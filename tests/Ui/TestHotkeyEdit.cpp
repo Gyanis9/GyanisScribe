@@ -15,7 +15,7 @@ TEST(HotkeyEditMapping, ModifierKeysAreNotHotkeyBodies)
 {
     for (const auto key: {Qt::Key_Control, Qt::Key_Shift, Qt::Key_Alt, Qt::Key_AltGr, Qt::Key_Meta, Qt::Key_CapsLock, Qt::Key_NumLock, Qt::Key_ScrollLock})
     {
-        EXPECT_FALSE(editableKeyFromEvent(key).has_value()) << static_cast<int>(key);
+        EXPECT_FALSE(editableKeyFromEvent(static_cast<int>(key)).has_value()) << static_cast<int>(key);
     }
 }
 
@@ -28,7 +28,9 @@ TEST(HotkeyEditMapping, KeypadDigitsNormalizeToTheMainRow)
 {
     // 小键盘数字在事件里是「数字键值 | KeypadModifier」，Qt6 把这个组合叫 QKeyCombination，
     // 这里按它的整数形态造出来，判据是归一之后回到主键盘那一枚键
-    const auto keypadFive = static_cast<Qt::Key>(static_cast<int>(Qt::KeypadModifier) | static_cast<int>(Qt::Key_5));
+    // 只当整数用：0x20000035 超出 Qt::Key 的取值范围，硬转成 Qt::Key 就是未定义行为
+    // （UBSan 在容器里报的正是这个「load of value ... not a valid value for type 'Key'」）
+    const int keypadFive = static_cast<int>(Qt::KeypadModifier) | static_cast<int>(Qt::Key_5);
 
     EXPECT_EQ(editableKeyFromEvent(Qt::Key_5), Qt::Key_5);
     EXPECT_EQ(editableKeyFromEvent(keypadFive), Qt::Key_5);

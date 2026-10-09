@@ -30,7 +30,7 @@ namespace GyanisScribe::Ui
      * @details 小键盘的数字要归到主键盘数字，否则同一颗键在两台机器上会存成两种写法；
      *          只按到 Ctrl 这类修饰键不是「录好了」，返回空让界面继续等真正的按键。
      */
-    [[nodiscard]] std::optional<Qt::Key> editableKeyFromEvent(Qt::Key key);
+    [[nodiscard]] std::optional<Qt::Key> editableKeyFromEvent(int keyCode);
 
     /**
      * @brief 快捷键录制框

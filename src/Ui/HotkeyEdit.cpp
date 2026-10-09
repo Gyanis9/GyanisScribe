@@ -11,10 +11,10 @@
 
 namespace GyanisScribe::Ui
 {
-    std::optional<Qt::Key> editableKeyFromEvent(const Qt::Key key)
+    std::optional<Qt::Key> editableKeyFromEvent(const int keyCode)
     {
         // 修饰键本身不是「按键本体」：只按到 Ctrl 时继续等下一个键，不能把半截组合写进配置
-        switch (key)
+        switch (keyCode)
         {
             case Qt::Key_Control:
             case Qt::Key_Shift:
@@ -29,16 +29,14 @@ namespace GyanisScribe::Ui
                 break;
         }
 
-        // 小键盘数字归到主键盘数字：同一颗键在两台机器上不该存成两种写法
-        if (key >= Qt::Key_0 && key <= Qt::Key_9)
+        // 小键盘数字归到主键盘数字：同一颗键在两台机器上不该存成两种写法。
+        // 摘位而不是相减：KeypadModifier 是一个位，减法在别的组合位上会算错
+        const auto unshifted = keyCode & ~Qt::KeypadModifier;
+        if (unshifted >= Qt::Key_0 && unshifted <= Qt::Key_9)
         {
-            return key;
+            return static_cast<Qt::Key>(unshifted);
         }
-        if (const auto shifted = static_cast<int>(key) - static_cast<int>(Qt::KeypadModifier); shifted >= static_cast<int>(Qt::Key_0) && shifted <= static_cast<int>(Qt::Key_9))
-        {
-            return static_cast<Qt::Key>(shifted);
-        }
-        return key;
+        return static_cast<Qt::Key>(keyCode);
     }
 
     HotkeyEdit::HotkeyEdit(Settings::ISettingsStore &settings, QWidget *parent) : QWidget(parent), m_settings(settings)
@@ -122,7 +120,7 @@ namespace GyanisScribe::Ui
             return;
         }
 
-        const auto key = editableKeyFromEvent(static_cast<Qt::Key>(event->key()));
+        const auto key = editableKeyFromEvent(event->key());
         if (!key)
         {
             // 只按到了修饰键：保持录制状态等真正的按键，别把 Ctrl 这种半截组合写进去
