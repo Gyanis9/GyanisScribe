@@ -1,5 +1,22 @@
-# Ui 这一层当前只有设计令牌（头文件里的常量），用接口目标把 include 路径发出去
-add_library(Ui INTERFACE)
+# Ui：设计令牌（纯常量）与图标供给器（要读 qrc 里的 SVG，所以是真目标文件）
+add_library(Ui STATIC
+        DesignTokens.h
+        IconProvider.h
+        IconProvider.cpp
+        ${CMAKE_SOURCE_DIR}/Resources/AppResources.qrc)
 
-target_include_directories(Ui INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/..)
-target_link_libraries(Ui INTERFACE Qt6::Gui)
+# qrc 由 AUTORCC 生成一个带静态初始化器的 .cpp；静态库里这份没人引用就会被链接器丢掉，
+# 于是运行时 :/icons 是空的，所以 IconProvider 构造时显式 Q_INIT_RESOURCE 一次
+set_target_properties(Ui PROPERTIES AUTORCC ON)
+
+target_include_directories(Ui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
+target_link_libraries(Ui PUBLIC
+        Core
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Widgets
+        Qt6::Svg)
+
+if (MSVC)
+    target_compile_options(Ui PRIVATE /W4 /WX)
+endif ()
