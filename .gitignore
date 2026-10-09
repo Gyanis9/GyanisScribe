@@ -1,0 +1,12 @@
+# 本机构建树：debug/release 预设各自的产物（含 Conan 的 generators 目录与 compile_commands.json），
+# cmake-build-* 是 CLion 直接生成 MSVC 工程的那一棵
+/build/
+/cmake-build-*/
+
+# CLion 的工程状态：workspace.xml、editor.xml 里带着本机 Qt 与工具链的绝对路径
+/.idea/
+
+# conan install 与 IDE 的 Conan 插件写在仓库根的接线文件：内容随本机 Conan 缓存位置和构建目录变化，
+# 换一台机器即失效，只由安装命令现场生成
+CMakeUserPresets.json
+generators/
