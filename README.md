@@ -1,8 +1,96 @@
 # GyanisScribe / 智录
 
-Windows 优先、可跨平台的桌面工具：截图、标注、贴图、取色、录屏、OCR。
-交互参考 Snipaste，但不使用其任何代码、图标、UI 资源或商标。
+Windows 优先、可跨平台的桌面工具：截图、标注、贴图、取色、录屏、文字识别。
+交互参考 Snipaste，但不使用其任何代码、图标、界面素材或商标。
 
-- **技术栈**：C++23 · Qt 6.11.1（Widgets）· CMake 4.3 · Conan 2 · MSVC，Linux 构建在 Docker Ubuntu 24.04 容器内验证
-- **当前状态**：工程骨架（CMake + Conan 空壳与一个 Hello world 窗口），功能尚未开始
+- **技术栈**：C++23 · Qt 6.11（Widgets/Svg/Network）· CMake ≥ 3.28 · Conan 2 · MSVC 2022；Linux 侧在 Docker Ubuntu 24.04 容器内构建与验证
+- **当前状态**：六大功能已可用；本机 debug 与 release 两档各 192 条用例全绿，容器 191 条
+  （差的那条是 Windows 专属的热键取值映射）；打包脚本产出绿色包 + 安装器
 - **需求与硬约束**：[docs/ProjectRequirements.md](docs/ProjectRequirements.md)
+
+## 热键与功能
+
+| 动作 | 默认组合 | 说明 |
+| --- | --- | --- |
+| 框选截图 | `Ctrl+Alt+A` | 截完进标注窗；工具八件，色板、线宽、字号、撤销重做、复制/保存/贴图/识别 |
+| 录屏 | `Ctrl+Alt+R` | 再按一次停止并编码；控制条显示状态、时长与 3-2-1 倒计时，可暂停、贴边、最小化到托盘 |
+| 文字识别 | `Ctrl+Alt+O` | 截完直接进结果窗口：左侧原图、右侧文本，点一行就在图上圈出那一行，可导出 TXT/JSON、换语言重认 |
+| 屏幕取色 | `Ctrl+Alt+P` | 全屏冻帧 + 9×9 放大镜，点一下把颜色按 HEX/RGB/HSL 复制走 |
+
+热键、保存目录、主题、识别语言与写法都在设置窗口里改，即时生效。托盘菜单是找不到窗口时的入口。
+
+## 在 Windows 上构建
+
+前置：Visual Studio 2022（MSVC）、CMake ≥ 3.28、Ninja、Conan 2、Qt 6.11（MSVC 套件，含 Svg/Network）、`ffmpeg`（仅录屏编码需要）。
+
+```bat
+set QTDIR=G:\Tools\Qt\6.11.1\msvc2022_64
+scripts\WindowsBuild.bat release
+build\release\bin\GyanisScribe.exe --selftest
+```
+
+`WindowsBuild.bat` 会自己调 `vcvars64`、按预设配置/编译并跑 `ctest`。预设两档：`debug`（识别走降级桩）与
+`release`（带 Tesseract 后端）。机器相关的路径只出现在这个脚本里，工程不写死绝对路径。
+
+打包（绿色目录 + zip + NSIS 安装器）：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\WindowsPackage.ps1
+```
+
+它会用 `windeployqt` 按可执行体的实际导入摆好 Qt 运行时，然后**在 staging 目录里跑一次 `--selftest`**——
+只有这样才能证明包是完整的，而不是"本机能跑"。产物在 `dist/`。
+
+## 在容器里构建（Linux 侧验证）
+
+```bash
+docker build -f Dockerfile.dev -t gyanisscribe-dev .
+docker run --rm -it -v "$PWD:/work" gyanisscribe-dev bash
+```
+
+容器内五件一键脚本（`scripts/container/`）：
+
+```bash
+scripts/container/init.sh          # 补包并体检工具链（幂等，可 SKIP_APT=1 只体检）
+scripts/container/build.sh debug   # 也支持 release / asan / tsan / coverage
+scripts/container/test.sh debug    # 有 Xvfb 就在虚拟屏下跑，界面用例才算真被跑到
+scripts/container/sanitize.sh      # ASan(+UBSan)；tsan 档另说，见下方边界
+scripts/container/coverage.sh 55   # gcovr 汇总，阈值不过就红（判定由 gcovr 的 --fail-under-line 做）
+```
+
+Linux 侧的已知边界：没有全局热键能力（登记会给出中文提示并降级）、无系统托盘时菜单改由主窗口提供、
+`Qt::ColorScheme` 要 6.8 才有而容器是 6.4（跟随系统会解算到兜底档）、**TSan 这一档在当前容器里跑不了**——
+这台内核（WSL2 6.18）下 libtsan 必须关 ASLR 才起得来进程，而 `setarch -R` 走的 `personality` 被 Docker 自带
+seccomp 档拒绝（实测 EPERM）。脚本会在建之前先探这一点并当场报红，不会把「没跑」当成「跑过」；
+要跑它得用 `docker run --security-opt seccomp=unconfined` 起容器。
+
+## 目录
+
+```
+src/Core        值类型、日志、目录 provider、图片等比适配几何
+src/Ui          设计令牌、主题、图标供给、Toast、快捷键输入框
+src/Platform    平台能力抽象（Windows / Linux 两套后端）
+src/Settings    配置读写与迁移       src/Hotkey    组合键解析与全局登记
+src/Capture     抓帧、选区、遮罩     src/Annotation 八个标注工具与标注窗
+src/Pin         贴图窗口与贴图管理   src/Record      录屏会话、帧时钟、ffmpeg 编码、控制条
+src/Ocr         预处理、后端选型、结果窗口与导出
+src/History     历史清单、保留策略、缩略图列表
+src/Pick        取色器：颜色写法与放大镜几何
+src/App         应用对象、核心控制器、托盘、主窗口、单实例、崩溃兜底
+tests/          逐级镜像 src 的目录结构
+```
+
+图标全部为原创 SVG（统一 24 视框、`currentColor`、1.5/2 描边），由 `IconProvider` 按主题着色；
+第三方组件与许可证见 [docs/ThirdPartyLicenses.md](docs/ThirdPartyLicenses.md)，
+识别后端与语言包的落地细节见 [docs/OcrBackends.md](docs/OcrBackends.md)。
+
+## 已知问题
+
+- 识别需要用户自备语言包（`eng.traineddata` 等）；缺语言包时功能明确报"不可用"并给出放置位置，
+  不会返回空结果冒充"这张图里没字"。
+- 录屏依赖外部 `ffmpeg`：不链接、不随包分发（避开 GPL 传染），没装就在编码那一步给出中文提示。
+- 安装器的"装完能起、卸载能清"这一步还没在真机上跑过 smoke test：脚本目前验证到
+  staging 目录自检通过 + 安装器带卸载段。
+- 界面文案尚未做中英文双版（需求第 380 行的一项），当前只有中文。
+- Debug 档不领 Tesseract：上游 leptonica 的 Debug 包库名与其 `cpp_info` 不一致，
+  `conanfile.py` 里按 `build_type` 分岔并写明撤除判据。
