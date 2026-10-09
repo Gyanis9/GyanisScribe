@@ -1,6 +1,12 @@
-# Ui：设计令牌（纯常量）与图标供给器（要读 qrc 里的 SVG，所以是真目标文件）
+# Ui：设计令牌（纯常量）、主题档位与管理器、图标供给器（要读 qrc，所以是真目标文件）
 add_library(Ui STATIC
         DesignTokens.h
+        ThemeKind.h
+        ThemeKind.cpp
+        ThemeManager.h
+        ThemeManager.cpp
+        AppResources.h
+        AppResources.cpp
         IconProvider.h
         IconProvider.cpp
         ${CMAKE_SOURCE_DIR}/Resources/AppResources.qrc)
@@ -12,6 +18,7 @@ set_target_properties(Ui PROPERTIES AUTORCC ON)
 target_include_directories(Ui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(Ui PUBLIC
         Core
+        Settings
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets

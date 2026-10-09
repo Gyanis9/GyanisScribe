@@ -57,4 +57,8 @@
     <file alias="Tray.svg">Icons/Tray.svg</file>
     <file alias="Undo.svg">Icons/Undo.svg</file>
   </qresource>
+  <qresource prefix="/styles">
+    <file alias="Light.qss">Styles/Light.qss</file>
+    <file alias="Dark.qss">Styles/Dark.qss</file>
+  </qresource>
 </RCC>

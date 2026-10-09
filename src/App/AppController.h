@@ -37,6 +37,12 @@ namespace GyanisScribe::Settings
     class SettingsStore;
 } // namespace GyanisScribe::Settings
 
+namespace GyanisScribe::Ui
+{
+    class IconProvider;
+    class ThemeManager;
+} // namespace GyanisScribe::Ui
+
 namespace GyanisScribe::App
 {
 
@@ -83,6 +89,18 @@ namespace GyanisScribe::App
          */
         [[nodiscard]] Settings::SettingsStore &settings() const noexcept;
 
+        /**
+         * @brief 主题管理器
+         * @return 控制器创建的那一个，界面从这里取当前生效的色板与图标描边色
+         */
+        [[nodiscard]] GyanisScribe::Ui::ThemeManager &theme() const noexcept;
+
+        /**
+         * @brief 图标供给器
+         * @return 全应用共用的那一个，描边色已跟着主题接好
+         */
+        [[nodiscard]] GyanisScribe::Ui::IconProvider &icons() const noexcept;
+
     private:
         /**
          * @brief 抓到一帧之后的收尾：交剪贴板并记日志
@@ -95,6 +113,8 @@ namespace GyanisScribe::App
         std::unique_ptr<Capture::IScreenCaptureSource>  m_captureSource; ///< 抓帧来源
         std::unique_ptr<Capture::CaptureService>        m_capture;       ///< 截图编排
         std::unique_ptr<Hotkey::HotkeyManager>          m_hotkeys;       ///< 热键登记与触发
+        std::unique_ptr<GyanisScribe::Ui::ThemeManager> m_theme;         ///< 主题档位与样式表
+        std::unique_ptr<GyanisScribe::Ui::IconProvider> m_icons;         ///< 图标供给器，描边色跟主题
     };
 
 } // namespace GyanisScribe::App

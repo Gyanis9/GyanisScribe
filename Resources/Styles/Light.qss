@@ -1,0 +1,225 @@
+/* Light 主题的界面样式表。
+   色值来自 src/Ui/DesignTokens.h 的同名语义字段，tests/Ui/TestThemeManager.cpp 逐色比对两边同解。
+   这里刻意不设 font-size：字号交给应用字体（尊重系统字体缩放），QSS 只管颜色、圆角与状态。 */
+
+QWidget {
+    background-color: #F3F4F6;
+    color: #1B1B1F;
+    border: 1px solid transparent;
+}
+
+QDialog {
+    background-color: #F3F4F6;
+    border-radius: 10px;
+}
+
+QGroupBox {
+    background-color: #FFFFFF;
+    border: 1px solid #C9CDD3;
+    border-radius: 8px;
+    margin-top: 12px;
+}
+
+QGroupBox::title {
+    color: #4A5058;
+    subcontrol-origin: margin;
+    left: 12px;
+    padding: 0 4px;
+}
+
+QPushButton {
+    background-color: #FFFFFF;
+    color: #1B1B1F;
+    border: 1px solid #C9CDD3;
+    border-radius: 6px;
+    padding: 4px 12px;
+}
+
+QPushButton:hover {
+    border-color: #007ACC;
+}
+
+QPushButton:pressed {
+    background-color: #BFDDF5;
+}
+
+QPushButton:focus {
+    border: 1px solid #007ACC;
+}
+
+QPushButton:disabled {
+    color: #4A5058;
+    background-color: #F3F4F6;
+}
+
+QPushButton:default {
+    background-color: #007ACC;
+    color: #FFFFFF;
+    border-color: #007ACC;
+}
+
+QToolButton {
+    background-color: transparent;
+    color: #1B1B1F;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 4px;
+}
+
+QToolButton:hover {
+    background-color: #BFDDF5;
+}
+
+QToolButton:checked {
+    background-color: #BFDDF5;
+    border-color: #007ACC;
+}
+
+QToolButton:focus {
+    border: 1px solid #007ACC;
+}
+
+QToolButton:disabled {
+    color: #4A5058;
+}
+
+QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {
+    background-color: #FFFFFF;
+    color: #1B1B1F;
+    border: 1px solid #C9CDD3;
+    border-radius: 6px;
+    padding: 4px 8px;
+    selection-background-color: #BFDDF5;
+    selection-color: #1B1B1F;
+}
+
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {
+    border: 1px solid #007ACC;
+}
+
+QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled {
+    color: #4A5058;
+    background-color: #F3F4F6;
+}
+
+QLineEdit:read-only {
+    color: #4A5058;
+    background-color: #F3F4F6;
+}
+
+QComboBox::drop-down {
+    border: none;
+    width: 24px;
+}
+
+QCheckBox::indicator, QRadioButton::indicator {
+    width: 16px;
+    height: 16px;
+    border: 1px solid #C9CDD3;
+    background-color: #FFFFFF;
+}
+
+QCheckBox::indicator {
+    border-radius: 6px;
+}
+
+QRadioButton::indicator {
+    border-radius: 8px;
+}
+
+QCheckBox::indicator:checked, QRadioButton::indicator:checked {
+    background-color: #007ACC;
+    border-color: #007ACC;
+}
+
+QCheckBox::indicator:focus, QRadioButton::indicator:focus {
+    border: 1px solid #007ACC;
+}
+
+QSlider::groove:horizontal {
+    height: 4px;
+    background-color: #C9CDD3;
+    border-radius: 4px;
+}
+
+QSlider::sub-page:horizontal {
+    background-color: #007ACC;
+    border-radius: 4px;
+}
+
+QSlider::handle:horizontal {
+    width: 16px;
+    height: 16px;
+    margin: -6px 0;
+    border-radius: 8px;
+    background-color: #FFFFFF;
+    border: 1px solid #007ACC;
+}
+
+QMenu {
+    background-color: #FFFFFF;
+    border: 1px solid #C9CDD3;
+    border-radius: 8px;
+}
+
+QMenu::item {
+    padding: 4px 24px 4px 12px;
+    border-radius: 6px;
+    color: #1B1B1F;
+}
+
+QMenu::item:selected {
+    background-color: #BFDDF5;
+    color: #1B1B1F;
+}
+
+QMenu::item:disabled {
+    color: #4A5058;
+}
+
+QToolTip {
+    background-color: #FFFFFF;
+    color: #1B1B1F;
+    border: 1px solid #C9CDD3;
+    border-radius: 6px;
+    padding: 4px 8px;
+}
+
+QListView, QTableView {
+    background-color: #FFFFFF;
+    alternate-background-color: #F3F4F6;
+    color: #1B1B1F;
+    border: 1px solid #C9CDD3;
+    border-radius: 8px;
+    selection-background-color: #BFDDF5;
+    selection-color: #1B1B1F;
+}
+
+QScrollBar:vertical {
+    background-color: #F3F4F6;
+    width: 8px;
+    margin: 0;
+}
+
+QScrollBar::handle:vertical {
+    background-color: #C9CDD3;
+    border-radius: 4px;
+    min-height: 24px;
+}
+
+QScrollBar:horizontal {
+    background-color: #F3F4F6;
+    height: 8px;
+    margin: 0;
+}
+
+QScrollBar::handle:horizontal {
+    background-color: #C9CDD3;
+    border-radius: 4px;
+    min-width: 24px;
+}
+
+QScrollBar::add-line, QScrollBar::sub-line {
+    height: 0;
+    width: 0;
+}

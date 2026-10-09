@@ -1,6 +1,7 @@
 #include "Ui/IconProvider.h"
 
 #include "Core/Logger.h"
+#include "Ui/AppResources.h"
 
 #include <QApplication>
 #include <QColor>
@@ -15,26 +16,11 @@
 #include <cmath>
 #include <format>
 #include <string>
-#include <tuple>
 
 namespace
 {
     /// 图标资源的前缀目录，路径规则只在这里出现一次，调用方只报文件名
     constexpr const char *kIconDirectory = ":/icons";
-
-    /**
-     * @brief 把 qrc 里的图标资源注册进当前进程
-     * @details 见 IconProvider 构造处的说明：这份初始化没有任何符号引用它，链接器会整份丢掉。
-     */
-    void ensureIconResourcesRegistered()
-    {
-        static const bool registered = []
-        {
-            Q_INIT_RESOURCE(AppResources);
-            return true;
-        }();
-        std::ignore = registered;
-    }
 
     /**
      * @brief 取要备到几倍缩放比的副本
@@ -57,7 +43,7 @@ namespace GyanisScribe::Ui
 {
     IconProvider::IconProvider()
     {
-        ensureIconResourcesRegistered();
+        ensureApplicationResourcesRegistered();
     }
 
     void IconProvider::setTintColor(const QColor &tintColor)
@@ -161,7 +147,7 @@ namespace GyanisScribe::Ui
     QStringList IconProvider::availableIconNames()
     {
         // 静态入口也要注册：调用方可能一个图标对象都没建就来列名单
-        ensureIconResourcesRegistered();
+        ensureApplicationResourcesRegistered();
 
         // 资源目录列出的就是 alias（带 .svg 后缀），去掉后缀才和调用方传进来的名字同形
         QStringList names;

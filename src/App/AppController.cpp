@@ -8,6 +8,8 @@
 #include "Hotkey/IHotkeyManager.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Settings/SettingsStore.h"
+#include "Ui/IconProvider.h"
+#include "Ui/ThemeManager.h"
 
 #include <QClipboard>
 #include <QGuiApplication>
@@ -23,6 +25,13 @@ namespace GyanisScribe::App
     {
         m_capture = std::make_unique<Capture::CaptureService>(*m_captureSource, *m_settings);
         m_hotkeys = std::make_unique<Hotkey::HotkeyManager>(*m_settings, *m_integration);
+
+        // 主题与图标：样式表落下去、图标描边色跟着走。这里挂一次连接，之后所有取图标的地方都不用再过问主题
+        m_theme = std::make_unique<Ui::ThemeManager>(*m_settings);
+        m_icons = std::make_unique<Ui::IconProvider>();
+        QObject::connect(m_theme.get(), &Ui::ThemeManager::themeChanged, this, [this] { m_icons->setTintColor(m_theme->iconTint()); });
+        // 第一次生效必然带一次通知（构造时解算位是「还没落过」的哨兵），描边色就在通知里落定
+        m_theme->applyFromSettings();
 
         // 热键 → 动作：唯一的接线处，界面加菜单项时也是发同一个信号而不是再走一条路径
         QObject::connect(m_hotkeys.get(), &Hotkey::IHotkeyManager::actionTriggered, this,
@@ -67,6 +76,16 @@ namespace GyanisScribe::App
     Settings::SettingsStore &AppController::settings() const noexcept
     {
         return *m_settings;
+    }
+
+    Ui::ThemeManager &AppController::theme() const noexcept
+    {
+        return *m_theme;
+    }
+
+    Ui::IconProvider &AppController::icons() const noexcept
+    {
+        return *m_icons;
     }
 
     void AppController::handleCaptured(const Core::CapturedImage &image)

@@ -12,6 +12,7 @@ target_link_libraries(App PUBLIC
         Hotkey
         Platform
         Settings
+        Ui
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets)

@@ -15,6 +15,9 @@ namespace GyanisScribe::Settings
     /// OCR 的全局热键文本，例如 Ctrl+Alt+O
     inline constexpr std::string_view kHotkeyOcr = "Hotkey/Ocr";
 
+    /// 主题档位，取值只能是 Light、Dark、System
+    inline constexpr std::string_view kThemeMode = "Theme/Mode";
+
     /// 上一次成功截图的选区，文本形如「x,y,width,height」；写方与读方都在 Capture 模块
     inline constexpr std::string_view kCaptureLastRegion = "Capture/LastRegion";
 

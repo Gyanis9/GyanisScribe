@@ -1,9 +1,11 @@
 add_executable(TestUi
-        TestIconProvider.cpp)
+        TestIconProvider.cpp
+        TestThemeManager.cpp)
 
 target_link_libraries(TestUi PRIVATE
         Ui
         Core
+        Settings
         GTest::gtest
         GTest::gtest_main)
 
