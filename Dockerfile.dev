@@ -1,0 +1,55 @@
+# 智录 GyanisScribe 的开发与验证容器（Ubuntu 24.04）
+#
+# 主机（Windows + MSVC）负责主力开发与最终打包；这个容器负责 Linux 侧的构建验证、
+# 核心逻辑单测、无界面 GUI 测试、Sanitizer 与覆盖率——需求第十三节的硬约束。
+#
+# 一键起容器并跑全套：
+#   docker build -f Dockerfile.dev -t gyanisscribe-dev .
+#   docker run --rm -it -v "$PWD:/work" gyanisscribe-dev bash -lc 'cd /work && scripts/container/init.sh && scripts/container/build.sh debug && scripts/container/test.sh debug'
+#
+# 已有的长期容器（名字 ubuntu24）也能直接复用：init.sh 是幂等的，缺什么补什么。
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 工具链按需求的硬指标选：GCC 13（C++23 的主力档）+ clang 18（另一份交叉核对）
+# + CMake 3.28（与 CMakePresets 的 version 6 / cmakeMinimumRequired 对齐）+ Ninja + Conan 2
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        g++-13 \
+        clang-18 \
+        cmake \
+        ninja-build \
+        git \
+        python3 \
+        python3-pip \
+        pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --no-cache-dir --break-system-packages conan==2.*
+
+# Qt 6：系统包（6.4 档）而不是 Conan 里的 qt——容器只验「跨平台抽象与核心逻辑有没有在 Linux
+# 上跑通」，主机那份 6.11 才是产品依赖。Svg 单独一包，缺它 IconProvider 会当场编不过。
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        qt6-base-dev \
+        qt6-base-dev-tools \
+        libqt6svg6 \
+        qt6-svg-dev \
+        libgl1-mesa-dev \
+        libxkbcommon-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# 无界面 GUI 测试与中文字体：xvfb-run 起虚拟屏；Noto Sans CJK 少了会让中文全变方框，
+# 那时「界面能起」的判据就成了假的
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        xvfb \
+        xauth \
+        fonts-noto-cjk \
+        lcov \
+        gcovr \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /work
+
+# 默认进来就是一句能用的 shell；具体步骤交给 scripts/container 下的一键脚本
+CMD ["bash"]

@@ -1,0 +1,16 @@
+# 跨平台构建的硬要求：容器里的 shell 脚本绝不能带 CRLF，否则 bash 会拿 \r 当命令的一部分。
+# 主机是 Windows 且 core.autocrlf=true，因此这里按类型钉死，不依赖每个人本地 git 配置。
+* text=auto
+
+*.sh  text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 构建产物与二进制不许被换行符转换碰
+*.png binary
+*.ico binary
+*.svg text eol=lf
+*.qrc text eol=lf
+*.qss text eol=lf
+
+# 生成的转储与日志不进版本库

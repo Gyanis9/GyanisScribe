@@ -27,6 +27,10 @@ endif ()
 add_custom_target(DeployQtRuntime ALL
         COMMENT "把 Qt 运行时副本刷进可执行体所在的目录")
 
+# Windows 才需要把 Qt 的 DLL 与平台插件摆到可执行体旁边：Linux 上 .so 由动态链接器按系统目录找，
+# 照抄这些拷贝命令会因为找不到 .dll 把构建判红，所以整个清单包在 WIN32 里。
+# 目标本身在两档都存在（各测试可执行体都 add_dependencies 到它），非 Windows 上它是个空操作。
+if (WIN32)
 add_custom_command(TARGET DeployQtRuntime POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory
         "$<TARGET_FILE_DIR:GyanisScribe>/plugins/platforms")
@@ -42,16 +46,27 @@ add_custom_command(TARGET DeployQtRuntime POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "$<TARGET_FILE_DIR:Qt6::Gui>/../plugins/platforms/qwindows${QT_DEBUG_SUFFIX}.dll"
         "$<TARGET_FILE_DIR:GyanisScribe>/plugins/platforms/")
+endif ()
 
-# WIN32 子系统：托盘类程序不该带控制台窗口；WinMain 由 Qt 的 EntryPoint 目标桥回 main()
-add_executable(GyanisScribe WIN32
-        App/Main.cpp)
+# WIN32 子系统：托盘类程序不该带控制台窗口；WinMain 由 Qt 的 EntryPoint 目标桥回 main()。
+# Linux 上没有这套：main() 就是入口，而 Ubuntu 那份 Qt6 也不提供 EntryPointPrivate 这个目标，
+# 照抄会在 generate 期报「target was not found」——这一条是容器里真跑出来的，不是推测
+if (WIN32)
+    add_executable(GyanisScribe WIN32
+            App/Main.cpp)
+else ()
+    add_executable(GyanisScribe
+            App/Main.cpp)
+endif ()
 
 target_link_libraries(GyanisScribe PRIVATE
         App
         Core
-        Qt6::EntryPointPrivate
         Qt6::Widgets)
+
+if (WIN32)
+    target_link_libraries(GyanisScribe PRIVATE Qt6::EntryPointPrivate)
+endif ()
 
 if (MSVC)
     target_compile_options(GyanisScribe PRIVATE /W4 /WX)
