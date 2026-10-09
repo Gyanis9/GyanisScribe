@@ -1,0 +1,396 @@
+#include "Annotation/AnnotationEngine.h"
+
+#include "Annotation/ArrowTool.h"
+#include "Annotation/EllipseTool.h"
+#include "Annotation/HighlightTool.h"
+#include "Annotation/MosaicTool.h"
+#include "Annotation/NumberTool.h"
+#include "Annotation/PenTool.h"
+#include "Annotation/RectangleTool.h"
+#include "Annotation/TextTool.h"
+
+#include <QImage>
+#include <QUndoCommand>
+
+#include <format>
+
+namespace GyanisScribe::Annotation
+{
+    namespace
+    {
+        /**
+         * @brief 插入一条图形
+         * @details 撤销栈里的三条命令都只碰工具的存储接口，不碰交互态：
+         *          撤销不该把在途图形也带回来。
+         */
+        class InsertShapeCommand : public QUndoCommand
+        {
+        public:
+            InsertShapeCommand(AnnotationTool *tool, int index, const AnnotationShape &shape, QUndoCommand *parent = nullptr) :
+                QUndoCommand(parent), m_tool(tool), m_index(index), m_shape(shape)
+            {
+            }
+
+            void redo() override
+            {
+                m_tool->insertShape(m_index, m_shape);
+            }
+
+            void undo() override
+            {
+                static_cast<void>(m_tool->takeShapeAt(m_index));
+            }
+
+        private:
+            AnnotationTool *m_tool;  ///< 目标工具，所有权在引擎
+            int             m_index; ///< 插入位置
+            AnnotationShape m_shape; ///< 图形内容
+        };
+
+        /**
+         * @brief 取走一条图形（删除）
+         * @details 撤销时按原索引把内容放回去，索引与内容成对存下来才谈得上原样还原。
+         */
+        class RemoveShapeCommand : public QUndoCommand
+        {
+        public:
+            RemoveShapeCommand(AnnotationTool *tool, int index, const AnnotationShape &shape, QUndoCommand *parent = nullptr) :
+                QUndoCommand(parent), m_tool(tool), m_index(index), m_shape(shape)
+            {
+            }
+
+            void redo() override
+            {
+                static_cast<void>(m_tool->takeShapeAt(m_index));
+            }
+
+            void undo() override
+            {
+                m_tool->insertShape(m_index, m_shape);
+            }
+
+        private:
+            AnnotationTool *m_tool;  ///< 目标工具
+            int             m_index; ///< 取走的位置
+            AnnotationShape m_shape; ///< 被取走的图形，撤销时要原样放回去
+        };
+
+        /**
+         * @brief 平移一条图形
+         * @details 撤销用等量反向位移：记下位移本身，而不是记下移动前后的两个位置。
+         */
+        class MoveShapeCommand : public QUndoCommand
+        {
+        public:
+            MoveShapeCommand(AnnotationTool *tool, int index, const QPoint &delta, QUndoCommand *parent = nullptr) :
+                QUndoCommand(parent), m_tool(tool), m_index(index), m_delta(delta)
+            {
+            }
+
+            void redo() override
+            {
+                static_cast<void>(m_tool->translateShapeBy(m_index, m_delta));
+            }
+
+            void undo() override
+            {
+                static_cast<void>(m_tool->translateShapeBy(m_index, -m_delta));
+            }
+
+        private:
+            AnnotationTool *m_tool;  ///< 目标工具
+            int             m_index; ///< 图形索引
+            QPoint          m_delta; ///< 位移量
+        };
+
+    } // namespace
+
+    AnnotationEngine::AnnotationEngine(QObject *parent) : IAnnotationEngine(parent)
+    {
+        m_tools.push_back(std::make_unique<RectangleTool>());
+        m_tools.push_back(std::make_unique<EllipseTool>());
+        m_tools.push_back(std::make_unique<ArrowTool>());
+        m_tools.push_back(std::make_unique<PenTool>());
+        m_tools.push_back(std::make_unique<HighlightTool>());
+        m_tools.push_back(std::make_unique<MosaicTool>());
+        m_tools.push_back(std::make_unique<TextTool>());
+        m_tools.push_back(std::make_unique<NumberTool>());
+
+        // 参数一次下发：切工具后笔还保持用户调过的那个粗细，才不会出现「换工具就得重调」
+        for (const auto &tool: m_tools)
+        {
+            tool->setPenColor(m_color);
+            tool->setLineWidth(m_lineWidth);
+            tool->setFontSize(m_fontSize);
+        }
+
+        QObject::connect(&m_undoStack, &QUndoStack::indexChanged, this, [this] { emit canvasChanged(); });
+    }
+
+    AnnotationEngine::~AnnotationEngine() = default;
+
+    void AnnotationEngine::loadCanvas(Core::CapturedImage image)
+    {
+        m_canvas = std::move(image);
+
+        // 换画布等于换一张纸：旧图形既不在新帧上，撤销回去也只会把用户引到错的地方
+        m_undoStack.clear();
+        m_selection.reset();
+        for (const auto &tool: m_tools)
+        {
+            while (tool->shapeCount() > 0)
+            {
+                static_cast<void>(tool->takeShapeAt(0));
+            }
+        }
+        emit canvasChanged();
+    }
+
+    const Core::CapturedImage &AnnotationEngine::canvas() const noexcept
+    {
+        return m_canvas;
+    }
+
+    QImage AnnotationEngine::exportImage() const
+    {
+        if (m_canvas.image.isNull())
+        {
+            return {};
+        }
+
+        QImage result = m_canvas.image.copy();
+        // 倍比由「物理宽 ÷ 逻辑宽」现算：拿屏幕的 devicePixelRatio 会在缩放窗口后与画布对不上
+        const qreal pixelScale = m_canvas.logicalSize.width() > 0 ? static_cast<qreal>(result.width()) / m_canvas.logicalSize.width() : 1.0;
+
+        // 源图取导出前那份底图：烘图过程中 result 在被改，马赛克要的始终是原始像素
+        const PaintContext bakeContext{m_canvas.image, pixelScale};
+        for (const auto &tool: m_tools)
+        {
+            tool->applyToImage(result, bakeContext);
+        }
+        return result;
+    }
+
+    Core::Expected<void> AnnotationEngine::setActiveTool(ToolKind kind)
+    {
+        auto *target = toolFor(kind);
+        if (target == nullptr)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, std::format("工具种类 0x{:X} 没有对应的工具：请把新工具登记进构造列表", static_cast<int>(kind))});
+        }
+
+        for (const auto &tool: m_tools)
+        {
+            tool->setActive(tool.get() == target);
+        }
+        m_activeTool = kind;
+        return {};
+    }
+
+    ToolKind AnnotationEngine::activeTool() const noexcept
+    {
+        return m_activeTool;
+    }
+
+    Core::Expected<void> AnnotationEngine::setPenParameters(const QColor &color, int lineWidth, int fontSize)
+    {
+        if (lineWidth <= 0)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, std::format("线宽必须是正数，收到的是 {}。请取 1 到 50 之间的整数", lineWidth)});
+        }
+        if (fontSize <= 0)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, std::format("字号必须是正数，收到的是 {}。请取 8 到 72 之间的整数", fontSize)});
+        }
+
+        m_color     = color;
+        m_lineWidth = lineWidth;
+        m_fontSize  = fontSize;
+        for (const auto &tool: m_tools)
+        {
+            tool->setPenColor(color);
+            tool->setLineWidth(lineWidth);
+            tool->setFontSize(fontSize);
+        }
+        return {};
+    }
+
+    void AnnotationEngine::beginStroke(const QPoint &point)
+    {
+        if (auto *tool = toolFor(m_activeTool); tool != nullptr)
+        {
+            tool->begin(point);
+        }
+    }
+
+    void AnnotationEngine::moveStroke(const QPoint &point)
+    {
+        if (auto *tool = toolFor(m_activeTool); tool != nullptr)
+        {
+            tool->update(point);
+        }
+    }
+
+    Core::Expected<AnnotationSelection> AnnotationEngine::endStroke()
+    {
+        auto *tool = toolFor(m_activeTool);
+        if (tool == nullptr)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InternalError, "当前工具种类没有对应的工具实现，请检查 setActiveTool 与构造列表"});
+        }
+
+        const int  index     = tool->shapeCount();
+        const auto committed = tool->end();
+        if (!committed)
+        {
+            return std::unexpected(
+                    Core::Error{Core::ErrorCode::InvalidArgument, QStringLiteral("这一笔没有落定：尺寸太小或内容为空。请按住鼠标拖出可见的范围后再松手").toStdString()});
+        }
+
+        m_undoStack.push(new InsertShapeCommand(tool, index, *committed));
+        return AnnotationSelection{m_activeTool, index};
+    }
+
+    Core::Expected<void> AnnotationEngine::setPendingText(const QString &text)
+    {
+        auto *tool = toolFor(ToolKind::Text);
+        if (tool == nullptr)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InternalError, "文字工具不在册"});
+        }
+        if (m_activeTool != ToolKind::Text)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, QStringLiteral("只有文字工具在用时才需要设定文本内容。请先切到文字工具再输入").toStdString()});
+        }
+
+        static_cast<TextTool *>(tool)->setPendingText(text);
+        return {};
+    }
+
+    std::optional<AnnotationSelection> AnnotationEngine::selectionAt(const QPoint &point) const
+    {
+        // 倒序遍历：后登记的工具压在上面，用户点的就是看得见的那一条
+        for (int index = static_cast<int>(m_tools.size()) - 1; index >= 0; --index)
+        {
+            const auto &tool = m_tools[index];
+            const auto  hit  = tool->hitTest(point);
+            if (hit >= 0)
+            {
+                return AnnotationSelection{tool->kind(), hit};
+            }
+        }
+        return std::nullopt;
+    }
+
+    Core::Expected<void> AnnotationEngine::select(const AnnotationSelection &selection)
+    {
+        auto *tool = toolFor(selection.tool);
+        if (tool == nullptr || selection.shapeIndex < 0 || selection.shapeIndex >= tool->shapeCount())
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
+                                               std::format("要选中的图形不在册：工具 0x{:X} 索引 {}。请重新点选", static_cast<int>(selection.tool), selection.shapeIndex)});
+        }
+
+        m_selection = selection;
+        emit canvasChanged();
+        return {};
+    }
+
+    void AnnotationEngine::clearSelection()
+    {
+        m_selection.reset();
+        emit canvasChanged();
+    }
+
+    const std::optional<AnnotationSelection> &AnnotationEngine::selection() const noexcept
+    {
+        return m_selection;
+    }
+
+    Core::Expected<void> AnnotationEngine::moveSelectionBy(const QPoint &delta)
+    {
+        if (!m_selection)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, "没有选中任何图形，无法移动。请先点中要移动的那一条"});
+        }
+
+        auto *tool = toolFor(m_selection->tool);
+        if (tool == nullptr || m_selection->shapeIndex >= tool->shapeCount())
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, "选中的图形已经不在了（多半刚被撤销或删除）。请重新点选"});
+        }
+
+        m_undoStack.push(new MoveShapeCommand(tool, m_selection->shapeIndex, delta));
+        return {};
+    }
+
+    Core::Expected<void> AnnotationEngine::removeSelection()
+    {
+        if (!m_selection)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, "没有选中任何图形，无需删除。请先点中要删的那一条"});
+        }
+
+        auto *tool = toolFor(m_selection->tool);
+        if (tool == nullptr || m_selection->shapeIndex >= tool->shapeCount())
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, "选中的图形已经不在了。请重新点选"});
+        }
+
+        const AnnotationShape removed = tool->shapeAt(m_selection->shapeIndex);
+        m_undoStack.push(new RemoveShapeCommand(tool, m_selection->shapeIndex, removed));
+        m_selection.reset();
+        return {};
+    }
+
+    bool AnnotationEngine::canUndo() const
+    {
+        return m_undoStack.canUndo();
+    }
+
+    bool AnnotationEngine::canRedo() const
+    {
+        return m_undoStack.canRedo();
+    }
+
+    Core::Expected<void> AnnotationEngine::undo()
+    {
+        if (!m_undoStack.canUndo())
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, "没有可撤销的标注动作了"});
+        }
+        m_undoStack.undo();
+        // 撤销可能把选中的那条抹掉：索引失效就丢掉选中，别让后续操作打到别的图形上
+        if (m_selection)
+        {
+            if (const auto resolved = toolFor(m_selection->tool); resolved == nullptr || m_selection->shapeIndex >= resolved->shapeCount())
+            {
+                m_selection.reset();
+            }
+        }
+        return {};
+    }
+
+    Core::Expected<void> AnnotationEngine::redo()
+    {
+        if (!m_undoStack.canRedo())
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, "没有可重做的标注动作了"});
+        }
+        m_undoStack.redo();
+        return {};
+    }
+
+    AnnotationTool *AnnotationEngine::toolFor(ToolKind kind) const noexcept
+    {
+        for (const auto &tool: m_tools)
+        {
+            if (tool->kind() == kind)
+            {
+                return tool.get();
+            }
+        }
+        return nullptr;
+    }
+
+} // namespace GyanisScribe::Annotation
