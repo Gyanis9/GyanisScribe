@@ -27,4 +27,10 @@ namespace GyanisScribe::Settings
     /// 贴图的布局记录（JSON 数组文本），重启后按它恢复摆位、缩放、旋转与透明度
     inline constexpr std::string_view kPinLayout = "Pin/Layout";
 
+    /// OCR 语言标签，取值见 Ocr::supportedOcrLanguageTags()
+    inline constexpr std::string_view kOcrLanguage = "Ocr/Language";
+
+    /// OCR 语言包（tessdata）目录；为空时按环境变量与程序数据目录找
+    inline constexpr std::string_view kOcrTessDataDirectory = "Ocr/TessDataDirectory";
+
 } // namespace GyanisScribe::Settings
