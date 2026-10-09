@@ -3,3 +3,4 @@
 find_package(GTest REQUIRED CONFIG)
 
 add_subdirectory(Core)
+add_subdirectory(Settings)

@@ -1,5 +1,6 @@
 # src 汇总层：各模块先建成自己的库，这里只做「可执行体 + 运行目录接线」，不重复声明依赖
 add_subdirectory(Core)
+add_subdirectory(Settings)
 add_subdirectory(App)
 
 # Debug 档的 Qt DLL 带 d 后缀，Release 不带；这条后缀只在 MSVC + Debug 下成立
