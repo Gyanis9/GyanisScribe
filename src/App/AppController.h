@@ -38,6 +38,13 @@ namespace GyanisScribe::Pin
     class PinManager;
 } // namespace GyanisScribe::Pin
 
+namespace GyanisScribe::Record
+{
+    class FfmpegRecordingEncoder;
+    struct RecorderConfig;
+    class RecordingService;
+} // namespace GyanisScribe::Record
+
 namespace GyanisScribe::Hotkey
 {
     class HotkeyManager;
@@ -100,6 +107,13 @@ namespace GyanisScribe::App
         void startCapture();
 
         /**
+         * @brief 录屏热键：没在录就开始整屏录，正在录就停下并编码
+         * @details 独立的录屏界面还没做，先做成一个开关：再按一次就是「停止并保存」，
+         *          用户不必在屏幕另一头找停止按钮。
+         */
+        void toggleRecording();
+
+        /**
          * @brief 配置存储，供设置页与后续模块取用
          * @return 本控制器持有的那一份，所有权不在调用方
          */
@@ -127,6 +141,15 @@ namespace GyanisScribe::App
 
         /// 标注窗请求复制
         void handleCopyRequested(const QImage &image);
+
+        /// 拼这一轮录屏的参数：屏幕名与输出目录都从这里取
+        [[nodiscard]] Core::Expected<Record::RecorderConfig> makeRecordingConfig() const;
+
+        /// 录屏结束：把成品路径落到日志
+        void handleRecordingFinished(const QString &outputPath);
+
+        /// 录屏中止：把原因落到日志
+        void handleRecordingFailed(const QString &reason);
         /// 标注窗请求存文件
         void handleSaveRequested(const QImage &image);
         /// 标注窗请求贴图
@@ -145,6 +168,8 @@ namespace GyanisScribe::App
         std::unique_ptr<Annotation::AnnotationWindow>   m_annotationWindow; ///< 标注窗口，复用同一把工具栏
         std::unique_ptr<Pin::PinManager>                m_pins;             ///< 贴图管理器
         std::unique_ptr<Ocr::IOcrEngine>                m_ocr;              ///< 识别后端，按设置与平台能力选一次
+        std::unique_ptr<Record::FfmpegRecordingEncoder> m_recorder;         ///< 录屏的编码步
+        std::unique_ptr<Record::RecordingService>       m_recording;        ///< 录屏服务，一轮一个会话
         Core::CapturedImage                             m_lastCapture;      ///< 本轮抓到的帧，贴图与识别要用它定位
         QRect                                           m_lastSelection;    ///< 本轮选区（全局逻辑坐标），标注窗与贴图的位置来源
     };

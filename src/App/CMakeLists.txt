@@ -14,6 +14,7 @@ target_link_libraries(App PUBLIC
         Ocr
         Pin
         Platform
+        Record
         Settings
         Ui
         Qt6::Core

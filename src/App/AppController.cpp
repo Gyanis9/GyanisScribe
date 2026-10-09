@@ -16,6 +16,8 @@
 #include "Ocr/OcrTypes.h"
 #include "Pin/PinManager.h"
 #include "Platform/IPlatformIntegration.h"
+#include "Record/FfmpegRecordingEncoder.h"
+#include "Record/RecordingService.h"
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
 #include "Ui/IconProvider.h"
@@ -83,7 +85,7 @@ namespace GyanisScribe::App
                                      startCapture();
                                      return;
                                  case Hotkey::HotkeyAction::Record:
-                                     Core::Logger::info("录屏热键已按下，但录屏模块还没接进来");
+                                     toggleRecording();
                                      return;
                                  case Hotkey::HotkeyAction::Ocr:
                                      // 识别入口需要一张图：没有选区时先框选，再走标注窗的「识别文字」
@@ -107,6 +109,12 @@ namespace GyanisScribe::App
         QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::saveRequested, this, &AppController::handleSaveRequested);
         QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::pinRequested, this, &AppController::handlePinRequested);
         QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::ocrRequested, this, &AppController::handleOcrRequested);
+
+        // 录屏：编码器与服务各一个，热键再按一次就是「停止并编码」
+        m_recorder  = std::make_unique<Record::FfmpegRecordingEncoder>();
+        m_recording = std::make_unique<Record::RecordingService>(*m_captureSource, *m_recorder);
+        QObject::connect(m_recording.get(), &Record::RecordingService::finished, this, &AppController::handleRecordingFinished);
+        QObject::connect(m_recording.get(), &Record::RecordingService::failed, this, &AppController::handleRecordingFailed);
     }
 
     AppController::~AppController() = default;
@@ -221,6 +229,57 @@ namespace GyanisScribe::App
         // 结果对话框还没落地，先交剪贴板：这一步让「识别」这个动作对用户是可用的而不是一个按钮
         QGuiApplication::clipboard()->setText(result->text());
         Core::Logger::info(std::format("文字识别完成：{} 行，已交剪贴板", result->lines.size()));
+    }
+
+    Core::Expected<Record::RecorderConfig> AppController::makeRecordingConfig() const
+    {
+        auto *screen = QGuiApplication::primaryScreen();
+        if (screen == nullptr)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::ScreenUnavailable, "当前没有可用屏幕，录屏没法开始。请接回显示器后重试"});
+        }
+
+        Record::RecorderConfig config;
+        config.screenName      = screen->name();
+        const auto configured  = m_settings->stringValue(Settings::kPathRecording, QString());
+        config.outputDirectory = configured.isEmpty() ? Core::Paths::defaultRecordingDirectory() : std::filesystem::path{configured.toStdString()};
+        return config;
+    }
+
+    void AppController::toggleRecording()
+    {
+        const auto state = m_recording->state();
+        if (state == Record::RecordingState::Idle || state == Record::RecordingState::Done || state == Record::RecordingState::Failed)
+        {
+            const auto config = makeRecordingConfig();
+            if (!config)
+            {
+                Core::Logger::error(std::format("录屏没能开始：{}", config.error().message));
+                return;
+            }
+            if (auto started = m_recording->start(*config); !started)
+            {
+                Core::Logger::error(std::format("录屏没能开始：{}", started.error().message));
+            }
+            return;
+        }
+
+        // 还在录或还在倒计时/暂停：这一按是「停止并保存」，编码要等一会儿，先记一条让用户知道在忙
+        Core::Logger::info("录屏停止中，正在编码成品");
+        if (auto stopped = m_recording->stop(); !stopped)
+        {
+            Core::Logger::error(std::format("录屏收尾失败：{}", stopped.error().message));
+        }
+    }
+
+    void AppController::handleRecordingFinished(const QString &outputPath)
+    {
+        Core::Logger::info(std::format("录屏成品：{}", outputPath.toStdString()));
+    }
+
+    void AppController::handleRecordingFailed(const QString &reason)
+    {
+        Core::Logger::error(std::format("录屏中止：{}", reason.toStdString()));
     }
 
 } // namespace GyanisScribe::App

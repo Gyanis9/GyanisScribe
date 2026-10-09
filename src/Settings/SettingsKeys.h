@@ -27,6 +27,9 @@ namespace GyanisScribe::Settings
     /// 贴图保存的默认目录，为空时用系统图片目录下的 GyanisScribe
     inline constexpr std::string_view kPathScreenshot = "Paths/Screenshot";
 
+    /// 录屏成品的默认保存目录
+    inline constexpr std::string_view kPathRecording = "Paths/Recording";
+
     /// 贴图的布局记录（JSON 数组文本），重启后按它恢复摆位、缩放、旋转与透明度
     inline constexpr std::string_view kPinLayout = "Pin/Layout";
 
