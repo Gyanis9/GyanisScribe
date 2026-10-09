@@ -15,6 +15,7 @@
 #include "Ocr/OcrEngineFactory.h"
 #include "Ocr/OcrTypes.h"
 #include "Pin/PinManager.h"
+#include "App/TrayController.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Record/FfmpegRecordingEncoder.h"
 #include "Record/RecordingService.h"
@@ -24,6 +25,7 @@
 #include "Ui/ThemeManager.h"
 
 #include <QClipboard>
+#include <QCoreApplication>
 #include <QDateTime>
 #include <QGuiApplication>
 #include <QImage>
@@ -70,9 +72,14 @@ namespace GyanisScribe::App
         m_theme->applyFromSettings();
 
         // 标注一套：引擎跨轮次复用（载入新帧自己会清空历史），窗口与工具栏也只建一次
-        m_annotation       = std::make_unique<Annotation::AnnotationEngine>();
-        m_pins             = std::make_unique<Pin::PinManager>(*m_settings, *m_integration);
-        m_ocr              = Ocr::createOcrEngine(*m_settings, *m_integration);
+        m_annotation = std::make_unique<Annotation::AnnotationEngine>();
+        m_pins       = std::make_unique<Pin::PinManager>(*m_settings, *m_integration);
+        m_ocr        = Ocr::createOcrEngine(*m_settings, *m_integration);
+        m_tray       = std::make_unique<TrayController>(*m_icons, *m_theme, *m_settings);
+        m_mainWindow = std::make_unique<MainWindow>(*m_settings, *m_theme, *m_icons);
+        QObject::connect(m_tray.get(), &TrayController::actionRequested, this, &AppController::handleTrayAction);
+        // 没有托盘的桌面环境（容器、精简安装）照样能跑：只是少一个入口，主窗口仍然可用
+        m_tray->install();
         m_annotationWindow = std::make_unique<Annotation::AnnotationWindow>(*m_annotation, std::make_unique<Annotation::AnnotationToolbar>(*m_icons));
 
         // 热键 → 动作：唯一的接线处，界面加菜单项时也是发同一个信号而不是再走一条路径
@@ -124,9 +131,60 @@ namespace GyanisScribe::App
         return m_hotkeys->reload();
     }
 
-    void AppController::startCapture()
+    void AppController::startCapture(const CaptureIntent intent)
     {
+        m_captureIntent = intent;
         m_capture->startInteractive();
+    }
+
+    void AppController::startFullScreenCapture(const CaptureIntent intent)
+    {
+        m_captureIntent = intent;
+        m_capture->captureFullScreen();
+    }
+
+    void AppController::startLastRegionCapture(const CaptureIntent intent)
+    {
+        m_captureIntent = intent;
+        m_capture->captureLastRegion();
+    }
+
+    void AppController::openMainWindow(const MainWindowPage page)
+    {
+        m_mainWindow->open(page);
+    }
+
+    void AppController::handleTrayAction(const TrayAction action)
+    {
+        switch (action)
+        {
+            case TrayAction::CaptureRegion:
+                startCapture();
+                return;
+            case TrayAction::CaptureFullScreen:
+                startFullScreenCapture();
+                return;
+            case TrayAction::CaptureLastRegion:
+                startLastRegionCapture();
+                return;
+            case TrayAction::ToggleRecord:
+                toggleRecording();
+                return;
+            case TrayAction::Recognize:
+                // 识别入口先框选：没有一张图，后端无事可做
+                startCapture(CaptureIntent::Recognize);
+                return;
+            case TrayAction::OpenSettings:
+                openMainWindow(MainWindowPage::Settings);
+                return;
+            case TrayAction::OpenAbout:
+                openMainWindow(MainWindowPage::About);
+                return;
+            case TrayAction::Quit:
+                // 退出交给事件循环：托盘图标随对象析构消失，这里不自己 quit 以免绕开析构里的日志冲刷
+                QCoreApplication::exit(0);
+                return;
+        }
     }
 
     Settings::SettingsStore &AppController::settings() const noexcept
@@ -166,6 +224,13 @@ namespace GyanisScribe::App
             selection = QRect{parsed->topLeft() + screen->geometry().topLeft(), parsed->size()};
         }
         m_lastSelection = selection;
+
+        if (m_captureIntent == CaptureIntent::Recognize)
+        {
+            // 识别这条不弹标注窗：用户点的是「识别文字」，先弹一个要再点一次的界面就是多一跳
+            handleOcrRequested(image.image);
+            return;
+        }
 
         m_annotationWindow->startAnnotation(image, screen->availableGeometry(), selection);
     }

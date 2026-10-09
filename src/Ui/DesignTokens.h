@@ -53,7 +53,8 @@ namespace GyanisScribe::Ui
      * @brief 一套主题的全部语义色
      * @details 绘制代码只认识这里的角色名，不认识具体十六进制；界面样式（Light.qss / Dark.qss）
      *          用同一批色值写规则，用例逐条比对两边同解，色值因此只可能有一处真源。
-     *          每个字段都必须有真实消费方，除 icon 由 IconProvider 取用外，其余都进 QSS。
+     *          每个字段都必须有真实消费方：icon 由 IconProvider 取用，success 与 danger 由 Toast 取用，
+     *          其余都进 QSS（这三者都不在 QSS 里，用例按这张名单核对）。
      */
     struct ThemePalette
     {
@@ -66,6 +67,8 @@ namespace GyanisScribe::Ui
         QColor onAccent;         ///< 压在主色上的文字色
         QColor selection;        ///< 文本选区底色，正文色压在其上仍要读得出
         QColor icon;             ///< 图标描边色，替换 SVG 里的 currentColor
+        QColor success;          ///< 成功语义色，Toast 与状态文字用
+        QColor danger;           ///< 危险语义色，出错提示与删除类动作的强调色
     };
 
     /// 浅色主题的语义色
@@ -79,6 +82,8 @@ namespace GyanisScribe::Ui
             QColor{255, 255, 255}, // onAccent
             QColor{191, 221, 245}, // selection
             QColor{58, 63, 69},    // icon
+            QColor{21, 122, 66},   // success
+            QColor{179, 38, 30},   // danger
     };
 
     /// 深色主题的语义色：主色与浅色共用，只把底色、文字与选区翻过来
@@ -92,6 +97,8 @@ namespace GyanisScribe::Ui
             QColor{255, 255, 255}, // onAccent
             QColor{30, 74, 104},   // selection
             QColor{212, 215, 219}, // icon
+            QColor{87, 199, 130},  // success
+            QColor{242, 85, 90},   // danger
     };
 
     /**

@@ -10,6 +10,7 @@
     <file alias="CaptureLastRegion.svg">Icons/CaptureLastRegion.svg</file>
     <file alias="CaptureRegion.svg">Icons/CaptureRegion.svg</file>
     <file alias="CaptureWindow.svg">Icons/CaptureWindow.svg</file>
+    <file alias="Check.svg">Icons/Check.svg</file>
     <file alias="Close.svg">Icons/Close.svg</file>
     <file alias="ColorPicker.svg">Icons/ColorPicker.svg</file>
     <file alias="Copy.svg">Icons/Copy.svg</file>
@@ -20,6 +21,7 @@
     <file alias="Highlight.svg">Icons/Highlight.svg</file>
     <file alias="History.svg">Icons/History.svg</file>
     <file alias="Hotkey.svg">Icons/Hotkey.svg</file>
+    <file alias="Info.svg">Icons/Info.svg</file>
     <file alias="Microphone.svg">Icons/Microphone.svg</file>
     <file alias="Mosaic.svg">Icons/Mosaic.svg</file>
     <file alias="Number.svg">Icons/Number.svg</file>
@@ -56,6 +58,7 @@
     <file alias="ThemeSystem.svg">Icons/ThemeSystem.svg</file>
     <file alias="Tray.svg">Icons/Tray.svg</file>
     <file alias="Undo.svg">Icons/Undo.svg</file>
+    <file alias="Warning.svg">Icons/Warning.svg</file>
   </qresource>
   <qresource prefix="/styles">
     <file alias="Light.qss">Styles/Light.qss</file>

@@ -3,7 +3,11 @@ add_library(App STATIC
         Application.h
         Application.cpp
         AppController.h
-        AppController.cpp)
+        AppController.cpp
+        MainWindow.h
+        MainWindow.cpp
+        TrayController.h
+        TrayController.cpp)
 
 target_include_directories(App PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(App PUBLIC

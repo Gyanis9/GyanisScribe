@@ -1,6 +1,8 @@
 add_executable(TestUi
         TestIconProvider.cpp
-        TestThemeManager.cpp)
+        TestThemeManager.cpp
+        TestHotkeyEdit.cpp
+        TestToast.cpp)
 
 target_link_libraries(TestUi PRIVATE
         Ui

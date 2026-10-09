@@ -312,6 +312,8 @@ TEST_F(ThemeManagerFixture, StyleSheetsAndPalettesAgreeInBothDirections)
         const auto palette = paletteFor(kind);
         ASSERT_FALSE(sheet.isEmpty()) << resource;
 
+        // 只列该进样式表的八个角色：icon/success/danger 是给绘制代码用的（图标描边、Toast 语义色），
+        // 出现在 QSS 里反而是问题，下面单独反着断言
         const std::array paletteColors = {palette.windowBackground, palette.surface, palette.text,     palette.secondaryText,
                                           palette.border,           palette.accent,  palette.onAccent, palette.selection};
 
@@ -329,8 +331,12 @@ TEST_F(ThemeManagerFixture, StyleSheetsAndPalettesAgreeInBothDirections)
             EXPECT_NE(sheet.indexOf(hexOf(color)), -1) << resource << " 没用出色板里的 " << hexOf(color).toStdString();
         }
 
-        // icon 色反过来不该出现在 QSS：它只走 IconProvider，出现在这里就是两套上色路径打架
-        EXPECT_EQ(sheet.indexOf(hexOf(palette.icon)), -1) << resource << " 里出现了图标色，图标描边不该由样式表管";
+        // 绘制专用的三个色反过来断言不在 QSS 里：图标描边只走 IconProvider，
+        // Toast 的语义色只走 toastColorFor——出现在样式表里就是两套上色路径打架
+        for (const auto &codeOnlyColor: {palette.icon, palette.success, palette.danger})
+        {
+            EXPECT_EQ(sheet.indexOf(hexOf(codeOnlyColor)), -1) << resource << " 里出现了只该由绘制代码用的语义色 " << hexOf(codeOnlyColor).toStdString();
+        }
     }
 }
 

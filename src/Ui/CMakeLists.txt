@@ -7,8 +7,12 @@ add_library(Ui STATIC
         ThemeManager.cpp
         AppResources.h
         AppResources.cpp
+        HotkeyEdit.h
+        HotkeyEdit.cpp
         IconProvider.h
         IconProvider.cpp
+        Toast.h
+        Toast.cpp
         ${CMAKE_SOURCE_DIR}/Resources/AppResources.qrc)
 
 # qrc 由 AUTORCC 生成一个带静态初始化器的 .cpp；静态库里这份没人引用就会被链接器丢掉，
@@ -16,9 +20,12 @@ add_library(Ui STATIC
 set_target_properties(Ui PROPERTIES AUTORCC ON)
 
 target_include_directories(Ui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
+# HotkeyEdit 要在校验组合键能否全局登记时才写配置，所以直接吃 Hotkey；
+# Hotkey 只依赖 Core/Platform/Settings，反向不指回 Ui，加这条不会成环
 target_link_libraries(Ui PUBLIC
         Core
         Settings
+        Hotkey
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets

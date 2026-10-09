@@ -12,6 +12,9 @@
 #include "Core/Types.h"
 #include "Hotkey/IHotkeyManager.h"
 
+#include "App/MainWindow.h"
+#include "App/TrayController.h"
+
 #include <QObject>
 
 #include <memory>
@@ -68,6 +71,20 @@ namespace GyanisScribe::Ui
 
 namespace GyanisScribe::App
 {
+    class MainWindow;
+    class TrayController;
+
+    /**
+     * @brief 一次截图要去做的事
+     * @details 同一条抓帧链路服务两个入口：截完标注、截完直接识别。分开是因为
+     *          识别那条不必先弹标注窗，多一步界面反而挡在用户与结果之间。
+     */
+    enum class CaptureIntent
+    {
+        Annotate,  ///< 截完进标注窗
+        Recognize, ///< 截完直接识别文字
+    };
+
 
     /**
      * @brief 核心控制器
@@ -103,8 +120,27 @@ namespace GyanisScribe::App
 
         /**
          * @brief 进入截图框选
+         * @param intent 截完之后做什么
          */
-        void startCapture();
+        void startCapture(CaptureIntent intent = CaptureIntent::Annotate);
+
+        /**
+         * @brief 整屏截图
+         * @param intent 截完之后做什么
+         */
+        void startFullScreenCapture(CaptureIntent intent = CaptureIntent::Annotate);
+
+        /**
+         * @brief 重复上一次的选区截图
+         * @param intent 截完之后做什么
+         */
+        void startLastRegionCapture(CaptureIntent intent = CaptureIntent::Annotate);
+
+        /**
+         * @brief 打开主窗口的某一页
+         * @param page 目标页
+         */
+        void openMainWindow(MainWindowPage page);
 
         /**
          * @brief 录屏热键：没在录就开始整屏录，正在录就停下并编码
@@ -142,6 +178,9 @@ namespace GyanisScribe::App
         /// 标注窗请求复制
         void handleCopyRequested(const QImage &image);
 
+        /// 托盘菜单的一项被点了
+        void handleTrayAction(TrayAction action);
+
         /// 拼这一轮录屏的参数：屏幕名与输出目录都从这里取
         [[nodiscard]] Core::Expected<Record::RecorderConfig> makeRecordingConfig() const;
 
@@ -157,21 +196,24 @@ namespace GyanisScribe::App
         /// 标注窗请求识别文字
         void handleOcrRequested(const QImage &image);
 
-        std::unique_ptr<Settings::SettingsStore>        m_settings;         ///< 配置存储
-        std::unique_ptr<Platform::IPlatformIntegration> m_integration;      ///< 平台集成
-        std::unique_ptr<Capture::IScreenCaptureSource>  m_captureSource;    ///< 抓帧来源
-        std::unique_ptr<Capture::CaptureService>        m_capture;          ///< 截图编排
-        std::unique_ptr<Hotkey::HotkeyManager>          m_hotkeys;          ///< 热键登记与触发
-        std::unique_ptr<GyanisScribe::Ui::ThemeManager> m_theme;            ///< 主题档位与样式表
-        std::unique_ptr<GyanisScribe::Ui::IconProvider> m_icons;            ///< 图标供给器，描边色跟主题
-        std::unique_ptr<Annotation::AnnotationEngine>   m_annotation;       ///< 标注引擎，跨轮次保留（载入新帧会清空）
-        std::unique_ptr<Annotation::AnnotationWindow>   m_annotationWindow; ///< 标注窗口，复用同一把工具栏
-        std::unique_ptr<Pin::PinManager>                m_pins;             ///< 贴图管理器
-        std::unique_ptr<Ocr::IOcrEngine>                m_ocr;              ///< 识别后端，按设置与平台能力选一次
-        std::unique_ptr<Record::FfmpegRecordingEncoder> m_recorder;         ///< 录屏的编码步
-        std::unique_ptr<Record::RecordingService>       m_recording;        ///< 录屏服务，一轮一个会话
-        Core::CapturedImage                             m_lastCapture;      ///< 本轮抓到的帧，贴图与识别要用它定位
-        QRect                                           m_lastSelection;    ///< 本轮选区（全局逻辑坐标），标注窗与贴图的位置来源
+        std::unique_ptr<Settings::SettingsStore>        m_settings;                                ///< 配置存储
+        std::unique_ptr<Platform::IPlatformIntegration> m_integration;                             ///< 平台集成
+        std::unique_ptr<Capture::IScreenCaptureSource>  m_captureSource;                           ///< 抓帧来源
+        std::unique_ptr<Capture::CaptureService>        m_capture;                                 ///< 截图编排
+        std::unique_ptr<Hotkey::HotkeyManager>          m_hotkeys;                                 ///< 热键登记与触发
+        std::unique_ptr<GyanisScribe::Ui::ThemeManager> m_theme;                                   ///< 主题档位与样式表
+        std::unique_ptr<GyanisScribe::Ui::IconProvider> m_icons;                                   ///< 图标供给器，描边色跟主题
+        std::unique_ptr<Annotation::AnnotationEngine>   m_annotation;                              ///< 标注引擎，跨轮次保留（载入新帧会清空）
+        std::unique_ptr<Annotation::AnnotationWindow>   m_annotationWindow;                        ///< 标注窗口，复用同一把工具栏
+        std::unique_ptr<Pin::PinManager>                m_pins;                                    ///< 贴图管理器
+        std::unique_ptr<Ocr::IOcrEngine>                m_ocr;                                     ///< 识别后端，按设置与平台能力选一次
+        std::unique_ptr<Record::FfmpegRecordingEncoder> m_recorder;                                ///< 录屏的编码步
+        std::unique_ptr<Record::RecordingService>       m_recording;                               ///< 录屏服务，一轮一个会话
+        std::unique_ptr<TrayController>                 m_tray;                                    ///< 托盘图标与菜单
+        std::unique_ptr<MainWindow>                     m_mainWindow;                              ///< 设置与关于的入口
+        CaptureIntent                                   m_captureIntent = CaptureIntent::Annotate; ///< 这一帧截完要去做的事
+        Core::CapturedImage                             m_lastCapture;                             ///< 本轮抓到的帧，贴图与识别要用它定位
+        QRect                                           m_lastSelection;                           ///< 本轮选区（全局逻辑坐标），标注窗与贴图的位置来源
     };
 
 } // namespace GyanisScribe::App
