@@ -222,13 +222,18 @@ TEST(RecordingFfmpeg, ArgumentTablesMatchTheDocumentedCommands)
     const auto config = baselineConfig();
 
     const QStringList silent = mp4Arguments(config, "C:/tmp/rec/frames", "C:/tmp/rec/out.mp4", {});
-    EXPECT_EQ(silent.first(6).join(QLatin1Char('|')), QStringLiteral("-y|-framerate|10|-i|C:/tmp/rec/frames\\%06d.png|-vf")) << silent.join(QLatin1Char(' ')).toStdString();
+    // 输入那一格按平台各自的分隔符拼，所以比「前四个参数 + 帧序列模式串」而不是整条字符串：
+    // 写死反斜杠只能在 Windows 上过，容器里分隔符是 / 会红一条与实现无关的用例
+    EXPECT_EQ(silent.first(4).join(QLatin1Char('|')), QStringLiteral("-y|-framerate|10|-i")) << silent.join(QLatin1Char(' ')).toStdString();
+    EXPECT_TRUE(silent.value(4).startsWith(QStringLiteral("C:/tmp/rec/frames"))) << silent.value(4).toStdString();
+    EXPECT_TRUE(silent.value(4).endsWith(QStringLiteral("%06d.png"))) << "帧序列模式串丢了，ffmpeg 会把目录当成一个文件读";
+    EXPECT_EQ(silent.value(5), QStringLiteral("-vf"));
     EXPECT_NE(silent.indexOf(QStringLiteral("-c:v")), -1);
     EXPECT_EQ(silent.value(silent.indexOf(QStringLiteral("-c:v")) + 1), QStringLiteral("libx264"));
     EXPECT_NE(silent.indexOf(QStringLiteral("scale=trunc(iw/2)*2:trunc(ih/2)*2")), -1) << "奇数尺寸的截图会被 x264 拒掉";
     EXPECT_NE(silent.indexOf(QStringLiteral("-an")), -1) << "没声音时要显式 -an";
     EXPECT_NE(silent.indexOf(QStringLiteral("+faststart")), -1);
-    EXPECT_EQ(silent.last(), QStringLiteral("C:/tmp/rec/out.mp4"));
+    EXPECT_TRUE(silent.last().endsWith(QStringLiteral("out.mp4"))) << silent.last().toStdString();
 
     const auto withAudio = mp4Arguments(config, "C:/tmp/rec/frames", "C:/tmp/rec/out.mp4", "C:/tmp/rec/audio.wav");
     EXPECT_EQ(withAudio.indexOf(QStringLiteral("-an")), -1) << "有配音时不该再关声轨";

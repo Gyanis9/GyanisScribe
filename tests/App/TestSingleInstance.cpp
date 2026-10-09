@@ -32,8 +32,6 @@ namespace
             char  argumentZero[] = "TestSingleInstance";
             char *arguments[]    = {argumentZero, nullptr};
             application          = std::make_unique<QCoreApplication>(argumentCount, arguments);
-            // applicationName 进实例名，必须在这里定下来：留着空值会让用例与真实启动走不同分支
-            application->setApplicationName(QStringLiteral("GyanisScribeTest"));
         }
 
         static void TearDownTestSuite()
@@ -43,7 +41,10 @@ namespace
 
         void SetUp() override
         {
-            // 名字是共用资源：两条用例都注册同一个监听名就会互相挡住，先清掉上一轮的残留
+            // 套接字名是跨进程共用资源：ctest -j 下两条用例同时监听同一个名字，SetUp 里的
+            // removeServer 会把对方的名字删掉，「第二次连得上」就变成随机红。
+            // 每条用例把自己的应用名（进实例名）唯一化，收尾只清自己那份
+            application->setApplicationName(QStringLiteral("GyanisScribeTest-") + QString::fromUtf8(::testing::UnitTest::GetInstance()->current_test_info()->name()));
             QLocalServer::removeServer(instanceKey());
         }
     };
@@ -88,7 +89,8 @@ TEST(CrashGuard, MessageCarriesReasonLogDirectoryAndNextStep)
  */
 TEST_F(InstanceFixture, InstanceKeyCarriesApplicationName)
 {
-    EXPECT_EQ(instanceKey(), QStringLiteral("GyanisScribe-GyanisScribeTest"));
+    // 应用名由 SetUp 按用例名定下，期望值照那个字面写：既不依赖机器，也不与被测函数同算法
+    EXPECT_EQ(instanceKey(), QStringLiteral("GyanisScribe-GyanisScribeTest-InstanceKeyCarriesApplicationName"));
 }
 
 /**

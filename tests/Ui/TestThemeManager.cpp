@@ -24,7 +24,6 @@
 #include <initializer_list>
 #include <memory>
 #include <string>
-#include <thread>
 
 using GyanisScribe::Core::ErrorCode;
 using GyanisScribe::Core::Logger;
@@ -45,7 +44,9 @@ namespace
     /// 每个用例带自己的 INI 路径：QSettings 后端是进程外的共享位置，共用键会让并行用例互相踩
     std::filesystem::path probeIni(std::string_view name)
     {
-        return std::filesystem::temp_directory_path() / std::format("GyanisScribe-Theme-{}-{}.ini", name, std::this_thread::get_id());
+        // ctest 是一条用例一个进程，进程内再取线程 id 没有额外信息量，
+        // 而 libstdc++ 13 不给 std::thread::id 提供 formatter（MSVC 给），跨编译器一侧会编不过
+        return std::filesystem::temp_directory_path() / std::format("GyanisScribe-Theme-{}.ini", name);
     }
 
     /// sRGB 相对亮度，按 WCAG 的定义手写，不调库也不从被测代码借公式

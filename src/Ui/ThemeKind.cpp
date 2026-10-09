@@ -61,6 +61,7 @@ namespace GyanisScribe::Ui
         return scheme == SystemScheme::Dark ? ThemeKind::Dark : ThemeKind::Light;
     }
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
     SystemScheme toSystemScheme(const Qt::ColorScheme scheme)
     {
         switch (scheme)
@@ -74,5 +75,7 @@ namespace GyanisScribe::Ui
         }
         return SystemScheme::Unknown;
     }
+
+#endif
 
 } // namespace GyanisScribe::Ui

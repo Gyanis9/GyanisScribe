@@ -48,6 +48,15 @@ namespace GyanisScribe::App
     {
     }
 
+    TrayController::~TrayController()
+    {
+        // 图标先摘：QSystemTrayIcon 还挂着菜单时把它销毁，退出路径上会留一个悬空指针
+        if (m_icon != nullptr)
+        {
+            m_icon->setVisible(false);
+        }
+    }
+
     bool TrayController::install()
     {
         if (!QSystemTrayIcon::isSystemTrayAvailable())

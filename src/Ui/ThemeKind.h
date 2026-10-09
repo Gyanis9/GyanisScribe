@@ -70,6 +70,15 @@ namespace GyanisScribe::Ui
      * @param scheme Qt 的深浅色偏好
      * @return 对应的 SystemScheme，Qt 的未知档翻成 Unknown
      */
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+    /**
+     * @brief Qt 报告的系统配色换成本工程的档位
+     * @param scheme Qt 6.8 起提供的系统配色
+     * @return 系统档位；Unknown 原样给 Unknown
+     * @note 声明本身带版本条件：Qt::ColorScheme 是 6.8 才有的类型，Ubuntu 24.04 那份 6.4 没有它，
+     *       不加条件连编译都过不去。
+     */
     [[nodiscard]] SystemScheme toSystemScheme(Qt::ColorScheme scheme);
+#endif
 
 } // namespace GyanisScribe::Ui

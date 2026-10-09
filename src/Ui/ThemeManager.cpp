@@ -60,7 +60,10 @@ namespace GyanisScribe::Ui
                          });
 
         // 用户选了「跟随系统」时，系统深浅色变了要立刻跟上，不等重启
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+        // 系统配色切换是 6.8 才有的信号；6.4 那侧「跟随系统」只能停在解算出的默认档
         QObject::connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged, this, [this](Qt::ColorScheme) { refresh(); });
+#endif
     }
 
     void ThemeManager::applyFromSettings()
@@ -148,7 +151,13 @@ namespace GyanisScribe::Ui
     SystemScheme ThemeManager::currentSystemScheme() const
     {
         const auto *hints = QGuiApplication::styleHints();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
         return hints == nullptr ? SystemScheme::Unknown : toSystemScheme(hints->colorScheme());
+#else
+        Q_UNUSED(hints)
+        // 没有系统配色可问：给 Unknown，让 resolveThemeKind 走那条已文档化的兜底档
+        return SystemScheme::Unknown;
+#endif
     }
 
 } // namespace GyanisScribe::Ui

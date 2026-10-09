@@ -84,6 +84,14 @@ namespace GyanisScribe::App
          */
         TrayController(GyanisScribe::Ui::IconProvider &icons, GyanisScribe::Ui::ThemeManager &theme, Settings::ISettingsStore &settings, QObject *parent = nullptr);
 
+
+        /**
+         * @brief 析构：先摘掉托盘图标，再随本类销毁菜单
+         * @details 析构必须定义在 .cpp 里：成员是 unique_ptr<QMenu>，头文件里 QMenu 只是前向声明，
+         *          在头文件里默认出来会让 GCC 对不完整类型求 sizeof（moc 也会实例化它），
+         *          MSVC 放行——这条是容器里跑出来的。
+         */
+        ~TrayController() override;
         /**
          * @brief 装出托盘图标与菜单
          * @return true 表示这台机器上有托盘可用；false 表示平台不支持托盘，界面层要另找入口
