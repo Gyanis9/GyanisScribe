@@ -106,9 +106,17 @@ namespace
 
         void wire(CaptureService &service, Outcome &outcome) const
         {
-            QObject::connect(&service, &ICaptureService::captured, [&outcome](const CapturedImage &image) { outcome.image = image; });
-            QObject::connect(&service, &ICaptureService::captureFailed, [&outcome](const Error &error) { outcome.error = error; });
-            QObject::connect(&service, &ICaptureService::captureCancelled, [&outcome] { ++outcome.cancellations; });
+            // 先断开上一轮的连接：同一条测试里会分几个块各 wire 一次，而 outcome 是块级对象。
+            // 留着旧连接就是让信号往已析构的栈对象里写——ASan 在容器里报的
+            // stack-use-after-scope 正是这个（第三条块的 emit 会踩前两块的 Outcome）
+            QObject::disconnect(&service, &ICaptureService::captured, nullptr, nullptr);
+            QObject::disconnect(&service, &ICaptureService::captureFailed, nullptr, nullptr);
+            QObject::disconnect(&service, &ICaptureService::captureCancelled, nullptr, nullptr);
+
+            // 上下文给 service：连接随它一起析构，不会留下比测试活得更久的挂接
+            QObject::connect(&service, &ICaptureService::captured, &service, [&outcome](const CapturedImage &image) { outcome.image = image; });
+            QObject::connect(&service, &ICaptureService::captureFailed, &service, [&outcome](const Error &error) { outcome.error = error; });
+            QObject::connect(&service, &ICaptureService::captureCancelled, &service, [&outcome] { ++outcome.cancellations; });
         }
 
         std::filesystem::path m_iniFile;
