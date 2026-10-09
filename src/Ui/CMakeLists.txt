@@ -3,6 +3,8 @@ add_library(Ui STATIC
         DesignTokens.h
         ThemeKind.h
         ThemeKind.cpp
+        Language.h
+        Language.cpp
         ThemeManager.h
         ThemeManager.cpp
         AppResources.h

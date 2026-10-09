@@ -1,5 +1,6 @@
 add_executable(TestUi
         TestIconProvider.cpp
+        TestLanguage.cpp
         TestThemeManager.cpp
         TestHotkeyEdit.cpp
         TestToast.cpp)

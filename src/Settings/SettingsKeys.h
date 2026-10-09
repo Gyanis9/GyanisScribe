@@ -21,6 +21,9 @@ namespace GyanisScribe::Settings
     /// 主题档位，取值只能是 Light、Dark、System
     inline constexpr std::string_view kThemeMode = "Theme/Mode";
 
+    /// 界面语言，取值只能是 zh 与 en；en 需要随包的语言包，见 Ui/Language.h
+    inline constexpr std::string_view kUiLanguage = "Ui/Language";
+
     /// 上一次成功截图的选区，文本形如「x,y,width,height」；写方与读方都在 Capture 模块
     inline constexpr std::string_view kCaptureLastRegion = "Capture/LastRegion";
 

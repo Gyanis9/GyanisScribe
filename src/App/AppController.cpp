@@ -29,6 +29,7 @@
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
 #include "Ui/IconProvider.h"
+#include "Ui/Language.h"
 #include "Ui/ThemeManager.h"
 #include "Ui/Toast.h"
 
@@ -73,6 +74,22 @@ namespace GyanisScribe::App
         QObject(parent), m_settings(std::make_unique<Settings::SettingsStore>()), m_integration(Platform::createPlatformIntegration()),
         m_captureSource(std::make_unique<Capture::QScreenCaptureSource>())
     {
+        // 语言要排在所有界面对象之前：translator 装晚了，已经建好的控件仍然拿源码文案
+        const auto defaultLanguageText = QString::fromUtf8(std::string{Ui::appLanguageText(Ui::AppLanguage::Chinese)});
+        const auto storedLanguage      = m_settings->stringValue(Settings::kUiLanguage, defaultLanguageText);
+        if (const auto parsed = Ui::parseAppLanguage(storedLanguage.toStdString()); parsed)
+        {
+            if (auto applied = Ui::applyLanguage(*parsed); !applied)
+            {
+                // 语言包缺席只降级不阻断：按中文继续跑，原因里已经给出该把它放哪儿
+                Core::Logger::warning(std::format("界面语言没能切换：{}", applied.error().message));
+            }
+        } else
+        {
+            // 配置里的值读不出时不猜：按中文继续，把原话报进日志
+            Core::Logger::warning(std::format("界面语言的配置值读不出：{}，按中文继续", parsed.error().message));
+        }
+
         m_capture = std::make_unique<Capture::CaptureService>(*m_captureSource, *m_settings);
         m_hotkeys = std::make_unique<Hotkey::HotkeyManager>(*m_settings, *m_integration);
 

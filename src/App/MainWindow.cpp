@@ -36,10 +36,12 @@ namespace
     using GyanisScribe::Ui::IconProvider;
     using GyanisScribe::Ui::ThemeKind;
     using GyanisScribe::Ui::ThemeManager;
+    using GyanisScribe::Ui::AppLanguage;
 
     using GyanisScribe::App::MainWindowPage;
     using GyanisScribe::App::PageChoice;
     using GyanisScribe::App::ThemeChoice;
+    using GyanisScribe::App::LanguageChoice;
 
     /// 主窗口的全部页：序号、目标页与选项卡标签绑在同一张表上
     constexpr std::array<PageChoice, 3> kPages = {
@@ -53,6 +55,12 @@ namespace
             ThemeChoice{ThemeKind::Light, "浅色"},
             ThemeChoice{ThemeKind::Dark, "深色"},
             ThemeChoice{ThemeKind::System, "跟随系统"},
+    };
+
+    /// 界面语言的全部行：标签用各自语言自称，因此这一张表不进翻译目录
+    constexpr std::array<LanguageChoice, 2> kLanguageChoices = {
+            LanguageChoice{AppLanguage::Chinese, "中文"},
+            LanguageChoice{AppLanguage::English, "English"},
     };
 
     /**
@@ -155,6 +163,32 @@ namespace GyanisScribe::App
         for (std::size_t index = 0; index < kThemeChoices.size(); ++index)
         {
             if (kThemeChoices[index].kind == themeKind)
+            {
+                return static_cast<int>(index);
+            }
+        }
+        return -1;
+    }
+
+    std::span<const LanguageChoice> languageChoices()
+    {
+        return kLanguageChoices;
+    }
+
+    std::optional<AppLanguage> appLanguageAt(const int index)
+    {
+        if (index < 0 || static_cast<std::size_t>(index) >= kLanguageChoices.size())
+        {
+            return {};
+        }
+        return kLanguageChoices[static_cast<std::size_t>(index)].language;
+    }
+
+    int indexOfAppLanguage(const AppLanguage language)
+    {
+        for (std::size_t index = 0; index < kLanguageChoices.size(); ++index)
+        {
+            if (kLanguageChoices[index].language == language)
             {
                 return static_cast<int>(index);
             }
@@ -279,6 +313,42 @@ namespace GyanisScribe::App
                              }
                          });
         appearance->addRow(QStringLiteral("配色方案"), themeCombo);
+
+        // 界面语言：档位与自称都在 languageChoices() 上，配置里存的是 token 而不是中文。
+        // 语言包在进程启动时就装好了，这里写了值也只影响下一次启动，所以把「要重启」挂在提示里
+        auto *uiLanguage = new QComboBox{appearanceBox};
+        for (const auto &choice: languageChoices())
+        {
+            uiLanguage->addItem(QString::fromUtf8(choice.label.data(), static_cast<qsizetype>(choice.label.size())));
+        }
+        uiLanguage->setAccessibleName(QStringLiteral("界面语言"));
+        uiLanguage->setToolTip(QStringLiteral("切换语言要重启智录才生效"));
+        const auto storedUiLanguage = m_settings.stringValue(GyanisScribe::Settings::kUiLanguage,
+                                                             QString::fromUtf8(std::string{GyanisScribe::Ui::appLanguageText(GyanisScribe::Ui::AppLanguage::Chinese)}));
+        if (const auto parsed = GyanisScribe::Ui::parseAppLanguage(storedUiLanguage.toStdString()); parsed)
+        {
+            uiLanguage->setCurrentIndex(indexOfAppLanguage(*parsed));
+        } else
+        {
+            // 配置里的值读不出时下拉框显示中文，但原因要落进日志：只把界面悄悄拨回默认档，用户会以为是自己选错的
+            Core::Logger::warning(std::format("设置页读不出界面语言：{}，下拉框按中文显示", parsed.error().message));
+            uiLanguage->setCurrentIndex(indexOfAppLanguage(AppLanguage::Chinese));
+        }
+        QObject::connect(uiLanguage, &QComboBox::currentIndexChanged, appearanceBox,
+                         [this, uiLanguage](int index)
+                         {
+                             const auto choice = appLanguageAt(index);
+                             if (!choice)
+                             {
+                                 return;
+                             }
+                             const auto token = QString::fromUtf8(std::string{GyanisScribe::Ui::appLanguageText(*choice)});
+                             if (auto written = m_settings.setValue(GyanisScribe::Settings::kUiLanguage, token); !written)
+                             {
+                                 Core::Logger::warning(std::format("界面语言没能保存：{}（当前选的是 {}）", written.error().message, uiLanguage->currentText().toStdString()));
+                             }
+                         });
+        appearance->addRow(QStringLiteral("界面语言"), uiLanguage);
         layout->addWidget(appearanceBox);
 
         // 识别组：语言下拉的取值来自后端词表，不在这里另列一份

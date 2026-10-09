@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "Ui/Language.h"
 #include "Ui/ThemeKind.h"
 #include "Ui/Toast.h"
 
@@ -104,6 +105,37 @@ namespace GyanisScribe::App
      * @return 序号；档位不在表里时返回 -1
      */
     [[nodiscard]] int indexOfThemeKind(GyanisScribe::Ui::ThemeKind themeKind);
+
+    /**
+     * @brief 界面语言下拉框的一行
+     * @details 标签按各自语言自称（「中文」与「English」），所以这一列不进翻译目录：
+     *          切成英文后仍要能认出「中文」是哪一项，否则用户回不去。
+     */
+    struct LanguageChoice
+    {
+        GyanisScribe::Ui::AppLanguage language; ///< 选中这一行时写入配置的档位
+        std::string_view              label;    ///< 下拉框里显示的自称文本
+    };
+
+    /**
+     * @brief 界面语言下拉框的全部行
+     * @return 只读表格，下标即下拉框序号
+     */
+    [[nodiscard]] std::span<const LanguageChoice> languageChoices();
+
+    /**
+     * @brief 下拉框序号与语言档位的互指
+     * @param index 下拉框序号
+     * @return 对应档位；序号越界返回空
+     */
+    [[nodiscard]] std::optional<GyanisScribe::Ui::AppLanguage> appLanguageAt(int index);
+
+    /**
+     * @brief 语言档位在下拉框里的序号
+     * @param language 档位
+     * @return 序号；档位不在表里时返回 -1
+     */
+    [[nodiscard]] int indexOfAppLanguage(GyanisScribe::Ui::AppLanguage language);
 
     /**
      * @brief 关于页正文

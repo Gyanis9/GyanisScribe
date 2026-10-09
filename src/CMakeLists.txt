@@ -48,6 +48,30 @@ add_custom_command(TARGET DeployQtRuntime POST_BUILD
         "$<TARGET_FILE_DIR:GyanisScribe>/plugins/platforms/")
 endif ()
 
+# 语言包：Translations/*.ts 是仓库里的真源，.qm 由 lrelease 在构建期产出。它是本构建图产出的产物，
+# 所以按规范挂在 ALL 目标上（不是可执行体的 POST_BUILD），改了 .ts 不重新链接可执行体也会刷新副本。
+# 容器里那份 Qt 6.4 不带 lrelease（实测 /usr/lib/qt6/bin 里没有），那一档整条跳过：
+# 语言包缺席时应用照旧按中文跑，Ui::Language 会报出该把包放在哪儿。
+file(GLOB TRANSLATION_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/Translations/*.ts")
+find_program(LRELEASE_EXECUTABLE NAMES lrelease lrelease-qt6)
+
+add_custom_target(DeployTranslations ALL
+        COMMENT "生成语言包并刷进可执行体所在的目录")
+
+if (LRELEASE_EXECUTABLE AND TRANSLATION_SOURCES)
+    add_custom_command(TARGET DeployTranslations POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:GyanisScribe>/translations")
+    foreach (TranslationSource ${TRANSLATION_SOURCES})
+        # 输出名取自 .ts 的本名（GyanisScribe_en.ts → GyanisScribe_en.qm）：
+        # Ui::Language 按档位找这个文件名，两边必须是同一个算法
+        get_filename_component(TranslationBaseName ${TranslationSource} NAME_WE)
+        add_custom_command(TARGET DeployTranslations POST_BUILD
+                COMMAND ${LRELEASE_EXECUTABLE} ${TranslationSource}
+                        -qm "$<TARGET_FILE_DIR:GyanisScribe>/translations/${TranslationBaseName}.qm"
+                COMMENT "lrelease ${TranslationSource}")
+    endforeach ()
+endif ()
+
 # WIN32 子系统：托盘类程序不该带控制台窗口；WinMain 由 Qt 的 EntryPoint 目标桥回 main()。
 # Linux 上没有这套：main() 就是入口，而 Ubuntu 那份 Qt6 也不提供 EntryPointPrivate 这个目标，
 # 照抄会在 generate 期报「target was not found」——这一条是容器里真跑出来的，不是推测
@@ -72,5 +96,5 @@ if (MSVC)
     target_compile_options(GyanisScribe PRIVATE /W4 /WX)
 endif ()
 
-# 拷贝依赖「产物已最新」而不是相反：先摆好 DLL，用例发现那一步才可能跑起来
-add_dependencies(GyanisScribe DeployQtRuntime)
+# 拷贝依赖「产物已最新」而不是相反：先摆好 DLL 与语言包，用例发现那一步才可能跑起来
+add_dependencies(GyanisScribe DeployQtRuntime DeployTranslations)
