@@ -1,5 +1,6 @@
 #include "Annotation/AnnotationView.h"
 
+#include "Core/ImageFit.h"
 #include "Core/Logger.h"
 #include "Ui/DesignTokens.h"
 
@@ -25,20 +26,6 @@ namespace
 
 namespace GyanisScribe::Annotation
 {
-    QRect displayRectFor(const QSize &widgetSize, const QSize &canvasLogicalSize)
-    {
-        if (widgetSize.width() <= 0 || widgetSize.height() <= 0 || canvasLogicalSize.width() <= 0 || canvasLogicalSize.height() <= 0)
-        {
-            return {};
-        }
-
-        // 取两个方向里更小的那个比例：保比例就是「谁先到边谁说话」，另一头留白
-        const auto  scale = std::min(static_cast<qreal>(widgetSize.width()) / canvasLogicalSize.width(), static_cast<qreal>(widgetSize.height()) / canvasLogicalSize.height());
-        const QSize shown{std::max(1, static_cast<int>(std::lround(canvasLogicalSize.width() * scale))),
-                          std::max(1, static_cast<int>(std::lround(canvasLogicalSize.height() * scale)))};
-        return {(widgetSize.width() - shown.width()) / 2, (widgetSize.height() - shown.height()) / 2, shown.width(), shown.height()};
-    }
-
     QPoint toCanvasPoint(const QPoint &widgetPoint, const QRect &displayRect, const QSize &canvasLogicalSize)
     {
         if (displayRect.isEmpty() || canvasLogicalSize.isEmpty())
@@ -82,7 +69,7 @@ namespace GyanisScribe::Annotation
 
     QRect AnnotationView::currentDisplayRect() const
     {
-        return displayRectFor(size(), m_engine.canvas().logicalSize);
+        return Core::displayRectFor(size(), m_engine.canvas().logicalSize);
     }
 
     void AnnotationView::paintEvent(QPaintEvent *)

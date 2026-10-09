@@ -13,6 +13,7 @@
 #include "Hotkey/IHotkeyManager.h"
 #include "Ocr/IOcrEngine.h"
 #include "Ocr/OcrEngineFactory.h"
+#include "Ocr/OcrResultWindow.h"
 #include "Ocr/OcrTypes.h"
 #include "Pin/PinManager.h"
 #include "App/TrayController.h"
@@ -23,6 +24,7 @@
 #include "Settings/SettingsStore.h"
 #include "Ui/IconProvider.h"
 #include "Ui/ThemeManager.h"
+#include "Ui/Toast.h"
 
 #include <QClipboard>
 #include <QCoreApplication>
@@ -77,6 +79,7 @@ namespace GyanisScribe::App
         m_ocr        = Ocr::createOcrEngine(*m_settings, *m_integration);
         m_tray       = std::make_unique<TrayController>(*m_icons, *m_theme, *m_settings);
         m_mainWindow = std::make_unique<MainWindow>(*m_settings, *m_theme, *m_icons);
+        m_toast      = std::make_unique<Ui::Toast>(*m_icons, *m_theme);
         QObject::connect(m_tray.get(), &TrayController::actionRequested, this, &AppController::handleTrayAction);
         // 没有托盘的桌面环境（容器、精简安装）照样能跑：只是少一个入口，主窗口仍然可用
         m_tray->install();
@@ -95,9 +98,8 @@ namespace GyanisScribe::App
                                      toggleRecording();
                                      return;
                                  case Hotkey::HotkeyAction::Ocr:
-                                     // 识别入口需要一张图：没有选区时先框选，再走标注窗的「识别文字」
-                                     Core::Logger::info("识别热键已按下：先框选，再在标注窗里点「识别文字」");
-                                     startCapture();
+                                     // 识别热键：截完直接进结果窗口，中间不弹标注窗
+                                     startCapture(CaptureIntent::Recognize);
                                      return;
                              }
                          });
@@ -105,10 +107,10 @@ namespace GyanisScribe::App
         QObject::connect(m_capture.get(), &Capture::ICaptureService::captured, this, &AppController::handleCaptured);
         QObject::connect(m_capture.get(), &Capture::ICaptureService::captureCancelled, this, [] { Core::Logger::info("截图已取消"); });
         QObject::connect(m_capture.get(), &Capture::ICaptureService::captureFailed, this,
-                         [](const Core::Error &error)
+                         [this](const Core::Error &error)
                          {
-                             // 失败在这里落地成用户看得见的一句话；Toast 到位之后再换成气泡提示
                              Core::Logger::error(std::format("截图未完成：{}", error.message));
+                             notifyUser(QString::fromUtf8(std::format("截图未完成：{}。请重试一次", error.message).c_str()), Ui::ToastKind::Danger);
                          });
 
         // 标注窗的四个出口：动作只有一个入口，界面不需要知道用户是点了按钮还是按了键盘
@@ -271,29 +273,69 @@ namespace GyanisScribe::App
 
     void AppController::handleOcrRequested(const QImage &image)
     {
+        m_ocrImage = image;
+        // 语言取上一次的选择：换过一次就该记住，而不是每轮都退回默认档
+        recognizeWithLanguage(m_settings->stringValue(Settings::kOcrLanguage, QString::fromUtf8(Ocr::kDefaultOcrLanguage)));
+    }
+
+    void AppController::recognizeWithLanguage(const QString &language)
+    {
         if (!m_ocr->isAvailable())
         {
-            Core::Logger::error(std::format("文字识别没能开始：{}", m_ocr->unavailableReason().toStdString()));
+            const auto reason = m_ocr->unavailableReason();
+            Core::Logger::error(std::format("文字识别没能开始：{}", reason.toStdString()));
+            notifyUser(reason, Ui::ToastKind::Danger);
             return;
         }
 
-        const auto language = m_settings->stringValue(Settings::kOcrLanguage, QStringLiteral("eng"));
-        const auto result   = m_ocr->recognize(image, language);
+        if (m_ocrImage.isNull())
+        {
+            notifyUser(QStringLiteral("还没有可识别的图：先按 Ctrl+Alt+A 框选一块屏幕"), Ui::ToastKind::Information);
+            return;
+        }
+
+        const auto result = m_ocr->recognize(m_ocrImage, language);
         if (!result)
         {
-            Core::Logger::error(std::format("文字识别失败：{}", result.error().message));
+            const auto message = QString::fromUtf8(std::format("文字识别失败：{}。请重试一次，或换一种语言再试", result.error().message).c_str());
+            Core::Logger::error(message.toStdString());
+            notifyUser(message, Ui::ToastKind::Danger);
             return;
         }
 
-        if (result->isEmpty())
+        // 认出多少算多少：空结果也要开窗，摘要里那句「这一张没认出文字」比一条三秒就消失的提示有用
+        if (auto stored = m_settings->setValue(Settings::kOcrLanguage, language); !stored)
         {
-            Core::Logger::warning("文字识别完成，但一行都没认出来。可以试试在标注前先放大，或在设置里换一种语言");
-            return;
+            Core::Logger::warning(std::format("识别语言没能记住：{}", stored.error().message));
         }
 
-        // 结果对话框还没落地，先交剪贴板：这一步让「识别」这个动作对用户是可用的而不是一个按钮
-        QGuiApplication::clipboard()->setText(result->text());
-        Core::Logger::info(std::format("文字识别完成：{} 行，已交剪贴板", result->lines.size()));
+        if (m_ocrWindow == nullptr)
+        {
+            m_ocrWindow = new Ocr::OcrResultWindow{m_ocrImage, *result, *m_icons, *m_theme};
+            // 关掉就自毁，控制器只持 QPointer：下一次识别会重新建一个，不会往已析构的对象里塞结果
+            m_ocrWindow->setAttribute(Qt::WA_DeleteOnClose);
+            QObject::connect(m_ocrWindow, &Ocr::OcrResultWindow::recognizeRequested, this, &AppController::recognizeWithLanguage);
+            QObject::connect(m_ocrWindow, &Ocr::OcrResultWindow::messageForUser, this, [this](const QString &message, Ui::ToastKind kind) { notifyUser(message, kind); });
+        } else
+        {
+            m_ocrWindow->setResult(m_ocrImage, *result);
+        }
+
+        m_ocrWindow->show();
+        m_ocrWindow->raise();
+        m_ocrWindow->activateWindow();
+        Core::Logger::info(std::format("文字识别完成：{} 行，语言 {}", result->lines.size(), language.toStdString()));
+    }
+
+    void AppController::notifyUser(const QString &message, const Ui::ToastKind kind)
+    {
+        if (m_toast != nullptr)
+        {
+            m_toast->show(message, kind);
+            return;
+        }
+        // 气泡还没建起来的那一段（构造早期）不该把话吞掉：日志是兜底出口
+        Core::Logger::info(std::format("提示：{}", message.toStdString()));
     }
 
     Core::Expected<Record::RecorderConfig> AppController::makeRecordingConfig() const

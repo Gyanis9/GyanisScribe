@@ -21,19 +21,11 @@ class QLineEdit;
 namespace GyanisScribe::Annotation
 {
 
-    /**
-     * @brief 算画布在控件里的显示区
-     * @param widgetSize 控件尺寸，逻辑像素
-     * @param canvasLogicalSize 画布逻辑尺寸
-     * @return 等比缩放后居中的矩形；任一尺寸不成立时返回空矩形
-     * @details 保比例居中，不拉伸：截图被拉变形之后，标注的坐标换算就不再是同一个比例。
-     */
-    [[nodiscard]] QRect displayRectFor(const QSize &widgetSize, const QSize &canvasLogicalSize);
 
     /**
      * @brief 控件坐标换算到画布逻辑坐标
      * @param widgetPoint 控件内坐标
-     * @param displayRect displayRectFor 的结果
+     * @param displayRect Core::displayRectFor 的结果
      * @param canvasLogicalSize 画布逻辑尺寸
      * @return 画布逻辑坐标；落在画布外的部分夹到边缘
      * @note 夹住而不是拒绝：拖出画布边缘的意思是画到边界，报「参数不合法」只会让画笔在边缘卡住
@@ -43,7 +35,7 @@ namespace GyanisScribe::Annotation
     /**
      * @brief 画布逻辑坐标换算回控件坐标
      * @param canvasPoint 画布逻辑坐标
-     * @param displayRect displayRectFor 的结果
+     * @param displayRect Core::displayRectFor 的结果
      * @param canvasLogicalSize 画布逻辑尺寸
      * @return 控件内坐标，供行内输入框这类别墅控件定位
      */

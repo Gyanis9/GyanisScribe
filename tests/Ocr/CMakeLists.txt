@@ -1,6 +1,7 @@
 add_executable(TestOcr
         TestOcrEngines.cpp
-        TestOcrPreprocessor.cpp)
+        TestOcrPreprocessor.cpp
+        TestOcrResultWindow.cpp)
 
 target_link_libraries(TestOcr PRIVATE
         Ocr
@@ -9,7 +10,8 @@ target_link_libraries(TestOcr PRIVATE
         Core
         GTest::gtest
         GTest::gtest_main
-        Qt6::Gui)
+        Qt6::Gui
+        Qt6::Widgets)
 
 if (MSVC)
     target_compile_options(TestOcr PRIVATE /W4 /WX)

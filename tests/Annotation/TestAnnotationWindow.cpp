@@ -1,4 +1,6 @@
 #include "Annotation/AnnotationView.h"
+
+#include "Core/ImageFit.h"
 #include "Annotation/AnnotationWindow.h"
 
 #include "Annotation/AnnotationEngine.h"
@@ -18,13 +20,13 @@
 #include <optional>
 #include <utility>
 
-using GyanisScribe::Annotation::displayRectFor;
 using GyanisScribe::Annotation::ShortcutAction;
 using GyanisScribe::Annotation::shortcutActionFor;
 using GyanisScribe::Annotation::toCanvasPoint;
 using GyanisScribe::Annotation::ToolKind;
 using GyanisScribe::Annotation::toWidgetPoint;
 using GyanisScribe::Core::CapturedImage;
+using GyanisScribe::Core::displayRectFor;
 using GyanisScribe::Core::ErrorCode;
 
 namespace
@@ -85,32 +87,8 @@ namespace
 } // namespace
 
 /**
- * @brief 钉住显示区算的是「等比缩放 + 居中」
- * @details 手算三个数：800x200 的画布放进 400x400 的控件，比例由更紧的横向定死（0.5），
- *          纵向留白 (400-100)/2 = 150。拉伸填满会破坏坐标换算，所以这里判的是精确矩形。
- */
-TEST(ViewGeometry, DisplayRectScalesInsideWithoutDistorting)
-{
-    EXPECT_EQ(displayRectFor({400, 400}, {800, 200}), QRect(0, 150, 400, 100));
-    // 反过来：控件很扁时是纵向说了算，横向留白 (200-100)/2 = 50
-    EXPECT_EQ(displayRectFor({200, 50}, {200, 100}), QRect(50, 0, 100, 50));
-    // 控件比画布大时不许放大过头？允许放大是刻意的：小截图也要看得清
-    EXPECT_EQ(displayRectFor({100, 100}, {50, 50}), QRect(0, 0, 100, 100));
-}
-
-/**
- * @brief 钉住退化尺寸的显示区是空矩形
- * @details 0 或负数尺寸会让后面的除法炸掉，判成空矩形让调用方走「什么都不画」那条路
- */
-TEST(ViewGeometry, DisplayRectRejectsDegenerateSizes)
-{
-    EXPECT_TRUE(displayRectFor({0, 100}, {200, 100}).isEmpty());
-    EXPECT_TRUE(displayRectFor({100, 100}, {0, 0}).isEmpty());
-    EXPECT_TRUE(displayRectFor({-5, 100}, {200, 100}).isEmpty());
-}
-
-/**
  * @brief 钉住两套坐标互指同一个点
+ * @details 显示区本身的判据已上收到 tests/Core/TestImageFit.cpp，这里只测点位往返。
  * @details 只补一套换算就是静默错位：正向、反向各算一遍并断它们落在同一个点上；
  *          同时钉住「画布外夹到边缘」而不是报错——拖出边缘的意思是画到边界。
  */

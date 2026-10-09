@@ -14,8 +14,12 @@
 
 #include "App/MainWindow.h"
 #include "App/TrayController.h"
+#include "Ui/Toast.h"
 
 #include <QObject>
+
+#include <QImage>
+#include <QPointer>
 
 #include <memory>
 
@@ -34,6 +38,7 @@ namespace GyanisScribe::Annotation
 namespace GyanisScribe::Ocr
 {
     class IOcrEngine;
+    class OcrResultWindow;
 } // namespace GyanisScribe::Ocr
 
 namespace GyanisScribe::Pin
@@ -67,6 +72,7 @@ namespace GyanisScribe::Ui
 {
     class IconProvider;
     class ThemeManager;
+    class Toast;
 } // namespace GyanisScribe::Ui
 
 namespace GyanisScribe::App
@@ -196,6 +202,17 @@ namespace GyanisScribe::App
         /// 标注窗请求识别文字
         void handleOcrRequested(const QImage &image);
 
+        /**
+         * @brief 用给定语言认一次当前这张图，并把结果摆进结果窗口
+         * @param language 语言标签，如 zh-Hans
+         * @details 首次识别与窗口里「换语言/重新识别」走同一条路：两条路各写一遍认字，
+         *          就会出现一个能提示「后端没编进来」而另一个静默给空结果。
+         */
+        void recognizeWithLanguage(const QString &language);
+
+        /// 给用户看的一条提示：有气泡就用气泡，没有（例如起不来托盘的那类环境）就落日志
+        void notifyUser(const QString &message, GyanisScribe::Ui::ToastKind kind);
+
         std::unique_ptr<Settings::SettingsStore>        m_settings;                                ///< 配置存储
         std::unique_ptr<Platform::IPlatformIntegration> m_integration;                             ///< 平台集成
         std::unique_ptr<Capture::IScreenCaptureSource>  m_captureSource;                           ///< 抓帧来源
@@ -211,6 +228,9 @@ namespace GyanisScribe::App
         std::unique_ptr<Record::RecordingService>       m_recording;                               ///< 录屏服务，一轮一个会话
         std::unique_ptr<TrayController>                 m_tray;                                    ///< 托盘图标与菜单
         std::unique_ptr<MainWindow>                     m_mainWindow;                              ///< 设置与关于的入口
+        std::unique_ptr<GyanisScribe::Ui::Toast>        m_toast;                                   ///< 右下角提示气泡，操作结果的落地处
+        QImage                                          m_ocrImage;                                ///< 最近一次送去识别的图，换语言重认按它算
+        QPointer<Ocr::OcrResultWindow>                  m_ocrWindow;                               ///< 识别结果窗口，关了就重建，不拥有
         CaptureIntent                                   m_captureIntent = CaptureIntent::Annotate; ///< 这一帧截完要去做的事
         Core::CapturedImage                             m_lastCapture;                             ///< 本轮抓到的帧，贴图与识别要用它定位
         QRect                                           m_lastSelection;                           ///< 本轮选区（全局逻辑坐标），标注窗与贴图的位置来源

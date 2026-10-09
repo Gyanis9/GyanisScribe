@@ -4,7 +4,9 @@ add_library(Core STATIC
         Logger.h
         Logger.cpp
         Paths.h
-        Paths.cpp)
+        Paths.cpp
+        ImageFit.h
+        ImageFit.cpp)
 
 target_include_directories(Core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
