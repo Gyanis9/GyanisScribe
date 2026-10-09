@@ -156,9 +156,9 @@ namespace
 } // namespace
 
 /**
- * @brief 钉住「设置里什么都没写」时的三条默认登记，取值逐条手算
+ * @brief 钉住「设置里什么都没写」时的四条默认登记，取值逐条手算
  */
-TEST_F(HotkeyManagerFixture, RegistersThreeDefaultsWhenSettingsAreEmpty)
+TEST_F(HotkeyManagerFixture, RegistersFourDefaultsWhenSettingsAreEmpty)
 {
     SettingsStore           settings(m_iniFile);
     FakePlatformIntegration integration;
@@ -166,11 +166,11 @@ TEST_F(HotkeyManagerFixture, RegistersThreeDefaultsWhenSettingsAreEmpty)
 
     const auto report = manager.reload();
     ASSERT_TRUE(report.has_value());
-    EXPECT_EQ(report->registered, 3) << "三个动作都该登记上，失败项：" << report->failures.size();
+    EXPECT_EQ(report->registered, 4) << "四个动作都该登记上，失败项：" << report->failures.size();
     EXPECT_TRUE(report->failures.empty());
 
     const auto &registrations = integration.m_backendMirror->registrations;
-    ASSERT_EQ(registrations.size(), 3U);
+    ASSERT_EQ(registrations.size(), 4U);
     // 编号 = 枚举序号 + 1，且每条的修饰键与按键按需求文档手算
     EXPECT_EQ(registrations[0].identifier, 1);
     EXPECT_EQ(registrations[0].modifiers, Qt::ControlModifier | Qt::AltModifier);
@@ -179,6 +179,8 @@ TEST_F(HotkeyManagerFixture, RegistersThreeDefaultsWhenSettingsAreEmpty)
     EXPECT_EQ(registrations[1].key, Qt::Key_R);
     EXPECT_EQ(registrations[2].identifier, 3);
     EXPECT_EQ(registrations[2].key, Qt::Key_O);
+    EXPECT_EQ(registrations[3].identifier, 4);
+    EXPECT_EQ(registrations[3].key, Qt::Key_P) << "取色动作追加在末尾，编号必须跟着排到 4";
 }
 
 /**
@@ -195,7 +197,7 @@ TEST_F(HotkeyManagerFixture, StoredCombinationOverridesDefault)
 
     ASSERT_NE(integration.m_backendMirror, nullptr) << "改快捷键后没有建后端，说明 valueChanged 没接到 reload 上";
     const auto &registrations = integration.m_backendMirror->registrations;
-    ASSERT_EQ(registrations.size(), 3U);
+    ASSERT_EQ(registrations.size(), 4U);
     EXPECT_EQ(registrations[0].identifier, 1);
     EXPECT_EQ(registrations[0].modifiers, Qt::ControlModifier | Qt::ShiftModifier);
     EXPECT_EQ(registrations[0].key, Qt::Key_F1) << "存进去的组合没有生效，用户按到的还是默认的 Ctrl+Alt+A";
@@ -216,7 +218,7 @@ TEST_F(HotkeyManagerFixture, OneFailureDoesNotStopTheOthers)
 
     const auto report = manager.reload();
     ASSERT_TRUE(report.has_value());
-    EXPECT_EQ(report->registered, 1) << "只有截图该登记上：坏值那条与被占用那条都要让路";
+    EXPECT_EQ(report->registered, 2) << "只有截图与取色该登记上：坏值那条与被占用那条都要让路";
     ASSERT_EQ(report->failures.size(), 2U);
 
     EXPECT_EQ(report->failures[0].action, HotkeyAction::Record);
@@ -227,11 +229,13 @@ TEST_F(HotkeyManagerFixture, OneFailureDoesNotStopTheOthers)
     EXPECT_EQ(report->failures[1].error.code, ErrorCode::Busy) << "后端拒绝走的是被占用那一档";
 
     const auto &registrations = integration.m_backendMirror->registrations;
-    ASSERT_EQ(registrations.size(), 2U) << "登记调用发生了两次：截图与被拒的 OCR，坏值那条不该去撞后端";
+    ASSERT_EQ(registrations.size(), 3U) << "登记调用发生了三次：截图、被拒的 OCR 与取色，坏值那条不该去撞后端";
     EXPECT_EQ(registrations[0].identifier, 1);
     EXPECT_EQ(registrations[1].identifier, 3);
-    EXPECT_EQ(integration.m_backendMirror->liveRegistrations.size(), 1U) << "OCR 被后端拒绝，它不该留在册上";
+    EXPECT_EQ(registrations[2].identifier, 4);
+    EXPECT_EQ(integration.m_backendMirror->liveRegistrations.size(), 2U) << "OCR 被后端拒绝，它不该留在册上";
     EXPECT_EQ(integration.m_backendMirror->liveRegistrations.count(1), 1U);
+    EXPECT_EQ(integration.m_backendMirror->liveRegistrations.count(4), 1U);
 }
 
 /**
@@ -248,7 +252,7 @@ TEST_F(HotkeyManagerFixture, ReloadUnregistersEverythingBeforeReRegistering)
 
     ASSERT_NE(integration.m_backendMirror, nullptr);
     EXPECT_GE(integration.m_backendMirror->unregisterAllCalls, 2) << "两轮重登至少两次清场";
-    EXPECT_EQ(integration.m_backendMirror->registrations.size(), 3U) << "重登后在册的还是三条，不是六条";
+    EXPECT_EQ(integration.m_backendMirror->registrations.size(), 4U) << "重登后在册的还是四条，不是八条";
 }
 
 /**
@@ -267,14 +271,16 @@ TEST_F(HotkeyManagerFixture, TriggeredIdentifierMapsBackToAction)
     integration.m_backendMirror->fire(1);
     integration.m_backendMirror->fire(2);
     integration.m_backendMirror->fire(3);
-    ASSERT_EQ(triggered.size(), 3U);
+    integration.m_backendMirror->fire(4);
+    ASSERT_EQ(triggered.size(), 4U);
     EXPECT_EQ(triggered[0], HotkeyAction::Capture);
     EXPECT_EQ(triggered[1], HotkeyAction::Record);
     EXPECT_EQ(triggered[2], HotkeyAction::Ocr);
+    EXPECT_EQ(triggered[3], HotkeyAction::Pick) << "编号 4 要落回报错以外的第四个动作，否则按一个热键会触发别的功能";
 
     // 不在册的编号：不能瞎指派一个动作，也不能一个都不发
     integration.m_backendMirror->fire(99);
-    EXPECT_EQ(triggered.size(), 3U) << "没登记过的编号被映射成了某个动作，会触发错的功能";
+    EXPECT_EQ(triggered.size(), 4U) << "没登记过的编号被映射成了某个动作，会触发错的功能";
 }
 
 /**
@@ -321,7 +327,7 @@ TEST_F(HotkeyManagerFixture, ReportsEveryActionUnsupportedWhenPlatformLacksHotke
     const auto report = manager.reload();
     ASSERT_TRUE(report.has_value()) << "平台不支持不是管理器本身的失败，要按项交回";
     EXPECT_EQ(report->registered, 0);
-    EXPECT_EQ(report->failures.size(), 3U);
+    EXPECT_EQ(report->failures.size(), 4U);
     for (const auto &failure: report->failures)
     {
         EXPECT_EQ(failure.error.code, ErrorCode::PlatformUnsupported) << "每一项都该说清是本平台没有这个能力";

@@ -3,6 +3,7 @@
 #include "Core/Logger.h"
 #include "Core/Paths.h"
 #include "Ocr/OcrEngineFactory.h"
+#include "Pick/ColorFormat.h"
 #include "Settings/ISettingsStore.h"
 #include "History/HistoryRules.h"
 #include "History/HistoryView.h"
@@ -230,12 +231,13 @@ namespace GyanisScribe::App
         auto *page   = new QWidget{this};
         auto *layout = new QVBoxLayout{page};
 
-        // 热键组：三个键各一个录制框，写进去之后由 HotkeyManager 的订阅即时重登记
+        // 热键组：四个动作各一个录制框，写进去之后由 HotkeyManager 的订阅即时重登记
         auto *hotkeyBox = new QGroupBox{QStringLiteral("快捷键"), page};
         auto *hotkeys   = new QFormLayout{hotkeyBox};
         for (const auto [key, title, defaultText]: {std::tuple{GyanisScribe::Settings::kHotkeyCapture, QStringLiteral("截图"), QStringLiteral("Ctrl+Alt+A")},
                                                     std::tuple{GyanisScribe::Settings::kHotkeyRecord, QStringLiteral("录屏"), QStringLiteral("Ctrl+Alt+R")},
-                                                    std::tuple{GyanisScribe::Settings::kHotkeyOcr, QStringLiteral("文字识别"), QStringLiteral("Ctrl+Alt+O")}})
+                                                    std::tuple{GyanisScribe::Settings::kHotkeyOcr, QStringLiteral("文字识别"), QStringLiteral("Ctrl+Alt+O")},
+                                                    std::tuple{GyanisScribe::Settings::kHotkeyPick, QStringLiteral("屏幕取色"), QStringLiteral("Ctrl+Alt+P")}})
         {
             auto *edit = new GyanisScribe::Ui::HotkeyEdit{m_settings, hotkeyBox};
             edit->bindTo(key, title, defaultText);
@@ -301,6 +303,32 @@ namespace GyanisScribe::App
                          });
         ocr->addRow(QStringLiteral("识别语言"), language);
         layout->addWidget(ocrBox);
+
+        // 取色组：写法下拉的项名与序号都来自 Pick 那张表，配置里存的是标记而不是中文
+        auto *pickBox    = new QGroupBox{QStringLiteral("屏幕取色"), page};
+        auto *pick       = new QFormLayout{pickBox};
+        auto *pickFormat = new QComboBox{pickBox};
+        pickFormat->addItems(GyanisScribe::Pick::colorFormatLabels());
+        pickFormat->setAccessibleName(QStringLiteral("颜色写法"));
+        const auto storedFormat = GyanisScribe::Pick::parseColorFormat(m_settings.stringValue(GyanisScribe::Settings::kPickFormat, QStringLiteral("Hex")).toStdString());
+        pickFormat->setCurrentIndex(GyanisScribe::Pick::indexOfColorFormat(storedFormat ? *storedFormat : GyanisScribe::Pick::ColorFormat::Hex));
+        QObject::connect(pickFormat, &QComboBox::currentIndexChanged, pickBox,
+                         [this, pickFormat](int index)
+                         {
+                             const auto format = GyanisScribe::Pick::colorFormatAt(index);
+                             if (!format)
+                             {
+                                 return;
+                             }
+                             const auto token = QString::fromUtf8(GyanisScribe::Pick::colorFormatToken(*format).data(),
+                                                                  static_cast<qsizetype>(GyanisScribe::Pick::colorFormatToken(*format).size()));
+                             if (auto written = m_settings.setValue(GyanisScribe::Settings::kPickFormat, token); !written)
+                             {
+                                 GyanisScribe::Core::Logger::warning(std::format("颜色写法没能保存：{}", written.error().message));
+                             }
+                         });
+        pick->addRow(QStringLiteral("复制用的写法"), pickFormat);
+        layout->addWidget(pickBox);
 
         layout->addStretch();
         return page;

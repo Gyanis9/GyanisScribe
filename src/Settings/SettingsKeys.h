@@ -15,6 +15,9 @@ namespace GyanisScribe::Settings
     /// OCR 的全局热键文本，例如 Ctrl+Alt+O
     inline constexpr std::string_view kHotkeyOcr = "Hotkey/Ocr";
 
+    /// 屏幕取色的全局热键
+    inline constexpr std::string_view kHotkeyPick = "Hotkey/Pick";
+
     /// 主题档位，取值只能是 Light、Dark、System
     inline constexpr std::string_view kThemeMode = "Theme/Mode";
 
@@ -38,6 +41,9 @@ namespace GyanisScribe::Settings
 
     /// OCR 语言包（tessdata）目录；为空时按环境变量与程序数据目录找
     inline constexpr std::string_view kOcrTessDataDirectory = "Ocr/TessDataDirectory";
+
+    /// 取色复制用的写法：Hex、Rgb 或 Hsl
+    inline constexpr std::string_view kPickFormat = "Pick/Format";
 
     /// 历史最多留多少条，0 表示不限条数
     inline constexpr std::string_view kHistoryMaximumEntries = "History/MaximumEntries";

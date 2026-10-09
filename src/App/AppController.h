@@ -48,6 +48,11 @@ namespace GyanisScribe::History
     class HistoryStore;
 } // namespace GyanisScribe::History
 
+namespace GyanisScribe::Pick
+{
+    class ColorPickerOverlay;
+} // namespace GyanisScribe::Pick
+
 namespace GyanisScribe::Pin
 {
     class PinManager;
@@ -245,6 +250,13 @@ namespace GyanisScribe::App
         /// 历史页要求去掉一条记录（成品文件保留）
         void handleHistoryRemove(const std::filesystem::path &filePath);
 
+        /**
+         * @brief 起一层全屏取色遮罩
+         * @details 抓的是按下那一刻的那一屏，之后遮罩显示的就是这一帧：放大镜要看的正是当前画面，
+         *          实时抓屏会让鼠标一停画面就变，颜色也就抄不准。
+         */
+        void startColorPick();
+
         std::unique_ptr<Settings::SettingsStore>             m_settings;                                ///< 配置存储
         std::unique_ptr<Platform::IPlatformIntegration>      m_integration;                             ///< 平台集成
         std::unique_ptr<Capture::IScreenCaptureSource>       m_captureSource;                           ///< 抓帧来源
@@ -264,6 +276,7 @@ namespace GyanisScribe::App
         QImage                                               m_ocrImage;                                ///< 最近一次送去识别的图，换语言重认按它算
         QPointer<Ocr::OcrResultWindow>                       m_ocrWindow;                               ///< 识别结果窗口，关了就重建，不拥有
         std::unique_ptr<GyanisScribe::History::HistoryStore> m_history;                                 ///< 历史清单：成品文件的索引，删记录不删文件
+        QPointer<Pick::ColorPickerOverlay>                   m_picker;                                  ///< 取色遮罩，关掉即重建
         QSize                                                m_recordingSize;                           ///< 本轮录屏区尺寸，成品落地时记进历史
         CaptureIntent                                        m_captureIntent = CaptureIntent::Annotate; ///< 这一帧截完要去做的事
         Core::CapturedImage                                  m_lastCapture;                             ///< 本轮抓到的帧，贴图与识别要用它定位

@@ -17,6 +17,7 @@ target_link_libraries(App PUBLIC
         History
         Hotkey
         Ocr
+        Pick
         Pin
         Platform
         Record

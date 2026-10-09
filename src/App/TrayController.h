@@ -45,6 +45,7 @@ namespace GyanisScribe::App
         CaptureLastRegion, ///< 重复上一次选区
         ToggleRecord,      ///< 开始或停止录屏
         Recognize,         ///< 框选后识别文字
+        PickColor,         ///< 屏幕取色
         OpenSettings,      ///< 打开设置页
         OpenAbout,         ///< 打开关于页
         Quit,              ///< 退出程序

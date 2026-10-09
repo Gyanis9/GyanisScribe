@@ -34,6 +34,7 @@ namespace GyanisScribe::App
         entries.append(TrayMenuEntry{}); // 分隔线
         entries.append(TrayMenuEntry{TrayAction::ToggleRecord, "Record", QStringLiteral("开始 / 停止录屏"), GyanisScribe::Settings::kHotkeyRecord});
         entries.append(TrayMenuEntry{TrayAction::Recognize, "Ocr", QStringLiteral("识别文字"), GyanisScribe::Settings::kHotkeyOcr});
+        entries.append(TrayMenuEntry{TrayAction::PickColor, "ColorPicker", QStringLiteral("屏幕取色"), GyanisScribe::Settings::kHotkeyPick});
         entries.append(TrayMenuEntry{});
         entries.append(TrayMenuEntry{TrayAction::OpenSettings, "Settings", QStringLiteral("设置"), {}});
         entries.append(TrayMenuEntry{TrayAction::OpenAbout, "About", QStringLiteral("关于智录"), {}});

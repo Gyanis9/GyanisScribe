@@ -29,6 +29,7 @@ namespace GyanisScribe::Hotkey
         Capture, ///< 截图
         Record,  ///< 录屏
         Ocr,     ///< 识别文字
+        Pick,    ///< 屏幕取色
     };
 
     /**

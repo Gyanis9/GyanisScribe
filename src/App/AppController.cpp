@@ -16,6 +16,8 @@
 #include "Hotkey/IHotkeyManager.h"
 #include "Ocr/IOcrEngine.h"
 #include "Ocr/OcrEngineFactory.h"
+#include "Pick/ColorFormat.h"
+#include "Pick/ColorPickerOverlay.h"
 #include "Ocr/OcrResultWindow.h"
 #include "Ocr/OcrTypes.h"
 #include "Pin/PinManager.h"
@@ -30,6 +32,9 @@
 #include "Ui/Toast.h"
 
 #include <QClipboard>
+#include <QCursor>
+#include <QGuiApplication>
+#include <QScreen>
 #include <QImageReader>
 #include <QCoreApplication>
 #include <QDateTime>
@@ -101,6 +106,9 @@ namespace GyanisScribe::App
                                      return;
                                  case Hotkey::HotkeyAction::Record:
                                      toggleRecording();
+                                     return;
+                                 case Hotkey::HotkeyAction::Pick:
+                                     startColorPick();
                                      return;
                                  case Hotkey::HotkeyAction::Ocr:
                                      // 识别热键：截完直接进结果窗口，中间不弹标注窗
@@ -186,6 +194,9 @@ namespace GyanisScribe::App
             case TrayAction::Recognize:
                 // 识别入口先框选：没有一张图，后端无事可做
                 startCapture(CaptureIntent::Recognize);
+                return;
+            case TrayAction::PickColor:
+                startColorPick();
                 return;
             case TrayAction::OpenSettings:
                 openMainWindow(MainWindowPage::Settings);
@@ -348,6 +359,48 @@ namespace GyanisScribe::App
         }
         // 气泡还没建起来的那一段（构造早期）不该把话吞掉：日志是兜底出口
         Core::Logger::info(std::format("提示：{}", message.toStdString()));
+    }
+
+    void AppController::startColorPick()
+    {
+        auto *screen = QGuiApplication::screenAt(QCursor::pos());
+        if (screen == nullptr)
+        {
+            screen = QGuiApplication::primaryScreen();
+        }
+        if (screen == nullptr)
+        {
+            notifyUser(QStringLiteral("这台机器上没有可用的屏幕，取色没法开始"), Ui::ToastKind::Danger);
+            return;
+        }
+
+        const auto frame = m_captureSource->grabScreen(screen->name());
+        if (!frame)
+        {
+            notifyUser(QString::fromUtf8(std::format("这一屏抓不下来：{}。请重试一次", frame.error().message).c_str()), Ui::ToastKind::Danger);
+            return;
+        }
+
+        // 写法读坏了不拦取色：按默认写法继续，并把这一条告诉用户，免得他复制到的格式莫名其妙变了
+        const auto storedText = m_settings->stringValue(Settings::kPickFormat, QStringLiteral("Hex"));
+        const auto parsed     = Pick::parseColorFormat(storedText.toStdString());
+        if (!parsed)
+        {
+            notifyUser(QString::fromUtf8(parsed.error().message.c_str()), Ui::ToastKind::Danger);
+        }
+        const auto format = parsed ? *parsed : Pick::ColorFormat::Hex;
+
+        m_picker = new Pick::ColorPickerOverlay{*frame, screen->geometry(), format, *m_theme};
+        QObject::connect(m_picker, &Pick::ColorPickerOverlay::colorPicked, this,
+                         [this](const QColor &, const QString &text)
+                         {
+                             QGuiApplication::clipboard()->setText(text);
+                             notifyUser(QStringLiteral("已复制颜色 ") + text, Ui::ToastKind::Success);
+                         });
+        QObject::connect(m_picker, &Pick::ColorPickerOverlay::cancelled, this, [] { Core::Logger::info("取色已取消"); });
+        m_picker->showFullScreen();
+        m_picker->raise();
+        m_picker->activateWindow();
     }
 
     Core::Expected<Record::RecorderConfig> AppController::makeRecordingConfig() const

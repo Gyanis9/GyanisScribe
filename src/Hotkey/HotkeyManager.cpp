@@ -17,6 +17,7 @@ namespace GyanisScribe::Hotkey
         constexpr std::string_view kDefaultCapture = "Ctrl+Alt+A";
         constexpr std::string_view kDefaultRecord  = "Ctrl+Alt+R";
         constexpr std::string_view kDefaultOcr     = "Ctrl+Alt+O";
+        constexpr std::string_view kDefaultPick    = "Ctrl+Alt+P";
     } // namespace
 
     HotkeyManager::HotkeyManager(Settings::ISettingsStore &settings, Platform::IPlatformIntegration &integration, QObject *parent) :
@@ -49,9 +50,10 @@ namespace GyanisScribe::Hotkey
         }
     }
 
-    const std::array<HotkeyAction, 3> &HotkeyManager::managedActions()
+    std::span<const HotkeyAction> HotkeyManager::managedActions()
     {
-        static constexpr std::array<HotkeyAction, 3> actions = {HotkeyAction::Capture, HotkeyAction::Record, HotkeyAction::Ocr};
+        // 表长度不写进返回类型：每加一个动作就改三处的日子结束了
+        static constexpr std::array<HotkeyAction, 4> actions = {HotkeyAction::Capture, HotkeyAction::Record, HotkeyAction::Ocr, HotkeyAction::Pick};
         return actions;
     }
 
@@ -65,6 +67,8 @@ namespace GyanisScribe::Hotkey
                 return Settings::kHotkeyRecord;
             case HotkeyAction::Ocr:
                 return Settings::kHotkeyOcr;
+            case HotkeyAction::Pick:
+                return Settings::kHotkeyPick;
         }
         // 上面穷举过；走到这里说明新增了动作而这里没跟上，交回兜底键名并在日志里点名
         Core::Logger::error(std::format("动作枚举 {} 没有对应的设置键，请把 settingsKeyFor 补全", static_cast<int>(action)));
@@ -81,6 +85,8 @@ namespace GyanisScribe::Hotkey
                 return kDefaultRecord;
             case HotkeyAction::Ocr:
                 return kDefaultOcr;
+            case HotkeyAction::Pick:
+                return kDefaultPick;
         }
         Core::Logger::error(std::format("动作枚举 {} 没有对应的默认组合，请把 defaultCombinationTextFor 补全", static_cast<int>(action)));
         return kDefaultCapture;

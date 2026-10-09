@@ -12,6 +12,7 @@
 #include "Hotkey/IHotkeyManager.h"
 
 #include <array>
+#include <span>
 #include <memory>
 #include <optional>
 #include <string_view>
@@ -75,7 +76,7 @@ namespace GyanisScribe::Hotkey
 
     private:
         /// 全部受管动作，顺序与登记顺序一致，是「有几项」的唯一出处
-        [[nodiscard]] static const std::array<HotkeyAction, 3> &managedActions();
+        [[nodiscard]] static std::span<const HotkeyAction> managedActions();
 
         /// 动作对应的设置键
         [[nodiscard]] static std::string_view settingsKeyFor(HotkeyAction action);
