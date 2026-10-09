@@ -65,6 +65,22 @@ namespace GyanisScribe::Core
          * @param directory 目标目录
          * @return 成功返回 void；失败返回原因，文案里带目录与系统错误
          */
+        /**
+         * @brief 路径换成能直接拼进界面文案的字符串
+         * @param path 文件路径
+         * @return UTF-16 的那串路径
+         * @details 走 wstring 而不是 narrow string：Windows 上 narrow 按本地 ANSI 码页解释，
+         *          中文用户名下的截图目录会被读成另一条不存在的路。
+         */
+        [[nodiscard]] static QString toDisplayText(const std::filesystem::path &path);
+
+        /**
+         * @brief 把 toDisplayText 的结果换回路径
+         * @param text 界面里的那串路径
+         * @return 文件路径
+         */
+        [[nodiscard]] static std::filesystem::path fromDisplayText(const QString &text);
+
         [[nodiscard]] static Expected<void> ensureDirectory(const std::filesystem::path &directory);
 
         /**

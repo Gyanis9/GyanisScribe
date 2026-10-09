@@ -9,6 +9,9 @@
 #include "Capture/ScreenUtils.h"
 #include "Core/Logger.h"
 #include "Core/Paths.h"
+#include "History/HistoryRules.h"
+#include "History/HistoryStore.h"
+#include "History/HistoryTypes.h"
 #include "Hotkey/HotkeyManager.h"
 #include "Hotkey/IHotkeyManager.h"
 #include "Ocr/IOcrEngine.h"
@@ -27,6 +30,7 @@
 #include "Ui/Toast.h"
 
 #include <QClipboard>
+#include <QImageReader>
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QGuiApplication>
@@ -78,7 +82,8 @@ namespace GyanisScribe::App
         m_pins       = std::make_unique<Pin::PinManager>(*m_settings, *m_integration);
         m_ocr        = Ocr::createOcrEngine(*m_settings, *m_integration);
         m_tray       = std::make_unique<TrayController>(*m_icons, *m_theme, *m_settings);
-        m_mainWindow = std::make_unique<MainWindow>(*m_settings, *m_theme, *m_icons);
+        m_history    = std::make_unique<History::HistoryStore>(History::HistoryStore::defaultStoragePath());
+        m_mainWindow = std::make_unique<MainWindow>(*m_settings, *m_theme, *m_icons, *m_history);
         m_toast      = std::make_unique<Ui::Toast>(*m_icons, *m_theme);
         QObject::connect(m_tray.get(), &TrayController::actionRequested, this, &AppController::handleTrayAction);
         // 没有托盘的桌面环境（容器、精简安装）照样能跑：只是少一个入口，主窗口仍然可用
@@ -124,6 +129,12 @@ namespace GyanisScribe::App
         m_recording = std::make_unique<Record::RecordingService>(*m_captureSource, *m_recorder);
         QObject::connect(m_recording.get(), &Record::RecordingService::finished, this, &AppController::handleRecordingFinished);
         QObject::connect(m_recording.get(), &Record::RecordingService::failed, this, &AppController::handleRecordingFailed);
+
+        // 历史页的三个出口：贴图与识别都要先把成品读回内存，删除只动清单不动文件
+        QObject::connect(m_mainWindow.get(), &MainWindow::historyPinRequested, this, &AppController::handleHistoryPin);
+        QObject::connect(m_mainWindow.get(), &MainWindow::historyOcrRequested, this, &AppController::handleHistoryOcr);
+        QObject::connect(m_mainWindow.get(), &MainWindow::historyRemoveRequested, this, &AppController::handleHistoryRemove);
+        QObject::connect(m_mainWindow.get(), &MainWindow::historyMessage, this, [this](const QString &message, Ui::ToastKind kind) { notifyUser(message, kind); });
     }
 
     AppController::~AppController() = default;
@@ -262,6 +273,7 @@ namespace GyanisScribe::App
             return;
         }
         Core::Logger::info(std::format("标注结果已保存：{}", filePath.string()));
+        recordHistory(filePath, History::HistoryKind::Screenshot, image.size());
     }
 
     void AppController::handlePinRequested(const QImage &image)
@@ -364,6 +376,8 @@ namespace GyanisScribe::App
                 Core::Logger::error(std::format("录屏没能开始：{}", config.error().message));
                 return;
             }
+            // 成品尺寸在这里记一次：编码完成时只剩一个路径，尺寸只能从当时的录屏区推
+            m_recordingSize = QSize{config->region.width(), config->region.height()};
             if (auto started = m_recording->start(*config); !started)
             {
                 Core::Logger::error(std::format("录屏没能开始：{}", started.error().message));
@@ -382,6 +396,74 @@ namespace GyanisScribe::App
     void AppController::handleRecordingFinished(const QString &outputPath)
     {
         Core::Logger::info(std::format("录屏成品：{}", outputPath.toStdString()));
+        recordHistory(Core::Paths::fromDisplayText(outputPath), History::HistoryKind::Recording, m_recordingSize);
+    }
+
+    void AppController::recordHistory(const std::filesystem::path &filePath, const History::HistoryKind kind, const QSize &size)
+    {
+        const auto entry = History::HistoryEntry{
+                .moment   = QDateTime::currentDateTime(),
+                .kind     = kind,
+                .filePath = filePath,
+                .size     = size,
+        };
+        if (auto stored = m_history->append(entry, History::policyFromSettings(*m_settings), QDateTime::currentDateTime()); !stored)
+        {
+            // 清单写不进去不该让「保存成功」变成假话：成品已经在盘上，只是下次打开找不到它
+            Core::Logger::warning(std::format("成品没进历史清单：{}", stored.error().message));
+            notifyUser(QString::fromUtf8(std::format("成品已保存，但没进历史清单：{}", stored.error().message).c_str()), Ui::ToastKind::Danger);
+            return;
+        }
+        m_mainWindow->refreshHistory();
+    }
+
+    Core::Expected<QImage> AppController::loadImageFile(const std::filesystem::path &filePath) const
+    {
+        QImageReader reader{Core::Paths::toDisplayText(filePath)};
+        reader.setAutoTransform(true);
+        const auto image = reader.read();
+        if (image.isNull())
+        {
+            return Core::Expected<QImage>{std::unexpected{Core::Error{
+                    .code    = Core::ErrorCode::DependencyMissing,
+                    .message = std::format("读不出这张图：{}。文件可能已被移动或删掉，或这个构建里没有对应的图片解码插件", Core::Paths::toDisplayText(filePath).toStdString()),
+            }}};
+        }
+        return Core::Expected<QImage>{image};
+    }
+
+    void AppController::handleHistoryPin(const std::filesystem::path &filePath)
+    {
+        auto image = loadImageFile(filePath);
+        if (!image)
+        {
+            notifyUser(QString::fromUtf8(image.error().message.c_str()), Ui::ToastKind::Danger);
+            return;
+        }
+        m_pins->addPin(*image, QCursor::pos());
+    }
+
+    void AppController::handleHistoryOcr(const std::filesystem::path &filePath)
+    {
+        auto image = loadImageFile(filePath);
+        if (!image)
+        {
+            notifyUser(QString::fromUtf8(image.error().message.c_str()), Ui::ToastKind::Danger);
+            return;
+        }
+        handleOcrRequested(*image);
+    }
+
+    void AppController::handleHistoryRemove(const std::filesystem::path &filePath)
+    {
+        if (auto removed = m_history->remove(filePath); !removed)
+        {
+            notifyUser(QString::fromUtf8(std::format("这条历史没删掉：{}", removed.error().message).c_str()), Ui::ToastKind::Danger);
+            return;
+        }
+        // 删记录不删文件：这句要让用户看见，否则他会以为图也被清掉了
+        notifyUser(QStringLiteral("已从历史里去掉，成品文件仍在 ") + Core::Paths::toDisplayText(filePath), Ui::ToastKind::Success);
+        m_mainWindow->refreshHistory();
     }
 
     void AppController::handleRecordingFailed(const QString &reason)

@@ -15,8 +15,10 @@
 #include <vector>
 
 using GyanisScribe::App::aboutText;
+using GyanisScribe::App::indexOfMainWindowPage;
 using GyanisScribe::App::indexOfThemeKind;
 using GyanisScribe::App::MainWindowPage;
+using GyanisScribe::App::pageChoices;
 using GyanisScribe::App::themeChoices;
 using GyanisScribe::App::themeKindAt;
 using GyanisScribe::App::TrayAction;
@@ -121,6 +123,30 @@ TEST(MainWindowMapping, ThemeChoicesAndIndicesPointAtEachOther)
     EXPECT_FALSE(themeKindAt(3).has_value());
     EXPECT_FALSE(themeKindAt(-1).has_value());
     EXPECT_EQ(indexOfThemeKind(static_cast<ThemeKind>(99)), -1) << "越界档位要给出 -1，让调用方跳过而不是写到 index 0";
+}
+
+/**
+ * @brief 钉住主窗口的「序号—页—标签」三者在同一张表上
+ * @details 托盘菜单按页跳转、选项卡按同一张表出题：分开放就会出现「菜单写着历史、点开是设置」。
+ */
+TEST(MainWindowMapping, PageChoicesBindIndexPageAndLabel)
+{
+    constexpr std::array<std::pair<MainWindowPage, std::string_view>, 3> expectedPages = {
+            std::pair{MainWindowPage::Settings, std::string_view{"设置"}},
+            std::pair{MainWindowPage::About, std::string_view{"关于"}},
+            std::pair{MainWindowPage::History, std::string_view{"历史"}},
+    };
+
+    const auto pages = pageChoices();
+    ASSERT_EQ(pages.size(), expectedPages.size()) << "加一页要同时进这张表，选项卡也从这里出题";
+    for (std::size_t index = 0; index < expectedPages.size(); ++index)
+    {
+        EXPECT_EQ(pages[index].page, expectedPages[index].first) << index;
+        EXPECT_EQ(pages[index].label, expectedPages[index].second) << index;
+        EXPECT_EQ(indexOfMainWindowPage(expectedPages[index].first), static_cast<int>(index)) << index;
+    }
+
+    EXPECT_EQ(indexOfMainWindowPage(static_cast<MainWindowPage>(42)), -1) << "没登记的页要给出 -1，让 open() 跳过而不是切到第 0 页";
 }
 
 /**

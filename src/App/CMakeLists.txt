@@ -14,6 +14,7 @@ target_link_libraries(App PUBLIC
         Annotation
         Capture
         Core
+        History
         Hotkey
         Ocr
         Pin

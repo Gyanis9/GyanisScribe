@@ -20,6 +20,7 @@
 
 #include <QImage>
 #include <QPointer>
+#include <QSize>
 
 #include <memory>
 
@@ -40,6 +41,12 @@ namespace GyanisScribe::Ocr
     class IOcrEngine;
     class OcrResultWindow;
 } // namespace GyanisScribe::Ocr
+
+namespace GyanisScribe::History
+{
+    enum class HistoryKind;
+    class HistoryStore;
+} // namespace GyanisScribe::History
 
 namespace GyanisScribe::Pin
 {
@@ -213,27 +220,54 @@ namespace GyanisScribe::App
         /// 给用户看的一条提示：有气泡就用气泡，没有（例如起不来托盘的那类环境）就落日志
         void notifyUser(const QString &message, GyanisScribe::Ui::ToastKind kind);
 
-        std::unique_ptr<Settings::SettingsStore>        m_settings;                                ///< 配置存储
-        std::unique_ptr<Platform::IPlatformIntegration> m_integration;                             ///< 平台集成
-        std::unique_ptr<Capture::IScreenCaptureSource>  m_captureSource;                           ///< 抓帧来源
-        std::unique_ptr<Capture::CaptureService>        m_capture;                                 ///< 截图编排
-        std::unique_ptr<Hotkey::HotkeyManager>          m_hotkeys;                                 ///< 热键登记与触发
-        std::unique_ptr<GyanisScribe::Ui::ThemeManager> m_theme;                                   ///< 主题档位与样式表
-        std::unique_ptr<GyanisScribe::Ui::IconProvider> m_icons;                                   ///< 图标供给器，描边色跟主题
-        std::unique_ptr<Annotation::AnnotationEngine>   m_annotation;                              ///< 标注引擎，跨轮次保留（载入新帧会清空）
-        std::unique_ptr<Annotation::AnnotationWindow>   m_annotationWindow;                        ///< 标注窗口，复用同一把工具栏
-        std::unique_ptr<Pin::PinManager>                m_pins;                                    ///< 贴图管理器
-        std::unique_ptr<Ocr::IOcrEngine>                m_ocr;                                     ///< 识别后端，按设置与平台能力选一次
-        std::unique_ptr<Record::FfmpegRecordingEncoder> m_recorder;                                ///< 录屏的编码步
-        std::unique_ptr<Record::RecordingService>       m_recording;                               ///< 录屏服务，一轮一个会话
-        std::unique_ptr<TrayController>                 m_tray;                                    ///< 托盘图标与菜单
-        std::unique_ptr<MainWindow>                     m_mainWindow;                              ///< 设置与关于的入口
-        std::unique_ptr<GyanisScribe::Ui::Toast>        m_toast;                                   ///< 右下角提示气泡，操作结果的落地处
-        QImage                                          m_ocrImage;                                ///< 最近一次送去识别的图，换语言重认按它算
-        QPointer<Ocr::OcrResultWindow>                  m_ocrWindow;                               ///< 识别结果窗口，关了就重建，不拥有
-        CaptureIntent                                   m_captureIntent = CaptureIntent::Annotate; ///< 这一帧截完要去做的事
-        Core::CapturedImage                             m_lastCapture;                             ///< 本轮抓到的帧，贴图与识别要用它定位
-        QRect                                           m_lastSelection;                           ///< 本轮选区（全局逻辑坐标），标注窗与贴图的位置来源
+        /**
+         * @brief 把一份成品记进历史清单并刷新历史页
+         * @param filePath 成品文件路径
+         * @param kind 成品类别
+         * @param size 成品尺寸，视频记的是录屏区尺寸
+         * @details 记不进清单只警告不报错：成品已经在盘上，把「保存成功」说成失败更糟。
+         */
+        void recordHistory(const std::filesystem::path &filePath, GyanisScribe::History::HistoryKind kind, const QSize &size);
+
+        /**
+         * @brief 从盘上读回一张图
+         * @param filePath 图片路径
+         * @return 图；读不出时返回写明原因的错误
+         */
+        [[nodiscard]] Core::Expected<QImage> loadImageFile(const std::filesystem::path &filePath) const;
+
+        /// 历史页要求把一条成品重新贴回屏幕
+        void handleHistoryPin(const std::filesystem::path &filePath);
+
+        /// 历史页要求对一条成品做识别
+        void handleHistoryOcr(const std::filesystem::path &filePath);
+
+        /// 历史页要求去掉一条记录（成品文件保留）
+        void handleHistoryRemove(const std::filesystem::path &filePath);
+
+        std::unique_ptr<Settings::SettingsStore>             m_settings;                                ///< 配置存储
+        std::unique_ptr<Platform::IPlatformIntegration>      m_integration;                             ///< 平台集成
+        std::unique_ptr<Capture::IScreenCaptureSource>       m_captureSource;                           ///< 抓帧来源
+        std::unique_ptr<Capture::CaptureService>             m_capture;                                 ///< 截图编排
+        std::unique_ptr<Hotkey::HotkeyManager>               m_hotkeys;                                 ///< 热键登记与触发
+        std::unique_ptr<GyanisScribe::Ui::ThemeManager>      m_theme;                                   ///< 主题档位与样式表
+        std::unique_ptr<GyanisScribe::Ui::IconProvider>      m_icons;                                   ///< 图标供给器，描边色跟主题
+        std::unique_ptr<Annotation::AnnotationEngine>        m_annotation;                              ///< 标注引擎，跨轮次保留（载入新帧会清空）
+        std::unique_ptr<Annotation::AnnotationWindow>        m_annotationWindow;                        ///< 标注窗口，复用同一把工具栏
+        std::unique_ptr<Pin::PinManager>                     m_pins;                                    ///< 贴图管理器
+        std::unique_ptr<Ocr::IOcrEngine>                     m_ocr;                                     ///< 识别后端，按设置与平台能力选一次
+        std::unique_ptr<Record::FfmpegRecordingEncoder>      m_recorder;                                ///< 录屏的编码步
+        std::unique_ptr<Record::RecordingService>            m_recording;                               ///< 录屏服务，一轮一个会话
+        std::unique_ptr<TrayController>                      m_tray;                                    ///< 托盘图标与菜单
+        std::unique_ptr<MainWindow>                          m_mainWindow;                              ///< 设置与关于的入口
+        std::unique_ptr<GyanisScribe::Ui::Toast>             m_toast;                                   ///< 右下角提示气泡，操作结果的落地处
+        QImage                                               m_ocrImage;                                ///< 最近一次送去识别的图，换语言重认按它算
+        QPointer<Ocr::OcrResultWindow>                       m_ocrWindow;                               ///< 识别结果窗口，关了就重建，不拥有
+        std::unique_ptr<GyanisScribe::History::HistoryStore> m_history;                                 ///< 历史清单：成品文件的索引，删记录不删文件
+        QSize                                                m_recordingSize;                           ///< 本轮录屏区尺寸，成品落地时记进历史
+        CaptureIntent                                        m_captureIntent = CaptureIntent::Annotate; ///< 这一帧截完要去做的事
+        Core::CapturedImage                                  m_lastCapture;                             ///< 本轮抓到的帧，贴图与识别要用它定位
+        QRect                                                m_lastSelection;                           ///< 本轮选区（全局逻辑坐标），标注窗与贴图的位置来源
     };
 
 } // namespace GyanisScribe::App

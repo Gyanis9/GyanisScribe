@@ -16,6 +16,7 @@
     <file alias="Copy.svg">Icons/Copy.svg</file>
     <file alias="Countdown.svg">Icons/Countdown.svg</file>
     <file alias="CursorHighlight.svg">Icons/CursorHighlight.svg</file>
+    <file alias="Delete.svg">Icons/Delete.svg</file>
     <file alias="Ellipse.svg">Icons/Ellipse.svg</file>
     <file alias="Exit.svg">Icons/Exit.svg</file>
     <file alias="Highlight.svg">Icons/Highlight.svg</file>

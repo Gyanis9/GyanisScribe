@@ -4,6 +4,8 @@
 #include "Core/Paths.h"
 #include "Ocr/OcrEngineFactory.h"
 #include "Settings/ISettingsStore.h"
+#include "History/HistoryRules.h"
+#include "History/HistoryView.h"
 #include "Settings/SettingsKeys.h"
 #include "Ui/HotkeyEdit.h"
 #include "Ui/IconProvider.h"
@@ -34,7 +36,16 @@ namespace
     using GyanisScribe::Ui::ThemeKind;
     using GyanisScribe::Ui::ThemeManager;
 
+    using GyanisScribe::App::MainWindowPage;
+    using GyanisScribe::App::PageChoice;
     using GyanisScribe::App::ThemeChoice;
+
+    /// 主窗口的全部页：序号、目标页与选项卡标签绑在同一张表上
+    constexpr std::array<PageChoice, 3> kPages = {
+            PageChoice{MainWindowPage::Settings, "设置"},
+            PageChoice{MainWindowPage::About, "关于"},
+            PageChoice{MainWindowPage::History, "历史"},
+    };
 
     /// 下拉框的全部行：序号、档位、可见标签三者绑在这一张表上
     constexpr std::array<ThemeChoice, 3> kThemeChoices = {
@@ -107,6 +118,23 @@ namespace
 
 namespace GyanisScribe::App
 {
+    std::span<const PageChoice> pageChoices()
+    {
+        return kPages;
+    }
+
+    int indexOfMainWindowPage(const MainWindowPage page)
+    {
+        for (std::size_t index = 0; index < kPages.size(); ++index)
+        {
+            if (kPages[index].page == page)
+            {
+                return static_cast<int>(index);
+            }
+        }
+        return -1;
+    }
+
     std::span<const ThemeChoice> themeChoices()
     {
         return kThemeChoices;
@@ -143,26 +171,58 @@ namespace GyanisScribe::App
                 .arg(version);
     }
 
-    MainWindow::MainWindow(ISettingsStore &settings, ThemeManager &theme, IconProvider &icons, QWidget *parent) :
-        QWidget(parent), m_settings(settings), m_theme(theme), m_icons(icons)
+    MainWindow::MainWindow(ISettingsStore &settings, ThemeManager &theme, IconProvider &icons, History::HistoryStore &historyStore, QWidget *parent) :
+        QWidget(parent), m_settings(settings), m_theme(theme), m_icons(icons), m_historyStore(historyStore)
     {
         setWindowTitle(QStringLiteral("智录 设置"));
         setWindowIcon(icons.icon("App"));
 
         auto *layout = new QVBoxLayout{this};
         m_tabs       = new QTabWidget{this};
-        m_tabs->addTab(buildSettingsPage(), QStringLiteral("设置"));
-        m_tabs->addTab(buildAboutPage(), QStringLiteral("关于"));
+        // 页与标签都从 pageChoices() 现取：这里再抄一份中文就会出现菜单与页签不同名
+        m_tabs->addTab(buildSettingsPage(), QString::fromUtf8(kPages[0].label.data(), static_cast<qsizetype>(kPages[0].label.size())));
+        m_tabs->addTab(buildAboutPage(), QString::fromUtf8(kPages[1].label.data(), static_cast<qsizetype>(kPages[1].label.size())));
+        m_tabs->addTab(buildHistoryPage(), QString::fromUtf8(kPages[2].label.data(), static_cast<qsizetype>(kPages[2].label.size())));
         layout->addWidget(m_tabs);
         resize(560, 460);
     }
 
     void MainWindow::open(const MainWindowPage page)
     {
-        m_tabs->setCurrentIndex(page == MainWindowPage::Settings ? 0 : 1);
+        const auto index = indexOfMainWindowPage(page);
+        if (index < 0)
+        {
+            // 页不在表里（比如新页忘了登记）就别切：切到第 0 页会把用户的操作读成「没反应」
+            Core::Logger::warning(std::format("主窗口没有这一页（枚举值 {}），已忽略这次跳转", static_cast<int>(page)));
+            return;
+        }
+        m_tabs->setCurrentIndex(index);
         show();
         raise();
         activateWindow();
+    }
+
+    QWidget *MainWindow::buildHistoryPage()
+    {
+        auto *page  = new QWidget{this};
+        auto *inner = new QVBoxLayout{page};
+        m_history   = new History::HistoryView{m_historyStore, History::policyFromSettings(m_settings), m_icons, page};
+        inner->addWidget(m_history);
+
+        // 三个出口原样转给控制器：主窗口不知道贴图与识别各自要做什么
+        QObject::connect(m_history, &History::HistoryView::pinRequested, this, &MainWindow::historyPinRequested);
+        QObject::connect(m_history, &History::HistoryView::ocrRequested, this, &MainWindow::historyOcrRequested);
+        QObject::connect(m_history, &History::HistoryView::removeRequested, this, &MainWindow::historyRemoveRequested);
+        QObject::connect(m_history, &History::HistoryView::messageForUser, this, &MainWindow::historyMessage);
+        return page;
+    }
+
+    void MainWindow::refreshHistory()
+    {
+        if (m_history != nullptr)
+        {
+            m_history->refresh();
+        }
     }
 
     QWidget *MainWindow::buildSettingsPage()

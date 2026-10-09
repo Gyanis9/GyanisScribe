@@ -55,6 +55,16 @@ namespace GyanisScribe::Core
         return fromQt(QStandardPaths::writableLocation(QStandardPaths::MoviesLocation)) / std::string(kApplicationFolder);
     }
 
+    QString Paths::toDisplayText(const std::filesystem::path &path)
+    {
+        return QString::fromStdWString(path.wstring());
+    }
+
+    std::filesystem::path Paths::fromDisplayText(const QString &text)
+    {
+        return std::filesystem::path{text.toStdWString()};
+    }
+
     Expected<void> Paths::ensureDirectory(const std::filesystem::path &directory)
     {
         std::error_code error;

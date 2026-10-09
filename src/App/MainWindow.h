@@ -10,10 +10,12 @@
 #pragma once
 
 #include "Ui/ThemeKind.h"
+#include "Ui/Toast.h"
 
 #include <QString>
 #include <QWidget>
 
+#include <filesystem>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -31,14 +33,46 @@ namespace GyanisScribe::Ui
     class ThemeManager;
 } // namespace GyanisScribe::Ui
 
+namespace GyanisScribe::History
+{
+    class HistoryStore;
+    class HistoryView;
+} // namespace GyanisScribe::History
+
 namespace GyanisScribe::App
 {
     /// 主窗口能直接跳到的页面
+    /// @note 新页只能追加在末尾：序号写进托盘菜单与用例，插进中间会把菜单指到别的页
     enum class MainWindowPage
     {
         Settings, ///< 设置
         About,    ///< 关于
+        History,  ///< 历史
     };
+
+    /**
+     * @brief 主窗口的一页
+     * @details 页与标签绑在同一行：托盘菜单、选项卡标题与 open() 的序号都从这张表来，
+     *          分开放就会出现「菜单写着历史、点开是设置」。
+     */
+    struct PageChoice
+    {
+        MainWindowPage   page;  ///< 这一行对应的页
+        std::string_view label; ///< 选项卡上的中文名
+    };
+
+    /**
+     * @brief 主窗口的全部页，下标即选项卡序号
+     * @return 只读表格
+     */
+    [[nodiscard]] std::span<const PageChoice> pageChoices();
+
+    /**
+     * @brief 某一页的选项卡序号
+     * @param page 目标页
+     * @return 序号；页不在表里时返回 -1
+     */
+    [[nodiscard]] int indexOfMainWindowPage(MainWindowPage page);
 
     /**
      * @brief 主题下拉框的一行
@@ -95,11 +129,13 @@ namespace GyanisScribe::App
          * @param settings 配置存储，页面上的每一项都直接读写它
          * @param theme 主题管理器，主题下拉即时生效走它
          * @param icons 图标供给器
+         * @param historyStore 历史清单，历史页从它读列表、往它删记录
          * @param parent Qt 父对象
          * @note 刻意不认识 AppController：热键与语言的改动由各自的订阅者接走，
-         *       设置页不需要为了「生效」去拖一个控制器进来。
+         *       设置页不需要为了「生效」去拖一个控制器进来。历史页的三个出口同样只发信号。
          */
-        explicit MainWindow(Settings::ISettingsStore &settings, GyanisScribe::Ui::ThemeManager &theme, GyanisScribe::Ui::IconProvider &icons, QWidget *parent = nullptr);
+        explicit MainWindow(Settings::ISettingsStore &settings, GyanisScribe::Ui::ThemeManager &theme, GyanisScribe::Ui::IconProvider &icons, History::HistoryStore &historyStore,
+                            QWidget *parent = nullptr);
 
         /**
          * @brief 切到某一页并显示窗口
@@ -107,16 +143,52 @@ namespace GyanisScribe::App
          */
         void open(MainWindowPage page);
 
+        /**
+         * @brief 重读历史清单并刷新历史页
+         * @details 截图与录屏落盘之后由控制器调用：列表不会自己发现盘上多了文件。
+         */
+        void refreshHistory();
+
+    signals:
+        /**
+         * @brief 历史页要求把一条成品重新贴回屏幕
+         * @param filePath 成品文件路径
+         */
+        void historyPinRequested(const std::filesystem::path &filePath);
+
+        /**
+         * @brief 历史页要求对一条成品做文字识别
+         * @param filePath 成品文件路径
+         */
+        void historyOcrRequested(const std::filesystem::path &filePath);
+
+        /**
+         * @brief 历史页要求从清单里去掉一条
+         * @param filePath 成品文件路径
+         */
+        void historyRemoveRequested(const std::filesystem::path &filePath);
+
+        /**
+         * @brief 历史页要落进气泡的一条提示
+         * @param message 中文正文
+         * @param kind 语义种类
+         */
+        void historyMessage(const QString &message, GyanisScribe::Ui::ToastKind kind);
+
     private:
         /// 搭设置页：热键、目录、主题、识别语言四组
         QWidget *buildSettingsPage();
         /// 搭关于页
         QWidget *buildAboutPage();
+        /// 搭历史页：缩略图列表与三个出口
+        QWidget *buildHistoryPage();
 
-        Settings::ISettingsStore       &m_settings;       ///< 配置存储，不拥有
-        GyanisScribe::Ui::ThemeManager &m_theme;          ///< 主题管理器，不拥有
-        GyanisScribe::Ui::IconProvider &m_icons;          ///< 图标供给器，不拥有
-        QTabWidget                     *m_tabs = nullptr; ///< 两页的容器
+        Settings::ISettingsStore       &m_settings;          ///< 配置存储，不拥有
+        GyanisScribe::Ui::ThemeManager &m_theme;             ///< 主题管理器，不拥有
+        GyanisScribe::Ui::IconProvider &m_icons;             ///< 图标供给器，不拥有
+        QTabWidget                     *m_tabs = nullptr;    ///< 各页的容器
+        History::HistoryStore          &m_historyStore;      ///< 历史清单，历史页从它读
+        History::HistoryView           *m_history = nullptr; ///< 历史页控件，重读清单时刷新它
     };
 
 } // namespace GyanisScribe::App
