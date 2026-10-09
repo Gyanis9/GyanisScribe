@@ -22,3 +22,11 @@ class ConanApplication(ConanFile):
     def requirements(self):
         for requirement in self.conan_data.get("requirements", []):
             self.requires(requirement)
+
+        # Debug 档不领 Tesseract：上游 leptonica 的 Debug 包与其 cpp_info 的库名不一致，
+        # tesseract 在 Debug 下 configure 一定失败（缺的库是 leptonica-1.87.0）。Release 档照领，
+        # 于是同一份源码在两档里各编一种形状：Release 带真后端，Debug 带降级桩。
+        # 撤掉这条判断的判据：conan install -s build_type=Debug --requires=tesseract/5.5.2 能 configure 过。
+        if str(self.settings.build_type) != "Debug":
+            for requirement in self.conan_data.get("releaseOnlyRequirements", []):
+                self.requires(requirement)

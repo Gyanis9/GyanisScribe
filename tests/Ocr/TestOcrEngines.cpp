@@ -213,8 +213,12 @@ TEST_F(OcrFixture, FactoryFallsBackToUnavailableWithActionableReason)
 }
 
 /**
- * @brief 钉住「语言包在但本构建没编入后端」那一格：不许把构建配置问题说成用户少放了文件
+ * @brief 钉住「语言包在、但这一档没编入后端」那一格：不许把构建配置问题说成用户少放了文件
+ * @details 只有 Debug 档走这一格（Tesseract 只进 Release 依赖图，原因见 conanfile.py）。
+ *          旧的断言是「任何构建都报后端缺席」，新语义是按宏分两种形状：带后端的构建里
+ *          同一份语言包必须拿到 Tesseract，那条由下面的用例钉。
  */
+#if !defined(GYANISSCRIBE_HAS_TESSERACT)
 TEST_F(OcrFixture, ReportsMissingBackendSeparatelyFromMissingLanguagePacks)
 {
     const auto    directory = makeModelDirectoryWith("eng.traineddata");
@@ -228,6 +232,32 @@ TEST_F(OcrFixture, ReportsMissingBackendSeparatelyFromMissingLanguagePacks)
     EXPECT_NE(reason.indexOf(QStringLiteral("OcrBackends")), -1) << "要指到接入办法那篇文档";
     EXPECT_EQ(reason.indexOf(QStringLiteral("traineddata）放进")), -1) << "不该再让用户去放本已存在的文件";
 }
+#else
+/**
+ * @brief 钉住带后端的构建里，语言包在位就拿到真后端
+ * @details 模型文件是这里现造的空文件，所以识别一定失败——失败要报「初始化语言失败」，
+ *          不许把坏模型当成「认出来是空结果」悄悄放过去。
+ */
+TEST_F(OcrFixture, PrefersTesseractWhenLanguagePacksArePresent)
+{
+    const auto    directory = makeModelDirectoryWith("eng.traineddata");
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kOcrTessDataDirectory, QVariant(QString::fromLocal8Bit(directory.string().c_str()))).has_value());
+
+    const auto engine = createOcrEngine(settings, *integration);
+    ASSERT_TRUE(engine->isAvailable()) << "语言包已经在位却仍报不可用：选型没接上 Tesseract";
+    EXPECT_EQ(engine->name(), QStringLiteral("Tesseract")) << "拿到的不是真后端";
+    EXPECT_TRUE(engine->supportedLanguages().contains(QStringLiteral("en")));
+    EXPECT_TRUE(engine->unavailableReason().isEmpty());
+
+    QImage image(64, 24, QImage::Format_ARGB32);
+    image.fill(Qt::white);
+    const auto recognized = engine->recognize(image, QStringLiteral("en"));
+    ASSERT_FALSE(recognized.has_value()) << "空文件冒充的模型被当成认出来了";
+    EXPECT_NE(recognized.error().message.find("初始化语言"), std::string::npos) << recognized.error().message;
+    EXPECT_EQ(recognized.error().code, GyanisScribe::Core::ErrorCode::InternalError);
+}
+#endif
 
 /**
  * @brief 钉住对外语言标签词表与默认值同解

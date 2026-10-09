@@ -2,28 +2,34 @@
 
 ## 现在有什么
 
-- `IOcrEngine`（同步接口）+ `UnavailableOcrEngine`（降级桩）+ 后端选型 `createOcrEngine()` 已落地并有 13 条用例。
+- `IOcrEngine`（同步接口）+ `TesseractOcrEngine`（真后端）+ `UnavailableOcrEngine`（降级桩）+ 后端选型 `createOcrEngine()`，Ocr 目录共 14 条用例。
 - 预处理链 `toGrayscale → denoise → enlarge → binarize` 已落地并逐环有判据。
 - 结果导出：TXT 与 JSON（JSON 带 language、averageConfidence、imageSize、逐词方框）。
 - 语言标签词表对外只有 `zh-Hans` / `en` 两个，磁盘上的模型名（`chi_sim` / `eng`）在引擎内部映射。
 
-## 当前构建里没有后端
+## 后端按构建档分形状：Release 带 Tesseract，Debug 带降级桩
 
-`createOcrEngine()` 现在恒回桩实现，原因文案会区分两种情况：语言包没找到（点出三处查找位置），
-或语言包在但本构建没编入后端（指向本文）。不装成「可用但返回空结果」——空结果与「这张图里没字」长得一样。
+`createOcrEngine()` 有两种形状，由宏 `GYANISSCRIBE_HAS_TESSERACT` 决定：Release 档拿到 `TesseractOcrEngine`，
+Debug 档拿到 `UnavailableOcrEngine`。两个预设都在门禁里各编各的，所以没有「声明了却没编过」的分支。
 
-## Tesseract（跨平台那一路）
-
-- conancenter 有配方（实测列到 5.5.3）。本机 `--build=missing` 的探测在从源码构建 leptonica + tesseract
-  （Windows/MSVC 195 没有可用的预编译包）。
-- 结论出来之前不把 `TesseractOcrEngine.{h,cpp}` 放进仓库：**没有依赖就编不到的文件，不该以「看起来完成」的形式留在树里**。
-- 接入清单（三处必须同批，否则 CMake 分支会指向不存在的文件）：
-  1. `conandata.yml` 的 `requirements` 加 `tesseract/<版本>`；
-  2. `src/Ocr/CMakeLists.txt` 恢复 `find_package(Tesseract QUIET CONFIG)` 的可选分支与 `GYANISSCRIBE_HAS_TESSERACT`；
-  3. 放回 `TesseractOcrEngine.h/.cpp`（C API：`TessBaseAPIInit3/SetImage/Recognize/GetIterator`，
-     行由词框纵坐标归并，置信度取均值）。
+- Debug 档为什么不带：上游 leptonica 的 Debug 包把库名写成 `leptonica-1.87.0`，而它自己的 `cpp_info`
+  里找不到这个文件，tesseract 在 Debug 下 `cmake configure` 必失败。实测两轮：第一轮卡在 WebP 的版本判定
+  （`find_dependency(WebP 0.5.0)` 与 libwebp 1.6.0 主版本不同），关掉 webp 之后第二轮卡在库名。
+- 撤掉这条不对称的判据：`conan install --requires=tesseract/5.5.2 -s build_type=Debug --build=missing`
+  能 configure 过，就把 `conandata.yml` 的 `releaseOnlyRequirements` 并回 `requirements`，
+  删掉 `conanfile.py` 里那段 `build_type` 判断与 `src/Ocr/CMakeLists.txt` 的 `if (Tesseract_FOUND)` 分支。
+- 包是按静态库给的（编译行里带 `-DLIBJPEG_STATIC` 一类开关），`bin/` 只有四个 Qt 的 DLL，
+  Release 的 `--selftest` 与 120 条用例都能跑起来，不需要额外部署 `tesseract.dll`。
+- 模型可用性只认「目录里有认识的语言对应的 `*.traineddata`」。空文件冒充的模型不算识别成功：
+  `recognize()` 返回 `InternalError` 并写明「初始化语言 X 失败」，这条由用例
+  `PrefersTesseractWhenLanguagePacksArePresent` 钉住（它同时证明库真的在运行，而不是被 `#if` 掉了）。
+- 迭代用 Tesseract 的 C 接口：函数是 `extern "C"` 的全局名，而 `RIL_*` 这组枚举在 C++ 模式下住在
+  `namespace tesseract` 里（capi.h 在 C++ 分支走 `typedef tesseract::PageIteratorLevel`），
+  两类名字的前缀不能一起加或一起去。
 - 语言包（`*.traineddata`）**不依赖构建期联网下载**（编码规范第 25 条：要么随包发布，要么由用户放置）；
   查找顺序为设置项 `Ocr/TessDataDirectory` → 环境变量 `TESSDATA_PREFIX` → 应用数据目录下的 `tessdata`。
+- 行归并是「按词框的纵坐标自己分行」：C 接口只给到逐词迭代，字号差异大的一行可能被拆成两行，
+  要做到逐行准确得换 C++ 接口按 `RIL_TEXTLINE` 走（源码里标了 `ponytail:`）。
 
 ## Windows.Media.Ocr（需求里的优先项）—— 为什么本轮没走
 

@@ -1,3 +1,8 @@
 requirements:
   - "spdlog/1.17.0"
   - "gtest/1.17.0"
+
+# 只有 Release 档才进依赖图：leptonica 的 Debug 包把库名写成 leptonica-1.87.0，
+# 而它自己的 cpp_info 找不到这个文件，tesseract 的 Debug configure 当场失败（上游配方问题）。
+releaseOnlyRequirements:
+  - "tesseract/5.5.2"
