@@ -15,4 +15,10 @@ namespace GyanisScribe::Settings
     /// OCR 的全局热键文本，例如 Ctrl+Alt+O
     inline constexpr std::string_view kHotkeyOcr = "Hotkey/Ocr";
 
+    /// 上一次成功截图的选区，文本形如「x,y,width,height」；写方与读方都在 Capture 模块
+    inline constexpr std::string_view kCaptureLastRegion = "Capture/LastRegion";
+
+    /// 上一次成功截图所在屏幕的名字，「上次区域」要回到那一块屏上
+    inline constexpr std::string_view kCaptureLastScreen = "Capture/LastScreen";
+
 } // namespace GyanisScribe::Settings
