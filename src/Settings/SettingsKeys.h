@@ -21,4 +21,10 @@ namespace GyanisScribe::Settings
     /// 上一次成功截图所在屏幕的名字，「上次区域」要回到那一块屏上
     inline constexpr std::string_view kCaptureLastScreen = "Capture/LastScreen";
 
+    /// 贴图保存的默认目录，为空时用系统图片目录下的 GyanisScribe
+    inline constexpr std::string_view kPathScreenshot = "Paths/Screenshot";
+
+    /// 贴图的布局记录（JSON 数组文本），重启后按它恢复摆位、缩放、旋转与透明度
+    inline constexpr std::string_view kPinLayout = "Pin/Layout";
+
 } // namespace GyanisScribe::Settings

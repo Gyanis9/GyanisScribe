@@ -6,6 +6,7 @@ add_subdirectory(Settings)
 add_subdirectory(Hotkey)
 add_subdirectory(Capture)
 add_subdirectory(Annotation)
+add_subdirectory(Pin)
 add_subdirectory(App)
 
 # Debug 档的 Qt DLL 带 d 后缀，Release 不带；这条后缀只在 MSVC + Debug 下成立
