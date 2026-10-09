@@ -39,4 +39,10 @@ namespace GyanisScribe::Settings
     /// OCR 语言包（tessdata）目录；为空时按环境变量与程序数据目录找
     inline constexpr std::string_view kOcrTessDataDirectory = "Ocr/TessDataDirectory";
 
+    /// 历史最多留多少条，0 表示不限条数
+    inline constexpr std::string_view kHistoryMaximumEntries = "History/MaximumEntries";
+
+    /// 历史最久留多少天，0 表示不限时长
+    inline constexpr std::string_view kHistoryRetentionDays = "History/RetentionDays";
+
 } // namespace GyanisScribe::Settings
