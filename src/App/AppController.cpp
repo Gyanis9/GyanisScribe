@@ -24,6 +24,7 @@
 #include "App/TrayController.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Record/FfmpegRecordingEncoder.h"
+#include "Record/RecordingHud.h"
 #include "Record/RecordingService.h"
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
@@ -137,6 +138,13 @@ namespace GyanisScribe::App
         m_recording = std::make_unique<Record::RecordingService>(*m_captureSource, *m_recorder);
         QObject::connect(m_recording.get(), &Record::RecordingService::finished, this, &AppController::handleRecordingFinished);
         QObject::connect(m_recording.get(), &Record::RecordingService::failed, this, &AppController::handleRecordingFailed);
+        QObject::connect(m_recording.get(), &Record::RecordingService::countdownChanged, this,
+                         [this](int remainingSeconds)
+                         {
+                             m_countdownRemaining = remainingSeconds;
+                             updateRecordingHud();
+                         });
+        QObject::connect(m_recording.get(), &Record::RecordingService::frameStored, this, [this] { updateRecordingHud(); });
 
         // 历史页的三个出口：贴图与识别都要先把成品读回内存，删除只动清单不动文件
         QObject::connect(m_mainWindow.get(), &MainWindow::historyPinRequested, this, &AppController::handleHistoryPin);
@@ -431,23 +439,92 @@ namespace GyanisScribe::App
             }
             // 成品尺寸在这里记一次：编码完成时只剩一个路径，尺寸只能从当时的录屏区推
             m_recordingSize = QSize{config->region.width(), config->region.height()};
+            showRecordingHud();
             if (auto started = m_recording->start(*config); !started)
             {
+                hideRecordingHud();
                 Core::Logger::error(std::format("录屏没能开始：{}", started.error().message));
+                notifyUser(QString::fromUtf8(std::format("录屏没能开始：{}", started.error().message).c_str()), Ui::ToastKind::Danger);
+                return;
             }
+            updateRecordingHud();
             return;
         }
 
-        // 还在录或还在倒计时/暂停：这一按是「停止并保存」，编码要等一会儿，先记一条让用户知道在忙
+        // 还在录或还在倒计时/暂停：这一按是「停止并保存」，编码要等一会儿，控制条先留着让用户知道在忙
         Core::Logger::info("录屏停止中，正在编码成品");
         if (auto stopped = m_recording->stop(); !stopped)
         {
+            hideRecordingHud();
             Core::Logger::error(std::format("录屏收尾失败：{}", stopped.error().message));
+            notifyUser(QString::fromUtf8(std::format("录屏收尾失败：{}", stopped.error().message).c_str()), Ui::ToastKind::Danger);
         }
+    }
+
+    void AppController::showRecordingHud()
+    {
+        auto *screen = QGuiApplication::primaryScreen();
+        if (screen == nullptr)
+        {
+            return;
+        }
+
+        m_hud = new Record::RecordingHud(*m_icons, screen->availableGeometry());
+        QObject::connect(m_hud, &Record::RecordingHud::pauseRequested, this,
+                         [this]
+                         {
+                             m_recording->pause();
+                             updateRecordingHud();
+                         });
+        QObject::connect(m_hud, &Record::RecordingHud::resumeRequested, this,
+                         [this]
+                         {
+                             m_recording->resume();
+                             updateRecordingHud();
+                         });
+        QObject::connect(m_hud, &Record::RecordingHud::stopRequested, this, &AppController::toggleRecording);
+        QObject::connect(m_hud, &Record::RecordingHud::minimized, this,
+                         [this]
+                         {
+                             // 最小化只是收起这一层：托盘菜单的录屏项还在，用户照样能停
+                             notifyUser(QStringLiteral("控制条已收起；按 Ctrl+Alt+R 或托盘里的录屏项可停止并保存"), Ui::ToastKind::Information);
+                         });
+
+        // 时长与状态每秒推一次：服务只在帧落地时发信号，而控制条要的是「现在过了多久」
+        m_hudTicker = new QTimer(this);
+        m_hudTicker->setInterval(1000);
+        QObject::connect(m_hudTicker, &QTimer::timeout, this, &AppController::updateRecordingHud);
+        m_hudTicker->start();
+        m_hud->show();
+    }
+
+    void AppController::updateRecordingHud()
+    {
+        if (m_hud == nullptr)
+        {
+            return;
+        }
+        m_hud->applyState(m_recording->state(), m_countdownRemaining, m_recording->recordedSeconds());
+    }
+
+    void AppController::hideRecordingHud()
+    {
+        if (m_hudTicker != nullptr)
+        {
+            m_hudTicker->stop();
+            m_hudTicker->deleteLater();
+            m_hudTicker = nullptr;
+        }
+        if (m_hud != nullptr)
+        {
+            m_hud->close();
+        }
+        m_countdownRemaining = 0;
     }
 
     void AppController::handleRecordingFinished(const QString &outputPath)
     {
+        hideRecordingHud();
         Core::Logger::info(std::format("录屏成品：{}", outputPath.toStdString()));
         recordHistory(Core::Paths::fromDisplayText(outputPath), History::HistoryKind::Recording, m_recordingSize);
     }
@@ -521,7 +598,9 @@ namespace GyanisScribe::App
 
     void AppController::handleRecordingFailed(const QString &reason)
     {
+        hideRecordingHud();
         Core::Logger::error(std::format("录屏中止：{}", reason.toStdString()));
+        notifyUser(QString::fromUtf8(std::format("录屏中止：{}。请重试一次", reason.toStdString()).c_str()), Ui::ToastKind::Danger);
     }
 
 } // namespace GyanisScribe::App

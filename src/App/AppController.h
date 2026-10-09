@@ -22,6 +22,8 @@
 #include <QPointer>
 #include <QSize>
 
+class QTimer;
+
 #include <memory>
 
 namespace GyanisScribe::Capture
@@ -61,6 +63,7 @@ namespace GyanisScribe::Pin
 namespace GyanisScribe::Record
 {
     class FfmpegRecordingEncoder;
+    class RecordingHud;
     struct RecorderConfig;
     class RecordingService;
 } // namespace GyanisScribe::Record
@@ -202,6 +205,15 @@ namespace GyanisScribe::App
         /// 拼这一轮录屏的参数：屏幕名与输出目录都从这里取
         [[nodiscard]] Core::Expected<Record::RecorderConfig> makeRecordingConfig() const;
 
+        /// 起一层录屏控制条并开始每秒推一次状态
+        void showRecordingHud();
+
+        /// 把服务当前状态推给控制条
+        void updateRecordingHud();
+
+        /// 收起控制条与轮询
+        void hideRecordingHud();
+
         /// 录屏结束：把成品路径落到日志
         void handleRecordingFinished(const QString &outputPath);
 
@@ -257,30 +269,33 @@ namespace GyanisScribe::App
          */
         void startColorPick();
 
-        std::unique_ptr<Settings::SettingsStore>             m_settings;                                ///< 配置存储
-        std::unique_ptr<Platform::IPlatformIntegration>      m_integration;                             ///< 平台集成
-        std::unique_ptr<Capture::IScreenCaptureSource>       m_captureSource;                           ///< 抓帧来源
-        std::unique_ptr<Capture::CaptureService>             m_capture;                                 ///< 截图编排
-        std::unique_ptr<Hotkey::HotkeyManager>               m_hotkeys;                                 ///< 热键登记与触发
-        std::unique_ptr<GyanisScribe::Ui::ThemeManager>      m_theme;                                   ///< 主题档位与样式表
-        std::unique_ptr<GyanisScribe::Ui::IconProvider>      m_icons;                                   ///< 图标供给器，描边色跟主题
-        std::unique_ptr<Annotation::AnnotationEngine>        m_annotation;                              ///< 标注引擎，跨轮次保留（载入新帧会清空）
-        std::unique_ptr<Annotation::AnnotationWindow>        m_annotationWindow;                        ///< 标注窗口，复用同一把工具栏
-        std::unique_ptr<Pin::PinManager>                     m_pins;                                    ///< 贴图管理器
-        std::unique_ptr<Ocr::IOcrEngine>                     m_ocr;                                     ///< 识别后端，按设置与平台能力选一次
-        std::unique_ptr<Record::FfmpegRecordingEncoder>      m_recorder;                                ///< 录屏的编码步
-        std::unique_ptr<Record::RecordingService>            m_recording;                               ///< 录屏服务，一轮一个会话
-        std::unique_ptr<TrayController>                      m_tray;                                    ///< 托盘图标与菜单
-        std::unique_ptr<MainWindow>                          m_mainWindow;                              ///< 设置与关于的入口
-        std::unique_ptr<GyanisScribe::Ui::Toast>             m_toast;                                   ///< 右下角提示气泡，操作结果的落地处
-        QImage                                               m_ocrImage;                                ///< 最近一次送去识别的图，换语言重认按它算
-        QPointer<Ocr::OcrResultWindow>                       m_ocrWindow;                               ///< 识别结果窗口，关了就重建，不拥有
-        std::unique_ptr<GyanisScribe::History::HistoryStore> m_history;                                 ///< 历史清单：成品文件的索引，删记录不删文件
-        QPointer<Pick::ColorPickerOverlay>                   m_picker;                                  ///< 取色遮罩，关掉即重建
-        QSize                                                m_recordingSize;                           ///< 本轮录屏区尺寸，成品落地时记进历史
-        CaptureIntent                                        m_captureIntent = CaptureIntent::Annotate; ///< 这一帧截完要去做的事
-        Core::CapturedImage                                  m_lastCapture;                             ///< 本轮抓到的帧，贴图与识别要用它定位
-        QRect                                                m_lastSelection;                           ///< 本轮选区（全局逻辑坐标），标注窗与贴图的位置来源
+        std::unique_ptr<Settings::SettingsStore>             m_settings;                                     ///< 配置存储
+        std::unique_ptr<Platform::IPlatformIntegration>      m_integration;                                  ///< 平台集成
+        std::unique_ptr<Capture::IScreenCaptureSource>       m_captureSource;                                ///< 抓帧来源
+        std::unique_ptr<Capture::CaptureService>             m_capture;                                      ///< 截图编排
+        std::unique_ptr<Hotkey::HotkeyManager>               m_hotkeys;                                      ///< 热键登记与触发
+        std::unique_ptr<GyanisScribe::Ui::ThemeManager>      m_theme;                                        ///< 主题档位与样式表
+        std::unique_ptr<GyanisScribe::Ui::IconProvider>      m_icons;                                        ///< 图标供给器，描边色跟主题
+        std::unique_ptr<Annotation::AnnotationEngine>        m_annotation;                                   ///< 标注引擎，跨轮次保留（载入新帧会清空）
+        std::unique_ptr<Annotation::AnnotationWindow>        m_annotationWindow;                             ///< 标注窗口，复用同一把工具栏
+        std::unique_ptr<Pin::PinManager>                     m_pins;                                         ///< 贴图管理器
+        std::unique_ptr<Ocr::IOcrEngine>                     m_ocr;                                          ///< 识别后端，按设置与平台能力选一次
+        std::unique_ptr<Record::FfmpegRecordingEncoder>      m_recorder;                                     ///< 录屏的编码步
+        std::unique_ptr<Record::RecordingService>            m_recording;                                    ///< 录屏服务，一轮一个会话
+        std::unique_ptr<TrayController>                      m_tray;                                         ///< 托盘图标与菜单
+        std::unique_ptr<MainWindow>                          m_mainWindow;                                   ///< 设置与关于的入口
+        std::unique_ptr<GyanisScribe::Ui::Toast>             m_toast;                                        ///< 右下角提示气泡，操作结果的落地处
+        QImage                                               m_ocrImage;                                     ///< 最近一次送去识别的图，换语言重认按它算
+        QPointer<Ocr::OcrResultWindow>                       m_ocrWindow;                                    ///< 识别结果窗口，关了就重建，不拥有
+        std::unique_ptr<GyanisScribe::History::HistoryStore> m_history;                                      ///< 历史清单：成品文件的索引，删记录不删文件
+        QPointer<Pick::ColorPickerOverlay>                   m_picker;                                       ///< 取色遮罩，关掉即重建
+        QSize                                                m_recordingSize;                                ///< 本轮录屏区尺寸，成品落地时记进历史
+        QPointer<Record::RecordingHud>                       m_hud;                                          ///< 录屏控制条，一轮一个，收起即销毁
+        QTimer                                              *m_hudTicker          = nullptr;                 ///< 控制条的每秒轮询，随一轮录屏起停
+        int                                                  m_countdownRemaining = 0;                       ///< 倒计时剩余整秒，推给控制条的大字
+        CaptureIntent                                        m_captureIntent      = CaptureIntent::Annotate; ///< 这一帧截完要去做的事
+        Core::CapturedImage                                  m_lastCapture;                                  ///< 本轮抓到的帧，贴图与识别要用它定位
+        QRect                                                m_lastSelection;                                ///< 本轮选区（全局逻辑坐标），标注窗与贴图的位置来源
     };
 
 } // namespace GyanisScribe::App
