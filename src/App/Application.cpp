@@ -1,19 +1,19 @@
 #include "App/Application.h"
 
+#include "App/AppController.h"
 #include "Core/Logger.h"
 #include "Core/Paths.h"
+#include "Hotkey/IHotkeyManager.h"
 
 #include <format>
 
 namespace
 {
-
     /// 与 GitHub 账号同名，QSettings 的组织键与安装路径都取这个值
     constexpr const char *kOrganizationName = "Gyanis";
 
     /// 内部标识名，进注册表与配置目录，保持英文
     constexpr const char *kApplicationName = "GyanisScribe";
-
 } // namespace
 
 Application::Application(int &argc, char **argv) : QApplication(argc, argv)
@@ -27,20 +27,54 @@ Application::Application(int &argc, char **argv) : QApplication(argc, argv)
     const auto logDirectory = GyanisScribe::Core::Paths::logDirectory();
     if (const auto ensured = GyanisScribe::Core::Paths::ensureDirectory(logDirectory); !ensured)
     {
-        // 目录都建不出来时初始化必然也失败，直接把原因走 Logger 的 stderr 兜底报出去
+        // 目录都建不出来时初始化必然也失败，原因走 Logger 的 stderr 兜底报出去；
+        // 不提前 return：日志坏了不该让用户用不了截图，剩下的步骤照常走
         GyanisScribe::Core::Logger::error(std::format("启动时日志不可用：{}", ensured.error().message));
-        return;
-    }
-    if (const auto initialized = GyanisScribe::Core::Logger::initialize(logDirectory); !initialized)
+    } else if (const auto initialized = GyanisScribe::Core::Logger::initialize(logDirectory); !initialized)
     {
         GyanisScribe::Core::Logger::error(std::format("启动时日志初始化失败：{}", initialized.error().message));
-        return;
+    } else
+    {
+        GyanisScribe::Core::Logger::info(std::format("智录 {} 启动，日志目录 {}", applicationVersion().toStdString(), logDirectory.string()));
     }
-    GyanisScribe::Core::Logger::info(std::format("智录 {} 启动，日志目录 {}", applicationVersion().toStdString(), logDirectory.string()));
+
+    m_controller = std::make_unique<GyanisScribe::App::AppController>();
+
+    // 热键登记失败不阻断启动：组合键被别的程序占了也要能让用户从界面里操作
+    if (const auto report = m_controller->registerHotkeys(); report)
+    {
+        m_hotkeyReport = *report;
+        for (const auto &failure: m_hotkeyReport.failures)
+        {
+            GyanisScribe::Core::Logger::warning(std::format("热键「{}」没能登记：{}", failure.combination.toStdString(), failure.error.message));
+        }
+    } else
+    {
+        GyanisScribe::Core::Logger::error(std::format("热键登记没走通：{}", report.error().message));
+    }
+
+    // 就绪判据只看日志有没有接管成功：界面在日志坏掉时照样能用，但 CI 的自检要把这一格判红
+    m_isReady = GyanisScribe::Core::Logger::isInitialized();
 }
 
 Application::~Application()
 {
-    // 对象析构即冲刷：静态库里的退出顺序不可控，把冲刷挂在唯一确定的持有者身上
+    // 控制器先走：它负责注销热键、收掉遮罩；日志最后冲刷，才能把这些收尾也记下来
+    m_controller.reset();
     GyanisScribe::Core::Logger::shutdown();
+}
+
+GyanisScribe::App::AppController &Application::controller() const noexcept
+{
+    return *m_controller;
+}
+
+bool Application::isReady() const noexcept
+{
+    return m_isReady;
+}
+
+const GyanisScribe::Hotkey::HotkeyReloadReport &Application::hotkeyReport() const noexcept
+{
+    return m_hotkeyReport;
 }

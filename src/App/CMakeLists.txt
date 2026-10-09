@@ -1,11 +1,17 @@
-# App：应用对象与入口。Application 带 Q_OBJECT，头文件必须进源文件列表，AUTOMOC 才找得到它
+# App：应用对象、核心控制器与入口。带 Q_OBJECT 的头文件必须进源文件列表，AUTOMOC 才找得到
 add_library(App STATIC
         Application.h
-        Application.cpp)
+        Application.cpp
+        AppController.h
+        AppController.cpp)
 
 target_include_directories(App PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(App PUBLIC
+        Capture
         Core
+        Hotkey
+        Platform
+        Settings
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets)
