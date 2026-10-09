@@ -1,7 +1,8 @@
 add_executable(TestAnnotation
         TestAnnotationEngine.cpp
         TestAnnotationTools.cpp
-        TestAnnotationToolbar.cpp)
+        TestAnnotationToolbar.cpp
+        TestAnnotationWindow.cpp)
 
 target_link_libraries(TestAnnotation PRIVATE
         Annotation

@@ -11,7 +11,12 @@
 
 #include "Core/Types.h"
 
+#include <QString>
+
 #include <filesystem>
+#include <string_view>
+
+class QDateTime;
 
 namespace GyanisScribe::Core
 {
@@ -61,6 +66,16 @@ namespace GyanisScribe::Core
          * @return 成功返回 void；失败返回原因，文案里带目录与系统错误
          */
         [[nodiscard]] static Expected<void> ensureDirectory(const std::filesystem::path &directory);
+
+        /**
+         * @brief 生成导出图像的文件名
+         * @param moment 导出时刻
+         * @param extension 扩展名，不带点，例如 png、mp4
+         * @return 形如 GyanisScribe_20261009_235959_123.png 的文件名
+         * @details 命名规则的唯一出处：贴图保存与标注保存共用同一个格式，两处各写一份就会在
+         *          某一天变成同一目录里两套文件名。毫秒位让同一秒内的多次导出不互相覆盖。
+         */
+        [[nodiscard]] static QString imageFileName(const QDateTime &moment, std::string_view extension);
     };
 
 } // namespace GyanisScribe::Core

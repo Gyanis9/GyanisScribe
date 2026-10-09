@@ -22,6 +22,22 @@ namespace GyanisScribe::Capture
     class IScreenCaptureSource;
 } // namespace GyanisScribe::Capture
 
+namespace GyanisScribe::Annotation
+{
+    class AnnotationEngine;
+    class AnnotationWindow;
+} // namespace GyanisScribe::Annotation
+
+namespace GyanisScribe::Ocr
+{
+    class IOcrEngine;
+} // namespace GyanisScribe::Ocr
+
+namespace GyanisScribe::Pin
+{
+    class PinManager;
+} // namespace GyanisScribe::Pin
+
 namespace GyanisScribe::Hotkey
 {
     class HotkeyManager;
@@ -103,18 +119,34 @@ namespace GyanisScribe::App
 
     private:
         /**
-         * @brief 抓到一帧之后的收尾：交剪贴板并记日志
+         * @brief 抓到一帧之后的收尾：开启一轮标注
          * @param image 抓屏产物
+         * @details 截完不再直接进剪贴板：标注窗的「复制」就是原来的那一步，只是多了先标一笔的机会
          */
         void handleCaptured(const Core::CapturedImage &image);
 
-        std::unique_ptr<Settings::SettingsStore>        m_settings;      ///< 配置存储
-        std::unique_ptr<Platform::IPlatformIntegration> m_integration;   ///< 平台集成
-        std::unique_ptr<Capture::IScreenCaptureSource>  m_captureSource; ///< 抓帧来源
-        std::unique_ptr<Capture::CaptureService>        m_capture;       ///< 截图编排
-        std::unique_ptr<Hotkey::HotkeyManager>          m_hotkeys;       ///< 热键登记与触发
-        std::unique_ptr<GyanisScribe::Ui::ThemeManager> m_theme;         ///< 主题档位与样式表
-        std::unique_ptr<GyanisScribe::Ui::IconProvider> m_icons;         ///< 图标供给器，描边色跟主题
+        /// 标注窗请求复制
+        void handleCopyRequested(const QImage &image);
+        /// 标注窗请求存文件
+        void handleSaveRequested(const QImage &image);
+        /// 标注窗请求贴图
+        void handlePinRequested(const QImage &image);
+        /// 标注窗请求识别文字
+        void handleOcrRequested(const QImage &image);
+
+        std::unique_ptr<Settings::SettingsStore>        m_settings;         ///< 配置存储
+        std::unique_ptr<Platform::IPlatformIntegration> m_integration;      ///< 平台集成
+        std::unique_ptr<Capture::IScreenCaptureSource>  m_captureSource;    ///< 抓帧来源
+        std::unique_ptr<Capture::CaptureService>        m_capture;          ///< 截图编排
+        std::unique_ptr<Hotkey::HotkeyManager>          m_hotkeys;          ///< 热键登记与触发
+        std::unique_ptr<GyanisScribe::Ui::ThemeManager> m_theme;            ///< 主题档位与样式表
+        std::unique_ptr<GyanisScribe::Ui::IconProvider> m_icons;            ///< 图标供给器，描边色跟主题
+        std::unique_ptr<Annotation::AnnotationEngine>   m_annotation;       ///< 标注引擎，跨轮次保留（载入新帧会清空）
+        std::unique_ptr<Annotation::AnnotationWindow>   m_annotationWindow; ///< 标注窗口，复用同一把工具栏
+        std::unique_ptr<Pin::PinManager>                m_pins;             ///< 贴图管理器
+        std::unique_ptr<Ocr::IOcrEngine>                m_ocr;              ///< 识别后端，按设置与平台能力选一次
+        Core::CapturedImage                             m_lastCapture;      ///< 本轮抓到的帧，贴图与识别要用它定位
+        QRect                                           m_lastSelection;    ///< 本轮选区（全局逻辑坐标），标注窗与贴图的位置来源
     };
 
 } // namespace GyanisScribe::App

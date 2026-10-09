@@ -307,6 +307,39 @@ namespace GyanisScribe::Annotation
         return m_selection;
     }
 
+    std::optional<QRect> AnnotationEngine::selectionBounds() const
+    {
+        if (!m_selection)
+        {
+            return {};
+        }
+
+        // 撤销/重做之后索引可能已经不在册，这里按「问不到就回空」处理：界面画不出选框是可接受的退化，
+        // 而把越界索引当成错误报给用户就只是噪音
+        const auto *tool = toolFor(m_selection->tool);
+        if (tool == nullptr || m_selection->shapeIndex < 0 || m_selection->shapeIndex >= tool->shapeCount())
+        {
+            return {};
+        }
+        return tool->boundingBoxOf(tool->shapeAt(m_selection->shapeIndex));
+    }
+
+    void AnnotationEngine::paintShapes(QPainter &painter) const
+    {
+        if (m_canvas.image.isNull())
+        {
+            return;
+        }
+
+        // 与 exportImage 同一套倍比算法：屏显与导出必须取同样的源像素，否则马赛克会显示在一个位置、保存在另一个位置
+        const qreal        pixelScale = m_canvas.logicalSize.width() > 0 ? static_cast<qreal>(m_canvas.image.width()) / m_canvas.logicalSize.width() : 1.0;
+        const PaintContext context{m_canvas.image, pixelScale};
+        for (const auto &tool: m_tools)
+        {
+            tool->paint(painter, context);
+        }
+    }
+
     Core::Expected<void> AnnotationEngine::moveSelectionBy(const QPoint &delta)
     {
         if (!m_selection)

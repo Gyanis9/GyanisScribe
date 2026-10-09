@@ -1,9 +1,12 @@
 #include "Core/Paths.h"
 
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QStandardPaths>
+#include <QString>
 
 #include <format>
+#include <string_view>
 #include <system_error>
 
 namespace GyanisScribe::Core
@@ -64,6 +67,14 @@ namespace GyanisScribe::Core
                                                                                  error ? error.message() : std::string("路径存在但不是目录"))});
         }
         return {};
+    }
+
+    QString Paths::imageFileName(const QDateTime &moment, const std::string_view extension)
+    {
+        // 命名格式的唯一出处：贴图保存、标注保存与以后的录屏都走这里，
+        // 毫秒位保证同一秒里连续导出两次不会互相覆盖
+        const auto stem = moment.toString(QStringLiteral("GyanisScribe_yyyyMMdd_HHmmss_zzz"));
+        return stem + QStringLiteral(".") + QString::fromUtf8(extension.data(), static_cast<qsizetype>(extension.size()));
     }
 
 } // namespace GyanisScribe::Core

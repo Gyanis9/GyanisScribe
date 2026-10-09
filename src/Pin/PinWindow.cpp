@@ -42,9 +42,6 @@ namespace GyanisScribe::Pin
         /// 选中边框与悬停边框的描边宽度
         constexpr int kBorderWidth = 1;
 
-        // 保存文件名里的时间戳格式：同一秒内连按两次保存要各留一个文件，故带毫秒
-        constexpr const char *kSaveFileNameFormat = "GyanisScribe_yyyyMMdd_HHmmss_zzz.png";
-
         /// 贴图的最小边长，逻辑像素：再小就找不到也拖不动
         constexpr double kMinimumEdge = 8.0;
 
@@ -183,7 +180,8 @@ namespace GyanisScribe::Pin
             return std::unexpected(ensured.error());
         }
 
-        const QString fileName = QDateTime::currentDateTime().toString(QLatin1String(kSaveFileNameFormat));
+        // 命名格式由 Core::Paths 统一给，标注保存与贴图保存共用同一条规则
+        const QString fileName = Core::Paths::imageFileName(QDateTime::currentDateTime(), "png");
         const auto    filePath = directory / fileName.toStdString();
 
         if (!m_image.save(QString::fromLocal8Bit(filePath.string().c_str())))

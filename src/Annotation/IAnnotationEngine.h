@@ -14,6 +14,7 @@
 
 #include <QObject>
 #include <QPoint>
+#include <QRect>
 #include <QString>
 
 #include <optional>
@@ -141,6 +142,21 @@ namespace GyanisScribe::Annotation
          * @return 有选中时返回那一条，否则空
          */
         [[nodiscard]] virtual const std::optional<AnnotationSelection> &selection() const noexcept = 0;
+
+        /**
+         * @brief 当前选中图形的包围盒
+         * @return 画布逻辑坐标下的矩形；没有选中项时返回空
+         * @note 只给界面画选框用：exportImage 不烘选框，否则选中的那条一保存就带上虚线
+         */
+        [[nodiscard]] virtual std::optional<QRect> selectionBounds() const = 0;
+
+        /**
+         * @brief 把全部图形画给界面
+         * @param painter 目标画家，坐标系必须是画布逻辑坐标（缩放由调用方设好）
+         * @details 与 exportImage 分工：导出只烘已落定的图形，屏显还要带上正在拖的那一条，
+         *          所以这里画的是「当前看到的样子」，不许被拿去保存。
+         */
+        virtual void paintShapes(QPainter &painter) const = 0;
 
         /**
          * @brief 移动选中项

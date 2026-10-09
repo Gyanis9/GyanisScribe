@@ -137,6 +137,21 @@ namespace GyanisScribe::Annotation
         [[nodiscard]] const std::optional<AnnotationSelection> &selection() const noexcept override;
 
         /**
+         * @brief 选中项的包围盒，见 IAnnotationEngine::selectionBounds()
+         * @return 由所属工具的 boundingBoxOf 算出；没选中或索引失效时返回空
+         * @details 重写基类接口：界面只拿到矩形，不需要认识工具与图形记录。
+         */
+        [[nodiscard]] std::optional<QRect> selectionBounds() const override;
+
+        /**
+         * @brief 画全部图形给界面，见 IAnnotationEngine::paintShapes()
+         * @param painter 目标画家，坐标系为画布逻辑坐标
+         * @details 重写基类接口：底图的物理/逻辑倍比按画布现算，让马赛克这类要取源像素的工具
+         *          在屏显与导出两条路上拿到同一份采样。
+         */
+        void paintShapes(QPainter &painter) const override;
+
+        /**
          * @brief 移动选中项，见 IAnnotationEngine::moveSelectionBy()
          * @param delta 位移
          * @return 成功返回空载荷；没选中或索引失效返回 InvalidArgument
