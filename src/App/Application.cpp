@@ -1,6 +1,7 @@
 #include "App/Application.h"
 
 #include "App/AppController.h"
+#include "App/SingleInstance.h"
 #include "Core/Logger.h"
 #include "Core/Paths.h"
 #include "Hotkey/IHotkeyManager.h"
@@ -53,6 +54,15 @@ Application::Application(int &argc, char **argv) : QApplication(argc, argv)
         GyanisScribe::Core::Logger::error(std::format("热键登记没走通：{}", report.error().message));
     }
 
+    // 单实例守卫在控制器之后建：第二次启动要唤的是控制器管着的那些窗口
+    m_singleInstance = std::make_unique<GyanisScribe::App::SingleInstance>();
+    QObject::connect(m_singleInstance.get(), &GyanisScribe::App::SingleInstance::secondLaunchRequested, this,
+                     [this]
+                     {
+                         GyanisScribe::Core::Logger::info("又有人启动智录：把设置窗口唤到前台，不再开第二份");
+                         m_controller->openMainWindow(GyanisScribe::App::MainWindowPage::Settings);
+                     });
+
     // 就绪判据只看日志有没有接管成功：界面在日志坏掉时照样能用，但 CI 的自检要把这一格判红
     m_isReady = GyanisScribe::Core::Logger::isInitialized();
 }
@@ -67,6 +77,16 @@ Application::~Application()
 GyanisScribe::App::AppController &Application::controller() const noexcept
 {
     return *m_controller;
+}
+
+bool Application::tryBecomePrimaryInstance()
+{
+    return m_singleInstance != nullptr && m_singleInstance->acquire();
+}
+
+bool Application::wakePrimaryInstance()
+{
+    return m_singleInstance != nullptr && m_singleInstance->notifyExisting();
 }
 
 bool Application::isReady() const noexcept

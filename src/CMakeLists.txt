@@ -31,7 +31,7 @@ add_custom_command(TARGET DeployQtRuntime POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory
         "$<TARGET_FILE_DIR:GyanisScribe>/plugins/platforms")
 
-foreach (QtModule Core Gui Widgets Svg)
+foreach (QtModule Core Gui Widgets Svg Network)
     add_custom_command(TARGET DeployQtRuntime POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "$<TARGET_FILE_DIR:Qt6::${QtModule}>/Qt6${QtModule}${QT_DEBUG_SUFFIX}.dll"

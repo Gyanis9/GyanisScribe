@@ -7,7 +7,11 @@ add_library(App STATIC
         MainWindow.h
         MainWindow.cpp
         TrayController.h
-        TrayController.cpp)
+        TrayController.cpp
+        SingleInstance.h
+        SingleInstance.cpp
+        CrashGuard.h
+        CrashGuard.cpp)
 
 target_include_directories(App PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(App PUBLIC
@@ -25,7 +29,8 @@ target_link_libraries(App PUBLIC
         Ui
         Qt6::Core
         Qt6::Gui
-        Qt6::Widgets)
+        Qt6::Widgets
+        Qt6::Network)
 
 # 版本号只有一处真源：工程的 project(... VERSION)，代码里通过宏取，不散落字面量
 target_compile_definitions(App PRIVATE PROJECT_VERSION="${PROJECT_VERSION}")

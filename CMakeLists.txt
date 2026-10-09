@@ -22,6 +22,7 @@ find_package(Qt6 COMPONENTS
         Gui
         Widgets
         Svg
+        Network
         REQUIRED)
 
 enable_testing()
