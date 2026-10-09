@@ -1,12 +1,17 @@
-cmake_minimum_required(VERSION 4.3)
-project(GyanisScribe)
+cmake_minimum_required(VERSION 3.28)
+project(GyanisScribe VERSION 0.0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-set(CMAKE_PREFIX_PATH "G:/Tools/Qt/6.11.1/msvc2022_64")
+# Qt 套件位置由环境变量 QTDIR 提供（构建脚本按本机档案设置），不在工程里写死绝对路径
+if (DEFINED ENV{QTDIR})
+    set(CMAKE_PREFIX_PATH "$ENV{QTDIR}")
+endif ()
 
 find_package(Qt6 COMPONENTS
         Core
