@@ -10,3 +10,7 @@
 # 换一台机器即失效，只由安装命令现场生成
 CMakeUserPresets.json
 generators/
+
+# 打包产物：WindowsPackage.ps1 在仓库根的 dist/ 下落 zip 与安装器。
+# 覆盖率报告不在这里列——它落在 build/coverage/coverage-report/，上面 /build/ 已经盖住了
+/dist/
