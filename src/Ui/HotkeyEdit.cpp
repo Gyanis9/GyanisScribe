@@ -62,7 +62,7 @@ namespace GyanisScribe::Ui
         // 无障碍名称与 tooltip 都写中文名：只有「Ctrl+Alt+A」这块文本时，读屏说不清它管哪个动作
         setAccessibleName(title);
         m_display->setAccessibleName(title);
-        setToolTip(QStringLiteral("{} 的全局热键。点击这一格后按下组合键即可替换，按 Esc 取消").arg(title));
+        setToolTip(QStringLiteral("%1 的全局热键。点击这一格后按下组合键即可替换，按 Esc 取消").arg(title));
 
         const auto stored = m_settings.stringValue(key, defaultText);
         m_display->setText(stored);

@@ -74,11 +74,11 @@ namespace
         editor->setText(display);
         editor->setClearButtonEnabled(false);
         editor->setAccessibleName(title);
-        editor->setToolTip(QStringLiteral("{}。留空表示用默认目录").arg(title));
+        editor->setToolTip(QStringLiteral("%1。留空表示用默认目录").arg(title));
 
         auto *browse = new QPushButton{QStringLiteral("浏览…"), row};
         browse->setIcon(icons.icon("Save"));
-        browse->setAccessibleName(QStringLiteral("选择{}的目录").arg(title));
+        browse->setAccessibleName(QStringLiteral("选择%1的目录").arg(title));
 
         layout->addWidget(editor);
         layout->addWidget(browse);
@@ -86,7 +86,7 @@ namespace
         QObject::connect(browse, &QPushButton::clicked, row,
                          [&, editor, title]
                          {
-                             const auto picked = QFileDialog::getExistingDirectory(row, QStringLiteral("选择{}").arg(title), editor->text());
+                             const auto picked = QFileDialog::getExistingDirectory(row, QStringLiteral("选择%1").arg(title), editor->text());
                              if (!picked.isEmpty())
                              {
                                  editor->setText(picked);
@@ -241,7 +241,7 @@ namespace GyanisScribe::App
         {
             auto *edit = new GyanisScribe::Ui::HotkeyEdit{m_settings, hotkeyBox};
             edit->bindTo(key, title, defaultText);
-            hotkeys->addRow(QStringLiteral("{} 的全局热键").arg(title), edit);
+            hotkeys->addRow(QStringLiteral("%1 的全局热键").arg(title), edit);
         }
         layout->addWidget(hotkeyBox);
 
