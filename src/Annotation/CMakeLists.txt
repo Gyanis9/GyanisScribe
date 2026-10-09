@@ -20,6 +20,10 @@ add_library(Annotation STATIC
         TextTool.cpp
         NumberTool.h
         NumberTool.cpp
+        AnnotationToolbarGeometry.h
+        AnnotationToolbarGeometry.cpp
+        AnnotationToolbar.h
+        AnnotationToolbar.cpp
         IAnnotationEngine.h
         AnnotationEngine.h
         AnnotationEngine.cpp)
@@ -27,6 +31,7 @@ add_library(Annotation STATIC
 target_include_directories(Annotation PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(Annotation PUBLIC
         Core
+        Ui
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets)

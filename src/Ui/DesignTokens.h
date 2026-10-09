@@ -13,6 +13,9 @@
 
 #include <QColor>
 
+#include <array>
+#include <cstddef>
+
 namespace GyanisScribe::Ui
 {
 
@@ -36,6 +39,12 @@ namespace GyanisScribe::Ui
 
     /// 读数文本四周的内边距，取自 4/8/12/16/24/32 的阶梯
     inline constexpr int kHintPadding = 4;
+
+    /// 工具栏的内边距与控件间距，同样取 4 这一档
+    inline constexpr int kToolbarPadding = 4;
+
+    /// 线宽滑块的固定宽度：滑块跟着布局拉伸会让「四档阶梯」的刻度间距变得忽宽忽窄
+    inline constexpr int kToolbarSliderWidth = 64;
 
     /// 选区边框宽度：1-2 像素之间取主色描边那一条
     inline constexpr int kSelectionBorderWidth = 2;
@@ -94,6 +103,39 @@ namespace GyanisScribe::Ui
     [[nodiscard]] constexpr const ThemePalette &paletteFor(ThemeKind themeKind)
     {
         return themeKind == ThemeKind::Dark ? kDarkPalette : kLightPalette;
+    }
+
+    /**
+     * @brief 标注默认色板
+     * @details 需求第五节点名的八色（红橙黄绿蓝紫黑白），自定义色由工具栏的取色对话框追加，
+     *          不在这里占位；消费方是标注工具栏的色块按钮，序号即按钮顺序。
+     */
+    inline constexpr std::array<QColor, 8> kAnnotationPalette{
+            QColor{232, 62, 62},  // 红
+            QColor{242, 141, 50}, // 橙
+            QColor{240, 195, 60}, // 黄
+            QColor{70, 180, 90},  // 绿
+            QColor{0, 122, 204},  // 蓝，与主色同值
+            QColor{150, 90, 200}, // 紫
+            QColor{24, 24, 24},   // 黑
+            QColor{252, 252, 252} // 白
+    };
+
+    /// 标注线宽阶梯，工具栏的滑块按这几档走，不允许连续取值
+    inline constexpr std::array<int, 4> kAnnotationWidths{2, 4, 6, 8};
+
+    /// 字号阶梯（需求第五节：12 / 13 / 14 / 16 / 20 / 24），工具栏的字号下拉只列这几档
+    inline constexpr std::array<int, 6> kFontSizes{12, 13, 14, 16, 20, 24};
+
+    /**
+     * @brief 按序号取标注色板里的颜色
+     * @param index 色板序号
+     * @return 对应的颜色；序号越界时返回调用方可见的空色，由调用方决定是否报「取不到」
+     * @note 越界返回空色而不是夹到最后一个：夹住会让工具栏少画一个色块也没人发现
+     */
+    [[nodiscard]] inline constexpr QColor annotationColorAt(std::size_t index)
+    {
+        return index < kAnnotationPalette.size() ? kAnnotationPalette[index] : QColor{};
     }
 
 } // namespace GyanisScribe::Ui
