@@ -174,6 +174,24 @@ namespace GyanisScribe::App
         QObject::connect(m_mainWindow.get(), &MainWindow::messageForUser, this, [this](const QString &message, Ui::ToastKind kind) { notifyUser(message, kind); });
         // 贴图张数走托盘悬停提示：贴图常被压在别的窗口后面，这是唯一还能看出「挂着几张」的地方
         QObject::connect(m_pins.get(), &Pin::PinManager::pinCountChanged, m_tray.get(), &TrayController::setPinCount);
+
+        // 启动把上一次会话留下的那几张摆回来；退出前把在存的这批连像素一起记下
+        if (const auto restored = m_pins->restoreLayout(); !restored)
+        {
+            Core::Logger::warning(std::format("上次留下的贴图没摆回来：{}", restored.error().message));
+        } else if (*restored > 0)
+        {
+            Core::Logger::info(std::format("启动恢复了 {} 张贴图", *restored));
+        }
+        // 挂在 aboutToQuit 而不是托盘那一条上：主窗口关闭、命令行退出与崩溃守卫收尾走的是同一个出口
+        QObject::connect(qApp, &QCoreApplication::aboutToQuit, this,
+                         [this]
+                         {
+                             if (const auto saved = m_pins->saveLayout(); !saved)
+                             {
+                                 Core::Logger::error(std::format("贴图布局没能存下：{}", saved.error().message));
+                             }
+                         });
     }
 
     AppController::~AppController() = default;

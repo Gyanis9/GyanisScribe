@@ -964,6 +964,10 @@
             <translation>Pin layout entry {} is missing the field {}. Clear this entry and let the program record it again.</translation>
         </message>
         <message>
+            <source>贴图布局第 {} 项没有图片位置。请清除这一项后让程序重新记一次</source>
+            <translation>Pin layout entry {} has no image location. Clear this entry and let the program record it again.</translation>
+        </message>
+        <message>
             <source>贴图布局第 {} 项的尺寸不是正数（{}×{}）。请清除这一项后让程序重新记一次</source>
             <translation>Pin layout entry {} has no positive size ({}x{}). Clear this entry and let the program record it again.</translation>
         </message>

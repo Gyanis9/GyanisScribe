@@ -58,7 +58,8 @@ namespace
 
     PinState sample(qint32 x, qint32 y, double scale, double rotation, double opacity)
     {
-        return PinState{QPoint(x, y), QSizeF(120.0, 80.0), scale, rotation, opacity};
+        // 路径是布局里唯一指向像素的那根线，往返必须一个字都不改
+        return PinState{QPoint(x, y), QSizeF(120.0, 80.0), scale, rotation, opacity, QStringLiteral("Pins/pin-0.png")};
     }
 } // namespace
 
@@ -88,6 +89,7 @@ TEST_F(PinLayoutFixture, RoundTripsEveryField)
         EXPECT_NEAR((*parsed)[index].scale, states[index].scale, 1e-6) << "缩放被改";
         EXPECT_NEAR((*parsed)[index].rotationDegrees, states[index].rotationDegrees, 1e-6) << "角度被改";
         EXPECT_NEAR((*parsed)[index].opacity, states[index].opacity, 1e-6) << "透明度被改";
+        EXPECT_EQ((*parsed)[index].imageFile, states[index].imageFile) << "图片位置被改，恢复时就读不到那张图了";
     }
 }
 
@@ -134,17 +136,25 @@ TEST_F(PinLayoutFixture, RejectsMalformedEntriesByName)
     ASSERT_FALSE(elementNotObject.has_value()) << "数组里混进非对象项时不该跳过它";
     EXPECT_NE(elementNotObject.error().message.find("第 1 项"), std::string::npos) << "要指出是哪一项坏了";
 
+    // 必填字段少一个都读不出：旧断言曾只查 opacity，漏在列表外的 rotation 会以「0 度」悄悄恢复过去
     const auto missingField = parseLayout(R"([{"x":1,"y":2,"width":10,"height":10,"scale":1}])");
-    ASSERT_FALSE(missingField.has_value()) << "缺 opacity 就当不透明恢复，用户的贴图会看不见";
-    EXPECT_NE(missingField.error().message.find("opacity"), std::string::npos) << "要写出缺的是哪个字段";
+    ASSERT_FALSE(missingField.has_value()) << "缺 rotation 就按 0 度恢复，用户旋过的贴图会摆正";
+    EXPECT_NE(missingField.error().message.find("rotation"), std::string::npos) << "要写出缺的是哪个字段";
 
-    const auto badSize = parseLayout(R"([{"x":1,"y":2,"width":0,"height":10,"scale":1,"rotation":0,"opacity":1}])");
+    const auto missingImage = parseLayout(R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1}])");
+    ASSERT_FALSE(missingImage.has_value()) << "没有图片位置的记录摆不回像素，只能是一张空窗口";
+    EXPECT_NE(missingImage.error().message.find("imageFile"), std::string::npos) << "要写出缺的是哪个字段";
+
+    const auto emptyImage = parseLayout(R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":""}])");
+    ASSERT_FALSE(emptyImage.has_value()) << "空路径不是「指向某个文件」，读图必然失败却还是占了一项的额度";
+
+    const auto badSize = parseLayout(R"([{"x":1,"y":2,"width":0,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png"}])");
     ASSERT_FALSE(badSize.has_value()) << "零宽度的记录会让窗口塌成看不见的一条线";
 
-    const auto badOpacity = parseLayout(R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":0}])");
+    const auto badOpacity = parseLayout(R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":0,"imageFile":"a.png"}])");
     ASSERT_FALSE(badOpacity.has_value()) << "不透明度 0 等于把贴图藏起来，不该当成合法记录";
 
-    const auto overOpacity = parseLayout(R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1.5}])");
+    const auto overOpacity = parseLayout(R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1.5,"imageFile":"a.png"}])");
     ASSERT_FALSE(overOpacity.has_value()) << "超过 1 的不透明度没有意义";
 }
 
@@ -167,6 +177,7 @@ TEST_F(PinLayoutFixture, SaveAndLoadThroughSettingsStore)
     EXPECT_NEAR(loaded->front().scale, 2.0, 1e-6);
     EXPECT_NEAR(loaded->front().rotationDegrees, 45.0, 1e-6);
     EXPECT_NEAR(loaded->front().opacity, 0.6, 1e-6);
+    EXPECT_EQ(loaded->front().imageFile, states.front().imageFile) << "布局过了配置一道，路径就不一样了";
 
     EXPECT_TRUE(reopened.allKeys().contains(QString::fromUtf8(GyanisScribe::Settings::kPinLayout.data()))) << "布局键名与 SettingsKeys 里的常量不同解";
 }

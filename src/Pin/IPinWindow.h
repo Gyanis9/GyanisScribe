@@ -109,9 +109,10 @@ namespace GyanisScribe::Pin
         /**
          * @brief 把当前图片存成文件
          * @param directory 目标目录
+         * @param fileName 目录里的文件名，由调用方给：一次写多张时靠它保证不互相覆盖
          * @return 成功返回写下的文件完整路径；失败返回带路径与原因的 Error
          */
-        [[nodiscard]] virtual Core::Expected<QString> saveToFile(const std::filesystem::path &directory) = 0;
+        [[nodiscard]] virtual Core::Expected<QString> saveToFile(const std::filesystem::path &directory, const QString &fileName) = 0;
 
         /**
          * @brief 贴图当前在全屏坐标里的位置

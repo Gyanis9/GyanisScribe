@@ -81,16 +81,21 @@ namespace GyanisScribe::Pin
         [[nodiscard]] IPinWindow *pinAt(int index) const;
 
         /**
-         * @brief 汇总全部贴图的状态
-         * @return 按创建顺序排列的状态列表
-         */
-        [[nodiscard]] QVector<PinState> states() const;
-
-        /**
-         * @brief 把当前布局写进配置
-         * @return 成功返回空载荷；配置写入失败时带回原因
+         * @brief 把当前布局写进配置，并把每张贴图的像素落到缓存目录
+         * @return 成功返回空载荷；某一张写不下去时整批不存，返回带路径的原因
+         * @details 布局里只有几何摆不回像素：保存那一刻给每张在
+         *          Core::Paths::cacheDirectory()/Pins 下写一份 PNG，路径记进布局。
          */
         [[nodiscard]] Core::Expected<void> saveLayout();
+
+        /**
+         * @brief 按配置里那份布局把贴图摆回来
+         * @return 成功返回真的摆出来的张数；布局本身读不出时返回 InvalidArgument 并点名坏在哪一项
+         * @details 布局形状坏 → 整次失败（少摆一张会让用户以为那张被删了）；
+         *          单个图片文件读不出 → 只跳过那一张并记一条日志（图是用户自己删的，
+         *          让剩下的继续摆回来比整次放弃更接近他留下的桌面）。
+         */
+        [[nodiscard]] Core::Expected<int> restoreLayout();
 
         /**
          * @brief 关闭全部贴图

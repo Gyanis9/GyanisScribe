@@ -9,6 +9,7 @@
 #include "Capture/CaptureService.h"
 #include "Capture/ICaptureService.h"
 #include "Capture/IScreenCaptureSource.h"
+#include "Core/Paths.h"
 #include "Core/Types.h"
 #include "Ocr/IOcrEngine.h"
 #include "Ocr/OcrEngineFactory.h"
@@ -183,6 +184,8 @@ namespace GyanisScribe
             {
                 std::error_code ignored;
                 std::filesystem::remove_all(m_root, ignored);
+                // 贴图布局用例写进的是真实的缓存目录（不在 m_root 里）：在这儿清，用例中途断言失败也清得到
+                std::filesystem::remove_all(Core::Paths::cacheDirectory() / "Pins", ignored);
             }
 
             /**
@@ -258,6 +261,88 @@ namespace GyanisScribe
 
             pins.closeAll();
             EXPECT_EQ(pins.count(), 0) << "closeAll 之后还留着贴图";
+        }
+
+        /**
+         * @brief 钉住「保存布局→换一个管理器实例→摆回来」这条持久化链
+         * @details 布局只管几何，像素住在缓存目录里：两边任何一侧掉链子，重启后的桌面
+         *          就少一张或摆回原位之外，而用户唯一的线索是「我明明贴过」。
+         */
+        TEST_F(ModuleFlowFixture, StoredLayoutRestoresPinsWithTheirGeometry)
+        {
+            GyanisScribe::Settings::SettingsStore settings(m_iniFile);
+            QImage                                image(40, 24, QImage::Format_ARGB32);
+            image.fill(Qt::red);
+
+            QRect  originalRect;
+            double originalScale   = 0.0;
+            double originalAngle   = 0.0;
+            double originalOpacity = 0.0;
+
+            {
+                GyanisScribe::Pin::PinManager pins(settings, *integration);
+                auto                         &first = pins.addPin(image, QPoint(120, 80));
+                first.setScale(1.5);
+                first.setRotationDegrees(30.0);
+                first.setOpacityLevel(0.6);
+                pins.addPin(image, QPoint(300, 200));
+                ASSERT_EQ(pins.count(), 2);
+
+                // 拿原窗口最终的读数当对照：缩放与旋转绕着图片中心重排，
+                // addPin 交进去的那个点早已不是左上，钉字面量就是在钉一个没人用的坐标
+                originalRect    = first.globalRect();
+                originalScale   = first.scale();
+                originalAngle   = first.rotationDegrees();
+                originalOpacity = first.opacityLevel();
+
+                const auto saved = pins.saveLayout();
+                ASSERT_TRUE(saved.has_value()) << "布局没写下去：" << saved.error().message;
+            }
+
+            GyanisScribe::Pin::PinManager reopened(settings, *integration);
+            const auto                    restored = reopened.restoreLayout();
+            ASSERT_TRUE(restored.has_value()) << "摆不回来：" << restored.error().message;
+            EXPECT_EQ(*restored, 2) << "两张都该摆回来";
+            ASSERT_EQ(reopened.count(), 2);
+
+            const auto *first = reopened.pinAt(0);
+            ASSERT_NE(first, nullptr);
+            EXPECT_EQ(first->globalRect(), originalRect) << "布局没把那张图摆回同一个矩形";
+            EXPECT_NEAR(first->scale(), originalScale, 1e-6) << "缩放没跟着布局回来";
+            EXPECT_NEAR(first->rotationDegrees(), originalAngle, 1e-6) << "旋转没跟着布局回来";
+            EXPECT_NEAR(first->opacityLevel(), originalOpacity, 1e-6) << "不透明度没跟着布局回来";
+            EXPECT_EQ(reopened.pinAt(1)->globalRect().topLeft(), QPoint(300, 200)) << "恢复顺序与保存顺序不同解";
+        }
+
+        /**
+         * @brief 钉住「缓存里那张图没了」只跳过那一张，而不是整次失败
+         * @details 缓存目录本就是可清的东西，图片文件是用户能删的：为它放弃整批还原，
+         *          等于把还在的那几张也扣掉，与用户留下的桌面差得更远。
+         *          与「布局形状坏→整次失败」是两种语义，这里钉的是前一种。
+         */
+        TEST_F(ModuleFlowFixture, RestoreSkipsOnlyThePinWhoseImageFileIsGone)
+        {
+            GyanisScribe::Settings::SettingsStore settings(m_iniFile);
+            QImage                                image(20, 20, QImage::Format_ARGB32);
+            image.fill(Qt::green);
+
+            {
+                GyanisScribe::Pin::PinManager pins(settings, *integration);
+                pins.addPin(image, QPoint(40, 40));
+                pins.addPin(image, QPoint(80, 80));
+                ASSERT_TRUE(pins.saveLayout().has_value()) << "布局没写下去";
+            }
+
+            const auto      cacheDirectory = Core::Paths::cacheDirectory() / "Pins";
+            std::error_code ignored;
+            ASSERT_TRUE(std::filesystem::remove(cacheDirectory / "pin-0.png", ignored)) << "缓存里没有那张图，用例前提就没构造出来";
+
+            GyanisScribe::Pin::PinManager reopened(settings, *integration);
+            const auto                    restored = reopened.restoreLayout();
+            ASSERT_TRUE(restored.has_value()) << "少一张图不该让整次还原失败：" << restored.error().message;
+            EXPECT_EQ(*restored, 1);
+            ASSERT_EQ(reopened.count(), 1);
+            EXPECT_EQ(reopened.pinAt(0)->globalRect().topLeft(), QPoint(80, 80)) << "跳掉坏的那一张后，还在的那张也该摆回来";
         }
 
         /**

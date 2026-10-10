@@ -24,6 +24,7 @@ namespace GyanisScribe::Pin
         constexpr std::string_view kKeyScale     = "scale";
         constexpr std::string_view kKeyRotation  = "rotation";
         constexpr std::string_view kKeyOpacity   = "opacity";
+        constexpr std::string_view kKeyImageFile = "imageFile";
 
         Core::Expected<QVector<PinState>> failWith(std::string reason)
         {
@@ -44,6 +45,7 @@ namespace GyanisScribe::Pin
             entry.insert(QLatin1String(kKeyScale.data()), clampScale(state.scale));
             entry.insert(QLatin1String(kKeyRotation.data()), normalizeDegrees(state.rotationDegrees));
             entry.insert(QLatin1String(kKeyOpacity.data()), state.opacity);
+            entry.insert(QLatin1String(kKeyImageFile.data()), state.imageFile);
             entries.append(entry);
         }
         return QString::fromUtf8(QJsonDocument(entries).toJson(QJsonDocument::Compact));
@@ -76,7 +78,7 @@ namespace GyanisScribe::Pin
             }
 
             const auto entry = entries[index].toObject();
-            for (std::string_view key: {kKeyPositionX, kKeyPositionY, kKeyWidth, kKeyHeight, kKeyScale, kKeyOpacity})
+            for (std::string_view key: {kKeyPositionX, kKeyPositionY, kKeyWidth, kKeyHeight, kKeyScale, kKeyRotation, kKeyOpacity, kKeyImageFile})
             {
                 if (!entry.contains(QLatin1String(key.data())))
                 {
@@ -91,6 +93,13 @@ namespace GyanisScribe::Pin
             state.scale           = entry[QLatin1String(kKeyScale.data())].toDouble();
             state.rotationDegrees = entry[QLatin1String(kKeyRotation.data())].toDouble();
             state.opacity         = entry[QLatin1String(kKeyOpacity.data())].toDouble();
+            state.imageFile       = entry[QLatin1String(kKeyImageFile.data())].toString();
+
+            if (state.imageFile.isEmpty())
+            {
+                // 像素进不了配置，路径就是恢复的唯一凭据：空路径那张图无论如何也摆不回去
+                return failWith(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局第 {} 项没有图片位置。请清除这一项后让程序重新记一次"), index + 1));
+            }
 
             if (state.logicalSize.width() <= 0.0 || state.logicalSize.height() <= 0.0)
             {

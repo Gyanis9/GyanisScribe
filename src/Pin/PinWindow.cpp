@@ -187,16 +187,15 @@ namespace GyanisScribe::Pin
         Core::Logger::info(std::format("贴图已交剪贴板：{}×{} 像素", m_image.width(), m_image.height()));
     }
 
-    Core::Expected<QString> PinWindow::saveToFile(const std::filesystem::path &directory)
+    Core::Expected<QString> PinWindow::saveToFile(const std::filesystem::path &directory, const QString &fileName)
     {
         if (const auto ensured = Core::Paths::ensureDirectory(directory); !ensured)
         {
             return std::unexpected(ensured.error());
         }
 
-        // 命名格式由 Core::Paths 统一给，标注保存与贴图保存共用同一条规则
-        const QString fileName = Core::Paths::imageFileName(QDateTime::currentDateTime(), "png");
-        const auto    filePath = directory / fileName.toStdString();
+        // 文件名归调用方：右键菜单那一路用 Core::Paths::imageFileName 起名，布局那一路用序号
+        const auto filePath = directory / Core::Paths::fromDisplayText(fileName);
 
         if (!m_image.save(Core::Paths::toDisplayText(filePath)))
         {
@@ -375,7 +374,7 @@ namespace GyanisScribe::Pin
         menu->addAction(GyanisScribe::Core::uiText("保存"), this,
                         [this, directory]
                         {
-                            if (const auto saved = saveToFile(directory); !saved)
+                            if (const auto saved = saveToFile(directory, Core::Paths::imageFileName(QDateTime::currentDateTime(), "png")); !saved)
                             {
                                 Core::Logger::error(saved.error().message);
                             }

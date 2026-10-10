@@ -28,16 +28,18 @@ namespace GyanisScribe::Pin
 
     /**
      * @brief 一张贴图的布局记录
-     * @details 只存几何与外观，不存图片内容：图片本身在需要时另存文件，
-     *          把像素塞进配置会让设置文件涨到不可维护，而重启后要恢复的是「摆在哪、多大、多透」。
+     * @details 存几何、外观与「像素在哪儿」，不存像素本身：把图片塞进配置会让设置文件涨到
+     *          不可维护，而重启后要恢复的是那几张还摆在桌上的图。像素由管理器写进缓存目录，
+     *          布局只记它的路径。
      */
     struct PinState
     {
-        QPoint position;              ///< 窗口左上角的全局逻辑坐标
-        QSizeF logicalSize;           ///< 图片未缩放时的逻辑尺寸
-        double scale           = 1.0; ///< 缩放因子
-        double rotationDegrees = 0.0; ///< 旋转角度，已折进 [0,360)
-        double opacity         = 1.0; ///< 不透明度，(0,1]
+        QPoint  position;              ///< 窗口左上角的全局逻辑坐标
+        QSizeF  logicalSize;           ///< 图片未缩放时的逻辑尺寸
+        double  scale           = 1.0; ///< 缩放因子
+        double  rotationDegrees = 0.0; ///< 旋转角度，已折进 [0,360)
+        double  opacity         = 1.0; ///< 不透明度，(0,1]
+        QString imageFile;             ///< 像素在盘上的位置，恢复时按它读图
     };
 
     /**
