@@ -37,6 +37,14 @@ namespace GyanisScribe::Core
         [[nodiscard]] static std::filesystem::path applicationDataDirectory();
 
         /**
+         * @brief 可执行体所在目录
+         * @return 安装/解压后的程序目录
+         * @details 随包分发的第三方件（ffmpeg、识别语言包）都从这里往下找：软件要装完即用，
+         *          不能要求用户再往系统里装一份或自己放文件。
+         */
+        [[nodiscard]] static std::filesystem::path applicationDirectory();
+
+        /**
          * @brief 日志目录
          * @return 位于可写数据目录下的 logs
          */

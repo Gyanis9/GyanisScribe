@@ -20,24 +20,30 @@ Qt 走 LGPL-3.0 的「动态链接 + 可替换」路线：用户拿到的是 Qt 
 
 ## 识别语言包
 
-`*.traineddata`（`eng`、`chi_sim`）**不随安装包分发**：官方 Tesseract 语言包是 Apache-2.0，
-可以随包，但体积与更新节奏更适合让用户自己放。查找顺序写在 `docs/OcrBackends.md`：
-设置项 `Ocr/TessDataDirectory` → 环境变量 `TESSDATA_PREFIX` → 应用数据目录下的 `tessdata`。
-缺语言包时识别功能会明确报「不可用」并给出放置位置，不装成能用而返回空结果。
-Windows 上这一节只在选用 Tesseract 时才需要用户动手：系统识别走 Windows 自己的语言包
+`eng.traineddata` 与 `chi_sim.traineddata`（Tesseract 官方的 `tessdata_fast` 系列，Apache-2.0）
+**随安装包分发**，放在程序目录的 `tessdata` 子目录里——软件要求「装完即用」，
+不能把放语言包这一步留给用户。查找顺序写在 `docs/OcrBackends.md`：
+设置项 `Ocr/TessDataDirectory` → 环境变量 `TESSDATA_PREFIX` → **程序目录下的 `tessdata`** → 应用数据目录下的 `tessdata`。
+许可证正文在 `licenses/TessData-Apache-2.0.txt`。
+缺语言包（例如用户手动删过安装目录）时识别功能会明确报「不可用」并列出找过的位置，不装成能用而返回空结果。
+Windows 上这一节只在选用 Tesseract 时才用得到：系统识别走 Windows 自己的语言包
 （设置 → 时间和语言 → 语音 里的「光学字符识别」），不需要往任何目录放文件。
 
-## 录屏用的 FFmpeg（外部进程，不链接）
+## 录屏用的 FFmpeg（随包分发，但不链接）
 
-录屏的编码一步调用用户机器上的 `ffmpeg` 可执行文件（`QProcess` 起进程），本项目不链接
-FFmpeg / x264 的任何库，也不把它们打进包里。这样做的结果是：
+录屏的编码一步调用 `ffmpeg` 可执行文件（`QProcess` 起进程）。查找顺序是
+**程序目录里随包那一份 → PATH**：安装包自带它，用户不需要再装任何东西。
+本项目不链接 FFmpeg / x264 的任何库，也不把它的代码并入本程序——这是「聚合分发」而不是衍生作品，
+所以 GPL 不传染本体的源码；但既然随包分发了 GPL 构建，就得按 GPL 的第三条交付对应源码：
 
-- 产品本体不被 GPL 传染：FFmpeg 若含 x264 等 GPL 组件，那是用户自己安装的独立程序；
-- 用户换 FFmpeg 版本不影响本程序构建；
-- 代价是必须自己检查：没装 FFmpeg 时录屏会失败并给出可操作的中文提示（装它，或改用其它编码器）。
+- 随包的是**未经修改**的官方构建（gyan.dev，版本见 `scripts/FetchFfmpeg.ps1` 里钉的 `$version`），
+  其对应源码由上游公开发布，可从 FFmpeg 官网的 releases 页取到同一版本；
+- 许可证正文在 `licenses/FFmpeg-GPL-3.0.txt`；
+- 取件与校验：`scripts/FetchFfmpeg.ps1` 按固定 URL 下载并核对 SHA-256，之后才允许打包——
+  校验不过或取不到就中止打包，不允许出一个「能装但录不了屏」的包。
 
-需要用户装的东西：`ffmpeg`（LGPL-2.1+/GPL-2.0+，按构建而定）。本项目不重新分发它，
-也不从其输出中嵌入任何素材。
+这样做的代价是包体积（ffmpeg 单文件约百 MB 级）。换来的是产品在任何一台干净机器上
+装完就能录屏，且用户换 FFmpeg 版本不影响本程序构建。
 
 ## 容器与开发工具（不进产品包）
 
@@ -58,4 +64,18 @@ FFmpeg / x264 的任何库，也不把它们打进包里。这样做的结果是
 
 - 若发布静态链接的组件，需要按对应许可证提供目标文件或再分发权；
 - 修改过的第三方源码必须在本页注明来源与改动位置；
-- 本页与 `README.md`、`docs/OcrBackends.md` 一起随包发布（`scripts/WindowsPackage.bat` 会把它们拷进包目录）。
+- 随包发出的内容（`scripts/WindowsPackage.ps1` 负责摆好，缺任一件就中止打包）：
+  `LICENSE.txt`（本软件自己的最终用户许可协议，安装器的许可页就是它）、`licenses/` 下各第三方
+  许可证正文、`README.md`、`docs/` 里的三份参考页（ThirdPartyLicenses / OcrBackends / UiStyleGuide，
+  内部需求文档不发）、Qt 运行时与插件、英文语言包 `.qm`、`tessdata/`、`ffmpeg.exe`。
+- `licenses/` 里的正文都 vendored 进仓库，打包不依赖联网取件。URL 全部钉到具体版本，
+  缺件或取回的不是许可证时由 `scripts/FetchLicenses.ps1` 重取——它按每份许可证的一行标记判，
+  所以「下载失败留下的 404 页面」会被当成缺陷而不是一个看起来正常的文件。
+  对应关系：Qt → `Qt-LGPL-3.0.txt`、FFmpeg → `FFmpeg-GPL-3.0.txt`、Tesseract 与语言包 →
+  `Tesseract-Apache-2.0.txt` 与 `TessData-Apache-2.0.txt`、Leptonica 1.87.0 → `Leptonica-BSD-2.txt`、
+  spdlog 1.17.0 → `Spdlog-MIT.txt`、GoogleTest 1.17.0 → `GoogleTest-BSD-3-Clause.txt`、
+  C++/WinRT 投影 → `WinRtProjection-MIT.txt`（钉到 tag 2.0.250303.1：我们生成的那份投影是
+  `2.0.250303.5`，它只作为 NuGet 包发布、没有对应 tag，而两个版本里的 MIT 正文逐字节相同，
+  这一点由 `cmp` 现测得出）。后两件不进产品包（只进测试可执行体、只进编译），正文一并放在这里
+  是为了让清单上点到的每个组件都能查到原文。
+- 本页只讲第三方；本软件自身的授权条款在仓库根的 `LICENSE.txt`。

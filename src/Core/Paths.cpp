@@ -37,6 +37,12 @@ namespace GyanisScribe::Core
         return fromQt(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation));
     }
 
+    std::filesystem::path Paths::applicationDirectory()
+    {
+        // 走 wstring：程序装在中文路径下时，窄串按本地码页解释会装不下而抛
+        return std::filesystem::path{QCoreApplication::applicationDirPath().toStdWString()};
+    }
+
     std::filesystem::path Paths::logDirectory()
     {
         return applicationDataDirectory() / "logs";

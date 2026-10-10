@@ -32,7 +32,9 @@
   `namespace tesseract` 里（capi.h 在 C++ 分支走 `typedef tesseract::PageIteratorLevel`），
   两类名字的前缀不能一起加或一起去。
 - 语言包（`*.traineddata`）**不依赖构建期联网下载**（编码规范第 25 条：要么随包发布，要么由用户放置）；
-  查找顺序为设置项 `Ocr/TessDataDirectory` → 环境变量 `TESSDATA_PREFIX` → 应用数据目录下的 `tessdata`。
+  查找顺序为设置项 `Ocr/TessDataDirectory` → 环境变量 `TESSDATA_PREFIX` → **程序目录下的 `tessdata`（随包那份）** → 应用数据目录下的 `tessdata`。
+  安装包自带 `eng` 与 `chi_sim`，所以干净安装后不需要往任何目录放文件；这条顺序由
+  `OcrFixture.TessDataCandidatesPutTheBundledDirectoryBeforeUserData` 钉住（随包那份必须排在用户数据目录之前）。
 - 行归并是「按词框的纵坐标自己分行」：C 接口只给到逐词迭代，字号差异大的一行可能被拆成两行，
   要做到逐行准确得换 C++ 接口按 `RIL_TEXTLINE` 走（源码里标了 `ponytail:`）。
 
@@ -75,7 +77,7 @@
 | --- | --- | --- |
 | Tesseract | Apache-2.0 | 与 Qt/LGPL 并存无冲突 |
 | Leptonica | BSD-2-clause | Tesseract 的传递依赖 |
-| tessdata 训练数据 | Apache-2.0（Google 训练的 eng/chi_sim 系列） | 随包发布时要一并带 LICENSE 与来源说明 |
+| tessdata 训练数据 | Apache-2.0（Google 训练的 eng/chi_sim 系列） | **已随包发布**：`Vendor/Tessdata/` 下两份 fast 变体进安装包的 `tessdata/`，许可证正文在 `licenses/TessData-Apache-2.0.txt` |
 | Windows.Media.Ocr | 系统组件，不随本程序分发 | 只是调用系统 API，不引入第三方代码 |
 | C++/WinRT 投影头（`Vendor/WinRt`） | MIT（微软 cppwinrt 生成） | 只在 Windows 档参与编译，编译进本程序的是我们的代码，头本身不分发 |
 

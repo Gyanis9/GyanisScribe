@@ -16,6 +16,8 @@
 
 #include <filesystem>
 #include <format>
+#include <vector>
+#include <string_view>
 
 namespace GyanisScribe::Ocr
 {
@@ -24,13 +26,22 @@ namespace GyanisScribe::Ocr
         /// 语言包目录的候选顺序里那一个固定子目录名
         constexpr const char *kTessDataFolder = "tessdata";
 
-        // 三个候选位置一次说全：只报「没有语言包」用户不知道该往哪放
-        QString describeMissingLanguagePacks(const std::filesystem::path &configuredKey, const std::filesystem::path &bundled)
+        // 找过的地方一次说全：只报「没有语言包」用户不知道该往哪放
+        QString describeMissingLanguagePacks(const std::string_view configuredKey, const std::vector<std::filesystem::path> &candidates)
         {
+            QStringList searched;
+            for (const auto &candidate: candidates)
+            {
+                if (!candidate.empty())
+                {
+                    searched << Core::Paths::toDisplayText(candidate);
+                }
+            }
             return QString::fromUtf8(
-                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("设置项 {}、环境变量 TESSDATA_PREFIX、以及 {} 三处都没有语言包。请把 eng.traineddata（要认中文再放 "
-                                                                                "chi_sim.traineddata）放进其中一处，或在设置的 OCR 页把语言包目录指过去"),
-                                                 Core::Paths::toDisplayText(configuredKey).toStdString(), Core::Paths::toDisplayText(bundled).toStdString())
+                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("找遍了设置项 {}、环境变量 TESSDATA_PREFIX 与这些目录都没有语言包：{}。语言包本该随安装包一起装好，"
+                                                                                "请先试重新安装本程序；也可以把 eng.traineddata（要认中文再放 chi_sim.traineddata）放进其中一处，"
+                                                                                "或在设置的 OCR 页把语言包目录指过去"),
+                                                 std::string{configuredKey}, searched.join(QStringLiteral("；")).toStdString())
                             .c_str());
         }
 
@@ -49,52 +60,55 @@ namespace GyanisScribe::Ocr
 #endif
     } // namespace
 
-    std::filesystem::path locateTessDataDirectory(const Settings::ISettingsStore &settings)
+    std::vector<std::filesystem::path> tessDataCandidateDirectories(const Settings::ISettingsStore &settings, const std::filesystem::path &applicationDirectory)
     {
-        const auto hasModels = [](const std::filesystem::path &candidate)
+        std::vector<std::filesystem::path> candidates;
+
+        // 界面与环境变量里的文本换成路径要走 wstring：窄串按本地码页解释，装不下就抛
+        const auto configuredText = settings.stringValue(Settings::kOcrTessDataDirectory, QString()).trimmed();
+        if (!configuredText.isEmpty())
+        {
+            candidates.push_back(Core::Paths::fromDisplayText(configuredText));
+        }
+
+        const auto environmentText = qEnvironmentVariable("TESSDATA_PREFIX");
+        if (!environmentText.isEmpty())
+        {
+            candidates.push_back(Core::Paths::fromDisplayText(environmentText));
+        }
+
+        // 随包那份排在用户数据目录之前：装完即用是本软件的要求，语言包在安装包里
+        if (!applicationDirectory.empty())
+        {
+            candidates.push_back(applicationDirectory / kTessDataFolder);
+        }
+        candidates.push_back(Core::Paths::applicationDataDirectory() / kTessDataFolder);
+        return candidates;
+    }
+
+    std::filesystem::path firstDirectoryWithLanguagePacks(const std::vector<std::filesystem::path> &candidates)
+    {
+        for (const auto &candidate: candidates)
         {
             if (candidate.empty() || !std::filesystem::is_directory(candidate))
             {
-                return false;
+                continue;
             }
             // 空目录不算「有语言包」：Tesseract 在其中一个模型也认不出来，不如在这里就判不可用
             for (const auto &entry: std::filesystem::directory_iterator(candidate))
             {
                 if (entry.is_regular_file() && entry.path().extension() == ".traineddata")
                 {
-                    return true;
+                    return candidate;
                 }
             }
-            return false;
-        };
-
-        // 两处路径都从界面/环境变量里的文本换成路径要走 wstring：窄串按本地码页解释，装不下就抛
-        const auto configuredText = settings.stringValue(Settings::kOcrTessDataDirectory, QString()).trimmed();
-        if (!configuredText.isEmpty())
-        {
-            const auto configured = Core::Paths::fromDisplayText(configuredText);
-            if (hasModels(configured))
-            {
-                return configured;
-            }
-        }
-
-        const auto environmentText = qEnvironmentVariable("TESSDATA_PREFIX");
-        if (!environmentText.isEmpty())
-        {
-            const auto fromEnvironment = Core::Paths::fromDisplayText(environmentText);
-            if (hasModels(fromEnvironment))
-            {
-                return fromEnvironment;
-            }
-        }
-
-        const auto bundled = Core::Paths::applicationDataDirectory() / kTessDataFolder;
-        if (hasModels(bundled))
-        {
-            return bundled;
         }
         return {};
+    }
+
+    std::filesystem::path locateTessDataDirectory(const Settings::ISettingsStore &settings)
+    {
+        return firstDirectoryWithLanguagePacks(tessDataCandidateDirectories(settings, Core::Paths::applicationDirectory()));
     }
 
     std::unique_ptr<IOcrEngine> createOcrEngine(const Settings::ISettingsStore &settings, const Platform::IPlatformIntegration &integration)
@@ -115,8 +129,8 @@ namespace GyanisScribe::Ocr
         const auto tessData = locateTessDataDirectory(settings);
         if (tessData.empty())
         {
-            // 三处都没有语言包：这一格与「后端没编进来」要分开说，用户能自己做的只有放文件
-            const auto reason = describeMissingLanguagePacks(std::string(Settings::kOcrTessDataDirectory), Core::Paths::applicationDataDirectory() / kTessDataFolder);
+            // 一处都没有语言包：这一格与「后端没编进来」要分开说，用户能自己做的只有重装或放文件
+            const auto reason = describeMissingLanguagePacks(Settings::kOcrTessDataDirectory, tessDataCandidateDirectories(settings, Core::Paths::applicationDirectory()));
             Core::Logger::warning(std::format("文字识别不可用（平台 {}）：{}", integration.displayName().toStdString(), reason.toStdString()));
             return std::make_unique<UnavailableOcrEngine>(reason);
         }

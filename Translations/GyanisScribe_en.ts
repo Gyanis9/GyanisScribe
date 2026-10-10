@@ -200,6 +200,10 @@
             <translation>Finishing the recording failed: {}</translation>
         </message>
         <message>
+            <source>正在编成品，好了会说一声</source>
+            <translation>Building the finished file - you will hear when it is ready</translation>
+        </message>
+        <message>
             <source>控制条已收起；按 Ctrl+Alt+R 或托盘里的录屏项可停止并保存</source>
             <translation>The control bar is collapsed; press Ctrl+Alt+R or use the recording entry in the tray to stop and save</translation>
         </message>
@@ -322,6 +326,18 @@
         <message>
             <source>录屏默认帧率</source>
             <translation>Recording default frame rate</translation>
+        </message>
+        <message>
+            <source> kbps</source>
+            <translation> kbps</translation>
+        </message>
+        <message>
+            <source>按质量优先</source>
+            <translation>Quality first</translation>
+        </message>
+        <message>
+            <source>画面码率</source>
+            <translation>Video bitrate</translation>
         </message>
         <message>
             <source>录制范围</source>
@@ -460,60 +476,24 @@
             <translation>Folder for recordings</translation>
         </message>
         <message>
-            <source>编码器探测</source>
-            <translation>Encoder probe</translation>
-        </message>
-        <message>
-            <source>第一帧读不出尺寸（{}）。请确认录屏期间磁盘没满，或先用剪贴板交付这一帧序列</source>
-            <translation>The first frame's size can't be read ({}). Check that the disk wasn't full during the recording, or deliver this frame sequence to the clipboard first</translation>
-        </message>
-        <message>
-            <source>你这份 ffmpeg 里没有能开起来的视频编码器（试过 {}）。请换装一个带 libx264 的完整 ffmpeg 构建，或者先把这一帧序列自己用 ffmpeg 编一次看报什么</source>
-            <translation>None of the video encoders in your ffmpeg build could start (tried {}). Install a full ffmpeg build that carries libx264, or encode this frame sequence by hand with ffmpeg to read what it reports</translation>
-        </message>
-        <message>
-            <source>画面码率</source>
-            <translation>Video bitrate</translation>
-        </message>
-        <message>
-            <source>正在编成品，好了会说一声</source>
-            <translation>Building the finished file - you will hear when it is ready</translation>
-        </message>
-        <message>
-            <source>按质量优先</source>
-            <translation>Quality first</translation>
-        </message>
-        <message>
-            <source> kbps</source>
-            <translation> kbps</translation>
-        </message>
-        <message>
-            <source>取值要在 0 到 {} 之间（0 表示按质量优先），当前是 {}。码率越高文件越大</source>
-            <translation>The value must be between 0 and {} (0 means quality first); it is currently {}. A higher bitrate means a larger file</translation>
-        </message>
-        <message>
-            <source>画面码率 "{}" 不在可用范围（0 到 {} kbps，0 表示按质量优先）里：请在设置的录屏页重选，或删掉 Record/VideoBitrateKbps 这一项回到默认档</source>
-            <translation>Video bitrate "{}" is not in the available range (0 to {} kbps, where 0 means quality first): pick a value again on the recording page of Settings, or delete the Record/VideoBitrateKbps entry to fall back to the default</translation>
-        </message>
-        <message>
             <source>录屏目录</source>
             <translation>Recordings</translation>
-        </message>
-        <message>
-            <source>麦克风这一路</source>
-            <translation>Microphone input</translation>
         </message>
         <message>
             <source>麦克风设备</source>
             <translation>Microphone device</translation>
         </message>
         <message>
-            <source>系统声音这一路</source>
-            <translation>System sound input</translation>
-        </message>
-        <message>
             <source>系统声音设备</source>
             <translation>System sound device</translation>
+        </message>
+        <message>
+            <source>麦克风这一路</source>
+            <translation>Microphone input</translation>
+        </message>
+        <message>
+            <source>系统声音这一路</source>
+            <translation>System sound input</translation>
         </message>
         <message>
             <source>认得出哪种文字取决于语言包。目录留空时按环境变量与程序数据目录找。</source>
@@ -856,8 +836,8 @@
             <translation>A global hotkey needs at least one modifier: the single key {} would swallow other programs' ordinary keystrokes. Add Ctrl or Alt.</translation>
         </message>
         <message>
-            <source>设置项 {}、环境变量 TESSDATA_PREFIX、以及 {} 三处都没有语言包。请把 eng.traineddata（要认中文再放 chi_sim.traineddata）放进其中一处，或在设置的 OCR 页把语言包目录指过去</source>
-            <translation>None of the three places has a language pack: setting {}, the TESSDATA_PREFIX environment variable, and {}. Put eng.traineddata there (add chi_sim.traineddata to read Chinese), or point the language pack folder at the OCR page in Settings.</translation>
+            <source>找遍了设置项 {}、环境变量 TESSDATA_PREFIX 与这些目录都没有语言包：{}。语言包本该随安装包一起装好，请先试重新安装本程序；也可以把 eng.traineddata（要认中文再放 chi_sim.traineddata）放进其中一处，或在设置的 OCR 页把语言包目录指过去</source>
+            <translation>None of these has a language pack: the setting {}, the TESSDATA_PREFIX environment variable, the folders {}. One should have come with the installer, so try reinstalling this program first; or put eng.traineddata (add chi_sim.traineddata to read Chinese) into one of them, or point the OCR page of Settings at that folder</translation>
         </message>
         <message>
             <source>语言包已就位于 {}，但本次构建没有编入任何识别后端。见 docs/OcrBackends.md：这是 Debug 档的形状，Release 档带真后端</source>
@@ -1156,8 +1136,16 @@
             <translation>Sound was asked for but neither input got a device. Pick one on the Recording page of Settings, or turn audio capture off</translation>
         </message>
         <message>
-            <source>没找到 ffmpeg 命令行程序，录屏的编码这一步要用它。请安装 ffmpeg 的 Windows 构建并把所在目录加入 PATH（winget 里搜 ffmpeg 也有），装好后重启本程序</source>
-            <translation>The ffmpeg command-line program wasn't found; the encoding step of recording needs it. Install a Windows build of ffmpeg and add its folder to PATH (searching ffmpeg in winget works too), then restart GyanisScribe.</translation>
+            <source>没找到 ffmpeg 命令行程序，录屏的编码这一步要用它。它本该随安装包一起装好，请重新安装本程序；也可以自行安装一份并把所在目录加入 PATH，然后重启本程序</source>
+            <translation>ffmpeg wasn't found, and the encoding step of the recording needs it. It should have come with the installer, so reinstall this program; or install your own copy, add its folder to PATH, then restart this program</translation>
+        </message>
+        <message>
+            <source>第一帧读不出尺寸（{}）。请确认录屏期间磁盘没满，或先用剪贴板交付这一帧序列</source>
+            <translation>The first frame's size can't be read ({}). Check that the disk wasn't full during the recording, or deliver this frame sequence to the clipboard first</translation>
+        </message>
+        <message>
+            <source>编码器探测</source>
+            <translation>Encoder probe</translation>
         </message>
         <message>
             <source>MP4 编码</source>
@@ -1188,6 +1176,10 @@
             <translation>{} failed (exit code {}): {}. The full output is in the log, and you can also run the same command yourself to see the details.</translation>
         </message>
         <message>
+            <source>你这份 ffmpeg 里没有能开起来的视频编码器（试过 {}）。请换装一个带 libx264 的完整 ffmpeg 构建，或者先把这一帧序列自己用 ffmpeg 编一次看报什么</source>
+            <translation>None of the video encoders in your ffmpeg build could start (tried {}). Install a full ffmpeg build that carries libx264, or encode this frame sequence by hand with ffmpeg to read what it reports</translation>
+        </message>
+        <message>
             <source>录屏参数 {}：{}</source>
             <translation>Recording option {}: {}</translation>
         </message>
@@ -1202,6 +1194,10 @@
         <message>
             <source>取值要在 1 到 {} 之间（{} 格式的上限），当前是 {}。帧率越高文件越大、编码越慢</source>
             <translation>The value must be between 1 and {} (the limit of the {} format); it is currently {}. A higher frame rate means a bigger file and slower encoding.</translation>
+        </message>
+        <message>
+            <source>取值要在 0 到 {} 之间（0 表示按质量优先），当前是 {}。码率越高文件越大</source>
+            <translation>The value must be between 0 and {} (0 means quality first); it is currently {}. A higher bitrate means a larger file</translation>
         </message>
         <message>
             <source>取值要在 1 到 {} 之间，当前是 {}。留一个上限是防止录屏忘了关，真需要更长就分两段录</source>
@@ -1222,6 +1218,10 @@
         <message>
             <source>默认帧率 "{}" 不在可用范围（1 到 {}）里：请在设置的录屏页重选一个值，或删掉 Record/DefaultFrameRate 这一项回到默认档</source>
             <translation>Default frame rate "{}" is outside the usable range (1 to {}): pick a value again on the Recording page of Settings, or remove the Record/DefaultFrameRate entry to go back to the default</translation>
+        </message>
+        <message>
+            <source>画面码率 "{}" 不在可用范围（0 到 {} kbps，0 表示按质量优先）里：请在设置的录屏页重选，或删掉 Record/VideoBitrateKbps 这一项回到默认档</source>
+            <translation>Video bitrate "{}" is not in the available range (0 to {} kbps, where 0 means quality first): pick a value again on the recording page of Settings, or delete the Record/VideoBitrateKbps entry to fall back to the default</translation>
         </message>
         <message>
             <source>整屏</source>

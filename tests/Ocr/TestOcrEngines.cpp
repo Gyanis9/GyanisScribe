@@ -1,3 +1,4 @@
+#include "Core/Paths.h"
 #include "Ocr/OcrEngineFactory.h"
 
 #include "Ocr/IOcrEngine.h"
@@ -25,6 +26,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -61,10 +63,12 @@ namespace
     protected:
         static void SetUpTestSuite()
         {
-            int   argumentCount  = 1;
-            char  argumentZero[] = "TestOcrEngines";
-            char *arguments[]    = {argumentZero, nullptr};
-            application          = std::make_unique<QCoreApplication>(argumentCount, arguments);
+            // argv 与 argc 的缓冲要有静态存储期：Qt 只存指针不拷贝，
+            // 而 QCoreApplication::applicationDirPath() 这类调用是在装置函数返回之后才读它们。
+            static int   argumentCount  = 1;
+            static char  argumentZero[] = "TestOcrEngines";
+            static char *arguments[]    = {argumentZero, nullptr};
+            application                 = std::make_unique<QCoreApplication>(argumentCount, arguments);
             QCoreApplication::setOrganizationName(QStringLiteral("Gyanis"));
             QCoreApplication::setApplicationName(QStringLiteral("GyanisScribe-Tests"));
             integration = createPlatformIntegration();
@@ -329,4 +333,33 @@ TEST_F(OcrFixture, LanguageTagsIncludeTheDefault)
     const auto tags = supportedOcrLanguageTags();
     EXPECT_TRUE(tags.contains(QString::fromUtf8(kDefaultOcrLanguage))) << "默认语言不在词表里，设置页的初始值会显示成一个不存在的选项";
     EXPECT_TRUE(tags.contains(QStringLiteral("en")));
+}
+
+/**
+ * @brief 钉住语言包的查找顺序把「随包那份」排在用户数据目录之前
+ * @details 软件装完即用：语言包在安装包里，位置是 <程序目录>/tessdata。
+ *          排在应用数据目录之后，就等于装了包还要用户自己去放文件。
+ */
+TEST_F(OcrFixture, TessDataCandidatesPutTheBundledDirectoryBeforeUserData)
+{
+    SettingsStore settings(m_iniFile);
+
+    const auto installDirectory = m_root / "install";
+    const auto bundledDirectory = installDirectory / "tessdata";
+    std::filesystem::create_directories(bundledDirectory);
+    std::ofstream(bundledDirectory / "eng.traineddata") << "假模型文件，只用来验查找顺序";
+
+    const auto candidates = tessDataCandidateDirectories(settings, installDirectory);
+    const auto indexOf    = [&candidates](const std::filesystem::path &path)
+    {
+        const auto found = std::ranges::find(candidates, path);
+        return found == candidates.end() ? -1 : static_cast<int>(std::ranges::distance(candidates.begin(), found));
+    };
+
+    const auto userDataDirectory = GyanisScribe::Core::Paths::applicationDataDirectory() / "tessdata";
+    ASSERT_GE(indexOf(bundledDirectory), 0) << "候选里没有程序目录下的 tessdata";
+    ASSERT_GE(indexOf(userDataDirectory), 0) << "候选里没有应用数据目录下的 tessdata";
+    EXPECT_LT(indexOf(bundledDirectory), indexOf(userDataDirectory)) << "随包那份排在用户数据目录之后，装完还得自己放语言包";
+
+    EXPECT_EQ(firstDirectoryWithLanguagePacks(candidates), bundledDirectory) << "只有随包那份放着模型时，选出来的必须是它";
 }

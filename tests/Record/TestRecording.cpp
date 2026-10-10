@@ -17,6 +17,7 @@
 #include <QtGlobal>
 
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <ranges>
 #include <string>
@@ -302,7 +303,7 @@ TEST(RecordingFfmpeg, EncodeTimeoutScalesWithDuration)
 /**
  * @brief 钉住「找不到 ffmpeg」的拒绝面
  * @details 装没装ffmpeg是环境事实，两种结果都要有确定行为：找到就给绝对路径，
- *          没找到就报 DependencyMissing 并写清怎么装，而不是让 QProcess 去抛一个看不懂的错。
+ *          没找到就报 DependencyMissing 并写清怎么补（重装或自装一份），而不是让 QProcess 抛一个看不懂的错。
  */
 TEST(RecordingFfmpeg, LocatesOrRejectsWithInstallHint)
 {
@@ -670,4 +671,34 @@ TEST(RecordFormatSetting, TableRoundTripsEveryFormatAndRejectsUnknownToken)
         EXPECT_NE(parsed.error().message.find("Gif"), std::string::npos) << bad.toStdString();
         EXPECT_NE(parsed.error().message.find("Record/Format"), std::string::npos) << bad.toStdString();
     }
+}
+
+/**
+ * @brief 钉住「随包的 ffmpeg 排在 PATH 之前」
+ * @details 安装包自带这一件才能装完即用，只有程序目录里没有它时才回落到 PATH。
+ *          文件名按平台不同（Windows 带 .exe），所以两头都钉：没有时报空、放了同名文件才报路径。
+ */
+TEST(RecordingFfmpeg, PrefersTheCopyShippedNextToTheExecutable)
+{
+    const auto      root = std::filesystem::temp_directory_path() / "GyanisScribe-FfmpegLookup";
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+    std::filesystem::create_directories(root);
+
+    const auto directory = QString::fromStdWString(root.wstring());
+    EXPECT_TRUE(GyanisScribe::Record::bundledFfmpegPath(directory).isEmpty()) << "程序目录里没有它时不该报出路径";
+    EXPECT_TRUE(GyanisScribe::Record::bundledFfmpegPath(QString{}).isEmpty()) << "空目录名要按「没有」处理";
+
+#ifdef Q_OS_WIN
+    constexpr const char *kProgramFileName = "ffmpeg.exe";
+#else
+    constexpr const char *kProgramFileName = "ffmpeg";
+#endif
+    std::ofstream{root / kProgramFileName} << "假可执行文件，只用来验查找";
+
+    const auto found = GyanisScribe::Record::bundledFfmpegPath(directory);
+    // 两边都过一遍 QFileInfo：std::filesystem 给反斜杠、Qt 给正斜杠，直接比字符串会假红
+    EXPECT_EQ(found, QFileInfo{QString::fromStdWString((root / kProgramFileName).wstring())}.absoluteFilePath()) << "找到的必须是程序目录里那一份";
+
+    std::filesystem::remove_all(root, ignored);
 }

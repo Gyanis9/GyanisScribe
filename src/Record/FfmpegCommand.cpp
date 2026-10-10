@@ -6,7 +6,11 @@
 #include "Record/FfmpegVideoEncoders.h"
 
 #include <QCoreApplication>
+#include <QDir>
+#include <QFileInfo>
 #include <QStandardPaths>
+
+#include <QtGlobal>
 
 #include <format>
 
@@ -152,18 +156,40 @@ namespace GyanisScribe::Record
         return arguments;
     }
 
+    QString bundledFfmpegPath(const QString &applicationDirectory)
+    {
+        if (applicationDirectory.isEmpty())
+        {
+            return {};
+        }
+
+#ifdef Q_OS_WIN
+        constexpr const char *kProgramFileName = "ffmpeg.exe";
+#else
+        constexpr const char *kProgramFileName = "ffmpeg";
+#endif
+        const QFileInfo candidate{QDir{applicationDirectory}.filePath(QLatin1String(kProgramFileName))};
+        return candidate.isFile() ? candidate.absoluteFilePath() : QString{};
+    }
+
     Core::Expected<QString> locateFfmpeg()
     {
+        // 先要随包那份：软件装完即用，不要求用户再装 ffmpeg 或把它加进 PATH
+        if (const auto bundled = bundledFfmpegPath(QCoreApplication::applicationDirPath()); !bundled.isEmpty())
+        {
+            return bundled;
+        }
+
         if (const auto found = QStandardPaths::findExecutable(QStringLiteral("ffmpeg")); !found.isEmpty())
         {
             return found;
         }
 
-        // 报「怎么装」而不是只报「没找到」：Windows 用户未必知道 ffmpeg 是一个要单独存在的命令行程序。
-        // 这里不写具体网址与包名，避免哪天源变了这条提示就成了误导
+        // 两处都没有：安装包本该自带这一件，所以第一句是「重装」，第二句才留给自带构建的用户。
+        // 不写具体网址与包名，避免哪天源变了这条提示就成了误导
         // 一条字面量：拆成相邻片段会让翻译目录只收到第一片（ctest 用例 Style.TranslationCatalog 会当场报红）
         const auto hint = GyanisScribe::Core::uiText(
-                "没找到 ffmpeg 命令行程序，录屏的编码这一步要用它。请安装 ffmpeg 的 Windows 构建并把所在目录加入 PATH（winget 里搜 ffmpeg 也有），装好后重启本程序");
+                "没找到 ffmpeg 命令行程序，录屏的编码这一步要用它。它本该随安装包一起装好，请重新安装本程序；也可以自行安装一份并把所在目录加入 PATH，然后重启本程序");
         Core::Logger::warning(hint.toStdString());
         return std::unexpected(Core::Error{Core::ErrorCode::DependencyMissing, hint.toStdString()});
     }

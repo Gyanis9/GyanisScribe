@@ -1,8 +1,8 @@
 ﻿; 智录 GyanisScribe 的 Windows 安装器（NSIS 3）
 ;
-; 由 scripts/WindowsPackage.bat 调用：它先把绿色包备好（windeployqt 的 Qt 运行时 + 文档），
-; 再用 -DGyanisScribeVersion / -DGyanisScribeStage 两个 -D 传进来。版本号不在这里写死——
-; 真源是 CMakeLists.txt 的 project(... VERSION)，两处各写一份迟早会对不上。
+; 由 scripts/WindowsPackage.ps1 调用：它先把绿色包备好（windeployqt 的 Qt 运行时、随包的 ffmpeg
+; 与识别语言包、许可文本），再用 -DGyanisScribeVersion / -DGyanisScribeStage 两个 -D 传进来。
+; 版本号不在这里写死——真源是 CMakeLists.txt 的 project(... VERSION)，两处各写一份迟早会对不上。
 ;
 ; 手工跑法（调试用）：
 ;   makensis -DGyanisScribeVersion=0.0.1 -DGyanisScribeStage=dist\stage packaging\GyanisScribe.nsi
@@ -34,7 +34,9 @@ SetCompressor /SOLID lzma
 !endif
 
 !insertmacro MUI_PAGE_WELCOME
-!insertmacro MUI_PAGE_LICENSE "..\docs\ThirdPartyLicenses.md"
+; 许可页要给用户看的是本程序自己的许可协议（随包那份 LICENSE.txt），不是第三方清单——
+; 清单也随包发（licenses/ 与 docs/ThirdPartyLicenses.md），但接受协议这一步针对的是前者。
+!insertmacro MUI_PAGE_LICENSE "${GyanisScribeStage}\LICENSE.txt"
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !define MUI_FINISHPAGE_RUN "$INSTDIR\GyanisScribe.exe"

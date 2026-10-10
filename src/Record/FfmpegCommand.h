@@ -67,9 +67,18 @@ namespace GyanisScribe::Record
                                                  const std::filesystem::path &outputFile);
 
     /**
+     * @brief 随包那份 ffmpeg 可执行文件
+     * @param applicationDirectory 可执行体所在目录
+     * @return 目录里有 ffmpeg（Windows 上带 .exe 后缀）时返回它的绝对路径，否则返回空串
+     * @details 安装包自带这一件，用户不需要再往系统里装一份；找不到随包那份才回落到 PATH。
+     */
+    [[nodiscard]] QString bundledFfmpegPath(const QString &applicationDirectory);
+
+    /**
      * @brief 找 ffmpeg 可执行文件
-     * @return 成功返回它的绝对路径；找不到返回 DependencyMissing，文案给出装法
-     * @details 用 QStandardPaths 而不是自己剥 PATH：Windows 上还要照顾 PATHEXT 的 .exe 后缀，
+     * @return 成功返回它的绝对路径；找不到返回 DependencyMissing，文案给出补法
+     * @details 顺序是「程序目录里随包那份 → PATH」：前者保证装完即用，后者留给自带构建的高级用户。
+     *          PATH 那一半用 QStandardPaths 而不是自己剥：Windows 上还要照顾 PATHEXT 的 .exe 后缀，
      *          容器里则要跟着 PATH 找无后缀的 ELF，这两条 Qt 都已经做好了。
      */
     [[nodiscard]] Core::Expected<QString> locateFfmpeg();

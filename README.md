@@ -14,7 +14,7 @@ C++23 + Qt 6 Widgets 实现，界面、图标与代码全部为本项目原创�
 - 常驻托盘，四个全局热键覆盖日常动作，不需要先开主窗口
 - 一个可执行体加随包摆好的 Qt 运行时，绿色目录即可运行；同时产出 zip 与 NSIS 安装器
 - 深浅主题、跟随系统、高 DPI 与多屏；中英双语界面
-- 录屏编码走外部 `ffmpeg` 进程，**不链接**（避开 GPL 传染）
+- 录屏编码走 `ffmpeg` 子进程，**随包分发、不链接**：装完即用，也不让 GPL 传染本体
 - 每个模块都有单测，另有一条跨模块流程用例；四条验证线（本机两档 + 容器两档）都是必建必测的门禁
 
 ## 目录
@@ -86,7 +86,8 @@ GyanisScribe.exe --selftest # 把启动路径跑完就退：日志就绪且热�
 1. 程序常驻托盘，关掉主窗口不会退出进程，退出只走托盘菜单那一条路。
 2. 全局热键默认 `Ctrl+Alt+A`（截图）、`Ctrl+Alt+R`（录屏，再按一次停止并保存）、`Ctrl+Alt+O`（识别）、
    `Ctrl+Alt+P`（取色），撞了就撞了——设置里可改，改完立刻重新登记，不用重启。
-3. 录屏要出 MP4 需要机器上有 `ffmpeg`（在 PATH 里即可）；没有也能录，只是会在编码那一步给一条中文提示。
+3. 录屏用的 `ffmpeg` 与识别语言包都在安装包里，程序目录里就能看见；不需要再装任何东西，
+   也不需要往哪个目录放 `traineddata`。
 
 Linux 侧当前是「可构建、可运行、能力降级」：抓帧、标注、贴图、识别可用，
 全局热键与录屏取声没有平台后端，会在日志与界面上给出中文降级原因而不是静默失败。
@@ -163,7 +164,7 @@ python scripts/check-translation-catalog.py --generate   # 把新增文案补进
 | Conan | 2 | 依赖：spdlog 1.17.0、GoogleTest 1.17.0，Release 档另领 Tesseract 5.5.2 |
 | Qt | 6.11，含 Core / Gui / Widgets / Concurrent / Svg / Network | Linux 容器里用发行版的 6.4 也可编 |
 | Python | 3 | 两条静态门禁脚本 |
-| ffmpeg | 任意带可用 h264 编码器的构建 | 可选：只在录屏编码时需要，作为外部进程调用 |
+| ffmpeg | 官方静态构建（gyan.dev） | 打包时需要：`scripts/FetchFfmpeg.ps1` 按钉好的 URL + SHA-256 取进 `Vendor/Ffmpeg/`；开发期 PATH 上有一份也行 |
 | NSIS | — | 可选：只在打安装器时需要 |
 
 机器相关的路径只出现在 `scripts/WindowsBuild.bat` 与 `scripts/container/env.sh` 里，工程不写死绝对路径。
@@ -313,8 +314,9 @@ docs/           需求、识别后端、第三方许可证、界面样式说明
 - Windows 上识别首选系统组件（`Windows.Media.Ocr`），它用的是 Windows 自己装的语言包，不需要用户放文件；
   只有选 Tesseract（以及 Linux 侧）时才需要自备 `eng.traineddata` 等——缺语言包会明确报「不可用」并给出放置位置，
   不会返回空结果冒充「这张图里没字」。
-- 录屏依赖外部 `ffmpeg`：不链接、不随包分发（避开 GPL 传染），没装就在编码那一步给出中文提示；
-  装的那份没有 `libx264` 时编码前会自己探一个开得起来的编码器顶上，五个候选全都开不起来才报失败。
+- 录屏的编码走 `ffmpeg` 子进程：随包分发那一份，**不链接**（避开 GPL 传染），所以本体源码不受它约束；
+  查找顺序是「程序目录里随包那份 → PATH」。装的那份没有 `libx264` 时编码前会自己探一个开得起来的编码器顶上，
+  五个候选全都开不起来才报失败。
 - Debug 档不领 Tesseract：上游 leptonica 的 Debug 包库名与其 `cpp_info` 不一致，
   `conanfile.py` 里按 `build_type` 分岔并写明撤除判据。Windows 的 Debug 档仍能真识别——工厂先问系统识别。
 - Linux 侧能力不全：没有全局热键后端（登记会给出中文提示并降级）、没有录屏取声、
@@ -387,7 +389,11 @@ docs/           需求、识别后端、第三方许可证、界面样式说明
 本项目的代码、界面与图标均为原创。第三方组件的许可证、用途与分发方式逐条列在
 [docs/ThirdPartyLicenses.md](docs/ThirdPartyLicenses.md)：Qt 6 走 LGPL-3.0 的动态链接路线，
 Tesseract / Leptonica / spdlog / GoogleTest / C++/WinRT 投影头各自按上游许可，
-`ffmpeg` 只作为外部进程调用、不链接也不随包分发（避开 GPL 传染）。
-识别语言包（`*.traineddata`）不随安装包分发，放置路径与查找顺序见 [docs/OcrBackends.md](docs/OcrBackends.md)。
+`ffmpeg` 只作为外部进程调用、**不链接**（避开 GPL 传染），随包那一份按上游原样分发并附许可证正文与源码获取说明。
+识别语言包（`eng`、`chi_sim`）随包分发在安装目录的 `tessdata/` 里，查找顺序见 [docs/OcrBackends.md](docs/OcrBackends.md)。
 
-本项目自身的许可证尚未随包声明（仓库当前为私有阶段）；对外分发前先在这里补上 `LICENSE` 与本节。
+本软件**免费供任何人使用**，条款见仓库根的 [`LICENSE.txt`](LICENSE.txt)（安装器的许可页就是它）。
+协议里有一处刻意的放宽：为保证第三方许可证合规而做的反向工程是允许的——LGPL 要求必须留这一条。
+各第三方组件的许可证正文随包发在 `licenses/` 下，仓库里也能直接看：Qt（LGPL-3.0）、
+FFmpeg（GPL-3.0，未修改的官方构建，对应源码由上游公开发布）、Tesseract 与语言包（Apache-2.0）、
+Leptonica（BSD-2-Clause）、spdlog（MIT）、GoogleTest（BSD-3-Clause，只进测试）、C++/WinRT 投影头（MIT）。

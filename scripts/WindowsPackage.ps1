@@ -32,12 +32,41 @@ if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $stage 'docs') | Out-Null
 
-# The exe plus Qt runtime go into one folder; docs travel with it because the About page
-# points the user at docs/ThirdPartyLicenses.md.
+# The package has to run on a machine where the user installed nothing else: Qt runtime, ffmpeg
+# and the OCR language packs all travel inside it. A missing piece is an error here, never a
+# silent skip -- a package that builds but cannot record or recognise is worse than no package.
 Copy-Item $exe $stage -Force
 Copy-Item 'README.md' $stage -Force
-Copy-Item (Join-Path 'docs' '*.md') (Join-Path $stage 'docs') -Force
-if (Test-Path 'LICENSE.txt') { Copy-Item 'LICENSE.txt' $stage -Force }
+if (-not (Test-Path 'LICENSE.txt')) { throw 'LICENSE.txt missing: the installer must carry the end-user license' }
+Copy-Item 'LICENSE.txt' $stage -Force
+# The license texts are vendored in the repo, so this call is a repair, not a download step: it only
+# re-fetches a file that is absent or is not the license (a failed fetch once left a 14-byte
+# "404: Not Found" page in the folder, and it copied just as prettily as the real text).
+& (Join-Path $PSScriptRoot 'FetchLicenses.ps1')
+if (-not (Test-Path 'licenses')) { throw 'licenses/ missing: third-party license texts must ship with the package' }
+Copy-Item -Recurse -Force 'licenses' (Join-Path $stage 'licenses')
+
+# Only the user-facing reference pages travel with the product; the internal requirement
+# document is not something an end user should receive.
+foreach ($document in 'ThirdPartyLicenses.md', 'OcrBackends.md', 'UiStyleGuide.md') {
+    Copy-Item (Join-Path 'docs' $document) (Join-Path $stage 'docs') -Force
+}
+
+& (Join-Path $PSScriptRoot 'FetchFfmpeg.ps1')
+$ffmpegExe = Join-Path (Join-Path 'Vendor' 'Ffmpeg') 'ffmpeg.exe'
+if (-not (Test-Path $ffmpegExe)) { throw "bundled ffmpeg missing at $ffmpegExe" }
+Copy-Item $ffmpegExe $stage -Force
+Write-Output '[ok] ffmpeg staged next to the executable'
+
+# Ui::Ocr looks for <application directory>/tessdata before the user data folder, so shipping the
+# packs here is what makes recognition work straight after installation.
+$tessDataSource = Join-Path 'Vendor' 'Tessdata'
+foreach ($required in 'eng.traineddata', 'chi_sim.traineddata') {
+    if (-not (Test-Path (Join-Path $tessDataSource $required))) { throw "language pack $required missing under $tessDataSource" }
+}
+New-Item -ItemType Directory -Force -Path (Join-Path $stage 'tessdata') | Out-Null
+Copy-Item (Join-Path $tessDataSource '*.traineddata') (Join-Path $stage 'tessdata') -Force
+Write-Output '[ok] OCR language packs staged'
 
 # The English catalog is a build product (DeployTranslations runs lrelease). Without it the
 # packaged app exposes the language setting but can never honour it -- the portable folder and
