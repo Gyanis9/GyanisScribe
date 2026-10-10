@@ -75,10 +75,12 @@ namespace
     protected:
         static void SetUpTestSuite()
         {
-            int   argumentCount  = 1;
-            char  argumentZero[] = "TestCaptureService";
-            char *arguments[]    = {argumentZero, nullptr};
-            application          = std::make_unique<QCoreApplication>(argumentCount, arguments);
+            // argv 与 argc 的缓冲要有静态存储期：Qt 只存指针不拷贝，
+            // 而 QCoreApplication::applicationDirPath() 这类调用是在装置函数返回之后才读它们。
+            static int   argumentCount  = 1;
+            static char  argumentZero[] = "TestCaptureService";
+            static char *arguments[]    = {argumentZero, nullptr};
+            application                 = std::make_unique<QCoreApplication>(argumentCount, arguments);
             QCoreApplication::setOrganizationName(QStringLiteral("Gyanis"));
             QCoreApplication::setApplicationName(QStringLiteral("GyanisScribe-Tests"));
         }

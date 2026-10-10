@@ -158,10 +158,12 @@ namespace
         static void SetUpTestSuite()
         {
             // QPixmap 必须有 GUI 应用对象才画得出来，QCoreApplication 不够
-            int   argumentCount  = 1;
-            char  argumentZero[] = "TestIconProvider";
-            char *arguments[]    = {argumentZero, nullptr};
-            application          = std::make_unique<QApplication>(argumentCount, arguments);
+            // argv 与 argc 的缓冲要有静态存储期：Qt 只存指针不拷贝，
+            // 而 QCoreApplication::applicationDirPath() 这类调用是在装置函数返回之后才读它们。
+            static int   argumentCount  = 1;
+            static char  argumentZero[] = "TestIconProvider";
+            static char *arguments[]    = {argumentZero, nullptr};
+            application                 = std::make_unique<QApplication>(argumentCount, arguments);
         }
 
         static void TearDownTestSuite()
