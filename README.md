@@ -222,8 +222,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\WindowsPackage.ps1
 ```
 
 产出绿色目录 + zip + NSIS 安装器，落在 `dist/`。脚本用 `windeployqt` 按可执行体的**实际导入**摆好
-Qt 运行时，然后在 staging 目录里跑一次 `--selftest`——只有这样才能证明包是完整的，而不是「本机能跑」。
-安装器带卸载段。
+Qt 运行时，然后在 staging 目录里把 `PATH` 收窄到只剩 `System32`、并清掉 `QTDIR` 与
+`QT_PLUGIN_PATH` 那几条提示，再跑一次 `--selftest` 与 `ffmpeg.exe -version`。
+为什么收窄：开发机的 `PATH` 上本来就有 Qt，缺了哪件 DLL 也会被本机那份悄悄补上，
+「本机能跑」就不是「包装完能跑」的证据。这条判据本身也验过能不能红：在同一份 staging 里
+把 `Qt6Widgets.dll` 挪开，`--selftest` 的退出码变成 `-1073741515`（`0xc0000135` = 找不到 DLL），
+放回又回到 0。安装器带卸载段。
 
 ## 验证与质量门禁
 
@@ -232,10 +236,10 @@ Qt 运行时，然后在 staging 目录里跑一次 `--selftest`——只有这�
 
 | 线 | 命令 | 结果 |
 | --- | --- | --- |
-| Windows Release | `scripts\WindowsBuild.bat release` | 280/280 通过，2 条环境门控跳过 |
-| Windows Debug | `scripts\WindowsBuild.bat debug` | 280/280 通过，3 条环境门控跳过 |
-| 容器 ASan(+UBSan) | `scripts/container/sanitize.sh` | 275/275 通过，3 条跳过 |
-| 容器覆盖率 | `scripts/container/coverage.sh 55` | 275/275 通过，行覆盖 **69.7%**（4036/5787），阈值 55%；主程序在 Xvfb 上 `--selftest` 退出码 0 |
+| Windows Release | `scripts\WindowsBuild.bat release` | 282 条全绿（0 失败），其中 2 条环境门控跳过 |
+| Windows Debug | `scripts\WindowsBuild.bat debug` | 282 条全绿（0 失败），其中 3 条跳过 |
+| 容器 ASan(+UBSan) | `scripts/container/sanitize.sh asan` | 277 条全绿（0 失败），其中 3 条跳过 |
+| 容器覆盖率 | `scripts/container/coverage.sh 55` | 277 条全绿（0 失败），行覆盖 **69.9%**（4054/5802），阈值 55%；主程序在 Xvfb 上 `--selftest` 退出码 0 |
 
 容器少的 5 条是 Windows 专属后端的用例：4 条 WinRT 系统识别、1 条 Win32 热键映射。
 跳过的都是环境门控用例，本机两档与容器各跳哪些是清楚的：
@@ -243,7 +247,7 @@ Qt 运行时，然后在 staging 目录里跑一次 `--selftest`——只有这�
 | 跳过的用例 | 为什么跳 |
 | --- | --- |
 | `LanguageFixture.BuiltEnglishPackTranslatesKnownString` | 容器那份 Qt 6.4 没有 lrelease，出不了真实语言包，只能在有包的一档成立 |
-| `OcrFixture.ReportsMissingBackendSeparatelyFromMissingLanguagePacks`（仅本机 debug） | Debug 档不领 Tesseract，这一档没有「后端在、语言包缺」那个组合可判 |
+| `OcrFixture.ReportsMissingBackendSeparatelyFromMissingLanguagePacks`（仅本机 Debug） | 这台机装了系统识别语言包，工厂先问 Windows 就拿到了后端，走不到「语言包在、后端没编进来」那一格；同一格由容器那两档跑 |
 | `FfmpegAudioCaptureEndToEnd.*`、`VideoEncoderEndToEndFixture.*` | 要真 `ffmpeg`，给齐环境变量才跑 |
 
 后两条端到端这样打开：

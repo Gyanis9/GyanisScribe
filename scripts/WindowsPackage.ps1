@@ -89,13 +89,32 @@ if (-not (Test-Path $winDeployQt)) { throw "windeployqt not found under $QtDir (
 & $winDeployQt --release --no-translations --svg --network (Join-Path $stage 'GyanisScribe.exe')
 if ($LASTEXITCODE -ne 0) { throw 'windeployqt failed' }
 
-# The staged folder must run on its own: that is the only proof the package is complete.
+# The staged folder has to run on a machine where the user installed nothing -- that is the whole
+# claim of "self-contained", and a developer box cannot show it: with the normal PATH a missing Qt
+# runtime DLL is quietly satisfied by the Qt install here. So narrow PATH to the system directory
+# and drop the Qt hints, then require both the app and the bundled ffmpeg to still run. A missing
+# dependency then fails as a launch error (0xc0000135) instead of shipping.
 Push-Location $stage
 try {
-    & .\GyanisScribe.exe --selftest
-    if ($LASTEXITCODE -ne 0) { throw "staged package failed its selftest (exit $LASTEXITCODE)" }
+    $savedPath    = $env:PATH
+    $savedQtDir   = $env:QTDIR
+    $savedPlugins = $env:QT_PLUGIN_PATH
+    $savedQpa     = $env:QT_QPA_PLATFORM_PLUGIN_PATH
+    try {
+        $env:PATH = (Join-Path $env:SystemRoot 'System32')
+        Remove-Item Env:QTDIR, Env:QT_PLUGIN_PATH, Env:QT_QPA_PLATFORM_PLUGIN_PATH -ErrorAction SilentlyContinue
+        & .\GyanisScribe.exe --selftest
+        if ($LASTEXITCODE -ne 0) { throw "staged package failed its selftest with PATH narrowed to System32 (exit $LASTEXITCODE)" }
+        & .\ffmpeg.exe -hide_banner -version 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "the ffmpeg shipped inside the package would not run (exit $LASTEXITCODE)" }
+    } finally {
+        $env:PATH = $savedPath
+        if ($savedQtDir) { $env:QTDIR = $savedQtDir }
+        if ($savedPlugins) { $env:QT_PLUGIN_PATH = $savedPlugins }
+        if ($savedQpa) { $env:QT_QPA_PLATFORM_PLUGIN_PATH = $savedQpa }
+    }
 } finally { Pop-Location }
-Write-Output '[ok] staged package selftest passed'
+Write-Output '[ok] staged package and bundled ffmpeg run with PATH narrowed to the system directory'
 
 $zip = Join-Path 'dist' "GyanisScribe-$version-win64.zip"
 Compress-Archive -Force -Path (Join-Path $stage '*') -DestinationPath $zip
