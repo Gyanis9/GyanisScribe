@@ -11,6 +11,7 @@
 #include <QCommandLineParser>
 #include <QCoreApplication>
 #include <QStringList>
+#include <QWidget>
 
 #include <format>
 
@@ -55,7 +56,17 @@ int main(int argc, char *argv[])
     if (parseCommandLine(application))
     {
         const auto &report = application.hotkeyReport();
-        GyanisScribe::Core::Logger::info(std::format("自检：热键登记 {} 项、未登记 {} 项，日志就绪 {}", report.registered, report.failures.size(), application.isReady()));
+        // 可见顶层窗口数也要报出来：托盘装不上时入口就只剩主窗口，这一格是那条降级真的落了地的读数
+        int visibleTopLevels = 0;
+        for (auto *widget: QApplication::topLevelWidgets())
+        {
+            if (widget->isVisible())
+            {
+                ++visibleTopLevels;
+            }
+        }
+        GyanisScribe::Core::Logger::info(std::format("自检：热键登记 {} 项、未登记 {} 项，日志就绪 {}，可见顶层窗口 {} 个", report.registered, report.failures.size(),
+                                                     application.isReady(), visibleTopLevels));
         return application.isReady() ? 0 : 1;
     }
 

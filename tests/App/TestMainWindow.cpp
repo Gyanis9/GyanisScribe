@@ -13,6 +13,7 @@
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
 #include "Ui/DesignTokens.h"
+#include "Ui/HotkeyEdit.h"
 #include "Ui/IconProvider.h"
 #include "Ui/Language.h"
 #include "Ui/ThemeManager.h"
@@ -112,9 +113,12 @@ namespace
         }
 
         /// 建窗口：WA_DontShowOnScreen 让 open() 里的 show() 不再真的弹一块窗口到桌面上
-        void makeWindow()
+        /// globalHotkeys 默认给真值：这一份装置要测的是「能改」那一格，不能改的那一格由用例自己关掉它
+        void makeWindow(const bool globalHotkeys = true)
         {
-            m_window = std::make_unique<MainWindow>(*m_store, *m_theme, *m_icons, *m_historyStore);
+            GyanisScribe::Platform::PlatformCapabilities capabilities;
+            capabilities.globalHotkeys = globalHotkeys;
+            m_window                   = std::make_unique<MainWindow>(*m_store, *m_theme, *m_icons, *m_historyStore, capabilities);
             m_window->setAttribute(Qt::WA_DontShowOnScreen);
         }
 
@@ -722,4 +726,30 @@ TEST_F(MainWindowFixture, IconsReResolveWhenTheThemeChangesLive)
 
     EXPECT_NE(list->item(0)->icon().cacheKey(), navKeyBefore) << "换主题后导航行的图标没重取：描边色停在旧档";
     EXPECT_NE(exportButton->icon().cacheKey(), buttonKeyBefore) << "换主题后按钮图标没重取：走的是 setIcon 而不是 applyIcon，名字没记在控件上";
+}
+
+/**
+ * @brief 钉住热键页的登记入口跟着平台能力位走：没有登记口的平台上不许装作改了会生效
+ * @details 两格都判：能力位为真时四行都能编辑（少了这一格，把 setEnabled 摘掉也不会红），
+ *          为假时四行都灰掉但仍在——行消失了用户就看不见自己配过什么。
+ */
+TEST_F(MainWindowFixture, HotkeyEntriesFollowTheGlobalHotkeyCapability)
+{
+    makeWindow(true);
+    m_window->open(MainWindowPage::Hotkey);
+    auto edits = m_window->findChildren<GyanisScribe::Ui::HotkeyEdit *>();
+    ASSERT_EQ(edits.size(), 4) << "热键页该有截图、录屏、文字识别、屏幕取色四行";
+    for (auto *edit: edits)
+    {
+        EXPECT_TRUE(edit->isEnabled()) << "有登记口的平台上这四行要能改";
+    }
+
+    makeWindow(false);
+    m_window->open(MainWindowPage::Hotkey);
+    edits = m_window->findChildren<GyanisScribe::Ui::HotkeyEdit *>();
+    ASSERT_EQ(edits.size(), 4) << "没有登记口也不能把行藏掉：用户配过的组合键要还在眼前";
+    for (auto *edit: edits)
+    {
+        EXPECT_FALSE(edit->isEnabled()) << "这台机器上改完不会生效，入口就该是灰的";
+    }
 }

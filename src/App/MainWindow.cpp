@@ -812,9 +812,10 @@ namespace GyanisScribe::App
 
     MainWindow::~MainWindow() = default;
 
-    MainWindow::MainWindow(ISettingsStore &settings, ThemeManager &theme, IconProvider &icons, History::HistoryStore &historyStore, QWidget *parent) :
-        QWidget(parent), m_settings(settings), m_theme(theme), m_icons(icons), m_audioDevices(std::make_unique<GyanisScribe::Record::FfmpegAudioDeviceEnumerator>()),
-        m_historyStore(historyStore)
+    MainWindow::MainWindow(ISettingsStore &settings, ThemeManager &theme, IconProvider &icons, History::HistoryStore &historyStore, Platform::PlatformCapabilities capabilities,
+                           QWidget *parent) :
+        QWidget(parent), m_settings(settings), m_theme(theme), m_icons(icons), m_capabilities(capabilities),
+        m_audioDevices(std::make_unique<GyanisScribe::Record::FfmpegAudioDeviceEnumerator>()), m_historyStore(historyStore)
     {
         setWindowTitle(GyanisScribe::Core::uiText("智录 设置"));
         setWindowIcon(icons.icon("App"));
@@ -1093,7 +1094,11 @@ namespace GyanisScribe::App
     QWidget *MainWindow::buildHotkeyPage()
     {
         auto *page = new QWidget{this};
-        auto *form = makePageForm(page, GyanisScribe::Core::uiText("四个全局热键随时可改，改完立即重新登记，不需要重启。"));
+        // 没有登记接口的那一种平台上，改组合键不会有任何效果：入口灰掉并当场说明，
+        // 比让人反复改完再按一次、把「没反应」当成程序坏了要好
+        const auto intro = m_capabilities.globalHotkeys ? GyanisScribe::Core::uiText("四个全局热键随时可改，改完立即重新登记，不需要重启。")
+                                                        : GyanisScribe::Core::uiText("这个平台没有登记全局热键的接口，下面四项改了也不会生效。");
+        auto      *form  = makePageForm(page, intro);
         for (const auto [key, title, defaultText]: {std::tuple{GyanisScribe::Settings::kHotkeyCapture, GyanisScribe::Core::uiText("截图"), QStringLiteral("Ctrl+Alt+A")},
                                                     std::tuple{GyanisScribe::Settings::kHotkeyRecord, GyanisScribe::Core::uiText("录屏"), QStringLiteral("Ctrl+Alt+R")},
                                                     std::tuple{GyanisScribe::Settings::kHotkeyOcr, GyanisScribe::Core::uiText("文字识别"), QStringLiteral("Ctrl+Alt+O")},
@@ -1101,6 +1106,7 @@ namespace GyanisScribe::App
         {
             auto *edit = new GyanisScribe::Ui::HotkeyEdit{m_settings, page};
             edit->bindTo(key, title, defaultText);
+            edit->setEnabled(m_capabilities.globalHotkeys);
             form->addRow(GyanisScribe::Core::uiText("%1 的全局热键").arg(title), edit);
         }
         return page;

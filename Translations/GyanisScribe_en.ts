@@ -160,6 +160,10 @@
             <translation>Capture did not complete: %1. Try again</translation>
         </message>
         <message>
+            <source>这些全局热键没能登记上：</source>
+            <translation>These global hotkeys could not be registered:</translation>
+        </message>
+        <message>
             <source>还没有可识别的图：先按 Ctrl+Alt+A 框选一块屏幕</source>
             <translation>No image to recognize yet: press Ctrl+Alt+A and drag out a screen region first</translation>
         </message>
@@ -510,6 +514,10 @@
         <message>
             <source>四个全局热键随时可改，改完立即重新登记，不需要重启。</source>
             <translation>The four global hotkeys can be changed any time; each change is re-registered right away, no restart needed.</translation>
+        </message>
+        <message>
+            <source>这个平台没有登记全局热键的接口，下面四项改了也不会生效。</source>
+            <translation>This platform offers no way to register global hotkeys, so changing the four entries below would have no effect.</translation>
         </message>
         <message>
             <source>截图</source>

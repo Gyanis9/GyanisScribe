@@ -83,14 +83,17 @@ GyanisScribe.exe --selftest # 把启动路径跑完就退：日志就绪且热�
 
 第一次运行要知道的三件事：
 
-1. 程序常驻托盘，关掉主窗口不会退出进程，退出只走托盘菜单那一条路。
+1. 程序常驻托盘，关掉主窗口不会退出进程，退出只走托盘菜单那一条路。托盘装不上的环境没有这条路
+   （无托盘的桌面、容器里）：主窗口会在启动时自己现身，关掉它就是退出程序。
 2. 全局热键默认 `Ctrl+Alt+A`（截图）、`Ctrl+Alt+R`（录屏，再按一次停止并保存）、`Ctrl+Alt+O`（识别）、
    `Ctrl+Alt+P`（取色），撞了就撞了——设置里可改，改完立刻重新登记，不用重启。
+   哪一条没能登记上，启动时会在气泡里连它各自的原因一起说出来，不留「按了没反应」让人猜。
 3. 录屏用的 `ffmpeg` 与识别语言包都在安装包里，程序目录里就能看见；不需要再装任何东西，
    也不需要往哪个目录放 `traineddata`。
 
 Linux 侧当前是「可构建、可运行、能力降级」：抓帧、标注、贴图、识别可用，
-全局热键与录屏取声没有平台后端，会在日志与界面上给出中文降级原因而不是静默失败。
+全局热键与录屏取声没有平台后端——热键页那四行会按能力位灰掉并在页首写明改了也不会生效，
+取声那两格给出中文降级原因，都不会静默失败；托盘同样没有，所以主窗口在启动时就现身。
 
 ## 快捷键
 
@@ -236,10 +239,10 @@ Qt 运行时，然后在 staging 目录里把 `PATH` 收窄到只剩 `System32`�
 
 | 线 | 命令 | 结果 |
 | --- | --- | --- |
-| Windows Release | `scripts\WindowsBuild.bat release` | 282 条全绿（0 失败），其中 2 条环境门控跳过 |
-| Windows Debug | `scripts\WindowsBuild.bat debug` | 282 条全绿（0 失败），其中 3 条跳过 |
-| 容器 ASan(+UBSan) | `scripts/container/sanitize.sh asan` | 277 条全绿（0 失败），其中 3 条跳过 |
-| 容器覆盖率 | `scripts/container/coverage.sh 55` | 277 条全绿（0 失败），行覆盖 **69.9%**（4056/5802），阈值 55%；主程序在 Xvfb 上 `--selftest` 退出码 0 |
+| Windows Release | `scripts\WindowsBuild.bat release` | 283 条全绿（0 失败），其中 2 条环境门控跳过 |
+| Windows Debug | `scripts\WindowsBuild.bat debug` | 283 条全绿（0 失败），其中 3 条跳过 |
+| 容器 ASan(+UBSan) | `scripts/container/sanitize.sh asan` | 278 条全绿（0 失败），其中 3 条跳过 |
+| 容器覆盖率 | `scripts/container/coverage.sh 55` | 278 条全绿（0 失败），行覆盖 **70.1%**（4078/5818），阈值 55%；主程序在 Xvfb 上 `--selftest` 退出码 0 |
 
 容器少的 5 条是 Windows 专属后端的用例：4 条 WinRT 系统识别、1 条 Win32 热键映射。
 跳过的都是环境门控用例，本机两档与容器各跳哪些是清楚的：

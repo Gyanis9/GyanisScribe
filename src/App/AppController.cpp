@@ -45,9 +45,8 @@
 #include <QImageReader>
 #include <QCoreApplication>
 #include <QDateTime>
-#include <QGuiApplication>
 #include <QImage>
-#include <QScreen>
+#include <QStringList>
 
 #include <filesystem>
 #include <format>
@@ -116,12 +115,12 @@ namespace GyanisScribe::App
         QObject::connect(m_ocrRunner.get(), &Ocr::RecognitionRunner::failed, this, &AppController::handleOcrFailed);
         m_tray       = std::make_unique<TrayController>(*m_icons, *m_theme, *m_settings, *m_integration);
         m_history    = std::make_unique<History::HistoryStore>(History::HistoryStore::defaultStoragePath());
-        m_mainWindow = std::make_unique<MainWindow>(*m_settings, *m_theme, *m_icons, *m_history);
+        m_mainWindow = std::make_unique<MainWindow>(*m_settings, *m_theme, *m_icons, *m_history, m_integration->capabilities());
         m_toast      = std::make_unique<Ui::Toast>(*m_icons, *m_theme);
         QObject::connect(m_tray.get(), &TrayController::actionRequested, this, &AppController::handleTrayAction);
-        // 没有托盘的桌面环境（容器、精简安装）照样能跑：只是少一个入口，主窗口仍然可用
-        m_tray->install();
-        m_annotationWindow = std::make_unique<Annotation::AnnotationWindow>(*m_annotation, std::make_unique<Annotation::AnnotationToolbar>(*m_settings, *m_icons));
+        // 装没装上要留到接线全部完成之后再处置：现身的这一刻起用户就能点，每个入口都得已经接好
+        const bool trayInstalled = m_tray->install();
+        m_annotationWindow       = std::make_unique<Annotation::AnnotationWindow>(*m_annotation, std::make_unique<Annotation::AnnotationToolbar>(*m_settings, *m_icons));
 
         // 热键 → 动作：唯一的接线处，界面加菜单项时也是发同一个信号而不是再走一条路径
         QObject::connect(m_hotkeys.get(), &Hotkey::IHotkeyManager::actionTriggered, this,
@@ -200,13 +199,34 @@ namespace GyanisScribe::App
                                  Core::Logger::error(std::format("贴图布局没能存下：{}", saved.error().message));
                              }
                          });
+
+        // 没有托盘就没有第二个入口，而全局热键在缺后端的平台上也不生效：主窗口得自己现身，
+        // 并把「关掉窗子就退出」打开。Application 里那句 setQuitOnLastWindowClosed(false) 是为
+        // 「缩回托盘继续跑」准备的，没有托盘可缩时它只留下一个活着却无处可点的进程。
+        if (!trayInstalled)
+        {
+            QGuiApplication::setQuitOnLastWindowClosed(true);
+            openMainWindow(MainWindowPage::General);
+        }
     }
 
     AppController::~AppController() = default;
 
     Core::Expected<Hotkey::HotkeyReloadReport> AppController::registerHotkeys()
     {
-        return m_hotkeys->reload();
+        auto report = m_hotkeys->reload();
+        if (report && !report->failures.empty())
+        {
+            // 登记结果只写进日志的话，用户看到的就只是「按了没反应」：要当场说出来，
+            // 而且把每一条组合键与它各自的原因一起说——四条未必是同一个理由。
+            QStringList lines;
+            for (const auto &failure: report->failures)
+            {
+                lines << QStringLiteral("%1（%2）").arg(failure.combination, QString::fromStdString(failure.error.message));
+            }
+            notifyUser(GyanisScribe::Core::uiText("这些全局热键没能登记上：") + lines.join(QStringLiteral("；")), Ui::ToastKind::Danger);
+        }
+        return report;
     }
 
     void AppController::startCapture(const CaptureIntent intent)

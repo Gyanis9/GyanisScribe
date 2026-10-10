@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "Platform/PlatformCapabilities.h"
 #include "Ui/Language.h"
 #include "Ui/ThemeKind.h"
 #include "Ui/Toast.h"
@@ -177,12 +178,14 @@ namespace GyanisScribe::App
          * @param theme 主题管理器，主题下拉即时生效走它
          * @param icons 图标供给器
          * @param historyStore 历史清单，历史页从它读列表、往它删记录
+         * @param capabilities 平台能力表：热键页按它决定给不给登记入口，
+         *        没有全局热键后端的平台上改组合键不会生效，界面不许装作会生效
          * @param parent Qt 父对象
          * @note 刻意不认识 AppController：热键与语言的改动由各自的订阅者接走，
          *       设置页不需要为了「生效」去拖一个控制器进来。历史页的三个出口同样只发信号。
          */
         explicit MainWindow(Settings::ISettingsStore &settings, GyanisScribe::Ui::ThemeManager &theme, GyanisScribe::Ui::IconProvider &icons, History::HistoryStore &historyStore,
-                            QWidget *parent = nullptr);
+                            Platform::PlatformCapabilities capabilities, QWidget *parent = nullptr);
 
         /**
          * @brief 析构：设备枚举器要在这里才看得到完整类型
@@ -284,6 +287,7 @@ namespace GyanisScribe::App
         Settings::ISettingsStore                            &m_settings;          ///< 配置存储，不拥有
         GyanisScribe::Ui::ThemeManager                      &m_theme;             ///< 主题管理器，不拥有
         GyanisScribe::Ui::IconProvider                      &m_icons;             ///< 图标供给器，不拥有
+        Platform::PlatformCapabilities                       m_capabilities;      ///< 平台能力表：热键页按它给不给登记入口
         QListWidget                                         *m_nav   = nullptr;   ///< 左侧导航，一行一页
         QStackedWidget                                      *m_stack = nullptr;   ///< 右侧页容器，序号与导航行同解
         std::unique_ptr<Record::FfmpegAudioDeviceEnumerator> m_audioDevices;      ///< 录屏页那两路设备清单的来源，一次查询两格共用
