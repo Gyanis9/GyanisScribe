@@ -1,7 +1,8 @@
 add_executable(TestShell
         TestShell.cpp
         TestSingleInstance.cpp
-        TestCrashGuard.cpp)
+        TestCrashGuard.cpp
+        TestCaptureIntent.cpp)
 
 target_link_libraries(TestShell PRIVATE
         App

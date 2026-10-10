@@ -13,6 +13,7 @@
 #include "Hotkey/IHotkeyManager.h"
 
 #include "App/MainWindow.h"
+#include "App/CaptureIntent.h"
 #include "App/TrayController.h"
 #include "Ui/Toast.h"
 
@@ -25,6 +26,7 @@
 class QTimer;
 
 #include <memory>
+#include <optional>
 
 namespace GyanisScribe::Capture
 {
@@ -97,17 +99,6 @@ namespace GyanisScribe::App
     class MainWindow;
     class TrayController;
 
-    /**
-     * @brief 一次截图要去做的事
-     * @details 同一条抓帧链路服务两个入口：截完标注、截完直接识别。分开是因为
-     *          识别那条不必先弹标注窗，多一步界面反而挡在用户与结果之间。
-     */
-    enum class CaptureIntent
-    {
-        Annotate,  ///< 截完进标注窗
-        Recognize, ///< 截完直接识别文字
-    };
-
 
     /**
      * @brief 核心控制器
@@ -143,21 +134,23 @@ namespace GyanisScribe::App
 
         /**
          * @brief 进入截图框选
-         * @param intent 截完之后做什么
+         * @param intent 截完之后做什么；不填就按设置里那一档（Capture/AfterAction）走
+         * @note 此处刻意不用 CaptureIntent 作默认值：默认值只能是「不填」这一个含义，
+         *       写成 = Annotate 就分不清「用户没选」与「用户选了进标注」，设置里那档也就没了读的地方
          */
-        void startCapture(CaptureIntent intent = CaptureIntent::Annotate);
+        void startCapture(std::optional<CaptureIntent> intent = std::nullopt);
 
         /**
          * @brief 整屏截图
-         * @param intent 截完之后做什么
+         * @param intent 截完之后做什么，不填按设置里那一档
          */
-        void startFullScreenCapture(CaptureIntent intent = CaptureIntent::Annotate);
+        void startFullScreenCapture(std::optional<CaptureIntent> intent = std::nullopt);
 
         /**
          * @brief 重复上一次的选区截图
-         * @param intent 截完之后做什么
+         * @param intent 截完之后做什么，不填按设置里那一档
          */
-        void startLastRegionCapture(CaptureIntent intent = CaptureIntent::Annotate);
+        void startLastRegionCapture(std::optional<CaptureIntent> intent = std::nullopt);
 
         /**
          * @brief 截取当前前台窗口
@@ -204,6 +197,12 @@ namespace GyanisScribe::App
          * @details 截完不再直接进剪贴板：标注窗的「复制」就是原来的那一步，只是多了先标一笔的机会
          */
         void handleCaptured(const Core::CapturedImage &image);
+
+        /**
+         * @brief 读设置里那一档「截完之后做什么」
+         * @return 配置里存的档位；读不出时回落到词表第一档并把原因落进日志
+         */
+        [[nodiscard]] CaptureIntent settingsCaptureIntent() const;
 
         /// 标注窗请求复制
         void handleCopyRequested(const QImage &image);

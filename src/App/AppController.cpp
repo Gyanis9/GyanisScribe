@@ -232,22 +232,40 @@ namespace GyanisScribe::App
         return report;
     }
 
-    void AppController::startCapture(const CaptureIntent intent)
+    void AppController::startCapture(const std::optional<CaptureIntent> intent)
     {
-        m_captureIntent = intent;
+        m_captureIntent = intent.value_or(settingsCaptureIntent());
         m_capture->startInteractive();
     }
 
-    void AppController::startFullScreenCapture(const CaptureIntent intent)
+    void AppController::startFullScreenCapture(const std::optional<CaptureIntent> intent)
     {
-        m_captureIntent = intent;
+        m_captureIntent = intent.value_or(settingsCaptureIntent());
         m_capture->captureFullScreen();
     }
 
-    void AppController::startLastRegionCapture(const CaptureIntent intent)
+    void AppController::startLastRegionCapture(const std::optional<CaptureIntent> intent)
     {
-        m_captureIntent = intent;
+        m_captureIntent = intent.value_or(settingsCaptureIntent());
         m_capture->captureLastRegion();
+    }
+
+    CaptureIntent AppController::settingsCaptureIntent() const
+    {
+        const auto stored = m_settings->stringValue(Settings::kCaptureAfterAction, QString{});
+        if (stored.isEmpty())
+        {
+            return defaultCaptureIntent();
+        }
+        const auto parsed = parseCaptureIntent(stored);
+        if (!parsed)
+        {
+            // 读不出就按默认档走，但原因要落进日志：只把界面悄悄拨回「进标注窗」，
+            // 用户会以为自己那一档没保存成功，而实际是配置里那一格的值写歪了
+            Core::Logger::warning(std::format("设置里的「截完之后」读不出：{}", parsed.error().message));
+            return defaultCaptureIntent();
+        }
+        return *parsed;
     }
 
     void AppController::captureForegroundWindow()
@@ -355,13 +373,25 @@ namespace GyanisScribe::App
         }
         m_lastSelection = selection;
 
-        if (m_captureIntent == CaptureIntent::Recognize)
+        // 交完帧之后做什么由那一档决定；开关覆盖到每一个枚举值，新加一档忘了接会在这里就编不过
+        switch (m_captureIntent)
         {
-            // 识别这条不弹标注窗：用户点的是「识别文字」，先弹一个要再点一次的界面就是多一跳
-            handleOcrRequested(image.image);
-            return;
+            case CaptureIntent::Recognize:
+                // 识别这条不弹标注窗：用户点的是「识别文字」，先弹一个要再点一次的界面就是多一跳
+                handleOcrRequested(image.image);
+                return;
+            case CaptureIntent::CopyToClipboard:
+                handleCopyRequested(image.image);
+                return;
+            case CaptureIntent::SaveToFile:
+                handleSaveRequested(image.image);
+                return;
+            case CaptureIntent::PinToDesk:
+                handlePinRequested(image.image);
+                return;
+            case CaptureIntent::Annotate:
+                break;
         }
-
         m_annotationWindow->startAnnotation(image, screen->availableGeometry(), selection);
     }
 
@@ -369,6 +399,8 @@ namespace GyanisScribe::App
     {
         QGuiApplication::clipboard()->setImage(image);
         Core::Logger::info(std::format("标注结果已交剪贴板：{}×{} 像素", image.width(), image.height()));
+        // 说一句：交剪贴板这一步本来没有任何界面变化，「按了没反应」与「已经进去了」只有这一处能分
+        notifyUser(GyanisScribe::Core::uiText("已复制到剪贴板"), Ui::ToastKind::Success);
     }
 
     void AppController::handleSaveRequested(const QImage &image)
@@ -379,6 +411,7 @@ namespace GyanisScribe::App
         if (const auto ensured = Core::Paths::ensureDirectory(directory); !ensured)
         {
             Core::Logger::error(std::format("标注结果没存下来：{}", ensured.error().message));
+            notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("没能存下图片：{}"), ensured.error().message).c_str()), Ui::ToastKind::Danger);
             return;
         }
 
@@ -387,9 +420,14 @@ namespace GyanisScribe::App
         if (!image.save(Core::Paths::toDisplayText(filePath)))
         {
             Core::Logger::error(std::format("标注结果写入失败：{}。请检查目录是否可写，或先用「复制」交剪贴板", Core::Paths::toDisplayText(filePath).toStdString()));
+            notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("写入失败：{}。请检查这个目录能不能写"),
+                                                                      Core::Paths::toDisplayText(filePath).toStdString())
+                                                 .c_str()),
+                       Ui::ToastKind::Danger);
             return;
         }
         Core::Logger::info(std::format("标注结果已保存：{}", Core::Paths::toDisplayText(filePath).toStdString()));
+        notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已存成 {}"), fileName.toStdString()).c_str()), Ui::ToastKind::Success);
         recordHistory(filePath, History::HistoryKind::Screenshot, image.size());
     }
 

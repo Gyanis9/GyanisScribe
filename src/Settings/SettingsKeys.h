@@ -30,6 +30,9 @@ namespace GyanisScribe::Settings
     /// 上一次成功截图所在屏幕的名字，「上次区域」要回到那一块屏上
     inline constexpr std::string_view kCaptureLastScreen = "Capture/LastScreen";
 
+    /// 截完之后做什么，取值词表在 App::kCaptureIntentChoices；读端在 AppController，写端在设置的截图页
+    inline constexpr std::string_view kCaptureAfterAction = "Capture/AfterAction";
+
     /// 贴图保存的默认目录，为空时用系统图片目录下的 GyanisScribe
     inline constexpr std::string_view kPathScreenshot = "Paths/Screenshot";
 

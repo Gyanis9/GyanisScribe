@@ -1,5 +1,6 @@
 #include "Record/RecorderConfig.h"
 
+#include "Core/Choices.h"
 #include "Core/Text.h"
 
 #include <format>
@@ -15,34 +16,6 @@ namespace
         });
     }
 
-    /// 词表里全部取值按表序拼成「A / B / C」
-    template<typename Choice, std::size_t Count>
-    std::string tokenListText(const std::array<Choice, Count> &choices)
-    {
-        std::string joined;
-        for (const auto &choice: choices)
-        {
-            joined += joined.empty() ? "" : " / ";
-            joined += choice.token;
-        }
-        return joined;
-    }
-
-    /**
-     * @brief 词表外的取值统一从这一处报错：点名这一格叫什么、可取哪些值、键在哪儿
-     * @details 两档各写一份文案会漂：同一类错法在两个设置行上给出两种恢复办法，
-     *          用户照着做完第一次，第二次就对不上了。
-     */
-    template<typename Choice, std::size_t Count>
-    GyanisScribe::Core::Error unknownTokenError(const std::array<Choice, Count> &choices, const QString &stored, const std::string_view settingName, const std::string_view key)
-    {
-        return GyanisScribe::Core::Error{
-                .code    = GyanisScribe::Core::ErrorCode::InvalidArgument,
-                .message = GyanisScribe::Core::uiFormat(
-                        GyanisScribe::Core::uiTextUtf8("{}：取值 \"{}\" 不在可选值里，可取的只有 {}。请在设置的录屏页重选，或删掉 {} 这一项回到默认档"), std::string{settingName},
-                        stored.toStdString(), tokenListText(choices), std::string{key}),
-        };
-    }
 } // namespace
 
 namespace GyanisScribe::Record
@@ -151,7 +124,7 @@ namespace GyanisScribe::Record
             }
         }
         // 不替用户猜一档：悄悄按整屏开始录，录下来的画面与他想要的完全不是一回事
-        return std::unexpected(unknownTokenError(kRecordScopeChoices, stored, GyanisScribe::Core::uiTextUtf8("录制范围"), "Record/Scope"));
+        return std::unexpected(Core::unknownTokenError(kRecordScopeChoices, stored, Core::uiTextUtf8("录制范围"), Core::uiTextUtf8("录屏页"), "Record/Scope"));
     }
 
     std::string_view recordFormatText(const OutputFormat format) noexcept
@@ -178,7 +151,7 @@ namespace GyanisScribe::Record
             }
         }
         // 格式定不下来就不开录：猜错的那一种会把已经抓完的帧按错的容器压出去，成品直接废掉
-        return std::unexpected(unknownTokenError(kRecordFormatChoices, stored, GyanisScribe::Core::uiTextUtf8("输出格式"), "Record/Format"));
+        return std::unexpected(Core::unknownTokenError(kRecordFormatChoices, stored, Core::uiTextUtf8("输出格式"), Core::uiTextUtf8("录屏页"), "Record/Format"));
     }
 
 } // namespace GyanisScribe::Record

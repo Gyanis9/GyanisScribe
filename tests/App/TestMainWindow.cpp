@@ -1,6 +1,7 @@
 // 主窗口的接线判据：导航行—页内容—配置键三者要互指。
 // 逐格核对的写法来自一个具体的坑：设置页的每一行都同时有「界面里的控件」和「另一头的读端」，
 // 只测其中一头时，另一头改成别的键也照样全绿。
+#include "App/CaptureIntent.h"
 #include "App/MainWindow.h"
 
 #include "App/TrayController.h"
@@ -217,7 +218,7 @@ namespace
         // 「这一类有什么」的用词取自界面里的无障碍名，不是从配置键推的：读的人要能对着窗口核对
         const std::vector<Expectation> expectations = {
                 Expectation{MainWindowPage::General, {"界面语言", "历史最多留多少条", "历史最久留多少天", "导出配置", "导入配置"}, true},
-                Expectation{MainWindowPage::Capture, {"截图目录", "颜色写法"}, true},
+                Expectation{MainWindowPage::Capture, {"截完之后", "截图目录", "颜色写法"}, true},
                 Expectation{MainWindowPage::Annotation, {"默认线宽", "默认字号"}, true},
                 Expectation{MainWindowPage::Pin, {"默认不透明度"}, true},
                 Expectation{MainWindowPage::Record, {"录屏目录", "录制范围", "输出格式", "默认帧率", "画面码率", "光标高亮", "麦克风设备", "系统声音设备"}, true},
@@ -374,6 +375,34 @@ namespace
         const auto parsed = GyanisScribe::Record::parseRecordScope(stored);
         ASSERT_TRUE(static_cast<bool>(parsed));
         EXPECT_EQ(*parsed, GyanisScribe::Record::RecordMode::Region);
+    }
+
+    /**
+     * @brief 钉住「截完之后」这一行写的是词表里的 token，且界面初值就是读端回落的那一档
+     * @details 存中文标签的话下次截图读不出来（parseCaptureIntent 认的是 Annotate/Copy/Save/Pin/Recognize）；
+     *          而这一格猜错的分量是「每按一次热键就多出一层窗」或「以为存了其实没存」。
+     */
+    TEST_F(MainWindowFixture, CaptureAfterActionRowWritesTheTokenTheCaptureUses)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::Capture);
+        auto *combo = qobject_cast<QComboBox *>(controlInCurrentPage("截完之后"));
+        ASSERT_NE(combo, nullptr);
+        EXPECT_EQ(combo->count(), static_cast<int>(GyanisScribe::App::kCaptureIntentChoices.size())) << "下拉框的行数与词表不同解";
+        EXPECT_EQ(combo->currentData().toString(), QString::fromUtf8(std::string{GyanisScribe::App::captureIntentText(GyanisScribe::App::defaultCaptureIntent())}))
+                << "没存过时要显示的那一档，必须就是控制器读不出时回落的那一档";
+
+        const auto saveRow = combo->findData(QStringLiteral("Save"));
+        ASSERT_NE(saveRow, -1) << "词表里没有 Save 这一档，设置页选得出却写不进配置";
+        combo->setCurrentIndex(saveRow);
+        closeWindowAndFlush();
+
+        const auto reopened = makeStore();
+        const auto stored   = reopened->stringValue(GyanisScribe::Settings::kCaptureAfterAction, QString{});
+        EXPECT_EQ(stored, QStringLiteral("Save"));
+        const auto parsed = GyanisScribe::App::parseCaptureIntent(stored);
+        ASSERT_TRUE(static_cast<bool>(parsed));
+        EXPECT_EQ(*parsed, GyanisScribe::App::CaptureIntent::SaveToFile) << "界面选的那一档与控制器实际走的那一步不是同一个";
     }
 
     /**

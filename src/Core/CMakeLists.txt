@@ -1,6 +1,8 @@
 # Core：值类型、日志与目录 provider 的静态库；App 与后续模块都只往这里链接一次
 add_library(Core STATIC
         Types.h
+        Choices.h
+        Text.h
         Logger.h
         Logger.cpp
         Paths.h

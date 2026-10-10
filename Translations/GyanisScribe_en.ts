@@ -164,6 +164,22 @@
             <translation>These global hotkeys could not be registered:</translation>
         </message>
         <message>
+            <source>已复制到剪贴板</source>
+            <translation>Copied to the clipboard</translation>
+        </message>
+        <message>
+            <source>没能存下图片：{}</source>
+            <translation>Couldn't save the image: {}</translation>
+        </message>
+        <message>
+            <source>写入失败：{}。请检查这个目录能不能写</source>
+            <translation>Write failed: {}. Check whether this directory is writable</translation>
+        </message>
+        <message>
+            <source>已存成 {}</source>
+            <translation>Saved as {}</translation>
+        </message>
+        <message>
             <source>还没有可识别的图：先按 Ctrl+Alt+A 框选一块屏幕</source>
             <translation>No image to recognize yet: press Ctrl+Alt+A and drag out a screen region first</translation>
         </message>
@@ -250,6 +266,22 @@
         <message>
             <source>已取消录屏：这一段没有保存，临时帧也删了</source>
             <translation>Recording cancelled: this take wasn't saved and its temporary frames are gone.</translation>
+        </message>
+        <message>
+            <source>进标注窗</source>
+            <translation>Open in the annotation window</translation>
+        </message>
+        <message>
+            <source>直接存成文件</source>
+            <translation>Save straight to a file</translation>
+        </message>
+        <message>
+            <source>直接贴到屏幕上</source>
+            <translation>Pin straight onto the screen</translation>
+        </message>
+        <message>
+            <source>直接识别文字</source>
+            <translation>Recognise text right away</translation>
         </message>
         <message>
             <source>智录遇到未处理的错误：{}。现场已尽量落到日志与崩溃转储，请到 {} 找最近一份日志（同目录下的 .dmp 是转储）；如果反复出现，请把日志、转储与出错的操作步骤一起反馈</source>
@@ -358,6 +390,14 @@
         <message>
             <source>「上次选区」用最近一次截图框出的那块矩形；「当前窗口」录按下开始时最靠前的那个窗口。改完从下一次录屏开始生效</source>
             <translation>Last selection records the rectangle framed by the most recent capture; Current window records whichever window is in front when recording starts. Changes apply from the next recording</translation>
+        </message>
+        <message>
+            <source>截完之后</source>
+            <translation>After a capture</translation>
+        </message>
+        <message>
+            <source>选「复制到剪贴板」「直接存成文件」「直接贴到屏幕上」时都不再弹标注窗；改完从下一次截图开始生效</source>
+            <translation>Choosing "Copied to the clipboard", "Save straight to a file" or "Pin straight onto the screen" skips the annotation window; it takes effect from the next capture</translation>
         </message>
         <message>
             <source>不取这一路</source>
@@ -722,6 +762,10 @@
         <message>
             <source>上次选区的宽高必须是正数，收到的是 {}×{}。请删掉这一项，让程序重新记一次</source>
             <translation>The last selection's width and height must be positive; got {}x{}. Delete this entry and let the program record it again.</translation>
+        </message>
+        <message>
+            <source>{}：取值 "{}" 不在可选值里，可取的只有 {}。请在设置的{}重选，或删掉 {} 这一项回到默认档</source>
+            <translation>{}: the value "{}" is not among the allowed ones, which are only {}. Re-pick it on the {} page in Settings, or delete the {} entry to fall back to the default</translation>
         </message>
         <message>
             <source>日志目录建不出来：{}（原因 {}）。请把 Paths 里的日志目录改到一个可写的路径再重启</source>
@@ -1220,10 +1264,6 @@
             <translation>Recording option {}: {}</translation>
         </message>
         <message>
-            <source>{}：取值 "{}" 不在可选值里，可取的只有 {}。请在设置的录屏页重选，或删掉 {} 这一项回到默认档</source>
-            <translation>{}: value "{}" is not one of the available choices, only {} are valid. Pick a value again on the Recording page of Settings, or delete the {} entry to go back to the default</translation>
-        </message>
-        <message>
             <source>要写清录哪块屏幕。请在录屏面板重新选一次目标屏幕</source>
             <translation>Say which screen to record. Pick the target screen again in the recording panel.</translation>
         </message>
@@ -1258,6 +1298,10 @@
         <message>
             <source>画面码率 "{}" 不在可用范围（0 到 {} kbps，0 表示按质量优先）里：请在设置的录屏页重选，或删掉 Record/VideoBitrateKbps 这一项回到默认档</source>
             <translation>Video bitrate "{}" is not in the available range (0 to {} kbps, where 0 means quality first): pick a value again on the recording page of Settings, or delete the Record/VideoBitrateKbps entry to fall back to the default</translation>
+        </message>
+        <message>
+            <source>录屏页</source>
+            <translation>recording</translation>
         </message>
         <message>
             <source>整屏</source>

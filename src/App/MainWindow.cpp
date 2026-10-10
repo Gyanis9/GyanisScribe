@@ -1,5 +1,5 @@
+#include "App/CaptureIntent.h"
 #include "App/MainWindow.h"
-
 #include "App/TrayController.h"
 #include "Core/Logger.h"
 #include "Core/Paths.h"
@@ -622,6 +622,46 @@ namespace
     }
 
     /**
+     * @brief 「截完之后做什么」的下拉框：档位、配置里的取值与标签都取自 App::kCaptureIntentChoices
+     * @param settings 配置存储
+     * @return 归调用方所有的下拉框
+     * @details 初值按词表第一档回落，而不是在这里另写一档：两处不同解时，用户没动过这一格，
+     *          按下热键走的却与界面显示的不是同一步。
+     */
+    QComboBox *makeCaptureIntentCombo(ISettingsStore &settings)
+    {
+        auto *combo = new QComboBox;
+        for (const auto &choice: GyanisScribe::App::kCaptureIntentChoices)
+        {
+            combo->addItem(GyanisScribe::Core::uiText(choice.label.data()), tokenText(choice.token));
+        }
+        combo->setAccessibleName(GyanisScribe::Core::uiText("截完之后"));
+        combo->setToolTip(GyanisScribe::Core::uiText("选「复制到剪贴板」「直接存成文件」「直接贴到屏幕上」时都不再弹标注窗；改完从下一次截图开始生效"));
+
+        const auto stored =
+                settings.stringValue(GyanisScribe::Settings::kCaptureAfterAction, tokenText(GyanisScribe::App::captureIntentText(GyanisScribe::App::defaultCaptureIntent())));
+        const auto parsed = GyanisScribe::App::parseCaptureIntent(stored);
+        if (!parsed)
+        {
+            Logger::warning(std::format("设置页读不出「截完之后」：{}，下拉框按默认档显示", parsed.error().message));
+        }
+        const auto chosen = parsed ? *parsed : GyanisScribe::App::defaultCaptureIntent();
+        combo->setCurrentIndex(combo->findData(tokenText(GyanisScribe::App::captureIntentText(chosen))));
+
+        // 接线排在设初值之后：否则「把界面摆到位」这一步会被当成用户改动写回配置
+        QObject::connect(combo, &QComboBox::currentIndexChanged, combo,
+                         [&settings, combo](int)
+                         {
+                             const auto token = combo->currentData().toString();
+                             if (auto written = settings.setValue(GyanisScribe::Settings::kCaptureAfterAction, token); !written)
+                             {
+                                 Logger::warning(std::format("「截完之后」没能写入：{}（当前选的是 {}）", written.error().message, combo->currentText().toStdString()));
+                             }
+                         });
+        return combo;
+    }
+
+    /**
      * @brief 一路音频输入的下拉框
      * @param settings 配置存储
      * @param key 这一路写哪个键
@@ -1080,6 +1120,7 @@ namespace GyanisScribe::App
     {
         auto *page = new QWidget{this};
         auto *form = makePageForm(page, GyanisScribe::Core::uiText("截图与标注成品落在这个目录里。取色复制出来的文本按下面的写法格式化。"));
+        form->addRow(GyanisScribe::Core::uiText("截完之后"), makeCaptureIntentCombo(m_settings));
         form->addRow(GyanisScribe::Core::uiText("截图与标注成品目录"),
                      makePathRow(m_settings, GyanisScribe::Settings::kPathScreenshot, GyanisScribe::Core::uiText("截图目录"), Core::Paths::defaultScreenshotDirectory(), m_icons));
         form->addRow(GyanisScribe::Core::uiText("复制用的写法"), makeColorFormatCombo(m_settings));
