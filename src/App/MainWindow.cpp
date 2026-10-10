@@ -18,6 +18,7 @@
 #include "Ui/ThemeManager.h"
 
 #include <QApplication>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QFileDialog>
 #include <QFormLayout>
@@ -229,6 +230,31 @@ namespace
         }
         Logger::warning(std::format("{}读不出：{}，这一行按 {} 显示", title.toStdString(), parsed.error().message, fallback));
         return fallback;
+    }
+
+    /**
+     * @brief 录屏时要不要把光标位置圈在帧上
+     * @param settings 配置存储
+     * @return 归调用方所有的复选框，由 addRow 挂上父对象
+     */
+    QCheckBox *makeCursorHighlightCheck(ISettingsStore &settings)
+    {
+        auto *check = new QCheckBox;
+        check->setText(GyanisScribe::Core::uiText("把光标位置圈在画面里"));
+        check->setAccessibleName(GyanisScribe::Core::uiText("光标高亮"));
+        check->setToolTip(GyanisScribe::Core::uiText("整屏与选区录屏生效；录单个窗口时目前还算不出窗口左上角的位置"));
+        check->setChecked(settings.boolValue(GyanisScribe::Settings::kRecordCursorHighlight, false));
+
+        // 接线排在设初值之后：摆到位不等于用户改过，否则一开设置页就把默认值写进配置
+        QObject::connect(check, &QCheckBox::toggled, check,
+                         [&settings](bool checked)
+                         {
+                             if (auto written = settings.setValue(GyanisScribe::Settings::kRecordCursorHighlight, checked); !written)
+                             {
+                                 Logger::warning(std::format("录屏光标高亮开关没能写入：{}", written.error().message));
+                             }
+                         });
+        return check;
     }
 
     /**
@@ -616,10 +642,11 @@ namespace GyanisScribe::App
     QWidget *MainWindow::buildRecordPage()
     {
         auto *page = new QWidget{this};
-        auto *form = makePageForm(page, GyanisScribe::Core::uiText("录屏成品落在这个目录里。帧率越高文件越大，存成 GIF 时上限比 MP4 低。"));
+        auto *form = makePageForm(page, GyanisScribe::Core::uiText("录屏成品落在这个目录里。帧率越高文件越大，存成 GIF 时上限比 MP4 低。帧率与高亮开关都从下一次开始录屏时生效。"));
         form->addRow(GyanisScribe::Core::uiText("录屏成品目录"),
                      makePathRow(m_settings, GyanisScribe::Settings::kPathRecording, GyanisScribe::Core::uiText("录屏目录"), Core::Paths::defaultRecordingDirectory(), m_icons));
         form->addRow(GyanisScribe::Core::uiText("默认帧率"), makeFrameRateSpin(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("光标高亮"), makeCursorHighlightCheck(m_settings));
         return page;
     }
 

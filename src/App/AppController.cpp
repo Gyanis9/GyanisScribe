@@ -453,6 +453,8 @@ namespace GyanisScribe::App
         {
             Core::Logger::warning(std::format("录屏默认帧率读不出：{}，本次按 {} 帧开始", parsed.error().message, config.frameRate));
         }
+        // 光标高亮是个开关，没有「读不出」这一档：配置里没有就按关；到了画不出位置的那一种模式，RecordingService 会自己报一句
+        config.cursorHighlight = m_settings->boolValue(Settings::kRecordCursorHighlight, false);
         return config;
     }
 

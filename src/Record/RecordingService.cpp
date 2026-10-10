@@ -4,16 +4,38 @@
 #include "Core/Logger.h"
 #include "Core/Paths.h"
 #include "Core/Text.h"
+#include "Record/CursorHighlight.h"
 
+#include <QCursor>
 #include <QDateTime>
+#include <QScreen>
 
 #include <chrono>
 #include <format>
+#include <optional>
 
 namespace
 {
     /// 定时器比目标帧率多要一点余量：正好按 1000/帧率 排会让偶发的一次迟到的抓帧直接跳过一整格
     constexpr int kTimerSlackMs = 4;
+
+    /**
+     * @brief 这一块屏左上角在全局逻辑坐标里的位置
+     * @param screenName 帧的来源屏幕名
+     * @return 全局原点；屏找不到时返回空
+     * @details 光标读数是整个虚拟桌面的全局坐标，而一帧只覆盖一块屏（或屏上一块选区），
+     *          减掉这一块的原点才知道它落在帧里的第几格。找不到屏就不画：
+     *          把圈画到别的位置比不画更误导人。
+     */
+    std::optional<QPoint> screenGlobalOrigin(const QString &screenName)
+    {
+        const auto *screen = GyanisScribe::Capture::screenByName(screenName);
+        if (screen == nullptr)
+        {
+            return {};
+        }
+        return screen->geometry().topLeft();
+    }
 } // namespace
 
 namespace GyanisScribe::Record
@@ -46,7 +68,9 @@ namespace GyanisScribe::Record
 
         m_config         = config;
         m_frameDirectory = directory;
-        m_sink           = std::make_unique<PngSequenceSink>(directory);
+        // 每一轮重新开始报：上一轮报过的原因（比如屏被拔掉）不代表这一轮也成立
+        m_cursorHighlightWarned = false;
+        m_sink                  = std::make_unique<PngSequenceSink>(directory);
         // 节拍从这一刻起算：会话拿到的所有时间都是同一个单调时钟的读数
         m_clock.start();
         m_session = std::make_unique<RecordingSession>(config, *m_sink, m_clock.elapsed(), countdownSeconds);
@@ -129,20 +153,58 @@ namespace GyanisScribe::Record
     {
         if (m_config.mode == RecordMode::Window)
         {
+            // 窗口帧的左上角要等平台侧的窗口几何接口才能拿到全局读数，这里算不出光标落在第几格：
+            // 与其画一个错位的圈冒充「已高亮」，不如第一帧就把这一档在窗口模式下没做说出来
+            if (m_config.cursorHighlight && !m_cursorHighlightWarned)
+            {
+                m_cursorHighlightWarned = true;
+                Core::Logger::warning("窗口录屏圈不出光标：还没法把窗口左上角换成全局坐标。请改用整屏或选区录屏，光标高亮只在它们上面生效");
+            }
             return m_source.grabWindow(m_config.windowHandle);
         }
 
-        const auto screen = m_source.grabScreen(m_config.screenName);
-        if (!screen)
+        auto grabbed = m_source.grabScreen(m_config.screenName);
+        if (!grabbed)
         {
-            return std::unexpected(screen.error());
+            return std::unexpected(grabbed.error());
         }
+
         if (m_config.mode == RecordMode::FullScreen)
         {
-            return screen;
+            // 认不出这块屏就跳过画圈：把圈画到别的位置比不画更误导人
+            if (const auto origin = screenGlobalOrigin(grabbed->screenName); origin)
+            {
+                overlayCursorHighlight(*grabbed, *origin);
+            }
+            return grabbed;
         }
+
         // 选区模式在整屏帧上裁：抓屏接口只给整屏与窗口两种，逐区抓屏要等平台上的 WGC 接入才有
-        return Capture::cropToLogicalRect(*screen, m_config.region);
+        auto cropped = Capture::cropToLogicalRect(*grabbed, m_config.region);
+        if (cropped)
+        {
+            // 裁出来的这一帧离全局原点的距离 = 屏的原点 + 选区在屏内的位置，两段都要算进去
+            if (const auto origin = screenGlobalOrigin(grabbed->screenName); origin)
+            {
+                overlayCursorHighlight(*cropped, *origin + m_config.region.topLeft());
+            }
+        }
+        return cropped;
+    }
+
+    void RecordingService::overlayCursorHighlight(Core::CapturedImage &frame, const QPoint &frameGlobalOriginLogical)
+    {
+        if (!m_config.cursorHighlight)
+        {
+            return;
+        }
+
+        const auto painted = paintCursorHighlight(frame.image, QCursor::pos(), frameGlobalOriginLogical, frame.devicePixelRatio);
+        if (!painted && !m_cursorHighlightWarned)
+        {
+            m_cursorHighlightWarned = true;
+            Core::Logger::warning(std::format("光标高亮没画出来：{}", painted.error().message));
+        }
     }
 
     void RecordingService::onTick()

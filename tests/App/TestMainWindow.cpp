@@ -17,6 +17,7 @@
 #include <gtest/gtest.h>
 
 #include <QApplication>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QIcon>
 #include <QLabel>
@@ -199,7 +200,7 @@ namespace
                 Expectation{MainWindowPage::Capture, {"截图目录", "颜色写法"}, true},
                 Expectation{MainWindowPage::Annotation, {"默认线宽", "默认字号"}, true},
                 Expectation{MainWindowPage::Pin, {"默认不透明度"}, true},
-                Expectation{MainWindowPage::Record, {"录屏目录", "默认帧率"}, true},
+                Expectation{MainWindowPage::Record, {"录屏目录", "默认帧率", "光标高亮"}, true},
                 Expectation{MainWindowPage::Ocr, {"识别语言", "语言包目录"}, true},
                 Expectation{MainWindowPage::Hotkey, {"截图", "录屏", "文字识别", "屏幕取色"}, true},
                 Expectation{MainWindowPage::Theme, {"主题"}, true},
@@ -273,6 +274,27 @@ namespace
         const auto parsed = GyanisScribe::Record::parseFrameRateSetting(stored);
         ASSERT_TRUE(static_cast<bool>(parsed));
         EXPECT_EQ(*parsed, 30);
+    }
+
+    /**
+     * @brief 钉住光标高亮开关写进 Record/CursorHighlight，且默认档与读端同解
+     * @details 开关默认必须一致：界面上显示「关」而 RecorderConfig 初值是「开」时，
+     *          用户会在没点过任何一格的情况下得到一张被圈过的画面。
+     */
+    TEST_F(MainWindowFixture, CursorHighlightRowWritesTheSwitchRecordingStartUses)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::Record);
+        auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage("光标高亮"));
+        ASSERT_NE(check, nullptr);
+        EXPECT_FALSE(check->isChecked()) << "默认要关着：圈住光标会改画面，用户没要求时不该动它";
+        EXPECT_FALSE(GyanisScribe::Record::RecorderConfig{}.cursorHighlight) << "读端初值与界面默认档不同解";
+
+        check->setChecked(true);
+        closeWindowAndFlush();
+
+        const auto reopened = makeStore();
+        EXPECT_TRUE(reopened->boolValue(GyanisScribe::Settings::kRecordCursorHighlight, false));
     }
 
     /**

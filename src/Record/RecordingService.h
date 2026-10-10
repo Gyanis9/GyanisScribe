@@ -16,6 +16,7 @@
 #include "Record/RecordingSinks.h"
 
 #include <QElapsedTimer>
+#include <QPoint>
 #include <QObject>
 #include <QTimer>
 
@@ -92,14 +93,24 @@ namespace GyanisScribe::Record
         /// 按模式抓到这一跳的画面
         [[nodiscard]] Core::Expected<Core::CapturedImage> grabFrame();
 
-        Capture::IScreenCaptureSource    &m_source;         ///< 抓帧来源，不拥有
-        IRecordingEncoder                &m_encoder;        ///< 编码器，不拥有
-        QTimer                            m_timer;          ///< 抓帧定时器
-        QElapsedTimer                     m_clock;          ///< 单调时钟，会话的时间轴都从它取
-        std::unique_ptr<RecordingSession> m_session;        ///< 当前会话
-        std::unique_ptr<IRecordingSink>   m_sink;           ///< 当前帧去处（PNG 序列）
-        RecorderConfig                    m_config;         ///< 本轮参数
-        std::filesystem::path             m_frameDirectory; ///< 本轮临时帧目录
+        /**
+         * @brief 按参数把光标圈叠在这一帧上
+         * @param frame 刚抓好的帧，就地改
+         * @param frameGlobalOriginLogical 这一帧左上角在屏幕全局逻辑坐标里的位置
+         * @details 没开就直接返回。画不出来时只报第一条日志：同一个原因会每帧重复一次，
+         *          15 帧率录十分钟能把别的信息全淹掉。
+         */
+        void overlayCursorHighlight(Core::CapturedImage &frame, const QPoint &frameGlobalOriginLogical);
+
+        Capture::IScreenCaptureSource    &m_source;                        ///< 抓帧来源，不拥有
+        IRecordingEncoder                &m_encoder;                       ///< 编码器，不拥有
+        QTimer                            m_timer;                         ///< 抓帧定时器
+        QElapsedTimer                     m_clock;                         ///< 单调时钟，会话的时间轴都从它取
+        std::unique_ptr<RecordingSession> m_session;                       ///< 当前会话
+        std::unique_ptr<IRecordingSink>   m_sink;                          ///< 当前帧去处（PNG 序列）
+        RecorderConfig                    m_config;                        ///< 本轮参数
+        std::filesystem::path             m_frameDirectory;                ///< 本轮临时帧目录
+        bool                              m_cursorHighlightWarned = false; ///< 光标高亮已经报过一次原因，本轮不再重复
     };
 
 } // namespace GyanisScribe::Record

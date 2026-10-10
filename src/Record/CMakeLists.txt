@@ -7,6 +7,8 @@ add_library(Record STATIC
         RecordingTiming.cpp
         RecordingSinks.h
         RecordingSinks.cpp
+        CursorHighlight.h
+        CursorHighlight.cpp
         FfmpegCommand.h
         FfmpegCommand.cpp
         FfmpegRecordingEncoder.h

@@ -240,6 +240,18 @@
             <translation>Choose %1</translation>
         </message>
         <message>
+            <source>把光标位置圈在画面里</source>
+            <translation>Ring the cursor position in the picture</translation>
+        </message>
+        <message>
+            <source>光标高亮</source>
+            <translation>Cursor highlight</translation>
+        </message>
+        <message>
+            <source>整屏与选区录屏生效；录单个窗口时目前还算不出窗口左上角的位置</source>
+            <translation>Works for full-screen and region recording. Recording a single window cannot yet tell where that top-left corner sits</translation>
+        </message>
+        <message>
             <source>界面语言</source>
             <translation>Interface language</translation>
         </message>
@@ -332,8 +344,8 @@
             <translation>Opacity for new pins</translation>
         </message>
         <message>
-            <source>录屏成品落在这个目录里。帧率越高文件越大，存成 GIF 时上限比 MP4 低。</source>
-            <translation>Finished recordings land in this folder. A higher frame rate means a bigger file, and the GIF ceiling is lower than the MP4 one.</translation>
+            <source>录屏成品落在这个目录里。帧率越高文件越大，存成 GIF 时上限比 MP4 低。帧率与高亮开关都从下一次开始录屏时生效。</source>
+            <translation>Finished recordings land in this folder. A higher frame rate means a bigger file, and the GIF ceiling is lower than the MP4 one. The frame rate and the highlight switch apply from the next recording.</translation>
         </message>
         <message>
             <source>录屏成品目录</source>
@@ -894,6 +906,14 @@
         <message>
             <source>按键 0x{:X} 不能用作全局热键。请改用字母、数字、空格或 F1-F24 之一</source>
             <translation>Key 0x{:X} can't be used as a global hotkey. Use a letter, a digit, Space or one of F1-F24.</translation>
+        </message>
+        <message>
+            <source>光标高亮的缩放因子必须是正数，收到的是 {}。请传这一块屏幕的 devicePixelRatio</source>
+            <translation>The cursor highlight scaling factor must be a positive number; got {}. Pass this screen's devicePixelRatio</translation>
+        </message>
+        <message>
+            <source>光标高亮的目标帧是空的：抓帧没成功时不该来画圈。请先确认抓到的帧，再调用这一步</source>
+            <translation>The cursor highlight target frame is empty: do not draw a ring when the grab did not succeed. Check the captured frame before calling this step</translation>
         </message>
         <message>
             <source>没找到 ffmpeg 命令行程序，录屏的编码这一步要用它。请安装 ffmpeg 的 Windows 构建并把所在目录加入 PATH（winget 里搜 ffmpeg 也有），装好后重启本程序</source>

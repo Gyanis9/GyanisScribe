@@ -1,6 +1,7 @@
 add_executable(TestRecord
         TestRecording.cpp
-        TestRecordingHud.cpp)
+        TestRecordingHud.cpp
+        TestCursorHighlight.cpp)
 
 target_link_libraries(TestRecord PRIVATE
         Record
