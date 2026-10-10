@@ -106,8 +106,6 @@ namespace GyanisScribe::Annotation
          * @param image 烘焙好的图
          */
         void ocrRequested(const QImage &image);
-        /// 一轮标注结束（取消或已交付），窗口已隐藏
-        void finished();
 
     protected:
         /**

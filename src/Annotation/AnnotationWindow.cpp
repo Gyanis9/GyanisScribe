@@ -172,7 +172,6 @@ namespace GyanisScribe::Annotation
             case ShortcutAction::Close:
                 m_toolbar->hide();
                 hide();
-                emit finished();
                 return;
             case ShortcutAction::Undo:
                 if (auto undone = m_engine.undo(); !undone)
@@ -222,7 +221,6 @@ namespace GyanisScribe::Annotation
             default:
                 return;
         }
-        emit finished();
     }
 
     void AnnotationWindow::applyPenParameters()
