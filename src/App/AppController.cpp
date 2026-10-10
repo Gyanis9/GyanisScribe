@@ -136,6 +136,10 @@ namespace GyanisScribe::App
                                  case Hotkey::HotkeyAction::Record:
                                      toggleRecording();
                                      return;
+                                 case Hotkey::HotkeyAction::CaptureLong:
+                                     // 与托盘那一行同一条路：热键不该有一条自己的截图逻辑
+                                     startLongCapture();
+                                     return;
                                  case Hotkey::HotkeyAction::Pick:
                                      startColorPick();
                                      return;

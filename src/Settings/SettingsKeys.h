@@ -18,6 +18,9 @@ namespace GyanisScribe::Settings
     /// 屏幕取色的全局热键
     inline constexpr std::string_view kHotkeyPick = "Hotkey/Pick";
 
+    /// 滚动长截图的全局热键
+    inline constexpr std::string_view kHotkeyCaptureLong = "Hotkey/CaptureLong";
+
     /// 主题档位，取值只能是 Light、Dark、System
     inline constexpr std::string_view kThemeMode = "Theme/Mode";
 

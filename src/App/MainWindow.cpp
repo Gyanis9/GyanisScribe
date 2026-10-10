@@ -1222,13 +1222,18 @@ namespace GyanisScribe::App
         auto *page = new QWidget{this};
         // 没有登记接口的那一种平台上，改组合键不会有任何效果：入口灰掉并当场说明，
         // 比让人反复改完再按一次、把「没反应」当成程序坏了要好
-        const auto intro = m_capabilities.globalHotkeys ? GyanisScribe::Core::uiText("四个全局热键随时可改，改完立即重新登记，不需要重启。")
-                                                        : GyanisScribe::Core::uiText("这个平台没有登记全局热键的接口，下面四项改了也不会生效。");
+        // 一行一个动作；条数由这份表自己数出来：文案里那个数字与热键登记表必须是同一个源
+        const auto rows = std::array{std::tuple{GyanisScribe::Settings::kHotkeyCapture, GyanisScribe::Core::uiText("截图"), QStringLiteral("Ctrl+Alt+A")},
+                                     std::tuple{GyanisScribe::Settings::kHotkeyRecord, GyanisScribe::Core::uiText("录屏"), QStringLiteral("Ctrl+Alt+R")},
+                                     std::tuple{GyanisScribe::Settings::kHotkeyOcr, GyanisScribe::Core::uiText("文字识别"), QStringLiteral("Ctrl+Alt+O")},
+                                     std::tuple{GyanisScribe::Settings::kHotkeyPick, GyanisScribe::Core::uiText("屏幕取色"), QStringLiteral("Ctrl+Alt+P")},
+                                     std::tuple{GyanisScribe::Settings::kHotkeyCaptureLong, GyanisScribe::Core::uiText("滚动长截图"), QStringLiteral("Ctrl+Alt+L")}};
+
+        const auto intro = m_capabilities.globalHotkeys
+                                   ? GyanisScribe::Core::uiText("%1 个全局热键随时可改，改完立即重新登记，不需要重启。").arg(static_cast<int>(rows.size()))
+                                   : GyanisScribe::Core::uiText("这个平台没有登记全局热键的接口，下面 %1 项改了也不会生效。").arg(static_cast<int>(rows.size()));
         auto      *form  = makePageForm(page, intro);
-        for (const auto [key, title, defaultText]: {std::tuple{GyanisScribe::Settings::kHotkeyCapture, GyanisScribe::Core::uiText("截图"), QStringLiteral("Ctrl+Alt+A")},
-                                                    std::tuple{GyanisScribe::Settings::kHotkeyRecord, GyanisScribe::Core::uiText("录屏"), QStringLiteral("Ctrl+Alt+R")},
-                                                    std::tuple{GyanisScribe::Settings::kHotkeyOcr, GyanisScribe::Core::uiText("文字识别"), QStringLiteral("Ctrl+Alt+O")},
-                                                    std::tuple{GyanisScribe::Settings::kHotkeyPick, GyanisScribe::Core::uiText("屏幕取色"), QStringLiteral("Ctrl+Alt+P")}})
+        for (const auto [key, title, defaultText]: rows)
         {
             auto *edit = new GyanisScribe::Ui::HotkeyEdit{m_settings, page};
             edit->bindTo(key, title, defaultText);

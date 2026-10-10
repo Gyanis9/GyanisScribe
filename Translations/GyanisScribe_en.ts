@@ -612,14 +612,6 @@
             <translation>Language packs</translation>
         </message>
         <message>
-            <source>四个全局热键随时可改，改完立即重新登记，不需要重启。</source>
-            <translation>The four global hotkeys can be changed any time; each change is re-registered right away, no restart needed.</translation>
-        </message>
-        <message>
-            <source>这个平台没有登记全局热键的接口，下面四项改了也不会生效。</source>
-            <translation>This platform offers no way to register global hotkeys, so changing the four entries below would have no effect.</translation>
-        </message>
-        <message>
             <source>截图</source>
             <translation>Screenshot</translation>
         </message>
@@ -634,6 +626,18 @@
         <message>
             <source>屏幕取色</source>
             <translation>Screen color picker</translation>
+        </message>
+        <message>
+            <source>滚动长截图</source>
+            <translation>Scrolling capture</translation>
+        </message>
+        <message>
+            <source>%1 个全局热键随时可改，改完立即重新登记，不需要重启。</source>
+            <translation>%1 global hotkeys can be changed any time; each change is re-registered right away, no restart needed.</translation>
+        </message>
+        <message>
+            <source>这个平台没有登记全局热键的接口，下面 %1 项改了也不会生效。</source>
+            <translation>This platform has no way to register global hotkeys, so changing the %1 entries below has no effect.</translation>
         </message>
         <message>
             <source>%1 的全局热键</source>
@@ -726,10 +730,6 @@
         <message>
             <source>截取当前窗口</source>
             <translation>Capture the foreground window</translation>
-        </message>
-        <message>
-            <source>滚动长截图</source>
-            <translation>Scrolling capture</translation>
         </message>
         <message>
             <source>开始 / 停止录屏</source>

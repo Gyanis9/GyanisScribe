@@ -841,15 +841,15 @@ TEST_F(MainWindowFixture, ActionBarLandsEveryVisibleTrayEntrySomewhere)
 
 /**
  * @brief 钉住热键页的登记入口跟着平台能力位走：没有登记口的平台上不许装作改了会生效
- * @details 两格都判：能力位为真时四行都能编辑（少了这一格，把 setEnabled 摘掉也不会红），
- *          为假时四行都灰掉但仍在——行消失了用户就看不见自己配过什么。
+ * @details 两格都判：能力位为真时每一行都能编辑（少了这一格，把 setEnabled 摘掉也不会红），
+ *          为假时所有行都灰掉但仍在——行消失了用户就看不见自己配过什么。
  */
 TEST_F(MainWindowFixture, HotkeyEntriesFollowTheGlobalHotkeyCapability)
 {
     makeWindow(true);
     m_window->open(MainWindowPage::Hotkey);
     auto edits = m_window->findChildren<GyanisScribe::Ui::HotkeyEdit *>();
-    ASSERT_EQ(edits.size(), 4) << "热键页该有截图、录屏、文字识别、屏幕取色四行";
+    ASSERT_EQ(edits.size(), 5) << "热键页该有截图、录屏、文字识别、屏幕取色、滚动长截图五行";
     for (auto *edit: edits)
     {
         EXPECT_TRUE(edit->isEnabled()) << "有登记口的平台上这四行要能改";
@@ -858,7 +858,7 @@ TEST_F(MainWindowFixture, HotkeyEntriesFollowTheGlobalHotkeyCapability)
     makeWindow(false);
     m_window->open(MainWindowPage::Hotkey);
     edits = m_window->findChildren<GyanisScribe::Ui::HotkeyEdit *>();
-    ASSERT_EQ(edits.size(), 4) << "没有登记口也不能把行藏掉：用户配过的组合键要还在眼前";
+    ASSERT_EQ(edits.size(), 5) << "没有登记口也不能把行藏掉：用户配过的组合键要还在眼前";
     for (auto *edit: edits)
     {
         EXPECT_FALSE(edit->isEnabled()) << "这台机器上改完不会生效，入口就该是灰的";

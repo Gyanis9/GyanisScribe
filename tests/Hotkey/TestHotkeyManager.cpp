@@ -181,9 +181,11 @@ namespace
 } // namespace
 
 /**
- * @brief 钉住「设置里什么都没写」时的四条默认登记，取值逐条手算
+ * @brief 钉住「设置里什么都没写」时每个受管动作各登记一条，取值逐条手算
+ * @details 条数与编号都写死在这里（独立期望）：动作追加在末尾时编号要跟着排，
+ *          中间插入会让用户设置里已有的组合错位到别的动作上。
  */
-TEST_F(HotkeyManagerFixture, RegistersFourDefaultsWhenSettingsAreEmpty)
+TEST_F(HotkeyManagerFixture, RegistersEveryManagedActionWithItsDefault)
 {
     SettingsStore           settings(m_iniFile);
     FakePlatformIntegration integration;
@@ -191,11 +193,11 @@ TEST_F(HotkeyManagerFixture, RegistersFourDefaultsWhenSettingsAreEmpty)
 
     const auto report = manager.reload();
     ASSERT_TRUE(report.has_value());
-    EXPECT_EQ(report->registered, 4) << "四个动作都该登记上，失败项：" << report->failures.size();
+    EXPECT_EQ(report->registered, 5) << "五个动作都该登记上，失败项：" << report->failures.size();
     EXPECT_TRUE(report->failures.empty());
 
     const auto &registrations = integration.m_backendMirror->registrations;
-    ASSERT_EQ(registrations.size(), 4U);
+    ASSERT_EQ(registrations.size(), 5U);
     // 编号 = 枚举序号 + 1，且每条的修饰键与按键按需求文档手算
     EXPECT_EQ(registrations[0].identifier, 1);
     EXPECT_EQ(registrations[0].modifiers, Qt::ControlModifier | Qt::AltModifier);
@@ -205,7 +207,9 @@ TEST_F(HotkeyManagerFixture, RegistersFourDefaultsWhenSettingsAreEmpty)
     EXPECT_EQ(registrations[2].identifier, 3);
     EXPECT_EQ(registrations[2].key, Qt::Key_O);
     EXPECT_EQ(registrations[3].identifier, 4);
-    EXPECT_EQ(registrations[3].key, Qt::Key_P) << "取色动作追加在末尾，编号必须跟着排到 4";
+    EXPECT_EQ(registrations[3].key, Qt::Key_P);
+    EXPECT_EQ(registrations[4].identifier, 5);
+    EXPECT_EQ(registrations[4].key, Qt::Key_L) << "长截图追加在末尾，编号必须跟着排到 5";
 }
 
 /**
@@ -222,7 +226,7 @@ TEST_F(HotkeyManagerFixture, StoredCombinationOverridesDefault)
 
     ASSERT_NE(integration.m_backendMirror, nullptr) << "改快捷键后没有建后端，说明 valueChanged 没接到 reload 上";
     const auto &registrations = integration.m_backendMirror->registrations;
-    ASSERT_EQ(registrations.size(), 4U);
+    ASSERT_EQ(registrations.size(), 5U);
     EXPECT_EQ(registrations[0].identifier, 1);
     EXPECT_EQ(registrations[0].modifiers, Qt::ControlModifier | Qt::ShiftModifier);
     EXPECT_EQ(registrations[0].key, Qt::Key_F1) << "存进去的组合没有生效，用户按到的还是默认的 Ctrl+Alt+A";
@@ -243,7 +247,7 @@ TEST_F(HotkeyManagerFixture, OneFailureDoesNotStopTheOthers)
 
     const auto report = manager.reload();
     ASSERT_TRUE(report.has_value());
-    EXPECT_EQ(report->registered, 2) << "只有截图与取色该登记上：坏值那条与被占用那条都要让路";
+    EXPECT_EQ(report->registered, 3) << "只有截图、长截图与取色该登记上：坏值那条与被占用那条都要让路";
     ASSERT_EQ(report->failures.size(), 2U);
 
     EXPECT_EQ(report->failures[0].action, HotkeyAction::Record);
@@ -254,13 +258,14 @@ TEST_F(HotkeyManagerFixture, OneFailureDoesNotStopTheOthers)
     EXPECT_EQ(report->failures[1].error.code, ErrorCode::Busy) << "后端拒绝走的是被占用那一档";
 
     const auto &registrations = integration.m_backendMirror->registrations;
-    ASSERT_EQ(registrations.size(), 3U) << "登记调用发生了三次：截图、被拒的 OCR 与取色，坏值那条不该去撞后端";
+    ASSERT_EQ(registrations.size(), 4U) << "登记调用发生了四次：截图、被拒的 OCR、长截图与取色，坏值那条不该去撞后端";
     EXPECT_EQ(registrations[0].identifier, 1);
     EXPECT_EQ(registrations[1].identifier, 3);
     EXPECT_EQ(registrations[2].identifier, 4);
-    EXPECT_EQ(integration.m_backendMirror->liveRegistrations.size(), 2U) << "OCR 被后端拒绝，它不该留在册上";
+    EXPECT_EQ(integration.m_backendMirror->liveRegistrations.size(), 3U) << "OCR 被后端拒绝，它不该留在册上";
     EXPECT_EQ(integration.m_backendMirror->liveRegistrations.count(1), 1U);
     EXPECT_EQ(integration.m_backendMirror->liveRegistrations.count(4), 1U);
+    EXPECT_EQ(integration.m_backendMirror->liveRegistrations.count(5), 1U) << "长截图那条该好好留在册上";
 }
 
 /**
@@ -277,7 +282,7 @@ TEST_F(HotkeyManagerFixture, ReloadUnregistersEverythingBeforeReRegistering)
 
     ASSERT_NE(integration.m_backendMirror, nullptr);
     EXPECT_GE(integration.m_backendMirror->unregisterAllCalls, 2) << "两轮重登至少两次清场";
-    EXPECT_EQ(integration.m_backendMirror->registrations.size(), 4U) << "重登后在册的还是四条，不是八条";
+    EXPECT_EQ(integration.m_backendMirror->registrations.size(), 5U) << "重登后在册的还是那五条，不是十条";
 }
 
 /**
@@ -297,15 +302,17 @@ TEST_F(HotkeyManagerFixture, TriggeredIdentifierMapsBackToAction)
     integration.m_backendMirror->fire(2);
     integration.m_backendMirror->fire(3);
     integration.m_backendMirror->fire(4);
-    ASSERT_EQ(triggered.size(), 4U);
+    integration.m_backendMirror->fire(5);
+    ASSERT_EQ(triggered.size(), 5U);
     EXPECT_EQ(triggered[0], HotkeyAction::Capture);
     EXPECT_EQ(triggered[1], HotkeyAction::Record);
     EXPECT_EQ(triggered[2], HotkeyAction::Ocr);
     EXPECT_EQ(triggered[3], HotkeyAction::Pick) << "编号 4 要落回报错以外的第四个动作，否则按一个热键会触发别的功能";
+    EXPECT_EQ(triggered[4], HotkeyAction::CaptureLong) << "编号 5 要落在追加在末尾的长截图上";
 
     // 不在册的编号：不能瞎指派一个动作，也不能一个都不发
     integration.m_backendMirror->fire(99);
-    EXPECT_EQ(triggered.size(), 4U) << "没登记过的编号被映射成了某个动作，会触发错的功能";
+    EXPECT_EQ(triggered.size(), 5U) << "没登记过的编号被映射成了某个动作，会触发错的功能";
 }
 
 /**
@@ -352,9 +359,32 @@ TEST_F(HotkeyManagerFixture, ReportsEveryActionUnsupportedWhenPlatformLacksHotke
     const auto report = manager.reload();
     ASSERT_TRUE(report.has_value()) << "平台不支持不是管理器本身的失败，要按项交回";
     EXPECT_EQ(report->registered, 0);
-    EXPECT_EQ(report->failures.size(), 4U);
+    EXPECT_EQ(report->failures.size(), 5U) << "五个动作都该各报一条不支持，少一条就是有一项被静默跳过了";
     for (const auto &failure: report->failures)
     {
         EXPECT_EQ(failure.error.code, ErrorCode::PlatformUnsupported) << "每一项都该说清是本平台没有这个能力";
     }
+}
+
+/**
+ * @brief 钉住长截图那条键真的走它自己的设置项
+ * @details 五个动作共用一套登记代码，键名接错一格就是「改了长截图的键，截图的键跟着变」——
+ *          两项都用同一条后端通道登记，界面上完全看不出来。这里改一项，另四项必须一动不动。
+ */
+TEST_F(HotkeyManagerFixture, LongCaptureHotkeyUsesItsOwnSetting)
+{
+    SettingsStore           settings(m_iniFile);
+    FakePlatformIntegration integration;
+    HotkeyManager           manager(settings, integration);
+
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kHotkeyCaptureLong, QVariant(QStringLiteral("Ctrl+Alt+F9"))).has_value());
+
+    const auto &registrations = integration.m_backendMirror->registrations;
+    ASSERT_EQ(registrations.size(), 5U) << "改一项设置没触发重登，后端那份登记还是旧的";
+    EXPECT_EQ(registrations[4].identifier, 5);
+    EXPECT_EQ(registrations[4].key, Qt::Key_F9) << "长截图的自定义组合没落到它那一条登记上";
+    EXPECT_EQ(registrations[0].key, Qt::Key_A) << "改长截图不该带动截图那条";
+    EXPECT_EQ(registrations[3].key, Qt::Key_P) << "改长截图不该带动取色那条";
+
+    EXPECT_EQ(manager.bindingText(HotkeyAction::CaptureLong), QStringLiteral("Ctrl+Alt+F9")) << "设置里存的那一条要能在界面上读回来";
 }
