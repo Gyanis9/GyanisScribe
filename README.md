@@ -1,36 +1,174 @@
-# GyanisScribe / 智录
+# 智录 · GyanisScribe
 
-Windows 优先、可跨平台的桌面工具：截图、标注、贴图、取色、录屏、文字识别。
-交互参考 Snipaste，但不使用其任何代码、图标、界面素材或商标。
+<p align="center">
+  <img src="https://img.shields.io/badge/C%2B%2B-C%2B%2B23-00599C?logo=c%2B%2B&logoColor=white" alt="C++23">
+  <img src="https://img.shields.io/badge/Qt-6.11-41CD52?logo=qt&logoColor=black" alt="Qt 6.11">
+  <img src="https://img.shields.io/badge/CMake-3.28%20%2B%20Conan%202-064F5C" alt="CMake and Conan">
+  <img src="https://img.shields.io/badge/Platform-Windows%20%C2%B7%20Linux-informational" alt="Windows and Linux">
+  <img src="https://img.shields.io/badge/version-0.0.1-lightgrey" alt="version 0.0.1">
+</p>
 
-- **技术栈**：C++23 · Qt 6.11（Widgets/Concurrent/Svg/Network）· CMake ≥ 3.28 · Conan 2 · MSVC 2022；Linux 侧在 Docker Ubuntu 24.04 容器内构建与验证
-- **当前状态**：六大功能已可用；本机 debug 与 release 两档各 243 条用例全绿；容器 asan 与 coverage 两档
-  238 条通过、1 条跳过（容器那份 Qt 6.4 没有 lrelease，「真实语言包装载」那条只能在有包的一档成立）；
-  行覆盖率 67.0%（阈值 55%）；打包脚本产出绿色目录 + zip + NSIS 安装器，英文语言包随包分发
-- **需求与硬约束**：[docs/ProjectRequirements.md](docs/ProjectRequirements.md)
+Windows 优先、可跨平台的桌面效率工具：**截图 · 标注 · 贴图 · 取色 · 录屏 · 文字识别**。
+C++23 + Qt 6 Widgets 实现，界面、图标与代码全部为本项目原创，不含任何现有产品的素材或商标。
 
-## 热键与功能
+- 常驻托盘，四个全局热键覆盖日常动作，不需要先开主窗口
+- 一个可执行体加随包摆好的 Qt 运行时，绿色目录即可运行；同时产出 zip 与 NSIS 安装器
+- 深浅主题、跟随系统、高 DPI 与多屏；中英双语界面
+- 录屏编码走外部 `ffmpeg` 进程，**不链接**（避开 GPL 传染）
+- 每个模块都有单测，另有一条跨模块流程用例；四条验证线（本机两档 + 容器两档）都是必建必测的门禁
+
+## 目录
+
+- [功能](#功能)
+- [快速开始](#快速开始)
+- [快捷键](#快捷键)
+- [设置与配置文件](#设置与配置文件)
+- [从源码构建](#从源码构建)
+- [打包](#打包)
+- [验证与质量门禁](#验证与质量门禁)
+- [项目结构](#项目结构)
+- [性能实测](#性能实测)
+- [已知问题](#已知问题)
+- [路线图（后续计划）](#路线图后续计划)
+- [参与贡献](#参与贡献)
+- [许可与第三方声明](#许可与第三方声明)
+
+## 功能
+
+**截图**
+全屏 / 区域框选 / 当前窗口 / 多显示器 / 高 DPI。按下热键后整屏冻帧，直接在上面拖框；
+Enter 或双击确认，Esc 取消，选完立刻进标注窗。
+
+**标注**
+八件工具：矩形、椭圆、箭头、画笔、高亮、马赛克、文字、序号。色板、线宽、字号各自可选，
+撤销重做、复制、保存、贴到屏幕上、送去识别都在同一排按钮上，选中的标注可以拖动与删除。
+
+**贴图**
+把图钉在屏幕最上层对着用。滚轮缩放（一格 1.1 倍）、`Ctrl`+滚轮旋转、`Shift`+滚轮调透明度，
+左键拖动移动，右键菜单复制 / 保存 / 识别文字 / 保持置顶 / 鼠标穿透 / 关闭。
+退出前把还在桌上的贴图连像素一起记下，下次启动摆回原位；某张图被清掉时只跳过那一张。
+
+**屏幕取色**
+全屏冻帧 + 9×9 放大镜，点一下按选定格式（HEX / RGB / HSL）把颜色复制走。
+
+**录屏**
+范围可选整屏 / 上次选区 / 当前窗口，输出可选 MP4 / GIF，帧率、画面码率、光标高亮、
+麦克风与系统声音各自可开（两路都开时混音）。控制条显示状态、时长与 3-2-1 倒计时，
+可暂停、贴边、最小化到托盘——收起后托盘那一行仍报「正在录制 / 已暂停 + 时长」。
+停止后编码在后台线程进行，界面不冻；编码器在编码前用真 `ffmpeg` 探一遍，取第一个开得起来的。
+
+**文字识别**
+`Windows.Media.Ocr`（用系统自己装的语言包，无需放文件）与 Tesseract 两个后端，按平台与可用性自动选型。
+结果窗口左侧原图、右侧文本，点一行就在图上圈出那一行；可导出 TXT / JSON，可换语言重认。
+托盘还有一条「识别图片文件…」，挑盘上的一张图直接认。
+
+**历史记录**
+截图与录屏的成品都进列表（缩略图 + 时间 + 类别），按条数与天数保留（填 0 即不限），
+每条可以贴回屏幕上、送去识别，或单独移除。
+
+**其他**
+中英文界面（英文档随包带语言包）、深浅主题与跟随系统、单实例检测、未捕获异常兜底
+（写一条中文日志再以退出码 70 退出）、托盘作为找不到窗口时的入口。
+
+## 快速开始
+
+已经构建好（或拿到打包产物）时：
+
+```powershell
+# 绿色目录或安装后的可执行体
+GyanisScribe.exe            # 起托盘，按 Ctrl+Alt+A 截第一张图
+GyanisScribe.exe --help     # 启动参数
+GyanisScribe.exe --selftest # 把启动路径跑完就退：日志就绪且热键登记结果打印出来，退出码 0 为通过
+```
+
+第一次运行要知道的三件事：
+
+1. 程序常驻托盘，关掉主窗口不会退出进程，退出只走托盘菜单那一条路。
+2. 全局热键默认 `Ctrl+Alt+A`（截图）、`Ctrl+Alt+R`（录屏，再按一次停止并保存）、`Ctrl+Alt+O`（识别）、
+   `Ctrl+Alt+P`（取色），撞了就撞了——设置里可改，改完立刻重新登记，不用重启。
+3. 录屏要出 MP4 需要机器上有 `ffmpeg`（在 PATH 里即可）；没有也能录，只是会在编码那一步给一条中文提示。
+
+Linux 侧当前是「可构建、可运行、能力降级」：抓帧、标注、贴图、识别可用，
+全局热键与录屏取声没有平台后端，会在日志与界面上给出中文降级原因而不是静默失败。
+
+## 快捷键
+
+全局热键（可在设置的「快捷键」页改）：
 
 | 动作 | 默认组合 | 说明 |
 | --- | --- | --- |
-| 框选截图 | `Ctrl+Alt+A` | 截完进标注窗；工具八件，色板、线宽、字号、撤销重做、复制/保存/贴图/识别 |
-| 截取当前窗口 | 托盘菜单 | 按平台拿前台窗口再去抓帧；Linux 拿不出句柄，这一项在菜单里根本不出现（不是留着让你点出一条报错） |
-| 录屏 | `Ctrl+Alt+R` | 再按一次停止并编码；控制条显示状态、时长与 3-2-1 倒计时，可暂停、贴边、最小化到托盘（收起后托盘那一行报「正在录制 / 已暂停 + 时长」）；开了「光标高亮」时用一圈把光标位置画在帧上（整屏与选区生效）；录制范围与输出格式在设置的录屏页选，取声也是（Windows） |
-| 文字识别 | `Ctrl+Alt+O` | 截完直接进结果窗口：左侧原图、右侧文本，点一行就在图上圈出那一行，可导出 TXT/JSON、换语言重认；托盘还有一条「识别图片文件…」，挑盘上的一张图直接认 |
-| 屏幕取色 | `Ctrl+Alt+P` | 全屏冻帧 + 9×9 放大镜，点一下把颜色按 HEX/RGB/HSL 复制走 |
+| 框选截图 | `Ctrl+Alt+A` | 截完进标注窗 |
+| 录屏 / 停止并保存 | `Ctrl+Alt+R` | 同一个键进出 |
+| 文字识别 | `Ctrl+Alt+O` | 认最近的一张图（刚截的、贴着的、历史里挑的都算）；手上还没有图时给一句提示而不是自己开一帧 |
+| 屏幕取色 | `Ctrl+Alt+P` | 冻帧 + 放大镜 |
+| 截取当前窗口 | 托盘菜单 | Linux 拿不出窗口句柄，这一项在菜单里根本不出现 |
+
+截图遮罩上：
+
+| 键 | 作用 |
+| --- | --- |
+| `Enter` / 双击 | 确认当前选区 |
+| `Esc` | 取消 |
+
+标注窗：
+
+| 键 | 作用 |
+| --- | --- |
+| `Enter` | 复制到剪贴板 |
+| `Ctrl+S` | 保存 |
+| `Ctrl+D` | 贴到屏幕上 |
+| `Ctrl+O` | 送去文字识别 |
+| `Ctrl+Z` / `Ctrl+Shift+Z` 或 `Ctrl+Y` | 撤销 / 重做 |
+| `Delete` / `Backspace` | 删掉选中的标注 |
+| `Esc` | 关闭 |
+
+贴图窗：拖动即移动，滚轮缩放，`Ctrl`+滚轮旋转，`Shift`+滚轮调透明度，`Esc` 关闭，右键出菜单。
+
+## 设置与配置文件
 
 设置窗口左侧按类别竖排：通用 / 截图 / 标注 / 贴图 / 录屏 / 文字识别 / 快捷键 / 主题 / 关于 / 历史，
-每页顶部一句说明写清这一类管什么。除界面语言（重启后生效）外，改完立即写入配置；
-标注默认线宽与字号、贴图默认不透明度、录屏的录制范围与输出格式、默认帧率与光标高亮，从下一次新建标注窗、新贴一张图、
-下一次开始录屏时起用。历史留多少条、留多少天在「通用」里改，填到 0 就是不限；
-同一页还能把全部设置导出成一个 JSON 文件或从那份文件读回来（换机器与备份用）。
-托盘菜单是找不到窗口时的入口，还有一条「关闭全部贴图」用来一次清场。
-退出前把还在桌上的贴图连像素一起记下（像素落在缓存目录，配置里只存路径与几何），下次启动摆回原位；
-某张图被清掉时只跳过那一张，剩下的照旧摆回来。
+每页顶部一句说明写清这一类管什么。除界面语言（重启后生效）外，改完立即写入配置：
+标注默认线宽与字号、贴图默认不透明度、录屏范围与输出格式、默认帧率与光标高亮，
+从下一次新建标注窗、新贴一张图、下一次开始录屏时起用。
+「通用」页还管着历史保留多少条、多少天（填 0 即不限），以及「导出配置… / 导入配置…」——
+把全部设置写成一个 JSON 文件，换机器与备份时用；导入后订阅配置的热键与主题立刻跟上新值，
+而当前那一页显示的还是导入前的值，关掉设置窗重开就对新。
 
-## 在 Windows 上构建
+| 用途 | 位置 |
+| --- | --- |
+| 配置 | Windows 注册表 `HKCU\Software\Gyanis\GyanisScribe`；Linux `~/.config/Gyanis/GyanisScribe.conf` |
+| 截图默认目录 | 用户图片目录下的 `GyanisScribe/`（可在设置里改） |
+| 录屏默认目录 | 用户视频目录下的 `GyanisScribe/`（可在设置里改） |
+| 日志 | `<AppData>/Gyanis/GyanisScribe/logs`，每条都是中文，界面切成英文也不翻译日志 |
+| 贴图恢复数据 | 缓存目录里的像素文件，配置里只存路径与几何 |
 
-前置：Visual Studio 2022（MSVC）、CMake ≥ 3.28、Ninja、Conan 2、Qt 6.11（MSVC 套件，含 Concurrent/Svg/Network）、`ffmpeg`（仅录屏编码需要）。
+界面文案是中文，走 `Core::uiText()` / `Core::uiTextUtf8()`；英文档需要
+`translations/GyanisScribe_en.qm`（随包分发，缺包时按中文继续并给出放置位置）。
+翻译目录 `Translations/GyanisScribe_en.ts` 是唯一真源，`.qm` 由构建期的 lrelease 产出。
+改完文案要重新生成目录：
+
+```bash
+python scripts/check-translation-catalog.py --generate   # 把新增文案补进 .ts，再逐条填英文
+```
+
+## 从源码构建
+
+### 前置要求
+
+| 组件 | 版本 | 说明 |
+| --- | --- | --- |
+| 编译器 | MSVC（本机实测 14.51）/ GCC 13 | 需要 C++20/23 的 `std::expected` 与 `std::format` |
+| CMake | ≥ 3.28 | — |
+| Ninja | — | 生成器 |
+| Conan | 2 | 依赖：spdlog 1.17.0、GoogleTest 1.17.0，Release 档另领 Tesseract 5.5.2 |
+| Qt | 6.11，含 Core / Gui / Widgets / Concurrent / Svg / Network | Linux 容器里用发行版的 6.4 也可编 |
+| Python | 3 | 两条静态门禁脚本 |
+| ffmpeg | 任意带可用 h264 编码器的构建 | 可选：只在录屏编码时需要，作为外部进程调用 |
+| NSIS | — | 可选：只在打安装器时需要 |
+
+机器相关的路径只出现在 `scripts/WindowsBuild.bat` 与 `scripts/container/env.sh` 里，工程不写死绝对路径。
+
+### Windows
 
 ```bat
 set QTDIR=G:\Tools\Qt\6.11.1\msvc2022_64
@@ -38,28 +176,17 @@ scripts\WindowsBuild.bat release
 build\release\bin\GyanisScribe.exe --selftest
 ```
 
-`WindowsBuild.bat` 会自己调 `vcvars64`、按预设配置/编译并跑 `ctest`。预设两档：`debug` 与 `release`——
-Windows 上两档都带系统识别后端（`Windows.Media.Ocr`，用系统自己装的语言包），只有 `release` 额外领 Tesseract
-（上游 Debug 包的问题见 [docs/OcrBackends.md](docs/OcrBackends.md)）。机器相关的路径只出现在这个脚本里，工程不写死绝对路径。
-预设名不分平台：`CMakePresets.json` 里是 `debug`/`release`/`asan`/`tsan`/`coverage` 五档，两侧共用同一份文件，
-需求 §十三 那张「WindowsDebug…LinuxTsan…」的名单按「平台 × 这四档」读。用哪套工具链不由预设名决定，
-而由进入构建的那一步决定：Windows 侧 `WindowsBuild.bat` 先调 `vcvars64`，容器侧 `env.sh` 设 `CC/CXX=gcc-13`，
-Conan 再按各自平台的 profile 指过去。再各写一个平台前缀的名字，就是多一份要手工同步的副本。
-Conan 两侧都是仓库里的一份档位（`Conan/Profiles/WindowsMsvc2022` 与 `LinuxGcc13`），
-不是每次现检测的产物：Windows 侧由脚本把 `-DCONAN_HOST_PROFILE` 指过去，容器侧由 `env.sh` 设
-`CONAN_DEFAULT_PROFILE_PATH`。档位里唯一按机器改的一行是 `compiler.version`；
-`build_type` 刻意不写进文件，它跟着预设走，而「Debug 不领 Tesseract」正是按 `build_type` 分岔的。
+`WindowsBuild.bat` 自己调 `vcvars64`、按预设配置、编译并跑 `ctest`，一条命令就是一条门禁。
+预设两档：`debug` 与 `release`。Windows 上两档都带系统识别后端（`Windows.Media.Ocr`），
+只有 `release` 额外领 Tesseract——上游 leptonica 的 Debug 包与其 `cpp_info` 对不上，
+细节与撤除判据见 [docs/OcrBackends.md](docs/OcrBackends.md)。
 
-打包（绿色目录 + zip + NSIS 安装器）：
+`CMakePresets.json` 里的档位名不分平台：`debug` / `release` / `asan` / `tsan` / `coverage` 五档，
+两侧共用同一份文件。用哪套工具链不由预设名决定，而由进入构建的那一步决定：
+Windows 侧 `WindowsBuild.bat` 先调 `vcvars64`，容器侧 `env.sh` 设 `CC/CXX=gcc-13`，
+Conan 再按各自平台的 profile（`Conan/Profiles/WindowsMsvc2022` 与 `LinuxGcc13`）指过去。
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\WindowsPackage.ps1
-```
-
-它会用 `windeployqt` 按可执行体的实际导入摆好 Qt 运行时，然后**在 staging 目录里跑一次 `--selftest`**——
-只有这样才能证明包是完整的，而不是"本机能跑"。产物在 `dist/`。
-
-## 在容器里构建（Linux 侧验证）
+### Linux（容器内验证）
 
 ```bash
 docker build -f Dockerfile.dev -t gyanisscribe-dev .
@@ -73,20 +200,71 @@ scripts/container/init.sh          # 补包并体检工具链（幂等，可 SKI
 scripts/container/build.sh debug   # 也支持 release / asan / tsan / coverage
 scripts/container/test.sh debug    # 有 Xvfb 就在虚拟屏下跑，界面用例才算真被跑到
 scripts/container/sanitize.sh      # ASan(+UBSan)；tsan 档另说，见下方边界
-scripts/container/coverage.sh 55   # gcovr 汇总，阈值不过就红（判定由 gcovr 的 --fail-under-line 做）
+scripts/container/coverage.sh 55   # gcovr 汇总，阈值不过就红（判定由 --fail-under-line 做）
 ```
 
-`asan` 档既可以用 `sanitize.sh` 一把跑完，也可以 `build.sh asan` 再 `test.sh asan`：sanitizer 的运行期参数
-（含 LSan 那张只放过系统库字体缓存的抑制表）统一在 `env.sh` 里导出，两条入口给的是同一个结果。
-早先这张表只挂在 `sanitize.sh` 上，换 `test.sh` 跑就会多出两条与代码无关的红。
+sanitizer 的运行期参数（含 LSan 那张只放过系统库字体缓存的抑制表）统一在 `env.sh` 里导出，
+所以 `sanitize.sh` 与「`build.sh asan` + `test.sh asan`」两条入口给的是同一个结果。
 
-Linux 侧的已知边界：没有全局热键能力（登记会给出中文提示并降级）、无系统托盘时菜单改由主窗口提供、
-`Qt::ColorScheme` 要 6.8 才有而容器是 6.4（跟随系统会解算到兜底档）、**TSan 这一档在当前容器里跑不了**——
-这台内核（WSL2 6.18）下 libtsan 必须关 ASLR 才起得来进程，而 `setarch -R` 走的 `personality` 被 Docker 自带
-seccomp 档拒绝（实测 EPERM）。脚本会在建之前先探这一点并当场报红，不会把「没跑」当成「跑过」；
-要跑它得用 `docker run --security-opt seccomp=unconfined` 起容器。
+要跑 TSan 这一档得放开 seccomp：这台内核（WSL2 6.18）下 libtsan 必须关 ASLR 才起得来进程，
+而 `setarch -R` 走的 `personality` 被 Docker 默认 seccomp 档拒绝（实测 EPERM）。
+脚本会在建之前先探这一点并当场报红，不会把「没跑」当成「跑过」：
 
-## 目录
+```bash
+docker run --rm -it --security-opt seccomp=unconfined -v "$PWD:/work" gyanisscribe-dev bash
+```
+
+## 打包
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\WindowsPackage.ps1
+```
+
+产出绿色目录 + zip + NSIS 安装器，落在 `dist/`。脚本用 `windeployqt` 按可执行体的**实际导入**摆好
+Qt 运行时，然后在 staging 目录里跑一次 `--selftest`——只有这样才能证明包是完整的，而不是「本机能跑」。
+安装器带卸载段。
+
+## 验证与质量门禁
+
+四条线，都是必建必测：本机 `debug` / `release` 两档，容器 `asan` / `coverage` 两档。
+本轮（2026-10-10，HEAD 含文档改动）实测：
+
+| 线 | 命令 | 结果 |
+| --- | --- | --- |
+| Windows Release | `scripts\WindowsBuild.bat release` | 276/276 通过，2 条环境门控跳过 |
+| Windows Debug | `scripts\WindowsBuild.bat debug` | 276/276 通过，3 条环境门控跳过 |
+| 容器 ASan(+UBSan) | `scripts/container/sanitize.sh` | 271/271 通过，3 条跳过 |
+| 容器覆盖率 | `scripts/container/coverage.sh 55` | 271/271 通过，行覆盖 **69.1%**（3911/5661），阈值 55%；主程序在 Xvfb 上 `--selftest` 退出码 0 |
+
+容器少的 5 条是 Windows 专属后端的用例：4 条 WinRT 系统识别、1 条 Win32 热键映射。
+跳过的都是环境门控用例，本机两档与容器各跳哪些是清楚的：
+
+| 跳过的用例 | 为什么跳 |
+| --- | --- |
+| `LanguageFixture.BuiltEnglishPackTranslatesKnownString` | 容器那份 Qt 6.4 没有 lrelease，出不了真实语言包，只能在有包的一档成立 |
+| `OcrFixture.ReportsMissingBackendSeparatelyFromMissingLanguagePacks`（仅本机 debug） | Debug 档不领 Tesseract，这一档没有「后端在、语言包缺」那个组合可判 |
+| `FfmpegAudioCaptureEndToEnd.*`、`VideoEncoderEndToEndFixture.*` | 要真 `ffmpeg`，给齐环境变量才跑 |
+
+后两条端到端这样打开：
+
+```bash
+GYANISSCRIBE_FFMPEG=C:/path/to/ffmpeg.exe             # 编码端到端
+GYANISSCRIBE_AUDIO_DEVICE=@device_cm_{...}\wave_{...} # 取声端到端（要用 dshow 的 Alternative name，不是友好名）
+```
+
+另有三条不编译源码的静态门禁，作为 ctest 用例注册在 `tests/Style/`：
+
+| 用例 | 钉住什么 |
+| --- | --- |
+| `Style.QtStringPlaceholders` | `QString` 占位符不许 `{}` 与 `%1` 混用——混用编译期无声，运行时把「选择{}的目录」原样摆给用户 |
+| `Style.TranslationCatalog` | 源码里每一条走 `uiText` 的文案都必须在 `.ts` 里有非空译文，否则英文档下会安静地显示中文 |
+| `Style.SourceConventions` | 路径不得按窄串交给第三方库；按枚举分派的开关要覆盖每个值（MSVC 与 GCC 的默认告警都不报这种漏项） |
+
+用例结构逐级镜像 `src/`，统一 GoogleTest，不引入第二个测试框架。
+共用同一份外部资源（真实缓存目录、临时文件）的用例用 CMake 的 `RESOURCE_LOCK` 串行化——
+`ctest -j` 把每条用例当独立进程启动，进程内互斥救不了。
+
+## 项目结构
 
 ```
 src/Core        值类型、日志、目录 provider、图片等比适配几何
@@ -99,42 +277,26 @@ src/Ocr         预处理、后端选型、结果窗口与导出
 src/History     历史清单、保留策略、缩略图列表
 src/Pick        取色器：颜色写法与放大镜几何
 src/App         应用对象、核心控制器、托盘、主窗口、单实例、崩溃兜底
-Vendor/WinRt    Windows 系统识别要用的 C++/WinRT 投影头（MIT，生成与裁剪办法见 docs/OcrBackends.md）
-tests/          逐级镜像 src 的目录结构
+Vendor/WinRt    Windows 系统识别用的 C++/WinRT 投影头（MIT，生成与裁剪办法见 docs/OcrBackends.md）
+tests/          逐级镜像 src 的目录结构；另有一条跨模块流程入口 tests/App/TestModuleFlow.cpp
+Resources/Icons 63 张原创 SVG 图标
+scripts/        构建、打包、容器一键脚本与静态门禁
+docs/           需求、识别后端、第三方许可证、界面样式说明
 ```
 
-图标全部为原创 SVG（统一 24 视框、`currentColor`、1.5/2 描边），由 `IconProvider` 按主题着色；
-用例按模块单测，另有一条跨模块流程的集成入口 `tests/App/TestModuleFlow.cpp`（抓帧 → 标注 → 贴图 → 识别）：
-它按生产形状造替身，钉的是模块接在一起时坐标系与语言词表还对不对——这类漂移在单模块用例里看不见。
-第三方组件与许可证见 [docs/ThirdPartyLicenses.md](docs/ThirdPartyLicenses.md)，
-识别后端与语言包的落地细节见 [docs/OcrBackends.md](docs/OcrBackends.md)，
-界面令牌、每个窗口的样式与状态、深浅主题对照与高 DPI 适配见 [docs/UiStyleGuide.md](docs/UiStyleGuide.md)。
+`tests/App/TestModuleFlow.cpp` 按生产形状造替身，钉的是模块接在一起时坐标系与语言词表还对不对——
+这类漂移在单模块用例里看不见。
 
-## 界面文案与语言切换
+文档索引：
 
-界面源码文案是中文。任何要显示给用户（含报错提示）的文本都走 `Core::uiText("中文")` /
-`Core::uiTextUtf8("中文{}")`（`src/Core/Text.h`），日志 `Core::Logger::*` 刻意保持中文——排障的人
-不该因为界面语言而读不到日志。
+| 文档 | 内容 |
+| --- | --- |
+| [docs/ProjectRequirements.md](docs/ProjectRequirements.md) | 需求原文与硬约束（功能清单、性能指标、UI 约束、交付物） |
+| [docs/OcrBackends.md](docs/OcrBackends.md) | 两个识别后端的选型顺序、语言包查找路径、WinRT 投影头怎么生成 |
+| [docs/ThirdPartyLicenses.md](docs/ThirdPartyLicenses.md) | 随包分发的组件、许可证与合规路线 |
+| [docs/UiStyleGuide.md](docs/UiStyleGuide.md) | 设计令牌、每个窗口的样式与状态、深浅主题对照、高 DPI 适配 |
 
-- 语言在「设置 → 通用」里选，配置键 `Ui/Language`（`zh` / `en`）；切换在重启后生效。
-- 英文档需要 `translations/GyanisScribe_en.qm`，随包分发；缺包时应用按中文继续并给出放置位置。
-- 翻译目录 `Translations/GyanisScribe_en.ts` 是唯一真源，`.qm` 由构建期的 lrelease 产出
-  （挂在 `DeployTranslations` 上）。容器里那份 Qt 6.4 没有 lrelease，那一档不出包。
-- 改完文案要重新生成目录：`python scripts/check-translation-catalog.py --generate`，把 `<translation type="unfinished">` 补成英文再构建。
-  ctest 用例 `Style.TranslationCatalog` 会断言「源码里用到的每条文案都在目录里且有非空译文」——
-  漏掉的那几处在英文档下会安静地显示中文，没人会逐条菜单点出来，所以钉成门禁。
-  脚本用 Python 而不是 CMake：穷举要把被 clang-format 断成相邻字面量的长文案按编译期规则拼回去，
-  CMake 的正则在跨语句时给出了错误的匹配（实测把十条不相关的文案拼成一条），门禁一旦误判就是永久假绿。
-
-## 启动参数
-
-`GyanisScribe --help` / `--version` / `--selftest`。解析走 `QCommandLineParser`：
-`--selftest` 把启动路径跑完就退（日志接管成功即退出码 0），打包脚本与 CI 用它当「起得来」的判据；
-不认识的参数当场退出码 1，不会装成「没带参数」安静地起一个界面。Qt 自己的参数（`-platform` 一类）
-照旧认得，实测 `GyanisScribe.exe -platform offscreen --version` 正常退出 0。
-`--help` 的说明文字进文案目录，装了英文包时命令行帮助也走英文。
-
-## 性能与测量
+## 性能实测
 
 需求 §十一 的指标与它们的实际测量方法——没测过的直接写「未测」，不拿推测充数：
 
@@ -142,34 +304,43 @@ tests/          逐级镜像 src 的目录结构
 | --- | --- | --- |
 | 截图延迟 < 100ms | 中位 30–31ms（10 次采样，min 26 / max 35） | 独立探针走产品同一条路（`QScreen::grabWindow` → `toImage` → `convertToFormat(ARGB32_Premultiplied)`），丢掉首轮的一次性开销，两次独立运行给出 30 与 31ms。机器：2560×1440、dpr 1.0、单屏、Release Qt |
 | OCR 单张 < 1s | 几十毫秒量级（640×160 的一次识别连同后端构造与 PNG 编解码，单用例计时 43ms） | ctest 的 per-test 计时；跨模块那条用 900×600 的图，337ms 里含 Qt 应用与引擎初始化 |
-| 录屏 1080p30 不掉帧、CPU 占用合理 | **未测** | 需要真机跑满 60s 再统计帧间隔分布与峰值 CPU；而现在帧序列按 PNG 逐帧落盘，1080p 十分钟就是 GB 级，这条要等 `rawvideo` 管道那一项落地后一起测（见下方后续计划） |
+| 录屏 1080p30 不掉帧、CPU 占用合理 | **未测** | 需要真机跑满 60s 再统计帧间隔分布与峰值 CPU；而现在帧序列按 PNG 逐帧落盘，1080p 十分钟就是 GB 级，这条要等 `rawvideo` 管道那一项落地后一起测（见[路线图](#路线图后续计划)） |
 | 编码前的编码器探测耗时 | 本机 1920×1080 单档实测：libx264 60ms（缺件立刻失败）、NVENC 187ms、QSV 1583ms、AMF 574ms、mpeg4 77ms；本机选中 NVENC 走的是前两档共 247ms，五档全试完是 2481ms | 三帧到 `null` 输出的探测命令，参数按真录屏尺寸、帧率与画面码率给；选中即停，只有 MP4 走这一步，GIF 不需要 |
 | 贴图拖动流畅、鼠标穿透不抢焦点 | 定性验证：拖动走 `PinTransform` 的增量换算（有用例钉数值），穿透由平台侧 `setMouseThrough` 落地 | 主观流畅度无法用断言钉；这里只承诺「没有动画在拖动的路上插队」 |
 
 ## 已知问题
 
 - Windows 上识别首选系统组件（`Windows.Media.Ocr`），它用的是 Windows 自己装的语言包，不需要用户放文件；
-  只有选 Tesseract（以及 Linux 侧）时才需要自备 `eng.traineddata` 等——缺语言包会明确报"不可用"并给出放置位置，
-  不会返回空结果冒充"这张图里没字"。
+  只有选 Tesseract（以及 Linux 侧）时才需要自备 `eng.traineddata` 等——缺语言包会明确报「不可用」并给出放置位置，
+  不会返回空结果冒充「这张图里没字」。
 - 录屏依赖外部 `ffmpeg`：不链接、不随包分发（避开 GPL 传染），没装就在编码那一步给出中文提示；
   装的那份没有 `libx264` 时编码前会自己探一个开得起来的编码器顶上，五个候选全都开不起来才报失败。
-- 安装器的"装完能起、卸载能清"这一步还没在真机上跑过 smoke test：脚本目前验证到
-  staging 目录自检通过 + 安装器带卸载段。
 - Debug 档不领 Tesseract：上游 leptonica 的 Debug 包库名与其 `cpp_info` 不一致，
   `conanfile.py` 里按 `build_type` 分岔并写明撤除判据。Windows 的 Debug 档仍能真识别——工厂先问系统识别。
+- Linux 侧能力不全：没有全局热键后端（登记会给出中文提示并降级）、没有录屏取声、
+  无系统托盘时菜单改由主窗口提供、`Qt::ColorScheme` 要 6.8 才有而容器是 6.4（跟随系统会解算到兜底档）。
+- 安装器的「装完能起、卸载能清」还没在真机上跑过 smoke test：脚本目前验证到
+  staging 目录自检通过 + 安装器带卸载段。
+- 两处路径仍按本地码页交给第三方库（各自在同一句里写明理由，`Style.SourceConventions` 认这些理由）：
+  spdlog 的日志文件名（本构建没开 `SPDLOG_WCHAR_FILENAMES`，窄串要按本地码页给）与 Tesseract/Leptonica 的
+  `TessBaseAPIInit3`（C 接口拿 `const char*` 开文件）。要彻底了断 spdlog 那一处，得在 Conan 侧把 wchar
+  文件名选项打开，再回到 `toDisplayText` 那条路上。
 
-## 后续计划
+## 路线图（后续计划）
 
 按需求条目核对过，剩下这些没做，都在等一个能验证它们的环境：
 
-- **Linux 侧录屏取声**：Windows 那一路已经落地（见下方「录屏带声音」），Linux 的入口是 ALSA/Pulse，
-  容器与 CI 都没有音频设备，写进去就是一段没人验过的代码。现在那一侧列出设备与取声都直接给出中文降级原因。
-- **录屏带声音**（Windows 已做）：设置的录屏页里麦克风与系统声音各一格，选中即取那一路，两路都选时 `amix` 混音；
-  采到中间 wav，编码那一步并进 MP4。输出格式选 GIF 时这两格会灰掉——那种容器没有音轨，服务侧按同一句
-  `outputFormatCarriesAudio` 跳过取声，不留一个白跑的 ffmpeg 与一份没人读的 wav。取声起不来就拒绝开始录屏，
-  中途丢了声音则成品照出并当面说一句。判据：`GYANISSCRIBE_FFMPEG` 与 `GYANISSCRIBE_AUDIO_DEVICE` 都给齐时
-  端到端跑一条真采集（本机实测 2 秒出 381774 字节的 48k 双声道 wav），缺任一就 SKIP。
 - **长录屏**：帧序列按 PNG 逐帧落盘，1080p 十分钟就是 GB 级；换成喂 ffmpeg `rawvideo` 管道才能放开时长上限。
+- **录屏逐帧写 PNG 仍在界面线程上**：需求的硬约束要求「耗时操作放工作线程」，现在只剩这一处
+  （`PngSequenceSink::write`：一帧的写盘时间直接算进下一格的等待）。
+  文字识别与停止后的编码都已交出去：`Ocr::RecognitionRunner` 与 `RecordingService::startEncoding`
+  都走 Qt 的全局线程池，认完/编完由 `QFutureWatcher` / `QFuture::then`（context 是界面线程那个对象）送回界面，
+  两处都同一时间只跑一条，析构前等手上的任务跑完。
+  **恢复条件**：这一处要与采集循环交接帧与状态，并发改动要有 TSan 才算判据（本机 MSVC 没有 TSan，
+  而容器里 `setarch -R` 被 Docker 默认 seccomp 拒绝），先用 `--security-opt seccomp=unconfined` 起一档、
+  证明旧写法报得出竞态，再动它。没有这一档之前把跨线程手抖写进去，只是把可复现的卡顿换成不可复现的竞态。
+- **Linux 录屏取声**：Windows 那一路已经落地，Linux 的入口是 ALSA/Pulse，容器与本机的验证环境都没有
+  可登记的音频设备，写进去就是一段没人验过的代码。现在那一侧列出设备与取声都直接给出中文降级原因。
 - **录屏编码器只自动选，不给设置项**：需求的参数清单里有「编码器」，现在做法是编码前用真 ffmpeg 探一遍
   （三帧到 `null` 输出），按 libx264 → NVENC → QSV → AMF → mpeg4 取第一个开得起来的，界面上没有那一格。
   探测代替名单是因为实测：本机那份 ffmpeg 的 `-encoders` 里 h264_qsv、h264_amf 都在，真跑却分别报
@@ -182,18 +353,41 @@ tests/          逐级镜像 src 的目录结构
   窗口左上角的全局读数要等平台侧的窗口几何接口。这条接口不是省事省掉的：Qt 6.11 只有 `QWindow::fromWinId`，
   返回的包装所有权不明（按帧拿就是每帧造一个可能已活的 `QWindow`），而 Win32 的 `GetWindowRect` 读的是物理像素，
   必须与 DPI 换算配成对才不错位。`RecordingService` 在第一帧就把这一点写进日志，不画错位的圈。
-- **安装器真机 smoke test**：脚本验到 staging 自检通过 + 安装器带卸载段，「装完能起、卸载能清」还没在真机上跑过。
-- **主线程还会被长任务占着**：需求的硬约束要求「耗时操作放工作线程」，现在只剩一处仍在 GUI 线程上跑——
-  录屏逐帧写 PNG（`PngSequenceSink::write`，一帧的写盘时间直接算进下一格的等待）。
-  文字识别与停止后的编码都已交出去：`Ocr::RecognitionRunner` 与 `RecordingService::startEncoding` 都走 Qt 的全局线程池，
-  认完/编完由 Qt 的回接（`QFutureWatcher` / `QFuture::then`，context 是界面线程那个对象）送回界面。两处都同一时间只跑一条，
-  析构前等手上的任务跑完。
-  **恢复条件**：剩下这一处要与采集循环交接帧与状态，并发改动要有 TSan 才算判据（本机 MSVC 没有 TSan，而容器里 `setarch -R` 被 Docker 自带 seccomp 拒绝），
-  先用 `docker run --security-opt seccomp=unconfined` 起一档、证明旧写法报得出竞态，再动它。
-  没有这一档之前把跨线程手抖写进去，只是把可复现的卡顿换成不可复现的竞态。
-- **两处路径仍按本地码页交给第三方库**（各自在同一句里写明理由，`Style.SourceConventions` 认这些理由）：
-  spdlog 的日志文件名（本构建没开 `SPDLOG_WCHAR_FILENAMES`，窄串要按本地码页给）与 Tesseract/Leptonica 的
-  `TessBaseAPIInit3`（C 接口拿 `const char*` 开文件）。要彻底了断 spdlog 那一处，得在 Conan 侧把 wchar
-  文件名选项打开，再回到 `toDisplayText` 那条路上。
-- **TSan 一档**：容器里跑不了（`setarch -R` 的 `personality` 被 Docker 自带 seccomp 拒绝，实测 EPERM），
-  要用 `docker run --security-opt seccomp=unconfined` 起容器才能补上这一轮跨线程判据。
+- **安装器真机 smoke test**：补上「装完能起、卸载能清」那一轮。
+- **界面截图与演示**：本文档暂时没有截图，等打包产物稳定后补真实界面图，不放占位图。
+
+## 参与贡献
+
+改动要么修掉错误行为，要么加上需求里的能力。上手顺序：
+
+1. 按[从源码构建](#从源码构建)跑一次本机的构建脚本——它一条命令包含配置、编译与 `ctest`，绿了才谈改动。
+2. 写完先跑 clang-format（仓库根的 `.clang-format`，`ColumnLimit: 180`），只递给源文件，别把 `CMakeLists.txt` 喂进去。
+3. 再跑对应平台的门禁：本机 `scripts\WindowsBuild.bat <preset>`；改到并发、生命周期或跨线程代码时，
+   容器两档也要跑（`sanitize.sh`、`coverage.sh`）。**本机全绿不构成并发正确性的证据**——MSVC 没有 TSan。
+4. 加功能要带用例，`tests/` 的目录结构逐级镜像 `src/`；每条用例说明它钉住什么，并且能红：
+   把实现改回缺陷行为确认这一条会失败，再提交。
+5. 提交信息用中文写「为什么」而不是「做了什么」，一次提交只讲一件事，
+   格式是约定式提交 `<类型>[(范围)]: <描述>`（类型取 `feat` / `fix` / `refactor` / `perf` / `test` / `docs` / `build` / `chore`）。
+
+规范要点（细节见 [docs/ProjectRequirements.md](docs/ProjectRequirements.md) 与 `tests/Style/` 三条门禁）：
+
+- 文件与类名 PascalCase、接口 `I` 前缀、函数 camelCase、成员 `m_` 前缀、常量 `k` 前缀，标识符不用缩写。
+- 声明处中文 Doxygen（重写的方法要独立写全），实现体在分支、状态流转、加锁、魔法数字处写中文 `//`；
+  注释只留「为什么」，不写实现历史与「旧实现怎样、现在怎样」。
+- 可恢复错误返回 `std::expected<T, Error>`，错误文案中文且可操作（写清「原因 + 替代做法」）；
+  不许静默失败、取整、回绕、把「不支持」悄悄当成「按默认处理」。
+- 一切要显示给用户的文本走 `Core::uiText()`，并且同步进翻译目录（`Style.TranslationCatalog` 会拦漏项）。
+- 图标必须是原创 SVG：`viewBox="0 0 24 24"`、`currentColor`、描边 1.5 或 2、圆角端点，
+  只经 `IconProvider` 加载；不下载、不引用、不复制任何现成图标库或任何现有产品的素材。
+- 零告警是硬判据：MSVC 侧每个目标都带 `/W4 /WX`；容器侧的 GCC 预设没开 `-Wall`，
+  这类编译器不报的漏项由 `Style.SourceConventions` 与用例兜住。
+
+## 许可与第三方声明
+
+本项目的代码、界面与图标均为原创。第三方组件的许可证、用途与分发方式逐条列在
+[docs/ThirdPartyLicenses.md](docs/ThirdPartyLicenses.md)：Qt 6 走 LGPL-3.0 的动态链接路线，
+Tesseract / Leptonica / spdlog / GoogleTest / C++/WinRT 投影头各自按上游许可，
+`ffmpeg` 只作为外部进程调用、不链接也不随包分发（避开 GPL 传染）。
+识别语言包（`*.traineddata`）不随安装包分发，放置路径与查找顺序见 [docs/OcrBackends.md](docs/OcrBackends.md)。
+
+本项目自身的许可证尚未随包声明（仓库当前为私有阶段）；对外分发前先在这里补上 `LICENSE` 与本节。
