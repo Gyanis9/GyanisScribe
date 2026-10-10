@@ -26,6 +26,9 @@ namespace GyanisScribe::Ocr
         // Tesseract 给的置信度是 0-100
         constexpr double kConfidencePercentScale = 100.0;
 
+        // 这条通道送识别前的放大倍率，与系统那一条通道取同一个上限档（理由见 recognize 里的实测读数）
+        constexpr int kEnlargeFactor = kMaximumEnlargeFactor;
+
         /// 一个词的中间结果（还没分行）
         struct RawWord
         {
@@ -151,7 +154,10 @@ namespace GyanisScribe::Ocr
             return std::unexpected(loaded.error());
         }
 
-        const QImage gray = toGrayscale(image).convertToFormat(QImage::Format_Grayscale8);
+        // 灰度 + 2× 放大，与系统那一条通道走同一个入口。现测（随包 eng 语言包、同一张 420×64 渲染图）：
+        // 7pt 小字不放大只回来 2/3 个词且平均置信度 0.446，放大 2× 后 3/3 且 0.920；3× 与 4× 又掉回 2/3，
+        // 所以倍率就取预处理模块夹住的那一档，不再往上试
+        const QImage gray = prepareForRecognition(image, kEnlargeFactor).convertToFormat(QImage::Format_Grayscale8);
         // 形参顺序是 (数据, 宽, 高, 每像素字节数, 每行字节数)：把「高」与「每像素字节数」写反，
         // Leptonica 会按 高×8 位深去建图并报「Cannot convert RAW image to Pix with bpp = 512」，
         // 识别一定失败——这条是靠真语言包的端到端用例才看得见的那一格
@@ -173,7 +179,10 @@ namespace GyanisScribe::Ocr
             // 游标是 ResultIterator 借出的 PageIterator：归 ResultIterator 管，不能单独释放
             auto *cursor = TessResultIteratorGetPageIterator(iterator);
             TessPageIteratorBegin(cursor);
-            bool stepped = true;
+            // 送进去的是放大过的那一张，方框要按同一个倍率折回去，才与用户看到的原图同系；
+            // 与系统那一条通道一样四舍五入，截断会让整框系统性偏左偏上
+            const auto fold    = [](int value) { return static_cast<int>(std::lround(static_cast<float>(value) / static_cast<float>(kEnlargeFactor))); };
+            bool       stepped = true;
             while (stepped)
             {
                 int left   = 0;
@@ -186,7 +195,8 @@ namespace GyanisScribe::Ocr
                 if (boxed && rawText != nullptr)
                 {
                     const float confidence = TessResultIteratorConfidence(iterator, tesseract::RIL_WORD);
-                    words.push_back(RawWord{QString::fromUtf8(rawText), QRect(left, top, right - left, bottom - top), static_cast<double>(confidence) / kConfidencePercentScale});
+                    words.push_back(RawWord{QString::fromUtf8(rawText), QRect(fold(left), fold(top), fold(right - left), fold(bottom - top)),
+                                            static_cast<double>(confidence) / kConfidencePercentScale});
                     // 这份文本是 Tesseract 分配的，必须交回去，否则每认一个词漏一个串
                     TessDeleteText(const_cast<char *>(rawText));
                 }

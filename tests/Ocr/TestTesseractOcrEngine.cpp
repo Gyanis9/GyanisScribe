@@ -105,3 +105,40 @@ TEST_F(TesseractEngineFixture, RecognizesRenderedTextWithTheBundledLanguagePack)
     EXPECT_NE(result.text().indexOf(QStringLiteral("report")), -1) << "实际认回：" << result.text().toStdString();
     EXPECT_GT(result.averageConfidence, 0.5) << "平均置信度低到不像认对了：" << result.averageConfidence;
 }
+
+/**
+ * @brief 钉住小字那一张要靠送识别前的放大这一步才认得全
+ * @details 现测：同一张 7pt 的图，不放大只回 2/3 个词（GyanisScribe 被认成 Gyanisseribe）且平均置信度 0.446，
+ *          放大到上限这一档后 3/3 且 0.920；再往上（3×、4×）实测掉回 2/3，所以上限就是这一档。
+ */
+TEST_F(TesseractEngineFixture, SmallTextNeedsTheEnlargementStep)
+{
+    const auto result = recognizeOrFail(renderText(QStringLiteral("GyanisScribe 2026 report"), 7));
+
+    ASSERT_FALSE(result.isEmpty());
+    EXPECT_NE(result.text().indexOf(QStringLiteral("GyanisScribe")), -1) << "小字没走放大这一步，实际认回：" << result.text().toStdString();
+    EXPECT_GT(result.averageConfidence, 0.8) << "接上放大后这一张的实测平均置信度在 0.9 上下，实际：" << result.averageConfidence;
+}
+
+/**
+ * @brief 钉住方框按同一个倍率折回原图坐标系
+ * @details 界面把框画回用户看到的那一张上，框越出图外就是没折回（放大 2 倍后框会整片偏出一倍）。
+ *          先断「至少认出一行」，否则这个循环会空跑而假装通过。
+ */
+TEST_F(TesseractEngineFixture, BoxesComeBackIntoTheSourceImageCoordinates)
+{
+    const QImage image  = renderText(QStringLiteral("GyanisScribe 2026 report"), 14);
+    const auto   result = recognizeOrFail(image);
+
+    ASSERT_FALSE(result.lines.isEmpty()) << "一行都没认出来，下面的越界判据就是空跑";
+    for (const auto &line: result.lines)
+    {
+        EXPECT_TRUE(image.rect().contains(line.boundingBox)) << "行框越出原图：左上 " << line.boundingBox.topLeft().x() << "," << line.boundingBox.topLeft().y() << " 尺寸 "
+                                                             << line.boundingBox.width() << "x" << line.boundingBox.height() << "，而原图是 " << image.width() << "x"
+                                                             << image.height();
+        for (const auto &word: line.words)
+        {
+            EXPECT_TRUE(image.rect().contains(word.boundingBox)) << "逐词框也要落在原图里";
+        }
+    }
+}
