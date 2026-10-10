@@ -538,6 +538,37 @@ namespace
     }
 
     /**
+     * @brief 截图的延时秒数
+     * @param settings 配置存储
+     * @return 归调用方所有的数字框
+     * @details 0 是「不延时」这一档而不是没填，所以给 0 挂上说明文字；这一格存在的理由是
+     *          菜单与悬停提示一碰就没，不延时永远截不到它们。
+     */
+    QSpinBox *makeCaptureDelaySpin(ISettingsStore &settings)
+    {
+        auto *spin = new QSpinBox;
+        spin->setRange(0, GyanisScribe::App::kMaximumCaptureDelaySeconds);
+        spin->setSuffix(GyanisScribe::Core::uiText(" 秒"));
+        spin->setAccessibleName(GyanisScribe::Core::uiText("延时截图"));
+        spin->setToolTip(GyanisScribe::Core::uiText("按下截图后等这么久再开始，用来截菜单、悬停提示这类一碰就没的画面；0 表示不延时"));
+
+        const auto title  = GyanisScribe::Core::uiText("延时截图");
+        const auto stored = settings.intValue(GyanisScribe::Settings::kCaptureDelaySeconds, 0);
+        const auto parsed = GyanisScribe::App::parseCaptureDelay(stored);
+        spin->setValue(shownValueForSetting(title, stored, parsed, 0));
+
+        QObject::connect(spin, &QSpinBox::valueChanged, spin,
+                         [&settings, title](int value)
+                         {
+                             if (auto written = settings.setValue(GyanisScribe::Settings::kCaptureDelaySeconds, value); !written)
+                             {
+                                 Logger::warning(std::format("{} 没能写入：{}", title.toStdString(), written.error().message));
+                             }
+                         });
+        return spin;
+    }
+
+    /**
      * @brief 录屏的画面码率，单位 kbps
      * @param settings 配置存储
      * @return 归调用方所有的数字框
@@ -1121,6 +1152,7 @@ namespace GyanisScribe::App
         auto *page = new QWidget{this};
         auto *form = makePageForm(page, GyanisScribe::Core::uiText("截图与标注成品落在这个目录里。取色复制出来的文本按下面的写法格式化。"));
         form->addRow(GyanisScribe::Core::uiText("截完之后"), makeCaptureIntentCombo(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("延时截图"), makeCaptureDelaySpin(m_settings));
         form->addRow(GyanisScribe::Core::uiText("截图与标注成品目录"),
                      makePathRow(m_settings, GyanisScribe::Settings::kPathScreenshot, GyanisScribe::Core::uiText("截图目录"), Core::Paths::defaultScreenshotDirectory(), m_icons));
         form->addRow(GyanisScribe::Core::uiText("复制用的写法"), makeColorFormatCombo(m_settings));

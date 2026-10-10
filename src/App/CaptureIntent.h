@@ -1,6 +1,6 @@
 /**
  * @file CaptureIntent.h
- * @brief 截完之后做什么：档位、配置里的取值与设置页标签的唯一词表
+ * @brief 截图页两档设置的取值口径：「截完之后做什么」的词表，与延时秒数的可用范围
  * @author Gyanis
  * @date 2026-10-11
  * @version 0.0.1
@@ -70,5 +70,17 @@ namespace GyanisScribe::App
      * @details 与「不填时界面显示什么、按下热键走哪一步」共用同一个出处，两处分开写就会漂移
      */
     [[nodiscard]] CaptureIntent defaultCaptureIntent() noexcept;
+
+    /// 延时截图的上限（秒）：再长就成了用户忘了按过热键，倒计时到点弹出一层挡住桌面的窗
+    constexpr int kMaximumCaptureDelaySeconds = 60;
+
+    /**
+     * @brief 校验配置里存的延时秒数
+     * @param stored 配置读出的整数，0 表示不延时
+     * @return 成功返回这个秒数；越界时返回 InvalidArgument 并写明可用范围
+     * @details 越界不取整也不夹到上限：把 600 秒悄悄夹成 60，用户等到的是「莫名其妙弹出一层窗」，
+     *          而那一眼就能看出是手改配置写歪了。
+     */
+    [[nodiscard]] Core::Expected<int> parseCaptureDelay(int stored);
 
 } // namespace GyanisScribe::App

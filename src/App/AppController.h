@@ -25,6 +25,7 @@
 
 class QTimer;
 
+#include <functional>
 #include <memory>
 #include <optional>
 
@@ -204,6 +205,15 @@ namespace GyanisScribe::App
          */
         [[nodiscard]] CaptureIntent settingsCaptureIntent() const;
 
+        /**
+         * @brief 按设置里的延时决定「现在就开」还是「等 N 秒再开」
+         * @param begin 真正开始截图的那一步，延时的读端与热键那条走同一个
+         * @details 延时是为「菜单、悬停提示这类一碰就没的画面」留的：没有它就只能整屏截完再裁。
+         *          延时期内再按一次不排队、也不叠第二个定时器——两层遮罩叠着弹出来没人收得干净，
+         *          所以只说一句「上一次还在等」。
+         */
+        void scheduleCapture(std::function<void()> begin);
+
         /// 标注窗请求复制
         void handleCopyRequested(const QImage &image);
 
@@ -333,6 +343,8 @@ namespace GyanisScribe::App
         QTimer                                              *m_hudTicker          = nullptr;                 ///< 控制条的每秒轮询，随一轮录屏起停
         int                                                  m_countdownRemaining = 0;                       ///< 倒计时剩余整秒，推给控制条的大字
         CaptureIntent                                        m_captureIntent      = CaptureIntent::Annotate; ///< 这一帧截完要去做的事
+        QTimer                                              *m_captureDelayTimer  = nullptr;                 ///< 延时截图那一枚，一次只允许有一个在等
+        std::function<void()>                                m_pendingCapture;                               ///< 延时到点要走的那一步，随定时器一起活到触发
         Core::CapturedImage                                  m_lastCapture;                                  ///< 本轮抓到的帧，贴图与识别要用它定位
         QRect                                                m_lastSelection;                                ///< 本轮选区（全局逻辑坐标），标注窗与贴图的位置来源
     };

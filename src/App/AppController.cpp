@@ -235,19 +235,57 @@ namespace GyanisScribe::App
     void AppController::startCapture(const std::optional<CaptureIntent> intent)
     {
         m_captureIntent = intent.value_or(settingsCaptureIntent());
-        m_capture->startInteractive();
+        scheduleCapture([this] { m_capture->startInteractive(); });
     }
 
     void AppController::startFullScreenCapture(const std::optional<CaptureIntent> intent)
     {
         m_captureIntent = intent.value_or(settingsCaptureIntent());
-        m_capture->captureFullScreen();
+        scheduleCapture([this] { m_capture->captureFullScreen(); });
     }
 
     void AppController::startLastRegionCapture(const std::optional<CaptureIntent> intent)
     {
         m_captureIntent = intent.value_or(settingsCaptureIntent());
-        m_capture->captureLastRegion();
+        scheduleCapture([this] { m_capture->captureLastRegion(); });
+    }
+
+    void AppController::scheduleCapture(std::function<void()> begin)
+    {
+        const auto stored = m_settings->intValue(Settings::kCaptureDelaySeconds, 0);
+        const auto delay  = parseCaptureDelay(stored);
+        if (!delay)
+        {
+            // 读不出就按不延时继续：拦下这一次按键比让用户对着一个莫名其妙的等待更好解释
+            Core::Logger::warning(std::format("延时截图的秒数读不出：{}，按不延时继续", delay.error().message));
+        }
+        const auto seconds = delay ? *delay : 0;
+        if (seconds <= 0)
+        {
+            begin();
+            return;
+        }
+
+        if (m_captureDelayTimer != nullptr)
+        {
+            notifyUser(GyanisScribe::Core::uiText("上一次延时截图还在等，等它弹出来之后再按"), Ui::ToastKind::Information);
+            return;
+        }
+
+        m_captureDelayTimer = new QTimer{this};
+        m_captureDelayTimer->setSingleShot(true);
+        QObject::connect(m_captureDelayTimer, &QTimer::timeout, this,
+                         [this]
+                         {
+                             m_captureDelayTimer->deleteLater();
+                             m_captureDelayTimer = nullptr;
+                             m_pendingCapture();
+                         });
+        // 成员里存的是这一轮要做的动作：定时器响时用户可能已经切走了窗口，走的是同一条开始截图的路
+        m_pendingCapture = std::move(begin);
+        m_captureDelayTimer->start(seconds * 1000);
+        notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("{} 秒后开始截图：把要截的菜单或悬停状态摆好，这一会儿别动"), seconds).c_str()),
+                   Ui::ToastKind::Information);
     }
 
     CaptureIntent AppController::settingsCaptureIntent() const

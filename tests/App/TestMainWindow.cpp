@@ -218,7 +218,7 @@ namespace
         // 「这一类有什么」的用词取自界面里的无障碍名，不是从配置键推的：读的人要能对着窗口核对
         const std::vector<Expectation> expectations = {
                 Expectation{MainWindowPage::General, {"界面语言", "历史最多留多少条", "历史最久留多少天", "导出配置", "导入配置"}, true},
-                Expectation{MainWindowPage::Capture, {"截完之后", "截图目录", "颜色写法"}, true},
+                Expectation{MainWindowPage::Capture, {"截完之后", "延时截图", "截图目录", "颜色写法"}, true},
                 Expectation{MainWindowPage::Annotation, {"默认线宽", "默认字号"}, true},
                 Expectation{MainWindowPage::Pin, {"默认不透明度"}, true},
                 Expectation{MainWindowPage::Record, {"录屏目录", "录制范围", "输出格式", "默认帧率", "画面码率", "光标高亮", "麦克风设备", "系统声音设备"}, true},

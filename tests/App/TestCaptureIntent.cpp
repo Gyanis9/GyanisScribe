@@ -3,6 +3,7 @@
 #include "App/CaptureIntent.h"
 
 #include <QString>
+#include "Settings/SettingsKeys.h"
 
 #include <gtest/gtest.h>
 
@@ -15,6 +16,7 @@ using GyanisScribe::App::CaptureIntent;
 using GyanisScribe::App::captureIntentText;
 using GyanisScribe::App::defaultCaptureIntent;
 using GyanisScribe::App::kCaptureIntentChoices;
+using GyanisScribe::App::parseCaptureDelay;
 using GyanisScribe::App::parseCaptureIntent;
 
 namespace
@@ -97,4 +99,27 @@ TEST(CaptureIntentVocabulary, DefaultIsTheFirstChoiceInTheTable)
 {
     EXPECT_EQ(defaultCaptureIntent(), kCaptureIntentChoices.front().intent);
     EXPECT_EQ(defaultCaptureIntent(), CaptureIntent::Annotate) << "默认档改了要同步改设置页的初值与本条期望值";
+}
+
+/**
+ * @brief 钉住延时秒数的可用范围：0 是一档（不延时），越界要报而不是夹
+ * @details 把 600 夹到 60 会让用户等到一个自己没要过的时刻弹出遮罩；报出来他才改得动那一格。
+ */
+TEST(CaptureIntentSettings, DelayAcceptsZeroAndRejectsOutOfRange)
+{
+    for (const int stored: {0, 1, 60})
+    {
+        const auto parsed = parseCaptureDelay(stored);
+        ASSERT_TRUE(parsed.has_value()) << parsed.error().message;
+        EXPECT_EQ(*parsed, stored);
+    }
+
+    for (const int stored: {-1, 61, 600})
+    {
+        const auto parsed = parseCaptureDelay(stored);
+        ASSERT_FALSE(parsed.has_value()) << "延时秒数 " << stored << " 被当成了可用值";
+        EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument);
+        EXPECT_NE(parsed.error().message.find("0 到 60"), std::string::npos) << "文案没写清可用范围：" << parsed.error().message;
+        EXPECT_NE(parsed.error().message.find("Capture/DelaySeconds"), std::string::npos) << "文案没点出键名：" << parsed.error().message;
+    }
 }

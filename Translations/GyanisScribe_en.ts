@@ -168,6 +168,14 @@
             <translation>These global hotkeys could not be registered:</translation>
         </message>
         <message>
+            <source>上一次延时截图还在等，等它弹出来之后再按</source>
+            <translation>The previous delayed capture is still waiting - press again once it comes up</translation>
+        </message>
+        <message>
+            <source>{} 秒后开始截图：把要截的菜单或悬停状态摆好，这一会儿别动</source>
+            <translation>Capture starts in {} seconds: get the menu or hover state ready and hold still for a moment</translation>
+        </message>
+        <message>
             <source>已复制到剪贴板</source>
             <translation>Copied to the clipboard</translation>
         </message>
@@ -272,6 +280,10 @@
             <translation>Recording cancelled: this take wasn't saved and its temporary frames are gone.</translation>
         </message>
         <message>
+            <source>延时截图的秒数 "{}" 不在可用范围（0 到 {} 秒，0 表示不延时）里：请在设置的截图页重选，或删掉 Capture/DelaySeconds 这一项回到默认档</source>
+            <translation>The capture delay "{}" is outside the usable range (0 to {} seconds, 0 means no delay): pick a value again on the Capture page in Settings, or delete the Capture/DelaySeconds entry to fall back to the default</translation>
+        </message>
+        <message>
             <source>进标注窗</source>
             <translation>Open in the annotation window</translation>
         </message>
@@ -374,6 +386,18 @@
         <message>
             <source>录屏默认帧率</source>
             <translation>Recording default frame rate</translation>
+        </message>
+        <message>
+            <source> 秒</source>
+            <translation> s</translation>
+        </message>
+        <message>
+            <source>延时截图</source>
+            <translation>Delayed capture</translation>
+        </message>
+        <message>
+            <source>按下截图后等这么久再开始，用来截菜单、悬停提示这类一碰就没的画面；0 表示不延时</source>
+            <translation>Wait this long after the key before capturing, for menus and hover hints that vanish as soon as you touch them; 0 means no delay</translation>
         </message>
         <message>
             <source> kbps</source>

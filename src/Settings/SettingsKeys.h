@@ -33,6 +33,9 @@ namespace GyanisScribe::Settings
     /// 截完之后做什么，取值词表在 App::kCaptureIntentChoices；读端在 AppController，写端在设置的截图页
     inline constexpr std::string_view kCaptureAfterAction = "Capture/AfterAction";
 
+    /// 按下截图后等几秒再开始（0 到 60，0 表示不延时）：用来截菜单、提示这类一碰就没的状态
+    inline constexpr std::string_view kCaptureDelaySeconds = "Capture/DelaySeconds";
+
     /// 贴图保存的默认目录，为空时用系统图片目录下的 GyanisScribe
     inline constexpr std::string_view kPathScreenshot = "Paths/Screenshot";
 
