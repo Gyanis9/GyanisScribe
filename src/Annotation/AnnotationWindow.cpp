@@ -4,6 +4,7 @@
 #include "Annotation/IAnnotationEngine.h"
 #include "Annotation/AnnotationToolbarGeometry.h"
 #include "Core/Logger.h"
+#include "Ui/KeyStep.h"
 #include "Core/Types.h"
 
 #include <QKeyEvent>
@@ -11,6 +12,12 @@
 
 #include <format>
 #include <utility>
+
+namespace
+{
+    /// 按住 Shift 时一次挪多少格：一格太慢、十格在 4K 屏上仍是「一下就跳过目标」，取中间值
+    constexpr int kCoarseNudgeStride = 10;
+} // namespace
 
 namespace GyanisScribe::Annotation
 {
@@ -41,6 +48,12 @@ namespace GyanisScribe::Annotation
             case Qt::Key_Delete:
             case Qt::Key_Backspace:
                 return modifiers == Qt::NoModifier ? ShortcutAction::DeleteSelection : ShortcutAction::None;
+            case Qt::Key_Left:
+            case Qt::Key_Right:
+            case Qt::Key_Up:
+            case Qt::Key_Down:
+                // 带 Ctrl 就不认：行内的文字框是 QLineEdit，Ctrl+方向键在它那儿是按词移光标，截走就少了这条既有行为
+                return modifiers == Qt::NoModifier || shift ? ShortcutAction::NudgeSelection : ShortcutAction::None;
             default:
                 return ShortcutAction::None;
         }
@@ -185,6 +198,21 @@ namespace GyanisScribe::Annotation
                     Core::Logger::info(std::format("重做没做成：{}", redone.error().message));
                 }
                 return;
+            case ShortcutAction::NudgeSelection:
+            {
+                const auto step = GyanisScribe::Ui::arrowStepFor(event->key());
+                if (!step)
+                {
+                    // 分派表只从方向键走到这一支；走到别处说明两张表不同解，宁可什么都不做也不瞎挪
+                    return;
+                }
+                const auto stride = event->modifiers().testFlag(Qt::ShiftModifier) ? kCoarseNudgeStride : 1;
+                if (auto moved = m_engine.moveSelectionBy(*step * stride); !moved)
+                {
+                    Core::Logger::info(std::format("微调没做成：{}", moved.error().message));
+                }
+                return;
+            }
             case ShortcutAction::DeleteSelection:
                 if (auto removed = m_engine.removeSelection(); !removed)
                 {
