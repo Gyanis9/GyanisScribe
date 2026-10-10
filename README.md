@@ -231,10 +231,10 @@ Qt 运行时，然后在 staging 目录里跑一次 `--selftest`——只有这�
 
 | 线 | 命令 | 结果 |
 | --- | --- | --- |
-| Windows Release | `scripts\WindowsBuild.bat release` | 276/276 通过，2 条环境门控跳过 |
-| Windows Debug | `scripts\WindowsBuild.bat debug` | 276/276 通过，3 条环境门控跳过 |
-| 容器 ASan(+UBSan) | `scripts/container/sanitize.sh` | 271/271 通过，3 条跳过 |
-| 容器覆盖率 | `scripts/container/coverage.sh 55` | 271/271 通过，行覆盖 **69.1%**（3911/5661），阈值 55%；主程序在 Xvfb 上 `--selftest` 退出码 0 |
+| Windows Release | `scripts\WindowsBuild.bat release` | 277/277 通过，2 条环境门控跳过 |
+| Windows Debug | `scripts\WindowsBuild.bat debug` | 277/277 通过，3 条环境门控跳过 |
+| 容器 ASan(+UBSan) | `scripts/container/sanitize.sh` | 272/272 通过，3 条跳过 |
+| 容器覆盖率 | `scripts/container/coverage.sh 55` | 272/272 通过，行覆盖 **69.6%**（4006/5757），阈值 55%；主程序在 Xvfb 上 `--selftest` 退出码 0 |
 
 容器少的 5 条是 Windows 专属后端的用例：4 条 WinRT 系统识别、1 条 Win32 热键映射。
 跳过的都是环境门控用例，本机两档与容器各跳哪些是清楚的：
