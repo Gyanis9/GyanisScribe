@@ -32,8 +32,22 @@ namespace GyanisScribe::Record
     [[nodiscard]] std::filesystem::path frameFileName(int index);
 
     /**
+     * @brief 这一轮实际达成的输入帧率，写成交给 ffmpeg 的那一句
+     * @param frameCount 帧序列里实际存下的帧数
+     * @param recordedDurationMs 这一轮录了多久，毫秒（暂停的那一段不计）
+     * @param nominalFrameRate 配置里的目标帧率
+     * @return 形如 70000/6000 的有理数；帧数或时长量不出来时退回目标帧率的整数写法
+     * @details 机器跟不上目标帧率时帧序列就是短的：按目标帧率编会把 6 秒编成 2.33 秒（实测），
+     *          画面加速、音轨还要被 -shortest 截掉尾巴。达成率按「帧数 × 1000 / 毫秒」写成分数，
+     *          成品时长就和录的那一段一致。用分数而不是四舍五入的整数：11.5 帧率取整到 12 会把十分钟拧成九分半。
+     */
+    [[nodiscard]] QString achievedFrameRateArgument(int frameCount, qint64 recordedDurationMs, int nominalFrameRate);
+
+    /**
      * @brief 拼 MP4 的实参表
-     * @param config 录屏参数，帧率、画面码率与是否录声音从这儿取
+     * @param config 录屏参数，帧率取的是「量不出来时退回的那一档」，画面码率也从这儿取
+     * @param frameCount 帧序列里实际存下的帧数
+     * @param recordedDurationMs 这一轮录了多久，毫秒
      * @param frameDirectory 帧序列所在目录
      * @param outputFile 成品文件路径
      * @param audioWav 配音文件；空路径表示不录声音
@@ -43,28 +57,33 @@ namespace GyanisScribe::Record
      *          而不是 ffmpeg 自己发现的意外。尺寸按 H.264 一类的硬要求凑成偶数
      *          （奇数高度会直接报 requested width/height for inplane are not multiples of 2）。
      */
-    [[nodiscard]] QStringList mp4Arguments(const RecorderConfig &config, const std::filesystem::path &frameDirectory, const std::filesystem::path &outputFile,
-                                           const std::filesystem::path &audioWav, std::string_view videoEncoder);
+    [[nodiscard]] QStringList mp4Arguments(const RecorderConfig &config, int frameCount, qint64 recordedDurationMs, const std::filesystem::path &frameDirectory,
+                                           const std::filesystem::path &outputFile, const std::filesystem::path &audioWav, std::string_view videoEncoder);
 
     /**
      * @brief GIF 第一遍：生成调色板
-     * @param config 录屏参数
+     * @param config 录屏参数，只在帧数量不出来时提供退回的那一档
+     * @param frameCount 帧序列里实际存下的帧数
+     * @param recordedDurationMs 这一轮录了多久，毫秒
      * @param frameDirectory 帧序列所在目录
      * @param paletteFile 调色板输出文件
      * @return 传给 ffmpeg 的参数序列
      */
-    [[nodiscard]] QStringList gifPaletteArguments(const RecorderConfig &config, const std::filesystem::path &frameDirectory, const std::filesystem::path &paletteFile);
+    [[nodiscard]] QStringList gifPaletteArguments(const RecorderConfig &config, int frameCount, qint64 recordedDurationMs, const std::filesystem::path &frameDirectory,
+                                                  const std::filesystem::path &paletteFile);
 
     /**
      * @brief GIF 第二遍：按调色板编码成品
-     * @param config 录屏参数
+     * @param config 录屏参数，只在帧数量不出来时提供退回的那一档
+     * @param frameCount 帧序列里实际存下的帧数
+     * @param recordedDurationMs 这一轮录了多久，毫秒
      * @param frameDirectory 帧序列所在目录
      * @param paletteFile 第一遍生成的调色板
      * @param outputFile 成品文件路径
      * @return 传给 ffmpeg 的参数序列
      */
-    [[nodiscard]] QStringList gifEncodeArguments(const RecorderConfig &config, const std::filesystem::path &frameDirectory, const std::filesystem::path &paletteFile,
-                                                 const std::filesystem::path &outputFile);
+    [[nodiscard]] QStringList gifEncodeArguments(const RecorderConfig &config, int frameCount, qint64 recordedDurationMs, const std::filesystem::path &frameDirectory,
+                                                 const std::filesystem::path &paletteFile, const std::filesystem::path &outputFile);
 
     /**
      * @brief 随包那份 ffmpeg 可执行文件

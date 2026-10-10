@@ -37,14 +37,17 @@ namespace GyanisScribe::Record
 
         /**
          * @brief 编码一段帧序列
-         * @param config 录屏参数，输出格式与帧率从这儿取
+         * @param config 录屏参数，输出格式与「量不出时长时退回的那一档帧率」从这儿取
          * @param frameDirectory 帧序列目录
-         * @param frameCount 帧数，用于估编码超时
+         * @param frameCount 实际存下的帧数，用于估编码超时与算达成帧率
+         * @param recordedDurationMs 这一轮录了多久，毫秒：成品时长按「帧数 / 这个时长」铺开
          * @param audioWav 配音文件，空路径表示没有声音
          * @return 成功返回成品文件路径；失败返回原因（含 ffmpeg 的末段输出）
+         * @details 帧数与时长必须成对交进来：机器跟不上目标帧率时帧序列是短的，
+         *          只按 config 里的目标帧率编会把六秒编成两秒（实测），画面加速、音轨被截尾。
          */
         [[nodiscard]] virtual Core::Expected<std::filesystem::path> encode(const RecorderConfig &config, const std::filesystem::path &frameDirectory, int frameCount,
-                                                                           const std::filesystem::path &audioWav) = 0;
+                                                                           qint64 recordedDurationMs, const std::filesystem::path &audioWav) = 0;
     };
 
     /**
@@ -70,14 +73,17 @@ namespace GyanisScribe::Record
 
         /**
          * @brief 帧序列 → 成品，见 IRecordingEncoder::encode()
+         * @details 重写 IRecordingEncoder::encode()：起一次 ffmpeg，先探编码器再按达成帧率铺开画面；
+         *          GIF 走两遍（调色板与编码），MP4 走一遍。
          * @param config 录屏参数
          * @param frameDirectory 帧序列目录
-         * @param frameCount 帧数
+         * @param frameCount 实际存下的帧数
+         * @param recordedDurationMs 这一轮录了多久，毫秒——与帧数一起决定 -framerate 那一句
          * @param audioWav 配音文件路径，空表示无声
          * @return 成品路径或原因
          */
         [[nodiscard]] Core::Expected<std::filesystem::path> encode(const RecorderConfig &config, const std::filesystem::path &frameDirectory, int frameCount,
-                                                                   const std::filesystem::path &audioWav) override;
+                                                                   qint64 recordedDurationMs, const std::filesystem::path &audioWav) override;
 
     private:
         /**

@@ -70,7 +70,7 @@ namespace GyanisScribe::Record
     }
 
     Core::Expected<std::filesystem::path> FfmpegRecordingEncoder::encode(const RecorderConfig &config, const std::filesystem::path &frameDirectory, const int frameCount,
-                                                                         const std::filesystem::path &audioWav)
+                                                                         const qint64 recordedDurationMs, const std::filesystem::path &audioWav)
     {
         const auto located = locateFfmpeg();
         if (!located)
@@ -97,7 +97,9 @@ namespace GyanisScribe::Record
                 return std::unexpected(selected.error());
             }
 
-            if (auto ran = run(mp4Arguments(config, frameDirectory, outputFile, audioWav, *selected), timeout, GyanisScribe::Core::uiTextUtf8("MP4 编码")); !ran)
+            // 帧数与这一轮的时长一起交给命令拼装：机器跟不上目标帧率时靠这两份把成品时长拧回真实
+            const auto arguments = mp4Arguments(config, frameCount, recordedDurationMs, frameDirectory, outputFile, audioWav, *selected);
+            if (auto ran = run(arguments, timeout, GyanisScribe::Core::uiTextUtf8("MP4 编码")); !ran)
             {
                 return std::unexpected(ran.error());
             }
@@ -105,11 +107,14 @@ namespace GyanisScribe::Record
         {
             // GIF 走两遍：先生成调色板再按它编码，一遍过会让渐变与文字边缘出现明显色带
             const auto paletteFile = frameDirectory / "palette.png";
-            if (auto palette = run(gifPaletteArguments(config, frameDirectory, paletteFile), timeout, GyanisScribe::Core::uiTextUtf8("GIF 调色板")); !palette)
+            if (auto palette = run(gifPaletteArguments(config, frameCount, recordedDurationMs, frameDirectory, paletteFile), timeout, GyanisScribe::Core::uiTextUtf8("GIF 调色板"));
+                !palette)
             {
                 return std::unexpected(palette.error());
             }
-            if (auto encoded = run(gifEncodeArguments(config, frameDirectory, paletteFile, outputFile), timeout, GyanisScribe::Core::uiTextUtf8("GIF 编码")); !encoded)
+            if (auto encoded = run(gifEncodeArguments(config, frameCount, recordedDurationMs, frameDirectory, paletteFile, outputFile), timeout,
+                                   GyanisScribe::Core::uiTextUtf8("GIF 编码"));
+                !encoded)
             {
                 return std::unexpected(encoded.error());
             }

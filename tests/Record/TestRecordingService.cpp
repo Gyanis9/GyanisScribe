@@ -270,9 +270,10 @@ namespace
     /// 一次编码调用的现场
     struct EncodeCall
     {
-        std::thread::id       thread;         ///< 编发生在哪条线程
-        std::filesystem::path frameDirectory; ///< 交给它的那一份帧目录（快照，不是服务的成员）
-        int                   frameCount = 0; ///< 交过去的帧数
+        std::thread::id       thread;                 ///< 编发生在哪条线程
+        std::filesystem::path frameDirectory;         ///< 交给它的那一份帧目录（快照，不是服务的成员）
+        int                   frameCount         = 0; ///< 交过去的帧数
+        qint64                recordedDurationMs = 0; ///< 交过去的这一轮时长，毫秒（成品时长就按它与帧数铺开）
     };
 
     /**
@@ -283,11 +284,11 @@ namespace
     {
     public:
         [[nodiscard]] Expected<std::filesystem::path> encode(const RecorderConfig &, const std::filesystem::path &frameDirectory, const int frameCount,
-                                                             const std::filesystem::path &) override
+                                                             const qint64 recordedDurationMs, const std::filesystem::path &) override
         {
             {
                 const std::lock_guard guard{m_mutex};
-                m_calls.push_back(EncodeCall{std::this_thread::get_id(), frameDirectory, frameCount});
+                m_calls.push_back(EncodeCall{std::this_thread::get_id(), frameDirectory, frameCount, recordedDurationMs});
             }
 
             const auto released = m_gate.try_acquire_for(kGatePatience);
@@ -792,7 +793,6 @@ namespace
 
         ASSERT_TRUE(static_cast<bool>(service.cancel()));
     }
-
     /**
      * @brief 钉住「开始那一刻就把成品目录建出来」
      * @details 成品目录由编码那一步写，而编码在几十秒之后：那时才报「写不进去」等于把整轮录制扔掉。
@@ -800,12 +800,12 @@ namespace
      */
     TEST_F(RecordingServiceFixture, StartCreatesTheOutputDirectorySoTheEncodeHasSomewhereToWrite)
     {
-        StubCaptureSource     source;
-        GatedRecordingEncoder encoder;
+        StubCaptureSource       source;
+        GatedRecordingEncoder   encoder;
         StubPlatformIntegration platform;
         RecordingService        service{source, encoder, platform};
 
-        const auto target = std::filesystem::temp_directory_path() / "GyanisScribeFreshOutputDir";
+        const auto      target = std::filesystem::temp_directory_path() / "GyanisScribeFreshOutputDir";
         std::error_code ignored;
         std::filesystem::remove_all(target, ignored);
         ASSERT_FALSE(std::filesystem::exists(target));
@@ -828,12 +828,12 @@ namespace
      */
     TEST_F(RecordingServiceFixture, StartRefusesWhenTheOutputPathIsNotADirectory)
     {
-        StubCaptureSource     source;
-        GatedRecordingEncoder encoder;
+        StubCaptureSource       source;
+        GatedRecordingEncoder   encoder;
         StubPlatformIntegration platform;
         RecordingService        service{source, encoder, platform};
 
-        const auto blocker = std::filesystem::temp_directory_path() / "GyanisScribeOutputBlocker";
+        const auto      blocker = std::filesystem::temp_directory_path() / "GyanisScribeOutputBlocker";
         std::error_code ignored;
         std::filesystem::remove(blocker, ignored);
         {
@@ -850,5 +850,34 @@ namespace
         EXPECT_EQ(service.state(), RecordingState::Idle) << "拒绝之后状态没回到空闲，下一轮会被「上一轮还没收尾」拦住";
 
         std::filesystem::remove(blocker, ignored);
+    }
+
+    /**
+     * @brief 钉住 stop() 把「这一轮的帧数与时长」成对交给编码器
+     * @details 成品时长按帧数除以这个时长铺开：只交帧数、让编码按目标帧率铺，
+     *          机器跟不上时就会把六秒编成两秒多（本机实测）。
+     */
+    TEST_F(RecordingServiceFixture, StopHandsTheEncoderThisRoundsFramesAndDuration)
+    {
+        StubCaptureSource       source;
+        GatedRecordingEncoder   encoder;
+        StubPlatformIntegration platform;
+        RecordingService        service{source, encoder, platform};
+
+        QElapsedTimer wall;
+        wall.start();
+        ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
+        spinFramesIn();
+
+        ASSERT_TRUE(static_cast<bool>(service.stop()));
+        ASSERT_TRUE(spinUntil([&] { return encoder.callCount() == 1; }));
+
+        const auto call = encoder.callAt(0);
+        EXPECT_GT(call.frameCount, 0) << "一帧都没交出去，成品时长也就没有可对齐的分子";
+        EXPECT_GT(call.recordedDurationMs, 0) << "时长没交出去：编码只能按目标帧率铺，短了的帧序列会被编成快放";
+        // 这两条一起排掉了两种错接：拿配置里的时长上限（60 秒）或拿墙钟整段（含倒计时）当这一轮时长
+        EXPECT_LE(call.recordedDurationMs, wall.elapsed()) << "交出去的时长比这一轮从开始到停止还长";
+
+        encoder.release();
     }
 } // namespace

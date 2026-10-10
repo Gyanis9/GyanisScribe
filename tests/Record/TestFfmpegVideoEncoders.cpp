@@ -16,6 +16,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QImage>
+#include <QProcess>
 #include <QString>
 #include <QStringList>
 
@@ -151,7 +152,7 @@ namespace
         config.frameRate        = 15;
         config.videoBitrateKbps = 0;
 
-        const auto withNvenc = mp4Arguments(config, "C:/tmp/rec/frames", "C:/tmp/rec/out.mp4", {}, "h264_nvenc");
+        const auto withNvenc = mp4Arguments(config, 0, 0, "C:/tmp/rec/frames", "C:/tmp/rec/out.mp4", {}, "h264_nvenc");
         EXPECT_EQ(withNvenc.value(withNvenc.indexOf(QStringLiteral("-c:v")) + 1), QStringLiteral("h264_nvenc"));
         EXPECT_FALSE(withNvenc.contains(QStringLiteral("-crf"))) << "选型换了编码器还留着 x264 的参数，整条命令开不起来";
         EXPECT_TRUE(withNvenc.contains(QStringLiteral("+faststart")));
@@ -217,7 +218,8 @@ namespace
         config.frameRate       = 15;
         config.outputDirectory = scratchDirectory;
 
-        const auto encoded = GyanisScribe::Record::FfmpegRecordingEncoder{}.encode(config, frameDirectory, sink.writtenFrames(), {});
+        // 三帧摊在两秒上：交出去的是「这一轮的帧数与时长」，编码就按这个达成率铺时间轴
+        const auto encoded = GyanisScribe::Record::FfmpegRecordingEncoder{}.encode(config, frameDirectory, sink.writtenFrames(), 2000, {});
         ASSERT_TRUE(static_cast<bool>(encoded)) << encoded.error().message;
 
         const auto bytes = std::filesystem::file_size(*encoded, ignored);
@@ -229,6 +231,16 @@ namespace
         const auto header = container.read(16);
         EXPECT_TRUE(header.contains("ftyp")) << "成品不是 MP4 容器：" << header.toStdString();
         container.close();
+
+        // 让 ffmpeg 自己读容器的时长：三帧按 3000/2000 的达成率铺出来就是 2.00 秒。
+        // 这一条钉的是用户实际看到的东西——按 config 里那 15 帧编，成品会变成 0.2 秒的快放
+        QProcess report;
+        report.setProgram(program);
+        report.setArguments({QStringLiteral("-hide_banner"), QStringLiteral("-i"), GyanisScribe::Core::Paths::toDisplayText(*encoded)});
+        report.start();
+        ASSERT_TRUE(report.waitForFinished(5000)) << "ffmpeg 读自己的成品都没读完";
+        const auto reading = QString::fromUtf8(report.readAllStandardError());
+        EXPECT_TRUE(reading.contains(QStringLiteral("Duration: 00:00:02.0"))) << reading.toStdString();
 
         std::filesystem::remove_all(scratchDirectory, ignored);
     }

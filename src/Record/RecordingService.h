@@ -179,12 +179,13 @@ namespace GyanisScribe::Record
          * @brief 把这一帧序列交给工作线程编码
          * @param config 本轮参数的快照：期间重新开一轮会覆盖成员那份，编码要用的是这一次的格式与码率
          * @param frameDirectory 这一轮的帧目录，同上按快照带过去
-         * @param frames 帧数，估编码超时用
+         * @param frames 帧数，估编码超时与算达成帧率用
+         * @param recordedDurationMs 这一轮录了多久，毫秒（暂停不计）：与帧数一起决定成品按什么帧率铺开
          * @param audioWav 中间 wav，空表示本轮没取声
          * @details 结果用 QFuture::then 送回界面线程（continuation 的 context 是本对象），
          *          因此并发跑两轮编码也各有归处，不需要排队。
          */
-        void startEncoding(const RecorderConfig &config, const std::filesystem::path &frameDirectory, int frames, const std::filesystem::path &audioWav);
+        void startEncoding(const RecorderConfig &config, const std::filesystem::path &frameDirectory, int frames, qint64 recordedDurationMs, const std::filesystem::path &audioWav);
 
         /**
          * @brief 编码回来之后处置成品、中间 wav 与帧目录

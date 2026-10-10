@@ -178,7 +178,9 @@ namespace GyanisScribe::Record
         m_timer.stop();
         const auto now    = m_clock.elapsed();
         const auto frames = m_session->storedFrames();
-        auto       sealed = m_session->finish(now);
+        // 时长取的是「录了多久」而不是墙钟：暂停那一段没写帧，交出去也要按同一口径，否则达成帧率会被自己算低
+        const auto recordedMs = m_session->recordedDurationMs(now);
+        auto       sealed     = m_session->finish(now);
         if (!sealed)
         {
             emit failed(QString::fromUtf8(sealed.error().message.c_str()));
@@ -187,7 +189,7 @@ namespace GyanisScribe::Record
 
         // 收尾这一串里只有编码要几秒到几十秒，所以只把那一段搬走：帧序列已经写完、取声进程也已经收尸，
         // 剩下的「编成成品 + 处置中间文件」由 deliverEncoding 在界面线程上接着做
-        startEncoding(m_config, m_frameDirectory, frames, finishAudioCapture());
+        startEncoding(m_config, m_frameDirectory, frames, recordedMs, finishAudioCapture());
         return {};
     }
 
@@ -224,11 +226,13 @@ namespace GyanisScribe::Record
         return {};
     }
 
-    void RecordingService::startEncoding(const RecorderConfig &config, const std::filesystem::path &frameDirectory, const int frames, const std::filesystem::path &audioWav)
+    void RecordingService::startEncoding(const RecorderConfig &config, const std::filesystem::path &frameDirectory, const int frames, const qint64 recordedDurationMs,
+                                         const std::filesystem::path &audioWav)
     {
         auto &encoder = m_encoder;
         // 参数与目录都按快照带过去：期间用户重新开一轮会覆盖成员那两份，而这一次编码认的是叫它出来的那一轮
-        auto future = QtConcurrent::run([&encoder, config, frameDirectory, frames, audioWav] { return encoder.encode(config, frameDirectory, frames, audioWav); });
+        auto future = QtConcurrent::run([&encoder, config, frameDirectory, frames, recordedDurationMs, audioWav]
+                                        { return encoder.encode(config, frameDirectory, frames, recordedDurationMs, audioWav); });
 
         // continuation 的 context 是本对象：回接落在界面线程，删目录与发信号都在这条线上做
         future.then(this, [this, frameDirectory, audioWav](const EncodeOutcome &outcome) { deliverEncoding(outcome, frameDirectory, audioWav); });

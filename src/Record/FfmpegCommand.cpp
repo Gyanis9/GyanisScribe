@@ -42,13 +42,24 @@ namespace GyanisScribe::Record
         return std::filesystem::path{std::format("{:06d}.png", index)};
     }
 
-    QStringList mp4Arguments(const RecorderConfig &config, const std::filesystem::path &frameDirectory, const std::filesystem::path &outputFile,
-                             const std::filesystem::path &audioWav, const std::string_view videoEncoder)
+    QString achievedFrameRateArgument(const int frameCount, const qint64 recordedDurationMs, const int nominalFrameRate)
+    {
+        // 量不出这一轮录了多久就退回目标帧率：按 0 时长除会得到一个说不出含义的分数
+        if (frameCount <= 0 || recordedDurationMs <= 0)
+        {
+            return QString::number(nominalFrameRate);
+        }
+        // 分数写法让「帧数 / 时长」原样交给 ffmpeg，不做整数取整
+        return QString::number(static_cast<qint64>(frameCount) * 1000) + QLatin1Char('/') + QString::number(recordedDurationMs);
+    }
+
+    QStringList mp4Arguments(const RecorderConfig &config, const int frameCount, const qint64 recordedDurationMs, const std::filesystem::path &frameDirectory,
+                             const std::filesystem::path &outputFile, const std::filesystem::path &audioWav, const std::string_view videoEncoder)
     {
         QStringList arguments{
                 QStringLiteral("-y"),
                 QStringLiteral("-framerate"),
-                QString::number(config.frameRate),
+                achievedFrameRateArgument(frameCount, recordedDurationMs, config.frameRate),
                 QStringLiteral("-i"),
                 sequencePattern(frameDirectory),
                 // H.264 一类编码器都要求宽高是偶数：截图经常给出奇数高度，不这条缩放滤镜就直接报错退出
@@ -83,35 +94,39 @@ namespace GyanisScribe::Record
         return arguments;
     }
 
-    QStringList gifPaletteArguments(const RecorderConfig &config, const std::filesystem::path &frameDirectory, const std::filesystem::path &paletteFile)
+    QStringList gifPaletteArguments(const RecorderConfig &config, const int frameCount, const qint64 recordedDurationMs, const std::filesystem::path &frameDirectory,
+                                    const std::filesystem::path &paletteFile)
     {
+        // 同一个达成率要出现在两处：输入按它铺开，滤镜按它抽帧，两处不同解就会让调色板与画面错位
+        const auto rate = achievedFrameRateArgument(frameCount, recordedDurationMs, config.frameRate);
         return {
                 QStringLiteral("-y"),
                 QStringLiteral("-framerate"),
-                QString::number(config.frameRate),
+                rate,
                 QStringLiteral("-i"),
                 sequencePattern(frameDirectory),
                 // stats_mode=diff 按画面变化取色：截图里大块的静态背景不会把 256 个色位占满
                 QStringLiteral("-vf"),
-                QStringLiteral("fps=%1,palettegen=stats_mode=diff").arg(config.frameRate),
+                QStringLiteral("fps=%1,palettegen=stats_mode=diff").arg(rate),
                 fromPath(paletteFile),
         };
     }
 
-    QStringList gifEncodeArguments(const RecorderConfig &config, const std::filesystem::path &frameDirectory, const std::filesystem::path &paletteFile,
-                                   const std::filesystem::path &outputFile)
+    QStringList gifEncodeArguments(const RecorderConfig &config, const int frameCount, const qint64 recordedDurationMs, const std::filesystem::path &frameDirectory,
+                                   const std::filesystem::path &paletteFile, const std::filesystem::path &outputFile)
     {
+        const auto rate = achievedFrameRateArgument(frameCount, recordedDurationMs, config.frameRate);
         return {
                 QStringLiteral("-y"),
                 QStringLiteral("-framerate"),
-                QString::number(config.frameRate),
+                rate,
                 QStringLiteral("-i"),
                 sequencePattern(frameDirectory),
                 QStringLiteral("-i"),
                 fromPath(paletteFile),
                 QStringLiteral("-lavfi"),
                 // 两遍法：第一遍出的调色板作为第二路输入，滤镜图里先把帧率对上再取色
-                QStringLiteral("fps=%1[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=3").arg(config.frameRate),
+                QStringLiteral("fps=%1[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=3").arg(rate),
                 fromPath(outputFile),
         };
     }

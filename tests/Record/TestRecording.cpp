@@ -26,6 +26,7 @@
 using GyanisScribe::Core::CapturedImage;
 using GyanisScribe::Core::ErrorCode;
 using GyanisScribe::Core::Expected;
+using GyanisScribe::Record::achievedFrameRateArgument;
 using GyanisScribe::Record::FrameClock;
 using GyanisScribe::Record::frameCountFor;
 using GyanisScribe::Record::frameFileName;
@@ -237,7 +238,7 @@ TEST(RecordingFfmpeg, ArgumentTablesMatchTheDocumentedCommands)
 {
     const auto config = baselineConfig();
 
-    const QStringList silent = mp4Arguments(config, "C:/tmp/rec/frames", "C:/tmp/rec/out.mp4", {}, "libx264");
+    const QStringList silent = mp4Arguments(config, 0, 0, "C:/tmp/rec/frames", "C:/tmp/rec/out.mp4", {}, "libx264");
     // 输入那一格按平台各自的分隔符拼，所以比「前四个参数 + 帧序列模式串」而不是整条字符串：
     // 写死反斜杠只能在 Windows 上过，容器里分隔符是 / 会红一条与实现无关的用例
     EXPECT_EQ(silent.first(4).join(QLatin1Char('|')), QStringLiteral("-y|-framerate|10|-i")) << silent.join(QLatin1Char(' ')).toStdString();
@@ -251,7 +252,7 @@ TEST(RecordingFfmpeg, ArgumentTablesMatchTheDocumentedCommands)
     EXPECT_NE(silent.indexOf(QStringLiteral("+faststart")), -1);
     EXPECT_TRUE(silent.last().endsWith(QStringLiteral("out.mp4"))) << silent.last().toStdString();
 
-    const auto withAudio = mp4Arguments(config, "C:/tmp/rec/frames", "C:/tmp/rec/out.mp4", "C:/tmp/rec/audio.wav", "libx264");
+    const auto withAudio = mp4Arguments(config, 0, 0, "C:/tmp/rec/frames", "C:/tmp/rec/out.mp4", "C:/tmp/rec/audio.wav", "libx264");
     EXPECT_EQ(withAudio.indexOf(QStringLiteral("-an")), -1) << "有配音时不该再关声轨";
     EXPECT_NE(withAudio.indexOf(QStringLiteral("-shortest")), -1);
     EXPECT_NE(withAudio.indexOf(QStringLiteral("aac")), -1);
@@ -263,17 +264,17 @@ TEST(RecordingFfmpeg, ArgumentTablesMatchTheDocumentedCommands)
     // 给了码率就换成码率控：两条同时给 ffmpeg 听码率而把 crf 当摆设，留着那条会让人以为改的是质量
     auto byBitrate             = baselineConfig();
     byBitrate.videoBitrateKbps = 4000;
-    const QStringList shaped   = mp4Arguments(byBitrate, "C:/tmp/rec/frames", "C:/tmp/rec/out.mp4", {}, "h264_nvenc");
+    const QStringList shaped   = mp4Arguments(byBitrate, 0, 0, "C:/tmp/rec/frames", "C:/tmp/rec/out.mp4", {}, "h264_nvenc");
     EXPECT_EQ(shaped.indexOf(QStringLiteral("-crf")), -1) << shaped.join(QLatin1Char(' ')).toStdString();
     EXPECT_EQ(shaped.value(shaped.indexOf(QStringLiteral("-b:v")) + 1), QStringLiteral("4000k"));
     EXPECT_NE(shaped.indexOf(QStringLiteral("yuv420p")), -1) << "换成码率控那一段时把像素格式弄丢了";
     EXPECT_NE(shaped.indexOf(QStringLiteral("+faststart")), -1) << "重排参数时把 faststart 弄丢了";
 
-    const auto palette = gifPaletteArguments(config, "C:/tmp/rec/frames", "C:/tmp/rec/palette.png");
+    const auto palette = gifPaletteArguments(config, 0, 0, "C:/tmp/rec/frames", "C:/tmp/rec/palette.png");
     EXPECT_TRUE(hasItemContaining(palette, QStringLiteral("palettegen=stats_mode=diff"))) << palette.join(QLatin1Char(' ')).toStdString();
     EXPECT_EQ(palette.last(), QStringLiteral("C:/tmp/rec/palette.png"));
 
-    const auto gif = gifEncodeArguments(config, "C:/tmp/rec/frames", "C:/tmp/rec/palette.png", "C:/tmp/rec/out.gif");
+    const auto gif = gifEncodeArguments(config, 0, 0, "C:/tmp/rec/frames", "C:/tmp/rec/palette.png", "C:/tmp/rec/out.gif");
     EXPECT_NE(gif.indexOf(QStringLiteral("-lavfi")), -1);
     EXPECT_TRUE(hasItemContaining(gif, QStringLiteral("paletteuse="))) << gif.join(QLatin1Char(' ')).toStdString();
     EXPECT_EQ(gif.count(QStringLiteral("-i")), 2) << "两遍法要有两路输入：帧序列与调色板";
@@ -283,10 +284,37 @@ TEST(RecordingFfmpeg, ArgumentTablesMatchTheDocumentedCommands)
     auto gifBitrate                  = baselineConfig();
     gifBitrate.format                = OutputFormat::Gif;
     gifBitrate.videoBitrateKbps      = 4000;
-    const auto gifPaletteWithBitrate = gifPaletteArguments(gifBitrate, "C:/tmp/rec/frames", "C:/tmp/rec/palette.png");
-    const auto gifEncodeWithBitrate  = gifEncodeArguments(gifBitrate, "C:/tmp/rec/frames", "C:/tmp/rec/palette.png", "C:/tmp/rec/out.gif");
+    const auto gifPaletteWithBitrate = gifPaletteArguments(gifBitrate, 0, 0, "C:/tmp/rec/frames", "C:/tmp/rec/palette.png");
+    const auto gifEncodeWithBitrate  = gifEncodeArguments(gifBitrate, 0, 0, "C:/tmp/rec/frames", "C:/tmp/rec/palette.png", "C:/tmp/rec/out.gif");
     EXPECT_EQ(gifPaletteWithBitrate.indexOf(QStringLiteral("-b:v")), -1) << gifPaletteWithBitrate.join(QLatin1Char(' ')).toStdString();
     EXPECT_EQ(gifEncodeWithBitrate.indexOf(QStringLiteral("-b:v")), -1) << gifEncodeWithBitrate.join(QLatin1Char(' ')).toStdString();
+}
+
+/**
+ * @brief 钉住「成品时长按这一轮实际达成的帧率铺开」
+ * @details 机器跟不上目标帧率时帧序列是短的：本机实测按目标帧率编会把 6 秒编成 2.33 秒，
+ *          画面快放、音轨还要被 -shortest 截尾。期望的分数按手算给，不从实现里再算一遍。
+ */
+TEST(RecordingFfmpeg, AchievedFrameRateDrivesTheCommandLine)
+{
+    // 70 帧摊在 6000ms 上：写成分数交给 ffmpeg，不做整数取整（11.5 取整成 12 会把十分钟拧成九分半）
+    EXPECT_EQ(achievedFrameRateArgument(70, 6000, 30).toStdString(), "70000/6000");
+    // 量不出帧数或时长才退回目标帧率：按 0 时长除会算出一个说不出含义的分数
+    EXPECT_EQ(achievedFrameRateArgument(0, 6000, 30).toStdString(), "30");
+    EXPECT_EQ(achievedFrameRateArgument(70, 0, 30).toStdString(), "30");
+
+    const auto config = baselineConfig();
+
+    const auto mp4 = mp4Arguments(config, 70, 6000, "C:/tmp/rec/frames", "C:/tmp/rec/out.mp4", {}, "libx264");
+    EXPECT_EQ(mp4.value(mp4.indexOf(QStringLiteral("-framerate")) + 1).toStdString(), "70000/6000") << mp4.join(QLatin1Char(' ')).toStdString();
+
+    // GIF 那一档同一个数要落在两处：输入按它铺开，滤镜按它抽帧，两处不同解就让调色板与画面错位
+    const auto palette = gifPaletteArguments(config, 70, 6000, "C:/tmp/rec/frames", "C:/tmp/rec/palette.png");
+    EXPECT_EQ(palette.value(palette.indexOf(QStringLiteral("-framerate")) + 1).toStdString(), "70000/6000");
+    EXPECT_TRUE(hasItemContaining(palette, QStringLiteral("fps=70000/6000,palettegen=stats_mode=diff"))) << palette.join(QLatin1Char(' ')).toStdString();
+
+    const auto gif = gifEncodeArguments(config, 70, 6000, "C:/tmp/rec/frames", "C:/tmp/rec/palette.png", "C:/tmp/rec/out.gif");
+    EXPECT_TRUE(hasItemContaining(gif, QStringLiteral("fps=70000/6000[x]"))) << gif.join(QLatin1Char(' ')).toStdString();
 }
 
 /**
