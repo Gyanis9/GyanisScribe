@@ -12,7 +12,9 @@
 
 三、声明出来的信号要有人接。Qt 的 connect 是字符串之外的字符串，编译器不参与：一条没人接的
    信号会让界面上出现「按了没反应」，而菜单、托盘、快捷键这三处入口都靠它转手。
-   认的是 &类名::信号名 这种写法（连到槽、以及信号转信号都算），emit 一处不算消费方。
+   认的是 &本类名::信号名 这种写法（连到槽、以及信号转信号都算），emit 一处不算消费方。
+   类名必须一起参与匹配：只按信号名找，两个类各有一条同名通道时接了的那条会把没人接的那条
+   一起冒认掉——贴图那条 ocrRequested 就是这么被放过去过一次的。
 
 跑法：python scripts/check-source-conventions.py [--scan-root src]
 退出码：0 通过；1 有违规；2 工具自己坏了（自检探针跑不起来或真源形状变了）——不许当成通过。
@@ -134,9 +136,13 @@ def check_dispatch_coverage(root: pathlib.Path) -> list[str]:
 IDENT_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")
 
 
-def signal_has_handler(texts: list[str], name: str) -> bool:
-    """这条信号有没有消费者：找 &类名::信号名 的写法（连到槽、以及信号转信号都算）。"""
-    needle = "::" + name
+def signal_has_handler(texts: list[str], class_name: str, name: str) -> bool:
+    """这条信号有没有消费者：要见到「本类名::信号名」并且同一段前面挂着 &。
+
+    类名必须参与匹配：只按信号名找，两个类各有一条同名的通道时，接了的那一条会把没人接的
+    那条一起冒认掉（实测就是这样放过贴图那条 ocrRequested 的）。
+    """
+    needle = class_name + "::" + name
     for text in texts:
         for line in text.splitlines():
             position = line.find(needle)
@@ -149,13 +155,29 @@ def signal_has_handler(texts: list[str], name: str) -> bool:
     return False
 
 
-def collect_signals(root: pathlib.Path) -> list[tuple[pathlib.Path, str]]:
-    """声明在各 signals: 段里的全部信号（纯文本扫：本条门一律不依赖编译）。"""
-    found: list[tuple[pathlib.Path, str]] = []
+CLASS_DECL = re.compile("(class|struct)[ ]+([A-Za-z_][A-Za-z0-9_]*)")
+
+
+def enclosing_class(line: str) -> str | None:
+    """这一行在开一个类定义时给出类名；前向声明和「class QMenu *buildContextMenu();」这种不算。"""
+    stripped = line.strip()
+    if stripped.endswith(";"):
+        return None
+    match = CLASS_DECL.search(stripped)
+    return match.group(2) if match else None
+
+
+def collect_signals(root: pathlib.Path) -> list[tuple[pathlib.Path, str, str]]:
+    """声明在各 signals: 段里的信号，连着所属类名一起返回（纯文本扫：本条门一律不依赖编译）。"""
+    found: list[tuple[pathlib.Path, str, str]] = []
     for source in sorted(list(root.rglob("*.h")) + list(root.rglob("*.cpp"))):
         inside = False
+        current_class: str | None = None
         for line in source.read_text(encoding="utf-8", errors="replace").splitlines():
             stripped = line.strip()
+            declared = enclosing_class(stripped)
+            if declared:
+                current_class = declared
             if stripped == "signals:":
                 inside = True
                 continue
@@ -164,8 +186,8 @@ def collect_signals(root: pathlib.Path) -> list[tuple[pathlib.Path, str]]:
                 continue
             if inside and stripped.startswith("void "):
                 name = stripped[5:].split("(")[0].strip()
-                if name:
-                    found.append((source, name))
+                if name and current_class:
+                    found.append((source, current_class, name))
     return found
 
 
@@ -173,9 +195,9 @@ def check_signal_consumers(root: pathlib.Path) -> list[str]:
     """每条信号都要有人接：发了没人接的通道，就是界面上的一块「按了没反应」。"""
     texts = [source.read_text(encoding="utf-8", errors="replace") for source in sorted(list(root.rglob("*.h")) + list(root.rglob("*.cpp")))]
     findings: list[str] = []
-    for source, name in collect_signals(root):
-        if not signal_has_handler(texts, name):
-            findings.append(f"{source.relative_to(root.parent)}: 信号 {name} 发了没人接：要么接出去，要么删掉")
+    for source, class_name, name in collect_signals(root):
+        if not signal_has_handler(texts, class_name, name):
+            findings.append(f"{source.relative_to(root.parent)}: {class_name}::{name} 发了没人接：要么接出去，要么删掉")
     return findings
 
 
@@ -206,10 +228,20 @@ def self_probe() -> None:
         raise RuntimeError("枚举名穷举错了：注释掉的一行不该算，带 ///< 的一行该算")
 
 #信号消费的判据要两个方向都能给答案：认不出 &类名::信号名 就是永红，把 emit 也算上就是永真
-    if signal_has_handler(["        QObject::connect(w, &Widget::valueChanged, this, &Owner::onValue);"], "valueChanged") is not True:
+    if signal_has_handler(["        QObject::connect(w, &Widget::valueChanged, this, &Owner::onValue);"], "Widget", "valueChanged") is not True:
         raise RuntimeError("探针：有人接的信号被判成没人接，模式认不出 &类名::信号名")
-    if signal_has_handler(["        emit statusChanged(1);"], "statusChanged"):
+    if signal_has_handler(["        emit statusChanged(1);"], "Widget", "statusChanged"):
         raise RuntimeError("探针：没人接的信号被放过了，这条判据是永真的")
+
+#同名信号分属两个类时，接了的那条不许替没人接的那条顶名——这正是本条门原先放过的那一种漏
+    collision = [
+        "        QObject::connect(annotation, &Annotation::AnnotationWindow::ocrRequested, this, &Owner::handle);",
+        "        emit ocrRequested(image);",
+    ]
+    if signal_has_handler(collision, "PinWindow", "ocrRequested"):
+        raise RuntimeError("探针：跨类冒认没被拦住，别人接了同名信号就算这条有人接")
+    if not signal_has_handler(["        QObject::connect(raw, &PinWindow::ocrRequested, this, &PinManager::pinOcrRequested);"], "PinWindow", "ocrRequested"):
+        raise RuntimeError("探针：类限定的转发写法没被认出来，判据成了永红")
 
 #分派检查也要能红：拿一份缺了一支的合成开关喂进去
     missing_case_body = "switch (action)" + NEWLINE + "{" + NEWLINE + "    case WidgetAction::Open:" + NEWLINE + "        return;" + NEWLINE + "}" + NEWLINE
