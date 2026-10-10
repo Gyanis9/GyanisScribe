@@ -7,6 +7,7 @@
 
 #include <QApplication>
 #include <QImage>
+#include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPoint>
 #include <QRect>
@@ -241,4 +242,80 @@ TEST_F(CaptureOverlayFixture, MagnifierFlipsAsideAtTheScreenCorner)
 
     const QRect widgetRect{QPoint{0, 0}, kScreenGeometry.size()};
     EXPECT_TRUE(widgetRect.contains(flipped)) << "放大镜整枚该留在这块屏内";
+}
+
+/// 投一条键盘事件给遮罩
+void pressKey(CaptureOverlay &overlay, const Qt::Key key, const Qt::KeyboardModifiers modifiers = Qt::KeyboardModifier{})
+{
+    QKeyEvent event{QEvent::KeyPress, key, modifiers};
+    QApplication::sendEvent(&overlay, &event);
+}
+
+/// 拖出一块选区：按下 anchor，拖到 current 后放开
+void dragOut(CaptureOverlay &overlay, const QPoint &anchor, const QPoint &current)
+{
+    buttonAt(overlay, QEvent::MouseButtonPress, anchor);
+    moveOver(overlay, current);
+    buttonAt(overlay, QEvent::MouseButtonRelease, current);
+}
+
+/**
+ * @brief 钉住方向键一格：单独按整块平移、按住 Shift 挪右下角，两者都不许改到另一件事
+ * @details 松手之后想改一像素得重框一遍，这条键就是为了不必重框。平移改了大小、缩放挪了顶边，
+ *          都是「看着按对了、交出去的却是另一块」。
+ */
+TEST_F(CaptureOverlayFixture, ArrowKeysNudgeTheLaidOutSelection)
+{
+    auto overlay = makeOverlay();
+    dragOut(*overlay, QPoint{100, 100}, QPoint{140, 120});
+    ASSERT_EQ(overlay->selectedRegion(), QRect(100, 100, 41, 21)) << "起点就不是这块";
+
+    pressKey(*overlay, Qt::Key_Right);
+    EXPECT_EQ(overlay->selectedRegion(), QRect(101, 100, 41, 21)) << "方向键没整块平移一格";
+
+    pressKey(*overlay, Qt::Key_Down, Qt::ShiftModifier);
+    EXPECT_EQ(overlay->selectedRegion(), QRect(101, 100, 41, 22)) << "Shift+方向键没把右下角往下扩一格";
+
+    pressKey(*overlay, Qt::Key_Left, Qt::ShiftModifier);
+    EXPECT_EQ(overlay->selectedRegion(), QRect(101, 100, 40, 22)) << "往里收一格该收窄而不是挪顶边";
+}
+
+/**
+ * @brief 拒绝面：还没框出选区时方向键不许编出一块框
+ * @details 与「划过光标不许产出选区」同一条规矩：键盘微调只对已经落成的那块动手。
+ */
+TEST_F(CaptureOverlayFixture, ArrowKeysWithoutASelectionYieldNothing)
+{
+    auto overlay = makeOverlay();
+    overlay->setWindowCandidates(kCandidates);
+    moveOver(*overlay, QPoint{300, 200});
+
+    pressKey(*overlay, Qt::Key_Right);
+    pressKey(*overlay, Qt::Key_Down, Qt::ShiftModifier);
+    EXPECT_TRUE(overlay->selectedRegion().isNull()) << "没有选区时方向键凭空造出了一块";
+}
+
+/**
+ * @brief 钉住选区贴到屏边时方向键就地停下，而不是把它推出这块屏
+ * @details 平移的夹取按整块算：贴边再按一次，选区一格都不动。越出去的那一半用户看不见，
+ *          交出去的成品却少了那几条像素。
+ */
+TEST_F(CaptureOverlayFixture, ArrowKeysStopAtTheScreenEdge)
+{
+    auto       overlay   = makeOverlay();
+    const auto rightEdge = kScreenGeometry.width() - 41;
+    dragOut(*overlay, QPoint{rightEdge, 50}, QPoint{kScreenGeometry.width() - 1, 60});
+    const auto flush = overlay->selectedRegion();
+    ASSERT_EQ(flush.right(), kScreenGeometry.width() - 1) << "没先造出贴边的选区，后面的判据就是空的";
+
+    pressKey(*overlay, Qt::Key_Right);
+    EXPECT_EQ(overlay->selectedRegion(), flush) << "贴到屏右边界还继续往屏外走";
+
+    auto flushed = makeOverlay();
+    dragOut(*flushed, QPoint{10, kScreenGeometry.height() - 10}, QPoint{30, kScreenGeometry.height() - 1});
+    const auto atBottom = flushed->selectedRegion();
+    ASSERT_EQ(atBottom.bottom(), kScreenGeometry.height() - 1) << "没先造出贴底的选区，后面的判据就是空的";
+
+    pressKey(*flushed, Qt::Key_Down, Qt::ShiftModifier);
+    EXPECT_EQ(flushed->selectedRegion(), atBottom) << "右下角不许越出这块屏";
 }

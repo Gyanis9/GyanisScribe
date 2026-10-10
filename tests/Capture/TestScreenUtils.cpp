@@ -12,9 +12,11 @@
 
 using GyanisScribe::Capture::cropToLogicalRect;
 using GyanisScribe::Capture::formatSelectionHint;
+using GyanisScribe::Capture::nudgeRegion;
 using GyanisScribe::Capture::regionAtPoint;
 using GyanisScribe::Capture::regionFromText;
 using GyanisScribe::Capture::regionToText;
+using GyanisScribe::Capture::resizeRegion;
 using GyanisScribe::Capture::toPhysicalRect;
 using GyanisScribe::Core::CapturedImage;
 using GyanisScribe::Core::ErrorCode;
@@ -152,4 +154,40 @@ TEST(ScreenUtils, HitTestTakesTheTopmostCandidate)
     EXPECT_FALSE(regionAtPoint(QPoint{120, 120}, candidates).has_value());
     // 空名单（平台给不出候选）：同样的空结果，不越界也不崩
     EXPECT_FALSE(regionAtPoint(QPoint{10, 10}, {}).has_value());
+}
+
+/**
+ * @brief 钉住方向键几何：平移改位置不改大小，缩放改大小不改顶边
+ * @details 这两个量在遮罩上是同一个矩形的两半，混用就会「挪一格」变成「大一格」。
+ */
+TEST(ScreenUtils, NudgeMovesWithoutChangingSize)
+{
+    const QRect limit{0, 0, 100, 100};
+    const QRect region{10, 20, 30, 40};
+
+    EXPECT_EQ(nudgeRegion(region, QPoint{1, 0}, limit), QRect(11, 20, 30, 40));
+    EXPECT_EQ(nudgeRegion(region, QPoint{0, -1}, limit), QRect(10, 19, 30, 40));
+    // 连按到边：贴住右边界就停下，越界的那一格不该把整块甩到屏外
+    EXPECT_EQ(nudgeRegion(QRect(70, 20, 30, 40), QPoint{1, 0}, limit), QRect(70, 20, 30, 40));
+    EXPECT_EQ(nudgeRegion(QRect(0, 20, 30, 40), QPoint{-1, 0}, limit), QRect(0, 20, 30, 40));
+    // 空选区没什么可挪的，也不该被挪出一个 (1,0) 的框
+    EXPECT_TRUE(nudgeRegion({}, QPoint{1, 0}, limit).isNull());
+}
+
+/**
+ * @brief 钉住缩放只动右下角，并且不许缩成空框、不许越出这块屏
+ * @details 右下角收到与左上角重合就是 0 宽：那种选区在界面上看着还在，交出去却是一张空图。
+ */
+TEST(ScreenUtils, ResizeMovesOnlyTheBottomRightCorner)
+{
+    const QRect limit{0, 0, 100, 100};
+    const QRect region{10, 20, 30, 40};
+
+    EXPECT_EQ(resizeRegion(region, QPoint{1, 0}, limit), QRect(10, 20, 31, 40));
+    EXPECT_EQ(resizeRegion(region, QPoint{0, -1}, limit), QRect(10, 20, 30, 39));
+    // 收到只剩一格就停：再往回收不许产出 0 宽
+    EXPECT_EQ(resizeRegion(QRect(10, 10, 1, 5), QPoint{-1, 0}, limit), QRect(10, 10, 1, 5));
+    // 撑到屏边就停：右下角不许越界
+    EXPECT_EQ(resizeRegion(QRect(0, 0, 100, 100), QPoint{1, 1}, limit), QRect(0, 0, 100, 100));
+    EXPECT_TRUE(resizeRegion({}, QPoint{1, 1}, limit).isNull());
 }

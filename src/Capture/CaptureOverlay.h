@@ -18,6 +18,8 @@
 #include <optional>
 #include <vector>
 
+class QKeyEvent;
+
 namespace GyanisScribe::Capture
 {
 
@@ -132,8 +134,9 @@ namespace GyanisScribe::Capture
         void mouseDoubleClickEvent(QMouseEvent *event) override;
 
         /**
-         * @brief 键盘：Enter 确认，Esc 取消
+         * @brief 键盘：Enter 确认，Esc 取消，方向键微调选区
          * @param event 键盘事件
+         * @details 方向键单独按是整块平移，按住 Shift 改成挪右下角；还没框出选区时什么都不做。
          */
         void keyPressEvent(QKeyEvent *event) override;
 
@@ -145,6 +148,13 @@ namespace GyanisScribe::Capture
          * @return 宽高非负的逻辑矩形
          */
         [[nodiscard]] static QRect normalizeRect(const QPoint &anchor, const QPoint &current);
+
+        /**
+         * @brief 方向键对应的那一格位移
+         * @param event 键盘事件
+         * @return 左/右/上/下分别给 (-1,0)、(1,0)、(0,-1)、(0,1)；别的键给空
+         */
+        [[nodiscard]] static std::optional<QPoint> arrowStep(const QKeyEvent &event);
 
         /**
          * @brief 读数应当画在哪

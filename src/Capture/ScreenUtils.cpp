@@ -165,4 +165,37 @@ namespace GyanisScribe::Capture
         return QRect(numbers[0], numbers[1], numbers[2], numbers[3]);
     }
 
+    QRect nudgeRegion(const QRect &region, const QPoint &step, const QRect &limit)
+    {
+        if (region.isEmpty() || limit.isEmpty())
+        {
+            return region;
+        }
+
+        // 逐轴算允许区间：往正方向最多走到「贴上 limit 的右边」，再往前就整块出界了。
+        // 选区本身比这一档还宽时原地不动——夹无可夹，硬夹会把宽高也改了
+        const auto clampAxis = [](int current, int delta, int low, int high, int span)
+        {
+            const auto upper = high - span + 1;
+            return upper < low ? current : std::clamp(current + delta, low, upper);
+        };
+
+        const auto left = clampAxis(region.left(), step.x(), limit.left(), limit.right(), region.width());
+        const auto top  = clampAxis(region.top(), step.y(), limit.top(), limit.bottom(), region.height());
+        return QRect{QPoint{left, top}, region.size()};
+    }
+
+    QRect resizeRegion(const QRect &region, const QPoint &step, const QRect &limit)
+    {
+        if (region.isEmpty() || limit.isEmpty())
+        {
+            return region;
+        }
+
+        // 顶边不动，只挪右下角；下限钉在顶边那一格，收到 0 宽就不是「一块图」了
+        const auto right  = std::max(region.left(), std::min(region.right() + step.x(), limit.right()));
+        const auto bottom = std::max(region.top(), std::min(region.bottom() + step.y(), limit.bottom()));
+        return QRect{region.topLeft(), QPoint{right, bottom}};
+    }
+
 } // namespace GyanisScribe::Capture

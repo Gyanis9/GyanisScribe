@@ -90,4 +90,24 @@ namespace GyanisScribe::Capture
      */
     [[nodiscard]] Core::Expected<QRect> regionFromText(std::string_view text);
 
+    /**
+     * @brief 把选区整体挪若干格
+     * @param region 当前选区
+     * @param step 位移量，一格是 (1,0)、(0,-1) 这种
+     * @param limit 允许的范围（通常是这块屏），矩形从它的左上角起算
+     * @return 挪好后的选区；宽高不变，越出 limit 的那一边被夹回来
+     * @details 夹住而不是绕到对面：方向键按过头时用户要的是「到头了」，不是选区跳到屏的另一角。
+     */
+    [[nodiscard]] QRect nudgeRegion(const QRect &region, const QPoint &step, const QRect &limit);
+
+    /**
+     * @brief 把选区的右下角挪若干格，顶边不动
+     * @param region 当前选区
+     * @param step 右下角的位移量
+     * @param limit 允许的范围
+     * @return 改好后的选区；至少留一格宽与一格高，越出 limit 的那一边被夹回来
+     * @details 下限是一格而不是零：缩成 0 的选区在遮罩上「看着还在」，交出去却是一张空图。
+     */
+    [[nodiscard]] QRect resizeRegion(const QRect &region, const QPoint &step, const QRect &limit);
+
 } // namespace GyanisScribe::Capture
