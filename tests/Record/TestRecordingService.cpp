@@ -5,13 +5,17 @@
 
 #include "Capture/IScreenCaptureSource.h"
 #include "Core/Paths.h"
+#include "Platform/IPlatformIntegration.h"
 #include "Core/Types.h"
 #include "Record/FfmpegCommand.h"
 #include "Record/FfmpegRecordingEncoder.h"
 #include "Record/RecorderConfig.h"
 #include "Record/RecordingService.h"
 
-#include <QCoreApplication>
+#include <QApplication>
+#include <QColor>
+#include <QPoint>
+#include <QRect>
 #include <QEventLoop>
 #include <QImage>
 #include <QSize>
@@ -28,6 +32,8 @@
 #include <mutex>
 #include <semaphore>
 #include <string>
+#include <algorithm>
+#include <ranges>
 #include <thread>
 #include <vector>
 
@@ -43,6 +49,7 @@ using GyanisScribe::Record::OutputFormat;
 using GyanisScribe::Record::RecorderConfig;
 using GyanisScribe::Record::RecordingService;
 using GyanisScribe::Record::RecordingState;
+using GyanisScribe::Record::RecordMode;
 
 namespace
 {
@@ -50,7 +57,7 @@ namespace
     char  applicationArgument[]  = "TestRecordingService";
     char *applicationArguments[] = {applicationArgument, nullptr};
 
-    std::unique_ptr<QCoreApplication> application;
+    std::unique_ptr<QApplication> application;
 
     /// 用例放开门闩之前，假编码器最多停这么久：同步实现也能在有限时间内把控制权交回用例
     constexpr std::chrono::milliseconds kGatePatience{2000};
@@ -60,6 +67,189 @@ namespace
 
     /// 开始一轮之后要转多久界面循环才攒到帧：15 帧率下 1.3 秒能落十几帧，够 stop() 收尾不报「一帧都没有」
     constexpr std::chrono::milliseconds kFrameSpin{1300};
+
+    /// 底色取中性灰：高亮圈是蓝系主色，只有它会让蓝色分量压过红色
+    const QColor kFrameBackground{32, 32, 32};
+
+    /**
+     * @brief 读回帧目录里第一份文件的像素
+     * @return 读回来的图；一份都没有时返回空图
+     * @details 落盘的帧就是「这一帧用户会看到什么」的唯一凭据，光标高亮的判据只能落在它上面。
+     */
+    [[nodiscard]] QImage readFirstFrame()
+    {
+        const auto      root = GyanisScribe::Core::Paths::cacheDirectory() / "Recording";
+        std::error_code ignored;
+        if (!std::filesystem::exists(root, ignored))
+        {
+            return {};
+        }
+
+        std::vector<std::filesystem::path> files;
+        for (const auto &directory: std::filesystem::directory_iterator{root})
+        {
+            if (!directory.is_directory())
+            {
+                continue;
+            }
+            for (const auto &entry: std::filesystem::directory_iterator{directory.path()})
+            {
+                if (entry.is_regular_file())
+                {
+                    files.push_back(entry.path());
+                }
+            }
+        }
+        std::ranges::sort(files);
+        if (files.empty())
+        {
+            return {};
+        }
+        return QImage{QString::fromStdWString(files.front().wstring())};
+    }
+
+    /// 改动像素的统计：个数与质心。质心就是「圈心落在第几格」的读数，环形对称因此抗抗锯齿的毛边
+    struct PaintedArea
+    {
+        int    count        = 0;     ///< 与底色不同的像素个数
+        double centroidX    = 0.0;   ///< 横向质心，物理像素
+        double centroidY    = 0.0;   ///< 纵向质心，物理像素
+        bool   hasAccentHue = false; ///< 是否出现「蓝压过红」的一格，即主色那一圈
+    };
+
+    /// 扫一遍帧，把与底色不同的像素计进 PaintedArea
+    [[nodiscard]] PaintedArea scanFrame(const QImage &image)
+    {
+        PaintedArea stats;
+        double      sumX = 0.0;
+        double      sumY = 0.0;
+        for (int y = 0; y < image.height(); ++y)
+        {
+            for (int x = 0; x < image.width(); ++x)
+            {
+                const QRgb pixel = image.pixel(x, y);
+                if (qRed(pixel) == kFrameBackground.red() && qGreen(pixel) == kFrameBackground.green() && qBlue(pixel) == kFrameBackground.blue())
+                {
+                    continue;
+                }
+                ++stats.count;
+                sumX += x;
+                sumY += y;
+                if (qBlue(pixel) > qRed(pixel) && qBlue(pixel) > qGreen(pixel))
+                {
+                    stats.hasAccentHue = true;
+                }
+            }
+        }
+        if (stats.count > 0)
+        {
+            stats.centroidX = sumX / static_cast<double>(stats.count);
+            stats.centroidY = sumY / static_cast<double>(stats.count);
+        }
+        return stats;
+    }
+
+    /**
+     * @brief 只演「屏上有这几扇窗」的替身
+     * @details 替身纪律与热键那一份相同：能力位的 windowEnumeration 与 screenWindows() 的交回必须同解，
+     *          否则「说不行却递出一个句柄」这种自相矛盾的形状会在用例里被当成正常输入。
+     */
+    class StubPlatformIntegration final : public GyanisScribe::Platform::IPlatformIntegration
+    {
+    public:
+        /**
+         * @brief 建替身
+         * @param windows 要交出去的窗口清单
+         * @param enumerates true 表示能力表里 windowEnumeration 置位；为假时一律回绝
+         */
+        explicit StubPlatformIntegration(std::vector<GyanisScribe::Platform::ScreenWindow> windows = {}, const bool enumerates = true) :
+            m_windows(std::move(windows)), m_enumerates(enumerates)
+        {
+        }
+
+        [[nodiscard]] GyanisScribe::Platform::PlatformCapabilities capabilities() const noexcept override
+        {
+            GyanisScribe::Platform::PlatformCapabilities table;
+            table.windowEnumeration = m_enumerates;
+            return table;
+        }
+
+        [[nodiscard]] QString displayName() const override
+        {
+            return QStringLiteral("窗口清单替身");
+        }
+
+        [[nodiscard]] std::unique_ptr<GyanisScribe::Platform::IHotkeyBackend> createHotkeyBackend() override
+        {
+            return nullptr;
+        }
+
+        [[nodiscard]] Expected<GyanisScribe::Platform::ForegroundWindow> foregroundWindow() const override
+        {
+            return std::unexpected(Error{ErrorCode::PlatformUnsupported, "替身不演取前台窗口这一项"});
+        }
+
+        [[nodiscard]] Expected<std::vector<GyanisScribe::Platform::ScreenWindow>> screenWindows() const override
+        {
+            if (!m_enumerates)
+            {
+                return std::unexpected(Error{ErrorCode::PlatformUnsupported, "本平台列不出窗口"});
+            }
+            return m_windows;
+        }
+
+    private:
+        std::vector<GyanisScribe::Platform::ScreenWindow> m_windows;           ///< 摆好的那份清单
+        bool                                              m_enumerates = true; ///< 能力位与交回内容要同解
+    };
+
+    /**
+     * @brief 给一张 80×60 纯色帧的来源
+     * @details 高亮圈半径 16，原来那张 8×8 放不下整个圈，判据就没法落在像素位置上。
+     */
+    class BlankFrameSource final : public IScreenCaptureSource
+    {
+    public:
+        [[nodiscard]] Expected<CapturedImage> grabScreen(const QString &screenName) const override
+        {
+            return frame(screenName);
+        }
+
+        [[nodiscard]] Expected<CapturedImage> grabWindow(const quintptr) const override
+        {
+            return frame(QStringLiteral("screen0"));
+        }
+
+    private:
+        [[nodiscard]] static CapturedImage frame(const QString &screenName)
+        {
+            QImage image{QSize{80, 60}, QImage::Format_ARGB32_Premultiplied};
+            image.fill(kFrameBackground);
+            return CapturedImage{image, QSize{80, 60}, 1.0, screenName};
+        }
+    };
+
+    /**
+     * @brief 把光标钉在已知点上的服务
+     * @details 真实鼠标随时会动，「圈该落在帧里的第几格」这条判据因此需要一个不会动的光标。
+     */
+    class FixedCursorRecordingService final : public RecordingService
+    {
+    public:
+        FixedCursorRecordingService(IScreenCaptureSource &source, IRecordingEncoder &encoder, GyanisScribe::Platform::IPlatformIntegration &integration, const QPoint &cursor) :
+            RecordingService(source, encoder, integration), m_cursor(cursor)
+        {
+        }
+
+    protected:
+        [[nodiscard]] QPoint cursorGlobalPosition() const override
+        {
+            return m_cursor;
+        }
+
+    private:
+        QPoint m_cursor; ///< 钉住的光标全局逻辑位置
+    };
 
     /// 不真抓屏的来源：只给一张纯色帧，够会话落盘
     class StubCaptureSource final : public IScreenCaptureSource
@@ -248,7 +438,7 @@ namespace
         static void SetUpTestSuite()
         {
             int argumentCount = 1;
-            application       = std::make_unique<QCoreApplication>(argumentCount, applicationArguments);
+            application       = std::make_unique<QApplication>(argumentCount, applicationArguments);
         }
 
         static void TearDownTestSuite()
@@ -271,9 +461,10 @@ namespace
      */
     TEST_F(RecordingServiceFixture, GifWithAudioRequestedStartsWithoutTakingSound)
     {
-        StubCaptureSource     source;
-        GatedRecordingEncoder encoder;
-        RecordingService      service{source, encoder};
+        StubCaptureSource       source;
+        GatedRecordingEncoder   encoder;
+        StubPlatformIntegration platform;
+        RecordingService        service{source, encoder, platform};
 
         const auto started = service.start(serviceConfig(OutputFormat::Gif, true), 0);
         ASSERT_TRUE(static_cast<bool>(started)) << started.error().message;
@@ -294,9 +485,10 @@ namespace
             GTEST_SKIP() << "这份现场找得到 ffmpeg，这一条要的是「没有它」的那一种情况";
         }
 
-        StubCaptureSource     source;
-        GatedRecordingEncoder encoder;
-        RecordingService      service{source, encoder};
+        StubCaptureSource       source;
+        GatedRecordingEncoder   encoder;
+        StubPlatformIntegration platform;
+        RecordingService        service{source, encoder, platform};
 
         const auto started = service.start(serviceConfig(OutputFormat::Mp4, true), 0);
         ASSERT_FALSE(static_cast<bool>(started)) << "MP4 也要跳过取声了：音轨这一档整个没了";
@@ -309,9 +501,10 @@ namespace
      */
     TEST_F(RecordingServiceFixture, StopReturnsWhileTheEncodeIsStillRunning)
     {
-        StubCaptureSource     source;
-        GatedRecordingEncoder encoder;
-        RecordingService      service{source, encoder};
+        StubCaptureSource       source;
+        GatedRecordingEncoder   encoder;
+        StubPlatformIntegration platform;
+        RecordingService        service{source, encoder, platform};
 
         ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
         spinFramesIn();
@@ -345,10 +538,11 @@ namespace
      */
     TEST_F(RecordingServiceFixture, EncodeFailureKeepsTheFramesAndReports)
     {
-        StubCaptureSource     source;
-        GatedRecordingEncoder encoder;
+        StubCaptureSource       source;
+        GatedRecordingEncoder   encoder;
+        StubPlatformIntegration platform;
         encoder.failNext();
-        RecordingService service{source, encoder};
+        RecordingService service{source, encoder, platform};
 
         ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
         spinFramesIn();
@@ -374,9 +568,10 @@ namespace
      */
     TEST_F(RecordingServiceFixture, SecondRecordingGetsItsOwnFrameDirectoryWhileTheFirstEncodes)
     {
-        StubCaptureSource     source;
-        GatedRecordingEncoder encoder;
-        RecordingService      service{source, encoder};
+        StubCaptureSource       source;
+        GatedRecordingEncoder   encoder;
+        StubPlatformIntegration platform;
+        RecordingService        service{source, encoder, platform};
 
         ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
         spinFramesIn();
@@ -408,9 +603,10 @@ namespace
      */
     TEST_F(RecordingServiceFixture, DestructionWaitsForTheEncodeInFlight)
     {
-        StubCaptureSource     source;
-        GatedRecordingEncoder encoder;
-        auto                  service = std::make_unique<RecordingService>(source, encoder);
+        StubCaptureSource       source;
+        GatedRecordingEncoder   encoder;
+        StubPlatformIntegration platform;
+        auto                    service = std::make_unique<RecordingService>(source, encoder, platform);
 
         ASSERT_TRUE(static_cast<bool>(service->start(serviceConfig(OutputFormat::Mp4, false), 0)));
         spinFramesIn();
@@ -428,9 +624,10 @@ namespace
      */
     TEST_F(RecordingServiceFixture, CancelDropsTheFramesAndNeverAsksTheEncoder)
     {
-        StubCaptureSource     source;
-        GatedRecordingEncoder encoder;
-        RecordingService      service{source, encoder};
+        StubCaptureSource       source;
+        GatedRecordingEncoder   encoder;
+        StubPlatformIntegration platform;
+        RecordingService        service{source, encoder, platform};
 
         ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
         spinFramesIn();
@@ -459,9 +656,10 @@ namespace
      */
     TEST_F(RecordingServiceFixture, CancelWithoutAnActiveRoundIsRefused)
     {
-        StubCaptureSource     source;
-        GatedRecordingEncoder encoder;
-        RecordingService      service{source, encoder};
+        StubCaptureSource       source;
+        GatedRecordingEncoder   encoder;
+        StubPlatformIntegration platform;
+        RecordingService        service{source, encoder, platform};
 
         int abortedCount = 0;
         QObject::connect(&service, &RecordingService::aborted, [&abortedCount] { ++abortedCount; });
@@ -478,9 +676,10 @@ namespace
      */
     TEST_F(RecordingServiceFixture, CancelAfterStopIsRefusedAndLeavesTheEncodeInputAlone)
     {
-        StubCaptureSource     source;
-        GatedRecordingEncoder encoder;
-        RecordingService      service{source, encoder};
+        StubCaptureSource       source;
+        GatedRecordingEncoder   encoder;
+        StubPlatformIntegration platform;
+        RecordingService        service{source, encoder, platform};
 
         ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
         spinFramesIn();
@@ -502,5 +701,94 @@ namespace
         QObject::connect(&service, &RecordingService::finished, [&product](const QString &path) { product = path; });
         encoder.release();
         EXPECT_TRUE(spinUntil([&] { return !product.isEmpty(); })) << "取消被拒之后这一轮该照常出成品";
+    }
+
+    /**
+     * @brief 钉住「只认客户区读数」这条选择
+     * @details 三种形状都要钉住：句柄对上就交回客户区左上角；只有整窗读数时交回空（不许拿整窗顶替）；
+     *          清单里没有这扇窗也交回空。resolver 一旦「退而用整窗」，圈就会画到标题栏上而看起来正常。
+     */
+    TEST_F(RecordingServiceFixture, WindowFrameOriginAcceptsOnlyTheClientRect)
+    {
+        GyanisScribe::Platform::ScreenWindow withClient;
+        withClient.handle              = 7;
+        withClient.logicalGlobal       = QRect{10, 20, 90, 80};
+        withClient.clientLogicalGlobal = QRect{30, 55, 80, 60};
+
+        GyanisScribe::Platform::ScreenWindow withoutClient;
+        withoutClient.handle        = 8;
+        withoutClient.logicalGlobal = QRect{100, 100, 90, 80};
+
+        const std::vector<GyanisScribe::Platform::ScreenWindow> windows{withClient, withoutClient};
+
+        const auto origin = GyanisScribe::Record::windowFrameOrigin(windows, 7);
+        ASSERT_TRUE(origin.has_value());
+        EXPECT_EQ(*origin, QPoint(30, 55)) << "对上了句柄就要交回客户区的左上角";
+
+        EXPECT_FALSE(GyanisScribe::Record::windowFrameOrigin(windows, 8).has_value()) << "只有整窗读数时不许拿它顶替客户区";
+        EXPECT_FALSE(GyanisScribe::Record::windowFrameOrigin(windows, 9).has_value()) << "清单里没这扇窗却编出一个位置";
+        EXPECT_FALSE(GyanisScribe::Record::windowFrameOrigin({}, 7).has_value());
+        EXPECT_FALSE(GyanisScribe::Record::windowFrameOrigin(windows, 0).has_value()) << "句柄为 0 是「没指定窗口」，不该去匹配任何一条";
+    }
+
+    /**
+     * @brief 钉住窗口模式真的按平台给的客户区位置画出高亮圈
+     * @details 改之前这一档只会记一句「圈不出光标」。替身交的客户区左上角在 (100,50)，光标钉在
+     *          (130,80) → 圈心必须落在帧内 (30,30)；拿整窗那份 (90,20) 算就会落到 (40,60)。
+     */
+    TEST_F(RecordingServiceFixture, WindowModePaintsHighlightWhereTheClientRectSays)
+    {
+        BlankFrameSource                     source;
+        GatedRecordingEncoder                encoder;
+        GyanisScribe::Platform::ScreenWindow target;
+        target.handle              = 7;
+        target.logicalGlobal       = QRect{90, 20, 90, 80};
+        target.clientLogicalGlobal = QRect{100, 50, 80, 60};
+        StubPlatformIntegration     platform{{target}};
+        FixedCursorRecordingService service{source, encoder, platform, QPoint{130, 80}};
+
+        auto config            = serviceConfig(OutputFormat::Mp4, false);
+        config.mode            = RecordMode::Window;
+        config.windowHandle    = 7;
+        config.cursorHighlight = true;
+        ASSERT_TRUE(static_cast<bool>(service.start(config, 0)));
+        spinFramesIn();
+
+        const auto painted = scanFrame(readFirstFrame());
+        ASSERT_GT(painted.count, 0) << "帧里没有高亮圈：窗口模式没把平台给的客户区读数接上";
+        EXPECT_TRUE(painted.hasAccentHue) << "改动里没有主色那一圈";
+        EXPECT_NEAR(painted.centroidX, 30.0, 3.0) << "圈心横坐标不对，多半用错了窗口的哪一份读数";
+        EXPECT_NEAR(painted.centroidY, 30.0, 3.0) << "圈心纵坐标不对，多半用错了窗口的哪一份读数";
+
+        ASSERT_TRUE(static_cast<bool>(service.cancel()));
+    }
+
+    /**
+     * @brief 钉住「平台给不出客户区读数」时窗口模式保持不画，而不是画个错位的
+     * @details 这是唯一能钉住「宁可不画」那条注记的地方：替身只交整窗读数，实现若退去用它，
+     *          帧里就会凭空多出一圈——判据正是「一个像素都不该变」。
+     */
+    TEST_F(RecordingServiceFixture, WindowModeLeavesFrameCleanWhenThePlatformGivesNoClientRect)
+    {
+        BlankFrameSource                     source;
+        GatedRecordingEncoder                encoder;
+        GyanisScribe::Platform::ScreenWindow target;
+        target.handle = 7;
+        // 整窗那份刻意摆在「光标会落在帧内 (40,20)」的位置：实现一旦退去用它，那一圈就会凭空出现
+        target.logicalGlobal = QRect{90, 60, 90, 80};
+        StubPlatformIntegration     platform{{target}};
+        FixedCursorRecordingService service{source, encoder, platform, QPoint{130, 80}};
+
+        auto config            = serviceConfig(OutputFormat::Mp4, false);
+        config.mode            = RecordMode::Window;
+        config.windowHandle    = 7;
+        config.cursorHighlight = true;
+        ASSERT_TRUE(static_cast<bool>(service.start(config, 0)));
+        spinFramesIn();
+
+        const auto painted = scanFrame(readFirstFrame());
+        EXPECT_EQ(painted.count, 0) << "没有客户区读数却仍然画了圈：那就是把整窗左上角当成了帧原点";
+
+        ASSERT_TRUE(static_cast<bool>(service.cancel()));
     }
 } // namespace

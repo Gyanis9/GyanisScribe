@@ -54,7 +54,30 @@ namespace
 
 namespace GyanisScribe::Record
 {
-    RecordingService::RecordingService(Capture::IScreenCaptureSource &source, IRecordingEncoder &encoder, QObject *parent) : QObject(parent), m_source(source), m_encoder(encoder)
+    std::optional<QPoint> windowFrameOrigin(const std::vector<Platform::ScreenWindow> &windows, const quintptr handle)
+    {
+        if (handle == 0)
+        {
+            return std::nullopt;
+        }
+
+        // 只认客户区那一份：抓下来的那一帧就是客户区的像素，整窗读数带着标题栏，用它当帧原点会把圈画歪
+        for (const auto &window: windows)
+        {
+            if (window.handle == handle)
+            {
+                if (window.clientLogicalGlobal.isNull())
+                {
+                    return std::nullopt;
+                }
+                return window.clientLogicalGlobal.topLeft();
+            }
+        }
+        return std::nullopt;
+    }
+
+    RecordingService::RecordingService(Capture::IScreenCaptureSource &source, IRecordingEncoder &encoder, Platform::IPlatformIntegration &integration, QObject *parent) :
+        QObject(parent), m_source(source), m_encoder(encoder), m_integration(integration)
     {
         m_timer.setTimerType(Qt::PreciseTimer);
         QObject::connect(&m_timer, &QTimer::timeout, this, &RecordingService::onTick);
@@ -257,14 +280,27 @@ namespace GyanisScribe::Record
     {
         if (m_config.mode == RecordMode::Window)
         {
-            // 窗口帧的左上角要等平台侧的窗口几何接口才能拿到全局读数，这里算不出光标落在第几格：
-            // 与其画一个错位的圈冒充「已高亮」，不如第一帧就把这一档在窗口模式下没做说出来
-            if (m_config.cursorHighlight && !m_cursorHighlightWarned)
+            auto grabbed = m_source.grabWindow(m_config.windowHandle);
+            if (!grabbed)
             {
-                m_cursorHighlightWarned = true;
-                Core::Logger::warning("窗口录屏圈不出光标：还没法把窗口左上角换成全局坐标。请改用整屏或选区录屏，光标高亮只在它们上面生效");
+                return std::unexpected(grabbed.error());
             }
-            return m_source.grabWindow(m_config.windowHandle);
+
+            if (m_config.cursorHighlight)
+            {
+                // 每帧现问一次：窗口会被拖走，缓存上一帧的位置就是把圈画到它已经不在的那个地方
+                const auto windows = m_integration.screenWindows();
+                const auto origin  = windows ? windowFrameOrigin(*windows, m_config.windowHandle) : std::optional<QPoint>{};
+                if (origin)
+                {
+                    overlayCursorHighlight(*grabbed, *origin);
+                } else if (!m_cursorHighlightWarned)
+                {
+                    m_cursorHighlightWarned = true;
+                    Core::Logger::warning("窗口录屏圈不出光标：平台这一帧没给得出那扇窗的客户区位置（窗口没在清单里、或本平台不枚举窗口）。请改用整屏或选区录屏");
+                }
+            }
+            return grabbed;
         }
 
         auto grabbed = m_source.grabScreen(m_config.screenName);
@@ -303,12 +339,17 @@ namespace GyanisScribe::Record
             return;
         }
 
-        const auto painted = paintCursorHighlight(frame.image, QCursor::pos(), frameGlobalOriginLogical, frame.devicePixelRatio);
+        const auto painted = paintCursorHighlight(frame.image, cursorGlobalPosition(), frameGlobalOriginLogical, frame.devicePixelRatio);
         if (!painted && !m_cursorHighlightWarned)
         {
             m_cursorHighlightWarned = true;
             Core::Logger::warning(std::format("光标高亮没画出来：{}", painted.error().message));
         }
+    }
+
+    QPoint RecordingService::cursorGlobalPosition() const
+    {
+        return QCursor::pos();
     }
 
     void RecordingService::onTick()

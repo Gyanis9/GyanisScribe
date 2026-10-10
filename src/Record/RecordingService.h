@@ -10,6 +10,7 @@
 #pragma once
 
 #include "Capture/IScreenCaptureSource.h"
+#include "Platform/IPlatformIntegration.h"
 #include "Record/FfmpegRecordingEncoder.h"
 #include "Record/RecorderConfig.h"
 #include "Record/RecordingSession.h"
@@ -22,12 +23,24 @@
 #include <QTimer>
 
 #include <memory>
+#include <optional>
 #include <vector>
 
 class QProcess;
 
 namespace GyanisScribe::Record
 {
+
+    /**
+     * @brief 从平台给的窗口清单里取「这一帧的左上角」在全局逻辑坐标里的位置
+     * @param windows 平台报出的可见窗口快照
+     * @param handle 本轮录的那扇窗的句柄
+     * @return 客户区的左上角；清单里没有这扇窗、或它没给客户区读数时返回空
+     * @details 只认客户区那一份读数：抓下来的那一帧就是客户区的像素（本机实测整窗 422×292 对
+     *          客户区 420×260），拿整窗的左上角当帧原点会把高亮圈偏到标题栏上。
+     * @note 取不到就交回空而不是「退而用整窗那一份」：圈画在错位置上比不画更难解释。
+     */
+    [[nodiscard]] std::optional<QPoint> windowFrameOrigin(const std::vector<Platform::ScreenWindow> &windows, quintptr handle);
 
     /**
      * @brief 本轮取声的结果
@@ -46,7 +59,8 @@ namespace GyanisScribe::Record
      * @details 这层只做胶水：定时器跳一次就抓一帧交给会话，会话决定写不写；
      *          「什么时候写、暂停怎么算、时长上限」全在 RecordingSession 里，那部分有用例。
      *          本类直测的是这几条：一份配置能不能开始、取声在该跳过的档位上真跳过了、编码交给工作线程
-     *          而回接落在界面线程、失败时帧目录留着、取消时帧目录删掉而编码一次都不叫、析构会等手上的编码；
+     *          而回接落在界面线程、失败时帧目录留着、取消时帧目录删掉而编码一次都不叫、析构会等手上的编码、
+     *          窗口模式按平台给的客户区读数把光标高亮叠在正确的格子上（光标位置由 cursorGlobalPosition 钉住）；
      *          真抓屏像素与真编出文件需要一个真实桌面会话，那一段仍然留给验收。
      */
     class RecordingService : public QObject
@@ -58,9 +72,10 @@ namespace GyanisScribe::Record
          * @brief 建服务
          * @param source 抓帧来源，所有权在宿主
          * @param encoder 编码器，所有权在宿主
+         * @param integration 平台集成，用来问「录的这扇窗在屏幕上的哪儿」，所有权在宿主
          * @param parent Qt 父对象
          */
-        RecordingService(Capture::IScreenCaptureSource &source, IRecordingEncoder &encoder, QObject *parent = nullptr);
+        RecordingService(Capture::IScreenCaptureSource &source, IRecordingEncoder &encoder, Platform::IPlatformIntegration &integration, QObject *parent = nullptr);
 
         /**
          * @brief 析构：收掉还在跑的取声进程，并等手上的编码跑完
@@ -179,8 +194,19 @@ namespace GyanisScribe::Record
          */
         void deliverEncoding(const EncodeOutcome &outcome, const std::filesystem::path &frameDirectory, const std::filesystem::path &audioWav);
 
+    protected:
+        /**
+         * @brief 取光标此刻的全局逻辑位置
+         * @return 生产实现交回 QCursor::pos()
+         * @details 留成可覆写的只为一件事：用例要把光标钉在一个已知点上，否则「圈该落在帧里的第几格」
+         *          没法断言——真实的鼠标随时会动，而这一层的判据是像素位置。
+         */
+        [[nodiscard]] virtual QPoint cursorGlobalPosition() const;
+
+    private:
         Capture::IScreenCaptureSource      &m_source;                                           ///< 抓帧来源，不拥有
         IRecordingEncoder                  &m_encoder;                                          ///< 编码器，不拥有
+        Platform::IPlatformIntegration     &m_integration;                                      ///< 平台集成，问窗口位置用，不拥有
         QTimer                              m_timer;                                            ///< 抓帧定时器
         QElapsedTimer                       m_clock;                                            ///< 单调时钟，会话的时间轴都从它取
         std::unique_ptr<RecordingSession>   m_session;                                          ///< 当前会话
