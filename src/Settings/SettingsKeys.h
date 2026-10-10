@@ -57,4 +57,10 @@ namespace GyanisScribe::Settings
     /// 标注色板的最近使用颜色（#RRGGBB 列表，最新的在前），读写都在 Annotation::AnnotationToolbar
     inline constexpr std::string_view kAnnotationRecentColors = "Annotation/RecentColors";
 
+    /// 标注的默认线宽，取值必须是 Ui::kAnnotationWidths 里的一档；工具栏起点与持久化都读它
+    inline constexpr std::string_view kAnnotationDefaultWidth = "Annotation/DefaultWidth";
+
+    /// 标注的默认字号，取值必须是 Ui::kFontSizes 里的一档
+    inline constexpr std::string_view kAnnotationDefaultFontSize = "Annotation/DefaultFontSize";
+
 } // namespace GyanisScribe::Settings

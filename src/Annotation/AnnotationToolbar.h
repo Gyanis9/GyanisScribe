@@ -134,6 +134,15 @@ namespace GyanisScribe::Annotation
         void chooseCustomColor();
 
         /**
+         * @brief 把配置里存的默认线宽与字号落到滑块和下拉框上
+         * @details 存的值不在阶梯里时记一条警告再回默认档：就近取一档会让用户以为存的那档生效了。
+         */
+        void applyStoredDefaults();
+
+        /// 把当前的线宽与字号写回配置，供下次打开标注窗作起点
+        void rememberDefaults();
+
+        /**
          * @brief 按 m_recentColors 重建最近使用的色块
          * @details 先摘旧按钮再插新的，编号从 kAnnotationPalette.size() 起排；
          *          自定义按钮固定用 kCustomColorButtonId，才不会和插进来的色块撞编号。
@@ -157,6 +166,7 @@ namespace GyanisScribe::Annotation
         QSlider                                                 *m_widthSlider       = nullptr; ///< 线宽滑块，档位对齐 kAnnotationWidths
         QComboBox                                               *m_fontSizeCombo     = nullptr; ///< 字号下拉，取值对齐 kFontSizes
         QColor                                                   m_currentColor;                ///< 当前颜色，初值取色板第一格
+        bool                                                     m_stateIsInitial = true;       ///< 还在构造期：起点值不回写配置，坏值要留在文件里让人看得见
         ToolKind                                                 m_activeTool;                  ///< 当前工具，用来挡住「重复点同一个工具」的二次信号
     };
 

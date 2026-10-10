@@ -490,3 +490,55 @@ TEST_F(ToolbarFixture, RecentColorsFromSettingsBecomeSwatches)
     ASSERT_EQ(log.colors.size(), 1U);
     EXPECT_EQ(log.colors[0], QColor(0, 0x78, 0xFF)) << "按下的是第二格，发出来的却是别的颜色";
 }
+
+/**
+ * @brief 钉住「默认线宽与字号」读写两头都接在配置上
+ * @details 只测读端的话，控件调档没写回配置也能绿；这里调完再重开一份 store，
+ *          让「下一次启动是不是从这里起」这一格真的被断到。
+ */
+TEST_F(ToolbarFixture, AdjustedWidthAndFontSizeAreRememberedAcrossRestart)
+{
+    {
+        SignalLog log;
+        auto      toolbar = makeToolbarLogged(log);
+
+        auto *slider = toolbar->findChild<QSlider *>();
+        ASSERT_NE(slider, nullptr);
+        slider->setValue(3); // 阶梯最后一档 = 8
+
+        auto *combo = toolbar->findChild<QComboBox *>();
+        ASSERT_NE(combo, nullptr);
+        combo->setCurrentIndex(5); // 字号阶梯最后一档 = 24
+        m_settings->sync();
+    }
+
+    m_settings = std::make_unique<SettingsStore>(m_iniPath);
+    EXPECT_EQ(m_settings->intValue(GyanisScribe::Settings::kAnnotationDefaultWidth, -1), 8) << "调过线宽没写进配置";
+    EXPECT_EQ(m_settings->intValue(GyanisScribe::Settings::kAnnotationDefaultFontSize, -1), 24) << "调过字号没写进配置";
+
+    SignalLog log;
+    auto      second = makeToolbarLogged(log);
+    EXPECT_EQ(second->currentWidth(), 8) << "配置存着 8，起点却不是 8";
+    EXPECT_EQ(second->currentFontSize(), 24);
+}
+
+/**
+ * @brief 钉住阶梯外的存量值回默认档，且不被悄悄改掉
+ * @details 就近取一档会让用户以为存的 5 生效了；把 5 改写成 4 更糟——配置文件里那条
+ *          本来是别处（手改或旧版本）留下的，静默改掉等于抹掉现场。
+ */
+TEST_F(ToolbarFixture, OffLadderStoredDefaultsFallBackWithoutRewriting)
+{
+    ASSERT_TRUE(m_settings->setValue(GyanisScribe::Settings::kAnnotationDefaultWidth, 5).has_value());
+    ASSERT_TRUE(m_settings->setValue(GyanisScribe::Settings::kAnnotationDefaultFontSize, 15).has_value());
+    m_settings->sync();
+
+    SignalLog log;
+    auto      toolbar = makeToolbarLogged(log);
+    EXPECT_EQ(toolbar->currentWidth(), 4) << "阶梯外的 5 应当回默认档 4";
+    EXPECT_EQ(toolbar->currentFontSize(), 14) << "字号同理";
+
+    m_settings->sync();
+    EXPECT_EQ(m_settings->intValue(GyanisScribe::Settings::kAnnotationDefaultWidth, -1), 5) << "构造期把坏值改写了";
+    EXPECT_EQ(m_settings->intValue(GyanisScribe::Settings::kAnnotationDefaultFontSize, -1), 15);
+}

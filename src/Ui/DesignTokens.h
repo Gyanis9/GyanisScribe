@@ -164,7 +164,27 @@ namespace GyanisScribe::Ui
     /// 字号阶梯（需求第五节：12 / 13 / 14 / 16 / 20 / 24），工具栏的字号下拉只列这几档
     inline constexpr std::array<int, 6> kFontSizes{12, 13, 14, 16, 20, 24};
 
-
+    /**
+     * @brief 在阶梯表里找回某个取值对应的下标
+     * @tparam Size 阶梯档数
+     * @param steps 阶梯表（值不重复）
+     * @param value 要找回的取值，例如配置文件里存着的默认线宽
+     * @return 命中的下标；取值不在阶梯里时返回空
+     * @details 刻意不做「就近取一档」：配置里写着 5 而阶梯只有 2/4/6/8 时，悄悄按 4 或 6 用
+     *          会让用户以为存的那一档生效了。返回空由调用方记一条日志再回落默认档。
+     */
+    template<std::size_t Size>
+    [[nodiscard]] constexpr std::optional<int> stepIndexOf(const std::array<int, Size> &steps, const int value)
+    {
+        for (std::size_t index = 0; index < steps.size(); ++index)
+        {
+            if (steps[index] == value)
+            {
+                return static_cast<int>(index);
+            }
+        }
+        return {};
+    }
 
     /**
      * @brief 按序号取标注色板里的颜色

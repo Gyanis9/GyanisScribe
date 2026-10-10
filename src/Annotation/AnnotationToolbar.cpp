@@ -33,6 +33,11 @@ namespace
     using GyanisScribe::Ui::kAnnotationPalette;
     using GyanisScribe::Ui::kAnnotationWidths;
     using GyanisScribe::Ui::kFontSizes;
+    using GyanisScribe::Ui::stepIndexOf;
+
+    /// 配置里没存过、或存的值不在阶梯里时用的起点档：线宽 4、字号 14
+    constexpr int kDefaultWidthStep     = 1;
+    constexpr int kDefaultFontSizeIndex = 2;
 
     /**
      * @brief 工具按钮的登记表：顺序、图标名与中文名一处对齐
@@ -171,6 +176,8 @@ namespace GyanisScribe::Annotation
                              if (step >= 0 && static_cast<std::size_t>(step) < kAnnotationWidths.size())
                              {
                                  emit widthChanged(kAnnotationWidths[static_cast<std::size_t>(step)]);
+                                 // 记成默认档：下次开标注窗不用再从 4 重新调，这是「工具记住了我」的那半
+                                 rememberDefaults();
                              }
                          });
         layout->addWidget(m_widthSlider);
@@ -189,6 +196,7 @@ namespace GyanisScribe::Annotation
                              if (index >= 0 && index < m_fontSizeCombo->count())
                              {
                                  emit fontSizeChanged(m_fontSizeCombo->itemData(index).toInt());
+                                 rememberDefaults();
                              }
                          });
         layout->addWidget(m_fontSizeCombo);
@@ -225,14 +233,55 @@ namespace GyanisScribe::Annotation
             layout->addWidget(button);
         }
 
-        // 起点状态：第一个工具、第一个色块按下，线宽取 4、字号取 14。
+        // 起点状态：第一个工具、第一个色块按下，线宽与字号取「上次用的那一档」（配置里没有就回到 4 / 14）。
         // 此刻还没有任何外部接收方（宿主是在构造之后才接线的），所以不需要挡信号，
         // 只需要把状态摆对——尤其是 m_activeTool 要与按下的那个工具同解，否则第一次点矩形会被守卫吞掉
         toolGroup->button(static_cast<int>(ToolKind::Rectangle))->setChecked(true);
         colorGroup->button(0)->setChecked(true);
-        m_widthSlider->setValue(1);
-        m_fontSizeCombo->setCurrentIndex(2);
-        m_currentColor = kAnnotationPalette[0];
+        applyStoredDefaults();
+        m_stateIsInitial = false;
+        m_currentColor   = kAnnotationPalette[0];
+    }
+
+    void AnnotationToolbar::applyStoredDefaults()
+    {
+        const auto storedWidth = m_settings.intValue(Settings::kAnnotationDefaultWidth, kAnnotationWidths[kDefaultWidthStep]);
+        if (const auto step = stepIndexOf(kAnnotationWidths, storedWidth); step)
+        {
+            m_widthSlider->setValue(*step);
+        } else
+        {
+            // 就近取一档会把「配置里存的是 5」这件事藏起来：界面摆了 4，用户以为自己要的那档生效了
+            Core::Logger::warning(std::format("默认线宽 {} 不在阶梯（2/4/6/8）里，本次按默认档显示", storedWidth));
+            m_widthSlider->setValue(kDefaultWidthStep);
+        }
+
+        const auto storedFontSize = m_settings.intValue(Settings::kAnnotationDefaultFontSize, kFontSizes[kDefaultFontSizeIndex]);
+        if (const auto index = stepIndexOf(kFontSizes, storedFontSize); index)
+        {
+            m_fontSizeCombo->setCurrentIndex(*index);
+        } else
+        {
+            Core::Logger::warning(std::format("默认字号 {} 不在阶梯（12/13/14/16/20/24）里，本次按默认档显示", storedFontSize));
+            m_fontSizeCombo->setCurrentIndex(kDefaultFontSizeIndex);
+        }
+    }
+
+    void AnnotationToolbar::rememberDefaults()
+    {
+        // 构造期不回写：那时写的就是刚读出来的值（或坏值的兜底档），写回去会把用户文件里的坏值悄悄改掉
+        if (m_stateIsInitial)
+        {
+            return;
+        }
+        if (auto written = m_settings.setValue(Settings::kAnnotationDefaultWidth, currentWidth()); !written)
+        {
+            Core::Logger::warning(std::format("默认线宽没能保存：{}", written.error().message));
+        }
+        if (auto written = m_settings.setValue(Settings::kAnnotationDefaultFontSize, currentFontSize()); !written)
+        {
+            Core::Logger::warning(std::format("默认字号没能保存：{}", written.error().message));
+        }
     }
 
     void AnnotationToolbar::setActiveTool(const ToolKind toolKind)

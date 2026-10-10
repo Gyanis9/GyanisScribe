@@ -1,4 +1,5 @@
 add_executable(TestUi
+        TestDesignTokens.cpp
         TestIconProvider.cpp
         TestLanguage.cpp
         TestThemeManager.cpp
