@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/ usr / bin / env python3
 """源码约定门禁：两条「编译期看不出来、运行时只安静地错」的检查。
 
 一、路径不许走窄串。Windows 上 std::filesystem::path::string() 按本地 ANSI 码页给字节，
@@ -21,18 +21,23 @@ import pathlib
 import re
 import sys
 
-# 例外要在同一句里留下的理由关键词
+#例外要在同一句里留下的理由关键词
 NARROW_REASON = "本地码页"
 
 NEWLINE = chr(10)
 CARRIAGE_RETURN = chr(13)
 
-# path → 窄串：QString::fromLocal8Bit(x.string().c_str()) 一类的形状
+#path → 窄串：QString::fromLocal8Bit(x.string().c_str()) 一类的形状
 PATH_TO_NARROW = re.compile(r"QString::fromLocal8Bit\([^;]*?(?:\.|->)string\(\)")
-# 窄串 → path：std::filesystem::path{某串.toStdString()} 一类的形状
+#窄串 → path：std::filesystem::path{某串.toStdString() } 一类的形状
 NARROW_TO_PATH = re.compile(r"std::filesystem::path\s*[({][^;]*?\.toStdString\(\)")
 
-# 按枚举分派的开关：(枚举名, 声明所在文件, 分派所在文件)
+#文案与日志里的路径实参：std::format("…", path.string()) 会在本地码页装不下时抛出，
+#而抛出点常在「承诺返回 expected」的函数里 —— 该用 Core::Paths::toDisplayText(path).toStdString()
+MESSAGE_ARG = re.compile(r"(?:std::format|uiFormat|Logger::)")
+PATH_DOT_STRING = re.compile(r"(?:\.|->)string\(\)")
+
+#按枚举分派的开关：(枚举名, 声明所在文件, 分派所在文件)
 DISPATCH_TABLES = (
     ("TrayAction", "src/App/TrayController.h", "src/App/AppController.cpp"),
     ("MainWindowPage", "src/App/MainWindow.h", "src/App/MainWindow.cpp"),
@@ -44,6 +49,15 @@ ENUM_BODY = re.compile(r"enum class (\w+)\s*\{([^}]*)\}", re.S)
 def is_path_narrow(text: str) -> bool:
     """这一段是不是「路径与窄串互转」；同一段里写了理由的算例外。"""
     if not (PATH_TO_NARROW.search(text) or NARROW_TO_PATH.search(text)):
+        return False
+    return NARROW_REASON not in text
+
+
+def is_message_narrow(text: str) -> bool:
+    """这一段是不是「文案或日志里把路径换成窄串」；写了理由或已走 toDisplayText 的放过。"""
+    if not (MESSAGE_ARG.search(text) and PATH_DOT_STRING.search(text)):
+        return False
+    if "toDisplayText" in text:
         return False
     return NARROW_REASON not in text
 
@@ -90,7 +104,7 @@ def check_path_encoding(root: pathlib.Path) -> list[str]:
     findings: list[str] = []
     for source in sorted(list(root.rglob("*.cpp")) + list(root.rglob("*.h"))):
         for number, statement in statements(source.read_text(encoding="utf-8", errors="replace")):
-            if is_path_narrow(statement):
+            if is_path_narrow(statement) or is_message_narrow(statement):
                 one_line = " ".join(part.strip() for part in statement.splitlines()).strip()
                 findings.append(f"{source.relative_to(root.parent)}:{number} 路径与窄串互转，要改走 Core::Paths::toDisplayText / fromDisplayText：{one_line}")
     return findings
@@ -125,11 +139,17 @@ def self_probe() -> None:
     if is_path_narrow(exempt):
         raise RuntimeError("写了理由的例外仍被拦下：例外口等于没有")
 
+    message_shape = '        Core::Logger::info(std::format("已保存：{}", filePath.string()));'
+    if not is_message_narrow(message_shape):
+        raise RuntimeError("文案里的 path.string() 没被认出来：抛出会被当成可恢复错误漏掉")
+    if is_message_narrow('        Core::Logger::info(std::format("已保存：{}", Core::Paths::toDisplayText(filePath).toStdString()));'):
+        raise RuntimeError("已经走 toDisplayText 的写法被误报：门禁会红得让人放弃它")
+
     header = "enum class WidgetAction" + NEWLINE + "{" + NEWLINE + "    Open," + NEWLINE + "    Close, ///< 关掉" + NEWLINE + "    // Deleted," + NEWLINE + "};" + NEWLINE
     if enumerate_names(header, "WidgetAction") != ["Open", "Close"]:
         raise RuntimeError("枚举名穷举错了：注释掉的一行不该算，带 ///< 的一行该算")
 
-    # 分派检查也要能红：拿一份缺了一支的合成开关喂进去
+#分派检查也要能红：拿一份缺了一支的合成开关喂进去
     missing_case_body = "switch (action)" + NEWLINE + "{" + NEWLINE + "    case WidgetAction::Open:" + NEWLINE + "        return;" + NEWLINE + "}" + NEWLINE
     if "Close" in set(re.findall(r"case\s+WidgetAction::(\w+)\s*:", missing_case_body)):
         raise RuntimeError("分派检查的探针失效：漏掉的那一支应当被认出来")

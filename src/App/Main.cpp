@@ -49,7 +49,8 @@ int main(int argc, char *argv[])
     } catch (...)
     {
         // 事件分发里的异常默认会走到 terminate；这里接住是为了给出退出码与那句人话
-        const auto message = GyanisScribe::App::crashMessageFor(std::current_exception(), GyanisScribe::Core::Paths::logDirectory().string());
+        const auto message =
+                GyanisScribe::App::crashMessageFor(std::current_exception(), GyanisScribe::Core::Paths::toDisplayText(GyanisScribe::Core::Paths::logDirectory()).toStdString());
         GyanisScribe::Core::Logger::error(message.toStdString());
         return GyanisScribe::App::kCrashExitCode;
     }

@@ -25,9 +25,9 @@ namespace GyanisScribe::Record
         // QImage::save 按后缀选格式，返回 false 时不给原因；这里补上路径，用户才知道是磁盘满还是没权限
         if (!frame.save(Core::Paths::toDisplayText(target), "PNG"))
         {
-            return std::unexpected(
-                    Core::Error{Core::ErrorCode::FileWriteFailed,
-                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("录屏帧写入失败：{}。请检查该目录是否可写、磁盘是否已满"), target.string())});
+            return std::unexpected(Core::Error{Core::ErrorCode::FileWriteFailed,
+                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("录屏帧写入失败：{}。请检查该目录是否可写、磁盘是否已满"),
+                                                                            Core::Paths::toDisplayText(target).toStdString())});
         }
         ++m_written;
         return {};

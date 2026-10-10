@@ -27,7 +27,7 @@ namespace GyanisScribe::Ocr
             return QString::fromUtf8(
                     GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("设置项 {}、环境变量 TESSDATA_PREFIX、以及 {} 三处都没有语言包。请把 eng.traineddata（要认中文再放 "
                                                                                 "chi_sim.traineddata）放进其中一处，或在设置的 OCR 页把语言包目录指过去"),
-                                                 configuredKey.string(), bundled.string())
+                                                 Core::Paths::toDisplayText(configuredKey).toStdString(), Core::Paths::toDisplayText(bundled).toStdString())
                             .c_str());
         }
 
@@ -40,7 +40,7 @@ namespace GyanisScribe::Ocr
             return QString::fromUtf8(
                     GyanisScribe::Core::uiFormat(
                             GyanisScribe::Core::uiTextUtf8("语言包已就位于 {}，但本次构建没有编入任何识别后端。见 docs/OcrBackends.md：这是 Debug 档的形状，Release 档带真后端"),
-                            tessData.string())
+                            Core::Paths::toDisplayText(tessData).toStdString())
                             .c_str());
         }
 #endif
@@ -111,7 +111,8 @@ namespace GyanisScribe::Ocr
         auto tesseract = std::make_unique<TesseractOcrEngine>(tessData);
         if (tesseract->isAvailable())
         {
-            Core::Logger::info(std::format("文字识别后端 Tesseract 就绪（平台 {}），语言包目录 {}", integration.displayName().toStdString(), tessData.string()));
+            Core::Logger::info(std::format("文字识别后端 Tesseract 就绪（平台 {}），语言包目录 {}", integration.displayName().toStdString(),
+                                           Core::Paths::toDisplayText(tessData).toStdString()));
             return tesseract;
         }
         const auto unavailable = tesseract->unavailableReason();

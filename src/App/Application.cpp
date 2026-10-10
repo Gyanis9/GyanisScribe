@@ -37,7 +37,8 @@ Application::Application(int &argc, char **argv) : QApplication(argc, argv)
         GyanisScribe::Core::Logger::error(std::format("启动时日志初始化失败：{}", initialized.error().message));
     } else
     {
-        GyanisScribe::Core::Logger::info(std::format("智录 {} 启动，日志目录 {}", applicationVersion().toStdString(), logDirectory.string()));
+        GyanisScribe::Core::Logger::info(
+                std::format("智录 {} 启动，日志目录 {}", applicationVersion().toStdString(), GyanisScribe::Core::Paths::toDisplayText(logDirectory).toStdString()));
     }
 
     m_controller = std::make_unique<GyanisScribe::App::AppController>();

@@ -627,7 +627,7 @@ namespace GyanisScribe::App
 
         // 条数从存储现取：导出的就是这一份的全部键，界面这层不再数一遍别的口径
         const auto count = static_cast<int>(m_settings.allKeys().size());
-        Logger::info(std::format("配置导出完成：{} 项写到 {}", count, target.string()));
+        Logger::info(std::format("配置导出完成：{} 项写到 {}", count, Core::Paths::toDisplayText(target).toStdString()));
         emit messageForUser(GyanisScribe::Core::uiText("已导出 %1 项设置").arg(count), GyanisScribe::Ui::ToastKind::Success);
     }
 
@@ -644,7 +644,7 @@ namespace GyanisScribe::App
 
         // 逐项走的仍是 setValue，订阅配置的模块（热键、主题）已经收到通知；这里只把改动刷到盘上
         m_settings.sync();
-        Logger::info(std::format("配置导入完成：{} 项来自 {}", *imported, source.string()));
+        Logger::info(std::format("配置导入完成：{} 项来自 {}", *imported, Core::Paths::toDisplayText(source).toStdString()));
         emit messageForUser(GyanisScribe::Core::uiText("已导入 %1 项设置。这一页显示的还是导入前的值，请关掉设置窗口再重新打开；界面语言要重启智录才生效。").arg(*imported),
                             GyanisScribe::Ui::ToastKind::Success);
     }

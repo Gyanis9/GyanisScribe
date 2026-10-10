@@ -1,5 +1,6 @@
 #include "Core/Logger.h"
 
+#include "Core/Paths.h"
 #include "Core/Text.h"
 
 #include <spdlog/sinks/rotating_file_sink.h>
@@ -85,16 +86,18 @@ namespace GyanisScribe::Core
         std::filesystem::create_directories(logDirectory, error);
         if (error && !std::filesystem::is_directory(logDirectory))
         {
-            return std::unexpected(Error{ErrorCode::FileWriteFailed,
-                                         GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("日志目录建不出来：{}（原因 {}）。请把 Paths 里的日志目录改到一个可写的路径再重启"),
-                                                     logDirectory.string(), error.message())});
+            return std::unexpected(
+                    Error{ErrorCode::FileWriteFailed,
+                          GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("日志目录建不出来：{}（原因 {}）。请把 Paths 里的日志目录改到一个可写的路径再重启"),
+                                                       Paths::toDisplayText(logDirectory).toStdString(), error.message())});
         }
 
         try
         {
-            const auto filePath    = logDirectory / std::string(kLogFileBaseName);
-            auto       fileSink    = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(filePath.string(), kMaximumLogFileBytes, kMaximumRotatedFiles);
-            auto       consoleSink = std::make_shared<spdlog::sinks::stdout_sink_mt>();
+            const auto filePath = logDirectory / std::string(kLogFileBaseName);
+            // 例外：spdlog 的文件名要按本地码页给（本构建没开 SPDLOG_WCHAR_FILENAMES），这里不走 toDisplayText
+            auto fileSink    = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(filePath.string(), kMaximumLogFileBytes, kMaximumRotatedFiles);
+            auto consoleSink = std::make_shared<spdlog::sinks::stdout_sink_mt>();
 
             // 控制台与文件用同一份 logger：级别只解析一次，两处读数不会各说各话
             current.logger = std::make_shared<spdlog::logger>("GyanisScribe", spdlog::sinks_init_list{fileSink, consoleSink});
@@ -104,9 +107,9 @@ namespace GyanisScribe::Core
         } catch (const spdlog::spdlog_ex &exception)
         {
             // spdlog 只抛这一种；文件被别的进程独占时走到这里，交回调用方提示用户
-            return std::unexpected(
-                    Error{ErrorCode::FileWriteFailed, GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("日志文件打不开：{}（原因 {}）。请关闭占用它的程序，或换一个日志目录"),
-                                                                  (logDirectory / std::string(kLogFileBaseName)).string(), exception.what())});
+            return std::unexpected(Error{ErrorCode::FileWriteFailed,
+                                         GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("日志文件打不开：{}（原因 {}）。请关闭占用它的程序，或换一个日志目录"),
+                                                                      Paths::toDisplayText(logDirectory / std::string(kLogFileBaseName)).toStdString(), exception.what())});
         }
 
         return {};

@@ -72,13 +72,14 @@ namespace GyanisScribe::Record
         // 退出码为 0 但成品不在或是空文件，是 ffmpeg 与磁盘之间的事，不能当成成功交回上层
         if (error || size == 0)
         {
-            const auto message = GyanisScribe::Core::uiFormat(
-                    GyanisScribe::Core::uiTextUtf8("ffmpeg 报告成功，但成品不可用：{}。请检查磁盘空间后重编码，或先用剪贴板交付这一帧序列"), outputFile.string());
+            const auto message =
+                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("ffmpeg 报告成功，但成品不可用：{}。请检查磁盘空间后重编码，或先用剪贴板交付这一帧序列"),
+                                                 Core::Paths::toDisplayText(outputFile).toStdString());
             Core::Logger::error(message);
             return std::unexpected(Core::Error{Core::ErrorCode::FileWriteFailed, message});
         }
 
-        Core::Logger::info(std::format("录屏编码完成：{}（{} 帧）", outputFile.string(), frameCount));
+        Core::Logger::info(std::format("录屏编码完成：{}（{} 帧）", Core::Paths::toDisplayText(outputFile).toStdString(), frameCount));
         return outputFile;
     }
 

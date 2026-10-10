@@ -48,7 +48,7 @@ namespace GyanisScribe::App
         std::set_terminate(
                 []
                 {
-                    const auto message = crashMessageFor(std::current_exception(), Core::Paths::logDirectory().string());
+                    const auto message = crashMessageFor(std::current_exception(), Core::Paths::toDisplayText(Core::Paths::logDirectory()).toStdString());
                     Core::Logger::error(message.toStdString());
                     Core::Logger::shutdown();
                     std::abort();

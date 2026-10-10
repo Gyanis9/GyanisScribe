@@ -1,5 +1,6 @@
 #include "Settings/SettingsStore.h"
 
+#include "Core/Paths.h"
 #include "Core/Logger.h"
 #include "Core/Text.h"
 
@@ -244,14 +245,14 @@ namespace GyanisScribe::Settings
         {
             return std::unexpected(Core::Error{Core::ErrorCode::FileWriteFailed,
                                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("配置导出文件打不开：{}（{}）。请换一个可写的目录再试"),
-                                                                            filePath.string(), output.errorString().toStdString())});
+                                                                            Core::Paths::toDisplayText(filePath).toStdString(), output.errorString().toStdString())});
         }
         output.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
         if (!output.commit())
         {
-            return std::unexpected(
-                    Core::Error{Core::ErrorCode::FileWriteFailed, GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("配置导出没落盘：{}（{}）。请检查磁盘空间与目录权限"),
-                                                                                               filePath.string(), output.errorString().toStdString())});
+            return std::unexpected(Core::Error{Core::ErrorCode::FileWriteFailed,
+                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("配置导出没落盘：{}（{}）。请检查磁盘空间与目录权限"),
+                                                                            Core::Paths::toDisplayText(filePath).toStdString(), output.errorString().toStdString())});
         }
         return {};
     }
@@ -261,9 +262,9 @@ namespace GyanisScribe::Settings
         QFile input(QString::fromStdWString(filePath.wstring()));
         if (!input.open(QIODevice::ReadOnly))
         {
-            return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("配置导入文件读不到：{}（{}）。请确认路径与文件名"),
-                                                                                               filePath.string(), input.errorString().toStdString())});
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("配置导入文件读不到：{}（{}）。请确认路径与文件名"),
+                                                                            Core::Paths::toDisplayText(filePath).toStdString(), input.errorString().toStdString())});
         }
 
         QJsonParseError parseError{};
@@ -273,7 +274,7 @@ namespace GyanisScribe::Settings
             return std::unexpected(
                     Core::Error{Core::ErrorCode::InvalidArgument,
                                 GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("配置导入文件不是一个 JSON 对象：{}（{}）。请导出本程序生成的那份再导入"),
-                                                             filePath.string(), parseError.errorString().toStdString())});
+                                                             Core::Paths::toDisplayText(filePath).toStdString(), parseError.errorString().toStdString())});
         }
 
         const auto root     = document.object();

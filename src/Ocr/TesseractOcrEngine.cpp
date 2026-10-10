@@ -1,5 +1,6 @@
 #include "Ocr/TesseractOcrEngine.h"
 
+#include "Core/Paths.h"
 #include "Core/Logger.h"
 #include "Core/Text.h"
 #include "Ocr/OcrEngineFactory.h"
@@ -79,7 +80,7 @@ namespace GyanisScribe::Ocr
                 GyanisScribe::Core::uiFormat(
                         GyanisScribe::Core::uiTextUtf8(
                                 "语言包目录 {} 里没有本程序认识的 traineddata。请至少放入 eng.traineddata（要认中文再加 chi_sim.traineddata），或在设置的 OCR 页把目录指过去"),
-                        m_dataDirectory.string())
+                        Core::Paths::toDisplayText(m_dataDirectory).toStdString())
                         .c_str());
     }
 
@@ -116,11 +117,11 @@ namespace GyanisScribe::Ocr
             return std::unexpected(Core::Error{
                     Core::ErrorCode::DependencyMissing,
                     GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("语言「{}」需要的模型文件不在：{}。请在设置的 OCR 页改选已有语言，或把该文件放进语言包目录"),
-                                                 languageTag.toStdString(), model.string())});
+                                                 languageTag.toStdString(), Core::Paths::toDisplayText(model).toStdString()});
         }
 
         // Init3 会换掉上一份语言：不先释放旧语言就重复 Init 是 Tesseract 允许的行为，但语言状态以这次为准
-        const int initialized = TessBaseAPIInit3(m_api.get(), m_dataDirectory.string().c_str(), modelFileNameFor(languageTag).toUtf8().constData());
+        const int initialized = TessBaseAPIInit3(m_api.get(), m_dataDirectory.string().c_str(), // 例外：Tesseract 与 Leptonica 的 C 接口按本地码页开文件 modelFileNameFor(languageTag).toUtf8().constData());
         if (initialized != 0)
         {
             m_loadedLanguage.clear();

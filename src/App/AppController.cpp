@@ -312,10 +312,10 @@ namespace GyanisScribe::App
         const auto filePath = directory / fileName.toStdString();
         if (!image.save(Core::Paths::toDisplayText(filePath)))
         {
-            Core::Logger::error(std::format("标注结果写入失败：{}。请检查目录是否可写，或先用「复制」交剪贴板", filePath.string()));
+            Core::Logger::error(std::format("标注结果写入失败：{}。请检查目录是否可写，或先用「复制」交剪贴板", Core::Paths::toDisplayText(filePath).toStdString()));
             return;
         }
-        Core::Logger::info(std::format("标注结果已保存：{}", filePath.string()));
+        Core::Logger::info(std::format("标注结果已保存：{}", Core::Paths::toDisplayText(filePath).toStdString()));
         recordHistory(filePath, History::HistoryKind::Screenshot, image.size());
     }
 

@@ -1,5 +1,6 @@
 #include "Record/FfmpegCommand.h"
 
+#include "Core/Paths.h"
 #include "Core/Logger.h"
 #include "Core/Text.h"
 

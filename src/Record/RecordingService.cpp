@@ -78,7 +78,8 @@ namespace GyanisScribe::Record
         // 间隔取 1000/帧率 再加几毫秒余量：抓屏本身就有抖动，排太紧只会让帧率抖动被放大成丢帧
         const auto interval = static_cast<int>(1000 / std::max(1, config.frameRate)) + kTimerSlackMs;
         m_timer.start(interval);
-        Core::Logger::info(std::format("录屏开始：帧率 {}，上限 {} 秒，临时帧目录 {}", config.frameRate, config.maximumDurationSeconds, directory.string()));
+        Core::Logger::info(
+                std::format("录屏开始：帧率 {}，上限 {} 秒，临时帧目录 {}", config.frameRate, config.maximumDurationSeconds, Core::Paths::toDisplayText(directory).toStdString()));
         return {};
     }
 
@@ -119,7 +120,7 @@ namespace GyanisScribe::Record
         if (!encoded)
         {
             // 保留临时帧：这已经是录完的内容，删掉就等于让用户白录一次
-            Core::Logger::warning(std::format("录屏编码失败，临时帧保留在 {} 以便重编码", m_frameDirectory.string()));
+            Core::Logger::warning(std::format("录屏编码失败，临时帧保留在 {} 以便重编码", Core::Paths::toDisplayText(m_frameDirectory).toStdString()));
             emit failed(QString::fromUtf8(encoded.error().message.c_str()));
             return std::unexpected(encoded.error());
         }
@@ -129,7 +130,7 @@ namespace GyanisScribe::Record
         if (cleanupError)
         {
             // 成品已经有了，这里只报一条：清不掉是磁盘占用问题，不是录屏失败
-            Core::Logger::warning(std::format("临时帧目录没清干净：{}（{}）", m_frameDirectory.string(), cleanupError.message()));
+            Core::Logger::warning(std::format("临时帧目录没清干净：{}（{}）", Core::Paths::toDisplayText(m_frameDirectory).toStdString(), cleanupError.message()));
         }
         emit finished(Core::Paths::toDisplayText(*encoded));
         return encoded;

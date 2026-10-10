@@ -14,3 +14,6 @@ generators/
 # 打包产物：WindowsPackage.ps1 在仓库根的 dist/ 下落 zip 与安装器。
 # 覆盖率报告不在这里列——它落在 build/coverage/coverage-report/，上面 /build/ 已经盖住了
 /dist/
+
+# Python 门禁脚本的字节码缓存
+__pycache__/

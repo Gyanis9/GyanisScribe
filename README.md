@@ -133,10 +133,16 @@ tests/          逐级镜像 src 的目录结构
 - **窗口录屏的光标位置**：整屏与选区都能圈出光标，录单个窗口时圈不出来——帧里只有窗口像素，
   窗口左上角的全局读数要等平台侧的窗口几何接口。`RecordingService` 在第一帧就把这一点写进日志，不画错位的圈。
 - **安装器真机 smoke test**：脚本验到 staging 自检通过 + 安装器带卸载段，「装完能起、卸载能清」还没在真机上跑过。
-- **路径文本还剩一处形状没清完**：界面与文件写入那几处已经改走 `Core::Paths::toDisplayText / fromDisplayText`
-  （新加的 `Style.SourceConventions` 门禁管着，同一句里写明理由的例外才放过），但日志与错误文案里还有若干
-  `std::format("…", path.string())` 的形状——Windows 上本地码页装不下的字会让这一句直接抛 `std::system_error`。
-  清法是逐处换成 `toDisplayText(path).toStdString()`，并把那条门禁的检查面扩到 format 实参；
-  先没扩是因为要先数清有多少处、哪几处（spdlog 与 Tesseract 的 C 接口）本就该拿窄串。
+- **主线程还会被长任务占着**：需求的硬约束要求「耗时操作放工作线程」，而现在三处仍在 GUI 线程上跑——
+  录屏逐帧写 PNG（`PngSequenceSink::write`，一帧的写盘时间直接算进下一格的等待）、
+  停止录屏后的 ffmpeg 编码（`RecordingService::stop` 里同步等）、以及文字识别（`AppController::recognizeWithLanguage`
+  同步调后端）。本机量不出识别的卡顿：这台机器没有语言包，Debug 档又走降级桩。
+  **恢复条件**：并发改动要有 TSan 才算判据（本机 MSVC 没有 TSan，而容器里 `setarch -R` 被 Docker 自带 seccomp 拒绝），
+  先用 `docker run --security-opt seccomp=unconfined` 起一档、证明旧写法报得出竞态，再动这三处。
+  没有这一档之前把跨线程手抖写进去，只是把可复现的卡顿换成不可复现的竞态。
+- **两处路径仍按本地码页交给第三方库**（各自在同一句里写明理由，`Style.SourceConventions` 认这些理由）：
+  spdlog 的日志文件名（本构建没开 `SPDLOG_WCHAR_FILENAMES`，窄串要按本地码页给）与 Tesseract/Leptonica 的
+  `TessBaseAPIInit3`（C 接口拿 `const char*` 开文件）。要彻底了断 spdlog 那一处，得在 Conan 侧把 wchar
+  文件名选项打开，再回到 `toDisplayText` 那条路上。
 - **TSan 一档**：容器里跑不了（`setarch -R` 的 `personality` 被 Docker 自带 seccomp 拒绝，实测 EPERM），
   要用 `docker run --security-opt seccomp=unconfined` 起容器才能补上这一轮跨线程判据。

@@ -200,12 +200,12 @@ namespace GyanisScribe::Pin
 
         if (!m_image.save(Core::Paths::toDisplayText(filePath)))
         {
-            return std::unexpected(
-                    Core::Error{Core::ErrorCode::FileWriteFailed,
-                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图保存失败：{}。请检查目录是否可写，或先把这一张复制进剪贴板"), filePath.string())});
+            return std::unexpected(Core::Error{Core::ErrorCode::FileWriteFailed,
+                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图保存失败：{}。请检查目录是否可写，或先把这一张复制进剪贴板"),
+                                                                            Core::Paths::toDisplayText(filePath).toStdString())});
         }
 
-        Core::Logger::info(std::format("贴图已保存：{}", filePath.string()));
+        Core::Logger::info(std::format("贴图已保存：{}", Core::Paths::toDisplayText(filePath).toStdString()));
         return Core::Paths::toDisplayText(filePath);
     }
 
