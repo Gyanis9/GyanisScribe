@@ -3,7 +3,7 @@
 Windows 优先、可跨平台的桌面工具：截图、标注、贴图、取色、录屏、文字识别。
 交互参考 Snipaste，但不使用其任何代码、图标、界面素材或商标。
 
-- **技术栈**：C++23 · Qt 6.11（Widgets/Svg/Network）· CMake ≥ 3.28 · Conan 2 · MSVC 2022；Linux 侧在 Docker Ubuntu 24.04 容器内构建与验证
+- **技术栈**：C++23 · Qt 6.11（Widgets/Concurrent/Svg/Network）· CMake ≥ 3.28 · Conan 2 · MSVC 2022；Linux 侧在 Docker Ubuntu 24.04 容器内构建与验证
 - **当前状态**：六大功能已可用；本机 debug 与 release 两档各 243 条用例全绿；容器 asan 与 coverage 两档
   238 条通过、1 条跳过（容器那份 Qt 6.4 没有 lrelease，「真实语言包装载」那条只能在有包的一档成立）；
   行覆盖率 67.0%（阈值 55%）；打包脚本产出绿色目录 + zip + NSIS 安装器，英文语言包随包分发
@@ -30,7 +30,7 @@ Windows 优先、可跨平台的桌面工具：截图、标注、贴图、取色
 
 ## 在 Windows 上构建
 
-前置：Visual Studio 2022（MSVC）、CMake ≥ 3.28、Ninja、Conan 2、Qt 6.11（MSVC 套件，含 Svg/Network）、`ffmpeg`（仅录屏编码需要）。
+前置：Visual Studio 2022（MSVC）、CMake ≥ 3.28、Ninja、Conan 2、Qt 6.11（MSVC 套件，含 Concurrent/Svg/Network）、`ffmpeg`（仅录屏编码需要）。
 
 ```bat
 set QTDIR=G:\Tools\Qt\6.11.1\msvc2022_64
@@ -170,12 +170,13 @@ tests/          逐级镜像 src 的目录结构
   返回的包装所有权不明（按帧拿就是每帧造一个可能已活的 `QWindow`），而 Win32 的 `GetWindowRect` 读的是物理像素，
   必须与 DPI 换算配成对才不错位。`RecordingService` 在第一帧就把这一点写进日志，不画错位的圈。
 - **安装器真机 smoke test**：脚本验到 staging 自检通过 + 安装器带卸载段，「装完能起、卸载能清」还没在真机上跑过。
-- **主线程还会被长任务占着**：需求的硬约束要求「耗时操作放工作线程」，而现在三处仍在 GUI 线程上跑——
+- **主线程还会被长任务占着**：需求的硬约束要求「耗时操作放工作线程」，而现在两处仍在 GUI 线程上跑——
   录屏逐帧写 PNG（`PngSequenceSink::write`，一帧的写盘时间直接算进下一格的等待）、
-  停止录屏后的 ffmpeg 编码（`RecordingService::stop` 里同步等）、以及文字识别（`AppController::recognizeWithLanguage`
-  同步调后端）。识别这一处本机已经量得着：Windows 两档都带系统后端，不再靠降级桩；Tesseract 那一路仍只在 Release 档。
-  **恢复条件**：并发改动要有 TSan 才算判据（本机 MSVC 没有 TSan，而容器里 `setarch -R` 被 Docker 自带 seccomp 拒绝），
-  先用 `docker run --security-opt seccomp=unconfined` 起一档、证明旧写法报得出竞态，再动这三处。
+  停止录屏后的 ffmpeg 编码（`RecordingService::stop` 里同步等）。
+  文字识别不在这一列里：`Ocr::RecognitionRunner` 把一次 `recognize()` 放到 Qt 的全局线程池上，
+  认完由 `QFutureWatcher` 把结果送回界面线程，同一时间只跑一条，忙时只认用户最新那一次请求。
+  **恢复条件**：这两处要与采集循环交接帧与状态，并发改动要有 TSan 才算判据（本机 MSVC 没有 TSan，而容器里 `setarch -R` 被 Docker 自带 seccomp 拒绝），
+  先用 `docker run --security-opt seccomp=unconfined` 起一档、证明旧写法报得出竞态，再动这两处。
   没有这一档之前把跨线程手抖写进去，只是把可复现的卡顿换成不可复现的竞态。
 - **两处路径仍按本地码页交给第三方库**（各自在同一句里写明理由，`Style.SourceConventions` 认这些理由）：
   spdlog 的日志文件名（本构建没开 `SPDLOG_WCHAR_FILENAMES`，窄串要按本地码页给）与 Tesseract/Leptonica 的

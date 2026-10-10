@@ -21,6 +21,7 @@ find_package(Qt6 COMPONENTS
         Core
         Gui
         Widgets
+        Concurrent
         Svg
         Network
         REQUIRED)

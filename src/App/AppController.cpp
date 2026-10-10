@@ -21,6 +21,7 @@
 #include "Pick/ColorPickerOverlay.h"
 #include "Ocr/OcrResultWindow.h"
 #include "Ocr/OcrTypes.h"
+#include "Ocr/RecognitionRunner.h"
 #include "Pin/PinManager.h"
 #include "App/TrayController.h"
 #include "Platform/IPlatformIntegration.h"
@@ -108,6 +109,11 @@ namespace GyanisScribe::App
         m_annotation = std::make_unique<Annotation::AnnotationEngine>();
         m_pins       = std::make_unique<Pin::PinManager>(*m_settings, *m_integration);
         m_ocr        = Ocr::createOcrEngine(*m_settings, *m_integration);
+        // Runner 拿着引擎的引用，它的析构必须排在引擎之前：成员的析构按声明反序，头文件里那份声明就排在 m_ocr 后面
+        m_ocrRunner = std::make_unique<Ocr::RecognitionRunner>(*m_ocr);
+        // 识别在工作线程上跑，回来的两条槽仍然跑在界面线程：结果窗口的建立与刷新不能交给别的线程
+        QObject::connect(m_ocrRunner.get(), &Ocr::RecognitionRunner::succeeded, this, &AppController::handleOcrSucceeded);
+        QObject::connect(m_ocrRunner.get(), &Ocr::RecognitionRunner::failed, this, &AppController::handleOcrFailed);
         m_tray       = std::make_unique<TrayController>(*m_icons, *m_theme, *m_settings, *m_integration);
         m_history    = std::make_unique<History::HistoryStore>(History::HistoryStore::defaultStoragePath());
         m_mainWindow = std::make_unique<MainWindow>(*m_settings, *m_theme, *m_icons, *m_history);
@@ -392,38 +398,45 @@ namespace GyanisScribe::App
             return;
         }
 
-        const auto result = m_ocr->recognize(m_ocrImage, language);
-        if (!result)
-        {
-            const auto message = QString::fromUtf8(
-                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("文字识别失败：{}。请重试一次，或换一种语言再试"), result.error().message).c_str());
-            Core::Logger::error(message.toStdString());
-            notifyUser(message, Ui::ToastKind::Danger);
-            return;
-        }
+        // 一次识别要跑几十到上千毫秒，放在这条线程上整个程序就停在那儿：交出去之前先说一句，
+        // 否则结果回来之前界面看着像「点了没反应」
+        notifyUser(GyanisScribe::Core::uiText("正在识别这一张…"), Ui::ToastKind::Information);
+        m_ocrRunner->request(m_ocrImage, language);
+    }
 
+    void AppController::handleOcrSucceeded(const QImage &image, const QString &language, const Ocr::OcrResult &result)
+    {
         // 认出多少算多少：空结果也要开窗，摘要里那句「这一张没认出文字」比一条三秒就消失的提示有用
         if (auto stored = m_settings->setValue(Settings::kOcrLanguage, language); !stored)
         {
             Core::Logger::warning(std::format("识别语言没能记住：{}", stored.error().message));
         }
 
+        // 底图用发出请求时那一张：期间用户可能又截了新图，而方框是按送去认的那一张算的，换了图就整体错位
         if (m_ocrWindow == nullptr)
         {
-            m_ocrWindow = new Ocr::OcrResultWindow{m_ocrImage, *result, *m_icons, *m_theme};
+            m_ocrWindow = new Ocr::OcrResultWindow{image, result, *m_icons, *m_theme};
             // 关掉就自毁，控制器只持 QPointer：下一次识别会重新建一个，不会往已析构的对象里塞结果
             m_ocrWindow->setAttribute(Qt::WA_DeleteOnClose);
             QObject::connect(m_ocrWindow, &Ocr::OcrResultWindow::recognizeRequested, this, &AppController::recognizeWithLanguage);
             QObject::connect(m_ocrWindow, &Ocr::OcrResultWindow::messageForUser, this, [this](const QString &message, Ui::ToastKind kind) { notifyUser(message, kind); });
         } else
         {
-            m_ocrWindow->setResult(m_ocrImage, *result);
+            m_ocrWindow->setResult(image, result);
         }
 
         m_ocrWindow->show();
         m_ocrWindow->raise();
         m_ocrWindow->activateWindow();
-        Core::Logger::info(std::format("文字识别完成：{} 行，语言 {}", result->lines.size(), language.toStdString()));
+        Core::Logger::info(std::format("文字识别完成：{} 行，语言 {}", result.lines.size(), language.toStdString()));
+    }
+
+    void AppController::handleOcrFailed(const Core::Error &error)
+    {
+        const auto message =
+                QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("文字识别失败：{}。请重试一次，或换一种语言再试"), error.message).c_str());
+        Core::Logger::error(message.toStdString());
+        notifyUser(message, Ui::ToastKind::Danger);
     }
 
     void AppController::notifyUser(const QString &message, const Ui::ToastKind kind)

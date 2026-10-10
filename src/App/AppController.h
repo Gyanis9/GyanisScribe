@@ -42,6 +42,8 @@ namespace GyanisScribe::Ocr
 {
     class IOcrEngine;
     class OcrResultWindow;
+    class RecognitionRunner;
+    struct OcrResult;
 } // namespace GyanisScribe::Ocr
 
 namespace GyanisScribe::History
@@ -241,6 +243,22 @@ namespace GyanisScribe::App
          */
         void recognizeWithLanguage(const QString &language);
 
+        /**
+         * @brief 工作线程认完之后把结果摆进结果窗口
+         * @param image 请求时那一张，方框与它同系；期间用户重新截的图不算这一张
+         * @param language 请求时那门语言，认成之后才记住它
+         * @param result 识别结果，空结果也照常开窗
+         * @details 与 handleOcrFailed 分两条槽而不是一条带 Expected：这里两个分支各写各的文案，
+         *          合在一条里就要在槽里再判一次有没有值，而 Runner 已经判过了。
+         */
+        void handleOcrSucceeded(const QImage &image, const QString &language, const Ocr::OcrResult &result);
+
+        /**
+         * @brief 识别失败：把后端给的中文原因原样报给用户
+         * @param error 后端给的故障类别与文案
+         */
+        void handleOcrFailed(const Core::Error &error);
+
         /// 给用户看的一条提示：有气泡就用气泡，没有（例如起不来托盘的那类环境）就落日志
         void notifyUser(const QString &message, GyanisScribe::Ui::ToastKind kind);
 
@@ -290,6 +308,7 @@ namespace GyanisScribe::App
         std::unique_ptr<Annotation::AnnotationWindow>        m_annotationWindow;                             ///< 标注窗口，复用同一把工具栏
         std::unique_ptr<Pin::PinManager>                     m_pins;                                         ///< 贴图管理器
         std::unique_ptr<Ocr::IOcrEngine>                     m_ocr;                                          ///< 识别后端，按设置与平台能力选一次
+        std::unique_ptr<Ocr::RecognitionRunner>              m_ocrRunner;                                    ///< 识别的线程搬运工
         std::unique_ptr<Record::FfmpegRecordingEncoder>      m_recorder;                                     ///< 录屏的编码步
         std::unique_ptr<Record::RecordingService>            m_recording;                                    ///< 录屏服务，一轮一个会话
         std::unique_ptr<TrayController>                      m_tray;                                         ///< 托盘图标与菜单

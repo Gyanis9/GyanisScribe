@@ -1,4 +1,4 @@
-# Ocr：类型、预处理、导出、结果窗口与后端选型。识别本身是可选依赖：
+# Ocr：类型、预处理、导出、结果窗口、后端选型，以及把一次识别搬到工作线程的那一层。识别本身是可选依赖：
 # 找到 Tesseract 才编那一份后端，找不到时用 UnavailableOcrEngine 那份降级桩（它一直在编译列表里，
 # 所以「缺失分支」不是从未被编过的分支）
 set(OcrSources
@@ -7,6 +7,8 @@ set(OcrSources
         OcrPreprocessor.h
         OcrPreprocessor.cpp
         IOcrEngine.h
+        RecognitionRunner.h
+        RecognitionRunner.cpp
         OcrTextExporter.h
         OcrTextExporter.cpp
         OcrEngineFactory.h
@@ -39,6 +41,7 @@ add_library(Ocr STATIC ${OcrSources})
 
 target_include_directories(Ocr PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 # 结果窗口要图标与主题色，所以 Ocr 吃 Ui；Ui 只依赖 Core/Settings/Hotkey，不指回 Ocr
+# Concurrent 只被 RecognitionRunner 用（把一次识别丢进 Qt 的全局线程池），它是 Qt 自带模块，不引新第三方
 target_link_libraries(Ocr PUBLIC
         Core
         Platform
@@ -46,7 +49,8 @@ target_link_libraries(Ocr PUBLIC
         Ui
         Qt6::Core
         Qt6::Gui
-        Qt6::Widgets)
+        Qt6::Widgets
+        Qt6::Concurrent)
 
 if (Tesseract_FOUND)
     target_link_libraries(Ocr PUBLIC Tesseract::libtesseract)

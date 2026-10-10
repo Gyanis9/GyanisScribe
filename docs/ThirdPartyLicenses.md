@@ -7,7 +7,7 @@
 
 | 组件 | 版本 | 许可证 | 用途 | 分发方式 |
 | --- | --- | --- | --- | --- |
-| Qt 6（Core / Gui / Widgets / Svg / Network） | 主机 6.11.1，容器 6.4.2 | LGPL-3.0（或商业授权） | 界面、图像、SVG 图标、本地套接字 | 动态链接 DLL / .so |
+| Qt 6（Core / Gui / Widgets / Concurrent / Svg / Network） | 主机 6.11.1，容器 6.4.2 | LGPL-3.0（或商业授权） | 界面、图像、SVG 图标、把一次文字识别搬到工作线程、本地套接字 | 动态链接 DLL / .so |
 | spdlog | conandata.yml 里那份 | MIT | 日志 | 静态或动态由 Conan 决定 |
 | GoogleTest | conandata.yml 里那份 | BSD-3-Clause | 单元测试 | 只进测试可执行体，不随产品分发 |
 | Tesseract | 5.5.2（仅 Release 档） | Apache-2.0 | 文字识别后端 | 动态链接 |

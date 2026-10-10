@@ -164,6 +164,10 @@
             <translation>No image to recognize yet: press Ctrl+Alt+A and drag out a screen region first</translation>
         </message>
         <message>
+            <source>正在识别这一张…</source>
+            <translation>Recognizing this image…</translation>
+        </message>
+        <message>
             <source>文字识别失败：{}。请重试一次，或换一种语言再试</source>
             <translation>Text recognition failed: {}. Try again, or switch to another language.</translation>
         </message>

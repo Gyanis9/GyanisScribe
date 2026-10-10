@@ -1,6 +1,7 @@
 add_executable(TestOcr
         TestOcrEngines.cpp
         TestOcrPreprocessor.cpp
+        TestRecognitionRunner.cpp
         TestOcrResultWindow.cpp)
 
 # 系统识别后端的直测跟着库那一档的条件走（同一台机器、同一个编译器才有这份后端）；
