@@ -165,6 +165,15 @@ namespace
 
     std::unique_ptr<QCoreApplication> application;
 
+    /// ä¸´æ¶ç®å½æè¿ç¨åå¼ï¼ctest -j
+    /// ææ¯æ¡ç¨ä¾å½ç¬ç«è¿ç¨èµ·ï¼ä¸¤æ£µæ£åºæ å¹¶è¡æ¶åºå®åå­ä¼è®©ä¸è¾¹å æå¦ä¸è¾¹æ­£å¨åçå¸§
+    /// ï¼å®æµï¼ä¸ä¸ªè¿ç¨åè·æ¶ãåç¡®è®¤ç®å½ä¸å­å¨ãé£æ¡å°±ç¿»çº¢è¿ï¼
+    [[nodiscard]] std::filesystem::path processScratchRoot(const std::string_view stem)
+    {
+        return std::filesystem::temp_directory_path() / (std::string{stem} + '-' + std::to_string(static_cast<long long>(QCoreApplication::applicationPid())));
+    }
+
+
     class VideoEncoderEndToEndFixture : public ::testing::Test
     {
     protected:
@@ -199,7 +208,7 @@ namespace
         qputenv("PATH", path.toLocal8Bit());
 
         std::error_code ignored;
-        const auto      scratchDirectory = std::filesystem::temp_directory_path() / "GyanisScribe-encoder-probe";
+        const auto      scratchDirectory = processScratchRoot("GyanisScribe-encoder-probe");
         std::filesystem::remove_all(scratchDirectory, ignored);
         const auto frameDirectory = scratchDirectory / "frames";
         std::filesystem::create_directories(frameDirectory, ignored);
@@ -264,7 +273,7 @@ namespace
 
         std::error_code ignored;
         // 目录名与 MP4 那条分开：ctest -j 把每条用例当独立进程起，共用一份临时目录会互相删掉对方正在写的帧
-        const auto scratchDirectory = std::filesystem::temp_directory_path() / "GyanisScribe-gif-rate-probe";
+        const auto scratchDirectory = processScratchRoot("GyanisScribe-gif-rate-probe");
         std::filesystem::remove_all(scratchDirectory, ignored);
         const auto frameDirectory = scratchDirectory / "frames";
         std::filesystem::create_directories(frameDirectory, ignored);

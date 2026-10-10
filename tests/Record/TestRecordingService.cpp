@@ -71,6 +71,19 @@ namespace
     /// 攒帧的最低条数：一帧太少不足以区分「落下过帧」与「刚好赶上一次跳表」，三帧够 stop() 收尾有内容可编
     constexpr int kMinimumFrames = 3;
 
+    /**
+     * @brief 按进程分开的临时目录名
+     * @param stem 这一组用例的名字前缀
+     * @return temp 下带进程号后缀的一条路径
+     * @details ctest -j 把每条用例当独立进程起，同一台机器上两棵检出树并行时，固定名字会让
+     *          一边把另一边正在用的那份目录删掉（实测：本用例的「先确认目录不存在」在三个进程
+     *          同跑时翻红）。名字唯一之后不需要跨进程锁。
+     */
+    [[nodiscard]] std::filesystem::path processScratchRoot(const std::string_view stem)
+    {
+        return std::filesystem::temp_directory_path() / (std::string{stem} + '-' + std::to_string(static_cast<long long>(QCoreApplication::applicationPid())));
+    }
+
     /// 底色取中性灰：高亮圈是蓝系主色，只有它会让蓝色分量压过红色
     const QColor kFrameBackground{32, 32, 32};
 
@@ -450,7 +463,12 @@ namespace
         static void SetUpTestSuite()
         {
             int argumentCount = 1;
-            application       = std::make_unique<QApplication>(argumentCount, applicationArguments);
+            // 帧目录挂在「按应用名分开的缓存目录」下面，而应用名默认取自 exe 名：同一台机器上另一棵
+            // 检出树跑同一份用例时，两边写进同一个目录，一方的删会撞进另一方正在写的那一层（实测：并行
+            // 跑两棵树的 ctest 时，取消之后帧目录还在——服务里的 remove_all 报了sharing violation 又被
+            // 吞掉）。按进程号把名字分开，谁也不必等谁；RESOURCE_LOCK 只在一次 ctest 里管用，跨不了进程。
+            QCoreApplication::setApplicationName(QStringLiteral("TestRecordingService-%1").arg(QCoreApplication::applicationPid()));
+            application = std::make_unique<QApplication>(argumentCount, applicationArguments);
         }
 
         static void TearDownTestSuite()
@@ -815,7 +833,7 @@ namespace
         StubPlatformIntegration platform;
         RecordingService        service{source, encoder, platform};
 
-        const auto      target = std::filesystem::temp_directory_path() / "GyanisScribeFreshOutputDir";
+        const auto      target = processScratchRoot("GyanisScribeFreshOutputDir");
         std::error_code ignored;
         std::filesystem::remove_all(target, ignored);
         ASSERT_FALSE(std::filesystem::exists(target));
@@ -843,7 +861,7 @@ namespace
         StubPlatformIntegration platform;
         RecordingService        service{source, encoder, platform};
 
-        const auto      blocker = std::filesystem::temp_directory_path() / "GyanisScribeOutputBlocker";
+        const auto      blocker = processScratchRoot("GyanisScribeOutputBlocker");
         std::error_code ignored;
         std::filesystem::remove(blocker, ignored);
         {
