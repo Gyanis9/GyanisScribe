@@ -88,7 +88,6 @@ namespace GyanisScribe::Ui
             return written;
         }
         m_display->setText(text);
-        emit combinationChanged(text);
         return {};
     }
 

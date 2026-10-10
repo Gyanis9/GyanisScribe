@@ -1,5 +1,5 @@
-#!/ usr / bin / env python3
-"""源码约定门禁：两条「编译期看不出来、运行时只安静地错」的检查。
+#!/usr/bin/env python3
+"""源码约定门禁：三条「编译期看不出来、运行时只安静地错」的检查。
 
 一、路径不许走窄串。Windows 上 std::filesystem::path::string() 按本地 ANSI 码页给字节，
    码页装不下的字会当场抛 std::system_error——而抛出点多半在承诺返回 std::expected 的通道里。
@@ -9,6 +9,10 @@
 
 二、按枚举分派的开关要覆盖每个值。MSVC 默认不对「switch 漏了某个枚举值」报警（C4061/C4062
    没开），容器里 GCC 的预设也没带 -Wall，于是漏一支就等于菜单上多一条按了没反应的项。
+
+三、声明出来的信号要有人接。Qt 的 connect 是字符串之外的字符串，编译器不参与：一条没人接的
+   信号会让界面上出现「按了没反应」，而菜单、托盘、快捷键这三处入口都靠它转手。
+   认的是 &类名::信号名 这种写法（连到槽、以及信号转信号都算），emit 一处不算消费方。
 
 跑法：python scripts/check-source-conventions.py [--scan-root src]
 退出码：0 通过；1 有违规；2 工具自己坏了（自检探针跑不起来或真源形状变了）——不许当成通过。
@@ -20,6 +24,10 @@ import argparse
 import pathlib
 import re
 import sys
+
+#判据全文是中文：控制台码页不对就把「违规」那条打成乱码，读的人无法据此改代码
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 #例外要在同一句里留下的理由关键词
 NARROW_REASON = "本地码页"
@@ -123,6 +131,54 @@ def check_dispatch_coverage(root: pathlib.Path) -> list[str]:
     return findings
 
 
+IDENT_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")
+
+
+def signal_has_handler(texts: list[str], name: str) -> bool:
+    """这条信号有没有消费者：找 &类名::信号名 的写法（连到槽、以及信号转信号都算）。"""
+    needle = "::" + name
+    for text in texts:
+        for line in text.splitlines():
+            position = line.find(needle)
+            while position != -1:
+                after = position + len(needle)
+                ends_cleanly = after == len(line) or line[after] not in IDENT_CHARS
+                if ends_cleanly and "&" in line[:position]:
+                    return True
+                position = line.find(needle, position + 1)
+    return False
+
+
+def collect_signals(root: pathlib.Path) -> list[tuple[pathlib.Path, str]]:
+    """声明在各 signals: 段里的全部信号（纯文本扫：本条门一律不依赖编译）。"""
+    found: list[tuple[pathlib.Path, str]] = []
+    for source in sorted(list(root.rglob("*.h")) + list(root.rglob("*.cpp"))):
+        inside = False
+        for line in source.read_text(encoding="utf-8", errors="replace").splitlines():
+            stripped = line.strip()
+            if stripped == "signals:":
+                inside = True
+                continue
+            if inside and stripped in ("private:", "public:", "protected:", "};"):
+                inside = False
+                continue
+            if inside and stripped.startswith("void "):
+                name = stripped[5:].split("(")[0].strip()
+                if name:
+                    found.append((source, name))
+    return found
+
+
+def check_signal_consumers(root: pathlib.Path) -> list[str]:
+    """每条信号都要有人接：发了没人接的通道，就是界面上的一块「按了没反应」。"""
+    texts = [source.read_text(encoding="utf-8", errors="replace") for source in sorted(list(root.rglob("*.h")) + list(root.rglob("*.cpp")))]
+    findings: list[str] = []
+    for source, name in collect_signals(root):
+        if not signal_has_handler(texts, name):
+            findings.append(f"{source.relative_to(root.parent)}: 信号 {name} 发了没人接：要么接出去，要么删掉")
+    return findings
+
+
 def self_probe() -> None:
     """探针：判据必须真的能红。任何一步不成立就抛，由 main 退 2。"""
     must_flag = [
@@ -149,6 +205,12 @@ def self_probe() -> None:
     if enumerate_names(header, "WidgetAction") != ["Open", "Close"]:
         raise RuntimeError("枚举名穷举错了：注释掉的一行不该算，带 ///< 的一行该算")
 
+#信号消费的判据要两个方向都能给答案：认不出 &类名::信号名 就是永红，把 emit 也算上就是永真
+    if signal_has_handler(["        QObject::connect(w, &Widget::valueChanged, this, &Owner::onValue);"], "valueChanged") is not True:
+        raise RuntimeError("探针：有人接的信号被判成没人接，模式认不出 &类名::信号名")
+    if signal_has_handler(["        emit statusChanged(1);"], "statusChanged"):
+        raise RuntimeError("探针：没人接的信号被放过了，这条判据是永真的")
+
 #分派检查也要能红：拿一份缺了一支的合成开关喂进去
     missing_case_body = "switch (action)" + NEWLINE + "{" + NEWLINE + "    case WidgetAction::Open:" + NEWLINE + "        return;" + NEWLINE + "}" + NEWLINE
     if "Close" in set(re.findall(r"case\s+WidgetAction::(\w+)\s*:", missing_case_body)):
@@ -156,14 +218,14 @@ def self_probe() -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="源码约定门禁：路径窄串与枚举分派")
+    parser = argparse.ArgumentParser(description="源码约定门禁：路径窄串、枚举分派、信号消费方")
     parser.add_argument("--scan-root", default=str(pathlib.Path(__file__).resolve().parent.parent / "src"), help="要扫的源码根目录")
     args = parser.parse_args()
 
     root = pathlib.Path(args.scan_root).resolve()
     try:
         self_probe()
-        findings = check_path_encoding(root) + check_dispatch_coverage(root)
+        findings = check_path_encoding(root) + check_dispatch_coverage(root) + check_signal_consumers(root)
     except RuntimeError as failure:
         print(f"[门禁坏了] {failure}", file=sys.stderr)
         return 2
@@ -173,7 +235,7 @@ def main() -> int:
     if findings:
         print(f"[失败] 源码约定检查报了 {len(findings)} 处", file=sys.stderr)
         return 1
-    print(f"[ok] 源码约定检查通过：路径窄串与枚举分派都没有漏项（扫 {root}）")
+    print(f"[ok] 源码约定检查没有发现违规（扫 {root}）")
     return 0
 
 

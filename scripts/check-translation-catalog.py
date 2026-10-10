@@ -23,6 +23,10 @@ import pathlib
 import re
 import sys
 
+#判据全文是中文：控制台码页不对就把「违规」那条打成乱码，读的人无法据此改代码
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 DEFAULT_SCAN_ROOT = REPO_ROOT / "src"
 DEFAULT_CATALOG = REPO_ROOT / "Translations" / "GyanisScribe_en.ts"

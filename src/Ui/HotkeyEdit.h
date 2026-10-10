@@ -67,10 +67,6 @@ namespace GyanisScribe::Ui
          */
         [[nodiscard]] Core::Expected<void> applyCombination(const Hotkey::HotkeyCombination &combination);
 
-    signals:
-        /// 组合已经写进配置
-        void combinationChanged(const QString &text);
-
     protected:
         /**
          * @brief 录制状态下接住按键；不在录制状态时交回 Qt
