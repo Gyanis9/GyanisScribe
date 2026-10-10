@@ -5,6 +5,7 @@
 #include "Capture/IScreenCaptureSource.h"
 #include "Core/Paths.h"
 #include "Core/Types.h"
+#include "Record/FfmpegCommand.h"
 #include "Record/FfmpegRecordingEncoder.h"
 #include "Record/RecorderConfig.h"
 #include "Record/RecordingService.h"
@@ -35,6 +36,7 @@ using GyanisScribe::Core::ErrorCode;
 using GyanisScribe::Core::Expected;
 using GyanisScribe::Record::AudioCaptureOutcome;
 using GyanisScribe::Record::IRecordingEncoder;
+using GyanisScribe::Record::locateFfmpeg;
 using GyanisScribe::Record::OutputFormat;
 using GyanisScribe::Record::RecorderConfig;
 using GyanisScribe::Record::RecordingService;
@@ -243,12 +245,14 @@ namespace
      * @brief 配对的那一条：MP4 选了取声仍然真的要去起 ffmpeg
      * @details 上一那条容易被写成「什么格式都跳过取声」——那种做法会把 MP4 的音轨一起关掉。
      *          这里在没有 ffmpeg 的现场断「起不动就拒绝开始」，跳过用在了对的档位上才算得住。
+     *          前置条件要按产品自己那条查找顺序判（程序目录里随包那份 → PATH），
+     *          只看 PATH 会漏掉「可执行体旁边就躺着一份」这种现场——随包分发之后那是常态。
      */
     TEST_F(RecordingServiceFixture, Mp4WithAudioRequestedStillWantsFfmpeg)
     {
-        if (!QStandardPaths::findExecutable(QStringLiteral("ffmpeg")).isEmpty())
+        if (locateFfmpeg())
         {
-            GTEST_SKIP() << "这台机器 PATH 上有 ffmpeg，这一条要的是「没有它」的那一种现场";
+            GTEST_SKIP() << "这份现场找得到 ffmpeg，这一条要的是「没有它」的那一种情况";
         }
 
         StubCaptureSource     source;
