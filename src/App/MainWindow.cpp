@@ -621,6 +621,23 @@ namespace
     }
 
     /**
+     * @brief 按当前输出格式决定两格取声可用不可用
+     * @param formatCombo 输出格式下拉
+     * @param microphoneCombo 麦克风那一格
+     * @param systemSoundCombo 系统声音那一格
+     * @details GIF 容器没有音轨，选了它就把两格关掉：判据与 RecordingService 跳过取声用的是同一句
+     *          outputFormatCarriesAudio。不动 tooltip——列不出设备时原因正挂在 tooltip 上，覆盖它就挤掉了那条信息。
+     */
+    void applyAudioAvailability(const QComboBox &formatCombo, QComboBox &microphoneCombo, QComboBox &systemSoundCombo)
+    {
+        const auto parsed       = GyanisScribe::Record::parseRecordFormat(formatCombo.currentData().toString());
+        const auto chosen       = parsed ? *parsed : GyanisScribe::Record::RecorderConfig{}.format;
+        const auto carriesAudio = GyanisScribe::Record::outputFormatCarriesAudio(chosen);
+        microphoneCombo.setEnabled(carriesAudio);
+        systemSoundCombo.setEnabled(carriesAudio);
+    }
+
+    /**
      * @brief 录屏输出格式下拉：档位、配置里的取值与设置页标签都取自 Record::kRecordFormatChoices
      * @param settings 配置存储
      * @return 归调用方所有的下拉框
@@ -955,21 +972,27 @@ namespace GyanisScribe::App
     QWidget *MainWindow::buildRecordPage()
     {
         auto *page = new QWidget{this};
-        auto *form = makePageForm(page,
-                                  GyanisScribe::Core::uiText("录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。存成 GIF 时帧率上限比 MP4 "
-                                                             "低。画面码率填 0 就交给编码器的质量档，给了具体数值就按那个码率控，GIF "
-                                                             "用不上这一项。取声那两格列不出设备时只剩「不取这一路」，把鼠标停在框上能看到原因。这几项都从下一次开始录屏时生效。"));
+        auto *form = makePageForm(page, GyanisScribe::Core::uiText("录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。存成 GIF 时帧率上限比 MP4 "
+                                                                   "低。画面码率填 0 就交给编码器的质量档，给了具体数值就按那个码率控，GIF "
+                                                                   "用不上这一项。取声那两格列不出设备时只剩「不取这一路」，把鼠标停在框上能看到原因；存成 GIF "
+                                                                   "时这两格会灰掉，那种文件带不了声音。这几项都从下一次开始录屏时生效。"));
         form->addRow(GyanisScribe::Core::uiText("录屏成品目录"),
                      makePathRow(m_settings, GyanisScribe::Settings::kPathRecording, GyanisScribe::Core::uiText("录屏目录"), Core::Paths::defaultRecordingDirectory(), m_icons));
         form->addRow(GyanisScribe::Core::uiText("录制范围"), makeRecordScopeCombo(m_settings));
-        form->addRow(GyanisScribe::Core::uiText("输出格式"), makeRecordFormatCombo(m_settings));
+        auto *formatCombo = makeRecordFormatCombo(m_settings);
+        form->addRow(GyanisScribe::Core::uiText("输出格式"), formatCombo);
         form->addRow(GyanisScribe::Core::uiText("默认帧率"), makeFrameRateSpin(m_settings));
         form->addRow(GyanisScribe::Core::uiText("画面码率"), makeVideoBitrateSpin(m_settings));
         form->addRow(GyanisScribe::Core::uiText("光标高亮"), makeCursorHighlightCheck(m_settings));
-        form->addRow(GyanisScribe::Core::uiText("麦克风这一路"),
-                     makeAudioDeviceCombo(m_settings, GyanisScribe::Settings::kRecordAudioMicrophone, GyanisScribe::Core::uiText("麦克风设备"), *m_audioDevices));
-        form->addRow(GyanisScribe::Core::uiText("系统声音这一路"),
-                     makeAudioDeviceCombo(m_settings, GyanisScribe::Settings::kRecordAudioSystemSound, GyanisScribe::Core::uiText("系统声音设备"), *m_audioDevices));
+        auto *microphoneCombo  = makeAudioDeviceCombo(m_settings, GyanisScribe::Settings::kRecordAudioMicrophone, GyanisScribe::Core::uiText("麦克风设备"), *m_audioDevices);
+        auto *systemSoundCombo = makeAudioDeviceCombo(m_settings, GyanisScribe::Settings::kRecordAudioSystemSound, GyanisScribe::Core::uiText("系统声音设备"), *m_audioDevices);
+        form->addRow(GyanisScribe::Core::uiText("麦克风这一路"), microphoneCombo);
+        form->addRow(GyanisScribe::Core::uiText("系统声音这一路"), systemSoundCombo);
+
+        // 选到 GIF 就把取声那两格关掉：判据与 RecordingService 跳过取声用的是同一句
+        QObject::connect(formatCombo, &QComboBox::currentIndexChanged, formatCombo,
+                         [formatCombo, microphoneCombo, systemSoundCombo](int) { applyAudioAvailability(*formatCombo, *microphoneCombo, *systemSoundCombo); });
+        applyAudioAvailability(*formatCombo, *microphoneCombo, *systemSoundCombo);
         return page;
     }
 

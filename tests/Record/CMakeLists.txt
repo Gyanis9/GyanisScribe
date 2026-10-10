@@ -1,5 +1,6 @@
 add_executable(TestRecord
         TestRecording.cpp
+        TestRecordingService.cpp
         TestFfmpegAudioDevices.cpp
         TestFfmpegVideoEncoders.cpp
         TestRecordingHud.cpp

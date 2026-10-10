@@ -452,8 +452,8 @@
             <translation>Opacity for new pins</translation>
         </message>
         <message>
-            <source>录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。存成 GIF 时帧率上限比 MP4 低。画面码率填 0 就交给编码器的质量档，给了具体数值就按那个码率控，GIF 用不上这一项。取声那两格列不出设备时只剩「不取这一路」，把鼠标停在框上能看到原因。这几项都从下一次开始录屏时生效。</source>
-            <translation>Recorded files land in this folder. With Last selection or Current window the picture keeps only that part of the screen. GIF allows a lower frame rate ceiling than MP4. A video bitrate of 0 leaves the quality to the encoder, a concrete number caps the bitrate, and GIF ignores this row. When the two audio rows can't list any device, only "Don't take this input" is left there - hover over the box to read why. All of these apply from the next recording.</translation>
+            <source>录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。存成 GIF 时帧率上限比 MP4 低。画面码率填 0 就交给编码器的质量档，给了具体数值就按那个码率控，GIF 用不上这一项。取声那两格列不出设备时只剩「不取这一路」，把鼠标停在框上能看到原因；存成 GIF 时这两格会灰掉，那种文件带不了声音。这几项都从下一次开始录屏时生效。</source>
+            <translation>Recorded files land in this folder. With Last selection or Current window the picture keeps only that part of the screen. GIF allows a lower frame rate ceiling than MP4. A video bitrate of 0 leaves the quality to the encoder, a concrete number caps the bitrate, and GIF ignores this row. When the two audio rows can't list any device, only "Don't take this input" is left there - hover over the box to read why; with GIF those two rows grey out because that container carries no sound. All of these apply from the next recording.</translation>
         </message>
         <message>
             <source>录屏成品目录</source>

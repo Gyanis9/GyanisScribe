@@ -301,6 +301,14 @@ namespace GyanisScribe::Record
             return {};
         }
 
+        // 存的是 MP4 才谈得上取声：GIF 容器没有音轨，起了进程只会得到一份没人用的 wav 还占着磁盘。
+        // 设置页选 GIF 时已经把两格置灰，这里兜的是「导入的配置里两格有值而格式是 GIF」那一路
+        if (!outputFormatCarriesAudio(m_config.format))
+        {
+            Core::Logger::info("录屏取声跳过：GIF 容器带不了声音。要留声就把输出格式改成 MP4");
+            return {};
+        }
+
         const auto program = locateFfmpeg();
         if (!program)
         {

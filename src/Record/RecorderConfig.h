@@ -58,6 +58,19 @@ namespace GyanisScribe::Record
     };
 
     /**
+     * @brief 这一档输出容器带不带音轨
+     * @param format 输出格式
+     * @return true 表示取回来的声音有地方放；GIF 返回 false
+     * @details GIF 容器根本没有音轨，起了取声的 ffmpeg 只会得到一份没人用的 wav。
+     *          判据只写在这一处：设置页置灰那两格与 RecordingService 跳过取声用的必须是同一句话，
+     *          两处不同解就会出现「界面能选而服务不认」或者反过来。
+     */
+    [[nodiscard]] constexpr bool outputFormatCarriesAudio(const OutputFormat format) noexcept
+    {
+        return format != OutputFormat::Gif;
+    }
+
+    /**
      * @brief 校验一轮录屏的参数
      * @param config 待校验的参数
      * @return 成功返回空载荷；任一项不成立返回 InvalidArgument 与中文原因

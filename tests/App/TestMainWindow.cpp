@@ -383,6 +383,32 @@ namespace
     }
 
     /**
+     * @brief 钉住「GIF 带不了声音」时取声那两格是灰的，改回 MP4 又亮
+     * @details 灰掉而不是允许选：允许选就会起一份取声的 ffmpeg，录完才发现那种容器没有音轨，
+     *          那份 wav 除了占磁盘没有别的用处。判据取自 Record::outputFormatCarriesAudio，与服务端同一句。
+     */
+    TEST_F(MainWindowFixture, AudioRowsGreyOutForTheFormatThatCannotCarrySound)
+    {
+        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kRecordFormat, QStringLiteral("Gif"))));
+
+        makeWindow();
+        m_window->open(MainWindowPage::Record);
+        auto *microphone  = qobject_cast<QComboBox *>(controlInCurrentPage("麦克风设备"));
+        auto *systemSound = qobject_cast<QComboBox *>(controlInCurrentPage("系统声音设备"));
+        auto *format      = qobject_cast<QComboBox *>(controlInCurrentPage("输出格式"));
+        ASSERT_NE(microphone, nullptr);
+        ASSERT_NE(systemSound, nullptr);
+        ASSERT_NE(format, nullptr);
+
+        EXPECT_FALSE(microphone->isEnabled()) << "存成 GIF 也允许选取声，就是允许起一份没人听的 ffmpeg";
+        EXPECT_FALSE(systemSound->isEnabled());
+
+        format->setCurrentIndex(format->findData(QStringLiteral("Mp4")));
+        EXPECT_TRUE(microphone->isEnabled()) << "改回 MP4 之后这两格该恢复可选";
+        EXPECT_TRUE(systemSound->isEnabled());
+    }
+
+    /**
      * @brief 钉住「配置里的录制范围读不出」时界面按初值档显示，而读端仍然拒绝开录
      * @details 两边都不许静默变形：界面不能把坏值当成用户选过的一档顺手写回去，
      *          读端更不能悄悄按整屏开始——录下来的画面与用户想要的完全不是一回事。

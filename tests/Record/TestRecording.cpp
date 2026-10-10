@@ -522,6 +522,22 @@ TEST(RecorderVideoBitrateSetting, ZeroIsAChoiceAndOutsideRangeIsRejected)
 }
 
 /**
+ * @brief 钉住「哪种输出带得了声音」：词表里只有 GIF 带不了
+ * @details 这一句同时管着设置页置灰哪两格与 RecordingService 跳过不跳过取声。新加一档格式时
+ *          循环那条会要求作者表态它带不带音轨，而不是让取回来的声音默默落进一个没人读的容器。
+ */
+TEST(OutputFormatCarriesAudio, OnlyGifCannotKeepASoundTrack)
+{
+    EXPECT_TRUE(GyanisScribe::Record::outputFormatCarriesAudio(GyanisScribe::Record::OutputFormat::Mp4));
+    EXPECT_FALSE(GyanisScribe::Record::outputFormatCarriesAudio(GyanisScribe::Record::OutputFormat::Gif));
+
+    for (const auto &choice: GyanisScribe::Record::kRecordFormatChoices)
+    {
+        EXPECT_EQ(GyanisScribe::Record::outputFormatCarriesAudio(choice.format), choice.format == GyanisScribe::Record::OutputFormat::Mp4) << std::string{choice.token};
+    }
+}
+
+/**
  * @brief 钉住录制范围词表：每一档写得出去也读得回来，读不出时报错要点名可取的值
  * @details 这张表是设置页、配置文件与录屏读端三方共用的唯一出处。漏一档就有一档在界面上选得出来
  *          却读不回去；两行同 token 则 parseRecordScope 先命中哪条说不准，下拉框也会出现同义的两行。
