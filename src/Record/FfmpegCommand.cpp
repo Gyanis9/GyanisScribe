@@ -18,7 +18,7 @@ namespace
      */
     QString fromPath(const std::filesystem::path &path)
     {
-        return QString::fromLocal8Bit(path.string().c_str());
+        return QString::fromLocal8Bit(path.string().c_str()); // 例外：命令行参数要按本地码页交给子进程，这条路不丢字
     }
 
     /// 帧序列输入的命令行写法：目录 + 定宽补零的模板

@@ -4,9 +4,9 @@ Windows 优先、可跨平台的桌面工具：截图、标注、贴图、取色
 交互参考 Snipaste，但不使用其任何代码、图标、界面素材或商标。
 
 - **技术栈**：C++23 · Qt 6.11（Widgets/Svg/Network）· CMake ≥ 3.28 · Conan 2 · MSVC 2022；Linux 侧在 Docker Ubuntu 24.04 容器内构建与验证
-- **当前状态**：六大功能已可用；本机 debug 与 release 两档各 230 条用例全绿；容器 asan 与 coverage 两档
-  229 条通过、1 条跳过（容器那份 Qt 6.4 没有 lrelease，「真实语言包装载」那条只能在有包的一档成立）；
-  行覆盖率 63.6%（阈值 55%）；打包脚本产出绿色目录 + zip + NSIS 安装器，英文语言包随包分发
+- **当前状态**：六大功能已可用；本机 debug 与 release 两档各 233 条用例全绿；容器 asan 与 coverage 两档
+  232 条通过、1 条跳过（容器那份 Qt 6.4 没有 lrelease，「真实语言包装载」那条只能在有包的一档成立）；
+  行覆盖率 63.5%（阈值 55%）；打包脚本产出绿色目录 + zip + NSIS 安装器，英文语言包随包分发
 - **需求与硬约束**：[docs/ProjectRequirements.md](docs/ProjectRequirements.md)
 
 ## 热键与功能
@@ -133,5 +133,10 @@ tests/          逐级镜像 src 的目录结构
 - **窗口录屏的光标位置**：整屏与选区都能圈出光标，录单个窗口时圈不出来——帧里只有窗口像素，
   窗口左上角的全局读数要等平台侧的窗口几何接口。`RecordingService` 在第一帧就把这一点写进日志，不画错位的圈。
 - **安装器真机 smoke test**：脚本验到 staging 自检通过 + 安装器带卸载段，「装完能起、卸载能清」还没在真机上跑过。
+- **路径文本还剩一处形状没清完**：界面与文件写入那几处已经改走 `Core::Paths::toDisplayText / fromDisplayText`
+  （新加的 `Style.SourceConventions` 门禁管着，同一句里写明理由的例外才放过），但日志与错误文案里还有若干
+  `std::format("…", path.string())` 的形状——Windows 上本地码页装不下的字会让这一句直接抛 `std::system_error`。
+  清法是逐处换成 `toDisplayText(path).toStdString()`，并把那条门禁的检查面扩到 format 实参；
+  先没扩是因为要先数清有多少处、哪几处（spdlog 与 Tesseract 的 C 接口）本就该拿窄串。
 - **TSan 一档**：容器里跑不了（`setarch -R` 的 `personality` 被 Docker 自带 seccomp 拒绝，实测 EPERM），
   要用 `docker run --security-opt seccomp=unconfined` 起容器才能补上这一轮跨线程判据。

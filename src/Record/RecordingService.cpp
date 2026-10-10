@@ -131,7 +131,7 @@ namespace GyanisScribe::Record
             // 成品已经有了，这里只报一条：清不掉是磁盘占用问题，不是录屏失败
             Core::Logger::warning(std::format("临时帧目录没清干净：{}（{}）", m_frameDirectory.string(), cleanupError.message()));
         }
-        emit finished(QString::fromLocal8Bit(encoded->string().c_str()));
+        emit finished(Core::Paths::toDisplayText(*encoded));
         return encoded;
     }
 

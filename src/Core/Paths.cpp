@@ -25,9 +25,9 @@ namespace GyanisScribe::Core
             // 因为调用方拿到空路径会在下一句 create_directories 上失败得更难读
             if (location.isEmpty())
             {
-                return std::filesystem::path(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation).toStdString());
+                return std::filesystem::path(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation).toStdWString());
             }
-            return std::filesystem::path(location.toStdString());
+            return std::filesystem::path(location.toStdWString());
         }
 
     } // namespace

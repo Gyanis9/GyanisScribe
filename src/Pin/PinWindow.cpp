@@ -57,7 +57,7 @@ namespace GyanisScribe::Pin
             const auto configured = settings.stringValue(Settings::kPathScreenshot, QString());
             if (!configured.trimmed().isEmpty())
             {
-                return std::filesystem::path(configured.toStdString());
+                return Core::Paths::fromDisplayText(configured);
             }
             return Core::Paths::defaultScreenshotDirectory();
         }
@@ -198,7 +198,7 @@ namespace GyanisScribe::Pin
         const QString fileName = Core::Paths::imageFileName(QDateTime::currentDateTime(), "png");
         const auto    filePath = directory / fileName.toStdString();
 
-        if (!m_image.save(QString::fromLocal8Bit(filePath.string().c_str())))
+        if (!m_image.save(Core::Paths::toDisplayText(filePath)))
         {
             return std::unexpected(
                     Core::Error{Core::ErrorCode::FileWriteFailed,
@@ -206,7 +206,7 @@ namespace GyanisScribe::Pin
         }
 
         Core::Logger::info(std::format("贴图已保存：{}", filePath.string()));
-        return QString::fromLocal8Bit(filePath.string().c_str());
+        return Core::Paths::toDisplayText(filePath);
     }
 
     QRect PinWindow::globalRect() const

@@ -65,16 +65,25 @@ namespace GyanisScribe::Ocr
             return false;
         };
 
-        const auto configured = settings.stringValue(Settings::kOcrTessDataDirectory, QString()).trimmed().toStdString();
-        if (!configured.empty() && hasModels(std::filesystem::path(configured)))
+        // 两处路径都从界面/环境变量里的文本换成路径要走 wstring：窄串按本地码页解释，装不下就抛
+        const auto configuredText = settings.stringValue(Settings::kOcrTessDataDirectory, QString()).trimmed();
+        if (!configuredText.isEmpty())
         {
-            return std::filesystem::path(configured);
+            const auto configured = Core::Paths::fromDisplayText(configuredText);
+            if (hasModels(configured))
+            {
+                return configured;
+            }
         }
 
-        const auto fromEnvironment = qEnvironmentVariable("TESSDATA_PREFIX");
-        if (!fromEnvironment.isEmpty() && hasModels(std::filesystem::path(fromEnvironment.toStdString())))
+        const auto environmentText = qEnvironmentVariable("TESSDATA_PREFIX");
+        if (!environmentText.isEmpty())
         {
-            return std::filesystem::path(fromEnvironment.toStdString());
+            const auto fromEnvironment = Core::Paths::fromDisplayText(environmentText);
+            if (hasModels(fromEnvironment))
+            {
+                return fromEnvironment;
+            }
         }
 
         const auto bundled = Core::Paths::applicationDataDirectory() / kTessDataFolder;

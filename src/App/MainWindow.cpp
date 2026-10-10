@@ -128,7 +128,7 @@ namespace
         auto      *layout  = new QHBoxLayout{row};
         auto      *editor  = new QLineEdit{row};
         const auto stored  = settings.stringValue(key, QString{});
-        const auto display = stored.isEmpty() ? QString::fromLocal8Bit(fallback.string().c_str()) : stored;
+        const auto display = stored.isEmpty() ? GyanisScribe::Core::Paths::toDisplayText(fallback) : stored;
         editor->setText(display);
         editor->setClearButtonEnabled(false);
         editor->setAccessibleName(title);
@@ -163,7 +163,7 @@ namespace
                                  {
                                      Logger::warning(std::format("{} 没能写入：{}", title.toStdString(), written.error().message));
                                  }
-                                 editor->setText(QString::fromLocal8Bit(fallback.string().c_str()));
+                                 editor->setText(GyanisScribe::Core::Paths::toDisplayText(fallback));
                                  return;
                              }
                              if (auto written = settings.setValue(key, text); !written)
@@ -614,9 +614,10 @@ namespace GyanisScribe::App
 
     void MainWindow::exportSettingsToFile(const QString &filePath)
     {
-        // 路径按本地编码交给文件系统：SettingsStore 那边也是 fromLocal8Bit 读回来，两边同一个码页才对得上
-        const std::filesystem::path target{filePath.toLocal8Bit().toStdString()};
-        const auto                  exported = m_settings.exportToFile(target);
+        // 界面里的路径串换回路径要走 wstring：Windows 上 narrow 那一串按本地 ANSI 码页解释，
+        // 中文目录名会被读成另一条不存在的路（Core::Paths::fromDisplayText 是同一条规则的唯一出处）
+        const auto target   = Core::Paths::fromDisplayText(filePath);
+        const auto exported = m_settings.exportToFile(target);
         if (!exported)
         {
             Logger::warning(std::format("配置导出失败：{}", exported.error().message));
@@ -632,8 +633,8 @@ namespace GyanisScribe::App
 
     void MainWindow::importSettingsFromFile(const QString &filePath)
     {
-        const std::filesystem::path source{filePath.toLocal8Bit().toStdString()};
-        const auto                  imported = m_settings.importFromFile(source);
+        const auto source   = Core::Paths::fromDisplayText(filePath);
+        const auto imported = m_settings.importFromFile(source);
         if (!imported)
         {
             Logger::warning(std::format("配置导入失败：{}", imported.error().message));
@@ -668,7 +669,7 @@ namespace GyanisScribe::App
         QObject::connect(exportButton, &QPushButton::clicked, row,
                          [this]
                          {
-                             const auto suggested = QString::fromLocal8Bit((Core::Paths::applicationDataDirectory() / "GyanisScribe-settings.json").string().c_str());
+                             const auto suggested = GyanisScribe::Core::Paths::toDisplayText(Core::Paths::applicationDataDirectory() / "GyanisScribe-settings.json");
                              const auto picked =
                                      QFileDialog::getSaveFileName(this, GyanisScribe::Core::uiText("导出配置"), suggested, GyanisScribe::Core::uiText("配置文件 (*.json)"));
                              if (picked.isEmpty())

@@ -300,7 +300,7 @@ namespace GyanisScribe::App
     void AppController::handleSaveRequested(const QImage &image)
     {
         const auto                  configured = m_settings->stringValue(Settings::kPathScreenshot, QString{});
-        const std::filesystem::path directory  = configured.isEmpty() ? Core::Paths::defaultScreenshotDirectory() : std::filesystem::path{configured.toStdString()};
+        const std::filesystem::path directory  = configured.isEmpty() ? Core::Paths::defaultScreenshotDirectory() : Core::Paths::fromDisplayText(configured);
 
         if (const auto ensured = Core::Paths::ensureDirectory(directory); !ensured)
         {
@@ -310,7 +310,7 @@ namespace GyanisScribe::App
 
         const auto fileName = Core::Paths::imageFileName(QDateTime::currentDateTime(), "png");
         const auto filePath = directory / fileName.toStdString();
-        if (!image.save(QString::fromLocal8Bit(filePath.string().c_str())))
+        if (!image.save(Core::Paths::toDisplayText(filePath)))
         {
             Core::Logger::error(std::format("标注结果写入失败：{}。请检查目录是否可写，或先用「复制」交剪贴板", filePath.string()));
             return;
@@ -448,7 +448,7 @@ namespace GyanisScribe::App
         Record::RecorderConfig config;
         config.screenName      = screen->name();
         const auto configured  = m_settings->stringValue(Settings::kPathRecording, QString());
-        config.outputDirectory = configured.isEmpty() ? Core::Paths::defaultRecordingDirectory() : std::filesystem::path{configured.toStdString()};
+        config.outputDirectory = configured.isEmpty() ? Core::Paths::defaultRecordingDirectory() : Core::Paths::fromDisplayText(configured);
 
         // 帧率取用户记下的那一档；读不出时记一条并按 RecorderConfig 的初值走，
         // 不拿一个"看起来能用"的值替用户决定（validateRecorderConfig 会在真正开始前再判一次范围）

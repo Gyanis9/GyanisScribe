@@ -1,5 +1,6 @@
 #include "Record/RecordingSinks.h"
 
+#include "Core/Paths.h"
 #include "Core/Text.h"
 #include "FfmpegCommand.h"
 
@@ -22,7 +23,7 @@ namespace GyanisScribe::Record
 
         const auto target = m_directory / frameFileName(index);
         // QImage::save 按后缀选格式，返回 false 时不给原因；这里补上路径，用户才知道是磁盘满还是没权限
-        if (!frame.save(QString::fromLocal8Bit(target.string().c_str()), "PNG"))
+        if (!frame.save(Core::Paths::toDisplayText(target), "PNG"))
         {
             return std::unexpected(
                     Core::Error{Core::ErrorCode::FileWriteFailed,

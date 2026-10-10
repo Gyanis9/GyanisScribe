@@ -159,6 +159,24 @@ TEST_F(OcrFixture, WriteTextFileCreatesAndRejectsBlockedPath)
 }
 
 /**
+ * @brief 钉住「路径里有本地码页装不下的字」时结果仍写进那一条路
+ * @details Windows 上 path::string() 按本地 ANSI 码页给字节，装不下就直接抛 std::system_error，
+ *          而抛出点在一个承诺返回 std::expected 的函数里——可恢复的错误被升成了崩溃。
+ *          目录名刻意带表情符号：只用汉字时 cp936 自洽，这条判据会退化成恒过
+ *          （与 SettingsStore 那条同一个写法，改回窄串应当当场红）。
+ */
+TEST_F(OcrFixture, WriteTextFileTakesAPathTheLocalCodepageCannotHold)
+{
+    const auto exotic = m_root / QString::fromUtf8("识别结果-📍").toStdWString();
+    const auto target = exotic / "result.txt";
+
+    const auto written = writeTextFile(target, QStringLiteral("第一行"));
+    ASSERT_TRUE(written.has_value()) << written.error().message;
+    ASSERT_TRUE(std::filesystem::exists(target)) << "报成功而文件不在这条路上";
+    EXPECT_GT(std::filesystem::file_size(target), 0U);
+}
+
+/**
  * @brief 钉住桩后端：不可用要说原因给替代做法，识别不能装成功
  */
 TEST_F(OcrFixture, UnavailableEngineRejectsWithoutPretending)

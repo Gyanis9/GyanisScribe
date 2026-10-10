@@ -247,6 +247,42 @@ TEST_F(SettingsFixture, ExportThenImportRestoresIntoAnotherStore)
 }
 
 /**
+ * @brief 钉住「路径里有本地码页装不下的字」时导出与导入仍指到同一条路
+ * @details Windows 上 std::filesystem::path::string() 按本地 ANSI 码页给窄串（实测本机 ACP=936，
+ *          窄串就是 cp936 字节），码页装不下的字会被写成问号，于是「导出成功」而文件躺在另一条路上。
+ *          本工程一律走 wstring（Core::Paths::toDisplayText 是同一条规则的唯一出处）。
+ *          目录名刻意带上表情符号：只用汉字或西里尔字母时 cp936 装得下，窄串路线自洽，
+ *          这条判据就退化成恒过——要它真的能红，得放一个本机码页表示不了的字。
+ */
+TEST_F(SettingsFixture, ExportAndImportSurviveAPathTheLocalCodepageCannotHold)
+{
+    const auto caseName = "CjkPath";
+    removeProbeFiles(caseName);
+
+    const auto      directory = std::filesystem::temp_directory_path() / QString::fromUtf8("智录-Настройки-设置-📍").toStdWString();
+    std::error_code made;
+    std::filesystem::create_directories(directory, made);
+    ASSERT_FALSE(made) << "造不出这个目录：" << made.message();
+
+    const auto jsonFile = directory / std::format(L"GyanisScribe-Settings-{}.json", QString::fromUtf8("导出设置").toStdWString());
+
+    SettingsStore store(probePath(caseName, "store"));
+    ASSERT_TRUE(store.setValue("Paths/Screenshot", QVariant(QStringLiteral("D:/截图"))).has_value());
+    store.sync();
+
+    ASSERT_TRUE(store.exportToFile(jsonFile).has_value()) << "导出到这条路径应当成功";
+    ASSERT_TRUE(std::filesystem::exists(jsonFile)) << "导出报成功，但文件不在这条路上";
+
+    SettingsStore another(probePath(caseName, "target"));
+    const auto    imported = another.importFromFile(jsonFile);
+    ASSERT_TRUE(imported.has_value()) << "导入失败，原因：" << imported.error().message;
+    EXPECT_EQ(another.stringValue("Paths/Screenshot", QString()), QStringLiteral("D:/截图")) << "窄串把路径换成另一条后，读回来的就是另一份文件的内容";
+
+    std::error_code ignored;
+    std::filesystem::remove_all(directory, ignored);
+}
+
+/**
  * @brief 钉住导入的拒绝面：文件不存在与文件不是 JSON 对象都要给出原因
  */
 TEST_F(SettingsFixture, ImportRejectsUnreadableAndMalformedFiles)
