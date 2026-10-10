@@ -52,10 +52,11 @@ namespace
     };
 
     /// 下拉框的全部行：序号、档位、可见标签三者绑在这一张表上
-    constexpr std::array<ThemeChoice, 3> kThemeChoices = {
+    constexpr std::array<ThemeChoice, 4> kThemeChoices = {
             ThemeChoice{ThemeKind::Light, "浅色"},
             ThemeChoice{ThemeKind::Dark, "深色"},
             ThemeChoice{ThemeKind::System, "跟随系统"},
+            ThemeChoice{ThemeKind::HighContrast, "高对比度"},
     };
 
     /// 界面语言的全部行：标签用各自语言自称，因此这一张表不进翻译目录
@@ -201,7 +202,8 @@ namespace GyanisScribe::App
     {
         // 版本号由调用方从 QApplication::applicationVersion() 传进来：真源只有一处。
         // 整段是一条字面量：翻译目录按整段查，拆成相邻字面量会让目录里只收到第一片
-        return GyanisScribe::Core::uiText("智录 GyanisScribe %1\n\n截图、标注、贴图、录屏与文字识别。\n全局热键：Ctrl+Alt+A 截图，Ctrl+Alt+R 录屏（再按一次停止并保存），Ctrl+Alt+O 识别。\n界面图标全部为本项目原创 SVG；第三方组件与其许可证见仓库 docs/ThirdPartyLicenses.md。\n")
+        return GyanisScribe::Core::uiText("智录 GyanisScribe %1\n\n截图、标注、贴图、录屏与文字识别。\n全局热键：Ctrl+Alt+A 截图，Ctrl+Alt+R "
+                                          "录屏（再按一次停止并保存），Ctrl+Alt+O 识别。\n界面图标全部为本项目原创 SVG；第三方组件与其许可证见仓库 docs/ThirdPartyLicenses.md。\n")
                 .arg(version);
     }
 

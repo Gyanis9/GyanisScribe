@@ -29,11 +29,21 @@ namespace
 
     /**
      * @brief 按解算后的档位取样式表的资源路径
-     * @param resolvedKind 只会是 Light 或 Dark，其余按浅色取
+     * @param resolvedKind 只会是 Light、Dark 或 HighContrast，其余按浅色取
      */
     QString styleSheetPath(const ThemeKind resolvedKind)
     {
-        return resolvedKind == ThemeKind::Dark ? QStringLiteral(":/styles/Dark.qss") : QStringLiteral(":/styles/Light.qss");
+        switch (resolvedKind)
+        {
+            case ThemeKind::Dark:
+                return QStringLiteral(":/styles/Dark.qss");
+            case ThemeKind::HighContrast:
+                return QStringLiteral(":/styles/HighContrast.qss");
+            case ThemeKind::Light:
+            case ThemeKind::System:
+                break;
+        }
+        return QStringLiteral(":/styles/Light.qss");
     }
 } // namespace
 

@@ -105,10 +105,11 @@ TEST(TrayMenuTable, HotkeyHintsBindToRealSettingKeys)
  */
 TEST(MainWindowMapping, ThemeChoicesAndIndicesPointAtEachOther)
 {
-    constexpr std::array<std::pair<ThemeKind, std::string_view>, 3> expectedChoices = {
+    constexpr std::array<std::pair<ThemeKind, std::string_view>, 4> expectedChoices = {
             std::pair{ThemeKind::Light, std::string_view{"浅色"}},
             std::pair{ThemeKind::Dark, std::string_view{"深色"}},
             std::pair{ThemeKind::System, std::string_view{"跟随系统"}},
+            std::pair{ThemeKind::HighContrast, std::string_view{"高对比度"}},
     };
 
     const auto choices = themeChoices();
@@ -121,7 +122,8 @@ TEST(MainWindowMapping, ThemeChoicesAndIndicesPointAtEachOther)
         EXPECT_EQ(indexOfThemeKind(expectedChoices[index].first), static_cast<int>(index)) << index;
     }
 
-    EXPECT_FALSE(themeKindAt(3).has_value());
+    // 序号 3 现在是高对比度那一行，越界要到 4 才算「不在表里」
+    EXPECT_FALSE(themeKindAt(4).has_value());
     EXPECT_FALSE(themeKindAt(-1).has_value());
     EXPECT_EQ(indexOfThemeKind(static_cast<ThemeKind>(99)), -1) << "越界档位要给出 -1，让调用方跳过而不是写到 index 0";
 }

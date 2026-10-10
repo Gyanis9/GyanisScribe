@@ -167,6 +167,9 @@ TEST(ThemeKindResolution, ResolvesSystemAgainstEverySchemeAndKeepsExplicitChoice
     EXPECT_EQ(resolveThemeKind(ThemeKind::System, SystemScheme::Unknown), ThemeKind::Light);
     EXPECT_EQ(resolveThemeKind(ThemeKind::Light, SystemScheme::Dark), ThemeKind::Light);
     EXPECT_EQ(resolveThemeKind(ThemeKind::Dark, SystemScheme::Light), ThemeKind::Dark);
+    // 高对比度是用户明确选的档，系统报深色也不能把它换掉
+    EXPECT_EQ(resolveThemeKind(ThemeKind::HighContrast, SystemScheme::Dark), ThemeKind::HighContrast);
+    EXPECT_EQ(resolveThemeKind(ThemeKind::HighContrast, SystemScheme::Unknown), ThemeKind::HighContrast);
 }
 
 /**
@@ -176,7 +179,7 @@ TEST(ThemeKindResolution, ResolvesSystemAgainstEverySchemeAndKeepsExplicitChoice
  */
 TEST(ThemeKindResolution, TextAndKindPointAtEachOtherAndRejectOthers)
 {
-    for (const auto kind: {ThemeKind::Light, ThemeKind::Dark, ThemeKind::System})
+    for (const auto kind: {ThemeKind::Light, ThemeKind::Dark, ThemeKind::System, ThemeKind::HighContrast})
     {
         const auto text   = themeKindText(kind);
         const auto parsed = parseThemeKind(text);
@@ -184,14 +187,20 @@ TEST(ThemeKindResolution, TextAndKindPointAtEachOtherAndRejectOthers)
         EXPECT_EQ(*parsed, kind) << text;
     }
 
+    // 独立真源：配置里写的词逐条手抄，不拿 themeKindText 的输出反推——整张词表换掉也照样绿的那种断言抓不到东西
+    EXPECT_EQ(themeKindText(ThemeKind::HighContrast), "HighContrast");
+    EXPECT_EQ(parseThemeKind("HighContrast").value(), ThemeKind::HighContrast);
+
     // 大小写不同的写法要拒：配置文件里 dark 与 Dark 只差一个字母，静默接受就会让「改了什么」无据可查
-    for (const auto *wrong: {"dark", "SYSTEM", "NavyBlue", ""})
+    for (const auto *wrong: {"dark", "SYSTEM", "NavyBlue", "highcontrast", "HighContrast ", ""})
     {
         const auto rejected = parseThemeKind(wrong);
         ASSERT_FALSE(rejected.has_value()) << wrong;
         EXPECT_EQ(rejected.error().code, ErrorCode::InvalidArgument) << wrong;
         EXPECT_NE(rejected.error().message.find("Light"), std::string::npos) << wrong;
         EXPECT_NE(rejected.error().message.find("System"), std::string::npos) << wrong;
+        // 新档位在可用取值里也要出现，否则照着文案手填的人永远填不回来
+        EXPECT_NE(rejected.error().message.find("HighContrast"), std::string::npos) << wrong;
     }
 }
 
@@ -307,7 +316,8 @@ TEST_F(ThemeManagerFixture, GarbageStoredValueFallsBackToSystemAndLogsWarning)
  */
 TEST_F(ThemeManagerFixture, StyleSheetsAndPalettesAgreeInBothDirections)
 {
-    for (const auto [kind, resource]: {std::pair{ThemeKind::Light, std::string_view{":/styles/Light.qss"}}, std::pair{ThemeKind::Dark, std::string_view{":/styles/Dark.qss"}}})
+    for (const auto [kind, resource]: {std::pair{ThemeKind::Light, std::string_view{":/styles/Light.qss"}}, std::pair{ThemeKind::Dark, std::string_view{":/styles/Dark.qss"}},
+                                       std::pair{ThemeKind::HighContrast, std::string_view{":/styles/HighContrast.qss"}}})
     {
         const auto sheet   = readStyleSheet(resource).toUpper();
         const auto palette = paletteFor(kind);
@@ -333,9 +343,15 @@ TEST_F(ThemeManagerFixture, StyleSheetsAndPalettesAgreeInBothDirections)
         }
 
         // 绘制专用的三个色反过来断言不在 QSS 里：图标描边只走 IconProvider，
-        // Toast 的语义色只走 toastColorFor——出现在样式表里就是两套上色路径打架
+        // Toast 的语义色只走 toastColorFor——出现在样式表里就是两套上色路径打架。
+        // 例外：与某个 QSS 角色同值的不能算——高对比度档的 icon 就是纯黑，与 text/border 同值，
+        // 那里"出现在样式表里"的是文字与边框，不是图标在两套路径上各上一次色
         for (const auto &codeOnlyColor: {palette.icon, palette.success, palette.danger})
         {
+            if (std::ranges::any_of(paletteColors, [&codeOnlyColor](const QColor &color) { return color == codeOnlyColor; }))
+            {
+                continue;
+            }
             EXPECT_EQ(sheet.indexOf(hexOf(codeOnlyColor)), -1) << resource << " 里出现了只该由绘制代码用的语义色 " << hexOf(codeOnlyColor).toStdString();
         }
     }
@@ -347,7 +363,7 @@ TEST_F(ThemeManagerFixture, StyleSheetsAndPalettesAgreeInBothDirections)
  */
 TEST_F(ThemeManagerFixture, SemanticColorPairsMeetWcagContrast)
 {
-    for (const auto kind: {ThemeKind::Light, ThemeKind::Dark})
+    for (const auto kind: {ThemeKind::Light, ThemeKind::Dark, ThemeKind::HighContrast})
     {
         const auto palette = paletteFor(kind);
         const auto label   = std::string{themeKindText(kind)};
@@ -363,6 +379,18 @@ TEST_F(ThemeManagerFixture, SemanticColorPairsMeetWcagContrast)
         EXPECT_GE(contrastRatio(palette.text, palette.selection), 4.5) << label << " 选区上的正文读不出";
         EXPECT_GE(contrastRatio(palette.onAccent, palette.accent), 4.5) << label << " 主按钮上的文字读不出";
     }
+
+    // 高对比度档另加一档判据：正文与次要文本要满足 AAA 的 7:1——这一档存在的理由就是「AA 还不够」，
+    // 只按 AA 复核的话，做一版与浅色档同样对比度的「高对比度」也能全绿
+    const auto highContrast = paletteFor(ThemeKind::HighContrast);
+    EXPECT_GE(contrastRatio(highContrast.text, highContrast.windowBackground), 7.0) << "高对比度档的正文只有 AA 级";
+    EXPECT_GE(contrastRatio(highContrast.secondaryText, highContrast.surface), 7.0) << "次要文本在这一档不该比正文弱";
+    EXPECT_GE(contrastRatio(highContrast.text, highContrast.selection), 7.0) << "选区上的正文要最强对比";
+
+    // 这一档还得真的和浅色档长得不一样：边框加粗是需求写的可辨识差异，样式表里没落就是空档
+    const auto highContrastSheet = ThemeManager::styleSheetFor(ThemeKind::HighContrast).toUpper();
+    EXPECT_FALSE(highContrastSheet.isEmpty());
+    EXPECT_NE(highContrastSheet.indexOf(QStringLiteral("2PX SOLID")), -1) << "高对比度档没把边框加粗，界面与浅色档没区别";
 }
 
 /**

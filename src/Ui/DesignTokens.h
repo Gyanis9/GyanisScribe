@@ -15,6 +15,7 @@
 
 #include <array>
 #include <cstddef>
+#include <optional>
 
 namespace GyanisScribe::Ui
 {
@@ -102,14 +103,44 @@ namespace GyanisScribe::Ui
     };
 
     /**
+     * @brief 高对比度主题的语义色
+     * @details 刻意不用灰阶层级：次要文本与正文同为纯黑、边框为纯黑（浅色与深色主题那条
+     *          「边框不用纯黑」在这里反过来是要求），靠 2px 边框与主色区分层级。
+     *          选区用纯黄而不是主色系，是为了让纯黑正文压在选区上仍是最强对比的那一档。
+     */
+    inline constexpr ThemePalette kHighContrastPalette{
+            QColor{255, 255, 255}, // windowBackground
+            QColor{255, 255, 255}, // surface
+            QColor{0, 0, 0},       // text
+            QColor{0, 0, 0},       // secondaryText
+            QColor{0, 0, 0},       // border
+            QColor{11, 87, 208},   // accent
+            QColor{255, 255, 255}, // onAccent
+            QColor{255, 229, 0},   // selection
+            QColor{0, 0, 0},       // icon
+            QColor{0, 100, 0},     // success
+            QColor{176, 0, 0},     // danger
+    };
+
+    /**
      * @brief 按已定档的主题取语义色
-     * @param themeKind 主题档，System 不该传进来（调用方应先解算成 Light 或 Dark）
+     * @param themeKind 主题档，System 不该传进来（调用方应先解算成 Light、Dark 或 HighContrast）
      * @return 对应主题的调色板引用
      * @note System 按浅色返回：这是「解算失败」的兜底档，正常路径拿不到它，兜底分支由用例钉住
      */
     [[nodiscard]] constexpr const ThemePalette &paletteFor(ThemeKind themeKind)
     {
-        return themeKind == ThemeKind::Dark ? kDarkPalette : kLightPalette;
+        switch (themeKind)
+        {
+            case ThemeKind::Dark:
+                return kDarkPalette;
+            case ThemeKind::HighContrast:
+                return kHighContrastPalette;
+            case ThemeKind::Light:
+            case ThemeKind::System:
+                break;
+        }
+        return kLightPalette;
     }
 
     /**
@@ -130,9 +161,10 @@ namespace GyanisScribe::Ui
 
     /// 标注线宽阶梯，工具栏的滑块按这几档走，不允许连续取值
     inline constexpr std::array<int, 4> kAnnotationWidths{2, 4, 6, 8};
-
     /// 字号阶梯（需求第五节：12 / 13 / 14 / 16 / 20 / 24），工具栏的字号下拉只列这几档
     inline constexpr std::array<int, 6> kFontSizes{12, 13, 14, 16, 20, 24};
+
+
 
     /**
      * @brief 按序号取标注色板里的颜色

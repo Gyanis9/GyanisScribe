@@ -25,9 +25,10 @@ namespace GyanisScribe::Ui
      */
     enum class ThemeKind
     {
-        Light,  ///< 浅色主题
-        Dark,   ///< 深色主题
-        System, ///< 跟随系统的深浅色偏好
+        Light,        ///< 浅色主题
+        Dark,         ///< 深色主题
+        System,       ///< 跟随系统的深浅色偏好
+        HighContrast, ///< 高对比度主题：纯黑白加主色，边框加粗，不用灰阶层级
     };
 
     /**
