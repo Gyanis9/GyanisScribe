@@ -93,7 +93,8 @@ namespace GyanisScribe::Core
     {
         // 命名格式的唯一出处：贴图保存、标注保存与以后的录屏都走这里，
         // 毫秒位保证同一秒里连续导出两次不会互相覆盖
-        const auto stem = moment.toString(QStringLiteral("GyanisScribe_yyyyMMdd_HHmmss_zzz"));
+        // 程序名必须用单引号包住：不包的那几个字母会被当成格式记号换掉数字（实测出过 Gyamni54Scribe_…）
+        const auto stem = moment.toString(QStringLiteral("'GyanisScribe'_yyyyMMdd_HHmmss_zzz"));
         return stem + QStringLiteral(".") + QString::fromUtf8(extension.data(), static_cast<qsizetype>(extension.size()));
     }
 

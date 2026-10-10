@@ -1,6 +1,7 @@
 #include "Core/Paths.h"
 
 #include <QCoreApplication>
+#include <QDateTime>
 
 #include <gtest/gtest.h>
 
@@ -112,4 +113,17 @@ TEST_F(PathsFixture, EnsureDirectoryRejectsPathBlockedByFile)
     EXPECT_EQ(result.error().code, ErrorCode::FileWriteFailed);
     EXPECT_NE(result.error().message.find("目录创建失败"), std::string::npos) << "文案要写给用户看的中文原因，实际是：" << result.error().message;
     EXPECT_NE(result.error().message.find(blocker.string()), std::string::npos) << "文案里没带出问题的路径，用户无法自查";
+}
+
+/**
+ * @brief 钉住交付文件名：程序名原样保留，只有日期那几段按格式展开
+ * @details 期望值写死成字面量，不用同一个 toString 现算——这条格式串里每个字母都可能是 Qt 的格式记号，
+ *          同源算出来的期望会把缺陷一起抄进期望。
+ */
+TEST_F(PathsFixture, ImageFileNameKeepsLiteralBrandAndExpandsOnlyDateTokens)
+{
+    const QDateTime moment{QDate{2026, 10, 11}, QTime{5, 48, 54, 160}};
+
+    EXPECT_EQ(Paths::imageFileName(moment, "png").toStdString(), "GyanisScribe_20261011_054854_160.png");
+    EXPECT_EQ(Paths::imageFileName(moment, "txt").toStdString(), "GyanisScribe_20261011_054854_160.txt");
 }
