@@ -57,6 +57,37 @@ TEST(PlatformIntegration, CapabilityTableMatchesProvidedBackend)
 #endif
 }
 
+/**
+ * @brief 钉住「取前台窗口」的能力位与实际给果同解
+ * @details 托盘菜单按这一位决定放不放「截取当前窗口」，位与行为分家时要么白少一项、要么放一条按了报错的项。
+ *          Windows 上不锁死结果：有没有前台窗口取决于用户此刻点了什么，这里只钉「不许报 PlatformUnsupported」
+ *          （那等于说这台机器做不出来，与能力位矛盾）；非 Windows 必须回绝且要给出替代做法。
+ */
+TEST(PlatformIntegration, WindowDiscoveryCapabilityMatchesTheOutcome)
+{
+    const auto integration = createPlatformIntegration();
+    ASSERT_NE(integration, nullptr);
+
+#ifdef Q_OS_WIN
+    EXPECT_TRUE(integration->capabilities().windowDiscovery) << "Windows 上 GetForegroundWindow 是给得出了，能力表不许写假";
+    const auto window = integration->foregroundWindow();
+    if (!window)
+    {
+        EXPECT_NE(window.error().code, ErrorCode::PlatformUnsupported) << "能力位说有，这一句却回绝：实际是 " << window.error().message;
+        EXPECT_FALSE(window.error().message.empty()) << "回绝时不许给空原因";
+    } else
+    {
+        EXPECT_NE(window->handle, static_cast<quintptr>(0)) << "报成功却交了个空句柄";
+    }
+#else
+    EXPECT_FALSE(integration->capabilities().windowDiscovery) << "本平台没有会话协议级的取窗口实现，能力表不许写假";
+    const auto window = integration->foregroundWindow();
+    ASSERT_FALSE(window.has_value()) << "能力位说没有，却还是交出了一个句柄";
+    EXPECT_EQ(window.error().code, ErrorCode::PlatformUnsupported);
+    EXPECT_NE(QString::fromStdString(window.error().message).indexOf(QStringLiteral("框选")), -1) << "回绝时没指替代做法：实际是 " << window.error().message;
+#endif
+}
+
 #ifdef Q_OS_WIN
 /**
  * @brief 钉住 Qt 取值到 Win32 取值域的转换与拒绝面

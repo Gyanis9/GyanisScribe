@@ -23,6 +23,7 @@ using GyanisScribe::Core::Expected;
 using GyanisScribe::Hotkey::HotkeyAction;
 using GyanisScribe::Hotkey::HotkeyManager;
 using GyanisScribe::Hotkey::HotkeyReloadReport;
+using GyanisScribe::Platform::ForegroundWindow;
 using GyanisScribe::Platform::IHotkeyBackend;
 using GyanisScribe::Platform::IPlatformIntegration;
 using GyanisScribe::Platform::PlatformCapabilities;
@@ -105,6 +106,17 @@ namespace
         QString displayName() const override
         {
             return QStringLiteral("测试替身");
+        }
+
+        /**
+         * @brief 取前台窗口：这份替身一律回绝
+         * @return PlatformUnsupported
+         * @note 与上面 capabilities() 里 windowDiscovery 保持为假同解——替身不许一边说没能力、
+         *       一边交出一个句柄，那会让「能力位与行为一致」那条判据在这里就失去意义
+         */
+        Expected<ForegroundWindow> foregroundWindow() const override
+        {
+            return std::unexpected(Error{ErrorCode::PlatformUnsupported, "测试替身不演取前台窗口这一项"});
         }
 
         std::unique_ptr<IHotkeyBackend> createHotkeyBackend() override

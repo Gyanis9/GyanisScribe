@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "Core/Types.h"
 #include "Platform/IHotkeyBackend.h"
 #include "Platform/PlatformCapabilities.h"
 
@@ -19,6 +20,15 @@
 
 namespace GyanisScribe::Platform
 {
+
+    /**
+     * @brief 一个前台窗口的快照
+     */
+    struct ForegroundWindow
+    {
+        quintptr handle = 0; ///< 平台窗口句柄，与 Qt 的 WId 同一口径，可直接交给抓帧那一步
+        QString  title;      ///< 标题栏文字；有些窗口不给标题，空串是正常的
+    };
 
     /**
      * @brief 平台集成抽象
@@ -57,6 +67,14 @@ namespace GyanisScribe::Platform
          * @note 每次调用给一个新对象，不共享：重载配置要「先全注销再重登」，共享实例会把上一次的登记带过来
          */
         [[nodiscard]] virtual std::unique_ptr<IHotkeyBackend> createHotkeyBackend() = 0;
+
+        /**
+         * @brief 取当前前台窗口
+         * @return 成功返回句柄与标题；本平台给不出时返回 PlatformUnsupported，并在文案里指一条替代做法
+         * @note 只给句柄不给几何：抓哪一块由抓帧那一步按句柄去问，这里再读一次系统就是两处读数，
+         *       窗口正在动的时候两边会不一致
+         */
+        [[nodiscard]] virtual Core::Expected<ForegroundWindow> foregroundWindow() const = 0;
     };
 
     /**

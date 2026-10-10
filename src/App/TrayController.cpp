@@ -2,6 +2,8 @@
 
 #include "Core/Logger.h"
 #include "Core/Text.h"
+#include "Platform/IPlatformIntegration.h"
+#include "Platform/PlatformCapabilities.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
 #include "Ui/IconProvider.h"
@@ -41,6 +43,7 @@ namespace GyanisScribe::App
         entries.append(TrayMenuEntry{TrayAction::CaptureRegion, "CaptureRegion", GyanisScribe::Core::uiText("框选截图"), GyanisScribe::Settings::kHotkeyCapture});
         entries.append(TrayMenuEntry{TrayAction::CaptureFullScreen, "CaptureFullScreen", GyanisScribe::Core::uiText("整屏截图"), {}});
         entries.append(TrayMenuEntry{TrayAction::CaptureLastRegion, "CaptureLastRegion", GyanisScribe::Core::uiText("重复上次选区"), {}});
+        entries.append(TrayMenuEntry{TrayAction::CaptureWindow, "CaptureRegion", GyanisScribe::Core::uiText("截取当前窗口"), {}});
         entries.append(TrayMenuEntry{}); // 分隔线
         entries.append(TrayMenuEntry{TrayAction::ToggleRecord, "Record", GyanisScribe::Core::uiText("开始 / 停止录屏"), GyanisScribe::Settings::kHotkeyRecord});
         entries.append(TrayMenuEntry{TrayAction::Recognize, "Ocr", GyanisScribe::Core::uiText("识别文字"), GyanisScribe::Settings::kHotkeyOcr});
@@ -54,8 +57,25 @@ namespace GyanisScribe::App
         return entries;
     }
 
-    TrayController::TrayController(GyanisScribe::Ui::IconProvider &icons, GyanisScribe::Ui::ThemeManager &theme, Settings::ISettingsStore &settings, QObject *parent) :
-        QObject(parent), m_icons(icons), m_theme(theme), m_settings(settings)
+    QList<TrayMenuEntry> visibleTrayMenuEntries(const Platform::PlatformCapabilities &capabilities)
+    {
+        QList<TrayMenuEntry> visible;
+        for (const auto &entry: trayMenuEntries())
+        {
+            // 「截取当前窗口」要靠平台给出前台窗口，Linux 那一档做不出来：
+            // 留着它就是让用户点出一条报错，所以按能力直接不放
+            if (entry.action == TrayAction::CaptureWindow && !capabilities.windowDiscovery)
+            {
+                continue;
+            }
+            visible.append(entry);
+        }
+        return visible;
+    }
+
+    TrayController::TrayController(GyanisScribe::Ui::IconProvider &icons, GyanisScribe::Ui::ThemeManager &theme, Settings::ISettingsStore &settings,
+                                   Platform::IPlatformIntegration &integration, QObject *parent) :
+        QObject(parent), m_icons(icons), m_theme(theme), m_settings(settings), m_integration(integration)
     {
     }
 
@@ -89,7 +109,7 @@ namespace GyanisScribe::App
         m_icon->setIcon(m_icons.icon("Tray"));
         m_icon->setToolTip(trayTooltip(m_pinCount));
 
-        for (const auto &entry: trayMenuEntries())
+        for (const auto &entry: visibleTrayMenuEntries(m_integration.capabilities()))
         {
             if (!entry.action)
             {

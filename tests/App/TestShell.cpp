@@ -1,6 +1,7 @@
 #include "App/MainWindow.h"
 #include "App/TrayController.h"
 
+#include "Platform/PlatformCapabilities.h"
 #include "Settings/SettingsKeys.h"
 #include "Ui/IconProvider.h"
 
@@ -25,6 +26,8 @@ using GyanisScribe::App::themeKindAt;
 using GyanisScribe::App::TrayAction;
 using GyanisScribe::App::trayMenuEntries;
 using GyanisScribe::App::TrayMenuEntry;
+using GyanisScribe::App::visibleTrayMenuEntries;
+using GyanisScribe::Platform::PlatformCapabilities;
 using GyanisScribe::Ui::IconProvider;
 using GyanisScribe::Ui::ThemeKind;
 
@@ -53,11 +56,15 @@ namespace
  */
 TEST(TrayMenuTable, ListsEachActionOnceWithRealIcons)
 {
-    const auto actions = actionsInTable();
-    EXPECT_EQ(actions.size(), 10u) << "表里的动作项数与 TrayAction 的枚举数不同解";
+    // 期望清单就是项数的真源：以前这里另写一个字面量 10，加一项就得记得改两处
+    constexpr std::array<TrayAction, 11> expectedActions{
+            TrayAction::CaptureRegion, TrayAction::CaptureFullScreen, TrayAction::CaptureLastRegion, TrayAction::CaptureWindow, TrayAction::ToggleRecord, TrayAction::Recognize,
+            TrayAction::RecognizeFile, TrayAction::PickColor,         TrayAction::OpenSettings,      TrayAction::OpenAbout,     TrayAction::Quit};
 
-    for (const auto action: {TrayAction::CaptureRegion, TrayAction::CaptureFullScreen, TrayAction::CaptureLastRegion, TrayAction::ToggleRecord, TrayAction::Recognize,
-                             TrayAction::RecognizeFile, TrayAction::PickColor, TrayAction::OpenSettings, TrayAction::OpenAbout, TrayAction::Quit})
+    const auto actions = actionsInTable();
+    EXPECT_EQ(actions.size(), expectedActions.size()) << "表里的动作项数与这份清单不同解";
+
+    for (const auto action: expectedActions)
     {
         const auto matches = std::ranges::count(actions, action);
         EXPECT_EQ(matches, 1) << static_cast<int>(action);
@@ -73,6 +80,29 @@ TEST(TrayMenuTable, ListsEachActionOnceWithRealIcons)
         EXPECT_FALSE(entry.label.isEmpty()) << "有一项没有文字，读屏与鼠标都只能靠猜";
         EXPECT_TRUE(available.contains(QString::fromUtf8(std::string{entry.iconName}.c_str()))) << "菜单项点名了一枚资源里没有的图标：" << std::string{entry.iconName};
     }
+}
+
+/**
+ * @brief 钉住「按能力过滤菜单」这一层：没有取前台窗口能力的平台不放那一项
+ * @details 判据两个方向都给：能力在位时那一项必须出现（否则是白过滤），不在位时必须消失；
+ *          还要求只有这一项受能力影响——别的能力位不该顺手把截图、录屏那些项一起摘掉。
+ */
+TEST(TrayMenuCapabilities, DropsWindowCaptureOnlyWhenThePlatformCannotDiscoverWindows)
+{
+    PlatformCapabilities withDiscovery;
+    withDiscovery.windowDiscovery = true;
+    PlatformCapabilities withoutDiscovery;
+
+    const auto hasWindowItem = [](const auto &entries)
+    { return std::ranges::any_of(entries, [](const TrayMenuEntry &entry) { return entry.action == TrayAction::CaptureWindow; }); };
+
+    const auto granted = visibleTrayMenuEntries(withDiscovery);
+    const auto denied  = visibleTrayMenuEntries(withoutDiscovery);
+
+    EXPECT_TRUE(hasWindowItem(granted)) << "平台给得出前台窗口，菜单却没有那一项";
+    EXPECT_FALSE(hasWindowItem(denied)) << "平台给不出前台窗口，菜单里却留着一条按了报错的项";
+    EXPECT_EQ(granted.size(), trayMenuEntries().size()) << "能力齐平时过滤不该改动任何一项";
+    EXPECT_EQ(denied.size(), granted.size() - 1) << "不该顺带摘掉别的项目";
 }
 
 /**

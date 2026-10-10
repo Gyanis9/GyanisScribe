@@ -107,7 +107,7 @@ namespace GyanisScribe::App
         m_annotation = std::make_unique<Annotation::AnnotationEngine>();
         m_pins       = std::make_unique<Pin::PinManager>(*m_settings, *m_integration);
         m_ocr        = Ocr::createOcrEngine(*m_settings, *m_integration);
-        m_tray       = std::make_unique<TrayController>(*m_icons, *m_theme, *m_settings);
+        m_tray       = std::make_unique<TrayController>(*m_icons, *m_theme, *m_settings, *m_integration);
         m_history    = std::make_unique<History::HistoryStore>(History::HistoryStore::defaultStoragePath());
         m_mainWindow = std::make_unique<MainWindow>(*m_settings, *m_theme, *m_icons, *m_history);
         m_toast      = std::make_unique<Ui::Toast>(*m_icons, *m_theme);
@@ -200,6 +200,20 @@ namespace GyanisScribe::App
         m_capture->captureLastRegion();
     }
 
+    void AppController::captureForegroundWindow()
+    {
+        const auto window = m_integration->foregroundWindow();
+        if (!window)
+        {
+            // 菜单按能力位过滤过这一项，走到这里说明能力位与实际结果不一致（或以后新增了别的入口）：
+            // 原因照样发给用户，不静默什么都不做
+            notifyUser(QString::fromStdString(window.error().message), Ui::ToastKind::Danger);
+            return;
+        }
+
+        m_capture->captureWindow(window->handle);
+    }
+
     void AppController::openMainWindow(const MainWindowPage page)
     {
         m_mainWindow->open(page);
@@ -217,6 +231,9 @@ namespace GyanisScribe::App
                 return;
             case TrayAction::CaptureLastRegion:
                 startLastRegionCapture();
+                return;
+            case TrayAction::CaptureWindow:
+                captureForegroundWindow();
                 return;
             case TrayAction::ToggleRecord:
                 toggleRecording();

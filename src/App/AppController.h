@@ -158,6 +158,13 @@ namespace GyanisScribe::App
         void startLastRegionCapture(CaptureIntent intent = CaptureIntent::Annotate);
 
         /**
+         * @brief 截取当前前台窗口
+         * @details 句柄由平台集成给（Windows 走 GetForegroundWindow），抓帧那一步按句柄去问几何；
+         *          平台给不出句柄时把原因发给用户，而不是静默什么都不做。
+         */
+        void captureForegroundWindow();
+
+        /**
          * @brief 打开主窗口的某一页
          * @param page 目标页
          */

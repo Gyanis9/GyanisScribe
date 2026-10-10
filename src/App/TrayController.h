@@ -25,6 +25,12 @@ namespace GyanisScribe::Settings
     class ISettingsStore;
 } // namespace GyanisScribe::Settings
 
+namespace GyanisScribe::Platform
+{
+    class IPlatformIntegration;
+    struct PlatformCapabilities;
+} // namespace GyanisScribe::Platform
+
 namespace GyanisScribe::Ui
 {
     class IconProvider;
@@ -43,6 +49,7 @@ namespace GyanisScribe::App
         CaptureRegion,     ///< 框选截图
         CaptureFullScreen, ///< 整屏截图
         CaptureLastRegion, ///< 重复上一次选区
+        CaptureWindow,     ///< 截取当前前台窗口，没有该能力的平台不在菜单里放这一项
         ToggleRecord,      ///< 开始或停止录屏
         Recognize,         ///< 框选后识别文字
         PickColor,         ///< 屏幕取色
@@ -65,6 +72,15 @@ namespace GyanisScribe::App
 
     /// 托盘菜单的条目表，顺序就是菜单里的顺序
     [[nodiscard]] QList<TrayMenuEntry> trayMenuEntries();
+
+    /**
+     * @brief 按平台能力过滤后的菜单条目表
+     * @param capabilities 平台能力表，来自 IPlatformIntegration::capabilities()
+     * @return 这一台机器上真能做的条目；顺序与 trayMenuEntries() 一致
+     * @details 缺能力的项直接从菜单里拿掉，而不是留着让用户点出一条报错：
+     *          「截取当前窗口」在 Linux 上做不出来（要与会话协议打交道），那里就不该出现这一项
+     */
+    [[nodiscard]] QList<TrayMenuEntry> visibleTrayMenuEntries(const Platform::PlatformCapabilities &capabilities);
 
     /**
      * @brief 托盘图标的悬停提示文字
@@ -90,9 +106,11 @@ namespace GyanisScribe::App
          * @param icons 图标供给器
          * @param theme 主题管理器，托盘图标颜色跟着主题走
          * @param settings 配置存储，菜单上的快捷键提示从它读
+         * @param integration 平台能力来源，决定菜单上放不放「截取当前窗口」这一项
          * @param parent Qt 父对象
          */
-        TrayController(GyanisScribe::Ui::IconProvider &icons, GyanisScribe::Ui::ThemeManager &theme, Settings::ISettingsStore &settings, QObject *parent = nullptr);
+        TrayController(GyanisScribe::Ui::IconProvider &icons, GyanisScribe::Ui::ThemeManager &theme, Settings::ISettingsStore &settings,
+                       Platform::IPlatformIntegration &integration, QObject *parent = nullptr);
 
 
         /**
@@ -140,6 +158,7 @@ namespace GyanisScribe::App
         GyanisScribe::Ui::IconProvider &m_icons;          ///< 图标供给器，不拥有
         GyanisScribe::Ui::ThemeManager &m_theme;          ///< 主题管理器，不拥有
         Settings::ISettingsStore       &m_settings;       ///< 配置存储，不拥有
+        Platform::IPlatformIntegration &m_integration;    ///< 平台能力来源，决定菜单放不放哪几项，不拥有
         QSystemTrayIcon                *m_icon = nullptr; ///< 托盘图标，父对象是本控制器
         std::unique_ptr<QMenu>          m_menu;           ///< 右键菜单：QSystemTrayIcon 不接管菜单所有权，由本类持有
         int                             m_pinCount = 0;   ///< 现在挂着的贴图张数，只用于悬停提示

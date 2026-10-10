@@ -36,7 +36,7 @@ namespace GyanisScribe::Platform
 
         /**
          * @brief 取 Windows 能力表，见 IPlatformIntegration::capabilities()
-         * @return 全局热键、鼠标穿透、录屏采集、系统声音、系统 OCR 五项均为真
+         * @return 全局热键、鼠标穿透、取前台窗口三项均为真
          */
         [[nodiscard]] PlatformCapabilities capabilities() const noexcept override;
 
@@ -52,6 +52,14 @@ namespace GyanisScribe::Platform
          * @warning 返回的对象要在 QGuiApplication 之后使用
          */
         [[nodiscard]] std::unique_ptr<IHotkeyBackend> createHotkeyBackend() override;
+
+        /**
+         * @brief 取前台窗口，见 IPlatformIntegration::foregroundWindow()
+         * @return GetForegroundWindow 给得出的句柄与标题栏文字（拿不到标题时为空串，仍算成功）
+         * @details 没有前台窗口（会话锁屏、开机后还没人点过窗口）时返回 ScreenUnavailable，
+         *          文案给的是「请先点一下要截的那个窗口」这类可操作的下一步
+         */
+        [[nodiscard]] Core::Expected<ForegroundWindow> foregroundWindow() const override;
     };
 
 } // namespace GyanisScribe::Platform

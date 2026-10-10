@@ -36,7 +36,7 @@ namespace GyanisScribe::Platform
 
         /**
          * @brief 取 Linux 能力表，见 IPlatformIntegration::capabilities()
-         * @return 只有录屏采集为真（经命令行采集器），其余四项为假
+         * @return 三项均为假：全局热键、鼠标穿透与「取前台窗口」都要与会话协议打交道，本仓没接
          * @note X11 与 Wayland 的差异不在这张表里细分：屏幕采集由采集器自己探，探不到就报 DependencyMissing
          */
         [[nodiscard]] PlatformCapabilities capabilities() const noexcept override;
@@ -52,6 +52,13 @@ namespace GyanisScribe::Platform
          * @return UnsupportedHotkeyBackend：本平台没有全局热键，登记一律回 PlatformUnsupported
          */
         [[nodiscard]] std::unique_ptr<IHotkeyBackend> createHotkeyBackend() override;
+
+        /**
+         * @brief 取前台窗口，见 IPlatformIntegration::foregroundWindow()
+         * @return 一律返回 PlatformUnsupported：X11 要读 _NET_ACTIVE_WINDOW、Wayland 要走会话协议，两样都没接
+         * @details 文案里给的是替代做法（在托盘改用「框选截图」把目标窗口框出来），不是只报一句「不支持」
+         */
+        [[nodiscard]] Core::Expected<ForegroundWindow> foregroundWindow() const override;
     };
 
 } // namespace GyanisScribe::Platform

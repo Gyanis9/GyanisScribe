@@ -544,6 +544,10 @@
             <translation>Repeat last selection</translation>
         </message>
         <message>
+            <source>截取当前窗口</source>
+            <translation>Capture the foreground window</translation>
+        </message>
+        <message>
             <source>开始 / 停止录屏</source>
             <translation>Start / stop recording</translation>
         </message>
@@ -988,6 +992,10 @@
             <translation>Linux (degraded implementation)</translation>
         </message>
         <message>
+            <source>本平台取不出当前前台窗口（X11 与 Wayland 各有各的会话协议，本仓没接）。请在托盘改用「框选截图」把那个窗口框出来</source>
+            <translation>This platform cannot report the foreground window (X11 and Wayland each need their own session protocol, and neither is wired up here). Use region capture in the tray and frame that window instead</translation>
+        </message>
+        <message>
             <source>本平台没有全局热键能力：登记不会生效。请在程序窗口内使用普通快捷键，或等平台适配后再开启这一项</source>
             <translation>This platform has no global hotkey support: registering won't take effect. Use ordinary shortcuts inside the program window, or enable this once the platform is adapted.</translation>
         </message>
@@ -1018,6 +1026,10 @@
         <message>
             <source>按键 0x{:X} 不能用作全局热键。请改用字母、数字、空格或 F1-F24 之一</source>
             <translation>Key 0x{:X} can't be used as a global hotkey. Use a letter, a digit, Space or one of F1-F24.</translation>
+        </message>
+        <message>
+            <source>现在没有一个在前台的窗口可截（可能锁了屏或焦点在桌面上）。请先点一下要截的那个窗口，再回来用这一项</source>
+            <translation>No window is in the foreground right now (the screen may be locked, or focus is on the desktop). Click the window you want first, then use this item again</translation>
         </message>
         <message>
             <source>光标高亮的缩放因子必须是正数，收到的是 {}。请传这一块屏幕的 devicePixelRatio</source>
