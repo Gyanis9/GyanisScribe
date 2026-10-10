@@ -151,7 +151,8 @@ namespace GyanisScribe::Ocr
             return std::unexpected(loaded.error());
         }
 
-        // 只转灰度：二值化与放大留给界面层的「重新识别」按钮，后端不替用户决定要不要预处理
+        // 只转灰度：这一条通道没有本机对照数据，放大到底帮不帮得上说不准，就不替用户改图片尺寸
+        // （系统那条通道是实测过的，结论见 OcrPreprocessor.h 的 @warning）
         const QImage gray = toGrayscale(image).convertToFormat(QImage::Format_Grayscale8);
         TessBaseAPISetImage(m_api.get(), static_cast<const unsigned char *>(gray.constBits()), gray.width(), 1, gray.height(), static_cast<int>(gray.bytesPerLine()));
 

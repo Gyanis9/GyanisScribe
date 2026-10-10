@@ -3,6 +3,7 @@
 #include "Core/Logger.h"
 #include "Core/Text.h"
 #include "Ocr/OcrEngineFactory.h"
+#include "Ocr/OcrPreprocessor.h"
 
 #include <QBuffer>
 #include <QByteArray>
@@ -179,11 +180,15 @@ namespace GyanisScribe::Ocr
                                         requestedLanguage.toStdString(), supportedLanguages().join(QStringLiteral("、")).toStdString())});
         }
 
+        // 放大倍率在这里显式取出来：返回的方框在放大后的坐标里，要按同一个数折回用户看到的那一张
+        const int  enlargeFactor = kMaximumEnlargeFactor;
+        const auto prepared      = prepareForRecognition(image, enlargeFactor);
+
         // PNG 编码放在调用线程：QImage 不是线程安全的，跨线程只带这段已经编好的字节
         QByteArray encoded;
         QBuffer    bytesDevice(&encoded);
         bytesDevice.open(QIODevice::WriteOnly);
-        if (!image.save(&bytesDevice, "PNG") || encoded.isEmpty())
+        if (!prepared.save(&bytesDevice, "PNG") || encoded.isEmpty())
         {
             return std::unexpected(
                     Core::Error{Core::ErrorCode::InternalError, GyanisScribe::Core::uiTextUtf8("这一张图没能编成 PNG。请重试一次，或先在标注窗里另存一份 PNG 再识别")});
@@ -195,14 +200,13 @@ namespace GyanisScribe::Ocr
         const QString      publicTag = requestedLanguage;
 
         return runOnWinRTThread(
-                [pngBytes = std::move(pngBytes), tag, publicTag]() -> Core::Expected<OcrResult>
+                [pngBytes = std::move(pngBytes), tag, publicTag, enlargeFactor]() -> Core::Expected<OcrResult>
                 {
                     try
                     {
                         auto const buffer = winrt::Windows::Storage::Streams::Buffer(static_cast<uint32_t>(pngBytes.size()));
-                        // 取裸指针走投影自带的 consume 扩展：它内部就是 IBufferByteAccess。
-                        // 不再拉 SDK 的 robuffer.h——那个目录不在 MSVC 默认 INCLUDE 里，
-                        // 不带完整 vcvars 的终端会把它红成一次与本次改动无关的失败
+                        // 取裸指针用投影自带的 consume 扩展：它内部就是 IBufferByteAccess，
+                        // 不必再拉 SDK 的 robuffer.h（那个目录不在 MSVC 默认 INCLUDE 里，干净终端下会红）
                         std::memcpy(buffer.data(), pngBytes.data(), pngBytes.size());
                         // Buffer(容量) 建出来长度是 0：不写长度就等于往流里写 0 字节，解码会拿到空流
                         buffer.Length(static_cast<uint32_t>(pngBytes.size()));
@@ -219,11 +223,12 @@ namespace GyanisScribe::Ocr
                         const auto maximumDimension = winrt::Windows::Media::Ocr::OcrEngine::MaxImageDimension();
                         if (static_cast<uint32_t>(bitmap.PixelWidth()) > maximumDimension || static_cast<uint32_t>(bitmap.PixelHeight()) > maximumDimension)
                         {
-                            return std::unexpected(Core::Error{
-                                    Core::ErrorCode::InvalidArgument,
-                                    GyanisScribe::Core::uiFormat(
-                                            GyanisScribe::Core::uiTextUtf8("这张图超过系统识别的上限（{}×{}，最长边 {}）。请分段截图后再识别，或先在标注窗里裁掉不需要的部分"),
-                                            bitmap.PixelWidth(), bitmap.PixelHeight(), maximumDimension)});
+                            return std::unexpected(
+                                    Core::Error{Core::ErrorCode::InvalidArgument,
+                                                GyanisScribe::Core::uiFormat(
+                                                        GyanisScribe::Core::uiTextUtf8(
+                                                                "这张图放大到识别尺寸（{}×{}）后超过系统上限（最长边 {}）。请分段截图后再识别，或先在标注窗里裁掉不需要的部分"),
+                                                        bitmap.PixelWidth(), bitmap.PixelHeight(), maximumDimension)});
                         }
 
                         auto const engine = winrt::Windows::Media::Ocr::OcrEngine::TryCreateFromLanguage(winrt::Windows::Globalization::Language(tag));
@@ -249,9 +254,10 @@ namespace GyanisScribe::Ocr
                             {
                                 auto const word = words.GetAt(wordIndex);
                                 auto const rect = word.BoundingRect();
-                                // 系统的方框是浮点物理像素，四舍五入到整数格：截断会让整行的框系统性偏左偏上
-                                const QRect box(static_cast<int>(std::lround(rect.X)), static_cast<int>(std::lround(rect.Y)), static_cast<int>(std::lround(rect.Width)),
-                                                static_cast<int>(std::lround(rect.Height)));
+                                // 系统的方框是浮点物理像素，四舍五入到整数格：截断会让整行的框系统性偏左偏上。
+                                // 送进去的是放大过的那一张，所以按同一个倍率折回去，框要与用户看到的原图同系
+                                const auto  fold = [enlargeFactor](const float value) { return static_cast<int>(std::lround(value / static_cast<float>(enlargeFactor))); };
+                                const QRect box(fold(rect.X), fold(rect.Y), fold(rect.Width), fold(rect.Height));
                                 line.words.push_back(OcrWord{fromWinRTString(word.Text()), box});
                                 line.boundingBox = line.boundingBox.isNull() ? box : line.boundingBox.united(box);
                             }

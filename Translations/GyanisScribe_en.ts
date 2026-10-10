@@ -936,8 +936,8 @@
             <translation>This image could not be encoded as PNG. Try again, or save a PNG copy from the annotation window and recognise that file</translation>
         </message>
         <message>
-            <source>这张图超过系统识别的上限（{}×{}，最长边 {}）。请分段截图后再识别，或先在标注窗里裁掉不需要的部分</source>
-            <translation>This image exceeds the system recognition limit ({}x{}, longest side {}). Capture it in parts, or crop the unneeded area in the annotation window first</translation>
+            <source>这张图放大到识别尺寸（{}×{}）后超过系统上限（最长边 {}）。请分段截图后再识别，或先在标注窗里裁掉不需要的部分</source>
+            <translation>Enlarged for recognition this image measures {}×{}, over the system limit of {} on the longest side. Capture it in parts, or crop what you don't need in the annotation window first</translation>
         </message>
         <message>
             <source>系统说装有「{}」的识别语言，但建不出识别器。请在 设置 → 时间和语言 → 语音 里重装该语言包</source>

@@ -46,11 +46,6 @@ namespace
         }
         return image;
     }
-
-    void setGrayPixel(QImage &image, int x, int y, quint8 value)
-    {
-        *(reinterpret_cast<quint8 *>(image.scanLine(y)) + x) = value;
-    }
 } // namespace
 
 /**
@@ -70,26 +65,6 @@ TEST(OcrPreprocessor, GrayscaleUsesIntegerWeights)
 }
 
 /**
- * @brief 钉住二值化在阈值两侧的判定与「等于阈值判白」
- */
-TEST(OcrPreprocessor, BinarizeSplitsAtThresholdWithEqualGoingWhite)
-{
-    QImage source = grayField(8, 8, 127);
-    setGrayPixel(source, 4, 4, 128);
-    setGrayPixel(source, 5, 5, 255);
-    setGrayPixel(source, 6, 6, 1);
-
-    const auto binary = binarize(source, 128);
-    EXPECT_EQ(grayAt(binary, 0, 0), 0) << "127 在阈值下方该判黑";
-    EXPECT_EQ(grayAt(binary, 4, 4), 255) << "正好等于阈值判白：把边界算进黑侧会让细字变粗粘连";
-    EXPECT_EQ(grayAt(binary, 5, 5), 255);
-    EXPECT_EQ(grayAt(binary, 6, 6), 0);
-
-    // 换阈值后同一个像素应翻面：证明阈值真的被用上了，而不是写死 128
-    EXPECT_EQ(grayAt(binarize(source, 100), 0, 0), 255);
-}
-
-/**
  * @brief 钉住放大的倍率、硬边与上下限夹取
  */
 TEST(OcrPreprocessor, EnlargeMultipliesSizeAndClampsFactor)
@@ -105,44 +80,20 @@ TEST(OcrPreprocessor, EnlargeMultipliesSizeAndClampsFactor)
 }
 
 /**
- * @brief 钉住中值滤波「抹掉孤立噪点、留住成片笔画」这一对
+ * @brief 钉住预处理链的产出：灰度、尺寸按倍率，且不出现「只剩两色」
+ * @details 不二值化不是疏忽：系统后端实测同一张图「原样 4 词、灰度+放大 4 词、再加二值化与
+ *          中值滤波 0 词」。这条断言把中间调留着，实现里偷偷加回二值化就会红。
  */
-TEST(OcrPreprocessor, DenoiseRemovesIsolatedSpeckAndKeepsStroke)
+TEST(OcrPreprocessor, PrepareChainGrayscalesAndEnlargesWithoutBinarizing)
 {
-    QImage speckled = grayField(9, 9, 255);
-    setGrayPixel(speckled, 4, 4, 0); // 孤立黑点
-    for (int y = 1; y <= 3; ++y)
-    {
-        for (int x = 6; x <= 8; ++x)
-        {
-            setGrayPixel(speckled, x, y, 0); // 3×3 黑块
-        }
-    }
+    QImage colored(6, 6, QImage::Format_ARGB32);
+    colored.fill(QColor(120, 120, 120));
 
-    const auto cleaned = denoise(speckled, 1);
-    EXPECT_EQ(grayAt(cleaned, 4, 4), 255) << "孤立噪点没被抹掉，中值滤波没生效";
-    EXPECT_EQ(grayAt(cleaned, 7, 2), 0) << "成片的笔画被抹掉了，去噪太狠";
-
-    EXPECT_EQ(denoise(speckled, 0).size(), speckled.size()) << "半径 0 应当原样返回";
-    EXPECT_EQ(grayAt(denoise(speckled, 99), 4, 4), 255) << "半径要夹在上限内，否则窗口会吃掉整幅图";
-}
-
-/**
- * @brief 钉住整条预处理链的产出：尺寸按倍率、取值只剩黑白两档
- */
-TEST(OcrPreprocessor, PrepareChainOutputsBinarizedImageAtRequestedSize)
-{
-    const auto prepared = prepareForRecognition(solid(QColor(0, 0, 0), 6, 6), 2, 128);
+    const auto prepared = prepareForRecognition(colored, 2);
     EXPECT_EQ(prepared.size(), QSize(12, 12));
     ASSERT_EQ(prepared.format(), QImage::Format_Grayscale8);
-    for (int y = 0; y < prepared.height(); ++y)
-    {
-        for (int x = 0; x < prepared.width(); ++x)
-        {
-            const int value = grayAt(prepared, x, y);
-            EXPECT_TRUE(value == 0 || value == 255) << "二值化之后出现了中间值 " << value;
-        }
-    }
+    const auto middle = grayAt(prepared, 0, 0);
+    EXPECT_EQ(middle, 120) << "灰度值被改成了两色之一，说明链里混进了二值化（三色相同时权重和正好 256，灰度就等于原值）";
     EXPECT_TRUE(prepareForRecognition(QImage()).isNull());
 }
 
