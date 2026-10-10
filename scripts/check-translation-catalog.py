@@ -22,6 +22,7 @@ import html
 import pathlib
 import re
 import sys
+import xml.etree.ElementTree as ElementTree
 
 #判据全文是中文：控制台码页不对就把「违规」那条打成乱码，读的人无法据此改代码
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -129,6 +130,13 @@ def generate(scan_root: pathlib.Path, catalog: pathlib.Path, required: list[str]
 def verify(scan_root: pathlib.Path, catalog: pathlib.Path, required: list[str]) -> int:
     if not catalog.exists():
         print(f"[失败] 翻译目录 {catalog} 不存在：先跑 {pathlib.Path(__file__).name} --generate", file=sys.stderr)
+        return 1
+    # 先把整份文件当 XML 解析一遍：手填译文最容易漏掉 & 的转义，而 lrelease 要到构建期才报，
+    # 报的还是一句「Expected '#' or '[a-zA-Z]'」——这里当场点名行列，红在改完的那一刻
+    try:
+        ElementTree.fromstring(catalog.read_text(encoding="utf-8"))
+    except ElementTree.ParseError as failure:
+        print(f"[失败] 翻译目录不是合法 XML：{failure}。常见原因是译文里写了没转义的 &（要写 &amp;）", file=sys.stderr)
         return 1
     existing = read_catalog(catalog)
     missing = [value for value in required if value not in existing]
