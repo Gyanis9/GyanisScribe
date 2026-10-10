@@ -253,16 +253,18 @@ Qt 运行时，然后在 staging 目录里把 `PATH` 收窄到只剩 `System32`�
 ## 验证与质量门禁
 
 四条线，都是必建必测：本机 `debug` / `release` 两档，容器 `asan` / `coverage` 两档。
-本轮（2026-10-10，HEAD 含文档改动）实测：
+本轮（2026-10-11，按提交后的树在独立工作树与容器里各跑一遍）实测：
 
 | 线 | 命令 | 结果 |
 | --- | --- | --- |
-| Windows Release | `scripts\WindowsBuild.bat release` | 287 条全绿（0 失败），其中 1 条环境门控跳过 |
-| Windows Debug | `scripts\WindowsBuild.bat debug` | 287 条全绿（0 失败），其中 2 条跳过 |
-| 容器 ASan(+UBSan) | `scripts/container/sanitize.sh asan` | 282 条全绿（0 失败），其中 5 条跳过 |
-| 容器覆盖率 | `scripts/container/coverage.sh 55` | 282 条全绿（0 失败），行覆盖 **70.6%**（4124/5838），阈值 55%；主程序在 Xvfb 上 `--selftest` 退出码 0 |
+| Windows Release | `scripts\WindowsBuild.bat release` | 321 条全绿（0 失败），其中 1 条环境门控跳过 |
+| Windows Debug | `scripts\WindowsBuild.bat debug` | 318 条全绿（0 失败），其中 2 条跳过 |
+| 容器 ASan(+UBSan) | `scripts/container/sanitize.sh asan` | 313 条全绿（0 失败），其中 6 条跳过 |
+| 容器覆盖率 | `scripts/container/coverage.sh 55` | 313 条全绿（0 失败），行覆盖 **71.0%**（4369/6155），阈值 55%；主程序在 Xvfb 上 `--selftest` 退出码 0 |
 
-容器少的 5 条是 Windows 专属后端的用例：4 条 WinRT 系统识别、1 条 Win32 热键映射。
+容器比本机 Release 少 9 条：4 条 WinRT 系统识别、1 条 Win32 热键映射，另 4 条 Tesseract 直测——
+`asan` 与 `coverage` 两档的 `build_type` 就是 Debug，而 Debug 档不领 Tesseract（理由与撤除判据见 [docs/OcrBackends.md](docs/OcrBackends.md)）。
+本机 Debug 那一档同样少这 4 条，另多 1 条「后端没编进来」的对照——两档条数不同是这套条件编译的结果，不是漏跑。
 跳过的都是环境门控用例，本机两档与容器各跳哪些是清楚的：
 
 | 跳过的用例 | 为什么跳 |
@@ -271,6 +273,7 @@ Qt 运行时，然后在 staging 目录里把 `PATH` 收窄到只剩 `System32`�
 | `OcrFixture.ReportsMissingBackendSeparatelyFromMissingLanguagePacks`（仅本机 Debug） | 这台机装了系统识别语言包，工厂先问 Windows 就拿到了后端，走不到「语言包在、后端没编进来」那一格；同一格由容器那两档跑 |
 | `FfmpegAudioCaptureEndToEnd.*`、`VideoEncoderEndToEndFixture.*`、`FfmpegAudioDevicesEndToEndFixture.*` | 要真 `ffmpeg`；取声那一条还要一路真设备 |
 | `CrashGuardEndToEnd.*` | minidump 走 Windows 的 dbghelp；Linux 侧这一格是空操作（core dump 归宿主配置） |
+| `PlatformIntegration.EnumeratedWindowSitsWhereQtPutsIt` | 「屏上有哪些窗口」只有 Windows 后端给得出；能力位为假时这一格按降级出口跳过，回绝文案由同文件另一条用例钉住 |
 
 `scripts\WindowsBuild.bat` 在 `Vendor/Ffmpeg/ffmpeg.exe` 就位时会自动把它交给 `GYANISSCRIBE_FFMPEG`，
 所以打过一次包的本机跑门禁时，编码与设备枚举这两条端到端是真的在跑（跳过的只剩取声那一条）。
