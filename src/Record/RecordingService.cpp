@@ -92,8 +92,16 @@ namespace GyanisScribe::Record
             m_audio->waitForFinished(1000);
         }
 
+        // 先拆回接的线再等：等待期间结果落地的话，finished 会打在正在析构的对象上（与 RecognitionRunner 同一条理由）。
+        // watcher 挂在本对象名下，随后随析构一起没
+        for (auto *watcher: m_runningDeliveries)
+        {
+            QObject::disconnect(watcher, nullptr, this, nullptr);
+        }
+        m_runningDeliveries.clear();
+
         // 还在编的那几份要等：那条线程用的是 m_encoder 的引用与带过来的快照，
-        // 不等就是让它对着已经析构的服务继续编（回接那一段由 context 自动不再投递）
+        // 不等就是让它对着已经析构的服务继续编
         for (auto &running: m_runningEncodes)
         {
             running.waitForFinished();
@@ -234,8 +242,22 @@ namespace GyanisScribe::Record
         auto future = QtConcurrent::run([&encoder, config, frameDirectory, frames, recordedDurationMs, audioWav]
                                         { return encoder.encode(config, frameDirectory, frames, recordedDurationMs, audioWav); });
 
-        // continuation 的 context 是本对象：回接落在界面线程，删目录与发信号都在这条线上做
-        future.then(this, [this, frameDirectory, audioWav](const EncodeOutcome &outcome) { deliverEncoding(outcome, frameDirectory, audioWav); });
+        // 回接走 QFutureWatcher：它随本对象一起析构，接收者没了连接由 Qt 自己断。
+        // 这里原来是 future.then(this, ...)——那条续接在跑到时才检查 context 还在不在，
+        // 而 Qt 6.4 检查的方式是 Q_ASSERT(context)：服务先析构、线程池后跑到这一步，容器 Debug 档当场把进程弄没
+        // （实测：录制停止后立刻销毁服务，日志停在 "[ OK ]" 之后接一句 ASSERT: "context" qfuture_impl.h:596）
+        auto *watcher = new QFutureWatcher<EncodeOutcome>(this);
+        QObject::connect(watcher, &QFutureWatcher<EncodeOutcome>::finished, this,
+                         [this, watcher, frameDirectory, audioWav]
+                         {
+                             const auto outcome = watcher->result();
+                             // 先从账上摘掉再收尾：这一份的活已经干完，留着指针等于让下一次遍历摸到 deleteLater 排着队的那个
+                             std::erase(m_runningDeliveries, watcher);
+                             watcher->deleteLater();
+                             deliverEncoding(outcome, frameDirectory, audioWav);
+                         });
+        watcher->setFuture(future);
+        m_runningDeliveries.push_back(watcher);
 
         m_runningEncodes.push_back(future);
         // 顺手收掉已经跑完的那些：这份列表只为析构时「还有谁在编」服务，不该越攒越长

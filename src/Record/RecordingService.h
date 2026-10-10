@@ -18,6 +18,7 @@
 
 #include <QElapsedTimer>
 #include <QFuture>
+#include <QFutureWatcher>
 #include <QPoint>
 #include <QObject>
 #include <QTimer>
@@ -218,7 +219,9 @@ namespace GyanisScribe::Record
         std::filesystem::path               m_audioWav;                                         ///< 本轮取声落在哪份 wav 上
         AudioCaptureOutcome                 m_audioOutcome = AudioCaptureOutcome::NotRequested; ///< 取声结果，stop 之后读
         std::vector<QFuture<EncodeOutcome>> m_runningEncodes;                                   ///< 还在编码的那几份，析构前要等完
-        bool                                m_cursorHighlightWarned = false;                    ///< 光标高亮已经报过一次原因，本轮不再重复
+        /// 还在回接的那几份：watcher 挂在本对象下随它一起析构，析构前要先拆线再等编码（与 RecognitionRunner 同一条理由）
+        std::vector<QFutureWatcher<EncodeOutcome> *> m_runningDeliveries;
+        bool                                         m_cursorHighlightWarned = false; ///< 光标高亮已经报过一次原因，本轮不再重复
     };
 
 } // namespace GyanisScribe::Record
