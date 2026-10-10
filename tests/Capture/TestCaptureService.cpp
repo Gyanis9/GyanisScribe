@@ -461,3 +461,33 @@ TEST_F(CaptureServiceFixture, LongCaptureReportsAGrabThatNeverHappened)
     service.grabNextLongFrame();
     EXPECT_EQ(failure->message, reported) << "这一轮已经死了还在重复报错";
 }
+
+/**
+ * @brief 钉住「长截图还在接时再起一轮」被当场拒掉，而且不把手里那张一起丢掉
+ * @details 第二层遮罩一铺，接了一半的那一轮既没交成品也没作废：用户取消遮罩之后会发现
+ *          刚才滚的十几屏不见了。拒的那一句要给出路（先按完成或取消），并且这一轮仍然活着。
+ */
+TEST_F(CaptureServiceFixture, StartingAnotherCaptureWhileALongRoundRunsIsRefused)
+{
+    SettingsStore     settings(m_iniFile);
+    FakeCaptureSource source;
+    source.screenQueue = {makeScreenFrame(QSize{200, 100}, 2.0, QColor{10, 200, 20})};
+    CaptureService service{source, settings, *platform};
+
+    std::optional<CapturedImage> finished;
+    std::optional<Error>         failure;
+    QObject::connect(&service, &ICaptureService::captured, &service, [&finished](const CapturedImage &image) { finished = image; });
+    QObject::connect(&service, &ICaptureService::captureFailed, &service, [&failure](const Error &error) { failure = error; });
+
+    service.captureLongRegion(QRect{0, 0, 50, 25});
+    service.grabNextLongFrame();
+
+    service.startInteractive();
+    ASSERT_TRUE(failure.has_value()) << "第二次框选没被拒，还在接的那一轮就被顶掉了";
+    EXPECT_NE(failure->message.find("还在接"), std::string::npos) << "拒的时候要给出路：先按完成或取消";
+
+    service.finishLongCapture();
+    ASSERT_TRUE(finished.has_value()) << "被拒的那一次顺手把长截图的结果也丢了";
+    // 队列里只备了一帧，第二帧退回替身那份固定的红图：内容不同 → 整段接上，长图从 50 行变 100 行
+    EXPECT_EQ(finished->image.size(), QSize(100, 100)) << "被拒之后这一轮还能接着接，接出来的高度才对得上";
+}

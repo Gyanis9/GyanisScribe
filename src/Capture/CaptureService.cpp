@@ -115,6 +115,15 @@ namespace GyanisScribe::Capture
 
     void CaptureService::beginInteractive(const bool longCapture)
     {
+        if (m_longActive)
+        {
+            // 上一轮长截图还在接：再铺一层遮罩会让手里那张接了一半的图既没交也没作废。
+            // 这一句把选择权交回给用户——完成或取消，再开始下一次
+            deliver(Core::Expected<Core::CapturedImage>(std::unexpected(
+                    Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("滚动长截图还在接：先在控制条上按完成或取消，再开始下一次截图")})));
+            return;
+        }
+
         closeOverlays();
 
         const auto screens = QGuiApplication::screens();

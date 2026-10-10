@@ -776,6 +776,10 @@
             <translation>No previous region to reuse yet: drag out one capture first, or use region capture.</translation>
         </message>
         <message>
+            <source>滚动长截图还在接：先在控制条上按完成或取消，再开始下一次截图</source>
+            <translation>A scrolling capture is still running: press Done or Cancel on its control bar before starting another one.</translation>
+        </message>
+        <message>
             <source>进入框选失败：Qt 没有报出任何屏幕。请在 GUI 会话里重试</source>
             <translation>Cannot start region capture: Qt reported no screens. Try again inside a GUI session.</translation>
         </message>
