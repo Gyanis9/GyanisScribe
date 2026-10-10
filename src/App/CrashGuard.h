@@ -11,7 +11,10 @@
 
 #include <QString>
 
+#include <cstdint>
 #include <exception>
+#include <filesystem>
+#include <string>
 #include <string_view>
 
 namespace GyanisScribe::App
@@ -36,5 +39,42 @@ namespace GyanisScribe::App
      *          这条路径要靠真的崩一次才能验，因此本文件把「写文案」那一步留成纯函数单独测。
      */
     void installTerminateHandler();
+
+    /**
+     * @brief 崩溃时刻的年月日时分秒
+     * @details 命名规则要有一处真源，而崩溃处理器里不能构造 Qt 的时间对象（会分配、会取锁），
+     *          所以两边都把时间拆成这几个整数再交给 crashDumpFileName。
+     */
+    struct CrashStamp
+    {
+        int year   = 1970; ///< 四位年
+        int month  = 1;    ///< 1 到 12
+        int day    = 1;    ///< 1 到 31
+        int hour   = 0;    ///< 0 到 23
+        int minute = 0;    ///< 0 到 59
+        int second = 0;    ///< 0 到 59
+    };
+
+    /**
+     * @brief 崩溃转储的文件名（命名规则的唯一出处）
+     * @param applicationVersion 版本号，与 --version 报的是同一份
+     * @param stamp 崩溃时刻
+     * @param processId 进程号，同秒内崩两次也要分得开
+     * @return 形如 GyanisScribe_0.0.1_20261010-191504_4712.dmp 的宽字符文件名
+     * @details 只吃整数与窄串、不分配堆：崩溃处理器里也要调它；用例侧写死期望值核对形状。
+     */
+    [[nodiscard]] std::wstring crashDumpFileName(std::wstring_view applicationVersion, const CrashStamp &stamp, std::uint32_t processId);
+
+    /**
+     * @brief 装上「崩了就往这个目录写 minidump」的兜底
+     * @param dumpDirectory 已存在或即将由本函数创建的目录
+     * @param applicationVersion 版本号，进文件名
+     * @details Windows 用 SetUnhandledExceptionFilter + MiniDumpWriteDump；处理器里只做三件事：
+     *          开文件、写转储、按 kCrashExitCode 结束进程——不写日志（日志的锁可能正被崩掉的那条线程
+     *          持有），也不走 Qt 类型。非 Windows 平台没有 dbghelp，这一格是空操作并记一条日志说明；
+     *          Linux 侧要靠 core dump，那是宿主的配置而不是本程序能决定的事。
+     * @note 会覆盖先前装好的异常过滤器：本程序只有这一处装，链到上游过滤器留给系统自己处理崩溃。
+     */
+    void installCrashDumpWriter(const std::filesystem::path &dumpDirectory, std::wstring_view applicationVersion);
 
 } // namespace GyanisScribe::App

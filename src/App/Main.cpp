@@ -71,6 +71,7 @@ int main(int argc, char *argv[])
     }
 
     // 兜底要在任何可能崩的步骤之前装好：装晚了那条崩就只是「程序没了」
+    GyanisScribe::App::installCrashDumpWriter(GyanisScribe::Core::Paths::logDirectory(), QCoreApplication::applicationVersion().toStdWString());
     GyanisScribe::App::installTerminateHandler();
 
     // 单实例：第二次启动把前一份唤出来然后自己退出，而不是两个实例抢同一批全局热键

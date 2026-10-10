@@ -1,6 +1,7 @@
 add_executable(TestShell
         TestShell.cpp
-        TestSingleInstance.cpp)
+        TestSingleInstance.cpp
+        TestCrashGuard.cpp)
 
 target_link_libraries(TestShell PRIVATE
         App
@@ -15,6 +16,25 @@ if (MSVC)
 endif ()
 
 add_dependencies(TestShell DeployQtRuntime)
+
+# 崩溃兜底只有真崩一次才验得出来，所以起一个测试专用的探针进程：它装好兜底然后读空指针。
+# 「让程序崩」不能有产品入口，因此它不是 GyanisScribe 的一部分，也不进安装包。
+add_executable(CrashProbe
+        CrashProbe.cpp)
+
+target_link_libraries(CrashProbe PRIVATE
+        App
+        Core
+        Qt6::Core)
+
+if (MSVC)
+    target_compile_options(CrashProbe PRIVATE /W4 /WX)
+endif ()
+
+add_dependencies(CrashProbe DeployQtRuntime)
+
+# 用例按这个宏起探针，路径由构建系统给，不写死本机位置
+target_compile_definitions(TestShell PRIVATE GYANISSCRIBE_CRASH_PROBE="$<TARGET_FILE:CrashProbe>")
 
 # 主窗口的接线判据要真的建窗口，因此单独一个可执行体：QApplication 一个进程只能有一个，
 # 与上面那两组不共用一份配置的用例隔开最省心

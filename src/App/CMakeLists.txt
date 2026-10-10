@@ -38,3 +38,8 @@ target_compile_definitions(App PRIVATE PROJECT_VERSION="${PROJECT_VERSION}")
 if (MSVC)
     target_compile_options(App PRIVATE /W4 /WX)
 endif ()
+
+# 崩溃转储要 MiniDumpWriteDump，它在 dbghelp 里（Windows 才有；非 Windows 那一条分支是空操作）
+if (WIN32)
+    target_link_libraries(App PUBLIC dbghelp)
+endif ()

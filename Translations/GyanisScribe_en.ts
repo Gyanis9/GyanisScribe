@@ -244,8 +244,8 @@
             <translation>Recording aborted: {}. Try again.</translation>
         </message>
         <message>
-            <source>智录遇到未处理的错误：{}。现场已尽量落到日志，请到 {} 找最近一份日志；如果反复出现，请把日志与出错的操作步骤一起反馈</source>
-            <translation>GyanisScribe hit an unhandled error: {}. As much as possible was written to the log; open {} and take the newest log file. If it keeps happening, send that log together with the steps you took.</translation>
+            <source>智录遇到未处理的错误：{}。现场已尽量落到日志与崩溃转储，请到 {} 找最近一份日志（同目录下的 .dmp 是转储）；如果反复出现，请把日志、转储与出错的操作步骤一起反馈</source>
+            <translation>GyanisScribe hit an unhandled error: {}. What could be saved went to the log and a crash dump; look for the newest log in {} (a .dmp next to it is the dump). If it keeps happening, send the log, the dump and the steps you took</translation>
         </message>
         <message>
             <source>智录：截图、标注、贴图、取色、录屏与文字识别</source>
