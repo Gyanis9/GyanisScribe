@@ -63,8 +63,10 @@ namespace
     /// 用例放开门闩之前，假编码器最多停这么久：同步实现也能在有限时间内把控制权交回用例
     constexpr std::chrono::milliseconds kGatePatience{2000};
 
-    /// 等条件成立的上限
-    constexpr std::chrono::milliseconds kWaitPatience{2000};
+    /// 等条件成立的上限：这一档只是「卡住了要能在有限时间内报出来」的兜底，不是快慢判据。
+    /// 线程池的排班由这台机器上当时刻多忙决定，把预算掐在 2 秒会把「机器正忙」写成用例失败
+    /// （实测：并行跑别的构建时，一次编码在 2 秒内没被排上，断言就红了）
+    constexpr std::chrono::milliseconds kWaitPatience{10000};
 
     /// 开始一轮之后要转多久界面循环才攒到帧：15 帧率下 1.3 秒能落十几帧，够 stop() 收尾不报「一帧都没有」
     constexpr std::chrono::milliseconds kFrameSpin{1300};
