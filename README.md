@@ -37,6 +37,10 @@ build\release\bin\GyanisScribe.exe --selftest
 
 `WindowsBuild.bat` 会自己调 `vcvars64`、按预设配置/编译并跑 `ctest`。预设两档：`debug`（识别走降级桩）与
 `release`（带 Tesseract 后端）。机器相关的路径只出现在这个脚本里，工程不写死绝对路径。
+Conan 两侧都是仓库里的一份档位（`Conan/Profiles/WindowsMsvc2022` 与 `LinuxGcc13`），
+不是每次现检测的产物：Windows 侧由脚本把 `-DCONAN_HOST_PROFILE` 指过去，容器侧由 `env.sh` 设
+`CONAN_DEFAULT_PROFILE_PATH`。档位里唯一按机器改的一行是 `compiler.version`；
+`build_type` 刻意不写进文件，它跟着预设走，而「Debug 不领 Tesseract」正是按 `build_type` 分岔的。
 
 打包（绿色目录 + zip + NSIS 安装器）：
 
