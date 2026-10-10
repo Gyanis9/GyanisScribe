@@ -232,6 +232,13 @@ Qt 运行时，然后在 staging 目录里把 `PATH` 收窄到只剩 `System32`�
 把 `Qt6Widgets.dll` 挪开，`--selftest` 的退出码变成 `-1073741515`（`0xc0000135` = 找不到 DLL），
 放回又回到 0。安装器带卸载段。
 
+「装完即用」这一条也真机量过：把 `dist/` 里的安装器静默装进一个空目录（`/S /D=<空目录>`），
+装出来的目录里 `GyanisScribe.exe`、`ffmpeg.exe`、`tessdata/` 两份语言包、`licenses/`、
+`translations/GyanisScribe_en.qm`、`platforms/qwindows.dll` 与 `Uninstaller.exe` 全在；
+就在那个目录里把 PATH 收窄到只剩 `System32` 跑 `--selftest`，退出码 0，
+`ffmpeg.exe -version` 也起得来（9.0.2-essentials_build）；随后 `Uninstaller.exe /S` 退出码 0，
+装出来的目录和 HKLM 里那条卸载登记键都不在了。
+
 ## 验证与质量门禁
 
 四条线，都是必建必测：本机 `debug` / `release` 两档，容器 `asan` / `coverage` 两档。
