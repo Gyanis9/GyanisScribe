@@ -36,12 +36,15 @@ namespace GyanisScribe::Platform
     /**
      * @brief 屏上一个可见窗口的快照，坐标已换成 Qt 的逻辑全局读数
      * @details 只给几何与标识，不给「该不该截」的判断：候选筛选与命中测试在用它的界面层做。
+     * @note 整窗与客户区要分开给：抓回来的那一帧是客户区的像素（本机实测：整窗 422×292，
+     *       客户区 420×260，差的是标题栏与边框），拿整窗的左上角当帧原点会把光标高亮偏出去三十来格。
      */
     struct ScreenWindow
     {
-        quintptr handle = 0;    ///< 平台窗口句柄，与 Qt 的 WId 同一口径
-        QString  title;         ///< 标题栏文字，没有标题的窗口是空串
-        QRect    logicalGlobal; ///< 窗口在 Qt 逻辑全局坐标下的矩形
+        quintptr handle = 0;          ///< 平台窗口句柄，与 Qt 的 WId 同一口径
+        QString  title;               ///< 标题栏文字，没有标题的窗口是空串
+        QRect    logicalGlobal;       ///< 窗口在 Qt 逻辑全局坐标下的矩形（含标题栏与边框）
+        QRect    clientLogicalGlobal; ///< 客户区的逻辑全局矩形；平台取不到客户区读数时是空矩形，消费方不许拿整窗矩形顶替
     };
 
     /**

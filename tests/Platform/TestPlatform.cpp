@@ -182,6 +182,16 @@ TEST(PlatformIntegration, EnumeratedWindowSitsWhereQtPutsIt)
             << found->logicalGlobal.height() << "，Qt " << qtFrame.x() << ',' << qtFrame.y() << ' ' << qtFrame.width() << '×' << qtFrame.height();
     EXPECT_TRUE(qtFrame.adjusted(-1, -1, 1, 1).contains(found->logicalGlobal)) << "反过来也得分一结论：两条换算只改一边就是静默错位";
     EXPECT_EQ(found->title, probe.windowTitle()) << "标题是候选列表上唯一能认出窗口的东西";
+
+    // 客户区是抓帧真正拿到的那一块：它必须比整窗小（差的是标题栏与边框），且与 Qt 自己那份客户区几何同系
+    const auto qtClient = probe.geometry();
+    ASSERT_FALSE(found->clientLogicalGlobal.isNull()) << "平台没给出客户区读数：窗口模式的光标高亮就只能继续不画";
+    EXPECT_TRUE(found->clientLogicalGlobal.adjusted(-1, -1, 1, 1).contains(qtClient))
+            << "客户区矩形包不住 Qt 那份：平台 " << found->clientLogicalGlobal.x() << ',' << found->clientLogicalGlobal.y() << ' ' << found->clientLogicalGlobal.width() << '×'
+            << found->clientLogicalGlobal.height() << "，Qt " << qtClient.x() << ',' << qtClient.y() << ' ' << qtClient.width() << '×' << qtClient.height();
+    EXPECT_TRUE(qtClient.adjusted(-1, -1, 1, 1).contains(found->clientLogicalGlobal)) << "互指要双向都成立，只补一套换算就是静默错位";
+    EXPECT_LT(found->clientLogicalGlobal.height(), found->logicalGlobal.height()) << "客户区不比整窗矮，说明两份读数是同一个来源抄的，抓帧的原点会偏到标题栏上";
+    EXPECT_GT(found->clientLogicalGlobal.height(), qtClient.height() - 2) << "客户区矮得离谱：多半把整窗矩形当成了客户区";
 }
 
 #ifdef Q_OS_WIN

@@ -30,9 +30,10 @@ namespace
     /// EnumWindows 回调收下来的一份原始读数：坐标还是平台给的全局物理像素
     struct RawWindow
     {
-        HWND    handle;         ///< 窗口句柄
-        QString title;          ///< 标题栏文字
-        QRect   physicalGlobal; ///< 全局物理矩形
+        HWND    handle;               ///< 窗口句柄
+        QString title;                ///< 标题栏文字
+        QRect   physicalGlobal;       ///< 整窗的全局物理矩形（含标题栏与边框）
+        QRect   clientPhysicalGlobal; ///< 客户区的全局物理矩形；取不到时为空矩形
     };
 
     /// EnumDisplayMonitors 回调收下来的一块屏：只有平台那一份读数
@@ -80,7 +81,22 @@ namespace
         constexpr int kWindowTitleBufferLength              = 512;
         wchar_t       titleBuffer[kWindowTitleBufferLength] = {};
         const auto    written                               = GetWindowTextW(window, titleBuffer, kWindowTitleBufferLength);
-        collected->push_back(RawWindow{window, written > 0 ? QString::fromWCharArray(titleBuffer, written) : QString(), physical});
+
+        // 客户区的读数单独取：抓帧拿到的是客户区的像素，而整窗矩形带着标题栏与边框，
+        // 用后者当帧原点会把光标高亮偏出去几十格。取不到就留空矩形，不拿整窗那一份顶替
+        QRect clientPhysical;
+        RECT  client{};
+        POINT clientCorner{};
+        if (GetClientRect(window, &client) != 0 && ClientToScreen(window, &clientCorner) != 0)
+        {
+            clientPhysical = QRect{clientCorner.x, clientCorner.y, client.right - client.left, client.bottom - client.top};
+            if (clientPhysical.isEmpty())
+            {
+                clientPhysical = QRect{};
+            }
+        }
+
+        collected->push_back(RawWindow{window, written > 0 ? QString::fromWCharArray(titleBuffer, written) : QString(), physical, clientPhysical});
         return TRUE;
     }
 
@@ -243,7 +259,10 @@ namespace GyanisScribe::Platform
             }
             if (const auto logical = GyanisScribe::Platform::physicalToLogicalGlobal(entry.physicalGlobal, mappings[ownerIndex]); logical)
             {
-                windows.push_back(ScreenWindow{reinterpret_cast<quintptr>(entry.handle), entry.title, *logical});
+                // 客户区跟着同一块屏的读数走：两次换算必须用同一份缩放，否则整窗与客户区会互相错开
+                const auto clientLogical =
+                        entry.clientPhysicalGlobal.isNull() ? QRect{} : physicalToLogicalGlobal(entry.clientPhysicalGlobal, mappings[ownerIndex]).value_or(QRect{});
+                windows.push_back(ScreenWindow{reinterpret_cast<quintptr>(entry.handle), entry.title, *logical, clientLogical});
             }
         }
         return windows;
