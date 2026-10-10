@@ -3,6 +3,7 @@
 // 只测其中一头时，另一头改成别的键也照样全绿。
 #include "App/MainWindow.h"
 
+#include "App/TrayController.h"
 #include "Annotation/AnnotationToolbar.h"
 #include "History/HistoryRules.h"
 #include "History/HistoryStore.h"
@@ -29,13 +30,16 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QMenu>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QStackedWidget>
 #include <QString>
 #include <QStringList>
+#include <QToolButton>
 #include <QWidget>
 
+#include <algorithm>
 #include <filesystem>
 #include <format>
 #include <memory>
@@ -114,11 +118,12 @@ namespace
 
         /// 建窗口：WA_DontShowOnScreen 让 open() 里的 show() 不再真的弹一块窗口到桌面上
         /// globalHotkeys 默认给真值：这一份装置要测的是「能改」那一格，不能改的那一格由用例自己关掉它
+        /// 能力表同时留在 m_capabilities 里：动作条的用例要按同一份表算出应当落点的条目
         void makeWindow(const bool globalHotkeys = true)
         {
-            GyanisScribe::Platform::PlatformCapabilities capabilities;
-            capabilities.globalHotkeys = globalHotkeys;
-            m_window                   = std::make_unique<MainWindow>(*m_store, *m_theme, *m_icons, *m_historyStore, capabilities);
+            m_capabilities               = GyanisScribe::Platform::PlatformCapabilities{};
+            m_capabilities.globalHotkeys = globalHotkeys;
+            m_window                     = std::make_unique<MainWindow>(*m_store, *m_theme, *m_icons, *m_historyStore, m_capabilities);
             m_window->setAttribute(Qt::WA_DontShowOnScreen);
         }
 
@@ -175,6 +180,8 @@ namespace
         std::unique_ptr<SettingsStore> m_store;
         std::unique_ptr<ThemeManager>  m_theme;
         std::unique_ptr<MainWindow>    m_window;
+        /// 建窗口时那份能力表，动作条的用例按它算出预期条目
+        GyanisScribe::Platform::PlatformCapabilities m_capabilities;
     };
 
     /**
@@ -726,6 +733,81 @@ TEST_F(MainWindowFixture, IconsReResolveWhenTheThemeChangesLive)
 
     EXPECT_NE(list->item(0)->icon().cacheKey(), navKeyBefore) << "换主题后导航行的图标没重取：描边色停在旧档";
     EXPECT_NE(exportButton->icon().cacheKey(), buttonKeyBefore) << "换主题后按钮图标没重取：走的是 setIcon 而不是 applyIcon，名字没记在控件上";
+}
+
+/**
+ * @brief 钉住主窗口动作条与托盘菜单同源：能力过滤后的每一条动作都有落点，且不许多出窗口自己的那三条
+ * @details 表是唯一出处，所以预期按同一份表算；控件按文字找而不是按下标——findChildren 的顺序
+ *          不保证等于创建顺序（工具栏那几条用例已经为此踩过一次）。
+ */
+TEST_F(MainWindowFixture, ActionBarLandsEveryVisibleTrayEntrySomewhere)
+{
+    using GyanisScribe::App::TrayAction;
+    using GyanisScribe::App::visibleTrayMenuEntries;
+
+    makeWindow(true);
+
+    auto *bar = m_window->findChild<QWidget *>(QStringLiteral("actionBar"));
+    ASSERT_NE(bar, nullptr) << "动作条没建出来：没有托盘的机器上就一条常设入口都没有";
+    auto *more = bar->findChild<QToolButton *>();
+    ASSERT_NE(more, nullptr) << "「更多」按钮不见了：次要动作没有落点";
+    ASSERT_NE(more->menu(), nullptr) << "「更多」没挂菜单：条目会被静默丢掉";
+
+    const auto buttons     = bar->findChildren<QPushButton *>();
+    const auto menuActions = more->menu()->actions();
+
+    int        primaryCount   = 0;
+    int        secondaryCount = 0;
+    QString    firstPrimaryLabel;
+    TrayAction firstPrimaryAction = TrayAction::Quit;
+
+    for (const auto &entry: visibleTrayMenuEntries(m_capabilities))
+    {
+        const auto action = entry.action;
+        if (!action)
+        {
+            continue; // 表里的分隔线在动作条上没有对应物
+        }
+        if (*action == TrayAction::OpenSettings || *action == TrayAction::OpenAbout || *action == TrayAction::Quit)
+        {
+            // 这三条说的就是这扇窗口本身：再摆一次等于给用户两个入口去开同一个东西
+            EXPECT_EQ(std::ranges::find(buttons, entry.label, &QPushButton::text), buttons.end()) << "「" << entry.label.toStdString() << "」是窗口自己的事，不该出现在动作条上";
+            continue;
+        }
+        if (entry.hotkeyKey.empty())
+        {
+            ++secondaryCount;
+            EXPECT_NE(std::ranges::find(menuActions, entry.label, &QAction::text), menuActions.end()) << "次要动作「" << entry.label.toStdString() << "」在「更多」里找不到落点";
+            continue;
+        }
+        ++primaryCount;
+        const auto found = std::ranges::find(buttons, entry.label, &QPushButton::text);
+        ASSERT_NE(found, buttons.end()) << "主操作「" << entry.label.toStdString() << "」没摆成按钮";
+        if (firstPrimaryLabel.isEmpty())
+        {
+            firstPrimaryLabel  = entry.label;
+            firstPrimaryAction = *action;
+        }
+    }
+
+    // 总数也要同解：多出来的按钮或菜单项意味着表和条散开了
+    EXPECT_EQ(static_cast<int>(buttons.size()), primaryCount) << "动作条上的按钮数与表里带热键提示的条目数不一致";
+    EXPECT_EQ(static_cast<int>(menuActions.size()), secondaryCount) << "「更多」里的条目数与表里其余条目数不一致";
+    ASSERT_FALSE(firstPrimaryLabel.isEmpty()) << "表里一条带热键提示的主操作都没有，这条用例就什么都没判";
+
+    // 按下去要出来的就是它那一个动作：接错一格就是「点了截图却开始录屏」
+    int        emissions = 0;
+    TrayAction emitted   = TrayAction::Quit;
+    QObject::connect(m_window.get(), &MainWindow::actionRequested,
+                     [&emissions, &emitted](const TrayAction action)
+                     {
+                         ++emissions;
+                         emitted = action;
+                     });
+    auto *clicked = *std::ranges::find(buttons, firstPrimaryLabel, &QPushButton::text);
+    clicked->click();
+    EXPECT_EQ(emissions, 1) << "按钮点了却没发信号，或发了不止一次";
+    EXPECT_TRUE(emitted == firstPrimaryAction) << "按「" << firstPrimaryLabel.toStdString() << "」发出来的不是它自己的动作";
 }
 
 /**

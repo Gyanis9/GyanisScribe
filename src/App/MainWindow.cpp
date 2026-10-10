@@ -1,5 +1,6 @@
 #include "App/MainWindow.h"
 
+#include "App/TrayController.h"
 #include "Core/Logger.h"
 #include "Core/Paths.h"
 #include "Core/Text.h"
@@ -18,6 +19,7 @@
 #include "Ui/Language.h"
 #include "Ui/ThemeManager.h"
 
+#include <QAction>
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
@@ -28,9 +30,11 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QMenu>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QStackedWidget>
+#include <QToolButton>
 #include <QVBoxLayout>
 
 #include <array>
@@ -819,8 +823,14 @@ namespace GyanisScribe::App
         setObjectName(QStringLiteral("appRoot"));
         setAttribute(Qt::WA_StyledBackground, true);
 
-        auto *layout = new QHBoxLayout{this};
-        layout->setContentsMargins(GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge);
+        // 根是竖的两段：上面一条常设动作条，下面才是「导航 | 页」这两列。
+        // 动作条是给「没有托盘、热键也没登记上」的那一类机器留的常设入口，
+        // 也是有托盘时不用先去右下角翻菜单的那条 shortcut。
+        auto *root = new QVBoxLayout{this};
+        root->setContentsMargins(GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge);
+        root->setSpacing(GyanisScribe::Ui::kSpacingMedium);
+
+        auto *layout = new QHBoxLayout;
         layout->setSpacing(GyanisScribe::Ui::kSpacingMedium);
         m_nav   = new QListWidget{this};
         m_stack = new QStackedWidget{this};
@@ -867,7 +877,9 @@ namespace GyanisScribe::App
 
         layout->addWidget(m_nav);
         layout->addWidget(m_stack, 1);
-        resize(680, 520);
+        root->addWidget(buildActionBar());
+        root->addLayout(layout);
+        resize(680, 560);
     }
 
     void MainWindow::open(const MainWindowPage page)
@@ -999,6 +1011,51 @@ namespace GyanisScribe::App
                 return buildHistoryPage();
         }
         return nullptr;
+    }
+
+    QWidget *MainWindow::buildActionBar()
+    {
+        auto *bar = new QWidget{this};
+        bar->setObjectName(QStringLiteral("actionBar"));
+        auto *row = new QHBoxLayout{bar};
+        row->setContentsMargins(0, 0, 0, 0);
+        row->setSpacing(GyanisScribe::Ui::kSpacingSmall);
+
+        auto *moreMenu = new QMenu{bar};
+        for (const auto &entry: GyanisScribe::App::visibleTrayMenuEntries(m_capabilities))
+        {
+            const auto action = entry.action;
+            if (!action)
+            {
+                // 表里的分隔线在这一条上没有对应物：分格由行距自己管
+                continue;
+            }
+            if (*action == TrayAction::OpenSettings || *action == TrayAction::OpenAbout || *action == TrayAction::Quit)
+            {
+                // 这三条说的就是这扇窗口：设置与关于是它的内容，退出在没有托盘的机器上是「关掉窗子」
+                continue;
+            }
+            if (entry.hotkeyKey.empty())
+            {
+                // 没配全局热键的那几条收进「更多」：主操作摆在明面，次要的也不许找不到
+                auto *item = moreMenu->addAction(entry.label);
+                QObject::connect(item, &QAction::triggered, this, [this, action] { emit actionRequested(*action); });
+                continue;
+            }
+            auto *button = new QPushButton{entry.label, bar};
+            m_icons.applyIcon(*button, entry.iconName);
+            button->setToolTip(GyanisScribe::Core::uiText("与托盘菜单、全局热键走同一个出口"));
+            QObject::connect(button, &QPushButton::clicked, this, [this, action] { emit actionRequested(*action); });
+            row->addWidget(button);
+        }
+
+        auto *more = new QToolButton{bar};
+        more->setText(GyanisScribe::Core::uiText("更多"));
+        more->setPopupMode(QToolButton::InstantPopup);
+        more->setMenu(moreMenu);
+        row->addWidget(more);
+        row->addStretch();
+        return bar;
     }
 
     QWidget *MainWindow::buildGeneralPage()

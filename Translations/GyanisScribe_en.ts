@@ -412,6 +412,14 @@
             <translation>Configuration files (*.json)</translation>
         </message>
         <message>
+            <source>与托盘菜单、全局热键走同一个出口</source>
+            <translation>Same action as the tray menu and the global hotkey</translation>
+        </message>
+        <message>
+            <source>更多</source>
+            <translation>More</translation>
+        </message>
+        <message>
             <source>界面语言决定菜单、托盘提示与这些设置页的措辞，切换后要重启智录才生效。下面两格管历史留多少，填到 0 就是不限。</source>
             <translation>The interface language sets the wording of the menus, the tray hints and these settings pages; a change takes effect after restarting GyanisScribe. The two rows below decide how much history is kept; 0 means no limit.</translation>
         </message>

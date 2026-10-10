@@ -40,7 +40,7 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 
 | 窗口 | 类与文件 | 样式来源 | 状态 |
 | --- | --- | --- | --- |
-| 主窗口（设置 / 历史 / 关于入口） | `src/App/MainWindow.cpp` | 根 `#appRoot` 铺窗口底；左侧导航 `QListWidget#settingsNav`（宽 `kNavColumnWidth`=180，无框）+ `QStackedWidget` 十页，每页是一张 `#pageCard` 卡片，页内 `kSpacingLarge` 边距、`kSpacingSmall` 行距、字段宽 ≤ `kFieldMaximumWidth` | 导航项选中走 `::item:selected`（`accentSoft` 底 + 主色描边），悬停走 `::item:hover`；每页顶部是 `#pageTitle`（15pt 半粗）加一条 `#pageHint`（9pt 次要色） |
+| 主窗口（设置 / 历史 / 关于入口） | `src/App/MainWindow.cpp` | 根 `#appRoot` 铺窗口底；顶部一条 `#actionBar`（不铺自己的底色，跟着 `#appRoot` 走）——带热键提示的主操作是图标按钮 `QPushButton`，其余条目收在一个 `QToolButton` 的弹出菜单「更多」里，两张清单都取自托盘那张表（`visibleTrayMenuEntries`），所以不会出现「只有菜单里有」的入口；下面是左侧导航 `QListWidget#settingsNav`（宽 `kNavColumnWidth`=180，无框）+ `QStackedWidget` 十页，每页是一张 `#pageCard` 卡片，页内 `kSpacingLarge` 边距、`kSpacingSmall` 行距、字段宽 ≤ `kFieldMaximumWidth` | 导航项选中走 `::item:selected`（`accentSoft` 底 + 主色描边），悬停走 `::item:hover`；每页顶部是 `#pageTitle`（15pt 半粗）加一条 `#pageHint`（9pt 次要色） |
 | 标注窗 | `src/Annotation/AnnotationWindow.cpp` | 画布 `AnnotationView` 自绘底图与图形；工具栏另计 | 快捷键动作表（复制/保存/贴图/识别/撤销重做），不可撤销时按钮 `:disabled` |
 | 标注工具栏 | `src/Annotation/AnnotationToolbar.cpp` | `#AnnotationToolbar` 卡片 + `kSpacingSmall` 内边距与间距，段与段之间是 `QFrame#toolbarSeparator`；`kToolbarSliderWidth` 固定滑块宽、`kAnnotationPalette` 八色块 + 自定义色、`RecentColors.h` 的 `kRecentColorCapacity`(6) 最近用色 | 当前工具按钮 `:checked`（`accentSoft` 底 + 主色描边，三态都在 QSS 里），线宽/字号只走阶梯；色块选中用主色描边 |
 | 截图遮罩 | `src/Capture/CaptureOverlay.cpp` | 自绘：`kCaptureMaskColor` 压暗背景、`kSelectionBorderWidth`+`kAccentColor` 选区框、`kCrosshairColor` 十字虚线、读数用 `kHintFontSize`/`kHintPadding` 压在 `kCaptureHintBackgroundColor` 上 | 拖拽中显示尺寸与坐标读数；`Esc` 取消、`Enter` 或双击确认（`keyPressEvent`/`mouseDoubleClickEvent`）|

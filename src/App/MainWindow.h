@@ -51,6 +51,10 @@ namespace GyanisScribe::App
 {
     /// 主窗口能直接跳到的页面
     /// @note 新增一项要同时给 pageChoices() 加一行和一个 buildPage() 分支，两处都齐了界面才完整
+    /// 托盘动作的枚举，声明在 TrayController.h；这里只要一个不透明的前向声明，
+    /// 为的是动作条能发同一个枚举而不用把整个托盘类拖进这张窗口的头
+    enum class TrayAction;
+
     enum class MainWindowPage
     {
         General,    ///< 通用
@@ -222,6 +226,14 @@ namespace GyanisScribe::App
 
     signals:
         /**
+         * @brief 动作条或「更多」菜单里点了一步
+         * @param action 那一步对应的托盘动作枚举
+         * @details 与托盘菜单发的是同一个枚举、界面层也是同一个出口：一条动作要么两处都能做，
+         *          要么两处都没了，不允许出现「只在托盘里有」这种在没有托盘的机器上找不到的入口。
+         */
+        void actionRequested(GyanisScribe::App::TrayAction action);
+
+        /**
          * @brief 历史页要求把一条成品重新贴回屏幕
          * @param filePath 成品文件路径
          */
@@ -274,6 +286,13 @@ namespace GyanisScribe::App
         QWidget *buildHotkeyPage();
         /// 主题页：配色方案
         QWidget *buildThemePage();
+
+        /**
+         * @brief 窗口顶部那条常设动作条
+         * @return 装着主操作按钮与「更多」菜单的容器
+         * @details 条目直接取自托盘那张表：表里有的这里就有，表里没有的这里也不许多造一份。
+         */
+        QWidget *buildActionBar();
         /// 关于页
         QWidget *buildAboutPage();
         /// 历史页：缩略图列表与三个出口
