@@ -16,3 +16,13 @@ export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}"
 
 export CC="${CC:-gcc-13}"
 export CXX="${CXX:-g++-13}"
+
+# sanitizer 的运行期参数放在这里而不是 sanitize.sh 里：这三条入口（build.sh/test.sh/sanitize.sh）
+# 都会 source 本文件，而 asan 档的树用 test.sh 直接跑同样会撞上这些行为——
+# 只挂在 sanitize.sh 上时，换一条入口跑就会出现「两条字体缓存泄漏用例红」这种与代码无关的差别。
+# 泄漏检测默认开：Qt 自身的常驻分配若被报出来，要在这里看清单而不是先关掉了事。
+export ASAN_OPTIONS="${ASAN_OPTIONS:-halt_on_error=1:abort_on_error=0:detect_stack_use_after_return=1}"
+export UBSAN_OPTIONS="${UBSAN_OPTIONS:-print_stacktrace=1:halt_on_error=1}"
+export TSAN_OPTIONS="${TSAN_OPTIONS:-halt_on_error=0}"
+# 只放过系统库的字体缓存（判据见 scripts/container/lsan-suppressions.txt）
+export LSAN_OPTIONS="${LSAN_OPTIONS:-suppressions=${CONTAINER_SCRIPT_ROOT}/scripts/container/lsan-suppressions.txt}"

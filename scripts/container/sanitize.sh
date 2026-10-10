@@ -43,12 +43,8 @@ run_one() {
         # 可执行体来枚举用例，那一步排在 ctest 之前（实测只包 ctest 时 FAILED: bin/TestSettings）
         prefix=(setarch "$(uname -m)" -R)
     fi
-    # 泄漏检测默认开：Qt 自身的常驻分配若被报出来，要在这里看清单而不是先关掉了事
-    export ASAN_OPTIONS="halt_on_error=1:abort_on_error=0:detect_stack_use_after_return=1"
-    export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1"
-    export TSAN_OPTIONS="halt_on_error=0"
-    # 只放过系统库的字体缓存（见 scripts/container/lsan-suppressions.txt 的判据）
-    export LSAN_OPTIONS="suppressions=${CONTAINER_SCRIPT_ROOT}/scripts/container/lsan-suppressions.txt"
+    # sanitizer 的运行期参数（含 LSan 抑制表）在 scripts/container/env.sh 里统一导出，
+    # 这里不重复一份：两份副本会各自漂移，而 build.sh/test.sh 直接跑 asan 档时也要吃到同一份
     "${prefix[@]}" "${SCRIPT_DIR}/build.sh" "${preset}"
     "${prefix[@]}" "${SCRIPT_DIR}/test.sh" "${preset}"
 }
