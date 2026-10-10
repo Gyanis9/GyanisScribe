@@ -100,7 +100,8 @@ tests/          逐级镜像 src 的目录结构
 用例按模块单测，另有一条跨模块流程的集成入口 `tests/App/TestModuleFlow.cpp`（抓帧 → 标注 → 贴图 → 识别）：
 它按生产形状造替身，钉的是模块接在一起时坐标系与语言词表还对不对——这类漂移在单模块用例里看不见。
 第三方组件与许可证见 [docs/ThirdPartyLicenses.md](docs/ThirdPartyLicenses.md)，
-识别后端与语言包的落地细节见 [docs/OcrBackends.md](docs/OcrBackends.md)。
+识别后端与语言包的落地细节见 [docs/OcrBackends.md](docs/OcrBackends.md)，
+界面令牌、每个窗口的样式与状态、深浅主题对照与高 DPI 适配见 [docs/UiStyleGuide.md](docs/UiStyleGuide.md)。
 
 ## 界面文案与语言切换
 
