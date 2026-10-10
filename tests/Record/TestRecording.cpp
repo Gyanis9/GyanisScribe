@@ -463,3 +463,35 @@ TEST(RecorderFrameRateSetting, AcceptsInRangeAndRejectsOutside)
         EXPECT_NE(parsed.error().message.find("Record/DefaultFrameRate"), std::string::npos) << bad;
     }
 }
+
+/**
+ * @brief 钉住录制范围词表：每一档写得出去也读得回来，读不出时报错要点名可取的值
+ * @details 这张表是设置页、配置文件与录屏读端三方共用的唯一出处。漏一档就有一档在界面上选得出来
+ *          却读不回去；两行同 token 则 parseRecordScope 先命中哪条说不准，下拉框也会出现同义的两行。
+ */
+TEST(RecordScopeSetting, TableRoundTripsEveryModeAndRejectsUnknownToken)
+{
+    for (const auto &choice: GyanisScribe::Record::kRecordScopeChoices)
+    {
+        const auto parsed = GyanisScribe::Record::parseRecordScope(QString::fromUtf8(std::string{choice.token}));
+        ASSERT_TRUE(static_cast<bool>(parsed)) << choice.token;
+        EXPECT_EQ(*parsed, choice.mode) << choice.token;
+        EXPECT_EQ(GyanisScribe::Record::recordScopeText(choice.mode), choice.token) << choice.token;
+    }
+
+    // 枚举里每一档都要在表里有一行：新加 RecordMode 而忘了补表时，recordScopeText 交回的是空串
+    for (const auto mode: {GyanisScribe::Record::RecordMode::FullScreen, GyanisScribe::Record::RecordMode::Region, GyanisScribe::Record::RecordMode::Window})
+    {
+        EXPECT_FALSE(GyanisScribe::Record::recordScopeText(mode).empty()) << "词表漏了 RecordMode 的某一档";
+    }
+
+    // 大小写、尾随空格与中文标签都不认：认了就等于替用户猜一档，录下来的画面可能与他要的完全不同
+    for (const QString &bad: {QStringLiteral(""), QStringLiteral("region"), QStringLiteral("FullScreen "), QStringLiteral("整屏")})
+    {
+        const auto parsed = GyanisScribe::Record::parseRecordScope(bad);
+        ASSERT_FALSE(static_cast<bool>(parsed)) << bad.toStdString();
+        EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument) << bad.toStdString();
+        EXPECT_NE(parsed.error().message.find("FullScreen"), std::string::npos) << bad.toStdString();
+        EXPECT_NE(parsed.error().message.find("Record/Scope"), std::string::npos) << bad.toStdString();
+    }
+}

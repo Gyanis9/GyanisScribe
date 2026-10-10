@@ -206,7 +206,7 @@ namespace
                 Expectation{MainWindowPage::Capture, {"截图目录", "颜色写法"}, true},
                 Expectation{MainWindowPage::Annotation, {"默认线宽", "默认字号"}, true},
                 Expectation{MainWindowPage::Pin, {"默认不透明度"}, true},
-                Expectation{MainWindowPage::Record, {"录屏目录", "默认帧率", "光标高亮"}, true},
+                Expectation{MainWindowPage::Record, {"录屏目录", "录制范围", "默认帧率", "光标高亮"}, true},
                 Expectation{MainWindowPage::Ocr, {"识别语言", "语言包目录"}, true},
                 Expectation{MainWindowPage::Hotkey, {"截图", "录屏", "文字识别", "屏幕取色"}, true},
                 Expectation{MainWindowPage::Theme, {"主题"}, true},
@@ -301,6 +301,54 @@ namespace
 
         const auto reopened = makeStore();
         EXPECT_TRUE(reopened->boolValue(GyanisScribe::Settings::kRecordCursorHighlight, false));
+    }
+
+    /**
+     * @brief 钉住录制范围这一行写的是 Record 词表里的 token，且界面默认档就是读端初值那一档
+     * @details 存中文标签的话下次录屏读不出来（parseRecordScope 认的是 FullScreen/Region/Window），
+     *          而「录什么」猜错比帧率猜错重得多：用户以为录的是那片选区，实际录了整个桌面。
+     */
+    TEST_F(MainWindowFixture, RecordScopeRowWritesTheTokenRecordingStartUses)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::Record);
+        auto *combo = qobject_cast<QComboBox *>(controlInCurrentPage("录制范围"));
+        ASSERT_NE(combo, nullptr);
+        EXPECT_EQ(combo->count(), static_cast<int>(GyanisScribe::Record::kRecordScopeChoices.size())) << "下拉框的行数与词表不同解";
+        EXPECT_EQ(combo->currentData().toString(), QString::fromUtf8(std::string{GyanisScribe::Record::recordScopeText(GyanisScribe::Record::RecorderConfig{}.mode)}))
+                << "没存过时要显示的那一档，必须就是录屏读端自己回落的那一档";
+
+        const auto regionRow = combo->findData(QStringLiteral("Region"));
+        ASSERT_NE(regionRow, -1) << "词表里没有 Region 这一档，设置页选得出却写不进配置";
+        combo->setCurrentIndex(regionRow);
+        closeWindowAndFlush();
+
+        const auto reopened = makeStore();
+        const auto stored   = reopened->stringValue(GyanisScribe::Settings::kRecordScope, QString{});
+        EXPECT_EQ(stored, QStringLiteral("Region"));
+        const auto parsed = GyanisScribe::Record::parseRecordScope(stored);
+        ASSERT_TRUE(static_cast<bool>(parsed));
+        EXPECT_EQ(*parsed, GyanisScribe::Record::RecordMode::Region);
+    }
+
+    /**
+     * @brief 钉住「配置里的录制范围读不出」时界面按初值档显示，而读端仍然拒绝开录
+     * @details 两边都不许静默变形：界面不能把坏值当成用户选过的一档顺手写回去，
+     *          读端更不能悄悄按整屏开始——录下来的画面与用户想要的完全不是一回事。
+     */
+    TEST_F(MainWindowFixture, GarbageStoredScopeShowsDefaultButStillBlocksTheStart)
+    {
+        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kRecordScope, QStringLiteral("region"))));
+
+        makeWindow();
+        m_window->open(MainWindowPage::Record);
+        const auto *combo = qobject_cast<QComboBox *>(controlInCurrentPage("录制范围"));
+        ASSERT_NE(combo, nullptr);
+        EXPECT_EQ(combo->currentData().toString(), QStringLiteral("FullScreen")) << "读不出时按初值档显示";
+        EXPECT_EQ(m_store->stringValue(GyanisScribe::Settings::kRecordScope, QString{}), QStringLiteral("region")) << "回落不该顺手把文件里的坏值改掉：它要留着让人查得到";
+
+        const auto parsed = GyanisScribe::Record::parseRecordScope(QStringLiteral("region"));
+        ASSERT_FALSE(static_cast<bool>(parsed)) << "读端把坏值认成一整档，就是拿整屏去录用户要的选区";
     }
 
     /**

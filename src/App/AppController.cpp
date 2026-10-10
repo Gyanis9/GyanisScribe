@@ -25,6 +25,7 @@
 #include "App/TrayController.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Record/FfmpegRecordingEncoder.h"
+#include "Record/RecorderConfig.h"
 #include "Record/RecordingHud.h"
 #include "Record/RecordingService.h"
 #include "Settings/SettingsKeys.h"
@@ -480,6 +481,35 @@ namespace GyanisScribe::App
         }
         // 光标高亮是个开关，没有「读不出」这一档：配置里没有就按关；到了画不出位置的那一种模式，RecordingService 会自己报一句
         config.cursorHighlight = m_settings->boolValue(Settings::kRecordCursorHighlight, false);
+
+        // 录制范围按用户选的那一档来；读不出或做不出来时把原因交回去，不悄悄换成整屏——
+        // 那会让用户以为录的是他选的那片，实际录下整个桌面
+        const auto storedScope = m_settings->stringValue(Settings::kRecordScope, QString::fromUtf8(std::string{Record::recordScopeText(config.mode)}));
+        const auto parsedScope = Record::parseRecordScope(storedScope);
+        if (!parsedScope)
+        {
+            return std::unexpected(parsedScope.error());
+        }
+        config.mode = *parsedScope;
+
+        if (config.mode == Record::RecordMode::Region)
+        {
+            const auto region = Capture::regionFromText(m_settings->stringValue(Settings::kCaptureLastRegion, QString()).toStdString());
+            if (!region)
+            {
+                return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
+                                                   GyanisScribe::Core::uiTextUtf8("还没有可录的选区：先按截图热键框一次选区，再开始录屏；也可以把录制范围改回整屏")});
+            }
+            config.region = *region;
+        } else if (config.mode == Record::RecordMode::Window)
+        {
+            const auto window = m_integration->foregroundWindow();
+            if (!window)
+            {
+                return std::unexpected(window.error());
+            }
+            config.windowHandle = window->handle;
+        }
         return config;
     }
 

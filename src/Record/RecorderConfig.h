@@ -14,7 +14,9 @@
 #include <QRect>
 #include <QString>
 
+#include <array>
 #include <filesystem>
+#include <string_view>
 
 namespace GyanisScribe::Record
 {
@@ -81,5 +83,36 @@ namespace GyanisScribe::Record
      *          这里只按两档共用的上限判，格式那一层仍由 validateRecorderConfig 把关。
      */
     [[nodiscard]] Core::Expected<int> parseFrameRateSetting(int stored);
+
+    /// 一档录制范围：存进配置的 token，与设置页显示的中文标签
+    struct RecordScopeChoice
+    {
+        RecordMode       mode;  ///< 这一档对应的录法
+        std::string_view token; ///< 配置里存的值，词表在这里唯一
+        std::string_view label; ///< 设置页上的中文标签，界面按 UTF-8 取
+    };
+
+    /// 全部录制范围档位，顺序就是设置页下拉的顺序
+    inline constexpr std::array<RecordScopeChoice, 3> kRecordScopeChoices{
+            RecordScopeChoice{RecordMode::FullScreen, "FullScreen", "整屏"},
+            RecordScopeChoice{RecordMode::Region, "Region", "上次选区"},
+            RecordScopeChoice{RecordMode::Window, "Window", "当前窗口"},
+    };
+
+    /**
+     * @brief 取一档录制范围存在配置里的那个值
+     * @param mode 目标档位
+     * @return token；词表外的枚举值返回空，由调用方决定怎么报
+     */
+    [[nodiscard]] std::string_view recordScopeText(RecordMode mode) noexcept;
+
+    /**
+     * @brief 解析配置里存的录制范围
+     * @param stored 配置读出的文本
+     * @return 对应档位；读不出时返回 InvalidArgument 并列出可取的几个值
+     * @details 不替用户猜一档：手改配置写成 "region"（小写）就该报出来，
+     *          悄悄按整屏开始录会录到完全不同的画面。
+     */
+    [[nodiscard]] Core::Expected<RecordMode> parseRecordScope(const QString &stored);
 
 } // namespace GyanisScribe::Record

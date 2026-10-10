@@ -74,4 +74,41 @@ namespace GyanisScribe::Record
         }}};
     }
 
+    std::string_view recordScopeText(const RecordMode mode) noexcept
+    {
+        for (const auto &choice: kRecordScopeChoices)
+        {
+            if (choice.mode == mode)
+            {
+                return choice.token;
+            }
+        }
+        // 词表里没有这一档：新加枚举值时会走到这里，交回空由调用方决定报法（表格与枚举不同解就是缺陷）
+        return {};
+    }
+
+    Core::Expected<RecordMode> parseRecordScope(const QString &stored)
+    {
+        const auto wanted = stored.toStdString();
+        for (const auto &choice: kRecordScopeChoices)
+        {
+            if (wanted == choice.token)
+            {
+                return choice.mode;
+            }
+        }
+        // 不替用户猜一档：悄悄按整屏开始录，录下来的画面与他想要的完全不是一回事
+        std::string tokens;
+        for (const auto &choice: kRecordScopeChoices)
+        {
+            tokens += tokens.empty() ? "" : " / ";
+            tokens += choice.token;
+        }
+        return std::unexpected(
+                Core::Error{.code    = Core::ErrorCode::InvalidArgument,
+                            .message = GyanisScribe::Core::uiFormat(
+                                    GyanisScribe::Core::uiTextUtf8("录制范围 \"{}\" 不是一个可选值：可取的只有 {}。请在设置的录屏页重选，或删掉 Record/Scope 这一项回到整屏"),
+                                    wanted, tokens)});
+    }
+
 } // namespace GyanisScribe::Record

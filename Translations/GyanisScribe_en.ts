@@ -184,6 +184,10 @@
             <translation>No screen is available, so recording cannot start. Reconnect a display and try again.</translation>
         </message>
         <message>
+            <source>还没有可录的选区：先按截图热键框一次选区，再开始录屏；也可以把录制范围改回整屏</source>
+            <translation>No selection to record yet: frame one with the capture hotkey first, then start recording; you can also set the recording scope back to full screen</translation>
+        </message>
+        <message>
             <source>录屏没能开始：{}</source>
             <translation>Recording didn't start: {}</translation>
         </message>
@@ -312,6 +316,14 @@
             <translation>Recording default frame rate</translation>
         </message>
         <message>
+            <source>录制范围</source>
+            <translation>Recording scope</translation>
+        </message>
+        <message>
+            <source>「上次选区」用最近一次截图框出的那块矩形；「当前窗口」录按下开始时最靠前的那个窗口。改完从下一次录屏开始生效</source>
+            <translation>Last selection records the rectangle framed by the most recent capture; Current window records whichever window is in front when recording starts. Changes apply from the next recording</translation>
+        </message>
+        <message>
             <source>智录 GyanisScribe %1\n\n截图、标注、贴图、录屏与文字识别。\n全局热键：Ctrl+Alt+A 截图，Ctrl+Alt+R 录屏（再按一次停止并保存），Ctrl+Alt+O 识别。\n界面图标全部为本项目原创 SVG；第三方组件与其许可证见仓库 docs/ThirdPartyLicenses.md。\n</source>
             <translation>GyanisScribe %1\n\nScreenshot, annotation, pin, screen recording and text recognition.\nGlobal hotkeys: Ctrl+Alt+A capture, Ctrl+Alt+R record (press again to stop and save), Ctrl+Alt+O recognize.\nAll UI icons are original SVG artwork made for this project; third-party components and their licenses are listed in docs/ThirdPartyLicenses.md in the repository.\n</translation>
         </message>
@@ -420,8 +432,8 @@
             <translation>Opacity for new pins</translation>
         </message>
         <message>
-            <source>录屏成品落在这个目录里。帧率越高文件越大，存成 GIF 时上限比 MP4 低。帧率与高亮开关都从下一次开始录屏时生效。</source>
-            <translation>Finished recordings land in this folder. A higher frame rate means a bigger file, and the GIF ceiling is lower than the MP4 one. The frame rate and the highlight switch apply from the next recording.</translation>
+            <source>录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。帧率越高文件越大，存成 GIF 时上限比 MP4 低。这三项都从下一次开始录屏时生效。</source>
+            <translation>Recorded files land in this folder. With Last selection or Current window, the picture keeps only that part of the screen. A higher frame rate means a larger file, and GIF allows a lower maximum than MP4. All three apply from the next recording.</translation>
         </message>
         <message>
             <source>录屏成品目录</source>
@@ -1102,6 +1114,22 @@
         <message>
             <source>默认帧率 "{}" 不在可用范围（1 到 {}）里：请在设置的录屏页重选一个值，或删掉 Record/DefaultFrameRate 这一项回到默认档</source>
             <translation>Default frame rate "{}" is outside the usable range (1 to {}): pick a value again on the Recording page of Settings, or remove the Record/DefaultFrameRate entry to go back to the default</translation>
+        </message>
+        <message>
+            <source>录制范围 "{}" 不是一个可选值：可取的只有 {}。请在设置的录屏页重选，或删掉 Record/Scope 这一项回到整屏</source>
+            <translation>Recording scope "{}" is not one of the available values; only {} are valid. Pick a value again on the Recording page of Settings, or delete the Record/Scope entry to go back to full screen</translation>
+        </message>
+        <message>
+            <source>整屏</source>
+            <translation>Full screen</translation>
+        </message>
+        <message>
+            <source>上次选区</source>
+            <translation>Last selection</translation>
+        </message>
+        <message>
+            <source>当前窗口</source>
+            <translation>Current window</translation>
         </message>
         <message>
             <source>未在录制</source>
