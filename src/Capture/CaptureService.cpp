@@ -5,6 +5,7 @@
 #include "Capture/ScreenUtils.h"
 #include "Core/Logger.h"
 #include "Core/Text.h"
+#include "Platform/IPlatformIntegration.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
 
@@ -16,8 +17,8 @@
 namespace GyanisScribe::Capture
 {
 
-    CaptureService::CaptureService(const IScreenCaptureSource &source, Settings::ISettingsStore &settings, QObject *parent) :
-        ICaptureService(parent), m_source(source), m_settings(settings)
+    CaptureService::CaptureService(const IScreenCaptureSource &source, Settings::ISettingsStore &settings, const Platform::IPlatformIntegration &integration, QObject *parent) :
+        ICaptureService(parent), m_source(source), m_settings(settings), m_integration(integration)
     {
     }
 
@@ -99,6 +100,10 @@ namespace GyanisScribe::Capture
             return;
         }
 
+        // 候选要在这批遮罩建出来之前取：遮罩自己是一层盖住全屏的窗口，取晚了它会被列成第一个候选，
+        // 于是每一格悬停都「认出整屏」，点一下就等于截全屏
+        const auto candidates = windowCandidates();
+
         for (auto *screen: screens)
         {
             const auto frame = m_source.grabScreen(screen->name());
@@ -111,6 +116,16 @@ namespace GyanisScribe::Capture
             }
 
             auto *overlay = new CaptureOverlay(frame->image, screen->geometry(), screen->devicePixelRatio());
+            // 只留与这块屏有交集的那几扇，并裁到屏内：跨屏的窗口截到的就是它在屏上看得见的那部分
+            std::vector<QRect> onThisScreen;
+            for (const auto &rect: candidates)
+            {
+                if (const auto clipped = rect.intersected(screen->geometry()); !clipped.isNull() && clipped.width() > 0 && clipped.height() > 0)
+                {
+                    onThisScreen.push_back(clipped);
+                }
+            }
+            overlay->setWindowCandidates(onThisScreen);
             QObject::connect(overlay, &CaptureOverlay::regionSelected, this,
                              [this, screen, overlay](const QRect &region)
                              {
@@ -160,6 +175,30 @@ namespace GyanisScribe::Capture
             }
         }
         m_overlays.clear();
+    }
+
+    std::vector<QRect> CaptureService::windowCandidates() const
+    {
+        if (!m_integration.capabilities().windowEnumeration)
+        {
+            // 平台给不出候选就不是「少一个悬停认窗」，别的照常：这里不报错也不拦框选
+            return {};
+        }
+
+        const auto windows = m_integration.screenWindows();
+        if (!windows)
+        {
+            Core::Logger::warning(std::format("框选时没拿到窗口候选，这一轮只做手动框选：{}", windows.error().message));
+            return {};
+        }
+
+        std::vector<QRect> rects;
+        rects.reserve(windows->size());
+        for (const auto &window: *windows)
+        {
+            rects.push_back(window.logicalGlobal);
+        }
+        return rects;
     }
 
 } // namespace GyanisScribe::Capture

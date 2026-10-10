@@ -14,6 +14,9 @@
 #include <QRect>
 #include <QWidget>
 
+#include <optional>
+#include <vector>
+
 namespace GyanisScribe::Capture
 {
 
@@ -53,6 +56,20 @@ namespace GyanisScribe::Capture
          * @note 空选区时不发声：一次没有落成的框不该产出一张 0×0 的图
          */
         void confirmSelection();
+
+        /**
+         * @brief 交给遮罩的窗口候选
+         * @param globalRects 全局逻辑矩形，按压盖顺序从最上面排到最下面
+         * @details 空一份就是不启用「光标压在哪个窗口上」：平台给不出候选时遮罩照旧只做框选。
+         *          传全局坐标即可，本方法按这块屏的原点换成局部坐标。
+         */
+        void setWindowCandidates(const std::vector<QRect> &globalRects);
+
+        /**
+         * @brief 光标正压在上的那一个候选
+         * @return 已经在框选、或没有候选含住光标时返回空
+         */
+        [[nodiscard]] std::optional<QRect> hoveredRegion() const;
 
     signals:
         /**
@@ -119,12 +136,22 @@ namespace GyanisScribe::Capture
          */
         [[nodiscard]] QPoint hintPositionFor(const QRect &region) const;
 
-        QImage m_background;             ///< 该屏的物理像素图，按缩放因子画成逻辑大小
-        QRect  m_screenGeometry;         ///< 该屏的全局逻辑几何
-        qreal  m_devicePixelRatio = 1.0; ///< 该屏缩放因子
-        QPoint m_anchorPoint;            ///< 本次框选的按下点，局部逻辑坐标
-        QPoint m_currentPoint;           ///< 框选过程中的当前点
-        bool   m_isSelecting = false;    ///< 是否正在拖动框选
+        /**
+         * @brief 按当前点重算「光标压在哪个候选上」
+         * @details 只在还没有选区时算：用户已经框出一块之后再亮一个别的矩形，会把「这就是要截的那块」
+         *          这句已经确定的话改成疑问句。
+         */
+        void refreshHoveredRegion();
+
+        QImage               m_background;             ///< 该屏的物理像素图，按缩放因子画成逻辑大小
+        QRect                m_screenGeometry;         ///< 该屏的全局逻辑几何
+        qreal                m_devicePixelRatio = 1.0; ///< 该屏缩放因子
+        QPoint               m_anchorPoint;            ///< 本次框选的按下点，局部逻辑坐标
+        QPoint               m_currentPoint;           ///< 框选过程中的当前点
+        QPoint               m_cursorPoint;            ///< 光标最近所在点，只喂辅助线与悬停，不参与选区计算
+        bool                 m_isSelecting = false;    ///< 是否正在拖动框选
+        std::vector<QRect>   m_windowCandidates;       ///< 窗口候选，已换成局部逻辑坐标，按 z 序排
+        std::optional<QRect> m_hoveredRegion;          ///< 光标压在上的那一个候选，没有则空
     };
 
 } // namespace GyanisScribe::Capture

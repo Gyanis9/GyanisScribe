@@ -49,6 +49,34 @@ namespace GyanisScribe::Capture
         emit regionSelected(region);
     }
 
+    void CaptureOverlay::setWindowCandidates(const std::vector<QRect> &globalRects)
+    {
+        // 换成局部坐标：遮罩上的鼠标读数与选区都是这块屏内的局部值，两套单位混在一起就会错一格
+        const auto origin = m_screenGeometry.topLeft();
+        m_windowCandidates.clear();
+        m_windowCandidates.reserve(globalRects.size());
+        for (const auto &rect: globalRects)
+        {
+            m_windowCandidates.push_back(rect.translated(-origin.x(), -origin.y()));
+        }
+        refreshHoveredRegion();
+    }
+
+    std::optional<QRect> CaptureOverlay::hoveredRegion() const
+    {
+        return m_hoveredRegion;
+    }
+
+    void CaptureOverlay::refreshHoveredRegion()
+    {
+        if (m_isSelecting || !selectedRegion().isNull())
+        {
+            m_hoveredRegion.reset();
+            return;
+        }
+        m_hoveredRegion = regionAtPoint(m_cursorPoint, m_windowCandidates);
+    }
+
     QRect CaptureOverlay::normalizeRect(const QPoint &anchor, const QPoint &current)
     {
         return QRect(anchor, current).normalized();
@@ -72,29 +100,31 @@ namespace GyanisScribe::Capture
         QPainter   painter(this);
         const auto widgetRect = QRect(QPoint(0, 0), size());
         const auto region     = selectedRegion();
+        // 还没框的时候把悬停认出的那一块当预览画出来：不亮这块，用户就只能靠猜知道点一下会不会中
+        const auto shown = region.isNull() ? m_hoveredRegion.value_or(QRect{}) : region;
 
         painter.drawImage(0, 0, m_background);
 
         // 压暗层用四块矩形围出选区，而不是建偶奇路径：四块矩形是这里最省事也最不容易画错形状的做法
         painter.setPen(Qt::NoPen);
         painter.setBrush(GyanisScribe::Ui::kCaptureMaskColor);
-        if (region.isNull())
+        if (shown.isNull())
         {
             painter.drawRect(widgetRect);
         } else
         {
-            painter.setClipRegion(QRegion(widgetRect) - QRegion(region));
+            painter.setClipRegion(QRegion(widgetRect) - QRegion(shown));
             painter.drawRect(widgetRect);
             painter.setClipping(false);
         }
 
-        if (!region.isNull())
+        if (!shown.isNull())
         {
             auto borderPen = QPen(GyanisScribe::Ui::kAccentColor);
             borderPen.setWidth(GyanisScribe::Ui::kSelectionBorderWidth);
             painter.setPen(borderPen);
             painter.setBrush(Qt::NoBrush);
-            painter.drawRect(region);
+            painter.drawRect(shown);
 
             if (m_isSelecting)
             {
@@ -106,13 +136,13 @@ namespace GyanisScribe::Capture
                 painter.drawLine(QPoint(0, m_currentPoint.y()), QPoint(widgetRect.width(), m_currentPoint.y()));
             }
 
-            const auto hint     = formatSelectionHint(region);
+            const auto hint     = formatSelectionHint(shown);
             QFont      hintFont = font();
             hintFont.setPointSize(GyanisScribe::Ui::kHintFontSize);
             painter.setFont(hintFont);
             const QFontMetrics metrics(hintFont);
             const auto         textSize    = metrics.size(Qt::TextSingleLine, hint);
-            const auto         hintTopLeft = hintPositionFor(region);
+            const auto         hintTopLeft = hintPositionFor(shown);
             const QRect        hintRect(hintTopLeft, textSize + QSize(GyanisScribe::Ui::kHintPadding * 2, GyanisScribe::Ui::kHintPadding));
 
             painter.setPen(Qt::NoPen);
@@ -130,14 +160,23 @@ namespace GyanisScribe::Capture
             m_isSelecting  = true;
             m_anchorPoint  = event->position().toPoint();
             m_currentPoint = m_anchorPoint;
+            m_cursorPoint  = m_anchorPoint;
+            // 预览留着不熄：按下还没拖的那一瞬间，「点一下要哪扇」的答案就是它。
+            // 真拖起来了再由 refreshHoveredRegion 关掉，同一时刻不会出现两个矩形
             update();
         }
     }
 
     void CaptureOverlay::mouseMoveEvent(QMouseEvent *event)
     {
-        m_currentPoint = event->position().toPoint();
-        // 没在拖也要重画：十字辅助线跟着光标走
+        // 光标位置与选区端点分开记：没按下时也要重画（辅助线与悬停跟着光标走），
+        // 但把它写进 m_currentPoint 会让 selectedRegion() 从原点编出一块根本没框过的选区
+        m_cursorPoint = event->position().toPoint();
+        if (m_isSelecting)
+        {
+            m_currentPoint = m_cursorPoint;
+        }
+        refreshHoveredRegion();
         update();
     }
 
@@ -147,6 +186,15 @@ namespace GyanisScribe::Capture
         {
             m_isSelecting  = false;
             m_currentPoint = event->position().toPoint();
+
+            // 按下又原地放开（没拖出任何一块）时，认此刻悬停亮着的那个候选：
+            // 「点一下就要这一扇窗口」是框选最常用的走法，而原地放开过去什么也不产出
+            if (m_hoveredRegion && selectedRegion().isNull())
+            {
+                m_anchorPoint  = m_hoveredRegion->topLeft();
+                m_currentPoint = m_hoveredRegion->bottomRight();
+                m_hoveredRegion.reset();
+            }
             update();
         }
     }

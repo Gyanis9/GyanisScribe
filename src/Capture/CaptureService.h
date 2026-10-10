@@ -27,6 +27,11 @@ namespace GyanisScribe::Settings
     class ISettingsStore;
 } // namespace GyanisScribe::Settings
 
+namespace GyanisScribe::Platform
+{
+    class IPlatformIntegration;
+} // namespace GyanisScribe::Platform
+
 namespace GyanisScribe::Capture
 {
 
@@ -43,12 +48,13 @@ namespace GyanisScribe::Capture
 
     public:
         /**
-         * @brief 绑定抓帧来源与配置
+         * @brief 绑定抓帧来源、配置与平台集成
          * @param source 抓帧来源，生命周期必须长于本服务
          * @param settings 配置存储，用于读写「上次区域」那两项，生命周期必须长于本服务
+         * @param integration 平台集成，只用来问「屏上有哪些窗口」，生命周期必须长于本服务
          * @param parent QObject 父对象，默认无
          */
-        CaptureService(const IScreenCaptureSource &source, Settings::ISettingsStore &settings, QObject *parent = nullptr);
+        CaptureService(const IScreenCaptureSource &source, Settings::ISettingsStore &settings, const Platform::IPlatformIntegration &integration, QObject *parent = nullptr);
 
         /**
          * @brief 析构服务，顺带收掉还开着的遮罩
@@ -106,9 +112,16 @@ namespace GyanisScribe::Capture
          */
         void closeOverlays();
 
-        const IScreenCaptureSource           &m_source;   ///< 抓帧来源
-        Settings::ISettingsStore             &m_settings; ///< 「上次区域」的读写处
-        std::vector<QPointer<CaptureOverlay>> m_overlays; ///< 在屏的遮罩，每块屏一张；窗口自己析构后要认得空指针
+        /**
+         * @brief 问平台要这一轮的窗口候选（全局逻辑矩形，按 z 序）
+         * @return 平台没这能力、或给不出时返回空表——遮罩就退回「只做手动框选」
+         */
+        [[nodiscard]] std::vector<QRect> windowCandidates() const;
+
+        const IScreenCaptureSource           &m_source;      ///< 抓帧来源
+        Settings::ISettingsStore             &m_settings;    ///< 「上次区域」的读写处
+        const Platform::IPlatformIntegration &m_integration; ///< 窗口候选的来源，不拥有
+        std::vector<QPointer<CaptureOverlay>> m_overlays;    ///< 在屏的遮罩，每块屏一张；窗口自己析构后要认得空指针
     };
 
 } // namespace GyanisScribe::Capture

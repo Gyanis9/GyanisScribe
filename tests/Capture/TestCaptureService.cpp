@@ -2,6 +2,7 @@
 
 #include "Capture/IScreenCaptureSource.h"
 #include "Core/Logger.h"
+#include "Platform/IPlatformIntegration.h"
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
 
@@ -70,6 +71,9 @@ namespace
 
     std::unique_ptr<QCoreApplication> application;
 
+    /// 服务现在要问平台「屏上有哪些窗口」；这几条用例不碰框选，用真的平台对象就够
+    std::unique_ptr<GyanisScribe::Platform::IPlatformIntegration> platform;
+
     class CaptureServiceFixture : public ::testing::Test
     {
     protected:
@@ -83,10 +87,12 @@ namespace
             application                 = std::make_unique<QCoreApplication>(argumentCount, arguments);
             QCoreApplication::setOrganizationName(QStringLiteral("Gyanis"));
             QCoreApplication::setApplicationName(QStringLiteral("GyanisScribe-Tests"));
+            platform = GyanisScribe::Platform::createPlatformIntegration();
         }
 
         static void TearDownTestSuite()
         {
+            platform.reset();
             application.reset();
         }
 
@@ -132,7 +138,7 @@ TEST_F(CaptureServiceFixture, FullScreenCaptureEmitsTheFrame)
 {
     SettingsStore     settings(m_iniFile);
     FakeCaptureSource source;
-    CaptureService    service(source, settings);
+    CaptureService    service(source, settings, *platform);
     Outcome           outcome;
     wire(service, outcome);
 
@@ -152,7 +158,7 @@ TEST_F(CaptureServiceFixture, RegionCaptureRemembersTheRegion)
 {
     SettingsStore     settings(m_iniFile);
     FakeCaptureSource source;
-    CaptureService    service(source, settings);
+    CaptureService    service(source, settings, *platform);
     Outcome           outcome;
     wire(service, outcome);
 
@@ -181,7 +187,7 @@ TEST_F(CaptureServiceFixture, FailedRegionKeepsPreviouslyRememberedRegion)
     settings.sync();
 
     FakeCaptureSource source;
-    CaptureService    service(source, settings);
+    CaptureService    service(source, settings, *platform);
     Outcome           outcome;
     wire(service, outcome);
 
@@ -204,7 +210,7 @@ TEST_F(CaptureServiceFixture, LastRegionReusesStoredRegionOrFails)
 {
     SettingsStore     settings(m_iniFile);
     FakeCaptureSource source;
-    CaptureService    service(source, settings);
+    CaptureService    service(source, settings, *platform);
 
     // 没记过时：拒绝并给替代做法
     {
@@ -247,7 +253,7 @@ TEST_F(CaptureServiceFixture, WindowCaptureForwardsHandleAndSourceFailure)
     SettingsStore     settings(m_iniFile);
     FakeCaptureSource source;
     source.windowResult = std::unexpected(Error{ErrorCode::PlatformUnsupported, "本平台抓不出窗口像素。请改用区域截图框住那个窗口"});
-    CaptureService service(source, settings);
+    CaptureService service(source, settings, *platform);
     Outcome        outcome;
     wire(service, outcome);
 
@@ -275,7 +281,7 @@ TEST_F(CaptureServiceFixture, FailuresAreWrittenToLog)
     SettingsStore     settings(m_iniFile);
     FakeCaptureSource source;
     source.screenResult = std::unexpected(Error{ErrorCode::ScreenUnavailable, "找不到名为「FakeScreen-9」的屏幕"});
-    CaptureService service(source, settings);
+    CaptureService service(source, settings, *platform);
     Outcome        outcome;
     wire(service, outcome);
 

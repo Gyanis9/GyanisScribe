@@ -94,7 +94,7 @@ namespace GyanisScribe::App
             Core::Logger::warning(std::format("界面语言的配置值读不出：{}，按中文继续", parsed.error().message));
         }
 
-        m_capture = std::make_unique<Capture::CaptureService>(*m_captureSource, *m_settings);
+        m_capture = std::make_unique<Capture::CaptureService>(*m_captureSource, *m_settings, *m_integration);
         m_hotkeys = std::make_unique<Hotkey::HotkeyManager>(*m_settings, *m_integration);
 
         // 主题与图标：样式表落下去、图标描边色跟着走。这里挂一次连接，之后所有取图标的地方都不用再过问主题

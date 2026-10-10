@@ -89,6 +89,19 @@ namespace GyanisScribe::Capture
     }
 
 
+    std::optional<QRect> regionAtPoint(const QPoint &point, const std::vector<QRect> &candidates)
+    {
+        // 先到先得：候选那份顺序就是压盖顺序，后面的已经被前面的挡住了
+        for (const auto &candidate: candidates)
+        {
+            if (candidate.contains(point))
+            {
+                return candidate;
+            }
+        }
+        return {};
+    }
+
     QString formatSelectionHint(const QRect &logicalRegion)
     {
         return QString::fromUtf8(std::format("{} × {}    ({}, {})", logicalRegion.width(), logicalRegion.height(), logicalRegion.x(), logicalRegion.y()).c_str());

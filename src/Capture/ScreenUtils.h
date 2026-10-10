@@ -15,6 +15,9 @@
 #include <QRect>
 #include <QString>
 
+#include <optional>
+#include <vector>
+
 class QScreen;
 
 namespace GyanisScribe::Capture
@@ -55,6 +58,15 @@ namespace GyanisScribe::Capture
      */
     [[nodiscard]] QScreen *screenAtGlobalPoint(const QPoint &globalPoint);
 
+
+    /**
+     * @brief 从一叠候选矩形里认出压在某个点上方的那一块
+     * @param point 待判定的点，与候选同一坐标系
+     * @param candidates 候选矩形，按压盖顺序从最上面排到最下面
+     * @return 第一个含住这个点的矩形；一个都不含时返回空
+     * @details 只取第一个命中：这份顺序就是谁压在谁上面，往后找会把用户看得见的那一块换成被压在底下的一块
+     */
+    [[nodiscard]] std::optional<QRect> regionAtPoint(const QPoint &point, const std::vector<QRect> &candidates);
 
     /**
      * @brief 选区提示文本

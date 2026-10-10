@@ -1,5 +1,6 @@
 add_executable(TestCapture
         TestCaptureService.cpp
+        TestCaptureOverlay.cpp
         TestScreenUtils.cpp)
 
 target_link_libraries(TestCapture PRIVATE

@@ -1,14 +1,18 @@
 #include "Capture/ScreenUtils.h"
 
 #include <QImage>
+#include <QPoint>
 #include <QRect>
 
 #include <gtest/gtest.h>
 
+#include <optional>
 #include <string>
+#include <vector>
 
 using GyanisScribe::Capture::cropToLogicalRect;
 using GyanisScribe::Capture::formatSelectionHint;
+using GyanisScribe::Capture::regionAtPoint;
 using GyanisScribe::Capture::regionFromText;
 using GyanisScribe::Capture::regionToText;
 using GyanisScribe::Capture::toPhysicalRect;
@@ -129,4 +133,23 @@ TEST(ScreenUtils, RegionTextRoundTripsAndRejects)
     const auto withSpaces = regionFromText(" 10 , 20 , 40 , 50 ");
     ASSERT_TRUE(withSpaces.has_value()) << "手改配置时的首尾空格不该判坏";
     EXPECT_EQ(*withSpaces, QRect(10, 20, 40, 50));
+}
+
+/**
+ * @brief 钉住命中测试取的是压在最上面的那一个，而不是面积最小或最后一个
+ * @details 候选那份顺序就是 z 序。往后找会把用户看得见的那扇换成被压在底下的一扇——
+ *          这不会报错，只会截出一张「明明点的是它」的图。
+ */
+TEST(ScreenUtils, HitTestTakesTheTopmostCandidate)
+{
+    const std::vector<QRect> candidates{QRect{0, 0, 100, 100}, QRect{20, 20, 30, 30}, QRect{50, 50, 40, 40}};
+
+    // (25,25) 同时落在前三块里：按顺序取第一块
+    EXPECT_EQ(regionAtPoint(QPoint{25, 25}, candidates), std::optional<QRect>{candidates[0]});
+    // (55,55) 落在第一块与第三块里：仍取压在上面的第一块
+    EXPECT_EQ(regionAtPoint(QPoint{55, 55}, candidates), std::optional<QRect>{candidates[0]});
+    // 一个都不含：返回空，遮罩上不该亮任何东西
+    EXPECT_FALSE(regionAtPoint(QPoint{120, 120}, candidates).has_value());
+    // 空名单（平台给不出候选）：同样的空结果，不越界也不崩
+    EXPECT_FALSE(regionAtPoint(QPoint{10, 10}, {}).has_value());
 }
