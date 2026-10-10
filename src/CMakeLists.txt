@@ -46,6 +46,15 @@ add_custom_command(TARGET DeployQtRuntime POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "$<TARGET_FILE_DIR:Qt6::Gui>/../plugins/platforms/qwindows${QT_DEBUG_SUFFIX}.dll"
         "$<TARGET_FILE_DIR:GyanisScribe>/plugins/platforms/")
+
+# 离屏平台只给开发树用：会真建窗口的用例（贴图、遮罩）把 QT_QPA_PLATFORM 设成 offscreen，
+# 否则窗口会弹到用户桌面上并抢前台——并行跑用例时这会咬到别的界面测试。
+# 缺这个插件时 Qt 不是报错而是弹出模态的「no platform plugin」消息框，ctest 表现为整条挂住。
+# 安装器的 staging 清单是另一处（scripts/WindowsPackage.ps1），产品包里不带这一件。
+add_custom_command(TARGET DeployQtRuntime POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_FILE_DIR:Qt6::Gui>/../plugins/platforms/qoffscreen${QT_DEBUG_SUFFIX}.dll"
+        "$<TARGET_FILE_DIR:GyanisScribe>/plugins/platforms/")
 endif ()
 
 # 语言包：Translations/*.ts 是仓库里的真源，.qm 由 lrelease 在构建期产出。它是本构建图产出的产物，

@@ -1,0 +1,305 @@
+// 跨模块流程的集成入口（需求 §10：覆盖截图、贴图、OCR 流程）。
+// 单模块用例各测各的，这一条钉的是它们接在一起时坐标系还对不对：抓帧那一步刻意按生产形状
+// 造——QImage 的倍比标成 1.0，真实缩放只住在 CapturedImage.devicePixelRatio 与 logicalSize 里
+// （见 src/Capture/QScreenCaptureSource.cpp），于是「标注吃逻辑坐标 → 导出物理像素 → 贴图开窗」
+// 这三步之间的换算一旦被漏掉，就只有这条链上看得见。
+
+#include "Annotation/AnnotationEngine.h"
+#include "Annotation/AnnotationTool.h"
+#include "Capture/CaptureService.h"
+#include "Capture/ICaptureService.h"
+#include "Capture/IScreenCaptureSource.h"
+#include "Core/Types.h"
+#include "Ocr/IOcrEngine.h"
+#include "Ocr/OcrEngineFactory.h"
+#include "Pin/IPinWindow.h"
+#include "Pin/PinManager.h"
+#include "Platform/IPlatformIntegration.h"
+#include "Settings/SettingsStore.h"
+
+#include <QApplication>
+#include <QColor>
+#include <QFont>
+#include <QImage>
+#include <QPainter>
+#include <QPoint>
+#include <QRect>
+#include <QSize>
+#include <QString>
+
+#include <gtest/gtest.h>
+
+#include <cmath>
+#include <filesystem>
+#include <format>
+#include <memory>
+#include <optional>
+#include <string>
+
+// 整份用例住在工程命名空间里：匿名命名空间在工程之外时 `Core::Expected` 这类写法认不到名字
+// （实测 C2061/C2653），而 nest 进 GyanisScribe 就不用给每个类型加前缀
+namespace GyanisScribe
+{
+    namespace
+    {
+        int                           argumentCount = 1;
+        std::unique_ptr<QApplication> application;
+
+        /// argv 缓冲要有静态存储期：QApplication 只存指针不拷贝
+        inline static char argumentZero[] = "TestModuleFlow";
+        char              *arguments[]    = {argumentZero, nullptr};
+
+        constexpr int   kPhysicalWidth    = 900;
+        constexpr int   kPhysicalHeight   = 600;
+        constexpr int   kLogicalWidth     = 600;
+        constexpr int   kLogicalHeight    = 400;
+        constexpr qreal kDevicePixelRatio = 1.5;
+        constexpr char  kFakeScreenName[] = "FakeScreen";
+
+        /// 标注用的颜色：假屏只有白底黑字，这个色一出现就说明图形真的烘进导出图了
+        const QColor kAnnotationColor(220, 30, 30);
+
+        /// 画的那条矩形在逻辑坐标下的位置，与下面的物理换算是一对
+        constexpr QRect kStrokeLogicalRect(50, 50, 200, 100);
+
+        /**
+         * @brief 把逻辑矩形换算成物理矩形
+         * @param logical 界面坐标下的矩形
+         * @return 像素缓冲里的矩形（向下取整左上、向上取整右下，与 ScreenUtils 同一套口径）
+         */
+        QRect toPhysical(const QRect &logical)
+        {
+            const auto left   = static_cast<int>(std::floor(logical.x() * kDevicePixelRatio));
+            const auto top    = static_cast<int>(std::floor(logical.y() * kDevicePixelRatio));
+            const auto right  = static_cast<int>(std::ceil((logical.x() + logical.width()) * kDevicePixelRatio));
+            const auto bottom = static_cast<int>(std::ceil((logical.y() + logical.height()) * kDevicePixelRatio));
+            return QRect(QPoint(left, top), QPoint(right - 1, bottom - 1));
+        }
+
+        /**
+         * @brief 造一帧假屏，形状与生产抓帧一致
+         * @return 抓帧产物：QImage 是物理像素且倍比标成 1.0，缩放只写在 devicePixelRatio 与 logicalSize 里
+         */
+        Core::CapturedImage makeFakeFrame()
+        {
+            QImage image(kPhysicalWidth, kPhysicalHeight, QImage::Format_ARGB32_Premultiplied);
+            image.fill(Qt::white);
+            image.setDevicePixelRatio(1.0);
+
+            QPainter painter(&image);
+            painter.setPen(Qt::black);
+            QFont font = painter.font();
+            font.setPointSize(64);
+            painter.setFont(font);
+            // 底图按物理像素摆：这一帧的倍比就是 1.0，与 QScreenCaptureSource 给回的形状同解
+            painter.drawText(QPoint(30, 110), QStringLiteral("12345"));
+
+            Core::CapturedImage frame;
+            frame.image            = image;
+            frame.logicalSize      = QSize(kLogicalWidth, kLogicalHeight);
+            frame.devicePixelRatio = kDevicePixelRatio;
+            frame.screenName       = QString::fromLatin1(kFakeScreenName);
+            return frame;
+        }
+
+        /**
+         * @brief 数一块矩形里有多少个像素正好是这个颜色
+         * @param image 待数的图（物理像素）
+         * @param region 要数的矩形，超出图外的部分自动裁掉
+         * @return 命中像素数
+         */
+        int countPixelsOf(const QImage &image, const QRect &region)
+        {
+            const auto bounded = region.intersected(image.rect());
+            int        hits    = 0;
+            for (int y = bounded.top(); y <= bounded.bottom(); ++y)
+            {
+                for (int x = bounded.left(); x <= bounded.right(); ++x)
+                {
+                    if (image.pixelColor(x, y) == kAnnotationColor)
+                    {
+                        ++hits;
+                    }
+                }
+            }
+            return hits;
+        }
+
+        /// 替掉真实抓屏：只回报固定的一帧，并把交下来的屏幕名留住
+        class FakeScreenSource final : public GyanisScribe::Capture::IScreenCaptureSource
+        {
+        public:
+            explicit FakeScreenSource(Core::CapturedImage frame) : m_frame(std::move(frame))
+            {
+            }
+
+            [[nodiscard]] GyanisScribe::Core::Expected<Core::CapturedImage> grabScreen(const QString &screenName) const override
+            {
+                requestedScreen = screenName;
+                return m_frame;
+            }
+
+            [[nodiscard]] GyanisScribe::Core::Expected<Core::CapturedImage> grabWindow(quintptr) const override
+            {
+                return std::unexpected(Core::Error{Core::ErrorCode::PlatformUnsupported, "这条流程不抓窗口"});
+            }
+
+            mutable QString requestedScreen; ///< 屏幕名有没有原样传到底，用例据此判
+
+        private:
+            Core::CapturedImage m_frame; ///< 与生产同形状的那一帧假屏
+        };
+
+        class ModuleFlowFixture : public ::testing::Test
+        {
+        protected:
+            static void SetUpTestSuite()
+            {
+                // 贴图要真的建窗口：把这一档跑到离屏平台上，测试不在用户的桌面上闪现，
+                // 也和容器里那一条（env.sh 里同样 export QT_QPA_PLATFORM=offscreen）用同一个读数环境
+                qputenv("QT_QPA_PLATFORM", "offscreen");
+                application = std::make_unique<QApplication>(argumentCount, arguments);
+                QCoreApplication::setOrganizationName(QStringLiteral("Gyanis"));
+                QCoreApplication::setApplicationName(QStringLiteral("GyanisScribe-Tests"));
+                integration = GyanisScribe::Platform::createPlatformIntegration();
+            }
+
+            static void TearDownTestSuite()
+            {
+                integration.reset();
+                application.reset();
+            }
+
+            void SetUp() override
+            {
+                const auto caseName = std::string_view(::testing::UnitTest::GetInstance()->current_test_info()->name());
+                m_root              = std::filesystem::temp_directory_path() / std::format("GyanisScribe-Flow-{}", caseName);
+                std::filesystem::remove_all(m_root);
+                std::filesystem::create_directories(m_root);
+                m_iniFile = m_root / "settings.ini";
+            }
+
+            void TearDown() override
+            {
+                std::error_code ignored;
+                std::filesystem::remove_all(m_root, ignored);
+            }
+
+            /**
+             * @brief 走一遍抓帧入口，把 captured 信号里的帧取回来
+             * @param settings 配置存储（CaptureService 要读写「上次区域」那两项）
+             * @param source 假屏来源
+             * @return 交出来的帧；没交出来时返回空帧并留下失败
+             */
+            [[nodiscard]] Core::CapturedImage captureOneFrame(GyanisScribe::Settings::SettingsStore &settings, FakeScreenSource &source) const
+            {
+                GyanisScribe::Capture::CaptureService service(source, settings);
+                std::optional<Core::CapturedImage>    received;
+                QObject::connect(&service, &GyanisScribe::Capture::ICaptureService::captured, &service, [&received](const Core::CapturedImage &image) { received = image; });
+
+                service.captureFullScreen(QString::fromLatin1(kFakeScreenName));
+                EXPECT_TRUE(received.has_value()) << "captureFullScreen 没把帧从 captured 信号交出来";
+                EXPECT_EQ(source.requestedScreen, QString::fromLatin1(kFakeScreenName)) << "屏幕名没原样传到底";
+                return received.value_or(Core::CapturedImage{});
+            }
+
+            std::filesystem::path m_root;    ///< 每条用例自己的临时目录，避免并行时互相踩
+            std::filesystem::path m_iniFile; ///< 配置存储落在的位置
+
+            /// 平台能力：套间级共用一份，用例结束时随 TearDownTestSuite 交还
+            inline static std::unique_ptr<GyanisScribe::Platform::IPlatformIntegration> integration;
+        };
+
+        /**
+         * @brief 钉住「抓帧 → 标注 → 贴图」这条链上的坐标系交接
+         * @details 三处读数必须互相指同一点：帧是物理 900×600 且倍比 1.5，标注吃逻辑 50,50–250,150，
+         *          导出的图形色出现在换算后的物理格上，贴图窗口的尺寸又回到逻辑 600×400。
+         *          任何一环把倍比弄丢（导出没带、贴图按物理尺寸开窗），这里就会红。
+         */
+        TEST_F(ModuleFlowFixture, FrameKeepsItsCoordinateSystemFromCaptureToPin)
+        {
+            GyanisScribe::Settings::SettingsStore settings(m_iniFile);
+            FakeScreenSource                      source(makeFakeFrame());
+
+            const auto frame = captureOneFrame(settings, source);
+            ASSERT_EQ(frame.image.size(), QSize(kPhysicalWidth, kPhysicalHeight)) << "抓到的帧不是物理尺寸";
+            EXPECT_DOUBLE_EQ(frame.devicePixelRatio, kDevicePixelRatio);
+            EXPECT_EQ(frame.logicalSize, QSize(kLogicalWidth, kLogicalHeight));
+            EXPECT_EQ(frame.screenName, QString::fromLatin1(kFakeScreenName));
+
+            GyanisScribe::Annotation::AnnotationEngine engine;
+            engine.loadCanvas(frame);
+            ASSERT_TRUE(engine.setActiveTool(GyanisScribe::Annotation::ToolKind::Rectangle).has_value());
+            ASSERT_TRUE(engine.setPenParameters(kAnnotationColor, 6, 12).has_value());
+            engine.beginStroke(kStrokeLogicalRect.topLeft());
+            engine.moveStroke(kStrokeLogicalRect.bottomRight());
+            ASSERT_TRUE(engine.endStroke().has_value()) << "矩形退化，没能进撤销栈";
+
+            const auto exported = engine.exportImage();
+            ASSERT_EQ(exported.size(), QSize(kPhysicalWidth, kPhysicalHeight)) << "导出改了物理尺寸";
+            // 导出要带上倍比：贴图靠它把窗口开回逻辑尺寸，界面上的「就地比对」才对得上
+            EXPECT_DOUBLE_EQ(exported.devicePixelRatio(), kDevicePixelRatio) << "导出没带倍比，贴图会按物理尺寸开窗";
+
+            const auto strokePhysical = toPhysical(kStrokeLogicalRect);
+            // 笔宽 6 逻辑格 = 9 物理格，描边压在框线两侧各约 4.5 格，再加抗锯齿的外溢；
+            // 容差取 6 格：够宽到不误报「画错地方」，又窄到真画错一格就会被抓出来
+            const QRect generousPhysical = strokePhysical.adjusted(-6, -6, 6, 6);
+            const int   hitsInside       = countPixelsOf(exported, generousPhysical);
+            const int   hitsTotal        = countPixelsOf(exported, exported.rect());
+            EXPECT_GT(hitsInside, 0) << "换算后的物理格上没有图形：" << strokePhysical.x() << "," << strokePhysical.y();
+            // 只许出现在换算后的位置上：整张图里框外一个都没有，才算「逻辑→物理」这一步没算错两遍或漏一遍
+            EXPECT_EQ(hitsTotal, hitsInside) << "图形落在了换算位置之外：全图 " << hitsTotal << " 个，框内 " << hitsInside << " 个";
+
+            GyanisScribe::Pin::PinManager pins(settings, *integration);
+            auto                         &pin = pins.addPin(exported, QPoint(700, 300));
+            EXPECT_EQ(pins.count(), 1);
+            EXPECT_EQ(pin.globalRect().topLeft(), QPoint(700, 300)) << "贴图没落在请求的全局位置";
+            EXPECT_EQ(pin.globalRect().size(), QSize(kLogicalWidth, kLogicalHeight)) << "贴图开成了物理尺寸：" << pin.globalRect().width() << "x" << pin.globalRect().height();
+
+            pins.closeAll();
+            EXPECT_EQ(pins.count(), 0) << "closeAll 之后还留着贴图";
+        }
+
+        /**
+         * @brief 钉住识别这一环吃的语言词表与设置页那一份同解
+         * @details 设置页下拉列的是 supportedOcrLanguageTags()，后端必须只认这套标签：两边分家时
+         *          界面会传出一个后端不认的标签，用户只看到「不认识这个语言」。
+         *          后端不可用时必须给可操作的原因，可用时至少要走通一次完整调用——两种形状都能红。
+         */
+        TEST_F(ModuleFlowFixture, OcrUsesTheSharedLanguageVocabulary)
+        {
+            GyanisScribe::Settings::SettingsStore settings(m_iniFile);
+            const auto                            engine = GyanisScribe::Ocr::createOcrEngine(settings, *integration);
+            ASSERT_NE(engine, nullptr) << "选型不许交回空指针";
+
+            const auto vocabulary = GyanisScribe::Ocr::supportedOcrLanguageTags();
+            for (const auto &language: engine->supportedLanguages())
+            {
+                EXPECT_TRUE(vocabulary.contains(language)) << "后端给出的语言不在对外词表里：" << language.toStdString();
+            }
+
+            if (!engine->isAvailable())
+            {
+                const auto reason = engine->unavailableReason();
+                EXPECT_FALSE(reason.isEmpty()) << "isAvailable 为假却不给原因";
+                EXPECT_NE(reason.indexOf(QStringLiteral("语言")), -1) << "原因没点名语言包这件事：实际是 " << reason.toStdString();
+                return;
+            }
+
+            const auto image      = makeFakeFrame().image;
+            const auto recognized = engine->recognize(image, engine->supportedLanguages().front());
+            ASSERT_TRUE(recognized.has_value()) << "自报可用的后端连一次完整调用都没走通：" << recognized.error().message;
+            EXPECT_TRUE(vocabulary.contains(recognized->language)) << "结果里的语言不在对外词表里：" << recognized->language.toStdString();
+            // 认字质量归 tests/Ocr 的用例钉（那两档在真实平台上画图）。这一档跑在 offscreen 平台上，
+            // 字体画不出字形，所以这条腿只钉接线：调用走通、语言对得上、方框落在同一套坐标里。
+            for (const auto &line: recognized->lines)
+            {
+                EXPECT_TRUE(image.rect().contains(line.boundingBox)) << "行框跑到了图外";
+                for (const auto &word: line.words)
+                {
+                    EXPECT_TRUE(image.rect().contains(word.boundingBox)) << "词框跑到了图外";
+                }
+            }
+        }
+    } // namespace
+} // namespace GyanisScribe
