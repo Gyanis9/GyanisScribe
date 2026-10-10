@@ -239,10 +239,10 @@ Qt 运行时，然后在 staging 目录里把 `PATH` 收窄到只剩 `System32`�
 
 | 线 | 命令 | 结果 |
 | --- | --- | --- |
-| Windows Release | `scripts\WindowsBuild.bat release` | 283 条全绿（0 失败），其中 2 条环境门控跳过 |
-| Windows Debug | `scripts\WindowsBuild.bat debug` | 283 条全绿（0 失败），其中 3 条跳过 |
-| 容器 ASan(+UBSan) | `scripts/container/sanitize.sh asan` | 278 条全绿（0 失败），其中 3 条跳过 |
-| 容器覆盖率 | `scripts/container/coverage.sh 55` | 278 条全绿（0 失败），行覆盖 **70.5%**（4082/5790），阈值 55%；主程序在 Xvfb 上 `--selftest` 退出码 0 |
+| Windows Release | `scripts\WindowsBuild.bat release` | 285 条全绿（0 失败），其中 1 条环境门控跳过 |
+| Windows Debug | `scripts\WindowsBuild.bat debug` | 285 条全绿（0 失败），其中 2 条跳过 |
+| 容器 ASan(+UBSan) | `scripts/container/sanitize.sh asan` | 280 条全绿（0 失败），其中 4 条跳过 |
+| 容器覆盖率 | `scripts/container/coverage.sh 55` | 280 条全绿（0 失败），行覆盖 **70.7%**（4118/5826），阈值 55%；主程序在 Xvfb 上 `--selftest` 退出码 0 |
 
 容器少的 5 条是 Windows 专属后端的用例：4 条 WinRT 系统识别、1 条 Win32 热键映射。
 跳过的都是环境门控用例，本机两档与容器各跳哪些是清楚的：
@@ -251,9 +251,11 @@ Qt 运行时，然后在 staging 目录里把 `PATH` 收窄到只剩 `System32`�
 | --- | --- |
 | `LanguageFixture.BuiltEnglishPackTranslatesKnownString` | 容器那份 Qt 6.4 没有 lrelease，出不了真实语言包，只能在有包的一档成立 |
 | `OcrFixture.ReportsMissingBackendSeparatelyFromMissingLanguagePacks`（仅本机 Debug） | 这台机装了系统识别语言包，工厂先问 Windows 就拿到了后端，走不到「语言包在、后端没编进来」那一格；同一格由容器那两档跑 |
-| `FfmpegAudioCaptureEndToEnd.*`、`VideoEncoderEndToEndFixture.*` | 要真 `ffmpeg`，给齐环境变量才跑 |
+| `FfmpegAudioCaptureEndToEnd.*`、`VideoEncoderEndToEndFixture.*`、`FfmpegAudioDevicesEndToEndFixture.*` | 要真 `ffmpeg`；取声那一条还要一路真设备 |
 
-后两条端到端这样打开：
+`scripts\WindowsBuild.bat` 在 `Vendor/Ffmpeg/ffmpeg.exe` 就位时会自动把它交给 `GYANISSCRIBE_FFMPEG`，
+所以打过一次包的本机跑门禁时，编码与设备枚举这两条端到端是真的在跑（跳过的只剩取声那一条）。
+自己指定仍然优先，本机没有随包那份时这样打开：
 
 ```bash
 GYANISSCRIBE_FFMPEG=C:/path/to/ffmpeg.exe             # 编码端到端

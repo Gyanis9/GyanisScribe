@@ -19,6 +19,11 @@ call "%VCVARS%" >nul || exit /b 1
 cmake --preset %PRESET% -DCONAN_HOST_PROFILE="%CONAN_HOST_PROFILE%" || exit /b 1
 cmake --build --preset %PRESET% || exit /b 1
 rem Once a ctest list exists it becomes the gate; with no cases yet the script must not report a false red.
+rem The encoder end-to-end cases need a real ffmpeg. Point them at the copy that ships inside the
+rem package (Vendor/Ffmpeg) when it is there, so the gate exercises the binary users actually get
+rem instead of whatever happens to be on this machine's PATH. An operator-set value always wins.
+rem Forward slashes on purpose: cmd accepts them, and the file name is then safe to write literally.
+if not defined GYANISSCRIBE_FFMPEG if exist "%CD%/Vendor/Ffmpeg/ffmpeg.exe" set "GYANISSCRIBE_FFMPEG=%CD%/Vendor/Ffmpeg/ffmpeg.exe"
 if exist "build\%PRESET%\CTestTestfile.cmake" ctest --preset %PRESET% || exit /b 1
 if not exist "build\%PRESET%\CTestTestfile.cmake" echo [skip] no ctest list in this build tree yet
 echo [ok] preset %PRESET% built
