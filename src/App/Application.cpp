@@ -25,6 +25,10 @@ Application::Application(int &argc, char **argv) : QApplication(argc, argv)
     // 品牌名不进翻译目录：切英文后用户仍然要能在任务栏与窗口标题里认出「智录」这个产品
     setApplicationDisplayName(QStringLiteral("智录"));
     setApplicationVersion(QStringLiteral(PROJECT_VERSION));
+    // 主窗口关掉就回托盘：这是常驻工具，退出只走托盘菜单那一条路。
+    // Qt 的默认是「最后一个窗口关掉就退进程」，不设这一行时用户关掉设置窗会把程序整个带走，
+    // 托盘图标与挂在屏幕上的贴图一起消失
+    setQuitOnLastWindowClosed(false);
 
     const auto logDirectory = GyanisScribe::Core::Paths::logDirectory();
     if (const auto ensured = GyanisScribe::Core::Paths::ensureDirectory(logDirectory); !ensured)
