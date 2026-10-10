@@ -27,7 +27,9 @@ Set-Location (Split-Path -Parent $PSScriptRoot)
 $version = '9.0.2'
 $zipName = "ffmpeg-$version-essentials_build.zip"
 $url     = "https://www.gyan.dev/ffmpeg/builds/packages/$zipName"
-$expectedSha256 = ''
+# Pinned from the upstream sidecar ($url.sha256) and re-checked against the bytes actually
+# downloaded here -- the two agreed, so this is the release the packager was tested with.
+$expectedSha256 = '60F467265B1E312373DBCD92200C2618A74850F98D3D078E94296BB3FA2047BA'
 
 $vendor = Join-Path 'Vendor' 'Ffmpeg'
 $zip    = Join-Path $vendor $zipName
