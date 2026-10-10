@@ -153,15 +153,6 @@ namespace GyanisScribe::App
         return true;
     }
 
-    void TrayController::notify(const QString &title, const QString &body)
-    {
-        if (m_icon == nullptr || !m_icon->isVisible())
-        {
-            Core::Logger::info(std::format("通知（无托盘）：{} — {}", title.toStdString(), body.toStdString()));
-            return;
-        }
-        m_icon->showMessage(title, body, QSystemTrayIcon::Information, 3000);
-    }
 
     void TrayController::setPinCount(const int pinCount)
     {
@@ -182,21 +173,5 @@ namespace GyanisScribe::App
         }
     }
 
-    bool TrayController::isInstalled() const noexcept
-    {
-        return m_icon != nullptr && m_icon->isVisible();
-    }
-
-    QString TrayController::labelFor(const TrayAction action) const
-    {
-        for (const auto &entry: trayMenuEntries())
-        {
-            if (entry.action == action)
-            {
-                return entry.label;
-            }
-        }
-        return {};
-    }
 
 } // namespace GyanisScribe::App

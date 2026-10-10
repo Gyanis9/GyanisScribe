@@ -24,10 +24,6 @@ namespace GyanisScribe::Annotation
         m_pending.rect = QRect();
     }
 
-    QString TextTool::pendingText() const
-    {
-        return m_pending.text;
-    }
 
     bool TextTool::shapeIsUsable(const AnnotationShape &shape) const
     {

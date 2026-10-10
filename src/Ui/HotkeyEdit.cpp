@@ -67,10 +67,6 @@ namespace GyanisScribe::Ui
         m_display->setText(stored);
     }
 
-    QString HotkeyEdit::combinationText() const
-    {
-        return m_display->text();
-    }
 
     Core::Expected<void> HotkeyEdit::applyCombination(const Hotkey::HotkeyCombination &combination)
     {

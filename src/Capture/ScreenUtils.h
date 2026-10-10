@@ -55,11 +55,6 @@ namespace GyanisScribe::Capture
      */
     [[nodiscard]] QScreen *screenAtGlobalPoint(const QPoint &globalPoint);
 
-    /**
-     * @brief 所有屏幕合起来的逻辑范围
-     * @return 全局逻辑坐标下的外接矩形；没有任何屏幕时为 QRect()
-     */
-    [[nodiscard]] QRect virtualGeometryOfAllScreens();
 
     /**
      * @brief 选区提示文本

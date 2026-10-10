@@ -222,10 +222,6 @@ namespace GyanisScribe::Annotation
         m_fontSize = size;
     }
 
-    QColor AnnotationTool::penColor() const noexcept
-    {
-        return m_color;
-    }
 
     int AnnotationTool::lineWidth() const noexcept
     {

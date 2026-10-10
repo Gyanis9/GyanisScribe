@@ -48,11 +48,6 @@ public:
     Application(const Application &)            = delete;
     Application &operator=(const Application &) = delete;
 
-    /**
-     * @brief 核心控制器
-     * @return 本应用持有的那一个，所有权在应用对象手里
-     */
-    [[nodiscard]] GyanisScribe::App::AppController &controller() const noexcept;
 
     /**
      * @brief 启动路径是否走通

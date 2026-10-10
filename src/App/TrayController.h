@@ -129,22 +129,6 @@ namespace GyanisScribe::App
          */
         bool install();
 
-        /**
-         * @brief 发一条托盘通知
-         * @param title 标题
-         * @param body 正文
-         */
-        void notify(const QString &title, const QString &body);
-
-        /// 托盘是否已经装上
-        [[nodiscard]] bool isInstalled() const noexcept;
-
-        /**
-         * @brief 按动作查菜单项文字
-         * @param action 目标动作
-         * @return 菜单上显示的那句文字（含快捷键提示）；表里没有时返回空串
-         */
-        [[nodiscard]] QString labelFor(TrayAction action) const;
 
         /**
          * @brief 把贴图张数写进悬停提示

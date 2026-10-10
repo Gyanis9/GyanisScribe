@@ -242,7 +242,7 @@ Qt 运行时，然后在 staging 目录里把 `PATH` 收窄到只剩 `System32`�
 | Windows Release | `scripts\WindowsBuild.bat release` | 283 条全绿（0 失败），其中 2 条环境门控跳过 |
 | Windows Debug | `scripts\WindowsBuild.bat debug` | 283 条全绿（0 失败），其中 3 条跳过 |
 | 容器 ASan(+UBSan) | `scripts/container/sanitize.sh asan` | 278 条全绿（0 失败），其中 3 条跳过 |
-| 容器覆盖率 | `scripts/container/coverage.sh 55` | 278 条全绿（0 失败），行覆盖 **70.1%**（4078/5818），阈值 55%；主程序在 Xvfb 上 `--selftest` 退出码 0 |
+| 容器覆盖率 | `scripts/container/coverage.sh 55` | 278 条全绿（0 失败），行覆盖 **70.5%**（4082/5790），阈值 55%；主程序在 Xvfb 上 `--selftest` 退出码 0 |
 
 容器少的 5 条是 Windows 专属后端的用例：4 条 WinRT 系统识别、1 条 Win32 热键映射。
 跳过的都是环境门控用例，本机两档与容器各跳哪些是清楚的：

@@ -337,15 +337,5 @@ namespace GyanisScribe::Ui
         return {};
     }
 
-    /**
-     * @brief 按序号取标注色板里的颜色
-     * @param index 色板序号
-     * @return 对应的颜色；序号越界时返回调用方可见的空色，由调用方决定是否报「取不到」
-     * @note 越界返回空色而不是夹到最后一个：夹住会让工具栏少画一个色块也没人发现
-     */
-    [[nodiscard]] inline constexpr QColor annotationColorAt(std::size_t index)
-    {
-        return index < kAnnotationPalette.size() ? kAnnotationPalette[index] : QColor{};
-    }
 
 } // namespace GyanisScribe::Ui

@@ -43,11 +43,6 @@ namespace GyanisScribe::Annotation
          */
         void setPendingText(const QString &text);
 
-        /**
-         * @brief 在途文字的内容
-         * @return 当前设进去的文本
-         */
-        [[nodiscard]] QString pendingText() const;
 
     protected:
         /**

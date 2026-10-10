@@ -775,10 +775,6 @@ namespace GyanisScribe::App
         return -1;
     }
 
-    std::span<const LanguageChoice> languageChoices()
-    {
-        return kLanguageChoices;
-    }
 
     std::optional<AppLanguage> appLanguageAt(const int index)
     {

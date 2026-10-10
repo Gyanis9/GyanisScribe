@@ -85,10 +85,6 @@ Application::~Application()
     GyanisScribe::Core::Logger::shutdown();
 }
 
-GyanisScribe::App::AppController &Application::controller() const noexcept
-{
-    return *m_controller;
-}
 
 bool Application::tryBecomePrimaryInstance()
 {

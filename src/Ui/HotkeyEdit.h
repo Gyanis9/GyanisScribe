@@ -57,8 +57,6 @@ namespace GyanisScribe::Ui
          */
         void bindTo(std::string_view key, const QString &title, const QString &defaultText);
 
-        /// 当前显示的组合文本
-        [[nodiscard]] QString combinationText() const;
 
         /**
          * @brief 校验并写入一个组合

@@ -204,11 +204,6 @@ namespace GyanisScribe::Annotation
          */
         void setFontSize(int size) noexcept;
 
-        /**
-         * @brief 当前默认颜色
-         * @return 画笔颜色
-         */
-        [[nodiscard]] QColor penColor() const noexcept;
 
         /**
          * @brief 当前默认线宽

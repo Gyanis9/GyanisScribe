@@ -218,10 +218,6 @@ namespace GyanisScribe::Pin
         return PinState{globalRect().topLeft(), m_logicalSize, m_scale, m_rotationDegrees, m_opacity};
     }
 
-    QSizeF PinWindow::logicalImageSize() const noexcept
-    {
-        return m_logicalSize;
-    }
 
     std::vector<QRectF> PinWindow::handleRects() const
     {

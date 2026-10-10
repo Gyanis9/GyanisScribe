@@ -135,11 +135,6 @@ namespace GyanisScribe::Pin
         /// 布局记录，见 IPinWindow::state()
         [[nodiscard]] PinState state() const override;
 
-        /**
-         * @brief 图片的逻辑尺寸（未缩放）
-         * @return 物理像素除以 devicePixelRatio
-         */
-        [[nodiscard]] QSizeF logicalImageSize() const noexcept;
 
         /**
          * @brief 手柄占位框，供绘制与用例核对

@@ -132,11 +132,6 @@ namespace GyanisScribe::App
         std::string_view              label;    ///< 下拉框里显示的自称文本
     };
 
-    /**
-     * @brief 界面语言下拉框的全部行
-     * @return 只读表格，下标即下拉框序号
-     */
-    [[nodiscard]] std::span<const LanguageChoice> languageChoices();
 
     /**
      * @brief 下拉框序号与语言档位的互指
