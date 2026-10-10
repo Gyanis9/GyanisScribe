@@ -54,7 +54,9 @@ Enter 或双击确认，Esc 取消，选完立刻进标注窗。
 **录屏**
 范围可选整屏 / 上次选区 / 当前窗口，输出可选 MP4 / GIF，帧率、画面码率、光标高亮、
 麦克风与系统声音各自可开（两路都开时混音）。控制条显示状态、时长与 3-2-1 倒计时，
-可暂停、贴边、最小化到托盘——收起后托盘那一行仍报「正在录制 / 已暂停 + 时长」。
+可暂停、可取消（这一段整段扔掉：不封盘、不起编码、临时帧当场删掉），可贴边、可最小化到托盘——
+收起后托盘那一行仍报「正在录制 / 已暂停 + 时长」。停止之后再按取消会被拒，理由说在提示里
+（那一份帧正是后台编码在读的输入）。
 停止后编码在后台线程进行，界面不冻；编码器在编码前用真 `ffmpeg` 探一遍，取第一个开得起来的。
 
 **文字识别**
@@ -247,10 +249,10 @@ Qt 运行时，然后在 staging 目录里把 `PATH` 收窄到只剩 `System32`�
 
 | 线 | 命令 | 结果 |
 | --- | --- | --- |
-| Windows Release | `scripts\WindowsBuild.bat release` | 285 条全绿（0 失败），其中 1 条环境门控跳过 |
-| Windows Debug | `scripts\WindowsBuild.bat debug` | 285 条全绿（0 失败），其中 2 条跳过 |
-| 容器 ASan(+UBSan) | `scripts/container/sanitize.sh asan` | 280 条全绿（0 失败），其中 4 条跳过 |
-| 容器覆盖率 | `scripts/container/coverage.sh 55` | 280 条全绿（0 失败），行覆盖 **70.7%**（4118/5826），阈值 55%；主程序在 Xvfb 上 `--selftest` 退出码 0 |
+| Windows Release | `scripts\WindowsBuild.bat release` | 287 条全绿（0 失败），其中 1 条环境门控跳过 |
+| Windows Debug | `scripts\WindowsBuild.bat debug` | 287 条全绿（0 失败），其中 2 条跳过 |
+| 容器 ASan(+UBSan) | `scripts/container/sanitize.sh asan` | 282 条全绿（0 失败），其中 5 条跳过 |
+| 容器覆盖率 | `scripts/container/coverage.sh 55` | 282 条全绿（0 失败），行覆盖 **70.6%**（4124/5838），阈值 55%；主程序在 Xvfb 上 `--selftest` 退出码 0 |
 
 容器少的 5 条是 Windows 专属后端的用例：4 条 WinRT 系统识别、1 条 Win32 热键映射。
 跳过的都是环境门控用例，本机两档与容器各跳哪些是清楚的：
@@ -260,6 +262,7 @@ Qt 运行时，然后在 staging 目录里把 `PATH` 收窄到只剩 `System32`�
 | `LanguageFixture.BuiltEnglishPackTranslatesKnownString` | 容器那份 Qt 6.4 没有 lrelease，出不了真实语言包，只能在有包的一档成立 |
 | `OcrFixture.ReportsMissingBackendSeparatelyFromMissingLanguagePacks`（仅本机 Debug） | 这台机装了系统识别语言包，工厂先问 Windows 就拿到了后端，走不到「语言包在、后端没编进来」那一格；同一格由容器那两档跑 |
 | `FfmpegAudioCaptureEndToEnd.*`、`VideoEncoderEndToEndFixture.*`、`FfmpegAudioDevicesEndToEndFixture.*` | 要真 `ffmpeg`；取声那一条还要一路真设备 |
+| `CrashGuardEndToEnd.*` | minidump 走 Windows 的 dbghelp；Linux 侧这一格是空操作（core dump 归宿主配置） |
 
 `scripts\WindowsBuild.bat` 在 `Vendor/Ffmpeg/ffmpeg.exe` 就位时会自动把它交给 `GYANISSCRIBE_FFMPEG`，
 所以打过一次包的本机跑门禁时，编码与设备枚举这两条端到端是真的在跑（跳过的只剩取声那一条）。

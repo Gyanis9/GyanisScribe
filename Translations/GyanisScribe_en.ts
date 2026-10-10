@@ -244,6 +244,14 @@
             <translation>Recording aborted: {}. Try again.</translation>
         </message>
         <message>
+            <source>取消录屏没成：{}</source>
+            <translation>Couldn't cancel the recording: {}</translation>
+        </message>
+        <message>
+            <source>已取消录屏：这一段没有保存，临时帧也删了</source>
+            <translation>Recording cancelled: this take wasn't saved and its temporary frames are gone.</translation>
+        </message>
+        <message>
             <source>智录遇到未处理的错误：{}。现场已尽量落到日志与崩溃转储，请到 {} 找最近一份日志（同目录下的 .dmp 是转储）；如果反复出现，请把日志、转储与出错的操作步骤一起反馈</source>
             <translation>GyanisScribe hit an unhandled error: {}. What could be saved went to the log and a crash dump; look for the newest log in {} (a .dmp next to it is the dump). If it keeps happening, send the log, the dump and the steps you took</translation>
         </message>
@@ -1300,6 +1308,18 @@
             <translation>Time recorded</translation>
         </message>
         <message>
+            <source>取消</source>
+            <translation>Cancel</translation>
+        </message>
+        <message>
+            <source>放弃这一段，不保存成品</source>
+            <translation>Discard this take without saving</translation>
+        </message>
+        <message>
+            <source>取消录屏</source>
+            <translation>Cancel recording</translation>
+        </message>
+        <message>
             <source>暂停</source>
             <translation>Pause</translation>
         </message>
@@ -1334,6 +1354,10 @@
         <message>
             <source>当前没有正在进行的录屏</source>
             <translation>No recording is in progress</translation>
+        </message>
+        <message>
+            <source>这一轮已经停止并在编成品：取消只对在录的那几秒有效，不想要成品就等它编完再删</source>
+            <translation>This round already stopped and is encoding now: cancel only applies while you are recording. If you don't want the file, delete it after it finishes.</translation>
         </message>
         <message>
             <source>取声的 ffmpeg 起不来。设备可能正被别的程序占用，关掉占用者再录，或在设置里把取声关掉</source>
