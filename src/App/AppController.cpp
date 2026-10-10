@@ -180,6 +180,8 @@ namespace GyanisScribe::App
         QObject::connect(m_mainWindow.get(), &MainWindow::messageForUser, this, [this](const QString &message, Ui::ToastKind kind) { notifyUser(message, kind); });
         // 贴图张数走托盘悬停提示：贴图常被压在别的窗口后面，这是唯一还能看出「挂着几张」的地方
         QObject::connect(m_pins.get(), &Pin::PinManager::pinCountChanged, m_tray.get(), &TrayController::setPinCount);
+        // 贴图菜单里的「识别文字」与热键、标注窗走的是同一个出口：一处接线管所有张（含启动恢复的那些）
+        QObject::connect(m_pins.get(), &Pin::PinManager::pinOcrRequested, this, &AppController::handleOcrRequested);
 
         // 启动把上一次会话留下的那几张摆回来；退出前把在存的这批连像素一起记下
         if (const auto restored = m_pins->restoreLayout(); !restored)

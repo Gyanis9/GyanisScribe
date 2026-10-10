@@ -48,6 +48,8 @@ namespace GyanisScribe::Pin
 
         // 窗口自己关掉了（Esc 或菜单里的关闭）就要从登记里摘掉，不然这里会留一个已析构的指针
         QObject::connect(raw, &PinWindow::closedByUser, this, [this, raw] { forget(raw); });
+        // 识别请求逐张转发出去：贴图在外头拿不到，出口不收在这一层就没人能替它识别
+        QObject::connect(raw, &PinWindow::ocrRequested, this, &PinManager::pinOcrRequested);
 
         m_pins.push_back(std::move(pin));
         m_pins.back()->move(globalTopLeft);

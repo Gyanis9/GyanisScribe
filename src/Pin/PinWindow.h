@@ -151,7 +151,8 @@ namespace GyanisScribe::Pin
         /**
          * @brief 用户要求识别这张图上的文字
          * @param image 当前图片
-         * @note 识别模块进来前没人接这个信号，接上之前菜单里的这一项会被标灰
+         * @note 由 PinManager 逐张转发出去，界面层在 AppController 里接；菜单项恒是可点的，
+         *       能不能识别由后端回答——拿不到后端时是一条中文原因，而不是把项灰掉让人猜
          */
         void ocrRequested(const QImage &image);
 

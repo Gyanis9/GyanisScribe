@@ -109,6 +109,14 @@ namespace GyanisScribe::Pin
          */
         void pinCountChanged(int count);
 
+        /**
+         * @brief 某张贴图上的「识别文字」被点了
+         * @param image 那张贴图当前的图片
+         * @details 管理器只转发，不自己识别：识别要用哪个后端、结果摆在哪个窗口，都是界面层的事，
+         *          而贴图窗口归管理器持有，外面拿不到——所以出口收在这一层，一处接线管所有张。
+         */
+        void pinOcrRequested(const QImage &image);
+
     private:
         /// 把某个已自行关闭的窗口从登记里摘掉
         void forget(PinWindow *window);
