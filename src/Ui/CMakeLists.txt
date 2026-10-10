@@ -1,6 +1,8 @@
 # Ui：设计令牌（纯常量）、主题档位与管理器、图标供给器（要读 qrc，所以是真目标文件）
 add_library(Ui STATIC
         DesignTokens.h
+        KeyStep.h
+        KeyStep.cpp
         ThemeKind.h
         ThemeKind.cpp
         Language.h

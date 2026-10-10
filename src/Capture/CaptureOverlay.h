@@ -18,7 +18,6 @@
 #include <optional>
 #include <vector>
 
-class QKeyEvent;
 
 namespace GyanisScribe::Capture
 {
@@ -148,13 +147,6 @@ namespace GyanisScribe::Capture
          * @return 宽高非负的逻辑矩形
          */
         [[nodiscard]] static QRect normalizeRect(const QPoint &anchor, const QPoint &current);
-
-        /**
-         * @brief 方向键对应的那一格位移
-         * @param event 键盘事件
-         * @return 左/右/上/下分别给 (-1,0)、(1,0)、(0,-1)、(0,1)；别的键给空
-         */
-        [[nodiscard]] static std::optional<QPoint> arrowStep(const QKeyEvent &event);
 
         /**
          * @brief 读数应当画在哪

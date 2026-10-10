@@ -1,6 +1,7 @@
 add_executable(TestUi
         TestDesignTokens.cpp
         TestIconProvider.cpp
+        TestKeyStep.cpp
         TestLanguage.cpp
         TestThemeManager.cpp
         TestHotkeyEdit.cpp

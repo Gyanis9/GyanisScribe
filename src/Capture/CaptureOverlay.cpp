@@ -4,6 +4,7 @@
 #include "Pick/ColorFormat.h"
 #include "Pick/PickGeometry.h"
 #include "Ui/DesignTokens.h"
+#include "Ui/KeyStep.h"
 
 #include <QFont>
 #include <QFontMetrics>
@@ -316,7 +317,7 @@ namespace GyanisScribe::Capture
     {
         // 方向键微调：单独按是整块挪，按住 Shift 是挪右下角。已经点中窗口或拖出一块之后，
         // 差一像素就得重框一遍，这条键就是为了不必重框
-        if (const auto step = arrowStep(*event))
+        if (const auto step = GyanisScribe::Ui::arrowStepFor(event->key()))
         {
             const auto region = selectedRegion();
             if (!region.isNull())
@@ -342,23 +343,6 @@ namespace GyanisScribe::Capture
             default:
                 QWidget::keyPressEvent(event);
                 return;
-        }
-    }
-
-    std::optional<QPoint> CaptureOverlay::arrowStep(const QKeyEvent &event)
-    {
-        switch (event.key())
-        {
-            case Qt::Key_Left:
-                return QPoint{-1, 0};
-            case Qt::Key_Right:
-                return QPoint{1, 0};
-            case Qt::Key_Up:
-                return QPoint{0, -1};
-            case Qt::Key_Down:
-                return QPoint{0, 1};
-            default:
-                return {};
         }
     }
 
