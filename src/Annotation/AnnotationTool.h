@@ -40,6 +40,7 @@ namespace GyanisScribe::Annotation
         Mosaic,    ///< 马赛克
         Text,      ///< 文字
         Number,    ///< 序号
+        Line,      ///< 直线（新增一档只能追加在末尾：工具栏登记表按 ToolKind 的顺序逐个核标签）
     };
 
     /**

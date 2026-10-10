@@ -32,7 +32,7 @@ namespace GyanisScribe::Annotation
 
     public:
         /**
-         * @brief 构造引擎并建齐八个工具
+         * @brief 构造引擎并按 ToolKind 建齐全部工具
          * @param parent QObject 父对象，默认无
          */
         explicit AnnotationEngine(QObject *parent = nullptr);
@@ -200,7 +200,7 @@ namespace GyanisScribe::Annotation
         [[nodiscard]] AnnotationTool *toolFor(ToolKind kind) const noexcept;
 
         Core::CapturedImage                          m_canvas;                           ///< 当前画布
-        std::vector<std::unique_ptr<AnnotationTool>> m_tools;                            ///< 八个工具，按 ToolKind 顺序登记
+        std::vector<std::unique_ptr<AnnotationTool>> m_tools;                            ///< 全部工具，按 ToolKind 顺序登记
         QUndoStack                                   m_undoStack;                        ///< 图形级撤销历史
         std::optional<AnnotationSelection>           m_selection;                        ///< 当前选中项
         ToolKind                                     m_activeTool = ToolKind::Rectangle; ///< 当前工具

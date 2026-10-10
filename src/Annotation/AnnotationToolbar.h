@@ -18,6 +18,7 @@
 
 #include <array>
 #include <string_view>
+#include <tuple>
 #include <vector>
 
 class QButtonGroup;
@@ -34,8 +35,22 @@ namespace GyanisScribe::Settings
 namespace GyanisScribe::Annotation
 {
 
-    /// 工具栏上的工具按钮数量，与 ToolKind 的八个工具同解
-    inline constexpr std::size_t kToolButtonCount = 8;
+    /**
+     * @brief 工具按钮的登记表：顺序、图标名与中文名一处对齐
+     * @details 顺序必须与 ToolKind 的声明顺序一致，用例按序号逐个核图标名与标签。
+     *          放在头文件是因为按钮数组的大小由它算：写死一个数量时，加一档工具就会写出数组外
+     *          （Debug 档当场 fast-fail，Release 档静默越界）。
+     */
+    inline constexpr std::array<std::tuple<ToolKind, std::string_view, std::string_view>, 9> kToolTable = {
+            std::tuple{ToolKind::Rectangle, "Rectangle", "矩形"}, std::tuple{ToolKind::Ellipse, "Ellipse", "椭圆"},
+            std::tuple{ToolKind::Arrow, "Arrow", "箭头"},         std::tuple{ToolKind::Pen, "Pen", "画笔"},
+            std::tuple{ToolKind::Highlight, "Highlight", "高亮"}, std::tuple{ToolKind::Mosaic, "Mosaic", "马赛克"},
+            std::tuple{ToolKind::Text, "Text", "文字"},           std::tuple{ToolKind::Number, "Number", "序号"},
+            std::tuple{ToolKind::Line, "Line", "直线"},
+    };
+
+    /// 工具栏上的工具按钮数量，由登记表算出：加一档工具只改表，数组跟着长
+    inline constexpr std::size_t kToolButtonCount = kToolTable.size();
 
     /// 自定义取色按钮在互斥组里的编号：不能紧跟在预设色板后面，最近使用颜色要往那段里插
     inline constexpr int kCustomColorButtonId = 100;

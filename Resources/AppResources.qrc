@@ -61,6 +61,7 @@
     <file alias="ThemeLight.svg">Icons/ThemeLight.svg</file>
     <file alias="ThemeSystem.svg">Icons/ThemeSystem.svg</file>
     <file alias="Tray.svg">Icons/Tray.svg</file>
+    <file alias="Line.svg">Icons/Line.svg</file>
     <file alias="Undo.svg">Icons/Undo.svg</file>
     <file alias="Warning.svg">Icons/Warning.svg</file>
   </qresource>

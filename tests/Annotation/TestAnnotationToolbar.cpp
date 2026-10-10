@@ -46,7 +46,7 @@ namespace
     std::unique_ptr<IconProvider> icons;
 
     /// 工具按钮的中文名，顺序与工具表同解；这一份是照需求第五节抄来的独立期望值
-    constexpr std::array<std::string_view, 8> kToolLabels = {"矩形", "椭圆", "箭头", "画笔", "高亮", "马赛克", "文字", "序号"};
+    constexpr std::array<std::string_view, 9> kToolLabels = {"矩形", "椭圆", "箭头", "画笔", "高亮", "马赛克", "文字", "序号", "直线"};
 
     /// 动作按钮的中文名，同样按需求第六节的排列顺序抄一份
     constexpr std::array<std::string_view, 4> kActionLabels = {"复制到剪贴板", "保存为文件", "贴到屏幕上", "识别文字"};
@@ -253,7 +253,7 @@ TEST_F(ToolbarFixture, ExposesEveryRequiredControlWithAccessibleNames)
     SignalLog log;
     auto      toolbar = makeToolbarLogged(log);
 
-    ASSERT_EQ(AnnotationToolbar::toolButtonCount(), 8);
+    ASSERT_EQ(AnnotationToolbar::toolButtonCount(), kToolLabels.size()) << "工具栏的按钮数要与这份独立写下的标签表同解";
     ASSERT_EQ(toolbar->colorButtonCount(), static_cast<int>(kAnnotationPalette.size()) + 1) << "配置是空的：预设八格加自定义一枚";
 
     for (std::size_t index = 0; index < kToolLabels.size(); ++index)

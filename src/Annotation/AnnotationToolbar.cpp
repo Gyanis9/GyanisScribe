@@ -42,17 +42,6 @@ namespace
     constexpr int kDefaultFontSizeIndex = static_cast<int>(kDefaultAnnotationFontSizeIndex);
 
     /**
-     * @brief 工具按钮的登记表：顺序、图标名与中文名一处对齐
-     * @details 顺序必须与 ToolKind 的声明顺序一致，用例按序号逐个核图标名与标签。
-     */
-    constexpr std::array<std::tuple<ToolKind, std::string_view, std::string_view>, 8> kToolTable = {
-            std::tuple{ToolKind::Rectangle, "Rectangle", "矩形"}, std::tuple{ToolKind::Ellipse, "Ellipse", "椭圆"},
-            std::tuple{ToolKind::Arrow, "Arrow", "箭头"},         std::tuple{ToolKind::Pen, "Pen", "画笔"},
-            std::tuple{ToolKind::Highlight, "Highlight", "高亮"}, std::tuple{ToolKind::Mosaic, "Mosaic", "马赛克"},
-            std::tuple{ToolKind::Text, "Text", "文字"},           std::tuple{ToolKind::Number, "Number", "序号"},
-    };
-
-    /**
      * @brief 画一枚色块
      * @param color 色块本身的颜色
      * @param outline 边框色，取主题的图标色

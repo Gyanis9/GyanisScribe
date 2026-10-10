@@ -128,6 +128,38 @@ TEST_F(AnnotationFixture, ArrowHitTestFollowsTheShaft)
 }
 
 /**
+ * @brief 钉住直线的命中走线距而不是外接框
+ * @details 与箭头同一套判据：外接框会把一条斜线的整片空白矩形算成命中，用户点 nowhere 却选中了这条线。
+ */
+TEST_F(AnnotationFixture, LineHitTestFollowsTheSegment)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Line).has_value());
+    m_engine.beginStroke(QPoint(0, 0));
+    m_engine.moveStroke(QPoint(120, 120));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+
+    EXPECT_TRUE(m_engine.selectionAt(QPoint(60, 60)).has_value()) << "线的正中该被点中";
+    EXPECT_FALSE(m_engine.selectionAt(QPoint(110, 20)).has_value()) << "外接框里的空白处不该算命中";
+    EXPECT_FALSE(m_engine.selectionAt(QPoint(200, 200)).has_value()) << "延长线上不该点得中";
+}
+
+/**
+ * @brief 钉住两端重合的「直线」不落定
+ * @details 两点距离不到 4 格时这条线没有长度：落进撤销栈会让用户按一次撤销却看不到画面有任何变化。
+ */
+TEST_F(AnnotationFixture, ZeroLengthLineIsNotCommitted)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Line).has_value());
+    m_engine.beginStroke(QPoint(50, 50));
+    m_engine.moveStroke(QPoint(51, 51));
+
+    const auto committed = m_engine.endStroke();
+    ASSERT_FALSE(committed.has_value()) << "退化的一笔被当成了落定";
+    EXPECT_EQ(committed.error().code, ErrorCode::InvalidArgument);
+    EXPECT_FALSE(m_engine.canUndo()) << "退化的一笔不该进撤销栈";
+}
+
+/**
  * @brief 钉住椭圆命中在环上，四角空心处点不中
  */
 TEST_F(AnnotationFixture, EllipseHitTestIsARingNotABoundingBox)

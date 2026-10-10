@@ -21,6 +21,8 @@ add_library(Annotation STATIC
         TextTool.h
         TextTool.cpp
         NumberTool.h
+        LineTool.h
+        LineTool.cpp
         NumberTool.cpp
         AnnotationToolbarGeometry.h
         AnnotationToolbarGeometry.cpp

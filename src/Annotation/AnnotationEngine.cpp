@@ -3,6 +3,7 @@
 #include "Annotation/ArrowTool.h"
 #include "Annotation/EllipseTool.h"
 #include "Annotation/HighlightTool.h"
+#include "Annotation/LineTool.h"
 #include "Annotation/MosaicTool.h"
 #include "Annotation/NumberTool.h"
 #include "Annotation/PenTool.h"
@@ -175,6 +176,7 @@ namespace GyanisScribe::Annotation
         m_tools.push_back(std::make_unique<MosaicTool>());
         m_tools.push_back(std::make_unique<TextTool>());
         m_tools.push_back(std::make_unique<NumberTool>());
+        m_tools.push_back(std::make_unique<LineTool>());
 
         // 参数一次下发：切工具后笔还保持用户调过的那个粗细，才不会出现「换工具就得重调」
         for (const auto &tool: m_tools)

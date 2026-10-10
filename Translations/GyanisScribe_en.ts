@@ -136,6 +136,10 @@
             <translation>Highlighter</translation>
         </message>
         <message>
+            <source>直线</source>
+            <translation>Line</translation>
+        </message>
+        <message>
             <source>马赛克</source>
             <translation>Mosaic</translation>
         </message>
