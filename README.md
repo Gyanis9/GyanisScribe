@@ -41,6 +41,10 @@ build\release\bin\GyanisScribe.exe --selftest
 `WindowsBuild.bat` 会自己调 `vcvars64`、按预设配置/编译并跑 `ctest`。预设两档：`debug` 与 `release`——
 Windows 上两档都带系统识别后端（`Windows.Media.Ocr`，用系统自己装的语言包），只有 `release` 额外领 Tesseract
 （上游 Debug 包的问题见 [docs/OcrBackends.md](docs/OcrBackends.md)）。机器相关的路径只出现在这个脚本里，工程不写死绝对路径。
+预设名不分平台：`CMakePresets.json` 里是 `debug`/`release`/`asan`/`tsan`/`coverage` 五档，两侧共用同一份文件，
+需求 §十三 那张「WindowsDebug…LinuxTsan…」的名单按「平台 × 这四档」读。用哪套工具链不由预设名决定，
+而由进入构建的那一步决定：Windows 侧 `WindowsBuild.bat` 先调 `vcvars64`，容器侧 `env.sh` 设 `CC/CXX=gcc-13`，
+Conan 再按各自平台的 profile 指过去。再各写一个平台前缀的名字，就是多一份要手工同步的副本。
 Conan 两侧都是仓库里的一份档位（`Conan/Profiles/WindowsMsvc2022` 与 `LinuxGcc13`），
 不是每次现检测的产物：Windows 侧由脚本把 `-DCONAN_HOST_PROFILE` 指过去，容器侧由 `env.sh` 设
 `CONAN_DEFAULT_PROFILE_PATH`。档位里唯一按机器改的一行是 `compiler.version`；
