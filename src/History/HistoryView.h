@@ -129,6 +129,17 @@ namespace GyanisScribe::History
         void removeRequested(const std::filesystem::path &filePath);
 
         /**
+         * @brief 请求在文件管理器里打开这条记录成品所在的那个目录
+         * @param filePath 选中的那条记录，目录由它的父级给出
+         */
+        void openFolderRequested(const std::filesystem::path &filePath);
+
+        /**
+         * @brief 请求清空整份历史清单（不动成品文件）
+         */
+        void clearAllRequested();
+
+        /**
          * @brief 一条要落进气泡的提示
          * @param message 中文正文
          * @param kind 语义种类

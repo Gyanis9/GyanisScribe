@@ -70,6 +70,13 @@ namespace GyanisScribe::History
          */
         [[nodiscard]] Core::Expected<void> remove(const std::filesystem::path &filePath);
 
+        /**
+         * @brief 清空整份清单
+         * @return 成功返回空载荷；写不回去时返回带路径与原因的 Error
+         * @note 与 remove() 同一条口径：只清记录不动成品文件，用户的图与视频由用户自己决定去留
+         */
+        [[nodiscard]] Core::Expected<void> clear();
+
     private:
         /**
          * @brief 原样读出清单，不裁也不丢

@@ -14,6 +14,7 @@
 #include <QLineEdit>
 #include <QPixmap>
 #include <QListWidget>
+#include <QMessageBox>
 #include <QListWidgetItem>
 #include <QPushButton>
 #include <QVariant>
@@ -115,15 +116,15 @@ namespace GyanisScribe::History
 
         auto                                                           *pinButton    = new QPushButton{GyanisScribe::Core::uiText("重新贴图"), this};
         auto                                                           *ocrButton    = new QPushButton{GyanisScribe::Core::uiText("重新识别"), this};
+        auto                                                           *folderButton = new QPushButton{GyanisScribe::Core::uiText("打开所在目录"), this};
         auto                                                           *deleteButton = new QPushButton{GyanisScribe::Core::uiText("删除"), this};
-        const std::array<std::pair<QPushButton *, std::string_view>, 3> buttons      = {
-                std::pair{pinButton, "Pin"},
-                std::pair{ocrButton, "Ocr"},
-                std::pair{deleteButton, "Delete"},
+        auto                                                           *clearButton  = new QPushButton{GyanisScribe::Core::uiText("清空列表"), this};
+        const std::array<std::pair<QPushButton *, std::string_view>, 5> buttons      = {
+                std::pair{pinButton, "Pin"}, std::pair{ocrButton, "Ocr"}, std::pair{folderButton, "Folder"}, std::pair{deleteButton, "Delete"}, std::pair{clearButton, "Delete"},
         };
         for (const auto &[button, iconName]: buttons)
         {
-            // 三个出口都要图标 + tooltip + 无障碍名，缺一件就是键盘与读屏用户找不到门
+            // 每一枚都要图标 + tooltip + 无障碍名，缺一件就是键盘与读屏用户找不到门
             m_icons.applyIcon(*button, iconName);
             button->setToolTip(button->text());
             button->setAccessibleName(button->text());
@@ -162,7 +163,34 @@ namespace GyanisScribe::History
                              }
                              emit messageForUser(GyanisScribe::Core::uiText("先在历史里选一张图"), Ui::ToastKind::Information);
                          });
+        QObject::connect(folderButton, &QPushButton::clicked, this,
+                         [this]
+                         {
+                             if (const auto path = selectedPath(); path)
+                             {
+                                 emit openFolderRequested(*path);
+                                 return;
+                             }
+                             emit messageForUser(GyanisScribe::Core::uiText("先在历史里选一张图"), Ui::ToastKind::Information);
+                         });
         QObject::connect(deleteButton, &QPushButton::clicked, this, &HistoryView::removeSelected);
+        QObject::connect(clearButton, &QPushButton::clicked, this,
+                         [this]
+                         {
+                             if (m_entries.isEmpty())
+                             {
+                                 emit messageForUser(GyanisScribe::Core::uiText("历史列表本来就是空的"), Ui::ToastKind::Information);
+                                 return;
+                             }
+                             // 清空是一下去掉一整批：先问一句，别让人一次点击丢掉整个清单
+                             const auto answer = QMessageBox::question(this, GyanisScribe::Core::uiText("清空历史列表"),
+                                                                       GyanisScribe::Core::uiText("要把历史列表里的记录全部去掉吗？成品文件本身不会被删除，仍在各自目录里。"),
+                                                                       QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+                             if (answer == QMessageBox::Yes)
+                             {
+                                 emit clearAllRequested();
+                             }
+                         });
     }
 
     void HistoryView::refresh()

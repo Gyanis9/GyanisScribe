@@ -252,6 +252,15 @@ namespace GyanisScribe::App
         void historyRemoveRequested(const std::filesystem::path &filePath);
 
         /**
+         * @brief 历史页请求打开这条记录成品所在的那个目录
+         * @param filePath 选中的那条记录
+         */
+        void historyOpenFolderRequested(const std::filesystem::path &filePath);
+
+        /// 历史页请求清空整份清单（成品文件不动）
+        void historyClearRequested();
+
+        /**
          * @brief 主窗口要落进气泡的一条提示
          * @param message 界面语言的正文（历史页与导入导出共用这一条通道）
          * @param kind 语义种类

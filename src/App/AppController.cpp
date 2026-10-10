@@ -45,6 +45,8 @@
 #include <QImageReader>
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QDesktopServices>
+#include <QUrl>
 #include <QImage>
 #include <QStringList>
 
@@ -161,7 +163,7 @@ namespace GyanisScribe::App
 
         // 录屏：编码器与服务各一个，热键再按一次就是「停止并编码」
         m_recorder  = std::make_unique<Record::FfmpegRecordingEncoder>();
-        m_recording = std::make_unique<Record::RecordingService>(*m_captureSource, *m_recorder);
+        m_recording = std::make_unique<Record::RecordingService>(*m_captureSource, *m_recorder, *m_integration);
         QObject::connect(m_recording.get(), &Record::RecordingService::finished, this, &AppController::handleRecordingFinished);
         QObject::connect(m_recording.get(), &Record::RecordingService::failed, this, &AppController::handleRecordingFailed);
         QObject::connect(m_recording.get(), &Record::RecordingService::aborted, this, &AppController::handleRecordingAborted);
@@ -177,6 +179,8 @@ namespace GyanisScribe::App
         QObject::connect(m_mainWindow.get(), &MainWindow::historyPinRequested, this, &AppController::handleHistoryPin);
         QObject::connect(m_mainWindow.get(), &MainWindow::historyOcrRequested, this, &AppController::recognizeImageFile);
         QObject::connect(m_mainWindow.get(), &MainWindow::historyRemoveRequested, this, &AppController::handleHistoryRemove);
+        QObject::connect(m_mainWindow.get(), &MainWindow::historyOpenFolderRequested, this, &AppController::handleHistoryOpenFolder);
+        QObject::connect(m_mainWindow.get(), &MainWindow::historyClearRequested, this, &AppController::handleHistoryClear);
         QObject::connect(m_mainWindow.get(), &MainWindow::messageForUser, this, [this](const QString &message, Ui::ToastKind kind) { notifyUser(message, kind); });
         // 主窗口动作条与托盘菜单发的是同一个枚举，所以出口也只有这一个 handleTrayAction
         QObject::connect(m_mainWindow.get(), &MainWindow::actionRequested, this, &AppController::handleTrayAction);
@@ -878,6 +882,42 @@ namespace GyanisScribe::App
         }
         // 删记录不删文件：这句要让用户看见，否则他会以为图也被清掉了
         notifyUser(GyanisScribe::Core::uiText("已从历史里去掉，成品文件仍在 ") + Core::Paths::toDisplayText(filePath), Ui::ToastKind::Success);
+        m_mainWindow->refreshHistory();
+    }
+
+    void AppController::handleHistoryOpenFolder(const std::filesystem::path &filePath)
+    {
+        std::error_code ignored;
+        const auto      directory = filePath.parent_path();
+        if (directory.empty() || !std::filesystem::exists(directory, ignored))
+        {
+            notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("打不开所在目录：{} 已经不在了。成品可能已被移动或删除"),
+                                                                      Core::Paths::toDisplayText(directory).toStdString())
+                                                 .c_str()),
+                       Ui::ToastKind::Danger);
+            return;
+        }
+        if (!QDesktopServices::openUrl(QUrl::fromLocalFile(QString::fromStdWString(directory.wstring()))))
+        {
+            notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("打不开目录 {}。请自己到设置里那个截图目录去找"),
+                                                                      Core::Paths::toDisplayText(directory).toStdString())
+                                                 .c_str()),
+                       Ui::ToastKind::Danger);
+            return;
+        }
+        Core::Logger::info(std::format("已打开历史成品所在目录：{}", Core::Paths::toDisplayText(directory).toStdString()));
+    }
+
+    void AppController::handleHistoryClear()
+    {
+        if (auto cleared = m_history->clear(); !cleared)
+        {
+            notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("历史清单没清空：{}"), cleared.error().message).c_str()),
+                       Ui::ToastKind::Danger);
+            return;
+        }
+        // 与单条删除同一条口径：动的是清单，不是用户磁盘上的成品
+        notifyUser(GyanisScribe::Core::uiText("历史列表已清空，成品文件仍在各自目录里"), Ui::ToastKind::Success);
         m_mainWindow->refreshHistory();
     }
 

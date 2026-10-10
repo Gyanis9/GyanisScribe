@@ -268,6 +268,22 @@
             <translation>Removed from history; the file is still at </translation>
         </message>
         <message>
+            <source>打不开所在目录：{} 已经不在了。成品可能已被移动或删除</source>
+            <translation>Can't open the folder: {} is gone. The artifact may have been moved or deleted</translation>
+        </message>
+        <message>
+            <source>打不开目录 {}。请自己到设置里那个截图目录去找</source>
+            <translation>Can't open {}. Look in the screenshot directory from Settings yourself</translation>
+        </message>
+        <message>
+            <source>历史清单没清空：{}</source>
+            <translation>The history list wasn't cleared: {}</translation>
+        </message>
+        <message>
+            <source>历史列表已清空，成品文件仍在各自目录里</source>
+            <translation>History list cleared; the artifact files are still in their own folders</translation>
+        </message>
+        <message>
             <source>录屏中止：{}。请重试一次</source>
             <translation>Recording aborted: {}. Try again.</translation>
         </message>
@@ -884,8 +900,16 @@
             <translation>Recognize again</translation>
         </message>
         <message>
+            <source>打开所在目录</source>
+            <translation>Open containing folder</translation>
+        </message>
+        <message>
             <source>删除</source>
             <translation>Delete</translation>
+        </message>
+        <message>
+            <source>清空列表</source>
+            <translation>Clear list</translation>
         </message>
         <message>
             <source>历史列表</source>
@@ -894,6 +918,18 @@
         <message>
             <source>先在历史里选一张图</source>
             <translation>Select an image in the history first</translation>
+        </message>
+        <message>
+            <source>历史列表本来就是空的</source>
+            <translation>The history list is already empty</translation>
+        </message>
+        <message>
+            <source>清空历史列表</source>
+            <translation>Clear the history list</translation>
+        </message>
+        <message>
+            <source>要把历史列表里的记录全部去掉吗？成品文件本身不会被删除，仍在各自目录里。</source>
+            <translation>Remove every entry from the history list? The artifact files themselves are not deleted and stay in their folders.</translation>
         </message>
         <message>
             <source>历史清单没能读出来：{}。列表先显示上一次的记录</source>

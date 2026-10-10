@@ -1257,6 +1257,8 @@ namespace GyanisScribe::App
         QObject::connect(m_history, &History::HistoryView::pinRequested, this, &MainWindow::historyPinRequested);
         QObject::connect(m_history, &History::HistoryView::ocrRequested, this, &MainWindow::historyOcrRequested);
         QObject::connect(m_history, &History::HistoryView::removeRequested, this, &MainWindow::historyRemoveRequested);
+        QObject::connect(m_history, &History::HistoryView::openFolderRequested, this, &MainWindow::historyOpenFolderRequested);
+        QObject::connect(m_history, &History::HistoryView::clearAllRequested, this, &MainWindow::historyClearRequested);
         QObject::connect(m_history, &History::HistoryView::messageForUser, this, &MainWindow::messageForUser);
         return page;
     }

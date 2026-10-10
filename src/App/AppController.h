@@ -311,6 +311,16 @@ namespace GyanisScribe::App
         void handleHistoryRemove(const std::filesystem::path &filePath);
 
         /**
+         * @brief 在文件管理器里打开这条记录所在的那个目录
+         * @param filePath 选中的那条记录的成品路径
+         * @details 目录而不是文件本身：各家系统「选中并打开所在目录」的接口不一，而打开目录在所有平台上都做得到。
+         */
+        void handleHistoryOpenFolder(const std::filesystem::path &filePath);
+
+        /// 清空历史清单：只清记录，成品文件留在各自目录里
+        void handleHistoryClear();
+
+        /**
          * @brief 起一层全屏取色遮罩
          * @details 抓的是按下那一刻的那一屏，之后遮罩显示的就是这一帧：放大镜要看的正是当前画面，
          *          实时抓屏会让鼠标一停画面就变，颜色也就抄不准。

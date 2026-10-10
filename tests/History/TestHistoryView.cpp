@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 #include <QApplication>
+#include <QPushButton>
 #include <QColor>
 #include <QDateTime>
 #include <QImage>
@@ -118,7 +119,55 @@ namespace
         std::unique_ptr<IconProvider>  m_icons;     ///< 图标供给器
     };
 
+    /// 按无障碍名字找历史页工具条上的一枚按钮
+    [[nodiscard]] QPushButton *buttonOf(const HistoryView &view, const QString &accessibleName)
+    {
+        const auto candidates = view.findChildren<QPushButton *>();
+        for (auto *candidate: candidates)
+        {
+            if (candidate->accessibleName() == accessibleName)
+            {
+                return candidate;
+            }
+        }
+        return nullptr;
+    }
+
 } // namespace
+
+/**
+ * @brief 钉住「打开所在目录」与「清空列表」这两枚键在空列表上的出口
+ * @details 空列表时两枚都不该有下游动作：一个会去开一个不存在的目录，另一个会弹一次没意义的确认框，
+ *          而确认框在无人点击的用例里就是永远等不到的那一发。
+ */
+TEST_F(HistoryViewFixture, EmptyListGuidesInsteadOfActing)
+{
+    auto view = makeView();
+    view->refresh();
+
+    auto *folder = buttonOf(*view, QStringLiteral("打开所在目录"));
+    auto *clear  = buttonOf(*view, QStringLiteral("清空列表"));
+    ASSERT_NE(folder, nullptr) << "历史页该有一枚打开所在目录";
+    ASSERT_NE(clear, nullptr) << "历史页该有一枚清空列表";
+    EXPECT_FALSE(folder->icon().isNull()) << "图标名拼错或资源没进 qrc";
+    EXPECT_FALSE(clear->icon().isNull()) << "图标名拼错或资源没进 qrc";
+
+    int     opens  = 0;
+    int     clears = 0;
+    QString guidance;
+    QObject::connect(view.get(), &HistoryView::openFolderRequested, view.get(), [&opens](const std::filesystem::path &) { ++opens; });
+    QObject::connect(view.get(), &HistoryView::clearAllRequested, view.get(), [&clears] { ++clears; });
+    QObject::connect(view.get(), &HistoryView::messageForUser, view.get(), [&guidance](const QString &text, GyanisScribe::Ui::ToastKind) { guidance = text; });
+
+    folder->click();
+    EXPECT_EQ(opens, 0) << "没选中就去了开目录";
+    EXPECT_NE(guidance.indexOf(QStringLiteral("先在历史里选一张图")), -1) << guidance.toStdString();
+
+    guidance.clear();
+    clear->click();
+    EXPECT_EQ(clears, 0) << "空列表还去弹确认框";
+    EXPECT_NE(guidance.indexOf(QStringLiteral("空")), -1) << guidance.toStdString();
+}
 
 /**
  * @brief 钉住列表文案的三种日期写法与固定分段

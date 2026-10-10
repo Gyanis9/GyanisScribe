@@ -304,6 +304,30 @@ TEST_F(HistoryFixture, RemoveClearsRecordOnlyAndRejectsUnknownPath)
 }
 
 /**
+ * @brief 钉住清空清单只清记录，并且留下的是能读的空清单
+ * @details 两条各钉一件事：成品文件不许跟着一起消失（那是用户的东西，不是一键点击该做的），
+ *          而清空后必须写得回一份读得懂的清单——留下一份截断的文件，下次启动就是「历史读不出来」。
+ */
+TEST_F(HistoryFixture, ClearEmptiesTheManifestAndKeepsTheArtifacts)
+{
+    HistoryStore store{storePath()};
+    const auto   first  = makeArtifact("clear-first.png");
+    const auto   second = makeArtifact("clear-second.png");
+    for (const auto &path: {first, second})
+    {
+        ASSERT_TRUE(static_cast<bool>(store.append(HistoryEntry{.moment = kNow, .kind = HistoryKind::Screenshot, .filePath = path, .size = QSize{8, 8}}, kNoLimits, kNow)));
+    }
+
+    ASSERT_TRUE(static_cast<bool>(store.clear()));
+    EXPECT_TRUE(std::filesystem::exists(first)) << "清列表把成品文件也删了";
+    EXPECT_TRUE(std::filesystem::exists(second));
+
+    const auto loaded = store.load(kNoLimits, kNow);
+    ASSERT_TRUE(static_cast<bool>(loaded)) << "清空后清单读不出来了";
+    EXPECT_TRUE(loaded->isEmpty());
+}
+
+/**
  * @brief 钉住读不懂的清单整体报错而不是读出半份
  * @details 静默跳过某一条等于替用户决定哪段历史不算历史；报错里必须给出第几条与文件位置。
  */
