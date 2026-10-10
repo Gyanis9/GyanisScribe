@@ -1,6 +1,6 @@
 /**
  * @file CaptureOverlay.h
- * @brief 截图遮罩：压暗全屏、框选区域、显示尺寸与坐标读数
+ * @brief 截图遮罩：压暗全屏、框选区域、显示尺寸与坐标读数、拖动途中给一枚像素放大镜
  * @author Gyanis
  * @date 2026-10-09
  * @version 0.0.1
@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include <QColor>
 #include <QImage>
 #include <QPoint>
 #include <QRect>
@@ -64,6 +65,22 @@ namespace GyanisScribe::Capture
          *          传全局坐标即可，本方法按这块屏的原点换成局部坐标。
          */
         void setWindowCandidates(const std::vector<QRect> &globalRects);
+
+        /**
+         * @brief 光标正压着的那一个像素的颜色
+         * @return 冻帧里的实际像素色；还没收到鼠标移动、或冻帧为空时返回无效颜色
+         * @details 按这块屏的原点与缩放因子换到帧像素：副屏不从 (0,0) 开始，高 DPI 下帧又比逻辑尺寸大，
+         *          两笔换算少任何一笔，报出来的都是光标别处的颜色。
+         */
+        [[nodiscard]] QColor colorUnderCursor() const;
+
+        /**
+         * @brief 放大镜占的位置
+         * @return 该屏内的逻辑矩形；还没收到鼠标移动时返回空矩形
+         * @details 默认摆在光标右下，摆不下就翻到左上：贴到屏角时不翻就会有一半跑出这块屏，
+         *          用户看到的格子里根本没有他正要框的那个像素。
+         */
+        [[nodiscard]] QRect magnifierRect() const;
 
         /**
          * @brief 光标正压在上的那一个候选
@@ -143,13 +160,33 @@ namespace GyanisScribe::Capture
          */
         void refreshHoveredRegion();
 
+        /**
+         * @brief 画放大镜：像素格与光标那一点的颜色读数
+         * @param painter 正在画这块遮罩的画笔
+         * @details 只在拖动途中画：选区一定下来放大镜就挡住刚框好的那块，读数此时已经没用了。
+         */
+        void paintMagnifier(QPainter &painter);
+
+        /**
+         * @brief 光标所在点的全局逻辑坐标
+         * @return 局部点加上这块屏的原点
+         */
+        [[nodiscard]] QPoint globalCursorPoint() const;
+
+        /**
+         * @brief 放大镜读数条上的坐标部分
+         * @return 形如「(1920, 300)」的全局逻辑坐标
+         */
+        [[nodiscard]] QString formatCursorReadout() const;
+
         QImage               m_background;             ///< 该屏的物理像素图，按缩放因子画成逻辑大小
         QRect                m_screenGeometry;         ///< 该屏的全局逻辑几何
         qreal                m_devicePixelRatio = 1.0; ///< 该屏缩放因子
         QPoint               m_anchorPoint;            ///< 本次框选的按下点，局部逻辑坐标
         QPoint               m_currentPoint;           ///< 框选过程中的当前点
-        QPoint               m_cursorPoint;            ///< 光标最近所在点，只喂辅助线与悬停，不参与选区计算
-        bool                 m_isSelecting = false;    ///< 是否正在拖动框选
+        QPoint               m_cursorPoint;            ///< 光标最近所在点，只喂辅助线、悬停与放大镜，不参与选区计算
+        bool                 m_hasCursorPoint = false; ///< 是否收到过鼠标移动：没有就不摆放大镜，别把 (0,0) 当成光标
+        bool                 m_isSelecting    = false; ///< 是否正在拖动框选
         std::vector<QRect>   m_windowCandidates;       ///< 窗口候选，已换成局部逻辑坐标，按 z 序排
         std::optional<QRect> m_hoveredRegion;          ///< 光标压在上的那一个候选，没有则空
     };

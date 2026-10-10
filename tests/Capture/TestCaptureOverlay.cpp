@@ -1,7 +1,9 @@
 // 遮罩的「悬停认出整扇窗口」：候选按这块屏的原点换成局部坐标、命中取压在最上面的那一个、
-// 原地放开（没拖出选区）时采纳此刻亮着的那一块。事件用 sendEvent 直接投给控件，
-// 判据不依赖「鼠标恰好在这个时刻移动到位」。
+// 原地放开（没拖出选区）时采纳此刻亮着的那一块；另钉放大镜的读数换算与翻边摆放。
+// 事件用 sendEvent 直接投给控件，判据不依赖「鼠标恰好在这个时刻移动到位」。
 #include "Capture/CaptureOverlay.h"
+
+#include "Pick/PickGeometry.h"
 
 #include <QApplication>
 #include <QImage>
@@ -46,6 +48,12 @@ namespace
             background.fill(Qt::white);
             return std::make_unique<CaptureOverlay>(background, kScreenGeometry, 1.0);
         }
+
+        /// 用给定的冻帧与缩放因子造遮罩：放大镜的两笔换算都要在这条路上验
+        [[nodiscard]] std::unique_ptr<CaptureOverlay> makeOverlay(const QImage &background, qreal devicePixelRatio) const
+        {
+            return std::make_unique<CaptureOverlay>(background, kScreenGeometry, devicePixelRatio);
+        }
     };
 
     /// 事件的局部坐标给控件自己读（position()），全局那一份按这块屏的原点推出去
@@ -65,6 +73,14 @@ namespace
         const auto  buttons = type == QEvent::MouseButtonPress ? Qt::LeftButton : Qt::NoButton;
         QMouseEvent event{type, QPointF{local}, globalOf(local), Qt::LeftButton, buttons, Qt::KeyboardModifiers{}};
         QApplication::sendEvent(&overlay, &event);
+    }
+
+    /// 造一份认得出自己位置的冻帧：底色全黑，被点名的格子各涂一种
+    [[nodiscard]] QImage makeFrame(const QSize &size)
+    {
+        QImage frame{size, QImage::Format_ARGB32};
+        frame.fill(Qt::black);
+        return frame;
     }
 
     /// 两扇叠在一起的窗口：第一份是压在最上面的那个小对话框，第二份是被它挡住的大窗口
@@ -167,4 +183,62 @@ TEST_F(CaptureOverlayFixture, MovingWithoutPressingYieldsNoSelection)
     QObject::connect(overlay.get(), &CaptureOverlay::regionSelected, overlay.get(), [&emitted](const QRect &) { ++emitted; });
     overlay->confirmSelection();
     EXPECT_EQ(emitted, 0) << "没框过东西的一次确认也产出了成品";
+}
+
+/**
+ * @brief 钉住「没有鼠标移动就没有放大镜」：默认值 (0,0) 不是光标位置
+ * @details 少了这一条，遮罩一铺出来就会在左上角摆一枚放大镜，而那里通常正是要框的东西。
+ */
+TEST_F(CaptureOverlayFixture, MagnifierAwaitsTheFirstMouseMove)
+{
+    auto overlay = makeOverlay();
+    EXPECT_TRUE(overlay->magnifierRect().isNull()) << "还没收到鼠标移动就摆出了放大镜";
+    EXPECT_FALSE(overlay->colorUnderCursor().isValid()) << "没有光标位置却报出了一个颜色";
+
+    moveOver(*overlay, QPoint{110, 160});
+    EXPECT_FALSE(overlay->magnifierRect().isNull());
+}
+
+/**
+ * @brief 钉住读数取的是「这块屏的原点 + 缩放因子」折算后的那一帧像素
+ * @details 遮罩记的是这块屏内的局部点，冻帧是物理像素。少减原点会在副屏上偏一整屏，
+ *          少乘缩放会在高 DPI 上偏到左上角——两种都错得毫无声息，只能把颜色本身钉住。
+ */
+TEST_F(CaptureOverlayFixture, ReadoutFollowsTheFramePixelNotTheLocalPoint)
+{
+    QImage frame{QSize{kScreenGeometry.width() * 2, kScreenGeometry.height() * 2}, QImage::Format_ARGB32};
+    frame.fill(Qt::black);
+    const QPoint local{100, 150};
+    frame.setPixelColor(QPoint{local.x() * 2, local.y() * 2}, QColor{10, 200, 20}); // 乘了缩放才是这一格
+    frame.setPixelColor(local, QColor{200, 20, 20});                                // 只减不乘会读到这一格
+
+    auto overlay = makeOverlay(frame, 2.0);
+    moveOver(*overlay, local);
+
+    const QColor expected{10, 200, 20};
+    EXPECT_EQ(overlay->colorUnderCursor(), expected) << "读数没按缩放因子折到帧像素";
+}
+
+/**
+ * @brief 钉住放大镜摆在光标右下、贴到屏角时翻到左上，并且整枚留在屏内
+ * @details 摆在光标右下是为了不挡住正要看的像素；翻边判据失效时放大镜有一半跑到屏外，
+ *          用户照着抄的格子根本不是光标那一片。
+ */
+TEST_F(CaptureOverlayFixture, MagnifierFlipsAsideAtTheScreenCorner)
+{
+    auto         overlay = makeOverlay();
+    const QPoint nearCorner{kScreenGeometry.width() - GyanisScribe::Pick::kMagnifierViewEdge - 40, kScreenGeometry.height() - GyanisScribe::Pick::kMagnifierViewEdge - 40};
+    moveOver(*overlay, nearCorner);
+    const auto roomy = overlay->magnifierRect();
+    EXPECT_TRUE(roomy.left() > nearCorner.x()) << "摆得下时放大镜该在光标右下";
+    EXPECT_TRUE(roomy.top() > nearCorner.y());
+
+    const QPoint corner{kScreenGeometry.width() - 2, kScreenGeometry.height() - 2};
+    moveOver(*overlay, corner);
+    const auto flipped = overlay->magnifierRect();
+    EXPECT_TRUE(flipped.right() < corner.x()) << "贴到屏角时没翻到光标左侧";
+    EXPECT_TRUE(flipped.bottom() < corner.y()) << "贴到屏底时没翻到光标上方";
+
+    const QRect widgetRect{QPoint{0, 0}, kScreenGeometry.size()};
+    EXPECT_TRUE(widgetRect.contains(flipped)) << "放大镜整枚该留在这块屏内";
 }

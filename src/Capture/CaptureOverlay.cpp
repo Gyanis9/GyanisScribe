@@ -1,6 +1,8 @@
 #include "Capture/CaptureOverlay.h"
 
 #include "Capture/ScreenUtils.h"
+#include "Pick/ColorFormat.h"
+#include "Pick/PickGeometry.h"
 #include "Ui/DesignTokens.h"
 
 #include <QFont>
@@ -8,6 +10,18 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
+
+#include <algorithm>
+#include <cmath>
+
+namespace
+{
+    /// 放大镜边框线宽，逻辑像素：与取色遮罩同一档，两处放大镜不能看起来是两个东西
+    constexpr int kMagnifierPenWidth = 2;
+
+    /// 放大镜下面那条读数条的高度，逻辑像素
+    constexpr int kMagnifierStripHeight = 24;
+} // namespace
 
 namespace GyanisScribe::Capture
 {
@@ -65,6 +79,90 @@ namespace GyanisScribe::Capture
     std::optional<QRect> CaptureOverlay::hoveredRegion() const
     {
         return m_hoveredRegion;
+    }
+
+    QColor CaptureOverlay::colorUnderCursor() const
+    {
+        if (!m_hasCursorPoint || m_background.isNull())
+        {
+            // 没收到鼠标移动就把 (0,0) 当成光标，报出来的是这块屏左上角的颜色
+            return {};
+        }
+        const auto pixel = Pick::framePixelFor(globalCursorPoint(), m_screenGeometry, m_devicePixelRatio, m_background.size());
+        return m_background.pixelColor(pixel);
+    }
+
+    QRect CaptureOverlay::magnifierRect() const
+    {
+        if (!m_hasCursorPoint)
+        {
+            return {};
+        }
+        return Pick::magnifierLayoutFor(globalCursorPoint(), m_screenGeometry, m_screenGeometry, Pick::kMagnifierSampleEdge, Pick::kMagnifierViewEdge)
+                .viewRect.translated(-m_screenGeometry.topLeft());
+    }
+
+    QPoint CaptureOverlay::globalCursorPoint() const
+    {
+        // 放大镜几何按全局坐标算（副屏的原点不是 (0,0)），画回遮罩时才减掉这块屏的原点
+        return m_cursorPoint + m_screenGeometry.topLeft();
+    }
+
+    void CaptureOverlay::paintMagnifier(QPainter &painter)
+    {
+        if (m_background.isNull())
+        {
+            return;
+        }
+
+        const auto layout    = Pick::magnifierLayoutFor(globalCursorPoint(), m_screenGeometry, m_screenGeometry, Pick::kMagnifierSampleEdge, Pick::kMagnifierViewEdge);
+        const auto viewRect  = layout.viewRect.translated(-m_screenGeometry.topLeft());
+        const auto cropPixel = Pick::framePixelFor(layout.sourceRect.topLeft(), m_screenGeometry, m_devicePixelRatio, m_background.size());
+        if (!viewRect.isValid())
+        {
+            return;
+        }
+
+        // 取样范围是逻辑像素，抓帧是设备像素：边长要乘缩放比，夹到帧内而不是让它越界画出一片空白
+        const auto cropSpan = static_cast<int>(std::lround(Pick::kMagnifierSampleEdge * m_devicePixelRatio));
+        const auto cropSize = QSize{std::clamp(cropSpan, 1, m_background.width() - cropPixel.x()), std::clamp(cropSpan, 1, m_background.height() - cropPixel.y())};
+
+        // 最近邻放大：Smooth 会把格子糊成一团，放大镜就没有存在的意义了
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(Qt::NoBrush);
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+        painter.drawImage(viewRect, m_background.copy(QRect{cropPixel, cropSize}));
+
+        auto borderPen = QPen(GyanisScribe::Ui::kAccentColor);
+        borderPen.setWidth(kMagnifierPenWidth);
+        painter.setPen(borderPen);
+        painter.drawRect(viewRect);
+
+        painter.setPen(QPen{GyanisScribe::Ui::kCrosshairColor, 1});
+        for (auto step = 1; step < Pick::kMagnifierSampleEdge; ++step)
+        {
+            const auto offset = step * layout.cellSize;
+            painter.drawLine(viewRect.left() + offset, viewRect.top(), viewRect.left() + offset, viewRect.bottom());
+            painter.drawLine(viewRect.left(), viewRect.top() + offset, viewRect.right(), viewRect.top() + offset);
+        }
+
+        // 读数条压在放大镜下沿：光标那一点的坐标与颜色，不必松手就能核对框到的是哪一格
+        const auto stripRect = QRect{viewRect.left(), viewRect.bottom() + kMagnifierPenWidth, viewRect.width(), kMagnifierStripHeight};
+        const auto readout   = QStringLiteral("%1  %2").arg(formatCursorReadout(), Pick::formatColor(colorUnderCursor(), Pick::ColorFormat::Hex));
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(GyanisScribe::Ui::kCaptureHintBackgroundColor);
+        painter.drawRect(stripRect);
+        QFont stripFont = font();
+        stripFont.setPointSize(GyanisScribe::Ui::kHintFontSize);
+        painter.setFont(stripFont);
+        painter.setPen(GyanisScribe::Ui::kCaptureHintTextColor);
+        painter.drawText(stripRect.adjusted(GyanisScribe::Ui::kHintPadding, 0, -GyanisScribe::Ui::kHintPadding, 0), Qt::AlignVCenter | Qt::AlignLeft, readout);
+    }
+
+    QString CaptureOverlay::formatCursorReadout() const
+    {
+        const auto global = globalCursorPoint();
+        return QStringLiteral("(%1, %2)").arg(global.x()).arg(global.y());
     }
 
     void CaptureOverlay::refreshHoveredRegion()
@@ -151,16 +249,23 @@ namespace GyanisScribe::Capture
             painter.setPen(GyanisScribe::Ui::kCaptureHintTextColor);
             painter.drawText(hintRect, Qt::AlignCenter, hint);
         }
+
+        // 放大镜排在最后画：它会挡住底下那片，但用户正要看的就是光标那一点，优先级比背景高
+        if (m_isSelecting)
+        {
+            paintMagnifier(painter);
+        }
     }
 
     void CaptureOverlay::mousePressEvent(QMouseEvent *event)
     {
         if (event->button() == Qt::LeftButton)
         {
-            m_isSelecting  = true;
-            m_anchorPoint  = event->position().toPoint();
-            m_currentPoint = m_anchorPoint;
-            m_cursorPoint  = m_anchorPoint;
+            m_isSelecting    = true;
+            m_anchorPoint    = event->position().toPoint();
+            m_currentPoint   = m_anchorPoint;
+            m_cursorPoint    = m_anchorPoint;
+            m_hasCursorPoint = true;
             // 预览留着不熄：按下还没拖的那一瞬间，「点一下要哪扇」的答案就是它。
             // 真拖起来了再由 refreshHoveredRegion 关掉，同一时刻不会出现两个矩形
             update();
@@ -171,7 +276,8 @@ namespace GyanisScribe::Capture
     {
         // 光标位置与选区端点分开记：没按下时也要重画（辅助线与悬停跟着光标走），
         // 但把它写进 m_currentPoint 会让 selectedRegion() 从原点编出一块根本没框过的选区
-        m_cursorPoint = event->position().toPoint();
+        m_cursorPoint    = event->position().toPoint();
+        m_hasCursorPoint = true;
         if (m_isSelecting)
         {
             m_currentPoint = m_cursorPoint;
