@@ -19,9 +19,12 @@ namespace GyanisScribe::Annotation
 {
     namespace
     {
+        /// 改样式命令的合并标识：本文件只有这一条命令重写 id()，其余命令沿用 Qt 默认的 -1（表示不参与合并）
+        constexpr int kRestyleCommandTypeId = 1;
+
         /**
          * @brief 插入一条图形
-         * @details 撤销栈里的三条命令都只碰工具的存储接口，不碰交互态：
+         * @details 撤销栈里的四条命令都只碰工具的存储接口，不碰交互态：
          *          撤销不该把在途图形也带回来。
          */
         class InsertShapeCommand : public QUndoCommand
@@ -102,6 +105,62 @@ namespace GyanisScribe::Annotation
             AnnotationTool *m_tool;  ///< 目标工具
             int             m_index; ///< 图形索引
             QPoint          m_delta; ///< 位移量
+        };
+
+        /**
+         * @brief 改一条图形的样式
+         * @details 同一条图形的连续改动并成一步：线宽滑块拖一趟会发好几次值，撤销一次就该回到
+         *          抬手之前，而不是让用户按好几下 Ctrl+Z。合并靠 id() 相同才会被栈尝试。
+         */
+        class RestyleShapeCommand : public QUndoCommand
+        {
+        public:
+            RestyleShapeCommand(AnnotationTool *tool, int index, const AnnotationShape &before, const QColor &color, int lineWidth, int fontSize) :
+                m_tool(tool), m_index(index), m_before(before), m_color(color), m_lineWidth(lineWidth), m_fontSize(fontSize)
+            {
+            }
+
+            void redo() override
+            {
+                static_cast<void>(m_tool->restyleShapeAt(m_index, m_color, m_lineWidth, m_fontSize));
+            }
+
+            void undo() override
+            {
+                static_cast<void>(m_tool->restyleShapeAt(m_index, m_before.color, m_before.lineWidth, m_before.fontSize));
+            }
+
+            [[nodiscard]] int id() const override
+            {
+                return kRestyleCommandTypeId;
+            }
+
+            bool mergeWith(const QUndoCommand *other) override
+            {
+                if (other->id() != kRestyleCommandTypeId)
+                {
+                    return false;
+                }
+                const auto &next = *static_cast<const RestyleShapeCommand *>(other);
+                if (next.m_tool != m_tool || next.m_index != m_index)
+                {
+                    return false;
+                }
+
+                // m_before 保持第一次那一份：撤销要回到这一轮手势开始之前，而不是上一个中间档
+                m_color     = next.m_color;
+                m_lineWidth = next.m_lineWidth;
+                m_fontSize  = next.m_fontSize;
+                return true;
+            }
+
+        private:
+            AnnotationTool *m_tool;      ///< 目标工具，所有权在引擎
+            int             m_index;     ///< 图形索引
+            AnnotationShape m_before;    ///< 改动前的图形，撤销只取它那三个样式字段
+            QColor          m_color;     ///< 目标颜色
+            int             m_lineWidth; ///< 目标线宽
+            int             m_fontSize;  ///< 目标字号
         };
 
     } // namespace
@@ -224,6 +283,23 @@ namespace GyanisScribe::Annotation
             tool->setPenColor(color);
             tool->setLineWidth(lineWidth);
             tool->setFontSize(fontSize);
+        }
+
+        // 选中项跟着这次改动一起换样式：样式记在每条图形自己身上，工具上那三份只是后续图形的默认值，
+        // 所以「选中着的那条」是用户改样式时唯一能合理指向的对象
+        if (m_selection)
+        {
+            auto *tool = toolFor(m_selection->tool);
+            if (tool != nullptr && m_selection->shapeIndex >= 0 && m_selection->shapeIndex < tool->shapeCount())
+            {
+                const AnnotationShape before = tool->shapeAt(m_selection->shapeIndex);
+                // 三项全等就别进栈：点一下已经在用的那个颜色不该凭空造出一步「可撤销」
+                if (before.color != color || before.lineWidth != lineWidth || before.fontSize != fontSize)
+                {
+                    // 快照取在改动之前：撤销栈里存的就是这条图形原来的三个样式值
+                    m_undoStack.push(new RestyleShapeCommand(tool, m_selection->shapeIndex, before, color, lineWidth, fontSize));
+                }
+            }
         }
         return {};
     }

@@ -92,6 +92,8 @@ namespace GyanisScribe::Annotation
          * @param fontSize 字号，必须为正
          * @return 成功返回空载荷；线宽或字号不是正数时返回 InvalidArgument，说明收哪些值
          * @note 参数同时下发给所有工具：切工具不该看到笔又变回默认值
+         * @note 有选中图形时这条图形也按新参数改样式，并记进撤销栈（同一条图形的连续改动合成一步）：
+         *       样式是每条图形自己的属性，工具上的值只给之后画出的图形用。三项与选中项全等时不进步骤。
          */
         virtual Core::Expected<void> setPenParameters(const QColor &color, int lineWidth, int fontSize) = 0;
 

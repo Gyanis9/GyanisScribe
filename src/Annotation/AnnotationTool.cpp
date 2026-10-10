@@ -123,6 +123,21 @@ namespace GyanisScribe::Annotation
         return true;
     }
 
+    bool AnnotationTool::restyleShapeAt(int index, const QColor &color, int lineWidth, int fontSize)
+    {
+        if (index < 0 || index >= m_shapes.size())
+        {
+            return false;
+        }
+
+        // 只碰这三个字段：位置、轨迹点与文本各自属于移动与内容命令，混进来会让撤销分不开
+        auto &shape     = m_shapes[index];
+        shape.color     = color;
+        shape.lineWidth = lineWidth;
+        shape.fontSize  = fontSize;
+        return true;
+    }
+
     int AnnotationTool::hitTest(const QPoint &point) const
     {
         // 倒序遍历：后画的图形压在上面，用户点的就是看得见的那一条

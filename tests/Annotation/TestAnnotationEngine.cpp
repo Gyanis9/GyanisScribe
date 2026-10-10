@@ -227,3 +227,98 @@ TEST_F(EngineFixture, UndoAndRedoWithoutHistoryFailWithReason)
     ASSERT_FALSE(nothingToRedo.has_value());
     EXPECT_NE(nothingToRedo.error().message.find("没有可重做"), std::string::npos);
 }
+
+/**
+ * @brief 钉住「选中时改样式」落到那条图形上并且可撤销
+ * @details 样式记在每条图形自己身上，工具上的值只是后续图形的默认值，所以这一步必须改图形本身。
+ *          像素按手算核：矩形左边在 x=10，描边以该线为中心向两侧各扩半个线宽——
+ *          线宽 3 覆盖 [8.5,11.5]，线宽 8 覆盖 [6,14]；于是 x=10 两档都是实心，
+ *          x=13 只在宽的那一档有墨。两条断言一实一虚，撤销是否真回退得出来。
+ */
+TEST_F(EngineFixture, StyleChangeRestylesTheSelectedShapeAndUndoesBack)
+{
+    const auto rectangle = drawRectangle(QPoint(10, 10), QPoint(90, 60));
+    ASSERT_TRUE(m_engine.select(rectangle).has_value());
+
+    const QImage drawn = m_engine.exportImage();
+    ASSERT_EQ(drawn.pixelColor(10, 35), QColor(255, 0, 0)) << "默认的红没落在左边界上，后面的对照就没基准";
+    ASSERT_EQ(drawn.pixelColor(13, 35), QColor(255, 255, 255)) << "线宽 3 的描边不该够到 x=13";
+
+    ASSERT_TRUE(m_engine.setPenParameters(QColor(0, 0, 255), 8, 16).has_value());
+    const QImage restyled = m_engine.exportImage();
+    EXPECT_EQ(restyled.pixelColor(10, 35), QColor(0, 0, 255)) << "改样式只改了默认值，没落到选中的那条图形上";
+    EXPECT_EQ(restyled.pixelColor(13, 35), QColor(0, 0, 255)) << "线宽没跟着改";
+
+    ASSERT_TRUE(m_engine.undo().has_value());
+    const QImage undone = m_engine.exportImage();
+    EXPECT_EQ(undone.pixelColor(10, 35), QColor(255, 0, 0)) << "撤销没把颜色退回改样式之前";
+    EXPECT_EQ(undone.pixelColor(13, 35), QColor(255, 255, 255)) << "撤销没把线宽退回改样式之前";
+    EXPECT_TRUE(m_engine.canRedo()) << "改样式没进栈，重做无从谈起";
+}
+
+/**
+ * @brief 钉住同一条图形上连续的改样式并成一步撤销
+ * @details 线宽滑块拖一趟会连发好几次值：撤一次要回到抬手之前，而不是让用户按三下 Ctrl+Z。
+ *          栈里该只有「插入 + 改样式」两步，所以第二次撤销才是把图形本身抹掉。
+ */
+TEST_F(EngineFixture, ConsecutiveStyleChangesOnOneShapeUndoAsASingleStep)
+{
+    const auto rectangle = drawRectangle(QPoint(10, 10), QPoint(90, 60));
+    ASSERT_TRUE(m_engine.select(rectangle).has_value());
+
+    ASSERT_TRUE(m_engine.setPenParameters(QColor(0, 0, 255), 4, 16).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(QColor(0, 255, 0), 6, 16).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(QColor(0, 0, 255), 8, 16).has_value());
+    ASSERT_EQ(m_engine.exportImage().pixelColor(13, 35), QColor(0, 0, 255)) << "最后一次改动没落到图形上";
+
+    ASSERT_TRUE(m_engine.undo().has_value());
+    // 没并成一步的话，这一撤只会退到「绿、宽 6」那一档：x=10 是绿的、x=13 仍是白的
+    EXPECT_EQ(m_engine.exportImage().pixelColor(10, 35), QColor(255, 0, 0)) << "撤一步没回到这一轮手势开始前的样式，三次改动没并成一步";
+
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(10, 35), QColor(255, 255, 255)) << "改样式多占了步骤，第二次撤销还没碰到那条图形";
+    EXPECT_FALSE(m_engine.canUndo()) << "栈里多出了不该有的条目";
+}
+
+/**
+ * @brief 钉住两条拒绝面：没有选中项、或样式没变时都不该造出一步撤销
+ * @details 改默认值本身不是画布上的动作；点一下已经在用的那个颜色也不是。
+ *          放进去之后用户按 Ctrl+Z 会「什么都没发生」，历史还被顶掉一格。
+ */
+TEST_F(EngineFixture, StyleChangeWithoutAVisibleDifferenceAddsNoUndoStep)
+{
+    ASSERT_TRUE(m_engine.setPenParameters(QColor(0, 0, 255), 8, 16).has_value());
+    EXPECT_FALSE(m_engine.canUndo()) << "画布上什么都没有，改默认值不该进撤销栈";
+
+    const auto rectangle = drawRectangle(QPoint(10, 10), QPoint(90, 60));
+    ASSERT_TRUE(m_engine.select(rectangle).has_value());
+    // 上面那次把默认值改成了蓝/8，新画的这条就是蓝/8：再下发同一组值等于什么都没改
+    ASSERT_TRUE(m_engine.setPenParameters(QColor(0, 0, 255), 8, 16).has_value());
+
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(10, 35), QColor(255, 255, 255)) << "点同一档颜色也造出了一步撤销，撤的就不是那条图形了";
+    EXPECT_FALSE(m_engine.canUndo());
+}
+
+/**
+ * @brief 钉住改样式只碰选中的那一条
+ * @details 工具上的默认值会下发给全部工具，图形样式不会：漏了这一条的话，
+ *          改个颜色会把整张画布上同类图形一起刷掉。
+ */
+TEST_F(EngineFixture, StyleChangeTouchesOnlyTheSelectedShape)
+{
+    const auto first  = drawRectangle(QPoint(10, 10), QPoint(40, 60));
+    const auto second = drawRectangle(QPoint(60, 10), QPoint(90, 60));
+    ASSERT_TRUE(m_engine.select(second).has_value());
+
+    const QImage drawn = m_engine.exportImage();
+    ASSERT_EQ(drawn.pixelColor(10, 35), QColor(255, 0, 0));
+    ASSERT_EQ(drawn.pixelColor(60, 35), QColor(255, 0, 0));
+
+    ASSERT_TRUE(m_engine.select(first).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(QColor(0, 0, 255), 3, 16).has_value());
+
+    const QImage restyled = m_engine.exportImage();
+    EXPECT_EQ(restyled.pixelColor(10, 35), QColor(0, 0, 255)) << "选中的那条没改";
+    EXPECT_EQ(restyled.pixelColor(60, 35), QColor(255, 0, 0)) << "没选中的那条被一起改了";
+}

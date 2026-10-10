@@ -315,3 +315,33 @@ TEST(PenToolTest, DropsDuplicateSamplesAndKeepsThePath)
         EXPECT_NE(committed->points[index], committed->points[index + 1]) << "第 " << index << " 与下一个采样点重合，去重没生效";
     }
 }
+
+/**
+ * @brief 钉住改样式只写三个样式字段，且越界两个方向都拒
+ * @details 撤销「改样式」靠的就是这一条：位置、轨迹、文本必须原样留着，
+ *          否则撤一次颜色会把图形挪走。越界不许回绕到末尾——那是把「没这条图形」当成「改最后一条」。
+ */
+TEST(PenToolRestyleTest, RestyleWritesOnlyTheStyleFields)
+{
+    PenTool tool;
+    tool.setActive(true);
+
+    tool.begin(QPoint(10, 10));
+    tool.update(QPoint(40, 35));
+    const auto committed = tool.end();
+    ASSERT_TRUE(committed.has_value());
+    tool.insertShape(0, *committed);
+
+    ASSERT_TRUE(tool.restyleShapeAt(0, QColor(0, 0, 255), 8, 20));
+    const auto restyled = tool.shapeAt(0);
+    EXPECT_EQ(restyled.color, QColor(0, 0, 255));
+    EXPECT_EQ(restyled.lineWidth, 8);
+    EXPECT_EQ(restyled.fontSize, 20);
+    EXPECT_EQ(restyled.points, committed->points) << "改样式把采样点动了";
+    EXPECT_EQ(restyled.rect, committed->rect) << "改样式把位置动了";
+
+    EXPECT_FALSE(tool.restyleShapeAt(1, QColor(255, 0, 0), 3, 16)) << "只有一条图形时索引 1 该被拒";
+    EXPECT_FALSE(tool.restyleShapeAt(-1, QColor(255, 0, 0), 3, 16)) << "负索引该被拒";
+    EXPECT_EQ(tool.shapeCount(), 1) << "越界的那次多插了一条";
+    EXPECT_EQ(tool.shapeAt(0).color, QColor(0, 0, 255)) << "越界的调用改到了已有图形";
+}

@@ -157,6 +157,18 @@ namespace GyanisScribe::Annotation
         bool translateShapeBy(int index, const QPoint &delta);
 
         /**
+         * @brief 改一条图形自己的样式
+         * @param index 索引
+         * @param color 颜色
+         * @param lineWidth 线宽，逻辑像素，必须为正
+         * @param fontSize 字号，必须为正
+         * @return 成功返回 true；索引越界返回 false
+         * @details 三个字段一起写，与 begin() 给在途图形上色的口径一致：只改其一会让图形
+         *          带着一个谁都没设过的混合样式，撤销时也说不清要回退到哪一份。位置与内容不动。
+         */
+        bool restyleShapeAt(int index, const QColor &color, int lineWidth, int fontSize);
+
+        /**
          * @brief 命中测试
          * @param point 画布逻辑坐标
          * @return 命中的图形索引（后画的优先），没命中返回 -1

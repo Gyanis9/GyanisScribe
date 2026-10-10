@@ -83,6 +83,8 @@ namespace GyanisScribe::Annotation
          * @param lineWidth 线宽，必须为正
          * @param fontSize 字号，必须为正
          * @return 成功返回空载荷；非正时返回写明取值范围的中文原因
+         * @details 有选中项时把改样式记进撤销栈，并与栈顶同一条图形的上一次改动合并：
+         *          滑块拖一趟只算一步，撤销一次回到抬手之前。
          */
         Core::Expected<void> setPenParameters(const QColor &color, int lineWidth, int fontSize) override;
 
