@@ -53,14 +53,22 @@ namespace GyanisScribe::Record
                 QStringLiteral("libx264"),
                 QStringLiteral("-preset"),
                 QStringLiteral("veryfast"),
-                QStringLiteral("-crf"),
-                QStringLiteral("23"),
-                QStringLiteral("-pix_fmt"),
-                QStringLiteral("yuv420p"),
-                // faststart 把 moov 搬到文件头：不搬的话录完立刻上传会被播放器抱怨「正在下载」
-                QStringLiteral("-movflags"),
-                QStringLiteral("+faststart"),
         };
+
+        // 质量这一档二选一：给了码率就走按码率控，没给才走 CRF。两条同时给 ffmpeg 会听码率而把 crf 当摆设，
+        // 留着那条会让人以为改的是质量
+        if (config.videoBitrateKbps > kDefaultVideoBitrateKbps)
+        {
+            arguments << QStringLiteral("-b:v") << QString::number(config.videoBitrateKbps) + QStringLiteral("k");
+        } else
+        {
+            arguments << QStringLiteral("-crf") << QStringLiteral("23");
+        }
+
+        arguments << QStringLiteral("-pix_fmt")
+                  << QStringLiteral("yuv420p")
+                  // faststart 把 moov 搬到文件头：不搬的话录完立刻上传会被播放器抱怨「正在下载」
+                  << QStringLiteral("-movflags") << QStringLiteral("+faststart");
 
         if (audioWav.empty())
         {

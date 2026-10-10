@@ -63,6 +63,14 @@ namespace GyanisScribe::Record
                                                                     maximumFrameRate, config.format == OutputFormat::Gif ? "GIF" : "MP4", config.frameRate));
         }
 
+        // 码率只在 MP4 那一档起作用（GIF 走两遍调色板），但范围在这里就判掉：
+        // 负值会让 ffmpeg 报「无效参数」而那句不带字段名，用户在界面上看不出是这一项写歪了
+        if (config.videoBitrateKbps < kDefaultVideoBitrateKbps || config.videoBitrateKbps > kMaximumVideoBitrateKbps)
+        {
+            return reject("videoBitrateKbps", GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("取值要在 0 到 {} 之间（0 表示按质量优先），当前是 {}。码率越高文件越大"),
+                                                                           kMaximumVideoBitrateKbps, config.videoBitrateKbps));
+        }
+
         if (config.maximumDurationSeconds < 1 || config.maximumDurationSeconds > kMaximumDurationSeconds)
         {
             return reject("maximumDurationSeconds",
@@ -100,6 +108,22 @@ namespace GyanisScribe::Record
                 .message = GyanisScribe::Core::uiFormat(
                         GyanisScribe::Core::uiTextUtf8("默认帧率 \"{}\" 不在可用范围（1 到 {}）里：请在设置的录屏页重选一个值，或删掉 Record/DefaultFrameRate 这一项回到默认档"),
                         stored, kMaximumFrameRate),
+        }}};
+    }
+
+    Core::Expected<int> parseVideoBitrateSetting(const int stored)
+    {
+        // 0 是「按质量优先」这一档，不是没填：负值与超出上限的大值才是手改配置写歪了
+        if (stored >= kDefaultVideoBitrateKbps && stored <= kMaximumVideoBitrateKbps)
+        {
+            return stored;
+        }
+        return Core::Expected<int>{std::unexpected{Core::Error{
+                .code    = Core::ErrorCode::InvalidArgument,
+                .message = GyanisScribe::Core::uiFormat(
+                        GyanisScribe::Core::uiTextUtf8(
+                                "画面码率 \"{}\" 不在可用范围（0 到 {} kbps，0 表示按质量优先）里：请在设置的录屏页重选，或删掉 Record/VideoBitrateKbps 这一项回到默认档"),
+                        stored, kMaximumVideoBitrateKbps),
         }}};
     }
 

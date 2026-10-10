@@ -25,6 +25,7 @@
 #include <QComboBox>
 #include <QIcon>
 #include <QLabel>
+#include <QLineEdit>
 #include <QListWidget>
 #include <QSpinBox>
 #include <QStackedWidget>
@@ -206,7 +207,7 @@ namespace
                 Expectation{MainWindowPage::Capture, {"截图目录", "颜色写法"}, true},
                 Expectation{MainWindowPage::Annotation, {"默认线宽", "默认字号"}, true},
                 Expectation{MainWindowPage::Pin, {"默认不透明度"}, true},
-                Expectation{MainWindowPage::Record, {"录屏目录", "录制范围", "输出格式", "默认帧率", "光标高亮", "麦克风设备", "系统声音设备"}, true},
+                Expectation{MainWindowPage::Record, {"录屏目录", "录制范围", "输出格式", "默认帧率", "画面码率", "光标高亮", "麦克风设备", "系统声音设备"}, true},
                 Expectation{MainWindowPage::Ocr, {"识别语言", "语言包目录"}, true},
                 Expectation{MainWindowPage::Hotkey, {"截图", "录屏", "文字识别", "屏幕取色"}, true},
                 Expectation{MainWindowPage::Theme, {"主题"}, true},
@@ -280,6 +281,37 @@ namespace
         const auto parsed = GyanisScribe::Record::parseFrameRateSetting(stored);
         ASSERT_TRUE(static_cast<bool>(parsed));
         EXPECT_EQ(*parsed, 30);
+    }
+
+    /**
+     * @brief 钉住画面码率这一行写进 Record/VideoBitrateKbps，且范围与读端同解
+     * @details 0 这一档必须有名字：框里显示一个光秃秃的 0，用户读出来的是「没设码率」，
+     *          而它其实是「按质量优先」这一档的取值。
+     */
+    TEST_F(MainWindowFixture, VideoBitrateRowWritesTheKeyRecordingStartUses)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::Record);
+        auto *spin = qobject_cast<QSpinBox *>(controlInCurrentPage("画面码率"));
+        ASSERT_NE(spin, nullptr);
+        EXPECT_EQ(spin->value(), GyanisScribe::Record::kDefaultVideoBitrateKbps);
+        EXPECT_EQ(spin->minimum(), GyanisScribe::Record::kDefaultVideoBitrateKbps) << "界面给不出 0 就没法表达按质量优先";
+        EXPECT_EQ(spin->maximum(), GyanisScribe::Record::kMaximumVideoBitrateKbps) << "上限要与读端拒收的那一格同解，否则界面能给出运行期不收的码率";
+        // textFromValue 是 protected，读用户真看见的那一格：把码率改成 0 之后行编辑里应当是这一档的名字
+        auto *bitrateEdit = spin->findChild<QLineEdit *>();
+        ASSERT_NE(bitrateEdit, nullptr);
+        spin->setValue(0);
+        EXPECT_EQ(bitrateEdit->text(), QStringLiteral("按质量优先")) << "0 这一档在界面上没有名字，用户读出来的是「没设码率」";
+
+        spin->setValue(4000);
+        closeWindowAndFlush();
+
+        const auto reopened = makeStore();
+        const auto stored   = reopened->intValue(GyanisScribe::Settings::kRecordVideoBitrate, -1);
+        EXPECT_EQ(stored, 4000);
+        const auto parsed = GyanisScribe::Record::parseVideoBitrateSetting(stored);
+        ASSERT_TRUE(static_cast<bool>(parsed));
+        EXPECT_EQ(*parsed, 4000);
     }
 
     /**

@@ -515,6 +515,14 @@ namespace GyanisScribe::App
         {
             Core::Logger::warning(std::format("录屏默认帧率读不出：{}，本次按 {} 帧开始", parsed.error().message, config.frameRate));
         }
+        // 画面码率与帧率同一条形状：读不出就记一条并按初值（按质量优先）走，不替用户挑一档
+        if (const auto parsed = Record::parseVideoBitrateSetting(m_settings->intValue(Settings::kRecordVideoBitrate, Record::kDefaultVideoBitrateKbps)); parsed)
+        {
+            config.videoBitrateKbps = *parsed;
+        } else
+        {
+            Core::Logger::warning(std::format("录屏画面码率读不出：{}，本次按质量优先开始", parsed.error().message));
+        }
         // 光标高亮是个开关，没有「读不出」这一档：配置里没有就按关；到了画不出位置的那一种模式，RecordingService 会自己报一句
         config.cursorHighlight = m_settings->boolValue(Settings::kRecordCursorHighlight, false);
 

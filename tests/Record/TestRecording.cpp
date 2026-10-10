@@ -153,6 +153,19 @@ TEST(RecordingConfig, AcceptsBaselineAndRejectsEachBadField)
         EXPECT_FALSE(validateRecorderConfig(bad).has_value());
     }
     {
+        // 0 是「按质量优先」这一档，必须放过去；越界的那一类要在开录之前点名，
+        // 交给 ffmpeg 只会换回一句不带字段名的「无效参数」
+        auto qualityFirst             = baselineConfig();
+        qualityFirst.videoBitrateKbps = 0;
+        EXPECT_TRUE(validateRecorderConfig(qualityFirst).has_value()) << "0 这一档被拒了，界面就没法表达按质量优先";
+
+        auto bad             = baselineConfig();
+        bad.videoBitrateKbps = -1;
+        const auto rejected  = validateRecorderConfig(bad);
+        ASSERT_FALSE(rejected.has_value());
+        EXPECT_NE(rejected.error().message.find("videoBitrateKbps"), std::string::npos) << rejected.error().message;
+    }
+    {
         auto bad = baselineConfig();
         bad.outputDirectory.clear();
         EXPECT_FALSE(validateRecorderConfig(bad).has_value());
@@ -242,6 +255,19 @@ TEST(RecordingFfmpeg, ArgumentTablesMatchTheDocumentedCommands)
     EXPECT_NE(withAudio.indexOf(QStringLiteral("-shortest")), -1);
     EXPECT_NE(withAudio.indexOf(QStringLiteral("aac")), -1);
 
+    // 没给码率时按质量优先，走 CRF
+    EXPECT_NE(silent.indexOf(QStringLiteral("-crf")), -1) << "缺省档要留下 CRF，否则成品质量没人负责";
+    EXPECT_EQ(silent.indexOf(QStringLiteral("-b:v")), -1) << "没给码率就不该出现码率控";
+
+    // 给了码率就换成码率控：两条同时给 ffmpeg 听码率而把 crf 当摆设，留着那条会让人以为改的是质量
+    auto byBitrate             = baselineConfig();
+    byBitrate.videoBitrateKbps = 4000;
+    const QStringList shaped   = mp4Arguments(byBitrate, "C:/tmp/rec/frames", "C:/tmp/rec/out.mp4", {});
+    EXPECT_EQ(shaped.indexOf(QStringLiteral("-crf")), -1) << shaped.join(QLatin1Char(' ')).toStdString();
+    EXPECT_EQ(shaped.value(shaped.indexOf(QStringLiteral("-b:v")) + 1), QStringLiteral("4000k"));
+    EXPECT_NE(shaped.indexOf(QStringLiteral("yuv420p")), -1) << "换成码率控那一段时把像素格式弄丢了";
+    EXPECT_NE(shaped.indexOf(QStringLiteral("+faststart")), -1) << "重排参数时把 faststart 弄丢了";
+
     const auto palette = gifPaletteArguments(config, "C:/tmp/rec/frames", "C:/tmp/rec/palette.png");
     EXPECT_TRUE(hasItemContaining(palette, QStringLiteral("palettegen=stats_mode=diff"))) << palette.join(QLatin1Char(' ')).toStdString();
     EXPECT_EQ(palette.last(), QStringLiteral("C:/tmp/rec/palette.png"));
@@ -251,6 +277,15 @@ TEST(RecordingFfmpeg, ArgumentTablesMatchTheDocumentedCommands)
     EXPECT_TRUE(hasItemContaining(gif, QStringLiteral("paletteuse="))) << gif.join(QLatin1Char(' ')).toStdString();
     EXPECT_EQ(gif.count(QStringLiteral("-i")), 2) << "两遍法要有两路输入：帧序列与调色板";
     EXPECT_EQ(gif.last(), QStringLiteral("C:/tmp/rec/out.gif"));
+
+    // GIF 走两遍调色板，画面码率对它没有意义：给了也不该混进命令行
+    auto gifBitrate                  = baselineConfig();
+    gifBitrate.format                = OutputFormat::Gif;
+    gifBitrate.videoBitrateKbps      = 4000;
+    const auto gifPaletteWithBitrate = gifPaletteArguments(gifBitrate, "C:/tmp/rec/frames", "C:/tmp/rec/palette.png");
+    const auto gifEncodeWithBitrate  = gifEncodeArguments(gifBitrate, "C:/tmp/rec/frames", "C:/tmp/rec/palette.png", "C:/tmp/rec/out.gif");
+    EXPECT_EQ(gifPaletteWithBitrate.indexOf(QStringLiteral("-b:v")), -1) << gifPaletteWithBitrate.join(QLatin1Char(' ')).toStdString();
+    EXPECT_EQ(gifEncodeWithBitrate.indexOf(QStringLiteral("-b:v")), -1) << gifEncodeWithBitrate.join(QLatin1Char(' ')).toStdString();
 }
 
 /**
@@ -463,6 +498,26 @@ TEST(RecorderFrameRateSetting, AcceptsInRangeAndRejectsOutside)
         EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument) << bad;
         EXPECT_NE(parsed.error().message.find("60"), std::string::npos) << bad;
         EXPECT_NE(parsed.error().message.find("Record/DefaultFrameRate"), std::string::npos) << bad;
+    }
+}
+
+/**
+ * @brief 钉住画面码率的读法：0 是一档而不是「没填」，越界要点名范围与配置键
+ * @details 0 这一档叫「按质量优先」，把它当成没配而回落某个具体数值，就等于替用户选了另一种控法。
+ */
+TEST(RecorderVideoBitrateSetting, ZeroIsAChoiceAndOutsideRangeIsRejected)
+{
+    EXPECT_EQ(GyanisScribe::Record::parseVideoBitrateSetting(GyanisScribe::Record::kDefaultVideoBitrateKbps).value(), 0);
+    EXPECT_EQ(GyanisScribe::Record::parseVideoBitrateSetting(4000).value(), 4000);
+    EXPECT_EQ(GyanisScribe::Record::parseVideoBitrateSetting(GyanisScribe::Record::kMaximumVideoBitrateKbps).value(), 50000);
+
+    for (const int bad: {-1, 50001, 5000000})
+    {
+        const auto parsed = GyanisScribe::Record::parseVideoBitrateSetting(bad);
+        ASSERT_FALSE(parsed.has_value()) << bad;
+        EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument) << bad;
+        EXPECT_NE(parsed.error().message.find("50000"), std::string::npos) << bad;
+        EXPECT_NE(parsed.error().message.find("Record/VideoBitrateKbps"), std::string::npos) << bad;
     }
 }
 

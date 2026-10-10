@@ -46,6 +46,7 @@ namespace GyanisScribe::Record
         RecordMode            mode                   = RecordMode::FullScreen; ///< 录什么
         OutputFormat          format                 = OutputFormat::Mp4;      ///< 存成什么
         int                   frameRate              = 15;                     ///< 目标帧率，逻辑每秒帧数
+        int                   videoBitrateKbps       = 0;                      ///< 画面码率 kbps，0 表示按质量优先（CRF），只对 MP4 起作用
         int                   maximumDurationSeconds = 600;                    ///< 最长录多久，到点自动收
         QRect                 region;                                          ///< Region 模式的选区，屏幕内逻辑坐标
         QString               screenName;                                      ///< 录哪块屏幕，全部模式必填
@@ -76,6 +77,20 @@ namespace GyanisScribe::Record
 
     /// 默认帧率的缺省档：配置里没有、或存的值不合法时用它，与 RecorderConfig::frameRate 的初值同解
     inline constexpr int kDefaultFrameRate = 15;
+
+    /// 画面码率的缺省档：0 表示不按码率管，交给 CRF，与 RecorderConfig::videoBitrateKbps 的初值同解
+    inline constexpr int kDefaultVideoBitrateKbps = 0;
+
+    /// 画面码率的上限，kbps：50 Mbps 已经远超屏幕内容的需要，再高就是把手改配置写成天文数字的那一类
+    inline constexpr int kMaximumVideoBitrateKbps = 50000;
+
+    /**
+     * @brief 解析配置里存的画面码率
+     * @param stored 配置读出的整数值，0 表示按质量优先
+     * @return 可用的码率；不在 0..kMaximumVideoBitrateKbps 里时返回带范围与替代做法的中文原因
+     * @details 0 是合法值而不是「没填」：它是这一档的名字（交给 CRF），读不出时才回落缺省档。
+     */
+    [[nodiscard]] Core::Expected<int> parseVideoBitrateSetting(int stored);
 
     /**
      * @brief 解析配置里存的默认帧率

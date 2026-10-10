@@ -452,12 +452,32 @@
             <translation>Opacity for new pins</translation>
         </message>
         <message>
-            <source>录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。存成 GIF 时帧率上限比 MP4 低。取声那两格列不出设备时只剩「不取这一路」，把鼠标停在框上能看到原因。这几项都从下一次开始录屏时生效。</source>
-            <translation>Recorded files land in this folder. With Last selection or Current window the picture keeps only that part of the screen. GIF allows a lower frame rate ceiling than MP4. When the two audio rows can't list any device, only "Don't take this input" is left there - hover over the box to read why. All of these apply from the next recording.</translation>
+            <source>录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。存成 GIF 时帧率上限比 MP4 低。画面码率填 0 就交给编码器的质量档，给了具体数值就按那个码率控，GIF 用不上这一项。取声那两格列不出设备时只剩「不取这一路」，把鼠标停在框上能看到原因。这几项都从下一次开始录屏时生效。</source>
+            <translation>Recorded files land in this folder. With Last selection or Current window the picture keeps only that part of the screen. GIF allows a lower frame rate ceiling than MP4. A video bitrate of 0 leaves the quality to the encoder, a concrete number caps the bitrate, and GIF ignores this row. When the two audio rows can't list any device, only "Don't take this input" is left there - hover over the box to read why. All of these apply from the next recording.</translation>
         </message>
         <message>
             <source>录屏成品目录</source>
             <translation>Folder for recordings</translation>
+        </message>
+        <message>
+            <source>画面码率</source>
+            <translation>Video bitrate</translation>
+        </message>
+        <message>
+            <source>按质量优先</source>
+            <translation>Quality first</translation>
+        </message>
+        <message>
+            <source> kbps</source>
+            <translation> kbps</translation>
+        </message>
+        <message>
+            <source>取值要在 0 到 {} 之间（0 表示按质量优先），当前是 {}。码率越高文件越大</source>
+            <translation>The value must be between 0 and {} (0 means quality first); it is currently {}. A higher bitrate means a larger file</translation>
+        </message>
+        <message>
+            <source>画面码率 "{}" 不在可用范围（0 到 {} kbps，0 表示按质量优先）里：请在设置的录屏页重选，或删掉 Record/VideoBitrateKbps 这一项回到默认档</source>
+            <translation>Video bitrate "{}" is not in the available range (0 to {} kbps, where 0 means quality first): pick a value again on the recording page of Settings, or delete the Record/VideoBitrateKbps entry to fall back to the default</translation>
         </message>
         <message>
             <source>录屏目录</source>

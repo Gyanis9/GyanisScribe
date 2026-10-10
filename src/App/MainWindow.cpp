@@ -483,6 +483,38 @@ namespace
     }
 
     /**
+     * @brief 录屏的画面码率，单位 kbps
+     * @param settings 配置存储
+     * @return 归调用方所有的数字框
+     * @details 0 是「按质量优先」这一档而不是「没填」，所以给 0 挂上说明文字：
+     *          空着个 0 会让人以为码率没生效，而它正是这一档的名字。
+     */
+    QSpinBox *makeVideoBitrateSpin(ISettingsStore &settings)
+    {
+        auto *spin = new QSpinBox;
+        spin->setRange(GyanisScribe::Record::kDefaultVideoBitrateKbps, GyanisScribe::Record::kMaximumVideoBitrateKbps);
+        spin->setSingleStep(500);
+        spin->setSuffix(GyanisScribe::Core::uiText(" kbps"));
+        spin->setSpecialValueText(GyanisScribe::Core::uiText("按质量优先"));
+        spin->setAccessibleName(GyanisScribe::Core::uiText("画面码率"));
+
+        const auto title  = GyanisScribe::Core::uiText("画面码率");
+        const auto stored = settings.intValue(GyanisScribe::Settings::kRecordVideoBitrate, GyanisScribe::Record::kDefaultVideoBitrateKbps);
+        const auto parsed = GyanisScribe::Record::parseVideoBitrateSetting(stored);
+        spin->setValue(shownValueForSetting(title, stored, parsed, GyanisScribe::Record::kDefaultVideoBitrateKbps));
+
+        QObject::connect(spin, &QSpinBox::valueChanged, spin,
+                         [&settings, title](int value)
+                         {
+                             if (auto written = settings.setValue(GyanisScribe::Settings::kRecordVideoBitrate, value); !written)
+                             {
+                                 Logger::warning(std::format("{} 没能写入：{}", title.toStdString(), written.error().message));
+                             }
+                         });
+        return spin;
+    }
+
+    /**
      * @brief 把词表里的窄字符取值转成 Qt 文本
      * @param token 配置里存的那一串
      * @return 原样的 Qt 文本，不经翻译
@@ -923,13 +955,16 @@ namespace GyanisScribe::App
     QWidget *MainWindow::buildRecordPage()
     {
         auto *page = new QWidget{this};
-        auto *form = makePageForm(page, GyanisScribe::Core::uiText("录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。存成 GIF 时帧率上限比 MP4 "
-                                                                   "低。取声那两格列不出设备时只剩「不取这一路」，把鼠标停在框上能看到原因。这几项都从下一次开始录屏时生效。"));
+        auto *form = makePageForm(page,
+                                  GyanisScribe::Core::uiText("录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。存成 GIF 时帧率上限比 MP4 "
+                                                             "低。画面码率填 0 就交给编码器的质量档，给了具体数值就按那个码率控，GIF "
+                                                             "用不上这一项。取声那两格列不出设备时只剩「不取这一路」，把鼠标停在框上能看到原因。这几项都从下一次开始录屏时生效。"));
         form->addRow(GyanisScribe::Core::uiText("录屏成品目录"),
                      makePathRow(m_settings, GyanisScribe::Settings::kPathRecording, GyanisScribe::Core::uiText("录屏目录"), Core::Paths::defaultRecordingDirectory(), m_icons));
         form->addRow(GyanisScribe::Core::uiText("录制范围"), makeRecordScopeCombo(m_settings));
         form->addRow(GyanisScribe::Core::uiText("输出格式"), makeRecordFormatCombo(m_settings));
         form->addRow(GyanisScribe::Core::uiText("默认帧率"), makeFrameRateSpin(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("画面码率"), makeVideoBitrateSpin(m_settings));
         form->addRow(GyanisScribe::Core::uiText("光标高亮"), makeCursorHighlightCheck(m_settings));
         form->addRow(GyanisScribe::Core::uiText("麦克风这一路"),
                      makeAudioDeviceCombo(m_settings, GyanisScribe::Settings::kRecordAudioMicrophone, GyanisScribe::Core::uiText("麦克风设备"), *m_audioDevices));

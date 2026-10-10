@@ -84,6 +84,10 @@ namespace GyanisScribe::Settings
     /// 录屏取声的系统声音那一路，取值形状与上一项相同
     inline constexpr std::string_view kRecordAudioSystemSound = "Record/AudioSystemSoundDevice";
 
+    /// 录屏的画面码率，kbps（0 表示按质量优先，交给编码器的 CRF）；
+    /// 读端在 AppController 造参数那一处，写端在设置的录屏页
+    inline constexpr std::string_view kRecordVideoBitrate = "Record/VideoBitrateKbps";
+
     /// 录屏时是否把光标位置圈在帧上，读端在 AppController 造参数那一处，写端在设置的录屏页
     inline constexpr std::string_view kRecordCursorHighlight = "Record/CursorHighlight";
 
