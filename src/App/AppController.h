@@ -154,6 +154,13 @@ namespace GyanisScribe::App
         void startLastRegionCapture(std::optional<CaptureIntent> intent = std::nullopt);
 
         /**
+         * @brief 起一轮滚动长截图
+         * @details 与 startCapture 同一条延时通道：先等设置里那几秒，再铺遮罩让人框出要滚的那一条。
+         *          接好的长图从 captured 出来，去向仍由设置里那一档决定。
+         */
+        void startLongCapture();
+
+        /**
          * @brief 截取当前前台窗口
          * @details 句柄由平台集成给（Windows 走 GetForegroundWindow），抓帧那一步按句柄去问几何；
          *          平台给不出句柄时把原因发给用户，而不是静默什么都不做。

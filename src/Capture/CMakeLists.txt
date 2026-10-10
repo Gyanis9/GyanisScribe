@@ -2,6 +2,10 @@
 add_library(Capture STATIC
         ScreenUtils.h
         ScreenUtils.cpp
+        FrameStitch.h
+        FrameStitch.cpp
+        LongCaptureHud.h
+        LongCaptureHud.cpp
         IScreenCaptureSource.h
         QScreenCaptureSource.h
         QScreenCaptureSource.cpp

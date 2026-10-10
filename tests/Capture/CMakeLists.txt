@@ -1,5 +1,7 @@
 add_executable(TestCapture
         TestCaptureService.cpp
+        TestFrameStitch.cpp
+        TestLongCaptureHud.cpp
         TestCaptureOverlay.cpp
         TestScreenUtils.cpp)
 

@@ -1,7 +1,9 @@
 #include "Capture/CaptureService.h"
 
 #include "Capture/CaptureOverlay.h"
+#include "Capture/FrameStitch.h"
 #include "Capture/IScreenCaptureSource.h"
+#include "Capture/LongCaptureHud.h"
 #include "Capture/ScreenUtils.h"
 #include "Core/Logger.h"
 #include "Core/Text.h"
@@ -12,7 +14,17 @@
 #include <QGuiApplication>
 #include <QScreen>
 
+#include <cmath>
 #include <format>
+
+namespace
+{
+    /// 滚动长截图的取帧节拍，毫秒：比人手滚一格快，又不至于每帧都在同一位置上
+    constexpr int kLongCaptureIntervalMs = 250;
+
+    /// 长图的逻辑高度上限：接到这里就地收口，免得在一条没有底的页面上把内存吃光
+    constexpr int kLongCaptureMaximumLogicalHeight = 40000;
+} // namespace
 
 namespace GyanisScribe::Capture
 {
@@ -25,6 +37,9 @@ namespace GyanisScribe::Capture
     CaptureService::~CaptureService()
     {
         closeOverlays();
+        // 析构时还在接：计时器与控制条一起收，别留下一个每 250ms 抓一次屏的孤儿
+        m_longTimer.stop();
+        closeLongHud();
     }
 
     void CaptureService::captureFullScreen(const QString &screenName)
@@ -90,6 +105,16 @@ namespace GyanisScribe::Capture
 
     void CaptureService::startInteractive()
     {
+        beginInteractive(false);
+    }
+
+    void CaptureService::startLongCapture()
+    {
+        beginInteractive(true);
+    }
+
+    void CaptureService::beginInteractive(const bool longCapture)
+    {
         closeOverlays();
 
         const auto screens = QGuiApplication::screens();
@@ -127,9 +152,15 @@ namespace GyanisScribe::Capture
             }
             overlay->setWindowCandidates(onThisScreen);
             QObject::connect(overlay, &CaptureOverlay::regionSelected, this,
-                             [this, screen, overlay](const QRect &region)
+                             [this, screen, overlay, longCapture](const QRect &region)
                              {
                                  closeOverlays();
+                                 // 同一层遮罩两条去处：长截图先把这一块当成开头接住，普通截图当场交成品
+                                 if (longCapture)
+                                 {
+                                     captureLongRegion(region, screen->name());
+                                     return;
+                                 }
                                  captureRegion(region, screen->name());
                              });
             QObject::connect(overlay, &CaptureOverlay::dismissed, this, &CaptureService::cancelInteractive);
@@ -175,6 +206,182 @@ namespace GyanisScribe::Capture
             }
         }
         m_overlays.clear();
+    }
+
+    void CaptureService::captureLongRegion(const QRect &logicalRegion, const QString &screenName)
+    {
+        if (m_longActive)
+        {
+            // 上一轮还开着：先按「用户作废」收掉，让那一次请求也有个可观察的结果，再开这一轮
+            cancelLongCapture();
+        }
+
+        const auto frame = m_source.grabScreen(screenName);
+        if (!frame)
+        {
+            deliver(frame);
+            return;
+        }
+
+        const auto first = cropToLogicalRect(*frame, logicalRegion);
+        if (!first)
+        {
+            deliver(first);
+            return;
+        }
+
+        m_longImage      = *first;
+        m_longRegion     = logicalRegion;
+        m_longScreenName = frame->screenName;
+        m_longActive     = true;
+
+        // 选区同样记进「上次区域」：长截图框出来的那条竖块往往正是下次要复用的那一块
+        if (const auto stored = m_settings.setValue(Settings::kCaptureLastRegion, QVariant(regionToText(logicalRegion))); !stored)
+        {
+            Core::Logger::warning(std::format("上次截图区域没能记下：{}", stored.error().message));
+        }
+        if (const auto storedScreen = m_settings.setValue(Settings::kCaptureLastScreen, QVariant(m_longScreenName)); !storedScreen)
+        {
+            Core::Logger::warning(std::format("上次截图所在屏没能记下：{}", storedScreen.error().message));
+        }
+
+        auto *hud = new LongCaptureHud{};
+        QObject::connect(hud, &LongCaptureHud::finished, this, &CaptureService::finishLongCapture);
+        QObject::connect(hud, &LongCaptureHud::cancelled, this, &CaptureService::cancelLongCapture);
+        m_longHud = QPointer<LongCaptureHud>(hud);
+        hud->show();
+        placeLongHud();
+        hud->setReadout(longReadout(true));
+
+        QObject::connect(&m_longTimer, &QTimer::timeout, this, &CaptureService::grabNextLongFrame);
+        m_longTimer.start(kLongCaptureIntervalMs);
+    }
+
+    void CaptureService::grabNextLongFrame()
+    {
+        if (!m_longActive)
+        {
+            return;
+        }
+
+        const auto frame = m_source.grabScreen(m_longScreenName);
+        if (!frame)
+        {
+            stopLongRound();
+            deliver(frame);
+            return;
+        }
+
+        const auto cropped = cropToLogicalRect(*frame, m_longRegion);
+        if (!cropped)
+        {
+            stopLongRound();
+            deliver(cropped);
+            return;
+        }
+
+        const auto appended = appendFrame(m_longImage.image, cropped->image);
+        if (!appended)
+        {
+            stopLongRound();
+            deliver(Core::Expected<Core::CapturedImage>(std::unexpected(appended.error())));
+            return;
+        }
+
+        const auto grew   = appended->height() > m_longImage.image.height();
+        m_longImage.image = *appended;
+        // 逻辑高度按缩放因子反算：宽没变，高是像素除以比例；向下取整会让读数比实际少一格
+        m_longImage.logicalSize = QSize{m_longImage.logicalSize.width(), static_cast<int>(std::lround(m_longImage.image.height() / m_longImage.devicePixelRatio))};
+
+        if (m_longHud)
+        {
+            m_longHud->setReadout(longReadout(grew));
+        }
+        if (m_longImage.logicalSize.height() >= kLongCaptureMaximumLogicalHeight)
+        {
+            Core::Logger::warning(std::format("长截图接到逻辑高度 {} 的上限，就地收口", m_longImage.logicalSize.height()));
+            finishLongCapture();
+        }
+    }
+
+    void CaptureService::finishLongCapture()
+    {
+        if (!m_longActive)
+        {
+            return;
+        }
+        m_longActive = false;
+        stopLongRound();
+
+        // 交出去的形状与一次普通截图完全一样：后续去向不需要知道这是接出来的
+        deliver(Core::Expected<Core::CapturedImage>(m_longImage));
+        m_longImage = {};
+    }
+
+    void CaptureService::cancelLongCapture()
+    {
+        if (!m_longActive)
+        {
+            return;
+        }
+        m_longActive = false;
+        stopLongRound();
+        m_longImage = {};
+        emit captureCancelled();
+    }
+
+    void CaptureService::stopLongRound()
+    {
+        m_longTimer.stop();
+        closeLongHud();
+        // 三条出口（完成、取消、接不上）都收在这里：这一位不翻，之后的每一次调用还会去抓一帧
+        m_longActive = false;
+    }
+
+    void CaptureService::closeLongHud()
+    {
+        if (m_longHud)
+        {
+            m_longHud->close();
+            m_longHud->deleteLater();
+        }
+    }
+
+    void CaptureService::placeLongHud()
+    {
+        if (m_longHud == nullptr)
+        {
+            return;
+        }
+
+        const QScreen *screen = nullptr;
+        for (auto *candidate: QGuiApplication::screens())
+        {
+            if (candidate->name() == m_longScreenName)
+            {
+                screen = candidate;
+                break;
+            }
+        }
+        if (screen == nullptr)
+        {
+            // 名字对不上（多半是这一轮之间拔了屏）：摆不了位也要能收口，控制条留在原地由用户关掉
+            Core::Logger::warning(std::format("长截图没找到那块屏 {}，控制条摆在原处", m_longScreenName.toStdString()));
+            return;
+        }
+
+        const auto regionGlobal = m_longRegion.translated(screen->geometry().topLeft());
+        m_longHud->setGeometry(LongCaptureHud::positionFor(regionGlobal, screen->availableGeometry(), m_longHud->preferredHudSize()));
+    }
+
+    QString CaptureService::longReadout(const bool grew) const
+    {
+        const auto height = m_longImage.logicalSize.height();
+        if (!grew)
+        {
+            return QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已接 {} 像素高：这一段和上一段一样，往下滚一点再接"), height).c_str());
+        }
+        return QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已接 {} 像素高"), height).c_str());
     }
 
     std::vector<QRect> CaptureService::windowCandidates() const

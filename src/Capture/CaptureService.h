@@ -10,8 +10,12 @@
 #pragma once
 
 #include "Capture/ICaptureService.h"
+#include "Core/Types.h"
 
 #include <QPointer>
+#include <QRect>
+#include <QString>
+#include <QTimer>
 
 #include <memory>
 #include <vector>
@@ -20,6 +24,7 @@ namespace GyanisScribe::Capture
 {
     class CaptureOverlay;
     class IScreenCaptureSource;
+    class LongCaptureHud;
 } // namespace GyanisScribe::Capture
 
 namespace GyanisScribe::Settings
@@ -100,6 +105,39 @@ namespace GyanisScribe::Capture
          */
         void cancelInteractive() override;
 
+        /**
+         * @brief 滚动长截图，见 ICaptureService::startLongCapture()
+         * @details 与 startInteractive 共用同一层遮罩：先把区域框出来，之后由计时器
+         *          反复抓这一块并接上新的几行；接好的长图照样从 captured 交出去。
+         */
+        void startLongCapture() override;
+
+        /**
+         * @brief 用给定的区域起一轮滚动拼接
+         * @param logicalRegion 该屏内的逻辑矩形
+         * @param screenName 目标屏幕名，空串取光标所在那块
+         * @details 这一块就是以后每一帧的取样框，位置不再变；第一帧当场接成开头。
+         *          上一轮还没收口时先把上一轮作废（发 captureCancelled），不静默吞掉任何一次请求。
+         */
+        void captureLongRegion(const QRect &logicalRegion, const QString &screenName = {});
+
+        /**
+         * @brief 抓一帧接上去
+         * @details 计时器到点调这一条，用例也直接调这一条：判据因此不必等节拍。
+         *          接不上（抓帧失败、宽度对不上）时当场收口并把原因从 captureFailed 交回。
+         */
+        void grabNextLongFrame();
+
+        /**
+         * @brief 收口这一轮：把接好的长图当成一次普通截图交出去
+         */
+        void finishLongCapture();
+
+        /**
+         * @brief 作废这一轮：停表、收控制条、发 captureCancelled
+         */
+        void cancelLongCapture();
+
     private:
         /**
          * @brief 把一次抓帧结果转成信号
@@ -118,10 +156,46 @@ namespace GyanisScribe::Capture
          */
         [[nodiscard]] std::vector<QRect> windowCandidates() const;
 
-        const IScreenCaptureSource           &m_source;      ///< 抓帧来源
-        Settings::ISettingsStore             &m_settings;    ///< 「上次区域」的读写处
-        const Platform::IPlatformIntegration &m_integration; ///< 窗口候选的来源，不拥有
-        std::vector<QPointer<CaptureOverlay>> m_overlays;    ///< 在屏的遮罩，每块屏一张；窗口自己析构后要认得空指针
+        /**
+         * @brief 铺遮罩进入框选
+         * @param longCapture 真表示选完区域之后接长图，假表示选完就截这一张
+         */
+        void beginInteractive(bool longCapture);
+
+        /**
+         * @brief 控制条的读数
+         * @param grew 这一帧是否接出了新的一段
+         * @return 中文文本，写明当前逻辑高度与「还在接 / 这段没动」
+         */
+        [[nodiscard]] QString longReadout(bool grew) const;
+
+        /**
+         * @brief 收掉这一轮的计时器与控制条
+         * @details 三条出口（完成、取消、接不上）都走这里：漏一条就会留下一张每 250ms 抓一次屏的计时器
+         */
+        void stopLongRound();
+
+        /**
+         * @brief 关掉控制条
+         */
+        void closeLongHud();
+
+        /**
+         * @brief 把控制条摆在选区之外
+         * @details 摆在选区里就会被自己拍进去，接缝从此对不上。
+         */
+        void placeLongHud();
+
+        const IScreenCaptureSource           &m_source;             ///< 抓帧来源
+        Settings::ISettingsStore             &m_settings;           ///< 「上次区域」的读写处
+        const Platform::IPlatformIntegration &m_integration;        ///< 窗口候选的来源，不拥有
+        std::vector<QPointer<CaptureOverlay>> m_overlays;           ///< 在屏的遮罩，每块屏一张；窗口自己析构后要认得空指针
+        QTimer                                m_longTimer;          ///< 滚动拼接的取帧节拍，只在有选区之后跑
+        QPointer<LongCaptureHud>              m_longHud;            ///< 长截图控制条，一轮一个
+        Core::CapturedImage                   m_longImage;          ///< 已经接好的长图，第一帧就是它的开头
+        QRect                                 m_longRegion;         ///< 反复抓的那块区域，该屏内的逻辑坐标
+        QString                               m_longScreenName;     ///< 这一轮所在的那块屏
+        bool                                  m_longActive = false; ///< 正在按节拍接帧
     };
 
 } // namespace GyanisScribe::Capture

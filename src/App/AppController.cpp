@@ -254,6 +254,12 @@ namespace GyanisScribe::App
         scheduleCapture([this] { m_capture->captureLastRegion(); });
     }
 
+    void AppController::startLongCapture()
+    {
+        m_captureIntent = settingsCaptureIntent();
+        scheduleCapture([this] { m_capture->startLongCapture(); });
+    }
+
     void AppController::scheduleCapture(std::function<void()> begin)
     {
         const auto stored = m_settings->intValue(Settings::kCaptureDelaySeconds, 0);
@@ -344,6 +350,10 @@ namespace GyanisScribe::App
                 return;
             case TrayAction::CaptureWindow:
                 captureForegroundWindow();
+                return;
+            case TrayAction::CaptureLongRegion:
+                // 长截图的入口只做「去框那一条区域」，接与收口都在截图服务里
+                startLongCapture();
                 return;
             case TrayAction::ToggleRecord:
                 toggleRecording();

@@ -728,6 +728,10 @@
             <translation>Capture the foreground window</translation>
         </message>
         <message>
+            <source>滚动长截图</source>
+            <translation>Scrolling capture</translation>
+        </message>
+        <message>
             <source>开始 / 停止录屏</source>
             <translation>Start / stop recording</translation>
         </message>
@@ -762,6 +766,66 @@
         <message>
             <source>进入框选失败：Qt 没有报出任何屏幕。请在 GUI 会话里重试</source>
             <translation>Cannot start region capture: Qt reported no screens. Try again inside a GUI session.</translation>
+        </message>
+        <message>
+            <source>已接 {} 像素高：这一段和上一段一样，往下滚一点再接</source>
+            <translation>Stitched to {} px: this stretch matches the previous one, scroll a bit further</translation>
+        </message>
+        <message>
+            <source>已接 {} 像素高</source>
+            <translation>Stitched to {} px</translation>
+        </message>
+        <message>
+            <source>长截图接不上：这一帧是空的。请重新截一次</source>
+            <translation>Scrolling capture cannot continue: this frame is empty. Capture it again</translation>
+        </message>
+        <message>
+            <source>长截图接不上：这一帧的宽度和前面不一致（多半是中途换了屏或改了缩放）。先把已有这一段收好再重来</source>
+            <translation>Scrolling capture cannot continue: this frame is a different width than the earlier ones (the screen or the scaling changed mid-way). Finish what you already have, then start over</translation>
+        </message>
+        <message>
+            <source>长截图控制条</source>
+            <translation>Scrolling capture bar</translation>
+        </message>
+        <message>
+            <source>滚动要截的页面，接好后按完成</source>
+            <translation>Scroll the page you are capturing, then press Done</translation>
+        </message>
+        <message>
+            <source>长截图提示</source>
+            <translation>Scrolling capture hint</translation>
+        </message>
+        <message>
+            <source>还没接上任何一段</source>
+            <translation>Nothing stitched yet</translation>
+        </message>
+        <message>
+            <source>已接高度</source>
+            <translation>Stitched height</translation>
+        </message>
+        <message>
+            <source>取消</source>
+            <translation>Cancel</translation>
+        </message>
+        <message>
+            <source>扔掉这一段，不产出长图</source>
+            <translation>Discard this run without producing an image</translation>
+        </message>
+        <message>
+            <source>取消长截图</source>
+            <translation>Cancel scrolling capture</translation>
+        </message>
+        <message>
+            <source>完成</source>
+            <translation>Done</translation>
+        </message>
+        <message>
+            <source>结束拼接，把这张长图交给下一步</source>
+            <translation>Stop stitching and hand this tall image to the next step</translation>
+        </message>
+        <message>
+            <source>完成长截图</source>
+            <translation>Finish scrolling capture</translation>
         </message>
         <message>
             <source>找不到名为「{}」的屏幕：多半已经被拔掉。请在不填屏幕名的情况下重抓一次（那样按光标所在屏走）</source>
@@ -1426,10 +1490,6 @@
         <message>
             <source>已录时长</source>
             <translation>Time recorded</translation>
-        </message>
-        <message>
-            <source>取消</source>
-            <translation>Cancel</translation>
         </message>
         <message>
             <source>放弃这一段，不保存成品</source>

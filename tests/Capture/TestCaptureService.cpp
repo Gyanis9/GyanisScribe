@@ -6,7 +6,7 @@
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
 
-#include <QCoreApplication>
+#include <QApplication>
 #include <QColor>
 #include <QImage>
 #include <QString>
@@ -54,6 +54,14 @@ namespace
         [[nodiscard]] Expected<CapturedImage> grabScreen(const QString &screenName) const override
         {
             requestedScreens.push_back(screenName);
+            // 队列非空就按帧交：滚动长截图要的是「同一块区域连着几张不同的」，
+            // 队列空了退回那份固定帧，其余用例的行为一个字都不变
+            if (!screenQueue.empty())
+            {
+                const auto next = screenQueue.front();
+                screenQueue.erase(screenQueue.begin());
+                return next;
+            }
             return screenResult;
         }
 
@@ -63,13 +71,14 @@ namespace
             return windowResult;
         }
 
-        mutable std::vector<QString>  requestedScreens;
-        mutable std::vector<quintptr> requestedWindows;
-        Expected<CapturedImage>       screenResult{makeFrame()};
-        Expected<CapturedImage>       windowResult{makeFrame()};
+        mutable std::vector<CapturedImage> screenQueue;
+        mutable std::vector<QString>       requestedScreens;
+        mutable std::vector<quintptr>      requestedWindows;
+        Expected<CapturedImage>            screenResult{makeFrame()};
+        Expected<CapturedImage>            windowResult{makeFrame()};
     };
 
-    std::unique_ptr<QCoreApplication> application;
+    std::unique_ptr<QApplication> application;
 
     /// 服务现在要问平台「屏上有哪些窗口」；这几条用例不碰框选，用真的平台对象就够
     std::unique_ptr<GyanisScribe::Platform::IPlatformIntegration> platform;
@@ -84,7 +93,7 @@ namespace
             static int   argumentCount  = 1;
             static char  argumentZero[] = "TestCaptureService";
             static char *arguments[]    = {argumentZero, nullptr};
-            application                 = std::make_unique<QCoreApplication>(argumentCount, arguments);
+            application                 = std::make_unique<QApplication>(argumentCount, arguments);
             QCoreApplication::setOrganizationName(QStringLiteral("Gyanis"));
             QCoreApplication::setApplicationName(QStringLiteral("GyanisScribe-Tests"));
             platform = GyanisScribe::Platform::createPlatformIntegration();
@@ -288,9 +297,167 @@ TEST_F(CaptureServiceFixture, FailuresAreWrittenToLog)
     service.captureFullScreen(QStringLiteral("FakeScreen-9"));
     ASSERT_TRUE(outcome.error.has_value());
 
+    // 先把 logger 收掉再去读文件：sink 是带缓冲的，边写边读就把「这行到没到盘上」交给了调度
+    GyanisScribe::Core::Logger::shutdown();
+
     std::ifstream     input(logDirectory / "GyanisScribe.log", std::ios::binary);
     const std::string logText{std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{}};
     EXPECT_NE(logText.find("截图失败"), std::string::npos) << "失败只发了信号没进日志，事后无从查起";
     EXPECT_NE(logText.find("找不到名为"), std::string::npos) << "日志里没带上原因文本";
-    GyanisScribe::Core::Logger::shutdown();
+}
+
+/**
+ * @brief 造一帧可辨认的整屏图：物理 width×height、逻辑一半、dpr 由入参给
+ * @details 每帧涂一种颜色，接缝与「接没接上这一段」都能从像素颜色上直接看出来
+ */
+[[nodiscard]] static CapturedImage makeScreenFrame(const QSize &physical, const qreal devicePixelRatio, const QColor &color,
+                                                   const QString &screenName = QStringLiteral("FakeScreen-1"))
+{
+    CapturedImage frame;
+    frame.image = QImage{physical, QImage::Format_ARGB32_Premultiplied};
+    frame.image.fill(color);
+    frame.image.setDevicePixelRatio(1.0);
+    frame.devicePixelRatio = devicePixelRatio;
+    frame.logicalSize      = QSize{static_cast<int>(physical.width() / devicePixelRatio), static_cast<int>(physical.height() / devicePixelRatio)};
+    frame.screenName       = screenName;
+    return frame;
+}
+
+/**
+ * @brief 钉住滚动长截图的整条流程：起一轮、逐帧接上、收口时交出一张自洽的长图
+ * @details 判据不走计时器（那是赌调度），用例自己按帧调 grabNextLongFrame。
+ *          收口交出的那份形状必须与普通截图同解：物理像素、逻辑尺寸、缩放因子、屏名四样互指同一个点，
+ *          下游的标注与贴图全按这一套算，错一样就是成品图与界面对不上。
+ */
+TEST_F(CaptureServiceFixture, LongCaptureStitchesEachGrabbedFrame)
+{
+    SettingsStore     settings(m_iniFile);
+    FakeCaptureSource source;
+    // 三帧同宽同缩放、内容各不相同：对不上接缝，于是每一帧都整段接在下面
+    source.screenQueue = {
+            makeScreenFrame(QSize{200, 100}, 2.0, QColor{10, 200, 20}),
+            makeScreenFrame(QSize{200, 100}, 2.0, QColor{200, 20, 20}),
+            makeScreenFrame(QSize{200, 100}, 2.0, QColor{20, 20, 200}),
+    };
+    CaptureService service{source, settings, *platform};
+
+    struct Watch
+    {
+        std::optional<CapturedImage> image;
+        std::optional<Error>         error;
+        int                          cancellations = 0;
+    } watch;
+
+    QObject::connect(&service, &ICaptureService::captured, &service, [&watch](const CapturedImage &image) { watch.image = image; });
+    QObject::connect(&service, &ICaptureService::captureFailed, &service, [&watch](const Error &error) { watch.error = error; });
+    QObject::connect(&service, &ICaptureService::captureCancelled, &service, [&watch] { ++watch.cancellations; });
+    service.captureLongRegion(QRect{0, 0, 50, 25});
+    EXPECT_FALSE(watch.error.has_value()) << "起一轮就把原因交回来了";
+    EXPECT_FALSE(watch.image.has_value()) << "还没收口就交了成品";
+
+    service.grabNextLongFrame();
+    service.grabNextLongFrame();
+    EXPECT_FALSE(watch.image.has_value()) << "接帧途中就把半成品当成品交了";
+
+    service.finishLongCapture();
+    ASSERT_TRUE(watch.image.has_value()) << "收口没交出长图";
+    EXPECT_EQ(watch.image->image.size(), QSize(100, 150)) << "长图的物理尺寸不对";
+    EXPECT_EQ(watch.image->logicalSize, QSize(50, 75)) << "逻辑尺寸没跟着长高";
+    EXPECT_EQ(watch.image->devicePixelRatio, 2.0) << "缩放因子丢了";
+    EXPECT_EQ(watch.image->screenName, QStringLiteral("FakeScreen-1")) << "来源屏丢了";
+
+    // 收口之后再按「完成」不该再交第二次成品：一轮只有一个结果
+    const auto delivered = watch.image->image.size();
+    service.finishLongCapture();
+    EXPECT_EQ(watch.image->image.size(), delivered) << "一轮交出了两次成品";
+}
+
+/**
+ * @brief 钉住接不上的那一帧会把原因交回来，而不是静默少接一段
+ * @details 中途换屏或改缩放时宽度对不上；继续装作在接就等于把用户的页面截了一半还不吭声。
+ */
+TEST_F(CaptureServiceFixture, LongCaptureReportsAFrameItCannotAttach)
+{
+    SettingsStore     settings(m_iniFile);
+    FakeCaptureSource source;
+    source.screenQueue = {
+            makeScreenFrame(QSize{200, 100}, 2.0, QColor{10, 200, 20}),
+            makeScreenFrame(QSize{200, 100}, 4.0, QColor{200, 20, 20}), // 缩放变了：裁出来的宽度对不上
+    };
+    CaptureService service{source, settings, *platform};
+
+    std::optional<CapturedImage> finished;
+    std::optional<Error>         failure;
+    QObject::connect(&service, &ICaptureService::captured, &service, [&finished](const CapturedImage &image) { finished = image; });
+    QObject::connect(&service, &ICaptureService::captureFailed, &service, [&failure](const Error &error) { failure = error; });
+
+    service.captureLongRegion(QRect{0, 0, 50, 25});
+    service.grabNextLongFrame();
+
+    EXPECT_FALSE(finished.has_value()) << "接不上却把半成品当成品交了";
+    ASSERT_TRUE(failure.has_value()) << "接不上却没报出任何原因";
+    EXPECT_FALSE(failure->message.empty()) << "原因要能读：用户看不出是哪一帧换了比例";
+
+    // 收口之后计时器那一支也该停下：再调一次不产出任何新结果
+    const auto reported = *failure;
+    service.grabNextLongFrame();
+    EXPECT_EQ(failure->message, reported.message) << "这一轮已经死了还在重复报错";
+}
+
+/**
+ * @brief 钉住取消这一轮只作废结果，不动「上次选区」那笔账
+ * @details 选区在起轮时就已经记下（与单张截图同一条走法），取消扔掉的是这一轮的成品图；
+ *          把账也一起退回去会让「重复上次选区」莫名其妙地失效。
+ */
+TEST_F(CaptureServiceFixture, CancellingLongCaptureDiscardsTheImageOnly)
+{
+    SettingsStore     settings(m_iniFile);
+    FakeCaptureSource source;
+    source.screenQueue = {makeScreenFrame(QSize{200, 100}, 2.0, QColor{10, 200, 20})};
+    CaptureService service{source, settings, *platform};
+
+    std::optional<CapturedImage> finished;
+    int                          cancellations = 0;
+    QObject::connect(&service, &ICaptureService::captured, &service, [&finished](const CapturedImage &image) { finished = image; });
+    QObject::connect(&service, &ICaptureService::captureCancelled, &service, [&cancellations] { ++cancellations; });
+
+    service.captureLongRegion(QRect{10, 5, 40, 20});
+    service.grabNextLongFrame();
+    service.cancelLongCapture();
+
+    EXPECT_FALSE(finished.has_value()) << "取消之后还交了成品";
+    EXPECT_EQ(cancellations, 1) << "取消没让这一轮可观察地收掉";
+    EXPECT_EQ(settings.stringValue(GyanisScribe::Settings::kCaptureLastRegion, QString()), QStringLiteral("10,5,40,20")) << "取消把选区账也退掉了";
+}
+
+/**
+ * @brief 钉住「这一帧根本没抓到」也当场报出来，而不是停在那里不吭声
+ * @details 屏幕被拔掉、或者那块屏的名字在这一轮之间变了，抓帧会直接失败。
+ *          此时控制条还在屏上摆着，用户看得见它不涨；没有原因信号就只剩一句「没反应」。
+ */
+TEST_F(CaptureServiceFixture, LongCaptureReportsAGrabThatNeverHappened)
+{
+    SettingsStore     settings(m_iniFile);
+    FakeCaptureSource source;
+    source.screenQueue = {makeScreenFrame(QSize{200, 100}, 2.0, QColor{10, 200, 20})};
+    CaptureService service{source, settings, *platform};
+
+    std::optional<CapturedImage> finished;
+    std::optional<Error>         failure;
+    QObject::connect(&service, &ICaptureService::captured, &service, [&finished](const CapturedImage &image) { finished = image; });
+    QObject::connect(&service, &ICaptureService::captureFailed, &service, [&failure](const Error &error) { failure = error; });
+
+    service.captureLongRegion(QRect{0, 0, 50, 25});
+    // 第二帧起抓不到屏了：替身按队列给完就退回固定那份，这里显式改成失败
+    source.screenResult = std::unexpected(Error{ErrorCode::ScreenUnavailable, "找不到名为「FakeScreen-1」的屏幕"});
+    service.grabNextLongFrame();
+
+    EXPECT_FALSE(finished.has_value()) << "抓不到帧却把半成品当成品交了";
+    ASSERT_TRUE(failure.has_value()) << "抓不到帧没有报出原因";
+    EXPECT_NE(failure->message.find("找不到名为"), std::string::npos) << "原因要把是哪块屏丢了写出来";
+
+    // 报错之后这一轮就该结束：再按一次不许又冒出一份结果
+    const auto reported = failure->message;
+    service.grabNextLongFrame();
+    EXPECT_EQ(failure->message, reported) << "这一轮已经死了还在重复报错";
 }

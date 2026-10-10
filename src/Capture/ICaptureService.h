@@ -73,6 +73,14 @@ namespace GyanisScribe::Capture
          */
         virtual void cancelInteractive() = 0;
 
+        /**
+         * @brief 进入滚动长截图：先框选一块，之后反复抓同一块区域并把新的一段接上去
+         * @details 选完区域后屏幕上方会出现一条控制条，用户边滚页面边让它自己接；
+         *          按「完成」时接好的那张长图照样从 captured 出来，后续的去向（标注、剪贴板、
+         *          存文件、贴图、识别）与一次普通截图完全同解。
+         */
+        virtual void startLongCapture() = 0;
+
     signals:
         /**
          * @brief 抓到了一帧
@@ -87,7 +95,7 @@ namespace GyanisScribe::Capture
         void captureFailed(const GyanisScribe::Core::Error &error);
 
         /**
-         * @brief 用户取消了框选
+         * @brief 用户取消了框选，或取消了滚动长截图
          */
         void captureCancelled();
     };
