@@ -33,17 +33,18 @@ namespace GyanisScribe::Record
 
     /**
      * @brief 拼 MP4 的实参表
-     * @param config 录屏参数，帧率与是否录声音从这儿取
+     * @param config 录屏参数，帧率、画面码率与是否录声音从这儿取
      * @param frameDirectory 帧序列所在目录
      * @param outputFile 成品文件路径
      * @param audioWav 配音文件；空路径表示不录声音
+     * @param videoEncoder 编码器名，取值来自 Record::kPreferredVideoEncoders，由调用方探出来再交进来
      * @return 传给 ffmpeg 的参数序列（不含可执行文件名本身）
      * @details 不录声音时显式加 -an：让「没有声轨」成为一个说得出的决定，
-     *          而不是 ffmpeg 自己发现的意外。另外按 x264 的硬要求把尺寸凑成偶数
+     *          而不是 ffmpeg 自己发现的意外。尺寸按 H.264 一类的硬要求凑成偶数
      *          （奇数高度会直接报 requested width/height for inplane are not multiples of 2）。
      */
     [[nodiscard]] QStringList mp4Arguments(const RecorderConfig &config, const std::filesystem::path &frameDirectory, const std::filesystem::path &outputFile,
-                                           const std::filesystem::path &audioWav);
+                                           const std::filesystem::path &audioWav, std::string_view videoEncoder);
 
     /**
      * @brief GIF 第一遍：生成调色板

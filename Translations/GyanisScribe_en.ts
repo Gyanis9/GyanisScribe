@@ -460,6 +460,18 @@
             <translation>Folder for recordings</translation>
         </message>
         <message>
+            <source>编码器探测</source>
+            <translation>Encoder probe</translation>
+        </message>
+        <message>
+            <source>第一帧读不出尺寸（{}）。请确认录屏期间磁盘没满，或先用剪贴板交付这一帧序列</source>
+            <translation>The first frame's size can't be read ({}). Check that the disk wasn't full during the recording, or deliver this frame sequence to the clipboard first</translation>
+        </message>
+        <message>
+            <source>你这份 ffmpeg 里没有能开起来的视频编码器（试过 {}）。请换装一个带 libx264 的完整 ffmpeg 构建，或者先把这一帧序列自己用 ffmpeg 编一次看报什么</source>
+            <translation>None of the video encoders in your ffmpeg build could start (tried {}). Install a full ffmpeg build that carries libx264, or encode this frame sequence by hand with ffmpeg to read what it reports</translation>
+        </message>
+        <message>
             <source>画面码率</source>
             <translation>Video bitrate</translation>
         </message>

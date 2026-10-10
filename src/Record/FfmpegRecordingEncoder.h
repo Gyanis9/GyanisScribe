@@ -12,9 +12,12 @@
 #include "Core/Types.h"
 #include "Record/RecorderConfig.h"
 
+#include <QSize>
 #include <QStringList>
 
 #include <filesystem>
+#include <string>
+#include <string_view>
 
 namespace GyanisScribe::Record
 {
@@ -48,8 +51,9 @@ namespace GyanisScribe::Record
      * @brief 调 ffmpeg 命令行程序的编码器
      * @details 用外部进程而不是 libavformat：后者会把 GPL 与一大坨动态库带进包里，
      *          而录屏不是每次都用的功能，缺了它截图与贴图照常工作。
-     * @note 进程是同步等的（在录屏的工作线程上跑），超时按帧数估；
+     * @note 进程是同步等的，等的时候跑在界面线程上（README 的后续计划里那一格）；
      *       真要做「边录边编」得换成持续写入 stdin 的 rawvideo 管道。
+     *       编码之前先探一次编码器，探的费用也落在同一次等待里。
      */
     class FfmpegRecordingEncoder final : public IRecordingEncoder
     {
@@ -84,6 +88,21 @@ namespace GyanisScribe::Record
          * @return 成功返回空载荷；失败返回带退出码与末段输出的原因
          */
         [[nodiscard]] static Core::Expected<void> run(const QStringList &arguments, int timeoutMs, std::string_view stepName);
+
+        /**
+         * @brief 读出这一轮帧序列的尺寸
+         * @param frameDirectory 帧序列目录
+         * @return 成功返回首帧尺寸，像素；一帧都没写成或 PNG 读不出时返回中文原因
+         */
+        [[nodiscard]] static Core::Expected<QSize> firstFrameSize(const std::filesystem::path &frameDirectory);
+
+        /**
+         * @brief 按真录屏的尺寸探出这台机器上开得起来的编码器
+         * @param config 录屏参数，帧率与画面码率从这儿取
+         * @param frameSize 首帧尺寸，像素
+         * @return 成功返回编码器名；候选全开不起来返回原因
+         */
+        [[nodiscard]] static Core::Expected<std::string> selectEncoder(const RecorderConfig &config, const QSize &frameSize);
     };
 
 } // namespace GyanisScribe::Record

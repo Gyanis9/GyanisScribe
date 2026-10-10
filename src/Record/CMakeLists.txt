@@ -13,6 +13,8 @@ add_library(Record STATIC
         FfmpegCommand.cpp
         FfmpegAudioDevices.h
         FfmpegAudioDevices.cpp
+        FfmpegVideoEncoders.h
+        FfmpegVideoEncoders.cpp
         FfmpegRecordingEncoder.h
         FfmpegRecordingEncoder.cpp
         RecordingSession.h

@@ -4,9 +4,12 @@
 #include "Core/Paths.h"
 #include "Core/Text.h"
 #include "Record/FfmpegCommand.h"
+#include "Record/FfmpegVideoEncoders.h"
 
 #include <QDateTime>
+#include <QImageReader>
 #include <QProcess>
+#include <QSize>
 
 #include <format>
 #include <utility>
@@ -23,6 +26,10 @@ namespace
         }
         return trimmed.right(400).toStdString();
     }
+
+    /// 一个候选编码器的探测上限，毫秒：本机实测最慢的一档 1.6 秒（缺硬件运行库的那一类要等它自己失败），
+    /// 15 秒是留给磁盘冷启动的余量
+    constexpr int kEncoderProbeTimeoutMs = 15000;
 } // namespace
 
 namespace GyanisScribe::Record
@@ -32,6 +39,34 @@ namespace GyanisScribe::Record
         // 按「实际时长 × 4」给余量，再垫 30 秒：几秒钟的短片不能因为余量算出来太小而被误杀
         const auto recordedSeconds = frameRate > 0 ? frameCount / frameRate : 0;
         return 30'000 + recordedSeconds * 4'000;
+    }
+
+    Core::Expected<QSize> FfmpegRecordingEncoder::firstFrameSize(const std::filesystem::path &frameDirectory)
+    {
+        QImageReader first{Core::Paths::toDisplayText(frameDirectory / frameFileName(0))};
+        const auto   size = first.size();
+        // 首帧读不出就别往下探：尺寸是探的输入，拿 0x0 去问编码器只会得到一条与真因无关的失败
+        if (size.isEmpty())
+        {
+            const auto message = GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("第一帧读不出尺寸（{}）。请确认录屏期间磁盘没满，或先用剪贴板交付这一帧序列"),
+                                                              Core::Paths::toDisplayText(frameDirectory).toStdString());
+            Core::Logger::error(message);
+            return std::unexpected(Core::Error{Core::ErrorCode::FileWriteFailed, message});
+        }
+        return size;
+    }
+
+    Core::Expected<std::string> FfmpegRecordingEncoder::selectEncoder(const RecorderConfig &config, const QSize &frameSize)
+    {
+        // 每个候选都真跑三帧：名单里有不等于开得起来（缺 Intel/AMD 运行库的那些照样在名单上）
+        const auto probe = [](const QStringList &arguments) { return run(arguments, kEncoderProbeTimeoutMs, GyanisScribe::Core::uiTextUtf8("编码器探测")).has_value(); };
+
+        const auto selected = selectVideoEncoder(probe, frameSize.width(), frameSize.height(), config.frameRate, config.videoBitrateKbps);
+        if (selected)
+        {
+            Core::Logger::info(std::format("录屏编码器：{}（{}x{}，{} 帧/秒）", *selected, frameSize.width(), frameSize.height(), config.frameRate));
+        }
+        return selected;
     }
 
     Core::Expected<std::filesystem::path> FfmpegRecordingEncoder::encode(const RecorderConfig &config, const std::filesystem::path &frameDirectory, const int frameCount,
@@ -49,7 +84,20 @@ namespace GyanisScribe::Record
 
         if (config.format == OutputFormat::Mp4)
         {
-            if (auto ran = run(mp4Arguments(config, frameDirectory, outputFile, audioWav), timeout, GyanisScribe::Core::uiTextUtf8("MP4 编码")); !ran)
+            // 编码器要按真录屏的尺寸探：硬件编码器有帧尺寸上限，用小图探出来的「能用」不作数
+            const auto frameSize = firstFrameSize(frameDirectory);
+            if (!frameSize)
+            {
+                return std::unexpected(frameSize.error());
+            }
+
+            const auto selected = selectEncoder(config, *frameSize);
+            if (!selected)
+            {
+                return std::unexpected(selected.error());
+            }
+
+            if (auto ran = run(mp4Arguments(config, frameDirectory, outputFile, audioWav, *selected), timeout, GyanisScribe::Core::uiTextUtf8("MP4 编码")); !ran)
             {
                 return std::unexpected(ran.error());
             }

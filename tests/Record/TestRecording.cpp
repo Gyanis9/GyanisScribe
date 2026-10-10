@@ -236,7 +236,7 @@ TEST(RecordingFfmpeg, ArgumentTablesMatchTheDocumentedCommands)
 {
     const auto config = baselineConfig();
 
-    const QStringList silent = mp4Arguments(config, "C:/tmp/rec/frames", "C:/tmp/rec/out.mp4", {});
+    const QStringList silent = mp4Arguments(config, "C:/tmp/rec/frames", "C:/tmp/rec/out.mp4", {}, "libx264");
     // 输入那一格按平台各自的分隔符拼，所以比「前四个参数 + 帧序列模式串」而不是整条字符串：
     // 写死反斜杠只能在 Windows 上过，容器里分隔符是 / 会红一条与实现无关的用例
     EXPECT_EQ(silent.first(4).join(QLatin1Char('|')), QStringLiteral("-y|-framerate|10|-i")) << silent.join(QLatin1Char(' ')).toStdString();
@@ -250,7 +250,7 @@ TEST(RecordingFfmpeg, ArgumentTablesMatchTheDocumentedCommands)
     EXPECT_NE(silent.indexOf(QStringLiteral("+faststart")), -1);
     EXPECT_TRUE(silent.last().endsWith(QStringLiteral("out.mp4"))) << silent.last().toStdString();
 
-    const auto withAudio = mp4Arguments(config, "C:/tmp/rec/frames", "C:/tmp/rec/out.mp4", "C:/tmp/rec/audio.wav");
+    const auto withAudio = mp4Arguments(config, "C:/tmp/rec/frames", "C:/tmp/rec/out.mp4", "C:/tmp/rec/audio.wav", "libx264");
     EXPECT_EQ(withAudio.indexOf(QStringLiteral("-an")), -1) << "有配音时不该再关声轨";
     EXPECT_NE(withAudio.indexOf(QStringLiteral("-shortest")), -1);
     EXPECT_NE(withAudio.indexOf(QStringLiteral("aac")), -1);
@@ -262,7 +262,7 @@ TEST(RecordingFfmpeg, ArgumentTablesMatchTheDocumentedCommands)
     // 给了码率就换成码率控：两条同时给 ffmpeg 听码率而把 crf 当摆设，留着那条会让人以为改的是质量
     auto byBitrate             = baselineConfig();
     byBitrate.videoBitrateKbps = 4000;
-    const QStringList shaped   = mp4Arguments(byBitrate, "C:/tmp/rec/frames", "C:/tmp/rec/out.mp4", {});
+    const QStringList shaped   = mp4Arguments(byBitrate, "C:/tmp/rec/frames", "C:/tmp/rec/out.mp4", {}, "h264_nvenc");
     EXPECT_EQ(shaped.indexOf(QStringLiteral("-crf")), -1) << shaped.join(QLatin1Char(' ')).toStdString();
     EXPECT_EQ(shaped.value(shaped.indexOf(QStringLiteral("-b:v")) + 1), QStringLiteral("4000k"));
     EXPECT_NE(shaped.indexOf(QStringLiteral("yuv420p")), -1) << "换成码率控那一段时把像素格式弄丢了";

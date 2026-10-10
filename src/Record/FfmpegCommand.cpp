@@ -3,6 +3,7 @@
 #include "Core/Paths.h"
 #include "Core/Logger.h"
 #include "Core/Text.h"
+#include "Record/FfmpegVideoEncoders.h"
 
 #include <QCoreApplication>
 #include <QStandardPaths>
@@ -38,7 +39,7 @@ namespace GyanisScribe::Record
     }
 
     QStringList mp4Arguments(const RecorderConfig &config, const std::filesystem::path &frameDirectory, const std::filesystem::path &outputFile,
-                             const std::filesystem::path &audioWav)
+                             const std::filesystem::path &audioWav, const std::string_view videoEncoder)
     {
         QStringList arguments{
                 QStringLiteral("-y"),
@@ -46,24 +47,16 @@ namespace GyanisScribe::Record
                 QString::number(config.frameRate),
                 QStringLiteral("-i"),
                 sequencePattern(frameDirectory),
-                // x264 要求宽高都是偶数：截图经常给出奇数高度，不这条缩放滤镜就直接报错退出
+                // H.264 一类编码器都要求宽高是偶数：截图经常给出奇数高度，不这条缩放滤镜就直接报错退出
                 QStringLiteral("-vf"),
                 QStringLiteral("scale=trunc(iw/2)*2:trunc(ih/2)*2"),
                 QStringLiteral("-c:v"),
-                QStringLiteral("libx264"),
-                QStringLiteral("-preset"),
-                QStringLiteral("veryfast"),
+                QString::fromUtf8(videoEncoder.data(), static_cast<qsizetype>(videoEncoder.size())),
         };
 
-        // 质量这一档二选一：给了码率就走按码率控，没给才走 CRF。两条同时给 ffmpeg 会听码率而把 crf 当摆设，
-        // 留着那条会让人以为改的是质量
-        if (config.videoBitrateKbps > kDefaultVideoBitrateKbps)
-        {
-            arguments << QStringLiteral("-b:v") << QString::number(config.videoBitrateKbps) + QStringLiteral("k");
-        } else
-        {
-            arguments << QStringLiteral("-crf") << QStringLiteral("23");
-        }
+        // 编码器由调用方探出来再交进来：拼参数这一层不知道这台机器上谁开得起来。
+        // 质量那一档也是它家的参数形状（CRF 只有 x264 认，NVENC 说的是 -cq），所以同表取
+        arguments << videoEncoderQualityArguments(videoEncoder, config.videoBitrateKbps);
 
         arguments << QStringLiteral("-pix_fmt")
                   << QStringLiteral("yuv420p")
