@@ -228,6 +228,14 @@
             <translation>GyanisScribe hit an unhandled error: {}. As much as possible was written to the log; open {} and take the newest log file. If it keeps happening, send that log together with the steps you took.</translation>
         </message>
         <message>
+            <source>智录：截图、标注、贴图、取色、录屏与文字识别</source>
+            <translation>GyanisScribe: capture, annotate, pin, pick colour, record, and read text</translation>
+        </message>
+        <message>
+            <source>把启动路径跑完就退出：热键登记与日志就绪算通过（退出码 0），否则 1</source>
+            <translation>Run the startup path and exit: hotkey registration plus ready logging count as a pass (exit code 0), otherwise 1</translation>
+        </message>
+        <message>
             <source>这一类的说明</source>
             <translation>What this section covers</translation>
         </message>
@@ -881,11 +889,11 @@
         </message>
         <message>
             <source>这台机器的 Windows 没装本程序认识的识别语言包（系统识别一个可用语言都没有）。请在 设置 → 时间和语言 → 语音 里装上「光学字符识别」，或在设置的 OCR 页改用 Tesseract 并放好语言包</source>
-            <translation>This Windows has no text-recognition language pack this app understands (the system engine reports no usable language). Install Optical Character Recognition under Settings -> Time &amp; Language -> Speech, or switch to Tesseract on the OCR settings page and place its language packs</translation>
+            <translation>This Windows has no text-recognition language pack this app understands (the system engine reports no usable language). Install Optical Character Recognition under Settings -&gt; Time &amp; Language -&gt; Speech, or switch to Tesseract on the OCR settings page and place its language packs</translation>
         </message>
         <message>
             <source>系统里没有「{}」的识别语言包。现在能用的是 {}。请在 设置 → 时间和语言 → 语音 里装上需要的语言包，或在设置的 OCR 页改选语言</source>
-            <translation>There is no system language pack for "{}". Usable right now: {}. Install the pack under Settings -> Time &amp; Language -> Speech, or pick another language on the OCR settings page</translation>
+            <translation>There is no system language pack for "{}". Usable right now: {}. Install the pack under Settings -&gt; Time &amp; Language -&gt; Speech, or pick another language on the OCR settings page</translation>
         </message>
         <message>
             <source>这一张图没能编成 PNG。请重试一次，或先在标注窗里另存一份 PNG 再识别</source>
@@ -897,7 +905,7 @@
         </message>
         <message>
             <source>系统说装有「{}」的识别语言，但建不出识别器。请在 设置 → 时间和语言 → 语音 里重装该语言包</source>
-            <translation>The system reports a language pack for "{}", but no recognizer could be created. Reinstall that pack under Settings -> Time &amp; Language -> Speech</translation>
+            <translation>The system reports a language pack for "{}", but no recognizer could be created. Reinstall that pack under Settings -&gt; Time &amp; Language -&gt; Speech</translation>
         </message>
         <message>
             <source>系统识别这一张图失败（{}，错误码 0x{}）。请重试一次，或改用 Tesseract 后端</source>
