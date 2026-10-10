@@ -14,12 +14,13 @@ namespace GyanisScribe::Platform
 
     PlatformCapabilities LinuxIntegration::capabilities() const noexcept
     {
-        // 全局热键没有跨桌面会话的统一登记口，桩后端如实回绝；穿透与「取前台窗口」同理
-        // （后者要靠 X11 的 _NET_ACTIVE_WINDOW 或 Wayland 的会话协议，本仓没接）
+        // 全局热键没有跨桌面会话的统一登记口，桩后端如实回绝；穿透、「取前台窗口」与「枚举可见窗口」同理
+        // （后两者要靠 X11 的 _NET_ACTIVE_WINDOW / 窗口树查询，或 Wayland 的会话协议，本仓没接）
         return PlatformCapabilities{
-                .globalHotkeys   = false,
-                .clickThrough    = false,
-                .windowDiscovery = false,
+                .globalHotkeys     = false,
+                .clickThrough      = false,
+                .windowDiscovery   = false,
+                .windowEnumeration = false,
         };
     }
 
@@ -40,6 +41,15 @@ namespace GyanisScribe::Platform
         return std::unexpected(
                 Core::Error{Core::ErrorCode::PlatformUnsupported,
                             GyanisScribe::Core::uiTextUtf8("本平台取不出当前前台窗口（X11 与 Wayland 各有各的会话协议，本仓没接）。请在托盘改用「框选截图」把那个窗口框出来")});
+    }
+
+    Core::Expected<std::vector<ScreenWindow>> LinuxIntegration::screenWindows() const
+    {
+        // 与取前台窗口同源：X11 要查窗口树并把每扇窗的客户端坐标换算到全局，Wayland 干脆不让客户端问别的窗口。
+        // 这里不硬造一份「只有当前窗口」的候选，因为那会让遮罩的悬停识别在两个会话下给出不同形状的结果
+        return std::unexpected(
+                Core::Error{Core::ErrorCode::PlatformUnsupported,
+                            GyanisScribe::Core::uiTextUtf8("本平台列不出屏上的窗口，遮罩上不认「悬停选中整扇窗口」。请直接把要的那一块框出来，或按一次截图键取整屏")});
     }
 
 } // namespace GyanisScribe::Platform

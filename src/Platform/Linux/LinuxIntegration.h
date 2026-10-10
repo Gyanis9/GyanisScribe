@@ -36,7 +36,7 @@ namespace GyanisScribe::Platform
 
         /**
          * @brief 取 Linux 能力表，见 IPlatformIntegration::capabilities()
-         * @return 三项均为假：全局热键、鼠标穿透与「取前台窗口」都要与会话协议打交道，本仓没接
+         * @return 四项均为假：全局热键、鼠标穿透、「取前台窗口」与「枚举可见窗口」都要与会话协议打交道，本仓没接
          * @note X11 与 Wayland 的差异不在这张表里细分：屏幕采集由采集器自己探，探不到就报 DependencyMissing
          */
         [[nodiscard]] PlatformCapabilities capabilities() const noexcept override;
@@ -59,6 +59,13 @@ namespace GyanisScribe::Platform
          * @details 文案里给的是替代做法（在托盘改用「框选截图」把目标窗口框出来），不是只报一句「不支持」
          */
         [[nodiscard]] Core::Expected<ForegroundWindow> foregroundWindow() const override;
+
+        /**
+         * @brief 枚举屏上可见窗口，见 IPlatformIntegration::screenWindows()
+         * @return 一律返回 PlatformUnsupported：X11 要查窗口树并逐扇窗换算全局坐标，Wayland 不让客户端问别的窗口
+         * @note 降级文案给的是「直接框出来」这条替代做法，遮罩上不会摆一枚认不出来的悬停选项
+         */
+        [[nodiscard]] Core::Expected<std::vector<ScreenWindow>> screenWindows() const override;
     };
 
 } // namespace GyanisScribe::Platform

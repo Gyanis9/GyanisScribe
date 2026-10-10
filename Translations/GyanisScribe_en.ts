@@ -1100,12 +1100,20 @@
             <translation>This platform cannot report the foreground window (X11 and Wayland each need their own session protocol, and neither is wired up here). Use region capture in the tray and frame that window instead</translation>
         </message>
         <message>
+            <source>本平台列不出屏上的窗口，遮罩上不认「悬停选中整扇窗口」。请直接把要的那一块框出来，或按一次截图键取整屏</source>
+            <translation>This platform can't list the windows on screen, so the overlay doesn't recognise "hover to pick a whole window". Frame the part you want directly, or press the capture key once for the full screen</translation>
+        </message>
+        <message>
             <source>本平台没有全局热键能力：登记不会生效。请在程序窗口内使用普通快捷键，或等平台适配后再开启这一项</source>
             <translation>This platform has no global hotkey support: registering won't take effect. Use ordinary shortcuts inside the program window, or enable this once the platform is adapted.</translation>
         </message>
         <message>
             <source>本平台没有全局热键能力：没有任何登记需要注销</source>
             <translation>This platform has no global hotkey support: nothing is registered to unregister</translation>
+        </message>
+        <message>
+            <source>换算窗口位置要有一个大于 0 的缩放因子，收到的是 {}。请把这块屏自己的读数（QScreen::devicePixelRatio）交进来</source>
+            <translation>Converting a window position needs a scaling factor greater than 0; got {}. Pass this screen's own reading (QScreen::devicePixelRatio)</translation>
         </message>
         <message>
             <source>热键编号 {} 在本进程内已经登记过。请换一个编号，或先注销那一条</source>
@@ -1134,6 +1142,10 @@
         <message>
             <source>现在没有一个在前台的窗口可截（可能锁了屏或焦点在桌面上）。请先点一下要截的那个窗口，再回来用这一项</source>
             <translation>No window is in the foreground right now (the screen may be locked, or focus is on the desktop). Click the window you want first, then use this item again</translation>
+        </message>
+        <message>
+            <source>认不出桌面上有哪些窗口：平台的屏幕清单与界面的屏幕清单配不上对。请先用整屏或框选截图，重开一次智录再试</source>
+            <translation>Can't tell which windows are on the desktop: the platform's screen list and the interface's screen list didn't pair up. Use full-screen or region capture for now, then restart GyanisScribe</translation>
         </message>
         <message>
             <source>光标高亮的缩放因子必须是正数，收到的是 {}。请传这一块屏幕的 devicePixelRatio</source>

@@ -27,6 +27,7 @@ using GyanisScribe::Platform::ForegroundWindow;
 using GyanisScribe::Platform::IHotkeyBackend;
 using GyanisScribe::Platform::IPlatformIntegration;
 using GyanisScribe::Platform::PlatformCapabilities;
+using GyanisScribe::Platform::ScreenWindow;
 using GyanisScribe::Platform::UnsupportedHotkeyBackend;
 using GyanisScribe::Settings::SettingsStore;
 
@@ -117,6 +118,16 @@ namespace
         Expected<ForegroundWindow> foregroundWindow() const override
         {
             return std::unexpected(Error{ErrorCode::PlatformUnsupported, "测试替身不演取前台窗口这一项"});
+        }
+
+        /**
+         * @brief 枚举可见窗口：与上面一样一律回绝
+         * @return PlatformUnsupported
+         * @note 与 capabilities() 里 windowEnumeration 保持为假同解：替身不许一边说没能力一边交出候选
+         */
+        Expected<std::vector<ScreenWindow>> screenWindows() const override
+        {
+            return std::unexpected(Error{ErrorCode::PlatformUnsupported, "测试替身不演枚举窗口这一项"});
         }
 
         std::unique_ptr<IHotkeyBackend> createHotkeyBackend() override

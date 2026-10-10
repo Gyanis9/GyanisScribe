@@ -12,11 +12,13 @@
 #include "Core/Types.h"
 #include "Platform/IHotkeyBackend.h"
 #include "Platform/PlatformCapabilities.h"
+#include "Platform/WindowGeometry.h"
 
 #include <QObject>
 #include <QString>
 
 #include <memory>
+#include <vector>
 
 namespace GyanisScribe::Platform
 {
@@ -75,6 +77,15 @@ namespace GyanisScribe::Platform
          *       窗口正在动的时候两边会不一致
          */
         [[nodiscard]] virtual Core::Expected<ForegroundWindow> foregroundWindow() const = 0;
+
+        /**
+         * @brief 桌面上看得见的顶层窗口，按 z 序从最上面排到最下面
+         * @return 成功返回一份份快照（逻辑全局坐标）；本平台给不出时返回 PlatformUnsupported，并指一条替代做法
+         * @details 截图遮罩用它做「悬停认出整扇窗口」：候选顺序就是 z 序，调用方取第一个含住光标的矩形。
+         *          本程序自己的窗口也留在名单里——遮罩那一层盖住全屏，调用方按句柄把自己那几层剔掉，
+         *          平台层不替界面决定「谁该出现在候选里」
+         */
+        [[nodiscard]] virtual Core::Expected<std::vector<ScreenWindow>> screenWindows() const = 0;
     };
 
     /**

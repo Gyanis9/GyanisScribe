@@ -20,9 +20,10 @@ namespace GyanisScribe::Platform
      */
     struct PlatformCapabilities
     {
-        bool globalHotkeys   = false; ///< 全局热键：Windows 有 RegisterHotKey，其余平台交 Stub，热键面板按它决定要不要给登记入口
-        bool clickThrough    = false; ///< 鼠标穿透：置位后贴图窗口不吃鼠标也不抢焦点
-        bool windowDiscovery = false; ///< 取当前前台窗口：托盘按它决定「截取当前窗口」这一项放不放
+        bool globalHotkeys     = false; ///< 全局热键：Windows 有 RegisterHotKey，其余平台交 Stub，热键面板按它决定要不要给登记入口
+        bool clickThrough      = false; ///< 鼠标穿透：置位后贴图窗口不吃鼠标也不抢焦点
+        bool windowDiscovery   = false; ///< 取当前前台窗口：托盘按它决定「截取当前窗口」这一项放不放
+        bool windowEnumeration = false; ///< 枚举屏上可见窗口：截图遮罩按它决定要不要给「悬停认出整扇窗口」
     };
 
 } // namespace GyanisScribe::Platform

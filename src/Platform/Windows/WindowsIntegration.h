@@ -36,7 +36,7 @@ namespace GyanisScribe::Platform
 
         /**
          * @brief 取 Windows 能力表，见 IPlatformIntegration::capabilities()
-         * @return 全局热键、鼠标穿透、取前台窗口三项均为真
+         * @return 全局热键、鼠标穿透、取前台窗口与枚举可见窗口四项均为真
          */
         [[nodiscard]] PlatformCapabilities capabilities() const noexcept override;
 
@@ -60,6 +60,15 @@ namespace GyanisScribe::Platform
          *          文案给的是「请先点一下要截的那个窗口」这类可操作的下一步
          */
         [[nodiscard]] Core::Expected<ForegroundWindow> foregroundWindow() const override;
+
+        /**
+         * @brief 枚举屏上可见窗口，见 IPlatformIntegration::screenWindows()
+         * @return 按 z 序（从上到下）排好的窗口快照，坐标已是逻辑全局读数
+         * @details EnumWindows 给的矩形带几条看不见的可调边框，这里优先取 DWM 的实际可见边界；
+         *          被 DWM 藏起来（切到别的虚拟桌面）与工具窗都不进候选。
+         * @note 一块屏都配不上名时返回 ScreenUnavailable：宁可不给候选，也不拿另一块屏的缩放因子硬算
+         */
+        [[nodiscard]] Core::Expected<std::vector<ScreenWindow>> screenWindows() const override;
     };
 
 } // namespace GyanisScribe::Platform

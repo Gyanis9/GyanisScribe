@@ -6,7 +6,9 @@ set(PlatformCommonSources
         IPlatformIntegration.h
         PlatformIntegration.cpp
         UnsupportedHotkeyBackend.h
-        UnsupportedHotkeyBackend.cpp)
+        UnsupportedHotkeyBackend.cpp
+        WindowGeometry.h
+        WindowGeometry.cpp)
 
 add_library(Platform STATIC ${PlatformCommonSources})
 
@@ -28,6 +30,10 @@ if (WIN32)
             Windows/Win32HotkeyBackend.cpp
             Windows/Win32HotkeyMapping.h
             Windows/Win32HotkeyMapping.cpp)
+
+    # 窗口枚举要用 DwmGetWindowAttribute 取「实际可见的那圈边界」，它在 dwmapi 里；
+    # user32 由 Qt6::Gui 带进来，这一份没人给，不显式链就上 LNK2019
+    target_link_libraries(Platform PRIVATE dwmapi)
 
     # Linux 那一档在 Windows 上不会被选中，给它一条只编译不链接的形状检查：
     # 桩实现里一旦写了 Windows 才有的调用，这里当场编不过，而不是等到容器里才发现

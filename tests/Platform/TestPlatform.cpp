@@ -1,5 +1,10 @@
 #include "Platform/IPlatformIntegration.h"
 #include "Platform/UnsupportedHotkeyBackend.h"
+#include "Platform/WindowGeometry.h"
+
+#include <QApplication>
+#include <QWindow>
+#include <QWidget>
 
 #include <gtest/gtest.h>
 
@@ -9,8 +14,13 @@
 #include "Platform/Windows/Win32HotkeyMapping.h"
 #endif
 
+#include <algorithm>
+#include <chrono>
+#include <thread>
+
 using GyanisScribe::Core::ErrorCode;
 using GyanisScribe::Platform::createPlatformIntegration;
+using GyanisScribe::Platform::ScreenWindow;
 using GyanisScribe::Platform::UnsupportedHotkeyBackend;
 
 /**
@@ -86,6 +96,92 @@ TEST(PlatformIntegration, WindowDiscoveryCapabilityMatchesTheOutcome)
     EXPECT_EQ(window.error().code, ErrorCode::PlatformUnsupported);
     EXPECT_NE(QString::fromStdString(window.error().message).indexOf(QStringLiteral("框选")), -1) << "回绝时没指替代做法：实际是 " << window.error().message;
 #endif
+}
+
+/**
+ * @brief 钉住「枚举窗口」的能力位与实际给果同解
+ * @details 遮罩按这一位决定要不要给「悬停认出整扇窗口」。位与行为分家时，要么白少一项功能，
+ *          要么放一条一按就报错的选项。非 Windows 的回绝文案必须指一条替代做法（直接框出来）。
+ */
+TEST(PlatformIntegration, WindowEnumerationCapabilityMatchesTheOutcome)
+{
+    const auto integration = createPlatformIntegration();
+    ASSERT_NE(integration, nullptr);
+
+    if (!integration->capabilities().windowEnumeration)
+    {
+        const auto windows = integration->screenWindows();
+        ASSERT_FALSE(windows.has_value()) << "能力位说没有，却还是交出了一份候选";
+        EXPECT_EQ(windows.error().code, ErrorCode::PlatformUnsupported);
+        EXPECT_NE(QString::fromStdString(windows.error().message).indexOf(QStringLiteral("框")), -1) << "回绝时没指替代做法：实际是 " << windows.error().message;
+        return;
+    }
+
+    const auto windows = integration->screenWindows();
+    if (!windows)
+    {
+        EXPECT_NE(windows.error().code, ErrorCode::PlatformUnsupported) << "能力位说有，这一句却回绝：实际是 " << windows.error().message;
+    }
+}
+
+/**
+ * @brief 端到端钉住「枚举出来的窗口位置与 Qt 自己那一份读数是同一个点」
+ * @details 两条独立来源对表：Qt 平台后端算的 frameGeometry()，与本仓「EnumWindows + DWM 可见边界 +
+ *          按像素尺寸配对」算出的逻辑全局矩形。任一边改了取整、配对或过滤，这条就红。
+ *          窗口是不是真的进了候选不能靠运气：用例自己有界地等它出现（最多两秒），等不到才判红。
+ * @note 本机缩放是 100%，这一条钉住的是「枚举、过滤、配对与 DWM 边界」这一串；
+ *       非 1 的缩放因子由 WindowGeometry 那组手算用例钉，两边各管一段，别拿这条的绿当那段的证据
+ */
+TEST(PlatformIntegration, EnumeratedWindowSitsWhereQtPutsIt)
+{
+    // argv 的缓冲要有静态存储期：Qt 只存指针不拷贝
+    static int   argumentCount  = 1;
+    static char  argumentZero[] = "TestPlatform";
+    static char *arguments[]    = {argumentZero, nullptr};
+    QApplication application{argumentCount, arguments};
+
+    const auto integration = createPlatformIntegration();
+    ASSERT_NE(integration, nullptr);
+    if (!integration->capabilities().windowEnumeration)
+    {
+        GTEST_SKIP() << "本平台列不出窗口：这一格是降级出口，降级文案由上一条钉住";
+    }
+
+    QWidget probe;
+    probe.setWindowTitle(QStringLiteral("智录窗口枚举探针"));
+    probe.resize(260, 180);
+    probe.show();
+    // 句柄要在原生窗口真的建出来之后才拿得到：winId() 会把它同步建出来，
+    // 在那之前 windowHandle()->handle() 是 0，比对出来的永远是「这扇窗不在候选里」
+    const auto handle = static_cast<quintptr>(probe.winId());
+    ASSERT_NE(handle, static_cast<quintptr>(0)) << "原生窗口句柄没建出来";
+
+    std::vector<ScreenWindow> listed;
+    const auto                deadline = std::chrono::steady_clock::now() + std::chrono::seconds{2};
+    do
+    {
+        QCoreApplication::processEvents();
+        const auto windows = integration->screenWindows();
+        ASSERT_TRUE(windows.has_value()) << windows.error().message;
+        listed = *windows;
+        if (std::ranges::find(listed, handle, &ScreenWindow::handle) != listed.end())
+        {
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds{20});
+    } while (std::chrono::steady_clock::now() < deadline);
+
+    const auto found = std::ranges::find(listed, handle, &ScreenWindow::handle);
+    ASSERT_NE(found, listed.end()) << "探针窗口没出现在候选里：多半是可见性、工具窗或 DWM 隐藏那一串过滤挡掉的";
+
+    // 互差一格之内，不是逐位相等：DWM 报的「可见边界」与 Qt 算的 frameGeometry 对边框的取整本来就差一格
+    // （本机实测各边 ±1）。缩放或配对出错会是几十格，这条判据照样打得中
+    const auto qtFrame = probe.frameGeometry();
+    EXPECT_TRUE(found->logicalGlobal.adjusted(-1, -1, 1, 1).contains(qtFrame))
+            << "枚举给的矩形包不住 Qt 那份：枚举 " << found->logicalGlobal.x() << ',' << found->logicalGlobal.y() << ' ' << found->logicalGlobal.width() << '×'
+            << found->logicalGlobal.height() << "，Qt " << qtFrame.x() << ',' << qtFrame.y() << ' ' << qtFrame.width() << '×' << qtFrame.height();
+    EXPECT_TRUE(qtFrame.adjusted(-1, -1, 1, 1).contains(found->logicalGlobal)) << "反过来也得分一结论：两条换算只改一边就是静默错位";
+    EXPECT_EQ(found->title, probe.windowTitle()) << "标题是候选列表上唯一能认出窗口的东西";
 }
 
 #ifdef Q_OS_WIN
