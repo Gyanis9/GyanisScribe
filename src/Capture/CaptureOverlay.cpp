@@ -109,6 +109,27 @@ namespace GyanisScribe::Capture
         return m_cursorPoint + m_screenGeometry.topLeft();
     }
 
+    void CaptureOverlay::paintGrips(QPainter &painter, const QRect &region)
+    {
+        const auto edge = GyanisScribe::Ui::kSelectionGripEdge;
+        painter.setPen(QPen{GyanisScribe::Ui::kAccentColor, 1});
+        for (const auto &center: gripCentersFor(region))
+        {
+            const auto rect = QRect{center - QPoint{edge / 2, edge / 2}, QSize{edge, edge}};
+            // 方块里填底色而不是纯填充：压在深色画面上时实心同色块会看不出来
+            painter.setBrush(GyanisScribe::Ui::kCaptureHintBackgroundColor);
+            painter.drawRect(rect);
+        }
+    }
+
+    std::array<QPoint, 8> CaptureOverlay::gripCentersFor(const QRect &region)
+    {
+        const auto horizontalMiddle = (region.left() + region.right()) / 2;
+        const auto verticalMiddle   = (region.top() + region.bottom()) / 2;
+        return {QPoint{region.left(), region.top()},     QPoint{horizontalMiddle, region.top()},    QPoint{region.right(), region.top()},   QPoint{region.right(), verticalMiddle},
+                QPoint{region.right(), region.bottom()}, QPoint{horizontalMiddle, region.bottom()}, QPoint{region.left(), region.bottom()}, QPoint{region.left(), verticalMiddle}};
+    }
+
     void CaptureOverlay::paintMagnifier(QPainter &painter)
     {
         if (m_background.isNull())
@@ -251,6 +272,12 @@ namespace GyanisScribe::Capture
             painter.drawText(hintRect, Qt::AlignCenter, hint);
         }
 
+        // 选区落定后在八个抓点上画小方块：不画就没人知道这块还能拖
+        if (!shown.isNull() && !m_isSelecting)
+        {
+            paintGrips(painter, shown);
+        }
+
         // 放大镜排在最后画：它会挡住底下那片，但用户正要看的就是光标那一点，优先级比背景高
         if (m_isSelecting)
         {
@@ -260,17 +287,35 @@ namespace GyanisScribe::Capture
 
     void CaptureOverlay::mousePressEvent(QMouseEvent *event)
     {
-        if (event->button() == Qt::LeftButton)
+        if (event->button() != Qt::LeftButton)
         {
-            m_isSelecting    = true;
-            m_anchorPoint    = event->position().toPoint();
-            m_currentPoint   = m_anchorPoint;
-            m_cursorPoint    = m_anchorPoint;
-            m_hasCursorPoint = true;
-            // 预览留着不熄：按下还没拖的那一瞬间，「点一下要哪扇」的答案就是它。
-            // 真拖起来了再由 refreshHoveredRegion 关掉，同一时刻不会出现两个矩形
-            update();
+            return;
         }
+
+        const auto point  = event->position().toPoint();
+        const auto region = selectedRegion();
+        // 已经框好的一块先认抓点：认到了就改这一块，而不是重新框一遍。
+        // 差几像素要重框是框选里最常见的一次火，八个抓点就是为了不必重框
+        if (!region.isNull())
+        {
+            if (const auto grip = gripAt(region, point); grip != SelectionGrip::None)
+            {
+                m_isAdjusting = true;
+                m_draggedGrip = grip;
+                m_adjustPoint = point;
+                update();
+                return;
+            }
+        }
+
+        m_isSelecting    = true;
+        m_anchorPoint    = point;
+        m_currentPoint   = m_anchorPoint;
+        m_cursorPoint    = m_anchorPoint;
+        m_hasCursorPoint = true;
+        // 预览留着不熄：按下还没拖的那一瞬间，「点一下要哪扇」的答案就是它。
+        // 真拖起来了再由 refreshHoveredRegion 关掉，同一时刻不会出现两个矩形
+        update();
     }
 
     void CaptureOverlay::mouseMoveEvent(QMouseEvent *event)
@@ -279,9 +324,26 @@ namespace GyanisScribe::Capture
         // 但把它写进 m_currentPoint 会让 selectedRegion() 从原点编出一块根本没框过的选区
         m_cursorPoint    = event->position().toPoint();
         m_hasCursorPoint = true;
+
+        if (m_isAdjusting && m_draggedGrip)
+        {
+            const auto delta = m_cursorPoint - m_adjustPoint;
+            m_adjustPoint    = m_cursorPoint;
+            // 逐帧增量交给我这儿的几何函数夹：一次挪多长都不许越过对边，也不许出这块屏
+            const auto moved = dragRegionByGrip(selectedRegion(), *m_draggedGrip, delta, QRect{QPoint{0, 0}, size()});
+            m_anchorPoint    = moved.topLeft();
+            m_currentPoint   = moved.bottomRight();
+            update();
+            return;
+        }
+
         if (m_isSelecting)
         {
             m_currentPoint = m_cursorPoint;
+        } else
+        {
+            // 没在拖的时候把光标形状交给抓点：形状变了就是「这里能抓」，不用试
+            setCursor(cursorForGrip(gripAt(selectedRegion(), m_cursorPoint)));
         }
         refreshHoveredRegion();
         update();
@@ -289,7 +351,22 @@ namespace GyanisScribe::Capture
 
     void CaptureOverlay::mouseReleaseEvent(QMouseEvent *event)
     {
-        if (event->button() == Qt::LeftButton && m_isSelecting)
+        if (event->button() != Qt::LeftButton)
+        {
+            return;
+        }
+
+        if (m_isAdjusting)
+        {
+            // 拖抓点改的大小已经写进两个端点了，松手只收状态：
+            // 再走一遍「原地放开采纳悬停」会把刚改好的那块换成别的
+            m_isAdjusting = false;
+            m_draggedGrip.reset();
+            update();
+            return;
+        }
+
+        if (m_isSelecting)
         {
             m_isSelecting  = false;
             m_currentPoint = event->position().toPoint();

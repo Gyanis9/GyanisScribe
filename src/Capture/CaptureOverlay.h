@@ -15,6 +15,9 @@
 #include <QRect>
 #include <QWidget>
 
+#include "Capture/ScreenUtils.h"
+
+#include <array>
 #include <optional>
 #include <vector>
 
@@ -163,6 +166,20 @@ namespace GyanisScribe::Capture
         void refreshHoveredRegion();
 
         /**
+         * @brief 画八个抓点的小方块
+         * @param painter 正在画这块遮罩的画笔
+         * @param region 已经落定的选区
+         */
+        void paintGrips(QPainter &painter, const QRect &region);
+
+        /**
+         * @brief 八个抓点的位置
+         * @param region 选区
+         * @return 四角与四边中点，顺序与 SelectionGrip 的边点同解
+         */
+        [[nodiscard]] static std::array<QPoint, 8> gripCentersFor(const QRect &region);
+
+        /**
          * @brief 画放大镜：像素格与光标那一点的颜色读数
          * @param painter 正在画这块遮罩的画笔
          * @details 只在拖动途中画：选区一定下来放大镜就挡住刚框好的那块，读数此时已经没用了。
@@ -181,16 +198,19 @@ namespace GyanisScribe::Capture
          */
         [[nodiscard]] QString formatCursorReadout() const;
 
-        QImage               m_background;             ///< 该屏的物理像素图，按缩放因子画成逻辑大小
-        QRect                m_screenGeometry;         ///< 该屏的全局逻辑几何
-        qreal                m_devicePixelRatio = 1.0; ///< 该屏缩放因子
-        QPoint               m_anchorPoint;            ///< 本次框选的按下点，局部逻辑坐标
-        QPoint               m_currentPoint;           ///< 框选过程中的当前点
-        QPoint               m_cursorPoint;            ///< 光标最近所在点，只喂辅助线、悬停与放大镜，不参与选区计算
-        bool                 m_hasCursorPoint = false; ///< 是否收到过鼠标移动：没有就不摆放大镜，别把 (0,0) 当成光标
-        bool                 m_isSelecting    = false; ///< 是否正在拖动框选
-        std::vector<QRect>   m_windowCandidates;       ///< 窗口候选，已换成局部逻辑坐标，按 z 序排
-        std::optional<QRect> m_hoveredRegion;          ///< 光标压在上的那一个候选，没有则空
+        QImage                       m_background;             ///< 该屏的物理像素图，按缩放因子画成逻辑大小
+        QRect                        m_screenGeometry;         ///< 该屏的全局逻辑几何
+        qreal                        m_devicePixelRatio = 1.0; ///< 该屏缩放因子
+        QPoint                       m_anchorPoint;            ///< 本次框选的按下点，局部逻辑坐标
+        QPoint                       m_currentPoint;           ///< 框选过程中的当前点
+        QPoint                       m_cursorPoint;            ///< 光标最近所在点，只喂辅助线、悬停与放大镜，不参与选区计算
+        bool                         m_hasCursorPoint = false; ///< 是否收到过鼠标移动：没有就不摆放大镜，别把 (0,0) 当成光标
+        bool                         m_isAdjusting    = false; ///< 是否正拖着某个抓点改选区
+        std::optional<SelectionGrip> m_draggedGrip;            ///< 拖着的那个抓点，没拖时为空
+        QPoint                       m_adjustPoint;            ///< 上一帧的鼠标位置，拖抓点时按增量走
+        bool                         m_isSelecting = false;    ///< 是否正在拖动框选
+        std::vector<QRect>           m_windowCandidates;       ///< 窗口候选，已换成局部逻辑坐标，按 z 序排
+        std::optional<QRect>         m_hoveredRegion;          ///< 光标压在上的那一个候选，没有则空
     };
 
 } // namespace GyanisScribe::Capture

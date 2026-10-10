@@ -198,4 +198,128 @@ namespace GyanisScribe::Capture
         return QRect{region.topLeft(), QPoint{right, bottom}};
     }
 
+    SelectionGrip gripAt(const QRect &region, const QPoint &point, const int tolerance)
+    {
+        if (region.isEmpty() || tolerance < 0)
+        {
+            return SelectionGrip::None;
+        }
+
+        // 切比雪夫距离：鼠标移动本来就是按轴向看的，用欧氏距离会在斜角上把边点判成角点
+        const auto near = [tolerance](const QPoint &a, const QPoint &b) { return std::max(std::abs(a.x() - b.x()), std::abs(a.y() - b.y())) <= tolerance; };
+
+        // 四角先认：贴着角的那一点同时也在两条边上，先认边就会把「拉这个角」变成「拉这条边」
+        if (near(point, region.topLeft()))
+        {
+            return SelectionGrip::TopLeft;
+        }
+        if (near(point, QPoint{region.right(), region.top()}))
+        {
+            return SelectionGrip::TopRight;
+        }
+        if (near(point, region.bottomRight()))
+        {
+            return SelectionGrip::BottomRight;
+        }
+        if (near(point, QPoint{region.left(), region.bottom()}))
+        {
+            return SelectionGrip::BottomLeft;
+        }
+
+        // 四条边：垂直方向贴到那条线，沿边方向还得落在边的范围内
+        const auto withinVerticalExtent   = point.y() >= region.top() && point.y() <= region.bottom();
+        const auto withinHorizontalExtent = point.x() >= region.left() && point.x() <= region.right();
+        if (withinVerticalExtent && std::abs(point.x() - region.left()) <= tolerance)
+        {
+            return SelectionGrip::Left;
+        }
+        if (withinVerticalExtent && std::abs(point.x() - region.right()) <= tolerance)
+        {
+            return SelectionGrip::Right;
+        }
+        if (withinHorizontalExtent && std::abs(point.y() - region.top()) <= tolerance)
+        {
+            return SelectionGrip::Top;
+        }
+        if (withinHorizontalExtent && std::abs(point.y() - region.bottom()) <= tolerance)
+        {
+            return SelectionGrip::Bottom;
+        }
+
+        return region.contains(point) ? SelectionGrip::Inside : SelectionGrip::None;
+    }
+
+    QRect dragRegionByGrip(const QRect &region, const SelectionGrip grip, const QPoint &delta, const QRect &limit)
+    {
+        if (region.isEmpty() || grip == SelectionGrip::None)
+        {
+            return region;
+        }
+        if (grip == SelectionGrip::Inside)
+        {
+            return nudgeRegion(region, delta, limit);
+        }
+
+        const auto pullsLeft   = grip == SelectionGrip::TopLeft || grip == SelectionGrip::Left || grip == SelectionGrip::BottomLeft;
+        const auto pullsRight  = grip == SelectionGrip::TopRight || grip == SelectionGrip::Right || grip == SelectionGrip::BottomRight;
+        const auto pullsTop    = grip == SelectionGrip::TopLeft || grip == SelectionGrip::Top || grip == SelectionGrip::TopRight;
+        const auto pullsBottom = grip == SelectionGrip::BottomLeft || grip == SelectionGrip::Bottom || grip == SelectionGrip::BottomRight;
+
+        auto left   = region.left();
+        auto top    = region.top();
+        auto right  = region.right();
+        auto bottom = region.bottom();
+
+        // 每根被拖的线都夹在「对边」与「这块屏的边」之间：拖过头最多收成一条格，不许把选区翻面
+        if (pullsLeft)
+        {
+            left = std::clamp(left + delta.x(), limit.left(), right);
+        }
+        if (pullsRight)
+        {
+            right = std::clamp(right + delta.x(), left, limit.right());
+        }
+        if (pullsTop)
+        {
+            top = std::clamp(top + delta.y(), limit.top(), bottom);
+        }
+        if (pullsBottom)
+        {
+            bottom = std::clamp(bottom + delta.y(), top, limit.bottom());
+        }
+
+        return QRect{QPoint{left, top}, QPoint{right, bottom}};
+    }
+
+    Qt::CursorShape cursorForGrip(const SelectionGrip grip)
+    {
+        auto shape = Qt::CursorShape::CrossCursor;
+        switch (grip)
+        {
+            case SelectionGrip::None:
+                shape = Qt::CursorShape::CrossCursor;
+                break;
+            case SelectionGrip::Inside:
+                shape = Qt::CursorShape::SizeAllCursor;
+                break;
+            case SelectionGrip::TopLeft:
+            case SelectionGrip::BottomRight:
+                shape = Qt::CursorShape::SizeFDiagCursor;
+                break;
+            case SelectionGrip::TopRight:
+            case SelectionGrip::BottomLeft:
+                shape = Qt::CursorShape::SizeBDiagCursor;
+                break;
+            case SelectionGrip::Left:
+            case SelectionGrip::Right:
+                shape = Qt::CursorShape::SizeHorCursor;
+                break;
+            case SelectionGrip::Top:
+            case SelectionGrip::Bottom:
+                shape = Qt::CursorShape::SizeVerCursor;
+                break;
+        }
+        return shape;
+    }
+
 } // namespace GyanisScribe::Capture

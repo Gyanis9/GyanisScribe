@@ -49,6 +49,9 @@ namespace GyanisScribe::Ui
     /// 选区边框宽度：1-2 像素之间取主色描边那一条
     inline constexpr int kSelectionBorderWidth = 2;
 
+    /// 选区抓点小方块的边长，逻辑像素：要盖住那条一像素的边界，又不能大到挡住要看的内容
+    inline constexpr int kSelectionGripEdge = 8;
+
     /**
      * @brief 录屏光标高亮圈的半径，逻辑像素
      * @details 取 4/8/12/16/24 阶梯里的 16 这一档：再小会被任务栏一类密集像素吃掉，再大就挡住被指的内容。

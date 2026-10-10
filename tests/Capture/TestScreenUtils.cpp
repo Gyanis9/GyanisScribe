@@ -11,12 +11,17 @@
 #include <vector>
 
 using GyanisScribe::Capture::cropToLogicalRect;
+using GyanisScribe::Capture::cursorForGrip;
+using GyanisScribe::Capture::dragRegionByGrip;
 using GyanisScribe::Capture::formatSelectionHint;
+using GyanisScribe::Capture::gripAt;
+using GyanisScribe::Capture::kSelectionGripTolerance;
 using GyanisScribe::Capture::nudgeRegion;
 using GyanisScribe::Capture::regionAtPoint;
 using GyanisScribe::Capture::regionFromText;
 using GyanisScribe::Capture::regionToText;
 using GyanisScribe::Capture::resizeRegion;
+using GyanisScribe::Capture::SelectionGrip;
 using GyanisScribe::Capture::toPhysicalRect;
 using GyanisScribe::Core::CapturedImage;
 using GyanisScribe::Core::ErrorCode;
@@ -190,4 +195,100 @@ TEST(ScreenUtils, ResizeMovesOnlyTheBottomRightCorner)
     // 撑到屏边就停：右下角不许越界
     EXPECT_EQ(resizeRegion(QRect(0, 0, 100, 100), QPoint{1, 1}, limit), QRect(0, 0, 100, 100));
     EXPECT_TRUE(resizeRegion({}, QPoint{1, 1}, limit).isNull());
+}
+
+/**
+ * @brief 钉住抓点的认序：角优先、再边、最后才是整块平移
+ * @details 贴着角的那一点既在两条边的容差内也在区域内。认序颠倒会把「拉这个角」变成
+ *          「拉这条边」或「推走整块」——三种动作在界面上看起来都是拖了，交出去的矩形却各不相同。
+ */
+TEST(ScreenUtils, GripRecognitionPrefersCornersThenEdges)
+{
+    const QRect region(100, 100, 50, 40); // right=149, bottom=139
+    const auto  grip = [&region](const int x, const int y, const int tolerance = kSelectionGripTolerance) { return gripAt(region, QPoint(x, y), tolerance); };
+
+    EXPECT_EQ(grip(100, 100), SelectionGrip::TopLeft);
+    EXPECT_EQ(grip(149, 139), SelectionGrip::BottomRight);
+    EXPECT_EQ(grip(149, 100), SelectionGrip::TopRight);
+    EXPECT_EQ(grip(100, 139), SelectionGrip::BottomLeft);
+    // 贴着角但还在容差内：仍是角，不许降级成边
+    EXPECT_EQ(grip(104, 104), SelectionGrip::TopLeft);
+
+    EXPECT_EQ(grip(100, 120), SelectionGrip::Left);
+    EXPECT_EQ(grip(149, 120), SelectionGrip::Right);
+    EXPECT_EQ(grip(120, 100), SelectionGrip::Top);
+    EXPECT_EQ(grip(120, 139), SelectionGrip::Bottom);
+    // 边线外一格也算抓住：一像素宽的线本来就要容差
+    EXPECT_EQ(grip(156, 120), SelectionGrip::Right);
+
+    EXPECT_EQ(grip(125, 125), SelectionGrip::Inside);
+    EXPECT_EQ(grip(10, 10), SelectionGrip::None);
+    // 空选区没有边可抓；负容差不该反过来把每个点都判成抓到了
+    const QRect nothing;
+    EXPECT_EQ(gripAt(nothing, QPoint(0, 0), kSelectionGripTolerance), SelectionGrip::None);
+    EXPECT_EQ(grip(100, 100, -1), SelectionGrip::None);
+}
+
+/**
+ * @brief 钉住每个抓点只动它自己那几条线
+ * @details 右下角动了顶边、或左边拖大了宽度却没挪位置，都是「拖对了、形状错了」。
+ *          这里把八个点各自的四边读数逐个钉住，连同越界夹取与 None 的原样返回。
+ */
+TEST(ScreenUtils, EachGripMovesOnlyItsOwnEdges)
+{
+    const QRect limit(0, 0, 100, 100);
+    const QRect region(10, 10, 30, 20); // left=10 top=10 right=39 bottom=29
+    const auto  drag = [&region, &limit](const SelectionGrip grip, const int dx, const int dy) { return dragRegionByGrip(region, grip, QPoint(dx, dy), limit); };
+
+    EXPECT_EQ(drag(SelectionGrip::Inside, 5, 5), QRect(15, 15, 30, 20));
+    EXPECT_EQ(drag(SelectionGrip::BottomRight, 5, 5), QRect(10, 10, 35, 25));
+    EXPECT_EQ(drag(SelectionGrip::TopLeft, 5, 5), QRect(15, 15, 25, 15));
+    EXPECT_EQ(drag(SelectionGrip::Left, -5, 0), QRect(5, 10, 35, 20));
+    EXPECT_EQ(drag(SelectionGrip::Top, 0, 5), QRect(10, 15, 30, 15));
+    EXPECT_EQ(drag(SelectionGrip::Right, 60, 0), QRect(10, 10, 90, 20)) << "右边不许越出这块屏";
+    EXPECT_EQ(drag(SelectionGrip::Bottom, 0, 90), QRect(10, 10, 30, 90)) << "下边不许越出这块屏";
+    // None 与空选区：原样交回，不许产出「一个格」的凭空选区
+    EXPECT_EQ(drag(SelectionGrip::None, 50, 50), region);
+    const QRect nothing;
+    EXPECT_TRUE(dragRegionByGrip(nothing, SelectionGrip::Inside, QPoint(5, 5), limit).isNull());
+}
+
+/**
+ * @brief 钉住拖过头时收成一条格而不是把选区翻面
+ * @details 越过对边后交出去的是归一化矩形：原本要对齐的那条边会被丢掉，
+ *          而遮罩上看着仍然像「拖到最小就停了」。
+ */
+TEST(ScreenUtils, GripDragStopsAtOnePixelInsteadOfFlipping)
+{
+    const QRect limit(0, 0, 100, 100);
+    const QRect region(10, 10, 30, 20);
+    const auto  drag = [&region, &limit](const SelectionGrip grip, const int dx, const int dy) { return dragRegionByGrip(region, grip, QPoint(dx, dy), limit); };
+
+    // 拖过头时收成一条格，并且钉在「没被拖的那对角」上：右下角拖过头就塌在左上角，反之亦然
+    const QRect collapsedAtTopLeft(10, 10, 1, 1);
+    const QRect collapsedAtBottomRight(39, 29, 1, 1);
+    EXPECT_EQ(drag(SelectionGrip::BottomRight, -50, -50), collapsedAtTopLeft);
+    EXPECT_EQ(drag(SelectionGrip::TopLeft, 50, 50), collapsedAtBottomRight);
+
+    const QRect oneRow(10, 10, 30, 1);
+    EXPECT_EQ(drag(SelectionGrip::Bottom, 0, -50), oneRow) << "只拖下边不该动左右";
+}
+
+/**
+ * @brief 钉住每个抓点的鼠标形状
+ * @details 形状是「这里能抓」的唯一提示：指错方向时用户会以为自己抓错了边，
+ *          而给回十字就等于没有提示。
+ */
+TEST(ScreenUtils, EachGripShowsItsOwnCursor)
+{
+    EXPECT_EQ(cursorForGrip(SelectionGrip::TopLeft), Qt::SizeFDiagCursor);
+    EXPECT_EQ(cursorForGrip(SelectionGrip::BottomRight), Qt::SizeFDiagCursor);
+    EXPECT_EQ(cursorForGrip(SelectionGrip::TopRight), Qt::SizeBDiagCursor);
+    EXPECT_EQ(cursorForGrip(SelectionGrip::BottomLeft), Qt::SizeBDiagCursor);
+    EXPECT_EQ(cursorForGrip(SelectionGrip::Left), Qt::SizeHorCursor);
+    EXPECT_EQ(cursorForGrip(SelectionGrip::Right), Qt::SizeHorCursor);
+    EXPECT_EQ(cursorForGrip(SelectionGrip::Top), Qt::SizeVerCursor);
+    EXPECT_EQ(cursorForGrip(SelectionGrip::Bottom), Qt::SizeVerCursor);
+    EXPECT_EQ(cursorForGrip(SelectionGrip::Inside), Qt::SizeAllCursor);
+    EXPECT_EQ(cursorForGrip(SelectionGrip::None), Qt::CrossCursor);
 }

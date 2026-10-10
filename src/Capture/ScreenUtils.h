@@ -110,4 +110,56 @@ namespace GyanisScribe::Capture
      */
     [[nodiscard]] QRect resizeRegion(const QRect &region, const QPoint &step, const QRect &limit);
 
+    /**
+     * @brief 选区上可以抓住的那个点
+     * @details Inside 是整块平移，None 表示这一点不该动选区。
+     *          被用例钉住的枚举新成员只能追加在末尾。
+     */
+    enum class SelectionGrip
+    {
+        None,        ///< 没抓住任何东西
+        Inside,      ///< 选区内部，整块平移
+        TopLeft,     ///< 左上角
+        Top,         ///< 上边
+        TopRight,    ///< 右上角
+        Right,       ///< 右边
+        BottomRight, ///< 右下角
+        Bottom,      ///< 下边
+        BottomLeft,  ///< 左下角
+        Left,        ///< 左边
+    };
+
+    /// 抓住一个边点允许的容差，逻辑像素：再小就要用户去对准一条一像素宽的线，鼠标做不到
+    inline constexpr int kSelectionGripTolerance = 8;
+
+    /**
+     * @brief 认一个位置压在选区的哪个点上
+     * @param region 选区
+     * @param point 待判定的位置，与选区同一坐标系
+     * @param tolerance 边点的容差
+     * @return 八个边点里最近的那一个（不超过容差）；否则在选区内给 Inside，再否则 None
+     * @details 先认边点再认内部：一个点既贴着左边又落在区域内时，用户要的是拖这条边，
+     *          认成 Inside 会把整块推走。
+     */
+    [[nodiscard]] SelectionGrip gripAt(const QRect &region, const QPoint &point, int tolerance = kSelectionGripTolerance);
+
+    /**
+     * @brief 按住某个点把选区拖成什么样
+     * @param region 当前选区
+     * @param grip 抓住的点
+     * @param delta 这一帧的位移量，逻辑像素
+     * @param limit 允许的范围
+     * @return 拖好后的选区；None 原样返回，其余情况不许越过对边、也不许越出 limit
+     * @details 对边钉住不动，拖过头时最多收成一格：允许越过就把选区翻了个面，
+     *          交出去的矩形会少掉用户本来要的那一条边。
+     */
+    [[nodiscard]] QRect dragRegionByGrip(const QRect &region, SelectionGrip grip, const QPoint &delta, const QRect &limit);
+
+    /**
+     * @brief 某个抓点对应的鼠标形状
+     * @param grip 抓住的点
+     * @return 该用的光标：边点给对应方向的伸缩箭，Inside 给四向移动，None 给十字
+     */
+    [[nodiscard]] Qt::CursorShape cursorForGrip(SelectionGrip grip);
+
 } // namespace GyanisScribe::Capture

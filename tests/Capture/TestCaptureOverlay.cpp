@@ -319,3 +319,55 @@ TEST_F(CaptureOverlayFixture, ArrowKeysStopAtTheScreenEdge)
     pressKey(*flushed, Qt::Key_Down, Qt::ShiftModifier);
     EXPECT_EQ(flushed->selectedRegion(), atBottom) << "右下角不许越出这块屏";
 }
+
+/**
+ * @brief 钉住「拖抓点是改这一块，而不是重新框一块」
+ * @details 松手之后框已经落定，此时按下右下角拖动只能走抓点这条支路；
+ *
+ * 把它当成新框的起点会把整块丢掉，而画面上的感觉只是「拖了一下没反应」。
+ */
+TEST_F(CaptureOverlayFixture, DraggingABottomRightGripReshapesTheSameSelection)
+{
+    auto overlay = makeOverlay();
+    dragOut(*overlay, QPoint{100, 100}, QPoint{140, 120});
+    const auto settled = overlay->selectedRegion();
+    ASSERT_EQ(settled, QRect(100, 100, 41, 21));
+
+    buttonAt(*overlay, QEvent::MouseButtonPress, QPoint{140, 120});
+    moveOver(*overlay, QPoint{160, 130});
+    buttonAt(*overlay, QEvent::MouseButtonRelease, QPoint{160, 130});
+
+    EXPECT_EQ(overlay->selectedRegion(), QRect(100, 100, 61, 31)) << "拖右下角没把这块改大";
+}
+
+/**
+ * @brief 钉住按住选区内部是整块平移，大小一格都不许变
+ */
+TEST_F(CaptureOverlayFixture, DraggingInsideMovesTheSelectionWithoutResizing)
+{
+    auto overlay = makeOverlay();
+    dragOut(*overlay, QPoint{100, 100}, QPoint{140, 120});
+
+    buttonAt(*overlay, QEvent::MouseButtonPress, QPoint{120, 110});
+    moveOver(*overlay, QPoint{140, 115});
+    buttonAt(*overlay, QEvent::MouseButtonRelease, QPoint{140, 115});
+
+    EXPECT_EQ(overlay->selectedRegion(), QRect(120, 105, 41, 21)) << "拖内部没挪位置，或顺手改了大小";
+}
+
+/**
+ * @brief 钉住离选区很远的按下仍然开一块新的
+ * @details 这是原有的框选走法，抓点不能把它抢走：认不到抓点就该回到「重新框」。
+
+ */
+TEST_F(CaptureOverlayFixture, PressingFarAwayStartsAFreshSelection)
+{
+    auto overlay = makeOverlay();
+    dragOut(*overlay, QPoint{100, 100}, QPoint{140, 120});
+
+    buttonAt(*overlay, QEvent::MouseButtonPress, QPoint{400, 400});
+    moveOver(*overlay, QPoint{500, 450});
+    buttonAt(*overlay, QEvent::MouseButtonRelease, QPoint{500, 450});
+
+    EXPECT_EQ(overlay->selectedRegion(), QRect(400, 400, 101, 51)) << "远处按下没开出新的一块";
+}
