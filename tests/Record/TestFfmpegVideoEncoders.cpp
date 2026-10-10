@@ -244,4 +244,50 @@ namespace
 
         std::filesystem::remove_all(scratchDirectory, ignored);
     }
+
+    /**
+     * @brief 用真 ffmpeg 走一遍 GIF 的两遍调色板（环境变量门控）
+     * @details 达成帧率写成分数之后，同一个数除了 -framerate 还要进滤镜里的 fps=，而滤镜图的转义规则
+     *          与命令行参数不是同一族：那一处写法不对就起不来进程，只有真编一次才看得见。
+     *          缺 GYANISSCRIBE_FFMPEG 就 SKIP。
+     */
+    TEST_F(VideoEncoderEndToEndFixture, GifTwoPassAcceptsTheRationalFrameRate)
+    {
+        const auto program = qEnvironmentVariable("GYANISSCRIBE_FFMPEG");
+        if (program.isEmpty())
+        {
+            GTEST_SKIP() << "没有 GYANISSCRIBE_FFMPEG，这一条要真 ffmpeg";
+        }
+
+        const auto path = QStringLiteral("%1%2%3").arg(QFileInfo(program).absolutePath(), QDir::listSeparator(), qEnvironmentVariable("PATH"));
+        qputenv("PATH", path.toLocal8Bit());
+
+        std::error_code ignored;
+        // 目录名与 MP4 那条分开：ctest -j 把每条用例当独立进程起，共用一份临时目录会互相删掉对方正在写的帧
+        const auto scratchDirectory = std::filesystem::temp_directory_path() / "GyanisScribe-gif-rate-probe";
+        std::filesystem::remove_all(scratchDirectory, ignored);
+        const auto frameDirectory = scratchDirectory / "frames";
+        std::filesystem::create_directories(frameDirectory, ignored);
+        ASSERT_FALSE(ignored) << "工作目录建不出来：" << scratchDirectory.string();
+
+        GyanisScribe::Record::PngSequenceSink sink{frameDirectory};
+        for (int index = 0; index < 3; ++index)
+        {
+            QImage frame{QSize{320, 240}, QImage::Format_ARGB32};
+            frame.fill(QColor{40, 90, 140});
+            ASSERT_TRUE(static_cast<bool>(sink.write(frame, index))) << "第 " << index << " 帧没写成";
+        }
+        ASSERT_TRUE(static_cast<bool>(sink.seal()));
+
+        GyanisScribe::Record::RecorderConfig config;
+        config.format          = GyanisScribe::Record::OutputFormat::Gif;
+        config.frameRate       = 15;
+        config.outputDirectory = scratchDirectory;
+
+        const auto encoded = GyanisScribe::Record::FfmpegRecordingEncoder{}.encode(config, frameDirectory, sink.writtenFrames(), 2000, {});
+        ASSERT_TRUE(static_cast<bool>(encoded)) << encoded.error().message;
+        EXPECT_GT(std::filesystem::file_size(*encoded, ignored), 1024u) << "调色板两遍法只出一个 KB 以下的 GIF，说明画面没进去";
+
+        std::filesystem::remove_all(scratchDirectory, ignored);
+    }
 } // namespace
