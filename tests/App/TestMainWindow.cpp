@@ -8,6 +8,7 @@
 #include "History/HistoryStore.h"
 #include "Pin/PinLayout.h"
 #include "Record/RecorderConfig.h"
+#include "Core/Text.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
@@ -27,6 +28,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QPushButton>
 #include <QSpinBox>
 #include <QStackedWidget>
 #include <QString>
@@ -685,3 +687,39 @@ namespace
     }
 
 } // namespace
+
+/**
+ * @brief 钉住「换主题时，设置页的导航行与按钮图标会重取一次」
+ * @details 描边色对不对的像素判据在 TestIconProvider 里，这一条钉的是接线：
+ *          设置窗是常驻窗口，图标是建窗时按当时的描边色拍的快照，不重取就停在旧色上
+ *          （深色档等于看不见）。断言取「图标对象被重新赋过」与「名字留在控件上」两件事。
+ */
+TEST_F(MainWindowFixture, IconsReResolveWhenTheThemeChangesLive)
+{
+    ASSERT_TRUE(m_store->setValue(GyanisScribe::Settings::kThemeMode, QStringLiteral("Light")).has_value());
+    makeWindow();
+
+    auto *list = nav();
+    ASSERT_NE(list, nullptr);
+    ASSERT_GE(list->count(), 2);
+
+    QPushButton *exportButton = nullptr;
+    for (auto *button: m_window->findChildren<QPushButton *>())
+    {
+        if (button->accessibleName() == GyanisScribe::Core::uiText("导出配置"))
+        {
+            exportButton = button;
+            break;
+        }
+    }
+    ASSERT_NE(exportButton, nullptr) << "设置页找不到导出按钮，这条判据就没对象了";
+    ASSERT_FALSE(exportButton->icon().isNull());
+
+    const auto navKeyBefore    = list->item(0)->icon().cacheKey();
+    const auto buttonKeyBefore = exportButton->icon().cacheKey();
+
+    ASSERT_TRUE(m_theme->setTheme(GyanisScribe::Ui::ThemeKind::Dark).has_value());
+
+    EXPECT_NE(list->item(0)->icon().cacheKey(), navKeyBefore) << "换主题后导航行的图标没重取：描边色停在旧档";
+    EXPECT_NE(exportButton->icon().cacheKey(), buttonKeyBefore) << "换主题后按钮图标没重取：走的是 setIcon 而不是 applyIcon，名字没记在控件上";
+}

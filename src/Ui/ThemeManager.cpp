@@ -156,7 +156,17 @@ namespace GyanisScribe::Ui
             application->setStyleSheet(styleSheetFor(resolved));
             // 样式表管不到由原生风格画的那部分（勾选的勾、微调框箭头、表头、占位与禁用文字），
             // 那些角色只认 QPalette：只落样式表时深色档会画出一批浅色原生件
-            application->setPalette(buildApplicationPalette(paletteFor(resolved)));
+            const auto appPalette = buildApplicationPalette(paletteFor(resolved));
+            application->setPalette(appPalette);
+            // 应用级 setPalette 只规定「之后新建的控件用什么」，已经建好的控件仍留着旧档色：
+            // 设置页里换主题号称即时生效，而标签文字会停在旧主题的色上（换成深色档就是看不见字）。
+            // 走 allWidgets 而不是 topLevelWidgets：后者只收已登记的窗口，还没 show 过的顶层控件不在里面
+            // （实测用 topLevelWidgets 时一个未显示的窗口拿不到新色）。setPalette 落在窗口上，
+            // Qt 会向下传给没有自设调色板的子控件。
+            for (auto *widget: QApplication::allWidgets())
+            {
+                widget->setPalette(appPalette);
+            }
         }
         emit themeChanged();
     }

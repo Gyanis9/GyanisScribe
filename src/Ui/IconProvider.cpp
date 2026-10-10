@@ -8,6 +8,8 @@
 #include <QDir>
 #include <QFile>
 #include <QIcon>
+#include <QWidget>
+#include <QAbstractButton>
 #include <QPalette>
 #include <QPainter>
 #include <QSvgRenderer>
@@ -37,6 +39,8 @@ namespace
         }
         return std::clamp<int>(static_cast<int>(std::ceil(qApp->devicePixelRatio())), 1, 3);
     }
+    /// 由 applyIcon 记在按钮上的动态属性名：refreshIcons 按它找回图标
+    constexpr const char *kIconNameProperty = "uiIconName";
 } // namespace
 
 namespace GyanisScribe::Ui
@@ -142,6 +146,28 @@ namespace GyanisScribe::Ui
             }
         }
         return result;
+    }
+
+    void IconProvider::applyIcon(QAbstractButton &button, const std::string_view name) const
+    {
+        // 名字挂在控件上而不是存在本类里：控件被销毁时记录跟着走，不需要谁去反注册
+        button.setProperty(kIconNameProperty, QString::fromUtf8(name.data(), static_cast<qsizetype>(name.size())));
+        button.setIcon(icon(name));
+    }
+
+    void IconProvider::refreshIcons(QWidget &root) const
+    {
+        const auto buttons = root.findChildren<QAbstractButton *>();
+        for (auto *button: buttons)
+        {
+            const auto name = button->property(kIconNameProperty).toString();
+            if (name.isEmpty())
+            {
+                // 没走过 applyIcon 的按钮有自己的图标来源（例如标注工具栏的色块），重取会画错
+                continue;
+            }
+            button->setIcon(icon(name.toStdString()));
+        }
     }
 
     QStringList IconProvider::availableIconNames()

@@ -393,7 +393,9 @@ TEST_F(ThemeManagerFixture, SemanticColorPairsMeetWcagContrast)
         for (const auto &background: {palette.windowBackground, palette.surface})
         {
             EXPECT_GE(contrastRatio(palette.text, background), 4.5) << label << " 正文压在这套底色上不足 AA";
-            EXPECT_GE(contrastRatio(palette.secondaryText, background), 4.5) << label << " 次要文本压在这套底色上不足 AA";
+            // 次要文本要过 7:1（AAA），不是 4.5：说明行与占位文字与正文同字号，弱化只能靠色，
+            // 压到 AA 那一档在浅色档实测就是「要看一眼才读得出」
+            EXPECT_GE(contrastRatio(palette.secondaryText, background), 7.0) << label << " 次要文本压在这套底色上不足 AAA";
             EXPECT_GE(contrastRatio(palette.accent, background), 3.0) << label << " 焦点圈/主按钮描边在这套底色上不足 3:1";
             EXPECT_GE(contrastRatio(palette.icon, background), 3.0) << label << " 图标在这套底色上不足 3:1";
         }
@@ -488,4 +490,27 @@ TEST_F(ThemeManagerFixture, ApplicationPaletteFollowsTheResolvedTheme)
     EXPECT_EQ(light.color(QPalette::Window), GyanisScribe::Ui::kLightPalette.windowBackground);
     EXPECT_NE(light.color(QPalette::Window), GyanisScribe::Ui::kDarkPalette.windowBackground) << "换档之后深色那套的底还在调色板里";
     EXPECT_EQ(light.color(QPalette::Highlight), GyanisScribe::Ui::kLightPalette.accentSoft);
+}
+
+/**
+ * @brief 钉住「换主题时已经建好的控件也跟着换色」
+ * @details 应用级 setPalette 只给之后新建的控件定默认值：设置页里换档号称即时生效，
+ *          而没落这一步时标签文字仍停在旧主题的色上——换成深色档就是「看不见字」，
+ *          样式表、令牌、用例却全都绿（2026-10-10 是把窗口画成位图才看见的）。
+ *          判据挂在父子两个控件上：真实界面里的文字都是子控件，靠继承拿色。
+ */
+TEST_F(ThemeManagerFixture, ExistingWidgetsRepaintWithTheNewThemeText)
+{
+    ASSERT_TRUE(manager().setTheme(ThemeKind::Light).has_value());
+
+    QWidget window;
+    QLabel  heading{QStringLiteral("录屏"), &window};
+    auto   *editor = new QLineEdit{&window};
+    editor->setPlaceholderText(QStringLiteral("占位"));
+    ASSERT_EQ(heading.palette().color(QPalette::WindowText), GyanisScribe::Ui::kLightPalette.text);
+
+    ASSERT_TRUE(manager().setTheme(ThemeKind::Dark).has_value());
+
+    EXPECT_EQ(heading.palette().color(QPalette::WindowText), GyanisScribe::Ui::kDarkPalette.text) << "已存在的标签留着旧主题的正文色，深色档下等于看不见字";
+    EXPECT_EQ(editor->palette().color(QPalette::PlaceholderText), GyanisScribe::Ui::kDarkPalette.secondaryText) << "占位文字留着旧档的灰";
 }

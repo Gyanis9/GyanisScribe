@@ -6,6 +6,8 @@
 #include <QColor>
 #include <QFile>
 #include <QIcon>
+#include <QWidget>
+#include <QPushButton>
 #include <QImage>
 #include <QPixmap>
 #include <QString>
@@ -297,4 +299,29 @@ TEST_F(IconProviderFixture, UnknownNameYieldsEmptyIconWithoutSubstituting)
     const auto bitmap = provider().pixmap("NoSuchIconAtAll", IconSize::Large);
     EXPECT_TRUE(bitmap.isNull()) << "不存在的名字画出了东西，说明路径拼接落到了别的文件上";
     EXPECT_TRUE(provider().icon("NoSuchIconAtAll").isNull()) << "不存在的名字应当给出空图标";
+}
+
+/**
+ * @brief 钉住「换主题后，已经挂出去的按钮图标能按名字重取一次」
+ * @details QIcon 是取色那一刻的快照：不记名字、不重取，深色档就会留着深色描边（等于看不见）。
+ *          refreshIcons 只动走过 applyIcon 的按钮——色块那类自绘图标不能被顺手覆盖。
+ */
+TEST_F(IconProviderFixture, AppliedIconsReResolveAfterTheTintChanges)
+{
+    IconProvider icons;
+    icons.setTintColor(QColor(0, 200, 0));
+
+    QWidget     root;
+    QPushButton applied{&root};
+    QPushButton handPainted{&root};
+    icons.applyIcon(applied, "Capture");
+    handPainted.setIcon(icons.icon("Capture"));
+    ASSERT_TRUE(containsColor(applied.icon().pixmap(16), QColor(0, 200, 0)));
+
+    icons.setTintColor(QColor(20, 20, 20));
+    icons.refreshIcons(root);
+
+    EXPECT_TRUE(containsColor(applied.icon().pixmap(16), QColor(20, 20, 20))) << "走过 applyIcon 的按钮换主题后仍是旧描边色";
+    EXPECT_FALSE(containsColor(applied.icon().pixmap(16), QColor(0, 200, 0))) << "旧描边色还留在图标里";
+    EXPECT_TRUE(containsColor(handPainted.icon().pixmap(16), QColor(0, 200, 0))) << "没走 applyIcon 的按钮被 refreshIcons 改了：自绘的图标会被覆盖";
 }

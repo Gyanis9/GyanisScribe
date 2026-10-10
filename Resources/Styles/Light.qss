@@ -19,7 +19,7 @@ QWidget#pageCard, QWidget#hudRoot, QWidget#AnnotationToolbar {
 
 /* ---- 文字颜色层级（字号见 applyTextRole） ---- */
 QLabel#pageHint {
-    color: #586170;
+    color: #495162;
 }
 
 QLabel#metricValue {
@@ -27,7 +27,7 @@ QLabel#metricValue {
 }
 
 QLabel:disabled {
-    color: #586170;
+    color: #495162;
 }
 
 /* ---- 按钮：中性底 + 一档悬停、一档按下；主按钮（default）走填充主色 ---- */
@@ -54,7 +54,7 @@ QPushButton:focus {
 
 QPushButton:disabled {
     background-color: #EDEFF2;
-    color: #586170;
+    color: #495162;
     border-color: #DCE0E6;
 }
 
@@ -124,13 +124,13 @@ QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
 
 QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled {
     background-color: #EDEFF2;
-    color: #586170;
+    color: #495162;
     border-color: #DCE0E6;
 }
 
 QLineEdit:read-only {
     background-color: #EDEFF2;
-    color: #586170;
+    color: #495162;
 }
 
 /* 下拉箭头由原生风格画在右侧这一条里：留出宽度，长选项的文字才不会压在箭头上 */
@@ -194,7 +194,7 @@ QCheckBox::indicator:disabled {
 }
 
 QCheckBox:disabled {
-    color: #586170;
+    color: #495162;
 }
 
 /* ---- 滑块：槽给一档描边（高对比度档靠这一档才看得见轨道），已走过的部分用主色 ---- */
@@ -257,7 +257,7 @@ QMenu::item:selected {
 }
 
 QMenu::item:disabled {
-    color: #586170;
+    color: #495162;
 }
 
 QMenu::separator {
@@ -344,7 +344,7 @@ QScrollBar::handle:vertical {
 }
 
 QScrollBar::handle:vertical:hover {
-    background-color: #586170;
+    background-color: #495162;
 }
 
 QScrollBar:horizontal {
@@ -360,7 +360,7 @@ QScrollBar::handle:horizontal {
 }
 
 QScrollBar::handle:horizontal:hover {
-    background-color: #586170;
+    background-color: #495162;
 }
 
 QScrollBar::add-line, QScrollBar::sub-line {

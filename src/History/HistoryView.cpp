@@ -124,7 +124,7 @@ namespace GyanisScribe::History
         for (const auto &[button, iconName]: buttons)
         {
             // 三个出口都要图标 + tooltip + 无障碍名，缺一件就是键盘与读屏用户找不到门
-            button->setIcon(m_icons.icon(iconName));
+            m_icons.applyIcon(*button, iconName);
             button->setToolTip(button->text());
             button->setAccessibleName(button->text());
             tools->addWidget(button);
@@ -172,8 +172,10 @@ namespace GyanisScribe::History
         {
             // 清单坏了不能把列表清空了事：留着上一次的行，用户还能找到那批文件
             Core::Logger::warning(std::format("历史清单没能读出来：{}", loaded.error().message));
-            emit messageForUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("历史清单没能读出来：{}。列表先显示上一次的记录"), loaded.error().message).c_str()),
-                                Ui::ToastKind::Danger);
+            emit messageForUser(
+                    QString::fromUtf8(
+                            GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("历史清单没能读出来：{}。列表先显示上一次的记录"), loaded.error().message).c_str()),
+                    Ui::ToastKind::Danger);
             return;
         }
 

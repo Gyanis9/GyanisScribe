@@ -101,7 +101,7 @@ namespace GyanisScribe::Ui
             QColor{244, 245, 247}, // windowBackground
             QColor{255, 255, 255}, // surface
             QColor{27, 31, 36},    // text
-            QColor{88, 97, 112},   // secondaryText
+            QColor{73, 81, 98},    // secondaryText
             QColor{220, 224, 230}, // border
             kAccentColor,          // accent
             QColor{255, 255, 255}, // onAccent
@@ -122,7 +122,7 @@ namespace GyanisScribe::Ui
             QColor{23, 25, 29},    // windowBackground
             QColor{31, 34, 40},    // surface
             QColor{232, 234, 237}, // text
-            QColor{163, 172, 185}, // secondaryText
+            QColor{174, 183, 196}, // secondaryText
             QColor{56, 62, 72},    // border
             QColor{78, 139, 245},  // accent
             QColor{11, 18, 32},    // onAccent：这一档主色偏亮，压深字才够 AA（Fluent 深色同做法）
@@ -226,16 +226,19 @@ namespace GyanisScribe::Ui
     enum class TextRole
     {
         PageTitle, ///< 页标题：一类的名字，每页只有一处
-        Body,      ///< 正文与控件文字
-        Hint,   ///< 说明行与次要读数，靠次要色与更小一档弱化，不靠灰色字
-        Metric, ///< 时长、计数这类数字读数，走等宽数字以免读数跳动
+        Body,      ///< 正文、控件文字与说明行——说明行只靠次要色弱化，不再另开更小的一档
+        Metric,    ///< 时长、计数这类数字读数，走等宽数字以免读数跳动
     };
 
-    /// 各文字角色的点值；与 TextRole 一一对应，改动只许发生在这一处
-    inline constexpr int kTextRolePointSizePageTitle    = 15;
-    inline constexpr int kTextRolePointSizeBody         = 10;
-    inline constexpr int kTextRolePointSizeHint         = 9;
-    inline constexpr int kTextRolePointSizeMetric       = 13;
+    /**
+     * @brief 各文字角色的点值；与 TextRole 一一对应，改动只许发生在这一处
+     * @details 刻意没有「比正文更小」的一档：小字号与次要色是两个独立的弱化手段，同时用就把
+     *          「灰一点」变成「看不清」（浅色档实测 9pt 压 5.7:1 的灰字，屏幕远一点就读不出）。
+     *          层级靠颜色与字重表达，字号只留正文与标题两级。
+     */
+    inline constexpr int kTextRolePointSizePageTitle = 15;
+    inline constexpr int kTextRolePointSizeBody      = 10;
+    inline constexpr int kTextRolePointSizeMetric    = 13;
 
     /**
      * @brief 按角色给控件设字号与字重
@@ -256,9 +259,6 @@ namespace GyanisScribe::Ui
             case TextRole::Body:
                 font.setPointSize(kTextRolePointSizeBody);
                 break;
-            case TextRole::Hint:
-                font.setPointSize(kTextRolePointSizeHint);
-                break;
             case TextRole::Metric:
                 font.setPointSize(kTextRolePointSizeMetric);
                 font.setWeight(QFont::DemiBold);
@@ -278,13 +278,12 @@ namespace GyanisScribe::Ui
     inline constexpr int kSpacingSmall  = 8;
     inline constexpr int kSpacingMedium = 12;
     inline constexpr int kSpacingLarge  = 16;
-    inline constexpr int kSpacingPage   = 24;
 
     /// 一行设置项里字段的最大宽度：路径与下拉拉到整窗宽时，「这一格填什么」就看不出来了
-    inline constexpr int kFieldMaximumWidth = 420;
+    inline constexpr int kFieldMaximumWidth = 380;
 
     /// 页顶说明行的最大宽度：整窗宽的一行长句读起来要回头数，收到这一档就按行折
-    inline constexpr int kIntroMaximumWidth = 520;
+    inline constexpr int kIntroMaximumWidth = 420;
 
     /**
      * @brief 标注默认色板

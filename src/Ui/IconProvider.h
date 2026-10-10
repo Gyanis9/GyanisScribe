@@ -15,6 +15,9 @@
 
 #include <string_view>
 
+class QAbstractButton;
+class QWidget;
+
 namespace GyanisScribe::Ui
 {
 
@@ -67,6 +70,23 @@ namespace GyanisScribe::Ui
          * @note 名字拼错不会崩也不会静默换成别的图：返回空 QIcon 并记一条含可用名单线索的错误日志。
          */
         [[nodiscard]] QIcon icon(std::string_view name) const;
+
+        /**
+         * @brief 给按钮挂一枚按名字取的图标，并把这个名字记在控件上
+         * @param button 目标按钮
+         * @param name SVG 文件名去掉扩展名，例如 "Export"
+         * @details 别直接 setIcon(icon(name))：QIcon 是取色那一刻的快照，换主题之后已发出去的
+         *          图标仍留着旧描边色（深色档下等于看不见）。记下名字才谈得上重取，见 refreshIcons。
+         */
+        void applyIcon(QAbstractButton &button, std::string_view name) const;
+
+        /**
+         * @brief 把 root 子树里由 applyIcon 挂过的按钮按当前描边色重取一次图标
+         * @param root 起点控件，通常是某个顶层窗口
+         * @details 只动带名字属性的按钮，没走过 applyIcon 的按钮不碰——它们的图标可能是自绘的
+         *          （标注工具栏的色块就是），重取会画错。
+         */
+        void refreshIcons(QWidget &root) const;
 
         /**
          * @brief 取单档像素图

@@ -83,7 +83,10 @@ namespace
     };
 
     /// 导航列的固定宽度：最长的标签是「文字识别」四个汉字加一枚图标与左右内边距，再宽就要挤右侧的字段了
-    constexpr int kNavColumnWidth = 208;
+    constexpr int kNavColumnWidth = 180;
+
+    /// 导航行上记图标名的角色：换主题时按它重取图标，不用把 kPages 与行号再对一遍
+    constexpr int kNavIconNameRole = Qt::UserRole + 1;
 
     /// 历史条数这一格能填到的最大值：再多就得靠搜索找，而截图量本身也撑不到这里
     constexpr int kMaximumEntriesLimit = 10000;
@@ -102,8 +105,8 @@ namespace
     QFormLayout *makePageForm(QWidget *page, const QString &intro)
     {
         auto *layout = new QVBoxLayout{page};
-        layout->setContentsMargins(GyanisScribe::Ui::kSpacingPage, GyanisScribe::Ui::kSpacingPage, GyanisScribe::Ui::kSpacingPage, GyanisScribe::Ui::kSpacingPage);
-        layout->setSpacing(GyanisScribe::Ui::kSpacingMedium);
+        layout->setContentsMargins(GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge);
+        layout->setSpacing(GyanisScribe::Ui::kSpacingSmall);
 
         auto *text = new QLabel{intro, page};
         text->setObjectName(QStringLiteral("pageHint"));
@@ -114,9 +117,9 @@ namespace
         layout->addWidget(text);
 
         auto *form = new QFormLayout;
-        form->setSpacing(GyanisScribe::Ui::kSpacingMedium);
-        // 标签一律左对齐并顶到字段上沿：右对齐会让标签与字段之间那条缝忽宽忽窄，扫读时对不齐
-        form->setLabelAlignment(Qt::AlignLeft | Qt::AlignTop);
+        form->setSpacing(GyanisScribe::Ui::kSpacingSmall);
+        // 标签左对齐并与字段同一水平线：右对齐会让标签与字段之间那条缝忽宽忽窄，顶对齐让单行字段看着下沉
+        form->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
         form->setFormAlignment(Qt::AlignLeft | Qt::AlignTop);
         layout->addLayout(form);
         layout->addStretch();
@@ -144,11 +147,6 @@ namespace
             heading->setObjectName(QStringLiteral("pageTitle"));
             GyanisScribe::Ui::applyTextRole(*heading, GyanisScribe::Ui::TextRole::PageTitle);
             box->insertWidget(0, heading);
-        }
-
-        for (auto *hint: page.findChildren<QLabel *>(QStringLiteral("pageHint")))
-        {
-            GyanisScribe::Ui::applyTextRole(*hint, GyanisScribe::Ui::TextRole::Hint);
         }
 
         // 字段宽度收到一档：路径框与下拉拉到整窗宽之后，「这一格填什么」和下一格就分不出来了
@@ -189,7 +187,7 @@ namespace
         editor->setToolTip(GyanisScribe::Core::uiText("%1。留空表示用默认目录").arg(title));
 
         auto *browse = new QPushButton{GyanisScribe::Core::uiText("浏览…"), row};
-        browse->setIcon(icons.icon("Save"));
+        icons.applyIcon(*browse, "Save");
         browse->setAccessibleName(GyanisScribe::Core::uiText("选择%1的目录").arg(title));
 
         layout->addWidget(editor);
@@ -844,16 +842,35 @@ namespace GyanisScribe::App
                 continue;
             }
             decoratePage(*content, GyanisScribe::Core::uiText(choice.label.data()));
-            m_nav->addItem(new QListWidgetItem{m_icons.icon(choice.icon), GyanisScribe::Core::uiText(choice.label.data())});
+            auto *entry = new QListWidgetItem{m_icons.icon(choice.icon), GyanisScribe::Core::uiText(choice.label.data())};
+            // 图标名留在行上：QIcon 是取色那一刻的快照，换主题时要按这个名字重取
+            entry->setData(kNavIconNameRole, QString::fromUtf8(choice.icon));
+            m_nav->addItem(entry);
             m_stack->addWidget(content);
         }
+
+        // 换主题时重取图标：样式表与调色板都会自己跟上，只有已经发出去的 QIcon 需要按名字再取一次
+        QObject::connect(&m_theme, &ThemeManager::themeChanged, this,
+                         [this]
+                         {
+                             m_icons.refreshIcons(*this);
+                             for (int row = 0; row < m_nav->count(); ++row)
+                             {
+                                 auto      *entry = m_nav->item(row);
+                                 const auto name  = entry->data(kNavIconNameRole).toString();
+                                 if (!name.isEmpty())
+                                 {
+                                     entry->setIcon(m_icons.icon(name.toStdString()));
+                                 }
+                             }
+                         });
 
         QObject::connect(m_nav, &QListWidget::currentRowChanged, m_stack, &QStackedWidget::setCurrentIndex);
         m_nav->setCurrentRow(0);
 
         layout->addWidget(m_nav);
         layout->addWidget(m_stack, 1);
-        resize(860, 600);
+        resize(680, 520);
     }
 
     void MainWindow::open(const MainWindowPage page)
@@ -917,12 +934,12 @@ namespace GyanisScribe::App
         layout->setContentsMargins(0, 0, 0, 0);
 
         auto *exportButton = new QPushButton{GyanisScribe::Core::uiText("导出配置…"), row};
-        exportButton->setIcon(m_icons.icon("Export"));
+        m_icons.applyIcon(*exportButton, "Export");
         exportButton->setAccessibleName(GyanisScribe::Core::uiText("导出配置"));
         exportButton->setToolTip(GyanisScribe::Core::uiText("把当前全部设置写成一个 JSON 文件，换机器或备份时用"));
 
         auto *importButton = new QPushButton{GyanisScribe::Core::uiText("导入配置…"), row};
-        importButton->setIcon(m_icons.icon("Import"));
+        m_icons.applyIcon(*importButton, "Import");
         importButton->setAccessibleName(GyanisScribe::Core::uiText("导入配置"));
         importButton->setToolTip(GyanisScribe::Core::uiText("从本程序导出的 JSON 文件读回设置；订阅配置的热键与主题立刻跟上新值"));
 
@@ -950,6 +967,12 @@ namespace GyanisScribe::App
                              }
                              importSettingsFromFile(picked);
                          });
+
+        // 两个按钮要交给布局管：只做父子挂载而不 addWidget，这一行的 sizeHint 就是 0，
+        // QFormLayout 会按标签的高度给这一行 15 像素，按钮被裁掉大半
+        layout->addWidget(exportButton);
+        layout->addWidget(importButton);
+        layout->addStretch();
         return row;
     }
 
