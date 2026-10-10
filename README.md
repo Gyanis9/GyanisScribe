@@ -4,8 +4,8 @@ Windows 优先、可跨平台的桌面工具：截图、标注、贴图、取色
 交互参考 Snipaste，但不使用其任何代码、图标、界面素材或商标。
 
 - **技术栈**：C++23 · Qt 6.11（Widgets/Svg/Network）· CMake ≥ 3.28 · Conan 2 · MSVC 2022；Linux 侧在 Docker Ubuntu 24.04 容器内构建与验证
-- **当前状态**：六大功能已可用；本机 debug 与 release 两档各 240 条用例全绿；容器 asan 与 coverage 两档
-  235 条通过、1 条跳过（容器那份 Qt 6.4 没有 lrelease，「真实语言包装载」那条只能在有包的一档成立）；
+- **当前状态**：六大功能已可用；本机 debug 与 release 两档各 241 条用例全绿；容器 asan 与 coverage 两档
+  236 条通过、1 条跳过（容器那份 Qt 6.4 没有 lrelease，「真实语言包装载」那条只能在有包的一档成立）；
   行覆盖率 64.5%（阈值 55%）；打包脚本产出绿色目录 + zip + NSIS 安装器，英文语言包随包分发
 - **需求与硬约束**：[docs/ProjectRequirements.md](docs/ProjectRequirements.md)
 

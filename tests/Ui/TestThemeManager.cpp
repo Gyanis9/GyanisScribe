@@ -12,6 +12,9 @@
 #include <QApplication>
 #include <QColor>
 #include <QFile>
+#include <QImage>
+#include <QPixmap>
+#include <QPushButton>
 #include <QRegularExpression>
 #include <QString>
 #include <QVariant>
@@ -404,4 +407,33 @@ TEST_F(ThemeManagerFixture, MissingStyleSheetYieldsEmptyTextNotAFakeTheme)
     EXPECT_FALSE(ThemeManager::styleSheetFor(ThemeKind::Dark).isEmpty());
     // System 按浅色取：解算前拿来用不该崩，也不该给个空串让界面停在无主题
     EXPECT_FALSE(ThemeManager::styleSheetFor(ThemeKind::System).isEmpty());
+}
+
+/**
+ * @brief 钉住「两套主题真的画出不一样」：同一件控件按各自样式表渲染后的底色
+ * @details 上面的用例核的是令牌与样式表文本同解，这一条核的是画出来的像素：样式表在应用层
+ *          没接上、或某一档的资源没打进包时，文本比对仍可全绿而界面是原生灰。
+ *          取的是空按钮的中部：判据只依赖底色，不依赖字形与字体可用性。
+ */
+TEST_F(ThemeManagerFixture, WidgetsRenderThePaletteSurfacePerTheme)
+{
+    const auto probe = [](const ThemeKind kind)
+    {
+        // setStyleSheet 是 QWidget 的成员而不是静态函数，这里挂在套件持有的应用对象上
+        application->setStyleSheet(ThemeManager::styleSheetFor(kind));
+        QPushButton button;
+        button.resize(120, 32);
+        const QPixmap pixmap = button.grab();
+        EXPECT_FALSE(pixmap.isNull()) << "这一档没画出任何像素：" << static_cast<int>(kind);
+        return pixmap.toImage().pixelColor(20, 16);
+    };
+
+    const auto light = probe(ThemeKind::Light);
+    const auto dark  = probe(ThemeKind::Dark);
+    // 样式表挂在应用对象上，不收回去就会跟着影响后面的用例
+    application->setStyleSheet(QString{});
+
+    EXPECT_EQ(light, paletteFor(ThemeKind::Light).surface) << "浅色档没画出它自己的面板底色";
+    EXPECT_EQ(dark, paletteFor(ThemeKind::Dark).surface) << "深色档没画出它自己的面板底色";
+    EXPECT_NE(light, dark) << "两档画出同一个底色，说明样式表根本没生效";
 }
