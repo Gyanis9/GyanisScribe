@@ -13,6 +13,7 @@
 | Tesseract | 5.5.2（仅 Release 档） | Apache-2.0 | 文字识别后端 | 动态链接 |
 | Leptonica | Tesseract 带进来的传递依赖 | BSD-2-Clause | Tesseract 的图像处理 | 动态链接 |
 | C++/WinRT 投影头 | cppwinrt v2.0.250303.5 从 Windows SDK 10.0.26100.0 元数据生成 | MIT | Windows 系统识别的编译期投影 | vendor 在 `Vendor/WinRt/`，只进编译，不作为独立件分发 |
+| Visual C++ 运行库（`vcruntime140.dll`、`vcruntime140_1.dll`、`msvcp140.dll`、`msvcp140_1.dll`、`msvcp140_2.dll`） | 与编译器同版本（本机 14.51.36231，按版本号取） | Microsoft 再分发条款：允许随应用程序一起分发运行库 | 我们的可执行体与 Qt 那几件都导入它 | 打包时从工具链的 `VC\Redist\MSVC\<版本>\onecore\x64\Microsoft.VC145.CRT` 取五份，摆在与可执行体同一目录（app-local，Windows 先搜程序目录） |
 
 Qt 走 LGPL-3.0 的「动态链接 + 可替换」路线：用户拿到的是 Qt 的 DLL，可自行换成同版本库；
 构建脚本不静态链接 Qt，也不做只读合并。产品若要在禁用逆向工程的场合分发，需要商业授权，
@@ -67,7 +68,11 @@ Windows 上这一节只在选用 Tesseract 时才用得到：系统识别走 Win
 - 随包发出的内容（`scripts/WindowsPackage.ps1` 负责摆好，缺任一件就中止打包）：
   `LICENSE.txt`（本软件自己的最终用户许可协议，安装器的许可页就是它）、`licenses/` 下各第三方
   许可证正文、`README.md`、`docs/` 里的三份参考页（ThirdPartyLicenses / OcrBackends / UiStyleGuide，
-  内部需求文档不发）、Qt 运行时与插件、英文语言包 `.qm`、`tessdata/`、`ffmpeg.exe`。
+  内部需求文档不发）、Qt 运行时与插件、英文语言包 `.qm`、`tessdata/`、`ffmpeg.exe`、
+  VC++ 运行库那五份（与可执行体同目录）。
+- VC++ 运行库不带许可证正文文件：本机工具链的 Redist 目录里没有可 vendored 的正文（实测
+  `find … -iname "*license*"` 零命中），再分发条款允许随应用一起分发运行库但不给一个可拷的文本；
+  所以这一项只在本页记条款依据与取件路径，不编造 URL，也不把 VS 的最终用户许可协议整份塞进包。
 - `licenses/` 里的正文都 vendored 进仓库，打包不依赖联网取件。URL 全部钉到具体版本，
   缺件或取回的不是许可证时由 `scripts/FetchLicenses.ps1` 重取——它按每份许可证的一行标记判，
   所以「下载失败留下的 404 页面」会被当成缺陷而不是一个看起来正常的文件。
