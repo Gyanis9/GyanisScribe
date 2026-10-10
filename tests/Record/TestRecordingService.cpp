@@ -28,6 +28,7 @@
 #include <chrono>
 #include <cstddef>
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <mutex>
 #include <semaphore>
@@ -790,5 +791,64 @@ namespace
         EXPECT_EQ(painted.count, 0) << "没有客户区读数却仍然画了圈：那就是把整窗左上角当成了帧原点";
 
         ASSERT_TRUE(static_cast<bool>(service.cancel()));
+    }
+
+    /**
+     * @brief 钉住「开始那一刻就把成品目录建出来」
+     * @details 成品目录由编码那一步写，而编码在几十秒之后：那时才报「写不进去」等于把整轮录制扔掉。
+     *          RecorderConfig 的校验一律写在开始之前判，目录这一项也得在同一处判掉。
+     */
+    TEST_F(RecordingServiceFixture, StartCreatesTheOutputDirectorySoTheEncodeHasSomewhereToWrite)
+    {
+        StubCaptureSource     source;
+        GatedRecordingEncoder encoder;
+        StubPlatformIntegration platform;
+        RecordingService        service{source, encoder, platform};
+
+        const auto target = std::filesystem::temp_directory_path() / "GyanisScribeFreshOutputDir";
+        std::error_code ignored;
+        std::filesystem::remove_all(target, ignored);
+        ASSERT_FALSE(std::filesystem::exists(target));
+
+        auto config            = serviceConfig(OutputFormat::Mp4, false);
+        config.outputDirectory = target;
+
+        const auto started = service.start(config, 0);
+        ASSERT_TRUE(static_cast<bool>(started)) << started.error().message;
+        EXPECT_TRUE(std::filesystem::exists(target)) << "开始录屏没建成品目录：几十秒后编码才会报写不进去，那一轮的帧白录了";
+
+        ASSERT_TRUE(static_cast<bool>(service.cancel()));
+        std::filesystem::remove_all(target, ignored);
+    }
+
+    /**
+     * @brief 配对的那一条：成品路径被一个普通文件占住时，开始就地拒绝
+     * @details 只补「建目录」不补拒绝，就会把这条路径当成可用而一路录到底；
+     *          拒绝必须落在开始这一步，且不留下临时帧目录。
+     */
+    TEST_F(RecordingServiceFixture, StartRefusesWhenTheOutputPathIsNotADirectory)
+    {
+        StubCaptureSource     source;
+        GatedRecordingEncoder encoder;
+        StubPlatformIntegration platform;
+        RecordingService        service{source, encoder, platform};
+
+        const auto blocker = std::filesystem::temp_directory_path() / "GyanisScribeOutputBlocker";
+        std::error_code ignored;
+        std::filesystem::remove(blocker, ignored);
+        {
+            std::ofstream file(blocker, std::ios::binary);
+            file << "占位";
+        }
+
+        auto config            = serviceConfig(OutputFormat::Mp4, false);
+        config.outputDirectory = blocker;
+
+        const auto started = service.start(config, 0);
+        ASSERT_FALSE(static_cast<bool>(started)) << "成品路径是个文件却仍然开始录：这一轮到最后一步才失败";
+        EXPECT_EQ(started.error().code, GyanisScribe::Core::ErrorCode::FileWriteFailed);
+        EXPECT_EQ(service.state(), RecordingState::Idle) << "拒绝之后状态没回到空闲，下一轮会被「上一轮还没收尾」拦住";
+
+        std::filesystem::remove(blocker, ignored);
     }
 } // namespace

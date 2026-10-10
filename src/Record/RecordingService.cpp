@@ -113,6 +113,12 @@ namespace GyanisScribe::Record
             return valid;
         }
 
+        // 成品目录在这一步就建出来：编码落在几十秒之后，那时才发现写不进去，这一轮录下的帧就白丢了
+        if (auto ensured = Core::Paths::ensureDirectory(config.outputDirectory); !ensured)
+        {
+            return std::unexpected(ensured.error());
+        }
+
         // 临时帧目录带时间戳：两轮录屏不会写进同一个目录，编码器也就不会把上一轮的残帧算进来
         const auto directory =
                 Core::Paths::cacheDirectory() / std::format("Recording/{}", QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd_HHmmss_zzz")).toStdString());
