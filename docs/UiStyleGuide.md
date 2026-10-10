@@ -9,8 +9,8 @@
 | --- | --- | --- |
 | 语义色（三套主题各一份） | `src/Ui/DesignTokens.h` 的 `ThemePalette`、`kLightPalette`、`kDarkPalette`、`kHighContrastPalette` | 绘制代码只认角色名（`windowBackground`、`surface`、`text`、`secondaryText`、`border`、`accent`、`onAccent`、`selection`、`icon`、`success`、`danger`、`mutedFill`、`hover`、`pressed`、`accentHover`、`accentSoft`、`borderStrong`），不认十六进制 |
 | 应用调色板的映射 | 同上：`buildApplicationPalette`，落在 `ThemeManager::refresh` | 样式表画不到原生那部分（微调框箭头、表头、占位与禁用文字），这些只认 `QPalette`；两份上色路径必须同源，否则深色档会带进一批浅色原生件 |
-| 排版档位 | 同上：`TextRole` 与 `kTextRolePointSize*`、`applyTextRole` | 五档：页标题 15 / 分组标题 11 / 正文 10 / 说明 9 / 读数 13（点）。走点值而不是样式表的 px——px 不随系统 DPI 缩放。正文档由 `App::Application` 设成应用字体，其余四档由调用点按角色打 |
-| 间距阶梯 | 同上：`kSpacingTiny/Small/Medium/Large/Page`、`kFieldMaximumWidth`、`kIntroMaximumWidth` | 界面里出现的每个间距都取自 4/8/12/16/24；字段与说明行的宽度上限管住「一行长句」和「整窗宽的输入框」 |
+| 排版档位 | 同上：`TextRole` 与 `kTextRolePointSize*`、`applyTextRole` | 三档：页标题 15 / 正文 10 / 读数 13（点）。刻意没有「比正文更小」的一档——小字号与次要色是两个独立的弱化手段，一起用就把「灰一点」变成「看不清」；说明行只压色不减号。走点值而不是样式表的 px（px 不随系统 DPI 缩放），正文档由 `App::Application` 设成应用字体 |
+| 间距阶梯 | 同上：`kSpacingTiny/Small/Medium/Large`、`kFieldMaximumWidth`、`kIntroMaximumWidth` | 界面里出现的每个间距都取自 4/8/12/16；字段与说明行的宽度上限管住「一行长句」和「整窗宽的输入框」，设置窗默认 680×520、导航 180 宽，让一行就是一条能扫读的行 |
 | 跨模块共用的绘制常量 | 同上：`kCaptureMaskColor`、`kAccentColor`、`kCaptureHintTextColor`、`kCaptureHintBackgroundColor`、`kCrosshairColor`、`kHintFontSize`、`kHintPadding`、`kToolbarSliderWidth`、`kSelectionBorderWidth`、光标高亮一族 | 遮罩、选区读数、工具栏滑块、录屏高亮这些「两个模块都要用到」的尺寸与色 |
 | 字号与线宽的阶梯 | 同上：`kFontSizes`（12/13/14/16/20/24）、`kAnnotationWidths`（2/4/6/8）、默认档位下标 `kDefaultAnnotationWidthStep`/`kDefaultAnnotationFontSizeIndex`、找回函数 `stepIndexOf` | 界面只允许走阶梯；配置里存了阶梯外的值时 `stepIndexOf` 返回空，调用方记日志后回落默认档，不就近取一档 |
 | 标注色板 | 同上：`kAnnotationPalette` 八色与 `annotationColorAt` | 序号越界返回空色而不是夹到最后一名，少画一个色块要能被发现 |
@@ -40,7 +40,7 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 
 | 窗口 | 类与文件 | 样式来源 | 状态 |
 | --- | --- | --- | --- |
-| 主窗口（设置 / 历史 / 关于入口） | `src/App/MainWindow.cpp` | 根 `#appRoot` 铺窗口底；左侧导航 `QListWidget#settingsNav`（宽 `kNavColumnWidth`=208，无框）+ `QStackedWidget` 十页，每页是一张 `#pageCard` 卡片，页内 `kSpacingPage` 边距、`kSpacingMedium` 行距、字段宽 ≤ `kFieldMaximumWidth` | 导航项选中走 `::item:selected`（`accentSoft` 底 + 主色描边），悬停走 `::item:hover`；每页顶部是 `#pageTitle`（15pt 半粗）加一条 `#pageHint`（9pt 次要色） |
+| 主窗口（设置 / 历史 / 关于入口） | `src/App/MainWindow.cpp` | 根 `#appRoot` 铺窗口底；左侧导航 `QListWidget#settingsNav`（宽 `kNavColumnWidth`=180，无框）+ `QStackedWidget` 十页，每页是一张 `#pageCard` 卡片，页内 `kSpacingLarge` 边距、`kSpacingSmall` 行距、字段宽 ≤ `kFieldMaximumWidth` | 导航项选中走 `::item:selected`（`accentSoft` 底 + 主色描边），悬停走 `::item:hover`；每页顶部是 `#pageTitle`（15pt 半粗）加一条 `#pageHint`（9pt 次要色） |
 | 标注窗 | `src/Annotation/AnnotationWindow.cpp` | 画布 `AnnotationView` 自绘底图与图形；工具栏另计 | 快捷键动作表（复制/保存/贴图/识别/撤销重做），不可撤销时按钮 `:disabled` |
 | 标注工具栏 | `src/Annotation/AnnotationToolbar.cpp` | `#AnnotationToolbar` 卡片 + `kSpacingSmall` 内边距与间距，段与段之间是 `QFrame#toolbarSeparator`；`kToolbarSliderWidth` 固定滑块宽、`kAnnotationPalette` 八色块 + 自定义色、`RecentColors.h` 的 `kRecentColorCapacity`(6) 最近用色 | 当前工具按钮 `:checked`（`accentSoft` 底 + 主色描边，三态都在 QSS 里），线宽/字号只走阶梯；色块选中用主色描边 |
 | 截图遮罩 | `src/Capture/CaptureOverlay.cpp` | 自绘：`kCaptureMaskColor` 压暗背景、`kSelectionBorderWidth`+`kAccentColor` 选区框、`kCrosshairColor` 十字虚线、读数用 `kHintFontSize`/`kHintPadding` 压在 `kCaptureHintBackgroundColor` 上 | 拖拽中显示尺寸与坐标读数；`Esc` 取消、`Enter` 或双击确认（`keyPressEvent`/`mouseDoubleClickEvent`）|
@@ -62,7 +62,7 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 | windowBackground | `#F4F5F7` | `#17191D` | 纯白 | 窗口底（只有具名的根铺这一档） |
 | surface | 纯白 | `#1F2228` | 纯白 | 卡片、按钮、输入框、弹层 |
 | text | `#1B1F24` | `#E8EAED` | 纯黑 | 正文 |
-| secondaryText | `#586170` | `#A3ACB9` | 纯黑（刻意不比正文弱） | 说明行、占位、禁用文字 |
+| secondaryText | `#495162` | `#AEB7C4` | 纯黑（刻意不比正文弱） | 说明行、占位、禁用文字：两档都过 7:1（AAA），因为它承载的是「改了要不要重启」这类关键信息 |
 | border | `#DCE0E6` | `#383E48` | 纯黑 + 2px（这一档反过来要求用纯黑） | 卡片描边与分隔线 |
 | borderStrong | `#C3C9D2` | `#4A525E` | 纯黑 + 2px | 输入类控件的默认描边，比 border 重一档 |
 | accent | `#2B67D8` | `#4E8BF5` | `#0B57D0` | 焦点、主按钮、选中项描边（深色档更亮才压得住深底） |
@@ -116,6 +116,13 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
   200% 缩放的屏上字号跟着系统一起放大。样式表里的 `font-size: Npx` 不随 DPI 缩放，
   所以这一版把颜色/形状留在 QSS、把字号交给 `applyTextRole`（用例 `Style.SourceConventions` 不管这条，
   靠的是「QSS 里没有 font-size」这个形状——要加字号就得多写一份点值映射，别退回 px）。
+
+**换主题要当场生效，三样东西得各自跟上**：样式表整片换（Qt 会重抛光）、`QPalette` 落到应用**并且**
+逐个控件重设（`QApplication::setPalette` 只规定之后新建的控件用什么，已建好的标签会停在旧档色上——
+实测深色档下等于看不见字，判据 `ExistingWidgetsRepaintWithTheNewThemeText`）、图标要按名字重取
+（`QIcon` 是取色那一刻的快照，`IconProvider::applyIcon` 把名字记在控件上，`refreshIcons` 换档时重取，
+判据 `AppliedIconsReResolveAfterTheTintChanges` 与 `IconsReResolveWhenTheThemeChangesLive`）。
+托盘在 `themeChanged` 上重跑一次 `install()`。
 
 ## 5. 键盘与可访问性
 
