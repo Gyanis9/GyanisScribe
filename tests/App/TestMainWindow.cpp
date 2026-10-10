@@ -206,7 +206,7 @@ namespace
                 Expectation{MainWindowPage::Capture, {"截图目录", "颜色写法"}, true},
                 Expectation{MainWindowPage::Annotation, {"默认线宽", "默认字号"}, true},
                 Expectation{MainWindowPage::Pin, {"默认不透明度"}, true},
-                Expectation{MainWindowPage::Record, {"录屏目录", "录制范围", "输出格式", "默认帧率", "光标高亮"}, true},
+                Expectation{MainWindowPage::Record, {"录屏目录", "录制范围", "输出格式", "默认帧率", "光标高亮", "麦克风设备", "系统声音设备"}, true},
                 Expectation{MainWindowPage::Ocr, {"识别语言", "语言包目录"}, true},
                 Expectation{MainWindowPage::Hotkey, {"截图", "录屏", "文字识别", "屏幕取色"}, true},
                 Expectation{MainWindowPage::Theme, {"主题"}, true},
@@ -329,6 +329,25 @@ namespace
         const auto parsed = GyanisScribe::Record::parseRecordScope(stored);
         ASSERT_TRUE(static_cast<bool>(parsed));
         EXPECT_EQ(*parsed, GyanisScribe::Record::RecordMode::Region);
+    }
+
+    /**
+     * @brief 钉住取声那两格列不出设备时不改写配置，也保持「不取这一路」的显示
+     * @details 设备可能只是临时被别的程序占着。在这里替用户把选择清掉，等于把
+     *          「下次插回来就恢复原样」这条退路删了；而真正该报错的地方在开录那一刻。
+     */
+    TEST_F(MainWindowFixture, AudioDeviceRowKeepsTheStoredSelectionWhenListingFails)
+    {
+        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kRecordAudioMicrophone, QStringLiteral("@device_cm_{GUID}\\wave_{MIC}"))));
+
+        makeWindow();
+        m_window->open(MainWindowPage::Record);
+        const auto *combo = qobject_cast<QComboBox *>(controlInCurrentPage("麦克风设备"));
+        ASSERT_NE(combo, nullptr);
+        EXPECT_EQ(combo->count(), 1) << "这台机器上没有真 ffmpeg 与音频设备，清单就该只有「不取这一路」这一项";
+        EXPECT_EQ(combo->currentIndex(), 0) << "列不出设备时下拉框不许停在一个凭空的位置上";
+        EXPECT_EQ(m_store->stringValue(GyanisScribe::Settings::kRecordAudioMicrophone, QString()), QStringLiteral("@device_cm_{GUID}\\wave_{MIC}"))
+                << "列不出来就把用户选的那一路清掉，是替他做了一个他没见过的原因导致的决定";
     }
 
     /**
