@@ -165,6 +165,15 @@ namespace GyanisScribe::Ui
     inline constexpr std::array<int, 6> kFontSizes{12, 13, 14, 16, 20, 24};
 
     /**
+     * @brief 标注起点档位在阶梯表里的下标：线宽 4、字号 14
+     * @details 工具栏的兜底档与设置页的显示档读同一个常量；两处各写一个下标，
+     *          「设置页显示 2、新开的标注窗却按 4 起步」就没人看得出来。
+     */
+    inline constexpr std::size_t kDefaultAnnotationWidthStep = 1;
+    /// 默认字号在字号阶梯里的下标，与上面同解
+    inline constexpr std::size_t kDefaultAnnotationFontSizeIndex = 2;
+
+    /**
      * @brief 在阶梯表里找回某个取值对应的下标
      * @tparam Size 阶梯档数
      * @param steps 阶梯表（值不重复）

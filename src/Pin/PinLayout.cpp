@@ -119,4 +119,18 @@ namespace GyanisScribe::Pin
         return parseLayout(stored.toStdString());
     }
 
+    Core::Expected<double> parseOpacityPercentSetting(const int percent)
+    {
+        if (percent >= 1 && percent <= 100)
+        {
+            return static_cast<double>(percent) / 100.0;
+        }
+        return Core::Expected<double>{std::unexpected{Core::Error{
+                .code    = Core::ErrorCode::InvalidArgument,
+                .message = GyanisScribe::Core::uiFormat(
+                        GyanisScribe::Core::uiTextUtf8("贴图默认不透明度 \"{}\" 不在 1 到 100 之间：请在设置的贴图页重选一个值，或删掉 Pin/DefaultOpacity 这一项回到完全不透明"),
+                        percent),
+        }}};
+    }
+
 } // namespace GyanisScribe::Pin

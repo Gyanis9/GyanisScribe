@@ -442,3 +442,24 @@ TEST(RecordingSinksCase, EmptySequenceCannotBeSealed)
     ASSERT_FALSE(sealed.has_value());
     EXPECT_EQ(sealed.error().code, ErrorCode::InternalError);
 }
+
+/**
+ * @brief 钉住配置里默认帧率的可用范围与拒绝面
+ * @details 拒绝面要给出范围与恢复办法：帧率是用户在设置页里填的，
+ *          只回「不合法」等于让他自己猜上限在哪儿。
+ */
+TEST(RecorderFrameRateSetting, AcceptsInRangeAndRejectsOutside)
+{
+    EXPECT_EQ(GyanisScribe::Record::parseFrameRateSetting(1).value(), 1);
+    EXPECT_EQ(GyanisScribe::Record::parseFrameRateSetting(GyanisScribe::Record::kDefaultFrameRate).value(), 15);
+    EXPECT_EQ(GyanisScribe::Record::parseFrameRateSetting(GyanisScribe::Record::kMaximumFrameRate).value(), 60);
+
+    for (const int bad: {0, -1, 61, 1000})
+    {
+        const auto parsed = GyanisScribe::Record::parseFrameRateSetting(bad);
+        ASSERT_FALSE(parsed.has_value()) << bad;
+        EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument) << bad;
+        EXPECT_NE(parsed.error().message.find("60"), std::string::npos) << bad;
+        EXPECT_NE(parsed.error().message.find("Record/DefaultFrameRate"), std::string::npos) << bad;
+    }
+}

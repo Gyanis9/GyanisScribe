@@ -220,6 +220,10 @@
             <translation>GyanisScribe hit an unhandled error: {}. As much as possible was written to the log; open {} and take the newest log file. If it keeps happening, send that log together with the steps you took.</translation>
         </message>
         <message>
+            <source>这一类的说明</source>
+            <translation>What this section covers</translation>
+        </message>
+        <message>
             <source>%1。留空表示用默认目录</source>
             <translation>%1. Leave empty to use the default folder</translation>
         </message>
@@ -236,6 +240,46 @@
             <translation>Choose %1</translation>
         </message>
         <message>
+            <source>界面语言</source>
+            <translation>Interface language</translation>
+        </message>
+        <message>
+            <source>切换语言要重启智录才生效</source>
+            <translation>Restart GyanisScribe for the language change to take effect</translation>
+        </message>
+        <message>
+            <source>主题</source>
+            <translation>Theme</translation>
+        </message>
+        <message>
+            <source>识别语言</source>
+            <translation>Recognition language</translation>
+        </message>
+        <message>
+            <source>颜色写法</source>
+            <translation>Color format</translation>
+        </message>
+        <message>
+            <source>默认不透明度</source>
+            <translation>Default opacity</translation>
+        </message>
+        <message>
+            <source>贴图默认不透明度</source>
+            <translation>Pin default opacity</translation>
+        </message>
+        <message>
+            <source> 帧/秒</source>
+            <translation> fps</translation>
+        </message>
+        <message>
+            <source>默认帧率</source>
+            <translation>Default frame rate</translation>
+        </message>
+        <message>
+            <source>录屏默认帧率</source>
+            <translation>Recording default frame rate</translation>
+        </message>
+        <message>
             <source>智录 GyanisScribe %1\n\n截图、标注、贴图、录屏与文字识别。\n全局热键：Ctrl+Alt+A 截图，Ctrl+Alt+R 录屏（再按一次停止并保存），Ctrl+Alt+O 识别。\n界面图标全部为本项目原创 SVG；第三方组件与其许可证见仓库 docs/ThirdPartyLicenses.md。\n</source>
             <translation>GyanisScribe %1\n\nScreenshot, annotation, pin, screen recording and text recognition.\nGlobal hotkeys: Ctrl+Alt+A capture, Ctrl+Alt+R record (press again to stop and save), Ctrl+Alt+O recognize.\nAll UI icons are original SVG artwork made for this project; third-party components and their licenses are listed in docs/ThirdPartyLicenses.md in the repository.\n</translation>
         </message>
@@ -244,8 +288,76 @@
             <translation>GyanisScribe Settings</translation>
         </message>
         <message>
-            <source>快捷键</source>
-            <translation>Keyboard shortcuts</translation>
+            <source>设置导航</source>
+            <translation>Settings navigation</translation>
+        </message>
+        <message>
+            <source>界面语言决定菜单、托盘提示与这些设置页的措辞。切换语言要重启智录才生效。</source>
+            <translation>The interface language sets the wording of the menus, the tray hints and these settings pages. Restart GyanisScribe for a language change to take effect.</translation>
+        </message>
+        <message>
+            <source>截图与标注成品落在这个目录里。取色复制出来的文本按下面的写法格式化。</source>
+            <translation>Screenshots and finished annotations land in this folder. Copied colors are formatted with the format chosen below.</translation>
+        </message>
+        <message>
+            <source>截图与标注成品目录</source>
+            <translation>Folder for screenshots and annotations</translation>
+        </message>
+        <message>
+            <source>截图目录</source>
+            <translation>Screenshots</translation>
+        </message>
+        <message>
+            <source>复制用的写法</source>
+            <translation>Format used when copying</translation>
+        </message>
+        <message>
+            <source>新打开的标注窗按这两档起步。画过之后的改动会被工具栏记下来，下次仍以最近用的那一档开始。</source>
+            <translation>A newly opened annotation window starts from these two steps. Once you have drawn, the toolbar remembers the step you actually used and starts from that next time.</translation>
+        </message>
+        <message>
+            <source>默认线宽</source>
+            <translation>Default stroke width</translation>
+        </message>
+        <message>
+            <source>默认字号</source>
+            <translation>Default font size</translation>
+        </message>
+        <message>
+            <source>新贴到屏幕上的图按这个不透明度开始。滚轮调透明度只影响那一张贴图，不改这里。</source>
+            <translation>A newly pinned image starts at this opacity. Scrolling to change opacity affects only that pin, not this setting.</translation>
+        </message>
+        <message>
+            <source>新建贴图的默认不透明度</source>
+            <translation>Opacity for new pins</translation>
+        </message>
+        <message>
+            <source>录屏成品落在这个目录里。帧率越高文件越大，存成 GIF 时上限比 MP4 低。</source>
+            <translation>Finished recordings land in this folder. A higher frame rate means a bigger file, and the GIF ceiling is lower than the MP4 one.</translation>
+        </message>
+        <message>
+            <source>录屏成品目录</source>
+            <translation>Folder for recordings</translation>
+        </message>
+        <message>
+            <source>录屏目录</source>
+            <translation>Recordings</translation>
+        </message>
+        <message>
+            <source>认得出哪种文字取决于语言包。目录留空时按环境变量与程序数据目录找。</source>
+            <translation>Which scripts can be recognized depends on the language packs. Leave the folder empty to fall back to the environment variable and the program data folder.</translation>
+        </message>
+        <message>
+            <source>识别语言包目录</source>
+            <translation>Recognition language pack folder</translation>
+        </message>
+        <message>
+            <source>语言包目录</source>
+            <translation>Language packs</translation>
+        </message>
+        <message>
+            <source>四个全局热键随时可改，改完立即重新登记，不需要重启。</source>
+            <translation>The four global hotkeys can be changed any time; each change is re-registered right away, no restart needed.</translation>
         </message>
         <message>
             <source>截图</source>
@@ -268,68 +380,32 @@
             <translation>Global hotkey for %1</translation>
         </message>
         <message>
-            <source>保存位置</source>
-            <translation>Save locations</translation>
-        </message>
-        <message>
-            <source>截图与标注成品目录</source>
-            <translation>Folder for screenshots and annotations</translation>
-        </message>
-        <message>
-            <source>截图目录</source>
-            <translation>Screenshots</translation>
-        </message>
-        <message>
-            <source>录屏成品目录</source>
-            <translation>Folder for recordings</translation>
-        </message>
-        <message>
-            <source>录屏目录</source>
-            <translation>Recordings</translation>
-        </message>
-        <message>
-            <source>识别语言包目录</source>
-            <translation>Recognition language pack folder</translation>
-        </message>
-        <message>
-            <source>语言包目录</source>
-            <translation>Language packs</translation>
-        </message>
-        <message>
-            <source>主题</source>
-            <translation>Theme</translation>
+            <source>配色方案即时生效。高对比度档是纯黑正文、纯白底与加粗边框。</source>
+            <translation>Color schemes apply immediately. High contrast uses pure black text on pure white with bold borders.</translation>
         </message>
         <message>
             <source>配色方案</source>
             <translation>Color scheme</translation>
         </message>
         <message>
-            <source>界面语言</source>
-            <translation>Interface language</translation>
-        </message>
-        <message>
-            <source>切换语言要重启智录才生效</source>
-            <translation>Restart GyanisScribe for the language change to take effect</translation>
-        </message>
-        <message>
-            <source>识别语言</source>
-            <translation>Recognition language</translation>
-        </message>
-        <message>
-            <source>颜色写法</source>
-            <translation>Color format</translation>
-        </message>
-        <message>
-            <source>复制用的写法</source>
-            <translation>Format used when copying</translation>
-        </message>
-        <message>
             <source>智录图标</source>
             <translation>GyanisScribe icon</translation>
         </message>
         <message>
-            <source>设置</source>
-            <translation>Settings</translation>
+            <source>通用</source>
+            <translation>General</translation>
+        </message>
+        <message>
+            <source>标注</source>
+            <translation>Annotation</translation>
+        </message>
+        <message>
+            <source>贴图</source>
+            <translation>Pin</translation>
+        </message>
+        <message>
+            <source>快捷键</source>
+            <translation>Keyboard shortcuts</translation>
         </message>
         <message>
             <source>关于</source>
@@ -374,6 +450,10 @@
         <message>
             <source>开始 / 停止录屏</source>
             <translation>Start / stop recording</translation>
+        </message>
+        <message>
+            <source>设置</source>
+            <translation>Settings</translation>
         </message>
         <message>
             <source>关于智录</source>
@@ -740,6 +820,10 @@
             <translation>Pin layout entry {} has an opacity outside (0,1]: {}. Clear this entry and let the program record it again.</translation>
         </message>
         <message>
+            <source>贴图默认不透明度 "{}" 不在 1 到 100 之间：请在设置的贴图页重选一个值，或删掉 Pin/DefaultOpacity 这一项回到完全不透明</source>
+            <translation>Pin default opacity "{}" is not between 1 and 100: pick a value again on the Pin page of Settings, or remove the Pin/DefaultOpacity entry to go back to fully opaque</translation>
+        </message>
+        <message>
             <source>智录贴图</source>
             <translation>GyanisScribe pin</translation>
         </message>
@@ -870,6 +954,10 @@
         <message>
             <source>窗口模式需要一个有效句柄，当前是 0。请在目标窗口还在的时候重新选一次</source>
             <translation>Window mode needs a valid handle; the current one is 0. Pick the window again while the target window is still open.</translation>
+        </message>
+        <message>
+            <source>默认帧率 "{}" 不在可用范围（1 到 {}）里：请在设置的录屏页重选一个值，或删掉 Record/DefaultFrameRate 这一项回到默认档</source>
+            <translation>Default frame rate "{}" is outside the usable range (1 to {}): pick a value again on the Recording page of Settings, or remove the Record/DefaultFrameRate entry to go back to the default</translation>
         </message>
         <message>
             <source>未在录制</source>

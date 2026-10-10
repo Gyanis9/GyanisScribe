@@ -32,12 +32,14 @@ namespace
     using GyanisScribe::Ui::IconSize;
     using GyanisScribe::Ui::kAnnotationPalette;
     using GyanisScribe::Ui::kAnnotationWidths;
+    using GyanisScribe::Ui::kDefaultAnnotationFontSizeIndex;
+    using GyanisScribe::Ui::kDefaultAnnotationWidthStep;
     using GyanisScribe::Ui::kFontSizes;
     using GyanisScribe::Ui::stepIndexOf;
 
-    /// 配置里没存过、或存的值不在阶梯里时用的起点档：线宽 4、字号 14
-    constexpr int kDefaultWidthStep     = 1;
-    constexpr int kDefaultFontSizeIndex = 2;
+    /// 配置里没存过、或存的值不在阶梯里时用的起点档：值在 Ui 的阶梯常量里，设置页与这里同解
+    constexpr int kDefaultWidthStep     = static_cast<int>(kDefaultAnnotationWidthStep);
+    constexpr int kDefaultFontSizeIndex = static_cast<int>(kDefaultAnnotationFontSizeIndex);
 
     /**
      * @brief 工具按钮的登记表：顺序、图标名与中文名一处对齐

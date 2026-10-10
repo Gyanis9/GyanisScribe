@@ -71,4 +71,16 @@ namespace GyanisScribe::Record
     /// 单次录屏的时长上限，秒：录屏最容易被忘在跑，超过两小时当场拒
     inline constexpr int kMaximumDurationSeconds = 7200;
 
+    /// 默认帧率的缺省档：配置里没有、或存的值不合法时用它，与 RecorderConfig::frameRate 的初值同解
+    inline constexpr int kDefaultFrameRate = 15;
+
+    /**
+     * @brief 解析配置里存的默认帧率
+     * @param stored 配置读出的整数值
+     * @return 可用的帧率；不在 1..kMaximumFrameRate 里时返回带范围与替代做法的中文原因
+     * @details 帧率的上限按输出格式分两档（GIF 更低），但那要等格式定了才知道；
+     *          这里只按两档共用的上限判，格式那一层仍由 validateRecorderConfig 把关。
+     */
+    [[nodiscard]] Core::Expected<int> parseFrameRateSetting(int stored);
+
 } // namespace GyanisScribe::Record

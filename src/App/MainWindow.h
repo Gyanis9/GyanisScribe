@@ -1,6 +1,6 @@
 /**
  * @file MainWindow.h
- * @brief 可隐藏主窗口：设置页与关于页的入口
+ * @brief 可隐藏主窗口：按类别竖排的设置页、关于页与历史页
  * @author Gyanis
  * @date 2026-10-10
  * @version 0.0.1
@@ -21,7 +21,8 @@
 #include <span>
 #include <string_view>
 
-class QTabWidget;
+class QListWidget;
+class QStackedWidget;
 
 namespace GyanisScribe::Settings
 {
@@ -43,33 +44,41 @@ namespace GyanisScribe::History
 namespace GyanisScribe::App
 {
     /// 主窗口能直接跳到的页面
-    /// @note 新页只能追加在末尾：序号写进托盘菜单与用例，插进中间会把菜单指到别的页
+    /// @note 新增一项要同时给 pageChoices() 加一行和一个 buildPage() 分支，两处都齐了界面才完整
     enum class MainWindowPage
     {
-        Settings, ///< 设置
-        About,    ///< 关于
-        History,  ///< 历史
+        General,    ///< 通用
+        Capture,    ///< 截图
+        Annotation, ///< 标注
+        Pin,        ///< 贴图
+        Record,     ///< 录屏
+        Ocr,        ///< 文字识别
+        Hotkey,     ///< 快捷键
+        Theme,      ///< 主题
+        About,      ///< 关于
+        History,    ///< 历史
     };
 
     /**
      * @brief 主窗口的一页
-     * @details 页与标签绑在同一行：托盘菜单、选项卡标题与 open() 的序号都从这张表来，
+     * @details 页、导航标签与导航图标绑在同一行：托盘菜单、导航行文字与 open() 的序号都从这张表来，
      *          分开放就会出现「菜单写着历史、点开是设置」。
      */
     struct PageChoice
     {
         MainWindowPage   page;  ///< 这一行对应的页
-        std::string_view label; ///< 选项卡上的中文名
+        std::string_view label; ///< 导航行上的中文名
+        std::string_view icon;  ///< 导航行的图标名，必须是 IconProvider 真的有的那一个
     };
 
     /**
-     * @brief 主窗口的全部页，下标即选项卡序号
+     * @brief 主窗口的全部页，下标即导航行与堆叠页的序号
      * @return 只读表格
      */
     [[nodiscard]] std::span<const PageChoice> pageChoices();
 
     /**
-     * @brief 某一页的选项卡序号
+     * @brief 某一页的导航行序号
      * @param page 目标页
      * @return 序号；页不在表里时返回 -1
      */
@@ -150,6 +159,7 @@ namespace GyanisScribe::App
      * @brief 主窗口
      * @details 这个工具平时住在托盘与热键上，主窗口只是配置与信息的入口：
      *          关掉它就回到托盘，不退出程序。
+     *          版面是左侧导航加右侧一页，导航顺序就是 pageChoices() 的顺序。
      */
     class MainWindow : public QWidget
     {
@@ -172,6 +182,8 @@ namespace GyanisScribe::App
         /**
          * @brief 切到某一页并显示窗口
          * @param page 目标页
+         * @details 页不在表里时只记日志不切换：切到第 0 页会把用户的操作读成「点了没反应」，
+         *          而日志里留着的是他真正想要的那一页。
          */
         void open(MainWindowPage page);
 
@@ -208,17 +220,41 @@ namespace GyanisScribe::App
         void historyMessage(const QString &message, GyanisScribe::Ui::ToastKind kind);
 
     private:
-        /// 搭设置页：热键、目录、主题、识别语言四组
-        QWidget *buildSettingsPage();
-        /// 搭关于页
+        /**
+         * @brief 搭某一页
+         * @param page 目标页，取值只会来自 pageChoices()
+         * @return 归本窗口所有的页控件；这一页还没有搭法时返回空指针
+         * @details 分派只认枚举、不认序号：表里新加一页而这里漏了一支时，
+         *          调用方会跳开这一行并在日志里点名，导航与堆叠页因此不会错位半格。
+         */
+        QWidget *buildPage(MainWindowPage page);
+
+        /// 通用页：界面语言
+        QWidget *buildGeneralPage();
+        /// 截图页：成品目录与取色复制的写法
+        QWidget *buildCapturePage();
+        /// 标注页：默认线宽与字号
+        QWidget *buildAnnotationPage();
+        /// 贴图页：新建贴图的默认不透明度
+        QWidget *buildPinPage();
+        /// 录屏页：成品目录与默认帧率
+        QWidget *buildRecordPage();
+        /// 识别页：识别语言与语言包目录
+        QWidget *buildOcrPage();
+        /// 快捷键页：四个全局热键
+        QWidget *buildHotkeyPage();
+        /// 主题页：配色方案
+        QWidget *buildThemePage();
+        /// 关于页
         QWidget *buildAboutPage();
-        /// 搭历史页：缩略图列表与三个出口
+        /// 历史页：缩略图列表与三个出口
         QWidget *buildHistoryPage();
 
         Settings::ISettingsStore       &m_settings;          ///< 配置存储，不拥有
         GyanisScribe::Ui::ThemeManager &m_theme;             ///< 主题管理器，不拥有
         GyanisScribe::Ui::IconProvider &m_icons;             ///< 图标供给器，不拥有
-        QTabWidget                     *m_tabs = nullptr;    ///< 各页的容器
+        QListWidget                    *m_nav   = nullptr;   ///< 左侧导航，一行一页
+        QStackedWidget                 *m_stack = nullptr;   ///< 右侧页容器，序号与导航行同解
         History::HistoryStore          &m_historyStore;      ///< 历史清单，历史页从它读
         History::HistoryView           *m_history = nullptr; ///< 历史页控件，重读清单时刷新它
     };

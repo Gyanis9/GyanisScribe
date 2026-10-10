@@ -3,26 +3,31 @@
 #include "Core/Logger.h"
 #include "Core/Paths.h"
 #include "Core/Text.h"
-#include "Ocr/OcrEngineFactory.h"
-#include "Pick/ColorFormat.h"
-#include "Settings/ISettingsStore.h"
 #include "History/HistoryRules.h"
 #include "History/HistoryView.h"
+#include "Ocr/OcrEngineFactory.h"
+#include "Pick/ColorFormat.h"
+#include "Pin/PinLayout.h"
+#include "Record/RecorderConfig.h"
+#include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
+#include "Ui/DesignTokens.h"
 #include "Ui/HotkeyEdit.h"
 #include "Ui/IconProvider.h"
+#include "Ui/Language.h"
 #include "Ui/ThemeManager.h"
 
 #include <QApplication>
 #include <QComboBox>
 #include <QFileDialog>
 #include <QFormLayout>
-#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QPushButton>
-#include <QTabWidget>
+#include <QSpinBox>
+#include <QStackedWidget>
 #include <QVBoxLayout>
 
 #include <array>
@@ -33,22 +38,31 @@
 
 namespace
 {
+    using GyanisScribe::Core::Expected;
+    using GyanisScribe::Core::Logger;
     using GyanisScribe::Settings::ISettingsStore;
     using GyanisScribe::Ui::AppLanguage;
     using GyanisScribe::Ui::IconProvider;
+    using GyanisScribe::Ui::stepIndexOf;
     using GyanisScribe::Ui::ThemeKind;
     using GyanisScribe::Ui::ThemeManager;
 
+    using GyanisScribe::App::appLanguageAt;
+    using GyanisScribe::App::indexOfAppLanguage;
+    using GyanisScribe::App::indexOfThemeKind;
     using GyanisScribe::App::LanguageChoice;
     using GyanisScribe::App::MainWindowPage;
     using GyanisScribe::App::PageChoice;
     using GyanisScribe::App::ThemeChoice;
+    using GyanisScribe::App::themeKindAt;
 
-    /// 主窗口的全部页：序号、目标页与选项卡标签绑在同一张表上
-    constexpr std::array<PageChoice, 3> kPages = {
-            PageChoice{MainWindowPage::Settings, "设置"},
-            PageChoice{MainWindowPage::About, "关于"},
-            PageChoice{MainWindowPage::History, "历史"},
+    /// 主窗口的全部页：序号、目标页、导航行标签与图标绑在同一张表上，表的顺序就是导航的顺序
+    constexpr std::array<PageChoice, 10> kPages = {
+            PageChoice{MainWindowPage::General, "通用", "Settings"},      PageChoice{MainWindowPage::Capture, "截图", "Capture"},
+            PageChoice{MainWindowPage::Annotation, "标注", "Annotation"}, PageChoice{MainWindowPage::Pin, "贴图", "Pin"},
+            PageChoice{MainWindowPage::Record, "录屏", "Record"},         PageChoice{MainWindowPage::Ocr, "文字识别", "Ocr"},
+            PageChoice{MainWindowPage::Hotkey, "快捷键", "Hotkey"},       PageChoice{MainWindowPage::Theme, "主题", "Theme"},
+            PageChoice{MainWindowPage::About, "关于", "About"},           PageChoice{MainWindowPage::History, "历史", "History"},
     };
 
     /// 下拉框的全部行：序号、档位、可见标签三者绑在这一张表上
@@ -64,6 +78,32 @@ namespace
             LanguageChoice{AppLanguage::Chinese, "中文"},
             LanguageChoice{AppLanguage::English, "English"},
     };
+
+    /// 导航列的固定宽度：最长的标签是「文字识别」四个汉字加一枚图标，这一档容得下并留出内边距
+    constexpr int kNavColumnWidth = 150;
+
+    /**
+     * @brief 一页设置的骨架：顶部一行说明文字加一张空表单
+     * @param page 这一页的容器，版面由本函数接管
+     * @param intro 已经过 uiText 的说明文字
+     * @return 归 page 所有的表单，调用方往它 addRow
+     * @details 每一类都得先有一句「这一类管什么、改了会怎样」：需求第五节要的是能自己上手的设置界面，
+     *          只列控件名会把「改了不重启就不生效」这类关键信息藏起来。
+     */
+    QFormLayout *makePageForm(QWidget *page, const QString &intro)
+    {
+        auto *layout = new QVBoxLayout{page};
+        auto *text   = new QLabel{intro, page};
+        text->setWordWrap(true);
+        // 说明行是次要文本，同时要让读屏软件把它当成这一段正文念出来
+        text->setAccessibleName(GyanisScribe::Core::uiText("这一类的说明"));
+        layout->addWidget(text);
+
+        auto *form = new QFormLayout;
+        layout->addLayout(form);
+        layout->addStretch();
+        return form;
+    }
 
     /**
      * @brief 一行「可写目录」的设置控件
@@ -113,17 +153,266 @@ namespace
                                  // 清空表示回到默认：这里不写空串，而是把键删到回落状态，显示也一并回落到默认目录
                                  if (auto written = settings.setValue(key, QString{}); !written)
                                  {
-                                     GyanisScribe::Core::Logger::warning(std::format("{} 没能写入：{}", title.toStdString(), written.error().message));
+                                     Logger::warning(std::format("{} 没能写入：{}", title.toStdString(), written.error().message));
                                  }
                                  editor->setText(QString::fromLocal8Bit(fallback.string().c_str()));
                                  return;
                              }
                              if (auto written = settings.setValue(key, text); !written)
                              {
-                                 GyanisScribe::Core::Logger::warning(std::format("{} 没能写入：{}", title.toStdString(), written.error().message));
+                                 Logger::warning(std::format("{} 没能写入：{}", title.toStdString(), written.error().message));
                              }
                          });
         return row;
+    }
+
+    /**
+     * @brief 一行「离散阶梯」下拉：选项直接列出阶梯里的值
+     * @tparam Size 阶梯档数
+     * @param settings 配置存储
+     * @param key 键名，存进去的就是选中的那个值
+     * @param steps 阶梯表，取值只能是 Ui::kAnnotationWidths 或 Ui::kFontSizes
+     * @param fallback 配置里没有、或存的值不在阶梯里时的回落档
+     * @param title 中文名，用作无障碍名称与日志里的线索
+     * @return 归调用方所有的下拉框，由 addRow 挂上父对象
+     */
+    template<std::size_t Size>
+    QComboBox *makeStepCombo(ISettingsStore &settings, const std::string_view key, const std::array<int, Size> &steps, const int fallback, const QString &title)
+    {
+        auto *combo = new QComboBox;
+        for (const auto stepValue: steps)
+        {
+            combo->addItem(QString::number(stepValue), stepValue);
+        }
+        combo->setAccessibleName(title);
+
+        const auto stored = settings.intValue(key, fallback);
+        if (const auto step = stepIndexOf(steps, stored); step)
+        {
+            combo->setCurrentIndex(*step);
+        } else
+        {
+            // 就近取一档会让人以为存的那档生效了：摆回默认档，同时把坏值说进日志
+            Logger::warning(std::format("{}读不出阶梯里的档位：配置里存的是 {}，这一行按 {} 显示", title.toStdString(), stored, fallback));
+            combo->setCurrentIndex(static_cast<int>(stepIndexOf(steps, fallback).value_or(0)));
+        }
+
+        // 接线排在设初值之后：否则「把界面摆到位」这一步会被当成用户改动写回配置
+        QObject::connect(combo, &QComboBox::currentIndexChanged, combo,
+                         [&settings, key, title, combo](int)
+                         {
+                             if (auto written = settings.setValue(key, combo->currentData().toInt()); !written)
+                             {
+                                 Logger::warning(std::format("{} 没能写入：{}", title.toStdString(), written.error().message));
+                             }
+                         });
+        return combo;
+    }
+
+    /**
+     * @brief 决定整数设置项这一行显示哪个值
+     * @tparam T 该键校验函数的成功载荷类型
+     * @param title 中文名，日志里点名是哪一行
+     * @param stored 配置读出的整数
+     * @param parsed 该键自己的校验结果：只看它成不成立，成功载荷不回界面（界面要的是整数档位）
+     * @param fallback 校验不过时的回落值
+     * @return 这一行该显示的值
+     * @details 复用模块里的校验函数而不是在这里重抄一遍范围：两处判据不同解时，
+     *          设置页会显示一档运行期根本不接受的值，而报错文案也各说一套。
+     */
+    template<typename T>
+    int shownValueForSetting(const QString &title, const int stored, const Expected<T> &parsed, const int fallback)
+    {
+        if (parsed)
+        {
+            return stored;
+        }
+        Logger::warning(std::format("{}读不出：{}，这一行按 {} 显示", title.toStdString(), parsed.error().message, fallback));
+        return fallback;
+    }
+
+    /**
+     * @brief 界面语言下拉：档位读写都走 Ui/Language 的词表
+     * @param settings 配置存储
+     * @return 归调用方所有的下拉框
+     */
+    QComboBox *makeUiLanguageCombo(ISettingsStore &settings)
+    {
+        auto *combo = new QComboBox;
+        for (const auto &choice: kLanguageChoices)
+        {
+            combo->addItem(GyanisScribe::Core::uiText(choice.label.data()));
+        }
+        combo->setAccessibleName(GyanisScribe::Core::uiText("界面语言"));
+        combo->setToolTip(GyanisScribe::Core::uiText("切换语言要重启智录才生效"));
+
+        const auto stored = settings.stringValue(GyanisScribe::Settings::kUiLanguage, QString::fromUtf8(std::string{GyanisScribe::Ui::appLanguageText(AppLanguage::Chinese)}));
+        if (const auto parsed = GyanisScribe::Ui::parseAppLanguage(stored.toStdString()); parsed)
+        {
+            combo->setCurrentIndex(indexOfAppLanguage(*parsed));
+        } else
+        {
+            // 配置里的值读不出时下拉框显示中文，但原因要落进日志：只把界面悄悄拨回默认档，用户会以为是自己选错的
+            Logger::warning(std::format("设置页读不出界面语言：{}，下拉框按中文显示", parsed.error().message));
+            combo->setCurrentIndex(indexOfAppLanguage(AppLanguage::Chinese));
+        }
+
+        QObject::connect(combo, &QComboBox::currentIndexChanged, combo,
+                         [&settings, combo](int index)
+                         {
+                             const auto choice = appLanguageAt(index);
+                             if (!choice)
+                             {
+                                 return;
+                             }
+                             const auto token = QString::fromUtf8(std::string{GyanisScribe::Ui::appLanguageText(*choice)});
+                             if (auto written = settings.setValue(GyanisScribe::Settings::kUiLanguage, token); !written)
+                             {
+                                 Logger::warning(std::format("界面语言没能保存：{}（当前选的是 {}）", written.error().message, combo->currentText().toStdString()));
+                             }
+                         });
+        return combo;
+    }
+
+    /**
+     * @brief 配色方案下拉：标签与档位都来自 themeChoices()
+     * @param theme 主题管理器，选中即时生效
+     * @return 归调用方所有的下拉框
+     */
+    QComboBox *makeThemeCombo(ThemeManager &theme)
+    {
+        auto *combo = new QComboBox;
+        for (const auto &choice: kThemeChoices)
+        {
+            combo->addItem(GyanisScribe::Core::uiText(choice.label.data()));
+        }
+        combo->setAccessibleName(GyanisScribe::Core::uiText("主题"));
+        combo->setCurrentIndex(indexOfThemeKind(theme.requestedKind()));
+        QObject::connect(combo, &QComboBox::currentIndexChanged, combo,
+                         [&theme](int index)
+                         {
+                             if (const auto kind = themeKindAt(index); kind)
+                             {
+                                 if (auto applied = theme.setTheme(*kind); !applied)
+                                 {
+                                     Logger::warning(std::format("主题没能切换：{}", applied.error().message));
+                                 }
+                             }
+                         });
+        return combo;
+    }
+
+    /**
+     * @brief 识别语言下拉：取值来自后端词表，不在界面这一层另列一份
+     * @param settings 配置存储
+     * @return 归调用方所有的下拉框
+     */
+    QComboBox *makeOcrLanguageCombo(ISettingsStore &settings)
+    {
+        auto *combo = new QComboBox;
+        combo->addItems(GyanisScribe::Ocr::supportedOcrLanguageTags());
+        combo->setAccessibleName(GyanisScribe::Core::uiText("识别语言"));
+        const auto stored = settings.stringValue(GyanisScribe::Settings::kOcrLanguage, QString::fromUtf8(GyanisScribe::Ocr::kDefaultOcrLanguage));
+        if (const int index = combo->findText(stored); index >= 0)
+        {
+            combo->setCurrentIndex(index);
+        }
+        QObject::connect(combo, &QComboBox::currentTextChanged, combo,
+                         [&settings, combo](const QString &text)
+                         {
+                             if (auto written = settings.setValue(GyanisScribe::Settings::kOcrLanguage, text); !written)
+                             {
+                                 Logger::warning(std::format("识别语言没能保存：{}（当前选的是 {}）", written.error().message, combo->currentText().toStdString()));
+                             }
+                         });
+        return combo;
+    }
+
+    /**
+     * @brief 取色复制写法下拉：项名与序号都来自 Pick 那张表
+     * @param settings 配置存储
+     * @return 归调用方所有的下拉框
+     */
+    QComboBox *makeColorFormatCombo(ISettingsStore &settings)
+    {
+        auto *combo = new QComboBox;
+        combo->addItems(GyanisScribe::Pick::colorFormatLabels());
+        combo->setAccessibleName(GyanisScribe::Core::uiText("颜色写法"));
+        const auto stored = GyanisScribe::Pick::parseColorFormat(settings.stringValue(GyanisScribe::Settings::kPickFormat, QStringLiteral("Hex")).toStdString());
+        combo->setCurrentIndex(GyanisScribe::Pick::indexOfColorFormat(stored ? *stored : GyanisScribe::Pick::ColorFormat::Hex));
+        QObject::connect(combo, &QComboBox::currentIndexChanged, combo,
+                         [&settings, combo](int index)
+                         {
+                             const auto format = GyanisScribe::Pick::colorFormatAt(index);
+                             if (!format)
+                             {
+                                 return;
+                             }
+                             const auto token = QString::fromUtf8(GyanisScribe::Pick::colorFormatToken(*format).data(),
+                                                                  static_cast<qsizetype>(GyanisScribe::Pick::colorFormatToken(*format).size()));
+                             if (auto written = settings.setValue(GyanisScribe::Settings::kPickFormat, token); !written)
+                             {
+                                 Logger::warning(std::format("颜色写法没能保存：{}", written.error().message));
+                             }
+                         });
+        return combo;
+    }
+
+    /**
+     * @brief 新建贴图的默认不透明度（百分比）
+     * @param settings 配置存储
+     * @return 归调用方所有的数字框
+     */
+    QSpinBox *makeOpacitySpin(ISettingsStore &settings)
+    {
+        auto *spin = new QSpinBox;
+        // 下限取 1：0% 的贴图在屏幕上看不见却还挡鼠标，那种「贴图功能坏了」的现象最难查
+        spin->setRange(1, 100);
+        spin->setSuffix(QStringLiteral(" %"));
+        spin->setAccessibleName(GyanisScribe::Core::uiText("默认不透明度"));
+
+        const auto title  = GyanisScribe::Core::uiText("贴图默认不透明度");
+        const auto stored = settings.intValue(GyanisScribe::Settings::kPinDefaultOpacity, GyanisScribe::Pin::kDefaultOpacityPercent);
+        const auto parsed = GyanisScribe::Pin::parseOpacityPercentSetting(stored);
+        spin->setValue(shownValueForSetting(title, stored, parsed, GyanisScribe::Pin::kDefaultOpacityPercent));
+
+        QObject::connect(spin, &QSpinBox::valueChanged, spin,
+                         [&settings, title](int value)
+                         {
+                             if (auto written = settings.setValue(GyanisScribe::Settings::kPinDefaultOpacity, value); !written)
+                             {
+                                 Logger::warning(std::format("{} 没能写入：{}", title.toStdString(), written.error().message));
+                             }
+                         });
+        return spin;
+    }
+
+    /**
+     * @brief 录屏的默认帧率
+     * @param settings 配置存储
+     * @return 归调用方所有的数字框
+     */
+    QSpinBox *makeFrameRateSpin(ISettingsStore &settings)
+    {
+        auto *spin = new QSpinBox;
+        spin->setRange(1, GyanisScribe::Record::kMaximumFrameRate);
+        spin->setSuffix(GyanisScribe::Core::uiText(" 帧/秒"));
+        spin->setAccessibleName(GyanisScribe::Core::uiText("默认帧率"));
+
+        const auto title  = GyanisScribe::Core::uiText("录屏默认帧率");
+        const auto stored = settings.intValue(GyanisScribe::Settings::kRecordDefaultFrameRate, GyanisScribe::Record::kDefaultFrameRate);
+        const auto parsed = GyanisScribe::Record::parseFrameRateSetting(stored);
+        spin->setValue(shownValueForSetting(title, stored, parsed, GyanisScribe::Record::kDefaultFrameRate));
+
+        QObject::connect(spin, &QSpinBox::valueChanged, spin,
+                         [&settings, title](int value)
+                         {
+                             if (auto written = settings.setValue(GyanisScribe::Settings::kRecordDefaultFrameRate, value); !written)
+                             {
+                                 Logger::warning(std::format("{} 没能写入：{}", title.toStdString(), written.error().message));
+                             }
+                         });
+        return spin;
     }
 } // namespace
 
@@ -213,14 +502,31 @@ namespace GyanisScribe::App
         setWindowTitle(GyanisScribe::Core::uiText("智录 设置"));
         setWindowIcon(icons.icon("App"));
 
-        auto *layout = new QVBoxLayout{this};
-        m_tabs       = new QTabWidget{this};
-        // 页与标签都从 pageChoices() 现取：这里再抄一份中文就会出现菜单与页签不同名
-        m_tabs->addTab(buildSettingsPage(), GyanisScribe::Core::uiText(kPages[0].label.data()));
-        m_tabs->addTab(buildAboutPage(), GyanisScribe::Core::uiText(kPages[1].label.data()));
-        m_tabs->addTab(buildHistoryPage(), GyanisScribe::Core::uiText(kPages[2].label.data()));
-        layout->addWidget(m_tabs);
-        resize(560, 460);
+        auto *layout = new QHBoxLayout{this};
+        m_nav        = new QListWidget{this};
+        m_stack      = new QStackedWidget{this};
+        m_nav->setFixedWidth(kNavColumnWidth);
+        m_nav->setAccessibleName(GyanisScribe::Core::uiText("设置导航"));
+
+        // 导航行与页容器都在这一趟循环里生成：一处顺序，标签、图标与页内容不可能各自漂移
+        for (const auto &choice: kPages)
+        {
+            auto *content = buildPage(choice.page);
+            if (content == nullptr)
+            {
+                // 这一页还没有搭法：跳开这一行，导航与页容器都少一行，因此仍然同序
+                continue;
+            }
+            m_nav->addItem(new QListWidgetItem{m_icons.icon(choice.icon), GyanisScribe::Core::uiText(choice.label.data())});
+            m_stack->addWidget(content);
+        }
+
+        QObject::connect(m_nav, &QListWidget::currentRowChanged, m_stack, &QStackedWidget::setCurrentIndex);
+        m_nav->setCurrentRow(0);
+
+        layout->addWidget(m_nav);
+        layout->addWidget(m_stack, 1);
+        resize(720, 520);
     }
 
     void MainWindow::open(const MainWindowPage page)
@@ -229,13 +535,126 @@ namespace GyanisScribe::App
         if (index < 0)
         {
             // 页不在表里（比如新页忘了登记）就别切：切到第 0 页会把用户的操作读成「没反应」
-            Core::Logger::warning(std::format("主窗口没有这一页（枚举值 {}），已忽略这次跳转", static_cast<int>(page)));
+            Logger::warning(std::format("主窗口没有这一页（枚举值 {}），已忽略这次跳转", static_cast<int>(page)));
             return;
         }
-        m_tabs->setCurrentIndex(index);
+        // 两边都摆到位：导航已经停在这一行时 currentRowChanged 不再发信号，只设导航会让页容器留在原处
+        m_nav->setCurrentRow(index);
+        m_stack->setCurrentIndex(index);
         show();
         raise();
         activateWindow();
+    }
+
+    QWidget *MainWindow::buildPage(const MainWindowPage page)
+    {
+        switch (page)
+        {
+            case MainWindowPage::General:
+                return buildGeneralPage();
+            case MainWindowPage::Capture:
+                return buildCapturePage();
+            case MainWindowPage::Annotation:
+                return buildAnnotationPage();
+            case MainWindowPage::Pin:
+                return buildPinPage();
+            case MainWindowPage::Record:
+                return buildRecordPage();
+            case MainWindowPage::Ocr:
+                return buildOcrPage();
+            case MainWindowPage::Hotkey:
+                return buildHotkeyPage();
+            case MainWindowPage::Theme:
+                return buildThemePage();
+            case MainWindowPage::About:
+                return buildAboutPage();
+            case MainWindowPage::History:
+                return buildHistoryPage();
+        }
+        return nullptr;
+    }
+
+    QWidget *MainWindow::buildGeneralPage()
+    {
+        auto *page = new QWidget{this};
+        auto *form = makePageForm(page, GyanisScribe::Core::uiText("界面语言决定菜单、托盘提示与这些设置页的措辞。切换语言要重启智录才生效。"));
+        form->addRow(GyanisScribe::Core::uiText("界面语言"), makeUiLanguageCombo(m_settings));
+        return page;
+    }
+
+    QWidget *MainWindow::buildCapturePage()
+    {
+        auto *page = new QWidget{this};
+        auto *form = makePageForm(page, GyanisScribe::Core::uiText("截图与标注成品落在这个目录里。取色复制出来的文本按下面的写法格式化。"));
+        form->addRow(GyanisScribe::Core::uiText("截图与标注成品目录"),
+                     makePathRow(m_settings, GyanisScribe::Settings::kPathScreenshot, GyanisScribe::Core::uiText("截图目录"), Core::Paths::defaultScreenshotDirectory(), m_icons));
+        form->addRow(GyanisScribe::Core::uiText("复制用的写法"), makeColorFormatCombo(m_settings));
+        return page;
+    }
+
+    QWidget *MainWindow::buildAnnotationPage()
+    {
+        auto *page = new QWidget{this};
+        auto *form = makePageForm(page, GyanisScribe::Core::uiText("新打开的标注窗按这两档起步。画过之后的改动会被工具栏记下来，下次仍以最近用的那一档开始。"));
+        form->addRow(GyanisScribe::Core::uiText("默认线宽"),
+                     makeStepCombo(m_settings, GyanisScribe::Settings::kAnnotationDefaultWidth, GyanisScribe::Ui::kAnnotationWidths,
+                                   GyanisScribe::Ui::kAnnotationWidths[GyanisScribe::Ui::kDefaultAnnotationWidthStep], GyanisScribe::Core::uiText("默认线宽")));
+        form->addRow(GyanisScribe::Core::uiText("默认字号"),
+                     makeStepCombo(m_settings, GyanisScribe::Settings::kAnnotationDefaultFontSize, GyanisScribe::Ui::kFontSizes,
+                                   GyanisScribe::Ui::kFontSizes[GyanisScribe::Ui::kDefaultAnnotationFontSizeIndex], GyanisScribe::Core::uiText("默认字号")));
+        return page;
+    }
+
+    QWidget *MainWindow::buildPinPage()
+    {
+        auto *page = new QWidget{this};
+        auto *form = makePageForm(page, GyanisScribe::Core::uiText("新贴到屏幕上的图按这个不透明度开始。滚轮调透明度只影响那一张贴图，不改这里。"));
+        form->addRow(GyanisScribe::Core::uiText("新建贴图的默认不透明度"), makeOpacitySpin(m_settings));
+        return page;
+    }
+
+    QWidget *MainWindow::buildRecordPage()
+    {
+        auto *page = new QWidget{this};
+        auto *form = makePageForm(page, GyanisScribe::Core::uiText("录屏成品落在这个目录里。帧率越高文件越大，存成 GIF 时上限比 MP4 低。"));
+        form->addRow(GyanisScribe::Core::uiText("录屏成品目录"),
+                     makePathRow(m_settings, GyanisScribe::Settings::kPathRecording, GyanisScribe::Core::uiText("录屏目录"), Core::Paths::defaultRecordingDirectory(), m_icons));
+        form->addRow(GyanisScribe::Core::uiText("默认帧率"), makeFrameRateSpin(m_settings));
+        return page;
+    }
+
+    QWidget *MainWindow::buildOcrPage()
+    {
+        auto *page = new QWidget{this};
+        auto *form = makePageForm(page, GyanisScribe::Core::uiText("认得出哪种文字取决于语言包。目录留空时按环境变量与程序数据目录找。"));
+        form->addRow(GyanisScribe::Core::uiText("识别语言"), makeOcrLanguageCombo(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("识别语言包目录"), makePathRow(m_settings, GyanisScribe::Settings::kOcrTessDataDirectory, GyanisScribe::Core::uiText("语言包目录"),
+                                                                               Core::Paths::applicationDataDirectory() / "tessdata", m_icons));
+        return page;
+    }
+
+    QWidget *MainWindow::buildHotkeyPage()
+    {
+        auto *page = new QWidget{this};
+        auto *form = makePageForm(page, GyanisScribe::Core::uiText("四个全局热键随时可改，改完立即重新登记，不需要重启。"));
+        for (const auto [key, title, defaultText]: {std::tuple{GyanisScribe::Settings::kHotkeyCapture, GyanisScribe::Core::uiText("截图"), QStringLiteral("Ctrl+Alt+A")},
+                                                    std::tuple{GyanisScribe::Settings::kHotkeyRecord, GyanisScribe::Core::uiText("录屏"), QStringLiteral("Ctrl+Alt+R")},
+                                                    std::tuple{GyanisScribe::Settings::kHotkeyOcr, GyanisScribe::Core::uiText("文字识别"), QStringLiteral("Ctrl+Alt+O")},
+                                                    std::tuple{GyanisScribe::Settings::kHotkeyPick, GyanisScribe::Core::uiText("屏幕取色"), QStringLiteral("Ctrl+Alt+P")}})
+        {
+            auto *edit = new GyanisScribe::Ui::HotkeyEdit{m_settings, page};
+            edit->bindTo(key, title, defaultText);
+            form->addRow(GyanisScribe::Core::uiText("%1 的全局热键").arg(title), edit);
+        }
+        return page;
+    }
+
+    QWidget *MainWindow::buildThemePage()
+    {
+        auto *page = new QWidget{this};
+        auto *form = makePageForm(page, GyanisScribe::Core::uiText("配色方案即时生效。高对比度档是纯黑正文、纯白底与加粗边框。"));
+        form->addRow(GyanisScribe::Core::uiText("配色方案"), makeThemeCombo(m_theme));
+        return page;
     }
 
     QWidget *MainWindow::buildHistoryPage()
@@ -259,150 +678,6 @@ namespace GyanisScribe::App
         {
             m_history->refresh();
         }
-    }
-
-    QWidget *MainWindow::buildSettingsPage()
-    {
-        auto *page   = new QWidget{this};
-        auto *layout = new QVBoxLayout{page};
-
-        // 热键组：四个动作各一个录制框，写进去之后由 HotkeyManager 的订阅即时重登记
-        auto *hotkeyBox = new QGroupBox{GyanisScribe::Core::uiText("快捷键"), page};
-        auto *hotkeys   = new QFormLayout{hotkeyBox};
-        for (const auto [key, title, defaultText]: {std::tuple{GyanisScribe::Settings::kHotkeyCapture, GyanisScribe::Core::uiText("截图"), QStringLiteral("Ctrl+Alt+A")},
-                                                    std::tuple{GyanisScribe::Settings::kHotkeyRecord, GyanisScribe::Core::uiText("录屏"), QStringLiteral("Ctrl+Alt+R")},
-                                                    std::tuple{GyanisScribe::Settings::kHotkeyOcr, GyanisScribe::Core::uiText("文字识别"), QStringLiteral("Ctrl+Alt+O")},
-                                                    std::tuple{GyanisScribe::Settings::kHotkeyPick, GyanisScribe::Core::uiText("屏幕取色"), QStringLiteral("Ctrl+Alt+P")}})
-        {
-            auto *edit = new GyanisScribe::Ui::HotkeyEdit{m_settings, hotkeyBox};
-            edit->bindTo(key, title, defaultText);
-            hotkeys->addRow(GyanisScribe::Core::uiText("%1 的全局热键").arg(title), edit);
-        }
-        layout->addWidget(hotkeyBox);
-
-        // 目录组：三处路径都给出默认值作提示，留空即回落
-        auto *pathBox = new QGroupBox{GyanisScribe::Core::uiText("保存位置"), page};
-        auto *paths   = new QFormLayout{pathBox};
-        paths->addRow(GyanisScribe::Core::uiText("截图与标注成品目录"),
-                      makePathRow(m_settings, GyanisScribe::Settings::kPathScreenshot, GyanisScribe::Core::uiText("截图目录"), Core::Paths::defaultScreenshotDirectory(), m_icons));
-        paths->addRow(GyanisScribe::Core::uiText("录屏成品目录"),
-                      makePathRow(m_settings, GyanisScribe::Settings::kPathRecording, GyanisScribe::Core::uiText("录屏目录"), Core::Paths::defaultRecordingDirectory(), m_icons));
-        paths->addRow(GyanisScribe::Core::uiText("识别语言包目录"), makePathRow(m_settings, GyanisScribe::Settings::kOcrTessDataDirectory, GyanisScribe::Core::uiText("语言包目录"),
-                                                                                Core::Paths::applicationDataDirectory() / "tessdata", m_icons));
-        layout->addWidget(pathBox);
-
-        // 主题组：三档即时生效，不需要重启
-        auto *appearanceBox = new QGroupBox{GyanisScribe::Core::uiText("主题"), page};
-        auto *appearance    = new QFormLayout{appearanceBox};
-        auto *themeCombo    = new QComboBox{appearanceBox};
-        // 标签来自 themeChoices()：控件里不再抄第二份中文，序号—标签—档位的对应关系才只有一个真源
-        for (const auto &choice: themeChoices())
-        {
-            themeCombo->addItem(GyanisScribe::Core::uiText(choice.label.data()));
-        }
-        themeCombo->setAccessibleName(GyanisScribe::Core::uiText("主题"));
-        themeCombo->setCurrentIndex(indexOfThemeKind(m_theme.requestedKind()));
-        QObject::connect(themeCombo, &QComboBox::currentIndexChanged, appearanceBox,
-                         [this, themeCombo](int index)
-                         {
-                             if (const auto kind = themeKindAt(index); kind)
-                             {
-                                 if (auto applied = m_theme.setTheme(*kind); !applied)
-                                 {
-                                     GyanisScribe::Core::Logger::warning(std::format("主题没能切换：{}", applied.error().message));
-                                 }
-                             }
-                         });
-        appearance->addRow(GyanisScribe::Core::uiText("配色方案"), themeCombo);
-
-        // 界面语言：档位与自称都在 languageChoices() 上，配置里存的是 token 而不是中文。
-        // 语言包在进程启动时就装好了，这里写了值也只影响下一次启动，所以把「要重启」挂在提示里
-        auto *uiLanguage = new QComboBox{appearanceBox};
-        for (const auto &choice: languageChoices())
-        {
-            uiLanguage->addItem(GyanisScribe::Core::uiText(choice.label.data()));
-        }
-        uiLanguage->setAccessibleName(GyanisScribe::Core::uiText("界面语言"));
-        uiLanguage->setToolTip(GyanisScribe::Core::uiText("切换语言要重启智录才生效"));
-        const auto storedUiLanguage = m_settings.stringValue(GyanisScribe::Settings::kUiLanguage,
-                                                             QString::fromUtf8(std::string{GyanisScribe::Ui::appLanguageText(GyanisScribe::Ui::AppLanguage::Chinese)}));
-        if (const auto parsed = GyanisScribe::Ui::parseAppLanguage(storedUiLanguage.toStdString()); parsed)
-        {
-            uiLanguage->setCurrentIndex(indexOfAppLanguage(*parsed));
-        } else
-        {
-            // 配置里的值读不出时下拉框显示中文，但原因要落进日志：只把界面悄悄拨回默认档，用户会以为是自己选错的
-            Core::Logger::warning(std::format("设置页读不出界面语言：{}，下拉框按中文显示", parsed.error().message));
-            uiLanguage->setCurrentIndex(indexOfAppLanguage(AppLanguage::Chinese));
-        }
-        QObject::connect(uiLanguage, &QComboBox::currentIndexChanged, appearanceBox,
-                         [this, uiLanguage](int index)
-                         {
-                             const auto choice = appLanguageAt(index);
-                             if (!choice)
-                             {
-                                 return;
-                             }
-                             const auto token = QString::fromUtf8(std::string{GyanisScribe::Ui::appLanguageText(*choice)});
-                             if (auto written = m_settings.setValue(GyanisScribe::Settings::kUiLanguage, token); !written)
-                             {
-                                 Core::Logger::warning(std::format("界面语言没能保存：{}（当前选的是 {}）", written.error().message, uiLanguage->currentText().toStdString()));
-                             }
-                         });
-        appearance->addRow(GyanisScribe::Core::uiText("界面语言"), uiLanguage);
-        layout->addWidget(appearanceBox);
-
-        // 识别组：语言下拉的取值来自后端词表，不在这里另列一份
-        auto *ocrBox   = new QGroupBox{GyanisScribe::Core::uiText("文字识别"), page};
-        auto *ocr      = new QFormLayout{ocrBox};
-        auto *language = new QComboBox{ocrBox};
-        language->addItems(GyanisScribe::Ocr::supportedOcrLanguageTags());
-        language->setAccessibleName(GyanisScribe::Core::uiText("识别语言"));
-        const auto storedLanguage = m_settings.stringValue(GyanisScribe::Settings::kOcrLanguage, QString::fromUtf8(GyanisScribe::Ocr::kDefaultOcrLanguage));
-        if (const int index = language->findText(storedLanguage); index >= 0)
-        {
-            language->setCurrentIndex(index);
-        }
-        QObject::connect(language, &QComboBox::currentTextChanged, ocrBox,
-                         [this, language](const QString &text)
-                         {
-                             if (auto written = m_settings.setValue(GyanisScribe::Settings::kOcrLanguage, text); !written)
-                             {
-                                 GyanisScribe::Core::Logger::warning(
-                                         std::format("识别语言没能保存：{}（当前选的是 {}）", written.error().message, language->currentText().toStdString()));
-                             }
-                         });
-        ocr->addRow(GyanisScribe::Core::uiText("识别语言"), language);
-        layout->addWidget(ocrBox);
-
-        // 取色组：写法下拉的项名与序号都来自 Pick 那张表，配置里存的是标记而不是中文
-        auto *pickBox    = new QGroupBox{GyanisScribe::Core::uiText("屏幕取色"), page};
-        auto *pick       = new QFormLayout{pickBox};
-        auto *pickFormat = new QComboBox{pickBox};
-        pickFormat->addItems(GyanisScribe::Pick::colorFormatLabels());
-        pickFormat->setAccessibleName(GyanisScribe::Core::uiText("颜色写法"));
-        const auto storedFormat = GyanisScribe::Pick::parseColorFormat(m_settings.stringValue(GyanisScribe::Settings::kPickFormat, QStringLiteral("Hex")).toStdString());
-        pickFormat->setCurrentIndex(GyanisScribe::Pick::indexOfColorFormat(storedFormat ? *storedFormat : GyanisScribe::Pick::ColorFormat::Hex));
-        QObject::connect(pickFormat, &QComboBox::currentIndexChanged, pickBox,
-                         [this, pickFormat](int index)
-                         {
-                             const auto format = GyanisScribe::Pick::colorFormatAt(index);
-                             if (!format)
-                             {
-                                 return;
-                             }
-                             const auto token = QString::fromUtf8(GyanisScribe::Pick::colorFormatToken(*format).data(),
-                                                                  static_cast<qsizetype>(GyanisScribe::Pick::colorFormatToken(*format).size()));
-                             if (auto written = m_settings.setValue(GyanisScribe::Settings::kPickFormat, token); !written)
-                             {
-                                 GyanisScribe::Core::Logger::warning(std::format("颜色写法没能保存：{}", written.error().message));
-                             }
-                         });
-        pick->addRow(GyanisScribe::Core::uiText("复制用的写法"), pickFormat);
-        layout->addWidget(pickBox);
-
-        layout->addStretch();
-        return page;
     }
 
     QWidget *MainWindow::buildAboutPage()

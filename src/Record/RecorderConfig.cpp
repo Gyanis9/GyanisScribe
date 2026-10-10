@@ -59,4 +59,19 @@ namespace GyanisScribe::Record
         return {};
     }
 
+    Core::Expected<int> parseFrameRateSetting(const int stored)
+    {
+        // 只报「不合法」不够：帧率是用户自己填的，范围与后果都要说清（越高越大越慢）
+        if (stored >= 1 && stored <= kMaximumFrameRate)
+        {
+            return stored;
+        }
+        return Core::Expected<int>{std::unexpected{Core::Error{
+                .code    = Core::ErrorCode::InvalidArgument,
+                .message = GyanisScribe::Core::uiFormat(
+                        GyanisScribe::Core::uiTextUtf8("默认帧率 \"{}\" 不在可用范围（1 到 {}）里：请在设置的录屏页重选一个值，或删掉 Record/DefaultFrameRate 这一项回到默认档"),
+                        stored, kMaximumFrameRate),
+        }}};
+    }
+
 } // namespace GyanisScribe::Record

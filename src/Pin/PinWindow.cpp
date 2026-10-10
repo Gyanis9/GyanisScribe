@@ -3,6 +3,7 @@
 #include "Core/Logger.h"
 #include "Core/Paths.h"
 #include "Core/Text.h"
+#include "Pin/PinLayout.h"
 #include "Ui/DesignTokens.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Settings/ISettingsStore.h"
@@ -79,6 +80,17 @@ namespace GyanisScribe::Pin
 
         setWindowTitle(GyanisScribe::Core::uiText("智录贴图"));
         setAccessibleName(GyanisScribe::Core::uiText("贴图窗口"));
+
+        // 起点不透明度取自配置。恢复布局那一条之后还会再覆盖一次，
+        // 所以每张旧贴图各自的透明度不受这一条影响
+        if (const auto parsed = parseOpacityPercentSetting(m_settings.intValue(Settings::kPinDefaultOpacity, kDefaultOpacityPercent)); parsed)
+        {
+            m_opacity = *parsed;
+        } else
+        {
+            Core::Logger::warning(std::format("贴图默认不透明度读不出：{}，本次按完全不透明开始", parsed.error().message));
+        }
+
         applyGeometry();
         setWindowOpacity(m_opacity);
     }

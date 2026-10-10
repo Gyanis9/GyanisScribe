@@ -181,3 +181,23 @@ TEST_F(PinLayoutFixture, LoadWithoutStoredLayoutIsEmpty)
     ASSERT_TRUE(loaded.has_value()) << "第一次启动没有布局文件，不该报错";
     EXPECT_TRUE(loaded->isEmpty());
 }
+
+/**
+ * @brief 钉住默认不透明度百分比到界面取值域的换算与拒绝面
+ * @details 下限取 1% 而不是 0%：完全透明的贴图在屏幕上是看不见的存在，
+ *          鼠标却还会被它挡住，那种状态比"没有贴图"更难排查。
+ */
+TEST(PinLayoutOpacitySetting, ConvertsPercentAndRejectsZeroAndOver)
+{
+    EXPECT_DOUBLE_EQ(GyanisScribe::Pin::parseOpacityPercentSetting(100).value(), 1.0);
+    EXPECT_DOUBLE_EQ(GyanisScribe::Pin::parseOpacityPercentSetting(50).value(), 0.5);
+    EXPECT_DOUBLE_EQ(GyanisScribe::Pin::parseOpacityPercentSetting(1).value(), 0.01);
+
+    for (const int bad: {0, -10, 101})
+    {
+        const auto parsed = GyanisScribe::Pin::parseOpacityPercentSetting(bad);
+        ASSERT_FALSE(parsed.has_value()) << bad;
+        EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument) << bad;
+        EXPECT_NE(parsed.error().message.find("Pin/DefaultOpacity"), std::string::npos) << bad;
+    }
+}

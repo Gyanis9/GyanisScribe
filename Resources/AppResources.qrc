@@ -54,6 +54,7 @@
     <file alias="Settings.svg">Icons/Settings.svg</file>
     <file alias="SystemAudio.svg">Icons/SystemAudio.svg</file>
     <file alias="Text.svg">Icons/Text.svg</file>
+    <file alias="Theme.svg">Icons/Theme.svg</file>
     <file alias="ThemeDark.svg">Icons/ThemeDark.svg</file>
     <file alias="ThemeLight.svg">Icons/ThemeLight.svg</file>
     <file alias="ThemeSystem.svg">Icons/ThemeSystem.svg</file>

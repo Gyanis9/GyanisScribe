@@ -225,14 +225,15 @@ TEST_F(LanguageFixture, BuiltEnglishPackTranslatesKnownString)
     ASSERT_TRUE(applied.has_value()) << applied.error().message;
 
     // 三类各取一条：字面量调用点、constexpr 表里经 uiText(row.label.data()) 运行期查的那一类、带占位符的那一条。
-    // 装载生效时三者都应变英文；还是源码中文就说明这条没进目录或 context 写错，键对不上时表那一类最先坏
+    // 装载生效时三者都应变英文；还是源码中文就说明这条没进目录或 context 写错，键对不上时表那一类最先坏。
+    // 界面里删掉某一条样例时这里会红——那是有意的：样例必须换成界面上真的还在的那一句，否则「包装好了」这句话就没人证
     struct Sample
     {
         const char *source;   ///< 源码里的那串中文
         const char *expected; ///< 目录里钉好的英文译文
     };
 
-    for (const Sample sample: {Sample{"保存位置", "Save locations"}, Sample{"浅色", "Light"}, Sample{"最近使用 %1", "Recent %1"}})
+    for (const Sample sample: {Sample{"截图与标注成品目录", "Folder for screenshots and annotations"}, Sample{"浅色", "Light"}, Sample{"最近使用 %1", "Recent %1"}})
     {
         const auto translated = QCoreApplication::translate("GyanisScribe", sample.source);
         EXPECT_NE(translated, QString::fromUtf8(sample.source)) << sample.source << "：包装载成功但这条没变，查 .ts 里有没有它、context 对不对";

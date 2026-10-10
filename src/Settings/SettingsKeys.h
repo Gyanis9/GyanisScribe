@@ -63,4 +63,10 @@ namespace GyanisScribe::Settings
     /// 标注的默认字号，取值必须是 Ui::kFontSizes 里的一档
     inline constexpr std::string_view kAnnotationDefaultFontSize = "Annotation/DefaultFontSize";
 
+    /// 新建贴图的默认不透明度（1 到 100 的百分比），读端在 Pin::PinWindow，写端在设置的贴图页
+    inline constexpr std::string_view kPinDefaultOpacity = "Pin/DefaultOpacity";
+
+    /// 录屏的默认帧率（1 到 Record::kMaximumFrameRate），读端在 AppController 造参数那一处，写端在设置的录屏页
+    inline constexpr std::string_view kRecordDefaultFrameRate = "Record/DefaultFrameRate";
+
 } // namespace GyanisScribe::Settings

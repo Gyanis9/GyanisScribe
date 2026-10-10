@@ -225,7 +225,7 @@ namespace GyanisScribe::App
                 startColorPick();
                 return;
             case TrayAction::OpenSettings:
-                openMainWindow(MainWindowPage::Settings);
+                openMainWindow(MainWindowPage::General);
                 return;
             case TrayAction::OpenAbout:
                 openMainWindow(MainWindowPage::About);
@@ -443,6 +443,16 @@ namespace GyanisScribe::App
         config.screenName      = screen->name();
         const auto configured  = m_settings->stringValue(Settings::kPathRecording, QString());
         config.outputDirectory = configured.isEmpty() ? Core::Paths::defaultRecordingDirectory() : std::filesystem::path{configured.toStdString()};
+
+        // 帧率取用户记下的那一档；读不出时记一条并按 RecorderConfig 的初值走，
+        // 不拿一个"看起来能用"的值替用户决定（validateRecorderConfig 会在真正开始前再判一次范围）
+        if (const auto parsed = Record::parseFrameRateSetting(m_settings->intValue(Settings::kRecordDefaultFrameRate, Record::kDefaultFrameRate)); parsed)
+        {
+            config.frameRate = *parsed;
+        } else
+        {
+            Core::Logger::warning(std::format("录屏默认帧率读不出：{}，本次按 {} 帧开始", parsed.error().message, config.frameRate));
+        }
         return config;
     }
 

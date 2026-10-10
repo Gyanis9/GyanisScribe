@@ -61,7 +61,7 @@ Application::Application(int &argc, char **argv) : QApplication(argc, argv)
                      [this]
                      {
                          GyanisScribe::Core::Logger::info("又有人启动智录：把设置窗口唤到前台，不再开第二份");
-                         m_controller->openMainWindow(GyanisScribe::App::MainWindowPage::Settings);
+                         m_controller->openMainWindow(GyanisScribe::App::MainWindowPage::General);
                      });
 
     // 就绪判据只看日志有没有接管成功：界面在日志坏掉时照样能用，但 CI 的自检要把这一格判红

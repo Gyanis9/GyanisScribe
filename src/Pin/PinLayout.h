@@ -71,4 +71,16 @@ namespace GyanisScribe::Pin
      */
     [[nodiscard]] Core::Expected<QVector<PinState>> loadLayout(const Settings::ISettingsStore &settings);
 
+    /// 新建贴图的默认不透明度（百分比）：配置里没有或值不合法时用它，即完全不透明
+    inline constexpr int kDefaultOpacityPercent = 100;
+
+    /**
+     * @brief 把配置里存的不透明度百分比换成界面用的 (0,1]
+     * @param percent 配置读出的整数百分比
+     * @return 可用的不透明度；不在 1..100 里时返回带范围与恢复办法的中文原因
+     * @details 取 1 而不是 0 作下限：0% 的贴图在屏幕上是看不见的存在，
+     *          用户会以为贴图功能坏了，而鼠标还会被它挡住。
+     */
+    [[nodiscard]] Core::Expected<double> parseOpacityPercentSetting(int percent);
+
 } // namespace GyanisScribe::Pin
