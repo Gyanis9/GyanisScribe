@@ -163,7 +163,7 @@ namespace GyanisScribe::App
 
         // 录屏：编码器与服务各一个，热键再按一次就是「停止并编码」
         m_recorder  = std::make_unique<Record::FfmpegRecordingEncoder>();
-        m_recording = std::make_unique<Record::RecordingService>(*m_captureSource, *m_recorder, *m_integration);
+        m_recording = std::make_unique<Record::RecordingService>(*m_captureSource, *m_recorder);
         QObject::connect(m_recording.get(), &Record::RecordingService::finished, this, &AppController::handleRecordingFinished);
         QObject::connect(m_recording.get(), &Record::RecordingService::failed, this, &AppController::handleRecordingFailed);
         QObject::connect(m_recording.get(), &Record::RecordingService::aborted, this, &AppController::handleRecordingAborted);
