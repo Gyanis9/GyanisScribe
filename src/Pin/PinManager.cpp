@@ -138,6 +138,28 @@ namespace GyanisScribe::Pin
         return restored;
     }
 
+    int PinManager::clearMouseThrough()
+    {
+        // 只动在穿透的那几张：没在穿透的调一次 setMouseThrough(false) 是空转，
+        // 而在没这能力的平台上那一次调用会回错，计数就假了
+        auto restored = 0;
+        for (const auto &pin: m_pins)
+        {
+            if (pin == nullptr || !pin->isMouseThrough())
+            {
+                continue;
+            }
+            if (const auto result = pin->setMouseThrough(false); result)
+            {
+                ++restored;
+            } else
+            {
+                Core::Logger::warning(std::format("有一张贴图的穿透没取消掉：{}", result.error().message));
+            }
+        }
+        return restored;
+    }
+
     void PinManager::closeAll()
     {
         // 逐个关掉：每个窗口关的时候会回调 forget，这里不能边遍历边 erase，先整份挪出来再收尾

@@ -387,4 +387,36 @@ namespace GyanisScribe
             }
         }
     } // namespace
+    /**
+     * @brief 钉住「贴图开着鼠标穿透时，托盘那一条能把它们点回来」
+     * @details 穿透中的贴图收不到右键，自己那一档就再也关不掉；没有这条出口时唯一的办法是
+     *          「关闭全部贴图」，那等于把用户摆了一桌的成果一起丢掉。计数只算真开着的那些：
+     *          一张都没恢复时说「已让 0 张…」就是把没发生的事报成发生了。
+     */
+    TEST_F(ModuleFlowFixture, TrayEscapeHatchMakesThroughPinsClickableAgain)
+    {
+        if (!integration->capabilities().clickThrough)
+        {
+            GTEST_SKIP() << "本平台没有鼠标穿透能力，开不出穿透中的贴图，这条出口在这里没有可复现的现场";
+        }
+
+        GyanisScribe::Settings::SettingsStore settings(m_iniFile);
+        FakeScreenSource                      source(makeFakeFrame());
+        const auto                            frame = captureOneFrame(settings, source);
+
+        GyanisScribe::Pin::PinManager pins(settings, *integration);
+        auto                         &through   = pins.addPin(frame.image, QPoint(700, 300));
+        auto                         &clickable = pins.addPin(frame.image, QPoint(900, 300));
+        ASSERT_TRUE(through.setMouseThrough(true).has_value()) << "能力位说有穿透，开起来却失败：能力表与实现不同解";
+        ASSERT_TRUE(through.isMouseThrough());
+        EXPECT_FALSE(clickable.isMouseThrough());
+
+        EXPECT_EQ(pins.clearMouseThrough(), 1) << "只该恢复那一张开着穿透的贴图";
+        EXPECT_FALSE(through.isMouseThrough()) << "按过之后还穿透着，这条出口就是假的";
+
+        EXPECT_EQ(pins.clearMouseThrough(), 0) << "再按一次没有可恢复的了，不该再报出数字";
+
+        pins.closeAll();
+    }
+
 } // namespace GyanisScribe

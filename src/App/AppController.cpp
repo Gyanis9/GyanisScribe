@@ -373,6 +373,16 @@ namespace GyanisScribe::App
             case TrayAction::PickColor:
                 startColorPick();
                 return;
+            case TrayAction::ClearPinsThrough:
+            {
+                const auto restored = m_pins->clearMouseThrough();
+                // 一张都没恢复也要说一声：用户按这条是因为他觉得贴图「点不动」，
+                // 没有这句他就会一直以为是程序卡住了
+                notifyUser(restored > 0 ? QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已让 {} 张贴图重新吃鼠标"), restored).c_str())
+                                        : GyanisScribe::Core::uiText("没有贴图开着鼠标穿透"),
+                           restored > 0 ? Ui::ToastKind::Success : Ui::ToastKind::Information);
+                return;
+            }
             case TrayAction::CloseAllPins:
                 // 一次点关掉全部：张数由 pinCountChanged 通知托盘刷新，这里只留一条日志，不再弹提示吵人
                 Core::Logger::info(std::format("托盘要求关闭全部贴图：{} 张", m_pins->count()));

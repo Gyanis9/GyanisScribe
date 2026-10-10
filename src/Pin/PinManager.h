@@ -102,6 +102,14 @@ namespace GyanisScribe::Pin
          */
         void closeAll();
 
+        /**
+         * @brief 让所有正在鼠标穿透的贴图重新吃鼠标
+         * @return 恢复的张数；没有一张在穿透时返回 0
+         * @details 穿透中的贴图收不到右键，也就关不掉自己那一档——这一条是那个死局的出口，
+         *          放在托盘而不是贴在图上。
+         */
+        int clearMouseThrough();
+
     signals:
         /**
          * @brief 贴图张数变了

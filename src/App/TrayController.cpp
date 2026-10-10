@@ -58,6 +58,7 @@ namespace GyanisScribe::App
         entries.append(TrayMenuEntry{TrayAction::RecognizeFile, "OcrImage", GyanisScribe::Core::uiText("识别图片文件…"), {}});
         entries.append(TrayMenuEntry{TrayAction::PickColor, "ColorPicker", GyanisScribe::Core::uiText("屏幕取色"), GyanisScribe::Settings::kHotkeyPick});
         entries.append(TrayMenuEntry{TrayAction::CloseAllPins, "PinClose", GyanisScribe::Core::uiText("关闭全部贴图"), {}});
+        entries.append(TrayMenuEntry{TrayAction::ClearPinsThrough, "PinMouseThrough", GyanisScribe::Core::uiText("取消全部贴图穿透"), {}});
         entries.append(TrayMenuEntry{});
         entries.append(TrayMenuEntry{TrayAction::OpenSettings, "Settings", GyanisScribe::Core::uiText("设置"), {}});
         entries.append(TrayMenuEntry{TrayAction::OpenAbout, "About", GyanisScribe::Core::uiText("关于智录"), {}});

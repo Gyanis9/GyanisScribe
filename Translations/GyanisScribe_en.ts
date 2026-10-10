@@ -176,6 +176,14 @@
             <translation>Capture starts in {} seconds: get the menu or hover state ready and hold still for a moment</translation>
         </message>
         <message>
+            <source>已让 {} 张贴图重新吃鼠标</source>
+            <translation>Restored mouse input on {} pinned image(s)</translation>
+        </message>
+        <message>
+            <source>没有贴图开着鼠标穿透</source>
+            <translation>No pinned image is click-through right now</translation>
+        </message>
+        <message>
             <source>已复制到剪贴板</source>
             <translation>Copied to the clipboard</translation>
         </message>
@@ -742,6 +750,10 @@
         <message>
             <source>关闭全部贴图</source>
             <translation>Close all pins</translation>
+        </message>
+        <message>
+            <source>取消全部贴图穿透</source>
+            <translation>Let every pinned image receive the mouse again</translation>
         </message>
         <message>
             <source>设置</source>

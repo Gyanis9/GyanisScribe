@@ -59,6 +59,7 @@ namespace GyanisScribe::App
         Quit,              ///< 退出程序
         CloseAllPins,      ///< 关掉全部贴图；新成员只追加在末尾，表用例按名字钉住了这一张表
         CaptureLongRegion, ///< 滚动长截图：先框一条区域，再反复抓同一块把新的一段接上去
+        ClearPinsThrough,  ///< 取消全部贴图的鼠标穿透；新成员只追加在末尾
     };
 
     /**

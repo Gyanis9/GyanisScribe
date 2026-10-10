@@ -50,17 +50,17 @@ namespace
 } // namespace
 
 /**
- * @brief 钉住托盘菜单表：十三项动作各一次，分隔线不带动作
+ * @brief 钉住托盘菜单表：每一项动作各一次，分隔线不带动作
  * @details 菜单是用户找不到主窗口时唯一的入口，少一项或重一项都直接影响可用；
  *          图标名还要求真的在资源里，否则菜单上会出现一个空白项。
  */
 TEST(TrayMenuTable, ListsEachActionOnceWithRealIcons)
 {
     // 期望清单就是项数的真源：不加显式大小，漏一项或多一项都由这一处对出来
-    constexpr std::array expectedActions{TrayAction::CaptureRegion,    TrayAction::CaptureFullScreen, TrayAction::CaptureLastRegion, TrayAction::CaptureWindow,
-                                         TrayAction::ToggleRecord,     TrayAction::Recognize,         TrayAction::RecognizeFile,     TrayAction::PickColor,
-                                         TrayAction::CloseAllPins,     TrayAction::OpenSettings,      TrayAction::OpenAbout,         TrayAction::Quit,
-                                         TrayAction::CaptureLongRegion};
+    constexpr std::array expectedActions{TrayAction::CaptureRegion,     TrayAction::CaptureFullScreen, TrayAction::CaptureLastRegion, TrayAction::CaptureWindow,
+                                         TrayAction::ToggleRecord,      TrayAction::Recognize,         TrayAction::RecognizeFile,     TrayAction::PickColor,
+                                         TrayAction::CloseAllPins,      TrayAction::OpenSettings,      TrayAction::OpenAbout,         TrayAction::Quit,
+                                         TrayAction::CaptureLongRegion, TrayAction::ClearPinsThrough};
 
     const auto actions = actionsInTable();
     EXPECT_EQ(actions.size(), expectedActions.size()) << "表里的动作项数与这份清单不同解";
