@@ -151,10 +151,11 @@ namespace GyanisScribe::Ocr
             return std::unexpected(loaded.error());
         }
 
-        // 只转灰度：这一条通道没有本机对照数据，放大到底帮不帮得上说不准，就不替用户改图片尺寸
-        // （系统那条通道是实测过的，结论见 OcrPreprocessor.h 的 @warning）
         const QImage gray = toGrayscale(image).convertToFormat(QImage::Format_Grayscale8);
-        TessBaseAPISetImage(m_api.get(), static_cast<const unsigned char *>(gray.constBits()), gray.width(), 1, gray.height(), static_cast<int>(gray.bytesPerLine()));
+        // 形参顺序是 (数据, 宽, 高, 每像素字节数, 每行字节数)：把「高」与「每像素字节数」写反，
+        // Leptonica 会按 高×8 位深去建图并报「Cannot convert RAW image to Pix with bpp = 512」，
+        // 识别一定失败——这条是靠真语言包的端到端用例才看得见的那一格
+        TessBaseAPISetImage(m_api.get(), static_cast<const unsigned char *>(gray.constBits()), gray.width(), gray.height(), 1, static_cast<int>(gray.bytesPerLine()));
 
         if (TessBaseAPIRecognize(m_api.get(), nullptr) != 0)
         {

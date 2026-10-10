@@ -10,6 +10,15 @@ if (WIN32 AND MSVC)
     target_sources(TestOcr PRIVATE TestWinRTImageOcrEngine.cpp)
 endif ()
 
+# Tesseract 那一档同理，判据直接问库导出的宏，不在这里重复一遍 find_package：
+# 本机 Debug 档没有这份后端（见 conanfile.py 的说明），容器两档都有
+get_target_property(ocrInterfaceCompileDefinitions Ocr INTERFACE_COMPILE_DEFINITIONS)
+if (ocrInterfaceCompileDefinitions MATCHES "GYANISSCRIBE_HAS_TESSERACT")
+    target_sources(TestOcr PRIVATE TestTesseractOcrEngine.cpp)
+    # 这份用例认的是随仓库那一份语言包，路径由构建期给；装完即用的判据不该依赖用户把包放哪
+    target_compile_definitions(TestOcr PRIVATE GYANISSCRIBE_VENDORED_TESSDATA="${CMAKE_SOURCE_DIR}/Vendor/Tessdata")
+endif ()
+
 target_link_libraries(TestOcr PRIVATE
         Ocr
         Settings
