@@ -150,7 +150,7 @@ TEST(TrayTooltip, ShowsRecordingProgressAndSeparatesPaused)
 TEST(TrayMenuTable, HotkeyHintsBindToRealSettingKeys)
 {
     const std::vector<std::string_view> knownKeys = {GyanisScribe::Settings::kHotkeyCapture, GyanisScribe::Settings::kHotkeyRecord, GyanisScribe::Settings::kHotkeyOcr,
-                                                     GyanisScribe::Settings::kHotkeyPick};
+                                                     GyanisScribe::Settings::kHotkeyPick, GyanisScribe::Settings::kHotkeyCaptureLong};
 
     int hinted = 0;
     for (const auto &entry: trayMenuEntries())
@@ -162,7 +162,7 @@ TEST(TrayMenuTable, HotkeyHintsBindToRealSettingKeys)
         ++hinted;
         EXPECT_TRUE(std::ranges::find(knownKeys, entry.hotkeyKey) != knownKeys.end()) << std::string{entry.hotkeyKey};
     }
-    EXPECT_EQ(hinted, 4) << "四个全局热键之外不该再有别的提示项";
+    EXPECT_EQ(hinted, 5) << "全局热键有五项，托盘上的提示项也只能是这五项：多出来那条永远显示默认组合";
 }
 
 /**
