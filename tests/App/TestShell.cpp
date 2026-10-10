@@ -56,10 +56,10 @@ namespace
  */
 TEST(TrayMenuTable, ListsEachActionOnceWithRealIcons)
 {
-    // 期望清单就是项数的真源：以前这里另写一个字面量 10，加一项就得记得改两处
-    constexpr std::array<TrayAction, 11> expectedActions{
-            TrayAction::CaptureRegion, TrayAction::CaptureFullScreen, TrayAction::CaptureLastRegion, TrayAction::CaptureWindow, TrayAction::ToggleRecord, TrayAction::Recognize,
-            TrayAction::RecognizeFile, TrayAction::PickColor,         TrayAction::OpenSettings,      TrayAction::OpenAbout,     TrayAction::Quit};
+    // 期望清单就是项数的真源：不加显式大小，漏一项或多一项都由这一处对出来
+    constexpr std::array expectedActions{TrayAction::CaptureRegion, TrayAction::CaptureFullScreen, TrayAction::CaptureLastRegion, TrayAction::CaptureWindow,
+                                         TrayAction::ToggleRecord,  TrayAction::Recognize,         TrayAction::RecognizeFile,     TrayAction::PickColor,
+                                         TrayAction::CloseAllPins,  TrayAction::OpenSettings,      TrayAction::OpenAbout,         TrayAction::Quit};
 
     const auto actions = actionsInTable();
     EXPECT_EQ(actions.size(), expectedActions.size()) << "表里的动作项数与这份清单不同解";

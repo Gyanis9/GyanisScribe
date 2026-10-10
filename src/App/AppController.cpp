@@ -250,6 +250,11 @@ namespace GyanisScribe::App
             case TrayAction::PickColor:
                 startColorPick();
                 return;
+            case TrayAction::CloseAllPins:
+                // 一次点关掉全部：张数由 pinCountChanged 通知托盘刷新，这里只留一条日志，不再弹提示吵人
+                Core::Logger::info(std::format("托盘要求关闭全部贴图：{} 张", m_pins->count()));
+                m_pins->closeAll();
+                return;
             case TrayAction::OpenSettings:
                 openMainWindow(MainWindowPage::General);
                 return;

@@ -576,6 +576,10 @@
             <translation>Recognize an image file…</translation>
         </message>
         <message>
+            <source>关闭全部贴图</source>
+            <translation>Close all pins</translation>
+        </message>
+        <message>
             <source>设置</source>
             <translation>Settings</translation>
         </message>

@@ -57,6 +57,7 @@ namespace GyanisScribe::App
         OpenAbout,         ///< 打开关于页
         RecognizeFile,     ///< 挑一张盘上的图去识别
         Quit,              ///< 退出程序
+        CloseAllPins,      ///< 关掉全部贴图；新成员只追加在末尾，表用例按名字钉住了这一张表
     };
 
     /**
