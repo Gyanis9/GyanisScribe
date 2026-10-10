@@ -45,8 +45,8 @@ namespace GyanisScribe::Record
      * @brief 录屏服务
      * @details 这层只做胶水：定时器跳一次就抓一帧交给会话，会话决定写不写；
      *          「什么时候写、暂停怎么算、时长上限」全在 RecordingSession 里，那部分有用例。
-     *          本类直测的是这几条：一份配置能不能开始、取声在该跳过的档位上真跳过了、
-     *          编码交给工作线程而回接落在界面线程、失败时帧目录留着、析构会等手上的编码；
+     *          本类直测的是这几条：一份配置能不能开始、取声在该跳过的档位上真跳过了、编码交给工作线程
+     *          而回接落在界面线程、失败时帧目录留着、取消时帧目录删掉而编码一次都不叫、析构会等手上的编码；
      *          真抓屏像素与真编出文件需要一个真实桌面会话，那一段仍然留给验收。
      */
     class RecordingService : public QObject
@@ -96,6 +96,14 @@ namespace GyanisScribe::Record
          */
         [[nodiscard]] Core::Expected<void> stop();
 
+        /**
+         * @brief 取消本轮录屏：这一段不要了，不出成品
+         * @return 成功返回空载荷；当前没有录制时返回原因
+         * @details 与 stop() 的分别只在收尾：不封盘、不起编码，已落的临时帧与中间 wav 直接删掉，
+         *          会话随之交回（state() 回到 Idle），所以下一轮不会被「上一轮还没收尾」拦住。
+         */
+        [[nodiscard]] Core::Expected<void> cancel();
+
         /// 当前状态
         [[nodiscard]] RecordingState state() const noexcept;
 
@@ -114,6 +122,8 @@ namespace GyanisScribe::Record
         void failed(const QString &reason);
         /// 录屏结束并编出成品
         void finished(const QString &outputPath);
+        /// 本轮被取消：临时帧与中间 wav 都已删掉，没有成品也不会有 finished
+        void aborted();
 
     private:
         /// 定时器一跳：抓一帧并推进会话

@@ -164,6 +164,7 @@ namespace GyanisScribe::App
         m_recording = std::make_unique<Record::RecordingService>(*m_captureSource, *m_recorder);
         QObject::connect(m_recording.get(), &Record::RecordingService::finished, this, &AppController::handleRecordingFinished);
         QObject::connect(m_recording.get(), &Record::RecordingService::failed, this, &AppController::handleRecordingFailed);
+        QObject::connect(m_recording.get(), &Record::RecordingService::aborted, this, &AppController::handleRecordingAborted);
         QObject::connect(m_recording.get(), &Record::RecordingService::countdownChanged, this,
                          [this](int remainingSeconds)
                          {
@@ -663,6 +664,7 @@ namespace GyanisScribe::App
                              updateRecordingHud();
                          });
         QObject::connect(m_hud, &Record::RecordingHud::stopRequested, this, &AppController::toggleRecording);
+        QObject::connect(m_hud, &Record::RecordingHud::cancelRequested, this, &AppController::cancelRecording);
         QObject::connect(m_hud, &Record::RecordingHud::minimized, this,
                          [this]
                          {
@@ -809,6 +811,25 @@ namespace GyanisScribe::App
         Core::Logger::error(std::format("录屏中止：{}", reason.toStdString()));
         notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("录屏中止：{}。请重试一次"), reason.toStdString()).c_str()),
                    Ui::ToastKind::Danger);
+    }
+
+    void AppController::cancelRecording()
+    {
+        const auto cancelled = m_recording->cancel();
+        // 成功那一路由服务自己的 aborted 信号回到 handleRecordingAborted：收尾只有一处，两个出口不各写一份
+        if (!cancelled)
+        {
+            Core::Logger::warning(std::format("录屏取消没成：{}", cancelled.error().message));
+            notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("取消录屏没成：{}"), cancelled.error().message).c_str()),
+                       Ui::ToastKind::Danger);
+        }
+    }
+
+    void AppController::handleRecordingAborted()
+    {
+        hideRecordingHud();
+        Core::Logger::info("录屏已取消：这一段没有成品");
+        notifyUser(GyanisScribe::Core::uiText("已取消录屏：这一段没有保存，临时帧也删了"), Ui::ToastKind::Information);
     }
 
 } // namespace GyanisScribe::App

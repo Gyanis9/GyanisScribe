@@ -228,6 +228,17 @@ namespace GyanisScribe::App
 
         /// 录屏中止：把原因落到日志
         void handleRecordingFailed(const QString &reason);
+
+        /**
+         * @brief 控制条上的「取消」：把正在录的这一段丢掉
+         * @details 走 RecordingService::cancel() 而不是 toggleRecording()：后者会封盘并起一次编码，
+         *          等成品出来再删等于让用户白等一趟，也把「这一段不要了」做成了有成品的一轮。
+         */
+        void cancelRecording();
+
+        /// 录屏已取消：收起控制条，说一句「没有成品」
+        void handleRecordingAborted();
+
         /// 标注窗请求存文件
         void handleSaveRequested(const QImage &image);
         /// 标注窗请求贴图

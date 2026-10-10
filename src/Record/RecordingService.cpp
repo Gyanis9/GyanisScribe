@@ -162,6 +162,39 @@ namespace GyanisScribe::Record
         return {};
     }
 
+    Core::Expected<void> RecordingService::cancel()
+    {
+        const auto state = m_session == nullptr ? RecordingState::Idle : m_session->state();
+        // 只对「还在要帧」的那三档动手：stop() 之后的那一轮正在后台读帧目录编成品，
+        // 这时候删等于把它的输入抽走，用户拿到的将是「编码失败」而不是「我取消了」
+        if (state != RecordingState::Countdown && state != RecordingState::Recording && state != RecordingState::Paused)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
+                                               state == RecordingState::Idle
+                                                       ? GyanisScribe::Core::uiTextUtf8("当前没有正在进行的录屏")
+                                                       : GyanisScribe::Core::uiTextUtf8("这一轮已经停止并在编成品：取消只对在录的那几秒有效，不想要成品就等它编完再删")});
+        }
+
+        m_timer.stop();
+        // 取声的进程照常收尸：留着一个还在写盘的 ffmpeg，删掉的文件会被它重新造出来
+        const auto      discardedWav = finishAudioCapture();
+        std::error_code ignored;
+        if (!discardedWav.empty())
+        {
+            std::filesystem::remove(discardedWav, ignored);
+        }
+        std::filesystem::remove_all(m_frameDirectory, ignored);
+        m_frameDirectory.clear();
+        m_audioWav.clear();
+        // 会话先走、去处再走：会话拿着那一份的引用。两者都交回去之后 state() 回到 Idle，
+        // 控制条与托盘的读数才不说谎，下一轮也不会被「上一轮还没收尾」拦住
+        m_session.reset();
+        m_sink.reset();
+        Core::Logger::info("录屏已取消：临时帧与中间音频都删掉了，这一轮不出成品");
+        emit aborted();
+        return {};
+    }
+
     void RecordingService::startEncoding(const RecorderConfig &config, const std::filesystem::path &frameDirectory, const int frames, const std::filesystem::path &audioWav)
     {
         auto &encoder = m_encoder;

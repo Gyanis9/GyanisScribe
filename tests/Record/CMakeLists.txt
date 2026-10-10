@@ -21,7 +21,7 @@ endif ()
 
 add_dependencies(TestRecord DeployQtRuntime)
 
-# 这六条用例走的是服务本体：开始一轮就在缓存的 Recording 目录下建带时间戳的帧目录，收尾时用例要把
+# 这一组用例走的是服务本体：开始一轮就在缓存的 Recording 目录下建带时间戳的帧目录，收尾时用例要把
 # 自己那一份清掉。ctest -j 会把每条用例当成独立进程，共删同一棵树就会互相删掉对方正在写的帧
 # （实测并行跑两条红、单跑全绿），因此整组串行。
 add_executable(TestRecordingService

@@ -77,7 +77,7 @@ namespace GyanisScribe::Record
     public:
         /**
          * @brief 构造控制条
-         * @param icons 图标供给器，三个按钮的图标由它取
+         * @param icons 图标供给器，四个按钮的图标由它取
          * @param screenAvailable 摆放用的可用区，屏幕坐标
          * @param parent Qt 父对象
          */
@@ -125,6 +125,9 @@ namespace GyanisScribe::Record
 
         /// 用户按了停止并保存
         void stopRequested();
+
+        /// 用户按了取消：这一段不要了，不出成品
+        void cancelRequested();
 
         /// 用户把控制条最小化到托盘
         void minimized();

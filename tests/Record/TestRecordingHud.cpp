@@ -56,6 +56,34 @@ namespace
         }
     };
 
+    /**
+     * @brief 按无障碍名字找控制条上的一枚按钮
+     * @return 找到返回那枚按钮，所有权在控制条；没有则返回空指针
+     * @details 认名字不认顺序：控制条加一枚键不该让所有用例都去改下标。
+     */
+    [[nodiscard]] QPushButton *buttonOf(const RecordingHud &hud, const QString &accessibleName)
+    {
+        const auto candidates = hud.findChildren<QPushButton *>();
+        for (auto *candidate: candidates)
+        {
+            if (candidate->accessibleName() == accessibleName)
+            {
+                return candidate;
+            }
+        }
+        return nullptr;
+    }
+
+    /// 按下再放开：QPushButton 的 clicked 要两半齐了才发，只发按下事件会让用例以为按钮没接上
+    void clickOn(QPushButton *target)
+    {
+        const QPointF where{5.0, 5.0};
+        QMouseEvent   press{QEvent::MouseButtonPress, where, where, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QMouseEvent   release{QEvent::MouseButtonRelease, where, where, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+        QApplication::sendEvent(target, &press);
+        QApplication::sendEvent(target, &release);
+    }
+
 } // namespace
 
 /**
@@ -166,30 +194,9 @@ TEST_F(RecordingHudFixture, PauseButtonFollowsStateAndEmitsMatchingRequest)
     QObject::connect(hud.get(), &RecordingHud::resumeRequested, hud.get(), [&resumes] { ++resumes; });
 
     hud->applyState(RecordingState::Recording, 0, 1);
-    auto *button = [&hud]
-    {
-        const auto candidates = hud->findChildren<QPushButton *>();
-        for (auto *candidate: candidates)
-        {
-            if (candidate->accessibleName() == QStringLiteral("暂停") || candidate->accessibleName() == QStringLiteral("继续"))
-            {
-                return candidate;
-            }
-        }
-        return static_cast<QPushButton *>(nullptr);
-    }();
+    auto *button = buttonOf(*hud, QStringLiteral("暂停"));
     ASSERT_NE(button, nullptr) << "控制条上该有一枚暂停/继续键";
     EXPECT_EQ(button->accessibleName(), QStringLiteral("暂停"));
-
-    // QPushButton 的 clicked 要一按一放齐了才发；只发按下事件会让用例以为按钮没接上
-    const auto clickOn = [](QPushButton *target)
-    {
-        const QPointF where{5.0, 5.0};
-        QMouseEvent   press{QEvent::MouseButtonPress, where, where, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
-        QMouseEvent   release{QEvent::MouseButtonRelease, where, where, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
-        QApplication::sendEvent(target, &press);
-        QApplication::sendEvent(target, &release);
-    };
 
     clickOn(button);
     EXPECT_EQ(pauses, 1);
@@ -200,4 +207,27 @@ TEST_F(RecordingHudFixture, PauseButtonFollowsStateAndEmitsMatchingRequest)
     clickOn(button);
     EXPECT_EQ(resumes, 1) << "暂停中按下去该恢复录制";
     EXPECT_EQ(pauses, 1) << "恢复不该被当成再一次暂停";
+}
+
+/**
+ * @brief 钉住「取消」那一枚键发的是取消请求，而不是停止并保存
+ * @details 两颗键挨在同一个条上：按错的下场完全不同——停止会编出一份成品，取消什么也不留。
+ *          因此这里既断「发了 cancelRequested」，也断「没有顺带发 stopRequested」。
+ */
+TEST_F(RecordingHudFixture, CancelButtonRequestsCancelAndNotSave)
+{
+    auto hud = makeHud();
+
+    int cancels = 0;
+    int stops   = 0;
+    QObject::connect(hud.get(), &RecordingHud::cancelRequested, hud.get(), [&cancels] { ++cancels; });
+    QObject::connect(hud.get(), &RecordingHud::stopRequested, hud.get(), [&stops] { ++stops; });
+
+    hud->applyState(RecordingState::Recording, 0, 5);
+    auto *button = buttonOf(*hud, QStringLiteral("取消录屏"));
+    ASSERT_NE(button, nullptr) << "控制条上该有一枚取消键：录坏了的那一段得能整段扔掉";
+
+    clickOn(button);
+    EXPECT_EQ(cancels, 1) << "按下去没发出取消请求";
+    EXPECT_EQ(stops, 0) << "取消走成了停止并保存，用户会多一份根本不想要的成品";
 }

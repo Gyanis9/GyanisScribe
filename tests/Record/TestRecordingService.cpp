@@ -1,5 +1,6 @@
-// RecordingService 的直测。抓屏与真编码留给桌面会话，这里钉的是这一层自己的两个决定：
-// 哪种输出该跳过取声（音频档位），以及 stop() 之后编码是不是真的不在界面线程上等（线程交接）。
+// RecordingService 的直测。抓屏与真编码留给桌面会话，这里钉的是这一层自己的三个决定：
+// 哪种输出该跳过取声（音频档位）、stop() 之后编码是不是真的不在界面线程上等（线程交接）、
+// 以及临时帧的处置（编码失败留着好重编码，取消则整棵删掉且一次编码都不叫）。
 // 假编码器把 encode() 停在门闩上，「调用已返回而活还没干完」因此成了可断言的事。
 
 #include "Capture/IScreenCaptureSource.h"
@@ -21,6 +22,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstddef>
 #include <filesystem>
 #include <memory>
 #include <mutex>
@@ -40,6 +42,7 @@ using GyanisScribe::Record::locateFfmpeg;
 using GyanisScribe::Record::OutputFormat;
 using GyanisScribe::Record::RecorderConfig;
 using GyanisScribe::Record::RecordingService;
+using GyanisScribe::Record::RecordingState;
 
 namespace
 {
@@ -180,6 +183,42 @@ namespace
             QCoreApplication::processEvents(QEventLoop::AllEvents, 1);
             std::this_thread::sleep_for(std::chrono::milliseconds{10});
         }
+    }
+
+    /**
+     * @brief 这一轮落在缓存里的帧目录
+     * @return 唯一的子目录路径；一个都没有时返回空路径
+     * @details 整组用例按 RESOURCE_LOCK 串行（Recording 那棵树是共用的），因此「恰好一个」这条前提成立。
+     */
+    [[nodiscard]] std::filesystem::path onlyFrameDirectory()
+    {
+        const auto root = GyanisScribe::Core::Paths::cacheDirectory() / "Recording";
+        // 环里带条件才返回：无条件 return 的循环会让 MSVC 在 Debug 档把循环之后那句当成不可达代码（C4702），
+        // 而 /W4 /WX 把那条警告直接变成构建失败
+        for (const auto &entry: std::filesystem::directory_iterator{root})
+        {
+            if (entry.is_directory())
+            {
+                return entry.path();
+            }
+        }
+        return {};
+    }
+
+    /// 目录里有几份文件：取消该把整棵树带走，一帧都不留
+    [[nodiscard]] std::size_t countFilesIn(const std::filesystem::path &directory)
+    {
+        std::error_code ignored;
+        if (directory.empty() || !std::filesystem::exists(directory, ignored))
+        {
+            return 0;
+        }
+        std::size_t count = 0;
+        for (const auto &entry: std::filesystem::directory_iterator{directory})
+        {
+            count += entry.is_regular_file() ? 1U : 0U;
+        }
+        return count;
     }
 
     /**
@@ -380,5 +419,88 @@ namespace
 
         service.reset();
         EXPECT_TRUE(encoder.isFinished()) << "析构直接返回了：编码还在跑，编码器却已经没人管了";
+    }
+
+    /**
+     * @brief 钉住「取消」既不出成品也不留帧，而且把服务放回能开下一轮的位置
+     * @details 取消的理由是「这一段白录了」：把 cancel() 做成 stop() 的别名，这三条都会反过来——
+     *          编码照跑、成品照出、下一轮还会被 Busy 拦住。
+     */
+    TEST_F(RecordingServiceFixture, CancelDropsTheFramesAndNeverAsksTheEncoder)
+    {
+        StubCaptureSource     source;
+        GatedRecordingEncoder encoder;
+        RecordingService      service{source, encoder};
+
+        ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
+        spinFramesIn();
+        const auto frameDirectory = onlyFrameDirectory();
+        ASSERT_GT(countFilesIn(frameDirectory), 0U) << "这一轮一帧都没落，取消就没有可删的东西";
+
+        int  abortedCount = 0;
+        bool gotFinished  = false;
+        QObject::connect(&service, &RecordingService::aborted, [&abortedCount] { ++abortedCount; });
+        QObject::connect(&service, &RecordingService::finished, [&gotFinished](const QString &) { gotFinished = true; });
+
+        const auto cancelled = service.cancel();
+        ASSERT_TRUE(static_cast<bool>(cancelled)) << cancelled.error().message;
+        EXPECT_EQ(abortedCount, 1) << "没发 aborted：控制条与托盘会停在「正在录制」那句假话上";
+        EXPECT_FALSE(gotFinished) << "取消还送出了成品";
+        EXPECT_EQ(encoder.callCount(), 0) << "取消还去叫了编码器：扔掉的一段不该再花一次 CPU";
+        EXPECT_FALSE(std::filesystem::exists(frameDirectory)) << "帧目录还留着，取消与停止并保存在磁盘上就没分别了";
+        EXPECT_EQ(service.state(), RecordingState::Idle) << "状态没归位，下一轮会被「上一轮还没收尾」拦住";
+
+        EXPECT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0))) << "取消之后开不了新一轮";
+    }
+
+    /**
+     * @brief 拒绝面：没在录的时候取消要报清楚，也不许发 aborted
+     * @details 空操作静默通过的话，用户按下取消而什么都没发生，只会以为「取消过了」。
+     */
+    TEST_F(RecordingServiceFixture, CancelWithoutAnActiveRoundIsRefused)
+    {
+        StubCaptureSource     source;
+        GatedRecordingEncoder encoder;
+        RecordingService      service{source, encoder};
+
+        int abortedCount = 0;
+        QObject::connect(&service, &RecordingService::aborted, [&abortedCount] { ++abortedCount; });
+
+        const auto cancelled = service.cancel();
+        ASSERT_FALSE(static_cast<bool>(cancelled)) << "没在录也报了取消成功";
+        EXPECT_NE(cancelled.error().message.find("没有正在进行的录屏"), std::string::npos) << cancelled.error().message;
+        EXPECT_EQ(abortedCount, 0) << "拒掉了却还是发了 aborted";
+    }
+
+    /**
+     * @brief 钉住「stop 之后再取消」被拒，而且不动后台编码正在读的那一份帧
+     * @details 取消删的目录正是那一次编码的输入：放进那一档等于把一轮「已经要出成品」的录屏做成编码失败。
+     */
+    TEST_F(RecordingServiceFixture, CancelAfterStopIsRefusedAndLeavesTheEncodeInputAlone)
+    {
+        StubCaptureSource     source;
+        GatedRecordingEncoder encoder;
+        RecordingService      service{source, encoder};
+
+        ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
+        spinFramesIn();
+        ASSERT_TRUE(static_cast<bool>(service.stop()));
+        ASSERT_TRUE(spinUntil([&] { return encoder.callCount() == 1; }));
+        const auto frameDirectory = encoder.callAt(0).frameDirectory;
+        ASSERT_TRUE(std::filesystem::exists(frameDirectory));
+
+        int abortedCount = 0;
+        QObject::connect(&service, &RecordingService::aborted, [&abortedCount] { ++abortedCount; });
+
+        const auto cancelled = service.cancel();
+        ASSERT_FALSE(static_cast<bool>(cancelled)) << "取消接了正在编的那一轮：成品会以「编码失败」的面目回来";
+        EXPECT_NE(cancelled.error().message.find("已经停止并在编"), std::string::npos) << cancelled.error().message;
+        EXPECT_TRUE(std::filesystem::exists(frameDirectory)) << "目录被取消删掉了，那正是后台编码在读的输入";
+        EXPECT_EQ(abortedCount, 0) << "拒了却还是发了 aborted";
+
+        QString product;
+        QObject::connect(&service, &RecordingService::finished, [&product](const QString &path) { product = path; });
+        encoder.release();
+        EXPECT_TRUE(spinUntil([&] { return !product.isEmpty(); })) << "取消被拒之后这一轮该照常出成品";
     }
 } // namespace

@@ -145,6 +145,11 @@ namespace GyanisScribe::Record
         GyanisScribe::Ui::applyTextRole(*m_elapsed, GyanisScribe::Ui::TextRole::Metric);
         line->addWidget(m_elapsed);
 
+        // 取消排在最左：它与「停止并保存」之间隔着暂停键，误点一格不会把录好的那段丢掉
+        auto *cancelButton = new QPushButton{GyanisScribe::Core::uiText("取消"), this};
+        cancelButton->setIcon(m_icons.icon("Close"));
+        cancelButton->setToolTip(GyanisScribe::Core::uiText("放弃这一段，不保存成品"));
+        cancelButton->setAccessibleName(GyanisScribe::Core::uiText("取消录屏"));
         m_pauseButton = new QPushButton{GyanisScribe::Core::uiText("暂停"), this};
         m_pauseButton->setIcon(m_icons.icon("RecordPause"));
         m_pauseButton->setAccessibleName(GyanisScribe::Core::uiText("暂停"));
@@ -157,6 +162,7 @@ namespace GyanisScribe::Record
         minimizeButton->setToolTip(GyanisScribe::Core::uiText("最小化到托盘"));
         minimizeButton->setAccessibleName(GyanisScribe::Core::uiText("最小化到托盘"));
 
+        line->addWidget(cancelButton);
         line->addWidget(m_pauseButton);
         line->addWidget(stopButton);
         line->addWidget(minimizeButton);
@@ -178,6 +184,7 @@ namespace GyanisScribe::Record
                              }
                              emit pauseRequested();
                          });
+        QObject::connect(cancelButton, &QPushButton::clicked, this, &RecordingHud::cancelRequested);
         QObject::connect(stopButton, &QPushButton::clicked, this, &RecordingHud::stopRequested);
         QObject::connect(minimizeButton, &QPushButton::clicked, this,
                          [this]
