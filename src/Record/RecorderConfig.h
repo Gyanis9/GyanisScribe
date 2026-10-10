@@ -115,4 +115,34 @@ namespace GyanisScribe::Record
      */
     [[nodiscard]] Core::Expected<RecordMode> parseRecordScope(const QString &stored);
 
+    /// 一档输出格式：存进配置的 token，与设置页显示的中文标签
+    struct RecordFormatChoice
+    {
+        OutputFormat     format; ///< 这一档存成什么容器
+        std::string_view token;  ///< 配置里存的值，词表在这里唯一
+        std::string_view label;  ///< 设置页上的中文标签，界面按 UTF-8 取
+    };
+
+    /// 全部输出格式档位，顺序就是设置页下拉的顺序
+    inline constexpr std::array<RecordFormatChoice, 2> kRecordFormatChoices{
+            RecordFormatChoice{OutputFormat::Mp4, "Mp4", "MP4 视频"},
+            RecordFormatChoice{OutputFormat::Gif, "Gif", "GIF 动图"},
+    };
+
+    /**
+     * @brief 取一档输出格式存在配置里的那个值
+     * @param format 目标档位
+     * @return token；词表外的枚举值返回空，由调用方决定怎么报
+     */
+    [[nodiscard]] std::string_view recordFormatText(OutputFormat format) noexcept;
+
+    /**
+     * @brief 解析配置里存的输出格式
+     * @param stored 配置读出的文本
+     * @return 对应档位；读不出时返回 InvalidArgument 并列出可取的几个值
+     * @details 格式定不下来就不能开录：MP4 与 GIF 走的是两条编码路线（后者两遍调色板），
+     *          猜错的那一种会把已经抓完的帧按错的容器压出去。
+     */
+    [[nodiscard]] Core::Expected<OutputFormat> parseRecordFormat(const QString &stored);
+
 } // namespace GyanisScribe::Record

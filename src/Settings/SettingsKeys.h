@@ -69,6 +69,10 @@ namespace GyanisScribe::Settings
     /// 录屏的默认帧率（1 到 Record::kMaximumFrameRate），读端在 AppController 造参数那一处，写端在设置的录屏页
     inline constexpr std::string_view kRecordDefaultFrameRate = "Record/DefaultFrameRate";
 
+    /// 录屏输出容器：Mp4 / Gif，取值词表在 Record::kRecordFormatChoices；
+    /// 读端在 AppController 造参数那一处，写端在设置的录屏页
+    inline constexpr std::string_view kRecordFormat = "Record/Format";
+
     /// 录屏范围：整屏 / 上次选区 / 当前窗口，取值词表在 Record::kRecordScopeChoices；
     /// 读端在 AppController 造参数那一处，写端在设置的录屏页
     inline constexpr std::string_view kRecordScope = "Record/Scope";

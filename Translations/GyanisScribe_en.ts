@@ -324,6 +324,14 @@
             <translation>Last selection records the rectangle framed by the most recent capture; Current window records whichever window is in front when recording starts. Changes apply from the next recording</translation>
         </message>
         <message>
+            <source>输出格式</source>
+            <translation>Output format</translation>
+        </message>
+        <message>
+            <source>GIF 走两遍调色板，帧率上限只有 %1 帧/秒，比 MP4 低；MP4 适合长片段。改完从下一次录屏开始生效</source>
+            <translation>GIF runs a two-pass palette and caps the frame rate at %1 frames per second, lower than MP4; MP4 suits longer clips. Changes apply from the next recording</translation>
+        </message>
+        <message>
             <source>智录 GyanisScribe %1\n\n截图、标注、贴图、录屏与文字识别。\n全局热键：Ctrl+Alt+A 截图，Ctrl+Alt+R 录屏（再按一次停止并保存），Ctrl+Alt+O 识别。\n界面图标全部为本项目原创 SVG；第三方组件与其许可证见仓库 docs/ThirdPartyLicenses.md。\n</source>
             <translation>GyanisScribe %1\n\nScreenshot, annotation, pin, screen recording and text recognition.\nGlobal hotkeys: Ctrl+Alt+A capture, Ctrl+Alt+R record (press again to stop and save), Ctrl+Alt+O recognize.\nAll UI icons are original SVG artwork made for this project; third-party components and their licenses are listed in docs/ThirdPartyLicenses.md in the repository.\n</translation>
         </message>
@@ -432,8 +440,8 @@
             <translation>Opacity for new pins</translation>
         </message>
         <message>
-            <source>录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。帧率越高文件越大，存成 GIF 时上限比 MP4 低。这三项都从下一次开始录屏时生效。</source>
-            <translation>Recorded files land in this folder. With Last selection or Current window, the picture keeps only that part of the screen. A higher frame rate means a larger file, and GIF allows a lower maximum than MP4. All three apply from the next recording.</translation>
+            <source>录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。存成 GIF 时帧率上限比 MP4 低。这几项都从下一次开始录屏时生效。</source>
+            <translation>Recorded files land in this folder. With Last selection or Current window, the picture keeps only that part of the screen. GIF allows a lower frame rate ceiling than MP4. All of these apply from the next recording.</translation>
         </message>
         <message>
             <source>录屏成品目录</source>
@@ -1088,6 +1096,10 @@
             <translation>Recording option {}: {}</translation>
         </message>
         <message>
+            <source>{}：取值 "{}" 不在可选值里，可取的只有 {}。请在设置的录屏页重选，或删掉 {} 这一项回到默认档</source>
+            <translation>{}: value "{}" is not one of the available choices, only {} are valid. Pick a value again on the Recording page of Settings, or delete the {} entry to go back to the default</translation>
+        </message>
+        <message>
             <source>要写清录哪块屏幕。请在录屏面板重新选一次目标屏幕</source>
             <translation>Say which screen to record. Pick the target screen again in the recording panel.</translation>
         </message>
@@ -1116,10 +1128,6 @@
             <translation>Default frame rate "{}" is outside the usable range (1 to {}): pick a value again on the Recording page of Settings, or remove the Record/DefaultFrameRate entry to go back to the default</translation>
         </message>
         <message>
-            <source>录制范围 "{}" 不是一个可选值：可取的只有 {}。请在设置的录屏页重选，或删掉 Record/Scope 这一项回到整屏</source>
-            <translation>Recording scope "{}" is not one of the available values; only {} are valid. Pick a value again on the Recording page of Settings, or delete the Record/Scope entry to go back to full screen</translation>
-        </message>
-        <message>
             <source>整屏</source>
             <translation>Full screen</translation>
         </message>
@@ -1130,6 +1138,14 @@
         <message>
             <source>当前窗口</source>
             <translation>Current window</translation>
+        </message>
+        <message>
+            <source>MP4 视频</source>
+            <translation>MP4 video</translation>
+        </message>
+        <message>
+            <source>GIF 动图</source>
+            <translation>GIF animation</translation>
         </message>
         <message>
             <source>未在录制</source>

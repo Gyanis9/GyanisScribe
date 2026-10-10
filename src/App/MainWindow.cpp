@@ -482,6 +482,17 @@ namespace
     }
 
     /**
+     * @brief 把词表里的窄字符取值转成 Qt 文本
+     * @param token 配置里存的那一串
+     * @return 原样的 Qt 文本，不经翻译
+     */
+    QString tokenText(const std::string_view token)
+    {
+        // 按「指针 + 长度」取，不靠零终止：词表里短到一眼看完的 token 也一样
+        return QString::fromUtf8(token.data(), static_cast<qsizetype>(token.size()));
+    }
+
+    /**
      * @brief 录屏范围下拉：档位、配置里的取值与设置页标签都取自 Record::kRecordScopeChoices
      * @param settings 配置存储
      * @return 归调用方所有的下拉框
@@ -493,13 +504,13 @@ namespace
         auto *combo = new QComboBox;
         for (const auto &choice: GyanisScribe::Record::kRecordScopeChoices)
         {
-            combo->addItem(GyanisScribe::Core::uiText(choice.label.data()), QString::fromUtf8(std::string{choice.token}));
+            combo->addItem(GyanisScribe::Core::uiText(choice.label.data()), tokenText(choice.token));
         }
         combo->setAccessibleName(GyanisScribe::Core::uiText("录制范围"));
         combo->setToolTip(GyanisScribe::Core::uiText("「上次选区」用最近一次截图框出的那块矩形；「当前窗口」录按下开始时最靠前的那个窗口。改完从下一次录屏开始生效"));
 
         const auto defaultScope = GyanisScribe::Record::RecorderConfig{}.mode;
-        const auto stored       = settings.stringValue(GyanisScribe::Settings::kRecordScope, QString::fromUtf8(std::string{GyanisScribe::Record::recordScopeText(defaultScope)}));
+        const auto stored       = settings.stringValue(GyanisScribe::Settings::kRecordScope, tokenText(GyanisScribe::Record::recordScopeText(defaultScope)));
         const auto parsed       = GyanisScribe::Record::parseRecordScope(stored);
         if (!parsed)
         {
@@ -507,7 +518,7 @@ namespace
             Logger::warning(std::format("设置页读不出录制范围：{}，下拉框按默认档显示", parsed.error().message));
         }
         const auto chosen = parsed ? *parsed : defaultScope;
-        combo->setCurrentIndex(combo->findData(QString::fromUtf8(std::string{GyanisScribe::Record::recordScopeText(chosen)})));
+        combo->setCurrentIndex(combo->findData(tokenText(GyanisScribe::Record::recordScopeText(chosen))));
 
         // 接线排在设初值之后：否则「把界面摆到位」这一步会被当成用户改动写回配置
         QObject::connect(combo, &QComboBox::currentIndexChanged, combo,
@@ -517,6 +528,47 @@ namespace
                              if (auto written = settings.setValue(GyanisScribe::Settings::kRecordScope, token); !written)
                              {
                                  Logger::warning(std::format("录制范围没能写入：{}（当前选的是 {}）", written.error().message, combo->currentText().toStdString()));
+                             }
+                         });
+        return combo;
+    }
+
+    /**
+     * @brief 录屏输出格式下拉：档位、配置里的取值与设置页标签都取自 Record::kRecordFormatChoices
+     * @param settings 配置存储
+     * @return 归调用方所有的下拉框
+     * @details 格式定错比范围定错更贵：帧已经抓完才按错的容器压出去，整段成品作废。
+     *          因此界面这一格读不出时只回落显示，开始录屏那一头是直接拒绝的。
+     */
+    QComboBox *makeRecordFormatCombo(ISettingsStore &settings)
+    {
+        auto *combo = new QComboBox;
+        for (const auto &choice: GyanisScribe::Record::kRecordFormatChoices)
+        {
+            combo->addItem(GyanisScribe::Core::uiText(choice.label.data()), tokenText(choice.token));
+        }
+        combo->setAccessibleName(GyanisScribe::Core::uiText("输出格式"));
+        // 上限那一个数取自 kMaximumGifFrameRate：写死了就会在阈值调那天变成一句假话
+        combo->setToolTip(GyanisScribe::Core::uiText("GIF 走两遍调色板，帧率上限只有 %1 帧/秒，比 MP4 低；MP4 适合长片段。改完从下一次录屏开始生效")
+                                  .arg(GyanisScribe::Record::kMaximumGifFrameRate));
+
+        const auto defaultFormat = GyanisScribe::Record::RecorderConfig{}.format;
+        const auto stored        = settings.stringValue(GyanisScribe::Settings::kRecordFormat, tokenText(GyanisScribe::Record::recordFormatText(defaultFormat)));
+        const auto parsed        = GyanisScribe::Record::parseRecordFormat(stored);
+        if (!parsed)
+        {
+            Logger::warning(std::format("设置页读不出输出格式：{}，下拉框按默认档显示", parsed.error().message));
+        }
+        const auto chosen = parsed ? *parsed : defaultFormat;
+        combo->setCurrentIndex(combo->findData(tokenText(GyanisScribe::Record::recordFormatText(chosen))));
+
+        QObject::connect(combo, &QComboBox::currentIndexChanged, combo,
+                         [&settings, combo](int)
+                         {
+                             const auto token = combo->currentData().toString();
+                             if (auto written = settings.setValue(GyanisScribe::Settings::kRecordFormat, token); !written)
+                             {
+                                 Logger::warning(std::format("输出格式没能写入：{}（当前选的是 {}）", written.error().message, combo->currentText().toStdString()));
                              }
                          });
         return combo;
@@ -813,11 +865,14 @@ namespace GyanisScribe::App
     QWidget *MainWindow::buildRecordPage()
     {
         auto *page = new QWidget{this};
-        auto *form = makePageForm(page, GyanisScribe::Core::uiText("录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。帧率越高文件越大，存成 GIF "
-                                                                   "时上限比 MP4 低。这三项都从下一次开始录屏时生效。"));
+        auto *form = makePageForm(
+                page,
+                GyanisScribe::Core::uiText(
+                        "录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。存成 GIF 时帧率上限比 MP4 低。这几项都从下一次开始录屏时生效。"));
         form->addRow(GyanisScribe::Core::uiText("录屏成品目录"),
                      makePathRow(m_settings, GyanisScribe::Settings::kPathRecording, GyanisScribe::Core::uiText("录屏目录"), Core::Paths::defaultRecordingDirectory(), m_icons));
         form->addRow(GyanisScribe::Core::uiText("录制范围"), makeRecordScopeCombo(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("输出格式"), makeRecordFormatCombo(m_settings));
         form->addRow(GyanisScribe::Core::uiText("默认帧率"), makeFrameRateSpin(m_settings));
         form->addRow(GyanisScribe::Core::uiText("光标高亮"), makeCursorHighlightCheck(m_settings));
         return page;

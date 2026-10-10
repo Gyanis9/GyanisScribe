@@ -206,7 +206,7 @@ namespace
                 Expectation{MainWindowPage::Capture, {"截图目录", "颜色写法"}, true},
                 Expectation{MainWindowPage::Annotation, {"默认线宽", "默认字号"}, true},
                 Expectation{MainWindowPage::Pin, {"默认不透明度"}, true},
-                Expectation{MainWindowPage::Record, {"录屏目录", "录制范围", "默认帧率", "光标高亮"}, true},
+                Expectation{MainWindowPage::Record, {"录屏目录", "录制范围", "输出格式", "默认帧率", "光标高亮"}, true},
                 Expectation{MainWindowPage::Ocr, {"识别语言", "语言包目录"}, true},
                 Expectation{MainWindowPage::Hotkey, {"截图", "录屏", "文字识别", "屏幕取色"}, true},
                 Expectation{MainWindowPage::Theme, {"主题"}, true},
@@ -349,6 +349,38 @@ namespace
 
         const auto parsed = GyanisScribe::Record::parseRecordScope(QStringLiteral("region"));
         ASSERT_FALSE(static_cast<bool>(parsed)) << "读端把坏值认成一整档，就是拿整屏去录用户要的选区";
+    }
+
+    /**
+     * @brief 钉住输出格式这一行写的是词表 token，且坏值只在界面回落、不顶掉盘上那份
+     * @details 存「GIF」这种给人看的写法，下次录屏读不出来（parseRecordFormat 认的是 Mp4/Gif）；
+     *          两种容器走两条编码路线，格式错了整段成品作废，所以读端是拒绝开始而不是猜一档。
+     */
+    TEST_F(MainWindowFixture, RecordFormatRowWritesTheTokenRecordingStartUses)
+    {
+        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kRecordFormat, QStringLiteral("gif"))));
+
+        makeWindow();
+        m_window->open(MainWindowPage::Record);
+        auto *combo = qobject_cast<QComboBox *>(controlInCurrentPage("输出格式"));
+        ASSERT_NE(combo, nullptr);
+        EXPECT_EQ(combo->count(), static_cast<int>(GyanisScribe::Record::kRecordFormatChoices.size())) << "下拉框的行数与词表不同解";
+        EXPECT_EQ(combo->currentData().toString(), QString::fromUtf8(std::string{GyanisScribe::Record::recordFormatText(GyanisScribe::Record::RecorderConfig{}.format)}))
+                << "读不出时按初值档显示";
+        EXPECT_EQ(m_store->stringValue(GyanisScribe::Settings::kRecordFormat, QString{}), QStringLiteral("gif")) << "回落不该顺手把文件里的坏值改掉：它要留着让人查得到";
+        ASSERT_FALSE(static_cast<bool>(GyanisScribe::Record::parseRecordFormat(QStringLiteral("gif")))) << "读端把坏值认成一档，就是拿错的容器压已经抓完的帧";
+
+        const auto gifRow = combo->findData(QStringLiteral("Gif"));
+        ASSERT_NE(gifRow, -1) << "词表里没有 Gif 这一档，设置页选得出却写不进配置";
+        combo->setCurrentIndex(gifRow);
+        closeWindowAndFlush();
+
+        const auto reopened = makeStore();
+        const auto stored   = reopened->stringValue(GyanisScribe::Settings::kRecordFormat, QString{});
+        EXPECT_EQ(stored, QStringLiteral("Gif"));
+        const auto parsed = GyanisScribe::Record::parseRecordFormat(stored);
+        ASSERT_TRUE(static_cast<bool>(parsed));
+        EXPECT_EQ(*parsed, GyanisScribe::Record::OutputFormat::Gif);
     }
 
     /**

@@ -495,3 +495,34 @@ TEST(RecordScopeSetting, TableRoundTripsEveryModeAndRejectsUnknownToken)
         EXPECT_NE(parsed.error().message.find("Record/Scope"), std::string::npos) << bad.toStdString();
     }
 }
+
+/**
+ * @brief 钉住输出格式词表：两档都写得出去也读得回来，读不出时报错点名可取的值与键
+ * @details 猜错格式比猜错范围更贵——帧已经抓完才按错的容器压出去，整段成品作废；
+ *          而 GIF 的帧率上限另有一档（见 kMaximumGifFrameRate），报错文案得让人看得懂该改哪一格。
+ */
+TEST(RecordFormatSetting, TableRoundTripsEveryFormatAndRejectsUnknownToken)
+{
+    for (const auto &choice: GyanisScribe::Record::kRecordFormatChoices)
+    {
+        const auto parsed = GyanisScribe::Record::parseRecordFormat(QString::fromUtf8(std::string{choice.token}));
+        ASSERT_TRUE(static_cast<bool>(parsed)) << choice.token;
+        EXPECT_EQ(*parsed, choice.format) << choice.token;
+        EXPECT_EQ(GyanisScribe::Record::recordFormatText(choice.format), choice.token) << choice.token;
+    }
+
+    // 枚举里每一档都要在表里有一行：新加 OutputFormat 而忘了补表时，recordFormatText 交回的是空串
+    for (const auto format: {GyanisScribe::Record::OutputFormat::Mp4, GyanisScribe::Record::OutputFormat::Gif})
+    {
+        EXPECT_FALSE(GyanisScribe::Record::recordFormatText(format).empty()) << "词表漏了 OutputFormat 的某一档";
+    }
+
+    for (const QString &bad: {QStringLiteral("mp4"), QStringLiteral("GIF"), QStringLiteral("Mp4 ")})
+    {
+        const auto parsed = GyanisScribe::Record::parseRecordFormat(bad);
+        ASSERT_FALSE(static_cast<bool>(parsed)) << bad.toStdString();
+        EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument) << bad.toStdString();
+        EXPECT_NE(parsed.error().message.find("Gif"), std::string::npos) << bad.toStdString();
+        EXPECT_NE(parsed.error().message.find("Record/Format"), std::string::npos) << bad.toStdString();
+    }
+}
