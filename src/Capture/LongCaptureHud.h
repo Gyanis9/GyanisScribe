@@ -14,6 +14,11 @@
 #include <QString>
 #include <QWidget>
 
+// 必须在全局作用域里声明：写成 `class QLabel *m_readout` 那种嵌套形态会在本命名空间里造出一个
+// GyanisScribe::Capture::QLabel，它是不是就指 ::QLabel 取决于「包含到这里时 ::QLabel 有没有被声明过」。
+// 主机那份 Qt 6.11 的头链里先声明过所以看不出问题，容器的 6.4 没有——GCC 当场报 invalid use of incomplete type。
+class QLabel;
+
 namespace GyanisScribe::Capture
 {
 
@@ -74,7 +79,7 @@ namespace GyanisScribe::Capture
         void cancelled();
 
     private:
-        class QLabel *m_readout = nullptr; ///< 读数那一行，setReadout 写在这里
+        QLabel *m_readout = nullptr; ///< 读数那一行，setReadout 写在这里
     };
 
 } // namespace GyanisScribe::Capture
