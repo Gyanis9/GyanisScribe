@@ -519,7 +519,13 @@ namespace GyanisScribe::App
 
     Core::Expected<Record::RecorderConfig> AppController::makeRecordingConfig() const
     {
-        auto *screen = QGuiApplication::primaryScreen();
+        // 录哪块屏跟着光标走：多屏机器上人在副屏干活，只盯着主屏就是把用户要的画面录丢了；
+        // 抓帧那一侧（QScreenCaptureSource）本来就是按光标选屏的，两处口径要一致。
+        auto *screen = QGuiApplication::screenAt(QCursor::pos());
+        if (screen == nullptr)
+        {
+            screen = QGuiApplication::primaryScreen();
+        }
         if (screen == nullptr)
         {
             return std::unexpected(Core::Error{Core::ErrorCode::ScreenUnavailable, GyanisScribe::Core::uiTextUtf8("当前没有可用屏幕，录屏没法开始。请接回显示器后重试")});
