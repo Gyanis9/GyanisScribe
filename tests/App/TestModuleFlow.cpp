@@ -196,7 +196,7 @@ namespace GyanisScribe
              */
             [[nodiscard]] Core::CapturedImage captureOneFrame(GyanisScribe::Settings::SettingsStore &settings, FakeScreenSource &source) const
             {
-                GyanisScribe::Capture::CaptureService service(source, settings);
+                GyanisScribe::Capture::CaptureService service(source, settings, *integration);
                 std::optional<Core::CapturedImage>    received;
                 QObject::connect(&service, &GyanisScribe::Capture::ICaptureService::captured, &service, [&received](const Core::CapturedImage &image) { received = image; });
 
