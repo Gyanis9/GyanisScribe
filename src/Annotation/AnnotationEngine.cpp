@@ -169,6 +169,14 @@ namespace GyanisScribe::Annotation
         {
             tool->applyToImage(result, bakeContext);
         }
+
+        // 倍比要标回导出图：贴图窗口按 image 的 devicePixelRatio 反推逻辑尺寸，
+        // 不标就会把高 DPI 屏上截的那一块开成放大 1.5 倍的窗口（跨模块集成用例红在这里抓到的）。
+        // 只在不是 1.0 时标：100% 缩放的普通屏幕保持逐字节不变的旧形状
+        if (pixelScale != 1.0)
+        {
+            result.setDevicePixelRatio(pixelScale);
+        }
         return result;
     }
 
@@ -177,8 +185,9 @@ namespace GyanisScribe::Annotation
         auto *target = toolFor(kind);
         if (target == nullptr)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("工具种类 0x{:X} 没有对应的工具：请把新工具登记进构造列表"), static_cast<int>(kind))});
+            return std::unexpected(
+                    Core::Error{Core::ErrorCode::InvalidArgument,
+                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("工具种类 0x{:X} 没有对应的工具：请把新工具登记进构造列表"), static_cast<int>(kind))});
         }
 
         for (const auto &tool: m_tools)
@@ -198,13 +207,13 @@ namespace GyanisScribe::Annotation
     {
         if (lineWidth <= 0)
         {
-            return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("线宽必须是正数，收到的是 {}。请取 1 到 50 之间的整数"), lineWidth)});
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("线宽必须是正数，收到的是 {}。请取 1 到 50 之间的整数"), lineWidth)});
         }
         if (fontSize <= 0)
         {
-            return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("字号必须是正数，收到的是 {}。请取 8 到 72 之间的整数"), fontSize)});
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("字号必须是正数，收到的是 {}。请取 8 到 72 之间的整数"), fontSize)});
         }
 
         m_color     = color;
@@ -292,8 +301,9 @@ namespace GyanisScribe::Annotation
         auto *tool = toolFor(selection.tool);
         if (tool == nullptr || selection.shapeIndex < 0 || selection.shapeIndex >= tool->shapeCount())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("要选中的图形不在册：工具 0x{:X} 索引 {}。请重新点选"),
-                                                                                             static_cast<int>(selection.tool), selection.shapeIndex)});
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("要选中的图形不在册：工具 0x{:X} 索引 {}。请重新点选"),
+                                                                            static_cast<int>(selection.tool), selection.shapeIndex)});
         }
 
         m_selection = selection;

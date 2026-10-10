@@ -60,6 +60,7 @@ namespace GyanisScribe::Annotation
          * @return 画布副本上烘好全部图形；没画布时返回空图
          * @details 重写基类接口：像素倍比由「物理宽 ÷ 逻辑宽」现算，
          *          不拿屏幕的 devicePixelRatio——缩放窗口后两者才是同一条账。
+         *          倍比不是 1.0 时把这个倍比标回导出图，让贴图那一步能反推逻辑尺寸。
          */
         [[nodiscard]] QImage exportImage() const override;
 

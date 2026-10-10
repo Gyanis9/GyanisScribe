@@ -67,6 +67,8 @@ namespace GyanisScribe::Annotation
         /**
          * @brief 导出烘焙好的图
          * @return 画布的副本上依次把各工具的图形烘进去；没画布时返回空图
+         * @note 画布倍比不是 1.0 时图上带着同一倍比：下游（贴图窗口）按 devicePixelRatio 反推
+         *       逻辑尺寸，丢了倍比一块 150% 屏上的截图会被开成放大 1.5 倍的窗口
          */
         [[nodiscard]] virtual QImage exportImage() const = 0;
 
