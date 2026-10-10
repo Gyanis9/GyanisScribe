@@ -308,6 +308,42 @@
             <translation>Settings navigation</translation>
         </message>
         <message>
+            <source>已导出 %1 项设置</source>
+            <translation>Exported %1 settings</translation>
+        </message>
+        <message>
+            <source>已导入 %1 项设置。这一页显示的还是导入前的值，请关掉设置窗口再重新打开；界面语言要重启智录才生效。</source>
+            <translation>Imported %1 settings. This page still shows the values from before the import: close the settings window and open it again. The interface language takes effect only after restarting GyanisScribe.</translation>
+        </message>
+        <message>
+            <source>导出配置…</source>
+            <translation>Export settings…</translation>
+        </message>
+        <message>
+            <source>导出配置</source>
+            <translation>Export settings</translation>
+        </message>
+        <message>
+            <source>把当前全部设置写成一个 JSON 文件，换机器或备份时用</source>
+            <translation>Writes all current settings into one JSON file, for a backup or another machine</translation>
+        </message>
+        <message>
+            <source>导入配置…</source>
+            <translation>Import settings…</translation>
+        </message>
+        <message>
+            <source>导入配置</source>
+            <translation>Import settings</translation>
+        </message>
+        <message>
+            <source>从本程序导出的 JSON 文件读回设置；订阅配置的热键与主题立刻跟上新值</source>
+            <translation>Reads settings back from a file this program exported; hotkeys and theme, which watch the configuration, follow the new values right away</translation>
+        </message>
+        <message>
+            <source>配置文件 (*.json)</source>
+            <translation>Configuration files (*.json)</translation>
+        </message>
+        <message>
             <source>界面语言决定菜单、托盘提示与这些设置页的措辞，切换后要重启智录才生效。下面两格管历史留多少，填到 0 就是不限。</source>
             <translation>The interface language sets the wording of the menus, the tray hints and these settings pages; a change takes effect after restarting GyanisScribe. The two rows below decide how much history is kept; 0 means no limit.</translation>
         </message>
@@ -326,6 +362,10 @@
         <message>
             <source> 天</source>
             <translation> days</translation>
+        </message>
+        <message>
+            <source>备份与恢复</source>
+            <translation>Backup and restore</translation>
         </message>
         <message>
             <source>截图与标注成品落在这个目录里。取色复制出来的文本按下面的写法格式化。</source>

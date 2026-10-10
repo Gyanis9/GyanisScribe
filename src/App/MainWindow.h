@@ -193,6 +193,23 @@ namespace GyanisScribe::App
          */
         void refreshHistory();
 
+        /**
+         * @brief 把当前全部设置导出成一个文件，并把结果落成一条气泡提示
+         * @param filePath 目标路径；界面上来自「导出配置…」的对话框
+         * @details 写成一条消息而不是返回值：按钮那一层只需要「发生了什么、用户看见什么」，
+         *          失败时原因同时进日志（日志保持中文）与气泡（走界面语言）。
+         * @note 公开是为了让用例能直接驱动「选好路径以后发生的事」——文件对话框要人点，判据钉不到它身上。
+         */
+        void exportSettingsToFile(const QString &filePath);
+
+        /**
+         * @brief 从一个文件把设置读回来，并把结果与「要重开哪一处」落成一条气泡提示
+         * @param filePath 来源路径，须是本程序导出的那种 JSON 形状
+         * @details 逐项走的仍是 setValue，所以每个键都会发出变更通知：订阅配置的模块（热键、主题）
+         *          立刻跟上新值；而这一页上已经摆好的控件不会自己重读，提示里要说明重开设置窗口。
+         */
+        void importSettingsFromFile(const QString &filePath);
+
     signals:
         /**
          * @brief 历史页要求把一条成品重新贴回屏幕
@@ -213,11 +230,11 @@ namespace GyanisScribe::App
         void historyRemoveRequested(const std::filesystem::path &filePath);
 
         /**
-         * @brief 历史页要落进气泡的一条提示
-         * @param message 中文正文
+         * @brief 主窗口要落进气泡的一条提示
+         * @param message 界面语言的正文（历史页与导入导出共用这一条通道）
          * @param kind 语义种类
          */
-        void historyMessage(const QString &message, GyanisScribe::Ui::ToastKind kind);
+        void messageForUser(const QString &message, GyanisScribe::Ui::ToastKind kind);
 
     private:
         /**
@@ -231,6 +248,8 @@ namespace GyanisScribe::App
 
         /// 通用页：界面语言
         QWidget *buildGeneralPage();
+        /// 通用页里「导出 / 导入配置」那一行：两个按钮各开一个文件对话框，活交给上面的两个公开方法做
+        QWidget *buildTransferRow();
         /// 截图页：成品目录与取色复制的写法
         QWidget *buildCapturePage();
         /// 标注页：默认线宽与字号

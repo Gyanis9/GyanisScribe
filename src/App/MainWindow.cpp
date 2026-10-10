@@ -20,6 +20,7 @@
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDir>
 #include <QFileDialog>
 #include <QFormLayout>
 #include <QHBoxLayout>
@@ -611,6 +612,85 @@ namespace GyanisScribe::App
         activateWindow();
     }
 
+    void MainWindow::exportSettingsToFile(const QString &filePath)
+    {
+        // 路径按本地编码交给文件系统：SettingsStore 那边也是 fromLocal8Bit 读回来，两边同一个码页才对得上
+        const std::filesystem::path target{filePath.toLocal8Bit().toStdString()};
+        const auto                  exported = m_settings.exportToFile(target);
+        if (!exported)
+        {
+            Logger::warning(std::format("配置导出失败：{}", exported.error().message));
+            emit messageForUser(QString::fromUtf8(exported.error().message.c_str()), GyanisScribe::Ui::ToastKind::Danger);
+            return;
+        }
+
+        // 条数从存储现取：导出的就是这一份的全部键，界面这层不再数一遍别的口径
+        const auto count = static_cast<int>(m_settings.allKeys().size());
+        Logger::info(std::format("配置导出完成：{} 项写到 {}", count, target.string()));
+        emit messageForUser(GyanisScribe::Core::uiText("已导出 %1 项设置").arg(count), GyanisScribe::Ui::ToastKind::Success);
+    }
+
+    void MainWindow::importSettingsFromFile(const QString &filePath)
+    {
+        const std::filesystem::path source{filePath.toLocal8Bit().toStdString()};
+        const auto                  imported = m_settings.importFromFile(source);
+        if (!imported)
+        {
+            Logger::warning(std::format("配置导入失败：{}", imported.error().message));
+            emit messageForUser(QString::fromUtf8(imported.error().message.c_str()), GyanisScribe::Ui::ToastKind::Danger);
+            return;
+        }
+
+        // 逐项走的仍是 setValue，订阅配置的模块（热键、主题）已经收到通知；这里只把改动刷到盘上
+        m_settings.sync();
+        Logger::info(std::format("配置导入完成：{} 项来自 {}", *imported, source.string()));
+        emit messageForUser(GyanisScribe::Core::uiText("已导入 %1 项设置。这一页显示的还是导入前的值，请关掉设置窗口再重新打开；界面语言要重启智录才生效。").arg(*imported),
+                            GyanisScribe::Ui::ToastKind::Success);
+    }
+
+    QWidget *MainWindow::buildTransferRow()
+    {
+        auto *row    = new QWidget{this};
+        auto *layout = new QHBoxLayout{row};
+        layout->setContentsMargins(0, 0, 0, 0);
+
+        auto *exportButton = new QPushButton{GyanisScribe::Core::uiText("导出配置…"), row};
+        exportButton->setIcon(m_icons.icon("Export"));
+        exportButton->setAccessibleName(GyanisScribe::Core::uiText("导出配置"));
+        exportButton->setToolTip(GyanisScribe::Core::uiText("把当前全部设置写成一个 JSON 文件，换机器或备份时用"));
+
+        auto *importButton = new QPushButton{GyanisScribe::Core::uiText("导入配置…"), row};
+        importButton->setIcon(m_icons.icon("Import"));
+        importButton->setAccessibleName(GyanisScribe::Core::uiText("导入配置"));
+        importButton->setToolTip(GyanisScribe::Core::uiText("从本程序导出的 JSON 文件读回设置；订阅配置的热键与主题立刻跟上新值"));
+
+        // 对话框取消时 picked 是空串：那不是失败，一句话都不多说
+        QObject::connect(exportButton, &QPushButton::clicked, row,
+                         [this]
+                         {
+                             const auto suggested = QString::fromLocal8Bit((Core::Paths::applicationDataDirectory() / "GyanisScribe-settings.json").string().c_str());
+                             const auto picked =
+                                     QFileDialog::getSaveFileName(this, GyanisScribe::Core::uiText("导出配置"), suggested, GyanisScribe::Core::uiText("配置文件 (*.json)"));
+                             if (picked.isEmpty())
+                             {
+                                 return;
+                             }
+                             exportSettingsToFile(picked);
+                         });
+        QObject::connect(importButton, &QPushButton::clicked, row,
+                         [this]
+                         {
+                             const auto picked =
+                                     QFileDialog::getOpenFileName(this, GyanisScribe::Core::uiText("导入配置"), QDir::homePath(), GyanisScribe::Core::uiText("配置文件 (*.json)"));
+                             if (picked.isEmpty())
+                             {
+                                 return;
+                             }
+                             importSettingsFromFile(picked);
+                         });
+        return row;
+    }
+
     QWidget *MainWindow::buildPage(const MainWindowPage page)
     {
         switch (page)
@@ -653,6 +733,7 @@ namespace GyanisScribe::App
         form->addRow(GyanisScribe::Core::uiText("历史最久留多少天"),
                      makeOptionalLimitSpin(m_settings, GyanisScribe::Settings::kHistoryRetentionDays, GyanisScribe::Core::uiText("历史最久留多少天"),
                                            GyanisScribe::Core::uiText(" 天"), kRetentionDaysLimit, GyanisScribe::History::kDefaultRetentionDays));
+        form->addRow(GyanisScribe::Core::uiText("备份与恢复"), buildTransferRow());
         return page;
     }
 
@@ -743,7 +824,7 @@ namespace GyanisScribe::App
         QObject::connect(m_history, &History::HistoryView::pinRequested, this, &MainWindow::historyPinRequested);
         QObject::connect(m_history, &History::HistoryView::ocrRequested, this, &MainWindow::historyOcrRequested);
         QObject::connect(m_history, &History::HistoryView::removeRequested, this, &MainWindow::historyRemoveRequested);
-        QObject::connect(m_history, &History::HistoryView::messageForUser, this, &MainWindow::historyMessage);
+        QObject::connect(m_history, &History::HistoryView::messageForUser, this, &MainWindow::messageForUser);
         return page;
     }
 

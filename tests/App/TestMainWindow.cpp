@@ -8,6 +8,7 @@
 #include "History/HistoryStore.h"
 #include "Pin/PinLayout.h"
 #include "Record/RecorderConfig.h"
+#include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
 #include "Ui/DesignTokens.h"
@@ -19,6 +20,8 @@
 
 #include <QApplication>
 #include <QCheckBox>
+#include <QFile>
+#include <QFileInfo>
 #include <QComboBox>
 #include <QIcon>
 #include <QLabel>
@@ -26,11 +29,13 @@
 #include <QSpinBox>
 #include <QStackedWidget>
 #include <QString>
+#include <QStringList>
 #include <QWidget>
 
 #include <filesystem>
 #include <format>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -197,7 +202,7 @@ namespace
 
         // 「这一类有什么」的用词取自界面里的无障碍名，不是从配置键推的：读的人要能对着窗口核对
         const std::vector<Expectation> expectations = {
-                Expectation{MainWindowPage::General, {"界面语言", "历史最多留多少条", "历史最久留多少天"}, true},
+                Expectation{MainWindowPage::General, {"界面语言", "历史最多留多少条", "历史最久留多少天", "导出配置", "导入配置"}, true},
                 Expectation{MainWindowPage::Capture, {"截图目录", "颜色写法"}, true},
                 Expectation{MainWindowPage::Annotation, {"默认线宽", "默认字号"}, true},
                 Expectation{MainWindowPage::Pin, {"默认不透明度"}, true},
@@ -442,6 +447,84 @@ namespace
         const auto policy = GyanisScribe::History::policyFromSettings(*m_store);
         EXPECT_EQ(policy.maximumEntries, 0) << "界面摆到「不限」而策略读成别的数";
         EXPECT_EQ(m_store->intValue(GyanisScribe::Settings::kHistoryMaximumEntries, -999), -1) << "回落不该顺手把文件里的坏值改掉：它要留着让人查得到";
+    }
+
+    /**
+     * @brief 钉住「导出→导入」真的把值搬回来，并且逐项发出变更通知
+     * @details 需求给 Settings 那一节列了「支持配置导入导出」，而这份能力此前零调用方：接口、实现与
+     *          SettingsStore 自己的用例都齐，全仓没有一处按过它。接进界面之后要证的不是它会写文件，
+     *          而是「导出的那份能回到同一批键，并且订阅配置的模块真的被叫醒」——后半句只有通知判据抓得到。
+     */
+    TEST_F(MainWindowFixture, ExportThenImportRoundTripWakesTheSubscribers)
+    {
+        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kHistoryMaximumEntries, 77)));
+        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kOcrLanguage, QStringLiteral("eng"))));
+        makeWindow();
+
+        QStringList                                notified;
+        QObject                                    receiver;
+        std::optional<GyanisScribe::Ui::ToastKind> kind;
+        QString                                    toast;
+        QObject::connect(m_store.get(), &GyanisScribe::Settings::ISettingsStore::valueChanged, &receiver, [&notified](const QString &key) { notified << key; });
+        QObject::connect(m_window.get(), &MainWindow::messageForUser, &receiver,
+                         [&toast, &kind](const QString &message, const GyanisScribe::Ui::ToastKind received)
+                         {
+                             toast = message;
+                             kind  = received;
+                         });
+
+        const auto packed = QString::fromStdWString((m_directory / "exported.json").wstring());
+        m_window->exportSettingsToFile(packed);
+        ASSERT_TRUE(QFileInfo::exists(packed)) << "导出没落盘";
+        EXPECT_TRUE(notified.isEmpty()) << "导出只是读配置，不该改动任何一项";
+
+        // 先把本地这一项改掉，导入才看得出「值真的回来了」而不是「什么都没动」
+        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kHistoryMaximumEntries, 1)));
+        notified.clear();
+
+        m_window->importSettingsFromFile(packed);
+        EXPECT_EQ(m_store->intValue(GyanisScribe::Settings::kHistoryMaximumEntries, -1), 77) << "导入没把值搬回来";
+        EXPECT_EQ(m_store->stringValue(GyanisScribe::Settings::kOcrLanguage, QString{}), QStringLiteral("eng"));
+        EXPECT_TRUE(notified.contains(QStringLiteral("History/MaximumEntries"))) << "导入没发变更通知：订阅热键与主题的模块会停在旧值";
+        ASSERT_TRUE(kind.has_value()) << "导入没落一条气泡提示";
+        EXPECT_EQ(*kind, GyanisScribe::Ui::ToastKind::Success);
+        EXPECT_TRUE(toast.contains(QStringLiteral("已导入"))) << toast.toStdString();
+        EXPECT_TRUE(toast.contains(QStringLiteral("重启"))) << toast.toStdString() << "提示里要写明哪些改动还要重启";
+    }
+
+    /**
+     * @brief 钉住「不是本程序导出的那份」会被拒，而且不动已有配置
+     * @details 一句「已导入 0 项」与真的失败在界面上长得一样，而后果完全不同：前者会让人觉得备份已生效。
+     *          拒绝必须是 Danger 一档、要点名形状问题，且已有的值一格都不许被半份导入改掉。
+     */
+    TEST_F(MainWindowFixture, ImportRejectsAFileThatIsNotOurExport)
+    {
+        const auto bogus = QString::fromStdWString((m_directory / "bogus.json").wstring());
+        {
+            QFile file{bogus};
+            ASSERT_TRUE(file.open(QIODevice::WriteOnly));
+            file.write("[]"); // 数组而不是对象：不是导出那一份的形状
+            file.close();
+        }
+
+        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kHistoryMaximumEntries, 42)));
+        makeWindow();
+
+        QObject                                    receiver;
+        std::optional<GyanisScribe::Ui::ToastKind> kind;
+        QString                                    toast;
+        QObject::connect(m_window.get(), &MainWindow::messageForUser, &receiver,
+                         [&toast, &kind](const QString &message, const GyanisScribe::Ui::ToastKind received)
+                         {
+                             toast = message;
+                             kind  = received;
+                         });
+
+        m_window->importSettingsFromFile(bogus);
+        ASSERT_TRUE(kind.has_value()) << "坏文件走掉了却没给任何提示";
+        EXPECT_EQ(*kind, GyanisScribe::Ui::ToastKind::Danger) << toast.toStdString();
+        EXPECT_NE(toast.indexOf(QStringLiteral("JSON")), -1) << "拒绝要指名是形状不对：" << toast.toStdString();
+        EXPECT_EQ(m_store->intValue(GyanisScribe::Settings::kHistoryMaximumEntries, -1), 42) << "被拒的导入动了已有配置";
     }
 
 } // namespace

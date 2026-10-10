@@ -168,7 +168,7 @@ namespace GyanisScribe::App
         QObject::connect(m_mainWindow.get(), &MainWindow::historyPinRequested, this, &AppController::handleHistoryPin);
         QObject::connect(m_mainWindow.get(), &MainWindow::historyOcrRequested, this, &AppController::handleHistoryOcr);
         QObject::connect(m_mainWindow.get(), &MainWindow::historyRemoveRequested, this, &AppController::handleHistoryRemove);
-        QObject::connect(m_mainWindow.get(), &MainWindow::historyMessage, this, [this](const QString &message, Ui::ToastKind kind) { notifyUser(message, kind); });
+        QObject::connect(m_mainWindow.get(), &MainWindow::messageForUser, this, [this](const QString &message, Ui::ToastKind kind) { notifyUser(message, kind); });
     }
 
     AppController::~AppController() = default;
