@@ -2,6 +2,8 @@
 #include "Annotation/AnnotationToolbarGeometry.h"
 
 #include "Annotation/AnnotationTool.h"
+#include "Settings/SettingsKeys.h"
+#include "Settings/SettingsStore.h"
 #include "Ui/DesignTokens.h"
 #include "Ui/IconProvider.h"
 
@@ -15,11 +17,14 @@
 #include <QSize>
 #include <QSlider>
 #include <QString>
+#include <QStringList>
 #include <QToolButton>
 #include <QWidget>
 
 #include <array>
 #include <cstdlib>
+#include <filesystem>
+#include <format>
 #include <memory>
 #include <string_view>
 #include <vector>
@@ -29,6 +34,7 @@ using GyanisScribe::Annotation::placeToolbar;
 using GyanisScribe::Annotation::ToolbarSide;
 using GyanisScribe::Annotation::ToolKind;
 using GyanisScribe::Core::ErrorCode;
+using GyanisScribe::Settings::SettingsStore;
 using GyanisScribe::Ui::IconProvider;
 using GyanisScribe::Ui::kAnnotationPalette;
 using GyanisScribe::Ui::kAnnotationWidths;
@@ -78,6 +84,29 @@ namespace
             application.reset();
         }
 
+        void SetUp() override
+        {
+            // 每条用例一份自己的 INI：ctest 并行时每个用例是一个独立进程，
+            // 共用一份配置的话「最近使用颜色」那条写进去会读到别人写的值
+            const auto *info = ::testing::UnitTest::GetInstance()->current_test_info();
+            m_iniPath        = std::filesystem::temp_directory_path() / std::format("GyanisScribe-Toolbar-{}-{}.ini", info->test_suite_name(), info->name());
+            std::error_code ignored;
+            std::filesystem::remove(m_iniPath, ignored);
+            m_settings = std::make_unique<SettingsStore>(m_iniPath);
+        }
+
+        void TearDown() override
+        {
+            // 先放 store（它会冲刷配置），再删文件
+            m_settings.reset();
+            std::error_code ignored;
+            std::filesystem::remove(m_iniPath, ignored);
+        }
+
+        /// 本用例独占的配置文件与 store，工具栏的最近使用颜色就落在这里
+        std::filesystem::path          m_iniPath;
+        std::unique_ptr<SettingsStore> m_settings;
+
         /// 工具栏每条信号的落地处，用例按「谁发了几次」判接线是否成环
         struct SignalLog
         {
@@ -91,9 +120,9 @@ namespace
         };
 
         /// 建一把工具栏，并把它的每条信号都记进 log
-        [[nodiscard]] static std::unique_ptr<AnnotationToolbar> makeToolbarLogged(SignalLog &log)
+        [[nodiscard]] std::unique_ptr<AnnotationToolbar> makeToolbarLogged(SignalLog &log)
         {
-            auto toolbar = std::make_unique<AnnotationToolbar>(*icons);
+            auto toolbar = std::make_unique<AnnotationToolbar>(*m_settings, *icons);
             QObject::connect(toolbar.get(), &AnnotationToolbar::toolChanged, [&log](ToolKind kind) { log.tools.push_back(kind); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::colorChanged, [&log](const QColor &color) { log.colors.push_back(color); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::widthChanged, [&log](int width) { log.widths.push_back(width); });
@@ -223,7 +252,7 @@ TEST_F(ToolbarFixture, ExposesEveryRequiredControlWithAccessibleNames)
     auto      toolbar = makeToolbarLogged(log);
 
     ASSERT_EQ(AnnotationToolbar::toolButtonCount(), 8);
-    ASSERT_EQ(AnnotationToolbar::colorButtonCount(), static_cast<int>(kAnnotationPalette.size()) + 1);
+    ASSERT_EQ(toolbar->colorButtonCount(), static_cast<int>(kAnnotationPalette.size()) + 1) << "配置是空的：预设八格加自定义一枚";
 
     for (std::size_t index = 0; index < kToolLabels.size(); ++index)
     {
@@ -435,4 +464,29 @@ TEST_F(ToolbarFixture, ColorSwatchesAndActionButtonsEmitTheirOwnSignals)
     EXPECT_FALSE(buttonByLabel(*toolbar, "重做（Ctrl+Y）")->isEnabled());
     buttonByLabel(*toolbar, "撤销（Ctrl+Z）")->click();
     EXPECT_EQ(log.undo, 1);
+}
+
+/**
+ * @brief 钉住「最近使用颜色」从配置回到色板，点了就发那条颜色
+ * @details 清单本身的算法在 TestRecentColors 里钉；这条端到端验的是接线——
+ *          存好配置后重开一份 store，等价于用户重启程序再回来。
+ *          「自定义取色之后写入配置」那一半没在这里验：QColorDialog 是无头的，
+ *          点不到它（界面的硬限制），算法侧的序列化与读回已经成对钉住。
+ */
+TEST_F(ToolbarFixture, RecentColorsFromSettingsBecomeSwatches)
+{
+    ASSERT_TRUE(m_settings->setValue(GyanisScribe::Settings::kAnnotationRecentColors, QStringList{QStringLiteral("#FF0000"), QStringLiteral("#0078FF")}).has_value());
+    m_settings->sync();
+    m_settings = std::make_unique<SettingsStore>(m_iniPath);
+
+    SignalLog log;
+    auto      toolbar = makeToolbarLogged(log);
+
+    ASSERT_EQ(toolbar->colorButtonCount(), static_cast<int>(kAnnotationPalette.size()) + 3) << "预设八格 + 最近两格 + 自定义一枚";
+
+    auto *second = buttonByLabel(*toolbar, "最近使用 2");
+    ASSERT_NE(second, nullptr) << "第二格没按清单排出来，顺序就不再是「最近」";
+    second->click();
+    ASSERT_EQ(log.colors.size(), 1U);
+    EXPECT_EQ(log.colors[0], QColor(0, 0x78, 0xFF)) << "按下的是第二格，发出来的却是别的颜色";
 }

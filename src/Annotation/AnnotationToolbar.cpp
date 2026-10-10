@@ -1,6 +1,11 @@
 #include "Annotation/AnnotationToolbar.h"
 
 #include "Annotation/AnnotationTool.h"
+#include "Annotation/RecentColors.h"
+#include "Core/Logger.h"
+#include "Core/Text.h"
+#include "Settings/ISettingsStore.h"
+#include "Settings/SettingsKeys.h"
 #include "Ui/DesignTokens.h"
 
 #include <QButtonGroup>
@@ -17,6 +22,7 @@
 #include <QToolButton>
 
 #include <array>
+#include <format>
 #include <string_view>
 #include <tuple>
 
@@ -27,12 +33,6 @@ namespace
     using GyanisScribe::Ui::kAnnotationPalette;
     using GyanisScribe::Ui::kAnnotationWidths;
     using GyanisScribe::Ui::kFontSizes;
-
-    /// 中文字面量走 UTF-8：源文件是 UTF-8，而 QString::fromUtf8 需要显式的字节序列
-    QString fromUtf8Text(const std::string_view text)
-    {
-        return QString::fromUtf8(text.data(), static_cast<qsizetype>(text.size()));
-    }
 
     /**
      * @brief 工具按钮的登记表：顺序、图标名与中文名一处对齐
@@ -78,11 +78,13 @@ namespace
 
 namespace GyanisScribe::Annotation
 {
-    AnnotationToolbar::AnnotationToolbar(const Ui::IconProvider &icons, QWidget *parent) : QWidget(parent), m_icons(icons), m_activeTool(ToolKind::Rectangle)
+    AnnotationToolbar::AnnotationToolbar(Settings::ISettingsStore &settings, const Ui::IconProvider &icons, QWidget *parent) :
+        QWidget(parent), m_settings(settings), m_icons(icons), m_activeTool(ToolKind::Rectangle)
     {
         setObjectName(QStringLiteral("AnnotationToolbar"));
 
         auto *layout = new QHBoxLayout{this};
+        m_layout     = layout;
         layout->setContentsMargins(Ui::kToolbarPadding, Ui::kToolbarPadding, Ui::kToolbarPadding, Ui::kToolbarPadding);
         layout->setSpacing(Ui::kToolbarPadding);
 
@@ -92,7 +94,7 @@ namespace GyanisScribe::Annotation
         for (std::size_t index = 0; index < kToolTable.size(); ++index)
         {
             const auto [kind, iconName, label] = kToolTable[index];
-            auto *button                       = makeButton(iconName, fromUtf8Text(label), true);
+            auto *button                       = makeButton(iconName, GyanisScribe::Core::uiText(label.data()), true);
             m_toolButtons[index]               = button;
             m_toolKinds[index]                 = kind;
             // id 取工具序号：与 ToolKind 的底层值同解，反向查按钮时不必再存一张表
@@ -112,13 +114,14 @@ namespace GyanisScribe::Annotation
         }
         layout->addWidget(makeSeparator());
 
-        // 颜色组：八个预设色块加一枚取色按钮，同样互斥，自定义色选中时也只亮一个
+        // 颜色组：八个预设色块、最近使用的色块与一枚取色按钮，同样互斥，自定义色选中时也只亮一个
         auto *colorGroup = new QButtonGroup{this};
+        m_colorGroup     = colorGroup;
         colorGroup->setExclusive(true);
         for (std::size_t index = 0; index < kAnnotationPalette.size(); ++index)
         {
             const auto color  = kAnnotationPalette[index];
-            auto      *button = makeButton("Close", QStringLiteral("颜色 %1").arg(index + 1), true);
+            auto      *button = makeButton("Close", GyanisScribe::Core::uiText("颜色 %1").arg(index + 1), true);
             // 图标换成色块：makeButton 那份图标只保证按钮尺寸合适，色块才是这一格要表达的东西
             button->setIcon(QIcon{colorSwatchPixmap(color, m_icons.tintColor())});
             m_colorButtons[index] = button;
@@ -131,8 +134,26 @@ namespace GyanisScribe::Annotation
                              });
             layout->addWidget(button);
         }
-        m_customColorButton = makeButton("ColorPicker", QStringLiteral("自定义颜色"), true);
-        colorGroup->addButton(m_customColorButton, static_cast<int>(kAnnotationPalette.size()));
+        // 最近使用颜色：读回上一次留下的清单，插在预设色板之后、自定义按钮之前。
+        // 记下这个插入点，之后每次重建成品色块都要落回同一排位置
+        m_recentInsertIndex = layout->count();
+        if (const auto parsed = parseRecentColors(m_settings.stringListValue(Settings::kAnnotationRecentColors, {})); parsed)
+        {
+            m_recentColors = *parsed;
+            // 手改过的配置文件可能超出上限：按上限截断，色板不会被撑到放不下
+            if (m_recentColors.size() > kRecentColorCapacity)
+            {
+                m_recentColors.resize(kRecentColorCapacity);
+            }
+        } else
+        {
+            Core::Logger::warning(std::format("最近使用颜色读不出：{}，本次从空清单开始", parsed.error().message));
+        }
+        rebuildRecentColors();
+
+        m_customColorButton = makeButton("ColorPicker", GyanisScribe::Core::uiText("自定义颜色"), true);
+        // 固定编号：最近使用的色块从 kAnnotationPalette.size() 起排，用相邻编号会撞车
+        colorGroup->addButton(m_customColorButton, kCustomColorButtonId);
         QObject::connect(m_customColorButton, &QToolButton::clicked, this, &AnnotationToolbar::chooseCustomColor);
         layout->addWidget(m_customColorButton);
         layout->addWidget(makeSeparator());
@@ -142,8 +163,8 @@ namespace GyanisScribe::Annotation
         m_widthSlider->setRange(0, static_cast<int>(kAnnotationWidths.size()) - 1);
         m_widthSlider->setPageStep(1);
         m_widthSlider->setFixedWidth(Ui::kToolbarSliderWidth);
-        m_widthSlider->setAccessibleName(QStringLiteral("线宽"));
-        m_widthSlider->setToolTip(QStringLiteral("线宽"));
+        m_widthSlider->setAccessibleName(GyanisScribe::Core::uiText("线宽"));
+        m_widthSlider->setToolTip(GyanisScribe::Core::uiText("线宽"));
         QObject::connect(m_widthSlider, &QSlider::valueChanged, this,
                          [this](int step)
                          {
@@ -160,8 +181,8 @@ namespace GyanisScribe::Annotation
         {
             m_fontSizeCombo->addItem(QString::number(size), size);
         }
-        m_fontSizeCombo->setAccessibleName(QStringLiteral("字号"));
-        m_fontSizeCombo->setToolTip(QStringLiteral("字号"));
+        m_fontSizeCombo->setAccessibleName(GyanisScribe::Core::uiText("字号"));
+        m_fontSizeCombo->setToolTip(GyanisScribe::Core::uiText("字号"));
         QObject::connect(m_fontSizeCombo, &QComboBox::currentIndexChanged, this,
                          [this](int index)
                          {
@@ -173,8 +194,8 @@ namespace GyanisScribe::Annotation
         layout->addWidget(m_fontSizeCombo);
         layout->addWidget(makeSeparator());
 
-        m_undoButton = makeButton("Undo", QStringLiteral("撤销（Ctrl+Z）"), false);
-        m_redoButton = makeButton("Redo", QStringLiteral("重做（Ctrl+Y）"), false);
+        m_undoButton = makeButton("Undo", GyanisScribe::Core::uiText("撤销（Ctrl+Z）"), false);
+        m_redoButton = makeButton("Redo", GyanisScribe::Core::uiText("重做（Ctrl+Y）"), false);
         // 初值不可用：引擎刚建好时没有历史，亮着的撤销按钮点了没反应，比灰着更误导
         m_undoButton->setEnabled(false);
         m_redoButton->setEnabled(false);
@@ -192,10 +213,10 @@ namespace GyanisScribe::Annotation
         };
 
         const std::array actions = {
-                ActionSpec{"Copy", QStringLiteral("复制到剪贴板"), &AnnotationToolbar::copyClicked},
-                ActionSpec{"Save", QStringLiteral("保存为文件"), &AnnotationToolbar::saveClicked},
-                ActionSpec{"Pin", QStringLiteral("贴到屏幕上"), &AnnotationToolbar::pinClicked},
-                ActionSpec{"Ocr", QStringLiteral("识别文字"), &AnnotationToolbar::ocrClicked},
+                ActionSpec{"Copy", GyanisScribe::Core::uiText("复制到剪贴板"), &AnnotationToolbar::copyClicked},
+                ActionSpec{"Save", GyanisScribe::Core::uiText("保存为文件"), &AnnotationToolbar::saveClicked},
+                ActionSpec{"Pin", GyanisScribe::Core::uiText("贴到屏幕上"), &AnnotationToolbar::pinClicked},
+                ActionSpec{"Ocr", GyanisScribe::Core::uiText("识别文字"), &AnnotationToolbar::ocrClicked},
         };
         for (const auto &action: actions)
         {
@@ -242,9 +263,10 @@ namespace GyanisScribe::Annotation
         return static_cast<int>(kToolButtonCount);
     }
 
-    int AnnotationToolbar::colorButtonCount()
+    int AnnotationToolbar::colorButtonCount() const
     {
-        return static_cast<int>(Ui::kAnnotationPalette.size()) + 1;
+        // 预设八格 + 最近使用若干 + 自定义一枚；最近使用是空的时候这一格与改动前逐字相同
+        return static_cast<int>(Ui::kAnnotationPalette.size() + m_recentButtons.size()) + 1;
     }
 
     QColor AnnotationToolbar::currentColor() const
@@ -282,7 +304,7 @@ namespace GyanisScribe::Annotation
 
     void AnnotationToolbar::chooseCustomColor()
     {
-        const auto picked = QColorDialog::getColor(m_currentColor, this, QStringLiteral("选择标注颜色"));
+        const auto picked = QColorDialog::getColor(m_currentColor, this, GyanisScribe::Core::uiText("选择标注颜色"));
         if (!picked.isValid())
         {
             // 用户按了取消：什么都不发，颜色停在上一格
@@ -290,6 +312,44 @@ namespace GyanisScribe::Annotation
         }
         m_currentColor = picked;
         emit colorChanged(picked);
+
+        // 记进「最近使用」并立刻重建色块行：需求要求这一排跟着用户最近的动作走，
+        // 落盘失败只记日志——颜色本身已经生效了，不该因为存不上就回退
+        m_recentColors = pushRecentColor(m_recentColors, picked);
+        rebuildRecentColors();
+        if (auto written = m_settings.setValue(Settings::kAnnotationRecentColors, serializeRecentColors(m_recentColors)); !written)
+        {
+            Core::Logger::warning(std::format("最近使用颜色没能保存：{}", written.error().message));
+        }
+    }
+
+    void AnnotationToolbar::rebuildRecentColors()
+    {
+        // 先摘旧的：编号与布局位置都要按当前清单重排，留着上一批会插出两排色块
+        for (auto it = m_recentButtons.rbegin(); it != m_recentButtons.rend(); ++it)
+        {
+            m_colorGroup->removeButton(*it);
+            m_layout->removeWidget(*it);
+            delete *it;
+        }
+        m_recentButtons.clear();
+
+        for (std::size_t index = 0; index < m_recentColors.size(); ++index)
+        {
+            const auto color  = m_recentColors[index];
+            auto      *button = makeButton("Close", GyanisScribe::Core::uiText("最近使用 %1").arg(static_cast<int>(index) + 1), true);
+            // 图标换成色块：与预设那八格同一个画法，两排放在一起才看不出是两套控件
+            button->setIcon(QIcon{colorSwatchPixmap(color, m_icons.tintColor())});
+            m_colorGroup->addButton(button, static_cast<int>(Ui::kAnnotationPalette.size() + index));
+            QObject::connect(button, &QToolButton::clicked, this,
+                             [this, color]
+                             {
+                                 m_currentColor = color;
+                                 emit colorChanged(color);
+                             });
+            m_layout->insertWidget(m_recentInsertIndex + static_cast<int>(index), button);
+            m_recentButtons.push_back(button);
+        }
     }
 
 } // namespace GyanisScribe::Annotation

@@ -112,7 +112,7 @@ namespace GyanisScribe::App
         QObject::connect(m_tray.get(), &TrayController::actionRequested, this, &AppController::handleTrayAction);
         // 没有托盘的桌面环境（容器、精简安装）照样能跑：只是少一个入口，主窗口仍然可用
         m_tray->install();
-        m_annotationWindow = std::make_unique<Annotation::AnnotationWindow>(*m_annotation, std::make_unique<Annotation::AnnotationToolbar>(*m_icons));
+        m_annotationWindow = std::make_unique<Annotation::AnnotationWindow>(*m_annotation, std::make_unique<Annotation::AnnotationToolbar>(*m_settings, *m_icons));
 
         // 热键 → 动作：唯一的接线处，界面加菜单项时也是发同一个信号而不是再走一条路径
         QObject::connect(m_hotkeys.get(), &Hotkey::IHotkeyManager::actionTriggered, this,

@@ -18,16 +18,27 @@
 
 #include <array>
 #include <string_view>
+#include <vector>
 
+class QButtonGroup;
 class QComboBox;
+class QHBoxLayout;
 class QSlider;
 class QToolButton;
+
+namespace GyanisScribe::Settings
+{
+    class ISettingsStore;
+} // namespace GyanisScribe::Settings
 
 namespace GyanisScribe::Annotation
 {
 
     /// 工具栏上的工具按钮数量，与 ToolKind 的八个工具同解
     inline constexpr std::size_t kToolButtonCount = 8;
+
+    /// 自定义取色按钮在互斥组里的编号：不能紧跟在预设色板后面，最近使用颜色要往那段里插
+    inline constexpr int kCustomColorButtonId = 100;
 
     /**
      * @brief 标注工具栏控件
@@ -43,10 +54,11 @@ namespace GyanisScribe::Annotation
     public:
         /**
          * @brief 构造工具栏
+         * @param settings 配置存储，最近使用颜色读写它；生命周期由应用保证
          * @param icons 图标供给器，生命周期由应用保证，必须活过本控件
          * @param parent Qt 父对象
          */
-        explicit AnnotationToolbar(const Ui::IconProvider &icons, QWidget *parent = nullptr);
+        explicit AnnotationToolbar(Settings::ISettingsStore &settings, const Ui::IconProvider &icons, QWidget *parent = nullptr);
 
         AnnotationToolbar(const AnnotationToolbar &)            = delete;
         AnnotationToolbar &operator=(const AnnotationToolbar &) = delete;
@@ -69,7 +81,7 @@ namespace GyanisScribe::Annotation
         [[nodiscard]] static int toolButtonCount();
 
         /// 色块按钮数量：八个预设色加一个自定义取色
-        [[nodiscard]] static int colorButtonCount();
+        [[nodiscard]] int colorButtonCount() const;
 
         /// 当前选中的颜色，含自定义取回来的那一个
         [[nodiscard]] QColor currentColor() const;
@@ -120,6 +132,20 @@ namespace GyanisScribe::Annotation
 
         /// 打开系统取色对话框并把选中的色并进色块行；用户取消时什么都不发
         void chooseCustomColor();
+
+        /**
+         * @brief 按 m_recentColors 重建最近使用的色块
+         * @details 先摘旧按钮再插新的，编号从 kAnnotationPalette.size() 起排；
+         *          自定义按钮固定用 kCustomColorButtonId，才不会和插进来的色块撞编号。
+         */
+        void rebuildRecentColors();
+
+        Settings::ISettingsStore  &m_settings;                    ///< 最近使用颜色的读写去处
+        std::vector<QColor>        m_recentColors;                ///< 最近用过的自定义颜色，首位最新
+        std::vector<QToolButton *> m_recentButtons;               ///< 与 m_recentColors 同序的色块按钮
+        int                        m_recentInsertIndex = 0;       ///< 色块插进布局的位置（预设色板之后、自定义按钮之前）
+        class QHBoxLayout         *m_layout            = nullptr; ///< 工具栏主布局，重建色块时要往这里插
+        QButtonGroup              *m_colorGroup        = nullptr; ///< 色块的互斥组，重建最近使用时要同步它的成员
 
         const Ui::IconProvider                                  &m_icons;                       ///< 图标出口，不拥有
         std::array<QToolButton *, kToolButtonCount>              m_toolButtons{};               ///< 八个工具按钮，按 ToolKind 顺序

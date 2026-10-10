@@ -54,4 +54,7 @@ namespace GyanisScribe::Settings
     /// 历史最久留多少天，0 表示不限时长
     inline constexpr std::string_view kHistoryRetentionDays = "History/RetentionDays";
 
+    /// 标注色板的最近使用颜色（#RRGGBB 列表，最新的在前），读写都在 Annotation::AnnotationToolbar
+    inline constexpr std::string_view kAnnotationRecentColors = "Annotation/RecentColors";
+
 } // namespace GyanisScribe::Settings

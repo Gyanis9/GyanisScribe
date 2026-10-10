@@ -2,11 +2,13 @@ add_executable(TestAnnotation
         TestAnnotationEngine.cpp
         TestAnnotationTools.cpp
         TestAnnotationToolbar.cpp
-        TestAnnotationWindow.cpp)
+        TestAnnotationWindow.cpp
+        TestRecentColors.cpp)
 
 target_link_libraries(TestAnnotation PRIVATE
         Annotation
         Core
+        Settings
         GTest::gtest
         GTest::gtest_main)
 
