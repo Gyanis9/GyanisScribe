@@ -89,6 +89,34 @@ if (-not (Test-Path $winDeployQt)) { throw "windeployqt not found under $QtDir (
 & $winDeployQt --release --no-translations --svg --network (Join-Path $stage 'GyanisScribe.exe')
 if ($LASTEXITCODE -ne 0) { throw 'windeployqt failed' }
 
+# Ship the VC runtime app-local. The executable imports MSVCP140.dll / VCRUNTIME140.dll (+ _1, _2),
+# and those are not part of the Windows base image: without them the packaged app only starts on a
+# machine where somebody already installed the redistributable, which is exactly what "install and
+# use, nothing else to fetch" rules out. --compiler-runtime does not copy them with this Qt build
+# (measured: it lands Qt modules only), so they are copied from the toolchain's own redist folder.
+# The application directory is searched before the system one, so these are what the loader picks.
+# The Universal CRT (api-ms-win-crt-*) is not repeated here: Windows 10/11 supplies it.
+$crtSource = if ($env:VCToolsRedistDir) {
+    Join-Path $env:VCToolsRedistDir 'onecore\x64\Microsoft.VC145.CRT'
+} else {
+    $vcVars = if ($env:VCVARS) { $env:VCVARS } else { 'G:\Tools\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat' }
+    $vcRoot = Split-Path (Split-Path (Split-Path $vcVars -Parent) -Parent) -Parent
+    # Version-like folder names only: Redist\MSVC also holds a 'v145' symlink, which sorts last as
+    # text but is not a toolchain version -- picking it produced "vcruntime140.dll missing".
+    $redist = Get-ChildItem (Join-Path $vcRoot 'Redist\MSVC') -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^\d+\.\d+' } | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
+    if (-not $redist) { throw "no VC redist under $(Join-Path $vcRoot 'Redist\MSVC'): set VCToolsRedistDir or VCVARS to a toolchain that ships one" }
+    Join-Path $redist.FullName 'onecore\x64\Microsoft.VC145.CRT'
+}
+foreach ($name in 'vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll', 'msvcp140_1.dll', 'msvcp140_2.dll') {
+    $source = Join-Path $crtSource $name
+    # A missing one is an error, never a skip: shipping five DLLs or four makes the difference
+    # between "starts anywhere" and "starts only on a developer box".
+    if (-not (Test-Path $source)) { throw "VC runtime $name missing under $crtSource" }
+    Copy-Item $source $stage -Force
+}
+Write-Output "[ok] VC runtime staged app-local from $crtSource"
+
 # The staged folder has to run on a machine where the user installed nothing -- that is the whole
 # claim of "self-contained", and a developer box cannot show it: with the normal PATH a missing Qt
 # runtime DLL is quietly satisfied by the Qt install here. So narrow PATH to the system directory
