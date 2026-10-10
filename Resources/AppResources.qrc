@@ -68,5 +68,7 @@
     <file alias="Light.qss">Styles/Light.qss</file>
     <file alias="Dark.qss">Styles/Dark.qss</file>
     <file alias="HighContrast.qss">Styles/HighContrast.qss</file>
+    <file alias="CheckmarkOnAccent.svg">Styles/CheckmarkOnAccent.svg</file>
+    <file alias="CheckmarkOnAccentDark.svg">Styles/CheckmarkOnAccentDark.svg</file>
   </qresource>
 </RCC>

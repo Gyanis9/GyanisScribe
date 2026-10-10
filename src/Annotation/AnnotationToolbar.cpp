@@ -79,6 +79,8 @@ namespace
         auto *separator = new QFrame;
         separator->setFrameShape(QFrame::VLine);
         separator->setFrameShadow(QFrame::Plain);
+        // 颜色由样式表按这个名字给：工具组、色板、线宽、字号四段之间要有同一条缝
+        separator->setObjectName(QStringLiteral("toolbarSeparator"));
         return separator;
     }
 } // namespace
@@ -89,11 +91,13 @@ namespace GyanisScribe::Annotation
         QWidget(parent), m_settings(settings), m_icons(icons), m_activeTool(ToolKind::Rectangle)
     {
         setObjectName(QStringLiteral("AnnotationToolbar"));
+        // 样式表给这个对象名画了一圈卡片底；QWidget 子类不打开这个开关就不会吃样式表的背景
+        setAttribute(Qt::WA_StyledBackground, true);
 
         auto *layout = new QHBoxLayout{this};
         m_layout     = layout;
-        layout->setContentsMargins(Ui::kToolbarPadding, Ui::kToolbarPadding, Ui::kToolbarPadding, Ui::kToolbarPadding);
-        layout->setSpacing(Ui::kToolbarPadding);
+        layout->setContentsMargins(Ui::kSpacingSmall, Ui::kSpacingSmall, Ui::kSpacingSmall, Ui::kSpacingSmall);
+        layout->setSpacing(Ui::kSpacingSmall);
 
         // 工具组：互斥交给 QButtonGroup，这样鼠标点击与 setActiveTool 走的是同一套按钮状态
         auto *toolGroup = new QButtonGroup{this};

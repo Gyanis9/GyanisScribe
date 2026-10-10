@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- 勾选框里的对勾，由样式表的 ::indicator 用 image: 引进去。
+       颜色写死而不走 currentColor：样式表画 ::indicator 时不解析 currentColor，
+       拿到的会是默认黑，压在浅色主题的主色上读不出来。
+       #FFFFFF 与 DesignTokens 的 onAccent（浅色档与高对比度档）同值，改那一档时这里要跟着改。 -->
+  <path d="M5 13l4 4 10-10"/>
+</svg>

@@ -82,8 +82,8 @@ namespace
             LanguageChoice{AppLanguage::English, "English"},
     };
 
-    /// 导航列的固定宽度：最长的标签是「文字识别」四个汉字加一枚图标，这一档容得下并留出内边距
-    constexpr int kNavColumnWidth = 150;
+    /// 导航列的固定宽度：最长的标签是「文字识别」四个汉字加一枚图标与左右内边距，再宽就要挤右侧的字段了
+    constexpr int kNavColumnWidth = 208;
 
     /// 历史条数这一格能填到的最大值：再多就得靠搜索找，而截图量本身也撑不到这里
     constexpr int kMaximumEntriesLimit = 10000;
@@ -102,16 +102,69 @@ namespace
     QFormLayout *makePageForm(QWidget *page, const QString &intro)
     {
         auto *layout = new QVBoxLayout{page};
-        auto *text   = new QLabel{intro, page};
+        layout->setContentsMargins(GyanisScribe::Ui::kSpacingPage, GyanisScribe::Ui::kSpacingPage, GyanisScribe::Ui::kSpacingPage, GyanisScribe::Ui::kSpacingPage);
+        layout->setSpacing(GyanisScribe::Ui::kSpacingMedium);
+
+        auto *text = new QLabel{intro, page};
+        text->setObjectName(QStringLiteral("pageHint"));
         text->setWordWrap(true);
+        text->setMaximumWidth(GyanisScribe::Ui::kIntroMaximumWidth);
         // 说明行是次要文本，同时要让读屏软件把它当成这一段正文念出来
         text->setAccessibleName(GyanisScribe::Core::uiText("这一类的说明"));
         layout->addWidget(text);
 
         auto *form = new QFormLayout;
+        form->setSpacing(GyanisScribe::Ui::kSpacingMedium);
+        // 标签一律左对齐并顶到字段上沿：右对齐会让标签与字段之间那条缝忽宽忽窄，扫读时对不齐
+        form->setLabelAlignment(Qt::AlignLeft | Qt::AlignTop);
+        form->setFormAlignment(Qt::AlignLeft | Qt::AlignTop);
         layout->addLayout(form);
         layout->addStretch();
         return form;
+    }
+
+    /**
+     * @brief 给一页设置套上卡片外观、页标题，并把字段宽度收到同一档
+     * @param page 这一页的容器（makePageForm 已经接管它的版面）
+     * @param title 已经过 uiText 的页名，与导航行同源
+     * @details 标题与导航行是同一个词：没有标题时，切进这一页只看得见左侧导航那一行高亮，
+     *          右侧整片是控件，「我在哪一节」要回头看导航。
+     *          说明行的次要色走样式表按对象名给，不在这里 setPalette：钉在控件上会在切主题时
+     *          停在旧的那一档色，而样式表是整片换掉的。
+     */
+    void decoratePage(QWidget &page, const QString &title)
+    {
+        page.setObjectName(QStringLiteral("pageCard"));
+        page.setAttribute(Qt::WA_StyledBackground, true);
+
+        auto *layout = page.layout();
+        if (auto *box = qobject_cast<QVBoxLayout *>(layout); box != nullptr)
+        {
+            auto *heading = new QLabel{title, &page};
+            heading->setObjectName(QStringLiteral("pageTitle"));
+            GyanisScribe::Ui::applyTextRole(*heading, GyanisScribe::Ui::TextRole::PageTitle);
+            box->insertWidget(0, heading);
+        }
+
+        for (auto *hint: page.findChildren<QLabel *>(QStringLiteral("pageHint")))
+        {
+            GyanisScribe::Ui::applyTextRole(*hint, GyanisScribe::Ui::TextRole::Hint);
+        }
+
+        // 字段宽度收到一档：路径框与下拉拉到整窗宽之后，「这一格填什么」和下一格就分不出来了
+        if (auto *form = page.findChild<QFormLayout *>(); form != nullptr)
+        {
+            for (int row = 0; row < form->rowCount(); ++row)
+            {
+                if (auto *field = form->itemAt(row, QFormLayout::FieldRole); field != nullptr)
+                {
+                    if (auto *widget = field->widget(); widget != nullptr)
+                    {
+                        widget->setMaximumWidth(GyanisScribe::Ui::kFieldMaximumWidth);
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -767,12 +820,19 @@ namespace GyanisScribe::App
     {
         setWindowTitle(GyanisScribe::Core::uiText("智录 设置"));
         setWindowIcon(icons.icon("App"));
+        // 根容器要自己铺底：样式表只给具名的根与卡片上色，不铺裸 QWidget
+        setObjectName(QStringLiteral("appRoot"));
+        setAttribute(Qt::WA_StyledBackground, true);
 
         auto *layout = new QHBoxLayout{this};
-        m_nav        = new QListWidget{this};
-        m_stack      = new QStackedWidget{this};
+        layout->setContentsMargins(GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge);
+        layout->setSpacing(GyanisScribe::Ui::kSpacingMedium);
+        m_nav   = new QListWidget{this};
+        m_stack = new QStackedWidget{this};
+        m_nav->setObjectName(QStringLiteral("settingsNav"));
         m_nav->setFixedWidth(kNavColumnWidth);
         m_nav->setAccessibleName(GyanisScribe::Core::uiText("设置导航"));
+        m_nav->setFrameShape(QFrame::NoFrame);
 
         // 导航行与页容器都在这一趟循环里生成：一处顺序，标签、图标与页内容不可能各自漂移
         for (const auto &choice: kPages)
@@ -783,6 +843,7 @@ namespace GyanisScribe::App
                 // 这一页还没有搭法：跳开这一行，导航与页容器都少一行，因此仍然同序
                 continue;
             }
+            decoratePage(*content, GyanisScribe::Core::uiText(choice.label.data()));
             m_nav->addItem(new QListWidgetItem{m_icons.icon(choice.icon), GyanisScribe::Core::uiText(choice.label.data())});
             m_stack->addWidget(content);
         }
@@ -792,7 +853,7 @@ namespace GyanisScribe::App
 
         layout->addWidget(m_nav);
         layout->addWidget(m_stack, 1);
-        resize(720, 520);
+        resize(860, 600);
     }
 
     void MainWindow::open(const MainWindowPage page)

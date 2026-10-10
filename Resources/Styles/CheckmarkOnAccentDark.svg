@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#0B1220" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- 深色档的勾：这一档主色偏亮，勾要压深色才够对比（同 DesignTokens 里深色档的 onAccent）。
+       与 CheckmarkOnAccent.svg 只差描边色，形状必须一致。 -->
+  <path d="M5 13l4 4 10-10"/>
+</svg>

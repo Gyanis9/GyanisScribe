@@ -1,5 +1,7 @@
 #include "Record/RecordingHud.h"
 
+#include "Ui/DesignTokens.h"
+
 #include "Core/Text.h"
 #include "Ui/IconProvider.h"
 
@@ -114,10 +116,16 @@ namespace GyanisScribe::Record
         setWindowTitle(GyanisScribe::Core::uiText("录屏控制条"));
         setAccessibleName(GyanisScribe::Core::uiText("录屏控制条"));
         setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
+        // 这一圈卡片底由样式表的 QWidget#hudRoot 给：无边框悬浮窗不铺底，字就直接压在桌面上
+        setObjectName(QStringLiteral("hudRoot"));
+        setAttribute(Qt::WA_StyledBackground, true);
 
         auto *root = new QVBoxLayout{this};
+        root->setContentsMargins(GyanisScribe::Ui::kSpacingSmall, GyanisScribe::Ui::kSpacingTiny, GyanisScribe::Ui::kSpacingSmall, GyanisScribe::Ui::kSpacingTiny);
+        root->setSpacing(GyanisScribe::Ui::kSpacingTiny);
 
         auto *line = new QHBoxLayout;
+        line->setSpacing(GyanisScribe::Ui::kSpacingSmall);
         root->addLayout(line);
 
         auto *dot = new QLabel{QStringLiteral("●"), this};
@@ -127,10 +135,14 @@ namespace GyanisScribe::Record
 
         m_status = new QLabel{hudStatusText(RecordingState::Idle, 0), this};
         m_status->setAccessibleName(GyanisScribe::Core::uiText("录制状态"));
+        GyanisScribe::Ui::applyTextRole(*m_status, GyanisScribe::Ui::TextRole::Body);
         line->addWidget(m_status);
 
         m_elapsed = new QLabel{formatDuration(0), this};
+        m_elapsed->setObjectName(QStringLiteral("metricValue"));
         m_elapsed->setAccessibleName(GyanisScribe::Core::uiText("已录时长"));
+        // 等宽数字：一秒一跳时这一列的宽度不能变，否则整条控制条每秒钟抖一次
+        GyanisScribe::Ui::applyTextRole(*m_elapsed, GyanisScribe::Ui::TextRole::Metric);
         line->addWidget(m_elapsed);
 
         m_pauseButton = new QPushButton{GyanisScribe::Core::uiText("暂停"), this};

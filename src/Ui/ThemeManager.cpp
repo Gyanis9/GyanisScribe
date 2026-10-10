@@ -154,6 +154,9 @@ namespace GyanisScribe::Ui
         if (auto *application = qobject_cast<QApplication *>(QGuiApplication::instance()); application != nullptr)
         {
             application->setStyleSheet(styleSheetFor(resolved));
+            // 样式表管不到由原生风格画的那部分（勾选的勾、微调框箭头、表头、占位与禁用文字），
+            // 那些角色只认 QPalette：只落样式表时深色档会画出一批浅色原生件
+            application->setPalette(buildApplicationPalette(paletteFor(resolved)));
         }
         emit themeChanged();
     }

@@ -13,6 +13,7 @@
 #include <QColor>
 #include <QFile>
 #include <QImage>
+#include <QPalette>
 #include <QPixmap>
 #include <QPushButton>
 #include <QRegularExpression>
@@ -26,6 +27,22 @@
 #include <fstream>
 #include <initializer_list>
 #include <memory>
+#include <QCheckBox>
+#include <QComboBox>
+#include <QFormLayout>
+#include <QGroupBox>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QLineEdit>
+#include <QListWidget>
+#include <QPushButton>
+#include <QSlider>
+#include <QSpinBox>
+#include <QToolButton>
+#include <QVBoxLayout>
+#include <QWidget>
+#include <QtGlobal>
+#include <QCheckBox>
 #include <string>
 
 using GyanisScribe::Core::ErrorCode;
@@ -123,8 +140,9 @@ namespace
             m_store.reset();
             std::error_code cleanupError;
             std::filesystem::remove(m_iniPath, cleanupError);
-            // 样式表是进程级的，用例之间要归零，否则下一条用例拿到上一条的残留
+            // 样式表与调色板都是进程级的，用例之间要归零，否则下一条用例拿到上一条的残留
             application->setStyleSheet(QString{});
+            application->setPalette(QPalette{});
         }
 
         [[nodiscard]] std::string testInfo() const
@@ -326,10 +344,11 @@ TEST_F(ThemeManagerFixture, StyleSheetsAndPalettesAgreeInBothDirections)
         const auto palette = paletteFor(kind);
         ASSERT_FALSE(sheet.isEmpty()) << resource;
 
-        // 只列该进样式表的八个角色：icon/success/danger 是给绘制代码用的（图标描边、Toast 语义色），
+        // 只列该进样式表的十四个角色：icon/success/danger 是给绘制代码用的（图标描边、Toast 语义色），
         // 出现在 QSS 里反而是问题，下面单独反着断言
-        const std::array paletteColors = {palette.windowBackground, palette.surface, palette.text,     palette.secondaryText,
-                                          palette.border,           palette.accent,  palette.onAccent, palette.selection};
+        const std::array paletteColors = {palette.windowBackground, palette.surface,     palette.text,       palette.secondaryText, palette.border,
+                                          palette.accent,           palette.onAccent,    palette.selection,  palette.mutedFill,     palette.hover,
+                                          palette.pressed,          palette.accentHover, palette.accentSoft, palette.borderStrong};
 
         // 正向：QSS 里不许出现色板之外的色值
         QRegularExpression hexPattern{QStringLiteral("#[0-9A-Fa-f]{6}")};
@@ -381,6 +400,15 @@ TEST_F(ThemeManagerFixture, SemanticColorPairsMeetWcagContrast)
 
         EXPECT_GE(contrastRatio(palette.text, palette.selection), 4.5) << label << " 选区上的正文读不出";
         EXPECT_GE(contrastRatio(palette.onAccent, palette.accent), 4.5) << label << " 主按钮上的文字读不出";
+
+        // 状态色不是「看着差不多」：悬停与按下这两档底上，次要文本仍要读得出，否则禁用/悬停二选一
+        EXPECT_GE(contrastRatio(palette.secondaryText, palette.hover), 4.5) << label << " 悬停底上的次要文本不足 AA";
+        EXPECT_GE(contrastRatio(palette.secondaryText, palette.pressed), 4.5) << label << " 按下底上的次要文本不足 AA";
+        EXPECT_GE(contrastRatio(palette.secondaryText, palette.mutedFill), 4.5) << label << " 静默底上的次要文本不足 AA";
+        // 导航当前项与勾选的工具按钮压的是 accentSoft：正文与主色描边都要在这一档底上站得住
+        EXPECT_GE(contrastRatio(palette.text, palette.accentSoft), 4.5) << label << " 选中底上的正文读不出";
+        EXPECT_GE(contrastRatio(palette.accent, palette.accentSoft), 3.0) << label << " 选中项的描边与它自己的底糊成一片";
+        EXPECT_GE(contrastRatio(palette.onAccent, palette.accentHover), 4.5) << label << " 主按钮悬停时文字读不出";
     }
 
     // 高对比度档另加一档判据：正文与次要文本要满足 AAA 的 7:1——这一档存在的理由就是「AA 还不够」，
@@ -436,4 +464,28 @@ TEST_F(ThemeManagerFixture, WidgetsRenderThePaletteSurfacePerTheme)
     EXPECT_EQ(light, paletteFor(ThemeKind::Light).surface) << "浅色档没画出它自己的面板底色";
     EXPECT_EQ(dark, paletteFor(ThemeKind::Dark).surface) << "深色档没画出它自己的面板底色";
     EXPECT_NE(light, dark) << "两档画出同一个底色，说明样式表根本没生效";
+}
+
+/**
+ * @brief 钉住「切主题时应用调色板跟着换」：原生绘制的那部分只认 QPalette
+ * @details 样式表覆盖不到勾选的勾、微调框箭头、占位文字与禁用文字——这些走调色板。
+ *          只落样式表时文本比对全绿而界面是浅色原生件，所以这里按角色逐个核到令牌上，
+ *          并反向确认换档之后另一套的底色不在了。
+ */
+TEST_F(ThemeManagerFixture, ApplicationPaletteFollowsTheResolvedTheme)
+{
+    ASSERT_TRUE(manager().setTheme(ThemeKind::Dark).has_value());
+    const auto dark = application->palette();
+    EXPECT_EQ(dark.color(QPalette::Window), GyanisScribe::Ui::kDarkPalette.windowBackground);
+    EXPECT_EQ(dark.color(QPalette::Base), GyanisScribe::Ui::kDarkPalette.surface);
+    EXPECT_EQ(dark.color(QPalette::Text), GyanisScribe::Ui::kDarkPalette.text);
+    EXPECT_EQ(dark.color(QPalette::PlaceholderText), GyanisScribe::Ui::kDarkPalette.secondaryText);
+    EXPECT_EQ(dark.color(QPalette::Highlight), GyanisScribe::Ui::kDarkPalette.accentSoft);
+    EXPECT_EQ(dark.color(QPalette::Disabled, QPalette::Text), GyanisScribe::Ui::kDarkPalette.secondaryText);
+
+    ASSERT_TRUE(manager().setTheme(ThemeKind::Light).has_value());
+    const auto light = application->palette();
+    EXPECT_EQ(light.color(QPalette::Window), GyanisScribe::Ui::kLightPalette.windowBackground);
+    EXPECT_NE(light.color(QPalette::Window), GyanisScribe::Ui::kDarkPalette.windowBackground) << "换档之后深色那套的底还在调色板里";
+    EXPECT_EQ(light.color(QPalette::Highlight), GyanisScribe::Ui::kLightPalette.accentSoft);
 }

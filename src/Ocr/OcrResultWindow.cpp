@@ -172,8 +172,8 @@ namespace GyanisScribe::Ocr
         }
 
         const auto percent = static_cast<int>(std::lround(result.averageConfidence * kConfidencePercentScale));
-        return QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("{} 行 · 平均置信度 {}% · 图像 {}×{} · 语言 {}"), result.lines.size(), percent, imageSize.width(),
-                                             imageSize.height(), result.language.toStdString())
+        return QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("{} 行 · 平均置信度 {}% · 图像 {}×{} · 语言 {}"), result.lines.size(), percent,
+                                                              imageSize.width(), imageSize.height(), result.language.toStdString())
                                          .c_str());
     }
 
@@ -182,8 +182,13 @@ namespace GyanisScribe::Ocr
     {
         setWindowTitle(GyanisScribe::Core::uiText("识别结果"));
         setWindowIcon(m_icons.icon("Ocr"));
+        // 顶层窗口自己铺底：样式表只给具名的根上底色
+        setObjectName(QStringLiteral("appRoot"));
+        setAttribute(Qt::WA_StyledBackground, true);
 
         auto *root = new QHBoxLayout{this};
+        root->setContentsMargins(GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge);
+        root->setSpacing(GyanisScribe::Ui::kSpacingMedium);
         root->addWidget(m_preview = new Preview, 3);
 
         auto *right = new QVBoxLayout;
@@ -350,7 +355,8 @@ namespace GyanisScribe::Ocr
         const auto path = chosen.toStdWString();
         if (auto exported = exportTxt(path); !exported)
         {
-            const auto message = QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("导出 TXT 失败：{}。请换一个目录再试一次"), exported.error().message).c_str());
+            const auto message =
+                    QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("导出 TXT 失败：{}。请换一个目录再试一次"), exported.error().message).c_str());
             Core::Logger::warning(message.toStdString());
             emit messageForUser(message, Ui::ToastKind::Danger);
             return;
@@ -370,7 +376,8 @@ namespace GyanisScribe::Ocr
         const auto path = chosen.toStdWString();
         if (auto exported = exportJson(path); !exported)
         {
-            const auto message = QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("导出 JSON 失败：{}。请换一个目录再试一次"), exported.error().message).c_str());
+            const auto message =
+                    QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("导出 JSON 失败：{}。请换一个目录再试一次"), exported.error().message).c_str());
             Core::Logger::warning(message.toStdString());
             emit messageForUser(message, Ui::ToastKind::Danger);
             return;
