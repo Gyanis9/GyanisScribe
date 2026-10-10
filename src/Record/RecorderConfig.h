@@ -49,8 +49,7 @@ namespace GyanisScribe::Record
         QString               screenName;                                      ///< 录哪块屏幕，全部模式必填
         quintptr              windowHandle = 0;                                ///< Window 模式的平台窗口句柄（Qt 的 WId）
         std::filesystem::path outputDirectory;                                 ///< 成品文件落在哪个目录
-        bool                  cursorHighlight    = false;                      ///< 是否在帧上圈出光标位置
-        bool                  captureSystemAudio = false;                      ///< 是否录系统声音，需要平台能力在位
+        bool                  cursorHighlight = false;                         ///< 是否在帧上圈出光标位置
     };
 
     /**
