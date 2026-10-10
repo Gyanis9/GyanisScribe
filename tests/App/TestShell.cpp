@@ -113,13 +113,32 @@ TEST(TrayMenuCapabilities, DropsWindowCaptureOnlyWhenThePlatformCannotDiscoverWi
  */
 TEST(TrayTooltip, ShowsThePinCountOnlyWhenPinsExist)
 {
-    EXPECT_EQ(GyanisScribe::App::trayTooltip(0), QStringLiteral("智录"));
-    EXPECT_EQ(GyanisScribe::App::trayTooltip(-1), QStringLiteral("智录")) << "负数不该写成「贴图 -1 张」";
+    EXPECT_EQ(GyanisScribe::App::trayTooltip(0, -1, false), QStringLiteral("智录"));
+    EXPECT_EQ(GyanisScribe::App::trayTooltip(-1, -1, false), QStringLiteral("智录")) << "负数不该写成「贴图 -1 张」";
 
-    const auto three = GyanisScribe::App::trayTooltip(3);
+    const auto three = GyanisScribe::App::trayTooltip(3, -1, false);
     EXPECT_NE(three.indexOf(QStringLiteral("智录")), -1) << three.toStdString();
     EXPECT_NE(three.indexOf(QStringLiteral("3")), -1) << three.toStdString();
     EXPECT_NE(three.indexOf(QStringLiteral("贴图")), -1) << three.toStdString();
+}
+
+/**
+ * @brief 钉住托盘那一行在录屏时换成进度，并把暂停与在录分开
+ * @details 控制条可以收进托盘，收起后这一行就是「还在录吗、录了多久」的唯一读数处：
+ *          两档写成同一句，用户不知道帧还在不在走，停手的时机也就错了。
+ */
+TEST(TrayTooltip, ShowsRecordingProgressAndSeparatesPaused)
+{
+    const auto recording = GyanisScribe::App::trayTooltip(2, 75, false);
+    EXPECT_NE(recording.indexOf(QStringLiteral("录制")), -1) << recording.toStdString();
+    EXPECT_NE(recording.indexOf(QStringLiteral("01:15")), -1) << "时长要按时钟文本给：75 直接写出来看不出比 90 短";
+
+    const auto paused = GyanisScribe::App::trayTooltip(2, 75, true);
+    EXPECT_NE(paused.indexOf(QStringLiteral("暂停")), -1) << paused.toStdString();
+    EXPECT_NE(recording, paused) << "暂停与在录在托盘上是同一句读数";
+
+    EXPECT_EQ(GyanisScribe::App::trayTooltip(2, -1, false), GyanisScribe::App::trayTooltip(2, -5, false)) << "负数一律按「没在录」处理，不该随数值变";
+    EXPECT_EQ(GyanisScribe::App::trayTooltip(0, -1, true), QStringLiteral("智录")) << "没在录时暂停位不该改读数";
 }
 
 /**

@@ -544,6 +544,14 @@
             <translation>中文</translation>
         </message>
         <message>
+            <source>智录 · 录制已暂停 %1</source>
+            <translation>GyanisScribe · recording paused at %1</translation>
+        </message>
+        <message>
+            <source>智录 · 正在录制 %1</source>
+            <translation>GyanisScribe · recording %1</translation>
+        </message>
+        <message>
             <source>智录</source>
             <translation>GyanisScribe</translation>
         </message>

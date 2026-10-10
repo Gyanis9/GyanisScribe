@@ -617,6 +617,8 @@ namespace GyanisScribe::App
         QObject::connect(m_hudTicker, &QTimer::timeout, this, &AppController::updateRecordingHud);
         m_hudTicker->start();
         m_hud->show();
+        // 一开始就把托盘那一行接管过来：第一秒的 ticker 还没跑，别让用户看到「贴图 N 张」以为没在录
+        m_tray->setRecordingStatus(0, false);
     }
 
     void AppController::updateRecordingHud()
@@ -626,6 +628,8 @@ namespace GyanisScribe::App
             return;
         }
         m_hud->applyState(m_recording->state(), m_countdownRemaining, m_recording->recordedSeconds());
+        // 控制条收进托盘后，这一行读数就是用户唯一的出口：每秒推一次，暂停与在录分开显示
+        m_tray->setRecordingStatus(m_recording->recordedSeconds(), m_recording->state() == Record::RecordingState::Paused);
     }
 
     void AppController::hideRecordingHud()
@@ -641,6 +645,8 @@ namespace GyanisScribe::App
             m_hud->close();
         }
         m_countdownRemaining = 0;
+        // 交还给贴图张数那一档：录制结束后托盘还写着「正在录制」就是句假话
+        m_tray->setRecordingStatus(-1, false);
     }
 
     void AppController::handleRecordingFinished(const QString &outputPath)

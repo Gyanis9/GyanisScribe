@@ -4,6 +4,7 @@
 #include "Core/Text.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Platform/PlatformCapabilities.h"
+#include "Record/RecordingHud.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
 #include "Ui/IconProvider.h"
@@ -28,8 +29,14 @@ namespace
 
 namespace GyanisScribe::App
 {
-    QString trayTooltip(const int pinCount)
+    QString trayTooltip(const int pinCount, const int recordedSeconds, const bool paused)
     {
+        if (recordedSeconds >= 0)
+        {
+            // 控制条收起后这就是唯一的读数处：暂停与在录要分得开，否则用户不知道帧还在不在走
+            const auto label = paused ? GyanisScribe::Core::uiText("智录 · 录制已暂停 %1") : GyanisScribe::Core::uiText("智录 · 正在录制 %1");
+            return label.arg(GyanisScribe::Record::formatDuration(recordedSeconds));
+        }
         if (pinCount <= 0)
         {
             return GyanisScribe::Core::uiText("智录");
@@ -108,7 +115,7 @@ namespace GyanisScribe::App
         // 托盘描边色跟着主题走：深色任务栏上的深色图标会完全看不见
         m_icons.setTintColor(m_theme.iconTint());
         m_icon->setIcon(m_icons.icon("Tray"));
-        m_icon->setToolTip(trayTooltip(m_pinCount));
+        m_icon->setToolTip(trayTooltip(m_pinCount, m_recordedSeconds, m_recordingPaused));
 
         for (const auto &entry: visibleTrayMenuEntries(m_integration.capabilities()))
         {
@@ -158,7 +165,17 @@ namespace GyanisScribe::App
         m_pinCount = pinCount;
         if (m_icon != nullptr)
         {
-            m_icon->setToolTip(trayTooltip(m_pinCount));
+            m_icon->setToolTip(trayTooltip(m_pinCount, m_recordedSeconds, m_recordingPaused));
+        }
+    }
+
+    void TrayController::setRecordingStatus(const int recordedSeconds, const bool paused)
+    {
+        m_recordedSeconds = recordedSeconds;
+        m_recordingPaused = paused;
+        if (m_icon != nullptr)
+        {
+            m_icon->setToolTip(trayTooltip(m_pinCount, m_recordedSeconds, m_recordingPaused));
         }
     }
 
