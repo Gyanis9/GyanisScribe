@@ -76,6 +76,23 @@ TEST(TrayMenuTable, ListsEachActionOnceWithRealIcons)
 }
 
 /**
+ * @brief 钉住托盘悬停提示里的贴图张数
+ * @details 贴图窗口常被别的窗口压住，托盘是唯一还能看出「屏幕上挂着几张」的地方。
+ *          PinManager::pinCountChanged 的通道存在由 Style.SourceConventions 管，
+ *          这里管的是那句话算得对不对（含 0 与负数两格）。
+ */
+TEST(TrayTooltip, ShowsThePinCountOnlyWhenPinsExist)
+{
+    EXPECT_EQ(GyanisScribe::App::trayTooltip(0), QStringLiteral("智录"));
+    EXPECT_EQ(GyanisScribe::App::trayTooltip(-1), QStringLiteral("智录")) << "负数不该写成「贴图 -1 张」";
+
+    const auto three = GyanisScribe::App::trayTooltip(3);
+    EXPECT_NE(three.indexOf(QStringLiteral("智录")), -1) << three.toStdString();
+    EXPECT_NE(three.indexOf(QStringLiteral("3")), -1) << three.toStdString();
+    EXPECT_NE(three.indexOf(QStringLiteral("贴图")), -1) << three.toStdString();
+}
+
+/**
  * @brief 钉住「快捷键提示只挂在真实存在的配置键上」
  * @details 提示文字要从配置现读，挂在一个没人写的键上就会永远显示默认值，
  *          用户改了设置也看不到变化。

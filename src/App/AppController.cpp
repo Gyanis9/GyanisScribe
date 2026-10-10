@@ -171,6 +171,8 @@ namespace GyanisScribe::App
         QObject::connect(m_mainWindow.get(), &MainWindow::historyOcrRequested, this, &AppController::recognizeImageFile);
         QObject::connect(m_mainWindow.get(), &MainWindow::historyRemoveRequested, this, &AppController::handleHistoryRemove);
         QObject::connect(m_mainWindow.get(), &MainWindow::messageForUser, this, [this](const QString &message, Ui::ToastKind kind) { notifyUser(message, kind); });
+        // 贴图张数走托盘悬停提示：贴图常被压在别的窗口后面，这是唯一还能看出「挂着几张」的地方
+        QObject::connect(m_pins.get(), &Pin::PinManager::pinCountChanged, m_tray.get(), &TrayController::setPinCount);
     }
 
     AppController::~AppController() = default;

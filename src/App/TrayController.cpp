@@ -26,6 +26,15 @@ namespace
 
 namespace GyanisScribe::App
 {
+    QString trayTooltip(const int pinCount)
+    {
+        if (pinCount <= 0)
+        {
+            return GyanisScribe::Core::uiText("智录");
+        }
+        return GyanisScribe::Core::uiText("智录 · 贴图 %1 张").arg(pinCount);
+    }
+
     QList<TrayMenuEntry> trayMenuEntries()
     {
         QList<TrayMenuEntry> entries;
@@ -78,7 +87,7 @@ namespace GyanisScribe::App
         // 托盘描边色跟着主题走：深色任务栏上的深色图标会完全看不见
         m_icons.setTintColor(m_theme.iconTint());
         m_icon->setIcon(m_icons.icon("Tray"));
-        m_icon->setToolTip(GyanisScribe::Core::uiText("智录"));
+        m_icon->setToolTip(trayTooltip(m_pinCount));
 
         for (const auto &entry: trayMenuEntries())
         {
@@ -121,6 +130,15 @@ namespace GyanisScribe::App
             return;
         }
         m_icon->showMessage(title, body, QSystemTrayIcon::Information, 3000);
+    }
+
+    void TrayController::setPinCount(const int pinCount)
+    {
+        m_pinCount = pinCount;
+        if (m_icon != nullptr)
+        {
+            m_icon->setToolTip(trayTooltip(m_pinCount));
+        }
     }
 
     bool TrayController::isInstalled() const noexcept

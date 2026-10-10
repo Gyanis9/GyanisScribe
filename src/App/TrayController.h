@@ -67,6 +67,15 @@ namespace GyanisScribe::App
     [[nodiscard]] QList<TrayMenuEntry> trayMenuEntries();
 
     /**
+     * @brief 托盘图标的悬停提示文字
+     * @param pinCount 现在挂在屏幕上的贴图张数
+     * @return 提示文本；一张也没有时只写应用名
+     * @details 贴图窗口常被别的窗口压住，托盘是唯一还能看出「屏幕上挂着几张」的地方。
+     *          做成纯函数是为了让用例能逐格点名，不依赖这台机器上真有托盘。
+     */
+    [[nodiscard]] QString trayTooltip(int pinCount);
+
+    /**
      * @brief 托盘控制器
      * @details 只负责「图标 + 菜单 + 通知」，动作一律发成信号：
      *          截图、录屏、识别的编排都在 AppController 里，托盘不认识它们。
@@ -116,6 +125,13 @@ namespace GyanisScribe::App
          */
         [[nodiscard]] QString labelFor(TrayAction action) const;
 
+        /**
+         * @brief 把贴图张数写进悬停提示
+         * @param pinCount 当前贴在屏幕上的贴图张数
+         * @details 装托盘之前调用也不会丢：install() 用的是这份存下来的张数。
+         */
+        void setPinCount(int pinCount);
+
     signals:
         /// 用户点了某一项
         void actionRequested(TrayAction action);
@@ -126,6 +142,7 @@ namespace GyanisScribe::App
         Settings::ISettingsStore       &m_settings;       ///< 配置存储，不拥有
         QSystemTrayIcon                *m_icon = nullptr; ///< 托盘图标，父对象是本控制器
         std::unique_ptr<QMenu>          m_menu;           ///< 右键菜单：QSystemTrayIcon 不接管菜单所有权，由本类持有
+        int                             m_pinCount = 0;   ///< 现在挂着的贴图张数，只用于悬停提示
     };
 
 } // namespace GyanisScribe::App

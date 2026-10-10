@@ -516,6 +516,14 @@
             <translation>中文</translation>
         </message>
         <message>
+            <source>智录</source>
+            <translation>GyanisScribe</translation>
+        </message>
+        <message>
+            <source>智录 · 贴图 %1 张</source>
+            <translation>GyanisScribe · %1 pin(s)</translation>
+        </message>
+        <message>
             <source>框选截图</source>
             <translation>Capture a region</translation>
         </message>
@@ -546,10 +554,6 @@
         <message>
             <source>退出</source>
             <translation>Quit</translation>
-        </message>
-        <message>
-            <source>智录</source>
-            <translation>GyanisScribe</translation>
         </message>
         <message>
             <source>快捷键：%1，可在设置页改</source>
