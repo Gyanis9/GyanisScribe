@@ -204,6 +204,14 @@
             <translation>This image can't be read: {}. The file may have been moved or deleted, or this build has no image decoder plugin for it.</translation>
         </message>
         <message>
+            <source>识别图片文件</source>
+            <translation>Recognize an image file</translation>
+        </message>
+        <message>
+            <source>图片文件 (*.png *.jpg *.jpeg *.bmp *.webp *.gif)</source>
+            <translation>Image files (*.png *.jpg *.jpeg *.bmp *.webp *.gif)</translation>
+        </message>
+        <message>
             <source>这条历史没删掉：{}</source>
             <translation>This history entry wasn't deleted: {}</translation>
         </message>
@@ -522,6 +530,10 @@
         <message>
             <source>开始 / 停止录屏</source>
             <translation>Start / stop recording</translation>
+        </message>
+        <message>
+            <source>识别图片文件…</source>
+            <translation>Recognize an image file…</translation>
         </message>
         <message>
             <source>设置</source>

@@ -256,8 +256,11 @@ namespace GyanisScribe::App
         /// 历史页要求把一条成品重新贴回屏幕
         void handleHistoryPin(const std::filesystem::path &filePath);
 
-        /// 历史页要求对一条成品做识别
-        void handleHistoryOcr(const std::filesystem::path &filePath);
+        /// 对盘上的一张图做识别：历史页的「重新识别」与托盘的「识别图片文件…」共用这一份实现
+        void recognizeImageFile(const std::filesystem::path &filePath);
+
+        /// 先让用户挑一张盘上的图，再交给 recognizeImageFile；取消时什么都不做
+        void pickImageFileAndRecognize();
 
         /// 历史页要求去掉一条记录（成品文件保留）
         void handleHistoryRemove(const std::filesystem::path &filePath);

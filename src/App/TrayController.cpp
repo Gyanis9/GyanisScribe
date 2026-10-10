@@ -35,6 +35,7 @@ namespace GyanisScribe::App
         entries.append(TrayMenuEntry{}); // 分隔线
         entries.append(TrayMenuEntry{TrayAction::ToggleRecord, "Record", GyanisScribe::Core::uiText("开始 / 停止录屏"), GyanisScribe::Settings::kHotkeyRecord});
         entries.append(TrayMenuEntry{TrayAction::Recognize, "Ocr", GyanisScribe::Core::uiText("识别文字"), GyanisScribe::Settings::kHotkeyOcr});
+        entries.append(TrayMenuEntry{TrayAction::RecognizeFile, "OcrImage", GyanisScribe::Core::uiText("识别图片文件…"), {}});
         entries.append(TrayMenuEntry{TrayAction::PickColor, "ColorPicker", GyanisScribe::Core::uiText("屏幕取色"), GyanisScribe::Settings::kHotkeyPick});
         entries.append(TrayMenuEntry{});
         entries.append(TrayMenuEntry{TrayAction::OpenSettings, "Settings", GyanisScribe::Core::uiText("设置"), {}});

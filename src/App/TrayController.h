@@ -48,6 +48,7 @@ namespace GyanisScribe::App
         PickColor,         ///< 屏幕取色
         OpenSettings,      ///< 打开设置页
         OpenAbout,         ///< 打开关于页
+        RecognizeFile,     ///< 挑一张盘上的图去识别
         Quit,              ///< 退出程序
     };
 

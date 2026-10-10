@@ -35,6 +35,8 @@
 #include "Ui/Toast.h"
 
 #include <QClipboard>
+#include <QDir>
+#include <QFileDialog>
 #include <QCursor>
 #include <QGuiApplication>
 #include <QScreen>
@@ -166,7 +168,7 @@ namespace GyanisScribe::App
 
         // 历史页的三个出口：贴图与识别都要先把成品读回内存，删除只动清单不动文件
         QObject::connect(m_mainWindow.get(), &MainWindow::historyPinRequested, this, &AppController::handleHistoryPin);
-        QObject::connect(m_mainWindow.get(), &MainWindow::historyOcrRequested, this, &AppController::handleHistoryOcr);
+        QObject::connect(m_mainWindow.get(), &MainWindow::historyOcrRequested, this, &AppController::recognizeImageFile);
         QObject::connect(m_mainWindow.get(), &MainWindow::historyRemoveRequested, this, &AppController::handleHistoryRemove);
         QObject::connect(m_mainWindow.get(), &MainWindow::messageForUser, this, [this](const QString &message, Ui::ToastKind kind) { notifyUser(message, kind); });
     }
@@ -220,6 +222,10 @@ namespace GyanisScribe::App
             case TrayAction::Recognize:
                 // 识别入口先框选：没有一张图，后端无事可做
                 startCapture(CaptureIntent::Recognize);
+                return;
+            case TrayAction::RecognizeFile:
+                // 需求给 OCR 列了三种来路：框选区域、贴图、以及盘上的一张图，这一条走最后那种
+                pickImageFileAndRecognize();
                 return;
             case TrayAction::PickColor:
                 startColorPick();
@@ -608,7 +614,20 @@ namespace GyanisScribe::App
         m_pins->addPin(*image, QCursor::pos());
     }
 
-    void AppController::handleHistoryOcr(const std::filesystem::path &filePath)
+    void AppController::pickImageFileAndRecognize()
+    {
+        // 没有窗口可当父对象（托盘动作发生时主窗口多半是藏起来的），对话框按应用级模态开
+        const auto picked = QFileDialog::getOpenFileName(nullptr, GyanisScribe::Core::uiText("识别图片文件"), QDir::homePath(),
+                                                         GyanisScribe::Core::uiText("图片文件 (*.png *.jpg *.jpeg *.bmp *.webp *.gif)"));
+        if (picked.isEmpty())
+        {
+            // 取消不是失败：一句都不多说，也不落日志
+            return;
+        }
+        recognizeImageFile(Core::Paths::fromDisplayText(picked));
+    }
+
+    void AppController::recognizeImageFile(const std::filesystem::path &filePath)
     {
         auto image = loadImageFile(filePath);
         if (!image)

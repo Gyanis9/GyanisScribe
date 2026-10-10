@@ -47,17 +47,17 @@ namespace
 } // namespace
 
 /**
- * @brief 钉住托盘菜单表：九项动作各一次，分隔线不带动作
+ * @brief 钉住托盘菜单表：十项动作各一次，分隔线不带动作
  * @details 菜单是用户找不到主窗口时唯一的入口，少一项或重一项都直接影响可用；
  *          图标名还要求真的在资源里，否则菜单上会出现一个空白项。
  */
 TEST(TrayMenuTable, ListsEachActionOnceWithRealIcons)
 {
     const auto actions = actionsInTable();
-    EXPECT_EQ(actions.size(), 9u) << "表里的动作项数与 TrayAction 的枚举数不同解";
+    EXPECT_EQ(actions.size(), 10u) << "表里的动作项数与 TrayAction 的枚举数不同解";
 
     for (const auto action: {TrayAction::CaptureRegion, TrayAction::CaptureFullScreen, TrayAction::CaptureLastRegion, TrayAction::ToggleRecord, TrayAction::Recognize,
-                             TrayAction::PickColor, TrayAction::OpenSettings, TrayAction::OpenAbout, TrayAction::Quit})
+                             TrayAction::RecognizeFile, TrayAction::PickColor, TrayAction::OpenSettings, TrayAction::OpenAbout, TrayAction::Quit})
     {
         const auto matches = std::ranges::count(actions, action);
         EXPECT_EQ(matches, 1) << static_cast<int>(action);
