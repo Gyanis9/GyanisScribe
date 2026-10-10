@@ -1,13 +1,52 @@
 #include "Record/FfmpegAudioDevices.h"
 
+#include "Record/FfmpegCommand.h"
+
+#include <QCoreApplication>
+#include <QDeadlineTimer>
+#include <QDir>
+#include <QEventLoop>
+#include <QFileInfo>
 #include <QString>
 #include <QStringList>
 #include <QVector>
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <memory>
+#include <string>
+
 using namespace GyanisScribe::Record;
 using GyanisScribe::Core::ErrorCode;
+
+namespace
+{
+    /// 等 ffmpeg 把设备列完的预算：这条链上没有别的时间判据，超了就算它没回话
+    constexpr int kWaitMilliseconds = 15000;
+
+    /// QProcess 起子进程要有应用对象；argv 缓冲要有静态存储期（Qt 只存指针不拷贝）。
+    /// 应用对象由这套件建、由套件收尾：同一个可执行体里还有别的套件各建各的，
+    /// 留着不销毁会让下一套再建一个时被 Qt 当场拦下（一个进程只许一个应用对象）
+    int                               argumentCount  = 1;
+    char                              argumentZero[] = "TestFfmpegAudioDevices";
+    char                             *arguments[]    = {argumentZero, nullptr};
+    std::unique_ptr<QCoreApplication> application;
+
+    class FfmpegAudioDevicesEndToEndFixture : public ::testing::Test
+    {
+    protected:
+        static void SetUpTestSuite()
+        {
+            application = std::make_unique<QCoreApplication>(argumentCount, arguments);
+        }
+
+        static void TearDownTestSuite()
+        {
+            application.reset();
+        }
+    };
+} // namespace
 
 namespace
 {
@@ -69,4 +108,62 @@ TEST(FfmpegAudioDevices, EmptyListingIsAFailureNotAnEmptyTable)
     const auto good = audioDevicesFromListing(kRealListing);
     ASSERT_TRUE(static_cast<bool>(good));
     EXPECT_EQ(good->size(), 2);
+}
+
+/**
+ * @brief 端到端：真起 ffmpeg，把这台机器的音频输入列出来
+ * @details 上面三条钉的是「样本怎么读」，这一条钉的是「进程起得来、读得到、归属落得下」——
+ *          随包那一份 ffmpeg 能不能真的用于取声前的枚举，只有跑一次才知道，
+ *          而设置页那两个下拉只在跑通的时候才有内容可选。
+ * @note 缺 GYANISSCRIBE_FFMPEG 就 SKIP，与编码端到端同一条环境变量；把它的目录顶到 PATH 前面，
+ *       于是这一条的成立条件由用例自己造，不依赖「这台机器恰好装了什么、上一套用例改了 PATH 没有」。
+ */
+TEST_F(FfmpegAudioDevicesEndToEndFixture, ListsThisMachineDevicesWithTheFfmpegThisBuildFinds)
+{
+    const auto requested = qEnvironmentVariable("GYANISSCRIBE_FFMPEG");
+    if (requested.isEmpty())
+    {
+        GTEST_SKIP() << "没有 GYANISSCRIBE_FFMPEG，这一条要真 ffmpeg";
+    }
+    const auto path = QStringLiteral("%1%2%3").arg(QFileInfo(requested).absolutePath(), QDir::listSeparator(), qEnvironmentVariable("PATH"));
+    qputenv("PATH", path.toLocal8Bit());
+
+    // 走产品自己那条查找顺序（程序目录随包那份 → PATH），量的就是真实形状
+    const auto program = locateFfmpeg();
+    ASSERT_TRUE(static_cast<bool>(program)) << program.error().message;
+
+    FfmpegAudioDeviceEnumerator enumerator;
+    QVector<AudioInputDevice>   listed;
+    std::string                 failure;
+    bool                        settled = false;
+    QObject::connect(&enumerator, &FfmpegAudioDeviceEnumerator::updated,
+                     [&listed, &settled](const QVector<AudioInputDevice> &devices)
+                     {
+                         listed  = devices;
+                         settled = true;
+                     });
+    QObject::connect(&enumerator, &FfmpegAudioDeviceEnumerator::failed,
+                     [&failure, &settled](const GyanisScribe::Core::Error &error)
+                     {
+                         failure = error.message;
+                         settled = true;
+                     });
+
+    enumerator.refresh();
+    // 有界轮询等「两边任一落定」：等待的是这一步有没有回话，不是赌它多久跑完
+    const QDeadlineTimer deadline{kWaitMilliseconds};
+    while (!settled && !deadline.hasExpired())
+    {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+    }
+
+    ASSERT_TRUE(settled) << "等了 " << kWaitMilliseconds << " 毫秒，ffmpeg 那一头既没列出来也没报错";
+    ASSERT_TRUE(failure.empty()) << "列设备这一步失败了（找到的 ffmpeg 在 " << program->toStdString() << "）：" << failure;
+    EXPECT_FALSE(listed.isEmpty()) << "进程跑完了却一条音频输入都没列出来：这台机器的 ffmpeg 与解析预期不一致";
+    for (const auto &device: listed)
+    {
+        EXPECT_FALSE(device.friendlyName.isEmpty()) << "列出来的设备连名字都没有，下拉里就是一条空白";
+    }
+    EXPECT_TRUE(std::any_of(listed.begin(), listed.end(), [](const AudioInputDevice &device) { return !device.alternativeName.isEmpty(); }))
+            << "全表都没有稳定标识，取声就只能按友好名匹配——换台机器或换个驱动就对不上号";
 }
