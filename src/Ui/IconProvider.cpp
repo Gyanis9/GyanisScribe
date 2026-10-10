@@ -41,10 +41,31 @@ namespace
     }
     /// 由 applyIcon 记在按钮上的动态属性名：refreshIcons 按它找回图标
     constexpr const char *kIconNameProperty = "uiIconName";
+
 } // namespace
 
 namespace GyanisScribe::Ui
 {
+    namespace
+    {
+        /**
+         * @brief 拼一枚光栅化结果的缓存键
+         * @param name SVG 文件名去掉扩展名
+         * @param size 尺寸档位
+         * @param tint 描边色
+         * @param ratio 夹住之后实际用的缩放比
+         * @return 四个分量拼成的一条键
+         * @details 描边色不在键里，换主题之后旧色那一份会被当成新图标继续发出去——正是 applyIcon()
+         *          的 @details 明令禁止的那种错；缩放比不在键里，换到另一块 DPI 的屏上就还会拿到
+         *          低缩放的那一份。传进来的必须是夹过的 ratio：9.0 与 3.0 要落进同一格。
+         */
+        [[nodiscard]] QString pixmapCacheKey(const std::string_view name, const IconSize size, const QColor &tint, const qreal ratio)
+        {
+            return QString::fromUtf8(name.data(), static_cast<qsizetype>(name.size())) + QLatin1Char('#') + QString::number(static_cast<int>(size)) + QLatin1Char('#') +
+                   QString::number(tint.rgba(), 16) + QLatin1Char('#') + QString::number(static_cast<int>(std::lround(ratio * 10.0)));
+        }
+    } // namespace
+
     IconProvider::IconProvider()
     {
         ensureApplicationResourcesRegistered();
@@ -97,6 +118,16 @@ namespace GyanisScribe::Ui
             return {};
         }
 
+        // 缩放比先夹定再进键：9.0 与 3.0 说的是同一份像素，各存一格会让同一枚图标重复光栅化
+        const auto    ratio = std::clamp(devicePixelRatio, 1.0, 3.0);
+        const QString key   = pixmapCacheKey(name, size, tint, ratio);
+        // 命中就一次文件读与一次解析都不做：录屏 HUD 每存一帧都按状态重挂暂停按钮的图标，
+        // 一枚图标是四档尺寸 × 若干缩放比，逐帧重画纯属白干
+        if (const auto cached = m_pixmapCache.constFind(key); cached != m_pixmapCache.constEnd())
+        {
+            return cached.value();
+        }
+
         const auto source = loadTintedSource(name, tint);
         if (source.isEmpty())
         {
@@ -115,14 +146,14 @@ namespace GyanisScribe::Ui
         }
 
         // 按缩放比渲染实际像素，再把比例写回位图，Qt 才会在高 DPI 屏上按逻辑尺寸摆放它
-        const auto ratio = std::clamp(devicePixelRatio, 1.0, 3.0);
-        QPixmap    bitmap(static_cast<int>(std::ceil(static_cast<qreal>(size) * ratio)), static_cast<int>(std::ceil(static_cast<qreal>(size) * ratio)));
+        QPixmap bitmap(static_cast<int>(std::ceil(static_cast<qreal>(size) * ratio)), static_cast<int>(std::ceil(static_cast<qreal>(size) * ratio)));
         bitmap.fill(Qt::transparent);
         bitmap.setDevicePixelRatio(ratio);
 
         QPainter painter(&bitmap);
         painter.setRenderHint(QPainter::Antialiasing);
         renderer.render(&painter);
+        m_pixmapCache.insert(key, bitmap);
         return bitmap;
     }
 
@@ -136,7 +167,8 @@ namespace GyanisScribe::Ui
 
         QIcon result;
 
-        // 每档尺寸都备齐 1 到最大缩放比的副本：QIcon 按目标屏幕自己挑，跨 DPI 屏拖动不会糊
+        // 每档尺寸都备齐 1 到最大缩放比的副本：QIcon 按目标屏幕自己挑，跨 DPI 屏拖动不会糊。
+        // 光栅化本身由 pixmap() 那张表兜着，重复取同一枚图标不再重画
         const auto ratios = maximumDevicePixelRatio();
         for (const auto size: {IconSize::Small, IconSize::Medium, IconSize::Large, IconSize::ExtraLarge})
         {

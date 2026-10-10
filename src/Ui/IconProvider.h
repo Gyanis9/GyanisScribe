@@ -10,6 +10,7 @@
 #pragma once
 
 #include <QColor>
+#include <QHash>
 #include <QIcon>
 #include <QPixmap>
 
@@ -115,8 +116,17 @@ namespace GyanisScribe::Ui
 
         QColor m_tintColor; ///< 显式设置的主题色，无效表示尚未接主题
 
-        // ponytail: 每次调用都重画，没有缓存。SVG 只有五十几枚、调用点都在界面搭建期，
-        //         真出现逐帧取图标（比如动画）时在类里加一张 QHash<(名字,尺寸,色), QPixmap> 就够。
+        /**
+         * @brief 光栅化过的位图，键是「名字 # 档位 # 描边色 # 缩放比」四个分量拼出来的
+         * @details 取图标的不止界面搭建那一次：录屏 HUD 每存一帧就按状态重挂暂停按钮的图标，
+         *          而一枚图标是四档尺寸 × 若干缩放比的光栅化，每帧重画一遍纯属白干。
+         * @note 描边色必须在键里：少了它，换主题之后旧色那一份会被当成新图标发出去，
+         *       正是 applyIcon() 的 @details 明令禁止的那种错。缩放比也要在键里（用夹住之后的值），
+         *       否则换到另一块 DPI 的屏上还会拿到低缩放的那一份。
+         *       条目数有界：名字只有 Resources/Icons 里那几十枚，档位四格、缩放比封顶 3、主题三档，
+         *       所以不做淘汰。空位图不入表——那是错误出口，下一次调用还要重新报出原因。
+         */
+        mutable QHash<QString, QPixmap> m_pixmapCache; ///< 光栅化结果，键的四个分量见 @details
     };
 
 } // namespace GyanisScribe::Ui

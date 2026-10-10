@@ -276,6 +276,38 @@ TEST_F(IconProviderFixture, TintColorReplacesCurrentColor)
 }
 
 /**
+ * @brief 钉住光栅化结果的缓存键带齐「名字、档位、描边色、缩放比」四个分量
+ * @details 加缓存的风险不是「慢」而是「把旧那一格当新的发出去」：同一个实例上换描边色是换主题时
+ *          真正走的路径（refreshIcons 就是这么接的），少一个分量就会交回旧色或低缩放的图。
+ *          同一组参数两次取值必须逐位相同——那是这份表唯一对外承诺的事。
+ */
+TEST_F(IconProviderFixture, CacheKeyCarriesTintSizeAndRatio)
+{
+    IconProvider icons;
+    icons.setTintColor(QColor(0, 200, 0));
+    const auto greenSmall   = icons.pixmap("Capture", IconSize::Small);
+    const auto greenMedium  = icons.pixmap("Capture", IconSize::Medium);
+    const auto greenDoubled = icons.pixmap("Capture", IconSize::Small, 2.0);
+    ASSERT_FALSE(greenSmall.isNull());
+
+    icons.setTintColor(QColor(20, 20, 20));
+    const auto darkSmall = icons.pixmap("Capture", IconSize::Small);
+    EXPECT_FALSE(containsColor(darkSmall, QColor(0, 200, 0))) << "描边色没进缓存键：换了主题色还交回旧色那一格";
+    EXPECT_TRUE(containsColor(darkSmall, QColor(20, 20, 20)));
+
+    // 回到第一次那一格：同一组参数两次取值要逐位相同
+    icons.setTintColor(QColor(0, 200, 0));
+    // QPixmap 的 operator== 在 Qt 6 里是被删掉的，逐位比对要走 QImage
+    EXPECT_TRUE(icons.pixmap("Capture", IconSize::Small).toImage() == greenSmall.toImage()) << "同一组参数两次取到不同的像素";
+
+    // 档位与缩放比也要各归各格：尺寸按 IconSize 的档位值与夹住后的缩放比手算
+    EXPECT_EQ(greenSmall.size(), QSize(16, 16));
+    EXPECT_EQ(greenMedium.size(), QSize(20, 20)) << "档位不在键里时两档会同尺寸";
+    EXPECT_EQ(greenDoubled.size(), QSize(32, 32)) << "缩放比不在键里时高 DPI 那格会拿到低缩放的那一份";
+    EXPECT_DOUBLE_EQ(greenDoubled.devicePixelRatio(), 2.0);
+}
+
+/**
  * @brief 钉住高 DPI 副本带着自己的缩放比
  * @details 需求要求矢量图标自动适配 DPI：200% 屏上必须交出一张 48 物理像素、逻辑仍是 24 的位图，
  *          否则系统会把 24 的图硬放大成糊的。
