@@ -35,7 +35,10 @@ add_custom_command(TARGET DeployQtRuntime POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory
         "$<TARGET_FILE_DIR:GyanisScribe>/plugins/platforms")
 
-foreach (QtModule Core Gui Widgets Concurrent Svg Network)
+# Concurrent 不在这份清单里：Qt 6 的 QtConcurrent::run 是模板代码，跑的是 QtCore 的线程池，
+# QFutureWatcher 也在 QtCore 里——实测 Release 成品与容器里的测试二进制都不 import Qt6Concurrent / libQt6Concurrent
+# （打包那一步的 windeployqt 同样没拷它）。链 Qt6::Concurrent 只是为了拿到头文件，摆一份没人加载的 DLL 进运行目录是死重量
+foreach (QtModule Core Gui Widgets Svg Network)
     add_custom_command(TARGET DeployQtRuntime POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "$<TARGET_FILE_DIR:Qt6::${QtModule}>/Qt6${QtModule}${QT_DEBUG_SUFFIX}.dll"
