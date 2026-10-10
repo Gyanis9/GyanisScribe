@@ -68,8 +68,8 @@ namespace
     /// （实测：并行跑别的构建时，一次编码在 2 秒内没被排上，断言就红了）
     constexpr std::chrono::milliseconds kWaitPatience{10000};
 
-    /// 开始一轮之后要转多久界面循环才攒到帧：15 帧率下 1.3 秒能落十几帧，够 stop() 收尾不报「一帧都没有」
-    constexpr std::chrono::milliseconds kFrameSpin{1300};
+    /// 攒帧的最低条数：一帧太少不足以区分「落下过帧」与「刚好赶上一次跳表」，三帧够 stop() 收尾有内容可编
+    constexpr int kMinimumFrames = 3;
 
     /// 底色取中性灰：高亮圈是蓝系主色，只有它会让蓝色分量压过红色
     const QColor kFrameBackground{32, 32, 32};
@@ -368,15 +368,23 @@ namespace
         return predicate();
     }
 
-    /// 转界面循环攒几帧：不转的话节拍定时器一跳都不会发生
-    void spinFramesIn()
+    /**
+     * @brief 转界面循环直到这一轮真的落下几帧
+     * @param service 正在录的那一份
+     * @return 帧数达标返回 true；到兜底上限仍未达标返回 false
+     * @details 判据是「帧到了没有」而不是「转够 1.3 秒没有」：后者把这台机器当刻多忙写成用例失败——
+     *          实测三棵构建树并行时节拍定时器在 1.3 秒里一跳没发生，六条用例一起报
+     *          「这一轮一帧都没有存下来」，红的是环境不是实现。
+     */
+    bool spinFramesIn(RecordingService &service)
     {
-        const auto deadline = std::chrono::steady_clock::now() + kFrameSpin;
-        while (std::chrono::steady_clock::now() < deadline)
-        {
-            QCoreApplication::processEvents(QEventLoop::AllEvents, 1);
-            std::this_thread::sleep_for(std::chrono::milliseconds{10});
-        }
+        int stored = 0;
+        // 连接必须在返回前断掉：lambda 抓的是栈上的计数，而发送方（服务）比这个助手活得久，
+        // 不断就会让下一次 frameStored 摸到已销毁的引用
+        const auto connection = QObject::connect(&service, &RecordingService::frameStored, [&stored](int) { ++stored; });
+        const auto enough     = spinUntil([&] { return stored >= kMinimumFrames; });
+        QObject::disconnect(connection);
+        return enough;
     }
 
     /**
@@ -511,7 +519,7 @@ namespace
         RecordingService        service{source, encoder, platform};
 
         ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
-        spinFramesIn();
+        ASSERT_TRUE(spinFramesIn(service)) << "节拍一直没落下帧";
 
         QString         finishedPath;
         std::thread::id deliveryThread;
@@ -549,7 +557,7 @@ namespace
         RecordingService service{source, encoder, platform};
 
         ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
-        spinFramesIn();
+        ASSERT_TRUE(spinFramesIn(service)) << "节拍一直没落下帧";
 
         QString failure;
         QObject::connect(&service, &RecordingService::failed, [&failure](const QString &reason) { failure = reason; });
@@ -578,14 +586,14 @@ namespace
         RecordingService        service{source, encoder, platform};
 
         ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
-        spinFramesIn();
+        ASSERT_TRUE(spinFramesIn(service)) << "节拍一直没落下帧";
         ASSERT_TRUE(static_cast<bool>(service.stop()));
         ASSERT_TRUE(spinUntil([&] { return encoder.callCount() == 1; }));
         const auto firstDirectory = encoder.callAt(0).frameDirectory;
         EXPECT_TRUE(std::filesystem::exists(firstDirectory)) << "第一轮还在编，它的目录就已经被人删了";
 
         ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
-        spinFramesIn();
+        ASSERT_TRUE(spinFramesIn(service)) << "节拍一直没落下帧";
         ASSERT_TRUE(static_cast<bool>(service.stop()));
         ASSERT_TRUE(spinUntil([&] { return encoder.callCount() == 2; })) << "上一轮还在编时开不了新一轮";
         const auto secondDirectory = encoder.callAt(1).frameDirectory;
@@ -613,7 +621,7 @@ namespace
         auto                    service = std::make_unique<RecordingService>(source, encoder, platform);
 
         ASSERT_TRUE(static_cast<bool>(service->start(serviceConfig(OutputFormat::Mp4, false), 0)));
-        spinFramesIn();
+        ASSERT_TRUE(spinFramesIn(*service)) << "节拍一直没落下帧";
         ASSERT_TRUE(static_cast<bool>(service->stop()));
         ASSERT_TRUE(spinUntil([&] { return encoder.callCount() == 1; }));
 
@@ -634,7 +642,7 @@ namespace
         RecordingService        service{source, encoder, platform};
 
         ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
-        spinFramesIn();
+        ASSERT_TRUE(spinFramesIn(service)) << "节拍一直没落下帧";
         const auto frameDirectory = onlyFrameDirectory();
         ASSERT_GT(countFilesIn(frameDirectory), 0U) << "这一轮一帧都没落，取消就没有可删的东西";
 
@@ -686,7 +694,7 @@ namespace
         RecordingService        service{source, encoder, platform};
 
         ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
-        spinFramesIn();
+        ASSERT_TRUE(spinFramesIn(service)) << "节拍一直没落下帧";
         ASSERT_TRUE(static_cast<bool>(service.stop()));
         ASSERT_TRUE(spinUntil([&] { return encoder.callCount() == 1; }));
         const auto frameDirectory = encoder.callAt(0).frameDirectory;
@@ -756,7 +764,7 @@ namespace
         config.windowHandle    = 7;
         config.cursorHighlight = true;
         ASSERT_TRUE(static_cast<bool>(service.start(config, 0)));
-        spinFramesIn();
+        ASSERT_TRUE(spinFramesIn(service)) << "节拍一直没落下帧";
 
         const auto painted = scanFrame(readFirstFrame());
         ASSERT_GT(painted.count, 0) << "帧里没有高亮圈：窗口模式没把平台给的客户区读数接上";
@@ -788,7 +796,7 @@ namespace
         config.windowHandle    = 7;
         config.cursorHighlight = true;
         ASSERT_TRUE(static_cast<bool>(service.start(config, 0)));
-        spinFramesIn();
+        ASSERT_TRUE(spinFramesIn(service)) << "节拍一直没落下帧";
 
         const auto painted = scanFrame(readFirstFrame());
         EXPECT_EQ(painted.count, 0) << "没有客户区读数却仍然画了圈：那就是把整窗左上角当成了帧原点";
@@ -869,7 +877,7 @@ namespace
         QElapsedTimer wall;
         wall.start();
         ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
-        spinFramesIn();
+        ASSERT_TRUE(spinFramesIn(service)) << "节拍一直没落下帧";
 
         ASSERT_TRUE(static_cast<bool>(service.stop()));
         ASSERT_TRUE(spinUntil([&] { return encoder.callCount() == 1; }));
