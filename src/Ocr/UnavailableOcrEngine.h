@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "Core/Text.h"
 #include "Ocr/IOcrEngine.h"
 
 namespace GyanisScribe::Ocr
@@ -26,7 +27,8 @@ namespace GyanisScribe::Ocr
          * @brief 用给出的原因构造桩
          * @param reason 为什么没有后端，中文且要含替代做法
          */
-        explicit UnavailableOcrEngine(QString reason = QStringLiteral("本程序没有可用的文字识别后端。请在设置里指定 OCR 语言包目录（tessdata），或安装系统自带的识别组件"));
+        explicit UnavailableOcrEngine(
+                QString reason = GyanisScribe::Core::uiText("本程序没有可用的文字识别后端。请在设置里指定 OCR 语言包目录（tessdata），或安装系统自带的识别组件"));
 
         /**
          * @brief 析构桩

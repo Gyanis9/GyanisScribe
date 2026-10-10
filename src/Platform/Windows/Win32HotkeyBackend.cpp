@@ -1,6 +1,7 @@
 #include "Platform/Windows/Win32HotkeyBackend.h"
 
 #include "Core/Logger.h"
+#include "Core/Text.h"
 #include "Platform/Windows/Win32HotkeyMapping.h"
 
 #include <QCoreApplication>
@@ -57,7 +58,8 @@ namespace GyanisScribe::Platform
 
         if (m_registeredIdentifiers.find(identifier) != m_registeredIdentifiers.end())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, std::format("热键编号 {} 在本进程内已经登记过。请换一个编号，或先注销那一条", identifier)});
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("热键编号 {} 在本进程内已经登记过。请换一个编号，或先注销那一条"), identifier)});
         }
 
         const auto windowHandle = reinterpret_cast<HWND>(m_sinkWindow->winId());
@@ -65,9 +67,10 @@ namespace GyanisScribe::Platform
         {
             const DWORD lastError = GetLastError();
             // ERROR_HOTKEY_ALREADY_REGISTERED 是这一条最常走到的分支，直说「被占用」比报错误码有用
-            return std::unexpected(
-                    Core::Error{Core::ErrorCode::Busy,
-                                std::format("全局热键登记失败（系统错误码 {}）：这个组合键多半已被其它程序占用。请在设置里换一个组合，或先退出占用它的程序", lastError)});
+            return std::unexpected(Core::Error{
+                    Core::ErrorCode::Busy,
+                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("全局热键登记失败（系统错误码 {}）：这个组合键多半已被其它程序占用。请在设置里换一个组合，或先退出占用它的程序"),
+                                lastError)});
         }
 
         m_registeredIdentifiers.insert(identifier);
@@ -79,13 +82,14 @@ namespace GyanisScribe::Platform
         const auto found = m_registeredIdentifiers.find(identifier);
         if (found == m_registeredIdentifiers.end())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, std::format("热键编号 {} 没有登记过，无需注销", identifier)});
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("热键编号 {} 没有登记过，无需注销"), identifier)});
         }
 
         const auto windowHandle = reinterpret_cast<HWND>(m_sinkWindow->winId());
         if (!UnregisterHotKey(windowHandle, identifier))
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::Busy, std::format("热键注销失败（系统错误码 {}）：编号 {}。请重试或重启本程序", GetLastError(), identifier)});
+            return std::unexpected(Core::Error{
+                    Core::ErrorCode::Busy, GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("热键注销失败（系统错误码 {}）：编号 {}。请重试或重启本程序"), GetLastError(), identifier)});
         }
 
         m_registeredIdentifiers.erase(found);

@@ -50,15 +50,18 @@ endif ()
 
 # 语言包：Translations/*.ts 是仓库里的真源，.qm 由 lrelease 在构建期产出。它是本构建图产出的产物，
 # 所以按规范挂在 ALL 目标上（不是可执行体的 POST_BUILD），改了 .ts 不重新链接可执行体也会刷新副本。
-# 容器里那份 Qt 6.4 不带 lrelease（实测 /usr/lib/qt6/bin 里没有），那一档整条跳过：
+# lrelease 从 Qt 的 LinguistTools 组件取（Qt6::lrelease 导入目标），不用 find_program：
+# Qt 的 bin 目录不在 PATH 上，find_program 会静默找不到，于是这条门变成一个永远空操作的目标——
+# 实测「207 条用例全绿」的同时语言包根本没生成。
+# 容器里那份 Qt 6.4 没装 LinguistTools（apt 的 qt6-tools 不在环境里），QUIET + 目标存在判断让那一档整条跳过：
 # 语言包缺席时应用照旧按中文跑，Ui::Language 会报出该把包放在哪儿。
 file(GLOB TRANSLATION_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/Translations/*.ts")
-find_program(LRELEASE_EXECUTABLE NAMES lrelease lrelease-qt6)
+find_package(Qt6 COMPONENTS LinguistTools QUIET)
 
 add_custom_target(DeployTranslations ALL
         COMMENT "生成语言包并刷进可执行体所在的目录")
 
-if (LRELEASE_EXECUTABLE AND TRANSLATION_SOURCES)
+if (TARGET Qt6::lrelease AND TRANSLATION_SOURCES)
     add_custom_command(TARGET DeployTranslations POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:GyanisScribe>/translations")
     foreach (TranslationSource ${TRANSLATION_SOURCES})
@@ -66,7 +69,7 @@ if (LRELEASE_EXECUTABLE AND TRANSLATION_SOURCES)
         # Ui::Language 按档位找这个文件名，两边必须是同一个算法
         get_filename_component(TranslationBaseName ${TranslationSource} NAME_WE)
         add_custom_command(TARGET DeployTranslations POST_BUILD
-                COMMAND ${LRELEASE_EXECUTABLE} ${TranslationSource}
+                COMMAND $<TARGET_FILE:Qt6::lrelease> ${TranslationSource}
                         -qm "$<TARGET_FILE_DIR:GyanisScribe>/translations/${TranslationBaseName}.qm"
                 COMMENT "lrelease ${TranslationSource}")
     endforeach ()

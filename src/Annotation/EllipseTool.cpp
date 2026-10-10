@@ -1,5 +1,7 @@
 #include "Annotation/EllipseTool.h"
 
+#include "Core/Text.h"
+
 #include <QPainter>
 
 #include <cmath>
@@ -13,7 +15,7 @@ namespace GyanisScribe::Annotation
 
     QString EllipseTool::displayName() const
     {
-        return QStringLiteral("椭圆");
+        return GyanisScribe::Core::uiText("椭圆");
     }
 
     void EllipseTool::paintShape(QPainter &painter, const AnnotationShape &shape, const PaintContext &context) const

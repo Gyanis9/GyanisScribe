@@ -1,6 +1,7 @@
 #include "Annotation/PenTool.h"
 
 #include "Annotation/AnnotationGeometry.h"
+#include "Core/Text.h"
 
 #include <QPainter>
 #include <QPainterPath>
@@ -23,7 +24,7 @@ namespace GyanisScribe::Annotation
 
     QString PenTool::displayName() const
     {
-        return QStringLiteral("画笔");
+        return GyanisScribe::Core::uiText("画笔");
     }
 
     void PenTool::begin(const QPoint &point)

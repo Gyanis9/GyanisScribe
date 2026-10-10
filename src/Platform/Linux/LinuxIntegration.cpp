@@ -1,5 +1,6 @@
 #include "Platform/Linux/LinuxIntegration.h"
 
+#include "Core/Text.h"
 #include "Platform/UnsupportedHotkeyBackend.h"
 
 #include <memory>
@@ -25,7 +26,7 @@ namespace GyanisScribe::Platform
 
     QString LinuxIntegration::displayName() const
     {
-        return QStringLiteral("Linux（降级实现）");
+        return GyanisScribe::Core::uiText("Linux（降级实现）");
     }
 
     std::unique_ptr<IHotkeyBackend> LinuxIntegration::createHotkeyBackend()

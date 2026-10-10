@@ -1,5 +1,7 @@
 #include "Annotation/TextTool.h"
 
+#include "Core/Text.h"
+
 #include <QFont>
 #include <QPainter>
 
@@ -12,7 +14,7 @@ namespace GyanisScribe::Annotation
 
     QString TextTool::displayName() const
     {
-        return QStringLiteral("文字");
+        return GyanisScribe::Core::uiText("文字");
     }
 
     void TextTool::setPendingText(const QString &text)

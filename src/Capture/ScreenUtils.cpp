@@ -1,5 +1,7 @@
 #include "Capture/ScreenUtils.h"
 
+#include "Core/Text.h"
+
 #include <QApplication>
 #include <QGuiApplication>
 #include <QScreen>
@@ -16,8 +18,9 @@ namespace GyanisScribe::Capture
     {
         if (devicePixelRatio <= 0.0)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
-                                               std::format("缩放因子必须大于 0，收到的是 {}。请检查这一帧来自哪块屏幕，dpr 不该由调用方自己猜", devicePixelRatio)});
+            return std::unexpected(Core::Error{
+                    Core::ErrorCode::InvalidArgument,
+                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("缩放因子必须大于 0，收到的是 {}。请检查这一帧来自哪块屏幕，dpr 不该由调用方自己猜"), devicePixelRatio)});
         }
 
         // 逻辑矩形按「[起点, 起点+长度)」的连续区间处理：起点向下取整、终点向上取整，
@@ -42,8 +45,9 @@ namespace GyanisScribe::Capture
         if (!frameRect.contains(*physical))
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::ScreenUnavailable, std::format("选区超出了这一帧：帧是 {}×{}，换算后要到 {}。请确认这块屏幕有没有被拔掉，或缩放因子有没有变",
-                                                                                frameRect.width(), frameRect.height(), physical->width())});
+                    Core::Error{Core::ErrorCode::ScreenUnavailable,
+                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("选区超出了这一帧：帧是 {}×{}，换算后要到 {}。请确认这块屏幕有没有被拔掉，或缩放因子有没有变"),
+                                            frameRect.width(), frameRect.height(), physical->width())});
         }
 
         Core::CapturedImage cropped;
@@ -124,7 +128,8 @@ namespace GyanisScribe::Capture
         {
             return std::unexpected(
                     Core::Error{Core::ErrorCode::InvalidArgument,
-                                std::format("上次选区的记录格式不对：收到「{}」，应为「x,y,width,height」四个整数。请删掉这一项，让程序重新记一次", std::string(text))});
+                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("上次选区的记录格式不对：收到「{}」，应为「x,y,width,height」四个整数。请删掉这一项，让程序重新记一次"),
+                                            std::string(text))});
         }
 
         int numbers[4] = {0, 0, 0, 0};
@@ -138,15 +143,17 @@ namespace GyanisScribe::Capture
             if (trimmed.empty() || converted.ec != std::errc{} || converted.ptr != trimmed.data() + trimmed.size())
             {
                 // 逐段点名是哪一段坏了：四个数字里任何一个被截断或取整都会把选区挪到别处
-                return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
-                                                   std::format("上次选区的记录第 {} 段「{}」不是整数。请删掉这一项，让程序重新记一次", index + 1, std::string(field))});
+                return std::unexpected(Core::Error{
+                        Core::ErrorCode::InvalidArgument,
+                        GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("上次选区的记录第 {} 段「{}」不是整数。请删掉这一项，让程序重新记一次"), index + 1, std::string(field))});
             }
         }
 
         if (numbers[2] <= 0 || numbers[3] <= 0)
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument, std::format("上次选区的宽高必须是正数，收到的是 {}×{}。请删掉这一项，让程序重新记一次", numbers[2], numbers[3])});
+                    Core::Error{Core::ErrorCode::InvalidArgument,
+                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("上次选区的宽高必须是正数，收到的是 {}×{}。请删掉这一项，让程序重新记一次"), numbers[2], numbers[3])});
         }
 
         return QRect(numbers[0], numbers[1], numbers[2], numbers[3]);

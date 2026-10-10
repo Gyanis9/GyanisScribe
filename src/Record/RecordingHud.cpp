@@ -1,5 +1,6 @@
 #include "Record/RecordingHud.h"
 
+#include "Core/Text.h"
 #include "Ui/IconProvider.h"
 
 #include <QFont>
@@ -59,19 +60,19 @@ namespace GyanisScribe::Record
         switch (state)
         {
             case RecordingState::Idle:
-                return QStringLiteral("未在录制");
+                return GyanisScribe::Core::uiText("未在录制");
             case RecordingState::Countdown:
-                return QStringLiteral("准备开始");
+                return GyanisScribe::Core::uiText("准备开始");
             case RecordingState::Recording:
-                return QStringLiteral("录制中");
+                return GyanisScribe::Core::uiText("录制中");
             case RecordingState::Paused:
-                return QStringLiteral("已暂停（时长不计）");
+                return GyanisScribe::Core::uiText("已暂停（时长不计）");
             case RecordingState::Done:
-                return QStringLiteral("已录 %1").arg(formatDuration(recordedSeconds));
+                return GyanisScribe::Core::uiText("已录 %1").arg(formatDuration(recordedSeconds));
             case RecordingState::Failed:
-                return QStringLiteral("已中止");
+                return GyanisScribe::Core::uiText("已中止");
         }
-        return QStringLiteral("未在录制");
+        return GyanisScribe::Core::uiText("未在录制");
     }
 
     QRect snapHudRect(const QRect &draggedRect, const QRect &available)
@@ -110,8 +111,8 @@ namespace GyanisScribe::Record
         QWidget(parent), m_icons(icons), m_available(screenAvailable.isEmpty() ? QRect{0, 0, 1920, 1080} : screenAvailable)
     {
         // 工具窗：不进任务栏、不抢焦点，录制区里出现一个任务栏按钮会污染成品
-        setWindowTitle(QStringLiteral("录屏控制条"));
-        setAccessibleName(QStringLiteral("录屏控制条"));
+        setWindowTitle(GyanisScribe::Core::uiText("录屏控制条"));
+        setAccessibleName(GyanisScribe::Core::uiText("录屏控制条"));
         setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
 
         auto *root = new QVBoxLayout{this};
@@ -121,35 +122,35 @@ namespace GyanisScribe::Record
 
         auto *dot = new QLabel{QStringLiteral("●"), this};
         dot->setObjectName(QStringLiteral("recordingDot"));
-        dot->setAccessibleName(QStringLiteral("录制指示"));
+        dot->setAccessibleName(GyanisScribe::Core::uiText("录制指示"));
         line->addWidget(dot);
 
         m_status = new QLabel{hudStatusText(RecordingState::Idle, 0), this};
-        m_status->setAccessibleName(QStringLiteral("录制状态"));
+        m_status->setAccessibleName(GyanisScribe::Core::uiText("录制状态"));
         line->addWidget(m_status);
 
         m_elapsed = new QLabel{formatDuration(0), this};
-        m_elapsed->setAccessibleName(QStringLiteral("已录时长"));
+        m_elapsed->setAccessibleName(GyanisScribe::Core::uiText("已录时长"));
         line->addWidget(m_elapsed);
 
-        m_pauseButton = new QPushButton{QStringLiteral("暂停"), this};
+        m_pauseButton = new QPushButton{GyanisScribe::Core::uiText("暂停"), this};
         m_pauseButton->setIcon(m_icons.icon("RecordPause"));
-        m_pauseButton->setAccessibleName(QStringLiteral("暂停"));
-        auto *stopButton = new QPushButton{QStringLiteral("停止"), this};
+        m_pauseButton->setAccessibleName(GyanisScribe::Core::uiText("暂停"));
+        auto *stopButton = new QPushButton{GyanisScribe::Core::uiText("停止"), this};
         stopButton->setIcon(m_icons.icon("RecordStop"));
-        stopButton->setToolTip(QStringLiteral("停止并保存成品"));
-        stopButton->setAccessibleName(QStringLiteral("停止并保存"));
+        stopButton->setToolTip(GyanisScribe::Core::uiText("停止并保存成品"));
+        stopButton->setAccessibleName(GyanisScribe::Core::uiText("停止并保存"));
         auto *minimizeButton = new QPushButton{this};
         minimizeButton->setIcon(m_icons.icon("Tray"));
-        minimizeButton->setToolTip(QStringLiteral("最小化到托盘"));
-        minimizeButton->setAccessibleName(QStringLiteral("最小化到托盘"));
+        minimizeButton->setToolTip(GyanisScribe::Core::uiText("最小化到托盘"));
+        minimizeButton->setAccessibleName(GyanisScribe::Core::uiText("最小化到托盘"));
 
         line->addWidget(m_pauseButton);
         line->addWidget(stopButton);
         line->addWidget(minimizeButton);
 
         m_countdown = new QLabel{this};
-        m_countdown->setAccessibleName(QStringLiteral("倒计时"));
+        m_countdown->setAccessibleName(GyanisScribe::Core::uiText("倒计时"));
         m_countdown->setAlignment(Qt::AlignCenter);
         m_countdown->hide();
         root->addWidget(m_countdown);
@@ -222,7 +223,7 @@ namespace GyanisScribe::Record
     void RecordingHud::reflectPauseAction()
     {
         // 按钮跟着状态改口：暂停中显示「继续」，否则用户会以为按下去是再暂停一次
-        const auto label = m_state == RecordingState::Paused ? QStringLiteral("继续") : QStringLiteral("暂停");
+        const auto label = m_state == RecordingState::Paused ? GyanisScribe::Core::uiText("继续") : GyanisScribe::Core::uiText("暂停");
         m_pauseButton->setText(label);
         m_pauseButton->setAccessibleName(label);
         m_pauseButton->setIcon(m_icons.icon(m_state == RecordingState::Paused ? "RecordStart" : "RecordPause"));

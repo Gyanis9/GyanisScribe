@@ -3,6 +3,7 @@
 #include "Capture/ScreenUtils.h"
 #include "Core/Logger.h"
 #include "Core/Paths.h"
+#include "Core/Text.h"
 
 #include <QDateTime>
 
@@ -27,7 +28,7 @@ namespace GyanisScribe::Record
     {
         if (m_session != nullptr && m_session->state() != RecordingState::Done && m_session->state() != RecordingState::Failed)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::Busy, "上一轮录屏还没收尾。请先停止它，再开始新的一轮"});
+            return std::unexpected(Core::Error{Core::ErrorCode::Busy, GyanisScribe::Core::uiTextUtf8("上一轮录屏还没收尾。请先停止它，再开始新的一轮")});
         }
 
         if (auto valid = validateRecorderConfig(config); !valid)
@@ -77,7 +78,7 @@ namespace GyanisScribe::Record
     {
         if (m_session == nullptr)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, "当前没有正在进行的录屏"});
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("当前没有正在进行的录屏")});
         }
 
         m_timer.stop();

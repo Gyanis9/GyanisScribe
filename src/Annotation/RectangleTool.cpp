@@ -1,5 +1,7 @@
 #include "Annotation/RectangleTool.h"
 
+#include "Core/Text.h"
+
 #include <QPainter>
 
 namespace GyanisScribe::Annotation
@@ -11,7 +13,7 @@ namespace GyanisScribe::Annotation
 
     QString RectangleTool::displayName() const
     {
-        return QStringLiteral("矩形");
+        return GyanisScribe::Core::uiText("矩形");
     }
 
     void RectangleTool::paintShape(QPainter &painter, const AnnotationShape &shape, const PaintContext &context) const

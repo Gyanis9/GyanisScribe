@@ -2,6 +2,7 @@
 
 #include "Core/ImageFit.h"
 #include "Core/Logger.h"
+#include "Core/Text.h"
 #include "Ui/DesignTokens.h"
 
 #include <QLineEdit>
@@ -219,7 +220,7 @@ namespace GyanisScribe::Annotation
         }
 
         m_textEditor = new QLineEdit{this};
-        m_textEditor->setPlaceholderText(QStringLiteral("输入文字后回车"));
+        m_textEditor->setPlaceholderText(GyanisScribe::Core::uiText("输入文字后回车"));
         m_textEditor->setFont(font());
         const auto height = m_textEditor->sizeHint().height() + kTextEditorHeightPad;
         // 宽度夹在显示区内：贴着右边缘点下的文字框不该跑到画布外面去

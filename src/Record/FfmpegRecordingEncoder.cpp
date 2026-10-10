@@ -2,6 +2,7 @@
 
 #include "Core/Logger.h"
 #include "Core/Paths.h"
+#include "Core/Text.h"
 #include "Record/FfmpegCommand.h"
 
 #include <QDateTime>
@@ -48,7 +49,7 @@ namespace GyanisScribe::Record
 
         if (config.format == OutputFormat::Mp4)
         {
-            if (auto ran = run(mp4Arguments(config, frameDirectory, outputFile, audioWav), timeout, "MP4 编码"); !ran)
+            if (auto ran = run(mp4Arguments(config, frameDirectory, outputFile, audioWav), timeout, GyanisScribe::Core::uiTextUtf8("MP4 编码")); !ran)
             {
                 return std::unexpected(ran.error());
             }
@@ -56,11 +57,11 @@ namespace GyanisScribe::Record
         {
             // GIF 走两遍：先生成调色板再按它编码，一遍过会让渐变与文字边缘出现明显色带
             const auto paletteFile = frameDirectory / "palette.png";
-            if (auto palette = run(gifPaletteArguments(config, frameDirectory, paletteFile), timeout, "GIF 调色板"); !palette)
+            if (auto palette = run(gifPaletteArguments(config, frameDirectory, paletteFile), timeout, GyanisScribe::Core::uiTextUtf8("GIF 调色板")); !palette)
             {
                 return std::unexpected(palette.error());
             }
-            if (auto encoded = run(gifEncodeArguments(config, frameDirectory, paletteFile, outputFile), timeout, "GIF 编码"); !encoded)
+            if (auto encoded = run(gifEncodeArguments(config, frameDirectory, paletteFile, outputFile), timeout, GyanisScribe::Core::uiTextUtf8("GIF 编码")); !encoded)
             {
                 return std::unexpected(encoded.error());
             }
@@ -71,7 +72,8 @@ namespace GyanisScribe::Record
         // 退出码为 0 但成品不在或是空文件，是 ffmpeg 与磁盘之间的事，不能当成成功交回上层
         if (error || size == 0)
         {
-            const auto message = std::format("ffmpeg 报告成功，但成品不可用：{}。请检查磁盘空间后重编码，或先用剪贴板交付这一帧序列", outputFile.string());
+            const auto message = GyanisScribe::Core::uiFormat(
+                    GyanisScribe::Core::uiTextUtf8("ffmpeg 报告成功，但成品不可用：{}。请检查磁盘空间后重编码，或先用剪贴板交付这一帧序列"), outputFile.string());
             Core::Logger::error(message);
             return std::unexpected(Core::Error{Core::ErrorCode::FileWriteFailed, message});
         }
@@ -94,7 +96,8 @@ namespace GyanisScribe::Record
 
         if (!process.waitForStarted(timeoutMs))
         {
-            const auto message = std::format("{} 起不动 ffmpeg（{}）。请确认该文件还能运行，或重新安装", std::string{stepName}, located->toStdString());
+            const auto message = GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("{} 起不动 ffmpeg（{}）。请确认该文件还能运行，或重新安装"), std::string{stepName},
+                                                              located->toStdString());
             Core::Logger::error(message);
             return std::unexpected(Core::Error{Core::ErrorCode::DependencyMissing, message});
         }
@@ -104,7 +107,8 @@ namespace GyanisScribe::Record
             // 超时后必须收尸：留一个还在写文件的 ffmpeg 在后台，下一轮录屏会撞上同一个目录
             process.kill();
             process.waitForFinished(1000);
-            const auto message = std::format("{} 超时（{} 毫秒未完成）。可以缩短录屏时长，或先把成品交剪贴板", std::string{stepName}, timeoutMs);
+            const auto message = GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("{} 超时（{} 毫秒未完成）。可以缩短录屏时长，或先把成品交剪贴板"),
+                                                              std::string{stepName}, timeoutMs);
             Core::Logger::error(message);
             return std::unexpected(Core::Error{Core::ErrorCode::Busy, message});
         }
@@ -112,7 +116,8 @@ namespace GyanisScribe::Record
         if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0)
         {
             const auto output  = tailOf(QString::fromUtf8(process.readAll()));
-            const auto message = std::format("{} 失败（退出码 {}）：{}。完整输出在日志里，也可以自己敲一遍同样的命令看细节", std::string{stepName}, process.exitCode(), output);
+            const auto message = GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("{} 失败（退出码 {}）：{}。完整输出在日志里，也可以自己敲一遍同样的命令看细节"),
+                                                              std::string{stepName}, process.exitCode(), output);
             Core::Logger::error(message);
             return std::unexpected(Core::Error{Core::ErrorCode::InternalError, message});
         }

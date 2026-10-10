@@ -2,6 +2,7 @@
 
 #include "Core/Logger.h"
 #include "Core/Paths.h"
+#include "Core/Text.h"
 #include "History/HistoryThumbnail.h"
 #include "Ui/IconProvider.h"
 
@@ -47,10 +48,10 @@ namespace GyanisScribe::History
         QString    dayText;
         if (dayDifference == 0)
         {
-            dayText = QStringLiteral("今天 ") + entry.moment.toString(QStringLiteral("HH:mm"));
+            dayText = GyanisScribe::Core::uiText("今天 ") + entry.moment.toString(QStringLiteral("HH:mm"));
         } else if (dayDifference == 1)
         {
-            dayText = QStringLiteral("昨天 ") + entry.moment.toString(QStringLiteral("HH:mm"));
+            dayText = GyanisScribe::Core::uiText("昨天 ") + entry.moment.toString(QStringLiteral("HH:mm"));
         } else
         {
             dayText = entry.moment.toString(QStringLiteral("yyyy-MM-dd HH:mm"));
@@ -63,7 +64,7 @@ namespace GyanisScribe::History
     QStringList historyFilterLabels()
     {
         // 类别名沿用 historyKindLabel：改中文说法时下拉与列表一起改，不会只改一半
-        return {QStringLiteral("全部"), historyKindLabel(HistoryKind::Screenshot), historyKindLabel(HistoryKind::Recording)};
+        return {GyanisScribe::Core::uiText("全部"), historyKindLabel(HistoryKind::Screenshot), historyKindLabel(HistoryKind::Recording)};
     }
 
     std::optional<HistoryKind> kindFilterAt(const int index)
@@ -102,19 +103,19 @@ namespace GyanisScribe::History
         root->addLayout(tools);
 
         m_search = new QLineEdit{this};
-        m_search->setPlaceholderText(QStringLiteral("按文件名、类别或日期搜索"));
+        m_search->setPlaceholderText(GyanisScribe::Core::uiText("按文件名、类别或日期搜索"));
         m_search->setClearButtonEnabled(true);
-        m_search->setAccessibleName(QStringLiteral("历史搜索"));
+        m_search->setAccessibleName(GyanisScribe::Core::uiText("历史搜索"));
         tools->addWidget(m_search, 1);
 
         m_filter = new QComboBox{this};
         m_filter->addItems(historyFilterLabels());
-        m_filter->setAccessibleName(QStringLiteral("历史类别"));
+        m_filter->setAccessibleName(GyanisScribe::Core::uiText("历史类别"));
         tools->addWidget(m_filter);
 
-        auto                                                           *pinButton    = new QPushButton{QStringLiteral("重新贴图"), this};
-        auto                                                           *ocrButton    = new QPushButton{QStringLiteral("重新识别"), this};
-        auto                                                           *deleteButton = new QPushButton{QStringLiteral("删除"), this};
+        auto                                                           *pinButton    = new QPushButton{GyanisScribe::Core::uiText("重新贴图"), this};
+        auto                                                           *ocrButton    = new QPushButton{GyanisScribe::Core::uiText("重新识别"), this};
+        auto                                                           *deleteButton = new QPushButton{GyanisScribe::Core::uiText("删除"), this};
         const std::array<std::pair<QPushButton *, std::string_view>, 3> buttons      = {
                 std::pair{pinButton, "Pin"},
                 std::pair{ocrButton, "Ocr"},
@@ -136,7 +137,7 @@ namespace GyanisScribe::History
         m_list->setResizeMode(QListView::Adjust);
         m_list->setMovement(QListView::Static);
         m_list->setSpacing(8);
-        m_list->setAccessibleName(QStringLiteral("历史列表"));
+        m_list->setAccessibleName(GyanisScribe::Core::uiText("历史列表"));
         root->addWidget(m_list, 1);
 
         QObject::connect(m_search, &QLineEdit::textChanged, this, [this] { refillList(); });
@@ -149,7 +150,7 @@ namespace GyanisScribe::History
                                  emit pinRequested(*path);
                                  return;
                              }
-                             emit messageForUser(QStringLiteral("先在历史里选一张图"), Ui::ToastKind::Information);
+                             emit messageForUser(GyanisScribe::Core::uiText("先在历史里选一张图"), Ui::ToastKind::Information);
                          });
         QObject::connect(ocrButton, &QPushButton::clicked, this,
                          [this]
@@ -159,7 +160,7 @@ namespace GyanisScribe::History
                                  emit ocrRequested(*path);
                                  return;
                              }
-                             emit messageForUser(QStringLiteral("先在历史里选一张图"), Ui::ToastKind::Information);
+                             emit messageForUser(GyanisScribe::Core::uiText("先在历史里选一张图"), Ui::ToastKind::Information);
                          });
         QObject::connect(deleteButton, &QPushButton::clicked, this, &HistoryView::removeSelected);
     }
@@ -171,7 +172,8 @@ namespace GyanisScribe::History
         {
             // 清单坏了不能把列表清空了事：留着上一次的行，用户还能找到那批文件
             Core::Logger::warning(std::format("历史清单没能读出来：{}", loaded.error().message));
-            emit messageForUser(QString::fromUtf8(std::format("历史清单没能读出来：{}。列表先显示上一次的记录", loaded.error().message).c_str()), Ui::ToastKind::Danger);
+            emit messageForUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("历史清单没能读出来：{}。列表先显示上一次的记录"), loaded.error().message).c_str()),
+                                Ui::ToastKind::Danger);
             return;
         }
 
@@ -214,7 +216,7 @@ namespace GyanisScribe::History
         {
             auto *item = new QListWidgetItem{iconFor(entry), entryCaption(entry, QDateTime::currentDateTime())};
             item->setData(kPathRole, GyanisScribe::Core::Paths::toDisplayText(entry.filePath));
-            item->setToolTip(GyanisScribe::Core::Paths::toDisplayText(entry.filePath) + QStringLiteral("（删除只从历史里去掉这条，成品文件留在原处）"));
+            item->setToolTip(GyanisScribe::Core::Paths::toDisplayText(entry.filePath) + GyanisScribe::Core::uiText("（删除只从历史里去掉这条，成品文件留在原处）"));
             m_list->addItem(item);
         }
     }
@@ -237,7 +239,7 @@ namespace GyanisScribe::History
         const auto path = selectedPath();
         if (!path)
         {
-            emit messageForUser(QStringLiteral("先在历史里选一张图"), Ui::ToastKind::Information);
+            emit messageForUser(GyanisScribe::Core::uiText("先在历史里选一张图"), Ui::ToastKind::Information);
             return;
         }
         emit removeRequested(*path);

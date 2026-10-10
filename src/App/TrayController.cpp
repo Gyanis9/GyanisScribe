@@ -1,6 +1,7 @@
 #include "App/TrayController.h"
 
 #include "Core/Logger.h"
+#include "Core/Text.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
 #include "Ui/IconProvider.h"
@@ -28,18 +29,18 @@ namespace GyanisScribe::App
     QList<TrayMenuEntry> trayMenuEntries()
     {
         QList<TrayMenuEntry> entries;
-        entries.append(TrayMenuEntry{TrayAction::CaptureRegion, "CaptureRegion", QStringLiteral("框选截图"), GyanisScribe::Settings::kHotkeyCapture});
-        entries.append(TrayMenuEntry{TrayAction::CaptureFullScreen, "CaptureFullScreen", QStringLiteral("整屏截图"), {}});
-        entries.append(TrayMenuEntry{TrayAction::CaptureLastRegion, "CaptureLastRegion", QStringLiteral("重复上次选区"), {}});
+        entries.append(TrayMenuEntry{TrayAction::CaptureRegion, "CaptureRegion", GyanisScribe::Core::uiText("框选截图"), GyanisScribe::Settings::kHotkeyCapture});
+        entries.append(TrayMenuEntry{TrayAction::CaptureFullScreen, "CaptureFullScreen", GyanisScribe::Core::uiText("整屏截图"), {}});
+        entries.append(TrayMenuEntry{TrayAction::CaptureLastRegion, "CaptureLastRegion", GyanisScribe::Core::uiText("重复上次选区"), {}});
         entries.append(TrayMenuEntry{}); // 分隔线
-        entries.append(TrayMenuEntry{TrayAction::ToggleRecord, "Record", QStringLiteral("开始 / 停止录屏"), GyanisScribe::Settings::kHotkeyRecord});
-        entries.append(TrayMenuEntry{TrayAction::Recognize, "Ocr", QStringLiteral("识别文字"), GyanisScribe::Settings::kHotkeyOcr});
-        entries.append(TrayMenuEntry{TrayAction::PickColor, "ColorPicker", QStringLiteral("屏幕取色"), GyanisScribe::Settings::kHotkeyPick});
+        entries.append(TrayMenuEntry{TrayAction::ToggleRecord, "Record", GyanisScribe::Core::uiText("开始 / 停止录屏"), GyanisScribe::Settings::kHotkeyRecord});
+        entries.append(TrayMenuEntry{TrayAction::Recognize, "Ocr", GyanisScribe::Core::uiText("识别文字"), GyanisScribe::Settings::kHotkeyOcr});
+        entries.append(TrayMenuEntry{TrayAction::PickColor, "ColorPicker", GyanisScribe::Core::uiText("屏幕取色"), GyanisScribe::Settings::kHotkeyPick});
         entries.append(TrayMenuEntry{});
-        entries.append(TrayMenuEntry{TrayAction::OpenSettings, "Settings", QStringLiteral("设置"), {}});
-        entries.append(TrayMenuEntry{TrayAction::OpenAbout, "About", QStringLiteral("关于智录"), {}});
+        entries.append(TrayMenuEntry{TrayAction::OpenSettings, "Settings", GyanisScribe::Core::uiText("设置"), {}});
+        entries.append(TrayMenuEntry{TrayAction::OpenAbout, "About", GyanisScribe::Core::uiText("关于智录"), {}});
         entries.append(TrayMenuEntry{});
-        entries.append(TrayMenuEntry{TrayAction::Quit, "Exit", QStringLiteral("退出"), {}});
+        entries.append(TrayMenuEntry{TrayAction::Quit, "Exit", GyanisScribe::Core::uiText("退出"), {}});
         return entries;
     }
 
@@ -76,7 +77,7 @@ namespace GyanisScribe::App
         // 托盘描边色跟着主题走：深色任务栏上的深色图标会完全看不见
         m_icons.setTintColor(m_theme.iconTint());
         m_icon->setIcon(m_icons.icon("Tray"));
-        m_icon->setToolTip(QStringLiteral("智录"));
+        m_icon->setToolTip(GyanisScribe::Core::uiText("智录"));
 
         for (const auto &entry: trayMenuEntries())
         {
@@ -100,7 +101,7 @@ namespace GyanisScribe::App
                 // 菜单项上带快捷键提示是需求第五节的原话；显示的是配置里的真值，不是写死的样例。
                 // 用制表符分开：Qt 的菜单会把 \t 之后的文字右对齐，这正是系统菜单里快捷键提示的排法
                 action->setText(QStringLiteral("%1\t%2").arg(entry.label, text));
-                action->setToolTip(QStringLiteral("快捷键：%1，可在设置页改").arg(text));
+                action->setToolTip(GyanisScribe::Core::uiText("快捷键：%1，可在设置页改").arg(text));
             }
             const auto trayAction = *entry.action;
             QObject::connect(action, &QAction::triggered, this, [this, trayAction] { emit actionRequested(trayAction); });

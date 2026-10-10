@@ -1,5 +1,6 @@
 #include "Pin/PinLayout.h"
 
+#include "Core/Text.h"
 #include "Pin/PinTransform.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
@@ -60,7 +61,8 @@ namespace GyanisScribe::Pin
         const auto      document = QJsonDocument::fromJson(QByteArray(text.data(), static_cast<qsizetype>(text.size())), &parseError);
         if (parseError.error != QJsonParseError::NoError || !document.isArray())
         {
-            return failWith(std::format("贴图布局不是一段 JSON 数组：{}。请在设置里清除这一项，让程序重新记一次", parseError.errorString().toStdString()));
+            return failWith(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局不是一段 JSON 数组：{}。请在设置里清除这一项，让程序重新记一次"),
+                                                         parseError.errorString().toStdString()));
         }
 
         QVector<PinState> states;
@@ -70,7 +72,7 @@ namespace GyanisScribe::Pin
             if (!entries[index].isObject())
             {
                 // 一项坏就整体失败：跳过它等于悄悄少恢复一张贴图，用户会以为那张被删了
-                return failWith(std::format("贴图布局第 {} 项不是对象。请清除这一项后让程序重新记一次", index + 1));
+                return failWith(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局第 {} 项不是对象。请清除这一项后让程序重新记一次"), index + 1));
             }
 
             const auto entry = entries[index].toObject();
@@ -78,7 +80,8 @@ namespace GyanisScribe::Pin
             {
                 if (!entry.contains(QLatin1String(key.data())))
                 {
-                    return failWith(std::format("贴图布局第 {} 项缺少字段 {}。请清除这一项后让程序重新记一次", index + 1, std::string(key)));
+                    return failWith(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局第 {} 项缺少字段 {}。请清除这一项后让程序重新记一次"), index + 1,
+                                                                 std::string(key)));
                 }
             }
 
@@ -91,12 +94,13 @@ namespace GyanisScribe::Pin
 
             if (state.logicalSize.width() <= 0.0 || state.logicalSize.height() <= 0.0)
             {
-                return failWith(
-                        std::format("贴图布局第 {} 项的尺寸不是正数（{}×{}）。请清除这一项后让程序重新记一次", index + 1, state.logicalSize.width(), state.logicalSize.height()));
+                return failWith(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局第 {} 项的尺寸不是正数（{}×{}）。请清除这一项后让程序重新记一次"), index + 1,
+                                                             state.logicalSize.width(), state.logicalSize.height()));
             }
             if (state.opacity <= 0.0 || state.opacity > 1.0)
             {
-                return failWith(std::format("贴图布局第 {} 项的不透明度不在 (0,1] 里：{}。请清除这一项后让程序重新记一次", index + 1, state.opacity));
+                return failWith(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局第 {} 项的不透明度不在 (0,1] 里：{}。请清除这一项后让程序重新记一次"),
+                                                             index + 1, state.opacity));
             }
 
             states.push_back(state);

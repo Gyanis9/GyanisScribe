@@ -1,5 +1,7 @@
 #include "Annotation/NumberTool.h"
 
+#include "Core/Text.h"
+
 #include <QFont>
 #include <QPainter>
 
@@ -17,7 +19,7 @@ namespace GyanisScribe::Annotation
 
     QString NumberTool::displayName() const
     {
-        return QStringLiteral("序号");
+        return GyanisScribe::Core::uiText("序号");
     }
 
     std::optional<AnnotationShape> NumberTool::end()

@@ -1,5 +1,7 @@
 #include "Annotation/MosaicTool.h"
 
+#include "Core/Text.h"
+
 #include <QImage>
 #include <QPainter>
 
@@ -17,7 +19,7 @@ namespace GyanisScribe::Annotation
 
     QString MosaicTool::displayName() const
     {
-        return QStringLiteral("马赛克");
+        return GyanisScribe::Core::uiText("马赛克");
     }
 
     void MosaicTool::paintShape(QPainter &painter, const AnnotationShape &shape, const PaintContext &context) const

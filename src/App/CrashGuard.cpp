@@ -2,6 +2,7 @@
 
 #include "Core/Logger.h"
 #include "Core/Paths.h"
+#include "Core/Text.h"
 
 #include <cstdlib>
 #include <exception>
@@ -33,8 +34,8 @@ namespace GyanisScribe::App
 {
     QString crashMessageFor(const std::exception_ptr &error, const std::string_view logDirectory)
     {
-        const auto text = QString::fromUtf8(std::format("智录遇到未处理的错误：{}。现场已尽量落到日志，请到 {} 找最近一份日志；"
-                                                        "如果反复出现，请把日志与出错的操作步骤一起反馈",
+        const auto text = QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("智录遇到未处理的错误：{}。现场已尽量落到日志，请到 {} 找最近一份日志；"
+                                                                                       "如果反复出现，请把日志与出错的操作步骤一起反馈"),
                                                         describeException(error), logDirectory)
                                                     .c_str());
         return text;

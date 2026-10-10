@@ -9,6 +9,7 @@
 #include "Capture/ScreenUtils.h"
 #include "Core/Logger.h"
 #include "Core/Paths.h"
+#include "Core/Text.h"
 #include "History/HistoryRules.h"
 #include "History/HistoryStore.h"
 #include "History/HistoryTypes.h"
@@ -141,7 +142,7 @@ namespace GyanisScribe::App
                          [this](const Core::Error &error)
                          {
                              Core::Logger::error(std::format("截图未完成：{}", error.message));
-                             notifyUser(QString::fromUtf8(std::format("截图未完成：{}。请重试一次", error.message).c_str()), Ui::ToastKind::Danger);
+                             notifyUser(GyanisScribe::Core::uiText("截图未完成：%1。请重试一次").arg(QString::fromStdString(error.message)), Ui::ToastKind::Danger);
                          });
 
         // 标注窗的四个出口：动作只有一个入口，界面不需要知道用户是点了按钮还是按了键盘
@@ -338,14 +339,15 @@ namespace GyanisScribe::App
 
         if (m_ocrImage.isNull())
         {
-            notifyUser(QStringLiteral("还没有可识别的图：先按 Ctrl+Alt+A 框选一块屏幕"), Ui::ToastKind::Information);
+            notifyUser(GyanisScribe::Core::uiText("还没有可识别的图：先按 Ctrl+Alt+A 框选一块屏幕"), Ui::ToastKind::Information);
             return;
         }
 
         const auto result = m_ocr->recognize(m_ocrImage, language);
         if (!result)
         {
-            const auto message = QString::fromUtf8(std::format("文字识别失败：{}。请重试一次，或换一种语言再试", result.error().message).c_str());
+            const auto message = QString::fromUtf8(
+                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("文字识别失败：{}。请重试一次，或换一种语言再试"), result.error().message).c_str());
             Core::Logger::error(message.toStdString());
             notifyUser(message, Ui::ToastKind::Danger);
             return;
@@ -395,14 +397,15 @@ namespace GyanisScribe::App
         }
         if (screen == nullptr)
         {
-            notifyUser(QStringLiteral("这台机器上没有可用的屏幕，取色没法开始"), Ui::ToastKind::Danger);
+            notifyUser(GyanisScribe::Core::uiText("这台机器上没有可用的屏幕，取色没法开始"), Ui::ToastKind::Danger);
             return;
         }
 
         const auto frame = m_captureSource->grabScreen(screen->name());
         if (!frame)
         {
-            notifyUser(QString::fromUtf8(std::format("这一屏抓不下来：{}。请重试一次", frame.error().message).c_str()), Ui::ToastKind::Danger);
+            notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("这一屏抓不下来：{}。请重试一次"), frame.error().message).c_str()),
+                       Ui::ToastKind::Danger);
             return;
         }
 
@@ -420,7 +423,7 @@ namespace GyanisScribe::App
                          [this](const QColor &, const QString &text)
                          {
                              QGuiApplication::clipboard()->setText(text);
-                             notifyUser(QStringLiteral("已复制颜色 ") + text, Ui::ToastKind::Success);
+                             notifyUser(GyanisScribe::Core::uiText("已复制颜色 ") + text, Ui::ToastKind::Success);
                          });
         QObject::connect(m_picker, &Pick::ColorPickerOverlay::cancelled, this, [] { Core::Logger::info("取色已取消"); });
         m_picker->showFullScreen();
@@ -433,7 +436,7 @@ namespace GyanisScribe::App
         auto *screen = QGuiApplication::primaryScreen();
         if (screen == nullptr)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::ScreenUnavailable, "当前没有可用屏幕，录屏没法开始。请接回显示器后重试"});
+            return std::unexpected(Core::Error{Core::ErrorCode::ScreenUnavailable, GyanisScribe::Core::uiTextUtf8("当前没有可用屏幕，录屏没法开始。请接回显示器后重试")});
         }
 
         Record::RecorderConfig config;
@@ -461,7 +464,8 @@ namespace GyanisScribe::App
             {
                 hideRecordingHud();
                 Core::Logger::error(std::format("录屏没能开始：{}", started.error().message));
-                notifyUser(QString::fromUtf8(std::format("录屏没能开始：{}", started.error().message).c_str()), Ui::ToastKind::Danger);
+                notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("录屏没能开始：{}"), started.error().message).c_str()),
+                           Ui::ToastKind::Danger);
                 return;
             }
             updateRecordingHud();
@@ -474,7 +478,7 @@ namespace GyanisScribe::App
         {
             hideRecordingHud();
             Core::Logger::error(std::format("录屏收尾失败：{}", stopped.error().message));
-            notifyUser(QString::fromUtf8(std::format("录屏收尾失败：{}", stopped.error().message).c_str()), Ui::ToastKind::Danger);
+            notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("录屏收尾失败：{}"), stopped.error().message).c_str()), Ui::ToastKind::Danger);
         }
     }
 
@@ -504,7 +508,7 @@ namespace GyanisScribe::App
                          [this]
                          {
                              // 最小化只是收起这一层：托盘菜单的录屏项还在，用户照样能停
-                             notifyUser(QStringLiteral("控制条已收起；按 Ctrl+Alt+R 或托盘里的录屏项可停止并保存"), Ui::ToastKind::Information);
+                             notifyUser(GyanisScribe::Core::uiText("控制条已收起；按 Ctrl+Alt+R 或托盘里的录屏项可停止并保存"), Ui::ToastKind::Information);
                          });
 
         // 时长与状态每秒推一次：服务只在帧落地时发信号，而控制条要的是「现在过了多久」
@@ -558,7 +562,8 @@ namespace GyanisScribe::App
         {
             // 清单写不进去不该让「保存成功」变成假话：成品已经在盘上，只是下次打开找不到它
             Core::Logger::warning(std::format("成品没进历史清单：{}", stored.error().message));
-            notifyUser(QString::fromUtf8(std::format("成品已保存，但没进历史清单：{}", stored.error().message).c_str()), Ui::ToastKind::Danger);
+            notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("成品已保存，但没进历史清单：{}"), stored.error().message).c_str()),
+                       Ui::ToastKind::Danger);
             return;
         }
         m_mainWindow->refreshHistory();
@@ -573,7 +578,8 @@ namespace GyanisScribe::App
         {
             return Core::Expected<QImage>{std::unexpected{Core::Error{
                     .code    = Core::ErrorCode::DependencyMissing,
-                    .message = std::format("读不出这张图：{}。文件可能已被移动或删掉，或这个构建里没有对应的图片解码插件", Core::Paths::toDisplayText(filePath).toStdString()),
+                    .message = GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("读不出这张图：{}。文件可能已被移动或删掉，或这个构建里没有对应的图片解码插件"),
+                                                            Core::Paths::toDisplayText(filePath).toStdString()),
             }}};
         }
         return Core::Expected<QImage>{image};
@@ -605,11 +611,12 @@ namespace GyanisScribe::App
     {
         if (auto removed = m_history->remove(filePath); !removed)
         {
-            notifyUser(QString::fromUtf8(std::format("这条历史没删掉：{}", removed.error().message).c_str()), Ui::ToastKind::Danger);
+            notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("这条历史没删掉：{}"), removed.error().message).c_str()),
+                       Ui::ToastKind::Danger);
             return;
         }
         // 删记录不删文件：这句要让用户看见，否则他会以为图也被清掉了
-        notifyUser(QStringLiteral("已从历史里去掉，成品文件仍在 ") + Core::Paths::toDisplayText(filePath), Ui::ToastKind::Success);
+        notifyUser(GyanisScribe::Core::uiText("已从历史里去掉，成品文件仍在 ") + Core::Paths::toDisplayText(filePath), Ui::ToastKind::Success);
         m_mainWindow->refreshHistory();
     }
 
@@ -617,7 +624,8 @@ namespace GyanisScribe::App
     {
         hideRecordingHud();
         Core::Logger::error(std::format("录屏中止：{}", reason.toStdString()));
-        notifyUser(QString::fromUtf8(std::format("录屏中止：{}。请重试一次", reason.toStdString()).c_str()), Ui::ToastKind::Danger);
+        notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("录屏中止：{}。请重试一次"), reason.toStdString()).c_str()),
+                   Ui::ToastKind::Danger);
     }
 
 } // namespace GyanisScribe::App

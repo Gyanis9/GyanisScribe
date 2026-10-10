@@ -1,5 +1,7 @@
 #include "Core/Paths.h"
 
+#include "Core/Text.h"
+
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QStandardPaths>
@@ -73,8 +75,9 @@ namespace GyanisScribe::Core
         // create_directories 在目录已存在时不报错也不返回 true，所以判据只能是「现在是不是一个目录」
         if (error || !std::filesystem::is_directory(directory))
         {
-            return std::unexpected(Error{ErrorCode::FileWriteFailed, std::format("目录创建失败：{}（原因 {}）。请检查该路径是否可写，或在设置里换一个目录", directory.string(),
-                                                                                 error ? error.message() : std::string("路径存在但不是目录"))});
+            return std::unexpected(Error{ErrorCode::FileWriteFailed,
+                                         GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("目录创建失败：{}（原因 {}）。请检查该路径是否可写，或在设置里换一个目录"),
+                                                                      directory.string(), error ? error.message() : GyanisScribe::Core::uiTextUtf8("路径存在但不是目录"))});
         }
         return {};
     }

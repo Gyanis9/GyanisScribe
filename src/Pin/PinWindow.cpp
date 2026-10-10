@@ -2,6 +2,7 @@
 
 #include "Core/Logger.h"
 #include "Core/Paths.h"
+#include "Core/Text.h"
 #include "Ui/DesignTokens.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Settings/ISettingsStore.h"
@@ -76,8 +77,8 @@ namespace GyanisScribe::Pin
             m_logicalSize = QSizeF(image.width() / image.devicePixelRatio(), image.height() / image.devicePixelRatio());
         }
 
-        setWindowTitle(QStringLiteral("智录贴图"));
-        setAccessibleName(QStringLiteral("贴图窗口"));
+        setWindowTitle(GyanisScribe::Core::uiText("智录贴图"));
+        setAccessibleName(GyanisScribe::Core::uiText("贴图窗口"));
         applyGeometry();
         setWindowOpacity(m_opacity);
     }
@@ -135,9 +136,10 @@ namespace GyanisScribe::Pin
     {
         if (through && !m_integration.capabilities().clickThrough)
         {
-            return std::unexpected(
-                    Core::Error{Core::ErrorCode::PlatformUnsupported, std::format("{}不支持鼠标穿透：这一项在本平台没有实现。请把贴图挪到不挡操作的位置，或降低透明度后从别处点击",
-                                                                                  m_integration.displayName().toStdString())});
+            return std::unexpected(Core::Error{
+                    Core::ErrorCode::PlatformUnsupported,
+                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("{}不支持鼠标穿透：这一项在本平台没有实现。请把贴图挪到不挡操作的位置，或降低透明度后从别处点击"),
+                                                 m_integration.displayName().toStdString())});
         }
 
         // 穿透同时去掉焦点接受：吃不到鼠标却又抢走焦点，会让用户的键盘操作莫名失灵
@@ -186,7 +188,9 @@ namespace GyanisScribe::Pin
 
         if (!m_image.save(QString::fromLocal8Bit(filePath.string().c_str())))
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::FileWriteFailed, std::format("贴图保存失败：{}。请检查目录是否可写，或先把这一张复制进剪贴板", filePath.string())});
+            return std::unexpected(
+                    Core::Error{Core::ErrorCode::FileWriteFailed,
+                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图保存失败：{}。请检查目录是否可写，或先把这一张复制进剪贴板"), filePath.string())});
         }
 
         Core::Logger::info(std::format("贴图已保存：{}", filePath.string()));
@@ -353,10 +357,10 @@ namespace GyanisScribe::Pin
     QMenu *PinWindow::buildContextMenu()
     {
         auto *menu = new QMenu(this);
-        menu->addAction(QStringLiteral("复制"), this, &PinWindow::copyToClipboard);
+        menu->addAction(GyanisScribe::Core::uiText("复制"), this, &PinWindow::copyToClipboard);
 
         const auto directory = screenshotDirectory(m_settings);
-        menu->addAction(QStringLiteral("保存"), this,
+        menu->addAction(GyanisScribe::Core::uiText("保存"), this,
                         [this, directory]
                         {
                             if (const auto saved = saveToFile(directory); !saved)
@@ -365,15 +369,15 @@ namespace GyanisScribe::Pin
                             }
                         });
 
-        menu->addAction(QStringLiteral("识别文字"), this, [this] { emit ocrRequested(m_image); });
+        menu->addAction(GyanisScribe::Core::uiText("识别文字"), this, [this] { emit ocrRequested(m_image); });
         menu->addSeparator();
 
         const auto capabilities = m_integration.capabilities();
-        auto      *pinAction    = menu->addAction(QStringLiteral("保持置顶"), this, [this] { setAlwaysOnTop(!m_pinned); });
+        auto      *pinAction    = menu->addAction(GyanisScribe::Core::uiText("保持置顶"), this, [this] { setAlwaysOnTop(!m_pinned); });
         pinAction->setCheckable(true);
         pinAction->setChecked(m_pinned);
 
-        auto *throughAction = menu->addAction(QStringLiteral("鼠标穿透"), this,
+        auto *throughAction = menu->addAction(GyanisScribe::Core::uiText("鼠标穿透"), this,
                                               [this]
                                               {
                                                   if (const auto result = setMouseThrough(!m_mouseThrough); !result)
@@ -385,10 +389,10 @@ namespace GyanisScribe::Pin
         throughAction->setCheckable(true);
         throughAction->setChecked(m_mouseThrough);
         throughAction->setVisible(capabilities.clickThrough);
-        throughAction->setToolTip(QStringLiteral("滚轮缩放，Ctrl+滚轮旋转，Shift+滚轮调透明度，Esc 关闭"));
+        throughAction->setToolTip(GyanisScribe::Core::uiText("滚轮缩放，Ctrl+滚轮旋转，Shift+滚轮调透明度，Esc 关闭"));
 
         menu->addSeparator();
-        menu->addAction(QStringLiteral("关闭"), this,
+        menu->addAction(GyanisScribe::Core::uiText("关闭"), this,
                         [this]
                         {
                             emit closedByUser();

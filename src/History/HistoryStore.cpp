@@ -2,6 +2,7 @@
 
 #include "Core/Logger.h"
 #include "Core/Paths.h"
+#include "Core/Text.h"
 
 #include <QByteArray>
 #include <QDateTime>
@@ -119,7 +120,8 @@ namespace GyanisScribe::History
         const auto found = std::ranges::find(*raw, filePath, &HistoryEntry::filePath);
         if (found == raw->end())
         {
-            return Expected<void>{std::unexpected{makeError(ErrorCode::InvalidArgument, std::format("历史清单里没有这条记录：{}。请刷新列表后再试一次", pathToText(filePath)))}};
+            return Expected<void>{std::unexpected{
+                    makeError(ErrorCode::InvalidArgument, GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("历史清单里没有这条记录：{}。请刷新列表后再试一次"), pathToText(filePath)))}};
         }
 
         raw->erase(found);
@@ -138,7 +140,8 @@ namespace GyanisScribe::History
         if (!file.open(QIODevice::ReadOnly))
         {
             return Expected<QVector<HistoryEntry>>{std::unexpected{
-                    makeError(ErrorCode::FileWriteFailed, std::format("历史清单打不开：{}。请检查这个文件是否被别的程序占着，或把它删掉让软件重建", pathToText(m_storagePath)))}};
+                    makeError(ErrorCode::FileWriteFailed, GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("历史清单打不开：{}。请检查这个文件是否被别的程序占着，或把它删掉让软件重建"),
+                                                                      pathToText(m_storagePath)))}};
         }
         const auto bytes = file.readAll();
 
@@ -147,7 +150,8 @@ namespace GyanisScribe::History
         {
             return Expected<QVector<HistoryEntry>>{std::unexpected{makeError(
                     ErrorCode::InvalidArgument,
-                    std::format("历史清单格式不对：{}。可以把这个文件删掉让软件重建（成品文件不受影响），或按 {{\"entries\": [...]}} 的形状修好", pathToText(m_storagePath)))}};
+                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("历史清单格式不对：{}。可以把这个文件删掉让软件重建（成品文件不受影响），或按 {{\"entries\": [...]}} 的形状修好"),
+                                pathToText(m_storagePath)))}};
         }
 
         const auto            array = document.object().value(QLatin1String{kRootKeyEntries}).toArray();
@@ -163,21 +167,23 @@ namespace GyanisScribe::History
             {
                 // 缺字段的条目报出来而不是跳过：跳过等于替用户决定哪条历史不算历史
                 return Expected<QVector<HistoryEntry>>{
-                        std::unexpected{makeError(ErrorCode::InvalidArgument, std::format("历史清单第 {} 条缺 path、kind 或 moment。请修好这一条，或删掉整个文件让软件重建：{}",
-                                                                                          index + 1, pathToText(m_storagePath)))}};
+                        std::unexpected{makeError(ErrorCode::InvalidArgument,
+                                                  GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("历史清单第 {} 条缺 path、kind 或 moment。请修好这一条，或删掉整个文件让软件重建：{}"),
+                                                              index + 1, pathToText(m_storagePath)))}};
             }
 
             auto kind = parseHistoryKind(kindText.toStdString());
             if (!kind)
             {
-                return Expected<QVector<HistoryEntry>>{std::unexpected{makeError(kind.error().code, std::format("历史清单第 {} 条：{}", index + 1, kind.error().message))}};
+                return Expected<QVector<HistoryEntry>>{
+                        std::unexpected{makeError(kind.error().code, GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("历史清单第 {} 条：{}"), index + 1, kind.error().message))}};
             }
             const auto moment = QDateTime::fromString(momentText, Qt::ISODateWithMs);
             if (!moment.isValid())
             {
-                return Expected<QVector<HistoryEntry>>{
-                        std::unexpected{makeError(ErrorCode::InvalidArgument, std::format("历史清单第 {} 条的时间 \"{}\" 读不出来。请用 2026-10-10T08:30:00.000 这种写法",
-                                                                                          index + 1, momentText.toStdString()))}};
+                return Expected<QVector<HistoryEntry>>{std::unexpected{makeError(
+                        ErrorCode::InvalidArgument, GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("历史清单第 {} 条的时间 \"{}\" 读不出来。请用 2026-10-10T08:30:00.000 这种写法"),
+                                                                index + 1, momentText.toStdString()))}};
             }
 
             entries.push_back(HistoryEntry{
@@ -217,13 +223,14 @@ namespace GyanisScribe::History
         {
             Core::Logger::error(std::format("历史清单写不了：{}", pathToText(m_storagePath)));
             return Expected<void>{std::unexpected{makeError(
-                    ErrorCode::FileWriteFailed, std::format("历史清单写不了：{}。请确认这个目录还能写，或先把软件设的截图目录改到一个可写位置", pathToText(m_storagePath)))}};
+                    ErrorCode::FileWriteFailed,
+                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("历史清单写不了：{}。请确认这个目录还能写，或先把软件设的截图目录改到一个可写位置"), pathToText(m_storagePath)))}};
         }
         file.write(QJsonDocument{root}.toJson(QJsonDocument::Indented));
         if (!file.commit())
         {
-            return Expected<void>{
-                    std::unexpected{makeError(ErrorCode::FileWriteFailed, std::format("历史清单没能落盘：{}。请重试一次，或换一个可写的目录", pathToText(m_storagePath)))}};
+            return Expected<void>{std::unexpected{makeError(
+                    ErrorCode::FileWriteFailed, GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("历史清单没能落盘：{}。请重试一次，或换一个可写的目录"), pathToText(m_storagePath)))}};
         }
         return Expected<void>{};
     }

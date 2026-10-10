@@ -1,5 +1,7 @@
 #include "Pick/ColorFormat.h"
 
+#include "Core/Text.h"
+
 #include <QStringList>
 
 #include <array>
@@ -41,13 +43,13 @@ namespace GyanisScribe::Pick
         switch (format)
         {
             case ColorFormat::Hex:
-                return QString::fromUtf8(kFormatLabels[0].data(), static_cast<qsizetype>(kFormatLabels[0].size()));
+                return GyanisScribe::Core::uiText(kFormatLabels[0].data());
             case ColorFormat::Rgb:
-                return QString::fromUtf8(kFormatLabels[1].data(), static_cast<qsizetype>(kFormatLabels[1].size()));
+                return GyanisScribe::Core::uiText(kFormatLabels[1].data());
             case ColorFormat::Hsl:
-                return QString::fromUtf8(kFormatLabels[2].data(), static_cast<qsizetype>(kFormatLabels[2].size()));
+                return GyanisScribe::Core::uiText(kFormatLabels[2].data());
         }
-        return QString::fromUtf8(kFormatLabels[0].data(), static_cast<qsizetype>(kFormatLabels[0].size()));
+        return GyanisScribe::Core::uiText(kFormatLabels[0].data());
     }
 
     std::optional<ColorFormat> colorFormatAt(const int index)
@@ -69,7 +71,7 @@ namespace GyanisScribe::Pick
         QStringList labels;
         for (const auto &label: kFormatLabels)
         {
-            labels.append(QString::fromUtf8(label.data(), static_cast<qsizetype>(label.size())));
+            labels.append(GyanisScribe::Core::uiText(label.data()));
         }
         return labels;
     }
@@ -86,7 +88,8 @@ namespace GyanisScribe::Pick
 
         return Core::Expected<ColorFormat>{std::unexpected{Core::Error{
                 .code    = Core::ErrorCode::InvalidArgument,
-                .message = std::format("颜色写法 \"{}\" 不认识。可用取值只有 Hex、Rgb 与 Hsl（区分大小写），请在设置的取色页里重选一次", token),
+                .message = GyanisScribe::Core::uiFormat(
+                        GyanisScribe::Core::uiTextUtf8("颜色写法 \"{}\" 不认识。可用取值只有 Hex、Rgb 与 Hsl（区分大小写），请在设置的取色页里重选一次"), token),
         }}};
     }
 

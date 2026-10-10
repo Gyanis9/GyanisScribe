@@ -1,5 +1,7 @@
 #include "Ui/ThemeKind.h"
 
+#include "Core/Text.h"
+
 #include <array>
 #include <format>
 
@@ -28,8 +30,8 @@ namespace GyanisScribe::Ui
         // 逐项列出可用取值：只报「取值不对」用户不知道该填什么
         return Core::Expected<ThemeKind>{std::unexpected{Core::Error{
                 .code    = Core::ErrorCode::InvalidArgument,
-                .message = std::format("主题取值 \"{}\" 不在可用档位里：请在设置的通用页从 Light、Dark、System 三项里选一项，"
-                                       "手写配置文件时只能是这三个词（区分大小写）",
+                .message = GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("主题取值 \"{}\" 不在可用档位里：请在设置的通用页从 Light、Dark、System 三项里选一项，"
+                                                                      "手写配置文件时只能是这三个词（区分大小写）"),
                                        text),
         }}};
     }

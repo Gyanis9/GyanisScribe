@@ -1,5 +1,7 @@
 #include "Platform/UnsupportedHotkeyBackend.h"
 
+#include "Core/Text.h"
+
 namespace GyanisScribe::Platform
 {
 
@@ -9,12 +11,13 @@ namespace GyanisScribe::Platform
 
     Core::Expected<void> UnsupportedHotkeyBackend::registerHotkey(int, Qt::KeyboardModifiers, Qt::Key)
     {
-        return std::unexpected(Core::Error{Core::ErrorCode::PlatformUnsupported, "本平台没有全局热键能力：登记不会生效。请在程序窗口内使用普通快捷键，或等平台适配后再开启这一项"});
+        return std::unexpected(Core::Error{Core::ErrorCode::PlatformUnsupported,
+                                           GyanisScribe::Core::uiTextUtf8("本平台没有全局热键能力：登记不会生效。请在程序窗口内使用普通快捷键，或等平台适配后再开启这一项")});
     }
 
     Core::Expected<void> UnsupportedHotkeyBackend::unregisterHotkey(int)
     {
-        return std::unexpected(Core::Error{Core::ErrorCode::PlatformUnsupported, "本平台没有全局热键能力：没有任何登记需要注销"});
+        return std::unexpected(Core::Error{Core::ErrorCode::PlatformUnsupported, GyanisScribe::Core::uiTextUtf8("本平台没有全局热键能力：没有任何登记需要注销")});
     }
 
     void UnsupportedHotkeyBackend::unregisterAll()

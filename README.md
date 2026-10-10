@@ -84,6 +84,20 @@ tests/          逐级镜像 src 的目录结构
 第三方组件与许可证见 [docs/ThirdPartyLicenses.md](docs/ThirdPartyLicenses.md)，
 识别后端与语言包的落地细节见 [docs/OcrBackends.md](docs/OcrBackends.md)。
 
+## 界面文案与语言切换
+
+界面源码文案是中文。任何要显示给用户（含报错提示）的文本都走 `Core::uiText("中文")` /
+`Core::uiTextUtf8("中文{}")`（`src/Core/Text.h`），日志 `Core::Logger::*` 刻意保持中文——排障的人
+不该因为界面语言而读不到日志。
+
+- 语言在「设置 → 主题」里选，配置键 `Ui/Language`（`zh` / `en`）；切换在重启后生效。
+- 英文档需要 `translations/GyanisScribe_en.qm`，随包分发；缺包时应用按中文继续并给出放置位置。
+- 翻译目录 `Translations/GyanisScribe_en.ts` 是唯一真源，`.qm` 由构建期的 lrelease 产出
+  （挂在 `DeployTranslations` 上）。容器里那份 Qt 6.4 没有 lrelease，那一档不出包。
+- 改完文案要重新生成目录：`cmake -DTRANSLATION_SCAN_ROOT=src -DTRANSLATION_CATALOG=Translations/GyanisScribe_en.ts -DTRANSLATION_CATALOG_GENERATE=ON -P scripts/check-translation-catalog.cmake`。
+  ctest 用例 `Style.TranslationCatalog` 会断言「源码里用到的每条文案都在目录里且有非空译文」——
+  漏掉的那几处在英文档下会安静地显示中文，没人会逐条菜单点出来，所以钉成门禁。
+
 ## 已知问题
 
 - 识别需要用户自备语言包（`eng.traineddata` 等）；缺语言包时功能明确报"不可用"并给出放置位置，

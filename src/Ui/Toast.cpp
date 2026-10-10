@@ -1,6 +1,7 @@
 #include "Ui/Toast.h"
 
 #include "Core/Logger.h"
+#include "Core/Text.h"
 #include "Ui/IconProvider.h"
 #include "Ui/ThemeManager.h"
 
@@ -64,14 +65,14 @@ namespace GyanisScribe::Ui
         {
             setAttribute(Qt::WA_ShowWithoutActivating);
             // 名称是给读屏与自动化测试的：一个没有名字的顶层窗在辅助技术里就是一块空白
-            setAccessibleName(QStringLiteral("提示"));
+            setAccessibleName(GyanisScribe::Core::uiText("提示"));
 
             auto *layout = new QHBoxLayout{this};
             layout->setContentsMargins(kToastIconSpacing, kToastIconSpacing, kToastIconSpacing * 2, kToastIconSpacing);
             layout->setSpacing(kToastIconSpacing);
 
             m_icon = new QLabel{this};
-            m_icon->setAccessibleName(QStringLiteral("提示图标"));
+            m_icon->setAccessibleName(GyanisScribe::Core::uiText("提示图标"));
             m_text = new QLabel{this};
             m_text->setWordWrap(true);
             m_text->setTextInteractionFlags(Qt::TextSelectableByMouse);

@@ -1,6 +1,7 @@
 #include "Ui/HotkeyEdit.h"
 
 #include "Core/Logger.h"
+#include "Core/Text.h"
 
 #include <QKeyEvent>
 #include <QMouseEvent>
@@ -48,7 +49,7 @@ namespace GyanisScribe::Ui
         m_display->setFrameShape(QFrame::Box);
         m_display->setAlignment(Qt::AlignCenter);
         m_display->setMinimumWidth(120);
-        m_display->setText(QStringLiteral("点击后按下快捷键"));
+        m_display->setText(GyanisScribe::Core::uiText("点击后按下快捷键"));
         layout->addWidget(m_display);
 
         setFocusPolicy(Qt::ClickFocus);
@@ -60,7 +61,7 @@ namespace GyanisScribe::Ui
         // 无障碍名称与 tooltip 都写中文名：只有「Ctrl+Alt+A」这块文本时，读屏说不清它管哪个动作
         setAccessibleName(title);
         m_display->setAccessibleName(title);
-        setToolTip(QStringLiteral("%1 的全局热键。点击这一格后按下组合键即可替换，按 Esc 取消").arg(title));
+        setToolTip(GyanisScribe::Core::uiText("%1 的全局热键。点击这一格后按下组合键即可替换，按 Esc 取消").arg(title));
 
         const auto stored = m_settings.stringValue(key, defaultText);
         m_display->setText(stored);
@@ -83,7 +84,7 @@ namespace GyanisScribe::Ui
         const auto text = combination.toText();
         if (auto written = m_settings.setValue(m_key, text); !written)
         {
-            showPrompt(QStringLiteral("写入失败"));
+            showPrompt(GyanisScribe::Core::uiText("写入失败"));
             return written;
         }
         m_display->setText(text);
@@ -101,7 +102,7 @@ namespace GyanisScribe::Ui
         // 进入录制态并抢焦点：焦点不在本控件上时 keyPressEvent 根本不会送过来
         m_recording = true;
         setFocus(Qt::MouseFocusReason);
-        showPrompt(QStringLiteral("请按下快捷键（Esc 取消）"));
+        showPrompt(GyanisScribe::Core::uiText("请按下快捷键（Esc 取消）"));
     }
 
     void HotkeyEdit::keyPressEvent(QKeyEvent *event)

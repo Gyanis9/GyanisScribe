@@ -1,5 +1,7 @@
 #include "Platform/Windows/Win32HotkeyMapping.h"
 
+#include "Core/Text.h"
+
 #include <Windows.h>
 
 #include <format>
@@ -35,8 +37,9 @@ namespace GyanisScribe::Platform
         const Qt::KeyboardModifiers unsupported = modifiers & ~(Qt::ControlModifier | Qt::AltModifier | Qt::ShiftModifier | Qt::MetaModifier);
         if (unsupported != Qt::NoModifier)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
-                                               std::format("修饰键无法用于全局热键：掩码 0x{:X}。请只用 Ctrl、Alt、Shift、Win 四种组合", static_cast<unsigned>(unsupported))});
+            return std::unexpected(Core::Error{
+                    Core::ErrorCode::InvalidArgument,
+                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("修饰键无法用于全局热键：掩码 0x{:X}。请只用 Ctrl、Alt、Shift、Win 四种组合"), static_cast<unsigned>(unsupported))});
         }
         return mask;
     }
@@ -64,7 +67,8 @@ namespace GyanisScribe::Platform
             return static_cast<quint32>(VK_F1 + (code - static_cast<int>(Qt::Key_F1)));
         }
 
-        return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, std::format("按键 0x{:X} 不能用作全局热键。请改用字母、数字、空格或 F1-F24 之一", code)});
+        return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
+                                           GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("按键 0x{:X} 不能用作全局热键。请改用字母、数字、空格或 F1-F24 之一"), code)});
     }
 
 } // namespace GyanisScribe::Platform

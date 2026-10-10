@@ -39,6 +39,20 @@ Copy-Item 'README.md' $stage -Force
 Copy-Item (Join-Path 'docs' '*.md') (Join-Path $stage 'docs') -Force
 if (Test-Path 'LICENSE.txt') { Copy-Item 'LICENSE.txt' $stage -Force }
 
+# The English catalog is a build product (DeployTranslations runs lrelease). Without it the
+# packaged app exposes the language setting but can never honour it -- the portable folder and
+# the installer both would ship a Chinese-only binary while claiming the UI is bilingual.
+# The language packs land next to the executable (that is where Ui::Language looks for them),
+# not under the build root -- pointing at build\release\translations would silently ship a
+# package that can never switch language.
+$translations = Join-Path 'build' 'release\bin\translations'
+if (Test-Path $translations) {
+    Copy-Item -Recurse -Force $translations (Join-Path $stage 'translations')
+    Write-Output '[ok] language packs staged'
+} else {
+    Write-Output '[info] no language packs in this tree (lrelease missing?) -- packaged app stays Chinese-only'
+}
+
 $winDeployQt = Join-Path $QtDir 'bin\windeployqt.exe'
 if (-not (Test-Path $winDeployQt)) { throw "windeployqt not found under $QtDir (set QTDIR)" }
 # windeployqt reads the binary's imports, so it copies exactly the needed modules and plugins;

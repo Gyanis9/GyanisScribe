@@ -1,5 +1,7 @@
 #include "Ocr/UnavailableOcrEngine.h"
 
+#include "Core/Text.h"
+
 namespace GyanisScribe::Ocr
 {
 
@@ -11,7 +13,7 @@ namespace GyanisScribe::Ocr
 
     QString UnavailableOcrEngine::name() const
     {
-        return QStringLiteral("无可用识别后端");
+        return GyanisScribe::Core::uiText("无可用识别后端");
     }
 
     bool UnavailableOcrEngine::isAvailable() const

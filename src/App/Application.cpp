@@ -22,6 +22,7 @@ Application::Application(int &argc, char **argv) : QApplication(argc, argv)
     // 身份三件套必须排在任何 Paths/Settings 调用之前，否则 QStandardPaths 会给出无组织名的路径
     setOrganizationName(QLatin1String(kOrganizationName));
     setApplicationName(QLatin1String(kApplicationName));
+    // 品牌名不进翻译目录：切英文后用户仍然要能在任务栏与窗口标题里认出「智录」这个产品
     setApplicationDisplayName(QStringLiteral("智录"));
     setApplicationVersion(QStringLiteral(PROJECT_VERSION));
 

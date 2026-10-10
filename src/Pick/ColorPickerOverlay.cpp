@@ -1,5 +1,6 @@
 #include "Pick/ColorPickerOverlay.h"
 
+#include "Core/Text.h"
 #include "Ui/DesignTokens.h"
 #include "Ui/ThemeManager.h"
 
@@ -40,8 +41,8 @@ namespace GyanisScribe::Pick
         setGeometry(m_screenGeometry);
         setMouseTracking(true);
         setCursor(Qt::CrossCursor);
-        setWindowTitle(QStringLiteral("取色器"));
-        setAccessibleName(QStringLiteral("取色遮罩"));
+        setWindowTitle(GyanisScribe::Core::uiText("取色器"));
+        setAccessibleName(GyanisScribe::Core::uiText("取色遮罩"));
     }
 
     QColor ColorPickerOverlay::colorAt(const QPoint &globalPos) const

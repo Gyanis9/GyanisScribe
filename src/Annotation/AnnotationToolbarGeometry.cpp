@@ -1,5 +1,7 @@
 #include "Annotation/AnnotationToolbarGeometry.h"
 
+#include "Core/Text.h"
+
 #include <algorithm>
 #include <format>
 
@@ -13,21 +15,22 @@ namespace GyanisScribe::Annotation
         {
             return Core::Expected<ToolbarPlacement>{std::unexpected{Core::Error{
                     .code    = Core::ErrorCode::InvalidArgument,
-                    .message = std::format("工具栏尺寸 {}x{} 不成立，摆放前要先有有效的 sizeHint", toolbarSize.width(), toolbarSize.height()),
+                    .message = GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("工具栏尺寸 {}x{} 不成立，摆放前要先有有效的 sizeHint"), toolbarSize.width(), toolbarSize.height()),
             }}};
         }
         if (selection.width() <= 0 || selection.height() <= 0)
         {
             return Core::Expected<ToolbarPlacement>{std::unexpected{Core::Error{
                     .code    = Core::ErrorCode::InvalidArgument,
-                    .message = std::format("选区 {}x{} 是空的，没有可参照的位置", selection.width(), selection.height()),
+                    .message = GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("选区 {}x{} 是空的，没有可参照的位置"), selection.width(), selection.height()),
             }}};
         }
         if (screenAvailable.width() <= 0 || screenAvailable.height() <= 0)
         {
             return Core::Expected<ToolbarPlacement>{std::unexpected{Core::Error{
-                    .code    = Core::ErrorCode::ScreenUnavailable,
-                    .message = std::format("屏幕可用区 {}x{} 放不下任何东西，请确认目标屏幕还在", screenAvailable.width(), screenAvailable.height()),
+                    .code = Core::ErrorCode::ScreenUnavailable,
+                    .message =
+                            GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("屏幕可用区 {}x{} 放不下任何东西，请确认目标屏幕还在"), screenAvailable.width(), screenAvailable.height()),
             }}};
         }
 

@@ -1,6 +1,7 @@
 #include "Annotation/HighlightTool.h"
 
 #include "Annotation/AnnotationGeometry.h"
+#include "Core/Text.h"
 
 #include <QPainter>
 #include <QPainterPath>
@@ -22,7 +23,7 @@ namespace GyanisScribe::Annotation
 
     QString HighlightTool::displayName() const
     {
-        return QStringLiteral("高亮");
+        return GyanisScribe::Core::uiText("高亮");
     }
 
     void HighlightTool::paintPolyline(QPainter &painter, const AnnotationShape &shape) const

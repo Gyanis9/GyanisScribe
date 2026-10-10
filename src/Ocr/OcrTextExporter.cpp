@@ -1,6 +1,7 @@
 #include "Ocr/OcrTextExporter.h"
 
 #include "Core/Paths.h"
+#include "Core/Text.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -68,15 +69,16 @@ namespace GyanisScribe::Ocr
         QSaveFile output(QString::fromLocal8Bit(filePath.string().c_str()));
         if (!output.open(QIODevice::WriteOnly))
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::FileWriteFailed, std::format("识别结果写不出去：{}（{}）。请换一个可写的目录，或直接复制到剪贴板",
-                                                                                             filePath.string(), output.errorString().toStdString())});
+            return std::unexpected(
+                    Core::Error{Core::ErrorCode::FileWriteFailed, GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("识别结果写不出去：{}（{}）。请换一个可写的目录，或直接复制到剪贴板"),
+                                                                              filePath.string(), output.errorString().toStdString())});
         }
 
         output.write(text.toUtf8());
         if (!output.commit())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::FileWriteFailed,
-                                               std::format("识别结果没落盘：{}（{}）。请检查磁盘空间后重试", filePath.string(), output.errorString().toStdString())});
+            return std::unexpected(Core::Error{Core::ErrorCode::FileWriteFailed, GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("识别结果没落盘：{}（{}）。请检查磁盘空间后重试"),
+                                                                                             filePath.string(), output.errorString().toStdString())});
         }
         return {};
     }

@@ -4,6 +4,7 @@
 #include "Capture/IScreenCaptureSource.h"
 #include "Capture/ScreenUtils.h"
 #include "Core/Logger.h"
+#include "Core/Text.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
 
@@ -70,7 +71,8 @@ namespace GyanisScribe::Capture
         const auto storedText = m_settings.stringValue(Settings::kCaptureLastRegion, QString());
         if (storedText.isEmpty())
         {
-            deliver(Core::Expected<Core::CapturedImage>(std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, "还没有可复用的上次区域：先框选截图一次，或改用区域截图"})));
+            deliver(Core::Expected<Core::CapturedImage>(
+                    std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("还没有可复用的上次区域：先框选截图一次，或改用区域截图")})));
             return;
         }
 
@@ -93,7 +95,7 @@ namespace GyanisScribe::Capture
         if (screens.isEmpty())
         {
             deliver(Core::Expected<Core::CapturedImage>(
-                    std::unexpected(Core::Error{Core::ErrorCode::ScreenUnavailable, "进入框选失败：Qt 没有报出任何屏幕。请在 GUI 会话里重试"})));
+                    std::unexpected(Core::Error{Core::ErrorCode::ScreenUnavailable, GyanisScribe::Core::uiTextUtf8("进入框选失败：Qt 没有报出任何屏幕。请在 GUI 会话里重试")})));
             return;
         }
 
