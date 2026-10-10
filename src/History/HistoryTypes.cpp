@@ -47,9 +47,8 @@ namespace GyanisScribe::History
         // 逐项列出可用标记：只报「不认识」用户不知道该把这一行改成什么
         return Core::Expected<HistoryKind>{std::unexpected{Core::Error{
                 .code    = Core::ErrorCode::InvalidArgument,
-                .message = GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("历史文件里的类别 \"{}\" 不认识。可用取值只有 Screenshot 与 Recording（区分大小写），"
-                                                                      "改不回任一取值就把这一行删掉"),
-                                       token),
+                .message = GyanisScribe::Core::uiFormat(
+                        GyanisScribe::Core::uiTextUtf8("历史文件里的类别 \"{}\" 不认识。可用取值只有 Screenshot 与 Recording（区分大小写），改不回任一取值就把这一行删掉"), token),
         }}};
     }
 

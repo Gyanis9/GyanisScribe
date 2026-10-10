@@ -224,11 +224,23 @@ TEST_F(LanguageFixture, BuiltEnglishPackTranslatesKnownString)
     const auto applied = applyLanguage(AppLanguage::English, dirs);
     ASSERT_TRUE(applied.has_value()) << applied.error().message;
 
-    // 「保存位置」是设置页的分组标题，按约定必须走 translate("GyanisScribe", …)：
-    // 装载生效时它变成英文，等于源码中文就说明这条文案没进目录、或者 context 写错了
-    const auto translated = QCoreApplication::translate("GyanisScribe", "保存位置");
-    EXPECT_NE(translated, QStringLiteral("保存位置")) << "包装载成功但这条文案没变：查 Translations/GyanisScribe_en.ts 里有没有它";
-    EXPECT_FALSE(translated.isEmpty());
+    // 三类各取一条：字面量调用点、constexpr 表里经 uiText(row.label.data()) 运行期查的那一类、带占位符的那一条。
+    // 装载生效时三者都应变英文；还是源码中文就说明这条没进目录或 context 写错，键对不上时表那一类最先坏
+    struct Sample
+    {
+        const char *source;   ///< 源码里的那串中文
+        const char *expected; ///< 目录里钉好的英文译文
+    };
+
+    for (const Sample sample: {Sample{"保存位置", "Save locations"}, Sample{"浅色", "Light"}, Sample{"最近使用 %1", "Recent %1"}})
+    {
+        const auto translated = QCoreApplication::translate("GyanisScribe", sample.source);
+        EXPECT_NE(translated, QString::fromUtf8(sample.source)) << sample.source << "：包装载成功但这条没变，查 .ts 里有没有它、context 对不对";
+        EXPECT_EQ(translated, QString::fromUtf8(sample.expected)) << sample.source;
+    }
+
+    // 占位符要在译文上继续能用：少一个 %1 就是界面写着 "Recent %1" 这种半成品
+    EXPECT_EQ(QCoreApplication::translate("GyanisScribe", "最近使用 %1").arg(2), QStringLiteral("Recent 2"));
 
     removeEveryTranslator();
 }

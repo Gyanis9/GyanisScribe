@@ -24,11 +24,11 @@ namespace GyanisScribe::Ocr
         // 三个候选位置一次说全：只报「没有语言包」用户不知道该往哪放
         QString describeMissingLanguagePacks(const std::filesystem::path &configuredKey, const std::filesystem::path &bundled)
         {
-            return QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("设置项 {}、环境变量 TESSDATA_PREFIX、以及 {} 三处都没有语言包。"
-                                                                                "请把 eng.traineddata（要认中文再放 chi_sim.traineddata）放进其中一处，"
-                                                                                "或在设置的 OCR 页把语言包目录指过去"),
+            return QString::fromUtf8(
+                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("设置项 {}、环境变量 TESSDATA_PREFIX、以及 {} 三处都没有语言包。请把 eng.traineddata（要认中文再放 "
+                                                                                "chi_sim.traineddata）放进其中一处，或在设置的 OCR 页把语言包目录指过去"),
                                                  configuredKey.string(), bundled.string())
-                                             .c_str());
+                            .c_str());
         }
 
         // 语言包在、这个构建里却没有后端：这是构建配置的事，不能让用户以为放好语言包就能认字。
@@ -37,10 +37,11 @@ namespace GyanisScribe::Ocr
 #if !defined(GYANISSCRIBE_HAS_TESSERACT)
         QString describeMissingBackend(const std::filesystem::path &tessData)
         {
-            return QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("语言包已就位于 {}，但本次构建没有编入任何识别后端。"
-                                                                                "见 docs/OcrBackends.md：这是 Debug 档的形状，Release 档带真后端"),
-                                                 tessData.string())
-                                             .c_str());
+            return QString::fromUtf8(
+                    GyanisScribe::Core::uiFormat(
+                            GyanisScribe::Core::uiTextUtf8("语言包已就位于 {}，但本次构建没有编入任何识别后端。见 docs/OcrBackends.md：这是 Debug 档的形状，Release 档带真后端"),
+                            tessData.string())
+                            .c_str());
         }
 #endif
     } // namespace

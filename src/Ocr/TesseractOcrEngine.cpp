@@ -75,10 +75,12 @@ namespace GyanisScribe::Ocr
         {
             return {};
         }
-        return QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("语言包目录 {} 里没有本程序认识的 traineddata。请至少放入 eng.traineddata"
-                                                                            "（要认中文再加 chi_sim.traineddata），或在设置的 OCR 页把目录指过去"),
-                                             m_dataDirectory.string())
-                                         .c_str());
+        return QString::fromUtf8(
+                GyanisScribe::Core::uiFormat(
+                        GyanisScribe::Core::uiTextUtf8(
+                                "语言包目录 {} 里没有本程序认识的 traineddata。请至少放入 eng.traineddata（要认中文再加 chi_sim.traineddata），或在设置的 OCR 页把目录指过去"),
+                        m_dataDirectory.string())
+                        .c_str());
     }
 
     QStringList TesseractOcrEngine::supportedLanguages() const
@@ -111,10 +113,10 @@ namespace GyanisScribe::Ocr
         const auto model = m_dataDirectory / (modelFileNameFor(languageTag) + QStringLiteral(".traineddata")).toStdString();
         if (!std::filesystem::exists(model))
         {
-            return std::unexpected(
-                    Core::Error{Core::ErrorCode::DependencyMissing,
-                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("语言「{}」需要的模型文件不在：{}。请在设置的 OCR 页改选已有语言，或把该文件放进语言包目录"),
-                                            languageTag.toStdString(), model.string())});
+            return std::unexpected(Core::Error{
+                    Core::ErrorCode::DependencyMissing,
+                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("语言「{}」需要的模型文件不在：{}。请在设置的 OCR 页改选已有语言，或把该文件放进语言包目录"),
+                                                 languageTag.toStdString(), model.string())});
         }
 
         // Init3 会换掉上一份语言：不先释放旧语言就重复 Init 是 Tesseract 允许的行为，但语言状态以这次为准
@@ -122,10 +124,10 @@ namespace GyanisScribe::Ocr
         if (initialized != 0)
         {
             m_loadedLanguage.clear();
-            return std::unexpected(
-                    Core::Error{Core::ErrorCode::InternalError,
-                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("Tesseract 初始化语言 {} 失败（返回值 {}）。请检查语言包是否完整或与本程序用的库版本一致"),
-                                            languageTag.toStdString(), initialized)});
+            return std::unexpected(Core::Error{
+                    Core::ErrorCode::InternalError,
+                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("Tesseract 初始化语言 {} 失败（返回值 {}）。请检查语言包是否完整或与本程序用的库版本一致"),
+                                                 languageTag.toStdString(), initialized)});
         }
 
         m_loadedLanguage = languageTag;
@@ -136,9 +138,9 @@ namespace GyanisScribe::Ocr
     {
         if (image.isNull() || image.width() < kMinimumImageEdge || image.height() < kMinimumImageEdge)
         {
-            return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("图片太小或为空（{}×{}），认不出字。请至少框住 {}×{} 的区域"),
-                                                                              image.width(), image.height(), kMinimumImageEdge, kMinimumImageEdge)});
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("图片太小或为空（{}×{}），认不出字。请至少框住 {}×{} 的区域"),
+                                                                            image.width(), image.height(), kMinimumImageEdge, kMinimumImageEdge)});
         }
 
         const QString requestedLanguage = language.isEmpty() ? QString::fromUtf8(kDefaultOcrLanguage) : language;
@@ -153,8 +155,8 @@ namespace GyanisScribe::Ocr
 
         if (TessBaseAPIRecognize(m_api.get(), nullptr) != 0)
         {
-            return std::unexpected(
-                    Core::Error{Core::ErrorCode::InternalError, GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("Tesseract 识别这一张图失败（语言 {}）。请重试一次，或换一种语言再试"),
+            return std::unexpected(Core::Error{Core::ErrorCode::InternalError,
+                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("Tesseract 识别这一张图失败（语言 {}）。请重试一次，或换一种语言再试"),
                                                                             requestedLanguage.toStdString())});
         }
 

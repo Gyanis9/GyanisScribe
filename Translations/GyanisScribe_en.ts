@@ -4,12 +4,8 @@
 <context>
     <name>GyanisScribe</name>
         <message>
-            <source>这一笔没有落定：尺寸太小或内容为空。请按住鼠标拖出可见的范围后再松手</source>
-            <translation>This stroke didn't land: it's too small or empty. Hold the mouse button, drag out a visible area, then release</translation>
-        </message>
-        <message>
-            <source>只有文字工具在用时才需要设定文本内容。请先切到文字工具再输入</source>
-            <translation>Only the text tool needs text content. Switch to the text tool first, then type</translation>
+            <source>工具种类 0x{:X} 没有对应的工具：请把新工具登记进构造列表</source>
+            <translation>Tool kind 0x{:X} has no tool behind it: register the new tool in the constructor list.</translation>
         </message>
         <message>
             <source>线宽必须是正数，收到的是 {}。请取 1 到 50 之间的整数</source>
@@ -24,8 +20,20 @@
             <translation>No tool implementation for this tool kind: check setActiveTool and the tool list in the constructor.</translation>
         </message>
         <message>
+            <source>这一笔没有落定：尺寸太小或内容为空。请按住鼠标拖出可见的范围后再松手</source>
+            <translation>This stroke didn't land: it's too small or empty. Hold the mouse button, drag out a visible area, then release</translation>
+        </message>
+        <message>
             <source>文字工具不在册</source>
             <translation>The text tool is not registered.</translation>
+        </message>
+        <message>
+            <source>只有文字工具在用时才需要设定文本内容。请先切到文字工具再输入</source>
+            <translation>Only the text tool needs text content. Switch to the text tool first, then type</translation>
+        </message>
+        <message>
+            <source>要选中的图形不在册：工具 0x{:X} 索引 {}。请重新点选</source>
+            <translation>The shape to select is not registered: tool 0x{:X}, index {}. Click it again.</translation>
         </message>
         <message>
             <source>没有选中任何图形，无法移动。请先点中要移动的那一条</source>
@@ -100,6 +108,18 @@
             <translation>Recent %1</translation>
         </message>
         <message>
+            <source>工具栏尺寸 {}x{} 不成立，摆放前要先有有效的 sizeHint</source>
+            <translation>The toolbar size {}x{} doesn't hold: get a valid sizeHint before placing it.</translation>
+        </message>
+        <message>
+            <source>选区 {}x{} 是空的，没有可参照的位置</source>
+            <translation>The selection {}x{} is empty, so there is no position to line up with.</translation>
+        </message>
+        <message>
+            <source>屏幕可用区 {}x{} 放不下任何东西，请确认目标屏幕还在</source>
+            <translation>The screen's usable area {}x{} fits nothing: check that the target screen is still connected.</translation>
+        </message>
+        <message>
             <source>输入文字后回车</source>
             <translation>Type the text, then press Enter</translation>
         </message>
@@ -144,24 +164,60 @@
             <translation>No image to recognize yet: press Ctrl+Alt+A and drag out a screen region first</translation>
         </message>
         <message>
+            <source>文字识别失败：{}。请重试一次，或换一种语言再试</source>
+            <translation>Text recognition failed: {}. Try again, or switch to another language.</translation>
+        </message>
+        <message>
             <source>这台机器上没有可用的屏幕，取色没法开始</source>
             <translation>No usable screen on this machine; color picking cannot start</translation>
+        </message>
+        <message>
+            <source>这一屏抓不下来：{}。请重试一次</source>
+            <translation>This screen couldn't be captured: {}. Try again.</translation>
         </message>
         <message>
             <source>已复制颜色 </source>
             <translation>Copied color </translation>
         </message>
         <message>
+            <source>当前没有可用屏幕，录屏没法开始。请接回显示器后重试</source>
+            <translation>No screen is available, so recording cannot start. Reconnect a display and try again.</translation>
+        </message>
+        <message>
+            <source>录屏没能开始：{}</source>
+            <translation>Recording didn't start: {}</translation>
+        </message>
+        <message>
+            <source>录屏收尾失败：{}</source>
+            <translation>Finishing the recording failed: {}</translation>
+        </message>
+        <message>
             <source>控制条已收起；按 Ctrl+Alt+R 或托盘里的录屏项可停止并保存</source>
             <translation>The control bar is collapsed; press Ctrl+Alt+R or use the recording entry in the tray to stop and save</translation>
+        </message>
+        <message>
+            <source>成品已保存，但没进历史清单：{}</source>
+            <translation>The file was saved but never reached the history list: {}</translation>
+        </message>
+        <message>
+            <source>读不出这张图：{}。文件可能已被移动或删掉，或这个构建里没有对应的图片解码插件</source>
+            <translation>This image can't be read: {}. The file may have been moved or deleted, or this build has no image decoder plugin for it.</translation>
+        </message>
+        <message>
+            <source>这条历史没删掉：{}</source>
+            <translation>This history entry wasn't deleted: {}</translation>
         </message>
         <message>
             <source>已从历史里去掉，成品文件仍在 </source>
             <translation>Removed from history; the file is still at </translation>
         </message>
         <message>
-            <source>当前没有可用屏幕，录屏没法开始。请接回显示器后重试</source>
-            <translation>No screen is available, so recording cannot start. Reconnect a display and try again.</translation>
+            <source>录屏中止：{}。请重试一次</source>
+            <translation>Recording aborted: {}. Try again.</translation>
+        </message>
+        <message>
+            <source>智录遇到未处理的错误：{}。现场已尽量落到日志，请到 {} 找最近一份日志；如果反复出现，请把日志与出错的操作步骤一起反馈</source>
+            <translation>GyanisScribe hit an unhandled error: {}. As much as possible was written to the log; open {} and take the newest log file. If it keeps happening, send that log together with the steps you took.</translation>
         </message>
         <message>
             <source>%1。留空表示用默认目录</source>
@@ -296,6 +352,10 @@
             <translation>Follow system</translation>
         </message>
         <message>
+            <source>高对比度</source>
+            <translation>High contrast</translation>
+        </message>
+        <message>
             <source>中文</source>
             <translation>中文</translation>
         </message>
@@ -340,12 +400,104 @@
             <translation>Cannot start region capture: Qt reported no screens. Try again inside a GUI session.</translation>
         </message>
         <message>
+            <source>找不到名为「{}」的屏幕：多半已经被拔掉。请在不填屏幕名的情况下重抓一次（那样按光标所在屏走）</source>
+            <translation>Cannot find a screen named "{}": it was probably unplugged. Capture again with no screen name, which follows the screen under the cursor.</translation>
+        </message>
+        <message>
             <source>Qt 没有报出任何屏幕：请在 QGuiApplication 建好之后再抓图</source>
             <translation>Qt reported no screens: capture only after QGuiApplication has been created.</translation>
         </message>
         <message>
+            <source>抓「{}」这块屏拿到了空图：本平台可能不允许直接抓取屏幕。请检查会话类型（远程会话、Wayland 沙箱）后重试</source>
+            <translation>Capturing screen "{}" returned an empty image: this platform may not allow grabbing the screen directly. Check the session type (remote session, Wayland sandbox) and retry.</translation>
+        </message>
+        <message>
             <source>抓窗口失败：传进来的窗口句柄是空的。请确认窗口还没有被关闭，或改用区域截图</source>
             <translation>Window capture failed: the window handle is empty. Make sure the window is still open, or use region capture.</translation>
+        </message>
+        <message>
+            <source>本平台抓不出窗口像素（句柄 {}）。请改用区域截图框住那个窗口</source>
+            <translation>This platform can't grab window pixels (handle {}). Use region capture and frame that window instead.</translation>
+        </message>
+        <message>
+            <source>抓不到句柄 {} 对应的窗口：本平台不允许抓取他人窗口，或窗口已关闭。请改用区域截图</source>
+            <translation>The window for handle {} can't be captured: this platform doesn't allow grabbing other programs' windows, or the window is already closed. Use region capture instead.</translation>
+        </message>
+        <message>
+            <source>缩放因子必须大于 0，收到的是 {}。请检查这一帧来自哪块屏幕，dpr 不该由调用方自己猜</source>
+            <translation>The scale factor must be greater than 0; got {}. Check which screen this frame came from: the caller must not guess the dpr.</translation>
+        </message>
+        <message>
+            <source>选区超出了这一帧：帧是 {}×{}，换算后要到 {}。请确认这块屏幕有没有被拔掉，或缩放因子有没有变</source>
+            <translation>The selection runs outside this frame: the frame is {}x{}, the converted area reaches {}. Check whether this screen was unplugged or the scale factor changed.</translation>
+        </message>
+        <message>
+            <source>上次选区的记录格式不对：收到「{}」，应为「x,y,width,height」四个整数。请删掉这一项，让程序重新记一次</source>
+            <translation>The last-selection record has the wrong format: got "{}", expected four integers "x,y,width,height". Delete this entry and let the program record it again.</translation>
+        </message>
+        <message>
+            <source>上次选区的记录第 {} 段「{}」不是整数。请删掉这一项，让程序重新记一次</source>
+            <translation>Part {} of the last-selection record, "{}", is not a whole number. Delete this entry and let the program record it again.</translation>
+        </message>
+        <message>
+            <source>上次选区的宽高必须是正数，收到的是 {}×{}。请删掉这一项，让程序重新记一次</source>
+            <translation>The last selection's width and height must be positive; got {}x{}. Delete this entry and let the program record it again.</translation>
+        </message>
+        <message>
+            <source>日志目录建不出来：{}（原因 {}）。请把 Paths 里的日志目录改到一个可写的路径再重启</source>
+            <translation>The log directory can't be created: {} (reason {}). Point the log directory in Paths at a writable path, then restart.</translation>
+        </message>
+        <message>
+            <source>日志文件打不开：{}（原因 {}）。请关闭占用它的程序，或换一个日志目录</source>
+            <translation>The log file can't be opened: {} (reason {}). Close the program holding it, or pick another log directory.</translation>
+        </message>
+        <message>
+            <source>目录创建失败：{}（原因 {}）。请检查该路径是否可写，或在设置里换一个目录</source>
+            <translation>The directory can't be created: {} (reason {}). Check that this path is writable, or pick another directory in Settings.</translation>
+        </message>
+        <message>
+            <source>路径存在但不是目录</source>
+            <translation>The path exists but is not a directory</translation>
+        </message>
+        <message>
+            <source>…</source>
+            <translation>…</translation>
+        </message>
+        <message>
+            <source>历史清单里没有这条记录：{}。请刷新列表后再试一次</source>
+            <translation>The history list has no such record: {}. Refresh the list and try again.</translation>
+        </message>
+        <message>
+            <source>历史清单打不开：{}。请检查这个文件是否被别的程序占着，或把它删掉让软件重建</source>
+            <translation>The history list can't be opened: {}. Check whether another program holds this file, or delete it and let the app rebuild it.</translation>
+        </message>
+        <message>
+            <source>历史清单格式不对：{}。可以把这个文件删掉让软件重建（成品文件不受影响），或按 {{"entries": [...]}} 的形状修好</source>
+            <translation>The history list is malformed: {}. Delete this file and let the app rebuild it (the saved files are not touched), or fix it into the shape {{"entries": [...]}}.</translation>
+        </message>
+        <message>
+            <source>历史清单第 {} 条缺 path、kind 或 moment。请修好这一条，或删掉整个文件让软件重建：{}</source>
+            <translation>History entry {} lacks path, kind or moment: {}. Fix this entry, or delete the whole file and let the app rebuild it.</translation>
+        </message>
+        <message>
+            <source>历史清单第 {} 条：{}</source>
+            <translation>History entry {}: {}</translation>
+        </message>
+        <message>
+            <source>历史清单第 {} 条的时间 "{}" 读不出来。请用 2026-10-10T08:30:00.000 这种写法</source>
+            <translation>The time of history entry {} reads as "{}", which can't be parsed. Use a form like 2026-10-10T08:30:00.000.</translation>
+        </message>
+        <message>
+            <source>历史清单写不了：{}。请确认这个目录还能写，或先把软件设的截图目录改到一个可写位置</source>
+            <translation>The history list can't be written: {}. Check that this directory is still writable, or move the screenshot folder to a writable place first.</translation>
+        </message>
+        <message>
+            <source>历史清单没能落盘：{}。请重试一次，或换一个可写的目录</source>
+            <translation>The history list wasn't saved to disk: {}. Try again, or pick a writable directory.</translation>
+        </message>
+        <message>
+            <source>历史文件里的类别 "{}" 不认识。可用取值只有 Screenshot 与 Recording（区分大小写），改不回任一取值就把这一行删掉</source>
+            <translation>The category "{}" in the history file is unknown. Only Screenshot and Recording are valid (case-sensitive); drop this line if it can't be set to one of them.</translation>
         </message>
         <message>
             <source>今天 </source>
@@ -392,8 +544,56 @@
             <translation>Select an image in the history first</translation>
         </message>
         <message>
+            <source>历史清单没能读出来：{}。列表先显示上一次的记录</source>
+            <translation>The history list couldn't be read: {}. The list keeps showing the previous records.</translation>
+        </message>
+        <message>
             <source>（删除只从历史里去掉这条，成品文件留在原处）</source>
             <translation>(Delete only removes this entry from the history; the file itself stays where it is)</translation>
+        </message>
+        <message>
+            <source>组合键「{}」里有一段是空的（相邻的 + 之间没有内容）。请写成 Ctrl+Alt+A 这种每段都有内容的形式</source>
+            <translation>The shortcut "{}" has an empty part (nothing between two neighbouring +). Write it with content in every part, like Ctrl+Alt+A.</translation>
+        </message>
+        <message>
+            <source>组合键「{}」里的「{}」不是修饰键。修饰键只认 Ctrl、Alt、Shift、Win（Control/Option/Meta/Super 同义）</source>
+            <translation>The shortcut "{}" contains "{}", which is not a modifier. Only Ctrl, Alt, Shift and Win count (Control/Option/Meta/Super mean the same).</translation>
+        </message>
+        <message>
+            <source>组合键「{}」最后没有按键。请写成 Ctrl+Alt+A 这种「修饰键+按键」的形式</source>
+            <translation>The shortcut "{}" ends without a key. Write it as modifiers plus a key, like Ctrl+Alt+A.</translation>
+        </message>
+        <message>
+            <source>组合键「{}」里的按键「{}」不支持。请改用字母 A-Z、数字 0-9、Space 或 F1-F24</source>
+            <translation>The shortcut "{}" uses the key "{}", which is not supported. Use a letter A-Z, a digit 0-9, Space or F1-F24.</translation>
+        </message>
+        <message>
+            <source>组合键的按键部分不能是修饰键本身：请在 Ctrl、Alt、Shift、Win 之外再选一个字母、数字、空格或 F1-F24</source>
+            <translation>The key part of a shortcut cannot be a modifier itself: pick a letter, digit, Space or F1-F24 besides Ctrl, Alt, Shift and Win.</translation>
+        </message>
+        <message>
+            <source>按键 0x{:X} 不能用作全局热键。请改用字母 A-Z、数字 0-9、空格或 F1-F24</source>
+            <translation>Key 0x{:X} can't be used as a global hotkey. Use a letter A-Z, a digit 0-9, Space or F1-F24.</translation>
+        </message>
+        <message>
+            <source>全局热键至少要带一个修饰键：单键 {} 会把其它程序的普通按键吞掉。请加上 Ctrl 或 Alt</source>
+            <translation>A global hotkey needs at least one modifier: the single key {} would swallow other programs' ordinary keystrokes. Add Ctrl or Alt.</translation>
+        </message>
+        <message>
+            <source>设置项 {}、环境变量 TESSDATA_PREFIX、以及 {} 三处都没有语言包。请把 eng.traineddata（要认中文再放 chi_sim.traineddata）放进其中一处，或在设置的 OCR 页把语言包目录指过去</source>
+            <translation>None of the three places has a language pack: setting {}, the TESSDATA_PREFIX environment variable, and {}. Put eng.traineddata there (add chi_sim.traineddata to read Chinese), or point the language pack folder at the OCR page in Settings.</translation>
+        </message>
+        <message>
+            <source>语言包已就位于 {}，但本次构建没有编入任何识别后端。见 docs/OcrBackends.md：这是 Debug 档的形状，Release 档带真后端</source>
+            <translation>The language pack is in place at {}, but this build compiled in no recognition backend. See docs/OcrBackends.md: that is the Debug shape, the Release build carries the real backend.</translation>
+        </message>
+        <message>
+            <source>这一张图里没认出文字。可以换一种语言再认一次，或重新截一张更清晰的图</source>
+            <translation>No text was recognized in this image. Recognize it in another language, or capture a sharper image.</translation>
+        </message>
+        <message>
+            <source>{} 行 · 平均置信度 {}% · 图像 {}×{} · 语言 {}</source>
+            <translation>{} lines · average confidence {}% · image {}x{} · language {}</translation>
         </message>
         <message>
             <source>识别结果</source>
@@ -448,6 +648,10 @@
             <translation>Text files (*.txt)</translation>
         </message>
         <message>
+            <source>导出 TXT 失败：{}。请换一个目录再试一次</source>
+            <translation>Exporting TXT failed: {}. Pick another directory and try again.</translation>
+        </message>
+        <message>
             <source>已导出 TXT：</source>
             <translation>Exported TXT: </translation>
         </message>
@@ -456,8 +660,44 @@
             <translation>JSON files (*.json)</translation>
         </message>
         <message>
+            <source>导出 JSON 失败：{}。请换一个目录再试一次</source>
+            <translation>Exporting JSON failed: {}. Pick another directory and try again.</translation>
+        </message>
+        <message>
             <source>已导出 JSON：</source>
             <translation>Exported JSON: </translation>
+        </message>
+        <message>
+            <source>识别结果写不出去：{}（{}）。请换一个可写的目录，或直接复制到剪贴板</source>
+            <translation>The recognition result can't be written: {} ({}). Pick a writable directory, or copy it to the clipboard instead.</translation>
+        </message>
+        <message>
+            <source>识别结果没落盘：{}（{}）。请检查磁盘空间后重试</source>
+            <translation>The recognition result wasn't saved to disk: {} ({}). Check the free disk space and retry.</translation>
+        </message>
+        <message>
+            <source>语言包目录 {} 里没有本程序认识的 traineddata。请至少放入 eng.traineddata（要认中文再加 chi_sim.traineddata），或在设置的 OCR 页把目录指过去</source>
+            <translation>The language pack folder {} holds no traineddata this program knows. Add at least eng.traineddata (plus chi_sim.traineddata to read Chinese), or point the folder at the OCR page in Settings.</translation>
+        </message>
+        <message>
+            <source>Tesseract 句柄没建出来（内存分配失败）。请重启本程序，若仍然如此请改用系统自带识别或稍后再试</source>
+            <translation>The Tesseract handle couldn't be created (memory allocation failed). Restart GyanisScribe; if it still fails, use the recognition that ships with the system or try again later.</translation>
+        </message>
+        <message>
+            <source>语言「{}」需要的模型文件不在：{}。请在设置的 OCR 页改选已有语言，或把该文件放进语言包目录</source>
+            <translation>The model file needed by language "{}" is missing: {}. Pick a language you already have on the OCR page in Settings, or put that file into the language pack folder.</translation>
+        </message>
+        <message>
+            <source>Tesseract 初始化语言 {} 失败（返回值 {}）。请检查语言包是否完整或与本程序用的库版本一致</source>
+            <translation>Tesseract failed to initialize language {} (returned {}). Check that the language pack is complete and matches the Tesseract library version this program uses.</translation>
+        </message>
+        <message>
+            <source>图片太小或为空（{}×{}），认不出字。请至少框住 {}×{} 的区域</source>
+            <translation>The image is too small or empty ({}x{}), so no text can be recognized. Frame an area of at least {}x{}.</translation>
+        </message>
+        <message>
+            <source>Tesseract 识别这一张图失败（语言 {}）。请重试一次，或换一种语言再试</source>
+            <translation>Tesseract failed on this image (language {}). Try again, or switch to another language.</translation>
         </message>
         <message>
             <source>无可用识别后端</source>
@@ -468,6 +708,10 @@
             <translation>This program has no text recognition backend available. Set the OCR language pack folder (tessdata) in Settings, or install the recognition component that ships with the system</translation>
         </message>
         <message>
+            <source>颜色写法 "{}" 不认识。可用取值只有 Hex、Rgb 与 Hsl（区分大小写），请在设置的取色页里重选一次</source>
+            <translation>The color format "{}" is unknown. Only Hex, Rgb and Hsl are valid (case-sensitive); pick one again on the color picker page in Settings.</translation>
+        </message>
+        <message>
             <source>取色器</source>
             <translation>Color picker</translation>
         </message>
@@ -476,12 +720,40 @@
             <translation>Color picker overlay</translation>
         </message>
         <message>
+            <source>贴图布局不是一段 JSON 数组：{}。请在设置里清除这一项，让程序重新记一次</source>
+            <translation>The pin layout isn't a JSON array: {}. Clear this entry in Settings and let the program record it again.</translation>
+        </message>
+        <message>
+            <source>贴图布局第 {} 项不是对象。请清除这一项后让程序重新记一次</source>
+            <translation>Pin layout entry {} is not an object. Clear this entry and let the program record it again.</translation>
+        </message>
+        <message>
+            <source>贴图布局第 {} 项缺少字段 {}。请清除这一项后让程序重新记一次</source>
+            <translation>Pin layout entry {} is missing the field {}. Clear this entry and let the program record it again.</translation>
+        </message>
+        <message>
+            <source>贴图布局第 {} 项的尺寸不是正数（{}×{}）。请清除这一项后让程序重新记一次</source>
+            <translation>Pin layout entry {} has no positive size ({}x{}). Clear this entry and let the program record it again.</translation>
+        </message>
+        <message>
+            <source>贴图布局第 {} 项的不透明度不在 (0,1] 里：{}。请清除这一项后让程序重新记一次</source>
+            <translation>Pin layout entry {} has an opacity outside (0,1]: {}. Clear this entry and let the program record it again.</translation>
+        </message>
+        <message>
             <source>智录贴图</source>
             <translation>GyanisScribe pin</translation>
         </message>
         <message>
             <source>贴图窗口</source>
             <translation>Pin window</translation>
+        </message>
+        <message>
+            <source>{}不支持鼠标穿透：这一项在本平台没有实现。请把贴图挪到不挡操作的位置，或降低透明度后从别处点击</source>
+            <translation>{} doesn't support click-through: this isn't implemented on this platform. Move the pinned image where it doesn't block your clicks, or lower its opacity and click from somewhere else.</translation>
+        </message>
+        <message>
+            <source>贴图保存失败：{}。请检查目录是否可写，或先把这一张复制进剪贴板</source>
+            <translation>Saving the pinned image failed: {}. Check that the directory is writable, or copy this image to the clipboard first.</translation>
         </message>
         <message>
             <source>复制</source>
@@ -497,7 +769,7 @@
         </message>
         <message>
             <source>鼠标穿透</source>
-            <translation>Click through</translation>
+            <translation>Click-through</translation>
         </message>
         <message>
             <source>滚轮缩放，Ctrl+滚轮旋转，Shift+滚轮调透明度，Esc 关闭</source>
@@ -505,19 +777,99 @@
         </message>
         <message>
             <source>Linux（降级实现）</source>
-            <translation>Linux (fallback implementation)</translation>
+            <translation>Linux (degraded implementation)</translation>
+        </message>
+        <message>
+            <source>本平台没有全局热键能力：登记不会生效。请在程序窗口内使用普通快捷键，或等平台适配后再开启这一项</source>
+            <translation>This platform has no global hotkey support: registering won't take effect. Use ordinary shortcuts inside the program window, or enable this once the platform is adapted.</translation>
         </message>
         <message>
             <source>本平台没有全局热键能力：没有任何登记需要注销</source>
-            <translation>This platform has no global hotkey support: there is nothing to unregister.</translation>
+            <translation>This platform has no global hotkey support: nothing is registered to unregister</translation>
+        </message>
+        <message>
+            <source>热键编号 {} 在本进程内已经登记过。请换一个编号，或先注销那一条</source>
+            <translation>Hotkey id {} is already registered in this process. Use another id, or unregister that entry first.</translation>
+        </message>
+        <message>
+            <source>全局热键登记失败（系统错误码 {}）：这个组合键多半已被其它程序占用。请在设置里换一个组合，或先退出占用它的程序</source>
+            <translation>Global hotkey registration failed (system error code {}): another program most likely already holds this combination. Pick another combination in Settings, or close the program that holds it.</translation>
         </message>
         <message>
             <source>热键编号 {} 没有登记过，无需注销</source>
-            <translation>Hotkey id {} was never registered, so there is nothing to unregister.</translation>
+            <translation>Hotkey id {} was never registered, so there is nothing to unregister</translation>
+        </message>
+        <message>
+            <source>热键注销失败（系统错误码 {}）：编号 {}。请重试或重启本程序</source>
+            <translation>Unregistering the hotkey failed (system error code {}): id {}. Retry, or restart GyanisScribe.</translation>
+        </message>
+        <message>
+            <source>修饰键无法用于全局热键：掩码 0x{:X}。请只用 Ctrl、Alt、Shift、Win 四种组合</source>
+            <translation>Modifiers alone can't be a global hotkey: mask 0x{:X}. Use only combinations of Ctrl, Alt, Shift and Win.</translation>
+        </message>
+        <message>
+            <source>按键 0x{:X} 不能用作全局热键。请改用字母、数字、空格或 F1-F24 之一</source>
+            <translation>Key 0x{:X} can't be used as a global hotkey. Use a letter, a digit, Space or one of F1-F24.</translation>
         </message>
         <message>
             <source>没找到 ffmpeg 命令行程序，录屏的编码这一步要用它。请安装 ffmpeg 的 Windows 构建并把所在目录加入 PATH（winget 里搜 ffmpeg 也有），装好后重启本程序</source>
-            <translation>ffmpeg command-line program not found: encoding a recording needs it. Install a Windows build of ffmpeg and add its folder to PATH (searching winget for ffmpeg works too), then restart this program</translation>
+            <translation>The ffmpeg command-line program wasn't found; the encoding step of recording needs it. Install a Windows build of ffmpeg and add its folder to PATH (searching ffmpeg in winget works too), then restart GyanisScribe.</translation>
+        </message>
+        <message>
+            <source>MP4 编码</source>
+            <translation>MP4 encoding</translation>
+        </message>
+        <message>
+            <source>GIF 调色板</source>
+            <translation>GIF palette</translation>
+        </message>
+        <message>
+            <source>GIF 编码</source>
+            <translation>GIF encoding</translation>
+        </message>
+        <message>
+            <source>ffmpeg 报告成功，但成品不可用：{}。请检查磁盘空间后重编码，或先用剪贴板交付这一帧序列</source>
+            <translation>ffmpeg reported success, but the output is unusable: {}. Check the free disk space and re-encode, or deliver this frame sequence through the clipboard.</translation>
+        </message>
+        <message>
+            <source>{} 起不动 ffmpeg（{}）。请确认该文件还能运行，或重新安装</source>
+            <translation>ffmpeg can't be started from {} ({}). Check that the file still runs, or reinstall it.</translation>
+        </message>
+        <message>
+            <source>{} 超时（{} 毫秒未完成）。可以缩短录屏时长，或先把成品交剪贴板</source>
+            <translation>{} timed out (still unfinished after {} ms). Shorten the recording, or hand the output to the clipboard first.</translation>
+        </message>
+        <message>
+            <source>{} 失败（退出码 {}）：{}。完整输出在日志里，也可以自己敲一遍同样的命令看细节</source>
+            <translation>{} failed (exit code {}): {}. The full output is in the log, and you can also run the same command yourself to see the details.</translation>
+        </message>
+        <message>
+            <source>录屏参数 {}：{}</source>
+            <translation>Recording option {}: {}</translation>
+        </message>
+        <message>
+            <source>要写清录哪块屏幕。请在录屏面板重新选一次目标屏幕</source>
+            <translation>Say which screen to record. Pick the target screen again in the recording panel.</translation>
+        </message>
+        <message>
+            <source>取值要在 1 到 {} 之间（{} 格式的上限），当前是 {}。帧率越高文件越大、编码越慢</source>
+            <translation>The value must be between 1 and {} (the limit of the {} format); it is currently {}. A higher frame rate means a bigger file and slower encoding.</translation>
+        </message>
+        <message>
+            <source>取值要在 1 到 {} 之间，当前是 {}。留一个上限是防止录屏忘了关，真需要更长就分两段录</source>
+            <translation>The value must be between 1 and {}; it is currently {}. The cap keeps a forgotten recording from running on; if you truly need longer, record in two takes.</translation>
+        </message>
+        <message>
+            <source>不能为空。请在设置的录屏页选一个可写目录</source>
+            <translation>Cannot be empty. Pick a writable directory on the recording page in Settings.</translation>
+        </message>
+        <message>
+            <source>选区模式需要一个非空矩形，当前是空矩形。请重新框选，或改用整屏模式</source>
+            <translation>Region mode needs a non-empty rectangle; the current one is empty. Frame a new selection, or use full-screen mode.</translation>
+        </message>
+        <message>
+            <source>窗口模式需要一个有效句柄，当前是 0。请在目标窗口还在的时候重新选一次</source>
+            <translation>Window mode needs a valid handle; the current one is 0. Pick the window again while the target window is still open.</translation>
         </message>
         <message>
             <source>未在录制</source>
@@ -525,7 +877,7 @@
         </message>
         <message>
             <source>准备开始</source>
-            <translation>Ready to start</translation>
+            <translation>Getting ready</translation>
         </message>
         <message>
             <source>录制中</source>
@@ -533,7 +885,7 @@
         </message>
         <message>
             <source>已暂停（时长不计）</source>
-            <translation>Paused (duration not counted)</translation>
+            <translation>Paused (time not counted)</translation>
         </message>
         <message>
             <source>已录 %1</source>
@@ -557,7 +909,7 @@
         </message>
         <message>
             <source>已录时长</source>
-            <translation>Recorded duration</translation>
+            <translation>Time recorded</translation>
         </message>
         <message>
             <source>暂停</source>
@@ -588,40 +940,68 @@
             <translation>Resume</translation>
         </message>
         <message>
-            <source>●</source>
-            <translation>●</translation>
-        </message>
-        <message>
             <source>上一轮录屏还没收尾。请先停止它，再开始新的一轮</source>
-            <translation>The previous recording has not finished. Stop it before starting a new one.</translation>
+            <translation>The previous recording hasn't finished. Stop it first, then start a new one.</translation>
         </message>
         <message>
             <source>当前没有正在进行的录屏</source>
-            <translation>No recording is in progress.</translation>
+            <translation>No recording is in progress</translation>
+        </message>
+        <message>
+            <source>第 {} 帧是空图，写不了。请检查抓帧那一层有没有拿到画面</source>
+            <translation>Frame {} is an empty image and can't be written. Check whether the frame-capture layer is getting the screen at all.</translation>
+        </message>
+        <message>
+            <source>录屏帧写入失败：{}。请检查该目录是否可写、磁盘是否已满</source>
+            <translation>Writing the recording frame failed: {}. Check that the directory is writable and the disk isn't full.</translation>
         </message>
         <message>
             <source>这一轮一帧都没有存下来，可能是刚开始就按了停止</source>
-            <translation>Not a single frame was saved for this recording; you probably pressed stop right after starting</translation>
+            <translation>Not one frame was saved for this recording; you probably pressed stop right after the start.</translation>
+        </message>
+        <message>
+            <source>配置项 {} 存不进去：后端返回了错误状态，请检查应用配置目录是否可写</source>
+            <translation>Setting {} couldn't be stored: the backend returned an error state. Check that the application settings directory is writable.</translation>
         </message>
         <message>
             <source>写入配置项失败：键名为空。请传「分组/大驼峰」形式的键，例如 Paths/Screenshot</source>
-            <translation>Cannot write a setting: the key is empty. Use a "Group/PascalCase" key such as Paths/Screenshot.</translation>
+            <translation>Writing the setting failed: the key name is empty. Pass a key as "Group/PascalCase", for example Paths/Screenshot.</translation>
+        </message>
+        <message>
+            <source>配置导出文件打不开：{}（{}）。请换一个可写的目录再试</source>
+            <translation>The settings export file can't be opened: {} ({}). Pick a writable directory and try again.</translation>
+        </message>
+        <message>
+            <source>配置导出没落盘：{}（{}）。请检查磁盘空间与目录权限</source>
+            <translation>The settings export wasn't saved to disk: {} ({}). Check the free disk space and the directory permissions.</translation>
+        </message>
+        <message>
+            <source>配置导入文件读不到：{}（{}）。请确认路径与文件名</source>
+            <translation>The settings import file can't be read: {} ({}). Check the path and the file name.</translation>
+        </message>
+        <message>
+            <source>配置导入文件不是一个 JSON 对象：{}（{}）。请导出本程序生成的那份再导入</source>
+            <translation>The settings import file isn't a JSON object: {} ({}). Import the file this program exported instead.</translation>
         </message>
         <message>
             <source>点击后按下快捷键</source>
-            <translation>Click, then press a shortcut</translation>
+            <translation>Click, then press the shortcut</translation>
         </message>
         <message>
             <source>%1 的全局热键。点击这一格后按下组合键即可替换，按 Esc 取消</source>
-            <translation>Global hotkey for %1. Click this cell, then press the key combination to replace it; press Esc to cancel</translation>
+            <translation>Global hotkey for %1. Click this cell and press the combination to replace it; press Esc to cancel.</translation>
         </message>
         <message>
             <source>写入失败</source>
-            <translation>Write failed</translation>
+            <translation>Writing failed</translation>
         </message>
         <message>
             <source>请按下快捷键（Esc 取消）</source>
-            <translation>Press a shortcut (Esc to cancel)</translation>
+            <translation>Press the shortcut (Esc cancels)</translation>
+        </message>
+        <message>
+            <source>主题取值 "{}" 不在可用档位里：请在设置的通用页从 Light、Dark、System、HighContrast 四项里选一项，手写配置文件时只能是这四个词（区分大小写）</source>
+            <translation>The theme value "{}" is not one of the available choices: pick Light, Dark, System or HighContrast on the general page in Settings; a hand-written settings file may only hold these four words (case-sensitive).</translation>
         </message>
         <message>
             <source>提示</source>

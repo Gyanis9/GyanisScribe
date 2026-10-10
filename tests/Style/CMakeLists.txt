@@ -8,8 +8,15 @@ add_test(NAME Style.QtStringPlaceholders
 
 # 界面文案与翻译目录的对照门禁：源码里每一条走 Core::uiText 的文案都必须在 .ts 里有非空译文。
 # 少了这条，英文档下漏掉的那几处会安静地显示中文——没人会把每条菜单、每个报错都点一遍发现它。
-add_test(NAME Style.TranslationCatalog
-        COMMAND ${CMAKE_COMMAND}
-        -DTRANSLATION_SCAN_ROOT=${CMAKE_SOURCE_DIR}/src
-        -DTRANSLATION_CATALOG=${CMAKE_SOURCE_DIR}/Translations/GyanisScribe_en.ts
-        -P ${CMAKE_SOURCE_DIR}/scripts/check-translation-catalog.cmake)
+# 用 Python 而不是 CMake 脚本：穷举要把「被 clang-format 断成相邻字面量的长文案」按编译期的规则拼回去，
+# CMake 的正则在跨语句时给出了错误的匹配（实测把十条不相关的文案拼成一条），而这条门一旦误判就是永久假绿。
+find_program(PYTHON3_EXECUTABLE NAMES python3 python)
+if (PYTHON3_EXECUTABLE)
+    add_test(NAME Style.TranslationCatalog
+            COMMAND ${PYTHON3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/check-translation-catalog.py
+                    --scan-root ${CMAKE_SOURCE_DIR}/src
+                    --catalog ${CMAKE_SOURCE_DIR}/Translations/GyanisScribe_en.ts)
+else ()
+    # 没有 Python 就当场报红而不是静默不跑：一条永远不会运行的检查比没有检查更糟
+    message(WARNING "没找到 python3：Style.TranslationCatalog 这条门禁不会注册，界面文案与翻译目录的对照没人管")
+endif ()

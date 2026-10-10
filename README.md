@@ -94,9 +94,11 @@ tests/          逐级镜像 src 的目录结构
 - 英文档需要 `translations/GyanisScribe_en.qm`，随包分发；缺包时应用按中文继续并给出放置位置。
 - 翻译目录 `Translations/GyanisScribe_en.ts` 是唯一真源，`.qm` 由构建期的 lrelease 产出
   （挂在 `DeployTranslations` 上）。容器里那份 Qt 6.4 没有 lrelease，那一档不出包。
-- 改完文案要重新生成目录：`cmake -DTRANSLATION_SCAN_ROOT=src -DTRANSLATION_CATALOG=Translations/GyanisScribe_en.ts -DTRANSLATION_CATALOG_GENERATE=ON -P scripts/check-translation-catalog.cmake`。
+- 改完文案要重新生成目录：`python scripts/check-translation-catalog.py --generate`，把 `<translation type="unfinished">` 补成英文再构建。
   ctest 用例 `Style.TranslationCatalog` 会断言「源码里用到的每条文案都在目录里且有非空译文」——
   漏掉的那几处在英文档下会安静地显示中文，没人会逐条菜单点出来，所以钉成门禁。
+  脚本用 Python 而不是 CMake：穷举要把被 clang-format 断成相邻字面量的长文案按编译期规则拼回去，
+  CMake 的正则在跨语句时给出了错误的匹配（实测把十条不相关的文案拼成一条），门禁一旦误判就是永久假绿。
 
 ## 已知问题
 
@@ -105,6 +107,5 @@ tests/          逐级镜像 src 的目录结构
 - 录屏依赖外部 `ffmpeg`：不链接、不随包分发（避开 GPL 传染），没装就在编码那一步给出中文提示。
 - 安装器的"装完能起、卸载能清"这一步还没在真机上跑过 smoke test：脚本目前验证到
   staging 目录自检通过 + 安装器带卸载段。
-- 界面文案尚未做中英文双版（需求第 380 行的一项），当前只有中文。
 - Debug 档不领 Tesseract：上游 leptonica 的 Debug 包库名与其 `cpp_info` 不一致，
   `conanfile.py` 里按 `build_type` 分岔并写明撤除判据。
