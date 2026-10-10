@@ -1,0 +1,281 @@
+#include "Ocr/WinRTImageOcrEngine.h"
+
+#include "Core/Logger.h"
+#include "Core/Text.h"
+#include "Ocr/OcrEngineFactory.h"
+
+#include <QBuffer>
+#include <QByteArray>
+#include <QImage>
+#include <QStringList>
+
+// Collections 必须排在其它投影之前：它给出 IIterable/IVectorView 的实现体，
+// 缺了它任何 .Size()/.GetAt() 都是「auto 返回函数未定义」（实测 C3779）
+#include <winrt/Windows.Foundation.Collections.h>
+#include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Globalization.h>
+#include <winrt/Windows.Graphics.Imaging.h>
+#include <winrt/Windows.Media.Ocr.h>
+#include <winrt/Windows.Storage.Streams.h>
+
+// windows.h 排在 Qt 与投影之后：它会带进 interface 这类宏，先解析完 Qt 头就不会互相干扰
+#include <windows.h>
+
+#include <robuffer.h>
+
+#include <cmath>
+#include <cstring>
+#include <format>
+#include <future>
+#include <vector>
+
+namespace GyanisScribe::Ocr
+{
+    namespace
+    {
+        // 认不出字的最小图尺寸：与 Tesseract 后端同一道门槛，界面对两个后端的拒绝形状要一致
+        constexpr int kMinimumImageEdge = 8;
+
+        /**
+         * @brief 把 WinRT 字符串换成 QString
+         * @param text 系统给回的字符串
+         * @return 按 UTF-16 逐码位搬过来的串
+         * @note 走「指针 + 长度」而不是零终止：识别结果里出现 NUL 时零终止会静默截断文本
+         */
+        QString fromWinRTString(const winrt::hstring &text)
+        {
+            return QString::fromWCharArray(text.data(), static_cast<int>(text.size()));
+        }
+
+        /**
+         * @brief 判断系统语言标签是否对上本程序对外的标签
+         * @param systemTag 系统标签，可能带区域后缀，如 zh-Hans-CN
+         * @param publicTag 对外标签，如 zh-Hans 或 en
+         * @return true 表示对外标签的每一段都与系统标签开头各段相等
+         * @note 按 '-' 分段逐段比，整串前缀会认错：en 对 en-** 成立，但对 "english…" 这类串也成立
+         */
+        bool matchesPublicTag(const QString &systemTag, const QString &publicTag)
+        {
+            const auto systemParts = systemTag.split(QLatin1Char('-'));
+            const auto publicParts = publicTag.split(QLatin1Char('-'));
+            if (systemParts.size() < publicParts.size())
+            {
+                return false;
+            }
+            for (qsizetype index = 0; index < publicParts.size(); ++index)
+            {
+                if (systemParts[index].compare(publicParts[index], Qt::CaseInsensitive) != 0)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /**
+         * @brief 在一条一次性线程上跑 WinRT 调用
+         * @tparam Task 可调用体，返回类型即本函数返回类型
+         * @param task 要在那条线程上执行的工作
+         * @return task 的返回值
+         * @details 每条调用自己把套间设成 MTA：Qt 的界面线程是 STA，而 .get() 会堵在调用线程上，
+         *          在 STA 上等异步完成要靠自己那台消息泵——界面线程等的时候它不会转。
+         */
+        template<typename Task>
+        auto runOnWinRTThread(Task task)
+        {
+            auto worker = std::async(std::launch::async,
+                                     [task = std::move(task)]() mutable
+                                     {
+                                         winrt::init_apartment(winrt::apartment_type::multi_threaded);
+                                         return task();
+                                     });
+            return worker.get();
+        }
+    } // namespace
+
+    WinRTImageOcrEngine::WinRTImageOcrEngine()
+    {
+        const auto systemTags = runOnWinRTThread(
+                []()
+                {
+                    QStringList tags;
+                    try
+                    {
+                        auto const languages = winrt::Windows::Media::Ocr::OcrEngine::AvailableRecognizerLanguages();
+                        for (uint32_t index = 0; index < static_cast<uint32_t>(languages.Size()); ++index)
+                        {
+                            tags << fromWinRTString(languages.GetAt(index).LanguageTag());
+                        }
+                    } catch (const winrt::hresult_error &failure)
+                    {
+                        // 枚举本身报错说明系统组件不在场，与「装了语言但没一个对得上」在用户侧是同一条提示
+                        Core::Logger::warning(
+                                std::format("Windows 系统识别语言枚举失败：{}（HRESULT 0x{:08X}）", winrt::to_string(failure.message()), static_cast<uint32_t>(failure.code())));
+                    }
+                    return tags;
+                });
+
+        // 对外词表只有一个真源：这里按 supportedOcrLanguageTags() 的顺序收，界面看到的就是这一份
+        for (const auto &publicTag: supportedOcrLanguageTags())
+        {
+            for (const auto &systemTag: systemTags)
+            {
+                if (matchesPublicTag(systemTag, publicTag))
+                {
+                    m_systemTagByPublicTag.insert(publicTag, systemTag);
+                    break;
+                }
+            }
+        }
+    }
+
+    QString WinRTImageOcrEngine::name() const
+    {
+        return QString::fromUtf8(GyanisScribe::Core::uiTextUtf8("Windows 系统识别").c_str());
+    }
+
+    bool WinRTImageOcrEngine::isAvailable() const
+    {
+        return !m_systemTagByPublicTag.isEmpty();
+    }
+
+    QString WinRTImageOcrEngine::unavailableReason() const
+    {
+        if (isAvailable())
+        {
+            return {};
+        }
+        return QString::fromUtf8(GyanisScribe::Core::uiTextUtf8("这台机器的 Windows 没装本程序认识的识别语言包（系统识别一个可用语言都没有）。请在 设置 → 时间和语言 → 语音 "
+                                                                "里装上「光学字符识别」，或在设置的 OCR 页改用 Tesseract 并放好语言包")
+                                         .c_str());
+    }
+
+    QStringList WinRTImageOcrEngine::supportedLanguages() const
+    {
+        QStringList found;
+        for (const auto &tag: supportedOcrLanguageTags())
+        {
+            if (m_systemTagByPublicTag.contains(tag))
+            {
+                found << tag;
+            }
+        }
+        return found;
+    }
+
+    Core::Expected<OcrResult> WinRTImageOcrEngine::recognize(const QImage &image, const QString &language)
+    {
+        if (image.isNull() || image.width() < kMinimumImageEdge || image.height() < kMinimumImageEdge)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("图片太小或为空（{}×{}），认不出字。请至少框住 {}×{} 的区域"),
+                                                                            image.width(), image.height(), kMinimumImageEdge, kMinimumImageEdge)});
+        }
+
+        const QString requestedLanguage = language.isEmpty() ? QString::fromUtf8(kDefaultOcrLanguage) : language;
+        const auto    systemTag         = m_systemTagByPublicTag.value(requestedLanguage);
+        if (systemTag.isEmpty())
+        {
+            return std::unexpected(
+                    Core::Error{Core::ErrorCode::DependencyMissing,
+                                GyanisScribe::Core::uiFormat(
+                                        GyanisScribe::Core::uiTextUtf8(
+                                                "系统里没有「{}」的识别语言包。现在能用的是 {}。请在 设置 → 时间和语言 → 语音 里装上需要的语言包，或在设置的 OCR 页改选语言"),
+                                        requestedLanguage.toStdString(), supportedLanguages().join(QStringLiteral("、")).toStdString())});
+        }
+
+        // PNG 编码放在调用线程：QImage 不是线程安全的，跨线程只带这段已经编好的字节
+        QByteArray encoded;
+        QBuffer    bytesDevice(&encoded);
+        bytesDevice.open(QIODevice::WriteOnly);
+        if (!image.save(&bytesDevice, "PNG") || encoded.isEmpty())
+        {
+            return std::unexpected(
+                    Core::Error{Core::ErrorCode::InternalError, GyanisScribe::Core::uiTextUtf8("这一张图没能编成 PNG。请重试一次，或先在标注窗里另存一份 PNG 再识别")});
+        }
+
+        std::vector<uint8_t> pngBytes(static_cast<size_t>(encoded.size()));
+        std::memcpy(pngBytes.data(), encoded.constData(), static_cast<size_t>(encoded.size()));
+        const std::wstring tag       = systemTag.toStdWString();
+        const QString      publicTag = requestedLanguage;
+
+        return runOnWinRTThread(
+                [pngBytes = std::move(pngBytes), tag, publicTag]() -> Core::Expected<OcrResult>
+                {
+                    try
+                    {
+                        auto const buffer = winrt::Windows::Storage::Streams::Buffer(static_cast<uint32_t>(pngBytes.size()));
+                        byte      *raw    = nullptr;
+                        // IBufferByteAccess 是这份 SDK 里的裸 COM 接口（robuffer.h 声明在 Windows:: 而不是 ABI:: 下），
+                        // 投影里没有对应物，只能这样把字节写进系统缓冲区
+                        buffer.as<Windows::Storage::Streams::IBufferByteAccess>()->Buffer(&raw);
+                        std::memcpy(raw, pngBytes.data(), pngBytes.size());
+                        // Buffer(容量) 建出来长度是 0：不写长度就等于往流里写 0 字节，解码会拿到空流
+                        buffer.Length(static_cast<uint32_t>(pngBytes.size()));
+
+                        auto const stream = winrt::Windows::Storage::Streams::InMemoryRandomAccessStream();
+                        stream.WriteAsync(buffer).get();
+                        stream.Seek(0);
+
+                        auto const decoder = winrt::Windows::Graphics::Imaging::BitmapDecoder::CreateAsync(stream).get();
+                        auto const bitmap  = decoder.GetSoftwareBitmapAsync().get();
+
+                        // 上限来自系统自己，不硬编码：超了就只能让用户缩小范围，绝不能偷偷缩放——
+                        // 方框坐标要与用户看到的那张图同系
+                        const auto maximumDimension = winrt::Windows::Media::Ocr::OcrEngine::MaxImageDimension();
+                        if (static_cast<uint32_t>(bitmap.PixelWidth()) > maximumDimension || static_cast<uint32_t>(bitmap.PixelHeight()) > maximumDimension)
+                        {
+                            return std::unexpected(Core::Error{
+                                    Core::ErrorCode::InvalidArgument,
+                                    GyanisScribe::Core::uiFormat(
+                                            GyanisScribe::Core::uiTextUtf8("这张图超过系统识别的上限（{}×{}，最长边 {}）。请分段截图后再识别，或先在标注窗里裁掉不需要的部分"),
+                                            bitmap.PixelWidth(), bitmap.PixelHeight(), maximumDimension)});
+                        }
+
+                        auto const engine = winrt::Windows::Media::Ocr::OcrEngine::TryCreateFromLanguage(winrt::Windows::Globalization::Language(tag));
+                        if (!engine)
+                        {
+                            return std::unexpected(
+                                    Core::Error{Core::ErrorCode::DependencyMissing,
+                                                GyanisScribe::Core::uiFormat(
+                                                        GyanisScribe::Core::uiTextUtf8("系统说装有「{}」的识别语言，但建不出识别器。请在 设置 → 时间和语言 → 语音 里重装该语言包"),
+                                                        publicTag.toStdString())});
+                        }
+
+                        auto const result = engine.RecognizeAsync(bitmap).get();
+
+                        OcrResult mapped;
+                        mapped.language  = publicTag;
+                        auto const lines = result.Lines();
+                        for (uint32_t lineIndex = 0; lineIndex < static_cast<uint32_t>(lines.Size()); ++lineIndex)
+                        {
+                            OcrLine    line;
+                            auto const words = lines.GetAt(lineIndex).Words();
+                            for (uint32_t wordIndex = 0; wordIndex < static_cast<uint32_t>(words.Size()); ++wordIndex)
+                            {
+                                auto const word = words.GetAt(wordIndex);
+                                auto const rect = word.BoundingRect();
+                                // 系统的方框是浮点物理像素，四舍五入到整数格：截断会让整行的框系统性偏左偏上
+                                const QRect box(static_cast<int>(std::lround(rect.X)), static_cast<int>(std::lround(rect.Y)), static_cast<int>(std::lround(rect.Width)),
+                                                static_cast<int>(std::lround(rect.Height)));
+                                line.words.push_back(OcrWord{fromWinRTString(word.Text()), box});
+                                line.boundingBox = line.boundingBox.isNull() ? box : line.boundingBox.united(box);
+                            }
+                            if (!line.words.isEmpty())
+                            {
+                                mapped.lines.push_back(std::move(line));
+                            }
+                        }
+                        // averageConfidence 留 0：Windows.Media.Ocr 不给逐词置信度，界面上那一格按「后端给不出」显示
+                        return mapped;
+                    } catch (const winrt::hresult_error &failure)
+                    {
+                        return std::unexpected(Core::Error{
+                                Core::ErrorCode::InternalError,
+                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("系统识别这一张图失败（{}，错误码 0x{}）。请重试一次，或改用 Tesseract 后端"),
+                                                             fromWinRTString(failure.message()).toStdString(), std::format("{:08X}", static_cast<uint32_t>(failure.code())))});
+                    }
+                });
+    }
+
+} // namespace GyanisScribe::Ocr

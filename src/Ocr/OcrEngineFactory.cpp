@@ -6,6 +6,9 @@
 #if defined(GYANISSCRIBE_HAS_TESSERACT)
 #include "Ocr/TesseractOcrEngine.h"
 #endif
+#if defined(GYANISSCRIBE_HAS_WINRT_OCR)
+#include "Ocr/WinRTImageOcrEngine.h"
+#endif
 #include "Ocr/UnavailableOcrEngine.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Settings/ISettingsStore.h"
@@ -96,6 +99,19 @@ namespace GyanisScribe::Ocr
 
     std::unique_ptr<IOcrEngine> createOcrEngine(const Settings::ISettingsStore &settings, const Platform::IPlatformIntegration &integration)
     {
+#if defined(GYANISSCRIBE_HAS_WINRT_OCR)
+        // 系统识别排第一：它不要求用户放语言包，语言包由 Windows 自己装；
+        // 它不可用时才往下找 Tesseract，两条原因分开记，用户能自己做的只有后一条
+        auto systemEngine = std::make_unique<WinRTImageOcrEngine>();
+        if (systemEngine->isAvailable())
+        {
+            Core::Logger::info(std::format("文字识别后端 Windows 系统识别就绪（平台 {}），可用语言 {}", integration.displayName().toStdString(),
+                                           systemEngine->supportedLanguages().join(QStringLiteral("、")).toStdString()));
+            return systemEngine;
+        }
+        Core::Logger::info(std::format("Windows 系统识别不可用，继续找 Tesseract：{}", systemEngine->unavailableReason().toStdString()));
+#endif
+
         const auto tessData = locateTessDataDirectory(settings);
         if (tessData.empty())
         {

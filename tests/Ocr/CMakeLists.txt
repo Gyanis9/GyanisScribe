@@ -3,6 +3,12 @@ add_executable(TestOcr
         TestOcrPreprocessor.cpp
         TestOcrResultWindow.cpp)
 
+# 系统识别后端的直测跟着库那一档的条件走（同一台机器、同一个编译器才有这份后端）；
+# 容器那一档这个文件不进编译列表，也不会有没被编过的用例文件
+if (WIN32 AND MSVC)
+    target_sources(TestOcr PRIVATE TestWinRTImageOcrEngine.cpp)
+endif ()
+
 target_link_libraries(TestOcr PRIVATE
         Ocr
         Settings

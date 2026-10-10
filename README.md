@@ -4,7 +4,7 @@ Windows 优先、可跨平台的桌面工具：截图、标注、贴图、取色
 交互参考 Snipaste，但不使用其任何代码、图标、界面素材或商标。
 
 - **技术栈**：C++23 · Qt 6.11（Widgets/Svg/Network）· CMake ≥ 3.28 · Conan 2 · MSVC 2022；Linux 侧在 Docker Ubuntu 24.04 容器内构建与验证
-- **当前状态**：六大功能已可用；本机 debug 与 release 两档各 234 条用例全绿；容器 asan 与 coverage 两档
+- **当前状态**：六大功能已可用；本机 debug 与 release 两档各 238 条用例全绿；容器 asan 与 coverage 两档
   233 条通过、1 条跳过（容器那份 Qt 6.4 没有 lrelease，「真实语言包装载」那条只能在有包的一档成立）；
   行覆盖率 63.4%（阈值 55%）；打包脚本产出绿色目录 + zip + NSIS 安装器，英文语言包随包分发
 - **需求与硬约束**：[docs/ProjectRequirements.md](docs/ProjectRequirements.md)
@@ -35,8 +35,9 @@ scripts\WindowsBuild.bat release
 build\release\bin\GyanisScribe.exe --selftest
 ```
 
-`WindowsBuild.bat` 会自己调 `vcvars64`、按预设配置/编译并跑 `ctest`。预设两档：`debug`（识别走降级桩）与
-`release`（带 Tesseract 后端）。机器相关的路径只出现在这个脚本里，工程不写死绝对路径。
+`WindowsBuild.bat` 会自己调 `vcvars64`、按预设配置/编译并跑 `ctest`。预设两档：`debug` 与 `release`——
+Windows 上两档都带系统识别后端（`Windows.Media.Ocr`，用系统自己装的语言包），只有 `release` 额外领 Tesseract
+（上游 Debug 包的问题见 [docs/OcrBackends.md](docs/OcrBackends.md)）。机器相关的路径只出现在这个脚本里，工程不写死绝对路径。
 Conan 两侧都是仓库里的一份档位（`Conan/Profiles/WindowsMsvc2022` 与 `LinuxGcc13`），
 不是每次现检测的产物：Windows 侧由脚本把 `-DCONAN_HOST_PROFILE` 指过去，容器侧由 `env.sh` 设
 `CONAN_DEFAULT_PROFILE_PATH`。档位里唯一按机器改的一行是 `compiler.version`；
@@ -91,6 +92,7 @@ src/Ocr         预处理、后端选型、结果窗口与导出
 src/History     历史清单、保留策略、缩略图列表
 src/Pick        取色器：颜色写法与放大镜几何
 src/App         应用对象、核心控制器、托盘、主窗口、单实例、崩溃兜底
+Vendor/WinRt    Windows 系统识别要用的 C++/WinRT 投影头（MIT，生成与裁剪办法见 docs/OcrBackends.md）
 tests/          逐级镜像 src 的目录结构
 ```
 
@@ -116,13 +118,14 @@ tests/          逐级镜像 src 的目录结构
 
 ## 已知问题
 
-- 识别需要用户自备语言包（`eng.traineddata` 等）；缺语言包时功能明确报"不可用"并给出放置位置，
+- Windows 上识别首选系统组件（`Windows.Media.Ocr`），它用的是 Windows 自己装的语言包，不需要用户放文件；
+  只有选 Tesseract（以及 Linux 侧）时才需要自备 `eng.traineddata` 等——缺语言包会明确报"不可用"并给出放置位置，
   不会返回空结果冒充"这张图里没字"。
 - 录屏依赖外部 `ffmpeg`：不链接、不随包分发（避开 GPL 传染），没装就在编码那一步给出中文提示。
 - 安装器的"装完能起、卸载能清"这一步还没在真机上跑过 smoke test：脚本目前验证到
   staging 目录自检通过 + 安装器带卸载段。
 - Debug 档不领 Tesseract：上游 leptonica 的 Debug 包库名与其 `cpp_info` 不一致，
-  `conanfile.py` 里按 `build_type` 分岔并写明撤除判据。
+  `conanfile.py` 里按 `build_type` 分岔并写明撤除判据。Windows 的 Debug 档仍能真识别——工厂先问系统识别。
 
 ## 后续计划
 
@@ -140,7 +143,7 @@ tests/          逐级镜像 src 的目录结构
 - **主线程还会被长任务占着**：需求的硬约束要求「耗时操作放工作线程」，而现在三处仍在 GUI 线程上跑——
   录屏逐帧写 PNG（`PngSequenceSink::write`，一帧的写盘时间直接算进下一格的等待）、
   停止录屏后的 ffmpeg 编码（`RecordingService::stop` 里同步等）、以及文字识别（`AppController::recognizeWithLanguage`
-  同步调后端）。本机量不出识别的卡顿：这台机器没有语言包，Debug 档又走降级桩。
+  同步调后端）。识别这一处本机已经量得着：Windows 两档都带系统后端，不再靠降级桩；Tesseract 那一路仍只在 Release 档。
   **恢复条件**：并发改动要有 TSan 才算判据（本机 MSVC 没有 TSan，而容器里 `setarch -R` 被 Docker 自带 seccomp 拒绝），
   先用 `docker run --security-opt seccomp=unconfined` 起一档、证明旧写法报得出竞态，再动这三处。
   没有这一档之前把跨线程手抖写进去，只是把可复现的卡顿换成不可复现的竞态。

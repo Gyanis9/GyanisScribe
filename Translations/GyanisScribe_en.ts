@@ -876,6 +876,34 @@
             <translation>This program has no text recognition backend available. Set the OCR language pack folder (tessdata) in Settings, or install the recognition component that ships with the system</translation>
         </message>
         <message>
+            <source>Windows 系统识别</source>
+            <translation>Windows text recognition</translation>
+        </message>
+        <message>
+            <source>这台机器的 Windows 没装本程序认识的识别语言包（系统识别一个可用语言都没有）。请在 设置 → 时间和语言 → 语音 里装上「光学字符识别」，或在设置的 OCR 页改用 Tesseract 并放好语言包</source>
+            <translation>This Windows has no text-recognition language pack this app understands (the system engine reports no usable language). Install Optical Character Recognition under Settings -> Time &amp; Language -> Speech, or switch to Tesseract on the OCR settings page and place its language packs</translation>
+        </message>
+        <message>
+            <source>系统里没有「{}」的识别语言包。现在能用的是 {}。请在 设置 → 时间和语言 → 语音 里装上需要的语言包，或在设置的 OCR 页改选语言</source>
+            <translation>There is no system language pack for "{}". Usable right now: {}. Install the pack under Settings -> Time &amp; Language -> Speech, or pick another language on the OCR settings page</translation>
+        </message>
+        <message>
+            <source>这一张图没能编成 PNG。请重试一次，或先在标注窗里另存一份 PNG 再识别</source>
+            <translation>This image could not be encoded as PNG. Try again, or save a PNG copy from the annotation window and recognise that file</translation>
+        </message>
+        <message>
+            <source>这张图超过系统识别的上限（{}×{}，最长边 {}）。请分段截图后再识别，或先在标注窗里裁掉不需要的部分</source>
+            <translation>This image exceeds the system recognition limit ({}x{}, longest side {}). Capture it in parts, or crop the unneeded area in the annotation window first</translation>
+        </message>
+        <message>
+            <source>系统说装有「{}」的识别语言，但建不出识别器。请在 设置 → 时间和语言 → 语音 里重装该语言包</source>
+            <translation>The system reports a language pack for "{}", but no recognizer could be created. Reinstall that pack under Settings -> Time &amp; Language -> Speech</translation>
+        </message>
+        <message>
+            <source>系统识别这一张图失败（{}，错误码 0x{}）。请重试一次，或改用 Tesseract 后端</source>
+            <translation>System recognition failed for this image ({} , error code 0x{}). Try again, or switch to the Tesseract backend</translation>
+        </message>
+        <message>
             <source>颜色写法 "{}" 不认识。可用取值只有 Hex、Rgb 与 Hsl（区分大小写），请在设置的取色页里重选一次</source>
             <translation>The color format "{}" is unknown. Only Hex, Rgb and Hsl are valid (case-sensitive); pick one again on the color picker page in Settings.</translation>
         </message>

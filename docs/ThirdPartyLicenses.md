@@ -12,6 +12,7 @@
 | GoogleTest | conandata.yml 里那份 | BSD-3-Clause | 单元测试 | 只进测试可执行体，不随产品分发 |
 | Tesseract | 5.5.2（仅 Release 档） | Apache-2.0 | 文字识别后端 | 动态链接 |
 | Leptonica | Tesseract 带进来的传递依赖 | BSD-2-Clause | Tesseract 的图像处理 | 动态链接 |
+| C++/WinRT 投影头 | cppwinrt v2.0.250303.5 从 Windows SDK 10.0.26100.0 元数据生成 | MIT | Windows 系统识别的编译期投影 | vendor 在 `Vendor/WinRt/`，只进编译，不作为独立件分发 |
 
 Qt 走 LGPL-3.0 的「动态链接 + 可替换」路线：用户拿到的是 Qt 的 DLL，可自行换成同版本库；
 构建脚本不静态链接 Qt，也不做只读合并。产品若要在禁用逆向工程的场合分发，需要商业授权，
@@ -23,6 +24,8 @@ Qt 走 LGPL-3.0 的「动态链接 + 可替换」路线：用户拿到的是 Qt 
 可以随包，但体积与更新节奏更适合让用户自己放。查找顺序写在 `docs/OcrBackends.md`：
 设置项 `Ocr/TessDataDirectory` → 环境变量 `TESSDATA_PREFIX` → 应用数据目录下的 `tessdata`。
 缺语言包时识别功能会明确报「不可用」并给出放置位置，不装成能用而返回空结果。
+Windows 上这一节只在选用 Tesseract 时才需要用户动手：系统识别走 Windows 自己的语言包
+（设置 → 时间和语言 → 语音 里的「光学字符识别」），不需要往任何目录放文件。
 
 ## 录屏用的 FFmpeg（外部进程，不链接）
 

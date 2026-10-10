@@ -3,6 +3,13 @@
 #include "Ocr/IOcrEngine.h"
 #include "Ocr/OcrTextExporter.h"
 #include "Ocr/UnavailableOcrEngine.h"
+#if defined(GYANISSCRIBE_HAS_TESSERACT)
+#include "Ocr/TesseractOcrEngine.h"
+#endif
+#if defined(GYANISSCRIBE_HAS_WINRT_OCR)
+#include "Ocr/WinRTImageOcrEngine.h"
+#endif
+#include "Core/Text.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
@@ -33,6 +40,21 @@ namespace
 {
     std::unique_ptr<QCoreApplication>                             application;
     std::unique_ptr<GyanisScribe::Platform::IPlatformIntegration> integration;
+
+    /**
+     * @brief 这一档、这台机器上有没有「Windows 系统识别」
+     * @return true 表示工厂会先拿到系统后端，走不到缺语言包与缺后端那两条提示
+     * @note 判的是运行期事实（系统装没装识别语言包）。用例要先问它再决定断言哪一种形状，
+     *       否则就是拿旧语义断言新分支
+     */
+    [[nodiscard]] bool systemOcrAvailable()
+    {
+#if defined(GYANISSCRIBE_HAS_WINRT_OCR)
+        return WinRTImageOcrEngine().isAvailable();
+#else
+        return false;
+#endif
+    }
 
     class OcrFixture : public ::testing::Test
     {
@@ -212,15 +234,27 @@ TEST_F(OcrFixture, LocatesTessDataBySettingThenReturnsEmptyWhenMissing)
 }
 
 /**
- * @brief 钉住后端选型：没有模型文件时拿到的是桩，且原因里点名三处查找位置
+ * @brief 钉住后端选型：先问系统识别，问不到才落回语言包那条路
+ * @details 需求 §8 写明 Windows 优先用 Windows.Media.Ocr，所以「没有模型文件」这一格在两种形状下
+ *          结论不同：这台机器装了识别语言包时工厂必须交回系统后端（旧断言「没有模型文件就是桩」
+ *          在新语义下不成立）；没装才报缺语言包，点名三处查找位置。
  */
-TEST_F(OcrFixture, FactoryFallsBackToUnavailableWithActionableReason)
+TEST_F(OcrFixture, FactoryPrefersSystemOcrAndFallsBackWithActionableReason)
 {
     SettingsStore settings(m_iniFile);
     const auto    engine = createOcrEngine(settings, *integration);
     ASSERT_NE(engine, nullptr) << "选型不许交回空指针";
 
     EXPECT_TRUE(locateTessDataDirectory(settings).empty());
+
+    if (systemOcrAvailable())
+    {
+        // 系统后端在场就不许再要用户放语言包：这条断言钉住「先问系统」的顺序本身
+        EXPECT_TRUE(engine->isAvailable()) << "系统识别可用，工厂却说不可用";
+        EXPECT_EQ(engine->name(), QString::fromUtf8(GyanisScribe::Core::uiTextUtf8("Windows 系统识别"))) << "拿到的不是系统后端";
+        return;
+    }
+
     EXPECT_FALSE(engine->isAvailable()) << "机器上一个模型文件都没有，却说后端可用";
     const auto reason = engine->unavailableReason();
     EXPECT_NE(reason.indexOf(QStringLiteral("TESSDATA_PREFIX")), -1) << "原因里没提环境变量那一路：实际是 " << reason.toStdString();
@@ -232,13 +266,21 @@ TEST_F(OcrFixture, FactoryFallsBackToUnavailableWithActionableReason)
 
 /**
  * @brief 钉住「语言包在、但这一档没编入后端」那一格：不许把构建配置问题说成用户少放了文件
- * @details 只有 Debug 档走这一格（Tesseract 只进 Release 依赖图，原因见 conanfile.py）。
+ * @details 只有既没有 Tesseract、又没有系统识别的那一档走这一格（Tesseract 只进 Release 依赖图，
+ *          原因见 conanfile.py；Windows Debug 档现在有系统识别，这一格改由容器那一档跑同一条断言）。
  *          旧的断言是「任何构建都报后端缺席」，新语义是按宏分两种形状：带后端的构建里
  *          同一份语言包必须拿到 Tesseract，那条由下面的用例钉。
  */
 #if !defined(GYANISSCRIBE_HAS_TESSERACT)
 TEST_F(OcrFixture, ReportsMissingBackendSeparatelyFromMissingLanguagePacks)
 {
+    if (systemOcrAvailable())
+    {
+        // 工厂先问系统识别并且拿到了它，根本走不到「后端没编入」这一格；跳过而不是改断言，
+        // 这一格在容器那一档（不编 WinRT）仍然是硬覆盖
+        GTEST_SKIP() << "这台机器有系统识别，工厂拿不到「后端没编入」那一格";
+    }
+
     const auto    directory = makeModelDirectoryWith("eng.traineddata");
     SettingsStore settings(m_iniFile);
     ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kOcrTessDataDirectory, QVariant(QString::fromLocal8Bit(directory.string().c_str()))).has_value());
@@ -262,7 +304,9 @@ TEST_F(OcrFixture, PrefersTesseractWhenLanguagePacksArePresent)
     SettingsStore settings(m_iniFile);
     ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kOcrTessDataDirectory, QVariant(QString::fromLocal8Bit(directory.string().c_str()))).has_value());
 
-    const auto engine = createOcrEngine(settings, *integration);
+    // 系统识别在场时工厂不会把 Tesseract 交出来（那条顺序归上面那条用例钉），所以这里按能力取
+    // 要验的那份后端：两种形状断的是同一件事——语言包在位时这条路是通的
+    const auto engine = systemOcrAvailable() ? std::make_unique<TesseractOcrEngine>(directory) : createOcrEngine(settings, *integration);
     ASSERT_TRUE(engine->isAvailable()) << "语言包已经在位却仍报不可用：选型没接上 Tesseract";
     EXPECT_EQ(engine->name(), QStringLiteral("Tesseract")) << "拿到的不是真后端";
     EXPECT_TRUE(engine->supportedLanguages().contains(QStringLiteral("en")));
