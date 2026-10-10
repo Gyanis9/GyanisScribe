@@ -12,6 +12,9 @@
 #include <QProcess>
 #include <QScreen>
 
+#include <QtConcurrent/QtConcurrentRun>
+
+#include <algorithm>
 #include <chrono>
 #include <format>
 #include <optional>
@@ -65,6 +68,14 @@ namespace GyanisScribe::Record
             m_audio->kill();
             m_audio->waitForFinished(1000);
         }
+
+        // 还在编的那几份要等：那条线程用的是 m_encoder 的引用与带过来的快照，
+        // 不等就是让它对着已经析构的服务继续编（回接那一段由 context 自动不再投递）
+        for (auto &running: m_runningEncodes)
+        {
+            running.waitForFinished();
+        }
+        m_runningEncodes.clear();
     }
 
     Core::Expected<void> RecordingService::start(const RecorderConfig &config, const int countdownSeconds)
@@ -128,7 +139,7 @@ namespace GyanisScribe::Record
         }
     }
 
-    Core::Expected<std::filesystem::path> RecordingService::stop()
+    Core::Expected<void> RecordingService::stop()
     {
         if (m_session == nullptr)
         {
@@ -145,14 +156,36 @@ namespace GyanisScribe::Record
             return std::unexpected(sealed.error());
         }
 
-        const auto audioWav = finishAudioCapture();
-        const auto encoded  = m_encoder.encode(m_config, m_frameDirectory, frames, audioWav);
-        if (!encoded)
+        // 收尾这一串里只有编码要几秒到几十秒，所以只把那一段搬走：帧序列已经写完、取声进程也已经收尸，
+        // 剩下的「编成成品 + 处置中间文件」由 deliverEncoding 在界面线程上接着做
+        startEncoding(m_config, m_frameDirectory, frames, finishAudioCapture());
+        return {};
+    }
+
+    void RecordingService::startEncoding(const RecorderConfig &config, const std::filesystem::path &frameDirectory, const int frames, const std::filesystem::path &audioWav)
+    {
+        auto &encoder = m_encoder;
+        // 参数与目录都按快照带过去：期间用户重新开一轮会覆盖成员那两份，而这一次编码认的是叫它出来的那一轮
+        auto future = QtConcurrent::run([&encoder, config, frameDirectory, frames, audioWav] { return encoder.encode(config, frameDirectory, frames, audioWav); });
+
+        // continuation 的 context 是本对象：回接落在界面线程，删目录与发信号都在这条线上做
+        future.then(this, [this, frameDirectory, audioWav](const EncodeOutcome &outcome) { deliverEncoding(outcome, frameDirectory, audioWav); });
+
+        m_runningEncodes.push_back(future);
+        // 顺手收掉已经跑完的那些：这份列表只为析构时「还有谁在编」服务，不该越攒越长
+        std::erase_if(m_runningEncodes, [](const QFuture<EncodeOutcome> &running) { return running.isFinished(); });
+    }
+
+    void RecordingService::deliverEncoding(const EncodeOutcome &outcome, const std::filesystem::path &frameDirectory, const std::filesystem::path &audioWav)
+    {
+        std::erase_if(m_runningEncodes, [](const QFuture<EncodeOutcome> &running) { return running.isFinished(); });
+
+        if (!outcome)
         {
             // 保留临时帧：这已经是录完的内容，删掉就等于让用户白录一次
-            Core::Logger::warning(std::format("录屏编码失败，临时帧保留在 {} 以便重编码", Core::Paths::toDisplayText(m_frameDirectory).toStdString()));
-            emit failed(QString::fromUtf8(encoded.error().message.c_str()));
-            return std::unexpected(encoded.error());
+            Core::Logger::warning(std::format("录屏编码失败，临时帧保留在 {} 以便重编码", Core::Paths::toDisplayText(frameDirectory).toStdString()));
+            emit failed(QString::fromUtf8(outcome.error().message.c_str()));
+            return;
         }
 
         // 成品已含音轨，中间 wav 就没用了；帧目录按原规则清，失败时两者都留着好重编码
@@ -163,14 +196,14 @@ namespace GyanisScribe::Record
         }
 
         std::error_code cleanupError;
-        std::filesystem::remove_all(m_frameDirectory, cleanupError);
+        std::filesystem::remove_all(frameDirectory, cleanupError);
         if (cleanupError)
         {
             // 成品已经有了，这里只报一条：清不掉是磁盘占用问题，不是录屏失败
-            Core::Logger::warning(std::format("临时帧目录没清干净：{}（{}）", Core::Paths::toDisplayText(m_frameDirectory).toStdString(), cleanupError.message()));
+            Core::Logger::warning(std::format("临时帧目录没清干净：{}（{}）", Core::Paths::toDisplayText(frameDirectory).toStdString(), cleanupError.message()));
         }
-        emit finished(Core::Paths::toDisplayText(*encoded));
-        return encoded;
+
+        emit finished(Core::Paths::toDisplayText(*outcome));
     }
 
     RecordingState RecordingService::state() const noexcept

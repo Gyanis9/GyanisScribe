@@ -597,14 +597,18 @@ namespace GyanisScribe::App
             return;
         }
 
-        // 还在录或还在倒计时/暂停：这一按是「停止并保存」，编码要等一会儿，控制条先留着让用户知道在忙
+        // 还在录或还在倒计时/暂停：这一按是「停止并保存」。编码已经搬到工作线程，界面不再停在控制条上——
+        // 录像是真的停了，控制条与托盘那行读数再留着就是句假话，所以先收掉，再告诉用户成品还在编
         Core::Logger::info("录屏停止中，正在编码成品");
         if (auto stopped = m_recording->stop(); !stopped)
         {
             hideRecordingHud();
             Core::Logger::error(std::format("录屏收尾失败：{}", stopped.error().message));
             notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("录屏收尾失败：{}"), stopped.error().message).c_str()), Ui::ToastKind::Danger);
+            return;
         }
+        hideRecordingHud();
+        notifyUser(GyanisScribe::Core::uiText("正在编成品，好了会说一声"), Ui::ToastKind::Information);
     }
 
     void AppController::showRecordingHud()

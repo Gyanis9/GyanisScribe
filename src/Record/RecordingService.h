@@ -16,11 +16,13 @@
 #include "Record/RecordingSinks.h"
 
 #include <QElapsedTimer>
+#include <QFuture>
 #include <QPoint>
 #include <QObject>
 #include <QTimer>
 
 #include <memory>
+#include <vector>
 
 class QProcess;
 
@@ -43,7 +45,8 @@ namespace GyanisScribe::Record
      * @brief 录屏服务
      * @details 这层只做胶水：定时器跳一次就抓一帧交给会话，会话决定写不写；
      *          「什么时候写、暂停怎么算、时长上限」全在 RecordingSession 里，那部分有用例。
-     *          本类直测的只有两条窄判据：一份配置能不能开始、取声在该跳过的档位上真跳过了；
+     *          本类直测的是这几条：一份配置能不能开始、取声在该跳过的档位上真跳过了、
+     *          编码交给工作线程而回接落在界面线程、失败时帧目录留着、析构会等手上的编码；
      *          真抓屏像素与真编出文件需要一个真实桌面会话，那一段仍然留给验收。
      */
     class RecordingService : public QObject
@@ -60,7 +63,9 @@ namespace GyanisScribe::Record
         RecordingService(Capture::IScreenCaptureSource &source, IRecordingEncoder &encoder, QObject *parent = nullptr);
 
         /**
-         * @brief 析构：收掉还在跑的取声进程
+         * @brief 析构：收掉还在跑的取声进程，并等手上的编码跑完
+         * @details 等编码是因为那份 ffmpeg 由本服务起，而帧目录的处置跟着它走；
+         *          不等就是让工作线程拿着已析构的编码器与配置继续编。
          */
         ~RecordingService() override;
 
@@ -83,12 +88,13 @@ namespace GyanisScribe::Record
         void resume();
 
         /**
-         * @brief 停止并编码成品
-         * @return 成功返回成品文件路径；失败返回原因
-         * @details 编码成功就删掉临时帧序列（那是 GB 级的中间产物）；失败时保留，
-         *          用户可以换参数重编码而不用重录一遍。
+         * @brief 停止录制并*开始*编码收尾
+         * @return 成功返回空载荷，成品稍后由 finished 送回；当前没有录制、或这一轮已经收过尾时返回原因
+         * @details 编码要几秒到几十秒，同步等就是把整个程序停在那儿，因此这一段搬到工作线程上。
+         *          帧目录与中间 wav 的处置跟着那一次编码走：不等它完成就删，用户换参数重编码的退路就没了；
+         *          而期间重新开一轮用的是另一个带时间戳的目录，两轮互不影响。
          */
-        [[nodiscard]] Core::Expected<std::filesystem::path> stop();
+        [[nodiscard]] Core::Expected<void> stop();
 
         /// 当前状态
         [[nodiscard]] RecordingState state() const noexcept;
@@ -141,18 +147,41 @@ namespace GyanisScribe::Record
          */
         [[nodiscard]] std::filesystem::path finishAudioCapture();
 
-        Capture::IScreenCaptureSource    &m_source;                                                    ///< 抓帧来源，不拥有
-        IRecordingEncoder                &m_encoder;                                                   ///< 编码器，不拥有
-        QTimer                            m_timer;                                                     ///< 抓帧定时器
-        QElapsedTimer                     m_clock;                                                     ///< 单调时钟，会话的时间轴都从它取
-        std::unique_ptr<RecordingSession> m_session;                                                   ///< 当前会话
-        std::unique_ptr<IRecordingSink>   m_sink;                                                      ///< 当前帧去处（PNG 序列）
-        std::unique_ptr<QProcess>         m_audio;                                                     ///< 取声进程，空表示本轮不取声
-        RecorderConfig                    m_config;                                                    ///< 本轮参数
-        std::filesystem::path             m_frameDirectory;                                            ///< 本轮临时帧目录
-        std::filesystem::path             m_audioWav;                                                  ///< 本轮取声落在哪份 wav 上
-        AudioCaptureOutcome               m_audioOutcome          = AudioCaptureOutcome::NotRequested; ///< 取声结果，stop 之后读
-        bool                              m_cursorHighlightWarned = false;                             ///< 光标高亮已经报过一次原因，本轮不再重复
+        /// 一次编码的结果：成品路径，或原因
+        using EncodeOutcome = Core::Expected<std::filesystem::path>;
+
+        /**
+         * @brief 把这一帧序列交给工作线程编码
+         * @param config 本轮参数的快照：期间重新开一轮会覆盖成员那份，编码要用的是这一次的格式与码率
+         * @param frameDirectory 这一轮的帧目录，同上按快照带过去
+         * @param frames 帧数，估编码超时用
+         * @param audioWav 中间 wav，空表示本轮没取声
+         * @details 结果用 QFuture::then 送回界面线程（continuation 的 context 是本对象），
+         *          因此并发跑两轮编码也各有归处，不需要排队。
+         */
+        void startEncoding(const RecorderConfig &config, const std::filesystem::path &frameDirectory, int frames, const std::filesystem::path &audioWav);
+
+        /**
+         * @brief 编码回来之后处置成品、中间 wav 与帧目录
+         * @param outcome 编码结果
+         * @param frameDirectory 这一次编码用的帧目录
+         * @param audioWav 这一次编码并进去的 wav
+         */
+        void deliverEncoding(const EncodeOutcome &outcome, const std::filesystem::path &frameDirectory, const std::filesystem::path &audioWav);
+
+        Capture::IScreenCaptureSource      &m_source;                                           ///< 抓帧来源，不拥有
+        IRecordingEncoder                  &m_encoder;                                          ///< 编码器，不拥有
+        QTimer                              m_timer;                                            ///< 抓帧定时器
+        QElapsedTimer                       m_clock;                                            ///< 单调时钟，会话的时间轴都从它取
+        std::unique_ptr<RecordingSession>   m_session;                                          ///< 当前会话
+        std::unique_ptr<IRecordingSink>     m_sink;                                             ///< 当前帧去处（PNG 序列）
+        std::unique_ptr<QProcess>           m_audio;                                            ///< 取声进程，空表示本轮不取声
+        RecorderConfig                      m_config;                                           ///< 本轮参数
+        std::filesystem::path               m_frameDirectory;                                   ///< 本轮临时帧目录
+        std::filesystem::path               m_audioWav;                                         ///< 本轮取声落在哪份 wav 上
+        AudioCaptureOutcome                 m_audioOutcome = AudioCaptureOutcome::NotRequested; ///< 取声结果，stop 之后读
+        std::vector<QFuture<EncodeOutcome>> m_runningEncodes;                                   ///< 还在编码的那几份，析构前要等完
+        bool                                m_cursorHighlightWarned = false;                    ///< 光标高亮已经报过一次原因，本轮不再重复
     };
 
 } // namespace GyanisScribe::Record

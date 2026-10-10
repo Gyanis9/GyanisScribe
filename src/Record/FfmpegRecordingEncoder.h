@@ -51,9 +51,9 @@ namespace GyanisScribe::Record
      * @brief 调 ffmpeg 命令行程序的编码器
      * @details 用外部进程而不是 libavformat：后者会把 GPL 与一大坨动态库带进包里，
      *          而录屏不是每次都用的功能，缺了它截图与贴图照常工作。
-     * @note 进程是同步等的，等的时候跑在界面线程上（README 的后续计划里那一格）；
-     *       真要做「边录边编」得换成持续写入 stdin 的 rawvideo 管道。
-     *       编码之前先探一次编码器，探的费用也落在同一次等待里。
+     * @note 本方法自己同步等 ffmpeg 退出，等在哪条线程上由调用方决定：RecordingService 把它放到
+     *       Qt 的线程池上，界面线程不等它。编码之前先探一次编码器，探的费用也落在同一次等待里。
+     *       真要做「边录边编」得换成持续写入 stdin 的 rawvideo 管道（README 的后续计划里那一格）。
      */
     class FfmpegRecordingEncoder final : public IRecordingEncoder
     {

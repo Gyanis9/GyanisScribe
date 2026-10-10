@@ -183,13 +183,13 @@ tests/          逐级镜像 src 的目录结构
   返回的包装所有权不明（按帧拿就是每帧造一个可能已活的 `QWindow`），而 Win32 的 `GetWindowRect` 读的是物理像素，
   必须与 DPI 换算配成对才不错位。`RecordingService` 在第一帧就把这一点写进日志，不画错位的圈。
 - **安装器真机 smoke test**：脚本验到 staging 自检通过 + 安装器带卸载段，「装完能起、卸载能清」还没在真机上跑过。
-- **主线程还会被长任务占着**：需求的硬约束要求「耗时操作放工作线程」，而现在两处仍在 GUI 线程上跑——
-  录屏逐帧写 PNG（`PngSequenceSink::write`，一帧的写盘时间直接算进下一格的等待）、
-  停止录屏后的 ffmpeg 编码（`RecordingService::stop` 里同步等）。
-  文字识别不在这一列里：`Ocr::RecognitionRunner` 把一次 `recognize()` 放到 Qt 的全局线程池上，
-  认完由 `QFutureWatcher` 把结果送回界面线程，同一时间只跑一条，忙时只认用户最新那一次请求。
-  **恢复条件**：这两处要与采集循环交接帧与状态，并发改动要有 TSan 才算判据（本机 MSVC 没有 TSan，而容器里 `setarch -R` 被 Docker 自带 seccomp 拒绝），
-  先用 `docker run --security-opt seccomp=unconfined` 起一档、证明旧写法报得出竞态，再动这两处。
+- **主线程还会被长任务占着**：需求的硬约束要求「耗时操作放工作线程」，现在只剩一处仍在 GUI 线程上跑——
+  录屏逐帧写 PNG（`PngSequenceSink::write`，一帧的写盘时间直接算进下一格的等待）。
+  文字识别与停止后的编码都已交出去：`Ocr::RecognitionRunner` 与 `RecordingService::startEncoding` 都走 Qt 的全局线程池，
+  认完/编完由 Qt 的回接（`QFutureWatcher` / `QFuture::then`，context 是界面线程那个对象）送回界面。两处都同一时间只跑一条，
+  析构前等手上的任务跑完。
+  **恢复条件**：剩下这一处要与采集循环交接帧与状态，并发改动要有 TSan 才算判据（本机 MSVC 没有 TSan，而容器里 `setarch -R` 被 Docker 自带 seccomp 拒绝），
+  先用 `docker run --security-opt seccomp=unconfined` 起一档、证明旧写法报得出竞态，再动它。
   没有这一档之前把跨线程手抖写进去，只是把可复现的卡顿换成不可复现的竞态。
 - **两处路径仍按本地码页交给第三方库**（各自在同一句里写明理由，`Style.SourceConventions` 认这些理由）：
   spdlog 的日志文件名（本构建没开 `SPDLOG_WCHAR_FILENAMES`，窄串要按本地码页给）与 Tesseract/Leptonica 的

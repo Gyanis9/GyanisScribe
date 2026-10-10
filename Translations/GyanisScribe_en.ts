@@ -476,6 +476,10 @@
             <translation>Video bitrate</translation>
         </message>
         <message>
+            <source>正在编成品，好了会说一声</source>
+            <translation>Building the finished file - you will hear when it is ready</translation>
+        </message>
+        <message>
             <source>按质量优先</source>
             <translation>Quality first</translation>
         </message>
