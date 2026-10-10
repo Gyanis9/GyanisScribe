@@ -350,7 +350,7 @@ namespace GyanisScribe::Pin
             return;
         }
 
-        // 不加修饰键就是缩放：按倍率乘除，滚轮一格 1.1 倍手感与 Snipaste 一致
+        // 不加修饰键就是缩放：按倍率乘除，滚轮一格 1.1 倍
         setScale(steps > 0.0 ? m_scale * kWheelScaleStep : m_scale / kWheelScaleStep);
     }
 
