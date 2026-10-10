@@ -49,11 +49,11 @@ def collect_required(scan_root: pathlib.Path) -> list[str]:
     """穷举源码里用到的界面文案：uiText 的字面量实参 + constexpr 表行里的中文标签。"""
     required: list[str] = []
     for source in sorted(list(scan_root.rglob("*.cpp")) + list(scan_root.rglob("*.h"))):
-        flat = JOINED.sub("", source.read_text(encoding="utf-8", newline="").replace("\n", " "))
+        flat = JOINED.sub("", source.read_text(encoding="utf-8").replace("\n", " "))
         required += [unescape_cpp(match) for match in CALL.findall(flat)]
         # 表行的标签不走字面量实参：只认「大写开头的聚合名{…}」这一形，且必须在同一行内，
         # 否则两个大括号之间的跨度会吃掉整段代码，把日志文案也算成表行
-        for row in re.finditer(r"[A-Z][A-Za-z0-9_]*\{[^{}\n]*\}", source.read_text(encoding="utf-8", newline="")):
+        for row in re.finditer(r"[A-Z][A-Za-z0-9_]*\{[^{}\n]*\}", source.read_text(encoding="utf-8")):
             for cell in re.finditer(r'"((?:\\.|[^"\\])*)"', row.group(0)):
                 value = unescape_cpp(cell.group(1))
                 if any("\u4e00" <= char <= "\u9fff" for char in value):
