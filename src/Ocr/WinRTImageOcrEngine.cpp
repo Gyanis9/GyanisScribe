@@ -18,11 +18,6 @@
 #include <winrt/Windows.Media.Ocr.h>
 #include <winrt/Windows.Storage.Streams.h>
 
-// windows.h 排在 Qt 与投影之后：它会带进 interface 这类宏，先解析完 Qt 头就不会互相干扰
-#include <windows.h>
-
-#include <robuffer.h>
-
 #include <cmath>
 #include <cstring>
 #include <format>
@@ -205,11 +200,10 @@ namespace GyanisScribe::Ocr
                     try
                     {
                         auto const buffer = winrt::Windows::Storage::Streams::Buffer(static_cast<uint32_t>(pngBytes.size()));
-                        byte      *raw    = nullptr;
-                        // IBufferByteAccess 是这份 SDK 里的裸 COM 接口（robuffer.h 声明在 Windows:: 而不是 ABI:: 下），
-                        // 投影里没有对应物，只能这样把字节写进系统缓冲区
-                        buffer.as<Windows::Storage::Streams::IBufferByteAccess>()->Buffer(&raw);
-                        std::memcpy(raw, pngBytes.data(), pngBytes.size());
+                        // 取裸指针走投影自带的 consume 扩展：它内部就是 IBufferByteAccess。
+                        // 不再拉 SDK 的 robuffer.h——那个目录不在 MSVC 默认 INCLUDE 里，
+                        // 不带完整 vcvars 的终端会把它红成一次与本次改动无关的失败
+                        std::memcpy(buffer.data(), pngBytes.data(), pngBytes.size());
                         // Buffer(容量) 建出来长度是 0：不写长度就等于往流里写 0 字节，解码会拿到空流
                         buffer.Length(static_cast<uint32_t>(pngBytes.size()));
 
