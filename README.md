@@ -4,8 +4,9 @@ Windows 优先、可跨平台的桌面工具：截图、标注、贴图、取色
 交互参考 Snipaste，但不使用其任何代码、图标、界面素材或商标。
 
 - **技术栈**：C++23 · Qt 6.11（Widgets/Svg/Network）· CMake ≥ 3.28 · Conan 2 · MSVC 2022；Linux 侧在 Docker Ubuntu 24.04 容器内构建与验证
-- **当前状态**：六大功能已可用；本机 debug 与 release 两档各 192 条用例全绿，容器 191 条
-  （差的那条是 Windows 专属的热键取值映射）；打包脚本产出绿色包 + 安装器
+- **当前状态**：六大功能已可用；本机 debug 与 release 两档各 220 条用例全绿；容器 asan 与 coverage 两档
+  219 条通过、1 条跳过（容器那份 Qt 6.4 没有 lrelease，「真实语言包装载」那条只能在有包的一档成立）；
+  行覆盖率 63.4%（阈值 55%）；打包脚本产出绿色目录 + zip + NSIS 安装器，英文语言包随包分发
 - **需求与硬约束**：[docs/ProjectRequirements.md](docs/ProjectRequirements.md)
 
 ## 热键与功能
@@ -17,7 +18,10 @@ Windows 优先、可跨平台的桌面工具：截图、标注、贴图、取色
 | 文字识别 | `Ctrl+Alt+O` | 截完直接进结果窗口：左侧原图、右侧文本，点一行就在图上圈出那一行，可导出 TXT/JSON、换语言重认 |
 | 屏幕取色 | `Ctrl+Alt+P` | 全屏冻帧 + 9×9 放大镜，点一下把颜色按 HEX/RGB/HSL 复制走 |
 
-热键、保存目录、主题、识别语言与写法都在设置窗口里改，即时生效。托盘菜单是找不到窗口时的入口。
+设置窗口左侧按类别竖排：通用 / 截图 / 标注 / 贴图 / 录屏 / 文字识别 / 快捷键 / 主题 / 关于 / 历史，
+每页顶部一句说明写清这一类管什么。除界面语言（重启后生效）外，改完立即写入配置；
+标注默认线宽与字号、贴图默认不透明度、录屏默认帧率从下一次新建标注窗、新贴一张图、下一次开始录屏时起用。
+托盘菜单是找不到窗口时的入口。
 
 ## 在 Windows 上构建
 
@@ -58,6 +62,10 @@ scripts/container/sanitize.sh      # ASan(+UBSan)；tsan 档另说，见下方�
 scripts/container/coverage.sh 55   # gcovr 汇总，阈值不过就红（判定由 gcovr 的 --fail-under-line 做）
 ```
 
+`asan` 档既可以用 `sanitize.sh` 一把跑完，也可以 `build.sh asan` 再 `test.sh asan`：sanitizer 的运行期参数
+（含 LSan 那张只放过系统库字体缓存的抑制表）统一在 `env.sh` 里导出，两条入口给的是同一个结果。
+早先这张表只挂在 `sanitize.sh` 上，换 `test.sh` 跑就会多出两条与代码无关的红。
+
 Linux 侧的已知边界：没有全局热键能力（登记会给出中文提示并降级）、无系统托盘时菜单改由主窗口提供、
 `Qt::ColorScheme` 要 6.8 才有而容器是 6.4（跟随系统会解算到兜底档）、**TSan 这一档在当前容器里跑不了**——
 这台内核（WSL2 6.18）下 libtsan 必须关 ASLR 才起得来进程，而 `setarch -R` 走的 `personality` 被 Docker 自带
@@ -90,7 +98,7 @@ tests/          逐级镜像 src 的目录结构
 `Core::uiTextUtf8("中文{}")`（`src/Core/Text.h`），日志 `Core::Logger::*` 刻意保持中文——排障的人
 不该因为界面语言而读不到日志。
 
-- 语言在「设置 → 主题」里选，配置键 `Ui/Language`（`zh` / `en`）；切换在重启后生效。
+- 语言在「设置 → 通用」里选，配置键 `Ui/Language`（`zh` / `en`）；切换在重启后生效。
 - 英文档需要 `translations/GyanisScribe_en.qm`，随包分发；缺包时应用按中文继续并给出放置位置。
 - 翻译目录 `Translations/GyanisScribe_en.ts` 是唯一真源，`.qm` 由构建期的 lrelease 产出
   （挂在 `DeployTranslations` 上）。容器里那份 Qt 6.4 没有 lrelease，那一档不出包。
@@ -109,3 +117,17 @@ tests/          逐级镜像 src 的目录结构
   staging 目录自检通过 + 安装器带卸载段。
 - Debug 档不领 Tesseract：上游 leptonica 的 Debug 包库名与其 `cpp_info` 不一致，
   `conanfile.py` 里按 `build_type` 分岔并写明撤除判据。
+
+## 后续计划
+
+按需求条目核对过，剩下这些没做，都在等一个能验证它们的环境：
+
+- **录屏带声音**（需求功能清单第 5 项的「麦克风/系统声音」）：没实现。取音要枚举系统设备并让用户选一路，
+  Windows 侧走 `dshow`/WASAPI 环回、Linux 侧另一套，而本机 CI 与容器都没有音频设备——
+  现在写进去就是一段没人验过的代码。资源里 `Microphone.svg` / `SystemAudio.svg` 是需求第七节点名的图标，先随包备着。
+- **长录屏**：帧序列按 PNG 逐帧落盘，1080p 十分钟就是 GB 级；换成喂 ffmpeg `rawvideo` 管道才能放开时长上限。
+- **Linux 全局热键**：`Platform` 抽象下只有 Windows 后端有真登记，Linux 侧给出中文降级提示；
+  要做得接 X11/Wayland 各自的快捷键协议。
+- **安装器真机 smoke test**：脚本验到 staging 自检通过 + 安装器带卸载段，「装完能起、卸载能清」还没在真机上跑过。
+- **TSan 一档**：容器里跑不了（`setarch -R` 的 `personality` 被 Docker 自带 seccomp 拒绝，实测 EPERM），
+  要用 `docker run --security-opt seccomp=unconfined` 起容器才能补上这一轮跨线程判据。
