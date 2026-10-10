@@ -77,6 +77,13 @@ namespace GyanisScribe::Settings
     /// 读端在 AppController 造参数那一处，写端在设置的录屏页
     inline constexpr std::string_view kRecordScope = "Record/Scope";
 
+    /// 录屏取声的麦克风那一路（dshow 的稳定标识），空表示不取这一路；
+    /// 读端在 AppController 造参数那一处，写端在设置的录屏页
+    inline constexpr std::string_view kRecordAudioMicrophone = "Record/AudioMicrophoneDevice";
+
+    /// 录屏取声的系统声音那一路，取值形状与上一项相同
+    inline constexpr std::string_view kRecordAudioSystemSound = "Record/AudioSystemSoundDevice";
+
     /// 录屏时是否把光标位置圈在帧上，读端在 AppController 造参数那一处，写端在设置的录屏页
     inline constexpr std::string_view kRecordCursorHighlight = "Record/CursorHighlight";
 

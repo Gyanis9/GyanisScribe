@@ -200,6 +200,10 @@
             <translation>The control bar is collapsed; press Ctrl+Alt+R or use the recording entry in the tray to stop and save</translation>
         </message>
         <message>
+            <source>成品已出，但没带上声音：取声那一步中途失败了，原因写在日志里</source>
+            <translation>The recording is done but has no sound: capturing audio failed partway through. The reason is in the log</translation>
+        </message>
+        <message>
             <source>成品已保存，但没进历史清单：{}</source>
             <translation>The file was saved but never reached the history list: {}</translation>
         </message>
@@ -324,6 +328,10 @@
             <translation>Last selection records the rectangle framed by the most recent capture; Current window records whichever window is in front when recording starts. Changes apply from the next recording</translation>
         </message>
         <message>
+            <source>不取这一路</source>
+            <translation>Don't take this input</translation>
+        </message>
+        <message>
             <source>输出格式</source>
             <translation>Output format</translation>
         </message>
@@ -440,8 +448,8 @@
             <translation>Opacity for new pins</translation>
         </message>
         <message>
-            <source>录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。存成 GIF 时帧率上限比 MP4 低。这几项都从下一次开始录屏时生效。</source>
-            <translation>Recorded files land in this folder. With Last selection or Current window, the picture keeps only that part of the screen. GIF allows a lower frame rate ceiling than MP4. All of these apply from the next recording.</translation>
+            <source>录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。存成 GIF 时帧率上限比 MP4 低。取声那两格列不出设备时只剩「不取这一路」，把鼠标停在框上能看到原因。这几项都从下一次开始录屏时生效。</source>
+            <translation>Recorded files land in this folder. With Last selection or Current window the picture keeps only that part of the screen. GIF allows a lower frame rate ceiling than MP4. When the two audio rows can't list any device, only "Don't take this input" is left there - hover over the box to read why. All of these apply from the next recording.</translation>
         </message>
         <message>
             <source>录屏成品目录</source>
@@ -450,6 +458,22 @@
         <message>
             <source>录屏目录</source>
             <translation>Recordings</translation>
+        </message>
+        <message>
+            <source>麦克风这一路</source>
+            <translation>Microphone input</translation>
+        </message>
+        <message>
+            <source>麦克风设备</source>
+            <translation>Microphone device</translation>
+        </message>
+        <message>
+            <source>系统声音这一路</source>
+            <translation>System sound input</translation>
+        </message>
+        <message>
+            <source>系统声音设备</source>
+            <translation>System sound device</translation>
         </message>
         <message>
             <source>认得出哪种文字取决于语言包。目录留空时按环境变量与程序数据目录找。</source>
@@ -1076,6 +1100,22 @@
             <translation>The cursor highlight target frame is empty: do not draw a ring when the grab did not succeed. Check the captured frame before calling this step</translation>
         </message>
         <message>
+            <source>列不出音频设备：ffmpeg 的输出里没有认得出的设备行（末段：{}）。请更新 ffmpeg 后重试，录屏仍可静音进行</source>
+            <translation>Couldn't list audio devices: ffmpeg's output had no recognizable device line (tail: {}). Update ffmpeg and try again; recording can still run without sound</translation>
+        </message>
+        <message>
+            <source>这个平台不经 dshow 列音频设备（Linux 走 ALSA/Pulse，还没接）。录屏可以照录，只是带不了声音</source>
+            <translation>This platform doesn't list audio devices through dshow (Linux uses ALSA/Pulse, not wired up yet). Recording still works, just without sound</translation>
+        </message>
+        <message>
+            <source>列音频设备的那一步起不动 ffmpeg。请确认它还能运行，或重新安装</source>
+            <translation>ffmpeg wouldn't start while listing audio devices. Check that it still runs, or reinstall it</translation>
+        </message>
+        <message>
+            <source>要取声音却一路设备都没给。请在设置的录屏页选一路，或把取声关掉</source>
+            <translation>Sound was asked for but neither input got a device. Pick one on the Recording page of Settings, or turn audio capture off</translation>
+        </message>
+        <message>
             <source>没找到 ffmpeg 命令行程序，录屏的编码这一步要用它。请安装 ffmpeg 的 Windows 构建并把所在目录加入 PATH（winget 里搜 ffmpeg 也有），装好后重启本程序</source>
             <translation>The ffmpeg command-line program wasn't found; the encoding step of recording needs it. Install a Windows build of ffmpeg and add its folder to PATH (searching ffmpeg in winget works too), then restart GyanisScribe.</translation>
         </message>
@@ -1238,6 +1278,10 @@
         <message>
             <source>当前没有正在进行的录屏</source>
             <translation>No recording is in progress</translation>
+        </message>
+        <message>
+            <source>取声的 ffmpeg 起不来。设备可能正被别的程序占用，关掉占用者再录，或在设置里把取声关掉</source>
+            <translation>The audio ffmpeg wouldn't start. The device may be held by another program - close it and try again, or turn audio capture off in Settings</translation>
         </message>
         <message>
             <source>第 {} 帧是空图，写不了。请检查抓帧那一层有没有拿到画面</source>

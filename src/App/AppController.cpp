@@ -505,6 +505,10 @@ namespace GyanisScribe::App
         // 光标高亮是个开关，没有「读不出」这一档：配置里没有就按关；到了画不出位置的那一种模式，RecordingService 会自己报一句
         config.cursorHighlight = m_settings->boolValue(Settings::kRecordCursorHighlight, false);
 
+        // 取声的两路：留空就是不取那一路。存的是 dshow 的稳定标识，换系统显示语言也不漂
+        config.microphoneDevice  = m_settings->stringValue(Settings::kRecordAudioMicrophone, QString());
+        config.systemSoundDevice = m_settings->stringValue(Settings::kRecordAudioSystemSound, QString());
+
         // 输出容器按用户选的那一档来：GIF 走两遍调色板，帧率上限比 MP4 低，
         // 那一档的天花板由 validateRecorderConfig 在真正开录之前判
         const auto storedFormat = m_settings->stringValue(Settings::kRecordFormat, QString::fromUtf8(std::string{Record::recordFormatText(config.format)}));
@@ -653,6 +657,11 @@ namespace GyanisScribe::App
     {
         hideRecordingHud();
         Core::Logger::info(std::format("录屏成品：{}", outputPath.toStdString()));
+        // 中途丢了声音要当面说一句：只写日志等于让用户拿到一个安静的成品，再自己发现没录上
+        if (m_recording->audioOutcome() == Record::AudioCaptureOutcome::Failed)
+        {
+            notifyUser(GyanisScribe::Core::uiText("成品已出，但没带上声音：取声那一步中途失败了，原因写在日志里"), Ui::ToastKind::Information);
+        }
         recordHistory(Core::Paths::fromDisplayText(outputPath), History::HistoryKind::Recording, m_recordingSize);
     }
 

@@ -11,6 +11,8 @@ add_library(Record STATIC
         CursorHighlight.cpp
         FfmpegCommand.h
         FfmpegCommand.cpp
+        FfmpegAudioDevices.h
+        FfmpegAudioDevices.cpp
         FfmpegRecordingEncoder.h
         FfmpegRecordingEncoder.cpp
         RecordingSession.h

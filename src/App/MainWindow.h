@@ -41,6 +41,11 @@ namespace GyanisScribe::History
     class HistoryView;
 } // namespace GyanisScribe::History
 
+namespace GyanisScribe::Record
+{
+    class FfmpegAudioDeviceEnumerator;
+} // namespace GyanisScribe::Record
+
 namespace GyanisScribe::App
 {
     /// 主窗口能直接跳到的页面
@@ -180,6 +185,13 @@ namespace GyanisScribe::App
                             QWidget *parent = nullptr);
 
         /**
+         * @brief 析构：设备枚举器要在这里才看得到完整类型
+         * @details 头里对它只有前向声明，而 unique_ptr 的隐式析构会被内联进每个 include 本头的
+         *          翻译单元 —— GCC 在那里嫌类型不完整（实测 C++ 侧红，MSVC 侧看不出）。
+         */
+        ~MainWindow() override;
+
+        /**
          * @brief 切到某一页并显示窗口
          * @param page 目标页
          * @details 页不在表里时只记日志不切换：切到第 0 页会把用户的操作读成「点了没反应」，
@@ -269,13 +281,14 @@ namespace GyanisScribe::App
         /// 历史页：缩略图列表与三个出口
         QWidget *buildHistoryPage();
 
-        Settings::ISettingsStore       &m_settings;          ///< 配置存储，不拥有
-        GyanisScribe::Ui::ThemeManager &m_theme;             ///< 主题管理器，不拥有
-        GyanisScribe::Ui::IconProvider &m_icons;             ///< 图标供给器，不拥有
-        QListWidget                    *m_nav   = nullptr;   ///< 左侧导航，一行一页
-        QStackedWidget                 *m_stack = nullptr;   ///< 右侧页容器，序号与导航行同解
-        History::HistoryStore          &m_historyStore;      ///< 历史清单，历史页从它读
-        History::HistoryView           *m_history = nullptr; ///< 历史页控件，重读清单时刷新它
+        Settings::ISettingsStore                            &m_settings;          ///< 配置存储，不拥有
+        GyanisScribe::Ui::ThemeManager                      &m_theme;             ///< 主题管理器，不拥有
+        GyanisScribe::Ui::IconProvider                      &m_icons;             ///< 图标供给器，不拥有
+        QListWidget                                         *m_nav   = nullptr;   ///< 左侧导航，一行一页
+        QStackedWidget                                      *m_stack = nullptr;   ///< 右侧页容器，序号与导航行同解
+        std::unique_ptr<Record::FfmpegAudioDeviceEnumerator> m_audioDevices;      ///< 录屏页那两路设备清单的来源，一次查询两格共用
+        History::HistoryStore                               &m_historyStore;      ///< 历史清单，历史页从它读
+        History::HistoryView                                *m_history = nullptr; ///< 历史页控件，重读清单时刷新它
     };
 
 } // namespace GyanisScribe::App

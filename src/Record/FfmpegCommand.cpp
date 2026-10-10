@@ -111,6 +111,46 @@ namespace GyanisScribe::Record
         };
     }
 
+    Core::Expected<QStringList> audioCaptureArguments(const QString &microphoneDevice, const QString &systemSoundDevice, const std::filesystem::path &wavFile)
+    {
+        // 顺序固定：麦克风在前、系统声在后，滤镜图里的 [0:a]/[1:a] 就是按这个次序数出来的
+        QStringList devices;
+        if (!microphoneDevice.isEmpty())
+        {
+            devices << microphoneDevice;
+        }
+        if (!systemSoundDevice.isEmpty())
+        {
+            devices << systemSoundDevice;
+        }
+        if (devices.isEmpty())
+        {
+            return std::unexpected(Core::Error{
+                    .code    = Core::ErrorCode::InvalidArgument,
+                    .message = GyanisScribe::Core::uiTextUtf8("要取声音却一路设备都没给。请在设置的录屏页选一路，或把取声关掉"),
+            });
+        }
+
+        QStringList arguments{QStringLiteral("-hide_banner"), QStringLiteral("-loglevel"), QStringLiteral("error"), QStringLiteral("-y")};
+        for (const auto &device: devices)
+        {
+            // 每一路自带 -f dshow：ffmpeg 的 -f 只作用于紧跟其后的那一个 -i
+            arguments << QStringLiteral("-f") << QStringLiteral("dshow") << QStringLiteral("-i") << QStringLiteral("audio=%1").arg(device);
+        }
+
+        if (devices.size() > 1)
+        {
+            // dropout_transition=0：一路先结束时不要把混音音量渐变掉，剩下的那路要照常录完
+            arguments << QStringLiteral("-filter_complex") << QStringLiteral("[0:a][1:a]amix=inputs=2:duration=longest:dropout_transition=0[a]") << QStringLiteral("-map")
+                      << QStringLiteral("[a]");
+        }
+
+        // 中间格式定 pcm_s16le 而不是一上来就 aac：取声失败时画面那一半还能独立出片
+        arguments << QStringLiteral("-acodec") << QStringLiteral("pcm_s16le") << QStringLiteral("-ar") << QStringLiteral("48000") << QStringLiteral("-ac") << QStringLiteral("2")
+                  << fromPath(wavFile);
+        return arguments;
+    }
+
     Core::Expected<QString> locateFfmpeg()
     {
         if (const auto found = QStandardPaths::findExecutable(QStringLiteral("ffmpeg")); !found.isEmpty())

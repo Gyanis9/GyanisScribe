@@ -10,9 +10,11 @@
 
 #include <QCoreApplication>
 #include <QFileInfo>
+#include <QProcess>
 #include <QStringList>
 #include <QImage>
 #include <QString>
+#include <QtGlobal>
 
 #include <filesystem>
 #include <memory>
@@ -494,6 +496,78 @@ TEST(RecordScopeSetting, TableRoundTripsEveryModeAndRejectsUnknownToken)
         EXPECT_NE(parsed.error().message.find("FullScreen"), std::string::npos) << bad.toStdString();
         EXPECT_NE(parsed.error().message.find("Record/Scope"), std::string::npos) << bad.toStdString();
     }
+}
+
+/**
+ * @brief 钉住取声命令的一路、两路与「一路都没给」三种形状
+ * @details 一路时不能出现 amix：那是两个输入才有的滤镜，多出去 ffmpeg 会直接报输入数不对。
+ *          两路时必须按麦克风在前、系统声在后数 [0:a]/[1:a]，数反了用户选的就不是他听见的。
+ */
+TEST(FfmpegAudioCaptureArguments, BuildsOneOrTwoInputsAndRefusesNone)
+{
+    const QString mic{QStringLiteral("@device_cm_{GUID}") + QStringLiteral("\\wave_{MIC}")};
+    const QString mix{QStringLiteral("@device_cm_{GUID}") + QStringLiteral("\\wave_{MIX}")};
+    const auto    wav = std::filesystem::path("C:/tmp/audio.wav");
+
+    const auto none = GyanisScribe::Record::audioCaptureArguments(QString(), QString(), wav);
+    ASSERT_FALSE(static_cast<bool>(none)) << "两路都没给却拼出了一条命令";
+    EXPECT_EQ(none.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument);
+    EXPECT_NE(none.error().message.find("设备"), std::string::npos);
+
+    const auto one = GyanisScribe::Record::audioCaptureArguments(mic, QString(), wav);
+    ASSERT_TRUE(static_cast<bool>(one)) << one.error().message;
+    EXPECT_EQ(one->count(QStringLiteral("-i")), 1);
+    EXPECT_TRUE(one->contains(QStringLiteral("audio=%1").arg(mic))) << one->join(QStringLiteral(" ")).toStdString();
+    EXPECT_FALSE(one->contains(QStringLiteral("-filter_complex"))) << "一路输入不该带混音滤镜";
+    EXPECT_TRUE(one->contains(QStringLiteral("pcm_s16le")));
+    EXPECT_TRUE(one->last().endsWith(QStringLiteral("audio.wav"))) << one->last().toStdString();
+
+    const auto two = GyanisScribe::Record::audioCaptureArguments(mic, mix, wav);
+    ASSERT_TRUE(static_cast<bool>(two)) << two.error().message;
+    EXPECT_EQ(two->count(QStringLiteral("-i")), 2);
+    EXPECT_TRUE(two->contains(QStringLiteral("[0:a][1:a]amix=inputs=2:duration=longest:dropout_transition=0[a]")));
+    // 顺序就是 [0:a]/[1:a] 的次序：麦克风必须排在第一个 -i 上
+    EXPECT_EQ(two->indexOf(QStringLiteral("audio=%1").arg(mic)) < two->indexOf(QStringLiteral("audio=%1").arg(mix)), true) << "两路的顺序反了";
+}
+
+/**
+ * @brief 用真 ffmpeg 验一次取声命令的形状（环境变量门控）
+ * @details 拼装函数只按我猜的形状断言是不够的：滤镜图、-f 与 -i 的配对方式只要有一处 ffmpeg
+ *          不认，界面上就只会剩一句「起不来」。给它一台真 ffmpeg 与一路真设备，这条就跑到底。
+ *          缺任一环境变量就 SKIP，仓库里不留任何设备名或路径。
+ */
+TEST(FfmpegAudioCaptureEndToEnd, CapturesAReadableWavWithARealFfmpeg)
+{
+    const auto program = qEnvironmentVariable("GYANISSCRIBE_FFMPEG");
+    const auto device  = qEnvironmentVariable("GYANISSCRIBE_AUDIO_DEVICE");
+    if (program.isEmpty() || device.isEmpty())
+    {
+        GTEST_SKIP() << "没有 GYANISSCRIBE_FFMPEG 或 GYANISSCRIBE_AUDIO_DEVICE，这一条要真 ffmpeg 与一路真设备";
+    }
+
+    const auto wav   = std::filesystem::temp_directory_path() / "GyanisScribe-audio-capture-probe.wav";
+    const auto built = GyanisScribe::Record::audioCaptureArguments(device, QString(), wav);
+    ASSERT_TRUE(static_cast<bool>(built)) << built.error().message;
+
+    QStringList arguments = *built;
+    // 探针只采两秒：-t 是输出的选项，必须落在输出文件名之前，把文件名先摘下来再补回去最直白
+    const auto outputFile = arguments.takeLast();
+    arguments << QStringLiteral("-t") << QStringLiteral("2") << outputFile;
+
+    std::error_code ignored;
+    std::filesystem::remove(wav, ignored);
+
+    QProcess recorder;
+    recorder.setProcessChannelMode(QProcess::MergedChannels);
+    recorder.start(program, arguments);
+    ASSERT_TRUE(recorder.waitForStarted(5000)) << "ffmpeg 起不来：" << program.toStdString();
+    ASSERT_TRUE(recorder.waitForFinished(20000)) << "两秒的采集没在 20 秒内收尾：" << recorder.readAll().toStdString();
+
+    const auto bytes = std::filesystem::file_size(wav, ignored);
+    ASSERT_FALSE(ignored) << "取声命令跑完了却没留下 wav。argv=[" << arguments.join(QStringLiteral(" ")).toStdString() << "] 输出=" << wav.string()
+                          << " 进程输出=" << QString::fromUtf8(recorder.readAll()).toStdString();
+    EXPECT_GT(bytes, 44u) << "只有 wav 头等于什么都没录到";
+    std::filesystem::remove(wav, ignored);
 }
 
 /**

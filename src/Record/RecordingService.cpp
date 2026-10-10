@@ -5,9 +5,11 @@
 #include "Core/Paths.h"
 #include "Core/Text.h"
 #include "Record/CursorHighlight.h"
+#include "Record/FfmpegCommand.h"
 
 #include <QCursor>
 #include <QDateTime>
+#include <QProcess>
 #include <QScreen>
 
 #include <chrono>
@@ -18,6 +20,15 @@ namespace
 {
     /// 定时器比目标帧率多要一点余量：正好按 1000/帧率 排会让偶发的一次迟到的抓帧直接跳过一整格
     constexpr int kTimerSlackMs = 4;
+
+    /// 等 ffmpeg 起来的最长时间：设备被占用时它几乎立刻就退，等满只为防机器卡住
+    constexpr int kAudioStartTimeoutMs = 3000;
+
+    /// 发了收尾的 q 之后最多再等多久：ffmpeg 关掉容器是毫秒级的事
+    constexpr int kAudioStopTimeoutMs = 5000;
+
+    /// wav 的头是 44 字节，只有头的文件等于没录到任何采样
+    constexpr auto kWavHeaderBytes = static_cast<std::uintmax_t>(44);
 
     /**
      * @brief 这一块屏左上角在全局逻辑坐标里的位置
@@ -46,6 +57,16 @@ namespace GyanisScribe::Record
         QObject::connect(&m_timer, &QTimer::timeout, this, &RecordingService::onTick);
     }
 
+    RecordingService::~RecordingService()
+    {
+        // 对象要走了而 ffmpeg 还在取声：强杀，不给它留一个「销毁了进程还在跑」的尾巴
+        if (m_audio != nullptr && m_audio->state() != QProcess::NotRunning)
+        {
+            m_audio->kill();
+            m_audio->waitForFinished(1000);
+        }
+    }
+
     Core::Expected<void> RecordingService::start(const RecorderConfig &config, const int countdownSeconds)
     {
         if (m_session != nullptr && m_session->state() != RecordingState::Done && m_session->state() != RecordingState::Failed)
@@ -71,6 +92,14 @@ namespace GyanisScribe::Record
         // 每一轮重新开始报：上一轮报过的原因（比如屏被拔掉）不代表这一轮也成立
         m_cursorHighlightWarned = false;
         m_sink                  = std::make_unique<PngSequenceSink>(directory);
+
+        // 取声起不动就整轮拒绝开始：交出一个安静的成品，比根本不录更容易让人误会
+        if (const auto audio = startAudioCapture(); !audio)
+        {
+            std::error_code cleanup;
+            std::filesystem::remove_all(directory, cleanup);
+            return std::unexpected(audio.error());
+        }
         // 节拍从这一刻起算：会话拿到的所有时间都是同一个单调时钟的读数
         m_clock.start();
         m_session = std::make_unique<RecordingSession>(config, *m_sink, m_clock.elapsed(), countdownSeconds);
@@ -116,13 +145,21 @@ namespace GyanisScribe::Record
             return std::unexpected(sealed.error());
         }
 
-        const auto encoded = m_encoder.encode(m_config, m_frameDirectory, frames, {});
+        const auto audioWav = finishAudioCapture();
+        const auto encoded  = m_encoder.encode(m_config, m_frameDirectory, frames, audioWav);
         if (!encoded)
         {
             // 保留临时帧：这已经是录完的内容，删掉就等于让用户白录一次
             Core::Logger::warning(std::format("录屏编码失败，临时帧保留在 {} 以便重编码", Core::Paths::toDisplayText(m_frameDirectory).toStdString()));
             emit failed(QString::fromUtf8(encoded.error().message.c_str()));
             return std::unexpected(encoded.error());
+        }
+
+        // 成品已含音轨，中间 wav 就没用了；帧目录按原规则清，失败时两者都留着好重编码
+        if (!audioWav.empty())
+        {
+            std::error_code wavCleanup;
+            std::filesystem::remove(audioWav, wavCleanup);
         }
 
         std::error_code cleanupError;
@@ -253,6 +290,83 @@ namespace GyanisScribe::Record
                 emit failed(QString::fromUtf8(stopped.error().message.c_str()));
             }
         }
+    }
+
+    Core::Expected<void> RecordingService::startAudioCapture()
+    {
+        m_audioOutcome = AudioCaptureOutcome::NotRequested;
+        m_audioWav.clear();
+        if (m_config.microphoneDevice.isEmpty() && m_config.systemSoundDevice.isEmpty())
+        {
+            return {};
+        }
+
+        const auto program = locateFfmpeg();
+        if (!program)
+        {
+            return std::unexpected(program.error());
+        }
+
+        m_audioWav           = m_frameDirectory / "audio.wav";
+        const auto arguments = audioCaptureArguments(m_config.microphoneDevice, m_config.systemSoundDevice, m_audioWav);
+        if (!arguments)
+        {
+            return std::unexpected(arguments.error());
+        }
+
+        m_audio = std::make_unique<QProcess>();
+        m_audio->setProcessChannelMode(QProcess::MergedChannels);
+        m_audio->start(*program, *arguments);
+        if (!m_audio->waitForStarted(kAudioStartTimeoutMs))
+        {
+            m_audio.reset();
+            return std::unexpected(Core::Error{
+                    Core::ErrorCode::DependencyMissing,
+                    GyanisScribe::Core::uiTextUtf8("取声的 ffmpeg 起不来。设备可能正被别的程序占用，关掉占用者再录，或在设置里把取声关掉"),
+            });
+        }
+        m_audioOutcome = AudioCaptureOutcome::Captured;
+        Core::Logger::info(std::format("录屏开始取声：麦克风 {}，系统声音 {}", m_config.microphoneDevice.isEmpty() ? "未选" : m_config.microphoneDevice.toStdString(),
+                                       m_config.systemSoundDevice.isEmpty() ? "未选" : m_config.systemSoundDevice.toStdString()));
+        return {};
+    }
+
+    std::filesystem::path RecordingService::finishAudioCapture()
+    {
+        if (m_audio == nullptr)
+        {
+            return {};
+        }
+
+        // 一个 q 走 stdin 就是 ffmpeg 自己的「收尾退出」：它会正常关掉 wav 的长度头，强杀留下的文件读不出时长
+        if (m_audio->state() != QProcess::NotRunning)
+        {
+            m_audio->write("q\\n");
+            m_audio->waitForBytesWritten(1000);
+            if (!m_audio->waitForFinished(kAudioStopTimeoutMs))
+            {
+                m_audio->kill();
+                m_audio->waitForFinished(1000);
+            }
+        }
+
+        std::error_code sizeError;
+        const auto      bytes = std::filesystem::file_size(m_audioWav, sizeError);
+        const auto      took  = !sizeError && bytes > kWavHeaderBytes;
+        if (!took)
+        {
+            Core::Logger::warning(std::format("取声没留下可读的 wav（退出码 {}）：成品按无声交回", m_audio->exitCode()));
+            m_audioOutcome = AudioCaptureOutcome::Failed;
+            m_audio.reset();
+            return {};
+        }
+        m_audio.reset();
+        return m_audioWav;
+    }
+
+    AudioCaptureOutcome RecordingService::audioOutcome() const noexcept
+    {
+        return m_audioOutcome;
     }
 
 } // namespace GyanisScribe::Record

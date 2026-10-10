@@ -8,6 +8,7 @@
 #include "Ocr/OcrEngineFactory.h"
 #include "Pick/ColorFormat.h"
 #include "Pin/PinLayout.h"
+#include "Record/FfmpegAudioDevices.h"
 #include "Record/RecorderConfig.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
@@ -534,6 +535,60 @@ namespace
     }
 
     /**
+     * @brief 一路音频输入的下拉框
+     * @param settings 配置存储
+     * @param key 这一路写哪个键
+     * @param title 这一路的中文名，日志与无障碍名都从它取
+     * @param enumerator 设备清单的来源，两格共用一个
+     * @return 归调用方所有的下拉框
+     * @details 清单是异步来的：起 ffmpeg 进程不能压在主线程上。配置里存的那一路这次列不出来时，
+     *          下拉框回到「不取这一路」而配置原样不动——取不到声会由录屏那一步拒绝开始并说明原因，
+     *          在这里顺手改掉用户的选择不但掩盖了设备被占用，还会让下一次插回设备时用回他原来的选择。
+     */
+    QComboBox *makeAudioDeviceCombo(ISettingsStore &settings, const std::string_view key, const QString &title, GyanisScribe::Record::FfmpegAudioDeviceEnumerator &enumerator)
+    {
+        auto *combo = new QComboBox;
+        combo->addItem(GyanisScribe::Core::uiText("不取这一路"), QString());
+        combo->setAccessibleName(title);
+
+        const auto stored = settings.stringValue(key, QString());
+        QObject::connect(&enumerator, &GyanisScribe::Record::FfmpegAudioDeviceEnumerator::updated, combo,
+                         [combo, stored, title](const QVector<GyanisScribe::Record::AudioInputDevice> &devices)
+                         {
+                             for (const auto &device: devices)
+                             {
+                                 combo->addItem(device.friendlyName, device.alternativeName);
+                             }
+                             if (const int index = combo->findData(stored); index >= 0)
+                             {
+                                 combo->setCurrentIndex(index);
+                             } else if (!stored.isEmpty())
+                             {
+                                 Logger::warning(std::format("设置页列不出{}：上次选的设备 {} 这次不在清单里，配置原样留着", title.toStdString(), stored.toStdString()));
+                             }
+                         });
+        QObject::connect(&enumerator, &GyanisScribe::Record::FfmpegAudioDeviceEnumerator::failed, combo,
+                         [combo, title](const GyanisScribe::Core::Error &error)
+                         {
+                             // 列不出来时这一格只剩「不取这一路」：原因挂在悬停提示上，用户不必去翻日志才知道这里为什么没有可选项
+                             combo->setToolTip(QString::fromUtf8(error.message.c_str()));
+                             Logger::warning(std::format("设置页列不出{}：{}", title.toStdString(), error.message));
+                         });
+        enumerator.refresh();
+
+        // 接线排在设初值之后：把界面摆到位不等于用户改过，否则一开设置页就把选择写回配置
+        QObject::connect(combo, &QComboBox::currentIndexChanged, combo,
+                         [&settings, key, title, combo](int)
+                         {
+                             if (auto written = settings.setValue(key, combo->currentData().toString()); !written)
+                             {
+                                 Logger::warning(std::format("音频设备没能写入：{}（当前选的是 {}）", written.error().message, combo->currentText().toStdString()));
+                             }
+                         });
+        return combo;
+    }
+
+    /**
      * @brief 录屏输出格式下拉：档位、配置里的取值与设置页标签都取自 Record::kRecordFormatChoices
      * @param settings 配置存储
      * @return 归调用方所有的下拉框
@@ -655,8 +710,11 @@ namespace GyanisScribe::App
                 .arg(version);
     }
 
+    MainWindow::~MainWindow() = default;
+
     MainWindow::MainWindow(ISettingsStore &settings, ThemeManager &theme, IconProvider &icons, History::HistoryStore &historyStore, QWidget *parent) :
-        QWidget(parent), m_settings(settings), m_theme(theme), m_icons(icons), m_historyStore(historyStore)
+        QWidget(parent), m_settings(settings), m_theme(theme), m_icons(icons), m_audioDevices(std::make_unique<GyanisScribe::Record::FfmpegAudioDeviceEnumerator>()),
+        m_historyStore(historyStore)
     {
         setWindowTitle(GyanisScribe::Core::uiText("智录 设置"));
         setWindowIcon(icons.icon("App"));
@@ -865,16 +923,18 @@ namespace GyanisScribe::App
     QWidget *MainWindow::buildRecordPage()
     {
         auto *page = new QWidget{this};
-        auto *form = makePageForm(
-                page,
-                GyanisScribe::Core::uiText(
-                        "录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。存成 GIF 时帧率上限比 MP4 低。这几项都从下一次开始录屏时生效。"));
+        auto *form = makePageForm(page, GyanisScribe::Core::uiText("录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。存成 GIF 时帧率上限比 MP4 "
+                                                                   "低。取声那两格列不出设备时只剩「不取这一路」，把鼠标停在框上能看到原因。这几项都从下一次开始录屏时生效。"));
         form->addRow(GyanisScribe::Core::uiText("录屏成品目录"),
                      makePathRow(m_settings, GyanisScribe::Settings::kPathRecording, GyanisScribe::Core::uiText("录屏目录"), Core::Paths::defaultRecordingDirectory(), m_icons));
         form->addRow(GyanisScribe::Core::uiText("录制范围"), makeRecordScopeCombo(m_settings));
         form->addRow(GyanisScribe::Core::uiText("输出格式"), makeRecordFormatCombo(m_settings));
         form->addRow(GyanisScribe::Core::uiText("默认帧率"), makeFrameRateSpin(m_settings));
         form->addRow(GyanisScribe::Core::uiText("光标高亮"), makeCursorHighlightCheck(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("麦克风这一路"),
+                     makeAudioDeviceCombo(m_settings, GyanisScribe::Settings::kRecordAudioMicrophone, GyanisScribe::Core::uiText("麦克风设备"), *m_audioDevices));
+        form->addRow(GyanisScribe::Core::uiText("系统声音这一路"),
+                     makeAudioDeviceCombo(m_settings, GyanisScribe::Settings::kRecordAudioSystemSound, GyanisScribe::Core::uiText("系统声音设备"), *m_audioDevices));
         return page;
     }
 

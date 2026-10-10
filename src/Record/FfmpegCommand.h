@@ -73,4 +73,16 @@ namespace GyanisScribe::Record
      */
     [[nodiscard]] Core::Expected<QString> locateFfmpeg();
 
+    /**
+     * @brief 拼「取声到 wav」那条命令的实参表
+     * @param microphoneDevice 麦克风那一路的 dshow 标识，空表示不取
+     * @param systemSoundDevice 系统声音那一路的标识，空表示不取
+     * @param wavFile 中间 wav 的落点，编码那一步再把它并进成品
+     * @return 成功返回参数序列（不含可执行文件名）；两路都空时返回 InvalidArgument
+     * @details 标识原样交给 `audio=`：本机用 dshow 的稳定标识实测过——一路出 384010 字节、
+     *          两路 amix 出 381774 字节的 2 秒 48k 双声道 wav，都不需要额外转义。
+     *          中间格式定 pcm_s16le：与编码那一步解耦，取声失败时画面那一半还能独立出片。
+     */
+    [[nodiscard]] Core::Expected<QStringList> audioCaptureArguments(const QString &microphoneDevice, const QString &systemSoundDevice, const std::filesystem::path &wavFile);
+
 } // namespace GyanisScribe::Record
