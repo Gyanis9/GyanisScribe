@@ -240,6 +240,10 @@
             <translation>Choose %1</translation>
         </message>
         <message>
+            <source>不限</source>
+            <translation>No limit</translation>
+        </message>
+        <message>
             <source>把光标位置圈在画面里</source>
             <translation>Ring the cursor position in the picture</translation>
         </message>
@@ -304,8 +308,24 @@
             <translation>Settings navigation</translation>
         </message>
         <message>
-            <source>界面语言决定菜单、托盘提示与这些设置页的措辞。切换语言要重启智录才生效。</source>
-            <translation>The interface language sets the wording of the menus, the tray hints and these settings pages. Restart GyanisScribe for a language change to take effect.</translation>
+            <source>界面语言决定菜单、托盘提示与这些设置页的措辞，切换后要重启智录才生效。下面两格管历史留多少，填到 0 就是不限。</source>
+            <translation>The interface language sets the wording of the menus, the tray hints and these settings pages; a change takes effect after restarting GyanisScribe. The two rows below decide how much history is kept; 0 means no limit.</translation>
+        </message>
+        <message>
+            <source>历史最多留多少条</source>
+            <translation>Maximum history entries</translation>
+        </message>
+        <message>
+            <source> 条</source>
+            <translation> entries</translation>
+        </message>
+        <message>
+            <source>历史最久留多少天</source>
+            <translation>How long history is kept, in days</translation>
+        </message>
+        <message>
+            <source> 天</source>
+            <translation> days</translation>
         </message>
         <message>
             <source>截图与标注成品落在这个目录里。取色复制出来的文本按下面的写法格式化。</source>

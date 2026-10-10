@@ -83,6 +83,12 @@ namespace
     /// 导航列的固定宽度：最长的标签是「文字识别」四个汉字加一枚图标，这一档容得下并留出内边距
     constexpr int kNavColumnWidth = 150;
 
+    /// 历史条数这一格能填到的最大值：再多就得靠搜索找，而截图量本身也撑不到这里
+    constexpr int kMaximumEntriesLimit = 10000;
+
+    /// 历史天数这一格能填到的最大值，按十年给：比这更久的留法就是「不限」那一档
+    constexpr int kRetentionDaysLimit = 3650;
+
     /**
      * @brief 一页设置的骨架：顶部一行说明文字加一张空表单
      * @param page 这一页的容器，版面由本函数接管
@@ -165,6 +171,39 @@ namespace
                              }
                          });
         return row;
+    }
+
+    /**
+     * @brief 一行「0 表示不限」的整数设置
+     * @param settings 配置存储
+     * @param key 键名
+     * @param title 中文名，用作无障碍名称与日志里的线索
+     * @param suffix 跟在数字后面的量词
+     * @param maximum 这一格能填到的最大值
+     * @param fallback 配置里没有这一项时显示的值
+     * @return 归调用方所有的数字框，由 addRow 挂上父对象
+     * @details 0 那一档在界面上写成「不限」而不是「0」：读端把 0 解释成不限，
+     *          摆一个 0 出来人人都可能读成「一条都不留」，而那恰好是它会删光历史的样子。
+     */
+    QSpinBox *makeOptionalLimitSpin(ISettingsStore &settings, const std::string_view key, const QString &title, const QString &suffix, const int maximum, const int fallback)
+    {
+        auto *spin = new QSpinBox;
+        spin->setRange(0, maximum);
+        spin->setSpecialValueText(GyanisScribe::Core::uiText("不限"));
+        spin->setSuffix(suffix);
+        spin->setAccessibleName(title);
+        // 配置里的负数会被范围夹到 0 那一档，也就是「不限」——与 History::policyFromSettings 的读法同解
+        spin->setValue(settings.intValue(key, fallback));
+
+        QObject::connect(spin, &QSpinBox::valueChanged, spin,
+                         [&settings, key, title](int value)
+                         {
+                             if (auto written = settings.setValue(key, value); !written)
+                             {
+                                 Logger::warning(std::format("{} 没能写入：{}", title.toStdString(), written.error().message));
+                             }
+                         });
+        return spin;
     }
 
     /**
@@ -603,8 +642,17 @@ namespace GyanisScribe::App
     QWidget *MainWindow::buildGeneralPage()
     {
         auto *page = new QWidget{this};
-        auto *form = makePageForm(page, GyanisScribe::Core::uiText("界面语言决定菜单、托盘提示与这些设置页的措辞。切换语言要重启智录才生效。"));
+        auto *form =
+                makePageForm(page, GyanisScribe::Core::uiText("界面语言决定菜单、托盘提示与这些设置页的措辞，切换后要重启智录才生效。下面两格管历史留多少，填到 0 就是不限。"));
         form->addRow(GyanisScribe::Core::uiText("界面语言"), makeUiLanguageCombo(m_settings));
+        // 保留策略的读端在 History::policyFromSettings，而那条负数提示写着「请在设置的通用页改回来」——
+        // 这一页没有这两格时，那句提示就是把用户指到一个不存在的地方
+        form->addRow(GyanisScribe::Core::uiText("历史最多留多少条"),
+                     makeOptionalLimitSpin(m_settings, GyanisScribe::Settings::kHistoryMaximumEntries, GyanisScribe::Core::uiText("历史最多留多少条"),
+                                           GyanisScribe::Core::uiText(" 条"), kMaximumEntriesLimit, GyanisScribe::History::kDefaultMaximumEntries));
+        form->addRow(GyanisScribe::Core::uiText("历史最久留多少天"),
+                     makeOptionalLimitSpin(m_settings, GyanisScribe::Settings::kHistoryRetentionDays, GyanisScribe::Core::uiText("历史最久留多少天"),
+                                           GyanisScribe::Core::uiText(" 天"), kRetentionDaysLimit, GyanisScribe::History::kDefaultRetentionDays));
         return page;
     }
 
