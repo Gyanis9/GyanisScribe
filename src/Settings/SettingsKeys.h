@@ -75,6 +75,9 @@ namespace GyanisScribe::Settings
     /// 当前显示的是第几个贴图分组（从 1 起），与布局一起读写：重启后回到同一组
     inline constexpr std::string_view kPinActiveGroup = "Pin/ActiveGroup";
 
+    /// 「收起 / 摆回全部贴图」的那一档状态，与布局一起读写：退出时收着一整桌，回来还是收着
+    inline constexpr std::string_view kPinAllConcealed = "Pin/AllConcealed";
+
     /// OCR 语言标签，取值见 Ocr::supportedOcrLanguageTags()
     inline constexpr std::string_view kOcrLanguage = "Ocr/Language";
 

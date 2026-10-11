@@ -293,7 +293,9 @@ namespace GyanisScribe::Pin
     PinState PinWindow::state() const
     {
         PinState state{globalRect().topLeft(), m_logicalSize, m_scale, m_rotationDegrees, m_opacity};
-        state.group = m_group;
+        state.group        = m_group;
+        state.alwaysOnTop  = m_pinned;
+        state.mouseThrough = m_mouseThrough;
         return state;
     }
 

@@ -26,6 +26,8 @@ namespace GyanisScribe::Pin
         constexpr std::string_view kKeyOpacity   = "opacity";
         constexpr std::string_view kKeyImageFile = "imageFile";
         constexpr std::string_view kKeyGroup     = "group";
+        constexpr std::string_view kKeyOnTop     = "alwaysOnTop";
+        constexpr std::string_view kKeyThrough   = "mouseThrough";
 
         Core::Expected<QVector<PinState>> failWith(std::string reason)
         {
@@ -48,6 +50,8 @@ namespace GyanisScribe::Pin
             entry.insert(QLatin1String(kKeyOpacity.data()), state.opacity);
             entry.insert(QLatin1String(kKeyImageFile.data()), state.imageFile);
             entry.insert(QLatin1String(kKeyGroup.data()), state.group);
+            entry.insert(QLatin1String(kKeyOnTop.data()), state.alwaysOnTop);
+            entry.insert(QLatin1String(kKeyThrough.data()), state.mouseThrough);
             entries.append(entry);
         }
         return QString::fromUtf8(QJsonDocument(entries).toJson(QJsonDocument::Compact));
@@ -125,6 +129,27 @@ namespace GyanisScribe::Pin
                                                                  index + 1, group));
                 }
                 state.group = group;
+            }
+
+            // 置顶与穿透同样是后加的字段、同样容忍缺省（旧布局按今天的新建行为：置顶、不穿透）；
+            // 写了但不是布尔值才是坏记录——toBool() 会把任意内容都折成 false，静默读反一个开关
+            if (entry.contains(QLatin1String(kKeyOnTop.data())))
+            {
+                if (!entry[QLatin1String(kKeyOnTop.data())].isBool())
+                {
+                    return failWith(
+                            GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局第 {} 项的置顶字段不是布尔值。请清除这一项后让程序重新记一次"), index + 1));
+                }
+                state.alwaysOnTop = entry[QLatin1String(kKeyOnTop.data())].toBool();
+            }
+            if (entry.contains(QLatin1String(kKeyThrough.data())))
+            {
+                if (!entry[QLatin1String(kKeyThrough.data())].isBool())
+                {
+                    return failWith(
+                            GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局第 {} 项的穿透字段不是布尔值。请清除这一项后让程序重新记一次"), index + 1));
+                }
+                state.mouseThrough = entry[QLatin1String(kKeyThrough.data())].toBool();
             }
 
             states.push_back(state);

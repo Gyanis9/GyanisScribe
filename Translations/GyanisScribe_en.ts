@@ -1544,6 +1544,14 @@
             <translation>Entry {} of the pin layout has a group number that is not a positive integer: {}. Clear that entry and let the app record it again</translation>
         </message>
         <message>
+            <source>贴图布局第 {} 项的置顶字段不是布尔值。请清除这一项后让程序重新记一次</source>
+            <translation>Entry {} of the pin layout has a non-boolean always-on-top field. Clear that entry and let the app record it again</translation>
+        </message>
+        <message>
+            <source>贴图布局第 {} 项的穿透字段不是布尔值。请清除这一项后让程序重新记一次</source>
+            <translation>Entry {} of the pin layout has a non-boolean mouse-through field. Clear that entry and let the app record it again</translation>
+        </message>
+        <message>
             <source>贴图默认不透明度 "{}" 不在 1 到 100 之间：请在设置的贴图页重选一个值，或删掉 Pin/DefaultOpacity 这一项回到完全不透明</source>
             <translation>Pin default opacity "{}" is not between 1 and 100: pick a value again on the Pin page of Settings, or remove the Pin/DefaultOpacity entry to go back to fully opaque</translation>
         </message>

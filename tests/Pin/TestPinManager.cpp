@@ -87,6 +87,11 @@ namespace GyanisScribe
                 return *m_settings;
             }
 
+            [[nodiscard]] Platform::IPlatformIntegration &integration() const
+            {
+                return *m_integration;
+            }
+
         private:
             std::filesystem::path                           m_iniFile;     ///< 本用例专用的设置文件
             std::unique_ptr<Settings::SettingsStore>        m_settings;    ///< 布局的读写处
@@ -212,6 +217,47 @@ namespace GyanisScribe
         EXPECT_EQ(reopened.activeGroup(), 2) << "活动组没记：重启后停在第一组，第二组那张就不见了";
         EXPECT_TRUE(isOnDesk(reopened.pinAt(1))) << "第二组的那张在重启后没露脸";
         EXPECT_FALSE(isOnDesk(reopened.pinAt(0))) << "第一组的那张不该同时在桌上";
+    }
+
+    /**
+     * @brief 钉住置顶、穿透与「收起全部」都跟着布局过夜
+     * @details 这几个开关是用户按自己的桌面摆出来的：只记几何不记它们，重启后摆回来的是「另一个桌面」。
+     *          穿透那一格按平台能力门控：没这能力的机器上恢复时会记一条日志并按不穿透继续，不能拿它判红。
+     */
+    TEST_F(PinManagerFixture, TopmostThroughAndConcealSurviveARestart)
+    {
+        const bool throughSupported = integration().capabilities().clickThrough;
+
+        {
+            auto &pins = makeManager();
+            pins.addPin(makeImage(), QPoint(10, 10));
+            pins.addPin(makeImage(), QPoint(60, 60));
+
+            auto *first = pins.pinAt(0);
+            ASSERT_NE(first, nullptr);
+            first->setAlwaysOnTop(false);
+            if (throughSupported)
+            {
+                ASSERT_TRUE(first->setMouseThrough(true).has_value()) << "前提没造出来：这台机器支持穿透";
+            }
+            ASSERT_EQ(pins.setAllPinsConcealed(true), 2) << "两张都该被收起";
+            ASSERT_TRUE(pins.saveLayout().has_value()) << "布局没写下去";
+        }
+
+        auto      &reopened = makeManager();
+        const auto restored = reopened.restoreLayout();
+        ASSERT_TRUE(restored.has_value()) << restored.error().message;
+        ASSERT_EQ(*restored, 2);
+
+        EXPECT_FALSE(reopened.pinAt(0)->isAlwaysOnTop()) << "不置顶那一档没跟着布局回来";
+        EXPECT_TRUE(reopened.pinAt(1)->isAlwaysOnTop()) << "默认置顶的那张被带成了不置顶";
+        EXPECT_TRUE(reopened.pinAt(0)->isConcealed()) << "退出时收着的一桌，回来该还是收着（托盘那句「摆回全部贴图」是出口）";
+        EXPECT_TRUE(reopened.pinAt(1)->isConcealed()) << "同一桌的两张该是同一档显隐";
+        if (throughSupported)
+        {
+            EXPECT_TRUE(reopened.pinAt(0)->isMouseThrough()) << "穿透那一档没跟着布局回来";
+            EXPECT_FALSE(reopened.pinAt(1)->isMouseThrough()) << "没设穿透的那张被带成了穿透";
+        }
     }
 
     /**

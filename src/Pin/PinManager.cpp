@@ -132,7 +132,12 @@ namespace GyanisScribe::Pin
             return written;
         }
         // 活动组跟着布局一起记：不记的话重启后停在第一组，别的组里的贴图就像丢了
-        return m_settings.setValue(Settings::kPinActiveGroup, m_activeGroup);
+        if (const auto grouped = m_settings.setValue(Settings::kPinActiveGroup, m_activeGroup); !grouped)
+        {
+            return grouped;
+        }
+        // 「收起全部」那一档也记：退出时收着一整桌，回来还是收着（托盘那句「摆回全部贴图」是出口）
+        return m_settings.setValue(Settings::kPinAllConcealed, m_allConcealed);
     }
 
     Core::Expected<int> PinManager::restoreLayout()
@@ -143,8 +148,10 @@ namespace GyanisScribe::Pin
             return std::unexpected(loaded.error());
         }
 
-        // 活动组先落定再摆图：addPin 把新贴图挂在活动组上，晚落定会让这一批全挤进第一组
-        m_activeGroup = m_settings.intValue(Settings::kPinActiveGroup, kFirstPinGroup);
+        // 活动组先落定再摆图：addPin 把新贴图挂在活动组上，晚落定会让这一批全挤进第一组；
+        // 「收起全部」那一档同样先读回来，最后那一次 applyGroupVisibility 才会把整桌收着
+        m_activeGroup  = m_settings.intValue(Settings::kPinActiveGroup, kFirstPinGroup);
+        m_allConcealed = m_settings.boolValue(Settings::kPinAllConcealed, false);
 
         int restored = 0;
         for (const auto &state: *loaded)
@@ -161,7 +168,15 @@ namespace GyanisScribe::Pin
             pin.setScale(state.scale);
             pin.setRotationDegrees(state.rotationDegrees);
             pin.setOpacityLevel(state.opacity);
+            pin.setAlwaysOnTop(state.alwaysOnTop);
             m_pins.back()->setGroup(state.group);
+
+            // 穿透这一格在没这能力的平台上会回错：记一条日志按「不穿透」继续摆，
+            // 不为一张贴图的一个开关把整次恢复放弃掉
+            if (const auto through = pin.setMouseThrough(state.mouseThrough); !through)
+            {
+                Core::Logger::warning(std::format("贴图恢复时设穿透没成：{}", through.error().message));
+            }
 
             // 位置排在几何参数之后：缩放与旋转都绕着图片中心重排，窗口左上会跟着挪，
             // 先摆位置再改尺寸就等于把记下来的那个点当成了「参数生效前」的位置

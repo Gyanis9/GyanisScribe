@@ -186,6 +186,31 @@ TEST_F(PinLayoutFixture, GroupRoundTripsWhileOldLayoutsDefaultToTheFirstGroup)
 }
 
 /**
+ * @brief 钉住置顶与穿透两个开关的往返、旧布局的缺省与非布尔值的拒绝面
+ * @details 两个字段与 group 同一条规矩：缺省要能读旧布局（按今天的新建行为），
+ *          写了但不是布尔值才是坏记录——JSON 里 "yes" 会被 toBool() 折成 false，静默把一个开关读反。
+ */
+TEST_F(PinLayoutFixture, TopmostAndThroughRoundTripWhileOldLayoutsDefaultToTodaysBehaviour)
+{
+    auto flipped         = sample(10, 20, 1.0, 0.0, 1.0);
+    flipped.alwaysOnTop  = false;
+    flipped.mouseThrough = true;
+    const auto parsed    = parseLayout(serializeLayout(QVector<PinState>{flipped}).toStdString());
+    ASSERT_TRUE(parsed.has_value()) << "自己写出的布局读不回来：" << parsed.error().message;
+    EXPECT_FALSE(parsed->front().alwaysOnTop) << "置顶那一档没进布局文本";
+    EXPECT_TRUE(parsed->front().mouseThrough) << "穿透那一档没进布局文本";
+
+    const auto legacy = parseLayout(R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png"}])");
+    ASSERT_TRUE(legacy.has_value()) << "旧布局读不出来：" << legacy.error().message;
+    EXPECT_TRUE(legacy->front().alwaysOnTop) << "旧布局缺字段时该按新建行为：置顶";
+    EXPECT_FALSE(legacy->front().mouseThrough) << "旧布局缺字段时该按新建行为：不穿透";
+
+    const auto notBool = parseLayout(R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png","alwaysOnTop":"yes"}])");
+    ASSERT_FALSE(notBool.has_value()) << "非布尔值被 toBool 折成 false，等于静默读反一个开关";
+    EXPECT_NE(notBool.error().message.find("置顶字段"), std::string::npos) << "要写出坏的是哪一个字段：" << notBool.error().message;
+}
+
+/**
  * @brief 钉住配置读写这一对：写下去的布局换实例也读得回来
  */
 TEST_F(PinLayoutFixture, SaveAndLoadThroughSettingsStore)
