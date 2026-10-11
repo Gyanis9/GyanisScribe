@@ -419,4 +419,37 @@ namespace GyanisScribe
         pins.closeAll();
     }
 
+    /**
+     * @brief 钉住「托盘那一条把整桌贴图收起、再原样摆回」
+     * @details 收起不等于关掉：册上张数不变，只是不在屏上，摆回时摆位与缩放都还在。
+     *          计数只算这次真的改了状态的张数——已经收着的再收一次还报「2」就是把没发生的事
+     *          报成发生了，而用户只能靠这句数字判断自己按到了哪一档。
+     */
+    TEST_F(ModuleFlowFixture, TrayToggleConcealsAndRestoresEveryPin)
+    {
+        GyanisScribe::Settings::SettingsStore settings(m_iniFile);
+        FakeScreenSource                      source(makeFakeFrame());
+        const auto                            frame = captureOneFrame(settings, source);
+
+        GyanisScribe::Pin::PinManager pins(settings, *integration);
+        auto                         &first  = pins.addPin(frame.image, QPoint(700, 300));
+        auto                         &second = pins.addPin(frame.image, QPoint(900, 300));
+        ASSERT_FALSE(first.isConcealed()) << "刚贴出来的图就该在桌面上";
+        EXPECT_EQ(pins.visiblePinCount(), 2);
+
+        EXPECT_EQ(pins.setAllPinsConcealed(true), 2) << "两张都该被收起，这个数是这次真的改了状态的张数";
+        EXPECT_TRUE(first.isConcealed());
+        EXPECT_TRUE(second.isConcealed());
+        EXPECT_EQ(pins.visiblePinCount(), 0);
+        EXPECT_EQ(pins.count(), 2) << "收起不是关掉：册上还是两张，摆位也还在";
+
+        EXPECT_EQ(pins.setAllPinsConcealed(true), 0) << "已经收着的再收一次不该再报出数字";
+        EXPECT_EQ(pins.setAllPinsConcealed(false), 2);
+        EXPECT_FALSE(first.isConcealed());
+        EXPECT_FALSE(second.isConcealed());
+        EXPECT_EQ(pins.visiblePinCount(), 2);
+
+        pins.closeAll();
+    }
+
 } // namespace GyanisScribe

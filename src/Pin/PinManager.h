@@ -110,6 +110,22 @@ namespace GyanisScribe::Pin
          */
         int clearMouseThrough();
 
+        /**
+         * @brief 桌面上还看得见几张贴图
+         * @return 没被收起的张数；一张也没有时返回 0
+         */
+        [[nodiscard]] int visiblePinCount() const;
+
+        /**
+         * @brief 把全部贴图一起收起或摆回
+         * @param concealed 收起还是摆回
+         * @return 这次真的改变了状态的张数（本来就是那一档的不计）
+         * @details 收起不等于关掉：图还在管理器手里，摆位与缩放都不动，只是不在屏上。
+         *          收着的时候用户点不到它，也就没有「自己关不掉自己」那条死路——
+         *          摆回这一格由托盘与热键给，不贴在图上。
+         */
+        int setAllPinsConcealed(bool concealed);
+
     signals:
         /**
          * @brief 贴图张数变了

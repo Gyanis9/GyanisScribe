@@ -181,6 +181,23 @@ namespace GyanisScribe::Pin
         return m_pinned;
     }
 
+    void PinWindow::setConcealed(const bool concealed)
+    {
+        if (concealed)
+        {
+            hide();
+            return;
+        }
+        // 摆回时要 raise：不压回来的话它落在别的窗口后面，看起来就像没收回来
+        show();
+        raise();
+    }
+
+    bool PinWindow::isConcealed() const noexcept
+    {
+        return !isVisible();
+    }
+
     void PinWindow::copyToClipboard()
     {
         QApplication::clipboard()->setImage(m_image);

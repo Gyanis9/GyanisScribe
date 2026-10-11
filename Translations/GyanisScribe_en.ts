@@ -184,6 +184,18 @@
             <translation>No pinned image is click-through right now</translation>
         </message>
         <message>
+            <source>已摆回 {} 张贴图</source>
+            <translation>Pinned {} image(s) back on the desk</translation>
+        </message>
+        <message>
+            <source>已收起 {} 张贴图</source>
+            <translation>Concealed {} image(s)</translation>
+        </message>
+        <message>
+            <source>桌上没有贴图</source>
+            <translation>No pinned images on the desk</translation>
+        </message>
+        <message>
             <source>已复制到剪贴板</source>
             <translation>Copied to the clipboard</translation>
         </message>
@@ -656,6 +668,10 @@
             <translation>Scrolling capture</translation>
         </message>
         <message>
+            <source>收起 / 摆回贴图</source>
+            <translation>Conceal / restore pins</translation>
+        </message>
+        <message>
             <source>%1 个全局热键随时可改，改完立即重新登记，不需要重启。</source>
             <translation>%1 global hotkeys can be changed any time; each change is re-registered right away, no restart needed.</translation>
         </message>
@@ -766,6 +782,10 @@
         <message>
             <source>关闭全部贴图</source>
             <translation>Close all pins</translation>
+        </message>
+        <message>
+            <source>收起 / 摆回全部贴图</source>
+            <translation>Conceal / restore all pinned images</translation>
         </message>
         <message>
             <source>取消全部贴图穿透</source>

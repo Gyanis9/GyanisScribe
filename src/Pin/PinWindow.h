@@ -115,6 +115,20 @@ namespace GyanisScribe::Pin
         [[nodiscard]] bool isAlwaysOnTop() const noexcept override;
 
         /**
+         * @brief 收起或摆回这张贴图，见 IPinWindow::setConcealed()
+         * @param concealed 收起还是摆回
+         * @details 重写基类接口：收 = hide()，摆回 = show() 再 raise()——不 raise 的话
+         *          它回到桌面时落在别的窗口后面，看起来就像没收回来。图片与摆位都不动。
+         */
+        void setConcealed(bool concealed) override;
+
+        /**
+         * @brief 此刻是否被收着，见 IPinWindow::isConcealed()
+         * @return 窗口不在屏上时为真
+         */
+        [[nodiscard]] bool isConcealed() const noexcept override;
+
+        /**
          * @brief 交进剪贴板，见 IPinWindow::copyToClipboard()
          */
         void copyToClipboard() override;

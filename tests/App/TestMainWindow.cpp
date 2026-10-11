@@ -849,16 +849,16 @@ TEST_F(MainWindowFixture, HotkeyEntriesFollowTheGlobalHotkeyCapability)
     makeWindow(true);
     m_window->open(MainWindowPage::Hotkey);
     auto edits = m_window->findChildren<GyanisScribe::Ui::HotkeyEdit *>();
-    ASSERT_EQ(edits.size(), 5) << "热键页该有截图、录屏、文字识别、屏幕取色、滚动长截图五行";
+    ASSERT_EQ(edits.size(), 6) << "热键页该有截图、录屏、文字识别、屏幕取色、滚动长截图、收起/摆回贴图六行";
     for (auto *edit: edits)
     {
-        EXPECT_TRUE(edit->isEnabled()) << "有登记口的平台上这四行要能改";
+        EXPECT_TRUE(edit->isEnabled()) << "有登记口的平台上这六行要能改";
     }
 
     makeWindow(false);
     m_window->open(MainWindowPage::Hotkey);
     edits = m_window->findChildren<GyanisScribe::Ui::HotkeyEdit *>();
-    ASSERT_EQ(edits.size(), 5) << "没有登记口也不能把行藏掉：用户配过的组合键要还在眼前";
+    ASSERT_EQ(edits.size(), 6) << "没有登记口也不能把行藏掉：用户配过的组合键要还在眼前";
     for (auto *edit: edits)
     {
         EXPECT_FALSE(edit->isEnabled()) << "这台机器上改完不会生效，入口就该是灰的";

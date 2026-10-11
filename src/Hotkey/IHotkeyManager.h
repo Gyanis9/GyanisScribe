@@ -31,6 +31,7 @@ namespace GyanisScribe::Hotkey
         Ocr,         ///< 识别文字
         Pick,        ///< 屏幕取色
         CaptureLong, ///< 滚动长截图；追加在末尾，编号排到 5
+        TogglePins,  ///< 收起或摆回全部贴图；追加在末尾，编号排到 6
     };
 
     /**

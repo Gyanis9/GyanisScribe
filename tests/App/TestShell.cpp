@@ -60,7 +60,7 @@ TEST(TrayMenuTable, ListsEachActionOnceWithRealIcons)
     constexpr std::array expectedActions{TrayAction::CaptureRegion,     TrayAction::CaptureFullScreen, TrayAction::CaptureLastRegion, TrayAction::CaptureWindow,
                                          TrayAction::ToggleRecord,      TrayAction::Recognize,         TrayAction::RecognizeFile,     TrayAction::PickColor,
                                          TrayAction::CloseAllPins,      TrayAction::OpenSettings,      TrayAction::OpenAbout,         TrayAction::Quit,
-                                         TrayAction::CaptureLongRegion, TrayAction::ClearPinsThrough};
+                                         TrayAction::CaptureLongRegion, TrayAction::ClearPinsThrough,  TrayAction::TogglePinsVisible};
 
     const auto actions = actionsInTable();
     EXPECT_EQ(actions.size(), expectedActions.size()) << "表里的动作项数与这份清单不同解";
@@ -174,8 +174,8 @@ TEST(TrayTooltip, ShowsRecordingProgressAndSeparatesPaused)
  */
 TEST(TrayMenuTable, HotkeyHintsBindToRealSettingKeys)
 {
-    const std::vector<std::string_view> knownKeys = {GyanisScribe::Settings::kHotkeyCapture, GyanisScribe::Settings::kHotkeyRecord, GyanisScribe::Settings::kHotkeyOcr,
-                                                     GyanisScribe::Settings::kHotkeyPick, GyanisScribe::Settings::kHotkeyCaptureLong};
+    const std::vector<std::string_view> knownKeys = {GyanisScribe::Settings::kHotkeyCapture, GyanisScribe::Settings::kHotkeyRecord,      GyanisScribe::Settings::kHotkeyOcr,
+                                                     GyanisScribe::Settings::kHotkeyPick,    GyanisScribe::Settings::kHotkeyCaptureLong, GyanisScribe::Settings::kHotkeyTogglePins};
 
     int hinted = 0;
     for (const auto &entry: trayMenuEntries())
@@ -187,7 +187,7 @@ TEST(TrayMenuTable, HotkeyHintsBindToRealSettingKeys)
         ++hinted;
         EXPECT_TRUE(std::ranges::find(knownKeys, entry.hotkeyKey) != knownKeys.end()) << std::string{entry.hotkeyKey};
     }
-    EXPECT_EQ(hinted, 5) << "全局热键有五项，托盘上的提示项也只能是这五项：多出来那条永远显示默认组合";
+    EXPECT_EQ(hinted, 6) << "全局热键有六项，托盘上的提示项也只能是这六项：多出来那条永远显示默认组合";
 }
 
 /**

@@ -102,6 +102,20 @@ namespace GyanisScribe::Pin
         [[nodiscard]] virtual bool isAlwaysOnTop() const noexcept = 0;
 
         /**
+         * @brief 把这张贴图从桌面上收起来（不关掉）
+         * @param concealed true 收起来，false 摆回桌面
+         * @details 收起来的贴图还在管理器手里，图片与摆位都不动，只是不在屏上；
+         *          刻意不叫 setVisible——那与 QWidget::setVisible 同名不同虚，两套语义撞在一个名字上。
+         */
+        virtual void setConcealed(bool concealed) = 0;
+
+        /**
+         * @brief 这张贴图此刻是否被收着
+         * @return true 表示桌面上看不见它，但它没被关掉
+         */
+        [[nodiscard]] virtual bool isConcealed() const noexcept = 0;
+
+        /**
          * @brief 把当前图片交进剪贴板
          */
         virtual void copyToClipboard() = 0;

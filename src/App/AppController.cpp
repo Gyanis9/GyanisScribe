@@ -147,6 +147,10 @@ namespace GyanisScribe::App
                                      // 识别热键：截完直接进结果窗口，中间不弹标注窗
                                      startCapture(CaptureIntent::Recognize);
                                      return;
+                                 case Hotkey::HotkeyAction::TogglePins:
+                                     // 走托盘那一条：开关的方向与提示文案都只有一份
+                                     handleTrayAction(TrayAction::TogglePinsVisible);
+                                     return;
                              }
                          });
 
@@ -381,6 +385,20 @@ namespace GyanisScribe::App
                 notifyUser(restored > 0 ? QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已让 {} 张贴图重新吃鼠标"), restored).c_str())
                                         : GyanisScribe::Core::uiText("没有贴图开着鼠标穿透"),
                            restored > 0 ? Ui::ToastKind::Success : Ui::ToastKind::Information);
+                return;
+            }
+            case TrayAction::TogglePinsVisible:
+            {
+                // 看得见就先收、一张都看不见就摆回：这一条是开关，不是单向的隐藏。
+                // 收着的贴图用户点不到，摆回这一格只能由托盘与热键给
+                const auto show    = m_pins->visiblePinCount() == 0;
+                const auto changed = m_pins->setAllPinsConcealed(!show);
+                notifyUser(changed > 0 ? QString::fromUtf8(GyanisScribe::Core::uiFormat(show ? GyanisScribe::Core::uiTextUtf8("已摆回 {} 张贴图")
+                                                                                             : GyanisScribe::Core::uiTextUtf8("已收起 {} 张贴图"),
+                                                                                        changed)
+                                                                   .c_str())
+                                       : GyanisScribe::Core::uiText("桌上没有贴图"),
+                           changed > 0 ? Ui::ToastKind::Success : Ui::ToastKind::Information);
                 return;
             }
             case TrayAction::CloseAllPins:

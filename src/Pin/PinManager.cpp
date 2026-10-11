@@ -160,6 +160,36 @@ namespace GyanisScribe::Pin
         return restored;
     }
 
+    int PinManager::visiblePinCount() const
+    {
+        auto visible = 0;
+        for (const auto &pin: m_pins)
+        {
+            // 空位是窗口自己析构后被摘掉的痕迹：那种张既看不见也不该计数
+            if (pin != nullptr && !pin->isConcealed())
+            {
+                ++visible;
+            }
+        }
+        return visible;
+    }
+
+    int PinManager::setAllPinsConcealed(const bool concealed)
+    {
+        auto changed = 0;
+        for (const auto &pin: m_pins)
+        {
+            // 已经是那一档的不动：重复 hide()/show() 会让窗口自己闪一下
+            if (pin == nullptr || pin->isConcealed() == concealed)
+            {
+                continue;
+            }
+            pin->setConcealed(concealed);
+            ++changed;
+        }
+        return changed;
+    }
+
     void PinManager::closeAll()
     {
         // 逐个关掉：每个窗口关的时候会回调 forget，这里不能边遍历边 erase，先整份挪出来再收尾

@@ -21,6 +21,9 @@ namespace GyanisScribe::Settings
     /// 滚动长截图的全局热键
     inline constexpr std::string_view kHotkeyCaptureLong = "Hotkey/CaptureLong";
 
+    /// 收起/摆回全部贴图的全局热键
+    inline constexpr std::string_view kHotkeyTogglePins = "Hotkey/TogglePins";
+
     /// 主题档位，取值只能是 Light、Dark、System
     inline constexpr std::string_view kThemeMode = "Theme/Mode";
 
