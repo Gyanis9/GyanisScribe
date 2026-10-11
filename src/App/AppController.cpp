@@ -1007,7 +1007,8 @@ namespace GyanisScribe::App
             notifyUser(QString::fromUtf8(image.error().message.c_str()), Ui::ToastKind::Danger);
             return;
         }
-        m_pins->addPin(*image, QCursor::pos());
+        // 盘上的原文件一并交过去：动图（GIF/APNG）贴上去要接着播，而不是停在首帧
+        m_pins->addPin(*image, QCursor::pos(), Core::Paths::toDisplayText(filePath));
     }
 
     void AppController::pickImageFileAndRecognize()

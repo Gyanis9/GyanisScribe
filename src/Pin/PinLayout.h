@@ -43,6 +43,7 @@ namespace GyanisScribe::Pin
         int     group        = 1;      ///< 所属贴图分组，从 1 起；一张贴图只属于一组
         bool    alwaysOnTop  = true;   ///< 是否保持置顶；缺省按今天的行为（新建的贴图都置顶）
         bool    mouseThrough = false;  ///< 是否鼠标穿透
+        QString sourceFile;            ///< 动图的来源文件；空表示这张是静图（剪贴板与标注贴出来的都在内存里）
     };
 
     /// 分组号的起点：布局里缺 group 字段（上一版存下的）与新建的贴图都落这一组

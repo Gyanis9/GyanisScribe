@@ -28,6 +28,7 @@ namespace GyanisScribe::Pin
         constexpr std::string_view kKeyGroup     = "group";
         constexpr std::string_view kKeyOnTop     = "alwaysOnTop";
         constexpr std::string_view kKeyThrough   = "mouseThrough";
+        constexpr std::string_view kKeySource    = "sourceFile";
 
         Core::Expected<QVector<PinState>> failWith(std::string reason)
         {
@@ -52,6 +53,7 @@ namespace GyanisScribe::Pin
             entry.insert(QLatin1String(kKeyGroup.data()), state.group);
             entry.insert(QLatin1String(kKeyOnTop.data()), state.alwaysOnTop);
             entry.insert(QLatin1String(kKeyThrough.data()), state.mouseThrough);
+            entry.insert(QLatin1String(kKeySource.data()), state.sourceFile);
             entries.append(entry);
         }
         return QString::fromUtf8(QJsonDocument(entries).toJson(QJsonDocument::Compact));
@@ -150,6 +152,12 @@ namespace GyanisScribe::Pin
                             GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局第 {} 项的穿透字段不是布尔值。请清除这一项后让程序重新记一次"), index + 1));
                 }
                 state.mouseThrough = entry[QLatin1String(kKeyThrough.data())].toBool();
+            }
+
+            // 动图来源同样是后加的字段：缺省就是静图（旧布局里放着的本来也都是静图）
+            if (entry.contains(QLatin1String(kKeySource.data())))
+            {
+                state.sourceFile = entry[QLatin1String(kKeySource.data())].toString();
             }
 
             states.push_back(state);

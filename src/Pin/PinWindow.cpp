@@ -20,6 +20,8 @@
 #include <QDesktopServices>
 #include <QFontMetrics>
 #include <QMenu>
+#include <QMovie>
+#include <QImageReader>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPaintEvent>
@@ -353,6 +355,7 @@ namespace GyanisScribe::Pin
         state.group        = m_group;
         state.alwaysOnTop  = m_pinned;
         state.mouseThrough = m_mouseThrough;
+        state.sourceFile   = m_sourceFile;
         return state;
     }
 
@@ -392,6 +395,50 @@ namespace GyanisScribe::Pin
     void PinWindow::setGroupChoices(const QVector<int> &groups)
     {
         m_groupChoices = groups;
+    }
+
+    void PinWindow::setAnimatedSource(const QString &file)
+    {
+        m_sourceFile.clear();
+
+        QImageReader reader(file);
+        if (file.isEmpty() || !reader.supportsAnimation() || reader.imageCount() < 2)
+        {
+            // 静图（或读不出）：什么都不做，窗口照旧显示构造时交进来的那一张
+            return;
+        }
+
+        m_movie = new QMovie(file, QByteArray(), this);
+        if (!m_movie->isValid())
+        {
+            delete m_movie;
+            m_movie = nullptr;
+            Core::Logger::warning(std::format("动图读不出，这张贴图按静图放着：{}", file.toStdString()));
+            return;
+        }
+
+        m_sourceFile = file;
+        // 帧换了就换手里那张图：绘制、复制与保存读的都是 m_image，一处换全处跟着走
+        QObject::connect(m_movie, &QMovie::frameChanged, this,
+                         [this]
+                         {
+                             if (m_movie != nullptr)
+                             {
+                                 m_image = m_movie->currentImage();
+                                 update();
+                             }
+                         });
+        // QMovie 建出来时手里还没有帧：先跳到第 0 帧把它读出来，否则 currentImage() 是空的
+        const auto firstFrame = m_movie->jumpToFrame(0) ? m_movie->currentImage() : QImage();
+        if (!firstFrame.isNull())
+        {
+            m_image = firstFrame;
+        }
+    }
+
+    bool PinWindow::isAnimated() const noexcept
+    {
+        return m_movie != nullptr;
     }
 
     void PinWindow::setColorPickMode(const bool enabled)
@@ -704,6 +751,25 @@ namespace GyanisScribe::Pin
         {
             m_dockCollapsed = true;
             applyDockGeometry();
+        }
+    }
+
+    void PinWindow::showEvent(QShowEvent *event)
+    {
+        QWidget::showEvent(event);
+        if (m_movie != nullptr)
+        {
+            m_movie->start();
+        }
+    }
+
+    void PinWindow::hideEvent(QHideEvent *event)
+    {
+        QWidget::hideEvent(event);
+        // 停而不是暂停：藏起来的贴图再过一会儿多半也不会被看到，让它一直记着帧反而是白烧 CPU
+        if (m_movie != nullptr)
+        {
+            m_movie->stop();
         }
     }
 

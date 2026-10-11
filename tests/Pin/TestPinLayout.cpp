@@ -195,15 +195,18 @@ TEST_F(PinLayoutFixture, TopmostAndThroughRoundTripWhileOldLayoutsDefaultToToday
     auto flipped         = sample(10, 20, 1.0, 0.0, 1.0);
     flipped.alwaysOnTop  = false;
     flipped.mouseThrough = true;
+    flipped.sourceFile   = QStringLiteral("C:/tmp/two-frames.gif");
     const auto parsed    = parseLayout(serializeLayout(QVector<PinState>{flipped}).toStdString());
     ASSERT_TRUE(parsed.has_value()) << "自己写出的布局读不回来：" << parsed.error().message;
     EXPECT_FALSE(parsed->front().alwaysOnTop) << "置顶那一档没进布局文本";
     EXPECT_TRUE(parsed->front().mouseThrough) << "穿透那一档没进布局文本";
+    EXPECT_EQ(parsed->front().sourceFile, flipped.sourceFile) << "动图来源没进布局文本，重启后动图就变静图";
 
     const auto legacy = parseLayout(R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png"}])");
     ASSERT_TRUE(legacy.has_value()) << "旧布局读不出来：" << legacy.error().message;
     EXPECT_TRUE(legacy->front().alwaysOnTop) << "旧布局缺字段时该按新建行为：置顶";
     EXPECT_FALSE(legacy->front().mouseThrough) << "旧布局缺字段时该按新建行为：不穿透";
+    EXPECT_TRUE(legacy->front().sourceFile.isEmpty()) << "旧布局缺字段时该按静图处理";
 
     const auto notBool = parseLayout(R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png","alwaysOnTop":"yes"}])");
     ASSERT_FALSE(notBool.has_value()) << "非布尔值被 toBool 折成 false，等于静默读反一个开关";

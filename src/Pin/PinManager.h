@@ -66,9 +66,10 @@ namespace GyanisScribe::Pin
          * @brief 贴出一张图片
          * @param image 图片（物理像素）
          * @param globalTopLeft 窗口左上角的全局逻辑坐标
+         * @param animatedSource 动图来源文件；空表示这张是静图（剪贴板与标注贴出来的都在内存里）
          * @return 新建的贴图窗口引用，所有权仍在管理器手里
          */
-        IPinWindow &addPin(const QImage &image, const QPoint &globalTopLeft);
+        IPinWindow &addPin(const QImage &image, const QPoint &globalTopLeft, const QString &animatedSource = {});
 
         /**
          * @brief 当前贴图张数

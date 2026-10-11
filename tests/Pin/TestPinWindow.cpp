@@ -4,6 +4,8 @@
 
 #include "Pin/PinWindow.h"
 
+#include "PinTestAssets.h"
+
 #include "Core/Paths.h"
 #include "Core/Types.h"
 #include "Platform/IPlatformIntegration.h"
@@ -15,18 +17,23 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QClipboard>
 #include <QEnterEvent>
+#include <QGuiApplication>
 #include <QImage>
 #include <QKeyEvent>
 #include <QMenu>
+#include <QMovie>
 #include <QScreen>
 #include <QMouseEvent>
 #include <QPoint>
 #include <QSize>
 
+#include <array>
 #include <filesystem>
 #include <cmath>
 #include <format>
+#include <fstream>
 #include <memory>
 #include <vector>
 
@@ -577,6 +584,43 @@ namespace GyanisScribe
         QApplication::sendEvent(&window, &dragRelease);
         EXPECT_EQ(window.edgeDock(), Pin::ScreenEdge::None) << "拖到屏中间松手还贴着边";
         EXPECT_GT(window.x(), available.left()) << "松手之后没停在拖到的位置";
+    }
+
+    /**
+     * @brief 钉住动图真的在播：贴上去之后手里那张图跟着帧换，不是停在首帧
+     * @details 判据走剪贴板：它读的就是窗口手里那张图（绘制、复制与保存共用同一份），
+     *          换帧没接上时第二次复制拿到的还是第一帧的颜色。素材是一段手写的两帧 GIF。
+     */
+    TEST_F(PinWindowFixture, AnimatedSourceKeepsPlayingFrames)
+    {
+        const auto gifPath = PinTestAssets::writeTwoFrameGif(std::filesystem::temp_directory_path() / "GyanisScribe-PinAnim-two-frames.gif");
+        ASSERT_FALSE(gifPath.isEmpty()) << "素材没落到临时文件上";
+
+        auto &window = makeWindow();
+        EXPECT_FALSE(window.isAnimated()) << "刚开的贴图不该是动图";
+
+        window.setAnimatedSource(gifPath);
+        ASSERT_TRUE(window.isAnimated()) << "两帧的 GIF 没被当成动图接上";
+        EXPECT_EQ(window.state().sourceFile, gifPath) << "动图来源没进布局记录，重启后就接不上了";
+
+        auto *movie = window.findChild<QMovie *>();
+        ASSERT_NE(movie, nullptr) << "动图播放器没挂在这张窗口上";
+        ASSERT_GE(movie->frameCount(), 2) << "素材没被读出两帧，判据无从谈起";
+
+        window.copyToClipboard();
+        EXPECT_EQ(QGuiApplication::clipboard()->image().pixelColor(0, 0), QColor(255, 0, 0)) << "首帧该是红色";
+
+        ASSERT_TRUE(movie->jumpToNextFrame()) << "跳不到下一帧";
+        window.copyToClipboard();
+        EXPECT_EQ(QGuiApplication::clipboard()->image().pixelColor(0, 0), QColor(0, 0, 255)) << "换帧没接上：手里那张图还是第一帧";
+
+        // 静图文件接不上动画这一档
+        const auto staticPath = std::filesystem::temp_directory_path() / "GyanisScribe-PinAnim-still.png";
+        ASSERT_TRUE(makeImage().save(QString::fromStdString(staticPath.string())));
+        auto &other = makeWindow();
+        other.setAnimatedSource(QString::fromStdString(staticPath.string()));
+        EXPECT_FALSE(other.isAnimated()) << "单帧图也被当成动图了";
+        EXPECT_TRUE(other.state().sourceFile.isEmpty()) << "静图不该在布局里记一个动图来源";
     }
 
 } // namespace GyanisScribe

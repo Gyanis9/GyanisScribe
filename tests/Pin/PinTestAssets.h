@@ -1,0 +1,37 @@
+// 贴图用例共用的小素材：一段手写的两帧 GIF（2×1，红/蓝各一帧、循环）。
+// 手写而不是随包带一个二进制：字节里每一段都在注释里对得上——头、调色板、循环扩展、两帧、尾。
+
+#pragma once
+
+#include <QString>
+
+#include <array>
+#include <filesystem>
+#include <fstream>
+#include <string>
+
+namespace GyanisScribe::PinTestAssets
+{
+    /// 两帧 GIF 的全部字节（85 个）
+    inline constexpr std::array<unsigned char, 85> kTwoFrameGif = {0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x02, 0x00, 0x01, 0x00, 0x80, 0x00, 0x00, 0xFF, 0x00, 0x00, 0x00,
+                                                                   0x00, 0xFF, 0x21, 0xFF, 0x0B, 0x4E, 0x45, 0x54, 0x53, 0x43, 0x41, 0x50, 0x45, 0x32, 0x2E, 0x30, 0x03,
+                                                                   0x01, 0x00, 0x00, 0x00, 0x21, 0xF9, 0x04, 0x00, 0x0A, 0x00, 0x00, 0x00, 0x2C, 0x00, 0x00, 0x00, 0x00,
+                                                                   0x02, 0x00, 0x01, 0x00, 0x00, 0x02, 0x02, 0x04, 0x0A, 0x00, 0x21, 0xF9, 0x04, 0x00, 0x0A, 0x00, 0x00,
+                                                                   0x00, 0x2C, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01, 0x00, 0x00, 0x02, 0x02, 0x4C, 0x0A, 0x00, 0x3B};
+
+    /**
+     * @brief 把那段两帧 GIF 落到给定文件上
+     * @param path 目标路径
+     * @return 成功返回该路径的 QString；写不下去时返回空串（用例自己判失败）
+     */
+    inline QString writeTwoFrameGif(const std::filesystem::path &path)
+    {
+        std::ofstream out(path, std::ios::binary | std::ios::trunc);
+        if (!out)
+        {
+            return {};
+        }
+        out.write(reinterpret_cast<const char *>(kTwoFrameGif.data()), static_cast<std::streamsize>(kTwoFrameGif.size()));
+        return QString::fromStdString(path.string());
+    }
+} // namespace GyanisScribe::PinTestAssets

@@ -42,10 +42,12 @@ namespace GyanisScribe::Pin
         closeAll();
     }
 
-    IPinWindow &PinManager::addPin(const QImage &image, const QPoint &globalTopLeft)
+    IPinWindow &PinManager::addPin(const QImage &image, const QPoint &globalTopLeft, const QString &animatedSource)
     {
         auto  pin = std::make_unique<PinWindow>(image, m_settings, m_integration);
         auto *raw = pin.get();
+        // 动图来源接上：不是动图（或文件读不出）时窗口什么都不做，仍显示交进来的那一帧
+        raw->setAnimatedSource(animatedSource);
 
         // 窗口自己关掉了（Esc 或菜单里的关闭）就要从登记里摘掉，不然这里会留一个已析构的指针
         QObject::connect(raw, &PinWindow::closedByUser, this, [this, raw] { forget(raw); });
@@ -164,7 +166,7 @@ namespace GyanisScribe::Pin
                 continue;
             }
 
-            auto &pin = addPin(image, state.position);
+            auto &pin = addPin(image, state.position, state.sourceFile);
             pin.setScale(state.scale);
             pin.setRotationDegrees(state.rotationDegrees);
             pin.setOpacityLevel(state.opacity);

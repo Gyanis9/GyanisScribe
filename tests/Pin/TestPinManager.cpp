@@ -2,6 +2,9 @@
 // 判据只走公开读数（isConcealed、activeGroup、groupsInUse 与写下的布局文本），不读私有成员。
 
 #include "Pin/IPinWindow.h"
+#include "Pin/PinWindow.h"
+
+#include "PinTestAssets.h"
 #include "Pin/PinLayout.h"
 #include "Pin/PinManager.h"
 
@@ -258,6 +261,33 @@ namespace GyanisScribe
             EXPECT_TRUE(reopened.pinAt(0)->isMouseThrough()) << "穿透那一档没跟着布局回来";
             EXPECT_FALSE(reopened.pinAt(1)->isMouseThrough()) << "没设穿透的那张被带成了穿透";
         }
+    }
+
+    /**
+     * @brief 钉住动图贴图过夜回来还是动图：来源文件跟着布局走，重启后重新接上
+     * @details 只记像素是不够的——缓存里落下的那一张 PNG 只是一个瞬间，重启后要能接着播，
+     *          靠的是布局里那条来源路径。
+     */
+    TEST_F(PinManagerFixture, AnimatedPinStaysAnimatedAfterARestart)
+    {
+        const auto gifPath = PinTestAssets::writeTwoFrameGif(std::filesystem::temp_directory_path() / "GyanisScribe-PinManager-two-frames.gif");
+        ASSERT_FALSE(gifPath.isEmpty()) << "素材没落到临时文件上";
+
+        {
+            auto &pins = makeManager();
+            pins.addPin(makeImage(), QPoint(30, 30), gifPath);
+            ASSERT_TRUE(pins.saveLayout().has_value()) << "布局没写下去";
+        }
+
+        auto      &reopened = makeManager();
+        const auto restored = reopened.restoreLayout();
+        ASSERT_TRUE(restored.has_value()) << restored.error().message;
+        ASSERT_EQ(reopened.count(), 1);
+
+        auto *pin = dynamic_cast<Pin::PinWindow *>(reopened.pinAt(0));
+        ASSERT_NE(pin, nullptr) << "管理器里的贴图不是 PinWindow，这一条判据接不上";
+        EXPECT_TRUE(pin->isAnimated()) << "动图过夜回来变成了静图：布局里那条来源路径没用上";
+        EXPECT_EQ(pin->state().sourceFile, gifPath) << "恢复之后来源路径又丢了";
     }
 
     /**

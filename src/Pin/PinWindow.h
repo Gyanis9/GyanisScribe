@@ -122,6 +122,20 @@ namespace GyanisScribe::Pin
         [[nodiscard]] ScreenEdge edgeDock() const noexcept;
 
         /**
+         * @brief 接上一个文件作为动图来源
+         * @param file 盘上的图片文件；不是动图（或读不出）时什么都不做，窗口仍显示构造时那张静图
+         * @details 动图只认「文件」这一条来路：剪贴板与标注贴出来的图在内存里，没有帧序列可播。
+         *          播放只在窗口露在屏上时进行（收起或隐藏时停下），否则一张藏起来的贴图会把 CPU 一直吃住。
+         */
+        void setAnimatedSource(const QString &file);
+
+        /**
+         * @brief 这张贴图是不是动图
+         * @return true 表示有帧序列可播（哪怕此刻暂停着）
+         */
+        [[nodiscard]] bool isAnimated() const noexcept;
+
+        /**
          * @brief 把这张贴图贴到最近的屏边并收成一条（或取消贴边）
          * @param docked true 表示贴边收起，false 表示取消贴边、整张摆回屏上
          * @details 贴到离当前矩形最近的边；菜单那一项与拖到边的释放走同一条路。
@@ -279,6 +293,19 @@ namespace GyanisScribe::Pin
         void leaveEvent(QEvent *event) override;
 
         /**
+         * @brief 窗口露出来了：动图在这时开播
+         * @param event 显示事件
+         */
+        void showEvent(QShowEvent *event) override;
+
+        /**
+         * @brief 窗口藏起来了：动图在这时停下
+         * @param event 隐藏事件
+         * @details 收起（setConcealed）走的也是 hide，所以两条路一起管住，不用两处各停一次
+         */
+        void hideEvent(QHideEvent *event) override;
+
+        /**
          * @brief 按下：在手柄上起拖缩放，否则开始移动
          * @param event 鼠标事件
          */
@@ -370,6 +397,8 @@ namespace GyanisScribe::Pin
         QRect                                 m_dockArea;                         ///< 贴边那一刻那块屏的可用区，收起与展开都按它算
         bool                                  m_dockCollapsed = false;            ///< 贴边后是不是收成了那一条
         bool                                  m_dragMoved     = false;            ///< 这一轮按下之后真拖动过没有（只点一下不吸边）
+        class QMovie                         *m_movie         = nullptr;          ///< 动图播放器；静图这张贴图时为空
+        QString                               m_sourceFile;                       ///< 动图的来源文件；进布局记录，重启后按它接上动画
         QPoint                                m_dragOffset;                       ///< 移动时起笔点与窗口左上角的差
         std::optional<HandleKind>             m_draggedHandle;                    ///< 正在拖的手柄，没拖时为空
         double                                m_dragInitialScale    = 1.0;        ///< 起拖时的缩放
