@@ -41,7 +41,7 @@ namespace GyanisScribe::Ocr
         /**
          * @brief 后端显示名
          * @return 「Windows 系统识别」
-         * @note 这个名字要翻：它出现在设置页与结果标题里，走的是界面文案目录
+         * @note 这个名字要翻：它按界面文案目录取词，用例与日志据此辨认工厂选中了哪一个后端
          */
         [[nodiscard]] QString name() const override;
 

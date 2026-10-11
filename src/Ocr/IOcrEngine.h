@@ -35,7 +35,7 @@ namespace GyanisScribe::Ocr
 
         /**
          * @brief 后端显示名
-         * @return 出现在设置页与结果标题里的名字，如「Windows 系统识别」
+         * @return 中文名，如「Windows 系统识别」「Tesseract」；用例据此辨认工厂选中了哪一个后端
          */
         [[nodiscard]] virtual QString name() const = 0;
 

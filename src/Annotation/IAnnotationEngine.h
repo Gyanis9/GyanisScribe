@@ -152,11 +152,6 @@ namespace GyanisScribe::Annotation
         virtual Core::Expected<void> select(const AnnotationSelection &selection) = 0;
 
         /**
-         * @brief 取消选中
-         */
-        virtual void clearSelection() = 0;
-
-        /**
          * @brief 当前选中项
          * @return 有选中时返回那一条，否则空
          */

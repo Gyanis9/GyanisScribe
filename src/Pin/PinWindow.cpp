@@ -132,18 +132,6 @@ namespace GyanisScribe::Pin
 
     PinWindow::~PinWindow() = default;
 
-    void PinWindow::setImage(const QImage &image)
-    {
-        m_image       = image;
-        m_logicalSize = QSizeF(image.width(), image.height());
-        if (image.devicePixelRatio() > 1.0)
-        {
-            m_logicalSize = QSizeF(image.width() / image.devicePixelRatio(), image.height() / image.devicePixelRatio());
-        }
-        applyGeometry();
-        update();
-    }
-
     void PinWindow::setScale(double scale)
     {
         m_scale = clampScale(scale);

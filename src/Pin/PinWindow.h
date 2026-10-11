@@ -61,12 +61,6 @@ namespace GyanisScribe::Pin
         ~PinWindow() override;
 
         /**
-         * @brief 换一张图，见 IPinWindow::setImage()
-         * @param image 新图片，缩放保持当前值
-         */
-        void setImage(const QImage &image) override;
-
-        /**
          * @brief 设缩放，见 IPinWindow::setScale()
          * @param scale 缩放因子，越界按边界取
          */

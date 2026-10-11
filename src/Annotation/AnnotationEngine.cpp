@@ -448,12 +448,6 @@ namespace GyanisScribe::Annotation
         return {};
     }
 
-    void AnnotationEngine::clearSelection()
-    {
-        m_selection.reset();
-        emit canvasChanged();
-    }
-
     const std::optional<AnnotationSelection> &AnnotationEngine::selection() const noexcept
     {
         return m_selection;

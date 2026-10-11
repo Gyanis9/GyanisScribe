@@ -99,8 +99,8 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 - 标注倍比现算：`AnnotationEngine` 用「物理宽 ÷ 逻辑宽」得到 `pixelScale`，不读屏幕的
   `devicePixelRatio`——用户缩放窗口后两者才是同一条账。屏显与导出共用这套算法，
   否则马赛克会显示在一个位置、保存在另一个位置。
-- 导出带倍比：`exportImage()` 在 `pixelScale != 1.0` 时把倍比标回图上，贴图据此反推逻辑尺寸
-  （`PinWindow::setImage`）。这一环丢了就会把 150% 屏上截的图开成放大 1.5 倍的窗口，
+- 导出带倍比：`exportImage()` 在 `pixelScale != 1.0` 时把倍比标回图上，贴图开窗时按它反推逻辑尺寸
+  （`PinWindow` 的构造里那段 `m_logicalSize`）。这一环丢了就会把 150% 屏上截的图开成放大 1.5 倍的窗口，
   判据在跨模块集成入口 `tests/App/TestModuleFlow.cpp` 里。
 - 贴图坐标：窗口位置是全局逻辑坐标（截哪儿贴哪儿，回到上一次选区的左上角），尺寸由
   `windowSizeFor(逻辑尺寸, 缩放)` 得出；旋转后的外接框另算（`PinTransform`）。

@@ -35,12 +35,6 @@ namespace GyanisScribe::Pin
         IPinWindow &operator=(const IPinWindow &) = delete;
 
         /**
-         * @brief 换一张图上去（再次贴图用）
-         * @param image 新的图片，物理像素；缩放因子保持不变
-         */
-        virtual void setImage(const QImage &image) = 0;
-
-        /**
          * @brief 设缩放因子
          * @param scale 会被夹进合法区间，越界不报错而是按边界取
          */

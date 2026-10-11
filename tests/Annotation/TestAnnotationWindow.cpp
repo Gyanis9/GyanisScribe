@@ -323,7 +323,6 @@ TEST_F(AnnotationWindowFixture, SelectionBoundsIsEmptyWithoutSelection)
     engine().beginStroke({5, 5});
     engine().moveStroke({45, 35});
     ASSERT_TRUE(engine().endStroke().has_value());
-    engine().clearSelection();
     EXPECT_FALSE(engine().selectionBounds().has_value());
 }
 

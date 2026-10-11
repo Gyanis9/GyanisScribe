@@ -144,11 +144,6 @@ namespace GyanisScribe::Annotation
         Core::Expected<void> select(const AnnotationSelection &selection) override;
 
         /**
-         * @brief 取消选中，见 IAnnotationEngine::clearSelection()
-         */
-        void clearSelection() override;
-
-        /**
          * @brief 当前选中项，见 IAnnotationEngine::selection()
          * @return 有选中时那一条
          */
