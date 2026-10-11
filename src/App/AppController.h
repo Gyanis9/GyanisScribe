@@ -271,6 +271,14 @@ namespace GyanisScribe::App
         void handleOcrRequested(const QImage &image);
 
         /**
+         * @brief 某张贴图上取到了一个像素的颜色
+         * @param color 颜色
+         * @details 排成设置里那一档写法、复制到剪贴板并给一句提示：与屏幕取色那一路同一个格式出口，
+         *          用户从哪一处取的色，粘出来的都是同一种写法
+         */
+        void handlePinColorPicked(const QColor &color);
+
+        /**
          * @brief 用给定语言认一次当前这张图，并把结果摆进结果窗口
          * @param language 语言标签，如 zh-Hans
          * @details 首次识别与窗口里「换语言/重新识别」走同一条路：两条路各写一遍认字，

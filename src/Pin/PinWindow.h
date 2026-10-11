@@ -96,6 +96,26 @@ namespace GyanisScribe::Pin
         void setGroupChoices(const QVector<int> &groups);
 
         /**
+         * @brief 进出取色模式
+         * @param enabled true 表示鼠标变成取色笔：悬停出读数，点一下就把那一像素的颜色交出去
+         * @details 取色模式不改图、不改缩放：它只是把鼠标事件从「拖动/缩放」改成「读像素」。
+         *          进去时把在拖的手柄清掉，免得从手柄上按下时两种语义打架。
+         */
+        void setColorPickMode(bool enabled);
+
+        /**
+         * @brief 当前是不是取色模式
+         * @return true 表示下一次左键点击会取走一个像素的颜色
+         */
+        [[nodiscard]] bool isColorPickMode() const noexcept;
+
+        /**
+         * @brief 取色模式下光标处那一像素的颜色读数
+         * @return 已按设置里的写法排好的文本（例如 #3C78C8）；光标不在图上时返回空
+         */
+        [[nodiscard]] std::optional<QString> hoveredColorText() const;
+
+        /**
          * @brief 设缩放，见 IPinWindow::setScale()
          * @param scale 缩放因子，越界按边界取
          */
@@ -212,6 +232,14 @@ namespace GyanisScribe::Pin
         void moveToGroupRequested(int group);
 
         /**
+         * @brief 取色模式下点中了一个像素
+         * @param color 那一像素的颜色
+         * @details 只报颜色：排成哪种写法、复制到剪贴板还是存起来，都是界面层的事；
+         *          贴图窗自己只管「点到了哪一格」
+         */
+        void colorPicked(const QColor &color);
+
+        /**
          * @brief 贴图被关闭，管理器据此把自己记的那一份摘掉
          */
         void closedByUser();
@@ -255,7 +283,7 @@ namespace GyanisScribe::Pin
         void wheelEvent(QWheelEvent *event) override;
 
         /**
-         * @brief 键盘：Esc 关闭，`R`/`Shift+R` 转正一挡，`0` 回到原始比例与角度
+         * @brief 键盘：Esc 关闭（取色模式里先退出取色），`R`/`Shift+R` 转正一挡，`0` 回到原始比例与角度
          * @param event 键盘事件；带 Ctrl 的字母不归这里管，交回 Qt
          */
         void keyPressEvent(QKeyEvent *event) override;
@@ -280,6 +308,22 @@ namespace GyanisScribe::Pin
          */
         void resetScaleAndRotation();
 
+        /**
+         * @brief 画取色模式的读数框：色块加写法文本，跟在光标旁边
+         * @param painter 目标画家
+         * @details 读数只在光标落在图上时出现；文本与复制出去的那一串同源（同一个 formatColor），
+         *          用户看到什么就能复制到什么。
+         */
+        void paintColorReadout(QPainter &painter);
+
+        /**
+         * @brief 按设置里的目录与命名模板把这张贴图存一份
+         * @return 成功返回写下的目录；失败返回带原因的错误
+         * @details 「保存」与「在文件夹中查看」共用这一处起名与写盘：两处各写一份，
+         *          将来改命名模板就会漏掉一处。
+         */
+        [[nodiscard]] Core::Expected<std::filesystem::path> saveWithDefaultName();
+
         QImage                                m_image;                            ///< 贴图内容，物理像素
         QSizeF                                m_logicalSize;                      ///< 图片逻辑尺寸
         double                                m_scale           = 1.0;            ///< 缩放因子
@@ -290,6 +334,8 @@ namespace GyanisScribe::Pin
         bool                                  m_pinned          = true;           ///< 是否置顶
         int                                   m_group           = kFirstPinGroup; ///< 所属贴图分组，菜单与布局记录都取它
         QVector<int>                          m_groupChoices{kFirstPinGroup};     ///< 现有分组号（升序），由管理器推过来
+        bool                                  m_colorPickMode = false;            ///< 取色模式：鼠标读像素而不是拖动
+        QPointF                               m_pickPoint;                        ///< 取色模式下光标在窗口里的位置，读数框跟它走
         QPoint                                m_dragOffset;                       ///< 移动时起笔点与窗口左上角的差
         std::optional<HandleKind>             m_draggedHandle;                    ///< 正在拖的手柄，没拖时为空
         double                                m_dragInitialScale    = 1.0;        ///< 起拖时的缩放

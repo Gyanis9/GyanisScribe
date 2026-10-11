@@ -5,6 +5,7 @@
 #include "Core/Paths.h"
 #include "Core/Text.h"
 #include "Pin/PinLayout.h"
+#include "Pick/ColorFormat.h"
 #include "Ui/DesignTokens.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Settings/ISettingsStore.h"
@@ -16,6 +17,8 @@
 #include <QClipboard>
 #include <QContextMenuEvent>
 #include <QDateTime>
+#include <QDesktopServices>
+#include <QFontMetrics>
 #include <QMenu>
 #include <QMouseEvent>
 #include <QPainter>
@@ -24,6 +27,7 @@
 
 #include <QGuiApplication>
 #include <QScreen>
+#include <QUrl>
 
 #include <cmath>
 #include <format>
@@ -55,6 +59,12 @@ namespace GyanisScribe::Pin
 
         /// 缩略图模式那枚小方块的边长，逻辑像素
         constexpr double kThumbnailEdge = 48.0;
+
+        /// 取色读数框：色块边长、字号、内边距与离光标的偏移，都是逻辑像素
+        constexpr double kColorReadoutSwatchEdge    = 16.0;
+        constexpr int    kColorReadoutFontPointSize = 8;
+        constexpr double kColorReadoutPadding       = 4.0;
+        constexpr double kColorReadoutOffset        = 14.0;
 
         /**
          * @brief 取保存贴图与截图的目录：配置里填了就用它，否则用系统图片目录下的那一个
@@ -232,6 +242,27 @@ namespace GyanisScribe::Pin
         Core::Logger::info(std::format("贴图已交剪贴板：{}×{} 像素", m_image.width(), m_image.height()));
     }
 
+    Core::Expected<std::filesystem::path> PinWindow::saveWithDefaultName()
+    {
+        const auto target = imageSaveTarget(m_settings);
+        if (!target)
+        {
+            // 格式或质量那一格存坏了：不写一个猜出来的文件，原因交回调用方
+            return std::unexpected(target.error());
+        }
+
+        const auto directory = screenshotDirectory(m_settings);
+        // 起名按设置里那一格的模板（留空即默认档），撞名时让一次位；
+        // 管理器成批写缓存那一路不走这里，那一路按设计就是要覆盖
+        const auto fileName = Core::Paths::imageFileName(QDateTime::currentDateTime(), target->first, Settings::nameTemplateOrDefault(m_settings));
+        const auto unique   = Core::Paths::toDisplayText(Core::Paths::uniqueFilePath(directory, fileName).filename());
+        if (const auto saved = saveToFile(directory, unique, target->second); !saved)
+        {
+            return std::unexpected(saved.error());
+        }
+        return directory;
+    }
+
     Core::Expected<QString> PinWindow::saveToFile(const std::filesystem::path &directory, const QString &fileName, const int quality)
     {
         if (const auto ensured = Core::Paths::ensureDirectory(directory); !ensured)
@@ -304,6 +335,53 @@ namespace GyanisScribe::Pin
         m_groupChoices = groups;
     }
 
+    void PinWindow::setColorPickMode(const bool enabled)
+    {
+        if (m_colorPickMode == enabled)
+        {
+            return;
+        }
+        m_colorPickMode = enabled;
+        // 进来时把在拖的那一手松开：从手柄上按下时「改大小」与「读像素」两种语义会打架
+        m_draggedHandle.reset();
+        if (enabled)
+        {
+            setCursor(Qt::CrossCursor);
+        } else
+        {
+            unsetCursor();
+        }
+        update();
+    }
+
+    bool PinWindow::isColorPickMode() const noexcept
+    {
+        return m_colorPickMode;
+    }
+
+    std::optional<QString> PinWindow::hoveredColorText() const
+    {
+        if (!m_colorPickMode)
+        {
+            return std::nullopt;
+        }
+        // 缩略图态不旋转：与绘制用的是同一个口径，不然读数会取到偏一格的颜色
+        const auto pixel = imagePixelAt(m_pickPoint, contentRect(), m_image.size(), m_thumbnail ? 0.0 : m_rotationDegrees);
+        if (!pixel)
+        {
+            return std::nullopt;
+        }
+
+        std::string complaint;
+        const auto  format = Pick::colorFormatOrDefault(m_settings.stringValue(Settings::kPickFormat, QStringLiteral("Hex")).toStdString(), complaint);
+        if (!complaint.empty())
+        {
+            // 读数不因坏配置停摆：按 HEX 顶上，原因照旧只进日志（同一句在界面那次取色时会弹给用户）
+            Core::Logger::warning(std::format("取色写法读不出：{}，贴图取色按 HEX 顶上", complaint));
+        }
+        return Pick::formatColor(m_image.pixelColor(*pixel), format);
+    }
+
     void PinWindow::applyGeometry()
     {
         const auto scaled   = m_thumbnail ? QSizeF{kThumbnailEdge, kThumbnailEdge} : windowSizeFor(m_logicalSize, m_scale);
@@ -360,12 +438,74 @@ namespace GyanisScribe::Pin
                 painter.drawRect(handle);
             }
         }
+
+        if (m_colorPickMode)
+        {
+            paintColorReadout(painter);
+        }
+    }
+
+    void PinWindow::paintColorReadout(QPainter &painter)
+    {
+        const auto text  = hoveredColorText();
+        const auto pixel = imagePixelAt(m_pickPoint, contentRect(), m_image.size(), m_thumbnail ? 0.0 : m_rotationDegrees);
+        if (!text || !pixel)
+        {
+            return;
+        }
+
+        const QColor swatch = m_image.pixelColor(*pixel);
+
+        // 读数框：一块色块加那串写法。底色与字色固定成深底浅字——读数要压在任意内容上都看得清，
+        // 跟着主题走会在浅色主题里与截图里的浅色糊在一起
+        const int swatchEdge = kColorReadoutSwatchEdge;
+        QFont     font       = painter.font();
+        font.setPointSize(kColorReadoutFontPointSize);
+        const QFontMetrics metrics(font);
+        const int          textWidth = metrics.horizontalAdvance(*text);
+
+        QRectF box(m_pickPoint + QPointF(kColorReadoutOffset, kColorReadoutOffset),
+                   QSizeF(kColorReadoutPadding * 2 + swatchEdge + kColorReadoutPadding + textWidth, kColorReadoutPadding * 2 + std::max(swatchEdge, metrics.height())));
+        // 贴到窗口边上时把框翻到光标另一侧：读数不该被窗口边界裁掉一半
+        if (box.right() > rect().right())
+        {
+            box.moveLeft(m_pickPoint.x() - kColorReadoutOffset - box.width());
+        }
+        if (box.bottom() > rect().bottom())
+        {
+            box.moveTop(m_pickPoint.y() - kColorReadoutOffset - box.height());
+        }
+
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(0, 0, 0, 200));
+        painter.drawRoundedRect(box, 3.0, 3.0);
+
+        const QRectF swatchRect(box.left() + kColorReadoutPadding, box.center().y() - swatchEdge / 2.0, swatchEdge, swatchEdge);
+        painter.setBrush(swatch);
+        painter.setPen(QPen(QColor(255, 255, 255, 120)));
+        painter.drawRect(swatchRect);
+
+        painter.setPen(QColor(255, 255, 255));
+        painter.setFont(font);
+        painter.drawText(QRectF(swatchRect.right() + kColorReadoutPadding, box.top(), textWidth, box.height()), Qt::AlignVCenter | Qt::AlignLeft, *text);
     }
 
     void PinWindow::mousePressEvent(QMouseEvent *event)
     {
         if (event->button() != Qt::LeftButton)
         {
+            return;
+        }
+
+        // 取色模式：点一下就把那一像素的颜色交出去，点完自己退出——与屏幕取色那边「点一下拿一个色」同一口径
+        if (m_colorPickMode)
+        {
+            const auto pixel = imagePixelAt(event->position(), contentRect(), m_image.size(), m_thumbnail ? 0.0 : m_rotationDegrees);
+            if (pixel)
+            {
+                emit colorPicked(m_image.pixelColor(*pixel));
+                setColorPickMode(false);
+            }
             return;
         }
 
@@ -388,6 +528,14 @@ namespace GyanisScribe::Pin
 
     void PinWindow::mouseMoveEvent(QMouseEvent *event)
     {
+        // 取色模式：鼠标只读像素，不拖窗也不缩图——读数框跟着光标走
+        if (m_colorPickMode)
+        {
+            m_pickPoint = event->position();
+            update();
+            return;
+        }
+
         if (m_draggedHandle)
         {
             const auto point    = event->position();
@@ -436,6 +584,13 @@ namespace GyanisScribe::Pin
     {
         if (event->key() == Qt::Key_Escape)
         {
+            // 取色模式里 Esc 先退出取色：用户想反悔的那一下多半是「不取了」，
+            // 而不是把这张贴图也关掉（那是撤销不回的动作）
+            if (m_colorPickMode)
+            {
+                setColorPickMode(false);
+                return;
+            }
             emit closedByUser();
             close();
             return;
@@ -489,28 +644,40 @@ namespace GyanisScribe::Pin
         auto *menu = new QMenu(this);
         menu->addAction(GyanisScribe::Core::uiText("复制"), this, &PinWindow::copyToClipboard);
 
-        const auto directory = screenshotDirectory(m_settings);
+        // 保存与「在文件夹中查看」是同一条路：后者在存下之后再打开那个目录，
+        // 两处各写一份起名与写盘的代码，将来改命名模板就会漏掉一处
         menu->addAction(GyanisScribe::Core::uiText("保存"), this,
-                        [this, directory]
+                        [this]
                         {
-                            const auto target = imageSaveTarget(m_settings);
-                            if (!target)
-                            {
-                                // 格式或质量那一格存坏了：不写一个猜出来的文件，原因照旧只进日志
-                                Core::Logger::error(target.error().message);
-                                return;
-                            }
-                            // 起名按设置里那一格的模板（留空即默认档），撞名时让一次位；
-                            // 管理器成批写缓存那一路不走这里，那一路按设计就是要覆盖
-                            const auto fileName = Core::Paths::imageFileName(QDateTime::currentDateTime(), target->first, Settings::nameTemplateOrDefault(m_settings));
-                            const auto unique   = Core::Paths::toDisplayText(Core::Paths::uniqueFilePath(directory, fileName).filename());
-                            if (const auto saved = saveToFile(directory, unique, target->second); !saved)
+                            if (const auto saved = saveWithDefaultName(); !saved)
                             {
                                 Core::Logger::error(saved.error().message);
                             }
                         });
+        menu->addAction(GyanisScribe::Core::uiText("在文件夹中查看"), this,
+                        [this]
+                        {
+                            const auto directory = screenshotDirectory(m_settings);
+                            // 贴图是内存里的像素，桌面上并没有一个「它所在的文件夹」：先按设置的目录与模板存一份，
+                            // 再把那个目录打开——用户要的是「这张图在盘上的样子」
+                            if (const auto saved = saveWithDefaultName(); !saved)
+                            {
+                                Core::Logger::error(saved.error().message);
+                                return;
+                            }
+                            const auto shown = Core::Paths::toDisplayText(directory);
+                            if (!QDesktopServices::openUrl(QUrl::fromLocalFile(shown)))
+                            {
+                                Core::Logger::warning(std::format("文件夹打不开：{}", shown.toStdString()));
+                            }
+                        });
 
         menu->addAction(GyanisScribe::Core::uiText("识别文字"), this, [this] { emit ocrRequested(m_image); });
+
+        // 取色：进模式之后鼠标只读像素，点一下把那一格的颜色交出去（见 mousePressEvent）
+        auto *pickAction = menu->addAction(GyanisScribe::Core::uiText("取色"), this, [this] { setColorPickMode(!m_colorPickMode); });
+        pickAction->setCheckable(true);
+        pickAction->setChecked(m_colorPickMode);
 
         auto *thumbnailAction = menu->addAction(GyanisScribe::Core::uiText("缩到小图"), this, [this] { setThumbnailMode(!m_thumbnail); });
         thumbnailAction->setCheckable(true);

@@ -27,6 +27,7 @@ using GyanisScribe::Pick::ColorFormat;
 using GyanisScribe::Pick::colorFormatAt;
 using GyanisScribe::Pick::colorFormatLabel;
 using GyanisScribe::Pick::colorFormatLabels;
+using GyanisScribe::Pick::colorFormatOrDefault;
 using GyanisScribe::Pick::colorFormatToken;
 using GyanisScribe::Pick::ColorPickerOverlay;
 using GyanisScribe::Pick::formatColor;
@@ -166,6 +167,26 @@ TEST(PickColorFormat, TokensLabelsAndHandComputedTexts)
 
     EXPECT_EQ(formatColor(QColor{0, 0, 0}, ColorFormat::Hsl), QStringLiteral("hsl(0, 0%, 0%)"));
     EXPECT_EQ(formatColor(QColor{255, 255, 255}, ColorFormat::Hsl), QStringLiteral("hsl(0, 0%, 100%)"));
+}
+
+/**
+ * @brief 钉住「读设置里的写法」这一处的回落：坏值按 HEX 顶上，并把原因原样交回
+ * @details 两个取色入口（屏幕遮罩与贴图）共用这一处：各自抄一份回落，一边改了默认写法
+ *          另一边不会跟着动，用户在两处取到的写法就会不一样。
+ */
+TEST(PickColorFormat, StoredTokenFallsBackToHexWithAComplaint)
+{
+    std::string complaint;
+    EXPECT_EQ(colorFormatOrDefault("Hsl", complaint), ColorFormat::Hsl);
+    EXPECT_TRUE(complaint.empty()) << "认得出来的标记不该带出原因：" << complaint;
+
+    EXPECT_EQ(colorFormatOrDefault("hex", complaint), ColorFormat::Hex) << "坏值要按 HEX 顶上，而不是让取色没法进行";
+    EXPECT_FALSE(complaint.empty()) << "坏值没有把原因交回：界面上就没法告诉用户设置里那一格坏了";
+    EXPECT_NE(complaint.find("Hex"), std::string::npos) << "原因里要点出可用取值：" << complaint;
+
+    // 再来一次：上一次的原因要清掉，不然调用方会把陈年旧账报给用户
+    EXPECT_EQ(colorFormatOrDefault("Rgb", complaint), ColorFormat::Rgb);
+    EXPECT_TRUE(complaint.empty()) << "成功后原因没清空，调用方会拿上一次那条去弹提示";
 }
 
 /**

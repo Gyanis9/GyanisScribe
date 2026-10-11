@@ -185,6 +185,13 @@ namespace GyanisScribe::Pin
          */
         void pinMovedToGroup(int group);
 
+        /**
+         * @brief 某张贴图上取到了颜色
+         * @param color 那一像素的颜色
+         * @details 与 pinOcrRequested 同一条形状：贴图在外头拿不到，出口不收在这一层就没人能替它复制
+         */
+        void pinColorPicked(const QColor &color);
+
     private:
         /// 把某个已自行关闭的窗口从登记里摘掉
         void forget(PinWindow *window);

@@ -73,6 +73,16 @@ namespace GyanisScribe::Pick
     [[nodiscard]] Core::Expected<ColorFormat> parseColorFormat(std::string_view token);
 
     /**
+     * @brief 把配置里存的标记读回写法，坏值按 HEX 顶上
+     * @param token 存储标记，来自设置项
+     * @param complaint 读不出时的中文原因，供调用方记日志；成功时清空
+     * @return 可用的写法
+     * @details 两个调用点（屏幕取色与贴图取色）共用这一处回落：各自抄一份时，
+     *          一边改了默认写法另一边不会跟着动，用户在两处取到的颜色写法就会不一样。
+     */
+    [[nodiscard]] ColorFormat colorFormatOrDefault(std::string_view token, std::string &complaint);
+
+    /**
      * @brief 按写法把颜色排成一串可复制的文本
      * @param color 颜色
      * @param format 写法

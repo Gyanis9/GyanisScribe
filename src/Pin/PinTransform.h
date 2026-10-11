@@ -12,8 +12,10 @@
 #include <QPoint>
 #include <QRect>
 #include <QRectF>
+#include <QSize>
 #include <QSizeF>
 
+#include <optional>
 #include <vector>
 
 namespace GyanisScribe::Pin
@@ -100,5 +102,17 @@ namespace GyanisScribe::Pin
      * @return 折算后的角度，供显示与布局存储
      */
     [[nodiscard]] double normalizeDegrees(double degrees) noexcept;
+
+    /**
+     * @brief 窗口坐标落在图片的哪一个像素上
+     * @param windowPoint 窗口内的坐标
+     * @param content 画布矩形（未旋转、已缩放），即 PinWindow::contentRect() 给的那个
+     * @param imagePixelSize 图片的物理像素尺寸
+     * @param degrees 旋转角度，顺时针，与绘制时用的是同一个
+     * @return 命中的像素坐标（左上角为原点）；落在图外或几何退化时返回空
+     * @details 与绘制正好相反的一步：先把点按 -degrees 绕画布中心转回来，再按画布矩形等比折进像素格。
+     *          缩略图态不旋转，调用方按绘制时的口径传 0 度即可。
+     */
+    [[nodiscard]] std::optional<QPoint> imagePixelAt(const QPointF &windowPoint, const QRectF &content, const QSize &imagePixelSize, double degrees);
 
 } // namespace GyanisScribe::Pin

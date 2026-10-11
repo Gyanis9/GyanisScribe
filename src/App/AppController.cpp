@@ -220,6 +220,8 @@ namespace GyanisScribe::App
         QObject::connect(m_pins.get(), &Pin::PinManager::pinCountChanged, m_tray.get(), &TrayController::setPinCount);
         // 贴图菜单里的「识别文字」与热键、标注窗走的是同一个出口：一处接线管所有张（含启动恢复的那些）
         QObject::connect(m_pins.get(), &Pin::PinManager::pinOcrRequested, this, &AppController::handleOcrRequested);
+        // 贴图上取的色与屏幕取色共用写法和复制那两句：两处各写一份，复制到的文本格式就会分家
+        QObject::connect(m_pins.get(), &Pin::PinManager::pinColorPicked, this, &AppController::handlePinColorPicked);
         // 移到别的组那一下它就从桌上消失了：说清它去了哪、怎么切过去，免得像「贴图自己没了」
         QObject::connect(
                 m_pins.get(), &Pin::PinManager::pinMovedToGroup, this,
@@ -632,6 +634,21 @@ namespace GyanisScribe::App
         recognizeWithLanguage(m_settings->stringValue(Settings::kOcrLanguage, QString::fromUtf8(Ocr::kDefaultOcrLanguage)));
     }
 
+    void AppController::handlePinColorPicked(const QColor &color)
+    {
+        // 与屏幕取色同一套：写法从设置现读，读坏了按 HEX 顶上并把原因说给用户
+        std::string complaint;
+        const auto  format = Pick::colorFormatOrDefault(m_settings->stringValue(Settings::kPickFormat, QStringLiteral("Hex")).toStdString(), complaint);
+        if (!complaint.empty())
+        {
+            notifyUser(QString::fromStdString(complaint), Ui::ToastKind::Danger);
+        }
+
+        const auto text = Pick::formatColor(color, format);
+        QGuiApplication::clipboard()->setText(text);
+        notifyUser(GyanisScribe::Core::uiText("已复制颜色 ") + text, Ui::ToastKind::Success);
+    }
+
     void AppController::recognizeWithLanguage(const QString &language)
     {
         if (!m_ocr->isAvailable())
@@ -722,13 +739,12 @@ namespace GyanisScribe::App
         }
 
         // 写法读坏了不拦取色：按默认写法继续，并把这一条告诉用户，免得他复制到的格式莫名其妙变了
-        const auto storedText = m_settings->stringValue(Settings::kPickFormat, QStringLiteral("Hex"));
-        const auto parsed     = Pick::parseColorFormat(storedText.toStdString());
-        if (!parsed)
+        std::string complaint;
+        const auto  format = Pick::colorFormatOrDefault(m_settings->stringValue(Settings::kPickFormat, QStringLiteral("Hex")).toStdString(), complaint);
+        if (!complaint.empty())
         {
-            notifyUser(QString::fromUtf8(parsed.error().message.c_str()), Ui::ToastKind::Danger);
+            notifyUser(QString::fromStdString(complaint), Ui::ToastKind::Danger);
         }
-        const auto format = parsed ? *parsed : Pick::ColorFormat::Hex;
 
         m_picker = new Pick::ColorPickerOverlay{*frame, screen->geometry(), format, *m_theme};
         QObject::connect(m_picker, &Pick::ColorPickerOverlay::colorPicked, this,

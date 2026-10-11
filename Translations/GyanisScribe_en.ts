@@ -252,6 +252,10 @@
             <translation>Saved as {}</translation>
         </message>
         <message>
+            <source>已复制颜色 </source>
+            <translation>Copied color </translation>
+        </message>
+        <message>
             <source>还没有可识别的图：先按 Ctrl+Alt+A 框选一块屏幕</source>
             <translation>No image to recognize yet: press Ctrl+Alt+A and drag out a screen region first</translation>
         </message>
@@ -270,10 +274,6 @@
         <message>
             <source>这一屏抓不下来：{}。请重试一次</source>
             <translation>This screen couldn't be captured: {}. Try again.</translation>
-        </message>
-        <message>
-            <source>已复制颜色 </source>
-            <translation>Copied color </translation>
         </message>
         <message>
             <source>当前没有可用屏幕，录屏没法开始。请接回显示器后重试</source>
@@ -1501,7 +1501,7 @@
         </message>
         <message>
             <source>现在只有 1 个贴图分组，没有下一组可切。在贴图的右键菜单里选「移动到分组 → 新建分组」才会多出一组</source>
-            <translation>There is only one pin group right now, so there is no next group. Choose "Move to group > New group" in a pin's context menu to create one</translation>
+            <translation>There is only one pin group right now, so there is no next group. Choose "Move to group &gt; New group" in a pin's context menu to create one</translation>
         </message>
         <message>
             <source>要移到分组的贴图不在册：索引 {}。请重新在贴图上打开菜单</source>
@@ -1534,6 +1534,14 @@
         <message>
             <source>保存</source>
             <translation>Save</translation>
+        </message>
+        <message>
+            <source>在文件夹中查看</source>
+            <translation>Show in folder</translation>
+        </message>
+        <message>
+            <source>取色</source>
+            <translation>Pick color</translation>
         </message>
         <message>
             <source>缩到小图</source>

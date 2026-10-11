@@ -1,8 +1,11 @@
 #include "Pin/PinTransform.h"
 
+#include <QPoint>
 #include <QPointF>
 #include <QRectF>
+#include <QSize>
 #include <QSizeF>
+#include <QTransform>
 
 #include <gtest/gtest.h>
 
@@ -126,4 +129,43 @@ TEST(PinTransform, DegreesFoldIntoFullCircle)
     EXPECT_TRUE(nearEqual(normalizeDegrees(720.0), 0.0));
     EXPECT_TRUE(nearEqual(normalizeDegrees(450.0), 90.0));
     EXPECT_TRUE(nearEqual(normalizeDegrees(359.9), 359.9));
+}
+
+/**
+ * @brief 钉住「窗口点 → 图片像素」的换算：把每个像素中心按 Qt 的旋转矩阵投出去，再反算回来
+ * @details 期望值不走被测那套三角公式，而是用 QTransform 正向投出去（与绘制约定同源）：
+ *          反变换只要少一个负号或把缩放漏掉，就会有格子对不上。
+ */
+TEST(PinTransform, MapsWindowPointsBackToThePixelTheyCameFrom)
+{
+    const QRectF content{0.0, 0.0, 300.0, 200.0};
+    const QSize  pixels{600, 400}; // 物理像素是逻辑的两倍，dpr 2 那种
+    const double degrees = 30.0;
+
+    for (int x = 0; x < pixels.width(); x += 37)
+    {
+        for (int y = 0; y < pixels.height(); y += 29)
+        {
+            QTransform transform;
+            transform.translate(content.center().x(), content.center().y());
+            transform.rotate(degrees);
+            transform.translate(-content.center().x(), -content.center().y());
+            const QPointF windowPoint =
+                    transform.map(QPointF(content.left() + (x + 0.5) * content.width() / pixels.width(), content.top() + (y + 0.5) * content.height() / pixels.height()));
+
+            const auto mapped = imagePixelAt(windowPoint, content, pixels, degrees);
+            ASSERT_TRUE(mapped.has_value()) << "投出去的点反算不回来：" << x << ',' << y;
+            EXPECT_EQ(*mapped, QPoint(x, y)) << "像素中心投出去再反算回来落到了别的格";
+        }
+    }
+
+    EXPECT_FALSE(imagePixelAt(QPointF{-5.0, -5.0}, content, pixels, degrees).has_value()) << "画布外的点不该给出像素";
+    EXPECT_FALSE(imagePixelAt(QPointF{10.0, 10.0}, QRectF{}, pixels, degrees).has_value()) << "退化画布要交回空";
+    EXPECT_FALSE(imagePixelAt(QPointF{10.0, 10.0}, content, QSize{}, degrees).has_value()) << "没有像素的图要交回空";
+
+    // 转 0 度时按缩放直接折：400×200 的图铺进 300×200 的画布，窗口 (150,100) 落在图心
+    const QSize small{400, 200};
+    const auto  centre = imagePixelAt(QPointF{150.0, 100.0}, content, small, 0.0);
+    ASSERT_TRUE(centre.has_value());
+    EXPECT_EQ(*centre, QPoint(200, 100)) << "不旋时的等比折算不对";
 }

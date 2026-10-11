@@ -4,9 +4,11 @@
 
 #include "Pin/PinWindow.h"
 
+#include "Core/Paths.h"
 #include "Core/Types.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Platform/PlatformCapabilities.h"
+#include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
 
 #include <gtest/gtest.h>
@@ -108,8 +110,19 @@ namespace GyanisScribe
             /// 开一张贴图：不 show，事件由 sendEvent 直投，判据只看状态量
             [[nodiscard]] Pin::PinWindow &makeWindow()
             {
-                m_window = std::make_unique<Pin::PinWindow>(makeImage(), *m_settings, *m_integration);
+                return makeWindow(makeImage());
+            }
+
+            /// 用指定图片开一张贴图：需要判「取到的是哪一半」这类位置判据时用它
+            [[nodiscard]] Pin::PinWindow &makeWindow(const QImage &image)
+            {
+                m_window = std::make_unique<Pin::PinWindow>(image, *m_settings, *m_integration);
                 return *m_window;
+            }
+
+            [[nodiscard]] Settings::ISettingsStore &settings() const
+            {
+                return *m_settings;
             }
 
         private:
@@ -331,6 +344,131 @@ namespace GyanisScribe
         entries.back()->trigger();
         ASSERT_EQ(requested.size(), 2);
         EXPECT_EQ(requested.back(), 5) << "新建分组该按现有最大组号 +1，而不是按现有组数重数";
+    }
+
+    /**
+     * @brief 钉住取色模式：菜单进模式、悬停出读数、点一下交出一个像素的颜色、Esc 先退出模式
+     * @details 取色判据要能分辨「取到的是哪一格」：用左右两半不同色的图，并在 2 倍缩放下点两处，
+     *          换算错一格（比如把窗口坐标当成像素坐标）就会取到隔壁那一半的颜色。
+     */
+    TEST_F(PinWindowFixture, ColorPickReportsThePixelUnderTheCursor)
+    {
+        // 左右两半不同色的图：取到哪一半立刻判得出来
+        QImage twoTone{kImageEdge * 2, kImageEdge, QImage::Format_ARGB32};
+        twoTone.fill(QColor{255, 0, 0});
+        for (int y = 0; y < twoTone.height(); ++y)
+        {
+            for (int x = kImageEdge; x < twoTone.width(); ++x)
+            {
+                twoTone.setPixelColor(x, y, QColor{0, 0, 255});
+            }
+        }
+
+        auto &window = makeWindow(twoTone);
+        window.setScale(2.0);
+
+        std::vector<QColor> picked;
+        QObject::connect(&window, &Pin::PinWindow::colorPicked, &window, [&picked](const QColor &color) { picked.push_back(color); });
+
+        // 菜单与它的动作同生共死：菜单一析构，动作就跟着没了（动作归菜单持有），
+        // 所以这里把菜单留在手上，只借用里面那一条
+        const auto pickActionIn = [](QMenu &menu) -> QAction *
+        {
+            for (QAction *action: menu.actions())
+            {
+                if (action->text() == QString::fromUtf8("取色"))
+                {
+                    return action;
+                }
+            }
+            return nullptr;
+        };
+
+        // 悬停：读数跟着光标走，文本按设置里那一档写法
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kPickFormat, QVariant(QStringLiteral("Rgb"))).has_value());
+        auto  menu       = std::unique_ptr<QMenu>{window.buildContextMenu()};
+        auto *pickAction = pickActionIn(*menu);
+        ASSERT_NE(pickAction, nullptr) << "右键菜单里没有「取色」这一项";
+        pickAction->trigger();
+        ASSERT_TRUE(window.isColorPickMode()) << "点了菜单项没进取色模式";
+
+        // 图片 80×40、2 倍缩放 → 画布矩形正好铺满窗口；像素 (10,20) 的中心落在窗口 (21,41)
+        QMouseEvent hover{QEvent::MouseMove, QPointF{21.0, 41.0}, QPointF{21.0, 41.0}, Qt::NoButton, Qt::NoButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &hover);
+        const auto readout = window.hoveredColorText();
+        ASSERT_TRUE(readout.has_value()) << "光标在图上却没有读数";
+        EXPECT_EQ(*readout, QStringLiteral("rgb(255, 0, 0)")) << "读数取到的不是光标下那一格（或没按设置里的写法排）";
+
+        // 点一下：把这一格交出去，并自己退出模式（与屏幕取色「点一下拿一个色」同一口径）
+        QMouseEvent press{QEvent::MouseButtonPress, QPointF{21.0, 41.0}, QPointF{21.0, 41.0}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &press);
+        ASSERT_EQ(picked.size(), 1);
+        EXPECT_EQ(picked.front(), QColor(255, 0, 0)) << "点左半取到的不是红";
+        EXPECT_FALSE(window.isColorPickMode()) << "取完一个色该退出模式";
+
+        // 再进一次，点右半：缩放换算错了这里会取到红
+        menu       = std::unique_ptr<QMenu>{window.buildContextMenu()};
+        pickAction = pickActionIn(*menu);
+        ASSERT_NE(pickAction, nullptr);
+        pickAction->trigger();
+        ASSERT_TRUE(window.isColorPickMode());
+        QMouseEvent secondPress{QEvent::MouseButtonPress, QPointF{141.0, 41.0}, QPointF{141.0, 41.0}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &secondPress);
+        ASSERT_EQ(picked.size(), 2);
+        EXPECT_EQ(picked.back(), QColor(0, 0, 255)) << "点右半取到的不是蓝：窗口坐标没按缩放折回像素格";
+
+        // Esc 先退出取色，而不是把贴图关掉
+        menu       = std::unique_ptr<QMenu>{window.buildContextMenu()};
+        pickAction = pickActionIn(*menu);
+        ASSERT_NE(pickAction, nullptr);
+        pickAction->trigger();
+        ASSERT_TRUE(window.isColorPickMode());
+        int closedSignals = 0;
+        QObject::connect(&window, &Pin::PinWindow::closedByUser, &window, [&closedSignals] { ++closedSignals; });
+        pressKey(window, Qt::Key_Escape);
+        EXPECT_FALSE(window.isColorPickMode()) << "取色模式里 Esc 没退出取色";
+        EXPECT_EQ(closedSignals, 0) << "取色模式里按 Esc 把贴图关掉了：这一下多半只是想不取了";
+    }
+
+    /**
+     * @brief 钉住右键菜单的「保存」真按设置里的目录与命名模板写下一个文件
+     * @details 这一条同时是「在文件夹中查看」那一半的守护：两条菜单项共用同一处起名与写盘，
+     *          保存坏了它们一起坏。文件落在用例自己的临时目录里，不碰用户真实的图片目录。
+     */
+    TEST_F(PinWindowFixture, SaveMenuItemWritesIntoTheConfiguredDirectory)
+    {
+        const auto      target = std::filesystem::temp_directory_path() / std::format("GyanisScribe-PinSave-{}", ::testing::UnitTest::GetInstance()->current_test_info()->name());
+        std::error_code ignored;
+        std::filesystem::remove_all(target, ignored);
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kPathScreenshot, QVariant(Core::Paths::toDisplayText(target))).has_value());
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kSaveImageFormat, QVariant(QStringLiteral("Png"))).has_value());
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kSaveNameTemplate, QVariant(QStringLiteral("pin_%date%"))).has_value());
+
+        auto                        &window = makeWindow();
+        const std::unique_ptr<QMenu> menu{window.buildContextMenu()};
+        QAction                     *saveAction = nullptr;
+        for (QAction *action: menu->actions())
+        {
+            if (action->text() == QString::fromUtf8("保存"))
+            {
+                saveAction = action;
+            }
+        }
+        ASSERT_NE(saveAction, nullptr) << "右键菜单里没有「保存」这一项";
+        saveAction->trigger();
+
+        // 文件名按模板起（pin_ 打头、.png 收尾），目录就是设置里那一格
+        int files = 0;
+        for (const auto &entry: std::filesystem::directory_iterator(target, ignored))
+        {
+            const auto name = entry.path().filename().string();
+            EXPECT_EQ(name.rfind("pin_", 0), 0u) << "文件名没按模板起：" << name;
+            EXPECT_EQ(entry.path().extension().string(), ".png") << "后缀没跟着设置里那一档格式：" << name;
+            ++files;
+        }
+        EXPECT_EQ(files, 1) << "保存过后目录里的文件数不对：" << files;
+
+        std::filesystem::remove_all(target, ignored);
     }
 
 } // namespace GyanisScribe

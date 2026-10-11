@@ -51,6 +51,8 @@ namespace GyanisScribe::Pin
         QObject::connect(raw, &PinWindow::closedByUser, this, [this, raw] { forget(raw); });
         // 识别请求逐张转发出去：贴图在外头拿不到，出口不收在这一层就没人能替它识别
         QObject::connect(raw, &PinWindow::ocrRequested, this, &PinManager::pinOcrRequested);
+        // 取色同理：窗口只管「点到了哪一格」，复制到剪贴板与提示都是界面层的事
+        QObject::connect(raw, &PinWindow::colorPicked, this, &PinManager::pinColorPicked);
         // 分组改动只接意图、由管理器落账：哪张在哪组是这一层的账，窗口自己改会与管理器各记一半
         QObject::connect(raw, &PinWindow::moveToGroupRequested, this,
                          [this, raw](int group)

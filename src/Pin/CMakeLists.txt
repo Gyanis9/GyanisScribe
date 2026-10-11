@@ -14,6 +14,7 @@ add_library(Pin STATIC
 target_include_directories(Pin PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(Pin PUBLIC
         Core
+        Pick
         Platform
         Settings
         Ui

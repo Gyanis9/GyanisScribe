@@ -72,4 +72,31 @@ namespace GyanisScribe::Pin
         return folded;
     }
 
+    std::optional<QPoint> imagePixelAt(const QPointF &windowPoint, const QRectF &content, const QSize &imagePixelSize, const double degrees)
+    {
+        if (content.width() <= 0.0 || content.height() <= 0.0 || imagePixelSize.isEmpty())
+        {
+            return std::nullopt;
+        }
+
+        // 绘制那一步是「绕画布中心转 +degrees」，这里按 -degrees 转回去。
+        // 坐标轴是屏幕那套（y 向下），所以反变换里的 sin 号与教科书写法相反
+        const QPointF center  = content.center();
+        const QPointF vector  = windowPoint - center;
+        const double  radians = -degrees * std::numbers::pi_v<double> / 180.0;
+        const double  cosine  = std::cos(radians);
+        const double  sine    = std::sin(radians);
+        const QPointF unrotated(center.x() + vector.x() * cosine - vector.y() * sine, center.y() + vector.x() * sine + vector.y() * cosine);
+
+        const double u = (unrotated.x() - content.left()) / content.width();
+        const double v = (unrotated.y() - content.top()) / content.height();
+        if (u < 0.0 || u >= 1.0 || v < 0.0 || v >= 1.0)
+        {
+            return std::nullopt;
+        }
+
+        // 画布矩形里是整张物理图被缩放着画进去的：按比例折进像素格，右/下边界取不到（u、v 已排除 1）
+        return QPoint(static_cast<int>(u * imagePixelSize.width()), static_cast<int>(v * imagePixelSize.height()));
+    }
+
 } // namespace GyanisScribe::Pin

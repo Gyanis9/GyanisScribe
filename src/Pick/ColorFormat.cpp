@@ -93,6 +93,18 @@ namespace GyanisScribe::Pick
         }}};
     }
 
+    ColorFormat colorFormatOrDefault(const std::string_view token, std::string &complaint)
+    {
+        complaint.clear();
+        const auto parsed = parseColorFormat(token);
+        if (parsed)
+        {
+            return *parsed;
+        }
+        complaint = parsed.error().message;
+        return ColorFormat::Hex;
+    }
+
     QString formatColor(const QColor &color, const ColorFormat format)
     {
         switch (format)
