@@ -468,9 +468,6 @@ docs/           需求、识别后端、第三方许可证、界面样式说明
   `RecordWindow`、`Microphone`、`SystemAudio`、`CursorHighlight`、`Countdown`、`OcrLanguage`、`OcrRegion`、`PinTop`、
   `PinTransparent`、`PinCopy`、`PinSave`、`ThemeLight`、`ThemeDark`、`ThemeSystem`）。它们由 `tests/Ui/TestIconProvider.cpp`
   那份独立清单逐张核对画得出来，所以不是坏资产，只是没人摆：接到对应的行上（录屏三档范围、两路取声、主题档位下拉），或者删掉。
-- **单实例的装配先后**：落败的第二次启动也先装了托盘、试注册了六个热键才退出（`Application` 的构造排在 `Main.cpp` 的探测之前）。
-  会不会闪出第二个托盘图标或一条热键失败气泡，要在真机连开两次进程才量得出来，量到再谈调顺序。
-
 ## 参与贡献
 
 改动要么修掉错误行为，要么加上需求里的能力。上手顺序：

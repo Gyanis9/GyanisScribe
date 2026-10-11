@@ -50,29 +50,41 @@ Application::Application(int &argc, char **argv) : QApplication(argc, argv)
                 std::format("智录 {} 启动，日志目录 {}", applicationVersion().toStdString(), GyanisScribe::Core::Paths::toDisplayText(logDirectory).toStdString()));
     }
 
-    m_controller = std::make_unique<GyanisScribe::App::AppController>();
-
-    // 热键登记失败不阻断启动：组合键被别的程序占了也要能让用户从界面里操作
-    if (const auto report = m_controller->registerHotkeys(); report)
+    // 单实例探测排在控制器与热键之前：落败的那一次启动不该装托盘、不该建主窗口、更不该去抢那六个
+    // 全局热键。实测（本机连开两次进程）：排在后面时第二份会把整棵树建完（设置页那四条 ffmpeg
+    // 警告就是它建主窗口留下的）、把六个热键挨个抢一遍（全部回 1409「已被占用」）才退出——
+    // 用户那一侧看到的是第二个托盘图标一闪，外加一次白启动
+    m_singleInstance    = std::make_unique<GyanisScribe::App::SingleInstance>();
+    m_isPrimaryInstance = m_singleInstance->acquire();
+    if (!m_isPrimaryInstance)
     {
-        m_hotkeyReport = *report;
-        for (const auto &failure: m_hotkeyReport.failures)
-        {
-            GyanisScribe::Core::Logger::warning(std::format("热键「{}」没能登记：{}", failure.combination.toStdString(), failure.error.message));
-        }
+        // 唤醒与退出的判断在 Main 里；界面这一侧只留一条日志，别的一概不建
+        GyanisScribe::Core::Logger::info("本次启动不是主实例：不建界面、不登记热键，交给 Main 去唤前一份");
     } else
     {
-        GyanisScribe::Core::Logger::error(std::format("热键登记没走通：{}", report.error().message));
-    }
+        m_controller = std::make_unique<GyanisScribe::App::AppController>();
 
-    // 单实例守卫在控制器之后建：第二次启动要唤的是控制器管着的那些窗口
-    m_singleInstance = std::make_unique<GyanisScribe::App::SingleInstance>();
-    QObject::connect(m_singleInstance.get(), &GyanisScribe::App::SingleInstance::secondLaunchRequested, this,
-                     [this]
-                     {
-                         GyanisScribe::Core::Logger::info("又有人启动智录：把设置窗口唤到前台，不再开第二份");
-                         m_controller->openMainWindow(GyanisScribe::App::MainWindowPage::General);
-                     });
+        // 热键登记失败不阻断启动：组合键被别的程序占了也要能让用户从界面里操作
+        if (const auto report = m_controller->registerHotkeys(); report)
+        {
+            m_hotkeyReport = *report;
+            for (const auto &failure: m_hotkeyReport.failures)
+            {
+                GyanisScribe::Core::Logger::warning(std::format("热键「{}」没能登记：{}", failure.combination.toStdString(), failure.error.message));
+            }
+        } else
+        {
+            GyanisScribe::Core::Logger::error(std::format("热键登记没走通：{}", report.error().message));
+        }
+
+        // 有人再来启动时唤前一份：唤的是控制器管着的那些窗口，因此这条接线只在主实例这一支上
+        QObject::connect(m_singleInstance.get(), &GyanisScribe::App::SingleInstance::secondLaunchRequested, this,
+                         [this]
+                         {
+                             GyanisScribe::Core::Logger::info("又有人启动智录：把设置窗口唤到前台，不再开第二份");
+                             m_controller->openMainWindow(GyanisScribe::App::MainWindowPage::General);
+                         });
+    }
 
     // 就绪判据只看日志有没有接管成功：界面在日志坏掉时照样能用，但 CI 的自检要把这一格判红
     m_isReady = GyanisScribe::Core::Logger::isInitialized();
@@ -88,7 +100,9 @@ Application::~Application()
 
 bool Application::tryBecomePrimaryInstance()
 {
-    return m_singleInstance != nullptr && m_singleInstance->acquire();
+    // 探测在构造里做过一次——那时候才知道要不要建控制器、登记热键。这里不再调 acquire()：
+    // 第二次调用会连上自己刚建的那条管道，把本进程判成「非主实例」
+    return m_singleInstance != nullptr && m_isPrimaryInstance;
 }
 
 bool Application::wakePrimaryInstance()
