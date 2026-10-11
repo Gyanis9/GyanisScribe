@@ -1,5 +1,6 @@
 #include "Pin/PinWindow.h"
 
+#include "Core/ImageFormat.h"
 #include "Core/Logger.h"
 #include "Core/Paths.h"
 #include "Core/Text.h"
@@ -60,6 +61,30 @@ namespace GyanisScribe::Pin
                 return Core::Paths::fromDisplayText(configured);
             }
             return Core::Paths::defaultScreenshotDirectory();
+        }
+
+        /**
+         * @brief 读设置里那一档保存格式与质量
+         * @param settings 配置来源
+         * @return 成功返回「文件名后缀 + 质量」；配置里存了词表外的取值或越界的质量时返回那一格的回绝原因
+         * @details 不替用户猜一档：猜错就是把成品按另一种压缩写出去，事后无从找回原样。
+         *          PNG 是无损的，质量那一格对它不起作用，交给 Qt 自己忽略。
+         */
+        [[nodiscard]] Core::Expected<std::pair<std::string_view, int>> imageSaveTarget(const Settings::ISettingsStore &settings)
+        {
+            const auto stored = settings.stringValue(Settings::kSaveImageFormat, QStringLiteral("Png"));
+            const auto format = Core::parseImageFormat(stored);
+            if (!format)
+            {
+                return std::unexpected(format.error());
+            }
+
+            const auto quality = settings.intValue(Settings::kSaveImageQuality, Core::kDefaultImageQuality);
+            if (const auto checked = Core::parseImageQuality(quality); !checked)
+            {
+                return std::unexpected(checked.error());
+            }
+            return std::pair{Core::imageFormatExtension(*format), quality};
         }
     } // namespace
 
@@ -204,17 +229,18 @@ namespace GyanisScribe::Pin
         Core::Logger::info(std::format("贴图已交剪贴板：{}×{} 像素", m_image.width(), m_image.height()));
     }
 
-    Core::Expected<QString> PinWindow::saveToFile(const std::filesystem::path &directory, const QString &fileName)
+    Core::Expected<QString> PinWindow::saveToFile(const std::filesystem::path &directory, const QString &fileName, const int quality)
     {
         if (const auto ensured = Core::Paths::ensureDirectory(directory); !ensured)
         {
             return std::unexpected(ensured.error());
         }
 
-        // 文件名归调用方：右键菜单那一路用 Core::Paths::imageFileName 起名，布局那一路用序号
+        // 文件名归调用方：右键菜单那一路用 Core::Paths::imageFileName 起名（后缀按设置里那一档），
+        // 布局那一路用序号。格式不单独传：Qt 按后缀挑编码器，再传一次格式名就是第二个出处
         const auto filePath = directory / Core::Paths::fromDisplayText(fileName);
 
-        if (!m_image.save(Core::Paths::toDisplayText(filePath)))
+        if (!m_image.save(Core::Paths::toDisplayText(filePath), nullptr, quality))
         {
             return std::unexpected(Core::Error{Core::ErrorCode::FileWriteFailed,
                                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图保存失败：{}。请检查目录是否可写，或先把这一张复制进剪贴板"),
@@ -387,7 +413,14 @@ namespace GyanisScribe::Pin
         menu->addAction(GyanisScribe::Core::uiText("保存"), this,
                         [this, directory]
                         {
-                            if (const auto saved = saveToFile(directory, Core::Paths::imageFileName(QDateTime::currentDateTime(), "png")); !saved)
+                            const auto target = imageSaveTarget(m_settings);
+                            if (!target)
+                            {
+                                // 格式或质量那一格存坏了：不写一个猜出来的文件，原因照旧只进日志
+                                Core::Logger::error(target.error().message);
+                                return;
+                            }
+                            if (const auto saved = saveToFile(directory, Core::Paths::imageFileName(QDateTime::currentDateTime(), target->first), target->second); !saved)
                             {
                                 Core::Logger::error(saved.error().message);
                             }

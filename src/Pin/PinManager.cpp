@@ -91,8 +91,10 @@ namespace GyanisScribe::Pin
         states.reserve(static_cast<int>(m_pins.size()));
         for (int index = 0; index < count(); ++index)
         {
-            auto      *pin   = pinAt(index);
-            const auto saved = pin->saveToFile(directory, pinCacheFileName(index));
+            auto *pin = pinAt(index);
+            // 恢复用的那一份永远是 PNG 且交给 Qt 默认质量：设置里的格式只管「用户按保存」那一路，
+            // 拿有损档存恢复数据会让桌面每次重启都糊一点，而没人要求过这种事
+            const auto saved = pin->saveToFile(directory, pinCacheFileName(index), -1);
             if (!saved)
             {
                 // 一张写不下去就整批不存：存半份布局会还原出一个与用户留下的桌面不一致的样子

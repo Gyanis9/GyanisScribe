@@ -50,6 +50,19 @@ add_custom_command(TARGET DeployQtRuntime POST_BUILD
         "$<TARGET_FILE_DIR:Qt6::Gui>/../plugins/platforms/qwindows${QT_DEBUG_SUFFIX}.dll"
         "$<TARGET_FILE_DIR:GyanisScribe>/plugins/platforms/")
 
+# 图像格式插件：PNG 编在 Qt6Gui 里，JPG 与 WebP 是插件。设置页摆出来的档必须真写得出来，
+# 否则用户选了那一档就得到一次失败（实测开发树里 imageformats 没摆时 jpg 就是写不出）。
+# 打包那一路不用管：windeployqt 默认就把 imageformats 带上（这条链没开 --no-imageformats）。
+add_custom_command(TARGET DeployQtRuntime POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+        "$<TARGET_FILE_DIR:GyanisScribe>/plugins/imageformats")
+foreach (ImageFormatPlugin jpeg webp)
+    add_custom_command(TARGET DeployQtRuntime POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE_DIR:Qt6::Gui>/../plugins/imageformats/q${ImageFormatPlugin}${QT_DEBUG_SUFFIX}.dll"
+            "$<TARGET_FILE_DIR:GyanisScribe>/plugins/imageformats/")
+endforeach ()
+
 # 离屏平台只给开发树用：会真建窗口的用例（贴图、遮罩）把 QT_QPA_PLATFORM 设成 offscreen，
 # 否则窗口会弹到用户桌面上并抢前台——并行跑用例时这会咬到别的界面测试。
 # 缺这个插件时 Qt 不是报错而是弹出模态的「no platform plugin」消息框，ctest 表现为整条挂住。

@@ -49,6 +49,13 @@ namespace GyanisScribe::Settings
     /// 「没填」那一档取不含指针：区域截图刚松手时指针就在选区里，默认画进去会让成品多出一只箭头
     inline constexpr bool kDefaultCaptureIncludeCursor = false;
 
+    /// 成品图片存成什么格式，取值词表在 Core::kImageFormatChoices；读端在 AppController 与 Pin 的保存那两处
+    inline constexpr std::string_view kSaveImageFormat = "Save/ImageFormat";
+
+    /// 有损档（JPG 与 WebP）的质量，取值区间见 Core::kMinimumImageQuality 到 kMaximumImageQuality；
+    /// PNG 是无损的，这一格对它没有作用，读端与「保存格式」那两格同处
+    inline constexpr std::string_view kSaveImageQuality = "Save/ImageQuality";
+
     /// 贴图保存的默认目录，为空时用系统图片目录下的 GyanisScribe
     inline constexpr std::string_view kPathScreenshot = "Paths/Screenshot";
 

@@ -8,7 +8,9 @@ add_library(Core STATIC
         Paths.h
         Paths.cpp
         ImageFit.h
-        ImageFit.cpp)
+        ImageFit.cpp
+        ImageFormat.h
+        ImageFormat.cpp)
 
 target_include_directories(Core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 

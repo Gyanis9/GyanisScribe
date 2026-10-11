@@ -7,6 +7,7 @@
 #include "Capture/IScreenCaptureSource.h"
 #include "Capture/QScreenCaptureSource.h"
 #include "Capture/ScreenUtils.h"
+#include "Core/ImageFormat.h"
 #include "Core/Logger.h"
 #include "Core/Paths.h"
 #include "Core/Text.h"
@@ -499,9 +500,25 @@ namespace GyanisScribe::App
             return;
         }
 
-        const auto fileName = Core::Paths::imageFileName(QDateTime::currentDateTime(), "png");
+        const auto storedFormat = m_settings->stringValue(Settings::kSaveImageFormat, QStringLiteral("Png"));
+        const auto format       = Core::parseImageFormat(storedFormat);
+        if (!format)
+        {
+            // 不猜一档：猜错就是把成品按另一种压缩写出去，事后无从找回原样
+            notifyUser(QString::fromUtf8(GyanisScribe::Core::uiTextUtf8("没能存下图片：%1").c_str()).arg(QString::fromStdString(format.error().message)), Ui::ToastKind::Danger);
+            return;
+        }
+        const auto quality = m_settings->intValue(Settings::kSaveImageQuality, Core::kDefaultImageQuality);
+        if (const auto checked = Core::parseImageQuality(quality); !checked)
+        {
+            notifyUser(QString::fromUtf8(GyanisScribe::Core::uiTextUtf8("没能存下图片：%1").c_str()).arg(QString::fromStdString(checked.error().message)), Ui::ToastKind::Danger);
+            return;
+        }
+
+        const auto fileName = Core::Paths::imageFileName(QDateTime::currentDateTime(), Core::imageFormatExtension(*format));
         const auto filePath = directory / fileName.toStdString();
-        if (!image.save(Core::Paths::toDisplayText(filePath)))
+        // 格式不单独传给 Qt：它按后缀挑编码器，再传一次格式名就是第二个出处
+        if (!image.save(Core::Paths::toDisplayText(filePath), nullptr, quality))
         {
             Core::Logger::error(std::format("标注结果写入失败：{}。请检查目录是否可写，或先用「复制」交剪贴板", Core::Paths::toDisplayText(filePath).toStdString()));
             notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("写入失败：{}。请检查这个目录能不能写"),

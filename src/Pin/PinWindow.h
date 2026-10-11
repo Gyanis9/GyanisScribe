@@ -136,12 +136,13 @@ namespace GyanisScribe::Pin
         /**
          * @brief 存成文件，见 IPinWindow::saveToFile()
          * @param directory 目标目录，不存在时先创建
-         * @param fileName 目录里的文件名，原样使用，不加时间戳也不改名
+         * @param fileName 目录里的文件名，原样使用，不加时间戳也不改名；后缀决定写成什么格式
+         * @param quality 有损档的质量，-1 表示交给 Qt 的默认档
          * @return 成功返回写下的路径；建目录或写文件失败时返回带路径的原因
          * @details 与基类一致，差别在命名：文件名归调用方，管理器一次写整批时靠序号区分，
          *          否则同一毫秒里的两张会写到同一个文件上，只剩最后一张。
          */
-        [[nodiscard]] Core::Expected<QString> saveToFile(const std::filesystem::path &directory, const QString &fileName) override;
+        [[nodiscard]] Core::Expected<QString> saveToFile(const std::filesystem::path &directory, const QString &fileName, int quality) override;
 
         /// 全屏坐标里的位置，见 IPinWindow::globalRect()
         [[nodiscard]] QRect globalRect() const override;

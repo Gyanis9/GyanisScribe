@@ -123,10 +123,13 @@ namespace GyanisScribe::Pin
         /**
          * @brief 把当前图片存成文件
          * @param directory 目标目录
-         * @param fileName 目录里的文件名，由调用方给：一次写多张时靠它保证不互相覆盖
+         * @param fileName 目录里的文件名，由调用方给：一次写多张时靠它保证不互相覆盖，
+         *                 后缀决定写成什么格式（Qt 按后缀挑编码器）
+         * @param quality 有损档的质量，取 Core::kMinimumImageQuality 到 kMaximumImageQuality；
+         *                传 -1 表示交给 Qt 的默认档
          * @return 成功返回写下的文件完整路径；失败返回带路径与原因的 Error
          */
-        [[nodiscard]] virtual Core::Expected<QString> saveToFile(const std::filesystem::path &directory, const QString &fileName) = 0;
+        [[nodiscard]] virtual Core::Expected<QString> saveToFile(const std::filesystem::path &directory, const QString &fileName, int quality) = 0;
 
         /**
          * @brief 贴图当前在全屏坐标里的位置

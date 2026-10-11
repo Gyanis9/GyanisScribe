@@ -204,6 +204,10 @@
             <translation>Couldn't save the image: {}</translation>
         </message>
         <message>
+            <source>没能存下图片：%1</source>
+            <translation>Could not save the image: %1</translation>
+        </message>
+        <message>
             <source>写入失败：{}。请检查这个目录能不能写</source>
             <translation>Write failed: {}. Check whether this directory is writable</translation>
         </message>
@@ -394,6 +398,22 @@
         <message>
             <source>整屏与区域截图生效；滚动长截图按帧接图，画进去会留下一串指针，那一趟不带。非 Windows 平台取不到系统指针的形状，开了也不会出现</source>
             <translation>Applies to full-screen and region shots. Scrolling capture stitches frames, so a pointer would repeat down the long image and is left out there. Non-Windows platforms cannot read the system pointer shape, so turning this on changes nothing</translation>
+        </message>
+        <message>
+            <source>保存格式</source>
+            <translation>Save format</translation>
+        </message>
+        <message>
+            <source>「直接存成文件」与贴图右键的「保存」按这一档写文件；PNG 无损，JPG 与 WebP 用来把照片类的截图压小</source>
+            <translation>"Save directly to a file" and the pin context-menu "Save" write with this format. PNG is lossless; JPG and WebP shrink photo-like shots</translation>
+        </message>
+        <message>
+            <source>保存质量</source>
+            <translation>Save quality</translation>
+        </message>
+        <message>
+            <source>只有 JPG 与 WebP 吃这一格，PNG 是无损的；数字越大越清晰，文件也越大</source>
+            <translation>Only JPG and WebP use this value; PNG is lossless. Higher means clearer and bigger</translation>
         </message>
         <message>
             <source>界面语言</source>
@@ -926,6 +946,18 @@
         <message>
             <source>{}：取值 "{}" 不在可选值里，可取的只有 {}。请在设置的{}重选，或删掉 {} 这一项回到默认档</source>
             <translation>{}: the value "{}" is not among the allowed ones, which are only {}. Re-pick it on the {} page in Settings, or delete the {} entry to fall back to the default</translation>
+        </message>
+        <message>
+            <source>截图页</source>
+            <translation>Shot page</translation>
+        </message>
+        <message>
+            <source>保存质量：取值 {} 不在可取区间里，只能是 {} 到 {}。请在设置的截图页重选，或删掉 Save/ImageQuality 这一项回到默认档</source>
+            <translation>Save quality: value {} is out of range, only {} to {} are accepted. Choose again on the Shot page of Settings, or delete the Save/ImageQuality entry to fall back to the default</translation>
+        </message>
+        <message>
+            <source>PNG（无损）</source>
+            <translation>PNG (lossless)</translation>
         </message>
         <message>
             <source>日志目录建不出来：{}（原因 {}）。请把 Paths 里的日志目录改到一个可写的路径再重启</source>

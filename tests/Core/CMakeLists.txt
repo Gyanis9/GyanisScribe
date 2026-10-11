@@ -1,7 +1,8 @@
 add_executable(TestCore
         TestLogger.cpp
         TestPaths.cpp
-        TestImageFit.cpp)
+        TestImageFit.cpp
+        TestImageFormat.cpp)
 
 target_link_libraries(TestCore PRIVATE
         Core

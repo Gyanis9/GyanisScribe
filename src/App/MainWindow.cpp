@@ -1,6 +1,7 @@
 #include "App/CaptureIntent.h"
 #include "App/MainWindow.h"
 #include "App/TrayController.h"
+#include "Core/ImageFormat.h"
 #include "Core/Logger.h"
 #include "Core/Paths.h"
 #include "Core/Text.h"
@@ -719,6 +720,75 @@ namespace
                          });
         return combo;
     }
+    /**
+     * @brief 成品图片存成什么格式的下拉：档位、token 与后缀都在 Core::kImageFormatChoices 里
+     * @param settings 配置存储
+     * @return 归调用方所有的下拉框，由 addRow 挂上父对象
+     */
+    QComboBox *makeImageFormatCombo(ISettingsStore &settings)
+    {
+        auto *combo = new QComboBox;
+        for (const auto &choice: GyanisScribe::Core::kImageFormatChoices)
+        {
+            combo->addItem(GyanisScribe::Core::uiText(choice.label.data()), tokenText(choice.token));
+        }
+        combo->setAccessibleName(GyanisScribe::Core::uiText("保存格式"));
+        combo->setToolTip(GyanisScribe::Core::uiText("「直接存成文件」与贴图右键的「保存」按这一档写文件；PNG 无损，JPG 与 WebP 用来把照片类的截图压小"));
+
+        const auto stored = settings.stringValue(GyanisScribe::Settings::kSaveImageFormat, tokenText(GyanisScribe::Core::imageFormatToken(GyanisScribe::Core::ImageFormat::Png)));
+        const auto parsed = GyanisScribe::Core::parseImageFormat(stored);
+        if (!parsed)
+        {
+            Logger::warning(std::format("设置页读不出「保存格式」：{}，下拉框按 PNG 显示", parsed.error().message));
+        }
+        const auto chosen = parsed.value_or(GyanisScribe::Core::ImageFormat::Png);
+        combo->setCurrentIndex(combo->findData(tokenText(GyanisScribe::Core::imageFormatToken(chosen))));
+
+        // 接线排在设初值之后：否则「把界面摆到位」这一步会被当成用户改动写回配置
+        QObject::connect(combo, &QComboBox::currentIndexChanged, combo,
+                         [&settings, combo](int)
+                         {
+                             const auto token = combo->currentData().toString();
+                             if (auto written = settings.setValue(GyanisScribe::Settings::kSaveImageFormat, token); !written)
+                             {
+                                 Logger::warning(std::format("「保存格式」没能写入：{}（当前选的是 {}）", written.error().message, combo->currentText().toStdString()));
+                             }
+                         });
+        return combo;
+    }
+
+    /**
+     * @brief 有损档的质量数字框
+     * @param settings 配置存储
+     * @return 归调用方所有的数字框，由 addRow 挂上父对象
+     * @details 越界的存值不夹取、按默认档显示并记一条日志：夹取会让用户以为自己要的那个值生效了。
+     */
+    QSpinBox *makeImageQualitySpin(ISettingsStore &settings)
+    {
+        auto *spin = new QSpinBox;
+        spin->setRange(GyanisScribe::Core::kMinimumImageQuality, GyanisScribe::Core::kMaximumImageQuality);
+        spin->setAccessibleName(GyanisScribe::Core::uiText("保存质量"));
+        spin->setToolTip(GyanisScribe::Core::uiText("只有 JPG 与 WebP 吃这一格，PNG 是无损的；数字越大越清晰，文件也越大"));
+
+        const auto stored = settings.intValue(GyanisScribe::Settings::kSaveImageQuality, GyanisScribe::Core::kDefaultImageQuality);
+        const auto parsed = GyanisScribe::Core::parseImageQuality(stored);
+        if (!parsed)
+        {
+            Logger::warning(std::format("设置页读不出「保存质量」：{}，这一格按 {} 显示", parsed.error().message, GyanisScribe::Core::kDefaultImageQuality));
+        }
+        spin->setValue(parsed.value_or(GyanisScribe::Core::kDefaultImageQuality));
+
+        QObject::connect(spin, &QSpinBox::valueChanged, spin,
+                         [&settings](int value)
+                         {
+                             if (auto written = settings.setValue(GyanisScribe::Settings::kSaveImageQuality, value); !written)
+                             {
+                                 Logger::warning(std::format("「保存质量」没能写入：{}", written.error().message));
+                             }
+                         });
+        return spin;
+    }
+
 
     /**
      * @brief 一路音频输入的下拉框
@@ -1184,6 +1254,8 @@ namespace GyanisScribe::App
         form->addRow(GyanisScribe::Core::uiText("鼠标指针"), makeIncludeCursorCheck(m_settings));
         form->addRow(GyanisScribe::Core::uiText("截图与标注成品目录"),
                      makePathRow(m_settings, GyanisScribe::Settings::kPathScreenshot, GyanisScribe::Core::uiText("截图目录"), Core::Paths::defaultScreenshotDirectory(), m_icons));
+        form->addRow(GyanisScribe::Core::uiText("保存格式"), makeImageFormatCombo(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("保存质量"), makeImageQualitySpin(m_settings));
         form->addRow(GyanisScribe::Core::uiText("复制用的写法"), makeColorFormatCombo(m_settings));
         return page;
     }
