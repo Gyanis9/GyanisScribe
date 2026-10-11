@@ -1,4 +1,5 @@
-# Pin：贴图。纯几何与布局存取可无界面测试，窗口本身要显示会话，留给验收
+# Pin：贴图。纯几何与布局存取可无界面测试；窗口本身的键盘与双击由 tests/Pin/TestPinWindow.cpp 直投事件来测
+# （构造要一个 QApplication，但不必真把窗口摆上屏幕，容器那一档在 Xvfb 下跑）
 add_library(Pin STATIC
         PinTransform.h
         PinTransform.cpp

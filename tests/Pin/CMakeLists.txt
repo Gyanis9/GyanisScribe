@@ -1,6 +1,7 @@
 add_executable(TestPin
         TestPinLayout.cpp
-        TestPinTransform.cpp)
+        TestPinTransform.cpp
+        TestPinWindow.cpp)
 
 target_link_libraries(TestPin PRIVATE
         Pin

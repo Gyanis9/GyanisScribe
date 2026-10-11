@@ -197,14 +197,21 @@ namespace GyanisScribe::Pin
         void mouseReleaseEvent(QMouseEvent *event) override;
 
         /**
+         * @brief 左键双击：回到原始比例与角度
+         * @param event 鼠标事件，非左键时交回 Qt 继续分发
+         * @details 重写 QWidget 的空实现：这一击与按 `0` 走同一个出口，已经在 1:1 且没转角时是幂等。
+         */
+        void mouseDoubleClickEvent(QMouseEvent *event) override;
+
+        /**
          * @brief 滚轮：默认缩放，Ctrl 旋转，Shift 改透明度
          * @param event 滚轮事件
          */
         void wheelEvent(QWheelEvent *event) override;
 
         /**
-         * @brief 键盘：Esc 关闭本张贴图
-         * @param event 键盘事件
+         * @brief 键盘：Esc 关闭，`R`/`Shift+R` 转正一挡，`0` 回到原始比例与角度
+         * @param event 键盘事件；带 Ctrl 的字母不归这里管，交回 Qt
          */
         void keyPressEvent(QKeyEvent *event) override;
 
@@ -226,6 +233,13 @@ namespace GyanisScribe::Pin
 
         /// 画布矩形（未旋转、已缩放）在本窗口内的位置
         [[nodiscard]] QRectF contentRect() const;
+
+        /**
+         * @brief 回到原始比例（1:1）与角度（0°），透明度与位置不动
+         * @details 键盘 `0` 与左键双击共用这一个出口：两处各写一份复位就会在将来只改一处。
+         *          位置不跟着改中心：复位尺寸不该把人摆好的那一站挪走。
+         */
+        void resetScaleAndRotation();
 
         QImage                                m_image;                     ///< 贴图内容，物理像素
         QSizeF                                m_logicalSize;               ///< 图片逻辑尺寸

@@ -42,6 +42,9 @@ namespace GyanisScribe::Pin
         /// 滚轮一格改变的透明度
         constexpr double kWheelOpacityStep = 0.05;
 
+        /// 键盘一挡转过的角度：滚轮那 5° 是细调，按一次 `R` 要的是「转正一首」
+        constexpr double kKeyboardRotationStride = 90.0;
+
         /// 选中边框与悬停边框的描边宽度
         constexpr int kBorderWidth = 1;
 
@@ -408,7 +411,41 @@ namespace GyanisScribe::Pin
             close();
             return;
         }
+
+        // `R` 顺转一挡、`Shift+R` 逆转一挡：带 Ctrl 的同一个字母不认，那是另一类组合键的地盘
+        if (event->key() == Qt::Key_R && (event->modifiers() == Qt::NoModifier || event->modifiers() == Qt::ShiftModifier))
+        {
+            const auto stride = event->modifiers().testFlag(Qt::ShiftModifier) ? -kKeyboardRotationStride : kKeyboardRotationStride;
+            setRotationDegrees(m_rotationDegrees + stride);
+            return;
+        }
+
+        if (event->key() == Qt::Key_0 && event->modifiers() == Qt::NoModifier)
+        {
+            resetScaleAndRotation();
+            return;
+        }
+
         QWidget::keyPressEvent(event);
+    }
+
+    void PinWindow::mouseDoubleClickEvent(QMouseEvent *event)
+    {
+        if (event->button() != Qt::LeftButton)
+        {
+            QWidget::mouseDoubleClickEvent(event);
+            return;
+        }
+
+        // 左键双击同样回到原始比例与角度：已经在 1:1 且没转角时这是幂等，而不是「按了没反应」
+        resetScaleAndRotation();
+    }
+
+    void PinWindow::resetScaleAndRotation()
+    {
+        // 透明度不在复位范围内：那是用户刻意调出来的一档，一起抹掉等于替他做了没要过的事
+        setScale(1.0);
+        setRotationDegrees(0.0);
     }
 
     QMenu *PinWindow::buildContextMenu()
@@ -453,7 +490,7 @@ namespace GyanisScribe::Pin
         throughAction->setCheckable(true);
         throughAction->setChecked(m_mouseThrough);
         throughAction->setVisible(capabilities.clickThrough);
-        throughAction->setToolTip(GyanisScribe::Core::uiText("滚轮缩放，Ctrl+滚轮旋转，Shift+滚轮调透明度，Esc 关闭"));
+        throughAction->setToolTip(GyanisScribe::Core::uiText("滚轮缩放，Ctrl+滚轮旋转，Shift+滚轮调透明度，R 转正一挡（Shift+R 反向），0 或双击回到原始比例，Esc 关闭"));
 
         menu->addSeparator();
         menu->addAction(GyanisScribe::Core::uiText("关闭"), this,
