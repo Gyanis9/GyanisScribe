@@ -26,12 +26,13 @@ namespace GyanisScribe::Hotkey
      */
     enum class HotkeyAction
     {
-        Capture,     ///< 截图
-        Record,      ///< 录屏
-        Ocr,         ///< 识别文字
-        Pick,        ///< 屏幕取色
-        CaptureLong, ///< 滚动长截图；追加在末尾，编号排到 5
-        TogglePins,  ///< 收起或摆回全部贴图；追加在末尾，编号排到 6
+        Capture,      ///< 截图
+        Record,       ///< 录屏
+        Ocr,          ///< 识别文字
+        Pick,         ///< 屏幕取色
+        CaptureLong,  ///< 滚动长截图；追加在末尾，编号排到 5
+        TogglePins,   ///< 收起或摆回全部贴图；追加在末尾，编号排到 6
+        NextPinGroup, ///< 切到下一组贴图；追加在末尾，编号排到 7
     };
 
     /**

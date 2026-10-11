@@ -62,6 +62,7 @@ namespace GyanisScribe::App
         ClearPinsThrough,  ///< 取消全部贴图的鼠标穿透；新成员只追加在末尾
         TogglePinsVisible, ///< 收起或摆回全部贴图；新成员只追加在末尾
         PasteClipboard,    ///< 把剪贴板里的图贴到屏幕上；新成员只追加在末尾
+        NextPinGroup,      ///< 切到下一组贴图；新成员只追加在末尾
     };
 
     /**

@@ -24,6 +24,9 @@ namespace GyanisScribe::Settings
     /// 收起/摆回全部贴图的全局热键
     inline constexpr std::string_view kHotkeyTogglePins = "Hotkey/TogglePins";
 
+    /// 切到下一组贴图的全局热键
+    inline constexpr std::string_view kHotkeyNextPinGroup = "Hotkey/NextPinGroup";
+
     /// 主题档位，取值只能是 Light、Dark、System、HighContrast
     inline constexpr std::string_view kThemeMode = "Theme/Mode";
 
@@ -68,6 +71,9 @@ namespace GyanisScribe::Settings
 
     /// 贴图的布局记录（JSON 数组文本），重启后按它恢复摆位、缩放、旋转与透明度
     inline constexpr std::string_view kPinLayout = "Pin/Layout";
+
+    /// 当前显示的是第几个贴图分组（从 1 起），与布局一起读写：重启后回到同一组
+    inline constexpr std::string_view kPinActiveGroup = "Pin/ActiveGroup";
 
     /// OCR 语言标签，取值见 Ocr::supportedOcrLanguageTags()
     inline constexpr std::string_view kOcrLanguage = "Ocr/Language";

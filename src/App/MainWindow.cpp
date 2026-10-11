@@ -1433,7 +1433,8 @@ namespace GyanisScribe::App
                                      std::tuple{GyanisScribe::Settings::kHotkeyOcr, GyanisScribe::Core::uiText("文字识别"), QStringLiteral("Ctrl+Alt+O")},
                                      std::tuple{GyanisScribe::Settings::kHotkeyPick, GyanisScribe::Core::uiText("屏幕取色"), QStringLiteral("Ctrl+Alt+P")},
                                      std::tuple{GyanisScribe::Settings::kHotkeyCaptureLong, GyanisScribe::Core::uiText("滚动长截图"), QStringLiteral("Ctrl+Alt+L")},
-                                     std::tuple{GyanisScribe::Settings::kHotkeyTogglePins, GyanisScribe::Core::uiText("收起 / 摆回贴图"), QStringLiteral("Ctrl+Alt+H")}};
+                                     std::tuple{GyanisScribe::Settings::kHotkeyTogglePins, GyanisScribe::Core::uiText("收起 / 摆回贴图"), QStringLiteral("Ctrl+Alt+H")},
+                                     std::tuple{GyanisScribe::Settings::kHotkeyNextPinGroup, GyanisScribe::Core::uiText("切换贴图分组"), QStringLiteral("Ctrl+Alt+G")}};
 
         const auto intro = m_capabilities.globalHotkeys
                                    ? GyanisScribe::Core::uiText("%1 个全局热键随时可改，改完立即重新登记，不需要重启。").arg(static_cast<int>(rows.size()))

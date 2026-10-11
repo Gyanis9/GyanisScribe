@@ -24,6 +24,9 @@ namespace GyanisScribe::Hotkey
 
         /// 收起/摆回全部贴图的默认组合：H 取 hide，与同类工具的 F3 同一件事
         constexpr std::string_view kDefaultTogglePins = "Ctrl+Alt+H";
+
+        /// 切到下一组贴图的默认组合：G 取 group
+        constexpr std::string_view kDefaultNextPinGroup = "Ctrl+Alt+G";
     } // namespace
 
     HotkeyManager::HotkeyManager(Settings::ISettingsStore &settings, Platform::IPlatformIntegration &integration, QObject *parent) :
@@ -59,8 +62,8 @@ namespace GyanisScribe::Hotkey
     std::span<const HotkeyAction> HotkeyManager::managedActions()
     {
         // 表长度由这份初始化列表自己算：每加一个动作就改三处的日子结束了
-        static constexpr std::array actions = {HotkeyAction::Capture, HotkeyAction::Record,      HotkeyAction::Ocr,
-                                               HotkeyAction::Pick,    HotkeyAction::CaptureLong, HotkeyAction::TogglePins};
+        static constexpr std::array actions = {HotkeyAction::Capture,     HotkeyAction::Record,     HotkeyAction::Ocr,         HotkeyAction::Pick,
+                                               HotkeyAction::CaptureLong, HotkeyAction::TogglePins, HotkeyAction::NextPinGroup};
         return actions;
     }
 
@@ -80,6 +83,8 @@ namespace GyanisScribe::Hotkey
                 return Settings::kHotkeyCaptureLong;
             case HotkeyAction::TogglePins:
                 return Settings::kHotkeyTogglePins;
+            case HotkeyAction::NextPinGroup:
+                return Settings::kHotkeyNextPinGroup;
         }
         // 上面穷举过；走到这里说明新增了动作而这里没跟上，交回兜底键名并在日志里点名
         Core::Logger::error(std::format("动作枚举 {} 没有对应的设置键，请把 settingsKeyFor 补全", static_cast<int>(action)));
@@ -102,6 +107,8 @@ namespace GyanisScribe::Hotkey
                 return kDefaultCaptureLong;
             case HotkeyAction::TogglePins:
                 return kDefaultTogglePins;
+            case HotkeyAction::NextPinGroup:
+                return kDefaultNextPinGroup;
         }
         Core::Logger::error(std::format("动作枚举 {} 没有对应的默认组合，请把 defaultCombinationTextFor 补全", static_cast<int>(action)));
         return kDefaultCapture;

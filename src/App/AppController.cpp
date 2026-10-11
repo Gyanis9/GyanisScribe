@@ -171,6 +171,10 @@ namespace GyanisScribe::App
                                      // 走托盘那一条：开关的方向与提示文案都只有一份
                                      handleTrayAction(TrayAction::TogglePinsVisible);
                                      return;
+                                 case Hotkey::HotkeyAction::NextPinGroup:
+                                     // 同上：切组只有一条实现，热键与托盘那一行不发散
+                                     handleTrayAction(TrayAction::NextPinGroup);
+                                     return;
                              }
                          });
 
@@ -216,6 +220,22 @@ namespace GyanisScribe::App
         QObject::connect(m_pins.get(), &Pin::PinManager::pinCountChanged, m_tray.get(), &TrayController::setPinCount);
         // 贴图菜单里的「识别文字」与热键、标注窗走的是同一个出口：一处接线管所有张（含启动恢复的那些）
         QObject::connect(m_pins.get(), &Pin::PinManager::pinOcrRequested, this, &AppController::handleOcrRequested);
+        // 移到别的组那一下它就从桌上消失了：说清它去了哪、怎么切过去，免得像「贴图自己没了」
+        QObject::connect(
+                m_pins.get(), &Pin::PinManager::pinMovedToGroup, this,
+                [this](int group)
+                {
+                    if (m_pins->activeGroup() == group)
+                    {
+                        notifyUser(GyanisScribe::Core::uiText("这张贴图已移到当前分组，就摆在原处"), Ui::ToastKind::Information);
+                        return;
+                    }
+                    // 热键文本从设置现读：用户改过组合键之后，提示里那个键还得是按得动的那个
+                    notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图已移到分组 {}，先收了起来；按 {} 或从托盘切到那一组就能看见"),
+                                                                              group, m_hotkeys->bindingText(Hotkey::HotkeyAction::NextPinGroup).toStdString())
+                                                         .c_str()),
+                               Ui::ToastKind::Information);
+                });
 
         // 启动把上一次会话留下的那几张摆回来；退出前把在存的这批连像素一起记下
         if (const auto restored = m_pins->restoreLayout(); !restored)
@@ -429,6 +449,19 @@ namespace GyanisScribe::App
             case TrayAction::PasteClipboard:
                 pasteClipboardAsPin();
                 return;
+            case TrayAction::NextPinGroup:
+            {
+                const auto switched = m_pins->switchToNextGroup();
+                if (!switched)
+                {
+                    // 只有一组时把「怎么多出一组」说清楚：热键按下去毫无动静最容易被当成坏了
+                    notifyUser(QString::fromUtf8(switched.error().message.c_str()), Ui::ToastKind::Information);
+                    return;
+                }
+                notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已切到贴图分组 {}，桌上是这一组"), *switched).c_str()),
+                           Ui::ToastKind::Success);
+                return;
+            }
             case TrayAction::CloseAllPins:
                 // 一次点关掉全部：张数由 pinCountChanged 通知托盘刷新，这里只留一条日志，不再弹提示吵人
                 Core::Logger::info(std::format("托盘要求关闭全部贴图：{} 张", m_pins->count()));

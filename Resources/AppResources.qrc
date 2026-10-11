@@ -40,6 +40,7 @@
     <file alias="Pin.svg">Icons/Pin.svg</file>
     <file alias="PinClose.svg">Icons/PinClose.svg</file>
     <file alias="PinCopy.svg">Icons/PinCopy.svg</file>
+    <file alias="PinGroup.svg">Icons/PinGroup.svg</file>
     <file alias="PinMouseThrough.svg">Icons/PinMouseThrough.svg</file>
     <file alias="PinSave.svg">Icons/PinSave.svg</file>
     <file alias="PinTop.svg">Icons/PinTop.svg</file>

@@ -5,6 +5,7 @@
 #include "Core/Text.h"
 #include "Pin/PinWindow.h"
 #include "Settings/ISettingsStore.h"
+#include "Settings/SettingsKeys.h"
 
 #include <QImage>
 #include <QPoint>
@@ -50,10 +51,28 @@ namespace GyanisScribe::Pin
         QObject::connect(raw, &PinWindow::closedByUser, this, [this, raw] { forget(raw); });
         // 识别请求逐张转发出去：贴图在外头拿不到，出口不收在这一层就没人能替它识别
         QObject::connect(raw, &PinWindow::ocrRequested, this, &PinManager::pinOcrRequested);
+        // 分组改动只接意图、由管理器落账：哪张在哪组是这一层的账，窗口自己改会与管理器各记一半
+        QObject::connect(raw, &PinWindow::moveToGroupRequested, this,
+                         [this, raw](int group)
+                         {
+                             const auto found = std::ranges::find_if(m_pins, [raw](const auto &held) { return held.get() == raw; });
+                             if (found == m_pins.end())
+                             {
+                                 return; // 菜单还开着时那张已被关掉：这一击没有可落账的对象
+                             }
+                             if (const auto moved = movePinToGroup(static_cast<int>(found - m_pins.begin()), group); !moved)
+                             {
+                                 Core::Logger::warning(moved.error().message);
+                             }
+                         });
+
+        // 新贴图落在当前显示的那一组：它在别的组里会一贴出来就看不见，最容易被当成贴图坏了
+        raw->setGroup(m_activeGroup);
 
         m_pins.push_back(std::move(pin));
         m_pins.back()->move(globalTopLeft);
         m_pins.back()->show();
+        applyGroupVisibility();
         emit pinCountChanged(count());
         return *raw;
     }
@@ -105,7 +124,13 @@ namespace GyanisScribe::Pin
             state.imageFile = *saved;
             states.push_back(state);
         }
-        return Pin::saveLayout(m_settings, states);
+
+        if (const auto written = Pin::saveLayout(m_settings, states); !written)
+        {
+            return written;
+        }
+        // 活动组跟着布局一起记：不记的话重启后停在第一组，别的组里的贴图就像丢了
+        return m_settings.setValue(Settings::kPinActiveGroup, m_activeGroup);
     }
 
     Core::Expected<int> PinManager::restoreLayout()
@@ -115,6 +140,9 @@ namespace GyanisScribe::Pin
         {
             return std::unexpected(loaded.error());
         }
+
+        // 活动组先落定再摆图：addPin 把新贴图挂在活动组上，晚落定会让这一批全挤进第一组
+        m_activeGroup = m_settings.intValue(Settings::kPinActiveGroup, kFirstPinGroup);
 
         int restored = 0;
         for (const auto &state: *loaded)
@@ -131,12 +159,18 @@ namespace GyanisScribe::Pin
             pin.setScale(state.scale);
             pin.setRotationDegrees(state.rotationDegrees);
             pin.setOpacityLevel(state.opacity);
+            m_pins.back()->setGroup(state.group);
 
             // 位置排在几何参数之后：缩放与旋转都绕着图片中心重排，窗口左上会跟着挪，
             // 先摆位置再改尺寸就等于把记下来的那个点当成了「参数生效前」的位置
             m_pins.back()->move(state.position);
             ++restored;
         }
+
+        // 记下的活动组可能已经没有贴图了（那一组的图被删了）：回落到第一组并把显隐重算一遍，
+        // 否则恢复出来是一张都看不见，用户以为贴图全丢了
+        normalizeActiveGroup();
+        applyGroupVisibility();
         return restored;
     }
 
@@ -178,16 +212,98 @@ namespace GyanisScribe::Pin
 
     int PinManager::setAllPinsConcealed(const bool concealed)
     {
-        auto changed = 0;
+        m_allConcealed = concealed;
+        return applyGroupVisibility();
+    }
+
+    int PinManager::activeGroup() const noexcept
+    {
+        return m_activeGroup;
+    }
+
+    QVector<int> PinManager::groupsInUse() const
+    {
+        QVector<int> groups;
         for (const auto &pin: m_pins)
         {
-            // 已经是那一档的不动：重复 hide()/show() 会让窗口自己闪一下
-            if (pin == nullptr || pin->isConcealed() == concealed)
+            if (pin == nullptr || groups.contains(pin->group()))
             {
                 continue;
             }
-            pin->setConcealed(concealed);
-            ++changed;
+            groups.append(pin->group());
+        }
+        std::ranges::sort(groups);
+        return groups;
+    }
+
+    Core::Expected<int> PinManager::switchToNextGroup()
+    {
+        const auto groups = groupsInUse();
+        if (groups.size() < 2)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("现在只有 1 个贴图分组，没有下一组可切。"
+                                                                                                                "在贴图的右键菜单里选「移动到分组 → 新建分组」才会多出一组")});
+        }
+
+        // 活动组不在册（刚被关掉最后一张）时从第一组接着走：indexOf 给 -1，加一取模正好落回 0
+        const auto current = groups.indexOf(m_activeGroup);
+        m_activeGroup      = groups[(current + 1) % groups.size()];
+        applyGroupVisibility();
+        return m_activeGroup;
+    }
+
+    Core::Expected<void> PinManager::movePinToGroup(const int index, const int group)
+    {
+        if (index < 0 || index >= count() || m_pins[static_cast<std::size_t>(index)] == nullptr)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("要移到分组的贴图不在册：索引 {}。请重新在贴图上打开菜单"), index)});
+        }
+
+        const int clamped = group < kFirstPinGroup ? kFirstPinGroup : group;
+        m_pins[static_cast<std::size_t>(index)]->setGroup(clamped);
+
+        // 移出当前组的当场收起、留在当前组的照旧显示：一次调用把显隐与菜单里的分组清单都重算
+        normalizeActiveGroup();
+        applyGroupVisibility();
+        emit pinMovedToGroup(clamped);
+        return {};
+    }
+
+    void PinManager::normalizeActiveGroup()
+    {
+        const auto groups = groupsInUse();
+        if (groups.isEmpty())
+        {
+            m_activeGroup = kFirstPinGroup;
+            return;
+        }
+        if (!groups.contains(m_activeGroup))
+        {
+            // 活动组的最后一张被关掉了：回落到第一组，否则桌上是一张都看不见，用户不知道去哪找
+            m_activeGroup = groups.front();
+        }
+    }
+
+    int PinManager::applyGroupVisibility()
+    {
+        const auto groups  = groupsInUse();
+        auto       changed = 0;
+        for (const auto &pin: m_pins)
+        {
+            if (pin == nullptr)
+            {
+                continue;
+            }
+            pin->setGroupChoices(groups);
+
+            const bool concealed = m_allConcealed || pin->group() != m_activeGroup;
+            // 已经是那一档的不动：重复 hide()/show() 会让窗口自己闪一下
+            if (pin->isConcealed() != concealed)
+            {
+                pin->setConcealed(concealed);
+                ++changed;
+            }
         }
         return changed;
     }
@@ -201,6 +317,8 @@ namespace GyanisScribe::Pin
         {
             pin->close();
         }
+        // 一张都不剩时活动组回到第一组：下次贴一张回来落在有名字的一组上，而不是一个幽灵组号
+        normalizeActiveGroup();
         emit pinCountChanged(0);
     }
 
@@ -214,6 +332,9 @@ namespace GyanisScribe::Pin
 
         (*found)->deleteLater(); // 回调可能来自该窗口自己的事件处理，立即析构会踩在栈上
         m_pins.erase(found);
+        // 关掉的若是活动组的最后一张，剩下的组要顶上来：不然桌上一张不剩，看不出是关掉了还是出错了
+        normalizeActiveGroup();
+        applyGroupVisibility();
         emit pinCountChanged(count());
     }
 

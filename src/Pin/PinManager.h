@@ -13,6 +13,7 @@
 #include "Pin/PinLayout.h"
 
 #include <QObject>
+#include <QVector>
 
 #include <memory>
 #include <vector>
@@ -35,8 +36,10 @@ namespace GyanisScribe::Pin
      * @brief 贴图管理器
      * @details 窗口由本管理器创建并持有；用户在窗口上按 Esc 或菜单里选关闭时，
      *          窗口发 closedByUser，管理器把自己记的那一份摘掉——两边都只有一条摘除路径。
+     *          贴图按分组组织：桌上只放活动组的那几张，切组就是换一批（分组与活动组都进布局记录，
+     *          重启后回到同一组）。哪张在哪一组记在贴图自己身上，管理器只按它算显隐。
      * @note 图片内容不进布局文件：恢复贴图要有图，而图从哪来（历史目录、剪贴板）是界面层的事，
-     *       布局只管「摆在哪、多大、多透」。
+     *       布局只管「摆在哪、多大、多透、哪一组」。
      */
     class PinManager : public QObject
     {
@@ -123,8 +126,42 @@ namespace GyanisScribe::Pin
          * @details 收起不等于关掉：图还在管理器手里，摆位与缩放都不动，只是不在屏上。
          *          收着的时候用户点不到它，也就没有「自己关不掉自己」那条死路——
          *          摆回这一格由托盘与热键给，不贴在图上。
+         * @note 这一档只盖住当前分组：切到别的组时那一组的贴图照常露脸，
+         *       全局收起的意思从「桌上什么都别留」变成了「这一组的先让开」
          */
         int setAllPinsConcealed(bool concealed);
+
+        /**
+         * @brief 现在显示的是第几组
+         * @return 分组号，从 1 起
+         */
+        [[nodiscard]] int activeGroup() const noexcept;
+
+        /**
+         * @brief 现有分组号
+         * @return 升序去重的分组号；一张贴图都没有时为空
+         * @details 分组由贴图带着：一组里最后一张被关掉，这一组就不在了（不留空壳组，
+         *          否则切换会在一个空组上停一站，看上去像贴图全丢了）
+         */
+        [[nodiscard]] QVector<int> groupsInUse() const;
+
+        /**
+         * @brief 切到下一组
+         * @return 成功返回新的分组号；只有一组时返回 InvalidArgument 并说清怎么多出一组
+         * @details 切换即重算显隐：上一组的收起来，这一组的摆出来。按「现有分组」的升序走一圈，
+         *          空组不留停站。
+         */
+        [[nodiscard]] Core::Expected<int> switchToNextGroup();
+
+        /**
+         * @brief 把某张贴图移到别的分组
+         * @param index 贴图索引，按创建顺序
+         * @param group 目标分组号，从 1 起；比现有最大组号大的取值就是新建那一组
+         * @return 成功返回空载荷；索引越界返回 InvalidArgument
+         * @details 移出当前组的那张当场收起来——换组放着本来就是「暂时腾地方」的手段；
+         *          要看它得切到那一组（托盘或热键）。
+         */
+        [[nodiscard]] Core::Expected<void> movePinToGroup(int index, int group);
 
     signals:
         /**
@@ -141,13 +178,33 @@ namespace GyanisScribe::Pin
          */
         void pinOcrRequested(const QImage &image);
 
+        /**
+         * @brief 某张贴图被移到了别的分组
+         * @param group 它现在所在的分组号
+         * @details 管理器只报事实：要不要提示用户「它被收起来了、切到那一组才看得见」是界面层的分寸
+         */
+        void pinMovedToGroup(int group);
+
     private:
         /// 把某个已自行关闭的窗口从登记里摘掉
         void forget(PinWindow *window);
 
-        Settings::ISettingsStore               &m_settings;    ///< 布局读写处
-        Platform::IPlatformIntegration         &m_integration; ///< 平台能力来源
-        std::vector<std::unique_ptr<PinWindow>> m_pins;        ///< 在册贴图，按创建顺序
+        /// 活动组已经不在册（最后一张被关掉、或布局里换过组）时回落到第一组
+        void normalizeActiveGroup();
+
+        /**
+         * @brief 按「活动组 + 全局收起」重算每张的显隐，并把分组清单推给每张
+         * @return 这次真的改变了状态的张数
+         * @details 显隐只有一个出口：贴图自己的 setConcealed 是唯一动作，
+         *          两个来源（在哪一组、全局收起）合并成一条判据，才不会出现两处各写一半的隐身状态
+         */
+        int applyGroupVisibility();
+
+        Settings::ISettingsStore               &m_settings;                      ///< 布局读写处
+        Platform::IPlatformIntegration         &m_integration;                   ///< 平台能力来源
+        std::vector<std::unique_ptr<PinWindow>> m_pins;                          ///< 在册贴图，按创建顺序
+        int                                     m_activeGroup  = kFirstPinGroup; ///< 当前显示的分组号
+        bool                                    m_allConcealed = false;          ///< 全局收起是不是开着
     };
 
 } // namespace GyanisScribe::Pin

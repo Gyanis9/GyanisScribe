@@ -70,11 +70,12 @@ namespace
  */
 TEST_F(PinLayoutFixture, RoundTripsEveryField)
 {
-    const QVector<PinState> states{
+    QVector<PinState> states{
             sample(10, 20, 1.5, 0.0, 1.0),
             sample(-300, 40, 0.25, 90.0, 0.4),
             sample(0, 0, 20.0, 359.0, 0.05),
     };
+    states[1].group = 2;
 
     const auto text = serializeLayout(states);
     ASSERT_FALSE(text.isEmpty()) << "空文本会被解析成「没有贴图」，等于把布局丢了";
@@ -92,6 +93,7 @@ TEST_F(PinLayoutFixture, RoundTripsEveryField)
         EXPECT_NEAR((*parsed)[index].rotationDegrees, states[index].rotationDegrees, 1e-6) << "角度被改";
         EXPECT_NEAR((*parsed)[index].opacity, states[index].opacity, 1e-6) << "透明度被改";
         EXPECT_EQ((*parsed)[index].imageFile, states[index].imageFile) << "图片位置被改，恢复时就读不到那张图了";
+        EXPECT_EQ((*parsed)[index].group, states[index].group) << "第 " << index << " 项的分组号变了";
     }
 }
 
@@ -158,6 +160,29 @@ TEST_F(PinLayoutFixture, RejectsMalformedEntriesByName)
 
     const auto overOpacity = parseLayout(R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1.5,"imageFile":"a.png"}])");
     ASSERT_FALSE(overOpacity.has_value()) << "超过 1 的不透明度没有意义";
+}
+
+/**
+ * @brief 钉住分组字段的往返、旧布局的兼容与非法组号的拒绝面
+ * @details group 是后加的字段：上一版存下的布局没有它，升级后第一次启动必须照样摆得回来
+ *          （缺省落第一组），否则用户的桌面会被清空一次；写了非法值的记录仍然按坏文件拒掉。
+ */
+TEST_F(PinLayoutFixture, GroupRoundTripsWhileOldLayoutsDefaultToTheFirstGroup)
+{
+    auto withGroup    = sample(10, 20, 1.0, 0.0, 1.0);
+    withGroup.group   = 3;
+    const auto parsed = parseLayout(serializeLayout(QVector<PinState>{withGroup}).toStdString());
+    ASSERT_TRUE(parsed.has_value()) << "自己写出的布局读不回来：" << parsed.error().message;
+    EXPECT_EQ(parsed->front().group, 3) << "分组号没进布局文本";
+
+    // 上一版写下的记录：没有 group 字段
+    const auto legacy = parseLayout(R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png"}])");
+    ASSERT_TRUE(legacy.has_value()) << "旧布局读不出来，升级后贴图会一张都摆不回：" << legacy.error().message;
+    EXPECT_EQ(legacy->front().group, 1) << "缺 group 字段的记录该落在第一组";
+
+    const auto zeroGroup = parseLayout(R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png","group":0}])");
+    ASSERT_FALSE(zeroGroup.has_value()) << "组号 0 不是合法分组，读进去就是一张谁也切不到的贴图";
+    EXPECT_NE(zeroGroup.error().message.find("分组号"), std::string::npos) << "要写出坏的是分组号：" << zeroGroup.error().message;
 }
 
 /**

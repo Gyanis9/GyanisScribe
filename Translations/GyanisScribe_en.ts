@@ -184,6 +184,14 @@
             <translation>Capture did not complete: %1. Try again</translation>
         </message>
         <message>
+            <source>这张贴图已移到当前分组，就摆在原处</source>
+            <translation>This pin has been moved into the group on screen; it stays where it is</translation>
+        </message>
+        <message>
+            <source>贴图已移到分组 {}，先收了起来；按 {} 或从托盘切到那一组就能看见</source>
+            <translation>The pin was moved to group {}, so it is put away for now; press {} or switch to that group from the tray to see it</translation>
+        </message>
+        <message>
             <source>这些全局热键没能登记上：</source>
             <translation>These global hotkeys could not be registered:</translation>
         </message>
@@ -214,6 +222,10 @@
         <message>
             <source>桌上没有贴图</source>
             <translation>No pinned images on the desk</translation>
+        </message>
+        <message>
+            <source>已切到贴图分组 {}，桌上是这一组</source>
+            <translation>Switched to pin group {}; that is the group on screen now</translation>
         </message>
         <message>
             <source>已复制到剪贴板</source>
@@ -756,6 +768,10 @@
             <translation>Conceal / restore pins</translation>
         </message>
         <message>
+            <source>切换贴图分组</source>
+            <translation>Switch pin group</translation>
+        </message>
+        <message>
             <source>%1 个全局热键随时可改，改完立即重新登记，不需要重启。</source>
             <translation>%1 global hotkeys can be changed any time; each change is re-registered right away, no restart needed.</translation>
         </message>
@@ -886,6 +902,10 @@
         <message>
             <source>把剪贴板里的图贴到屏幕上</source>
             <translation>Paste the clipboard image onto the screen</translation>
+        </message>
+        <message>
+            <source>切到下一组贴图</source>
+            <translation>Switch to the next pin group</translation>
         </message>
         <message>
             <source>设置</source>
@@ -1472,8 +1492,20 @@
             <translation>Pin layout entry {} has an opacity outside (0,1]: {}. Clear this entry and let the program record it again.</translation>
         </message>
         <message>
+            <source>贴图布局第 {} 项的分组号不是正整数：{}。请清除这一项后让程序重新记一次</source>
+            <translation>Entry {} of the pin layout has a group number that is not a positive integer: {}. Clear that entry and let the app record it again</translation>
+        </message>
+        <message>
             <source>贴图默认不透明度 "{}" 不在 1 到 100 之间：请在设置的贴图页重选一个值，或删掉 Pin/DefaultOpacity 这一项回到完全不透明</source>
             <translation>Pin default opacity "{}" is not between 1 and 100: pick a value again on the Pin page of Settings, or remove the Pin/DefaultOpacity entry to go back to fully opaque</translation>
+        </message>
+        <message>
+            <source>现在只有 1 个贴图分组，没有下一组可切。在贴图的右键菜单里选「移动到分组 → 新建分组」才会多出一组</source>
+            <translation>There is only one pin group right now, so there is no next group. Choose "Move to group > New group" in a pin's context menu to create one</translation>
+        </message>
+        <message>
+            <source>要移到分组的贴图不在册：索引 {}。请重新在贴图上打开菜单</source>
+            <translation>The pin to move is not registered: index {}. Open the menu on that pin again</translation>
         </message>
         <message>
             <source>这台机器的 Qt 写不出「{}」这一档保存格式。请在设置的截图页改选一档</source>
@@ -1506,6 +1538,18 @@
         <message>
             <source>缩到小图</source>
             <translation>Shrink to thumbnail</translation>
+        </message>
+        <message>
+            <source>移动到分组</source>
+            <translation>Move to group</translation>
+        </message>
+        <message>
+            <source>分组 %1</source>
+            <translation>Group %1</translation>
+        </message>
+        <message>
+            <source>新建分组</source>
+            <translation>New group</translation>
         </message>
         <message>
             <source>保持置顶</source>

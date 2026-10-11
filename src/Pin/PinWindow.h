@@ -15,6 +15,7 @@
 #include <QImage>
 #include <QPoint>
 #include <QRectF>
+#include <QVector>
 #include <QWheelEvent>
 #include <QWidget>
 
@@ -73,6 +74,26 @@ namespace GyanisScribe::Pin
          * @return true 表示现在是那枚小方块
          */
         [[nodiscard]] bool isThumbnailMode() const noexcept;
+
+        /**
+         * @brief 设所属贴图分组
+         * @param group 分组号，从 1 起；小于 1 的取值会被夹到 1
+         */
+        void setGroup(int group);
+
+        /**
+         * @brief 所属贴图分组
+         * @return 分组号，最小是 1
+         */
+        [[nodiscard]] int group() const noexcept;
+
+        /**
+         * @brief 告诉这张贴图「现在有哪些分组」
+         * @param groups 现有分组号，升序；右键菜单的「移动到分组」按它长出条目
+         * @details 窗口不自己去问管理器：分组是管理器那份模型的账，
+         *          窗口只是在菜单里替它列出可选项，清单由管理器推过来。
+         */
+        void setGroupChoices(const QVector<int> &groups);
 
         /**
          * @brief 设缩放，见 IPinWindow::setScale()
@@ -165,6 +186,14 @@ namespace GyanisScribe::Pin
          */
         [[nodiscard]] std::vector<QRectF> handleRects() const;
 
+        /**
+         * @brief 建右键菜单
+         * @return 菜单对象，所有权交调用方（Qt 的 exec 路径）
+         * @note 公开出来是给用例核对菜单结构与接线：菜单项的动作都握在 lambda 里，
+         *       不把菜单本身借出来，那些接线就只能靠人读代码
+         */
+        [[nodiscard]] class QMenu *buildContextMenu();
+
     signals:
         /**
          * @brief 用户要求识别这张图上的文字
@@ -173,6 +202,14 @@ namespace GyanisScribe::Pin
          *       能不能识别由后端回答——拿不到后端时是一条中文原因，而不是把项灰掉让人猜
          */
         void ocrRequested(const QImage &image);
+
+        /**
+         * @brief 用户从右键菜单要求把这张贴图移到某个分组
+         * @param group 目标分组号；比现有最大组号大 1 表示「新建分组」
+         * @details 只发意图、自己不改分组：分组是管理器那份模型里的账，
+         *          改动与随之而来的显示/隐藏都由它一处说了算
+         */
+        void moveToGroupRequested(int group);
 
         /**
          * @brief 贴图被关闭，管理器据此把自己记的那一份摘掉
@@ -230,12 +267,6 @@ namespace GyanisScribe::Pin
         void contextMenuEvent(QContextMenuEvent *event) override;
 
     private:
-        /**
-         * @brief 建右键菜单
-         * @return 菜单对象，所有权交调用方（Qt 的 exec 路径）
-         */
-        [[nodiscard]] class QMenu *buildContextMenu();
-
         /// 按当前的缩放与旋转重算窗口尺寸与位置，保持中心不动
         void applyGeometry();
 
@@ -249,20 +280,22 @@ namespace GyanisScribe::Pin
          */
         void resetScaleAndRotation();
 
-        QImage                                m_image;                     ///< 贴图内容，物理像素
-        QSizeF                                m_logicalSize;               ///< 图片逻辑尺寸
-        double                                m_scale           = 1.0;     ///< 缩放因子
-        double                                m_rotationDegrees = 0.0;     ///< 旋转角度
-        double                                m_opacity         = 1.0;     ///< 不透明度
-        bool                                  m_mouseThrough    = false;   ///< 是否鼠标穿透
-        bool                                  m_thumbnail       = false;   ///< 缩略图模式：窗口缩成小方块，缩放等设定原样留着
-        bool                                  m_pinned          = true;    ///< 是否置顶
-        QPoint                                m_dragOffset;                ///< 移动时起笔点与窗口左上角的差
-        std::optional<HandleKind>             m_draggedHandle;             ///< 正在拖的手柄，没拖时为空
-        double                                m_dragInitialScale    = 1.0; ///< 起拖时的缩放
-        double                                m_dragInitialDistance = 0.0; ///< 起拖时指针到中心的距离
-        Settings::ISettingsStore             &m_settings;                  ///< 配置来源（保存目录）
-        const Platform::IPlatformIntegration &m_integration;               ///< 平台能力查询
+        QImage                                m_image;                            ///< 贴图内容，物理像素
+        QSizeF                                m_logicalSize;                      ///< 图片逻辑尺寸
+        double                                m_scale           = 1.0;            ///< 缩放因子
+        double                                m_rotationDegrees = 0.0;            ///< 旋转角度
+        double                                m_opacity         = 1.0;            ///< 不透明度
+        bool                                  m_mouseThrough    = false;          ///< 是否鼠标穿透
+        bool                                  m_thumbnail       = false;          ///< 缩略图模式：窗口缩成小方块，缩放等设定原样留着
+        bool                                  m_pinned          = true;           ///< 是否置顶
+        int                                   m_group           = kFirstPinGroup; ///< 所属贴图分组，菜单与布局记录都取它
+        QVector<int>                          m_groupChoices{kFirstPinGroup};     ///< 现有分组号（升序），由管理器推过来
+        QPoint                                m_dragOffset;                       ///< 移动时起笔点与窗口左上角的差
+        std::optional<HandleKind>             m_draggedHandle;                    ///< 正在拖的手柄，没拖时为空
+        double                                m_dragInitialScale    = 1.0;        ///< 起拖时的缩放
+        double                                m_dragInitialDistance = 0.0;        ///< 起拖时指针到中心的距离
+        Settings::ISettingsStore             &m_settings;                         ///< 配置来源（保存目录）
+        const Platform::IPlatformIntegration &m_integration;                      ///< 平台能力查询
     };
 
 } // namespace GyanisScribe::Pin

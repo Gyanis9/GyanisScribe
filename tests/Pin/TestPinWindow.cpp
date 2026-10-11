@@ -11,9 +11,11 @@
 
 #include <gtest/gtest.h>
 
+#include <QAction>
 #include <QApplication>
 #include <QImage>
 #include <QKeyEvent>
+#include <QMenu>
 #include <QMouseEvent>
 #include <QPoint>
 #include <QSize>
@@ -22,6 +24,7 @@
 #include <cmath>
 #include <format>
 #include <memory>
+#include <vector>
 
 // 整份用例 nest 进工程命名空间：匿名命名空间在外面时 `Core::Expected` 这类写法认不到名字
 namespace GyanisScribe
@@ -269,6 +272,65 @@ namespace GyanisScribe
 
         pressKey(window, Qt::Key_T, Qt::ControlModifier);
         EXPECT_FALSE(window.isThumbnailMode()) << "带修饰键的 T 不归贴图窗管";
+    }
+
+    /**
+     * @brief 钉住布局记录里带着分组号，越界的组号夹回第一组
+     * @details 分组号不进记录的话，重启后所有贴图挤回第一组，用户摆好的「哪几张算一摊」就没了。
+     */
+    TEST_F(PinWindowFixture, StateCarriesItsGroup)
+    {
+        auto &window = makeWindow();
+        window.setGroup(3);
+        EXPECT_EQ(window.state().group, 3) << "分组号没进布局记录";
+
+        window.setGroup(0);
+        EXPECT_EQ(window.state().group, 1) << "0 或负数组号要被夹到第一组，否则布局里会出现一个不存在的组";
+    }
+
+    /**
+     * @brief 钉住右键菜单的「移动到分组」：列全推来的分组、当前组带勾不可点、末项按最大组号新建
+     * @details 菜单项的动作都握在 lambda 里，不把菜单借出来核对，这层接线就只能靠人读代码：
+     *          新建那一项算错组号（比如按「现有组数 +1」数）会把两张贴图并进同一组，
+     *          用户以为新建了，却始终有一张看不见。
+     */
+    TEST_F(PinWindowFixture, GroupSubmenuListsChoicesAndRequestsTheChosenGroup)
+    {
+        auto &window = makeWindow();
+        window.setGroup(2);
+        window.setGroupChoices({1, 2, 4});
+
+        std::vector<int> requested;
+        QObject::connect(&window, &Pin::PinWindow::moveToGroupRequested, &window, [&requested](const int group) { requested.push_back(group); });
+
+        const std::unique_ptr<QMenu> menu{window.buildContextMenu()};
+        QMenu                       *groupMenu = nullptr;
+        for (QAction *action: menu->actions())
+        {
+            if (action->menu() != nullptr && action->text() == QString::fromUtf8("移动到分组"))
+            {
+                groupMenu = action->menu();
+            }
+        }
+        ASSERT_NE(groupMenu, nullptr) << "右键菜单里没有「移动到分组」这一项";
+
+        const auto entries = groupMenu->actions();
+        // 三项现有分组 + 一条分隔线 + 新建分组
+        ASSERT_EQ(entries.size(), 5) << "分组子菜单的条目数与推过来的分组清单不同解";
+        EXPECT_EQ(entries[0]->text(), QString::fromUtf8("分组 1"));
+        EXPECT_EQ(entries[1]->text(), QString::fromUtf8("分组 2"));
+        EXPECT_EQ(entries[2]->text(), QString::fromUtf8("分组 4"));
+        EXPECT_TRUE(entries[1]->isChecked()) << "当前所在的那一组没有带勾";
+        EXPECT_FALSE(entries[1]->isEnabled()) << "当前这一组还点得动：按下去什么都不会发生";
+        EXPECT_FALSE(entries[0]->isChecked()) << "别的分组也带上了勾，看不出自己在哪一组";
+
+        entries[0]->trigger();
+        ASSERT_EQ(requested.size(), 1);
+        EXPECT_EQ(requested.front(), 1) << "点「分组 1」要的是 1 号组";
+
+        entries.back()->trigger();
+        ASSERT_EQ(requested.size(), 2);
+        EXPECT_EQ(requested.back(), 5) << "新建分组该按现有最大组号 +1，而不是按现有组数重数";
     }
 
 } // namespace GyanisScribe

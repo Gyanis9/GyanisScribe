@@ -1,0 +1,240 @@
+// 贴图分组的直测：哪张在哪一组、切组时谁显谁隐、活动组怎么落账。
+// 判据只走公开读数（isConcealed、activeGroup、groupsInUse 与写下的布局文本），不读私有成员。
+
+#include "Pin/IPinWindow.h"
+#include "Pin/PinLayout.h"
+#include "Pin/PinManager.h"
+
+#include "Platform/IPlatformIntegration.h"
+#include "Settings/SettingsKeys.h"
+#include "Settings/SettingsStore.h"
+
+#include <gtest/gtest.h>
+
+#include <QApplication>
+#include <QColor>
+#include <QImage>
+#include <QPoint>
+
+#include <filesystem>
+#include <format>
+#include <memory>
+#include <string>
+
+namespace GyanisScribe
+{
+    namespace
+    {
+        std::unique_ptr<QApplication> application;
+
+        constexpr int kImageWidth  = 32;
+        constexpr int kImageHeight = 24;
+
+        /// 小图一张：分组判据不看内容，只看谁在桌上
+        QImage makeImage()
+        {
+            QImage image{kImageWidth, kImageHeight, QImage::Format_ARGB32};
+            image.fill(QColor{90, 140, 210});
+            return image;
+        }
+
+        class PinManagerFixture : public ::testing::Test
+        {
+        protected:
+            static void SetUpTestSuite()
+            {
+                // argv 与 argc 的缓冲要有静态存储期：Qt 只存指针不拷贝
+                static int   argumentCount  = 1;
+                static char  argumentZero[] = "TestPinManager";
+                static char *arguments[]    = {argumentZero, nullptr};
+                application                 = std::make_unique<QApplication>(argumentCount, arguments);
+            }
+
+            static void TearDownTestSuite()
+            {
+                application.reset();
+            }
+
+            void SetUp() override
+            {
+                // 每条用例一份 ini：ctest 并行时同名的键会互相盖掉
+                const auto caseName = std::string_view(::testing::UnitTest::GetInstance()->current_test_info()->name());
+                m_iniFile           = std::filesystem::temp_directory_path() / std::format("GyanisScribe-PinManager-{}.ini", caseName);
+                std::error_code ignored;
+                std::filesystem::remove(m_iniFile, ignored);
+
+                m_settings    = std::make_unique<Settings::SettingsStore>(m_iniFile);
+                m_integration = Platform::createPlatformIntegration();
+            }
+
+            void TearDown() override
+            {
+                m_pins.reset();
+                m_integration.reset();
+                m_settings.reset();
+                std::error_code ignored;
+                std::filesystem::remove(m_iniFile, ignored);
+            }
+
+            [[nodiscard]] Pin::PinManager &makeManager()
+            {
+                m_pins = std::make_unique<Pin::PinManager>(*m_settings, *m_integration);
+                return *m_pins;
+            }
+
+            [[nodiscard]] Settings::ISettingsStore &settings() const
+            {
+                return *m_settings;
+            }
+
+        private:
+            std::filesystem::path                           m_iniFile;     ///< 本用例专用的设置文件
+            std::unique_ptr<Settings::SettingsStore>        m_settings;    ///< 布局的读写处
+            std::unique_ptr<Platform::IPlatformIntegration> m_integration; ///< 贴图窗要的平台能力
+            std::unique_ptr<Pin::PinManager>                m_pins;        ///< 被测管理器
+        };
+
+        /// 这张贴图此刻在桌上吗：显隐只有 setConcealed 一个出口，判据就直接读它
+        [[nodiscard]] bool isOnDesk(const Pin::IPinWindow *pin)
+        {
+            return pin != nullptr && !pin->isConcealed();
+        }
+    } // namespace
+
+    /**
+     * @brief 钉住分组的核心语义：移到别的组＝从这一组收起来，切过去才看得见
+     * @details 若「移过去」不收起，那张图会继续挡在当前组的画面上，用户以为菜单没生效；
+     *          若「切组」不重算显隐，两组混在一起，「分组」就只是个没有效果的标签。
+     */
+    TEST_F(PinManagerFixture, MovingAndSwitchingTradesWhichPinsAreOnTheDesk)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(10, 10));
+        pins.addPin(makeImage(), QPoint(60, 60));
+        pins.addPin(makeImage(), QPoint(120, 120));
+
+        EXPECT_EQ(pins.activeGroup(), 1) << "新贴图都落在第一组，活动组却不是它";
+        EXPECT_TRUE(isOnDesk(pins.pinAt(0)) && isOnDesk(pins.pinAt(1)) && isOnDesk(pins.pinAt(2))) << "三张都该在桌上";
+
+        const auto moved = pins.movePinToGroup(2, 2);
+        ASSERT_TRUE(moved.has_value()) << moved.error().message;
+        EXPECT_TRUE(isOnDesk(pins.pinAt(0)));
+        EXPECT_TRUE(isOnDesk(pins.pinAt(1)));
+        EXPECT_FALSE(isOnDesk(pins.pinAt(2))) << "移出当前组的贴图没有收起来：它还会挡着这一组的画面";
+        EXPECT_EQ(pins.groupsInUse(), (QVector<int>{1, 2})) << "分组清单不对，切换就会走错";
+
+        const auto switched = pins.switchToNextGroup();
+        ASSERT_TRUE(switched.has_value()) << switched.error().message;
+        EXPECT_EQ(*switched, 2) << "只有两组时下一组就是第二组";
+        EXPECT_FALSE(isOnDesk(pins.pinAt(0))) << "切组后上一组的贴图还在桌上";
+        EXPECT_FALSE(isOnDesk(pins.pinAt(1)));
+        EXPECT_TRUE(isOnDesk(pins.pinAt(2))) << "切到第二组后那张该露脸";
+
+        const auto wrapped = pins.switchToNextGroup();
+        ASSERT_TRUE(wrapped.has_value()) << wrapped.error().message;
+        EXPECT_EQ(*wrapped, 1) << "两组之间该来回切，而不是在第二组上停住";
+        EXPECT_TRUE(isOnDesk(pins.pinAt(0)));
+        EXPECT_FALSE(isOnDesk(pins.pinAt(2)));
+    }
+
+    /**
+     * @brief 钉住只有一组时的拒绝面：要说清怎么多出一组，而不是按下去毫无动静
+     */
+    TEST_F(PinManagerFixture, SingleGroupSwitchTellsHowToMakeAnother)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(0, 0));
+
+        const auto switched = pins.switchToNextGroup();
+        ASSERT_FALSE(switched.has_value());
+        EXPECT_EQ(switched.error().code, Core::ErrorCode::InvalidArgument);
+        EXPECT_NE(switched.error().message.find("新建分组"), std::string::npos) << "拒绝文案要给出多出一组的做法，实际：" << switched.error().message;
+
+        EXPECT_EQ(pins.activeGroup(), 1) << "切不动时活动组被改掉了";
+        EXPECT_TRUE(isOnDesk(pins.pinAt(0))) << "切不动的那一下把贴图收起来了";
+    }
+
+    /**
+     * @brief 钉住全局收起与分组互不干扰：收起再放下，别组的贴图不会跟着露脸
+     * @details 两条判据各盯一侧：全局收起着切组，切过去那一组也不许露脸（用户说的是「桌上什么都别留」）；
+     *          摆回时只放当前组的，别组的不许跟着出来（那等于把用户分好的摊子搅乱）。
+     */
+    TEST_F(PinManagerFixture, GlobalConcealNeverRevealsOtherGroups)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(0, 0));
+        pins.addPin(makeImage(), QPoint(50, 50));
+        ASSERT_TRUE(pins.movePinToGroup(1, 2).has_value());
+
+        EXPECT_EQ(pins.setAllPinsConcealed(true), 1) << "当前组里只有一张，该收起一张";
+        EXPECT_FALSE(isOnDesk(pins.pinAt(0)));
+        EXPECT_FALSE(isOnDesk(pins.pinAt(1)));
+
+        const auto switched = pins.switchToNextGroup();
+        ASSERT_TRUE(switched.has_value()) << switched.error().message;
+        EXPECT_FALSE(isOnDesk(pins.pinAt(1))) << "全局收起着，切过去的那张却露了脸";
+
+        EXPECT_EQ(pins.setAllPinsConcealed(false), 1) << "摆回该只影响当前组的那一张";
+        EXPECT_TRUE(isOnDesk(pins.pinAt(1)));
+        EXPECT_FALSE(isOnDesk(pins.pinAt(0))) << "摆回把别组的贴图也放了出来";
+    }
+
+    /**
+     * @brief 钉住「哪张在哪组」与「现在看哪一组」都进配置：换一个管理器实例也回得来
+     * @details 不记分组，重启后所有贴图挤回第一组；不记活动组，则停在第一组，
+     *          别的组的贴图看上去像丢了。
+     */
+    TEST_F(PinManagerFixture, GroupAndActiveGroupSurviveARestart)
+    {
+        {
+            auto &pins = makeManager();
+            pins.addPin(makeImage(), QPoint(20, 20));
+            pins.addPin(makeImage(), QPoint(200, 40));
+            ASSERT_TRUE(pins.movePinToGroup(1, 2).has_value());
+            const auto switched = pins.switchToNextGroup();
+            ASSERT_TRUE(switched.has_value()) << switched.error().message;
+            ASSERT_EQ(pins.activeGroup(), 2);
+            ASSERT_TRUE(pins.saveLayout().has_value()) << "布局没写下去";
+        }
+
+        // 布局文本是「哪张在哪组」的唯一凭据：从配置里现读现解一遍
+        const auto text   = settings().stringValue(Settings::kPinLayout, QString());
+        const auto states = Pin::parseLayout(text.toStdString());
+        ASSERT_TRUE(states.has_value()) << "写下的布局读不回来：" << states.error().message;
+        ASSERT_EQ(states->size(), 2);
+        EXPECT_EQ((*states)[0].group, 1);
+        EXPECT_EQ((*states)[1].group, 2) << "第二张的组号没写进布局";
+
+        auto      &reopened = makeManager();
+        const auto restored = reopened.restoreLayout();
+        ASSERT_TRUE(restored.has_value()) << restored.error().message;
+        ASSERT_EQ(*restored, 2);
+        EXPECT_EQ(reopened.activeGroup(), 2) << "活动组没记：重启后停在第一组，第二组那张就不见了";
+        EXPECT_TRUE(isOnDesk(reopened.pinAt(1))) << "第二组的那张在重启后没露脸";
+        EXPECT_FALSE(isOnDesk(reopened.pinAt(0))) << "第一组的那张不该同时在桌上";
+    }
+
+    /**
+     * @brief 钉住活动组指向一个不存在的分组时回落到第一组
+     * @details 那个组号是上一次会话留下的（那一组的图被删了、布局被清过）：不回落的后果是
+     *          桌上一张都看不见，而用户手上没有任何线索说明为什么。
+     */
+    TEST_F(PinManagerFixture, ActiveGroupWithoutPinsFallsBackToTheFirstGroup)
+    {
+        {
+            auto &pins = makeManager();
+            pins.addPin(makeImage(), QPoint(30, 30));
+            ASSERT_TRUE(pins.saveLayout().has_value());
+        }
+        // 手工把活动组改成一个没有贴图的组号：模拟「上一次会话留下的那个组已经空了」
+        ASSERT_TRUE(settings().setValue(Settings::kPinActiveGroup, 7).has_value());
+        settings().sync();
+
+        auto      &reopened = makeManager();
+        const auto restored = reopened.restoreLayout();
+        ASSERT_TRUE(restored.has_value()) << restored.error().message;
+        EXPECT_EQ(reopened.activeGroup(), 1) << "活动组停在一个不存在的组上，桌上会一张都看不见";
+        EXPECT_TRUE(isOnDesk(reopened.pinAt(0))) << "回落之后那张该露脸";
+    }
+
+} // namespace GyanisScribe

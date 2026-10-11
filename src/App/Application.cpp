@@ -50,9 +50,9 @@ Application::Application(int &argc, char **argv) : QApplication(argc, argv)
                 std::format("智录 {} 启动，日志目录 {}", applicationVersion().toStdString(), GyanisScribe::Core::Paths::toDisplayText(logDirectory).toStdString()));
     }
 
-    // 单实例探测排在控制器与热键之前：落败的那一次启动不该装托盘、不该建主窗口、更不该去抢那六个
+    // 单实例探测排在控制器与热键之前：落败的那一次启动不该装托盘、不该建主窗口、更不该去抢那七个
     // 全局热键。实测（本机连开两次进程）：排在后面时第二份会把整棵树建完（设置页那四条 ffmpeg
-    // 警告就是它建主窗口留下的）、把六个热键挨个抢一遍（全部回 1409「已被占用」）才退出——
+    // 警告就是它建主窗口留下的）、把七个热键挨个抢一遍（全部回 1409「已被占用」）才退出——
     // 用户那一侧看到的是第二个托盘图标一闪，外加一次白启动
     m_singleInstance    = std::make_unique<GyanisScribe::App::SingleInstance>();
     m_isPrimaryInstance = m_singleInstance->acquire();

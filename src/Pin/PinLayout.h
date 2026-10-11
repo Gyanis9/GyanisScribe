@@ -40,7 +40,11 @@ namespace GyanisScribe::Pin
         double  rotationDegrees = 0.0; ///< 旋转角度，已折进 [0,360)
         double  opacity         = 1.0; ///< 不透明度，(0,1]
         QString imageFile;             ///< 像素在盘上的位置，恢复时按它读图
+        int     group = 1;             ///< 所属贴图分组，从 1 起；一张贴图只属于一组
     };
+
+    /// 分组号的起点：布局里缺 group 字段（上一版存下的）与新建的贴图都落这一组
+    inline constexpr int kFirstPinGroup = 1;
 
     /**
      * @brief 把一组布局序列化成 JSON 文本

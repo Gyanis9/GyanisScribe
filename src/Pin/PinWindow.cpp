@@ -11,6 +11,7 @@
 #include "Settings/NamingRules.h"
 #include "Settings/SettingsKeys.h"
 
+#include <QAction>
 #include <QApplication>
 #include <QClipboard>
 #include <QContextMenuEvent>
@@ -260,7 +261,9 @@ namespace GyanisScribe::Pin
 
     PinState PinWindow::state() const
     {
-        return PinState{globalRect().topLeft(), m_logicalSize, m_scale, m_rotationDegrees, m_opacity};
+        PinState state{globalRect().topLeft(), m_logicalSize, m_scale, m_rotationDegrees, m_opacity};
+        state.group = m_group;
+        return state;
     }
 
 
@@ -284,6 +287,21 @@ namespace GyanisScribe::Pin
     bool PinWindow::isThumbnailMode() const noexcept
     {
         return m_thumbnail;
+    }
+
+    void PinWindow::setGroup(const int group)
+    {
+        m_group = group < kFirstPinGroup ? kFirstPinGroup : group;
+    }
+
+    int PinWindow::group() const noexcept
+    {
+        return m_group;
+    }
+
+    void PinWindow::setGroupChoices(const QVector<int> &groups)
+    {
+        m_groupChoices = groups;
     }
 
     void PinWindow::applyGeometry()
@@ -497,6 +515,23 @@ namespace GyanisScribe::Pin
         auto *thumbnailAction = menu->addAction(GyanisScribe::Core::uiText("缩到小图"), this, [this] { setThumbnailMode(!m_thumbnail); });
         thumbnailAction->setCheckable(true);
         thumbnailAction->setChecked(m_thumbnail);
+
+        // 移动到分组：列出管理器推过来的现有分组号，当前那一项带勾且灰掉（「现在就在这儿」），
+        // 末尾一项按现有最大组号 +1 现建新组。移过去等于把它从当前这组暂时收起来，
+        // 与实际改动都由管理器一处落账
+        auto *groupMenu = menu->addMenu(GyanisScribe::Core::uiText("移动到分组"));
+        for (const int group: m_groupChoices)
+        {
+            auto *groupAction = groupMenu->addAction(GyanisScribe::Core::uiText("分组 %1").arg(group));
+            groupAction->setCheckable(true);
+            groupAction->setChecked(group == m_group);
+            groupAction->setEnabled(group != m_group);
+            QObject::connect(groupAction, &QAction::triggered, this, [this, group] { emit moveToGroupRequested(group); });
+        }
+        groupMenu->addSeparator();
+        const auto nextGroup = m_groupChoices.isEmpty() ? kFirstPinGroup : m_groupChoices.back() + 1;
+        QObject::connect(groupMenu->addAction(GyanisScribe::Core::uiText("新建分组")), &QAction::triggered, this, [this, nextGroup] { emit moveToGroupRequested(nextGroup); });
+
         menu->addSeparator();
 
         const auto capabilities = m_integration.capabilities();

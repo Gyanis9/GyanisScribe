@@ -25,6 +25,7 @@ namespace GyanisScribe::Pin
         constexpr std::string_view kKeyRotation  = "rotation";
         constexpr std::string_view kKeyOpacity   = "opacity";
         constexpr std::string_view kKeyImageFile = "imageFile";
+        constexpr std::string_view kKeyGroup     = "group";
 
         Core::Expected<QVector<PinState>> failWith(std::string reason)
         {
@@ -46,6 +47,7 @@ namespace GyanisScribe::Pin
             entry.insert(QLatin1String(kKeyRotation.data()), normalizeDegrees(state.rotationDegrees));
             entry.insert(QLatin1String(kKeyOpacity.data()), state.opacity);
             entry.insert(QLatin1String(kKeyImageFile.data()), state.imageFile);
+            entry.insert(QLatin1String(kKeyGroup.data()), state.group);
             entries.append(entry);
         }
         return QString::fromUtf8(QJsonDocument(entries).toJson(QJsonDocument::Compact));
@@ -110,6 +112,19 @@ namespace GyanisScribe::Pin
             {
                 return failWith(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局第 {} 项的不透明度不在 (0,1] 里：{}。请清除这一项后让程序重新记一次"),
                                                              index + 1, state.opacity));
+            }
+
+            // group 是后加的字段，必须容忍缺省：升级后第一次启动要摆回上一版存下的那几张，
+            // 缺字段就整项失败等于把用户的桌面清空一次。缺省落第 1 组；写了但不合法才是坏记录
+            if (entry.contains(QLatin1String(kKeyGroup.data())))
+            {
+                const auto group = entry[QLatin1String(kKeyGroup.data())].toInt();
+                if (group < kFirstPinGroup)
+                {
+                    return failWith(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局第 {} 项的分组号不是正整数：{}。请清除这一项后让程序重新记一次"),
+                                                                 index + 1, group));
+                }
+                state.group = group;
             }
 
             states.push_back(state);
