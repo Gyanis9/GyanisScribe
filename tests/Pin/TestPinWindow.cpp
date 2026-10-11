@@ -230,4 +230,45 @@ namespace GyanisScribe
         EXPECT_TRUE(nearEqual(window.rotationDegrees(), 30.0, kDegreesTolerance)) << "没绑的键改动了角度";
     }
 
+
+    /**
+     * @brief 钉住缩略图模式：缩成小方块、缩放与旋转原样留着、退出回原样
+     * @details 缩略图只是「先让开地方」：它不进恢复布局，也不改用户调好的缩放与旋转。
+     */
+    TEST_F(PinWindowFixture, ThumbnailModeShrinksTheWindowAndRestoresIt)
+    {
+        auto &window = makeWindow();
+        window.setScale(3.0);
+        window.setRotationDegrees(30.0);
+        const auto originalSize = window.size();
+        ASSERT_GT(originalSize.width(), 100) << "前提不对：原尺寸得明显大于小方块，不然判不出「缩了」";
+
+        window.setThumbnailMode(true);
+        EXPECT_TRUE(window.isThumbnailMode());
+        EXPECT_NEAR(window.width(), 48, 1) << "缩略图该是那枚固定的小方块";
+        EXPECT_NEAR(window.height(), 48, 1);
+        EXPECT_TRUE(nearEqual(window.scale(), 3.0, kScaleTolerance)) << "缩略图不该动缩放";
+        EXPECT_TRUE(nearEqual(window.rotationDegrees(), 30.0, kDegreesTolerance)) << "缩略图不该动旋转";
+
+        window.setThumbnailMode(false);
+        EXPECT_FALSE(window.isThumbnailMode());
+        EXPECT_EQ(window.size(), originalSize) << "退出缩略图要回到原来的大小";
+    }
+
+    /**
+     * @brief 钉住裸按 T 切换缩略图，带修饰键的不认
+     */
+    TEST_F(PinWindowFixture, ThumbnailKeyTogglesAndIgnoresModifiers)
+    {
+        auto &window = makeWindow();
+
+        pressKey(window, Qt::Key_T);
+        EXPECT_TRUE(window.isThumbnailMode()) << "裸按 T 该缩到小图";
+        pressKey(window, Qt::Key_T);
+        EXPECT_FALSE(window.isThumbnailMode()) << "再按一次该还原";
+
+        pressKey(window, Qt::Key_T, Qt::ControlModifier);
+        EXPECT_FALSE(window.isThumbnailMode()) << "带修饰键的 T 不归贴图窗管";
+    }
+
 } // namespace GyanisScribe

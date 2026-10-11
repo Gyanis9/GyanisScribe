@@ -61,6 +61,20 @@ namespace GyanisScribe::Pin
         ~PinWindow() override;
 
         /**
+         * @brief 切换缩略图模式
+         * @param enabled true 表示缩成屏上一枚小方块，false 表示恢复原来的大小
+         * @details 只改窗口几何与绘制方式，不动缩放、旋转与透明度：退出时回到原样，位置保持中心不动。
+         *          缩略图态下不旋转（一枚小方块里转起来看不清是什么），退出后旋转照旧。
+         */
+        void setThumbnailMode(bool enabled);
+
+        /**
+         * @brief 当前是不是缩略图模式
+         * @return true 表示现在是那枚小方块
+         */
+        [[nodiscard]] bool isThumbnailMode() const noexcept;
+
+        /**
          * @brief 设缩放，见 IPinWindow::setScale()
          * @param scale 缩放因子，越界按边界取
          */
@@ -241,6 +255,7 @@ namespace GyanisScribe::Pin
         double                                m_rotationDegrees = 0.0;     ///< 旋转角度
         double                                m_opacity         = 1.0;     ///< 不透明度
         bool                                  m_mouseThrough    = false;   ///< 是否鼠标穿透
+        bool                                  m_thumbnail       = false;   ///< 缩略图模式：窗口缩成小方块，缩放等设定原样留着
         bool                                  m_pinned          = true;    ///< 是否置顶
         QPoint                                m_dragOffset;                ///< 移动时起笔点与窗口左上角的差
         std::optional<HandleKind>             m_draggedHandle;             ///< 正在拖的手柄，没拖时为空

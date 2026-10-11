@@ -52,6 +52,9 @@ namespace GyanisScribe::Pin
         /// 贴图的最小边长，逻辑像素：再小就找不到也拖不动
         constexpr double kMinimumEdge = 8.0;
 
+        /// 缩略图模式那枚小方块的边长，逻辑像素
+        constexpr double kThumbnailEdge = 48.0;
+
         /**
          * @brief 取保存贴图与截图的目录：配置里填了就用它，否则用系统图片目录下的那一个
          * @param settings 配置来源
@@ -266,14 +269,32 @@ namespace GyanisScribe::Pin
         return Pin::handleRects(contentRect(), kHandleSize);
     }
 
+    void PinWindow::setThumbnailMode(const bool enabled)
+    {
+        if (m_thumbnail == enabled)
+        {
+            return;
+        }
+        m_thumbnail = enabled;
+        // 位置保持中心不动：缩一下不该让用户重新找它在哪
+        applyGeometry();
+        update();
+    }
+
+    bool PinWindow::isThumbnailMode() const noexcept
+    {
+        return m_thumbnail;
+    }
+
     void PinWindow::applyGeometry()
     {
-        const auto scaled = windowSizeFor(m_logicalSize, m_scale);
-        const auto width  = std::max(kMinimumEdge, scaled.width());
-        const auto height = std::max(kMinimumEdge, scaled.height());
+        const auto scaled   = m_thumbnail ? QSizeF{kThumbnailEdge, kThumbnailEdge} : windowSizeFor(m_logicalSize, m_scale);
+        const auto rotation = m_thumbnail ? 0.0 : m_rotationDegrees;
+        const auto width    = std::max(kMinimumEdge, scaled.width());
+        const auto height   = std::max(kMinimumEdge, scaled.height());
 
         const QPointF center = QRectF(pos(), size()).center();
-        const auto    box    = rotatedBoundingBox(center, QSizeF(width, height), m_rotationDegrees);
+        const auto    box    = rotatedBoundingBox(center, QSizeF(width, height), rotation);
 
         // 尺寸取外接框，绘制时按同样的角度转回去：命中、拖动与手柄都落在这个轴对齐框里算
         setGeometry(box.toAlignedRect());
@@ -281,7 +302,7 @@ namespace GyanisScribe::Pin
 
     QRectF PinWindow::contentRect() const
     {
-        const auto   scaled = windowSizeFor(m_logicalSize, m_scale);
+        const auto   scaled = m_thumbnail ? QSizeF{kThumbnailEdge, kThumbnailEdge} : windowSizeFor(m_logicalSize, m_scale);
         const double width  = std::max(kMinimumEdge, scaled.width());
         const double height = std::max(kMinimumEdge, scaled.height());
 
@@ -299,7 +320,8 @@ namespace GyanisScribe::Pin
 
         const auto content = contentRect();
         painter.translate(content.center());
-        painter.rotate(m_rotationDegrees);
+        // 缩略图态不旋转：一枚小方块里转起来看不清是什么，退出后旋转照旧
+        painter.rotate(m_thumbnail ? 0.0 : m_rotationDegrees);
         painter.translate(-content.center());
         painter.drawImage(content, m_image, QRectF(QPointF(0.0, 0.0), QSizeF(m_image.width(), m_image.height())));
         painter.resetTransform();
@@ -401,6 +423,13 @@ namespace GyanisScribe::Pin
             return;
         }
 
+        // 裸按 `T` 缩到小图 / 还原：与右键菜单那一项同一条路
+        if (event->key() == Qt::Key_T && event->modifiers() == Qt::NoModifier)
+        {
+            setThumbnailMode(!m_thumbnail);
+            return;
+        }
+
         // `R` 顺转一挡、`Shift+R` 逆转一挡：带 Ctrl 的同一个字母不认，那是另一类组合键的地盘
         if (event->key() == Qt::Key_R && (event->modifiers() == Qt::NoModifier || event->modifiers() == Qt::ShiftModifier))
         {
@@ -464,6 +493,10 @@ namespace GyanisScribe::Pin
                         });
 
         menu->addAction(GyanisScribe::Core::uiText("识别文字"), this, [this] { emit ocrRequested(m_image); });
+
+        auto *thumbnailAction = menu->addAction(GyanisScribe::Core::uiText("缩到小图"), this, [this] { setThumbnailMode(!m_thumbnail); });
+        thumbnailAction->setCheckable(true);
+        thumbnailAction->setChecked(m_thumbnail);
         menu->addSeparator();
 
         const auto capabilities = m_integration.capabilities();

@@ -1500,6 +1500,10 @@
             <translation>Save</translation>
         </message>
         <message>
+            <source>缩到小图</source>
+            <translation>Shrink to thumbnail</translation>
+        </message>
+        <message>
             <source>保持置顶</source>
             <translation>Keep on top</translation>
         </message>
