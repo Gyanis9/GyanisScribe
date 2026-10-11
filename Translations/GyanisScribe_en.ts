@@ -140,6 +140,10 @@
             <translation>Arrow</translation>
         </message>
         <message>
+            <source>高斯模糊</source>
+            <translation>Gaussian blur</translation>
+        </message>
+        <message>
             <source>椭圆</source>
             <translation>Ellipse</translation>
         </message>

@@ -43,12 +43,12 @@ namespace GyanisScribe::Annotation
      *          第四列是标注窗的字母快捷键，取英文工具名首字母且九档互不撞；按钮提示与按键分派都读这一列，
      *          另记一张键位表就会与按钮各说各话。
      */
-    inline constexpr std::array<std::tuple<ToolKind, std::string_view, std::string_view, std::string_view>, 9> kToolTable = {
+    inline constexpr std::array<std::tuple<ToolKind, std::string_view, std::string_view, std::string_view>, 10> kToolTable = {
             std::tuple{ToolKind::Rectangle, "Rectangle", "矩形", "R"}, std::tuple{ToolKind::Ellipse, "Ellipse", "椭圆", "E"},
             std::tuple{ToolKind::Arrow, "Arrow", "箭头", "A"},         std::tuple{ToolKind::Pen, "Pen", "画笔", "P"},
             std::tuple{ToolKind::Highlight, "Highlight", "高亮", "H"}, std::tuple{ToolKind::Mosaic, "Mosaic", "马赛克", "M"},
             std::tuple{ToolKind::Text, "Text", "文字", "T"},           std::tuple{ToolKind::Number, "Number", "序号", "N"},
-            std::tuple{ToolKind::Line, "Line", "直线", "L"},
+            std::tuple{ToolKind::Line, "Line", "直线", "L"},           std::tuple{ToolKind::Blur, "Blur", "高斯模糊", "B"},
     };
 
     /// 工具栏上的工具按钮数量，由登记表算出：加一档工具只改表，数组跟着长

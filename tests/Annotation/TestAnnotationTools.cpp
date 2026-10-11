@@ -1,6 +1,7 @@
 #include "Annotation/AnnotationEngine.h"
 
 #include "Annotation/HighlightTool.h"
+#include "Annotation/ImageBlur.h"
 #include "Annotation/MosaicTool.h"
 #include "Annotation/NumberTool.h"
 #include "Annotation/PenTool.h"
@@ -73,6 +74,73 @@ namespace
         AnnotationEngine m_engine;
         QImage           m_original; ///< 未经标注的底图，用于数「改了哪些像素」
     };
+
+    /**
+     * @brief 钉住高斯模糊把跨边界的对比糊掉，且只动框住的那一块
+     * @details 靶子必须是**底图自带**的分界（这个装置上半白、下半黑，分界在 y=100）：
+     *          马赛克与模糊都取底图像素、会先把底下的标注盖掉，拿标注当靶子的话
+     *          「不糊」也能让对比度变化，那条用例就白写了（此条第一版正是这么假绿的）。
+     *          判据取跨分界线的相邻像素亮度差：锐利时是 255，糊过之后掉到一半以下。
+     */
+    TEST_F(AnnotationFixture, BlurHalvesTheEdgeContrastInsideItsRegionOnly)
+    {
+        const auto before               = m_engine.exportImage();
+        const auto maximumVerticalDelta = [](const QImage &image, const QRect &region)
+        {
+            int maximum = 0;
+            for (int x = region.left(); x <= region.right(); ++x)
+            {
+                for (int y = region.top(); y < region.bottom(); ++y)
+                {
+                    maximum = std::max(maximum, std::abs(qGray(image.pixel(x, y)) - qGray(image.pixel(x, y + 1))));
+                }
+            }
+            return maximum;
+        };
+        const QRect blurredRegion{100, 70, 100, 60}; // 压住底图 y=100 那条黑白分界
+        ASSERT_GT(maximumVerticalDelta(before, blurredRegion), 200) << "靶子不对：底图分界上本该是黑白相邻";
+
+        ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Blur).has_value());
+        m_engine.beginStroke(QPoint(100, 70));
+        m_engine.moveStroke(QPoint(200, 130));
+        ASSERT_TRUE(m_engine.endStroke().has_value());
+
+        const auto after = m_engine.exportImage();
+        EXPECT_LT(maximumVerticalDelta(after, blurredRegion), maximumVerticalDelta(before, blurredRegion) / 2) << "跨分界线的对比没降下来：模糊没生效";
+
+        // 框外逐像素对比：模糊不许越界
+        for (int y = 0; y < after.height(); y += 7)
+        {
+            for (int x = 210; x < after.width(); x += 7)
+            {
+                EXPECT_EQ(after.pixelColor(x, y), before.pixelColor(x, y)) << "框外的像素被糊到了：(" << x << "," << y << ")";
+            }
+        }
+    }
+
+
+    /**
+     * @brief 钉住方框模糊的两条底性：均匀图糊完还是均匀（边缘不渗黑），半径非正原样交回
+     * @details 边缘不夹取采样时四边会混进黑色，看上去像多了一圈暗边——这条判据就盯那一圈。
+     */
+    TEST(ImageBlur, KeepsUniformImagesUniformAndIgnoresNonPositiveRadius)
+    {
+        QImage uniform{QSize{40, 24}, QImage::Format_ARGB32};
+        uniform.fill(QColor(128, 128, 128));
+
+        const auto blurred = GyanisScribe::Annotation::boxBlurred(uniform, 4);
+        for (int y = 0; y < blurred.height(); ++y)
+        {
+            for (int x = 0; x < blurred.width(); ++x)
+            {
+                EXPECT_EQ(blurred.pixelColor(x, y), QColor(128, 128, 128)) << "(" << x << "," << y << ") 渗进了别的颜色";
+            }
+        }
+
+        EXPECT_EQ(GyanisScribe::Annotation::boxBlurred(uniform, 0), uniform) << "半径非正该原样交回";
+        EXPECT_TRUE(GyanisScribe::Annotation::boxBlurred(QImage{}, 4).isNull());
+    }
+
 } // namespace
 
 /**

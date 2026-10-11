@@ -18,6 +18,10 @@ add_library(Annotation STATIC
         HighlightTool.cpp
         MosaicTool.h
         MosaicTool.cpp
+        ImageBlur.h
+        ImageBlur.cpp
+        BlurTool.h
+        BlurTool.cpp
         TextTool.h
         TextTool.cpp
         NumberTool.h

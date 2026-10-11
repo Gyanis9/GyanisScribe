@@ -4,6 +4,7 @@
 #include "Annotation/EllipseTool.h"
 #include "Annotation/HighlightTool.h"
 #include "Annotation/LineTool.h"
+#include "Annotation/BlurTool.h"
 #include "Annotation/MosaicTool.h"
 #include "Annotation/NumberTool.h"
 #include "Annotation/PenTool.h"
@@ -233,6 +234,8 @@ namespace GyanisScribe::Annotation
         m_tools.push_back(std::make_unique<PenTool>());
         m_tools.push_back(std::make_unique<HighlightTool>());
         m_tools.push_back(std::make_unique<MosaicTool>());
+        // 新增一档工具只在这里补一行：工具栏按 kToolTable 长出按钮，顺序两边一致
+        m_tools.push_back(std::make_unique<BlurTool>());
         m_tools.push_back(std::make_unique<TextTool>());
         m_tools.push_back(std::make_unique<NumberTool>());
         m_tools.push_back(std::make_unique<LineTool>());
