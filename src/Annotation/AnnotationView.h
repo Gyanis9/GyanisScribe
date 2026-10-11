@@ -98,6 +98,14 @@ namespace GyanisScribe::Annotation
         void mouseReleaseEvent(QMouseEvent *event) override;
 
         /**
+         * @brief 双击一条已放下的文字：原地把它重新打开来改
+         * @param event 双击事件
+         * @details 判据是「命中的那一条是文字图形」且此刻没有在途笔画或输入框：文字工具正等着
+         *          输入新文字时，第二次按下不该被当成重编，否则会把刚要落定的那条改掉。
+         */
+        void mouseDoubleClickEvent(QMouseEvent *event) override;
+
+        /**
          * @brief 拦行内输入框的 Esc：取消这一条文字标注
          * @param watched 被观察对象
          * @param event 事件
@@ -108,20 +116,23 @@ namespace GyanisScribe::Annotation
 
     private:
         /**
-         * @brief 文字工具的行内输入框：在按下处摆一个，提交后落定图形
-         * @param canvasPoint 画布逻辑坐标
+         * @brief 文字的行内输入框：在按下处摆一个
+         * @param canvasPoint 画布逻辑坐标，输入框左上角落在这一点
+         * @param initial 输入框的初始内容；新画的那条传空串
+         * @param reEditing true 表示改的是已放下的那一条（提交走 setTextOfSelection），false 是新画一条
          */
-        void openTextEditor(const QPoint &canvasPoint);
+        void openTextEditor(const QPoint &canvasPoint, const QString &initial, bool reEditing);
 
         /// 当前显示区，绘制与坐标换算共用同一个算法
         [[nodiscard]] QRect currentDisplayRect() const;
 
-        IAnnotationEngine &m_engine;               ///< 标注引擎，不拥有
-        bool               m_stroking     = false; ///< 正在画一条新图形
-        bool               m_dragging     = false; ///< 正在拖动选中项
-        bool               m_awaitingText = false; ///< 文字在途：这条图形由输入框提交，而不是由抬笔提交
-        QPoint             m_lastCanvasPoint;      ///< 上一次事件换算到的画布坐标
-        QLineEdit         *m_textEditor = nullptr; ///< 行内输入框，用完即销毁
+        IAnnotationEngine &m_engine;                ///< 标注引擎，不拥有
+        bool               m_stroking      = false; ///< 正在画一条新图形
+        bool               m_dragging      = false; ///< 正在拖动选中项
+        bool               m_awaitingText  = false; ///< 文字在途：这条图形由输入框提交，而不是由抬笔提交
+        bool               m_reEditingText = false; ///< 输入框此刻改的是已放下的那一条，而不是新画的一条
+        QPoint             m_lastCanvasPoint;       ///< 上一次事件换算到的画布坐标
+        QLineEdit         *m_textEditor = nullptr;  ///< 行内输入框，用完即销毁
     };
 
 } // namespace GyanisScribe::Annotation

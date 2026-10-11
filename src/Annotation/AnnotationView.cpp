@@ -142,7 +142,7 @@ namespace GyanisScribe::Annotation
         if (m_engine.activeTool() == ToolKind::Text)
         {
             m_awaitingText = true;
-            openTextEditor(point);
+            openTextEditor(point, QString{}, false);
         }
         event->accept();
     }
@@ -209,7 +209,7 @@ namespace GyanisScribe::Annotation
         event->accept();
     }
 
-    void AnnotationView::openTextEditor(const QPoint &canvasPoint)
+    void AnnotationView::openTextEditor(const QPoint &canvasPoint, const QString &initial, const bool reEditing)
     {
         const auto rect   = currentDisplayRect();
         const auto widget = toWidgetPoint(canvasPoint, rect, m_engine.canvas().logicalSize);
@@ -219,8 +219,12 @@ namespace GyanisScribe::Annotation
             m_textEditor->deleteLater();
         }
 
-        m_textEditor = new QLineEdit{this};
+        m_reEditingText = reEditing;
+        m_textEditor    = new QLineEdit{this};
         m_textEditor->setPlaceholderText(GyanisScribe::Core::uiText("输入文字后回车"));
+        m_textEditor->setText(initial);
+        // 重编时全选着打开：改的是这一条，全选后直接打字就换掉，不必先手动清
+        m_textEditor->selectAll();
         m_textEditor->setFont(font());
         const auto height = m_textEditor->sizeHint().height() + kTextEditorHeightPad;
         // 宽度夹在显示区内：贴着右边缘点下的文字框不该跑到画布外面去
@@ -230,8 +234,25 @@ namespace GyanisScribe::Annotation
         m_textEditor->setFocus();
 
         QObject::connect(m_textEditor, &QLineEdit::editingFinished, this,
-                         [this, editor = m_textEditor]
+                         [this, editor = m_textEditor, reEditing]
                          {
+                             if (reEditing)
+                             {
+                                 // 改已放下的那一条：走撤销栈，界面不碰图形本体
+                                 if (auto applied = m_engine.setTextOfSelection(editor->text()); !applied)
+                                 {
+                                     Core::Logger::warning(std::format("这条文字没能改成：{}", applied.error().message));
+                                 }
+                                 m_reEditingText = false;
+                                 editor->deleteLater();
+                                 if (m_textEditor == editor)
+                                 {
+                                     m_textEditor = nullptr;
+                                 }
+                                 update();
+                                 return;
+                             }
+
                              // 提交路径：先填内容再收笔，收笔会把这条图形放进撤销栈
                              if (auto text = m_engine.setPendingText(editor->text()); !text)
                              {
@@ -253,10 +274,48 @@ namespace GyanisScribe::Annotation
         m_textEditor->installEventFilter(this);
     }
 
+    void AnnotationView::mouseDoubleClickEvent(QMouseEvent *event)
+    {
+        if (event->button() != Qt::LeftButton)
+        {
+            QWidget::mouseDoubleClickEvent(event);
+            return;
+        }
+
+        const auto rect  = currentDisplayRect();
+        const auto point = toCanvasPoint(event->pos(), rect, m_engine.canvas().logicalSize);
+        const auto hit   = m_engine.selectionAt(point);
+        // 有在途笔画或输入框开着时不抢这条双击：那一次按下属于正在输入的那一条
+        const bool busy = m_stroking || m_awaitingText || m_textEditor != nullptr;
+
+        if (hit && hit->tool == ToolKind::Text && !busy)
+        {
+            if (auto selected = m_engine.select(*hit); selected)
+            {
+                openTextEditor(point, m_engine.textOfSelection().value_or(QString{}), true);
+            } else
+            {
+                Core::Logger::warning(std::format("双击要改的那条文字没能选中：{}", selected.error().message));
+            }
+            event->accept();
+            return;
+        }
+
+        QWidget::mouseDoubleClickEvent(event);
+    }
+
     bool AnnotationView::eventFilter(QObject *watched, QEvent *event)
     {
         if (watched == m_textEditor && event->type() == QEvent::KeyPress && static_cast<QKeyEvent *>(event)->key() == Qt::Key_Escape)
         {
+            if (m_reEditingText)
+            {
+                // 重编那一格的 Esc 是「不改了」：原内容一个字都没动，不该去收笔也不该压撤销
+                m_reEditingText = false;
+                m_textEditor->deleteLater();
+                m_textEditor = nullptr;
+                return true;
+            }
             // 取消这一条：文本没提交过，引擎会把这条退化图形拒掉——拒掉正是「取消成功」的样子
             if (auto cancelled = m_engine.endStroke(); cancelled)
             {

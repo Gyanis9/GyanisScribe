@@ -138,6 +138,18 @@ namespace GyanisScribe::Annotation
         return true;
     }
 
+    bool AnnotationTool::setTextAt(const int index, const QString &text)
+    {
+        if (index < 0 || index >= m_shapes.size())
+        {
+            return false;
+        }
+
+        // 只碰文本：位置与字号属于移动与改样式那两条命令，混进来撤销时就分不开这两步
+        m_shapes[index].text = text;
+        return true;
+    }
+
     int AnnotationTool::hitTest(const QPoint &point) const
     {
         // 倒序遍历：后画的图形压在上面，用户点的就是看得见的那一条

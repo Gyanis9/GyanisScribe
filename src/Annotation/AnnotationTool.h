@@ -170,6 +170,16 @@ namespace GyanisScribe::Annotation
         bool restyleShapeAt(int index, const QColor &color, int lineWidth, int fontSize);
 
         /**
+         * @brief 改一条图形的文字内容
+         * @param index 索引
+         * @param text 新的文字；空串也收下（撤销与重做要能回到改之前的那一份）
+         * @return 成功返回 true；索引越界返回 false
+         * @details 这一层不判「哪一档工具带文字」：序号图形的 text 是从 number 派生的，
+         *          让它被随手改掉就等于把编号与显示分家——那道判断在引擎的「改选中文字」里。
+         */
+        bool setTextAt(int index, const QString &text);
+
+        /**
          * @brief 命中测试
          * @param point 画布逻辑坐标
          * @return 命中的图形索引（后画的优先），没命中返回 -1

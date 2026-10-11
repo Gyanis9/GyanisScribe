@@ -44,6 +44,18 @@
             <translation>The selected shape is gone (it was probably just undone or deleted). Select it again.</translation>
         </message>
         <message>
+            <source>没有选中任何图形，改不了文字。请先双击要改的那条文字</source>
+            <translation>Nothing is selected, so there is no text to change. Double-click the text you want to edit</translation>
+        </message>
+        <message>
+            <source>选中的不是文字图形，改不了内容。只有文字工具画出来的那几条可以双击重编</source>
+            <translation>The selected shape is not text. Only shapes made with the Text tool can be re-edited by double-clicking</translation>
+        </message>
+        <message>
+            <source>文字不能是空的：不要这一条就按 Delete 删掉，或按 Ctrl+Z 撤销这次改动</source>
+            <translation>Text cannot be empty: press Delete to drop this shape, or Ctrl+Z to undo this change</translation>
+        </message>
+        <message>
             <source>没有选中任何图形，无需删除。请先点中要删的那一条</source>
             <translation>Nothing is selected, so there is nothing to delete. Click the shape you want to delete first.</translation>
         </message>

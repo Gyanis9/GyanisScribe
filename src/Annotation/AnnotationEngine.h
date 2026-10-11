@@ -114,6 +114,21 @@ namespace GyanisScribe::Annotation
         Core::Expected<void> setPendingText(const QString &text) override;
 
         /**
+         * @brief 改已放下那条文字的内容，见 IAnnotationEngine::setTextOfSelection()
+         * @param text 新的文字
+         * @return 成功返回空载荷；四种拒法各带自己的原因（没选中、选的不是文字、文本为空、那条已不在）
+         * @details 重写基类接口：与移动、改样式同一形状——先验选中，再压一条撤销命令，
+         *          界面不需要知道撤销栈的存在。
+         */
+        Core::Expected<void> setTextOfSelection(const QString &text) override;
+
+        /**
+         * @brief 取选中那条文字的内容，见 IAnnotationEngine::textOfSelection()
+         * @return 选中且是文字图形时返回它的文字；其余情况返回空
+         */
+        [[nodiscard]] std::optional<QString> textOfSelection() const override;
+
+        /**
          * @brief 命中测试，见 IAnnotationEngine::selectionAt()
          * @param point 画布逻辑坐标
          * @return 命中的图形；没有则空

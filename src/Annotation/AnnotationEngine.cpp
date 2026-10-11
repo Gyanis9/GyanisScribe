@@ -164,6 +164,36 @@ namespace GyanisScribe::Annotation
             int             m_fontSize;  ///< 目标字号
         };
 
+        /**
+         * @brief 改一条文字图形的内容
+         * @details 不合并：行内输入框一次回车就是一次「说定了」，连着两次改的是两次意图，
+         *          合成一步会让用户按一次 Ctrl+Z 跳过头一次改动。
+         */
+        class SetTextCommand : public QUndoCommand
+        {
+        public:
+            SetTextCommand(AnnotationTool *tool, int index, const QString &before, const QString &text, QUndoCommand *parent = nullptr) :
+                QUndoCommand(parent), m_tool(tool), m_index(index), m_before(before), m_text(text)
+            {
+            }
+
+            void redo() override
+            {
+                static_cast<void>(m_tool->setTextAt(m_index, m_text));
+            }
+
+            void undo() override
+            {
+                static_cast<void>(m_tool->setTextAt(m_index, m_before));
+            }
+
+        private:
+            AnnotationTool *m_tool;   ///< 目标工具，所有权在引擎
+            int             m_index;  ///< 图形索引
+            QString         m_before; ///< 改之前的文字
+            QString         m_text;   ///< 目标文字
+        };
+
     } // namespace
 
     AnnotationEngine::AnnotationEngine(QObject *parent) : IAnnotationEngine(parent)
@@ -448,6 +478,48 @@ namespace GyanisScribe::Annotation
 
         m_undoStack.push(new MoveShapeCommand(tool, m_selection->shapeIndex, delta));
         return {};
+    }
+
+    Core::Expected<void> AnnotationEngine::setTextOfSelection(const QString &text)
+    {
+        if (!m_selection)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("没有选中任何图形，改不了文字。请先双击要改的那条文字")});
+        }
+        // 序号图形的文本是从编号派生的，让它被随手改掉就等于把编号与显示分家
+        if (m_selection->tool != ToolKind::Text)
+        {
+            return std::unexpected(
+                    Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("选中的不是文字图形，改不了内容。只有文字工具画出来的那几条可以双击重编")});
+        }
+        if (text.isEmpty())
+        {
+            return std::unexpected(
+                    Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("文字不能是空的：不要这一条就按 Delete 删掉，或按 Ctrl+Z 撤销这次改动")});
+        }
+
+        auto *tool = toolFor(m_selection->tool);
+        if (tool == nullptr || m_selection->shapeIndex >= tool->shapeCount())
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("选中的图形已经不在了（多半刚被撤销或删除）。请重新点选")});
+        }
+
+        m_undoStack.push(new SetTextCommand(tool, m_selection->shapeIndex, tool->shapeAt(m_selection->shapeIndex).text, text));
+        return {};
+    }
+
+    std::optional<QString> AnnotationEngine::textOfSelection() const
+    {
+        if (!m_selection || m_selection->tool != ToolKind::Text)
+        {
+            return std::nullopt;
+        }
+        const auto *tool = toolFor(m_selection->tool);
+        if (tool == nullptr || m_selection->shapeIndex >= tool->shapeCount())
+        {
+            return std::nullopt;
+        }
+        return tool->shapeAt(m_selection->shapeIndex).text;
     }
 
     Core::Expected<void> AnnotationEngine::removeSelection()

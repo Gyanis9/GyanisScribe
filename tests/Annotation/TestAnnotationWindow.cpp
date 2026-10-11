@@ -15,6 +15,7 @@
 #include <QApplication>
 #include <QImage>
 #include <QKeyEvent>
+#include <QLineEdit>
 #include <QMouseEvent>
 #include <QPoint>
 #include <QRect>
@@ -306,4 +307,42 @@ TEST_F(AnnotationWindowFixture, ArrowKeysWithoutASelectionMoveNothing)
 
     EXPECT_FALSE(engine().selectionBounds().has_value()) << "没选中项却被挪出了一个包围盒";
     EXPECT_FALSE(engine().canUndo()) << "这两次按键各往撤销栈塞了一条空动作";
+}
+
+/**
+ * @brief 钉住「双击一条已放下的文字」真的原地打开来改
+ * @details 走的是真事件：双击 → 输入框带着原文出现 → 改内容 → 回车提交。
+ *          判据落在引擎那一份内容上，而不是输入框的显示——界面把框填对了但没提交，
+ *          用户看到的仍然是旧文字。
+ */
+TEST_F(AnnotationWindowFixture, DoubleClickReEditsPlacedText)
+{
+    GyanisScribe::Annotation::AnnotationView view{engine()};
+    view.resize(400, 200);
+    // 画布逻辑 200×100 放进 400×200 的视图：比例 2.0，控件坐标 = 逻辑坐标乘 2
+    ASSERT_TRUE(engine().setActiveTool(GyanisScribe::Annotation::ToolKind::Text).has_value());
+    engine().beginStroke(QPoint(20, 20));
+    ASSERT_TRUE(engine().setPendingText(QStringLiteral("AB")).has_value());
+    const auto placed = engine().endStroke();
+    ASSERT_TRUE(placed.has_value()) << placed.error().message;
+    ASSERT_TRUE(engine().select(*placed).has_value());
+
+    const auto bounds = engine().selectionBounds();
+    ASSERT_TRUE(bounds.has_value());
+    const QPoint widgetCenter{(bounds->center().x() + 1) * 2, (bounds->center().y() + 1) * 2};
+
+    QMouseEvent doubleClick{QEvent::MouseButtonDblClick, QPointF{widgetCenter}, QPointF{widgetCenter}, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+    QApplication::sendEvent(&view, &doubleClick);
+
+    auto *editor = view.findChild<QLineEdit *>();
+    ASSERT_NE(editor, nullptr) << "双击一条文字没有打开输入框";
+    EXPECT_EQ(editor->text(), QStringLiteral("AB")) << "输入框没带着原文打开，用户得重打一遍";
+
+    editor->setText(QStringLiteral("CD"));
+    QKeyEvent enter{QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier};
+    QApplication::sendEvent(editor, &enter);
+
+    EXPECT_EQ(engine().textOfSelection().value_or(QString{}), QStringLiteral("CD")) << "回车提交没把内容写回那条图形";
+    ASSERT_TRUE(engine().undo().has_value());
+    EXPECT_EQ(engine().textOfSelection().value_or(QString{}), QStringLiteral("AB")) << "改文字没进撤销栈，Ctrl+Z 回不到改之前";
 }

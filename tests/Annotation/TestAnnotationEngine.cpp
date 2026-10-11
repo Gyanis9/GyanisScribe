@@ -322,3 +322,72 @@ TEST_F(EngineFixture, StyleChangeTouchesOnlyTheSelectedShape)
     EXPECT_EQ(restyled.pixelColor(10, 35), QColor(0, 0, 255)) << "选中的那条没改";
     EXPECT_EQ(restyled.pixelColor(60, 35), QColor(255, 0, 0)) << "没选中的那条被一起改了";
 }
+
+namespace
+{
+    /// 用文字工具在指定位置放一条文字，返回它的位置
+    AnnotationSelection placeText(AnnotationEngine &engine, const QPoint &at, const QString &text)
+    {
+        EXPECT_TRUE(engine.setActiveTool(ToolKind::Text).has_value());
+        engine.beginStroke(at);
+        EXPECT_TRUE(engine.setPendingText(text).has_value());
+        const auto committed = engine.endStroke();
+        EXPECT_TRUE(committed.has_value()) << "这条文字没落定：内容或位置被当成退化了";
+        return committed.value_or(AnnotationSelection{});
+    }
+} // namespace
+
+/**
+ * @brief 钉住「改已放下的文字」这一步可撤销、可重做，并且真的改到渲染
+ * @details 打错一个字不该要重画一遍：改内容是一步独立操作，Ctrl+Z 回到改之前那一份，
+ *          而不是把整条抹掉。像素对照证明改动落到了导出图上，不是只记在数据里。
+ */
+TEST_F(EngineFixture, SelectedTextCanBeReEditedAndUndone)
+{
+    const auto text = placeText(m_engine, QPoint(20, 20), QStringLiteral("AB"));
+    ASSERT_TRUE(m_engine.select(text).has_value());
+    ASSERT_TRUE(m_engine.textOfSelection().has_value());
+    EXPECT_EQ(*m_engine.textOfSelection(), QStringLiteral("AB"));
+
+    const QImage before = m_engine.exportImage();
+    ASSERT_TRUE(m_engine.setTextOfSelection(QStringLiteral("CD")).has_value());
+    EXPECT_EQ(*m_engine.textOfSelection(), QStringLiteral("CD")) << "改完再读回来还是旧内容，改动没落到那条图形上";
+    EXPECT_NE(m_engine.exportImage(), before) << "内容改了但导出图一模一样，渲染读的不是这一格";
+
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_EQ(*m_engine.textOfSelection(), QStringLiteral("AB")) << "撤销把整条抹掉了，而不是退回改之前那一份文字";
+    EXPECT_EQ(m_engine.exportImage(), before) << "撤销后的画面没回到改之前";
+
+    ASSERT_TRUE(m_engine.redo().has_value());
+    EXPECT_EQ(*m_engine.textOfSelection(), QStringLiteral("CD")) << "重做没把改动再放回来";
+}
+
+/**
+ * @brief 钉住改文字的四种拒法，每种都给出路
+ * @details 「选中的不是文字」与「那条已经不在了」如果都被当成成功，用户会以为改完了；
+ *          空文本要指到 Delete 那一条，否则想撤掉一条文字的人只能改成空格再删。
+ */
+TEST_F(EngineFixture, TextEditingRefusesWrongTargetsWithReasons)
+{
+    EXPECT_FALSE(m_engine.setTextOfSelection(QStringLiteral("x")).has_value()) << "没选中也能改，等于改到上一条身上";
+    EXPECT_NE(m_engine.setTextOfSelection(QStringLiteral("x")).error().message.find("双击"), std::string::npos);
+
+    const auto rectangle = drawRectangle(QPoint(10, 10), QPoint(90, 60));
+    ASSERT_TRUE(m_engine.select(rectangle).has_value());
+    const auto wrongTool = m_engine.setTextOfSelection(QStringLiteral("x"));
+    ASSERT_FALSE(wrongTool.has_value()) << "矩形被当成可以改文字的目标";
+    EXPECT_FALSE(m_engine.textOfSelection().has_value()) << "选中的不是文字，还回了一份内容";
+
+    const auto reText = placeText(m_engine, QPoint(120, 20), QStringLiteral("AB"));
+    ASSERT_TRUE(m_engine.select(reText).has_value());
+    const auto empty = m_engine.setTextOfSelection(QString());
+    ASSERT_FALSE(empty.has_value()) << "空文本被收下，画布上会留一条看不见的图形";
+    EXPECT_NE(empty.error().message.find("Delete"), std::string::npos) << "空文本要指到「删掉这一条」那条路";
+
+    // 撤销会把选中项一起作废（见 UndoInvalidatesStaleSelection），这时改文字报的是「没选中，先双击」：
+    // 两种说法都给出路，且都不许悄悄改到别的那一条上
+    ASSERT_TRUE(m_engine.undo().has_value());
+    const auto stale = m_engine.setTextOfSelection(QStringLiteral("CD"));
+    ASSERT_FALSE(stale.has_value()) << "被撤销掉的图形还能改文字";
+    EXPECT_NE(stale.error().message.find("双击"), std::string::npos) << stale.error().message;
+}

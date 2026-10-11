@@ -123,6 +123,21 @@ namespace GyanisScribe::Annotation
         virtual Core::Expected<void> setPendingText(const QString &text) = 0;
 
         /**
+         * @brief 改已放下那条文字图形的内容
+         * @param text 新的文字，不许为空
+         * @return 成功返回空载荷；没选中、选中的不是文字图形、文本为空、或那条已经不在了都返回 InvalidArgument
+         * @details 走撤销栈：改一次文字是一步操作，Ctrl+Z 要回到改之前那一份，而不是把整条抹掉。
+         */
+        virtual Core::Expected<void> setTextOfSelection(const QString &text) = 0;
+
+        /**
+         * @brief 取选中那条文字图形的内容
+         * @return 选中且是文字图形时返回它当前的文字；其余情况返回空
+         * @details 界面拿它预填重编辑的输入框：不预填的话用户要重打一遍，改一个字也得从头输入。
+         */
+        [[nodiscard]] virtual std::optional<QString> textOfSelection() const = 0;
+
+        /**
          * @brief 命中测试
          * @param point 画布逻辑坐标
          * @return 命中的图形（层叠最上的那条）；没命中返回空
