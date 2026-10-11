@@ -1254,6 +1254,53 @@ namespace GyanisScribe::App
         return page;
     }
 
+    /**
+     * @brief 成品文件名模板那一格：留空即默认档，填歪的不写进配置
+     * @details 填歪了还写进去，只会在下一次保存时静默回落到默认档，用户反倒以为模板生效了；
+     *          这里把原因写进 tooltip 并保留输入框内容，让他能就地改。
+     */
+    QLineEdit *makeNameTemplateEdit(ISettingsStore &settings)
+    {
+        auto *edit = new QLineEdit;
+        edit->setText(settings.stringValue(GyanisScribe::Settings::kSaveNameTemplate, QString{}));
+        edit->setPlaceholderText(GyanisScribe::Core::Paths::defaultNameTemplate());
+        edit->setClearButtonEnabled(true);
+        edit->setAccessibleName(GyanisScribe::Core::uiText("文件名模板"));
+
+        const auto explainHint = [edit](const QString &reason)
+        {
+            edit->setToolTip(reason.isEmpty() ? GyanisScribe::Core::uiText("可用变量：%date%（日期）、%time%（时刻）、%ms%（毫秒）；留空表示用默认档。改动后从下一次保存起生效")
+                                              : reason);
+        };
+        explainHint(QString{});
+
+        QObject::connect(edit, &QLineEdit::editingFinished, edit,
+                         [edit, &settings, explainHint]
+                         {
+                             const auto text = edit->text();
+                             if (text.trimmed().isEmpty())
+                             {
+                                 // 留空是「用默认档」这一档，不是错误：清掉那一格即可
+                                 static_cast<void>(settings.setValue(GyanisScribe::Settings::kSaveNameTemplate, QString{}));
+                                 explainHint(QString{});
+                                 return;
+                             }
+
+                             const auto parsed = GyanisScribe::Core::Paths::parseNameTemplate(text);
+                             if (!parsed)
+                             {
+                                 explainHint(QString::fromStdString(parsed.error().message));
+                                 return;
+                             }
+                             if (const auto written = settings.setValue(GyanisScribe::Settings::kSaveNameTemplate, *parsed); !written)
+                             {
+                                 Core::Logger::warning(std::format("文件名模板没能写进配置：{}", written.error().message));
+                             }
+                             explainHint(QString{});
+                         });
+        return edit;
+    }
+
     QWidget *MainWindow::buildCapturePage()
     {
         auto *page = new QWidget{this};
@@ -1265,6 +1312,7 @@ namespace GyanisScribe::App
                      makePathRow(m_settings, GyanisScribe::Settings::kPathScreenshot, GyanisScribe::Core::uiText("截图目录"), Core::Paths::defaultScreenshotDirectory(), m_icons));
         form->addRow(GyanisScribe::Core::uiText("保存格式"), makeImageFormatCombo(m_settings));
         form->addRow(GyanisScribe::Core::uiText("保存质量"), makeImageQualitySpin(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("文件名模板"), makeNameTemplateEdit(m_settings));
         form->addRow(GyanisScribe::Core::uiText("复制用的写法"), makeColorFormatCombo(m_settings));
         return page;
     }

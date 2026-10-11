@@ -78,8 +78,9 @@ namespace GyanisScribe::Record
             return std::unexpected(located.error());
         }
 
-        const auto extension  = config.format == OutputFormat::Mp4 ? "mp4" : "gif";
-        const auto outputFile = config.outputDirectory / Core::Paths::imageFileName(QDateTime::currentDateTime(), extension).toStdString();
+        const auto extension = config.format == OutputFormat::Mp4 ? "mp4" : "gif";
+        // 名字按设置里那一格的模板拼，并让一次位：同一秒里连开两轮不会把上一轮悄悄盖掉
+        const auto outputFile = Core::Paths::uniqueFilePath(config.outputDirectory, Core::Paths::imageFileName(QDateTime::currentDateTime(), extension, config.nameTemplate));
         const auto timeout    = encodeTimeoutMs(config.frameRate, frameCount);
 
         if (config.format == OutputFormat::Mp4)

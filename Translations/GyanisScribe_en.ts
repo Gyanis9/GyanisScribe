@@ -612,6 +612,14 @@
             <translation>Backup and restore</translation>
         </message>
         <message>
+            <source>文件名模板</source>
+            <translation>File name template</translation>
+        </message>
+        <message>
+            <source>可用变量：%date%（日期）、%time%（时刻）、%ms%（毫秒）；留空表示用默认档。改动后从下一次保存起生效</source>
+            <translation>Available variables: %date% (date), %time% (time), %ms% (milliseconds); leave blank to use the default. Changes take effect from the next save</translation>
+        </message>
+        <message>
             <source>截图与标注成品落在这个目录里。取色复制出来的文本按下面的写法格式化。</source>
             <translation>Screenshots and finished annotations land in this folder. Copied colors are formatted with the format chosen below.</translation>
         </message>
@@ -1002,6 +1010,22 @@
         <message>
             <source>路径存在但不是目录</source>
             <translation>The path exists but is not a directory</translation>
+        </message>
+        <message>
+            <source>文件名模板不能为空：可以填 %date%_%time%，或留空用默认档</source>
+            <translation>The file name template cannot be empty: fill in something like %date%_%time%, or leave it blank for the default</translation>
+        </message>
+        <message>
+            <source>文件名模板太长（{} 个字，上限 {}）：太长的名字在别的程序里也常常打不开</source>
+            <translation>The file name template is too long ({} characters, limit {}): names that long often fail to open in other programs</translation>
+        </message>
+        <message>
+            <source>文件名模板里不能有「{}」：它会把文件写到别的目录，或让系统直接拒绝写盘</source>
+            <translation>The file name template cannot contain "{}": it would put the file in another folder, or make the system refuse the write</translation>
+        </message>
+        <message>
+            <source>文件名模板里的变量「%{}%」不认得：可用的只有 %date%（日期）、%time%（时刻）、%ms%（毫秒）</source>
+            <translation>Unknown variable "%{}%" in the file name template: the only ones are %date% (date), %time% (time) and %ms% (milliseconds)</translation>
         </message>
         <message>
             <source>…</source>

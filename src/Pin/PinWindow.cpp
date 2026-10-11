@@ -8,6 +8,7 @@
 #include "Ui/DesignTokens.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Settings/ISettingsStore.h"
+#include "Settings/NamingRules.h"
 #include "Settings/SettingsKeys.h"
 
 #include <QApplication>
@@ -452,7 +453,11 @@ namespace GyanisScribe::Pin
                                 Core::Logger::error(target.error().message);
                                 return;
                             }
-                            if (const auto saved = saveToFile(directory, Core::Paths::imageFileName(QDateTime::currentDateTime(), target->first), target->second); !saved)
+                            // 起名按设置里那一格的模板（留空即默认档），撞名时让一次位；
+                            // 管理器成批写缓存那一路不走这里，那一路按设计就是要覆盖
+                            const auto fileName = Core::Paths::imageFileName(QDateTime::currentDateTime(), target->first, Settings::nameTemplateOrDefault(m_settings));
+                            const auto unique   = Core::Paths::toDisplayText(Core::Paths::uniqueFilePath(directory, fileName).filename());
+                            if (const auto saved = saveToFile(directory, unique, target->second); !saved)
                             {
                                 Core::Logger::error(saved.error().message);
                             }

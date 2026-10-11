@@ -31,6 +31,7 @@
 #include "Record/RecorderConfig.h"
 #include "Record/RecordingHud.h"
 #include "Record/RecordingService.h"
+#include "Settings/NamingRules.h"
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
 #include "Ui/IconProvider.h"
@@ -533,8 +534,10 @@ namespace GyanisScribe::App
             return;
         }
 
-        const auto fileName = Core::Paths::imageFileName(QDateTime::currentDateTime(), Core::imageFormatExtension(*format));
-        const auto filePath = directory / fileName.toStdString();
+        // 名字规则来自设置里那一格（留空即默认档）；起好名再让一次位：模板里去掉 %ms% 之后
+        // 同一秒连拍会撞名，直接写就是把前一张悄悄盖掉
+        const auto fileName = Core::Paths::imageFileName(QDateTime::currentDateTime(), Core::imageFormatExtension(*format), Settings::nameTemplateOrDefault(*m_settings));
+        const auto filePath = Core::Paths::uniqueFilePath(directory, fileName);
         // 格式不单独传给 Qt：它按后缀挑编码器，再传一次格式名就是第二个出处
         if (!image.save(Core::Paths::toDisplayText(filePath), nullptr, quality))
         {
@@ -612,7 +615,7 @@ namespace GyanisScribe::App
         // 底图用发出请求时那一张：期间用户可能又截了新图，而方框是按送去认的那一张算的，换了图就整体错位
         if (m_ocrWindow == nullptr)
         {
-            m_ocrWindow = new Ocr::OcrResultWindow{image, result, *m_icons, *m_theme};
+            m_ocrWindow = new Ocr::OcrResultWindow{image, result, *m_icons, *m_theme, Settings::nameTemplateOrDefault(*m_settings)};
             // 关掉就自毁，控制器只持 QPointer：下一次识别会重新建一个，不会往已析构的对象里塞结果
             m_ocrWindow->setAttribute(Qt::WA_DeleteOnClose);
             QObject::connect(m_ocrWindow, &Ocr::OcrResultWindow::recognizeRequested, this, &AppController::recognizeWithLanguage);
@@ -728,6 +731,8 @@ namespace GyanisScribe::App
         }
         // 光标高亮是个开关，没有「读不出」这一档：配置里没有就按关；到了画不出位置的那一种模式，RecordingService 会自己报一句
         config.cursorHighlight = m_settings->boolValue(Settings::kRecordCursorHighlight, false);
+        // 成品文件名模板：与截图、贴图保存、识别导出同一格，几个写盘口各取一次、各按同一规则回落
+        config.nameTemplate = Settings::nameTemplateOrDefault(*m_settings);
 
         // 取声的两路：留空就是不取那一路。存的是 dshow 的稳定标识，换系统显示语言也不漂
         config.microphoneDevice  = m_settings->stringValue(Settings::kRecordAudioMicrophone, QString());

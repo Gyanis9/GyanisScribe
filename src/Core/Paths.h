@@ -95,11 +95,48 @@ namespace GyanisScribe::Core
          * @brief 生成导出图像的文件名
          * @param moment 导出时刻
          * @param extension 扩展名，不带点，例如 png、mp4
+         * @param pattern 文件名模板；留空表示用 kDefaultNameTemplate（与「目录留空表示默认目录」同一约定）
          * @return 形如 GyanisScribe_20261009_235959_123.png 的文件名
-         * @details 命名规则的唯一出处：贴图保存与标注保存共用同一个格式，两处各写一份就会在
-         *          某一天变成同一目录里两套文件名。毫秒位让同一秒内的多次导出不互相覆盖。
+         * @details 命名规则的唯一出处：贴图保存、标注保存、识别导出与录屏成品共用同一个格式，
+         *          几处各写一份就会在某一天变成同一目录里几套文件名。
+         *          pattern 不合法（含路径分隔符、未知变量）时记一条警告并按默认档走：
+         *          宁可写一个能用的名字，也不能把文件写到模板里那个分隔符指去的地方。
          */
-        [[nodiscard]] static QString imageFileName(const QDateTime &moment, std::string_view extension);
+        [[nodiscard]] static QString imageFileName(const QDateTime &moment, std::string_view extension, const QString &pattern = {});
+
+        /// 成品文件名的默认模板：三格变量是日期、时刻与毫秒；毫秒那一格让同一秒里连拍不互相覆盖
+        static constexpr std::string_view kDefaultNameTemplate = "GyanisScribe_%date%_%time%_%ms%";
+
+        /// 默认模板的 QString 形态：配置键、界面与拼名那几处都要用它，少写几次转换
+        [[nodiscard]] static QString defaultNameTemplate();
+
+        /**
+         * @brief 校验一份文件名模板
+         * @param text 用户填的模板
+         * @return 成功返回可用的模板（已去掉首尾空白）；不合法时返回带中文原因的 InvalidArgument
+         * @details 只认三格变量：%date%、%time%、%ms%，其余按字面量写进名字。
+         *          路径分隔符与 Windows 上的保留字符一律拒绝——放过去就是写到别的目录或写不出去；
+         *          形如 %xxx% 的未知变量也拒绝：打错一个字不该悄悄写进文件名。
+         */
+        [[nodiscard]] static Expected<QString> parseNameTemplate(const QString &text);
+
+        /**
+         * @brief 按模板拼出成品名
+         * @param moment 产出时刻
+         * @param pattern 已校验过的模板
+         * @return 不含扩展名的名字
+         */
+        [[nodiscard]] static QString formatProductName(const QDateTime &moment, const QString &pattern);
+
+        /**
+         * @brief 取一个不与已有文件相撞的路径
+         * @param directory 目标目录
+         * @param fileName 想用的文件名（含扩展名）
+         * @return 目录下的路径；同名文件已存在时在扩展名前加 -2、-3……
+         * @details 模板里去掉 %ms% 之后同一秒连拍会撞名，直接写就是把前一张悄悄盖掉。
+         *          试到 -99 仍撞名就交回原路径：再往下试只是把名字拉长，不如让调用方按写失败处理。
+         */
+        [[nodiscard]] static std::filesystem::path uniqueFilePath(const std::filesystem::path &directory, const QString &fileName);
     };
 
 } // namespace GyanisScribe::Core

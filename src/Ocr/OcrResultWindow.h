@@ -83,9 +83,11 @@ namespace GyanisScribe::Ocr
          * @param result 识别结果
          * @param icons 图标供给器，工具栏按钮的图标由它取
          * @param theme 主题管理器，决定高亮框用哪个主色
+         * @param nameTemplate 导出时的文件名模板；留空表示默认档（与截图成品同一套名字规则）
          * @param parent 父窗口，可空
          */
-        OcrResultWindow(const QImage &image, const OcrResult &result, Ui::IconProvider &icons, const Ui::ThemeManager &theme, QWidget *parent = nullptr);
+        OcrResultWindow(const QImage &image, const OcrResult &result, Ui::IconProvider &icons, const Ui::ThemeManager &theme, const QString &nameTemplate = {},
+                        QWidget *parent = nullptr);
 
         /**
          * @brief 换一份结果与底图（重新识别之后调用）
@@ -169,6 +171,7 @@ namespace GyanisScribe::Ocr
         OcrResult               m_result;              ///< 当前结果，窗口只展示不改写
         Ui::IconProvider       &m_icons;               ///< 图标供给器
         const Ui::ThemeManager &m_theme;               ///< 主题管理器，取主色画高亮框
+        QString                 m_nameTemplate;        ///< 导出用文件名模板，构造时给；空串表示默认档
         QWidget                *m_preview   = nullptr; ///< 左侧预览控件，重绘由 refreshPreview 驱动
         QTextEdit              *m_text      = nullptr; ///< 右侧文本，只读、可选中
         QLabel                 *m_status    = nullptr; ///< 摘要那一行，随结果刷新

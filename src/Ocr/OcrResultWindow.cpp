@@ -122,11 +122,11 @@ namespace
         return button;
     }
 
-    /// 导出对话框的默认文件名：与成品图同一时间戳口径，只在末尾换扩展名
-    std::filesystem::path suggestedExportPath(const QString &extension)
+    /// 导出对话框的默认文件名：与成品图同一套名字规则，只在末尾换扩展名
+    std::filesystem::path suggestedExportPath(const QString &extension, const QString &nameTemplate)
     {
         return GyanisScribe::Core::Paths::defaultScreenshotDirectory() /
-               GyanisScribe::Core::Paths::imageFileName(QDateTime::currentDateTime(), extension.toStdString()).toStdString();
+               GyanisScribe::Core::Paths::fromDisplayText(GyanisScribe::Core::Paths::imageFileName(QDateTime::currentDateTime(), extension.toStdString(), nameTemplate));
     }
 } // namespace
 
@@ -180,8 +180,8 @@ namespace GyanisScribe::Ocr
                                          .c_str());
     }
 
-    OcrResultWindow::OcrResultWindow(const QImage &image, const OcrResult &result, Ui::IconProvider &icons, const Ui::ThemeManager &theme, QWidget *parent) :
-        QWidget(parent), m_image(image), m_result(result), m_icons(icons), m_theme(theme)
+    OcrResultWindow::OcrResultWindow(const QImage &image, const OcrResult &result, Ui::IconProvider &icons, const Ui::ThemeManager &theme, const QString &nameTemplate,
+                                     QWidget *parent) : QWidget(parent), m_image(image), m_result(result), m_icons(icons), m_theme(theme), m_nameTemplate(nameTemplate)
     {
         setWindowTitle(GyanisScribe::Core::uiText("识别结果"));
         setWindowIcon(m_icons.icon("Ocr"));
@@ -347,7 +347,7 @@ namespace GyanisScribe::Ocr
 
     void OcrResultWindow::chooseAndExportTxt()
     {
-        const auto suggested = suggestedExportPath(QStringLiteral("txt"));
+        const auto suggested = suggestedExportPath(QStringLiteral("txt"), m_nameTemplate);
         const auto chosen    = QFileDialog::getSaveFileName(this, GyanisScribe::Core::uiText("导出 TXT"), QString::fromStdWString(suggested.wstring()),
                                                             GyanisScribe::Core::uiText("文本文件 (*.txt)"));
         // 取消对话框不是失败：不提示、也不动已有结果
@@ -369,7 +369,7 @@ namespace GyanisScribe::Ocr
 
     void OcrResultWindow::chooseAndExportJson()
     {
-        const auto suggested = suggestedExportPath(QStringLiteral("json"));
+        const auto suggested = suggestedExportPath(QStringLiteral("json"), m_nameTemplate);
         const auto chosen    = QFileDialog::getSaveFileName(this, GyanisScribe::Core::uiText("导出 JSON"), QString::fromStdWString(suggested.wstring()),
                                                             GyanisScribe::Core::uiText("JSON 文件 (*.json)"));
         if (chosen.isEmpty())

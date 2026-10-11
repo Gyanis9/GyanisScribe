@@ -52,6 +52,7 @@ namespace GyanisScribe::Record
         QString               screenName;                                      ///< 录哪块屏幕，全部模式必填
         quintptr              windowHandle = 0;                                ///< Window 模式的平台窗口句柄（Qt 的 WId）
         std::filesystem::path outputDirectory;                                 ///< 成品文件落在哪个目录
+        QString               nameTemplate;                                    ///< 成品文件名模板，留空即默认档；读端在 FfmpegRecordingEncoder
         bool                  cursorHighlight = false;                         ///< 是否在帧上圈出光标位置
         QString               microphoneDevice;                                ///< 麦克风那一路的 dshow 标识，空表示不取这一路
         QString               systemSoundDevice;                               ///< 系统声音那一路的 dshow 标识，空表示不取这一路

@@ -127,3 +127,70 @@ TEST_F(PathsFixture, ImageFileNameKeepsLiteralBrandAndExpandsOnlyDateTokens)
     EXPECT_EQ(Paths::imageFileName(moment, "png").toStdString(), "GyanisScribe_20261011_054854_160.png");
     EXPECT_EQ(Paths::imageFileName(moment, "txt").toStdString(), "GyanisScribe_20261011_054854_160.txt");
 }
+
+/**
+ * @brief 钉住模板解析的放行面与拒因面
+ * @details 拒的是会把文件带出目录、系统写不出去、以及打错字这三类；放行的是「进度 50%」这种
+ *          不成对的百分号——它是正常名字的一部分，不是变量写法。
+ */
+TEST(PathsNameTemplate, ParsesOnlyTheThreeDocumentedTokens)
+{
+    const auto trimmed = Paths::parseNameTemplate(QStringLiteral("  截图_%date%_%time%_%ms%  "));
+    ASSERT_TRUE(trimmed.has_value()) << trimmed.error().message;
+    EXPECT_EQ(*trimmed, QStringLiteral("截图_%date%_%time%_%ms%")) << "首尾空白该去掉";
+
+    EXPECT_FALSE(Paths::parseNameTemplate(QStringLiteral("   ")).has_value()) << "空模板不该放行";
+    EXPECT_FALSE(Paths::parseNameTemplate(QStringLiteral("a/b")).has_value()) << "路径分隔符会把文件写到别的目录";
+    EXPECT_FALSE(Paths::parseNameTemplate(QStringLiteral("a:b")).has_value()) << "冒号在 Windows 上写不出去";
+
+    const auto typo = Paths::parseNameTemplate(QStringLiteral("shot_%dtae%"));
+    ASSERT_FALSE(typo.has_value()) << "认不出的变量放过去，就是让打错的一个字悄悄写进文件名";
+    EXPECT_NE(typo.error().message.find("dtae"), std::string::npos) << "要说清是哪一个变量不认得";
+
+    EXPECT_TRUE(Paths::parseNameTemplate(QStringLiteral("进度 50%")).has_value()) << "不成对的百分号是正常名字的一部分";
+    EXPECT_TRUE(Paths::parseNameTemplate(QStringLiteral("%date%-%time%")).has_value());
+}
+
+/**
+ * @brief 钉住拼名与三条回落：模板留空、模板不合法、模板里带中文
+ * @details 带分隔符的模板若被原样拼进名字，文件会落到别的目录；这一条钉的就是它落到默认档上。
+ */
+TEST_F(PathsFixture, FormatsProductNameByTemplateAndNeverLeavesTheDirectory)
+{
+    const QDateTime moment{QDate{2026, 10, 11}, QTime{5, 48, 54, 160}};
+
+    EXPECT_EQ(Paths::formatProductName(moment, QStringLiteral("截图_%date%_%time%")), QStringLiteral("截图_20261011_054854"));
+    EXPECT_EQ(Paths::imageFileName(moment, "png", QStringLiteral("shot-%date%")), QStringLiteral("shot-20261011.png"));
+    EXPECT_EQ(Paths::imageFileName(moment, "png", QString{}), QStringLiteral("GyanisScribe_20261011_054854_160.png")) << "留空该落到默认档";
+
+    EXPECT_EQ(Paths::imageFileName(moment, "png", QStringLiteral("../逃出去")), QStringLiteral("GyanisScribe_20261011_054854_160.png"))
+            << "没先校验的调用方传进带分隔符的模板时，宁可写默认名字";
+}
+
+/**
+ * @brief 钉住撞名时的退让：-2 加在扩展名之前，且按盘上真实存在的文件判
+ */
+TEST_F(PathsFixture, UniqueFilePathStepsAsideBeforeTheExtension)
+{
+    const auto      directory = probeDirectory("NameTemplate");
+    std::error_code ignored;
+    std::filesystem::remove_all(directory, ignored);
+    std::filesystem::create_directories(directory);
+
+    const auto first = Paths::uniqueFilePath(directory, QStringLiteral("shot-20261011.png"));
+    EXPECT_EQ(first.filename().string(), "shot-20261011.png") << "没有撞名就该用原名";
+
+    {
+        std::ofstream{first} << "x";
+    }
+    const auto second = Paths::uniqueFilePath(directory, QStringLiteral("shot-20261011.png"));
+    EXPECT_EQ(second.filename().string(), "shot-20261011-2.png") << "-2 该加在扩展名之前，加在后面双击打不开";
+
+    {
+        std::ofstream{second} << "x";
+    }
+    const auto third = Paths::uniqueFilePath(directory, QStringLiteral("shot-20261011.png"));
+    EXPECT_EQ(third.filename().string(), "shot-20261011-3.png");
+
+    std::filesystem::remove_all(directory, ignored);
+}

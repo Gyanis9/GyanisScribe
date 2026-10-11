@@ -56,6 +56,10 @@ namespace GyanisScribe::Settings
     /// PNG 是无损的，这一格对它没有作用，读端与「保存格式」那两格同处
     inline constexpr std::string_view kSaveImageQuality = "Save/ImageQuality";
 
+    /// 成品文件名的模板，变量只有 %date%、%time%、%ms%（Core::Paths::parseNameTemplate 校验）；
+    /// 留空表示默认档，读端见 Settings::nameTemplateOrDefault
+    inline constexpr std::string_view kSaveNameTemplate = "Save/NameTemplate";
+
     /// 贴图保存的默认目录，为空时用系统图片目录下的 GyanisScribe
     inline constexpr std::string_view kPathScreenshot = "Paths/Screenshot";
 
