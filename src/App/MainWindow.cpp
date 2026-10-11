@@ -339,9 +339,10 @@ namespace
      * @param settings 配置存储
      * @return 归调用方所有的复选框，由 addRow 挂上父对象
      */
-    QCheckBox *makeCursorHighlightCheck(ISettingsStore &settings)
+    QCheckBox *makeCursorHighlightCheck(ISettingsStore &settings, const IconProvider &icons)
     {
         auto *check = new QCheckBox;
+        check->setIcon(icons.icon("CursorHighlight"));
         check->setText(GyanisScribe::Core::uiText("把光标位置圈在画面里"));
         check->setAccessibleName(GyanisScribe::Core::uiText("光标高亮"));
         check->setToolTip(GyanisScribe::Core::uiText("整屏、选区与窗口录屏都生效；录窗口时按平台报出的客户区左上角落位，那份读数拿不到时这一帧就不画圈"));
@@ -652,12 +653,13 @@ namespace
      * @details 初值按 RecorderConfig 的 mode 初值回落，而不是在这里另写一档：
      *          两处不同解时，用户没动过这一格却录到与界面显示不符的画面。
      */
-    QComboBox *makeRecordScopeCombo(ISettingsStore &settings)
+    QComboBox *makeRecordScopeCombo(ISettingsStore &settings, const IconProvider &icons)
     {
         auto *combo = new QComboBox;
         for (const auto &choice: GyanisScribe::Record::kRecordScopeChoices)
         {
-            combo->addItem(GyanisScribe::Core::uiText(choice.label.data()), tokenText(choice.token));
+            // 图标名与标签同在词表里：三档录法的字形不一样，扫一眼就分得出，不必逐条读字
+            combo->addItem(icons.icon(choice.iconName), GyanisScribe::Core::uiText(choice.label.data()), tokenText(choice.token));
         }
         combo->setAccessibleName(GyanisScribe::Core::uiText("录制范围"));
         combo->setToolTip(GyanisScribe::Core::uiText("「上次选区」用最近一次截图框出的那块矩形；「当前窗口」录按下开始时最靠前的那个窗口。改完从下一次录屏开始生效"));
@@ -693,12 +695,13 @@ namespace
      * @details 初值按词表第一档回落，而不是在这里另写一档：两处不同解时，用户没动过这一格，
      *          按下热键走的却与界面显示的不是同一步。
      */
-    QComboBox *makeCaptureIntentCombo(ISettingsStore &settings)
+    QComboBox *makeCaptureIntentCombo(ISettingsStore &settings, const IconProvider &icons)
     {
         auto *combo = new QComboBox;
         for (const auto &choice: GyanisScribe::App::kCaptureIntentChoices)
         {
-            combo->addItem(GyanisScribe::Core::uiText(choice.label.data()), tokenText(choice.token));
+            // 与录制范围那格同一条形状：图标名跟着词表走，界面只负责取
+            combo->addItem(icons.icon(choice.iconName), GyanisScribe::Core::uiText(choice.label.data()), tokenText(choice.token));
         }
         combo->setAccessibleName(GyanisScribe::Core::uiText("截完之后"));
         combo->setToolTip(GyanisScribe::Core::uiText("选「复制到剪贴板」「直接存成文件」「直接贴到屏幕上」时都不再弹标注窗；改完从下一次截图开始生效"));
@@ -1349,7 +1352,7 @@ namespace GyanisScribe::App
     {
         auto *page = new QWidget{this};
         auto *form = makePageForm(page, GyanisScribe::Core::uiText("截图与标注成品落在这个目录里。取色复制出来的文本按下面的写法格式化。"));
-        form->addRow(GyanisScribe::Core::uiText("截完之后"), makeCaptureIntentCombo(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("截完之后"), makeCaptureIntentCombo(m_settings, m_icons));
         form->addRow(GyanisScribe::Core::uiText("延时截图"), makeCaptureDelaySpin(m_settings));
         form->addRow(GyanisScribe::Core::uiText("鼠标指针"), makeIncludeCursorCheck(m_settings));
         form->addRow(GyanisScribe::Core::uiText("截图与标注成品目录"),
@@ -1391,12 +1394,12 @@ namespace GyanisScribe::App
                                                                    "时这两格会灰掉，那种文件带不了声音。这几项都从下一次开始录屏时生效。"));
         form->addRow(GyanisScribe::Core::uiText("录屏成品目录"),
                      makePathRow(m_settings, GyanisScribe::Settings::kPathRecording, GyanisScribe::Core::uiText("录屏目录"), Core::Paths::defaultRecordingDirectory(), m_icons));
-        form->addRow(GyanisScribe::Core::uiText("录制范围"), makeRecordScopeCombo(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("录制范围"), makeRecordScopeCombo(m_settings, m_icons));
         auto *formatCombo = makeRecordFormatCombo(m_settings);
         form->addRow(GyanisScribe::Core::uiText("输出格式"), formatCombo);
         form->addRow(GyanisScribe::Core::uiText("默认帧率"), makeFrameRateSpin(m_settings));
         form->addRow(GyanisScribe::Core::uiText("画面码率"), makeVideoBitrateSpin(m_settings));
-        form->addRow(GyanisScribe::Core::uiText("光标高亮"), makeCursorHighlightCheck(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("光标高亮"), makeCursorHighlightCheck(m_settings, m_icons));
         auto *microphoneCombo  = makeAudioDeviceCombo(m_settings, GyanisScribe::Settings::kRecordAudioMicrophone, GyanisScribe::Core::uiText("麦克风设备"), *m_audioDevices);
         auto *systemSoundCombo = makeAudioDeviceCombo(m_settings, GyanisScribe::Settings::kRecordAudioSystemSound, GyanisScribe::Core::uiText("系统声音设备"), *m_audioDevices);
         form->addRow(GyanisScribe::Core::uiText("麦克风这一路"), microphoneCombo);

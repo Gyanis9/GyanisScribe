@@ -480,10 +480,14 @@ docs/           需求、识别后端、第三方许可证、界面样式说明
 - **`AppController` 那一层没有直测**：构造函数自己造出设置、抓帧、托盘、编码这些真模块，没有注入口，测试里一个实例都没有。
   延时截图的路由与成品进历史那几条都住在这一层，本轮「截取当前窗口绕过延时」就是这么漏下来的——只能靠人读代码发现。
   前置工作是给它一套与 `tests/App/TestModuleFlow.cpp` 同形状的替身。
-- **图标接线**：`Resources/Icons` 里有 16 枚在界面上一次都不出现（`CaptureWindow`、`RecordFullScreen`、`RecordRegion`、
-  `RecordWindow`、`Microphone`、`SystemAudio`、`CursorHighlight`、`Countdown`、`OcrLanguage`、`OcrRegion`、`PinTop`、
-  `PinTransparent`、`PinSave`、`ThemeLight`、`ThemeDark`、`ThemeSystem`）。它们由 `tests/Ui/TestIconProvider.cpp`
-  那份独立清单逐张核对画得出来，所以不是坏资产，只是没人摆：接到对应的行上（录屏三档范围、两路取声、主题档位下拉），或者删掉。
+- **图标接线**：需求第七节点名要有的那批 SVG 里，还有 8 枚在界面上一次都不出现（`Microphone`、`SystemAudio`、
+  `Countdown`、`OcrLanguage`、`OcrRegion`、`ThemeLight`、`ThemeDark`、`ThemeSystem`）。它们由
+  `tests/Ui/TestIconProvider.cpp` 那份独立清单逐张核对画得出来，所以不是坏资产，只是还没找到配得上的落点：
+  两路取声是整条下拉共用一个图标（一排里同一枚挂着没有区分作用）、主题那三档缺高对比度对应的第四枚
+  （只给它三枚会看着像漏了）、倒计时与语言包各自只有一处文字读数、`OcrRegion` 与托盘那两种识别入口的语义对不上。
+  其余几枚（三档录制范围、五种截图去向、托盘的「截取当前窗口」、录屏页的光标高亮那一行）已经接上。
+  贴图右键菜单与录屏页两处取声没有接：前者要为此把图标供给器一路穿过 `PinManager` 的构造链，
+  后者是整条下拉共用一个图标，为观感拉一条链子不划算。
 - **自动更新只做到「查」**：下载、校验与替换可执行体要先有代码签名与原子替换那套方案——
   替换到一半失败会把用户的程序留在半坏状态，而这不是截图工具该自己发明的机制。在那之前，
   关于页把新版号与发布页摆出来，下载与覆盖安装交给用户自己。

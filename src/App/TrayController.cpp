@@ -50,7 +50,8 @@ namespace GyanisScribe::App
         entries.append(TrayMenuEntry{TrayAction::CaptureRegion, "CaptureRegion", GyanisScribe::Core::uiText("框选截图"), GyanisScribe::Settings::kHotkeyCapture});
         entries.append(TrayMenuEntry{TrayAction::CaptureFullScreen, "CaptureFullScreen", GyanisScribe::Core::uiText("整屏截图"), {}});
         entries.append(TrayMenuEntry{TrayAction::CaptureLastRegion, "CaptureLastRegion", GyanisScribe::Core::uiText("重复上次选区"), {}});
-        entries.append(TrayMenuEntry{TrayAction::CaptureWindow, "CaptureRegion", GyanisScribe::Core::uiText("截取当前窗口"), {}});
+        // 图标用 CaptureWindow 那一枚：与「框选截图」共用同一枚会让两行在菜单里长得一模一样
+        entries.append(TrayMenuEntry{TrayAction::CaptureWindow, "CaptureWindow", GyanisScribe::Core::uiText("截取当前窗口"), {}});
         entries.append(TrayMenuEntry{TrayAction::CaptureLongRegion, "CaptureRegion", GyanisScribe::Core::uiText("滚动长截图"), GyanisScribe::Settings::kHotkeyCaptureLong});
         entries.append(TrayMenuEntry{}); // 分隔线
         entries.append(TrayMenuEntry{TrayAction::ToggleRecord, "Record", GyanisScribe::Core::uiText("开始 / 停止录屏"), GyanisScribe::Settings::kHotkeyRecord});

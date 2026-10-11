@@ -761,6 +761,37 @@ namespace
         EXPECT_EQ(check->isChecked(), *state) << "勾的初值要与系统里的启动项一致";
     }
 
+
+    /**
+     * @brief 钉住两处下拉的每一项都带着词表里那一枚图标
+     * @details 图标只挂在整条下拉上没有区分作用；按项挂才有意义，所以这里逐项核装饰角色，
+     *          并且要求每一项都有——只挂前两项会看着像后几项漏了图。
+     */
+    TEST_F(MainWindowFixture, ChoiceCombosCarryPerItemIcons)
+    {
+        makeWindow();
+
+        for (const auto &name: {QStringLiteral("录制范围"), QStringLiteral("截完之后")})
+        {
+            QComboBox *combo = nullptr;
+            for (auto *candidate: m_window->findChildren<QComboBox *>())
+            {
+                if (candidate->accessibleName() == name)
+                {
+                    combo = candidate;
+                    break;
+                }
+            }
+            ASSERT_NE(combo, nullptr) << name.toStdString() << " 这一条下拉没找到";
+            ASSERT_GT(combo->count(), 0) << name.toStdString() << " 下拉里一项都没有";
+
+            for (int index = 0; index < combo->count(); ++index)
+            {
+                EXPECT_FALSE(combo->itemData(index, Qt::DecorationRole).isNull()) << name.toStdString() << " 的第 " << index << " 项没有图标";
+            }
+        }
+    }
+
 } // namespace
 
 /**

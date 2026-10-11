@@ -118,16 +118,17 @@ namespace GyanisScribe::Record
     /// 一档录制范围：存进配置的 token，与设置页显示的中文标签
     struct RecordScopeChoice
     {
-        RecordMode       mode;  ///< 这一档对应的录法
-        std::string_view token; ///< 配置里存的值，词表在这里唯一
-        std::string_view label; ///< 设置页上的中文标签，界面按 UTF-8 取
+        RecordMode       mode;     ///< 这一档对应的录法
+        std::string_view token;    ///< 配置里存的值，词表在这里唯一
+        std::string_view label;    ///< 设置页上的中文标签，界面按 UTF-8 取
+        std::string_view iconName; ///< 设置页下拉里那一格的图标名（IconProvider 按名字取 SVG）
     };
 
     /// 全部录制范围档位，顺序就是设置页下拉的顺序
     inline constexpr std::array<RecordScopeChoice, 3> kRecordScopeChoices{
-            RecordScopeChoice{RecordMode::FullScreen, "FullScreen", "整屏"},
-            RecordScopeChoice{RecordMode::Region, "Region", "上次选区"},
-            RecordScopeChoice{RecordMode::Window, "Window", "当前窗口"},
+            RecordScopeChoice{RecordMode::FullScreen, "FullScreen", "整屏", "RecordFullScreen"},
+            RecordScopeChoice{RecordMode::Region, "Region", "上次选区", "RecordRegion"},
+            RecordScopeChoice{RecordMode::Window, "Window", "当前窗口", "RecordWindow"},
     };
 
     /**

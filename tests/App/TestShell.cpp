@@ -81,6 +81,15 @@ TEST(TrayMenuTable, ListsEachActionOnceWithRealIcons)
         EXPECT_FALSE(entry.label.isEmpty()) << "有一项没有文字，读屏与鼠标都只能靠猜";
         EXPECT_TRUE(available.contains(QString::fromUtf8(std::string{entry.iconName}.c_str()))) << "菜单项点名了一枚资源里没有的图标：" << std::string{entry.iconName};
     }
+
+    // 「截取当前窗口」不许与「框选截图」共用同一枚图标：两行在菜单里长得一样，用户只能逐字读
+    for (const auto &entry: trayMenuEntries())
+    {
+        if (entry.action && *entry.action == TrayAction::CaptureWindow)
+        {
+            EXPECT_EQ(std::string{entry.iconName}, "CaptureWindow");
+        }
+    }
 }
 
 /**

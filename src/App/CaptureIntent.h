@@ -36,16 +36,19 @@ namespace GyanisScribe::App
     /// 一档去处：枚举、存进配置的 token，与设置页显示的中文标签
     struct CaptureIntentChoice
     {
-        CaptureIntent    intent; ///< 这一档走哪一步
-        std::string_view token;  ///< 配置里存的值，词表在这里唯一
-        std::string_view label;  ///< 设置页上的中文标签，界面按 UTF-8 取
+        CaptureIntent    intent;   ///< 这一档走哪一步
+        std::string_view token;    ///< 配置里存的值，词表在这里唯一
+        std::string_view label;    ///< 设置页上的中文标签，界面按 UTF-8 取
+        std::string_view iconName; ///< 设置页下拉里那一格的图标名（IconProvider 按名字取 SVG）
     };
 
     /// 全部档位，顺序就是设置页下拉的顺序；第一档是不填配置时的回落档
     inline constexpr std::array<CaptureIntentChoice, 5> kCaptureIntentChoices{
-            CaptureIntentChoice{CaptureIntent::Annotate, "Annotate", "进标注窗"},       CaptureIntentChoice{CaptureIntent::CopyToClipboard, "Copy", "复制到剪贴板"},
-            CaptureIntentChoice{CaptureIntent::SaveToFile, "Save", "直接存成文件"},     CaptureIntentChoice{CaptureIntent::PinToDesk, "Pin", "直接贴到屏幕上"},
-            CaptureIntentChoice{CaptureIntent::Recognize, "Recognize", "直接识别文字"},
+            CaptureIntentChoice{CaptureIntent::Annotate, "Annotate", "进标注窗", "CaptureRegion"},
+            CaptureIntentChoice{CaptureIntent::CopyToClipboard, "Copy", "复制到剪贴板", "Copy"},
+            CaptureIntentChoice{CaptureIntent::SaveToFile, "Save", "直接存成文件", "Save"},
+            CaptureIntentChoice{CaptureIntent::PinToDesk, "Pin", "直接贴到屏幕上", "Pin"},
+            CaptureIntentChoice{CaptureIntent::Recognize, "Recognize", "直接识别文字", "Ocr"},
     };
 
     /**
