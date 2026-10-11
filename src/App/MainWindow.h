@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "App/UpdateCheck.h"
 #include "Platform/PlatformCapabilities.h"
 #include "Ui/Language.h"
 #include "Ui/ThemeKind.h"
@@ -314,6 +315,7 @@ namespace GyanisScribe::App
         QListWidget                                         *m_nav   = nullptr;   ///< 左侧导航，一行一页
         QStackedWidget                                      *m_stack = nullptr;   ///< 右侧页容器，序号与导航行同解
         std::unique_ptr<Record::FfmpegAudioDeviceEnumerator> m_audioDevices;      ///< 录屏页那两路设备清单的来源，一次查询两格共用
+        std::unique_ptr<App::UpdateChecker>                  m_updateChecker;     ///< 检查更新那一条：关于页按一下才发请求，不是启动就联网
         History::HistoryStore                               &m_historyStore;      ///< 历史清单，历史页从它读
         History::HistoryView                                *m_history = nullptr; ///< 历史页控件，重读清单时刷新它
     };

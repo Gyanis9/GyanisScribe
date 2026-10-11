@@ -748,6 +748,14 @@
             <translation>GyanisScribe icon</translation>
         </message>
         <message>
+            <source>检查更新</source>
+            <translation>Check for updates</translation>
+        </message>
+        <message>
+            <source>正在检查…</source>
+            <translation>Checking…</translation>
+        </message>
+        <message>
             <source>通用</source>
             <translation>General</translation>
         </message>
@@ -862,6 +870,38 @@
         <message>
             <source>快捷键：%1，可在设置页改</source>
             <translation>Shortcut: %1. Change it on the Settings page</translation>
+        </message>
+        <message>
+            <source>更新检查的回应不是一份发布信息（不是 JSON 对象）：多半是网络中间被拦了，请稍后再试</source>
+            <translation>The update response is not a release description (not a JSON object): something in the middle of the network probably intercepted it, please try again later</translation>
+        </message>
+        <message>
+            <source>发布信息里没有版本标签：请到发布页看有没有新版</source>
+            <translation>The release has no version tag: check the releases page for a new version</translation>
+        </message>
+        <message>
+            <source>发布信息里没有发布页地址：请到发布页看有没有新版</source>
+            <translation>The release has no page address: check the releases page for a new version</translation>
+        </message>
+        <message>
+            <source>本机版本号「{}」读不出来，没法与最新版比。请到发布页自己看一眼</source>
+            <translation>The local version "{}" cannot be parsed, so it cannot be compared with the latest one. Take a look at the releases page yourself</translation>
+        </message>
+        <message>
+            <source>发布页上的版本标签「{}」读不出来，没法与本机版本比</source>
+            <translation>The version tag "{}" on the releases page cannot be parsed, so it cannot be compared with the local version</translation>
+        </message>
+        <message>
+            <source>有新版本 {}（本机 {}）：点这一行打开下载页</source>
+            <translation>A new version {} is available (you have {}): click this line to open the download page</translation>
+        </message>
+        <message>
+            <source>已是最新（{}）</source>
+            <translation>Up to date ({})</translation>
+        </message>
+        <message>
+            <source>检查更新失败：{}。请稍后再试，或到发布页自己看一眼</source>
+            <translation>Update check failed: {}. Try again later, or take a look at the releases page yourself</translation>
         </message>
         <message>
             <source>还没有可复用的上次区域：先框选截图一次，或改用区域截图</source>

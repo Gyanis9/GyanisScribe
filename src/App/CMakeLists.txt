@@ -12,6 +12,8 @@ add_library(App STATIC
         MainWindow.cpp
         TrayController.h
         TrayController.cpp
+        UpdateCheck.h
+        UpdateCheck.cpp
         SingleInstance.h
         SingleInstance.cpp
         CrashGuard.h

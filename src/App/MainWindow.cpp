@@ -1,6 +1,7 @@
 #include "App/CaptureIntent.h"
 #include "App/MainWindow.h"
 #include "App/TrayController.h"
+#include "App/UpdateCheck.h"
 #include "Core/ImageFormat.h"
 #include "Core/Logger.h"
 #include "Core/Paths.h"
@@ -24,6 +25,7 @@
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDesktopServices>
 #include <QDir>
 #include <QFileDialog>
 #include <QFormLayout>
@@ -36,6 +38,7 @@
 #include <QSpinBox>
 #include <QStackedWidget>
 #include <QToolButton>
+#include <QUrl>
 #include <QVBoxLayout>
 
 #include <array>
@@ -1448,8 +1451,41 @@ namespace GyanisScribe::App
         text->setWordWrap(true);
         text->setTextInteractionFlags(Qt::TextSelectableByMouse);
 
+        // 检查更新：只查不换——下载与替换可执行体要先有签名与原子替换那一套，
+        // 这里把「有没有新版」与发布页地址摆出来，下载交给用户自己在浏览器里点
+        auto *checkButton = new QPushButton{GyanisScribe::Core::uiText("检查更新"), page};
+        checkButton->setAccessibleName(GyanisScribe::Core::uiText("检查更新"));
+        auto *status = new QLabel{page};
+        status->setObjectName(QStringLiteral("pageHint"));
+        status->setWordWrap(true);
+        status->setTextInteractionFlags(Qt::TextBrowserInteraction);
+        status->setOpenExternalLinks(false);
+        QObject::connect(status, &QLabel::linkActivated, status, [](const QString &link) { QDesktopServices::openUrl(QUrl{link}); });
+
+        m_updateChecker = std::make_unique<GyanisScribe::App::UpdateChecker>(this);
+        QObject::connect(m_updateChecker.get(), &GyanisScribe::App::UpdateChecker::finished, status,
+                         [checkButton, status](const GyanisScribe::App::UpdateVerdict &verdict)
+                         {
+                             checkButton->setEnabled(true);
+                             status->setText(verdict.link.isEmpty() ? verdict.message : QStringLiteral("<a href=\"%1\">%2</a>").arg(verdict.link, verdict.message));
+                         });
+        QObject::connect(checkButton, &QPushButton::clicked, page,
+                         [this, checkButton, status]
+                         {
+                             if (m_updateChecker->isRunning())
+                             {
+                                 // 已经在查：按钮这会儿本来就该是灰的，走到这里说明有两处入口，直接不理
+                                 return;
+                             }
+                             checkButton->setEnabled(false);
+                             status->setText(GyanisScribe::Core::uiText("正在检查…"));
+                             m_updateChecker->check();
+                         });
+
         layout->addWidget(logo);
         layout->addWidget(text);
+        layout->addWidget(checkButton);
+        layout->addWidget(status);
         layout->addStretch();
         return page;
     }
