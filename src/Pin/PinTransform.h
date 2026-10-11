@@ -104,7 +104,7 @@ namespace GyanisScribe::Pin
     [[nodiscard]] double normalizeDegrees(double degrees) noexcept;
 
     /**
-     * @brief 窗口坐标落在图片的哪一个像素上
+     * @brief 把窗口坐标落在图片的哪一个像素上
      * @param windowPoint 窗口内的坐标
      * @param content 画布矩形（未旋转、已缩放），即 PinWindow::contentRect() 给的那个
      * @param imagePixelSize 图片的物理像素尺寸
@@ -114,5 +114,55 @@ namespace GyanisScribe::Pin
      *          缩略图态不旋转，调用方按绘制时的口径传 0 度即可。
      */
     [[nodiscard]] std::optional<QPoint> imagePixelAt(const QPointF &windowPoint, const QRectF &content, const QSize &imagePixelSize, double degrees);
+
+    /// 拖到离屏幕边多近就算「要贴上去」，逻辑像素
+    inline constexpr int kEdgeSnapTolerance = 12;
+
+    /// 贴边收起后留在屏上的那条边，逻辑像素：全藏进去用户就再也找不回它了
+    inline constexpr int kEdgeStripWidth = 6;
+
+    /**
+     * @brief 贴的是屏的哪条边
+     * @details 取值可能被写进布局与菜单，新成员只能追加在末尾。
+     */
+    enum class ScreenEdge
+    {
+        None,   ///< 没贴边
+        Left,   ///< 左边
+        Right,  ///< 右边
+        Top,    ///< 上边
+        Bottom, ///< 下边
+    };
+
+    /**
+     * @brief 贴边换算的结果
+     */
+    struct EdgeSnap
+    {
+        QRect      rect;                    ///< 夹进可用区并吸好边的窗口矩形
+        ScreenEdge edge = ScreenEdge::None; ///< 贴上的那条边
+    };
+
+    /**
+     * @brief 把拖到的窗口矩形吸进屏幕：越界的先夹回来，挨着哪条边就贴哪条
+     * @param draggedRect 拖到的位置（窗口矩形）
+     * @param available 这块屏的可用区（不含任务栏）
+     * @param tolerance 判「够近」的容差，逻辑像素
+     * @return 吸好之后的矩形与贴的是哪条边
+     * @details 夹进可用区不是顺手加的：夹取之前可以把一张贴图整个拖出屏幕，从此再也点不到它。
+     *          两条边同时够近（小窗口拖到角上）时取左/上，与录屏控制条那边同一口径。
+     */
+    [[nodiscard]] EdgeSnap snapToScreenEdges(const QRect &draggedRect, const QRect &available, int tolerance = kEdgeSnapTolerance);
+
+    /**
+     * @brief 贴边之后的窗口矩形：露着还是收成一条
+     * @param revealed 贴边后完全露出的矩形
+     * @param available 那块屏的可用区
+     * @param edge 贴的哪条边；None 时原样返回 revealed
+     * @param collapsed true 表示收成一条，false 表示全露出
+     * @param stripWidth 收起来时留在屏上的那条边的宽度
+     * @return 贴边后的窗口矩形（收起时大部分在屏外）
+     */
+    [[nodiscard]] QRect dockedRect(const QRect &revealed, const QRect &available, ScreenEdge edge, bool collapsed, int stripWidth = kEdgeStripWidth);
 
 } // namespace GyanisScribe::Pin

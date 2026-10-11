@@ -15,9 +15,11 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QEnterEvent>
 #include <QImage>
 #include <QKeyEvent>
 #include <QMenu>
+#include <QScreen>
 #include <QMouseEvent>
 #include <QPoint>
 #include <QSize>
@@ -469,6 +471,112 @@ namespace GyanisScribe
         EXPECT_EQ(files, 1) << "保存过后目录里的文件数不对：" << files;
 
         std::filesystem::remove_all(target, ignored);
+    }
+
+    /**
+     * @brief 钉住拖着放到屏边会贴上去：松手先露着，指针离开收成一条，悬停再露出来
+     * @details 三条判据各打一处：贴边那一步（释放时吸边）、收起来那一步（离开时只剩一条）、
+     *          露出来那一步（进入时回到贴齐的位置）。没有这三步，「贴边」只是在边上停着的一张图。
+     */
+    TEST_F(PinWindowFixture, DroppingAtTheScreenEdgeDocksAndHoverReveals)
+    {
+        QScreen *screen = QGuiApplication::primaryScreen();
+        if (screen == nullptr)
+        {
+            GTEST_SKIP() << "这个环境没有屏幕可枚举，贴边的几何无从谈起";
+        }
+        const auto available = screen->availableGeometry();
+
+        auto &window = makeWindow();
+        window.move(available.left() + 5, available.top() + 200);
+        ASSERT_EQ(window.edgeDock(), Pin::ScreenEdge::None);
+
+        // 拖一下再松手（只点一下不触发吸边，这一条顺带钉住）。
+        // 落点取窗口正中：八个手柄的占位框贴着四边，按在边上会成为「拖手柄改大小」而不是「拖窗口」
+        const QPointF grip = QRectF(QPointF(0, 0), QSizeF(window.size())).center();
+        QMouseEvent   press{QEvent::MouseButtonPress, grip, grip, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &press);
+        QMouseEvent drag{QEvent::MouseMove, grip + QPointF{7.0, 7.0}, grip + QPointF{7.0, 7.0}, Qt::NoButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &drag);
+        QMouseEvent release{QEvent::MouseButtonRelease, grip + QPointF{7.0, 7.0}, grip + QPointF{7.0, 7.0}, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &release);
+
+        EXPECT_EQ(window.edgeDock(), Pin::ScreenEdge::Left) << "拖到左边附近松手没贴上去";
+        EXPECT_EQ(window.x(), available.left()) << "贴上之后没有贴齐那条边";
+        const auto revealedWidth = window.width();
+
+        // 指针离开：收成一条
+        QEvent leave{QEvent::Leave};
+        QApplication::sendEvent(&window, &leave);
+        EXPECT_EQ(window.geometry().right(), Pin::kEdgeStripWidth - 1) << "指针走了没收起来，或者收得太多（整张藏进了屏外）";
+        EXPECT_EQ(window.width(), revealedWidth) << "收起只挪位置，不改尺寸";
+
+        // 悬停：露回来
+        QEnterEvent enter{QPointF{1.0, 1.0}, QPointF{1.0, 1.0}, QPointF{1.0, 1.0}};
+        QApplication::sendEvent(&window, &enter);
+        EXPECT_EQ(window.x(), available.left()) << "悬停没有露回来：收起的贴图就再也点不到了";
+    }
+
+    /**
+     * @brief 钉住菜单那一项：点一下就地贴边收起，再点一下摆回屏上；拖离屏边也会自动脱开
+     */
+    TEST_F(PinWindowFixture, EdgeDockMenuTogglesAndDraggingAwayClearsIt)
+    {
+        if (QGuiApplication::primaryScreen() == nullptr)
+        {
+            GTEST_SKIP() << "这个环境没有屏幕可枚举，贴边的几何无从谈起";
+        }
+        const auto available = QGuiApplication::primaryScreen()->availableGeometry();
+
+        auto &window = makeWindow();
+        window.move(available.left() + 5, available.top() + 150);
+
+        const auto dockActionOf = [](QWidget &target)
+        {
+            // 菜单与它的动作同生共死：借用之后要让菜单活到用完（动作归菜单持有）
+            return std::unique_ptr<QMenu>{static_cast<Pin::PinWindow &>(target).buildContextMenu()};
+        };
+        const auto triggerDock = [](QMenu &menu)
+        {
+            for (QAction *action: menu.actions())
+            {
+                if (action->text() == QString::fromUtf8("贴边隐藏"))
+                {
+                    action->trigger();
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        auto menu = dockActionOf(window);
+        ASSERT_TRUE(triggerDock(*menu)) << "右键菜单里没有「贴边隐藏」这一项";
+        EXPECT_EQ(window.edgeDock(), Pin::ScreenEdge::Left) << "菜单点了之后没贴边";
+        EXPECT_EQ(window.geometry().right(), Pin::kEdgeStripWidth - 1) << "菜单点的这一档该当场收起来";
+
+        menu = dockActionOf(window);
+        ASSERT_TRUE(triggerDock(*menu));
+        EXPECT_EQ(window.edgeDock(), Pin::ScreenEdge::None) << "再点一次该取消贴边";
+        EXPECT_EQ(window.x(), available.left()) << "取消贴边后没整张摆回屏上";
+
+        // 贴上去再拖走：拖离屏边要自动脱开。收起状态下能按到的只有露在屏上的那一条，
+        // 所以先悬停把它展开，再按窗口正中（避开手柄）
+        menu = dockActionOf(window);
+        ASSERT_TRUE(triggerDock(*menu));
+        ASSERT_EQ(window.edgeDock(), Pin::ScreenEdge::Left);
+        QEnterEvent hover{QPointF{1.0, 1.0}, QPointF{1.0, 1.0}, QPointF{1.0, 1.0}};
+        QApplication::sendEvent(&window, &hover);
+        ASSERT_EQ(window.x(), available.left()) << "悬停没展开，拖走的判据就落不到实处";
+
+        const QPointF grip = QRectF(QPointF(0, 0), QSizeF(window.size())).center();
+        QMouseEvent   enterPress{QEvent::MouseButtonPress, grip, grip, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &enterPress);
+        QMouseEvent dragAway{QEvent::MouseMove, grip + QPointF{420.0, 330.0}, grip + QPointF{420.0, 330.0}, Qt::NoButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &dragAway);
+        QMouseEvent dragRelease{QEvent::MouseButtonRelease, grip + QPointF{420.0, 330.0}, grip + QPointF{420.0, 330.0}, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &dragRelease);
+        EXPECT_EQ(window.edgeDock(), Pin::ScreenEdge::None) << "拖到屏中间松手还贴着边";
+        EXPECT_GT(window.x(), available.left()) << "松手之后没停在拖到的位置";
     }
 
 } // namespace GyanisScribe

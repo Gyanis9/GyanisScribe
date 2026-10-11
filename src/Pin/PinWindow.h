@@ -116,6 +116,20 @@ namespace GyanisScribe::Pin
         [[nodiscard]] std::optional<QString> hoveredColorText() const;
 
         /**
+         * @brief 现在贴在屏的哪条边上
+         * @return 贴的边；没贴边返回 ScreenEdge::None
+         */
+        [[nodiscard]] ScreenEdge edgeDock() const noexcept;
+
+        /**
+         * @brief 把这张贴图贴到最近的屏边并收成一条（或取消贴边）
+         * @param docked true 表示贴边收起，false 表示取消贴边、整张摆回屏上
+         * @details 贴到离当前矩形最近的边；菜单那一项与拖到边的释放走同一条路。
+         *          贴边收起后留在屏上最窄的一条，悬停会自动露出来（见 enterEvent）。
+         */
+        void setEdgeDocked(bool docked);
+
+        /**
          * @brief 设缩放，见 IPinWindow::setScale()
          * @param scale 缩放因子，越界按边界取
          */
@@ -252,6 +266,19 @@ namespace GyanisScribe::Pin
         void paintEvent(QPaintEvent *event) override;
 
         /**
+         * @brief 指针进到窗口上：贴边收起的贴图在这里露出来
+         * @param event 进入事件
+         * @details 收成一条之后它大部分在屏外，能接到的交互只有这条边——悬停展开是它唯一的自救口
+         */
+        void enterEvent(QEnterEvent *event) override;
+
+        /**
+         * @brief 指针离开窗口：贴边的贴图在这里收回去
+         * @param event 离开事件
+         */
+        void leaveEvent(QEvent *event) override;
+
+        /**
          * @brief 按下：在手柄上起拖缩放，否则开始移动
          * @param event 鼠标事件
          */
@@ -324,6 +351,9 @@ namespace GyanisScribe::Pin
          */
         [[nodiscard]] Core::Expected<std::filesystem::path> saveWithDefaultName();
 
+        /// 按现在的尺寸与贴边档把窗口摆到贴上那条边上（露出或收成一条）
+        void applyDockGeometry();
+
         QImage                                m_image;                            ///< 贴图内容，物理像素
         QSizeF                                m_logicalSize;                      ///< 图片逻辑尺寸
         double                                m_scale           = 1.0;            ///< 缩放因子
@@ -336,6 +366,10 @@ namespace GyanisScribe::Pin
         QVector<int>                          m_groupChoices{kFirstPinGroup};     ///< 现有分组号（升序），由管理器推过来
         bool                                  m_colorPickMode = false;            ///< 取色模式：鼠标读像素而不是拖动
         QPointF                               m_pickPoint;                        ///< 取色模式下光标在窗口里的位置，读数框跟它走
+        ScreenEdge                            m_edgeDock = ScreenEdge::None;      ///< 贴的是哪条屏边；None 表示没贴
+        QRect                                 m_dockArea;                         ///< 贴边那一刻那块屏的可用区，收起与展开都按它算
+        bool                                  m_dockCollapsed = false;            ///< 贴边后是不是收成了那一条
+        bool                                  m_dragMoved     = false;            ///< 这一轮按下之后真拖动过没有（只点一下不吸边）
         QPoint                                m_dragOffset;                       ///< 移动时起笔点与窗口左上角的差
         std::optional<HandleKind>             m_draggedHandle;                    ///< 正在拖的手柄，没拖时为空
         double                                m_dragInitialScale    = 1.0;        ///< 起拖时的缩放

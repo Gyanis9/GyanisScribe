@@ -99,4 +99,73 @@ namespace GyanisScribe::Pin
         return QPoint(static_cast<int>(u * imagePixelSize.width()), static_cast<int>(v * imagePixelSize.height()));
     }
 
+    EdgeSnap snapToScreenEdges(const QRect &draggedRect, const QRect &available, const int tolerance)
+    {
+        if (available.isEmpty() || draggedRect.isEmpty())
+        {
+            return EdgeSnap{draggedRect, ScreenEdge::None};
+        }
+
+        // 先把整块夹进可用区：夹取之前能把贴图整个拖出屏幕，从此用户再也点不到它
+        const auto maxX = std::max(available.left(), available.right() - draggedRect.width() + 1);
+        const auto maxY = std::max(available.top(), available.bottom() - draggedRect.height() + 1);
+        auto rect = QRect(std::clamp(draggedRect.left(), available.left(), maxX), std::clamp(draggedRect.top(), available.top(), maxY), draggedRect.width(), draggedRect.height());
+
+        // 挨着哪条边就贴哪条；两条边同时够近（小窗口拖到角上）时先认左右再认上下
+        EdgeSnap snap;
+        snap.rect = rect;
+        if (std::abs(rect.left() - available.left()) <= tolerance)
+        {
+            rect.moveLeft(available.left());
+            snap.edge = ScreenEdge::Left;
+        } else if (std::abs(available.right() - rect.right()) <= tolerance)
+        {
+            rect.moveLeft(available.right() - rect.width() + 1);
+            snap.edge = ScreenEdge::Right;
+        }
+        if (std::abs(rect.top() - available.top()) <= tolerance)
+        {
+            rect.moveTop(available.top());
+            snap.edge = snap.edge == ScreenEdge::None ? ScreenEdge::Top : snap.edge;
+        } else if (std::abs(available.bottom() - rect.bottom()) <= tolerance)
+        {
+            rect.moveTop(available.bottom() - rect.height() + 1);
+            snap.edge = snap.edge == ScreenEdge::None ? ScreenEdge::Bottom : snap.edge;
+        }
+        snap.rect = rect;
+        return snap;
+    }
+
+    QRect dockedRect(const QRect &revealed, const QRect &available, const ScreenEdge edge, const bool collapsed, const int stripWidth)
+    {
+        if (edge == ScreenEdge::None || available.isEmpty())
+        {
+            return revealed;
+        }
+        if (!collapsed)
+        {
+            return revealed;
+        }
+
+        auto rect = revealed;
+        switch (edge)
+        {
+            case ScreenEdge::Left:
+                rect.moveLeft(available.left() - revealed.width() + stripWidth);
+                break;
+            case ScreenEdge::Right:
+                rect.moveLeft(available.right() - stripWidth + 1);
+                break;
+            case ScreenEdge::Top:
+                rect.moveTop(available.top() - revealed.height() + stripWidth);
+                break;
+            case ScreenEdge::Bottom:
+                rect.moveTop(available.bottom() - stripWidth + 1);
+                break;
+            case ScreenEdge::None:
+                break;
+        }
+        return rect;
+    }
+
 } // namespace GyanisScribe::Pin

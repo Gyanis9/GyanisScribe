@@ -132,6 +132,73 @@ TEST(PinTransform, DegreesFoldIntoFullCircle)
 }
 
 /**
+ * @brief 钉住贴边换算：夹回可用区、够近才贴、角上左/上优先
+ * @details 期望值手算：1920×1080 的可用区、200×100 的贴图、容差 12。
+ */
+TEST(PinTransform, SnapsToEdgesAndClampsInsideTheScreen)
+{
+    const QRect available{0, 0, 1920, 1080};
+
+    // 差 8 像素（在容差内）该贴到左边
+    const auto nearLeft = snapToScreenEdges(QRect{8, 400, 200, 100}, available);
+    EXPECT_EQ(nearLeft.edge, ScreenEdge::Left);
+    EXPECT_EQ(nearLeft.rect.left(), 0) << "够近却没贴上去";
+
+    // 差 40 像素（超出容差）保持用户放的位置，不许自己吸
+    const auto farFromLeft = snapToScreenEdges(QRect{40, 400, 200, 100}, available);
+    EXPECT_EQ(farFromLeft.edge, ScreenEdge::None);
+    EXPECT_EQ(farFromLeft.rect.left(), 40) << "离得远也被吸走了";
+
+    // 右边与下边各差 5 像素
+    const auto nearRight = snapToScreenEdges(QRect{1920 - 200 - 5, 400, 200, 100}, available);
+    EXPECT_EQ(nearRight.edge, ScreenEdge::Right);
+    EXPECT_EQ(nearRight.rect.right(), 1919) << "右边没对齐到可用区右沿";
+
+    const auto nearBottom = snapToScreenEdges(QRect{700, 1080 - 100 - 5, 200, 100}, available);
+    EXPECT_EQ(nearBottom.edge, ScreenEdge::Bottom);
+    EXPECT_EQ(nearBottom.rect.bottom(), 1079);
+
+    // 角上两条边都够近：左右先判，所以是 Left（与录屏控制条那边同一口径）
+    const auto corner = snapToScreenEdges(QRect{3, 3, 200, 100}, available);
+    EXPECT_EQ(corner.edge, ScreenEdge::Left);
+    EXPECT_EQ(corner.rect.topLeft(), QPoint(0, 0));
+
+    // 夹取：拖出屏幕外要夹回来，不然这张贴图从此点不到
+    const auto outside = snapToScreenEdges(QRect{2200, -80, 200, 100}, available);
+    EXPECT_EQ(outside.rect, QRect(1920 - 200, 0, 200, 100)) << "越界的贴图没被夹回可用区";
+
+    // 可用区退化时原样交回，不猜一个位置
+    const auto degenerate = snapToScreenEdges(QRect{10, 20, 30, 40}, QRect{});
+    EXPECT_EQ(degenerate.edge, ScreenEdge::None);
+    EXPECT_EQ(degenerate.rect, QRect(10, 20, 30, 40));
+}
+
+/**
+ * @brief 钉住贴边收起后的位置：收起时只在屏上留一条，露出时贴齐边
+ */
+TEST(PinTransform, DockedRectKeepsAStripOnScreen)
+{
+    const QRect available{0, 0, 1920, 1080};
+    const QRect revealed{0, 300, 200, 100};
+
+    EXPECT_EQ(dockedRect(revealed, available, ScreenEdge::None, true), revealed) << "没贴边的贴图不该被推到屏外";
+    EXPECT_EQ(dockedRect(revealed, available, ScreenEdge::Left, false), revealed) << "露出态就是贴齐后的那个矩形";
+
+    const auto leftCollapsed = dockedRect(revealed, available, ScreenEdge::Left, true);
+    EXPECT_EQ(leftCollapsed.right(), kEdgeStripWidth - 1) << "左边收起后留在屏上的那条边宽度不对";
+    EXPECT_EQ(leftCollapsed.width(), revealed.width()) << "收起只挪位置，不改尺寸";
+
+    const auto rightCollapsed = dockedRect(QRect{1720, 300, 200, 100}, available, ScreenEdge::Right, true);
+    EXPECT_EQ(rightCollapsed.left(), available.right() - kEdgeStripWidth + 1) << "右边收起后该只剩贴右边的一条";
+
+    const auto topCollapsed = dockedRect(QRect{600, 0, 200, 100}, available, ScreenEdge::Top, true);
+    EXPECT_EQ(topCollapsed.bottom(), kEdgeStripWidth - 1);
+
+    const auto bottomCollapsed = dockedRect(QRect{600, 980, 200, 100}, available, ScreenEdge::Bottom, true);
+    EXPECT_EQ(bottomCollapsed.top(), available.bottom() - kEdgeStripWidth + 1);
+}
+
+/**
  * @brief 钉住「窗口点 → 图片像素」的换算：把每个像素中心按 Qt 的旋转矩阵投出去，再反算回来
  * @details 期望值不走被测那套三角公式，而是用 QTransform 正向投出去（与绘制约定同源）：
  *          反变换只要少一个负号或把缩放漏掉，就会有格子对不上。

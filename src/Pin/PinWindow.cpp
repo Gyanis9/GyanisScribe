@@ -236,6 +236,63 @@ namespace GyanisScribe::Pin
         return !isVisible();
     }
 
+    ScreenEdge PinWindow::edgeDock() const noexcept
+    {
+        return m_edgeDock;
+    }
+
+    void PinWindow::setEdgeDocked(const bool docked)
+    {
+        if (!docked)
+        {
+            // 取消贴边 = 摆回贴上那条边、整张露出来；之后的拖动照旧，拖离屏边就自动脱开
+            if (m_edgeDock != ScreenEdge::None)
+            {
+                m_dockCollapsed = false;
+                applyDockGeometry();
+            }
+            m_edgeDock = ScreenEdge::None;
+            update();
+            return;
+        }
+
+        // 贴到离当前矩形最近的那条边：菜单那一项与拖着放上去走同一条落地路径
+        const auto *screen = QGuiApplication::screenAt(QRectF(pos(), size()).center().toPoint());
+        if (screen == nullptr)
+        {
+            return;
+        }
+        m_dockArea = screen->availableGeometry();
+
+        const auto rect     = QRect(pos(), size());
+        const auto toLeft   = std::abs(rect.left() - m_dockArea.left());
+        const auto toRight  = std::abs(m_dockArea.right() - rect.right());
+        const auto toTop    = std::abs(rect.top() - m_dockArea.top());
+        const auto toBottom = std::abs(m_dockArea.bottom() - rect.bottom());
+        auto       nearest  = ScreenEdge::Left;
+        auto       best     = toLeft;
+        if (toRight < best)
+        {
+            nearest = ScreenEdge::Right;
+            best    = toRight;
+        }
+        if (toTop < best)
+        {
+            nearest = ScreenEdge::Top;
+            best    = toTop;
+        }
+        if (toBottom < best)
+        {
+            nearest = ScreenEdge::Bottom;
+        }
+
+        m_edgeDock = nearest;
+        // 菜单点「贴边隐藏」就当场收成一条：与拖着放上去的那一路不同——那一路松手时指针还在图上，先露着
+        m_dockCollapsed = true;
+        applyDockGeometry();
+        update();
+    }
+
     void PinWindow::copyToClipboard()
     {
         QApplication::clipboard()->setImage(m_image);
@@ -396,6 +453,39 @@ namespace GyanisScribe::Pin
 
         // 尺寸取外接框，绘制时按同样的角度转回去：命中、拖动与手柄都落在这个轴对齐框里算
         setGeometry(box.toAlignedRect());
+
+        // 贴边的那张尺寸变了（缩放、旋转、缩略图）还要按同一条边重排：不然它会被居中算法拉回屏里，
+        // 变成一张「贴过边但已经不在边上」的图，收起与展开也没有了依据
+        applyDockGeometry();
+    }
+
+    void PinWindow::applyDockGeometry()
+    {
+        if (m_edgeDock == ScreenEdge::None || m_dockArea.isEmpty())
+        {
+            return;
+        }
+
+        // 露出时的目标矩形：按当前尺寸贴齐那条边，另一轴保持现在的中心
+        auto revealed = QRect(pos(), size());
+        switch (m_edgeDock)
+        {
+            case ScreenEdge::Left:
+                revealed.moveLeft(m_dockArea.left());
+                break;
+            case ScreenEdge::Right:
+                revealed.moveLeft(m_dockArea.right() - revealed.width() + 1);
+                break;
+            case ScreenEdge::Top:
+                revealed.moveTop(m_dockArea.top());
+                break;
+            case ScreenEdge::Bottom:
+                revealed.moveTop(m_dockArea.bottom() - revealed.height() + 1);
+                break;
+            case ScreenEdge::None:
+                return;
+        }
+        setGeometry(dockedRect(revealed, m_dockArea, m_edgeDock, m_dockCollapsed));
     }
 
     QRectF PinWindow::contentRect() const
@@ -511,6 +601,8 @@ namespace GyanisScribe::Pin
             return;
         }
 
+        m_dragMoved = false;
+
         const auto point   = event->position();
         const auto handles = handleRects();
         for (std::size_t index = 0; index < handles.size(); ++index)
@@ -548,6 +640,7 @@ namespace GyanisScribe::Pin
 
         if (event->buttons().testFlag(Qt::LeftButton))
         {
+            m_dragMoved = true;
             move(event->globalPosition().toPoint() - m_dragOffset);
         }
     }
@@ -555,8 +648,63 @@ namespace GyanisScribe::Pin
     void PinWindow::mouseReleaseEvent(QMouseEvent *event)
     {
         Q_UNUSED(event);
-        m_draggedHandle.reset();
+        if (m_draggedHandle)
+        {
+            m_draggedHandle.reset();
+            update();
+            return;
+        }
+
+        // 只是点了一下（没拖动）不吸边：在屏边附近点一下就把图收起来是没人要过的行为
+        if (!m_dragMoved)
+        {
+            update();
+            return;
+        }
+
+        // 拖完落在屏边附近就贴上去：贴边那一刻记下这块屏的可用区，之后的收起与展开都按它算，
+        // 免得收起后再去问「窗口在哪块屏」——那时它大部分已经在屏外了
+        const auto *screen = QGuiApplication::screenAt(QRectF(pos(), size()).center().toPoint());
+        if (screen != nullptr)
+        {
+            const auto snapped = snapToScreenEdges(QRect(pos(), size()), screen->availableGeometry());
+            if (snapped.edge != ScreenEdge::None)
+            {
+                m_dockArea = screen->availableGeometry();
+                m_edgeDock = snapped.edge;
+                // 松手那一刻指针还在这张图上：先露着，等指针离开再收回去（见 leaveEvent）
+                m_dockCollapsed = false;
+                setGeometry(dockedRect(snapped.rect, m_dockArea, m_edgeDock, false));
+                update();
+                return;
+            }
+            m_edgeDock      = ScreenEdge::None;
+            m_dockCollapsed = false;
+        }
+
         update();
+    }
+
+    void PinWindow::enterEvent(QEnterEvent *event)
+    {
+        QWidget::enterEvent(event);
+        // 贴边收着的时候悬停要露出来：收成一条之后能接到的交互只有那条边
+        if (m_edgeDock != ScreenEdge::None && m_dockCollapsed)
+        {
+            m_dockCollapsed = false;
+            applyDockGeometry();
+        }
+    }
+
+    void PinWindow::leaveEvent(QEvent *event)
+    {
+        QWidget::leaveEvent(event);
+        // 指针走了就收回去：贴边这一档本来就是「别占着地方」
+        if (m_edgeDock != ScreenEdge::None && !m_dockCollapsed)
+        {
+            m_dockCollapsed = true;
+            applyDockGeometry();
+        }
     }
 
     void PinWindow::wheelEvent(QWheelEvent *event)
@@ -684,6 +832,11 @@ namespace GyanisScribe::Pin
         auto *thumbnailAction = menu->addAction(GyanisScribe::Core::uiText("缩到小图"), this, [this] { setThumbnailMode(!m_thumbnail); });
         thumbnailAction->setCheckable(true);
         thumbnailAction->setChecked(m_thumbnail);
+
+        // 贴边隐藏：贴着屏边收成一条，悬停展开。拖着放到屏边也会进这一档（见 mouseReleaseEvent）
+        auto *dockAction = menu->addAction(GyanisScribe::Core::uiText("贴边隐藏"), this, [this] { setEdgeDocked(m_edgeDock == ScreenEdge::None); });
+        dockAction->setCheckable(true);
+        dockAction->setChecked(m_edgeDock != ScreenEdge::None);
 
         // 移动到分组：列出管理器推过来的现有分组号，当前那一项带勾且灰掉（「现在就在这儿」），
         // 末尾一项按现有最大组号 +1 现建新组。移过去等于把它从当前这组暂时收起来，

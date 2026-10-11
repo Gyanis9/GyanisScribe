@@ -1604,6 +1604,10 @@
             <translation>Shrink to thumbnail</translation>
         </message>
         <message>
+            <source>贴边隐藏</source>
+            <translation>Hide at screen edge</translation>
+        </message>
+        <message>
             <source>移动到分组</source>
             <translation>Move to group</translation>
         </message>
