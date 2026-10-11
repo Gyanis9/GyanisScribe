@@ -112,6 +112,11 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 - 界面缩放不在代码里覆盖：本仓不调 `QApplication::setAttribute` 一类的高 DPI 开关，Qt 6 默认按
   系统缩放走，每块屏按自己的 `devicePixelRatio` 报几何。没有 X 的容器里读数环境是 offscreen
   平台（`scripts/container/env.sh`）。
+- **这一节里的倍比结论是在 dpr 1.0 那块屏上加合成倍比验出来的**：几何与像素的换算按
+  `devicePixelRatio` 的分母判，用例把 1.5、2.0 这类倍比直接喂进被测函数（`windowSizeFor`、
+  裁框与高亮半径那几处），所以「200% 屏上圈的视觉大小与 100% 一致」说的是算法形状。
+  本机只有一块 dpr 1.0 的屏，非整数缩放（125%/150%）下系统怎么合成、字体Hinting 与 1px 边框
+  会不会落进半个像素，**没有在真面板上看过**——那需要一块真的缩放屏，靠改设置造不出这个现场。
 - 排版走点值而不是样式表的 px：`TextRole` 的五档都是 `QFont::setPointSize`，Qt 按逻辑 DPI 换算，
   200% 缩放的屏上字号跟着系统一起放大。样式表里的 `font-size: Npx` 不随 DPI 缩放，
   所以这一版把颜色/形状留在 QSS、把字号交给 `applyTextRole`（用例 `Style.SourceConventions` 不管这条，
