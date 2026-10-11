@@ -210,6 +210,30 @@ TEST_F(RecordingHudFixture, PauseButtonFollowsStateAndEmitsMatchingRequest)
 }
 
 /**
+ * @brief 钉住暂停键只在会话认这一步的状态里可按
+ * @details 会话在倒计时里收到暂停请求是什么都不做的，留着可按就是把「按了没反应」摆上控制条。
+ *          两态都断：只断不可按的那一半，一句常驻的 setEnabled(false) 也能骗过去。
+ */
+TEST_F(RecordingHudFixture, PauseButtonIsOnlyEnabledWhenTheSessionAcceptsIt)
+{
+    auto hud = makeHud();
+
+    hud->applyState(RecordingState::Countdown, 3, 0);
+    auto *button = buttonOf(*hud, QStringLiteral("暂停"));
+    ASSERT_NE(button, nullptr) << "控制条上该有一枚暂停/继续键";
+    EXPECT_FALSE(button->isEnabled()) << "倒计时里这一枚还可按：按下去会话什么都不做，用户却以为已经停了";
+
+    hud->applyState(RecordingState::Recording, 0, 1);
+    EXPECT_TRUE(button->isEnabled()) << "开始录制后暂停键没跟着恢复可按";
+
+    hud->applyState(RecordingState::Paused, 0, 1);
+    EXPECT_TRUE(button->isEnabled()) << "暂停中的「继续」也得可按，否则这一轮再也恢复不了";
+
+    hud->applyState(RecordingState::Done, 0, 5);
+    EXPECT_FALSE(button->isEnabled()) << "已经收尾的这一轮还留着可按的暂停键";
+}
+
+/**
  * @brief 钉住「取消」那一枚键发的是取消请求，而不是停止并保存
  * @details 两颗键挨在同一个条上：按错的下场完全不同——停止会编出一份成品，取消什么也不留。
  *          因此这里既断「发了 cancelRequested」，也断「没有顺带发 stopRequested」。

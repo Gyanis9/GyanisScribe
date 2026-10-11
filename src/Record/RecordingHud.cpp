@@ -246,6 +246,10 @@ namespace GyanisScribe::Record
         m_pauseButton->setText(label);
         m_pauseButton->setAccessibleName(label);
         m_pauseButton->setIcon(m_icons.icon(m_state == RecordingState::Paused ? "RecordStart" : "RecordPause"));
+
+        // 会话只认录制中与已暂停这两态的暂停/继续，倒计时里按下去是什么都不做的：
+        // 这一格按状态关掉，控制条上才不留一个按了没反应的按钮
+        m_pauseButton->setEnabled(m_state == RecordingState::Recording || m_state == RecordingState::Paused);
     }
 
     void RecordingHud::mousePressEvent(QMouseEvent *event)

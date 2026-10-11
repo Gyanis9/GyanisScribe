@@ -88,7 +88,7 @@ namespace GyanisScribe::Record
          * @param state 会话状态
          * @param countdownRemaining 倒计时剩余整秒，不在倒计时里传 0
          * @param recordedSeconds 已录秒数
-         * @details 时长、大字与状态文本都由这一次调用刷新，控制器不必分别管三处。
+         * @details 时长、大字、状态文本与暂停键的字面和可用态都由这一次调用刷新，控制器不必分别管几处。
          */
         void applyState(RecordingState state, int countdownRemaining, int recordedSeconds);
 
@@ -138,7 +138,7 @@ namespace GyanisScribe::Record
         void mouseReleaseEvent(QMouseEvent *event) override;
 
     private:
-        /// 按当前状态决定暂停键是「暂停」还是「继续」
+        /// 按当前状态决定暂停键是「暂停」还是「继续」，并只在这两态让它可按
         void reflectPauseAction();
 
         const Ui::IconProvider &m_icons;                              ///< 图标供给器
