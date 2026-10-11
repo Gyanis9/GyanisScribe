@@ -18,42 +18,12 @@
 #endif
 
 #include <format>
-#include <vector>
 
 namespace GyanisScribe::Capture
 {
     namespace
     {
 #ifdef Q_OS_WIN
-        /// 指针边的可信上限：Windows 的指针最大约 128 物理像素，读到更大的值说明尺寸面读歪了
-        constexpr int kMaximumCursorEdge = 256;
-
-        /**
-         * @brief GetIconInfo 交出来的两枚位图的收口处
-         * @details 文档写明这两枚归调用方销毁；写成析构而不是在每条出口手动 DeleteObject，
-         *          是因为这一层有五条提前返回，漏一条就是每次截图漏一枚 GDI 句柄。
-         */
-        struct IconInfoOwner
-        {
-            ICONINFO value{};
-
-            IconInfoOwner()                                 = default;
-            IconInfoOwner(const IconInfoOwner &)            = delete;
-            IconInfoOwner &operator=(const IconInfoOwner &) = delete;
-
-            ~IconInfoOwner()
-            {
-                if (value.hbmColor != nullptr)
-                {
-                    DeleteObject(value.hbmColor);
-                }
-                if (value.hbmMask != nullptr)
-                {
-                    DeleteObject(value.hbmMask);
-                }
-            }
-        };
-
         std::optional<CursorSprite> windowsCursorSprite()
         {
             CURSORINFO cursor{};
@@ -63,91 +33,8 @@ namespace GyanisScribe::Capture
             {
                 return std::nullopt;
             }
-
-            IconInfoOwner owner;
-            if (!GetIconInfo(cursor.hCursor, &owner.value))
-            {
-                return std::nullopt;
-            }
-
-            // 单色指针没有 hbmColor，掩码那张是「AND 面 + XOR 面」上下叠起来的，高度要折半
-            const bool isMono     = owner.value.hbmColor == nullptr;
-            HBITMAP    sizeSource = isMono ? owner.value.hbmMask : owner.value.hbmColor;
-            BITMAP     sizeBitmap{};
-            if (!GetObjectW(sizeSource, static_cast<int>(sizeof(sizeBitmap)), &sizeBitmap) || sizeBitmap.bmWidth <= 0 || sizeBitmap.bmHeight <= 0)
-            {
-                return std::nullopt;
-            }
-            const int width  = sizeBitmap.bmWidth;
-            const int height = isMono ? sizeBitmap.bmHeight / 2 : sizeBitmap.bmHeight;
-            if (width <= 0 || height <= 0 || width > kMaximumCursorEdge || height > kMaximumCursorEdge)
-            {
-                Core::Logger::warning(std::format("鼠标指针的尺寸读出来是 {}×{}，超出可信范围，这次截图不含指针", width, height));
-                return std::nullopt;
-            }
-
-            HDC screenDc = GetDC(nullptr);
-            if (screenDc == nullptr)
-            {
-                return std::nullopt;
-            }
-
-            // 颜色面按 32 位取：GDI 会把 1/4/8/24 位的指针都换算过来，省去自己解调色板
-            std::vector<QRgb> colorBits(static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
-            BITMAPINFO        colorInfo{};
-            colorInfo.bmiHeader.biSize        = static_cast<DWORD>(sizeof(BITMAPINFOHEADER));
-            colorInfo.bmiHeader.biWidth       = width;
-            colorInfo.bmiHeader.biHeight      = -height; // 负数即自上而下，与 QImage 的行序一致
-            colorInfo.bmiHeader.biPlanes      = 1;
-            colorInfo.bmiHeader.biBitCount    = 32;
-            colorInfo.bmiHeader.biCompression = BI_RGB;
-
-            std::vector<unsigned char> maskBits;
-            int                        maskRows = height;
-            if (!isMono)
-            {
-                maskBits.assign(static_cast<std::size_t>(cursorMonoRowBytes(width)) * static_cast<std::size_t>(height), 0U);
-            } else
-            {
-                // 两平面各 height 行，一次读全：AND 面在前，XOR 面紧随其后
-                maskRows = height * 2;
-                maskBits.assign(static_cast<std::size_t>(cursorMonoRowBytes(width)) * static_cast<std::size_t>(maskRows), 0U);
-            }
-
-            BITMAPINFO maskInfo{};
-            maskInfo.bmiHeader.biSize        = static_cast<DWORD>(sizeof(BITMAPINFOHEADER));
-            maskInfo.bmiHeader.biWidth       = width;
-            maskInfo.bmiHeader.biHeight      = -maskRows;
-            maskInfo.bmiHeader.biPlanes      = 1;
-            maskInfo.bmiHeader.biBitCount    = 1;
-            maskInfo.bmiHeader.biCompression = BI_RGB;
-
-            const bool hasColorPlane = !isMono && GetDIBits(screenDc, owner.value.hbmColor, 0, height, colorBits.data(), &colorInfo, DIB_RGB_COLORS) == height;
-            const bool hasMaskPlane  = GetDIBits(screenDc, owner.value.hbmMask, 0, maskRows, maskBits.data(), &maskInfo, DIB_RGB_COLORS) == maskRows;
-            ReleaseDC(nullptr, screenDc);
-
-            if (!hasColorPlane && !isMono)
-            {
-                // 颜色面读不出来时不能只靠掩码画个空壳：整枚指针放弃，让上层照常出图
-                Core::Logger::warning(std::format("鼠标指针的颜色面读不出来（{}×{}），这次截图不含指针", width, height));
-                return std::nullopt;
-            }
-            if (!hasMaskPlane)
-            {
-                Core::Logger::warning(std::format("鼠标指针的掩码面读不出来（{}×{}），这次截图不含指针", width, height));
-                return std::nullopt;
-            }
-
-            CursorSprite sprite;
-            // 三种指针（带 alpha、老式彩色、单色）的位平面合成规则在 CursorPixels 里，
-            // 那一层不碰 GDI，容器里也跑得动用例
-            sprite.image   = composeCursorImage(colorBits, maskBits, width, height, isMono);
-            sprite.hotspot = QPoint{static_cast<int>(owner.value.xHotspot), static_cast<int>(owner.value.yHotspot)};
-            if (sprite.image.isNull())
-            {
-                return std::nullopt;
-            }
-            return sprite;
+            // 两张位平面的解法在 CursorPixels 里：那一层能喂进自造的指针，用例验得到
+            return cursorSpriteFromHandle(reinterpret_cast<quintptr>(cursor.hCursor));
         }
 #endif
 

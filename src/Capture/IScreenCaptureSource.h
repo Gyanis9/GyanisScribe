@@ -9,33 +9,17 @@
 
 #pragma once
 
+#include "Capture/CursorPixels.h"
 #include "Core/Types.h"
 
 #include <QtGlobal>
 
 #include <QString>
 
-#include <QImage>
-#include <QPoint>
-
 #include <optional>
 
 namespace GyanisScribe::Capture
 {
-
-    /**
-     * @brief 鼠标指针的形状与落点：一张与抓帧同尺度的小图，加它的热点和此刻在屏内的位置
-     * @details 像素按物理算，与 CapturedImage 的 image 同一口径；形状本身受系统 DPI 支配，
-     *          我们只搬位置，不再乘一次缩放因子。
-     * @note position 是「最近一次抓的那块屏」内的逻辑坐标，与 grabCursor() 传的屏名同源，
-     *       换算是屏内位置乘缩放因子——两处口径不一致就会画歪。
-     */
-    struct CursorSprite
-    {
-        QImage image;    ///< 指针形状，Format_ARGB32_Premultiplied，物理像素
-        QPoint hotspot;  ///< 尖端在 image 内的物理像素坐标，落点要按它回退
-        QPoint position; ///< 尖端在该屏内的逻辑坐标，与抓帧用的那块屏同一个坐标系
-    };
 
     /**
      * @brief 抓帧来源

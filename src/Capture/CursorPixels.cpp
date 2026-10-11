@@ -1,7 +1,18 @@
 #include "Capture/CursorPixels.h"
 
+#include "Core/Logger.h"
+
+#include <QtGlobal>
+
+#ifdef Q_OS_WIN
+#include <windows.h>
+#endif
+
 #include <algorithm>
 #include <cstddef>
+#include <cstring>
+#include <format>
+#include <vector>
 
 namespace GyanisScribe::Capture
 {
@@ -64,5 +75,146 @@ namespace GyanisScribe::Capture
 
         return QImage(reinterpret_cast<const uchar *>(pixels.data()), width, height, width * 4, QImage::Format_ARGB32).copy();
     }
+
+#ifdef Q_OS_WIN
+    namespace
+    {
+        /// 指针边的可信上限：Windows 的指针最大约 128 物理像素，读到更大的值说明尺寸面读歪了
+        constexpr int kMaximumCursorEdge = 256;
+
+        /**
+         * @brief GetIconInfo 交出来的两枚位图的收口处
+         * @details 文档写明这两枚归调用方销毁；写成析构而不是在每条出口手动 DeleteObject，
+         *          是因为这一层有好几条提前返回，漏一条就是每次截图漏一枚 GDI 句柄。
+         */
+        struct IconInfoOwner
+        {
+            ICONINFO value{};
+
+            IconInfoOwner()                                 = default;
+            IconInfoOwner(const IconInfoOwner &)            = delete;
+            IconInfoOwner &operator=(const IconInfoOwner &) = delete;
+
+            ~IconInfoOwner()
+            {
+                if (value.hbmColor != nullptr)
+                {
+                    DeleteObject(value.hbmColor);
+                }
+                if (value.hbmMask != nullptr)
+                {
+                    DeleteObject(value.hbmMask);
+                }
+            }
+        };
+    } // namespace
+
+    std::optional<CursorSprite> cursorSpriteFromHandle(const quintptr cursorHandle)
+    {
+        if (cursorHandle == 0)
+        {
+            return std::nullopt;
+        }
+
+        IconInfoOwner owner;
+        if (!GetIconInfo(reinterpret_cast<HCURSOR>(cursorHandle), &owner.value))
+        {
+            return std::nullopt;
+        }
+
+        // 单色指针没有 hbmColor，掩码那张是「AND 面 + XOR 面」上下叠起来的，高度要折半
+        const bool isMono     = owner.value.hbmColor == nullptr;
+        HBITMAP    sizeSource = isMono ? owner.value.hbmMask : owner.value.hbmColor;
+        BITMAP     sizeBitmap{};
+        if (!GetObjectW(sizeSource, static_cast<int>(sizeof(sizeBitmap)), &sizeBitmap) || sizeBitmap.bmWidth <= 0 || sizeBitmap.bmHeight <= 0)
+        {
+            return std::nullopt;
+        }
+        const int width  = sizeBitmap.bmWidth;
+        const int height = isMono ? sizeBitmap.bmHeight / 2 : sizeBitmap.bmHeight;
+        if (width > kMaximumCursorEdge || height > kMaximumCursorEdge)
+        {
+            Core::Logger::warning(std::format("鼠标指针的尺寸读出来是 {}×{}，超出可信范围，这次截图不含指针", width, height));
+            return std::nullopt;
+        }
+
+        HDC screenDc = GetDC(nullptr);
+        if (screenDc == nullptr)
+        {
+            return std::nullopt;
+        }
+
+        // 颜色面按 32 位取：GDI 会把 1/4/8/24 位的指针都换算过来，省去自己解调色板
+        std::vector<QRgb> colorBits(static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
+        BITMAPINFO        colorInfo{};
+        colorInfo.bmiHeader.biSize        = static_cast<DWORD>(sizeof(BITMAPINFOHEADER));
+        colorInfo.bmiHeader.biWidth       = width;
+        colorInfo.bmiHeader.biHeight      = -height; // 负数即自上而下，与 QImage 的行序一致
+        colorInfo.bmiHeader.biPlanes      = 1;
+        colorInfo.bmiHeader.biBitCount    = 32;
+        colorInfo.bmiHeader.biCompression = BI_RGB;
+
+        const auto maskRowBytes = static_cast<std::size_t>(cursorMonoRowBytes(width));
+        const int  maskPlanes   = isMono ? 2 : 1;
+        const int  maskRows     = height * maskPlanes;
+        BITMAPINFO maskInfo{};
+        maskInfo.bmiHeader.biSize        = static_cast<DWORD>(sizeof(BITMAPINFOHEADER));
+        maskInfo.bmiHeader.biWidth       = width;
+        maskInfo.bmiHeader.biHeight      = maskRows; // 正数即 GDI 的自下而上：一次读全，行起点才落在平面边界上
+        maskInfo.bmiHeader.biPlanes      = 1;
+        maskInfo.bmiHeader.biBitCount    = 1;
+        maskInfo.bmiHeader.biCompression = BI_RGB;
+
+        // 单色指针的掩码是一张 2×height 高的位图。GetIconInfo 交回来的那张里，自下而上数是
+        // 「先 XOR 面、后 AND 面」（实测：把前一半当 AND 读，一枚自造指针的外圈会画成实心白块），
+        // 而 composeCursorImage 约定的是「AND 在前」。这里按平面各自翻一次行序，顺手把这个次序摆正。
+        std::vector<unsigned char> maskRaw(maskRowBytes * static_cast<std::size_t>(maskRows), 0U);
+        const bool                 hasMaskPlane  = GetDIBits(screenDc, owner.value.hbmMask, 0, maskRows, maskRaw.data(), &maskInfo, DIB_RGB_COLORS) == maskRows;
+        const bool                 hasColorPlane = !isMono && GetDIBits(screenDc, owner.value.hbmColor, 0, height, colorBits.data(), &colorInfo, DIB_RGB_COLORS) == height;
+        ReleaseDC(nullptr, screenDc);
+
+        std::vector<unsigned char> maskBits(maskRaw.size(), 0U);
+        for (int targetPlane = 0; targetPlane < maskPlanes && hasMaskPlane; ++targetPlane)
+        {
+            // 单色指针的两个平面在源里位置相反；只有一个平面时它就是 AND
+            const int         sourcePlane = isMono ? maskPlanes - 1 - targetPlane : 0;
+            const auto *const planeStart  = maskRaw.data() + static_cast<std::size_t>(sourcePlane) * static_cast<std::size_t>(height) * maskRowBytes;
+            auto *const       target      = maskBits.data() + static_cast<std::size_t>(targetPlane) * static_cast<std::size_t>(height) * maskRowBytes;
+            for (int row = 0; row < height; ++row)
+            {
+                std::memcpy(target + static_cast<std::size_t>(row) * maskRowBytes, planeStart + static_cast<std::size_t>(height - 1 - row) * maskRowBytes, maskRowBytes);
+            }
+        }
+
+        if (!hasColorPlane && !isMono)
+        {
+            // 颜色面读不出来时不能只靠掩码画个空壳：整枚指针放弃，让上层照常出图
+            Core::Logger::warning(std::format("鼠标指针的颜色面读不出来（{}×{}），这次截图不含指针", width, height));
+            return std::nullopt;
+        }
+        if (!hasMaskPlane)
+        {
+            Core::Logger::warning(std::format("鼠标指针的掩码面读不出来（{}×{}），这次截图不含指针", width, height));
+            return std::nullopt;
+        }
+
+        CursorSprite sprite;
+        sprite.image   = composeCursorImage(colorBits, maskBits, width, height, isMono);
+        sprite.hotspot = QPoint{static_cast<int>(owner.value.xHotspot), static_cast<int>(owner.value.yHotspot)};
+        if (sprite.image.isNull())
+        {
+            return std::nullopt;
+        }
+        return sprite;
+    }
+#else
+    std::optional<CursorSprite> cursorSpriteFromHandle(const quintptr cursorHandle)
+    {
+        // 别的平台没有「向系统要一枚指针的两张位平面」这一格：交回空值，
+        // 由编排层在日志里说明这次不含指针
+        Q_UNUSED(cursorHandle);
+        return std::nullopt;
+    }
+#endif
 
 } // namespace GyanisScribe::Capture

@@ -3,12 +3,20 @@
 
 #include "Capture/CursorPixels.h"
 
+#include <QtGlobal>
+
+#ifdef Q_OS_WIN
+#include <windows.h>
+#endif
+
 #include <QColor>
 #include <QImage>
 #include <QRgb>
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cstddef>
 #include <vector>
 
 using GyanisScribe::Capture::composeCursorImage;
@@ -120,3 +128,98 @@ TEST(CursorPixels, NonPositiveSizeYieldsEmptyImage)
     EXPECT_TRUE(composeCursorImage(color, mask, 0, kHeight, true).isNull());
     EXPECT_TRUE(composeCursorImage(color, mask, kWidth, -1, false).isNull());
 }
+
+#ifdef Q_OS_WIN
+namespace
+{
+    /// 背景色：GDI 没往上面画的那些格子会原样留着这一色
+    const QColor kProbeBackground(255, 0, 255);
+
+    /**
+     * @brief 让 GDI 自己把这枚指针画到一张空图上
+     * @details 判据取「GDI 画出来的样子」而不是我对 AND/XOR 两张面的理解：画出来是什么样，
+     *          截图里就该是什么样，平面次序与上下序这些文档讲不清的东西都由这一次绘制定案。
+     */
+    [[nodiscard]] QImage renderCursorWithGdi(HCURSOR cursor, int width, int height)
+    {
+        BITMAPINFO info{};
+        info.bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
+        info.bmiHeader.biWidth       = width;
+        info.bmiHeader.biHeight      = -height;
+        info.bmiHeader.biPlanes      = 1;
+        info.bmiHeader.biBitCount    = 32;
+        info.bmiHeader.biCompression = BI_RGB;
+
+        void   *bits   = nullptr;
+        HDC     screen = GetDC(nullptr);
+        HDC     memory = CreateCompatibleDC(screen);
+        HBITMAP dib    = CreateDIBSection(screen, &info, DIB_RGB_COLORS, &bits, nullptr, 0);
+        QImage  result;
+        if (dib != nullptr && bits != nullptr && memory != nullptr)
+        {
+            auto *const previous = SelectObject(memory, dib);
+            auto *const pixels   = static_cast<QRgb *>(bits);
+            std::fill_n(pixels, static_cast<std::size_t>(width) * static_cast<std::size_t>(height), kProbeBackground.rgba());
+            DrawIconEx(memory, 0, 0, cursor, width, height, 0, nullptr, DI_NORMAL);
+            result = QImage(static_cast<const uchar *>(bits), width, height, width * 4, QImage::Format_ARGB32).copy();
+            SelectObject(memory, previous);
+        }
+        if (dib != nullptr)
+        {
+            DeleteObject(dib);
+        }
+        if (memory != nullptr)
+        {
+            DeleteDC(memory);
+        }
+        if (screen != nullptr)
+        {
+            ReleaseDC(nullptr, screen);
+        }
+        return result;
+    }
+} // namespace
+
+/**
+ * @brief 钉住「解出来的指针」与「GDI 自己画出来的指针」逐格一致
+ * @details 自造一枚 8×8 的单色指针（AND 与 XOR 两张面），一条路是我从位平面解，另一条路是让
+ *          GDI 直接画一遍。两边不一致就是解错了平面——这一条只在 Windows 上成立。
+ */
+TEST(CursorPixelsFromHandle, DecodesWhatGdiItselfDraws)
+{
+    // GDI 的 DDB 行距按字对齐：8 像素宽的一行占 2 字节，第二个字节是补零
+    unsigned char andPlane[16] = {0xFF, 0x00, 0x81, 0x00, 0x81, 0x00, 0x81, 0x00, 0x81, 0x00, 0x81, 0x00, 0x81, 0x00, 0xFF, 0x00};
+    unsigned char xorPlane[16] = {0x00, 0x00, 0x7E, 0x00, 0x7E, 0x00, 0x72, 0x00, 0x7E, 0x00, 0x7E, 0x00, 0x7E, 0x00, 0x00, 0x00};
+
+    const HCURSOR cursor = CreateCursor(nullptr, 2, 3, 8, 8, andPlane, xorPlane);
+    ASSERT_NE(cursor, nullptr) << "自造指针都建不出来，这条判据无从谈起";
+
+    const auto sprite = GyanisScribe::Capture::cursorSpriteFromHandle(reinterpret_cast<quintptr>(cursor));
+    ASSERT_TRUE(sprite.has_value()) << "GDI 那一段解不出这枚指针：真机上的指针同样解不出来";
+    ASSERT_EQ(sprite->image.size(), QSize(8, 8));
+    EXPECT_EQ(sprite->hotspot, (QPoint(2, 3)));
+
+    const QImage drawn = renderCursorWithGdi(cursor, 8, 8);
+    DeleteObject(cursor);
+    ASSERT_EQ(drawn.size(), QSize(8, 8)) << "GDI 那一侧没画出来，判据不成立";
+
+    int mismatched = 0;
+    for (int y = 0; y < 8; ++y)
+    {
+        for (int x = 0; x < 8; ++x)
+        {
+            const QColor mine = sprite->image.pixelColor(x, y);
+            const QColor real = drawn.pixelColor(x, y);
+            // 我判为透明的格子，GDI 也不该在上面落下颜色；其余格子要逐色相同
+            // GDI 画进 32 位图时不写 alpha，那一格恒为 0：判透明只能看「有没有动过背景」
+            const bool untouched = real.red() == kProbeBackground.red() && real.green() == kProbeBackground.green() && real.blue() == kProbeBackground.blue();
+            const bool agrees    = (mine.alpha() == 0) ? untouched : (!untouched && real.red() == mine.red() && real.green() == mine.green() && real.blue() == mine.blue());
+            if (!agrees)
+            {
+                ++mismatched;
+            }
+        }
+    }
+    EXPECT_EQ(mismatched, 0) << "解出来的指针与 GDI 画出来的不一致：平面次序或上下序读错了";
+}
+#endif
