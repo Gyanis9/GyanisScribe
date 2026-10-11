@@ -144,33 +144,49 @@ namespace GyanisScribe::Capture
             return std::nullopt;
         }
 
-        // 颜色面按 32 位取：GDI 会把 1/4/8/24 位的指针都换算过来，省去自己解调色板
-        std::vector<QRgb> colorBits(static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
-        BITMAPINFO        colorInfo{};
-        colorInfo.bmiHeader.biSize        = static_cast<DWORD>(sizeof(BITMAPINFOHEADER));
-        colorInfo.bmiHeader.biWidth       = width;
-        colorInfo.bmiHeader.biHeight      = -height; // 负数即自上而下，与 QImage 的行序一致
-        colorInfo.bmiHeader.biPlanes      = 1;
-        colorInfo.bmiHeader.biBitCount    = 32;
-        colorInfo.bmiHeader.biCompression = BI_RGB;
+        /**
+         * @brief 带调色板余量的位图信息块
+         * @details BITMAPINFO 只声明了 bmiColors[1] 一格，而 GDI 对 ≤8 位的位图按 2^位数 读写表项：
+         *          1bpp 要两格。多出来的那一格落在栈上的局部变量之外——Debug 档的 /RTC1 会当场报
+         *          「Stack around the variable was corrupted」并弹模态框（实测：整条用例挂在那儿不动），
+         *          Release 档不报，但同样在踩邻居的栈。
+         */
+        struct BitmapInfoWithPalette
+        {
+            BITMAPINFOHEADER header;
+            RGBQUAD          colors[2];
+        };
 
-        const auto maskRowBytes = static_cast<std::size_t>(cursorMonoRowBytes(width));
-        const int  maskPlanes   = isMono ? 2 : 1;
-        const int  maskRows     = height * maskPlanes;
-        BITMAPINFO maskInfo{};
-        maskInfo.bmiHeader.biSize        = static_cast<DWORD>(sizeof(BITMAPINFOHEADER));
-        maskInfo.bmiHeader.biWidth       = width;
-        maskInfo.bmiHeader.biHeight      = maskRows; // 正数即 GDI 的自下而上：一次读全，行起点才落在平面边界上
-        maskInfo.bmiHeader.biPlanes      = 1;
-        maskInfo.bmiHeader.biBitCount    = 1;
-        maskInfo.bmiHeader.biCompression = BI_RGB;
+        /// 指针的颜色面：一帧 width×height 的 32 位像素
+        std::vector<QRgb> colorBits(static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
+
+        /// 指针的位平面按 32 位取：GDI 会把 1/4/8/24 位的指针都换算过来，省去自己解调色板
+        BitmapInfoWithPalette colorInfo{};
+        colorInfo.header.biSize        = static_cast<DWORD>(sizeof(BITMAPINFOHEADER));
+        colorInfo.header.biWidth       = width;
+        colorInfo.header.biHeight      = -height; // 负数即自上而下，与 QImage 的行序一致
+        colorInfo.header.biPlanes      = 1;
+        colorInfo.header.biBitCount    = 32;
+        colorInfo.header.biCompression = BI_RGB;
+
+        const auto            maskRowBytes = static_cast<std::size_t>(cursorMonoRowBytes(width));
+        const int             maskPlanes   = isMono ? 2 : 1;
+        const int             maskRows     = height * maskPlanes;
+        BitmapInfoWithPalette maskInfo{};
+        maskInfo.header.biSize        = static_cast<DWORD>(sizeof(BITMAPINFOHEADER));
+        maskInfo.header.biWidth       = width;
+        maskInfo.header.biHeight      = maskRows; // 正数即 GDI 的自下而上：一次读全，行起点才落在平面边界上
+        maskInfo.header.biPlanes      = 1;
+        maskInfo.header.biBitCount    = 1;
+        maskInfo.header.biCompression = BI_RGB;
 
         // 单色指针的掩码是一张 2×height 高的位图。GetIconInfo 交回来的那张里，自下而上数是
         // 「先 XOR 面、后 AND 面」（实测：把前一半当 AND 读，一枚自造指针的外圈会画成实心白块），
         // 而 composeCursorImage 约定的是「AND 在前」。这里按平面各自翻一次行序，顺手把这个次序摆正。
         std::vector<unsigned char> maskRaw(maskRowBytes * static_cast<std::size_t>(maskRows), 0U);
-        const bool                 hasMaskPlane  = GetDIBits(screenDc, owner.value.hbmMask, 0, maskRows, maskRaw.data(), &maskInfo, DIB_RGB_COLORS) == maskRows;
-        const bool                 hasColorPlane = !isMono && GetDIBits(screenDc, owner.value.hbmColor, 0, height, colorBits.data(), &colorInfo, DIB_RGB_COLORS) == height;
+        const bool hasMaskPlane = GetDIBits(screenDc, owner.value.hbmMask, 0, maskRows, maskRaw.data(), reinterpret_cast<BITMAPINFO *>(&maskInfo), DIB_RGB_COLORS) == maskRows;
+        const bool hasColorPlane =
+                !isMono && GetDIBits(screenDc, owner.value.hbmColor, 0, height, colorBits.data(), reinterpret_cast<BITMAPINFO *>(&colorInfo), DIB_RGB_COLORS) == height;
         ReleaseDC(nullptr, screenDc);
 
         std::vector<unsigned char> maskBits(maskRaw.size(), 0U);
