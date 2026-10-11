@@ -66,6 +66,19 @@ namespace GyanisScribe::Platform
          * @note 降级文案给的是「直接框出来」这条替代做法，遮罩上不会摆一枚认不出来的悬停选项
          */
         [[nodiscard]] Core::Expected<std::vector<ScreenWindow>> screenWindows() const override;
+
+        /**
+         * @brief 查开机启动，见 IPlatformIntegration::autostartEnabled()
+         * @return 本平台一律 PlatformUnsupported，并给出自己加启动项的替代做法
+         */
+        [[nodiscard]] Core::Expected<bool> autostartEnabled() const override;
+
+        /**
+         * @brief 开关开机启动，见 IPlatformIntegration::setAutostart()
+         * @param enabled 本平台不使用
+         * @return 本平台一律 PlatformUnsupported，原因与上一条同源
+         */
+        [[nodiscard]] Core::Expected<void> setAutostart(bool enabled) override;
     };
 
 } // namespace GyanisScribe::Platform

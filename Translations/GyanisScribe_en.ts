@@ -588,6 +588,14 @@
             <translation>More</translation>
         </message>
         <message>
+            <source>开机时自动启动</source>
+            <translation>Start automatically at sign-in</translation>
+        </message>
+        <message>
+            <source>开机时自动起这一份程序；状态读的是系统里的启动项，改完立即生效</source>
+            <translation>Start this copy of the program at sign-in; the state is read from the system's startup items and takes effect immediately</translation>
+        </message>
+        <message>
             <source>界面语言决定菜单、托盘提示与这些设置页的措辞，切换后要重启智录才生效。下面两格管历史留多少，填到 0 就是不限。</source>
             <translation>The interface language sets the wording of the menus, the tray hints and these settings pages; a change takes effect after restarting GyanisScribe. The two rows below decide how much history is kept; 0 means no limit.</translation>
         </message>
@@ -606,6 +614,10 @@
         <message>
             <source> 天</source>
             <translation> days</translation>
+        </message>
+        <message>
+            <source>开机自启动</source>
+            <translation>Start at sign-in</translation>
         </message>
         <message>
             <source>备份与恢复</source>
@@ -1492,6 +1504,10 @@
             <translation>This platform cannot report the foreground window (X11 and Wayland each need their own session protocol, and neither is wired up here). Use region capture in the tray and frame that window instead</translation>
         </message>
         <message>
+            <source>本平台没有接开机启动（X11 与 Wayland 的会话各自管启动项，本仓没接）。可以把本程序自己加进桌面环境的「启动应用程序」</source>
+            <translation>Autostart is not wired up on this platform (X11 and Wayland sessions each manage startup items, and this repository does not). You can add the program to your desktop environment's start-up applications yourself</translation>
+        </message>
+        <message>
             <source>本平台列不出屏上的窗口，遮罩上不认「悬停选中整扇窗口」。请直接把要的那一块框出来，或按一次截图键取整屏</source>
             <translation>This platform can't list the windows on screen, so the overlay doesn't recognise "hover to pick a whole window". Frame the part you want directly, or press the capture key once for the full screen</translation>
         </message>
@@ -1538,6 +1554,18 @@
         <message>
             <source>认不出桌面上有哪些窗口：平台的屏幕清单与界面的屏幕清单配不上对。请先用整屏或框选截图，重开一次智录再试</source>
             <translation>Can't tell which windows are on the desktop: the platform's screen list and the interface's screen list didn't pair up. Use full-screen or region capture for now, then restart GyanisScribe</translation>
+        </message>
+        <message>
+            <source>取不到本程序的完整路径，没法写开机启动项。请从安装目录启动本程序后再试一次</source>
+            <translation>The program's full path is unavailable, so the startup item cannot be written. Start the program from its install folder and try again</translation>
+        </message>
+        <message>
+            <source>开机启动项没能{}：写系统设置失败（可能是权限或安全软件拦截）。可以在系统的「启动」设置里把本程序自己加进去</source>
+            <translation>Could not {} the startup item: writing the system setting failed (permissions or security software may be blocking it). You can add the program to the system's Startup settings yourself</translation>
+        </message>
+        <message>
+            <source>开启</source>
+            <translation>enable</translation>
         </message>
         <message>
             <source>光标高亮的缩放因子必须是正数，收到的是 {}。请传这一块屏幕的 devicePixelRatio</source>

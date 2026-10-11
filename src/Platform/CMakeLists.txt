@@ -29,7 +29,9 @@ if (WIN32)
             Windows/Win32HotkeyBackend.h
             Windows/Win32HotkeyBackend.cpp
             Windows/Win32HotkeyMapping.h
-            Windows/Win32HotkeyMapping.cpp)
+            Windows/Win32HotkeyMapping.cpp
+            Windows/Win32Autostart.h
+            Windows/Win32Autostart.cpp)
 
     # 窗口枚举要用 DwmGetWindowAttribute 取「实际可见的那圈边界」，它在 dwmapi 里；
     # user32 由 Qt6::Gui 带进来，这一份没人给，不显式链就上 LNK2019

@@ -48,6 +48,11 @@ namespace GyanisScribe::Record
     class FfmpegAudioDeviceEnumerator;
 } // namespace GyanisScribe::Record
 
+namespace GyanisScribe::Platform
+{
+    class IPlatformIntegration;
+} // namespace GyanisScribe::Platform
+
 namespace GyanisScribe::App
 {
     /// 主窗口能直接跳到的页面
@@ -185,7 +190,7 @@ namespace GyanisScribe::App
          *       设置页不需要为了「生效」去拖一个控制器进来。历史页的三个出口同样只发信号。
          */
         explicit MainWindow(Settings::ISettingsStore &settings, GyanisScribe::Ui::ThemeManager &theme, GyanisScribe::Ui::IconProvider &icons, History::HistoryStore &historyStore,
-                            Platform::PlatformCapabilities capabilities, QWidget *parent = nullptr);
+                            Platform::PlatformCapabilities capabilities, Platform::IPlatformIntegration &integration, QWidget *parent = nullptr);
 
         /**
          * @brief 析构：设备枚举器要在这里才看得到完整类型
@@ -316,6 +321,7 @@ namespace GyanisScribe::App
         QStackedWidget                                      *m_stack = nullptr;   ///< 右侧页容器，序号与导航行同解
         std::unique_ptr<Record::FfmpegAudioDeviceEnumerator> m_audioDevices;      ///< 录屏页那两路设备清单的来源，一次查询两格共用
         std::unique_ptr<App::UpdateChecker>                  m_updateChecker;     ///< 检查更新那一条：关于页按一下才发请求，不是启动就联网
+        Platform::IPlatformIntegration                      &m_integration;       ///< 平台动作（当前只有开机启动那一格）：能力位可以造假，动作要有真对象
         History::HistoryStore                               &m_historyStore;      ///< 历史清单，历史页从它读
         History::HistoryView                                *m_history = nullptr; ///< 历史页控件，重读清单时刷新它
     };

@@ -79,6 +79,21 @@ namespace GyanisScribe::Platform
         [[nodiscard]] virtual Core::Expected<ForegroundWindow> foregroundWindow() const = 0;
 
         /**
+         * @brief 本程序现在有没有登记开机启动
+         * @return 成功返回状态；本平台没有这一能力时返回 PlatformUnsupported 并写明替代做法
+         * @note 状态的真源是系统里那一条启动项本身，不在配置里另存一份——两份真源迟早对不上
+         */
+        [[nodiscard]] virtual Core::Expected<bool> autostartEnabled() const = 0;
+
+        /**
+         * @brief 开/关开机启动
+         * @param enabled true 表示开机时自动起本程序
+         * @return 成功返回空载荷；写不进去或本平台没有这一能力时返回带中文原因的错误
+         * @details 入口只从设置页来，且按 capabilities().autostart 决定给不给点
+         */
+        [[nodiscard]] virtual Core::Expected<void> setAutostart(bool enabled) = 0;
+
+        /**
          * @brief 桌面上看得见的顶层窗口，按 z 序从最上面排到最下面
          * @return 成功返回一份份快照（逻辑全局坐标）；本平台给不出时返回 PlatformUnsupported，并指一条替代做法
          * @details 截图遮罩用它做「悬停认出整扇窗口」：候选顺序就是 z 序，调用方取第一个含住光标的矩形。

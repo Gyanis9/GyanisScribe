@@ -43,6 +43,23 @@ namespace GyanisScribe::Platform
                             GyanisScribe::Core::uiTextUtf8("本平台取不出当前前台窗口（X11 与 Wayland 各有各的会话协议，本仓没接）。请在托盘改用「框选截图」把那个窗口框出来")});
     }
 
+    Core::Expected<bool> LinuxIntegration::autostartEnabled() const
+    {
+        // 与开关同源：不假装「没开」，也不假装「开了」，两种都按没有这一能力回绝
+        return std::unexpected(
+                Core::Error{Core::ErrorCode::PlatformUnsupported,
+                            GyanisScribe::Core::uiTextUtf8("本平台没有接开机启动（X11 与 Wayland 的会话各自管启动项，本仓没接）。可以把本程序自己加进桌面环境的「启动应用程序」")});
+    }
+
+    Core::Expected<void> LinuxIntegration::setAutostart(const bool enabled)
+    {
+        static_cast<void>(enabled);
+
+        return std::unexpected(
+                Core::Error{Core::ErrorCode::PlatformUnsupported,
+                            GyanisScribe::Core::uiTextUtf8("本平台没有接开机启动（X11 与 Wayland 的会话各自管启动项，本仓没接）。可以把本程序自己加进桌面环境的「启动应用程序」")});
+    }
+
     Core::Expected<std::vector<ScreenWindow>> LinuxIntegration::screenWindows() const
     {
         // 与取前台窗口同源：X11 要查窗口树并把每扇窗的客户端坐标换算到全局，Wayland 干脆不让客户端问别的窗口。

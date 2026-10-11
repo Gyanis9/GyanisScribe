@@ -11,6 +11,7 @@
 #ifdef Q_OS_WIN
 #include <Windows.h>
 
+#include "Platform/Windows/Win32Autostart.h"
 #include "Platform/Windows/Win32HotkeyMapping.h"
 #endif
 
@@ -22,6 +23,9 @@ using GyanisScribe::Core::ErrorCode;
 using GyanisScribe::Platform::createPlatformIntegration;
 using GyanisScribe::Platform::ScreenWindow;
 using GyanisScribe::Platform::UnsupportedHotkeyBackend;
+#ifdef Q_OS_WIN
+using GyanisScribe::Platform::autostartCommandLine;
+#endif
 
 /**
  * @brief 钉住桩后端的拒绝契约：不支持就说「不支持」，不静默成功
@@ -224,5 +228,21 @@ TEST(Win32HotkeyMapping, ConvertsSupportedVocabulary)
     const auto unsupportedKey = GyanisScribe::Platform::toWin32VirtualKey(Qt::Key_Question);
     ASSERT_FALSE(unsupportedKey.has_value()) << "符号键随键盘布局变位，不能当全局热键";
     EXPECT_EQ(unsupportedKey.error().code, ErrorCode::InvalidArgument);
+}
+#endif
+
+#ifdef Q_OS_WIN
+/**
+ * @brief 钉住开机启动项那条命令行的拼法：路径必须带引号
+ * @details 装到 Program Files 这类带空格的目录下时，不加引号的路径会被 Windows 按空格切成两截，
+ *          开机时起不来且不留任何提示；空路径要交回空串，由调用方去报「取不到自身路径」。
+ */
+TEST(Win32Autostart, QuotesTheExecutablePathForTheRunKey)
+{
+    const auto command = autostartCommandLine(QStringLiteral("C:\\Program Files\\GyanisScribe\\GyanisScribe.exe"));
+    EXPECT_EQ(command, QStringLiteral("\"C:\\Program Files\\GyanisScribe\\GyanisScribe.exe\"")) << "带空格的路径必须整条被引号包住";
+
+    EXPECT_TRUE(autostartCommandLine(QString{}).isEmpty()) << "取不到路径时交回空串，让调用方去报错";
+    EXPECT_TRUE(autostartCommandLine(QStringLiteral("   ")).isEmpty()) << "纯空白不算路径";
 }
 #endif

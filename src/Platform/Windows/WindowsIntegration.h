@@ -69,6 +69,21 @@ namespace GyanisScribe::Platform
          * @note 一块屏都配不上名时返回 ScreenUnavailable：宁可不给候选，也不拿另一块屏的缩放因子硬算
          */
         [[nodiscard]] Core::Expected<std::vector<ScreenWindow>> screenWindows() const override;
+
+        /**
+         * @brief 查开机启动，见 IPlatformIntegration::autostartEnabled()
+         * @return 成功返回有没有为「当前这一份可执行体」登记开机启动
+         * @details 重写接口：写的是 HKCU 的 Run 键，值指着别的副本路径时按「本份没开」算，
+         *          因为这一格问的是「这台机器开机时会不会起我这一份」。
+         */
+        [[nodiscard]] Core::Expected<bool> autostartEnabled() const override;
+
+        /**
+         * @brief 开关开机启动，见 IPlatformIntegration::setAutostart()
+         * @param enabled true 写入 Run 键，false 摘掉那一条
+         * @return 成功返回空载荷；取不到自身路径或注册表写不进去时返回中文原因
+         */
+        [[nodiscard]] Core::Expected<void> setAutostart(bool enabled) override;
     };
 
 } // namespace GyanisScribe::Platform

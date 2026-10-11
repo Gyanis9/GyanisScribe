@@ -13,6 +13,7 @@
 #include "Pin/PinLayout.h"
 #include "Record/FfmpegAudioDevices.h"
 #include "Record/RecorderConfig.h"
+#include "Platform/IPlatformIntegration.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
 #include "Ui/DesignTokens.h"
@@ -35,6 +36,7 @@
 #include <QListWidget>
 #include <QMenu>
 #include <QPushButton>
+#include <QSignalBlocker>
 #include <QSpinBox>
 #include <QStackedWidget>
 #include <QToolButton>
@@ -994,8 +996,8 @@ namespace GyanisScribe::App
     MainWindow::~MainWindow() = default;
 
     MainWindow::MainWindow(ISettingsStore &settings, ThemeManager &theme, IconProvider &icons, History::HistoryStore &historyStore, Platform::PlatformCapabilities capabilities,
-                           QWidget *parent) :
-        QWidget(parent), m_settings(settings), m_theme(theme), m_icons(icons), m_capabilities(capabilities),
+                           Platform::IPlatformIntegration &integration, QWidget *parent) :
+        QWidget(parent), m_settings(settings), m_theme(theme), m_icons(icons), m_capabilities(capabilities), m_integration(integration),
         m_audioDevices(std::make_unique<GyanisScribe::Record::FfmpegAudioDeviceEnumerator>()), m_historyStore(historyStore)
     {
         setWindowTitle(GyanisScribe::Core::uiText("智录 设置"));
@@ -1239,6 +1241,44 @@ namespace GyanisScribe::App
         return bar;
     }
 
+    /**
+     * @brief 开机自启动那一格：状态从系统里现读，失败就不给点并把原因写进提示
+     * @details 不在配置里另存一份状态——两份真源迟早对不上（用户在系统「启动」设置里手动改过之后，
+     *          配置里那个勾就会说谎）。读不到就问平台为什么不支持，把它的原话摆进提示里。
+     */
+    QCheckBox *makeAutostartCheck(Platform::IPlatformIntegration &integration)
+    {
+        auto *check = new QCheckBox;
+        check->setText(GyanisScribe::Core::uiText("开机时自动启动"));
+        check->setAccessibleName(GyanisScribe::Core::uiText("开机时自动启动"));
+
+        const auto state = integration.autostartEnabled();
+        if (!state)
+        {
+            check->setEnabled(false);
+            check->setToolTip(QString::fromStdString(state.error().message));
+            return check;
+        }
+
+        check->setChecked(*state);
+        check->setToolTip(GyanisScribe::Core::uiText("开机时自动起这一份程序；状态读的是系统里的启动项，改完立即生效"));
+
+        // 接线排在设初值之后：摆到位不等于用户改过，否则一开设置页就把状态写回一次
+        QObject::connect(check, &QCheckBox::toggled, check,
+                         [check, &integration](const bool enabled)
+                         {
+                             if (const auto applied = integration.setAutostart(enabled); !applied)
+                             {
+                                 Core::Logger::warning(std::format("开机启动项没能改：{}", applied.error().message));
+                                 check->setToolTip(QString::fromStdString(applied.error().message));
+                                 // 写失败就把勾摆回真实状态：挂着假勾，用户以为下次开机就会起来
+                                 QSignalBlocker blocker{check};
+                                 check->setChecked(!enabled);
+                             }
+                         });
+        return check;
+    }
+
     QWidget *MainWindow::buildGeneralPage()
     {
         auto *page = new QWidget{this};
@@ -1253,6 +1293,7 @@ namespace GyanisScribe::App
         form->addRow(GyanisScribe::Core::uiText("历史最久留多少天"),
                      makeOptionalLimitSpin(m_settings, GyanisScribe::Settings::kHistoryRetentionDays, GyanisScribe::Core::uiText("历史最久留多少天"),
                                            GyanisScribe::Core::uiText(" 天"), kRetentionDaysLimit, GyanisScribe::History::kDefaultRetentionDays));
+        form->addRow(GyanisScribe::Core::uiText("开机自启动"), makeAutostartCheck(m_integration));
         form->addRow(GyanisScribe::Core::uiText("备份与恢复"), buildTransferRow());
         return page;
     }

@@ -1,6 +1,7 @@
 #include "Platform/Windows/WindowsIntegration.h"
 
 #include "Platform/WindowGeometry.h"
+#include "Platform/Windows/Win32Autostart.h"
 #include "Platform/Windows/Win32HotkeyBackend.h"
 
 #include "Core/Logger.h"
@@ -10,8 +11,10 @@
 
 #include <dwmapi.h>
 
+#include <QCoreApplication>
 #include <QGuiApplication>
 #include <QScreen>
+#include <QSettings>
 #include <QSize>
 #include <QStringList>
 
@@ -195,6 +198,7 @@ namespace GyanisScribe::Platform
                 .clickThrough      = true,
                 .windowDiscovery   = true,
                 .windowEnumeration = true,
+                .autostart         = true,
         };
     }
 
@@ -266,6 +270,51 @@ namespace GyanisScribe::Platform
             }
         }
         return windows;
+    }
+
+    Core::Expected<bool> WindowsIntegration::autostartEnabled() const
+    {
+        QSettings  runKey{QStringLiteral(R"(HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run)"), QSettings::NativeFormat};
+        const auto stored = runKey.value(QString::fromLatin1(kAutostartValueName.data(), static_cast<qsizetype>(kAutostartValueName.size()))).toString();
+        if (stored.isEmpty())
+        {
+            return false;
+        }
+
+        // 值指着别的副本或写法变了都按「本份没开」算：这一格问的是「开机时会不会起我这一份」，
+        // 界面据此重新勾选一次就能纠正，而不是让用户对着一个勾着的框却等不到程序起来
+        return QString::compare(stored, autostartCommandLine(QCoreApplication::applicationFilePath()), Qt::CaseInsensitive) == 0;
+    }
+
+    Core::Expected<void> WindowsIntegration::setAutostart(const bool enabled)
+    {
+        const auto command = autostartCommandLine(QCoreApplication::applicationFilePath());
+        if (command.isEmpty())
+        {
+            return std::unexpected(
+                    Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("取不到本程序的完整路径，没法写开机启动项。请从安装目录启动本程序后再试一次")});
+        }
+
+        // 写在当前用户的 Run 键下：不需要管理员权限，也不需要计划任务
+        QSettings  runKey{QStringLiteral(R"(HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run)"), QSettings::NativeFormat};
+        const auto valueName = QString::fromLatin1(kAutostartValueName.data(), static_cast<qsizetype>(kAutostartValueName.size()));
+        if (enabled)
+        {
+            runKey.setValue(valueName, command);
+        } else
+        {
+            runKey.remove(valueName);
+        }
+        runKey.sync();
+        if (runKey.status() != QSettings::NoError)
+        {
+            return std::unexpected(
+                    Core::Error{Core::ErrorCode::FileWriteFailed,
+                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8(
+                                                                     "开机启动项没能{}：写系统设置失败（可能是权限或安全软件拦截）。可以在系统的「启动」设置里把本程序自己加进去"),
+                                                             enabled ? GyanisScribe::Core::uiTextUtf8("开启") : GyanisScribe::Core::uiTextUtf8("关闭"))});
+        }
+        return {};
     }
 
 } // namespace GyanisScribe::Platform

@@ -9,6 +9,7 @@
 #include "History/HistoryRules.h"
 #include "History/HistoryStore.h"
 #include "Pin/PinLayout.h"
+#include "Platform/IPlatformIntegration.h"
 #include "Record/RecorderConfig.h"
 #include "Core/Text.h"
 #include "Settings/ISettingsStore.h"
@@ -122,9 +123,10 @@ namespace
         /// 能力表同时留在 m_capabilities 里：动作条的用例要按同一份表算出应当落点的条目
         void makeWindow(const bool globalHotkeys = true)
         {
+            m_integration                = GyanisScribe::Platform::createPlatformIntegration();
             m_capabilities               = GyanisScribe::Platform::PlatformCapabilities{};
             m_capabilities.globalHotkeys = globalHotkeys;
-            m_window                     = std::make_unique<MainWindow>(*m_store, *m_theme, *m_icons, *m_historyStore, m_capabilities);
+            m_window                     = std::make_unique<MainWindow>(*m_store, *m_theme, *m_icons, *m_historyStore, m_capabilities, *m_integration);
             m_window->setAttribute(Qt::WA_DontShowOnScreen);
         }
 
@@ -182,7 +184,8 @@ namespace
         std::unique_ptr<ThemeManager>  m_theme;
         std::unique_ptr<MainWindow>    m_window;
         /// 建窗口时那份能力表，动作条的用例按它算出预期条目
-        GyanisScribe::Platform::PlatformCapabilities m_capabilities;
+        GyanisScribe::Platform::PlatformCapabilities                  m_capabilities;
+        std::unique_ptr<GyanisScribe::Platform::IPlatformIntegration> m_integration; ///< 平台动作（开机启动那一格要真对象）
     };
 
     /**
@@ -724,6 +727,38 @@ namespace
         EXPECT_EQ(*kind, GyanisScribe::Ui::ToastKind::Danger) << toast.toStdString();
         EXPECT_NE(toast.indexOf(QStringLiteral("JSON")), -1) << "拒绝要指名是形状不对：" << toast.toStdString();
         EXPECT_EQ(m_store->intValue(GyanisScribe::Settings::kHistoryMaximumEntries, -1), 42) << "被拒的导入动了已有配置";
+    }
+
+
+    /**
+     * @brief 钉住开机自启那一格与平台状态同解，且这一格不写配置
+     * @details 用例只读不点：点下去会写这台机器的启动项，测试不该改宿主的系统设置。
+     *          状态的真源是系统里那条启动项，所以断言取的是平台现读的读数，而不是配置里的某一格。
+     */
+    TEST_F(MainWindowFixture, AutostartRowMirrorsThePlatformWithoutWriting)
+    {
+        makeWindow();
+
+        QCheckBox *check = nullptr;
+        for (auto *candidate: m_window->findChildren<QCheckBox *>())
+        {
+            if (candidate->accessibleName() == GyanisScribe::Core::uiText("开机时自动启动"))
+            {
+                check = candidate;
+                break;
+            }
+        }
+        ASSERT_NE(check, nullptr) << "通用页该有开机自启那一格";
+
+        const auto state = m_integration->autostartEnabled();
+        if (!state)
+        {
+            EXPECT_FALSE(check->isEnabled()) << "本平台没有这一能力时不该给点";
+            EXPECT_EQ(check->toolTip(), QString::fromStdString(state.error().message)) << "原因要摆进提示里，而不是让用户猜";
+            return;
+        }
+        EXPECT_TRUE(check->isEnabled());
+        EXPECT_EQ(check->isChecked(), *state) << "勾的初值要与系统里的启动项一致";
     }
 
 } // namespace

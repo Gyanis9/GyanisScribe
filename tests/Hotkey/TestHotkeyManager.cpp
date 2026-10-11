@@ -130,6 +130,28 @@ namespace
             return std::unexpected(Error{ErrorCode::PlatformUnsupported, "测试替身不演枚举窗口这一项"});
         }
 
+        /**
+         * @brief 查开机启动：这份替身不演这一项
+         * @return PlatformUnsupported
+         * @note 与 capabilities() 里 autostart 保持为假同解
+         */
+        Expected<bool> autostartEnabled() const override
+        {
+            return std::unexpected(Error{ErrorCode::PlatformUnsupported, "测试替身不演开机启动这一项"});
+        }
+
+        /**
+         * @brief 开关开机启动：这份替身不演这一项
+         * @param enabled 不使用
+         * @return PlatformUnsupported
+         */
+        Expected<void> setAutostart(bool enabled) override
+        {
+            static_cast<void>(enabled);
+
+            return std::unexpected(Error{ErrorCode::PlatformUnsupported, "测试替身不演开机启动这一项"});
+        }
+
         std::unique_ptr<IHotkeyBackend> createHotkeyBackend() override
         {
             if (!m_supportsHotkeys)

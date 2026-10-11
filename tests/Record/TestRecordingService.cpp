@@ -205,6 +205,18 @@ namespace
             return std::unexpected(Error{ErrorCode::PlatformUnsupported, "替身不演取前台窗口这一项"});
         }
 
+        [[nodiscard]] Expected<bool> autostartEnabled() const override
+        {
+            return std::unexpected(Error{ErrorCode::PlatformUnsupported, "替身不演开机启动这一项"});
+        }
+
+        [[nodiscard]] Expected<void> setAutostart(const bool enabled) override
+        {
+            static_cast<void>(enabled);
+
+            return std::unexpected(Error{ErrorCode::PlatformUnsupported, "替身不演开机启动这一项"});
+        }
+
         [[nodiscard]] Expected<std::vector<GyanisScribe::Platform::ScreenWindow>> screenWindows() const override
         {
             if (!m_enumerates)

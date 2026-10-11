@@ -120,7 +120,7 @@ namespace GyanisScribe::App
         QObject::connect(m_ocrRunner.get(), &Ocr::RecognitionRunner::failed, this, &AppController::handleOcrFailed);
         m_tray       = std::make_unique<TrayController>(*m_icons, *m_theme, *m_settings, *m_integration);
         m_history    = std::make_unique<History::HistoryStore>(History::HistoryStore::defaultStoragePath());
-        m_mainWindow = std::make_unique<MainWindow>(*m_settings, *m_theme, *m_icons, *m_history, m_integration->capabilities());
+        m_mainWindow = std::make_unique<MainWindow>(*m_settings, *m_theme, *m_icons, *m_history, m_integration->capabilities(), *m_integration);
         m_toast      = std::make_unique<Ui::Toast>(*m_icons, *m_theme);
         QObject::connect(m_tray.get(), &TrayController::actionRequested, this, &AppController::handleTrayAction);
         // 装没装上要留到接线全部完成之后再处置：现身的这一刻起用户就能点，每个入口都得已经接好
