@@ -1,6 +1,7 @@
 #include "Capture/CaptureOverlay.h"
 
 #include "Capture/ScreenUtils.h"
+#include "Core/Text.h"
 #include "Pick/ColorFormat.h"
 #include "Pick/PickGeometry.h"
 #include "Ui/DesignTokens.h"
@@ -12,6 +13,9 @@
 #include <QMouseEvent>
 #include <QPainter>
 
+#include <QClipboard>
+#include <QGuiApplication>
+
 #include <algorithm>
 #include <cmath>
 
@@ -22,6 +26,9 @@ namespace
 
     /// 放大镜下面那条读数条的高度，逻辑像素
     constexpr int kMagnifierStripHeight = 24;
+
+    /// 「已复制尺寸」提示与读数框之间的间距，逻辑像素
+    constexpr int kCopiedHintGap = 4;
 } // namespace
 
 namespace GyanisScribe::Capture
@@ -281,6 +288,20 @@ namespace GyanisScribe::Capture
             painter.drawRect(hintRect);
             painter.setPen(GyanisScribe::Ui::kCaptureHintTextColor);
             painter.drawText(hintRect, Qt::AlignCenter, hint);
+
+            // 「已复制尺寸 …」贴在读数框下面一格；指针一动就清（见 mouseMoveEvent），
+            // 不为它引一个定时器——那种反馈本来就不必跟秒表绑定
+            if (!m_copiedSizeHint.isEmpty())
+            {
+                const auto  copyTextSize = metrics.size(Qt::TextSingleLine, m_copiedSizeHint);
+                const QRect copyRect(hintTopLeft + QPoint(0, textSize.height() + kCopiedHintGap),
+                                     copyTextSize + QSize(GyanisScribe::Ui::kHintPadding * 2, GyanisScribe::Ui::kHintPadding));
+                painter.setPen(Qt::NoPen);
+                painter.setBrush(GyanisScribe::Ui::kCaptureHintBackgroundColor);
+                painter.drawRect(copyRect);
+                painter.setPen(GyanisScribe::Ui::kCaptureHintTextColor);
+                painter.drawText(copyRect, Qt::AlignCenter, m_copiedSizeHint);
+            }
         }
 
         // 选区落定后在八个抓点上画小方块：不画就没人知道这块还能拖
@@ -336,6 +357,7 @@ namespace GyanisScribe::Capture
         // 但把它写进 m_currentPoint 会让 selectedRegion() 从原点编出一块根本没框过的选区
         m_cursorPoint    = event->position().toPoint();
         m_hasCursorPoint = true;
+        m_copiedSizeHint.clear();
 
         if (m_isAdjusting && m_draggedGrip)
         {
@@ -351,7 +373,8 @@ namespace GyanisScribe::Capture
 
         if (m_isSelecting)
         {
-            m_currentPoint = m_cursorPoint;
+            // 按住 Shift 锁正方形：对着图标的直角、圆形按钮这类目标，手拖不出等边
+            m_currentPoint = squareLockedPoint(m_anchorPoint, m_cursorPoint, event->modifiers().testFlag(Qt::ShiftModifier), QRect{QPoint{0, 0}, size()});
         } else
         {
             // 没在拖的时候把光标形状交给抓点：形状变了就是「这里能抓」，不用试
@@ -428,6 +451,35 @@ namespace GyanisScribe::Capture
             case Qt::Key_Return:
             case Qt::Key_Enter:
                 confirmSelection();
+                return;
+            case Qt::Key_A:
+                // Ctrl+A 选整块屏：多屏上省掉从一角拖到另一角这一趟
+                if (event->modifiers() != Qt::ControlModifier)
+                {
+                    QWidget::keyPressEvent(event);
+                    return;
+                }
+                m_anchorPoint  = QPoint{0, 0};
+                m_currentPoint = QPoint{size().width() - 1, size().height() - 1};
+                update();
+                return;
+            case Qt::Key_V:
+                // 裸按 V 把当前选区的成品像素尺寸复制进剪贴板：贴给别人时先报一句「多大」
+                if (event->modifiers() != Qt::NoModifier)
+                {
+                    QWidget::keyPressEvent(event);
+                    return;
+                }
+                if (const auto region = selectedRegion(); !region.isNull())
+                {
+                    if (const auto physical = toPhysicalRect(region, m_devicePixelRatio); physical)
+                    {
+                        const auto text = QStringLiteral("%1×%2").arg(physical->width()).arg(physical->height());
+                        QGuiApplication::clipboard()->setText(text);
+                        m_copiedSizeHint = GyanisScribe::Core::uiText("已复制尺寸 %1").arg(text);
+                        update();
+                    }
+                }
                 return;
             case Qt::Key_C:
                 // 裸按 C 轮换读数里颜色那一格的写法（Hex → Rgb → Hsl）：对着目标程序核对配色时

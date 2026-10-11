@@ -7,6 +7,8 @@
 #include "Pick/PickGeometry.h"
 
 #include <QApplication>
+#include <QClipboard>
+#include <QGuiApplication>
 #include <QImage>
 #include <QKeyEvent>
 #include <QMouseEvent>
@@ -412,4 +414,70 @@ TEST_F(CaptureOverlayFixture, PressingFarAwayStartsAFreshSelection)
     buttonAt(*overlay, QEvent::MouseButtonRelease, QPoint{500, 450});
 
     EXPECT_EQ(overlay->selectedRegion(), QRect(400, 400, 101, 51)) << "远处按下没开出新的一块";
+}
+
+/**
+ * @brief 钉住 Shift 拖框锁正方形（含贴边时的夹取）
+ * @details 期望值手算：从 (100,100) 拖到 (300,200)，宽 200 高 100 → 锁成 200×200，
+ *
+ * 另一个端点落到 (300,300)；往上拖时朝上展开；贴到屏边夹完仍是正方形。
+ */
+TEST_F(CaptureOverlayFixture, ShiftDragLocksTheSelectionToASquare)
+{
+    auto overlay = makeOverlay();
+
+    buttonAt(*overlay, QEvent::MouseButtonPress, QPoint{100, 100});
+    QMouseEvent drag{QEvent::MouseMove, QPointF{300.0, 200.0}, globalOf(QPoint{300, 200}), Qt::NoButton, Qt::LeftButton, Qt::ShiftModifier};
+    QApplication::sendEvent(overlay.get(), &drag);
+
+    // 端点对到 (300,300)：宽高都是 201，正方形；判据取两个端点与等边，不写整串矩形
+    const auto region = overlay->selectedRegion();
+    EXPECT_EQ(region.topLeft(), QPoint(100, 100));
+    EXPECT_EQ(region.bottomRight(), QPoint(300, 300)) << "按住 Shift 拖出来的不是正方形";
+    EXPECT_EQ(region.width(), region.height()) << "宽高不等就不叫正方形";
+
+    // 不按 Shift 的那一次要原样跟随：上锁逻辑不许影响普通拖框
+    QMouseEvent plain{QEvent::MouseMove, QPointF{300.0, 200.0}, globalOf(QPoint{300, 200}), Qt::NoButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+    QApplication::sendEvent(overlay.get(), &plain);
+    EXPECT_EQ(overlay->selectedRegion().bottomRight(), QPoint(300, 200)) << "松开 Shift 之后没回到自由拖框";
+}
+
+/**
+ * @brief 钉住 Ctrl+A 选中整块屏、V 复制成品像素尺寸
+ * @details
+ * 尺寸复制的是「会被裁出来多少像素」而不是逻辑格：缩放屏上两者不等，
+
+ * * 复制逻辑格会让用户对不上产物。判据直接读剪贴板，与用户粘出来的是同一份。
+ */
+TEST_F(CaptureOverlayFixture, ControlASelectsEverythingAndVCopiesThePixelSize)
+{
+    auto overlay = makeOverlay();
+
+    // 先框一块 201×101 的：V 复制的就是它的成品像素尺寸（这块遮罩的缩放因子是 1，逻辑与物理同值）
+    dragOut(*overlay, QPoint{100, 100}, QPoint{300, 200});
+    QGuiApplication::clipboard()->clear();
+    QKeyEvent copySize{QEvent::KeyPress, Qt::Key_V, Qt::NoModifier};
+    QApplication::sendEvent(overlay.get(), &copySize);
+    EXPECT_EQ(QGuiApplication::clipboard()->text(), QStringLiteral("201×101")) << "V 没把尺寸复制进剪贴板";
+
+    // 缩放屏上复制的是「会被裁出多少像素」而不是逻辑格：两者不等时以物理为准
+    const auto background = makeFrame(kScreenGeometry.size());
+    auto       scaled     = makeOverlay(background, 2.0);
+    dragOut(*scaled, QPoint{100, 100}, QPoint{300, 200});
+    QGuiApplication::clipboard()->clear();
+    QApplication::sendEvent(scaled.get(), &copySize);
+    EXPECT_EQ(QGuiApplication::clipboard()->text(), QStringLiteral("402×202")) << "V 复制的是逻辑格而不是成品像素";
+
+    // 裸按 A 什么都不该发生（不许把 A 也当成选全屏）
+    const auto before = overlay->selectedRegion();
+    QKeyEvent  bareA{QEvent::KeyPress, Qt::Key_A, Qt::NoModifier};
+    QApplication::sendEvent(overlay.get(), &bareA);
+    EXPECT_EQ(overlay->selectedRegion(), before) << "裸按 A 改动了选区";
+
+    // Ctrl+A：整块屏（末端取 size-1，选区宽度正好等于屏宽）
+    QKeyEvent selectAll{QEvent::KeyPress, Qt::Key_A, Qt::ControlModifier};
+    QApplication::sendEvent(overlay.get(), &selectAll);
+    const auto full = overlay->selectedRegion();
+    EXPECT_EQ(full.width(), kScreenGeometry.width()) << "Ctrl+A 没选中整块屏";
+    EXPECT_EQ(full.height(), kScreenGeometry.height());
 }

@@ -179,6 +179,27 @@ namespace GyanisScribe::Capture
         return QRect(numbers[0], numbers[1], numbers[2], numbers[3]);
     }
 
+    QPoint squareLockedPoint(const QPoint &anchor, const QPoint &current, const bool locked, const QRect &limit)
+    {
+        if (!locked)
+        {
+            return current;
+        }
+
+        const int dx     = current.x() - anchor.x();
+        const int dy     = current.y() - anchor.y();
+        const int extent = std::max(std::abs(dx), std::abs(dy));
+        // 偏移为 0 的方向没有符号：按正方向走，正方形总是往起手点的右/下展开
+        const int signX = dx < 0 ? -1 : 1;
+        const int signY = dy < 0 ? -1 : 1;
+
+        const int clampedX = std::clamp(anchor.x() + signX * extent, limit.left(), limit.right());
+        const int clampedY = std::clamp(anchor.y() + signY * extent, limit.top(), limit.bottom());
+        // 夹取可能把等边破坏掉：按两轴里更小的那个偏移量收回来，仍是正方形
+        const int size = std::min(std::abs(clampedX - anchor.x()), std::abs(clampedY - anchor.y()));
+        return QPoint(anchor.x() + signX * size, anchor.y() + signY * size);
+    }
+
     QRect nudgeRegion(const QRect &region, const QPoint &step, const QRect &limit)
     {
         if (region.isEmpty() || limit.isEmpty())

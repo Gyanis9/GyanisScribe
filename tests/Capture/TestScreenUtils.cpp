@@ -26,6 +26,7 @@ using GyanisScribe::Capture::regionFromText;
 using GyanisScribe::Capture::regionToText;
 using GyanisScribe::Capture::resizeRegion;
 using GyanisScribe::Capture::SelectionGrip;
+using GyanisScribe::Capture::squareLockedPoint;
 using GyanisScribe::Capture::toPhysicalRect;
 using GyanisScribe::Core::CapturedImage;
 using GyanisScribe::Core::ErrorCode;
@@ -443,4 +444,26 @@ TEST(ScreenUtils, DrawCursorBlendsSemiTransparentEdges)
     EXPECT_LT(blended.red(), 255);
     EXPECT_GT(blended.green(), 0);
     EXPECT_LT(blended.green(), 255);
+}
+
+/**
+ * @brief 钉住 Shift 锁正方形的三条：不上锁原样、上锁取大边、贴边夹完仍是正方形
+ * @details 期望值手算：起手 (100,100)。拖到 (300,200) 差 (200,100) → 取大边 200 → (300,300)；
+ *          往左上拖要朝那侧展开；夹到屏边时（0..1919、0..1079）不许把等边破坏掉。
+ */
+TEST(ScreenUtilsSelection, SquareLockTakesTheLargerExtentAndKeepsTheSquareAtEdges)
+{
+    const QRect limit{0, 0, 1920, 1080};
+
+    EXPECT_EQ(squareLockedPoint(QPoint{100, 100}, QPoint{300, 200}, false, limit), QPoint(300, 200)) << "没上锁时不该改端点";
+    EXPECT_EQ(squareLockedPoint(QPoint{100, 100}, QPoint{300, 200}, true, limit), QPoint(300, 300)) << "上锁后该取两个方向里大的那一边";
+    EXPECT_EQ(squareLockedPoint(QPoint{100, 100}, QPoint{150, 300}, true, limit), QPoint(300, 300)) << "纵向更大时对称展开";
+
+    // 往左上拖：正方形该朝左上展开
+    EXPECT_EQ(squareLockedPoint(QPoint{300, 300}, QPoint{100, 200}, true, limit), QPoint(100, 100));
+
+    // 贴到左边：夹取之后仍是正方形——按两轴里更小的那个偏移收回来，x 停在屏的左沿
+    const auto clamped = squareLockedPoint(QPoint{10, 500}, QPoint{0, 600}, true, limit);
+    EXPECT_EQ(clamped.x(), limit.left()) << "该被夹到屏的左沿";
+    EXPECT_EQ(std::abs(clamped.x() - 10), std::abs(clamped.y() - 500)) << "夹到屏边之后不是正方形了";
 }

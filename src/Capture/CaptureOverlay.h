@@ -221,7 +221,8 @@ namespace GyanisScribe::Capture
         QPoint                       m_cursorPoint;                             ///< 光标最近所在点，只喂辅助线、悬停与放大镜，不参与选区计算
         bool                         m_hasCursorPoint = false;                  ///< 是否收到过鼠标移动：没有就不摆放大镜，别把 (0,0) 当成光标
         Pick::ColorFormat            m_readoutFormat  = Pick::ColorFormat::Hex; ///< 读数里颜色那格的写法，按 C 轮换
-        bool                         m_isAdjusting    = false;                  ///< 是否正拖着某个抓点改选区
+        QString                      m_copiedSizeHint;                          ///< 「已复制尺寸 …」那行提示，指针一动就清
+        bool                         m_isAdjusting = false;                     ///< 是否正拖着某个抓点改选区
         std::optional<SelectionGrip> m_draggedGrip;                             ///< 拖着的那个抓点，没拖时为空
         QPoint                       m_adjustPoint;                             ///< 上一帧的鼠标位置，拖抓点时按增量走
         bool                         m_isSelecting = false;                     ///< 是否正在拖动框选

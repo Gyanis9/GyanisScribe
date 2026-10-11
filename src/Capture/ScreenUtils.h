@@ -103,6 +103,19 @@ namespace GyanisScribe::Capture
     [[nodiscard]] Core::Expected<QRect> regionFromText(std::string_view text);
 
     /**
+     * @brief 按住了 Shift 时把选区的另一个端点锁成正方形
+     * @param anchor 起手那个端点
+     * @param current 光标所在端点
+     * @param locked 是否按住了 Shift
+     * @param limit 允许的范围（通常是这块屏）
+     * @return 该用的端点；没上锁时原样交回 current
+     * @details 正方形取两个方向里大的那一边：用户要的是「至少盖住我拖过的那一截」，
+     *          取小的会让选区在视觉上往回缩。夹取之后再按两轴里更小的偏移量对称收一次，
+     *          贴到屏边时仍然是正方形——不然「锁了正方形」在边上会悄悄失效。
+     */
+    [[nodiscard]] QPoint squareLockedPoint(const QPoint &anchor, const QPoint &current, bool locked, const QRect &limit);
+
+    /**
      * @brief 把选区整体挪若干格
      * @param region 当前选区
      * @param step 位移量，一格是 (1,0)、(0,-1) 这种
