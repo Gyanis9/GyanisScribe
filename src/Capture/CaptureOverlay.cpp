@@ -109,6 +109,17 @@ namespace GyanisScribe::Capture
         return m_cursorPoint + m_screenGeometry.topLeft();
     }
 
+    bool CaptureOverlay::isMagnifierVisible() const noexcept
+    {
+        // 与画那一侧同一判据：光标亮过，且这块屏的冻帧真的抓到了（抓不到就没什么可放大的）
+        return m_hasCursorPoint && !m_background.isNull() && !magnifierRect().isNull();
+    }
+
+    Pick::ColorFormat CaptureOverlay::readoutFormat() const noexcept
+    {
+        return m_readoutFormat;
+    }
+
     void CaptureOverlay::paintGrips(QPainter &painter, const QRect &region)
     {
         const auto edge = GyanisScribe::Ui::kSelectionGripEdge;
@@ -170,7 +181,7 @@ namespace GyanisScribe::Capture
 
         // 读数条压在放大镜下沿：光标那一点的坐标与颜色，不必松手就能核对框到的是哪一格
         const auto stripRect = QRect{viewRect.left(), viewRect.bottom() + kMagnifierPenWidth, viewRect.width(), kMagnifierStripHeight};
-        const auto readout   = QStringLiteral("%1  %2").arg(formatCursorReadout(), Pick::formatColor(colorUnderCursor(), Pick::ColorFormat::Hex));
+        const auto readout   = QStringLiteral("%1  %2").arg(formatCursorReadout(), Pick::formatColor(colorUnderCursor(), m_readoutFormat));
         painter.setPen(Qt::NoPen);
         painter.setBrush(GyanisScribe::Ui::kCaptureHintBackgroundColor);
         painter.drawRect(stripRect);
@@ -278,8 +289,9 @@ namespace GyanisScribe::Capture
             paintGrips(painter, shown);
         }
 
-        // 放大镜排在最后画：它会挡住底下那片，但用户正要看的就是光标那一点，优先级比背景高
-        if (m_isSelecting)
+        // 放大镜排在最后画：它会挡住底下那片，但用户正要看的就是光标那一点，优先级比背景高。
+        // 只要光标亮过就显示，不限于拖框途中——挑起始角与拉手柄这两处同样要像素级读数
+        if (isMagnifierVisible())
         {
             paintMagnifier(painter);
         }
@@ -416,6 +428,20 @@ namespace GyanisScribe::Capture
             case Qt::Key_Return:
             case Qt::Key_Enter:
                 confirmSelection();
+                return;
+            case Qt::Key_C:
+                // 裸按 C 轮换读数里颜色那一格的写法（Hex → Rgb → Hsl）：对着目标程序核对配色时
+                // 常常要换一种写法看，不必为这个先离开截图去设置里改一档。
+                // 带修饰键的不认——Shift 已经被「挪右下角」用掉了，Ctrl/Alt 留给系统组合
+                if (event->modifiers() != Qt::NoModifier)
+                {
+                    QWidget::keyPressEvent(event);
+                    return;
+                }
+                m_readoutFormat = m_readoutFormat == Pick::ColorFormat::Hex   ? Pick::ColorFormat::Rgb
+                                  : m_readoutFormat == Pick::ColorFormat::Rgb ? Pick::ColorFormat::Hsl
+                                                                              : Pick::ColorFormat::Hex;
+                update();
                 return;
             default:
                 QWidget::keyPressEvent(event);

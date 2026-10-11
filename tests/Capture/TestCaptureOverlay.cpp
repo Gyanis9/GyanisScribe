@@ -3,6 +3,7 @@
 // 事件用 sendEvent 直接投给控件，判据不依赖「鼠标恰好在这个时刻移动到位」。
 #include "Capture/CaptureOverlay.h"
 
+#include "Pick/ColorFormat.h"
 #include "Pick/PickGeometry.h"
 
 #include <QApplication>
@@ -18,6 +19,7 @@
 #include <vector>
 
 using GyanisScribe::Capture::CaptureOverlay;
+using GyanisScribe::Pick::ColorFormat;
 
 namespace
 {
@@ -201,6 +203,26 @@ TEST_F(CaptureOverlayFixture, MagnifierAwaitsTheFirstMouseMove)
 }
 
 /**
+ * @brief 钉住放大镜跟着光标常驻，不限于拖框途中
+ * @details 挑起始角、拉手柄、平移选区这三处都要像素级读数；只在拖框时显示的话，
+ *          最需要它的「按下之前对准那一个像素」反而没有。
+ */
+TEST_F(CaptureOverlayFixture, MagnifierTravelsWithTheCursorBeyondDragging)
+{
+    auto overlay = makeOverlay();
+    EXPECT_FALSE(overlay->isMagnifierVisible()) << "还没收到鼠标移动就显示，等于把 (0,0) 当成了光标";
+
+    moveOver(*overlay, QPoint{110, 160});
+    EXPECT_TRUE(overlay->isMagnifierVisible()) << "悬停挑窗口时不显示：挑起始角那一下看不到像素";
+
+    // 拖出一块再松开：选区落定、抓点摆出来之后它仍该跟着光标
+    buttonAt(*overlay, QEvent::MouseButtonPress, QPoint{100, 150});
+    moveOver(*overlay, QPoint{200, 230});
+    buttonAt(*overlay, QEvent::MouseButtonRelease, QPoint{200, 230});
+    EXPECT_TRUE(overlay->isMagnifierVisible()) << "选区落定之后放大镜就没了：拉手柄对齐边线时没有读数";
+}
+
+/**
  * @brief 钉住读数取的是「这块屏的原点 + 缩放因子」折算后的那一帧像素
  * @details 遮罩记的是这块屏内的局部点，冻帧是物理像素。少减原点会在副屏上偏一整屏，
  *          少乘缩放会在高 DPI 上偏到左上角——两种都错得毫无声息，只能把颜色本身钉住。
@@ -257,6 +279,26 @@ void dragOut(CaptureOverlay &overlay, const QPoint &anchor, const QPoint &curren
     buttonAt(overlay, QEvent::MouseButtonPress, anchor);
     moveOver(overlay, current);
     buttonAt(overlay, QEvent::MouseButtonRelease, current);
+}
+
+/**
+ * @brief 钉住裸按 C 轮换读数写法，带修饰键的不认
+ * @details 只影响遮罩上这一枚读数，不写回配置：临时换一种写法看一眼，不该顺手改掉用户的默认档。
+ */
+TEST_F(CaptureOverlayFixture, ColorKeyCyclesTheReadoutFormat)
+{
+    auto overlay = makeOverlay();
+    EXPECT_EQ(overlay->readoutFormat(), ColorFormat::Hex) << "默认档应当是 Hex";
+
+    pressKey(*overlay, Qt::Key_C);
+    EXPECT_EQ(overlay->readoutFormat(), ColorFormat::Rgb);
+    pressKey(*overlay, Qt::Key_C);
+    EXPECT_EQ(overlay->readoutFormat(), ColorFormat::Hsl);
+    pressKey(*overlay, Qt::Key_C);
+    EXPECT_EQ(overlay->readoutFormat(), ColorFormat::Hex) << "三档应当轮回来";
+
+    pressKey(*overlay, Qt::Key_C, Qt::ShiftModifier);
+    EXPECT_EQ(overlay->readoutFormat(), ColorFormat::Hex) << "Shift 已经归「挪右下角」，裸按才轮换";
 }
 
 /**
