@@ -1012,6 +1012,62 @@
             <translation>Stitched to {} px</translation>
         </message>
         <message>
+            <source>DXGI 桌面重复认不出屏幕（{}×{}，原点 {}）：Qt 报的几何与适配器的输出坐标对不上。请重试一次，或改用 Qt 的抓帧原语</source>
+            <translation>DXGI desktop duplication cannot match a screen ({}x{}, origin {}): the geometry Qt reports does not match any adapter output. Try again, or switch to the Qt capture primitive</translation>
+        </message>
+        <message>
+            <source>这块屏所挂的显示适配器建不起 D3D11 设备（{}）：请改用 Qt 的抓帧原语</source>
+            <translation>The display adapter behind this screen cannot create a D3D11 device ({}): switch to the Qt capture primitive</translation>
+        </message>
+        <message>
+            <source>这块屏开不了 DXGI 桌面重复（{}）：远程会话、驱动或桌面格式可能不支持。请改用 Qt 的抓帧原语</source>
+            <translation>This screen cannot open DXGI desktop duplication ({}): a remote session, the driver, or the desktop format may not support it. Switch to the Qt capture primitive</translation>
+        </message>
+        <message>
+            <source>DXGI 抓帧连续两轮失效（{}）：画面刚切过分辨率或会话被锁。请重试一次</source>
+            <translation>DXGI capture failed twice in a row ({}): the display just changed resolution or the session is locked. Try again</translation>
+        </message>
+        <message>
+            <source>DXGI 桌面重复开了之后一直没等到第一帧：画面可能刚被锁屏或切走。请重试一次</source>
+            <translation>DXGI desktop duplication never delivered a first frame: the screen may have just been locked or switched away. Try again</translation>
+        </message>
+        <message>
+            <source>DXGI 桌面重复已失效（切分辨率或会话切换）：接口要重开一轮</source>
+            <translation>DXGI desktop duplication went stale (resolution change or session switch): the interface has to be reopened</translation>
+        </message>
+        <message>
+            <source>DXGI 取帧失败（HRESULT 0x{:08X}）</source>
+            <translation>DXGI failed to acquire a frame (HRESULT 0x{:08X})</translation>
+        </message>
+        <message>
+            <source>DXGI 交回的帧不是 2D 纹理：这一版取帧路径与驱动对不上</source>
+            <translation>The frame DXGI returned is not a 2D texture: this capture path does not match the driver</translation>
+        </message>
+        <message>
+            <source>桌面的像素格式是 0x{:X}，这一路只认 B8G8R8A8：请改用 Qt 的抓帧原语</source>
+            <translation>The desktop pixel format is 0x{:X}; this path only handles B8G8R8A8. Switch to the Qt capture primitive</translation>
+        </message>
+        <message>
+            <source>DXGI 抓帧：建暂存纹理失败。请重试一次；一直失败请改用 Qt 的抓帧原语</source>
+            <translation>DXGI capture: creating the staging texture failed. Try again; if it keeps failing, switch to the Qt capture primitive</translation>
+        </message>
+        <message>
+            <source>DXGI 抓帧：暂存纹理读不出来。请重试一次</source>
+            <translation>DXGI capture: the staging texture cannot be read. Try again</translation>
+        </message>
+        <message>
+            <source>DXGI 抓帧：读出来的是空图。请重试一次</source>
+            <translation>DXGI capture: the read came back as an empty image. Try again</translation>
+        </message>
+        <message>
+            <source>找不到名为「{}」的屏幕：多半已经被拔掉。请在不填屏幕名的情况下重抓一次（那样按光标所在屏走）</source>
+            <translation>Cannot find a screen named "{}": it was probably unplugged. Capture again with no screen name, which follows the screen under the cursor.</translation>
+        </message>
+        <message>
+            <source>Qt 没有报出任何屏幕：请在 QGuiApplication 建好之后再抓图</source>
+            <translation>Qt reported no screens: capture only after QGuiApplication has been created.</translation>
+        </message>
+        <message>
             <source>长截图接不上：这一帧是空的。请重新截一次</source>
             <translation>Scrolling capture cannot continue: this frame is empty. Capture it again</translation>
         </message>
@@ -1062,14 +1118,6 @@
         <message>
             <source>完成长截图</source>
             <translation>Finish scrolling capture</translation>
-        </message>
-        <message>
-            <source>找不到名为「{}」的屏幕：多半已经被拔掉。请在不填屏幕名的情况下重抓一次（那样按光标所在屏走）</source>
-            <translation>Cannot find a screen named "{}": it was probably unplugged. Capture again with no screen name, which follows the screen under the cursor.</translation>
-        </message>
-        <message>
-            <source>Qt 没有报出任何屏幕：请在 QGuiApplication 建好之后再抓图</source>
-            <translation>Qt reported no screens: capture only after QGuiApplication has been created.</translation>
         </message>
         <message>
             <source>抓「{}」这块屏拿到了空图：本平台可能不允许直接抓取屏幕。请检查会话类型（远程会话、Wayland 沙箱）后重试</source>

@@ -52,6 +52,17 @@ namespace GyanisScribe::Capture
     [[nodiscard]] QScreen *screenByName(const QString &screenName);
 
     /**
+     * @brief 把一张抓到的像素图装成帧：补上逻辑尺寸、缩放因子与屏名
+     * @param grabbed 抓到的像素（物理像素）
+     * @param screen 来源屏幕，可为空（拿不到时缩放因子按 1、屏名留空）
+     * @param logicalSize 这一帧对应的逻辑尺寸
+     * @return 组装好的帧；图本身统一标成 dpr 1，物理与逻辑的互指只走 devicePixelRatio 一格
+     * @details 两份抓帧来源（Qt 与 DXGI）共用这一处：两处各写一份时，缩放因子标错会表现为
+     *          「高 DPI 屏上标注与成品错位」，而那种错位只在特定屏上出现，很难在现场看出根因。
+     */
+    [[nodiscard]] Core::CapturedImage frameFromGrabbedImage(const QImage &grabbed, const QScreen *screen, const QSize &logicalSize);
+
+    /**
      * @brief 取覆盖某个全局逻辑点的屏幕
      * @param globalPoint 全局逻辑坐标
      * @return 命中的屏幕指针；一点正落在两屏接缝上时取声明顺序里的那一块

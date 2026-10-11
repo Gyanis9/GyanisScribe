@@ -74,6 +74,19 @@ namespace GyanisScribe::Capture
         return nullptr;
     }
 
+    Core::CapturedImage frameFromGrabbedImage(const QImage &grabbed, const QScreen *screen, const QSize &logicalSize)
+    {
+        Core::CapturedImage frame;
+        frame.image = grabbed.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+        // 抓回来的图按物理像素交回：Qt 有时会把 dpr 标在图上，这里统一清成 1，
+        // 免得下游既乘一次又除一次
+        frame.image.setDevicePixelRatio(1.0);
+        frame.devicePixelRatio = screen != nullptr ? screen->devicePixelRatio() : 1.0;
+        frame.logicalSize      = logicalSize;
+        frame.screenName       = screen != nullptr ? screen->name() : QString();
+        return frame;
+    }
+
     QScreen *screenAtGlobalPoint(const QPoint &globalPoint)
     {
         // 接缝上的点按屏幕声明顺序取第一块命中的：两屏共享一条边时必须有唯一答案，

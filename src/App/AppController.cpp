@@ -6,7 +6,7 @@
 #include "App/ClipboardPin.h"
 #include "Capture/CaptureService.h"
 #include "Capture/IScreenCaptureSource.h"
-#include "Capture/QScreenCaptureSource.h"
+#include "Capture/ScreenCaptureSourceFactory.h"
 #include "Capture/ScreenUtils.h"
 #include "Core/ImageFormat.h"
 #include "Core/Logger.h"
@@ -98,7 +98,7 @@ namespace GyanisScribe::App
 
 
     AppController::AppController(QObject *parent) :
-        QObject(parent), m_settings(createSettingsStore()), m_integration(Platform::createPlatformIntegration()), m_captureSource(std::make_unique<Capture::QScreenCaptureSource>())
+        QObject(parent), m_settings(createSettingsStore()), m_integration(Platform::createPlatformIntegration()), m_captureSource(Capture::createScreenCaptureSource())
     {
         // 语言要排在所有界面对象之前：translator 装晚了，已经建好的控件仍然拿源码文案
         const auto defaultLanguageText = QString::fromUtf8(std::string{Ui::appLanguageText(Ui::AppLanguage::Chinese)});

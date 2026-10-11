@@ -1,4 +1,5 @@
 add_executable(TestCapture
+        TestBgraFrame.cpp
         TestCaptureService.cpp
         TestCursorPixels.cpp
         TestFrameStitch.cpp

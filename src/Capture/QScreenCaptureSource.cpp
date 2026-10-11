@@ -54,18 +54,8 @@ namespace GyanisScribe::Capture
             return screenName.isEmpty() ? screenForCursor() : screenByName(screenName);
         }
 
-        Core::CapturedImage assembleImage(const QImage &grabbed, const QScreen *screen, const QSize &logicalSize)
-        {
-            Core::CapturedImage image;
-            image.image = grabbed.convertToFormat(QImage::Format_ARGB32_Premultiplied);
-            // 抓回来的图按物理像素交回：Qt 有时会把 dpr 标在图上，这里统一清成 1，
-            // 免得下游既乘一次又除一次
-            image.image.setDevicePixelRatio(1.0);
-            image.devicePixelRatio = screen != nullptr ? screen->devicePixelRatio() : 1.0;
-            image.logicalSize      = logicalSize;
-            image.screenName       = screen != nullptr ? screen->name() : QString();
-            return image;
-        }
+        // 帧的组装（逻辑尺寸、缩放因子、屏名）在 ScreenUtils 那一处：DXGI 那一份来源也要
+        // 装成同一形状，两处各写一份时缩放因子标错只在特定屏上现形
     } // namespace
 
     Core::Expected<Core::CapturedImage> QScreenCaptureSource::grabScreen(const QString &screenName) const
@@ -94,7 +84,7 @@ namespace GyanisScribe::Capture
                                         target->name().toStdString())});
         }
 
-        return assembleImage(grabbed, target, target->geometry().size());
+        return frameFromGrabbedImage(grabbed, target, target->geometry().size());
     }
 
     Core::Expected<Core::CapturedImage> QScreenCaptureSource::grabWindow(quintptr windowHandle) const
@@ -119,7 +109,7 @@ namespace GyanisScribe::Capture
                             Core::Error{Core::ErrorCode::PlatformUnsupported,
                                         GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("本平台抓不出窗口像素（句柄 {}）。请改用区域截图框住那个窗口"), windowHandle)});
                 }
-                return assembleImage(grabbed, target, window->geometry().size());
+                return frameFromGrabbedImage(grabbed, target, window->geometry().size());
             }
         }
 
@@ -138,7 +128,7 @@ namespace GyanisScribe::Capture
         const QSize logicalSize(qRound(static_cast<double>(grabbed.width()) / dpr), qRound(static_cast<double>(grabbed.height()) / dpr));
         Core::Logger::info(std::format("按外部窗口抓取：句柄 {}，像素 {}×{}，按 dpr {} 回算逻辑尺寸 {}×{}", windowHandle, grabbed.width(), grabbed.height(), dpr,
                                        logicalSize.width(), logicalSize.height()));
-        return assembleImage(grabbed, target, logicalSize);
+        return frameFromGrabbedImage(grabbed, target, logicalSize);
     }
 
     std::optional<CursorSprite> QScreenCaptureSource::grabCursor(const QString &screenName) const
