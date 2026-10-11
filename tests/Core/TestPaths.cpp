@@ -2,6 +2,8 @@
 
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QDir>
+#include <QFileInfo>
 
 #include <gtest/gtest.h>
 
@@ -165,6 +167,33 @@ TEST_F(PathsFixture, FormatsProductNameByTemplateAndNeverLeavesTheDirectory)
 
     EXPECT_EQ(Paths::imageFileName(moment, "png", QStringLiteral("../逃出去")), QStringLiteral("GyanisScribe_20261011_054854_160.png"))
             << "没先校验的调用方传进带分隔符的模板时，宁可写默认名字";
+}
+
+/**
+ * @brief 钉住便携标记的判读：有标记才把配置落在程序目录旁，没有就交回空串走系统默认
+ * @details 用标记文件而不是「默认就近」：装到 Program Files 这类不可写目录时，默认就近会直接坏掉；
+ *          绿色版用户放一个空文件是明确的选择。只有配置跟着走，日志与历史不跟。
+ */
+TEST_F(PathsFixture, PortableConfigFollowsTheMarkerFile)
+{
+    const auto      directory = probeDirectory("Portable");
+    std::error_code ignored;
+    std::filesystem::remove_all(directory, ignored);
+    std::filesystem::create_directories(directory);
+    const auto directoryText = Paths::toDisplayText(directory);
+
+    EXPECT_TRUE(Paths::portableConfigFileIn(directoryText).isEmpty()) << "没有标记时不该把配置搬到程序旁边";
+
+    {
+        std::ofstream{directory / std::string{Paths::kPortableMarkerFileName}} << "";
+    }
+    // 比语义而不是比字符串：两种写法只差分隔符与大小写风格，归一之后钉住「落在标记那个目录里」
+    const auto portable = Paths::portableConfigFileIn(directoryText);
+    EXPECT_EQ(QFileInfo{portable}.fileName(), QStringLiteral("GyanisScribe.ini"));
+    const auto normalize = [](const QString &path) { return QDir::cleanPath(path).replace(QLatin1Char('\\'), QLatin1Char('/')).toLower(); };
+    EXPECT_EQ(normalize(QFileInfo{portable}.absolutePath()), normalize(directoryText)) << "有标记时配置要落在它旁边";
+
+    std::filesystem::remove_all(directory, ignored);
 }
 
 /**

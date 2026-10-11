@@ -110,6 +110,25 @@ namespace GyanisScribe::Core
         /// 默认模板的 QString 形态：配置键、界面与拼名那几处都要用它，少写几次转换
         [[nodiscard]] static QString defaultNameTemplate();
 
+        /// 便携模式的标记文件名：程序目录下放一个同名空文件就切过去
+        static constexpr std::string_view kPortableMarkerFileName = "portable.txt";
+
+        /**
+         * @brief 看某个目录里有没有便携标记，有就把配置落在它旁边
+         * @param directory 待查目录（生产传程序目录，用例传临时目录）
+         * @return 便携配置文件的完整路径；目录里没有标记时返回空串
+         * @details 用「显式放一个标记文件」而不是「默认就近」：装到 Program Files 这类目录下时
+         *          程序目录不可写，默认就近会直接坏掉，而绿色版用户放个标记是明确的选择。
+         *          只有配置跟着走：日志、历史、缓存与成品目录仍在各自的位置（见 README）。
+         */
+        [[nodiscard]] static QString portableConfigFileIn(const QString &directory);
+
+        /**
+         * @brief 程序目录里的便携配置（没有标记时返回空串）
+         * @return 便携配置文件路径，或空串表示走系统默认位置
+         */
+        [[nodiscard]] static QString portableConfigFile();
+
         /**
          * @brief 校验一份文件名模板
          * @param text 用户填的模板

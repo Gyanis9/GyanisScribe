@@ -79,9 +79,26 @@ namespace
 namespace GyanisScribe::App
 {
 
+    /**
+     * @brief 按有没有便携标记决定配置落在哪儿
+     * @return 便携模式下是程序目录旁那份 INI，否则是系统默认位置（Windows 是注册表）
+     * @details 只有配置跟着程序走：日志、历史、缓存与成品目录仍在各自的位置，README 里写清了边界。
+     */
+    std::unique_ptr<Settings::SettingsStore> createSettingsStore()
+    {
+        const auto portableFile = Core::Paths::portableConfigFile();
+        if (portableFile.isEmpty())
+        {
+            return std::make_unique<Settings::SettingsStore>();
+        }
+
+        Core::Logger::info(std::format("便携模式：配置读写 {}", portableFile.toStdString()));
+        return std::make_unique<Settings::SettingsStore>(Core::Paths::fromDisplayText(portableFile));
+    }
+
+
     AppController::AppController(QObject *parent) :
-        QObject(parent), m_settings(std::make_unique<Settings::SettingsStore>()), m_integration(Platform::createPlatformIntegration()),
-        m_captureSource(std::make_unique<Capture::QScreenCaptureSource>())
+        QObject(parent), m_settings(createSettingsStore()), m_integration(Platform::createPlatformIntegration()), m_captureSource(std::make_unique<Capture::QScreenCaptureSource>())
     {
         // 语言要排在所有界面对象之前：translator 装晚了，已经建好的控件仍然拿源码文案
         const auto defaultLanguageText = QString::fromUtf8(std::string{Ui::appLanguageText(Ui::AppLanguage::Chinese)});

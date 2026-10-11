@@ -4,6 +4,8 @@
 #include "Core/Text.h"
 
 #include <QCoreApplication>
+#include <QDir>
+#include <QFileInfo>
 #include <QDateTime>
 #include <QStandardPaths>
 #include <QString>
@@ -104,6 +106,26 @@ namespace GyanisScribe::Core
                                                        toDisplayText(directory).toStdString(), error ? error.message() : GyanisScribe::Core::uiTextUtf8("路径存在但不是目录"))});
         }
         return {};
+    }
+
+    QString Paths::portableConfigFileIn(const QString &directory)
+    {
+        if (directory.trimmed().isEmpty())
+        {
+            return {};
+        }
+
+        const auto marker = QDir{directory}.filePath(QString::fromLatin1(kPortableMarkerFileName.data(), static_cast<qsizetype>(kPortableMarkerFileName.size())));
+        if (!QFileInfo::exists(marker))
+        {
+            return {};
+        }
+        return QDir{directory}.filePath(QStringLiteral("GyanisScribe.ini"));
+    }
+
+    QString Paths::portableConfigFile()
+    {
+        return portableConfigFileIn(QCoreApplication::applicationDirPath());
     }
 
     QString Paths::defaultNameTemplate()

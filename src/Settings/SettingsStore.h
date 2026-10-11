@@ -39,8 +39,9 @@ namespace GyanisScribe::Settings
          * @brief 用指定的 INI 文件构造
          * @param iniFile 配置文件路径
          * @param parent QObject 父对象，默认无
-         * @note 目前只有用例与容器门禁走这一支：生产路径恒用系统默认位置（Windows 是注册表），
-         *       「绿色版把配置摆在程序目录旁边」还没有接线，别把这一格当成它已经成立。
+         * @note 生产路径也走这一支：程序目录里有 portable.txt 标记时，AppController 就按
+         *       Core::Paths::portableConfigFile() 指的那份 INI 构造（绿色版把配置摆在程序旁边）；
+         *       没有标记时恒用系统默认位置（Windows 是注册表）。
          */
         explicit SettingsStore(const std::filesystem::path &iniFile, QObject *parent = nullptr);
 

@@ -206,6 +206,7 @@ Linux 侧当前是「可构建、可运行、能力降级」：抓帧、标注�
 | 用途 | 位置 |
 | --- | --- |
 | 配置 | Windows 注册表 `HKCU\Software\Gyanis\GyanisScribe`；Linux `~/.config/Gyanis/GyanisScribe.conf` |
+| 配置（便携模式） | 程序目录旁放一个空的 `portable.txt`，配置就改读写同目录下的 `GyanisScribe.ini`——启动日志里会写明「便携模式」；**只有配置跟着走**，日志、历史、缓存与成品目录仍在下面各自的位置（要连数据一起带走得另立一套根路径设计，见路线图） |
 | 截图默认目录 | 用户图片目录下的 `GyanisScribe/`（可在设置里改） |
 | 录屏默认目录 | 用户视频目录下的 `GyanisScribe/`（可在设置里改） |
 | 日志 | `<AppData>/Gyanis/GyanisScribe/logs`，每条都是中文，界面切成英文也不翻译日志 |
