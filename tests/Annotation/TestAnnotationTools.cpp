@@ -141,6 +141,78 @@ namespace
         EXPECT_TRUE(GyanisScribe::Annotation::boxBlurred(QImage{}, 4).isNull());
     }
 
+    /**
+     * @brief 钉住橡皮擦沿笔迹擦回底图，且只擦到笔迹那一块
+     * @details 三条判据各打一处：擦区正中要看得到**底图自己的**像素（这一带底图是黑的，
+     *          写成白色或透明都会被抓到，写「什么都不画」则留着红带也被抓到）；擦区之外的带子
+     *          必须原样留着；探针红点落在擦笔迹外接框里、却在笔迹半径之外，用来看住是「按笔迹抠」
+     *          还是「把整个外接框盖下去」——后者会把探针也盖掉。
+     */
+    TEST_F(AnnotationFixture, EraserRevealsTheBaseImageOnlyAlongItsStroke)
+    {
+        ASSERT_TRUE(m_engine.setPenParameters(QColor(255, 0, 0), 8, 16).has_value());
+
+        // 红色横带压在黑色半区上（底图 y=100 以下是黑的），另在白色半区点一个探针红点
+        ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Pen).has_value());
+        m_engine.beginStroke(QPoint(40, 150));
+        m_engine.moveStroke(QPoint(360, 150));
+        ASSERT_TRUE(m_engine.endStroke().has_value());
+        m_engine.beginStroke(QPoint(280, 40));
+        ASSERT_TRUE(m_engine.endStroke().has_value());
+
+        const auto annotated = m_engine.exportImage();
+        ASSERT_EQ(annotated.pixelColor(300, 150), QColor(255, 0, 0)) << "靶子不对：横带该是红的";
+        ASSERT_EQ(annotated.pixelColor(280, 40), QColor(255, 0, 0)) << "靶子不对：探针红点没画上";
+
+        // 竖直擦一笔穿过横带：线宽 8 的橡皮是 8×6=48 宽，覆盖 x∈[276,324]
+        ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Eraser).has_value());
+        m_engine.beginStroke(QPoint(300, 150));
+        m_engine.moveStroke(QPoint(300, 60));
+        ASSERT_TRUE(m_engine.endStroke().has_value());
+
+        const auto erased = m_engine.exportImage();
+        EXPECT_EQ(erased.pixelColor(300, 150), QColor(0, 0, 0)) << "擦过的地方该露出底图那块黑，而不是被涂成别的颜色或原样留着红";
+        EXPECT_EQ(erased.pixelColor(200, 150), QColor(255, 0, 0)) << "擦区之外的横带被连带擦掉了";
+        EXPECT_EQ(erased.pixelColor(280, 40), QColor(255, 0, 0)) << "探针在外接框里但不在笔迹上，被整框盖下去了：抠图丢的不是笔迹形状";
+
+        // 单点落笔也要擦出一个圆点：擦的是 (250,150) 一带，30 像素外的 (220,150) 不该动
+        m_engine.beginStroke(QPoint(250, 150));
+        ASSERT_TRUE(m_engine.endStroke().has_value());
+        const auto dotErased = m_engine.exportImage();
+        EXPECT_EQ(dotErased.pixelColor(250, 150), QColor(0, 0, 0)) << "单点擦除没有落下任何东西";
+        EXPECT_EQ(dotErased.pixelColor(220, 150), QColor(255, 0, 0)) << "单点擦除的影响范围超出了自己的半径";
+
+        // 一笔擦除就是一步撤销：撤掉刚才那一下，红点该回来，而上一笔擦除照旧
+        ASSERT_TRUE(m_engine.undo().has_value());
+        const auto undone = m_engine.exportImage();
+        EXPECT_EQ(undone.pixelColor(250, 150), QColor(255, 0, 0)) << "撤销没把单点擦除收回来";
+        EXPECT_EQ(undone.pixelColor(300, 150), QColor(0, 0, 0)) << "撤销一次却收回了不止一笔";
+    }
+
+    /**
+     * @brief 钉住橡皮擦压在别的工具之上
+     * @details 擦除笔迹登记在工具表最后，层序按登记顺序：直线画在它之前，擦过的地方就该断。
+     *          若把橡皮登记到直线之前，这条线会盖在擦层上面，擦不断地判据当场变红。
+     */
+    TEST_F(AnnotationFixture, EraserSitsAboveEveryOtherTool)
+    {
+        ASSERT_TRUE(m_engine.setPenParameters(QColor(255, 0, 0), 8, 16).has_value());
+        ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Line).has_value());
+        m_engine.beginStroke(QPoint(60, 40));
+        m_engine.moveStroke(QPoint(340, 40));
+        ASSERT_TRUE(m_engine.endStroke().has_value());
+        ASSERT_EQ(m_engine.exportImage().pixelColor(200, 40), QColor(255, 0, 0)) << "靶子不对：直线该是红的";
+
+        ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Eraser).has_value());
+        m_engine.beginStroke(QPoint(200, 20));
+        m_engine.moveStroke(QPoint(200, 60));
+        ASSERT_TRUE(m_engine.endStroke().has_value());
+
+        const auto erased = m_engine.exportImage();
+        EXPECT_EQ(erased.pixelColor(200, 40), QColor(255, 255, 255)) << "擦层没压住先画的直线：擦过的地方要回到白底";
+        EXPECT_EQ(erased.pixelColor(100, 40), QColor(255, 0, 0)) << "擦区之外的直线被连带擦掉了";
+    }
+
 } // namespace
 
 /**

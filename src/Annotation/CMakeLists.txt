@@ -22,6 +22,8 @@ add_library(Annotation STATIC
         ImageBlur.cpp
         BlurTool.h
         BlurTool.cpp
+        EraserTool.h
+        EraserTool.cpp
         TextTool.h
         TextTool.cpp
         NumberTool.h

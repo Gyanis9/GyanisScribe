@@ -148,6 +148,10 @@
             <translation>Ellipse</translation>
         </message>
         <message>
+            <source>橡皮擦</source>
+            <translation>Eraser</translation>
+        </message>
+        <message>
             <source>高亮</source>
             <translation>Highlighter</translation>
         </message>

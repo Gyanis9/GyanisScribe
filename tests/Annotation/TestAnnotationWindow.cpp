@@ -206,7 +206,7 @@ TEST(ViewShortcuts, ShortcutTableMapsExactlyTheDocumentedKeys)
 
 /**
  * @brief 钉住字母键位与登记表同解，且只认裸字母
- * @details 键位取自 kToolTable 的第四列，界面提示与按键分派共用那一张表：九档逐个钉住，
+ * @details 键位取自 kToolTable 的第四列，界面提示与按键分派共用那一张表：十一档逐个钉住，
  *          再钉两位拒绝面——没绑工具的字母不许换工具，带修饰键的组合也不许
  *          （Ctrl+Z 里的 z 若当成字母键位，撤销就变成换工具）。
  */
@@ -221,6 +221,8 @@ TEST(ViewShortcuts, ToolShortcutTableMapsEveryRegisteredTool)
     EXPECT_EQ(toolShortcutFor(Qt::Key_T, Qt::NoModifier), ToolKind::Text);
     EXPECT_EQ(toolShortcutFor(Qt::Key_N, Qt::NoModifier), ToolKind::Number);
     EXPECT_EQ(toolShortcutFor(Qt::Key_L, Qt::NoModifier), ToolKind::Line);
+    EXPECT_EQ(toolShortcutFor(Qt::Key_B, Qt::NoModifier), ToolKind::Blur);
+    EXPECT_EQ(toolShortcutFor(Qt::Key_X, Qt::NoModifier), ToolKind::Eraser);
 
     EXPECT_FALSE(toolShortcutFor(Qt::Key_S, Qt::NoModifier).has_value()) << "s 没绑任何工具，不该把当前工具换掉";
     EXPECT_FALSE(toolShortcutFor(Qt::Key_Z, Qt::NoModifier).has_value()) << "z 只归 Ctrl+Z 那一档用";
