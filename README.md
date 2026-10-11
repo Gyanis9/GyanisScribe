@@ -292,19 +292,19 @@ VC++ 运行库也随包带：可执行体导入 `MSVCP140.dll` 与 `VCRUNTIME140
 ## 验证与质量门禁
 
 四条线，都是必建必测：本机 `debug` / `release` 两档，容器 `asan` / `coverage` 两档。
-本轮（2026-10-11）实测的是 `b80020d` 这一棵树：本机两档就地跑，容器两档把同一份提交同步进
+本轮（2026-10-11）实测的是 `26c8c4c` 这一棵树：本机两档就地跑，容器两档把同一份提交同步进
 `/work/scribe3` 再跑，两边被量的代码与用例逐字相同。
 
 | 线 | 命令 | 结果 |
 | --- | --- | --- |
-| Windows Release | `scripts\WindowsBuild.bat release` | 382 条全绿（0 失败），3 条环境门控跳过，名单共 385 条 |
-| Windows Debug | `scripts\WindowsBuild.bat debug` | 380 条全绿（0 失败），2 条跳过，名单共 382 条 |
-| 容器 ASan(+UBSan) | `scripts/container/sanitize.sh asan` | 366 条全绿（0 失败），10 条跳过，名单共 376 条 |
-| 容器覆盖率 | `scripts/container/coverage.sh 55` | 366 条全绿（0 失败），10 条跳过，名单共 376 条；行覆盖 **72.1%**（4918/6822），阈值 55%；主程序在 Xvfb 上 `--selftest` 退出码 0 |
+| Windows Release | `scripts\WindowsBuild.bat release` | 387 条全绿（0 失败），3 条环境门控跳过，名单共 390 条 |
+| Windows Debug | `scripts\WindowsBuild.bat debug` | 383 条全绿（0 失败），4 条跳过，名单共 387 条 |
+| 容器 ASan(+UBSan) | `scripts/container/sanitize.sh asan` | 371 条全绿（0 失败），10 条跳过，名单共 381 条 |
+| 容器覆盖率 | `scripts/container/coverage.sh 55` | 371 条全绿（0 失败），10 条跳过，名单共 381 条；行覆盖 **71.9%**（4994/6949），阈值 55%；主程序在 Xvfb 上 `--selftest` 退出码 0 |
 
 条数差是按两档 `ctest -N` 的名单现比的，不是记下来的：本机 Release 的名单比容器多 10 条（4 条 WinRT 系统识别、
 1 条 Win32 热键映射、4 条 Tesseract 直测、1 条只在 Windows 编译的单色指针解码），容器比本机多 1 条「后端没编进来」
-的对照，净差 385 − 376 = 9。全绿那条数还要各自再减掉本档的跳过数，所以 382 与 366 之间差 16 而不是 9——
+的对照，净差 390 − 381 = 9。全绿那条数还要各自再减掉本档的跳过数，所以 387 与 371 之间差 16 而不是 9——
 余下的 7 条是容器那份环境跳的。
 `asan` 与 `coverage` 两档的 `build_type` 就是 Debug，而 Debug 档不领 Tesseract（理由与撤除判据见 [docs/OcrBackends.md](docs/OcrBackends.md)）。
 本机 Debug 那一档同样少这 4 条，另多 1 条「后端没编进来」的对照——两档条数不同是这套条件编译的结果，不是漏跑。
