@@ -162,7 +162,9 @@ namespace GyanisScribe::App
 
         /**
          * @brief 截取当前前台窗口
-         * @details 句柄由平台集成给（Windows 走 GetForegroundWindow），抓帧那一步按句柄去问几何；
+         * @details 与 startCapture 同一条延时通道，前台窗口在到点那一刻才取：等的那几秒本就是用来
+         *          把菜单、悬停状态摆出来的，按下时就取走会把这一档的意义抹掉。
+         *          句柄由平台集成给（Windows 走 GetForegroundWindow），抓帧那一步按句柄去问几何；
          *          平台给不出句柄时把原因发给用户，而不是静默什么都不做。
          */
         void captureForegroundWindow();

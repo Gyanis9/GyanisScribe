@@ -327,16 +327,21 @@ namespace GyanisScribe::App
 
     void AppController::captureForegroundWindow()
     {
-        const auto window = m_integration->foregroundWindow();
-        if (!window)
-        {
-            // 菜单按能力位过滤过这一项，走到这里说明能力位与实际结果不一致（或以后新增了别的入口）：
-            // 原因照样发给用户，不静默什么都不做
-            notifyUser(QString::fromStdString(window.error().message), Ui::ToastKind::Danger);
-            return;
-        }
+        // 走与其他截图入口同一条延时通道：到点才取前台窗口，才截得到「等的那几秒里摆出来的」那一扇
+        scheduleCapture(
+                [this]
+                {
+                    const auto window = m_integration->foregroundWindow();
+                    if (!window)
+                    {
+                        // 菜单按能力位过滤过这一项，走到这里说明能力位与实际结果不一致（或以后新增了别的入口）：
+                        // 原因照样发给用户，不静默什么都不做
+                        notifyUser(QString::fromStdString(window.error().message), Ui::ToastKind::Danger);
+                        return;
+                    }
 
-        m_capture->captureWindow(window->handle);
+                    m_capture->captureWindow(window->handle);
+                });
     }
 
     void AppController::openMainWindow(const MainWindowPage page)
