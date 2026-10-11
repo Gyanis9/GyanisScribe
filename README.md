@@ -264,6 +264,12 @@ Qt 运行时，然后在 staging 目录里把 `PATH` 收窄到只剩 `System32`�
 把 `Qt6Widgets.dll` 挪开，`--selftest` 的退出码变成 `-1073741515`（`0xc0000135` = 找不到 DLL），
 放回又回到 0。安装器带卸载段。
 
+VC++ 运行库也随包带：可执行体导入 `MSVCP140.dll` 与 `VCRUNTIME140.dll`（还有 `_1`、`_2` 两份），
+这几件不属于 Windows 自带的系统映像，新装机上要么先装 redist 要么程序起不来。打包脚本按编译器版本
+从工具链的 `VC\Redist\MSVC\<版本>\onecore\x64\Microsoft.VC145.CRT` 取那五份摆到可执行体旁边
+（Windows 先搜程序目录，加载的就是随包这一份），缺任一件当场中止；UCRT（`api-ms-win-crt-*`）不搬，
+那是 10/11 自带的。`windeployqt --compiler-runtime` 在这套 Qt 上一个 CRT 都不落地（实测），所以自己拷。
+
 「装完即用」这一条也真机量过：把 `dist/` 里的安装器静默装进一个空目录（`/S /D=<空目录>`），
 装出来的目录里 `GyanisScribe.exe`、`ffmpeg.exe`、`tessdata/` 两份语言包、`licenses/`、
 `translations/GyanisScribe_en.qm`、`platforms/qwindows.dll` 与 `Uninstaller.exe` 全在；
@@ -274,16 +280,17 @@ Qt 运行时，然后在 staging 目录里把 `PATH` 收窄到只剩 `System32`�
 ## 验证与质量门禁
 
 四条线，都是必建必测：本机 `debug` / `release` 两档，容器 `asan` / `coverage` 两档。
-本轮（2026-10-11，按提交后的树在独立工作树与容器里各跑一遍）实测：
+本轮（2026-10-11，按 `c3b3d42` 那一份提交后的树在独立工作树与容器里各跑一遍）实测：
 
 | 线 | 命令 | 结果 |
 | --- | --- | --- |
-| Windows Release | `scripts\WindowsBuild.bat release` | 321 条全绿（0 失败），其中 1 条环境门控跳过 |
-| Windows Debug | `scripts\WindowsBuild.bat debug` | 318 条全绿（0 失败），其中 2 条跳过 |
-| 容器 ASan(+UBSan) | `scripts/container/sanitize.sh asan` | 313 条全绿（0 失败），其中 6 条跳过 |
-| 容器覆盖率 | `scripts/container/coverage.sh 55` | 313 条全绿（0 失败），行覆盖 **71.0%**（4369/6155），阈值 55%；主程序在 Xvfb 上 `--selftest` 退出码 0 |
+| Windows Release | `scripts\WindowsBuild.bat release` | 365 条全绿（0 失败），其中 1 条环境门控跳过 |
+| Windows Debug | `scripts\WindowsBuild.bat debug` | 362 条全绿（0 失败），其中 2 条跳过 |
+| 容器 ASan(+UBSan) | `scripts/container/sanitize.sh asan` | 357 条全绿（0 失败），其中 7 条跳过 |
+| 容器覆盖率 | `scripts/container/coverage.sh 55` | 357 条全绿（0 失败），行覆盖 **71.4%**（4790/6704），阈值 55%；主程序在 Xvfb 上 `--selftest` 退出码 0 |
 
-容器比本机 Release 少 9 条：4 条 WinRT 系统识别、1 条 Win32 热键映射，另 4 条 Tesseract 直测——
+容器比本机 Release 少 8 条（按两档 `ctest -N` 的名单现比现算，不是记下来的差值）：
+3 条 WinRT 系统识别、1 条 Win32 热键映射，另 4 条 Tesseract 直测——
 `asan` 与 `coverage` 两档的 `build_type` 就是 Debug，而 Debug 档不领 Tesseract（理由与撤除判据见 [docs/OcrBackends.md](docs/OcrBackends.md)）。
 本机 Debug 那一档同样少这 4 条，另多 1 条「后端没编进来」的对照——两档条数不同是这套条件编译的结果，不是漏跑。
 跳过的都是环境门控用例，本机两档与容器各跳哪些是清楚的：
@@ -295,6 +302,7 @@ Qt 运行时，然后在 staging 目录里把 `PATH` 收窄到只剩 `System32`�
 | `FfmpegAudioCaptureEndToEnd.*`、`VideoEncoderEndToEndFixture.*`、`FfmpegAudioDevicesEndToEndFixture.*` | 要真 `ffmpeg`；取声那一条还要一路真设备 |
 | `CrashGuardEndToEnd.*` | minidump 走 Windows 的 dbghelp；Linux 侧这一格是空操作（core dump 归宿主配置） |
 | `PlatformIntegration.EnumeratedWindowSitsWhereQtPutsIt` | 「屏上有哪些窗口」只有 Windows 后端给得出；能力位为假时这一格按降级出口跳过，回绝文案由同文件另一条用例钉住 |
+| `ModuleFlowFixture.TrayEscapeHatchMakesThroughPinsClickableAgain` | 要真鼠标穿透能力才开得出「穿透中」的贴图，Linux 侧那一位为假；没有可复现的现场就跳过，不拿假现场充一条通过 |
 
 `scripts\WindowsBuild.bat` 在 `Vendor/Ffmpeg/ffmpeg.exe` 就位时会自动把它交给 `GYANISSCRIBE_FFMPEG`，
 所以打过一次包的本机跑门禁时，编码与设备枚举这两条端到端是真的在跑（跳过的只剩取声那一条）。
@@ -357,7 +365,8 @@ docs/           需求、识别后端、第三方许可证、界面样式说明
 | --- | --- | --- |
 | 截图延迟 < 100ms | 中位 30–31ms（10 次采样，min 26 / max 35） | 独立探针走产品同一条路（`QScreen::grabWindow` → `toImage` → `convertToFormat(ARGB32_Premultiplied)`），丢掉首轮的一次性开销，两次独立运行给出 30 与 31ms。机器：2560×1440、dpr 1.0、单屏、Release Qt |
 | OCR 单张 < 1s | 几十毫秒量级（640×160 的一次识别连同后端构造与 PNG 编解码，单用例计时 43ms） | ctest 的 per-test 计时；跨模块那条用 900×600 的图，337ms 里含 Qt 应用与引擎初始化 |
-| 录屏 1080p30 不掉帧、CPU 占用合理 | **未测** | 需要真机跑满 60s 再统计帧间隔分布与峰值 CPU；而现在帧序列按 PNG 逐帧落盘，1080p 十分钟就是 GB 级，这条要等 `rawvideo` 管道那一项落地后一起测（见[路线图](#路线图后续计划)） |
+| 录屏 1080p30 不掉帧、CPU 占用合理 | **没达成**：1920×1080 选区、30 帧档，十秒实测只存下 113/300 帧（≈11.2fps），最大帧间隔 148ms，这一轮进程占掉 85.7% 一个核 | 真的 `RecordingService` 在真屏幕上跑十秒，数 `frameStored` 与帧间隔；CPU 取 `GetProcessTimes` 的进程时间除以墙钟。两道墙拆开看：抓一帧（2560×1440）中位 34ms——单这一项就超掉 30fps 的 33ms 预算，要放开帧率得换采集原语（Windows Graphics Capture / DXGI 桌面重复）；PNG 落盘中位 53ms/帧（约 210KB），那一段还留在界面线程上（见[路线图](#路线图后续计划)）。顺一条反直觉的实测：Qt 的 PNG 压缩档不是省时间的开关，`quality=1` 要 168ms，比默认档慢三倍 |
+| 录屏成品的时长与录的那一段一致 | 6.00 秒那一轮编出来容器自报 6.12 秒；旧写法同一轮是 2.33 秒的快放 | 命令里的 `-framerate`（以及 GIF 滤镜里的 `fps=`）按「这一轮的帧数 × 1000 / 毫秒」写成有理数，不再用配置里那档目标帧率——短了的帧序列按目标帧率铺就是快放，音轨还会被 `-shortest` 截尾。端到端用例读 ffmpeg 自己报的 `Duration` 来断：三帧摊在两秒上，容器里就该写着 2.00 秒 |
 | 编码前的编码器探测耗时 | 本机 1920×1080 单档实测：libx264 60ms（缺件立刻失败）、NVENC 187ms、QSV 1583ms、AMF 574ms、mpeg4 77ms；本机选中 NVENC 走的是前两档共 247ms，五档全试完是 2481ms | 三帧到 `null` 输出的探测命令，参数按真录屏尺寸、帧率与画面码率给；选中即停，只有 MP4 走这一步，GIF 不需要 |
 | 贴图拖动流畅、鼠标穿透不抢焦点 | 定性验证：拖动走 `PinTransform` 的增量换算（有用例钉数值），穿透由平台侧 `setMouseThrough` 落地 | 主观流畅度无法用断言钉；这里只承诺「没有动画在拖动的路上插队」 |
 
@@ -373,8 +382,8 @@ docs/           需求、识别后端、第三方许可证、界面样式说明
   `conanfile.py` 里按 `build_type` 分岔并写明撤除判据。Windows 的 Debug 档仍能真识别——工厂先问系统识别。
 - Linux 侧能力不全：没有全局热键后端（登记会给出中文提示并降级）、没有录屏取声、
   无系统托盘时菜单改由主窗口提供、`Qt::ColorScheme` 要 6.8 才有而容器是 6.4（跟随系统会解算到兜底档）。
-- 安装器的「装完能起、卸载能清」还没在真机上跑过 smoke test：脚本目前验证到
-  staging 目录自检通过 + 安装器带卸载段。
+- 录屏跟不上目标帧率时，成品按这一轮**实际达成**的那一档帧率铺时间轴：画面不快放，只是变卡，
+  音轨也不再被截尾。达成率与墙钟对齐这件事写在[性能实测](#性能实测)那一格里，有端到端用例钉着。
 - 两处路径仍按本地码页交给第三方库（各自在同一句里写明理由，`Style.SourceConventions` 认这些理由）：
   spdlog 的日志文件名（本构建没开 `SPDLOG_WCHAR_FILENAMES`，窄串要按本地码页给）与 Tesseract/Leptonica 的
   `TessBaseAPIInit3`（C 接口拿 `const char*` 开文件）。要彻底了断 spdlog 那一处，得在 Conan 侧把 wchar
@@ -384,7 +393,8 @@ docs/           需求、识别后端、第三方许可证、界面样式说明
 
 按需求条目核对过，剩下这些没做，都在等一个能验证它们的环境：
 
-- **长录屏**：帧序列按 PNG 逐帧落盘，1080p 十分钟就是 GB 级；换成喂 ffmpeg `rawvideo` 管道才能放开时长上限。
+- **长录屏**：帧序列按 PNG 逐帧落盘，1080p 十分钟就是 GB 级（实测屏幕内容一帧约 210KB，15 帧率十分钟约 1.9GB）；
+  换成喂 ffmpeg `rawvideo` 管道才能放开时长上限。
 - **录屏逐帧写 PNG 仍在界面线程上**：需求的硬约束要求「耗时操作放工作线程」，现在只剩这一处
   （`PngSequenceSink::write`：一帧的写盘时间直接算进下一格的等待）。
   文字识别与停止后的编码都已交出去：`Ocr::RecognitionRunner` 与 `RecordingService::startEncoding`
@@ -403,11 +413,6 @@ docs/           需求、识别后端、第三方许可证、界面样式说明
   选出这台机器开不起来的那一档，就是让整段录屏白录。
 - **Linux 全局热键**：`Platform` 抽象下只有 Windows 后端有真登记，Linux 侧给出中文降级提示；
   要做得接 X11/Wayland 各自的快捷键协议。
-- **窗口录屏的光标位置**：整屏与选区都能圈出光标，录单个窗口时圈不出来——帧里只有窗口像素，
-  窗口左上角的全局读数要等平台侧的窗口几何接口。这条接口不是省事省掉的：Qt 6.11 只有 `QWindow::fromWinId`，
-  返回的包装所有权不明（按帧拿就是每帧造一个可能已活的 `QWindow`），而 Win32 的 `GetWindowRect` 读的是物理像素，
-  必须与 DPI 换算配成对才不错位。`RecordingService` 在第一帧就把这一点写进日志，不画错位的圈。
-- **安装器真机 smoke test**：补上「装完能起、卸载能清」那一轮。
 - **界面截图与演示**：本文档暂时没有截图，等打包产物稳定后补真实界面图，不放占位图。
 
 ## 参与贡献
