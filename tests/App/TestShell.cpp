@@ -92,6 +92,7 @@ TEST(TrayMenuCapabilities, DropsWindowCaptureOnlyWhenThePlatformCannotDiscoverWi
 {
     PlatformCapabilities withDiscovery;
     withDiscovery.windowDiscovery = true;
+    withDiscovery.clickThrough    = true; // 齐平 = 两条按能力过滤的项都在，第 105 行那句才判得动
     PlatformCapabilities withoutDiscovery;
 
     const auto hasWindowItem = [](const auto &entries)
@@ -103,9 +104,33 @@ TEST(TrayMenuCapabilities, DropsWindowCaptureOnlyWhenThePlatformCannotDiscoverWi
     EXPECT_TRUE(hasWindowItem(granted)) << "平台给得出前台窗口，菜单却没有那一项";
     EXPECT_FALSE(hasWindowItem(denied)) << "平台给不出前台窗口，菜单里却留着一条按了报错的项";
     EXPECT_EQ(granted.size(), trayMenuEntries().size()) << "能力齐平时过滤不该改动任何一项";
-    EXPECT_EQ(denied.size(), granted.size() - 1) << "不该顺带摘掉别的项目";
+    // 全零的这一档少两项：按能力过滤的就是这两条（前台窗口、贴图出口），别的不许跟着掉
+    EXPECT_EQ(denied.size(), granted.size() - 2) << "受能力影响的只有这两条，别的一项都不许跟着被摘";
 }
 
+/**
+ * @brief 钉住「取消全部贴图穿透」这一条只在平台做得到穿透时才出现
+ * @details 没这能力的平台上按它永远只会回一句「没有贴图开着鼠标穿透」，
+ *          那是一条按下去不会有用的菜单项；两个方向都要判，白过滤与漏过滤是两种不同的坏法。
+ */
+TEST(TrayMenuCapabilities, DropsThroughEscapeOnlyWhenThePlatformCannotGoThrough)
+{
+    PlatformCapabilities withThrough;
+    withThrough.clickThrough    = true;
+    withThrough.windowDiscovery = true;
+    PlatformCapabilities withoutThrough;
+    withoutThrough.windowDiscovery = true;
+
+    const auto hasThroughItem = [](const auto &entries)
+    { return std::ranges::any_of(entries, [](const TrayMenuEntry &entry) { return entry.action == TrayAction::ClearPinsThrough; }); };
+
+    const auto granted = visibleTrayMenuEntries(withThrough);
+    const auto denied  = visibleTrayMenuEntries(withoutThrough);
+
+    EXPECT_TRUE(hasThroughItem(granted)) << "平台做得到穿透，菜单里却没有这条出口";
+    EXPECT_FALSE(hasThroughItem(denied)) << "平台做不到，留着它就是给用户一条按了没用的项";
+    EXPECT_EQ(denied.size(), granted.size() - 1) << "过滤这条不该顺带摘掉别的项目";
+}
 /**
  * @brief 钉住托盘悬停提示里的贴图张数
  * @details 贴图窗口常被别的窗口压住，托盘是唯一还能看出「屏幕上挂着几张」的地方。

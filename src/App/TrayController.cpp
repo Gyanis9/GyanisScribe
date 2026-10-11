@@ -78,6 +78,12 @@ namespace GyanisScribe::App
             {
                 continue;
             }
+            // 没有穿透能力的平台上这张出口永远只会回一句「没有贴图开着鼠标穿透」：
+            // 一条按下去永远不会有用处的菜单项不该占这一格
+            if (entry.action == TrayAction::ClearPinsThrough && !capabilities.clickThrough)
+            {
+                continue;
+            }
             visible.append(entry);
         }
         return visible;
