@@ -284,19 +284,19 @@ VC++ 运行库也随包带：可执行体导入 `MSVCP140.dll` 与 `VCRUNTIME140
 ## 验证与质量门禁
 
 四条线，都是必建必测：本机 `debug` / `release` 两档，容器 `asan` / `coverage` 两档。
-本轮（2026-10-11）实测：本机两档跑在 `4526f29`，容器两档把 `f5e89e4` 同步进 `/work/scribe2` 再跑，
-而 `f5e89e4` 只改本节这几行字，两处被量的代码与用例逐字相同。
+本轮（2026-10-11）实测的是 `b7a6cd8` 这一棵树：本机两档就地跑，容器两档把同一份工作树同步进
+`/work/scribe3` 再跑，两边被量的代码与用例逐字相同。
 
 | 线 | 命令 | 结果 |
 | --- | --- | --- |
-| Windows Release | `scripts\WindowsBuild.bat release` | 366 条全绿（0 失败），1 条环境门控跳过，名单共 367 条 |
-| Windows Debug | `scripts\WindowsBuild.bat debug` | 362 条全绿（0 失败），2 条跳过，名单共 364 条 |
-| 容器 ASan(+UBSan) | `scripts/container/sanitize.sh asan` | 351 条全绿（0 失败），8 条跳过，名单共 359 条 |
-| 容器覆盖率 | `scripts/container/coverage.sh 55` | 351 条全绿（0 失败），8 条跳过，名单共 359 条；行覆盖 **71.5%**（4800/6710），阈值 55%；主程序在 Xvfb 上 `--selftest` 退出码 0 |
+| Windows Release | `scripts\WindowsBuild.bat release` | 382 条全绿（0 失败），1 条环境门控跳过，名单共 383 条 |
+| Windows Debug | `scripts\WindowsBuild.bat debug` | 378 条全绿（0 失败），2 条跳过，名单共 380 条 |
+| 容器 ASan(+UBSan) | `scripts/container/sanitize.sh asan` | 365 条全绿（0 失败），10 条跳过，名单共 375 条 |
+| 容器覆盖率 | `scripts/container/coverage.sh 55` | 365 条全绿（0 失败），10 条跳过，名单共 375 条；行覆盖 **72.1%**（4890/6782），阈值 55%；主程序在 Xvfb 上 `--selftest` 退出码 0 |
 
 条数差是按两档 `ctest -N` 的名单现比的，不是记下来的：本机 Release 的名单比容器多 9 条（4 条 WinRT 系统识别、
-1 条 Win32 热键映射、4 条 Tesseract 直测），容器比本机多 1 条「后端没编进来」的对照，净差 367 − 359 = 8。
-全绿那条数还要各自再减掉本档的跳过数，所以 366 与 351 之间差 15 而不是 8——余下的 7 条是容器那份环境跳的。
+1 条 Win32 热键映射、4 条 Tesseract 直测），容器比本机多 1 条「后端没编进来」的对照，净差 383 − 375 = 8。
+全绿那条数还要各自再减掉本档的跳过数，所以 382 与 365 之间差 17 而不是 8——余下的 9 条是容器那份环境跳的。
 `asan` 与 `coverage` 两档的 `build_type` 就是 Debug，而 Debug 档不领 Tesseract（理由与撤除判据见 [docs/OcrBackends.md](docs/OcrBackends.md)）。
 本机 Debug 那一档同样少这 4 条，另多 1 条「后端没编进来」的对照——两档条数不同是这套条件编译的结果，不是漏跑。
 跳过的都是环境门控用例，本机两档与容器各跳哪些是清楚的：
@@ -309,6 +309,7 @@ VC++ 运行库也随包带：可执行体导入 `MSVCP140.dll` 与 `VCRUNTIME140
 | `CrashGuardEndToEnd.*` | minidump 走 Windows 的 dbghelp；Linux 侧这一格是空操作（core dump 归宿主配置） |
 | `PlatformIntegration.EnumeratedWindowSitsWhereQtPutsIt` | 「屏上有哪些窗口」只有 Windows 后端给得出；能力位为假时这一格按降级出口跳过，回绝文案由同文件另一条用例钉住 |
 | `ModuleFlowFixture.TrayEscapeHatchMakesThroughPinsClickableAgain` | 要真鼠标穿透能力才开得出「穿透中」的贴图，Linux 侧那一位为假；没有可复现的现场就跳过，不拿假现场充一条通过 |
+| `QScreenCaptureSourceFixture.GrabbedCursorShapeIsSelfConsistent`、`...CursorDrawsIntoARealFrameWithoutBreakingItsGeometry` | 要真桌面才取得到系统指针的形状；容器与离屏档拿不到就跳过。掩码与三态的合成规则不靠这一格——`CursorPixels` 那三条用自造的位平面跑，两边都跑得到 |
 
 `scripts\WindowsBuild.bat` 在 `Vendor/Ffmpeg/ffmpeg.exe` 就位时会自动把它交给 `GYANISSCRIBE_FFMPEG`，
 所以打过一次包的本机跑门禁时，编码与设备枚举这两条端到端是真的在跑（跳过的只剩取声那一条）。
