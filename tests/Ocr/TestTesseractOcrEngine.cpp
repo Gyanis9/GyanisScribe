@@ -103,7 +103,8 @@ TEST_F(TesseractEngineFixture, RecognizesRenderedTextWithTheBundledLanguagePack)
     ASSERT_FALSE(result.isEmpty()) << "一张 14pt 的干净渲染图一个字都没认出来";
     EXPECT_NE(result.text().indexOf(QStringLiteral("2026")), -1) << "实际认回：" << result.text().toStdString();
     EXPECT_NE(result.text().indexOf(QStringLiteral("report")), -1) << "实际认回：" << result.text().toStdString();
-    EXPECT_GT(result.averageConfidence, 0.5) << "平均置信度低到不像认对了：" << result.averageConfidence;
+    ASSERT_TRUE(result.averageConfidence.has_value()) << "Tesseract 报得出逐词置信度，这一格不该为空";
+    EXPECT_GT(*result.averageConfidence, 0.5) << "平均置信度低到不像认对了：" << *result.averageConfidence;
 }
 
 /**
@@ -117,7 +118,8 @@ TEST_F(TesseractEngineFixture, SmallTextNeedsTheEnlargementStep)
 
     ASSERT_FALSE(result.isEmpty());
     EXPECT_NE(result.text().indexOf(QStringLiteral("GyanisScribe")), -1) << "小字没走放大这一步，实际认回：" << result.text().toStdString();
-    EXPECT_GT(result.averageConfidence, 0.8) << "接上放大后这一张的实测平均置信度在 0.9 上下，实际：" << result.averageConfidence;
+    ASSERT_TRUE(result.averageConfidence.has_value()) << "这一张认出了词，置信度就该有读数";
+    EXPECT_GT(*result.averageConfidence, 0.8) << "接上放大后这一张的实测平均置信度在 0.9 上下，实际：" << *result.averageConfidence;
 }
 
 /**

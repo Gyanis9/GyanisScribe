@@ -121,8 +121,8 @@ namespace
             }
         }
 
-        // 系统后端不给逐词置信度，这一格必须留 0：界面据此显示「未提供」而不是「0% 把握」
-        EXPECT_DOUBLE_EQ(recognized->averageConfidence, 0.0);
+        // 系统后端不给逐词置信度，这一格必须是「没有读数」而不是 0：0 会被界面打成一个 0% 的假读数
+        EXPECT_FALSE(recognized->averageConfidence.has_value()) << "置信度该留空，留 0 等于把「不报这个数」报成「认得很差」";
     }
 
     TEST_F(WinRTImageOcrEngineFixture, RejectsALanguageWithoutAPackAndNamesWhatWorks)

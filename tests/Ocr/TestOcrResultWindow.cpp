@@ -18,6 +18,7 @@
 #include <format>
 #include <fstream>
 #include <memory>
+#include <optional>
 #include <string>
 
 using GyanisScribe::Ocr::highlightRectFor;
@@ -171,6 +172,22 @@ TEST(OcrResultStatus, SummaryCarriesLinesConfidenceAndLanguage)
 
     const QString emptySummary = statusLineFor(OcrResult{}, {800, 200});
     EXPECT_NE(emptySummary.indexOf(QString::fromUtf8("没认出文字")), -1) << "空结果要说「没字」，不能报 0 行让用户以为识别失败";
+}
+
+/**
+ * @brief 钉住后端给不出置信度时摘要写「未提供」，并且不打任何百分数
+ * @details 系统后端（Windows.Media.Ocr）根本没有逐词置信度这一路读数；打成「0%」会被读成
+ *          「这张图认得很差」，用户于是去换图换语言，而那一条路本来不通。
+ */
+TEST(OcrResultStatus, SummaryNamesTheMissingConfidenceInsteadOfZeroPercent)
+{
+    OcrResult blind         = makeTwoLineResult();
+    blind.averageConfidence = std::nullopt;
+
+    const auto summary = statusLineFor(blind, {800, 200});
+    EXPECT_NE(summary.indexOf(QString::fromUtf8("未提供")), -1) << "给不出的读数要直说，实际写着：" << summary.toStdString();
+    EXPECT_EQ(summary.indexOf(QStringLiteral("%")), -1) << "还是打出了一个百分数，「没这个量」与「把握为零」在界面上分不开";
+    EXPECT_NE(summary.indexOf(QString::fromUtf8("2 行")), -1) << "行数这类给得出的读数不该跟着一起消失";
 }
 
 /**

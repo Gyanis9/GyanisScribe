@@ -400,8 +400,8 @@
             <translation>Cursor highlight</translation>
         </message>
         <message>
-            <source>整屏与选区录屏生效；录单个窗口时目前还算不出窗口左上角的位置</source>
-            <translation>Works for full-screen and region recording. Recording a single window cannot yet tell where that top-left corner sits</translation>
+            <source>整屏、选区与窗口录屏都生效；录窗口时按平台报出的客户区左上角落位，那份读数拿不到时这一帧就不画圈</source>
+            <translation>Applies to full-screen, region, and window recording; when recording a window the ring is placed using the client-area top-left the platform reports, and a frame is left uncircled when that reading is unavailable</translation>
         </message>
         <message>
             <source>把鼠标指针画进成品</source>
@@ -1144,8 +1144,12 @@
             <translation>No text was recognized in this image. Recognize it in another language, or capture a sharper image.</translation>
         </message>
         <message>
-            <source>{} 行 · 平均置信度 {}% · 图像 {}×{} · 语言 {}</source>
-            <translation>{} lines · average confidence {}% · image {}x{} · language {}</translation>
+            <source>未提供</source>
+            <translation>not provided</translation>
+        </message>
+        <message>
+            <source>{} 行 · 平均置信度 {} · 图像 {}×{} · 语言 {}</source>
+            <translation>{} lines · average confidence {} · image {}×{} · language {}</translation>
         </message>
         <message>
             <source>识别结果</source>

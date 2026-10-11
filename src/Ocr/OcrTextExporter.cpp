@@ -6,6 +6,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonValue>
 #include <QSaveFile>
 
 #include <format>
@@ -45,7 +46,8 @@ namespace GyanisScribe::Ocr
 
         QJsonObject root;
         root.insert(QStringLiteral("language"), result.language);
-        root.insert(QStringLiteral("averageConfidence"), result.averageConfidence);
+        // 后端给不出这一路读数时导出 null：0 是一个读数，null 才说的是「这个后端不报置信度」
+        root.insert(QStringLiteral("averageConfidence"), result.averageConfidence ? QJsonValue{*result.averageConfidence} : QJsonValue{});
         // 方框坐标只在原图那一套坐标里成立，尺寸一起存出去才可能核对
         root.insert(QStringLiteral("imageSize"), QJsonObject{
                                                          {QStringLiteral("width"), imageSize.width()},

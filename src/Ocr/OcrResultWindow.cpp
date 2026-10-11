@@ -171,9 +171,12 @@ namespace GyanisScribe::Ocr
             return QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("这一张图里没认出文字。可以换一种语言再认一次，或重新截一张更清晰的图")).c_str());
         }
 
-        const auto percent = static_cast<int>(std::lround(result.averageConfidence * kConfidencePercentScale));
-        return QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("{} 行 · 平均置信度 {}% · 图像 {}×{} · 语言 {}"), result.lines.size(), percent,
-                                                              imageSize.width(), imageSize.height(), result.language.toStdString())
+        // 置信度按后端给不给得出分两种写法：给不出这一路读数就写「未提供」，
+        // 打一个 0% 会被读成「这张图认得很差」，可它说的其实是「这个后端不报这个数」
+        const std::string confidenceReadout = result.averageConfidence ? std::format("{}%", static_cast<int>(std::lround(*result.averageConfidence * kConfidencePercentScale)))
+                                                                       : GyanisScribe::Core::uiTextUtf8("未提供");
+        return QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("{} 行 · 平均置信度 {} · 图像 {}×{} · 语言 {}"), result.lines.size(),
+                                                              confidenceReadout, imageSize.width(), imageSize.height(), result.language.toStdString())
                                          .c_str());
     }
 

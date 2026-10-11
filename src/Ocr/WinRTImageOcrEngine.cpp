@@ -266,7 +266,7 @@ namespace GyanisScribe::Ocr
                                 mapped.lines.push_back(std::move(line));
                             }
                         }
-                        // averageConfidence 留 0：Windows.Media.Ocr 不给逐词置信度，界面上那一格按「后端给不出」显示
+                        // averageConfidence 留空：Windows.Media.Ocr 不给逐词置信度，界面与导出各按「没有这一路读数」显示
                         return mapped;
                     } catch (const winrt::hresult_error &failure)
                     {

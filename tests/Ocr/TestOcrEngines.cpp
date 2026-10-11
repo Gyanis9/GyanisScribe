@@ -31,6 +31,7 @@
 #include <format>
 #include <fstream>
 #include <memory>
+#include <optional>
 #include <string>
 
 using namespace GyanisScribe::Ocr;
@@ -151,6 +152,21 @@ TEST_F(OcrFixture, JsonExportIsReadableAndCarriesBoxesAndImageSize)
     EXPECT_EQ(box.value(QStringLiteral("x")).toInt(), 1);
     EXPECT_EQ(box.value(QStringLiteral("height")).toInt(), 12);
     EXPECT_EQ(lines.at(0).toObject().value(QStringLiteral("text")).toString(), QStringLiteral("第一 行"));
+}
+
+/**
+ * @brief 钉住后端没报置信度时 JSON 写 null 而不是 0
+ * @details 0 是一个读数；把文件读回来的人分不开「这个后端不报这个量」与「把握接近零」。
+ */
+TEST_F(OcrFixture, JsonExportWritesNullWhenConfidenceIsAbsent)
+{
+    OcrResult blind         = sampleResult();
+    blind.averageConfidence = std::nullopt;
+
+    const auto parsed = QJsonDocument::fromJson(toJson(blind, QSize(400, 200)).toUtf8());
+    ASSERT_TRUE(parsed.isObject());
+    EXPECT_TRUE(parsed.object().value(QStringLiteral("averageConfidence")).isNull()) << "没有的读数被写成了一个数";
+    EXPECT_EQ(parsed.object().value(QStringLiteral("language")).toString(), QStringLiteral("zh-Hans")) << "其余读数不该跟着少";
 }
 
 /**

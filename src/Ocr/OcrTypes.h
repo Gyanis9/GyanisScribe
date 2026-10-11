@@ -13,6 +13,8 @@
 #include <QString>
 #include <QVector>
 
+#include <optional>
+
 namespace GyanisScribe::Ocr
 {
 
@@ -47,9 +49,9 @@ namespace GyanisScribe::Ocr
      */
     struct OcrResult
     {
-        QString          language;                ///< 实际用的语言标签，如 zh-Hans、en
-        QVector<OcrLine> lines;                   ///< 按从上到下顺序的行
-        double           averageConfidence = 0.0; ///< 平均置信度，0-1；后端给不出时保持 0 并在文档里说明
+        QString               language;          ///< 实际用的语言标签，如 zh-Hans、en
+        QVector<OcrLine>      lines;             ///< 按从上到下顺序的行
+        std::optional<double> averageConfidence; ///< 平均置信度，0-1；后端给不出这一路读数时为空，不拿 0 冒充「认得很差」
 
         /**
          * @brief 把所有行拼成整段文本

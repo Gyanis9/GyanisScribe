@@ -62,6 +62,7 @@ namespace GyanisScribe::Ocr
      * @param imageSize 原图尺寸，像素
      * @return 「N 行 · 平均置信度 P% · 宽×高」；没有行时报「没认出文字」
      * @details 置信度按百分数取整给出：0.87 这种小数在界面上要数一遍位数才知道是高还是低。
+     *          后端压根不报这一路读数时那一格写「未提供」，不打 0%。
      */
     [[nodiscard]] QString statusLineFor(const OcrResult &result, const QSize &imageSize);
 

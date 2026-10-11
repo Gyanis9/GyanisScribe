@@ -235,6 +235,7 @@ namespace GyanisScribe::Ocr
         }
         if (!words.empty())
         {
+            // 置信度只在真有词的时候算：一个词都没有就交回空，界面那一格说「未提供」，不打一个 0% 冒充读数
             result.averageConfidence = confidenceSum / static_cast<double>(words.size());
         }
         return result;

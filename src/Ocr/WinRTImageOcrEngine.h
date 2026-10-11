@@ -23,8 +23,8 @@ namespace GyanisScribe::Ocr
      * @details 只在 Windows + MSVC 下编入（宏 GYANISSCRIBE_HAS_WINRT_OCR），构造函数就会去问系统
      *          装了哪些识别语言。头文件刻意不含 C++/WinRT 投影——那一份只由实现文件吃，
      *          消费者与容器那一档都不会因此看到 Windows 头文件。
-     * @note 系统后端不给逐词置信度，因此结果的 averageConfidence 恒为 0；
-     *       界面按「后端给不出」的形状处理（契约里写明这一格由后端文档说明）。
+     * @note 系统后端不给逐词置信度，因此结果的 averageConfidence 为空；
+     *       界面那一格随之显示「未提供」，导出 JSON 里写 null——打一个 0% 会被读成「这张图认得很差」。
      */
     class WinRTImageOcrEngine final : public IOcrEngine
     {

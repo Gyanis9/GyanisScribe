@@ -30,6 +30,7 @@ namespace GyanisScribe::Ocr
      * @brief 导出成 JSON
      * @param result 识别结果
      * @return 缩进 JSON 文本：language、averageConfidence、lines[words[text,boundingBox]]
+     * @note averageConfidence 在后端给不出这一路读数时是 null，不是 0
      * @note 方框按 x/y/width/height 四个整数存，坐标是原图那一个坐标系：
      *       换一张图对不上号，故导出文本里另存图片尺寸供核对
      */
