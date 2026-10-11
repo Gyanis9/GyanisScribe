@@ -3,6 +3,9 @@
 #include "Core/Choices.h"
 #include "Core/Text.h"
 
+#include <QImageWriter>
+
+#include <algorithm>
 #include <expected>
 
 namespace GyanisScribe::Core
@@ -45,6 +48,27 @@ namespace GyanisScribe::Core
         }
         // 猜一档就是把同一批成品按另一种压缩写出去，事后无从找回原样
         return std::unexpected(Core::unknownTokenError(kImageFormatChoices, stored, Core::uiTextUtf8("保存格式"), Core::uiTextUtf8("截图页"), "Save/ImageFormat"));
+    }
+
+    std::vector<ImageFormat> writableImageFormats()
+    {
+        const auto               supported = QImageWriter::supportedImageFormats();
+        std::vector<ImageFormat> writable;
+        for (const auto &choice: kImageFormatChoices)
+        {
+            // 插件报的是格式名（"png"、"jpg"、"webp"），与词表里的后缀同一套写法
+            if (supported.contains(QByteArray(choice.extension.data(), static_cast<qsizetype>(choice.extension.size()))))
+            {
+                writable.push_back(choice.format);
+            }
+        }
+        return writable;
+    }
+
+    bool isImageFormatWritable(const ImageFormat format)
+    {
+        const auto writable = writableImageFormats();
+        return std::find(writable.begin(), writable.end(), format) != writable.end();
     }
 
     Core::Expected<int> parseImageQuality(const int stored)

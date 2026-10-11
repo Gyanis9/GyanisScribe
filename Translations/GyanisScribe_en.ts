@@ -208,6 +208,10 @@
             <translation>Could not save the image: %1</translation>
         </message>
         <message>
+            <source>没能存下图片：这台机器的 Qt 写不出「{}」这一档。请在设置的截图页改选一档</source>
+            <translation>Could not save the image: this Qt build cannot write the "{}" format. Pick another one on the Shot page of Settings</translation>
+        </message>
+        <message>
             <source>写入失败：{}。请检查这个目录能不能写</source>
             <translation>Write failed: {}. Check whether this directory is writable</translation>
         </message>
@@ -400,22 +404,6 @@
             <translation>Applies to full-screen and region shots. Scrolling capture stitches frames, so a pointer would repeat down the long image and is left out there. Non-Windows platforms cannot read the system pointer shape, so turning this on changes nothing</translation>
         </message>
         <message>
-            <source>保存格式</source>
-            <translation>Save format</translation>
-        </message>
-        <message>
-            <source>「直接存成文件」与贴图右键的「保存」按这一档写文件；PNG 无损，JPG 与 WebP 用来把照片类的截图压小</source>
-            <translation>"Save directly to a file" and the pin context-menu "Save" write with this format. PNG is lossless; JPG and WebP shrink photo-like shots</translation>
-        </message>
-        <message>
-            <source>保存质量</source>
-            <translation>Save quality</translation>
-        </message>
-        <message>
-            <source>只有 JPG 与 WebP 吃这一格，PNG 是无损的；数字越大越清晰，文件也越大</source>
-            <translation>Only JPG and WebP use this value; PNG is lossless. Higher means clearer and bigger</translation>
-        </message>
-        <message>
             <source>界面语言</source>
             <translation>Interface language</translation>
         </message>
@@ -494,6 +482,22 @@
         <message>
             <source>选「复制到剪贴板」「直接存成文件」「直接贴到屏幕上」时都不再弹标注窗；改完从下一次截图开始生效</source>
             <translation>Choosing "Copied to the clipboard", "Save straight to a file" or "Pin straight onto the screen" skips the annotation window; it takes effect from the next capture</translation>
+        </message>
+        <message>
+            <source>保存格式</source>
+            <translation>Save format</translation>
+        </message>
+        <message>
+            <source>「直接存成文件」与贴图右键的「保存」按这一档写文件；PNG 无损，JPG 与 WebP 用来把照片类的截图压小</source>
+            <translation>"Save directly to a file" and the pin context-menu "Save" write with this format. PNG is lossless; JPG and WebP shrink photo-like shots</translation>
+        </message>
+        <message>
+            <source>保存质量</source>
+            <translation>Save quality</translation>
+        </message>
+        <message>
+            <source>只有 JPG 与 WebP 吃这一格，PNG 是无损的；数字越大越清晰，文件也越大</source>
+            <translation>Only JPG and WebP use this value; PNG is lossless. Higher means clearer and bigger</translation>
         </message>
         <message>
             <source>不取这一路</source>
@@ -1310,6 +1314,10 @@
         <message>
             <source>贴图默认不透明度 "{}" 不在 1 到 100 之间：请在设置的贴图页重选一个值，或删掉 Pin/DefaultOpacity 这一项回到完全不透明</source>
             <translation>Pin default opacity "{}" is not between 1 and 100: pick a value again on the Pin page of Settings, or remove the Pin/DefaultOpacity entry to go back to fully opaque</translation>
+        </message>
+        <message>
+            <source>这台机器的 Qt 写不出「{}」这一档保存格式。请在设置的截图页改选一档</source>
+            <translation>This Qt build cannot write the "{}" save format. Pick another one on the Shot page of Settings</translation>
         </message>
         <message>
             <source>智录贴图</source>

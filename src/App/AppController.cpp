@@ -514,6 +514,15 @@ namespace GyanisScribe::App
             notifyUser(QString::fromUtf8(GyanisScribe::Core::uiTextUtf8("没能存下图片：%1").c_str()).arg(QString::fromStdString(checked.error().message)), Ui::ToastKind::Danger);
             return;
         }
+        if (!Core::isImageFormatWritable(*format))
+        {
+            // 这一档的编码器没装：说清是格式的问题，别让用户去查目录权限
+            notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("没能存下图片：这台机器的 Qt 写不出「{}」这一档。请在设置的截图页改选一档"),
+                                                                      storedFormat.toStdString())
+                                                 .c_str()),
+                       Ui::ToastKind::Danger);
+            return;
+        }
 
         const auto fileName = Core::Paths::imageFileName(QDateTime::currentDateTime(), Core::imageFormatExtension(*format));
         const auto filePath = directory / fileName.toStdString();

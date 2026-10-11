@@ -84,6 +84,13 @@ namespace GyanisScribe::Pin
             {
                 return std::unexpected(checked.error());
             }
+            if (!Core::isImageFormatWritable(*format))
+            {
+                // 编码器没装这一档：说清是格式的问题，别让用户去查目录权限
+                return std::unexpected(Core::Error{
+                        Core::ErrorCode::PlatformUnsupported,
+                        GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("这台机器的 Qt 写不出「{}」这一档保存格式。请在设置的截图页改选一档"), stored.toStdString())});
+            }
             return std::pair{Core::imageFormatExtension(*format), quality};
         }
     } // namespace

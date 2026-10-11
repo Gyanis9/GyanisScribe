@@ -728,8 +728,10 @@ namespace
     QComboBox *makeImageFormatCombo(ISettingsStore &settings)
     {
         auto *combo = new QComboBox;
-        for (const auto &choice: GyanisScribe::Core::kImageFormatChoices)
+        // 只摆这台机器真写得出来的那几档：Qt 的图像编码器是插件，摆一档写不出的就是让用户白失败一次
+        for (const auto format: GyanisScribe::Core::writableImageFormats())
         {
+            const auto &choice = *std::ranges::find_if(GyanisScribe::Core::kImageFormatChoices, [format](const auto &row) { return row.format == format; });
             combo->addItem(GyanisScribe::Core::uiText(choice.label.data()), tokenText(choice.token));
         }
         combo->setAccessibleName(GyanisScribe::Core::uiText("保存格式"));
@@ -741,8 +743,15 @@ namespace
         {
             Logger::warning(std::format("设置页读不出「保存格式」：{}，下拉框按 PNG 显示", parsed.error().message));
         }
-        const auto chosen = parsed.value_or(GyanisScribe::Core::ImageFormat::Png);
-        combo->setCurrentIndex(combo->findData(tokenText(GyanisScribe::Core::imageFormatToken(chosen))));
+        const auto chosen      = parsed.value_or(GyanisScribe::Core::ImageFormat::Png);
+        auto       chosenIndex = combo->findData(tokenText(GyanisScribe::Core::imageFormatToken(chosen)));
+        if (chosenIndex < 0)
+        {
+            // 配置里那一档这台机器写不出来（换过机器或手改过配置）：按第一档摆，用户改一次就写回新值
+            Logger::warning(std::format("设置里存的保存格式「{}」在这台机器上写不出来，下拉框按第一档显示", stored.toStdString()));
+            chosenIndex = 0;
+        }
+        combo->setCurrentIndex(chosenIndex);
 
         // 接线排在设初值之后：否则「把界面摆到位」这一步会被当成用户改动写回配置
         QObject::connect(combo, &QComboBox::currentIndexChanged, combo,

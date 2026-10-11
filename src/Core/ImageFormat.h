@@ -15,6 +15,7 @@
 
 #include <array>
 #include <string_view>
+#include <vector>
 
 namespace GyanisScribe::Core
 {
@@ -68,6 +69,22 @@ namespace GyanisScribe::Core
      * @details 不替用户猜一档：猜错就是把同一批成品按另一种压缩写出去，事后无从找回原样。
      */
     [[nodiscard]] Core::Expected<ImageFormat> parseImageFormat(const QString &stored);
+
+    /**
+     * @brief 这台机器的 Qt 真写得出来的格式档位
+     * @return 按词表顺序筛过一遍的档位；PNG 编在 Qt6Gui 里，所以至少有一条
+     * @details 图像编码器是插件：容器里那份 Qt 6.4 没有 WebP 的写插件，Windows 那份 6.11 有。
+     *          设置页摆出写不出来的那一档，就是让用户选一次、失败一次，还拿到一句
+     *          「检查目录能不能写」的错话。
+     */
+    [[nodiscard]] std::vector<ImageFormat> writableImageFormats();
+
+    /**
+     * @brief 这一档在本机写不写得出来
+     * @param format 目标档位
+     * @return 可写为真
+     */
+    [[nodiscard]] bool isImageFormatWritable(ImageFormat format);
 
     /// 有损档的质量下限：再低就只剩块状噪声，没人会要
     inline constexpr int kMinimumImageQuality = 10;

@@ -23,11 +23,13 @@ using GyanisScribe::Core::Expected;
 using GyanisScribe::Core::ImageFormat;
 using GyanisScribe::Core::imageFormatExtension;
 using GyanisScribe::Core::imageFormatToken;
+using GyanisScribe::Core::isImageFormatWritable;
 using GyanisScribe::Core::kDefaultImageQuality;
 using GyanisScribe::Core::kMaximumImageQuality;
 using GyanisScribe::Core::kMinimumImageQuality;
 using GyanisScribe::Core::parseImageFormat;
 using GyanisScribe::Core::parseImageQuality;
+using GyanisScribe::Core::writableImageFormats;
 
 namespace
 {
@@ -128,8 +130,15 @@ TEST(ImageFormatWrite, ExtensionPicksTheEncoder)
     std::filesystem::remove_all(directory, ignored);
     ASSERT_TRUE(GyanisScribe::Core::Paths::ensureDirectory(directory).has_value());
 
+    int probed = 0;
     for (const auto &probe: probes)
     {
+        // 编码器是插件：这一档在这台机器上写不出来时，设置页根本不会摆它，用例也不该拿它判红
+        if (!isImageFormatWritable(probe.format))
+        {
+            continue;
+        }
+        ++probed;
         const auto extension = imageFormatExtension(probe.format);
         const auto path      = directory / std::format("probe.{}", extension);
         // 质量给默认档：这一条判的是「挑对了编码器」，压缩率不在这里管
@@ -141,5 +150,24 @@ TEST(ImageFormatWrite, ExtensionPicksTheEncoder)
         EXPECT_TRUE(std::equal(probe.magic.begin(), probe.magic.end(), head.begin())) << "后缀 " << extension << " 写出来的不是这一档";
     }
 
+    EXPECT_GE(probed, 2) << "两档都没跑动，说明能力过滤把可写的也筛掉了";
     std::filesystem::remove_all(directory, ignored);
+}
+
+/**
+ * @brief 钉住「写不出来的那一档不会被摆出来」这条能力过滤
+ * @details 容器那份 Qt 没有 WebP 的写插件（实测），Windows 那份有：判据取 Qt 自己报的可写格式。
+ *          PNG 编在 QtGui 里、JPG 两边都带插件，所以至少要有这两档——筛成空表的话设置页就只剩
+ *          一个不能选的下拉框，而这条会先红。
+ */
+TEST(ImageFormatCapability, UnwritableFormatsAreFilteredOut)
+{
+    const auto writable = writableImageFormats();
+    EXPECT_GE(writable.size(), 2U) << "可写档位被筛得太狠，设置页会只剩一档甚至空着";
+    EXPECT_NE(std::find(writable.begin(), writable.end(), ImageFormat::Png), writable.end());
+    EXPECT_NE(std::find(writable.begin(), writable.end(), ImageFormat::Jpeg), writable.end());
+    for (const auto format: writable)
+    {
+        EXPECT_TRUE(isImageFormatWritable(format)) << static_cast<int>(format);
+    }
 }
