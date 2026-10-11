@@ -18,6 +18,26 @@ namespace GyanisScribe::App
 {
     namespace
     {
+        /// 把网络错误枚举换成可读名：文案里塞一个数字用户没法照做
+        [[nodiscard]] QString errorStringOf(const QNetworkReply::NetworkError error)
+        {
+            switch (error)
+            {
+                case QNetworkReply::TimeoutError:
+                    return QString::fromUtf8(Core::uiTextUtf8("超时"));
+                case QNetworkReply::HostNotFoundError:
+                    return QString::fromUtf8(Core::uiTextUtf8("域名解析不了"));
+                case QNetworkReply::ConnectionRefusedError:
+                    return QString::fromUtf8(Core::uiTextUtf8("连接被拒绝"));
+                case QNetworkReply::TemporaryNetworkFailureError:
+                case QNetworkReply::NetworkSessionFailedError:
+                case QNetworkReply::RemoteHostClosedError:
+                    return QString::fromUtf8(Core::uiTextUtf8("连接中断"));
+                default:
+                    return QString::fromUtf8(Core::uiTextUtf8("网络错误"));
+            }
+        }
+
         /// 版本号前那个 v 是标签的写法，比较前要去掉（大小写都认，GitHub 上两种都见过）
         [[nodiscard]] QString versionTextOf(const QString &tag)
         {
@@ -53,6 +73,30 @@ namespace GyanisScribe::App
         }
 
         return UpdateRelease{.tagName = tag.toString().trimmed(), .pageUrl = page.toString().trimmed()};
+    }
+
+    QString failureMessageFor(const QNetworkReply::NetworkError error, const int httpStatus)
+    {
+        switch (error)
+        {
+            case QNetworkReply::ContentNotFoundError:
+                // 私有仓库与「还没有发布过正式版」在未鉴权的接口上是同一个 404，两种都只能这么提示
+                return QString::fromUtf8(Core::uiTextUtf8("查不到发布信息（404）：这个仓库还没公开，或还没有发布过正式版。请到发布页自己看一眼"));
+            case QNetworkReply::AuthenticationRequiredError:
+            case QNetworkReply::ContentAccessDenied:
+                return QString::fromUtf8(
+                        Core::uiFormat(Core::uiTextUtf8("GitHub 拒绝了这次请求（HTTP {}）：多半是请求太频繁，也可能网络中间被拦。过一会儿再试，或直接去发布页看"), httpStatus)
+                                .c_str());
+            case QNetworkReply::TimeoutError:
+            case QNetworkReply::HostNotFoundError:
+            case QNetworkReply::ConnectionRefusedError:
+            case QNetworkReply::TemporaryNetworkFailureError:
+            case QNetworkReply::NetworkSessionFailedError:
+            case QNetworkReply::RemoteHostClosedError:
+                return QString::fromUtf8(Core::uiFormat(Core::uiTextUtf8("连不上 GitHub（{}）：检查网络或代理后重试，或直接去发布页看"), errorStringOf(error).toStdString()).c_str());
+            default:
+                return QString::fromUtf8(Core::uiFormat(Core::uiTextUtf8("检查更新失败（{}）：请稍后再试，或直接去发布页看"), errorStringOf(error).toStdString()).c_str());
+        }
     }
 
     UpdateVerdict verdictFor(const QString &runningVersion, const UpdateRelease &release)

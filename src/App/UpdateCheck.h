@@ -12,6 +12,7 @@
 #include "Core/Types.h"
 
 #include <QByteArray>
+#include <QNetworkReply>
 #include <QObject>
 #include <QPointer>
 #include <QString>
@@ -19,7 +20,6 @@
 #include <string_view>
 
 class QNetworkAccessManager;
-class QNetworkReply;
 
 namespace GyanisScribe::App
 {
@@ -57,6 +57,16 @@ namespace GyanisScribe::App
      * @return 判定与文案；两边版本号有任一个解析不出来时按「没法比」处理，并把原因写进文案
      */
     [[nodiscard]] UpdateVerdict verdictFor(const QString &runningVersion, const UpdateRelease &release);
+
+    /**
+     * @brief 把一次失败的检查翻成用户能照做的一句话
+     * @param error Qt 报的网络错误
+     * @param httpStatus HTTP 状态码，没走到响应时为 0
+     * @return 中文原因 + 替代做法；原始英文原因附在括号里
+     * @details 分三档写：404（仓库没公开或还没发布）、403（限流或被拦）、连不上（网络/代理）。
+     *          其余归到一档通用文案里并把原始原因带上，不把 Qt 的英文原句直接摆给用户。
+     */
+    [[nodiscard]] QString failureMessageFor(QNetworkReply::NetworkError error, int httpStatus);
 
     /**
      * @brief 去 GitHub 问一次最新正式版

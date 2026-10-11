@@ -6,10 +6,12 @@
 #include <gtest/gtest.h>
 
 #include <QByteArray>
+#include <QNetworkReply>
 #include <QString>
 
 #include <string>
 
+using GyanisScribe::App::failureMessageFor;
 using GyanisScribe::App::parseLatestRelease;
 using GyanisScribe::App::UpdateRelease;
 using GyanisScribe::App::verdictFor;
@@ -83,4 +85,27 @@ TEST(UpdateVerdict, UnreadableVersionsSaySoInsteadOfGuessing)
 
     const auto tolerant = verdictFor(QStringLiteral("0.0.1"), UpdateRelease{.tagName = QStringLiteral(" V0.0.2 "), .pageUrl = QStringLiteral("https://example.invalid")});
     EXPECT_TRUE(tolerant.hasNewer) << "大写 V 与首尾空白都是常见写法，该认";
+}
+
+/**
+ * @brief 钉住三条常见失败各给一句能照做的话，且不把 Qt 的英文原句摆给用户
+ * @details 私有仓库与「还没发布过正式版」在未鉴权的接口上是同一个 404，文案要把两种都说上，
+ *          并给出「去发布页看」这条替代做法。
+ */
+TEST(UpdateFailureText, NamesTheCommonCasesAndStaysChinese)
+{
+    const auto notFound = failureMessageFor(QNetworkReply::ContentNotFoundError, 404);
+    EXPECT_NE(notFound.indexOf(QStringLiteral("404")), -1);
+    EXPECT_NE(notFound.indexOf(QStringLiteral("发布页")), -1) << "要说清下一步去哪看";
+
+    const auto denied = failureMessageFor(QNetworkReply::ContentAccessDenied, 403);
+    EXPECT_NE(denied.indexOf(QStringLiteral("403")), -1) << "限流那一档要带上状态码，便于用户自己和 GitHub 的记录对上";
+
+    const auto offline = failureMessageFor(QNetworkReply::HostNotFoundError, 0);
+    EXPECT_NE(offline.indexOf(QStringLiteral("域名解析不了")), -1) << "网络类要给可读的原因名，而不是一个枚举数字";
+
+    for (const auto &message: {notFound, denied, offline})
+    {
+        EXPECT_EQ(message.indexOf(QStringLiteral("Error")), -1) << "把 Qt 的英文原句交出去：" << message.toStdString();
+    }
 }

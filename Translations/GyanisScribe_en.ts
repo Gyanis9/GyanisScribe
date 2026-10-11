@@ -872,6 +872,26 @@
             <translation>Shortcut: %1. Change it on the Settings page</translation>
         </message>
         <message>
+            <source>超时</source>
+            <translation>timed out</translation>
+        </message>
+        <message>
+            <source>域名解析不了</source>
+            <translation>the host name cannot be resolved</translation>
+        </message>
+        <message>
+            <source>连接被拒绝</source>
+            <translation>the connection was refused</translation>
+        </message>
+        <message>
+            <source>连接中断</source>
+            <translation>the connection dropped</translation>
+        </message>
+        <message>
+            <source>网络错误</source>
+            <translation>network error</translation>
+        </message>
+        <message>
             <source>更新检查的回应不是一份发布信息（不是 JSON 对象）：多半是网络中间被拦了，请稍后再试</source>
             <translation>The update response is not a release description (not a JSON object): something in the middle of the network probably intercepted it, please try again later</translation>
         </message>
@@ -882,6 +902,22 @@
         <message>
             <source>发布信息里没有发布页地址：请到发布页看有没有新版</source>
             <translation>The release has no page address: check the releases page for a new version</translation>
+        </message>
+        <message>
+            <source>查不到发布信息（404）：这个仓库还没公开，或还没有发布过正式版。请到发布页自己看一眼</source>
+            <translation>No release information found (404): this repository is not public yet, or has no published release yet. Take a look at the releases page yourself</translation>
+        </message>
+        <message>
+            <source>GitHub 拒绝了这次请求（HTTP {}）：多半是请求太频繁，也可能网络中间被拦。过一会儿再试，或直接去发布页看</source>
+            <translation>GitHub rejected this request (HTTP {}): probably too many requests, or something in the middle of the network intercepted it. Try again in a while, or go straight to the releases page</translation>
+        </message>
+        <message>
+            <source>连不上 GitHub（{}）：检查网络或代理后重试，或直接去发布页看</source>
+            <translation>Cannot reach GitHub ({}): check your network or proxy and retry, or go straight to the releases page</translation>
+        </message>
+        <message>
+            <source>检查更新失败（{}）：请稍后再试，或直接去发布页看</source>
+            <translation>Update check failed ({}): try again later, or go straight to the releases page</translation>
         </message>
         <message>
             <source>本机版本号「{}」读不出来，没法与最新版比。请到发布页自己看一眼</source>
