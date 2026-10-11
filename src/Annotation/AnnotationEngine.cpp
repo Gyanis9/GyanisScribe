@@ -20,12 +20,15 @@ namespace GyanisScribe::Annotation
 {
     namespace
     {
-        /// 改样式命令的合并标识：本文件只有这一条命令重写 id()，其余命令沿用 Qt 默认的 -1（表示不参与合并）
+        /// 改样式命令的合并标识，取值只在本文件内用来分派：平移那一格另有一个编号
         constexpr int kRestyleCommandTypeId = 1;
+
+        /// 平移命令的合并标识：与样式各自一个编号，改线宽与挪位置这两趟手势不许互相并成一步
+        constexpr int kMoveCommandTypeId = 2;
 
         /**
          * @brief 插入一条图形
-         * @details 撤销栈里的四条命令都只碰工具的存储接口，不碰交互态：
+         * @details 撤销栈里的命令都只碰工具的存储接口，不碰交互态：
          *          撤销不该把在途图形也带回来。
          */
         class InsertShapeCommand : public QUndoCommand
@@ -83,6 +86,8 @@ namespace GyanisScribe::Annotation
         /**
          * @brief 平移一条图形
          * @details 撤销用等量反向位移：记下位移本身，而不是记下移动前后的两个位置。
+         *          同一条图形的连续平移并成一步：拖一趟会发几十次位移，方向键逐格也能连按好几次，
+         *          不并的话撤销一次只退一格，用户只能一直按着 Ctrl+Z 往回跑。
          */
         class MoveShapeCommand : public QUndoCommand
         {
@@ -100,6 +105,30 @@ namespace GyanisScribe::Annotation
             void undo() override
             {
                 static_cast<void>(m_tool->translateShapeBy(m_index, -m_delta));
+            }
+
+            [[nodiscard]] int id() const override
+            {
+                return kMoveCommandTypeId;
+            }
+
+            bool mergeWith(const QUndoCommand *other) override
+            {
+                if (other->id() != kMoveCommandTypeId)
+                {
+                    return false;
+                }
+                const auto &next = *static_cast<const MoveShapeCommand *>(other);
+                // 只并同一条图形的位移：换了工具或换了序号，那就是另一趟意图
+                if (next.m_tool != m_tool || next.m_index != m_index)
+                {
+                    return false;
+                }
+
+                // Qt 的 QUndoStack::push() 先跑新命令的 redo() 再试合并，位移已经落到图形上：
+                // 这里只把两段累加成一个总位移，撤销取的是反向总量，回到这一趟开始之前
+                m_delta += next.m_delta;
+                return true;
             }
 
         private:

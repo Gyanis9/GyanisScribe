@@ -173,6 +173,8 @@ namespace GyanisScribe::Annotation
          * @brief 移动选中项，见 IAnnotationEngine::moveSelectionBy()
          * @param delta 位移
          * @return 成功返回空载荷；没选中或索引失效返回 InvalidArgument
+         * @details 重写基类接口：压一条平移命令，并与栈顶同一条图形的上一次位移并成一步，
+         *          拖一趟与连按方向键都只算一步撤销。
          */
         Core::Expected<void> moveSelectionBy(const QPoint &delta) override;
 

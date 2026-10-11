@@ -181,6 +181,8 @@ namespace GyanisScribe::Annotation
          * @brief 移动选中项
          * @param delta 逻辑坐标位移
          * @return 成功返回空载荷；没有选中项或索引失效时返回 InvalidArgument
+         * @details 同一条图形的连续位移并成一步撤销：拖一趟要发几十次位移，方向键也能连按好几格，
+         *          并成一步之后撤销一次就回到这一趟开始之前。
          */
         virtual Core::Expected<void> moveSelectionBy(const QPoint &delta) = 0;
 

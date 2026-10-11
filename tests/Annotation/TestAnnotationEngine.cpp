@@ -157,6 +157,63 @@ TEST_F(EngineFixture, MoveSelectionByIsUndoable)
 }
 
 /**
+ * @brief 钉住「拖一趟 = 一步撤销」：连续平移同一条图形要并成一步
+ * @details 拖动一路会发几十次位移、方向键也能连按好几格，每一跳各占一步的话撤销一次只退一格。
+ *          判据取像素与栈深两处：一次撤销就回到这一趟开始之前，再撤一步撤掉的是绘制本身。
+ */
+TEST_F(EngineFixture, ConsecutiveMovesOfTheSameShapeCollapseIntoOneUndoStep)
+{
+    drawRectangle(QPoint(10, 10), QPoint(90, 60));
+    const auto hit = m_engine.selectionAt(QPoint(10, 35));
+    ASSERT_TRUE(hit.has_value());
+    ASSERT_TRUE(m_engine.select(*hit).has_value());
+
+    // 三跳各 +10，合起来是 +30：左边描边该从 x=10 走到 x=40
+    for (int step = 0; step < 3; ++step)
+    {
+        ASSERT_TRUE(m_engine.moveSelectionBy(QPoint(10, 0)).has_value());
+    }
+    EXPECT_NE(m_engine.exportImage().pixelColor(40, 35), QColor(255, 255, 255)) << "三跳位移没全落到图形上";
+
+    ASSERT_TRUE(m_engine.undo().has_value());
+    const auto afterOneUndo = m_engine.exportImage();
+    EXPECT_NE(afterOneUndo.pixelColor(10, 35), QColor(255, 255, 255)) << "一次撤销没回到这一趟开始之前：每一跳各占了一步";
+    EXPECT_EQ(afterOneUndo.pixelColor(40, 35), QColor(255, 255, 255)) << "撤销只退了一格，剩下两跳还留在图上";
+
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_FALSE(m_engine.canUndo()) << "撤销栈里还剩着移动步：并步只并掉了其中几跳";
+}
+
+/**
+ * @brief 钉住并步的范围：换了图形就不许把两趟位移并成一步
+ * @details 并步按「同一工具 + 同一序号」判，认错了对象就会把两条图形的位移合成一次撤销，
+ *          撤第二条的移动时把第一条也拖回去。
+ */
+TEST_F(EngineFixture, MovesOfDifferentShapesAreNotMerged)
+{
+    drawRectangle(QPoint(10, 10), QPoint(60, 60));
+    drawRectangle(QPoint(100, 10), QPoint(150, 60));
+
+    const auto first = m_engine.selectionAt(QPoint(10, 35));
+    ASSERT_TRUE(first.has_value());
+    ASSERT_TRUE(m_engine.select(*first).has_value());
+    ASSERT_TRUE(m_engine.moveSelectionBy(QPoint(20, 0)).has_value());
+
+    // 两趟位移之间没有别的命令插队，栈顶正是上一条移动：并步若不认图形就会把它们合成一步
+    const auto second = m_engine.selectionAt(QPoint(100, 35));
+    ASSERT_TRUE(second.has_value());
+    ASSERT_TRUE(m_engine.select(*second).has_value());
+    ASSERT_TRUE(m_engine.moveSelectionBy(QPoint(20, 0)).has_value());
+
+    // 撤的应当只是第二趟：第二条回到 x=100，第一条仍留在 x=30
+    ASSERT_TRUE(m_engine.undo().has_value());
+    const auto afterOneUndo = m_engine.exportImage();
+    EXPECT_NE(afterOneUndo.pixelColor(100, 35), QColor(255, 255, 255)) << "第二次撤销没把第二条图形放回原位";
+    EXPECT_EQ(afterOneUndo.pixelColor(120, 35), QColor(255, 255, 255)) << "第二条还停在位移后的位置，撤销没打到它";
+    EXPECT_NE(afterOneUndo.pixelColor(30, 35), QColor(255, 255, 255)) << "第一条被一起拖回去了：两趟位移被并成了一步";
+}
+
+/**
  * @brief 钉住换画布清空图形与历史
  */
 TEST_F(EngineFixture, LoadCanvasClearsShapesAndHistory)
