@@ -39,6 +39,13 @@ namespace GyanisScribe::Settings
     /// 按下截图后等几秒再开始（0 到 60，0 表示不延时）：用来截菜单、提示这类一碰就没的状态
     inline constexpr std::string_view kCaptureDelaySeconds = "Capture/DelaySeconds";
 
+    /// 截图要不要把鼠标指针画进去，读端在 Capture::CaptureService，写端在设置的截图页；
+    /// 只有整屏与区域截图吃这一格，滚动长截图按帧接图，画进去会在长图上留下一串指针
+    inline constexpr std::string_view kCaptureIncludeCursor = "Capture/IncludeCursor";
+
+    /// 「没填」那一档取不含指针：区域截图刚松手时指针就在选区里，默认画进去会让成品多出一只箭头
+    inline constexpr bool kDefaultCaptureIncludeCursor = false;
+
     /// 贴图保存的默认目录，为空时用系统图片目录下的 GyanisScribe
     inline constexpr std::string_view kPathScreenshot = "Paths/Screenshot";
 

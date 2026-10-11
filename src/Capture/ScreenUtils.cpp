@@ -4,6 +4,7 @@
 
 #include <QApplication>
 #include <QGuiApplication>
+#include <QPainter>
 #include <QScreen>
 
 #include <cmath>
@@ -320,6 +321,31 @@ namespace GyanisScribe::Capture
                 break;
         }
         return shape;
+    }
+
+    QRect cursorRectInPixels(const CursorSprite &sprite, qreal devicePixelRatio)
+    {
+        // 缩放因子只换算位置：形状本身就是系统按这块屏的 DPI 挑出来的物理像素，再乘一次指针会大一圈
+        const auto ratio = devicePixelRatio > 0.0 ? devicePixelRatio : 1.0;
+        // 尖端位置换算成物理像素后，形状要按热点回退，否则指针整体偏右下
+        const auto topLeft = QPoint{static_cast<int>(std::lround(static_cast<double>(sprite.position.x()) * ratio)),
+                                    static_cast<int>(std::lround(static_cast<double>(sprite.position.y()) * ratio))} -
+                             sprite.hotspot;
+        return QRect{topLeft, sprite.image.size()};
+    }
+
+    void drawCursorInto(Core::CapturedImage &frame, const CursorSprite &sprite)
+    {
+        if (sprite.image.isNull() || frame.image.isNull())
+        {
+            return;
+        }
+
+        const auto target = cursorRectInPixels(sprite, frame.devicePixelRatio);
+        QPainter   painter{&frame.image};
+        // 落点已经是物理像素：来源交回的图都按「image 的缩放因子清成 1」这一格约定（见 IScreenCaptureSource），
+        // painter 因此按设备像素画，指针不会被再放大一次
+        painter.drawImage(target.topLeft(), sprite.image);
     }
 
 } // namespace GyanisScribe::Capture

@@ -71,11 +71,20 @@ namespace
             return windowResult;
         }
 
-        mutable std::vector<CapturedImage> screenQueue;
-        mutable std::vector<QString>       requestedScreens;
-        mutable std::vector<quintptr>      requestedWindows;
-        Expected<CapturedImage>            screenResult{makeFrame()};
-        Expected<CapturedImage>            windowResult{makeFrame()};
+        /// 替身照抄生产端的入参形状：取指针要同一份屏名，落点才算在同一块屏上
+        [[nodiscard]] std::optional<GyanisScribe::Capture::CursorSprite> grabCursor(const QString &screenName) const override
+        {
+            requestedCursorScreens.push_back(screenName);
+            return cursorSprite;
+        }
+
+        mutable std::vector<CapturedImage>                 screenQueue;
+        mutable std::vector<QString>                       requestedScreens;
+        mutable std::vector<QString>                       requestedCursorScreens;
+        mutable std::vector<quintptr>                      requestedWindows;
+        Expected<CapturedImage>                            screenResult{makeFrame()};
+        Expected<CapturedImage>                            windowResult{makeFrame()};
+        std::optional<GyanisScribe::Capture::CursorSprite> cursorSprite;
     };
 
     std::unique_ptr<QApplication> application;
@@ -490,4 +499,175 @@ TEST_F(CaptureServiceFixture, StartingAnotherCaptureWhileALongRoundRunsIsRefused
     ASSERT_TRUE(finished.has_value()) << "被拒的那一次顺手把长截图的结果也丢了";
     // 队列里只备了一帧，第二帧退回替身那份固定的红图：内容不同 → 整段接上，长图从 50 行变 100 行
     EXPECT_EQ(finished->image.size(), QSize(100, 100)) << "被拒之后这一轮还能接着接，接出来的高度才对得上";
+}
+
+namespace
+{
+    /// 一枚 8×8 的实心绿指针：落点与画没画都从像素颜色上直接看得出来
+    GyanisScribe::Capture::CursorSprite makeGreenSprite(const QPoint &position)
+    {
+        GyanisScribe::Capture::CursorSprite sprite;
+        sprite.image = QImage(8, 8, QImage::Format_ARGB32_Premultiplied);
+        sprite.image.fill(QColor(0, 255, 0));
+        sprite.hotspot  = QPoint(0, 0);
+        sprite.position = position;
+        return sprite;
+    }
+} // namespace
+
+/**
+ * @brief 钉住「含指针」开关的三档：默认不画、开着才画、画完不改来源那帧
+ * @details 默认档必须与开关无关地不动像素——区域截图刚松手时指针就在选区里，
+ *
+ * 默认画进去会让每个人的成品都多出一只箭头。开关开着时落点按帧自己的缩放因子算：
+ *          逻辑 (10,10) 在 dpr 2 的帧上是物理 (20,20)。
+
+ */
+TEST_F(CaptureServiceFixture, CursorIsDrawnOnlyWhenTheSettingIsOn)
+{
+    SettingsStore     settings(m_iniFile);
+    FakeCaptureSource source;
+    source.cursorSprite = makeGreenSprite(QPoint(10, 10));
+
+    {
+        CaptureService service(source, settings, *platform);
+        Outcome        outcome;
+        wire(service, outcome);
+        service.captureFullScreen();
+        ASSERT_TRUE(outcome.image.has_value());
+        EXPECT_EQ(outcome.image->image.pixelColor(20, 20), QColor(255, 0, 0)) << "没打开开关就画了指针，默认档会把箭头塞进每个人的截图";
+        EXPECT_TRUE(source.requestedCursorScreens.empty()) << "开关关着时连形状都不该去问，白跑一次平台调用";
+    }
+
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureIncludeCursor, QVariant(true)).has_value());
+    {
+        CaptureService service(source, settings, *platform);
+        Outcome        outcome;
+        wire(service, outcome);
+        service.captureFullScreen();
+        ASSERT_TRUE(outcome.image.has_value());
+        EXPECT_EQ(outcome.image->image.pixelColor(20, 20), QColor(0, 255, 0));
+        EXPECT_EQ(outcome.image->image.pixelColor(27, 27), QColor(0, 255, 0));
+        EXPECT_EQ(outcome.image->image.pixelColor(28, 28), QColor(255, 0, 0)) << "绿块铺过了 8×8，形状被放大了";
+        ASSERT_EQ(source.requestedCursorScreens.size(), 1U);
+        EXPECT_EQ(source.requestedCursorScreens[0], QStringLiteral("FakeScreen-1")) << "落点要折回抓帧用的那块屏，屏名必须同源";
+    }
+
+    // 来源那帧不能被上一轮就地改花：替身返回的是同一个 Expected，画歪一次就会留色给后面所有用例
+    {
+        CaptureService service(source, settings, *platform);
+        Outcome        outcome;
+        wire(service, outcome);
+        service.captureFullScreen();
+        ASSERT_TRUE(outcome.image.has_value());
+        EXPECT_EQ(outcome.image->image.pixelColor(20, 20), QColor(0, 255, 0));
+    }
+}
+
+/**
+ * @brief 钉住区域截图先把指针画进整帧再裁
+ * @details 顺序颠倒就会拿整帧坐标去裁选区：含指针的那一小块要么丢失，要么凭空多出在选区角落。
+ *
+ * 两条对照一起跑——框住指针的必须有绿，没框住的必须一格绿都没有。
+ */
+TEST_F(CaptureServiceFixture, RegionCropKeepsCursorOnlyWhereItFalls)
+{
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureIncludeCursor, QVariant(true)).has_value());
+    FakeCaptureSource source;
+    source.cursorSprite = makeGreenSprite(QPoint(10, 10));
+
+    {
+        CaptureService service(source, settings, *platform);
+        Outcome        outcome;
+        wire(service, outcome);
+        // 选区 (10,10,40,15) 在 dpr 2 上是物理 (20,20)-(100,50)：指针尖端正好落在裁出图的原点
+        service.captureRegion(QRect(10, 10, 40, 15), QStringLiteral("FakeScreen-1"));
+        ASSERT_TRUE(outcome.image.has_value());
+        EXPECT_EQ(outcome.image->image.pixelColor(0, 0), QColor(0, 255, 0)) << "指针在选区里却没画进来，合成与裁剪的顺序错了";
+    }
+
+    {
+        CaptureService service(source, settings, *platform);
+        Outcome        outcome;
+        wire(service, outcome);
+        service.captureRegion(QRect(60, 40, 20, 10), QStringLiteral("FakeScreen-1"));
+        ASSERT_TRUE(outcome.image.has_value());
+        for (int y = 0; y < outcome.image->image.height(); ++y)
+        {
+            for (int x = 0; x < outcome.image->image.width(); ++x)
+            {
+                EXPECT_EQ(outcome.image->image.pixelColor(x, y), QColor(255, 0, 0)) << "选区外 (60,40) 的指针被画进了这块选区";
+            }
+        }
+    }
+}
+
+/**
+ * @brief 钉住取不到形状时照常出图，并在日志里说明这次不含指针
+ * @details 指针隐藏、或平台根本不是 Windows 时，来源交回空值。这时必须安静地出一张没指针的图，
+ *
+ * 而不是失败——也不能按「含了」交下去让用户以为箭头在。
+ */
+TEST_F(CaptureServiceFixture, MissingCursorShapeStillDeliversAFrameAndSaysSo)
+{
+    const auto      caseName     = std::string_view(::testing::UnitTest::GetInstance()->current_test_info()->name());
+    const auto      logDirectory = std::filesystem::temp_directory_path() / std::format("GyanisScribe-Capture-{}-logs", caseName);
+    std::error_code ignored;
+    std::filesystem::remove_all(logDirectory, ignored);
+    ASSERT_TRUE(GyanisScribe::Core::Logger::initialize(logDirectory).has_value());
+
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureIncludeCursor, QVariant(true)).has_value());
+
+    FakeCaptureSource source; // cursorSprite 留空，等于本平台取不到形状
+    CaptureService    service(source, settings, *platform);
+    Outcome           outcome;
+    wire(service, outcome);
+
+    service.captureFullScreen();
+    ASSERT_TRUE(outcome.image.has_value()) << "取不到指针形状不该把整次截图判失败";
+    EXPECT_EQ(outcome.image->image.pixelColor(20, 20), QColor(255, 0, 0));
+
+    // 先收 logger 再读文件：sink 带缓冲，边写边读就把「这行到没到盘上」交给了调度
+    GyanisScribe::Core::Logger::shutdown();
+
+    std::ifstream     input(logDirectory / "GyanisScribe.log", std::ios::binary);
+    const std::string logText{std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{}};
+    EXPECT_NE(logText.find("取不到指针的形状"), std::string::npos) << "降级没写进日志，用户只能对着没有箭头的图猜";
+}
+
+/**
+ * @brief 钉住滚动长截图的取帧一律不带指针
+ * @details 长图是按帧接出来的：每一帧都画一枚指针，接完就是一串排到页底的箭头。
+ *
+ * 这一条把「设置开着、形状也给得出来」的前提摆足，再证明接出来的长图一格绿都没有。
+ */
+TEST_F(CaptureServiceFixture, LongCaptureFramesNeverCarryTheCursor)
+{
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureIncludeCursor, QVariant(true)).has_value());
+
+    FakeCaptureSource source;
+    source.cursorSprite = makeGreenSprite(QPoint(10, 10));
+    source.screenQueue  = {makeFrame(), makeFrame()};
+
+    CaptureService service(source, settings, *platform);
+    Outcome        outcome;
+    wire(service, outcome);
+
+    service.captureLongRegion(QRect(0, 0, 50, 25));
+    service.grabNextLongFrame();
+    service.grabNextLongFrame();
+    service.finishLongCapture();
+
+    ASSERT_TRUE(outcome.image.has_value());
+    EXPECT_TRUE(source.requestedCursorScreens.empty()) << "长截图去问了指针形状，接出来的长图会带一串箭头";
+    for (int y = 0; y < outcome.image->image.height(); ++y)
+    {
+        for (int x = 0; x < outcome.image->image.width(); ++x)
+        {
+            EXPECT_EQ(outcome.image->image.pixelColor(x, y), QColor(255, 0, 0)) << "长图里混进了指针色";
+        }
+    }
 }

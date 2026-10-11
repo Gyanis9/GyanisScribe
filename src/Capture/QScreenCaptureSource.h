@@ -47,6 +47,16 @@ namespace GyanisScribe::Capture
          * @return 窗口那一帧；句柄失效返回 InvalidArgument，本平台抓不出窗口返回 PlatformUnsupported
          */
         [[nodiscard]] Core::Expected<Core::CapturedImage> grabWindow(quintptr windowHandle) const override;
+
+        /**
+         * @brief 取鼠标指针当前的形状与落点，见 IScreenCaptureSource::grabCursor()
+         * @param screenName 与同一次 grabScreen() 同一个屏名，空串取光标所在那块
+         * @details 重写基类接口：形状在 Windows 上用 GetCursorInfo 拿系统正在画的那枚指针并解出
+         *          像素，落点用 Qt 的光标读数折回该屏的逻辑坐标；其余平台保持基类的空值。
+         *          Qt 6.11 没有公开 API 能取到系统指针的形状，只能走 Win32 这一层。
+         * @return 指针在屏上可见、形状也解得出来时返回；隐藏、解不出或本平台不支持时返回空
+         */
+        [[nodiscard]] std::optional<CursorSprite> grabCursor(const QString &screenName) const override;
     };
 
 } // namespace GyanisScribe::Capture

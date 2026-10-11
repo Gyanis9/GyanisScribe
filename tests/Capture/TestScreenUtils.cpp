@@ -14,7 +14,9 @@
 
 using GyanisScribe::Capture::cropToLogicalRect;
 using GyanisScribe::Capture::cursorForGrip;
+using GyanisScribe::Capture::cursorRectInPixels;
 using GyanisScribe::Capture::dragRegionByGrip;
+using GyanisScribe::Capture::drawCursorInto;
 using GyanisScribe::Capture::formatSelectionHint;
 using GyanisScribe::Capture::gripAt;
 using GyanisScribe::Capture::kSelectionGripTolerance;
@@ -293,4 +295,152 @@ TEST(ScreenUtils, EachGripShowsItsOwnCursor)
     EXPECT_EQ(cursorForGrip(SelectionGrip::Bottom), Qt::SizeVerCursor);
     EXPECT_EQ(cursorForGrip(SelectionGrip::Inside), Qt::SizeAllCursor);
     EXPECT_EQ(cursorForGrip(SelectionGrip::None), Qt::CrossCursor);
+}
+
+/**
+ * @brief 钉住指针落点：只有位置乘缩放因子，形状尺寸不动
+ * @details 热点回退排在乘因子之后，反过来的话高 DPI 屏上尖端会偏出好几个像素；
+ *          缩放因子非正时退回按 1
+ * 算，而不是判成「画不出去」返回空矩形。
+ */
+TEST(ScreenUtils, CursorRectScalesOnlyItsPosition)
+{
+    GyanisScribe::Capture::CursorSprite sprite;
+    sprite.image   = QImage(12, 18, QImage::Format_ARGB32_Premultiplied);
+    sprite.hotspot = QPoint(3, 6);
+
+    sprite.position = QPoint(100, 80);
+    EXPECT_EQ(cursorRectInPixels(sprite, 1.0), QRect(97, 74, 12, 18));
+    EXPECT_EQ(cursorRectInPixels(sprite, 2.0), QRect(197, 154, 12, 18)) << "12×18 变成 24×36 就是把形状也乘了一遍，指针会大一圈";
+    // 1.5 这一档的半格按四舍五入落格：16.5 → 17
+    sprite.position = QPoint(11, 11);
+    EXPECT_EQ(cursorRectInPixels(sprite, 1.5), QRect(14, 11, 12, 18));
+    // 多屏时来源已经把位置折回屏内，这里只按屏内读数算
+    sprite.position = QPoint(10, 500);
+    EXPECT_EQ(cursorRectInPixels(sprite, 1.0), QRect(7, 494, 12, 18));
+    // 缩放因子非正：退回按 1 算
+    sprite.position = QPoint(50, 50);
+    EXPECT_EQ(cursorRectInPixels(sprite, 0.0), QRect(47, 44, 12, 18));
+    // 尖端贴着屏左上角时形状会探出屏外：允许负落点，裁切交给画的那一步
+    sprite.position = QPoint(1, 1);
+    EXPECT_EQ(cursorRectInPixels(sprite, 1.0), QRect(-2, -5, 12, 18));
+}
+
+/**
+ * @brief 钉住画进帧里的指针只改自己覆盖的那几格
+ * @details 落点算对了还得真画得出来：不透明的格子换成指针色、透明的格子一个字都不动，
+ *
+ * 这两格一起才证明混合走的是源-over，而不是整块覆盖或整块跳过。
+ */
+TEST(ScreenUtils, DrawCursorReplacesOnlyItsOwnPixels)
+{
+    CapturedImage frame;
+    frame.image = QImage(20, 20, QImage::Format_ARGB32_Premultiplied);
+    frame.image.fill(QColor(255, 0, 0));
+    frame.devicePixelRatio = 1.0;
+
+    GyanisScribe::Capture::CursorSprite sprite;
+    sprite.image = QImage(4, 4, QImage::Format_ARGB32_Premultiplied);
+    sprite.image.fill(QColor(0, 255, 0));
+    sprite.image.setPixelColor(0, 0, Qt::transparent); // 左上角留一格全透明，混合要放过它
+    sprite.hotspot  = QPoint(0, 0);
+    sprite.position = QPoint(5, 5);
+
+    drawCursorInto(frame, sprite);
+
+    const auto green = QColor(0, 255, 0);
+    const auto red   = QColor(255, 0, 0);
+    EXPECT_EQ(frame.image.pixelColor(5, 5), red) << "指针上全透明那一格被盖上了颜色，混合做成了整格覆盖";
+    EXPECT_EQ(frame.image.pixelColor(6, 5), green);
+    EXPECT_EQ(frame.image.pixelColor(8, 8), green);
+    EXPECT_EQ(frame.image.pixelColor(4, 5), red) << "指针外的像素被动了，落点或尺寸算错";
+    EXPECT_EQ(frame.image.pixelColor(9, 9), red);
+}
+
+/**
+ * @brief 钉住高 DPI 那一档画出来的是原尺寸的指针、放在翻倍后的位置上
+ * @details 这条是「只换算位置」的现场判据：形状若也跟着乘因子，绿块会铺到 8×8；
+ *
+ * 位置若没乘，绿块会落在 (10,10) 而不是 (20,20)。
+ */
+TEST(ScreenUtils, DrawCursorOnHighDpiFrameKeepsSpriteSize)
+{
+    CapturedImage frame;
+    frame.image = QImage(40, 40, QImage::Format_ARGB32_Premultiplied);
+    frame.image.fill(QColor(255, 0, 0));
+    frame.devicePixelRatio = 2.0;
+
+    GyanisScribe::Capture::CursorSprite sprite;
+    sprite.image = QImage(4, 4, QImage::Format_ARGB32_Premultiplied);
+    sprite.image.fill(QColor(0, 255, 0));
+    sprite.hotspot  = QPoint(0, 0);
+    sprite.position = QPoint(10, 10);
+
+    drawCursorInto(frame, sprite);
+
+    const auto green = QColor(0, 255, 0);
+    const auto red   = QColor(255, 0, 0);
+    EXPECT_EQ(frame.image.pixelColor(20, 20), green) << "落点没按缩放因子翻倍";
+    EXPECT_EQ(frame.image.pixelColor(23, 23), green);
+    EXPECT_EQ(frame.image.pixelColor(19, 20), red);
+    EXPECT_EQ(frame.image.pixelColor(24, 24), red) << "绿块铺过了 4×4，形状被放大了";
+}
+
+/**
+ * @brief 钉住指针贴到屏边与屏外时的裁切
+ * @details 截整屏时光标常在角落：越界的那一半要裁掉而不是回绕到对面，
+ *          回绕会在左上角多出一块没人见过的指针。
+
+ */
+TEST(ScreenUtils, DrawCursorClipsAtScreenEdges)
+{
+    GyanisScribe::Capture::CursorSprite sprite;
+    sprite.image = QImage(4, 4, QImage::Format_ARGB32_Premultiplied);
+    sprite.image.fill(QColor(0, 255, 0));
+    sprite.hotspot = QPoint(0, 0);
+
+    CapturedImage corner;
+    corner.image = QImage(20, 20, QImage::Format_ARGB32_Premultiplied);
+    corner.image.fill(QColor(255, 0, 0));
+    corner.devicePixelRatio = 1.0;
+    sprite.position         = QPoint(18, 18);
+    drawCursorInto(corner, sprite);
+    EXPECT_EQ(corner.image.pixelColor(19, 19), QColor(0, 255, 0)) << "右下角只剩 2×2 进得来，那一格必须画到";
+    EXPECT_EQ(corner.image.pixelColor(17, 19), QColor(255, 0, 0));
+
+    CapturedImage offScreen;
+    offScreen.image = QImage(20, 20, QImage::Format_ARGB32_Premultiplied);
+    offScreen.image.fill(QColor(255, 0, 0));
+    offScreen.devicePixelRatio = 1.0;
+    sprite.position            = QPoint(-5, -5);
+    drawCursorInto(offScreen, sprite);
+    EXPECT_EQ(offScreen.image.pixelColor(0, 0), QColor(255, 0, 0)) << "屏外的指针回绕进画面了";
+}
+
+/**
+ * @brief 钉住半透明的指针边缘真的做了混合
+ * @details 指针的抗锯齿边是半透明的：只做整格覆盖就会在浅色背景上留一圈硬边，
+ *          这一条钉的是「介于两色之间」，具体数值交给
+ * Qt 自己算。
+ */
+TEST(ScreenUtils, DrawCursorBlendsSemiTransparentEdges)
+{
+    CapturedImage frame;
+    frame.image = QImage(8, 8, QImage::Format_ARGB32_Premultiplied);
+    frame.image.fill(QColor(255, 0, 0));
+    frame.devicePixelRatio = 1.0;
+
+    GyanisScribe::Capture::CursorSprite sprite;
+    sprite.image = QImage(2, 2, QImage::Format_ARGB32_Premultiplied);
+    sprite.image.fill(QColor(0, 255, 0, 128));
+    sprite.hotspot  = QPoint(0, 0);
+    sprite.position = QPoint(1, 1);
+
+    drawCursorInto(frame, sprite);
+
+    const auto blended = frame.image.pixelColor(1, 1);
+    EXPECT_GT(blended.red(), 0) << "混合后红通道被抹平，等于整格覆盖";
+    EXPECT_LT(blended.red(), 255);
+    EXPECT_GT(blended.green(), 0);
+    EXPECT_LT(blended.green(), 255);
 }

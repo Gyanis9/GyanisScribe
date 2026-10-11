@@ -146,6 +146,16 @@ namespace GyanisScribe::Capture
         void deliver(const Core::Expected<Core::CapturedImage> &result);
 
         /**
+         * @brief 按设置把鼠标指针合成进整帧
+         * @param frame 刚抓好的整帧（可能已经失败）
+         * @return 开关关着、抓帧本身失败、或本平台取不到指针形状时原样返回；否则返回画好指针的那一帧
+         * @details 只在整帧上画：裁选区排在后面，选区里带不带指针由选区自己决定，
+         *          不必在裁完之后再来一次坐标换算。取不到形状时写一条日志说明这次不含指针，
+         *          不悄悄按「含了」交下去。
+         */
+        [[nodiscard]] Core::Expected<Core::CapturedImage> withCursorIfWanted(const Core::Expected<Core::CapturedImage> &frame) const;
+
+        /**
          * @brief 收掉全部遮罩，不发任何信号
          */
         void closeOverlays();

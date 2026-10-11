@@ -4,6 +4,8 @@ add_library(Capture STATIC
         ScreenUtils.cpp
         FrameStitch.h
         FrameStitch.cpp
+        CursorPixels.h
+        CursorPixels.cpp
         LongCaptureHud.h
         LongCaptureHud.cpp
         IScreenCaptureSource.h

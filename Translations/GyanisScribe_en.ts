@@ -372,6 +372,18 @@
             <translation>Works for full-screen and region recording. Recording a single window cannot yet tell where that top-left corner sits</translation>
         </message>
         <message>
+            <source>把鼠标指针画进成品</source>
+            <translation>Draw the mouse pointer into the result</translation>
+        </message>
+        <message>
+            <source>含鼠标指针</source>
+            <translation>Include mouse pointer</translation>
+        </message>
+        <message>
+            <source>整屏与区域截图生效；滚动长截图按帧接图，画进去会留下一串指针，那一趟不带。非 Windows 平台取不到系统指针的形状，开了也不会出现</source>
+            <translation>Applies to full-screen and region shots. Scrolling capture stitches frames, so a pointer would repeat down the long image and is left out there. Non-Windows platforms cannot read the system pointer shape, so turning this on changes nothing</translation>
+        </message>
+        <message>
             <source>界面语言</source>
             <translation>Interface language</translation>
         </message>
@@ -546,6 +558,10 @@
         <message>
             <source>截图与标注成品落在这个目录里。取色复制出来的文本按下面的写法格式化。</source>
             <translation>Screenshots and finished annotations land in this folder. Copied colors are formatted with the format chosen below.</translation>
+        </message>
+        <message>
+            <source>鼠标指针</source>
+            <translation>Mouse pointer</translation>
         </message>
         <message>
             <source>截图与标注成品目录</source>

@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "Capture/IScreenCaptureSource.h"
 #include "Core/Types.h"
 
 #include <QPoint>
@@ -161,5 +162,25 @@ namespace GyanisScribe::Capture
      * @return 该用的光标：边点给对应方向的伸缩箭，Inside 给四向移动，None 给十字
      */
     [[nodiscard]] Qt::CursorShape cursorForGrip(SelectionGrip grip);
+
+    /**
+     * @brief 指针形状该落在帧内的哪一个物理矩形
+     * @param sprite 指针形状、热点与屏内位置
+     * @param devicePixelRatio 该帧的缩放因子，必须大于 0
+     * @return 帧内坐标下的落点矩形，可能整块或部分在帧外；缩放因子非正时退回按 1 算，
+     *         不返回空矩形冒充「不在屏上」
+     * @details 只有位置受缩放因子影响：形状本身已是系统按该屏 DPI 挑出来的物理像素，
+     *          再乘一次就会把指针放大一圈。落点 = 屏内逻辑位置乘因子，再按热点回退。
+     */
+    [[nodiscard]] QRect cursorRectInPixels(const CursorSprite &sprite, qreal devicePixelRatio);
+
+    /**
+     * @brief 把指针画进这一帧，就地改 frame.image
+     * @param frame 抓到的整帧（物理像素，缩放因子按 frame.devicePixelRatio 参与落点换算）
+     * @param sprite 指针形状与落点
+     * @details 算好落点交给 QPainter 做源-over 混合：部分透明与贴屏边裁切都由它兜，
+     *          自己写逐像素回绕会在高缩放屏上把指针画糊。
+     */
+    void drawCursorInto(Core::CapturedImage &frame, const CursorSprite &sprite);
 
 } // namespace GyanisScribe::Capture

@@ -44,12 +44,13 @@ namespace GyanisScribe::Capture
 
     void CaptureService::captureFullScreen(const QString &screenName)
     {
-        deliver(m_source.grabScreen(screenName));
+        deliver(withCursorIfWanted(m_source.grabScreen(screenName)));
     }
 
     void CaptureService::captureRegion(const QRect &logicalRegion, const QString &screenName)
     {
-        const auto frame = m_source.grabScreen(screenName);
+        // 指针先画进整帧再裁：选区里带不带指针由选区自己决定，不必裁完再来一次坐标换算
+        const auto frame = withCursorIfWanted(m_source.grabScreen(screenName));
         if (!frame)
         {
             // 整帧都没抓到就谈不上裁剪：原因交回，别在这里补一个「按 0 处理」的形状
@@ -79,6 +80,7 @@ namespace GyanisScribe::Capture
 
     void CaptureService::captureWindow(quintptr windowHandle)
     {
+        // 这一路刻意不合成指针：形状要按窗口左上角换算落点，而抓别人的窗口时那份逻辑几何拿不齐
         deliver(m_source.grabWindow(windowHandle));
     }
 
@@ -187,6 +189,27 @@ namespace GyanisScribe::Capture
         {
             emit captureCancelled();
         }
+    }
+
+    Core::Expected<Core::CapturedImage> CaptureService::withCursorIfWanted(const Core::Expected<Core::CapturedImage> &frame) const
+    {
+        if (!frame || !m_settings.boolValue(Settings::kCaptureIncludeCursor, Settings::kDefaultCaptureIncludeCursor))
+        {
+            return frame;
+        }
+
+        // 屏名沿用这一帧自己报回来的那一个：来源按光标选屏时也会把真名写回帧里，两边认的是同一块屏
+        const auto sprite = m_source.grabCursor(frame->screenName);
+        if (!sprite || sprite->image.isNull())
+        {
+            // 平台给不出形状（指针隐藏、非 Windows 后端）：说明白这次不含指针，别按「含了」交下去
+            Core::Logger::warning(std::format("设置里要含鼠标指针，但这次取不到指针的形状，交出去的图里没有指针"));
+            return frame;
+        }
+
+        auto result = *frame;
+        drawCursorInto(result, *sprite);
+        return result;
     }
 
     void CaptureService::deliver(const Core::Expected<Core::CapturedImage> &result)

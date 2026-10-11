@@ -15,8 +15,27 @@
 
 #include <QString>
 
+#include <QImage>
+#include <QPoint>
+
+#include <optional>
+
 namespace GyanisScribe::Capture
 {
+
+    /**
+     * @brief 鼠标指针的形状与落点：一张与抓帧同尺度的小图，加它的热点和此刻在屏内的位置
+     * @details 像素按物理算，与 CapturedImage 的 image 同一口径；形状本身受系统 DPI 支配，
+     *          我们只搬位置，不再乘一次缩放因子。
+     * @note position 是「最近一次抓的那块屏」内的逻辑坐标，与 grabCursor() 传的屏名同源，
+     *       换算是屏内位置乘缩放因子——两处口径不一致就会画歪。
+     */
+    struct CursorSprite
+    {
+        QImage image;    ///< 指针形状，Format_ARGB32_Premultiplied，物理像素
+        QPoint hotspot;  ///< 尖端在 image 内的物理像素坐标，落点要按它回退
+        QPoint position; ///< 尖端在该屏内的逻辑坐标，与抓帧用的那块屏同一个坐标系
+    };
 
     /**
      * @brief 抓帧来源
@@ -48,6 +67,19 @@ namespace GyanisScribe::Capture
          * @return 句柄已失效、或本平台抓不出窗口时返回原因
          */
         [[nodiscard]] virtual Core::Expected<Core::CapturedImage> grabWindow(quintptr windowHandle) const = 0;
+
+        /**
+         * @brief 取鼠标指针当前的形状与落点
+         * @param screenName 与同一次 grabScreen() 传的同一个屏名，空串表示「光标所在那块」
+         * @return 拿得出时返回形状；本平台拿不到、指针此刻没显示、或落点算不出时返回空
+         * @note 缺省实现返回空：一份来源没接这一格，编排层就跳过合成并在日志里说明，
+         *       而不是画一枚凭空的指针冒充「含指针」。
+         */
+        [[nodiscard]] virtual std::optional<CursorSprite> grabCursor(const QString &screenName) const
+        {
+            Q_UNUSED(screenName);
+            return std::nullopt;
+        }
     };
 
 } // namespace GyanisScribe::Capture

@@ -354,6 +354,34 @@ namespace
     }
 
     /**
+     * @brief 截图时要不要把鼠标指针画进成品
+     * @param settings 配置存储
+     * @return 归调用方所有的复选框，由 addRow 挂上父对象
+     * @details 默认档与 CaptureService 读的是同一个常量：两处各写一份就会造成
+     *          「界面显示已开、编排按未开走」这种两边不同解。
+     */
+    QCheckBox *makeIncludeCursorCheck(ISettingsStore &settings)
+    {
+        auto *check = new QCheckBox;
+        check->setText(GyanisScribe::Core::uiText("把鼠标指针画进成品"));
+        check->setAccessibleName(GyanisScribe::Core::uiText("含鼠标指针"));
+        check->setToolTip(
+                GyanisScribe::Core::uiText("整屏与区域截图生效；滚动长截图按帧接图，画进去会留下一串指针，那一趟不带。非 Windows 平台取不到系统指针的形状，开了也不会出现"));
+        check->setChecked(settings.boolValue(GyanisScribe::Settings::kCaptureIncludeCursor, GyanisScribe::Settings::kDefaultCaptureIncludeCursor));
+
+        // 接线排在设初值之后：摆到位不等于用户改过，否则一开设置页就把默认值写进配置
+        QObject::connect(check, &QCheckBox::toggled, check,
+                         [&settings](bool checked)
+                         {
+                             if (auto written = settings.setValue(GyanisScribe::Settings::kCaptureIncludeCursor, checked); !written)
+                             {
+                                 Logger::warning(std::format("截图含指针开关没能写入：{}", written.error().message));
+                             }
+                         });
+        return check;
+    }
+
+    /**
      * @brief 界面语言下拉：档位读写都走 Ui/Language 的词表
      * @param settings 配置存储
      * @return 归调用方所有的下拉框
@@ -1153,6 +1181,7 @@ namespace GyanisScribe::App
         auto *form = makePageForm(page, GyanisScribe::Core::uiText("截图与标注成品落在这个目录里。取色复制出来的文本按下面的写法格式化。"));
         form->addRow(GyanisScribe::Core::uiText("截完之后"), makeCaptureIntentCombo(m_settings));
         form->addRow(GyanisScribe::Core::uiText("延时截图"), makeCaptureDelaySpin(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("鼠标指针"), makeIncludeCursorCheck(m_settings));
         form->addRow(GyanisScribe::Core::uiText("截图与标注成品目录"),
                      makePathRow(m_settings, GyanisScribe::Settings::kPathScreenshot, GyanisScribe::Core::uiText("截图目录"), Core::Paths::defaultScreenshotDirectory(), m_icons));
         form->addRow(GyanisScribe::Core::uiText("复制用的写法"), makeColorFormatCombo(m_settings));

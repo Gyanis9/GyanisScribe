@@ -1,8 +1,10 @@
 add_executable(TestCapture
         TestCaptureService.cpp
+        TestCursorPixels.cpp
         TestFrameStitch.cpp
         TestLongCaptureHud.cpp
         TestCaptureOverlay.cpp
+        TestQScreenCaptureSource.cpp
         TestScreenUtils.cpp)
 
 target_link_libraries(TestCapture PRIVATE
