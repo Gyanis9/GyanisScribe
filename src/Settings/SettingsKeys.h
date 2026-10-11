@@ -24,7 +24,7 @@ namespace GyanisScribe::Settings
     /// 收起/摆回全部贴图的全局热键
     inline constexpr std::string_view kHotkeyTogglePins = "Hotkey/TogglePins";
 
-    /// 主题档位，取值只能是 Light、Dark、System
+    /// 主题档位，取值只能是 Light、Dark、System、HighContrast
     inline constexpr std::string_view kThemeMode = "Theme/Mode";
 
     /// 界面语言，取值只能是 zh 与 en；en 需要随包的语言包，见 Ui/Language.h

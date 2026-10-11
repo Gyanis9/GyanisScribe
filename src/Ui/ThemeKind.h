@@ -20,8 +20,8 @@ namespace GyanisScribe::Ui
 
     /**
      * @brief 用户可选的主题档位
-     * @details 三档是需求第五节的原样：浅色、深色、跟随系统。枚举成员只追加不改序，
-     *          用例按序号钉住了 JSON 与配置里的取值表。
+     * @details 枚举成员只追加不改序，用例按序号钉住了 JSON 与配置里的取值表。
+     *          高对比度是需求 §九「支持高对比度模式」那一格：纯黑白加主色，边框升到 2px。
      */
     enum class ThemeKind
     {
@@ -45,8 +45,8 @@ namespace GyanisScribe::Ui
 
     /**
      * @brief 把配置里的文本解析成主题档位
-     * @param text 配置存的文本，取值只能是 Light、Dark、System
-     * @return 解析出的档位；文本不合法时返回 InvalidArgument 并写清可用的三个取值
+     * @param text 配置存的文本，取值只能是 Light、Dark、System、HighContrast
+     * @return 解析出的档位；文本不合法时返回 InvalidArgument 并列出这四档
      */
     [[nodiscard]] Core::Expected<ThemeKind> parseThemeKind(std::string_view text);
 

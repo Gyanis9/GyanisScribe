@@ -339,7 +339,7 @@ namespace
         auto *check = new QCheckBox;
         check->setText(GyanisScribe::Core::uiText("把光标位置圈在画面里"));
         check->setAccessibleName(GyanisScribe::Core::uiText("光标高亮"));
-        check->setToolTip(GyanisScribe::Core::uiText("整屏与选区录屏生效；录单个窗口时目前还算不出窗口左上角的位置"));
+        check->setToolTip(GyanisScribe::Core::uiText("整屏、选区与窗口录屏都生效；录窗口时按平台报出的客户区左上角落位，那份读数拿不到时这一帧就不画圈"));
         check->setChecked(settings.boolValue(GyanisScribe::Settings::kRecordCursorHighlight, false));
 
         // 接线排在设初值之后：摆到位不等于用户改过，否则一开设置页就把默认值写进配置

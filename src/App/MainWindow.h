@@ -291,7 +291,7 @@ namespace GyanisScribe::App
         QWidget *buildRecordPage();
         /// 识别页：识别语言与语言包目录
         QWidget *buildOcrPage();
-        /// 快捷键页：四个全局热键
+        /// 快捷键页：每个全局动作一行
         QWidget *buildHotkeyPage();
         /// 主题页：配色方案
         QWidget *buildThemePage();

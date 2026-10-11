@@ -3,9 +3,12 @@
 ## 现在有什么
 
 - `IOcrEngine`（同步接口）+ `WinRTImageOcrEngine`（Windows 系统识别）+ `TesseractOcrEngine`（跨平台真后端）
-  + `UnavailableOcrEngine`（降级桩）+ 后端选型 `createOcrEngine()`，Ocr 目录共 26 条用例。
-- 预处理链 `toGrayscale → denoise → enlarge → binarize` 已落地并逐环有判据。
-- 结果导出：TXT 与 JSON（JSON 带 language、averageConfidence、imageSize、逐词方框）。
+  + `UnavailableOcrEngine`（降级桩）+ 后端选型 `createOcrEngine()`，用例逐条摆在 `tests/Ocr/`（条数不写在这儿，加一条就漂移一次）。
+- 预处理链只有「灰度 → 最近邻放大（上限 2×）」两环：二值化与中值滤波刻意不做——实测在系统后端上，
+  同一张「小字灰底带噪点」的图原样 4 词、灰度+放大 4 词（并把「741g」认回「7419」），再加二值化与中值滤波后 0 词，
+  判据与理由写在 `src/Ocr/OcrPreprocessor.h` 的 `@warning`。
+- 结果导出：TXT 与 JSON（JSON 带 language、averageConfidence、imageSize、逐词方框；
+  后端不报置信度时那一项是 null，界面上那一格写「未提供」，不打 0%）。
 - 语言标签词表对外只有 `zh-Hans` / `en` 两个，磁盘上的模型名（`chi_sim` / `eng`）在引擎内部映射。
 
 ## 后端选型按「先问系统、再看语言包」排，两档形状不同

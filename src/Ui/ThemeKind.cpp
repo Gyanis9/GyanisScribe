@@ -32,7 +32,7 @@ namespace GyanisScribe::Ui
                 .code    = Core::ErrorCode::InvalidArgument,
                 .message = GyanisScribe::Core::uiFormat(
                         GyanisScribe::Core::uiTextUtf8(
-                                "主题取值 \"{}\" 不在可用档位里：请在设置的通用页从 Light、Dark、System、HighContrast 四项里选一项，手写配置文件时只能是这四个词（区分大小写）"),
+                                "主题取值 \"{}\" 不在可用档位里：请在设置的主题页从 Light、Dark、System、HighContrast 四项里选一项，手写配置文件时只能是这四个词（区分大小写）"),
                         text),
         }}};
     }

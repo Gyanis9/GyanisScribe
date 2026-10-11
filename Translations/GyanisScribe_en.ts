@@ -1704,8 +1704,8 @@
             <translation>Press the shortcut (Esc cancels)</translation>
         </message>
         <message>
-            <source>主题取值 "{}" 不在可用档位里：请在设置的通用页从 Light、Dark、System、HighContrast 四项里选一项，手写配置文件时只能是这四个词（区分大小写）</source>
-            <translation>The theme value "{}" is not one of the available choices: pick Light, Dark, System or HighContrast on the general page in Settings; a hand-written settings file may only hold these four words (case-sensitive).</translation>
+            <source>主题取值 "{}" 不在可用档位里：请在设置的主题页从 Light、Dark、System、HighContrast 四项里选一项，手写配置文件时只能是这四个词（区分大小写）</source>
+            <translation>Theme value "{}" is not one of the available options: pick Light, Dark, System, or HighContrast on the Theme page in Settings, or write exactly one of those four words (case-sensitive) when editing the config file by hand</translation>
         </message>
         <message>
             <source>提示</source>

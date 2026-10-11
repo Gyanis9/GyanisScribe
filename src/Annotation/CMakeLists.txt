@@ -1,4 +1,4 @@
-# Annotation：图形记录、八个工具与引擎。绘制只依赖 QPainter/QImage，容器里无界面也能测
+# Annotation：图形记录、各档工具与引擎。绘制只依赖 QPainter/QImage，容器里无界面也能测
 add_library(Annotation STATIC
         AnnotationShape.h
         AnnotationGeometry.h
