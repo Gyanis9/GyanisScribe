@@ -239,8 +239,8 @@ namespace GyanisScribe::App
         /// 收起控制条与轮询
         void hideRecordingHud();
 
-        /// 录屏结束：把成品路径落到日志
-        void handleRecordingFinished(const QString &outputPath);
+        /// 录屏结束：把成品路径落到日志，历史按这一轮实际落帧的尺寸记（一张都没落就不记尺寸）
+        void handleRecordingFinished(const QString &outputPath, const QSize &frameSize);
 
         /// 录屏中止：把原因落到日志
         void handleRecordingFailed(const QString &reason);
@@ -355,7 +355,6 @@ namespace GyanisScribe::App
         QPointer<Ocr::OcrResultWindow>                       m_ocrWindow;                                    ///< 识别结果窗口，关了就重建，不拥有
         std::unique_ptr<GyanisScribe::History::HistoryStore> m_history;                                      ///< 历史清单：成品文件的索引，删记录不删文件
         QPointer<Pick::ColorPickerOverlay>                   m_picker;                                       ///< 取色遮罩，关掉即重建
-        QSize                                                m_recordingSize;                                ///< 本轮录屏区尺寸，成品落地时记进历史
         QPointer<Record::RecordingHud>                       m_hud;                                          ///< 录屏控制条，一轮一个，收起即销毁
         QTimer                                              *m_hudTicker          = nullptr;                 ///< 控制条的每秒轮询，随一轮录屏起停
         int                                                  m_countdownRemaining = 0;                       ///< 倒计时剩余整秒，推给控制条的大字

@@ -540,11 +540,13 @@ namespace
         ASSERT_TRUE(spinFramesIn(service)) << "节拍一直没落下帧";
 
         QString         finishedPath;
+        QSize           finishedSize;
         std::thread::id deliveryThread;
         QObject::connect(&service, &RecordingService::finished,
-                         [&finishedPath, &deliveryThread](const QString &path)
+                         [&finishedPath, &finishedSize, &deliveryThread](const QString &path, const QSize &frameSize)
                          {
                              finishedPath   = path;
+                             finishedSize   = frameSize;
                              deliveryThread = std::this_thread::get_id();
                          });
 
@@ -559,6 +561,9 @@ namespace
         encoder.release();
         ASSERT_TRUE(spinUntil([&] { return !finishedPath.isEmpty(); })) << "放开门闩之后成品一直没送回来";
         EXPECT_TRUE(finishedPath.contains(QStringLiteral("product.mp4"))) << finishedPath.toStdString();
+        // 尺寸随这一轮一起交回来：假来源每帧 8×8，成品读数就得是它，而不是从配置里的录屏区反推的那份。
+        // 这里用 QSize(8, 8) 而不是 QSize{8, 8}：花括号不替宏挡逗号，EXPECT_EQ 会被拆成三个实参
+        EXPECT_EQ(finishedSize, QSize(8, 8)) << "成品没带上这一轮实际落帧的尺寸，整屏与窗口两种模式会把它记成 0×0";
         EXPECT_EQ(deliveryThread, std::this_thread::get_id()) << "成品不在界面线程上送，处置目录与发信号就都落在别的线程上了";
     }
 
@@ -618,7 +623,7 @@ namespace
         EXPECT_NE(firstDirectory, secondDirectory) << "两轮录屏写进了同一个帧目录";
 
         int finishedCount = 0;
-        QObject::connect(&service, &RecordingService::finished, [&finishedCount](const QString &) { ++finishedCount; });
+        QObject::connect(&service, &RecordingService::finished, [&finishedCount](const QString &, const QSize &) { ++finishedCount; });
 
         encoder.release();
         encoder.release();
@@ -667,7 +672,7 @@ namespace
         int  abortedCount = 0;
         bool gotFinished  = false;
         QObject::connect(&service, &RecordingService::aborted, [&abortedCount] { ++abortedCount; });
-        QObject::connect(&service, &RecordingService::finished, [&gotFinished](const QString &) { gotFinished = true; });
+        QObject::connect(&service, &RecordingService::finished, [&gotFinished](const QString &, const QSize &) { gotFinished = true; });
 
         const auto cancelled = service.cancel();
         ASSERT_TRUE(static_cast<bool>(cancelled)) << cancelled.error().message;

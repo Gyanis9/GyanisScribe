@@ -38,8 +38,9 @@ namespace GyanisScribe::History
      * @brief 一条历史在列表里的文字
      * @param entry 记录
      * @param now 判「今天 / 昨天」用的时刻，用例里由调用方给
-     * @return 「今天 14:03 · 截图 · 800×600」这样的单行文本
+     * @return 「今天 14:03 · 截图 · 800×600」这样的单行文本；尺寸读不出时不带最后那一格
      * @details 相对日期放在最前：用户找的是「今天上午那几张」，绝对日期要先心算一次。
+     *          尺寸为空是「这一轮没落下帧」这类读不出的现场，硬打 0×0 等于把不知道报成一个数。
      */
     [[nodiscard]] QString entryCaption(const HistoryEntry &entry, const QDateTime &now);
 

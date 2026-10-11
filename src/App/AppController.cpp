@@ -761,8 +761,6 @@ namespace GyanisScribe::App
                 Core::Logger::error(std::format("录屏没能开始：{}", config.error().message));
                 return;
             }
-            // 成品尺寸在这里记一次：编码完成时只剩一个路径，尺寸只能从当时的录屏区推
-            m_recordingSize = QSize{config->region.width(), config->region.height()};
             showRecordingHud();
             if (auto started = m_recording->start(*config); !started)
             {
@@ -858,7 +856,7 @@ namespace GyanisScribe::App
         m_tray->setRecordingStatus(-1, false);
     }
 
-    void AppController::handleRecordingFinished(const QString &outputPath)
+    void AppController::handleRecordingFinished(const QString &outputPath, const QSize &frameSize)
     {
         hideRecordingHud();
         Core::Logger::info(std::format("录屏成品：{}", outputPath.toStdString()));
@@ -867,7 +865,8 @@ namespace GyanisScribe::App
         {
             notifyUser(GyanisScribe::Core::uiText("成品已出，但没带上声音：取声那一步中途失败了，原因写在日志里"), Ui::ToastKind::Information);
         }
-        recordHistory(Core::Paths::fromDisplayText(outputPath), History::HistoryKind::Recording, m_recordingSize);
+        // 尺寸取信号里这一轮自己那份：编码在后台跑的时候用户可以再开一轮，回读成员拿到的会是后一轮的
+        recordHistory(Core::Paths::fromDisplayText(outputPath), History::HistoryKind::Recording, frameSize);
     }
 
     void AppController::recordHistory(const std::filesystem::path &filePath, const History::HistoryKind kind, const QSize &size)

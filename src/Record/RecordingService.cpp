@@ -137,6 +137,8 @@ namespace GyanisScribe::Record
 
         m_config         = config;
         m_frameDirectory = directory;
+        // 尺寸按轮清：上一轮那一帧的读数不属于这一轮，一张帧都没落时它就该是空，历史那格据此不写尺寸
+        m_frameSize = {};
         // 每一轮重新开始报：上一轮报过的原因（比如屏被拔掉）不代表这一轮也成立
         m_cursorHighlightWarned = false;
         m_sink                  = std::make_unique<PngSequenceSink>(directory);
@@ -197,7 +199,7 @@ namespace GyanisScribe::Record
 
         // 收尾这一串里只有编码要几秒到几十秒，所以只把那一段搬走：帧序列已经写完、取声进程也已经收尸，
         // 剩下的「编成成品 + 处置中间文件」由 deliverEncoding 在界面线程上接着做
-        startEncoding(m_config, m_frameDirectory, frames, recordedMs, finishAudioCapture());
+        startEncoding(m_config, m_frameDirectory, frames, recordedMs, finishAudioCapture(), m_frameSize);
         return {};
     }
 
@@ -235,7 +237,7 @@ namespace GyanisScribe::Record
     }
 
     void RecordingService::startEncoding(const RecorderConfig &config, const std::filesystem::path &frameDirectory, const int frames, const qint64 recordedDurationMs,
-                                         const std::filesystem::path &audioWav)
+                                         const std::filesystem::path &audioWav, const QSize &frameSize)
     {
         auto &encoder = m_encoder;
         // 参数与目录都按快照带过去：期间用户重新开一轮会覆盖成员那两份，而这一次编码认的是叫它出来的那一轮
@@ -248,13 +250,13 @@ namespace GyanisScribe::Record
         // （实测：录制停止后立刻销毁服务，日志停在 "[ OK ]" 之后接一句 ASSERT: "context" qfuture_impl.h:596）
         auto *watcher = new QFutureWatcher<EncodeOutcome>(this);
         QObject::connect(watcher, &QFutureWatcher<EncodeOutcome>::finished, this,
-                         [this, watcher, frameDirectory, audioWav]
+                         [this, watcher, frameDirectory, audioWav, frameSize]
                          {
                              const auto outcome = watcher->result();
                              // 先从账上摘掉再收尾：这一份的活已经干完，留着指针等于让下一次遍历摸到 deleteLater 排着队的那个
                              std::erase(m_runningDeliveries, watcher);
                              watcher->deleteLater();
-                             deliverEncoding(outcome, frameDirectory, audioWav);
+                             deliverEncoding(outcome, frameDirectory, audioWav, frameSize);
                          });
         watcher->setFuture(future);
         m_runningDeliveries.push_back(watcher);
@@ -264,7 +266,7 @@ namespace GyanisScribe::Record
         std::erase_if(m_runningEncodes, [](const QFuture<EncodeOutcome> &running) { return running.isFinished(); });
     }
 
-    void RecordingService::deliverEncoding(const EncodeOutcome &outcome, const std::filesystem::path &frameDirectory, const std::filesystem::path &audioWav)
+    void RecordingService::deliverEncoding(const EncodeOutcome &outcome, const std::filesystem::path &frameDirectory, const std::filesystem::path &audioWav, const QSize &frameSize)
     {
         std::erase_if(m_runningEncodes, [](const QFuture<EncodeOutcome> &running) { return running.isFinished(); });
 
@@ -291,7 +293,7 @@ namespace GyanisScribe::Record
             Core::Logger::warning(std::format("临时帧目录没清干净：{}（{}）", Core::Paths::toDisplayText(frameDirectory).toStdString(), cleanupError.message()));
         }
 
-        emit finished(Core::Paths::toDisplayText(*outcome));
+        emit finished(Core::Paths::toDisplayText(*outcome), frameSize);
     }
 
     RecordingState RecordingService::state() const noexcept
@@ -411,6 +413,12 @@ namespace GyanisScribe::Record
         }
         if (tick.frameStored)
         {
+            // 第一张落下的帧定下这一轮成品的尺寸：三种模式各自裁到哪儿只有真落下来的像素说得准，
+            // 从配置里的录屏区反推会在整屏与窗口两种模式上推出 0×0
+            if (m_frameSize.isEmpty())
+            {
+                m_frameSize = frame->image.size();
+            }
             emit frameStored(m_session->storedFrames() - 1);
         }
         if (tick.state == RecordingState::Failed)

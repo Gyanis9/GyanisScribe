@@ -58,8 +58,14 @@ namespace GyanisScribe::History
             dayText = entry.moment.toString(QStringLiteral("yyyy-MM-dd HH:mm"));
         }
 
-        return dayText + QStringLiteral(" · ") + historyKindLabel(entry.kind) + QStringLiteral(" · ") + QString::number(entry.size.width()) + QStringLiteral("×") +
-               QString::number(entry.size.height());
+        // 尺寸那一格只在两侧都落到 1 以上的时候写：默认构造是 (-1,-1)，而旧清单里还躺着 0×0 的记录，
+        // 两种都是「读不出」，硬打一个 0×0 等于把不知道报成一个数
+        QString caption = dayText + QStringLiteral(" · ") + historyKindLabel(entry.kind);
+        if (!entry.size.isEmpty())
+        {
+            caption += QStringLiteral(" · ") + QString::number(entry.size.width()) + QStringLiteral("×") + QString::number(entry.size.height());
+        }
+        return caption;
     }
 
     QStringList historyFilterLabels()

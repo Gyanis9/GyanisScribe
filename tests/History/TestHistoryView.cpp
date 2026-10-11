@@ -190,6 +190,24 @@ TEST(HistoryViewMapping, CaptionUsesTodayYesterdayThenAbsoluteDate)
 }
 
 /**
+ * @brief 钉住尺寸读不出时列表文案不带那一格
+ * @details 默认构造的 QSize 是 (-1,-1)，旧清单里还留着 0×0 的记录，两种都代表「不知道」：
+ *          打成「0×0」会被读成「这张成品是 0 像素」，而不是「这一轮没落下帧」。
+ */
+TEST(HistoryViewMapping, CaptionDropsTheSizeSegmentWhenItIsNotReadable)
+{
+    const auto moment = QDateTime{QDate{2026, 10, 10}, QTime{9, 5}};
+
+    EXPECT_EQ(entryCaption(HistoryEntry{.moment = moment, .kind = HistoryKind::Recording, .filePath = "clip.mp4", .size = QSize{}}, kNow), QString::fromUtf8("今天 09:05 · 录屏"));
+    EXPECT_EQ(entryCaption(HistoryEntry{.moment = moment, .kind = HistoryKind::Recording, .filePath = "clip.mp4", .size = QSize{0, 0}}, kNow),
+              QString::fromUtf8("今天 09:05 · 录屏"));
+
+    EXPECT_EQ(entryCaption(HistoryEntry{.moment = moment, .kind = HistoryKind::Recording, .filePath = "clip.mp4", .size = QSize{8, 8}}, kNow),
+              QString::fromUtf8("今天 09:05 · 录屏 · 8×8"))
+            << "读得出尺寸时那一格还得在，不然凭空少一个读数";
+}
+
+/**
  * @brief 钉住筛选下拉的标签与档位互指
  * @details 只测 kindFilterAt 的话，把表重排也照样全绿，而用户看到的是标签：
  *          选「录屏」却列出截图就是这里漏出来的。标签沿用 historyKindLabel，改中文时两处同改。

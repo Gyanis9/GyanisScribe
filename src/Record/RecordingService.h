@@ -21,6 +21,7 @@
 #include <QFutureWatcher>
 #include <QPoint>
 #include <QObject>
+#include <QSize>
 #include <QTimer>
 
 #include <memory>
@@ -136,8 +137,14 @@ namespace GyanisScribe::Record
         void frameStored(int frameIndex);
         /// 出错了，文案是可以直接给用户看的那句
         void failed(const QString &reason);
-        /// 录屏结束并编出成品
-        void finished(const QString &outputPath);
+        /**
+         * @brief 录屏结束并编出成品
+         * @param outputPath 成品路径
+         * @param frameSize 这一轮实际落下的那一帧的物理尺寸，一张都没落时为空
+         * @details 尺寸跟着这一轮一起交出去，而不是让接收方回来读成员的：编码在后台跑，
+         *          期间用户可以开第二轮，读到的是后一轮的尺寸。
+         */
+        void finished(const QString &outputPath, const QSize &frameSize);
         /// 本轮被取消：临时帧与中间 wav 都已删掉，没有成品也不会有 finished
         void aborted();
 
@@ -183,18 +190,21 @@ namespace GyanisScribe::Record
          * @param frames 帧数，估编码超时与算达成帧率用
          * @param recordedDurationMs 这一轮录了多久，毫秒（暂停不计）：与帧数一起决定成品按什么帧率铺开
          * @param audioWav 中间 wav，空表示本轮没取声
+         * @param frameSize 这一轮落下的那一帧的物理尺寸，成品进历史时按它记
          * @details 结果用 QFuture::then 送回界面线程（continuation 的 context 是本对象），
          *          因此并发跑两轮编码也各有归处，不需要排队。
          */
-        void startEncoding(const RecorderConfig &config, const std::filesystem::path &frameDirectory, int frames, qint64 recordedDurationMs, const std::filesystem::path &audioWav);
+        void startEncoding(const RecorderConfig &config, const std::filesystem::path &frameDirectory, int frames, qint64 recordedDurationMs, const std::filesystem::path &audioWav,
+                           const QSize &frameSize);
 
         /**
          * @brief 编码回来之后处置成品、中间 wav 与帧目录
          * @param outcome 编码结果
          * @param frameDirectory 这一次编码用的帧目录
          * @param audioWav 这一次编码并进去的 wav
+         * @param frameSize 这一次编码吃的那一帧的尺寸，随 finished 一起交出去
          */
-        void deliverEncoding(const EncodeOutcome &outcome, const std::filesystem::path &frameDirectory, const std::filesystem::path &audioWav);
+        void deliverEncoding(const EncodeOutcome &outcome, const std::filesystem::path &frameDirectory, const std::filesystem::path &audioWav, const QSize &frameSize);
 
     protected:
         /**
@@ -217,6 +227,7 @@ namespace GyanisScribe::Record
         RecorderConfig                      m_config;                                           ///< 本轮参数
         std::filesystem::path               m_frameDirectory;                                   ///< 本轮临时帧目录
         std::filesystem::path               m_audioWav;                                         ///< 本轮取声落在哪份 wav 上
+        QSize                               m_frameSize;                                        ///< 本轮第一张落下的帧的物理尺寸，成品进历史按它记，start 时清空
         AudioCaptureOutcome                 m_audioOutcome = AudioCaptureOutcome::NotRequested; ///< 取声结果，stop 之后读
         std::vector<QFuture<EncodeOutcome>> m_runningEncodes;                                   ///< 还在编码的那几份，析构前要等完
         /// 还在回接的那几份：watcher 挂在本对象下随它一起析构，析构前要先拆线再等编码（与 RecognitionRunner 同一条理由）
