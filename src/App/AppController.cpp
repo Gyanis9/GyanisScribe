@@ -1,6 +1,5 @@
 #include "App/AppController.h"
 
-
 #include "Annotation/AnnotationEngine.h"
 #include "Annotation/AnnotationToolbar.h"
 #include "Annotation/AnnotationWindow.h"
