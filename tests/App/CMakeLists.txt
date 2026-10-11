@@ -2,7 +2,8 @@ add_executable(TestShell
         TestShell.cpp
         TestSingleInstance.cpp
         TestCrashGuard.cpp
-        TestCaptureIntent.cpp)
+        TestCaptureIntent.cpp
+        TestClipboardPin.cpp)
 
 target_link_libraries(TestShell PRIVATE
         App

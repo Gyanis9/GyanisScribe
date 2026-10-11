@@ -60,7 +60,7 @@ TEST(TrayMenuTable, ListsEachActionOnceWithRealIcons)
     constexpr std::array expectedActions{TrayAction::CaptureRegion,     TrayAction::CaptureFullScreen, TrayAction::CaptureLastRegion, TrayAction::CaptureWindow,
                                          TrayAction::ToggleRecord,      TrayAction::Recognize,         TrayAction::RecognizeFile,     TrayAction::PickColor,
                                          TrayAction::CloseAllPins,      TrayAction::OpenSettings,      TrayAction::OpenAbout,         TrayAction::Quit,
-                                         TrayAction::CaptureLongRegion, TrayAction::ClearPinsThrough,  TrayAction::TogglePinsVisible};
+                                         TrayAction::CaptureLongRegion, TrayAction::ClearPinsThrough,  TrayAction::TogglePinsVisible, TrayAction::PasteClipboard};
 
     const auto actions = actionsInTable();
     EXPECT_EQ(actions.size(), expectedActions.size()) << "表里的动作项数与这份清单不同解";

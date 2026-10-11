@@ -6,6 +6,8 @@ add_library(App STATIC
         AppController.cpp
         CaptureIntent.h
         CaptureIntent.cpp
+        ClipboardPin.h
+        ClipboardPin.cpp
         MainWindow.h
         MainWindow.cpp
         TrayController.h

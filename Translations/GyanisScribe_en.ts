@@ -356,6 +356,14 @@
             <translation>Recognise text right away</translation>
         </message>
         <message>
+            <source>剪贴板里没有图像：先复制一张图，或按截图热键截一张再来贴。这一条只认图像，文本与颜色还没有转贴图的做法</source>
+            <translation>There is no image on the clipboard: copy one first, or capture one with the capture hotkey and then paste. This entry only takes images; text and colors have no pinning path yet</translation>
+        </message>
+        <message>
+            <source>剪贴板里的图像读不出来（来源可能只挂了名目、没给像素）：换一张图复制，或先截图再来贴</source>
+            <translation>The image on the clipboard cannot be read (the source may have offered only a label, not pixels): copy another image, or capture one and then paste</translation>
+        </message>
+        <message>
             <source>智录遇到未处理的错误：{}。现场已尽量落到日志与崩溃转储，请到 {} 找最近一份日志（同目录下的 .dmp 是转储）；如果反复出现，请把日志、转储与出错的操作步骤一起反馈</source>
             <translation>GyanisScribe hit an unhandled error: {}. What could be saved went to the log and a crash dump; look for the newest log in {} (a .dmp next to it is the dump). If it keeps happening, send the log, the dump and the steps you took</translation>
         </message>
@@ -826,6 +834,10 @@
         <message>
             <source>取消全部贴图穿透</source>
             <translation>Let every pinned image receive the mouse again</translation>
+        </message>
+        <message>
+            <source>把剪贴板里的图贴到屏幕上</source>
+            <translation>Paste the clipboard image onto the screen</translation>
         </message>
         <message>
             <source>设置</source>

@@ -261,6 +261,12 @@ namespace GyanisScribe::App
         void handleSaveRequested(const QImage &image);
         /// 标注窗请求贴图
         void handlePinRequested(const QImage &image);
+        /**
+         * @brief 把剪贴板里的图贴到光标那一处（托盘那一条的落点）
+         * @details 剪贴板来的图没有「原来那块位置」，跟着鼠标落才是用户此刻的落点；
+         *          取不到图时把原因与替代做法发给用户，不静默什么都不做
+         */
+        void pasteClipboardAsPin();
         /// 标注窗请求识别文字
         void handleOcrRequested(const QImage &image);
 

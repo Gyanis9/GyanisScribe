@@ -84,6 +84,8 @@ C++23 + Qt 6 Widgets 实现，界面、图标与代码全部为本项目原创�
 按下去说清恢复了几张，一张都没开时也说「没有贴图开着鼠标穿透」，不让人以为程序卡住了。
 要临时把桌面清干净不必关掉贴图：托盘与 `Ctrl+Alt+H` 那一条把整桌一起收起来，再按一次原样摆回——
 收着的图还在册（张数、摆位、缩放、透明度都不动），只是不在屏上；因为收着的时候点不到它，摆回这一格也只放在托盘与热键上。
+托盘上还有一条「把剪贴板里的图贴到屏幕上」：复制一张图（别的程序里复制的、截下来复制的都算）按一下就在光标处落一张贴图；
+剪贴板里不是图像（比如只有一段文字）时给一句原因与替代做法，而不是静默什么都不做——文本与颜色转贴图还没有做，见路线图。
 
 **屏幕取色**
 全屏冻帧 + 9×9 放大镜，点一下按选定格式（HEX / RGB / HSL）把颜色复制走。
@@ -467,10 +469,13 @@ docs/           需求、识别后端、第三方许可证、界面样式说明
 - **`AppController` 那一层没有直测**：构造函数自己造出设置、抓帧、托盘、编码这些真模块，没有注入口，测试里一个实例都没有。
   延时截图的路由与成品进历史那几条都住在这一层，本轮「截取当前窗口绕过延时」就是这么漏下来的——只能靠人读代码发现。
   前置工作是给它一套与 `tests/App/TestModuleFlow.cpp` 同形状的替身。
-- **图标接线**：`Resources/Icons` 里有 17 枚在界面上一次都不出现（`CaptureWindow`、`RecordFullScreen`、`RecordRegion`、
+- **图标接线**：`Resources/Icons` 里有 16 枚在界面上一次都不出现（`CaptureWindow`、`RecordFullScreen`、`RecordRegion`、
   `RecordWindow`、`Microphone`、`SystemAudio`、`CursorHighlight`、`Countdown`、`OcrLanguage`、`OcrRegion`、`PinTop`、
-  `PinTransparent`、`PinCopy`、`PinSave`、`ThemeLight`、`ThemeDark`、`ThemeSystem`）。它们由 `tests/Ui/TestIconProvider.cpp`
+  `PinTransparent`、`PinSave`、`ThemeLight`、`ThemeDark`、`ThemeSystem`）。它们由 `tests/Ui/TestIconProvider.cpp`
   那份独立清单逐张核对画得出来，所以不是坏资产，只是没人摆：接到对应的行上（录屏三档范围、两路取声、主题档位下拉），或者删掉。
+- **剪贴板里的文本与颜色还不能转贴图**：现在这一条只认图像（图像文件本身与其像素都算）。
+  文本要渲染成图、颜色要画成色卡，两条都需要一套「拿什么字体、多大、留多少边距」的决定，
+  没想清之前不做——做半条的代价是用户贴出一张排版随缘的图。
 ## 参与贡献
 
 改动要么修掉错误行为，要么加上需求里的能力。上手顺序：

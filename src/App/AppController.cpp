@@ -1,8 +1,10 @@
 #include "App/AppController.h"
 
+
 #include "Annotation/AnnotationEngine.h"
 #include "Annotation/AnnotationToolbar.h"
 #include "Annotation/AnnotationWindow.h"
+#include "App/ClipboardPin.h"
 #include "Capture/CaptureService.h"
 #include "Capture/IScreenCaptureSource.h"
 #include "Capture/QScreenCaptureSource.h"
@@ -407,6 +409,9 @@ namespace GyanisScribe::App
                            changed > 0 ? Ui::ToastKind::Success : Ui::ToastKind::Information);
                 return;
             }
+            case TrayAction::PasteClipboard:
+                pasteClipboardAsPin();
+                return;
             case TrayAction::CloseAllPins:
                 // 一次点关掉全部：张数由 pinCountChanged 通知托盘刷新，这里只留一条日志，不再弹提示吵人
                 Core::Logger::info(std::format("托盘要求关闭全部贴图：{} 张", m_pins->count()));
@@ -551,6 +556,21 @@ namespace GyanisScribe::App
         // 贴回原来那块位置：用户截哪儿就贴在哪儿，跳回主屏中央会打断「就地比对」这个用法
         m_pins->addPin(image, m_lastSelection.topLeft());
         Core::Logger::info(std::format("已贴出 {}×{} 像素", image.width(), image.height()));
+    }
+
+    void AppController::pasteClipboardAsPin()
+    {
+        const auto image = pinnableImageFrom(QGuiApplication::clipboard()->mimeData());
+        if (!image)
+        {
+            // 取不到就直说原因与替代做法：这一条的入口在托盘上，附近没有任何输入框能提示
+            notifyUser(QString::fromUtf8(image.error().message), Ui::ToastKind::Information);
+            return;
+        }
+
+        // 落在光标那一处：剪贴板来的图没有「原来那块位置」，跟着鼠标走才是用户此刻的落点
+        m_pins->addPin(*image, QCursor::pos());
+        Core::Logger::info(std::format("剪贴板里的图已贴出：{}×{} 像素", image->width(), image->height()));
     }
 
     void AppController::handleOcrRequested(const QImage &image)
