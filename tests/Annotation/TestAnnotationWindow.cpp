@@ -17,6 +17,7 @@
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QMouseEvent>
+#include <QToolButton>
 #include <QPoint>
 #include <QRect>
 #include <QSize>
@@ -34,6 +35,7 @@ using GyanisScribe::Annotation::ShortcutAction;
 using GyanisScribe::Annotation::shortcutActionFor;
 using GyanisScribe::Annotation::toCanvasPoint;
 using GyanisScribe::Annotation::ToolKind;
+using GyanisScribe::Annotation::toolShortcutFor;
 using GyanisScribe::Annotation::toWidgetPoint;
 using GyanisScribe::Core::CapturedImage;
 using GyanisScribe::Core::displayRectFor;
@@ -200,6 +202,64 @@ TEST(ViewShortcuts, ShortcutTableMapsExactlyTheDocumentedKeys)
     EXPECT_EQ(shortcutActionFor(Qt::Key_Delete, Qt::ControlModifier), ShortcutAction::None);
     // 带 Ctrl 的方向键留给 Qt 自己用（换焦点那一类），截走就少一条既有行为
     EXPECT_EQ(shortcutActionFor(Qt::Key_Right, Qt::ControlModifier), ShortcutAction::None);
+}
+
+/**
+ * @brief 钉住字母键位与登记表同解，且只认裸字母
+ * @details 键位取自 kToolTable 的第四列，界面提示与按键分派共用那一张表：九档逐个钉住，
+ *          再钉两位拒绝面——没绑工具的字母不许换工具，带修饰键的组合也不许
+ *          （Ctrl+Z 里的 z 若当成字母键位，撤销就变成换工具）。
+ */
+TEST(ViewShortcuts, ToolShortcutTableMapsEveryRegisteredTool)
+{
+    EXPECT_EQ(toolShortcutFor(Qt::Key_R, Qt::NoModifier), ToolKind::Rectangle);
+    EXPECT_EQ(toolShortcutFor(Qt::Key_E, Qt::NoModifier), ToolKind::Ellipse);
+    EXPECT_EQ(toolShortcutFor(Qt::Key_A, Qt::NoModifier), ToolKind::Arrow);
+    EXPECT_EQ(toolShortcutFor(Qt::Key_P, Qt::NoModifier), ToolKind::Pen);
+    EXPECT_EQ(toolShortcutFor(Qt::Key_H, Qt::NoModifier), ToolKind::Highlight);
+    EXPECT_EQ(toolShortcutFor(Qt::Key_M, Qt::NoModifier), ToolKind::Mosaic);
+    EXPECT_EQ(toolShortcutFor(Qt::Key_T, Qt::NoModifier), ToolKind::Text);
+    EXPECT_EQ(toolShortcutFor(Qt::Key_N, Qt::NoModifier), ToolKind::Number);
+    EXPECT_EQ(toolShortcutFor(Qt::Key_L, Qt::NoModifier), ToolKind::Line);
+
+    EXPECT_FALSE(toolShortcutFor(Qt::Key_S, Qt::NoModifier).has_value()) << "s 没绑任何工具，不该把当前工具换掉";
+    EXPECT_FALSE(toolShortcutFor(Qt::Key_Z, Qt::NoModifier).has_value()) << "z 只归 Ctrl+Z 那一档用";
+    EXPECT_FALSE(toolShortcutFor(Qt::Key_T, Qt::ControlModifier).has_value()) << "带修饰键的字母要交回原组合，不能当成换工具";
+    EXPECT_FALSE(toolShortcutFor(Qt::Key_Escape, Qt::NoModifier).has_value()) << "非字母键不该落进这张表";
+}
+
+/**
+ * @brief 钉住按字母换工具时，引擎与按钮态一起跟上
+ * @details 引擎是真源：只改按钮不改引擎，按 T 之后画出来的还是矩形；只改引擎不改按钮，
+ *          屏幕上亮着的是另一档。两处必须同一批到位。
+ */
+TEST_F(AnnotationWindowFixture, LetterKeySwitchesToolInEngineAndToolbarTogether)
+{
+    auto window = makeWindow();
+
+    // 登记表里文字排第 7 枚（下标 6）：矩形、椭圆、箭头、画笔、高亮、马赛克、文字
+    pressKeyOn(*window, Qt::Key_T);
+    EXPECT_EQ(engine().activeTool(), ToolKind::Text) << "按 T 没换成文字工具";
+    EXPECT_TRUE(window->toolbar().toolButtonAt(6)->isChecked()) << "引擎换了工具，按钮还亮在原来那一档";
+    EXPECT_FALSE(window->toolbar().toolButtonAt(0)->isChecked()) << "两枚工具按钮同时亮着，用户看不出自己在用哪一档";
+
+    // Ctrl+Z 走的还是撤销那一条：没有可撤的一步也不该顺手把当前工具改掉
+    pressKeyOn(*window, Qt::Key_Z, Qt::ControlModifier);
+    EXPECT_EQ(engine().activeTool(), ToolKind::Text) << "Ctrl+Z 把当前工具改走了";
+}
+
+/**
+ * @brief 钉住工具按钮的提示里带着那枚字母
+ * @details 键位只在登记表写一处，界面提示必须跟着它走：漏了提示等于功能存在但没人找得到。
+ *          无障碍名要保持工具本名——读屏报「矩形 (R)」会把键位念成名字的一部分。
+ */
+TEST_F(AnnotationWindowFixture, ToolButtonTooltipsCarryTheirShortcutLetter)
+{
+    auto window = makeWindow();
+
+    EXPECT_EQ(window->toolbar().toolButtonAt(0)->toolTip(), QString::fromUtf8("矩形 (R)"));
+    EXPECT_EQ(window->toolbar().toolButtonAt(6)->toolTip(), QString::fromUtf8("文字 (T)"));
+    EXPECT_EQ(window->toolbar().toolButtonAt(0)->accessibleName(), QString::fromUtf8("矩形"));
 }
 
 /**

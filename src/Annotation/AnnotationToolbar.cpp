@@ -93,10 +93,12 @@ namespace GyanisScribe::Annotation
         toolGroup->setExclusive(true);
         for (std::size_t index = 0; index < kToolTable.size(); ++index)
         {
-            const auto [kind, iconName, label] = kToolTable[index];
-            auto *button                       = makeButton(iconName, GyanisScribe::Core::uiText(label.data()), true);
-            m_toolButtons[index]               = button;
-            m_toolKinds[index]                 = kind;
+            const auto [kind, iconName, label, shortcut] = kToolTable[index];
+            auto *button                                 = makeButton(iconName, GyanisScribe::Core::uiText(label.data()), true);
+            // 字母快捷键只进 tooltip：无障碍名要保持与标签同名，读屏报出来的才是工具本名而不是键位
+            button->setToolTip(GyanisScribe::Core::uiText(label.data()) + QStringLiteral(" (") + QString::fromUtf8(shortcut.data()) + QStringLiteral(")"));
+            m_toolButtons[index] = button;
+            m_toolKinds[index]   = kind;
             // id 取工具序号：与 ToolKind 的底层值同解，反向查按钮时不必再存一张表
             toolGroup->addButton(button, static_cast<int>(kind));
             QObject::connect(button, &QToolButton::clicked, this,

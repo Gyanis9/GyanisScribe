@@ -7,6 +7,7 @@
 #include "Ui/KeyStep.h"
 #include "Core/Types.h"
 
+#include <QChar>
 #include <QKeyEvent>
 #include <QVBoxLayout>
 
@@ -57,6 +58,27 @@ namespace GyanisScribe::Annotation
             default:
                 return ShortcutAction::None;
         }
+    }
+
+    std::optional<ToolKind> toolShortcutFor(const int key, const Qt::KeyboardModifiers modifiers)
+    {
+        // 裸字母才切工具：Ctrl+Z、Ctrl+Shift+Z、Ctrl+S 这些组合里也含字母，认了就把撤销当成换工具
+        if (modifiers != Qt::NoModifier)
+        {
+            return std::nullopt;
+        }
+
+        const auto letter = QChar(static_cast<ushort>(key)).toUpper();
+        for (const auto &entry: kToolTable)
+        {
+            // 键位就取登记表的第四列：界面上提示的那枚字母与这里认的是同一个字符，两处不会各说各话
+            const auto shortcut = std::get<3>(entry);
+            if (!shortcut.empty() && QChar(static_cast<ushort>(shortcut.front())) == letter)
+            {
+                return std::get<0>(entry);
+            }
+        }
+        return std::nullopt;
     }
 
     AnnotationWindow::AnnotationWindow(IAnnotationEngine &engine, std::unique_ptr<AnnotationToolbar> toolbar, QWidget *parent) :
@@ -175,6 +197,19 @@ namespace GyanisScribe::Annotation
         const auto action = shortcutActionFor(event->key(), event->modifiers());
         if (action == ShortcutAction::None)
         {
+            // 裸字母是换工具：引擎才是真源，切成了要回灌按钮态，否则按钮亮着一个、画的却是另一个
+            if (const auto tool = toolShortcutFor(event->key(), event->modifiers()); tool)
+            {
+                if (auto switched = m_engine.setActiveTool(*tool); switched)
+                {
+                    m_toolbar->setActiveTool(*tool);
+                } else
+                {
+                    Core::Logger::info(std::format("工具没换成：{}", switched.error().message));
+                }
+                return;
+            }
+
             // 行内文字框在输入时自己吃掉按键，走到这里的都是界面级快捷键
             QWidget::keyPressEvent(event);
             return;

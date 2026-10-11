@@ -48,6 +48,9 @@ namespace
     /// 工具按钮的中文名，顺序与工具表同解；这一份是照需求第五节抄来的独立期望值
     constexpr std::array<std::string_view, 9> kToolLabels = {"矩形", "椭圆", "箭头", "画笔", "高亮", "马赛克", "文字", "序号", "直线"};
 
+    /// 工具按钮该在提示里带上的字母键位，同样是一份独立抄来的期望值：与 kToolTable 第四列交叉核对
+    constexpr std::array<std::string_view, 9> kToolShortcuts = {"R", "E", "A", "P", "H", "M", "T", "N", "L"};
+
     /// 动作按钮的中文名，同样按需求第六节的排列顺序抄一份
     constexpr std::array<std::string_view, 4> kActionLabels = {"复制到剪贴板", "保存为文件", "贴到屏幕上", "识别文字"};
 
@@ -245,8 +248,9 @@ TEST(ToolbarGeometry, RejectsDegenerateInputs)
 
 /**
  * @brief 钉住工具栏的控件齐全且都带无障碍名称
- * @details 需求要八个工具、八色加自定义、撤销重做与四个动作，并要每个图标按钮都有 tooltip
+ * @details 需求要那几件工具、八色加自定义、撤销重做与四个动作，并要每个图标按钮都有 tooltip
  *          与无障碍名称。这条按控件树逐个核，不看布局画得好不好。
+ *          tooltip 比无障碍名多一段键位提示：读屏要的是工具本名，眼睛要的是「按哪个键也能切过去」。
  */
 TEST_F(ToolbarFixture, ExposesEveryRequiredControlWithAccessibleNames)
 {
@@ -254,6 +258,7 @@ TEST_F(ToolbarFixture, ExposesEveryRequiredControlWithAccessibleNames)
     auto      toolbar = makeToolbarLogged(log);
 
     ASSERT_EQ(AnnotationToolbar::toolButtonCount(), kToolLabels.size()) << "工具栏的按钮数要与这份独立写下的标签表同解";
+    ASSERT_EQ(kToolLabels.size(), kToolShortcuts.size()) << "两份独立清单长度不同，交叉核对就没做了";
     ASSERT_EQ(toolbar->colorButtonCount(), static_cast<int>(kAnnotationPalette.size()) + 1) << "配置是空的：预设八格加自定义一枚";
 
     for (std::size_t index = 0; index < kToolLabels.size(); ++index)
@@ -262,7 +267,7 @@ TEST_F(ToolbarFixture, ExposesEveryRequiredControlWithAccessibleNames)
         ASSERT_NE(button, nullptr) << index;
         // 中文名与抄来的清单同解：图标画得出来但名字叫「按钮 3」，读屏的用户还是用不了
         EXPECT_EQ(button->accessibleName(), text(kToolLabels[index])) << index;
-        EXPECT_EQ(button->toolTip(), text(kToolLabels[index])) << index;
+        EXPECT_EQ(button->toolTip(), text(kToolLabels[index]) + QStringLiteral(" (") + text(kToolShortcuts[index]) + QStringLiteral(")")) << index;
         EXPECT_TRUE(button->isCheckable()) << index;
         EXPECT_FALSE(button->icon().isNull()) << index << " 没取到图标，图标名拼错或资源没进 qrc";
     }

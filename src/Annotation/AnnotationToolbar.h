@@ -36,17 +36,19 @@ namespace GyanisScribe::Annotation
 {
 
     /**
-     * @brief 工具按钮的登记表：顺序、图标名与中文名一处对齐
+     * @brief 工具按钮的登记表：顺序、图标名、中文名与字母快捷键一处对齐
      * @details 顺序必须与 ToolKind 的声明顺序一致，用例按序号逐个核图标名与标签。
      *          放在头文件是因为按钮数组的大小由它算：写死一个数量时，加一档工具就会写出数组外
      *          （Debug 档当场 fast-fail，Release 档静默越界）。
+     *          第四列是标注窗的字母快捷键，取英文工具名首字母且九档互不撞；按钮提示与按键分派都读这一列，
+     *          另记一张键位表就会与按钮各说各话。
      */
-    inline constexpr std::array<std::tuple<ToolKind, std::string_view, std::string_view>, 9> kToolTable = {
-            std::tuple{ToolKind::Rectangle, "Rectangle", "矩形"}, std::tuple{ToolKind::Ellipse, "Ellipse", "椭圆"},
-            std::tuple{ToolKind::Arrow, "Arrow", "箭头"},         std::tuple{ToolKind::Pen, "Pen", "画笔"},
-            std::tuple{ToolKind::Highlight, "Highlight", "高亮"}, std::tuple{ToolKind::Mosaic, "Mosaic", "马赛克"},
-            std::tuple{ToolKind::Text, "Text", "文字"},           std::tuple{ToolKind::Number, "Number", "序号"},
-            std::tuple{ToolKind::Line, "Line", "直线"},
+    inline constexpr std::array<std::tuple<ToolKind, std::string_view, std::string_view, std::string_view>, 9> kToolTable = {
+            std::tuple{ToolKind::Rectangle, "Rectangle", "矩形", "R"}, std::tuple{ToolKind::Ellipse, "Ellipse", "椭圆", "E"},
+            std::tuple{ToolKind::Arrow, "Arrow", "箭头", "A"},         std::tuple{ToolKind::Pen, "Pen", "画笔", "P"},
+            std::tuple{ToolKind::Highlight, "Highlight", "高亮", "H"}, std::tuple{ToolKind::Mosaic, "Mosaic", "马赛克", "M"},
+            std::tuple{ToolKind::Text, "Text", "文字", "T"},           std::tuple{ToolKind::Number, "Number", "序号", "N"},
+            std::tuple{ToolKind::Line, "Line", "直线", "L"},
     };
 
     /// 工具栏上的工具按钮数量，由登记表算出：加一档工具只改表，数组跟着长
@@ -59,7 +61,7 @@ namespace GyanisScribe::Annotation
      * @brief 标注工具栏控件
      * @details 按钮顺序按需求第六节：工具组 → 颜色 → 线宽/字号 → 撤销/重做 → 复制/保存/贴图/OCR。
      *          本控件不直接改画布，只把用户意图发成信号，由宿主窗口转给引擎——
-     *          这样工具栏不必拖着引擎一起走，贴图编辑要复用它也不需要改这里。
+     *          这样工具栏不必拖着引擎一起走，将来别处要复用同一排按钮也不必改这里。
      * @note 每个图标按钮都带 tooltip 与无障碍名称，这是需求的可访问性硬要求，不是装饰。
      */
     class AnnotationToolbar : public QWidget
@@ -92,7 +94,7 @@ namespace GyanisScribe::Annotation
          */
         void setUndoRedoAvailable(bool canUndo, bool canRedo);
 
-        /// 工具按钮数量，布局与用例据此核对「八个工具齐全」
+        /// 工具按钮数量，由登记表算出：布局与用例据此核对「每一档工具都有一枚按钮」
         [[nodiscard]] static int toolButtonCount();
 
         /// 色块按钮数量：八个预设色加一个自定义取色
@@ -172,7 +174,7 @@ namespace GyanisScribe::Annotation
         QButtonGroup              *m_colorGroup        = nullptr; ///< 色块的互斥组，重建最近使用时要同步它的成员
 
         const Ui::IconProvider                                  &m_icons;                       ///< 图标出口，不拥有
-        std::array<QToolButton *, kToolButtonCount>              m_toolButtons{};               ///< 八个工具按钮，按 ToolKind 顺序
+        std::array<QToolButton *, kToolButtonCount>              m_toolButtons{};               ///< 工具按钮，按 ToolKind 顺序
         std::array<QToolButton *, Ui::kAnnotationPalette.size()> m_colorButtons{};              ///< 八个预设色块
         std::array<ToolKind, kToolButtonCount>                   m_toolKinds{};                 ///< 按钮序号到工具的映射，反向查也用它
         QToolButton                                             *m_customColorButton = nullptr; ///< 自定义取色按钮

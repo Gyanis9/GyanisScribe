@@ -15,6 +15,7 @@
 #include <QWidget>
 
 #include <memory>
+#include <optional>
 
 namespace GyanisScribe::Core
 {
@@ -52,6 +53,16 @@ namespace GyanisScribe::Annotation
      * @note 方向键（带不带 Shift）都算微调选中项，带 Ctrl 的不算：那几组合留给行内文字框按词移光标
      */
     [[nodiscard]] ShortcutAction shortcutActionFor(int key, Qt::KeyboardModifiers modifiers);
+
+    /**
+     * @brief 把字母键翻成要切过去的标注工具
+     * @param key 事件里的键值
+     * @param modifiers 当时的修饰键
+     * @return 那一档工具；这个字母没绑工具、或按下了任何修饰键时返回空
+     * @details 键位取自 kToolTable 的第四列，界面提示与分派共用同一张表。带修饰键一律不认：
+     *          Ctrl+Z、Ctrl+Shift+Z 这些组合里也含字母，切工具只走裸字母才分得清。
+     */
+    [[nodiscard]] std::optional<ToolKind> toolShortcutFor(int key, Qt::KeyboardModifiers modifiers);
 
     /**
      * @brief 标注窗口
