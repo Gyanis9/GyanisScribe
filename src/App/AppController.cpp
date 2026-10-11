@@ -579,7 +579,7 @@ namespace GyanisScribe::App
 
     void AppController::pasteClipboardAsPin()
     {
-        const auto image = pinnableImageFrom(QGuiApplication::clipboard()->mimeData());
+        const auto image = pinContentFrom(QGuiApplication::clipboard()->mimeData(), QGuiApplication::font());
         if (!image)
         {
             // 取不到就直说原因与替代做法：这一条的入口在托盘上，附近没有任何输入框能提示

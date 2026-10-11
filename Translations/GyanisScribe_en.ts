@@ -356,12 +356,24 @@
             <translation>Recognise text right away</translation>
         </message>
         <message>
-            <source>剪贴板里没有图像：先复制一张图，或按截图热键截一张再来贴。这一条只认图像，文本与颜色还没有转贴图的做法</source>
-            <translation>There is no image on the clipboard: copy one first, or capture one with the capture hotkey and then paste. This entry only takes images; text and colors have no pinning path yet</translation>
+            <source>剪贴板里没有可以贴的内容：图像、纯文本或颜色都行。先复制一个再来贴</source>
+            <translation>There is nothing on the clipboard to pin: an image, plain text, or a color all work. Copy something first</translation>
         </message>
         <message>
             <source>剪贴板里的图像读不出来（来源可能只挂了名目、没给像素）：换一张图复制，或先截图再来贴</source>
             <translation>The image on the clipboard cannot be read (the source may have offered only a label, not pixels): copy another image, or capture one and then paste</translation>
+        </message>
+        <message>
+            <source>剪贴板里没有可以贴的内容：图像、纯文本或颜色都行。链接与文件这一类还没有转贴图的做法</source>
+            <translation>There is nothing on the clipboard to pin: an image, plain text, or a color all work. Links and files have no pinning path yet</translation>
+        </message>
+        <message>
+            <source>剪贴板里的文本是空的（只有空白）：先复制一段文字再来贴</source>
+            <translation>The clipboard text is empty (whitespace only): copy some text first</translation>
+        </message>
+        <message>
+            <source>剪贴板里的文本太长（{} 个字，上限 {}）：整张卡片会长到没法看，先把要贴的那一段截短再试</source>
+            <translation>The clipboard text is too long ({} characters, limit {}): the card would be unreadably tall. Shorten the passage you want to pin and try again</translation>
         </message>
         <message>
             <source>智录遇到未处理的错误：{}。现场已尽量落到日志与崩溃转储，请到 {} 找最近一份日志（同目录下的 .dmp 是转储）；如果反复出现，请把日志、转储与出错的操作步骤一起反馈</source>

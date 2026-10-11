@@ -3,7 +3,6 @@ add_executable(TestShell
         TestSingleInstance.cpp
         TestCrashGuard.cpp
         TestCaptureIntent.cpp
-        TestClipboardPin.cpp
         TestUpdateCheck.cpp)
 
 target_link_libraries(TestShell PRIVATE
@@ -42,6 +41,7 @@ target_compile_definitions(TestShell PRIVATE GYANISSCRIBE_CRASH_PROBE="$<TARGET_
 # 主窗口的接线判据要真的建窗口，因此单独一个可执行体：QApplication 一个进程只能有一个，
 # 与上面那两组不共用一份配置的用例隔开最省心
 add_executable(TestMainWindow
+        TestClipboardPin.cpp
         TestMainWindow.cpp)
 
 target_link_libraries(TestMainWindow PRIVATE
