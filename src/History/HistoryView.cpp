@@ -191,6 +191,10 @@ namespace GyanisScribe::History
                                  emit clearAllRequested();
                              }
                          });
+
+        // 建好就自读一次：程序重启后第一次打开这一页时盘上没有新增，靠外部触发要等到下一次保存才出得来，
+        // 而用户在那之前看到的是空列表——那读起来跟「记录丢了」一模一样
+        refresh();
     }
 
     void HistoryView::refresh()

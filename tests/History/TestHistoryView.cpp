@@ -13,6 +13,7 @@
 #include <QDateTime>
 #include <QImage>
 #include <QPoint>
+#include <QSize>
 
 #include <filesystem>
 #include <format>
@@ -225,6 +226,22 @@ TEST(HistoryThumbnail, SquaresAreUniformAndCornersAreCut)
 
     EXPECT_TRUE(makeThumbnail(QImage{}, {kThumbnailEdge, kThumbnailEdge}, kThumbnailCornerRadius).isNull());
     EXPECT_TRUE(makeThumbnail(source, {0, 0}, kThumbnailCornerRadius).isNull());
+}
+
+/**
+ * @brief 钉住视图建立就自读清单，初读不靠外部触发
+ * @details 程序重启后第一次打开这一页时盘上没有新增：初读若交给调用方，列表就是空的，
+ *          而空列表读起来与「记录丢了」一模一样。这一条只构造视图、不调 refresh()。
+ */
+TEST_F(HistoryViewFixture, ConstructorReadsTheManifestOnItsOwn)
+{
+    const auto first  = writeImageArtifact(m_directory, "first.png", {640, 480});
+    const auto second = writeImageArtifact(m_directory, "second.png", {640, 480});
+    addRecord(first, HistoryKind::Screenshot, kNow.addDays(-1));
+    addRecord(second, HistoryKind::Screenshot, kNow);
+
+    const auto view = makeView();
+    EXPECT_EQ(view->rowCount(), 2) << "构造没读清单：这一页要等下一次保存才把旧记录列出来";
 }
 
 /**

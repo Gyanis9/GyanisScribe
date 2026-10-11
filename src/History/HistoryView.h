@@ -77,6 +77,7 @@ namespace GyanisScribe::History
     public:
         /**
          * @brief 构造历史页
+         * @details 收尾读一次清单：这一页第一次摆出来就得是当前的记录，不能等下一次保存才有内容。
          * @param store 历史清单，刷新时从它读
          * @param policy 保留策略，读清单时裁剪
          * @param icons 图标供给器，读不到缩略图时的兜底图标由它给
@@ -87,7 +88,7 @@ namespace GyanisScribe::History
 
         /**
          * @brief 重读清单并按当前条件重填列表
-         * @details 每次截图或录屏之后由调用方触发；列表不会自己发现盘上多了文件。
+         * @details 视图建立时读过一次，之后每次截图或录屏由调用方触发；列表不会自己发现盘上多了文件。
          */
         void refresh();
 
