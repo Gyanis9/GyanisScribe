@@ -407,3 +407,28 @@ TEST_F(AnnotationWindowFixture, DoubleClickReEditsPlacedText)
     ASSERT_TRUE(engine().undo().has_value());
     EXPECT_EQ(engine().textOfSelection().value_or(QString{}), QStringLiteral("AB")) << "改文字没进撤销栈，Ctrl+Z 回不到改之前";
 }
+/**
+ * @brief 钉住改号键只在序号工具在用的时候认
+ * @details 别的工具在用的时候 `+` 该交回 Qt：它是键盘上的普通字符，不该偷偷改某个工具的档。
+
+ */
+TEST_F(AnnotationWindowFixture, NumberKeysAdjustTheNextNumberOnlyForThatTool)
+{
+    auto window = makeWindow();
+
+    // 换到矩形：`+` 不该动序号
+    pressKeyOn(*window, Qt::Key_R);
+    const auto before = engine().nextNumber();
+    pressKeyOn(*window, Qt::Key_Plus);
+    EXPECT_EQ(engine().nextNumber(), before) << "别的工具在用的时候 `+` 改了序号";
+
+    pressKeyOn(*window, Qt::Key_N);
+    pressKeyOn(*window, Qt::Key_Plus);
+    EXPECT_EQ(engine().nextNumber(), before + 1) << "序号工具在用，`+` 没把下一个号加一";
+    pressKeyOn(*window, Qt::Key_Minus);
+    EXPECT_EQ(engine().nextNumber(), before) << "`-` 没把号退回来";
+
+    pressKeyOn(*window, Qt::Key_Plus);
+    pressKeyOn(*window, Qt::Key_0);
+    EXPECT_EQ(engine().nextNumber(), 1) << "`0` 该回到自动口径：一条序号都没有时下一个号是 1";
+}

@@ -463,6 +463,39 @@ TEST(NumberToolTest, LabelFollowsTheCurrentShapeCount)
 }
 
 /**
+ * @brief 钉住点名下一个号：从点名那个号连排，回到自动口径后按现有条数接上
+ * @details 「归零」在这一版里就是回到自动口径——号本来就长在现有条数上，清掉点名值即可。
+ */
+TEST(NumberToolTest, NamedNextNumberRunsFromThereUntilReset)
+{
+    NumberTool tool;
+    tool.setNextNumber(5);
+
+    tool.begin(QPoint(0, 0));
+    const auto first = tool.end();
+    ASSERT_TRUE(first.has_value());
+    EXPECT_EQ(first->number, 5) << "点名的号没落上去";
+    tool.insertShape(0, *first);
+
+    tool.begin(QPoint(5, 5));
+    const auto second = tool.end();
+    ASSERT_TRUE(second.has_value());
+    EXPECT_EQ(second->number, 6) << "点名之后该接着往下走，而不是每张都落同一个号";
+    tool.insertShape(1, *second);
+
+    tool.clearNextNumber();
+    EXPECT_EQ(tool.nextNumber(), 3) << "回到自动口径该按现有条数 +1";
+    tool.begin(QPoint(9, 9));
+    const auto third = tool.end();
+    ASSERT_TRUE(third.has_value());
+    EXPECT_EQ(third->number, 3) << "回到自动口径后没按现有条数接上";
+
+    // 小于 1 的号夹到 1：号牌上写 0 或负数是没有意义的
+    tool.setNextNumber(0);
+    EXPECT_EQ(tool.nextNumber(), 1);
+}
+
+/**
  * @brief 钉住画笔的采样：重合点不入库，走过的每一步都入库
  */
 TEST(PenToolTest, DropsDuplicateSamplesAndKeepsThePath)

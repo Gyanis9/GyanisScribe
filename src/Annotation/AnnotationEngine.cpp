@@ -424,6 +424,32 @@ namespace GyanisScribe::Annotation
         return {};
     }
 
+    Core::Expected<void> AnnotationEngine::setNextNumber(const int number)
+    {
+        auto *tool = toolFor(ToolKind::Number);
+        if (tool == nullptr)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InternalError, GyanisScribe::Core::uiTextUtf8("序号工具不在册")});
+        }
+        static_cast<NumberTool *>(tool)->setNextNumber(number);
+        return {};
+    }
+
+    void AnnotationEngine::resetNumbering()
+    {
+        if (auto *tool = toolFor(ToolKind::Number); tool != nullptr)
+        {
+            static_cast<NumberTool *>(tool)->clearNextNumber();
+        }
+    }
+
+    int AnnotationEngine::nextNumber() const
+    {
+        const auto *tool = toolFor(ToolKind::Number);
+        // 工具恒在册（构造列表里就有它）；真缺了交回 1，让界面显示一个不含蓄的起点而不是崩溃
+        return tool != nullptr ? static_cast<const NumberTool *>(tool)->nextNumber() : 1;
+    }
+
     std::optional<AnnotationSelection> AnnotationEngine::selectionAt(const QPoint &point) const
     {
         // 倒序遍历：后登记的工具压在上面，用户点的就是看得见的那一条

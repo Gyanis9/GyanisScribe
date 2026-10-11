@@ -194,6 +194,34 @@ namespace GyanisScribe::Annotation
 
     void AnnotationWindow::keyPressEvent(QKeyEvent *event)
     {
+        // 序号工具在用的时候：`+`/`-` 改下一个号、`0` 回到自动编号。改号本身不动画布，
+        // 点一下就能看见新号落在牌子上；别的工具在用时不认，把键交回 Qt
+        if (m_engine.activeTool() == ToolKind::Number && event->modifiers() == Qt::NoModifier)
+        {
+            switch (event->key())
+            {
+                case Qt::Key_Plus:
+                case Qt::Key_Equal:
+                    if (const auto changed = m_engine.setNextNumber(m_engine.nextNumber() + 1); !changed)
+                    {
+                        Core::Logger::warning(std::format("改下一个序号没成：{}", changed.error().message));
+                    }
+                    return;
+                case Qt::Key_Minus:
+                    if (const auto changed = m_engine.setNextNumber(m_engine.nextNumber() - 1); !changed)
+                    {
+                        Core::Logger::warning(std::format("改下一个序号没成：{}", changed.error().message));
+                    }
+                    return;
+                case Qt::Key_0:
+                    m_engine.resetNumbering();
+                    return;
+                default:
+                    break;
+            }
+        }
+
+
         const auto action = shortcutActionFor(event->key(), event->modifiers());
         if (action == ShortcutAction::None)
         {

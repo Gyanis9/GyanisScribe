@@ -114,6 +114,19 @@ namespace GyanisScribe::Annotation
         Core::Expected<void> setPendingText(const QString &text) override;
 
         /**
+         * @brief 点名序号的下一个号，见 IAnnotationEngine::setNextNumber()
+         * @param number 下一个号，小于 1 会被夹到 1
+         * @return 成功返回空载荷；序号工具不在册时返回 InternalError
+         */
+        Core::Expected<void> setNextNumber(int number) override;
+
+        /// 序号回到自动编号，见 IAnnotationEngine::resetNumbering()
+        void resetNumbering() override;
+
+        /// 下一个序号，见 IAnnotationEngine::nextNumber()
+        [[nodiscard]] int nextNumber() const override;
+
+        /**
          * @brief 改已放下那条文字的内容，见 IAnnotationEngine::setTextOfSelection()
          * @param text 新的文字
          * @return 成功返回空载荷；四种拒法各带自己的原因（没选中、选的不是文字、文本为空、那条已不在）

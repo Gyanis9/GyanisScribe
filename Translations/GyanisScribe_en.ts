@@ -32,6 +32,10 @@
             <translation>Only the text tool needs text content. Switch to the text tool first, then type</translation>
         </message>
         <message>
+            <source>序号工具不在册</source>
+            <translation>The number tool is not registered.</translation>
+        </message>
+        <message>
             <source>要选中的图形不在册：工具 0x{:X} 索引 {}。请重新点选</source>
             <translation>The shape to select is not registered: tool 0x{:X}, index {}. Click it again.</translation>
         </message>

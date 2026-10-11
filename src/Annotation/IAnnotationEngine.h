@@ -123,6 +123,26 @@ namespace GyanisScribe::Annotation
         virtual Core::Expected<void> setPendingText(const QString &text) = 0;
 
         /**
+         * @brief 点名序号工具的下一个号
+         * @param number 下一个号，小于 1 会被夹到 1
+         * @return 成功返回空载荷；序号工具不在册时返回 InternalError
+         * @details 点名之后编号从那个号开始连排（5、6、7…），不再跟着现有条数走；
+         *          回到自动口径用 resetNumbering()。
+         */
+        [[nodiscard]] virtual Core::Expected<void> setNextNumber(int number) = 0;
+
+        /**
+         * @brief 序号工具回到「按现有条数 +1」的自动编号
+         */
+        virtual void resetNumbering() = 0;
+
+        /**
+         * @brief 下一个序号会是多少
+         * @return 点名过的号，或现有条数 +1
+         */
+        [[nodiscard]] virtual int nextNumber() const = 0;
+
+        /**
          * @brief 改已放下那条文字图形的内容
          * @param text 新的文字，不许为空
          * @return 成功返回空载荷；没选中、选中的不是文字图形、文本为空、或那条已经不在了都返回 InvalidArgument

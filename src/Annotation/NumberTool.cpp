@@ -3,6 +3,8 @@
 #include "Core/Text.h"
 
 #include <QFont>
+#include <algorithm>
+
 #include <QPainter>
 
 namespace GyanisScribe::Annotation
@@ -25,9 +27,28 @@ namespace GyanisScribe::Annotation
     std::optional<AnnotationShape> NumberTool::end()
     {
         // 编号取交回这一刻的条数：起笔之后又被撤销一条的话，这里跟着退一号，不会跳出两个 3
-        m_pending.number = shapeCount() + 1;
+        m_pending.number = nextNumber();
         m_pending.text   = QString::number(m_pending.number);
+        if (m_nextNumber)
+        {
+            *m_nextNumber = m_pending.number + 1;
+        }
         return AnnotationTool::end();
+    }
+
+    void NumberTool::setNextNumber(const int number)
+    {
+        m_nextNumber = std::max(1, number);
+    }
+
+    void NumberTool::clearNextNumber() noexcept
+    {
+        m_nextNumber.reset();
+    }
+
+    int NumberTool::nextNumber() const noexcept
+    {
+        return m_nextNumber ? *m_nextNumber : shapeCount() + 1;
     }
 
     bool NumberTool::shapeIsUsable(const AnnotationShape &shape) const

@@ -392,6 +392,29 @@ namespace
         EXPECT_TRUE(committed.has_value()) << "这条文字没落定：内容或位置被当成退化了";
         return committed.value_or(AnnotationSelection{});
     }
+
+    /**
+ * @brief 钉住改号入口穿过引擎之后读数与落号同一口径
+ * @details 号落在牌子上，引擎这一层能核对的是「下一个号是多少」；牌子上的数字由 NumberTool
+ *
+     * 那一条直测钉住。
+ */
+    TEST_F(EngineFixture, NextNumberOverrideGoesThroughTheEngine)
+    {
+        EXPECT_EQ(m_engine.nextNumber(), 1) << "一条都没有时下一个号该是 1";
+
+        ASSERT_TRUE(m_engine.setNextNumber(5).has_value());
+        EXPECT_EQ(m_engine.nextNumber(), 5);
+
+        ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Number).has_value());
+        m_engine.beginStroke(QPoint(30, 30));
+        ASSERT_TRUE(m_engine.endStroke().has_value());
+        EXPECT_EQ(m_engine.nextNumber(), 6) << "落了一号之后下一个号该顺下去";
+
+        m_engine.resetNumbering();
+        EXPECT_EQ(m_engine.nextNumber(), 2) << "回到自动口径该按现有条数 +1（已经落了一条）";
+    }
+
 } // namespace
 
 /**
