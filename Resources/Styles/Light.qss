@@ -133,6 +133,23 @@ QLineEdit:read-only {
     color: #495162;
 }
 
+/* ---- 标注窗的行内文字输入框：与上面几档输入框同形，别把识别结果区的宽内边距带进去 ----
+   上下内边距为零是标注输入框高度算式的前提（AnnotationView::resizeTextEditorToContent 只补边框与余量），
+   改这里的 padding 要同步改那边 */
+QTextEdit#annotationTextEditor {
+    background-color: #FFFFFF;
+    color: #1B1F24;
+    border: 1px solid #C3C9D2;
+    border-radius: 8px;
+    padding: 0 8px;
+    selection-background-color: #CFE1F8;
+    selection-color: #1B1F24;
+}
+
+QTextEdit#annotationTextEditor:focus {
+    border: 2px solid #2B67D8;
+}
+
 /* 下拉箭头由原生风格画在右侧这一条里：留出宽度，长选项的文字才不会压在箭头上 */
 QComboBox {
     padding-right: 26px;

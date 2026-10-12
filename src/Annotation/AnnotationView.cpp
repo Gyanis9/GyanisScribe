@@ -5,12 +5,15 @@
 #include "Core/Text.h"
 #include "Ui/DesignTokens.h"
 
-#include <QLineEdit>
+#include <QFontMetricsF>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPen>
 #include <QPolygonF>
 #include <QRectF>
+#include <QTextCursor>
+#include <QTextDocument>
+#include <QTextEdit>
 
 #include <algorithm>
 #include <cmath>
@@ -23,8 +26,22 @@ namespace
     /// 行内文字输入框的默认宽度，逻辑像素：再窄就打不开一个像样的句子
     constexpr int kTextEditorWidth = 180;
 
-    /// 输入框的高度余量，逻辑像素：贴着字号摆会让光标被裁掉一半
+    /// 输入框在文字行之外补的高度余量，逻辑像素：贴着字号摆会让光标被裁掉一半
     constexpr int kTextEditorHeightPad = 6;
+
+    /// 输入框的高度下限，逻辑像素：至少装得下一行与光标
+    constexpr int kTextEditorMinimumHeight = 24;
+
+    /// 提交前削掉尾巴上的空行：多半是「敲完回车就提交」带出来的，留着会在图形里多出一行空白
+    QString textWithoutTrailingBlankLines(const QString &text)
+    {
+        QString trimmed = text;
+        while (trimmed.endsWith(QLatin1Char('\n')))
+        {
+            trimmed.chop(1);
+        }
+        return trimmed;
+    }
 } // namespace
 
 namespace GyanisScribe::Annotation
@@ -314,58 +331,117 @@ namespace GyanisScribe::Annotation
         }
 
         m_reEditingText = reEditing;
-        m_textEditor    = new QLineEdit{this};
-        m_textEditor->setPlaceholderText(GyanisScribe::Core::uiText("输入文字后回车"));
-        m_textEditor->setText(initial);
-        // 重编时全选着打开：改的是这一条，全选后直接打字就换掉，不必先手动清
-        m_textEditor->selectAll();
+        m_textEditor    = new QTextEdit{this};
+        // 样式表按这个名字给它输入类那一档的样子：不挂名字就会落到识别结果区那条宽内边距的规则上
+        m_textEditor->setObjectName(QStringLiteral("annotationTextEditor"));
+        m_textEditor->setAcceptRichText(false);
+        // 只在回车处断行（不软换行）：屏上看到的断行就是成品里的断行，不会多出几处凭空折的行
+        m_textEditor->setLineWrapMode(QTextEdit::NoWrap);
+        m_textEditor->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        m_textEditor->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        // Tab 交回界面（与单行时代同解）：在标注里插个制表符没有意义
+        m_textEditor->setTabChangesFocus(true);
+        m_textEditor->setPlaceholderText(GyanisScribe::Core::uiText("输入文字，回车换行，Ctrl+回车提交"));
         m_textEditor->setFont(font());
-        const auto height = m_textEditor->sizeHint().height() + kTextEditorHeightPad;
+        m_textEditor->setPlainText(initial);
+        // 重编时光标落到文末，不摆全选：全选之下按个回车就把原文整段替成一个换行，
+        // 而多行编辑里「接着往下写一行」才是重开这一格的正事；要整段换掉按 Ctrl+A 自选
+        m_textEditor->moveCursor(QTextCursor::End);
         // 宽度夹在显示区内：贴着右边缘点下的文字框不该跑到画布外面去
         const auto width = std::min(kTextEditorWidth, std::max(40, rect.right() - widget.x()));
-        m_textEditor->setGeometry(widget.x(), widget.y(), width, height);
+        m_textEditor->setGeometry(widget.x(), widget.y(), width, kTextEditorMinimumHeight);
         m_textEditor->show();
         m_textEditor->setFocus();
+        resizeTextEditorToContent();
 
-        QObject::connect(m_textEditor, &QLineEdit::editingFinished, this,
-                         [this, editor = m_textEditor, reEditing]
-                         {
-                             if (reEditing)
-                             {
-                                 // 改已放下的那一条：走撤销栈，界面不碰图形本体
-                                 if (auto applied = m_engine.setTextOfSelection(editor->text()); !applied)
-                                 {
-                                     Core::Logger::warning(std::format("这条文字没能改成：{}", applied.error().message));
-                                 }
-                                 m_reEditingText = false;
-                                 editor->deleteLater();
-                                 if (m_textEditor == editor)
-                                 {
-                                     m_textEditor = nullptr;
-                                 }
-                                 update();
-                                 return;
-                             }
-
-                             // 提交路径：先填内容再收笔，收笔会把这条图形放进撤销栈
-                             if (auto text = m_engine.setPendingText(editor->text()); !text)
-                             {
-                                 Core::Logger::warning(std::format("文字标注没能落定：{}", text.error().message));
-                             }
-                             if (auto settled = m_engine.endStroke(); !settled)
-                             {
-                                 Core::Logger::info(std::format("这条文字标注是空的，没有留下图形"));
-                             }
-                             m_stroking     = false;
-                             m_awaitingText = false;
-                             editor->deleteLater();
-                             if (m_textEditor == editor)
-                             {
-                                 m_textEditor = nullptr;
-                             }
-                         });
-        // Esc 由本视图的事件过滤器接：QLineEdit 没有对应的信号，只有受保护的虚函数
+        QObject::connect(m_textEditor, &QTextEdit::textChanged, this, [this] { resizeTextEditorToContent(); });
+        // Esc、Ctrl+回车与失焦由本视图的事件过滤器接：QTextEdit 三者都没有对应的信号
         m_textEditor->installEventFilter(this);
+    }
+
+    void AnnotationView::resizeTextEditorToContent()
+    {
+        if (m_textEditor == nullptr)
+        {
+            return;
+        }
+
+        // 按段落数乘行距自己算内容高度：QTextDocument::size() 要等版面算完才准，
+        // 而这里刚 setPlainText 完、也还没进事件循环，自己算不会量到一个半成品的值。
+        // 只补文档内边距与边框，不计样式表的上下内边距——#annotationTextEditor 那条规则里上下是 0
+        const QFontMetricsF editorMetrics{m_textEditor->font()};
+        const auto          margin        = m_textEditor->document()->documentMargin();
+        const auto          contentHeight = static_cast<int>(std::ceil(editorMetrics.lineSpacing() * static_cast<qreal>(m_textEditor->document()->blockCount()))) +
+                                            static_cast<int>(2 * margin) + 2 * m_textEditor->frameWidth() + kTextEditorHeightPad;
+        const auto          maximum       = std::max(kTextEditorMinimumHeight, currentDisplayRect().height());
+        m_textEditor->resize(m_textEditor->width(), std::clamp(contentHeight, kTextEditorMinimumHeight, maximum));
+    }
+
+    void AnnotationView::commitTextEditor()
+    {
+        if (m_textEditor == nullptr)
+        {
+            return;
+        }
+
+        const QString text      = textWithoutTrailingBlankLines(m_textEditor->toPlainText());
+        const bool    reEditing = m_reEditingText;
+        closeTextEditor();
+
+        if (reEditing)
+        {
+            // 改已放下的那一条：走撤销栈，界面不碰图形本体
+            if (auto applied = m_engine.setTextOfSelection(text); !applied)
+            {
+                Core::Logger::warning(std::format("这条文字没能改成：{}", applied.error().message));
+            }
+            m_reEditingText = false;
+            update();
+            return;
+        }
+
+        // 提交路径：先填内容再收笔，收笔会把这条图形放进撤销栈
+        if (auto filled = m_engine.setPendingText(text); !filled)
+        {
+            Core::Logger::warning(std::format("文字标注没能落定：{}", filled.error().message));
+        }
+        if (auto settled = m_engine.endStroke(); !settled)
+        {
+            Core::Logger::info(std::format("这条文字标注是空的，没有留下图形"));
+        }
+        m_stroking     = false;
+        m_awaitingText = false;
+    }
+
+    void AnnotationView::cancelTextEditor()
+    {
+        // 重编那一格的 Esc 是「不改了」：原内容一个字都没动，不该去收笔也不该压撤销
+        if (m_reEditingText)
+        {
+            m_reEditingText = false;
+            closeTextEditor();
+            return;
+        }
+
+        // 取消这一条：文本没提交过，引擎会把这条退化图形拒掉——拒掉正是「取消成功」的样子
+        if (auto cancelled = m_engine.endStroke(); cancelled)
+        {
+            Core::Logger::warning("按 Esc 取消文字标注，但引擎仍然收下了一条图形：这条不该走到这里");
+        }
+        m_stroking     = false;
+        m_awaitingText = false;
+        closeTextEditor();
+    }
+
+    void AnnotationView::closeTextEditor()
+    {
+        if (m_textEditor == nullptr)
+        {
+            return;
+        }
+
+        m_textEditor->deleteLater();
+        m_textEditor = nullptr;
     }
 
     void AnnotationView::mouseDoubleClickEvent(QMouseEvent *event)
@@ -419,27 +495,34 @@ namespace GyanisScribe::Annotation
 
     bool AnnotationView::eventFilter(QObject *watched, QEvent *event)
     {
-        if (watched == m_textEditor && event->type() == QEvent::KeyPress && static_cast<QKeyEvent *>(event)->key() == Qt::Key_Escape)
+        if (watched != m_textEditor)
         {
-            if (m_reEditingText)
+            return QWidget::eventFilter(watched, event);
+        }
+
+        if (event->type() == QEvent::KeyPress)
+        {
+            const auto *key = static_cast<QKeyEvent *>(event);
+            if (key->key() == Qt::Key_Escape)
             {
-                // 重编那一格的 Esc 是「不改了」：原内容一个字都没动，不该去收笔也不该压撤销
-                m_reEditingText = false;
-                m_textEditor->deleteLater();
-                m_textEditor = nullptr;
+                cancelTextEditor();
                 return true;
             }
-            // 取消这一条：文本没提交过，引擎会把这条退化图形拒掉——拒掉正是「取消成功」的样子
-            if (auto cancelled = m_engine.endStroke(); cancelled)
+            // 多行输入里回车只负责换行，提交改由 Ctrl+回车承担；这一格得在 QTextEdit 自己处理之前接，
+            // 按晚了换行就先插进去了，提交下来图形尾巴上会多一行空白
+            if ((key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter) && key->modifiers().testFlag(Qt::ControlModifier))
             {
-                Core::Logger::warning("按 Esc 取消文字标注，但引擎仍然收下了一条图形：这条不该走到这里");
+                commitTextEditor();
+                return true;
             }
-            m_stroking     = false;
-            m_awaitingText = false;
-            m_textEditor->deleteLater();
-            m_textEditor = nullptr;
-            return true;
         }
+
+        // 点到别处（画布、工具栏、别的窗口）就是「就这些字」：与单行时代 QLineEdit 的 editingFinished 同解
+        if (event->type() == QEvent::FocusOut)
+        {
+            commitTextEditor();
+        }
+
         return QWidget::eventFilter(watched, event);
     }
 

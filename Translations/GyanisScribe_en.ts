@@ -316,8 +316,8 @@
             <translation>The screen's usable area {}x{} fits nothing: check that the target screen is still connected.</translation>
         </message>
         <message>
-            <source>输入文字后回车</source>
-            <translation>Type the text, then press Enter</translation>
+            <source>输入文字，回车换行，Ctrl+回车提交</source>
+            <translation>Type the text. Enter starts a new line; Ctrl+Enter commits.</translation>
         </message>
         <message>
             <source>箭头</source>

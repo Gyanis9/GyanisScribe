@@ -1,6 +1,7 @@
 #include "Annotation/TextTool.h"
 
 #include "Annotation/TextFont.h"
+#include "Annotation/TextLayout.h"
 #include "Core/Text.h"
 
 #include <QFontMetricsF>
@@ -58,10 +59,17 @@ namespace GyanisScribe::Annotation
         // 字体拼装与外接框量度共用 textFontFor：字体族、粗体、斜体一处改，画与量跟着一起动
         const QFont font = textFontFor(shape);
 
-        // 字形的真实占位：position 是基线（drawText 的口径），框顶从基线往上退一个 ascent，底板围着它摆
+        // 整块占位与逐行落笔都按 TextLayout.h 的口径来：面板垫哪、描边围哪、选中框盖哪三处同解
         const QFontMetricsF metrics(font);
-        const QRectF        textBox(static_cast<qreal>(shape.position.x()), static_cast<qreal>(shape.position.y()) - metrics.ascent(), metrics.horizontalAdvance(shape.text),
-                                    metrics.height());
+        const QRectF        textBox = textBoxOf(shape, metrics);
+
+        const QStringList lines        = textLinesOf(shape.text);
+        const qreal       lineStep     = textLineStepOf(metrics);
+        const auto        lineOriginOf = [&shape, lineStep](const int index)
+        {
+            // position 是首行基线（drawText 的口径），往下每行加一个行距
+            return QPointF{static_cast<qreal>(shape.position.x()), static_cast<qreal>(shape.position.y()) + static_cast<qreal>(index) * lineStep};
+        };
 
         if (shape.textBackground)
         {
@@ -77,7 +85,10 @@ namespace GyanisScribe::Annotation
         {
             // 描边走字形路径的笔画：线宽给两倍，外半边就是露出来的反差轮廓，内半边随后被字色盖住
             QPainterPath glyphs;
-            glyphs.addText(QPointF(shape.position), font, shape.text);
+            for (int index = 0; index < lines.size(); ++index)
+            {
+                glyphs.addText(lineOriginOf(index), font, lines[index]);
+            }
             const double outlineWidth = qBound(1.0, shape.fontSize * kTextOutlineWidthPerFontSize, 6.0);
             painter.setBrush(Qt::NoBrush);
             painter.setPen(QPen(contrastingColorFor(shape.color), outlineWidth * 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
@@ -90,8 +101,11 @@ namespace GyanisScribe::Annotation
 
         painter.setFont(font);
         painter.setPen(shape.color);
-        // position 是基线起点，与 boundingBoxOf 里那个框同解
-        painter.drawText(shape.position, shape.text);
+        for (int index = 0; index < lines.size(); ++index)
+        {
+            // Qt 的 drawText 不收换行，逐行按各自的基线落笔；单行内容与老写法逐像素同解
+            painter.drawText(lineOriginOf(index), lines[index]);
+        }
     }
 
 } // namespace GyanisScribe::Annotation

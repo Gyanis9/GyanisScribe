@@ -2,6 +2,7 @@
 
 #include "Annotation/ShapeTransform.h"
 #include "Annotation/TextFont.h"
+#include "Annotation/TextLayout.h"
 
 #include <QFont>
 
@@ -244,14 +245,13 @@ namespace GyanisScribe::Annotation
 
         if (!shape.text.isEmpty())
         {
-            // 文字的外接框按同一份字形量出来，锚点与画字同解：position 是基线（drawText 的口径），
-            // 框顶要从基线往上退一个 ascent。按左上角估会让选中框整体压在字底下约一行（渲染探针核对过）。
+            // 文字的外接框按同一份字形量出来，锚点与画字同解（口径见 TextLayout.h 的 textBoxOf）：
+            // 首行基线落在 position 上（drawText 的口径），框顶要从基线往上退一个 ascent，
+            // 多行内容按行数长高。按左上角估会让选中框整体压在字底下约一行（渲染探针核对过）。
             // 粗细、斜体、字体族都会动字宽，所以量这里必须与画那边共用 textFontFor
             const QFontMetricsF metrics(textFontFor(shape));
-            const auto          width  = static_cast<int>(metrics.horizontalAdvance(shape.text));
-            const auto          ascent = static_cast<int>(metrics.ascent());
-            const auto          height = static_cast<int>(metrics.height());
-            box                        = box.united(QRect(shape.position.x(), shape.position.y() - ascent, width, height));
+            const QRectF        textBox = textBoxOf(shape, metrics);
+            box = box.united(QRect(static_cast<int>(textBox.left()), static_cast<int>(textBox.top()), static_cast<int>(textBox.width()), static_cast<int>(textBox.height())));
         }
 
         return box;

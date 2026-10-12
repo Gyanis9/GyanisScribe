@@ -19,7 +19,7 @@
 
 #include <array>
 
-class QLineEdit;
+class QTextEdit;
 
 namespace GyanisScribe::Annotation
 {
@@ -118,22 +118,50 @@ namespace GyanisScribe::Annotation
         void mouseDoubleClickEvent(QMouseEvent *event) override;
 
         /**
-         * @brief 拦行内输入框的 Esc：取消这一条文字标注
+         * @brief 拦行内输入框的 Esc、Ctrl+回车与失焦
          * @param watched 被观察对象
          * @param event 事件
          * @return 处理掉了返回 true
-         * @details QLineEdit 的 Esc 不是信号，只能靠事件过滤器接；不接的话按 Esc 会穿到窗口去关掉整轮标注
+         * @details 三者都不是 QTextEdit 的信号，只能靠事件过滤器接，且都要抢在它自己处理之前：
+         *          多行输入里回车只负责换行，提交改由 Ctrl+回车承担（按晚了就先插进一个换行）；
+         *          点到画布、工具栏或别的窗口算「就这些字」，与单行时代 QLineEdit 的
+         *          editingFinished 同解。不接的话按 Esc 会穿到窗口去关掉整轮标注。
          */
         bool eventFilter(QObject *watched, QEvent *event) override;
 
     private:
         /**
-         * @brief 文字的行内输入框：在按下处摆一个
+         * @brief 文字的行内输入框：在按下处摆一个多行的
          * @param canvasPoint 画布逻辑坐标，输入框左上角落在这一点
          * @param initial 输入框的初始内容；新画的那条传空串
          * @param reEditing true 表示改的是已放下的那一条（提交走 setTextOfSelection），false 是新画一条
+         * @note 框只在 \n 处断行（不软换行）：屏上看到的断行就是成品里的断行
          */
         void openTextEditor(const QPoint &canvasPoint, const QString &initial, bool reEditing);
+
+        /**
+         * @brief 提交输入框里的内容并收起输入框
+         * @details 重编走 setTextOfSelection（进撤销栈，界面不碰图形本体），新画一条走
+         *          setPendingText + 收笔；尾巴上的空行在提交前削掉，不留在图形里当空白行
+         */
+        void commitTextEditor();
+
+        /**
+         * @brief 收起输入框但不提交：Esc 取消这一条时用
+         * @details 重编那一格原内容一个字没动，直接收起；新画那一格还要把在途图形喂给引擎
+         *          收掉（空文本会被判退化而丢弃，正是「取消成功」的样子）
+         */
+        void cancelTextEditor();
+
+        /// 收起输入框：销毁补刀与清成员只此一处，免得两条收场路各漏一半
+        void closeTextEditor();
+
+        /**
+         * @brief 按内容行数调输入框的高度
+         * @details 敲一行回车框就长一行，封顶在显示区高度之内——再多就盖住底图，
+         *          看不见自己在给哪块写字（超出部分靠光标自带滚动）
+         */
+        void resizeTextEditorToContent();
 
         /// 当前显示区，绘制与坐标换算共用同一个算法
         [[nodiscard]] QRect currentDisplayRect() const;
@@ -163,7 +191,7 @@ namespace GyanisScribe::Annotation
         bool       m_awaitingText      = false; ///< 文字在途：这条图形由输入框提交，而不是由抬笔提交
         bool       m_reEditingText     = false; ///< 输入框此刻改的是已放下的那一条，而不是新画的一条
         QPoint     m_lastCanvasPoint;           ///< 上一次事件换算到的画布坐标
-        QLineEdit *m_textEditor = nullptr;      ///< 行内输入框，用完即销毁
+        QTextEdit *m_textEditor = nullptr;      ///< 行内输入框（多行），用完即销毁
     };
 
 } // namespace GyanisScribe::Annotation

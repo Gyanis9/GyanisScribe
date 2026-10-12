@@ -5,6 +5,7 @@ add_library(Annotation STATIC
         FillBrush.h
         PenParameters.h
         TextFont.h
+        TextLayout.h
         AnnotationTool.h
         AnnotationTool.cpp
         RectangleTool.h

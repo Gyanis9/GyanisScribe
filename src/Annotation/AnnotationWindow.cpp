@@ -59,7 +59,7 @@ namespace GyanisScribe::Annotation
                 return modifiers == Qt::NoModifier ? ShortcutAction::DeleteSelection : ShortcutAction::None;
             case Qt::Key_Left:
             case Qt::Key_Right:
-                // 带 Ctrl 就不认：行内的文字框是 QLineEdit，Ctrl+方向键在它那儿是按词移光标，截走就少了这条既有行为
+                // 带 Ctrl 就不认：行内的文字框是 QTextEdit，Ctrl+方向键在它那儿是按词移光标，截走就少了这条既有行为
                 return control ? ShortcutAction::None : ShortcutAction::NudgeSelection;
             case Qt::Key_Up:
             case Qt::Key_Down:

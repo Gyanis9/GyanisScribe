@@ -34,9 +34,12 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 子控件用 `::indicator`、`::handle`。三份 QSS 逐条同构，覆盖同一批选择器
 （`QPushButton`、`QToolButton`、`QLineEdit`/`QComboBox`/`QSpinBox`、`QCheckBox`、`QSlider`、`QMenu`、
 `QToolTip`、`QListWidget`、`QTextEdit`、`QScrollBar`，以及具名容器 `#appRoot`/`#pageCard`/`#hudRoot`/
-`#AnnotationToolbar`/`#toolbarSeparator` 与文字角色 `#pageTitle`/`#pageHint`/`#metricValue`），差异只在色值。
+`#AnnotationToolbar`/`#toolbarSeparator`/`#annotationTextEditor` 与文字角色 `#pageTitle`/`#pageHint`/`#metricValue`），差异只在色值。
 应用里没用到的控件（`QGroupBox`、`QRadioButton`、`QProgressBar`、`QTabBar`）刻意不写规则——
 没人吃的样式表和没人吃的配置键一样是债。
+其中 `#annotationTextEditor`（标注窗里那个多行行内输入框）单列一档而没并进 `QTextEdit` 那条：
+识别结果区的规则带 8 像素内边距，而标注输入框的上下内边距必须为零——它的高度是代码按行数算的
+（`AnnotationView::resizeTextEditorToContent` 只补边框与余量），有上下内边距就会把行裁掉半截。
 
 | 窗口 | 类与文件 | 样式来源 | 状态 |
 | --- | --- | --- | --- |

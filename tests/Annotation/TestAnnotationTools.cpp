@@ -878,6 +878,58 @@ TEST_F(AnnotationFixture, TextSelectionBoxRidesTheBaseline)
 }
 
 /**
+ * @brief 钉住多行：第二行照画不误，外接框按行数长高、且盖得住两行
+ * @details 单行时代画与量都只铺一行（高 = 一行的 metrics.height()），多行内容会被截掉下半截。
+ *          这里在同一基线上并排画一条单行与一条两行：框高必须高过单行那条，且第二行的墨
+ *          只能出现在单行框底之下——两处判据合起来同时钉住「量」与「画」，只修一处都过不去。
+ */
+TEST_F(AnnotationFixture, TextPlotsEveryLineAndTheBoxCoversThem)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Text).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 4, .fontSize = 20, .fillStyle = 0}).has_value());
+
+    // 单行那条在左边：先把它的框底量下来，当作「一行到得了哪」的基准
+    m_engine.beginStroke(QPoint(20, 40));
+    ASSERT_TRUE(m_engine.setPendingText(QStringLiteral("AB")).has_value());
+    const auto single = m_engine.endStroke();
+    ASSERT_TRUE(single.has_value()) << single.error().message;
+    ASSERT_TRUE(m_engine.select(*single).has_value());
+    const auto singleBounds = m_engine.selectionBounds();
+    ASSERT_TRUE(singleBounds.has_value());
+
+    // 两行那条在右边，与单行那条同一条首行基线
+    m_engine.beginStroke(QPoint(220, 40));
+    ASSERT_TRUE(m_engine.setPendingText(QStringLiteral("AB\nCD")).has_value());
+    const auto multi = m_engine.endStroke();
+    ASSERT_TRUE(multi.has_value()) << multi.error().message;
+    ASSERT_TRUE(m_engine.select(*multi).has_value());
+    const auto multiBounds = m_engine.selectionBounds();
+    ASSERT_TRUE(multiBounds.has_value());
+
+    EXPECT_GT(multiBounds->height(), singleBounds->height()) << "外接框还是单行的高，第二行落在框外";
+
+    // 两行那条的列里数墨：只数单行框底之下的部分（画布 y=100 以下换成黑底，别数进去）
+    const QImage drawn = m_engine.exportImage();
+    const QRect  column(210, singleBounds->bottom() + 1, 180, 95 - singleBounds->bottom());
+    int          ink     = 0;
+    int          deepest = -1;
+    for (int y = column.top(); y <= column.bottom(); ++y)
+    {
+        for (int x = column.left(); x <= column.right(); ++x)
+        {
+            if (drawn.pixelColor(x, y) != QColor(255, 255, 255))
+            {
+                ++ink;
+                deepest = y;
+                break; // 每行只认第一个墨点：这里只关心「有没有」与「最深到哪」
+            }
+        }
+    }
+    EXPECT_GT(ink, 0) << "第二行一个字都没画出来（或两行叠成了一行）";
+    EXPECT_GE(multiBounds->bottom(), deepest) << "框没盖住第二行的墨";
+}
+
+/**
  * @brief 钉住序号取号的位置：按当时的条数 +1，撤销一条后接着那个号走
  */
 TEST(NumberToolTest, LabelFollowsTheCurrentShapeCount)

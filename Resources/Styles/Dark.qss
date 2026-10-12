@@ -131,6 +131,23 @@ QLineEdit:read-only {
     color: #AEB7C4;
 }
 
+/* ---- 标注窗的行内文字输入框：与上面几档输入框同形，别把识别结果区的宽内边距带进去 ----
+   上下内边距为零是标注输入框高度算式的前提（AnnotationView::resizeTextEditorToContent 只补边框与余量），
+   改这里的 padding 要同步改那边 */
+QTextEdit#annotationTextEditor {
+    background-color: #1F2228;
+    color: #E8EAED;
+    border: 1px solid #4A525E;
+    border-radius: 8px;
+    padding: 0 8px;
+    selection-background-color: #2C4E77;
+    selection-color: #E8EAED;
+}
+
+QTextEdit#annotationTextEditor:focus {
+    border: 2px solid #4E8BF5;
+}
+
 QComboBox QAbstractItemView {
     background-color: #1F2228;
     color: #E8EAED;

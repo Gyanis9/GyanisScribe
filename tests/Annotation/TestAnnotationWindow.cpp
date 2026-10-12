@@ -14,10 +14,12 @@
 #include <gtest/gtest.h>
 
 #include <QApplication>
+#include <QCoreApplication>
 #include <QImage>
 #include <QKeyEvent>
-#include <QLineEdit>
 #include <QMouseEvent>
+#include <QTextCursor>
+#include <QTextEdit>
 #include <QToolButton>
 #include <QPoint>
 #include <QRect>
@@ -400,7 +402,7 @@ TEST_F(AnnotationWindowFixture, ArrowKeysWithoutASelectionMoveNothing)
 
 /**
  * @brief 钉住「双击一条已放下的文字」真的原地打开来改
- * @details 走的是真事件：双击 → 输入框带着原文出现 → 改内容 → 回车提交。
+ * @details 走的是真事件：双击 → 输入框带着原文出现 → 改内容 → Ctrl+回车提交。
  *          判据落在引擎那一份内容上，而不是输入框的显示——界面把框填对了但没提交，
  *          用户看到的仍然是旧文字。
  */
@@ -423,17 +425,130 @@ TEST_F(AnnotationWindowFixture, DoubleClickReEditsPlacedText)
     QMouseEvent doubleClick{QEvent::MouseButtonDblClick, QPointF{widgetCenter}, QPointF{widgetCenter}, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
     QApplication::sendEvent(&view, &doubleClick);
 
-    auto *editor = view.findChild<QLineEdit *>();
+    auto *editor = view.findChild<QTextEdit *>();
     ASSERT_NE(editor, nullptr) << "双击一条文字没有打开输入框";
-    EXPECT_EQ(editor->text(), QStringLiteral("AB")) << "输入框没带着原文打开，用户得重打一遍";
+    EXPECT_EQ(editor->toPlainText(), QStringLiteral("AB")) << "输入框没带着原文打开，用户得重打一遍";
 
-    editor->setText(QStringLiteral("CD"));
-    QKeyEvent enter{QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier};
-    QApplication::sendEvent(editor, &enter);
+    editor->setPlainText(QStringLiteral("CD"));
+    pressKeyOn(*editor, Qt::Key_Return, Qt::ControlModifier);
 
-    EXPECT_EQ(engine().textOfSelection().value_or(QString{}), QStringLiteral("CD")) << "回车提交没把内容写回那条图形";
+    EXPECT_EQ(engine().textOfSelection().value_or(QString{}), QStringLiteral("CD")) << "Ctrl+回车提交没把内容写回那条图形";
     ASSERT_TRUE(engine().undo().has_value());
     EXPECT_EQ(engine().textOfSelection().value_or(QString{}), QStringLiteral("AB")) << "改文字没进撤销栈，Ctrl+Z 回不到改之前";
+}
+
+/**
+ * @brief 钉住多行输入的分工：回车在框里换行、Ctrl+回车才提交，且提交前引擎里一个字都没动
+ * @details 单行时代回车即提交（QLineEdit 的 editingFinished）；多行之后这个分工反过来。
+ *          两次判据一次钉住两边——回车后框里多了一行而图形上还是原文（回车若还当提交，
+ *          半截内容当场就落定了），Ctrl+回车才把两行一起写回去。
+ */
+TEST_F(AnnotationWindowFixture, EnterInsertsALineAndControlEnterCommits)
+{
+    GyanisScribe::Annotation::AnnotationView view{engine()};
+    view.resize(400, 200);
+    ASSERT_TRUE(engine().setActiveTool(GyanisScribe::Annotation::ToolKind::Text).has_value());
+    engine().beginStroke(QPoint(20, 20));
+    ASSERT_TRUE(engine().setPendingText(QStringLiteral("AB")).has_value());
+    const auto placed = engine().endStroke();
+    ASSERT_TRUE(placed.has_value()) << placed.error().message;
+    ASSERT_TRUE(engine().select(*placed).has_value());
+
+    const auto bounds = engine().selectionBounds();
+    ASSERT_TRUE(bounds.has_value());
+    const QPoint widgetCenter{(bounds->center().x() + 1) * 2, (bounds->center().y() + 1) * 2};
+
+    QMouseEvent doubleClick{QEvent::MouseButtonDblClick, QPointF{widgetCenter}, QPointF{widgetCenter}, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+    QApplication::sendEvent(&view, &doubleClick);
+
+    auto *editor = view.findChild<QTextEdit *>();
+    ASSERT_NE(editor, nullptr) << "双击一条文字没有打开输入框";
+    EXPECT_FALSE(editor->textCursor().hasSelection()) << "重编打开时全选了：多行之下按个回车就把原文整段替掉";
+
+    pressKeyOn(*editor, Qt::Key_Return);
+    EXPECT_EQ(editor->toPlainText(), QStringLiteral("AB\n")) << "回车没在框里换行";
+    EXPECT_EQ(engine().textOfSelection().value_or(QString{}), QStringLiteral("AB")) << "回车把半截内容提交了：多行编辑里它只负责换行";
+
+    editor->moveCursor(QTextCursor::End);
+    editor->insertPlainText(QStringLiteral("CD"));
+
+    pressKeyOn(*editor, Qt::Key_Return, Qt::ControlModifier);
+    EXPECT_EQ(engine().textOfSelection().value_or(QString{}), QStringLiteral("AB\nCD")) << "Ctrl+回车没把两行都写回那条图形";
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    EXPECT_EQ(view.findChild<QTextEdit *>(), nullptr) << "提交之后输入框还挂在视图上";
+}
+
+/**
+ * @brief 钉住提交时对空行的取舍：尾巴上的空行削掉、中间的空行是内容要留着
+ * @details 尾随空行多半是「敲完回车就提交」带出来的，留着会在图形里多出一行空白
+ *          （底板与选中框都跟着多一格）；而不挨着末尾的空行是用户分出来的段，
+ *          删掉就是把排版改了。
+ */
+TEST_F(AnnotationWindowFixture, TrailingBlankLinesAreTrimmedButInnerOnesKept)
+{
+    GyanisScribe::Annotation::AnnotationView view{engine()};
+    view.resize(400, 200);
+    ASSERT_TRUE(engine().setActiveTool(GyanisScribe::Annotation::ToolKind::Text).has_value());
+    engine().beginStroke(QPoint(20, 20));
+    ASSERT_TRUE(engine().setPendingText(QStringLiteral("AB")).has_value());
+    const auto placed = engine().endStroke();
+    ASSERT_TRUE(placed.has_value()) << placed.error().message;
+    ASSERT_TRUE(engine().select(*placed).has_value());
+
+    const auto openEditor = [&view, this]
+    {
+        // 上一轮收场是 deleteLater：先把欠下的销毁跑掉，免得 findChild 捡到还没死的那一只——
+        // 那样后面敲的字全进了僵尸，引擎那几条断言就成了恒真的假绿
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+
+        const auto bounds = engine().selectionBounds();
+        if (!bounds.has_value())
+        {
+            return static_cast<QTextEdit *>(nullptr);
+        }
+        const QPoint widgetCenter{(bounds->center().x() + 1) * 2, (bounds->center().y() + 1) * 2};
+        QMouseEvent  doubleClick{QEvent::MouseButtonDblClick, QPointF{widgetCenter}, QPointF{widgetCenter}, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+        QApplication::sendEvent(&view, &doubleClick);
+        EXPECT_EQ(view.findChildren<QTextEdit *>().size(), 1) << "视图里同时活着的输入框不止一只，下面的判据可能打在僵尸身上";
+        return view.findChild<QTextEdit *>();
+    };
+
+    auto *editor = openEditor();
+    ASSERT_NE(editor, nullptr) << "双击一条文字没有打开输入框";
+    editor->setPlainText(QStringLiteral("A\n\nB"));
+    pressKeyOn(*editor, Qt::Key_Return, Qt::ControlModifier);
+    EXPECT_EQ(engine().textOfSelection().value_or(QString{}), QStringLiteral("A\n\nB")) << "中间的空行被削掉了，用户分的段没了";
+
+    editor = openEditor();
+    ASSERT_NE(editor, nullptr) << "第二次双击没有重开输入框";
+    editor->setPlainText(QStringLiteral("A\n\nB\n\n"));
+    pressKeyOn(*editor, Qt::Key_Return, Qt::ControlModifier);
+    EXPECT_EQ(engine().textOfSelection().value_or(QString{}), QStringLiteral("A\n\nB")) << "尾巴上的空行落了地，图形里多出一行空白";
+}
+
+/**
+ * @brief 钉住新画一条时的 Esc：输入框收起、画布上不留半个图形、撤销栈里不落东西
+ * @details 文字是点一下落的，起笔之后由输入框决定这条算不算数；取消路径上引擎会收一次
+ *          空笔（空文本会被判退化而丢弃），这一条就是那个「丢弃」的回归判据。
+ */
+TEST_F(AnnotationWindowFixture, EscCancelsTheEditorWithoutLeavingAShape)
+{
+    GyanisScribe::Annotation::AnnotationView view{engine()};
+    view.resize(400, 200);
+    ASSERT_TRUE(engine().setActiveTool(GyanisScribe::Annotation::ToolKind::Text).has_value());
+
+    // 画布逻辑 200×100 放进 400×200 的视图：控件 (40, 40) 落在空白处的画布 (20, 20)
+    QMouseEvent press{QEvent::MouseButtonPress, QPointF{40, 40}, QPointF{40, 40}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QApplication::sendEvent(&view, &press);
+
+    auto *editor = view.findChild<QTextEdit *>();
+    ASSERT_NE(editor, nullptr) << "文字工具下点一下画布没有打开输入框";
+    editor->setPlainText(QStringLiteral("AB"));
+    pressKeyOn(*editor, Qt::Key_Escape);
+
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    EXPECT_EQ(view.findChild<QTextEdit *>(), nullptr) << "Esc 之后输入框还挂在视图上";
+    EXPECT_FALSE(engine().canUndo()) << "取消掉的那条进了撤销栈（或半截内容落了地）";
 }
 /**
  * @brief 钉住改号键只在序号工具在用的时候认
