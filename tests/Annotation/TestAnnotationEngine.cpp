@@ -1,4 +1,5 @@
 #include "Annotation/AnnotationEngine.h"
+#include "Annotation/PenParameters.h"
 
 #include <QApplication>
 #include <QColor>
@@ -12,6 +13,7 @@
 
 using GyanisScribe::Annotation::AnnotationEngine;
 using GyanisScribe::Annotation::AnnotationSelection;
+using GyanisScribe::Annotation::PenParameters;
 using GyanisScribe::Annotation::ToolKind;
 using GyanisScribe::Core::CapturedImage;
 using GyanisScribe::Core::ErrorCode;
@@ -87,11 +89,11 @@ TEST_F(EngineFixture, RejectsUnknownToolAndNonPositivePenParameters)
     EXPECT_EQ(unknown.error().code, ErrorCode::InvalidArgument);
     EXPECT_EQ(m_engine.activeTool(), ToolKind::Rectangle) << "失败的选择也不该改到当前工具";
 
-    const auto badWidth = m_engine.setPenParameters(QColor(0, 0, 255), 0, 16, 0);
+    const auto badWidth = m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 255), .lineWidth = 0, .fontSize = 16, .fillStyle = 0});
     ASSERT_FALSE(badWidth.has_value()) << "线宽 0 会让图形变成看不见的线";
     EXPECT_NE(badWidth.error().message.find("正数"), std::string::npos);
 
-    const auto badFont = m_engine.setPenParameters(QColor(0, 0, 255), 3, -2, 0);
+    const auto badFont = m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 255), .lineWidth = 3, .fontSize = -2, .fillStyle = 0});
     ASSERT_FALSE(badFont.has_value()) << "负字号会被 Qt 取绝对值，用户设的与实际的不是一回事";
     EXPECT_EQ(badFont.error().code, ErrorCode::InvalidArgument);
 }
@@ -301,7 +303,7 @@ TEST_F(EngineFixture, StyleChangeRestylesTheSelectedShapeAndUndoesBack)
     ASSERT_EQ(drawn.pixelColor(10, 35), QColor(255, 0, 0)) << "默认的红没落在左边界上，后面的对照就没基准";
     ASSERT_EQ(drawn.pixelColor(13, 35), QColor(255, 255, 255)) << "线宽 3 的描边不该够到 x=13";
 
-    ASSERT_TRUE(m_engine.setPenParameters(QColor(0, 0, 255), 8, 16, 0).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 255), .lineWidth = 8, .fontSize = 16, .fillStyle = 0}).has_value());
     const QImage restyled = m_engine.exportImage();
     EXPECT_EQ(restyled.pixelColor(10, 35), QColor(0, 0, 255)) << "改样式只改了默认值，没落到选中的那条图形上";
     EXPECT_EQ(restyled.pixelColor(13, 35), QColor(0, 0, 255)) << "线宽没跟着改";
@@ -323,9 +325,9 @@ TEST_F(EngineFixture, ConsecutiveStyleChangesOnOneShapeUndoAsASingleStep)
     const auto rectangle = drawRectangle(QPoint(10, 10), QPoint(90, 60));
     ASSERT_TRUE(m_engine.select(rectangle).has_value());
 
-    ASSERT_TRUE(m_engine.setPenParameters(QColor(0, 0, 255), 4, 16, 0).has_value());
-    ASSERT_TRUE(m_engine.setPenParameters(QColor(0, 255, 0), 6, 16, 0).has_value());
-    ASSERT_TRUE(m_engine.setPenParameters(QColor(0, 0, 255), 8, 16, 0).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 255), .lineWidth = 4, .fontSize = 16, .fillStyle = 0}).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 255, 0), .lineWidth = 6, .fontSize = 16, .fillStyle = 0}).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 255), .lineWidth = 8, .fontSize = 16, .fillStyle = 0}).has_value());
     ASSERT_EQ(m_engine.exportImage().pixelColor(13, 35), QColor(0, 0, 255)) << "最后一次改动没落到图形上";
 
     ASSERT_TRUE(m_engine.undo().has_value());
@@ -344,13 +346,13 @@ TEST_F(EngineFixture, ConsecutiveStyleChangesOnOneShapeUndoAsASingleStep)
  */
 TEST_F(EngineFixture, StyleChangeWithoutAVisibleDifferenceAddsNoUndoStep)
 {
-    ASSERT_TRUE(m_engine.setPenParameters(QColor(0, 0, 255), 8, 16, 0).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 255), .lineWidth = 8, .fontSize = 16, .fillStyle = 0}).has_value());
     EXPECT_FALSE(m_engine.canUndo()) << "画布上什么都没有，改默认值不该进撤销栈";
 
     const auto rectangle = drawRectangle(QPoint(10, 10), QPoint(90, 60));
     ASSERT_TRUE(m_engine.select(rectangle).has_value());
     // 上面那次把默认值改成了蓝/8，新画的这条就是蓝/8：再下发同一组值等于什么都没改
-    ASSERT_TRUE(m_engine.setPenParameters(QColor(0, 0, 255), 8, 16, 0).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 255), .lineWidth = 8, .fontSize = 16, .fillStyle = 0}).has_value());
 
     ASSERT_TRUE(m_engine.undo().has_value());
     EXPECT_EQ(m_engine.exportImage().pixelColor(10, 35), QColor(255, 255, 255)) << "点同一档颜色也造出了一步撤销，撤的就不是那条图形了";
@@ -373,11 +375,36 @@ TEST_F(EngineFixture, StyleChangeTouchesOnlyTheSelectedShape)
     ASSERT_EQ(drawn.pixelColor(60, 35), QColor(255, 0, 0));
 
     ASSERT_TRUE(m_engine.select(first).has_value());
-    ASSERT_TRUE(m_engine.setPenParameters(QColor(0, 0, 255), 3, 16, 0).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 255), .lineWidth = 3, .fontSize = 16, .fillStyle = 0}).has_value());
 
     const QImage restyled = m_engine.exportImage();
     EXPECT_EQ(restyled.pixelColor(10, 35), QColor(0, 0, 255)) << "选中的那条没改";
     EXPECT_EQ(restyled.pixelColor(60, 35), QColor(255, 0, 0)) << "没选中的那条被一起改了";
+}
+
+/**
+ * @brief 钉住「双向箭头」也走改样式命令：选中一条已画好的单头箭头，开双向要立刻落到它身上，撤销回单头
+ * @details 样式开关记在图形自己身上：新开关加进来如果忘了进 RestyleShapeCommand，选中的那条不会变，
+ *          或变了撤不回去。取样点与箭头几何用例手算的同一处：线宽 4 时头长 14，
+ *          起点端三角在 (30, 63) 一带最厚，离杆身与三条边都在 1.5 格以上。
+ */
+TEST_F(EngineFixture, DoubleHeadedRestyleLandsOnTheSelectedArrowAndUndoesBack)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Arrow).has_value());
+    m_engine.beginStroke(QPoint(20, 60));
+    m_engine.moveStroke(QPoint(180, 60));
+    const auto arrow = m_engine.endStroke();
+    ASSERT_TRUE(arrow.has_value()) << arrow.error().message;
+    ASSERT_TRUE(m_engine.select(*arrow).has_value());
+
+    ASSERT_EQ(m_engine.exportImage().pixelColor(30, 63), QColor(255, 255, 255)) << "单头箭头在起点端该是白的，后面的对照就没基准";
+
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 16, .fillStyle = 0, .doubleHeaded = true}).has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(30, 63), QColor(255, 0, 0)) << "开了双向，选中的那条起点端没长出第二个头";
+    EXPECT_EQ(m_engine.exportImage().pixelColor(170, 63), QColor(255, 0, 0)) << "终点端的头也没了";
+
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(30, 63), QColor(255, 255, 255)) << "撤销没把双向退回单头";
 }
 
 namespace

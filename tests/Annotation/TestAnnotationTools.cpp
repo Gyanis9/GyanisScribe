@@ -1,4 +1,5 @@
 #include "Annotation/AnnotationEngine.h"
+#include "Annotation/PenParameters.h"
 
 #include "Annotation/HighlightTool.h"
 #include "Annotation/ImageBlur.h"
@@ -14,13 +15,13 @@
 
 #include <gtest/gtest.h>
 
-
 #include <memory>
 #include <string>
 
 using GyanisScribe::Annotation::AnnotationEngine;
 using GyanisScribe::Annotation::AnnotationSelection;
 using GyanisScribe::Annotation::NumberTool;
+using GyanisScribe::Annotation::PenParameters;
 using GyanisScribe::Annotation::PenTool;
 using GyanisScribe::Annotation::ToolKind;
 using GyanisScribe::Core::CapturedImage;
@@ -150,7 +151,7 @@ namespace
      */
     TEST_F(AnnotationFixture, EraserRevealsTheBaseImageOnlyAlongItsStroke)
     {
-        ASSERT_TRUE(m_engine.setPenParameters(QColor(255, 0, 0), 8, 16, 0).has_value());
+        ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 8, .fontSize = 16, .fillStyle = 0}).has_value());
 
         // 红色横带压在黑色半区上（底图 y=100 以下是黑的），另在白色半区点一个探针红点
         ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Pen).has_value());
@@ -196,7 +197,7 @@ namespace
      */
     TEST_F(AnnotationFixture, EraserSitsAboveEveryOtherTool)
     {
-        ASSERT_TRUE(m_engine.setPenParameters(QColor(255, 0, 0), 8, 16, 0).has_value());
+        ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 8, .fontSize = 16, .fillStyle = 0}).has_value());
         ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Line).has_value());
         m_engine.beginStroke(QPoint(60, 40));
         m_engine.moveStroke(QPoint(340, 40));
@@ -223,14 +224,14 @@ namespace
         ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Rectangle).has_value());
 
         // 无填充：内里保持底图的白
-        ASSERT_TRUE(m_engine.setPenParameters(QColor(255, 0, 0), 4, 16, 0).has_value());
+        ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 16, .fillStyle = 0}).has_value());
         m_engine.beginStroke(QPoint(20, 20));
         m_engine.moveStroke(QPoint(120, 120));
         ASSERT_TRUE(m_engine.endStroke().has_value());
         EXPECT_EQ(m_engine.exportImage().pixelColor(70, 70), QColor(255, 255, 255)) << "无填充档的内里被动过了";
 
         // 半透明：内里是红压在白上的一层浅红（既不是纯白也不是纯红）
-        ASSERT_TRUE(m_engine.setPenParameters(QColor(255, 0, 0), 4, 16, 1).has_value());
+        ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 16, .fillStyle = 1}).has_value());
         m_engine.beginStroke(QPoint(150, 20));
         m_engine.moveStroke(QPoint(250, 120));
         ASSERT_TRUE(m_engine.endStroke().has_value());
@@ -240,7 +241,7 @@ namespace
         EXPECT_GT(translucent.green(), 100) << "半透明档成了实心：底下的白被完全盖住";
 
         // 实心：内里就是描边色
-        ASSERT_TRUE(m_engine.setPenParameters(QColor(255, 0, 0), 4, 16, 2).has_value());
+        ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 16, .fillStyle = 2}).has_value());
         m_engine.beginStroke(QPoint(280, 20));
         m_engine.moveStroke(QPoint(380, 120));
         ASSERT_TRUE(m_engine.endStroke().has_value());
@@ -357,6 +358,45 @@ TEST_F(AnnotationFixture, ArrowHitTestFollowsTheShaft)
     EXPECT_TRUE(m_engine.selectionAt(QPoint(100, 0)).has_value()) << "箭杆正中该被点中";
     EXPECT_FALSE(m_engine.selectionAt(QPoint(100, 100)).has_value()) << "外接框里的空白处不该算命中";
     EXPECT_FALSE(m_engine.selectionAt(QPoint(300, 0)).has_value()) << "箭头延长线上不该点得中";
+}
+
+/**
+ * @brief 钉住箭头头部是实心三角：两翼张在尖端往回约 12 格的地方，而不是贴在尖端旁的一小片
+ * @details 线宽 4 时头长 14，两翼各与箭杆成 30°，三角在尖端往回 12 格处最宽（±7）。
+ *          (170,63) 只可能落在三角里：离杆身 1.5 格、离三条边都在 1.6 格以上——
+ *          两翼如果算错成「从尖端往回 14 的底边点再前伸 14」这个位置是白的，画出来就是一根光杆。
+ */
+TEST_F(AnnotationFixture, ArrowHeadIsASolidTriangle)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Arrow).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 16, .fillStyle = 0}).has_value());
+    m_engine.beginStroke(QPoint(20, 60));
+    m_engine.moveStroke(QPoint(180, 60));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+
+    const auto drawn = m_engine.exportImage();
+    EXPECT_EQ(drawn.pixelColor(170, 63), QColor(255, 0, 0)) << "头部三角在这个位置没有墨：两翼贴在尖端旁，画出来还是一根光杆";
+    EXPECT_EQ(drawn.pixelColor(172, 60), QColor(255, 0, 0)) << "尖端往回一点的位置该在三角里";
+    EXPECT_EQ(drawn.pixelColor(30, 63), QColor(255, 255, 255)) << "单向箭头不该在起点端长出第二个头";
+}
+
+/**
+ * @brief 钉住双向箭头：doubleHeaded 打开后两端各有一个实心三角，箭杆仍然连得到
+ * @details 与上一条同一组坐标互为对照：只把 doubleHeaded 打开，(30,63) 就从白变红。
+ *          这条同时走完「参数下发 → 新画的图形带上开关 → 两端各画一个头」整条路。
+ */
+TEST_F(AnnotationFixture, DoubleHeadedArrowDrawsAHeadOnBothEnds)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Arrow).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 16, .fillStyle = 0, .doubleHeaded = true}).has_value());
+    m_engine.beginStroke(QPoint(20, 60));
+    m_engine.moveStroke(QPoint(180, 60));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+
+    const auto drawn = m_engine.exportImage();
+    EXPECT_EQ(drawn.pixelColor(170, 63), QColor(255, 0, 0)) << "终点端没画头";
+    EXPECT_EQ(drawn.pixelColor(30, 63), QColor(255, 0, 0)) << "起点端没画第二个头：双向开关没落到新画的图形上";
+    EXPECT_EQ(drawn.pixelColor(100, 60), QColor(255, 0, 0)) << "两个头之间箭杆断了";
 }
 
 /**
@@ -515,7 +555,7 @@ TEST_F(AnnotationFixture, MosaicCoversOnlyItsRegion)
 TEST_F(AnnotationFixture, HighlightIsWiderThanThePen)
 {
     ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Highlight).has_value());
-    ASSERT_TRUE(m_engine.setPenParameters(QColor(255, 255, 0), 3, 16, 0).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 255, 0), .lineWidth = 3, .fontSize = 16, .fillStyle = 0}).has_value());
     m_engine.beginStroke(QPoint(20, 20));
     m_engine.moveStroke(QPoint(20, 120));
     ASSERT_TRUE(m_engine.endStroke().has_value());
@@ -629,7 +669,7 @@ TEST(PenToolRestyleTest, RestyleWritesOnlyTheStyleFields)
     ASSERT_TRUE(committed.has_value());
     tool.insertShape(0, *committed);
 
-    ASSERT_TRUE(tool.restyleShapeAt(0, QColor(0, 0, 255), 8, 20, 0));
+    ASSERT_TRUE(tool.restyleShapeAt(0, PenParameters{.color = QColor(0, 0, 255), .lineWidth = 8, .fontSize = 20, .fillStyle = 0}));
     const auto restyled = tool.shapeAt(0);
     EXPECT_EQ(restyled.color, QColor(0, 0, 255));
     EXPECT_EQ(restyled.lineWidth, 8);
@@ -637,8 +677,8 @@ TEST(PenToolRestyleTest, RestyleWritesOnlyTheStyleFields)
     EXPECT_EQ(restyled.points, committed->points) << "改样式把采样点动了";
     EXPECT_EQ(restyled.rect, committed->rect) << "改样式把位置动了";
 
-    EXPECT_FALSE(tool.restyleShapeAt(1, QColor(255, 0, 0), 3, 16, 0)) << "只有一条图形时索引 1 该被拒";
-    EXPECT_FALSE(tool.restyleShapeAt(-1, QColor(255, 0, 0), 3, 16, 0)) << "负索引该被拒";
+    EXPECT_FALSE(tool.restyleShapeAt(1, PenParameters{.color = QColor(255, 0, 0), .lineWidth = 3, .fontSize = 16, .fillStyle = 0})) << "只有一条图形时索引 1 该被拒";
+    EXPECT_FALSE(tool.restyleShapeAt(-1, PenParameters{.color = QColor(255, 0, 0), .lineWidth = 3, .fontSize = 16, .fillStyle = 0})) << "负索引该被拒";
     EXPECT_EQ(tool.shapeCount(), 1) << "越界的那次多插了一条";
     EXPECT_EQ(tool.shapeAt(0).color, QColor(0, 0, 255)) << "越界的调用改到了已有图形";
 }

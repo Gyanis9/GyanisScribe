@@ -6,6 +6,7 @@
 #include "Annotation/AnnotationEngine.h"
 #include "Annotation/AnnotationToolbar.h"
 #include "Annotation/IAnnotationEngine.h"
+#include "Annotation/PenParameters.h"
 
 #include "Settings/SettingsStore.h"
 #include "Ui/IconProvider.h"
@@ -31,6 +32,7 @@
 
 using GyanisScribe::Annotation::AnnotationToolbar;
 using GyanisScribe::Annotation::AnnotationWindow;
+using GyanisScribe::Annotation::PenParameters;
 using GyanisScribe::Annotation::ShortcutAction;
 using GyanisScribe::Annotation::shortcutActionFor;
 using GyanisScribe::Annotation::toCanvasPoint;
@@ -96,7 +98,7 @@ namespace
             m_engine->loadCanvas(makeCanvas({200, 100}));
             // 这两步都要验成功：SetUp 里悄悄失败会让后面的用例在「工具不是矩形」的状态上跑，红了也看不出原因
             ASSERT_TRUE(m_engine->setActiveTool(ToolKind::Rectangle).has_value());
-            ASSERT_TRUE(m_engine->setPenParameters(QColor{255, 0, 0}, 2, 16, 0).has_value());
+            ASSERT_TRUE(m_engine->setPenParameters(PenParameters{.color = QColor{255, 0, 0}, .lineWidth = 2, .fontSize = 16, .fillStyle = 0}).has_value());
         }
 
         void TearDown() override
@@ -431,4 +433,57 @@ TEST_F(AnnotationWindowFixture, NumberKeysAdjustTheNextNumberOnlyForThatTool)
     pressKeyOn(*window, Qt::Key_Plus);
     pressKeyOn(*window, Qt::Key_0);
     EXPECT_EQ(engine().nextNumber(), 1) << "`0` 该回到自动口径：一条序号都没有时下一个号是 1";
+}
+
+/**
+ * @brief 钉住双向箭头开关从工具栏一路走到引擎：点一下按钮，选中的单头箭头当场变双向，撤销回单头
+ * @details 窗口把工具栏的五项参数汇成画笔包再下发，这条验的正是「双向」那一项在这条链上：
+ *          漏了它按钮会按下去，选中的那条却不动。取样区手算：窗口建起时下发的是工具栏初值
+ *          （线宽 4），画布 200x100、倍比 2，起点端上侧的物理 (54..64, 126..128) 一带
+ *          在单头箭头下必然是底色（杆身只到 y=124），双向后起点端三角盖到这里。
+ */
+TEST_F(AnnotationWindowFixture, DoubleArrowToggleFromToolbarReachesTheEngine)
+{
+    auto window = makeWindow();
+
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Arrow).has_value());
+    engine().beginStroke(QPoint(20, 60));
+    engine().moveStroke(QPoint(180, 60));
+    const auto arrow = engine().endStroke();
+    ASSERT_TRUE(arrow.has_value()) << arrow.error().message;
+    ASSERT_TRUE(engine().select(*arrow).has_value());
+
+    const auto countInkAtStartHead = [this]
+    {
+        const QImage drawn = engine().exportImage();
+        int          ink   = 0;
+        for (int x = 54; x < 64; ++x)
+        {
+            for (int y = 126; y < 128; ++y)
+            {
+                if (drawn.pixelColor(x, y) != QColor(180, 180, 180))
+                {
+                    ++ink;
+                }
+            }
+        }
+        return ink;
+    };
+    EXPECT_EQ(countInkAtStartHead(), 0) << "单头箭头在起点端的翼区不该有墨";
+
+    QToolButton *doubleButton = nullptr;
+    for (auto *candidate: window->toolbar().findChildren<QToolButton *>())
+    {
+        if (candidate->accessibleName() == QString::fromUtf8("双向箭头"))
+        {
+            doubleButton = candidate;
+            break;
+        }
+    }
+    ASSERT_NE(doubleButton, nullptr) << "工具栏上找不到双向箭头按钮";
+    doubleButton->click();
+
+    EXPECT_GT(countInkAtStartHead(), 0) << "按钮点下去了，选中的那条没有跟着变双向：窗口到引擎这条链没接上";
+    ASSERT_TRUE(engine().undo().has_value());
+    EXPECT_EQ(countInkAtStartHead(), 0) << "撤销没把双向退回单头，改开关没进撤销栈";
 }

@@ -6,6 +6,7 @@
 
 #include "Annotation/AnnotationEngine.h"
 #include "Annotation/AnnotationTool.h"
+#include "Annotation/PenParameters.h"
 #include "Capture/CaptureService.h"
 #include "Capture/ICaptureService.h"
 #include "Capture/IScreenCaptureSource.h"
@@ -233,7 +234,7 @@ namespace GyanisScribe
             GyanisScribe::Annotation::AnnotationEngine engine;
             engine.loadCanvas(frame);
             ASSERT_TRUE(engine.setActiveTool(GyanisScribe::Annotation::ToolKind::Rectangle).has_value());
-            ASSERT_TRUE(engine.setPenParameters(kAnnotationColor, 6, 12, 0).has_value());
+            ASSERT_TRUE(engine.setPenParameters(GyanisScribe::Annotation::PenParameters{.color = kAnnotationColor, .lineWidth = 6, .fontSize = 12, .fillStyle = 0}).has_value());
             engine.beginStroke(kStrokeLogicalRect.topLeft());
             engine.moveStroke(kStrokeLogicalRect.bottomRight());
             ASSERT_TRUE(engine.endStroke().has_value()) << "矩形退化，没能进撤销栈";

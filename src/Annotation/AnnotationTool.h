@@ -10,6 +10,7 @@
 #pragma once
 
 #include "Annotation/AnnotationShape.h"
+#include "Annotation/PenParameters.h"
 
 #include <QColor>
 #include <QPoint>
@@ -163,14 +164,12 @@ namespace GyanisScribe::Annotation
         /**
          * @brief 改一条图形自己的样式
          * @param index 索引
-         * @param color 颜色
-         * @param lineWidth 线宽，逻辑像素，必须为正
-         * @param fontSize 字号，必须为正
+         * @param parameters 一整套样式参数
          * @return 成功返回 true；索引越界返回 false
-         * @details 三个字段一起写，与 begin() 给在途图形上色的口径一致：只改其一会让图形
+         * @details 整包样式一起写，与 begin() 给在途图形上样的口径一致：只改其一会让图形
          *          带着一个谁都没设过的混合样式，撤销时也说不清要回退到哪一份。位置与内容不动。
          */
-        bool restyleShapeAt(int index, const QColor &color, int lineWidth, int fontSize, int fillStyle);
+        bool restyleShapeAt(int index, const PenParameters &parameters);
 
         /**
          * @brief 改一条图形的文字内容
@@ -258,6 +257,12 @@ namespace GyanisScribe::Annotation
          */
         [[nodiscard]] int fillStyle() const noexcept;
 
+        /**
+         * @brief 设双向箭头
+         * @param enabled true 表示两端各画一个箭头
+         * @details 只有箭头工具用得上；开关随新画的图形带走，选中的那条改开关走改样式命令。
+         */
+        void setDoubleHeaded(bool enabled) noexcept;
 
         /**
          * @brief 当前默认线宽
@@ -299,11 +304,12 @@ namespace GyanisScribe::Annotation
 
         /// 起笔点，拖拽类图形用它算外接框
         QPoint          m_startPoint;
-        AnnotationShape m_pending;       ///< 在途图形
-        QColor          m_color;         ///< 默认画笔颜色
-        int             m_lineWidth;     ///< 默认线宽
-        int             m_fillStyle = 0; ///< 默认填充档（0 无、1 半透明、2 实心）
-        int             m_fontSize;      ///< 默认字号
+        AnnotationShape m_pending;              ///< 在途图形
+        QColor          m_color;                ///< 默认画笔颜色
+        int             m_lineWidth;            ///< 默认线宽
+        int             m_fillStyle    = 0;     ///< 默认填充档（0 无、1 半透明、2 实心）
+        bool            m_doubleHeaded = false; ///< 默认双向箭头（仅箭头工具用）
+        int             m_fontSize;             ///< 默认字号
 
     private:
         ToolKind                 m_kind;             ///< 工具种类

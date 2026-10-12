@@ -201,6 +201,11 @@ namespace GyanisScribe::Annotation
         m_fillButton = makeButton("Fill", GyanisScribe::Core::uiText("填充"), false);
         QObject::connect(m_fillButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleFillStyle);
         layout->addWidget(m_fillButton);
+        // 双向箭头：箭头工具用得上，是一个保持按下态的开关。同样不进互斥组，
+        // 点击时 Qt 先翻 checked 再发 clicked，所以这里读按钮态而不是自己翻一遍
+        m_doubleArrowButton = makeButton("ArrowDouble", GyanisScribe::Core::uiText("双向箭头"), true);
+        QObject::connect(m_doubleArrowButton, &QToolButton::clicked, this, [this] { setDoubleHeaded(m_doubleArrowButton->isChecked()); });
+        layout->addWidget(m_doubleArrowButton);
         layout->addWidget(m_fontSizeCombo);
         layout->addWidget(makeSeparator());
 
@@ -263,6 +268,25 @@ namespace GyanisScribe::Annotation
             m_fillButton->setAccessibleName(label);
         }
         emit fillStyleChanged(m_fillStyle);
+    }
+
+    bool AnnotationToolbar::currentDoubleHeaded() const
+    {
+        return m_doubleHeaded;
+    }
+
+    void AnnotationToolbar::setDoubleHeaded(const bool enabled)
+    {
+        m_doubleHeaded = enabled;
+        if (m_doubleArrowButton != nullptr)
+        {
+            // 按下态本身看得见，但提示与无障碍名还是要跟上：读屏报「双向箭头」时得知道箭头现在是开是关
+            m_doubleArrowButton->setChecked(enabled);
+            const auto label = enabled ? GyanisScribe::Core::uiText("双向箭头：开") : GyanisScribe::Core::uiText("双向箭头：关");
+            m_doubleArrowButton->setToolTip(label);
+            m_doubleArrowButton->setAccessibleName(label);
+        }
+        emit doubleHeadedChanged(enabled);
     }
 
     void AnnotationToolbar::applyStoredDefaults()

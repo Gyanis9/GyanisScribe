@@ -97,10 +97,12 @@ namespace GyanisScribe::Annotation
         // 工具栏是自己的一层浮窗：它要摆在窗口外面，所以不能进上面的布局
         m_toolbar->setParent(this, Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
 
-        m_color     = m_toolbar->currentColor();
-        m_lineWidth = m_toolbar->currentWidth();
-        m_fontSize  = m_toolbar->currentFontSize();
-        m_fillStyle = m_toolbar->currentFillStyle();
+        // 起点参数整套照工具栏的初值抄一遍：五处必须与工具栏同解，否则开窗第一笔的样式与按钮显示的不一致
+        m_penParameters = PenParameters{.color        = m_toolbar->currentColor(),
+                                        .lineWidth    = m_toolbar->currentWidth(),
+                                        .fontSize     = m_toolbar->currentFontSize(),
+                                        .fillStyle    = m_toolbar->currentFillStyle(),
+                                        .doubleHeaded = m_toolbar->currentDoubleHeaded()};
 
         QObject::connect(m_toolbar.get(), &AnnotationToolbar::toolChanged, this,
                          [this](ToolKind kind)
@@ -113,25 +115,31 @@ namespace GyanisScribe::Annotation
         QObject::connect(m_toolbar.get(), &AnnotationToolbar::colorChanged, this,
                          [this](const QColor &color)
                          {
-                             m_color = color;
+                             m_penParameters.color = color;
                              applyPenParameters();
                          });
         QObject::connect(m_toolbar.get(), &AnnotationToolbar::widthChanged, this,
                          [this](int width)
                          {
-                             m_lineWidth = width;
+                             m_penParameters.lineWidth = width;
                              applyPenParameters();
                          });
         QObject::connect(m_toolbar.get(), &AnnotationToolbar::fontSizeChanged, this,
                          [this](int size)
                          {
-                             m_fontSize = size;
+                             m_penParameters.fontSize = size;
                              applyPenParameters();
                          });
         QObject::connect(m_toolbar.get(), &AnnotationToolbar::fillStyleChanged, this,
                          [this](int style)
                          {
-                             m_fillStyle = style;
+                             m_penParameters.fillStyle = style;
+                             applyPenParameters();
+                         });
+        QObject::connect(m_toolbar.get(), &AnnotationToolbar::doubleHeadedChanged, this,
+                         [this](bool enabled)
+                         {
+                             m_penParameters.doubleHeaded = enabled;
                              applyPenParameters();
                          });
 
@@ -324,7 +332,7 @@ namespace GyanisScribe::Annotation
 
     void AnnotationWindow::applyPenParameters()
     {
-        if (auto applied = m_engine.setPenParameters(m_color, m_lineWidth, m_fontSize, m_fillStyle); !applied)
+        if (auto applied = m_engine.setPenParameters(m_penParameters); !applied)
         {
             Core::Logger::warning(std::format("画笔参数没下发：{}", applied.error().message));
         }

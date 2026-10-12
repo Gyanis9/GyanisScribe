@@ -79,14 +79,12 @@ namespace GyanisScribe::Annotation
 
         /**
          * @brief 下发画笔参数，见 IAnnotationEngine::setPenParameters()
-         * @param color 颜色
-         * @param lineWidth 线宽，必须为正
-         * @param fontSize 字号，必须为正
+         * @param parameters 一整套样式参数（颜色、线宽、字号、填充档、双向箭头）
          * @return 成功返回空载荷；非正时返回写明取值范围的中文原因
          * @details 有选中项时把改样式记进撤销栈，并与栈顶同一条图形的上一次改动合并：
          *          滑块拖一趟只算一步，撤销一次回到抬手之前。
          */
-        Core::Expected<void> setPenParameters(const QColor &color, int lineWidth, int fontSize, int fillStyle) override;
+        Core::Expected<void> setPenParameters(const PenParameters &parameters) override;
 
         /**
          * @brief 起笔，见 IAnnotationEngine::beginStroke()
@@ -229,15 +227,15 @@ namespace GyanisScribe::Annotation
          */
         [[nodiscard]] AnnotationTool *toolFor(ToolKind kind) const noexcept;
 
+        /// 把当前画笔参数下发给全部工具：构造与改参数两处共用一个口径
+        void applyPenParametersToTools();
+
         Core::CapturedImage                          m_canvas;                           ///< 当前画布
         std::vector<std::unique_ptr<AnnotationTool>> m_tools;                            ///< 全部工具，按 ToolKind 顺序登记
         QUndoStack                                   m_undoStack;                        ///< 图形级撤销历史
         std::optional<AnnotationSelection>           m_selection;                        ///< 当前选中项
         ToolKind                                     m_activeTool = ToolKind::Rectangle; ///< 当前工具
-        QColor                                       m_color      = QColor(255, 0, 0);   ///< 画笔默认色
-        int                                          m_lineWidth  = 3;                   ///< 默认线宽
-        int                                          m_fontSize   = 16;                  ///< 默认字号
-        int                                          m_fillStyle  = 0;                   ///< 默认填充档：0 无、1 半透明、2 实心
+        PenParameters                                m_penParameters;                    ///< 画笔默认参数整套
     };
 
 } // namespace GyanisScribe::Annotation

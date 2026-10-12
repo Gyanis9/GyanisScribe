@@ -148,19 +148,19 @@ namespace GyanisScribe::Annotation
         class RestyleShapeCommand : public QUndoCommand
         {
         public:
-            RestyleShapeCommand(AnnotationTool *tool, int index, const AnnotationShape &before, const QColor &color, int lineWidth, int fontSize, int fillStyle) :
-                m_tool(tool), m_index(index), m_before(before), m_color(color), m_lineWidth(lineWidth), m_fontSize(fontSize), m_fillStyle(fillStyle)
+            RestyleShapeCommand(AnnotationTool *tool, int index, const PenParameters &before, const PenParameters &after) :
+                m_tool(tool), m_index(index), m_before(before), m_after(after)
             {
             }
 
             void redo() override
             {
-                static_cast<void>(m_tool->restyleShapeAt(m_index, m_color, m_lineWidth, m_fontSize, m_fillStyle));
+                static_cast<void>(m_tool->restyleShapeAt(m_index, m_after));
             }
 
             void undo() override
             {
-                static_cast<void>(m_tool->restyleShapeAt(m_index, m_before.color, m_before.lineWidth, m_before.fontSize, m_before.fillStyle));
+                static_cast<void>(m_tool->restyleShapeAt(m_index, m_before));
             }
 
             [[nodiscard]] int id() const override
@@ -181,21 +181,15 @@ namespace GyanisScribe::Annotation
                 }
 
                 // m_before 保持第一次那一份：撤销要回到这一轮手势开始之前，而不是上一个中间档
-                m_color     = next.m_color;
-                m_lineWidth = next.m_lineWidth;
-                m_fontSize  = next.m_fontSize;
-                m_fillStyle = next.m_fillStyle;
+                m_after = next.m_after;
                 return true;
             }
 
         private:
-            AnnotationTool *m_tool;      ///< 目标工具，所有权在引擎
-            int             m_index;     ///< 图形索引
-            AnnotationShape m_before;    ///< 改动前的图形，撤销只取它那三个样式字段
-            QColor          m_color;     ///< 目标颜色
-            int             m_lineWidth; ///< 目标线宽
-            int             m_fontSize;  ///< 目标字号
-            int             m_fillStyle; ///< 目标填充档
+            AnnotationTool *m_tool;   ///< 目标工具，所有权在引擎
+            int             m_index;  ///< 图形索引
+            PenParameters   m_before; ///< 改动前的整套样式，撤销回它
+            PenParameters   m_after;  ///< 目标样式
         };
 
         /**
@@ -249,12 +243,7 @@ namespace GyanisScribe::Annotation
         m_tools.insert(m_tools.end() - 1, std::make_unique<PolylineTool>());
 
         // 参数一次下发：切工具后笔还保持用户调过的那个粗细，才不会出现「换工具就得重调」
-        for (const auto &tool: m_tools)
-        {
-            tool->setPenColor(m_color);
-            tool->setLineWidth(m_lineWidth);
-            tool->setFontSize(m_fontSize);
-        }
+        applyPenParametersToTools();
 
         QObject::connect(&m_undoStack, &QUndoStack::indexChanged, this, [this] { emit canvasChanged(); });
     }
@@ -334,48 +323,53 @@ namespace GyanisScribe::Annotation
         return m_activeTool;
     }
 
-    Core::Expected<void> AnnotationEngine::setPenParameters(const QColor &color, int lineWidth, int fontSize, int fillStyle)
+    Core::Expected<void> AnnotationEngine::setPenParameters(const PenParameters &parameters)
     {
-        if (lineWidth <= 0)
+        if (parameters.lineWidth <= 0)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("线宽必须是正数，收到的是 {}。请取 1 到 50 之间的整数"), lineWidth)});
+            return std::unexpected(
+                    Core::Error{Core::ErrorCode::InvalidArgument,
+                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("线宽必须是正数，收到的是 {}。请取 1 到 50 之间的整数"), parameters.lineWidth)});
         }
-        if (fontSize <= 0)
+        if (parameters.fontSize <= 0)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("字号必须是正数，收到的是 {}。请取 8 到 72 之间的整数"), fontSize)});
-        }
-
-        m_color     = color;
-        m_lineWidth = lineWidth;
-        m_fontSize  = fontSize;
-        m_fillStyle = fillStyle;
-        for (const auto &tool: m_tools)
-        {
-            tool->setPenColor(color);
-            tool->setLineWidth(lineWidth);
-            tool->setFontSize(fontSize);
-            tool->setFillStyle(fillStyle);
+            return std::unexpected(
+                    Core::Error{Core::ErrorCode::InvalidArgument,
+                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("字号必须是正数，收到的是 {}。请取 8 到 72 之间的整数"), parameters.fontSize)});
         }
 
-        // 选中项跟着这次改动一起换样式：样式记在每条图形自己身上，工具上那三份只是后续图形的默认值，
+        m_penParameters = parameters;
+        applyPenParametersToTools();
+
+        // 选中项跟着这次改动一起换样式：样式记在每条图形自己身上，工具上那一份只是后续图形的默认值，
         // 所以「选中着的那条」是用户改样式时唯一能合理指向的对象
         if (m_selection)
         {
             auto *tool = toolFor(m_selection->tool);
             if (tool != nullptr && m_selection->shapeIndex >= 0 && m_selection->shapeIndex < tool->shapeCount())
             {
-                const AnnotationShape before = tool->shapeAt(m_selection->shapeIndex);
-                // 三项全等就别进栈：点一下已经在用的那个颜色不该凭空造出一步「可撤销」
-                if (before.color != color || before.lineWidth != lineWidth || before.fontSize != fontSize || before.fillStyle != fillStyle)
+                // 整包全等就别进栈：点一下已经在用的那个颜色不该凭空造出一步「可撤销」
+                const PenParameters before = penParametersOf(tool->shapeAt(m_selection->shapeIndex));
+                if (before != parameters)
                 {
-                    // 快照取在改动之前：撤销栈里存的就是这条图形原来的三个样式值
-                    m_undoStack.push(new RestyleShapeCommand(tool, m_selection->shapeIndex, before, color, lineWidth, fontSize, fillStyle));
+                    // 快照取在改动之前：撤销栈里存的就是这条图形原来的那一整套样式值
+                    m_undoStack.push(new RestyleShapeCommand(tool, m_selection->shapeIndex, before, parameters));
                 }
             }
         }
         return {};
+    }
+
+    void AnnotationEngine::applyPenParametersToTools()
+    {
+        for (const auto &tool: m_tools)
+        {
+            tool->setPenColor(m_penParameters.color);
+            tool->setLineWidth(m_penParameters.lineWidth);
+            tool->setFontSize(m_penParameters.fontSize);
+            tool->setFillStyle(m_penParameters.fillStyle);
+            tool->setDoubleHeaded(m_penParameters.doubleHeaded);
+        }
     }
 
     void AnnotationEngine::beginStroke(const QPoint &point)

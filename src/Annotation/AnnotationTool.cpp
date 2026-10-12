@@ -41,15 +41,16 @@ namespace GyanisScribe::Annotation
 
     void AnnotationTool::begin(const QPoint &point)
     {
-        m_startPoint        = point;
-        m_pending           = AnnotationShape{};
-        m_pending.color     = m_color;
-        m_pending.lineWidth = m_lineWidth;
-        m_pending.fillStyle = m_fillStyle;
-        m_pending.fontSize  = m_fontSize;
-        m_pending.position  = point;
-        m_pending.rect      = QRect(point, point);
-        m_pending.points    = {point, point};
+        m_startPoint           = point;
+        m_pending              = AnnotationShape{};
+        m_pending.color        = m_color;
+        m_pending.lineWidth    = m_lineWidth;
+        m_pending.fillStyle    = m_fillStyle;
+        m_pending.fontSize     = m_fontSize;
+        m_pending.doubleHeaded = m_doubleHeaded;
+        m_pending.position     = point;
+        m_pending.rect         = QRect(point, point);
+        m_pending.points       = {point, point};
     }
 
     void AnnotationTool::update(const QPoint &point)
@@ -126,19 +127,20 @@ namespace GyanisScribe::Annotation
         return true;
     }
 
-    bool AnnotationTool::restyleShapeAt(int index, const QColor &color, int lineWidth, int fontSize, int fillStyle)
+    bool AnnotationTool::restyleShapeAt(const int index, const PenParameters &parameters)
     {
         if (index < 0 || index >= m_shapes.size())
         {
             return false;
         }
 
-        // 只碰这三个字段：位置、轨迹点与文本各自属于移动与内容命令，混进来会让撤销分不开
-        auto &shape     = m_shapes[index];
-        shape.color     = color;
-        shape.lineWidth = lineWidth;
-        shape.fontSize  = fontSize;
-        shape.fillStyle = fillStyle;
+        // 只碰这些样式字段：位置、轨迹点与文本各自属于移动与内容命令，混进来会让撤销分不开
+        auto &shape        = m_shapes[index];
+        shape.color        = parameters.color;
+        shape.lineWidth    = parameters.lineWidth;
+        shape.fontSize     = parameters.fontSize;
+        shape.fillStyle    = parameters.fillStyle;
+        shape.doubleHeaded = parameters.doubleHeaded;
         return true;
     }
 
@@ -267,6 +269,11 @@ namespace GyanisScribe::Annotation
     int AnnotationTool::fillStyle() const noexcept
     {
         return m_fillStyle;
+    }
+
+    void AnnotationTool::setDoubleHeaded(const bool enabled) noexcept
+    {
+        m_doubleHeaded = enabled;
     }
 
     int AnnotationTool::fontSize() const noexcept

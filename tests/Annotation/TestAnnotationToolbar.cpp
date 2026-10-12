@@ -115,14 +115,15 @@ namespace
         /// 工具栏每条信号的落地处，用例按「谁发了几次」判接线是否成环
         struct SignalLog
         {
-            std::vector<ToolKind> tools;      ///< toolChanged 收到的工具
-            std::vector<QColor>   colors;     ///< colorChanged 收到的颜色
-            std::vector<int>      widths;     ///< widthChanged 收到的线宽
-            std::vector<int>      fontSizes;  ///< fontSizeChanged 收到的字号
-            std::vector<int>      fillStyles; ///< fillStyleChanged 收到的填充档
-            int                   actions{};  ///< 四个动作按钮的合计触发次数
-            int                   undo{};     ///< undoClicked 次数
-            int                   redo{};     ///< redoClicked 次数
+            std::vector<ToolKind> tools;        ///< toolChanged 收到的工具
+            std::vector<QColor>   colors;       ///< colorChanged 收到的颜色
+            std::vector<int>      widths;       ///< widthChanged 收到的线宽
+            std::vector<int>      fontSizes;    ///< fontSizeChanged 收到的字号
+            std::vector<int>      fillStyles;   ///< fillStyleChanged 收到的填充档
+            std::vector<int>      doubleHeaded; ///< doubleHeadedChanged 收到的开关（1 开 0 关）
+            int                   actions{};    ///< 四个动作按钮的合计触发次数
+            int                   undo{};       ///< undoClicked 次数
+            int                   redo{};       ///< redoClicked 次数
         };
 
         /// 建一把工具栏，并把它的每条信号都记进 log
@@ -134,6 +135,7 @@ namespace
             QObject::connect(toolbar.get(), &AnnotationToolbar::widthChanged, [&log](int width) { log.widths.push_back(width); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::fontSizeChanged, [&log](int fontSize) { log.fontSizes.push_back(fontSize); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::fillStyleChanged, [&log](int style) { log.fillStyles.push_back(style); });
+            QObject::connect(toolbar.get(), &AnnotationToolbar::doubleHeadedChanged, [&log](bool enabled) { log.doubleHeaded.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::undoClicked, [&log] { ++log.undo; });
             QObject::connect(toolbar.get(), &AnnotationToolbar::redoClicked, [&log] { ++log.redo; });
             for (auto signal: {&AnnotationToolbar::copyClicked, &AnnotationToolbar::saveClicked, &AnnotationToolbar::pinClicked, &AnnotationToolbar::ocrClicked})
@@ -182,6 +184,34 @@ namespace
         button->click();
         EXPECT_EQ(toolbar->currentFillStyle(), 0) << "三档之后该回到「无」";
         EXPECT_EQ(button->accessibleName(), QString::fromUtf8("填充：无")) << "无障碍名没跟上当前档";
+    }
+
+    /**
+     * @brief 钉住双向箭头开关：点一下开、再点一下关，按下态、提示与信号三者同解
+     * @details 与「填充」那种走档按钮不同，这是个保持按下态的开关：按钮的 checked、工具栏读数
+     *          与发出去的信号必须同时翻，否则按钮按着、画出来却还是单头。
+     */
+    TEST_F(ToolbarFixture, DoubleArrowButtonTogglesAndNamesTheState)
+    {
+        SignalLog log;
+        auto      toolbar = makeToolbarLogged(log);
+        auto     *button  = buttonByLabel(*toolbar, "双向箭头");
+        ASSERT_NE(button, nullptr) << "工具栏上找不到双向箭头按钮";
+
+        EXPECT_FALSE(toolbar->currentDoubleHeaded()) << "起点该是关";
+        EXPECT_FALSE(button->isChecked()) << "起点按钮该是弹起态";
+
+        button->click();
+        EXPECT_TRUE(toolbar->currentDoubleHeaded());
+        EXPECT_EQ(log.doubleHeaded, std::vector<int>{1}) << "开了却没把信号发出去";
+        EXPECT_TRUE(button->isChecked()) << "开关开了按钮却没保持按下";
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("双向箭头：开")) << "提示没跟上开关";
+
+        button->click();
+        EXPECT_FALSE(toolbar->currentDoubleHeaded());
+        EXPECT_EQ(log.doubleHeaded, (std::vector<int>{1, 0}));
+        EXPECT_FALSE(button->isChecked()) << "关掉之后按钮还按着";
+        EXPECT_EQ(button->accessibleName(), QString::fromUtf8("双向箭头：关")) << "无障碍名没跟上开关";
     }
 
 } // namespace

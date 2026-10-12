@@ -5,6 +5,7 @@
     <file alias="App.svg">Icons/App.svg</file>
     <file alias="AppIcon.svg">Icons/AppIcon.svg</file>
     <file alias="Arrow.svg">Icons/Arrow.svg</file>
+    <file alias="ArrowDouble.svg">Icons/ArrowDouble.svg</file>
     <file alias="Capture.svg">Icons/Capture.svg</file>
     <file alias="CaptureFullScreen.svg">Icons/CaptureFullScreen.svg</file>
     <file alias="CaptureLastRegion.svg">Icons/CaptureLastRegion.svg</file>

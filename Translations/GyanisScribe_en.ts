@@ -104,6 +104,10 @@
             <translation>Fill</translation>
         </message>
         <message>
+            <source>双向箭头</source>
+            <translation>Double-headed arrow</translation>
+        </message>
+        <message>
             <source>撤销（Ctrl+Z）</source>
             <translation>Undo (Ctrl+Z)</translation>
         </message>
@@ -138,6 +142,14 @@
         <message>
             <source>填充：实心</source>
             <translation>Fill: solid</translation>
+        </message>
+        <message>
+            <source>双向箭头：开</source>
+            <translation>Double-headed arrow: on</translation>
+        </message>
+        <message>
+            <source>双向箭头：关</source>
+            <translation>Double-headed arrow: off</translation>
         </message>
         <message>
             <source>选择标注颜色</source>

@@ -27,15 +27,16 @@ namespace GyanisScribe::Annotation
      */
     struct AnnotationShape
     {
-        QRect           rect;                          ///< 拖拽类图形的外接矩形（矩形、椭圆、马赛克）
-        QVector<QPoint> points;                        ///< 轨迹类图形的采样点（画笔、高亮、箭头首尾两点）
-        QPoint          position;                      ///< 锚点（文字、序号）
-        QString         text;                          ///< 文字内容；序号工具用它存编号文本
-        QColor          color     = QColor(255, 0, 0); ///< 画笔颜色，默认标注红
-        int             lineWidth = 3;                 ///< 线宽，逻辑像素
-        int             fontSize  = 16;                ///< 字号，仅文字与序号使用
-        int             number    = 1;                 ///< 序号值，仅序号工具使用
-        int             fillStyle = 0;                 ///< 填充档：0 无、1 半透明、2 实心（仅矩形与椭圆用）
+        QRect           rect;                             ///< 拖拽类图形的外接矩形（矩形、椭圆、马赛克）
+        QVector<QPoint> points;                           ///< 轨迹类图形的采样点（画笔、高亮、箭头首尾两点）
+        QPoint          position;                         ///< 锚点（文字、序号）
+        QString         text;                             ///< 文字内容；序号工具用它存编号文本
+        QColor          color        = QColor(255, 0, 0); ///< 画笔颜色，默认标注红
+        int             lineWidth    = 3;                 ///< 线宽，逻辑像素
+        int             fontSize     = 16;                ///< 字号，仅文字与序号使用
+        int             number       = 1;                 ///< 序号值，仅序号工具使用
+        int             fillStyle    = 0;                 ///< 填充档：0 无、1 半透明、2 实心（仅矩形与椭圆用）
+        bool            doubleHeaded = false;             ///< 双向箭头：两端各画一个（仅箭头工具用）
     };
 
 } // namespace GyanisScribe::Annotation

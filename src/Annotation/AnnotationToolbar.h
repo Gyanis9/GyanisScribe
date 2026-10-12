@@ -118,6 +118,15 @@ namespace GyanisScribe::Annotation
         /// 按 无 → 半透明 → 实心 → 无 走一档；按钮与用例共用这一个入口
         void cycleFillStyle();
 
+        /// 当前是不是双向箭头（箭头工具用；新建的箭头按它两端画头）
+        [[nodiscard]] bool currentDoubleHeaded() const;
+
+        /**
+         * @brief 开/关双向箭头，按钮态、提示与信号一次对齐
+         * @param enabled true 表示两端各画一个箭头
+         */
+        void setDoubleHeaded(bool enabled);
+
         /**
          * @brief 指定序号的工具按钮，用例与调试用它核对状态
          * @param index 按钮序号，越界返回空指针
@@ -135,6 +144,8 @@ namespace GyanisScribe::Annotation
         void fontSizeChanged(int fontSize);
         /// 用户改了填充档
         void fillStyleChanged(int fillStyle);
+        /// 用户开了/关了双向箭头
+        void doubleHeadedChanged(bool enabled);
         /// 撤销
         void undoClicked();
         /// 重做
@@ -195,6 +206,8 @@ namespace GyanisScribe::Annotation
         QComboBox                                               *m_fontSizeCombo     = nullptr; ///< 字号下拉，取值对齐 kFontSizes
         QToolButton                                             *m_fillButton        = nullptr; ///< 填充档按钮，点一下走一档
         int                                                      m_fillStyle         = 0;       ///< 当前填充档：0 无、1 半透明、2 实心
+        QToolButton                                             *m_doubleArrowButton = nullptr; ///< 双向箭头开关按钮，按下表示两端有头
+        bool                                                     m_doubleHeaded      = false;   ///< 当前是不是双向箭头
         QColor                                                   m_currentColor;                ///< 当前颜色，初值取色板第一格
         bool                                                     m_stateIsInitial = true;       ///< 还在构造期：起点值不回写配置，坏值要留在文件里让人看得见
         ToolKind                                                 m_activeTool;                  ///< 当前工具，用来挡住「重复点同一个工具」的二次信号

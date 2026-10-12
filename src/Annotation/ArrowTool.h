@@ -15,7 +15,7 @@ namespace GyanisScribe::Annotation
 {
 
     /**
-     * @brief 从起点指向终点的箭头
+     * @brief 从起点指向终点的箭头；shape.doubleHeaded 为真时两端各有一个箭头
      */
     class ArrowTool : public AnnotationTool
     {
@@ -35,7 +35,7 @@ namespace GyanisScribe::Annotation
         /**
          * @brief 画一条带箭头的线，见 AnnotationTool::paintShape()
          * @param painter 目标画家
-         * @param shape 图形，取 points 的前两点为首尾
+         * @param shape 图形，取 points 的前两点为首尾；doubleHeaded 为真时起点端也画一个箭头
          * @param context 绘制现场，本工具不使用
          * @details 重写基类纯虚接口：箭头三角随线宽变长，短线段上会让箭头盖过箭杆，
          *          这里把长度限制在箭杆长度的一半。
