@@ -46,15 +46,36 @@ namespace GyanisScribe::Annotation
                 return control ? ShortcutAction::Pin : ShortcutAction::None;
             case Qt::Key_O:
                 return control ? ShortcutAction::Ocr : ShortcutAction::None;
+            case Qt::Key_C:
+                // Ctrl+C 复制选中的图形；一条都没选中时窗口按老习惯把它当「复制整张成品」
+                return control && !shift ? ShortcutAction::CopyShape : ShortcutAction::None;
+            case Qt::Key_V:
+                return control && !shift ? ShortcutAction::PasteShape : ShortcutAction::None;
             case Qt::Key_Delete:
             case Qt::Key_Backspace:
                 return modifiers == Qt::NoModifier ? ShortcutAction::DeleteSelection : ShortcutAction::None;
             case Qt::Key_Left:
             case Qt::Key_Right:
+                // 带 Ctrl 就不认：行内的文字框是 QLineEdit，Ctrl+方向键在它那儿是按词移光标，截走就少了这条既有行为
+                return control ? ShortcutAction::None : ShortcutAction::NudgeSelection;
             case Qt::Key_Up:
             case Qt::Key_Down:
-                // 带 Ctrl 就不认：行内的文字框是 QLineEdit，Ctrl+方向键在它那儿是按词移光标，截走就少了这条既有行为
-                return modifiers == Qt::NoModifier || shift ? ShortcutAction::NudgeSelection : ShortcutAction::None;
+                if (control)
+                {
+                    // Ctrl+Shift+↑/↓ 改层序；Ctrl+↑/↓ 那几组合留给行内文字框按词移光标
+                    if (!shift)
+                    {
+                        return ShortcutAction::None;
+                    }
+                    return key == Qt::Key_Up ? ShortcutAction::RaiseSelection : ShortcutAction::LowerSelection;
+                }
+                return ShortcutAction::NudgeSelection;
+            case Qt::Key_Home:
+                // Ctrl+Shift+Home 置底：Home 指向这摞图形的开头，也就是压在底下那一层
+                return control && shift ? ShortcutAction::SendToBack : ShortcutAction::None;
+            case Qt::Key_End:
+                // Ctrl+Shift+End 置顶：End 指向末尾，也就是压在最上面那一层
+                return control && shift ? ShortcutAction::BringToFront : ShortcutAction::None;
             default:
                 return ShortcutAction::None;
         }
@@ -345,6 +366,48 @@ namespace GyanisScribe::Annotation
                 if (auto removed = m_engine.removeSelection(); !removed)
                 {
                     Core::Logger::info(std::format("删除没做成：{}", removed.error().message));
+                }
+                return;
+            case ShortcutAction::CopyShape:
+                // 一条都没选中时按老习惯走：Ctrl+C 复制整张成品，与回车同一条路
+                if (m_engine.selections().empty())
+                {
+                    deliver(ShortcutAction::Copy);
+                    return;
+                }
+                if (auto copied = m_engine.copySelection(); !copied)
+                {
+                    Core::Logger::info(std::format("复制没做成：{}", copied.error().message));
+                }
+                return;
+            case ShortcutAction::PasteShape:
+                if (auto pasted = m_engine.pasteClipboard(); !pasted)
+                {
+                    Core::Logger::info(std::format("粘贴没做成：{}", pasted.error().message));
+                }
+                return;
+            case ShortcutAction::RaiseSelection:
+                if (auto raised = m_engine.raiseSelection(); !raised)
+                {
+                    Core::Logger::info(std::format("上移一层没做成：{}", raised.error().message));
+                }
+                return;
+            case ShortcutAction::LowerSelection:
+                if (auto lowered = m_engine.lowerSelection(); !lowered)
+                {
+                    Core::Logger::info(std::format("下移一层没做成：{}", lowered.error().message));
+                }
+                return;
+            case ShortcutAction::BringToFront:
+                if (auto fronted = m_engine.bringSelectionToFront(); !fronted)
+                {
+                    Core::Logger::info(std::format("置顶没做成：{}", fronted.error().message));
+                }
+                return;
+            case ShortcutAction::SendToBack:
+                if (auto backed = m_engine.sendSelectionToBack(); !backed)
+                {
+                    Core::Logger::info(std::format("置底没做成：{}", backed.error().message));
                 }
                 return;
             default:

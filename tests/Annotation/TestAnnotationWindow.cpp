@@ -207,6 +207,30 @@ TEST(ViewShortcuts, ShortcutTableMapsExactlyTheDocumentedKeys)
 }
 
 /**
+ * @brief 钉住图形操作与层叠那几枚键，以及它们的拒面
+ * @details Ctrl+C/V 管图形副本（没选中时复制整图的回退由窗口分派时判，不进这张表）；
+ *          Ctrl+Shift+↑/↓ 改一层、Home/End 到两端。Ctrl+↑/↓ 不带 Shift 仍交回 Qt——
+ *          行内文字框用它按词移光标，截走就少一条既有行为。
+ */
+TEST(ViewShortcuts, ShapeAndLayerShortcutsMapExactlyTheDocumentedKeys)
+{
+    EXPECT_EQ(shortcutActionFor(Qt::Key_C, Qt::ControlModifier), ShortcutAction::CopyShape);
+    EXPECT_EQ(shortcutActionFor(Qt::Key_V, Qt::ControlModifier), ShortcutAction::PasteShape);
+    EXPECT_EQ(shortcutActionFor(Qt::Key_Up, Qt::ControlModifier | Qt::ShiftModifier), ShortcutAction::RaiseSelection);
+    EXPECT_EQ(shortcutActionFor(Qt::Key_Down, Qt::ControlModifier | Qt::ShiftModifier), ShortcutAction::LowerSelection);
+    EXPECT_EQ(shortcutActionFor(Qt::Key_Home, Qt::ControlModifier | Qt::ShiftModifier), ShortcutAction::SendToBack);
+    EXPECT_EQ(shortcutActionFor(Qt::Key_End, Qt::ControlModifier | Qt::ShiftModifier), ShortcutAction::BringToFront);
+
+    EXPECT_EQ(shortcutActionFor(Qt::Key_C, Qt::ControlModifier | Qt::ShiftModifier), ShortcutAction::None);
+    EXPECT_EQ(shortcutActionFor(Qt::Key_V, Qt::ControlModifier | Qt::ShiftModifier), ShortcutAction::None);
+    EXPECT_EQ(shortcutActionFor(Qt::Key_Home, Qt::ControlModifier), ShortcutAction::None) << "Ctrl+Home 不带 Shift 不该改层序";
+    EXPECT_EQ(shortcutActionFor(Qt::Key_End, Qt::ControlModifier), ShortcutAction::None);
+    EXPECT_EQ(shortcutActionFor(Qt::Key_Up, Qt::ControlModifier), ShortcutAction::None) << "Ctrl+↑ 留给行内文字框按词移光标";
+    EXPECT_EQ(shortcutActionFor(Qt::Key_Down, Qt::ControlModifier), ShortcutAction::None);
+    EXPECT_EQ(shortcutActionFor(Qt::Key_C, Qt::NoModifier), ShortcutAction::None) << "裸 c 不归这张表：它没绑任何动作";
+}
+
+/**
  * @brief 钉住字母键位与登记表同解，且只认裸字母
  * @details 键位取自 kToolTable 的第四列，界面提示与按键分派共用那一张表：十一档逐个钉住，
  *          再钉两位拒绝面——没绑工具的字母不许换工具，带修饰键的组合也不许
@@ -486,4 +510,219 @@ TEST_F(AnnotationWindowFixture, DoubleArrowToggleFromToolbarReachesTheEngine)
     EXPECT_GT(countInkAtStartHead(), 0) << "按钮点下去了，选中的那条没有跟着变双向：窗口到引擎这条链没接上";
     ASSERT_TRUE(engine().undo().has_value());
     EXPECT_EQ(countInkAtStartHead(), 0) << "撤销没把双向退回单头，改开关没进撤销栈";
+}
+
+/**
+ * @brief 钉住从视图拖缩放手柄：一趟手势把选中项拉大，抬笔后一次撤销退回
+ * @details 手柄判定要压过普通命中：按点就落在右边线上，不先问手柄的话这一按会被当成「拖图形」。
+ *          视图 400x200、画布逻辑 200x100：控件坐标 = 逻辑坐标乘 2。
+ *          画的矩形是 QRect(10,10,51,41)，转成外接框后右中手柄在逻辑 (61,30.5)、控件 (122,61)。
+ */
+TEST_F(AnnotationWindowFixture, ViewHandleDragResizesTheSelectedShape)
+{
+    GyanisScribe::Annotation::AnnotationView view{engine()};
+    view.resize(400, 200);
+
+    engine().beginStroke({10, 10});
+    engine().moveStroke({60, 50});
+    const auto settled = engine().endStroke();
+    ASSERT_TRUE(settled.has_value()) << settled.error().message;
+    ASSERT_TRUE(engine().select(*settled).has_value());
+
+    for (const auto &[type, position]:
+         {std::pair{QEvent::MouseButtonPress, QPoint{122, 61}}, std::pair{QEvent::MouseMove, QPoint{162, 61}}, std::pair{QEvent::MouseButtonRelease, QPoint{162, 61}}})
+    {
+        QMouseEvent event{type, QPointF{position}, QPointF{position}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&view, &event);
+    }
+
+    const auto grown = engine().selectionBounds();
+    ASSERT_TRUE(grown.has_value());
+    EXPECT_NEAR(grown->right(), 80, 2.5) << "手柄没把右边拖到逻辑 81 一带（控件 162 的一半）";
+    // 图形的左边界原位还在（物理坐标：逻辑 10 乘 2，正落在描边中线上）：这趟是缩放，不是整条挪走
+    EXPECT_EQ(engine().exportImage().pixelColor(20, 60), QColor(255, 0, 0)) << "左边界不在了：这不像缩放";
+
+    ASSERT_TRUE(engine().undo().has_value());
+    const auto back = engine().selectionBounds();
+    ASSERT_TRUE(back.has_value());
+    EXPECT_NEAR(back->right(), 60, 1.5) << "一次撤销没回到拖手柄之前";
+}
+
+/**
+ * @brief 钉住 Ctrl/Shift 点选多选与「多选后拖任意一条挪整组」
+ * @details 点选走合成事件：先裸点选中 A，再 Ctrl 点 B 并进选中集；
+ *          多选状态下按住任意一条拖动，整组一起挪，一步撤销整组回位。
+ */
+TEST_F(AnnotationWindowFixture, ViewMultiSelectsWithModifiersAndDragsTheWholeGroup)
+{
+    GyanisScribe::Annotation::AnnotationView view{engine()};
+    view.resize(400, 200);
+
+    // 两条矩形：A 逻辑 (10,10)-(40,40)，B 逻辑 (100,10)-(130,40)
+    engine().beginStroke({10, 10});
+    engine().moveStroke({40, 40});
+    ASSERT_TRUE(engine().endStroke().has_value());
+    engine().beginStroke({100, 10});
+    engine().moveStroke({130, 40});
+    ASSERT_TRUE(engine().endStroke().has_value());
+
+    const auto click = [&view](const QPoint &widgetPoint, const Qt::KeyboardModifiers modifiers)
+    {
+        for (const auto type: {QEvent::MouseButtonPress, QEvent::MouseButtonRelease})
+        {
+            QMouseEvent event{type, QPointF{widgetPoint}, QPointF{widgetPoint}, Qt::LeftButton, Qt::LeftButton, modifiers};
+            QApplication::sendEvent(&view, &event);
+        }
+    };
+
+    click(QPoint{50, 50}, Qt::NoModifier); // A 中心：逻辑 (25,25)
+    EXPECT_EQ(engine().selections().size(), 1U) << "裸点没有单选上那一条";
+    click(QPoint{230, 50}, Qt::ControlModifier); // B 中心：逻辑 (115,25)
+    EXPECT_EQ(engine().selections().size(), 2U) << "Ctrl 点选没把第二条并进选中集";
+    click(QPoint{230, 50}, Qt::ShiftModifier);
+    EXPECT_EQ(engine().selections().size(), 2U) << "Shift 加选已选中的一条造出了重复项";
+
+    // 拖 A（已在选中集里）：整组一起挪逻辑 (10,10)
+    for (const auto &[type, position]:
+         {std::pair{QEvent::MouseButtonPress, QPoint{50, 50}}, std::pair{QEvent::MouseMove, QPoint{70, 70}}, std::pair{QEvent::MouseButtonRelease, QPoint{70, 70}}})
+    {
+        QMouseEvent event{type, QPointF{position}, QPointF{position}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&view, &event);
+    }
+    EXPECT_EQ(engine().selections().size(), 2U) << "拖动把多选塌缩成了单选";
+
+    const auto moved = engine().selectionBounds();
+    ASSERT_TRUE(moved.has_value());
+    EXPECT_EQ(moved->topLeft(), QPoint(20, 20)) << "整组没跟着一起挪";
+    EXPECT_EQ(moved->bottomRight(), QPoint(140, 50)) << "只挪了被按住的那一条";
+
+    ASSERT_TRUE(engine().undo().has_value());
+    const auto back = engine().selectionBounds();
+    ASSERT_TRUE(back.has_value());
+    EXPECT_EQ(back->topLeft(), QPoint(10, 10)) << "一次撤销没把整组挪回去";
+}
+
+/**
+ * @brief 钉住点空白：先清掉选中再起笔，选框不会留在「刚才那条」上
+ */
+TEST_F(AnnotationWindowFixture, ViewClickingBlankClearsTheSelection)
+{
+    GyanisScribe::Annotation::AnnotationView view{engine()};
+    view.resize(400, 200);
+
+    const auto settled = drawAndSelect({10, 10}, {60, 40});
+    ASSERT_TRUE(settled.has_value());
+    ASSERT_EQ(engine().selections().size(), 1U);
+
+    for (const auto &[type, position]: {std::pair{QEvent::MouseButtonPress, QPoint{380, 180}}, std::pair{QEvent::MouseButtonRelease, QPoint{380, 180}}})
+    {
+        QMouseEvent event{type, QPointF{position}, QPointF{position}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&view, &event);
+    }
+
+    EXPECT_TRUE(engine().selections().empty()) << "点空白没清掉选中，选框会留在刚才那条上";
+    // 点一下没拖动：矩形退化不收，撤销栈里不该多出条目——撤一次该轮到原来那条的插入
+    ASSERT_TRUE(engine().undo().has_value());
+    EXPECT_FALSE(engine().selectionAt(QPoint(10, 25)).has_value()) << "撤销栈里多出了空动作，这一撤没撤到原来那条";
+}
+
+/**
+ * @brief 钉住从视图抓旋转手柄：拖到正右方，图形绕中心转 90°
+ * @details 旋转柄按上边中点再往上一个固定偏移摆；起点在正上方（-90° 方向）、
+ *          终点在正右方，增量正好 +90°。判据取手柄框转角与像素两处。
+ */
+TEST_F(AnnotationWindowFixture, ViewRotateHandleTurnsTheSelectedShape)
+{
+    GyanisScribe::Annotation::AnnotationView view{engine()};
+    view.resize(400, 200);
+
+    // 逻辑 (40,40)-(120,60) 的矩形；控件坐标 = 逻辑乘 2
+    engine().beginStroke({40, 40});
+    engine().moveStroke({120, 60});
+    const auto settled = engine().endStroke();
+    ASSERT_TRUE(settled.has_value()) << settled.error().message;
+    ASSERT_TRUE(engine().select(*settled).has_value());
+
+    // 上边中点逻辑 (80.5,40)（QRect 含右边界，框心落在 80.5）→ 控件 (161,80)；
+    // 旋转柄再往上 24 控件像素 → (161,56)。终点取正右方：增量正好 +90°
+    for (const auto &[type, position]:
+         {std::pair{QEvent::MouseButtonPress, QPoint{161, 56}}, std::pair{QEvent::MouseMove, QPoint{261, 101}}, std::pair{QEvent::MouseButtonRelease, QPoint{261, 101}}})
+    {
+        QMouseEvent event{type, QPointF{position}, QPointF{position}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&view, &event);
+    }
+
+    const auto frame = engine().selectionFrame();
+    ASSERT_TRUE(frame.has_value());
+    EXPECT_NEAR((*frame)[0].x(), 91.0, 1.5) << "转 90° 后左上角该转到 (91,10) 一带";
+    EXPECT_NEAR((*frame)[0].y(), 10.0, 1.5);
+    // 物理坐标：转前上边线在逻辑 y=40（物理 80）；转完该处是内里，上边线立到逻辑 x=91（物理 182）
+    const auto turned = engine().exportImage();
+    EXPECT_EQ(turned.pixelColor(160, 80), QColor(180, 180, 180)) << "转完之后原上边线那里该是底色";
+    EXPECT_EQ(turned.pixelColor(182, 100), QColor(255, 0, 0)) << "原来的上边线转到右侧：物理 x=182 一带该有墨";
+
+    ASSERT_TRUE(engine().undo().has_value());
+    EXPECT_EQ(engine().exportImage().pixelColor(160, 80), QColor(255, 0, 0)) << "撤销没把旋转退回去";
+}
+
+/**
+ * @brief 钉住 Ctrl+C/Ctrl+V 的窗口分派：有选中复制图形，没选中退回复制整图
+ */
+TEST_F(AnnotationWindowFixture, CopyPasteShortcutsCopyTheShapeAndFallBackToImageCopy)
+{
+    auto window      = makeWindow();
+    auto imageCopies = 0;
+    QObject::connect(window.get(), &AnnotationWindow::copyRequested, [&imageCopies](const QImage &) { ++imageCopies; });
+
+    // 没选中：Ctrl+C 走老习惯（复制整张成品），不收进图形剪贴板
+    pressKeyOn(*window, Qt::Key_C, Qt::ControlModifier);
+    EXPECT_EQ(imageCopies, 1) << "没选中时 Ctrl+C 没退回复制整图";
+    EXPECT_TRUE(engine().selections().empty());
+
+    // 画一条并选中：Ctrl+C 复制图形、Ctrl+V 粘出带偏移的副本，界面不收场
+    ASSERT_TRUE(drawAndSelect({10, 10}, {60, 40}).has_value());
+    pressKeyOn(*window, Qt::Key_C, Qt::ControlModifier);
+    pressKeyOn(*window, Qt::Key_V, Qt::ControlModifier);
+    EXPECT_EQ(imageCopies, 1) << "有选中时 Ctrl+C 把整张图也交出去了";
+    ASSERT_EQ(engine().selections().size(), 1U) << "粘出来的副本该成为新的选中集";
+    const auto bounds = engine().selectionBounds();
+    ASSERT_TRUE(bounds.has_value());
+    EXPECT_EQ(bounds->topLeft(), QPoint(18, 18)) << "副本没带一格偏移";
+}
+
+/**
+ * @brief 钉住 Ctrl+Shift+↑/↓ 与 Home/End 从窗口接到引擎
+ * @details 两条实心矩形盖同一块地，中心像素就是层叠读数；四条键各按一次核对读数。
+ */
+TEST_F(AnnotationWindowFixture, LayerShortcutsReachTheEngine)
+{
+    auto window = makeWindow();
+
+    ASSERT_TRUE(engine().setPenParameters(PenParameters{.color = QColor{255, 0, 0}, .lineWidth = 2, .fontSize = 16, .fillStyle = 2}).has_value());
+    engine().beginStroke({10, 10});
+    engine().moveStroke({90, 60});
+    const auto first = engine().endStroke();
+    ASSERT_TRUE(first.has_value()) << first.error().message;
+
+    ASSERT_TRUE(engine().setPenParameters(PenParameters{.color = QColor{0, 0, 255}, .lineWidth = 2, .fontSize = 16, .fillStyle = 2}).has_value());
+    engine().beginStroke({10, 10});
+    engine().moveStroke({90, 60});
+    ASSERT_TRUE(engine().endStroke().has_value());
+
+    // 物理坐标：(50,35) 逻辑的二倍是 (100,70)
+    const auto centerColor = [this] { return engine().exportImage().pixelColor(100, 70); };
+    ASSERT_EQ(centerColor(), QColor(0, 0, 255)) << "后画的该在上面，后面的对照就没基准";
+
+    ASSERT_TRUE(engine().select(*first).has_value());
+    pressKeyOn(*window, Qt::Key_Up, Qt::ControlModifier | Qt::ShiftModifier);
+    EXPECT_EQ(centerColor(), QColor(255, 0, 0)) << "Ctrl+Shift+↑ 没把选中的那条上移一层";
+
+    pressKeyOn(*window, Qt::Key_Home, Qt::ControlModifier | Qt::ShiftModifier);
+    EXPECT_EQ(centerColor(), QColor(0, 0, 255)) << "Ctrl+Shift+Home 没把选中的那条置底";
+
+    pressKeyOn(*window, Qt::Key_End, Qt::ControlModifier | Qt::ShiftModifier);
+    EXPECT_EQ(centerColor(), QColor(255, 0, 0)) << "Ctrl+Shift+End 没把选中的那条置顶";
+
+    pressKeyOn(*window, Qt::Key_Down, Qt::ControlModifier | Qt::ShiftModifier);
+    EXPECT_EQ(centerColor(), QColor(0, 0, 255)) << "Ctrl+Shift+↓ 没把选中的那条下移一层";
 }

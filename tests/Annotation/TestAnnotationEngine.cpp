@@ -14,6 +14,7 @@
 using GyanisScribe::Annotation::AnnotationEngine;
 using GyanisScribe::Annotation::AnnotationSelection;
 using GyanisScribe::Annotation::PenParameters;
+using GyanisScribe::Annotation::SelectionHandle;
 using GyanisScribe::Annotation::ToolKind;
 using GyanisScribe::Core::CapturedImage;
 using GyanisScribe::Core::ErrorCode;
@@ -131,7 +132,7 @@ TEST_F(EngineFixture, RemoveSelectionIsUndoableAndClearsSelection)
     ASSERT_TRUE(m_engine.select(*hit).has_value());
 
     ASSERT_TRUE(m_engine.removeSelection().has_value());
-    EXPECT_FALSE(m_engine.selection().has_value()) << "删掉的图形还留在选中里，下一次操作会打到邻居";
+    EXPECT_TRUE(m_engine.selections().empty()) << "删掉的图形还留在选中里，下一次操作会打到邻居";
     EXPECT_FALSE(m_engine.selectionAt(QPoint(20, 50)).has_value());
 
     ASSERT_TRUE(m_engine.undo().has_value());
@@ -237,7 +238,8 @@ TEST_F(EngineFixture, LoadCanvasClearsShapesAndHistory)
 }
 
 /**
- * @brief 钉住跨工具的命中顺序按层叠（后登记的工具在上）
+ * @brief 钉住跨工具的命中顺序按层叠（后画的压在上面）
+ * @details 层叠号在落定那一刻由引擎发：这条用例先画矩形再落序号牌，牌该压住矩形被点中。
  */
 TEST_F(EngineFixture, SelectionPrefersTopmostToolAcrossTools)
 {
@@ -262,7 +264,7 @@ TEST_F(EngineFixture, UndoInvalidatesStaleSelection)
     ASSERT_TRUE(m_engine.select(second).has_value());
 
     ASSERT_TRUE(m_engine.undo().has_value()); // 撤掉第二条
-    EXPECT_FALSE(m_engine.selection().has_value()) << "被撤掉的图形还留在选中里，下一次移动会打到别处";
+    EXPECT_TRUE(m_engine.selections().empty()) << "被撤掉的图形还留在选中里，下一次移动会打到别处";
 
     const auto moveFailed = m_engine.moveSelectionBy(QPoint(5, 5));
     ASSERT_FALSE(moveFailed.has_value()) << "没有选中却移动成功";
@@ -652,4 +654,314 @@ TEST_F(EngineFixture, TextPlateAndOutlineRestyleAndUndoBack)
     EXPECT_GT(brightIn(box), 0) << "选中这条文字的底板没跟着开";
     ASSERT_TRUE(m_engine.undo().has_value());
     EXPECT_EQ(brightIn(box), 0) << "撤销没把底板退回去";
+}
+
+/**
+ * @brief 钉住层叠按创建顺序跨工具生效：后画的压住先画的
+ * @details 旧口径是按工具登记顺序画（椭圆永远盖得住矩形，与画的先后无关）；
+ *          层叠号改成落定发号之后，后画的必须先被点中——这条同时钉住「发号、绘制、
+ *          命中」三处读同一个号。取样区：两块图形盖同一片，中心像素看得到谁在上面；
+ *          命中探针取椭圆环上的点（椭圆的内里在命中判定上不算环，见椭圆那一条直测）。
+ */
+TEST_F(EngineFixture, LaterShapesStackOnTopAcrossTools)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Ellipse).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 3, .fontSize = 16, .fillStyle = 2}).has_value());
+    m_engine.beginStroke(QPoint(20, 20));
+    m_engine.moveStroke(QPoint(120, 80));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Rectangle).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 255), .lineWidth = 3, .fontSize = 16, .fillStyle = 2}).has_value());
+    m_engine.beginStroke(QPoint(20, 20));
+    m_engine.moveStroke(QPoint(120, 80));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+
+    EXPECT_EQ(m_engine.exportImage().pixelColor(70, 50), QColor(0, 0, 255)) << "后画的矩形没压住先画的椭圆";
+    const auto hit = m_engine.selectionAt(QPoint(70, 20));
+    ASSERT_TRUE(hit.has_value());
+    EXPECT_EQ(hit->tool, ToolKind::Rectangle) << "命中没跟着层叠走：点的是看得见的蓝";
+
+    ASSERT_TRUE(m_engine.select(AnnotationSelection{ToolKind::Ellipse, 0}).has_value());
+    ASSERT_TRUE(m_engine.bringSelectionToFront().has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(70, 50), QColor(255, 0, 0)) << "置顶没把椭圆提到矩形之上";
+    const auto raisedHit = m_engine.selectionAt(QPoint(70, 20));
+    ASSERT_TRUE(raisedHit.has_value());
+    EXPECT_EQ(raisedHit->tool, ToolKind::Ellipse) << "置顶之后命中还在下面的矩形上";
+
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(70, 50), QColor(0, 0, 255)) << "撤销没把层叠顺序退回去";
+}
+
+/**
+ * @brief 钉住上移/下移/置顶/置底，且已经在端点的再按一次是空动作
+ * @details 空动作若进了撤销栈，用户按一次「置顶」再按 Ctrl+Z，撤掉的是上一步真实操作——
+ *          这条用「连按两次置顶，撤一次该回到下移后的状态」把空动作钉出来。
+ *          两条实心矩形盖同一块地，中心像素就是层叠读数。
+ */
+TEST_F(EngineFixture, RaiseLowerFrontBackMoveAndNoOpAtTheBoundaryCarriesNoUndoStep)
+{
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 3, .fontSize = 16, .fillStyle = 2}).has_value());
+    drawRectangle(QPoint(10, 10), QPoint(90, 60));
+
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 255), .lineWidth = 3, .fontSize = 16, .fillStyle = 2}).has_value());
+    drawRectangle(QPoint(10, 10), QPoint(90, 60));
+
+    const AnnotationSelection second{ToolKind::Rectangle, 1};
+    const auto                centerColor = [this] { return m_engine.exportImage().pixelColor(50, 35); };
+    EXPECT_EQ(centerColor(), QColor(0, 0, 255)) << "后画的该在上面，后面的对照就没基准";
+
+    // 下移一层：蓝的沉到红的下面
+    ASSERT_TRUE(m_engine.select(second).has_value());
+    ASSERT_TRUE(m_engine.lowerSelection().has_value());
+    EXPECT_EQ(centerColor(), QColor(255, 0, 0)) << "下移一层没生效";
+
+    // 置顶：蓝的回到最上面
+    ASSERT_TRUE(m_engine.bringSelectionToFront().has_value());
+    EXPECT_EQ(centerColor(), QColor(0, 0, 255)) << "置顶没生效";
+
+    // 已经在最上面，再置顶是空动作：撤销一次该回到「下移之后」（红），而不是原地不动
+    ASSERT_TRUE(m_engine.bringSelectionToFront().has_value());
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_EQ(centerColor(), QColor(255, 0, 0)) << "空动作进了撤销栈：这一撤撤掉了上一次真操作";
+
+    // 再撤一步：把「下移」收回去，蓝的回到上面
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_EQ(centerColor(), QColor(0, 0, 255)) << "第二次撤销没把下移收回";
+
+    // 置底：蓝的一沉到底
+    ASSERT_TRUE(m_engine.select(second).has_value());
+    ASSERT_TRUE(m_engine.sendSelectionToBack().has_value());
+    EXPECT_EQ(centerColor(), QColor(255, 0, 0)) << "置底没生效";
+
+    // 上移一层：蓝的又回到上面
+    ASSERT_TRUE(m_engine.raiseSelection().has_value());
+    EXPECT_EQ(centerColor(), QColor(0, 0, 255)) << "上移一层没生效";
+}
+
+/**
+ * @brief 钉住选中集：加选、反选与整组删除（一步撤销）
+ */
+TEST_F(EngineFixture, SelectionSetSupportsAddToggleAndGroupDelete)
+{
+    const auto first  = drawRectangle(QPoint(10, 10), QPoint(50, 40));
+    const auto second = drawRectangle(QPoint(60, 10), QPoint(100, 40));
+
+    ASSERT_TRUE(m_engine.select(first).has_value());
+    EXPECT_EQ(m_engine.selections().size(), 1U);
+
+    ASSERT_TRUE(m_engine.addToSelection(second).has_value());
+    EXPECT_EQ(m_engine.selections().size(), 2U) << "加选没进选中集";
+    ASSERT_TRUE(m_engine.addToSelection(second).has_value());
+    EXPECT_EQ(m_engine.selections().size(), 2U) << "同一条加选两次造出了重复项，之后整组移动会把它挪两倍";
+
+    ASSERT_TRUE(m_engine.toggleSelection(first).has_value());
+    ASSERT_EQ(m_engine.selections().size(), 1U) << "反选没把选中的那条摘掉";
+    EXPECT_EQ(m_engine.selections().front().shapeIndex, second.shapeIndex) << "反选摘错了对象";
+
+    ASSERT_TRUE(m_engine.toggleSelection(first).has_value());
+    EXPECT_EQ(m_engine.selections().size(), 2U) << "反选没能把摘掉的那条再加回来";
+
+    ASSERT_TRUE(m_engine.removeSelection().has_value());
+    EXPECT_TRUE(m_engine.selections().empty());
+    EXPECT_FALSE(m_engine.selectionAt(QPoint(10, 25)).has_value()) << "整组删除漏了第一条";
+    EXPECT_FALSE(m_engine.selectionAt(QPoint(60, 25)).has_value()) << "整组删除漏了第二条";
+
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_TRUE(m_engine.selectionAt(QPoint(10, 25)).has_value()) << "一次撤销没把整组放回来";
+    EXPECT_TRUE(m_engine.selectionAt(QPoint(60, 25)).has_value()) << "撤销只放回来了其中一条";
+}
+
+/**
+ * @brief 钉住多选整组挪与整组改样式各是一步撤销
+ * @details 多选若逐条压命令，拖一趟要点好几下 Ctrl+Z 才退得回去，改一次颜色同理。
+ */
+TEST_F(EngineFixture, MultiSelectionMovesAndRestylesAsOneUndoStep)
+{
+    const auto first  = drawRectangle(QPoint(10, 10), QPoint(50, 40));
+    const auto second = drawRectangle(QPoint(60, 10), QPoint(100, 40));
+    ASSERT_TRUE(m_engine.select(first).has_value());
+    ASSERT_TRUE(m_engine.addToSelection(second).has_value());
+
+    ASSERT_TRUE(m_engine.moveSelectionBy(QPoint(20, 0)).has_value());
+    const auto moved = m_engine.exportImage();
+    EXPECT_NE(moved.pixelColor(30, 25), QColor(255, 255, 255)) << "第一条没跟着整组挪";
+    EXPECT_NE(moved.pixelColor(80, 25), QColor(255, 255, 255)) << "第二条没跟着整组挪";
+    EXPECT_EQ(moved.pixelColor(10, 25), QColor(255, 255, 255)) << "第一条的原位还留着墨";
+
+    ASSERT_TRUE(m_engine.undo().has_value());
+    const auto back = m_engine.exportImage();
+    EXPECT_NE(back.pixelColor(10, 25), QColor(255, 255, 255)) << "一次撤销没把整组挪回去";
+    EXPECT_NE(back.pixelColor(60, 25), QColor(255, 255, 255)) << "一次撤销只退回了其中一条";
+    EXPECT_EQ(back.pixelColor(30, 25), QColor(255, 255, 255)) << "撤销只退了一半";
+
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 255), .lineWidth = 3, .fontSize = 16, .fillStyle = 0}).has_value());
+    const auto restyled = m_engine.exportImage();
+    EXPECT_EQ(restyled.pixelColor(10, 25), QColor(0, 0, 255)) << "整组改样式漏了第一条";
+    EXPECT_EQ(restyled.pixelColor(60, 25), QColor(0, 0, 255)) << "整组改样式漏了第二条";
+
+    ASSERT_TRUE(m_engine.undo().has_value());
+    const auto reverted = m_engine.exportImage();
+    EXPECT_EQ(reverted.pixelColor(10, 25), QColor(255, 0, 0)) << "一次撤销没把整组样式退回去";
+    EXPECT_EQ(reverted.pixelColor(60, 25), QColor(255, 0, 0)) << "一次撤销只退回了其中一条的样式";
+}
+
+/**
+ * @brief 钉住手柄框的八枚点与选中项的几何对上
+ */
+TEST_F(EngineFixture, SelectionFrameCarriesTheEightHandles)
+{
+    const auto rectangle = drawRectangle(QPoint(20, 30), QPoint(100, 70));
+    ASSERT_TRUE(m_engine.select(rectangle).has_value());
+
+    const auto frame = m_engine.selectionFrame();
+    ASSERT_TRUE(frame.has_value()) << "选中一条时该有手柄框";
+    // 外接框按 QRectF 的包含口径量：QRect(20,30,81,41) 转成 QRectF 后右边在 101、下边在 71
+    EXPECT_DOUBLE_EQ((*frame)[0].x(), 20.0);
+    EXPECT_DOUBLE_EQ((*frame)[0].y(), 30.0);  // 左上
+    EXPECT_DOUBLE_EQ((*frame)[2].x(), 101.0); // 右上
+    EXPECT_DOUBLE_EQ((*frame)[2].y(), 30.0);
+    EXPECT_DOUBLE_EQ((*frame)[4].x(), 101.0); // 右下
+    EXPECT_DOUBLE_EQ((*frame)[4].y(), 71.0);
+
+    // 多选不给手柄框
+    const auto other = drawRectangle(QPoint(120, 30), QPoint(160, 70));
+    ASSERT_TRUE(m_engine.addToSelection(other).has_value());
+    EXPECT_FALSE(m_engine.selectionFrame().has_value()) << "多选还给手柄框，界面会按哪条画无法交代";
+}
+
+/**
+ * @brief 钉住缩放拖动：从开场那一份重算、一趟是一步撤销
+ * @details 每次 update 都拿开场时的外接框重算，所以中间的取整不会一格格攒成漂移；
+ *          判据取「终点拖到哪、边就落在哪」与「撤一次回到开场之前」两处。
+ */
+TEST_F(EngineFixture, HandleDragResizesAndUndoesInOneStep)
+{
+    const auto rectangle = drawRectangle(QPoint(20, 30), QPoint(100, 70));
+    ASSERT_TRUE(m_engine.select(rectangle).has_value());
+
+    ASSERT_TRUE(m_engine.beginSelectionDrag(SelectionHandle::Right, QPoint(100, 50)).has_value());
+    ASSERT_TRUE(m_engine.updateSelectionDrag(QPoint(130, 50)).has_value());
+    ASSERT_TRUE(m_engine.updateSelectionDrag(QPoint(160, 50)).has_value());
+    m_engine.endSelectionDrag();
+
+    const auto bounds = m_engine.selectionBounds();
+    ASSERT_TRUE(bounds.has_value());
+    EXPECT_NEAR(bounds->right(), 160, 2.5) << "右边没跟着手柄走到终点";
+    EXPECT_EQ(m_engine.exportImage().pixelColor(158, 50), QColor(255, 0, 0)) << "新右边线上该有墨";
+    EXPECT_EQ(m_engine.exportImage().pixelColor(170, 50), QColor(255, 255, 255)) << "右边线之外不该有墨";
+
+    ASSERT_TRUE(m_engine.undo().has_value());
+    const auto undone = m_engine.selectionBounds();
+    ASSERT_TRUE(undone.has_value());
+    EXPECT_NEAR(undone->right(), 100, 1.5) << "一次撤销没回到开场之前（中间两次 update 占了两步？）";
+    EXPECT_EQ(m_engine.exportImage().pixelColor(158, 50), QColor(255, 255, 255)) << "撤销后伸出去的那一段还留着";
+}
+
+/**
+ * @brief 钉住旋转拖动：绕外接框中心转到位、可撤销；先转后缩时伸缩走图形自己的轴
+ * @details 起始点在正上方（-90° 方向）、终点在正右方：增量正好 +90°。
+ *          转 90° 后原来的右边线立到下方、上边线立到右侧，用像素与手柄框两处核对。
+ */
+TEST_F(EngineFixture, HandleDragRotatesAboutTheCenterAndUndoes)
+{
+    const auto rectangle = drawRectangle(QPoint(40, 40), QPoint(120, 60));
+    ASSERT_TRUE(m_engine.select(rectangle).has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(80, 40), QColor(255, 0, 0)) << "靶子不对：上边线该在 y=40";
+
+    ASSERT_TRUE(m_engine.beginSelectionDrag(SelectionHandle::Rotate, QPoint(80, 16)).has_value());
+    ASSERT_TRUE(m_engine.updateSelectionDrag(QPoint(130, 50)).has_value());
+    m_engine.endSelectionDrag();
+
+    const auto frame = m_engine.selectionFrame();
+    ASSERT_TRUE(frame.has_value());
+    EXPECT_NEAR((*frame)[0].x(), 90.0, 1.5) << "转 90° 后左上角该转到 (90,10) 一带";
+    EXPECT_NEAR((*frame)[0].y(), 10.0, 1.5);
+
+    const auto turned = m_engine.exportImage();
+    EXPECT_EQ(turned.pixelColor(80, 40), QColor(255, 255, 255)) << "转完之后原上边线那里该是空心的内里";
+    EXPECT_EQ(turned.pixelColor(90, 50), QColor(255, 0, 0)) << "原来的上边线转到右侧：x=90 一带该有墨";
+
+    // 命中走同一条旋转映射：点转过来的新位置有、点旧位置不该再有
+    EXPECT_TRUE(m_engine.selectionAt(QPoint(90, 50)).has_value()) << "转过来的那条边点不中：命中没跟着旋转映射";
+    EXPECT_FALSE(m_engine.selectionAt(QPoint(40, 50)).has_value()) << "旧位置还能点中：命中没跟着旋转映射";
+
+    ASSERT_TRUE(m_engine.undo().has_value());
+    const auto back = m_engine.exportImage();
+    EXPECT_EQ(back.pixelColor(80, 40), QColor(255, 0, 0)) << "撤销没把旋转退回去";
+    EXPECT_EQ(back.pixelColor(90, 50), QColor(255, 255, 255)) << "撤销后转出去的那条边还留着墨";
+    EXPECT_TRUE(m_engine.selectionAt(QPoint(40, 50)).has_value()) << "撤销后原位该又能点中";
+}
+
+/**
+ * @brief 钉住复制粘贴：副本按层叠抄、逐次偏移、整批一步撤销
+ */
+TEST_F(EngineFixture, CopyPasteDuplicatesWithGrowingOffsetAndOneStepUndo)
+{
+    ASSERT_FALSE(m_engine.pasteClipboard().has_value()) << "空剪贴板也能粘贴，画布上会凭空冒出东西";
+    EXPECT_NE(m_engine.pasteClipboard().error().message.find("Ctrl+C"), std::string::npos) << "空剪贴板的提示该指出复制那一步";
+
+    const auto rectangle = drawRectangle(QPoint(10, 10), QPoint(60, 40));
+    ASSERT_FALSE(m_engine.copySelection().has_value()) << "没选中也能复制";
+    ASSERT_TRUE(m_engine.select(rectangle).has_value());
+    ASSERT_TRUE(m_engine.copySelection().has_value());
+
+    ASSERT_TRUE(m_engine.pasteClipboard().has_value());
+    ASSERT_EQ(m_engine.selections().size(), 1U) << "粘出来的该成为新的选中集";
+    EXPECT_EQ(m_engine.selections().front().shapeIndex, 1);
+    const auto firstCopy = m_engine.selectionBounds();
+    ASSERT_TRUE(firstCopy.has_value());
+    EXPECT_EQ(firstCopy->topLeft(), QPoint(18, 18)) << "第一份副本该带一格偏移（+8,+8）";
+    EXPECT_EQ(m_engine.exportImage().pixelColor(18, 30), QColor(255, 0, 0)) << "副本的左边缘该落在 x=18";
+
+    ASSERT_TRUE(m_engine.pasteClipboard().has_value());
+    const auto secondCopy = m_engine.selectionBounds();
+    ASSERT_TRUE(secondCopy.has_value());
+    EXPECT_EQ(secondCopy->topLeft(), QPoint(26, 26)) << "第二次粘贴该再多偏一格，两次不会完全叠住";
+
+    // 两次粘贴各占一步：撤一次少一份副本，再撤一次全没
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(26, 30), QColor(255, 255, 255)) << "撤销没把第二份副本收走";
+    EXPECT_EQ(m_engine.exportImage().pixelColor(18, 30), QColor(255, 0, 0)) << "撤一次却把两份都收走了";
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(18, 30), QColor(255, 255, 255)) << "撤销没把第一份副本收走";
+    EXPECT_NE(m_engine.exportImage().pixelColor(10, 30), QColor(255, 255, 255)) << "原件被一起收走了";
+
+    ASSERT_TRUE(m_engine.redo().has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(18, 30), QColor(255, 0, 0)) << "重做没把第一份副本放回来";
+
+    // 多选整组复制出两份副本：一次粘贴是一步，Ctrl+Z 一下该把整批一起收走。
+    // 新画两条互不重叠的矩形，让两份副本各有一条能单独探到的左边缘（复用旧图形的话
+    // 新一轮粘贴的偏移又从 +8 起，副本会正好叠在既有副本上，探针分不出谁在谁不在）
+    const auto third  = drawRectangle(QPoint(60, 60), QPoint(110, 90));
+    const auto fourth = drawRectangle(QPoint(120, 60), QPoint(170, 90));
+    ASSERT_TRUE(m_engine.select(third).has_value());
+    ASSERT_TRUE(m_engine.addToSelection(fourth).has_value());
+    ASSERT_TRUE(m_engine.copySelection().has_value());
+    ASSERT_TRUE(m_engine.pasteClipboard().has_value());
+    ASSERT_EQ(m_engine.selections().size(), 2U) << "两份副本该一起成为选中集";
+    EXPECT_EQ(m_engine.exportImage().pixelColor(68, 75), QColor(255, 0, 0)) << "第一份副本没落位（左边缘该在 x=68）";
+    EXPECT_EQ(m_engine.exportImage().pixelColor(128, 75), QColor(255, 0, 0)) << "第二份副本没落位（左边缘该在 x=128）";
+
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(68, 75), QColor(255, 255, 255)) << "一次撤销没收走整批：粘贴没包成一步";
+    EXPECT_EQ(m_engine.exportImage().pixelColor(128, 75), QColor(255, 255, 255)) << "一次撤销只收走了其中一份副本";
+}
+
+/**
+ * @brief 钉住手柄拖动的拒绝面：没抓住、没选中、多选、没开场
+ */
+TEST_F(EngineFixture, HandleDragRefusesWithoutASingleSelection)
+{
+    EXPECT_FALSE(m_engine.beginSelectionDrag(SelectionHandle::Right, QPoint(10, 10)).has_value()) << "没选中也能开拖手柄";
+    EXPECT_FALSE(m_engine.updateSelectionDrag(QPoint(10, 10)).has_value()) << "没开场也能拖动";
+    EXPECT_NE(m_engine.updateSelectionDrag(QPoint(10, 10)).error().message.find("手柄"), std::string::npos);
+
+    const auto rectangle = drawRectangle(QPoint(20, 30), QPoint(100, 70));
+    ASSERT_TRUE(m_engine.select(rectangle).has_value());
+    EXPECT_FALSE(m_engine.beginSelectionDrag(SelectionHandle::None, QPoint(100, 50)).has_value()) << "没抓住手柄也能开拖";
+
+    const auto other = drawRectangle(QPoint(120, 30), QPoint(160, 70));
+    ASSERT_TRUE(m_engine.addToSelection(other).has_value());
+    EXPECT_FALSE(m_engine.beginSelectionDrag(SelectionHandle::Right, QPoint(100, 50)).has_value()) << "多选时还能开拖手柄";
 }

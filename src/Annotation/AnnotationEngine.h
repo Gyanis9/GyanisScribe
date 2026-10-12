@@ -11,8 +11,11 @@
 
 #include "Annotation/IAnnotationEngine.h"
 
+#include <QRectF>
 #include <QUndoStack>
 
+#include <optional>
+#include <utility>
 #include <vector>
 
 namespace GyanisScribe::Annotation
@@ -22,9 +25,9 @@ namespace GyanisScribe::Annotation
      * @brief IAnnotationEngine 的实现
      * @details 工具集在构造时按 ToolKind 建齐，切换只是改「谁接收事件」——
      *          每类图形归各自工具管，撤销栈管的正是「插哪条、取哪条、移哪条」这三件事。
-     * @note ponytail: 层叠顺序按工具种类的登记顺序（矩形在最下、序号在最上），
-     *       做不到「后画的一条一定压住先画的另一条」。要补这一点，得把图形收进引擎的一张全局表，
-     *       工具只作为交互器存在——那时命中测试与绘制都读同一张表。
+     *          层叠顺序由引擎统一发号：每条图形落定时领到一个全局层叠号（AnnotationShape::zOrder），
+     *          绘制与命中都按那个号排序后进行，于是「后画的压在先画的上面」跨工具也成立，
+     *          置顶/置底只是换号。
      */
     class AnnotationEngine : public IAnnotationEngine
     {
@@ -153,24 +156,83 @@ namespace GyanisScribe::Annotation
         [[nodiscard]] std::optional<AnnotationSelection> selectionAt(const QPoint &point) const override;
 
         /**
-         * @brief 选中一条图形，见 IAnnotationEngine::select()
+         * @brief 选中一条图形（替换整个选中集），见 IAnnotationEngine::select()
          * @param selection 目标
          * @return 成功返回空载荷；不在册返回 InvalidArgument
          */
         Core::Expected<void> select(const AnnotationSelection &selection) override;
 
         /**
-         * @brief 当前选中项，见 IAnnotationEngine::selection()
-         * @return 有选中时那一条
+         * @brief 把一条图形并进选中集，见 IAnnotationEngine::addToSelection()
+         * @param selection 目标
+         * @return 成功返回空载荷；不在册返回 InvalidArgument
          */
-        [[nodiscard]] const std::optional<AnnotationSelection> &selection() const noexcept override;
+        Core::Expected<void> addToSelection(const AnnotationSelection &selection) override;
+
+        /**
+         * @brief 在选中集里翻转一条图形，见 IAnnotationEngine::toggleSelection()
+         * @param selection 目标
+         * @return 成功返回空载荷；不在册返回 InvalidArgument
+         */
+        Core::Expected<void> toggleSelection(const AnnotationSelection &selection) override;
+
+        /// 清空选中集，见 IAnnotationEngine::clearSelection()
+        void clearSelection() override;
+
+        /**
+         * @brief 当前选中集，见 IAnnotationEngine::selections()
+         * @return 选中图形的位置列表
+         */
+        [[nodiscard]] const std::vector<AnnotationSelection> &selections() const noexcept override;
 
         /**
          * @brief 选中项的包围盒，见 IAnnotationEngine::selectionBounds()
-         * @return 由所属工具的 boundingBoxOf 算出；没选中或索引失效时返回空
+         * @return 各条的外接框并集；没选中或索引失效时返回空
          * @details 重写基类接口：界面只拿到矩形，不需要认识工具与图形记录。
          */
         [[nodiscard]] std::optional<QRect> selectionBounds() const override;
+
+        /**
+         * @brief 选中框的八枚手柄位置，见 IAnnotationEngine::selectionFrame()
+         * @return 恰好选中一条时给出手柄点；其余情况为空
+         */
+        [[nodiscard]] std::optional<std::array<QPointF, 8>> selectionFrame() const override;
+
+        /**
+         * @brief 开场一次手柄拖动，见 IAnnotationEngine::beginSelectionDrag()
+         * @param handle 抓住的手柄
+         * @param point 按下点
+         * @return 成功返回空载荷；四种拒法各带自己的原因
+         */
+        Core::Expected<void> beginSelectionDrag(SelectionHandle handle, const QPoint &point) override;
+
+        /**
+         * @brief 手柄拖动中，见 IAnnotationEngine::updateSelectionDrag()
+         * @param point 当前点
+         * @return 成功返回空载荷；没有开场过或那条已不在册时返回 InvalidArgument
+         */
+        Core::Expected<void> updateSelectionDrag(const QPoint &point) override;
+
+        /// 结束手柄拖动，见 IAnnotationEngine::endSelectionDrag()
+        void endSelectionDrag() override;
+
+        /// 上移一层，见 IAnnotationEngine::raiseSelection()
+        Core::Expected<void> raiseSelection() override;
+
+        /// 下移一层，见 IAnnotationEngine::lowerSelection()
+        Core::Expected<void> lowerSelection() override;
+
+        /// 置顶，见 IAnnotationEngine::bringSelectionToFront()
+        Core::Expected<void> bringSelectionToFront() override;
+
+        /// 置底，见 IAnnotationEngine::sendSelectionToBack()
+        Core::Expected<void> sendSelectionToBack() override;
+
+        /// 复制选中项到引擎内剪贴板，见 IAnnotationEngine::copySelection()
+        Core::Expected<void> copySelection() override;
+
+        /// 粘贴剪贴板，见 IAnnotationEngine::pasteClipboard()
+        Core::Expected<void> pasteClipboard() override;
 
         /**
          * @brief 画全部图形给界面，见 IAnnotationEngine::paintShapes()
@@ -220,6 +282,25 @@ namespace GyanisScribe::Annotation
         Core::Expected<void> redo() override;
 
     private:
+        /// 全局层叠表里的一条：哪个工具的哪一条图形、压在第几层
+        struct ZEntry
+        {
+            AnnotationTool *tool;   ///< 所属工具，所有权在引擎
+            int             index;  ///< 该工具内的索引
+            int             zOrder; ///< 全局层叠号
+        };
+
+        /// 手柄拖动开场时记下的现场：缩放与旋转都从这一份重新算，中途的取整不会攒成漂移
+        struct HandleDrag
+        {
+            SelectionHandle handle     = SelectionHandle::None; ///< 抓住的手柄
+            ToolKind        tool       = ToolKind::Rectangle;   ///< 目标工具
+            int             shapeIndex = -1;                    ///< 目标图形索引
+            AnnotationShape before;                             ///< 改动之前的那一份图形
+            QRectF          localBox;                           ///< 改动之前的局部外接框
+            qreal           startAngle = 0.0;                   ///< 按下点相对局部中心的方位角，旋转用
+        };
+
         /**
          * @brief 按种类找工具
          * @param kind 目标种类
@@ -230,12 +311,37 @@ namespace GyanisScribe::Annotation
         /// 把当前画笔参数下发给全部工具：构造与改参数两处共用一个口径
         void applyPenParametersToTools();
 
-        Core::CapturedImage                          m_canvas;                           ///< 当前画布
-        std::vector<std::unique_ptr<AnnotationTool>> m_tools;                            ///< 全部工具，按 ToolKind 顺序登记
-        QUndoStack                                   m_undoStack;                        ///< 图形级撤销历史
-        std::optional<AnnotationSelection>           m_selection;                        ///< 当前选中项
-        ToolKind                                     m_activeTool = ToolKind::Rectangle; ///< 当前工具
-        PenParameters                                m_penParameters;                    ///< 画笔默认参数整套
+        /// 全部图形按层叠号升序排好（最底层的在前）
+        [[nodiscard]] std::vector<ZEntry> zOrderedEntries() const;
+
+        /// 一条选中项到底在不在册
+        [[nodiscard]] bool selectionIsValid(const AnnotationSelection &selection) const;
+
+        /// 一条选中项的外接框（含旋转）；索引失效时为空
+        [[nodiscard]] std::optional<QRect> boundsOf(const AnnotationSelection &selection) const;
+
+        /// 层叠调整的四个方向
+        enum class ReorderMode
+        {
+            Raise,   ///< 上移一层
+            Lower,   ///< 下移一层
+            ToFront, ///< 置顶
+            ToBack,  ///< 置底
+        };
+
+        /// 上移/下移/置顶/置底的共同实现：排出目标次序、逐个换号、一步撤销
+        Core::Expected<void> reorderSelection(ReorderMode mode);
+
+        Core::CapturedImage                               m_canvas;                           ///< 当前画布
+        std::vector<std::unique_ptr<AnnotationTool>>      m_tools;                            ///< 全部工具，按 ToolKind 顺序登记
+        QUndoStack                                        m_undoStack;                        ///< 图形级撤销历史
+        std::vector<AnnotationSelection>                  m_selection;                        ///< 当前选中集：多选是常态，单条只是它的一格
+        ToolKind                                          m_activeTool = ToolKind::Rectangle; ///< 当前工具
+        PenParameters                                     m_penParameters;                    ///< 画笔默认参数整套
+        int                                               m_topZ = 0;                         ///< 已发出的最大层叠号：新图形总领到更大的号，落在最上层
+        std::optional<HandleDrag>                         m_handleDrag;                       ///< 进行中的手柄拖动现场
+        std::vector<std::pair<ToolKind, AnnotationShape>> m_clipboard;                        ///< 引擎内剪贴板：复制下来的图形副本，与系统剪贴板无关
+        int                                               m_pasteSeries = 0;                  ///< 连续粘贴的轮次：每粘一次多偏一格，两次粘贴不会完全叠在一起
     };
 
 } // namespace GyanisScribe::Annotation

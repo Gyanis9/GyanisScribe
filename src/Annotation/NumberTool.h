@@ -73,13 +73,13 @@ namespace GyanisScribe::Annotation
         bool shapeIsUsable(const AnnotationShape &shape) const override;
 
         /**
-         * @brief 圆牌的外接框，见 AnnotationTool::boundingBoxOf()
+         * @brief 圆牌的局部外接框，见 AnnotationTool::localBoundingBoxOf()
          * @param shape 图形，取 position 与 fontSize
          * @return 以落点为中心的圆牌方框
          * @details 重写基类接口：基类把文本框的左上角摆在落点上，而圆牌是围着落点画的，
          *          不重写就会让选中框偏移半个牌面。
          */
-        [[nodiscard]] QRect boundingBoxOf(const AnnotationShape &shape) const override;
+        [[nodiscard]] QRect localBoundingBoxOf(const AnnotationShape &shape) const override;
 
         /**
          * @brief 画一个带数字的圆牌，见 AnnotationTool::paintShape()

@@ -1,10 +1,12 @@
 #include "Annotation/AnnotationTool.h"
 
+#include "Annotation/ShapeTransform.h"
 #include "Annotation/TextFont.h"
 
 #include <QFont>
 
 #include <algorithm>
+#include <cmath>
 #include <QFontMetricsF>
 #include <QImage>
 #include <QPainter>
@@ -126,13 +128,7 @@ namespace GyanisScribe::Annotation
             return false;
         }
 
-        auto &shape = m_shapes[index];
-        shape.rect.translate(delta);
-        shape.position += delta;
-        for (auto &point: shape.points)
-        {
-            point += delta;
-        }
+        translateShape(m_shapes[index], delta);
         return true;
     }
 
@@ -172,14 +168,23 @@ namespace GyanisScribe::Annotation
         return true;
     }
 
+    bool AnnotationTool::replaceShapeAt(const int index, const AnnotationShape &shape)
+    {
+        if (index < 0 || index >= m_shapes.size())
+        {
+            return false;
+        }
+        m_shapes[index] = shape;
+        return true;
+    }
+
     int AnnotationTool::hitTest(const QPoint &point) const
     {
-        // 倒序遍历：后画的图形压在上面，用户点的就是看得见的那一条
+        // 倒序遍历：工具内部后画的图形压在上面，用户点的就是看得见的那一条；
+        // 跨工具的层叠由引擎按全局层叠号排序后再问，这里只管本工具这一摞
         for (int index = static_cast<int>(m_shapes.size()) - 1; index >= 0; --index)
         {
-            const auto &shape     = m_shapes[index];
-            const int   tolerance = shape.lineWidth > kMinimumHitTolerance ? shape.lineWidth : kMinimumHitTolerance;
-            if (hitTestShape(shape, point, tolerance))
+            if (hitTestShapeAt(index, point))
             {
                 return index;
             }
@@ -187,14 +192,33 @@ namespace GyanisScribe::Annotation
         return -1;
     }
 
+    bool AnnotationTool::hitTestShapeAt(const int index, const QPoint &point) const
+    {
+        if (index < 0 || index >= m_shapes.size())
+        {
+            return false;
+        }
+
+        const auto &shape     = m_shapes[index];
+        const int   tolerance = shape.lineWidth > kMinimumHitTolerance ? shape.lineWidth : kMinimumHitTolerance;
+        // 转过的图形：事件点先绕中心反向转回来，再走与未旋转时完全相同的那条判据
+        if (shape.rotationDeg != 0.0)
+        {
+            const QPointF center = QRectF{localBoundingBoxOf(shape)}.center();
+            const QPointF local  = unrotatedPoint(QPointF{point}, center, shape.rotationDeg);
+            return hitTestShape(shape, QPoint{static_cast<int>(std::lround(local.x())), static_cast<int>(std::lround(local.y()))}, tolerance);
+        }
+        return hitTestShape(shape, point, tolerance);
+    }
+
     bool AnnotationTool::hasPending() const noexcept
     {
         return !m_pending.rect.isNull() || !m_pending.text.isEmpty() || !m_pending.points.isEmpty();
     }
 
-    bool AnnotationTool::hitTestShape(const AnnotationShape &shape, const QPoint &point, int tolerance) const
+    bool AnnotationTool::hitTestShape(const AnnotationShape &shape, const QPoint &point, const int tolerance) const
     {
-        const auto box = boundingBoxOf(shape).adjusted(-tolerance, -tolerance, tolerance, tolerance);
+        const auto box = localBoundingBoxOf(shape).adjusted(-tolerance, -tolerance, tolerance, tolerance);
         return box.contains(point);
     }
 
@@ -203,7 +227,7 @@ namespace GyanisScribe::Annotation
         return shape.rect.width() > 1 && shape.rect.height() > 1;
     }
 
-    QRect AnnotationTool::boundingBoxOf(const AnnotationShape &shape) const
+    QRect AnnotationTool::localBoundingBoxOf(const AnnotationShape &shape) const
     {
         QRect box;
 
@@ -231,29 +255,58 @@ namespace GyanisScribe::Annotation
         return box;
     }
 
-    void AnnotationTool::paint(QPainter &painter, const PaintContext &context) const
+    QRect AnnotationTool::boundingBoxOf(const AnnotationShape &shape) const
     {
-        for (const auto &shape: m_shapes)
+        const QRect local = localBoundingBoxOf(shape);
+        if (shape.rotationDeg == 0.0)
         {
-            paintShape(painter, shape, context);
+            return local;
+        }
+        return rotatedBoxBounds(QRectF{local}, shape.rotationDeg).toAlignedRect();
+    }
+
+    std::array<QPointF, 4> AnnotationTool::frameCornersOf(const AnnotationShape &shape) const
+    {
+        const QRectF  local{localBoundingBoxOf(shape)};
+        const QPointF center = local.center();
+        if (shape.rotationDeg == 0.0)
+        {
+            return {local.topLeft(), local.topRight(), local.bottomRight(), local.bottomLeft()};
+        }
+        return {rotatedPoint(local.topLeft(), center, shape.rotationDeg), rotatedPoint(local.topRight(), center, shape.rotationDeg),
+                rotatedPoint(local.bottomRight(), center, shape.rotationDeg), rotatedPoint(local.bottomLeft(), center, shape.rotationDeg)};
+    }
+
+    void AnnotationTool::paintShapeAt(const int index, QPainter &painter, const PaintContext &context) const
+    {
+        if (index < 0 || index >= m_shapes.size())
+        {
+            return;
         }
 
+        const auto &shape = m_shapes[index];
+        if (shape.rotationDeg == 0.0)
+        {
+            paintShape(painter, shape, context);
+            return;
+        }
+
+        // 转过的话把画家绕外接框中心摆正：paintShape 照旧按未旋转的坐标画，屏显与导出同一处生效
+        const QPointF center = QRectF{localBoundingBoxOf(shape)}.center();
+        painter.save();
+        painter.translate(center);
+        painter.rotate(shape.rotationDeg);
+        painter.translate(-center);
+        paintShape(painter, shape, context);
+        painter.restore();
+    }
+
+    void AnnotationTool::paintPending(QPainter &painter, const PaintContext &context) const
+    {
         // 在途图形也画：用户要立刻看到自己正在框的东西，但它不进最终导出
         if (isActive() && hasPending())
         {
             paintShape(painter, m_pending, context);
-        }
-    }
-
-    void AnnotationTool::applyToImage(QImage &image, const PaintContext &context) const
-    {
-        QPainter painter(&image);
-        // 图形记的是逻辑坐标，底图是物理像素：缩放画家让两处用同一套数字，导出与屏显才不会分家
-        painter.scale(context.pixelScale, context.pixelScale);
-        painter.setRenderHint(QPainter::Antialiasing, true);
-        for (const auto &shape: m_shapes)
-        {
-            paintShape(painter, shape, context);
         }
     }
 

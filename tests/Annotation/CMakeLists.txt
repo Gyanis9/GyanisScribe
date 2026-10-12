@@ -2,6 +2,7 @@ add_executable(TestAnnotation
         TestAnnotationEngine.cpp
         TestAnnotationTools.cpp
         TestAnnotationToolbar.cpp
+        TestAnnotationTransform.cpp
         TestAnnotationWindow.cpp
         TestRecentColors.cpp)
 

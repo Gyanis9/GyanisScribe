@@ -12,15 +12,26 @@
 #include "Annotation/IAnnotationEngine.h"
 
 #include <QPoint>
+#include <QPointF>
 #include <QRect>
 #include <QSize>
 #include <QWidget>
+
+#include <array>
 
 class QLineEdit;
 
 namespace GyanisScribe::Annotation
 {
 
+    /// 缩放手柄的边长，控件像素：太小点不着、太大盖住图形本身
+    inline constexpr int kHandleSizeWidget = 7;
+
+    /// 旋转手柄离选中框上边中点的距离，控件像素
+    inline constexpr int kRotateHandleOffsetWidget = 24;
+
+    /// 抓住手柄的判定半径，控件像素：手柄很小，不给余量就抓不住
+    inline constexpr int kHandleHitRadiusWidget = 8;
 
     /**
      * @brief 控件坐标换算到画布逻辑坐标
@@ -47,7 +58,8 @@ namespace GyanisScribe::Annotation
      *          把鼠标的按下/移动/抬起转成引擎的起笔/行进/收笔（或选中后的拖动）。
      *          每帧都直接画底图 + 图形，不走 exportImage：导出只烘已落定的图形，
      *          屏显要立刻看到在途那一条，两条路分开才不会让预览改变最终产物。
-     * @note 按下时先做命中测试：点中已有图形就选中并进入拖动，点的是空白处才起笔画新的。
+     * @note 按下的优先顺序：选中框的手柄 → 命中已有图形（`Ctrl` 反选、`Shift` 加选、裸按单选并拖）
+     *        → 空白处起笔。点空白会先清掉选中：选框不该留着指向「刚才那条」。
      *        因此「在已有图形内部再画一个」做不到——需求列的那几件工具里没有独立的选择工具，
      *        真要给就得先补一档工具种类。
      */
@@ -126,11 +138,28 @@ namespace GyanisScribe::Annotation
         /// 当前显示区，绘制与坐标换算共用同一个算法
         [[nodiscard]] QRect currentDisplayRect() const;
 
+        /**
+         * @brief 旋转手柄在控件坐标里的落点
+         * @param frame 引擎给的八枚手柄点（画布逻辑坐标）
+         * @return 控件内的点：上边中点往外挪一个固定偏移；那个位置出画布时翻到下边
+         * @details 翻边是因为贴着上边缘的图形，柄按常规摆法会落到窗口外面，根本点不着。
+         */
+        [[nodiscard]] QPointF rotateHandlePointWidget(const std::array<QPointF, 8> &frame) const;
+
+        /**
+         * @brief 这个控件坐标点抓住了哪枚手柄
+         * @param widgetPoint 控件内坐标
+         * @return 抓住的手柄；没抓住任何一枚时返回 None
+         * @details 在控件坐标里按距离判：容差是「手指能命中的距离」，不该随画布缩放变粗变细。
+         */
+        [[nodiscard]] SelectionHandle handleAt(const QPoint &widgetPoint) const;
+
         IAnnotationEngine &m_engine;           ///< 标注引擎，不拥有
         bool               m_stroking = false; ///< 正在画一条新图形
 
         bool       m_ignoreNextRelease = false; ///< 双击收笔之后吞掉那一次松手
         bool       m_dragging          = false; ///< 正在拖动选中项
+        bool       m_handleDragging    = false; ///< 正在拖选中框上的手柄（缩放或旋转）
         bool       m_awaitingText      = false; ///< 文字在途：这条图形由输入框提交，而不是由抬笔提交
         bool       m_reEditingText     = false; ///< 输入框此刻改的是已放下的那一条，而不是新画的一条
         QPoint     m_lastCanvasPoint;           ///< 上一次事件换算到的画布坐标

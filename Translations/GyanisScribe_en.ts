@@ -48,6 +48,14 @@
             <translation>The shape to select is not registered: tool 0x{:X}, index {}. Click it again.</translation>
         </message>
         <message>
+            <source>要加选的图形不在册：工具 0x{:X} 索引 {}。请重新点选</source>
+            <translation>The shape to add is not registered: tool 0x{:X}, index {}. Click it again.</translation>
+        </message>
+        <message>
+            <source>要反选的图形不在册：工具 0x{:X} 索引 {}。请重新点选</source>
+            <translation>The shape to toggle is not registered: tool 0x{:X}, index {}. Click it again.</translation>
+        </message>
+        <message>
             <source>没有选中任何图形，无法移动。请先点中要移动的那一条</source>
             <translation>Nothing is selected, so there is nothing to move. Click the shape you want to move first.</translation>
         </message>
@@ -60,8 +68,8 @@
             <translation>Nothing is selected, so there is no text to change. Double-click the text you want to edit</translation>
         </message>
         <message>
-            <source>选中的不是文字图形，改不了内容。只有文字工具画出来的那几条可以双击重编</source>
-            <translation>The selected shape is not text. Only shapes made with the Text tool can be re-edited by double-clicking</translation>
+            <source>改内容要恰好选中一条文字图形：多选或别的图形都改不了。只有文字工具画出来的那几条可以双击重编</source>
+            <translation>Changing content needs exactly one text shape selected: multiple selections or other shapes will not work. Only text shapes drawn with the text tool can be double-clicked to re-edit</translation>
         </message>
         <message>
             <source>文字不能是空的：不要这一条就按 Delete 删掉，或按 Ctrl+Z 撤销这次改动</source>
@@ -82,6 +90,38 @@
         <message>
             <source>没有可重做的标注动作了</source>
             <translation>There is nothing left to redo.</translation>
+        </message>
+        <message>
+            <source>没有抓住任何手柄。请对准选中框上的小方块或框外的圆点再拖</source>
+            <translation>No handle was grabbed. Aim at the small squares on the selection frame or the circle outside it, then drag</translation>
+        </message>
+        <message>
+            <source>缩放手柄只在选中一条图形时出现。请先只选中一条再拖手柄</source>
+            <translation>Resize handles only appear when exactly one shape is selected. Select a single shape first, then drag a handle</translation>
+        </message>
+        <message>
+            <source>现在没有在拖手柄。请先按下选中框上的手柄再拖</source>
+            <translation>No handle drag is in progress. Press a handle on the selection frame first, then drag</translation>
+        </message>
+        <message>
+            <source>拖的那条图形已经不在了。请重新点选</source>
+            <translation>The shape being dragged is gone. Select it again.</translation>
+        </message>
+        <message>
+            <source>没有选中任何图形，改不了层叠顺序。请先点中要挪层的那一条</source>
+            <translation>Nothing is selected, so the stacking order cannot change. Click the shape you want to restack first</translation>
+        </message>
+        <message>
+            <source>没有选中任何图形，没有可复制的。请先点中要复制的那一条</source>
+            <translation>Nothing is selected, so there is nothing to copy. Click the shape you want to copy first</translation>
+        </message>
+        <message>
+            <source>剪贴板里还没有图形：先用 Ctrl+C 复制一条，再按 Ctrl+V 粘贴</source>
+            <translation>The clipboard is still empty: press Ctrl+C to copy a shape first, then Ctrl+V to paste</translation>
+        </message>
+        <message>
+            <source>剪贴板里的工具都不在册，粘贴没有落点</source>
+            <translation>None of the tools in the clipboard are registered, so there is nowhere to paste</translation>
         </message>
         <message>
             <source>颜色 %1</source>

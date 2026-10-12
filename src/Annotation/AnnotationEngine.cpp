@@ -11,23 +11,35 @@
 #include "Annotation/PenTool.h"
 #include "Annotation/PolylineTool.h"
 #include "Annotation/RectangleTool.h"
+#include "Annotation/ShapeTransform.h"
 #include "Annotation/TextTool.h"
 #include "Core/Text.h"
 
 #include <QImage>
+#include <QPainter>
 #include <QUndoCommand>
 
+#include <algorithm>
 #include <format>
 
 namespace GyanisScribe::Annotation
 {
     namespace
     {
-        /// 改样式命令的合并标识，取值只在本文件内用来分派：平移那一格另有一个编号
+        /// 改样式命令的合并标识，取值只在本文件内用来分派：平移、几何与层叠各另有一个编号
         constexpr int kRestyleCommandTypeId = 1;
 
         /// 平移命令的合并标识：与样式各自一个编号，改线宽与挪位置这两趟手势不许互相并成一步
         constexpr int kMoveCommandTypeId = 2;
+
+        /// 缩放手势的合并标识
+        constexpr int kResizeCommandTypeId = 3;
+
+        /// 旋转手势的合并标识：缩放与旋转各自一趟手势，不互相并步
+        constexpr int kRotateCommandTypeId = 4;
+
+        /// 粘贴时副本相对原件每轮的偏移量，逻辑像素：叠得死死的会让人以为没粘上
+        constexpr int kPasteOffsetStride = 8;
 
         /**
          * @brief 插入一条图形
@@ -87,27 +99,42 @@ namespace GyanisScribe::Annotation
         };
 
         /**
-         * @brief 平移一条图形
+         * @brief 平移一组图形（多选时整组一起走）
          * @details 撤销用等量反向位移：记下位移本身，而不是记下移动前后的两个位置。
-         *          同一条图形的连续平移并成一步：拖一趟会发几十次位移，方向键逐格也能连按好几次，
+         *          同一组图形的连续平移并成一步：拖一趟会发几十次位移，方向键逐格也能连按好几次，
          *          不并的话撤销一次只退一格，用户只能一直按着 Ctrl+Z 往回跑。
          */
-        class MoveShapeCommand : public QUndoCommand
+        class MoveShapesCommand : public QUndoCommand
         {
         public:
-            MoveShapeCommand(AnnotationTool *tool, int index, const QPoint &delta, QUndoCommand *parent = nullptr) :
-                QUndoCommand(parent), m_tool(tool), m_index(index), m_delta(delta)
+            /// 一条被平移的图形：哪个工具的哪一条
+            struct Target
+            {
+                AnnotationTool *tool  = nullptr; ///< 目标工具，所有权在引擎
+                int             index = -1;      ///< 图形索引
+
+                [[nodiscard]] bool operator==(const Target &) const = default;
+            };
+
+            MoveShapesCommand(std::vector<Target> targets, const QPoint &delta, QUndoCommand *parent = nullptr) :
+                QUndoCommand(parent), m_targets(std::move(targets)), m_delta(delta)
             {
             }
 
             void redo() override
             {
-                static_cast<void>(m_tool->translateShapeBy(m_index, m_delta));
+                for (const auto &target: m_targets)
+                {
+                    static_cast<void>(target.tool->translateShapeBy(target.index, m_delta));
+                }
             }
 
             void undo() override
             {
-                static_cast<void>(m_tool->translateShapeBy(m_index, -m_delta));
+                for (const auto &target: m_targets)
+                {
+                    static_cast<void>(target.tool->translateShapeBy(target.index, -m_delta));
+                }
             }
 
             [[nodiscard]] int id() const override
@@ -121,9 +148,9 @@ namespace GyanisScribe::Annotation
                 {
                     return false;
                 }
-                const auto &next = *static_cast<const MoveShapeCommand *>(other);
-                // 只并同一条图形的位移：换了工具或换了序号，那就是另一趟意图
-                if (next.m_tool != m_tool || next.m_index != m_index)
+                const auto &next = *static_cast<const MoveShapesCommand *>(other);
+                // 只并同一组图形的位移：换了工具或换了序号，那就是另一趟意图
+                if (next.m_targets != m_targets)
                 {
                     return false;
                 }
@@ -135,32 +162,44 @@ namespace GyanisScribe::Annotation
             }
 
         private:
-            AnnotationTool *m_tool;  ///< 目标工具
-            int             m_index; ///< 图形索引
-            QPoint          m_delta; ///< 位移量
+            std::vector<Target> m_targets; ///< 被平移的图形清单
+            QPoint              m_delta;   ///< 位移量
         };
 
         /**
-         * @brief 改一条图形的样式
-         * @details 同一条图形的连续改动并成一步：线宽滑块拖一趟会发好几次值，撤销一次就该回到
+         * @brief 改一组图形的样式
+         * @details 同一组图形的连续改动并成一步：线宽滑块拖一趟会发好几次值，撤销一次就该回到
          *          抬手之前，而不是让用户按好几下 Ctrl+Z。合并靠 id() 相同才会被栈尝试。
          */
-        class RestyleShapeCommand : public QUndoCommand
+        class RestyleShapesCommand : public QUndoCommand
         {
         public:
-            RestyleShapeCommand(AnnotationTool *tool, int index, const PenParameters &before, const PenParameters &after) :
-                m_tool(tool), m_index(index), m_before(before), m_after(after)
+            /// 一条被改样式的图形与它改动前的那一份样式
+            struct Target
+            {
+                AnnotationTool *tool  = nullptr; ///< 目标工具，所有权在引擎
+                int             index = -1;      ///< 图形索引
+                PenParameters   before;          ///< 改动前的整套样式，撤销回它
+            };
+
+            RestyleShapesCommand(std::vector<Target> targets, const PenParameters &after) : m_targets(std::move(targets)), m_after(after)
             {
             }
 
             void redo() override
             {
-                static_cast<void>(m_tool->restyleShapeAt(m_index, m_after));
+                for (const auto &target: m_targets)
+                {
+                    static_cast<void>(target.tool->restyleShapeAt(target.index, m_after));
+                }
             }
 
             void undo() override
             {
-                static_cast<void>(m_tool->restyleShapeAt(m_index, m_before));
+                for (const auto &target: m_targets)
+                {
+                    static_cast<void>(target.tool->restyleShapeAt(target.index, target.before));
+                }
             }
 
             [[nodiscard]] int id() const override
@@ -174,10 +213,17 @@ namespace GyanisScribe::Annotation
                 {
                     return false;
                 }
-                const auto &next = *static_cast<const RestyleShapeCommand *>(other);
-                if (next.m_tool != m_tool || next.m_index != m_index)
+                const auto &next = *static_cast<const RestyleShapesCommand *>(other);
+                if (next.m_targets.size() != m_targets.size())
                 {
                     return false;
+                }
+                for (std::size_t position = 0; position < m_targets.size(); ++position)
+                {
+                    if (next.m_targets[position].tool != m_targets[position].tool || next.m_targets[position].index != m_targets[position].index)
+                    {
+                        return false;
+                    }
                 }
 
                 // m_before 保持第一次那一份：撤销要回到这一轮手势开始之前，而不是上一个中间档
@@ -186,10 +232,110 @@ namespace GyanisScribe::Annotation
             }
 
         private:
+            std::vector<Target> m_targets; ///< 被改样式的图形清单与各自的「之前」
+            PenParameters       m_after;   ///< 目标样式
+        };
+
+        /**
+         * @brief 整条替换一条图形（缩放与旋转走的这一条）
+         * @details 命令只认「替换前」与「替换后」两份整条图形：缩放与旋转的中间量都由引擎按
+         *          开场时那一份原样重算，所以合并只需要换掉「之后」那一份。
+         *          合并标识由调用方给（缩放与旋转各一个），两趟手势不许互相并步。
+         */
+        class ReplaceShapeCommand : public QUndoCommand
+        {
+        public:
+            ReplaceShapeCommand(const int typeId, AnnotationTool *tool, const int index, const AnnotationShape &before, const AnnotationShape &after) :
+                m_typeId(typeId), m_tool(tool), m_index(index), m_before(before), m_after(after)
+            {
+            }
+
+            void redo() override
+            {
+                static_cast<void>(m_tool->replaceShapeAt(m_index, m_after));
+            }
+
+            void undo() override
+            {
+                static_cast<void>(m_tool->replaceShapeAt(m_index, m_before));
+            }
+
+            [[nodiscard]] int id() const override
+            {
+                return m_typeId;
+            }
+
+            bool mergeWith(const QUndoCommand *other) override
+            {
+                if (other->id() != m_typeId)
+                {
+                    return false;
+                }
+                const auto &next = *static_cast<const ReplaceShapeCommand *>(other);
+                if (next.m_tool != m_tool || next.m_index != m_index)
+                {
+                    return false;
+                }
+
+                // m_before 保持开场时那一份：撤销回到这一趟手势开始之前
+                m_after = next.m_after;
+                return true;
+            }
+
+        private:
+            int             m_typeId; ///< 合并标识：缩放与旋转各一个
             AnnotationTool *m_tool;   ///< 目标工具，所有权在引擎
             int             m_index;  ///< 图形索引
-            PenParameters   m_before; ///< 改动前的整套样式，撤销回它
-            PenParameters   m_after;  ///< 目标样式
+            AnnotationShape m_before; ///< 改动之前的那一份图形
+            AnnotationShape m_after;  ///< 目标图形
+        };
+
+        /**
+         * @brief 改一批图形的全局层叠号
+         * @details 换号就是换层：命令按「谁从几号换到几号」成对存下来，撤销逐个换回。
+         *          一次调整（含多选整组）是一步撤销，不合并——每一次按键都是一次独立意图。
+         */
+        class ReorderShapesCommand : public QUndoCommand
+        {
+        public:
+            /// 一条被换号的图形
+            struct Entry
+            {
+                AnnotationTool *tool   = nullptr; ///< 目标工具，所有权在引擎
+                int             index  = -1;      ///< 图形索引
+                int             before = 0;       ///< 改动前的层叠号
+                int             after  = 0;       ///< 目标层叠号
+            };
+
+            explicit ReorderShapesCommand(std::vector<Entry> entries, QUndoCommand *parent = nullptr) : QUndoCommand(parent), m_entries(std::move(entries))
+            {
+            }
+
+            void redo() override
+            {
+                for (const auto &entry: m_entries)
+                {
+                    setZ(entry, entry.after);
+                }
+            }
+
+            void undo() override
+            {
+                for (const auto &entry: m_entries)
+                {
+                    setZ(entry, entry.before);
+                }
+            }
+
+        private:
+            static void setZ(const Entry &entry, const int zOrder)
+            {
+                AnnotationShape shape = entry.tool->shapeAt(entry.index);
+                shape.zOrder          = zOrder;
+                static_cast<void>(entry.tool->replaceShapeAt(entry.index, shape));
+            }
+
+            std::vector<Entry> m_entries; ///< 被换号的图形与它们的前后层叠号
         };
 
         /**
@@ -256,7 +402,11 @@ namespace GyanisScribe::Annotation
 
         // 换画布等于换一张纸：旧图形既不在新帧上，撤销回去也只会把用户引到错的地方
         m_undoStack.clear();
-        m_selection.reset();
+        m_selection.clear();
+        m_handleDrag.reset();
+        m_topZ        = 0;
+        m_pasteSeries = 0;
+        // 剪贴板不清：复制的是一条标注的副本，粘到下一张图上接着用正是它存在的意义
         for (const auto &tool: m_tools)
         {
             while (tool->shapeCount() > 0)
@@ -285,10 +435,16 @@ namespace GyanisScribe::Annotation
 
         // 源图取导出前那份底图：烘图过程中 result 在被改，马赛克要的始终是原始像素
         const PaintContext bakeContext{m_canvas.image, pixelScale};
-        for (const auto &tool: m_tools)
+        QPainter           painter(&result);
+        // 图形记的是逻辑坐标，底图是物理像素：缩放画家让两处用同一套数字，导出与屏显才不会分家
+        painter.scale(pixelScale, pixelScale);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        // 按全局层叠号排序后逐条烘：后画的压在先画的上面，置顶/置底也在这里生效
+        for (const auto &entry: zOrderedEntries())
         {
-            tool->applyToImage(result, bakeContext);
+            entry.tool->paintShapeAt(entry.index, painter, bakeContext);
         }
+        painter.end();
 
         // 倍比要标回导出图：贴图窗口按 image 的 devicePixelRatio 反推逻辑尺寸，
         // 不标就会把高 DPI 屏上截的那一块开成放大 1.5 倍的窗口（跨模块集成用例红在这里抓到的）。
@@ -341,21 +497,26 @@ namespace GyanisScribe::Annotation
         m_penParameters = parameters;
         applyPenParametersToTools();
 
-        // 选中项跟着这次改动一起换样式：样式记在每条图形自己身上，工具上那一份只是后续图形的默认值，
-        // 所以「选中着的那条」是用户改样式时唯一能合理指向的对象
-        if (m_selection)
+        // 选中的图形跟着这次改动一起换样式：样式记在每条图形自己身上，工具上那一份只是后续图形的默认值，
+        // 所以「选中着的那几条」是用户改样式时唯一能合理指向的对象
+        std::vector<RestyleShapesCommand::Target> targets;
+        bool                                      anyChanged = false;
+        for (const auto &item: m_selection)
         {
-            auto *tool = toolFor(m_selection->tool);
-            if (tool != nullptr && m_selection->shapeIndex >= 0 && m_selection->shapeIndex < tool->shapeCount())
+            auto *tool = toolFor(item.tool);
+            if (tool == nullptr || item.shapeIndex < 0 || item.shapeIndex >= tool->shapeCount())
             {
-                // 整包全等就别进栈：点一下已经在用的那个颜色不该凭空造出一步「可撤销」
-                const PenParameters before = penParametersOf(tool->shapeAt(m_selection->shapeIndex));
-                if (before != parameters)
-                {
-                    // 快照取在改动之前：撤销栈里存的就是这条图形原来的那一整套样式值
-                    m_undoStack.push(new RestyleShapeCommand(tool, m_selection->shapeIndex, before, parameters));
-                }
+                continue;
             }
+            // 快照取在改动之前：撤销栈里存的就是这条图形原来的那一整套样式值
+            const PenParameters before = penParametersOf(tool->shapeAt(item.shapeIndex));
+            targets.push_back({tool, item.shapeIndex, before});
+            anyChanged = anyChanged || before != parameters;
+        }
+        // 整组全等就别进栈：点一下已经在用的那个颜色不该凭空造出一步「可撤销」
+        if (anyChanged)
+        {
+            m_undoStack.push(new RestyleShapesCommand(std::move(targets), parameters));
         }
         return {};
     }
@@ -417,7 +578,10 @@ namespace GyanisScribe::Annotation
                                                GyanisScribe::Core::uiText("这一笔没有落定：尺寸太小或内容为空。请按住鼠标拖出可见的范围后再松手").toStdString()});
         }
 
-        m_undoStack.push(new InsertShapeCommand(tool, index, *committed));
+        // 落定这一刻领号：新图形总压在最上层，「后画的压在先画的上面」就靠这个号
+        AnnotationShape stamped = *committed;
+        stamped.zOrder          = ++m_topZ;
+        m_undoStack.push(new InsertShapeCommand(tool, index, stamped));
         return AnnotationSelection{m_activeTool, index};
     }
 
@@ -454,7 +618,10 @@ namespace GyanisScribe::Annotation
             return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiText("现在没有在途的笔画可以收笔。折线至少要点出两个折点").toStdString()});
         }
 
-        m_undoStack.push(new InsertShapeCommand(tool, index, *committed));
+        // 与 endStroke 同一口径：落定即领号，压在现有全部图形之上
+        AnnotationShape stamped = *committed;
+        stamped.zOrder          = ++m_topZ;
+        m_undoStack.push(new InsertShapeCommand(tool, index, stamped));
         return AnnotationSelection{m_activeTool, index};
     }
 
@@ -486,54 +653,140 @@ namespace GyanisScribe::Annotation
 
     std::optional<AnnotationSelection> AnnotationEngine::selectionAt(const QPoint &point) const
     {
-        // 倒序遍历：后登记的工具压在上面，用户点的就是看得见的那一条
-        for (int index = static_cast<int>(m_tools.size()) - 1; index >= 0; --index)
+        // 按层叠号的倒序问：最上层的那条先答，用户点的就是看得见的那一条
+        const auto entries = zOrderedEntries();
+        for (auto it = entries.rbegin(); it != entries.rend(); ++it)
         {
-            const auto &tool = m_tools[index];
-            const auto  hit  = tool->hitTest(point);
-            if (hit >= 0)
+            if (it->tool->hitTestShapeAt(it->index, point))
             {
-                return AnnotationSelection{tool->kind(), hit};
+                return AnnotationSelection{it->tool->kind(), it->index};
             }
         }
         return std::nullopt;
     }
 
+    bool AnnotationEngine::selectionIsValid(const AnnotationSelection &selection) const
+    {
+        const auto *tool = toolFor(selection.tool);
+        return tool != nullptr && selection.shapeIndex >= 0 && selection.shapeIndex < tool->shapeCount();
+    }
+
     Core::Expected<void> AnnotationEngine::select(const AnnotationSelection &selection)
     {
-        auto *tool = toolFor(selection.tool);
-        if (tool == nullptr || selection.shapeIndex < 0 || selection.shapeIndex >= tool->shapeCount())
+        if (!selectionIsValid(selection))
         {
             return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
                                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("要选中的图形不在册：工具 0x{:X} 索引 {}。请重新点选"),
                                                                             static_cast<int>(selection.tool), selection.shapeIndex)});
         }
 
-        m_selection = selection;
+        m_selection.assign(1, selection);
         emit canvasChanged();
         return {};
     }
 
-    const std::optional<AnnotationSelection> &AnnotationEngine::selection() const noexcept
+    Core::Expected<void> AnnotationEngine::addToSelection(const AnnotationSelection &selection)
+    {
+        if (!selectionIsValid(selection))
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("要加选的图形不在册：工具 0x{:X} 索引 {}。请重新点选"),
+                                                                            static_cast<int>(selection.tool), selection.shapeIndex)});
+        }
+
+        // 已经在选中集里就什么都不做：Shift 连点同一条不该造出重复项，之后整组移动会把它挪两倍
+        const bool alreadySelected = std::any_of(m_selection.begin(), m_selection.end(),
+                                                 [&selection](const AnnotationSelection &item) { return item.tool == selection.tool && item.shapeIndex == selection.shapeIndex; });
+        if (!alreadySelected)
+        {
+            m_selection.push_back(selection);
+            emit canvasChanged();
+        }
+        return {};
+    }
+
+    Core::Expected<void> AnnotationEngine::toggleSelection(const AnnotationSelection &selection)
+    {
+        if (!selectionIsValid(selection))
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("要反选的图形不在册：工具 0x{:X} 索引 {}。请重新点选"),
+                                                                            static_cast<int>(selection.tool), selection.shapeIndex)});
+        }
+
+        const auto found = std::find_if(m_selection.begin(), m_selection.end(),
+                                        [&selection](const AnnotationSelection &item) { return item.tool == selection.tool && item.shapeIndex == selection.shapeIndex; });
+        if (found != m_selection.end())
+        {
+            m_selection.erase(found);
+        } else
+        {
+            m_selection.push_back(selection);
+        }
+        emit canvasChanged();
+        return {};
+    }
+
+    void AnnotationEngine::clearSelection()
+    {
+        if (m_selection.empty())
+        {
+            return;
+        }
+        m_selection.clear();
+        emit canvasChanged();
+    }
+
+    const std::vector<AnnotationSelection> &AnnotationEngine::selections() const noexcept
     {
         return m_selection;
     }
 
-    std::optional<QRect> AnnotationEngine::selectionBounds() const
+    std::optional<QRect> AnnotationEngine::boundsOf(const AnnotationSelection &selection) const
     {
-        if (!m_selection)
-        {
-            return {};
-        }
-
         // 撤销/重做之后索引可能已经不在册，这里按「问不到就回空」处理：界面画不出选框是可接受的退化，
         // 而把越界索引当成错误报给用户就只是噪音
-        const auto *tool = toolFor(m_selection->tool);
-        if (tool == nullptr || m_selection->shapeIndex < 0 || m_selection->shapeIndex >= tool->shapeCount())
+        const auto *tool = toolFor(selection.tool);
+        if (tool == nullptr || selection.shapeIndex < 0 || selection.shapeIndex >= tool->shapeCount())
         {
             return {};
         }
-        return tool->boundingBoxOf(tool->shapeAt(m_selection->shapeIndex));
+        return tool->boundingBoxOf(tool->shapeAt(selection.shapeIndex));
+    }
+
+    std::optional<QRect> AnnotationEngine::selectionBounds() const
+    {
+        std::optional<QRect> united;
+        for (const auto &item: m_selection)
+        {
+            const auto box = boundsOf(item);
+            if (!box)
+            {
+                continue;
+            }
+            united = united ? united->united(*box) : box;
+        }
+        return united;
+    }
+
+    std::optional<std::array<QPointF, 8>> AnnotationEngine::selectionFrame() const
+    {
+        // 多选不给手柄：八个把手该按哪一条的框摆没有共识，界面对多选只画联合虚线框
+        if (m_selection.size() != 1)
+        {
+            return std::nullopt;
+        }
+
+        const auto *tool = toolFor(m_selection.front().tool);
+        if (tool == nullptr || m_selection.front().shapeIndex < 0 || m_selection.front().shapeIndex >= tool->shapeCount())
+        {
+            return std::nullopt;
+        }
+
+        const auto corners  = tool->frameCornersOf(tool->shapeAt(m_selection.front().shapeIndex));
+        const auto midpoint = [](const QPointF &a, const QPointF &b) { return (a + b) / 2.0; };
+        return std::array<QPointF, 8>{corners[0], midpoint(corners[0], corners[1]), corners[1], midpoint(corners[1], corners[2]),
+                                      corners[2], midpoint(corners[2], corners[3]), corners[3], midpoint(corners[3], corners[0])};
     }
 
     void AnnotationEngine::paintShapes(QPainter &painter) const
@@ -546,40 +799,67 @@ namespace GyanisScribe::Annotation
         // 与 exportImage 同一套倍比算法：屏显与导出必须取同样的源像素，否则马赛克会显示在一个位置、保存在另一个位置
         const qreal        pixelScale = m_canvas.logicalSize.width() > 0 ? static_cast<qreal>(m_canvas.image.width()) / m_canvas.logicalSize.width() : 1.0;
         const PaintContext context{m_canvas.image, pixelScale};
+        for (const auto &entry: zOrderedEntries())
+        {
+            entry.tool->paintShapeAt(entry.index, painter, context);
+        }
+        // 在途图形压在最上层：它是「正在画的那一条」，缩在别的图形下面会看不见自己画的进度
+        if (auto *active = toolFor(m_activeTool); active != nullptr)
+        {
+            active->paintPending(painter, context);
+        }
+    }
+
+    std::vector<AnnotationEngine::ZEntry> AnnotationEngine::zOrderedEntries() const
+    {
+        std::vector<ZEntry> entries;
         for (const auto &tool: m_tools)
         {
-            tool->paint(painter, context);
+            for (int index = 0; index < tool->shapeCount(); ++index)
+            {
+                entries.push_back({tool.get(), index, tool->shapeAt(index).zOrder});
+            }
         }
+        // 稳定排序：层叠号本该互不相同；真撞上了（老数据、手工构造）也保持工具登记顺序，不随机打乱
+        std::stable_sort(entries.begin(), entries.end(), [](const ZEntry &left, const ZEntry &right) { return left.zOrder < right.zOrder; });
+        return entries;
     }
 
     Core::Expected<void> AnnotationEngine::moveSelectionBy(const QPoint &delta)
     {
-        if (!m_selection)
+        if (m_selection.empty())
         {
             return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("没有选中任何图形，无法移动。请先点中要移动的那一条")});
         }
 
-        auto *tool = toolFor(m_selection->tool);
-        if (tool == nullptr || m_selection->shapeIndex >= tool->shapeCount())
+        std::vector<MoveShapesCommand::Target> targets;
+        targets.reserve(m_selection.size());
+        for (const auto &item: m_selection)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("选中的图形已经不在了（多半刚被撤销或删除）。请重新点选")});
+            auto *tool = toolFor(item.tool);
+            if (tool == nullptr || item.shapeIndex >= tool->shapeCount())
+            {
+                return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("选中的图形已经不在了（多半刚被撤销或删除）。请重新点选")});
+            }
+            targets.push_back({tool, item.shapeIndex});
         }
 
-        m_undoStack.push(new MoveShapeCommand(tool, m_selection->shapeIndex, delta));
+        m_undoStack.push(new MoveShapesCommand(std::move(targets), delta));
         return {};
     }
 
     Core::Expected<void> AnnotationEngine::setTextOfSelection(const QString &text)
     {
-        if (!m_selection)
+        if (m_selection.empty())
         {
             return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("没有选中任何图形，改不了文字。请先双击要改的那条文字")});
         }
-        // 序号图形的文本是从编号派生的，让它被随手改掉就等于把编号与显示分家
-        if (m_selection->tool != ToolKind::Text)
+        // 序号图形的文本是从编号派生的，让它被随手改掉就等于把编号与显示分家；
+        // 多选里有整有零也说不清改的是哪一条，所以这里只认「恰好选中一条文字图形」
+        if (m_selection.size() != 1 || m_selection.front().tool != ToolKind::Text)
         {
-            return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("选中的不是文字图形，改不了内容。只有文字工具画出来的那几条可以双击重编")});
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Core::uiTextUtf8("改内容要恰好选中一条文字图形：多选或别的图形都改不了。只有文字工具画出来的那几条可以双击重编")});
         }
         if (text.isEmpty())
         {
@@ -587,46 +867,72 @@ namespace GyanisScribe::Annotation
                     Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("文字不能是空的：不要这一条就按 Delete 删掉，或按 Ctrl+Z 撤销这次改动")});
         }
 
-        auto *tool = toolFor(m_selection->tool);
-        if (tool == nullptr || m_selection->shapeIndex >= tool->shapeCount())
+        const auto &subject = m_selection.front();
+        auto       *tool    = toolFor(subject.tool);
+        if (tool == nullptr || subject.shapeIndex >= tool->shapeCount())
         {
             return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("选中的图形已经不在了（多半刚被撤销或删除）。请重新点选")});
         }
 
-        m_undoStack.push(new SetTextCommand(tool, m_selection->shapeIndex, tool->shapeAt(m_selection->shapeIndex).text, text));
+        m_undoStack.push(new SetTextCommand(tool, subject.shapeIndex, tool->shapeAt(subject.shapeIndex).text, text));
         return {};
     }
 
     std::optional<QString> AnnotationEngine::textOfSelection() const
     {
-        if (!m_selection || m_selection->tool != ToolKind::Text)
+        if (m_selection.size() != 1 || m_selection.front().tool != ToolKind::Text)
         {
             return std::nullopt;
         }
-        const auto *tool = toolFor(m_selection->tool);
-        if (tool == nullptr || m_selection->shapeIndex >= tool->shapeCount())
+        const auto *tool = toolFor(m_selection.front().tool);
+        if (tool == nullptr || m_selection.front().shapeIndex >= tool->shapeCount())
         {
             return std::nullopt;
         }
-        return tool->shapeAt(m_selection->shapeIndex).text;
+        return tool->shapeAt(m_selection.front().shapeIndex).text;
     }
 
     Core::Expected<void> AnnotationEngine::removeSelection()
     {
-        if (!m_selection)
+        if (m_selection.empty())
         {
             return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("没有选中任何图形，无需删除。请先点中要删的那一条")});
         }
 
-        auto *tool = toolFor(m_selection->tool);
-        if (tool == nullptr || m_selection->shapeIndex >= tool->shapeCount())
+        // 先收集再删：同一工具内删掉小索引会让大索引整体前移，按索引从大到小的次序删才不会互相踩
+        struct Victim
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("选中的图形已经不在了。请重新点选")});
+            AnnotationTool *tool;
+            int             index;
+            AnnotationShape shape;
+        };
+        std::vector<Victim> victims;
+        victims.reserve(m_selection.size());
+        for (const auto &item: m_selection)
+        {
+            auto *tool = toolFor(item.tool);
+            if (tool == nullptr || item.shapeIndex < 0 || item.shapeIndex >= tool->shapeCount())
+            {
+                return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("选中的图形已经不在了。请重新点选")});
+            }
+            victims.push_back({tool, item.shapeIndex, tool->shapeAt(item.shapeIndex)});
         }
+        std::sort(victims.begin(), victims.end(), [](const Victim &left, const Victim &right) { return left.index > right.index; });
 
-        const AnnotationShape removed = tool->shapeAt(m_selection->shapeIndex);
-        m_undoStack.push(new RemoveShapeCommand(tool, m_selection->shapeIndex, removed));
-        m_selection.reset();
+        if (victims.size() == 1)
+        {
+            m_undoStack.push(new RemoveShapeCommand(victims.front().tool, victims.front().index, victims.front().shape));
+        } else
+        {
+            // 整组删除是一步：撤销一次把这一批都放回来。宏名只落在 QUndoStack 里，界面上不显示
+            m_undoStack.beginMacro(QStringLiteral("删除选中标注"));
+            for (const auto &victim: victims)
+            {
+                m_undoStack.push(new RemoveShapeCommand(victim.tool, victim.index, victim.shape));
+            }
+            m_undoStack.endMacro();
+        }
+        m_selection.clear();
         return {};
     }
 
@@ -647,14 +953,9 @@ namespace GyanisScribe::Annotation
             return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("没有可撤销的标注动作了")});
         }
         m_undoStack.undo();
-        // 撤销可能把选中的那条抹掉：索引失效就丢掉选中，别让后续操作打到别的图形上
-        if (m_selection)
-        {
-            if (const auto resolved = toolFor(m_selection->tool); resolved == nullptr || m_selection->shapeIndex >= resolved->shapeCount())
-            {
-                m_selection.reset();
-            }
-        }
+        m_handleDrag.reset();
+        // 撤销可能把选中的那条抹掉：索引失效的就从选中集里摘掉，别让后续操作打到别的图形上
+        std::erase_if(m_selection, [this](const AnnotationSelection &item) { return !selectionIsValid(item); });
         return {};
     }
 
@@ -665,6 +966,292 @@ namespace GyanisScribe::Annotation
             return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("没有可重做的标注动作了")});
         }
         m_undoStack.redo();
+        m_handleDrag.reset();
+        return {};
+    }
+
+    Core::Expected<void> AnnotationEngine::beginSelectionDrag(const SelectionHandle handle, const QPoint &point)
+    {
+        if (handle == SelectionHandle::None)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("没有抓住任何手柄。请对准选中框上的小方块或框外的圆点再拖")});
+        }
+        if (m_selection.size() != 1)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("缩放手柄只在选中一条图形时出现。请先只选中一条再拖手柄")});
+        }
+
+        const auto &subject = m_selection.front();
+        auto       *tool    = toolFor(subject.tool);
+        if (tool == nullptr || subject.shapeIndex < 0 || subject.shapeIndex >= tool->shapeCount())
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("选中的图形已经不在了（多半刚被撤销或删除）。请重新点选")});
+        }
+
+        HandleDrag drag;
+        drag.handle     = handle;
+        drag.tool       = subject.tool;
+        drag.shapeIndex = subject.shapeIndex;
+        drag.before     = tool->shapeAt(subject.shapeIndex);
+        drag.localBox   = QRectF{tool->localBoundingBoxOf(drag.before)};
+        // 旋转的起点角取按下点相对中心的方向：之后每一点都跟这个方向比，抬手时图形正好转了多少一眼可算
+        drag.startAngle = angleDegreesOf(QPointF{point}, drag.localBox.center());
+        m_handleDrag    = drag;
+        return {};
+    }
+
+    Core::Expected<void> AnnotationEngine::updateSelectionDrag(const QPoint &point)
+    {
+        if (!m_handleDrag)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("现在没有在拖手柄。请先按下选中框上的手柄再拖")});
+        }
+
+        const HandleDrag session = *m_handleDrag;
+        auto            *tool    = toolFor(session.tool);
+        if (tool == nullptr || session.shapeIndex < 0 || session.shapeIndex >= tool->shapeCount())
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("拖的那条图形已经不在了。请重新点选")});
+        }
+
+        AnnotationShape target = session.before;
+        int             typeId = kResizeCommandTypeId;
+        if (session.handle == SelectionHandle::Rotate)
+        {
+            typeId = kRotateCommandTypeId;
+            // 归一化角度差：拖着绕过对侧时那一步跨过 ±180°，不归一图形会跟着猛转一整圈
+            const qreal current = angleDegreesOf(QPointF{point}, session.localBox.center());
+            const qreal delta   = normalizedAngleDelta(current - session.startAngle);
+            target.rotationDeg  = normalizedAngleDelta(session.before.rotationDeg + delta);
+        } else
+        {
+            // 缩放从开场那一份外接框重算：事件点先按图形的旋转角映回局部坐标，
+            // 于是旋转过的图形也是沿它自己的两条边伸缩，而不是沿屏幕的横竖
+            const QPointF local  = unrotatedPoint(QPointF{point}, session.localBox.center(), session.before.rotationDeg);
+            const QRectF  newBox = resizedBox(session.localBox, session.handle, local);
+            target               = shapeInBox(session.before, session.localBox, newBox);
+            target.rotationDeg   = session.before.rotationDeg;
+        }
+
+        // 每一点都从 session.before 重算并覆盖命令的终点，中途的取整不会一格格攒成漂移；
+        // 同一条图形的连续拖动并成一步撤销
+        m_undoStack.push(new ReplaceShapeCommand(typeId, tool, session.shapeIndex, session.before, target));
+        return {};
+    }
+
+    void AnnotationEngine::endSelectionDrag()
+    {
+        m_handleDrag.reset();
+    }
+
+    Core::Expected<void> AnnotationEngine::raiseSelection()
+    {
+        return reorderSelection(ReorderMode::Raise);
+    }
+
+    Core::Expected<void> AnnotationEngine::lowerSelection()
+    {
+        return reorderSelection(ReorderMode::Lower);
+    }
+
+    Core::Expected<void> AnnotationEngine::bringSelectionToFront()
+    {
+        return reorderSelection(ReorderMode::ToFront);
+    }
+
+    Core::Expected<void> AnnotationEngine::sendSelectionToBack()
+    {
+        return reorderSelection(ReorderMode::ToBack);
+    }
+
+    Core::Expected<void> AnnotationEngine::reorderSelection(const ReorderMode mode)
+    {
+        if (m_selection.empty())
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("没有选中任何图形，改不了层叠顺序。请先点中要挪层的那一条")});
+        }
+
+        // 层叠表按升序拿（最底层的在前）；选中的那几条做个标记，跟着排
+        auto              entries = zOrderedEntries();
+        std::vector<bool> selected;
+        selected.reserve(entries.size());
+        int selectedCount = 0;
+        for (const auto &entry: entries)
+        {
+            const bool hit = std::any_of(m_selection.begin(), m_selection.end(),
+                                         [&entry](const AnnotationSelection &item) { return item.tool == entry.tool->kind() && item.shapeIndex == entry.index; });
+            selected.push_back(hit);
+            selectedCount += hit ? 1 : 0;
+        }
+        if (selectedCount == 0)
+        {
+            // 选中的那几条都已经被撤没了：与「没选中」同一句交代，不写进栈
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("选中的图形已经不在了（多半刚被撤销或删除）。请重新点选")});
+        }
+
+        std::vector<ZEntry> arranged     = entries;
+        std::vector<bool>   arrangedMask = selected;
+        switch (mode)
+        {
+            case ReorderMode::Raise:
+                // 从最上面那条开始逐个上浮：头顶挨着的是没选中的就换位，选中的连成一块就整块上浮
+                for (int position = static_cast<int>(arranged.size()) - 1; position >= 0; --position)
+                {
+                    if (arrangedMask[position] && position + 1 < static_cast<int>(arranged.size()) && !arrangedMask[position + 1])
+                    {
+                        std::swap(arranged[position], arranged[position + 1]);
+                        // vector<bool> 的元素是代理引用，进不了 std::swap，手动换
+                        const bool aboveSelected   = arrangedMask[position + 1];
+                        arrangedMask[position + 1] = arrangedMask[position];
+                        arrangedMask[position]     = aboveSelected;
+                    }
+                }
+                break;
+            case ReorderMode::Lower:
+                // 镜像：从最底下那条开始逐个下沉
+                for (int position = 0; position < static_cast<int>(arranged.size()); ++position)
+                {
+                    if (arrangedMask[position] && position > 0 && !arrangedMask[position - 1])
+                    {
+                        std::swap(arranged[position], arranged[position - 1]);
+                        const bool belowSelected   = arrangedMask[position - 1];
+                        arrangedMask[position - 1] = arrangedMask[position];
+                        arrangedMask[position]     = belowSelected;
+                    }
+                }
+                break;
+            case ReorderMode::ToFront:
+            {
+                std::vector<ZEntry> reordered;
+                for (std::size_t position = 0; position < arranged.size(); ++position)
+                {
+                    if (!arrangedMask[position])
+                    {
+                        reordered.push_back(arranged[position]);
+                    }
+                }
+                for (std::size_t position = 0; position < arranged.size(); ++position)
+                {
+                    if (arrangedMask[position])
+                    {
+                        reordered.push_back(arranged[position]);
+                    }
+                }
+                arranged = std::move(reordered);
+                break;
+            }
+            case ReorderMode::ToBack:
+            {
+                std::vector<ZEntry> reordered;
+                for (std::size_t position = 0; position < arranged.size(); ++position)
+                {
+                    if (arrangedMask[position])
+                    {
+                        reordered.push_back(arranged[position]);
+                    }
+                }
+                for (std::size_t position = 0; position < arranged.size(); ++position)
+                {
+                    if (!arrangedMask[position])
+                    {
+                        reordered.push_back(arranged[position]);
+                    }
+                }
+                arranged = std::move(reordered);
+                break;
+            }
+        }
+
+        // 次序没动就别进栈：已经在顶上的再按一次「上移」是空动作，不该造出一步「可撤销」
+        bool moved = false;
+        for (std::size_t position = 0; position < arranged.size(); ++position)
+        {
+            if (arranged[position].tool != entries[position].tool || arranged[position].index != entries[position].index)
+            {
+                moved = true;
+                break;
+            }
+        }
+        if (!moved)
+        {
+            return {};
+        }
+
+        // 整摞重编成 0..n-1 的连续号：每次调整后层叠号都不留空档，下次调整的差值判据才有单一含义
+        std::vector<ReorderShapesCommand::Entry> commandEntries;
+        commandEntries.reserve(arranged.size());
+        for (std::size_t position = 0; position < arranged.size(); ++position)
+        {
+            commandEntries.push_back({arranged[position].tool, arranged[position].index, arranged[position].zOrder, static_cast<int>(position)});
+        }
+        m_undoStack.push(new ReorderShapesCommand(std::move(commandEntries)));
+        return {};
+    }
+
+    Core::Expected<void> AnnotationEngine::copySelection()
+    {
+        if (m_selection.empty())
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("没有选中任何图形，没有可复制的。请先点中要复制的那一条")});
+        }
+
+        // 按层叠号的升序抄：粘出来那批的相对压叠与原件一致，不是随手按点选顺序摞
+        std::vector<std::pair<ToolKind, AnnotationShape>> copies;
+        for (const auto &entry: zOrderedEntries())
+        {
+            const bool hit = std::any_of(m_selection.begin(), m_selection.end(),
+                                         [&entry](const AnnotationSelection &item) { return item.tool == entry.tool->kind() && item.shapeIndex == entry.index; });
+            if (hit)
+            {
+                copies.emplace_back(entry.tool->kind(), entry.tool->shapeAt(entry.index));
+            }
+        }
+        if (copies.empty())
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("选中的图形已经不在了。请重新点选")});
+        }
+
+        m_clipboard   = std::move(copies);
+        m_pasteSeries = 0;
+        return {};
+    }
+
+    Core::Expected<void> AnnotationEngine::pasteClipboard()
+    {
+        if (m_clipboard.empty())
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("剪贴板里还没有图形：先用 Ctrl+C 复制一条，再按 Ctrl+V 粘贴")});
+        }
+
+        // 连续粘贴逐次多偏一格：两次都落在同一点会让人以为只粘上了一份
+        ++m_pasteSeries;
+        const QPoint offset{kPasteOffsetStride * m_pasteSeries, kPasteOffsetStride * m_pasteSeries};
+
+        std::vector<AnnotationSelection> pasted;
+        m_undoStack.beginMacro(QStringLiteral("粘贴标注"));
+        for (const auto &[kind, shape]: m_clipboard)
+        {
+            auto *tool = toolFor(kind);
+            if (tool == nullptr)
+            {
+                continue;
+            }
+            AnnotationShape copy = shape;
+            translateShape(copy, offset);
+            copy.zOrder      = ++m_topZ; // 粘出来的压在最上层
+            const int placed = tool->shapeCount();
+            m_undoStack.push(new InsertShapeCommand(tool, placed, copy));
+            pasted.push_back({kind, placed});
+        }
+        m_undoStack.endMacro();
+
+        if (pasted.empty())
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InternalError, GyanisScribe::Core::uiTextUtf8("剪贴板里的工具都不在册，粘贴没有落点")});
+        }
+        // 粘出来的这批成为新的选中集：接着就能拖它、改它
+        m_selection = std::move(pasted);
+        emit canvasChanged();
         return {};
     }
 

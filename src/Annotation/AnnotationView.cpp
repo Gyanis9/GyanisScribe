@@ -9,6 +9,8 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPen>
+#include <QPolygonF>
+#include <QRectF>
 
 #include <algorithm>
 #include <cmath>
@@ -97,8 +99,40 @@ namespace GyanisScribe::Annotation
         painter.restore();
 
         // 选框走控件坐标而不是逻辑坐标：线宽与虚线间隔不该随缩放变粗变细
-        if (const auto bounds = m_engine.selectionBounds(); bounds)
+        if (const auto frame = m_engine.selectionFrame(); frame)
         {
+            // 单条选中：画跟着图形一起转的定向框，四角连成多边形
+            const auto toWidget = [this, &rect, &canvas](const QPointF &canvasPoint)
+            { return QPointF{toWidgetPoint(QPoint{qRound(canvasPoint.x()), qRound(canvasPoint.y())}, rect, canvas.logicalSize)}; };
+
+            QPolygonF outline;
+            for (const int node: {0, 2, 4, 6})
+            {
+                outline << toWidget((*frame)[node]);
+            }
+            QPen outlinePen{GyanisScribe::Ui::kAccentColor, 1.0, Qt::DashLine};
+            outlinePen.setCapStyle(Qt::FlatCap);
+            painter.setPen(outlinePen);
+            painter.setBrush(Qt::NoBrush);
+            painter.drawPolygon(outline);
+
+            // 缩放八枚手柄：白底描边的小方块，压在图形上也看得见
+            QPen handlePen{GyanisScribe::Ui::kAccentColor, 1.0};
+            painter.setPen(handlePen);
+            painter.setBrush(Qt::white);
+            for (const auto &node: *frame)
+            {
+                const QPoint widget = toWidget(node).toPoint();
+                painter.drawRect(QRect{widget.x() - kHandleSizeWidget / 2, widget.y() - kHandleSizeWidget / 2, kHandleSizeWidget, kHandleSizeWidget});
+            }
+
+            // 旋转手柄：上边中点连一条细线到圆点，形状与缩放手柄分开，一眼认得出是「转」不是「拉」
+            const QPointF rotatePoint = rotateHandlePointWidget(*frame);
+            painter.drawLine(toWidget((*frame)[1]), rotatePoint);
+            painter.drawEllipse(rotatePoint, kHandleSizeWidget / 2.0, kHandleSizeWidget / 2.0);
+        } else if (const auto bounds = m_engine.selectionBounds(); bounds)
+        {
+            // 多选（或手柄算不出来的退化）：只画联合虚线框
             QPen outline{GyanisScribe::Ui::kAccentColor, 1.0, Qt::DashLine};
             outline.setCapStyle(Qt::FlatCap);
             painter.setPen(outline);
@@ -121,13 +155,46 @@ namespace GyanisScribe::Annotation
         const auto point  = toCanvasPoint(event->pos(), rect, m_engine.canvas().logicalSize);
         m_lastCanvasPoint = point;
 
-        // 先问命中：点中已有图形就选中并准备拖动，点空白才起笔画新的
+        // 手柄压在最前面问：它们坐在选中框的角与边中点上，那些点往往正落在图形自己的命中区里
+        if (const auto handle = handleAt(event->pos()); handle != SelectionHandle::None)
+        {
+            if (auto begun = m_engine.beginSelectionDrag(handle, point); begun)
+            {
+                m_handleDragging = true;
+            } else
+            {
+                Core::Logger::warning(std::format("手柄拖动没开场：{}", begun.error().message));
+            }
+            event->accept();
+            return;
+        }
+
+        // 再问命中：点中已有图形就选中并准备拖动，点空白才起笔画新的
         if (const auto hit = m_engine.selectionAt(point); hit)
         {
-            if (auto selected = m_engine.select(*hit); !selected)
+            const auto modifiers = event->modifiers();
+            // Ctrl 反选、Shift 加选：都是「改选中集」的意思，不再进拖动
+            if (modifiers.testFlag(Qt::ControlModifier) || modifiers.testFlag(Qt::ShiftModifier))
             {
-                Core::Logger::warning(std::format("命中测试给出的图形没能选中：{}", selected.error().message));
+                const auto changed = modifiers.testFlag(Qt::ControlModifier) ? m_engine.toggleSelection(*hit) : m_engine.addToSelection(*hit);
+                if (!changed)
+                {
+                    Core::Logger::warning(std::format("多选没改成：{}", changed.error().message));
+                }
+                event->accept();
                 return;
+            }
+            // 已经选中着的再按住：保持整组选中并进入拖动——多选之后拖其中任意一条都是整组挪，
+            // 塌缩成单选的时机是「按在没选中的图形上」
+            const bool alreadySelected = std::any_of(m_engine.selections().begin(), m_engine.selections().end(),
+                                                     [hit](const AnnotationSelection &item) { return item.tool == hit->tool && item.shapeIndex == hit->shapeIndex; });
+            if (!alreadySelected)
+            {
+                if (auto selected = m_engine.select(*hit); !selected)
+                {
+                    Core::Logger::warning(std::format("命中测试给出的图形没能选中：{}", selected.error().message));
+                    return;
+                }
             }
             m_dragging = true;
             update();
@@ -135,6 +202,8 @@ namespace GyanisScribe::Annotation
             return;
         }
 
+        // 点空白：先清掉选中再起笔——选框不该留着指向「刚才那条」
+        m_engine.clearSelection();
         m_engine.beginStroke(point);
         m_stroking = true;
 
@@ -160,6 +229,17 @@ namespace GyanisScribe::Annotation
             event->accept();
             return;
         }
+        if (m_handleDragging)
+        {
+            // 每次都从开场那份几何重算，失败（那条被撤没了）就安静跳过：拖动途中的报错只会刷屏
+            if (auto dragged = m_engine.updateSelectionDrag(point); dragged)
+            {
+                update();
+            }
+            m_lastCanvasPoint = point;
+            event->accept();
+            return;
+        }
         if (m_dragging)
         {
             if (auto moved = m_engine.moveSelectionBy(point - m_lastCanvasPoint); moved)
@@ -178,6 +258,14 @@ namespace GyanisScribe::Annotation
         if (event->button() != Qt::LeftButton)
         {
             QWidget::mouseReleaseEvent(event);
+            return;
+        }
+
+        if (m_handleDragging)
+        {
+            m_engine.endSelectionDrag();
+            m_handleDragging = false;
+            event->accept();
             return;
         }
 
@@ -353,6 +441,64 @@ namespace GyanisScribe::Annotation
             return true;
         }
         return QWidget::eventFilter(watched, event);
+    }
+
+    QPointF AnnotationView::rotateHandlePointWidget(const std::array<QPointF, 8> &frame) const
+    {
+        const auto rect     = currentDisplayRect();
+        const auto toWidget = [this, &rect](const QPointF &canvasPoint)
+        { return QPointF{toWidgetPoint(QPoint{qRound(canvasPoint.x()), qRound(canvasPoint.y())}, rect, m_engine.canvas().logicalSize)}; };
+
+        // 次序见 SelectionHandle：索引 1 是上边中点、索引 5 是下边中点
+        const QPointF topMiddle    = toWidget(frame[1]);
+        const QPointF bottomMiddle = toWidget(frame[5]);
+        QPointF       direction    = topMiddle - bottomMiddle;
+        const qreal   length       = std::hypot(direction.x(), direction.y());
+        direction                  = length > 0.0 ? direction / length : QPointF{0.0, -1.0};
+
+        const QPointF candidate = topMiddle + direction * kRotateHandleOffsetWidget;
+        if (!QRectF{this->rect()}.contains(candidate))
+        {
+            // 图形贴着上边缘时柄会跑到窗口外：翻到下边，用户还抓得着
+            const QPointF flipped = bottomMiddle - direction * kRotateHandleOffsetWidget;
+            if (QRectF{this->rect()}.contains(flipped))
+            {
+                return flipped;
+            }
+        }
+        return candidate;
+    }
+
+    SelectionHandle AnnotationView::handleAt(const QPoint &widgetPoint) const
+    {
+        const auto frame = m_engine.selectionFrame();
+        if (!frame)
+        {
+            return SelectionHandle::None;
+        }
+
+        const auto      rect         = currentDisplayRect();
+        SelectionHandle best         = SelectionHandle::None;
+        qreal           bestDistance = kHandleHitRadiusWidget;
+
+        const auto consider = [&](const QPointF &candidate, const SelectionHandle handle)
+        {
+            const qreal distance = std::hypot(candidate.x() - widgetPoint.x(), candidate.y() - widgetPoint.y());
+            if (distance <= bestDistance)
+            {
+                best         = handle;
+                bestDistance = distance;
+            }
+        };
+
+        // 八枚手柄点按 Enum 的次序逐位对应（TopLeft=1 … Left=8）
+        for (int node = 0; node < 8; ++node)
+        {
+            const QPoint widget = toWidgetPoint(QPoint{qRound((*frame)[node].x()), qRound((*frame)[node].y())}, rect, m_engine.canvas().logicalSize);
+            consider(QPointF{widget}, static_cast<SelectionHandle>(node + 1));
+        }
+        consider(rotateHandlePointWidget(*frame), SelectionHandle::Rotate);
+        return best;
     }
 
 } // namespace GyanisScribe::Annotation

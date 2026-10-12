@@ -57,6 +57,25 @@ namespace GyanisScribe::Annotation
         bool            textItalic     = false;                                         ///< 斜体（仅文字工具用）
         bool            textOutline    = false;                                         ///< 反色描边：字形围一圈与字色反差的轮廓（仅文字工具用）
         bool            textBackground = false;                                         ///< 反色底板：字形后面垫一块半透明的反差圆角板（仅文字工具用）
+        qreal           rotationDeg    = 0.0;                                           ///< 旋转角，度，顺时针为正；绕图形自己的外接框中心转（画与命中测试同解）
+        int             zOrder         = 0;                                             ///< 全局层叠序号：越大越靠上，由引擎落定时发号，不用手工维护
     };
+
+    /**
+     * @brief 平移一条图形的几何
+     * @param shape 就地修改的图形
+     * @param delta 逻辑坐标位移
+     * @details 矩形、采样点与锚点各走一步。工具的 translateShapeBy 与粘贴副本共用这一处：
+     *          各写一份的话，漏掉某个几何字段就是「拖动会动、粘贴不动」这种半身不遂。
+     */
+    inline void translateShape(AnnotationShape &shape, const QPoint &delta)
+    {
+        shape.rect.translate(delta);
+        shape.position += delta;
+        for (auto &point: shape.points)
+        {
+            point += delta;
+        }
+    }
 
 } // namespace GyanisScribe::Annotation

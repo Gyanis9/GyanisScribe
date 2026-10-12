@@ -35,14 +35,20 @@ namespace GyanisScribe::Annotation
     {
         None,            ///< 不归标注窗口管，交回给 Qt 继续分发
         Close,           ///< 关闭并丢弃标注
-        Copy,            ///< 复制到剪贴板
+        Copy,            ///< 复制整张成品到剪贴板
         Save,            ///< 存成文件
         Pin,             ///< 贴到屏幕上
         Ocr,             ///< 识别文字
         Undo,            ///< 撤销一步
         Redo,            ///< 重做一步
-        DeleteSelection, ///< 删掉选中的那条图形
-        NudgeSelection,  ///< 把选中的那条图形挪一格（按住 Shift 是大步）
+        DeleteSelection, ///< 删掉选中的图形（多选时整组）
+        NudgeSelection,  ///< 把选中的图形挪一格（按住 Shift 是大步）
+        CopyShape,       ///< 把选中的图形复制进引擎内的剪贴板
+        PasteShape,      ///< 把剪贴板里的图形粘到画布上
+        RaiseSelection,  ///< 选中的图形上移一层
+        LowerSelection,  ///< 选中的图形下移一层
+        BringToFront,    ///< 选中的图形置顶
+        SendToBack,      ///< 选中的图形置底
     };
 
     /**
@@ -51,7 +57,9 @@ namespace GyanisScribe::Annotation
      * @param modifiers 当时的修饰键
      * @return 对应动作；不在表内的返回 None
      * @note Ctrl+Shift+Z 与 Ctrl+Y 都算重做：两个习惯都要照顾到，少认一个用户就以为重做坏了
-     * @note 方向键（带不带 Shift）都算微调选中项，带 Ctrl 的不算：那几组合留给行内文字框按词移光标
+     * @note 方向键（带不带 Shift）是微调；Ctrl+Shift+↑/↓ 改层序、Ctrl+Shift+Home/End 置底/置顶，
+     *       带 Ctrl 的其它方向键交回 Qt：行内文字框在它那儿是按词移光标。
+     * @note Ctrl+C 的「没选中就复制整图」由窗口分派时判：快捷键表只报意图，看状态的话表就不好逐条钉
      */
     [[nodiscard]] ShortcutAction shortcutActionFor(int key, Qt::KeyboardModifiers modifiers);
 

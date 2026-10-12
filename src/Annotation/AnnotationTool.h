@@ -14,9 +14,11 @@
 
 #include <QColor>
 #include <QPoint>
+#include <QPointF>
 #include <QRect>
 #include <QVector>
 
+#include <array>
 #include <memory>
 #include <optional>
 
@@ -62,9 +64,11 @@ namespace GyanisScribe::Annotation
     /**
      * @brief 标注工具抽象基类
      * @details 一个工具管自己那一类的全部图形：交互（begin/update/end）、绘制、命中测试、
-     *          以及被撤销栈调用的插入/取回/平移。各档工具之间互不认识，层叠顺序按种类登记顺序，
-     *          这是一个有意的简化——真要做到「后画的压在先画的之上」，得把图形收进一张全局表，
-     *          标注语义才允许跨类重排。橡皮擦的「压在最上」正是靠登记在最后拿到的。
+     *          以及被撤销栈调用的插入/取回/平移。各档工具之间互不认识；
+     *          层叠顺序不在这里——每条图形带着引擎在落定时发的全局层叠号（AnnotationShape::zOrder），
+     *          绘制与命中都由引擎按那个号排序后进行，后画的自然压在先画的上面，
+     *          置顶/置底也只是换号。旋转同样在基类统一处理：paintShapeAt / hitTestShapeAt
+     *          把画家与事件点先按图形自己的旋转角摆正，再走各工具那一条原判据。
      */
     class AnnotationTool
     {
@@ -172,6 +176,16 @@ namespace GyanisScribe::Annotation
         bool restyleShapeAt(int index, const PenParameters &parameters);
 
         /**
+         * @brief 整条替换一条图形
+         * @param index 索引
+         * @param shape 新的那一份（几何、样式、旋转、层叠号一起写）
+         * @return 成功返回 true；索引越界返回 false
+         * @details 缩放与旋转命令用的就是这一格：它们要按旧图形整体算出新图形，
+         *          逐字段写会漏字段——漏掉的那个字段在撤销时就成了「回不去」。
+         */
+        bool replaceShapeAt(int index, const AnnotationShape &shape);
+
+        /**
          * @brief 改一条图形的文字内容
          * @param index 索引
          * @param text 新的文字；空串也收下（撤销与重做要能回到改之前的那一份）
@@ -198,32 +212,61 @@ namespace GyanisScribe::Annotation
         /**
          * @brief 命中测试
          * @param point 画布逻辑坐标
-         * @return 命中的图形索引（后画的优先），没命中返回 -1
+         * @return 命中的图形索引（本工具内后画的优先），没命中返回 -1
+         * @note 引擎按全局层叠号逐条问 hitTestShapeAt；这一格是给工具自己的用例与单工具场景留的整包入口
          */
         [[nodiscard]] int hitTest(const QPoint &point) const;
 
         /**
-         * @brief 画到画布上：全部已落定图形，外加在途的那一条
+         * @brief 命中测试一条图形
+         * @param index 索引
+         * @param point 画布逻辑坐标
+         * @return true 命中
+         * @details 事件点先按图形自己的旋转角映回局部坐标，再走各工具的原始判据；索引越界返回 false。
+         */
+        [[nodiscard]] bool hitTestShapeAt(int index, const QPoint &point) const;
+
+        /**
+         * @brief 画一条已落定的图形
+         * @param index 索引
          * @param painter 目标画家，已由调用方设好逻辑坐标
          * @param context 绘制现场
+         * @details 旋转在这里统一处理：画家绕外接框中心转好，paintShape 照旧按未旋转的坐标画。
          */
-        virtual void paint(QPainter &painter, const PaintContext &context) const;
+        void paintShapeAt(int index, QPainter &painter, const PaintContext &context) const;
 
         /**
-         * @brief 烘焙进图像：只落定图形，在途的那条不算
-         * @param image 目标图像（物理像素），就地修改
+         * @brief 画在途图形
+         * @param painter 目标画家，已由调用方设好逻辑坐标
          * @param context 绘制现场
+         * @note 只有本工具还在用时才画：在途图形在任何一次切换里都会被丢掉
          */
-        virtual void applyToImage(QImage &image, const PaintContext &context) const;
+        void paintPending(QPainter &painter, const PaintContext &context) const;
 
         /**
-         * @brief 图形的外接框，供选中框、命中测试与移动判据
+         * @brief 图形的外接框（含旋转），供选中框与移动判据
          * @param shape 图形
-         * @return 逻辑坐标下的矩形
+         * @return 逻辑坐标下的矩形；旋转过的图形返回包住它的轴对齐框
+         * @details 转正的话是 localBoundingBoxOf 的结果，转过的话是它四个角转完后的轴对齐框。
+         */
+        [[nodiscard]] QRect boundingBoxOf(const AnnotationShape &shape) const;
+
+        /**
+         * @brief 图形的局部外接框（不含旋转）
+         * @param shape 图形
+         * @return 未旋转时的矩形
          * @details 基类把 rect、采样点与文本三种来源并起来算；锚点型工具（序号）的重写要返回
          *          它真正画出来的那一圈，否则选中框与图形错开半个身位。
          */
-        [[nodiscard]] virtual QRect boundingBoxOf(const AnnotationShape &shape) const;
+        [[nodiscard]] virtual QRect localBoundingBoxOf(const AnnotationShape &shape) const;
+
+        /**
+         * @brief 选中框的四个角点（含旋转）
+         * @param shape 图形
+         * @return 次序：左上、右上、右下、左下；坐标是画布逻辑坐标
+         * @details 局部框的四角绕中心转过图形自己的旋转角，界面的手柄与旋转柄都摆在这四个点上。
+         */
+        [[nodiscard]] std::array<QPointF, 4> frameCornersOf(const AnnotationShape &shape) const;
 
         /**
          * @brief 设画笔默认颜色
@@ -337,10 +380,10 @@ namespace GyanisScribe::Annotation
         /**
          * @brief 命中判据
          * @param shape 待判图形
-         * @param point 画布逻辑坐标
+         * @param point 局部坐标下的点（旋转过的图形在进来之前已由基类映回）
          * @param tolerance 允许的偏差，逻辑像素
          * @return true 命中
-         * @details 默认按外接框判；轨迹类工具必须重写，否则一条绕圈的画笔在其空心区域里也会被选中。
+         * @details 默认按局部外接框判；轨迹类工具必须重写，否则一条绕圈的画笔在其空心区域里也会被选中。
          */
         virtual bool hitTestShape(const AnnotationShape &shape, const QPoint &point, int tolerance) const;
 
