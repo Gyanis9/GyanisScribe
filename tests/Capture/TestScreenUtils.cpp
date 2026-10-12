@@ -1,5 +1,7 @@
 #include "Capture/ScreenUtils.h"
 
+#include "Core/SizeText.h"
+
 #include <QImage>
 #include <QPoint>
 #include <QRect>
@@ -505,7 +507,7 @@ TEST(ScreenUtilsSelection, SizeAndAspectTextRoundTrip)
 {
     using GyanisScribe::Capture::aspectRatioFromText;
     using GyanisScribe::Capture::aspectRatioToText;
-    using GyanisScribe::Capture::parseSizeText;
+    using GyanisScribe::Core::parseSizeText;
 
     EXPECT_EQ(parseSizeText(QStringLiteral("300x200")), (QSize(300, 200)));
     EXPECT_EQ(parseSizeText(QStringLiteral("300×200")), (QSize(300, 200)));

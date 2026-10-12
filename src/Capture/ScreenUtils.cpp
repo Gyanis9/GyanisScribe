@@ -5,7 +5,6 @@
 #include <QApplication>
 #include <QGuiApplication>
 #include <QPainter>
-#include <QRegularExpression>
 #include <QScreen>
 
 #include <cmath>
@@ -273,27 +272,6 @@ namespace GyanisScribe::Capture
             return anchor;
         }
         return QPoint(anchor.x() + signX * (span * ratio.width() - 1), anchor.y() + signY * (span * ratio.height() - 1));
-    }
-
-    std::optional<QSize> parseSizeText(const QString &text)
-    {
-        // 宽度与高度之间允许 x/×/逗号/空白：标签上印的是「宽 × 高」，用户照着敲、换一种敲都得认
-        static const QRegularExpression separator{QStringLiteral(R"([x×,\s]+)")};
-        const QStringList               parts = text.trimmed().split(separator, Qt::SkipEmptyParts);
-        if (parts.size() != 2)
-        {
-            return std::nullopt;
-        }
-
-        bool      okWidth  = false;
-        bool      okHeight = false;
-        const int width    = parts[0].toInt(&okWidth);
-        const int height   = parts[1].toInt(&okHeight);
-        if (!okWidth || !okHeight || width <= 0 || height <= 0)
-        {
-            return std::nullopt;
-        }
-        return QSize{width, height};
     }
 
     QString aspectRatioToText(const QSize &ratio)

@@ -152,13 +152,6 @@ namespace GyanisScribe::Capture
     [[nodiscard]] QPoint ratioLockedPoint(const QPoint &anchor, const QPoint &current, const QSize &ratio, const QRect &limit);
 
     /**
-     * @brief 把遮罩上敲进去的尺寸文本解析成尺寸
-     * @param text 形如「300x200」「300×200」「300,200」「300 200」；x 不分大小写
-     * @return 成功返回正数尺寸；解析不出或不是正数时为空
-     */
-    [[nodiscard]] std::optional<QSize> parseSizeText(const QString &text);
-
-    /**
      * @brief 把长宽比写成存取文本
      * @param ratio 长宽比；空或非正时返回空串
      * @return 约分后的「宽:高」，如「16:9」

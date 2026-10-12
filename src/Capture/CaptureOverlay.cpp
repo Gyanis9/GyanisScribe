@@ -2,6 +2,7 @@
 
 #include "Capture/RegionHistory.h"
 #include "Capture/ScreenUtils.h"
+#include "Core/SizeText.h"
 #include "Core/Text.h"
 #include "Pick/ColorFormat.h"
 #include "Pick/PickGeometry.h"
@@ -747,7 +748,7 @@ namespace GyanisScribe::Capture
             return;
         }
 
-        const auto parsed = parseSizeText(m_sizeEditor->text());
+        const auto parsed = GyanisScribe::Core::parseSizeText(m_sizeEditor->text());
         if (!parsed)
         {
             // 敲不成尺寸就留在框里继续改：把「看不懂」变成「框没了」是最坏的一种反馈

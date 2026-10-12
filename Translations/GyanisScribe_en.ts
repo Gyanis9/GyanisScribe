@@ -2108,6 +2108,22 @@
             <translation>Copy as file</translation>
         </message>
         <message>
+            <source>自定义尺寸…</source>
+            <translation>Custom size…</translation>
+        </message>
+        <message>
+            <source>自定义贴图尺寸</source>
+            <translation>Custom pin size</translation>
+        </message>
+        <message>
+            <source>宽 x 高（像素）</source>
+            <translation>Width x height (pixels)</translation>
+        </message>
+        <message>
+            <source>没读懂这个尺寸：请按「宽x高」写，比如 640x360</source>
+            <translation>Could not read that size: write it as "width x height", for example 640x360</translation>
+        </message>
+        <message>
             <source>保存</source>
             <translation>Save</translation>
         </message>

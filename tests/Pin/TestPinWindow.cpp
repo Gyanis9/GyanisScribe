@@ -1374,4 +1374,32 @@ namespace GyanisScribe
         EXPECT_FALSE(window.isCropping()) << "绕过菜单直接开也进了裁剪";
     }
 
+    /**
+     * @brief 钉住「自定义尺寸」：按宽或按高设精确尺寸、保持长宽比、越界夹在缩放区间里
+     * @details 只查菜单项在不在、不点它：点了会弹输入对话框（模态），用例会挂在那儿——
+     *          与背景色那条「不点自定义…」同一套纪律。40×40 的方图：120 宽 → 3.0 倍、窗口 120×120。
+     */
+    TEST_F(PinWindowFixture, CustomSizeSetsAnExactWidthAndKeepsTheRatio)
+    {
+        auto  &window = makeWindow();
+        QMenu *menu   = window.buildContextMenu();
+        auto  *exact  = findMenuAction(*menu, QString::fromUtf8("自定义尺寸…"));
+        ASSERT_NE(exact, nullptr) << "右键菜单里没有「自定义尺寸…」这一项";
+        delete menu;
+
+        window.setExactSize(QSize{120, 0});
+        EXPECT_TRUE(nearEqual(window.scale(), 3.0, kScaleTolerance)) << "按宽设的精确值没落到缩放上";
+        EXPECT_EQ(window.size(), QSize(120, 120)) << "窗口没跟着缩放到指定的显示尺寸";
+
+        window.setExactSize(QSize{0, 80});
+        EXPECT_TRUE(nearEqual(window.scale(), 2.0, kScaleTolerance)) << "宽没给时该按高算";
+
+        const auto before = window.scale();
+        window.setExactSize(QSize{-5, -5});
+        EXPECT_TRUE(nearEqual(window.scale(), before, kScaleTolerance)) << "两维都没给时不该动";
+
+        window.setExactSize(QSize{100000, 0});
+        EXPECT_TRUE(nearEqual(window.scale(), 20.0, kScaleTolerance)) << "超界的精确值该夹在缩放上限上（夹不住就是第二套坐标口径）";
+    }
+
 } // namespace GyanisScribe

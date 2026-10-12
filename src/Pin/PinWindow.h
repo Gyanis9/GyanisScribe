@@ -224,6 +224,15 @@ namespace GyanisScribe::Pin
         [[nodiscard]] double scale() const noexcept override;
 
         /**
+         * @brief 把贴图缩放到指定的显示尺寸（菜单「自定义尺寸…」）
+         * @param size 目标逻辑尺寸（像素）；两维都不为正时什么都不做
+         * @details 图保持自己的长宽比、不拉伸：按宽算，宽没给才按高算——两个都同时吻合只有
+         *          先裁成那个比例才谈得上。算出的因子照旧夹在既有缩放区间里，
+         *          超界的「精确值」只能夹住：夹不住就是第二套坐标口径了。
+         */
+        void setExactSize(const QSize &size);
+
+        /**
          * @brief 设旋转角度，见 IPinWindow::setRotationDegrees()
          * @param degrees 顺时针角度，折进 [0,360)
          */

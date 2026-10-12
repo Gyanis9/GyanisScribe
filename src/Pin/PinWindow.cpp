@@ -11,6 +11,7 @@
 #include "Core/Logger.h"
 #include "Core/OutputDecoration.h"
 #include "Core/Paths.h"
+#include "Core/SizeText.h"
 #include "Core/Text.h"
 #include "Pin/PinLayout.h"
 #include "Pin/PinViewFilter.h"
@@ -38,6 +39,8 @@
 #include <QMimeData>
 #include <QMovie>
 #include <QImageReader>
+#include <QInputDialog>
+#include <QMessageBox>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
@@ -229,6 +232,23 @@ namespace GyanisScribe::Pin
     double PinWindow::scale() const noexcept
     {
         return m_scale;
+    }
+
+    void PinWindow::setExactSize(const QSize &size)
+    {
+        if (m_logicalSize.width() <= 0.0 || m_logicalSize.height() <= 0.0)
+        {
+            return;
+        }
+
+        // 保持长宽比、不拉伸：按宽算，宽没给才按高算。两维都超出缩放区间时由 setScale 夹住
+        if (size.width() > 0)
+        {
+            setScale(size.width() / m_logicalSize.width());
+        } else if (size.height() > 0)
+        {
+            setScale(size.height() / m_logicalSize.height());
+        }
     }
 
     void PinWindow::setRotationDegrees(double degrees)
@@ -1623,6 +1643,29 @@ namespace GyanisScribe::Pin
         // 复制为文件：剪贴板里放的是一条本地文件路径，粘进资源管理器/聊天窗口得到一份 .png
         // （与「复制」是两条出口：那一条粘进文档里是一张图）
         menu->addAction(GyanisScribe::Core::uiText("复制为文件"), this, &PinWindow::copyAsFileToClipboard);
+
+        // 自定义尺寸：滚轮是一格一格缩，这一项要的是「正好 1280 宽」这种精确值。
+        // 对话框预填当前尺寸，认「宽x高」这一套写法（与截图选区那个输入框同一处解析）
+        menu->addAction(GyanisScribe::Core::uiText("自定义尺寸…"), this,
+                        [this]
+                        {
+                            const auto current  = QStringLiteral("%1x%2").arg(qRound(m_logicalSize.width())).arg(qRound(m_logicalSize.height()));
+                            bool       accepted = false;
+                            const auto text     = QInputDialog::getText(this, GyanisScribe::Core::uiText("自定义贴图尺寸"), GyanisScribe::Core::uiText("宽 x 高（像素）"),
+                                                                        QLineEdit::Normal, current, &accepted);
+                            if (!accepted)
+                            {
+                                return; // 取消是一种正常收场：什么都没发生，也什么都不用说
+                            }
+                            if (const auto parsed = GyanisScribe::Core::parseSizeText(text); parsed)
+                            {
+                                setExactSize(*parsed);
+                            } else
+                            {
+                                QMessageBox::information(this, GyanisScribe::Core::uiText("自定义贴图尺寸"),
+                                                         GyanisScribe::Core::uiText("没读懂这个尺寸：请按「宽x高」写，比如 640x360"));
+                            }
+                        });
 
         // 保存与「在文件夹中查看」是同一条路：后者在存下之后再打开那个目录，
         // 两处各写一份起名与写盘的代码，将来改命名模板就会漏掉一处
