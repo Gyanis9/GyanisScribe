@@ -182,6 +182,12 @@ namespace GyanisScribe::Annotation
         }
 
         m_dragging = false;
+        if (m_ignoreNextRelease)
+        {
+            // 上一条事件是「双击收笔」：这一下松手不再走 endStroke（在途图形已经落定了）
+            m_ignoreNextRelease = false;
+            return;
+        }
         if (m_stroking)
         {
             // 抬笔点也要当成一次行进：有的拖拽最后一跳只发 release 不发 move，少这一步图形就会停在半路
@@ -287,6 +293,25 @@ namespace GyanisScribe::Annotation
         const auto hit   = m_engine.selectionAt(point);
         // 有在途笔画或输入框开着时不抢这条双击：那一次按下属于正在输入的那一条
         const bool busy = m_stroking || m_awaitingText || m_textEditor != nullptr;
+
+        // 折线：双击就是「就到这里」。收笔之后还要吞掉随后那一次松手——
+        // 那一下在 Qt 的事件序里跟在双击后面，收过笔的在途图形已经不在了，再收一次会报「没有落定」
+        if (!busy && m_engine.activeTool() == ToolKind::Polyline)
+        {
+            if (const auto finished = m_engine.finishPendingStroke(); finished)
+            {
+                if (auto selected = m_engine.select(*finished); !selected)
+                {
+                    Core::Logger::warning(std::format("刚收笔的折线没能选中：{}", selected.error().message));
+                }
+                m_ignoreNextRelease = true;
+            } else
+            {
+                Core::Logger::info(std::format("这次双击没有可收笔的折线：{}", finished.error().message));
+            }
+            event->accept();
+            return;
+        }
 
         if (hit && hit->tool == ToolKind::Text && !busy)
         {

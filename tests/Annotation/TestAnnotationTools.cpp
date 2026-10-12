@@ -247,6 +247,64 @@ namespace
         EXPECT_EQ(m_engine.exportImage().pixelColor(330, 70), QColor(255, 0, 0)) << "实心档的内里不是描边色";
     }
 
+
+    /**
+     * @brief 钉住折线的点击落点式交互：点一下落一个折点、松手不落定、收笔才整条进图
+     * @details 松手不落定是这一档与别的工具最大的不同：`endStroke` 这时该回 Busy（在途图形还在），
+     *          双击收笔走的 `finishPendingStroke` 才把整条交出来。最后那段（末折点到预览点）在收笔时并入。
+     */
+    TEST_F(AnnotationFixture, PolylineCollectsCornersUntilItIsFinished)
+    {
+        ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Polyline).has_value());
+
+        // 第一下：起头，松手不该落定
+        m_engine.beginStroke(QPoint(40, 40));
+        const auto unfinished = m_engine.endStroke();
+        ASSERT_FALSE(unfinished.has_value()) << "半途松手就把折线落定了";
+        EXPECT_EQ(unfinished.error().code, ErrorCode::Busy) << "该用 Busy 把「还没收」与「真没画成」分开";
+
+        // 第二、第三个折点；中间那一次移动只当预览
+        m_engine.beginStroke(QPoint(140, 40));
+        ASSERT_FALSE(m_engine.endStroke().has_value());
+        m_engine.beginStroke(QPoint(140, 120));
+        ASSERT_FALSE(m_engine.endStroke().has_value());
+        m_engine.moveStroke(QPoint(240, 120));
+
+        // 收笔：整条落定，最后那段并入
+        const auto finished = m_engine.finishPendingStroke();
+        ASSERT_TRUE(finished.has_value()) << finished.error().message;
+        EXPECT_EQ(finished->shapeIndex, 0);
+
+        const auto exported = m_engine.exportImage();
+        EXPECT_NE(exported.pixelColor(90, 40), QColor(255, 255, 255)) << "第一段没画出来";
+        EXPECT_NE(exported.pixelColor(140, 80), QColor(255, 255, 255)) << "第二段没画出来";
+        EXPECT_NE(exported.pixelColor(190, 120), QColor(255, 255, 255)) << "收笔时末段没并入";
+        EXPECT_EQ(exported.pixelColor(240, 40), QColor(255, 255, 255)) << "折线跑到了折点之外";
+
+        // 收完笔就没了在途图形：再收一次要被拒
+        const auto again = m_engine.finishPendingStroke();
+        ASSERT_FALSE(again.has_value());
+        EXPECT_EQ(again.error().code, ErrorCode::InvalidArgument);
+
+        EXPECT_TRUE(m_engine.undo().has_value());
+        EXPECT_EQ(m_engine.exportImage().pixelColor(90, 40), QColor(255, 255, 255)) << "撤销没把整条折线收回去";
+    }
+
+    /**
+     * @brief 钉住折线的落定下限：只有一个折点不算数
+     */
+    TEST_F(AnnotationFixture, SingleCornerPolylineIsNotUsable)
+    {
+        ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Polyline).has_value());
+        m_engine.beginStroke(QPoint(50, 50));
+        ASSERT_FALSE(m_engine.endStroke().has_value());
+
+        const auto finished = m_engine.finishPendingStroke();
+        ASSERT_FALSE(finished.has_value()) << "一个折点也落定了";
+        EXPECT_EQ(finished.error().code, ErrorCode::InvalidArgument);
+        EXPECT_FALSE(m_engine.canUndo()) << "没落定的折线不该进撤销栈";
+    }
+
 } // namespace
 
 /**

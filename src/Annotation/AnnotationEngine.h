@@ -118,7 +118,12 @@ namespace GyanisScribe::Annotation
          * @param number 下一个号，小于 1 会被夹到 1
          * @return 成功返回空载荷；序号工具不在册时返回 InternalError
          */
-        Core::Expected<void> setNextNumber(int number) override;
+        /**
+         * @brief 把在途的那条落定，见 IAnnotationEngine::finishPendingStroke()
+         * @return 成功返回刚落定那条的位置；没有在途图形时返回 InvalidArgument
+         */
+        [[nodiscard]] Core::Expected<AnnotationSelection> finishPendingStroke() override;
+        Core::Expected<void>                              setNextNumber(int number) override;
 
         /// 序号回到自动编号，见 IAnnotationEngine::resetNumbering()
         void resetNumbering() override;

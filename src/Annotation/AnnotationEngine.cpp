@@ -9,6 +9,7 @@
 #include "Annotation/MosaicTool.h"
 #include "Annotation/NumberTool.h"
 #include "Annotation/PenTool.h"
+#include "Annotation/PolylineTool.h"
 #include "Annotation/RectangleTool.h"
 #include "Annotation/TextTool.h"
 #include "Core/Text.h"
@@ -244,6 +245,8 @@ namespace GyanisScribe::Annotation
         m_tools.push_back(std::make_unique<LineTool>());
         // 橡皮擦登记在最后＝压在全部工具之上：擦的是「画在底图上的一切」，露出原图那一块
         m_tools.push_back(std::make_unique<EraserTool>());
+        // 折线登记在橡皮擦之前：擦除压在它上面，折线自己按落定顺序与别的笔画同层
+        m_tools.insert(m_tools.end() - 1, std::make_unique<PolylineTool>());
 
         // 参数一次下发：切工具后笔还保持用户调过的那个粗细，才不会出现「换工具就得重调」
         for (const auto &tool: m_tools)
@@ -403,6 +406,12 @@ namespace GyanisScribe::Annotation
         const auto committed = tool->end();
         if (!committed)
         {
+            // 多步工具（折线）半途松手：在途图形还在手里，等下一个折点或双击收笔——
+            // 这不是失败，错误码用 Busy 让界面与日志把它与「真没画成」分开
+            if (tool->hasPending())
+            {
+                return std::unexpected(Core::Error{Core::ErrorCode::Busy, GyanisScribe::Core::uiTextUtf8("这一笔还没收：折线继续点下一个折点，双击收笔")});
+            }
             return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
                                                GyanisScribe::Core::uiText("这一笔没有落定：尺寸太小或内容为空。请按住鼠标拖出可见的范围后再松手").toStdString()});
         }
@@ -426,6 +435,26 @@ namespace GyanisScribe::Annotation
 
         static_cast<TextTool *>(tool)->setPendingText(text);
         return {};
+    }
+
+    Core::Expected<AnnotationSelection> AnnotationEngine::finishPendingStroke()
+    {
+        auto *tool = toolFor(m_activeTool);
+        if (tool == nullptr)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InternalError, GyanisScribe::Core::uiTextUtf8("当前工具种类没有对应的工具实现，请检查 setActiveTool 与构造列表")});
+        }
+
+        tool->requestFinish();
+        const int  index     = tool->shapeCount();
+        const auto committed = tool->end();
+        if (!committed)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiText("现在没有在途的笔画可以收笔。折线至少要点出两个折点").toStdString()});
+        }
+
+        m_undoStack.push(new InsertShapeCommand(tool, index, *committed));
+        return AnnotationSelection{m_activeTool, index};
     }
 
     Core::Expected<void> AnnotationEngine::setNextNumber(const int number)

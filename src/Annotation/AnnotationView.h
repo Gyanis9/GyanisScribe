@@ -126,13 +126,15 @@ namespace GyanisScribe::Annotation
         /// 当前显示区，绘制与坐标换算共用同一个算法
         [[nodiscard]] QRect currentDisplayRect() const;
 
-        IAnnotationEngine &m_engine;                ///< 标注引擎，不拥有
-        bool               m_stroking      = false; ///< 正在画一条新图形
-        bool               m_dragging      = false; ///< 正在拖动选中项
-        bool               m_awaitingText  = false; ///< 文字在途：这条图形由输入框提交，而不是由抬笔提交
-        bool               m_reEditingText = false; ///< 输入框此刻改的是已放下的那一条，而不是新画的一条
-        QPoint             m_lastCanvasPoint;       ///< 上一次事件换算到的画布坐标
-        QLineEdit         *m_textEditor = nullptr;  ///< 行内输入框，用完即销毁
+        IAnnotationEngine &m_engine;           ///< 标注引擎，不拥有
+        bool               m_stroking = false; ///< 正在画一条新图形
+
+        bool       m_ignoreNextRelease = false; ///< 双击收笔之后吞掉那一次松手
+        bool       m_dragging          = false; ///< 正在拖动选中项
+        bool       m_awaitingText      = false; ///< 文字在途：这条图形由输入框提交，而不是由抬笔提交
+        bool       m_reEditingText     = false; ///< 输入框此刻改的是已放下的那一条，而不是新画的一条
+        QPoint     m_lastCanvasPoint;           ///< 上一次事件换算到的画布坐标
+        QLineEdit *m_textEditor = nullptr;      ///< 行内输入框，用完即销毁
     };
 
 } // namespace GyanisScribe::Annotation

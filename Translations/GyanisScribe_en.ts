@@ -20,6 +20,10 @@
             <translation>No tool implementation for this tool kind: check setActiveTool and the tool list in the constructor.</translation>
         </message>
         <message>
+            <source>这一笔还没收：折线继续点下一个折点，双击收笔</source>
+            <translation>This stroke is not finished yet: keep clicking to add polyline corners, double-click to finish</translation>
+        </message>
+        <message>
             <source>这一笔没有落定：尺寸太小或内容为空。请按住鼠标拖出可见的范围后再松手</source>
             <translation>This stroke didn't land: it's too small or empty. Hold the mouse button, drag out a visible area, then release</translation>
         </message>
@@ -30,6 +34,10 @@
         <message>
             <source>只有文字工具在用时才需要设定文本内容。请先切到文字工具再输入</source>
             <translation>Only the text tool needs text content. Switch to the text tool first, then type</translation>
+        </message>
+        <message>
+            <source>现在没有在途的笔画可以收笔。折线至少要点出两个折点</source>
+            <translation>There is no in-progress stroke to finish. A polyline needs at least two corners</translation>
         </message>
         <message>
             <source>序号工具不在册</source>
@@ -190,6 +198,10 @@
         <message>
             <source>画笔</source>
             <translation>Pen</translation>
+        </message>
+        <message>
+            <source>折线</source>
+            <translation>Polyline</translation>
         </message>
         <message>
             <source>矩形</source>

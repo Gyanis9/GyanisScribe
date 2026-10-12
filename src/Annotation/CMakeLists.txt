@@ -25,6 +25,8 @@ add_library(Annotation STATIC
         BlurTool.cpp
         EraserTool.h
         EraserTool.cpp
+        PolylineTool.h
+        PolylineTool.cpp
         TextTool.h
         TextTool.cpp
         NumberTool.h

@@ -38,6 +38,7 @@
     <file alias="OcrLanguage.svg">Icons/OcrLanguage.svg</file>
     <file alias="OcrRegion.svg">Icons/OcrRegion.svg</file>
     <file alias="Pen.svg">Icons/Pen.svg</file>
+    <file alias="Polyline.svg">Icons/Polyline.svg</file>
     <file alias="Pin.svg">Icons/Pin.svg</file>
     <file alias="PinClose.svg">Icons/PinClose.svg</file>
     <file alias="PinCopy.svg">Icons/PinCopy.svg</file>

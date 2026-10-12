@@ -43,6 +43,7 @@ namespace GyanisScribe::Annotation
         Line,      ///< 直线（新增一档只能追加在末尾：工具栏登记表按 ToolKind 的顺序逐个核标签）
         Blur,      ///< 高斯模糊
         Eraser,    ///< 橡皮擦（沿笔迹擦回底图）
+        Polyline,  ///< 折线（点一下落一个折点，双击收笔）
     };
 
     /**
@@ -182,6 +183,20 @@ namespace GyanisScribe::Annotation
         bool setTextAt(int index, const QString &text);
 
         /**
+         * @brief 手里还有在途图形吗
+         * @return true 表示有一条还没落定的图形（多步工具在半途时会为真）
+         * @details 引擎用它区分两种「收笔交回空」：多步工具还在等下一段，与真的没画成。
+         */
+        [[nodiscard]] bool hasPending() const noexcept;
+
+        /**
+         * @brief 收笔在即：多步工具（折线）在这里把「下一段」当成最后一段
+         * @details 单步工具不重写它：它们松手即落定，收到这个请求也没有别的事要做。
+         */
+        virtual void requestFinish()
+        {
+        }
+        /**
          * @brief 命中测试
          * @param point 画布逻辑坐标
          * @return 命中的图形索引（后画的优先），没命中返回 -1
@@ -291,12 +306,6 @@ namespace GyanisScribe::Annotation
         int             m_fontSize;      ///< 默认字号
 
     private:
-        /**
-         * @brief 有没有在途图形
-         * @return true 有内容等待落定，预览该把它画出来
-         */
-        [[nodiscard]] bool hasPending() const noexcept;
-
         ToolKind                 m_kind;             ///< 工具种类
         bool                     m_isActive = false; ///< 是否当前工具
         QVector<AnnotationShape> m_shapes;           ///< 已落定的图形，按登记顺序绘制

@@ -129,6 +129,15 @@ namespace GyanisScribe::Annotation
          * @details 点名之后编号从那个号开始连排（5、6、7…），不再跟着现有条数走；
          *          回到自动口径用 resetNumbering()。
          */
+        /**
+         * @brief 把在途的那条落定（折线双击收笔走的这一条）
+         * @return 成功返回刚落定那条的位置；没有在途图形时返回 InvalidArgument
+         * @details 与 endStroke() 的区别在「谁说了算」：endStroke 是松手时试落定，多步工具这时
+         *          还在等下一段、会交回空（错误码是 Busy）；这一条是用户明确说「就到这里」，
+         *          工具才把在途图形交出来。
+         */
+        [[nodiscard]] virtual Core::Expected<AnnotationSelection> finishPendingStroke() = 0;
+
         [[nodiscard]] virtual Core::Expected<void> setNextNumber(int number) = 0;
 
         /**
