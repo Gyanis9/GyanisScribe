@@ -66,6 +66,89 @@ TEST(ShapeTransformResize, ClampsAtTheMinimumWithoutFlipping)
 }
 
 /**
+ * @brief 钉住 Ctrl 档（中心点缩放）：拖一条边，对面一条对向走同样多的距离，中心不动
+ * @details 中心是 (50,40) 的框，右边拖到 80 时半程 30：左边该从 10 走到 20。
+ *          拖过中心时夹在最小边长上、中心也不挪——翻转在这里同样不做，两档共用一个规矩。
+ */
+TEST(ShapeTransformResize, ScalesAboutTheCenterWhenAsked)
+{
+    const QRectF box{10.0, 20.0, 80.0, 40.0}; // 中心 (50,40)
+
+    const auto right = resizedBox(box, SelectionHandle::Right, QPointF{80.0, 40.0}, kMinimumResizedBoxSide, true, false);
+    EXPECT_DOUBLE_EQ(right.left(), 20.0) << "中心点缩放时左边没对向跟上";
+    EXPECT_DOUBLE_EQ(right.right(), 80.0);
+    EXPECT_DOUBLE_EQ(right.top(), 20.0) << "没拖的那条轴不该跟着动";
+    EXPECT_DOUBLE_EQ(right.bottom(), 60.0);
+
+    const auto topLeft = resizedBox(box, SelectionHandle::TopLeft, QPointF{30.0, 30.0}, kMinimumResizedBoxSide, true, false);
+    EXPECT_DOUBLE_EQ(topLeft.left(), 30.0);
+    EXPECT_DOUBLE_EQ(topLeft.right(), 70.0) << "右上角没绕中心对向跟上";
+    EXPECT_DOUBLE_EQ(topLeft.top(), 30.0);
+    EXPECT_DOUBLE_EQ(topLeft.bottom(), 50.0);
+    EXPECT_DOUBLE_EQ(topLeft.center().x(), 50.0) << "中心点缩放的框该以原中心为不动点";
+    EXPECT_DOUBLE_EQ(topLeft.center().y(), 40.0);
+
+    const auto crossed = resizedBox(box, SelectionHandle::Right, QPointF{20.0, 40.0}, kMinimumResizedBoxSide, true, false);
+    EXPECT_DOUBLE_EQ(crossed.width(), kMinimumResizedBoxSide) << "拖过中心没夹在最小边长上";
+    EXPECT_DOUBLE_EQ(crossed.center().x(), 50.0) << "夹住时中心也被带走了";
+}
+
+/**
+ * @brief 钉住 Shift 档（等比例）：角上手柄取变化大的那一轴定倍率，边中手柄另一轴绕中线补出去
+ * @details 80×40（2:1）的框：右下角拖到 (90,80) 时两轴比值 1.0 与 1.5，取大的 1.5，
+ *          两轴同倍、锚定的左与上两条边不动；右边中点拖到 170 时横向倍率 2，
+ *          纵向按 2 绕中线长出去，上下各让出 20。
+ */
+TEST(ShapeTransformResize, KeepsTheAspectRatioWhenAsked)
+{
+    const QRectF box{10.0, 20.0, 80.0, 40.0};
+
+    const auto corner = resizedBox(box, SelectionHandle::BottomRight, QPointF{90.0, 80.0}, kMinimumResizedBoxSide, false, true);
+    EXPECT_DOUBLE_EQ(corner.left(), 10.0) << "等比例缩放把锚定的左边带走了";
+    EXPECT_DOUBLE_EQ(corner.top(), 20.0);
+    EXPECT_DOUBLE_EQ(corner.width(), 120.0) << "宽没按变化大的那一轴倍率走";
+    EXPECT_DOUBLE_EQ(corner.height(), 60.0) << "高没按同一倍率跟出去";
+    EXPECT_DOUBLE_EQ(corner.width() / corner.height(), 2.0) << "长宽比没保住";
+
+    const auto edge = resizedBox(box, SelectionHandle::Right, QPointF{170.0, 40.0}, kMinimumResizedBoxSide, false, true);
+    EXPECT_DOUBLE_EQ(edge.left(), 10.0);
+    EXPECT_DOUBLE_EQ(edge.width(), 160.0);
+    EXPECT_DOUBLE_EQ(edge.height(), 80.0) << "另一轴没按同一倍率补偿";
+    EXPECT_DOUBLE_EQ(edge.top(), 0.0) << "补偿的那条轴没绕自己的中线长出去";
+    EXPECT_DOUBLE_EQ(edge.bottom(), 80.0);
+    EXPECT_DOUBLE_EQ(edge.center().y(), 40.0) << "补偿把整框带得跳了位";
+}
+
+/**
+ * @brief 钉住两档同时按：以中心为不动点、保持长宽比
+ */
+TEST(ShapeTransformResize, CombinesCenterAndProportional)
+{
+    const QRectF box{10.0, 20.0, 80.0, 40.0};
+
+    // 右下角拖到 (110,40)：横向半程 60（倍率 1.5）、纵向半程 0（夹在最小），取大的 1.5
+    const auto both = resizedBox(box, SelectionHandle::BottomRight, QPointF{110.0, 40.0}, kMinimumResizedBoxSide, true, true);
+    EXPECT_DOUBLE_EQ(both.width(), 120.0);
+    EXPECT_DOUBLE_EQ(both.height(), 60.0);
+    EXPECT_DOUBLE_EQ(both.center().x(), 50.0) << "两档一起按时框该仍以原中心为不动点";
+    EXPECT_DOUBLE_EQ(both.center().y(), 40.0);
+}
+
+/**
+ * @brief 钉住某一轴长为零时等比例退回逐轴伸缩：没有长宽比可算，也不能除零
+ * @details 竖直线（宽 0、高 40）横向拖大：零宽那轴按拖动点直接给长度，有长度的那轴原地不动。
+ */
+TEST(ShapeTransformResize, FallsBackToPerAxisForAZeroLengthAxis)
+{
+    const QRectF line{50.0, 10.0, 0.0, 40.0};
+
+    const auto widened = resizedBox(line, SelectionHandle::Right, QPointF{80.0, 30.0}, kMinimumResizedBoxSide, false, true);
+    EXPECT_DOUBLE_EQ(widened.width(), 30.0) << "零宽那轴该按拖动点直接给出长度";
+    EXPECT_DOUBLE_EQ(widened.height(), 40.0) << "有长度的那轴没有倍率可算，该原地不动";
+    EXPECT_DOUBLE_EQ(widened.top(), 10.0) << "退回逐轴伸缩时那条轴该保持原位";
+}
+
+/**
  * @brief 钉住整条映射：几何按倍率走，笔宽/字号/粒度按两轴里大的那边缩放
  * @details 取整与 QRect 的包含口径各差一个像素，断言留一格容差；轨迹点与锚点是无损的，
  *          可以按手算的绝对值钉死。

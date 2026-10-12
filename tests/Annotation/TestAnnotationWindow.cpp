@@ -866,6 +866,39 @@ TEST_F(AnnotationWindowFixture, ViewHandleDragResizesTheSelectedShape)
 }
 
 /**
+ * @brief 钉住修饰键从鼠标事件一路走到几何：按住 Shift 拖角手柄＝等比例缩放
+ * @details 画的是 51×51 的正方形，右下角拖到逻辑 (81,70)：两轴比值 71/51 与 60/51，
+ *          等比例档取大的那一轴定倍率，另一轴跟乘到 71。不带这一档时高会停在 60——
+ *          断言「高追上了宽」才能证明 Shift 真进了几何，而不是把普通缩放当成了等比例。
+ */
+TEST_F(AnnotationWindowFixture, ViewKeepsTheAspectRatioWhenShiftIsHeld)
+{
+    GyanisScribe::Annotation::AnnotationView view{engine()};
+    view.resize(400, 200);
+
+    engine().beginStroke({10, 10});
+    engine().moveStroke({60, 60});
+    const auto settled = engine().endStroke();
+    ASSERT_TRUE(settled.has_value()) << settled.error().message;
+    ASSERT_TRUE(engine().select(*settled).has_value());
+
+    // 右下角手柄在逻辑 (61,61)：视图 400x200、画布逻辑 200x100，控件坐标是逻辑坐标的两倍
+    for (const auto &[type, position]:
+         {std::pair{QEvent::MouseButtonPress, QPoint{122, 122}}, std::pair{QEvent::MouseMove, QPoint{162, 140}}, std::pair{QEvent::MouseButtonRelease, QPoint{162, 140}}})
+    {
+        QMouseEvent event{type, QPointF{position}, QPointF{position}, Qt::LeftButton, Qt::LeftButton, Qt::ShiftModifier};
+        QApplication::sendEvent(&view, &event);
+    }
+
+    const auto grown = engine().selectionBounds();
+    ASSERT_TRUE(grown.has_value());
+    EXPECT_NEAR(grown->width(), 71.0, 2.5) << "宽没按变化大的那一轴倍率走";
+    EXPECT_NEAR(grown->height(), grown->width(), 2.0) << "Shift 拖完长宽比没保住（修饰键没走到几何）";
+    EXPECT_NEAR(grown->left(), 10.0, 2.5) << "等比例缩放该锚住左与上两条边";
+    EXPECT_NEAR(grown->top(), 10.0, 2.5);
+}
+
+/**
  * @brief 钉住 Ctrl/Shift 点选多选与「多选后拖任意一条挪整组」
  * @details 点选走合成事件：先裸点选中 A，再 Ctrl 点 B 并进选中集；
  *          多选状态下按住任意一条拖动，整组一起挪，一步撤销整组回位。

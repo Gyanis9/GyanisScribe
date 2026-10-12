@@ -1005,7 +1005,7 @@ namespace GyanisScribe::Annotation
         return {};
     }
 
-    Core::Expected<void> AnnotationEngine::updateSelectionDrag(const QPoint &point)
+    Core::Expected<void> AnnotationEngine::updateSelectionDrag(const QPoint &point, const SelectionDragModifiers &modifiers)
     {
         if (!m_handleDrag)
         {
@@ -1031,9 +1031,10 @@ namespace GyanisScribe::Annotation
         } else
         {
             // 缩放从开场那一份外接框重算：事件点先按图形的旋转角映回局部坐标，
-            // 于是旋转过的图形也是沿它自己的两条边伸缩，而不是沿屏幕的横竖
+            // 于是旋转过的图形也是沿它自己的两条边伸缩，而不是沿屏幕的横竖；
+            // Ctrl/Shift 两档由修饰键一并带进几何
             const QPointF local  = unrotatedPoint(QPointF{point}, session.localBox.center(), session.before.rotationDeg);
-            const QRectF  newBox = resizedBox(session.localBox, session.handle, local);
+            const QRectF  newBox = resizedBox(session.localBox, session.handle, local, kMinimumResizedBoxSide, modifiers.fromCenter, modifiers.proportional);
             target               = shapeInBox(session.before, session.localBox, newBox);
             target.rotationDeg   = session.before.rotationDeg;
         }

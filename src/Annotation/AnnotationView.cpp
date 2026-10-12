@@ -42,6 +42,16 @@ namespace
         }
         return trimmed;
     }
+
+    /**
+     * @brief 鼠标修饰键翻成拖手柄的两档开关：Ctrl 中心点、Shift 等比例，与主流图像工具同一套键位
+     * @param modifiers 此刻按住的修饰键
+     * @return 拖手柄时用的两档
+     */
+    [[nodiscard]] GyanisScribe::Annotation::SelectionDragModifiers selectionDragModifiersOf(const Qt::KeyboardModifiers modifiers)
+    {
+        return GyanisScribe::Annotation::SelectionDragModifiers{.fromCenter = modifiers.testFlag(Qt::ControlModifier), .proportional = modifiers.testFlag(Qt::ShiftModifier)};
+    }
 } // namespace
 
 namespace GyanisScribe::Annotation
@@ -249,7 +259,7 @@ namespace GyanisScribe::Annotation
         if (m_handleDragging)
         {
             // 每次都从开场那份几何重算，失败（那条被撤没了）就安静跳过：拖动途中的报错只会刷屏
-            if (auto dragged = m_engine.updateSelectionDrag(point); dragged)
+            if (auto dragged = m_engine.updateSelectionDrag(point, selectionDragModifiersOf(event->modifiers())); dragged)
             {
                 update();
             }

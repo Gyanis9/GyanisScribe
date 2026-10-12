@@ -58,6 +58,17 @@ namespace GyanisScribe::Annotation
     };
 
     /**
+     * @brief 拖手柄时按住的修饰键：缩放的两条老约定各占一个开关
+     * @details 记的是「这一刻按着什么」而不是按下手柄那一刻按着什么：拖到一半再按或松开
+     *          是常规操作，按开场那一刻定档会让人以为键没接上。
+     */
+    struct SelectionDragModifiers
+    {
+        bool fromCenter   = false; ///< Ctrl：原中心是不动点，拖一条边对面一条对向走同样多的距离
+        bool proportional = false; ///< Shift：保持原框长宽比，只拖一轴时另一轴按同一倍率补偿
+    };
+
+    /**
      * @brief 标注引擎
      * @details 界面只跟这一个接口打交道：切换工具、走笔、选中、撤销、导出。
      *          引擎不依赖任何具体 Widget，因此容器里没有界面也能把整条标注流程跑进用例。
@@ -255,10 +266,11 @@ namespace GyanisScribe::Annotation
         /**
          * @brief 手柄拖动中
          * @param point 当前画布逻辑坐标
+         * @param modifiers 此刻按住的修饰键（Ctrl 中心点缩放、Shift 等比例缩放；旋转档不吃这两键）
          * @return 成功返回空载荷；没有开场过或那条已不在册时返回 InvalidArgument
          * @details 一趟拖动并成一步撤销：起点固定在开场时那一份图形上，逐个中间点覆盖命令的终点。
          */
-        virtual Core::Expected<void> updateSelectionDrag(const QPoint &point) = 0;
+        virtual Core::Expected<void> updateSelectionDrag(const QPoint &point, const SelectionDragModifiers &modifiers) = 0;
 
         /**
          * @brief 结束手柄拖动（松手那一刻叫）

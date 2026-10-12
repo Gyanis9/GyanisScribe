@@ -31,49 +31,121 @@ namespace GyanisScribe::Annotation
      * @param handle 抓住的手柄（八个方向之一；None 与 Rotate 不动框）
      * @param point 拖动点在图形局部坐标下的位置
      * @param minimumSide 夹住的最小边长
+     * @param fromCenter true 时原中心是不动点（Ctrl）：拖一条边，对面一条对向走同样多的距离
+     * @param proportional true 时保持原框的长宽比（Shift）：只拖一轴时另一轴按同一倍率绕自己的中线长出去；
+     *                     角上手柄两轴都在拖，取变化大的那一轴定倍率
      * @return 新框；拖过对面一条边时把边夹在最小边长上，不做翻转
-     * @note 不做翻转是有意的：翻转会换来翻转手柄语义与取整方向两套特例，收益只是镜像一条图形
+     * @note 不做翻转是有意的：翻转会换来翻转手柄语义与取整方向两套特例，收益只是镜像一条图形。
+     *       原框某一轴长为 0（竖线、横线）时没有倍率可算，等比例那一档退回逐轴伸缩。
      */
-    [[nodiscard]] inline QRectF resizedBox(const QRectF &box, const SelectionHandle handle, const QPointF &point, const qreal minimumSide = kMinimumResizedBoxSide)
+    [[nodiscard]] inline QRectF resizedBox(const QRectF &box, const SelectionHandle handle, const QPointF &point, const qreal minimumSide = kMinimumResizedBoxSide,
+                                           const bool fromCenter = false, const bool proportional = false)
     {
-        qreal left   = box.left();
-        qreal top    = box.top();
-        qreal right  = box.right();
-        qreal bottom = box.bottom();
-
-        switch (handle)
+        const bool dragsLeft   = handle == SelectionHandle::TopLeft || handle == SelectionHandle::Left || handle == SelectionHandle::BottomLeft;
+        const bool dragsRight  = handle == SelectionHandle::TopRight || handle == SelectionHandle::Right || handle == SelectionHandle::BottomRight;
+        const bool dragsTop    = handle == SelectionHandle::TopLeft || handle == SelectionHandle::Top || handle == SelectionHandle::TopRight;
+        const bool dragsBottom = handle == SelectionHandle::BottomLeft || handle == SelectionHandle::Bottom || handle == SelectionHandle::BottomRight;
+        if (!dragsLeft && !dragsRight && !dragsTop && !dragsBottom)
         {
-            case SelectionHandle::TopLeft:
-                left = std::min(point.x(), right - minimumSide);
-                top  = std::min(point.y(), bottom - minimumSide);
-                break;
-            case SelectionHandle::Top:
-                top = std::min(point.y(), bottom - minimumSide);
-                break;
-            case SelectionHandle::TopRight:
-                right = std::max(point.x(), left + minimumSide);
-                top   = std::min(point.y(), bottom - minimumSide);
-                break;
-            case SelectionHandle::Right:
-                right = std::max(point.x(), left + minimumSide);
-                break;
-            case SelectionHandle::BottomRight:
-                right  = std::max(point.x(), left + minimumSide);
-                bottom = std::max(point.y(), top + minimumSide);
-                break;
-            case SelectionHandle::Bottom:
-                bottom = std::max(point.y(), top + minimumSide);
-                break;
-            case SelectionHandle::BottomLeft:
-                left   = std::min(point.x(), right - minimumSide);
-                bottom = std::max(point.y(), top + minimumSide);
-                break;
-            case SelectionHandle::Left:
-                left = std::min(point.x(), right - minimumSide);
-                break;
-            default:
-                break;
+            return box;
         }
+
+        const qreal centerX = box.center().x();
+        const qreal centerY = box.center().y();
+
+        // 先按拖动点算出拖动轴上想要的新长：中心起算时两侧对向同步，故是「到中心距离的两倍」
+        qreal width  = box.width();
+        qreal height = box.height();
+        if (dragsLeft)
+        {
+            width = fromCenter ? (centerX - point.x()) * 2.0 : box.right() - point.x();
+        } else if (dragsRight)
+        {
+            width = fromCenter ? (point.x() - centerX) * 2.0 : point.x() - box.left();
+        }
+        if (dragsTop)
+        {
+            height = fromCenter ? (centerY - point.y()) * 2.0 : box.bottom() - point.y();
+        } else if (dragsBottom)
+        {
+            height = fromCenter ? (point.y() - centerY) * 2.0 : point.y() - box.top();
+        }
+        width  = std::max(width, minimumSide);
+        height = std::max(height, minimumSide);
+
+        if (proportional && box.width() > 0.0 && box.height() > 0.0)
+        {
+            qreal factor = 0.0;
+            if (dragsLeft || dragsRight)
+            {
+                factor = std::max(factor, width / box.width());
+            }
+            if (dragsTop || dragsBottom)
+            {
+                factor = std::max(factor, height / box.height());
+            }
+            width  = box.width() * factor;
+            height = box.height() * factor;
+        }
+
+        // 落位：拖动的那条轴按「对面一条边不动」或「绕中心对向对称」；
+        // 没拖的那条轴只在等比例档下随倍率变长，绕自己的中线长出去（锚定的那条边不参与的那一轴）
+        qreal left  = box.left();
+        qreal right = box.right();
+        if (dragsRight)
+        {
+            if (fromCenter)
+            {
+                left  = centerX - width / 2.0;
+                right = centerX + width / 2.0;
+            } else
+            {
+                right = box.left() + width;
+            }
+        } else if (dragsLeft)
+        {
+            if (fromCenter)
+            {
+                left  = centerX - width / 2.0;
+                right = centerX + width / 2.0;
+            } else
+            {
+                left = box.right() - width;
+            }
+        } else
+        {
+            left  = centerX - width / 2.0;
+            right = centerX + width / 2.0;
+        }
+
+        qreal top    = box.top();
+        qreal bottom = box.bottom();
+        if (dragsBottom)
+        {
+            if (fromCenter)
+            {
+                top    = centerY - height / 2.0;
+                bottom = centerY + height / 2.0;
+            } else
+            {
+                bottom = box.top() + height;
+            }
+        } else if (dragsTop)
+        {
+            if (fromCenter)
+            {
+                top    = centerY - height / 2.0;
+                bottom = centerY + height / 2.0;
+            } else
+            {
+                top = box.bottom() - height;
+            }
+        } else
+        {
+            top    = centerY - height / 2.0;
+            bottom = centerY + height / 2.0;
+        }
+
         return QRectF{QPointF{left, top}, QPointF{right, bottom}};
     }
 

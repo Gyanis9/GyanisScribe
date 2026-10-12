@@ -14,6 +14,7 @@
 using GyanisScribe::Annotation::AnnotationEngine;
 using GyanisScribe::Annotation::AnnotationSelection;
 using GyanisScribe::Annotation::PenParameters;
+using GyanisScribe::Annotation::SelectionDragModifiers;
 using GyanisScribe::Annotation::SelectionHandle;
 using GyanisScribe::Annotation::ToolKind;
 using GyanisScribe::Core::CapturedImage;
@@ -998,8 +999,8 @@ TEST_F(EngineFixture, HandleDragResizesAndUndoesInOneStep)
     ASSERT_TRUE(m_engine.select(rectangle).has_value());
 
     ASSERT_TRUE(m_engine.beginSelectionDrag(SelectionHandle::Right, QPoint(100, 50)).has_value());
-    ASSERT_TRUE(m_engine.updateSelectionDrag(QPoint(130, 50)).has_value());
-    ASSERT_TRUE(m_engine.updateSelectionDrag(QPoint(160, 50)).has_value());
+    ASSERT_TRUE(m_engine.updateSelectionDrag(QPoint(130, 50), {}).has_value());
+    ASSERT_TRUE(m_engine.updateSelectionDrag(QPoint(160, 50), {}).has_value());
     m_engine.endSelectionDrag();
 
     const auto bounds = m_engine.selectionBounds();
@@ -1016,6 +1017,27 @@ TEST_F(EngineFixture, HandleDragResizesAndUndoesInOneStep)
 }
 
 /**
+ * @brief 钉住拖动档从引擎一路走到几何：按住 Ctrl 拖右边＝以中心为不动点、两侧对向一起让
+ * @details 原框 (20,30)-(101,71)，中心 x=60.5；右边拖到 120 时半程 59.5，左边该跟到 1。
+ *          不带这一档时左边会留在 20——断言左边走了，才能证明修饰键真进了几何，而不是把
+ *          「右边到了 120」这句普通缩放也满足的话当真。
+ */
+TEST_F(EngineFixture, HandleDragHonorsTheFromCenterSwitch)
+{
+    const auto rectangle = drawRectangle(QPoint(20, 30), QPoint(100, 70));
+    ASSERT_TRUE(m_engine.select(rectangle).has_value());
+
+    ASSERT_TRUE(m_engine.beginSelectionDrag(SelectionHandle::Right, QPoint(100, 50)).has_value());
+    ASSERT_TRUE(m_engine.updateSelectionDrag(QPoint(120, 50), SelectionDragModifiers{.fromCenter = true}).has_value());
+    m_engine.endSelectionDrag();
+
+    const auto bounds = m_engine.selectionBounds();
+    ASSERT_TRUE(bounds.has_value());
+    EXPECT_NEAR(bounds->left(), 1.0, 2.5) << "Ctrl 档没把左边对向带出来（修饰键没走到几何）";
+    EXPECT_NEAR(bounds->right(), 120.0, 2.5) << "右边该落在拖动点上";
+}
+
+/**
  * @brief 钉住旋转拖动：绕外接框中心转到位、可撤销；先转后缩时伸缩走图形自己的轴
  * @details 起始点在正上方（-90° 方向）、终点在正右方：增量正好 +90°。
  *          转 90° 后原来的右边线立到下方、上边线立到右侧，用像素与手柄框两处核对。
@@ -1027,7 +1049,7 @@ TEST_F(EngineFixture, HandleDragRotatesAboutTheCenterAndUndoes)
     EXPECT_EQ(m_engine.exportImage().pixelColor(80, 40), QColor(255, 0, 0)) << "靶子不对：上边线该在 y=40";
 
     ASSERT_TRUE(m_engine.beginSelectionDrag(SelectionHandle::Rotate, QPoint(80, 16)).has_value());
-    ASSERT_TRUE(m_engine.updateSelectionDrag(QPoint(130, 50)).has_value());
+    ASSERT_TRUE(m_engine.updateSelectionDrag(QPoint(130, 50), {}).has_value());
     m_engine.endSelectionDrag();
 
     const auto frame = m_engine.selectionFrame();
@@ -1111,8 +1133,8 @@ TEST_F(EngineFixture, CopyPasteDuplicatesWithGrowingOffsetAndOneStepUndo)
 TEST_F(EngineFixture, HandleDragRefusesWithoutASingleSelection)
 {
     EXPECT_FALSE(m_engine.beginSelectionDrag(SelectionHandle::Right, QPoint(10, 10)).has_value()) << "没选中也能开拖手柄";
-    EXPECT_FALSE(m_engine.updateSelectionDrag(QPoint(10, 10)).has_value()) << "没开场也能拖动";
-    EXPECT_NE(m_engine.updateSelectionDrag(QPoint(10, 10)).error().message.find("手柄"), std::string::npos);
+    EXPECT_FALSE(m_engine.updateSelectionDrag(QPoint(10, 10), {}).has_value()) << "没开场也能拖动";
+    EXPECT_NE(m_engine.updateSelectionDrag(QPoint(10, 10), {}).error().message.find("手柄"), std::string::npos);
 
     const auto rectangle = drawRectangle(QPoint(20, 30), QPoint(100, 70));
     ASSERT_TRUE(m_engine.select(rectangle).has_value());

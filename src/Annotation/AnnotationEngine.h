@@ -209,9 +209,10 @@ namespace GyanisScribe::Annotation
         /**
          * @brief 手柄拖动中，见 IAnnotationEngine::updateSelectionDrag()
          * @param point 当前点
+         * @param modifiers 此刻按住的修饰键（Ctrl 中心点缩放、Shift 等比例缩放）
          * @return 成功返回空载荷；没有开场过或那条已不在册时返回 InvalidArgument
          */
-        Core::Expected<void> updateSelectionDrag(const QPoint &point) override;
+        Core::Expected<void> updateSelectionDrag(const QPoint &point, const SelectionDragModifiers &modifiers) override;
 
         /// 结束手柄拖动，见 IAnnotationEngine::endSelectionDrag()
         void endSelectionDrag() override;
