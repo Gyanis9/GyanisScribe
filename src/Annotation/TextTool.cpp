@@ -1,8 +1,8 @@
 #include "Annotation/TextTool.h"
 
+#include "Annotation/TextFont.h"
 #include "Core/Text.h"
 
-#include <QFont>
 #include <QPainter>
 
 namespace GyanisScribe::Annotation
@@ -34,9 +34,8 @@ namespace GyanisScribe::Annotation
     {
         Q_UNUSED(context);
 
-        QFont font = painter.font();
-        font.setPointSize(shape.fontSize);
-        painter.setFont(font);
+        // 字体拼装与外接框量度共用 textFontFor：字体族、粗体、斜体一处改，画与量跟着一起动
+        painter.setFont(textFontFor(shape));
         painter.setPen(shape.color);
         // 基线锚点：position 就是文字左上角，与 boundingBoxOf 里那个矩形同一个起点
         painter.drawText(shape.position, shape.text);

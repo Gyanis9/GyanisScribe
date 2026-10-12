@@ -10,6 +10,9 @@
 
 #include <QApplication>
 #include <QColor>
+#include <QFont>
+#include <QFontDatabase>
+#include <QFontMetricsF>
 #include <QImage>
 #include <QString>
 
@@ -607,6 +610,160 @@ TEST_F(AnnotationFixture, HighlightOpacityFollowsEachShape)
     m_engine.moveStroke(QPoint(180, 160));
     ASSERT_TRUE(m_engine.endStroke().has_value());
     EXPECT_EQ(m_engine.exportImage().pixelColor(100, 160), QColor(170, 170, 0)) << "重档在黑底上的读数不是 170";
+}
+
+/**
+ * @brief 钉住粗体：同一串字按粗体画出来的墨点明显多过常规档
+ * @details 墨点数这条判据在字体与平台之间都成立：粗体的笔画更厚，非底色像素必然更多。
+ *          两串 MM 同字号画在上下两块互不重叠的白区里（底图 y=100 以下是黑的，取样块都留了余量），
+ *          只比计数不比位置。
+ */
+TEST_F(AnnotationFixture, TextBoldDoublesTheInk)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Text).has_value());
+
+    const auto inkCount = [this](const QRect &box)
+    {
+        const QImage drawn = m_engine.exportImage();
+        int          ink   = 0;
+        for (int y = box.top(); y <= box.bottom(); ++y)
+        {
+            for (int x = box.left(); x <= box.right(); ++x)
+            {
+                if (drawn.pixelColor(x, y) != QColor(255, 255, 255))
+                {
+                    ++ink;
+                }
+            }
+        }
+        return ink;
+    };
+
+    // 常规档
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 4, .fontSize = 20, .fillStyle = 0}).has_value());
+    m_engine.beginStroke(QPoint(20, 35));
+    ASSERT_TRUE(m_engine.setPendingText(QStringLiteral("MMMM")).has_value());
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+
+    // 粗体档
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 4, .fontSize = 20, .fillStyle = 0, .textBold = true}).has_value());
+    m_engine.beginStroke(QPoint(20, 85));
+    ASSERT_TRUE(m_engine.setPendingText(QStringLiteral("MMMM")).has_value());
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+
+    const auto regularInk = inkCount(QRect(10, 10, 380, 45));
+    const auto boldInk    = inkCount(QRect(10, 60, 380, 39));
+    EXPECT_GT(regularInk, 0) << "常规档一个字都没画出来，后面的对照就没有意义";
+    EXPECT_GT(boldInk, regularInk) << "粗体的墨点没有多过常规档，粗体没生效";
+}
+
+/**
+ * @brief 钉住斜体：同一根竖笔画斜体档的顶端比底端更靠右，常规档上下基本对齐
+ * @details 只比「最上一行墨点」与「最下一行墨点」的左端差值：字体是否真有斜体变体、
+ *          平台合成斜体的倾角差几像素，都不影响这条相对比较。取大写字 H——左竖笔画的
+ *          上下端各自代表整字的倾倒方向。
+ */
+TEST_F(AnnotationFixture, TextItalicLeansTheStem)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Text).has_value());
+
+    // 最上与最下一行墨点的左端之差：斜体为正（上端更靠右），常规应近似 0
+    const auto leanOf = [this](const QRect &box)
+    {
+        const QImage drawn   = m_engine.exportImage();
+        int          topX    = -1;
+        int          bottomX = -1;
+        for (int y = box.top(); y <= box.bottom(); ++y)
+        {
+            for (int x = box.left(); x <= box.right(); ++x)
+            {
+                if (drawn.pixelColor(x, y) == QColor(255, 255, 255))
+                {
+                    continue;
+                }
+                if (topX < 0)
+                {
+                    topX = x;
+                }
+                bottomX = x;
+                break;
+            }
+        }
+        return topX < 0 || bottomX < 0 ? 0 : topX - bottomX;
+    };
+
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 4, .fontSize = 24, .fillStyle = 0}).has_value());
+    m_engine.beginStroke(QPoint(30, 40));
+    ASSERT_TRUE(m_engine.setPendingText(QStringLiteral("H")).has_value());
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 4, .fontSize = 24, .fillStyle = 0, .textItalic = true}).has_value());
+    m_engine.beginStroke(QPoint(30, 85));
+    ASSERT_TRUE(m_engine.setPendingText(QStringLiteral("H")).has_value());
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+
+    const auto regularLean = leanOf(QRect(20, 10, 120, 48));
+    const auto italicLean  = leanOf(QRect(20, 55, 120, 44));
+    EXPECT_LE(std::abs(regularLean), 2) << "常规档的竖笔画就歪了，先查取样框是不是切到了别的墨";
+    EXPECT_GT(italicLean, regularLean + 2) << "斜体档的笔画没有向右倾倒，斜体没生效";
+}
+
+/**
+ * @brief 钉住字体族：换一个家族，同一串字的渲染就该变
+ * @details 家族名从本机字体库里现取两个，再把两族渲染逐像素比对——写死家族名会在别的
+ *          机器上落到同一个替代字体上，判据假绿。两族量出来一样宽的少见情形按跳过处理，
+ *          那是这台机器没有可判的差，不是被测代码的问题。
+ */
+TEST_F(AnnotationFixture, TextFamilyChangesTheGlyphs)
+{
+    const auto families = QFontDatabase::families();
+    ASSERT_GE(families.size(), 2) << "这台机器只有一个字体家族，换族无从验起";
+    const QString first = families.first();
+    QString       second;
+    for (const auto &family: families)
+    {
+        if (family != first)
+        {
+            second = family;
+            break;
+        }
+    }
+
+    QFont probe;
+    probe.setPointSize(24);
+    probe.setFamily(first);
+    const auto firstAdvance = QFontMetricsF(probe).horizontalAdvance(QStringLiteral("HWM"));
+    probe.setFamily(second);
+    if (qFuzzyCompare(firstAdvance, QFontMetricsF(probe).horizontalAdvance(QStringLiteral("HWM"))))
+    {
+        GTEST_SKIP() << "本机两族量『HWM』一样宽，没有可判的差";
+    }
+
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Text).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 4, .fontSize = 20, .fillStyle = 0, .fontFamily = first}).has_value());
+    m_engine.beginStroke(QPoint(20, 35));
+    ASSERT_TRUE(m_engine.setPendingText(QStringLiteral("HWM")).has_value());
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 4, .fontSize = 20, .fillStyle = 0, .fontFamily = second}).has_value());
+    m_engine.beginStroke(QPoint(20, 85));
+    ASSERT_TRUE(m_engine.setPendingText(QStringLiteral("HWM")).has_value());
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+
+    // 两串字同字号同列起画、只差一个家族：逐像素比「上下相隔 50 行」的两块，有差即证明家族生效
+    const QImage drawn = m_engine.exportImage();
+    int          diff  = 0;
+    for (int y = 10; y <= 44; ++y)
+    {
+        for (int x = 20; x <= 180; ++x)
+        {
+            if (drawn.pixelColor(x, y) != drawn.pixelColor(x, y + 50))
+            {
+                ++diff;
+            }
+        }
+    }
+    EXPECT_GT(diff, 0) << "两个家族画出来的字逐像素一致，字体族没生效";
 }
 
 /**

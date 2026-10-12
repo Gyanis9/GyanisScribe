@@ -116,6 +116,22 @@
             <translation>Highlight opacity</translation>
         </message>
         <message>
+            <source>字体</source>
+            <translation>Font</translation>
+        </message>
+        <message>
+            <source>字体（文字）</source>
+            <translation>Font (text)</translation>
+        </message>
+        <message>
+            <source>粗体</source>
+            <translation>Bold</translation>
+        </message>
+        <message>
+            <source>斜体</source>
+            <translation>Italic</translation>
+        </message>
+        <message>
             <source>撤销（Ctrl+Z）</source>
             <translation>Undo (Ctrl+Z)</translation>
         </message>
@@ -182,6 +198,22 @@
         <message>
             <source>高亮透明度：重</source>
             <translation>Highlight opacity: strong</translation>
+        </message>
+        <message>
+            <source>粗体：开</source>
+            <translation>Bold: on</translation>
+        </message>
+        <message>
+            <source>粗体：关</source>
+            <translation>Bold: off</translation>
+        </message>
+        <message>
+            <source>斜体：开</source>
+            <translation>Italic: on</translation>
+        </message>
+        <message>
+            <source>斜体：关</source>
+            <translation>Italic: off</translation>
         </message>
         <message>
             <source>选择标注颜色</source>

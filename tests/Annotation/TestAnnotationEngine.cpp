@@ -557,3 +557,43 @@ TEST_F(EngineFixture, TextEditingRefusesWrongTargetsWithReasons)
     ASSERT_FALSE(stale.has_value()) << "被撤销掉的图形还能改文字";
     EXPECT_NE(stale.error().message.find("双击"), std::string::npos) << stale.error().message;
 }
+
+/**
+ * @brief 钉住文字的字体族/粗体/斜体三件也走改样式命令：选中那条当场变，撤销回原样
+ * @details 三个字段与马赛克粒度、高亮透明度同属「后加的样式旋钮」：penParametersOf 与
+ *          restyleShapeAt 都按字段逐个抄，漏一个就是「选中老样式的文字调样式不生效」。
+ *          墨点计数在字体与平台之间都成立——粗体的笔画更厚，非白像素必然更多。
+ */
+TEST_F(EngineFixture, TextStyleRestyleLandsOnTheSelectedTextAndUndoesBack)
+{
+    const auto inkIn = [this](const QRect &box)
+    {
+        const QImage drawn = m_engine.exportImage();
+        int          ink   = 0;
+        for (int y = box.top(); y <= box.bottom(); ++y)
+        {
+            for (int x = box.left(); x <= box.right(); ++x)
+            {
+                if (drawn.pixelColor(x, y) != QColor(255, 255, 255))
+                {
+                    ++ink;
+                }
+            }
+        }
+        return ink;
+    };
+
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 4, .fontSize = 24, .fillStyle = 0}).has_value());
+    const auto text = placeText(m_engine, QPoint(20, 50), QStringLiteral("MM"));
+    ASSERT_TRUE(m_engine.select(text).has_value());
+
+    const QRect box(10, 20, 180, 45);
+    const auto  regularInk = inkIn(box);
+    ASSERT_GT(regularInk, 0) << "常规档一个字都没画出来，后面的对照就没有意义";
+
+    // 开粗体：选中这条的墨点变多；撤一步回常规
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 4, .fontSize = 24, .fillStyle = 0, .textBold = true}).has_value());
+    EXPECT_GT(inkIn(box), regularInk) << "选中这条文字的粗体没跟着开";
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_EQ(inkIn(box), regularInk) << "撤销没把粗体退回常规档";
+}

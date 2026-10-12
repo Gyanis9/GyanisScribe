@@ -11,6 +11,7 @@
 #include <QButtonGroup>
 #include <QColorDialog>
 #include <QComboBox>
+#include <QFontComboBox>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QIcon>
@@ -214,7 +215,21 @@ namespace GyanisScribe::Annotation
         m_highlightAlphaButton = makeButton("HighlightOpacity", GyanisScribe::Core::uiText("高亮透明度"), false);
         QObject::connect(m_highlightAlphaButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleHighlightAlpha);
         layout->addWidget(m_highlightAlphaButton);
+        // 文字字体族：文字工具用得上，列系统字体。宽度封顶——字体名长的很，放任 sizeHint 会撑出去
+        m_fontCombo = new QFontComboBox{this};
+        m_fontCombo->setMaximumWidth(Ui::kToolbarFontComboWidth);
+        m_fontCombo->setAccessibleName(GyanisScribe::Core::uiText("字体"));
+        m_fontCombo->setToolTip(GyanisScribe::Core::uiText("字体（文字）"));
+        QObject::connect(m_fontCombo, &QFontComboBox::currentFontChanged, this, [this](const QFont &font) { emit fontFamilyChanged(font.family()); });
+        layout->addWidget(m_fontCombo);
         layout->addWidget(m_fontSizeCombo);
+        // 粗体/斜体：文字工具用得上，保持按下态的开关，与双向箭头同一套口径
+        m_boldButton = makeButton("Bold", GyanisScribe::Core::uiText("粗体"), true);
+        QObject::connect(m_boldButton, &QToolButton::clicked, this, [this] { setTextBold(m_boldButton->isChecked()); });
+        layout->addWidget(m_boldButton);
+        m_italicButton = makeButton("Italic", GyanisScribe::Core::uiText("斜体"), true);
+        QObject::connect(m_italicButton, &QToolButton::clicked, this, [this] { setTextItalic(m_italicButton->isChecked()); });
+        layout->addWidget(m_italicButton);
         layout->addWidget(makeSeparator());
 
         m_undoButton = makeButton("Undo", GyanisScribe::Core::uiText("撤销（Ctrl+Z）"), false);
@@ -335,6 +350,45 @@ namespace GyanisScribe::Annotation
             m_highlightAlphaButton->setAccessibleName(label);
         }
         emit highlightAlphaChanged(currentHighlightAlpha());
+    }
+
+    QString AnnotationToolbar::currentFontFamily() const
+    {
+        return m_fontCombo->currentFont().family();
+    }
+
+    bool AnnotationToolbar::currentTextBold() const
+    {
+        return m_boldButton != nullptr && m_boldButton->isChecked();
+    }
+
+    void AnnotationToolbar::setTextBold(const bool enabled)
+    {
+        if (m_boldButton != nullptr)
+        {
+            m_boldButton->setChecked(enabled);
+            const auto label = enabled ? GyanisScribe::Core::uiText("粗体：开") : GyanisScribe::Core::uiText("粗体：关");
+            m_boldButton->setToolTip(label);
+            m_boldButton->setAccessibleName(label);
+        }
+        emit textBoldChanged(enabled);
+    }
+
+    bool AnnotationToolbar::currentTextItalic() const
+    {
+        return m_italicButton != nullptr && m_italicButton->isChecked();
+    }
+
+    void AnnotationToolbar::setTextItalic(const bool enabled)
+    {
+        if (m_italicButton != nullptr)
+        {
+            m_italicButton->setChecked(enabled);
+            const auto label = enabled ? GyanisScribe::Core::uiText("斜体：开") : GyanisScribe::Core::uiText("斜体：关");
+            m_italicButton->setToolTip(label);
+            m_italicButton->setAccessibleName(label);
+        }
+        emit textItalicChanged(enabled);
     }
 
     void AnnotationToolbar::applyStoredDefaults()

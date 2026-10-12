@@ -56,10 +56,10 @@ namespace GyanisScribe::Annotation
         /**
          * @brief 画一段文字，见 AnnotationTool::paintShape()
          * @param painter 目标画家
-         * @param shape 图形，取 text、position、color、fontSize
+         * @param shape 图形，取 text、position、color、fontSize、fontFamily、textBold、textItalic
          * @param context 绘制现场，本工具不使用
-         * @details 重写基类纯虚接口：字号用 pointSize，与基类算外接框时用的是同一个值，
-         *          选中框才不会和字错位。
+         * @details 重写基类纯虚接口：字体经 TextFont.h 的 textFontFor 拼装，与基类算外接框
+         *          用的是同一处，选中框才不会和字错位。
          */
         void paintShape(QPainter &painter, const AnnotationShape &shape, const PaintContext &context) const override;
     };

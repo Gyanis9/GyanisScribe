@@ -23,6 +23,7 @@
 
 class QButtonGroup;
 class QComboBox;
+class QFontComboBox;
 class QHBoxLayout;
 class QSlider;
 class QToolButton;
@@ -139,6 +140,27 @@ namespace GyanisScribe::Annotation
         /// 按 中 → 重 → 轻 → 中 走一档；按钮与用例共用这一个入口
         void cycleHighlightAlpha();
 
+        /// 当前文字字体族，取字体下拉的当前项（非空；跟随应用默认时就是默认家族名）
+        [[nodiscard]] QString currentFontFamily() const;
+
+        /// 当前文字是不是粗体
+        [[nodiscard]] bool currentTextBold() const;
+
+        /**
+         * @brief 开/关文字粗体，按钮态、提示与信号一次对齐
+         * @param enabled true 表示粗体
+         */
+        void setTextBold(bool enabled);
+
+        /// 当前文字是不是斜体
+        [[nodiscard]] bool currentTextItalic() const;
+
+        /**
+         * @brief 开/关文字斜体，按钮态、提示与信号一次对齐
+         * @param enabled true 表示斜体
+         */
+        void setTextItalic(bool enabled);
+
         /**
          * @brief 指定序号的工具按钮，用例与调试用它核对状态
          * @param index 按钮序号，越界返回空指针
@@ -162,6 +184,12 @@ namespace GyanisScribe::Annotation
         void mosaicBlockSizeChanged(int blockSize);
         /// 用户改了高亮透明度
         void highlightAlphaChanged(int alpha);
+        /// 用户换了文字字体族
+        void fontFamilyChanged(const QString &family);
+        /// 用户开了/关了文字粗体
+        void textBoldChanged(bool enabled);
+        /// 用户开了/关了文字斜体
+        void textItalicChanged(bool enabled);
         /// 撤销
         void undoClicked();
         /// 重做
@@ -228,6 +256,9 @@ namespace GyanisScribe::Annotation
         int                                                      m_mosaicBlockStep      = static_cast<int>(kDefaultMosaicBlockStep);  ///< 当前粒度档下标，值表是 kMosaicBlockSizes
         QToolButton                                             *m_highlightAlphaButton = nullptr;                                    ///< 高亮透明度按钮，点一下走一档
         int                                                      m_highlightAlphaStep = static_cast<int>(kDefaultHighlightAlphaStep); ///< 当前透明度档下标，值表是 kHighlightAlphas
+        QFontComboBox                                           *m_fontCombo          = nullptr;                                      ///< 文字字体族下拉，列系统字体
+        QToolButton                                             *m_boldButton         = nullptr;                                      ///< 文字粗体开关，按下表示粗
+        QToolButton                                             *m_italicButton       = nullptr;                                      ///< 文字斜体开关，按下表示斜
         QColor                                                   m_currentColor;                                                      ///< 当前颜色，初值取色板第一格
         bool                                                     m_stateIsInitial = true; ///< 还在构造期：起点值不回写配置，坏值要留在文件里让人看得见
         ToolKind                                                 m_activeTool;            ///< 当前工具，用来挡住「重复点同一个工具」的二次信号

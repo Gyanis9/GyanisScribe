@@ -12,6 +12,9 @@
 #include <QApplication>
 #include <QColor>
 #include <QComboBox>
+#include <QFont>
+#include <QFontComboBox>
+#include <QFontDatabase>
 #include <QImage>
 #include <QRect>
 #include <QSize>
@@ -123,6 +126,9 @@ namespace
             std::vector<int>      doubleHeaded;     ///< doubleHeadedChanged 收到的开关（1 开 0 关）
             std::vector<int>      mosaicBlockSizes; ///< mosaicBlockSizeChanged 收到的粒度
             std::vector<int>      highlightAlphas;  ///< highlightAlphaChanged 收到的透明度
+            std::vector<QString>  fontFamilies;     ///< fontFamilyChanged 收到的字体族
+            std::vector<int>      textBolds;        ///< textBoldChanged 收到的开关（1 开 0 关）
+            std::vector<int>      textItalics;      ///< textItalicChanged 收到的开关（1 开 0 关）
             int                   actions{};        ///< 四个动作按钮的合计触发次数
             int                   undo{};           ///< undoClicked 次数
             int                   redo{};           ///< redoClicked 次数
@@ -140,6 +146,9 @@ namespace
             QObject::connect(toolbar.get(), &AnnotationToolbar::doubleHeadedChanged, [&log](bool enabled) { log.doubleHeaded.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::mosaicBlockSizeChanged, [&log](int blockSize) { log.mosaicBlockSizes.push_back(blockSize); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::highlightAlphaChanged, [&log](int alpha) { log.highlightAlphas.push_back(alpha); });
+            QObject::connect(toolbar.get(), &AnnotationToolbar::fontFamilyChanged, [&log](const QString &family) { log.fontFamilies.push_back(family); });
+            QObject::connect(toolbar.get(), &AnnotationToolbar::textBoldChanged, [&log](bool enabled) { log.textBolds.push_back(enabled ? 1 : 0); });
+            QObject::connect(toolbar.get(), &AnnotationToolbar::textItalicChanged, [&log](bool enabled) { log.textItalics.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::undoClicked, [&log] { ++log.undo; });
             QObject::connect(toolbar.get(), &AnnotationToolbar::redoClicked, [&log] { ++log.redo; });
             for (auto signal: {&AnnotationToolbar::copyClicked, &AnnotationToolbar::saveClicked, &AnnotationToolbar::pinClicked, &AnnotationToolbar::ocrClicked})
@@ -267,6 +276,59 @@ namespace
         button->click();
         EXPECT_EQ(toolbar->currentHighlightAlpha(), 110) << "三档之后该回到「中」";
         EXPECT_EQ(button->accessibleName(), QString::fromUtf8("高亮透明度：中")) << "无障碍名没跟上当前档";
+    }
+
+    /**
+     * @brief 钉住文字样式三件：字体下拉换族发信号，粗体/斜体是保持按下态的开关
+     * @details 字体族从本机字体库里现取一个与当前不同的：写死家族名在别的机器上可能落到同一个
+     *          替代字体上，信号那格就验不出东西。
+     */
+    TEST_F(ToolbarFixture, TextStyleControlsDriveTheSignals)
+    {
+        SignalLog log;
+        auto      toolbar = makeToolbarLogged(log);
+
+        auto *fontCombo = toolbar->findChild<QFontComboBox *>();
+        ASSERT_NE(fontCombo, nullptr) << "工具栏上找不到字体下拉";
+        const auto families = QFontDatabase::families();
+        ASSERT_GE(families.size(), 2) << "这台机器只有一个字体家族，换族无从验起";
+        QString other;
+        for (const auto &family: families)
+        {
+            if (family != fontCombo->currentFont().family())
+            {
+                other = family;
+                break;
+            }
+        }
+        ASSERT_FALSE(other.isEmpty());
+        fontCombo->setCurrentFont(QFont{other});
+        EXPECT_EQ(toolbar->currentFontFamily(), other);
+        ASSERT_EQ(log.fontFamilies.size(), 1) << "换族没把信号发出去";
+        EXPECT_EQ(log.fontFamilies.back(), other);
+
+        auto *boldButton = buttonByLabel(*toolbar, "粗体");
+        ASSERT_NE(boldButton, nullptr) << "工具栏上找不到粗体按钮";
+        EXPECT_FALSE(toolbar->currentTextBold()) << "起点该是常规档";
+        boldButton->click();
+        EXPECT_TRUE(toolbar->currentTextBold());
+        EXPECT_EQ(log.textBolds, std::vector<int>{1}) << "开了却没把信号发出去";
+        EXPECT_TRUE(boldButton->isChecked()) << "开关开了按钮却没保持按下";
+        EXPECT_EQ(boldButton->toolTip(), QString::fromUtf8("粗体：开")) << "提示没跟上开关";
+        boldButton->click();
+        EXPECT_FALSE(toolbar->currentTextBold());
+        EXPECT_EQ(log.textBolds, (std::vector<int>{1, 0}));
+
+        auto *italicButton = buttonByLabel(*toolbar, "斜体");
+        ASSERT_NE(italicButton, nullptr) << "工具栏上找不到斜体按钮";
+        EXPECT_FALSE(toolbar->currentTextItalic()) << "起点该是常规档";
+        italicButton->click();
+        EXPECT_TRUE(toolbar->currentTextItalic());
+        EXPECT_EQ(log.textItalics, std::vector<int>{1}) << "开了却没把信号发出去";
+        EXPECT_EQ(italicButton->toolTip(), QString::fromUtf8("斜体：开")) << "提示没跟上开关";
+        italicButton->click();
+        EXPECT_FALSE(toolbar->currentTextItalic());
+        EXPECT_EQ(italicButton->accessibleName(), QString::fromUtf8("斜体：关")) << "无障碍名没跟上开关";
     }
 
 } // namespace
@@ -471,16 +533,28 @@ TEST_F(ToolbarFixture, StartsOnDefinedLadderValues)
     EXPECT_FALSE(buttonByLabel(*toolbar, "撤销（Ctrl+Z）")->isEnabled()) << "刚建好没有历史，亮着的撤销点了没反应";
     EXPECT_FALSE(buttonByLabel(*toolbar, "重做（Ctrl+Y）")->isEnabled());
 
-    // 字号下拉的取值必须恰好是那六个数，一个不多一个少
-    std::vector<int> listedSizes;
+    // 字号下拉的取值必须恰好是那六个数，一个不多一个少。字体下拉是后来加进来的同类控件
+    // （QFontComboBox 继承 QComboBox）：按无障碍名挑出字号那一个再数，别把系统字体名也算进去
+    QComboBox *sizeCombo = nullptr;
     for (auto *combo: toolbar->findChildren<QComboBox *>())
     {
-        for (int index = 0; index < combo->count(); ++index)
+        if (combo->accessibleName() == QString::fromUtf8("字号"))
         {
-            listedSizes.push_back(combo->itemData(index).toInt());
+            sizeCombo = combo;
+            break;
         }
     }
+    ASSERT_NE(sizeCombo, nullptr) << "工具栏上找不到字号下拉";
+    std::vector<int> listedSizes;
+    for (int index = 0; index < sizeCombo->count(); ++index)
+    {
+        listedSizes.push_back(sizeCombo->itemData(index).toInt());
+    }
     EXPECT_EQ(listedSizes, std::vector<int>(kFontSizes.begin(), kFontSizes.end())) << "字号下拉列出了需求之外的档位";
+
+    auto *fontCombo = toolbar->findChild<QFontComboBox *>();
+    ASSERT_NE(fontCombo, nullptr) << "工具栏上找不到字体下拉";
+    EXPECT_GT(fontCombo->count(), 0) << "字体下拉一个家族都没列出来";
 }
 
 /**

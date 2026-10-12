@@ -97,14 +97,17 @@ namespace GyanisScribe::Annotation
         // 工具栏是自己的一层浮窗：它要摆在窗口外面，所以不能进上面的布局
         m_toolbar->setParent(this, Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
 
-        // 起点参数整套照工具栏的初值抄一遍：七处必须与工具栏同解，否则开窗第一笔的样式与按钮显示的不一致
+        // 起点参数整套照工具栏的初值抄一遍：十处必须与工具栏同解，否则开窗第一笔的样式与按钮显示的不一致
         m_penParameters = PenParameters{.color           = m_toolbar->currentColor(),
                                         .lineWidth       = m_toolbar->currentWidth(),
                                         .fontSize        = m_toolbar->currentFontSize(),
                                         .fillStyle       = m_toolbar->currentFillStyle(),
                                         .doubleHeaded    = m_toolbar->currentDoubleHeaded(),
                                         .mosaicBlockSize = m_toolbar->currentMosaicBlockSize(),
-                                        .highlightAlpha  = m_toolbar->currentHighlightAlpha()};
+                                        .highlightAlpha  = m_toolbar->currentHighlightAlpha(),
+                                        .fontFamily      = m_toolbar->currentFontFamily(),
+                                        .textBold        = m_toolbar->currentTextBold(),
+                                        .textItalic      = m_toolbar->currentTextItalic()};
 
         QObject::connect(m_toolbar.get(), &AnnotationToolbar::toolChanged, this,
                          [this](ToolKind kind)
@@ -154,6 +157,24 @@ namespace GyanisScribe::Annotation
                          [this](int alpha)
                          {
                              m_penParameters.highlightAlpha = alpha;
+                             applyPenParameters();
+                         });
+        QObject::connect(m_toolbar.get(), &AnnotationToolbar::fontFamilyChanged, this,
+                         [this](const QString &family)
+                         {
+                             m_penParameters.fontFamily = family;
+                             applyPenParameters();
+                         });
+        QObject::connect(m_toolbar.get(), &AnnotationToolbar::textBoldChanged, this,
+                         [this](bool enabled)
+                         {
+                             m_penParameters.textBold = enabled;
+                             applyPenParameters();
+                         });
+        QObject::connect(m_toolbar.get(), &AnnotationToolbar::textItalicChanged, this,
+                         [this](bool enabled)
+                         {
+                             m_penParameters.textItalic = enabled;
                              applyPenParameters();
                          });
 

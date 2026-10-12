@@ -46,6 +46,9 @@ namespace GyanisScribe::Ui
     /// 线宽滑块的固定宽度：滑块跟着布局拉伸会让「四档阶梯」的刻度间距变得忽宽忽窄
     inline constexpr int kToolbarSliderWidth = 64;
 
+    /// 字体下拉的宽度上限：系统字体名可以很长，放任 sizeHint 会把整条工具栏撑出去
+    inline constexpr int kToolbarFontComboWidth = 150;
+
     /// 选区边框宽度：1-2 像素之间取主色描边那一条
     inline constexpr int kSelectionBorderWidth = 2;
 

@@ -1,5 +1,7 @@
 #include "Annotation/AnnotationTool.h"
 
+#include "Annotation/TextFont.h"
+
 #include <QFont>
 
 #include <algorithm>
@@ -50,6 +52,9 @@ namespace GyanisScribe::Annotation
         m_pending.doubleHeaded    = m_doubleHeaded;
         m_pending.mosaicBlockSize = m_mosaicBlockSize;
         m_pending.highlightAlpha  = m_highlightAlpha;
+        m_pending.fontFamily      = m_fontFamily;
+        m_pending.textBold        = m_textBold;
+        m_pending.textItalic      = m_textItalic;
         m_pending.position        = point;
         m_pending.rect            = QRect(point, point);
         m_pending.points          = {point, point};
@@ -145,6 +150,9 @@ namespace GyanisScribe::Annotation
         shape.doubleHeaded    = parameters.doubleHeaded;
         shape.mosaicBlockSize = parameters.mosaicBlockSize;
         shape.highlightAlpha  = parameters.highlightAlpha;
+        shape.fontFamily      = parameters.fontFamily;
+        shape.textBold        = parameters.textBold;
+        shape.textItalic      = parameters.textItalic;
         return true;
     }
 
@@ -206,10 +214,9 @@ namespace GyanisScribe::Annotation
 
         if (!shape.text.isEmpty())
         {
-            // 文字的外接框按同一字号量出来：估算宽度会让选中框比实际画的字宽一截或窄一截
-            QFont font;
-            font.setPointSize(shape.fontSize);
-            const QFontMetricsF metrics(font);
+            // 文字的外接框按同一份字形量出来：估算宽度会让选中框比实际画的字宽一截或窄一截，
+            // 粗细、斜体与字体族都会动字宽，所以量这里必须与画那边共用 textFontFor
+            const QFontMetricsF metrics(textFontFor(shape));
             const auto          width  = static_cast<int>(metrics.horizontalAdvance(shape.text));
             const auto          height = metrics.height();
             box                        = box.united(QRect(shape.position, QSize(width, height)));
@@ -289,6 +296,21 @@ namespace GyanisScribe::Annotation
     void AnnotationTool::setHighlightAlpha(const int alpha) noexcept
     {
         m_highlightAlpha = std::clamp(alpha, 0, 255);
+    }
+
+    void AnnotationTool::setFontFamily(const QString &family)
+    {
+        m_fontFamily = family;
+    }
+
+    void AnnotationTool::setTextBold(const bool enabled) noexcept
+    {
+        m_textBold = enabled;
+    }
+
+    void AnnotationTool::setTextItalic(const bool enabled) noexcept
+    {
+        m_textItalic = enabled;
     }
 
     int AnnotationTool::fontSize() const noexcept

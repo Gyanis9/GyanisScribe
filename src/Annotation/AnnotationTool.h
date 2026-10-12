@@ -279,6 +279,27 @@ namespace GyanisScribe::Annotation
         void setHighlightAlpha(int alpha) noexcept;
 
         /**
+         * @brief 设文字字体族
+         * @param family 家族名；空串表示跟随应用默认字体
+         * @details 只有文字工具用得上；画字与量字共用 TextFont.h 那一处拼装，选中框不会与字形错开。
+         */
+        void setFontFamily(const QString &family);
+
+        /**
+         * @brief 设文字粗体
+         * @param enabled true 表示粗体
+         * @details 只有文字工具用得上；与斜体、字体族一样随新画的图形带走。
+         */
+        void setTextBold(bool enabled) noexcept;
+
+        /**
+         * @brief 设文字斜体
+         * @param enabled true 表示斜体
+         * @details 只有文字工具用得上。
+         */
+        void setTextItalic(bool enabled) noexcept;
+
+        /**
          * @brief 当前默认线宽
          * @return 逻辑像素
          */
@@ -325,6 +346,9 @@ namespace GyanisScribe::Annotation
         bool            m_doubleHeaded    = false;                                        ///< 默认双向箭头（仅箭头工具用）
         int             m_mosaicBlockSize = kMosaicBlockSizes[kDefaultMosaicBlockStep];   ///< 默认马赛克粒度（仅马赛克工具用）
         int             m_highlightAlpha  = kHighlightAlphas[kDefaultHighlightAlphaStep]; ///< 默认高亮透明度（仅高亮工具用）
+        QString         m_fontFamily;                                                     ///< 默认文字字体族，空串=跟随应用默认（仅文字工具用）
+        bool            m_textBold   = false;                                             ///< 默认文字粗体（仅文字工具用）
+        bool            m_textItalic = false;                                             ///< 默认文字斜体（仅文字工具用）
         int             m_fontSize;                                                       ///< 默认字号
 
     private:

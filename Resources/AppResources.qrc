@@ -6,6 +6,7 @@
     <file alias="AppIcon.svg">Icons/AppIcon.svg</file>
     <file alias="Arrow.svg">Icons/Arrow.svg</file>
     <file alias="ArrowDouble.svg">Icons/ArrowDouble.svg</file>
+    <file alias="Bold.svg">Icons/Bold.svg</file>
     <file alias="Capture.svg">Icons/Capture.svg</file>
     <file alias="CaptureFullScreen.svg">Icons/CaptureFullScreen.svg</file>
     <file alias="CaptureLastRegion.svg">Icons/CaptureLastRegion.svg</file>
@@ -22,6 +23,7 @@
     <file alias="Exit.svg">Icons/Exit.svg</file>
     <file alias="Export.svg">Icons/Export.svg</file>
     <file alias="Import.svg">Icons/Import.svg</file>
+    <file alias="Italic.svg">Icons/Italic.svg</file>
     <file alias="Highlight.svg">Icons/Highlight.svg</file>
     <file alias="HighlightOpacity.svg">Icons/HighlightOpacity.svg</file>
     <file alias="History.svg">Icons/History.svg</file>
