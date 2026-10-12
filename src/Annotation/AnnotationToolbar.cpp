@@ -230,6 +230,13 @@ namespace GyanisScribe::Annotation
         m_italicButton = makeButton("Italic", GyanisScribe::Core::uiText("斜体"), true);
         QObject::connect(m_italicButton, &QToolButton::clicked, this, [this] { setTextItalic(m_italicButton->isChecked()); });
         layout->addWidget(m_italicButton);
+        // 描边/底板：文字工具用得上，同为保持按下态的开关
+        m_outlineButton = makeButton("TextOutline", GyanisScribe::Core::uiText("描边"), true);
+        QObject::connect(m_outlineButton, &QToolButton::clicked, this, [this] { setTextOutline(m_outlineButton->isChecked()); });
+        layout->addWidget(m_outlineButton);
+        m_backgroundButton = makeButton("TextBackground", GyanisScribe::Core::uiText("背景"), true);
+        QObject::connect(m_backgroundButton, &QToolButton::clicked, this, [this] { setTextBackground(m_backgroundButton->isChecked()); });
+        layout->addWidget(m_backgroundButton);
         layout->addWidget(makeSeparator());
 
         m_undoButton = makeButton("Undo", GyanisScribe::Core::uiText("撤销（Ctrl+Z）"), false);
@@ -389,6 +396,40 @@ namespace GyanisScribe::Annotation
             m_italicButton->setAccessibleName(label);
         }
         emit textItalicChanged(enabled);
+    }
+
+    bool AnnotationToolbar::currentTextOutline() const
+    {
+        return m_outlineButton != nullptr && m_outlineButton->isChecked();
+    }
+
+    void AnnotationToolbar::setTextOutline(const bool enabled)
+    {
+        if (m_outlineButton != nullptr)
+        {
+            m_outlineButton->setChecked(enabled);
+            const auto label = enabled ? GyanisScribe::Core::uiText("描边：开") : GyanisScribe::Core::uiText("描边：关");
+            m_outlineButton->setToolTip(label);
+            m_outlineButton->setAccessibleName(label);
+        }
+        emit textOutlineChanged(enabled);
+    }
+
+    bool AnnotationToolbar::currentTextBackground() const
+    {
+        return m_backgroundButton != nullptr && m_backgroundButton->isChecked();
+    }
+
+    void AnnotationToolbar::setTextBackground(const bool enabled)
+    {
+        if (m_backgroundButton != nullptr)
+        {
+            m_backgroundButton->setChecked(enabled);
+            const auto label = enabled ? GyanisScribe::Core::uiText("背景：开") : GyanisScribe::Core::uiText("背景：关");
+            m_backgroundButton->setToolTip(label);
+            m_backgroundButton->setAccessibleName(label);
+        }
+        emit textBackgroundChanged(enabled);
     }
 
     void AnnotationToolbar::applyStoredDefaults()

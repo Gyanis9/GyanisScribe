@@ -129,6 +129,8 @@ namespace
             std::vector<QString>  fontFamilies;     ///< fontFamilyChanged 收到的字体族
             std::vector<int>      textBolds;        ///< textBoldChanged 收到的开关（1 开 0 关）
             std::vector<int>      textItalics;      ///< textItalicChanged 收到的开关（1 开 0 关）
+            std::vector<int>      textOutlines;     ///< textOutlineChanged 收到的开关（1 开 0 关）
+            std::vector<int>      textBackgrounds;  ///< textBackgroundChanged 收到的开关（1 开 0 关）
             int                   actions{};        ///< 四个动作按钮的合计触发次数
             int                   undo{};           ///< undoClicked 次数
             int                   redo{};           ///< redoClicked 次数
@@ -149,6 +151,8 @@ namespace
             QObject::connect(toolbar.get(), &AnnotationToolbar::fontFamilyChanged, [&log](const QString &family) { log.fontFamilies.push_back(family); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::textBoldChanged, [&log](bool enabled) { log.textBolds.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::textItalicChanged, [&log](bool enabled) { log.textItalics.push_back(enabled ? 1 : 0); });
+            QObject::connect(toolbar.get(), &AnnotationToolbar::textOutlineChanged, [&log](bool enabled) { log.textOutlines.push_back(enabled ? 1 : 0); });
+            QObject::connect(toolbar.get(), &AnnotationToolbar::textBackgroundChanged, [&log](bool enabled) { log.textBackgrounds.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::undoClicked, [&log] { ++log.undo; });
             QObject::connect(toolbar.get(), &AnnotationToolbar::redoClicked, [&log] { ++log.redo; });
             for (auto signal: {&AnnotationToolbar::copyClicked, &AnnotationToolbar::saveClicked, &AnnotationToolbar::pinClicked, &AnnotationToolbar::ocrClicked})
@@ -329,6 +333,37 @@ namespace
         italicButton->click();
         EXPECT_FALSE(toolbar->currentTextItalic());
         EXPECT_EQ(italicButton->accessibleName(), QString::fromUtf8("斜体：关")) << "无障碍名没跟上开关";
+    }
+
+    /**
+     * @brief 钉住描边与背景两个开关：按下态、提示、无障碍名与信号四处同解
+     */
+    TEST_F(ToolbarFixture, TextEffectTogglesDriveTheSignals)
+    {
+        SignalLog log;
+        auto      toolbar = makeToolbarLogged(log);
+
+        auto *outlineButton = buttonByLabel(*toolbar, "描边");
+        ASSERT_NE(outlineButton, nullptr) << "工具栏上找不到描边按钮";
+        EXPECT_FALSE(toolbar->currentTextOutline()) << "起点该是关";
+        outlineButton->click();
+        EXPECT_TRUE(toolbar->currentTextOutline());
+        EXPECT_EQ(log.textOutlines, std::vector<int>{1}) << "开了却没把信号发出去";
+        EXPECT_EQ(outlineButton->toolTip(), QString::fromUtf8("描边：开")) << "提示没跟上开关";
+        outlineButton->click();
+        EXPECT_FALSE(toolbar->currentTextOutline());
+        EXPECT_EQ(outlineButton->accessibleName(), QString::fromUtf8("描边：关")) << "无障碍名没跟上开关";
+
+        auto *backgroundButton = buttonByLabel(*toolbar, "背景");
+        ASSERT_NE(backgroundButton, nullptr) << "工具栏上找不到背景按钮";
+        EXPECT_FALSE(toolbar->currentTextBackground()) << "起点该是关";
+        backgroundButton->click();
+        EXPECT_TRUE(toolbar->currentTextBackground());
+        EXPECT_EQ(log.textBackgrounds, std::vector<int>{1}) << "开了却没把信号发出去";
+        EXPECT_EQ(backgroundButton->toolTip(), QString::fromUtf8("背景：开")) << "提示没跟上开关";
+        backgroundButton->click();
+        EXPECT_FALSE(toolbar->currentTextBackground());
+        EXPECT_EQ(log.textBackgrounds, (std::vector<int>{1, 0}));
     }
 
 } // namespace

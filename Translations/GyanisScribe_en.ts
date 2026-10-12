@@ -132,6 +132,14 @@
             <translation>Italic</translation>
         </message>
         <message>
+            <source>描边</source>
+            <translation>Outline</translation>
+        </message>
+        <message>
+            <source>背景</source>
+            <translation>Background</translation>
+        </message>
+        <message>
             <source>撤销（Ctrl+Z）</source>
             <translation>Undo (Ctrl+Z)</translation>
         </message>
@@ -214,6 +222,22 @@
         <message>
             <source>斜体：关</source>
             <translation>Italic: off</translation>
+        </message>
+        <message>
+            <source>描边：开</source>
+            <translation>Outline: on</translation>
+        </message>
+        <message>
+            <source>描边：关</source>
+            <translation>Outline: off</translation>
+        </message>
+        <message>
+            <source>背景：开</source>
+            <translation>Background: on</translation>
+        </message>
+        <message>
+            <source>背景：关</source>
+            <translation>Background: off</translation>
         </message>
         <message>
             <source>选择标注颜色</source>

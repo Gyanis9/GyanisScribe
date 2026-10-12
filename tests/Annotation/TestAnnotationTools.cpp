@@ -767,6 +767,117 @@ TEST_F(AnnotationFixture, TextFamilyChangesTheGlyphs)
 }
 
 /**
+ * @brief 钉住描边：深字在杂底上围出一圈反色轮廓
+ * @details 底图下半是黑的，红字（亮度过半判为深色）的描边取白——黑底上「白像素」这一格
+ *          只有描边画得出来：不打描边时，红字压黑底任何混合都到不了三通道全高。
+ */
+TEST_F(AnnotationFixture, TextOutlineHalosTheGlyphs)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Text).has_value());
+
+    const auto brightCount = [this](const QRect &box)
+    {
+        const QImage drawn  = m_engine.exportImage();
+        int          bright = 0;
+        for (int y = box.top(); y <= box.bottom(); ++y)
+        {
+            for (int x = box.left(); x <= box.right(); ++x)
+            {
+                const auto pixel = drawn.pixelColor(x, y);
+                if (pixel.red() > 200 && pixel.green() > 200 && pixel.blue() > 200)
+                {
+                    ++bright;
+                }
+            }
+        }
+        return bright;
+    };
+
+    // 常规档：黑底红字，没有白
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 32, .fillStyle = 0}).has_value());
+    m_engine.beginStroke(QPoint(20, 150));
+    ASSERT_TRUE(m_engine.setPendingText(QStringLiteral("H")).has_value());
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+    EXPECT_EQ(brightCount(QRect(10, 105, 130, 70)), 0) << "不打描边时黑底上出了白像素，后面的对照就没基准";
+
+    // 描边档：字形外围一圈白
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 32, .fillStyle = 0, .textOutline = true}).has_value());
+    m_engine.beginStroke(QPoint(20, 150));
+    ASSERT_TRUE(m_engine.setPendingText(QStringLiteral("H")).has_value());
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+    EXPECT_GT(brightCount(QRect(10, 105, 130, 70)), 0) << "描边没有围出反色轮廓";
+}
+
+/**
+ * @brief 钉住底板：字形后面垫一块反色的半透明圆角板
+ * @details 红字（深色）的底板取白、透明度 200/255：黑底上白板叠出来是 (200,200,200)，
+ *          取样点放在字形左侧的留白带里（板比字形框每边多出 8 像素），不在字上也不在板外。
+ */
+TEST_F(AnnotationFixture, TextBackgroundPlatesTheGlyphs)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Text).has_value());
+
+    // 常规档：留白带是黑底本色
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 32, .fillStyle = 0}).has_value());
+    m_engine.beginStroke(QPoint(30, 150));
+    ASSERT_TRUE(m_engine.setPendingText(QStringLiteral("H")).has_value());
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(26, 150), QColor(0, 0, 0)) << "没开底板时留白带该是黑底";
+
+    // 底板档：同一个点在板内，是白 200 叠黑的结果
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 32, .fillStyle = 0, .textBackground = true}).has_value());
+    m_engine.beginStroke(QPoint(30, 150));
+    ASSERT_TRUE(m_engine.setPendingText(QStringLiteral("H")).has_value());
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(26, 150), QColor(200, 200, 200)) << "底板没垫到字形左侧的留白带里";
+}
+
+/**
+ * @brief 钉住文字外接框的锚点与画字同解：position 是基线，框要盖住字、不许整框压在字底下
+ * @details 渲染探针核过：position.y=60、字号 24 时墨迹在 [35,59]——postion 是基线。
+ *          框顶须从基线往上退一个 ascent（约 0.9 字号），基线须落在框内。按左上角估的老写法
+ *          框顶就在基线上，整框悬在字下面约一行，这条就是那处缺陷的回归判据。
+ */
+TEST_F(AnnotationFixture, TextSelectionBoxRidesTheBaseline)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Text).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 4, .fontSize = 24, .fillStyle = 0}).has_value());
+    m_engine.beginStroke(QPoint(40, 60));
+    ASSERT_TRUE(m_engine.setPendingText(QStringLiteral("H")).has_value());
+    const auto committed = m_engine.endStroke();
+    ASSERT_TRUE(committed.has_value()) << committed.error().message;
+
+    // 墨迹行范围：判定框要把字整个盖住
+    const QImage drawn       = m_engine.exportImage();
+    int          firstInkRow = -1;
+    int          lastInkRow  = -1;
+    for (int y = 0; y < 100; ++y)
+    {
+        for (int x = 30; x < 160; ++x)
+        {
+            if (drawn.pixelColor(x, y) != QColor(255, 255, 255))
+            {
+                if (firstInkRow < 0)
+                {
+                    firstInkRow = y;
+                }
+                lastInkRow = y;
+                break;
+            }
+        }
+    }
+    ASSERT_GE(firstInkRow, 0) << "字没画出来，判定框无从比";
+
+    ASSERT_TRUE(m_engine.select(*committed).has_value());
+    const auto bounds = m_engine.selectionBounds();
+    ASSERT_TRUE(bounds.has_value()) << "选中了却拿不到外接框";
+    EXPECT_LT(bounds->top(), firstInkRow) << "框顶在墨迹之下，整框压在字底下";
+    EXPECT_LE(bounds->top(), 60 - static_cast<int>(24 * 0.6)) << "框顶距基线的退让不足大半个字号，锚点还是按左上角算的";
+    EXPECT_GE(bounds->bottom(), lastInkRow) << "框没盖住字的底边";
+    EXPECT_EQ(bounds->left(), 40) << "框左沿没落在 position.x 上";
+}
+
+/**
  * @brief 钉住序号取号的位置：按当时的条数 +1，撤销一条后接着那个号走
  */
 TEST(NumberToolTest, LabelFollowsTheCurrentShapeCount)

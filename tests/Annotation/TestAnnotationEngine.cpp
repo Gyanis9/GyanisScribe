@@ -597,3 +597,59 @@ TEST_F(EngineFixture, TextStyleRestyleLandsOnTheSelectedTextAndUndoesBack)
     ASSERT_TRUE(m_engine.undo().has_value());
     EXPECT_EQ(inkIn(box), regularInk) << "撤销没把粗体退回常规档";
 }
+
+/**
+ * @brief 钉住描边与底板也走改样式命令：灰底上的亮格计数当场变，撤销回原样
+ * @details 两个字段与文字样式三件同属「后加的样式旋钮」：penParametersOf 与 restyleShapeAt
+ *          都按字段逐个抄，漏一个就是「选中老样式的文字调效果不生效」。
+ *          画布换成中灰 128：红字（深色）的描边与底板都取白——亮格（三通道 >200）在不开效果时
+ *          一个都没有，开了就成片出现，两处各按这个口径比。撤销会作废选中项，第二处要重新选中。
+ */
+TEST_F(EngineFixture, TextPlateAndOutlineRestyleAndUndoBack)
+{
+    CapturedImage canvas;
+    canvas.image = QImage(200, 100, QImage::Format_ARGB32_Premultiplied);
+    canvas.image.fill(QColor(128, 128, 128));
+    canvas.devicePixelRatio = 1.0;
+    canvas.logicalSize      = QSize(200, 100);
+    canvas.screenName       = QStringLiteral("FakeScreen-1");
+    m_engine.loadCanvas(canvas);
+
+    const auto brightIn = [this](const QRect &box)
+    {
+        const QImage drawn  = m_engine.exportImage();
+        int          bright = 0;
+        for (int y = box.top(); y <= box.bottom(); ++y)
+        {
+            for (int x = box.left(); x <= box.right(); ++x)
+            {
+                const auto pixel = drawn.pixelColor(x, y);
+                if (pixel.red() > 200 && pixel.green() > 200 && pixel.blue() > 200)
+                {
+                    ++bright;
+                }
+            }
+        }
+        return bright;
+    };
+
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 24, .fillStyle = 0}).has_value());
+    const auto text = placeText(m_engine, QPoint(20, 60), QStringLiteral("H"));
+    ASSERT_TRUE(m_engine.select(text).has_value());
+
+    const QRect box(10, 20, 180, 70);
+    ASSERT_EQ(brightIn(box), 0) << "灰底红字不该有亮格，后面的对照就没基准";
+
+    // 开描边：白轮廓进来
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 24, .fillStyle = 0, .textOutline = true}).has_value());
+    EXPECT_GT(brightIn(box), 0) << "选中这条文字的描边没跟着开";
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_EQ(brightIn(box), 0) << "撤销没把描边退回去";
+
+    // 开底板：白板叠灰出 227，也是亮格；撤销作废了选中项，先重新选中
+    ASSERT_TRUE(m_engine.select(text).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 24, .fillStyle = 0, .textBackground = true}).has_value());
+    EXPECT_GT(brightIn(box), 0) << "选中这条文字的底板没跟着开";
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_EQ(brightIn(box), 0) << "撤销没把底板退回去";
+}

@@ -53,8 +53,10 @@ namespace GyanisScribe::Annotation
         int             mosaicBlockSize = kMosaicBlockSizes[kDefaultMosaicBlockStep];   ///< 马赛克方块边长，逻辑像素（仅马赛克工具用），默认为阶梯里的「中」档
         int             highlightAlpha  = kHighlightAlphas[kDefaultHighlightAlphaStep]; ///< 高亮透明度，0-255（仅高亮工具用），默认为阶梯里的「中」档
         QString         fontFamily;                                                     ///< 字体族，空串=跟随应用默认字体（仅文字工具用）
-        bool            textBold   = false;                                             ///< 粗体（仅文字工具用）
-        bool            textItalic = false;                                             ///< 斜体（仅文字工具用）
+        bool            textBold       = false;                                         ///< 粗体（仅文字工具用）
+        bool            textItalic     = false;                                         ///< 斜体（仅文字工具用）
+        bool            textOutline    = false;                                         ///< 反色描边：字形围一圈与字色反差的轮廓（仅文字工具用）
+        bool            textBackground = false;                                         ///< 反色底板：字形后面垫一块半透明的反差圆角板（仅文字工具用）
     };
 
 } // namespace GyanisScribe::Annotation

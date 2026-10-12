@@ -161,6 +161,24 @@ namespace GyanisScribe::Annotation
          */
         void setTextItalic(bool enabled);
 
+        /// 当前文字是不是反色描边
+        [[nodiscard]] bool currentTextOutline() const;
+
+        /**
+         * @brief 开/关文字反色描边，按钮态、提示与信号一次对齐
+         * @param enabled true 表示字形围一圈与字色反差的轮廓
+         */
+        void setTextOutline(bool enabled);
+
+        /// 当前文字是不是反色底板
+        [[nodiscard]] bool currentTextBackground() const;
+
+        /**
+         * @brief 开/关文字反色底板，按钮态、提示与信号一次对齐
+         * @param enabled true 表示字形后面垫一块与字色反差的半透明圆角板
+         */
+        void setTextBackground(bool enabled);
+
         /**
          * @brief 指定序号的工具按钮，用例与调试用它核对状态
          * @param index 按钮序号，越界返回空指针
@@ -190,6 +208,10 @@ namespace GyanisScribe::Annotation
         void textBoldChanged(bool enabled);
         /// 用户开了/关了文字斜体
         void textItalicChanged(bool enabled);
+        /// 用户开了/关了文字反色描边
+        void textOutlineChanged(bool enabled);
+        /// 用户开了/关了文字反色底板
+        void textBackgroundChanged(bool enabled);
         /// 撤销
         void undoClicked();
         /// 重做
@@ -259,6 +281,8 @@ namespace GyanisScribe::Annotation
         QFontComboBox                                           *m_fontCombo          = nullptr;                                      ///< 文字字体族下拉，列系统字体
         QToolButton                                             *m_boldButton         = nullptr;                                      ///< 文字粗体开关，按下表示粗
         QToolButton                                             *m_italicButton       = nullptr;                                      ///< 文字斜体开关，按下表示斜
+        QToolButton                                             *m_outlineButton      = nullptr;                                      ///< 文字描边开关，按下表示围一圈反色轮廓
+        QToolButton                                             *m_backgroundButton   = nullptr;                                      ///< 文字底板开关，按下表示垫一块反色圆角板
         QColor                                                   m_currentColor;                                                      ///< 当前颜色，初值取色板第一格
         bool                                                     m_stateIsInitial = true; ///< 还在构造期：起点值不回写配置，坏值要留在文件里让人看得见
         ToolKind                                                 m_activeTool;            ///< 当前工具，用来挡住「重复点同一个工具」的二次信号

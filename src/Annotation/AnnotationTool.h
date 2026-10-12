@@ -300,6 +300,20 @@ namespace GyanisScribe::Annotation
         void setTextItalic(bool enabled) noexcept;
 
         /**
+         * @brief 设文字反色描边
+         * @param enabled true 表示字形围一圈与字色反差的轮廓
+         * @details 只有文字工具用得上；与底板一样随新画的图形带走，选中的那条走改样式命令。
+         */
+        void setTextOutline(bool enabled) noexcept;
+
+        /**
+         * @brief 设文字反色底板
+         * @param enabled true 表示字形后面垫一块与字色反差的半透明圆角板
+         * @details 只有文字工具用得上。
+         */
+        void setTextBackground(bool enabled) noexcept;
+
+        /**
          * @brief 当前默认线宽
          * @return 逻辑像素
          */
@@ -347,8 +361,10 @@ namespace GyanisScribe::Annotation
         int             m_mosaicBlockSize = kMosaicBlockSizes[kDefaultMosaicBlockStep];   ///< 默认马赛克粒度（仅马赛克工具用）
         int             m_highlightAlpha  = kHighlightAlphas[kDefaultHighlightAlphaStep]; ///< 默认高亮透明度（仅高亮工具用）
         QString         m_fontFamily;                                                     ///< 默认文字字体族，空串=跟随应用默认（仅文字工具用）
-        bool            m_textBold   = false;                                             ///< 默认文字粗体（仅文字工具用）
-        bool            m_textItalic = false;                                             ///< 默认文字斜体（仅文字工具用）
+        bool            m_textBold       = false;                                         ///< 默认文字粗体（仅文字工具用）
+        bool            m_textItalic     = false;                                         ///< 默认文字斜体（仅文字工具用）
+        bool            m_textOutline    = false;                                         ///< 默认反色描边（仅文字工具用）
+        bool            m_textBackground = false;                                         ///< 默认反色底板（仅文字工具用）
         int             m_fontSize;                                                       ///< 默认字号
 
     private:

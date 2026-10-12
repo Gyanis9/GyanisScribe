@@ -55,6 +55,8 @@ namespace GyanisScribe::Annotation
         m_pending.fontFamily      = m_fontFamily;
         m_pending.textBold        = m_textBold;
         m_pending.textItalic      = m_textItalic;
+        m_pending.textOutline     = m_textOutline;
+        m_pending.textBackground  = m_textBackground;
         m_pending.position        = point;
         m_pending.rect            = QRect(point, point);
         m_pending.points          = {point, point};
@@ -153,6 +155,8 @@ namespace GyanisScribe::Annotation
         shape.fontFamily      = parameters.fontFamily;
         shape.textBold        = parameters.textBold;
         shape.textItalic      = parameters.textItalic;
+        shape.textOutline     = parameters.textOutline;
+        shape.textBackground  = parameters.textBackground;
         return true;
     }
 
@@ -214,12 +218,14 @@ namespace GyanisScribe::Annotation
 
         if (!shape.text.isEmpty())
         {
-            // 文字的外接框按同一份字形量出来：估算宽度会让选中框比实际画的字宽一截或窄一截，
-            // 粗细、斜体与字体族都会动字宽，所以量这里必须与画那边共用 textFontFor
+            // 文字的外接框按同一份字形量出来，锚点与画字同解：position 是基线（drawText 的口径），
+            // 框顶要从基线往上退一个 ascent。按左上角估会让选中框整体压在字底下约一行（渲染探针核对过）。
+            // 粗细、斜体、字体族都会动字宽，所以量这里必须与画那边共用 textFontFor
             const QFontMetricsF metrics(textFontFor(shape));
             const auto          width  = static_cast<int>(metrics.horizontalAdvance(shape.text));
-            const auto          height = metrics.height();
-            box                        = box.united(QRect(shape.position, QSize(width, height)));
+            const auto          ascent = static_cast<int>(metrics.ascent());
+            const auto          height = static_cast<int>(metrics.height());
+            box                        = box.united(QRect(shape.position.x(), shape.position.y() - ascent, width, height));
         }
 
         return box;
@@ -311,6 +317,16 @@ namespace GyanisScribe::Annotation
     void AnnotationTool::setTextItalic(const bool enabled) noexcept
     {
         m_textItalic = enabled;
+    }
+
+    void AnnotationTool::setTextOutline(const bool enabled) noexcept
+    {
+        m_textOutline = enabled;
+    }
+
+    void AnnotationTool::setTextBackground(const bool enabled) noexcept
+    {
+        m_textBackground = enabled;
     }
 
     int AnnotationTool::fontSize() const noexcept
