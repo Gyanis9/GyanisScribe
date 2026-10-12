@@ -7,12 +7,6 @@
 
 namespace GyanisScribe::Annotation
 {
-    namespace
-    {
-        // 一个马赛克方块的边长，逻辑像素
-        constexpr int kMosaicBlockSizeLogical = 12;
-    } // namespace
-
     MosaicTool::MosaicTool() : AnnotationTool(ToolKind::Mosaic)
     {
     }
@@ -39,9 +33,11 @@ namespace GyanisScribe::Annotation
             return;
         }
 
-        const int    blocksWide = qMax(1, physical.width() / (qRound(kMosaicBlockSizeLogical * context.pixelScale)));
-        const int    blocksTall = qMax(1, physical.height() / (qRound(kMosaicBlockSizeLogical * context.pixelScale)));
-        const QImage region     = source.copy(physical);
+        // 方块边长按图形自己的粒度档换算成物理像素；夹住分母，缩放比例极小或档位取到边界时不做除零
+        const int    blockPixels = qMax(1, qRound(shape.mosaicBlockSize * context.pixelScale));
+        const int    blocksWide  = qMax(1, physical.width() / blockPixels);
+        const int    blocksTall  = qMax(1, physical.height() / blockPixels);
+        const QImage region      = source.copy(physical);
         // 两段都用 FastTransformation：任何一段带平滑都会把方块糊回可读的细节
         const QImage downscaled = region.scaled(blocksWide, blocksTall, Qt::IgnoreAspectRatio, Qt::FastTransformation);
         const QImage upscaled   = downscaled.scaled(physical.size(), Qt::IgnoreAspectRatio, Qt::FastTransformation);

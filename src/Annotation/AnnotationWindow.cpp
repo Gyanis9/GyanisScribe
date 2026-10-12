@@ -97,12 +97,14 @@ namespace GyanisScribe::Annotation
         // 工具栏是自己的一层浮窗：它要摆在窗口外面，所以不能进上面的布局
         m_toolbar->setParent(this, Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
 
-        // 起点参数整套照工具栏的初值抄一遍：五处必须与工具栏同解，否则开窗第一笔的样式与按钮显示的不一致
-        m_penParameters = PenParameters{.color        = m_toolbar->currentColor(),
-                                        .lineWidth    = m_toolbar->currentWidth(),
-                                        .fontSize     = m_toolbar->currentFontSize(),
-                                        .fillStyle    = m_toolbar->currentFillStyle(),
-                                        .doubleHeaded = m_toolbar->currentDoubleHeaded()};
+        // 起点参数整套照工具栏的初值抄一遍：七处必须与工具栏同解，否则开窗第一笔的样式与按钮显示的不一致
+        m_penParameters = PenParameters{.color           = m_toolbar->currentColor(),
+                                        .lineWidth       = m_toolbar->currentWidth(),
+                                        .fontSize        = m_toolbar->currentFontSize(),
+                                        .fillStyle       = m_toolbar->currentFillStyle(),
+                                        .doubleHeaded    = m_toolbar->currentDoubleHeaded(),
+                                        .mosaicBlockSize = m_toolbar->currentMosaicBlockSize(),
+                                        .highlightAlpha  = m_toolbar->currentHighlightAlpha()};
 
         QObject::connect(m_toolbar.get(), &AnnotationToolbar::toolChanged, this,
                          [this](ToolKind kind)
@@ -140,6 +142,18 @@ namespace GyanisScribe::Annotation
                          [this](bool enabled)
                          {
                              m_penParameters.doubleHeaded = enabled;
+                             applyPenParameters();
+                         });
+        QObject::connect(m_toolbar.get(), &AnnotationToolbar::mosaicBlockSizeChanged, this,
+                         [this](int blockSize)
+                         {
+                             m_penParameters.mosaicBlockSize = blockSize;
+                             applyPenParameters();
+                         });
+        QObject::connect(m_toolbar.get(), &AnnotationToolbar::highlightAlphaChanged, this,
+                         [this](int alpha)
+                         {
+                             m_penParameters.highlightAlpha = alpha;
                              applyPenParameters();
                          });
 

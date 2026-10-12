@@ -22,15 +22,18 @@ namespace GyanisScribe::Annotation
      *          restyleShapeAt 追加一个位置参数，调用点很快会排到七八个同型 int，串位这类错误
      *          编译期看不出来。打包成一个结构体后，新增旋钮只动这里与消费它的那几个工具。
      * @note 与 AnnotationShape 里的样式字段同解：改这里的字段就是改「新笔画出去是什么样」，
-     *       落到已画的某一条上要经 restyleShapeAt。
+     *       落到已画的某一条上要经 restyleShapeAt。两边的默认值都从 AnnotationShape.h 的
+     *       阶梯表取值，不存在「开窗第一笔与按钮读数错开」的两份数字。
      */
     struct PenParameters
     {
-        QColor color        = QColor(255, 0, 0); ///< 画笔颜色
-        int    lineWidth    = 3;                 ///< 线宽，逻辑像素
-        int    fontSize     = 16;                ///< 字号，磅
-        int    fillStyle    = 0;                 ///< 填充档：0 无、1 半透明、2 实心（仅矩形与椭圆用）
-        bool   doubleHeaded = false;             ///< 双向箭头：两端各画一个箭头（仅箭头工具用）
+        QColor color           = QColor(255, 0, 0);                            ///< 画笔颜色
+        int    lineWidth       = 3;                                            ///< 线宽，逻辑像素
+        int    fontSize        = 16;                                           ///< 字号，磅
+        int    fillStyle       = 0;                                            ///< 填充档：0 无、1 半透明、2 实心（仅矩形与椭圆用）
+        bool   doubleHeaded    = false;                                        ///< 双向箭头：两端各画一个箭头（仅箭头工具用）
+        int    mosaicBlockSize = kMosaicBlockSizes[kDefaultMosaicBlockStep];   ///< 马赛克方块边长，逻辑像素（仅马赛克工具用）
+        int    highlightAlpha  = kHighlightAlphas[kDefaultHighlightAlphaStep]; ///< 高亮透明度，0-255（仅高亮工具用）
 
         [[nodiscard]] bool operator==(const PenParameters &) const = default;
     };
@@ -42,7 +45,13 @@ namespace GyanisScribe::Annotation
      */
     [[nodiscard]] inline PenParameters penParametersOf(const AnnotationShape &shape)
     {
-        return PenParameters{.color = shape.color, .lineWidth = shape.lineWidth, .fontSize = shape.fontSize, .fillStyle = shape.fillStyle, .doubleHeaded = shape.doubleHeaded};
+        return PenParameters{.color           = shape.color,
+                             .lineWidth       = shape.lineWidth,
+                             .fontSize        = shape.fontSize,
+                             .fillStyle       = shape.fillStyle,
+                             .doubleHeaded    = shape.doubleHeaded,
+                             .mosaicBlockSize = shape.mosaicBlockSize,
+                             .highlightAlpha  = shape.highlightAlpha};
     }
 
 } // namespace GyanisScribe::Annotation

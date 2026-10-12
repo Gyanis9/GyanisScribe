@@ -115,15 +115,17 @@ namespace
         /// 工具栏每条信号的落地处，用例按「谁发了几次」判接线是否成环
         struct SignalLog
         {
-            std::vector<ToolKind> tools;        ///< toolChanged 收到的工具
-            std::vector<QColor>   colors;       ///< colorChanged 收到的颜色
-            std::vector<int>      widths;       ///< widthChanged 收到的线宽
-            std::vector<int>      fontSizes;    ///< fontSizeChanged 收到的字号
-            std::vector<int>      fillStyles;   ///< fillStyleChanged 收到的填充档
-            std::vector<int>      doubleHeaded; ///< doubleHeadedChanged 收到的开关（1 开 0 关）
-            int                   actions{};    ///< 四个动作按钮的合计触发次数
-            int                   undo{};       ///< undoClicked 次数
-            int                   redo{};       ///< redoClicked 次数
+            std::vector<ToolKind> tools;            ///< toolChanged 收到的工具
+            std::vector<QColor>   colors;           ///< colorChanged 收到的颜色
+            std::vector<int>      widths;           ///< widthChanged 收到的线宽
+            std::vector<int>      fontSizes;        ///< fontSizeChanged 收到的字号
+            std::vector<int>      fillStyles;       ///< fillStyleChanged 收到的填充档
+            std::vector<int>      doubleHeaded;     ///< doubleHeadedChanged 收到的开关（1 开 0 关）
+            std::vector<int>      mosaicBlockSizes; ///< mosaicBlockSizeChanged 收到的粒度
+            std::vector<int>      highlightAlphas;  ///< highlightAlphaChanged 收到的透明度
+            int                   actions{};        ///< 四个动作按钮的合计触发次数
+            int                   undo{};           ///< undoClicked 次数
+            int                   redo{};           ///< redoClicked 次数
         };
 
         /// 建一把工具栏，并把它的每条信号都记进 log
@@ -136,6 +138,8 @@ namespace
             QObject::connect(toolbar.get(), &AnnotationToolbar::fontSizeChanged, [&log](int fontSize) { log.fontSizes.push_back(fontSize); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::fillStyleChanged, [&log](int style) { log.fillStyles.push_back(style); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::doubleHeadedChanged, [&log](bool enabled) { log.doubleHeaded.push_back(enabled ? 1 : 0); });
+            QObject::connect(toolbar.get(), &AnnotationToolbar::mosaicBlockSizeChanged, [&log](int blockSize) { log.mosaicBlockSizes.push_back(blockSize); });
+            QObject::connect(toolbar.get(), &AnnotationToolbar::highlightAlphaChanged, [&log](int alpha) { log.highlightAlphas.push_back(alpha); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::undoClicked, [&log] { ++log.undo; });
             QObject::connect(toolbar.get(), &AnnotationToolbar::redoClicked, [&log] { ++log.redo; });
             for (auto signal: {&AnnotationToolbar::copyClicked, &AnnotationToolbar::saveClicked, &AnnotationToolbar::pinClicked, &AnnotationToolbar::ocrClicked})
@@ -212,6 +216,57 @@ namespace
         EXPECT_EQ(log.doubleHeaded, (std::vector<int>{1, 0}));
         EXPECT_FALSE(button->isChecked()) << "关掉之后按钮还按着";
         EXPECT_EQ(button->accessibleName(), QString::fromUtf8("双向箭头：关")) << "无障碍名没跟上开关";
+    }
+
+    /**
+     * @brief 钉住马赛克粒度按钮：点一下走一档（中 → 粗 → 细 → 中），提示与无障碍名跟着读数走
+     * @details 与填充同一套口径：一枚图标说不清现在是哪一档，提示就是它的读数。
+     */
+    TEST_F(ToolbarFixture, MosaicGrainButtonCyclesAndNamesTheStep)
+    {
+        SignalLog log;
+        auto      toolbar = makeToolbarLogged(log);
+        auto     *button  = buttonByLabel(*toolbar, "马赛克粒度");
+        ASSERT_NE(button, nullptr) << "工具栏上找不到马赛克粒度按钮";
+
+        EXPECT_EQ(toolbar->currentMosaicBlockSize(), 12) << "起点该是「中」12";
+        button->click();
+        EXPECT_EQ(toolbar->currentMosaicBlockSize(), 20);
+        EXPECT_EQ(log.mosaicBlockSizes, std::vector<int>{20}) << "走了一档却没把信号发出去";
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("马赛克粒度：粗")) << "提示没跟上当前档";
+
+        button->click();
+        EXPECT_EQ(toolbar->currentMosaicBlockSize(), 8);
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("马赛克粒度：细"));
+
+        button->click();
+        EXPECT_EQ(toolbar->currentMosaicBlockSize(), 12) << "三档之后该回到「中」";
+        EXPECT_EQ(button->accessibleName(), QString::fromUtf8("马赛克粒度：中")) << "无障碍名没跟上当前档";
+    }
+
+    /**
+     * @brief 钉住高亮透明度按钮：点一下走一档（中 → 重 → 轻 → 中）
+     */
+    TEST_F(ToolbarFixture, HighlightAlphaButtonCyclesAndNamesTheStep)
+    {
+        SignalLog log;
+        auto      toolbar = makeToolbarLogged(log);
+        auto     *button  = buttonByLabel(*toolbar, "高亮透明度");
+        ASSERT_NE(button, nullptr) << "工具栏上找不到高亮透明度按钮";
+
+        EXPECT_EQ(toolbar->currentHighlightAlpha(), 110) << "起点该是「中」110";
+        button->click();
+        EXPECT_EQ(toolbar->currentHighlightAlpha(), 170);
+        EXPECT_EQ(log.highlightAlphas, std::vector<int>{170}) << "走了一档却没把信号发出去";
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("高亮透明度：重")) << "提示没跟上当前档";
+
+        button->click();
+        EXPECT_EQ(toolbar->currentHighlightAlpha(), 60);
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("高亮透明度：轻"));
+
+        button->click();
+        EXPECT_EQ(toolbar->currentHighlightAlpha(), 110) << "三档之后该回到「中」";
+        EXPECT_EQ(button->accessibleName(), QString::fromUtf8("高亮透明度：中")) << "无障碍名没跟上当前档";
     }
 
 } // namespace

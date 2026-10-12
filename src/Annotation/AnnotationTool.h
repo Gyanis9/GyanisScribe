@@ -265,6 +265,20 @@ namespace GyanisScribe::Annotation
         void setDoubleHeaded(bool enabled) noexcept;
 
         /**
+         * @brief 设马赛克粒度
+         * @param blockSize 方块边长，逻辑像素；越界按 1..64 夹取
+         * @details 只有马赛克工具用得上；当前粒度随新画的图形带走，选中的那条改粒度走改样式命令。
+         */
+        void setMosaicBlockSize(int blockSize) noexcept;
+
+        /**
+         * @brief 设高亮透明度
+         * @param alpha 0-255 的不透明度；越界按 0..255 夹取
+         * @details 只有高亮工具用得上；当前透明度随新画的图形带走，选中的那条改透明度走改样式命令。
+         */
+        void setHighlightAlpha(int alpha) noexcept;
+
+        /**
          * @brief 当前默认线宽
          * @return 逻辑像素
          */
@@ -304,12 +318,14 @@ namespace GyanisScribe::Annotation
 
         /// 起笔点，拖拽类图形用它算外接框
         QPoint          m_startPoint;
-        AnnotationShape m_pending;              ///< 在途图形
-        QColor          m_color;                ///< 默认画笔颜色
-        int             m_lineWidth;            ///< 默认线宽
-        int             m_fillStyle    = 0;     ///< 默认填充档（0 无、1 半透明、2 实心）
-        bool            m_doubleHeaded = false; ///< 默认双向箭头（仅箭头工具用）
-        int             m_fontSize;             ///< 默认字号
+        AnnotationShape m_pending;                                                        ///< 在途图形
+        QColor          m_color;                                                          ///< 默认画笔颜色
+        int             m_lineWidth;                                                      ///< 默认线宽
+        int             m_fillStyle       = 0;                                            ///< 默认填充档（0 无、1 半透明、2 实心）
+        bool            m_doubleHeaded    = false;                                        ///< 默认双向箭头（仅箭头工具用）
+        int             m_mosaicBlockSize = kMosaicBlockSizes[kDefaultMosaicBlockStep];   ///< 默认马赛克粒度（仅马赛克工具用）
+        int             m_highlightAlpha  = kHighlightAlphas[kDefaultHighlightAlphaStep]; ///< 默认高亮透明度（仅高亮工具用）
+        int             m_fontSize;                                                       ///< 默认字号
 
     private:
         ToolKind                 m_kind;             ///< 工具种类

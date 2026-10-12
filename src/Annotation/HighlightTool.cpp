@@ -10,11 +10,8 @@ namespace GyanisScribe::Annotation
 {
     namespace
     {
-        // 高亮相对线宽的加宽倍数：一支笔要能盖住一行字
+        // 高亮相对线宽的加宽倍数：一支笔要能盖住一行字（宽度的档不随图形走，透明度才随）
         constexpr int kHighlightWidthFactor = 4;
-
-        // 高亮颜色的透明度（0-255 的不透明度）：压住底色又要让字透出来
-        constexpr int kHighlightAlpha = 110;
     } // namespace
 
     HighlightTool::HighlightTool() : PenTool(ToolKind::Highlight)
@@ -34,7 +31,7 @@ namespace GyanisScribe::Annotation
         }
 
         auto color = shape.color;
-        color.setAlpha(kHighlightAlpha);
+        color.setAlpha(shape.highlightAlpha);
 
         auto pen = QPen(color);
         pen.setWidth(shape.lineWidth * kHighlightWidthFactor);

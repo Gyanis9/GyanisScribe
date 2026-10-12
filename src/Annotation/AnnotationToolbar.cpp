@@ -206,6 +206,14 @@ namespace GyanisScribe::Annotation
         m_doubleArrowButton = makeButton("ArrowDouble", GyanisScribe::Core::uiText("双向箭头"), true);
         QObject::connect(m_doubleArrowButton, &QToolButton::clicked, this, [this] { setDoubleHeaded(m_doubleArrowButton->isChecked()); });
         layout->addWidget(m_doubleArrowButton);
+        // 马赛克粒度：马赛克工具用得上，点一下走一档（细 → 中 → 粗），档位表是 kMosaicBlockSizes
+        m_mosaicGrainButton = makeButton("MosaicGrain", GyanisScribe::Core::uiText("马赛克粒度"), false);
+        QObject::connect(m_mosaicGrainButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleMosaicBlockSize);
+        layout->addWidget(m_mosaicGrainButton);
+        // 高亮透明度：高亮工具用得上，点一下走一档（轻 → 中 → 重），档位表是 kHighlightAlphas
+        m_highlightAlphaButton = makeButton("HighlightOpacity", GyanisScribe::Core::uiText("高亮透明度"), false);
+        QObject::connect(m_highlightAlphaButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleHighlightAlpha);
+        layout->addWidget(m_highlightAlphaButton);
         layout->addWidget(m_fontSizeCombo);
         layout->addWidget(makeSeparator());
 
@@ -287,6 +295,46 @@ namespace GyanisScribe::Annotation
             m_doubleArrowButton->setAccessibleName(label);
         }
         emit doubleHeadedChanged(enabled);
+    }
+
+    int AnnotationToolbar::currentMosaicBlockSize() const
+    {
+        return kMosaicBlockSizes[static_cast<std::size_t>(m_mosaicBlockStep)];
+    }
+
+    void AnnotationToolbar::cycleMosaicBlockSize()
+    {
+        m_mosaicBlockStep = (m_mosaicBlockStep + 1) % static_cast<int>(kMosaicBlockSizes.size());
+        if (m_mosaicGrainButton != nullptr)
+        {
+            // 档名落在提示里：一枚图标说不清现在是哪一档，鼠标一停就该看得见
+            const auto label = m_mosaicBlockStep == 0   ? GyanisScribe::Core::uiText("马赛克粒度：细")
+                               : m_mosaicBlockStep == 1 ? GyanisScribe::Core::uiText("马赛克粒度：中")
+                                                        : GyanisScribe::Core::uiText("马赛克粒度：粗");
+            m_mosaicGrainButton->setToolTip(label);
+            m_mosaicGrainButton->setAccessibleName(label);
+        }
+        emit mosaicBlockSizeChanged(currentMosaicBlockSize());
+    }
+
+    int AnnotationToolbar::currentHighlightAlpha() const
+    {
+        return kHighlightAlphas[static_cast<std::size_t>(m_highlightAlphaStep)];
+    }
+
+    void AnnotationToolbar::cycleHighlightAlpha()
+    {
+        m_highlightAlphaStep = (m_highlightAlphaStep + 1) % static_cast<int>(kHighlightAlphas.size());
+        if (m_highlightAlphaButton != nullptr)
+        {
+            // 与粒度同一套口径：提示就是这一档的读数
+            const auto label = m_highlightAlphaStep == 0   ? GyanisScribe::Core::uiText("高亮透明度：轻")
+                               : m_highlightAlphaStep == 1 ? GyanisScribe::Core::uiText("高亮透明度：中")
+                                                           : GyanisScribe::Core::uiText("高亮透明度：重");
+            m_highlightAlphaButton->setToolTip(label);
+            m_highlightAlphaButton->setAccessibleName(label);
+        }
+        emit highlightAlphaChanged(currentHighlightAlpha());
     }
 
     void AnnotationToolbar::applyStoredDefaults()

@@ -550,6 +550,29 @@ TEST_F(AnnotationFixture, MosaicCoversOnlyItsRegion)
 }
 
 /**
+ * @brief 钉住马赛克粒度记在每条图形自己身上：细档跨分界线那一块采成黑，粗档同一高度上还是白
+ * @details 画布上半白下半黑，分界线在 y=100。细档（8）从 y=65 起框：跨线那一块覆盖 [97,105)，
+ *          块内无论取哪一行做采样都落在黑半区；粗档（20）从 y=65 起的块是 [85,105)，
+ *          采样行还落在白半区。两个取样点各按自己的方块网格手算，粒度被写死成别的档就过不了。
+ */
+TEST_F(AnnotationFixture, MosaicGranularityFollowsEachShape)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Mosaic).has_value());
+
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 16, .fillStyle = 0, .mosaicBlockSize = 8}).has_value());
+    m_engine.beginStroke(QPoint(20, 65));
+    m_engine.moveStroke(QPoint(120, 145));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+    EXPECT_LT(m_engine.exportImage().pixelColor(60, 99).red(), 128) << "细档跨线那一块没采到黑半区，粒度没生效";
+
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 16, .fillStyle = 0, .mosaicBlockSize = 20}).has_value());
+    m_engine.beginStroke(QPoint(140, 65));
+    m_engine.moveStroke(QPoint(240, 145));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+    EXPECT_GT(m_engine.exportImage().pixelColor(180, 99).red(), 128) << "粗档同一高度那一块被采成了黑，粒度没跟上";
+}
+
+/**
  * @brief 钉住高亮的笔迹比普通画笔宽，容差同步放宽
  */
 TEST_F(AnnotationFixture, HighlightIsWiderThanThePen)
@@ -562,6 +585,28 @@ TEST_F(AnnotationFixture, HighlightIsWiderThanThePen)
 
     EXPECT_TRUE(m_engine.selectionAt(QPoint(20, 70)).has_value());
     EXPECT_TRUE(m_engine.selectionAt(QPoint(28, 70)).has_value()) << "高亮的宽带子外侧点不中，容差没跟着宽度放宽";
+}
+
+/**
+ * @brief 钉住高亮透明度记在每条图形自己身上：黑底上「颜色 × 透明度」就是直接的读数
+ * @details 底图下半是黑的，黄 (255,255,0) 按 alpha 压上去，合成结果的红绿通道就是 alpha 值：
+ *          60 一档留 (60,60,0)，170 一档留 (170,170,0)。两笔同框、档各不同，互不串档。
+ */
+TEST_F(AnnotationFixture, HighlightOpacityFollowsEachShape)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Highlight).has_value());
+
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 255, 0), .lineWidth = 8, .fontSize = 16, .fillStyle = 0, .highlightAlpha = 60}).has_value());
+    m_engine.beginStroke(QPoint(20, 130));
+    m_engine.moveStroke(QPoint(180, 130));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(100, 130), QColor(60, 60, 0)) << "轻档在黑底上的读数不是 60";
+
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 255, 0), .lineWidth = 8, .fontSize = 16, .fillStyle = 0, .highlightAlpha = 170}).has_value());
+    m_engine.beginStroke(QPoint(20, 160));
+    m_engine.moveStroke(QPoint(180, 160));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(100, 160), QColor(170, 170, 0)) << "重档在黑底上的读数不是 170";
 }
 
 /**

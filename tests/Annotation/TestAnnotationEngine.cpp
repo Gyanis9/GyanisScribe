@@ -407,6 +407,65 @@ TEST_F(EngineFixture, DoubleHeadedRestyleLandsOnTheSelectedArrowAndUndoesBack)
     EXPECT_EQ(m_engine.exportImage().pixelColor(30, 63), QColor(255, 255, 255)) << "撤销没把双向退回单头";
 }
 
+/**
+ * @brief 钉住马赛克粒度与高亮透明度都走改样式命令：选中项当场改档，撤销回原档
+ * @details 这两个是后加的样式旋钮里最容易被漏掉的两处：penParametersOf 与 restyleShapeAt
+ *          都按字段逐个抄，漏一个就等于「选中老档的图形去调档不生效」。
+ *          画布换成上半白下半黑、分界在 y=50：马赛克细档（8）从 y=35 起框，
+ *          取样点 (60,53) 落在跨线块 [51,59) 里、采到黑；粗档（20）的块是 [35,55)、采到白。
+ *          高亮在黑底上红绿通道的读数就是 alpha 值。
+ */
+TEST_F(EngineFixture, MosaicGrainAndHighlightAlphaRestyleAndUndoBack)
+{
+    CapturedImage canvas;
+    canvas.image = QImage(200, 100, QImage::Format_ARGB32_Premultiplied);
+    canvas.image.fill(QColor(255, 255, 255));
+    for (int y = 50; y < 100; ++y)
+    {
+        for (int x = 0; x < 200; ++x)
+        {
+            canvas.image.setPixelColor(x, y, QColor(0, 0, 0));
+        }
+    }
+    canvas.devicePixelRatio = 1.0;
+    canvas.logicalSize      = QSize(200, 100);
+    canvas.screenName       = QStringLiteral("FakeScreen-1");
+    m_engine.loadCanvas(canvas);
+
+    // 马赛克：细档跨线块采到黑
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Mosaic).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 16, .fillStyle = 0, .mosaicBlockSize = 8}).has_value());
+    m_engine.beginStroke(QPoint(20, 35));
+    m_engine.moveStroke(QPoint(120, 75));
+    const auto mosaic = m_engine.endStroke();
+    ASSERT_TRUE(mosaic.has_value()) << mosaic.error().message;
+    EXPECT_LT(m_engine.exportImage().pixelColor(60, 53).red(), 128) << "细档该采到黑，后面的对照就没基准";
+
+    // 改成粗档：同一个取样点变白；撤一步退回细档
+    ASSERT_TRUE(m_engine.select(*mosaic).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 16, .fillStyle = 0, .mosaicBlockSize = 20}).has_value());
+    EXPECT_GT(m_engine.exportImage().pixelColor(60, 53).red(), 128) << "选中项的马赛克粒度没跟着改";
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_LT(m_engine.exportImage().pixelColor(60, 53).red(), 128) << "撤销没把粒度退回细档";
+
+    // 高亮透明度：黑底上 60 档 → 170 档 → 撤销
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Highlight).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 255, 0), .lineWidth = 8, .fontSize = 16, .fillStyle = 0, .mosaicBlockSize = 20, .highlightAlpha = 60})
+                        .has_value());
+    m_engine.beginStroke(QPoint(20, 70));
+    m_engine.moveStroke(QPoint(180, 70));
+    const auto highlight = m_engine.endStroke();
+    ASSERT_TRUE(highlight.has_value()) << highlight.error().message;
+    EXPECT_EQ(m_engine.exportImage().pixelColor(160, 70), QColor(60, 60, 0)) << "轻档的读数不是 60";
+
+    ASSERT_TRUE(m_engine.select(*highlight).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 255, 0), .lineWidth = 8, .fontSize = 16, .fillStyle = 0, .mosaicBlockSize = 20, .highlightAlpha = 170})
+                        .has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(160, 70), QColor(170, 170, 0)) << "选中项的高亮透明度没跟着改";
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(160, 70), QColor(60, 60, 0)) << "撤销没把透明度退回轻档";
+}
+
 namespace
 {
     /// 用文字工具在指定位置放一条文字，返回它的位置

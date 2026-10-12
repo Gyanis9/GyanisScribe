@@ -23,6 +23,7 @@
     <file alias="Export.svg">Icons/Export.svg</file>
     <file alias="Import.svg">Icons/Import.svg</file>
     <file alias="Highlight.svg">Icons/Highlight.svg</file>
+    <file alias="HighlightOpacity.svg">Icons/HighlightOpacity.svg</file>
     <file alias="History.svg">Icons/History.svg</file>
     <file alias="Hotkey.svg">Icons/Hotkey.svg</file>
     <file alias="Info.svg">Icons/Info.svg</file>
@@ -31,6 +32,7 @@
     <file alias="Eraser.svg">Icons/Eraser.svg</file>
     <file alias="Fill.svg">Icons/Fill.svg</file>
     <file alias="Mosaic.svg">Icons/Mosaic.svg</file>
+    <file alias="MosaicGrain.svg">Icons/MosaicGrain.svg</file>
     <file alias="Number.svg">Icons/Number.svg</file>
     <file alias="Ocr.svg">Icons/Ocr.svg</file>
     <file alias="OcrCopy.svg">Icons/OcrCopy.svg</file>

@@ -37,8 +37,8 @@ namespace GyanisScribe::Annotation
         /**
          * @brief 打一块马赛克，见 AnnotationTool::paintShape()
          * @param painter 目标画家
-         * @param shape 图形，取 rect
-         * @param context 绘制现场，用 source 取被盖那块的原像素、用 pixelScale 把逻辑框换成物理框
+         * @param shape 图形，取 rect 与 mosaicBlockSize（方块边长，逻辑像素）
+         * @param context 绘制现场，用 source 取被盖那块的原像素、用 pixelScale 把逻辑框与方块边长换成物理量
          * @details 重写基类纯虚接口：先按方块尺寸缩小再等比放大回去（两段插值都不做平滑），
          *          这是 Qt 原生能力，不必自建像素循环。缩放因子非正或源图为空时什么都不画——
          *          宁可看不见效果，也不把一片随机像素盖到用户脸上。

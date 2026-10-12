@@ -127,6 +127,18 @@ namespace GyanisScribe::Annotation
          */
         void setDoubleHeaded(bool enabled);
 
+        /// 当前马赛克粒度（方块边长，逻辑像素），取值只会落在 kMosaicBlockSizes 的阶梯上
+        [[nodiscard]] int currentMosaicBlockSize() const;
+
+        /// 按 中 → 粗 → 细 → 中 走一档；按钮与用例共用这一个入口
+        void cycleMosaicBlockSize();
+
+        /// 当前高亮透明度（0-255），取值只会落在 kHighlightAlphas 的阶梯上
+        [[nodiscard]] int currentHighlightAlpha() const;
+
+        /// 按 中 → 重 → 轻 → 中 走一档；按钮与用例共用这一个入口
+        void cycleHighlightAlpha();
+
         /**
          * @brief 指定序号的工具按钮，用例与调试用它核对状态
          * @param index 按钮序号，越界返回空指针
@@ -146,6 +158,10 @@ namespace GyanisScribe::Annotation
         void fillStyleChanged(int fillStyle);
         /// 用户开了/关了双向箭头
         void doubleHeadedChanged(bool enabled);
+        /// 用户改了马赛克粒度
+        void mosaicBlockSizeChanged(int blockSize);
+        /// 用户改了高亮透明度
+        void highlightAlphaChanged(int alpha);
         /// 撤销
         void undoClicked();
         /// 重做
@@ -195,22 +211,26 @@ namespace GyanisScribe::Annotation
         class QHBoxLayout         *m_layout            = nullptr; ///< 工具栏主布局，重建色块时要往这里插
         QButtonGroup              *m_colorGroup        = nullptr; ///< 色块的互斥组，重建最近使用时要同步它的成员
 
-        const Ui::IconProvider                                  &m_icons;                       ///< 图标出口，不拥有
-        std::array<QToolButton *, kToolButtonCount>              m_toolButtons{};               ///< 工具按钮，按 ToolKind 顺序
-        std::array<QToolButton *, Ui::kAnnotationPalette.size()> m_colorButtons{};              ///< 八个预设色块
-        std::array<ToolKind, kToolButtonCount>                   m_toolKinds{};                 ///< 按钮序号到工具的映射，反向查也用它
-        QToolButton                                             *m_customColorButton = nullptr; ///< 自定义取色按钮
-        QToolButton                                             *m_undoButton        = nullptr; ///< 撤销按钮
-        QToolButton                                             *m_redoButton        = nullptr; ///< 重做按钮
-        QSlider                                                 *m_widthSlider       = nullptr; ///< 线宽滑块，档位对齐 kAnnotationWidths
-        QComboBox                                               *m_fontSizeCombo     = nullptr; ///< 字号下拉，取值对齐 kFontSizes
-        QToolButton                                             *m_fillButton        = nullptr; ///< 填充档按钮，点一下走一档
-        int                                                      m_fillStyle         = 0;       ///< 当前填充档：0 无、1 半透明、2 实心
-        QToolButton                                             *m_doubleArrowButton = nullptr; ///< 双向箭头开关按钮，按下表示两端有头
-        bool                                                     m_doubleHeaded      = false;   ///< 当前是不是双向箭头
-        QColor                                                   m_currentColor;                ///< 当前颜色，初值取色板第一格
-        bool                                                     m_stateIsInitial = true;       ///< 还在构造期：起点值不回写配置，坏值要留在文件里让人看得见
-        ToolKind                                                 m_activeTool;                  ///< 当前工具，用来挡住「重复点同一个工具」的二次信号
+        const Ui::IconProvider                                  &m_icons;                                                             ///< 图标出口，不拥有
+        std::array<QToolButton *, kToolButtonCount>              m_toolButtons{};                                                     ///< 工具按钮，按 ToolKind 顺序
+        std::array<QToolButton *, Ui::kAnnotationPalette.size()> m_colorButtons{};                                                    ///< 八个预设色块
+        std::array<ToolKind, kToolButtonCount>                   m_toolKinds{};                                                       ///< 按钮序号到工具的映射，反向查也用它
+        QToolButton                                             *m_customColorButton    = nullptr;                                    ///< 自定义取色按钮
+        QToolButton                                             *m_undoButton           = nullptr;                                    ///< 撤销按钮
+        QToolButton                                             *m_redoButton           = nullptr;                                    ///< 重做按钮
+        QSlider                                                 *m_widthSlider          = nullptr;                                    ///< 线宽滑块，档位对齐 kAnnotationWidths
+        QComboBox                                               *m_fontSizeCombo        = nullptr;                                    ///< 字号下拉，取值对齐 kFontSizes
+        QToolButton                                             *m_fillButton           = nullptr;                                    ///< 填充档按钮，点一下走一档
+        int                                                      m_fillStyle            = 0;                                          ///< 当前填充档：0 无、1 半透明、2 实心
+        QToolButton                                             *m_doubleArrowButton    = nullptr;                                    ///< 双向箭头开关按钮，按下表示两端有头
+        bool                                                     m_doubleHeaded         = false;                                      ///< 当前是不是双向箭头
+        QToolButton                                             *m_mosaicGrainButton    = nullptr;                                    ///< 马赛克粒度按钮，点一下走一档
+        int                                                      m_mosaicBlockStep      = static_cast<int>(kDefaultMosaicBlockStep);  ///< 当前粒度档下标，值表是 kMosaicBlockSizes
+        QToolButton                                             *m_highlightAlphaButton = nullptr;                                    ///< 高亮透明度按钮，点一下走一档
+        int                                                      m_highlightAlphaStep = static_cast<int>(kDefaultHighlightAlphaStep); ///< 当前透明度档下标，值表是 kHighlightAlphas
+        QColor                                                   m_currentColor;                                                      ///< 当前颜色，初值取色板第一格
+        bool                                                     m_stateIsInitial = true; ///< 还在构造期：起点值不回写配置，坏值要留在文件里让人看得见
+        ToolKind                                                 m_activeTool;            ///< 当前工具，用来挡住「重复点同一个工具」的二次信号
     };
 
 } // namespace GyanisScribe::Annotation

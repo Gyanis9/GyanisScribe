@@ -36,8 +36,8 @@ namespace GyanisScribe::Annotation
         /**
          * @brief 画一条带颜色的粗笔迹，见 PenTool::paintPolyline()
          * @param painter 目标画家
-         * @param shape 图形，取 points、color、lineWidth
-         * @details 重写父类接口：线宽放大到四倍、颜色带半透明、笔头方而平，
+         * @param shape 图形，取 points、color、lineWidth 与 highlightAlpha（透明度）
+         * @details 重写父类接口：线宽放大到四倍、颜色按图形自己的透明度档、笔头方而平，
          *          这样压过去的字仍读得出来；此外与画笔工具行为一致。
          */
         void paintPolyline(QPainter &painter, const AnnotationShape &shape) const override;

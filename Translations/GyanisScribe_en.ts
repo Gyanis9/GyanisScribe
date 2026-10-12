@@ -108,6 +108,14 @@
             <translation>Double-headed arrow</translation>
         </message>
         <message>
+            <source>马赛克粒度</source>
+            <translation>Mosaic grain</translation>
+        </message>
+        <message>
+            <source>高亮透明度</source>
+            <translation>Highlight opacity</translation>
+        </message>
+        <message>
             <source>撤销（Ctrl+Z）</source>
             <translation>Undo (Ctrl+Z)</translation>
         </message>
@@ -150,6 +158,30 @@
         <message>
             <source>双向箭头：关</source>
             <translation>Double-headed arrow: off</translation>
+        </message>
+        <message>
+            <source>马赛克粒度：细</source>
+            <translation>Mosaic grain: fine</translation>
+        </message>
+        <message>
+            <source>马赛克粒度：中</source>
+            <translation>Mosaic grain: medium</translation>
+        </message>
+        <message>
+            <source>马赛克粒度：粗</source>
+            <translation>Mosaic grain: coarse</translation>
+        </message>
+        <message>
+            <source>高亮透明度：轻</source>
+            <translation>Highlight opacity: light</translation>
+        </message>
+        <message>
+            <source>高亮透明度：中</source>
+            <translation>Highlight opacity: medium</translation>
+        </message>
+        <message>
+            <source>高亮透明度：重</source>
+            <translation>Highlight opacity: strong</translation>
         </message>
         <message>
             <source>选择标注颜色</source>

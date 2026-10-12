@@ -369,6 +369,8 @@ namespace GyanisScribe::Annotation
             tool->setFontSize(m_penParameters.fontSize);
             tool->setFillStyle(m_penParameters.fillStyle);
             tool->setDoubleHeaded(m_penParameters.doubleHeaded);
+            tool->setMosaicBlockSize(m_penParameters.mosaicBlockSize);
+            tool->setHighlightAlpha(m_penParameters.highlightAlpha);
         }
     }
 

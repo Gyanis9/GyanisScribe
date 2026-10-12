@@ -41,16 +41,18 @@ namespace GyanisScribe::Annotation
 
     void AnnotationTool::begin(const QPoint &point)
     {
-        m_startPoint           = point;
-        m_pending              = AnnotationShape{};
-        m_pending.color        = m_color;
-        m_pending.lineWidth    = m_lineWidth;
-        m_pending.fillStyle    = m_fillStyle;
-        m_pending.fontSize     = m_fontSize;
-        m_pending.doubleHeaded = m_doubleHeaded;
-        m_pending.position     = point;
-        m_pending.rect         = QRect(point, point);
-        m_pending.points       = {point, point};
+        m_startPoint              = point;
+        m_pending                 = AnnotationShape{};
+        m_pending.color           = m_color;
+        m_pending.lineWidth       = m_lineWidth;
+        m_pending.fillStyle       = m_fillStyle;
+        m_pending.fontSize        = m_fontSize;
+        m_pending.doubleHeaded    = m_doubleHeaded;
+        m_pending.mosaicBlockSize = m_mosaicBlockSize;
+        m_pending.highlightAlpha  = m_highlightAlpha;
+        m_pending.position        = point;
+        m_pending.rect            = QRect(point, point);
+        m_pending.points          = {point, point};
     }
 
     void AnnotationTool::update(const QPoint &point)
@@ -135,12 +137,14 @@ namespace GyanisScribe::Annotation
         }
 
         // 只碰这些样式字段：位置、轨迹点与文本各自属于移动与内容命令，混进来会让撤销分不开
-        auto &shape        = m_shapes[index];
-        shape.color        = parameters.color;
-        shape.lineWidth    = parameters.lineWidth;
-        shape.fontSize     = parameters.fontSize;
-        shape.fillStyle    = parameters.fillStyle;
-        shape.doubleHeaded = parameters.doubleHeaded;
+        auto &shape           = m_shapes[index];
+        shape.color           = parameters.color;
+        shape.lineWidth       = parameters.lineWidth;
+        shape.fontSize        = parameters.fontSize;
+        shape.fillStyle       = parameters.fillStyle;
+        shape.doubleHeaded    = parameters.doubleHeaded;
+        shape.mosaicBlockSize = parameters.mosaicBlockSize;
+        shape.highlightAlpha  = parameters.highlightAlpha;
         return true;
     }
 
@@ -274,6 +278,17 @@ namespace GyanisScribe::Annotation
     void AnnotationTool::setDoubleHeaded(const bool enabled) noexcept
     {
         m_doubleHeaded = enabled;
+    }
+
+    void AnnotationTool::setMosaicBlockSize(const int blockSize) noexcept
+    {
+        // 0 会让分块除法除零，1 与不马赛克没差别；64 以上在大图上只剩几块色斑
+        m_mosaicBlockSize = std::clamp(blockSize, 1, 64);
+    }
+
+    void AnnotationTool::setHighlightAlpha(const int alpha) noexcept
+    {
+        m_highlightAlpha = std::clamp(alpha, 0, 255);
     }
 
     int AnnotationTool::fontSize() const noexcept
