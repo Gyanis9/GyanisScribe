@@ -92,4 +92,18 @@ namespace GyanisScribe::Platform
         return monitors.size();
     }
 
+    Core::Expected<QPoint> logicalPointToPhysicalGlobal(const QPoint &logicalPoint, const MonitorMapping &monitor)
+    {
+        if (const auto problem = scalingProblem(monitor.devicePixelRatio); problem)
+        {
+            return std::unexpected(*problem);
+        }
+
+        // 与 logicalToPhysicalGlobal 的起点那一条同解：先减这块屏自己的逻辑原点再乘缩放因子，最后取整向下
+        const auto ratio = monitor.devicePixelRatio;
+        const auto x     = floorEdge(static_cast<double>(logicalPoint.x() - monitor.logicalGlobal.x()) * ratio);
+        const auto y     = floorEdge(static_cast<double>(logicalPoint.y() - monitor.logicalGlobal.y()) * ratio);
+        return QPoint{monitor.physicalGlobal.x() + x, monitor.physicalGlobal.y() + y};
+    }
+
 } // namespace GyanisScribe::Platform

@@ -85,6 +85,27 @@ namespace GyanisScribe::Capture
         refreshHoveredRegion();
     }
 
+    void CaptureOverlay::setElementChain(const std::vector<QRect> &globalRects)
+    {
+        // 同窗口候选：换算到这块屏的局部坐标再用
+        const auto origin = m_screenGeometry.topLeft();
+        m_elementChain.clear();
+        m_elementChain.reserve(globalRects.size());
+        for (const auto &rect: globalRects)
+        {
+            const auto local = rect.translated(-origin.x(), -origin.y());
+            // 相邻同矩形并档：惰性树里一层包装层套一层同尺寸的壳，`,`、`.` 按的是「块」不是「层」，
+            // 不并档就会出现按几下尺寸都不动的死档。只在相邻之间并——链是按深度排的，隔着不同尺寸的重复才是真的退了回去
+            if (!m_elementChain.empty() && m_elementChain.back() == local)
+            {
+                continue;
+            }
+            m_elementChain.push_back(local);
+        }
+        refreshHoveredRegion();
+        update();
+    }
+
     void CaptureOverlay::setRegionHistory(const std::vector<QRect> &localRects)
     {
         // 进来就是这块屏的局部坐标（条目在记的时候就按屏存的），只做一次上限裁剪：
@@ -224,6 +245,18 @@ namespace GyanisScribe::Capture
         {
             m_hoveredRegion.reset();
             return;
+        }
+
+        if (!m_elementChain.empty())
+        {
+            // 链按「最深在前」存，位次就是下标：链换了长度也还指得着同一档，用户按到哪一档就一直停在那一档
+            const auto count = m_elementChain.size();
+            if (m_elementAscent < count)
+            {
+                m_hoveredRegion = m_elementChain[m_elementAscent];
+                return;
+            }
+            // 升到最深一级元素还往外一层：把整扇窗口当成链的更外一层，正好接上窗口候选
         }
         m_hoveredRegion = regionAtPoint(m_cursorPoint, m_windowCandidates);
     }
@@ -374,6 +407,14 @@ namespace GyanisScribe::Capture
         m_hasCursorPoint = true;
         m_copiedSizeHint.clear();
 
+        // 悬停点报给服务去问界面元素：只在「没在框选、也还没有选区」时报，
+        // 这两种状态下悬停预览本来就不显示，问了也是白花一次跨进程的费用。
+        // 先报再重算：服务把新链送回来之后，下面的 refreshHoveredRegion 用的就是这一帧的链
+        if (!m_isSelecting && !m_isAdjusting && selectedRegion().isNull())
+        {
+            emit hoverPointChanged(globalCursorPoint());
+        }
+
         if (m_isAdjusting && m_draggedGrip)
         {
             const auto delta = m_cursorPoint - m_adjustPoint;
@@ -480,6 +521,28 @@ namespace GyanisScribe::Capture
                 m_historyIndex = -1; // 整屏不是取自历史：下一次 R 该从最近一条重新起
                 update();
                 return;
+            case Qt::Key_Comma:
+            case Qt::Key_Period:
+            {
+                // `,` 往上一层、`.` 往回一层：悬停认出的界面元素从最深一级起，按这两个键在层级间走，
+                // 走到最外层再往上就是整扇窗口，与「悬停认窗」正好接上。没有元素链时什么都不做，别留哑键
+                if (event->modifiers() != Qt::NoModifier || m_elementChain.empty())
+                {
+                    QWidget::keyPressEvent(event);
+                    return;
+                }
+                if (event->key() == Qt::Key_Comma)
+                {
+                    // 上限是链长：等于链长那一档看的就是整扇窗口
+                    m_elementAscent = std::min(m_elementAscent + 1, m_elementChain.size());
+                } else if (m_elementAscent > 0)
+                {
+                    --m_elementAscent;
+                }
+                refreshHoveredRegion();
+                update();
+                return;
+            }
             case Qt::Key_R:
             {
                 // `R` / `Shift+R` 在最近几次选区之间循环挑：转一圈回到起点。方向键那一档是「挪一格」，

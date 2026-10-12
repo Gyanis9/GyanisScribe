@@ -10,6 +10,7 @@
 
 #include <vector>
 
+using GyanisScribe::Platform::logicalPointToPhysicalGlobal;
 using GyanisScribe::Platform::logicalToPhysicalGlobal;
 using GyanisScribe::Platform::monitorIndexForPoint;
 using GyanisScribe::Platform::MonitorMapping;
@@ -112,6 +113,40 @@ TEST(WindowGeometry, RejectsNonPositiveScaleInsteadOfGuessing)
         ASSERT_FALSE(backward.has_value()) << "缩放因子 " << ratio << " 被当成能算（反方向）";
         EXPECT_EQ(backward.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument);
     }
+}
+
+/**
+ * @brief 钉住逻辑点→物理点的手算值：按矩形起点那条规则向下取整，两块屏各验一次
+ * @details 150% 下逻辑 (101,51) 是物理 151.5,76.5：起点规则取 (151,76)。若图省事四舍五入，
+ *          同一个点在这条换算里是 (152,77)、在矩形换算里是 (151,76)，边界那一格两边各说各话。
+ *          副屏那一路同时钉住「先减这块屏的逻辑原点再加回它的物理原点」，少一步就会串到主屏上。
+ */
+TEST(WindowGeometry, MapsLogicalPointOntoPhysicalWithTheStartCornerRule)
+{
+    const auto onPrimary = logicalPointToPhysicalGlobal(QPoint{101, 51}, primaryAtOneFifty);
+    ASSERT_TRUE(onPrimary.has_value()) << onPrimary.error().message;
+    EXPECT_EQ(*onPrimary, QPoint(151, 76)) << "起点取整的方向不对：应该向下取，不能四舍五入";
+
+    // 与矩形换算互指：点当成 1×1 矩形的起点，两条路必须落到同一个像素
+    const auto asRect = logicalToPhysicalGlobal(QRect(QPoint{101, 51}, QSize{1, 1}), primaryAtOneFifty);
+    ASSERT_TRUE(asRect.has_value());
+    EXPECT_EQ(*onPrimary, asRect->topLeft()) << "点那条与矩形那条算出了两个起点，边界上的命中会两边各说各话";
+
+    const auto onSecond = logicalPointToPhysicalGlobal(QPoint{2000, 100}, secondAtOneHundred);
+    ASSERT_TRUE(onSecond.has_value()) << onSecond.error().message;
+    EXPECT_EQ(*onSecond, QPoint(2960, 100)) << "副屏没减自己的逻辑原点，点被算到了主屏的坐标里";
+}
+
+/**
+ * @brief 拒绝面：点换算和矩形换算同一条闸，缩放因子非正一律拒
+ */
+TEST(WindowGeometry, RejectsPointConversionWithNonPositiveScale)
+{
+    MonitorMapping broken{QStringLiteral(R"(\\.\DISPLAY1)"), QRect{0, 0, 2880, 1620}, QRect{0, 0, 1920, 1080}, 0.0};
+
+    const auto rejected = logicalPointToPhysicalGlobal(QPoint{10, 10}, broken);
+    ASSERT_FALSE(rejected.has_value()) << "缩放因子 0 被当成能算";
+    EXPECT_EQ(rejected.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument);
 }
 
 /**

@@ -18,6 +18,7 @@
 #include <QTimer>
 
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace GyanisScribe::Capture
@@ -167,6 +168,23 @@ namespace GyanisScribe::Capture
         [[nodiscard]] std::vector<QRect> windowCandidates() const;
 
         /**
+         * @brief 悬停点的元素链：问平台要光标处一摞界面元素，送回顾问的那张遮罩
+         * @param overlay 发起问询的遮罩，问完把结果送回它
+         * @param globalLogicalPoint 光标的全局逻辑坐标
+         * @details 同一个点不重复问：遮罩的悬停点可以连着两次落在同一格，而每次问都是
+         *          一串跨进程调用。排除名单把在屏的遮罩窗全交进去——UIA 命中穿不过置顶窗，
+         *          不排除的话认到的就是遮罩自己。问不出来时把空链送回去（退回只认窗口），
+         *          失败原因只报一次，别跟着鼠标一路刷日志。
+         */
+        void queryElementChain(CaptureOverlay *overlay, const QPoint &globalLogicalPoint);
+
+        /**
+         * @brief 在屏遮罩的窗口句柄，交给平台当元素命中的排除名单
+         * @return 每张还在的遮罩一份句柄；还没建出原生窗口的那些跳过
+         */
+        [[nodiscard]] std::vector<quintptr> overlayHandles() const;
+
+        /**
          * @brief 铺遮罩进入框选
          * @param longCapture 真表示选完区域之后接长图，假表示选完就截这一张
          */
@@ -196,16 +214,18 @@ namespace GyanisScribe::Capture
          */
         void placeLongHud();
 
-        const IScreenCaptureSource           &m_source;             ///< 抓帧来源
-        Settings::ISettingsStore             &m_settings;           ///< 「上次区域」的读写处
-        const Platform::IPlatformIntegration &m_integration;        ///< 窗口候选的来源，不拥有
-        std::vector<QPointer<CaptureOverlay>> m_overlays;           ///< 在屏的遮罩，每块屏一张；窗口自己析构后要认得空指针
-        QTimer                                m_longTimer;          ///< 滚动拼接的取帧节拍，只在有选区之后跑
-        QPointer<LongCaptureHud>              m_longHud;            ///< 长截图控制条，一轮一个
-        Core::CapturedImage                   m_longImage;          ///< 已经接好的长图，第一帧就是它的开头
-        QRect                                 m_longRegion;         ///< 反复抓的那块区域，该屏内的逻辑坐标
-        QString                               m_longScreenName;     ///< 这一轮所在的那块屏
-        bool                                  m_longActive = false; ///< 正在按节拍接帧
+        const IScreenCaptureSource           &m_source;                         ///< 抓帧来源
+        Settings::ISettingsStore             &m_settings;                       ///< 「上次区域」的读写处
+        const Platform::IPlatformIntegration &m_integration;                    ///< 窗口候选与界面元素的来源，不拥有
+        std::vector<QPointer<CaptureOverlay>> m_overlays;                       ///< 在屏的遮罩，每块屏一张；窗口自己析构后要认得空指针
+        QTimer                                m_longTimer;                      ///< 滚动拼接的取帧节拍，只在有选区之后跑
+        QPointer<LongCaptureHud>              m_longHud;                        ///< 长截图控制条，一轮一个
+        Core::CapturedImage                   m_longImage;                      ///< 已经接好的长图，第一帧就是它的开头
+        QRect                                 m_longRegion;                     ///< 反复抓的那块区域，该屏内的逻辑坐标
+        QString                               m_longScreenName;                 ///< 这一轮所在的那块屏
+        std::optional<QPoint>                 m_lastElementQuery;               ///< 上一格问过的悬停点，同一个点不重复问
+        bool                                  m_elementFailureReported = false; ///< 元素问询的失败原因本轮是否已经报过
+        bool                                  m_longActive             = false; ///< 正在按节拍接帧
     };
 
 } // namespace GyanisScribe::Capture

@@ -533,3 +533,196 @@ TEST_F(CaptureOverlayFixture, RegionHistoryKeysCycleThroughRecentSelections)
     pressKey(*overlay, Qt::Key_R);
     EXPECT_EQ(overlay->selectedRegion(), first) << "自己框过之后 R 该从最近一条重新起，而不是接着上一轮的位次";
 }
+
+// 光标处一摞界面元素，全局坐标，由深到浅：最外一层是窗口根（局部 (100,110,280,180)）；
+// (200,160) 这个局部点同时落在三层与窗口候选里，用来验「悬停优先落在哪一级」
+const std::vector<QRect> kElementChainGlobal{
+        QRect{2060, 150, 80, 40},   // 最深一级，局部 (140,150,80,40)：按钮之类的小块
+        QRect{2050, 140, 100, 60},  // 中间一层，局部 (130,140,100,60)：工具条
+        QRect{2020, 110, 280, 180}, // 窗口根，局部 (100,110,280,180)：客户区
+};
+
+/**
+ * @brief 钉住悬停优先落在元素链最深一级，链没了才退回窗口候选
+ * @details 元素比整扇窗口更贴目标：给着链却还亮整窗，等于这一整批没生效；
+ *          链为空是「本平台认不出元素」的常态出口，那时必须原样退回只认窗口。
+ */
+TEST_F(CaptureOverlayFixture, HoverPrefersTheDeepestElementOverTheWindowCandidate)
+{
+    auto overlay = makeOverlay();
+    overlay->setWindowCandidates(kCandidates);
+    overlay->setElementChain(kElementChainGlobal);
+
+    moveOver(*overlay, QPoint{200, 160});
+    ASSERT_TRUE(overlay->hoveredRegion().has_value());
+    EXPECT_EQ(*overlay->hoveredRegion(), QRect(140, 150, 80, 40)) << "悬停没落在最深一级元素上；全局到局部少减一次屏原点也会是这副样子";
+
+    // 对照：同一块窗口候选上不给链，悬停就该退回整窗那一档
+    auto withoutChain = makeOverlay();
+    withoutChain->setWindowCandidates(kCandidates);
+    moveOver(*withoutChain, QPoint{200, 160});
+    ASSERT_TRUE(withoutChain->hoveredRegion().has_value());
+    EXPECT_EQ(*withoutChain->hoveredRegion(), QRect(180, 150, 100, 80)) << "没有元素链时没退回窗口候选";
+}
+
+/**
+ * @brief 钉住 `,` 从最深一级逐级升到窗口根、再上一档就是整扇窗口，到头停住
+ * @details 每一档都要与手算的局部矩形逐位相等：升错方向或跳档，用户按出来的框会一次比一次离谱。
+ *          Shift+`,` 不接管（`,` 已经被「升一层」用掉了裸键这一档）。
+ */
+TEST_F(CaptureOverlayFixture, CommaWalksUpTheElementChainToTheWholeWindow)
+{
+    auto overlay = makeOverlay();
+    overlay->setWindowCandidates(kCandidates);
+    overlay->setElementChain(kElementChainGlobal);
+    moveOver(*overlay, QPoint{200, 160});
+    ASSERT_TRUE(overlay->hoveredRegion().has_value());
+
+    pressKey(*overlay, Qt::Key_Comma);
+    ASSERT_TRUE(overlay->hoveredRegion().has_value());
+    EXPECT_EQ(*overlay->hoveredRegion(), QRect(130, 140, 100, 60)) << "第一下该升到中间一层";
+
+    pressKey(*overlay, Qt::Key_Comma);
+    ASSERT_TRUE(overlay->hoveredRegion().has_value());
+    EXPECT_EQ(*overlay->hoveredRegion(), QRect(100, 110, 280, 180)) << "第二下该升到窗口根";
+
+    pressKey(*overlay, Qt::Key_Comma);
+    ASSERT_TRUE(overlay->hoveredRegion().has_value());
+    EXPECT_EQ(*overlay->hoveredRegion(), QRect(180, 150, 100, 80)) << "再往上该接上整扇窗口";
+
+    pressKey(*overlay, Qt::Key_Comma);
+    EXPECT_EQ(*overlay->hoveredRegion(), QRect(180, 150, 100, 80)) << "到头之后还继续按，超过了整扇窗口这一档";
+
+    pressKey(*overlay, Qt::Key_Comma, Qt::ShiftModifier);
+    EXPECT_EQ(*overlay->hoveredRegion(), QRect(180, 150, 100, 80)) << "带 Shift 的不该接管这一档";
+}
+
+/**
+ * @brief 钉住 `.` 从窗口那一档往回降到底，到底停住
+ */
+TEST_F(CaptureOverlayFixture, PeriodWalksBackDownToTheDeepestElement)
+{
+    auto overlay = makeOverlay();
+    overlay->setWindowCandidates(kCandidates);
+    overlay->setElementChain(kElementChainGlobal);
+    moveOver(*overlay, QPoint{200, 160});
+
+    pressKey(*overlay, Qt::Key_Comma);
+    pressKey(*overlay, Qt::Key_Comma);
+    pressKey(*overlay, Qt::Key_Comma);
+    ASSERT_EQ(overlay->hoveredRegion(), std::optional<QRect>(QRect(180, 150, 100, 80))) << "先升到整窗那一档，后面的下降才验得到跨级";
+
+    pressKey(*overlay, Qt::Key_Period);
+    EXPECT_EQ(*overlay->hoveredRegion(), QRect(100, 110, 280, 180)) << "`. ` 该从整窗降回窗口根";
+    pressKey(*overlay, Qt::Key_Period);
+    EXPECT_EQ(*overlay->hoveredRegion(), QRect(130, 140, 100, 60));
+    pressKey(*overlay, Qt::Key_Period);
+    EXPECT_EQ(*overlay->hoveredRegion(), QRect(140, 150, 80, 40)) << "该降回最深一级";
+
+    pressKey(*overlay, Qt::Key_Period);
+    EXPECT_EQ(*overlay->hoveredRegion(), QRect(140, 150, 80, 40)) << "到底之后还继续按，钻过了最深一级";
+}
+
+/**
+ * @brief 钉住相邻同矩形的包装层并成一档：按一下就得换到另一档
+ * @details 惰性树里一层包装层套一层同尺寸的壳（本机实测 Chromium 窗口根连着七层同矩形），
+ *          不并档就会出现按几下尺寸都不动的死档。判据收在「并过之后一次按键跨到下一个尺寸」上。
+ */
+TEST_F(CaptureOverlayFixture, AdjacentDuplicateLayersCollapseIntoOneStep)
+{
+    auto overlay = makeOverlay();
+    overlay->setWindowCandidates(kCandidates);
+    // 最里那层连着两份同矩形，最外一层尺寸不同
+    overlay->setElementChain({QRect{2060, 150, 80, 40}, QRect{2060, 150, 80, 40}, QRect{2020, 110, 280, 180}});
+    moveOver(*overlay, QPoint{200, 160});
+    ASSERT_EQ(overlay->hoveredRegion(), std::optional<QRect>(QRect(140, 150, 80, 40)));
+
+    pressKey(*overlay, Qt::Key_Comma);
+    EXPECT_EQ(*overlay->hoveredRegion(), QRect(100, 110, 280, 180)) << "同矩形包装层没并档：按键停在一个尺寸不动的死档上";
+
+    pressKey(*overlay, Qt::Key_Comma);
+    EXPECT_EQ(*overlay->hoveredRegion(), QRect(180, 150, 100, 80)) << "并档之后往上该直接接上整扇窗口";
+}
+
+/**
+ * @brief 钉住升到的档位在链变化后还指着「同一相对层级」，链短了就在整窗那一档收住
+ * @details 用户按到中间一层后光标挪一点，链换了但层级还在：位次该跟着走，不是跳回最深一级。
+ *          换到一条只有一层的链时，位次越界，应当收在整扇窗口这一档而不是编出一块不存在的元素。
+ */
+TEST_F(CaptureOverlayFixture, AscendedDepthSticksWhenTheChainChanges)
+{
+    auto overlay = makeOverlay();
+    overlay->setWindowCandidates(kCandidates);
+    overlay->setElementChain(kElementChainGlobal);
+    moveOver(*overlay, QPoint{200, 160});
+    pressKey(*overlay, Qt::Key_Comma); // 停在中层（位次 1）
+    ASSERT_EQ(overlay->hoveredRegion(), std::optional<QRect>(QRect(130, 140, 100, 60)));
+
+    // 链换了、层级还是三层：位次该指到新链的中层，而不是跳回最深一级
+    overlay->setElementChain({QRect{2055, 155, 70, 30}, QRect{2045, 145, 95, 55}, QRect{2015, 115, 275, 175}});
+    ASSERT_TRUE(overlay->hoveredRegion().has_value());
+    EXPECT_EQ(*overlay->hoveredRegion(), QRect(125, 145, 95, 55)) << "链换了之后位次跳档，用户刚按出来的层级被顺手改掉";
+
+    // 链只剩一层：位次越界，收在整扇窗口那一档
+    overlay->setElementChain({QRect{2060, 150, 80, 40}});
+    ASSERT_TRUE(overlay->hoveredRegion().has_value());
+    EXPECT_EQ(*overlay->hoveredRegion(), QRect(180, 150, 100, 80)) << "链短于位次时该收在整窗一档，而不是编出不存在的一级";
+}
+
+/**
+ * @brief 钉住「按下又原地放开」采纳的是元素那一档，不是整扇窗口
+ * @details 采纳走的就是悬停预览的那一块：预览已经细分到按钮上了，点一下交出去的却是整窗，
+ *          用户按「点一下要这块」得到的东西比看到的多了十几倍。
+ */
+TEST_F(CaptureOverlayFixture, ClickWithoutDragAdoptsTheDeepestElement)
+{
+    auto overlay = makeOverlay();
+    overlay->setWindowCandidates(kCandidates);
+    overlay->setElementChain(kElementChainGlobal);
+
+    moveOver(*overlay, QPoint{200, 160});
+    buttonAt(*overlay, QEvent::MouseButtonPress, QPoint{200, 160});
+    buttonAt(*overlay, QEvent::MouseButtonRelease, QPoint{200, 160});
+
+    EXPECT_EQ(overlay->selectedRegion(), QRect(140, 150, 80, 40)) << "点一下交出的是整扇窗口而不是按钮那一块";
+    EXPECT_FALSE(overlay->hoveredRegion().has_value()) << "已经落成的选区不该再留一个预览框";
+}
+
+/**
+ * @brief 钉住悬停点只在「没在框选、也还没有选区」时报给服务
+ * @details 服务按这条去问平台要元素，每次都是一串跨进程调用：拖框途中或选区已落成时再报，
+ *          就是白花费用。报的坐标必须是全局读数——服务要拿它去问平台，局部坐标问出来的是别的屏的元素。
+ */
+TEST_F(CaptureOverlayFixture, HoverPointChangesAreReportedOnlyWhileNothingIsSelected)
+{
+    auto overlay = makeOverlay();
+
+    std::vector<QPoint> reported;
+    QObject::connect(overlay.get(), &CaptureOverlay::hoverPointChanged, overlay.get(), [&reported](const QPoint &point) { reported.push_back(point); });
+
+    moveOver(*overlay, QPoint{200, 160});
+    ASSERT_EQ(reported.size(), 1U) << "悬停点没报给服务，元素链永远不会被问";
+    EXPECT_EQ(reported[0], kScreenGeometry.topLeft() + QPoint(200, 160)) << "报的必须是全局坐标";
+
+    // 拖出一块选区：按下与拖动途中都不该再报
+    dragOut(*overlay, QPoint{300, 300}, QPoint{340, 320});
+    EXPECT_EQ(reported.size(), 1U) << "框选途中还在报悬停点";
+
+    moveOver(*overlay, QPoint{250, 250});
+    EXPECT_EQ(reported.size(), 1U) << "选区已落成还在报悬停点";
+}
+
+/**
+ * @brief 钉住选区落成后元素链不再影响悬停：链晚到一步也不许亮出预览框
+ * @details 悬停点报出去、链送回来之间用户已经拖出了选区：这时再把预览框亮起来，
+ *          「这就是要截的那块」那句已经确定的话被改成了疑问句。
+ */
+TEST_F(CaptureOverlayFixture, ElementChainIsIgnoredOnceASelectionExists)
+{
+    auto overlay = makeOverlay();
+    overlay->setWindowCandidates(kCandidates);
+    dragOut(*overlay, QPoint{300, 300}, QPoint{340, 320});
+
+    overlay->setElementChain(kElementChainGlobal);
+    EXPECT_FALSE(overlay->hoveredRegion().has_value()) << "已有选区时元素链还亮起了预览框";
+}

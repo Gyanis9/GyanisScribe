@@ -36,7 +36,7 @@ namespace GyanisScribe::Platform
 
         /**
          * @brief 取 Linux 能力表，见 IPlatformIntegration::capabilities()
-         * @return 四项均为假：全局热键、鼠标穿透、「取前台窗口」与「枚举可见窗口」都要与会话协议打交道，本仓没接
+         * @return 各项均为假：全局热键、鼠标穿透、「取前台窗口」、「枚举可见窗口」与「界面元素检测」都要与会话协议打交道，本仓没接
          * @note X11 与 Wayland 的差异不在这张表里细分：屏幕采集由采集器自己探，探不到就报 DependencyMissing
          */
         [[nodiscard]] PlatformCapabilities capabilities() const noexcept override;
@@ -66,6 +66,15 @@ namespace GyanisScribe::Platform
          * @note 降级文案给的是「直接框出来」这条替代做法，遮罩上不会摆一枚认不出来的悬停选项
          */
         [[nodiscard]] Core::Expected<std::vector<ScreenWindow>> screenWindows() const override;
+
+        /**
+         * @brief 光标处的界面元素，见 IPlatformIntegration::elementChainAtPoint()
+         * @param globalLogicalPoint 本平台不使用
+         * @param excludeWindowHandles 本平台不使用
+         * @return 一律返回 PlatformUnsupported：这套能力依赖系统无障碍树（Windows 上的 UI Automation），
+         *         X11 与 Wayland 都没有统一可问的对等物，本仓没接
+         */
+        [[nodiscard]] Core::Expected<std::vector<QRect>> elementChainAtPoint(const QPoint &globalLogicalPoint, const std::vector<quintptr> &excludeWindowHandles) const override;
 
         /**
          * @brief 查开机启动，见 IPlatformIntegration::autostartEnabled()

@@ -72,6 +72,15 @@ namespace GyanisScribe::Capture
         void setWindowCandidates(const std::vector<QRect> &globalRects);
 
         /**
+         * @brief 交付光标处的一摞界面元素
+         * @param globalRects 全局逻辑矩形，从最深一级排到窗口根；空一份表示光标下没有可切分的元素
+         * @details 悬停预览优先落在这一摞的最深一级：比整扇窗口更贴目标。相邻同矩形的包装层
+         *          （惰性树里常见）在这里并成一档——`,`、`.` 一步步选的是「块」，隔几档尺寸不动是死档。
+         *          本方法按这块屏的原点换成局部坐标；空一份就是退回「只认窗口候选」。
+         */
+        void setElementChain(const std::vector<QRect> &globalRects);
+
+        /**
          * @brief 交付这块屏上的历史选区
          * @param localRects 历史选区，屏内局部逻辑坐标，最近的在前；只放与这块屏同屏的那几条
          * @details `R` / `Shift+R` 在这份清单里循环挑：按一次换一块，转一圈回到起点。
@@ -126,6 +135,14 @@ namespace GyanisScribe::Capture
          * @brief 用户取消了这次截图
          */
         void dismissed();
+
+        /**
+         * @brief 光标在这块屏上动了，且此刻没在框选、也还没有选区
+         * @param globalPoint 光标的全局逻辑坐标
+         * @details 服务按这条去问平台「点下有哪些界面元素」，再把结果走 setElementChain 送回来。
+         *          没在框选、没有选区时才报：这两种状态下悬停预览本来就不显示，白问一次是跨进程开销。
+         */
+        void hoverPointChanged(const QPoint &globalPoint);
 
     protected:
         /**
@@ -184,7 +201,8 @@ namespace GyanisScribe::Capture
         /**
          * @brief 按当前点重算「光标压在哪个候选上」
          * @details 只在还没有选区时算：用户已经框出一块之后再亮一个别的矩形，会把「这就是要截的那块」
-         *          这句已经确定的话改成疑问句。
+         *          这句已经确定的话改成疑问句。有元素链时优先在链里选（按层数从最深往上），
+         *          链取完或没有链时退回窗口候选。
          */
         void refreshHoveredRegion();
 
@@ -238,6 +256,8 @@ namespace GyanisScribe::Capture
         QPoint                       m_adjustPoint;         ///< 上一帧的鼠标位置，拖抓点时按增量走
         bool                         m_isSelecting = false; ///< 是否正在拖动框选
         std::vector<QRect>           m_windowCandidates;    ///< 窗口候选，已换成局部逻辑坐标，按 z 序排
+        std::vector<QRect>           m_elementChain;        ///< 光标处的元素链，已换成局部逻辑坐标，由深到浅；相邻同矩形已并档
+        std::size_t                  m_elementAscent = 0;   ///< 从这里往上数了几级（0 = 最深一级）；等于链长时看整扇窗口
         std::optional<QRect>         m_hoveredRegion;       ///< 光标压在上的那一个候选，没有则空
     };
 

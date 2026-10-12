@@ -1,5 +1,6 @@
 #include "Capture/CaptureService.h"
 
+#include "Capture/CaptureOverlay.h"
 #include "Capture/IScreenCaptureSource.h"
 #include "Core/Logger.h"
 #include "Platform/IPlatformIntegration.h"
@@ -9,11 +10,13 @@
 #include <QApplication>
 #include <QColor>
 #include <QImage>
+#include <QMouseEvent>
 #include <QString>
 #include <QVariant>
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -23,6 +26,7 @@
 #include <string>
 #include <vector>
 
+using GyanisScribe::Capture::CaptureOverlay;
 using GyanisScribe::Capture::CaptureService;
 using GyanisScribe::Capture::ICaptureService;
 using GyanisScribe::Capture::IScreenCaptureSource;
@@ -709,4 +713,144 @@ TEST_F(CaptureServiceFixture, LongCaptureFramesNeverCarryTheCursor)
             EXPECT_EQ(outcome.image->image.pixelColor(x, y), QColor(255, 0, 0)) << "长图里混进了指针色";
         }
     }
+}
+
+namespace
+{
+    /// 替身照抄生产端的契约形状：能力位决定接线，问询记录用来核对「问了哪个点、排除了谁」
+    class FakePlatformIntegration : public GyanisScribe::Platform::IPlatformIntegration
+    {
+    public:
+        [[nodiscard]] GyanisScribe::Platform::PlatformCapabilities capabilities() const noexcept override
+        {
+            return capabilitiesValue;
+        }
+
+        [[nodiscard]] QString displayName() const override
+        {
+            return QStringLiteral("替身");
+        }
+
+        [[nodiscard]] std::unique_ptr<GyanisScribe::Platform::IHotkeyBackend> createHotkeyBackend() override
+        {
+            return nullptr;
+        }
+
+        [[nodiscard]] Expected<GyanisScribe::Platform::ForegroundWindow> foregroundWindow() const override
+        {
+            return std::unexpected(Error{ErrorCode::PlatformUnsupported, "替身不给前台窗口"});
+        }
+
+        [[nodiscard]] Expected<bool> autostartEnabled() const override
+        {
+            return std::unexpected(Error{ErrorCode::PlatformUnsupported, "替身不管开机启动"});
+        }
+
+        [[nodiscard]] Expected<void> setAutostart(bool enabled) override
+        {
+            static_cast<void>(enabled);
+            return std::unexpected(Error{ErrorCode::PlatformUnsupported, "替身不管开机启动"});
+        }
+
+        [[nodiscard]] Expected<std::vector<GyanisScribe::Platform::ScreenWindow>> screenWindows() const override
+        {
+            return std::unexpected(Error{ErrorCode::PlatformUnsupported, "替身不列窗口"});
+        }
+
+        [[nodiscard]] Expected<std::vector<QRect>> elementChainAtPoint(const QPoint &globalLogicalPoint, const std::vector<quintptr> &excludeWindowHandles) const override
+        {
+            queriedPoints.push_back(globalLogicalPoint);
+            excludedHandles = excludeWindowHandles;
+            return elementChain;
+        }
+
+        GyanisScribe::Platform::PlatformCapabilities capabilitiesValue;
+        Expected<std::vector<QRect>>                 elementChain{std::vector<QRect>{}};
+        mutable std::vector<QPoint>                  queriedPoints;
+        mutable std::vector<quintptr>                excludedHandles;
+    };
+
+    /// 找这一轮铺出来的遮罩：它是一张顶层控件，按类型认出来
+    [[nodiscard]] CaptureOverlay *findOverlay()
+    {
+        for (auto *widget: QApplication::topLevelWidgets())
+        {
+            if (auto *overlay = qobject_cast<CaptureOverlay *>(widget))
+            {
+                return overlay;
+            }
+        }
+        return nullptr;
+    }
+} // namespace
+
+/**
+ * @brief 钉住悬停接线：遮罩报点、服务问平台、链送回遮罩，排除名单里带着自家遮罩窗
+ * @details 三处各钉一步：没接线就没人问（用户看到元素检测没生效）；排除名单漏了自家遮罩，
+ *          UIA 命中会认到盖在全屏上的遮罩自己（本机探针实测，置顶工具窗也挡不住命中）；
+ *          链没送回遮罩，悬停就退回窗口候选。同一个点连报两次只问一次——每次问都是一串跨进程调用。
+ */
+TEST_F(CaptureServiceFixture, HoverAsksThePlatformAndFeedsTheChainBackToTheOverlay)
+{
+    if (QGuiApplication::screens().isEmpty())
+    {
+        GTEST_SKIP() << "这个环境没有屏幕可枚举，铺不出遮罩";
+    }
+
+    SettingsStore           settings(m_iniFile);
+    FakeCaptureSource       source;
+    FakePlatformIntegration fake;
+    fake.capabilitiesValue.uiElements = true;
+    CaptureService service(source, settings, fake);
+
+    service.startInteractive();
+    auto *overlay = findOverlay();
+    ASSERT_NE(overlay, nullptr) << "开始框选之后没铺出遮罩";
+
+    const auto localPoint  = QRect(QPoint{0, 0}, overlay->size()).center();
+    const auto globalPoint = overlay->geometry().topLeft() + localPoint;
+    const auto localDeep   = QRect{localPoint.x() - 10, localPoint.y() - 10, 20, 20};
+    const auto localWide   = QRect{localPoint.x() - 100, localPoint.y() - 100, 300, 300};
+    fake.elementChain      = std::vector<QRect>{localDeep.translated(overlay->geometry().topLeft()), localWide.translated(overlay->geometry().topLeft())};
+
+    QMouseEvent move{QEvent::MouseMove, QPointF{localPoint}, QPointF{globalPoint}, Qt::NoButton, Qt::NoButton, Qt::KeyboardModifiers{}};
+    QApplication::sendEvent(overlay, &move);
+
+    ASSERT_EQ(fake.queriedPoints.size(), 1U) << "悬停没有去问平台要界面元素";
+    EXPECT_EQ(fake.queriedPoints[0], globalPoint) << "问的不是全局坐标，问到的是别的屏上的元素";
+    EXPECT_NE(std::ranges::find(fake.excludedHandles, static_cast<quintptr>(overlay->winId())), fake.excludedHandles.end())
+            << "自家遮罩窗没进排除名单：命中会认到盖住全屏的遮罩自己";
+    ASSERT_TRUE(overlay->hoveredRegion().has_value()) << "链送回来了，悬停却没落在链上";
+    EXPECT_EQ(*overlay->hoveredRegion(), localDeep) << "链的全局到局部换算与遮罩自己那条不一致";
+
+    // 同一点再报一次：不重复问
+    QApplication::sendEvent(overlay, &move);
+    EXPECT_EQ(fake.queriedPoints.size(), 1U) << "同一个点被问了两次，每次都是一串跨进程调用";
+}
+
+/**
+ * @brief 钉住平台没有元素能力时不接这条线：鼠标一动就问一次是白花跨进程开销
+ */
+TEST_F(CaptureServiceFixture, HoverDoesNotAskWhenThePlatformHasNoElementDetection)
+{
+    if (QGuiApplication::screens().isEmpty())
+    {
+        GTEST_SKIP() << "这个环境没有屏幕可枚举，铺不出遮罩";
+    }
+
+    SettingsStore           settings(m_iniFile);
+    FakeCaptureSource       source;
+    FakePlatformIntegration fake; // 能力位全假：连 uiElements 都不给
+    CaptureService          service(source, settings, fake);
+
+    service.startInteractive();
+    auto *overlay = findOverlay();
+    ASSERT_NE(overlay, nullptr) << "开始框选之后没铺出遮罩";
+
+    const auto  localPoint  = QRect(QPoint{0, 0}, overlay->size()).center();
+    const auto  globalPoint = overlay->geometry().topLeft() + localPoint;
+    QMouseEvent move{QEvent::MouseMove, QPointF{localPoint}, QPointF{globalPoint}, Qt::NoButton, Qt::NoButton, Qt::KeyboardModifiers{}};
+    QApplication::sendEvent(overlay, &move);
+
+    EXPECT_TRUE(fake.queriedPoints.empty()) << "能力位为假还是去问了平台";
 }

@@ -3,6 +3,8 @@
 #include "Platform/WindowGeometry.h"
 
 #include <QApplication>
+#include <QElapsedTimer>
+#include <QPushButton>
 #include <QWindow>
 #include <QWidget>
 
@@ -17,6 +19,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <iostream>
 #include <thread>
 
 using GyanisScribe::Core::ErrorCode;
@@ -26,6 +29,25 @@ using GyanisScribe::Platform::UnsupportedHotkeyBackend;
 #ifdef Q_OS_WIN
 using GyanisScribe::Platform::autostartCommandLine;
 #endif
+
+namespace
+{
+    /// 保证进程里有一份 QApplication：用例各自造成立条件，先建过的直接复用
+    /// @details Qt 每进程只允许一份应用对象，本文件里有两条用例要用 GUI（枚举窗口、元素检测）：
+    ///          堆一份带静态存储期的，谁先跑到谁把它建起来，谁也不用借别处的初始化
+    void ensureApplication()
+    {
+        if (QCoreApplication::instance() != nullptr)
+        {
+            return;
+        }
+        static int                argumentCount  = 1;
+        static char               argumentZero[] = "TestPlatform";
+        static char              *arguments[]    = {argumentZero, nullptr};
+        static const QApplication application{argumentCount, arguments};
+        Q_UNUSED(application);
+    }
+} // namespace
 
 /**
  * @brief 钉住桩后端的拒绝契约：不支持就说「不支持」，不静默成功
@@ -138,11 +160,7 @@ TEST(PlatformIntegration, WindowEnumerationCapabilityMatchesTheOutcome)
  */
 TEST(PlatformIntegration, EnumeratedWindowSitsWhereQtPutsIt)
 {
-    // argv 的缓冲要有静态存储期：Qt 只存指针不拷贝
-    static int   argumentCount  = 1;
-    static char  argumentZero[] = "TestPlatform";
-    static char *arguments[]    = {argumentZero, nullptr};
-    QApplication application{argumentCount, arguments};
+    ensureApplication();
 
     const auto integration = createPlatformIntegration();
     ASSERT_NE(integration, nullptr);
@@ -197,6 +215,151 @@ TEST(PlatformIntegration, EnumeratedWindowSitsWhereQtPutsIt)
     EXPECT_LT(found->clientLogicalGlobal.height(), found->logicalGlobal.height()) << "客户区不比整窗矮，说明两份读数是同一个来源抄的，抓帧的原点会偏到标题栏上";
     EXPECT_GT(found->clientLogicalGlobal.height(), qtClient.height() - 2) << "客户区矮得离谱：多半把整窗矩形当成了客户区";
 }
+
+/**
+ * @brief 钉住「界面元素」的能力位与实际给果同解
+ * @details 遮罩按这一位决定悬停要不要细问元素。位与行为分家时要么白少一项、
+ *          要么鼠标每动一格都去问一条注定拒绝的路。非 Windows 的回绝文案必须指一条替代做法
+ *          （继续认整扇窗口、或直接框住要的那一块）。
+ */
+TEST(PlatformIntegration, UiElementCapabilityMatchesTheOutcome)
+{
+    ensureApplication();
+    const auto integration = createPlatformIntegration();
+    ASSERT_NE(integration, nullptr);
+
+    const auto chain = integration->elementChainAtPoint(QPoint{0, 0}, {});
+    if (!integration->capabilities().uiElements)
+    {
+        ASSERT_FALSE(chain.has_value()) << "能力位说没有，却还是交出了一份元素链";
+        EXPECT_EQ(chain.error().code, ErrorCode::PlatformUnsupported);
+        EXPECT_NE(QString::fromStdString(chain.error().message).indexOf(QStringLiteral("框")), -1) << "回绝时没指替代做法：实际是 " << chain.error().message;
+        return;
+    }
+
+    if (!chain)
+    {
+        EXPECT_NE(chain.error().code, ErrorCode::PlatformUnsupported) << "能力位说有，这一句却回绝：实际是 " << chain.error().message;
+    }
+}
+
+#ifdef Q_OS_WIN
+namespace
+{
+    /// EnumWindows 收集用：除探针之外全部可见顶层窗都进排除名单
+    struct ExcludeAllButProbe
+    {
+        std::vector<quintptr> handles;  ///< 收集到的句柄
+        quintptr              keep = 0; ///< 这一扇不排除（探针自己）
+    };
+
+    BOOL CALLBACK collectOtherWindows(const HWND window, const LPARAM parameter)
+    {
+        auto *const collected = reinterpret_cast<ExcludeAllButProbe *>(parameter);
+        if (IsWindowVisible(window) != 0 && reinterpret_cast<quintptr>(window) != collected->keep)
+        {
+            collected->handles.push_back(reinterpret_cast<quintptr>(window));
+        }
+        return TRUE;
+    }
+} // namespace
+
+/**
+ * @brief 钉住元素链能穿过遮罩形状的置顶窗认到下面的界面，并且真的钻到最细一级
+ * @details 与生产同形：整块覆盖的置顶工具窗（截图遮罩就是这个形状）+ 排除名单里它的句柄。
+ *          判据是「最深一级落在按钮那块里」：排除名单失效会锚到别的窗上，下钻断在任何一层都到不了按钮。
+ *          排除名单把「除探针外全部可见顶层窗」都收进去——锚定探针这一步就与桌面上的 z 序无关，
+ *          用例不用赌探针能升到最上面（用户正开着别的窗口时那是会变的现场）；
+ *          覆盖窗也在名单里，于是「顶上的那扇被跳过、继续往下找」这一步照样被验到。
+ *          收尾顺带量一轮耗时读数（不断言时间：那是机器现场）。
+ */
+TEST(PlatformIntegration, ElementChainDescendsIntoTheWindowUnderThePoint)
+{
+    ensureApplication();
+    const auto integration = createPlatformIntegration();
+    ASSERT_NE(integration, nullptr);
+    if (!integration->capabilities().uiElements)
+    {
+        GTEST_SKIP() << "本平台没有界面元素检测：降级出口由上一条用例钉住";
+    }
+    if (QGuiApplication::screens().isEmpty())
+    {
+        GTEST_SKIP() << "这个环境没有屏幕可枚举，探针摆不出来";
+    }
+
+    QWidget probe;
+    probe.setWindowTitle(QStringLiteral("智录元素检测探针"));
+    probe.resize(520, 380);
+    auto *const button = new QPushButton(QStringLiteral("叶片"), &probe);
+    button->setGeometry(40, 60, 160, 48);
+    probe.show();
+    QCoreApplication::processEvents();
+
+    // 遮罩形状的覆盖窗：置顶 + 工具窗，盖住探针整块——截图遮罩盖住桌面的样子
+    QWidget cover;
+    cover.setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
+    cover.setGeometry(probe.frameGeometry());
+    cover.show();
+    QCoreApplication::processEvents();
+
+    const auto buttonCenter = button->mapToGlobal(button->rect().center());
+    const auto buttonGlobal = QRect{button->mapToGlobal(QPoint{0, 0}), button->size()};
+
+    ExcludeAllButProbe exclusion;
+    exclusion.keep = static_cast<quintptr>(probe.winId());
+    EnumWindows(collectOtherWindows, reinterpret_cast<LPARAM>(&exclusion));
+    ASSERT_FALSE(exclusion.handles.empty()) << "一扇别的窗都没收到，排除名单等于没立起来";
+
+    std::vector<QRect> chain;
+    bool               reached  = false;
+    const auto         deadline = std::chrono::steady_clock::now() + std::chrono::seconds{2};
+    do
+    {
+        QCoreApplication::processEvents();
+        if (const auto queried = integration->elementChainAtPoint(buttonCenter, exclusion.handles); queried)
+        {
+            chain   = *queried;
+            reached = !chain.empty() && buttonGlobal.adjusted(-4, -4, 4, 4).contains(chain.front());
+        }
+        if (!reached)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds{20});
+        }
+    } while (!reached && std::chrono::steady_clock::now() < deadline);
+
+    ASSERT_TRUE(reached) << "元素链没钻到探针按钮上：排除名单或按包含关系的下钻断在了中间某一层";
+
+    // 链里每一级都该套住这个点：下钻就是按包含关系走的
+    for (const auto &rect: chain)
+    {
+        EXPECT_TRUE(rect.contains(buttonCenter)) << "某一级不套住光标点，说明包含关系判错了";
+    }
+    EXPECT_LT(chain.front().width(), probe.width()) << "最深一级还是整扇窗口那么宽，下钻一步都没走";
+    EXPECT_TRUE(buttonGlobal.contains(chain.front()) || chain.front().contains(buttonGlobal)) << "最深一级与按钮没有包含关系，认到的是别处";
+
+    // 拔屏/改分辨率后的陈旧坐标：不在任何一块屏上的点要当场拒绝，不编一块出来
+    const auto offscreen = integration->elementChainAtPoint(QPoint{-100000, -100000}, {});
+    ASSERT_FALSE(offscreen.has_value()) << "不在任何屏上的点居然算出了元素链";
+    EXPECT_EQ(offscreen.error().code, ErrorCode::InvalidArgument);
+
+    // 读数（不断言时间）：探针窗、链深若干，一次悬停问询的中位耗时
+    std::vector<double> costs;
+    for (int round = 0; round < 20; ++round)
+    {
+        QElapsedTimer timer;
+        timer.start();
+        if (integration->elementChainAtPoint(buttonCenter, exclusion.handles))
+        {
+            costs.push_back(static_cast<double>(timer.nsecsElapsed()) / 1'000'000.0);
+        }
+    }
+    if (!costs.empty())
+    {
+        std::ranges::sort(costs);
+        std::cout << "[读数] 元素链一次查询中位耗时：" << costs[costs.size() / 2] << "ms（探针窗、链深 " << chain.size() << "、20 轮）" << std::endl;
+    }
+}
+#endif
 
 #ifdef Q_OS_WIN
 /**

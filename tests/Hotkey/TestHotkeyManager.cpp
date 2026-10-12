@@ -131,6 +131,21 @@ namespace
         }
 
         /**
+         * @brief 界面元素链：这份替身不演这一项
+         * @param globalLogicalPoint 不使用
+         * @param excludeWindowHandles 不使用
+         * @return PlatformUnsupported
+         * @note 与 capabilities() 里 uiElements 保持为假同解
+         */
+        Expected<std::vector<QRect>> elementChainAtPoint(const QPoint &globalLogicalPoint, const std::vector<quintptr> &excludeWindowHandles) const override
+        {
+            static_cast<void>(globalLogicalPoint);
+            static_cast<void>(excludeWindowHandles);
+
+            return std::unexpected(Error{ErrorCode::PlatformUnsupported, "测试替身不演界面元素这一项"});
+        }
+
+        /**
          * @brief 查开机启动：这份替身不演这一项
          * @return PlatformUnsupported
          * @note 与 capabilities() 里 autostart 保持为假同解

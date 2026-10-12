@@ -120,6 +120,10 @@ namespace GyanisScribe::Capture
 
         closeOverlays();
 
+        // 这一轮的悬停记账到期重来：上一轮问过的点与报过的失败理由都不该带进新一轮
+        m_lastElementQuery.reset();
+        m_elementFailureReported = false;
+
         const auto screens = QGuiApplication::screens();
         if (screens.isEmpty())
         {
@@ -178,6 +182,11 @@ namespace GyanisScribe::Capture
                                  captureRegion(region, screen->name());
                              });
             QObject::connect(overlay, &CaptureOverlay::dismissed, this, &CaptureService::cancelInteractive);
+            // 悬停细分到界面元素：平台没这能力就不接这条线，遮罩照旧只认窗口候选
+            if (m_integration.capabilities().uiElements)
+            {
+                QObject::connect(overlay, &CaptureOverlay::hoverPointChanged, this, [this, overlay](const QPoint &globalPoint) { queryElementChain(overlay, globalPoint); });
+            }
             m_overlays.push_back(QPointer<CaptureOverlay>(overlay));
             overlay->show();
             overlay->activateWindow();
@@ -434,6 +443,48 @@ namespace GyanisScribe::Capture
             rects.push_back(window.logicalGlobal);
         }
         return rects;
+    }
+
+    void CaptureService::queryElementChain(CaptureOverlay *overlay, const QPoint &globalLogicalPoint)
+    {
+        // 光标可以连着两次落在同一格上（进遮罩的那一下、按下前的微动），同一格不重复问：
+        // 每次问都是一串跨进程调用，答案还一模一样
+        if (m_lastElementQuery && *m_lastElementQuery == globalLogicalPoint)
+        {
+            return;
+        }
+        m_lastElementQuery = globalLogicalPoint;
+
+        const auto chain = m_integration.elementChainAtPoint(globalLogicalPoint, overlayHandles());
+        if (chain)
+        {
+            overlay->setElementChain(*chain);
+            return;
+        }
+
+        // 问不出来就退回只认窗口，别把上一次的链留在屏幕上装作还认得：那个框已经不对应光标下的东西了
+        overlay->setElementChain({});
+        if (m_elementFailureReported)
+        {
+            return;
+        }
+        m_elementFailureReported = true;
+        Core::Logger::warning(std::format("认不出光标下的界面元素，这一轮退回只认整扇窗口：{}", chain.error().message));
+    }
+
+    std::vector<quintptr> CaptureService::overlayHandles() const
+    {
+        std::vector<quintptr> handles;
+        handles.reserve(m_overlays.size());
+        for (const auto &overlay: m_overlays)
+        {
+            if (overlay)
+            {
+                // winId() 对已 show 的窗口不会新建原生窗口，只是把句柄取出来
+                handles.push_back(static_cast<quintptr>(overlay->winId()));
+            }
+        }
+        return handles;
     }
 
 } // namespace GyanisScribe::Capture

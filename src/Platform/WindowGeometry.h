@@ -77,4 +77,15 @@ namespace GyanisScribe::Platform
      */
     [[nodiscard]] std::size_t monitorIndexForPoint(const QPoint &physicalPoint, const std::vector<MonitorMapping> &monitors);
 
+    /**
+     * @brief 把全局逻辑点换成同一块屏上的全局物理点
+     * @param logicalPoint 该屏坐标系里的全局逻辑点
+     * @param monitor 这块屏的两份读数
+     * @return 成功返回物理点；缩放因子非正时返回 InvalidArgument
+     * @details 点按「矩形的起点」处理，取整沿用 logicalToPhysicalGlobal() 那一条（起点向下）：
+     *          平台侧按物理点做命中（窗口矩形包含、UIA 命中），取整若与矩形换算不同源，
+     *          边界上的那一格会两边各说各话。
+     */
+    [[nodiscard]] Core::Expected<QPoint> logicalPointToPhysicalGlobal(const QPoint &logicalPoint, const MonitorMapping &monitor);
+
 } // namespace GyanisScribe::Platform

@@ -1848,6 +1848,10 @@
             <translation>This platform can't list the windows on screen, so the overlay doesn't recognise "hover to pick a whole window". Frame the part you want directly, or press the capture key once for the full screen</translation>
         </message>
         <message>
+            <source>本平台认不出界面元素（要系统的无障碍树，X11 与 Wayland 都没有统一可问的入口，本仓没接）。遮罩上悬停仍会认整扇窗口，也可以直接框住要的那一块</source>
+            <translation>This platform can't detect UI elements (that needs the system accessibility tree, and neither X11 nor Wayland offers a unified way to ask; not wired up here). Hovering still recognises whole windows, and you can always frame the part you want directly</translation>
+        </message>
+        <message>
             <source>本平台没有全局热键能力：登记不会生效。请在程序窗口内使用普通快捷键，或等平台适配后再开启这一项</source>
             <translation>This platform has no global hotkey support: registering won't take effect. Use ordinary shortcuts inside the program window, or enable this once the platform is adapted.</translation>
         </message>
@@ -1890,6 +1894,18 @@
         <message>
             <source>认不出桌面上有哪些窗口：平台的屏幕清单与界面的屏幕清单配不上对。请先用整屏或框选截图，重开一次智录再试</source>
             <translation>Can't tell which windows are on the desktop: the platform's screen list and the interface's screen list didn't pair up. Use full-screen or region capture for now, then restart GyanisScribe</translation>
+        </message>
+        <message>
+            <source>认不出光标下的界面元素：平台的屏幕清单与界面的屏幕清单配不上对。可以继续直接框住要截的那一块</source>
+            <translation>Can't detect the UI element under the cursor: the platform's screen list and the interface's screen list didn't pair up. You can still frame the part you want directly</translation>
+        </message>
+        <message>
+            <source>这个光标位置不落在任何一块屏幕上（多半是拔屏或改分辨率之后的陈旧坐标）。请把鼠标动一下再试</source>
+            <translation>This cursor position doesn't fall on any screen (most likely a stale coordinate after unplugging a display or changing resolution). Move the mouse and try again</translation>
+        </message>
+        <message>
+            <source>系统的 UI Automation 起不来，认不出界面元素。可以继续用悬停认整扇窗口，或直接框住要的那一块</source>
+            <translation>The system's UI Automation failed to start, so UI elements can't be detected. Hovering can still recognise whole windows, or frame the part you want directly</translation>
         </message>
         <message>
             <source>取不到本程序的完整路径，没法写开机启动项。请从安装目录启动本程序后再试一次</source>

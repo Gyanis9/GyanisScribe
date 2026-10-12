@@ -14,13 +14,15 @@ namespace GyanisScribe::Platform
 
     PlatformCapabilities LinuxIntegration::capabilities() const noexcept
     {
-        // 全局热键没有跨桌面会话的统一登记口，桩后端如实回绝；穿透、「取前台窗口」与「枚举可见窗口」同理
-        // （后两者要靠 X11 的 _NET_ACTIVE_WINDOW / 窗口树查询，或 Wayland 的会话协议，本仓没接）
+        // 全局热键没有跨桌面会话的统一登记口，桩后端如实回绝；穿透、「取前台窗口」、「枚举可见窗口」
+        // 与「界面元素检测」同理（前两者要靠 X11 的 _NET_ACTIVE_WINDOW / 窗口树查询或 Wayland 的会话协议，
+        // 元素检测要靠系统无障碍树，本仓都没接）
         return PlatformCapabilities{
                 .globalHotkeys     = false,
                 .clickThrough      = false,
                 .windowDiscovery   = false,
                 .windowEnumeration = false,
+                .uiElements        = false,
         };
     }
 
@@ -67,6 +69,19 @@ namespace GyanisScribe::Platform
         return std::unexpected(
                 Core::Error{Core::ErrorCode::PlatformUnsupported,
                             GyanisScribe::Core::uiTextUtf8("本平台列不出屏上的窗口，遮罩上不认「悬停选中整扇窗口」。请直接把要的那一块框出来，或按一次截图键取整屏")});
+    }
+
+    Core::Expected<std::vector<QRect>> LinuxIntegration::elementChainAtPoint(const QPoint &globalLogicalPoint, const std::vector<quintptr> &excludeWindowHandles) const
+    {
+        static_cast<void>(globalLogicalPoint);
+        static_cast<void>(excludeWindowHandles);
+
+        // 这套能力要问系统的无障碍树，两个会话都没有统一可问的对等物：不硬造一份「整扇窗口」冒充元素，
+        // 那会让遮罩在 Linux 上多出一档按了没差别的层级切换
+        return std::unexpected(Core::Error{
+                Core::ErrorCode::PlatformUnsupported,
+                GyanisScribe::Core::uiTextUtf8(
+                        "本平台认不出界面元素（要系统的无障碍树，X11 与 Wayland 都没有统一可问的入口，本仓没接）。遮罩上悬停仍会认整扇窗口，也可以直接框住要的那一块")});
     }
 
 } // namespace GyanisScribe::Platform

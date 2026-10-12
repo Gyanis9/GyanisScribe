@@ -101,6 +101,20 @@ namespace GyanisScribe::Platform
          *          平台层不替界面决定「谁该出现在候选里」
          */
         [[nodiscard]] virtual Core::Expected<std::vector<ScreenWindow>> screenWindows() const = 0;
+
+        /**
+         * @brief 光标处一摞界面元素，从最深一级往上排到所在窗口的根
+         * @param globalLogicalPoint 全局逻辑坐标
+         * @param excludeWindowHandles 命中到这几位里的窗口直接跳过：截图时把自家的遮罩窗交进来，
+         *        免得全屏置顶的遮罩自己把底下真正的界面挡在名单外面
+         * @return 成功返回元素矩形（逻辑全局），从最深一级排到窗口根；空一份表示光标下这块没有可切分的界面元素
+         * @return 本平台给不出时返回 PlatformUnsupported，并指一条替代做法
+         * @details 截图遮罩用它做「悬停细分到元素一级」，比整扇窗口更贴目标。矩形按包含关系逐级套住光标点；
+         *          零宽高的中间层由实现剔除，而相邻同矩形的包装层（惰性树里常见）如实交回——消费方按需归并，
+         *          自己决定几层算一档。实现在 Windows 上先认「光标下第一扇不在排除名单里的可见窗」再问 UI Automation：
+         *          UIA 的命中测试穿不过置顶窗（本机探针实测，工具窗也不例外），所以不能直接问「点下的元素」。
+         */
+        [[nodiscard]] virtual Core::Expected<std::vector<QRect>> elementChainAtPoint(const QPoint &globalLogicalPoint, const std::vector<quintptr> &excludeWindowHandles) const = 0;
     };
 
     /**

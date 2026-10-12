@@ -226,6 +226,19 @@ namespace
             return m_windows;
         }
 
+        /// @brief 界面元素链：这份替身不演这一项
+        /// @param globalLogicalPoint 不使用
+        /// @param excludeWindowHandles 不使用
+        /// @return PlatformUnsupported
+        /// @note 与 capabilities() 里 uiElements 保持为假同解
+        [[nodiscard]] Expected<std::vector<QRect>> elementChainAtPoint(const QPoint &globalLogicalPoint, const std::vector<quintptr> &excludeWindowHandles) const override
+        {
+            static_cast<void>(globalLogicalPoint);
+            static_cast<void>(excludeWindowHandles);
+
+            return std::unexpected(Error{ErrorCode::PlatformUnsupported, "替身不演界面元素这一项"});
+        }
+
     private:
         std::vector<GyanisScribe::Platform::ScreenWindow> m_windows;           ///< 摆好的那份清单
         bool                                              m_enumerates = true; ///< 能力位与交回内容要同解
