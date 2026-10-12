@@ -218,6 +218,16 @@ namespace GyanisScribe::Pin
         /// 此刻是否上下翻转
         [[nodiscard]] bool mirroredVertically() const noexcept;
 
+        /// 此刻是否在裁剪模式
+        [[nodiscard]] bool isCropping() const noexcept;
+
+        /**
+         * @brief 进裁剪模式：在贴图上拖一个框，回车（或双击）裁到那一块
+         * @details 与进标注同一套摆正规矩：裁剪框是轴对齐的，先把旋转与翻转清掉、退出时恢复。
+         *          动图不进这一档（裁完会被下一帧盖回原尺寸），菜单项灰掉并写明出路。
+         */
+        void startCropping();
+
         /**
          * @brief 开关灰度显示（视图滤镜，不进成品）
          * @param grayscale true 表示按 luma 转灰度
@@ -529,6 +539,15 @@ namespace GyanisScribe::Pin
          */
         void routeAnnotationKey(QKeyEvent *event);
 
+        /// 收裁剪：commit 为真时把框里的像素留下，为假时原样退出（两路都恢复进裁剪前的旋转与翻转）
+        void finishCropping(bool commit);
+
+        /**
+         * @brief 裁剪框（窗口坐标）
+         * @return 拖出来过的框；还没拖时为空
+         */
+        [[nodiscard]] std::optional<QRectF> cropRect() const;
+
         QImage m_image;       ///< 贴图内容，物理像素
         QSizeF m_logicalSize; ///< 图片逻辑尺寸
         /// 显示用的像素：灰度/反色两档按需算一份并挂住（同一版像素只算一次）
@@ -539,6 +558,12 @@ namespace GyanisScribe::Pin
         bool                                                 m_mirroredVertically   = false;             ///< 上下翻转（视图变换）
         bool                                                 m_grayscale            = false;             ///< 灰度显示（视图滤镜）
         bool                                                 m_inverted             = false;             ///< 反色（视图滤镜）
+        bool                                                 m_cropping             = false;             ///< 裁剪模式
+        std::optional<QPointF>                               m_cropAnchor;                               ///< 裁剪框起笔点（窗口坐标）；没拖过时为空
+        std::optional<QPointF>                               m_cropCurrent;                              ///< 裁剪框当前点（窗口坐标）
+        double                                               m_rotationBeforeCrop           = 0.0;       ///< 进裁剪前的旋转角，退出时恢复
+        bool                                                 m_mirrorHorizontallyBeforeCrop = false;     ///< 进裁剪前的左右翻转，退出时恢复
+        bool                                                 m_mirrorVerticallyBeforeCrop   = false;     ///< 进裁剪前的上下翻转，退出时恢复
         mutable QImage                                       m_viewFiltered;                             ///< 灰度/反色算出来的显示图；两档全关时为空
         mutable qint64                                       m_viewFilteredSourceKey = 0;                ///< 上面那份缓存对的是哪一版像素（cacheKey）
         double                                               m_opacity               = 1.0;              ///< 不透明度

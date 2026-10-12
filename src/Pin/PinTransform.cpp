@@ -103,6 +103,30 @@ namespace GyanisScribe::Pin
         return QPoint(static_cast<int>(u * imagePixelSize.width()), static_cast<int>(v * imagePixelSize.height()));
     }
 
+    std::optional<QRect> imagePixelRect(const QRectF &windowRect, const QRectF &content, const QSize &imagePixelSize)
+    {
+        if (content.width() <= 0.0 || content.height() <= 0.0 || imagePixelSize.isEmpty())
+        {
+            return std::nullopt;
+        }
+
+        const QRectF clamped = windowRect.normalized().intersected(content);
+        if (clamped.width() <= 0.0 || clamped.height() <= 0.0)
+        {
+            return std::nullopt;
+        }
+
+        // 左/上边界下取整（框压到哪一格就算哪一格）、右/下边界上取整再退一格（边界线本身不算新的一列）
+        const auto fold = [](const double position, const double origin, const double span, const int pixels) { return (position - origin) / span * pixels; };
+        const int  x0   = std::clamp(static_cast<int>(std::floor(fold(clamped.left(), content.left(), content.width(), imagePixelSize.width()))), 0, imagePixelSize.width() - 1);
+        const int  y0   = std::clamp(static_cast<int>(std::floor(fold(clamped.top(), content.top(), content.height(), imagePixelSize.height()))), 0, imagePixelSize.height() - 1);
+        const int  x1 = std::clamp(static_cast<int>(std::ceil(fold(clamped.right(), content.left(), content.width(), imagePixelSize.width()))) - 1, 0, imagePixelSize.width() - 1);
+        const int  y1 =
+                std::clamp(static_cast<int>(std::ceil(fold(clamped.bottom(), content.top(), content.height(), imagePixelSize.height()))) - 1, 0, imagePixelSize.height() - 1);
+
+        return QRect(QPoint(x0, y0), QPoint(x1, y1));
+    }
+
     EdgeSnap snapToScreenEdges(const QRect &draggedRect, const QRect &available, const int tolerance)
     {
         if (available.isEmpty() || draggedRect.isEmpty())

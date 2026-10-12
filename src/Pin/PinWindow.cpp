@@ -38,6 +38,7 @@
 #include <QImageReader>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPaintEvent>
 #include <QKeyEvent>
 
@@ -84,6 +85,12 @@ namespace GyanisScribe::Pin
 
         /// 按住 Shift 时标注微调一次挪多少格：与标注窗那一档同值
         constexpr int kAnnotateCoarseNudgeStride = 10;
+
+        /// 裁剪框的最小边长，像素：比这还小的框多半是手抖点了一下，不当裁剪
+        constexpr int kMinimumCropEdge = 2;
+
+        /// 裁剪模式压暗框外的透明度（0-255）：压太黑看不清框外该不该留，太淡又看不出框在哪
+        constexpr int kCropDimAlpha = 120;
 
         /// 拖放的粗判据：带文件、图像或文本就值得收下再看（细判在落下那一刻做）
         bool dragPayloadIsPinnable(const QMimeData *mime)
@@ -701,6 +708,87 @@ namespace GyanisScribe::Pin
         update();
     }
 
+    bool PinWindow::isCropping() const noexcept
+    {
+        return m_cropping;
+    }
+
+    std::optional<QRectF> PinWindow::cropRect() const
+    {
+        if (!m_cropAnchor.has_value() || !m_cropCurrent.has_value())
+        {
+            return std::nullopt;
+        }
+        return QRectF(*m_cropAnchor, *m_cropCurrent).normalized();
+    }
+
+    void PinWindow::startCropping()
+    {
+        if (m_cropping || isAnimated())
+        {
+            return;
+        }
+
+        // 缩略图态先摆回整张、取色模式先退出：这两种模式下都没有可画的坐标面
+        setThumbnailMode(false);
+        setColorPickMode(false);
+
+        // 裁剪框是轴对齐的：旋转与翻转先摆正（与进标注同一条规矩），退出时恢复
+        m_rotationBeforeCrop           = m_rotationDegrees;
+        m_mirrorHorizontallyBeforeCrop = m_mirroredHorizontally;
+        m_mirrorVerticallyBeforeCrop   = m_mirroredVertically;
+        setRotationDegrees(0.0);
+        setMirroredHorizontally(false);
+        setMirroredVertically(false);
+        applyGeometry();
+
+        m_cropping = true;
+        m_cropAnchor.reset();
+        m_cropCurrent.reset();
+        setCursor(Qt::CrossCursor);
+        update();
+        Core::Logger::info(std::format("贴图进入裁剪：{}×{} 逻辑像素，拖一个框后回车裁到那一块", m_logicalSize.width(), m_logicalSize.height()));
+    }
+
+    void PinWindow::finishCropping(const bool commit)
+    {
+        if (!m_cropping)
+        {
+            return;
+        }
+
+        const auto rect = cropRect();
+        m_cropping      = false;
+        m_cropAnchor.reset();
+        m_cropCurrent.reset();
+        unsetCursor();
+
+        if (commit && rect.has_value())
+        {
+            if (const auto pixels = imagePixelRect(*rect, contentRect(), m_image.size()); pixels.has_value())
+            {
+                if (pixels->width() >= kMinimumCropEdge && pixels->height() >= kMinimumCropEdge)
+                {
+                    m_image        = m_image.copy(*pixels);
+                    m_logicalSize  = m_image.devicePixelRatio() > 0.0 ? QSizeF(m_image.width() / m_image.devicePixelRatio(), m_image.height() / m_image.devicePixelRatio())
+                                                                      : QSizeF(m_image.size());
+                    m_viewFiltered = {};
+                    Core::Logger::info(std::format("贴图裁剪完成：留 {}×{} 像素", m_image.width(), m_image.height()));
+                } else
+                {
+                    Core::Logger::info(std::format("这一框太小（{}×{} 像素），没有裁", pixels->width(), pixels->height()));
+                }
+            }
+        }
+
+        // 恢复进裁剪前的旋转与翻转：裁的是像素，摆回去之后用户看到的那一份还是他摆好的样子
+        setRotationDegrees(m_rotationBeforeCrop);
+        setMirroredHorizontally(m_mirrorHorizontallyBeforeCrop);
+        setMirroredVertically(m_mirrorVerticallyBeforeCrop);
+        applyGeometry();
+        update();
+    }
+
     void PinWindow::routeAnnotationKey(QKeyEvent *event)
     {
         // 序号工具在用时的 `+`/`-`/`0`：与标注窗同一口径（改的是「下一个号」，不动画布）
@@ -991,6 +1079,31 @@ namespace GyanisScribe::Pin
         {
             paintColorReadout(painter);
         }
+
+        // 裁剪模式：框外压一层暗，留下的那一块亮着；框本身用虚线圈出来
+        if (m_cropping)
+        {
+            const auto   box = cropRect();
+            QPainterPath outside;
+            outside.addRect(QRectF(rect()));
+            if (box.has_value())
+            {
+                outside.addRect(*box);
+            }
+            // 两条矩形走奇偶填充：框内那一条被挖掉，压暗只落在框外
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(QColor(0, 0, 0, kCropDimAlpha));
+            painter.drawPath(outside);
+
+            if (box.has_value())
+            {
+                QPen cropPen(GyanisScribe::Ui::kAccentColor, 1.0, Qt::DashLine);
+                cropPen.setCapStyle(Qt::FlatCap);
+                painter.setPen(cropPen);
+                painter.setBrush(Qt::NoBrush);
+                painter.drawRect(*box);
+            }
+        }
     }
 
     void PinWindow::paintColorReadout(QPainter &painter)
@@ -1051,6 +1164,15 @@ namespace GyanisScribe::Pin
             return;
         }
 
+        // 裁剪模式：左键起一笔新的裁剪框（进这一档时取色与缩略图都已经退出）
+        if (m_cropping)
+        {
+            m_cropAnchor  = event->position();
+            m_cropCurrent = event->position();
+            update();
+            return;
+        }
+
         // 取色模式：点一下就把那一像素的颜色交出去，点完自己退出——与屏幕取色那边「点一下拿一个色」同一口径
         if (m_colorPickMode)
         {
@@ -1090,6 +1212,17 @@ namespace GyanisScribe::Pin
             return;
         }
 
+        // 裁剪模式：拖的是那一框（按下时已经起笔）
+        if (m_cropping)
+        {
+            if (m_cropAnchor.has_value())
+            {
+                m_cropCurrent = event->position();
+                update();
+            }
+            return;
+        }
+
         // 取色模式：鼠标只读像素，不拖窗也不缩图——读数框跟着光标走
         if (m_colorPickMode)
         {
@@ -1118,6 +1251,15 @@ namespace GyanisScribe::Pin
         Q_UNUSED(event);
         if (m_annotating)
         {
+            return;
+        }
+        if (m_cropping)
+        {
+            if (m_cropAnchor.has_value())
+            {
+                m_cropCurrent = event->position();
+                update();
+            }
             return;
         }
         if (m_draggedHandle)
@@ -1243,6 +1385,20 @@ namespace GyanisScribe::Pin
             return;
         }
 
+        // 裁剪模式：回车（或双击）裁到框里，Esc 原样退出；别的键一律不认——
+        // 这时候按 T/R/字母都是手滑，不该改掉这张图的别的状态
+        if (m_cropping)
+        {
+            if (event->key() == Qt::Key_Escape)
+            {
+                finishCropping(false);
+            } else if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter)
+            {
+                finishCropping(true);
+            }
+            return;
+        }
+
         if (event->key() == Qt::Key_Escape)
         {
             // 取色模式里 Esc 先退出取色：用户想反悔的那一下多半是「不取了」，
@@ -1317,6 +1473,13 @@ namespace GyanisScribe::Pin
             return;
         }
 
+        // 裁剪模式：双击就是「就这一框」——与回车同一条路
+        if (m_cropping)
+        {
+            finishCropping(true);
+            return;
+        }
+
         // 左键双击同样回到原始比例与角度：已经在 1:1 且没转角时这是幂等，而不是「按了没反应」
         resetScaleAndRotation();
     }
@@ -1376,6 +1539,15 @@ namespace GyanisScribe::Pin
         auto *pickAction = menu->addAction(GyanisScribe::Core::uiText("取色"), this, [this] { setColorPickMode(!m_colorPickMode); });
         pickAction->setCheckable(true);
         pickAction->setChecked(m_colorPickMode);
+
+        // 裁剪：拖一个框、回车裁到那一块。动图不进这一档（裁完会被下一帧盖回原尺寸），
+        // 与「标注」同一条口径：灰掉并写明出路
+        auto *cropAction = menu->addAction(GyanisScribe::Core::uiText("裁剪"), this, [this] { startCropping(); });
+        if (isAnimated())
+        {
+            cropAction->setEnabled(false);
+            cropAction->setToolTip(GyanisScribe::Core::uiText("动图不能裁剪：裁完会被下一帧盖回原尺寸。请先保存成静态图，再把那张贴出来裁"));
+        }
 
         auto *thumbnailAction = menu->addAction(GyanisScribe::Core::uiText("缩到小图"), this, [this] { setThumbnailMode(!m_thumbnail); });
         thumbnailAction->setCheckable(true);

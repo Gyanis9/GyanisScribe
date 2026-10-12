@@ -2008,6 +2008,14 @@
             <translation>Pick color</translation>
         </message>
         <message>
+            <source>裁剪</source>
+            <translation>Crop</translation>
+        </message>
+        <message>
+            <source>动图不能裁剪：裁完会被下一帧盖回原尺寸。请先保存成静态图，再把那张贴出来裁</source>
+            <translation>An animated pin cannot be cropped: the next frame would restore the original size. Save it as a still image and pin that one to crop it.</translation>
+        </message>
+        <message>
             <source>缩到小图</source>
             <translation>Shrink to thumbnail</translation>
         </message>

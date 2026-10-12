@@ -283,3 +283,36 @@ TEST(PinTransform, MapsWindowPointsBackUnderMirrors)
     EXPECT_EQ(*anchored, QPoint(0, 0)) << "90° + 左右翻转的反算次序不对";
     EXPECT_FALSE(imagePixelAt(QPointF{75.0, 75.0}, tallContent, samePixels, 90.0, false, false).has_value()) << "同一点在不翻转时该落回图外";
 }
+
+/**
+ * @brief 钉住裁剪框的按块换算：左闭右开，右边界那一格不多算、贴边那一列不少算
+ * @details 1:1 手算：40×40 折进 40×40 的画布，(10,10) 拖到 (20,30) 该裁出 10×20——
+ *          拿两个角去问点命中会得到 11×21（右/下边界那一格被多算一列）。
+ *          缩放档：300×200 的画布铺 600×400 的图，(30,20) 拖到 (300,180) 折成 (60,40)+(540,320)。
+ */
+TEST(PinTransform, CropRectFoldsLeftClosedRightOpen)
+{
+    const QRectF content{0.0, 0.0, 40.0, 40.0};
+    const QSize  pixels{40, 40};
+
+    const auto box = imagePixelRect(QRectF(10.0, 10.0, 10.0, 20.0), content, pixels);
+    ASSERT_TRUE(box.has_value());
+    EXPECT_EQ(*box, QRect(10, 10, 10, 20)) << "1:1 的裁剪框折算不对（多半是右/下边界多算了一格）";
+
+    const auto full = imagePixelRect(QRectF(0.0, 0.0, 40.0, 40.0), content, pixels);
+    ASSERT_TRUE(full.has_value());
+    EXPECT_EQ(*full, QRect(0, 0, 40, 40)) << "整张的框该覆盖到最后一行/列，不该被排掉";
+
+    const QRectF scaledContent{0.0, 0.0, 300.0, 200.0};
+    const auto   scaled = imagePixelRect(QRectF(30.0, 20.0, 270.0, 160.0), scaledContent, QSize(600, 400));
+    ASSERT_TRUE(scaled.has_value());
+    EXPECT_EQ(*scaled, QRect(60, 40, 540, 320)) << "带缩放的裁剪框折算不对";
+
+    // 拖出画布的部分先夹回来：(-50,-50) 起、到 (10,10) 止，只算画布里的那 10×10
+    const auto clamped = imagePixelRect(QRectF(-50.0, -50.0, 60.0, 60.0), content, pixels);
+    ASSERT_TRUE(clamped.has_value());
+    EXPECT_EQ(*clamped, QRect(0, 0, 10, 10)) << "画布外的部分没被夹掉";
+
+    EXPECT_FALSE(imagePixelRect(QRectF(-50.0, -50.0, 10.0, 10.0), content, pixels).has_value()) << "整框都在画布外该交回空";
+    EXPECT_FALSE(imagePixelRect(QRectF(10.0, 10.0, 5.0, 5.0), QRectF{}, pixels).has_value()) << "退化画布要交回空";
+}

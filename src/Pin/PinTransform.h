@@ -120,6 +120,18 @@ namespace GyanisScribe::Pin
     [[nodiscard]] std::optional<QPoint> imagePixelAt(const QPointF &windowPoint, const QRectF &content, const QSize &imagePixelSize, double degrees,
                                                      bool mirroredHorizontally = false, bool mirroredVertically = false);
 
+    /**
+     * @brief 把窗口坐标里的一个矩形折成图片像素的裁剪框
+     * @param windowRect 窗口里的矩形（轴对齐：调用方保证此刻没有旋转与翻转）
+     * @param content 画布矩形
+     * @param imagePixelSize 图片的物理像素尺寸
+     * @return 覆盖到的像素范围（闭区间取整）；几何退化或框完全落在画布外时返回空
+     * @details 与 imagePixelAt 是同一套折算的「按块」版本：点命中是下取整，块换算要左闭右开——
+     *          直接拿两个角去问点命中，右边界那一格会被多算一列（框拖到 20..30 会裁出 21 像素宽）。
+     *          框先夹回画布：拖出画布的部分不参与，贴边的那一列/行照样算进去。
+     */
+    [[nodiscard]] std::optional<QRect> imagePixelRect(const QRectF &windowRect, const QRectF &content, const QSize &imagePixelSize);
+
     /// 拖到离屏幕边多近就算「要贴上去」，逻辑像素
     inline constexpr int kEdgeSnapTolerance = 12;
 

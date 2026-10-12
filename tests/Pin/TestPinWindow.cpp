@@ -1061,4 +1061,110 @@ namespace GyanisScribe
         EXPECT_TRUE(window.mirroredVertically()) << "退出标注没把上下翻转恢复";
     }
 
+    /**
+     * @brief 钉住裁剪：拖一个框、回车 → 只留框里那一块，窗口跟着缩到新尺寸
+     * @details 四格图 40×40，(10,10) 拖到 (20,30) 该裁出 20×20——拿两个角去问点命中会多算一列
+     *          （框拖到 20..30 会裁出 21 像素宽），这条判据顺带把那一处钉死。
+     */
+    TEST_F(PinWindowFixture, CropDragThenEnterKeepsOnlyTheBox)
+    {
+        auto &window = makeWindow(makeQuadImage());
+        window.startCropping();
+        ASSERT_TRUE(window.isCropping());
+
+        for (const auto &[type, position]:
+             {std::pair{QEvent::MouseButtonPress, QPoint{10, 10}}, std::pair{QEvent::MouseMove, QPoint{20, 20}}, std::pair{QEvent::MouseButtonRelease, QPoint{30, 30}}})
+        {
+            QMouseEvent event{type, QPointF{position}, QPointF{position}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+            QApplication::sendEvent(&window, &event);
+        }
+        pressKey(window, Qt::Key_Return);
+
+        EXPECT_FALSE(window.isCropping());
+        const auto cropped = window.image();
+        EXPECT_EQ(cropped.size(), QSize(20, 20)) << "裁出来的不是框里那一块（右/下边界多半多算了一格）";
+        EXPECT_EQ(cropped.pixelColor(1, 1), QColor(255, 0, 0)) << "框左上角该是原来的红";
+        EXPECT_EQ(cropped.pixelColor(18, 1), QColor(0, 255, 0)) << "框右上角该是原来的绿";
+        EXPECT_EQ(cropped.pixelColor(1, 18), QColor(0, 0, 255)) << "框左下角该是原来的蓝";
+        EXPECT_EQ(cropped.pixelColor(18, 18), QColor(255, 255, 0)) << "框右下角该是原来的黄";
+        EXPECT_EQ(window.size(), QSize(20, 20)) << "窗口没跟着裁后的尺寸缩";
+    }
+
+    /**
+     * @brief 钉住裁剪的取消与摆正：旋转与翻转在裁剪期间清掉、Esc 原样退出并恢复
+     */
+    TEST_F(PinWindowFixture, CropEscapeLeavesTheImageAndRestoresTheViewTransform)
+    {
+        auto &window = makeWindow(makeQuadImage());
+        window.setRotationDegrees(90.0);
+        window.setMirroredHorizontally(true);
+
+        window.startCropping();
+        ASSERT_TRUE(window.isCropping());
+        EXPECT_TRUE(nearEqual(window.rotationDegrees(), 0.0, kDegreesTolerance)) << "进裁剪没摆正：裁剪框是轴对齐的";
+        EXPECT_FALSE(window.mirroredHorizontally()) << "进裁剪没摆正：裁剪框是轴对齐的";
+
+        for (const auto &[type, position]:
+             {std::pair{QEvent::MouseButtonPress, QPoint{10, 10}}, std::pair{QEvent::MouseMove, QPoint{20, 20}}, std::pair{QEvent::MouseButtonRelease, QPoint{30, 30}}})
+        {
+            QMouseEvent event{type, QPointF{position}, QPointF{position}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+            QApplication::sendEvent(&window, &event);
+        }
+        pressKey(window, Qt::Key_Escape);
+
+        EXPECT_FALSE(window.isCropping());
+        EXPECT_EQ(window.image().size(), QSize(40, 40)) << "Esc 退出把图裁了";
+        EXPECT_TRUE(nearEqual(window.rotationDegrees(), 90.0, kDegreesTolerance)) << "退出裁剪没恢复旋转";
+        EXPECT_TRUE(window.mirroredHorizontally()) << "退出裁剪没恢复翻转";
+    }
+
+    /**
+     * @brief 钉住没拖出像样的框就回车：图原样不动（手抖点一下不该把图裁成 1×1）
+     * @details 两种形状各判一次：没拖（框退化成一个点）与只拖了 1 像素（够折出 1×1 的框，
+     *          由最小边长的守卫拦下）。少了后一种，那道守卫就没有用例罩着。
+     */
+    TEST_F(PinWindowFixture, CropCommitWithoutAMeaningfulBoxLeavesTheImageAlone)
+    {
+        auto &window = makeWindow(makeQuadImage());
+        window.startCropping();
+        ASSERT_TRUE(window.isCropping());
+
+        pressKey(window, Qt::Key_Return);
+        EXPECT_FALSE(window.isCropping());
+        EXPECT_EQ(window.image().size(), QSize(40, 40)) << "没拖出框也把图裁了";
+
+        window.startCropping();
+        ASSERT_TRUE(window.isCropping());
+        for (const auto &[type, position]: {std::pair{QEvent::MouseButtonPress, QPoint{10, 10}}, std::pair{QEvent::MouseButtonRelease, QPoint{11, 11}}})
+        {
+            QMouseEvent event{type, QPointF{position}, QPointF{position}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+            QApplication::sendEvent(&window, &event);
+        }
+        pressKey(window, Qt::Key_Return);
+        EXPECT_EQ(window.image().size(), QSize(40, 40)) << "1×1 的框也裁了：最小边长那道守卫没起作用";
+    }
+
+    /**
+     * @brief 钉住动图不能裁剪：菜单项灰掉并写明出路，绕过菜单直接开也不进（与「标注」同一条口径）
+     */
+    TEST_F(PinWindowFixture, AnimatedPinsDoNotOfferCropping)
+    {
+        const auto gifPath = PinTestAssets::writeTwoFrameGif(std::filesystem::temp_directory_path() / "GyanisScribe-PinCrop-anim.gif");
+        ASSERT_FALSE(gifPath.isEmpty()) << "素材没落到临时文件上";
+
+        auto &window = makeWindow();
+        window.setAnimatedSource(gifPath);
+        ASSERT_TRUE(window.isAnimated());
+
+        QMenu *menu = window.buildContextMenu();
+        auto  *crop = findMenuAction(*menu, QString::fromUtf8("裁剪"));
+        ASSERT_NE(crop, nullptr) << "右键菜单里没有「裁剪」这一项";
+        EXPECT_FALSE(crop->isEnabled()) << "动图的「裁剪」该灰掉：裁完会被下一帧盖回原尺寸";
+        EXPECT_FALSE(crop->toolTip().isEmpty()) << "灰掉也要写明出路，不把「点了没反应」留给人猜";
+        delete menu;
+
+        window.startCropping();
+        EXPECT_FALSE(window.isCropping()) << "绕过菜单直接开也进了裁剪";
+    }
+
 } // namespace GyanisScribe
