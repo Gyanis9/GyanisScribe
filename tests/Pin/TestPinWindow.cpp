@@ -909,4 +909,156 @@ namespace GyanisScribe
         EXPECT_FALSE(dropped) << "标注中把载荷也放下了";
     }
 
+    /**
+     * @brief 2×2 的四格图：左上红、右上绿、左下蓝、右下黄——翻转与滤镜在屏上都能一眼读数
+     */
+    QImage makeQuadImage()
+    {
+        QImage image{QSize{40, 40}, QImage::Format_ARGB32};
+        image.fill(QColor(255, 0, 0));
+        for (int y = 0; y < 20; ++y)
+        {
+            for (int x = 20; x < 40; ++x)
+            {
+                image.setPixelColor(x, y, QColor(0, 255, 0));
+            }
+        }
+        for (int y = 20; y < 40; ++y)
+        {
+            for (int x = 0; x < 20; ++x)
+            {
+                image.setPixelColor(x, y, QColor(0, 0, 255));
+            }
+            for (int x = 20; x < 40; ++x)
+            {
+                image.setPixelColor(x, y, QColor(255, 255, 0));
+            }
+        }
+        image.setDevicePixelRatio(1.0);
+        return image;
+    }
+
+    /**
+     * @brief 钉住 `H` / `V` 翻转：屏上那一份左右/上下镜像，再按一次翻回来
+     * @details 判据取「渲染出来的像素」——渲染用的是 render() 而不是 grab()：
+     *          grab() 在 125% 缩放的屏上会按屏的倍比出图，探点坐标就与窗口逻辑坐标对不上了。
+     */
+    TEST_F(PinWindowFixture, FlipKeysMirrorThePaintedImage)
+    {
+        auto &window = makeWindow(makeQuadImage());
+
+        const auto painted = [&window]
+        {
+            QImage canvas{window.size(), QImage::Format_ARGB32};
+            canvas.fill(Qt::transparent);
+            window.render(&canvas);
+            return canvas;
+        };
+
+        const QImage before = painted();
+        EXPECT_EQ(before.size(), QSize(40, 40)) << "窗口尺寸不是图片尺寸，下面的探点没有基准";
+        EXPECT_EQ(before.pixelColor(10, 10), QColor(255, 0, 0)) << "左上该是红";
+        EXPECT_EQ(before.pixelColor(30, 10), QColor(0, 255, 0)) << "右上该是绿";
+
+        pressKey(window, Qt::Key_H);
+        EXPECT_TRUE(window.mirroredHorizontally());
+        const QImage flippedH = painted();
+        EXPECT_EQ(flippedH.pixelColor(10, 10), QColor(0, 255, 0)) << "左右翻转后左上该是原来右上的绿";
+        EXPECT_EQ(flippedH.pixelColor(30, 10), QColor(255, 0, 0)) << "左右翻转后右上该是原来左上的红";
+
+        pressKey(window, Qt::Key_H);
+        EXPECT_FALSE(window.mirroredHorizontally()) << "再按一次该翻回来";
+        EXPECT_EQ(painted().pixelColor(10, 10), QColor(255, 0, 0));
+
+        pressKey(window, Qt::Key_V);
+        EXPECT_TRUE(window.mirroredVertically());
+        const QImage flippedV = painted();
+        EXPECT_EQ(flippedV.pixelColor(10, 10), QColor(0, 0, 255)) << "上下翻转后左上该是原来左下的蓝";
+        EXPECT_EQ(flippedV.pixelColor(10, 30), QColor(255, 0, 0)) << "上下翻转后左下该是原来左上的红";
+    }
+
+    /**
+     * @brief 钉住 `G` 灰度与 `I` 反色：屏上那一份按 luma 折灰、按 255-c 反相，两样可叠
+     * @details 手算锚点：纯红的 luma = (255×11)/32 = 87；叠上反色成 168（先灰度、后反色）。
+     */
+    TEST_F(PinWindowFixture, GrayAndInvertKeysChangeThePaintedPixels)
+    {
+        auto &window = makeWindow(makeQuadImage());
+
+        const auto painted = [&window]
+        {
+            QImage canvas{window.size(), QImage::Format_ARGB32};
+            canvas.fill(Qt::transparent);
+            window.render(&canvas);
+            return canvas;
+        };
+
+        pressKey(window, Qt::Key_G);
+        EXPECT_TRUE(window.grayscale());
+        EXPECT_EQ(painted().pixelColor(10, 10), QColor(87, 87, 87, 255)) << "纯红的灰度不是手算的 87";
+
+        pressKey(window, Qt::Key_I);
+        EXPECT_TRUE(window.inverted());
+        EXPECT_EQ(painted().pixelColor(10, 10), QColor(168, 168, 168, 255)) << "灰度叠反色的次序或取值不对";
+
+        pressKey(window, Qt::Key_G);
+        pressKey(window, Qt::Key_I);
+        EXPECT_FALSE(window.grayscale());
+        EXPECT_FALSE(window.inverted());
+        EXPECT_EQ(painted().pixelColor(10, 10), QColor(255, 0, 0)) << "两档关掉之后屏上不是原色";
+
+        // 贴图手里那份像素从头到尾没被视图滤镜动过：复制/保存拿到的仍是原图
+        EXPECT_EQ(window.image().pixelColor(10, 10), QColor(255, 0, 0)) << "视图滤镜改了贴图手里的像素";
+    }
+
+    /**
+     * @brief 钉住四档视图变换的菜单项：勾选态就是当前读数，点一下翻转状态
+     */
+    TEST_F(PinWindowFixture, ViewTransformMenuItemsShowAndToggleState)
+    {
+        auto &window = makeWindow();
+
+        {
+            auto menu = std::unique_ptr<QMenu>{window.buildContextMenu()};
+            for (const auto &label: {"左右翻转", "上下翻转", "灰度显示", "反色"})
+            {
+                auto *action = findMenuAction(*menu, QString::fromUtf8(label));
+                ASSERT_NE(action, nullptr) << "右键菜单里没有「" << label << "」这一项";
+                EXPECT_TRUE(action->isCheckable()) << label << " 该是勾选项";
+                EXPECT_FALSE(action->isChecked()) << label << " 起点该是没开";
+            }
+            findMenuAction(*menu, QString::fromUtf8("灰度显示"))->trigger();
+            findMenuAction(*menu, QString::fromUtf8("上下翻转"))->trigger();
+        }
+        EXPECT_TRUE(window.grayscale()) << "菜单点了灰度没生效";
+        EXPECT_TRUE(window.mirroredVertically()) << "菜单点了上下翻转没生效";
+
+        auto menu = std::unique_ptr<QMenu>{window.buildContextMenu()};
+        EXPECT_TRUE(findMenuAction(*menu, QString::fromUtf8("灰度显示"))->isChecked()) << "重开菜单勾选态没跟上";
+        EXPECT_TRUE(findMenuAction(*menu, QString::fromUtf8("上下翻转"))->isChecked());
+        EXPECT_FALSE(findMenuAction(*menu, QString::fromUtf8("左右翻转"))->isChecked());
+    }
+
+    /**
+     * @brief 钉住进标注时翻转先摆正、退出后原样恢复（与旋转同一条规矩）
+     * @details 标注视图是轴对齐且不镜像的：翻着的画布铺不平，所以进去先归位；
+     *          退出收工之后用户看到的那一份还得是他翻好的样子。
+     */
+    TEST_F(PinWindowFixture, EnteringAnnotationClearsMirrorsAndRestoresThem)
+    {
+        auto &window = makeWindow();
+        window.setMirroredHorizontally(true);
+        window.setMirroredVertically(true);
+
+        window.startAnnotation();
+        EXPECT_TRUE(window.isAnnotating());
+        EXPECT_FALSE(window.mirroredHorizontally()) << "进标注没摆正：标注画布不镜像";
+        EXPECT_FALSE(window.mirroredVertically()) << "进标注没摆正：标注画布不镜像";
+
+        pressKey(window, Qt::Key_Escape);
+        EXPECT_FALSE(window.isAnnotating());
+        EXPECT_TRUE(window.mirroredHorizontally()) << "退出标注没把左右翻转恢复";
+        EXPECT_TRUE(window.mirroredVertically()) << "退出标注没把上下翻转恢复";
+    }
+
 } // namespace GyanisScribe

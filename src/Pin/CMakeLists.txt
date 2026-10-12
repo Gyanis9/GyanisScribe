@@ -3,6 +3,8 @@
 add_library(Pin STATIC
         PinTransform.h
         PinTransform.cpp
+        PinViewFilter.h
+        PinViewFilter.cpp
         PinLayout.h
         PinLayout.cpp
         IPinWindow.h

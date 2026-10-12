@@ -12,6 +12,7 @@
 #include "Core/Paths.h"
 #include "Core/Text.h"
 #include "Pin/PinLayout.h"
+#include "Pin/PinViewFilter.h"
 #include "Pick/ColorFormat.h"
 #include "Ui/DesignTokens.h"
 #include "Ui/IconProvider.h"
@@ -196,6 +197,68 @@ namespace GyanisScribe::Pin
     double PinWindow::rotationDegrees() const noexcept
     {
         return m_rotationDegrees;
+    }
+
+    void PinWindow::setMirroredHorizontally(const bool mirrored)
+    {
+        m_mirroredHorizontally = mirrored;
+        update();
+    }
+
+    bool PinWindow::mirroredHorizontally() const noexcept
+    {
+        return m_mirroredHorizontally;
+    }
+
+    void PinWindow::setMirroredVertically(const bool mirrored)
+    {
+        m_mirroredVertically = mirrored;
+        update();
+    }
+
+    bool PinWindow::mirroredVertically() const noexcept
+    {
+        return m_mirroredVertically;
+    }
+
+    void PinWindow::setGrayscale(const bool grayscale)
+    {
+        m_grayscale    = grayscale;
+        m_viewFiltered = {};
+        update();
+    }
+
+    bool PinWindow::grayscale() const noexcept
+    {
+        return m_grayscale;
+    }
+
+    void PinWindow::setInverted(const bool inverted)
+    {
+        m_inverted     = inverted;
+        m_viewFiltered = {};
+        update();
+    }
+
+    bool PinWindow::inverted() const noexcept
+    {
+        return m_inverted;
+    }
+
+    const QImage &PinWindow::displayImage() const
+    {
+        if (!m_grayscale && !m_inverted)
+        {
+            return m_image;
+        }
+
+        // 缓存按「哪一版像素」认：动图每换一帧都会换掉 m_image，cacheKey 跟着变，这里自然重算
+        if (m_viewFiltered.isNull() || m_viewFilteredSourceKey != m_image.cacheKey())
+        {
+            m_viewFiltered          = pinViewFiltered(m_image, m_grayscale, m_inverted);
+            m_viewFilteredSourceKey = m_image.cacheKey();
+        }
+        return m_viewFiltered;
     }
 
     void PinWindow::setOpacityLevel(double opacity)
@@ -510,12 +573,16 @@ namespace GyanisScribe::Pin
         setThumbnailMode(false);
         setColorPickMode(false);
 
-        // 旋转过的贴图先转正：标注视图是轴对齐的，斜着的画布铺不平；退出时转回原角度。
-        // 成品记的是图片自己的像素，转回去之后批注自然跟着图一起转
-        m_rotationBeforeAnnotate      = m_rotationDegrees;
-        m_dockCollapsedBeforeAnnotate = m_dockCollapsed;
-        m_dockCollapsed               = false;
+        // 旋转与翻转过的贴图先摆正：标注视图是轴对齐且不镜像的，斜着或翻着的画布铺不平；
+        // 退出时两样都恢复。成品记的是图片自己的像素，摆回去之后批注自然跟着图一起转/翻
+        m_rotationBeforeAnnotate           = m_rotationDegrees;
+        m_mirrorHorizontallyBeforeAnnotate = m_mirroredHorizontally;
+        m_mirrorVerticallyBeforeAnnotate   = m_mirroredVertically;
+        m_dockCollapsedBeforeAnnotate      = m_dockCollapsed;
+        m_dockCollapsed                    = false;
         setRotationDegrees(0.0);
+        setMirroredHorizontally(false);
+        setMirroredVertically(false);
         applyDockGeometry();
 
         if (m_annotateEngine == nullptr)
@@ -625,9 +692,11 @@ namespace GyanisScribe::Pin
             m_annotateToolbar->hide();
         }
 
-        // 恢复进标注前的那一档：旋转角与贴边收起态
+        // 恢复进标注前的那一档：旋转角、翻转与贴边收起态
         m_dockCollapsed = m_dockCollapsedBeforeAnnotate;
         setRotationDegrees(m_rotationBeforeAnnotate);
+        setMirroredHorizontally(m_mirrorHorizontallyBeforeAnnotate);
+        setMirroredVertically(m_mirrorVerticallyBeforeAnnotate);
         applyDockGeometry();
         update();
     }
@@ -808,8 +877,8 @@ namespace GyanisScribe::Pin
         {
             return std::nullopt;
         }
-        // 缩略图态不旋转：与绘制用的是同一个口径，不然读数会取到偏一格的颜色
-        const auto pixel = imagePixelAt(m_pickPoint, contentRect(), m_image.size(), m_thumbnail ? 0.0 : m_rotationDegrees);
+        // 缩略图态不旋转、翻转照常：与绘制用的是同一个口径，不然读数会取到偏一格的颜色
+        const auto pixel = imagePixelAt(m_pickPoint, contentRect(), m_image.size(), m_thumbnail ? 0.0 : m_rotationDegrees, m_mirroredHorizontally, m_mirroredVertically);
         if (!pixel)
         {
             return std::nullopt;
@@ -822,7 +891,8 @@ namespace GyanisScribe::Pin
             // 读数不因坏配置停摆：按 HEX 顶上，原因照旧只进日志（同一句在界面那次取色时会弹给用户）
             Core::Logger::warning(std::format("取色写法读不出：{}，贴图取色按 HEX 顶上", complaint));
         }
-        return Pick::formatColor(m_image.pixelColor(*pixel), format);
+        // 读的是显示用的那一份：开了灰度/反色之后，用户看到的就是这个颜色
+        return Pick::formatColor(displayImage().pixelColor(*pixel), format);
     }
 
     void PinWindow::applyGeometry()
@@ -892,10 +962,12 @@ namespace GyanisScribe::Pin
 
         const auto content = contentRect();
         painter.translate(content.center());
-        // 缩略图态不旋转：一枚小方块里转起来看不清是什么，退出后旋转照旧
+        // 缩略图态不旋转：一枚小方块里转起来看不清是什么，退出后旋转照旧。翻转不改外框，照常生效
         painter.rotate(m_thumbnail ? 0.0 : m_rotationDegrees);
+        // 翻转在旋转之前做：转的是翻好的那一份，与 imagePixelAt 的反变换成对（先反旋转、后反翻转）
+        painter.scale(m_mirroredHorizontally ? -1.0 : 1.0, m_mirroredVertically ? -1.0 : 1.0);
         painter.translate(-content.center());
-        painter.drawImage(content, m_image, QRectF(QPointF(0.0, 0.0), QSizeF(m_image.width(), m_image.height())));
+        painter.drawImage(content, displayImage(), QRectF(QPointF(0.0, 0.0), QSizeF(m_image.width(), m_image.height())));
         painter.resetTransform();
 
         // 悬停或选中才画边框，平时一张干净的图压在屏幕上不该有装饰
@@ -924,13 +996,13 @@ namespace GyanisScribe::Pin
     void PinWindow::paintColorReadout(QPainter &painter)
     {
         const auto text  = hoveredColorText();
-        const auto pixel = imagePixelAt(m_pickPoint, contentRect(), m_image.size(), m_thumbnail ? 0.0 : m_rotationDegrees);
+        const auto pixel = imagePixelAt(m_pickPoint, contentRect(), m_image.size(), m_thumbnail ? 0.0 : m_rotationDegrees, m_mirroredHorizontally, m_mirroredVertically);
         if (!text || !pixel)
         {
             return;
         }
 
-        const QColor swatch = m_image.pixelColor(*pixel);
+        const QColor swatch = displayImage().pixelColor(*pixel);
 
         // 读数框：一块色块加那串写法。底色与字色固定成深底浅字——读数要压在任意内容上都看得清，
         // 跟着主题走会在浅色主题里与截图里的浅色糊在一起
@@ -982,10 +1054,11 @@ namespace GyanisScribe::Pin
         // 取色模式：点一下就把那一像素的颜色交出去，点完自己退出——与屏幕取色那边「点一下拿一个色」同一口径
         if (m_colorPickMode)
         {
-            const auto pixel = imagePixelAt(event->position(), contentRect(), m_image.size(), m_thumbnail ? 0.0 : m_rotationDegrees);
+            const auto pixel = imagePixelAt(event->position(), contentRect(), m_image.size(), m_thumbnail ? 0.0 : m_rotationDegrees, m_mirroredHorizontally, m_mirroredVertically);
             if (pixel)
             {
-                emit colorPicked(m_image.pixelColor(*pixel));
+                // 交出去的是显示色：开了灰度/反色之后，用户挑中的就是屏上那一个
+                emit colorPicked(displayImage().pixelColor(*pixel));
                 setColorPickMode(false);
             }
             return;
@@ -1205,6 +1278,28 @@ namespace GyanisScribe::Pin
             return;
         }
 
+        // `H`/`V` 翻转、`G` 灰度、`I` 反色：都是视图变换，再按一次原样退回
+        if (event->modifiers() == Qt::NoModifier)
+        {
+            switch (event->key())
+            {
+                case Qt::Key_H:
+                    setMirroredHorizontally(!m_mirroredHorizontally);
+                    return;
+                case Qt::Key_V:
+                    setMirroredVertically(!m_mirroredVertically);
+                    return;
+                case Qt::Key_G:
+                    setGrayscale(!m_grayscale);
+                    return;
+                case Qt::Key_I:
+                    setInverted(!m_inverted);
+                    return;
+                default:
+                    break;
+            }
+        }
+
         QWidget::keyPressEvent(event);
     }
 
@@ -1327,6 +1422,22 @@ namespace GyanisScribe::Pin
         throughAction->setChecked(m_mouseThrough);
         throughAction->setVisible(capabilities.clickThrough);
         throughAction->setToolTip(GyanisScribe::Core::uiText("滚轮缩放，Ctrl+滚轮旋转，Shift+滚轮调透明度，R 转正一挡（Shift+R 反向），0 或双击回到原始比例，Esc 关闭"));
+
+        // 视图变换四档：翻转与灰度/反色都只改「看」，复制、保存、标注拿到的仍是原始像素——
+        // 与旋转同一条规矩。菜单项的勾选态就是当前读数，键位与它们同一条路（H/V/G/I）
+        menu->addSeparator();
+        auto *flipHorizontalAction = menu->addAction(GyanisScribe::Core::uiText("左右翻转"), this, [this] { setMirroredHorizontally(!m_mirroredHorizontally); });
+        flipHorizontalAction->setCheckable(true);
+        flipHorizontalAction->setChecked(m_mirroredHorizontally);
+        auto *flipVerticalAction = menu->addAction(GyanisScribe::Core::uiText("上下翻转"), this, [this] { setMirroredVertically(!m_mirroredVertically); });
+        flipVerticalAction->setCheckable(true);
+        flipVerticalAction->setChecked(m_mirroredVertically);
+        auto *grayscaleAction = menu->addAction(GyanisScribe::Core::uiText("灰度显示"), this, [this] { setGrayscale(!m_grayscale); });
+        grayscaleAction->setCheckable(true);
+        grayscaleAction->setChecked(m_grayscale);
+        auto *invertAction = menu->addAction(GyanisScribe::Core::uiText("反色"), this, [this] { setInverted(!m_inverted); });
+        invertAction->setCheckable(true);
+        invertAction->setChecked(m_inverted);
 
         menu->addSeparator();
         menu->addAction(GyanisScribe::Core::uiText("关闭"), this,

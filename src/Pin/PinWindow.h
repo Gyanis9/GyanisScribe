@@ -200,6 +200,43 @@ namespace GyanisScribe::Pin
         [[nodiscard]] double rotationDegrees() const noexcept override;
 
         /**
+         * @brief 设左右翻转（视图变换，不进成品）
+         * @param mirrored true 表示左右镜像
+         * @details 与旋转同一条规矩：只改「看」，复制/保存/标注/识别拿的都是原始像素。
+         */
+        void setMirroredHorizontally(bool mirrored);
+
+        /// 此刻是否左右翻转
+        [[nodiscard]] bool mirroredHorizontally() const noexcept;
+
+        /**
+         * @brief 设上下翻转（视图变换，不进成品）
+         * @param mirrored true 表示上下镜像
+         */
+        void setMirroredVertically(bool mirrored);
+
+        /// 此刻是否上下翻转
+        [[nodiscard]] bool mirroredVertically() const noexcept;
+
+        /**
+         * @brief 开关灰度显示（视图滤镜，不进成品）
+         * @param grayscale true 表示按 luma 转灰度
+         */
+        void setGrayscale(bool grayscale);
+
+        /// 此刻是否开着灰度
+        [[nodiscard]] bool grayscale() const noexcept;
+
+        /**
+         * @brief 开关反色（视图滤镜，不进成品）
+         * @param inverted true 表示 RGB 反相（alpha 不动）
+         */
+        void setInverted(bool inverted);
+
+        /// 此刻是否反色
+        [[nodiscard]] bool inverted() const noexcept;
+
+        /**
          * @brief 设不透明度，见 IPinWindow::setOpacityLevel()
          * @param opacity 取值 (0,1]，越界按边界取
          */
@@ -492,38 +529,48 @@ namespace GyanisScribe::Pin
          */
         void routeAnnotationKey(QKeyEvent *event);
 
-        QImage                                               m_image;                               ///< 贴图内容，物理像素
-        QSizeF                                               m_logicalSize;                         ///< 图片逻辑尺寸
-        double                                               m_scale           = 1.0;               ///< 缩放因子
-        double                                               m_rotationDegrees = 0.0;               ///< 旋转角度
-        double                                               m_opacity         = 1.0;               ///< 不透明度
-        bool                                                 m_mouseThrough    = false;             ///< 是否鼠标穿透
-        bool                                                 m_thumbnail       = false;             ///< 缩略图模式：窗口缩成小方块，缩放等设定原样留着
-        bool                                                 m_pinned          = true;              ///< 是否置顶
-        int                                                  m_group           = kFirstPinGroup;    ///< 所属贴图分组，菜单与布局记录都取它
-        QVector<int>                                         m_groupChoices{kFirstPinGroup};        ///< 现有分组号（升序），由管理器推过来
-        bool                                                 m_colorPickMode = false;               ///< 取色模式：鼠标读像素而不是拖动
-        QPointF                                              m_pickPoint;                           ///< 取色模式下光标在窗口里的位置，读数框跟它走
-        ScreenEdge                                           m_edgeDock = ScreenEdge::None;         ///< 贴的是哪条屏边；None 表示没贴
-        QRect                                                m_dockArea;                            ///< 贴边那一刻那块屏的可用区，收起与展开都按它算
-        bool                                                 m_dockCollapsed = false;               ///< 贴边后是不是收成了那一条
-        bool                                                 m_dragMoved     = false;               ///< 这一轮按下之后真拖动过没有（只点一下不吸边）
-        class QMovie                                        *m_movie         = nullptr;             ///< 动图播放器；静图这张贴图时为空
-        QString                                              m_sourceFile;                          ///< 动图的来源文件；进布局记录，重启后按它接上动画
-        QPoint                                               m_dragOffset;                          ///< 移动时起笔点与窗口左上角的差
-        std::optional<HandleKind>                            m_draggedHandle;                       ///< 正在拖的手柄，没拖时为空
-        double                                               m_dragInitialScale            = 1.0;   ///< 起拖时的缩放
-        double                                               m_dragInitialDistance         = 0.0;   ///< 起拖时指针到中心的距离
-        bool                                                 m_annotating                  = false; ///< 正在贴图上直接标注
-        double                                               m_rotationBeforeAnnotate      = 0.0;   ///< 进标注前的旋转角，退出时恢复
-        bool                                                 m_dockCollapsedBeforeAnnotate = false; ///< 进标注前的贴边收起态，退出时恢复
-        std::unique_ptr<Annotation::AnnotationEngine>        m_annotateEngine;                      ///< 标注引擎，首次进入标注时创建
-        Annotation::AnnotationView                          *m_annotateView    = nullptr;           ///< 铺在贴图上的标注视图，本窗口的子控件
-        Annotation::AnnotationToolbar                       *m_annotateToolbar = nullptr;           ///< 浮着的标注工具栏
-        std::unique_ptr<Annotation::AnnotationToolbarBridge> m_annotateBridge;                      ///< 工具栏与引擎的接线
-        std::unique_ptr<Ui::IconProvider>                    m_icons;                               ///< 工具栏要的图标供给器，首次进入标注时创建
-        Settings::ISettingsStore                            &m_settings;                            ///< 配置来源（保存目录）
-        const Platform::IPlatformIntegration                &m_integration;                         ///< 平台能力查询
+        QImage m_image;       ///< 贴图内容，物理像素
+        QSizeF m_logicalSize; ///< 图片逻辑尺寸
+        /// 显示用的像素：灰度/反色两档按需算一份并挂住（同一版像素只算一次）
+        [[nodiscard]] const QImage                          &displayImage() const;
+        double                                               m_scale                = 1.0;               ///< 缩放因子
+        double                                               m_rotationDegrees      = 0.0;               ///< 旋转角度
+        bool                                                 m_mirroredHorizontally = false;             ///< 左右翻转（视图变换）
+        bool                                                 m_mirroredVertically   = false;             ///< 上下翻转（视图变换）
+        bool                                                 m_grayscale            = false;             ///< 灰度显示（视图滤镜）
+        bool                                                 m_inverted             = false;             ///< 反色（视图滤镜）
+        mutable QImage                                       m_viewFiltered;                             ///< 灰度/反色算出来的显示图；两档全关时为空
+        mutable qint64                                       m_viewFilteredSourceKey = 0;                ///< 上面那份缓存对的是哪一版像素（cacheKey）
+        double                                               m_opacity               = 1.0;              ///< 不透明度
+        bool                                                 m_mouseThrough          = false;            ///< 是否鼠标穿透
+        bool                                                 m_thumbnail             = false;            ///< 缩略图模式：窗口缩成小方块，缩放等设定原样留着
+        bool                                                 m_pinned                = true;             ///< 是否置顶
+        int                                                  m_group                 = kFirstPinGroup;   ///< 所属贴图分组，菜单与布局记录都取它
+        QVector<int>                                         m_groupChoices{kFirstPinGroup};             ///< 现有分组号（升序），由管理器推过来
+        bool                                                 m_colorPickMode = false;                    ///< 取色模式：鼠标读像素而不是拖动
+        QPointF                                              m_pickPoint;                                ///< 取色模式下光标在窗口里的位置，读数框跟它走
+        ScreenEdge                                           m_edgeDock = ScreenEdge::None;              ///< 贴的是哪条屏边；None 表示没贴
+        QRect                                                m_dockArea;                                 ///< 贴边那一刻那块屏的可用区，收起与展开都按它算
+        bool                                                 m_dockCollapsed = false;                    ///< 贴边后是不是收成了那一条
+        bool                                                 m_dragMoved     = false;                    ///< 这一轮按下之后真拖动过没有（只点一下不吸边）
+        class QMovie                                        *m_movie         = nullptr;                  ///< 动图播放器；静图这张贴图时为空
+        QString                                              m_sourceFile;                               ///< 动图的来源文件；进布局记录，重启后按它接上动画
+        QPoint                                               m_dragOffset;                               ///< 移动时起笔点与窗口左上角的差
+        std::optional<HandleKind>                            m_draggedHandle;                            ///< 正在拖的手柄，没拖时为空
+        double                                               m_dragInitialScale                 = 1.0;   ///< 起拖时的缩放
+        double                                               m_dragInitialDistance              = 0.0;   ///< 起拖时指针到中心的距离
+        bool                                                 m_annotating                       = false; ///< 正在贴图上直接标注
+        double                                               m_rotationBeforeAnnotate           = 0.0;   ///< 进标注前的旋转角，退出时恢复
+        bool                                                 m_mirrorHorizontallyBeforeAnnotate = false; ///< 进标注前的左右翻转，退出时恢复
+        bool                                                 m_mirrorVerticallyBeforeAnnotate   = false; ///< 进标注前的上下翻转，退出时恢复
+        bool                                                 m_dockCollapsedBeforeAnnotate      = false; ///< 进标注前的贴边收起态，退出时恢复
+        std::unique_ptr<Annotation::AnnotationEngine>        m_annotateEngine;                           ///< 标注引擎，首次进入标注时创建
+        Annotation::AnnotationView                          *m_annotateView    = nullptr;                ///< 铺在贴图上的标注视图，本窗口的子控件
+        Annotation::AnnotationToolbar                       *m_annotateToolbar = nullptr;                ///< 浮着的标注工具栏
+        std::unique_ptr<Annotation::AnnotationToolbarBridge> m_annotateBridge;                           ///< 工具栏与引擎的接线
+        std::unique_ptr<Ui::IconProvider>                    m_icons;                                    ///< 工具栏要的图标供给器，首次进入标注时创建
+        Settings::ISettingsStore                            &m_settings;                                 ///< 配置来源（保存目录）
+        const Platform::IPlatformIntegration                &m_integration;                              ///< 平台能力查询
     };
 
 } // namespace GyanisScribe::Pin

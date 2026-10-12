@@ -236,3 +236,50 @@ TEST(PinTransform, MapsWindowPointsBackToThePixelTheyCameFrom)
     ASSERT_TRUE(centre.has_value());
     EXPECT_EQ(*centre, QPoint(200, 100)) << "不旋时的等比折算不对";
 }
+
+/**
+ * @brief 钉住翻转下的反算：四种翻转组合都要与绘制那一步互逆
+ * @details 绘制是「先按中心翻转、后绕中心旋转」（转的是翻好的那一份），所以这里用
+ *          QTransform 按同样的次序搭一份独立参照，把像素中心投出去再反算回来。
+ *          另外配一条手算锚点：90° + 左右翻转时，窗口 (75,75) 必须落回 (0,0)——
+ *          只测互逆的话，两处一起把次序写反（先镜像后反旋转 / 先反旋转后镜像）照样绿。
+ */
+TEST(PinTransform, MapsWindowPointsBackUnderMirrors)
+{
+    const QRectF content{0.0, 0.0, 300.0, 200.0};
+    const QSize  pixels{600, 400};
+
+    for (const bool horizontal: {false, true})
+    {
+        for (const bool vertical: {false, true})
+        {
+            const double degrees = 40.0;
+            for (int x = 0; x < pixels.width(); x += 61)
+            {
+                for (int y = 0; y < pixels.height(); y += 43)
+                {
+                    QTransform transform;
+                    transform.translate(content.center().x(), content.center().y());
+                    transform.rotate(degrees);
+                    transform.scale(horizontal ? -1.0 : 1.0, vertical ? -1.0 : 1.0);
+                    transform.translate(-content.center().x(), -content.center().y());
+                    const QPointF windowPoint =
+                            transform.map(QPointF(content.left() + (x + 0.5) * content.width() / pixels.width(), content.top() + (y + 0.5) * content.height() / pixels.height()));
+
+                    const auto mapped = imagePixelAt(windowPoint, content, pixels, degrees, horizontal, vertical);
+                    ASSERT_TRUE(mapped.has_value()) << "翻转组合 " << horizontal << vertical << " 投出去的点反算不回来：" << x << ',' << y;
+                    EXPECT_EQ(*mapped, QPoint(x, y)) << "翻转组合 " << horizontal << vertical << " 的反算落到了别的格";
+                }
+            }
+        }
+    }
+
+    // 手算锚点：100×50 的图铺进同尺寸画布、转 90°、左右翻转。
+    // 源像素 (0,0) 在画布中心左边 50、上边 25 → 先翻转成右边 50、上边 25 → 顺时针 90° 后到底边中段 → 窗口 (75,75)
+    const QRectF tallContent{0.0, 0.0, 100.0, 50.0};
+    const QSize  samePixels{100, 50};
+    const auto   anchored = imagePixelAt(QPointF{75.0, 75.0}, tallContent, samePixels, 90.0, true, false);
+    ASSERT_TRUE(anchored.has_value()) << "手算锚点没落回图内";
+    EXPECT_EQ(*anchored, QPoint(0, 0)) << "90° + 左右翻转的反算次序不对";
+    EXPECT_FALSE(imagePixelAt(QPointF{75.0, 75.0}, tallContent, samePixels, 90.0, false, false).has_value()) << "同一点在不翻转时该落回图外";
+}

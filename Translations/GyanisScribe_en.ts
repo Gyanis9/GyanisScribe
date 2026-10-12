@@ -2040,6 +2040,22 @@
             <translation>Scroll to scale, Ctrl+scroll to rotate, Shift+scroll for opacity, R to turn a quarter step (Shift+R the other way), 0 or double-click to restore the original size and angle, Esc to close</translation>
         </message>
         <message>
+            <source>左右翻转</source>
+            <translation>Flip horizontally</translation>
+        </message>
+        <message>
+            <source>上下翻转</source>
+            <translation>Flip vertically</translation>
+        </message>
+        <message>
+            <source>灰度显示</source>
+            <translation>Grayscale</translation>
+        </message>
+        <message>
+            <source>反色</source>
+            <translation>Invert colors</translation>
+        </message>
+        <message>
             <source>Linux（降级实现）</source>
             <translation>Linux (degraded implementation)</translation>
         </message>

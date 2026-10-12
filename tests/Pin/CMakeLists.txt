@@ -2,6 +2,7 @@ add_executable(TestPin
         TestPinLayout.cpp
         TestPinManager.cpp
         TestPinTransform.cpp
+        TestPinViewFilter.cpp
         TestPinWindow.cpp)
 
 target_link_libraries(TestPin PRIVATE

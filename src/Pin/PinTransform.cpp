@@ -72,7 +72,8 @@ namespace GyanisScribe::Pin
         return folded;
     }
 
-    std::optional<QPoint> imagePixelAt(const QPointF &windowPoint, const QRectF &content, const QSize &imagePixelSize, const double degrees)
+    std::optional<QPoint> imagePixelAt(const QPointF &windowPoint, const QRectF &content, const QSize &imagePixelSize, const double degrees, const bool mirroredHorizontally,
+                                       const bool mirroredVertically)
     {
         if (content.width() <= 0.0 || content.height() <= 0.0 || imagePixelSize.isEmpty())
         {
@@ -88,8 +89,11 @@ namespace GyanisScribe::Pin
         const double  sine    = std::sin(radians);
         const QPointF unrotated(center.x() + vector.x() * cosine - vector.y() * sine, center.y() + vector.x() * sine + vector.y() * cosine);
 
-        const double u = (unrotated.x() - content.left()) / content.width();
-        const double v = (unrotated.y() - content.top()) / content.height();
+        // 绘制在旋转之前先按中心翻转（转的是翻好的那一份），这里按同一中心翻回来
+        const QPointF unmirrored(mirroredHorizontally ? 2.0 * center.x() - unrotated.x() : unrotated.x(), mirroredVertically ? 2.0 * center.y() - unrotated.y() : unrotated.y());
+
+        const double u = (unmirrored.x() - content.left()) / content.width();
+        const double v = (unmirrored.y() - content.top()) / content.height();
         if (u < 0.0 || u >= 1.0 || v < 0.0 || v >= 1.0)
         {
             return std::nullopt;

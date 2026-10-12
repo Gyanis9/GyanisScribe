@@ -109,11 +109,16 @@ namespace GyanisScribe::Pin
      * @param content 画布矩形（未旋转、已缩放），即 PinWindow::contentRect() 给的那个
      * @param imagePixelSize 图片的物理像素尺寸
      * @param degrees 旋转角度，顺时针，与绘制时用的是同一个
+     * @param mirroredHorizontally 左右翻转，与绘制时用的是同一个
+     * @param mirroredVertically 上下翻转，与绘制时用的是同一个
      * @return 命中的像素坐标（左上角为原点）；落在图外或几何退化时返回空
-     * @details 与绘制正好相反的一步：先把点按 -degrees 绕画布中心转回来，再按画布矩形等比折进像素格。
-     *          缩略图态不旋转，调用方按绘制时的口径传 0 度即可。
+     * @details 与绘制正好相反的一步：先把点按 -degrees 绕画布中心转回来、再按同一中心翻回来，
+     *          最后按画布矩形等比折进像素格。绘制那边是「先翻转、后旋转」（转的是翻好的那一份），
+     *          所以反变换的顺序是「先反旋转、后反翻转」——两处必须成对改。
+     *          缩略图态不旋转，调用方按绘制时的口径传 0 度即可（翻转不改外框，照常传）。
      */
-    [[nodiscard]] std::optional<QPoint> imagePixelAt(const QPointF &windowPoint, const QRectF &content, const QSize &imagePixelSize, double degrees);
+    [[nodiscard]] std::optional<QPoint> imagePixelAt(const QPointF &windowPoint, const QRectF &content, const QSize &imagePixelSize, double degrees,
+                                                     bool mirroredHorizontally = false, bool mirroredVertically = false);
 
     /// 拖到离屏幕边多近就算「要贴上去」，逻辑像素
     inline constexpr int kEdgeSnapTolerance = 12;
