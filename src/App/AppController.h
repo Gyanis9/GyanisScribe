@@ -345,6 +345,15 @@ namespace GyanisScribe::App
         void handlePrintRequested(const QImage &image);
 
         /**
+         * @brief 标注窗请求刷新截图（F5）：重抓这块区域换底图，标注留着
+         * @param screenName 屏幕名
+         * @param region 该屏内的逻辑区域
+         * @details 走采集服务的就地重抓口：不出 captured、不记选区，也就不会触发「截图完成」
+         *          那一串反应（音效、自动保存、意图分派）——刷新不是一次新截图。
+         */
+        void refreshLastCapture(const QString &screenName, const QRect &region);
+
+        /**
          * @brief 某张贴图上取到了一个像素的颜色
          * @param color 颜色
          * @details 排成设置里那一档写法、复制到剪贴板并给一句提示：与屏幕取色那一路同一个格式出口，

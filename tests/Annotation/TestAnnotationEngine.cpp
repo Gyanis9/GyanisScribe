@@ -559,6 +559,37 @@ TEST_F(EngineFixture, EllipticalRestylesTheSelectionAndUndoesBack)
 }
 
 /**
+ * @brief 钉住刷新截图：换底图但图形、选中与撤销历史都留着
+ * @details 与 loadCanvas 的分别是「清不清」一条：同一块区域再抓一帧走 refreshCanvas，
+ *          要是把刚才画的那条矩形清掉了，用户刷一下屏就丢了标注。
+ */
+TEST_F(EngineFixture, RefreshCanvasSwapsTheBaseAndKeepsTheAnnotations)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Rectangle).has_value());
+    m_engine.beginStroke(QPoint(20, 20));
+    m_engine.moveStroke(QPoint(80, 60));
+    const auto box = m_engine.endStroke();
+    ASSERT_TRUE(box.has_value()) << box.error().message;
+    ASSERT_TRUE(m_engine.select(*box).has_value());
+
+    CapturedImage fresh;
+    fresh.image = QImage(200, 100, QImage::Format_ARGB32_Premultiplied);
+    fresh.image.fill(QColor(0, 0, 255)); // 新底图整块蓝，换没换一眼看得出
+    fresh.devicePixelRatio = 1.0;
+    fresh.logicalSize      = QSize(200, 100);
+    fresh.screenName       = QStringLiteral("FakeScreen-1");
+    m_engine.refreshCanvas(fresh);
+
+    const auto drawn = m_engine.exportImage();
+    EXPECT_EQ(drawn.pixelColor(150, 80), QColor(0, 0, 255)) << "底图没换成新抓的那一帧";
+    EXPECT_EQ(drawn.pixelColor(20, 40), QColor(255, 0, 0)) << "刷新把画好的标注抹掉了：留着图形该是 refreshCanvas 的事";
+    ASSERT_EQ(m_engine.selections().size(), 1U) << "刷新把选中也清了";
+
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(20, 40), QColor(0, 0, 255)) << "撤销历史没留住：撤一步该回到还没画那条的画面上";
+}
+
+/**
  * @brief 钉住线型的换档与撤销：档记在图形自己身上，选中的那条跟着改
  * @details 白底上一条 90 长的横线：实线铺满、点线按 (1,2)×线宽 断——同一段量墨点数，
  *          改档之后读数变小、撤一步又回到满。

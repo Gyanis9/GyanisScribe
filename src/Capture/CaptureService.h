@@ -86,6 +86,16 @@ namespace GyanisScribe::Capture
         void captureRegion(const QRect &logicalRegion, const QString &screenName = {}) override;
 
         /**
+         * @brief 就地重抓一块区域：抓好交回，不出 captured、不记选区
+         * @param logicalRegion 该屏内的逻辑矩形
+         * @param screenName 目标屏幕名，空串取光标所在那块
+         * @return 裁好的那一块；抓帧或裁剪失败时交回原因
+         * @details 刷新截图（标注窗里按 F5）走这条：它不是一次新截图，不该触发「截图完成」
+         *          那一串反应（音效、自动保存、意图分派），也不该往最近选区里再记一遍。
+         */
+        [[nodiscard]] Core::Expected<Core::CapturedImage> grabRegionNow(const QRect &logicalRegion, const QString &screenName = {});
+
+        /**
          * @brief 抓一个窗口，见 ICaptureService::captureWindow()
          * @param windowHandle 平台窗口句柄
          */

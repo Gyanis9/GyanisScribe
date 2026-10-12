@@ -50,26 +50,31 @@ namespace GyanisScribe::Capture
 
     void CaptureService::captureRegion(const QRect &logicalRegion, const QString &screenName)
     {
-        // 指针先画进整帧再裁：选区里带不带指针由选区自己决定，不必裁完再来一次坐标换算
-        const auto frame = withCursorIfWanted(m_source.grabScreen(screenName));
+        const auto frame = grabRegionNow(logicalRegion, screenName);
         if (!frame)
         {
-            // 整帧都没抓到就谈不上裁剪：原因交回，别在这里补一个「按 0 处理」的形状
+            // 抓帧或裁剪失败：原因原样交回，别在这里补一个「按 0 处理」的形状
             deliver(frame);
-            return;
-        }
-
-        const auto cropped = cropToLogicalRect(*frame, logicalRegion);
-        if (!cropped)
-        {
-            deliver(cropped);
             return;
         }
 
         // 选区记账排在成功之后：失败也写就会把用户上次的好选区顶掉
         rememberRegion(m_settings, RegionHistoryEntry{logicalRegion, frame->screenName});
 
-        deliver(cropped);
+        deliver(frame);
+    }
+
+    Core::Expected<Core::CapturedImage> CaptureService::grabRegionNow(const QRect &logicalRegion, const QString &screenName)
+    {
+        // 指针先画进整帧再裁：选区里带不带指针由选区自己决定，不必裁完再来一次坐标换算
+        const auto frame = withCursorIfWanted(m_source.grabScreen(screenName));
+        if (!frame)
+        {
+            // 整帧都没抓到就谈不上裁剪：原因交回
+            return std::unexpected(frame.error());
+        }
+
+        return cropToLogicalRect(*frame, logicalRegion);
     }
 
     void CaptureService::captureWindow(quintptr windowHandle)

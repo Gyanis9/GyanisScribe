@@ -78,6 +78,7 @@ namespace GyanisScribe::Core
         QSize   logicalSize;            ///< 逻辑坐标下的尺寸，用于界面与标注摆放
         qreal   devicePixelRatio = 1.0; ///< 该屏缩放因子，物理像素 = 逻辑尺寸乘以它
         QString screenName;             ///< 来源屏幕标识，多显示器场景据此回到正确的那一块
+        QRect   logicalRegion;          ///< 来自哪一块屏幕内逻辑区域；整屏抓取或来源未知时是空矩形
     };
 
 } // namespace GyanisScribe::Core

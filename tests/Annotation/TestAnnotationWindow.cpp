@@ -199,6 +199,7 @@ TEST(ViewShortcuts, ShortcutTableMapsExactlyTheDocumentedKeys)
     EXPECT_EQ(shortcutActionFor(Qt::Key_Backspace, Qt::NoModifier), ShortcutAction::DeleteSelection);
     EXPECT_EQ(shortcutActionFor(Qt::Key_Left, Qt::NoModifier), ShortcutAction::NudgeSelection);
     EXPECT_EQ(shortcutActionFor(Qt::Key_Down, Qt::ShiftModifier), ShortcutAction::NudgeSelection);
+    EXPECT_EQ(shortcutActionFor(Qt::Key_F5, Qt::NoModifier), ShortcutAction::Refresh);
 
     // 这些组合不归窗口管：文字输入里按 s/z、没有 Ctrl 的 Esc 之外的键都要交回 Qt
     EXPECT_EQ(shortcutActionFor(Qt::Key_S, Qt::NoModifier), ShortcutAction::None);
@@ -208,6 +209,7 @@ TEST(ViewShortcuts, ShortcutTableMapsExactlyTheDocumentedKeys)
     EXPECT_EQ(shortcutActionFor(Qt::Key_Delete, Qt::ControlModifier), ShortcutAction::None);
     // 带 Ctrl 的方向键留给 Qt 自己用（换焦点那一类），截走就少一条既有行为
     EXPECT_EQ(shortcutActionFor(Qt::Key_Right, Qt::ControlModifier), ShortcutAction::None);
+    EXPECT_EQ(shortcutActionFor(Qt::Key_F5, Qt::ControlModifier), ShortcutAction::None);
 }
 
 /**
@@ -810,6 +812,53 @@ TEST_F(AnnotationWindowFixture, NumberGroupFromToolbarReachesTheEngine)
 
     EXPECT_EQ(engine().numberGroup(), 2) << "按钮点下去了，引擎的计数组没跟着切：窗口到引擎这条链没接上";
     EXPECT_EQ(engine().nextNumber(), 1) << "切到第 2 组之后下一个号该回到 1";
+}
+
+/**
+ * @brief 钉住刷新截图的窗口两半：F5 报出「哪块屏、哪块区域」，refreshCapture 换底图保标注
+ * @details 窗口自己不碰抓屏来源：F5 只把这一轮的开窗现场（屏名 + 区域）报出去，宿主抓回来
+ *          再经 refreshCapture 换上去。两半分别钉：报错了地方宿主就抓错屏，换的时候清了图形
+ *          用户就丢标注。
+ */
+TEST_F(AnnotationWindowFixture, RefreshShortcutReportsTheRegionAndKeepsTheAnnotations)
+{
+    auto window = makeWindow();
+
+    // 摆一轮带来源信息的开窗现场：刷新要知道重抓哪块地方
+    auto captured          = makeCanvas({200, 100});
+    captured.screenName    = QStringLiteral("FakeScreen-9");
+    captured.logicalRegion = QRect(40, 50, 200, 100);
+    window->startAnnotation(captured, QRect(0, 0, 1920, 1080), QRect(40, 50, 200, 100));
+
+    QString seenScreen;
+    QRect   seenRegion;
+    QObject::connect(window.get(), &AnnotationWindow::refreshRequested,
+                     [&](const QString &screenName, const QRect &region)
+                     {
+                         seenScreen = screenName;
+                         seenRegion = region;
+                     });
+
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Rectangle).has_value());
+    engine().beginStroke(QPoint(20, 20));
+    engine().moveStroke(QPoint(80, 60));
+    ASSERT_TRUE(engine().endStroke().has_value());
+
+    pressKeyOn(*window, Qt::Key_F5);
+    EXPECT_EQ(seenScreen, QStringLiteral("FakeScreen-9")) << "F5 没把屏幕名报出来，宿主不知道抓哪块屏";
+    EXPECT_EQ(seenRegion, QRect(40, 50, 200, 100)) << "F5 没把区域原样报出来，重抓会抓到别处";
+
+    // 宿主把新帧送回来：底图换了、画的那条还在（物理探测：逻辑坐标乘 2）
+    auto fresh = makeCanvas({200, 100});
+    fresh.image.fill(QColor(0, 0, 255));
+    fresh.screenName    = captured.screenName;
+    fresh.logicalRegion = captured.logicalRegion;
+    window->refreshCapture(fresh);
+
+    const auto drawn = engine().exportImage();
+    EXPECT_EQ(drawn.pixelColor(300, 160), QColor(0, 0, 255)) << "新底图没换上";
+    // 字色取的是工具栏调色板第一格（桥构造时就把整套参数压给了引擎），不是引擎自带的纯红
+    EXPECT_EQ(drawn.pixelColor(40, 80), QColor(232, 62, 62)) << "刷新把画好的标注抹掉了：该走 refreshCanvas 而不是 loadCanvas";
 }
 
 /**

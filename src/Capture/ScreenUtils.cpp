@@ -59,6 +59,7 @@ namespace GyanisScribe::Capture
         cropped.devicePixelRatio = source.devicePixelRatio;
         cropped.logicalSize      = logicalRegion.size();
         cropped.screenName       = source.screenName;
+        cropped.logicalRegion    = logicalRegion;
         return cropped;
     }
 

@@ -93,6 +93,17 @@ namespace GyanisScribe::Annotation
         virtual void loadCanvas(Core::CapturedImage image) = 0;
 
         /**
+         * @brief 换掉底图、保留画面上的一切：图形、选中、层序与撤销历史都不动
+         * @param image 重新抓到的那一帧（刷新截图）
+         * @details 刷新截图走的这一条：屏幕上的内容变了、标注还留在原地，撤销栈也必须留着——
+         *          用户刷完还能把刚才画错的那笔撤掉。取底图像素的工具（马赛克、模糊、放大镜）
+         *          下一次绘制就会读到新底图，不用另做处理。
+         * @note 与 loadCanvas 的分别就在「清不清」这一条：换一张完全不同的画布用 loadCanvas，
+         *       同一块区域的再抓一帧用这一条。
+         */
+        virtual void refreshCanvas(Core::CapturedImage image) = 0;
+
+        /**
          * @brief 当前画布
          * @return 载入的那一帧；没载入过时返回空帧（image 为 null）
          */

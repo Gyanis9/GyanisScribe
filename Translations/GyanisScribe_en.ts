@@ -548,6 +548,10 @@
             <translation>"{}" cannot be written. Check whether this directory is writable</translation>
         </message>
         <message>
+            <source>这一轮没记录选区，刷新截图用不了</source>
+            <translation>No region was recorded for this capture, so the screenshot cannot be refreshed</translation>
+        </message>
+        <message>
             <source>还没有可打印的画面</source>
             <translation>Nothing to print yet</translation>
         </message>

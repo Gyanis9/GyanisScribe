@@ -50,6 +50,7 @@ namespace GyanisScribe::Annotation
         LowerSelection,  ///< 选中的图形下移一层
         BringToFront,    ///< 选中的图形置顶
         SendToBack,      ///< 选中的图形置底
+        Refresh,         ///< 刷新截图：重抓这块区域换底图，标注留着
     };
 
     /**
@@ -108,7 +109,21 @@ namespace GyanisScribe::Annotation
         /// 浮着的工具栏，测试与调试用它核对摆放
         [[nodiscard]] AnnotationToolbar &toolbar() const noexcept;
 
+        /**
+         * @brief 把重新抓到的一帧换上：底图换了，标注、选中与撤销历史都留着
+         * @param captured 重抓的产物，应与开窗时那一帧同形（同一块区域再抓一帧）
+         * @details 引擎的 refreshCanvas 就是这个语义；与 loadCanvas 分开正是为了不把标注清掉。
+         */
+        void refreshCapture(const Core::CapturedImage &captured);
+
     signals:
+        /**
+         * @brief 请求重抓一块区域（F5 刷新截图）
+         * @param screenName 屏幕名
+         * @param region 该屏内的逻辑区域
+         * @note 窗口自己不碰抓屏来源：把「哪块屏、哪块区域」报出去，由宿主接上采集服务再送回来
+         */
+        void refreshRequested(const QString &screenName, const QRect &region);
         /**
          * @brief 请求把标注结果送进剪贴板
          * @param image 烘焙好的图，物理像素
@@ -147,10 +162,12 @@ namespace GyanisScribe::Annotation
         /// 把标注结果交出去：先收窗口与工具栏，再发对应信号，避免成品图里带上界面
         void deliver(ShortcutAction action);
 
-        IAnnotationEngine                       &m_engine;         ///< 标注引擎，不拥有
-        std::unique_ptr<AnnotationToolbar>       m_toolbar;        ///< 浮层工具栏，本窗口拥有
-        std::unique_ptr<AnnotationToolbarBridge> m_toolbarBridge;  ///< 工具栏与引擎的接线：样式、工具、撤销重做都在桥里
-        AnnotationView                          *m_view = nullptr; ///< 画布视图，父对象是本窗口
+        IAnnotationEngine                       &m_engine;            ///< 标注引擎，不拥有
+        std::unique_ptr<AnnotationToolbar>       m_toolbar;           ///< 浮层工具栏，本窗口拥有
+        std::unique_ptr<AnnotationToolbarBridge> m_toolbarBridge;     ///< 工具栏与引擎的接线：样式、工具、撤销重做都在桥里
+        AnnotationView                          *m_view = nullptr;    ///< 画布视图，父对象是本窗口
+        QString                                  m_refreshScreenName; ///< 本轮截图来自哪块屏（F5 重抓用它）
+        QRect                                    m_refreshRegion;     ///< 本轮截的是屏内哪块区域（F5 重抓用它）
     };
 
 } // namespace GyanisScribe::Annotation

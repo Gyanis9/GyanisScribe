@@ -35,6 +35,10 @@ namespace GyanisScribe::Annotation
             case Qt::Key_Return:
             case Qt::Key_Enter:
                 return modifiers == Qt::NoModifier ? ShortcutAction::Copy : ShortcutAction::None;
+            case Qt::Key_F5:
+                // 刷新截图：重抓这块区域换底图，标注留着。按住不放由键盘自动重复兜住——
+                // 每一次重复按键就是一次重抓，刷到画面追上为止
+                return modifiers == Qt::NoModifier ? ShortcutAction::Refresh : ShortcutAction::None;
             case Qt::Key_Z:
                 // Ctrl+Z 撤销、Ctrl+Shift+Z 重做：两个方向共用一个键位是惯例，反过来不认
                 return control ? (shift ? ShortcutAction::Redo : ShortcutAction::Undo) : ShortcutAction::None;
@@ -134,6 +138,10 @@ namespace GyanisScribe::Annotation
 
     void AnnotationWindow::startAnnotation(const Core::CapturedImage &captured, const QRect &screenAvailable, const QRect &selection)
     {
+        // 记下这一轮抓的是哪块屏、哪块区域：刷新截图（F5）要对着同一块地方重抓
+        m_refreshScreenName = captured.screenName;
+        m_refreshRegion     = captured.logicalRegion;
+
         // 载入会发 canvasChanged，桥在那里把按钮态与当前工具一起回灌，这里不用再同步一次
         m_engine.loadCanvas(captured);
 
@@ -161,6 +169,13 @@ namespace GyanisScribe::Annotation
     AnnotationToolbar &AnnotationWindow::toolbar() const noexcept
     {
         return *m_toolbar;
+    }
+
+    void AnnotationWindow::refreshCapture(const Core::CapturedImage &captured)
+    {
+        // 刷新的区域就是原来那块：尺寸该同形；真差了一点也不动窗口——用户的标注坐标还是老坐标系，
+        // 挪窗口只会让画面与标注错开。引擎只换底图这一份，标注与撤销栈原地留着
+        m_engine.refreshCanvas(captured);
     }
 
     void AnnotationWindow::keyPressEvent(QKeyEvent *event)
@@ -294,6 +309,10 @@ namespace GyanisScribe::Annotation
                 {
                     Core::Logger::info(std::format("置底没做成：{}", backed.error().message));
                 }
+                return;
+            case ShortcutAction::Refresh:
+                // 交给宿主去重抓：抓屏的口子在采集服务那边，窗口自己不碰来源
+                emit refreshRequested(m_refreshScreenName, m_refreshRegion);
                 return;
             case ShortcutAction::Print:
                 // 打印不关窗：对话框取消、或是打完还想接着改，编辑现场都留着。

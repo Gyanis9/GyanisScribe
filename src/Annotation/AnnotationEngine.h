@@ -53,6 +53,13 @@ namespace GyanisScribe::Annotation
         void loadCanvas(Core::CapturedImage image) override;
 
         /**
+         * @brief 换底图保标注，见 IAnnotationEngine::refreshCanvas()
+         * @param image 重新抓到的那一帧
+         * @details 重写基类接口：只换 m_canvas 这一份，图形、选中、层序与撤销历史原地留着。
+         */
+        void refreshCanvas(Core::CapturedImage image) override;
+
+        /**
          * @brief 当前画布，见 IAnnotationEngine::canvas()
          * @return 载入的那一帧
          */

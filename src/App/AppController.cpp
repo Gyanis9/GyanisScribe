@@ -215,6 +215,7 @@ namespace GyanisScribe::App
         QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::pinRequested, this, &AppController::handlePinRequested);
         QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::ocrRequested, this, &AppController::handleOcrRequested);
         QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::printRequested, this, &AppController::handlePrintRequested);
+        QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::refreshRequested, this, &AppController::refreshLastCapture);
 
         // 录屏：编码器与服务各一个，热键再按一次就是「停止并编码」
         m_recorder  = std::make_unique<Record::FfmpegRecordingEncoder>();
@@ -701,6 +702,24 @@ namespace GyanisScribe::App
         // 三条落盘路（存文件/快速保存/自动保存）共用这一处：交出去一次路径，命令行的脚本靠它接着干活
         emit imageFileSaved(Core::Paths::toDisplayText(filePath));
         return fileName;
+    }
+
+    void AppController::refreshLastCapture(const QString &screenName, const QRect &region)
+    {
+        // 区域未知（整屏抓来的那几路）就没法对着重抓：说一声，而不是抓一块错的盖上去
+        if (region.isEmpty())
+        {
+            notifyUser(GyanisScribe::Core::uiText("这一轮没记录选区，刷新截图用不了"), Ui::ToastKind::Information);
+            return;
+        }
+
+        const auto frame = m_capture->grabRegionNow(region, screenName);
+        if (!frame)
+        {
+            notifyUser(QString::fromStdString(frame.error().message), Ui::ToastKind::Danger);
+            return;
+        }
+        m_annotationWindow->refreshCapture(*frame);
     }
 
     void AppController::handlePrintRequested(const QImage &image)

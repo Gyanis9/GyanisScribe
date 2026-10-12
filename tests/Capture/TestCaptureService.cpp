@@ -201,6 +201,38 @@ TEST_F(CaptureServiceFixture, RegionCaptureRemembersTheRegion)
 }
 
 /**
+ * @brief 钉住就地重抓：裁好的帧带着区域交回，但不出 captured、不记选区
+ * @details 刷新截图（标注窗 F5）走这条：它不是一次新截图，不该触发「截图完成」那一串反应
+ *          （音效、自动保存、意图分派），也不该往最近选区里再记一遍——同一块区域记两次，
+ *          R/Shift+R 的历史里就会冒出重复项。区域字段随裁剪一起写进帧：重抓的人靠它认识这块地方。
+ */
+TEST_F(CaptureServiceFixture, GrabRegionNowReturnsTheFrameWithoutEmittingOrRemembering)
+{
+    SettingsStore     settings(m_iniFile);
+    FakeCaptureSource source;
+    CaptureService    service(source, settings, *platform);
+
+    // 先用一次正常抓取把「上次区域」写成一条已知值，之后就看重抓有没有去动它
+    service.captureRegion(QRect(5, 5, 20, 10), QStringLiteral("FakeScreen-1"));
+
+    Outcome outcome;
+    wire(service, outcome);
+    const auto frame = service.grabRegionNow(QRect(10, 10, 40, 15), QStringLiteral("FakeScreen-1"));
+
+    ASSERT_TRUE(frame.has_value()) << (frame ? std::string{} : frame.error().message);
+    EXPECT_EQ(frame->image.width(), 80);
+    EXPECT_EQ(frame->logicalSize, (QSize(40, 15)));
+    EXPECT_EQ(frame->screenName, QStringLiteral("FakeScreen-1"));
+    EXPECT_EQ(frame->logicalRegion, (QRect(10, 10, 40, 15))) << "重抓的帧没带上区域，下一次刷新就不知道重抓哪";
+    EXPECT_FALSE(outcome.image.has_value()) << "重抓不该出 captured：那会把刷新当新截图，音效与自动保存各来一遍";
+
+    settings.sync();
+    SettingsStore reopened(m_iniFile);
+    EXPECT_EQ(reopened.stringValue(GyanisScribe::Settings::kCaptureLastRegion, QString()), QStringLiteral("5,5,20,10")) << "重抓把最近选区顶掉了";
+    EXPECT_EQ(reopened.stringValue(GyanisScribe::Settings::kCaptureRegionHistory, QString()), QStringLiteral("5,5,20,10,FakeScreen-1")) << "重抓往选区历史里记了账";
+}
+
+/**
  * @brief 钉住历史按最近在前排，且「重复上次选区」取的是历史首条
  * @details 两本账（历史与单值键）由同一个写点保成同一条：这里两处各验一次，
  *          分开写就会出现「重复上次选区」与 R/Shift+R 说的不是同一块的局面。

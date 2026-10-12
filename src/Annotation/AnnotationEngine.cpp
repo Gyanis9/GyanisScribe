@@ -420,6 +420,14 @@ namespace GyanisScribe::Annotation
         emit canvasChanged();
     }
 
+    void AnnotationEngine::refreshCanvas(Core::CapturedImage image)
+    {
+        // 只换底图这一份：图形、选中、层序、编号与撤销历史全部原地留着。
+        // 取底图像素的工具（马赛克、模糊、放大镜）下一次绘制时自然读到新底图
+        m_canvas = std::move(image);
+        emit canvasChanged();
+    }
+
     const Core::CapturedImage &AnnotationEngine::canvas() const noexcept
     {
         return m_canvas;
