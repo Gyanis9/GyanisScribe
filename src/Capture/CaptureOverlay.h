@@ -22,6 +22,7 @@
 #include <optional>
 #include <vector>
 
+class QLineEdit;
 
 namespace GyanisScribe::Capture
 {
@@ -124,6 +125,18 @@ namespace GyanisScribe::Capture
          */
         [[nodiscard]] std::optional<QRect> hoveredRegion() const;
 
+        /**
+         * @brief 装上一档「记住的」长宽比并锁上（开遮罩时服务从配置里读到的就是它）
+         * @param ratio 已约分的宽高比；任一维非正时什么都不做
+         */
+        void setLockedAspectRatio(const QSize &ratio);
+
+        /**
+         * @brief 当前锁住的长宽比
+         * @return 已约分的比例；没锁时返回空尺寸
+         */
+        [[nodiscard]] QSize lockedAspectRatio() const;
+
     signals:
         /**
          * @brief 选区已确认
@@ -143,6 +156,14 @@ namespace GyanisScribe::Capture
          *          没在框选、没有选区时才报：这两种状态下悬停预览本来就不显示，白问一次是跨进程开销。
          */
         void hoverPointChanged(const QPoint &globalPoint);
+
+        /**
+         * @brief 长宽比锁开/关或换档了
+         * @param ratio 锁住的比例（已约分）；解开时为空尺寸
+         * @details 服务接这一声落盘（见 Settings 里那把 Capture/AspectRatio 键）：
+         *          锁着的档跨轮次记住这件事就是它在办
+         */
+        void aspectRatioLockChanged(const QSize &ratio);
 
     protected:
         /**
@@ -179,8 +200,19 @@ namespace GyanisScribe::Capture
          * @brief 键盘：Enter 确认，Esc 取消，方向键微调选区
          * @param event 键盘事件
          * @details 方向键单独按是整块平移，按住 Shift 改成挪右下角；还没框出选区时什么都不做。
+         *          裸按 `A` 锁/解长宽比（`Ctrl+A` 仍是选整块屏）、裸按 `S` 开尺寸输入框。
          */
         void keyPressEvent(QKeyEvent *event) override;
+
+        /**
+         * @brief 拦尺寸输入框的 Esc 与回车
+         * @param watched 被观察对象
+         * @param event 事件
+         * @return 处理掉了返回 true
+         * @details 两者都不是 QLineEdit 的信号：Esc 不给它拦住会穿到遮罩把整轮截图关掉；
+         *          回车在滤镜里处理，`returnPressed` 与它两个都接会应用两次。
+         */
+        bool eventFilter(QObject *watched, QEvent *event) override;
 
     private:
         /**
@@ -234,6 +266,27 @@ namespace GyanisScribe::Capture
         [[nodiscard]] QPoint globalCursorPoint() const;
 
         /**
+         * @brief 锁上/解开长宽比
+         * @details 锁上时优先取当前选区的比例（先框一个相近的再按 A），没有选区就用这一轮里
+         *          上次锁过的那一档；都没有时什么都不做——凭空锁一个比例只会让下一拖出意外。
+         *          解开时清掉持久层那一档（信号里带上空尺寸），但"上一档"留在本轮里，
+         *          再按 A 还能用同一个比例重新锁上。
+         */
+        void toggleAspectRatioLock();
+
+        /// 在读数框的位置开尺寸输入框（预填当前选区尺寸）
+        void openSizeEditor();
+
+        /// 应用输入框里的尺寸：选区左上角不动，越界夹回屏内；敲不成尺寸就留在框里继续改
+        void commitSizeEditor();
+
+        /// 收起输入框且不应用：Esc 与「点别处」走这一条
+        void cancelSizeEditor();
+
+        /// 销毁输入框：两条收场路共用，免得各漏一半
+        void closeSizeEditor();
+
+        /**
          * @brief 放大镜读数条上的坐标部分
          * @return 形如「(1920, 300)」的全局逻辑坐标
          */
@@ -248,17 +301,19 @@ namespace GyanisScribe::Capture
         bool              m_hasCursorPoint = false;                  ///< 是否收到过鼠标移动：没有就不摆放大镜，别把 (0,0) 当成光标
         Pick::ColorFormat m_readoutFormat  = Pick::ColorFormat::Hex; ///< 读数里颜色那格的写法，按 C 轮换
 
-        std::vector<QRect>           m_regionHistory;       ///< 这块屏上的历史选区，最近的在前；由 CaptureService 推过来
-        int                          m_historyIndex = -1;   ///< 当前选区取自历史里的哪一条；-1 表示不是取自历史（用户自己框/改的）
-        QString                      m_copiedSizeHint;      ///< 「已复制尺寸 …」那行提示，指针一动就清
-        bool                         m_isAdjusting = false; ///< 是否正拖着某个抓点改选区
-        std::optional<SelectionGrip> m_draggedGrip;         ///< 拖着的那个抓点，没拖时为空
-        QPoint                       m_adjustPoint;         ///< 上一帧的鼠标位置，拖抓点时按增量走
-        bool                         m_isSelecting = false; ///< 是否正在拖动框选
-        std::vector<QRect>           m_windowCandidates;    ///< 窗口候选，已换成局部逻辑坐标，按 z 序排
-        std::vector<QRect>           m_elementChain;        ///< 光标处的元素链，已换成局部逻辑坐标，由深到浅；相邻同矩形已并档
-        std::size_t                  m_elementAscent = 0;   ///< 从这里往上数了几级（0 = 最深一级）；等于链长时看整扇窗口
-        std::optional<QRect>         m_hoveredRegion;       ///< 光标压在上的那一个候选，没有则空
+        std::vector<QRect>           m_regionHistory;          ///< 这块屏上的历史选区，最近的在前；由 CaptureService 推过来
+        int                          m_historyIndex = -1;      ///< 当前选区取自历史里的哪一条；-1 表示不是取自历史（用户自己框/改的）
+        QString                      m_copiedSizeHint;         ///< 「已复制尺寸 …」那行提示，指针一动就清
+        bool                         m_isAdjusting = false;    ///< 是否正拖着某个抓点改选区
+        std::optional<SelectionGrip> m_draggedGrip;            ///< 拖着的那个抓点，没拖时为空
+        QPoint                       m_adjustPoint;            ///< 上一帧的鼠标位置，拖抓点时按增量走
+        bool                         m_isSelecting = false;    ///< 是否正在拖动框选
+        std::vector<QRect>           m_windowCandidates;       ///< 窗口候选，已换成局部逻辑坐标，按 z 序排
+        std::vector<QRect>           m_elementChain;           ///< 光标处的元素链，已换成局部逻辑坐标，由深到浅；相邻同矩形已并档
+        std::size_t                  m_elementAscent = 0;      ///< 从这里往上数了几级（0 = 最深一级）；等于链长时看整扇窗口
+        std::optional<QRect>         m_hoveredRegion;          ///< 光标压在上的那一个候选，没有则空
+        QSize                        m_aspectRatio;            ///< 上一次锁过的长宽比（已约分）；空 = 还没有过
+        bool                         m_aspectLocked = false;   ///< 长宽比锁此刻是不是开着
+        QLineEdit                   *m_sizeEditor   = nullptr; ///< 尺寸输入框，开着时才有
     };
-
 } // namespace GyanisScribe::Capture

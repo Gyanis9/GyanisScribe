@@ -10,6 +10,7 @@
 #include <QApplication>
 #include <QColor>
 #include <QImage>
+#include <QKeyEvent>
 #include <QMouseEvent>
 #include <QString>
 #include <QVariant>
@@ -885,4 +886,47 @@ TEST_F(CaptureServiceFixture, HoverDoesNotAskWhenThePlatformHasNoElementDetectio
     QApplication::sendEvent(overlay, &move);
 
     EXPECT_TRUE(fake.queriedPoints.empty()) << "能力位为假还是去问了平台";
+}
+
+/**
+ * @brief 钉住比例锁跨轮次记住的整条路：开遮罩时装档、拖动按档、解开落盘清空
+ * @details 三处各钉一步：装档漏了下一轮白锁一次；拖动不按档等于锁定没生效；
+ *          落盘漏了「记住上次那档」这句话就没有出处。锁上写的是约分后的样子（100:50 → 2:1）。
+ */
+TEST_F(CaptureServiceFixture, AspectRatioLockLoadsAppliesAndPersists)
+{
+    if (QGuiApplication::screens().isEmpty())
+    {
+        GTEST_SKIP() << "这个环境没有屏幕可枚举，铺不出遮罩";
+    }
+
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureAspectRatio, QVariant(QStringLiteral("2:1"))).has_value());
+    settings.sync();
+
+    FakeCaptureSource       source;
+    FakePlatformIntegration fake;
+    CaptureService          service(source, settings, fake);
+
+    service.startInteractive();
+    auto *overlay = findOverlay();
+    ASSERT_NE(overlay, nullptr) << "开始框选之后没铺出遮罩";
+    EXPECT_EQ(overlay->lockedAspectRatio(), (QSize(2, 1))) << "开遮罩没把记住的那一档装上";
+
+    // 拖一块：光标差 (200,200)，2:1 下按纵轴要的格数算 → 宽 400、高 200
+    const auto  anchor = QPoint{60, 60};
+    const auto  pull   = QPoint{260, 260};
+    const auto  global = overlay->geometry().topLeft();
+    QMouseEvent press{QEvent::MouseButtonPress, QPointF{anchor}, QPointF{global + anchor}, Qt::LeftButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+    QApplication::sendEvent(overlay, &press);
+    QMouseEvent move{QEvent::MouseMove, QPointF{pull}, QPointF{global + pull}, Qt::NoButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+    QApplication::sendEvent(overlay, &move);
+    EXPECT_EQ(overlay->selectedRegion(), QRect(60, 60, 400, 200)) << "拖动没按装上的那一档来：记住的档没走到绘制这一层";
+
+    // 解开：落盘的那一档跟着清
+    QKeyEvent unlock{QEvent::KeyPress, Qt::Key_A, Qt::NoModifier};
+    QApplication::sendEvent(overlay, &unlock);
+    settings.sync();
+    SettingsStore reopened(m_iniFile);
+    EXPECT_TRUE(reopened.stringValue(GyanisScribe::Settings::kCaptureAspectRatio, QString()).isEmpty()) << "解开没有落盘，下一轮会又锁上";
 }

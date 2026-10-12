@@ -11,6 +11,7 @@
 #include <QGuiApplication>
 #include <QImage>
 #include <QKeyEvent>
+#include <QLineEdit>
 #include <QMouseEvent>
 #include <QPoint>
 #include <QThread>
@@ -749,4 +750,99 @@ TEST_F(CaptureOverlayFixture, ElementChainIsIgnoredOnceASelectionExists)
 
     overlay->setElementChain(kElementChainGlobal);
     EXPECT_FALSE(overlay->hoveredRegion().has_value()) << "已有选区时元素链还亮起了预览框";
+}
+
+/**
+ * @brief 钉住比例锁：锁的是当前选区的比例、下一拖按档来、再按一次解开恢复自由
+ * @details 手算：先自由框一块 200×100（2:1），按 A 锁上取的就是它；再拖到 (600,300)
+ *          差 (200,200)，2:1 下按纵轴要的格数算：宽 400、高 200；解开之后再拖恢复自由尺寸。
+ *          每次起拖都落在既有选区之外的空白处：落在抓点上会走「拖手柄」，那是另一条路。
+ * @note 锁着比例时新拖出的框按档来；已经框好的块仍可自由拉手柄微调——手柄那八条每次拉的是
+ *       某一条边，硬套比例会把「只想改宽一点」变成两个方向一起动，反而难用。
+ */
+TEST_F(CaptureOverlayFixture, AspectLockTakesTheSelectionRatioAndAppliesToTheNextDrag)
+{
+    auto overlay = makeOverlay();
+
+    dragOut(*overlay, QPoint{100, 100}, QPoint{299, 199});
+    ASSERT_EQ(overlay->selectedRegion(), QRect(100, 100, 200, 100));
+
+    QSize seenRatio;
+    QObject::connect(overlay.get(), &CaptureOverlay::aspectRatioLockChanged, overlay.get(), [&seenRatio](const QSize &ratio) { seenRatio = ratio; });
+    pressKey(*overlay, Qt::Key_A);
+    EXPECT_EQ(overlay->lockedAspectRatio(), (QSize(2, 1))) << "锁的不是当前选区的比例";
+    EXPECT_EQ(seenRatio, (QSize(2, 1))) << "锁上没有报出去，宿主就落不了盘";
+
+    dragOut(*overlay, QPoint{400, 100}, QPoint{600, 300});
+    EXPECT_EQ(overlay->selectedRegion(), QRect(400, 100, 400, 200)) << "拖动没按锁住的 2:1 来";
+
+    pressKey(*overlay, Qt::Key_A);
+    EXPECT_TRUE(overlay->lockedAspectRatio().isEmpty()) << "再按一次没解开";
+    EXPECT_TRUE(seenRatio.isEmpty()) << "解开也该报一声（空尺寸），持久层要跟着清";
+
+    dragOut(*overlay, QPoint{50, 50}, QPoint{250, 150});
+    EXPECT_EQ(overlay->selectedRegion(), QRect(50, 50, 201, 101)) << "解开之后拖动还按着比例";
+
+    // Shift 锁正方形：松手那一刻也不许弹回自由形状——老的 release 分支直接写原始光标点，
+    // 拖出来的方框会在松手瞬间变回长方形（纯函数有用例，遮罩这一层以前没人看着）
+    QMouseEvent press{QEvent::MouseButtonPress, QPointF{QPoint{500, 50}}, globalOf(QPoint{500, 50}), Qt::LeftButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+    QApplication::sendEvent(overlay.get(), &press);
+    QMouseEvent move{QEvent::MouseMove, QPointF{QPoint{560, 150}}, globalOf(QPoint{560, 150}), Qt::NoButton, Qt::LeftButton, Qt::ShiftModifier};
+    QApplication::sendEvent(overlay.get(), &move);
+    QMouseEvent release{QEvent::MouseButtonRelease, QPointF{QPoint{560, 150}}, globalOf(QPoint{560, 150}), Qt::LeftButton, Qt::NoButton, Qt::ShiftModifier};
+    QApplication::sendEvent(overlay.get(), &release);
+    EXPECT_EQ(overlay->selectedRegion(), QRect(500, 50, 101, 101)) << "Shift 拖出的方框在松手时弹回了自由形状";
+}
+
+/**
+ * @brief 钉住尺寸输入框：S 开出并预填、回车按原左上角应用（越界夹回）、Esc 与点画布取消
+ */
+TEST_F(CaptureOverlayFixture, SizeEditorAppliesTypedSizeAtTheSameOrigin)
+{
+    auto overlay = makeOverlay();
+
+    // 输入框用 deleteLater 收场：查「对象还在不在」就查得到收没收起
+    // （isVisible 在没 show 过的遮罩下恒为假，拿它判会恒绿）
+    const auto editorAlive = [&overlay] { return overlay->findChild<QLineEdit *>(QStringLiteral("overlaySizeEditor")) != nullptr; };
+
+    dragOut(*overlay, QPoint{100, 100}, QPoint{199, 149});
+    ASSERT_EQ(overlay->selectedRegion(), QRect(100, 100, 100, 50));
+
+    pressKey(*overlay, Qt::Key_S);
+    auto *editor = overlay->findChild<QLineEdit *>(QStringLiteral("overlaySizeEditor"));
+    ASSERT_NE(editor, nullptr) << "S 没开出尺寸输入框";
+    EXPECT_EQ(editor->text(), QStringLiteral("100x50")) << "输入框没预填当前尺寸";
+
+    // 回车应用：左上角不动、输入框收起
+    editor->setText(QStringLiteral("300x200"));
+    QKeyEvent commit{QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier};
+    QApplication::sendEvent(editor, &commit);
+    EXPECT_EQ(overlay->selectedRegion(), QRect(100, 100, 300, 200)) << "回车没把尺寸应用上";
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    EXPECT_FALSE(editorAlive()) << "应用之后输入框没收起";
+
+    // 敲不成尺寸就留在框里继续改：一个字母都不该落到选区上
+    pressKey(*overlay, Qt::Key_S);
+    editor = overlay->findChild<QLineEdit *>(QStringLiteral("overlaySizeEditor"));
+    ASSERT_NE(editor, nullptr);
+    editor->setText(QStringLiteral("abc"));
+    QApplication::sendEvent(editor, &commit);
+    EXPECT_EQ(overlay->selectedRegion(), QRect(100, 100, 300, 200)) << "解析不出的尺寸被当成别的东西应用了";
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    EXPECT_TRUE(editorAlive()) << "敲不成尺寸时该留在框里继续改";
+
+    // Esc 取消：选区不动、框收起
+    QKeyEvent cancel{QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier};
+    QApplication::sendEvent(editor, &cancel);
+    EXPECT_EQ(overlay->selectedRegion(), QRect(100, 100, 300, 200)) << "Esc 之后选区被改了";
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    EXPECT_FALSE(editorAlive()) << "Esc 没收起输入框";
+
+    // 输一个大数：夹回屏内（这块屏 800×600，锚点 (100,100)）
+    pressKey(*overlay, Qt::Key_S);
+    editor = overlay->findChild<QLineEdit *>(QStringLiteral("overlaySizeEditor"));
+    ASSERT_NE(editor, nullptr);
+    editor->setText(QStringLiteral("5000x5000"));
+    QApplication::sendEvent(editor, &commit);
+    EXPECT_EQ(overlay->selectedRegion(), QRect(100, 100, 700, 500)) << "越界的尺寸没夹回屏内";
 }

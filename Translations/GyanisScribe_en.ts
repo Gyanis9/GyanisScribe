@@ -1468,8 +1468,16 @@
             <translation>Update check failed: {}. Try again later, or take a look at the releases page yourself</translation>
         </message>
         <message>
+            <source>（锁定 %1）</source>
+            <translation>(locked %1)</translation>
+        </message>
+        <message>
             <source>已复制尺寸 %1</source>
             <translation>Copied size %1</translation>
+        </message>
+        <message>
+            <source>选区尺寸</source>
+            <translation>Selection size</translation>
         </message>
         <message>
             <source>还没有可复用的上次区域：先框选截图一次，或改用区域截图</source>

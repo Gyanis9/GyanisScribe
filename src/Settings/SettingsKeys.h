@@ -50,6 +50,14 @@ namespace GyanisScribe::Settings
      */
     inline constexpr std::string_view kCaptureRegionHistory = "Capture/RegionHistory";
 
+    /**
+     * @brief 框选时锁住的长宽比，形如「16:9」；空串表示没锁
+     * @details 遮罩上按 A 把当前选区的比例锁上、再按一次解开；锁着的时候它跨轮次记住
+     *          （下次开截图还是这一档），解开就清空——用户明确松开的档不该在下一轮里复活。
+     *          读端在 Capture::CaptureService（开遮罩时装进去），写端跟着遮罩的信号落盘。
+     */
+    inline constexpr std::string_view kCaptureAspectRatio = "Capture/AspectRatio";
+
     /// 截完之后做什么，取值词表在 App::kCaptureIntentChoices；读端在 AppController，写端在设置的截图页
     inline constexpr std::string_view kCaptureAfterAction = "Capture/AfterAction";
 

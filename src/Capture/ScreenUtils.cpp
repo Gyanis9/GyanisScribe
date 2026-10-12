@@ -5,11 +5,13 @@
 #include <QApplication>
 #include <QGuiApplication>
 #include <QPainter>
+#include <QRegularExpression>
 #include <QScreen>
 
 #include <cmath>
 #include <format>
 #include <charconv>
+#include <numeric>
 #include <vector>
 
 namespace GyanisScribe::Capture
@@ -199,6 +201,92 @@ namespace GyanisScribe::Capture
         // 夹取可能把等边破坏掉：按两轴里更小的那个偏移量收回来，仍是正方形
         const int size = std::min(std::abs(clampedX - anchor.x()), std::abs(clampedY - anchor.y()));
         return QPoint(anchor.x() + signX * size, anchor.y() + signY * size);
+    }
+
+    QPoint ratioLockedPoint(const QPoint &anchor, const QPoint &current, const QSize &ratio, const QRect &limit)
+    {
+        if (ratio.width() <= 0 || ratio.height() <= 0)
+        {
+            return current;
+        }
+
+        const int dx = current.x() - anchor.x();
+        const int dy = current.y() - anchor.y();
+        // 偏移为 0 的方向没有符号：按正方向走，选区总是往起手点的右/下展开（与方框版本同解）
+        const int signX = dx < 0 ? -1 : 1;
+        const int signY = dy < 0 ? -1 : 1;
+
+        // 选区宽 = |dx| + 1（两个端点是闭区间）：这里按「比例格数」算，最后再减 1 落到端点上，
+        // 不然锁 16:9 会拖出 321×181 这种「差一格」的假比例
+        const auto spanToCover = [](const int offset, const int unit)
+        {
+            // 盖住光标所需的格数，向上取整：少盖一格会让人觉得锁反了方向
+            return (std::abs(offset) + unit - 1) / unit;
+        };
+        int span = std::max(spanToCover(dx, ratio.width()), spanToCover(dy, ratio.height()));
+
+        // 贴边能落下的最大格数：可用像素数按含端点的格数算（到边界的距离 + 1）
+        const int availableX = signX > 0 ? limit.right() - anchor.x() + 1 : anchor.x() - limit.left() + 1;
+        const int availableY = signY > 0 ? limit.bottom() - anchor.y() + 1 : anchor.y() - limit.top() + 1;
+        span                 = std::min(span, std::min(availableX / ratio.width(), availableY / ratio.height()));
+        if (span <= 0)
+        {
+            return anchor;
+        }
+        return QPoint(anchor.x() + signX * (span * ratio.width() - 1), anchor.y() + signY * (span * ratio.height() - 1));
+    }
+
+    std::optional<QSize> parseSizeText(const QString &text)
+    {
+        // 宽度与高度之间允许 x/×/逗号/空白：标签上印的是「宽 × 高」，用户照着敲、换一种敲都得认
+        static const QRegularExpression separator{QStringLiteral(R"([x×,\s]+)")};
+        const QStringList               parts = text.trimmed().split(separator, Qt::SkipEmptyParts);
+        if (parts.size() != 2)
+        {
+            return std::nullopt;
+        }
+
+        bool      okWidth  = false;
+        bool      okHeight = false;
+        const int width    = parts[0].toInt(&okWidth);
+        const int height   = parts[1].toInt(&okHeight);
+        if (!okWidth || !okHeight || width <= 0 || height <= 0)
+        {
+            return std::nullopt;
+        }
+        return QSize{width, height};
+    }
+
+    QString aspectRatioToText(const QSize &ratio)
+    {
+        if (ratio.width() <= 0 || ratio.height() <= 0)
+        {
+            return {};
+        }
+
+        const int divisor = std::gcd(ratio.width(), ratio.height());
+        return QStringLiteral("%1:%2").arg(ratio.width() / divisor).arg(ratio.height() / divisor);
+    }
+
+    std::optional<QSize> aspectRatioFromText(const QString &text)
+    {
+        const auto parts = text.trimmed().split(QLatin1Char(':'));
+        if (parts.size() != 2)
+        {
+            return std::nullopt;
+        }
+
+        bool      okWidth  = false;
+        bool      okHeight = false;
+        const int width    = parts[0].toInt(&okWidth);
+        const int height   = parts[1].toInt(&okHeight);
+        if (!okWidth || !okHeight || width <= 0 || height <= 0)
+        {
+            return std::nullopt;
+        }
+
+        const int divisor = std::gcd(width, height);
+        return QSize{width / divisor, height / divisor};
     }
 
     QRect nudgeRegion(const QRect &region, const QPoint &step, const QRect &limit)

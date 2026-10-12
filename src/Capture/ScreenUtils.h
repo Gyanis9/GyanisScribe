@@ -116,6 +116,39 @@ namespace GyanisScribe::Capture
     [[nodiscard]] QPoint squareLockedPoint(const QPoint &anchor, const QPoint &current, bool locked, const QRect &limit);
 
     /**
+     * @brief 锁着某一档长宽比时，把选区的另一个端点收到这条比例上
+     * @param anchor 起手那个端点
+     * @param current 光标所在端点
+     * @param ratio 锁住的长宽比（已约分，如 16:9）；任一维非正时原样交回 current
+     * @param limit 允许的范围（通常是这块屏）
+     * @return 该用的端点：从 anchor 朝光标那一侧，按比例铺一块尽量盖住光标的矩形
+     * @details 与方框版本同一套做法：取「两轴里要求更大的那一边」定尺度（少盖住光标会让人觉得锁反了），
+     *          贴边被夹之后按能落下的最小尺度收一次，比例不因贴边失效。
+     */
+    [[nodiscard]] QPoint ratioLockedPoint(const QPoint &anchor, const QPoint &current, const QSize &ratio, const QRect &limit);
+
+    /**
+     * @brief 把遮罩上敲进去的尺寸文本解析成尺寸
+     * @param text 形如「300x200」「300×200」「300,200」「300 200」；x 不分大小写
+     * @return 成功返回正数尺寸；解析不出或不是正数时为空
+     */
+    [[nodiscard]] std::optional<QSize> parseSizeText(const QString &text);
+
+    /**
+     * @brief 把长宽比写成存取文本
+     * @param ratio 长宽比；空或非正时返回空串
+     * @return 约分后的「宽:高」，如「16:9」
+     */
+    [[nodiscard]] QString aspectRatioToText(const QSize &ratio);
+
+    /**
+     * @brief 解析长宽比的存取文本
+     * @param text 形如「16:9」；两侧非正数、缺冒号或多余的尾巴都算解析不出
+     * @return 成功返回约分后的长宽比；解析不出时为空
+     */
+    [[nodiscard]] std::optional<QSize> aspectRatioFromText(const QString &text);
+
+    /**
      * @brief 把选区整体挪若干格
      * @param region 当前选区
      * @param step 位移量，一格是 (1,0)、(0,-1) 这种

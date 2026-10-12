@@ -23,6 +23,15 @@ namespace
     /// 滚动长截图的取帧节拍，毫秒：比人手滚一格快，又不至于每帧都在同一位置上
     constexpr int kLongCaptureIntervalMs = 250;
 
+    /// 比例锁落盘的那一处：空尺寸＝解开，把配置里这一档清掉（下一次开遮罩就是自由的）
+    void rememberAspectRatio(GyanisScribe::Settings::ISettingsStore &settings, const QSize &ratio)
+    {
+        if (const auto stored = settings.setValue(GyanisScribe::Settings::kCaptureAspectRatio, QVariant(GyanisScribe::Capture::aspectRatioToText(ratio))); !stored)
+        {
+            GyanisScribe::Core::Logger::warning(std::format("长宽比锁没能记下：{}", stored.error().message));
+        }
+    }
+
     /// 长图的逻辑高度上限：接到这里就地收口，免得在一条没有底的页面上把内存吃光
     constexpr int kLongCaptureMaximumLogicalHeight = 40000;
 } // namespace
@@ -174,6 +183,11 @@ namespace GyanisScribe::Capture
             overlay->setWindowCandidates(onThisScreen);
             // 只给同屏的几条：R/Shift+R 循环挑的是这块屏上的几块，别屏的矩形放上来会露出一块越界的框
             overlay->setRegionHistory(regionsOnScreen(*regionHistory, screen->name()));
+            // 记住的长宽比在开遮罩时装上：上一轮锁着哪一档，这一轮接着锁
+            if (const auto ratio = aspectRatioFromText(m_settings.stringValue(Settings::kCaptureAspectRatio, QString())); ratio)
+            {
+                overlay->setLockedAspectRatio(*ratio);
+            }
             QObject::connect(overlay, &CaptureOverlay::regionSelected, this,
                              [this, screen, overlay, longCapture](const QRect &region)
                              {
@@ -186,6 +200,8 @@ namespace GyanisScribe::Capture
                                  }
                                  captureRegion(region, screen->name());
                              });
+            // 比例锁开/关或换档：落盘的那一处就这一条，锁着的档因此跨轮次记得住
+            QObject::connect(overlay, &CaptureOverlay::aspectRatioLockChanged, this, [this](const QSize &ratio) { rememberAspectRatio(m_settings, ratio); });
             QObject::connect(overlay, &CaptureOverlay::dismissed, this, &CaptureService::cancelInteractive);
             // 悬停细分到界面元素：平台没这能力就不接这条线，遮罩照旧只认窗口候选
             if (m_integration.capabilities().uiElements)

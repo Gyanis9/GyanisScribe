@@ -21,6 +21,7 @@ using GyanisScribe::Capture::formatSelectionHint;
 using GyanisScribe::Capture::gripAt;
 using GyanisScribe::Capture::kSelectionGripTolerance;
 using GyanisScribe::Capture::nudgeRegion;
+using GyanisScribe::Capture::ratioLockedPoint;
 using GyanisScribe::Capture::regionAtPoint;
 using GyanisScribe::Capture::regionFromText;
 using GyanisScribe::Capture::regionToText;
@@ -466,4 +467,61 @@ TEST(ScreenUtilsSelection, SquareLockTakesTheLargerExtentAndKeepsTheSquareAtEdge
     const auto clamped = squareLockedPoint(QPoint{10, 500}, QPoint{0, 600}, true, limit);
     EXPECT_EQ(clamped.x(), limit.left()) << "该被夹到屏的左沿";
     EXPECT_EQ(std::abs(clamped.x() - 10), std::abs(clamped.y() - 500)) << "夹到屏边之后不是正方形了";
+}
+
+/**
+ * @brief 钉住任意长宽比锁：按比例格数展开、贴边收缩后比例不变、减掉一格落成精确比例
+ * @details 期望值手算：起手 (100,100)、比例 16:9。
+ *          拖到 (420,260)：差 (320,160)，需要 ceil(320/16)=20 与 ceil(160/9)=18 取大 → 20 格，
+ *          端点 = 100 + 20×16 - 1 = 419 → 选区宽 420-100+1 = 320 = 20 格 ✓（不减那一格会出 321×181）。
+ *          贴左边时按能落下的格数收缩，宽高仍是 16:9。
+ */
+TEST(ScreenUtilsSelection, RatioLockKeepsTheExactRatioAndShrinksAtEdges)
+{
+    const QRect limit{0, 0, 1920, 1080};
+    const QSize ratio{16, 9};
+
+    // 没锁（空比例）时原样交回
+    EXPECT_EQ(ratioLockedPoint(QPoint{100, 100}, QPoint{300, 200}, QSize{}, limit), QPoint(300, 200)) << "没上锁时不该改端点";
+
+    // 横向主导：20 格 × 16:9
+    EXPECT_EQ(ratioLockedPoint(QPoint{100, 100}, QPoint{420, 260}, ratio, limit), QPoint(419, 279)) << "按格数展开的端点不对";
+    // 纵向主导：拖到 (150, 400)，差 (50,300)：ceil(300/9)=34 格 → (644, 405)? 手算：34×16-1=543 → x=643；34×9-1=305 → y=405
+    EXPECT_EQ(ratioLockedPoint(QPoint{100, 100}, QPoint{150, 400}, ratio, limit), QPoint(643, 405)) << "纵向主导时该按纵轴要的格数定尺度";
+
+    // 往左上拖：朝左上展开。差 (-200,-100)：ceil(200/16)=13 格与 ceil(100/9)=12 取大 → 13 格
+    EXPECT_EQ(ratioLockedPoint(QPoint{500, 500}, QPoint{300, 400}, ratio, limit), QPoint(500 - 13 * 16 + 1, 500 - 13 * 9 + 1));
+
+    // 贴左边：能落下的格数 = min(500/16, 500/9) = 31 格 → 宽 496、高 279，比例仍是 16:9
+    const auto clamped = ratioLockedPoint(QPoint{500, 500}, QPoint{0, 0}, ratio, limit);
+    EXPECT_EQ(500 - clamped.x(), 16 * 31 - 1);
+    EXPECT_EQ(500 - clamped.y(), 9 * 31 - 1);
+}
+
+/**
+ * @brief 钉住尺寸与长宽比文本的解析与书写：认得四种分隔符，写的是约分后的样子
+ */
+TEST(ScreenUtilsSelection, SizeAndAspectTextRoundTrip)
+{
+    using GyanisScribe::Capture::aspectRatioFromText;
+    using GyanisScribe::Capture::aspectRatioToText;
+    using GyanisScribe::Capture::parseSizeText;
+
+    EXPECT_EQ(parseSizeText(QStringLiteral("300x200")), (QSize(300, 200)));
+    EXPECT_EQ(parseSizeText(QStringLiteral("300×200")), (QSize(300, 200)));
+    EXPECT_EQ(parseSizeText(QStringLiteral("300,200")), (QSize(300, 200)));
+    EXPECT_EQ(parseSizeText(QStringLiteral(" 300 200 ")), (QSize(300, 200)));
+    EXPECT_FALSE(parseSizeText(QStringLiteral("300")).has_value()) << "只有一个数不算尺寸";
+    EXPECT_FALSE(parseSizeText(QStringLiteral("300x0")).has_value()) << "零高度不算尺寸";
+    EXPECT_FALSE(parseSizeText(QStringLiteral("三百x两百")).has_value());
+    EXPECT_FALSE(parseSizeText(QString()).has_value());
+
+    EXPECT_EQ(aspectRatioToText(QSize{1920, 1080}), QStringLiteral("16:9")) << "写出去的要先约分";
+    EXPECT_EQ(aspectRatioToText(QSize{100, 50}), QStringLiteral("2:1"));
+    EXPECT_EQ(aspectRatioToText(QSize{}), QString());
+    EXPECT_EQ(aspectRatioFromText(QStringLiteral("16:9")), (QSize(16, 9)));
+    EXPECT_EQ(aspectRatioFromText(QStringLiteral("32:18")), (QSize(16, 9))) << "读进来也要约分，运算里数字才小";
+    EXPECT_FALSE(aspectRatioFromText(QStringLiteral("16")).has_value()) << "缺冒号不算比例";
+    EXPECT_FALSE(aspectRatioFromText(QStringLiteral("16:0")).has_value());
+    EXPECT_FALSE(aspectRatioFromText(QStringLiteral("16:9:1")).has_value()) << "多余的尾巴不该被忽略";
 }

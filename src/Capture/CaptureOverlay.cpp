@@ -11,6 +11,7 @@
 #include <QFont>
 #include <QFontMetrics>
 #include <QKeyEvent>
+#include <QLineEdit>
 #include <QMouseEvent>
 #include <QPainter>
 
@@ -19,6 +20,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 
 namespace
 {
@@ -30,6 +32,12 @@ namespace
 
     /// 「已复制尺寸」提示与读数框之间的间距，逻辑像素
     constexpr int kCopiedHintGap = 4;
+
+    /// 尺寸输入框的宽度，逻辑像素：装得下「1920x1080」这样的读数
+    constexpr int kSizeEditorWidth = 148;
+
+    /// 尺寸输入框摆在光标右下时的偏移，逻辑像素
+    constexpr int kSizeEditorCursorGap = 12;
 } // namespace
 
 namespace GyanisScribe::Capture
@@ -320,8 +328,13 @@ namespace GyanisScribe::Capture
                 painter.drawLine(QPoint(0, m_currentPoint.y()), QPoint(widgetRect.width(), m_currentPoint.y()));
             }
 
-            const auto hint     = formatSelectionHint(shown);
-            QFont      hintFont = font();
+            auto hint = formatSelectionHint(shown);
+            if (m_aspectLocked)
+            {
+                // 锁着比例时在读数后面标出来：不标的话「拖不出想要的形状」会被当成手抖
+                hint += GyanisScribe::Core::uiText("（锁定 %1）").arg(aspectRatioToText(m_aspectRatio));
+            }
+            QFont hintFont = font();
             hintFont.setPointSize(GyanisScribe::Ui::kHintFontSize);
             painter.setFont(hintFont);
             const QFontMetrics metrics(hintFont);
@@ -369,6 +382,12 @@ namespace GyanisScribe::Capture
         if (event->button() != Qt::LeftButton)
         {
             return;
+        }
+
+        // 尺寸输入框开着时点画布＝放弃这次输入（回车才算应用）：留着框会让人以为还没提交
+        if (m_sizeEditor != nullptr)
+        {
+            closeSizeEditor();
         }
 
         const auto point  = event->position().toPoint();
@@ -429,8 +448,11 @@ namespace GyanisScribe::Capture
 
         if (m_isSelecting)
         {
-            // 按住 Shift 锁正方形：对着图标的直角、圆形按钮这类目标，手拖不出等边
-            m_currentPoint = squareLockedPoint(m_anchorPoint, m_cursorPoint, event->modifiers().testFlag(Qt::ShiftModifier), QRect{QPoint{0, 0}, size()});
+            const auto limit = QRect{QPoint{0, 0}, size()};
+            // Shift 临时锁正方形；没按 Shift 时看长宽比锁。两处收口都在纯函数里（见 ScreenUtils）：
+            // 比例锁关着时 ratioLockedPoint 原样交回光标点，与老行为逐像素同解
+            m_currentPoint = event->modifiers().testFlag(Qt::ShiftModifier) ? squareLockedPoint(m_anchorPoint, m_cursorPoint, true, limit)
+                                                                            : ratioLockedPoint(m_anchorPoint, m_cursorPoint, m_aspectLocked ? m_aspectRatio : QSize{}, limit);
         } else
         {
             // 没在拖的时候把光标形状交给抓点：形状变了就是「这里能抓」，不用试
@@ -459,8 +481,13 @@ namespace GyanisScribe::Capture
 
         if (m_isSelecting)
         {
-            m_isSelecting  = false;
-            m_currentPoint = event->position().toPoint();
+            m_isSelecting = false;
+            // 松手的那一刻也走一遍锁：直接写原始光标点的话，Move 里锁好的端点会被覆盖掉，
+            // 拖出来的正方形/按比例框会在松手瞬间弹回自由形状（Shift 锁正方形以前就有这个毛病）
+            const auto releasePoint = event->position().toPoint();
+            const auto limit        = QRect{QPoint{0, 0}, size()};
+            m_currentPoint = event->modifiers().testFlag(Qt::ShiftModifier) ? squareLockedPoint(m_anchorPoint, releasePoint, true, limit)
+                                                                            : ratioLockedPoint(m_anchorPoint, releasePoint, m_aspectLocked ? m_aspectRatio : QSize{}, limit);
 
             // 按下又原地放开（没拖出任何一块）时，认此刻悬停亮着的那个候选：
             // 「点一下就要这一扇窗口」是框选最常用的走法，而原地放开过去什么也不产出
@@ -510,7 +537,12 @@ namespace GyanisScribe::Capture
                 confirmSelection();
                 return;
             case Qt::Key_A:
-                // Ctrl+A 选整块屏：多屏上省掉从一角拖到另一角这一趟
+                // 裸按 A 锁/解长宽比；Ctrl+A 选整块屏：多屏上省掉从一角拖到另一角这一趟
+                if (event->modifiers() == Qt::NoModifier)
+                {
+                    toggleAspectRatioLock();
+                    return;
+                }
                 if (event->modifiers() != Qt::ControlModifier)
                 {
                     QWidget::keyPressEvent(event);
@@ -520,6 +552,15 @@ namespace GyanisScribe::Capture
                 m_currentPoint = QPoint{size().width() - 1, size().height() - 1};
                 m_historyIndex = -1; // 整屏不是取自历史：下一次 R 该从最近一条重新起
                 update();
+                return;
+            case Qt::Key_S:
+                // 裸按 S 开尺寸输入框：敲「宽x高」回车应用，选区左上角不动
+                if (event->modifiers() != Qt::NoModifier)
+                {
+                    QWidget::keyPressEvent(event);
+                    return;
+                }
+                openSizeEditor();
                 return;
             case Qt::Key_Comma:
             case Qt::Key_Period:
@@ -613,6 +654,147 @@ namespace GyanisScribe::Capture
                 QWidget::keyPressEvent(event);
                 return;
         }
+    }
+
+    void CaptureOverlay::setLockedAspectRatio(const QSize &ratio)
+    {
+        if (ratio.width() <= 0 || ratio.height() <= 0)
+        {
+            return;
+        }
+        m_aspectRatio  = ratio;
+        m_aspectLocked = true;
+        update();
+    }
+
+    QSize CaptureOverlay::lockedAspectRatio() const
+    {
+        return m_aspectLocked ? m_aspectRatio : QSize{};
+    }
+
+    void CaptureOverlay::toggleAspectRatioLock()
+    {
+        if (m_aspectLocked)
+        {
+            m_aspectLocked = false;
+            // 持久层那一档跟着清：用户明确松开的档不该在下一轮里复活。
+            // 本轮里的「上一档」留着——再按 A 还能用同一个比例锁上
+            emit aspectRatioLockChanged(QSize{});
+            update();
+            return;
+        }
+
+        // 锁上时优先取当前选区的比例（先框一个相近的再按 A 就是「锁这一档」）；
+        // 没有选区就用本轮上次锁过的。两样都没有时什么都不做——凭空锁一个比例只会让下一拖出意外
+        if (const auto region = selectedRegion(); !region.isNull() && region.width() > 0 && region.height() > 0)
+        {
+            const int divisor = std::gcd(region.width(), region.height());
+            m_aspectRatio     = QSize{region.width() / divisor, region.height() / divisor};
+        }
+        if (m_aspectRatio.isEmpty())
+        {
+            return;
+        }
+        m_aspectLocked = true;
+        emit aspectRatioLockChanged(m_aspectRatio);
+        update();
+    }
+
+    void CaptureOverlay::openSizeEditor()
+    {
+        if (m_sizeEditor == nullptr)
+        {
+            m_sizeEditor = new QLineEdit{this};
+            m_sizeEditor->setObjectName(QStringLiteral("overlaySizeEditor"));
+            m_sizeEditor->setAlignment(Qt::AlignCenter);
+            m_sizeEditor->setFixedWidth(kSizeEditorWidth);
+            m_sizeEditor->setAccessibleName(GyanisScribe::Core::uiText("选区尺寸"));
+            m_sizeEditor->installEventFilter(this);
+        }
+
+        const auto region = selectedRegion();
+        if (!region.isNull())
+        {
+            m_sizeEditor->setText(QStringLiteral("%1x%2").arg(region.width()).arg(region.height()));
+        } else
+        {
+            m_sizeEditor->setText({});
+        }
+
+        // 摆在读数框那一格（贴顶时会翻到选区下方）；还没有选区就摆光标右下
+        const auto base = region.isNull()
+                                  ? (m_hasCursorPoint ? m_cursorPoint + QPoint{kSizeEditorCursorGap, kSizeEditorCursorGap} : QPoint{kSizeEditorCursorGap, kSizeEditorCursorGap})
+                                  : hintPositionFor(region);
+        const auto editorSize = QSize{m_sizeEditor->width(), m_sizeEditor->sizeHint().height()};
+        m_sizeEditor->move(
+                QPoint{std::clamp(base.x(), 0, std::max(0, size().width() - editorSize.width())), std::clamp(base.y(), 0, std::max(0, size().height() - editorSize.height()))});
+        m_sizeEditor->show();
+        m_sizeEditor->setFocus();
+        m_sizeEditor->selectAll();
+    }
+
+    void CaptureOverlay::commitSizeEditor()
+    {
+        if (m_sizeEditor == nullptr)
+        {
+            return;
+        }
+
+        const auto parsed = parseSizeText(m_sizeEditor->text());
+        if (!parsed)
+        {
+            // 敲不成尺寸就留在框里继续改：把「看不懂」变成「框没了」是最坏的一种反馈
+            return;
+        }
+
+        // 以选区左上角为锚点铺开；还没有选区时从屏的左上角起。越界按屏收——输错一个大数
+        // 之后画面里只剩一小角，比夹住更让人摸不着头脑
+        const auto region = selectedRegion();
+        const auto anchor = region.isNull() ? QPoint{0, 0} : region.topLeft();
+        const auto limit  = QRect{QPoint{0, 0}, size()};
+        const int  width  = std::clamp(parsed->width(), 1, std::max(1, limit.width() - anchor.x()));
+        const int  height = std::clamp(parsed->height(), 1, std::max(1, limit.height() - anchor.y()));
+        m_anchorPoint     = anchor;
+        m_currentPoint    = QPoint(anchor.x() + width - 1, anchor.y() + height - 1);
+        m_historyIndex    = -1;
+        closeSizeEditor();
+        update();
+    }
+
+    void CaptureOverlay::cancelSizeEditor()
+    {
+        closeSizeEditor();
+    }
+
+    void CaptureOverlay::closeSizeEditor()
+    {
+        if (m_sizeEditor == nullptr)
+        {
+            return;
+        }
+        auto *editor = m_sizeEditor;
+        m_sizeEditor = nullptr;
+        editor->hide();
+        editor->deleteLater();
+    }
+
+    bool CaptureOverlay::eventFilter(QObject *watched, QEvent *event)
+    {
+        if (watched == m_sizeEditor && event->type() == QEvent::KeyPress)
+        {
+            auto *key = static_cast<QKeyEvent *>(event);
+            if (key->key() == Qt::Key_Escape)
+            {
+                cancelSizeEditor();
+                return true;
+            }
+            if (key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter)
+            {
+                commitSizeEditor();
+                return true;
+            }
+        }
+        return QWidget::eventFilter(watched, event);
     }
 
 } // namespace GyanisScribe::Capture
