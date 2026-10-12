@@ -22,6 +22,14 @@
 #include <optional>
 #include <vector>
 
+namespace GyanisScribe::Annotation
+{
+    class AnnotationEngine;
+    class AnnotationToolbar;
+    class AnnotationToolbarBridge;
+    class AnnotationView;
+} // namespace GyanisScribe::Annotation
+
 namespace GyanisScribe::Platform
 {
     class IPlatformIntegration;
@@ -31,6 +39,11 @@ namespace GyanisScribe::Settings
 {
     class ISettingsStore;
 } // namespace GyanisScribe::Settings
+
+namespace GyanisScribe::Ui
+{
+    class IconProvider;
+} // namespace GyanisScribe::Ui
 
 namespace GyanisScribe::Pin
 {
@@ -74,6 +87,29 @@ namespace GyanisScribe::Pin
          * @return true 表示现在是那枚小方块
          */
         [[nodiscard]] bool isThumbnailMode() const noexcept;
+
+        /**
+         * @brief 在贴图上直接标注：进入标注模式
+         * @details 把这张贴图当作画布交给标注引擎，标注视图铺满整窗，工具栏浮在旁边——
+         *          与标注窗是同一套引擎、视图与快捷键表。
+         *          两处先决动作：缩略图态先摆回整张（小方块上画不了东西）；旋转过的先转正、
+         *          退出时转回原角度（视图是轴对齐的，斜画布铺不平，而成品记的是图片自己的像素）。
+         * @note 动图不进标注：标注会被下一帧盖掉，这种情况记一条日志而不是悄悄吞掉。
+         */
+        void startAnnotation();
+
+        /**
+         * @brief 结束标注：把画上的图形烘进这张贴图并退出标注模式
+         * @details 成品走引擎的 exportImage（与标注窗保存的是同一条路）；旋转角与贴边收起态
+         *          恢复到进入之前。没在标注时调用是幂等的。
+         */
+        void finishAnnotation();
+
+        /**
+         * @brief 此刻是不是在标注模式
+         * @return true 表示鼠标键盘归标注那一套
+         */
+        [[nodiscard]] bool isAnnotating() const noexcept;
 
         /**
          * @brief 设所属贴图分组
@@ -268,6 +304,14 @@ namespace GyanisScribe::Pin
         void colorPicked(const QColor &color);
 
         /**
+         * @brief 标注模式下点了「贴到屏幕上」：把成品另贴一张新贴图
+         * @param image 烘焙好的成品
+         * @details 不动这一张：要的是「改这张」之外的另一种走向（留底再贴一份）才走这条路；
+         *          摆位由管理器按本张附近算，界面层只管建一张新贴图
+         */
+        void pinAnotherRequested(const QImage &image);
+
+        /**
          * @brief 贴图被关闭，管理器据此把自己记的那一份摘掉
          */
         void closedByUser();
@@ -378,33 +422,52 @@ namespace GyanisScribe::Pin
          */
         [[nodiscard]] Core::Expected<std::filesystem::path> saveWithDefaultName();
 
-        /// 按现在的尺寸与贴边档把窗口摆到贴上那条边上（露出或收成一条）
+        /**
+         * @brief 按现在的尺寸与贴边档把窗口摆到贴上那条边上（露出或收成一条）
+         */
         void applyDockGeometry();
 
-        QImage                                m_image;                            ///< 贴图内容，物理像素
-        QSizeF                                m_logicalSize;                      ///< 图片逻辑尺寸
-        double                                m_scale           = 1.0;            ///< 缩放因子
-        double                                m_rotationDegrees = 0.0;            ///< 旋转角度
-        double                                m_opacity         = 1.0;            ///< 不透明度
-        bool                                  m_mouseThrough    = false;          ///< 是否鼠标穿透
-        bool                                  m_thumbnail       = false;          ///< 缩略图模式：窗口缩成小方块，缩放等设定原样留着
-        bool                                  m_pinned          = true;           ///< 是否置顶
-        int                                   m_group           = kFirstPinGroup; ///< 所属贴图分组，菜单与布局记录都取它
-        QVector<int>                          m_groupChoices{kFirstPinGroup};     ///< 现有分组号（升序），由管理器推过来
-        bool                                  m_colorPickMode = false;            ///< 取色模式：鼠标读像素而不是拖动
-        QPointF                               m_pickPoint;                        ///< 取色模式下光标在窗口里的位置，读数框跟它走
-        ScreenEdge                            m_edgeDock = ScreenEdge::None;      ///< 贴的是哪条屏边；None 表示没贴
-        QRect                                 m_dockArea;                         ///< 贴边那一刻那块屏的可用区，收起与展开都按它算
-        bool                                  m_dockCollapsed = false;            ///< 贴边后是不是收成了那一条
-        bool                                  m_dragMoved     = false;            ///< 这一轮按下之后真拖动过没有（只点一下不吸边）
-        class QMovie                         *m_movie         = nullptr;          ///< 动图播放器；静图这张贴图时为空
-        QString                               m_sourceFile;                       ///< 动图的来源文件；进布局记录，重启后按它接上动画
-        QPoint                                m_dragOffset;                       ///< 移动时起笔点与窗口左上角的差
-        std::optional<HandleKind>             m_draggedHandle;                    ///< 正在拖的手柄，没拖时为空
-        double                                m_dragInitialScale    = 1.0;        ///< 起拖时的缩放
-        double                                m_dragInitialDistance = 0.0;        ///< 起拖时指针到中心的距离
-        Settings::ISettingsStore             &m_settings;                         ///< 配置来源（保存目录）
-        const Platform::IPlatformIntegration &m_integration;                      ///< 平台能力查询
+        /**
+         * @brief 标注模式下的按键路由：查标注窗那张快捷键表并执行
+         * @param event 按键事件
+         * @details 与标注窗同一张表（shortcutActionFor + toolShortcutFor），两处按键含义不会各说各话。
+         *          `Esc` 在这里是「收工保留」而不是关掉贴图：贴图是本来就有的东西，
+         *          收起的那一步在菜单与快捷键里，不该被标注的退出键撞上。
+         */
+        void routeAnnotationKey(QKeyEvent *event);
+
+        QImage                                               m_image;                               ///< 贴图内容，物理像素
+        QSizeF                                               m_logicalSize;                         ///< 图片逻辑尺寸
+        double                                               m_scale           = 1.0;               ///< 缩放因子
+        double                                               m_rotationDegrees = 0.0;               ///< 旋转角度
+        double                                               m_opacity         = 1.0;               ///< 不透明度
+        bool                                                 m_mouseThrough    = false;             ///< 是否鼠标穿透
+        bool                                                 m_thumbnail       = false;             ///< 缩略图模式：窗口缩成小方块，缩放等设定原样留着
+        bool                                                 m_pinned          = true;              ///< 是否置顶
+        int                                                  m_group           = kFirstPinGroup;    ///< 所属贴图分组，菜单与布局记录都取它
+        QVector<int>                                         m_groupChoices{kFirstPinGroup};        ///< 现有分组号（升序），由管理器推过来
+        bool                                                 m_colorPickMode = false;               ///< 取色模式：鼠标读像素而不是拖动
+        QPointF                                              m_pickPoint;                           ///< 取色模式下光标在窗口里的位置，读数框跟它走
+        ScreenEdge                                           m_edgeDock = ScreenEdge::None;         ///< 贴的是哪条屏边；None 表示没贴
+        QRect                                                m_dockArea;                            ///< 贴边那一刻那块屏的可用区，收起与展开都按它算
+        bool                                                 m_dockCollapsed = false;               ///< 贴边后是不是收成了那一条
+        bool                                                 m_dragMoved     = false;               ///< 这一轮按下之后真拖动过没有（只点一下不吸边）
+        class QMovie                                        *m_movie         = nullptr;             ///< 动图播放器；静图这张贴图时为空
+        QString                                              m_sourceFile;                          ///< 动图的来源文件；进布局记录，重启后按它接上动画
+        QPoint                                               m_dragOffset;                          ///< 移动时起笔点与窗口左上角的差
+        std::optional<HandleKind>                            m_draggedHandle;                       ///< 正在拖的手柄，没拖时为空
+        double                                               m_dragInitialScale            = 1.0;   ///< 起拖时的缩放
+        double                                               m_dragInitialDistance         = 0.0;   ///< 起拖时指针到中心的距离
+        bool                                                 m_annotating                  = false; ///< 正在贴图上直接标注
+        double                                               m_rotationBeforeAnnotate      = 0.0;   ///< 进标注前的旋转角，退出时恢复
+        bool                                                 m_dockCollapsedBeforeAnnotate = false; ///< 进标注前的贴边收起态，退出时恢复
+        std::unique_ptr<Annotation::AnnotationEngine>        m_annotateEngine;                      ///< 标注引擎，首次进入标注时创建
+        Annotation::AnnotationView                          *m_annotateView    = nullptr;           ///< 铺在贴图上的标注视图，本窗口的子控件
+        Annotation::AnnotationToolbar                       *m_annotateToolbar = nullptr;           ///< 浮着的标注工具栏
+        std::unique_ptr<Annotation::AnnotationToolbarBridge> m_annotateBridge;                      ///< 工具栏与引擎的接线
+        std::unique_ptr<Ui::IconProvider>                    m_icons;                               ///< 工具栏要的图标供给器，首次进入标注时创建
+        Settings::ISettingsStore                            &m_settings;                            ///< 配置来源（保存目录）
+        const Platform::IPlatformIntegration                &m_integration;                         ///< 平台能力查询
     };
 
 } // namespace GyanisScribe::Pin

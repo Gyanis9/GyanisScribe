@@ -222,6 +222,13 @@ namespace GyanisScribe::App
         QObject::connect(m_pins.get(), &Pin::PinManager::pinOcrRequested, this, &AppController::handleOcrRequested);
         // 贴图上取的色与屏幕取色共用写法和复制那两句：两处各写一份，复制到的文本格式就会分家
         QObject::connect(m_pins.get(), &Pin::PinManager::pinColorPicked, this, &AppController::handlePinColorPicked);
+        // 贴图标注时的「另贴一张」：与回车复制出去的结果一样走 addPin，一处入口管所有新贴图
+        QObject::connect(m_pins.get(), &Pin::PinManager::pinAnotherRequested, this,
+                         [this](const QImage &image, const QPoint &globalTopLeft)
+                         {
+                             // 留底再贴一份：不动原来那张，新的一张摆在它右下一点
+                             m_pins->addPin(image, globalTopLeft);
+                         });
         // 移到别的组那一下它就从桌上消失了：说清它去了哪、怎么切过去，免得像「贴图自己没了」
         QObject::connect(
                 m_pins.get(), &Pin::PinManager::pinMovedToGroup, this,

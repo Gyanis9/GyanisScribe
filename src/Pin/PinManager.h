@@ -12,7 +12,9 @@
 #include "Pin/IPinWindow.h"
 #include "Pin/PinLayout.h"
 
+#include <QImage>
 #include <QObject>
+#include <QPoint>
 #include <QVector>
 
 #include <memory>
@@ -192,6 +194,14 @@ namespace GyanisScribe::Pin
          * @details 与 pinOcrRequested 同一条形状：贴图在外头拿不到，出口不收在这一层就没人能替它复制
          */
         void pinColorPicked(const QColor &color);
+
+        /**
+         * @brief 某张贴图在标注时要求把成品另贴一张
+         * @param image 烘焙好的成品
+         * @param globalTopLeft 新贴图左上角的全局坐标，按源贴图附近算好
+         * @details 与 pinOcrRequested 同一条形状：只有这个出口能让界面层拿到「贴一张新的」这件事
+         */
+        void pinAnotherRequested(const QImage &image, const QPoint &globalTopLeft);
 
     private:
         /// 把某个已自行关闭的窗口从登记里摘掉

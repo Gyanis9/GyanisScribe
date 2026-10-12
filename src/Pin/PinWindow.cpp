@@ -1,5 +1,11 @@
 #include "Pin/PinWindow.h"
 
+#include "Annotation/AnnotationEngine.h"
+#include "Annotation/AnnotationToolbar.h"
+#include "Annotation/AnnotationToolbarBridge.h"
+#include "Annotation/AnnotationToolbarGeometry.h"
+#include "Annotation/AnnotationView.h"
+#include "Annotation/AnnotationWindow.h"
 #include "Core/ImageFormat.h"
 #include "Core/Logger.h"
 #include "Core/Paths.h"
@@ -7,6 +13,8 @@
 #include "Pin/PinLayout.h"
 #include "Pick/ColorFormat.h"
 #include "Ui/DesignTokens.h"
+#include "Ui/IconProvider.h"
+#include "Ui/KeyStep.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/NamingRules.h"
@@ -67,6 +75,9 @@ namespace GyanisScribe::Pin
         constexpr int    kColorReadoutFontPointSize = 8;
         constexpr double kColorReadoutPadding       = 4.0;
         constexpr double kColorReadoutOffset        = 14.0;
+
+        /// 按住 Shift 时标注微调一次挪多少格：与标注窗那一档同值
+        constexpr int kAnnotateCoarseNudgeStride = 10;
 
         /**
          * @brief 取保存贴图与截图的目录：配置里填了就用它，否则用系统图片目录下的那一个
@@ -441,6 +452,296 @@ namespace GyanisScribe::Pin
         return m_movie != nullptr;
     }
 
+    bool PinWindow::isAnnotating() const noexcept
+    {
+        return m_annotating;
+    }
+
+    void PinWindow::startAnnotation()
+    {
+        if (m_annotating)
+        {
+            return;
+        }
+        if (m_movie != nullptr)
+        {
+            // 标注画在一帧上，下一帧就把成品盖掉了：拒绝并说清出路，而不是收下这一轮注定丢掉的改动
+            Core::Logger::info("动图不进直接标注：标注会被下一帧盖掉。请先保存成静态图再贴一张来标");
+            return;
+        }
+
+        // 缩略图态先摆回整张、取色模式先退出：这两种模式下都没有可画的坐标面
+        setThumbnailMode(false);
+        setColorPickMode(false);
+
+        // 旋转过的贴图先转正：标注视图是轴对齐的，斜着的画布铺不平；退出时转回原角度。
+        // 成品记的是图片自己的像素，转回去之后批注自然跟着图一起转
+        m_rotationBeforeAnnotate      = m_rotationDegrees;
+        m_dockCollapsedBeforeAnnotate = m_dockCollapsed;
+        m_dockCollapsed               = false;
+        setRotationDegrees(0.0);
+        applyDockGeometry();
+
+        if (m_annotateEngine == nullptr)
+        {
+            m_annotateEngine = std::make_unique<Annotation::AnnotationEngine>();
+        }
+        Core::CapturedImage canvas;
+        canvas.image            = m_image;
+        canvas.devicePixelRatio = m_image.devicePixelRatio();
+        canvas.logicalSize      = m_logicalSize.toSize();
+        canvas.screenName       = QString();
+        m_annotateEngine->loadCanvas(std::move(canvas));
+
+        if (m_annotateView == nullptr)
+        {
+            m_annotateView = new Annotation::AnnotationView{*m_annotateEngine, this};
+        }
+        // 视图铺满整窗：此时旋转已归零，窗口框就是画布框
+        m_annotateView->setGeometry(contentRect().toRect());
+        m_annotateView->show();
+        m_annotateView->raise();
+
+        if (m_annotateToolbar == nullptr)
+        {
+            if (m_icons == nullptr)
+            {
+                m_icons = std::make_unique<Ui::IconProvider>();
+            }
+            m_annotateToolbar = new Annotation::AnnotationToolbar{m_settings, *m_icons, this};
+            // 与标注窗同一条摆法：工具栏是独立浮窗，摆在贴图旁边
+            m_annotateToolbar->setParent(this, Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
+            m_annotateBridge = std::make_unique<Annotation::AnnotationToolbarBridge>(*m_annotateToolbar, *m_annotateEngine, this);
+
+            // 四个动作按钮都是「收工并做这件事」：与标注窗里「按下即交出去」同一条形状
+            QObject::connect(m_annotateBridge.get(), &Annotation::AnnotationToolbarBridge::copyRequested, this,
+                             [this]
+                             {
+                                 finishAnnotation();
+                                 copyToClipboard();
+                             });
+            QObject::connect(m_annotateBridge.get(), &Annotation::AnnotationToolbarBridge::saveRequested, this,
+                             [this]
+                             {
+                                 finishAnnotation();
+                                 if (const auto saved = saveWithDefaultName(); !saved)
+                                 {
+                                     Core::Logger::error(saved.error().message);
+                                 }
+                             });
+            QObject::connect(m_annotateBridge.get(), &Annotation::AnnotationToolbarBridge::pinRequested, this,
+                             [this]
+                             {
+                                 finishAnnotation();
+                                 emit pinAnotherRequested(m_image);
+                             });
+            QObject::connect(m_annotateBridge.get(), &Annotation::AnnotationToolbarBridge::ocrRequested, this,
+                             [this]
+                             {
+                                 finishAnnotation();
+                                 emit ocrRequested(m_image);
+                             });
+        }
+
+        m_annotateToolbar->adjustSize();
+        const auto *screen    = QGuiApplication::screenAt(globalRect().center());
+        const auto  available = screen != nullptr ? screen->availableGeometry() : QRect{};
+        if (const auto placed = Annotation::placeToolbar(available, m_annotateToolbar->sizeHint(), globalRect()); placed)
+        {
+            m_annotateToolbar->setGeometry(placed->frame);
+        } else
+        {
+            // 与标注窗同一条兜底：摆不出来时别让工具栏消失
+            Core::Logger::warning(std::format("标注工具栏摆放失败，改用贴图下沿兜底：{}", placed.error().message));
+            m_annotateToolbar->move(globalRect().left(), globalRect().bottom() + 1);
+        }
+        m_annotateToolbar->show();
+        m_annotateToolbar->raise();
+
+        m_annotating = true;
+        update();
+        Core::Logger::info(std::format("贴图进入直接标注：{}×{} 逻辑像素", m_logicalSize.width(), m_logicalSize.height()));
+    }
+
+    void PinWindow::finishAnnotation()
+    {
+        if (!m_annotating)
+        {
+            return;
+        }
+        m_annotating = false;
+
+        // 收工即烘焙：成品走引擎的导出（与标注窗保存同一条路），画布尺寸不变、逻辑尺寸照旧
+        if (m_annotateEngine != nullptr)
+        {
+            const QImage baked = m_annotateEngine->exportImage();
+            if (!baked.isNull())
+            {
+                m_image = baked;
+            }
+        }
+        if (m_annotateView != nullptr)
+        {
+            m_annotateView->hide();
+        }
+        if (m_annotateToolbar != nullptr)
+        {
+            m_annotateToolbar->hide();
+        }
+
+        // 恢复进标注前的那一档：旋转角与贴边收起态
+        m_dockCollapsed = m_dockCollapsedBeforeAnnotate;
+        setRotationDegrees(m_rotationBeforeAnnotate);
+        applyDockGeometry();
+        update();
+    }
+
+    void PinWindow::routeAnnotationKey(QKeyEvent *event)
+    {
+        // 序号工具在用时的 `+`/`-`/`0`：与标注窗同一口径（改的是「下一个号」，不动画布）
+        if (m_annotateEngine->activeTool() == Annotation::ToolKind::Number && event->modifiers() == Qt::NoModifier)
+        {
+            switch (event->key())
+            {
+                case Qt::Key_Plus:
+                case Qt::Key_Equal:
+                    if (const auto changed = m_annotateEngine->setNextNumber(m_annotateEngine->nextNumber() + 1); !changed)
+                    {
+                        Core::Logger::warning(std::format("改下一个序号没成：{}", changed.error().message));
+                    }
+                    return;
+                case Qt::Key_Minus:
+                    if (const auto changed = m_annotateEngine->setNextNumber(m_annotateEngine->nextNumber() - 1); !changed)
+                    {
+                        Core::Logger::warning(std::format("改下一个序号没成：{}", changed.error().message));
+                    }
+                    return;
+                case Qt::Key_0:
+                    m_annotateEngine->resetNumbering();
+                    return;
+                default:
+                    break;
+            }
+        }
+
+        const auto action = Annotation::shortcutActionFor(event->key(), event->modifiers());
+        switch (action)
+        {
+            case Annotation::ShortcutAction::None:
+                break; // 还可能是字母工具键，落到下面那张表
+            case Annotation::ShortcutAction::Close:
+                // Esc 在这里是收工保留：贴图本来就存在，丢弃它不是一个可用的选择
+                finishAnnotation();
+                return;
+            case Annotation::ShortcutAction::Undo:
+                if (auto undone = m_annotateEngine->undo(); !undone)
+                {
+                    Core::Logger::info(std::format("撤销没做成：{}", undone.error().message));
+                }
+                return;
+            case Annotation::ShortcutAction::Redo:
+                if (auto redone = m_annotateEngine->redo(); !redone)
+                {
+                    Core::Logger::info(std::format("重做没做成：{}", redone.error().message));
+                }
+                return;
+            case Annotation::ShortcutAction::NudgeSelection:
+            {
+                const auto step = Ui::arrowStepFor(event->key());
+                if (!step)
+                {
+                    return;
+                }
+                const auto stride = event->modifiers().testFlag(Qt::ShiftModifier) ? kAnnotateCoarseNudgeStride : 1;
+                if (auto moved = m_annotateEngine->moveSelectionBy(*step * stride); !moved)
+                {
+                    Core::Logger::info(std::format("微调没做成：{}", moved.error().message));
+                }
+                return;
+            }
+            case Annotation::ShortcutAction::DeleteSelection:
+                if (auto removed = m_annotateEngine->removeSelection(); !removed)
+                {
+                    Core::Logger::info(std::format("删除没做成：{}", removed.error().message));
+                }
+                return;
+            case Annotation::ShortcutAction::CopyShape:
+                if (m_annotateEngine->selections().empty())
+                {
+                    finishAnnotation();
+                    copyToClipboard();
+                    return;
+                }
+                if (auto copied = m_annotateEngine->copySelection(); !copied)
+                {
+                    Core::Logger::info(std::format("复制没做成：{}", copied.error().message));
+                }
+                return;
+            case Annotation::ShortcutAction::PasteShape:
+                if (auto pasted = m_annotateEngine->pasteClipboard(); !pasted)
+                {
+                    Core::Logger::info(std::format("粘贴没做成：{}", pasted.error().message));
+                }
+                return;
+            case Annotation::ShortcutAction::RaiseSelection:
+                if (auto raised = m_annotateEngine->raiseSelection(); !raised)
+                {
+                    Core::Logger::info(std::format("上移一层没做成：{}", raised.error().message));
+                }
+                return;
+            case Annotation::ShortcutAction::LowerSelection:
+                if (auto lowered = m_annotateEngine->lowerSelection(); !lowered)
+                {
+                    Core::Logger::info(std::format("下移一层没做成：{}", lowered.error().message));
+                }
+                return;
+            case Annotation::ShortcutAction::BringToFront:
+                if (auto fronted = m_annotateEngine->bringSelectionToFront(); !fronted)
+                {
+                    Core::Logger::info(std::format("置顶没做成：{}", fronted.error().message));
+                }
+                return;
+            case Annotation::ShortcutAction::SendToBack:
+                if (auto backed = m_annotateEngine->sendSelectionToBack(); !backed)
+                {
+                    Core::Logger::info(std::format("置底没做成：{}", backed.error().message));
+                }
+                return;
+            case Annotation::ShortcutAction::Copy:
+                // 与标注窗一致：回车=复制成品并收工；工具栏那个按钮走桥的 copyRequested，同一形状
+                finishAnnotation();
+                copyToClipboard();
+                return;
+            case Annotation::ShortcutAction::Save:
+                finishAnnotation();
+                if (const auto saved = saveWithDefaultName(); !saved)
+                {
+                    Core::Logger::error(saved.error().message);
+                }
+                return;
+            case Annotation::ShortcutAction::Pin:
+                finishAnnotation();
+                emit pinAnotherRequested(m_image);
+                return;
+            case Annotation::ShortcutAction::Ocr:
+                finishAnnotation();
+                emit ocrRequested(m_image);
+                return;
+        }
+
+        // 裸字母切工具：与标注窗共用 kToolTable 的键位列，切完回灌按钮态
+        if (const auto tool = Annotation::toolShortcutFor(event->key(), event->modifiers()); tool)
+        {
+            if (auto switched = m_annotateEngine->setActiveTool(*tool); switched)
+            {
+                m_annotateToolbar->setActiveTool(*tool);
+            } else
+            {
+                Core::Logger::info(std::format("工具没换成：{}", switched.error().message));
+            }
+        }
+    }
+
     void PinWindow::setColorPickMode(const bool enabled)
     {
         if (m_colorPickMode == enabled)
@@ -636,6 +937,12 @@ namespace GyanisScribe::Pin
             return;
         }
 
+        // 标注模式：鼠标归标注视图（它铺满整窗收事件），窗口这一层什么都不做
+        if (m_annotating)
+        {
+            return;
+        }
+
         // 取色模式：点一下就把那一像素的颜色交出去，点完自己退出——与屏幕取色那边「点一下拿一个色」同一口径
         if (m_colorPickMode)
         {
@@ -669,6 +976,11 @@ namespace GyanisScribe::Pin
 
     void PinWindow::mouseMoveEvent(QMouseEvent *event)
     {
+        if (m_annotating)
+        {
+            return;
+        }
+
         // 取色模式：鼠标只读像素，不拖窗也不缩图——读数框跟着光标走
         if (m_colorPickMode)
         {
@@ -695,6 +1007,10 @@ namespace GyanisScribe::Pin
     void PinWindow::mouseReleaseEvent(QMouseEvent *event)
     {
         Q_UNUSED(event);
+        if (m_annotating)
+        {
+            return;
+        }
         if (m_draggedHandle)
         {
             m_draggedHandle.reset();
@@ -746,8 +1062,9 @@ namespace GyanisScribe::Pin
     void PinWindow::leaveEvent(QEvent *event)
     {
         QWidget::leaveEvent(event);
-        // 指针走了就收回去：贴边这一档本来就是「别占着地方」
-        if (m_edgeDock != ScreenEdge::None && !m_dockCollapsed)
+        // 指针走了就收回去：贴边这一档本来就是「别占着地方」；标注中不收——
+        // 光标去点工具栏就是一次离开窗口，把贴图收走等于把正在画的这张纸抽掉
+        if (m_edgeDock != ScreenEdge::None && !m_dockCollapsed && !m_annotating)
         {
             m_dockCollapsed = true;
             applyDockGeometry();
@@ -766,6 +1083,11 @@ namespace GyanisScribe::Pin
     void PinWindow::hideEvent(QHideEvent *event)
     {
         QWidget::hideEvent(event);
+        // 收起或关闭发生在标注中途时先收工：已经画上的东西烘进图里，不留一个悬着的会话
+        if (m_annotating)
+        {
+            finishAnnotation();
+        }
         // 停而不是暂停：藏起来的贴图再过一会儿多半也不会被看到，让它一直记着帧反而是白烧 CPU
         if (m_movie != nullptr)
         {
@@ -775,6 +1097,12 @@ namespace GyanisScribe::Pin
 
     void PinWindow::wheelEvent(QWheelEvent *event)
     {
+        // 标注模式：滚轮不缩不转——那两种手势会把视图铺着的坐标面改掉
+        if (m_annotating)
+        {
+            return;
+        }
+
         const auto steps = event->angleDelta().y() / 120.0; // 一格 120 度，允许半格（精密滚轮）
         if (steps == 0.0)
         {
@@ -798,6 +1126,14 @@ namespace GyanisScribe::Pin
 
     void PinWindow::keyPressEvent(QKeyEvent *event)
     {
+        // 标注模式：键盘归标注那一套（与标注窗同一张表）；路由之后一律吞掉，
+        // 不能漏到下面的贴图键上——按 T 把正在标的图缩成小方块不是任何人想要的
+        if (m_annotating)
+        {
+            routeAnnotationKey(event);
+            return;
+        }
+
         if (event->key() == Qt::Key_Escape)
         {
             // 取色模式里 Esc 先退出取色：用户想反悔的那一下多半是「不取了」，
@@ -841,6 +1177,12 @@ namespace GyanisScribe::Pin
         if (event->button() != Qt::LeftButton)
         {
             QWidget::mouseDoubleClickEvent(event);
+            return;
+        }
+
+        // 标注模式：双击归标注视图（重编文字那一路），窗口这一层不抢
+        if (m_annotating)
+        {
             return;
         }
 
@@ -889,6 +1231,15 @@ namespace GyanisScribe::Pin
                         });
 
         menu->addAction(GyanisScribe::Core::uiText("识别文字"), this, [this] { emit ocrRequested(m_image); });
+
+        // 标注：在贴图上直接标注。动图不进这一档（标注会被下一帧盖掉），灰掉并写明出路，
+        // 不把「点了没反应」留给用户猜
+        auto *annotateAction = menu->addAction(GyanisScribe::Core::uiText("标注"), this, [this] { startAnnotation(); });
+        if (isAnimated())
+        {
+            annotateAction->setEnabled(false);
+            annotateAction->setToolTip(GyanisScribe::Core::uiText("动图不能直接标注：标注会被下一帧盖掉。请先保存成静态图，再把那张贴出来标注"));
+        }
 
         // 取色：进模式之后鼠标只读像素，点一下把那一格的颜色交出去（见 mousePressEvent）
         auto *pickAction = menu->addAction(GyanisScribe::Core::uiText("取色"), this, [this] { setColorPickMode(!m_colorPickMode); });
@@ -953,6 +1304,12 @@ namespace GyanisScribe::Pin
 
     void PinWindow::contextMenuEvent(QContextMenuEvent *event)
     {
+        // 标注模式：右键不出菜单——退出标注走 Esc，菜单里的动作会与正在画的这一张打架
+        if (m_annotating)
+        {
+            return;
+        }
+
         QMenu *menu = buildContextMenu();
         menu->exec(event->globalPos());
         delete menu;

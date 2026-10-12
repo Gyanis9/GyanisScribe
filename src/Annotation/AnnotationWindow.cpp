@@ -118,139 +118,21 @@ namespace GyanisScribe::Annotation
         // 工具栏是自己的一层浮窗：它要摆在窗口外面，所以不能进上面的布局
         m_toolbar->setParent(this, Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
 
-        // 起点参数整套照工具栏的初值抄一遍：十二处必须与工具栏同解，否则开窗第一笔的样式与按钮显示的不一致
-        m_penParameters = PenParameters{.color           = m_toolbar->currentColor(),
-                                        .lineWidth       = m_toolbar->currentWidth(),
-                                        .fontSize        = m_toolbar->currentFontSize(),
-                                        .fillStyle       = m_toolbar->currentFillStyle(),
-                                        .doubleHeaded    = m_toolbar->currentDoubleHeaded(),
-                                        .mosaicBlockSize = m_toolbar->currentMosaicBlockSize(),
-                                        .highlightAlpha  = m_toolbar->currentHighlightAlpha(),
-                                        .fontFamily      = m_toolbar->currentFontFamily(),
-                                        .textBold        = m_toolbar->currentTextBold(),
-                                        .textItalic      = m_toolbar->currentTextItalic(),
-                                        .textOutline     = m_toolbar->currentTextOutline(),
-                                        .textBackground  = m_toolbar->currentTextBackground()};
+        // 工具栏与引擎的接线全在桥里：十三项样式参数、工具切换、撤销重做与按钮态回灌一处接齐。
+        // 贴图上直接标注那一处共用同一个桥，将来加新参数不会出现「这边接了那边漏了」
+        m_toolbarBridge = std::make_unique<AnnotationToolbarBridge>(*m_toolbar, engine, this);
 
-        QObject::connect(m_toolbar.get(), &AnnotationToolbar::toolChanged, this,
-                         [this](ToolKind kind)
-                         {
-                             if (auto switched = m_engine.setActiveTool(kind); !switched)
-                             {
-                                 Core::Logger::warning(std::format("切工具没成：{}", switched.error().message));
-                             }
-                         });
-        QObject::connect(m_toolbar.get(), &AnnotationToolbar::colorChanged, this,
-                         [this](const QColor &color)
-                         {
-                             m_penParameters.color = color;
-                             applyPenParameters();
-                         });
-        QObject::connect(m_toolbar.get(), &AnnotationToolbar::widthChanged, this,
-                         [this](int width)
-                         {
-                             m_penParameters.lineWidth = width;
-                             applyPenParameters();
-                         });
-        QObject::connect(m_toolbar.get(), &AnnotationToolbar::fontSizeChanged, this,
-                         [this](int size)
-                         {
-                             m_penParameters.fontSize = size;
-                             applyPenParameters();
-                         });
-        QObject::connect(m_toolbar.get(), &AnnotationToolbar::fillStyleChanged, this,
-                         [this](int style)
-                         {
-                             m_penParameters.fillStyle = style;
-                             applyPenParameters();
-                         });
-        QObject::connect(m_toolbar.get(), &AnnotationToolbar::doubleHeadedChanged, this,
-                         [this](bool enabled)
-                         {
-                             m_penParameters.doubleHeaded = enabled;
-                             applyPenParameters();
-                         });
-        QObject::connect(m_toolbar.get(), &AnnotationToolbar::mosaicBlockSizeChanged, this,
-                         [this](int blockSize)
-                         {
-                             m_penParameters.mosaicBlockSize = blockSize;
-                             applyPenParameters();
-                         });
-        QObject::connect(m_toolbar.get(), &AnnotationToolbar::highlightAlphaChanged, this,
-                         [this](int alpha)
-                         {
-                             m_penParameters.highlightAlpha = alpha;
-                             applyPenParameters();
-                         });
-        QObject::connect(m_toolbar.get(), &AnnotationToolbar::fontFamilyChanged, this,
-                         [this](const QString &family)
-                         {
-                             m_penParameters.fontFamily = family;
-                             applyPenParameters();
-                         });
-        QObject::connect(m_toolbar.get(), &AnnotationToolbar::textBoldChanged, this,
-                         [this](bool enabled)
-                         {
-                             m_penParameters.textBold = enabled;
-                             applyPenParameters();
-                         });
-        QObject::connect(m_toolbar.get(), &AnnotationToolbar::textItalicChanged, this,
-                         [this](bool enabled)
-                         {
-                             m_penParameters.textItalic = enabled;
-                             applyPenParameters();
-                         });
-        QObject::connect(m_toolbar.get(), &AnnotationToolbar::textOutlineChanged, this,
-                         [this](bool enabled)
-                         {
-                             m_penParameters.textOutline = enabled;
-                             applyPenParameters();
-                         });
-        QObject::connect(m_toolbar.get(), &AnnotationToolbar::textBackgroundChanged, this,
-                         [this](bool enabled)
-                         {
-                             m_penParameters.textBackground = enabled;
-                             applyPenParameters();
-                         });
-
-        QObject::connect(m_toolbar.get(), &AnnotationToolbar::undoClicked, this,
-                         [this]
-                         {
-                             if (auto undone = m_engine.undo(); !undone)
-                             {
-                                 Core::Logger::info(std::format("撤销没做成：{}", undone.error().message));
-                             }
-                         });
-        QObject::connect(m_toolbar.get(), &AnnotationToolbar::redoClicked, this,
-                         [this]
-                         {
-                             if (auto redone = m_engine.redo(); !redone)
-                             {
-                                 Core::Logger::info(std::format("重做没做成：{}", redone.error().message));
-                             }
-                         });
-        QObject::connect(m_toolbar.get(), &AnnotationToolbar::copyClicked, this, [this] { deliver(ShortcutAction::Copy); });
-        QObject::connect(m_toolbar.get(), &AnnotationToolbar::saveClicked, this, [this] { deliver(ShortcutAction::Save); });
-        QObject::connect(m_toolbar.get(), &AnnotationToolbar::pinClicked, this, [this] { deliver(ShortcutAction::Pin); });
-        QObject::connect(m_toolbar.get(), &AnnotationToolbar::ocrClicked, this, [this] { deliver(ShortcutAction::Ocr); });
-
-        // 引擎的栈深变了就刷按钮：让用户看见「还能不能撤」而不是点了才知道没得撤
-        QObject::connect(&engine, &IAnnotationEngine::canvasChanged, this,
-                         [this]
-                         {
-                             m_toolbar->setUndoRedoAvailable(m_engine.canUndo(), m_engine.canRedo());
-                             // 工具与引擎同步：快捷键也能切工具，切完要把按钮态回灌，别让按钮亮着错的
-                             m_toolbar->setActiveTool(m_engine.activeTool());
-                         });
-
-        applyPenParameters();
+        // 四个动作按钮与快捷键汇到同一个出口：谁按的都走 deliver，界面不需要知道来源
+        QObject::connect(m_toolbarBridge.get(), &AnnotationToolbarBridge::copyRequested, this, [this] { deliver(ShortcutAction::Copy); });
+        QObject::connect(m_toolbarBridge.get(), &AnnotationToolbarBridge::saveRequested, this, [this] { deliver(ShortcutAction::Save); });
+        QObject::connect(m_toolbarBridge.get(), &AnnotationToolbarBridge::pinRequested, this, [this] { deliver(ShortcutAction::Pin); });
+        QObject::connect(m_toolbarBridge.get(), &AnnotationToolbarBridge::ocrRequested, this, [this] { deliver(ShortcutAction::Ocr); });
     }
 
     void AnnotationWindow::startAnnotation(const Core::CapturedImage &captured, const QRect &screenAvailable, const QRect &selection)
     {
+        // 载入会发 canvasChanged，桥在那里把按钮态与当前工具一起回灌，这里不用再同步一次
         m_engine.loadCanvas(captured);
-        m_toolbar->setUndoRedoAvailable(m_engine.canUndo(), m_engine.canRedo());
-        m_toolbar->setActiveTool(m_engine.activeTool());
 
         // 窗口正好盖住截到的那一块：用户看到的画面与之后的成品逐像素对齐
         resize(captured.logicalSize);
@@ -439,14 +321,6 @@ namespace GyanisScribe::Annotation
                 break;
             default:
                 return;
-        }
-    }
-
-    void AnnotationWindow::applyPenParameters()
-    {
-        if (auto applied = m_engine.setPenParameters(m_penParameters); !applied)
-        {
-            Core::Logger::warning(std::format("画笔参数没下发：{}", applied.error().message));
         }
     }
 

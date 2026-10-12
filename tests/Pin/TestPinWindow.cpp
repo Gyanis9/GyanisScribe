@@ -4,6 +4,8 @@
 
 #include "Pin/PinWindow.h"
 
+#include "Annotation/AnnotationView.h"
+
 #include "PinTestAssets.h"
 
 #include "Core/Paths.h"
@@ -28,6 +30,7 @@
 #include <QMouseEvent>
 #include <QPoint>
 #include <QSize>
+#include <QWheelEvent>
 
 #include <array>
 #include <filesystem>
@@ -35,6 +38,7 @@
 #include <format>
 #include <fstream>
 #include <memory>
+#include <optional>
 #include <vector>
 
 // 整份用例 nest 进工程命名空间：匿名命名空间在外面时 `Core::Expected` 这类写法认不到名字
@@ -621,6 +625,216 @@ namespace GyanisScribe
         other.setAnimatedSource(QString::fromStdString(staticPath.string()));
         EXPECT_FALSE(other.isAnimated()) << "单帧图也被当成动图了";
         EXPECT_TRUE(other.state().sourceFile.isEmpty()) << "静图不该在布局里记一个动图来源";
+    }
+
+    namespace
+    {
+        /// 在贴图窗的右键菜单里找一枚动作：找不到返回空
+        [[nodiscard]] QAction *findMenuAction(QMenu &menu, const QString &text)
+        {
+            for (auto *action: menu.actions())
+            {
+                if (action->text() == text)
+                {
+                    return action;
+                }
+            }
+            return nullptr;
+        }
+
+        /// 往标注视图上投一次拖拽（按下—行进—抬起）：坐标是控件坐标，1:1 的贴图上与画布坐标相等
+        void dragOnView(QWidget &view, const QPoint &from, const QPoint &mid, const QPoint &to)
+        {
+            for (const auto &[type, position]: {std::pair{QEvent::MouseButtonPress, from}, std::pair{QEvent::MouseMove, mid}, std::pair{QEvent::MouseButtonRelease, to}})
+            {
+                QMouseEvent event{type, QPointF{position}, QPointF{position}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+                QApplication::sendEvent(&view, &event);
+            }
+        }
+    } // namespace
+
+    /**
+     * @brief 钉住右键菜单里的「标注」：静图可点，点了就把标注视图铺到贴图上
+     * @details 判据分两层：菜单里真的有这一项（发现性），点了之后整窗被标注视图盖住（接线）。
+     */
+    TEST_F(PinWindowFixture, MenuOffersDirectAnnotationAndItOpensTheView)
+    {
+        auto &window = makeWindow();
+
+        QMenu *menu     = window.buildContextMenu();
+        auto  *annotate = findMenuAction(*menu, QString::fromUtf8("标注"));
+        ASSERT_NE(annotate, nullptr) << "右键菜单里没有「标注」这一项";
+        EXPECT_TRUE(annotate->isEnabled()) << "静图的「标注」该是可点的";
+        annotate->trigger();
+        delete menu;
+
+        EXPECT_TRUE(window.isAnnotating()) << "点了「标注」没进标注模式";
+        auto *view = window.findChild<Annotation::AnnotationView *>();
+        ASSERT_NE(view, nullptr) << "标注视图没挂到贴图窗上";
+        EXPECT_EQ(view->geometry(), window.rect()) << "标注视图该铺满整窗";
+    }
+
+    /**
+     * @brief 钉住直接标注的核心语义：画到收工才烘，Esc 是「收工保留」而不是「丢弃并关闭」
+     * @details 贴图本来就存在，标注只是给它添一笔；Esc 若走关闭那一路，用户丢的是整张贴图。
+     *          判据取「收工前后贴图手里那张图」：没收工不带笔迹，收工之后笔迹在、内里仍是底图。
+     */
+    TEST_F(PinWindowFixture, AnnotationPaintsAndBakesOnEscapeWithoutClosingThePin)
+    {
+        auto &window = makeWindow();
+        auto  closed = false;
+        QObject::connect(&window, &Pin::PinWindow::closedByUser, [&closed] { closed = true; });
+
+        window.startAnnotation();
+        auto *view = window.findChild<Annotation::AnnotationView *>();
+        ASSERT_NE(view, nullptr) << "标注视图没挂上";
+        ASSERT_TRUE(window.isAnnotating());
+
+        dragOnView(*view, QPoint{5, 5}, QPoint{17, 17}, QPoint{30, 30});
+
+        // 还没收工：贴图手里那份图不该带上笔迹（画布上的图形还归引擎的撤销栈管）
+        window.copyToClipboard();
+        EXPECT_EQ(QGuiApplication::clipboard()->image().pixelColor(5, 20), QColor(200, 60, 60)) << "没收工就把笔迹烘进了贴图";
+
+        pressKey(window, Qt::Key_Escape);
+        EXPECT_FALSE(window.isAnnotating()) << "Esc 没退出标注模式";
+        EXPECT_FALSE(closed) << "标注里的 Esc 把贴图关掉了：那一击该是「收工」而不是「丢弃」";
+
+        window.copyToClipboard();
+        const auto baked = QGuiApplication::clipboard()->image();
+        EXPECT_NE(baked.pixelColor(5, 20), QColor(200, 60, 60)) << "收工没把笔迹烘进贴图";
+        EXPECT_EQ(baked.pixelColor(17, 17), QColor(200, 60, 60)) << "空心矩形的内里不该有笔迹";
+
+        // 收工之后的 Esc 才回到贴图自己的含义：关掉这张
+        pressKey(window, Qt::Key_Escape);
+        EXPECT_TRUE(closed) << "收工后 Esc 该照旧关闭贴图";
+    }
+
+    /**
+     * @brief 钉住进入标注先把贴图转正、收工转回原角度
+     * @details 标注视图是轴对齐的，斜着的画布铺不平；成品记的是图片自己的像素，
+     *          转回去之后批注自然跟着图一起转。两段各判一次，漏任一段都会让用户看到一张歪回去的图。
+     */
+    TEST_F(PinWindowFixture, AnnotationRestoresRotationAfterFinishing)
+    {
+        auto &window = makeWindow();
+        window.setRotationDegrees(90.0);
+        ASSERT_TRUE(nearEqual(window.rotationDegrees(), 90.0, kDegreesTolerance));
+
+        window.startAnnotation();
+        EXPECT_TRUE(nearEqual(window.rotationDegrees(), 0.0, kDegreesTolerance)) << "进标注没把画布转正";
+
+        window.finishAnnotation();
+        EXPECT_FALSE(window.isAnnotating());
+        EXPECT_TRUE(nearEqual(window.rotationDegrees(), 90.0, kDegreesTolerance)) << "收工没把旋转转回去";
+    }
+
+    /**
+     * @brief 钉住标注模式吞键：贴图自己的 T/R/0 不许在标注中生效，收工之后照旧
+     * @details 按 T 把正在标的图缩成小方块、按 R 把画布转走，都是「键盘漏到了另一套语义」的形状。
+     */
+    TEST_F(PinWindowFixture, AnnotationKeysDoNotLeakToThePin)
+    {
+        auto &window = makeWindow();
+        window.startAnnotation();
+
+        pressKey(window, Qt::Key_T);
+        EXPECT_FALSE(window.isThumbnailMode()) << "按 T 把正在标的贴图缩成了小方块";
+        pressKey(window, Qt::Key_R);
+        EXPECT_TRUE(nearEqual(window.rotationDegrees(), 0.0, kDegreesTolerance)) << "按 R 动的是贴图角度，标注中该归工具键";
+        pressKey(window, Qt::Key_0);
+        EXPECT_TRUE(nearEqual(window.scale(), 1.0, kScaleTolerance)) << "按 0 在标注中不该动缩放";
+
+        window.finishAnnotation();
+        pressKey(window, Qt::Key_T);
+        EXPECT_TRUE(window.isThumbnailMode()) << "收工之后 T 该还是缩略图开关";
+    }
+
+    /**
+     * @brief 钉住标注中滚轮不缩不转：收工之后恢复
+     * @details 滚轮缩一下会把标注视图铺着的坐标面改掉，画上去的点就与像素对不上。
+     */
+    TEST_F(PinWindowFixture, WheelAndDragAreInertWhileAnnotating)
+    {
+        auto &window = makeWindow();
+        window.startAnnotation();
+
+        QWheelEvent zoomIn{QPointF{20.0, 20.0}, QPointF{20.0, 20.0}, QPoint{}, QPoint{0, 120}, Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false};
+        QApplication::sendEvent(&window, &zoomIn);
+        EXPECT_TRUE(nearEqual(window.scale(), 1.0, kScaleTolerance)) << "标注中滚轮把贴图缩了";
+
+        // 拖窗也不该动：鼠标归标注视图，窗口这一层要按住不动
+        const auto  before = window.pos();
+        QMouseEvent press{QEvent::MouseButtonPress, QPointF{20.0, 20.0}, QPointF{20.0, 20.0}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &press);
+        EXPECT_EQ(window.pos(), before) << "标注中按下把贴图挪走了";
+
+        window.finishAnnotation();
+        QApplication::sendEvent(&window, &zoomIn);
+        EXPECT_FALSE(nearEqual(window.scale(), 1.0, kScaleTolerance)) << "收工之后滚轮缩放该恢复";
+    }
+
+    /**
+     * @brief 钉住动图不进直接标注：菜单灰掉并写明出路，绕过菜单直接开也不进
+     * @details 标注画在一帧上，下一帧就把它盖掉了；收下这一轮改动等于收下一场注定丢掉的编辑。
+     */
+    TEST_F(PinWindowFixture, AnimatedPinsDoNotOfferDirectAnnotation)
+    {
+        const auto gifPath = PinTestAssets::writeTwoFrameGif(std::filesystem::temp_directory_path() / "GyanisScribe-PinAnnotate-anim.gif");
+        ASSERT_FALSE(gifPath.isEmpty()) << "素材没落到临时文件上";
+
+        auto &window = makeWindow();
+        window.setAnimatedSource(gifPath);
+        ASSERT_TRUE(window.isAnimated());
+
+        QMenu *menu     = window.buildContextMenu();
+        auto  *annotate = findMenuAction(*menu, QString::fromUtf8("标注"));
+        ASSERT_NE(annotate, nullptr);
+        EXPECT_FALSE(annotate->isEnabled()) << "动图的「标注」该灰掉：标注会被下一帧盖掉";
+        EXPECT_FALSE(annotate->toolTip().isEmpty()) << "灰掉也要写明出路，不把「点了没反应」留给人猜";
+        delete menu;
+
+        window.startAnnotation();
+        EXPECT_FALSE(window.isAnnotating()) << "绕过菜单直接开也进了标注：动图进标注是注定的数据丢失";
+    }
+
+    /**
+     * @brief 钉住标注里的「贴到屏幕上」＝把成品另贴一张：发信号、收工、不动这一张
+     */
+    TEST_F(PinWindowFixture, AnnotationPinAnotherRequestsANewPin)
+    {
+        auto                 &window = makeWindow();
+        std::optional<QImage> another;
+        QObject::connect(&window, &Pin::PinWindow::pinAnotherRequested, [&another](const QImage &image) { another = image; });
+
+        window.startAnnotation();
+        pressKey(window, Qt::Key_D, Qt::ControlModifier);
+
+        ASSERT_TRUE(another.has_value()) << "Ctrl+D 没发出「另贴一张」的请求";
+        EXPECT_FALSE(window.isAnnotating()) << "「另贴一张」之后该收工";
+        EXPECT_EQ(another->size(), makeImage().size()) << "交出去的该是这张贴图的成品尺寸";
+    }
+
+    /**
+     * @brief 钉住标注中的字母工具键：切到画笔再画，图形按新工具落笔
+     * @details 画一条斜线：画笔下 (16,14) 在中途、(24,8) 离笔迹远；若工具没切（还是矩形），
+     *          外接框的上边会把 (24,8) 也画上——两处探针一起判「换的是画笔还是矩形」。
+     */
+    TEST_F(PinWindowFixture, AnnotationToolKeySwitchesTheDrawingTool)
+    {
+        auto &window = makeWindow();
+        window.startAnnotation();
+        auto *view = window.findChild<Annotation::AnnotationView *>();
+        ASSERT_NE(view, nullptr);
+
+        pressKey(window, Qt::Key_P);
+        dragOnView(*view, QPoint{8, 8}, QPoint{16, 14}, QPoint{24, 20});
+        window.finishAnnotation();
+
+        window.copyToClipboard();
+        const auto baked = QGuiApplication::clipboard()->image();
+        EXPECT_NE(baked.pixelColor(16, 14), QColor(200, 60, 60)) << "画笔的笔迹没落上";
+        EXPECT_EQ(baked.pixelColor(24, 8), QColor(200, 60, 60)) << "(24,8) 被画上了：工具没切成画笔，落的是矩形";
     }
 
 } // namespace GyanisScribe

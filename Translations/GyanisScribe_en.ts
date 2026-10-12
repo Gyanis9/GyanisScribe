@@ -1772,6 +1772,10 @@
             <translation>Show in folder</translation>
         </message>
         <message>
+            <source>动图不能直接标注：标注会被下一帧盖掉。请先保存成静态图，再把那张贴出来标注</source>
+            <translation>An animated pin cannot be annotated directly: the next frame would cover the edits. Save it as a static image first, then pin that and annotate it</translation>
+        </message>
+        <message>
             <source>取色</source>
             <translation>Pick color</translation>
         </message>

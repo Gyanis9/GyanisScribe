@@ -9,9 +9,9 @@
 
 #pragma once
 
+#include "Annotation/AnnotationToolbarBridge.h"
 #include "Annotation/AnnotationToolbar.h"
 #include "Annotation/AnnotationView.h"
-#include "Annotation/PenParameters.h"
 
 #include <QWidget>
 
@@ -140,13 +140,10 @@ namespace GyanisScribe::Annotation
         /// 把标注结果交出去：先收窗口与工具栏，再发对应信号，避免成品图里带上界面
         void deliver(ShortcutAction action);
 
-        /// 把当前画笔参数下发给引擎
-        void applyPenParameters();
-
-        IAnnotationEngine                 &m_engine;         ///< 标注引擎，不拥有
-        std::unique_ptr<AnnotationToolbar> m_toolbar;        ///< 浮层工具栏，本窗口拥有
-        AnnotationView                    *m_view = nullptr; ///< 画布视图，父对象是本窗口
-        PenParameters                      m_penParameters;  ///< 画笔参数整套：工具栏下发的都先汇到这里再给引擎
+        IAnnotationEngine                       &m_engine;         ///< 标注引擎，不拥有
+        std::unique_ptr<AnnotationToolbar>       m_toolbar;        ///< 浮层工具栏，本窗口拥有
+        std::unique_ptr<AnnotationToolbarBridge> m_toolbarBridge;  ///< 工具栏与引擎的接线：样式、工具、撤销重做都在桥里
+        AnnotationView                          *m_view = nullptr; ///< 画布视图，父对象是本窗口
     };
 
 } // namespace GyanisScribe::Annotation

@@ -27,6 +27,9 @@ namespace
     {
         return QStringLiteral("pin-%1.png").arg(index);
     }
+
+    /// 「另贴一张」的落点相对源贴图左上角的偏移，逻辑像素：完全叠住会让人以为没贴出来
+    constexpr int kPinAgainOffset = 24;
 } // namespace
 
 namespace GyanisScribe::Pin
@@ -55,6 +58,13 @@ namespace GyanisScribe::Pin
         QObject::connect(raw, &PinWindow::ocrRequested, this, &PinManager::pinOcrRequested);
         // 取色同理：窗口只管「点到了哪一格」，复制到剪贴板与提示都是界面层的事
         QObject::connect(raw, &PinWindow::colorPicked, this, &PinManager::pinColorPicked);
+        // 「另贴一张」也走这一层：新贴图摆在哪是管理器的账，窗口不该自己算第二个出口
+        QObject::connect(raw, &PinWindow::pinAnotherRequested, this,
+                         [this, raw](const QImage &image)
+                         {
+                             const auto at = raw->globalRect().topLeft() + QPoint{kPinAgainOffset, kPinAgainOffset};
+                             emit       pinAnotherRequested(image, at);
+                         });
         // 分组改动只接意图、由管理器落账：哪张在哪组是这一层的账，窗口自己改会与管理器各记一半
         QObject::connect(raw, &PinWindow::moveToGroupRequested, this,
                          [this, raw](int group)

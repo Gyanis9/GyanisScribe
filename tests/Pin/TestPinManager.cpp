@@ -17,11 +17,13 @@
 #include <QApplication>
 #include <QColor>
 #include <QImage>
+#include <QKeyEvent>
 #include <QPoint>
 
 #include <filesystem>
 #include <format>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace GyanisScribe
@@ -311,6 +313,28 @@ namespace GyanisScribe
         ASSERT_TRUE(restored.has_value()) << restored.error().message;
         EXPECT_EQ(reopened.activeGroup(), 1) << "活动组停在一个不存在的组上，桌上会一张都看不见";
         EXPECT_TRUE(isOnDesk(reopened.pinAt(0))) << "回落之后那张该露脸";
+    }
+
+    /**
+     * @brief 钉住标注里的「另贴一张」在管理器这一层的落点：相对源贴图右下偏一格转发出去
+     * @details 新贴图摆在哪是管理器算的账：完全叠在原件上时，用户看到的是「贴了没反应」。
+     */
+    TEST_F(PinManagerFixture, PinAnotherFromAnnotationForwardsWithAnOffset)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(100, 100));
+        auto *window = dynamic_cast<Pin::PinWindow *>(pins.pinAt(0));
+        ASSERT_NE(window, nullptr) << "管理器里的贴图不是 PinWindow，这一条判据接不上";
+
+        std::optional<QPoint> at;
+        QObject::connect(&pins, &Pin::PinManager::pinAnotherRequested, [&at](const QImage &, const QPoint &globalTopLeft) { at = globalTopLeft; });
+
+        window->startAnnotation();
+        QKeyEvent press{QEvent::KeyPress, Qt::Key_D, Qt::ControlModifier};
+        QApplication::sendEvent(window, &press);
+
+        ASSERT_TRUE(at.has_value()) << "「另贴一张」没从管理器转发出去";
+        EXPECT_EQ(*at, window->globalRect().topLeft() + QPoint(24, 24)) << "新贴图该落在源贴图右下偏一格的位置";
     }
 
 } // namespace GyanisScribe
