@@ -936,6 +936,40 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住「只显示这一张」的菜单项：勾选项、点一下把开关意图发出去（谁在屏上由管理器算）
+     */
+    TEST_F(PinWindowFixture, SoloMenuEntryRequestsTheToggle)
+    {
+        auto &window = makeWindow();
+
+        std::optional<bool> requested;
+        QObject::connect(&window, &Pin::PinWindow::soloRequested, [&requested](bool solo) { requested = solo; });
+
+        QMenu *menu  = window.buildContextMenu();
+        auto  *entry = findMenuAction(*menu, QString::fromUtf8("只显示这一张"));
+        ASSERT_NE(entry, nullptr) << "右键菜单里没有「只显示这一张」这一项";
+        EXPECT_TRUE(entry->isCheckable()) << "该是勾选项";
+        EXPECT_FALSE(entry->isChecked()) << "起点该是没开";
+        entry->trigger();
+        delete menu;
+
+        ASSERT_TRUE(requested.has_value()) << "点了没把开关意图发出去";
+        EXPECT_TRUE(*requested) << "起点没开时点一下该是「开」";
+
+        // 管理器把主角态推下来之后，勾选态与发出的值都跟着走
+        window.setSoloState(true);
+        QMenu *again = window.buildContextMenu();
+        auto  *item  = findMenuAction(*again, QString::fromUtf8("只显示这一张"));
+        ASSERT_NE(item, nullptr);
+        EXPECT_TRUE(item->isChecked()) << "主角态推下来之后勾选态没跟上";
+        requested.reset();
+        item->trigger();
+        delete again;
+        ASSERT_TRUE(requested.has_value());
+        EXPECT_FALSE(*requested) << "已经是主角时点一下该是「关」";
+    }
+
+    /**
      * @brief 钉住选中态那一圈：选进多选集的贴图在边缘画一圈强调色（没选中、没悬停时边缘是图自己的色）
      */
     TEST_F(PinWindowFixture, SelectedPinPaintsAnAccentBorder)

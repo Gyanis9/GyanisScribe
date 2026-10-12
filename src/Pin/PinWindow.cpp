@@ -299,6 +299,16 @@ namespace GyanisScribe::Pin
         update();
     }
 
+    bool PinWindow::isSolo() const noexcept
+    {
+        return m_soloState;
+    }
+
+    void PinWindow::setSoloState(const bool solo)
+    {
+        m_soloState = solo;
+    }
+
     int PinWindow::selectionCount() const noexcept
     {
         return m_selectionCount;
@@ -1659,6 +1669,12 @@ namespace GyanisScribe::Pin
                                                 });
         thumbnailAction->setCheckable(true);
         thumbnailAction->setChecked(m_thumbnail);
+
+        // 只显示这一张：其余的收起来，屏幕腾给这一张；再点一下恢复按组的那套规则。
+        // 与「标注」那两档不同，它对谁用都成立（动图也一样）
+        auto *soloAction = menu->addAction(GyanisScribe::Core::uiText("只显示这一张"), this, [this] { emit soloRequested(!m_soloState); });
+        soloAction->setCheckable(true);
+        soloAction->setChecked(m_soloState);
 
         // 贴边隐藏：贴着屏边收成一条，悬停展开。拖着放到屏边也会进这一档（见 mouseReleaseEvent）
         auto *dockAction = menu->addAction(GyanisScribe::Core::uiText("贴边隐藏"), this, [this] { setEdgeDocked(m_edgeDock == ScreenEdge::None); });

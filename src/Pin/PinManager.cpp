@@ -93,6 +93,8 @@ namespace GyanisScribe::Pin
                          });
 
         // 多选：切选与清空都是这一层的账；拖动与缩放只叫其余的几张跟着动（发起的那张自己已经动过）
+        // Solo：只接意图，「谁在屏上」由 applyGroupVisibility 那一条判据统一算
+        QObject::connect(raw, &PinWindow::soloRequested, this, [this, raw](const bool solo) { setPinSolo(*raw, solo); });
         QObject::connect(raw, &PinWindow::selectionToggleRequested, this, [this, raw] { togglePinSelection(*raw); });
         QObject::connect(raw, &PinWindow::clearSelectionRequested, this, [this] { clearPinSelection(); });
         QObject::connect(raw, &PinWindow::draggedWithSelection, this,
@@ -131,6 +133,10 @@ namespace GyanisScribe::Pin
 
         // 新贴图落在当前显示的那一组：它在别的组里会一贴出来就看不见，最容易被当成贴图坏了
         raw->setGroup(m_activeGroup);
+
+        // 新贴图自己该看得见：Solo 那一档跟着落掉（否则它一贴出来就被挡在屏外）
+        m_solo = nullptr;
+        publishSolo();
 
         m_pins.push_back(std::move(pin));
         m_pins.back()->move(globalTopLeft);
@@ -291,8 +297,10 @@ namespace GyanisScribe::Pin
     int PinManager::setAllPinsConcealed(const bool concealed)
     {
         m_allConcealed = concealed;
-        // 整桌收起时清掉选择：选着一张看不见的贴图，后面的整组动作会落到屏上没有的东西上
+        // 整桌收起时清掉选择与 Solo：选着一张看不见的贴图、或让一张在整桌收起后还留在屏上，都不对
         clearPinSelection();
+        m_solo = nullptr;
+        publishSolo();
         return applyGroupVisibility();
     }
 
@@ -314,6 +322,34 @@ namespace GyanisScribe::Pin
             pin->setSelected(false);
         }
         publishSelection();
+    }
+
+    bool PinManager::pinIsSolo(const PinWindow &pin) const noexcept
+    {
+        return m_solo == &pin;
+    }
+
+    void PinManager::setPinSolo(PinWindow &pin, const bool solo)
+    {
+        PinWindow *target = solo ? &pin : nullptr;
+        if (m_solo == target)
+        {
+            return;
+        }
+
+        m_solo = target;
+        // 只看这一张时，选中集里的其余几张已经不在屏上：清掉，免得后面的整组动作落到看不见的东西上
+        clearPinSelection();
+        publishSolo();
+        applyGroupVisibility();
+    }
+
+    void PinManager::publishSolo()
+    {
+        for (auto &pin: m_pins)
+        {
+            pin->setSoloState(pin.get() == m_solo);
+        }
     }
 
     std::vector<PinWindow *> PinManager::pinsAffectedBy(PinWindow &source) const
@@ -374,8 +410,10 @@ namespace GyanisScribe::Pin
         // 活动组不在册（刚被关掉最后一张）时从第一组接着走：indexOf 给 -1，加一取模正好落回 0
         const auto current = groups.indexOf(m_activeGroup);
         m_activeGroup      = groups[(current + 1) % groups.size()];
-        // 换组换的是一桌人：留着的选中集会指向看不见的那几张，先清掉
+        // 换组换的是一桌人：留着的选中集与「只看这一张」都会指向看不见的那几张，先清掉
         clearPinSelection();
+        m_solo = nullptr;
+        publishSolo();
         applyGroupVisibility();
         return m_activeGroup;
     }
@@ -425,7 +463,8 @@ namespace GyanisScribe::Pin
             }
             pin->setGroupChoices(groups);
 
-            const bool concealed = m_allConcealed || pin->group() != m_activeGroup;
+            // 显隐的唯一判据：整桌收起 > Solo > 分组。Solo 开着时不看分组——「只看这一张」就是只看这一张
+            const bool concealed = m_allConcealed || (m_solo != nullptr ? pin.get() != m_solo : pin->group() != m_activeGroup);
             // 已经是那一档的不动：重复 hide()/show() 会让窗口自己闪一下
             if (pin->isConcealed() != concealed)
             {
@@ -460,10 +499,16 @@ namespace GyanisScribe::Pin
 
         (*found)->deleteLater(); // 回调可能来自该窗口自己的事件处理，立即析构会踩在栈上
         m_pins.erase(found);
+        // 关掉的若正是 Solo 的主角，这一档先落掉：下面的显隐重算才看得见其余几张
+        if (m_solo == window)
+        {
+            m_solo = nullptr;
+        }
         // 关掉的若是活动组的最后一张，剩下的组要顶上来：不然桌上一张不剩，看不出是关掉了还是出错了
         normalizeActiveGroup();
         applyGroupVisibility();
         // 少了一张，选中集的张数读数跟着改（关掉的若在选中集里，它已经不在册了）
+        publishSolo();
         publishSelection();
         emit pinCountChanged(count());
     }

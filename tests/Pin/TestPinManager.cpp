@@ -587,4 +587,94 @@ namespace GyanisScribe
         EXPECT_EQ(pins.selectedPinCount(), 0) << "整桌收起之后选中集还留着";
     }
 
+    /**
+     * @brief 钉住 Solo 的本义：开着时只有主角在屏上，关掉其余几张原样回来
+     */
+    TEST_F(PinManagerFixture, SoloHidesTheOthersAndTheToggleBringsThemBack)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(10, 10));
+        pins.addPin(makeImage(), QPoint(80, 80));
+        pins.addPin(makeImage(), QPoint(150, 150));
+        auto *first = pins.pinAt(0);
+        ASSERT_NE(first, nullptr);
+
+        pins.setPinSolo(static_cast<Pin::PinWindow &>(*first), true);
+        EXPECT_TRUE(pins.pinIsSolo(static_cast<const Pin::PinWindow &>(*first)));
+        EXPECT_TRUE(static_cast<Pin::PinWindow *>(pins.pinAt(0))->isSolo()) << "主角态没推给窗口（菜单项的勾选态照它走）";
+        EXPECT_FALSE(static_cast<Pin::PinWindow *>(pins.pinAt(1))->isSolo()) << "非主角被推成了主角";
+        EXPECT_TRUE(isOnDesk(pins.pinAt(0))) << "主角自己该留在屏上";
+        EXPECT_FALSE(isOnDesk(pins.pinAt(1))) << "其余的没收起来，Solo 没生效";
+        EXPECT_FALSE(isOnDesk(pins.pinAt(2)));
+
+        pins.setPinSolo(static_cast<Pin::PinWindow &>(*first), false);
+        EXPECT_FALSE(pins.pinIsSolo(static_cast<const Pin::PinWindow &>(*first)));
+        EXPECT_TRUE(isOnDesk(pins.pinAt(0)) && isOnDesk(pins.pinAt(1)) && isOnDesk(pins.pinAt(2))) << "关掉 Solo 之后其余几张没回来";
+    }
+
+    /**
+     * @brief 钉住主角被关掉时 Solo 自动落掉：其余几张该回来
+     */
+    TEST_F(PinManagerFixture, SoloEndsWhenItsPinIsClosed)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(10, 10));
+        pins.addPin(makeImage(), QPoint(80, 80));
+        auto *solo = pins.pinAt(0);
+        ASSERT_NE(solo, nullptr);
+        pins.setPinSolo(static_cast<Pin::PinWindow &>(*solo), true);
+        ASSERT_FALSE(isOnDesk(pins.pinAt(1)));
+
+        static_cast<Pin::PinWindow *>(solo)->close();
+        emit static_cast<Pin::PinWindow *>(solo)->closedByUser();
+
+        EXPECT_FALSE(pins.pinIsSolo(static_cast<const Pin::PinWindow &>(*pins.pinAt(0)))) << "主角没了 Solo 还挂着";
+        EXPECT_TRUE(isOnDesk(pins.pinAt(0))) << "主角被关掉之后其余几张没回来";
+    }
+
+    /**
+     * @brief 钉住新贴一张时 Solo 自动落掉：新贴的自己该看得见
+     */
+    TEST_F(PinManagerFixture, SoloEndsWhenANewPinArrives)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(10, 10));
+        pins.addPin(makeImage(), QPoint(80, 80));
+        pins.setPinSolo(static_cast<Pin::PinWindow &>(*pins.pinAt(0)), true);
+        pins.addPin(makeImage(), QPoint(150, 150));
+
+        EXPECT_TRUE(isOnDesk(pins.pinAt(2))) << "新贴的一张被 Solo 挡在屏外";
+        EXPECT_TRUE(isOnDesk(pins.pinAt(1))) << "新贴一张之后其余几张没回来";
+    }
+
+    /**
+     * @brief 钉住切组时 Solo 自动落掉：换的是一桌人
+     */
+    TEST_F(PinManagerFixture, SoloEndsOnGroupSwitch)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(10, 10));
+        pins.addPin(makeImage(), QPoint(80, 80));
+        pins.setPinSolo(static_cast<Pin::PinWindow &>(*pins.pinAt(0)), true);
+        ASSERT_TRUE(pins.movePinToGroup(1, 2).has_value());
+        ASSERT_TRUE(pins.switchToNextGroup().has_value());
+        EXPECT_FALSE(pins.pinIsSolo(static_cast<const Pin::PinWindow &>(*pins.pinAt(0)))) << "切组之后 Solo 还挂着";
+    }
+
+    /**
+     * @brief 钉住 Solo 与选中集互不打架：开 Solo 会把选中集清掉（其余几张已经不在屏上）
+     */
+    TEST_F(PinManagerFixture, SoloClearsTheSelection)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(10, 10));
+        pins.addPin(makeImage(), QPoint(80, 80));
+        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*pins.pinAt(0)));
+        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*pins.pinAt(1)));
+        ASSERT_EQ(pins.selectedPinCount(), 2);
+
+        pins.setPinSolo(static_cast<Pin::PinWindow &>(*pins.pinAt(0)), true);
+        EXPECT_EQ(pins.selectedPinCount(), 0) << "开 Solo 之后选中集还留着：那几张已经不在屏上了";
+    }
+
 } // namespace GyanisScribe

@@ -180,6 +180,18 @@ namespace GyanisScribe::Pin
         /// 清空选中集（贴图自己的「取消选择」、切组与整桌收起时都走这里）
         void clearPinSelection();
 
+        /// 这一张此刻是不是「只看这一张」的主角
+        [[nodiscard]] bool pinIsSolo(const PinWindow &pin) const noexcept;
+
+        /**
+         * @brief 开关「只显示这一张」：开着时其余的全收起来，关掉恢复按组的那套规则
+         * @param pin 主角那一张
+         * @param solo true 表示只显示它
+         * @details 新增贴图、切组、整桌收起与主角自己被关掉都会自动关掉这一档——
+         *          那些时刻「只看这一张」已经指不动屏上的东西了
+         */
+        void setPinSolo(PinWindow &pin, bool solo);
+
     signals:
         /**
          * @brief 贴图张数变了
@@ -240,6 +252,9 @@ namespace GyanisScribe::Pin
         /// 选中集变了之后把「一共几张」推给每一张
         void publishSelection();
 
+        /// Solo 变了之后把「自己是不是主角」推给每一张（菜单项的勾选态照它走）
+        void publishSolo();
+
         /// 活动组已经不在册（最后一张被关掉、或布局里换过组）时回落到第一组
         void normalizeActiveGroup();
 
@@ -256,6 +271,7 @@ namespace GyanisScribe::Pin
         std::vector<std::unique_ptr<PinWindow>> m_pins;                          ///< 在册贴图，按创建顺序
         int                                     m_activeGroup  = kFirstPinGroup; ///< 当前显示的分组号
         bool                                    m_allConcealed = false;          ///< 全局收起是不是开着
+        PinWindow                              *m_solo         = nullptr;        ///< 「只看这一张」的主角；空表示没开
     };
 
 } // namespace GyanisScribe::Pin

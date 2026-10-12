@@ -2036,6 +2036,10 @@
             <translation>Shrink to thumbnail</translation>
         </message>
         <message>
+            <source>只显示这一张</source>
+            <translation>Show only this one</translation>
+        </message>
+        <message>
             <source>贴边隐藏</source>
             <translation>Hide at screen edge</translation>
         </message>

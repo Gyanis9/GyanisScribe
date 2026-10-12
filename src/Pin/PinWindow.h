@@ -288,6 +288,15 @@ namespace GyanisScribe::Pin
          */
         void setSelected(bool selected);
 
+        /// 此刻是不是「只看这一张」的主角（管理器推下来）
+        [[nodiscard]] bool isSolo() const noexcept;
+
+        /**
+         * @brief 设「只看这一张」的主角态（管理器推下来；菜单项的勾选态照它走）
+         * @param solo true 表示此刻只显示它
+         */
+        void setSoloState(bool solo);
+
         /// 此刻选中集里有几张（管理器推下来；0 表示一张都没选）
         [[nodiscard]] int selectionCount() const noexcept;
 
@@ -437,6 +446,12 @@ namespace GyanisScribe::Pin
 
         /// 用户点了「取消选择」：请管理器清空选中集
         void clearSelectionRequested();
+
+        /**
+         * @brief 用户开关了「只显示这一张」：请管理器把其余几张收起来（或恢复按组的那套规则）
+         * @param solo true 表示只看这一张
+         */
+        void soloRequested(bool solo);
 
         /**
          * @brief 这一张刚被拖动 @p delta ：请管理器把选中集里其余几张按同一位移跟着挪
@@ -647,6 +662,7 @@ namespace GyanisScribe::Pin
         bool                                                 m_cropping             = false;             ///< 裁剪模式
         bool                                                 m_selected             = false;             ///< 在不在多选集中
         int                                                  m_selectionCount       = 0;                 ///< 选中集里的张数（管理器推下来）
+        bool                                                 m_soloState            = false;             ///< 是不是「只看这一张」的主角（管理器推下来）
         std::optional<QPointF>                               m_cropAnchor;                               ///< 裁剪框起笔点（窗口坐标）；没拖过时为空
         std::optional<QPointF>                               m_cropCurrent;                              ///< 裁剪框当前点（窗口坐标）
         double                                               m_rotationBeforeCrop           = 0.0;       ///< 进裁剪前的旋转角，退出时恢复
