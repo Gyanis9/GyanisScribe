@@ -259,6 +259,10 @@ namespace GyanisScribe::Annotation
         m_outlineButton = makeButton("TextOutline", GyanisScribe::Core::uiText("描边"), true);
         QObject::connect(m_outlineButton, &QToolButton::clicked, this, [this] { setTextOutline(m_outlineButton->isChecked()); });
         layout->addWidget(m_outlineButton);
+        // 描边色：描边开着时用哪一色，点一下走一档（自动 → 白 → 黑）
+        m_strokeColorButton = makeButton("StrokeColor", GyanisScribe::Core::uiText("描边色"), false);
+        QObject::connect(m_strokeColorButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleTextStrokeColor);
+        layout->addWidget(m_strokeColorButton);
         m_backgroundButton = makeButton("TextBackground", GyanisScribe::Core::uiText("背景"), true);
         QObject::connect(m_backgroundButton, &QToolButton::clicked, this, [this] { setTextBackground(m_backgroundButton->isChecked()); });
         layout->addWidget(m_backgroundButton);
@@ -554,6 +558,26 @@ namespace GyanisScribe::Annotation
             m_outlineButton->setAccessibleName(label);
         }
         emit textOutlineChanged(enabled);
+    }
+
+    int AnnotationToolbar::currentTextStrokeColorStep() const
+    {
+        return m_textStrokeColorStep;
+    }
+
+    void AnnotationToolbar::cycleTextStrokeColor()
+    {
+        m_textStrokeColorStep = (m_textStrokeColorStep + 1) % kTextStrokeColorCount;
+        if (m_strokeColorButton != nullptr)
+        {
+            // 与另几档同一套口径：提示就是这一档的读数
+            const auto label = m_textStrokeColorStep == kTextStrokeColorWhite   ? GyanisScribe::Core::uiText("描边色：白")
+                               : m_textStrokeColorStep == kTextStrokeColorBlack ? GyanisScribe::Core::uiText("描边色：黑")
+                                                                                : GyanisScribe::Core::uiText("描边色：自动");
+            m_strokeColorButton->setToolTip(label);
+            m_strokeColorButton->setAccessibleName(label);
+        }
+        emit textStrokeColorStepChanged(m_textStrokeColorStep);
     }
 
     bool AnnotationToolbar::currentTextBackground() const

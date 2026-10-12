@@ -838,6 +838,53 @@ TEST_F(EngineFixture, TextPlateAndOutlineRestyleAndUndoBack)
 }
 
 /**
+ * @brief 钉住描边色档也走改样式命令：自动档的白轮廓切到黑档当场消失、撤销回自动
+ * @details 与上面那条同一个灰底装置，但这里只做**一次**改样式：连续两次改样式会被撤销栈
+ *          合并成一步（引擎对同一条图形的样式命令有 merge），那样「撤销一次」回的是两处
+ *          改动之前的状态，判据就指错了地方。
+ */
+TEST_F(EngineFixture, TextStrokeColorRestylesAndUndoesBack)
+{
+    CapturedImage canvas;
+    canvas.image = QImage(200, 100, QImage::Format_ARGB32_Premultiplied);
+    canvas.image.fill(QColor(128, 128, 128));
+    canvas.devicePixelRatio = 1.0;
+    canvas.logicalSize      = QSize(200, 100);
+    canvas.screenName       = QStringLiteral("FakeScreen-1");
+    m_engine.loadCanvas(canvas);
+
+    const auto brightIn = [this](const QRect &box)
+    {
+        const QImage drawn  = m_engine.exportImage();
+        int          bright = 0;
+        for (int y = box.top(); y <= box.bottom(); ++y)
+        {
+            for (int x = box.left(); x <= box.right(); ++x)
+            {
+                const auto pixel = drawn.pixelColor(x, y);
+                if (pixel.red() > 200 && pixel.green() > 200 && pixel.blue() > 200)
+                {
+                    ++bright;
+                }
+            }
+        }
+        return bright;
+    };
+
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 24, .fillStyle = 0, .textOutline = true}).has_value());
+    const auto  text = placeText(m_engine, QPoint(20, 60), QStringLiteral("H"));
+    const QRect box(10, 20, 180, 70);
+    ASSERT_GT(brightIn(box), 0) << "自动档的白轮廓没画出来，后面的对照没有基准";
+
+    ASSERT_TRUE(m_engine.select(text).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 24, .fillStyle = 0, .textOutline = true, .textStrokeColorStep = 2})
+                        .has_value());
+    EXPECT_EQ(brightIn(box), 0) << "切到黑档之后白轮廓还在：描边色档没落到那条图形上";
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_GT(brightIn(box), 0) << "撤销没把描边色退回自动档";
+}
+
+/**
  * @brief 钉住层叠按创建顺序跨工具生效：后画的压住先画的
  * @details 旧口径是按工具登记顺序画（椭圆永远盖得住矩形，与画的先后无关）；
  *          层叠号改成落定发号之后，后画的必须先被点中——这条同时钉住「发号、绘制、

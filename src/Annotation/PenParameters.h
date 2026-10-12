@@ -41,10 +41,11 @@ namespace GyanisScribe::Annotation
         int     arrowHeadStyle       = kArrowHeadFilled;                                   ///< 箭头头部款式：0 实心、1 空心、2 开口两翼（仅箭头工具用）
         qreal   arrowHeadScale       = kArrowHeadScales[kDefaultArrowHeadScaleStep];       ///< 箭头头部大小：头长相对线宽的倍数（仅箭头工具用）
         QString fontFamily;                                                                ///< 字体族，空串=跟随应用默认字体（仅文字工具用）
-        bool    textBold       = false;                                                    ///< 粗体（仅文字工具用）
-        bool    textItalic     = false;                                                    ///< 斜体（仅文字工具用）
-        bool    textOutline    = false;                                                    ///< 反色描边（仅文字工具用）
-        bool    textBackground = false;                                                    ///< 反色底板（仅文字工具用）
+        bool    textBold            = false;                                               ///< 粗体（仅文字工具用）
+        bool    textItalic          = false;                                               ///< 斜体（仅文字工具用）
+        bool    textOutline         = false;                                               ///< 反色描边（仅文字工具用）
+        bool    textBackground      = false;                                               ///< 反色底板（仅文字工具用）
+        int     textStrokeColorStep = static_cast<int>(kDefaultTextStrokeColorStep);       ///< 描边色档：0 自动（反差色）、1 白、2 黑（仅文字工具用）
 
         [[nodiscard]] bool operator==(const PenParameters &) const = default;
     };
@@ -73,7 +74,8 @@ namespace GyanisScribe::Annotation
                              .textBold             = shape.textBold,
                              .textItalic           = shape.textItalic,
                              .textOutline          = shape.textOutline,
-                             .textBackground       = shape.textBackground};
+                             .textBackground       = shape.textBackground,
+                             .textStrokeColorStep  = shape.textStrokeColorStep};
     }
 
 } // namespace GyanisScribe::Annotation

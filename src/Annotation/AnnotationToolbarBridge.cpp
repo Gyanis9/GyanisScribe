@@ -10,7 +10,7 @@ namespace GyanisScribe::Annotation
 {
     AnnotationToolbarBridge::AnnotationToolbarBridge(AnnotationToolbar &toolbar, IAnnotationEngine &engine, QObject *parent) : QObject(parent), m_toolbar(toolbar), m_engine(engine)
     {
-        // 起点参数整套照工具栏的初值抄一遍：十六处必须与工具栏同解，否则第一笔的样式与按钮显示的不一致
+        // 起点参数整套照工具栏的初值抄一遍：十七处必须与工具栏同解，否则第一笔的样式与按钮显示的不一致
         m_penParameters = PenParameters{.color                = toolbar.currentColor(),
                                         .lineWidth            = toolbar.currentWidth(),
                                         .fontSize             = toolbar.currentFontSize(),
@@ -28,7 +28,8 @@ namespace GyanisScribe::Annotation
                                         .textBold             = toolbar.currentTextBold(),
                                         .textItalic           = toolbar.currentTextItalic(),
                                         .textOutline          = toolbar.currentTextOutline(),
-                                        .textBackground       = toolbar.currentTextBackground()};
+                                        .textBackground       = toolbar.currentTextBackground(),
+                                        .textStrokeColorStep  = toolbar.currentTextStrokeColorStep()};
 
         QObject::connect(&toolbar, &AnnotationToolbar::toolChanged, this,
                          [this](const ToolKind kind)
@@ -144,6 +145,12 @@ namespace GyanisScribe::Annotation
                          [this](const bool enabled)
                          {
                              m_penParameters.textBackground = enabled;
+                             applyPenParameters();
+                         });
+        QObject::connect(&toolbar, &AnnotationToolbar::textStrokeColorStepChanged, this,
+                         [this](const int step)
+                         {
+                             m_penParameters.textStrokeColorStep = step;
                              applyPenParameters();
                          });
 

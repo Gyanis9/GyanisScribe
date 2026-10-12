@@ -953,6 +953,48 @@ TEST_F(AnnotationFixture, TextOutlineHalosTheGlyphs)
 }
 
 /**
+ * @brief 钉住文字描边色档：自动档取反差色（红字得白轮廓），切到黑档轮廓就换成黑的
+ * @details 画布上半是白的：红字的自动描边取白、在白底上等于隐形；切到黑档，字形一圈
+ *          立刻出现「深色像素」——同一条字形路径只差描边颜色这一格。
+ */
+TEST_F(AnnotationFixture, TextStrokeColorFollowsEachShape)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Text).has_value());
+
+    const auto darkCount = [this](const QRect &box)
+    {
+        const QImage drawn = m_engine.exportImage();
+        int          dark  = 0;
+        for (int y = box.top(); y <= box.bottom(); ++y)
+        {
+            for (int x = box.left(); x <= box.right(); ++x)
+            {
+                if (drawn.pixelColor(x, y).lightness() < 100)
+                {
+                    ++dark;
+                }
+            }
+        }
+        return dark;
+    };
+
+    // 自动档：白轮廓压在白底上，窗口里不该有深色像素（红字本身亮度 128 也够不着这条判据）
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 32, .fillStyle = 0, .textOutline = true}).has_value());
+    m_engine.beginStroke(QPoint(20, 60));
+    ASSERT_TRUE(m_engine.setPendingText(QStringLiteral("H")).has_value());
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+    EXPECT_EQ(darkCount(QRect(10, 10, 120, 80)), 0) << "自动档的白轮廓不该出现深色像素，后面的对照没有基准";
+
+    // 黑档：同一字形、同一条描边路径，只换颜色档
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 32, .fillStyle = 0, .textOutline = true, .textStrokeColorStep = 2})
+                        .has_value());
+    m_engine.beginStroke(QPoint(160, 60));
+    ASSERT_TRUE(m_engine.setPendingText(QStringLiteral("H")).has_value());
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+    EXPECT_GT(darkCount(QRect(150, 10, 120, 80)), 0) << "黑档的轮廓没出现：描边色档没落到画上";
+}
+
+/**
  * @brief 钉住底板：字形后面垫一块反色的半透明圆角板
  * @details 红字（深色）的底板取白、透明度 200/255：黑底上白板叠出来是 (200,200,200)，
  *          取样点放在字形左侧的留白带里（板比字形框每边多出 8 像素），不在字上也不在板外。

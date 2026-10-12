@@ -724,6 +724,63 @@ TEST_F(AnnotationWindowFixture, EllipticalToggleFromToolbarReachesTheEngine)
 }
 
 /**
+ * @brief 钉住描边色按钮从窗口接到引擎：点成「白」档之后新画的文字描边才是白的
+ * @details 工具栏默认字色是调色板第一格红 (232,62,62)，亮度 147 → 自动档的反差色是**黑**；
+ *          所以判别取「白档」：桥接不上时新字会拿到自动档的黑描边，亮格一个都不会有。
+ */
+TEST_F(AnnotationWindowFixture, TextStrokeColorFromToolbarReachesTheEngine)
+{
+    auto window = makeWindow();
+
+    const auto brightIn = [this](const QRect &box)
+    {
+        const QImage drawn  = engine().exportImage();
+        int          bright = 0;
+        for (int y = box.top(); y <= box.bottom(); ++y)
+        {
+            for (int x = box.left(); x <= box.right(); ++x)
+            {
+                const auto pixel = drawn.pixelColor(x, y);
+                if (pixel.red() > 200 && pixel.green() > 200 && pixel.blue() > 200)
+                {
+                    ++bright;
+                }
+            }
+        }
+        return bright;
+    };
+
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Text).has_value());
+    engine().beginStroke(QPoint(20, 60));
+    ASSERT_TRUE(engine().setPendingText(QStringLiteral("H")).has_value());
+    ASSERT_TRUE(engine().endStroke().has_value());
+    EXPECT_EQ(brightIn(QRect(20, 10, 280, 180)), 0) << "不打描边时窗口里出了亮格，后面的对照没有基准";
+
+    QToolButton *outlineButton     = nullptr;
+    QToolButton *strokeColorButton = nullptr;
+    for (auto *candidate: window->toolbar().findChildren<QToolButton *>())
+    {
+        if (candidate->accessibleName() == QString::fromUtf8("描边"))
+        {
+            outlineButton = candidate;
+        }
+        if (candidate->accessibleName() == QString::fromUtf8("描边色"))
+        {
+            strokeColorButton = candidate;
+        }
+    }
+    ASSERT_NE(outlineButton, nullptr) << "工具栏上找不到描边按钮";
+    ASSERT_NE(strokeColorButton, nullptr) << "工具栏上找不到描边色按钮";
+    outlineButton->click();
+    strokeColorButton->click(); // 自动 → 白
+
+    engine().beginStroke(QPoint(160, 60));
+    ASSERT_TRUE(engine().setPendingText(QStringLiteral("H")).has_value());
+    ASSERT_TRUE(engine().endStroke().has_value());
+    EXPECT_GT(brightIn(QRect(300, 10, 100, 180)), 0) << "按钮点下去了，新画的文字描边不是白的：窗口到引擎这条链没接上";
+}
+
+/**
  * @brief 钉住线型按钮从窗口接到引擎：点一下（实线→虚线），选中的那条断口就出来了
  * @details 画布逻辑 200×100 放进 400×200 的视图：一条逻辑 (20,50)-(180,50) 的横线；
  *          判据量与引擎级那条同一套——同一段里「有墨的列数」，改档之后变小。

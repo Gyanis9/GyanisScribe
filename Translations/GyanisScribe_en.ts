@@ -200,6 +200,10 @@
             <translation>Outline</translation>
         </message>
         <message>
+            <source>描边色</source>
+            <translation>Stroke color</translation>
+        </message>
+        <message>
             <source>背景</source>
             <translation>Background</translation>
         </message>
@@ -358,6 +362,18 @@
         <message>
             <source>描边：关</source>
             <translation>Outline: off</translation>
+        </message>
+        <message>
+            <source>描边色：白</source>
+            <translation>Stroke color: white</translation>
+        </message>
+        <message>
+            <source>描边色：黑</source>
+            <translation>Stroke color: black</translation>
+        </message>
+        <message>
+            <source>描边色：自动</source>
+            <translation>Stroke color: automatic</translation>
         </message>
         <message>
             <source>背景：开</source>

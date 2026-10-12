@@ -212,6 +212,12 @@ namespace GyanisScribe::Annotation
          */
         void setTextOutline(bool enabled);
 
+        /// 当前描边色档：0 自动（与字色反差）、1 白、2 黑（文字工具用；描边开着时按它取色）
+        [[nodiscard]] int currentTextStrokeColorStep() const;
+
+        /// 描边色走一档（自动 → 白 → 黑 → 自动），并发出 textStrokeColorStepChanged
+        void cycleTextStrokeColor();
+
         /// 当前文字是不是反色底板
         [[nodiscard]] bool currentTextBackground() const;
 
@@ -265,6 +271,8 @@ namespace GyanisScribe::Annotation
         void textItalicChanged(bool enabled);
         /// 用户开了/关了文字反色描边
         void textOutlineChanged(bool enabled);
+        /// 用户改了文字描边色档
+        void textStrokeColorStepChanged(int step);
         /// 用户开了/关了文字反色底板
         void textBackgroundChanged(bool enabled);
         /// 撤销
@@ -340,19 +348,21 @@ namespace GyanisScribe::Annotation
         QToolButton                                             *m_highlightAlphaButton = nullptr;                                    ///< 高亮透明度按钮，点一下走一档
         int                                                      m_highlightAlphaStep = static_cast<int>(kDefaultHighlightAlphaStep); ///< 当前透明度档下标，值表是 kHighlightAlphas
         QToolButton                                             *m_highlightWidthButton = nullptr;                                    ///< 高亮加宽按钮，点一下走一档
-        int            m_highlightWidthStep   = static_cast<int>(kDefaultHighlightWidthStep); ///< 当前加宽档下标，值表是 kHighlightWidthFactors
-        QToolButton   *m_arrowHeadStyleButton = nullptr;                                      ///< 箭头款式按钮，点一下走一档
-        int            m_arrowHeadStyle       = kArrowHeadFilled;                             ///< 当前头部款式：0 实心、1 空心、2 开口两翼
-        QToolButton   *m_arrowHeadScaleButton = nullptr;                                      ///< 箭头大小按钮，点一下走一档
-        int            m_arrowHeadScaleStep   = static_cast<int>(kDefaultArrowHeadScaleStep); ///< 当前大小档下标，值表是 kArrowHeadScales
-        QFontComboBox *m_fontCombo            = nullptr;                                      ///< 文字字体族下拉，列系统字体
-        QToolButton   *m_boldButton           = nullptr;                                      ///< 文字粗体开关，按下表示粗
-        QToolButton   *m_italicButton         = nullptr;                                      ///< 文字斜体开关，按下表示斜
-        QToolButton   *m_outlineButton        = nullptr;                                      ///< 文字描边开关，按下表示围一圈反色轮廓
-        QToolButton   *m_backgroundButton     = nullptr;                                      ///< 文字底板开关，按下表示垫一块反色圆角板
-        QColor         m_currentColor;                                                        ///< 当前颜色，初值取色板第一格
-        bool           m_stateIsInitial = true;                                               ///< 还在构造期：起点值不回写配置，坏值要留在文件里让人看得见
-        ToolKind       m_activeTool;                                                          ///< 当前工具，用来挡住「重复点同一个工具」的二次信号
+        int            m_highlightWidthStep   = static_cast<int>(kDefaultHighlightWidthStep);  ///< 当前加宽档下标，值表是 kHighlightWidthFactors
+        QToolButton   *m_arrowHeadStyleButton = nullptr;                                       ///< 箭头款式按钮，点一下走一档
+        int            m_arrowHeadStyle       = kArrowHeadFilled;                              ///< 当前头部款式：0 实心、1 空心、2 开口两翼
+        QToolButton   *m_arrowHeadScaleButton = nullptr;                                       ///< 箭头大小按钮，点一下走一档
+        int            m_arrowHeadScaleStep   = static_cast<int>(kDefaultArrowHeadScaleStep);  ///< 当前大小档下标，值表是 kArrowHeadScales
+        QFontComboBox *m_fontCombo            = nullptr;                                       ///< 文字字体族下拉，列系统字体
+        QToolButton   *m_boldButton           = nullptr;                                       ///< 文字粗体开关，按下表示粗
+        QToolButton   *m_italicButton         = nullptr;                                       ///< 文字斜体开关，按下表示斜
+        QToolButton   *m_outlineButton        = nullptr;                                       ///< 文字描边开关，按下表示围一圈反色轮廓
+        QToolButton   *m_strokeColorButton    = nullptr;                                       ///< 文字描边色按钮，点一下走一档
+        int            m_textStrokeColorStep  = static_cast<int>(kDefaultTextStrokeColorStep); ///< 当前描边色档，值表是 kTextStrokeColor* 三档
+        QToolButton   *m_backgroundButton     = nullptr;                                       ///< 文字底板开关，按下表示垫一块反色圆角板
+        QColor         m_currentColor;                                                         ///< 当前颜色，初值取色板第一格
+        bool           m_stateIsInitial = true;                                                ///< 还在构造期：起点值不回写配置，坏值要留在文件里让人看得见
+        ToolKind       m_activeTool;                                                           ///< 当前工具，用来挡住「重复点同一个工具」的二次信号
     };
 
 } // namespace GyanisScribe::Annotation

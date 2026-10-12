@@ -66,6 +66,7 @@ namespace GyanisScribe::Annotation
         m_pending.textItalic           = m_textItalic;
         m_pending.textOutline          = m_textOutline;
         m_pending.textBackground       = m_textBackground;
+        m_pending.textStrokeColorStep  = m_textStrokeColorStep;
         m_pending.position             = point;
         m_pending.rect                 = QRect(point, point);
         m_pending.points               = {point, point};
@@ -166,6 +167,7 @@ namespace GyanisScribe::Annotation
         shape.textItalic           = parameters.textItalic;
         shape.textOutline          = parameters.textOutline;
         shape.textBackground       = parameters.textBackground;
+        shape.textStrokeColorStep  = parameters.textStrokeColorStep;
         return true;
     }
 
@@ -366,6 +368,11 @@ namespace GyanisScribe::Annotation
     void AnnotationTool::setElliptical(const bool enabled) noexcept
     {
         m_elliptical = enabled;
+    }
+
+    void AnnotationTool::setTextStrokeColorStep(const int step) noexcept
+    {
+        m_textStrokeColorStep = std::clamp(step, 0, kTextStrokeColorCount - 1);
     }
 
     void AnnotationTool::setMosaicBlockSize(const int blockSize) noexcept

@@ -42,6 +42,15 @@ namespace GyanisScribe::Annotation
     inline constexpr int kArrowHeadOpenWings  = 2;
     inline constexpr int kArrowHeadStyleCount = 3;
 
+    /// 文字描边色档：0 自动（取与字色反差的一色）、1 白、2 黑
+    inline constexpr int kTextStrokeColorAutomatic = 0;
+    inline constexpr int kTextStrokeColorWhite     = 1;
+    inline constexpr int kTextStrokeColorBlack     = 2;
+    inline constexpr int kTextStrokeColorCount     = 3;
+
+    /// 文字描边色起点档（「自动」，与这一格出现之前同解）
+    inline constexpr std::size_t kDefaultTextStrokeColorStep = 0;
+
     /// 马赛克粒度起点档在阶梯里的下标（「中」）
     inline constexpr std::size_t kDefaultMosaicBlockStep = 1;
     /// 高亮透明度起点档在阶梯里的下标（「中」）
@@ -79,12 +88,13 @@ namespace GyanisScribe::Annotation
         int             arrowHeadStyle       = kArrowHeadFilled;                                   ///< 箭头头部款式：0 实心、1 空心、2 开口两翼（仅箭头工具用）
         qreal           arrowHeadScale       = kArrowHeadScales[kDefaultArrowHeadScaleStep];       ///< 箭头头部大小：头长相对线宽的倍数（仅箭头工具用），默认为阶梯里的「中」档
         QString         fontFamily;                                                                ///< 字体族，空串=跟随应用默认字体（仅文字工具用）
-        bool            textBold       = false;                                                    ///< 粗体（仅文字工具用）
-        bool            textItalic     = false;                                                    ///< 斜体（仅文字工具用）
-        bool            textOutline    = false;                                                    ///< 反色描边：字形围一圈与字色反差的轮廓（仅文字工具用）
-        bool            textBackground = false;                                                    ///< 反色底板：字形后面垫一块半透明的反差圆角板（仅文字工具用）
-        qreal           rotationDeg    = 0.0;                                                      ///< 旋转角，度，顺时针为正；绕图形自己的外接框中心转（画与命中测试同解）
-        int             zOrder         = 0;                                                        ///< 全局层叠序号：越大越靠上，由引擎落定时发号，不用手工维护
+        bool            textBold            = false;                                               ///< 粗体（仅文字工具用）
+        bool            textItalic          = false;                                               ///< 斜体（仅文字工具用）
+        bool            textOutline         = false;                                               ///< 反色描边：字形围一圈与字色反差的轮廓（仅文字工具用）
+        bool            textBackground      = false;                                               ///< 反色底板：字形后面垫一块半透明的反差圆角板（仅文字工具用）
+        int             textStrokeColorStep = static_cast<int>(kDefaultTextStrokeColorStep);       ///< 描边色档：0 自动（反差色）、1 白、2 黑（仅文字工具用）
+        qreal           rotationDeg         = 0.0;                                                 ///< 旋转角，度，顺时针为正；绕图形自己的外接框中心转（画与命中测试同解）
+        int             zOrder              = 0;                                                   ///< 全局层叠序号：越大越靠上，由引擎落定时发号，不用手工维护
     };
 
     /**

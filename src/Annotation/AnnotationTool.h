@@ -323,6 +323,13 @@ namespace GyanisScribe::Annotation
         void setElliptical(bool enabled) noexcept;
 
         /**
+         * @brief 设文字描边色档
+         * @param step 0 自动（与字色反差）、1 白、2 黑；越界按最近的一档夹取
+         * @details 只有文字工具用得上；档随新画的图形带走，选中的那条改档走改样式命令。
+         */
+        void setTextStrokeColorStep(int step) noexcept;
+
+        /**
          * @brief 设马赛克粒度
          * @param blockSize 方块边长，逻辑像素；越界按 1..64 夹取
          * @details 只有马赛克工具用得上；当前粒度随新画的图形带走，选中的那条改粒度走改样式命令。
@@ -450,10 +457,11 @@ namespace GyanisScribe::Annotation
         int             m_arrowHeadStyle       = kArrowHeadFilled;                                   ///< 默认箭头头部款式（仅箭头工具用）
         qreal           m_arrowHeadScale       = kArrowHeadScales[kDefaultArrowHeadScaleStep];       ///< 默认箭头头部大小：头长相对线宽的倍数（仅箭头工具用）
         QString         m_fontFamily;                                                                ///< 默认文字字体族，空串=跟随应用默认（仅文字工具用）
-        bool            m_textBold       = false;                                                    ///< 默认文字粗体（仅文字工具用）
-        bool            m_textItalic     = false;                                                    ///< 默认文字斜体（仅文字工具用）
-        bool            m_textOutline    = false;                                                    ///< 默认反色描边（仅文字工具用）
-        bool            m_textBackground = false;                                                    ///< 默认反色底板（仅文字工具用）
+        bool            m_textBold            = false;                                               ///< 默认文字粗体（仅文字工具用）
+        bool            m_textItalic          = false;                                               ///< 默认文字斜体（仅文字工具用）
+        bool            m_textOutline         = false;                                               ///< 默认反色描边（仅文字工具用）
+        bool            m_textBackground      = false;                                               ///< 默认反色底板（仅文字工具用）
+        int             m_textStrokeColorStep = static_cast<int>(kDefaultTextStrokeColorStep);       ///< 默认文字描边色档（仅文字工具用）
         int             m_fontSize;                                                                  ///< 默认字号
 
     private:

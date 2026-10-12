@@ -543,6 +543,7 @@ namespace GyanisScribe::Annotation
             tool->setTextItalic(m_penParameters.textItalic);
             tool->setTextOutline(m_penParameters.textOutline);
             tool->setTextBackground(m_penParameters.textBackground);
+            tool->setTextStrokeColorStep(m_penParameters.textStrokeColorStep);
         }
     }
 

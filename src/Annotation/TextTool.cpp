@@ -23,6 +23,20 @@ namespace GyanisScribe::Annotation
         {
             return color.lightness() > 128 ? QColor(0, 0, 0) : QColor(255, 255, 255);
         }
+
+        /// 描边色按图形自己的档取：自动档走反差色，白 / 黑两档是指定色（只作用在描边上，底板照旧自动）
+        QColor textStrokeColorOf(const AnnotationShape &shape)
+        {
+            if (shape.textStrokeColorStep == kTextStrokeColorWhite)
+            {
+                return QColor(255, 255, 255);
+            }
+            if (shape.textStrokeColorStep == kTextStrokeColorBlack)
+            {
+                return QColor(0, 0, 0);
+            }
+            return contrastingColorFor(shape.color);
+        }
     } // namespace
 
     TextTool::TextTool() : AnnotationTool(ToolKind::Text)
@@ -91,7 +105,7 @@ namespace GyanisScribe::Annotation
             }
             const double outlineWidth = qBound(1.0, shape.fontSize * kTextOutlineWidthPerFontSize, 6.0);
             painter.setBrush(Qt::NoBrush);
-            painter.setPen(QPen(contrastingColorFor(shape.color), outlineWidth * 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+            painter.setPen(QPen(textStrokeColorOf(shape), outlineWidth * 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
             painter.drawPath(glyphs);
             painter.setPen(Qt::NoPen);
             painter.setBrush(shape.color);

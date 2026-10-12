@@ -127,6 +127,7 @@ namespace
             std::vector<int>      roundedRects;     ///< roundedRectChanged 收到的开关（1 开 0 关）
             std::vector<int>      doubleHeaded;     ///< doubleHeadedChanged 收到的开关（1 开 0 关）
             std::vector<int>      ellipticals;      ///< ellipticalChanged 收到的开关（1 椭圆 0 矩形）
+            std::vector<int>      strokeSteps;      ///< textStrokeColorStepChanged 收到的档（0 自动、1 白、2 黑）
             std::vector<int>      mosaicBlockSizes; ///< mosaicBlockSizeChanged 收到的粒度
             std::vector<int>      highlightAlphas;  ///< highlightAlphaChanged 收到的透明度
             std::vector<int>      highlightWidths;  ///< highlightWidthFactorChanged 收到的加宽倍数
@@ -155,6 +156,7 @@ namespace
             QObject::connect(toolbar.get(), &AnnotationToolbar::roundedRectChanged, [&log](bool enabled) { log.roundedRects.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::doubleHeadedChanged, [&log](bool enabled) { log.doubleHeaded.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::ellipticalChanged, [&log](bool enabled) { log.ellipticals.push_back(enabled ? 1 : 0); });
+            QObject::connect(toolbar.get(), &AnnotationToolbar::textStrokeColorStepChanged, [&log](int step) { log.strokeSteps.push_back(step); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::mosaicBlockSizeChanged, [&log](int blockSize) { log.mosaicBlockSizes.push_back(blockSize); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::highlightAlphaChanged, [&log](int alpha) { log.highlightAlphas.push_back(alpha); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::highlightWidthFactorChanged, [&log](int factor) { log.highlightWidths.push_back(factor); });
@@ -311,6 +313,31 @@ namespace
         EXPECT_FALSE(toolbar->currentElliptical());
         EXPECT_EQ(log.ellipticals, (std::vector<int>{1, 0}));
         EXPECT_EQ(button->accessibleName(), QString::fromUtf8("椭圆形状：矩形")) << "无障碍名没跟上";
+    }
+
+    /**
+     * @brief 钉住描边色按钮的三档循环：自动 → 白 → 黑 → 自动，提示与无障碍名跟着读数走
+     */
+    TEST_F(ToolbarFixture, StrokeColorButtonCyclesAndNamesTheStep)
+    {
+        SignalLog log;
+        auto      toolbar = makeToolbarLogged(log);
+        auto     *button  = buttonByLabel(*toolbar, "描边色");
+        ASSERT_NE(button, nullptr) << "工具栏上找不到描边色按钮";
+
+        EXPECT_EQ(toolbar->currentTextStrokeColorStep(), 0) << "起点该是「自动」";
+        button->click();
+        EXPECT_EQ(toolbar->currentTextStrokeColorStep(), 1);
+        EXPECT_EQ(log.strokeSteps, std::vector<int>{1}) << "走了一档却没把信号发出去";
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("描边色：白")) << "提示没跟上当前档";
+
+        button->click();
+        EXPECT_EQ(toolbar->currentTextStrokeColorStep(), 2);
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("描边色：黑"));
+
+        button->click();
+        EXPECT_EQ(toolbar->currentTextStrokeColorStep(), 0) << "三档之后该回到「自动」";
+        EXPECT_EQ(button->accessibleName(), QString::fromUtf8("描边色：自动")) << "无障碍名没跟上当前档";
     }
 
     /**
