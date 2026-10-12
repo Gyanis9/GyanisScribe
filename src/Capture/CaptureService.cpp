@@ -4,6 +4,7 @@
 #include "Capture/FrameStitch.h"
 #include "Capture/IScreenCaptureSource.h"
 #include "Capture/LongCaptureHud.h"
+#include "Capture/RegionHistory.h"
 #include "Capture/ScreenUtils.h"
 #include "Core/Logger.h"
 #include "Core/Text.h"
@@ -66,14 +67,7 @@ namespace GyanisScribe::Capture
         }
 
         // 选区记账排在成功之后：失败也写就会把用户上次的好选区顶掉
-        if (const auto stored = m_settings.setValue(Settings::kCaptureLastRegion, QVariant(regionToText(logicalRegion))); !stored)
-        {
-            Core::Logger::warning(std::format("上次截图区域没能记下：{}", stored.error().message));
-        }
-        if (const auto storedScreen = m_settings.setValue(Settings::kCaptureLastScreen, QVariant(frame->screenName)); !storedScreen)
-        {
-            Core::Logger::warning(std::format("上次截图所在屏没能记下：{}", storedScreen.error().message));
-        }
+        rememberRegion(m_settings, RegionHistoryEntry{logicalRegion, frame->screenName});
 
         deliver(cropped);
     }
@@ -86,23 +80,21 @@ namespace GyanisScribe::Capture
 
     void CaptureService::captureLastRegion()
     {
-        const auto storedText = m_settings.stringValue(Settings::kCaptureLastRegion, QString());
-        if (storedText.isEmpty())
+        const auto history = loadRegionHistory(m_settings);
+        if (!history)
+        {
+            deliver(Core::Expected<Core::CapturedImage>(std::unexpected(history.error())));
+            return;
+        }
+        if (history->empty())
         {
             deliver(Core::Expected<Core::CapturedImage>(
                     std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("还没有可复用的上次区域：先框选截图一次，或改用区域截图")})));
             return;
         }
 
-        const auto region = regionFromText(storedText.toStdString());
-        if (!region)
-        {
-            deliver(Core::Expected<Core::CapturedImage>(std::unexpected(region.error())));
-            return;
-        }
-
-        const auto screenName = m_settings.stringValue(Settings::kCaptureLastScreen, QString());
-        captureRegion(*region, screenName);
+        // 「上次区域」取最近那一条：历史里其余几条留给框选态的 R/Shift+R 循环挑
+        captureRegion(history->front().region, history->front().screenName);
     }
 
     void CaptureService::startInteractive()
@@ -140,6 +132,15 @@ namespace GyanisScribe::Capture
         // 于是每一格悬停都「认出整屏」，点一下就等于截全屏
         const auto candidates = windowCandidates();
 
+        // 历史选区按屏分：遮罩铺在哪块屏，就只把那块屏的几条交给它——
+        // R/Shift+R 循环挑的是同屏的几块，别屏的矩形放上来会露出一块越界的框
+        auto regionHistory = loadRegionHistory(m_settings);
+        if (!regionHistory)
+        {
+            Core::Logger::warning(std::format("选区历史读不出，这一轮的 R/Shift+R 没有可挑的：{}", regionHistory.error().message));
+            regionHistory = std::vector<RegionHistoryEntry>{};
+        }
+
         for (auto *screen: screens)
         {
             const auto frame = m_source.grabScreen(screen->name());
@@ -162,6 +163,8 @@ namespace GyanisScribe::Capture
                 }
             }
             overlay->setWindowCandidates(onThisScreen);
+            // 只给同屏的几条：R/Shift+R 循环挑的是这块屏上的几块，别屏的矩形放上来会露出一块越界的框
+            overlay->setRegionHistory(regionsOnScreen(*regionHistory, screen->name()));
             QObject::connect(overlay, &CaptureOverlay::regionSelected, this,
                              [this, screen, overlay, longCapture](const QRect &region)
                              {
@@ -268,14 +271,7 @@ namespace GyanisScribe::Capture
         m_longActive     = true;
 
         // 选区同样记进「上次区域」：长截图框出来的那条竖块往往正是下次要复用的那一块
-        if (const auto stored = m_settings.setValue(Settings::kCaptureLastRegion, QVariant(regionToText(logicalRegion))); !stored)
-        {
-            Core::Logger::warning(std::format("上次截图区域没能记下：{}", stored.error().message));
-        }
-        if (const auto storedScreen = m_settings.setValue(Settings::kCaptureLastScreen, QVariant(m_longScreenName)); !storedScreen)
-        {
-            Core::Logger::warning(std::format("上次截图所在屏没能记下：{}", storedScreen.error().message));
-        }
+        rememberRegion(m_settings, RegionHistoryEntry{logicalRegion, m_longScreenName});
 
         auto *hud = new LongCaptureHud{};
         QObject::connect(hud, &LongCaptureHud::finished, this, &CaptureService::finishLongCapture);

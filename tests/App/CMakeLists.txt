@@ -101,4 +101,4 @@ add_dependencies(TestModuleFlow DeployQtRuntime)
 # 测试改不了；ctest 把每条用例当独立进程并行起，因此这一组要按资源锁串行，
 # 否则一个进程删掉的文件是另一个进程正要读的。拖放那一条借系统剪贴板读回像素，
 # 与 TestPin / TestCapture / TestOcr 同拿 clipboardShared 那一把。
-gtest_discover_tests(TestModuleFlow PROPERTIES RESOURCE_LOCK "pinLayoutCache;clipboardShared")
+gtest_discover_tests(TestModuleFlow PROPERTIES RESOURCE_LOCK "pinLayoutCache\;clipboardShared")

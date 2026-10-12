@@ -26,4 +26,5 @@ include(GoogleTest)
 # 传图（写一份再读回来），并行时读到的会是别的进程刚写进去的另一张图——
 # 表现是「像素越界读到无效色」这种看着像坐标写错的假红。三处碰剪贴板的用例
 # （这里、TestCapture 的选区复制、TestOcr 的结果复制）同拿这一把锁。
-gtest_discover_tests(TestPin PROPERTIES RESOURCE_LOCK "pinLayoutCache;clipboardShared")
+# 注意：PROPERTIES 的值里两把锁之间的分号要写成 \;（转义）——裸分号会被 CMake 当列表分隔吃掉，只剩第一把。
+gtest_discover_tests(TestPin PROPERTIES RESOURCE_LOCK "pinLayoutCache\;clipboardShared")

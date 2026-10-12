@@ -192,6 +192,34 @@ TEST_F(CaptureServiceFixture, RegionCaptureRemembersTheRegion)
     SettingsStore reopened(m_iniFile);
     EXPECT_EQ(reopened.stringValue(GyanisScribe::Settings::kCaptureLastRegion, QString()), QStringLiteral("10,10,40,15")) << "成功抓过的选区没记下，「上次区域」就永远复用不了";
     EXPECT_EQ(reopened.stringValue(GyanisScribe::Settings::kCaptureLastScreen, QString()), QStringLiteral("FakeScreen-1")) << "所在屏没记下，多显示器下上次区域会回到错的那一块屏";
+    EXPECT_EQ(reopened.stringValue(GyanisScribe::Settings::kCaptureRegionHistory, QString()), QStringLiteral("10,10,40,15,FakeScreen-1"))
+            << "选区历史没记下，框选时的 R/Shift+R 就没有可挑的";
+}
+
+/**
+ * @brief 钉住历史按最近在前排，且「重复上次选区」取的是历史首条
+ * @details 两本账（历史与单值键）由同一个写点保成同一条：这里两处各验一次，
+ *          分开写就会出现「重复上次选区」与 R/Shift+R 说的不是同一块的局面。
+ */
+TEST_F(CaptureServiceFixture, RegionHistoryKeepsNewestFirstAndLastRegionReusesTheHead)
+{
+    SettingsStore     settings(m_iniFile);
+    FakeCaptureSource source;
+    CaptureService    service(source, settings, *platform);
+
+    service.captureRegion(QRect(10, 10, 40, 15), QStringLiteral("FakeScreen-1"));
+    service.captureRegion(QRect(50, 5, 30, 20), QStringLiteral("FakeScreen-1"));
+
+    settings.sync();
+    SettingsStore reopened(m_iniFile);
+    EXPECT_EQ(reopened.stringValue(GyanisScribe::Settings::kCaptureRegionHistory, QString()), QStringLiteral("50,5,30,20,FakeScreen-1;10,10,40,15,FakeScreen-1"))
+            << "历史该按最近在前排，两条都在";
+
+    Outcome outcome;
+    wire(service, outcome);
+    service.captureLastRegion();
+    ASSERT_TRUE(outcome.image.has_value()) << "复用上次区域应当抓出一帧，错误：" << (outcome.error ? outcome.error->message : std::string{});
+    EXPECT_EQ(outcome.image->logicalSize, (QSize(30, 20))) << "复用的不是最近那一条";
 }
 
 /**
@@ -252,13 +280,24 @@ TEST_F(CaptureServiceFixture, LastRegionReusesStoredRegionOrFails)
         EXPECT_EQ(source.requestedScreens.back(), QStringLiteral("FakeScreen-1")) << "没有回到记下的那块屏";
     }
 
-    // 记的文本坏了：拒绝，且不猜成任意一块屏
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureLastRegion, QVariant(QStringLiteral("10,20,30"))).has_value());
+    // 记的文本坏了：拒绝，且不猜成任意一块屏。两本账各验一次——
+    // 历史键是现在的真源；升级前留下的单值键只在历史为空时才被回退读，坏文本同样不许补全
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureRegionHistory, QVariant(QStringLiteral("10,20,30"))).has_value());
     {
         Outcome outcome;
         wire(service, outcome);
         service.captureLastRegion();
         ASSERT_TRUE(outcome.error.has_value()) << "三段文本不该被补成四段";
+        EXPECT_EQ(outcome.error->code, ErrorCode::InvalidArgument);
+    }
+
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureRegionHistory, QVariant(QString())).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureLastRegion, QVariant(QStringLiteral("10,20,30"))).has_value());
+    {
+        Outcome outcome;
+        wire(service, outcome);
+        service.captureLastRegion();
+        ASSERT_TRUE(outcome.error.has_value()) << "只剩旧键时，坏文本仍不该被补成四段";
         EXPECT_EQ(outcome.error->code, ErrorCode::InvalidArgument);
     }
 }

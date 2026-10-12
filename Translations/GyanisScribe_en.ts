@@ -1328,6 +1328,10 @@
             <translation>The window for handle {} can't be captured: this platform doesn't allow grabbing other programs' windows, or the window is already closed. Use region capture instead.</translation>
         </message>
         <message>
+            <source>选区历史的记录格式不对：第 {} 段「{}」应为「x,y,width,height,屏名」。请删掉这一项，让程序重新记一次</source>
+            <translation>The selection history entry is malformed: segment {} "{}" should look like "x,y,width,height,screen-name". Delete that entry so the app can record a fresh one</translation>
+        </message>
+        <message>
             <source>缩放因子必须大于 0，收到的是 {}。请检查这一帧来自哪块屏幕，dpr 不该由调用方自己猜</source>
             <translation>The scale factor must be greater than 0; got {}. Check which screen this frame came from: the caller must not guess the dpr.</translation>
         </message>

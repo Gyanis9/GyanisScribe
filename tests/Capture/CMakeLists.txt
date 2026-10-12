@@ -6,6 +6,7 @@ add_executable(TestCapture
         TestLongCaptureHud.cpp
         TestCaptureOverlay.cpp
         TestQScreenCaptureSource.cpp
+        TestRegionHistory.cpp
         TestScreenUtils.cpp)
 
 target_link_libraries(TestCapture PRIVATE

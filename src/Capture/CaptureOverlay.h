@@ -72,6 +72,14 @@ namespace GyanisScribe::Capture
         void setWindowCandidates(const std::vector<QRect> &globalRects);
 
         /**
+         * @brief 交付这块屏上的历史选区
+         * @param localRects 历史选区，屏内局部逻辑坐标，最近的在前；只放与这块屏同屏的那几条
+         * @details `R` / `Shift+R` 在这份清单里循环挑：按一次换一块，转一圈回到起点。
+         *          跨屏的那几条不进来——遮罩铺的是特定一块屏，把别屏的矩形放上来只会露出一块越界的框。
+         */
+        void setRegionHistory(const std::vector<QRect> &localRects);
+
+        /**
          * @brief 光标正压着的那一个像素的颜色
          * @return 冻帧里的实际像素色；还没收到鼠标移动、或冻帧为空时返回无效颜色
          * @details 按这块屏的原点与缩放因子换到帧像素：副屏不从 (0,0) 开始，高 DPI 下帧又比逻辑尺寸大，
@@ -213,21 +221,24 @@ namespace GyanisScribe::Capture
          */
         [[nodiscard]] QString formatCursorReadout() const;
 
-        QImage                       m_background;                              ///< 该屏的物理像素图，按缩放因子画成逻辑大小
-        QRect                        m_screenGeometry;                          ///< 该屏的全局逻辑几何
-        qreal                        m_devicePixelRatio = 1.0;                  ///< 该屏缩放因子
-        QPoint                       m_anchorPoint;                             ///< 本次框选的按下点，局部逻辑坐标
-        QPoint                       m_currentPoint;                            ///< 框选过程中的当前点
-        QPoint                       m_cursorPoint;                             ///< 光标最近所在点，只喂辅助线、悬停与放大镜，不参与选区计算
-        bool                         m_hasCursorPoint = false;                  ///< 是否收到过鼠标移动：没有就不摆放大镜，别把 (0,0) 当成光标
-        Pick::ColorFormat            m_readoutFormat  = Pick::ColorFormat::Hex; ///< 读数里颜色那格的写法，按 C 轮换
-        QString                      m_copiedSizeHint;                          ///< 「已复制尺寸 …」那行提示，指针一动就清
-        bool                         m_isAdjusting = false;                     ///< 是否正拖着某个抓点改选区
-        std::optional<SelectionGrip> m_draggedGrip;                             ///< 拖着的那个抓点，没拖时为空
-        QPoint                       m_adjustPoint;                             ///< 上一帧的鼠标位置，拖抓点时按增量走
-        bool                         m_isSelecting = false;                     ///< 是否正在拖动框选
-        std::vector<QRect>           m_windowCandidates;                        ///< 窗口候选，已换成局部逻辑坐标，按 z 序排
-        std::optional<QRect>         m_hoveredRegion;                           ///< 光标压在上的那一个候选，没有则空
+        QImage            m_background;                              ///< 该屏的物理像素图，按缩放因子画成逻辑大小
+        QRect             m_screenGeometry;                          ///< 该屏的全局逻辑几何
+        qreal             m_devicePixelRatio = 1.0;                  ///< 该屏缩放因子
+        QPoint            m_anchorPoint;                             ///< 本次框选的按下点，局部逻辑坐标
+        QPoint            m_currentPoint;                            ///< 框选过程中的当前点
+        QPoint            m_cursorPoint;                             ///< 光标最近所在点，只喂辅助线、悬停与放大镜，不参与选区计算
+        bool              m_hasCursorPoint = false;                  ///< 是否收到过鼠标移动：没有就不摆放大镜，别把 (0,0) 当成光标
+        Pick::ColorFormat m_readoutFormat  = Pick::ColorFormat::Hex; ///< 读数里颜色那格的写法，按 C 轮换
+
+        std::vector<QRect>           m_regionHistory;       ///< 这块屏上的历史选区，最近的在前；由 CaptureService 推过来
+        int                          m_historyIndex = -1;   ///< 当前选区取自历史里的哪一条；-1 表示不是取自历史（用户自己框/改的）
+        QString                      m_copiedSizeHint;      ///< 「已复制尺寸 …」那行提示，指针一动就清
+        bool                         m_isAdjusting = false; ///< 是否正拖着某个抓点改选区
+        std::optional<SelectionGrip> m_draggedGrip;         ///< 拖着的那个抓点，没拖时为空
+        QPoint                       m_adjustPoint;         ///< 上一帧的鼠标位置，拖抓点时按增量走
+        bool                         m_isSelecting = false; ///< 是否正在拖动框选
+        std::vector<QRect>           m_windowCandidates;    ///< 窗口候选，已换成局部逻辑坐标，按 z 序排
+        std::optional<QRect>         m_hoveredRegion;       ///< 光标压在上的那一个候选，没有则空
     };
 
 } // namespace GyanisScribe::Capture

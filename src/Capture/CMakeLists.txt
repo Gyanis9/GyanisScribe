@@ -2,6 +2,8 @@
 add_library(Capture STATIC
         ScreenUtils.h
         ScreenUtils.cpp
+        RegionHistory.h
+        RegionHistory.cpp
         FrameStitch.h
         FrameStitch.cpp
         CursorPixels.h

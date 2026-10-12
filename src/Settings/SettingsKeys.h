@@ -39,6 +39,14 @@ namespace GyanisScribe::Settings
     /// 上一次成功截图所在屏幕的名字，「上次区域」要回到那一块屏上
     inline constexpr std::string_view kCaptureLastScreen = "Capture/LastScreen";
 
+    /**
+     * @brief 最近若干次截图的选区历史
+     * @details 每条「x,y,width,height,屏名」，段间以 ';' 相连、最近的一条在最前；上限与去重见 Capture/RegionHistory.h。
+     *          框选时的 R / Shift+R 在这份历史里循环挑，「重复上次选区」与录屏的「上次选区」取第一条。
+     *          上面那两把单值键由同一个写点照写一份（记录 = 历史首条），老读法不受升级影响。
+     */
+    inline constexpr std::string_view kCaptureRegionHistory = "Capture/RegionHistory";
+
     /// 截完之后做什么，取值词表在 App::kCaptureIntentChoices；读端在 AppController，写端在设置的截图页
     inline constexpr std::string_view kCaptureAfterAction = "Capture/AfterAction";
 

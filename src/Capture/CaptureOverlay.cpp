@@ -1,5 +1,6 @@
 #include "Capture/CaptureOverlay.h"
 
+#include "Capture/RegionHistory.h"
 #include "Capture/ScreenUtils.h"
 #include "Core/Text.h"
 #include "Pick/ColorFormat.h"
@@ -82,6 +83,18 @@ namespace GyanisScribe::Capture
             m_windowCandidates.push_back(rect.translated(-origin.x(), -origin.y()));
         }
         refreshHoveredRegion();
+    }
+
+    void CaptureOverlay::setRegionHistory(const std::vector<QRect> &localRects)
+    {
+        // 进来就是这块屏的局部坐标（条目在记的时候就按屏存的），只做一次上限裁剪：
+        // 与 RegionHistory 那条上限同解，别在两处各写一个数字
+        m_regionHistory = localRects;
+        if (m_regionHistory.size() > kRegionHistoryLimit)
+        {
+            m_regionHistory.resize(kRegionHistoryLimit);
+        }
+        m_historyIndex = -1;
     }
 
     std::optional<QRect> CaptureOverlay::hoveredRegion() const
@@ -346,6 +359,8 @@ namespace GyanisScribe::Capture
         m_currentPoint   = m_anchorPoint;
         m_cursorPoint    = m_anchorPoint;
         m_hasCursorPoint = true;
+        // 重新框一块就不是「取自历史」了：下一次 R 该从最近一条重新起，而不是接着上一轮的位次
+        m_historyIndex = -1;
         // 预览留着不熄：按下还没拖的那一瞬间，「点一下要哪扇」的答案就是它。
         // 真拖起来了再由 refreshHoveredRegion 关掉，同一时刻不会出现两个矩形
         update();
@@ -413,6 +428,7 @@ namespace GyanisScribe::Capture
                 m_anchorPoint  = m_hoveredRegion->topLeft();
                 m_currentPoint = m_hoveredRegion->bottomRight();
                 m_hoveredRegion.reset();
+                m_historyIndex = -1; // 采纳的是悬停候选，不是历史里那一条
             }
             update();
         }
@@ -461,8 +477,45 @@ namespace GyanisScribe::Capture
                 }
                 m_anchorPoint  = QPoint{0, 0};
                 m_currentPoint = QPoint{size().width() - 1, size().height() - 1};
+                m_historyIndex = -1; // 整屏不是取自历史：下一次 R 该从最近一条重新起
                 update();
                 return;
+            case Qt::Key_R:
+            {
+                // `R` / `Shift+R` 在最近几次选区之间循环挑：转一圈回到起点。方向键那一档是「挪一格」，
+                // 这一档是「换一块」。没有历史时什么都不做，不留一个按了没反应的哑键
+                if (event->modifiers() != Qt::NoModifier && event->modifiers() != Qt::ShiftModifier)
+                {
+                    QWidget::keyPressEvent(event);
+                    return;
+                }
+                if (m_regionHistory.empty())
+                {
+                    QWidget::keyPressEvent(event);
+                    return;
+                }
+
+                const auto count = static_cast<int>(m_regionHistory.size());
+                const auto step  = event->modifiers().testFlag(Qt::ShiftModifier) ? -1 : 1;
+                if (m_historyIndex < 0)
+                {
+                    // 还没从历史里挑过：正向从最近一条起、反向从最久一条起——两头各自从各自那一端起步
+                    m_historyIndex = step > 0 ? 0 : count - 1;
+                } else
+                {
+                    m_historyIndex = (m_historyIndex + step + count) % count;
+                }
+
+                const auto &picked = m_regionHistory[static_cast<std::size_t>(m_historyIndex)];
+                m_isSelecting      = false;
+                m_isAdjusting      = false;
+                m_draggedGrip.reset();
+                m_hoveredRegion.reset();
+                m_anchorPoint  = picked.topLeft();
+                m_currentPoint = picked.bottomRight();
+                update();
+                return;
+            }
             case Qt::Key_V:
                 // 裸按 V 把当前选区的成品像素尺寸复制进剪贴板：贴给别人时先报一句「多大」
                 if (event->modifiers() != Qt::NoModifier)

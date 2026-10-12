@@ -481,3 +481,55 @@ TEST_F(CaptureOverlayFixture, ControlASelectsEverythingAndVCopiesThePixelSize)
     EXPECT_EQ(full.width(), kScreenGeometry.width()) << "Ctrl+A 没选中整块屏";
     EXPECT_EQ(full.height(), kScreenGeometry.height());
 }
+
+/**
+ * @brief 钉住 R / Shift+R 在历史选区之间循环挑
+ * @details 正向从最近一条起、反向从最久一条起；到头绕回另一端（循环挑）。
+ *          自己重新框过一块之后位次从头起——接着上一轮的位次会跳到一条没人指着的历史上；
+ *          这一段的位次要落在「顺手接着按会给出另一条」的那个下标上（0），否则改坏了也看不出来。
+ */
+TEST_F(CaptureOverlayFixture, RegionHistoryKeysCycleThroughRecentSelections)
+{
+    const QRect first{10, 10, 40, 20};
+    const QRect second{100, 50, 30, 30};
+    const QRect third{200, 300, 20, 20};
+
+    auto overlay = makeOverlay();
+
+    // 没有历史：R 什么都不做，不凭空造出一块
+    pressKey(*overlay, Qt::Key_R);
+    EXPECT_TRUE(overlay->selectedRegion().isNull()) << "没有历史时 R 不该凭空造出一块";
+
+    overlay->setRegionHistory({first, second, third});
+
+    pressKey(*overlay, Qt::Key_R);
+    EXPECT_EQ(overlay->selectedRegion(), first) << "第一下 R 该挑最近一条";
+    pressKey(*overlay, Qt::Key_R);
+    EXPECT_EQ(overlay->selectedRegion(), second) << "再按一下该往更久的一条走";
+    pressKey(*overlay, Qt::Key_R);
+    EXPECT_EQ(overlay->selectedRegion(), third) << "第三下该到最久的一条";
+    pressKey(*overlay, Qt::Key_R);
+    EXPECT_EQ(overlay->selectedRegion(), first) << "到头该绕回最近一条（循环挑）";
+
+    // 反向：退一条、退到头再绕回另一端（收在最近一条上，为后面的「手框重置位次」留出可判别的下标）
+    pressKey(*overlay, Qt::Key_R, Qt::ShiftModifier);
+    EXPECT_EQ(overlay->selectedRegion(), third) << "Shift+R 该反向退一条";
+    pressKey(*overlay, Qt::Key_R, Qt::ShiftModifier);
+    EXPECT_EQ(overlay->selectedRegion(), second);
+    pressKey(*overlay, Qt::Key_R, Qt::ShiftModifier);
+    EXPECT_EQ(overlay->selectedRegion(), first) << "反向退到头该绕回最近一条";
+
+    // 反向的第一下（从空的选区起）：从最久一条起
+    auto fresh = makeOverlay();
+    fresh->setRegionHistory({first, second, third});
+    pressKey(*fresh, Qt::Key_R, Qt::ShiftModifier);
+    EXPECT_EQ(fresh->selectedRegion(), third) << "反向的第一下该从最久一条起";
+
+    // 自己重新框一块之后：位次从头起，而不是接着上一轮
+    buttonAt(*overlay, QEvent::MouseButtonPress, QPoint{200, 200});
+    moveOver(*overlay, QPoint{260, 250});
+    buttonAt(*overlay, QEvent::MouseButtonRelease, QPoint{260, 250});
+    EXPECT_EQ(overlay->selectedRegion(), QRect(200, 200, 61, 51)) << "手框的这一块没落定，后面的判据无从谈起";
+    pressKey(*overlay, Qt::Key_R);
+    EXPECT_EQ(overlay->selectedRegion(), first) << "自己框过之后 R 该从最近一条重新起，而不是接着上一轮的位次";
+}

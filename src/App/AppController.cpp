@@ -6,6 +6,7 @@
 #include "App/ClipboardPin.h"
 #include "Capture/CaptureService.h"
 #include "Capture/IScreenCaptureSource.h"
+#include "Capture/RegionHistory.h"
 #include "Capture/ScreenCaptureSourceFactory.h"
 #include "Capture/ScreenUtils.h"
 #include "Core/ImageFormat.h"
@@ -856,13 +857,18 @@ namespace GyanisScribe::App
 
         if (config.mode == Record::RecordMode::Region)
         {
-            const auto region = Capture::regionFromText(m_settings->stringValue(Settings::kCaptureLastRegion, QString()).toStdString());
-            if (!region)
+            // 「上次选区」取历史首条：与截图那边「重复上次选区」同一条（选区历史见 Capture/RegionHistory.h）
+            const auto history = Capture::loadRegionHistory(*m_settings);
+            if (!history)
+            {
+                return std::unexpected(history.error());
+            }
+            if (history->empty())
             {
                 return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
                                                    GyanisScribe::Core::uiTextUtf8("还没有可录的选区：先按截图热键框一次选区，再开始录屏；也可以把录制范围改回整屏")});
             }
-            config.region = *region;
+            config.region = history->front().region;
         } else if (config.mode == Record::RecordMode::Window)
         {
             const auto window = m_integration->foregroundWindow();
