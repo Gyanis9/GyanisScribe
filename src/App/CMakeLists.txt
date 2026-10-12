@@ -4,6 +4,8 @@ add_library(App STATIC
         Application.cpp
         AppController.h
         AppController.cpp
+        CommandLine.h
+        CommandLine.cpp
         CaptureIntent.h
         CaptureIntent.cpp
         ClipboardPin.h
@@ -39,8 +41,9 @@ target_link_libraries(App PUBLIC
         Qt6::Network
         Qt6::PrintSupport)
 
-# 版本号只有一处真源：工程的 project(... VERSION)，代码里通过宏取，不散落字面量
-target_compile_definitions(App PRIVATE PROJECT_VERSION="${PROJECT_VERSION}")
+# 版本号只有一处真源：工程的 project(... VERSION)，代码里通过宏取，不散落字面量。
+# PUBLIC：最终可执行体的 Main.cpp 也用这一份（--version 在应用对象之前就要打出来）
+target_compile_definitions(App PUBLIC PROJECT_VERSION="${PROJECT_VERSION}")
 
 if (MSVC)
     target_compile_options(App PRIVATE /W4 /WX)

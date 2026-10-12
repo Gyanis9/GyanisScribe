@@ -57,10 +57,15 @@ namespace GyanisScribe::Record
      * @param height 真录屏的帧高，像素
      * @param frameRate 真录屏的帧率
      * @param videoBitrateKbps 画面码率，0 表示按质量优先
+     * @param pinnedEncoder 设置里钉死的那一档；空表示走全自动
      * @return 成功返回选中的编码器名；一个都不开得来返回中文原因，里面列出试过哪几个
      * @details 判据是真跑一次而不是读 `ffmpeg -encoders` 的名单：本机实测那份名单里的
      *          h264_qsv 与 h264_amf 都在（缺 Intel/AMD 的运行库时当场开不起来），
      *          h264_mf 在名单里也开得出，跑到一半却自己崩了。
+     *          钉了某一档就先探它：探得过就用它；探不过退回自动档（调用方比较返回值与钉子，
+     *          把「钉的那一档这次没开起来」写进日志）——到了编码这一步帧已经录完，
+     *          宁可按自动档编出来，也不让这一段白录。钉子不在候选表里时直接退回自动。
      */
-    [[nodiscard]] Core::Expected<std::string> selectVideoEncoder(const std::function<bool(const QStringList &)> &run, int width, int height, int frameRate, int videoBitrateKbps);
+    [[nodiscard]] Core::Expected<std::string> selectVideoEncoder(const std::function<bool(const QStringList &)> &run, int width, int height, int frameRate, int videoBitrateKbps,
+                                                                 std::string_view pinnedEncoder = {});
 } // namespace GyanisScribe::Record

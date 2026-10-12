@@ -156,6 +156,10 @@
             <translation>Highlight opacity</translation>
         </message>
         <message>
+            <source>高亮加宽</source>
+            <translation>Highlight width</translation>
+        </message>
+        <message>
             <source>字体</source>
             <translation>Font</translation>
         </message>
@@ -246,6 +250,18 @@
         <message>
             <source>高亮透明度：重</source>
             <translation>Highlight opacity: strong</translation>
+        </message>
+        <message>
+            <source>高亮加宽：窄</source>
+            <translation>Highlight width: narrow</translation>
+        </message>
+        <message>
+            <source>高亮加宽：中</source>
+            <translation>Highlight width: medium</translation>
+        </message>
+        <message>
+            <source>高亮加宽：宽</source>
+            <translation>Highlight width: wide</translation>
         </message>
         <message>
             <source>粗体：开</source>
@@ -356,14 +372,6 @@
             <translation>Capture did not complete: %1. Try again</translation>
         </message>
         <message>
-            <source>已贴出 {} 张；{} 不是图片，没贴</source>
-            <translation>Pinned {} image(s); {} is not an image and was skipped</translation>
-        </message>
-        <message>
-            <source>已贴出 {} 张</source>
-            <translation>Pinned {} image(s)</translation>
-        </message>
-        <message>
             <source>这张贴图已移到当前分组，就摆在原处</source>
             <translation>This pin has been moved into the group on screen; it stays where it is</translation>
         </message>
@@ -446,6 +454,30 @@
         <message>
             <source>已送往打印机</source>
             <translation>Sent to the printer</translation>
+        </message>
+        <message>
+            <source>已贴出 {} 张；{} 不是图片，没贴</source>
+            <translation>Pinned {} image(s); {} is not an image and was skipped</translation>
+        </message>
+        <message>
+            <source>已贴出 {} 张</source>
+            <translation>Pinned {} image(s)</translation>
+        </message>
+        <message>
+            <source>复制的文件里没有能当图片贴的：请复制图片文件本身，或复制图片内容</source>
+            <translation>None of the copied files can be pinned as an image: copy the image file itself, or copy the image content</translation>
+        </message>
+        <message>
+            <source>这个命令行动作不走截图这条路</source>
+            <translation>This command-line action does not go through the capture path</translation>
+        </message>
+        <message>
+            <source>没找到这个文件：{}</source>
+            <translation>File not found: {}</translation>
+        </message>
+        <message>
+            <source>「{}」不是能贴的图片：支持 PNG / JPG / WebP / GIF 这类格式</source>
+            <translation>“{}” is not an image that can be pinned: PNG / JPG / WebP / GIF are supported</translation>
         </message>
         <message>
             <source>已复制颜色 </source>
@@ -604,16 +636,52 @@
             <translation>The dropped files are not images or cannot be read: {}. Image files, links and text can all be pinned</translation>
         </message>
         <message>
+            <source>--capture 要带一个范围取值：full、region 或 window</source>
+            <translation>--capture needs a scope value: full, region or window</translation>
+        </message>
+        <message>
+            <source>--capture 的取值「%1」不认识：只能是 full、region 或 window（区分大小写）</source>
+            <translation>Unrecognised value “%1” for --capture: only full, region or window are accepted (case-sensitive)</translation>
+        </message>
+        <message>
+            <source>--pin 要带一个图片文件路径</source>
+            <translation>--pin needs a path to an image file</translation>
+        </message>
+        <message>
+            <source>不认识的参数：%1。可用参数见 --help</source>
+            <translation>Unrecognised argument: %1. Run --help for the available ones</translation>
+        </message>
+        <message>
+            <source>一次只能给一个动作：%1 与 %2 只能选一个</source>
+            <translation>Only one action can be given at a time: %1 and %2 are mutually exclusive</translation>
+        </message>
+        <message>
+            <source>    --capture=%1       %2\n</source>
+            <translation>    --capture=%1       %2\n</translation>
+        </message>
+        <message>
+            <source>智录：截图、标注、贴图、取色、录屏与文字识别。不带参数启动即常驻（托盘 + 全局热键）。\n\n用法：GyanisScribe [参数]\n  -h, --help         打这份说明后退出\n  -v, --version      打版本号后退出\n  --selftest         把启动路径跑完就退出：热键登记与日志就绪算通过（退出码 0），否则 1\n  --capture=&lt;范围&gt;   截一张并直接存成文件（同时进剪贴板），把文件路径打到标准输出后退出：\n</source>
+            <translation>GyanisScribe: capture, annotate, pin, pick colours, record and OCR.\nStarting without arguments keeps it resident (tray + global hotkeys).\n\nUsage: GyanisScribe [options]\n  -h, --help         print this help and exit\n  -v, --version      print the version and exit\n  --selftest         run the startup path once and exit: code 0 when hotkeys and logging are ready, 1 otherwise\n  --capture=&lt;scope&gt;  take one shot, save it straight to a file (and the clipboard), print the path to stdout, exit:\n</translation>
+        </message>
+        <message>
+            <source>  --pin &lt;文件&gt;       把盘上的图片贴到屏幕上（保持运行）\n  --pick             进入屏幕取色（保持运行）\n</source>
+            <translation>  --pin &lt;file&gt;       pin an image file onto the screen (keeps running)\n  --pick             enter screen colour picking (keeps running)\n</translation>
+        </message>
+        <message>
+            <source>整块屏</source>
+            <translation>the whole screen</translation>
+        </message>
+        <message>
+            <source>复用「上次选区」（没有记过选区时当场报错）</source>
+            <translation>reuse the last region (errors out when none was recorded)</translation>
+        </message>
+        <message>
+            <source>当前前台窗口</source>
+            <translation>the current foreground window</translation>
+        </message>
+        <message>
             <source>智录遇到未处理的错误：{}。现场已尽量落到日志与崩溃转储，请到 {} 找最近一份日志（同目录下的 .dmp 是转储）；如果反复出现，请把日志、转储与出错的操作步骤一起反馈</source>
             <translation>GyanisScribe hit an unhandled error: {}. What could be saved went to the log and a crash dump; look for the newest log in {} (a .dmp next to it is the dump). If it keeps happening, send the log, the dump and the steps you took</translation>
-        </message>
-        <message>
-            <source>智录：截图、标注、贴图、取色、录屏与文字识别</source>
-            <translation>GyanisScribe: capture, annotate, pin, pick colour, record, and read text</translation>
-        </message>
-        <message>
-            <source>把启动路径跑完就退出：热键登记与日志就绪算通过（退出码 0），否则 1</source>
-            <translation>Run the startup path and exit: hotkey registration plus ready logging count as a pass (exit code 0), otherwise 1</translation>
         </message>
         <message>
             <source>这一类的说明</source>
@@ -716,6 +784,14 @@
             <translation>Wait this long after the key before capturing, for menus and hover hints that vanish as soon as you touch them; 0 means no delay</translation>
         </message>
         <message>
+            <source>录屏倒计时</source>
+            <translation>Recording countdown</translation>
+        </message>
+        <message>
+            <source>按下录屏键后先数这么几秒再开始录，用来把要录的画面摆好；0 表示立即开始</source>
+            <translation>Counts down before recording starts so you can arrange what is about to be recorded; 0 starts immediately</translation>
+        </message>
+        <message>
             <source> kbps</source>
             <translation> kbps</translation>
         </message>
@@ -762,6 +838,26 @@
         <message>
             <source>不取这一路</source>
             <translation>Don't take this input</translation>
+        </message>
+        <message>
+            <source>自动（逐个探测）</source>
+            <translation>Automatic (probe each in turn)</translation>
+        </message>
+        <message>
+            <source>视频编码器</source>
+            <translation>Video encoder</translation>
+        </message>
+        <message>
+            <source>列出的是这台机器上前不久真探通的编码器；自动档会在每次编码前按偏好顺序探一遍</source>
+            <translation>Lists the encoders actually probed working on this machine; the automatic option probes them in preference order before every encode</translation>
+        </message>
+        <message>
+            <source>GIF 最高 24 帧/秒：再高肉眼看不出来，两遍调色板还按帧数翻倍涨。切回 MP4 会恢复你原来那一档</source>
+            <translation>GIF tops out at 24 fps: beyond that the eye cannot tell while the two-pass palette scales with the frame count. Switching back to MP4 restores your own value</translation>
+        </message>
+        <message>
+            <source>录屏的目标帧率；GIF 档的上限比 MP4 低（24 帧/秒）</source>
+            <translation>Target frame rate for recording; the GIF format tops out lower than MP4 (24 fps)</translation>
         </message>
         <message>
             <source>输出格式</source>
@@ -964,8 +1060,8 @@
             <translation>Opacity for new pins</translation>
         </message>
         <message>
-            <source>录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。存成 GIF 时帧率上限比 MP4 低。画面码率填 0 就交给编码器的质量档，给了具体数值就按那个码率控，GIF 用不上这一项。取声那两格列不出设备时只剩「不取这一路」，把鼠标停在框上能看到原因；存成 GIF 时这两格会灰掉，那种文件带不了声音。这几项都从下一次开始录屏时生效。</source>
-            <translation>Recorded files land in this folder. With Last selection or Current window the picture keeps only that part of the screen. GIF allows a lower frame rate ceiling than MP4. A video bitrate of 0 leaves the quality to the encoder, a concrete number caps the bitrate, and GIF ignores this row. When the two audio rows can't list any device, only "Don't take this input" is left there - hover over the box to read why; with GIF those two rows grey out because that container carries no sound. All of these apply from the next recording.</translation>
+            <source>录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。存成 GIF 时帧率上限比 MP4 低（选了 GIF 那一格只到 24）。画面码率填 0 就交给编码器的质量档，给了具体数值就按那个码率控，GIF 用不上这一项。编码器可以钉住某一家，默认自动就是编码前逐个真探、挑第一个开得起来的。倒计时 0 表示立即开始。取声那两格列不出设备时只剩「不取这一路」，把鼠标停在框上能看到原因；存成 GIF 时这两格会灰掉，那种文件带不了声音。这几项都从下一次开始录屏时生效。</source>
+            <translation>Recording output lands in this directory. Pick “Last region” or “Current window” under Recording area to keep only that part in the picture. When saving as GIF the frame-rate ceiling is lower than for MP4 (the frame-rate field stops at 24 for GIF). Set the video bitrate to 0 to leave quality to the encoder; give a number to control the bitrate — GIF ignores this. An encoder can be pinned; the automatic option probes each one for real before encoding and picks the first that starts. A countdown of 0 starts immediately. When the audio rows cannot list devices only “no sound” remains; hover the boxes to see why; picking GIF greys them out because that container cannot carry a soundtrack. All of these take effect from the next recording.</translation>
         </message>
         <message>
             <source>录屏成品目录</source>
@@ -974,6 +1070,10 @@
         <message>
             <source>录屏目录</source>
             <translation>Recordings</translation>
+        </message>
+        <message>
+            <source>倒计时</source>
+            <translation>Countdown</translation>
         </message>
         <message>
             <source>麦克风设备</source>
@@ -1776,8 +1876,8 @@
             <translation>System recognition failed for this image ({} , error code 0x{}). Try again, or switch to the Tesseract backend</translation>
         </message>
         <message>
-            <source>颜色写法 "{}" 不认识。可用取值只有 Hex、Rgb 与 Hsl（区分大小写），请在设置的取色页里重选一次</source>
-            <translation>The color format "{}" is unknown. Only Hex, Rgb and Hsl are valid (case-sensitive); pick one again on the color picker page in Settings.</translation>
+            <source>颜色写法 "{}" 不认识。可用取值只有 Hex、Rgb、Hsl、Hsv、Hsi 与 Decimal（区分大小写），请在设置的取色页里重选一次</source>
+            <translation>Unrecognised colour format “{}”. Available values are Hex, Rgb, Hsl, Hsv, Hsi and Decimal (case-sensitive); pick again on the Colour page of Settings</translation>
         </message>
         <message>
             <source>取色器</source>
@@ -2060,6 +2160,14 @@
             <translation>{} failed (exit code {}): {}. The full output is in the log, and you can also run the same command yourself to see the details.</translation>
         </message>
         <message>
+            <source>你这份 ffmpeg 里一个候选编码器都开不起来（逐个真探过）。请换装一个带 libx264 的完整 ffmpeg 构建，录屏仍可进行——编码时会再试一遍，全不行才报错</source>
+            <translation>None of the candidate encoders starts with your ffmpeg build (each was probed for real). Install a full ffmpeg build with libx264; recording still works — the encoder is probed again before encoding and only fails when every candidate does</translation>
+        </message>
+        <message>
+            <source>探测编码器 {} 的那一步起不动 ffmpeg。请确认它还能运行，或重新安装</source>
+            <translation>The ffmpeg probe for encoder {} could not start. Make sure ffmpeg still runs, or reinstall it</translation>
+        </message>
+        <message>
             <source>你这份 ffmpeg 里没有能开起来的视频编码器（试过 {}）。请换装一个带 libx264 的完整 ffmpeg 构建，或者先把这一帧序列自己用 ffmpeg 编一次看报什么</source>
             <translation>None of the video encoders in your ffmpeg build could start (tried {}). Install a full ffmpeg build that carries libx264, or encode this frame sequence by hand with ffmpeg to read what it reports</translation>
         </message>
@@ -2102,6 +2210,10 @@
         <message>
             <source>画面码率 "{}" 不在可用范围（0 到 {} kbps，0 表示按质量优先）里：请在设置的录屏页重选，或删掉 Record/VideoBitrateKbps 这一项回到默认档</source>
             <translation>Video bitrate "{}" is not in the available range (0 to {} kbps, where 0 means quality first): pick a value again on the recording page of Settings, or delete the Record/VideoBitrateKbps entry to fall back to the default</translation>
+        </message>
+        <message>
+            <source>倒计时「{}」不在可用范围（0 到 {} 秒，0 表示立即开始）里：请在设置的录屏页重选，或删掉 Record/CountdownSeconds 这一项回到默认档</source>
+            <translation>Countdown “{}” is outside the range (0 to {} seconds; 0 starts immediately): reselect it on the Record page of Settings, or remove Record/CountdownSeconds to fall back to the default</translation>
         </message>
         <message>
             <source>录屏页</source>
@@ -2194,10 +2306,6 @@
         <message>
             <source>最小化到托盘</source>
             <translation>Minimize to tray</translation>
-        </message>
-        <message>
-            <source>倒计时</source>
-            <translation>Countdown</translation>
         </message>
         <message>
             <source>继续</source>

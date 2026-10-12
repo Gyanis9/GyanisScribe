@@ -468,6 +468,49 @@ TEST_F(EngineFixture, MosaicGrainAndHighlightAlphaRestyleAndUndoBack)
     EXPECT_EQ(m_engine.exportImage().pixelColor(160, 70), QColor(60, 60, 0)) << "撤销没把透明度退回轻档";
 }
 
+/**
+ * @brief 钉住高亮加宽的换档与撤销：宽度记在图形自己身上，选中的那条跟着改
+ * @details 窄档（2×）带宽 16、宽档（8×）带宽 64：探点取在窄档带外、宽档带内，
+ *          同一个坐标在两档下的读数互为对照。改倍数是样式动作，撤销要能整条退回去。
+ */
+TEST_F(EngineFixture, HighlightWidthFactorRestylesAndUndoBack)
+{
+    CapturedImage canvas;
+    canvas.image = QImage(200, 100, QImage::Format_ARGB32_Premultiplied);
+    canvas.image.fill(QColor(255, 255, 255));
+    for (int y = 50; y < 100; ++y)
+    {
+        for (int x = 0; x < 200; ++x)
+        {
+            canvas.image.setPixelColor(x, y, QColor(0, 0, 0));
+        }
+    }
+    canvas.devicePixelRatio = 1.0;
+    canvas.logicalSize      = QSize(200, 100);
+    canvas.screenName       = QStringLiteral("FakeScreen-1");
+    m_engine.loadCanvas(canvas);
+
+    // 窄档（2×）画一条 8 线宽的高亮：带宽 16，(160,55) 落在带外
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Highlight).has_value());
+    ASSERT_TRUE(
+            m_engine.setPenParameters(PenParameters{.color = QColor(255, 255, 0), .lineWidth = 8, .fontSize = 16, .fillStyle = 0, .highlightAlpha = 110, .highlightWidthFactor = 2})
+                    .has_value());
+    m_engine.beginStroke(QPoint(20, 70));
+    m_engine.moveStroke(QPoint(180, 70));
+    const auto highlight = m_engine.endStroke();
+    ASSERT_TRUE(highlight.has_value()) << highlight.error().message;
+    EXPECT_EQ(m_engine.exportImage().pixelColor(160, 55), QColor(0, 0, 0)) << "窄档在带外留了墨，后面的对照就没有基准";
+
+    // 改成宽档（8×）：同一个探点进带内；撤一步退回窄档
+    ASSERT_TRUE(m_engine.select(*highlight).has_value());
+    ASSERT_TRUE(
+            m_engine.setPenParameters(PenParameters{.color = QColor(255, 255, 0), .lineWidth = 8, .fontSize = 16, .fillStyle = 0, .highlightAlpha = 110, .highlightWidthFactor = 8})
+                    .has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(160, 55), QColor(110, 110, 0)) << "选中项的高亮加宽没跟着改";
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(160, 55), QColor(0, 0, 0)) << "撤销没把加宽退回窄档，改倍数没进撤销栈";
+}
+
 namespace
 {
     /// 用文字工具在指定位置放一条文字，返回它的位置

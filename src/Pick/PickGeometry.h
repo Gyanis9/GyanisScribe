@@ -12,6 +12,8 @@
 #include <QPoint>
 #include <QRect>
 
+#include <vector>
+
 namespace GyanisScribe::Pick
 {
 
@@ -23,6 +25,10 @@ namespace GyanisScribe::Pick
 
     /// 放大镜相对光标的默认偏移，逻辑像素：贴着光标会挡住正要看的像素
     inline constexpr int kMagnifierCursorOffset = 18;
+
+    /// 最近取色色块的边长与间距，逻辑像素；距屏幕底边的留白与它同一档
+    inline constexpr int kRecentSwatchEdge = 28;
+    inline constexpr int kRecentSwatchGap  = 6;
 
     /**
      * @brief 放大镜该画在哪、取哪一块
@@ -59,5 +65,16 @@ namespace GyanisScribe::Pick
      *          取到的颜色是光标左上几像素的那块。
      */
     [[nodiscard]] QPoint framePixelFor(const QPoint &globalPos, const QRect &screenGeometry, qreal devicePixelRatio, const QSize &imageSize);
+
+    /**
+     * @brief 最近取色的色块行占的各个矩形
+     * @param screen 这块屏的几何，屏幕坐标
+     * @param count 要摆几个色块；0 个返回空表
+     * @return 每个色块一个矩形，从左到右按最近在前排；屏幕太窄摆不下时按可摆数量截断
+     * @details 摆在屏幕底边中间：不挡上方要核对的内容，又在一个不用找的位置。
+     *          底色与描边由画的一侧定，这里只管几何——命中测试与绘制的矩形必须出自同一处，
+     *          各自算一遍就会「看着点在块上、实际没点中」。
+     */
+    [[nodiscard]] std::vector<QRect> recentSwatchRects(const QRect &screen, int count);
 
 } // namespace GyanisScribe::Pick

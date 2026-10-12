@@ -61,9 +61,14 @@ namespace GyanisScribe::Record
         // 每个候选都真跑三帧：名单里有不等于开得起来（缺 Intel/AMD 运行库的那些照样在名单上）
         const auto probe = [](const QStringList &arguments) { return run(arguments, kEncoderProbeTimeoutMs, GyanisScribe::Core::uiTextUtf8("编码器探测")).has_value(); };
 
-        const auto selected = selectVideoEncoder(probe, frameSize.width(), frameSize.height(), config.frameRate, config.videoBitrateKbps);
+        const auto selected = selectVideoEncoder(probe, frameSize.width(), frameSize.height(), config.frameRate, config.videoBitrateKbps, config.videoEncoder);
         if (selected)
         {
+            if (!config.videoEncoder.empty() && *selected != config.videoEncoder)
+            {
+                // 帧已经录完了，这里不中途失败：钉的那一档这次开不起来（驱动或运行库变了）按自动档编出来，原因写清楚
+                Core::Logger::warning(std::format("设置里钉的编码器 {} 这次探不过，已按自动档 {} 编这一轮", config.videoEncoder, *selected));
+            }
             Core::Logger::info(std::format("录屏编码器：{}（{}x{}，{} 帧/秒）", *selected, frameSize.width(), frameSize.height(), config.frameRate));
         }
         return selected;

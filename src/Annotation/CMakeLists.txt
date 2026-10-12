@@ -7,8 +7,6 @@ add_library(Annotation STATIC
         TextFont.h
         AnnotationTool.h
         AnnotationTool.cpp
-        RecentColors.h
-        RecentColors.cpp
         RectangleTool.h
         RectangleTool.cpp
         EllipseTool.h
@@ -52,6 +50,7 @@ add_library(Annotation STATIC
 target_include_directories(Annotation PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(Annotation PUBLIC
         Core
+        Pick
         Settings
         Ui
         Qt6::Core

@@ -598,7 +598,7 @@ namespace GyanisScribe::Capture
                 }
                 return;
             case Qt::Key_C:
-                // 裸按 C 轮换读数里颜色那一格的写法（Hex → Rgb → Hsl）：对着目标程序核对配色时
+                // 裸按 C 轮换读数里颜色那一格的写法（词表见 Pick/ColorFormat，六个轮一圈）：对着目标程序核对配色时
                 // 常常要换一种写法看，不必为这个先离开截图去设置里改一档。
                 // 带修饰键的不认——Shift 已经被「挪右下角」用掉了，Ctrl/Alt 留给系统组合
                 if (event->modifiers() != Qt::NoModifier)
@@ -606,9 +606,7 @@ namespace GyanisScribe::Capture
                     QWidget::keyPressEvent(event);
                     return;
                 }
-                m_readoutFormat = m_readoutFormat == Pick::ColorFormat::Hex   ? Pick::ColorFormat::Rgb
-                                  : m_readoutFormat == Pick::ColorFormat::Rgb ? Pick::ColorFormat::Hsl
-                                                                              : Pick::ColorFormat::Hex;
+                m_readoutFormat = *Pick::colorFormatAt((Pick::indexOfColorFormat(m_readoutFormat) + 1) % static_cast<int>(Pick::kColorFormatCount));
                 update();
                 return;
             default:

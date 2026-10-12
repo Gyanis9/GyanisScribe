@@ -320,6 +320,11 @@ namespace GyanisScribe::Pin
         update();
     }
 
+    const QImage &PinWindow::image() const noexcept
+    {
+        return m_image;
+    }
+
     void PinWindow::copyToClipboard()
     {
         // 剪贴板带得了透明通道：装饰按「不垫白」来（与标注窗那边同一条规矩）。

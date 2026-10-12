@@ -5,7 +5,9 @@ add_library(Pick STATIC
         PickGeometry.h
         PickGeometry.cpp
         ColorPickerOverlay.h
-        ColorPickerOverlay.cpp)
+        ColorPickerOverlay.cpp
+        RecentColors.h
+        RecentColors.cpp)
 
 target_include_directories(Pick PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(Pick PUBLIC

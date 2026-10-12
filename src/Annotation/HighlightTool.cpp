@@ -8,12 +8,6 @@
 
 namespace GyanisScribe::Annotation
 {
-    namespace
-    {
-        // 高亮相对线宽的加宽倍数：一支笔要能盖住一行字（宽度的档不随图形走，透明度才随）
-        constexpr int kHighlightWidthFactor = 4;
-    } // namespace
-
     HighlightTool::HighlightTool() : PenTool(ToolKind::Highlight)
     {
     }
@@ -34,7 +28,8 @@ namespace GyanisScribe::Annotation
         color.setAlpha(shape.highlightAlpha);
 
         auto pen = QPen(color);
-        pen.setWidth(shape.lineWidth * kHighlightWidthFactor);
+        // 加宽倍数记在每条图形自己身上（窄/中/宽三档）：工具上那一份只是后续笔画的默认值
+        pen.setWidth(shape.lineWidth * shape.highlightWidthFactor);
         pen.setCapStyle(Qt::FlatCap);
         pen.setJoinStyle(Qt::MiterJoin);
         painter.setPen(pen);
@@ -50,7 +45,7 @@ namespace GyanisScribe::Annotation
 
     bool HighlightTool::hitTestShape(const AnnotationShape &shape, const QPoint &point, int tolerance) const
     {
-        const double widened = static_cast<double>(tolerance) * kHighlightWidthFactor;
+        const double widened = static_cast<double>(tolerance) * shape.highlightWidthFactor;
         return squaredDistanceToPolyline(point, shape.points) <= widened * widened;
     }
 

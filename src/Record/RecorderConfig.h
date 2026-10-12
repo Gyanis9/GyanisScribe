@@ -56,6 +56,7 @@ namespace GyanisScribe::Record
         bool                  cursorHighlight = false;                         ///< 是否在帧上圈出光标位置
         QString               microphoneDevice;                                ///< 麦克风那一路的 dshow 标识，空表示不取这一路
         QString               systemSoundDevice;                               ///< 系统声音那一路的 dshow 标识，空表示不取这一路
+        std::string           videoEncoder;                                    ///< 钉死的 MP4 编码器名；空表示按偏好顺序逐个探测自动选
     };
 
     /**
@@ -92,6 +93,12 @@ namespace GyanisScribe::Record
     /// 默认帧率的缺省档：配置里没有、或存的值不合法时用它，与 RecorderConfig::frameRate 的初值同解
     inline constexpr int kDefaultFrameRate = 15;
 
+    /// 开始前倒计时的缺省秒数，与 RecordingService::start 的默认参数同解
+    inline constexpr int kDefaultCountdownSeconds = 3;
+
+    /// 倒计时秒数的上限：再长用户会以为程序没反应，0 表示立即开始
+    inline constexpr int kMaximumCountdownSeconds = 10;
+
     /// 画面码率的缺省档：0 表示不按码率管，交给 CRF，与 RecorderConfig::videoBitrateKbps 的初值同解
     inline constexpr int kDefaultVideoBitrateKbps = 0;
 
@@ -114,6 +121,14 @@ namespace GyanisScribe::Record
      *          这里只按两档共用的上限判，格式那一层仍由 validateRecorderConfig 把关。
      */
     [[nodiscard]] Core::Expected<int> parseFrameRateSetting(int stored);
+
+    /**
+     * @brief 解析配置里存的倒计时秒数
+     * @param stored 配置读出的整数值，0 表示立即开始
+     * @return 可用的秒数；不在 0..kMaximumCountdownSeconds 里时返回带范围的中文原因
+     * @details 0 是合法值而不是「没填」：它就是「立即开始」这一档的名字。
+     */
+    [[nodiscard]] Core::Expected<int> parseCountdownSetting(int stored);
 
     /// 一档录制范围：存进配置的 token，与设置页显示的中文标签
     struct RecordScopeChoice

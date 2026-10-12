@@ -13,6 +13,7 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPoint>
+#include <QThread>
 #include <QRect>
 
 #include <gtest/gtest.h>
@@ -275,6 +276,28 @@ void pressKey(CaptureOverlay &overlay, const Qt::Key key, const Qt::KeyboardModi
     QApplication::sendEvent(&overlay, &event);
 }
 
+/// 按 V 复制尺寸并读回，读不到就重按一次，最多等两秒
+/// @param expected 期望的文本
+/// @return 最终从剪贴板读到的文本
+/// @details 剪贴板是全桌面共享的资源：别的进程恰好把它占着的那一刻，这一次 setText 会写不进去
+///          （本机实测过的偶发红签名）。重按一次就是重写一遍——读到期望值或超时才收口，
+///          判据仍然打在真实路径上，不靠「通常都成功」。
+[[nodiscard]] QString copySizeAndReadBack(CaptureOverlay &overlay, const QString &expected)
+{
+    for (int attempt = 0; attempt < 40; ++attempt)
+    {
+        pressKey(overlay, Qt::Key_V);
+        const auto text = QGuiApplication::clipboard()->text();
+        if (text == expected)
+        {
+            return text;
+        }
+        QApplication::processEvents();
+        QThread::msleep(50);
+    }
+    return QGuiApplication::clipboard()->text();
+}
+
 /// 拖出一块选区：按下 anchor，拖到 current 后放开
 void dragOut(CaptureOverlay &overlay, const QPoint &anchor, const QPoint &current)
 {
@@ -297,7 +320,13 @@ TEST_F(CaptureOverlayFixture, ColorKeyCyclesTheReadoutFormat)
     pressKey(*overlay, Qt::Key_C);
     EXPECT_EQ(overlay->readoutFormat(), ColorFormat::Hsl);
     pressKey(*overlay, Qt::Key_C);
-    EXPECT_EQ(overlay->readoutFormat(), ColorFormat::Hex) << "三档应当轮回来";
+    EXPECT_EQ(overlay->readoutFormat(), ColorFormat::Hsv);
+    pressKey(*overlay, Qt::Key_C);
+    EXPECT_EQ(overlay->readoutFormat(), ColorFormat::Hsi);
+    pressKey(*overlay, Qt::Key_C);
+    EXPECT_EQ(overlay->readoutFormat(), ColorFormat::Decimal);
+    pressKey(*overlay, Qt::Key_C);
+    EXPECT_EQ(overlay->readoutFormat(), ColorFormat::Hex) << "六档应当轮回来";
 
     pressKey(*overlay, Qt::Key_C, Qt::ShiftModifier);
     EXPECT_EQ(overlay->readoutFormat(), ColorFormat::Hex) << "Shift 已经归「挪右下角」，裸按才轮换";
@@ -455,18 +484,13 @@ TEST_F(CaptureOverlayFixture, ControlASelectsEverythingAndVCopiesThePixelSize)
 
     // 先框一块 201×101 的：V 复制的就是它的成品像素尺寸（这块遮罩的缩放因子是 1，逻辑与物理同值）
     dragOut(*overlay, QPoint{100, 100}, QPoint{300, 200});
-    QGuiApplication::clipboard()->clear();
-    QKeyEvent copySize{QEvent::KeyPress, Qt::Key_V, Qt::NoModifier};
-    QApplication::sendEvent(overlay.get(), &copySize);
-    EXPECT_EQ(QGuiApplication::clipboard()->text(), QStringLiteral("201×101")) << "V 没把尺寸复制进剪贴板";
+    EXPECT_EQ(copySizeAndReadBack(*overlay, QStringLiteral("201×101")), QStringLiteral("201×101")) << "V 没把尺寸复制进剪贴板";
 
     // 缩放屏上复制的是「会被裁出多少像素」而不是逻辑格：两者不等时以物理为准
     const auto background = makeFrame(kScreenGeometry.size());
     auto       scaled     = makeOverlay(background, 2.0);
     dragOut(*scaled, QPoint{100, 100}, QPoint{300, 200});
-    QGuiApplication::clipboard()->clear();
-    QApplication::sendEvent(scaled.get(), &copySize);
-    EXPECT_EQ(QGuiApplication::clipboard()->text(), QStringLiteral("402×202")) << "V 复制的是逻辑格而不是成品像素";
+    EXPECT_EQ(copySizeAndReadBack(*scaled, QStringLiteral("402×202")), QStringLiteral("402×202")) << "V 复制的是逻辑格而不是成品像素";
 
     // 裸按 A 什么都不该发生（不许把 A 也当成选全屏）
     const auto before = overlay->selectedRegion();

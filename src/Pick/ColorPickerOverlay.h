@@ -17,6 +17,8 @@
 #include <QPoint>
 #include <QWidget>
 
+#include <vector>
+
 namespace GyanisScribe::Ui
 {
     class ThemeManager;
@@ -65,6 +67,14 @@ namespace GyanisScribe::Pick
          */
         [[nodiscard]] QString currentText() const;
 
+        /**
+         * @brief 交给遮罩的「最近取色」清单
+         * @param colors 颜色列表，最近的在前；空表不摆色块行
+         * @details 摆在屏幕底边中间：点一下就是取那个颜色（按当前写法复制并关闭），
+         *          数字键 1..8 取第几个。同样的颜色重复取工作时不必回原处重新对像素
+         */
+        void setRecentColors(std::vector<QColor> colors);
+
     signals:
         /**
          * @brief 用户取定了一个颜色
@@ -86,11 +96,19 @@ namespace GyanisScribe::Pick
         /// 取当前色并发信号、随后关闭遮罩
         void pickAndClose();
 
-        Core::CapturedImage     m_frame;          ///< 这一屏的冻帧
-        QRect                   m_screenGeometry; ///< 冻帧对应屏幕的几何
-        ColorFormat             m_format;         ///< 复制用的写法
-        const Ui::ThemeManager &m_theme;          ///< 主题管理器，画放大镜边框用主色
-        QPoint                  m_cursor;         ///< 当前光标的屏幕坐标
+        /// 取定一个颜色：发信号、随后关闭遮罩；色块行与光标取色共用这一处出口
+        void deliverColor(const QColor &color);
+
+        /// 某个屏幕坐标压在色块行的第几块上；不在任何一块上时返回 -1
+        [[nodiscard]] int swatchIndexAt(const QPoint &globalPos) const;
+
+        Core::CapturedImage     m_frame;              ///< 这一屏的冻帧
+        QRect                   m_screenGeometry;     ///< 冻帧对应屏幕的几何
+        ColorFormat             m_format;             ///< 复制用的写法
+        const Ui::ThemeManager &m_theme;              ///< 主题管理器，画放大镜边框用主色
+        QPoint                  m_cursor;             ///< 当前光标的屏幕坐标
+        std::vector<QColor>     m_recent;             ///< 最近取色清单，最近的在前；命中的下标与色块行同序
+        int                     m_hoveredSwatch = -1; ///< 光标压在色块行第几块上；-1 表示没压在任何一块上
     };
 
 } // namespace GyanisScribe::Pick

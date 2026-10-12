@@ -65,6 +65,26 @@ namespace GyanisScribe::Pick
         return formatColor(colorAt(m_cursor), m_format);
     }
 
+    void ColorPickerOverlay::setRecentColors(std::vector<QColor> colors)
+    {
+        m_recent        = std::move(colors);
+        m_hoveredSwatch = -1;
+        update();
+    }
+
+    int ColorPickerOverlay::swatchIndexAt(const QPoint &globalPos) const
+    {
+        const auto rects = recentSwatchRects(m_screenGeometry, static_cast<int>(m_recent.size()));
+        for (std::size_t index = 0; index < rects.size(); ++index)
+        {
+            if (rects[index].contains(globalPos))
+            {
+                return static_cast<int>(index);
+            }
+        }
+        return -1;
+    }
+
     void ColorPickerOverlay::paintEvent(QPaintEvent *)
     {
         QPainter painter{this};
@@ -117,11 +137,26 @@ namespace GyanisScribe::Pick
         painter.fillRect(stripRect.adjusted(4, 4, -(stripRect.width() - kColorChipEdge - 8), -4), colorAt(m_cursor));
         painter.setPen(QPen{m_theme.palette().text});
         painter.drawText(stripRect.adjusted(kColorChipEdge + 12, 0, -4, 0), Qt::AlignVCenter | Qt::AlignLeft, currentText());
+
+        // 最近取色的色块行贴在屏幕底边中间：命中测试与绘制共用 recentSwatchRects 那一处几何
+        const auto origin   = m_screenGeometry.topLeft();
+        const auto swatches = recentSwatchRects(m_screenGeometry, static_cast<int>(m_recent.size()));
+        for (std::size_t index = 0; index < swatches.size(); ++index)
+        {
+            const auto box = swatches[index].translated(-origin.x(), -origin.y());
+            painter.fillRect(box, m_recent[index]);
+            const auto hovered = m_hoveredSwatch == static_cast<int>(index);
+            // 线宽走 qreal：花括号初始化里 int 到 qreal 是收缩转换，MSVC /WX 直接拒
+            painter.setPen(QPen{hovered ? accent : m_theme.palette().text, static_cast<qreal>(hovered ? kMagnifierPenWidth : kGridPenWidth)});
+            painter.setBrush(Qt::NoBrush);
+            painter.drawRect(box.adjusted(0, 0, -1, -1));
+        }
     }
 
     void ColorPickerOverlay::mouseMoveEvent(QMouseEvent *event)
     {
-        m_cursor = event->globalPosition().toPoint();
+        m_cursor        = event->globalPosition().toPoint();
+        m_hoveredSwatch = swatchIndexAt(m_cursor);
         update();
     }
 
@@ -130,6 +165,12 @@ namespace GyanisScribe::Pick
         if (event->button() == Qt::LeftButton)
         {
             m_cursor = event->globalPosition().toPoint();
+            // 压在色块行上就是取那一块，不是取它底下那个像素：色块行是给「再取一次最近用过的色」留的
+            if (const auto swatch = swatchIndexAt(m_cursor); swatch >= 0)
+            {
+                deliverColor(m_recent[static_cast<std::size_t>(swatch)]);
+                return;
+            }
             pickAndClose();
             return;
         }
@@ -146,14 +187,29 @@ namespace GyanisScribe::Pick
             close();
             return;
         }
+
+        // 数字键 1..8 取色块行上的第几块：与点击取那一块是同一条出口，光标动没动都不影响
+        if (event->modifiers() == Qt::NoModifier && event->key() >= Qt::Key_1 && event->key() <= Qt::Key_8)
+        {
+            const auto index = event->key() - Qt::Key_1;
+            if (index >= 0 && static_cast<std::size_t>(index) < m_recent.size())
+            {
+                deliverColor(m_recent[static_cast<std::size_t>(index)]);
+                return;
+            }
+        }
         QWidget::keyPressEvent(event);
     }
 
     void ColorPickerOverlay::pickAndClose()
     {
         // 文本与颜色同刻取：先取文本再取色会让两者有可能落在两次移动之间
-        const auto color = colorAt(m_cursor);
-        emit       colorPicked(color, formatColor(color, m_format));
+        deliverColor(colorAt(m_cursor));
+    }
+
+    void ColorPickerOverlay::deliverColor(const QColor &color)
+    {
+        emit colorPicked(color, formatColor(color, m_format));
         close();
     }
 

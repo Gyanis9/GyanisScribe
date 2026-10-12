@@ -45,23 +45,24 @@ namespace GyanisScribe::Annotation
 
     void AnnotationTool::begin(const QPoint &point)
     {
-        m_startPoint              = point;
-        m_pending                 = AnnotationShape{};
-        m_pending.color           = m_color;
-        m_pending.lineWidth       = m_lineWidth;
-        m_pending.fillStyle       = m_fillStyle;
-        m_pending.fontSize        = m_fontSize;
-        m_pending.doubleHeaded    = m_doubleHeaded;
-        m_pending.mosaicBlockSize = m_mosaicBlockSize;
-        m_pending.highlightAlpha  = m_highlightAlpha;
-        m_pending.fontFamily      = m_fontFamily;
-        m_pending.textBold        = m_textBold;
-        m_pending.textItalic      = m_textItalic;
-        m_pending.textOutline     = m_textOutline;
-        m_pending.textBackground  = m_textBackground;
-        m_pending.position        = point;
-        m_pending.rect            = QRect(point, point);
-        m_pending.points          = {point, point};
+        m_startPoint                   = point;
+        m_pending                      = AnnotationShape{};
+        m_pending.color                = m_color;
+        m_pending.lineWidth            = m_lineWidth;
+        m_pending.fillStyle            = m_fillStyle;
+        m_pending.fontSize             = m_fontSize;
+        m_pending.doubleHeaded         = m_doubleHeaded;
+        m_pending.mosaicBlockSize      = m_mosaicBlockSize;
+        m_pending.highlightAlpha       = m_highlightAlpha;
+        m_pending.highlightWidthFactor = m_highlightWidthFactor;
+        m_pending.fontFamily           = m_fontFamily;
+        m_pending.textBold             = m_textBold;
+        m_pending.textItalic           = m_textItalic;
+        m_pending.textOutline          = m_textOutline;
+        m_pending.textBackground       = m_textBackground;
+        m_pending.position             = point;
+        m_pending.rect                 = QRect(point, point);
+        m_pending.points               = {point, point};
     }
 
     void AnnotationTool::update(const QPoint &point)
@@ -140,19 +141,20 @@ namespace GyanisScribe::Annotation
         }
 
         // 只碰这些样式字段：位置、轨迹点与文本各自属于移动与内容命令，混进来会让撤销分不开
-        auto &shape           = m_shapes[index];
-        shape.color           = parameters.color;
-        shape.lineWidth       = parameters.lineWidth;
-        shape.fontSize        = parameters.fontSize;
-        shape.fillStyle       = parameters.fillStyle;
-        shape.doubleHeaded    = parameters.doubleHeaded;
-        shape.mosaicBlockSize = parameters.mosaicBlockSize;
-        shape.highlightAlpha  = parameters.highlightAlpha;
-        shape.fontFamily      = parameters.fontFamily;
-        shape.textBold        = parameters.textBold;
-        shape.textItalic      = parameters.textItalic;
-        shape.textOutline     = parameters.textOutline;
-        shape.textBackground  = parameters.textBackground;
+        auto &shape                = m_shapes[index];
+        shape.color                = parameters.color;
+        shape.lineWidth            = parameters.lineWidth;
+        shape.fontSize             = parameters.fontSize;
+        shape.fillStyle            = parameters.fillStyle;
+        shape.doubleHeaded         = parameters.doubleHeaded;
+        shape.mosaicBlockSize      = parameters.mosaicBlockSize;
+        shape.highlightAlpha       = parameters.highlightAlpha;
+        shape.highlightWidthFactor = parameters.highlightWidthFactor;
+        shape.fontFamily           = parameters.fontFamily;
+        shape.textBold             = parameters.textBold;
+        shape.textItalic           = parameters.textItalic;
+        shape.textOutline          = parameters.textOutline;
+        shape.textBackground       = parameters.textBackground;
         return true;
     }
 
@@ -355,6 +357,12 @@ namespace GyanisScribe::Annotation
     void AnnotationTool::setHighlightAlpha(const int alpha) noexcept
     {
         m_highlightAlpha = std::clamp(alpha, 0, 255);
+    }
+
+    void AnnotationTool::setHighlightWidthFactor(const int factor) noexcept
+    {
+        // 倍数取正：0 或负数画出来是一条不存在的带，命中测试也会跟着失效
+        m_highlightWidthFactor = std::clamp(factor, 1, 16);
     }
 
     void AnnotationTool::setFontFamily(const QString &family)

@@ -3,6 +3,7 @@ add_executable(TestShell
         TestSingleInstance.cpp
         TestCrashGuard.cpp
         TestCaptureIntent.cpp
+        TestCommandLine.cpp
         TestUpdateCheck.cpp)
 
 target_link_libraries(TestShell PRIVATE

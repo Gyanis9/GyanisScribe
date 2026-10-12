@@ -1,5 +1,6 @@
 add_executable(TestPick
-        TestPick.cpp)
+        TestPick.cpp
+        TestRecentColors.cpp)
 
 target_link_libraries(TestPick PRIVATE
         Pick

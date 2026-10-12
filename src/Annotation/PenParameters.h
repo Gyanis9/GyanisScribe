@@ -27,18 +27,19 @@ namespace GyanisScribe::Annotation
      */
     struct PenParameters
     {
-        QColor  color           = QColor(255, 0, 0);                            ///< 画笔颜色
-        int     lineWidth       = 3;                                            ///< 线宽，逻辑像素
-        int     fontSize        = 16;                                           ///< 字号，磅
-        int     fillStyle       = 0;                                            ///< 填充档：0 无、1 半透明、2 实心（仅矩形与椭圆用）
-        bool    doubleHeaded    = false;                                        ///< 双向箭头：两端各画一个箭头（仅箭头工具用）
-        int     mosaicBlockSize = kMosaicBlockSizes[kDefaultMosaicBlockStep];   ///< 马赛克方块边长，逻辑像素（仅马赛克工具用）
-        int     highlightAlpha  = kHighlightAlphas[kDefaultHighlightAlphaStep]; ///< 高亮透明度，0-255（仅高亮工具用）
-        QString fontFamily;                                                     ///< 字体族，空串=跟随应用默认字体（仅文字工具用）
-        bool    textBold       = false;                                         ///< 粗体（仅文字工具用）
-        bool    textItalic     = false;                                         ///< 斜体（仅文字工具用）
-        bool    textOutline    = false;                                         ///< 反色描边（仅文字工具用）
-        bool    textBackground = false;                                         ///< 反色底板（仅文字工具用）
+        QColor  color                = QColor(255, 0, 0);                                  ///< 画笔颜色
+        int     lineWidth            = 3;                                                  ///< 线宽，逻辑像素
+        int     fontSize             = 16;                                                 ///< 字号，磅
+        int     fillStyle            = 0;                                                  ///< 填充档：0 无、1 半透明、2 实心（仅矩形与椭圆用）
+        bool    doubleHeaded         = false;                                              ///< 双向箭头：两端各画一个箭头（仅箭头工具用）
+        int     mosaicBlockSize      = kMosaicBlockSizes[kDefaultMosaicBlockStep];         ///< 马赛克方块边长，逻辑像素（仅马赛克工具用）
+        int     highlightAlpha       = kHighlightAlphas[kDefaultHighlightAlphaStep];       ///< 高亮透明度，0-255（仅高亮工具用）
+        int     highlightWidthFactor = kHighlightWidthFactors[kDefaultHighlightWidthStep]; ///< 高亮相对线宽的加宽倍数（仅高亮工具用）
+        QString fontFamily;                                                                ///< 字体族，空串=跟随应用默认字体（仅文字工具用）
+        bool    textBold       = false;                                                    ///< 粗体（仅文字工具用）
+        bool    textItalic     = false;                                                    ///< 斜体（仅文字工具用）
+        bool    textOutline    = false;                                                    ///< 反色描边（仅文字工具用）
+        bool    textBackground = false;                                                    ///< 反色底板（仅文字工具用）
 
         [[nodiscard]] bool operator==(const PenParameters &) const = default;
     };
@@ -50,18 +51,19 @@ namespace GyanisScribe::Annotation
      */
     [[nodiscard]] inline PenParameters penParametersOf(const AnnotationShape &shape)
     {
-        return PenParameters{.color           = shape.color,
-                             .lineWidth       = shape.lineWidth,
-                             .fontSize        = shape.fontSize,
-                             .fillStyle       = shape.fillStyle,
-                             .doubleHeaded    = shape.doubleHeaded,
-                             .mosaicBlockSize = shape.mosaicBlockSize,
-                             .highlightAlpha  = shape.highlightAlpha,
-                             .fontFamily      = shape.fontFamily,
-                             .textBold        = shape.textBold,
-                             .textItalic      = shape.textItalic,
-                             .textOutline     = shape.textOutline,
-                             .textBackground  = shape.textBackground};
+        return PenParameters{.color                = shape.color,
+                             .lineWidth            = shape.lineWidth,
+                             .fontSize             = shape.fontSize,
+                             .fillStyle            = shape.fillStyle,
+                             .doubleHeaded         = shape.doubleHeaded,
+                             .mosaicBlockSize      = shape.mosaicBlockSize,
+                             .highlightAlpha       = shape.highlightAlpha,
+                             .highlightWidthFactor = shape.highlightWidthFactor,
+                             .fontFamily           = shape.fontFamily,
+                             .textBold             = shape.textBold,
+                             .textItalic           = shape.textItalic,
+                             .textOutline          = shape.textOutline,
+                             .textBackground       = shape.textBackground};
     }
 
 } // namespace GyanisScribe::Annotation

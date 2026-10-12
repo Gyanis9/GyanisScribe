@@ -551,6 +551,26 @@ TEST(RecorderVideoBitrateSetting, ZeroIsAChoiceAndOutsideRangeIsRejected)
 }
 
 /**
+ * @brief 钉住倒计时秒数的解析：0 是「立即开始」这一档，越界点名范围与键名
+ * @details 0 会被当成「没填」的话，选「立即开始」的用户每次都被莫名其妙数三秒。
+ */
+TEST(RecordCountdownSetting, ParsesWithItsOwnRange)
+{
+    EXPECT_EQ(GyanisScribe::Record::parseCountdownSetting(0).value(), 0) << "0 是「立即开始」这一档，不是没填";
+    EXPECT_EQ(GyanisScribe::Record::parseCountdownSetting(GyanisScribe::Record::kDefaultCountdownSeconds).value(), 3);
+    EXPECT_EQ(GyanisScribe::Record::parseCountdownSetting(GyanisScribe::Record::kMaximumCountdownSeconds).value(), 10);
+
+    for (const int bad: {-1, 11, 900})
+    {
+        const auto parsed = GyanisScribe::Record::parseCountdownSetting(bad);
+        ASSERT_FALSE(parsed.has_value()) << bad;
+        EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument) << bad;
+        EXPECT_NE(parsed.error().message.find("10"), std::string::npos) << bad;
+        EXPECT_NE(parsed.error().message.find("Record/CountdownSeconds"), std::string::npos) << bad;
+    }
+}
+
+/**
  * @brief 钉住「哪种输出带得了声音」：词表里只有 GIF 带不了
  * @details 这一句同时管着设置页置灰哪两格与 RecordingService 跳过不跳过取声。新加一档格式时
  *          循环那条会要求作者表态它带不带音轨，而不是让取回来的声音默默落进一个没人读的容器。

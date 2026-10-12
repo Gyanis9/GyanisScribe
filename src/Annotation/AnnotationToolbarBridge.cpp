@@ -11,18 +11,19 @@ namespace GyanisScribe::Annotation
     AnnotationToolbarBridge::AnnotationToolbarBridge(AnnotationToolbar &toolbar, IAnnotationEngine &engine, QObject *parent) : QObject(parent), m_toolbar(toolbar), m_engine(engine)
     {
         // 起点参数整套照工具栏的初值抄一遍：十三处必须与工具栏同解，否则第一笔的样式与按钮显示的不一致
-        m_penParameters = PenParameters{.color           = toolbar.currentColor(),
-                                        .lineWidth       = toolbar.currentWidth(),
-                                        .fontSize        = toolbar.currentFontSize(),
-                                        .fillStyle       = toolbar.currentFillStyle(),
-                                        .doubleHeaded    = toolbar.currentDoubleHeaded(),
-                                        .mosaicBlockSize = toolbar.currentMosaicBlockSize(),
-                                        .highlightAlpha  = toolbar.currentHighlightAlpha(),
-                                        .fontFamily      = toolbar.currentFontFamily(),
-                                        .textBold        = toolbar.currentTextBold(),
-                                        .textItalic      = toolbar.currentTextItalic(),
-                                        .textOutline     = toolbar.currentTextOutline(),
-                                        .textBackground  = toolbar.currentTextBackground()};
+        m_penParameters = PenParameters{.color                = toolbar.currentColor(),
+                                        .lineWidth            = toolbar.currentWidth(),
+                                        .fontSize             = toolbar.currentFontSize(),
+                                        .fillStyle            = toolbar.currentFillStyle(),
+                                        .doubleHeaded         = toolbar.currentDoubleHeaded(),
+                                        .mosaicBlockSize      = toolbar.currentMosaicBlockSize(),
+                                        .highlightAlpha       = toolbar.currentHighlightAlpha(),
+                                        .highlightWidthFactor = toolbar.currentHighlightWidthFactor(),
+                                        .fontFamily           = toolbar.currentFontFamily(),
+                                        .textBold             = toolbar.currentTextBold(),
+                                        .textItalic           = toolbar.currentTextItalic(),
+                                        .textOutline          = toolbar.currentTextOutline(),
+                                        .textBackground       = toolbar.currentTextBackground()};
 
         QObject::connect(&toolbar, &AnnotationToolbar::toolChanged, this,
                          [this](const ToolKind kind)
@@ -72,6 +73,12 @@ namespace GyanisScribe::Annotation
                          [this](const int alpha)
                          {
                              m_penParameters.highlightAlpha = alpha;
+                             applyPenParameters();
+                         });
+        QObject::connect(&toolbar, &AnnotationToolbar::highlightWidthFactorChanged, this,
+                         [this](const int factor)
+                         {
+                             m_penParameters.highlightWidthFactor = factor;
                              applyPenParameters();
                          });
         QObject::connect(&toolbar, &AnnotationToolbar::fontFamilyChanged, this,

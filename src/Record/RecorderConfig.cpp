@@ -100,6 +100,22 @@ namespace GyanisScribe::Record
         }}};
     }
 
+    Core::Expected<int> parseCountdownSetting(const int stored)
+    {
+        // 0 是「立即开始」这一档，不是没填：负值与超出上限的大值才是手改配置写歪了
+        if (stored >= 0 && stored <= kMaximumCountdownSeconds)
+        {
+            return stored;
+        }
+        return Core::Expected<int>{std::unexpected{Core::Error{
+                .code    = Core::ErrorCode::InvalidArgument,
+                .message = GyanisScribe::Core::uiFormat(
+                        GyanisScribe::Core::uiTextUtf8(
+                                "倒计时「{}」不在可用范围（0 到 {} 秒，0 表示立即开始）里：请在设置的录屏页重选，或删掉 Record/CountdownSeconds 这一项回到默认档"),
+                        stored, kMaximumCountdownSeconds),
+        }}};
+    }
+
     std::string_view recordScopeText(const RecordMode mode) noexcept
     {
         for (const auto &choice: kRecordScopeChoices)

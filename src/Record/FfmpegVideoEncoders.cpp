@@ -2,6 +2,7 @@
 
 #include "Core/Text.h"
 
+#include <algorithm>
 #include <array>
 
 namespace GyanisScribe::Record
@@ -67,11 +68,22 @@ namespace GyanisScribe::Record
     }
 
     Core::Expected<std::string> selectVideoEncoder(const std::function<bool(const QStringList &)> &run, const int width, const int height, const int frameRate,
-                                                   const int videoBitrateKbps)
+                                                   const int videoBitrateKbps, const std::string_view pinnedEncoder)
     {
+        // 钉了某一档就先探它：探得过就用，探不过退到自动（调用方按返回值与钉子的差异记日志）
+        const auto pinnedInTable = std::ranges::find(kPreferredVideoEncoders, pinnedEncoder) != kPreferredVideoEncoders.end();
+        if (!pinnedEncoder.empty() && pinnedInTable && run(videoEncoderProbeArguments(pinnedEncoder, videoBitrateKbps, width, height, frameRate)))
+        {
+            return std::string{pinnedEncoder};
+        }
+
         // h264_mf 不在候选里：本机同一条件连跑五次，四次是退出码 139 自己崩了，只留一个 48 字节的空壳
         for (const auto encoder: kPreferredVideoEncoders)
         {
+            if (encoder == pinnedEncoder)
+            {
+                continue; // 刚探过的不再探第二次：同一条命令跑两遍只是多花一次时间
+            }
             if (run(videoEncoderProbeArguments(encoder, videoBitrateKbps, width, height, frameRate)))
             {
                 return std::string{encoder};

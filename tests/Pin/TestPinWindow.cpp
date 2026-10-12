@@ -614,12 +614,10 @@ namespace GyanisScribe
         ASSERT_NE(movie, nullptr) << "动图播放器没挂在这张窗口上";
         ASSERT_GE(movie->frameCount(), 2) << "素材没被读出两帧，判据无从谈起";
 
-        window.copyToClipboard();
-        EXPECT_EQ(QGuiApplication::clipboard()->image().pixelColor(0, 0), QColor(255, 0, 0)) << "首帧该是红色";
+        EXPECT_EQ(window.image().pixelColor(0, 0), QColor(255, 0, 0)) << "首帧该是红色";
 
         ASSERT_TRUE(movie->jumpToNextFrame()) << "跳不到下一帧";
-        window.copyToClipboard();
-        EXPECT_EQ(QGuiApplication::clipboard()->image().pixelColor(0, 0), QColor(0, 0, 255)) << "换帧没接上：手里那张图还是第一帧";
+        EXPECT_EQ(window.image().pixelColor(0, 0), QColor(0, 0, 255)) << "换帧没接上：手里那张图还是第一帧";
 
         // 静图文件接不上动画这一档
         const auto staticPath = std::filesystem::temp_directory_path() / "GyanisScribe-PinAnim-still.png";
@@ -696,15 +694,14 @@ namespace GyanisScribe
         dragOnView(*view, QPoint{5, 5}, QPoint{17, 17}, QPoint{30, 30});
 
         // 还没收工：贴图手里那份图不该带上笔迹（画布上的图形还归引擎的撤销栈管）
-        window.copyToClipboard();
-        EXPECT_EQ(QGuiApplication::clipboard()->image().pixelColor(5, 20), QColor(200, 60, 60)) << "没收工就把笔迹烘进了贴图";
+        EXPECT_EQ(window.image().pixelColor(5, 20), QColor(200, 60, 60)) << "没收工就把笔迹烘进了贴图";
 
         pressKey(window, Qt::Key_Escape);
         EXPECT_FALSE(window.isAnnotating()) << "Esc 没退出标注模式";
         EXPECT_FALSE(closed) << "标注里的 Esc 把贴图关掉了：那一击该是「收工」而不是「丢弃」";
 
-        window.copyToClipboard();
-        const auto baked = QGuiApplication::clipboard()->image();
+        // 读数直接取贴图手里的那张图：经系统剪贴板读回会把这条判据搭在桌面上别的进程身上
+        const auto baked = window.image();
         EXPECT_NE(baked.pixelColor(5, 20), QColor(200, 60, 60)) << "收工没把笔迹烘进贴图";
         EXPECT_EQ(baked.pixelColor(17, 17), QColor(200, 60, 60)) << "空心矩形的内里不该有笔迹";
 
@@ -834,8 +831,7 @@ namespace GyanisScribe
         dragOnView(*view, QPoint{8, 8}, QPoint{16, 14}, QPoint{24, 20});
         window.finishAnnotation();
 
-        window.copyToClipboard();
-        const auto baked = QGuiApplication::clipboard()->image();
+        const auto baked = window.image();
         EXPECT_NE(baked.pixelColor(16, 14), QColor(200, 60, 60)) << "画笔的笔迹没落上";
         EXPECT_EQ(baked.pixelColor(24, 8), QColor(200, 60, 60)) << "(24,8) 被画上了：工具没切成画笔，落的是矩形";
     }

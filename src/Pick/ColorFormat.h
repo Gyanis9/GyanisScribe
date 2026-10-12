@@ -1,6 +1,6 @@
 /**
  * @file ColorFormat.h
- * @brief 取色器的颜色写法：HEX、RGB 与 HSL 三种，以及它们的存储标记
+ * @brief 取色器的颜色写法：HEX、RGB、HSL、HSV、HSI 与十进制，以及它们的存储标记
  * @author Gyanis
  * @date 2026-10-10
  * @version 0.0.1
@@ -15,6 +15,7 @@
 #include <QString>
 #include <optional>
 
+#include <cstddef>
 #include <string_view>
 
 namespace GyanisScribe::Pick
@@ -26,10 +27,16 @@ namespace GyanisScribe::Pick
      */
     enum class ColorFormat
     {
-        Hex, ///< #RRGGBB
-        Rgb, ///< rgb(r, g, b)
-        Hsl, ///< hsl(h, s%, l%)
+        Hex,     ///< #RRGGBB
+        Rgb,     ///< rgb(r, g, b)
+        Hsl,     ///< hsl(h, s%, l%)，CSS 那一套；s 是 HSL 饱和
+        Hsv,     ///< hsv(h, s%, v%)：设计工具的取色盘多用这一套（s 是 HSV 饱和）
+        Hsi,     ///< hsi(h, s%, i%)：i 是三分量均值，色相与 HSL/HSV 同源
+        Decimal, ///< 十进制三元组「r, g, b」，粘进代码当数组元素用
     };
+
+    /// 全部写法的条数：轮换与校验共用这一个数，别在别处再写一遍字面量
+    inline constexpr std::size_t kColorFormatCount = 6;
 
     /**
      * @brief 写法的存储标记
@@ -41,7 +48,7 @@ namespace GyanisScribe::Pick
     /**
      * @brief 写法的界面名
      * @param format 写法
-     * @return 下拉框与提示里出现的那三个字（HEX / RGB / HSL）
+     * @return 下拉框与提示里出现的那几个字（HEX / RGB / HSL / HSV / HSI / 十进制）
      */
     [[nodiscard]] QString colorFormatLabel(ColorFormat format);
 
@@ -86,8 +93,9 @@ namespace GyanisScribe::Pick
      * @brief 按写法把颜色排成一串可复制的文本
      * @param color 颜色
      * @param format 写法
-     * @return 例如 #3C78C8、rgb(60, 120, 200)、hsl(214, 56%, 51%)
-     * @details HSL 的角度与百分数都四舍五入到整数：小数位再多也不比一格的色差更有信息，
+     * @return 例如 #3C78C8、rgb(60, 120, 200)、hsl(214, 56%, 51%)、hsv(214, 70%, 78%)、
+     *         hsi(214, 53%, 50%)、60, 120, 200
+     * @details 角度与百分数都四舍五入到整数：小数位再多也不比一格的色差更有信息，
      *          而复制出去粘进 CSS 时带小数反而要被再裁一次。
      */
     [[nodiscard]] QString formatColor(const QColor &color, ColorFormat format);

@@ -53,4 +53,34 @@ namespace GyanisScribe::Pick
         return {x, y};
     }
 
+
+    std::vector<QRect> recentSwatchRects(const QRect &screen, const int count)
+    {
+        std::vector<QRect> rects;
+        if (count <= 0 || screen.isEmpty())
+        {
+            return rects;
+        }
+
+        // 一行摆得下几个：留白按色块边长同宽，两侧各留一份，块间再夹间距
+        const auto stride   = kRecentSwatchEdge + kRecentSwatchGap;
+        const auto usable   = screen.width() - 2 * kRecentSwatchEdge;
+        const auto capacity = usable > 0 ? (usable + kRecentSwatchGap) / stride : 0;
+        const auto shown    = std::min(count, capacity);
+        if (shown <= 0)
+        {
+            return rects;
+        }
+
+        const auto rowWidth = shown * kRecentSwatchEdge + (shown - 1) * kRecentSwatchGap;
+        const auto left     = screen.left() + (screen.width() - rowWidth) / 2;
+        const auto top      = screen.bottom() - kRecentSwatchEdge - kRecentSwatchEdge;
+        rects.reserve(static_cast<std::size_t>(shown));
+        for (int index = 0; index < shown; ++index)
+        {
+            rects.push_back(QRect{left + index * stride, top, kRecentSwatchEdge, kRecentSwatchEdge});
+        }
+        return rects;
+    }
+
 } // namespace GyanisScribe::Pick

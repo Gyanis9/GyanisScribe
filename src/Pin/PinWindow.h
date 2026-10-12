@@ -249,6 +249,14 @@ namespace GyanisScribe::Pin
         void copyToClipboard() override;
 
         /**
+         * @brief 贴图当前手里那张图
+         * @return 物理像素；动图是正在播的那一帧。绘制、复制与保存读的都是这一份
+         * @details 用例与调试取读数用：经系统剪贴板读回会把判据搭在桌面上别的进程身上——
+         *          别人占着剪贴板时读回的是别人的内容，那是本机实测过的偶发红签名
+         */
+        [[nodiscard]] const QImage &image() const noexcept;
+
+        /**
          * @brief 按设置里的两格给成品装边框与投影
          * @param image 成品图
          * @param fillBackground 目标端带不了透明通道时给真（存 JPG）：投影底下垫白

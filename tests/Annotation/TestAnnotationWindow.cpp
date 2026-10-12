@@ -515,6 +515,61 @@ TEST_F(AnnotationWindowFixture, DoubleArrowToggleFromToolbarReachesTheEngine)
 }
 
 /**
+ * @brief 钉住高亮加宽按钮从窗口接到引擎：按一下（中→宽）选中的那条跟着加宽
+ * @details 画布 400×200、逻辑 200×100：高亮画在逻辑 y=70（物理 140），线宽 8。
+ *          窄档（2×）带宽 16 物理格，探点 (320,110) 在带外；宽档（8×）带宽 64，探点进带内。
+ *          探点在灰色底上与墨色的差别用「不等于底色」数格子——与双向箭头那条同一套判据。
+ */
+TEST_F(AnnotationWindowFixture, HighlightWidthCycleFromToolbarReachesTheEngine)
+{
+    auto window = makeWindow();
+
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Highlight).has_value());
+    ASSERT_TRUE(
+            engine().setPenParameters(PenParameters{.color = QColor(255, 255, 0), .lineWidth = 8, .fontSize = 16, .fillStyle = 0, .highlightAlpha = 110, .highlightWidthFactor = 2})
+                    .has_value());
+    engine().beginStroke(QPoint(20, 70));
+    engine().moveStroke(QPoint(180, 70));
+    const auto highlight = engine().endStroke();
+    ASSERT_TRUE(highlight.has_value()) << highlight.error().message;
+    ASSERT_TRUE(engine().select(*highlight).has_value());
+
+    const auto countInkAtProbe = [this]
+    {
+        const QImage drawn = engine().exportImage();
+        int          ink   = 0;
+        for (int x = 316; x < 325; ++x)
+        {
+            for (int y = 106; y < 115; ++y)
+            {
+                if (drawn.pixelColor(x, y) != QColor(180, 180, 180))
+                {
+                    ++ink;
+                }
+            }
+        }
+        return ink;
+    };
+    EXPECT_EQ(countInkAtProbe(), 0) << "窄档在探点处不该有墨，后面的对照就没有基准";
+
+    QToolButton *widthButton = nullptr;
+    for (auto *candidate: window->toolbar().findChildren<QToolButton *>())
+    {
+        if (candidate->accessibleName().startsWith(QString::fromUtf8("高亮加宽")))
+        {
+            widthButton = candidate;
+            break;
+        }
+    }
+    ASSERT_NE(widthButton, nullptr) << "工具栏上找不到高亮加宽按钮";
+    // 工具栏的默认档是「中」（4×）：点一下到「宽」（8×），探点进带内。
+    // 注意别按「窄 → 中 → 宽」来点——从「中」出发两下会绕回「窄」，探点又出带，读数会假装链路没接上
+    widthButton->click();
+
+    EXPECT_GT(countInkAtProbe(), 0) << "按钮点下去了，选中的那条没有跟着加宽：窗口到引擎这条链没接上";
+}
+
+/**
  * @brief 钉住从视图拖缩放手柄：一趟手势把选中项拉大，抬笔后一次撤销退回
  * @details 手柄判定要压过普通命中：按点就落在右边线上，不先问手柄的话这一按会被当成「拖图形」。
  *          视图 400x200、画布逻辑 200x100：控件坐标 = 逻辑坐标乘 2。

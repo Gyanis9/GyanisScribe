@@ -105,8 +105,12 @@ namespace GyanisScribe::Settings
     /// OCR 语言包（tessdata）目录；为空时按环境变量与程序数据目录找
     inline constexpr std::string_view kOcrTessDataDirectory = "Ocr/TessDataDirectory";
 
-    /// 取色复制用的写法：Hex、Rgb 或 Hsl
+    /// 取色复制用的写法：Hex、Rgb、Hsl、Hsv、Hsi 或 Decimal（词表在 Pick/ColorFormat.h）
     inline constexpr std::string_view kPickFormat = "Pick/Format";
+
+    /// 最近取过的颜色（#RRGGBB 列表，最新在前，上限见 Pick::kPickColorHistoryCapacity）；
+    /// 屏幕取色与贴图取色共用这一份，取色遮罩底部的色块行按它摆
+    inline constexpr std::string_view kPickRecentColors = "Pick/RecentColors";
 
     /// 历史最多留多少条，0 表示不限条数
     inline constexpr std::string_view kHistoryMaximumEntries = "History/MaximumEntries";
@@ -150,5 +154,15 @@ namespace GyanisScribe::Settings
 
     /// 录屏时是否把光标位置圈在帧上，读端在 AppController 造参数那一处，写端在设置的录屏页
     inline constexpr std::string_view kRecordCursorHighlight = "Record/CursorHighlight";
+
+    /// 开始录屏前的倒计时秒数（0 到 10，0 表示立即开始）；读端在 AppController 起录那一处，写端在设置的录屏页
+    inline constexpr std::string_view kRecordCountdownSeconds = "Record/CountdownSeconds";
+
+    /// 钉死的视频编码器名（取值来自 Record::kPreferredVideoEncoders），"Auto" 或空表示逐个探测自动选；
+    /// 读端在 AppController 造参数那一处，写端在设置的录屏页，选型规则见 FfmpegVideoEncoders
+    inline constexpr std::string_view kRecordVideoEncoder = "Record/VideoEncoder";
+
+    /// 编码器下拉里「自动」那一项的取值：与「没填」区分开，用户能显式选回自动
+    inline constexpr std::string_view kRecordVideoEncoderAutoToken = "Auto";
 
 } // namespace GyanisScribe::Settings

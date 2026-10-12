@@ -1,7 +1,7 @@
 #include "Annotation/AnnotationToolbar.h"
 
 #include "Annotation/AnnotationTool.h"
-#include "Annotation/RecentColors.h"
+#include "Pick/RecentColors.h"
 #include "Core/Logger.h"
 #include "Core/Text.h"
 #include "Settings/ISettingsStore.h"
@@ -140,13 +140,13 @@ namespace GyanisScribe::Annotation
         // 最近使用颜色：读回上一次留下的清单，插在预设色板之后、自定义按钮之前。
         // 记下这个插入点，之后每次重建成品色块都要落回同一排位置
         m_recentInsertIndex = layout->count();
-        if (const auto parsed = parseRecentColors(m_settings.stringListValue(Settings::kAnnotationRecentColors, {})); parsed)
+        if (const auto parsed = Pick::parseRecentColors(m_settings.stringListValue(Settings::kAnnotationRecentColors, {})); parsed)
         {
             m_recentColors = *parsed;
             // 手改过的配置文件可能超出上限：按上限截断，色板不会被撑到放不下
-            if (m_recentColors.size() > kRecentColorCapacity)
+            if (m_recentColors.size() > Pick::kRecentColorCapacity)
             {
-                m_recentColors.resize(kRecentColorCapacity);
+                m_recentColors.resize(Pick::kRecentColorCapacity);
             }
         } else
         {
@@ -215,6 +215,10 @@ namespace GyanisScribe::Annotation
         m_highlightAlphaButton = makeButton("HighlightOpacity", GyanisScribe::Core::uiText("高亮透明度"), false);
         QObject::connect(m_highlightAlphaButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleHighlightAlpha);
         layout->addWidget(m_highlightAlphaButton);
+        // 高亮加宽：高亮工具用得上，点一下走一档（窄 → 中 → 宽），档位表是 kHighlightWidthFactors
+        m_highlightWidthButton = makeButton("HighlightWidth", GyanisScribe::Core::uiText("高亮加宽"), false);
+        QObject::connect(m_highlightWidthButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleHighlightWidthFactor);
+        layout->addWidget(m_highlightWidthButton);
         // 文字字体族：文字工具用得上，列系统字体。宽度封顶——字体名长的很，放任 sizeHint 会撑出去
         m_fontCombo = new QFontComboBox{this};
         m_fontCombo->setMaximumWidth(Ui::kToolbarFontComboWidth);
@@ -357,6 +361,26 @@ namespace GyanisScribe::Annotation
             m_highlightAlphaButton->setAccessibleName(label);
         }
         emit highlightAlphaChanged(currentHighlightAlpha());
+    }
+
+    int AnnotationToolbar::currentHighlightWidthFactor() const
+    {
+        return kHighlightWidthFactors[static_cast<std::size_t>(m_highlightWidthStep)];
+    }
+
+    void AnnotationToolbar::cycleHighlightWidthFactor()
+    {
+        m_highlightWidthStep = (m_highlightWidthStep + 1) % static_cast<int>(kHighlightWidthFactors.size());
+        if (m_highlightWidthButton != nullptr)
+        {
+            // 与另两档同一套口径：提示就是这一档的读数
+            const auto label = m_highlightWidthStep == 0   ? GyanisScribe::Core::uiText("高亮加宽：窄")
+                               : m_highlightWidthStep == 1 ? GyanisScribe::Core::uiText("高亮加宽：中")
+                                                           : GyanisScribe::Core::uiText("高亮加宽：宽");
+            m_highlightWidthButton->setToolTip(label);
+            m_highlightWidthButton->setAccessibleName(label);
+        }
+        emit highlightWidthFactorChanged(currentHighlightWidthFactor());
     }
 
     QString AnnotationToolbar::currentFontFamily() const
@@ -553,9 +577,9 @@ namespace GyanisScribe::Annotation
 
         // 记进「最近使用」并立刻重建色块行：需求要求这一排跟着用户最近的动作走，
         // 落盘失败只记日志——颜色本身已经生效了，不该因为存不上就回退
-        m_recentColors = pushRecentColor(m_recentColors, picked);
+        m_recentColors = Pick::pushRecentColor(m_recentColors, picked);
         rebuildRecentColors();
-        if (auto written = m_settings.setValue(Settings::kAnnotationRecentColors, serializeRecentColors(m_recentColors)); !written)
+        if (auto written = m_settings.setValue(Settings::kAnnotationRecentColors, Pick::serializeRecentColors(m_recentColors)); !written)
         {
             Core::Logger::warning(std::format("最近使用颜色没能保存：{}", written.error().message));
         }

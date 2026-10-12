@@ -12,6 +12,7 @@
 #include "Pick/ColorFormat.h"
 #include "Pin/PinLayout.h"
 #include "Record/FfmpegAudioDevices.h"
+#include "Record/FfmpegVideoEncoderEnumerator.h"
 #include "Record/RecorderConfig.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Settings/ISettingsStore.h"
@@ -635,6 +636,36 @@ namespace
     }
 
     /**
+     * @brief 录屏倒计时的秒数
+     * @param settings 配置存储
+     * @return 归调用方所有的数字框
+     * @details 0 是「立即开始」这一档而不是「没填」，工具提示里说明这一档的名字。
+     */
+    QSpinBox *makeCountdownSpin(ISettingsStore &settings)
+    {
+        auto *spin = new QSpinBox;
+        spin->setRange(0, GyanisScribe::Record::kMaximumCountdownSeconds);
+        spin->setSuffix(GyanisScribe::Core::uiText(" 秒"));
+        spin->setAccessibleName(GyanisScribe::Core::uiText("录屏倒计时"));
+        spin->setToolTip(GyanisScribe::Core::uiText("按下录屏键后先数这么几秒再开始录，用来把要录的画面摆好；0 表示立即开始"));
+
+        const auto title  = GyanisScribe::Core::uiText("录屏倒计时");
+        const auto stored = settings.intValue(GyanisScribe::Settings::kRecordCountdownSeconds, GyanisScribe::Record::kDefaultCountdownSeconds);
+        const auto parsed = GyanisScribe::Record::parseCountdownSetting(stored);
+        spin->setValue(shownValueForSetting(title, stored, parsed, GyanisScribe::Record::kDefaultCountdownSeconds));
+
+        QObject::connect(spin, &QSpinBox::valueChanged, spin,
+                         [&settings, title](int value)
+                         {
+                             if (auto written = settings.setValue(GyanisScribe::Settings::kRecordCountdownSeconds, value); !written)
+                             {
+                                 Logger::warning(std::format("{} 没能写入：{}", title.toStdString(), written.error().message));
+                             }
+                         });
+        return spin;
+    }
+
+    /**
      * @brief 录屏的画面码率，单位 kbps
      * @param settings 配置存储
      * @return 归调用方所有的数字框
@@ -893,6 +924,85 @@ namespace
     }
 
     /**
+     * @brief 视频编码器下拉：自动一档在前，探得通的候选跟在后面
+     * @param settings 配置存储
+     * @param enumerator 编码器清单的来源
+     * @return 归调用方所有的下拉框
+     * @details 「自动」就是编码前按偏好顺序逐个探的那条既有点；列出来的几个是设置页当场探通的，
+     *          选中即钉死（真编码前还会按真实尺寸复核一次，探不过退回自动并把原因写进日志）。
+     *          清单是异步拿的：先只摆「自动」，探测器回来再补候选并把她上次钉的那一档选中。
+     */
+    QComboBox *makeVideoEncoderCombo(ISettingsStore &settings, GyanisScribe::Record::FfmpegVideoEncoderEnumerator &enumerator)
+    {
+        auto *combo = new QComboBox;
+        combo->addItem(GyanisScribe::Core::uiText("自动（逐个探测）"), QString::fromUtf8(std::string{GyanisScribe::Settings::kRecordVideoEncoderAutoToken}));
+        combo->setAccessibleName(GyanisScribe::Core::uiText("视频编码器"));
+        combo->setToolTip(GyanisScribe::Core::uiText("列出的是这台机器上前不久真探通的编码器；自动档会在每次编码前按偏好顺序探一遍"));
+
+        const auto stored = settings.stringValue(GyanisScribe::Settings::kRecordVideoEncoder, QString::fromUtf8(std::string{GyanisScribe::Settings::kRecordVideoEncoderAutoToken}));
+        QObject::connect(&enumerator, &GyanisScribe::Record::FfmpegVideoEncoderEnumerator::updated, combo,
+                         [combo, stored](const QStringList &usable)
+                         {
+                             for (const auto &name: usable)
+                             {
+                                 combo->addItem(name, name);
+                             }
+                             if (const int index = combo->findData(stored); index >= 0)
+                             {
+                                 combo->setCurrentIndex(index);
+                             } else if (!stored.isEmpty())
+                             {
+                                 Logger::warning(std::format("设置页列不出上次钉的编码器 {}：这次没探通，配置原样留着，编码时会按自动档走", stored.toStdString()));
+                             }
+                         });
+        QObject::connect(&enumerator, &GyanisScribe::Record::FfmpegVideoEncoderEnumerator::failed, combo,
+                         [combo](const GyanisScribe::Core::Error &error)
+                         {
+                             // 列不出来时只剩「自动」：原因挂在悬停提示上，用户不必翻日志才知道这里为什么没有候选
+                             combo->setToolTip(QString::fromUtf8(error.message.c_str()));
+                             Logger::warning(std::format("设置页列不出编码器清单：{}", error.message));
+                         });
+        enumerator.refresh();
+
+        // 接线排在设初值之后：把界面摆到位不等于用户改过，否则一开设置页就把选择写回配置
+        QObject::connect(combo, &QComboBox::currentIndexChanged, combo,
+                         [&settings, combo](int)
+                         {
+                             if (auto written = settings.setValue(GyanisScribe::Settings::kRecordVideoEncoder, combo->currentData().toString()); !written)
+                             {
+                                 Logger::warning(std::format("视频编码器没能写入：{}（当前选的是 {}）", written.error().message, combo->currentText().toStdString()));
+                             }
+                         });
+        return combo;
+    }
+
+    /**
+     * @brief 按当前输出格式决定帧率那一格的天花板
+     * @param formatCombo 输出格式下拉
+     * @param frameRateSpin 帧率那一格
+     * @param settings 配置存储
+     * @details GIF 的上限比 MP4 低（阈值单源：Record::kMaximumGifFrameRate，与 validateRecorderConfig 同解）：
+     *          选了 GIF 就把这一格的上限收到 24，不让用户配出一个到录制那一刻才被拒的组合。
+     *          显示的夹取不写回配置——切回 MP4 要还回用户原来填的那一档；配置里那份仍由
+     *          validateRecorderConfig 在开录前把关（手改配置绕过界面时它兜着）。
+     */
+    void applyFrameRateAvailability(const QComboBox &formatCombo, QSpinBox &frameRateSpin, ISettingsStore &settings)
+    {
+        const auto parsed = GyanisScribe::Record::parseRecordFormat(formatCombo.currentData().toString());
+        const auto chosen = parsed ? *parsed : GyanisScribe::Record::RecorderConfig{}.format;
+        const auto gif    = chosen == GyanisScribe::Record::OutputFormat::Gif;
+
+        const auto maximum = gif ? GyanisScribe::Record::kMaximumGifFrameRate : GyanisScribe::Record::kMaximumFrameRate;
+        const auto stored  = settings.intValue(GyanisScribe::Settings::kRecordDefaultFrameRate, GyanisScribe::Record::kDefaultFrameRate);
+
+        const QSignalBlocker blocker{frameRateSpin};
+        frameRateSpin.setMaximum(maximum);
+        frameRateSpin.setToolTip(gif ? GyanisScribe::Core::uiText("GIF 最高 24 帧/秒：再高肉眼看不出来，两遍调色板还按帧数翻倍涨。切回 MP4 会恢复你原来那一档")
+                                     : GyanisScribe::Core::uiText("录屏的目标帧率；GIF 档的上限比 MP4 低（24 帧/秒）"));
+        frameRateSpin.setValue(gif ? std::min(stored, maximum) : stored);
+    }
+
+    /**
      * @brief 按当前输出格式决定两格取声可用不可用
      * @param formatCombo 输出格式下拉
      * @param microphoneCombo 麦克风那一格
@@ -1032,7 +1142,8 @@ namespace GyanisScribe::App
     MainWindow::MainWindow(ISettingsStore &settings, ThemeManager &theme, IconProvider &icons, History::HistoryStore &historyStore, Platform::PlatformCapabilities capabilities,
                            Platform::IPlatformIntegration &integration, QWidget *parent) :
         QWidget(parent), m_settings(settings), m_theme(theme), m_icons(icons), m_capabilities(capabilities), m_integration(integration),
-        m_audioDevices(std::make_unique<GyanisScribe::Record::FfmpegAudioDeviceEnumerator>()), m_historyStore(historyStore)
+        m_audioDevices(std::make_unique<GyanisScribe::Record::FfmpegAudioDeviceEnumerator>()),
+        m_videoEncoders(std::make_unique<GyanisScribe::Record::FfmpegVideoEncoderEnumerator>()), m_historyStore(historyStore)
     {
         setWindowTitle(GyanisScribe::Core::uiText("智录 设置"));
         setWindowIcon(icons.icon("App"));
@@ -1433,27 +1544,38 @@ namespace GyanisScribe::App
     QWidget *MainWindow::buildRecordPage()
     {
         auto *page = new QWidget{this};
-        auto *form = makePageForm(page, GyanisScribe::Core::uiText("录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。存成 GIF 时帧率上限比 MP4 "
-                                                                   "低。画面码率填 0 就交给编码器的质量档，给了具体数值就按那个码率控，GIF "
-                                                                   "用不上这一项。取声那两格列不出设备时只剩「不取这一路」，把鼠标停在框上能看到原因；存成 GIF "
-                                                                   "时这两格会灰掉，那种文件带不了声音。这几项都从下一次开始录屏时生效。"));
+        auto *form =
+                makePageForm(page, GyanisScribe::Core::uiText("录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。存成 GIF "
+                                                              "时帧率上限比 MP4 低（选了 GIF 那一格只到 24）。画面码率填 0 就交给编码器的质量档，给了具体数值就按那个码率控，GIF "
+                                                              "用不上这一项。编码器可以钉住某一家，默认自动就是编码前逐个真探、挑第一个开得起来的。倒计时 0 表示立即开始。"
+                                                              "取声那两格列不出设备时只剩「不取这一路」，把鼠标停在框上能看到原因；存成 GIF "
+                                                              "时这两格会灰掉，那种文件带不了声音。这几项都从下一次开始录屏时生效。"));
         form->addRow(GyanisScribe::Core::uiText("录屏成品目录"),
                      makePathRow(m_settings, GyanisScribe::Settings::kPathRecording, GyanisScribe::Core::uiText("录屏目录"), Core::Paths::defaultRecordingDirectory(), m_icons));
         form->addRow(GyanisScribe::Core::uiText("录制范围"), makeRecordScopeCombo(m_settings, m_icons));
         auto *formatCombo = makeRecordFormatCombo(m_settings);
         form->addRow(GyanisScribe::Core::uiText("输出格式"), formatCombo);
-        form->addRow(GyanisScribe::Core::uiText("默认帧率"), makeFrameRateSpin(m_settings));
+        auto *frameRateSpin = makeFrameRateSpin(m_settings);
+        form->addRow(GyanisScribe::Core::uiText("默认帧率"), frameRateSpin);
+        form->addRow(GyanisScribe::Core::uiText("倒计时"), makeCountdownSpin(m_settings));
         form->addRow(GyanisScribe::Core::uiText("画面码率"), makeVideoBitrateSpin(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("视频编码器"), makeVideoEncoderCombo(m_settings, *m_videoEncoders));
         form->addRow(GyanisScribe::Core::uiText("光标高亮"), makeCursorHighlightCheck(m_settings, m_icons));
         auto *microphoneCombo  = makeAudioDeviceCombo(m_settings, GyanisScribe::Settings::kRecordAudioMicrophone, GyanisScribe::Core::uiText("麦克风设备"), *m_audioDevices);
         auto *systemSoundCombo = makeAudioDeviceCombo(m_settings, GyanisScribe::Settings::kRecordAudioSystemSound, GyanisScribe::Core::uiText("系统声音设备"), *m_audioDevices);
         form->addRow(GyanisScribe::Core::uiText("麦克风这一路"), microphoneCombo);
         form->addRow(GyanisScribe::Core::uiText("系统声音这一路"), systemSoundCombo);
 
-        // 选到 GIF 就把取声那两格关掉：判据与 RecordingService 跳过取声用的是同一句
+        // 选到 GIF 就把取声那两格关掉、把帧率那一格的天花板收到 24：判据与 RecordingService 跳过取声
+        // 用的是同一句，帧率上限与 validateRecorderConfig 同源（kMaximumGifFrameRate 一处真源）
         QObject::connect(formatCombo, &QComboBox::currentIndexChanged, formatCombo,
-                         [formatCombo, microphoneCombo, systemSoundCombo](int) { applyAudioAvailability(*formatCombo, *microphoneCombo, *systemSoundCombo); });
+                         [this, formatCombo, frameRateSpin, microphoneCombo, systemSoundCombo](int)
+                         {
+                             applyAudioAvailability(*formatCombo, *microphoneCombo, *systemSoundCombo);
+                             applyFrameRateAvailability(*formatCombo, *frameRateSpin, m_settings);
+                         });
         applyAudioAvailability(*formatCombo, *microphoneCombo, *systemSoundCombo);
+        applyFrameRateAvailability(*formatCombo, *frameRateSpin, m_settings);
         return page;
     }
 

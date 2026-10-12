@@ -131,6 +131,42 @@ namespace
         EXPECT_EQ(recorder.probed().size(), 4u) << "探到能用的那一档就该停，后面每档都是白等";
     }
 
+    TEST(VideoEncoderSelection, PinnedEncoderIsTriedFirstAndWins)
+    {
+        // 钉子可用：即便按偏好顺序 libx264 排最前，也要用钉的那一档，而且只探它一个
+        ProbeRecorder recorder{std::vector<std::string>{}};
+        const auto    selected = selectVideoEncoder(makeProbe(recorder), 1920, 1080, 15, 0, "h264_nvenc");
+
+        ASSERT_TRUE(static_cast<bool>(selected)) << selected.error().message;
+        EXPECT_EQ(*selected, "h264_nvenc");
+        ASSERT_EQ(recorder.probed().size(), 1u) << "钉的那一档探通了就不该再探别的";
+        EXPECT_EQ(recorder.probed()[0], "h264_nvenc") << "钉子要第一个试，不能排在偏好顺序后面";
+    }
+
+    TEST(VideoEncoderSelection, PinnedEncoderFallsBackToAutoWithoutReprobing)
+    {
+        // 钉子探不通、其余可用：退回自动档，并且刚探过的钉子不在自动那一趟里再探第二次
+        ProbeRecorder recorder{std::vector<std::string>{"h264_nvenc"}};
+        const auto    selected = selectVideoEncoder(makeProbe(recorder), 1920, 1080, 15, 0, "h264_nvenc");
+
+        ASSERT_TRUE(static_cast<bool>(selected)) << selected.error().message;
+        EXPECT_EQ(*selected, "libx264") << "钉子探不通要退回自动档的第一档";
+        ASSERT_EQ(recorder.probed().size(), 2u);
+        EXPECT_EQ(recorder.probed()[0], "h264_nvenc");
+        EXPECT_EQ(recorder.probed()[1], "libx264") << "刚探过的钉子不该在自动那一趟里再探第二次";
+    }
+
+    TEST(VideoEncoderSelection, UnknownPinFallsBackToAutoEntirely)
+    {
+        // 表外的钉子不发明行为：直接按自动档走，连探都不探——探一条我们不知道参数形状的命令只会得到一条假失败
+        ProbeRecorder recorder{std::vector<std::string>{}};
+        const auto    selected = selectVideoEncoder(makeProbe(recorder), 1920, 1080, 15, 0, "h264_fake");
+
+        ASSERT_TRUE(static_cast<bool>(selected)) << selected.error().message;
+        EXPECT_EQ(*selected, "libx264");
+        EXPECT_EQ(recorder.probed()[0], "libx264") << "表外的钉子连探都不该探";
+    }
+
     TEST(VideoEncoderSelection, RejectionNamesEveryCandidateItTried)
     {
         // 全部候选都开不起来：报错要点名试过哪几个，否则用户无法判断是 ffmpeg 缺件还是参数写歪

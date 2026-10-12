@@ -1,6 +1,7 @@
 /**
  * @file RecentColors.h
- * @brief 标注色板的「最近使用颜色」清单：入队、去重、序列化与读回
+ * @brief 「最近使用颜色」清单：入队、去重、序列化与读回
+ * @details 两处在用：标注色板的最近色与取色器的最近取色记录。放这里是因为两边都依赖 Pick
  * @author Gyanis
  * @date 2026-10-10
  * @version 0.0.1
@@ -18,10 +19,13 @@
 #include <span>
 #include <vector>
 
-namespace GyanisScribe::Annotation
+namespace GyanisScribe::Pick
 {
-    /// 最近使用颜色的上限：再多就挤满工具栏，也记不住那么多次
+    /// 标注色板「最近使用颜色」的上限：再多就挤满工具栏，也记不住那么多次
     inline constexpr std::size_t kRecentColorCapacity = 6;
+
+    /// 取色器「最近取色」记录的上限：遮罩底部的色块行放得下几个就记几个
+    inline constexpr std::size_t kPickColorHistoryCapacity = 8;
 
     /**
      * @brief 把刚用过的颜色插到清单最前
@@ -56,4 +60,4 @@ namespace GyanisScribe::Annotation
      */
     [[nodiscard]] Core::Expected<std::vector<QColor>> parseRecentColors(const QStringList &tokens);
 
-} // namespace GyanisScribe::Annotation
+} // namespace GyanisScribe::Pick

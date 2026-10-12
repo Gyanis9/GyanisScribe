@@ -28,6 +28,7 @@
     <file alias="TextBackground.svg">Icons/TextBackground.svg</file>
     <file alias="Highlight.svg">Icons/Highlight.svg</file>
     <file alias="HighlightOpacity.svg">Icons/HighlightOpacity.svg</file>
+    <file alias="HighlightWidth.svg">Icons/HighlightWidth.svg</file>
     <file alias="History.svg">Icons/History.svg</file>
     <file alias="Hotkey.svg">Icons/Hotkey.svg</file>
     <file alias="Info.svg">Icons/Info.svg</file>

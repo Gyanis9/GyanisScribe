@@ -321,6 +321,9 @@ namespace GyanisScribe::Annotation
          */
         void setHighlightAlpha(int alpha) noexcept;
 
+        /// 设默认高亮加宽倍数（仅高亮工具用），取值夹在 1 到 16 之间
+        void setHighlightWidthFactor(int factor) noexcept;
+
         /**
          * @brief 设文字字体族
          * @param family 家族名；空串表示跟随应用默认字体
@@ -396,19 +399,20 @@ namespace GyanisScribe::Annotation
 
         /// 起笔点，拖拽类图形用它算外接框
         QPoint          m_startPoint;
-        AnnotationShape m_pending;                                                        ///< 在途图形
-        QColor          m_color;                                                          ///< 默认画笔颜色
-        int             m_lineWidth;                                                      ///< 默认线宽
-        int             m_fillStyle       = 0;                                            ///< 默认填充档（0 无、1 半透明、2 实心）
-        bool            m_doubleHeaded    = false;                                        ///< 默认双向箭头（仅箭头工具用）
-        int             m_mosaicBlockSize = kMosaicBlockSizes[kDefaultMosaicBlockStep];   ///< 默认马赛克粒度（仅马赛克工具用）
-        int             m_highlightAlpha  = kHighlightAlphas[kDefaultHighlightAlphaStep]; ///< 默认高亮透明度（仅高亮工具用）
-        QString         m_fontFamily;                                                     ///< 默认文字字体族，空串=跟随应用默认（仅文字工具用）
-        bool            m_textBold       = false;                                         ///< 默认文字粗体（仅文字工具用）
-        bool            m_textItalic     = false;                                         ///< 默认文字斜体（仅文字工具用）
-        bool            m_textOutline    = false;                                         ///< 默认反色描边（仅文字工具用）
-        bool            m_textBackground = false;                                         ///< 默认反色底板（仅文字工具用）
-        int             m_fontSize;                                                       ///< 默认字号
+        AnnotationShape m_pending;                                                                   ///< 在途图形
+        QColor          m_color;                                                                     ///< 默认画笔颜色
+        int             m_lineWidth;                                                                 ///< 默认线宽
+        int             m_fillStyle            = 0;                                                  ///< 默认填充档（0 无、1 半透明、2 实心）
+        bool            m_doubleHeaded         = false;                                              ///< 默认双向箭头（仅箭头工具用）
+        int             m_mosaicBlockSize      = kMosaicBlockSizes[kDefaultMosaicBlockStep];         ///< 默认马赛克粒度（仅马赛克工具用）
+        int             m_highlightAlpha       = kHighlightAlphas[kDefaultHighlightAlphaStep];       ///< 默认高亮透明度（仅高亮工具用）
+        int             m_highlightWidthFactor = kHighlightWidthFactors[kDefaultHighlightWidthStep]; ///< 默认高亮加宽倍数（仅高亮工具用）
+        QString         m_fontFamily;                                                                ///< 默认文字字体族，空串=跟随应用默认（仅文字工具用）
+        bool            m_textBold       = false;                                                    ///< 默认文字粗体（仅文字工具用）
+        bool            m_textItalic     = false;                                                    ///< 默认文字斜体（仅文字工具用）
+        bool            m_textOutline    = false;                                                    ///< 默认反色描边（仅文字工具用）
+        bool            m_textBackground = false;                                                    ///< 默认反色底板（仅文字工具用）
+        int             m_fontSize;                                                                  ///< 默认字号
 
     private:
         ToolKind                 m_kind;             ///< 工具种类

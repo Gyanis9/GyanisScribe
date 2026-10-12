@@ -126,6 +126,7 @@ namespace
             std::vector<int>      doubleHeaded;     ///< doubleHeadedChanged 收到的开关（1 开 0 关）
             std::vector<int>      mosaicBlockSizes; ///< mosaicBlockSizeChanged 收到的粒度
             std::vector<int>      highlightAlphas;  ///< highlightAlphaChanged 收到的透明度
+            std::vector<int>      highlightWidths;  ///< highlightWidthFactorChanged 收到的加宽倍数
             std::vector<QString>  fontFamilies;     ///< fontFamilyChanged 收到的字体族
             std::vector<int>      textBolds;        ///< textBoldChanged 收到的开关（1 开 0 关）
             std::vector<int>      textItalics;      ///< textItalicChanged 收到的开关（1 开 0 关）
@@ -148,6 +149,7 @@ namespace
             QObject::connect(toolbar.get(), &AnnotationToolbar::doubleHeadedChanged, [&log](bool enabled) { log.doubleHeaded.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::mosaicBlockSizeChanged, [&log](int blockSize) { log.mosaicBlockSizes.push_back(blockSize); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::highlightAlphaChanged, [&log](int alpha) { log.highlightAlphas.push_back(alpha); });
+            QObject::connect(toolbar.get(), &AnnotationToolbar::highlightWidthFactorChanged, [&log](int factor) { log.highlightWidths.push_back(factor); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::fontFamilyChanged, [&log](const QString &family) { log.fontFamilies.push_back(family); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::textBoldChanged, [&log](bool enabled) { log.textBolds.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::textItalicChanged, [&log](bool enabled) { log.textItalics.push_back(enabled ? 1 : 0); });
@@ -280,6 +282,29 @@ namespace
         button->click();
         EXPECT_EQ(toolbar->currentHighlightAlpha(), 110) << "三档之后该回到「中」";
         EXPECT_EQ(button->accessibleName(), QString::fromUtf8("高亮透明度：中")) << "无障碍名没跟上当前档";
+    }
+
+    /**
+     * @brief 钉住高亮加宽按钮的三档循环：起点「中」=4（与旧写死值同解），信号与提示一起走
+     */
+    TEST_F(ToolbarFixture, HighlightWidthButtonCyclesAndNamesTheStep)
+    {
+        SignalLog log;
+        auto      toolbar = makeToolbarLogged(log);
+        auto     *button  = buttonByLabel(*toolbar, "高亮加宽");
+        ASSERT_NE(button, nullptr) << "工具栏上找不到高亮加宽按钮";
+
+        EXPECT_EQ(toolbar->currentHighlightWidthFactor(), 4) << "起点该是「中」4：与这一格出现之前的写死值同解，老图样不受影响";
+        button->click();
+        EXPECT_EQ(toolbar->currentHighlightWidthFactor(), 8);
+        EXPECT_EQ(log.highlightWidths, std::vector<int>{8}) << "走了一档却没把信号发出去";
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("高亮加宽：宽")) << "提示没跟上当前档";
+
+        button->click();
+        EXPECT_EQ(toolbar->currentHighlightWidthFactor(), 2);
+        button->click();
+        EXPECT_EQ(toolbar->currentHighlightWidthFactor(), 4) << "三档之后该回到「中」";
+        EXPECT_EQ(button->accessibleName(), QString::fromUtf8("高亮加宽：中")) << "无障碍名没跟上当前档";
     }
 
     /**

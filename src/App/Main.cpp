@@ -1,4 +1,5 @@
 #include "App/Application.h"
+#include "App/CommandLine.h"
 
 #include "App/CrashGuard.h"
 
@@ -7,67 +8,62 @@
 #include "Core/Text.h"
 
 #include <QApplication>
-#include <QCommandLineOption>
-#include <QCommandLineParser>
 #include <QCoreApplication>
 #include <QStringList>
-#include <QWidget>
 
+#include <cstdio>
 #include <format>
+#include <iostream>
 
 namespace
 {
-    /**
-     * @brief 摆出命令行参数这一条路
-     * @param application 已经建好的应用对象（--version 要用它的应用名与版本号）
-     * @return 自检开关
-     * @details --help/--version 由 Qt 打印后直接结束进程；不认识的参数也当场退出而不是
-     *          装成「没带参数」安静地起一个界面——那样用户会以为那条参数生效了。
-     */
-    bool parseCommandLine(QCoreApplication &application)
+    /// 把主进程的 argv 收成 QStringList：参数要在 QApplication 之前读（命令行动作影响装配方式），
+    /// 按本地码页转——与日志文件名那条同一处口径
+    [[nodiscard]] QStringList argumentsFromMain(const int argc, char *argv[])
     {
-        QCommandLineParser parser;
-        // 这两句是给用户看的文案，走文案目录：装了英文语言包时 --help 也该出英文
-        parser.setApplicationDescription(GyanisScribe::Core::uiText("智录：截图、标注、贴图、取色、录屏与文字识别"));
-        parser.addHelpOption();
-        parser.addVersionOption();
-
-        const QCommandLineOption selfTest{QStringLiteral("selftest"), GyanisScribe::Core::uiText("把启动路径跑完就退出：热键登记与日志就绪算通过（退出码 0），否则 1")};
-        parser.addOption(selfTest);
-        parser.process(application);
-        return parser.isSet(selfTest);
+        QStringList arguments;
+        for (int index = 1; index < argc; ++index)
+        {
+            arguments << QString::fromLocal8Bit(argv[index]);
+        }
+        return arguments;
     }
 } // namespace
 
 /**
  * @brief 进程入口
- * @details 启动顺序是刻意的：应用对象先建（日志目录、配置与主题都依赖它），参数再解析，
- *          自检分支在崩溃兜底与单实例之前就走掉——自检要量的就是「不带这些副作用能不能起得来」，
+ * @details 启动顺序是刻意的：参数先解析（命令行动作决定装配方式：一次性动作不锁单实例、不登记热键），
+ *          应用对象再建，命令行动作在崩溃兜底与单实例之前就走掉——它们要量的或做的只有那一件事，
  *          而且不能在用户机器上长期占着全局热键。
  * @param argc 命令行参数个数
  * @param argv 命令行参数数组
- * @return 事件循环退出码；自检模式下按启动路径是否走通返回 0 或 1
+ * @return 事件循环退出码；自检按启动路径给出 0/1，截图按落盘成败给出 0/1，参数写错给出 2
  */
 int main(int argc, char *argv[])
 {
-    Application application(argc, argv);
-
-    // --selftest：把启动路径跑完就退出。给 CI 与本机一个「起得来」的判据
-    if (parseCommandLine(application))
+    const auto parsed = GyanisScribe::App::parseStartupArguments(argumentsFromMain(argc, argv));
+    if (!parsed.errorText.isEmpty())
     {
-        const auto &report = application.hotkeyReport();
-        // 可见顶层窗口数也要报出来：托盘装不上时入口就只剩主窗口，这一格是那条降级真的落了地的读数
-        int visibleTopLevels = 0;
-        for (auto *widget: QApplication::topLevelWidgets())
-        {
-            if (widget->isVisible())
-            {
-                ++visibleTopLevels;
-            }
-        }
-        GyanisScribe::Core::Logger::info(std::format("自检：热键登记 {} 项、未登记 {} 项，日志就绪 {}，可见顶层窗口 {} 个", report.registered, report.failures.size(),
-                                                     application.isReady(), visibleTopLevels));
-        return application.isReady() ? 0 : 1;
+        std::fprintf(stderr, "%s\n%s\n", parsed.errorText.toLocal8Bit().constData(), GyanisScribe::App::commandLineUsageText().toLocal8Bit().constData());
+        return 2;
+    }
+    if (parsed.request.action == GyanisScribe::App::CommandLineAction::Help)
+    {
+        std::cout << GyanisScribe::App::commandLineUsageText().toLocal8Bit().constData() << std::endl;
+        return 0;
+    }
+    if (parsed.request.action == GyanisScribe::App::CommandLineAction::Version)
+    {
+        std::printf("智录（GyanisScribe）%s\n", PROJECT_VERSION);
+        return 0;
+    }
+
+    Application application(argc, argv, parsed.request);
+
+    // 命令行动作：截图三档、贴图与取色各自收场，普通启动落到下面常驻那一路
+    if (parsed.request.action != GyanisScribe::App::CommandLineAction::None)
+    {
+        return application.executeCommandLine(parsed.request);
     }
 
     // 兜底要在任何可能崩的步骤之前装好：装晚了那条崩就只是「程序没了」

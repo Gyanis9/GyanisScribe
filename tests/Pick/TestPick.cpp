@@ -36,6 +36,7 @@ using GyanisScribe::Pick::indexOfColorFormat;
 using GyanisScribe::Pick::kMagnifierSampleEdge;
 using GyanisScribe::Pick::magnifierLayoutFor;
 using GyanisScribe::Pick::parseColorFormat;
+using GyanisScribe::Pick::recentSwatchRects;
 using GyanisScribe::Settings::SettingsStore;
 using GyanisScribe::Ui::ThemeManager;
 
@@ -112,10 +113,13 @@ namespace
  */
 TEST(PickColorFormat, IndexTokenAndLabelPointAtEachOther)
 {
-    constexpr std::array<std::tuple<ColorFormat, std::string_view, std::string_view>, 3> expected = {
+    constexpr std::array<std::tuple<ColorFormat, std::string_view, std::string_view>, 6> expected = {
             std::tuple{ColorFormat::Hex, std::string_view{"Hex"}, std::string_view{"HEX"}},
             std::tuple{ColorFormat::Rgb, std::string_view{"Rgb"}, std::string_view{"RGB"}},
             std::tuple{ColorFormat::Hsl, std::string_view{"Hsl"}, std::string_view{"HSL"}},
+            std::tuple{ColorFormat::Hsv, std::string_view{"Hsv"}, std::string_view{"HSV"}},
+            std::tuple{ColorFormat::Hsi, std::string_view{"Hsi"}, std::string_view{"HSI"}},
+            std::tuple{ColorFormat::Decimal, std::string_view{"Decimal"}, std::string_view{"十进制"}},
     };
 
     const auto labels = colorFormatLabels();
@@ -130,7 +134,7 @@ TEST(PickColorFormat, IndexTokenAndLabelPointAtEachOther)
         EXPECT_EQ(indexOfColorFormat(*format), static_cast<int>(index)) << index;
     }
 
-    EXPECT_FALSE(colorFormatAt(3).has_value()) << "越界要给出空，让调用方跳过而不是写坏配置";
+    EXPECT_FALSE(colorFormatAt(6).has_value()) << "越界要给出空，让调用方跳过而不是写坏配置";
     EXPECT_FALSE(colorFormatAt(-1).has_value());
 }
 
@@ -145,10 +149,16 @@ TEST(PickColorFormat, TokensLabelsAndHandComputedTexts)
     EXPECT_EQ(colorFormatToken(ColorFormat::Hex), "Hex");
     EXPECT_EQ(colorFormatToken(ColorFormat::Rgb), "Rgb");
     EXPECT_EQ(colorFormatToken(ColorFormat::Hsl), "Hsl");
+    EXPECT_EQ(colorFormatToken(ColorFormat::Hsv), "Hsv");
+    EXPECT_EQ(colorFormatToken(ColorFormat::Hsi), "Hsi");
+    EXPECT_EQ(colorFormatToken(ColorFormat::Decimal), "Decimal");
     EXPECT_EQ(colorFormatLabel(ColorFormat::Hex), QStringLiteral("HEX"));
     EXPECT_EQ(colorFormatLabel(ColorFormat::Hsl), QStringLiteral("HSL"));
+    EXPECT_EQ(colorFormatLabel(ColorFormat::Hsv), QStringLiteral("HSV"));
+    EXPECT_EQ(colorFormatLabel(ColorFormat::Hsi), QStringLiteral("HSI"));
+    EXPECT_EQ(colorFormatLabel(ColorFormat::Decimal), QStringLiteral("十进制"));
 
-    for (const auto format: {ColorFormat::Hex, ColorFormat::Rgb, ColorFormat::Hsl})
+    for (const auto format: {ColorFormat::Hex, ColorFormat::Rgb, ColorFormat::Hsl, ColorFormat::Hsv, ColorFormat::Hsi, ColorFormat::Decimal})
     {
         const auto parsed = parseColorFormat(colorFormatToken(format));
         ASSERT_TRUE(static_cast<bool>(parsed));
@@ -160,13 +170,22 @@ TEST(PickColorFormat, TokensLabelsAndHandComputedTexts)
     ASSERT_FALSE(static_cast<bool>(rejected));
     EXPECT_NE(rejected.error().message.find("Hex"), std::string::npos);
 
+    // 手算第二组：#3C78C8 的 HSV 是 max=200、chroma=140 → v=78%、s=140/200=70%；
+    // HSI 的 i=(60+120+200)/3=126.7 → 50%、s=1-60/126.7=53%
     const QColor sample{60, 120, 200};
     EXPECT_EQ(formatColor(sample, ColorFormat::Hex), QStringLiteral("#3C78C8"));
     EXPECT_EQ(formatColor(sample, ColorFormat::Rgb), QStringLiteral("rgb(60, 120, 200)"));
     EXPECT_EQ(formatColor(sample, ColorFormat::Hsl), QStringLiteral("hsl(214, 56%, 51%)"));
+    EXPECT_EQ(formatColor(sample, ColorFormat::Hsv), QStringLiteral("hsv(214, 70%, 78%)"));
+    EXPECT_EQ(formatColor(sample, ColorFormat::Hsi), QStringLiteral("hsi(214, 53%, 50%)"));
+    EXPECT_EQ(formatColor(sample, ColorFormat::Decimal), QStringLiteral("60, 120, 200"));
 
     EXPECT_EQ(formatColor(QColor{0, 0, 0}, ColorFormat::Hsl), QStringLiteral("hsl(0, 0%, 0%)"));
     EXPECT_EQ(formatColor(QColor{255, 255, 255}, ColorFormat::Hsl), QStringLiteral("hsl(0, 0%, 100%)"));
+    EXPECT_EQ(formatColor(QColor{0, 0, 0}, ColorFormat::Hsv), QStringLiteral("hsv(0, 0%, 0%)")) << "纯黑的无彩色相按 0 记，饱和 0";
+    EXPECT_EQ(formatColor(QColor{0, 0, 0}, ColorFormat::Hsi), QStringLiteral("hsi(0, 0%, 0%)")) << "I 为 0 时饱和按 0 记，不许除零";
+    EXPECT_EQ(formatColor(QColor{255, 255, 255}, ColorFormat::Hsi), QStringLiteral("hsi(0, 0%, 100%)"));
+    EXPECT_EQ(formatColor(QColor{255, 0, 0}, ColorFormat::Hsi), QStringLiteral("hsi(0, 100%, 33%)")) << "纯红 i=85/255→33%，s=1-0/i=100%";
 }
 
 /**
@@ -306,6 +325,75 @@ TEST_F(PickFixture, LeftClickPicksWhileEscapeAndRightClickCancel)
     QApplication::sendEvent(pointer, &rightClick);
     EXPECT_EQ(cancelledCount, 2) << "右键等同放弃：用户按下去时不该以为取到了色";
     EXPECT_EQ(pickedCount, 1) << "右键不该顺带复制一个颜色";
+}
+
+/**
+ * @brief 钉住最近取色色块行的几何：居中、等距、贴底，摆不下就按可摆数量截断
+ * @details 期望值手算：1000×800 屏摆 3 块（边长 28、间距 6、两侧各留 28）
+ *          → 行宽 96、左起 452、顶边 743。命中测试与绘制共用这一处，各自算一遍就会点不中。
+ */
+TEST(PickGeometry, RecentSwatchesCenterAtTheBottom)
+{
+    const auto three = recentSwatchRects(QRect{0, 0, 1000, 800}, 3);
+    ASSERT_EQ(three.size(), 3U);
+    EXPECT_EQ(three[0], QRect(452, 743, 28, 28));
+    EXPECT_EQ(three[1], QRect(486, 743, 28, 28));
+    EXPECT_EQ(three[2], QRect(520, 743, 28, 28));
+
+    // 副屏原点不是 (0,0)：整行跟着屏走
+    const auto two = recentSwatchRects(QRect{1920, 0, 800, 600}, 2);
+    ASSERT_EQ(two.size(), 2U);
+    EXPECT_EQ(two[0], QRect(2289, 543, 28, 28));
+    EXPECT_EQ(two[1], QRect(2323, 543, 28, 28));
+
+    // 太窄的屏：能摆几块摆几块，一块都摆不下就交空
+    const auto one = recentSwatchRects(QRect{0, 0, 90, 200}, 3);
+    ASSERT_EQ(one.size(), 1U) << "90 宽只摆得下一块";
+    EXPECT_EQ(one[0], QRect(31, 143, 28, 28));
+    EXPECT_TRUE(recentSwatchRects(QRect{0, 0, 60, 200}, 3).empty()) << "60 宽一块都摆不下，不许画到屏外";
+
+    EXPECT_TRUE(recentSwatchRects(QRect{0, 0, 1000, 800}, 0).empty());
+    EXPECT_TRUE(recentSwatchRects(QRect{}, 3).empty());
+}
+
+/**
+ * @brief 钉住色块行的取回：点色块取的是那一块的颜色，数字键同理，都不是取它底下的像素
+ * @details 200×200 屏摆 2 块 → (69,143) 与 (103,143) 两块 28×28。点第一块拿到的必须是
+ *          记录里的第一个颜色（红），而那个坐标底下的帧像素是底色——两件事必须分得开。
+ */
+TEST_F(PickFixture, RecentSwatchesPickTheStoredColorNotThePixelUnderneath)
+{
+    const auto frame   = makeFrame({200, 200}, 1.0, {83, 157}, QColor{10, 200, 20});
+    auto       overlay = makeOverlay(frame, {0, 0, 200, 200}, ColorFormat::Hex);
+    overlay->setRecentColors({QColor{255, 0, 0}, QColor{0, 0, 255}});
+
+    std::vector<QColor>  picked;
+    std::vector<QString> texts;
+    auto                *pointer = overlay.get();
+    QObject::connect(pointer, &ColorPickerOverlay::colorPicked, pointer,
+                     [&picked, &texts](const QColor &color, const QString &text)
+                     {
+                         picked.push_back(color);
+                         texts.push_back(text);
+                     });
+
+    // 第一块的中心点在 (83,157)：底下的帧像素是 (10,200,20)，取回的必须是记录里的红
+    const QPointF center{83.0, 157.0};
+    QMouseEvent   click{QEvent::MouseButtonPress, center, center, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QApplication::sendEvent(pointer, &click);
+    ASSERT_EQ(picked.size(), 1U);
+    EXPECT_EQ(picked[0], QColor(255, 0, 0)) << "取到的是底下的像素色，不是色块记录的颜色";
+    EXPECT_EQ(texts[0], QStringLiteral("#FF0000"));
+
+    // 数字键 2 取第二块（蓝）；3 没有对应块，不产出
+    QKeyEvent second{QEvent::KeyPress, Qt::Key_2, Qt::NoModifier};
+    QApplication::sendEvent(pointer, &second);
+    ASSERT_EQ(picked.size(), 2U);
+    EXPECT_EQ(picked[1], QColor(0, 0, 255));
+
+    QKeyEvent third{QEvent::KeyPress, Qt::Key_3, Qt::NoModifier};
+    QApplication::sendEvent(pointer, &third);
+    EXPECT_EQ(picked.size(), 2U) << "没有第三块，数字键 3 不该产出颜色";
 }
 
 /**

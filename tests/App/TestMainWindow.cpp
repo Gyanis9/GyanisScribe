@@ -224,7 +224,9 @@ namespace
                 Expectation{MainWindowPage::Capture, {"截完之后", "延时截图", "截图目录", "颜色写法", "自动保存所有截图", "截图音效", "成品加边框", "成品加投影"}, true},
                 Expectation{MainWindowPage::Annotation, {"默认线宽", "默认字号"}, true},
                 Expectation{MainWindowPage::Pin, {"默认不透明度"}, true},
-                Expectation{MainWindowPage::Record, {"录屏目录", "录制范围", "输出格式", "默认帧率", "画面码率", "光标高亮", "麦克风设备", "系统声音设备"}, true},
+                Expectation{MainWindowPage::Record,
+                            {"录屏目录", "录制范围", "输出格式", "默认帧率", "录屏倒计时", "画面码率", "视频编码器", "光标高亮", "麦克风设备", "系统声音设备"},
+                            true},
                 Expectation{MainWindowPage::Ocr, {"识别语言", "语言包目录"}, true},
                 Expectation{MainWindowPage::Hotkey, {"截图", "录屏", "文字识别", "屏幕取色", "快速保存"}, true},
                 Expectation{MainWindowPage::Theme, {"主题"}, true},
@@ -350,6 +352,61 @@ namespace
 
         const auto reopened = makeStore();
         EXPECT_TRUE(reopened->boolValue(GyanisScribe::Settings::kRecordCursorHighlight, false));
+    }
+
+    /**
+     * @brief 钉住 GIF 档下帧率那一格的天花板，以及切回 MP4 时用户那一档的还原
+     * @details 上限来自 Record::kMaximumGifFrameRate 一处真源（与 validateRecorderConfig 同解）：
+     *          不联动的话设置页允许到 60，用户配到 60 选了 GIF，到开录那一刻才被拒。
+     *          夹取只影响显示：把 60 写回配置就等于用户切回 MP4 时丢了原来那一档。
+     */
+    TEST_F(MainWindowFixture, FrameRateCeilingFollowsTheOutputFormat)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::Record);
+        auto *format = qobject_cast<QComboBox *>(controlInCurrentPage("输出格式"));
+        auto *rate   = qobject_cast<QSpinBox *>(controlInCurrentPage("默认帧率"));
+        ASSERT_NE(format, nullptr);
+        ASSERT_NE(rate, nullptr);
+
+        // 先把帧率调到 60：MP4 档下这一格必须让它过得去，并写进配置
+        rate->setValue(GyanisScribe::Record::kMaximumFrameRate);
+        EXPECT_EQ(rate->maximum(), GyanisScribe::Record::kMaximumFrameRate);
+
+        // 选到 GIF：上限收到 24、显示值被夹住，配置里那份 60 原样留着
+        const int gifIndex = format->findData(QStringLiteral("Gif"));
+        ASSERT_GE(gifIndex, 0) << "输出格式下拉里没有 GIF 这一档";
+        format->setCurrentIndex(gifIndex);
+        EXPECT_EQ(rate->maximum(), GyanisScribe::Record::kMaximumGifFrameRate) << "选了 GIF 帧率那格的天花板没跟着收";
+        EXPECT_EQ(rate->value(), GyanisScribe::Record::kMaximumGifFrameRate) << "高过上限的显示值该夹到上限";
+        EXPECT_EQ(makeStore()->intValue(GyanisScribe::Settings::kRecordDefaultFrameRate, 0), GyanisScribe::Record::kMaximumFrameRate)
+                << "夹取只影响显示：把 60 写回配置，切回 MP4 时用户就丢了原来那一档";
+
+        // 切回 MP4：天花板放开，用户原来那一档回来
+        const int mp4Index = format->findData(QStringLiteral("Mp4"));
+        ASSERT_GE(mp4Index, 0);
+        format->setCurrentIndex(mp4Index);
+        EXPECT_EQ(rate->maximum(), GyanisScribe::Record::kMaximumFrameRate);
+        EXPECT_EQ(rate->value(), GyanisScribe::Record::kMaximumFrameRate) << "切回 MP4 没还回用户原定那一档";
+    }
+
+    /**
+     * @brief 钉住倒计时那一行写进 Record/CountdownSeconds，默认档与读端缺省同解
+     */
+    TEST_F(MainWindowFixture, CountdownRowWritesTheSecondsRecordingStartUses)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::Record);
+        auto *spin = qobject_cast<QSpinBox *>(controlInCurrentPage("录屏倒计时"));
+        ASSERT_NE(spin, nullptr);
+        EXPECT_EQ(spin->value(), GyanisScribe::Record::kDefaultCountdownSeconds) << "默认档要与起录那一侧的缺省同解";
+        EXPECT_EQ(spin->maximum(), GyanisScribe::Record::kMaximumCountdownSeconds);
+
+        spin->setValue(1);
+        closeWindowAndFlush();
+
+        const auto reopened = makeStore();
+        EXPECT_EQ(reopened->intValue(GyanisScribe::Settings::kRecordCountdownSeconds, -1), 1) << "倒计时没写进 Record/CountdownSeconds";
     }
 
     /**

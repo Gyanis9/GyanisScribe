@@ -14,6 +14,7 @@
 
 #include "App/MainWindow.h"
 #include "App/CaptureIntent.h"
+#include "App/CommandLine.h"
 #include "App/TrayController.h"
 #include "Ui/Toast.h"
 
@@ -97,6 +98,7 @@ namespace GyanisScribe::Ui
 
 namespace GyanisScribe::App
 {
+    struct DropPinOutcome;
     class MainWindow;
     class TrayController;
 
@@ -176,6 +178,29 @@ namespace GyanisScribe::App
         void openMainWindow(MainWindowPage page);
 
         /**
+         * @brief 命令行那次截图：处理固定走「快速保存」那一档（落盘 + 剪贴板），不做任何交互
+         * @param action 三档范围之一：整屏 / 上次选区 / 前台窗口
+         * @details 命令行没有界面可等，也不走延时那道闸。落盘成功从 imageFileSaved 交回路径，
+         *          取不到条件（比如没有前台窗口）时从 commandLineActionFailed 交回中文原因。
+         */
+        void startCommandLineCapture(CommandLineAction action);
+
+        /**
+         * @brief 命令行贴图：把盘上的图片贴到光标处
+         * @param filePath 图片文件路径
+         * @return 成功返回空载荷；文件不在、或不是能贴的图片时返回中文原因
+         * @details 复用拖放那套内容转换：图片读像素、动图连来源带走、读不出的说清是哪一件
+         */
+        [[nodiscard]] Core::Expected<void> pinImageFile(const QString &filePath);
+
+        /**
+         * @brief 起一层全屏取色遮罩（热键、托盘与命令行共用这一条）
+         * @details 抓的是按下那一刻的那一屏，之后遮罩显示的就是这一帧：放大镜要看的正是当前画面，
+         *          实时抓屏会让鼠标一停画面就变，颜色也就抄不准。
+         */
+        void startColorPick();
+
+        /**
          * @brief 录屏热键：没在录就开始整屏录，正在录就停下并编码
          * @details 独立的录屏界面还没做，先做成一个开关：再按一次就是「停止并保存」，
          *          用户不必在屏幕另一头找停止按钮。
@@ -199,6 +224,20 @@ namespace GyanisScribe::App
          * @return 全应用共用的那一个，描边色已跟着主题接好
          */
         [[nodiscard]] GyanisScribe::Ui::IconProvider &icons() const noexcept;
+
+    Q_SIGNALS:
+        /**
+         * @brief 成品落盘：存文件、快速保存与自动保存三条路共用这一处
+         * @param filePath 写下的完整路径
+         * @details 命令行那次截图靠它把路径打到标准输出；界面这一侧没有人监听
+         */
+        void imageFileSaved(const QString &filePath);
+
+        /**
+         * @brief 命令行动作当场失败（还没走到截图就取不到条件）
+         * @param reason 中文原因
+         */
+        void commandLineActionFailed(const QString &reason);
 
     private:
         /**
@@ -280,11 +319,20 @@ namespace GyanisScribe::App
         /// 标注窗请求贴图
         void handlePinRequested(const QImage &image);
         /**
-         * @brief 把剪贴板里的图贴到光标那一处（托盘那一条的落点）
+         * @brief 把剪贴板里的内容贴到光标那一处（托盘那一条的落点）
          * @details 剪贴板来的图没有「原来那块位置」，跟着鼠标落才是用户此刻的落点；
-         *          取不到图时把原因与替代做法发给用户，不静默什么都不做
+         *          剪贴板里是文件（资源管理器里复制的那一份）时走拖放那条内容转换，
+         *          一次贴多件、动图连来源带走；取不到图时把原因与替代做法发给用户，不静默什么都不做
          */
         void pasteClipboardAsPin();
+
+        /**
+         * @brief 贴出一批之后的一句提示
+         * @param outcome 贴出的张数与没贴成的文件名
+         * @details 拖放落图与剪贴板贴图两处共用：贴上一部分也要说清另一半去哪了，
+         *          静默丢掉一件比整次拒绝更让人困惑
+         */
+        void notifyPinnedDrop(const DropPinOutcome &outcome);
         /// 标注窗请求识别文字
         void handleOcrRequested(const QImage &image);
 
@@ -300,9 +348,21 @@ namespace GyanisScribe::App
          * @brief 某张贴图上取到了一个像素的颜色
          * @param color 颜色
          * @details 排成设置里那一档写法、复制到剪贴板并给一句提示：与屏幕取色那一路同一个格式出口，
-         *          用户从哪一处取的色，粘出来的都是同一种写法
+         *          用户从哪一处取的色，粘出来的都是同一种写法；两处都进「最近取色」那一份清单
          */
         void handlePinColorPicked(const QColor &color);
+
+        /**
+         * @brief 读「最近取色」清单
+         * @return 设置里那份清单（最近的在前）；坏词整体拒绝、按空清单继续并把原因落进日志
+         */
+        [[nodiscard]] std::vector<QColor> recentPickedColors() const;
+
+        /**
+         * @brief 把刚取到的颜色压进「最近取色」清单并写回设置
+         * @param color 颜色
+         */
+        void rememberPickedColor(const QColor &color);
 
         /**
          * @brief 用给定语言认一次当前这张图，并把结果摆进结果窗口
@@ -369,13 +429,6 @@ namespace GyanisScribe::App
         /// 清空历史清单：只清记录，成品文件留在各自目录里
         void handleHistoryClear();
 
-        /**
-         * @brief 起一层全屏取色遮罩
-         * @details 抓的是按下那一刻的那一屏，之后遮罩显示的就是这一帧：放大镜要看的正是当前画面，
-         *          实时抓屏会让鼠标一停画面就变，颜色也就抄不准。
-         */
-        void startColorPick();
-
         std::unique_ptr<Settings::SettingsStore>             m_settings;                                     ///< 配置存储
         std::unique_ptr<Platform::IPlatformIntegration>      m_integration;                                  ///< 平台集成
         std::unique_ptr<Capture::IScreenCaptureSource>       m_captureSource;                                ///< 抓帧来源
@@ -401,10 +454,11 @@ namespace GyanisScribe::App
         QTimer                                              *m_hudTicker          = nullptr;                 ///< 控制条的每秒轮询，随一轮录屏起停
         int                                                  m_countdownRemaining = 0;                       ///< 倒计时剩余整秒，推给控制条的大字
         CaptureIntent                                        m_captureIntent      = CaptureIntent::Annotate; ///< 这一帧截完要去做的事
-        QTimer                                              *m_captureDelayTimer  = nullptr;                 ///< 延时截图那一枚，一次只允许有一个在等
-        std::function<void()>                                m_pendingCapture;                               ///< 延时到点要走的那一步，随定时器一起活到触发
-        Core::CapturedImage                                  m_lastCapture;                                  ///< 本轮抓到的帧，贴图与识别要用它定位
-        QRect                                                m_lastSelection;                                ///< 本轮选区（全局逻辑坐标），标注窗与贴图的位置来源
+        bool                                                 m_commandLineActive  = false;   ///< 正在跑命令行那次截图：失败路径要往 commandLineActionFailed 也交一份
+        QTimer                                              *m_captureDelayTimer  = nullptr; ///< 延时截图那一枚，一次只允许有一个在等
+        std::function<void()>                                m_pendingCapture;               ///< 延时到点要走的那一步，随定时器一起活到触发
+        Core::CapturedImage                                  m_lastCapture;                  ///< 本轮抓到的帧，贴图与识别要用它定位
+        QRect                                                m_lastSelection;                ///< 本轮选区（全局逻辑坐标），标注窗与贴图的位置来源
     };
 
 } // namespace GyanisScribe::App
