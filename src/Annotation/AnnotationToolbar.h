@@ -303,6 +303,9 @@ namespace GyanisScribe::Annotation
         /// 送去做文字识别
         void ocrClicked();
 
+        /// 识别二维码/条形码
+        void scanClicked();
+
     private:
         /**
          * @brief 建一个带图标、tooltip 与无障碍名称的按钮

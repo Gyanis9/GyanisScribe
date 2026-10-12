@@ -185,6 +185,7 @@ namespace GyanisScribe::Annotation
         QObject::connect(&toolbar, &AnnotationToolbar::saveClicked, this, &AnnotationToolbarBridge::saveRequested);
         QObject::connect(&toolbar, &AnnotationToolbar::pinClicked, this, &AnnotationToolbarBridge::pinRequested);
         QObject::connect(&toolbar, &AnnotationToolbar::ocrClicked, this, &AnnotationToolbarBridge::ocrRequested);
+        QObject::connect(&toolbar, &AnnotationToolbar::scanClicked, this, &AnnotationToolbarBridge::scanRequested);
 
         // 引擎的栈深或工具变了就刷按钮：让用户看见「还能不能撤」而不是点了才知道没得撤；
         // 快捷键切的工具也从这里回灌到按钮上，两处永远同解

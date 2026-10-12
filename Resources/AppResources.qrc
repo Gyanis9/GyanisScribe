@@ -26,6 +26,7 @@
     <file alias="StrokeColor.svg">Icons/StrokeColor.svg</file>
     <file alias="NumberGroup.svg">Icons/NumberGroup.svg</file>
     <file alias="Magnifier.svg">Icons/Magnifier.svg</file>
+    <file alias="QrCode.svg">Icons/QrCode.svg</file>
     <file alias="Exit.svg">Icons/Exit.svg</file>
     <file alias="Export.svg">Icons/Export.svg</file>
     <file alias="Import.svg">Icons/Import.svg</file>

@@ -337,6 +337,15 @@ namespace GyanisScribe::App
         void handleOcrRequested(const QImage &image);
 
         /**
+         * @brief 标注窗请求识别二维码/条形码：认出来就复制到剪贴板并报一声
+         * @param image 成品图（未装饰）
+         * @details 与识别文字不同，这里不另开结果窗：多半只是想知道「这里头是什么」——
+         *          认出来直接进剪贴板，提示里说清认出了几个；一个都没认出来也只报一声，
+         *          标注窗不关（见 AnnotationWindow::scanRequested）
+         */
+        void handleScanRequested(const QImage &image);
+
+        /**
          * @brief 标注窗请求打印：开系统打印对话框，按纸面等比居中画上去
          * @param image 成品图（未装饰）
          * @details 用户取消对话框就静默收场——打印这件事「什么都没发生」也是一种正常结果。

@@ -236,6 +236,10 @@
             <translation>Recognize text</translation>
         </message>
         <message>
+            <source>识别二维码</source>
+            <translation>Scan QR/barcode</translation>
+        </message>
+        <message>
             <source>填充：无</source>
             <translation>Fill: none</translation>
         </message>
@@ -578,6 +582,18 @@
         <message>
             <source>复制的文件里没有能当图片贴的：请复制图片文件本身，或复制图片内容</source>
             <translation>None of the copied files can be pinned as an image: copy the image file itself, or copy the image content</translation>
+        </message>
+        <message>
+            <source>这一张里没认出二维码或条形码</source>
+            <translation>No QR code or barcode was found in this image</translation>
+        </message>
+        <message>
+            <source>已复制识别结果（%1 个字符）</source>
+            <translation>Scan result copied (%1 characters)</translation>
+        </message>
+        <message>
+            <source>认出 %1 个码，已复制最上面那条</source>
+            <translation>%1 codes found; the topmost one was copied</translation>
         </message>
         <message>
             <source>这个命令行动作不走截图这条路</source>
@@ -2566,6 +2582,10 @@
         <message>
             <source>这一轮一帧都没有存下来，可能是刚开始就按了停止</source>
             <translation>Not one frame was saved for this recording; you probably pressed stop right after the start.</translation>
+        </message>
+        <message>
+            <source>本档没带二维码/条形码识别后端。请用随包发布的安装版，或让构建依赖里带上 zxing-cpp</source>
+            <translation>This build has no QR/barcode backend. Use the packaged installer, or add zxing-cpp to the build dependencies</translation>
         </message>
         <message>
             <source>配置项 {} 存不进去：后端返回了错误状态，请检查应用配置目录是否可写</source>

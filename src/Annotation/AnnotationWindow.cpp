@@ -134,6 +134,8 @@ namespace GyanisScribe::Annotation
         QObject::connect(m_toolbarBridge.get(), &AnnotationToolbarBridge::saveRequested, this, [this] { deliver(ShortcutAction::Save); });
         QObject::connect(m_toolbarBridge.get(), &AnnotationToolbarBridge::pinRequested, this, [this] { deliver(ShortcutAction::Pin); });
         QObject::connect(m_toolbarBridge.get(), &AnnotationToolbarBridge::ocrRequested, this, [this] { deliver(ShortcutAction::Ocr); });
+        // 扫码不关窗：与打印同一条口径，识别结果由宿主提示，编辑现场留着
+        QObject::connect(m_toolbarBridge.get(), &AnnotationToolbarBridge::scanRequested, this, [this] { emit scanRequested(m_engine.exportImage()); });
     }
 
     void AnnotationWindow::startAnnotation(const Core::CapturedImage &captured, const QRect &screenAvailable, const QRect &selection)

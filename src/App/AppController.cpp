@@ -27,6 +27,7 @@
 #include "Pick/ColorPickerOverlay.h"
 #include "Ocr/OcrResultWindow.h"
 #include "Ocr/OcrTypes.h"
+#include "Scan/BarcodeDecoder.h"
 #include "Ocr/RecognitionRunner.h"
 #include "Pin/PinManager.h"
 #include "App/TrayController.h"
@@ -214,6 +215,7 @@ namespace GyanisScribe::App
         QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::saveRequested, this, &AppController::handleSaveRequested);
         QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::pinRequested, this, &AppController::handlePinRequested);
         QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::ocrRequested, this, &AppController::handleOcrRequested);
+        QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::scanRequested, this, &AppController::handleScanRequested);
         QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::printRequested, this, &AppController::handlePrintRequested);
         QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::refreshRequested, this, &AppController::refreshLastCapture);
 
@@ -817,6 +819,38 @@ namespace GyanisScribe::App
         m_ocrImage = image;
         // 语言取上一次的选择：换过一次就该记住，而不是每轮都退回默认档
         recognizeWithLanguage(m_settings->stringValue(Settings::kOcrLanguage, QString::fromUtf8(Ocr::kDefaultOcrLanguage)));
+    }
+
+    void AppController::handleScanRequested(const QImage &image)
+    {
+        const auto readings = Scan::readBarcodes(image);
+        if (!readings)
+        {
+            // 后端没编进来这类原因原样播出去：文案里已经写明出路
+            notifyUser(QString::fromStdString(readings.error().message), Ui::ToastKind::Danger);
+            return;
+        }
+        if (readings->empty())
+        {
+            notifyUser(GyanisScribe::Core::uiText("这一张里没认出二维码或条形码"), Ui::ToastKind::Information);
+            return;
+        }
+
+        // 认出多个就报第一个二维的（一维在二维码花纹里偶发假阳性，见 preferredReading）；
+        // 提示里说明数量
+        const auto preferred = Scan::preferredReading(*readings);
+        if (!preferred)
+        {
+            return; // 空列表在上面已经报过了，这里只是不变量兜底
+        }
+        QGuiApplication::clipboard()->setText(preferred->text);
+        if (readings->size() == 1)
+        {
+            notifyUser(GyanisScribe::Core::uiText("已复制识别结果（%1 个字符）").arg(preferred->text.size()), Ui::ToastKind::Success);
+        } else
+        {
+            notifyUser(GyanisScribe::Core::uiText("认出 %1 个码，已复制最上面那条").arg(static_cast<int>(readings->size())), Ui::ToastKind::Success);
+        }
     }
 
     std::vector<QColor> AppController::recentPickedColors() const

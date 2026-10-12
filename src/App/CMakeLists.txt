@@ -33,6 +33,7 @@ target_link_libraries(App PUBLIC
         Pin
         Platform
         Record
+        Scan
         Settings
         Ui
         Qt6::Core

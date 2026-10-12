@@ -55,7 +55,7 @@ namespace
     constexpr std::array<std::string_view, 13> kToolShortcuts = {"R", "E", "A", "P", "H", "M", "T", "N", "L", "B", "X", "G", "F"};
 
     /// 动作按钮的中文名，同样按需求第六节的排列顺序抄一份
-    constexpr std::array<std::string_view, 4> kActionLabels = {"复制到剪贴板", "保存为文件", "贴到屏幕上", "识别文字"};
+    constexpr std::array<std::string_view, 5> kActionLabels = {"复制到剪贴板", "保存为文件", "贴到屏幕上", "识别文字", "识别二维码"};
 
     /// 全 1920x1080、原点的可用区，几何用例的默认舞台
     constexpr QRect kScreen{0, 0, 1920, 1080};
@@ -171,7 +171,8 @@ namespace
             QObject::connect(toolbar.get(), &AnnotationToolbar::textBackgroundChanged, [&log](bool enabled) { log.textBackgrounds.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::undoClicked, [&log] { ++log.undo; });
             QObject::connect(toolbar.get(), &AnnotationToolbar::redoClicked, [&log] { ++log.redo; });
-            for (auto signal: {&AnnotationToolbar::copyClicked, &AnnotationToolbar::saveClicked, &AnnotationToolbar::pinClicked, &AnnotationToolbar::ocrClicked})
+            for (auto signal: {&AnnotationToolbar::copyClicked, &AnnotationToolbar::saveClicked, &AnnotationToolbar::pinClicked, &AnnotationToolbar::ocrClicked,
+                               &AnnotationToolbar::scanClicked})
             {
                 QObject::connect(toolbar.get(), signal, [&log] { ++log.actions; });
             }
@@ -893,7 +894,7 @@ TEST_F(ToolbarFixture, ColorSwatchesAndActionButtonsEmitTheirOwnSignals)
         ASSERT_NE(button, nullptr) << label;
         button->click();
     }
-    EXPECT_EQ(log.actions, 4) << "四个动作按钮的信号没各自分开落地";
+    EXPECT_EQ(log.actions, 5) << "五个动作按钮的信号没各自分开落地";
     EXPECT_EQ(log.undo, 0);
     EXPECT_EQ(log.redo, 0);
 

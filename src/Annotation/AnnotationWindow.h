@@ -145,6 +145,13 @@ namespace GyanisScribe::Annotation
          */
         void ocrRequested(const QImage &image);
         /**
+         * @brief 请求识别画面里的二维码/条形码
+         * @param image 当前成品的烘焙图，物理像素
+         * @note 与别的出口不同：识别不关窗——多半只是想知道「这里头是什么」，
+         *       认出与否都该留着编辑现场（与打印同一条口径）
+         */
+        void scanRequested(const QImage &image);
+        /**
          * @brief 请求打印标注结果
          * @param image 烘焙好的图
          * @note 与其它出口不同：打印不关窗，用户取消打印或在打印之后接着改，现场都不丢

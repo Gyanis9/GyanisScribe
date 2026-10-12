@@ -1,6 +1,9 @@
 requirements:
   - "spdlog/1.17.0"
   - "gtest/1.17.0"
+  # 二维码/条形码识别后端（Apache-2.0，许可证正文随包发；识别与自造测试样例都用它）。
+  # 两档都领：它的 Debug 包在本机源码构建通过（与 tesseract 那条上游问题无关）
+  - "zxing-cpp/3.1.1"
 
 # 只有 Release 档才进依赖图：leptonica 的 Debug 包把库名写成 leptonica-1.87.0，
 # 而它自己的 cpp_info 找不到这个文件，tesseract 的 Debug configure 当场失败（上游配方问题）。

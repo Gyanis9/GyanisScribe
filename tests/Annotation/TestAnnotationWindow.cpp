@@ -1249,6 +1249,49 @@ TEST_F(AnnotationWindowFixture, PrintShortcutEmitsTheBakedExportAndKeepsTheWindo
 }
 
 /**
+ * @brief 钉住「识别二维码」按钮：交出去的是烘好的成品，而且窗口不收场（与打印同一口径）
+ * @details 与识别文字不同：扫码不另开结果窗，认没认出来都该留在标注窗里——多半只是想知道
+ *          「这里头是什么」，顺手关掉现场是最烦的一种收场。
+ */
+TEST_F(AnnotationWindowFixture, ScanButtonEmitsTheBakedExportAndKeepsTheWindow)
+{
+    auto window = makeWindow();
+    window->startAnnotation(makeCanvas({200, 100}), QRect{0, 0, 1920, 1080}, QRect{0, 0, 200, 100});
+    ASSERT_TRUE(window->isVisible());
+
+    auto   scanCalls = 0;
+    QImage scanned;
+    QObject::connect(window.get(), &AnnotationWindow::scanRequested,
+                     [&](const QImage &image)
+                     {
+                         ++scanCalls;
+                         scanned = image;
+                     });
+
+    ASSERT_TRUE(drawAndSelect({10, 10}, {60, 40}).has_value());
+    ASSERT_TRUE(window->toolbar().isVisible());
+
+    QToolButton *scanButton = nullptr;
+    for (auto *candidate: window->toolbar().findChildren<QToolButton *>())
+    {
+        if (candidate->accessibleName() == QString::fromUtf8("识别二维码"))
+        {
+            scanButton = candidate;
+            break;
+        }
+    }
+    ASSERT_NE(scanButton, nullptr) << "工具栏上找不到「识别二维码」按钮";
+    scanButton->click();
+
+    EXPECT_EQ(scanCalls, 1) << "点了按钮没走到扫码那一路";
+    ASSERT_FALSE(scanned.isNull());
+    EXPECT_EQ(scanned.size(), QSize(400, 200)) << "交出去的不是画布的物理尺寸";
+    EXPECT_NE(scanned.pixelColor(60, 20), QColor(180, 180, 180)) << "交出去的是底图，不是画上图形的成品";
+    EXPECT_TRUE(window->isVisible()) << "扫码把窗口收了：认没认出来都该留着编辑现场";
+    EXPECT_TRUE(window->toolbar().isVisible());
+}
+
+/**
  * @brief 钉住 Ctrl+Shift+↑/↓ 与 Home/End 从窗口接到引擎
  * @details 两条实心矩形盖同一块地，中心像素就是层叠读数；四条键各按一次核对读数。
  */

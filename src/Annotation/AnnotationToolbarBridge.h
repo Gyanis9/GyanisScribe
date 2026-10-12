@@ -56,6 +56,9 @@ namespace GyanisScribe::Annotation
         /// 工具栏上的「识别文字」被点了
         void ocrRequested();
 
+        /// 识别二维码/条形码
+        void scanRequested();
+
     private:
         /// 把整包参数下发给引擎，并把失败记进日志
         void applyPenParameters();

@@ -295,6 +295,7 @@ namespace GyanisScribe::Annotation
                 ActionSpec{"Save", GyanisScribe::Core::uiText("保存为文件"), &AnnotationToolbar::saveClicked},
                 ActionSpec{"Pin", GyanisScribe::Core::uiText("贴到屏幕上"), &AnnotationToolbar::pinClicked},
                 ActionSpec{"Ocr", GyanisScribe::Core::uiText("识别文字"), &AnnotationToolbar::ocrClicked},
+                ActionSpec{"QrCode", GyanisScribe::Core::uiText("识别二维码"), &AnnotationToolbar::scanClicked},
         };
         for (const auto &action: actions)
         {

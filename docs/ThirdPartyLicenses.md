@@ -12,6 +12,7 @@
 | GoogleTest | conandata.yml 里那份 | BSD-3-Clause | 单元测试 | 只进测试可执行体，不随产品分发 |
 | Tesseract | 5.5.2（仅 Release 档） | Apache-2.0 | 文字识别后端 | 动态链接 |
 | Leptonica | Tesseract 带进来的传递依赖 | BSD-2-Clause | Tesseract 的图像处理 | 动态链接 |
+| zxing-cpp | 3.1.1（conandata.yml 里那份） | Apache-2.0 | 二维码/条形码识别 | 静态链接（许可证正文见 `licenses/Zxing-Apache-2.0.txt`） |
 | C++/WinRT 投影头 | cppwinrt v2.0.250303.5 从 Windows SDK 10.0.26100.0 元数据生成 | MIT | Windows 系统识别的编译期投影 | vendor 在 `Vendor/WinRt/`，只进编译，不作为独立件分发 |
 | Visual C++ 运行库（`vcruntime140.dll`、`vcruntime140_1.dll`、`msvcp140.dll`、`msvcp140_1.dll`、`msvcp140_2.dll`） | 与编译器同版本（本机 14.51.36231，按版本号取） | Microsoft 再分发条款：允许随应用程序一起分发运行库 | 我们的可执行体与 Qt 那几件都导入它 | 打包时从工具链的 `VC\Redist\MSVC\<版本>\onecore\x64\Microsoft.VC145.CRT` 取五份，摆在与可执行体同一目录（app-local，Windows 先搜程序目录） |
 
