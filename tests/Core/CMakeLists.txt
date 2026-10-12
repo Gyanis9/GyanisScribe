@@ -4,7 +4,8 @@ add_executable(TestCore
         TestImageFit.cpp
         TestImageFormat.cpp
         TestOutputDecoration.cpp
-        TestClipboardImage.cpp)
+        TestClipboardImage.cpp
+        TestClipboardFile.cpp)
 
 target_link_libraries(TestCore PRIVATE
         Core

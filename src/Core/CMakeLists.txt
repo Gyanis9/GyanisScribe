@@ -12,7 +12,9 @@ add_library(Core STATIC
         ImageFormat.h
         ImageFormat.cpp
         OutputDecoration.h
-        OutputDecoration.cpp)
+        OutputDecoration.cpp
+        ClipboardFile.h
+        ClipboardFile.cpp)
 
 target_include_directories(Core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 

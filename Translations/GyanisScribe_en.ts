@@ -1564,6 +1564,14 @@
             <translation>{}: the value "{}" is not among the allowed ones, which are only {}. Re-pick it on the {} page in Settings, or delete the {} entry to fall back to the default</translation>
         </message>
         <message>
+            <source>这张图是空的，没有可复制成文件的内容</source>
+            <translation>This image is empty; there is nothing to copy as a file</translation>
+        </message>
+        <message>
+            <source>复制为文件失败：{} 写不下去。请检查这个目录是否可写</source>
+            <translation>Copy as file failed: cannot write {}. Check that this directory is writable</translation>
+        </message>
+        <message>
             <source>截图页</source>
             <translation>Shot page</translation>
         </message>
@@ -1990,6 +1998,10 @@
         <message>
             <source>复制</source>
             <translation>Copy</translation>
+        </message>
+        <message>
+            <source>复制为文件</source>
+            <translation>Copy as file</translation>
         </message>
         <message>
             <source>保存</source>

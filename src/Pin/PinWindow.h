@@ -296,6 +296,13 @@ namespace GyanisScribe::Pin
         void copyToClipboard() override;
 
         /**
+         * @brief 把这张图落成文件、按「文件」交进剪贴板（粘进资源管理器/聊天窗口得到一份 .png）
+         * @details 落地在缓存目录的 Clipboard 子目录里（内容寻址，重复复制复用同一个文件）；
+         *          与「复制」是两条出口：那一条交的是像素，粘进文档里是一张图。
+         */
+        void copyAsFileToClipboard();
+
+        /**
          * @brief 贴图当前手里那张图
          * @return 物理像素；动图是正在播的那一帧。绘制、复制与保存读的都是这一份
          * @details 用例与调试取读数用：经系统剪贴板读回会把判据搭在桌面上别的进程身上——

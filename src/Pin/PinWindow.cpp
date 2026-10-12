@@ -7,6 +7,7 @@
 #include "Annotation/AnnotationView.h"
 #include "Annotation/AnnotationWindow.h"
 #include "Core/ImageFormat.h"
+#include "Core/ClipboardFile.h"
 #include "Core/Logger.h"
 #include "Core/OutputDecoration.h"
 #include "Core/Paths.h"
@@ -401,6 +402,15 @@ namespace GyanisScribe::Pin
         // 这一路本来就静默：复制过没有从别处看得出来，不需要再补一句
         QApplication::clipboard()->setImage(decorateForOutput(m_image, false));
         Core::Logger::info(std::format("贴图已交剪贴板：{}×{} 像素", m_image.width(), m_image.height()));
+    }
+
+    void PinWindow::copyAsFileToClipboard()
+    {
+        // 落在缓存目录下一个专用子目录：这是给剪贴板用的中转文件，不往用户的图片目录里塞
+        if (const auto written = Core::copyImageAsFile(m_image, Core::Paths::cacheDirectory() / "Clipboard"); !written)
+        {
+            Core::Logger::warning(std::format("复制为文件没成：{}", written.error().message));
+        }
     }
 
     QImage PinWindow::decorateForOutput(const QImage &image, const bool fillBackground) const
@@ -1495,6 +1505,9 @@ namespace GyanisScribe::Pin
     {
         auto *menu = new QMenu(this);
         menu->addAction(GyanisScribe::Core::uiText("复制"), this, &PinWindow::copyToClipboard);
+        // 复制为文件：剪贴板里放的是一条本地文件路径，粘进资源管理器/聊天窗口得到一份 .png
+        // （与「复制」是两条出口：那一条粘进文档里是一张图）
+        menu->addAction(GyanisScribe::Core::uiText("复制为文件"), this, &PinWindow::copyAsFileToClipboard);
 
         // 保存与「在文件夹中查看」是同一条路：后者在存下之后再打开那个目录，
         // 两处各写一份起名与写盘的代码，将来改命名模板就会漏掉一处

@@ -23,6 +23,7 @@
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QEnterEvent>
+#include <QFileInfo>
 #include <QGuiApplication>
 #include <QImage>
 #include <QKeyEvent>
@@ -907,6 +908,31 @@ namespace GyanisScribe
         QDropEvent drop{QPointF{5.0, 5.0}, Qt::CopyAction, &text, Qt::LeftButton, Qt::NoModifier};
         QApplication::sendEvent(&window, &drop);
         EXPECT_FALSE(dropped) << "标注中把载荷也放下了";
+    }
+
+    /**
+     * @brief 钉住右键菜单的「复制为文件」：剪贴板里交出去的是一条本地文件路径（粘进资源管理器是一份 .png）
+     * @details 与「复制」是两条出口：那一条交像素（粘进文档是一张图），这一条交文件。
+     *          判据取剪贴板里那条 URL 指着的文件真在、且像素对得上。
+     */
+    TEST_F(PinWindowFixture, CopyAsFilePutsALocalFileOnTheClipboard)
+    {
+        auto  &window   = makeWindow();
+        QMenu *menu     = window.buildContextMenu();
+        auto  *copyFile = findMenuAction(*menu, QString::fromUtf8("复制为文件"));
+        ASSERT_NE(copyFile, nullptr) << "右键菜单里没有「复制为文件」这一项";
+        copyFile->trigger();
+        delete menu;
+
+        const QMimeData *mime = QApplication::clipboard()->mimeData();
+        ASSERT_NE(mime, nullptr) << "剪贴板里什么都没有";
+        ASSERT_TRUE(mime->hasUrls()) << "交出去的不是文件 URL，粘进资源管理器只会得到像素";
+        ASSERT_EQ(mime->urls().size(), 1);
+        const auto filePath = mime->urls().front().toLocalFile();
+        EXPECT_TRUE(QFileInfo::exists(filePath)) << "剪贴板里指的那份文件不在";
+        const QImage readBack{filePath};
+        ASSERT_FALSE(readBack.isNull()) << "指过去的那份文件读不成图";
+        EXPECT_EQ(readBack.size(), window.image().size()) << "交出去的文件不是这张贴图";
     }
 
     /**
