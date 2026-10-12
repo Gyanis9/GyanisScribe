@@ -10,6 +10,7 @@
 #pragma once
 
 #include <QColor>
+#include <Qt>
 #include <QPoint>
 #include <QRect>
 #include <QString>
@@ -29,6 +30,11 @@ namespace GyanisScribe::Annotation
     inline constexpr std::array<int, 3> kHighlightWidthFactors{2, 4, 8};
     /// 箭头头部大小阶梯：头长 = 线宽乘这个倍数；同一条杆上头能有多大，全看这一档
     inline constexpr std::array<qreal, 3> kArrowHeadScales{2.5, 3.5, 5.0};
+
+    /// 线型阶梯：实线 / 虚线 / 点线（描边类工具用；高亮、马赛克、模糊、橡皮擦这些效果工具不走这一档）
+    inline constexpr std::array<Qt::PenStyle, 3> kAnnotationLineStyles{Qt::SolidLine, Qt::DashLine, Qt::DotLine};
+    /// 线型起点档在阶梯里的下标（「实线」，与这一格出现之前同解）
+    inline constexpr std::size_t kDefaultLineStyleStep = 0;
 
     /// 箭头头部款式：0 实心三角、1 空心三角（只有一圈描边，里头透底）、2 开口两翼（只有两条边线，无底边）
     inline constexpr int kArrowHeadFilled     = 0;
@@ -63,6 +69,7 @@ namespace GyanisScribe::Annotation
         int             fontSize             = 16;                                                 ///< 字号，仅文字与序号使用
         int             number               = 1;                                                  ///< 序号值，仅序号工具使用
         int             fillStyle            = 0;                                                  ///< 填充档：0 无、1 半透明、2 实心（仅矩形与椭圆用）
+        int             lineStyle            = static_cast<int>(kDefaultLineStyleStep);            ///< 线型档：0 实线、1 虚线、2 点线（描边类工具用）
         bool            doubleHeaded         = false;                                              ///< 双向箭头：两端各画一个（仅箭头工具用）
         int             mosaicBlockSize      = kMosaicBlockSizes[kDefaultMosaicBlockStep];         ///< 马赛克方块边长，逻辑像素（仅马赛克工具用），默认为阶梯里的「中」档
         int             highlightAlpha       = kHighlightAlphas[kDefaultHighlightAlphaStep];       ///< 高亮透明度，0-255（仅高亮工具用），默认为阶梯里的「中」档

@@ -116,6 +116,12 @@ namespace GyanisScribe::Annotation
         /// 当前填充档：0 无、1 半透明、2 实心（矩形与椭圆用；新建的图形按它上笔刷）
         [[nodiscard]] int currentFillStyle() const;
 
+        /// 当前线型档：0 实线、1 虚线、2 点线（描边类工具用；新建的图形按它落笔）
+        [[nodiscard]] int currentLineStyle() const;
+
+        /// 按 实线 → 虚线 → 点线 走一档；按钮与用例共用这一个入口
+        void cycleLineStyle();
+
         /// 按 无 → 半透明 → 实心 → 无 走一档；按钮与用例共用这一个入口
         void cycleFillStyle();
 
@@ -214,6 +220,8 @@ namespace GyanisScribe::Annotation
         void fontSizeChanged(int fontSize);
         /// 用户改了填充档
         void fillStyleChanged(int fillStyle);
+        /// 用户改了线型
+        void lineStyleChanged(int style);
         /// 用户开了/关了双向箭头
         void doubleHeadedChanged(bool enabled);
         /// 用户改了马赛克粒度
@@ -297,6 +305,8 @@ namespace GyanisScribe::Annotation
         QComboBox                                               *m_fontSizeCombo        = nullptr;                                    ///< 字号下拉，取值对齐 kFontSizes
         QToolButton                                             *m_fillButton           = nullptr;                                    ///< 填充档按钮，点一下走一档
         int                                                      m_fillStyle            = 0;                                          ///< 当前填充档：0 无、1 半透明、2 实心
+        QToolButton                                             *m_lineStyleButton      = nullptr;                                    ///< 线型按钮，点一下走一档
+        int                                                      m_lineStyle            = static_cast<int>(kDefaultLineStyleStep);    ///< 当前线型档，值表是 kAnnotationLineStyles
         QToolButton                                             *m_doubleArrowButton    = nullptr;                                    ///< 双向箭头开关按钮，按下表示两端有头
         bool                                                     m_doubleHeaded         = false;                                      ///< 当前是不是双向箭头
         QToolButton                                             *m_mosaicGrainButton    = nullptr;                                    ///< 马赛克粒度按钮，点一下走一档

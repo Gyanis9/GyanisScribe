@@ -1,4 +1,5 @@
 #include "Annotation/ArrowTool.h"
+#include "Annotation/StrokePen.h"
 
 #include "Annotation/AnnotationGeometry.h"
 #include "Core/Text.h"
@@ -85,9 +86,7 @@ namespace GyanisScribe::Annotation
             return;
         }
 
-        auto pen = QPen(shape.color);
-        pen.setWidth(shape.lineWidth);
-        pen.setCapStyle(Qt::RoundCap);
+        auto pen = strokePenFor(shape);
         // 三角与两翼的转角给尖角：默认的斜切角在 60° 的翼尖上会削掉一截，看着像缺了一块
         pen.setJoinStyle(Qt::MiterJoin);
         painter.setPen(pen);

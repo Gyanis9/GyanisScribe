@@ -1,4 +1,5 @@
 #include "Annotation/LineTool.h"
+#include "Annotation/StrokePen.h"
 
 #include "Annotation/AnnotationGeometry.h"
 #include "Core/Text.h"
@@ -40,8 +41,7 @@ namespace GyanisScribe::Annotation
             return;
         }
 
-        auto pen = QPen(shape.color);
-        pen.setWidth(shape.lineWidth);
+        auto pen = strokePenFor(shape, Qt::FlatCap);
         pen.setCapStyle(Qt::RoundCap);
         painter.setPen(pen);
         painter.setBrush(Qt::NoBrush);

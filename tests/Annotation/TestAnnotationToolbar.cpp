@@ -123,6 +123,7 @@ namespace
             std::vector<int>      widths;           ///< widthChanged 收到的线宽
             std::vector<int>      fontSizes;        ///< fontSizeChanged 收到的字号
             std::vector<int>      fillStyles;       ///< fillStyleChanged 收到的填充档
+            std::vector<int>      lineStyles;       ///< lineStyleChanged 收到的线型档
             std::vector<int>      doubleHeaded;     ///< doubleHeadedChanged 收到的开关（1 开 0 关）
             std::vector<int>      mosaicBlockSizes; ///< mosaicBlockSizeChanged 收到的粒度
             std::vector<int>      highlightAlphas;  ///< highlightAlphaChanged 收到的透明度
@@ -148,6 +149,7 @@ namespace
             QObject::connect(toolbar.get(), &AnnotationToolbar::widthChanged, [&log](int width) { log.widths.push_back(width); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::fontSizeChanged, [&log](int fontSize) { log.fontSizes.push_back(fontSize); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::fillStyleChanged, [&log](int style) { log.fillStyles.push_back(style); });
+            QObject::connect(toolbar.get(), &AnnotationToolbar::lineStyleChanged, [&log](int style) { log.lineStyles.push_back(style); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::doubleHeadedChanged, [&log](bool enabled) { log.doubleHeaded.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::mosaicBlockSizeChanged, [&log](int blockSize) { log.mosaicBlockSizes.push_back(blockSize); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::highlightAlphaChanged, [&log](int alpha) { log.highlightAlphas.push_back(alpha); });
@@ -261,6 +263,31 @@ namespace
         button->click();
         EXPECT_EQ(toolbar->currentMosaicBlockSize(), 12) << "三档之后该回到「中」";
         EXPECT_EQ(button->accessibleName(), QString::fromUtf8("马赛克粒度：中")) << "无障碍名没跟上当前档";
+    }
+
+    /**
+     * @brief 钉住线型按钮的三档循环：起点「实线」（与旧写法同解），信号与提示一起走
+     */
+    TEST_F(ToolbarFixture, LineStyleButtonCyclesAndNamesTheStep)
+    {
+        SignalLog log;
+        auto      toolbar = makeToolbarLogged(log);
+        auto     *button  = buttonByLabel(*toolbar, "线型");
+        ASSERT_NE(button, nullptr) << "工具栏上找不到线型按钮";
+
+        EXPECT_EQ(toolbar->currentLineStyle(), 0) << "起点该是「实线」：这一格出现之前只有这一档";
+        button->click();
+        EXPECT_EQ(toolbar->currentLineStyle(), 1);
+        EXPECT_EQ(log.lineStyles, std::vector<int>{1}) << "走了一档却没把信号发出去";
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("线型：虚线")) << "提示没跟上当前档";
+
+        button->click();
+        EXPECT_EQ(toolbar->currentLineStyle(), 2);
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("线型：点线"));
+
+        button->click();
+        EXPECT_EQ(toolbar->currentLineStyle(), 0) << "三档之后该回到「实线」";
+        EXPECT_EQ(button->accessibleName(), QString::fromUtf8("线型：实线")) << "无障碍名没跟上当前档";
     }
 
     /**

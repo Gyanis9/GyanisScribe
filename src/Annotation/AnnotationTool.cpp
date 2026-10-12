@@ -51,6 +51,7 @@ namespace GyanisScribe::Annotation
         m_pending.color                = m_color;
         m_pending.lineWidth            = m_lineWidth;
         m_pending.fillStyle            = m_fillStyle;
+        m_pending.lineStyle            = m_lineStyle;
         m_pending.fontSize             = m_fontSize;
         m_pending.doubleHeaded         = m_doubleHeaded;
         m_pending.mosaicBlockSize      = m_mosaicBlockSize;
@@ -149,6 +150,7 @@ namespace GyanisScribe::Annotation
         shape.lineWidth            = parameters.lineWidth;
         shape.fontSize             = parameters.fontSize;
         shape.fillStyle            = parameters.fillStyle;
+        shape.lineStyle            = parameters.lineStyle;
         shape.doubleHeaded         = parameters.doubleHeaded;
         shape.mosaicBlockSize      = parameters.mosaicBlockSize;
         shape.highlightAlpha       = parameters.highlightAlpha;
@@ -361,6 +363,12 @@ namespace GyanisScribe::Annotation
     void AnnotationTool::setHighlightAlpha(const int alpha) noexcept
     {
         m_highlightAlpha = std::clamp(alpha, 0, 255);
+    }
+
+    void AnnotationTool::setLineStyle(const int style) noexcept
+    {
+        // 线型是三档里的一档：越界按最近的一档夹取，留一个界外的值只会画不出东西
+        m_lineStyle = std::clamp(style, 0, static_cast<int>(kAnnotationLineStyles.size()) - 1);
     }
 
     void AnnotationTool::setHighlightWidthFactor(const int factor) noexcept

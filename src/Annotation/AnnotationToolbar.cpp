@@ -202,6 +202,10 @@ namespace GyanisScribe::Annotation
         m_fillButton = makeButton("Fill", GyanisScribe::Core::uiText("填充"), false);
         QObject::connect(m_fillButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleFillStyle);
         layout->addWidget(m_fillButton);
+        // 线型：描边类工具用得上，点一下走一档（实线 → 虚线 → 点线）
+        m_lineStyleButton = makeButton("LineStyle", GyanisScribe::Core::uiText("线型"), false);
+        QObject::connect(m_lineStyleButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleLineStyle);
+        layout->addWidget(m_lineStyleButton);
         // 双向箭头：箭头工具用得上，是一个保持按下态的开关。同样不进互斥组，
         // 点击时 Qt 先翻 checked 再发 clicked，所以这里读按钮态而不是自己翻一遍
         m_doubleArrowButton = makeButton("ArrowDouble", GyanisScribe::Core::uiText("双向箭头"), true);
@@ -315,6 +319,26 @@ namespace GyanisScribe::Annotation
     bool AnnotationToolbar::currentDoubleHeaded() const
     {
         return m_doubleHeaded;
+    }
+
+    int AnnotationToolbar::currentLineStyle() const
+    {
+        return m_lineStyle;
+    }
+
+    void AnnotationToolbar::cycleLineStyle()
+    {
+        m_lineStyle = (m_lineStyle + 1) % static_cast<int>(kAnnotationLineStyles.size());
+        if (m_lineStyleButton != nullptr)
+        {
+            // 与另几档同一套口径：提示就是这一档的读数
+            const auto label = m_lineStyle == 0   ? GyanisScribe::Core::uiText("线型：实线")
+                               : m_lineStyle == 1 ? GyanisScribe::Core::uiText("线型：虚线")
+                                                  : GyanisScribe::Core::uiText("线型：点线");
+            m_lineStyleButton->setToolTip(label);
+            m_lineStyleButton->setAccessibleName(label);
+        }
+        emit lineStyleChanged(currentLineStyle());
     }
 
     void AnnotationToolbar::setDoubleHeaded(const bool enabled)

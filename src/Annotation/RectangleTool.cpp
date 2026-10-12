@@ -1,4 +1,5 @@
 #include "Annotation/RectangleTool.h"
+#include "Annotation/StrokePen.h"
 
 #include "Annotation/FillBrush.h"
 #include "Core/Text.h"
@@ -21,8 +22,7 @@ namespace GyanisScribe::Annotation
     {
         Q_UNUSED(context);
 
-        auto pen = QPen(shape.color);
-        pen.setWidth(shape.lineWidth);
+        auto pen = strokePenFor(shape);
         pen.setCapStyle(Qt::RoundCap);
         painter.setPen(pen);
         painter.setBrush(fillBrushFor(shape));

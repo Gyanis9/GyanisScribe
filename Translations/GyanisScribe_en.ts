@@ -144,6 +144,10 @@
             <translation>Fill</translation>
         </message>
         <message>
+            <source>线型</source>
+            <translation>Line style</translation>
+        </message>
+        <message>
             <source>双向箭头</source>
             <translation>Double-headed arrow</translation>
         </message>
@@ -226,6 +230,18 @@
         <message>
             <source>填充：实心</source>
             <translation>Fill: solid</translation>
+        </message>
+        <message>
+            <source>线型：实线</source>
+            <translation>Line style: solid</translation>
+        </message>
+        <message>
+            <source>线型：虚线</source>
+            <translation>Line style: dashed</translation>
+        </message>
+        <message>
+            <source>线型：点线</source>
+            <translation>Line style: dotted</translation>
         </message>
         <message>
             <source>双向箭头：开</source>

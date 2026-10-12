@@ -31,6 +31,7 @@ namespace GyanisScribe::Annotation
         int     lineWidth            = 3;                                                  ///< 线宽，逻辑像素
         int     fontSize             = 16;                                                 ///< 字号，磅
         int     fillStyle            = 0;                                                  ///< 填充档：0 无、1 半透明、2 实心（仅矩形与椭圆用）
+        int     lineStyle            = static_cast<int>(kDefaultLineStyleStep);            ///< 线型档：0 实线、1 虚线、2 点线（描边类工具用）
         bool    doubleHeaded         = false;                                              ///< 双向箭头：两端各画一个箭头（仅箭头工具用）
         int     mosaicBlockSize      = kMosaicBlockSizes[kDefaultMosaicBlockStep];         ///< 马赛克方块边长，逻辑像素（仅马赛克工具用）
         int     highlightAlpha       = kHighlightAlphas[kDefaultHighlightAlphaStep];       ///< 高亮透明度，0-255（仅高亮工具用）
@@ -57,6 +58,7 @@ namespace GyanisScribe::Annotation
                              .lineWidth            = shape.lineWidth,
                              .fontSize             = shape.fontSize,
                              .fillStyle            = shape.fillStyle,
+                             .lineStyle            = shape.lineStyle,
                              .doubleHeaded         = shape.doubleHeaded,
                              .mosaicBlockSize      = shape.mosaicBlockSize,
                              .highlightAlpha       = shape.highlightAlpha,

@@ -687,6 +687,59 @@ TEST_F(AnnotationWindowFixture, HighlightWidthCycleFromToolbarReachesTheEngine)
 }
 
 /**
+ * @brief 钉住线型按钮从窗口接到引擎：点一下（实线→虚线），选中的那条断口就出来了
+ * @details 画布逻辑 200×100 放进 400×200 的视图：一条逻辑 (20,50)-(180,50) 的横线；
+ *          判据量与引擎级那条同一套——同一段里「有墨的列数」，改档之后变小。
+ */
+TEST_F(AnnotationWindowFixture, LineStyleCycleFromToolbarReachesTheEngine)
+{
+    auto window = makeWindow();
+
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Line).has_value());
+    ASSERT_TRUE(engine().setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 16, .fillStyle = 0}).has_value());
+    engine().beginStroke(QPoint(20, 50));
+    engine().moveStroke(QPoint(180, 50));
+    const auto line = engine().endStroke();
+    ASSERT_TRUE(line.has_value()) << line.error().message;
+    ASSERT_TRUE(engine().select(*line).has_value());
+
+    const auto inkedColumns = [this]
+    {
+        const QImage drawn = engine().exportImage();
+        int          ink   = 0;
+        for (int x = 40; x <= 360; ++x)
+        {
+            for (int dy = -8; dy <= 8; ++dy)
+            {
+                if (drawn.pixelColor(x, 100 + dy) != QColor(180, 180, 180))
+                {
+                    ++ink;
+                    break;
+                }
+            }
+        }
+        return ink;
+    };
+
+    const int solid = inkedColumns();
+    ASSERT_GT(solid, 250) << "实线没铺满，后面的对照没有基准";
+
+    QToolButton *styleButton = nullptr;
+    for (auto *candidate: window->toolbar().findChildren<QToolButton *>())
+    {
+        if (candidate->accessibleName() == QString::fromUtf8("线型"))
+        {
+            styleButton = candidate;
+            break;
+        }
+    }
+    ASSERT_NE(styleButton, nullptr) << "工具栏上找不到线型按钮";
+    styleButton->click(); // 实线 → 虚线
+
+    EXPECT_LT(inkedColumns(), solid) << "按钮点下去了，选中的那条线还是满的：窗口到引擎这条链没接上";
+}
+
+/**
  * @brief 钉住箭头款式与大小两枚按钮从窗口接到引擎：点一下，选中的那条跟着变
  * @details 画布逻辑 200×100 放进 400×200 的视图（2 倍），箭头尖在逻辑 (140, 50) → 物理 (280, 100)。
  *          探点全按工具栏自己的读数算几何——按按钮时桥会把工具栏整套参数（含线宽）下发给选中项，

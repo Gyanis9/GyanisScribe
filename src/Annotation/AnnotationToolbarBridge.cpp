@@ -15,6 +15,7 @@ namespace GyanisScribe::Annotation
                                         .lineWidth            = toolbar.currentWidth(),
                                         .fontSize             = toolbar.currentFontSize(),
                                         .fillStyle            = toolbar.currentFillStyle(),
+                                        .lineStyle            = toolbar.currentLineStyle(),
                                         .doubleHeaded         = toolbar.currentDoubleHeaded(),
                                         .mosaicBlockSize      = toolbar.currentMosaicBlockSize(),
                                         .highlightAlpha       = toolbar.currentHighlightAlpha(),
@@ -57,6 +58,12 @@ namespace GyanisScribe::Annotation
                          [this](const int style)
                          {
                              m_penParameters.fillStyle = style;
+                             applyPenParameters();
+                         });
+        QObject::connect(&toolbar, &AnnotationToolbar::lineStyleChanged, this,
+                         [this](const int style)
+                         {
+                             m_penParameters.lineStyle = style;
                              applyPenParameters();
                          });
         QObject::connect(&toolbar, &AnnotationToolbar::doubleHeadedChanged, this,

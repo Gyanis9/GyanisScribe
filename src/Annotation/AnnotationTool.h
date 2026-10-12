@@ -321,6 +321,14 @@ namespace GyanisScribe::Annotation
          */
         void setHighlightAlpha(int alpha) noexcept;
 
+        /**
+         * @brief 设线型档
+         * @param style 0 实线、1 虚线、2 点线；越界按最近的一档夹取
+         * @details 描边类工具（矩形、椭圆、直线、箭头、画笔、折线）用得上；档随新画的图形带走，
+         *          选中的那条改线型走改样式命令。
+         */
+        void setLineStyle(int style) noexcept;
+
         /// 设默认高亮加宽倍数（仅高亮工具用），取值夹在 1 到 16 之间
         void setHighlightWidthFactor(int factor) noexcept;
 
@@ -420,6 +428,7 @@ namespace GyanisScribe::Annotation
         bool            m_doubleHeaded         = false;                                              ///< 默认双向箭头（仅箭头工具用）
         int             m_mosaicBlockSize      = kMosaicBlockSizes[kDefaultMosaicBlockStep];         ///< 默认马赛克粒度（仅马赛克工具用）
         int             m_highlightAlpha       = kHighlightAlphas[kDefaultHighlightAlphaStep];       ///< 默认高亮透明度（仅高亮工具用）
+        int             m_lineStyle            = static_cast<int>(kDefaultLineStyleStep);            ///< 默认线型档（描边类工具用）
         int             m_highlightWidthFactor = kHighlightWidthFactors[kDefaultHighlightWidthStep]; ///< 默认高亮加宽倍数（仅高亮工具用）
         int             m_arrowHeadStyle       = kArrowHeadFilled;                                   ///< 默认箭头头部款式（仅箭头工具用）
         qreal           m_arrowHeadScale       = kArrowHeadScales[kDefaultArrowHeadScaleStep];       ///< 默认箭头头部大小：头长相对线宽的倍数（仅箭头工具用）

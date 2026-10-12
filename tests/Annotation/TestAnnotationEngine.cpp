@@ -512,6 +512,48 @@ TEST_F(EngineFixture, HighlightWidthFactorRestylesAndUndoBack)
 }
 
 /**
+ * @brief 钉住线型的换档与撤销：档记在图形自己身上，选中的那条跟着改
+ * @details 白底上一条 90 长的横线：实线铺满、点线按 (1,2)×线宽 断——同一段量墨点数，
+ *          改档之后读数变小、撤一步又回到满。
+ */
+TEST_F(EngineFixture, LineStyleRestylesAndUndoesBack)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Line).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 4, .fontSize = 16, .fillStyle = 0}).has_value());
+    m_engine.beginStroke(QPoint(20, 50));
+    m_engine.moveStroke(QPoint(140, 50));
+    const auto line = m_engine.endStroke();
+    ASSERT_TRUE(line.has_value()) << line.error().message;
+
+    const auto inkAlong = [this]
+    {
+        const QImage drawn = m_engine.exportImage();
+        int          ink   = 0;
+        for (int x = 20; x <= 140; ++x)
+        {
+            for (int dy = -4; dy <= 4; ++dy)
+            {
+                if (drawn.pixelColor(x, 50 + dy) != QColor(255, 255, 255))
+                {
+                    ++ink;
+                    break;
+                }
+            }
+        }
+        return ink;
+    };
+
+    const int solid = inkAlong();
+    ASSERT_GT(solid, 100) << "实线没铺满，后面的对照没有基准";
+
+    ASSERT_TRUE(m_engine.select(*line).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 4, .fontSize = 16, .fillStyle = 0, .lineStyle = 2}).has_value());
+    EXPECT_LT(inkAlong(), solid) << "选中项改成点线之后还是满的：线型没落到那条图形上";
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_EQ(inkAlong(), solid) << "撤销没把线型退回实线，改线型没进撤销栈";
+}
+
+/**
  * @brief 钉住箭头款式与大小两档都能改在选中项上、撤销能退回去
  * @details 白底、线宽 6、尖在 (140, 50)：头长 3.5×6=21（纵深 18.2）。
  *          款式探点取轴线上离尖 12 那点：实心有芯、空心透白；

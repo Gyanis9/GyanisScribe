@@ -930,6 +930,56 @@ TEST_F(AnnotationFixture, TextPlotsEveryLineAndTheBoxCoversThem)
 }
 
 /**
+ * @brief 钉住线型三档：实线连成一条，虚线断开，点线断得更碎
+ * @details 三条等长的横线各取同一段量墨点数：实线铺满、虚线按 Qt 的 (4,2)×线宽 断、
+ *          点线按 (1,2)×线宽 断——三段读数严格递减，任何一档没生效都会并到相邻那一档上。
+ */
+TEST_F(AnnotationFixture, LineStyleDividesSolidDashAndDot)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Line).has_value());
+
+    const auto drawLineOfStyle = [this](const int style, const int y)
+    {
+        ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 4, .fontSize = 16, .fillStyle = 0, .lineStyle = style}).has_value());
+        m_engine.beginStroke(QPoint(20, y));
+        m_engine.moveStroke(QPoint(180, y));
+        const auto committed = m_engine.endStroke();
+        ASSERT_TRUE(committed.has_value()) << committed.error().message;
+    };
+
+    drawLineOfStyle(0, 20); // 实线
+    drawLineOfStyle(1, 50); // 虚线
+    drawLineOfStyle(2, 80); // 点线
+
+    const QImage drawn     = m_engine.exportImage();
+    const auto   inkOfLine = [&drawn](const int y)
+    {
+        int ink = 0;
+        for (int x = 20; x <= 180; ++x)
+        {
+            for (int dy = -4; dy <= 4; ++dy)
+            {
+                if (drawn.pixelColor(x, y + dy) != QColor(255, 255, 255))
+                {
+                    ++ink;
+                    break;
+                }
+            }
+        }
+        return ink;
+    };
+
+    const int solid = inkOfLine(20);
+    const int dash  = inkOfLine(50);
+    const int dot   = inkOfLine(80);
+    EXPECT_GT(solid, 150) << "实线没铺满，后面的对照没有基准";
+    EXPECT_LT(dash, solid) << "线型没生效：虚线与实线一样满";
+    EXPECT_GT(dash, 40) << "虚线的断口比 Qt 这一档该有的还多";
+    EXPECT_LT(dot, dash) << "点线的断口没比虚线更碎";
+    EXPECT_GT(dot, 10) << "点线几乎没画出来";
+}
+
+/**
  * @brief 钉住箭头头部三档款式的差别：实心有芯、空心透底、开口没有底边
  * @details 同一根箭头画三遍（白底、线宽 6、头长 3.5×6=21、张角 60°），两个探点把三档两两分开：
  *          轴线上离尖 12 像素那点——实心是芯（有墨）、空心是空的（透白）、开口是杆（有墨）；
