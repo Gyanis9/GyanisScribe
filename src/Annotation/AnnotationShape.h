@@ -70,6 +70,7 @@ namespace GyanisScribe::Annotation
         int             number               = 1;                                                  ///< 序号值，仅序号工具使用
         int             fillStyle            = 0;                                                  ///< 填充档：0 无、1 半透明、2 实心（仅矩形与椭圆用）
         int             lineStyle            = static_cast<int>(kDefaultLineStyleStep);            ///< 线型档：0 实线、1 虚线、2 点线（描边类工具用）
+        bool            roundedRect          = false;                                              ///< 圆角矩形：四角按短边的比例切圆（仅矩形工具用）
         bool            doubleHeaded         = false;                                              ///< 双向箭头：两端各画一个（仅箭头工具用）
         int             mosaicBlockSize      = kMosaicBlockSizes[kDefaultMosaicBlockStep];         ///< 马赛克方块边长，逻辑像素（仅马赛克工具用），默认为阶梯里的「中」档
         int             highlightAlpha       = kHighlightAlphas[kDefaultHighlightAlphaStep];       ///< 高亮透明度，0-255（仅高亮工具用），默认为阶梯里的「中」档

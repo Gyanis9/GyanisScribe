@@ -67,6 +67,7 @@
     <file alias="Rectangle.svg">Icons/Rectangle.svg</file>
     <file alias="Redo.svg">Icons/Redo.svg</file>
     <file alias="Refresh.svg">Icons/Refresh.svg</file>
+    <file alias="RoundedRect.svg">Icons/RoundedRect.svg</file>
     <file alias="Save.svg">Icons/Save.svg</file>
     <file alias="Settings.svg">Icons/Settings.svg</file>
     <file alias="SystemAudio.svg">Icons/SystemAudio.svg</file>

@@ -930,6 +930,36 @@ TEST_F(AnnotationFixture, TextPlotsEveryLineAndTheBoxCoversThem)
 }
 
 /**
+ * @brief 钉住圆角矩形：四角被切掉，四边中段照旧
+ * @details 同一个方块画两遍（直角 / 圆角，线宽 4）：角上一格（离框沿 1 像素）直角档压在描边上，
+ *          圆角档那里已经被切掉了；两边中段两档都有墨——少了后一条，「什么都没画」也会绿。
+ */
+TEST_F(AnnotationFixture, RoundedRectCutsTheCornersButKeepsTheSides)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Rectangle).has_value());
+
+    const auto drawBoxOfStyle = [this](const bool rounded, const QRect &rect)
+    {
+        ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 4, .fontSize = 16, .fillStyle = 0, .roundedRect = rounded}).has_value());
+        m_engine.beginStroke(rect.topLeft());
+        m_engine.moveStroke(rect.bottomRight());
+        const auto committed = m_engine.endStroke();
+        ASSERT_TRUE(committed.has_value()) << committed.error().message;
+    };
+
+    drawBoxOfStyle(false, QRect(20, 20, 60, 60)); // 直角
+    drawBoxOfStyle(true, QRect(140, 20, 60, 60)); // 圆角
+
+    // 判据取「墨的深浅」而不是「是不是纯白」：探点离圆角弧只有一像素出头，
+    // 弧外那一圈会吃进抗锯齿的浅灰（实测 245），按纯白判会把正确的圆角读成没切
+    const QImage drawn = m_engine.exportImage();
+    EXPECT_LT(drawn.pixelColor(21, 21).lightness(), 100) << "直角档的角上没有墨，后面的对照没有基准";
+    EXPECT_GT(drawn.pixelColor(141, 21).lightness(), 200) << "圆角档的角没被切掉";
+    EXPECT_LT(drawn.pixelColor(50, 21).lightness(), 100) << "直角档的上边中段没画出来";
+    EXPECT_LT(drawn.pixelColor(170, 21).lightness(), 100) << "圆角档的上边中段没画出来";
+}
+
+/**
  * @brief 钉住线型三档：实线连成一条，虚线断开，点线断得更碎
  * @details 三条等长的横线各取同一段量墨点数：实线铺满、虚线按 Qt 的 (4,2)×线宽 断、
  *          点线按 (1,2)×线宽 断——三段读数严格递减，任何一档没生效都会并到相邻那一档上。

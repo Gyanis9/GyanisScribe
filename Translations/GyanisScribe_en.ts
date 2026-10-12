@@ -144,6 +144,10 @@
             <translation>Fill</translation>
         </message>
         <message>
+            <source>圆角</source>
+            <translation>Rounded</translation>
+        </message>
+        <message>
             <source>线型</source>
             <translation>Line style</translation>
         </message>
@@ -230,6 +234,14 @@
         <message>
             <source>填充：实心</source>
             <translation>Fill: solid</translation>
+        </message>
+        <message>
+            <source>圆角：开</source>
+            <translation>Rounded: on</translation>
+        </message>
+        <message>
+            <source>圆角：关</source>
+            <translation>Rounded: off</translation>
         </message>
         <message>
             <source>线型：实线</source>

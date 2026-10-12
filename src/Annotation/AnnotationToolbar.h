@@ -116,6 +116,15 @@ namespace GyanisScribe::Annotation
         /// 当前填充档：0 无、1 半透明、2 实心（矩形与椭圆用；新建的图形按它上笔刷）
         [[nodiscard]] int currentFillStyle() const;
 
+        /// 当前是不是圆角矩形（矩形工具用；新建的矩形按它切角）
+        [[nodiscard]] bool currentRoundedRect() const;
+
+        /**
+         * @brief 开/关圆角矩形，按钮态、提示与信号一次对齐
+         * @param enabled true 表示四角切圆
+         */
+        void setRoundedRect(bool enabled);
+
         /// 当前线型档：0 实线、1 虚线、2 点线（描边类工具用；新建的图形按它落笔）
         [[nodiscard]] int currentLineStyle() const;
 
@@ -220,6 +229,8 @@ namespace GyanisScribe::Annotation
         void fontSizeChanged(int fontSize);
         /// 用户改了填充档
         void fillStyleChanged(int fillStyle);
+        /// 用户开了/关了圆角矩形
+        void roundedRectChanged(bool enabled);
         /// 用户改了线型
         void lineStyleChanged(int style);
         /// 用户开了/关了双向箭头
@@ -304,6 +315,8 @@ namespace GyanisScribe::Annotation
         QSlider                                                 *m_widthSlider          = nullptr;                                    ///< 线宽滑块，档位对齐 kAnnotationWidths
         QComboBox                                               *m_fontSizeCombo        = nullptr;                                    ///< 字号下拉，取值对齐 kFontSizes
         QToolButton                                             *m_fillButton           = nullptr;                                    ///< 填充档按钮，点一下走一档
+        QToolButton                                             *m_roundedRectButton    = nullptr;                                    ///< 圆角矩形开关，按下表示切圆角
+        bool                                                     m_roundedRect          = false;                                      ///< 当前是不是圆角矩形
         int                                                      m_fillStyle            = 0;                                          ///< 当前填充档：0 无、1 半透明、2 实心
         QToolButton                                             *m_lineStyleButton      = nullptr;                                    ///< 线型按钮，点一下走一档
         int                                                      m_lineStyle            = static_cast<int>(kDefaultLineStyleStep);    ///< 当前线型档，值表是 kAnnotationLineStyles

@@ -124,6 +124,7 @@ namespace
             std::vector<int>      fontSizes;        ///< fontSizeChanged 收到的字号
             std::vector<int>      fillStyles;       ///< fillStyleChanged 收到的填充档
             std::vector<int>      lineStyles;       ///< lineStyleChanged 收到的线型档
+            std::vector<int>      roundedRects;     ///< roundedRectChanged 收到的开关（1 开 0 关）
             std::vector<int>      doubleHeaded;     ///< doubleHeadedChanged 收到的开关（1 开 0 关）
             std::vector<int>      mosaicBlockSizes; ///< mosaicBlockSizeChanged 收到的粒度
             std::vector<int>      highlightAlphas;  ///< highlightAlphaChanged 收到的透明度
@@ -150,6 +151,7 @@ namespace
             QObject::connect(toolbar.get(), &AnnotationToolbar::fontSizeChanged, [&log](int fontSize) { log.fontSizes.push_back(fontSize); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::fillStyleChanged, [&log](int style) { log.fillStyles.push_back(style); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::lineStyleChanged, [&log](int style) { log.lineStyles.push_back(style); });
+            QObject::connect(toolbar.get(), &AnnotationToolbar::roundedRectChanged, [&log](bool enabled) { log.roundedRects.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::doubleHeadedChanged, [&log](bool enabled) { log.doubleHeaded.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::mosaicBlockSizeChanged, [&log](int blockSize) { log.mosaicBlockSizes.push_back(blockSize); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::highlightAlphaChanged, [&log](int alpha) { log.highlightAlphas.push_back(alpha); });
@@ -263,6 +265,28 @@ namespace
         button->click();
         EXPECT_EQ(toolbar->currentMosaicBlockSize(), 12) << "三档之后该回到「中」";
         EXPECT_EQ(button->accessibleName(), QString::fromUtf8("马赛克粒度：中")) << "无障碍名没跟上当前档";
+    }
+
+    /**
+     * @brief 钉住圆角开关：保持按下态的开关，提示与信号一起走
+     */
+    TEST_F(ToolbarFixture, RoundedRectTogglesAndNamesTheState)
+    {
+        SignalLog log;
+        auto      toolbar = makeToolbarLogged(log);
+        auto     *button  = buttonByLabel(*toolbar, "圆角");
+        ASSERT_NE(button, nullptr) << "工具栏上找不到圆角按钮";
+
+        EXPECT_FALSE(toolbar->currentRoundedRect()) << "起点该是关";
+        button->click();
+        EXPECT_TRUE(toolbar->currentRoundedRect());
+        EXPECT_EQ(log.roundedRects, std::vector<int>{1}) << "开了却没把信号发出去";
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("圆角：开")) << "提示没跟上";
+
+        button->click();
+        EXPECT_FALSE(toolbar->currentRoundedRect());
+        EXPECT_EQ(log.roundedRects, (std::vector<int>{1, 0}));
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("圆角：关"));
     }
 
     /**

@@ -301,6 +301,13 @@ namespace GyanisScribe::Annotation
         [[nodiscard]] int fillStyle() const noexcept;
 
         /**
+         * @brief 开关圆角矩形
+         * @param enabled true 表示四角按短边的比例切圆
+         * @details 只有矩形工具用得上；开关随新画的图形带走，选中的那条改开关走改样式命令。
+         */
+        void setRoundedRect(bool enabled) noexcept;
+
+        /**
          * @brief 设双向箭头
          * @param enabled true 表示两端各画一个箭头
          * @details 只有箭头工具用得上；开关随新画的图形带走，选中的那条改开关走改样式命令。
@@ -425,6 +432,7 @@ namespace GyanisScribe::Annotation
         QColor          m_color;                                                                     ///< 默认画笔颜色
         int             m_lineWidth;                                                                 ///< 默认线宽
         int             m_fillStyle            = 0;                                                  ///< 默认填充档（0 无、1 半透明、2 实心）
+        bool            m_roundedRect          = false;                                              ///< 默认圆角矩形（仅矩形工具用）
         bool            m_doubleHeaded         = false;                                              ///< 默认双向箭头（仅箭头工具用）
         int             m_mosaicBlockSize      = kMosaicBlockSizes[kDefaultMosaicBlockStep];         ///< 默认马赛克粒度（仅马赛克工具用）
         int             m_highlightAlpha       = kHighlightAlphas[kDefaultHighlightAlphaStep];       ///< 默认高亮透明度（仅高亮工具用）

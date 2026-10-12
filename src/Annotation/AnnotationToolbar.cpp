@@ -202,6 +202,10 @@ namespace GyanisScribe::Annotation
         m_fillButton = makeButton("Fill", GyanisScribe::Core::uiText("填充"), false);
         QObject::connect(m_fillButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleFillStyle);
         layout->addWidget(m_fillButton);
+        // 圆角矩形：矩形工具用得上，是一个保持按下态的开关（与双向箭头同一套口径）
+        m_roundedRectButton = makeButton("RoundedRect", GyanisScribe::Core::uiText("圆角"), true);
+        QObject::connect(m_roundedRectButton, &QToolButton::clicked, this, [this] { setRoundedRect(m_roundedRectButton->isChecked()); });
+        layout->addWidget(m_roundedRectButton);
         // 线型：描边类工具用得上，点一下走一档（实线 → 虚线 → 点线）
         m_lineStyleButton = makeButton("LineStyle", GyanisScribe::Core::uiText("线型"), false);
         QObject::connect(m_lineStyleButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleLineStyle);
@@ -319,6 +323,24 @@ namespace GyanisScribe::Annotation
     bool AnnotationToolbar::currentDoubleHeaded() const
     {
         return m_doubleHeaded;
+    }
+
+    bool AnnotationToolbar::currentRoundedRect() const
+    {
+        return m_roundedRectButton != nullptr && m_roundedRectButton->isChecked();
+    }
+
+    void AnnotationToolbar::setRoundedRect(const bool enabled)
+    {
+        m_roundedRect = enabled;
+        if (m_roundedRectButton != nullptr)
+        {
+            m_roundedRectButton->setChecked(enabled);
+            const auto label = enabled ? GyanisScribe::Core::uiText("圆角：开") : GyanisScribe::Core::uiText("圆角：关");
+            m_roundedRectButton->setToolTip(label);
+            m_roundedRectButton->setAccessibleName(label);
+        }
+        emit roundedRectChanged(enabled);
     }
 
     int AnnotationToolbar::currentLineStyle() const

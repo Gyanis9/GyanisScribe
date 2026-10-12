@@ -53,6 +53,7 @@ namespace GyanisScribe::Annotation
         m_pending.fillStyle            = m_fillStyle;
         m_pending.lineStyle            = m_lineStyle;
         m_pending.fontSize             = m_fontSize;
+        m_pending.roundedRect          = m_roundedRect;
         m_pending.doubleHeaded         = m_doubleHeaded;
         m_pending.mosaicBlockSize      = m_mosaicBlockSize;
         m_pending.highlightAlpha       = m_highlightAlpha;
@@ -150,6 +151,7 @@ namespace GyanisScribe::Annotation
         shape.lineWidth            = parameters.lineWidth;
         shape.fontSize             = parameters.fontSize;
         shape.fillStyle            = parameters.fillStyle;
+        shape.roundedRect          = parameters.roundedRect;
         shape.lineStyle            = parameters.lineStyle;
         shape.doubleHeaded         = parameters.doubleHeaded;
         shape.mosaicBlockSize      = parameters.mosaicBlockSize;
@@ -347,6 +349,11 @@ namespace GyanisScribe::Annotation
     int AnnotationTool::fillStyle() const noexcept
     {
         return m_fillStyle;
+    }
+
+    void AnnotationTool::setRoundedRect(const bool enabled) noexcept
+    {
+        m_roundedRect = enabled;
     }
 
     void AnnotationTool::setDoubleHeaded(const bool enabled) noexcept

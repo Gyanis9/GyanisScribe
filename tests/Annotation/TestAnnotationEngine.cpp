@@ -512,6 +512,29 @@ TEST_F(EngineFixture, HighlightWidthFactorRestylesAndUndoBack)
 }
 
 /**
+ * @brief 钉住圆角的开关能改在选中项上、撤销能退回去
+ */
+TEST_F(EngineFixture, RoundedRectRestylesAndUndoesBack)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Rectangle).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 4, .fontSize = 16, .fillStyle = 0}).has_value());
+    m_engine.beginStroke(QPoint(20, 20));
+    m_engine.moveStroke(QPoint(80, 80));
+    const auto box = m_engine.endStroke();
+    ASSERT_TRUE(box.has_value()) << box.error().message;
+
+    // 「有墨」取深浅而不是纯白：紧贴圆角弧的探点会吃进抗锯齿的浅灰（见工具级那条的说明）
+    const auto cornerInked = [this] { return m_engine.exportImage().pixelColor(21, 21).lightness() < 100; };
+    ASSERT_TRUE(cornerInked()) << "直角档的角上没有墨，后面的对照没有基准";
+
+    ASSERT_TRUE(m_engine.select(*box).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 4, .fontSize = 16, .fillStyle = 0, .roundedRect = true}).has_value());
+    EXPECT_FALSE(cornerInked()) << "选中项改成圆角之后角还在：开关没落到那条图形上";
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_TRUE(cornerInked()) << "撤销没把圆角退回直角，改开关没进撤销栈";
+}
+
+/**
  * @brief 钉住线型的换档与撤销：档记在图形自己身上，选中的那条跟着改
  * @details 白底上一条 90 长的横线：实线铺满、点线按 (1,2)×线宽 断——同一段量墨点数，
  *          改档之后读数变小、撤一步又回到满。

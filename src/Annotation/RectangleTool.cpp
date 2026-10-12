@@ -6,8 +6,15 @@
 
 #include <QPainter>
 
+#include <algorithm>
+
 namespace GyanisScribe::Annotation
 {
+    namespace
+    {
+        /// 圆角半径相对短边的比例：太大窄条会长成一粒胶囊，太小又看不出圆
+        constexpr double kRoundedRectRadiusRatio = 0.18;
+    } // namespace
 
     RectangleTool::RectangleTool() : AnnotationTool(ToolKind::Rectangle)
     {
@@ -26,7 +33,16 @@ namespace GyanisScribe::Annotation
         pen.setCapStyle(Qt::RoundCap);
         painter.setPen(pen);
         painter.setBrush(fillBrushFor(shape));
-        painter.drawRect(shape.rect);
+
+        if (!shape.roundedRect)
+        {
+            painter.drawRect(shape.rect);
+            return;
+        }
+
+        // 圆角按短边算：长条上按长边给半径会把两端收成一粒胶囊
+        const double radius = std::min(shape.rect.width(), shape.rect.height()) * kRoundedRectRadiusRatio;
+        painter.drawRoundedRect(shape.rect, radius, radius);
     }
 
 } // namespace GyanisScribe::Annotation

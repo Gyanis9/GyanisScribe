@@ -16,6 +16,7 @@ namespace GyanisScribe::Annotation
                                         .fontSize             = toolbar.currentFontSize(),
                                         .fillStyle            = toolbar.currentFillStyle(),
                                         .lineStyle            = toolbar.currentLineStyle(),
+                                        .roundedRect          = toolbar.currentRoundedRect(),
                                         .doubleHeaded         = toolbar.currentDoubleHeaded(),
                                         .mosaicBlockSize      = toolbar.currentMosaicBlockSize(),
                                         .highlightAlpha       = toolbar.currentHighlightAlpha(),
@@ -58,6 +59,12 @@ namespace GyanisScribe::Annotation
                          [this](const int style)
                          {
                              m_penParameters.fillStyle = style;
+                             applyPenParameters();
+                         });
+        QObject::connect(&toolbar, &AnnotationToolbar::roundedRectChanged, this,
+                         [this](const bool enabled)
+                         {
+                             m_penParameters.roundedRect = enabled;
                              applyPenParameters();
                          });
         QObject::connect(&toolbar, &AnnotationToolbar::lineStyleChanged, this,
