@@ -687,6 +687,43 @@ TEST_F(AnnotationWindowFixture, HighlightWidthCycleFromToolbarReachesTheEngine)
 }
 
 /**
+ * @brief 钉住椭圆形状开关从窗口接到引擎：点开之后新画的高亮两头才有圆帽
+ * @details 工具栏默认线宽 4、加宽 4 倍：笔宽 16、圆帽半径 8。端点外 6 逻辑像素处
+ *          （物理 252 那一列）圆帽下该有墨、平头下没有；再往外的 268 列圆帽也不该到。
+ *          两笔一前一后画在同一条底图上，长出帽沿的那一笔只能是开关按下去的功劳。
+ */
+TEST_F(AnnotationWindowFixture, EllipticalToggleFromToolbarReachesTheEngine)
+{
+    auto window = makeWindow();
+
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Highlight).has_value());
+    engine().beginStroke(QPoint(60, 50));
+    engine().moveStroke(QPoint(120, 50));
+    ASSERT_TRUE(engine().endStroke().has_value());
+    EXPECT_EQ(engine().exportImage().pixelColor(252, 100), QColor(180, 180, 180)) << "平头档在探点处就有墨，后面的对照没有基准";
+
+    QToolButton *ellipticalButton = nullptr;
+    for (auto *candidate: window->toolbar().findChildren<QToolButton *>())
+    {
+        if (candidate->accessibleName().startsWith(QString::fromUtf8("椭圆形状")))
+        {
+            ellipticalButton = candidate;
+            break;
+        }
+    }
+    ASSERT_NE(ellipticalButton, nullptr) << "工具栏上找不到椭圆形状按钮";
+    ellipticalButton->click();
+
+    engine().beginStroke(QPoint(60, 70));
+    engine().moveStroke(QPoint(120, 70));
+    ASSERT_TRUE(engine().endStroke().has_value());
+
+    const auto drawn = engine().exportImage();
+    EXPECT_NE(drawn.pixelColor(252, 140), QColor(180, 180, 180)) << "开关点下去了，新画的笔迹两头没有圆帽：窗口到引擎这条链没接上";
+    EXPECT_EQ(drawn.pixelColor(268, 140), QColor(180, 180, 180)) << "帽沿伸过了自己的半径：圆帽画成了拉长的方块";
+}
+
+/**
  * @brief 钉住线型按钮从窗口接到引擎：点一下（实线→虚线），选中的那条断口就出来了
  * @details 画布逻辑 200×100 放进 400×200 的视图：一条逻辑 (20,50)-(180,50) 的横线；
  *          判据量与引擎级那条同一套——同一段里「有墨的列数」，改档之后变小。

@@ -143,6 +143,15 @@ namespace GyanisScribe::Annotation
          */
         void setDoubleHeaded(bool enabled);
 
+        /// 当前是不是椭圆档（马赛克/高斯模糊/高亮/橡皮擦用；新建的图形按它选形状）
+        [[nodiscard]] bool currentElliptical() const;
+
+        /**
+         * @brief 开/关椭圆档，按钮态、提示与信号一次对齐
+         * @param enabled true 表示区域类收进内切椭圆、笔迹类换圆头圆角
+         */
+        void setElliptical(bool enabled);
+
         /// 当前马赛克粒度（方块边长，逻辑像素），取值只会落在 kMosaicBlockSizes 的阶梯上
         [[nodiscard]] int currentMosaicBlockSize() const;
 
@@ -235,6 +244,8 @@ namespace GyanisScribe::Annotation
         void lineStyleChanged(int style);
         /// 用户开了/关了双向箭头
         void doubleHeadedChanged(bool enabled);
+        /// 用户开了/关了椭圆档
+        void ellipticalChanged(bool enabled);
         /// 用户改了马赛克粒度
         void mosaicBlockSizeChanged(int blockSize);
         /// 用户改了高亮透明度
@@ -305,24 +316,26 @@ namespace GyanisScribe::Annotation
         class QHBoxLayout         *m_layout            = nullptr; ///< 工具栏主布局，重建色块时要往这里插
         QButtonGroup              *m_colorGroup        = nullptr; ///< 色块的互斥组，重建最近使用时要同步它的成员
 
-        const Ui::IconProvider                                  &m_icons;                                                             ///< 图标出口，不拥有
-        std::array<QToolButton *, kToolButtonCount>              m_toolButtons{};                                                     ///< 工具按钮，按 ToolKind 顺序
-        std::array<QToolButton *, Ui::kAnnotationPalette.size()> m_colorButtons{};                                                    ///< 八个预设色块
-        std::array<ToolKind, kToolButtonCount>                   m_toolKinds{};                                                       ///< 按钮序号到工具的映射，反向查也用它
-        QToolButton                                             *m_customColorButton    = nullptr;                                    ///< 自定义取色按钮
-        QToolButton                                             *m_undoButton           = nullptr;                                    ///< 撤销按钮
-        QToolButton                                             *m_redoButton           = nullptr;                                    ///< 重做按钮
-        QSlider                                                 *m_widthSlider          = nullptr;                                    ///< 线宽滑块，档位对齐 kAnnotationWidths
-        QComboBox                                               *m_fontSizeCombo        = nullptr;                                    ///< 字号下拉，取值对齐 kFontSizes
-        QToolButton                                             *m_fillButton           = nullptr;                                    ///< 填充档按钮，点一下走一档
-        QToolButton                                             *m_roundedRectButton    = nullptr;                                    ///< 圆角矩形开关，按下表示切圆角
-        bool                                                     m_roundedRect          = false;                                      ///< 当前是不是圆角矩形
-        int                                                      m_fillStyle            = 0;                                          ///< 当前填充档：0 无、1 半透明、2 实心
-        QToolButton                                             *m_lineStyleButton      = nullptr;                                    ///< 线型按钮，点一下走一档
-        int                                                      m_lineStyle            = static_cast<int>(kDefaultLineStyleStep);    ///< 当前线型档，值表是 kAnnotationLineStyles
-        QToolButton                                             *m_doubleArrowButton    = nullptr;                                    ///< 双向箭头开关按钮，按下表示两端有头
-        bool                                                     m_doubleHeaded         = false;                                      ///< 当前是不是双向箭头
-        QToolButton                                             *m_mosaicGrainButton    = nullptr;                                    ///< 马赛克粒度按钮，点一下走一档
+        const Ui::IconProvider                                  &m_icons;                                                          ///< 图标出口，不拥有
+        std::array<QToolButton *, kToolButtonCount>              m_toolButtons{};                                                  ///< 工具按钮，按 ToolKind 顺序
+        std::array<QToolButton *, Ui::kAnnotationPalette.size()> m_colorButtons{};                                                 ///< 八个预设色块
+        std::array<ToolKind, kToolButtonCount>                   m_toolKinds{};                                                    ///< 按钮序号到工具的映射，反向查也用它
+        QToolButton                                             *m_customColorButton    = nullptr;                                 ///< 自定义取色按钮
+        QToolButton                                             *m_undoButton           = nullptr;                                 ///< 撤销按钮
+        QToolButton                                             *m_redoButton           = nullptr;                                 ///< 重做按钮
+        QSlider                                                 *m_widthSlider          = nullptr;                                 ///< 线宽滑块，档位对齐 kAnnotationWidths
+        QComboBox                                               *m_fontSizeCombo        = nullptr;                                 ///< 字号下拉，取值对齐 kFontSizes
+        QToolButton                                             *m_fillButton           = nullptr;                                 ///< 填充档按钮，点一下走一档
+        QToolButton                                             *m_roundedRectButton    = nullptr;                                 ///< 圆角矩形开关，按下表示切圆角
+        bool                                                     m_roundedRect          = false;                                   ///< 当前是不是圆角矩形
+        int                                                      m_fillStyle            = 0;                                       ///< 当前填充档：0 无、1 半透明、2 实心
+        QToolButton                                             *m_lineStyleButton      = nullptr;                                 ///< 线型按钮，点一下走一档
+        int                                                      m_lineStyle            = static_cast<int>(kDefaultLineStyleStep); ///< 当前线型档，值表是 kAnnotationLineStyles
+        QToolButton                                             *m_doubleArrowButton    = nullptr;                                 ///< 双向箭头开关按钮，按下表示两端有头
+        bool                                                     m_doubleHeaded         = false;                                   ///< 当前是不是双向箭头
+        QToolButton                                             *m_ellipticalButton     = nullptr; ///< 椭圆形状开关按钮，按下表示收进内切椭圆/换圆头
+        bool                                                     m_elliptical           = false;   ///< 当前是不是椭圆档
+        QToolButton                                             *m_mosaicGrainButton    = nullptr; ///< 马赛克粒度按钮，点一下走一档
         int                                                      m_mosaicBlockStep      = static_cast<int>(kDefaultMosaicBlockStep);  ///< 当前粒度档下标，值表是 kMosaicBlockSizes
         QToolButton                                             *m_highlightAlphaButton = nullptr;                                    ///< 高亮透明度按钮，点一下走一档
         int                                                      m_highlightAlphaStep = static_cast<int>(kDefaultHighlightAlphaStep); ///< 当前透明度档下标，值表是 kHighlightAlphas

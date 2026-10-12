@@ -215,6 +215,11 @@ namespace GyanisScribe::Annotation
         m_doubleArrowButton = makeButton("ArrowDouble", GyanisScribe::Core::uiText("双向箭头"), true);
         QObject::connect(m_doubleArrowButton, &QToolButton::clicked, this, [this] { setDoubleHeaded(m_doubleArrowButton->isChecked()); });
         layout->addWidget(m_doubleArrowButton);
+        // 椭圆形状：马赛克/高斯模糊/高亮/橡皮擦四件用得上，同为保持按下态的开关；
+        // 名字带「形状」是为了与工具组里那枚「椭圆」区分——那枚是切工具，这枚是切当前工具的落笔形状
+        m_ellipticalButton = makeButton("EllipseShape", GyanisScribe::Core::uiText("椭圆形状"), true);
+        QObject::connect(m_ellipticalButton, &QToolButton::clicked, this, [this] { setElliptical(m_ellipticalButton->isChecked()); });
+        layout->addWidget(m_ellipticalButton);
         // 马赛克粒度：马赛克工具用得上，点一下走一档（细 → 中 → 粗），档位表是 kMosaicBlockSizes
         m_mosaicGrainButton = makeButton("MosaicGrain", GyanisScribe::Core::uiText("马赛克粒度"), false);
         QObject::connect(m_mosaicGrainButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleMosaicBlockSize);
@@ -329,7 +334,6 @@ namespace GyanisScribe::Annotation
     {
         return m_roundedRectButton != nullptr && m_roundedRectButton->isChecked();
     }
-
     void AnnotationToolbar::setRoundedRect(const bool enabled)
     {
         m_roundedRect = enabled;
@@ -375,6 +379,25 @@ namespace GyanisScribe::Annotation
             m_doubleArrowButton->setAccessibleName(label);
         }
         emit doubleHeadedChanged(enabled);
+    }
+
+    bool AnnotationToolbar::currentElliptical() const
+    {
+        return m_elliptical;
+    }
+
+    void AnnotationToolbar::setElliptical(const bool enabled)
+    {
+        m_elliptical = enabled;
+        if (m_ellipticalButton != nullptr)
+        {
+            // 与双向箭头同一套口径：按钮态、提示、无障碍名三者同解
+            m_ellipticalButton->setChecked(enabled);
+            const auto label = enabled ? GyanisScribe::Core::uiText("椭圆形状：椭圆") : GyanisScribe::Core::uiText("椭圆形状：矩形");
+            m_ellipticalButton->setToolTip(label);
+            m_ellipticalButton->setAccessibleName(label);
+        }
+        emit ellipticalChanged(enabled);
     }
 
     int AnnotationToolbar::currentMosaicBlockSize() const

@@ -67,14 +67,24 @@ namespace GyanisScribe::Annotation
             maskPainter.setBrush(Qt::black);
             if (shape.points.size() == 1)
             {
-                // 单点落笔擦一个圆点，与画笔工具落点留下的圆点同一口径
-                maskPainter.drawEllipse(toMaskPoint(shape.points.front()), eraseWidth / 2.0, eraseWidth / 2.0);
+                // 单点落笔擦一个点，与画笔工具落点同一套口径；形状档决定圆点还是方点
+                const QPointF center = toMaskPoint(shape.points.front());
+                if (shape.elliptical)
+                {
+                    maskPainter.drawEllipse(center, eraseWidth / 2.0, eraseWidth / 2.0);
+                } else
+                {
+                    maskPainter.drawRect(QRectF(center.x() - eraseWidth / 2.0, center.y() - eraseWidth / 2.0, eraseWidth, eraseWidth));
+                }
             } else
             {
                 auto pen = QPen(Qt::black);
                 pen.setWidthF(eraseWidth);
-                pen.setCapStyle(Qt::RoundCap);
-                pen.setJoinStyle(Qt::RoundJoin);
+                // 椭圆档圆头圆角、方档方头直角。方头用 SquareCap 而不是 FlatCap：
+                // 与圆头同为「向外伸半个笔宽」，只换角的形状，不缩覆盖范围——平头会把拖动
+                // 起点那一格削掉半像素，用起来就是「按下的地方没擦到」
+                pen.setCapStyle(shape.elliptical ? Qt::RoundCap : Qt::SquareCap);
+                pen.setJoinStyle(shape.elliptical ? Qt::RoundJoin : Qt::MiterJoin);
                 maskPainter.setPen(pen);
                 maskPainter.setBrush(Qt::NoBrush);
 

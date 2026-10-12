@@ -60,20 +60,21 @@ namespace GyanisScribe::Annotation
      */
     struct AnnotationShape
     {
-        QRect           rect;                                                                      ///< 拖拽类图形的外接矩形（矩形、椭圆、马赛克）
-        QVector<QPoint> points;                                                                    ///< 轨迹类图形的采样点（画笔、高亮、箭头首尾两点）
-        QPoint          position;                                                                  ///< 锚点（文字、序号）
-        QString         text;                                                                      ///< 文字内容；序号工具用它存编号文本
-        QColor          color                = QColor(255, 0, 0);                                  ///< 画笔颜色，默认标注红
-        int             lineWidth            = 3;                                                  ///< 线宽，逻辑像素
-        int             fontSize             = 16;                                                 ///< 字号，仅文字与序号使用
-        int             number               = 1;                                                  ///< 序号值，仅序号工具使用
-        int             fillStyle            = 0;                                                  ///< 填充档：0 无、1 半透明、2 实心（仅矩形与椭圆用）
-        int             lineStyle            = static_cast<int>(kDefaultLineStyleStep);            ///< 线型档：0 实线、1 虚线、2 点线（描边类工具用）
-        bool            roundedRect          = false;                                              ///< 圆角矩形：四角按短边的比例切圆（仅矩形工具用）
-        bool            doubleHeaded         = false;                                              ///< 双向箭头：两端各画一个（仅箭头工具用）
-        int             mosaicBlockSize      = kMosaicBlockSizes[kDefaultMosaicBlockStep];         ///< 马赛克方块边长，逻辑像素（仅马赛克工具用），默认为阶梯里的「中」档
-        int             highlightAlpha       = kHighlightAlphas[kDefaultHighlightAlphaStep];       ///< 高亮透明度，0-255（仅高亮工具用），默认为阶梯里的「中」档
+        QRect           rect;                                                                ///< 拖拽类图形的外接矩形（矩形、椭圆、马赛克）
+        QVector<QPoint> points;                                                              ///< 轨迹类图形的采样点（画笔、高亮、箭头首尾两点）
+        QPoint          position;                                                            ///< 锚点（文字、序号）
+        QString         text;                                                                ///< 文字内容；序号工具用它存编号文本
+        QColor          color                = QColor(255, 0, 0);                            ///< 画笔颜色，默认标注红
+        int             lineWidth            = 3;                                            ///< 线宽，逻辑像素
+        int             fontSize             = 16;                                           ///< 字号，仅文字与序号使用
+        int             number               = 1;                                            ///< 序号值，仅序号工具使用
+        int             fillStyle            = 0;                                            ///< 填充档：0 无、1 半透明、2 实心（仅矩形与椭圆用）
+        int             lineStyle            = static_cast<int>(kDefaultLineStyleStep);      ///< 线型档：0 实线、1 虚线、2 点线（描边类工具用）
+        bool            roundedRect          = false;                                        ///< 圆角矩形：四角按短边的比例切圆（仅矩形工具用）
+        bool            doubleHeaded         = false;                                        ///< 双向箭头：两端各画一个（仅箭头工具用）
+        bool            elliptical           = false;                                        ///< 椭圆档（马赛克/高斯模糊/高亮/橡皮擦用）：区域类收进内切椭圆，笔迹类换圆头圆角笔尖
+        int             mosaicBlockSize      = kMosaicBlockSizes[kDefaultMosaicBlockStep];   ///< 马赛克方块边长，逻辑像素（仅马赛克工具用），默认为阶梯里的「中」档
+        int             highlightAlpha       = kHighlightAlphas[kDefaultHighlightAlphaStep]; ///< 高亮透明度，0-255（仅高亮工具用），默认为阶梯里的「中」档
         int             highlightWidthFactor = kHighlightWidthFactors[kDefaultHighlightWidthStep]; ///< 高亮相对线宽的加宽倍数（仅高亮工具用），默认为阶梯里的「中」档
         int             arrowHeadStyle       = kArrowHeadFilled;                                   ///< 箭头头部款式：0 实心、1 空心、2 开口两翼（仅箭头工具用）
         qreal           arrowHeadScale       = kArrowHeadScales[kDefaultArrowHeadScaleStep];       ///< 箭头头部大小：头长相对线宽的倍数（仅箭头工具用），默认为阶梯里的「中」档

@@ -315,6 +315,14 @@ namespace GyanisScribe::Annotation
         void setDoubleHeaded(bool enabled) noexcept;
 
         /**
+         * @brief 开关椭圆档
+         * @param enabled true 表示圆的那一档：马赛克/高斯模糊把作用区收进内切椭圆，高亮/橡皮擦换圆头圆角笔尖
+         * @details 四件工具（马赛克、高斯模糊、高亮、橡皮擦）用得上；开关随新画的图形带走，
+         *          选中的那条改开关走改样式命令。
+         */
+        void setElliptical(bool enabled) noexcept;
+
+        /**
          * @brief 设马赛克粒度
          * @param blockSize 方块边长，逻辑像素；越界按 1..64 夹取
          * @details 只有马赛克工具用得上；当前粒度随新画的图形带走，选中的那条改粒度走改样式命令。
@@ -434,6 +442,7 @@ namespace GyanisScribe::Annotation
         int             m_fillStyle            = 0;                                                  ///< 默认填充档（0 无、1 半透明、2 实心）
         bool            m_roundedRect          = false;                                              ///< 默认圆角矩形（仅矩形工具用）
         bool            m_doubleHeaded         = false;                                              ///< 默认双向箭头（仅箭头工具用）
+        bool            m_elliptical           = false;                                              ///< 默认椭圆档（马赛克/高斯模糊/高亮/橡皮擦用）
         int             m_mosaicBlockSize      = kMosaicBlockSizes[kDefaultMosaicBlockStep];         ///< 默认马赛克粒度（仅马赛克工具用）
         int             m_highlightAlpha       = kHighlightAlphas[kDefaultHighlightAlphaStep];       ///< 默认高亮透明度（仅高亮工具用）
         int             m_lineStyle            = static_cast<int>(kDefaultLineStyleStep);            ///< 默认线型档（描边类工具用）

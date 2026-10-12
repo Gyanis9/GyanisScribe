@@ -156,6 +156,10 @@
             <translation>Double-headed arrow</translation>
         </message>
         <message>
+            <source>椭圆形状</source>
+            <translation>Ellipse shape</translation>
+        </message>
+        <message>
             <source>马赛克粒度</source>
             <translation>Mosaic grain</translation>
         </message>
@@ -262,6 +266,14 @@
         <message>
             <source>双向箭头：关</source>
             <translation>Double-headed arrow: off</translation>
+        </message>
+        <message>
+            <source>椭圆形状：椭圆</source>
+            <translation>Ellipse shape: ellipse</translation>
+        </message>
+        <message>
+            <source>椭圆形状：矩形</source>
+            <translation>Ellipse shape: rectangle</translation>
         </message>
         <message>
             <source>马赛克粒度：细</source>

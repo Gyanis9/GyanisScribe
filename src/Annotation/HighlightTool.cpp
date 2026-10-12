@@ -30,8 +30,9 @@ namespace GyanisScribe::Annotation
         auto pen = QPen(color);
         // 加宽倍数记在每条图形自己身上（窄/中/宽三档）：工具上那一份只是后续笔画的默认值
         pen.setWidth(shape.lineWidth * shape.highlightWidthFactor);
-        pen.setCapStyle(Qt::FlatCap);
-        pen.setJoinStyle(Qt::MiterJoin);
+        // 椭圆档换圆头圆角：方档是平头直角，两头的切法一眼可辨
+        pen.setCapStyle(shape.elliptical ? Qt::RoundCap : Qt::FlatCap);
+        pen.setJoinStyle(shape.elliptical ? Qt::RoundJoin : Qt::MiterJoin);
         painter.setPen(pen);
 
         QPainterPath path;

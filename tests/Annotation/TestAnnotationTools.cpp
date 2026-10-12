@@ -168,7 +168,10 @@ namespace
         ASSERT_EQ(annotated.pixelColor(300, 150), QColor(255, 0, 0)) << "靶子不对：横带该是红的";
         ASSERT_EQ(annotated.pixelColor(280, 40), QColor(255, 0, 0)) << "靶子不对：探针红点没画上";
 
-        // 竖直擦一笔穿过横带：线宽 8 的橡皮是 8×6=48 宽，覆盖 x∈[276,324]
+        // 竖直擦一笔穿过横带：线宽 8 的橡皮是 8×6=48 宽，覆盖 x∈[276,324]。
+        // 形状档明确切到圆头：本用例那条「探针在外接框里、却在笔迹半径之外」是按圆头端帽
+        // 之外的空隙摆的（方档的端帽是方块，那些空隙不复存在，探针会合法地被盖住）
+        ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 8, .fontSize = 16, .fillStyle = 0, .elliptical = true}).has_value());
         ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Eraser).has_value());
         m_engine.beginStroke(QPoint(300, 150));
         m_engine.moveStroke(QPoint(300, 60));
@@ -573,6 +576,147 @@ TEST_F(AnnotationFixture, MosaicGranularityFollowsEachShape)
     m_engine.moveStroke(QPoint(240, 145));
     ASSERT_TRUE(m_engine.endStroke().has_value());
     EXPECT_GT(m_engine.exportImage().pixelColor(180, 99).red(), 128) << "粗档同一高度那一块被采成了黑，粒度没跟上";
+}
+
+/**
+ * @brief 钉住马赛克的椭圆档：作用区收进内切椭圆，椭圆外的角上一个像素都不碰
+ * @details 画布上半白下半黑、分界线在 y=100。框取 (100,20)-(200,100)：方块按框顶 y=20 起、
+ *          边长 12 排，最后一块的采样行落在 97（白）却盖到 100 那一行黑——矩形档下这一行整宽
+ *          被翻白，椭圆档下只有椭圆底缘那一小段（y=100 处横向只剩 ±11）被翻。两个探点各盯
+ *          一侧：椭圆内 (150,100) 该翻白，椭圆外 (120,100) 该原样是黑；矩形档的对照另画一框，
+ *          用来证明「不是马赛克根本没画上」。
+ */
+TEST_F(AnnotationFixture, MosaicEllipseCoversOnlyTheInscribedEllipse)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Mosaic).has_value());
+
+    // 对照：矩形档同一个形状照旧盖满整个外接框，角上那点该被翻白
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 16, .fillStyle = 0, .elliptical = false}).has_value());
+    m_engine.beginStroke(QPoint(250, 20));
+    m_engine.moveStroke(QPoint(350, 100));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+    EXPECT_GT(m_engine.exportImage().pixelColor(255, 100).red(), 128) << "矩形档下那一行没被翻白，后面的对照没有基准";
+
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 16, .fillStyle = 0, .elliptical = true}).has_value());
+    m_engine.beginStroke(QPoint(100, 20));
+    m_engine.moveStroke(QPoint(200, 100));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+
+    const auto exported = m_engine.exportImage();
+    EXPECT_GT(exported.pixelColor(150, 100).red(), 128) << "椭圆内的跨线方块没翻白：椭圆档把整个作用区关掉了";
+    EXPECT_LT(exported.pixelColor(120, 100).red(), 128) << "椭圆外的角上被改了：作用区没收进内切椭圆";
+}
+
+/**
+ * @brief 钉住高斯模糊的椭圆档：椭圆外那圈保持原样，椭圆内照糊
+ * @details 与马赛克同框不同区：矩形档在 (250,30)-(350,110) 把角上糊出灰，椭圆档在
+ *          (100,30)-(200,110) 的角上原样留黑——模糊半径 6，角上探点距黑白分界只有几行，
+ *          矩形档必糊到，椭圆档的掩膜外则一个像素都不该动。
+ */
+TEST_F(AnnotationFixture, BlurEllipseKeepsPixelsOutsideTheInscribedEllipse)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Blur).has_value());
+
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 16, .fillStyle = 0, .elliptical = false}).has_value());
+    m_engine.beginStroke(QPoint(250, 30));
+    m_engine.moveStroke(QPoint(350, 110));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+    EXPECT_NE(m_engine.exportImage().pixelColor(255, 100), m_original.pixelColor(255, 100)) << "矩形档下角上没被糊到，后面的对照没有基准";
+
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 16, .fillStyle = 0, .elliptical = true}).has_value());
+    m_engine.beginStroke(QPoint(100, 30));
+    m_engine.moveStroke(QPoint(200, 110));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+
+    const auto exported = m_engine.exportImage();
+    EXPECT_NE(exported.pixelColor(150, 100), m_original.pixelColor(150, 100)) << "椭圆内的跨线像素没被糊：椭圆档把整个作用区关掉了";
+    EXPECT_EQ(exported.pixelColor(105, 100), m_original.pixelColor(105, 100)) << "椭圆外的角上被糊了：作用区没收进内切椭圆";
+}
+
+/**
+ * @brief 钉住高亮的椭圆档：笔迹两头由平头换成圆头
+ * @details 线宽 8、加宽 4 倍的带子宽 32：圆头的帽沿往外多出半个笔宽（16）。
+ *          矩形档的笔迹到端点为止，圆头档在端点外 10 像素处该有墨、25 像素处该没有——
+ *          少了后一条，「两头补齐」也会绿成圆头。
+ */
+TEST_F(AnnotationFixture, HighlightEllipseRoundsTheStrokeEnds)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Highlight).has_value());
+
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 8, .fontSize = 16, .fillStyle = 0, .elliptical = false}).has_value());
+    m_engine.beginStroke(QPoint(100, 50));
+    m_engine.moveStroke(QPoint(160, 50));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(170, 50), QColor(255, 255, 255)) << "矩形档的笔迹伸过了端点，后面的对照没有基准";
+
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 8, .fontSize = 16, .fillStyle = 0, .elliptical = true}).has_value());
+    m_engine.beginStroke(QPoint(100, 70));
+    m_engine.moveStroke(QPoint(160, 70));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+
+    const auto exported = m_engine.exportImage();
+    EXPECT_NE(exported.pixelColor(170, 70), QColor(255, 255, 255)) << "椭圆档的端点外没有圆帽：两头还是平头";
+    EXPECT_EQ(exported.pixelColor(185, 70), QColor(255, 255, 255)) << "帽沿伸过了自己的半径：补齐的是个方块而不是圆头";
+}
+
+/**
+ * @brief 钉住橡皮擦的椭圆档：单点落笔的印子从方块换成圆
+ * @details 实心黑板 (50,20)-(350,80) 上点两下：方档的印子盖到 (140,70)（斜角偏 20、20，
+ *          仍在 24 的方形半径内），圆档的印子在 (300,70)（同样的偏移，但在圆外）不该到——
+ *          两个探点取同样的斜角偏移，只有一个「方 vs 圆」能解释两边的差别。
+ */
+TEST_F(AnnotationFixture, EraserEllipseRoundsTheSinglePointDot)
+{
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 8, .fontSize = 16, .fillStyle = 2}).has_value());
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Rectangle).has_value());
+    m_engine.beginStroke(QPoint(50, 20));
+    m_engine.moveStroke(QPoint(350, 80));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+    ASSERT_EQ(m_engine.exportImage().pixelColor(300, 70), QColor(0, 0, 0)) << "靶子不对：黑板没画上";
+
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Eraser).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 8, .fontSize = 16, .fillStyle = 0, .elliptical = false}).has_value());
+    m_engine.beginStroke(QPoint(120, 50));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(140, 70), QColor(255, 255, 255)) << "方档的印子没盖到斜角上";
+
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 8, .fontSize = 16, .fillStyle = 0, .elliptical = true}).has_value());
+    m_engine.beginStroke(QPoint(280, 50));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+    const auto exported = m_engine.exportImage();
+    EXPECT_EQ(exported.pixelColor(280, 50), QColor(255, 255, 255)) << "圆档的印子连中心都没擦出来";
+    EXPECT_EQ(exported.pixelColor(300, 70), QColor(0, 0, 0)) << "圆档的印子盖到了圆外的斜角上";
+}
+
+/**
+ * @brief 钉住橡皮擦笔画的方档：端帽是方块，斜角上要擦到；圆档同一斜角偏移在圆外
+ * @details 黑板 (50,10)-(350,90) 上竖擦两笔（线宽 10 的橡皮是 60 宽、半宽 30）：方档那一笔的
+ *          端帽是 90..150 × 10..100 的方块，(148,25) 距竖直中线 28、在方块的角里；
+ *          圆档那一笔同样的斜角偏移 (28,15) 距端点 31.8 已在 30 之外，同一格该原样留着黑。
+ */
+TEST_F(AnnotationFixture, EraserSquareStrokeCoversTheEndSquareCorners)
+{
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 10, .fontSize = 16, .fillStyle = 2}).has_value());
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Rectangle).has_value());
+    m_engine.beginStroke(QPoint(50, 10));
+    m_engine.moveStroke(QPoint(350, 90));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+    ASSERT_EQ(m_engine.exportImage().pixelColor(148, 25), QColor(0, 0, 0)) << "靶子不对：黑板没画上";
+
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Eraser).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 10, .fontSize = 16, .fillStyle = 0, .elliptical = false}).has_value());
+    m_engine.beginStroke(QPoint(120, 40));
+    m_engine.moveStroke(QPoint(120, 70));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(148, 25), QColor(255, 255, 255)) << "方档端帽的斜角上没擦到：笔画两头还是圆头";
+
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 10, .fontSize = 16, .fillStyle = 0, .elliptical = true}).has_value());
+    m_engine.beginStroke(QPoint(220, 40));
+    m_engine.moveStroke(QPoint(220, 70));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+    const auto exported = m_engine.exportImage();
+    EXPECT_EQ(exported.pixelColor(220, 50), QColor(255, 255, 255)) << "圆档这一笔连中心都没擦出来";
+    EXPECT_EQ(exported.pixelColor(248, 25), QColor(0, 0, 0)) << "圆档在圆外的斜角上也擦了：两档没差别";
 }
 
 /**

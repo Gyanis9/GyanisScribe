@@ -10,7 +10,7 @@ namespace GyanisScribe::Annotation
 {
     AnnotationToolbarBridge::AnnotationToolbarBridge(AnnotationToolbar &toolbar, IAnnotationEngine &engine, QObject *parent) : QObject(parent), m_toolbar(toolbar), m_engine(engine)
     {
-        // 起点参数整套照工具栏的初值抄一遍：十五处必须与工具栏同解，否则第一笔的样式与按钮显示的不一致
+        // 起点参数整套照工具栏的初值抄一遍：十六处必须与工具栏同解，否则第一笔的样式与按钮显示的不一致
         m_penParameters = PenParameters{.color                = toolbar.currentColor(),
                                         .lineWidth            = toolbar.currentWidth(),
                                         .fontSize             = toolbar.currentFontSize(),
@@ -18,6 +18,7 @@ namespace GyanisScribe::Annotation
                                         .lineStyle            = toolbar.currentLineStyle(),
                                         .roundedRect          = toolbar.currentRoundedRect(),
                                         .doubleHeaded         = toolbar.currentDoubleHeaded(),
+                                        .elliptical           = toolbar.currentElliptical(),
                                         .mosaicBlockSize      = toolbar.currentMosaicBlockSize(),
                                         .highlightAlpha       = toolbar.currentHighlightAlpha(),
                                         .highlightWidthFactor = toolbar.currentHighlightWidthFactor(),
@@ -77,6 +78,12 @@ namespace GyanisScribe::Annotation
                          [this](const bool enabled)
                          {
                              m_penParameters.doubleHeaded = enabled;
+                             applyPenParameters();
+                         });
+        QObject::connect(&toolbar, &AnnotationToolbar::ellipticalChanged, this,
+                         [this](const bool enabled)
+                         {
+                             m_penParameters.elliptical = enabled;
                              applyPenParameters();
                          });
         QObject::connect(&toolbar, &AnnotationToolbar::mosaicBlockSizeChanged, this,

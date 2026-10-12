@@ -536,6 +536,29 @@ TEST_F(EngineFixture, RoundedRectRestylesAndUndoesBack)
 }
 
 /**
+ * @brief 钉住椭圆档的开关能改在选中项上、撤销能退回去
+ * @details 选一条高亮，看端点外那一格：平头档到端点为止，切到椭圆档圆帽该顶出来。
+ */
+TEST_F(EngineFixture, EllipticalRestylesTheSelectionAndUndoesBack)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Highlight).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 8, .fontSize = 16, .fillStyle = 0}).has_value());
+    m_engine.beginStroke(QPoint(60, 50));
+    m_engine.moveStroke(QPoint(120, 50));
+    const auto band = m_engine.endStroke();
+    ASSERT_TRUE(band.has_value()) << band.error().message;
+
+    const auto capInked = [this] { return m_engine.exportImage().pixelColor(131, 50) != QColor(255, 255, 255); };
+    ASSERT_FALSE(capInked()) << "平头档的端点外就有墨，后面的对照没有基准";
+
+    ASSERT_TRUE(m_engine.select(*band).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 8, .fontSize = 16, .fillStyle = 0, .elliptical = true}).has_value());
+    EXPECT_TRUE(capInked()) << "选中项切成椭圆档之后端点外该有圆帽：开关没落到那条图形上";
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_FALSE(capInked()) << "撤销没把椭圆档退回平头，改开关没进撤销栈";
+}
+
+/**
  * @brief 钉住线型的换档与撤销：档记在图形自己身上，选中的那条跟着改
  * @details 白底上一条 90 长的横线：实线铺满、点线按 (1,2)×线宽 断——同一段量墨点数，
  *          改档之后读数变小、撤一步又回到满。

@@ -126,6 +126,7 @@ namespace
             std::vector<int>      lineStyles;       ///< lineStyleChanged 收到的线型档
             std::vector<int>      roundedRects;     ///< roundedRectChanged 收到的开关（1 开 0 关）
             std::vector<int>      doubleHeaded;     ///< doubleHeadedChanged 收到的开关（1 开 0 关）
+            std::vector<int>      ellipticals;      ///< ellipticalChanged 收到的开关（1 椭圆 0 矩形）
             std::vector<int>      mosaicBlockSizes; ///< mosaicBlockSizeChanged 收到的粒度
             std::vector<int>      highlightAlphas;  ///< highlightAlphaChanged 收到的透明度
             std::vector<int>      highlightWidths;  ///< highlightWidthFactorChanged 收到的加宽倍数
@@ -153,6 +154,7 @@ namespace
             QObject::connect(toolbar.get(), &AnnotationToolbar::lineStyleChanged, [&log](int style) { log.lineStyles.push_back(style); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::roundedRectChanged, [&log](bool enabled) { log.roundedRects.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::doubleHeadedChanged, [&log](bool enabled) { log.doubleHeaded.push_back(enabled ? 1 : 0); });
+            QObject::connect(toolbar.get(), &AnnotationToolbar::ellipticalChanged, [&log](bool enabled) { log.ellipticals.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::mosaicBlockSizeChanged, [&log](int blockSize) { log.mosaicBlockSizes.push_back(blockSize); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::highlightAlphaChanged, [&log](int alpha) { log.highlightAlphas.push_back(alpha); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::highlightWidthFactorChanged, [&log](int factor) { log.highlightWidths.push_back(factor); });
@@ -287,6 +289,28 @@ namespace
         EXPECT_FALSE(toolbar->currentRoundedRect());
         EXPECT_EQ(log.roundedRects, (std::vector<int>{1, 0}));
         EXPECT_EQ(button->toolTip(), QString::fromUtf8("圆角：关"));
+    }
+
+    /**
+     * @brief 钉住椭圆形状开关：保持按下态的开关，提示与信号一起走
+     */
+    TEST_F(ToolbarFixture, EllipticalTogglesAndNamesTheState)
+    {
+        SignalLog log;
+        auto      toolbar = makeToolbarLogged(log);
+        auto     *button  = buttonByLabel(*toolbar, "椭圆形状");
+        ASSERT_NE(button, nullptr) << "工具栏上找不到椭圆形状按钮";
+
+        EXPECT_FALSE(toolbar->currentElliptical()) << "起点该是矩形档";
+        button->click();
+        EXPECT_TRUE(toolbar->currentElliptical());
+        EXPECT_EQ(log.ellipticals, std::vector<int>{1}) << "开起来却没把信号发出去";
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("椭圆形状：椭圆")) << "提示没跟上";
+
+        button->click();
+        EXPECT_FALSE(toolbar->currentElliptical());
+        EXPECT_EQ(log.ellipticals, (std::vector<int>{1, 0}));
+        EXPECT_EQ(button->accessibleName(), QString::fromUtf8("椭圆形状：矩形")) << "无障碍名没跟上";
     }
 
     /**

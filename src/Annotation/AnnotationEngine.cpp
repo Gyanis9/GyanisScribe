@@ -532,6 +532,7 @@ namespace GyanisScribe::Annotation
             tool->setRoundedRect(m_penParameters.roundedRect);
             tool->setLineStyle(m_penParameters.lineStyle);
             tool->setDoubleHeaded(m_penParameters.doubleHeaded);
+            tool->setElliptical(m_penParameters.elliptical);
             tool->setMosaicBlockSize(m_penParameters.mosaicBlockSize);
             tool->setHighlightAlpha(m_penParameters.highlightAlpha);
             tool->setHighlightWidthFactor(m_penParameters.highlightWidthFactor);

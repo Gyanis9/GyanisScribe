@@ -42,7 +42,30 @@ namespace GyanisScribe::Annotation
         const QImage downscaled = region.scaled(blocksWide, blocksTall, Qt::IgnoreAspectRatio, Qt::FastTransformation);
         const QImage upscaled   = downscaled.scaled(physical.size(), Qt::IgnoreAspectRatio, Qt::FastTransformation);
 
-        painter.drawImage(shape.rect, upscaled);
+        if (!shape.elliptical)
+        {
+            painter.drawImage(shape.rect, upscaled);
+            return;
+        }
+
+        // 椭圆档：把方块图裁进内切椭圆再贴，椭圆之外一个像素都不碰。走掩膜而不是 setClipPath——
+        // 裁剪边不带抗锯齿，椭圆弧上会看见一圈台阶
+        QImage masked = upscaled.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+        QImage mask(masked.size(), QImage::Format_ARGB32_Premultiplied);
+        mask.fill(Qt::transparent);
+        {
+            QPainter maskPainter(&mask);
+            maskPainter.setRenderHint(QPainter::Antialiasing, true);
+            maskPainter.setPen(Qt::NoPen);
+            maskPainter.setBrush(Qt::black);
+            maskPainter.drawEllipse(QRectF(mask.rect()));
+        }
+        {
+            QPainter maskedPainter(&masked);
+            maskedPainter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+            maskedPainter.drawImage(0, 0, mask);
+        }
+        painter.drawImage(shape.rect, masked);
     }
 
 } // namespace GyanisScribe::Annotation
