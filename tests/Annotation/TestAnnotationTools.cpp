@@ -23,6 +23,7 @@
 
 using GyanisScribe::Annotation::AnnotationEngine;
 using GyanisScribe::Annotation::AnnotationSelection;
+using GyanisScribe::Annotation::kNumberGroupCount;
 using GyanisScribe::Annotation::NumberTool;
 using GyanisScribe::Annotation::PenParameters;
 using GyanisScribe::Annotation::PenTool;
@@ -1340,6 +1341,59 @@ TEST(NumberToolTest, NamedNextNumberRunsFromThereUntilReset)
     // 小于 1 的号夹到 1：号牌上写 0 或负数是没有意义的
     tool.setNextNumber(0);
     EXPECT_EQ(tool.nextNumber(), 1);
+}
+
+/**
+ * @brief 钉住多组计数：每一组各自连排，条数与点名都各记各的
+ */
+TEST(NumberToolTest, GroupsCountIndependently)
+{
+    NumberTool tool;
+
+    // 第 1 组两条：1、2
+    tool.begin(QPoint(0, 0));
+    const auto first = tool.end();
+    ASSERT_TRUE(first.has_value());
+    EXPECT_EQ(first->number, 1);
+    EXPECT_EQ(first->numberGroup, 1);
+    tool.insertShape(0, *first);
+    tool.begin(QPoint(5, 5));
+    const auto second = tool.end();
+    ASSERT_TRUE(second.has_value());
+    tool.insertShape(1, *second);
+
+    // 切到第 2 组：从自己的 1 开始，不受第 1 组两条的影响
+    tool.setNumberGroup(2);
+    EXPECT_EQ(tool.numberGroup(), 2);
+    EXPECT_EQ(tool.nextNumber(), 1) << "第 2 组该从自己的 1 开始";
+    tool.begin(QPoint(9, 9));
+    const auto otherGroup = tool.end();
+    ASSERT_TRUE(otherGroup.has_value());
+    EXPECT_EQ(otherGroup->number, 1);
+    EXPECT_EQ(otherGroup->numberGroup, 2);
+    tool.insertShape(2, *otherGroup);
+
+    // 切回第 1 组：接着自己的 2 走（下一个是 3），第 2 组的条数不参与
+    tool.setNumberGroup(1);
+    EXPECT_EQ(tool.nextNumber(), 3) << "切回第 1 组没接着自己的条数走";
+
+    // 点名也各记各的：第 2 组从 7 连排，第 1 组的自动计数不受牵连
+    tool.setNumberGroup(2);
+    tool.setNextNumber(7);
+    tool.begin(QPoint(13, 13));
+    const auto named = tool.end();
+    ASSERT_TRUE(named.has_value());
+    EXPECT_EQ(named->number, 7);
+    tool.insertShape(3, *named);
+    EXPECT_EQ(tool.nextNumber(), 8) << "第 2 组点名之后该接着往下走";
+    tool.setNumberGroup(1);
+    EXPECT_EQ(tool.nextNumber(), 3) << "第 2 组点名把第 1 组的号带歪了";
+
+    // 组号越界夹回两端
+    tool.setNumberGroup(9);
+    EXPECT_EQ(tool.numberGroup(), kNumberGroupCount);
+    tool.setNumberGroup(0);
+    EXPECT_EQ(tool.numberGroup(), 1);
 }
 
 /**

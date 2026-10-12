@@ -658,6 +658,23 @@ namespace GyanisScribe::Annotation
         return tool != nullptr ? static_cast<const NumberTool *>(tool)->nextNumber() : 1;
     }
 
+    Core::Expected<void> AnnotationEngine::setNumberGroup(const int group)
+    {
+        auto *tool = toolFor(ToolKind::Number);
+        if (tool == nullptr)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InternalError, GyanisScribe::Core::uiTextUtf8("序号工具不在册")});
+        }
+        static_cast<NumberTool *>(tool)->setNumberGroup(group);
+        return {};
+    }
+
+    int AnnotationEngine::numberGroup() const
+    {
+        const auto *tool = toolFor(ToolKind::Number);
+        return tool != nullptr ? static_cast<const NumberTool *>(tool)->numberGroup() : 1;
+    }
+
     std::optional<AnnotationSelection> AnnotationEngine::selectionAt(const QPoint &point) const
     {
         // 按层叠号的倒序问：最上层的那条先答，用户点的就是看得见的那一条

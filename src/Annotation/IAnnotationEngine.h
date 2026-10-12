@@ -155,13 +155,6 @@ namespace GyanisScribe::Annotation
         virtual Core::Expected<void> setPendingText(const QString &text) = 0;
 
         /**
-         * @brief 点名序号工具的下一个号
-         * @param number 下一个号，小于 1 会被夹到 1
-         * @return 成功返回空载荷；序号工具不在册时返回 InternalError
-         * @details 点名之后编号从那个号开始连排（5、6、7…），不再跟着现有条数走；
-         *          回到自动口径用 resetNumbering()。
-         */
-        /**
          * @brief 把在途的那条落定（折线双击收笔走的这一条）
          * @return 成功返回刚落定那条的位置；没有在途图形时返回 InvalidArgument
          * @details 与 endStroke() 的区别在「谁说了算」：endStroke 是松手时试落定，多步工具这时
@@ -170,18 +163,40 @@ namespace GyanisScribe::Annotation
          */
         [[nodiscard]] virtual Core::Expected<AnnotationSelection> finishPendingStroke() = 0;
 
+        /**
+         * @brief 点名序号工具当前计数组的下一个号
+         * @param number 下一个号，小于 1 会被夹到 1
+         * @return 成功返回空载荷；序号工具不在册时返回 InternalError
+         * @details 点名之后该组编号从那个号开始连排（5、6、7…），不再跟着现有条数走；
+         *          回到自动口径用 resetNumbering()。
+         */
         [[nodiscard]] virtual Core::Expected<void> setNextNumber(int number) = 0;
 
         /**
-         * @brief 序号工具回到「按现有条数 +1」的自动编号
+         * @brief 序号工具当前计数组回到「按现有条数 +1」的自动编号
          */
         virtual void resetNumbering() = 0;
 
         /**
-         * @brief 下一个序号会是多少
-         * @return 点名过的号，或现有条数 +1
+         * @brief 下一个序号会是多少（当前计数组）
+         * @return 该组点名过的号，或该组现有条数 +1
          */
         [[nodiscard]] virtual int nextNumber() const = 0;
+
+        /**
+         * @brief 切换序号工具的计数组
+         * @param group 组号，夹在 1..kNumberGroupCount
+         * @return 成功返回空载荷；序号工具不在册时返回 InternalError
+         * @details 每一组各自连排自己的号：切组之后再落牌从那一组的下一号接着走，
+         *          各组点过的名也各记各的。
+         */
+        [[nodiscard]] virtual Core::Expected<void> setNumberGroup(int group) = 0;
+
+        /**
+         * @brief 当前计数组
+         * @return 1..kNumberGroupCount
+         */
+        [[nodiscard]] virtual int numberGroup() const = 0;
 
         /**
          * @brief 改已放下那条文字图形的内容

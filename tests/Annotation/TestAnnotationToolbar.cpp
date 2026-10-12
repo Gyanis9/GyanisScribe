@@ -128,6 +128,7 @@ namespace
             std::vector<int>      doubleHeaded;     ///< doubleHeadedChanged 收到的开关（1 开 0 关）
             std::vector<int>      ellipticals;      ///< ellipticalChanged 收到的开关（1 椭圆 0 矩形）
             std::vector<int>      strokeSteps;      ///< textStrokeColorStepChanged 收到的档（0 自动、1 白、2 黑）
+            std::vector<int>      numberGroups;     ///< numberGroupChanged 收到的组号（1..3）
             std::vector<int>      mosaicBlockSizes; ///< mosaicBlockSizeChanged 收到的粒度
             std::vector<int>      highlightAlphas;  ///< highlightAlphaChanged 收到的透明度
             std::vector<int>      highlightWidths;  ///< highlightWidthFactorChanged 收到的加宽倍数
@@ -157,6 +158,7 @@ namespace
             QObject::connect(toolbar.get(), &AnnotationToolbar::doubleHeadedChanged, [&log](bool enabled) { log.doubleHeaded.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::ellipticalChanged, [&log](bool enabled) { log.ellipticals.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::textStrokeColorStepChanged, [&log](int step) { log.strokeSteps.push_back(step); });
+            QObject::connect(toolbar.get(), &AnnotationToolbar::numberGroupChanged, [&log](int group) { log.numberGroups.push_back(group); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::mosaicBlockSizeChanged, [&log](int blockSize) { log.mosaicBlockSizes.push_back(blockSize); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::highlightAlphaChanged, [&log](int alpha) { log.highlightAlphas.push_back(alpha); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::highlightWidthFactorChanged, [&log](int factor) { log.highlightWidths.push_back(factor); });
@@ -338,6 +340,31 @@ namespace
         button->click();
         EXPECT_EQ(toolbar->currentTextStrokeColorStep(), 0) << "三档之后该回到「自动」";
         EXPECT_EQ(button->accessibleName(), QString::fromUtf8("描边色：自动")) << "无障碍名没跟上当前档";
+    }
+
+    /**
+     * @brief 钉住计数组按钮的三档循环：第 1 组 → 第 2 组 → 第 3 组 → 第 1 组
+     */
+    TEST_F(ToolbarFixture, NumberGroupButtonCyclesAndNamesTheStep)
+    {
+        SignalLog log;
+        auto      toolbar = makeToolbarLogged(log);
+        auto     *button  = buttonByLabel(*toolbar, "计数组");
+        ASSERT_NE(button, nullptr) << "工具栏上找不到计数组按钮";
+
+        EXPECT_EQ(toolbar->currentNumberGroup(), 1) << "起点该是第 1 组";
+        button->click();
+        EXPECT_EQ(toolbar->currentNumberGroup(), 2);
+        EXPECT_EQ(log.numberGroups, std::vector<int>{2}) << "走了一档却没把信号发出去";
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("计数组：第 2 组")) << "提示没跟上当前档";
+
+        button->click();
+        EXPECT_EQ(toolbar->currentNumberGroup(), 3);
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("计数组：第 3 组"));
+
+        button->click();
+        EXPECT_EQ(toolbar->currentNumberGroup(), 1) << "三档之后该回到第 1 组";
+        EXPECT_EQ(button->accessibleName(), QString::fromUtf8("计数组：第 1 组")) << "无障碍名没跟上当前档";
     }
 
     /**

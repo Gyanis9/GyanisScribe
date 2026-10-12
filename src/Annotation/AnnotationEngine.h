@@ -133,6 +133,16 @@ namespace GyanisScribe::Annotation
         [[nodiscard]] int nextNumber() const override;
 
         /**
+         * @brief 切换序号工具的计数组，见 IAnnotationEngine::setNumberGroup()
+         * @param group 组号，夹在 1..kNumberGroupCount
+         * @return 成功返回空载荷；序号工具不在册时返回 InternalError
+         */
+        Core::Expected<void> setNumberGroup(int group) override;
+
+        /// 当前计数组，见 IAnnotationEngine::numberGroup()
+        [[nodiscard]] int numberGroup() const override;
+
+        /**
          * @brief 改已放下那条文字的内容，见 IAnnotationEngine::setTextOfSelection()
          * @param text 新的文字
          * @return 成功返回空载荷；四种拒法各带自己的原因（没选中、选的不是文字、文本为空、那条已不在）

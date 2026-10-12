@@ -51,6 +51,9 @@ namespace GyanisScribe::Annotation
     /// 文字描边色起点档（「自动」，与这一格出现之前同解）
     inline constexpr std::size_t kDefaultTextStrokeColorStep = 0;
 
+    /// 计数组数量：序号可以开几组各自连排的序列（第 1..3 组，工具栏按这个数循环）
+    inline constexpr int kNumberGroupCount = 3;
+
     /// 马赛克粒度起点档在阶梯里的下标（「中」）
     inline constexpr std::size_t kDefaultMosaicBlockStep = 1;
     /// 高亮透明度起点档在阶梯里的下标（「中」）
@@ -77,6 +80,7 @@ namespace GyanisScribe::Annotation
         int             lineWidth            = 3;                                            ///< 线宽，逻辑像素
         int             fontSize             = 16;                                           ///< 字号，仅文字与序号使用
         int             number               = 1;                                            ///< 序号值，仅序号工具使用
+        int             numberGroup          = 1;                                            ///< 所属计数组（1..kNumberGroupCount），各组各自连排（仅序号工具使用）
         int             fillStyle            = 0;                                            ///< 填充档：0 无、1 半透明、2 实心（仅矩形与椭圆用）
         int             lineStyle            = static_cast<int>(kDefaultLineStyleStep);      ///< 线型档：0 实线、1 虚线、2 点线（描边类工具用）
         bool            roundedRect          = false;                                        ///< 圆角矩形：四角按短边的比例切圆（仅矩形工具用）

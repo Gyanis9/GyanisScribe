@@ -263,6 +263,10 @@ namespace GyanisScribe::Annotation
         m_strokeColorButton = makeButton("StrokeColor", GyanisScribe::Core::uiText("描边色"), false);
         QObject::connect(m_strokeColorButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleTextStrokeColor);
         layout->addWidget(m_strokeColorButton);
+        // 计数组：序号工具用得上，点一下走一档（第 1 组 → 第 2 组 → 第 3 组 → 第 1 组）
+        m_numberGroupButton = makeButton("NumberGroup", GyanisScribe::Core::uiText("计数组"), false);
+        QObject::connect(m_numberGroupButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleNumberGroup);
+        layout->addWidget(m_numberGroupButton);
         m_backgroundButton = makeButton("TextBackground", GyanisScribe::Core::uiText("背景"), true);
         QObject::connect(m_backgroundButton, &QToolButton::clicked, this, [this] { setTextBackground(m_backgroundButton->isChecked()); });
         layout->addWidget(m_backgroundButton);
@@ -578,6 +582,26 @@ namespace GyanisScribe::Annotation
             m_strokeColorButton->setAccessibleName(label);
         }
         emit textStrokeColorStepChanged(m_textStrokeColorStep);
+    }
+
+    int AnnotationToolbar::currentNumberGroup() const
+    {
+        return m_numberGroup;
+    }
+
+    void AnnotationToolbar::cycleNumberGroup()
+    {
+        m_numberGroup = m_numberGroup % kNumberGroupCount + 1;
+        if (m_numberGroupButton != nullptr)
+        {
+            // 与另几档同一套口径：提示就是这一档的读数
+            const auto label = m_numberGroup == 1   ? GyanisScribe::Core::uiText("计数组：第 1 组")
+                               : m_numberGroup == 2 ? GyanisScribe::Core::uiText("计数组：第 2 组")
+                                                    : GyanisScribe::Core::uiText("计数组：第 3 组");
+            m_numberGroupButton->setToolTip(label);
+            m_numberGroupButton->setAccessibleName(label);
+        }
+        emit numberGroupChanged(m_numberGroup);
     }
 
     bool AnnotationToolbar::currentTextBackground() const

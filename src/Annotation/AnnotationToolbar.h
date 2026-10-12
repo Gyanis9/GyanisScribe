@@ -218,6 +218,12 @@ namespace GyanisScribe::Annotation
         /// 描边色走一档（自动 → 白 → 黑 → 自动），并发出 textStrokeColorStepChanged
         void cycleTextStrokeColor();
 
+        /// 当前计数组（1..kNumberGroupCount；序号工具用，新落的牌记在它上面）
+        [[nodiscard]] int currentNumberGroup() const;
+
+        /// 计数组走一档（第 1 组 → 第 2 组 → 第 3 组 → 第 1 组），并发出 numberGroupChanged
+        void cycleNumberGroup();
+
         /// 当前文字是不是反色底板
         [[nodiscard]] bool currentTextBackground() const;
 
@@ -273,6 +279,8 @@ namespace GyanisScribe::Annotation
         void textOutlineChanged(bool enabled);
         /// 用户改了文字描边色档
         void textStrokeColorStepChanged(int step);
+        /// 用户切了序号的计数组
+        void numberGroupChanged(int group);
         /// 用户开了/关了文字反色底板
         void textBackgroundChanged(bool enabled);
         /// 撤销
@@ -359,6 +367,8 @@ namespace GyanisScribe::Annotation
         QToolButton   *m_outlineButton        = nullptr;                                       ///< 文字描边开关，按下表示围一圈反色轮廓
         QToolButton   *m_strokeColorButton    = nullptr;                                       ///< 文字描边色按钮，点一下走一档
         int            m_textStrokeColorStep  = static_cast<int>(kDefaultTextStrokeColorStep); ///< 当前描边色档，值表是 kTextStrokeColor* 三档
+        QToolButton   *m_numberGroupButton    = nullptr;                                       ///< 计数组按钮，点一下走一档（序号工具用）
+        int            m_numberGroup          = 1;                                             ///< 当前计数组（1..kNumberGroupCount）
         QToolButton   *m_backgroundButton     = nullptr;                                       ///< 文字底板开关，按下表示垫一块反色圆角板
         QColor         m_currentColor;                                                         ///< 当前颜色，初值取色板第一格
         bool           m_stateIsInitial = true;                                                ///< 还在构造期：起点值不回写配置，坏值要留在文件里让人看得见

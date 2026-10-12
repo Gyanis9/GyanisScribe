@@ -781,6 +781,36 @@ TEST_F(AnnotationWindowFixture, TextStrokeColorFromToolbarReachesTheEngine)
 }
 
 /**
+ * @brief 钉住计数组从窗口接到引擎：点过按钮之后落的牌从第 2 组的 1 重新起数
+ * @details 先用第 1 组落一条（下一个号变 2），再点「计数组」：引擎的组号与下一个号
+ *          同时该换到第 2 组那一套——两处都钉住，桥断在哪一半都跑不掉。
+ */
+TEST_F(AnnotationWindowFixture, NumberGroupFromToolbarReachesTheEngine)
+{
+    auto window = makeWindow();
+
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Number).has_value());
+    engine().beginStroke(QPoint(30, 30));
+    ASSERT_TRUE(engine().endStroke().has_value());
+    EXPECT_EQ(engine().nextNumber(), 2) << "第 1 组落了一条，下一个号该是 2";
+
+    QToolButton *groupButton = nullptr;
+    for (auto *candidate: window->toolbar().findChildren<QToolButton *>())
+    {
+        if (candidate->accessibleName() == QString::fromUtf8("计数组"))
+        {
+            groupButton = candidate;
+            break;
+        }
+    }
+    ASSERT_NE(groupButton, nullptr) << "工具栏上找不到计数组按钮";
+    groupButton->click();
+
+    EXPECT_EQ(engine().numberGroup(), 2) << "按钮点下去了，引擎的计数组没跟着切：窗口到引擎这条链没接上";
+    EXPECT_EQ(engine().nextNumber(), 1) << "切到第 2 组之后下一个号该回到 1";
+}
+
+/**
  * @brief 钉住线型按钮从窗口接到引擎：点一下（实线→虚线），选中的那条断口就出来了
  * @details 画布逻辑 200×100 放进 400×200 的视图：一条逻辑 (20,50)-(180,50) 的横线；
  *          判据量与引擎级那条同一套——同一段里「有墨的列数」，改档之后变小。

@@ -204,6 +204,10 @@
             <translation>Stroke color</translation>
         </message>
         <message>
+            <source>计数组</source>
+            <translation>Counting group</translation>
+        </message>
+        <message>
             <source>背景</source>
             <translation>Background</translation>
         </message>
@@ -374,6 +378,18 @@
         <message>
             <source>描边色：自动</source>
             <translation>Stroke color: automatic</translation>
+        </message>
+        <message>
+            <source>计数组：第 1 组</source>
+            <translation>Counting group: group 1</translation>
+        </message>
+        <message>
+            <source>计数组：第 2 组</source>
+            <translation>Counting group: group 2</translation>
+        </message>
+        <message>
+            <source>计数组：第 3 组</source>
+            <translation>Counting group: group 3</translation>
         </message>
         <message>
             <source>背景：开</source>

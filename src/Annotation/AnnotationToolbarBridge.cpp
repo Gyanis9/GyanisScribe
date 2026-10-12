@@ -153,6 +153,15 @@ namespace GyanisScribe::Annotation
                              m_penParameters.textStrokeColorStep = step;
                              applyPenParameters();
                          });
+        // 计数组不是画笔样式（不进 PenParameters）：它是序号工具自己的计数状态，直接交给引擎
+        QObject::connect(&toolbar, &AnnotationToolbar::numberGroupChanged, this,
+                         [this](const int group)
+                         {
+                             if (auto applied = m_engine.setNumberGroup(group); !applied)
+                             {
+                                 Core::Logger::warning(std::format("切计数组没成：{}", applied.error().message));
+                             }
+                         });
 
         QObject::connect(&toolbar, &AnnotationToolbar::undoClicked, this,
                          [this]

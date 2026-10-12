@@ -26,29 +26,53 @@ namespace GyanisScribe::Annotation
 
     std::optional<AnnotationShape> NumberTool::end()
     {
-        // 编号取交回这一刻的条数：起笔之后又被撤销一条的话，这里跟着退一号，不会跳出两个 3
-        m_pending.number = nextNumber();
-        m_pending.text   = QString::number(m_pending.number);
-        if (m_nextNumber)
+        // 编号取交回这一刻**当前组**的条数：起笔之后又被撤销一条的话，这里跟着退一号，不会跳出两个 3
+        m_pending.number      = nextNumber();
+        m_pending.numberGroup = m_activeGroup;
+        m_pending.text        = QString::number(m_pending.number);
+        if (auto &named = m_nextNumbers[static_cast<std::size_t>(m_activeGroup - 1)]; named)
         {
-            *m_nextNumber = m_pending.number + 1;
+            *named = m_pending.number + 1;
         }
         return AnnotationTool::end();
     }
 
     void NumberTool::setNextNumber(const int number)
     {
-        m_nextNumber = std::max(1, number);
+        m_nextNumbers[static_cast<std::size_t>(m_activeGroup - 1)] = std::max(1, number);
     }
 
     void NumberTool::clearNextNumber() noexcept
     {
-        m_nextNumber.reset();
+        m_nextNumbers[static_cast<std::size_t>(m_activeGroup - 1)].reset();
     }
 
     int NumberTool::nextNumber() const noexcept
     {
-        return m_nextNumber ? *m_nextNumber : shapeCount() + 1;
+        if (const auto &named = m_nextNumbers[static_cast<std::size_t>(m_activeGroup - 1)]; named)
+        {
+            return *named;
+        }
+
+        int inGroup = 0;
+        for (int index = 0; index < shapeCount(); ++index)
+        {
+            if (shapeAt(index).numberGroup == m_activeGroup)
+            {
+                ++inGroup;
+            }
+        }
+        return inGroup + 1;
+    }
+
+    void NumberTool::setNumberGroup(const int group) noexcept
+    {
+        m_activeGroup = std::clamp(group, 1, kNumberGroupCount);
+    }
+
+    int NumberTool::numberGroup() const noexcept
+    {
+        return m_activeGroup;
     }
 
     bool NumberTool::shapeIsUsable(const AnnotationShape &shape) const

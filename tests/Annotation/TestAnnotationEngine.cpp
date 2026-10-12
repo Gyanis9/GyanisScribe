@@ -684,6 +684,27 @@ namespace
         EXPECT_EQ(m_engine.nextNumber(), 2) << "回到自动口径该按现有条数 +1（已经落了一条）";
     }
 
+    /**
+     * @brief 钉住计数组穿过引擎：切到第 2 组后下一个号回到 1，第 1 组的进度不受影响
+     */
+    TEST_F(EngineFixture, NumberGroupsGoThroughTheEngine)
+    {
+        ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Number).has_value());
+        m_engine.beginStroke(QPoint(30, 30));
+        ASSERT_TRUE(m_engine.endStroke().has_value());
+        EXPECT_EQ(m_engine.nextNumber(), 2) << "第 1 组落了一条，下一个号该是 2";
+
+        ASSERT_TRUE(m_engine.setNumberGroup(2).has_value());
+        EXPECT_EQ(m_engine.numberGroup(), 2);
+        EXPECT_EQ(m_engine.nextNumber(), 1) << "第 2 组该从自己的 1 开始";
+        m_engine.beginStroke(QPoint(40, 40));
+        ASSERT_TRUE(m_engine.endStroke().has_value());
+        EXPECT_EQ(m_engine.nextNumber(), 2);
+
+        ASSERT_TRUE(m_engine.setNumberGroup(1).has_value());
+        EXPECT_EQ(m_engine.nextNumber(), 2) << "切回第 1 组该接着自己的进度走（下一条仍是 2；按总条数算会读出 3）";
+    }
+
 } // namespace
 
 /**
