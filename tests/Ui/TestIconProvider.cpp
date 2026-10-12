@@ -10,11 +10,14 @@
 #include <QPushButton>
 #include <QImage>
 #include <QPixmap>
+#include <QRegularExpression>
 #include <QString>
 #include <QStringList>
 #include <QSize>
 
 #include <array>
+#include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <initializer_list>
 #include <memory>
@@ -358,4 +361,199 @@ TEST_F(IconProviderFixture, AppliedIconsReResolveAfterTheTintChanges)
     EXPECT_TRUE(containsColor(applied.icon().pixmap(16), QColor(20, 20, 20))) << "走过 applyIcon 的按钮换主题后仍是旧描边色";
     EXPECT_FALSE(containsColor(applied.icon().pixmap(16), QColor(0, 200, 0))) << "旧描边色还留在图标里";
     EXPECT_TRUE(containsColor(handPainted.icon().pixmap(16), QColor(0, 200, 0))) << "没走 applyIcon 的按钮被 refreshIcons 改了：自绘的图标会被覆盖";
+}
+
+/**
+ * @brief 钉住全部图标只用一个线宽档、且颜色只走主题注入
+ * @details 设计规格把描边收在唯一的 1.5 档：多出来的粗细会让同一排按钮看上去不是一家人。
+ *          颜色只允许 none / currentColor——写死的色值绕开了 IconProvider 的主题注入，换主题时会留在旧色上。
+ *          与 BundledSourcesFollowTheSvgContract 分工：那条查「1.5 这个档位还在不在」，
+ *          这条查「有没有第二档或写死的色混进来」。
+ */
+TEST_F(IconProviderFixture, BundledSourcesKeepOneStrokeWidthAndThemeColorsOnly)
+{
+    const QRegularExpression widthPattern{QStringLiteral(R"re(stroke-width="([^"]+)")re")};
+    const QRegularExpression fillPattern{QStringLiteral(R"re(fill="([^"]+)")re")};
+
+    for (const auto &name: provider().availableIconNames())
+    {
+        const auto source = readIconSource(name.toStdString());
+        ASSERT_FALSE(source.isEmpty()) << name.toStdString() << " 的资源是空的";
+
+        auto widths = widthPattern.globalMatch(source);
+        ASSERT_TRUE(widths.hasNext()) << name.toStdString() << " 没有声明线宽";
+        while (widths.hasNext())
+        {
+            EXPECT_EQ(widths.next().captured(1), QStringLiteral("1.5")) << name.toStdString() << " 上混进了第二档线宽";
+        }
+
+        auto fills = fillPattern.globalMatch(source);
+        while (fills.hasNext())
+        {
+            const auto value = fills.next().captured(1);
+            EXPECT_TRUE(value == QStringLiteral("none") || value == QStringLiteral("currentColor")) << name.toStdString() << " 出现了写死的填充色：" << value.toStdString();
+        }
+
+        EXPECT_EQ(source.indexOf(QLatin1Char('#')), -1) << name.toStdString() << " 里出现了十六进制颜色，绕过了主题注入";
+    }
+}
+
+/**
+ * @brief 钉住每枚图标在每个缩放比上的墨迹都压在安全区里
+ * @details 两个关注点共用这一圈判据：
+ *          其一，24 网格两侧各留两格的呼吸感是这套图标「不挤」的来源，贴边或出框的图形与别处并排就显脏；
+ *          其二，高 DPI 副本曾经整片画歪过——不带边界的 render() 把 viewBox 按物理像素铺满画家视口，
+ *          画家再乘一次缩放比，画出来是两倍大且右下半被裁——那种错的墨迹正好全落在外圈上。
+ *          判据按 24 逻辑 ×2 / ×3 渲染，外圈 3 像素对应逻辑 1.5；
+ *          这一圈里出现任何墨迹，都说明坐标越过了规格的内容界 2..22（含 0.75 描边外缘），或渲染口径又错了。
+ */
+TEST_F(IconProviderFixture, BundledIconsStayInsideTheSafeZoneAtEveryDevicePixelRatio)
+{
+    constexpr int kRing = 3; ///< 外圈像素数，对应逻辑 1.5
+
+    for (const auto ratio: {2.0, 3.0})
+    {
+        const auto edge = static_cast<int>(IconSize::Large) * static_cast<int>(ratio);
+        for (const auto &name: provider().availableIconNames())
+        {
+            const auto bitmap = provider().pixmap(name.toStdString(), IconSize::Large, ratio);
+            ASSERT_FALSE(bitmap.isNull()) << name.toStdString() << " 画不出位图";
+            const auto image = bitmap.toImage().convertToFormat(QImage::Format_ARGB32);
+            ASSERT_EQ(image.size(), QSize(edge, edge));
+
+            auto paintedInRing = 0;
+            for (int y = 0; y < edge; ++y)
+            {
+                const auto *line = reinterpret_cast<const QRgb *>(image.constScanLine(y));
+                for (int x = 0; x < edge; ++x)
+                {
+                    const auto inRing = x < kRing || y < kRing || x >= edge - kRing || y >= edge - kRing;
+                    if (inRing && qAlpha(line[x]) != 0)
+                    {
+                        ++paintedInRing;
+                    }
+                }
+            }
+            EXPECT_EQ(paintedInRing, 0) << name.toStdString() << " 在 " << ratio << " 倍缩放下有墨迹落进了外圈 3 像素：内容出界、贴边或渲染口径错了";
+        }
+    }
+}
+
+/**
+ * @brief 钉住每枚图标的墨迹坐落在光学中心附近
+ * @details 偏心的图形在按钮里会有「没对齐」的观感，肉眼说不清但一排排摆过去就是歪的。
+ *          判据：48 像素位图上墨迹外接框的中心与几何中心相差不超过 4 像素（逻辑 2 格为限），
+ *          留这个宽度是给手指、铅笔这类天生有方向的图形留的余地——它们的小尾巴允许偏一点，但不许偏一圈。
+ */
+TEST_F(IconProviderFixture, BundledIconsSitNearTheOpticalCenter)
+{
+    constexpr int    kEdge      = 48;
+    constexpr double kTolerance = 4.0;
+
+    for (const auto &name: provider().availableIconNames())
+    {
+        const auto bitmap = provider().pixmap(name.toStdString(), IconSize::Large, 2.0);
+        ASSERT_FALSE(bitmap.isNull()) << name.toStdString() << " 画不出位图";
+        const auto image = bitmap.toImage().convertToFormat(QImage::Format_ARGB32);
+
+        int minimumX = kEdge;
+        int minimumY = kEdge;
+        int maximumX = -1;
+        int maximumY = -1;
+        for (int y = 0; y < kEdge; ++y)
+        {
+            const auto *line = reinterpret_cast<const QRgb *>(image.constScanLine(y));
+            for (int x = 0; x < kEdge; ++x)
+            {
+                if (qAlpha(line[x]) == 0)
+                {
+                    continue;
+                }
+                minimumX = std::min(minimumX, x);
+                maximumX = std::max(maximumX, x);
+                minimumY = std::min(minimumY, y);
+                maximumY = std::max(maximumY, y);
+            }
+        }
+
+        ASSERT_GE(maximumX, 0) << name.toStdString() << " 画出来是全透明";
+        const auto centerX = (minimumX + maximumX) / 2.0;
+        const auto centerY = (minimumY + maximumY) / 2.0;
+        EXPECT_LE(std::abs(centerX - (kEdge - 1) / 2.0), kTolerance) << name.toStdString() << " 的墨迹横向偏心";
+        EXPECT_LE(std::abs(centerY - (kEdge - 1) / 2.0), kTolerance) << name.toStdString() << " 的墨迹纵向偏心";
+    }
+}
+
+/**
+ * @brief 钉住高 DPI 副本里图形不被缩小
+ * @details 渲染口径的另一种坏法：边界给错时图形会整只缩进一角——这种坏法既不越安全区也不偏心，
+ *          前面两条判据都看不见（缩小的图形本来就在安全区里，还居着中）。
+ *          判据取墨迹外接框的长边：48 像素图上至少要占 22 像素（逻辑 11 格）——
+ *          全套图标的长边都远在这之上，缩水到一半当场变红。
+ */
+TEST_F(IconProviderFixture, HighDpiVariantsKeepTheGlyphAtFullSize)
+{
+    constexpr int kEdge            = 48;
+    constexpr int kMinimumLongSide = 22;
+
+    for (const auto &name: provider().availableIconNames())
+    {
+        const auto bitmap = provider().pixmap(name.toStdString(), IconSize::Large, 2.0);
+        ASSERT_FALSE(bitmap.isNull()) << name.toStdString() << " 画不出位图";
+        const auto image = bitmap.toImage().convertToFormat(QImage::Format_ARGB32);
+
+        int minimumX = kEdge;
+        int minimumY = kEdge;
+        int maximumX = -1;
+        int maximumY = -1;
+        for (int y = 0; y < kEdge; ++y)
+        {
+            const auto *line = reinterpret_cast<const QRgb *>(image.constScanLine(y));
+            for (int x = 0; x < kEdge; ++x)
+            {
+                if (qAlpha(line[x]) == 0)
+                {
+                    continue;
+                }
+                minimumX = std::min(minimumX, x);
+                maximumX = std::max(maximumX, x);
+                minimumY = std::min(minimumY, y);
+                maximumY = std::max(maximumY, y);
+            }
+        }
+
+        ASSERT_GE(maximumX, 0) << name.toStdString() << " 画出来是全透明";
+        const auto longerSide = std::max(maximumX - minimumX + 1, maximumY - minimumY + 1);
+        EXPECT_GE(longerSide, kMinimumLongSide) << name.toStdString() << " 的高 DPI 副本里图形缩水了";
+    }
+}
+
+/**
+ * @brief 钉住同族图标共用同一份外框几何
+ * @details 截图族与录屏族是同两句话（全屏 / 选区 / 上次选区 / 窗口），外框必须逐字一致：
+ *          分头画是这条路最容易发生的劣化——改了一处忘了另一处，两枚图标看上去是两家出的。
+ *          判据比对的就是外框那一行的字面量，改家族就得改一处。
+ */
+TEST_F(IconProviderFixture, CaptureAndRecordFamiliesShareFrameGeometry)
+{
+    const auto dashedFrame = QStringLiteral(R"(<rect x="3" y="3" width="18" height="18" rx="3" stroke-dasharray="3 3"/>)");
+    for (const auto name: {"CaptureRegion", "CaptureLastRegion", "RecordRegion", "OcrRegion"})
+    {
+        EXPECT_NE(readIconSource(name).indexOf(dashedFrame), -1) << name << " 的虚线选区框不是家族那一份";
+    }
+
+    const auto windowFrame = QStringLiteral(R"(<rect x="3" y="4" width="18" height="16" rx="3"/>)");
+    const auto titleBar    = QStringLiteral(R"(<path d="M3 8h18"/>)");
+    for (const auto name: {"CaptureWindow", "RecordWindow"})
+    {
+        const auto source = readIconSource(name);
+        EXPECT_NE(source.indexOf(windowFrame), -1) << name << " 的窗口外框不是家族那一份";
+        EXPECT_NE(source.indexOf(titleBar), -1) << name << " 的标题栏线不是家族那一份";
+    }
+
+    const auto cornerBracket = QStringLiteral(R"(M3 8V5A2 2 0 0 1 5 3H8)");
+    for (const auto name: {"CaptureFullScreen", "RecordFullScreen"})
+    {
+        EXPECT_NE(readIconSource(name).indexOf(cornerBracket), -1) << name << " 的角括号不是家族那一份";
+    }
 }

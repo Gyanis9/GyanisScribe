@@ -12,6 +12,7 @@
 #include <QAbstractButton>
 #include <QPalette>
 #include <QPainter>
+#include <QRectF>
 #include <QSvgRenderer>
 
 #include <algorithm>
@@ -152,7 +153,11 @@ namespace GyanisScribe::Ui
 
         QPainter painter(&bitmap);
         painter.setRenderHint(QPainter::Antialiasing);
-        renderer.render(&painter);
+        // 边界必须显式给逻辑尺寸：不带边界的 render() 把 viewBox 铺到画家的视口矩形上，
+        // 而那一步按物理像素计，画家随后又按位图的缩放比放大一次——dpr=2 时实测图形两倍大、
+        // 右下半整片裁掉（HIGH DPI 副本渲成 PNG 一眼可见）。传 24 逻辑格的边界，
+        // 缩放只剩位图自己这一道，两个缩放比上的输出都完整。
+        renderer.render(&painter, QRectF{0.0, 0.0, static_cast<qreal>(size), static_cast<qreal>(size)});
         m_pixmapCache.insert(key, bitmap);
         return bitmap;
     }

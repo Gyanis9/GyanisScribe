@@ -138,5 +138,16 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
   `:focus` 焦点圈（主色描边）体现，`QPushButton:default` 给主操作单独配色。
 - 焦点可见性是硬要求：`:focus` 规则在三份 QSS 里都在；高对比度档把边框加粗到 2px，
   这条由 `ThemeManagerFixture` 在样式表文本里核（`2PX SOLID`）。
-- 图标全部原创 SVG（24 视框、`currentColor`、1.5/2 描边），描边色由 `IconProvider` 按主题注入；
-  用例 `IconProviderFixture` 数的是真的画出来的像素，不是文件名。
+- 图标全部原创 SVG（24 视框、`currentColor` 描边），描边色由 `IconProvider` 按主题注入；
+  用例 `IconProviderFixture` 数的是真的画出来的像素，不是文件名。整套图的画法规格（2026-10-12 全量重绘后）：
+  - 网格与安全区：24 视框，内容（含 0.75 描边外缘）压在 **2..22**；直线优先落在整数或 0.5 格点上，
+    墨迹外接框中心与几何中心相差不超过 2 格。判据 `BundledIconsStayInsideTheSafeZoneAtEveryDevicePixelRatio`
+    与 `BundledIconsSitNearTheOpticalCenter`。
+  - 线宽收在 **1.5 一档**（需求允许 1.5/2，本套统一到 1.5 并拒绝第二档混入）；填充点缀只允许
+    `fill="currentColor" stroke="none"`，源码里不许出现写死的色值。判据
+    `BundledSourcesKeepOneStrokeWidthAndThemeColorsOnly`。
+  - 族内共用外框：截图族与录屏族的虚线选区、窗口外框、四角括号是同几行字面量逐字一致——
+    改家族只改一处。判据 `CaptureAndRecordFamiliesShareFrameGeometry`。
+  - 高 DPI 渲染必须显式给逻辑边界：`render(painter, QRectF{0,0,size,size})`。不带边界的 `render()`
+    会把 viewBox 按物理像素铺满画家视口、再叠一次位图缩放比，dpr=2 实测画成两倍大且右下半被裁
+    （修复同批，判据把 2×/3× 两档都钉住）。
