@@ -127,6 +127,8 @@ namespace
             std::vector<int>      mosaicBlockSizes; ///< mosaicBlockSizeChanged 收到的粒度
             std::vector<int>      highlightAlphas;  ///< highlightAlphaChanged 收到的透明度
             std::vector<int>      highlightWidths;  ///< highlightWidthFactorChanged 收到的加宽倍数
+            std::vector<int>      arrowHeadStyles;  ///< arrowHeadStyleChanged 收到的款式（0 实心、1 空心、2 开口）
+            std::vector<double>   arrowHeadScales;  ///< arrowHeadScaleChanged 收到的大小倍数
             std::vector<QString>  fontFamilies;     ///< fontFamilyChanged 收到的字体族
             std::vector<int>      textBolds;        ///< textBoldChanged 收到的开关（1 开 0 关）
             std::vector<int>      textItalics;      ///< textItalicChanged 收到的开关（1 开 0 关）
@@ -150,6 +152,8 @@ namespace
             QObject::connect(toolbar.get(), &AnnotationToolbar::mosaicBlockSizeChanged, [&log](int blockSize) { log.mosaicBlockSizes.push_back(blockSize); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::highlightAlphaChanged, [&log](int alpha) { log.highlightAlphas.push_back(alpha); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::highlightWidthFactorChanged, [&log](int factor) { log.highlightWidths.push_back(factor); });
+            QObject::connect(toolbar.get(), &AnnotationToolbar::arrowHeadStyleChanged, [&log](int style) { log.arrowHeadStyles.push_back(style); });
+            QObject::connect(toolbar.get(), &AnnotationToolbar::arrowHeadScaleChanged, [&log](double scale) { log.arrowHeadScales.push_back(scale); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::fontFamilyChanged, [&log](const QString &family) { log.fontFamilies.push_back(family); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::textBoldChanged, [&log](bool enabled) { log.textBolds.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::textItalicChanged, [&log](bool enabled) { log.textItalics.push_back(enabled ? 1 : 0); });
@@ -305,6 +309,56 @@ namespace
         button->click();
         EXPECT_EQ(toolbar->currentHighlightWidthFactor(), 4) << "三档之后该回到「中」";
         EXPECT_EQ(button->accessibleName(), QString::fromUtf8("高亮加宽：中")) << "无障碍名没跟上当前档";
+    }
+
+    /**
+     * @brief 钉住箭头款式按钮的三档循环：起点「实心」（与旧写法同解），信号与提示一起走
+     */
+    TEST_F(ToolbarFixture, ArrowHeadStyleButtonCyclesAndNamesTheStep)
+    {
+        SignalLog log;
+        auto      toolbar = makeToolbarLogged(log);
+        auto     *button  = buttonByLabel(*toolbar, "箭头样式");
+        ASSERT_NE(button, nullptr) << "工具栏上找不到箭头样式按钮";
+
+        EXPECT_EQ(toolbar->currentArrowHeadStyle(), 0) << "起点该是「实心」：这一格出现之前只有这一档";
+        button->click();
+        EXPECT_EQ(toolbar->currentArrowHeadStyle(), 1);
+        EXPECT_EQ(log.arrowHeadStyles, std::vector<int>{1}) << "走了一档却没把信号发出去";
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("箭头样式：空心")) << "提示没跟上当前档";
+
+        button->click();
+        EXPECT_EQ(toolbar->currentArrowHeadStyle(), 2);
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("箭头样式：开口"));
+
+        button->click();
+        EXPECT_EQ(toolbar->currentArrowHeadStyle(), 0) << "三档之后该回到「实心」";
+        EXPECT_EQ(button->accessibleName(), QString::fromUtf8("箭头样式：实心")) << "无障碍名没跟上当前档";
+    }
+
+    /**
+     * @brief 钉住箭头大小按钮的三档循环：起点「中」=3.5（与旧写死值同解），信号与提示一起走
+     */
+    TEST_F(ToolbarFixture, ArrowHeadScaleButtonCyclesAndNamesTheStep)
+    {
+        SignalLog log;
+        auto      toolbar = makeToolbarLogged(log);
+        auto     *button  = buttonByLabel(*toolbar, "箭头大小");
+        ASSERT_NE(button, nullptr) << "工具栏上找不到箭头大小按钮";
+
+        EXPECT_EQ(toolbar->currentArrowHeadScale(), 3.5) << "起点该是「中」3.5：与这一格出现之前的写死值同解，老图样不受影响";
+        button->click();
+        EXPECT_EQ(toolbar->currentArrowHeadScale(), 5.0);
+        EXPECT_EQ(log.arrowHeadScales, std::vector<double>{5.0}) << "走了一档却没把信号发出去";
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("箭头大小：大")) << "提示没跟上当前档";
+
+        button->click();
+        EXPECT_EQ(toolbar->currentArrowHeadScale(), 2.5);
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("箭头大小：小"));
+
+        button->click();
+        EXPECT_EQ(toolbar->currentArrowHeadScale(), 3.5) << "三档之后该回到「中」";
+        EXPECT_EQ(button->accessibleName(), QString::fromUtf8("箭头大小：中")) << "无障碍名没跟上当前档";
     }
 
     /**

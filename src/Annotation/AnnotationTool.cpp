@@ -56,6 +56,8 @@ namespace GyanisScribe::Annotation
         m_pending.mosaicBlockSize      = m_mosaicBlockSize;
         m_pending.highlightAlpha       = m_highlightAlpha;
         m_pending.highlightWidthFactor = m_highlightWidthFactor;
+        m_pending.arrowHeadStyle       = m_arrowHeadStyle;
+        m_pending.arrowHeadScale       = m_arrowHeadScale;
         m_pending.fontFamily           = m_fontFamily;
         m_pending.textBold             = m_textBold;
         m_pending.textItalic           = m_textItalic;
@@ -151,6 +153,8 @@ namespace GyanisScribe::Annotation
         shape.mosaicBlockSize      = parameters.mosaicBlockSize;
         shape.highlightAlpha       = parameters.highlightAlpha;
         shape.highlightWidthFactor = parameters.highlightWidthFactor;
+        shape.arrowHeadStyle       = parameters.arrowHeadStyle;
+        shape.arrowHeadScale       = parameters.arrowHeadScale;
         shape.fontFamily           = parameters.fontFamily;
         shape.textBold             = parameters.textBold;
         shape.textItalic           = parameters.textItalic;
@@ -363,6 +367,18 @@ namespace GyanisScribe::Annotation
     {
         // 倍数取正：0 或负数画出来是一条不存在的带，命中测试也会跟着失效
         m_highlightWidthFactor = std::clamp(factor, 1, 16);
+    }
+
+    void AnnotationTool::setArrowHeadStyle(const int style) noexcept
+    {
+        // 越界按最近的一档夹取：样式是三档里的一档，留一个界外的值只会画不出东西
+        m_arrowHeadStyle = std::clamp(style, kArrowHeadFilled, kArrowHeadStyleCount - 1);
+    }
+
+    void AnnotationTool::setArrowHeadScale(const qreal scale) noexcept
+    {
+        // 倍数取正且给个上限：0 画不出头，太大在短箭头上会被半程夹掉、只剩一个糊块
+        m_arrowHeadScale = std::clamp(scale, 1.0, 10.0);
     }
 
     void AnnotationTool::setFontFamily(const QString &family)

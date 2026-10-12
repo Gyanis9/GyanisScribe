@@ -325,6 +325,20 @@ namespace GyanisScribe::Annotation
         void setHighlightWidthFactor(int factor) noexcept;
 
         /**
+         * @brief 设箭头头部款式
+         * @param style 0 实心、1 空心、2 开口两翼；越界按最近的一档夹取
+         * @details 只有箭头工具用得上；款式随新画的箭头带走，选中的那条改款式走改样式命令。
+         */
+        void setArrowHeadStyle(int style) noexcept;
+
+        /**
+         * @brief 设箭头头部大小
+         * @param scale 头长相对线宽的倍数，取值夹在 1 到 10 之间
+         * @details 只有箭头工具用得上；大小随新画的箭头带走，选中的那条改大小走改样式命令。
+         */
+        void setArrowHeadScale(qreal scale) noexcept;
+
+        /**
          * @brief 设文字字体族
          * @param family 家族名；空串表示跟随应用默认字体
          * @details 只有文字工具用得上；画字与量字共用 TextFont.h 那一处拼装，选中框不会与字形错开。
@@ -407,6 +421,8 @@ namespace GyanisScribe::Annotation
         int             m_mosaicBlockSize      = kMosaicBlockSizes[kDefaultMosaicBlockStep];         ///< 默认马赛克粒度（仅马赛克工具用）
         int             m_highlightAlpha       = kHighlightAlphas[kDefaultHighlightAlphaStep];       ///< 默认高亮透明度（仅高亮工具用）
         int             m_highlightWidthFactor = kHighlightWidthFactors[kDefaultHighlightWidthStep]; ///< 默认高亮加宽倍数（仅高亮工具用）
+        int             m_arrowHeadStyle       = kArrowHeadFilled;                                   ///< 默认箭头头部款式（仅箭头工具用）
+        qreal           m_arrowHeadScale       = kArrowHeadScales[kDefaultArrowHeadScaleStep];       ///< 默认箭头头部大小：头长相对线宽的倍数（仅箭头工具用）
         QString         m_fontFamily;                                                                ///< 默认文字字体族，空串=跟随应用默认（仅文字工具用）
         bool            m_textBold       = false;                                                    ///< 默认文字粗体（仅文字工具用）
         bool            m_textItalic     = false;                                                    ///< 默认文字斜体（仅文字工具用）

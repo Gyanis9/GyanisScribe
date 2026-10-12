@@ -27,6 +27,14 @@ namespace GyanisScribe::Annotation
     inline constexpr std::array<int, 3> kHighlightAlphas{60, 110, 170};
     /// 高亮加宽阶梯：高亮的实际粗细 = 线宽乘这个倍数；一支笔要能盖住一行字，倍数是这个差别的全部来源
     inline constexpr std::array<int, 3> kHighlightWidthFactors{2, 4, 8};
+    /// 箭头头部大小阶梯：头长 = 线宽乘这个倍数；同一条杆上头能有多大，全看这一档
+    inline constexpr std::array<qreal, 3> kArrowHeadScales{2.5, 3.5, 5.0};
+
+    /// 箭头头部款式：0 实心三角、1 空心三角（只有一圈描边，里头透底）、2 开口两翼（只有两条边线，无底边）
+    inline constexpr int kArrowHeadFilled     = 0;
+    inline constexpr int kArrowHeadHollow     = 1;
+    inline constexpr int kArrowHeadOpenWings  = 2;
+    inline constexpr int kArrowHeadStyleCount = 3;
 
     /// 马赛克粒度起点档在阶梯里的下标（「中」）
     inline constexpr std::size_t kDefaultMosaicBlockStep = 1;
@@ -34,6 +42,8 @@ namespace GyanisScribe::Annotation
     inline constexpr std::size_t kDefaultHighlightAlphaStep = 1;
     /// 高亮加宽起点档在阶梯里的下标（「中」=4，与这一格出现之前的写死值同解，老图样不受影响）
     inline constexpr std::size_t kDefaultHighlightWidthStep = 1;
+    /// 箭头头部大小起点档在阶梯里的下标（「中」=3.5，与这一格出现之前的写死值同解，老图样不受影响）
+    inline constexpr std::size_t kDefaultArrowHeadScaleStep = 1;
 
     /**
      * @brief 一条图形
@@ -57,6 +67,8 @@ namespace GyanisScribe::Annotation
         int             mosaicBlockSize      = kMosaicBlockSizes[kDefaultMosaicBlockStep];         ///< 马赛克方块边长，逻辑像素（仅马赛克工具用），默认为阶梯里的「中」档
         int             highlightAlpha       = kHighlightAlphas[kDefaultHighlightAlphaStep];       ///< 高亮透明度，0-255（仅高亮工具用），默认为阶梯里的「中」档
         int             highlightWidthFactor = kHighlightWidthFactors[kDefaultHighlightWidthStep]; ///< 高亮相对线宽的加宽倍数（仅高亮工具用），默认为阶梯里的「中」档
+        int             arrowHeadStyle       = kArrowHeadFilled;                                   ///< 箭头头部款式：0 实心、1 空心、2 开口两翼（仅箭头工具用）
+        qreal           arrowHeadScale       = kArrowHeadScales[kDefaultArrowHeadScaleStep];       ///< 箭头头部大小：头长相对线宽的倍数（仅箭头工具用），默认为阶梯里的「中」档
         QString         fontFamily;                                                                ///< 字体族，空串=跟随应用默认字体（仅文字工具用）
         bool            textBold       = false;                                                    ///< 粗体（仅文字工具用）
         bool            textItalic     = false;                                                    ///< 斜体（仅文字工具用）

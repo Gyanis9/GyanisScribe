@@ -533,6 +533,8 @@ namespace GyanisScribe::Annotation
             tool->setMosaicBlockSize(m_penParameters.mosaicBlockSize);
             tool->setHighlightAlpha(m_penParameters.highlightAlpha);
             tool->setHighlightWidthFactor(m_penParameters.highlightWidthFactor);
+            tool->setArrowHeadStyle(m_penParameters.arrowHeadStyle);
+            tool->setArrowHeadScale(m_penParameters.arrowHeadScale);
             tool->setFontFamily(m_penParameters.fontFamily);
             tool->setTextBold(m_penParameters.textBold);
             tool->setTextItalic(m_penParameters.textItalic);

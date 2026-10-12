@@ -121,7 +121,7 @@ namespace GyanisScribe::Annotation
         // 工具栏是自己的一层浮窗：它要摆在窗口外面，所以不能进上面的布局
         m_toolbar->setParent(this, Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
 
-        // 工具栏与引擎的接线全在桥里：十三项样式参数、工具切换、撤销重做与按钮态回灌一处接齐。
+        // 工具栏与引擎的接线全在桥里：十五项样式参数、工具切换、撤销重做与按钮态回灌一处接齐。
         // 贴图上直接标注那一处共用同一个桥，将来加新参数不会出现「这边接了那边漏了」
         m_toolbarBridge = std::make_unique<AnnotationToolbarBridge>(*m_toolbar, engine, this);
 

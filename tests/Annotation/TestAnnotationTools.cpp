@@ -930,6 +930,90 @@ TEST_F(AnnotationFixture, TextPlotsEveryLineAndTheBoxCoversThem)
 }
 
 /**
+ * @brief 钉住箭头头部三档款式的差别：实心有芯、空心透底、开口没有底边
+ * @details 同一根箭头画三遍（白底、线宽 6、头长 3.5×6=21、张角 60°），两个探点把三档两两分开：
+ *          轴线上离尖 12 像素那点——实心是芯（有墨）、空心是空的（透白）、开口是杆（有墨）；
+ *          离尖 18、离轴 5 那点——实心与空心都有墨（前者是芯、后者正压在底边的笔画上），
+ *          开口没有底边、又离杆与两翼的笔画各两像素以上，就是白的。
+ *          两个读数合起来三档的取值组合两两不同：实心（墨，墨）、空心（白，墨）、开口（墨，白）。
+ */
+TEST_F(AnnotationFixture, ArrowHeadStylesDivideFilledHollowAndOpenWings)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Arrow).has_value());
+
+    const auto drawArrowOfStyle = [this](const int style, const int y)
+    {
+        ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 6, .fontSize = 16, .fillStyle = 0, .arrowHeadStyle = style}).has_value());
+        m_engine.beginStroke(QPoint(40, y));
+        m_engine.moveStroke(QPoint(160, y));
+        const auto committed = m_engine.endStroke();
+        ASSERT_TRUE(committed.has_value()) << committed.error().message;
+    };
+
+    // 三档各画一条，错开 y；探点固定在同一列（尖在 x=160）
+    drawArrowOfStyle(0, 25); // 实心
+    drawArrowOfStyle(1, 55); // 空心
+    drawArrowOfStyle(2, 85); // 开口
+
+    const QImage drawn = m_engine.exportImage();
+    const auto   inked = [&drawn](const int x, const int y) { return drawn.pixelColor(x, y) != QColor(255, 255, 255); };
+
+    EXPECT_TRUE(inked(148, 25)) << "实心的头里没有芯";
+    EXPECT_FALSE(inked(148, 55)) << "空心的头里还填着色（或两翼收得太窄把中间盖住了）";
+    EXPECT_TRUE(inked(148, 85)) << "开口档在轴线上没有墨：杆没伸到尖上，或两翼没画出来";
+
+    EXPECT_TRUE(inked(142, 30)) << "实心的底边一带没有墨";
+    EXPECT_TRUE(inked(142, 60)) << "空心的底边笔画没画出来——空心不是「只有两翼」，底边也要在";
+    EXPECT_FALSE(inked(142, 90)) << "开口档画出了底边：那是空心不是开口";
+
+    // 开口档的两翼另点名一次：离尖 12、离轴 6.9（=12×tan30°）正落在翼上
+    EXPECT_TRUE(inked(148, 85 + 7)) << "开口档少了一翼";
+    EXPECT_TRUE(inked(148, 85 - 7)) << "开口档少了一翼";
+}
+
+/**
+ * @brief 钉住箭头头部大小三档：头长随档位伸缩，杆与头是同一个倍数的产物
+ * @details 同线宽（6）同款式（实心）画两条，只差大小档：小档头长 15（纵深 13）、大档头长 30（纵深 26）。
+ *          在离尖 22 像素处纵切——小档那一条只剩杆（线宽 6，约 6-8 格），大档那一条连头的芯一起切到
+ *          （半宽 22×tan30°≈12.7，约 25 格）。两个绝对值都随机器略有抖动，判的是「大档明显更宽」。
+ */
+TEST_F(AnnotationFixture, ArrowHeadScaleStretchesTheHead)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Arrow).has_value());
+
+    const auto drawArrowOfScale = [this](const double scale, const int y)
+    {
+        ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 6, .fontSize = 16, .fillStyle = 0, .arrowHeadScale = scale}).has_value());
+        m_engine.beginStroke(QPoint(40, y));
+        m_engine.moveStroke(QPoint(160, y));
+        const auto committed = m_engine.endStroke();
+        ASSERT_TRUE(committed.has_value()) << committed.error().message;
+    };
+
+    drawArrowOfScale(2.5, 30); // 小
+    drawArrowOfScale(5.0, 70); // 大
+
+    const QImage drawn           = m_engine.exportImage();
+    const auto   inkRowsInColumn = [&drawn](const int x, const int yCenter)
+    {
+        int rows = 0;
+        for (int y = yCenter - 20; y <= yCenter + 20; ++y)
+        {
+            if (drawn.pixelColor(x, y) != QColor(255, 255, 255))
+            {
+                ++rows;
+            }
+        }
+        return rows;
+    };
+
+    const int smallRows = inkRowsInColumn(138, 30);
+    const int bigRows   = inkRowsInColumn(138, 70);
+    EXPECT_GT(smallRows, 0) << "小档那一条在离尖 22 处连杆都没切到，后面的对照没有基准";
+    EXPECT_GT(bigRows, smallRows * 2) << "大档的头没有明显更长：大小档没落在这个倍数上";
+}
+
+/**
  * @brief 钉住序号取号的位置：按当时的条数 +1，撤销一条后接着那个号走
  */
 TEST(NumberToolTest, LabelFollowsTheCurrentShapeCount)

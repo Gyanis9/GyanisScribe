@@ -26,9 +26,11 @@
 #include <QSize>
 #include <QWidget>
 
+#include <cmath>
 #include <filesystem>
 #include <format>
 #include <memory>
+#include <numbers>
 #include <optional>
 #include <utility>
 
@@ -682,6 +684,96 @@ TEST_F(AnnotationWindowFixture, HighlightWidthCycleFromToolbarReachesTheEngine)
     widthButton->click();
 
     EXPECT_GT(countInkAtProbe(), 0) << "按钮点下去了，选中的那条没有跟着加宽：窗口到引擎这条链没接上";
+}
+
+/**
+ * @brief 钉住箭头款式与大小两枚按钮从窗口接到引擎：点一下，选中的那条跟着变
+ * @details 画布逻辑 200×100 放进 400×200 的视图（2 倍），箭头尖在逻辑 (140, 50) → 物理 (280, 100)。
+ *          探点全按工具栏自己的读数算几何——按按钮时桥会把工具栏整套参数（含线宽）下发给选中项，
+ *          所以起点线宽就取工具栏那一档，点击前后只差款式/大小这一个变量。
+ *          款式探点取三角的重心（离尖 2/3 纵深处）：实心有芯、空心透白、开口是伸到尖上的杆（有墨）。
+ *          大小探点取「中档头够不着、大档头够得着」的一列（两档纵深的中间）：只有杆 vs 切到头的芯。
+ */
+TEST_F(AnnotationWindowFixture, ArrowHeadButtonsFromToolbarReachTheEngine)
+{
+    auto window = makeWindow();
+
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Arrow).has_value());
+    ASSERT_TRUE(engine().setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = window->toolbar().currentWidth(), .fontSize = 16, .fillStyle = 0}).has_value());
+    engine().beginStroke(QPoint(20, 50));
+    engine().moveStroke(QPoint(140, 50));
+    const auto arrow = engine().endStroke();
+    ASSERT_TRUE(arrow.has_value()) << arrow.error().message;
+    ASSERT_TRUE(engine().select(*arrow).has_value());
+
+    // 张角 60°（两翼各与杆成 30°）、头长 = 大小档 × 线宽：都按工具栏读数现算，物理像素 = 逻辑 × 2
+    constexpr double kHalfAngle  = 30.0 * std::numbers::pi / 180.0;
+    const qreal      scale       = window->toolbar().currentArrowHeadScale();
+    const qreal      headLength  = scale * static_cast<qreal>(window->toolbar().currentWidth()) * 2.0;
+    const qreal      headDepth   = headLength * std::cos(kHalfAngle);
+    const int        tipX        = 280;
+    const int        interiorX   = tipX - static_cast<int>(std::lround(headDepth * 2.0 / 3.0));
+    const int        outsideMidX = tipX - static_cast<int>(std::lround(headDepth * (1.0 + GyanisScribe::Annotation::kArrowHeadScales.back() / scale) / 2.0));
+
+    const auto innerInk = [this, interiorX]
+    {
+        const QImage drawn = engine().exportImage();
+        int          ink   = 0;
+        for (int x = interiorX - 1; x <= interiorX + 1; ++x)
+        {
+            for (int y = 99; y <= 101; ++y)
+            {
+                if (drawn.pixelColor(x, y) != QColor(180, 180, 180))
+                {
+                    ++ink;
+                }
+            }
+        }
+        return ink;
+    };
+    ASSERT_GT(innerInk(), 0) << "实心档在头的重心处没有芯，后面的对照没有基准（探点几何与线宽档对不上了）";
+
+    const auto buttonLabelled = [&window](const QString &prefix) -> QToolButton *
+    {
+        for (auto *candidate: window->toolbar().findChildren<QToolButton *>())
+        {
+            if (candidate->accessibleName().startsWith(prefix))
+            {
+                return candidate;
+            }
+        }
+        return nullptr;
+    };
+
+    auto *styleButton = buttonLabelled(QString::fromUtf8("箭头样式"));
+    ASSERT_NE(styleButton, nullptr) << "工具栏上找不到箭头样式按钮";
+    styleButton->click(); // 实心 → 空心
+    EXPECT_EQ(innerInk(), 0) << "点成空心之后头里还有芯：款式按钮到引擎这条链没接上";
+    styleButton->click(); // 空心 → 开口
+    EXPECT_GT(innerInk(), 0) << "再点到开口，重心处又没有墨：开口档的杆没伸到尖上（或按钮没接上）";
+    styleButton->click(); // 开口 → 实心：把款式转回实心，下面的大小对照才只差一个变量
+    ASSERT_GT(innerInk(), 0) << "三档转回来不是实心";
+
+    const auto inkRowsInColumn = [this](const int x)
+    {
+        const QImage drawn = engine().exportImage();
+        int          rows  = 0;
+        for (int y = 60; y <= 140; ++y)
+        {
+            if (drawn.pixelColor(x, y) != QColor(180, 180, 180))
+            {
+                ++rows;
+            }
+        }
+        return rows;
+    };
+    const int shaftRows = inkRowsInColumn(outsideMidX);
+    ASSERT_GT(shaftRows, 0) << "中档在那一列连杆都没切到，后面的对照没有基准";
+
+    auto *scaleButton = buttonLabelled(QString::fromUtf8("箭头大小"));
+    ASSERT_NE(scaleButton, nullptr) << "工具栏上找不到箭头大小按钮";
+    scaleButton->click(); // 中 → 大
+    EXPECT_GT(inkRowsInColumn(outsideMidX), shaftRows * 2) << "点成大档之后那一列还是只有杆：大小按钮到引擎这条链没接上";
 }
 
 /**

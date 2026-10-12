@@ -511,6 +511,55 @@ TEST_F(EngineFixture, HighlightWidthFactorRestylesAndUndoBack)
     EXPECT_EQ(m_engine.exportImage().pixelColor(160, 55), QColor(0, 0, 0)) << "撤销没把加宽退回窄档，改倍数没进撤销栈";
 }
 
+/**
+ * @brief 钉住箭头款式与大小两档都能改在选中项上、撤销能退回去
+ * @details 白底、线宽 6、尖在 (140, 50)：头长 3.5×6=21（纵深 18.2）。
+ *          款式探点取轴线上离尖 12 那点：实心有芯、空心透白；
+ *          大小探点取离尖 22 的纵切行数：大档（头长 30）切到芯（约 25 行），小档（头长 15）只剩杆（约 6-8 行）。
+ *          两样都是样式动作、各进一次撤销栈：退一步就是原位原样。
+ */
+TEST_F(EngineFixture, ArrowHeadStyleAndScaleRestyleAndUndoBack)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Arrow).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 6, .fontSize = 16, .fillStyle = 0}).has_value());
+    m_engine.beginStroke(QPoint(20, 50));
+    m_engine.moveStroke(QPoint(140, 50));
+    const auto arrow = m_engine.endStroke();
+    ASSERT_TRUE(arrow.has_value()) << arrow.error().message;
+
+    const auto innerInked = [this] { return m_engine.exportImage().pixelColor(128, 50) != QColor(255, 255, 255); };
+    ASSERT_TRUE(innerInked()) << "实心档在轴线上没有芯，后面的对照没有基准";
+
+    // 款式：实心 → 空心 → 撤回实心
+    ASSERT_TRUE(m_engine.select(*arrow).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 6, .fontSize = 16, .fillStyle = 0, .arrowHeadStyle = 1}).has_value());
+    EXPECT_FALSE(innerInked()) << "选中项改成空心档之后头里还填着色：款式没落到那条图形上";
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_TRUE(innerInked()) << "撤销没把款式退回实心，改款式没进撤销栈";
+
+    // 大小：小档 → 大档 → 撤回小档
+    const auto inkRowsAtDepth22 = [this]
+    {
+        const QImage drawn = m_engine.exportImage();
+        int          rows  = 0;
+        for (int y = 30; y <= 70; ++y)
+        {
+            if (drawn.pixelColor(118, y) != QColor(255, 255, 255))
+            {
+                ++rows;
+            }
+        }
+        return rows;
+    };
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 6, .fontSize = 16, .fillStyle = 0, .arrowHeadScale = 2.5}).has_value());
+    const int smallRows = inkRowsAtDepth22();
+    ASSERT_GT(smallRows, 0) << "小档在离尖 22 处连杆都没切到，后面的对照没有基准";
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 0), .lineWidth = 6, .fontSize = 16, .fillStyle = 0, .arrowHeadScale = 5.0}).has_value());
+    EXPECT_GT(inkRowsAtDepth22(), smallRows * 2) << "选中项改成大档之后那一列还是只有杆：大小没落到那条图形上";
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_EQ(inkRowsAtDepth22(), smallRows) << "撤销没把大小退回小档，改大小没进撤销栈";
+}
+
 namespace
 {
     /// 用文字工具在指定位置放一条文字，返回它的位置

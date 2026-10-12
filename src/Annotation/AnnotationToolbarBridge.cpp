@@ -10,7 +10,7 @@ namespace GyanisScribe::Annotation
 {
     AnnotationToolbarBridge::AnnotationToolbarBridge(AnnotationToolbar &toolbar, IAnnotationEngine &engine, QObject *parent) : QObject(parent), m_toolbar(toolbar), m_engine(engine)
     {
-        // 起点参数整套照工具栏的初值抄一遍：十三处必须与工具栏同解，否则第一笔的样式与按钮显示的不一致
+        // 起点参数整套照工具栏的初值抄一遍：十五处必须与工具栏同解，否则第一笔的样式与按钮显示的不一致
         m_penParameters = PenParameters{.color                = toolbar.currentColor(),
                                         .lineWidth            = toolbar.currentWidth(),
                                         .fontSize             = toolbar.currentFontSize(),
@@ -19,6 +19,8 @@ namespace GyanisScribe::Annotation
                                         .mosaicBlockSize      = toolbar.currentMosaicBlockSize(),
                                         .highlightAlpha       = toolbar.currentHighlightAlpha(),
                                         .highlightWidthFactor = toolbar.currentHighlightWidthFactor(),
+                                        .arrowHeadStyle       = toolbar.currentArrowHeadStyle(),
+                                        .arrowHeadScale       = toolbar.currentArrowHeadScale(),
                                         .fontFamily           = toolbar.currentFontFamily(),
                                         .textBold             = toolbar.currentTextBold(),
                                         .textItalic           = toolbar.currentTextItalic(),
@@ -79,6 +81,18 @@ namespace GyanisScribe::Annotation
                          [this](const int factor)
                          {
                              m_penParameters.highlightWidthFactor = factor;
+                             applyPenParameters();
+                         });
+        QObject::connect(&toolbar, &AnnotationToolbar::arrowHeadStyleChanged, this,
+                         [this](const int style)
+                         {
+                             m_penParameters.arrowHeadStyle = style;
+                             applyPenParameters();
+                         });
+        QObject::connect(&toolbar, &AnnotationToolbar::arrowHeadScaleChanged, this,
+                         [this](const qreal scale)
+                         {
+                             m_penParameters.arrowHeadScale = scale;
                              applyPenParameters();
                          });
         QObject::connect(&toolbar, &AnnotationToolbar::fontFamilyChanged, this,

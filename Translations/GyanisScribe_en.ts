@@ -160,6 +160,14 @@
             <translation>Highlight width</translation>
         </message>
         <message>
+            <source>箭头样式</source>
+            <translation>Arrow head</translation>
+        </message>
+        <message>
+            <source>箭头大小</source>
+            <translation>Arrow head size</translation>
+        </message>
+        <message>
             <source>字体</source>
             <translation>Font</translation>
         </message>
@@ -262,6 +270,30 @@
         <message>
             <source>高亮加宽：宽</source>
             <translation>Highlight width: wide</translation>
+        </message>
+        <message>
+            <source>箭头样式：实心</source>
+            <translation>Arrow head: filled</translation>
+        </message>
+        <message>
+            <source>箭头样式：空心</source>
+            <translation>Arrow head: hollow</translation>
+        </message>
+        <message>
+            <source>箭头样式：开口</source>
+            <translation>Arrow head: open wings</translation>
+        </message>
+        <message>
+            <source>箭头大小：小</source>
+            <translation>Arrow head size: small</translation>
+        </message>
+        <message>
+            <source>箭头大小：中</source>
+            <translation>Arrow head size: medium</translation>
+        </message>
+        <message>
+            <source>箭头大小：大</source>
+            <translation>Arrow head size: large</translation>
         </message>
         <message>
             <source>粗体：开</source>

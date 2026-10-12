@@ -35,6 +35,8 @@ namespace GyanisScribe::Annotation
         int     mosaicBlockSize      = kMosaicBlockSizes[kDefaultMosaicBlockStep];         ///< 马赛克方块边长，逻辑像素（仅马赛克工具用）
         int     highlightAlpha       = kHighlightAlphas[kDefaultHighlightAlphaStep];       ///< 高亮透明度，0-255（仅高亮工具用）
         int     highlightWidthFactor = kHighlightWidthFactors[kDefaultHighlightWidthStep]; ///< 高亮相对线宽的加宽倍数（仅高亮工具用）
+        int     arrowHeadStyle       = kArrowHeadFilled;                                   ///< 箭头头部款式：0 实心、1 空心、2 开口两翼（仅箭头工具用）
+        qreal   arrowHeadScale       = kArrowHeadScales[kDefaultArrowHeadScaleStep];       ///< 箭头头部大小：头长相对线宽的倍数（仅箭头工具用）
         QString fontFamily;                                                                ///< 字体族，空串=跟随应用默认字体（仅文字工具用）
         bool    textBold       = false;                                                    ///< 粗体（仅文字工具用）
         bool    textItalic     = false;                                                    ///< 斜体（仅文字工具用）
@@ -59,6 +61,8 @@ namespace GyanisScribe::Annotation
                              .mosaicBlockSize      = shape.mosaicBlockSize,
                              .highlightAlpha       = shape.highlightAlpha,
                              .highlightWidthFactor = shape.highlightWidthFactor,
+                             .arrowHeadStyle       = shape.arrowHeadStyle,
+                             .arrowHeadScale       = shape.arrowHeadScale,
                              .fontFamily           = shape.fontFamily,
                              .textBold             = shape.textBold,
                              .textItalic           = shape.textItalic,

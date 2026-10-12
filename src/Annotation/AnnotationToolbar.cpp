@@ -219,6 +219,14 @@ namespace GyanisScribe::Annotation
         m_highlightWidthButton = makeButton("HighlightWidth", GyanisScribe::Core::uiText("高亮加宽"), false);
         QObject::connect(m_highlightWidthButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleHighlightWidthFactor);
         layout->addWidget(m_highlightWidthButton);
+        // 箭头款式：箭头工具用得上，点一下走一档（实心 → 空心 → 开口）
+        m_arrowHeadStyleButton = makeButton("ArrowHeadStyle", GyanisScribe::Core::uiText("箭头样式"), false);
+        QObject::connect(m_arrowHeadStyleButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleArrowHeadStyle);
+        layout->addWidget(m_arrowHeadStyleButton);
+        // 箭头大小：箭头工具用得上，点一下走一档（小 → 中 → 大），档位表是 kArrowHeadScales
+        m_arrowHeadScaleButton = makeButton("ArrowHeadSize", GyanisScribe::Core::uiText("箭头大小"), false);
+        QObject::connect(m_arrowHeadScaleButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleArrowHeadScale);
+        layout->addWidget(m_arrowHeadScaleButton);
         // 文字字体族：文字工具用得上，列系统字体。宽度封顶——字体名长的很，放任 sizeHint 会撑出去
         m_fontCombo = new QFontComboBox{this};
         m_fontCombo->setMaximumWidth(Ui::kToolbarFontComboWidth);
@@ -381,6 +389,46 @@ namespace GyanisScribe::Annotation
             m_highlightWidthButton->setAccessibleName(label);
         }
         emit highlightWidthFactorChanged(currentHighlightWidthFactor());
+    }
+
+    int AnnotationToolbar::currentArrowHeadStyle() const
+    {
+        return m_arrowHeadStyle;
+    }
+
+    void AnnotationToolbar::cycleArrowHeadStyle()
+    {
+        m_arrowHeadStyle = (m_arrowHeadStyle + 1) % kArrowHeadStyleCount;
+        if (m_arrowHeadStyleButton != nullptr)
+        {
+            // 与另几档同一套口径：提示就是这一档的读数
+            const auto label = m_arrowHeadStyle == kArrowHeadFilled   ? GyanisScribe::Core::uiText("箭头样式：实心")
+                               : m_arrowHeadStyle == kArrowHeadHollow ? GyanisScribe::Core::uiText("箭头样式：空心")
+                                                                      : GyanisScribe::Core::uiText("箭头样式：开口");
+            m_arrowHeadStyleButton->setToolTip(label);
+            m_arrowHeadStyleButton->setAccessibleName(label);
+        }
+        emit arrowHeadStyleChanged(currentArrowHeadStyle());
+    }
+
+    qreal AnnotationToolbar::currentArrowHeadScale() const
+    {
+        return kArrowHeadScales[static_cast<std::size_t>(m_arrowHeadScaleStep)];
+    }
+
+    void AnnotationToolbar::cycleArrowHeadScale()
+    {
+        m_arrowHeadScaleStep = (m_arrowHeadScaleStep + 1) % static_cast<int>(kArrowHeadScales.size());
+        if (m_arrowHeadScaleButton != nullptr)
+        {
+            // 与另几档同一套口径：提示就是这一档的读数
+            const auto label = m_arrowHeadScaleStep == 0   ? GyanisScribe::Core::uiText("箭头大小：小")
+                               : m_arrowHeadScaleStep == 1 ? GyanisScribe::Core::uiText("箭头大小：中")
+                                                           : GyanisScribe::Core::uiText("箭头大小：大");
+            m_arrowHeadScaleButton->setToolTip(label);
+            m_arrowHeadScaleButton->setAccessibleName(label);
+        }
+        emit arrowHeadScaleChanged(currentArrowHeadScale());
     }
 
     QString AnnotationToolbar::currentFontFamily() const

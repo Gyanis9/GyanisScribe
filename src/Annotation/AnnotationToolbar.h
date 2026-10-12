@@ -146,6 +146,18 @@ namespace GyanisScribe::Annotation
         /// 高亮加宽走一档（窄 → 中 → 宽），并发出 highlightWidthFactorChanged
         void cycleHighlightWidthFactor();
 
+        /// 当前箭头头部款式：0 实心、1 空心、2 开口两翼（箭头工具用；新建的箭头按它画头）
+        [[nodiscard]] int currentArrowHeadStyle() const;
+
+        /// 箭头款式走一档（实心 → 空心 → 开口），并发出 arrowHeadStyleChanged
+        void cycleArrowHeadStyle();
+
+        /// 当前箭头头部大小：头长相对线宽的倍数，取值只会落在 kArrowHeadScales 的阶梯上
+        [[nodiscard]] qreal currentArrowHeadScale() const;
+
+        /// 箭头大小走一档（中 → 大 → 小 → 中），并发出 arrowHeadScaleChanged
+        void cycleArrowHeadScale();
+
         /// 当前文字字体族，取字体下拉的当前项（非空；跟随应用默认时就是默认家族名）
         [[nodiscard]] QString currentFontFamily() const;
 
@@ -211,6 +223,10 @@ namespace GyanisScribe::Annotation
 
         /// 用户改了高亮加宽倍数
         void highlightWidthFactorChanged(int factor);
+        /// 用户改了箭头头部款式
+        void arrowHeadStyleChanged(int style);
+        /// 用户改了箭头头部大小
+        void arrowHeadScaleChanged(qreal scale);
         /// 用户换了文字字体族
         void fontFamilyChanged(const QString &family);
         /// 用户开了/关了文字粗体
@@ -288,15 +304,19 @@ namespace GyanisScribe::Annotation
         QToolButton                                             *m_highlightAlphaButton = nullptr;                                    ///< 高亮透明度按钮，点一下走一档
         int                                                      m_highlightAlphaStep = static_cast<int>(kDefaultHighlightAlphaStep); ///< 当前透明度档下标，值表是 kHighlightAlphas
         QToolButton                                             *m_highlightWidthButton = nullptr;                                    ///< 高亮加宽按钮，点一下走一档
-        int            m_highlightWidthStep = static_cast<int>(kDefaultHighlightWidthStep); ///< 当前加宽档下标，值表是 kHighlightWidthFactors
-        QFontComboBox *m_fontCombo          = nullptr;                                      ///< 文字字体族下拉，列系统字体
-        QToolButton   *m_boldButton         = nullptr;                                      ///< 文字粗体开关，按下表示粗
-        QToolButton   *m_italicButton       = nullptr;                                      ///< 文字斜体开关，按下表示斜
-        QToolButton   *m_outlineButton      = nullptr;                                      ///< 文字描边开关，按下表示围一圈反色轮廓
-        QToolButton   *m_backgroundButton   = nullptr;                                      ///< 文字底板开关，按下表示垫一块反色圆角板
-        QColor         m_currentColor;                                                      ///< 当前颜色，初值取色板第一格
-        bool           m_stateIsInitial = true;                                             ///< 还在构造期：起点值不回写配置，坏值要留在文件里让人看得见
-        ToolKind       m_activeTool;                                                        ///< 当前工具，用来挡住「重复点同一个工具」的二次信号
+        int            m_highlightWidthStep   = static_cast<int>(kDefaultHighlightWidthStep); ///< 当前加宽档下标，值表是 kHighlightWidthFactors
+        QToolButton   *m_arrowHeadStyleButton = nullptr;                                      ///< 箭头款式按钮，点一下走一档
+        int            m_arrowHeadStyle       = kArrowHeadFilled;                             ///< 当前头部款式：0 实心、1 空心、2 开口两翼
+        QToolButton   *m_arrowHeadScaleButton = nullptr;                                      ///< 箭头大小按钮，点一下走一档
+        int            m_arrowHeadScaleStep   = static_cast<int>(kDefaultArrowHeadScaleStep); ///< 当前大小档下标，值表是 kArrowHeadScales
+        QFontComboBox *m_fontCombo            = nullptr;                                      ///< 文字字体族下拉，列系统字体
+        QToolButton   *m_boldButton           = nullptr;                                      ///< 文字粗体开关，按下表示粗
+        QToolButton   *m_italicButton         = nullptr;                                      ///< 文字斜体开关，按下表示斜
+        QToolButton   *m_outlineButton        = nullptr;                                      ///< 文字描边开关，按下表示围一圈反色轮廓
+        QToolButton   *m_backgroundButton     = nullptr;                                      ///< 文字底板开关，按下表示垫一块反色圆角板
+        QColor         m_currentColor;                                                        ///< 当前颜色，初值取色板第一格
+        bool           m_stateIsInitial = true;                                               ///< 还在构造期：起点值不回写配置，坏值要留在文件里让人看得见
+        ToolKind       m_activeTool;                                                          ///< 当前工具，用来挡住「重复点同一个工具」的二次信号
     };
 
 } // namespace GyanisScribe::Annotation
