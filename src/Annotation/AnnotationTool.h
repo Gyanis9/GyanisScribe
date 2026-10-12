@@ -47,6 +47,7 @@ namespace GyanisScribe::Annotation
         Blur,      ///< 高斯模糊
         Eraser,    ///< 橡皮擦（沿笔迹擦回底图）
         Polyline,  ///< 折线（点一下落一个折点，双击收笔）
+        Magnifier, ///< 放大镜（拖出源框，框里那块放大成旁边的插图）
     };
 
     /**

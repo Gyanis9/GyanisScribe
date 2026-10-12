@@ -10,6 +10,7 @@
 #include "Annotation/NumberTool.h"
 #include "Annotation/PenTool.h"
 #include "Annotation/PolylineTool.h"
+#include "Annotation/MagnifierTool.h"
 #include "Annotation/RectangleTool.h"
 #include "Annotation/ShapeTransform.h"
 #include "Annotation/TextTool.h"
@@ -387,6 +388,8 @@ namespace GyanisScribe::Annotation
         m_tools.push_back(std::make_unique<EraserTool>());
         // 折线登记在橡皮擦之前：擦除压在它上面，折线自己按落定顺序与别的笔画同层
         m_tools.insert(m_tools.end() - 1, std::make_unique<PolylineTool>());
+        // 放大镜同样登记在橡皮擦之前：它的插图是展示件，与别的笔画同层
+        m_tools.insert(m_tools.end() - 1, std::make_unique<MagnifierTool>());
 
         // 参数一次下发：切工具后笔还保持用户调过的那个粗细，才不会出现「换工具就得重调」
         applyPenParametersToTools();

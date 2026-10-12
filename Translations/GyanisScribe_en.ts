@@ -448,6 +448,10 @@
             <translation>Line</translation>
         </message>
         <message>
+            <source>放大镜</source>
+            <translation>Magnifier</translation>
+        </message>
+        <message>
             <source>马赛克</source>
             <translation>Mosaic</translation>
         </message>

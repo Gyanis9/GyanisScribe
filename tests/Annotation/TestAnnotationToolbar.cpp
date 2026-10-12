@@ -49,10 +49,10 @@ namespace
     std::unique_ptr<IconProvider> icons;
 
     /// 工具按钮的中文名，顺序与工具表同解；这一份是照需求第五节抄来的独立期望值
-    constexpr std::array<std::string_view, 12> kToolLabels = {"矩形", "椭圆", "箭头", "画笔", "高亮", "马赛克", "文字", "序号", "直线", "高斯模糊", "橡皮擦", "折线"};
+    constexpr std::array<std::string_view, 13> kToolLabels = {"矩形", "椭圆", "箭头", "画笔", "高亮", "马赛克", "文字", "序号", "直线", "高斯模糊", "橡皮擦", "折线", "放大镜"};
 
     /// 工具按钮该在提示里带上的字母键位，同样是一份独立抄来的期望值：与 kToolTable 第四列交叉核对
-    constexpr std::array<std::string_view, 12> kToolShortcuts = {"R", "E", "A", "P", "H", "M", "T", "N", "L", "B", "X", "G"};
+    constexpr std::array<std::string_view, 13> kToolShortcuts = {"R", "E", "A", "P", "H", "M", "T", "N", "L", "B", "X", "G", "F"};
 
     /// 动作按钮的中文名，同样按需求第六节的排列顺序抄一份
     constexpr std::array<std::string_view, 4> kActionLabels = {"复制到剪贴板", "保存为文件", "贴到屏幕上", "识别文字"};

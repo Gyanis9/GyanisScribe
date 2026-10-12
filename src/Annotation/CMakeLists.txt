@@ -7,6 +7,7 @@ add_library(Annotation STATIC
         TextFont.h
         StrokePen.h
         TextLayout.h
+        MagnifierLayout.h
         AnnotationTool.h
         AnnotationTool.cpp
         RectangleTool.h
@@ -29,6 +30,8 @@ add_library(Annotation STATIC
         EraserTool.cpp
         PolylineTool.h
         PolylineTool.cpp
+        MagnifierTool.h
+        MagnifierTool.cpp
         TextTool.h
         TextTool.cpp
         NumberTool.h

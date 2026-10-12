@@ -3,6 +3,7 @@
 
 #include "Annotation/HighlightTool.h"
 #include "Annotation/ImageBlur.h"
+#include "Annotation/MagnifierLayout.h"
 #include "Annotation/MosaicTool.h"
 #include "Annotation/NumberTool.h"
 #include "Annotation/PenTool.h"
@@ -23,7 +24,9 @@
 
 using GyanisScribe::Annotation::AnnotationEngine;
 using GyanisScribe::Annotation::AnnotationSelection;
+using GyanisScribe::Annotation::kMagnifierGap;
 using GyanisScribe::Annotation::kNumberGroupCount;
+using GyanisScribe::Annotation::magnifierInsetRectFor;
 using GyanisScribe::Annotation::NumberTool;
 using GyanisScribe::Annotation::PenParameters;
 using GyanisScribe::Annotation::PenTool;
@@ -718,6 +721,72 @@ TEST_F(AnnotationFixture, EraserSquareStrokeCoversTheEndSquareCorners)
     const auto exported = m_engine.exportImage();
     EXPECT_EQ(exported.pixelColor(220, 50), QColor(255, 255, 255)) << "圆档这一笔连中心都没擦出来";
     EXPECT_EQ(exported.pixelColor(248, 25), QColor(0, 0, 0)) << "圆档在圆外的斜角上也擦了：两档没差别";
+}
+
+/**
+ * @brief 钉住插图框的位置算法：默认摆右侧上边对齐，右边放不下翻左侧，上下越界夹回画布内
+ */
+TEST(MagnifierLayout, PlacesTheInsetBesideTheSourceAndFlipsAtTheEdge)
+{
+    const QSize canvas{400, 200};
+
+    // 右侧放得下：源框 (100,60)-(139,99)，插图 ×2 是 80×80，摆在右边隔一个间隙
+    const auto right = magnifierInsetRectFor(QRect(100, 60, 40, 40), canvas);
+    EXPECT_EQ(right, QRect(139 + 1 + kMagnifierGap, 60, 80, 80));
+
+    // 右边放不下：源框贴右边缘，翻到左侧
+    const auto flipped = magnifierInsetRectFor(QRect(330, 60, 40, 40), canvas);
+    EXPECT_EQ(flipped, QRect(330 - kMagnifierGap - 80, 60, 80, 80));
+
+    // 上下越界：夹回画布内（插图下边不探出画布底）
+    const auto clamped = magnifierInsetRectFor(QRect(100, 180, 40, 40), canvas);
+    EXPECT_EQ(clamped.top(), canvas.height() - 80);
+
+    // 两侧都放不下：夹在 0 上允许与源框重叠，不把插图推到画布外
+    const auto overlapping = magnifierInsetRectFor(QRect(100, 60, 300, 40), canvas);
+    EXPECT_EQ(overlapping.left(), 0);
+    EXPECT_EQ(overlapping.width(), 600);
+}
+
+/**
+ * @brief 钉住放大镜：插图里是源框的 2 倍放大，源框内容只被围一圈虚线、像素没被动
+ * @details 源框 (100,96)-(120,104) 横跨 y=100 分界线（上白下黑）。插图 42×18 摆在右侧
+ *          (133,96)：源框第 4 行是第一行黑，放大 2 倍后是插图的第 8 行起。
+ */
+TEST_F(AnnotationFixture, MagnifierEnlargesTheSourceBesideIt)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Magnifier).has_value());
+    m_engine.beginStroke(QPoint(100, 96));
+    m_engine.moveStroke(QPoint(120, 104));
+    const auto settled = m_engine.endStroke();
+    ASSERT_TRUE(settled.has_value()) << settled.error().message;
+
+    const auto drawn = m_engine.exportImage();
+    EXPECT_EQ(drawn.pixelColor(154, 100), QColor(255, 255, 255)) << "插图上半没画出源框的白段";
+    EXPECT_EQ(drawn.pixelColor(154, 110), QColor(0, 0, 0)) << "插图下半没画出源框的黑段";
+
+    // 源框里那两个像素没被动过：放大镜是一面镜子，不改镜子照的那块
+    EXPECT_EQ(drawn.pixelColor(110, 98), QColor(255, 255, 255)) << "源框里的白被插图动了";
+    EXPECT_EQ(drawn.pixelColor(110, 102), QColor(0, 0, 0)) << "源框里的黑被插图动了";
+
+    // 源框围了一圈虚线：上边那一带该出现图形色（默认红）的像素——虚线有断口，按整条计数
+    int outlinePixels = 0;
+    for (int x = 100; x <= 120; ++x)
+    {
+        for (int y = 95; y <= 97; ++y)
+        {
+            const auto pixel = drawn.pixelColor(x, y);
+            if (pixel.red() > 150 && pixel.green() < 120 && pixel.blue() < 120)
+            {
+                ++outlinePixels;
+            }
+        }
+    }
+    EXPECT_GT(outlinePixels, 0) << "源框没围出虚线：看不出放大的是哪块";
+
+    // 命中与选中框只看源框：插图是展示件，不单独命中
+    EXPECT_TRUE(m_engine.selectionAt(QPoint(110, 100)).has_value());
+    EXPECT_FALSE(m_engine.selectionAt(QPoint(154, 110)).has_value()) << "插图被当成了独立可点的对象";
 }
 
 /**
