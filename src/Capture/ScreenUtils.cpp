@@ -182,6 +182,45 @@ namespace GyanisScribe::Capture
         return QRect(numbers[0], numbers[1], numbers[2], numbers[3]);
     }
 
+    QImage roundedCornerImage(const QImage &image, const int radiusPhysical)
+    {
+        if (image.isNull() || radiusPhysical <= 0)
+        {
+            return image;
+        }
+
+        QImage rounded = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+
+        // 掩膜整幅画好再合成：DestinationIn 只作用于「画到的像素」，直接 fillPath 的话圆角之外
+        // 的像素根本没人碰、四角会原样留着。整幅掩膜与马赛克、橡皮擦同一套口径
+        QImage mask(rounded.size(), QImage::Format_ARGB32_Premultiplied);
+        mask.fill(Qt::transparent);
+        {
+            QPainter maskPainter(&mask);
+            maskPainter.setRenderHint(QPainter::Antialiasing, true);
+            maskPainter.setPen(Qt::NoPen);
+            maskPainter.setBrush(Qt::black);
+            maskPainter.drawRoundedRect(QRectF{mask.rect()}, radiusPhysical, radiusPhysical);
+        }
+        {
+            QPainter painter(&rounded);
+            painter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+            painter.drawImage(0, 0, mask);
+        }
+        return rounded;
+    }
+
+    std::array<QLine, 4> thirdsGridLinesFor(const QRect &region)
+    {
+        const int thirdX    = region.left() + region.width() / 3;
+        const int twoThirdX = region.left() + region.width() * 2 / 3;
+        const int thirdY    = region.top() + region.height() / 3;
+        const int twoThirdY = region.top() + region.height() * 2 / 3;
+
+        return {QLine{thirdX, region.top(), thirdX, region.bottom()}, QLine{twoThirdX, region.top(), twoThirdX, region.bottom()},
+                QLine{region.left(), thirdY, region.right(), thirdY}, QLine{region.left(), twoThirdY, region.right(), twoThirdY}};
+    }
+
     QPoint squareLockedPoint(const QPoint &anchor, const QPoint &current, const bool locked, const QRect &limit)
     {
         if (!locked)

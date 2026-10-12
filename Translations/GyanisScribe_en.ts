@@ -1088,6 +1088,18 @@
             <translation>Mouse pointer</translation>
         </message>
         <message>
+            <source>圆角截图</source>
+            <translation>Rounded screenshot</translation>
+        </message>
+        <message>
+            <source>成品四角切圆</source>
+            <translation>Round the corners of the output</translation>
+        </message>
+        <message>
+            <source>区域截图生效：按固定半径把成品四角切圆，角上是透明像素；整屏、窗口与滚动长截图不带</source>
+            <translation>Applies to region captures: rounds the four corners of the output with a fixed radius, leaving transparent pixels at the corners; full-screen, window and scrolling captures are not affected</translation>
+        </message>
+        <message>
             <source>自动保存</source>
             <translation>Auto save</translation>
         </message>

@@ -71,6 +71,13 @@ namespace GyanisScribe::Settings
     /// 「没填」那一档取不含指针：区域截图刚松手时指针就在选区里，默认画进去会让成品多出一只箭头
     inline constexpr bool kDefaultCaptureIncludeCursor = false;
 
+    /// 区域截图的成品要不要把四角切圆（读端在 Capture::CaptureService，写端在设置的截图页）；
+    /// 只作用在区域这一路：整屏、窗口与滚动长截图的成品形状改起来各有各的意外，不做
+    inline constexpr std::string_view kCaptureRoundCorners = "Capture/RoundCorners";
+
+    /// 「圆角截图」没填时的默认档：不切
+    inline constexpr bool kDefaultCaptureRoundCorners = false;
+
     /// 每张截图都顺手存一份进截图目录（不进标注、不弹窗）；默认关，开了之后每次截图都会在盘上留一份
     inline constexpr std::string_view kCaptureAutoSave = "Capture/AutoSave";
 

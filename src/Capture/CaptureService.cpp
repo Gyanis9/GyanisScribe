@@ -59,12 +59,18 @@ namespace GyanisScribe::Capture
 
     void CaptureService::captureRegion(const QRect &logicalRegion, const QString &screenName)
     {
-        const auto frame = grabRegionNow(logicalRegion, screenName);
+        auto frame = grabRegionNow(logicalRegion, screenName);
         if (!frame)
         {
             // 抓帧或裁剪失败：原因原样交回，别在这里补一个「按 0 处理」的形状
             deliver(frame);
             return;
+        }
+
+        // 圆角截图：成品的一步加工，排在记账之前——切圆失败不该发生，真发生了也没截坏原帧
+        if (m_settings.boolValue(Settings::kCaptureRoundCorners, Settings::kDefaultCaptureRoundCorners))
+        {
+            frame->image = roundedCornerImage(frame->image, qRound(kCaptureCornerRadiusLogical * frame->devicePixelRatio));
         }
 
         // 选区记账排在成功之后：失败也写就会把用户上次的好选区顶掉

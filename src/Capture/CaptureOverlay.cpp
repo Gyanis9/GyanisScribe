@@ -326,6 +326,13 @@ namespace GyanisScribe::Capture
                 painter.setPen(crossPen);
                 painter.drawLine(QPoint(m_currentPoint.x(), 0), QPoint(m_currentPoint.x(), widgetRect.height()));
                 painter.drawLine(QPoint(0, m_currentPoint.y()), QPoint(widgetRect.width(), m_currentPoint.y()));
+
+                // 三分网格：两条竖两条横的构图参考线，与十字线同一档（只在拖动途中露面）
+                painter.setPen(QPen(GyanisScribe::Ui::kCrosshairColor));
+                for (const auto &line: thirdsGridLinesFor(shown))
+                {
+                    painter.drawLine(line);
+                }
             }
 
             auto hint = formatSelectionHint(shown);

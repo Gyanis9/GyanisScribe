@@ -1497,6 +1497,10 @@ namespace GyanisScribe::App
         form->addRow(GyanisScribe::Core::uiText("截完之后"), makeCaptureIntentCombo(m_settings, m_icons));
         form->addRow(GyanisScribe::Core::uiText("延时截图"), makeCaptureDelaySpin(m_settings));
         form->addRow(GyanisScribe::Core::uiText("鼠标指针"), makeIncludeCursorCheck(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("圆角截图"),
+                     makeSettingCheck(m_settings, Settings::kCaptureRoundCorners, Settings::kDefaultCaptureRoundCorners, GyanisScribe::Core::uiText("成品四角切圆"),
+                                      GyanisScribe::Core::uiText("圆角截图"),
+                                      GyanisScribe::Core::uiText("区域截图生效：按固定半径把成品四角切圆，角上是透明像素；整屏、窗口与滚动长截图不带")));
         form->addRow(GyanisScribe::Core::uiText("自动保存"),
                      makeSettingCheck(m_settings, GyanisScribe::Settings::kCaptureAutoSave, false, GyanisScribe::Core::uiText("每张截图都先存一份进上面的目录"),
                                       GyanisScribe::Core::uiText("自动保存所有截图"),

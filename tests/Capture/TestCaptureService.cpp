@@ -930,3 +930,30 @@ TEST_F(CaptureServiceFixture, AspectRatioLockLoadsAppliesAndPersists)
     SettingsStore reopened(m_iniFile);
     EXPECT_TRUE(reopened.stringValue(GyanisScribe::Settings::kCaptureAspectRatio, QString()).isEmpty()) << "解开没有落盘，下一轮会又锁上";
 }
+
+/**
+ * @brief 钉住圆角截图开关：开着时区域成品四角透明、内里不动；关着是原样方角
+ * @details 替身帧是 2 倍比的纯色图：裁 (0,0,20,20) 得 40×40；半径 12 逻辑 × 2 = 24 物理，
+ *
+ * 角尖 (0,0) 距圆角圆心 (24,24) 有 34 格、必在弧外；中心与边上不动。
+ */
+TEST_F(CaptureServiceFixture, RoundCornersToggleShapesTheRegionProduct)
+{
+    SettingsStore     settings(m_iniFile);
+    FakeCaptureSource source;
+    CaptureService    service(source, settings, *platform);
+
+    Outcome outcome;
+    wire(service, outcome);
+    service.captureRegion(QRect(0, 0, 20, 20), QStringLiteral("FakeScreen-1"));
+    ASSERT_TRUE(outcome.image.has_value()) << (outcome.error ? outcome.error->message : std::string{});
+    EXPECT_NE(outcome.image->image.pixelColor(0, 0).alpha(), 0) << "默认档不该切圆角";
+
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureRoundCorners, QVariant(true)).has_value());
+    Outcome rounded;
+    wire(service, rounded);
+    service.captureRegion(QRect(0, 0, 20, 20), QStringLiteral("FakeScreen-1"));
+    ASSERT_TRUE(rounded.image.has_value());
+    EXPECT_EQ(rounded.image->image.pixelColor(0, 0).alpha(), 0) << "开了圆角，角尖还是实心";
+    EXPECT_NE(rounded.image->image.pixelColor(10, 10).alpha(), 0) << "开了圆角，内里被一起切了";
+}

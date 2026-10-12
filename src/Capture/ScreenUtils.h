@@ -12,10 +12,12 @@
 #include "Capture/IScreenCaptureSource.h"
 #include "Core/Types.h"
 
+#include <QLine>
 #include <QPoint>
 #include <QRect>
 #include <QString>
 
+#include <array>
 #include <optional>
 #include <vector>
 
@@ -23,6 +25,9 @@ class QScreen;
 
 namespace GyanisScribe::Capture
 {
+
+    /// 「圆角截图」的圆角半径，逻辑像素：小圆角看得出意思又不吃掉内容
+    inline constexpr int kCaptureCornerRadiusLogical = 12;
 
     /**
      * @brief 把某块屏幕内的逻辑矩形换成同一块屏幕上的物理像素矩形
@@ -101,6 +106,25 @@ namespace GyanisScribe::Capture
      * @return 失败返回 InvalidArgument，文案写明期望的形状与实际收到的内容
      */
     [[nodiscard]] Core::Expected<QRect> regionFromText(std::string_view text);
+
+    /**
+     * @brief 把一张图按给定半径切圆四角
+     * @param image 源图
+     * @param radiusPhysical 圆角半径，物理像素；非正时原样交回
+     * @return 四角切圆后的 ARGB 图：圆角之外是透明像素，边与内里一个像素不动
+     * @details 「圆角矩形截图」的成品加工：走掩膜而不是裁剪边，圆弧上才不会有台阶。
+     *          半径由调用方按缩放因子换好再送进来，这里不做 dpr 换算。
+     */
+    [[nodiscard]] QImage roundedCornerImage(const QImage &image, int radiusPhysical);
+
+    /**
+     * @brief 三分网格的两竖两横，摆在选区里当构图参考线
+     * @param region 选区（该屏内的逻辑坐标）
+     * @return 两条竖线与两条横线：竖在宽的三分之一与三分之二处、横在高的同比例处
+     * @note 取整按整数除法：极小的选区里两条线可能与边重合，画出来也只是叠在框上，
+     *       不做「小于多少就不画」的分支——那种阈值很快会变成第二份规格
+     */
+    [[nodiscard]] std::array<QLine, 4> thirdsGridLinesFor(const QRect &region);
 
     /**
      * @brief 按住了 Shift 时把选区的另一个端点锁成正方形

@@ -525,3 +525,40 @@ TEST(ScreenUtilsSelection, SizeAndAspectTextRoundTrip)
     EXPECT_FALSE(aspectRatioFromText(QStringLiteral("16:0")).has_value());
     EXPECT_FALSE(aspectRatioFromText(QStringLiteral("16:9:1")).has_value()) << "多余的尾巴不该被忽略";
 }
+
+/**
+ * @brief 钉住圆角切图：四角变透明、边与内里一个像素不动、半径非正原样交回
+ * @details 40×30 的实心红图切半径 8：角尖 (0,0) 一定在圆角之外；(0,15) 是左边中点、必在；
+ *
+ * 圆心附近 (8,8) 恰在弧上，不取——抗锯齿会给出半透明的答案，判据不拿它当靶子。
+ */
+TEST(ScreenUtils, RoundedCornersBecomeTransparentAndKeepTheMiddle)
+{
+    using GyanisScribe::Capture::roundedCornerImage;
+
+    QImage square{40, 30, QImage::Format_ARGB32_Premultiplied};
+    square.fill(QColor(255, 0, 0));
+
+    const auto rounded = roundedCornerImage(square, 8);
+    ASSERT_EQ(rounded.size(), square.size());
+    EXPECT_EQ(rounded.pixelColor(0, 0).alpha(), 0) << "角尖没被切掉";
+    EXPECT_EQ(rounded.pixelColor(20, 15), QColor(255, 0, 0)) << "内里被动过了";
+    EXPECT_EQ(rounded.pixelColor(0, 15), QColor(255, 0, 0)) << "左边中点不该被切到";
+    EXPECT_EQ(rounded.pixelColor(39, 15), QColor(255, 0, 0)) << "右边中点不该被切到";
+
+    EXPECT_EQ(roundedCornerImage(square, 0), square) << "半径为 0 时该原样交回";
+}
+
+/**
+ * @brief 钉住三分网格线的位置：两竖在 1/3 与 2/3 处贯穿全高，两横同理
+ */
+TEST(ScreenUtils, ThirdsGridSplitsTheRegionIntoThirds)
+{
+    using GyanisScribe::Capture::thirdsGridLinesFor;
+
+    const auto lines = thirdsGridLinesFor(QRect(100, 50, 90, 60)); // 1/3 = 30、2/3 = 60
+    EXPECT_EQ(lines[0], (QLine(130, 50, 130, 109))) << "第一条竖线不在三分之一处";
+    EXPECT_EQ(lines[1], (QLine(160, 50, 160, 109))) << "第二条竖线不在三分之二处";
+    EXPECT_EQ(lines[2], (QLine(100, 70, 189, 70))) << "第一条横线不在三分之一处";
+    EXPECT_EQ(lines[3], (QLine(100, 90, 189, 90))) << "第二条横线不在三分之二处";
+}
