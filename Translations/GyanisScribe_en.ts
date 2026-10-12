@@ -2208,6 +2208,14 @@
             <translation>Scroll to scale, Ctrl+scroll to rotate, Shift+scroll for opacity, R to turn a quarter step (Shift+R the other way), 0 or double-click to restore the original size and angle, Esc to close</translation>
         </message>
         <message>
+            <source>窗口阴影</source>
+            <translation>Window shadow</translation>
+        </message>
+        <message>
+            <source>给这一张围一圈投影：窗口比内容大一圈，内容坐标与吸附位置都不变；缩到小方块（T）时不带</source>
+            <translation>Draw a shadow around this pin: the window grows one ring larger than the content while content coordinates and snap positions stay unchanged; not applied in thumbnail mode (T)</translation>
+        </message>
+        <message>
             <source>左右翻转</source>
             <translation>Flip horizontally</translation>
         </message>

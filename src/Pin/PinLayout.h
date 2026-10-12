@@ -49,6 +49,12 @@ namespace GyanisScribe::Pin
     /// 分组号的起点：布局里缺 group 字段（上一版存下的）与新建的贴图都落这一组
     inline constexpr int kFirstPinGroup = 1;
 
+    /// 「窗口阴影」的留边，逻辑像素：开着时窗口比内容每边大这一圈，投影画在这条带子里
+    inline constexpr int kShadowMargin = 8;
+
+    /// 阴影的层数：几圈递减的描边叠出「虚」的感觉，比真高斯便宜得多
+    inline constexpr int kShadowLayers = 5;
+
     /**
      * @brief 把一组布局序列化成 JSON 文本
      * @param states 全部贴图的状态，顺序即恢复顺序

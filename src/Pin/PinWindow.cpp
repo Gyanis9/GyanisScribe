@@ -1091,6 +1091,22 @@ namespace GyanisScribe::Pin
         return Pick::formatColor(displayImage().pixelColor(*pixel), format);
     }
 
+    void PinWindow::setShadowEnabled(const bool enabled)
+    {
+        if (m_shadowEnabled == enabled)
+        {
+            return;
+        }
+        m_shadowEnabled = enabled;
+        applyGeometry();
+        update();
+    }
+
+    bool PinWindow::shadowEnabled() const noexcept
+    {
+        return m_shadowEnabled;
+    }
+
     void PinWindow::applyGeometry()
     {
         const auto scaled   = m_thumbnail ? QSizeF{kThumbnailEdge, kThumbnailEdge} : windowSizeFor(m_logicalSize, m_scale);
@@ -1101,8 +1117,13 @@ namespace GyanisScribe::Pin
         const QPointF center = QRectF(pos(), size()).center();
         const auto    box    = rotatedBoundingBox(center, QSizeF(width, height), rotation);
 
-        // 尺寸取外接框，绘制时按同样的角度转回去：命中、拖动与手柄都落在这个轴对齐框里算
-        setGeometry(box.toAlignedRect());
+        // 窗口阴影：窗口比外接框每边大一圈，投影画在带子里；内容在窗口里居中（见 contentRect），
+        // 于是留边出现或消失时内容一个像素都不动。缩略图态不铺——那枚小方块是临时让位用的
+        const bool   shadowOn = m_shadowEnabled && !m_thumbnail;
+        const QRectF padded   = shadowOn ? box.adjusted(-kShadowMargin, -kShadowMargin, kShadowMargin, kShadowMargin) : box;
+
+        // 尺寸取外接框（有阴影时再套上留边），绘制时按同样的角度转回去：命中、拖动与手柄都落在这个轴对齐框里算
+        setGeometry(padded.toAlignedRect());
 
         // 贴边的那张尺寸变了（缩放、旋转、缩略图）还要按同一条边重排：不然它会被居中算法拉回屏里，
         // 变成一张「贴过边但已经不在边上」的图，收起与展开也没有了依据
@@ -1163,6 +1184,23 @@ namespace GyanisScribe::Pin
         // 翻转在旋转之前做：转的是翻好的那一份，与 imagePixelAt 的反变换成对（先反旋转、后反翻转）
         painter.scale(m_mirroredHorizontally ? -1.0 : 1.0, m_mirroredVertically ? -1.0 : 1.0);
         painter.translate(-content.center());
+
+        // 窗口阴影：几圈递减的描边叠出一圈暗晕，贴着内容四外画在留边带子里。排在白板与图像之前——
+        // 它是「垫在底下」的那一层，跟着同一套转与翻走
+        if (m_shadowEnabled && !m_thumbnail)
+        {
+            painter.setBrush(Qt::NoBrush);
+            for (int layer = 1; layer <= kShadowLayers; ++layer)
+            {
+                QColor shadow{0, 0, 0};
+                // 贴着内容那一圈最深、往外一格格淡下去：常数越小越像「远处的一圈光晕」
+                shadow.setAlpha(8 + 32 * (kShadowLayers - layer) / kShadowLayers);
+                QPen pen{shadow};
+                pen.setWidth(2);
+                painter.setPen(pen);
+                painter.drawRect(content.adjusted(-layer, -layer, layer, layer));
+            }
+        }
         // 白板：垫在图的后面，透明像素处露出来的就是它；画在同一个坐标系里，跟着转与翻
         if (m_backgroundColor.isValid())
         {
@@ -1813,6 +1851,13 @@ namespace GyanisScribe::Pin
         throughAction->setChecked(m_mouseThrough);
         throughAction->setVisible(capabilities.clickThrough);
         throughAction->setToolTip(GyanisScribe::Core::uiText("滚轮缩放，Ctrl+滚轮旋转，Shift+滚轮调透明度，R 转正一挡（Shift+R 反向），0 或双击回到原始比例，Esc 关闭"));
+
+        // 窗口阴影：窗口比内容每边大一圈、投影画在带子里，内容坐标不动（见 setShadowEnabled）。
+        // 缩略图态不铺：那枚小方块是临时让位用的
+        auto *shadowAction = menu->addAction(GyanisScribe::Core::uiText("窗口阴影"), this, [this] { setShadowEnabled(!m_shadowEnabled); });
+        shadowAction->setCheckable(true);
+        shadowAction->setChecked(m_shadowEnabled);
+        shadowAction->setToolTip(GyanisScribe::Core::uiText("给这一张围一圈投影：窗口比内容大一圈，内容坐标与吸附位置都不变；缩到小方块（T）时不带"));
 
         // 视图变换四档：翻转与灰度/反色都只改「看」，复制、保存、标注拿到的仍是原始像素——
         // 与旋转同一条规矩。菜单项的勾选态就是当前读数，键位与它们同一条路（H/V/G/I）

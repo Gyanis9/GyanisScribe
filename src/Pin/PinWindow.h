@@ -233,6 +233,18 @@ namespace GyanisScribe::Pin
         void setExactSize(const QSize &size);
 
         /**
+         * @brief 开/关窗口阴影
+         * @param enabled true 表示窗口比内容每边大一圈，投影画在带子里
+         * @details 只改「看」：内容坐标（选中框、取色、标注覆盖）都按 contentRect 算，
+         *          留边出现或消失时它们自动跟着居中；缩略图态（T）不铺阴影——那枚小方块
+         *          是临时让位用的，再拖一圈阴影像换了种东西。
+         */
+        void setShadowEnabled(bool enabled);
+
+        /// 当前是否开着窗口阴影
+        [[nodiscard]] bool shadowEnabled() const noexcept;
+
+        /**
          * @brief 设旋转角度，见 IPinWindow::setRotationDegrees()
          * @param degrees 顺时针角度，折进 [0,360)
          */
@@ -694,6 +706,7 @@ namespace GyanisScribe::Pin
         double                                               m_opacity               = 1.0;              ///< 不透明度
         bool                                                 m_mouseThrough          = false;            ///< 是否鼠标穿透
         bool                                                 m_thumbnail             = false;            ///< 缩略图模式：窗口缩成小方块，缩放等设定原样留着
+        bool                                                 m_shadowEnabled         = false;            ///< 窗口阴影：窗口比内容每边大 kShadowMargin，投影画在带子里
         bool                                                 m_pinned                = true;             ///< 是否置顶
         int                                                  m_group                 = kFirstPinGroup;   ///< 所属贴图分组，菜单与布局记录都取它
         QVector<int>                                         m_groupChoices{kFirstPinGroup};             ///< 现有分组号（升序），由管理器推过来

@@ -1402,4 +1402,55 @@ namespace GyanisScribe
         EXPECT_TRUE(nearEqual(window.scale(), 20.0, kScaleTolerance)) << "超界的精确值该夹在缩放上限上（夹不住就是第二套坐标口径）";
     }
 
+    /**
+     * @brief 钉住窗口阴影：窗口比内容每边大一圈、内容居中不动、投影贴着内容一圈圈淡出去
+     * @details 判据取渲染出来的像素（render 而不是 grab，见翻转那条的说明）。40×40 的四色块：
+     *          留边 8 之后窗口 56×56，色块探点整体偏移 8；(6,28) 是贴内容最深的一圈、
+     *          (2,28) 是更外更淡的一圈——两处的深浅差就是「有投影」这个事实。
+     */
+    TEST_F(PinWindowFixture, ShadowPadsTheWindowAndPaintsAGradedHalo)
+    {
+        auto &window = makeWindow(makeQuadImage());
+
+        window.setShadowEnabled(true);
+        EXPECT_TRUE(window.shadowEnabled());
+        EXPECT_EQ(window.size(), QSize(40 + 2 * Pin::kShadowMargin, 40 + 2 * Pin::kShadowMargin)) << "窗口没比内容每边大一圈";
+
+        QImage canvas{window.size(), QImage::Format_ARGB32};
+        canvas.fill(Qt::transparent);
+        window.render(&canvas);
+
+        // 内容在窗口里居中：留边出现之后四个色块的相对位置与颜色都不变
+        EXPECT_EQ(canvas.pixelColor(Pin::kShadowMargin + 10, Pin::kShadowMargin + 10), QColor(255, 0, 0)) << "留边把内容挤偏了";
+        EXPECT_EQ(canvas.pixelColor(Pin::kShadowMargin + 30, Pin::kShadowMargin + 10), QColor(0, 255, 0));
+
+        // 带子里有投影：贴内容那一圈比更外的一圈深（亮度小）
+        const auto near = canvas.pixelColor(Pin::kShadowMargin - 2, Pin::kShadowMargin + 20).lightness();
+        const auto far  = canvas.pixelColor(2, Pin::kShadowMargin + 20).lightness();
+        EXPECT_LT(near, far) << "带子里没有「贴内容深、往外淡」的投影";
+
+        window.setShadowEnabled(false);
+        EXPECT_EQ(window.size(), QSize(40, 40)) << "关掉之后窗口没回到内容大小";
+    }
+
+    /**
+     * @brief 钉住「窗口阴影」菜单项：勾选态就是当前读数，点一下即开即关
+     */
+    TEST_F(PinWindowFixture, ShadowMenuToggleFlipsTheState)
+    {
+        auto  &window = makeWindow();
+        QMenu *menu   = window.buildContextMenu();
+        auto  *shadow = findMenuAction(*menu, QString::fromUtf8("窗口阴影"));
+        ASSERT_NE(shadow, nullptr) << "右键菜单里没有「窗口阴影」这一项";
+        EXPECT_FALSE(shadow->isChecked()) << "默认该是关：已有的贴图不该凭空多出一圈";
+        shadow->trigger();
+        EXPECT_TRUE(window.shadowEnabled()) << "点了菜单没开";
+        EXPECT_TRUE(shadow->isChecked());
+
+        shadow->trigger();
+        EXPECT_FALSE(window.shadowEnabled()) << "再点一次没关";
+        EXPECT_FALSE(shadow->isChecked());
+        delete menu;
+    }
+
 } // namespace GyanisScribe
