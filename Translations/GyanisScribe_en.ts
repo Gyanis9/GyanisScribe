@@ -356,6 +356,14 @@
             <translation>Capture did not complete: %1. Try again</translation>
         </message>
         <message>
+            <source>已贴出 {} 张；{} 不是图片，没贴</source>
+            <translation>Pinned {} image(s); {} is not an image and was skipped</translation>
+        </message>
+        <message>
+            <source>已贴出 {} 张</source>
+            <translation>Pinned {} image(s)</translation>
+        </message>
+        <message>
             <source>这张贴图已移到当前分组，就摆在原处</source>
             <translation>This pin has been moved into the group on screen; it stays where it is</translation>
         </message>
@@ -566,6 +574,14 @@
         <message>
             <source>剪贴板里的文本太长（{} 个字，上限 {}）：整张卡片会长到没法看，先把要贴的那一段截短再试</source>
             <translation>The clipboard text is too long ({} characters, limit {}): the card would be unreadably tall. Shorten the passage you want to pin and try again</translation>
+        </message>
+        <message>
+            <source>拖进来的东西没有可读的内容，贴不出来</source>
+            <translation>Nothing readable was dropped, so there is nothing to pin</translation>
+        </message>
+        <message>
+            <source>拖进来的文件不是图片或读不出来：{}。图片文件、链接与文本都可以贴</source>
+            <translation>The dropped files are not images or cannot be read: {}. Image files, links and text can all be pinned</translation>
         </message>
         <message>
             <source>智录遇到未处理的错误：{}。现场已尽量落到日志与崩溃转储，请到 {} 找最近一份日志（同目录下的 .dmp 是转储）；如果反复出现，请把日志、转储与出错的操作步骤一起反馈</source>

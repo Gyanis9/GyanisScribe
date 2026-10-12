@@ -4,6 +4,8 @@
 
 #include "App/ClipboardPin.h"
 
+#include "PinTestAssets.h"
+
 #include <gtest/gtest.h>
 
 #include <QApplication>
@@ -13,15 +15,22 @@
 #include <QMimeData>
 #include <QSize>
 #include <QString>
+#include <QUrl>
 #include <QVariant>
 
 #include <array>
+#include <filesystem>
+#include <fstream>
 #include <memory>
 #include <string>
 
+using GyanisScribe::App::dropContentFrom;
+using GyanisScribe::App::kColorCardHeight;
 using GyanisScribe::App::kColorCardStripHeight;
+using GyanisScribe::App::kColorCardWidth;
 using GyanisScribe::App::kMaximumTextCardCharacters;
 using GyanisScribe::App::kTextCardMaximumWidth;
+using GyanisScribe::App::kTextCardMinimumWidth;
 using GyanisScribe::App::pinContentFrom;
 using GyanisScribe::App::renderColorCard;
 using GyanisScribe::App::renderTextCard;
@@ -179,4 +188,93 @@ TEST_F(ClipboardPinFixture, ColorCardKeepsTheSwatchAboveTheLabelStrip)
     ASSERT_FALSE(card.isNull());
     EXPECT_EQ(card.pixelColor(80, 10), QColor(12, 34, 56));
     EXPECT_NE(card.pixelColor(80, card.height() - 4), QColor(12, 34, 56));
+}
+
+/**
+ * @brief 钉住拖来的文件：图片按盘上的像素读出、GIF 连来源路径一起带走
+ * @details 来源路径不带走的话，贴上去是一张静止的首帧；带走之后与布局恢复那一路同解，
+ *          窗口自己会把动画接上。两件按拖进来的顺序一一对应。
+ */
+TEST_F(ClipboardPinFixture, DropReadsImageFilesInOrderAndKeepsAnimationSource)
+{
+    const auto directory = std::filesystem::temp_directory_path();
+    const auto pngPath   = directory / "GyanisScribe-DropPin-red.png";
+    QImage     red{QSize{8, 8}, QImage::Format_ARGB32};
+    red.fill(QColor{255, 0, 0});
+    ASSERT_TRUE(red.save(QString::fromStdString(pngPath.string())));
+
+    const auto gifPath = GyanisScribe::PinTestAssets::writeTwoFrameGif(directory / "GyanisScribe-DropPin-two-frames.gif");
+    ASSERT_FALSE(gifPath.isEmpty()) << "素材没落到临时文件上";
+
+    QMimeData mime;
+    mime.setUrls({QUrl::fromLocalFile(QString::fromStdString(pngPath.string())), QUrl::fromLocalFile(gifPath)});
+
+    const auto dropped = dropContentFrom(&mime, cardFont());
+    ASSERT_TRUE(dropped.has_value()) << dropped.error().message;
+    ASSERT_EQ(dropped->contents.size(), 2U) << "拖进来两张该渲染出两份";
+    EXPECT_EQ(dropped->contents[0].image.pixelColor(4, 4), QColor(255, 0, 0)) << "PNG 没按盘上的像素读出来";
+    EXPECT_TRUE(dropped->contents[0].animatedSource.isEmpty()) << "静图不该记动图来源";
+    EXPECT_TRUE(dropped->contents[1].animatedSource.endsWith(QStringLiteral("two-frames.gif"))) << "GIF 没把来源路径一起带走，贴上去不会播";
+    EXPECT_TRUE(dropped->rejectedNames.isEmpty());
+}
+
+/**
+ * @brief 钉住链接与杂文件：链接渲染成卡片，非图片的名字记下来交给调用方提示
+ * @details 一件不是图片不拦整次拖放：能贴的照贴，名字记进 rejectedNames——
+ *          静默丢掉一件比整次拒绝更让人困惑。
+ */
+TEST_F(ClipboardPinFixture, DropRendersLinksAsCardsAndRecordsNonImages)
+{
+    const auto directory = std::filesystem::temp_directory_path();
+    const auto txtPath   = directory / "GyanisScribe-DropPin-notes.txt";
+    {
+        std::ofstream out{txtPath, std::ios::binary | std::ios::trunc};
+        ASSERT_TRUE(out.good());
+        out << "not an image";
+    }
+
+    QMimeData mime;
+    mime.setUrls({QUrl{QStringLiteral("https://example.com/page")}, QUrl::fromLocalFile(QString::fromStdString(txtPath.string()))});
+
+    const auto dropped = dropContentFrom(&mime, cardFont());
+    ASSERT_TRUE(dropped.has_value()) << dropped.error().message;
+    ASSERT_EQ(dropped->contents.size(), 1U) << "链接该渲染成一张卡片";
+    EXPECT_GE(dropped->contents.front().image.width(), kTextCardMinimumWidth) << "链接卡片宽度退化了";
+    ASSERT_EQ(dropped->rejectedNames.size(), 1U) << "非图片的名字没记下来，用户会以为它被贴了";
+    EXPECT_EQ(dropped->rejectedNames.front(), QStringLiteral("GyanisScribe-DropPin-notes.txt"));
+}
+
+/**
+ * @brief 钉住没有文件时退回剪贴板那套单件内容：颜色写法仍走颜色卡
+ */
+TEST_F(ClipboardPinFixture, DropWithoutFilesFallsBackToTheSingleContentPath)
+{
+    QMimeData mime;
+    mime.setText(QStringLiteral("#3C78C8"));
+
+    const auto dropped = dropContentFrom(&mime, cardFont());
+    ASSERT_TRUE(dropped.has_value()) << dropped.error().message;
+    ASSERT_EQ(dropped->contents.size(), 1U);
+    EXPECT_EQ(dropped->contents.front().image.size(), QSize(kColorCardWidth, kColorCardHeight)) << "颜色写法没走颜色卡那一档";
+}
+
+/**
+ * @brief 钉住全是非图片时说清是哪个文件不行
+ */
+TEST_F(ClipboardPinFixture, DropOfOnlyNonImagesSaysWhatCameIn)
+{
+    const auto directory = std::filesystem::temp_directory_path();
+    const auto txtPath   = directory / "GyanisScribe-DropPin-only.txt";
+    {
+        std::ofstream out{txtPath, std::ios::binary | std::ios::trunc};
+        ASSERT_TRUE(out.good());
+        out << "plain";
+    }
+
+    QMimeData mime;
+    mime.setUrls({QUrl::fromLocalFile(QString::fromStdString(txtPath.string()))});
+
+    const auto dropped = dropContentFrom(&mime, cardFont());
+    ASSERT_FALSE(dropped.has_value()) << "全是非图片也当成贴得成，画布上会凭空冒出东西";
+    EXPECT_NE(dropped.error().message.find("GyanisScribe-DropPin-only.txt"), std::string::npos) << "要说清是哪个文件不行";
 }

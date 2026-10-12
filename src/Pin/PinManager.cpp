@@ -8,6 +8,7 @@
 #include "Settings/SettingsKeys.h"
 
 #include <QImage>
+#include <QMimeData>
 #include <QPoint>
 
 #include <algorithm>
@@ -65,6 +66,8 @@ namespace GyanisScribe::Pin
                              const auto at = raw->globalRect().topLeft() + QPoint{kPinAgainOffset, kPinAgainOffset};
                              emit       pinAnotherRequested(image, at);
                          });
+        // 拖放同理：窗口只报「谁被拖到了哪」，渲染与建帖是界面层的事（载荷指针当场有效，直接转发）
+        QObject::connect(raw, &PinWindow::dropRequested, this, &PinManager::pinDropRequested);
         // 分组改动只接意图、由管理器落账：哪张在哪组是这一层的账，窗口自己改会与管理器各记一半
         QObject::connect(raw, &PinWindow::moveToGroupRequested, this,
                          [this, raw](int group)

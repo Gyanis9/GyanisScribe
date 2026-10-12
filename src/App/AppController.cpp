@@ -44,6 +44,7 @@
 #include <QFileDialog>
 #include <QCursor>
 #include <QGuiApplication>
+#include <QMimeData>
 #include <QScreen>
 #include <QImageReader>
 #include <QCoreApplication>
@@ -228,6 +229,28 @@ namespace GyanisScribe::App
                          {
                              // 留底再贴一份：不动原来那张，新的一张摆在它右下一点
                              m_pins->addPin(image, globalTopLeft);
+                         });
+        // 拖到贴图上的文件/链接/文本：与「把剪贴板里的内容贴到屏幕上」共用同一套内容渲染
+        QObject::connect(m_pins.get(), &Pin::PinManager::pinDropRequested, this,
+                         [this](const QMimeData *data, const QPoint &globalTopLeft)
+                         {
+                             const auto dropped = pinDroppedContent(*m_pins, data, globalTopLeft, QGuiApplication::font());
+                             if (!dropped)
+                             {
+                                 notifyUser(QString::fromUtf8(dropped.error().message), Ui::ToastKind::Information);
+                                 return;
+                             }
+                             if (!dropped->rejectedNames.isEmpty())
+                             {
+                                 // 贴上一部分也要说清另一半去哪了：静默丢掉一件比整次拒绝更让人困惑
+                                 notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已贴出 {} 张；{} 不是图片，没贴"), dropped->pinnedCount,
+                                                                                           dropped->rejectedNames.join(QStringLiteral("、")).toStdString())
+                                                                      .c_str()),
+                                            Ui::ToastKind::Information);
+                                 return;
+                             }
+                             notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已贴出 {} 张"), dropped->pinnedCount).c_str()),
+                                        Ui::ToastKind::Success);
                          });
         // 移到别的组那一下它就从桌上消失了：说清它去了哪、怎么切过去，免得像「贴图自己没了」
         QObject::connect(

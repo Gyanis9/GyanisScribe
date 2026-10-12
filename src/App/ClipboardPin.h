@@ -14,9 +14,18 @@
 #include <QColor>
 #include <QFont>
 #include <QImage>
+#include <QPoint>
 #include <QString>
+#include <QStringList>
+
+#include <vector>
 
 class QMimeData;
+
+namespace GyanisScribe::Pin
+{
+    class PinManager;
+} // namespace GyanisScribe::Pin
 
 namespace GyanisScribe::App
 {
@@ -63,5 +72,54 @@ namespace GyanisScribe::App
      * @return 上块下条的图：色块本体 + 底部写法条
      */
     [[nodiscard]] QImage renderColorCard(const QColor &color, const QString &label);
+
+    /**
+     * @brief 一份可以贴出去的内容
+     */
+    struct PinContent
+    {
+        QImage  image;          ///< 要贴的像素
+        QString animatedSource; ///< 动图来源文件；空表示这一份是静图
+    };
+
+    /**
+     * @brief 拖放载荷渲染出来的全部可贴内容
+     */
+    struct DropContent
+    {
+        std::vector<PinContent> contents;      ///< 可贴的若干份，按拖进来的顺序
+        QStringList             rejectedNames; ///< 没能当成图片的文件名（不是图片或读不出）
+    };
+
+    /**
+     * @brief 把拖放载荷转成可贴的内容
+     * @param data 拖放的 mime 载荷，可为 nullptr
+     * @param font 渲染卡片用的字体（生产传应用字体，用例传固定字体）
+     * @return 成功返回可贴的若干份；一件都贴不出来时返回带原因的错误
+     * @details 有文件就按文件走：图片读成像素（GIF 这类连来源路径一起带走，贴上去会接着播），
+     *          链接渲染成文本卡片；没有文件时退回剪贴板那套单件内容（图像 / 颜色卡 / 文本卡）。
+     *          不是图片的文件不拦整次拖放：能贴的照贴，名字记进 rejectedNames 由调用方提示。
+     */
+    [[nodiscard]] Core::Expected<DropContent> dropContentFrom(const QMimeData *data, const QFont &font);
+
+    /**
+     * @brief 一次拖放的贴图结果
+     */
+    struct DropPinOutcome
+    {
+        int         pinnedCount = 0; ///< 成功贴出的张数
+        QStringList rejectedNames;   ///< 没能当成图片贴出的文件名
+    };
+
+    /**
+     * @brief 把拖进来的东西贴成若干张新图
+     * @param pins 贴图管理器
+     * @param data 拖放载荷
+     * @param globalTopLeft 落点，第一张新贴图的左上角；多张依次向右下错开
+     * @param font 渲染卡片用的字体
+     * @return 成功返回贴出的张数与没贴成的文件名；一件都贴不出来时返回原因
+     * @details 与「把剪贴板里的内容贴到屏幕上」共用同一套内容渲染，两处不会将来只改一处。
+     */
+    [[nodiscard]] Core::Expected<DropPinOutcome> pinDroppedContent(Pin::PinManager &pins, const QMimeData *data, const QPoint &globalTopLeft, const QFont &font);
 
 } // namespace GyanisScribe::App

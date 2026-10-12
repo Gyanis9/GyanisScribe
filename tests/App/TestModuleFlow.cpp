@@ -11,6 +11,7 @@
 #include "Capture/ICaptureService.h"
 #include "Capture/IScreenCaptureSource.h"
 #include "Core/Paths.h"
+#include "App/ClipboardPin.h"
 #include "Core/Types.h"
 #include "Ocr/IOcrEngine.h"
 #include "Ocr/OcrEngineFactory.h"
@@ -20,14 +21,17 @@
 #include "Settings/SettingsStore.h"
 
 #include <QApplication>
+#include <QClipboard>
 #include <QColor>
 #include <QFont>
 #include <QImage>
+#include <QMimeData>
 #include <QPainter>
 #include <QPoint>
 #include <QRect>
 #include <QSize>
 #include <QString>
+#include <QUrl>
 
 #include <gtest/gtest.h>
 
@@ -451,6 +455,43 @@ namespace GyanisScribe
         EXPECT_EQ(pins.visiblePinCount(), 2);
 
         pins.closeAll();
+    }
+
+    /**
+     * @brief 钉住拖放这条路从内容到成品的整段：图片文件贴出、多件错开、像素真的对
+     * @details 借剪贴板把贴出来的像素读回来（窗口的复制与绘制读同一份图）。
+     *          渲染与「把剪贴板里的内容贴到屏幕上」共用同一套，两处不会将来只改一处。
+     */
+    TEST_F(ModuleFlowFixture, DroppedImageFilesBecomePinsCascadingFromTheDropPoint)
+    {
+        const auto firstPath  = m_root / "first.png";
+        const auto secondPath = m_root / "second.png";
+        QImage     firstImage{QSize{8, 8}, QImage::Format_ARGB32};
+        firstImage.fill(QColor(255, 0, 0));
+        QImage secondImage = firstImage;
+        secondImage.fill(QColor(0, 0, 255));
+        ASSERT_TRUE(firstImage.save(QString::fromStdString(firstPath.string())));
+        ASSERT_TRUE(secondImage.save(QString::fromStdString(secondPath.string())));
+
+        QMimeData mime;
+        mime.setUrls({QUrl::fromLocalFile(QString::fromStdString(firstPath.string())), QUrl::fromLocalFile(QString::fromStdString(secondPath.string()))});
+
+        Settings::SettingsStore settings(m_iniFile);
+        Pin::PinManager         pins(settings, *integration);
+        const auto              dropped = App::pinDroppedContent(pins, &mime, QPoint(400, 300), QApplication::font());
+        ASSERT_TRUE(dropped.has_value()) << dropped.error().message;
+        EXPECT_EQ(dropped->pinnedCount, 2);
+        ASSERT_EQ(pins.count(), 2);
+
+        ASSERT_NE(pins.pinAt(0), nullptr);
+        EXPECT_EQ(pins.pinAt(0)->globalRect().topLeft(), QPoint(400, 300)) << "第一张没落在拖放点上";
+        ASSERT_NE(pins.pinAt(1), nullptr);
+        EXPECT_EQ(pins.pinAt(1)->globalRect().topLeft(), QPoint(424, 324)) << "第二张该往右下错开一格：完全叠住会让人以为只贴上一张";
+
+        pins.pinAt(0)->copyToClipboard();
+        EXPECT_EQ(QGuiApplication::clipboard()->image().pixelColor(4, 4), QColor(255, 0, 0)) << "贴出来的像素不是盘上那张文件";
+        pins.closeAll();
+        EXPECT_EQ(pins.count(), 0);
     }
 
 } // namespace GyanisScribe

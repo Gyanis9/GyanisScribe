@@ -44,6 +44,10 @@ add_executable(TestMainWindow
         TestClipboardPin.cpp
         TestMainWindow.cpp)
 
+# 两帧 GIF 那条小素材住在 tests/Pin/PinTestAssets.h：拖放里的动图分支与 Pin 组共用它，
+# 不在两处各打一份字节（两份会随着将来改素材而分家）
+target_include_directories(TestMainWindow PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../Pin)
+
 target_link_libraries(TestMainWindow PRIVATE
         App
         Annotation
@@ -73,6 +77,7 @@ add_executable(TestModuleFlow
         TestModuleFlow.cpp)
 
 target_link_libraries(TestModuleFlow PRIVATE
+        App
         Annotation
         Capture
         Core
@@ -94,5 +99,6 @@ add_dependencies(TestModuleFlow DeployQtRuntime)
 
 # 布局那两条用例写的是真实缓存目录（cacheDirectory()/Pins），目录名由 Pin 模块自己定，
 # 测试改不了；ctest 把每条用例当独立进程并行起，因此这一组要按资源锁串行，
-# 否则一个进程删掉的文件是另一个进程正要读的
-gtest_discover_tests(TestModuleFlow PROPERTIES RESOURCE_LOCK pinLayoutCache)
+# 否则一个进程删掉的文件是另一个进程正要读的。拖放那一条借系统剪贴板读回像素，
+# 与 TestPin / TestCapture / TestOcr 同拿 clipboardShared 那一把。
+gtest_discover_tests(TestModuleFlow PROPERTIES RESOURCE_LOCK "pinLayoutCache;clipboardShared")

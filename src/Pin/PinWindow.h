@@ -22,6 +22,8 @@
 #include <optional>
 #include <vector>
 
+class QMimeData;
+
 namespace GyanisScribe::Annotation
 {
     class AnnotationEngine;
@@ -312,6 +314,14 @@ namespace GyanisScribe::Pin
         void pinAnotherRequested(const QImage &image);
 
         /**
+         * @brief 有东西被拖到这张贴图上（盘上的文件、链接或文本）
+         * @param data 拖放载荷，只在本次事件处理期间有效
+         * @param globalTopLeft 落点的全局坐标，新贴图从这里开始摆
+         * @details 窗口只报「谁被拖到了哪」：渲染成什么、贴几张、失败怎么说，都是界面层的事。
+         */
+        void dropRequested(const QMimeData *data, const QPoint &globalTopLeft);
+
+        /**
          * @brief 贴图被关闭，管理器据此把自己记的那一份摘掉
          */
         void closedByUser();
@@ -391,6 +401,23 @@ namespace GyanisScribe::Pin
          * @param event 上下文菜单事件，取它的全局位置
          */
         void contextMenuEvent(QContextMenuEvent *event) override;
+
+        /**
+         * @brief 有东西拖到窗口上：内容可贴且没在标注时收下
+         * @param event 拖动进入事件
+         * @details 只做粗判（带文件、图像或文本就收）：细判要在落下那一刻读文件，拖动途中读一遍纯属白费。
+         *          具体的可用性与拒绝原因由内容渲染那一层回答。
+         */
+        void dragEnterEvent(QDragEnterEvent *event) override;
+
+        /// 拖动在窗口上移动：与进入同一判据，不放行的话这一拖根本落不下来
+        void dragMoveEvent(QDragMoveEvent *event) override;
+
+        /**
+         * @brief 落下：把载荷与落点交给界面层贴出新图
+         * @param event 放下事件
+         */
+        void dropEvent(QDropEvent *event) override;
 
     private:
         /// 按当前的缩放与旋转重算窗口尺寸与位置，保持中心不动

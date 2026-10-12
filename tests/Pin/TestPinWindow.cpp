@@ -20,11 +20,14 @@
 #include <QAction>
 #include <QApplication>
 #include <QClipboard>
+#include <QDragEnterEvent>
+#include <QDropEvent>
 #include <QEnterEvent>
 #include <QGuiApplication>
 #include <QImage>
 #include <QKeyEvent>
 #include <QMenu>
+#include <QMimeData>
 #include <QMovie>
 #include <QScreen>
 #include <QMouseEvent>
@@ -835,6 +838,79 @@ namespace GyanisScribe
         const auto baked = QGuiApplication::clipboard()->image();
         EXPECT_NE(baked.pixelColor(16, 14), QColor(200, 60, 60)) << "画笔的笔迹没落上";
         EXPECT_EQ(baked.pixelColor(24, 8), QColor(200, 60, 60)) << "(24,8) 被画上了：工具没切成画笔，落的是矩形";
+    }
+
+    /**
+     * @brief 钉住拖放落下：窗口把载荷与换算回全局的落点一起交出去
+     * @details 落点是新贴图的位置，用窗口内坐标交出去就会错到屏角上；
+     *          窗口挪到一个已知位置，两处坐标手算得出。
+     *          必须先投一次被收下的 DragEnter：QApplication::notify 只把 Drop 投给
+     *          收下过 DragEnter 的那个窗口（QDragManager 的 currentTarget），
+     *          裸投 Drop 会在分发层被静静丢掉，判据到不了 dropEvent。
+     */
+    TEST_F(PinWindowFixture, DropRequestedCarriesThePayloadAndTheGlobalPoint)
+    {
+        auto &window = makeWindow();
+        EXPECT_TRUE(window.acceptDrops()) << "贴图窗没开拖放";
+        window.move(300, 200);
+
+        QMimeData mime;
+        mime.setText(QStringLiteral("hello"));
+
+        QDragEnterEvent enter{QPoint{10, 12}, Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &enter);
+        ASSERT_TRUE(enter.isAccepted()) << "拖动进入没收下，后面的落下无从谈起";
+
+        const QMimeData      *seen = nullptr;
+        std::optional<QPoint> at;
+        QObject::connect(&window, &Pin::PinWindow::dropRequested,
+                         [&](const QMimeData *data, const QPoint &globalTopLeft)
+                         {
+                             seen = data;
+                             at   = globalTopLeft;
+                         });
+
+        QDropEvent drop{QPointF{10.0, 12.0}, Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &drop);
+
+        ASSERT_NE(seen, nullptr) << "落下没发出「有东西被拖进来」";
+        EXPECT_EQ(seen, &mime) << "交出去的不是拖放里那一份载荷";
+        ASSERT_TRUE(at.has_value());
+        EXPECT_EQ(*at, QPoint(310, 212)) << "落点没换算回全局坐标，新贴图会错到别处";
+    }
+
+    /**
+     * @brief 钉住拖动的收与不收：带内容的收、空载荷不收、标注中一律不收
+     * @details 标注中收下拖放会把载荷落在正画着的这张画布上——那一阵子这张图不是「贴图」而是画布。
+     *          落下那一半要先把一次正常的拖动收下（currentTarget 指向本窗口）再进标注模式，
+     *          否则裸投的 Drop 在分发层就被丢掉了，判据验不到 dropEvent 里的守卫。
+     */
+    TEST_F(PinWindowFixture, DragEnterAcceptsPinnablePayloadsAndRefusesWhileAnnotating)
+    {
+        auto &window = makeWindow();
+
+        QMimeData       empty;
+        QDragEnterEvent refused{QPoint{5, 5}, Qt::CopyAction, &empty, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &refused);
+        EXPECT_FALSE(refused.isAccepted()) << "空载荷也收下了";
+
+        QMimeData text;
+        text.setText(QStringLiteral("x"));
+        QDragEnterEvent accepted{QPoint{5, 5}, Qt::CopyAction, &text, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &accepted);
+        EXPECT_TRUE(accepted.isAccepted()) << "带文本的拖动没收下";
+
+        auto dropped = false;
+        QObject::connect(&window, &Pin::PinWindow::dropRequested, [&dropped](const QMimeData *, const QPoint &) { dropped = true; });
+
+        window.startAnnotation();
+        QDragEnterEvent during{QPoint{5, 5}, Qt::CopyAction, &text, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &during);
+        EXPECT_FALSE(during.isAccepted()) << "标注中把拖动也收下了";
+
+        QDropEvent drop{QPointF{5.0, 5.0}, Qt::CopyAction, &text, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &drop);
+        EXPECT_FALSE(dropped) << "标注中把载荷也放下了";
     }
 
 } // namespace GyanisScribe

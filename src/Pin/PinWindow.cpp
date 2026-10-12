@@ -26,8 +26,12 @@
 #include <QContextMenuEvent>
 #include <QDateTime>
 #include <QDesktopServices>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
 #include <QFontMetrics>
 #include <QMenu>
+#include <QMimeData>
 #include <QMovie>
 #include <QImageReader>
 #include <QMouseEvent>
@@ -78,6 +82,12 @@ namespace GyanisScribe::Pin
 
         /// 按住 Shift 时标注微调一次挪多少格：与标注窗那一档同值
         constexpr int kAnnotateCoarseNudgeStride = 10;
+
+        /// 拖放的粗判据：带文件、图像或文本就值得收下再看（细判在落下那一刻做）
+        bool dragPayloadIsPinnable(const QMimeData *mime)
+        {
+            return mime != nullptr && (mime->hasUrls() || mime->hasImage() || mime->hasText());
+        }
 
         /**
          * @brief 取保存贴图与截图的目录：配置里填了就用它，否则用系统图片目录下的那一个
@@ -133,6 +143,8 @@ namespace GyanisScribe::Pin
         setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
         setMouseTracking(true); // 悬停要亮边框，不追踪就等不到进入事件
         setAttribute(Qt::WA_TranslucentBackground, false);
+        // 收拖放：盘上的图片文件、链接与文本拖上来贴成新图（见 dragEnterEvent 与 dropEvent）
+        setAcceptDrops(true);
 
         m_image       = image;
         m_logicalSize = QSizeF(image.width(), image.height());
@@ -1313,6 +1325,44 @@ namespace GyanisScribe::Pin
         QMenu *menu = buildContextMenu();
         menu->exec(event->globalPos());
         delete menu;
+    }
+
+    void PinWindow::dragEnterEvent(QDragEnterEvent *event)
+    {
+        // 标注中不收拖放：这一阵子这张图是一张画布，往画布上丢文件不是任何人的意图
+        if (m_annotating)
+        {
+            return;
+        }
+
+        // 只做粗判：带文件、图像或文本就收下。细判要在落下那一刻读文件，
+        // 拖动途中读一遍纯属白费——具体的可用性与拒绝原因由内容渲染那一层回答
+        if (dragPayloadIsPinnable(event->mimeData()))
+        {
+            event->acceptProposedAction();
+        }
+    }
+
+    void PinWindow::dragMoveEvent(QDragMoveEvent *event)
+    {
+        // 与进入同一判据：拖动途中不逐格放行的话，这一拖根本落不下来
+        if (dragPayloadIsPinnable(event->mimeData()))
+        {
+            event->acceptProposedAction();
+        }
+    }
+
+    void PinWindow::dropEvent(QDropEvent *event)
+    {
+        if (m_annotating || event->mimeData() == nullptr)
+        {
+            return;
+        }
+
+        event->acceptProposedAction();
+        // 只报「谁被拖到了哪」：渲染成什么、贴几张、失败怎么说，都是界面层的事；
+        // 载荷指针只在本次事件处理期间有效，接收方要当场把它读掉
+        emit dropRequested(event->mimeData(), mapToGlobal(event->position().toPoint()));
     }
 
 } // namespace GyanisScribe::Pin

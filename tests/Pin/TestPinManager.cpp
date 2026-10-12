@@ -16,8 +16,11 @@
 
 #include <QApplication>
 #include <QColor>
+#include <QDragEnterEvent>
+#include <QDropEvent>
 #include <QImage>
 #include <QKeyEvent>
+#include <QMimeData>
 #include <QPoint>
 
 #include <filesystem>
@@ -335,6 +338,43 @@ namespace GyanisScribe
 
         ASSERT_TRUE(at.has_value()) << "「另贴一张」没从管理器转发出去";
         EXPECT_EQ(*at, window->globalRect().topLeft() + QPoint(24, 24)) << "新贴图该落在源贴图右下偏一格的位置";
+    }
+
+    /**
+     * @brief 钉住拖到贴图上的内容从管理器转发出去：载荷原样、落点是全局坐标
+     * @details 与「另贴一张」同一条形状：窗口、管理器都只报事实，渲染与建帖是界面层的事。
+     */
+    TEST_F(PinManagerFixture, DropOnAPinIsForwardedWithThePayloadAndPoint)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(50, 60));
+        auto *window = dynamic_cast<Pin::PinWindow *>(pins.pinAt(0));
+        ASSERT_NE(window, nullptr) << "管理器里的贴图不是 PinWindow，这一条判据接不上";
+        window->move(50, 60);
+
+        QMimeData mime;
+        mime.setText(QStringLiteral("dropped text"));
+
+        const QMimeData      *seen = nullptr;
+        std::optional<QPoint> at;
+        QObject::connect(&pins, &Pin::PinManager::pinDropRequested,
+                         [&](const QMimeData *data, const QPoint &globalTopLeft)
+                         {
+                             seen = data;
+                             at   = globalTopLeft;
+                         });
+
+        // 先收下 DragEnter：QApplication::notify 只把 Drop 投给收下过 DragEnter 的窗口
+        QDragEnterEvent enter{QPoint{4, 6}, Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(window, &enter);
+        ASSERT_TRUE(enter.isAccepted()) << "拖动进入没收下，后面的落下无从谈起";
+
+        QDropEvent drop{QPointF{4.0, 6.0}, Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(window, &drop);
+
+        EXPECT_EQ(seen, &mime) << "拖放载荷没转发给界面层，没人能替它渲染";
+        ASSERT_TRUE(at.has_value());
+        EXPECT_EQ(*at, QPoint(54, 66)) << "落点没换算回全局坐标";
     }
 
 } // namespace GyanisScribe

@@ -1,11 +1,15 @@
 #include "App/ClipboardPin.h"
 
+#include "Core/Paths.h"
 #include "Core/Text.h"
+#include "Pin/PinManager.h"
 
 #include <QFontMetrics>
+#include <QImageReader>
 #include <QMimeData>
 #include <QPainter>
 #include <QPen>
+#include <QUrl>
 #include <QVariant>
 
 #include <algorithm>
@@ -20,6 +24,9 @@ namespace GyanisScribe::App
         const QColor kCardBackground{252, 252, 252};
         const QColor kCardText{24, 24, 24};
         const QColor kCardBorder{220, 224, 230};
+
+        /// 一次拖放贴出多张时，后一张相对前一张向右下错开的格数：完全叠住会让人以为只贴上一张
+        constexpr int kDropPinCascadeStride = 24;
 
         /**
          * @brief 看一段文本是不是「一种颜色」
@@ -95,6 +102,86 @@ namespace GyanisScribe::App
                                                               trimmed.size(), static_cast<int>(kMaximumTextCardCharacters))});
         }
         return renderTextCard(trimmed, font);
+    }
+
+    Core::Expected<DropContent> dropContentFrom(const QMimeData *data, const QFont &font)
+    {
+        if (data == nullptr)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, Core::uiTextUtf8("拖进来的东西没有可读的内容，贴不出来")});
+        }
+
+        // 有文件就按文件走：拖一叠图片进来该贴出一叠，不是只看第一件
+        if (data->hasUrls())
+        {
+            DropContent content;
+            for (const auto &url: data->urls())
+            {
+                // 链接（网页地址等）按文本卡片贴：URL 本身就是一行字，渲染成卡片才立得住
+                if (!url.isLocalFile())
+                {
+                    content.contents.push_back(PinContent{renderTextCard(url.toString(), font), QString()});
+                    continue;
+                }
+
+                const auto   path = Core::Paths::fromDisplayText(url.toLocalFile());
+                QImageReader reader{Core::Paths::toDisplayText(path)};
+                // EXIF 里带方向的照片按显示方向摆正：贴出来的该是「相机给我们看的样子」
+                reader.setAutoTransform(true);
+                const QImage image = reader.read();
+                if (image.isNull())
+                {
+                    content.rejectedNames.append(url.fileName());
+                    continue;
+                }
+
+                PinContent single;
+                single.image = image;
+                if (reader.supportsAnimation() && reader.imageCount() > 1)
+                {
+                    // 动图把来源路径一起带走：贴上去会接着播（与布局恢复那一路同解）
+                    single.animatedSource = Core::Paths::toDisplayText(path);
+                }
+                content.contents.push_back(std::move(single));
+            }
+
+            if (!content.contents.empty())
+            {
+                return content;
+            }
+            return std::unexpected(
+                    Core::Error{Core::ErrorCode::InvalidArgument, Core::uiFormat(Core::uiTextUtf8("拖进来的文件不是图片或读不出来：{}。图片文件、链接与文本都可以贴"),
+                                                                                 content.rejectedNames.join(QStringLiteral("、")).toStdString())});
+        }
+
+        // 没有文件：退回剪贴板那套单件内容（图像 / 颜色卡 / 文本卡），两条路不会将来只改一处
+        const auto single = pinContentFrom(data, font);
+        if (!single)
+        {
+            return std::unexpected(single.error());
+        }
+        DropContent content;
+        content.contents.push_back(PinContent{*single, QString()});
+        return content;
+    }
+
+    Core::Expected<DropPinOutcome> pinDroppedContent(Pin::PinManager &pins, const QMimeData *data, const QPoint &globalTopLeft, const QFont &font)
+    {
+        const auto content = dropContentFrom(data, font);
+        if (!content)
+        {
+            return std::unexpected(content.error());
+        }
+
+        DropPinOutcome outcome;
+        for (const auto &single: content->contents)
+        {
+            const auto at = globalTopLeft + QPoint{kDropPinCascadeStride * outcome.pinnedCount, kDropPinCascadeStride * outcome.pinnedCount};
+            pins.addPin(single.image, at, single.animatedSource);
+            ++outcome.pinnedCount;
+        }
+        outcome.rejectedNames = content->rejectedNames;
+        return outcome;
     }
 
     QImage renderTextCard(const QString &text, const QFont &font)

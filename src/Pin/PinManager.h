@@ -20,6 +20,8 @@
 #include <memory>
 #include <vector>
 
+class QMimeData;
+
 namespace GyanisScribe::Platform
 {
     class IPlatformIntegration;
@@ -202,6 +204,15 @@ namespace GyanisScribe::Pin
          * @details 与 pinOcrRequested 同一条形状：只有这个出口能让界面层拿到「贴一张新的」这件事
          */
         void pinAnotherRequested(const QImage &image, const QPoint &globalTopLeft);
+
+        /**
+         * @brief 有东西被拖到某张贴图上（盘上的文件、链接或文本）
+         * @param data 拖放载荷，只在本次事件处理期间有效
+         * @param globalTopLeft 落点的全局坐标
+         * @details 与 pinOcrRequested 同一条形状：贴图在外头拿不到，出口不收在这一层
+         *          就没人能替它把载荷渲染成新贴图
+         */
+        void pinDropRequested(const QMimeData *data, const QPoint &globalTopLeft);
 
     private:
         /// 把某个已自行关闭的窗口从登记里摘掉
