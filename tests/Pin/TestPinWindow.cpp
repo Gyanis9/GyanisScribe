@@ -936,6 +936,28 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住选中态那一圈：选进多选集的贴图在边缘画一圈强调色（没选中、没悬停时边缘是图自己的色）
+     */
+    TEST_F(PinWindowFixture, SelectedPinPaintsAnAccentBorder)
+    {
+        auto &window = makeWindow();
+
+        const auto edgeColor = [&window]
+        {
+            QImage canvas{window.size(), QImage::Format_ARGB32};
+            canvas.fill(Qt::transparent);
+            window.render(&canvas);
+            return canvas.pixelColor(0, window.height() / 2);
+        };
+
+        EXPECT_EQ(edgeColor(), QColor(200, 60, 60)) << "没选中也没悬停时边缘该是图自己的色，后面的对照没有基准";
+        window.setSelected(true);
+        EXPECT_NE(edgeColor(), QColor(200, 60, 60)) << "选中之后边缘还是原色：选中圈没画出来";
+        window.setSelected(false);
+        EXPECT_EQ(edgeColor(), QColor(200, 60, 60)) << "取消选中之后圈还留着";
+    }
+
+    /**
      * @brief 2×2 的四格图：左上红、右上绿、左下蓝、右下黄——翻转与滤镜在屏上都能一眼读数
      */
     QImage makeQuadImage()

@@ -168,6 +168,18 @@ namespace GyanisScribe::Pin
          */
         [[nodiscard]] Core::Expected<void> movePinToGroup(int index, int group);
 
+        /// 选中集里有几张（0 表示一张都没选）
+        [[nodiscard]] int selectedPinCount() const noexcept;
+
+        /**
+         * @brief 把这一张切进/切出选中集（Ctrl+点选那一路）
+         * @param pin 被点的那一张；切完把「一共几张」推给每一张（窗口不知道兄弟，选中集是这一层的账）
+         */
+        void togglePinSelection(PinWindow &pin);
+
+        /// 清空选中集（贴图自己的「取消选择」、切组与整桌收起时都走这里）
+        void clearPinSelection();
+
     signals:
         /**
          * @brief 贴图张数变了
@@ -217,6 +229,16 @@ namespace GyanisScribe::Pin
     private:
         /// 把某个已自行关闭的窗口从登记里摘掉
         void forget(PinWindow *window);
+
+        /**
+         * @brief 一次动作作用到哪些贴图上
+         * @param source 发起动作的那一张
+         * @return 这张在选中集里且选中不止一张时是整组，否则只有它自己
+         */
+        [[nodiscard]] std::vector<PinWindow *> pinsAffectedBy(PinWindow &source) const;
+
+        /// 选中集变了之后把「一共几张」推给每一张
+        void publishSelection();
 
         /// 活动组已经不在册（最后一张被关掉、或布局里换过组）时回落到第一组
         void normalizeActiveGroup();

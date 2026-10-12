@@ -52,6 +52,38 @@
 
 namespace GyanisScribe::Pin
 {
+    void applyPinBatchAction(PinWindow &pin, const PinBatchAction action, const bool value)
+    {
+        switch (action)
+        {
+            case PinBatchAction::AlwaysOnTop:
+                pin.setAlwaysOnTop(value);
+                break;
+            case PinBatchAction::MouseThrough:
+                if (const auto applied = pin.setMouseThrough(value); !applied)
+                {
+                    // 没能力的平台上穿透这一项在菜单里根本不出现；走到这里仍是能力表与菜单不一致的那条兜底
+                    Core::Logger::error(applied.error().message);
+                }
+                break;
+            case PinBatchAction::Thumbnail:
+                pin.setThumbnailMode(value);
+                break;
+            case PinBatchAction::Grayscale:
+                pin.setGrayscale(value);
+                break;
+            case PinBatchAction::Inverted:
+                pin.setInverted(value);
+                break;
+            case PinBatchAction::FlipHorizontal:
+                pin.setMirroredHorizontally(value);
+                break;
+            case PinBatchAction::FlipVertical:
+                pin.setMirroredVertically(value);
+                break;
+        }
+    }
+
     namespace
     {
         /// 手柄边长，逻辑像素
@@ -71,6 +103,9 @@ namespace GyanisScribe::Pin
 
         /// 选中边框与悬停边框的描边宽度
         constexpr int kBorderWidth = 1;
+
+        /// 选进多选集时的边框宽，逻辑像素：比悬停那一圈粗一档，一眼分得出这一组是哪几张
+        constexpr int kSelectedBorderWidth = 2;
 
         /// 贴图的最小边长，逻辑像素：再小就找不到也拖不动
         constexpr double kMinimumEdge = 8.0;
@@ -251,6 +286,27 @@ namespace GyanisScribe::Pin
     bool PinWindow::inverted() const noexcept
     {
         return m_inverted;
+    }
+
+    bool PinWindow::isSelected() const noexcept
+    {
+        return m_selected;
+    }
+
+    void PinWindow::setSelected(const bool selected)
+    {
+        m_selected = selected;
+        update();
+    }
+
+    int PinWindow::selectionCount() const noexcept
+    {
+        return m_selectionCount;
+    }
+
+    void PinWindow::setSelectionCount(const int count)
+    {
+        m_selectionCount = count;
     }
 
     const QImage &PinWindow::displayImage() const
@@ -1068,12 +1124,13 @@ namespace GyanisScribe::Pin
         painter.drawImage(content, displayImage(), QRectF(QPointF(0.0, 0.0), QSizeF(m_image.width(), m_image.height())));
         painter.resetTransform();
 
-        // 悬停或选中才画边框，平时一张干净的图压在屏幕上不该有装饰
-        const bool decorated = underMouse() || m_draggedHandle.has_value();
+        // 悬停、拖手柄或选进多选集才画边框，平时一张干净的图压在屏幕上不该有装饰；
+        // 选中的那一圈加粗一档：多选之后一眼看得出这一组是哪几张
+        const bool decorated = underMouse() || m_draggedHandle.has_value() || m_selected;
         if (decorated)
         {
             auto border = QPen(GyanisScribe::Ui::kAccentColor);
-            border.setWidth(kBorderWidth);
+            border.setWidth(m_selected ? kSelectedBorderWidth : kBorderWidth);
             painter.setPen(border);
             painter.setBrush(Qt::NoBrush);
             painter.drawRect(rect().adjusted(0, 0, -1, -1));
@@ -1183,6 +1240,13 @@ namespace GyanisScribe::Pin
             return;
         }
 
+        // Ctrl+左键：切进/切出多选集（不拖动）。选中集是管理器的账，这里只报意图
+        if (event->modifiers().testFlag(Qt::ControlModifier))
+        {
+            emit selectionToggleRequested();
+            return;
+        }
+
         // 取色模式：点一下就把那一像素的颜色交出去，点完自己退出——与屏幕取色那边「点一下拿一个色」同一口径
         if (m_colorPickMode)
         {
@@ -1251,8 +1315,12 @@ namespace GyanisScribe::Pin
 
         if (event->buttons().testFlag(Qt::LeftButton))
         {
-            m_dragMoved = true;
-            move(event->globalPosition().toPoint() - m_dragOffset);
+            m_dragMoved         = true;
+            const QPoint target = event->globalPosition().toPoint() - m_dragOffset;
+            const QPoint delta  = target - pos();
+            move(target);
+            // 选中集里其余几张按同一位移跟着挪：本张已经挪过，管理器只动其余的
+            emit draggedWithSelection(delta);
         }
     }
 
@@ -1381,8 +1449,10 @@ namespace GyanisScribe::Pin
             return;
         }
 
-        // 不加修饰键就是缩放：按倍率乘除，滚轮一格 1.1 倍
-        setScale(steps > 0.0 ? m_scale * kWheelScaleStep : m_scale / kWheelScaleStep);
+        // 不加修饰键就是缩放：按倍率乘除，滚轮一格 1.1 倍。选中集里其余几张按同一倍率跟着缩
+        const double factor = steps > 0.0 ? kWheelScaleStep : 1.0 / kWheelScaleStep;
+        setScale(m_scale * factor);
+        emit scaledWithSelection(factor);
     }
 
     void PinWindow::keyPressEvent(QKeyEvent *event)
@@ -1418,8 +1488,16 @@ namespace GyanisScribe::Pin
                 setColorPickMode(false);
                 return;
             }
-            emit closedByUser();
+            // 多选里 Esc 先清选择（关闭是一组一起的动作，得再按一次才落）
+            if (m_selected && m_selectionCount > 1)
+            {
+                emit clearSelectionRequested();
+                return;
+            }
+            // 先自己收场再报出去：管理器收到之后会把这张（与选中集里其余几张）从册上摘掉、
+            // 当场析构；反过来先报再收场，回调回来时 this 已经没了
             close();
+            emit closedByUser();
             return;
         }
 
@@ -1504,6 +1582,16 @@ namespace GyanisScribe::Pin
     QMenu *PinWindow::buildContextMenu()
     {
         auto *menu = new QMenu(this);
+
+        // 多选里的这一张：菜单头上一句读数，末尾一项取消选择；下面那些状态开关对整组生效
+        const bool inMultiSelection = m_selected && m_selectionCount > 1;
+        if (inMultiSelection)
+        {
+            auto *countLabel = menu->addAction(GyanisScribe::Core::uiText("已选中 %1 张").arg(m_selectionCount));
+            countLabel->setEnabled(false);
+            menu->addSeparator();
+        }
+
         menu->addAction(GyanisScribe::Core::uiText("复制"), this, &PinWindow::copyToClipboard);
         // 复制为文件：剪贴板里放的是一条本地文件路径，粘进资源管理器/聊天窗口得到一份 .png
         // （与「复制」是两条出口：那一条粘进文档里是一张图）
@@ -1562,7 +1650,13 @@ namespace GyanisScribe::Pin
             cropAction->setToolTip(GyanisScribe::Core::uiText("动图不能裁剪：裁完会被下一帧盖回原尺寸。请先保存成静态图，再把那张贴出来裁"));
         }
 
-        auto *thumbnailAction = menu->addAction(GyanisScribe::Core::uiText("缩到小图"), this, [this] { setThumbnailMode(!m_thumbnail); });
+        auto *thumbnailAction = menu->addAction(GyanisScribe::Core::uiText("缩到小图"), this,
+                                                [this]
+                                                {
+                                                    const bool wanted = !m_thumbnail;
+                                                    applyPinBatchAction(*this, PinBatchAction::Thumbnail, wanted);
+                                                    emit batchActionRequested(PinBatchAction::Thumbnail, wanted);
+                                                });
         thumbnailAction->setCheckable(true);
         thumbnailAction->setChecked(m_thumbnail);
 
@@ -1590,18 +1684,22 @@ namespace GyanisScribe::Pin
         menu->addSeparator();
 
         const auto capabilities = m_integration.capabilities();
-        auto      *pinAction    = menu->addAction(GyanisScribe::Core::uiText("保持置顶"), this, [this] { setAlwaysOnTop(!m_pinned); });
+        auto      *pinAction    = menu->addAction(GyanisScribe::Core::uiText("保持置顶"), this,
+                                                  [this]
+                                                  {
+                                              const bool wanted = !m_pinned;
+                                              applyPinBatchAction(*this, PinBatchAction::AlwaysOnTop, wanted);
+                                              emit batchActionRequested(PinBatchAction::AlwaysOnTop, wanted);
+                                                  });
         pinAction->setCheckable(true);
         pinAction->setChecked(m_pinned);
 
         auto *throughAction = menu->addAction(GyanisScribe::Core::uiText("鼠标穿透"), this,
                                               [this]
                                               {
-                                                  if (const auto result = setMouseThrough(!m_mouseThrough); !result)
-                                                  {
-                                                      // 菜单项在没能力的平台上直接不出现，走到这里说明能力表与菜单不一致：记一条错误按实际状态回退
-                                                      Core::Logger::error(result.error().message);
-                                                  }
+                                                  const bool wanted = !m_mouseThrough;
+                                                  applyPinBatchAction(*this, PinBatchAction::MouseThrough, wanted);
+                                                  emit batchActionRequested(PinBatchAction::MouseThrough, wanted);
                                               });
         throughAction->setCheckable(true);
         throughAction->setChecked(m_mouseThrough);
@@ -1611,25 +1709,56 @@ namespace GyanisScribe::Pin
         // 视图变换四档：翻转与灰度/反色都只改「看」，复制、保存、标注拿到的仍是原始像素——
         // 与旋转同一条规矩。菜单项的勾选态就是当前读数，键位与它们同一条路（H/V/G/I）
         menu->addSeparator();
-        auto *flipHorizontalAction = menu->addAction(GyanisScribe::Core::uiText("左右翻转"), this, [this] { setMirroredHorizontally(!m_mirroredHorizontally); });
+        auto *flipHorizontalAction = menu->addAction(GyanisScribe::Core::uiText("左右翻转"), this,
+                                                     [this]
+                                                     {
+                                                         const bool wanted = !m_mirroredHorizontally;
+                                                         applyPinBatchAction(*this, PinBatchAction::FlipHorizontal, wanted);
+                                                         emit batchActionRequested(PinBatchAction::FlipHorizontal, wanted);
+                                                     });
         flipHorizontalAction->setCheckable(true);
         flipHorizontalAction->setChecked(m_mirroredHorizontally);
-        auto *flipVerticalAction = menu->addAction(GyanisScribe::Core::uiText("上下翻转"), this, [this] { setMirroredVertically(!m_mirroredVertically); });
+        auto *flipVerticalAction = menu->addAction(GyanisScribe::Core::uiText("上下翻转"), this,
+                                                   [this]
+                                                   {
+                                                       const bool wanted = !m_mirroredVertically;
+                                                       applyPinBatchAction(*this, PinBatchAction::FlipVertical, wanted);
+                                                       emit batchActionRequested(PinBatchAction::FlipVertical, wanted);
+                                                   });
         flipVerticalAction->setCheckable(true);
         flipVerticalAction->setChecked(m_mirroredVertically);
-        auto *grayscaleAction = menu->addAction(GyanisScribe::Core::uiText("灰度显示"), this, [this] { setGrayscale(!m_grayscale); });
+        auto *grayscaleAction = menu->addAction(GyanisScribe::Core::uiText("灰度显示"), this,
+                                                [this]
+                                                {
+                                                    const bool wanted = !m_grayscale;
+                                                    applyPinBatchAction(*this, PinBatchAction::Grayscale, wanted);
+                                                    emit batchActionRequested(PinBatchAction::Grayscale, wanted);
+                                                });
         grayscaleAction->setCheckable(true);
         grayscaleAction->setChecked(m_grayscale);
-        auto *invertAction = menu->addAction(GyanisScribe::Core::uiText("反色"), this, [this] { setInverted(!m_inverted); });
+        auto *invertAction = menu->addAction(GyanisScribe::Core::uiText("反色"), this,
+                                             [this]
+                                             {
+                                                 const bool wanted = !m_inverted;
+                                                 applyPinBatchAction(*this, PinBatchAction::Inverted, wanted);
+                                                 emit batchActionRequested(PinBatchAction::Inverted, wanted);
+                                             });
         invertAction->setCheckable(true);
         invertAction->setChecked(m_inverted);
+
+        if (inMultiSelection)
+        {
+            menu->addSeparator();
+            menu->addAction(GyanisScribe::Core::uiText("取消选择（%1 张）").arg(m_selectionCount), this, [this] { emit clearSelectionRequested(); });
+        }
 
         menu->addSeparator();
         menu->addAction(GyanisScribe::Core::uiText("关闭"), this,
                         [this]
                         {
-                            emit closedByUser();
+                            // 与 Esc 那条同一条次序：先自己收场再报出去（管理器收到后会现场析构这一张）
                             close();
+                            emit closedByUser();
                         });
         return menu;
     }

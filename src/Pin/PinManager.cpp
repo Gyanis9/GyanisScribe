@@ -31,6 +31,7 @@ namespace
 
     /// 「另贴一张」的落点相对源贴图左上角的偏移，逻辑像素：完全叠住会让人以为没贴出来
     constexpr int kPinAgainOffset = 24;
+
 } // namespace
 
 namespace GyanisScribe::Pin
@@ -54,7 +55,15 @@ namespace GyanisScribe::Pin
         raw->setAnimatedSource(animatedSource);
 
         // 窗口自己关掉了（Esc 或菜单里的关闭）就要从登记里摘掉，不然这里会留一个已析构的指针
-        QObject::connect(raw, &PinWindow::closedByUser, this, [this, raw] { forget(raw); });
+        QObject::connect(raw, &PinWindow::closedByUser, this,
+                         [this, raw]
+                         {
+                             // 选中集里按关闭＝整组一起关：先把范围抄下来再逐个摘（每摘一张名单都变一次）
+                             for (auto *pin: pinsAffectedBy(*raw))
+                             {
+                                 forget(pin);
+                             }
+                         });
         // 识别请求逐张转发出去：贴图在外头拿不到，出口不收在这一层就没人能替它识别
         QObject::connect(raw, &PinWindow::ocrRequested, this, &PinManager::pinOcrRequested);
         // 取色同理：窗口只管「点到了哪一格」，复制到剪贴板与提示都是界面层的事
@@ -80,6 +89,43 @@ namespace GyanisScribe::Pin
                              if (const auto moved = movePinToGroup(static_cast<int>(found - m_pins.begin()), group); !moved)
                              {
                                  Core::Logger::warning(moved.error().message);
+                             }
+                         });
+
+        // 多选：切选与清空都是这一层的账；拖动与缩放只叫其余的几张跟着动（发起的那张自己已经动过）
+        QObject::connect(raw, &PinWindow::selectionToggleRequested, this, [this, raw] { togglePinSelection(*raw); });
+        QObject::connect(raw, &PinWindow::clearSelectionRequested, this, [this] { clearPinSelection(); });
+        QObject::connect(raw, &PinWindow::draggedWithSelection, this,
+                         [this, raw](const QPoint &delta)
+                         {
+                             for (auto *pin: pinsAffectedBy(*raw))
+                             {
+                                 if (pin != raw)
+                                 {
+                                     pin->move(pin->pos() + delta);
+                                 }
+                             }
+                         });
+        QObject::connect(raw, &PinWindow::scaledWithSelection, this,
+                         [this, raw](const double factor)
+                         {
+                             for (auto *pin: pinsAffectedBy(*raw))
+                             {
+                                 if (pin != raw)
+                                 {
+                                     pin->setScale(pin->scale() * factor);
+                                 }
+                             }
+                         });
+        QObject::connect(raw, &PinWindow::batchActionRequested, this,
+                         [this, raw](const PinBatchAction action, const bool value)
+                         {
+                             for (auto *pin: pinsAffectedBy(*raw))
+                             {
+                                 if (pin != raw)
+                                 {
+                                     applyPinBatchAction(*pin, action, value);
+                                 }
                              }
                          });
 
@@ -245,7 +291,55 @@ namespace GyanisScribe::Pin
     int PinManager::setAllPinsConcealed(const bool concealed)
     {
         m_allConcealed = concealed;
+        // 整桌收起时清掉选择：选着一张看不见的贴图，后面的整组动作会落到屏上没有的东西上
+        clearPinSelection();
         return applyGroupVisibility();
+    }
+
+    int PinManager::selectedPinCount() const noexcept
+    {
+        return static_cast<int>(std::ranges::count_if(m_pins, [](const auto &pin) { return pin->isSelected(); }));
+    }
+
+    void PinManager::togglePinSelection(PinWindow &pin)
+    {
+        pin.setSelected(!pin.isSelected());
+        publishSelection();
+    }
+
+    void PinManager::clearPinSelection()
+    {
+        for (auto &pin: m_pins)
+        {
+            pin->setSelected(false);
+        }
+        publishSelection();
+    }
+
+    std::vector<PinWindow *> PinManager::pinsAffectedBy(PinWindow &source) const
+    {
+        if (source.isSelected() && selectedPinCount() > 1)
+        {
+            std::vector<PinWindow *> affected;
+            for (auto &pin: m_pins)
+            {
+                if (pin->isSelected())
+                {
+                    affected.push_back(pin.get());
+                }
+            }
+            return affected;
+        }
+        return {&source};
+    }
+
+    void PinManager::publishSelection()
+    {
+        const auto count = selectedPinCount();
+        for (auto &pin: m_pins)
+        {
+            pin->setSelectionCount(count);
+        }
     }
 
     int PinManager::activeGroup() const noexcept
@@ -280,6 +374,8 @@ namespace GyanisScribe::Pin
         // 活动组不在册（刚被关掉最后一张）时从第一组接着走：indexOf 给 -1，加一取模正好落回 0
         const auto current = groups.indexOf(m_activeGroup);
         m_activeGroup      = groups[(current + 1) % groups.size()];
+        // 换组换的是一桌人：留着的选中集会指向看不见的那几张，先清掉
+        clearPinSelection();
         applyGroupVisibility();
         return m_activeGroup;
     }
@@ -367,6 +463,8 @@ namespace GyanisScribe::Pin
         // 关掉的若是活动组的最后一张，剩下的组要顶上来：不然桌上一张不剩，看不出是关掉了还是出错了
         normalizeActiveGroup();
         applyGroupVisibility();
+        // 少了一张，选中集的张数读数跟着改（关掉的若在选中集里，它已经不在册了）
+        publishSelection();
         emit pinCountChanged(count());
     }
 

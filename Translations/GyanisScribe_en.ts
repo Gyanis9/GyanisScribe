@@ -1996,6 +1996,10 @@
             <translation>Saving the pinned image failed: {}. Check that the directory is writable, or copy this image to the clipboard first.</translation>
         </message>
         <message>
+            <source>已选中 %1 张</source>
+            <translation>%1 selected</translation>
+        </message>
+        <message>
             <source>复制</source>
             <translation>Copy</translation>
         </message>
@@ -2074,6 +2078,10 @@
         <message>
             <source>反色</source>
             <translation>Invert colors</translation>
+        </message>
+        <message>
+            <source>取消选择（%1 张）</source>
+            <translation>Deselect (%1)</translation>
         </message>
         <message>
             <source>Linux（降级实现）</source>

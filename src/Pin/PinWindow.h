@@ -49,6 +49,39 @@ namespace GyanisScribe::Ui
 
 namespace GyanisScribe::Pin
 {
+    class PinManager;
+
+    /**
+     * @brief 可以「整组动」的状态开关
+     * @details 多选时这些动作对整组生效（范围由 PinManager 决定：这张在选中集里就整组，否则只有它自己）；
+     *          内容相关的操作（标注、裁剪、取色、保存、识别文字、分组）不走这一档，它们指向的是
+     *          「这一张的内容」；键位（`R`/`0`/`H`/`V`/`G`/`I`/`T`）也只动这一张——菜单是整组的入口。
+     */
+    enum class PinBatchAction
+    {
+        AlwaysOnTop,    ///< 保持置顶
+        MouseThrough,   ///< 鼠标穿透
+        Thumbnail,      ///< 缩到小图
+        Grayscale,      ///< 灰度显示
+        Inverted,       ///< 反色
+        FlipHorizontal, ///< 左右翻转
+        FlipVertical,   ///< 上下翻转
+    };
+
+    /// 前置声明：整组动那一档的落地函数在两处共用（见下）
+    class PinWindow;
+
+    /**
+     * @brief 把整组动那一档里的某个开关落到一张贴图上
+     * @param pin 目标贴图
+     * @param action 哪个开关
+     * @param value 要设成什么值
+     * @details 菜单项自己先落一遍（裸窗口没有管理器时也照样生效），再发信号让管理器把
+     *          选中集里**其余**几张按同一个值落一遍——两处共用这一个函数，
+     *          「设进去哪些字段」不会各写一份。
+     */
+    void applyPinBatchAction(PinWindow &pin, PinBatchAction action, bool value);
+
 
     /**
      * @brief 贴图窗口
@@ -246,6 +279,24 @@ namespace GyanisScribe::Pin
         /// 此刻是否反色
         [[nodiscard]] bool inverted() const noexcept;
 
+        /// 此刻是否被选进多选集
+        [[nodiscard]] bool isSelected() const noexcept;
+
+        /**
+         * @brief 设选中态（管理器推下来；窗口自己不知道兄弟，选没选中由它说了算）
+         * @param selected 选中还是没选
+         */
+        void setSelected(bool selected);
+
+        /// 此刻选中集里有几张（管理器推下来；0 表示一张都没选）
+        [[nodiscard]] int selectionCount() const noexcept;
+
+        /**
+         * @brief 设选中集张数（管理器推下来）
+         * @param count 选中集里的张数，含自己；0 表示一张都没选
+         */
+        void setSelectionCount(int count);
+
         /**
          * @brief 设不透明度，见 IPinWindow::setOpacityLevel()
          * @param opacity 取值 (0,1]，越界按边界取
@@ -377,6 +428,34 @@ namespace GyanisScribe::Pin
          *          贴图窗自己只管「点到了哪一格」
          */
         void colorPicked(const QColor &color);
+
+        /**
+         * @brief 用户按住 Ctrl 点了这一张：请管理器把它切进/切出选中集
+         * @details 窗口不知道兄弟在哪，选中集是管理器的账（与分组同一条口径：只报意图、不自己落账）
+         */
+        void selectionToggleRequested();
+
+        /// 用户点了「取消选择」：请管理器清空选中集
+        void clearSelectionRequested();
+
+        /**
+         * @brief 这一张刚被拖动 @p delta ：请管理器把选中集里其余几张按同一位移跟着挪
+         * @param delta 这一次移动的位移（本张已经自己挪过了，管理器只动其余的）
+         */
+        void draggedWithSelection(const QPoint &delta);
+
+        /**
+         * @brief 这一张刚被按下倍率 @p factor 缩过：请管理器把选中集里其余几张按同一倍率缩
+         * @param factor 本次缩放的倍率（本张已经自己缩过了，管理器只动其余的）
+         */
+        void scaledWithSelection(double factor);
+
+        /**
+         * @brief 菜单里点了某个状态开关：多选时由管理器对整组生效
+         * @param action 哪个开关
+         * @param value 要设成什么值（开关都是「设进去一个值」，不是自己翻）
+         */
+        void batchActionRequested(GyanisScribe::Pin::PinBatchAction action, bool value);
 
         /**
          * @brief 标注模式下点了「贴到屏幕上」：把成品另贴一张新贴图
@@ -566,6 +645,8 @@ namespace GyanisScribe::Pin
         bool                                                 m_grayscale            = false;             ///< 灰度显示（视图滤镜）
         bool                                                 m_inverted             = false;             ///< 反色（视图滤镜）
         bool                                                 m_cropping             = false;             ///< 裁剪模式
+        bool                                                 m_selected             = false;             ///< 在不在多选集中
+        int                                                  m_selectionCount       = 0;                 ///< 选中集里的张数（管理器推下来）
         std::optional<QPointF>                               m_cropAnchor;                               ///< 裁剪框起笔点（窗口坐标）；没拖过时为空
         std::optional<QPointF>                               m_cropCurrent;                              ///< 裁剪框当前点（窗口坐标）
         double                                               m_rotationBeforeCrop           = 0.0;       ///< 进裁剪前的旋转角，退出时恢复

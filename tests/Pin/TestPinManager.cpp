@@ -19,7 +19,11 @@
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QImage>
+#include <QAction>
 #include <QKeyEvent>
+#include <QMenu>
+#include <QMouseEvent>
+#include <QWheelEvent>
 #include <QMimeData>
 #include <QPoint>
 
@@ -111,6 +115,18 @@ namespace GyanisScribe
         [[nodiscard]] bool isOnDesk(const Pin::IPinWindow *pin)
         {
             return pin != nullptr && !pin->isConcealed();
+        }
+        /// 按文案找菜单项：用文案定位比记序号稳
+        [[nodiscard]] QAction *findAction(QMenu &menu, const QString &text)
+        {
+            for (auto *action: menu.actions())
+            {
+                if (action->text() == text)
+                {
+                    return action;
+                }
+            }
+            return nullptr;
         }
     } // namespace
 
@@ -375,6 +391,200 @@ namespace GyanisScribe
         EXPECT_EQ(seen, &mime) << "拖放载荷没转发给界面层，没人能替它渲染";
         ASSERT_TRUE(at.has_value());
         EXPECT_EQ(*at, QPoint(54, 66)) << "落点没换算回全局坐标";
+    }
+
+    /**
+     * @brief 钉住 Ctrl+点选：切进/切出选中集，张数读数推给每一张
+     */
+    TEST_F(PinManagerFixture, ControllerClickTogglesTheSelectionAndPublishesTheCount)
+    {
+        auto &pins  = makeManager();
+        auto &first = static_cast<Pin::PinWindow &>(pins.addPin(makeImage(), QPoint(10, 10)));
+        auto &other = static_cast<Pin::PinWindow &>(pins.addPin(makeImage(), QPoint(80, 80)));
+
+        const auto controlClick = [](QWidget &target)
+        {
+            QMouseEvent press{QEvent::MouseButtonPress, QPointF{5.0, 5.0}, QPointF{5.0, 5.0}, Qt::LeftButton, Qt::LeftButton, Qt::ControlModifier};
+            QApplication::sendEvent(&target, &press);
+        };
+
+        EXPECT_EQ(pins.selectedPinCount(), 0);
+        controlClick(first);
+        EXPECT_TRUE(first.isSelected()) << "Ctrl+点一下没把它切进选中集";
+        EXPECT_EQ(pins.selectedPinCount(), 1);
+        EXPECT_EQ(first.selectionCount(), 1) << "张数读数没推给自己";
+
+        controlClick(other);
+        EXPECT_EQ(pins.selectedPinCount(), 2);
+        EXPECT_EQ(first.selectionCount(), 2) << "张数读数没推给先前选中的那一张";
+
+        controlClick(first);
+        EXPECT_FALSE(first.isSelected()) << "再点一次该切出去";
+        EXPECT_TRUE(other.isSelected());
+        EXPECT_EQ(pins.selectedPinCount(), 1);
+    }
+
+    /**
+     * @brief 钉住整组拖动：拖着选中集里的任意一张，其余几张按同一位移跟着挪
+     */
+    TEST_F(PinManagerFixture, DraggingASelectedPinCarriesTheWholeSelection)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(10, 10));
+        pins.addPin(makeImage(), QPoint(80, 80));
+        auto *first = pins.pinAt(0);
+        auto *other = pins.pinAt(1);
+        ASSERT_NE(first, nullptr);
+        ASSERT_NE(other, nullptr);
+
+        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*first));
+        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*other));
+        ASSERT_EQ(pins.selectedPinCount(), 2);
+
+        const QPoint otherBefore = other->globalRect().topLeft();
+        const QPoint firstBefore = first->globalRect().topLeft();
+
+        // 从窗口正中起手：角与边中点上摆着缩放手柄，按在那里会变成「改大小」而不是「挪位置」
+        auto       *target = static_cast<Pin::PinWindow *>(first);
+        QMouseEvent press{QEvent::MouseButtonPress, QPointF{16.0, 16.0}, QPointF{16.0, 16.0}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(target, &press);
+        QMouseEvent move{QEvent::MouseMove, QPointF{36.0, 26.0}, QPointF{36.0, 26.0}, Qt::NoButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(target, &move);
+        QMouseEvent release{QEvent::MouseButtonRelease, QPointF{36.0, 26.0}, QPointF{36.0, 26.0}, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+        QApplication::sendEvent(target, &release);
+
+        const QPoint moved = first->globalRect().topLeft() - firstBefore;
+        ASSERT_NE(moved, QPoint(0, 0)) << "这一拖本身没挪动，后面的对照没有基准";
+        EXPECT_EQ(other->globalRect().topLeft(), otherBefore + moved) << "选中集里的另一张没按同一位移跟着挪";
+    }
+
+    /**
+     * @brief 钉住整组缩放：在一张上滚一格，选中集里其余的按同一倍率跟着缩
+     */
+    TEST_F(PinManagerFixture, WheelScaleFollowsTheSelection)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(10, 10));
+        pins.addPin(makeImage(), QPoint(80, 80));
+        auto *first = pins.pinAt(0);
+        auto *other = pins.pinAt(1);
+        ASSERT_NE(first, nullptr);
+        ASSERT_NE(other, nullptr);
+
+        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*first));
+        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*other));
+
+        QWheelEvent wheel{QPointF{5.0, 5.0}, QPointF{5.0, 5.0}, QPoint{0, 0}, QPoint{0, 120}, Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false};
+        QApplication::sendEvent(static_cast<Pin::PinWindow *>(first), &wheel);
+
+        EXPECT_GT(first->scale(), 1.0) << "在这一张上滚一格它自己没缩";
+        EXPECT_NEAR(other->scale(), first->scale(), 0.0001) << "选中集里的另一张没按同一倍率跟着缩";
+    }
+
+    /**
+     * @brief 钉住菜单里的状态开关对整组生效：多选时点「保持置顶」，整组一起翻
+     */
+    TEST_F(PinManagerFixture, BatchMenuAppliesToTheWholeSelection)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(10, 10));
+        pins.addPin(makeImage(), QPoint(80, 80));
+        auto *first = pins.pinAt(0);
+        auto *other = pins.pinAt(1);
+        ASSERT_NE(first, nullptr);
+        ASSERT_NE(other, nullptr);
+
+        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*first));
+        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*other));
+        ASSERT_TRUE(first->isAlwaysOnTop());
+
+        auto *menu      = static_cast<Pin::PinWindow *>(first)->buildContextMenu();
+        auto *pinAction = findAction(*menu, QString::fromUtf8("保持置顶"));
+        ASSERT_NE(pinAction, nullptr) << "菜单里没有「保持置顶」这一项";
+        pinAction->trigger();
+        delete menu;
+
+        EXPECT_FALSE(first->isAlwaysOnTop()) << "发起的那一张没跟着翻";
+        EXPECT_FALSE(other->isAlwaysOnTop()) << "选中集里的另一张没跟着翻";
+    }
+
+    /**
+     * @brief 钉住整组关闭：多选时按关闭＝整组一起关
+     */
+    TEST_F(PinManagerFixture, BatchCloseClosesTheWholeSelection)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(10, 10));
+        pins.addPin(makeImage(), QPoint(80, 80));
+        auto *first = pins.pinAt(0);
+        auto *other = pins.pinAt(1);
+        ASSERT_NE(first, nullptr);
+        ASSERT_NE(other, nullptr);
+
+        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*first));
+        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*other));
+
+        auto *menu      = static_cast<Pin::PinWindow *>(first)->buildContextMenu();
+        auto *closeItem = findAction(*menu, QString::fromUtf8("关闭"));
+        ASSERT_NE(closeItem, nullptr);
+        // 菜单是那一张的子对象：整组关闭把宿主也析构了，菜单跟着一起没——这里不再自己 delete
+        closeItem->trigger();
+
+        EXPECT_EQ(pins.count(), 0) << "多选里按关闭只关掉了这一张";
+    }
+
+    /**
+     * @brief 钉住 Esc 的两段含义：多选里先清选择，再按一次才关这一张
+     */
+    TEST_F(PinManagerFixture, EscapeClearsTheSelectionBeforeClosing)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(10, 10));
+        pins.addPin(makeImage(), QPoint(80, 80));
+        auto *first = pins.pinAt(0);
+        auto *other = pins.pinAt(1);
+        ASSERT_NE(first, nullptr);
+        ASSERT_NE(other, nullptr);
+
+        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*first));
+        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*other));
+
+        const auto escape = [](QWidget &target)
+        {
+            QKeyEvent event{QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier};
+            QApplication::sendEvent(&target, &event);
+        };
+
+        escape(*static_cast<Pin::PinWindow *>(first));
+        EXPECT_EQ(pins.selectedPinCount(), 0) << "第一次 Esc 没清选择";
+        EXPECT_EQ(pins.count(), 2) << "第一次 Esc 把贴图也关了：关闭是一组一起的动作，得再按一次";
+
+        escape(*static_cast<Pin::PinWindow *>(first));
+        EXPECT_EQ(pins.count(), 1) << "第二次 Esc 该关掉这一张";
+    }
+
+    /**
+     * @brief 钉住两处会清选择的时机：切组与整桌收起——留着的选中集会指向看不见的那几张
+     */
+    TEST_F(PinManagerFixture, SwitchingGroupsOrConcealingAllClearsTheSelection)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(10, 10));
+        pins.addPin(makeImage(), QPoint(80, 80));
+
+        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*pins.pinAt(0)));
+        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*pins.pinAt(1)));
+        ASSERT_EQ(pins.selectedPinCount(), 2);
+
+        // 建第二组再切过去：选中集该清空
+        ASSERT_TRUE(pins.movePinToGroup(1, 2).has_value());
+        ASSERT_TRUE(pins.switchToNextGroup().has_value());
+        EXPECT_EQ(pins.selectedPinCount(), 0) << "切组之后选中集还留着：那几张已经不在屏上了";
+
+        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*pins.pinAt(0)));
+        ASSERT_EQ(pins.selectedPinCount(), 1);
+        static_cast<void>(pins.setAllPinsConcealed(true));
+        EXPECT_EQ(pins.selectedPinCount(), 0) << "整桌收起之后选中集还留着";
     }
 
 } // namespace GyanisScribe
