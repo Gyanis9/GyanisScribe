@@ -2,6 +2,7 @@
 add_library(Annotation STATIC
         AnnotationShape.h
         AnnotationGeometry.h
+        FillBrush.h
         AnnotationTool.h
         AnnotationTool.cpp
         RecentColors.h

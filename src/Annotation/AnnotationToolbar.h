@@ -111,6 +111,13 @@ namespace GyanisScribe::Annotation
         /// 当前字号，取值只会落在 Ui::kFontSizes 的阶梯上
         [[nodiscard]] int currentFontSize() const;
 
+
+        /// 当前填充档：0 无、1 半透明、2 实心（矩形与椭圆用；新建的图形按它上笔刷）
+        [[nodiscard]] int currentFillStyle() const;
+
+        /// 按 无 → 半透明 → 实心 → 无 走一档；按钮与用例共用这一个入口
+        void cycleFillStyle();
+
         /**
          * @brief 指定序号的工具按钮，用例与调试用它核对状态
          * @param index 按钮序号，越界返回空指针
@@ -126,6 +133,8 @@ namespace GyanisScribe::Annotation
         void widthChanged(int width);
         /// 用户改了字号
         void fontSizeChanged(int fontSize);
+        /// 用户改了填充档
+        void fillStyleChanged(int fillStyle);
         /// 撤销
         void undoClicked();
         /// 重做
@@ -184,6 +193,8 @@ namespace GyanisScribe::Annotation
         QToolButton                                             *m_redoButton        = nullptr; ///< 重做按钮
         QSlider                                                 *m_widthSlider       = nullptr; ///< 线宽滑块，档位对齐 kAnnotationWidths
         QComboBox                                               *m_fontSizeCombo     = nullptr; ///< 字号下拉，取值对齐 kFontSizes
+        QToolButton                                             *m_fillButton        = nullptr; ///< 填充档按钮，点一下走一档
+        int                                                      m_fillStyle         = 0;       ///< 当前填充档：0 无、1 半透明、2 实心
         QColor                                                   m_currentColor;                ///< 当前颜色，初值取色板第一格
         bool                                                     m_stateIsInitial = true;       ///< 还在构造期：起点值不回写配置，坏值要留在文件里让人看得见
         ToolKind                                                 m_activeTool;                  ///< 当前工具，用来挡住「重复点同一个工具」的二次信号

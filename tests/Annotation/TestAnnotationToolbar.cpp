@@ -115,13 +115,14 @@ namespace
         /// 工具栏每条信号的落地处，用例按「谁发了几次」判接线是否成环
         struct SignalLog
         {
-            std::vector<ToolKind> tools;     ///< toolChanged 收到的工具
-            std::vector<QColor>   colors;    ///< colorChanged 收到的颜色
-            std::vector<int>      widths;    ///< widthChanged 收到的线宽
-            std::vector<int>      fontSizes; ///< fontSizeChanged 收到的字号
-            int                   actions{}; ///< 四个动作按钮的合计触发次数
-            int                   undo{};    ///< undoClicked 次数
-            int                   redo{};    ///< redoClicked 次数
+            std::vector<ToolKind> tools;      ///< toolChanged 收到的工具
+            std::vector<QColor>   colors;     ///< colorChanged 收到的颜色
+            std::vector<int>      widths;     ///< widthChanged 收到的线宽
+            std::vector<int>      fontSizes;  ///< fontSizeChanged 收到的字号
+            std::vector<int>      fillStyles; ///< fillStyleChanged 收到的填充档
+            int                   actions{};  ///< 四个动作按钮的合计触发次数
+            int                   undo{};     ///< undoClicked 次数
+            int                   redo{};     ///< redoClicked 次数
         };
 
         /// 建一把工具栏，并把它的每条信号都记进 log
@@ -132,6 +133,7 @@ namespace
             QObject::connect(toolbar.get(), &AnnotationToolbar::colorChanged, [&log](const QColor &color) { log.colors.push_back(color); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::widthChanged, [&log](int width) { log.widths.push_back(width); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::fontSizeChanged, [&log](int fontSize) { log.fontSizes.push_back(fontSize); });
+            QObject::connect(toolbar.get(), &AnnotationToolbar::fillStyleChanged, [&log](int style) { log.fillStyles.push_back(style); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::undoClicked, [&log] { ++log.undo; });
             QObject::connect(toolbar.get(), &AnnotationToolbar::redoClicked, [&log] { ++log.redo; });
             for (auto signal: {&AnnotationToolbar::copyClicked, &AnnotationToolbar::saveClicked, &AnnotationToolbar::pinClicked, &AnnotationToolbar::ocrClicked})
@@ -154,6 +156,33 @@ namespace
             return nullptr;
         }
     };
+
+
+    /**
+     * @brief 钉住填充按钮：点一下走一档（无 → 半透明 → 实心 → 无），提示与无障碍名跟着这一档走
+     * @details 一枚图标说不清现在是哪一档，所以提示就是它的读数：三档各点一次，提示要三种都对得上。
+     */
+    TEST_F(ToolbarFixture, FillButtonCyclesAndNamesTheCurrentStyle)
+    {
+        SignalLog log;
+        auto      toolbar = makeToolbarLogged(log);
+        auto     *button  = buttonByLabel(*toolbar, "填充");
+        ASSERT_NE(button, nullptr) << "工具栏上找不到填充按钮";
+
+        EXPECT_EQ(toolbar->currentFillStyle(), 0) << "起点该是「无」";
+        button->click();
+        EXPECT_EQ(toolbar->currentFillStyle(), 1);
+        EXPECT_EQ(log.fillStyles, std::vector<int>{1}) << "走了一档却没把信号发出去";
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("填充：半透明")) << "提示没跟上当前档";
+
+        button->click();
+        EXPECT_EQ(toolbar->currentFillStyle(), 2);
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("填充：实心"));
+
+        button->click();
+        EXPECT_EQ(toolbar->currentFillStyle(), 0) << "三档之后该回到「无」";
+        EXPECT_EQ(button->accessibleName(), QString::fromUtf8("填充：无")) << "无障碍名没跟上当前档";
+    }
 
 } // namespace
 

@@ -100,6 +100,7 @@ namespace GyanisScribe::Annotation
         m_color     = m_toolbar->currentColor();
         m_lineWidth = m_toolbar->currentWidth();
         m_fontSize  = m_toolbar->currentFontSize();
+        m_fillStyle = m_toolbar->currentFillStyle();
 
         QObject::connect(m_toolbar.get(), &AnnotationToolbar::toolChanged, this,
                          [this](ToolKind kind)
@@ -127,6 +128,13 @@ namespace GyanisScribe::Annotation
                              m_fontSize = size;
                              applyPenParameters();
                          });
+        QObject::connect(m_toolbar.get(), &AnnotationToolbar::fillStyleChanged, this,
+                         [this](int style)
+                         {
+                             m_fillStyle = style;
+                             applyPenParameters();
+                         });
+
         QObject::connect(m_toolbar.get(), &AnnotationToolbar::undoClicked, this,
                          [this]
                          {
@@ -316,7 +324,7 @@ namespace GyanisScribe::Annotation
 
     void AnnotationWindow::applyPenParameters()
     {
-        if (auto applied = m_engine.setPenParameters(m_color, m_lineWidth, m_fontSize); !applied)
+        if (auto applied = m_engine.setPenParameters(m_color, m_lineWidth, m_fontSize, m_fillStyle); !applied)
         {
             Core::Logger::warning(std::format("画笔参数没下发：{}", applied.error().message));
         }

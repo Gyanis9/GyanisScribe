@@ -1,5 +1,6 @@
 #include "Annotation/RectangleTool.h"
 
+#include "Annotation/FillBrush.h"
 #include "Core/Text.h"
 
 #include <QPainter>
@@ -24,7 +25,7 @@ namespace GyanisScribe::Annotation
         pen.setWidth(shape.lineWidth);
         pen.setCapStyle(Qt::RoundCap);
         painter.setPen(pen);
-        painter.setBrush(Qt::NoBrush);
+        painter.setBrush(fillBrushFor(shape));
         painter.drawRect(shape.rect);
     }
 

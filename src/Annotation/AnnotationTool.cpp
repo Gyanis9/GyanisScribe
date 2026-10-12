@@ -1,6 +1,8 @@
 #include "Annotation/AnnotationTool.h"
 
 #include <QFont>
+
+#include <algorithm>
 #include <QFontMetricsF>
 #include <QImage>
 #include <QPainter>
@@ -43,6 +45,7 @@ namespace GyanisScribe::Annotation
         m_pending           = AnnotationShape{};
         m_pending.color     = m_color;
         m_pending.lineWidth = m_lineWidth;
+        m_pending.fillStyle = m_fillStyle;
         m_pending.fontSize  = m_fontSize;
         m_pending.position  = point;
         m_pending.rect      = QRect(point, point);
@@ -123,7 +126,7 @@ namespace GyanisScribe::Annotation
         return true;
     }
 
-    bool AnnotationTool::restyleShapeAt(int index, const QColor &color, int lineWidth, int fontSize)
+    bool AnnotationTool::restyleShapeAt(int index, const QColor &color, int lineWidth, int fontSize, int fillStyle)
     {
         if (index < 0 || index >= m_shapes.size())
         {
@@ -135,6 +138,7 @@ namespace GyanisScribe::Annotation
         shape.color     = color;
         shape.lineWidth = lineWidth;
         shape.fontSize  = fontSize;
+        shape.fillStyle = fillStyle;
         return true;
     }
 
@@ -253,6 +257,16 @@ namespace GyanisScribe::Annotation
     int AnnotationTool::lineWidth() const noexcept
     {
         return m_lineWidth;
+    }
+
+    void AnnotationTool::setFillStyle(const int style) noexcept
+    {
+        m_fillStyle = std::clamp(style, 0, 2);
+    }
+
+    int AnnotationTool::fillStyle() const noexcept
+    {
+        return m_fillStyle;
     }
 
     int AnnotationTool::fontSize() const noexcept

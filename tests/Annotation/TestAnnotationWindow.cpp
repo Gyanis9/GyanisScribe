@@ -96,7 +96,7 @@ namespace
             m_engine->loadCanvas(makeCanvas({200, 100}));
             // 这两步都要验成功：SetUp 里悄悄失败会让后面的用例在「工具不是矩形」的状态上跑，红了也看不出原因
             ASSERT_TRUE(m_engine->setActiveTool(ToolKind::Rectangle).has_value());
-            ASSERT_TRUE(m_engine->setPenParameters(QColor{255, 0, 0}, 2, 16).has_value());
+            ASSERT_TRUE(m_engine->setPenParameters(QColor{255, 0, 0}, 2, 16, 0).has_value());
         }
 
         void TearDown() override

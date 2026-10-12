@@ -86,7 +86,7 @@ namespace GyanisScribe::Annotation
          * @details 有选中项时把改样式记进撤销栈，并与栈顶同一条图形的上一次改动合并：
          *          滑块拖一趟只算一步，撤销一次回到抬手之前。
          */
-        Core::Expected<void> setPenParameters(const QColor &color, int lineWidth, int fontSize) override;
+        Core::Expected<void> setPenParameters(const QColor &color, int lineWidth, int fontSize, int fillStyle) override;
 
         /**
          * @brief 起笔，见 IAnnotationEngine::beginStroke()
@@ -232,6 +232,7 @@ namespace GyanisScribe::Annotation
         QColor                                       m_color      = QColor(255, 0, 0);   ///< 画笔默认色
         int                                          m_lineWidth  = 3;                   ///< 默认线宽
         int                                          m_fontSize   = 16;                  ///< 默认字号
+        int                                          m_fillStyle  = 0;                   ///< 默认填充档：0 无、1 半透明、2 实心
     };
 
 } // namespace GyanisScribe::Annotation

@@ -95,7 +95,7 @@ namespace GyanisScribe::Annotation
          * @note 有选中图形时这条图形也按新参数改样式，并记进撤销栈（同一条图形的连续改动合成一步）：
          *       样式是每条图形自己的属性，工具上的值只给之后画出的图形用。三项与选中项全等时不进步骤。
          */
-        virtual Core::Expected<void> setPenParameters(const QColor &color, int lineWidth, int fontSize) = 0;
+        virtual Core::Expected<void> setPenParameters(const QColor &color, int lineWidth, int fontSize, int fillStyle) = 0;
 
         /**
          * @brief 起笔

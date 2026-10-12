@@ -35,6 +35,7 @@ namespace GyanisScribe::Annotation
         int             lineWidth = 3;                 ///< 线宽，逻辑像素
         int             fontSize  = 16;                ///< 字号，仅文字与序号使用
         int             number    = 1;                 ///< 序号值，仅序号工具使用
+        int             fillStyle = 0;                 ///< 填充档：0 无、1 半透明、2 实心（仅矩形与椭圆用）
     };
 
 } // namespace GyanisScribe::Annotation

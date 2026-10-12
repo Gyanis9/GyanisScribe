@@ -1,5 +1,6 @@
 #include "Annotation/EllipseTool.h"
 
+#include "Annotation/FillBrush.h"
 #include "Core/Text.h"
 
 #include <QPainter>
@@ -25,7 +26,7 @@ namespace GyanisScribe::Annotation
         auto pen = QPen(shape.color);
         pen.setWidth(shape.lineWidth);
         painter.setPen(pen);
-        painter.setBrush(Qt::NoBrush);
+        painter.setBrush(fillBrushFor(shape));
         painter.drawEllipse(shape.rect);
     }
 

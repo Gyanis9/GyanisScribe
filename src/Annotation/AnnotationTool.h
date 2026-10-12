@@ -169,7 +169,7 @@ namespace GyanisScribe::Annotation
          * @details 三个字段一起写，与 begin() 给在途图形上色的口径一致：只改其一会让图形
          *          带着一个谁都没设过的混合样式，撤销时也说不清要回退到哪一份。位置与内容不动。
          */
-        bool restyleShapeAt(int index, const QColor &color, int lineWidth, int fontSize);
+        bool restyleShapeAt(int index, const QColor &color, int lineWidth, int fontSize, int fillStyle);
 
         /**
          * @brief 改一条图形的文字内容
@@ -231,6 +231,20 @@ namespace GyanisScribe::Annotation
 
 
         /**
+         * @brief 设填充档
+         * @param style 0 无、1 半透明、2 实心；越界按最近的一档夹取
+         * @details 只有矩形与椭圆用得上；档随在途图形的外接框一起画，选中的那条改档走改样式命令。
+         */
+        void setFillStyle(int style) noexcept;
+
+        /**
+         * @brief 当前填充档
+         * @return 0、1 或 2
+         */
+        [[nodiscard]] int fillStyle() const noexcept;
+
+
+        /**
          * @brief 当前默认线宽
          * @return 逻辑像素
          */
@@ -270,10 +284,11 @@ namespace GyanisScribe::Annotation
 
         /// 起笔点，拖拽类图形用它算外接框
         QPoint          m_startPoint;
-        AnnotationShape m_pending;   ///< 在途图形
-        QColor          m_color;     ///< 默认画笔颜色
-        int             m_lineWidth; ///< 默认线宽
-        int             m_fontSize;  ///< 默认字号
+        AnnotationShape m_pending;       ///< 在途图形
+        QColor          m_color;         ///< 默认画笔颜色
+        int             m_lineWidth;     ///< 默认线宽
+        int             m_fillStyle = 0; ///< 默认填充档（0 无、1 半透明、2 实心）
+        int             m_fontSize;      ///< 默认字号
 
     private:
         /**

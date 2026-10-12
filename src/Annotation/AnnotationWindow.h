@@ -140,6 +140,7 @@ namespace GyanisScribe::Annotation
         QColor                             m_color;          ///< 画笔参数三件套：颜色
         int                                m_lineWidth{};    ///< 画笔参数三件套：线宽
         int                                m_fontSize{};     ///< 画笔参数三件套：字号
+        int                                m_fillStyle{};    ///< 填充档：0 无、1 半透明、2 实心（矩形与椭圆用）
     };
 
 } // namespace GyanisScribe::Annotation

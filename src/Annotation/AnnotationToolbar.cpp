@@ -196,6 +196,11 @@ namespace GyanisScribe::Annotation
                                  rememberDefaults();
                              }
                          });
+        // 填充档：矩形与椭圆用得上，点一下走一档（无 → 半透明 → 实心）。按钮不进工具栏的互斥组——
+        // 它是「这条图形怎么填」而不是「用哪档工具」
+        m_fillButton = makeButton("Fill", GyanisScribe::Core::uiText("填充"), false);
+        QObject::connect(m_fillButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleFillStyle);
+        layout->addWidget(m_fillButton);
         layout->addWidget(m_fontSizeCombo);
         layout->addWidget(makeSeparator());
 
@@ -238,6 +243,26 @@ namespace GyanisScribe::Annotation
         applyStoredDefaults();
         m_stateIsInitial = false;
         m_currentColor   = kAnnotationPalette[0];
+    }
+
+    int AnnotationToolbar::currentFillStyle() const
+    {
+        return m_fillStyle;
+    }
+
+    void AnnotationToolbar::cycleFillStyle()
+    {
+        m_fillStyle = (m_fillStyle + 1) % 3;
+        if (m_fillButton != nullptr)
+        {
+            // 档名落在提示里：一枚图标说不清现在是哪一档，鼠标一停就该看得见
+            const auto label = m_fillStyle == 0   ? GyanisScribe::Core::uiText("填充：无")
+                               : m_fillStyle == 1 ? GyanisScribe::Core::uiText("填充：半透明")
+                                                  : GyanisScribe::Core::uiText("填充：实心");
+            m_fillButton->setToolTip(label);
+            m_fillButton->setAccessibleName(label);
+        }
+        emit fillStyleChanged(m_fillStyle);
     }
 
     void AnnotationToolbar::applyStoredDefaults()

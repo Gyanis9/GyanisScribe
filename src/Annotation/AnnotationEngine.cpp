@@ -147,19 +147,19 @@ namespace GyanisScribe::Annotation
         class RestyleShapeCommand : public QUndoCommand
         {
         public:
-            RestyleShapeCommand(AnnotationTool *tool, int index, const AnnotationShape &before, const QColor &color, int lineWidth, int fontSize) :
-                m_tool(tool), m_index(index), m_before(before), m_color(color), m_lineWidth(lineWidth), m_fontSize(fontSize)
+            RestyleShapeCommand(AnnotationTool *tool, int index, const AnnotationShape &before, const QColor &color, int lineWidth, int fontSize, int fillStyle) :
+                m_tool(tool), m_index(index), m_before(before), m_color(color), m_lineWidth(lineWidth), m_fontSize(fontSize), m_fillStyle(fillStyle)
             {
             }
 
             void redo() override
             {
-                static_cast<void>(m_tool->restyleShapeAt(m_index, m_color, m_lineWidth, m_fontSize));
+                static_cast<void>(m_tool->restyleShapeAt(m_index, m_color, m_lineWidth, m_fontSize, m_fillStyle));
             }
 
             void undo() override
             {
-                static_cast<void>(m_tool->restyleShapeAt(m_index, m_before.color, m_before.lineWidth, m_before.fontSize));
+                static_cast<void>(m_tool->restyleShapeAt(m_index, m_before.color, m_before.lineWidth, m_before.fontSize, m_before.fillStyle));
             }
 
             [[nodiscard]] int id() const override
@@ -183,6 +183,7 @@ namespace GyanisScribe::Annotation
                 m_color     = next.m_color;
                 m_lineWidth = next.m_lineWidth;
                 m_fontSize  = next.m_fontSize;
+                m_fillStyle = next.m_fillStyle;
                 return true;
             }
 
@@ -193,6 +194,7 @@ namespace GyanisScribe::Annotation
             QColor          m_color;     ///< 目标颜色
             int             m_lineWidth; ///< 目标线宽
             int             m_fontSize;  ///< 目标字号
+            int             m_fillStyle; ///< 目标填充档
         };
 
         /**
@@ -329,7 +331,7 @@ namespace GyanisScribe::Annotation
         return m_activeTool;
     }
 
-    Core::Expected<void> AnnotationEngine::setPenParameters(const QColor &color, int lineWidth, int fontSize)
+    Core::Expected<void> AnnotationEngine::setPenParameters(const QColor &color, int lineWidth, int fontSize, int fillStyle)
     {
         if (lineWidth <= 0)
         {
@@ -345,11 +347,13 @@ namespace GyanisScribe::Annotation
         m_color     = color;
         m_lineWidth = lineWidth;
         m_fontSize  = fontSize;
+        m_fillStyle = fillStyle;
         for (const auto &tool: m_tools)
         {
             tool->setPenColor(color);
             tool->setLineWidth(lineWidth);
             tool->setFontSize(fontSize);
+            tool->setFillStyle(fillStyle);
         }
 
         // 选中项跟着这次改动一起换样式：样式记在每条图形自己身上，工具上那三份只是后续图形的默认值，
@@ -361,10 +365,10 @@ namespace GyanisScribe::Annotation
             {
                 const AnnotationShape before = tool->shapeAt(m_selection->shapeIndex);
                 // 三项全等就别进栈：点一下已经在用的那个颜色不该凭空造出一步「可撤销」
-                if (before.color != color || before.lineWidth != lineWidth || before.fontSize != fontSize)
+                if (before.color != color || before.lineWidth != lineWidth || before.fontSize != fontSize || before.fillStyle != fillStyle)
                 {
                     // 快照取在改动之前：撤销栈里存的就是这条图形原来的三个样式值
-                    m_undoStack.push(new RestyleShapeCommand(tool, m_selection->shapeIndex, before, color, lineWidth, fontSize));
+                    m_undoStack.push(new RestyleShapeCommand(tool, m_selection->shapeIndex, before, color, lineWidth, fontSize, fillStyle));
                 }
             }
         }

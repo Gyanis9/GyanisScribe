@@ -150,7 +150,7 @@ namespace
      */
     TEST_F(AnnotationFixture, EraserRevealsTheBaseImageOnlyAlongItsStroke)
     {
-        ASSERT_TRUE(m_engine.setPenParameters(QColor(255, 0, 0), 8, 16).has_value());
+        ASSERT_TRUE(m_engine.setPenParameters(QColor(255, 0, 0), 8, 16, 0).has_value());
 
         // 红色横带压在黑色半区上（底图 y=100 以下是黑的），另在白色半区点一个探针红点
         ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Pen).has_value());
@@ -196,7 +196,7 @@ namespace
      */
     TEST_F(AnnotationFixture, EraserSitsAboveEveryOtherTool)
     {
-        ASSERT_TRUE(m_engine.setPenParameters(QColor(255, 0, 0), 8, 16).has_value());
+        ASSERT_TRUE(m_engine.setPenParameters(QColor(255, 0, 0), 8, 16, 0).has_value());
         ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Line).has_value());
         m_engine.beginStroke(QPoint(60, 40));
         m_engine.moveStroke(QPoint(340, 40));
@@ -211,6 +211,40 @@ namespace
         const auto erased = m_engine.exportImage();
         EXPECT_EQ(erased.pixelColor(200, 40), QColor(255, 255, 255)) << "擦层没压住先画的直线：擦过的地方要回到白底";
         EXPECT_EQ(erased.pixelColor(100, 40), QColor(255, 0, 0)) << "擦区之外的直线被连带擦掉了";
+    }
+
+
+    /**
+     * @brief 钉住矩形与椭圆按各自的填充档上笔刷：无（内里不动）、半透明（浅浅一层）、实心（就是描边色）
+     * @details 档记在图形自己身上，所以三档能同框出现：一条空心、一条半透、一条实心。
+     */
+    TEST_F(AnnotationFixture, ShapesRespectTheirOwnFillStyle)
+    {
+        ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Rectangle).has_value());
+
+        // 无填充：内里保持底图的白
+        ASSERT_TRUE(m_engine.setPenParameters(QColor(255, 0, 0), 4, 16, 0).has_value());
+        m_engine.beginStroke(QPoint(20, 20));
+        m_engine.moveStroke(QPoint(120, 120));
+        ASSERT_TRUE(m_engine.endStroke().has_value());
+        EXPECT_EQ(m_engine.exportImage().pixelColor(70, 70), QColor(255, 255, 255)) << "无填充档的内里被动过了";
+
+        // 半透明：内里是红压在白上的一层浅红（既不是纯白也不是纯红）
+        ASSERT_TRUE(m_engine.setPenParameters(QColor(255, 0, 0), 4, 16, 1).has_value());
+        m_engine.beginStroke(QPoint(150, 20));
+        m_engine.moveStroke(QPoint(250, 120));
+        ASSERT_TRUE(m_engine.endStroke().has_value());
+        const auto translucent = m_engine.exportImage().pixelColor(200, 70);
+        EXPECT_GT(translucent.red(), 200) << "半透明档没压上一层红";
+        EXPECT_LT(translucent.green(), 255) << "半透明档的内里与底图一模一样，等于没填";
+        EXPECT_GT(translucent.green(), 100) << "半透明档成了实心：底下的白被完全盖住";
+
+        // 实心：内里就是描边色
+        ASSERT_TRUE(m_engine.setPenParameters(QColor(255, 0, 0), 4, 16, 2).has_value());
+        m_engine.beginStroke(QPoint(280, 20));
+        m_engine.moveStroke(QPoint(380, 120));
+        ASSERT_TRUE(m_engine.endStroke().has_value());
+        EXPECT_EQ(m_engine.exportImage().pixelColor(330, 70), QColor(255, 0, 0)) << "实心档的内里不是描边色";
     }
 
 } // namespace
@@ -423,7 +457,7 @@ TEST_F(AnnotationFixture, MosaicCoversOnlyItsRegion)
 TEST_F(AnnotationFixture, HighlightIsWiderThanThePen)
 {
     ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Highlight).has_value());
-    ASSERT_TRUE(m_engine.setPenParameters(QColor(255, 255, 0), 3, 16).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(QColor(255, 255, 0), 3, 16, 0).has_value());
     m_engine.beginStroke(QPoint(20, 20));
     m_engine.moveStroke(QPoint(20, 120));
     ASSERT_TRUE(m_engine.endStroke().has_value());
@@ -537,7 +571,7 @@ TEST(PenToolRestyleTest, RestyleWritesOnlyTheStyleFields)
     ASSERT_TRUE(committed.has_value());
     tool.insertShape(0, *committed);
 
-    ASSERT_TRUE(tool.restyleShapeAt(0, QColor(0, 0, 255), 8, 20));
+    ASSERT_TRUE(tool.restyleShapeAt(0, QColor(0, 0, 255), 8, 20, 0));
     const auto restyled = tool.shapeAt(0);
     EXPECT_EQ(restyled.color, QColor(0, 0, 255));
     EXPECT_EQ(restyled.lineWidth, 8);
@@ -545,8 +579,8 @@ TEST(PenToolRestyleTest, RestyleWritesOnlyTheStyleFields)
     EXPECT_EQ(restyled.points, committed->points) << "改样式把采样点动了";
     EXPECT_EQ(restyled.rect, committed->rect) << "改样式把位置动了";
 
-    EXPECT_FALSE(tool.restyleShapeAt(1, QColor(255, 0, 0), 3, 16)) << "只有一条图形时索引 1 该被拒";
-    EXPECT_FALSE(tool.restyleShapeAt(-1, QColor(255, 0, 0), 3, 16)) << "负索引该被拒";
+    EXPECT_FALSE(tool.restyleShapeAt(1, QColor(255, 0, 0), 3, 16, 0)) << "只有一条图形时索引 1 该被拒";
+    EXPECT_FALSE(tool.restyleShapeAt(-1, QColor(255, 0, 0), 3, 16, 0)) << "负索引该被拒";
     EXPECT_EQ(tool.shapeCount(), 1) << "越界的那次多插了一条";
     EXPECT_EQ(tool.shapeAt(0).color, QColor(0, 0, 255)) << "越界的调用改到了已有图形";
 }

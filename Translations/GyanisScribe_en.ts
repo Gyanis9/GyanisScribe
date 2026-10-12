@@ -92,6 +92,10 @@
             <translation>Font size</translation>
         </message>
         <message>
+            <source>填充</source>
+            <translation>Fill</translation>
+        </message>
+        <message>
             <source>撤销（Ctrl+Z）</source>
             <translation>Undo (Ctrl+Z)</translation>
         </message>
@@ -114,6 +118,18 @@
         <message>
             <source>识别文字</source>
             <translation>Recognize text</translation>
+        </message>
+        <message>
+            <source>填充：无</source>
+            <translation>Fill: none</translation>
+        </message>
+        <message>
+            <source>填充：半透明</source>
+            <translation>Fill: translucent</translation>
+        </message>
+        <message>
+            <source>填充：实心</source>
+            <translation>Fill: solid</translation>
         </message>
         <message>
             <source>选择标注颜色</source>
