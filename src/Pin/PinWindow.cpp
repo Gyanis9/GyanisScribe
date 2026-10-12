@@ -26,6 +26,7 @@
 #include <QAction>
 #include <QApplication>
 #include <QClipboard>
+#include <QColorDialog>
 #include <QContextMenuEvent>
 #include <QDateTime>
 #include <QDesktopServices>
@@ -297,6 +298,17 @@ namespace GyanisScribe::Pin
     {
         m_selected = selected;
         update();
+    }
+
+    void PinWindow::setBackgroundColor(const QColor &color)
+    {
+        m_backgroundColor = color;
+        update();
+    }
+
+    QColor PinWindow::backgroundColor() const
+    {
+        return m_backgroundColor;
     }
 
     bool PinWindow::isSolo() const noexcept
@@ -1131,6 +1143,11 @@ namespace GyanisScribe::Pin
         // 翻转在旋转之前做：转的是翻好的那一份，与 imagePixelAt 的反变换成对（先反旋转、后反翻转）
         painter.scale(m_mirroredHorizontally ? -1.0 : 1.0, m_mirroredVertically ? -1.0 : 1.0);
         painter.translate(-content.center());
+        // 白板：垫在图的后面，透明像素处露出来的就是它；画在同一个坐标系里，跟着转与翻
+        if (m_backgroundColor.isValid())
+        {
+            painter.fillRect(content, m_backgroundColor);
+        }
         painter.drawImage(content, displayImage(), QRectF(QPointF(0.0, 0.0), QSizeF(m_image.width(), m_image.height())));
         painter.resetTransform();
 
@@ -1669,6 +1686,38 @@ namespace GyanisScribe::Pin
                                                 });
         thumbnailAction->setCheckable(true);
         thumbnailAction->setChecked(m_thumbnail);
+
+        // 背景色（白板）：垫在图的后面，透明像素处露出来的就是它；「无背景」回到透出桌面那一档。
+        // 四项预设各一项，外加一个开取色对话框的自定义
+        auto      *backgroundMenu      = menu->addMenu(GyanisScribe::Core::uiText("背景色"));
+        const auto addBackgroundChoice = [this, backgroundMenu](const QString &label, const QColor &color)
+        {
+            auto *item = backgroundMenu->addAction(label);
+            item->setCheckable(true);
+            item->setChecked(m_backgroundColor.isValid() && m_backgroundColor == color);
+            QObject::connect(item, &QAction::triggered, this, [this, color] { setBackgroundColor(color); });
+        };
+        {
+            // 这张窗口不是透明背景的（见构造里那行 WA_TranslucentBackground）：不垫背景色时
+            // 透明像素处露出来的是主题的窗口底色，所以这一项的写法是「跟随主题」而不是「无背景」
+            auto *none = backgroundMenu->addAction(GyanisScribe::Core::uiText("跟随主题"));
+            none->setCheckable(true);
+            none->setChecked(!m_backgroundColor.isValid());
+            QObject::connect(none, &QAction::triggered, this, [this] { setBackgroundColor(QColor{}); });
+        }
+        addBackgroundChoice(GyanisScribe::Core::uiText("白色"), QColor(255, 255, 255));
+        addBackgroundChoice(GyanisScribe::Core::uiText("黑色"), QColor(0, 0, 0));
+        addBackgroundChoice(GyanisScribe::Core::uiText("灰色"), QColor(128, 128, 128));
+        backgroundMenu->addSeparator();
+        QObject::connect(backgroundMenu->addAction(GyanisScribe::Core::uiText("自定义…")), &QAction::triggered, this,
+                         [this]
+                         {
+                             const QColor picked = QColorDialog::getColor(m_backgroundColor, this, GyanisScribe::Core::uiText("背景色"));
+                             if (picked.isValid())
+                             {
+                                 setBackgroundColor(picked);
+                             }
+                         });
 
         // 只显示这一张：其余的收起来，屏幕腾给这一张；再点一下恢复按组的那套规则。
         // 与「标注」那两档不同，它对谁用都成立（动图也一样）

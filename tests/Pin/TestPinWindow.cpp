@@ -936,6 +936,131 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 左半不透明、右半透明的图：背景色这一档的判据全靠「透明处露出来的是什么」
+     */
+    QImage makeHalfTransparentImage()
+    {
+        QImage image{QSize{40, 20}, QImage::Format_ARGB32};
+        image.fill(Qt::transparent);
+        for (int y = 0; y < 20; ++y)
+        {
+            for (int x = 0; x < 20; ++x)
+            {
+                image.setPixelColor(x, y, QColor(200, 60, 60));
+            }
+        }
+        image.setDevicePixelRatio(1.0);
+        return image;
+    }
+
+    /**
+     * @brief 钉住背景色（白板）：垫上之后透明像素处露出来的是它，不透明处与关掉之后都不受影响
+     * @details 渲染到一张透明画布上：没垫背景时右半边读出来是透明的，垫了白之后是不透明白——
+     *          这一条同时钉住「垫在图的后面」与「只改看、不改像素」（贴图手里那份图始终是原样）。
+     */
+    TEST_F(PinWindowFixture, BackgroundColorFillsBehindTransparentPixels)
+    {
+        auto &window = makeWindow(makeHalfTransparentImage());
+
+        const auto painted = [&window]
+        {
+            QImage canvas{window.size(), QImage::Format_ARGB32};
+            canvas.fill(Qt::transparent);
+            window.render(&canvas);
+            return canvas;
+        };
+
+        // 这张窗口不是透明背景的：不垫背景色时，透明像素处露出来的是主题的窗口底色
+        EXPECT_EQ(painted().pixelColor(30, 10), window.palette().color(QPalette::Window)) << "不垫背景时透明处该露主题底色，后面的对照没有基准";
+        EXPECT_EQ(painted().pixelColor(10, 10), QColor(200, 60, 60)) << "不透明处该是图自己的色";
+
+        window.setBackgroundColor(QColor(255, 255, 255));
+        EXPECT_EQ(painted().pixelColor(30, 10), QColor(255, 255, 255)) << "垫了白，透明处没露出来";
+        EXPECT_EQ(painted().pixelColor(10, 10), QColor(200, 60, 60)) << "垫背景把不透明处也盖了";
+
+        window.setBackgroundColor(QColor{});
+        EXPECT_EQ(painted().pixelColor(30, 10), window.palette().color(QPalette::Window)) << "撤掉背景之后没回到主题底色";
+
+        // 贴图手里那份像素从头到尾没被动过：白板只改「看」
+        EXPECT_EQ(window.image().pixelColor(30, 10).alpha(), 0) << "白板改了贴图手里的像素";
+    }
+
+    /**
+     * @brief 钉住背景色的菜单：四项预设加自定义，勾选态就是当前那一档
+     */
+    TEST_F(PinWindowFixture, BackgroundMenuOffersPresetsAndMarksTheCurrentOne)
+    {
+        auto &window = makeWindow();
+
+        const auto backgroundMenuOf = [&window]
+        {
+            auto *menu = window.buildContextMenu();
+            for (auto *action: menu->actions())
+            {
+                if (action->menu() != nullptr && action->text() == QString::fromUtf8("背景色"))
+                {
+                    return std::make_pair(menu, action->menu());
+                }
+            }
+            delete menu;
+            return std::make_pair(static_cast<QMenu *>(nullptr), static_cast<QMenu *>(nullptr));
+        };
+
+        const auto pick = [](QMenu &submenu, const QString &label)
+        {
+            for (auto *action: submenu.actions())
+            {
+                if (action->text() == label)
+                {
+                    action->trigger();
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        {
+            auto [menu, submenu] = backgroundMenuOf();
+            ASSERT_NE(submenu, nullptr) << "右键菜单里没有「背景色」这一项";
+            // 只查在不在：不去点「自定义…」——那一项会弹模态取色框，用例点下去就挂在那儿等人关
+            const auto labels = [submenu]
+            {
+                QStringList found;
+                for (auto *action: submenu->actions())
+                {
+                    found << action->text();
+                }
+                return found;
+            }();
+            for (const auto &label: {"跟随主题", "白色", "黑色", "灰色", "自定义…"})
+            {
+                EXPECT_TRUE(labels.contains(QString::fromUtf8(label))) << "背景色里少一项：" << label;
+            }
+            ASSERT_TRUE(pick(*submenu, QString::fromUtf8("灰色")));
+            delete menu;
+        }
+        EXPECT_EQ(window.backgroundColor(), QColor(128, 128, 128)) << "点了「灰色」没落到背景色上";
+
+        // 重开菜单：勾选态跟着当前这一档走
+        auto [menu, submenu] = backgroundMenuOf();
+        ASSERT_NE(submenu, nullptr);
+        for (auto *action: submenu->actions())
+        {
+            if (action->text() == QString::fromUtf8("灰色"))
+            {
+                EXPECT_TRUE(action->isCheckable()) << "背景色各项该是勾选项";
+                EXPECT_TRUE(action->isChecked()) << "当前是灰色，菜单里没勾上";
+            } else if (action->text() == QString::fromUtf8("白色"))
+            {
+                EXPECT_FALSE(action->isChecked()) << "不是当前档的那一项也勾上了";
+            }
+        }
+        ASSERT_TRUE(pick(*submenu, QString::fromUtf8("跟随主题")));
+        delete menu;
+        EXPECT_FALSE(window.backgroundColor().isValid()) << "「跟随主题」没把背景撤掉";
+    }
+
+    /**
      * @brief 钉住「只显示这一张」的菜单项：勾选项、点一下把开关意图发出去（谁在屏上由管理器算）
      */
     TEST_F(PinWindowFixture, SoloMenuEntryRequestsTheToggle)

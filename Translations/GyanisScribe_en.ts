@@ -2036,6 +2036,30 @@
             <translation>Shrink to thumbnail</translation>
         </message>
         <message>
+            <source>背景色</source>
+            <translation>Background</translation>
+        </message>
+        <message>
+            <source>跟随主题</source>
+            <translation>Follow theme</translation>
+        </message>
+        <message>
+            <source>白色</source>
+            <translation>White</translation>
+        </message>
+        <message>
+            <source>黑色</source>
+            <translation>Black</translation>
+        </message>
+        <message>
+            <source>灰色</source>
+            <translation>Gray</translation>
+        </message>
+        <message>
+            <source>自定义…</source>
+            <translation>Custom...</translation>
+        </message>
+        <message>
             <source>只显示这一张</source>
             <translation>Show only this one</translation>
         </message>

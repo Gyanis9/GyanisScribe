@@ -288,6 +288,17 @@ namespace GyanisScribe::Pin
          */
         void setSelected(bool selected);
 
+        /**
+         * @brief 设背景色（白板）：垫在图的后面，透明像素处露出来的就是它
+         * @param color 颜色；无效色表示「无背景」（回到透出桌面那一档）
+         * @details 与旋转、翻转、灰度同一条规矩：只改「看」，复制、保存、标注拿到的仍是原始像素
+         *          （透明像素不会因为看了一眼白板就变实心）。画在图片自己的坐标系里，跟着转与翻。
+         */
+        void setBackgroundColor(const QColor &color);
+
+        /// 此刻的背景色；无效色表示没垫背景
+        [[nodiscard]] QColor backgroundColor() const;
+
         /// 此刻是不是「只看这一张」的主角（管理器推下来）
         [[nodiscard]] bool isSolo() const noexcept;
 
@@ -663,6 +674,7 @@ namespace GyanisScribe::Pin
         bool                                                 m_selected             = false;             ///< 在不在多选集中
         int                                                  m_selectionCount       = 0;                 ///< 选中集里的张数（管理器推下来）
         bool                                                 m_soloState            = false;             ///< 是不是「只看这一张」的主角（管理器推下来）
+        QColor                                               m_backgroundColor;                          ///< 背景色（白板）；无效色表示没垫
         std::optional<QPointF>                               m_cropAnchor;                               ///< 裁剪框起笔点（窗口坐标）；没拖过时为空
         std::optional<QPointF>                               m_cropCurrent;                              ///< 裁剪框当前点（窗口坐标）
         double                                               m_rotationBeforeCrop           = 0.0;       ///< 进裁剪前的旋转角，退出时恢复
