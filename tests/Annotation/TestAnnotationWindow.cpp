@@ -216,6 +216,7 @@ TEST(ViewShortcuts, ShapeAndLayerShortcutsMapExactlyTheDocumentedKeys)
 {
     EXPECT_EQ(shortcutActionFor(Qt::Key_C, Qt::ControlModifier), ShortcutAction::CopyShape);
     EXPECT_EQ(shortcutActionFor(Qt::Key_V, Qt::ControlModifier), ShortcutAction::PasteShape);
+    EXPECT_EQ(shortcutActionFor(Qt::Key_P, Qt::ControlModifier), ShortcutAction::Print);
     EXPECT_EQ(shortcutActionFor(Qt::Key_Up, Qt::ControlModifier | Qt::ShiftModifier), ShortcutAction::RaiseSelection);
     EXPECT_EQ(shortcutActionFor(Qt::Key_Down, Qt::ControlModifier | Qt::ShiftModifier), ShortcutAction::LowerSelection);
     EXPECT_EQ(shortcutActionFor(Qt::Key_Home, Qt::ControlModifier | Qt::ShiftModifier), ShortcutAction::SendToBack);
@@ -228,6 +229,7 @@ TEST(ViewShortcuts, ShapeAndLayerShortcutsMapExactlyTheDocumentedKeys)
     EXPECT_EQ(shortcutActionFor(Qt::Key_Up, Qt::ControlModifier), ShortcutAction::None) << "Ctrl+↑ 留给行内文字框按词移光标";
     EXPECT_EQ(shortcutActionFor(Qt::Key_Down, Qt::ControlModifier), ShortcutAction::None);
     EXPECT_EQ(shortcutActionFor(Qt::Key_C, Qt::NoModifier), ShortcutAction::None) << "裸 c 不归这张表：它没绑任何动作";
+    EXPECT_EQ(shortcutActionFor(Qt::Key_P, Qt::NoModifier), ShortcutAction::None) << "裸 P 是画笔工具的字母键，打印只认 Ctrl+P";
 }
 
 /**
@@ -688,6 +690,39 @@ TEST_F(AnnotationWindowFixture, CopyPasteShortcutsCopyTheShapeAndFallBackToImage
     const auto bounds = engine().selectionBounds();
     ASSERT_TRUE(bounds.has_value());
     EXPECT_EQ(bounds->topLeft(), QPoint(18, 18)) << "副本没带一格偏移";
+}
+
+/**
+ * @brief 钉住 Ctrl+P 打印分派：交出去的是烘好的成品，而且窗口不收场
+ * @details 打印与别的出口不同这一点要钉住：对话框取消、打完还想接着改，现场都得留着。
+ *          不钉的话下一轮「统一收口」会顺手把它并进收场那一组。
+ */
+TEST_F(AnnotationWindowFixture, PrintShortcutEmitsTheBakedExportAndKeepsTheWindow)
+{
+    auto window = makeWindow();
+    // 走一遍真开局：窗口与工具栏都要先在屏上，后面的「没收场」断言才有意义
+    window->startAnnotation(makeCanvas({200, 100}), QRect{0, 0, 1920, 1080}, QRect{0, 0, 200, 100});
+    ASSERT_TRUE(window->isVisible());
+
+    auto   printCalls = 0;
+    QImage printed;
+    QObject::connect(window.get(), &AnnotationWindow::printRequested,
+                     [&](const QImage &image)
+                     {
+                         ++printCalls;
+                         printed = image;
+                     });
+
+    ASSERT_TRUE(drawAndSelect({10, 10}, {60, 40}).has_value());
+    pressKeyOn(*window, Qt::Key_P, Qt::ControlModifier);
+
+    EXPECT_EQ(printCalls, 1) << "Ctrl+P 没走到打印那一路";
+    ASSERT_FALSE(printed.isNull());
+    EXPECT_EQ(printed.size(), QSize(400, 200)) << "打印交出去的不是画布的物理尺寸";
+    // 交出去的是烘好图形的成品：矩形上边框那一段在物理图上不会是底色的灰
+    EXPECT_NE(printed.pixelColor(60, 20), QColor(180, 180, 180)) << "打印的是底图，不是画上图形的成品";
+    EXPECT_TRUE(window->isVisible()) << "打印把窗口收了：取消对话框之后编辑现场就没了";
+    EXPECT_TRUE(window->toolbar().isVisible()) << "打印把工具栏也收了";
 }
 
 /**

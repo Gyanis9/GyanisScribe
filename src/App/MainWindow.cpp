@@ -389,6 +389,37 @@ namespace
     }
 
     /**
+     * @brief 一枚绑定到设置键的复选框：勾选写 true、去勾写 false
+     * @param settings 配置存储
+     * @param key 设置键
+     * @param defaultOn 「没填」那一档，必须与消费端读的时候给的默认值一致
+     * @param label 复选框正文
+     * @param accessibleName 无障碍名
+     * @param tooltip 悬停说明
+     * @return 归调用方所有的复选框
+     * @details 接线排在设初值之后：摆到位不等于用户改过，否则一开设置页就把默认值写进配置
+     */
+    QCheckBox *makeSettingCheck(ISettingsStore &settings, const std::string_view key, const bool defaultOn, const QString &label, const QString &accessibleName,
+                                const QString &tooltip)
+    {
+        auto *check = new QCheckBox;
+        check->setText(label);
+        check->setAccessibleName(accessibleName);
+        check->setToolTip(tooltip);
+        check->setChecked(settings.boolValue(key, defaultOn));
+
+        QObject::connect(check, &QCheckBox::toggled, check,
+                         [&settings, key](const bool checked)
+                         {
+                             if (auto written = settings.setValue(key, checked); !written)
+                             {
+                                 Logger::warning(std::format("设置项 {} 没能写入：{}", key, written.error().message));
+                             }
+                         });
+        return check;
+    }
+
+    /**
      * @brief 界面语言下拉：档位读写都走 Ui/Language 的词表
      * @param settings 配置存储
      * @return 归调用方所有的下拉框
@@ -1355,6 +1386,20 @@ namespace GyanisScribe::App
         form->addRow(GyanisScribe::Core::uiText("截完之后"), makeCaptureIntentCombo(m_settings, m_icons));
         form->addRow(GyanisScribe::Core::uiText("延时截图"), makeCaptureDelaySpin(m_settings));
         form->addRow(GyanisScribe::Core::uiText("鼠标指针"), makeIncludeCursorCheck(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("自动保存"),
+                     makeSettingCheck(m_settings, GyanisScribe::Settings::kCaptureAutoSave, false, GyanisScribe::Core::uiText("每张截图都先存一份进上面的目录"),
+                                      GyanisScribe::Core::uiText("自动保存所有截图"),
+                                      GyanisScribe::Core::uiText("截图完成时立即按上面的格式与目录存一份，不弹提示；「截完之后」已经选了「存成文件」或「快速保存」时不重复存")));
+        form->addRow(GyanisScribe::Core::uiText("截图音效"),
+                     makeSettingCheck(m_settings, GyanisScribe::Settings::kCaptureSound, false, GyanisScribe::Core::uiText("截图完成时响一声系统提示音"),
+                                      GyanisScribe::Core::uiText("截图音效"), GyanisScribe::Core::uiText("用系统的提示音，不需要放音频文件")));
+        form->addRow(GyanisScribe::Core::uiText("成品加边框"),
+                     makeSettingCheck(m_settings, GyanisScribe::Settings::kOutputBorder, false, GyanisScribe::Core::uiText("出程序时围一圈中灰边框"),
+                                      GyanisScribe::Core::uiText("成品加边框"),
+                                      GyanisScribe::Core::uiText("存文件、交剪贴板与打印都加上；贴到屏幕上那一张不加——那是显示，不是输出")));
+        form->addRow(GyanisScribe::Core::uiText("成品加投影"),
+                     makeSettingCheck(m_settings, GyanisScribe::Settings::kOutputShadow, false, GyanisScribe::Core::uiText("出程序时带一圈轻投影"),
+                                      GyanisScribe::Core::uiText("成品加投影"), GyanisScribe::Core::uiText("与边框同一组：存文件、交剪贴板与打印都加上；存 JPG 时投影底下垫白")));
         form->addRow(GyanisScribe::Core::uiText("截图与标注成品目录"),
                      makePathRow(m_settings, GyanisScribe::Settings::kPathScreenshot, GyanisScribe::Core::uiText("截图目录"), Core::Paths::defaultScreenshotDirectory(), m_icons));
         form->addRow(GyanisScribe::Core::uiText("保存格式"), makeImageFormatCombo(m_settings));
@@ -1433,6 +1478,7 @@ namespace GyanisScribe::App
                                      std::tuple{GyanisScribe::Settings::kHotkeyOcr, GyanisScribe::Core::uiText("文字识别"), QStringLiteral("Ctrl+Alt+O")},
                                      std::tuple{GyanisScribe::Settings::kHotkeyPick, GyanisScribe::Core::uiText("屏幕取色"), QStringLiteral("Ctrl+Alt+P")},
                                      std::tuple{GyanisScribe::Settings::kHotkeyCaptureLong, GyanisScribe::Core::uiText("滚动长截图"), QStringLiteral("Ctrl+Alt+L")},
+                                     std::tuple{GyanisScribe::Settings::kHotkeyQuickSave, GyanisScribe::Core::uiText("快速保存"), QStringLiteral("Ctrl+Alt+S")},
                                      std::tuple{GyanisScribe::Settings::kHotkeyTogglePins, GyanisScribe::Core::uiText("收起 / 摆回贴图"), QStringLiteral("Ctrl+Alt+H")},
                                      std::tuple{GyanisScribe::Settings::kHotkeyNextPinGroup, GyanisScribe::Core::uiText("切换贴图分组"), QStringLiteral("Ctrl+Alt+G")}};
 

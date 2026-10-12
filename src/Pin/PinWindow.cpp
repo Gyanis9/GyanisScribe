@@ -8,6 +8,7 @@
 #include "Annotation/AnnotationWindow.h"
 #include "Core/ImageFormat.h"
 #include "Core/Logger.h"
+#include "Core/OutputDecoration.h"
 #include "Core/Paths.h"
 #include "Core/Text.h"
 #include "Pin/PinLayout.h"
@@ -107,11 +108,12 @@ namespace GyanisScribe::Pin
         /**
          * @brief 读设置里那一档保存格式与质量
          * @param settings 配置来源
-         * @return 成功返回「文件名后缀 + 质量」；配置里存了词表外的取值或越界的质量时返回那一格的回绝原因
+         * @return 成功返回「档位 + 质量」；配置里存了词表外的取值或越界的质量时返回那一格的回绝原因
          * @details 不替用户猜一档：猜错就是把成品按另一种压缩写出去，事后无从找回原样。
          *          PNG 是无损的，质量那一格对它不起作用，交给 Qt 自己忽略。
+         *          交回的是档位而不是后缀：装饰那一步要知道这一档带不带透明通道（JPG 垫白）。
          */
-        [[nodiscard]] Core::Expected<std::pair<std::string_view, int>> imageSaveTarget(const Settings::ISettingsStore &settings)
+        [[nodiscard]] Core::Expected<std::pair<Core::ImageFormat, int>> imageSaveTarget(const Settings::ISettingsStore &settings)
         {
             const auto stored = settings.stringValue(Settings::kSaveImageFormat, QStringLiteral("Png"));
             const auto format = Core::parseImageFormat(stored);
@@ -132,7 +134,7 @@ namespace GyanisScribe::Pin
                         Core::ErrorCode::PlatformUnsupported,
                         GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("这台机器的 Qt 写不出「{}」这一档保存格式。请在设置的截图页改选一档"), stored.toStdString())});
             }
-            return std::pair{Core::imageFormatExtension(*format), quality};
+            return std::pair{*format, quality};
         }
     } // namespace
 
@@ -320,8 +322,17 @@ namespace GyanisScribe::Pin
 
     void PinWindow::copyToClipboard()
     {
-        QApplication::clipboard()->setImage(m_image);
+        // 剪贴板带得了透明通道：装饰按「不垫白」来（与标注窗那边同一条规矩）。
+        // 这一路本来就静默：复制过没有从别处看得出来，不需要再补一句
+        QApplication::clipboard()->setImage(decorateForOutput(m_image, false));
         Core::Logger::info(std::format("贴图已交剪贴板：{}×{} 像素", m_image.width(), m_image.height()));
+    }
+
+    QImage PinWindow::decorateForOutput(const QImage &image, const bool fillBackground) const
+    {
+        const auto border = m_settings.boolValue(Settings::kOutputBorder, false);
+        const auto shadow = m_settings.boolValue(Settings::kOutputShadow, false);
+        return Core::decorateForOutput(image, border, shadow, fillBackground);
     }
 
     Core::Expected<std::filesystem::path> PinWindow::saveWithDefaultName()
@@ -336,9 +347,12 @@ namespace GyanisScribe::Pin
         const auto directory = screenshotDirectory(m_settings);
         // 起名按设置里那一格的模板（留空即默认档），撞名时让一次位；
         // 管理器成批写缓存那一路不走这里，那一路按设计就是要覆盖
-        const auto fileName = Core::Paths::imageFileName(QDateTime::currentDateTime(), target->first, Settings::nameTemplateOrDefault(m_settings));
+        const auto fileName = Core::Paths::imageFileName(QDateTime::currentDateTime(), Core::imageFormatExtension(target->first), Settings::nameTemplateOrDefault(m_settings));
         const auto unique   = Core::Paths::toDisplayText(Core::Paths::uniqueFilePath(directory, fileName).filename());
-        if (const auto saved = saveToFile(directory, unique, target->second); !saved)
+        // 右键「保存」是给用户拿走的成品：按外观设置装好饰再写。缓存与布局那一路走 saveToFile（原图），
+        // 那些文件是给程序自己读回来的，装过饰下次恢复出来的贴图就多一圈边
+        const auto decorated = decorateForOutput(m_image, !Core::imageFormatHasAlpha(target->first));
+        if (const auto saved = writeFile(directory, unique, decorated, target->second); !saved)
         {
             return std::unexpected(saved.error());
         }
@@ -346,6 +360,11 @@ namespace GyanisScribe::Pin
     }
 
     Core::Expected<QString> PinWindow::saveToFile(const std::filesystem::path &directory, const QString &fileName, const int quality)
+    {
+        return writeFile(directory, fileName, m_image, quality);
+    }
+
+    Core::Expected<QString> PinWindow::writeFile(const std::filesystem::path &directory, const QString &fileName, const QImage &contents, const int quality)
     {
         if (const auto ensured = Core::Paths::ensureDirectory(directory); !ensured)
         {
@@ -356,7 +375,7 @@ namespace GyanisScribe::Pin
         // 布局那一路用序号。格式不单独传：Qt 按后缀挑编码器，再传一次格式名就是第二个出处
         const auto filePath = directory / Core::Paths::fromDisplayText(fileName);
 
-        if (!m_image.save(Core::Paths::toDisplayText(filePath), nullptr, quality))
+        if (!contents.save(Core::Paths::toDisplayText(filePath), nullptr, quality))
         {
             return std::unexpected(Core::Error{Core::ErrorCode::FileWriteFailed,
                                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图保存失败：{}。请检查目录是否可写，或先把这一张复制进剪贴板"),

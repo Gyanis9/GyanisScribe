@@ -46,6 +46,9 @@ namespace GyanisScribe::Annotation
                 return control ? ShortcutAction::Pin : ShortcutAction::None;
             case Qt::Key_O:
                 return control ? ShortcutAction::Ocr : ShortcutAction::None;
+            case Qt::Key_P:
+                // Ctrl+P 打印；裸 P 是画笔工具，带 Ctrl 才分得清（工具键只认裸字母）
+                return control ? ShortcutAction::Print : ShortcutAction::None;
             case Qt::Key_C:
                 // Ctrl+C 复制选中的图形；一条都没选中时窗口按老习惯把它当「复制整张成品」
                 return control && !shift ? ShortcutAction::CopyShape : ShortcutAction::None;
@@ -291,6 +294,11 @@ namespace GyanisScribe::Annotation
                 {
                     Core::Logger::info(std::format("置底没做成：{}", backed.error().message));
                 }
+                return;
+            case ShortcutAction::Print:
+                // 打印不关窗：对话框取消、或是打完还想接着改，编辑现场都留着。
+                // 导出与其它出口同一条路——烘的只有已经落定的图形，界面本身不进来
+                emit printRequested(m_engine.exportImage());
                 return;
             default:
                 deliver(action);

@@ -10,7 +10,9 @@ add_library(Core STATIC
         ImageFit.h
         ImageFit.cpp
         ImageFormat.h
-        ImageFormat.cpp)
+        ImageFormat.cpp
+        OutputDecoration.h
+        OutputDecoration.cpp)
 
 target_include_directories(Core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 

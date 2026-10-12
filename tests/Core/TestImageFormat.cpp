@@ -22,6 +22,7 @@
 using GyanisScribe::Core::Expected;
 using GyanisScribe::Core::ImageFormat;
 using GyanisScribe::Core::imageFormatExtension;
+using GyanisScribe::Core::imageFormatHasAlpha;
 using GyanisScribe::Core::imageFormatToken;
 using GyanisScribe::Core::isImageFormatWritable;
 using GyanisScribe::Core::kDefaultImageQuality;
@@ -170,4 +171,17 @@ TEST(ImageFormatCapability, UnwritableFormatsAreFilteredOut)
     {
         EXPECT_TRUE(isImageFormatWritable(format)) << static_cast<int>(format);
     }
+}
+
+/**
+ * @brief 钉住透明通道词表：只有 JPG 带不了透明
+ * @details 带投影的输出拿它决定垫不垫白（Core::decorateForOutput 的 fillBackground）：
+ *          这一格说反了，存 JPG
+ * 时透明区会被压成不可预期的底色、存 PNG 时又被白白垫上一层白。
+ */
+TEST(ImageFormatCapability, OnlyJpegLacksAnAlphaChannel)
+{
+    EXPECT_FALSE(imageFormatHasAlpha(ImageFormat::Jpeg)) << "JPG 带不了透明通道，说反了会让垫白分支整体反向";
+    EXPECT_TRUE(imageFormatHasAlpha(ImageFormat::Png));
+    EXPECT_TRUE(imageFormatHasAlpha(ImageFormat::Webp));
 }

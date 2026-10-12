@@ -39,6 +39,7 @@ namespace GyanisScribe::Annotation
         Save,            ///< 存成文件
         Pin,             ///< 贴到屏幕上
         Ocr,             ///< 识别文字
+        Print,           ///< 打印（不关窗：打印取消或打完，编辑现场都还在）
         Undo,            ///< 撤销一步
         Redo,            ///< 重做一步
         DeleteSelection, ///< 删掉选中的图形（多选时整组）
@@ -128,6 +129,12 @@ namespace GyanisScribe::Annotation
          * @param image 烘焙好的图
          */
         void ocrRequested(const QImage &image);
+        /**
+         * @brief 请求打印标注结果
+         * @param image 烘焙好的图
+         * @note 与其它出口不同：打印不关窗，用户取消打印或在打印之后接着改，现场都不丢
+         */
+        void printRequested(const QImage &image);
 
     protected:
         /**

@@ -22,8 +22,8 @@ using GyanisScribe::App::parseCaptureIntent;
 namespace
 {
     /// 全部枚举值，逐个点名写出来：加了新档位而忘了补词表，这条用例会因为对不上数而红
-    constexpr std::array<CaptureIntent, 5> kAllIntents{
-            CaptureIntent::Annotate, CaptureIntent::CopyToClipboard, CaptureIntent::SaveToFile, CaptureIntent::PinToDesk, CaptureIntent::Recognize,
+    constexpr std::array<CaptureIntent, 6> kAllIntents{
+            CaptureIntent::Annotate, CaptureIntent::CopyToClipboard, CaptureIntent::SaveToFile, CaptureIntent::QuickSave, CaptureIntent::PinToDesk, CaptureIntent::Recognize,
     };
 } // namespace
 
@@ -75,7 +75,7 @@ TEST(CaptureIntentVocabulary, RejectsUnknownTokenWithTheVocabulary)
         ASSERT_FALSE(parsed.has_value()) << "取值 \"" << stored << "\" 不在词表里，却被接下了";
         EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument);
         EXPECT_NE(parsed.error().message.find("不在可选值里"), std::string::npos) << parsed.error().message;
-        EXPECT_NE(parsed.error().message.find("Annotate / Copy / Save / Pin / Recognize"), std::string::npos) << "没列出可取值：" << parsed.error().message;
+        EXPECT_NE(parsed.error().message.find("Annotate / Copy / Save / QuickSave / Pin / Recognize"), std::string::npos) << "没列出可取值：" << parsed.error().message;
         EXPECT_NE(parsed.error().message.find("Capture/AfterAction"), std::string::npos) << "没点出键名：" << parsed.error().message;
     }
 }

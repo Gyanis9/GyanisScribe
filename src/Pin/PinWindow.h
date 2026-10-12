@@ -249,6 +249,16 @@ namespace GyanisScribe::Pin
         void copyToClipboard() override;
 
         /**
+         * @brief 按设置里的两格给成品装边框与投影
+         * @param image 成品图
+         * @param fillBackground 目标端带不了透明通道时给真（存 JPG）：投影底下垫白
+         * @return 装好饰的图；两格都关时原样交回
+         * @note 只用在「给用户拿走」的两条路（右键保存、两条复制）：缓存与布局恢复写的是原图，
+         *       装过饰的文件下次恢复出来就多一圈边
+         */
+        [[nodiscard]] QImage decorateForOutput(const QImage &image, bool fillBackground) const;
+
+        /**
          * @brief 存成文件，见 IPinWindow::saveToFile()
          * @param directory 目标目录，不存在时先创建
          * @param fileName 目录里的文件名，原样使用，不加时间戳也不改名；后缀决定写成什么格式
@@ -256,6 +266,7 @@ namespace GyanisScribe::Pin
          * @return 成功返回写下的路径；建目录或写文件失败时返回带路径的原因
          * @details 与基类一致，差别在命名：文件名归调用方，管理器一次写整批时靠序号区分，
          *          否则同一毫秒里的两张会写到同一个文件上，只剩最后一张。
+         *          这一条写的是 m_image 的原样（管理器缓存与布局恢复用）；给用户的成品走 saveWithDefaultName()
          */
         [[nodiscard]] Core::Expected<QString> saveToFile(const std::filesystem::path &directory, const QString &fileName, int quality) override;
 
@@ -445,9 +456,19 @@ namespace GyanisScribe::Pin
          * @brief 按设置里的目录与命名模板把这张贴图存一份
          * @return 成功返回写下的目录；失败返回带原因的错误
          * @details 「保存」与「在文件夹中查看」共用这一处起名与写盘：两处各写一份，
-         *          将来改命名模板就会漏掉一处。
+         *          将来改命名模板就会漏掉一处。写出去的是装好饰的成品，缓存恢复不受影响。
          */
         [[nodiscard]] Core::Expected<std::filesystem::path> saveWithDefaultName();
+
+        /**
+         * @brief 落盘的实际动作：建目录、按后缀写文件
+         * @param directory 目标目录
+         * @param fileName 文件名，后缀决定格式
+         * @param contents 要写的内容
+         * @param quality 有损档质量
+         * @return 成功返回写下的完整路径；失败返回带路径的原因
+         */
+        [[nodiscard]] Core::Expected<QString> writeFile(const std::filesystem::path &directory, const QString &fileName, const QImage &contents, int quality);
 
         /**
          * @brief 按现在的尺寸与贴边档把窗口摆到贴上那条边上（露出或收成一条）

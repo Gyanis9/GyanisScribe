@@ -86,6 +86,15 @@ namespace GyanisScribe::Core
      */
     [[nodiscard]] bool isImageFormatWritable(ImageFormat format);
 
+    /**
+     * @brief 这一档带不带透明通道
+     * @param format 目标档位
+     * @return Png 与 Webp 为真；Jpg 为假——写出去时透明区会被压成不可预期的底色
+     * @details 带投影的输出（Core::decorateForOutput）拿它决定要不要先垫一层白：
+     *          带不了透明的档位垫白，带得了的保持透明。
+     */
+    [[nodiscard]] bool imageFormatHasAlpha(ImageFormat format) noexcept;
+
     /// 有损档的质量下限：再低就只剩块状噪声，没人会要
     inline constexpr int kMinimumImageQuality = 10;
 

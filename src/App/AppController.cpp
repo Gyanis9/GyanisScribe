@@ -9,8 +9,10 @@
 #include "Capture/RegionHistory.h"
 #include "Capture/ScreenCaptureSourceFactory.h"
 #include "Capture/ScreenUtils.h"
+#include "Core/ImageFit.h"
 #include "Core/ImageFormat.h"
 #include "Core/Logger.h"
+#include "Core/OutputDecoration.h"
 #include "Core/Paths.h"
 #include "Core/Text.h"
 #include "History/HistoryRules.h"
@@ -40,12 +42,18 @@
 #include "Ui/ThemeManager.h"
 #include "Ui/Toast.h"
 
+#include <QApplication>
 #include <QClipboard>
+#include <QDialog>
 #include <QDir>
 #include <QFileDialog>
 #include <QCursor>
 #include <QGuiApplication>
 #include <QMimeData>
+#include <QPageLayout>
+#include <QPainter>
+#include <QPrintDialog>
+#include <QPrinter>
 #include <QScreen>
 #include <QImageReader>
 #include <QCoreApplication>
@@ -177,6 +185,11 @@ namespace GyanisScribe::App
                                      // 同上：切组只有一条实现，热键与托盘那一行不发散
                                      handleTrayAction(TrayAction::NextPinGroup);
                                      return;
+                                 case Hotkey::HotkeyAction::QuickSave:
+                                     // 快速保存走的就是「截完之后」那一档的实体：热键只是替用户把这一档定死，
+                                     // 不另写一条截图→存盘的捷径，两条各写一遍就会两边行为漂移
+                                     startCapture(CaptureIntent::QuickSave);
+                                     return;
                              }
                          });
 
@@ -194,6 +207,7 @@ namespace GyanisScribe::App
         QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::saveRequested, this, &AppController::handleSaveRequested);
         QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::pinRequested, this, &AppController::handlePinRequested);
         QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::ocrRequested, this, &AppController::handleOcrRequested);
+        QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::printRequested, this, &AppController::handlePrintRequested);
 
         // 录屏：编码器与服务各一个，热键再按一次就是「停止并编码」
         m_recorder  = std::make_unique<Record::FfmpegRecordingEncoder>();
@@ -532,6 +546,24 @@ namespace GyanisScribe::App
     {
         m_lastCapture = image;
 
+        // 音效与自动保存接在「截图完成」这一刻：不管之后去哪一步，先响一声、先在盘上留一份。
+        // 自动保存走「存成文件」同一条落盘路（装饰与历史记账都在里面），只是不弹成功提示
+        if (m_settings->boolValue(Settings::kCaptureSound, false))
+        {
+            QApplication::beep();
+        }
+        if (m_settings->boolValue(Settings::kCaptureAutoSave, false) && m_captureIntent != CaptureIntent::SaveToFile && m_captureIntent != CaptureIntent::QuickSave)
+        {
+            if (const auto saved = writeImageToDisk(image.image); saved)
+            {
+                Core::Logger::info(std::format("已自动保存：{}", saved->toStdString()));
+            } else
+            {
+                // 自动保存失败要说出来：用户开着这一档就是指望盘上那份在，静默会把「没有备份」瞒到最后
+                notifyUser(QString::fromStdString(saved.error().message), Ui::ToastKind::Danger);
+            }
+        }
+
         auto *screen = screenFor(image.screenName);
         if (screen == nullptr)
         {
@@ -564,6 +596,21 @@ namespace GyanisScribe::App
             case CaptureIntent::SaveToFile:
                 handleSaveRequested(image.image);
                 return;
+            case CaptureIntent::QuickSave:
+            {
+                // 快速保存：落盘 + 交剪贴板，一句提示收尾。失败时不做剪贴板那一半——
+                // 「存下了也复制了」不能说半句真话，用户会以为盘上有一份
+                const auto saved = writeImageToDisk(image.image);
+                if (!saved)
+                {
+                    notifyUser(QString::fromStdString(saved.error().message), Ui::ToastKind::Danger);
+                    return;
+                }
+                QGuiApplication::clipboard()->setImage(decorateOutput(image.image, false));
+                notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已保存并复制：{}"), saved->toStdString()).c_str()),
+                           Ui::ToastKind::Success);
+                return;
+            }
             case CaptureIntent::PinToDesk:
                 handlePinRequested(image.image);
                 return;
@@ -575,22 +622,47 @@ namespace GyanisScribe::App
 
     void AppController::handleCopyRequested(const QImage &image)
     {
-        QGuiApplication::clipboard()->setImage(image);
-        Core::Logger::info(std::format("标注结果已交剪贴板：{}×{} 像素", image.width(), image.height()));
+        // 剪贴板带得了透明通道：装饰按「不垫白」来（垫了白，贴到深色底上的投影会围一圈白框）
+        const auto decorated = decorateOutput(image, false);
+        QGuiApplication::clipboard()->setImage(decorated);
+        Core::Logger::info(std::format("标注结果已交剪贴板：{}×{} 像素", decorated.width(), decorated.height()));
         // 说一句：交剪贴板这一步本来没有任何界面变化，「按了没反应」与「已经进去了」只有这一处能分
         notifyUser(GyanisScribe::Core::uiText("已复制到剪贴板"), Ui::ToastKind::Success);
     }
 
+    QImage AppController::decorateOutput(const QImage &image, const bool fillBackground) const
+    {
+        const auto border = m_settings->boolValue(Settings::kOutputBorder, false);
+        const auto shadow = m_settings->boolValue(Settings::kOutputShadow, false);
+        return Core::decorateForOutput(image, border, shadow, fillBackground);
+    }
+
     void AppController::handleSaveRequested(const QImage &image)
     {
+        const auto saved = writeImageToDisk(image);
+        if (!saved)
+        {
+            notifyUser(QString::fromStdString(saved.error().message), Ui::ToastKind::Danger);
+            return;
+        }
+        notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已存成 {}"), saved->toStdString()).c_str()), Ui::ToastKind::Success);
+    }
+
+    Core::Expected<QString> AppController::writeImageToDisk(const QImage &image)
+    {
+        // 失败一律带上「没能存下图片」这句头：三条调用路共用一处出口，用户看到的措辞才不会三处各说各的
+        const auto fail = [](const Core::Error &reason)
+        {
+            const auto message = GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("没能存下图片：{}"), reason.message);
+            Core::Logger::error(message);
+            return std::unexpected(Core::Error{reason.code, message});
+        };
+
         const auto                  configured = m_settings->stringValue(Settings::kPathScreenshot, QString{});
         const std::filesystem::path directory  = configured.isEmpty() ? Core::Paths::defaultScreenshotDirectory() : Core::Paths::fromDisplayText(configured);
-
         if (const auto ensured = Core::Paths::ensureDirectory(directory); !ensured)
         {
-            Core::Logger::error(std::format("标注结果没存下来：{}", ensured.error().message));
-            notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("没能存下图片：{}"), ensured.error().message).c_str()), Ui::ToastKind::Danger);
-            return;
+            return fail(ensured.error());
         }
 
         const auto storedFormat = m_settings->stringValue(Settings::kSaveImageFormat, QStringLiteral("Png"));
@@ -598,42 +670,73 @@ namespace GyanisScribe::App
         if (!format)
         {
             // 不猜一档：猜错就是把成品按另一种压缩写出去，事后无从找回原样
-            notifyUser(QString::fromUtf8(GyanisScribe::Core::uiTextUtf8("没能存下图片：%1").c_str()).arg(QString::fromStdString(format.error().message)), Ui::ToastKind::Danger);
-            return;
+            return fail(format.error());
         }
         const auto quality = m_settings->intValue(Settings::kSaveImageQuality, Core::kDefaultImageQuality);
         if (const auto checked = Core::parseImageQuality(quality); !checked)
         {
-            notifyUser(QString::fromUtf8(GyanisScribe::Core::uiTextUtf8("没能存下图片：%1").c_str()).arg(QString::fromStdString(checked.error().message)), Ui::ToastKind::Danger);
-            return;
+            return fail(checked.error());
         }
         if (!Core::isImageFormatWritable(*format))
         {
             // 这一档的编码器没装：说清是格式的问题，别让用户去查目录权限
-            notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("没能存下图片：这台机器的 Qt 写不出「{}」这一档。请在设置的截图页改选一档"),
-                                                                      storedFormat.toStdString())
-                                                 .c_str()),
-                       Ui::ToastKind::Danger);
-            return;
+            return fail(Core::Error{
+                    Core::ErrorCode::PlatformUnsupported,
+                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("这台机器的 Qt 写不出「{}」这一档。请在设置的截图页改选一档"), storedFormat.toStdString())});
         }
+
+        // 装饰按目标端要不要透明通道来定：JPG 垫白，PNG/WebP 保持透明（写出去不丢那一层）
+        const auto decorated = decorateOutput(image, !Core::imageFormatHasAlpha(*format));
 
         // 名字规则来自设置里那一格（留空即默认档）；起好名再让一次位：模板里去掉 %ms% 之后
         // 同一秒连拍会撞名，直接写就是把前一张悄悄盖掉
         const auto fileName = Core::Paths::imageFileName(QDateTime::currentDateTime(), Core::imageFormatExtension(*format), Settings::nameTemplateOrDefault(*m_settings));
         const auto filePath = Core::Paths::uniqueFilePath(directory, fileName);
         // 格式不单独传给 Qt：它按后缀挑编码器，再传一次格式名就是第二个出处
-        if (!image.save(Core::Paths::toDisplayText(filePath), nullptr, quality))
+        if (!decorated.save(Core::Paths::toDisplayText(filePath), nullptr, quality))
         {
-            Core::Logger::error(std::format("标注结果写入失败：{}。请检查目录是否可写，或先用「复制」交剪贴板", Core::Paths::toDisplayText(filePath).toStdString()));
-            notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("写入失败：{}。请检查这个目录能不能写"),
-                                                                      Core::Paths::toDisplayText(filePath).toStdString())
-                                                 .c_str()),
-                       Ui::ToastKind::Danger);
+            return fail(Core::Error{Core::ErrorCode::FileWriteFailed, GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("「{}」写不进去。请检查这个目录能不能写"),
+                                                                                                   Core::Paths::toDisplayText(filePath).toStdString())});
+        }
+        Core::Logger::info(std::format("成品已保存：{}", Core::Paths::toDisplayText(filePath).toStdString()));
+        // 历史记的是盘上那份的尺寸：开着装饰时成品比原图大一围，记小了缩略图会裁边
+        recordHistory(filePath, History::HistoryKind::Screenshot, decorated.size());
+        return fileName;
+    }
+
+    void AppController::handlePrintRequested(const QImage &image)
+    {
+        if (image.isNull())
+        {
+            notifyUser(GyanisScribe::Core::uiText("还没有可打印的画面"), Ui::ToastKind::Information);
             return;
         }
-        Core::Logger::info(std::format("标注结果已保存：{}", Core::Paths::toDisplayText(filePath).toStdString()));
-        notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已存成 {}"), fileName.toStdString()).c_str()), Ui::ToastKind::Success);
-        recordHistory(filePath, History::HistoryKind::Screenshot, image.size());
+
+        QPrinter     printer{QPrinter::HighResolution};
+        QPrintDialog dialog{&printer, m_annotationWindow.get()};
+        dialog.setWindowTitle(GyanisScribe::Core::uiText("打印标注结果"));
+        if (dialog.exec() != QDialog::Accepted)
+        {
+            // 取消是一种正常收场：什么都没打印，也什么都不用说
+            return;
+        }
+
+        QPainter painter;
+        if (!painter.begin(&printer))
+        {
+            Core::Logger::error("打印没能开始：打印设备没有准备好");
+            notifyUser(GyanisScribe::Core::uiText("打印没能开始：系统打印设备没有准备好。可以先存成文件再从别处打"), Ui::ToastKind::Danger);
+            return;
+        }
+        // 纸面按没有透明通道处理（投影底下垫白）；等比居中用的就是「图片摆进控件」那条既有换算，
+        // 打印的摆放不需要第二套适配算法
+        const auto decorated = decorateOutput(image, true);
+        const auto page      = printer.pageLayout().paintRectPixels(printer.resolution());
+        const auto target    = Core::displayRectFor(page.size(), decorated.size()).translated(page.topLeft());
+        painter.drawImage(target, decorated);
+        painter.end();
+        Core::Logger::info(std::format("已送往打印机：{}×{} 像素", decorated.width(), decorated.height()));
+        notifyUser(GyanisScribe::Core::uiText("已送往打印机"), Ui::ToastKind::Success);
     }
 
     void AppController::handlePinRequested(const QImage &image)

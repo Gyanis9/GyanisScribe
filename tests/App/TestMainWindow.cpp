@@ -221,12 +221,12 @@ namespace
         // 「这一类有什么」的用词取自界面里的无障碍名，不是从配置键推的：读的人要能对着窗口核对
         const std::vector<Expectation> expectations = {
                 Expectation{MainWindowPage::General, {"界面语言", "历史最多留多少条", "历史最久留多少天", "导出配置", "导入配置"}, true},
-                Expectation{MainWindowPage::Capture, {"截完之后", "延时截图", "截图目录", "颜色写法"}, true},
+                Expectation{MainWindowPage::Capture, {"截完之后", "延时截图", "截图目录", "颜色写法", "自动保存所有截图", "截图音效", "成品加边框", "成品加投影"}, true},
                 Expectation{MainWindowPage::Annotation, {"默认线宽", "默认字号"}, true},
                 Expectation{MainWindowPage::Pin, {"默认不透明度"}, true},
                 Expectation{MainWindowPage::Record, {"录屏目录", "录制范围", "输出格式", "默认帧率", "画面码率", "光标高亮", "麦克风设备", "系统声音设备"}, true},
                 Expectation{MainWindowPage::Ocr, {"识别语言", "语言包目录"}, true},
-                Expectation{MainWindowPage::Hotkey, {"截图", "录屏", "文字识别", "屏幕取色"}, true},
+                Expectation{MainWindowPage::Hotkey, {"截图", "录屏", "文字识别", "屏幕取色", "快速保存"}, true},
                 Expectation{MainWindowPage::Theme, {"主题"}, true},
                 Expectation{MainWindowPage::About, {"智录图标"}, false},
                 Expectation{MainWindowPage::History, {"历史列表"}, false},
@@ -350,6 +350,34 @@ namespace
 
         const auto reopened = makeStore();
         EXPECT_TRUE(reopened->boolValue(GyanisScribe::Settings::kRecordCursorHighlight, false));
+    }
+
+    /**
+     * @brief 钉住截图页四枚新开关各自写进它那一个键，默认档与消费端读的时候给的一致
+     * @details 自动保存、音效、边框、投影四个键都只在 AppController 那几条路里现读：
+     *          键写错一格不会报错，只会表现成「开关拨了没反应」——四处各验一次才分得清。
+     */
+    TEST_F(MainWindowFixture, CaptureOutputRowsWriteTheirOwnKeys)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::Capture);
+
+        const auto rows = std::array{std::pair{"自动保存所有截图", GyanisScribe::Settings::kCaptureAutoSave}, std::pair{"截图音效", GyanisScribe::Settings::kCaptureSound},
+                                     std::pair{"成品加边框", GyanisScribe::Settings::kOutputBorder}, std::pair{"成品加投影", GyanisScribe::Settings::kOutputShadow}};
+        for (const auto &[name, key]: rows)
+        {
+            auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage(name));
+            ASSERT_NE(check, nullptr) << "截图页没有这一格：" << name;
+            EXPECT_FALSE(check->isChecked()) << "「" << name << "」的默认档应当是关：它一开就改每一张成品";
+            check->setChecked(true);
+        }
+        closeWindowAndFlush();
+
+        const auto reopened = makeStore();
+        for (const auto &[name, key]: rows)
+        {
+            EXPECT_TRUE(reopened->boolValue(key, false)) << "「" << name << "」没写进 " << key;
+        }
     }
 
     /**
@@ -915,16 +943,16 @@ TEST_F(MainWindowFixture, HotkeyEntriesFollowTheGlobalHotkeyCapability)
     makeWindow(true);
     m_window->open(MainWindowPage::Hotkey);
     auto edits = m_window->findChildren<GyanisScribe::Ui::HotkeyEdit *>();
-    ASSERT_EQ(edits.size(), 7) << "热键页该有截图、录屏、文字识别、屏幕取色、滚动长截图、收起/摆回贴图、切换贴图分组七行";
+    ASSERT_EQ(edits.size(), 8) << "热键页该有截图、录屏、文字识别、屏幕取色、滚动长截图、快速保存、收起/摆回贴图、切换贴图分组八行";
     for (auto *edit: edits)
     {
-        EXPECT_TRUE(edit->isEnabled()) << "有登记口的平台上这七行要能改";
+        EXPECT_TRUE(edit->isEnabled()) << "有登记口的平台上这八行要能改";
     }
 
     makeWindow(false);
     m_window->open(MainWindowPage::Hotkey);
     edits = m_window->findChildren<GyanisScribe::Ui::HotkeyEdit *>();
-    ASSERT_EQ(edits.size(), 7) << "没有登记口也不能把行藏掉：用户配过的组合键要还在眼前";
+    ASSERT_EQ(edits.size(), 8) << "没有登记口也不能把行藏掉：用户配过的组合键要还在眼前";
     for (auto *edit: edits)
     {
         EXPECT_FALSE(edit->isEnabled()) << "这台机器上改完不会生效，入口就该是灰的";

@@ -259,6 +259,24 @@ namespace GyanisScribe::App
 
         /// 标注窗请求存文件
         void handleSaveRequested(const QImage &image);
+
+        /**
+         * @brief 把成品写进截图目录：装饰、格式质量校验、起名、落盘与历史记账都在这一处
+         * @param image 成品图（未装饰）
+         * @return 成功返回存下的文件名；失败返回已带中文原因的 Error（调用方负责提示）
+         * @details 「存成文件」「快速保存」与「自动保存」三条路共用：三条各写一遍落盘
+         *          就迟早出现「这边记了历史那边没记」这类暗差
+         */
+        [[nodiscard]] Core::Expected<QString> writeImageToDisk(const QImage &image);
+
+        /**
+         * @brief 按设置里的两格给成品装边框与投影
+         * @param image 成品图
+         * @param fillBackground 目标端带不了透明通道时给真（存 JPG、打印到纸面）：投影底下垫白
+         * @return 装好饰的图；两格都关时原样交回
+         */
+        [[nodiscard]] QImage decorateOutput(const QImage &image, bool fillBackground) const;
+
         /// 标注窗请求贴图
         void handlePinRequested(const QImage &image);
         /**
@@ -269,6 +287,14 @@ namespace GyanisScribe::App
         void pasteClipboardAsPin();
         /// 标注窗请求识别文字
         void handleOcrRequested(const QImage &image);
+
+        /**
+         * @brief 标注窗请求打印：开系统打印对话框，按纸面等比居中画上去
+         * @param image 成品图（未装饰）
+         * @details 用户取消对话框就静默收场——打印这件事「什么都没发生」也是一种正常结果。
+         *          打到纸上按没有透明通道处理：投影底下垫白，不然透明区会按驱动作自己的解释落色。
+         */
+        void handlePrintRequested(const QImage &image);
 
         /**
          * @brief 某张贴图上取到了一个像素的颜色

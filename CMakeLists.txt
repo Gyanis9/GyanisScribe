@@ -24,6 +24,7 @@ find_package(Qt6 COMPONENTS
         Concurrent
         Svg
         Network
+        PrintSupport
         REQUIRED)
 
 enable_testing()

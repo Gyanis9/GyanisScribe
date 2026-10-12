@@ -71,6 +71,12 @@ namespace GyanisScribe::Core
         return std::find(writable.begin(), writable.end(), format) != writable.end();
     }
 
+    bool imageFormatHasAlpha(const ImageFormat format) noexcept
+    {
+        // 只有 JPG 带不了透明：词表里再添有损档时这条要跟着表走，所以不写成「等于 Png 或 Webp」的硬碰硬
+        return format != ImageFormat::Jpeg;
+    }
+
     Core::Expected<int> parseImageQuality(const int stored)
     {
         if (stored < kMinimumImageQuality || stored > kMaximumImageQuality)

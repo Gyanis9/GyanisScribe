@@ -36,7 +36,8 @@ target_link_libraries(App PUBLIC
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets
-        Qt6::Network)
+        Qt6::Network
+        Qt6::PrintSupport)
 
 # 版本号只有一处真源：工程的 project(... VERSION)，代码里通过宏取，不散落字面量
 target_compile_definitions(App PRIVATE PROJECT_VERSION="${PROJECT_VERSION}")

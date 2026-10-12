@@ -27,6 +27,9 @@ namespace GyanisScribe::Settings
     /// 切到下一组贴图的全局热键
     inline constexpr std::string_view kHotkeyNextPinGroup = "Hotkey/NextPinGroup";
 
+    /// 快速保存的全局热键：截图后直接存成文件并复制，不走「截完之后」那一档
+    inline constexpr std::string_view kHotkeyQuickSave = "Hotkey/QuickSave";
+
     /// 主题档位，取值只能是 Light、Dark、System、HighContrast
     inline constexpr std::string_view kThemeMode = "Theme/Mode";
 
@@ -59,6 +62,16 @@ namespace GyanisScribe::Settings
 
     /// 「没填」那一档取不含指针：区域截图刚松手时指针就在选区里，默认画进去会让成品多出一只箭头
     inline constexpr bool kDefaultCaptureIncludeCursor = false;
+
+    /// 每张截图都顺手存一份进截图目录（不进标注、不弹窗）；默认关，开了之后每次截图都会在盘上留一份
+    inline constexpr std::string_view kCaptureAutoSave = "Capture/AutoSave";
+
+    /// 截图完成时响一声系统提示音；默认关
+    inline constexpr std::string_view kCaptureSound = "Capture/Sound";
+
+    /// 成品出程序（存文件或交剪贴板）时加的装饰，两格独立；默认都关，装饰是「要的时候才有」的东西
+    inline constexpr std::string_view kOutputBorder = "Save/OutputBorder";
+    inline constexpr std::string_view kOutputShadow = "Save/OutputShadow";
 
     /// 成品图片存成什么格式，取值词表在 Core::kImageFormatChoices；读端在 AppController 与 Pin 的保存那两处
     inline constexpr std::string_view kSaveImageFormat = "Save/ImageFormat";

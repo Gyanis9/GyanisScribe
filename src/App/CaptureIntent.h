@@ -29,6 +29,7 @@ namespace GyanisScribe::App
         Annotate,        ///< 打开标注窗，后续动作在那一排按钮上
         CopyToClipboard, ///< 只交剪贴板，不弹任何窗
         SaveToFile,      ///< 直接按命名规则存进截图目录
+        QuickSave,       ///< 存成文件并同时交剪贴板，一句提示收尾（「快速保存」键走的就是这一档）
         PinToDesk,       ///< 直接贴回屏幕上原那块位置
         Recognize,       ///< 直接送文字识别
     };
@@ -43,10 +44,11 @@ namespace GyanisScribe::App
     };
 
     /// 全部档位，顺序就是设置页下拉的顺序；第一档是不填配置时的回落档
-    inline constexpr std::array<CaptureIntentChoice, 5> kCaptureIntentChoices{
+    inline constexpr std::array<CaptureIntentChoice, 6> kCaptureIntentChoices{
             CaptureIntentChoice{CaptureIntent::Annotate, "Annotate", "进标注窗", "CaptureRegion"},
             CaptureIntentChoice{CaptureIntent::CopyToClipboard, "Copy", "复制到剪贴板", "Copy"},
             CaptureIntentChoice{CaptureIntent::SaveToFile, "Save", "直接存成文件", "Save"},
+            CaptureIntentChoice{CaptureIntent::QuickSave, "QuickSave", "快速保存（存文件并复制）", "Save"},
             CaptureIntentChoice{CaptureIntent::PinToDesk, "Pin", "直接贴到屏幕上", "Pin"},
             CaptureIntentChoice{CaptureIntent::Recognize, "Recognize", "直接识别文字", "Ocr"},
     };

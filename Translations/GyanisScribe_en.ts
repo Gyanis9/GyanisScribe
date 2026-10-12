@@ -408,28 +408,44 @@
             <translation>Switched to pin group {}; that is the group on screen now</translation>
         </message>
         <message>
+            <source>已保存并复制：{}</source>
+            <translation>Saved and copied: {}</translation>
+        </message>
+        <message>
             <source>已复制到剪贴板</source>
             <translation>Copied to the clipboard</translation>
+        </message>
+        <message>
+            <source>已存成 {}</source>
+            <translation>Saved as {}</translation>
         </message>
         <message>
             <source>没能存下图片：{}</source>
             <translation>Couldn't save the image: {}</translation>
         </message>
         <message>
-            <source>没能存下图片：%1</source>
-            <translation>Could not save the image: %1</translation>
+            <source>这台机器的 Qt 写不出「{}」这一档。请在设置的截图页改选一档</source>
+            <translation>This Qt build cannot write the "{}" format. Pick another one on the Shot page of Settings</translation>
         </message>
         <message>
-            <source>没能存下图片：这台机器的 Qt 写不出「{}」这一档。请在设置的截图页改选一档</source>
-            <translation>Could not save the image: this Qt build cannot write the "{}" format. Pick another one on the Shot page of Settings</translation>
+            <source>「{}」写不进去。请检查这个目录能不能写</source>
+            <translation>"{}" cannot be written. Check whether this directory is writable</translation>
         </message>
         <message>
-            <source>写入失败：{}。请检查这个目录能不能写</source>
-            <translation>Write failed: {}. Check whether this directory is writable</translation>
+            <source>还没有可打印的画面</source>
+            <translation>Nothing to print yet</translation>
         </message>
         <message>
-            <source>已存成 {}</source>
-            <translation>Saved as {}</translation>
+            <source>打印标注结果</source>
+            <translation>Print the annotated result</translation>
+        </message>
+        <message>
+            <source>打印没能开始：系统打印设备没有准备好。可以先存成文件再从别处打</source>
+            <translation>Printing could not start: the system print device is not ready. Save the image to a file and print it from elsewhere</translation>
+        </message>
+        <message>
+            <source>已送往打印机</source>
+            <translation>Sent to the printer</translation>
         </message>
         <message>
             <source>已复制颜色 </source>
@@ -546,6 +562,10 @@
         <message>
             <source>直接存成文件</source>
             <translation>Save straight to a file</translation>
+        </message>
+        <message>
+            <source>快速保存（存文件并复制）</source>
+            <translation>Quick save (file + clipboard)</translation>
         </message>
         <message>
             <source>直接贴到屏幕上</source>
@@ -860,6 +880,58 @@
             <translation>Mouse pointer</translation>
         </message>
         <message>
+            <source>自动保存</source>
+            <translation>Auto save</translation>
+        </message>
+        <message>
+            <source>每张截图都先存一份进上面的目录</source>
+            <translation>Save every capture into the directory above</translation>
+        </message>
+        <message>
+            <source>自动保存所有截图</source>
+            <translation>Auto-save every capture</translation>
+        </message>
+        <message>
+            <source>截图完成时立即按上面的格式与目录存一份，不弹提示；「截完之后」已经选了「存成文件」或「快速保存」时不重复存</source>
+            <translation>Each capture is saved right away using the format and directory above, with no toast; skipped when "After capture" is already set to "Save to file" or "Quick save"</translation>
+        </message>
+        <message>
+            <source>截图音效</source>
+            <translation>Capture sound</translation>
+        </message>
+        <message>
+            <source>截图完成时响一声系统提示音</source>
+            <translation>Play a system alert when a capture completes</translation>
+        </message>
+        <message>
+            <source>用系统的提示音，不需要放音频文件</source>
+            <translation>Uses the system alert sound; no audio file needed</translation>
+        </message>
+        <message>
+            <source>成品加边框</source>
+            <translation>Border on output</translation>
+        </message>
+        <message>
+            <source>出程序时围一圈中灰边框</source>
+            <translation>Put a neutral-gray frame around it when it leaves the app</translation>
+        </message>
+        <message>
+            <source>存文件、交剪贴板与打印都加上；贴到屏幕上那一张不加——那是显示，不是输出</source>
+            <translation>Applied to file saves, clipboard copies and printing; not to pins on screen — that is display, not output</translation>
+        </message>
+        <message>
+            <source>成品加投影</source>
+            <translation>Shadow on output</translation>
+        </message>
+        <message>
+            <source>出程序时带一圈轻投影</source>
+            <translation>Add a soft shadow when it leaves the app</translation>
+        </message>
+        <message>
+            <source>与边框同一组：存文件、交剪贴板与打印都加上；存 JPG 时投影底下垫白</source>
+            <translation>Same group as the border: applied to file saves, clipboard copies and printing; flattened onto white for JPG</translation>
+        </message>
+        <message>
             <source>截图与标注成品目录</source>
             <translation>Folder for screenshots and annotations</translation>
         </message>
@@ -950,6 +1022,10 @@
         <message>
             <source>滚动长截图</source>
             <translation>Scrolling capture</translation>
+        </message>
+        <message>
+            <source>快速保存</source>
+            <translation>Quick save</translation>
         </message>
         <message>
             <source>收起 / 摆回贴图</source>
