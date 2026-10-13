@@ -93,6 +93,10 @@ namespace GyanisScribe::Pin
         /// 手柄边长，逻辑像素
         constexpr double kHandleSize = 10.0;
 
+        /// 边缘改大小的起笔带，逻辑像素：离窗口四边这一格以内都算「按住边」，
+        /// 不必正落在那枚小手柄上——那枚方块只有 10 格，对着小图几乎按不中
+        constexpr double kEdgeResizeBand = 6.0;
+
         /// 滚轮一格的缩放倍率
         constexpr double kWheelScaleStep = 1.1;
 
@@ -119,6 +123,42 @@ namespace GyanisScribe::Pin
 
         /// 缩略图模式那枚小方块的边长，逻辑像素
         constexpr double kThumbnailEdge = 48.0;
+
+        /// 手柄档对哪一个光标形状：八个档只有三种形状，两条对角各一枚
+        Qt::CursorShape resizeCursorFor(const HandleKind handle) noexcept
+        {
+            switch (handle)
+            {
+                case HandleKind::TopLeft:
+                case HandleKind::BottomRight:
+                    return Qt::SizeFDiagCursor;
+                case HandleKind::TopRight:
+                case HandleKind::BottomLeft:
+                    return Qt::SizeBDiagCursor;
+                case HandleKind::Top:
+                case HandleKind::Bottom:
+                    return Qt::SizeVerCursor;
+                case HandleKind::Left:
+                case HandleKind::Right:
+                    return Qt::SizeHorCursor;
+            }
+            return Qt::ArrowCursor; // 走到这里说明枚举加了新档没配形状
+        }
+
+        /// 改完大小之后窗口该摆在哪：抓哪条边就把对面那条钉住，没人抓的那一轴让中心原地不动
+        QPoint anchoredTopLeft(const HandleKind handle, const QRect &before, const QRect &after)
+        {
+            const bool grabsLeft   = handle == HandleKind::Left || handle == HandleKind::TopLeft || handle == HandleKind::BottomLeft;
+            const bool grabsRight  = handle == HandleKind::Right || handle == HandleKind::TopRight || handle == HandleKind::BottomRight;
+            const bool grabsTop    = handle == HandleKind::Top || handle == HandleKind::TopLeft || handle == HandleKind::TopRight;
+            const bool grabsBottom = handle == HandleKind::Bottom || handle == HandleKind::BottomLeft || handle == HandleKind::BottomRight;
+
+            // 横向：抓的是左边就让那一条线跟着走（对面即右边界钉住），抓右边则左边界钉住；
+            // QRect 的右边界含最后一格，所以对面那条线在 right()+1 上
+            const int left = grabsLeft ? before.right() + 1 - after.width() : grabsRight ? before.left() : (before.left() + before.right() + 1 - after.width()) / 2;
+            const int top  = grabsTop ? before.bottom() + 1 - after.height() : grabsBottom ? before.top() : (before.top() + before.bottom() + 1 - after.height()) / 2;
+            return {left, top};
+        }
 
         /// 取色读数框：色块边长、字号、内边距与离光标的偏移，都是逻辑像素
         constexpr double kColorReadoutSwatchEdge    = 16.0;
@@ -591,6 +631,96 @@ namespace GyanisScribe::Pin
     std::vector<QRectF> PinWindow::handleRects() const
     {
         return Pin::handleRects(contentRect(), kHandleSize);
+    }
+
+    std::optional<HandleKind> PinWindow::edgeHandleAt(const QPointF &localPoint) const
+    {
+        // 缩略图那一档不认边带：那枚小方块是「先让开地方」，四边一带就没有挪它的落点了
+        if (m_thumbnail)
+        {
+            return {};
+        }
+
+        // 带子夹到最短那一边的三分之一以内：图小的时候四边的带子会叠到一起，
+        // 整张都成了「改大小」就再没有平移的地方
+        const auto band       = std::min(kEdgeResizeBand, std::min(width(), height()) / 3.0);
+        const bool nearLeft   = localPoint.x() <= band;
+        const bool nearRight  = localPoint.x() >= static_cast<double>(width()) - band;
+        const bool nearTop    = localPoint.y() <= band;
+        const bool nearBottom = localPoint.y() >= static_cast<double>(height()) - band;
+
+        // 角先判：同时贴着两条边的落点要的是「两个方向一起给」，按边判会把它降成一维
+        if (nearLeft && nearTop)
+        {
+            return HandleKind::TopLeft;
+        }
+        if (nearRight && nearTop)
+        {
+            return HandleKind::TopRight;
+        }
+        if (nearRight && nearBottom)
+        {
+            return HandleKind::BottomRight;
+        }
+        if (nearLeft && nearBottom)
+        {
+            return HandleKind::BottomLeft;
+        }
+        if (nearTop)
+        {
+            return HandleKind::Top;
+        }
+        if (nearRight)
+        {
+            return HandleKind::Right;
+        }
+        if (nearBottom)
+        {
+            return HandleKind::Bottom;
+        }
+        if (nearLeft)
+        {
+            return HandleKind::Left;
+        }
+        return {};
+    }
+
+    std::optional<HandleKind> PinWindow::resizeHandleAt(const QPointF &localPoint) const
+    {
+        const auto handles = handleRects();
+        for (std::size_t index = 0; index < handles.size(); ++index)
+        {
+            if (handles[index].contains(localPoint))
+            {
+                return static_cast<HandleKind>(index);
+            }
+        }
+        return edgeHandleAt(localPoint);
+    }
+
+    void PinWindow::applyHoverCursor(const QPointF &localPoint)
+    {
+        // 取色那一档的十字归 setColorPickMode 自己管：抢过来会让光标说「要改大小」而点下去仍是一个色
+        if (m_colorPickMode)
+        {
+            return;
+        }
+
+        const auto handle = resizeHandleAt(localPoint);
+        if (!handle)
+        {
+            // 只在已经压过形状时才收回：每次悬停移动都 unsetCursor 会让光标闪一下
+            if (cursor().shape() != Qt::ArrowCursor)
+            {
+                unsetCursor();
+            }
+            return;
+        }
+        const auto shape = resizeCursorFor(*handle);
+        if (cursor().shape() != shape)
+        {
+            setCursor(shape);
+        }
     }
 
     void PinWindow::setThumbnailMode(const bool enabled)
@@ -1391,15 +1521,11 @@ namespace GyanisScribe::Pin
         // 起笔时取一次参照快照：整趟拖动都用它，每帧重新枚举窗口会把鼠标移动拖慢
         m_dragCandidates = m_snapCandidates ? m_snapCandidates() : std::vector<QRect>{};
 
-        const auto point   = event->position();
-        const auto handles = handleRects();
-        for (std::size_t index = 0; index < handles.size(); ++index)
+        const auto point = event->position();
+        // 起笔点先认手柄与边带：碰上了就是改大小，没碰上才是整张平移
+        if (const auto handle = resizeHandleAt(point); handle)
         {
-            if (!handles[index].contains(point))
-            {
-                continue;
-            }
-            m_draggedHandle       = static_cast<HandleKind>(index);
+            m_draggedHandle       = *handle;
             m_dragInitialScale    = m_scale;
             m_dragInitialDistance = std::hypot(point.x() - rect().center().x(), point.y() - rect().center().y());
             return;
@@ -1438,7 +1564,11 @@ namespace GyanisScribe::Pin
         {
             const auto point    = event->position();
             const auto distance = std::hypot(point.x() - rect().center().x(), point.y() - rect().center().y());
+            const auto before   = QRect(pos(), size());
             setScale(scaleFromDrag(m_dragInitialScale, m_dragInitialDistance, distance));
+            // applyGeometry 是按中心重算尺寸的；这里把对面那条边钉回原位——按住右边往外拖时
+            // 左边不该一起跑，那看着像整张在漂而不是在改大小
+            move(anchoredTopLeft(*m_draggedHandle, before, QRect(pos(), size())));
             return;
         }
 
@@ -1456,6 +1586,11 @@ namespace GyanisScribe::Pin
             move(target);
             // 选中集里其余几张按同一位移跟着挪：本张已经挪过，管理器只动其余的
             emit draggedWithSelection(delta);
+        } else if (event->buttons() == Qt::NoButton)
+        {
+            // 没有按键的移动就是悬停：落点挨着哪一条边，光标就换成那一条边的改大小形状——
+            // 不换光标没人知道这四条边是可以拖的，那八枚小手柄太细，对着小图基本按不中
+            applyHoverCursor(event->position());
         }
     }
 
@@ -1530,6 +1665,11 @@ namespace GyanisScribe::Pin
     void PinWindow::leaveEvent(QEvent *event)
     {
         QWidget::leaveEvent(event);
+        // 悬停时压上的改大小形状跟着收回去：不然下次进来还没移动，第一眼仍是「这条边能拖」
+        if (!m_colorPickMode)
+        {
+            unsetCursor();
+        }
         // 指针走了就收回去：贴边这一档本来就是「别占着地方」；标注中不收——
         // 光标去点工具栏就是一次离开窗口，把贴图收走等于把正在画的这张纸抽掉
         if (m_edgeDock != ScreenEdge::None && !m_dockCollapsed && !m_annotating)

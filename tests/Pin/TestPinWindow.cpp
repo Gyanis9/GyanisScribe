@@ -1623,4 +1623,127 @@ namespace GyanisScribe
         EXPECT_EQ(closures, 0) << "销毁不该同时被当成关闭：那样它又会进那份可恢复的册子";
     }
 
+    /**
+     * @brief 钉住按住贴图四边那一条带子拖就能改大小：落在手柄小方块之外也算
+     * @details 那八枚手柄只有 10 格，对着 40 格的小图基本按不中；判据取「拖完确实大了」而不是
+     *          「起笔认成了哪一档」，因为读者要的是这一条边能不能拖得动。
+     */
+    TEST_F(PinWindowFixture, EdgeBandDragScalesThePin)
+    {
+        auto &window = makeWindow();
+        window.move(QPoint{100, 100});
+        const auto before = window.size();
+
+        // 右边带里、八枚手柄之外的那一格：右边那枚手柄只盖住纵向中线 ±5，这一格往下错开八格
+        const QPointF pressLocal{static_cast<double>(before.width()) - 2.0, static_cast<double>(before.height()) / 2.0 + 8.0};
+        const QPoint  pressGlobal{window.pos() + pressLocal.toPoint()};
+        QMouseEvent   press{QEvent::MouseButtonPress, pressLocal, pressGlobal, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &press);
+
+        const QPointF draggedLocal{pressLocal.x() + 20.0, pressLocal.y()};
+        const QPoint  draggedGlobal{window.pos() + draggedLocal.toPoint()};
+        QMouseEvent   drag{QEvent::MouseMove, draggedLocal, draggedGlobal, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &drag);
+        QMouseEvent release{QEvent::MouseButtonRelease, draggedLocal, draggedGlobal, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &release);
+
+        EXPECT_GT(window.width(), before.width()) << "按住右边往外拖该把这一张放大，而不是把它整张挪走";
+    }
+
+    /**
+     * @brief 钉住悬停在四边带子上给出对应的改大小光标：边给双向箭头、角给对角箭头
+     * @details 落点都挑在手柄小方块之外，测的是边带这一档；三个方向各一条，是因为把八档映成
+     *          一种形状（例如一律给 SizeHor）也照样「有光标变化」，只断一条认不出来。
+     */
+    TEST_F(PinWindowFixture, EdgeBandHoverSetsTheResizeCursorForThatEdge)
+    {
+        auto &window = makeWindow();
+        window.move(QPoint{100, 100});
+
+        const auto hoverAt = [&window](const QPointF &local)
+        {
+            const QPoint global{window.pos() + local.toPoint()};
+            QMouseEvent  hover{QEvent::MouseMove, local, global, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+            QApplication::sendEvent(&window, &hover);
+        };
+
+        hoverAt(QPointF{38.0, 32.0});
+        EXPECT_EQ(window.cursor().shape(), Qt::SizeHorCursor) << "右边带上的光标该说要左右改大小";
+
+        hoverAt(QPointF{30.0, 2.0});
+        EXPECT_EQ(window.cursor().shape(), Qt::SizeVerCursor) << "上边带上的光标该说要上下改大小";
+
+        hoverAt(QPointF{2.0, 34.0});
+        EXPECT_EQ(window.cursor().shape(), Qt::SizeBDiagCursor) << "左下角上的光标该说斜着改大小";
+    }
+
+    /**
+     * @brief 钉住贴图中央的悬停不换成改大小光标
+     * @details 上面那条只断「边上变了」，把带子放到无限大照样过；这一条从反面对着同一处，
+     *          中间那一块还得是「拖着走」的落点。
+     */
+    TEST_F(PinWindowFixture, InteriorHoverKeepsTheArrowCursor)
+    {
+        auto &window = makeWindow();
+        window.move(QPoint{100, 100});
+
+        const QPointF center{20.0, 20.0};
+        const QPoint  centerGlobal{window.pos() + center.toPoint()};
+        QMouseEvent   hover{QEvent::MouseMove, center, centerGlobal, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &hover);
+
+        EXPECT_EQ(window.cursor().shape(), Qt::ArrowCursor) << "贴图中间的光标不该被改大小抢走";
+    }
+
+    /**
+     * @brief 钉住拖边改大小时对面那条边钉在原地：拖右边长出去的是左边在退
+     * @details 尺寸重算原本按「中心不动」来摆，边上拖就会整张漂；这一条把「对面那条线不动」钉住。
+     *          两条断言配着用：只看左边没动，什么都不做的实现也能过。
+     */
+    TEST_F(PinWindowFixture, EdgeDragAnchorsTheOppositeEdge)
+    {
+        auto &window = makeWindow();
+        window.move(QPoint{100, 100});
+        const auto before = QRect(window.pos(), window.size());
+
+        const QPointF pressLocal{38.0, 32.0};
+        const QPoint  pressGlobal{window.pos() + pressLocal.toPoint()};
+        QMouseEvent   press{QEvent::MouseButtonPress, pressLocal, pressGlobal, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &press);
+
+        const QPointF draggedLocal{58.0, 32.0};
+        const QPoint  draggedGlobal{window.pos() + draggedLocal.toPoint()};
+        QMouseEvent   drag{QEvent::MouseMove, draggedLocal, draggedGlobal, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &drag);
+
+        const auto after = QRect(window.pos(), window.size());
+        EXPECT_EQ(after.left(), before.left()) << "拖的是右边：左边那条线该钉在原地，不该跟着往外退";
+        EXPECT_GT(after.width(), before.width()) << "这一拖得真的把尺寸改大了，否则上面那条「没动」不带信息";
+    }
+
+    /**
+     * @brief 钉住缩略图那一档不吃边带：拖小方块还是挪，不是改大小
+     * @details 那枚方块固定 48 格，改大小在这档里根本无从表现；更关键的是它本来的用途就是
+     *          「先让开地方」，四边一带就没有挪它的落点了。
+     */
+    TEST_F(PinWindowFixture, ThumbnailEdgeDragStillPans)
+    {
+        auto &window = makeWindow();
+        window.setThumbnailMode(true);
+        window.move(QPoint{100, 100});
+
+        const QPointF pressLocal{46.0, 32.0};
+        const QPoint  pressGlobal{window.pos() + pressLocal.toPoint()};
+        QMouseEvent   press{QEvent::MouseButtonPress, pressLocal, pressGlobal, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &press);
+
+        const QPointF draggedLocal{66.0, 52.0};
+        const QPoint  draggedGlobal{window.pos() + draggedLocal.toPoint()};
+        QMouseEvent   drag{QEvent::MouseMove, draggedLocal, draggedGlobal, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &drag);
+
+        const QPoint panned(120, 120);
+        EXPECT_EQ(window.pos(), panned) << "缩略图上也按住边拖，该是整块挪走而不是改大小（这一档的尺寸是钉死的）";
+    }
+
 } // namespace GyanisScribe

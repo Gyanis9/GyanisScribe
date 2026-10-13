@@ -673,6 +673,29 @@ namespace GyanisScribe::Pin
         [[nodiscard]] QRectF contentRect() const;
 
         /**
+         * @brief 这一落点归哪一档「改大小」：先认那八枚手柄，再认窗口四边那一条带子
+         * @param localPoint 本窗口内坐标
+         * @return 命中的那一档；带子与手柄都没碰上时为空——那才是整张平移的落点
+         * @note 缩略图那一档不认边带：那枚 48 格的小方块是「先让开地方」，四边一带就没了挪它的落点
+         */
+        [[nodiscard]] std::optional<HandleKind> resizeHandleAt(const QPointF &localPoint) const;
+
+        /**
+         * @brief 窗口四边那一条带子里的落点归哪一档（角上优先，其次是那一条边）
+         * @param localPoint 本窗口内坐标
+         * @return 对应的手柄档；落在带子外（或缩略图那一档）为空
+         */
+        [[nodiscard]] std::optional<HandleKind> edgeHandleAt(const QPointF &localPoint) const;
+
+        /**
+         * @brief 悬停时按落点换光标：改大小的落点给对应的双头箭头，别处交回默认
+         * @param localPoint 本窗口内坐标
+         * @note 取色那一档的十字由 setColorPickMode 自己管，这里不抢——抢了之后点出来的还是色，
+         *       光标却在说「要改大小」
+         */
+        void applyHoverCursor(const QPointF &localPoint);
+
+        /**
          * @brief 回到原始比例（1:1）与角度（0°），透明度与位置不动
          * @details 键盘 `0` 与左键双击共用这一个出口：两处各写一份复位就会在将来只改一处。
          *          位置不跟着改中心：复位尺寸不该把人摆好的那一站挪走。
