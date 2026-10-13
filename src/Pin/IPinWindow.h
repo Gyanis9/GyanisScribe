@@ -84,6 +84,18 @@ namespace GyanisScribe::Pin
         [[nodiscard]] virtual bool isMouseThrough() const noexcept = 0;
 
         /**
+         * @brief 设「透明区」这一档：带透明通道的贴图，透明像素底下画什么
+         * @param mode 跟随窗口底色 / 桌面透出 / 深色棋盘 / 亮色棋盘
+         */
+        virtual void setTransparentBackdrop(TransparentBackdrop mode) = 0;
+
+        /**
+         * @brief 当前「透明区」这一档
+         * @return 四档之一，初值是跟随窗口底色
+         */
+        [[nodiscard]] virtual TransparentBackdrop transparentBackdrop() const noexcept = 0;
+
+        /**
          * @brief 保持置顶
          * @param pinned true 压在普通窗口之上
          */

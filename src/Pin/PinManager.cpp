@@ -339,6 +339,8 @@ namespace GyanisScribe::Pin
             {
                 Core::Logger::warning(std::format("贴图恢复时设穿透没成：{}", through.error().message));
             }
+            // 透明区这一档不需要平台能力，直接退回去：重启前是棋盘，回来还是棋盘
+            pin.setTransparentBackdrop(state.transparentBackdrop);
 
             // 位置排在几何参数之后：缩放与旋转都绕着图片中心重排，窗口左上会跟着挪，
             // 先摆位置再改尺寸就等于把记下来的那个点当成了「参数生效前」的位置

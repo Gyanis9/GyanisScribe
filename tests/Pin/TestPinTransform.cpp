@@ -1,6 +1,8 @@
 #include "Pin/PinTransform.h"
 
 #include <QPoint>
+#include <QColor>
+#include <QImage>
 #include <QPointF>
 #include <QRectF>
 #include <QSize>
@@ -366,4 +368,44 @@ TEST(SnapToCandidateEdges, LeavesTheRectAloneWhenNothingQualifies)
     EXPECT_EQ(snapToCandidateEdges(moved, none), moved) << "没有参照就该原样交回";
     EXPECT_EQ(snapToCandidateEdges(moved, far), moved) << "最近的线也在容差之外就不该吸";
     EXPECT_EQ(snapToCandidateEdges(moved, far, -1), moved) << "容差为负是非法输入，不该被当成全都算够近";
+}
+
+/**
+ * @brief 钉住棋盘贴片的形状：2×2 格、两色对角，非正数的格长交出空图
+ * @details 贴片是平铺出来的最小单位：只有一色就是「画成一整块实心」那个坏法，在这儿当场看得见。
+ *          cell 不是正数时交出空贴片而不是 1×1 的一格——调用方拿空刷子什么都不画，比糊出一张点图诚实。
+ */
+TEST(PinCheckerTile, AlternatesTwoColorsAndRejectsNonPositiveCell)
+{
+    const QColor first{10, 20, 30};
+    const QColor second{200, 210, 220};
+
+    const auto tile = checkerboardTile(first, second, 4);
+    ASSERT_EQ(tile.size(), QSize(8, 8)) << "贴片该是 2×2 格，平铺之后才连得成棋盘";
+    EXPECT_EQ(tile.pixelColor(1, 1), first) << "左上格";
+    EXPECT_EQ(tile.pixelColor(5, 1), second) << "右上格该换成另一色";
+    EXPECT_EQ(tile.pixelColor(1, 5), second) << "左下格该换成另一色";
+    EXPECT_EQ(tile.pixelColor(5, 5), first) << "右下格该回到第一色";
+
+    EXPECT_TRUE(checkerboardTile(first, second, 0).isNull()) << "格长为 0 要交出空贴片";
+    EXPECT_TRUE(checkerboardTile(first, second, -3).isNull()) << "负格长同样是非法输入，不该被折成一格";
+}
+
+/**
+ * @brief 钉住只有两档棋盘给得出颜色对，露底色与桌面透出那两档什么都不画
+ * @details 深色档两色由暗到亮、亮色档由亮到暗：这是「摆在白文档上」与「摆在深色桌面上」两种用途的分界，
+ *          写反了就成了深色档画亮棋盘。
+ */
+TEST(PinCheckerColors, OnlyTheTwoCheckerModesDrawATile)
+{
+    EXPECT_FALSE(checkerColorsFor(TransparentBackdrop::ThemeBase).has_value()) << "跟随窗口底色不该画棋盘";
+    EXPECT_FALSE(checkerColorsFor(TransparentBackdrop::SeeThrough).has_value()) << "桌面透出该让那块空着，垫上棋盘就把桌面又挡住了";
+
+    const auto dark  = checkerColorsFor(TransparentBackdrop::DarkChecker);
+    const auto light = checkerColorsFor(TransparentBackdrop::LightChecker);
+    ASSERT_TRUE(dark.has_value());
+    ASSERT_TRUE(light.has_value());
+    EXPECT_LT(dark->first.lightness(), dark->second.lightness()) << "深色档的两色反了顺序，摆在白底上就看不出边界";
+    EXPECT_GT(light->first.lightness(), light->second.lightness()) << "亮色档同理";
+    EXPECT_NE(dark->first, light->first) << "深浅两档撞成同一组色，那一档等于白给";
 }

@@ -2256,6 +2256,14 @@
             <translation>Entry {} of the pin layout has a non-boolean mouse-through field. Clear that entry and let the app record it again</translation>
         </message>
         <message>
+            <source>贴图布局第 {} 项的透明区档位不是整数。请清除这一项后让程序重新记一次</source>
+            <translation>Pin layout entry {} has a transparent-area step that is not an integer. Clear the entry so the app can record the layout again</translation>
+        </message>
+        <message>
+            <source>贴图布局第 {} 项的透明区档位不在 0 到 {} 里：{}。请清除这一项后让程序重新记一次</source>
+            <translation>Pin layout entry {} has a transparent-area step outside 0 to {} (read {}). Clear the entry so the app can record the layout again</translation>
+        </message>
+        <message>
             <source>贴图分组名字不是一段 JSON 对象：{}。请在设置里清除 Pin/GroupNames 这一项，让程序重新记一次</source>
             <translation>Pin group names are not a JSON object: {}. Clear Pin/GroupNames in Settings and let the program record them again</translation>
         </message>
@@ -2398,6 +2406,42 @@
         <message>
             <source>自定义…</source>
             <translation>Custom...</translation>
+        </message>
+        <message>
+            <source>透明区</source>
+            <translation>Transparent area</translation>
+        </message>
+        <message>
+            <source>跟随窗口底色</source>
+            <translation>Window background</translation>
+        </message>
+        <message>
+            <source>透明像素露出窗口的底色（一直以来的那一档）</source>
+            <translation>Transparent pixels show the window background (the previous behaviour)</translation>
+        </message>
+        <message>
+            <source>桌面透出</source>
+            <translation>Show the desktop</translation>
+        </message>
+        <message>
+            <source>整窗改成逐像素合成，透明那几块把底下的桌面透出来</source>
+            <translation>The window switches to per-pixel compositing, so those transparent patches show the desktop underneath</translation>
+        </message>
+        <message>
+            <source>深色棋盘</source>
+            <translation>Dark checkerboard</translation>
+        </message>
+        <message>
+            <source>按深色棋盘画出透明区，摆在白文档上看得出边界</source>
+            <translation>Paint the transparent area as a dark checkerboard, so its border shows on a white document</translation>
+        </message>
+        <message>
+            <source>亮色棋盘</source>
+            <translation>Light checkerboard</translation>
+        </message>
+        <message>
+            <source>按亮色棋盘画出透明区，摆在深色桌面上看得出边界</source>
+            <translation>Paint the transparent area as a light checkerboard, so its border shows on a dark desktop</translation>
         </message>
         <message>
             <source>只显示这一张</source>

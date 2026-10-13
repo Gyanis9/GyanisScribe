@@ -1935,4 +1935,140 @@ namespace GyanisScribe
         EXPECT_EQ(window.width(), 120) << "弹回原样再缩起来，方块的大小不该掉回默认的 48";
     }
 
+    /**
+     * @brief 钉住两档棋盘只垫在图透明的地方，不透明的地方还是图本身
+     * @details 探针用一张左半实色红、右半全透明的 40×40：棋盘该出现在右半，而且两色各要出现一次
+     *          （画成一整块实心是最省事的坏法，光看「有东西垫着」认不出来），左半该仍是那张图的红——
+     *          一条判据同时钉住「画在图之前」与「没盖住图」。默认档按「不是棋盘的两色之一」判，
+     *          不写死成全透明：窗口背景由 Qt 填什么，不是这一档的承诺。
+     */
+    TEST_F(PinWindowFixture, TransparentBackdropCheckersPaintOnlyWhereTheImageIsTransparent)
+    {
+        QImage image{QSize{40, 40}, QImage::Format_ARGB32};
+        image.fill(Qt::transparent);
+        for (int y = 0; y < 40; ++y)
+        {
+            for (int x = 0; x < 20; ++x)
+            {
+                image.setPixelColor(x, y, QColor(255, 0, 0));
+            }
+        }
+        auto &window = makeWindow(image);
+
+        const auto painted = [&window]
+        {
+            QImage canvas{window.size(), QImage::Format_ARGB32};
+            canvas.fill(Qt::transparent);
+            window.render(&canvas);
+            return canvas;
+        };
+
+        const QColor darkFirst{56, 56, 56};
+        const QColor darkSecond{88, 88, 88};
+
+        // 默认档：透明那半边没垫棋盘色
+        const QColor before = painted().pixelColor(24, 4);
+        EXPECT_TRUE(before != darkFirst && before != darkSecond) << "没开棋盘档时透明区就被画上了棋盘色";
+
+        window.setTransparentBackdrop(Pin::TransparentBackdrop::DarkChecker);
+        const QImage dark = painted();
+        EXPECT_EQ(dark.pixelColor(10, 10), QColor(255, 0, 0)) << "棋盘盖住了图上本来不透明的那一块";
+        // 贴片 16 见方、一格 8 像素：(24,4) 与 (32,4) 落在贴片里两个不同的格上
+        const QColor atFirstCell  = dark.pixelColor(24, 4);
+        const QColor atSecondCell = dark.pixelColor(32, 4);
+        EXPECT_TRUE(atFirstCell == darkFirst || atFirstCell == darkSecond) << "深色档画的不是棋盘那两色之一";
+        EXPECT_NE(atFirstCell, atSecondCell) << "相邻两格同色：画成了一整块实心，不是棋盘";
+
+        const QColor lightFirst{255, 255, 255};
+        const QColor lightSecond{204, 204, 204};
+        window.setTransparentBackdrop(Pin::TransparentBackdrop::LightChecker);
+        const QImage light         = painted();
+        const QColor atLightFirst  = light.pixelColor(24, 4);
+        const QColor atLightSecond = light.pixelColor(32, 4);
+        EXPECT_TRUE(atLightFirst == lightFirst || atLightFirst == lightSecond) << "亮色档画的不是亮色棋盘那两色之一";
+        EXPECT_NE(atLightFirst, atLightSecond) << "亮色档也只画了一整块实心";
+        EXPECT_NE(atLightFirst, atFirstCell) << "深浅两档撞成同一色，那一档等于白给";
+    }
+
+    /**
+     * @brief 钉住「桌面透出」这一档驱动的是逐像素合成那个窗口属性，退回默认时改回来
+     * @details 这里验得了的是「属性跟着档走」。透明像素把桌面透出来、那几处不再拦鼠标，是平台按 alpha
+     *          做命中测试的结果——无头环境后面没有第二块桌面，那半句验不了（界面的硬限制，写在这里免得下轮当成已覆盖）。
+     */
+    TEST_F(PinWindowFixture, SeeThroughModeDrivesTheTranslucentAttribute)
+    {
+        auto &window = makeWindow();
+        EXPECT_EQ(window.transparentBackdrop(), Pin::TransparentBackdrop::ThemeBase) << "起点该是「跟随窗口底色」，也就是这一格出现之前的行为";
+        EXPECT_FALSE(window.testAttribute(Qt::WA_TranslucentBackground)) << "默认档不该把窗口开成逐像素合成";
+
+        window.setTransparentBackdrop(Pin::TransparentBackdrop::SeeThrough);
+        EXPECT_TRUE(window.testAttribute(Qt::WA_TranslucentBackground)) << "切到桌面透出，窗口属性没跟着走";
+
+        window.setTransparentBackdrop(Pin::TransparentBackdrop::ThemeBase);
+        EXPECT_FALSE(window.testAttribute(Qt::WA_TranslucentBackground)) << "退回默认档之后窗口还留着逐像素合成";
+    }
+
+    /**
+     * @brief 钉住右键「透明区」四档各一条、按下的那条就是当前档，点一条就换档
+     * @details 一枚菜单项说不清现在垫的是什么，按下态就是读数；四档少一条就意味着某一档在界面上到不了。
+     */
+    TEST_F(PinWindowFixture, TransparentBackdropSubmenuChecksAndSwitches)
+    {
+        auto &window = makeWindow();
+
+        const std::unique_ptr<QMenu> menu{window.buildContextMenu()};
+        QMenu                       *backdropMenu = nullptr;
+        for (QAction *action: menu->actions())
+        {
+            if (action->menu() != nullptr && action->text() == QString::fromUtf8("透明区"))
+            {
+                backdropMenu = action->menu();
+            }
+        }
+        ASSERT_NE(backdropMenu, nullptr) << "右键里没有「透明区」这一格";
+
+        const auto entries = backdropMenu->actions();
+        ASSERT_EQ(entries.size(), 4) << "透明区该有四档，多一档少一档都不算对上";
+        int checkedCount{};
+        for (QAction *action: entries)
+        {
+            if (action->isChecked())
+            {
+                ++checkedCount;
+            }
+            EXPECT_FALSE(action->toolTip().isEmpty()) << "有一档没写它是干什么的";
+        }
+        EXPECT_EQ(checkedCount, 1) << "起点该恰好一条按下";
+
+        for (QAction *action: entries)
+        {
+            if (action->text() == QString::fromUtf8("深色棋盘"))
+            {
+                action->trigger();
+                break;
+            }
+        }
+        EXPECT_EQ(window.transparentBackdrop(), Pin::TransparentBackdrop::DarkChecker) << "点「深色棋盘」没换档";
+
+        const std::unique_ptr<QMenu> reopened{window.buildContextMenu()};
+        QMenu                       *again = nullptr;
+        for (QAction *action: reopened->actions())
+        {
+            if (action->menu() != nullptr && action->text() == QString::fromUtf8("透明区"))
+            {
+                again = action->menu();
+            }
+        }
+        ASSERT_NE(again, nullptr);
+        int reopenedChecked{};
+        for (QAction *action: again->actions())
+        {
+            if (action->isChecked())
+            {
+                ++reopenedChecked;
+            }
+        }
+        EXPECT_EQ(reopenedChecked, 1) << "换档之后菜单上的按下态没跟着走";
+    }
+
 } // namespace GyanisScribe

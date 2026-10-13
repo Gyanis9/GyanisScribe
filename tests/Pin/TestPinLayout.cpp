@@ -15,6 +15,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <array>
 #include <filesystem>
 #include <format>
 #include <memory>
@@ -212,6 +213,36 @@ TEST_F(PinLayoutFixture, TopmostAndThroughRoundTripWhileOldLayoutsDefaultToToday
     const auto notBool = parseLayout(R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png","alwaysOnTop":"yes"}])");
     ASSERT_FALSE(notBool.has_value()) << "非布尔值被 toBool 折成 false，等于静默读反一个开关";
     EXPECT_NE(notBool.error().message.find("置顶字段"), std::string::npos) << "要写出坏的是哪一个字段：" << notBool.error().message;
+}
+
+/**
+ * @brief 钉住透明区这一档进得了布局，旧布局缺字段落回旧行为，越界或写歪的数字被拒
+ * @details 这里存的是档位序号。读到一个不存在的档必须报错而不是悄悄当成第一档——用户选的是棋盘，
+ *          静默换成底色就是「重启之后我的棋盘没了」这种在代码里查不出来的坏法。
+ */
+TEST_F(PinLayoutFixture, TransparentBackdropRoundTripsAndRejectsUnknownSteps)
+{
+    auto checkered                = sample(10, 20, 1.0, 0.0, 1.0);
+    checkered.transparentBackdrop = TransparentBackdrop::DarkChecker;
+    const auto parsed             = parseLayout(serializeLayout(QVector<PinState>{checkered}).toStdString());
+    ASSERT_TRUE(parsed.has_value()) << "自己写出的布局读不回来：" << parsed.error().message;
+    EXPECT_EQ(parsed->front().transparentBackdrop, TransparentBackdrop::DarkChecker) << "透明区那一档没进布局文本";
+
+    const auto legacy = parseLayout(R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png"}])");
+    ASSERT_TRUE(legacy.has_value()) << "旧布局读不出来：" << legacy.error().message;
+    EXPECT_EQ(legacy->front().transparentBackdrop, TransparentBackdrop::ThemeBase) << "旧布局缺字段时该落在这一格出现之前的行为";
+
+    constexpr std::array<const char *, 3> bad = {
+            R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png","transparentBackdrop":7}])",
+            R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png","transparentBackdrop":-1}])",
+            R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png","transparentBackdrop":"checker"}])",
+    };
+    for (const char *record: bad)
+    {
+        const auto rejected = parseLayout(record);
+        ASSERT_FALSE(rejected.has_value()) << "这一条坏布局被当成了合法的一档：" << record;
+        EXPECT_NE(rejected.error().message.find("透明区"), std::string::npos) << "要写出坏的是哪一个字段：" << rejected.error().message;
+    }
 }
 
 /**

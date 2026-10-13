@@ -29,6 +29,7 @@ namespace GyanisScribe::Pin
         constexpr std::string_view kKeyOnTop     = "alwaysOnTop";
         constexpr std::string_view kKeyThrough   = "mouseThrough";
         constexpr std::string_view kKeySource    = "sourceFile";
+        constexpr std::string_view kKeyBackdrop  = "transparentBackdrop";
 
         Core::Expected<QVector<PinState>> failWith(std::string reason)
         {
@@ -60,6 +61,7 @@ namespace GyanisScribe::Pin
             entry.insert(QLatin1String(kKeyOnTop.data()), state.alwaysOnTop);
             entry.insert(QLatin1String(kKeyThrough.data()), state.mouseThrough);
             entry.insert(QLatin1String(kKeySource.data()), state.sourceFile);
+            entry.insert(QLatin1String(kKeyBackdrop.data()), static_cast<int>(state.transparentBackdrop));
             entries.append(entry);
         }
         return QString::fromUtf8(QJsonDocument(entries).toJson(QJsonDocument::Compact));
@@ -164,6 +166,25 @@ namespace GyanisScribe::Pin
             if (entry.contains(QLatin1String(kKeySource.data())))
             {
                 state.sourceFile = entry[QLatin1String(kKeySource.data())].toString();
+            }
+
+            // 透明区同样是后加的字段，缺省落「跟随窗口底色」（旧布局里那几张露的就是窗口底色）；
+            // 写了但不是整数、或不在档数里，才是坏记录——越界的数字静默当成第一档，等于把用户选的棋盘偷偷换掉
+            if (entry.contains(QLatin1String(kKeyBackdrop.data())))
+            {
+                const auto stored = entry[QLatin1String(kKeyBackdrop.data())];
+                if (!stored.isDouble())
+                {
+                    return failWith(
+                            GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局第 {} 项的透明区档位不是整数。请清除这一项后让程序重新记一次"), index + 1));
+                }
+                const auto raw = stored.toInt();
+                if (raw < 0 || raw >= kTransparentBackdropCount)
+                {
+                    return failWith(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局第 {} 项的透明区档位不在 0 到 {} 里：{}。请清除这一项后让程序重新记一次"),
+                                                                 index + 1, kTransparentBackdropCount - 1, raw));
+                }
+                state.transparentBackdrop = static_cast<TransparentBackdrop>(raw);
             }
 
             states.push_back(state);

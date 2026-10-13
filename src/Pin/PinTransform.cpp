@@ -1,6 +1,7 @@
 #include "Pin/PinTransform.h"
 
 #include <QLineF>
+#include <QPainter>
 
 #include <algorithm>
 #include <array>
@@ -266,6 +267,42 @@ namespace GyanisScribe::Pin
                 break;
         }
         return rect;
+    }
+
+    std::optional<CheckerColors> checkerColorsFor(const TransparentBackdrop mode)
+    {
+        switch (mode)
+        {
+            case TransparentBackdrop::DarkChecker:
+                return CheckerColors{.first = QColor{56, 56, 56}, .second = QColor{88, 88, 88}};
+            case TransparentBackdrop::LightChecker:
+                return CheckerColors{.first = QColor{255, 255, 255}, .second = QColor{204, 204, 204}};
+            case TransparentBackdrop::ThemeBase:
+            case TransparentBackdrop::SeeThrough:
+                // 这两档不画棋盘：一档露窗口底色，一档让桌面透出来
+                return std::nullopt;
+        }
+        return std::nullopt;
+    }
+
+    QImage checkerboardTile(const QColor &first, const QColor &second, const int cell)
+    {
+        if (cell <= 0)
+        {
+            return {};
+        }
+
+        // 贴片是 2×2 格：平铺之后相邻的格子交替两色，就是棋盘
+        QImage tile{QSize{cell * 2, cell * 2}, QImage::Format_ARGB32_Premultiplied};
+        tile.fill(first);
+        {
+            QPainter painter{&tile};
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(second);
+            painter.drawRect(QRect{0, cell, cell, cell});
+            painter.drawRect(QRect{cell, 0, cell, cell});
+        }
+        return tile;
     }
 
 } // namespace GyanisScribe::Pin

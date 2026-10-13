@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include <QColor>
+#include <QImage>
 #include <QPoint>
 #include <QRect>
 #include <QRectF>
@@ -20,6 +22,50 @@
 
 namespace GyanisScribe::Pin
 {
+
+    /**
+     * @brief 带透明通道的贴图，透明像素底下画什么
+     * @details ThemeBase 是这一格出现之前的唯一行为（露出窗口的底色）；SeeThrough 让桌面透出来；
+     *          两档棋盘解决「看清哪里是透明的」——深浅两档是因为底上可能是白文档也可能是深色桌面。
+     *          整张图不透明时这四档看不出差别，差别只在透明的那几块。
+     * @note 底层是布局里存的整数，新档只能追加在末尾。
+     */
+    enum class TransparentBackdrop
+    {
+        ThemeBase    = 0, ///< 透明像素露出窗口的底色（旧行为）
+        SeeThrough   = 1, ///< 透明像素把桌面透出来
+        DarkChecker  = 2, ///< 透明像素画深色棋盘
+        LightChecker = 3, ///< 透明像素画亮色棋盘
+    };
+
+    /// 棋盘一格的边长，逻辑像素
+    inline constexpr int kCheckerCellPixels = 8;
+
+    /// 透明区档数：布局里读到越界的数字算坏记录，而不是悄悄当成第一档
+    inline constexpr int kTransparentBackdropCount = 4;
+
+    /// 棋盘的两格颜色（深色档与亮色档各一组）
+    struct CheckerColors
+    {
+        QColor first;  ///< 左上与右下那两格
+        QColor second; ///< 右上与左下那两格
+    };
+
+    /**
+     * @brief 这一档该画哪一组棋盘色
+     * @param mode 透明区的档
+     * @return 两档棋盘返回颜色对；ThemeBase 与 SeeThrough 不画棋盘，返回空
+     */
+    [[nodiscard]] std::optional<CheckerColors> checkerColorsFor(const TransparentBackdrop mode);
+
+    /**
+     * @brief 拼一枚可平铺的棋盘贴片
+     * @param first 左上与右下的颜色
+     * @param second 右上与左下的颜色
+     * @param cell 一格边长，逻辑像素
+     * @return 2×cell 见方的贴片；cell 不是正数时返回空图
+     */
+    [[nodiscard]] QImage checkerboardTile(const QColor &first, const QColor &second, int cell);
 
     /// 缩放下限：再小就成一个点，恢复原大小时用户会找不到它
     constexpr double kMinimumScale = 0.05;

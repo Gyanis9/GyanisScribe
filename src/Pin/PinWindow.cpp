@@ -443,6 +443,33 @@ namespace GyanisScribe::Pin
         return m_mouseThrough;
     }
 
+    void PinWindow::setTransparentBackdrop(const TransparentBackdrop mode)
+    {
+        if (mode == m_transparentBackdrop)
+        {
+            // 重复设同一档不重映射窗口：那会看得见地闪一下，而什么都没变
+            return;
+        }
+        const auto wasVisible = isVisible();
+        // WA_TranslucentBackground 要在窗口未创建的状态下改才生效，与改标志位同一套做法
+        if (wasVisible)
+        {
+            hide();
+        }
+        setAttribute(Qt::WA_TranslucentBackground, mode == TransparentBackdrop::SeeThrough);
+        m_transparentBackdrop = mode;
+        if (wasVisible)
+        {
+            show();
+        }
+        update();
+    }
+
+    TransparentBackdrop PinWindow::transparentBackdrop() const noexcept
+    {
+        return m_transparentBackdrop;
+    }
+
     void PinWindow::setAlwaysOnTop(bool pinned)
     {
         m_pinned            = pinned;
@@ -620,10 +647,11 @@ namespace GyanisScribe::Pin
     PinState PinWindow::state() const
     {
         PinState state{globalRect().topLeft(), m_logicalSize, m_scale, m_rotationDegrees, m_opacity};
-        state.group        = m_group;
-        state.alwaysOnTop  = m_pinned;
-        state.mouseThrough = m_mouseThrough;
-        state.sourceFile   = m_sourceFile;
+        state.group               = m_group;
+        state.alwaysOnTop         = m_pinned;
+        state.mouseThrough        = m_mouseThrough;
+        state.transparentBackdrop = m_transparentBackdrop;
+        state.sourceFile          = m_sourceFile;
         return state;
     }
 
@@ -1398,6 +1426,11 @@ namespace GyanisScribe::Pin
         {
             painter.fillRect(content, m_backgroundColor);
         }
+        // 透明区两档棋盘：画在底板之后、图之前，于是只有图上是透明的地方才看得见它
+        if (const auto checker = checkerColorsFor(m_transparentBackdrop); checker)
+        {
+            painter.fillRect(content, QBrush{checkerboardTile(checker->first, checker->second, kCheckerCellPixels)});
+        }
         painter.drawImage(content, displayImage(), QRectF(QPointF(0.0, 0.0), QSizeF(m_image.width(), m_image.height())));
         painter.resetTransform();
 
@@ -2051,6 +2084,21 @@ namespace GyanisScribe::Pin
                                  setBackgroundColor(picked);
                              }
                          });
+
+        // 透明区：带透明通道的图，那些像素底下画什么。四档各管一件事，所以把「露底色」与「让桌面透出来」摆在前面
+        auto      *backdropMenu      = menu->addMenu(GyanisScribe::Core::uiText("透明区"));
+        const auto addBackdropChoice = [this, backdropMenu](const QString &label, const TransparentBackdrop mode, const QString &hint)
+        {
+            auto *item = backdropMenu->addAction(label);
+            item->setCheckable(true);
+            item->setChecked(m_transparentBackdrop == mode);
+            item->setToolTip(hint);
+            QObject::connect(item, &QAction::triggered, this, [this, mode] { setTransparentBackdrop(mode); });
+        };
+        addBackdropChoice(GyanisScribe::Core::uiText("跟随窗口底色"), TransparentBackdrop::ThemeBase, GyanisScribe::Core::uiText("透明像素露出窗口的底色（一直以来的那一档）"));
+        addBackdropChoice(GyanisScribe::Core::uiText("桌面透出"), TransparentBackdrop::SeeThrough, GyanisScribe::Core::uiText("整窗改成逐像素合成，透明那几块把底下的桌面透出来"));
+        addBackdropChoice(GyanisScribe::Core::uiText("深色棋盘"), TransparentBackdrop::DarkChecker, GyanisScribe::Core::uiText("按深色棋盘画出透明区，摆在白文档上看得出边界"));
+        addBackdropChoice(GyanisScribe::Core::uiText("亮色棋盘"), TransparentBackdrop::LightChecker, GyanisScribe::Core::uiText("按亮色棋盘画出透明区，摆在深色桌面上看得出边界"));
 
         // 只显示这一张：其余的收起来，屏幕腾给这一张；再点一下恢复按组的那套规则。
         // 与「标注」那两档不同，它对谁用都成立（动图也一样）

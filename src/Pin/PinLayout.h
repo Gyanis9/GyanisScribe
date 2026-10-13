@@ -10,6 +10,7 @@
 #pragma once
 
 #include "Core/Types.h"
+#include "Pin/PinTransform.h"
 
 #include <QMap>
 #include <QPoint>
@@ -35,16 +36,17 @@ namespace GyanisScribe::Pin
      */
     struct PinState
     {
-        QPoint  position;              ///< 窗口左上角的全局逻辑坐标
-        QSizeF  logicalSize;           ///< 图片未缩放时的逻辑尺寸
-        double  scale           = 1.0; ///< 缩放因子
-        double  rotationDegrees = 0.0; ///< 旋转角度，已折进 [0,360)
-        double  opacity         = 1.0; ///< 不透明度，(0,1]
-        QString imageFile;             ///< 像素在盘上的位置，恢复时按它读图
-        int     group        = 1;      ///< 所属贴图分组，从 1 起；一张贴图只属于一组
-        bool    alwaysOnTop  = true;   ///< 是否保持置顶；缺省按今天的行为（新建的贴图都置顶）
-        bool    mouseThrough = false;  ///< 是否鼠标穿透
-        QString sourceFile;            ///< 动图的来源文件；空表示这张是静图（剪贴板与标注贴出来的都在内存里）
+        QPoint              position;                                             ///< 窗口左上角的全局逻辑坐标
+        QSizeF              logicalSize;                                          ///< 图片未缩放时的逻辑尺寸
+        double              scale           = 1.0;                                ///< 缩放因子
+        double              rotationDegrees = 0.0;                                ///< 旋转角度，已折进 [0,360)
+        double              opacity         = 1.0;                                ///< 不透明度，(0,1]
+        QString             imageFile;                                            ///< 像素在盘上的位置，恢复时按它读图
+        int                 group        = 1;                                     ///< 所属贴图分组，从 1 起；一张贴图只属于一组
+        bool                alwaysOnTop  = true;                                  ///< 是否保持置顶；缺省按今天的行为（新建的贴图都置顶）
+        bool                mouseThrough = false;                                 ///< 是否鼠标穿透
+        QString             sourceFile;                                           ///< 动图的来源文件；空表示这张是静图（剪贴板与标注贴出来的都在内存里）
+        TransparentBackdrop transparentBackdrop = TransparentBackdrop::ThemeBase; ///< 透明像素底下画哪一档，与右键「透明区」同解
     };
 
     /// 分组号的起点：布局里缺 group 字段（上一版存下的）与新建的贴图都落这一组
