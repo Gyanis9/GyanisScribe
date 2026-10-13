@@ -964,6 +964,18 @@
             <translation>Wait this long after the key before capturing, for menus and hover hints that vanish as soon as you touch them; 0 means no delay</translation>
         </message>
         <message>
+            <source> 像素</source>
+            <translation> px</translation>
+        </message>
+        <message>
+            <source>圆角半径</source>
+            <translation>Corner Radius</translation>
+        </message>
+        <message>
+            <source>开着「圆角截图」时把四角切多圆：只对区域截图生效，整屏、窗口与滚动长截图不带</source>
+            <translation>How round the corners are while Round Corners is on. Region captures only; full-screen, window and scrolling captures keep square corners</translation>
+        </message>
+        <message>
             <source>录屏倒计时</source>
             <translation>Recording countdown</translation>
         </message>
@@ -1164,8 +1176,8 @@
             <translation>Round the corners of the output</translation>
         </message>
         <message>
-            <source>区域截图生效：按固定半径把成品四角切圆，角上是透明像素；整屏、窗口与滚动长截图不带</source>
-            <translation>Applies to region captures: rounds the four corners of the output with a fixed radius, leaving transparent pixels at the corners; full-screen, window and scrolling captures are not affected</translation>
+            <source>区域截图生效：把成品四角切圆，角上是透明像素；切多圆由下面那一格定；整屏、窗口与滚动长截图不带</source>
+            <translation>Region captures only: the four corners of the product are rounded with transparent pixels there. The row below sets how round; full-screen, window and scrolling captures keep square corners</translation>
         </message>
         <message>
             <source>自动保存</source>
@@ -1742,6 +1754,10 @@
         <message>
             <source>上次选区的宽高必须是正数，收到的是 {}×{}。请删掉这一项，让程序重新记一次</source>
             <translation>The last selection's width and height must be positive; got {}x{}. Delete this entry and let the program record it again.</translation>
+        </message>
+        <message>
+            <source>圆角半径 "{}" 不在 {} 到 {} 之间：请在设置的截图页重选一个值，或删掉 Capture/CornerRadius 这一项回到默认的 {} 格</source>
+            <translation>Corner radius "{}" is outside {} to {}. Pick a new value on the Shot page of Settings, or delete Capture/CornerRadius to fall back to the default {} pixels</translation>
         </message>
         <message>
             <source>{}：取值 "{}" 不在可选值里，可取的只有 {}。请在设置的{}重选，或删掉 {} 这一项回到默认档</source>

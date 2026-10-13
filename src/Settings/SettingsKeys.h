@@ -78,6 +78,9 @@ namespace GyanisScribe::Settings
     /// 「圆角截图」没填时的默认档：不切
     inline constexpr bool kDefaultCaptureRoundCorners = false;
 
+    /// 圆角截图的半径，逻辑像素（取值范围与默认档见 `Capture/ScreenUtils.h`）；开关开着才起作用
+    inline constexpr std::string_view kCaptureCornerRadius = "Capture/CornerRadius";
+
     /// 每张截图都顺手存一份进截图目录（不进标注、不弹窗）；默认关，开了之后每次截图都会在盘上留一份
     inline constexpr std::string_view kCaptureAutoSave = "Capture/AutoSave";
 

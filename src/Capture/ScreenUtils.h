@@ -26,8 +26,21 @@ class QScreen;
 namespace GyanisScribe::Capture
 {
 
-    /// 「圆角截图」的圆角半径，逻辑像素：小圆角看得出意思又不吃掉内容
-    inline constexpr int kCaptureCornerRadiusLogical = 12;
+    /// 圆角截图半径的默认档，逻辑像素：12 格在 100% 与 150% 屏上都看得出「切了个圆」又不吃内容
+    inline constexpr int kCaptureCornerRadiusDefault = 12;
+
+    /// 圆角半径下限，逻辑像素：小于 1 就与不切没有区别，那一档由「圆角截图」那个开关负责
+    inline constexpr int kCaptureCornerRadiusMinimum = 1;
+
+    /// 圆角半径上限，逻辑像素：再往上切掉的就是内容本身，而不是四个角
+    inline constexpr int kCaptureCornerRadiusMaximum = 60;
+
+    /**
+     * @brief 校验配置里读出的圆角半径
+     * @param logical 配置读出的整数（逻辑像素）
+     * @return 成功返回可用的半径；不在 [1,60] 里时返回带范围与补救办法的中文原因
+     */
+    [[nodiscard]] Core::Expected<int> parseCaptureCornerRadius(int logical);
 
     /**
      * @brief 把某块屏幕内的逻辑矩形换成同一块屏幕上的物理像素矩形

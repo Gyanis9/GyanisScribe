@@ -21,8 +21,11 @@ using GyanisScribe::Capture::dragRegionByGrip;
 using GyanisScribe::Capture::drawCursorInto;
 using GyanisScribe::Capture::formatSelectionHint;
 using GyanisScribe::Capture::gripAt;
+using GyanisScribe::Capture::kCaptureCornerRadiusMaximum;
+using GyanisScribe::Capture::kCaptureCornerRadiusMinimum;
 using GyanisScribe::Capture::kSelectionGripTolerance;
 using GyanisScribe::Capture::nudgeRegion;
+using GyanisScribe::Capture::parseCaptureCornerRadius;
 using GyanisScribe::Capture::ratioLockedPoint;
 using GyanisScribe::Capture::regionAtPoint;
 using GyanisScribe::Capture::regionFromSizeText;
@@ -554,6 +557,24 @@ TEST(ScreenUtils, RoundedCornersBecomeTransparentAndKeepTheMiddle)
 }
 
 /**
+ * @brief 钉住半径超过短边一半时按短边一半收：不能把整张切光
+ * @details 半径这一格现在归用户调，而截图的区域可小可大：一枚 60×20 的图标配 500 的半径，
+ *          不夹的话弧心跑到图外、整张内容都会被切掉——那等于「截到的是空的」。
+ */
+TEST(ScreenUtils, RoundedCornersClampTheRadiusToHalfTheShortEdge)
+{
+    using GyanisScribe::Capture::roundedCornerImage;
+
+    QImage wide{60, 20, QImage::Format_ARGB32_Premultiplied};
+    wide.fill(QColor(255, 0, 0));
+
+    const auto rounded = roundedCornerImage(wide, 500);
+    EXPECT_EQ(rounded.pixelColor(0, 0).alpha(), 0) << "角上仍该被切掉：夹半径不是不切";
+    EXPECT_EQ(rounded.pixelColor(30, 10), QColor(255, 0, 0)) << "中心被切光了：半径该收在短边一半，而不是盖过整张";
+    EXPECT_EQ(rounded.pixelColor(30, 0), QColor(255, 0, 0)) << "上边中点在夹过的弧外一格都不得碰";
+}
+
+/**
  * @brief 钉住三分网格线的位置：两竖在 1/3 与 2/3 处贯穿全高，两横同理
  */
 TEST(ScreenUtils, ThirdsGridSplitsTheRegionIntoThirds)
@@ -626,4 +647,27 @@ TEST(RegionFromSizeText, ClampsIntoTheScreenAndRejectsGarbage)
     EXPECT_FALSE(regionFromSizeText(QStringLiteral("宽x高"), anchor, limit).has_value()) << "非数字不能当成「按零处理」";
     EXPECT_FALSE(regionFromSizeText(QStringLiteral("1,2,3"), anchor, limit).has_value()) << "少一段就是读不懂，交回空让调用方留在框里继续改";
     EXPECT_FALSE(regionFromSizeText(QStringLiteral("20,30,-4,10"), anchor, limit).has_value()) << "负尺寸不是「一小格」，该拒";
+}
+
+/**
+ * @brief 钉住圆角半径的取值域：1 到 60 收下，越界与零都要拒
+ * @details 拒 0 而不是当「不切」：那一档由「圆角截图」的开关说，半径这一格给出 0 就是填错了，
+ *          悄悄当 0 处理会让用户以为开关开着却没效果。上限防的是把内容本身切掉。
+ */
+TEST(ParseCaptureCornerRadius, AcceptsItsRangeAndRejectsBothEndsOutside)
+{
+    for (const int good: {kCaptureCornerRadiusMinimum, 12, kCaptureCornerRadiusMaximum})
+    {
+        const auto parsed = parseCaptureCornerRadius(good);
+        ASSERT_TRUE(parsed.has_value()) << good << "：" << parsed.error().message;
+        EXPECT_EQ(*parsed, good);
+    }
+
+    for (const int bad: {0, -8, kCaptureCornerRadiusMaximum + 1})
+    {
+        const auto rejected = parseCaptureCornerRadius(bad);
+        ASSERT_FALSE(rejected.has_value()) << bad << " 这个越界值被收下了";
+        EXPECT_EQ(rejected.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument) << bad;
+        EXPECT_NE(rejected.error().message.find("Capture/CornerRadius"), std::string::npos) << "拒绝要说清去哪一格补救，实际：" << rejected.error().message;
+    }
 }

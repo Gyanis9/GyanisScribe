@@ -6,6 +6,7 @@
 
 #include "App/TrayController.h"
 #include "Annotation/AnnotationToolbar.h"
+#include "Capture/ScreenUtils.h"
 #include "History/HistoryRules.h"
 #include "History/HistoryStore.h"
 #include "Pin/PinLayout.h"
@@ -276,6 +277,32 @@ namespace
         const auto parsed = GyanisScribe::Pin::parseOpacityPercentSetting(stored);
         ASSERT_TRUE(static_cast<bool>(parsed));
         EXPECT_DOUBLE_EQ(*parsed, 0.4);
+    }
+
+    /**
+     * @brief 钉住「圆角半径」这一行写进 Capture/CornerRadius，且范围与读端判据同解
+     * @details 数字框能给出读端要拒的值（0 或 61），用户就会存下一个自己用不了的档位；
+     *          而这一行若写的是别的键，截图那头永远读不到它。
+     */
+    TEST_F(MainWindowFixture, CornerRadiusRowWritesTheKeyCaptureUses)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::Capture);
+        auto *spin = qobject_cast<QSpinBox *>(controlInCurrentPage("圆角半径"));
+        ASSERT_NE(spin, nullptr) << "截图页里没有「圆角半径」这一格";
+        EXPECT_EQ(spin->value(), GyanisScribe::Capture::kCaptureCornerRadiusDefault) << "没存过时要显示默认那一档";
+        EXPECT_EQ(spin->minimum(), GyanisScribe::Capture::kCaptureCornerRadiusMinimum) << "下限要与 parseCaptureCornerRadius 的拒绝面同解";
+        EXPECT_EQ(spin->maximum(), GyanisScribe::Capture::kCaptureCornerRadiusMaximum) << "上限要与 parseCaptureCornerRadius 的拒绝面同解";
+
+        spin->setValue(25);
+        closeWindowAndFlush();
+
+        const auto reopened = makeStore();
+        const auto stored   = reopened->intValue(GyanisScribe::Settings::kCaptureCornerRadius, -1);
+        EXPECT_EQ(stored, 25) << "这一行没把值写进 Capture/CornerRadius";
+        const auto parsed = GyanisScribe::Capture::parseCaptureCornerRadius(stored);
+        ASSERT_TRUE(static_cast<bool>(parsed)) << parsed.error().message;
+        EXPECT_EQ(*parsed, 25);
     }
 
     /**

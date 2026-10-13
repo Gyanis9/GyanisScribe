@@ -211,9 +211,31 @@ namespace GyanisScribe::Capture
         return QRect{QPoint{left, top}, QSize{width, height}};
     }
 
+    Core::Expected<int> parseCaptureCornerRadius(const int logical)
+    {
+        if (logical >= kCaptureCornerRadiusMinimum && logical <= kCaptureCornerRadiusMaximum)
+        {
+            return logical;
+        }
+        return Core::Expected<int>{std::unexpected{Core::Error{
+                .code    = Core::ErrorCode::InvalidArgument,
+                .message = GyanisScribe::Core::uiFormat(
+                        GyanisScribe::Core::uiTextUtf8("圆角半径 \"{}\" 不在 {} 到 {} 之间：请在设置的截图页重选一个值，或删掉 Capture/CornerRadius 这一项回到默认的 {} 格"),
+                        logical, kCaptureCornerRadiusMinimum, kCaptureCornerRadiusMaximum, kCaptureCornerRadiusDefault),
+        }}};
+    }
+
     QImage roundedCornerImage(const QImage &image, const int radiusPhysical)
     {
         if (image.isNull() || radiusPhysical <= 0)
+        {
+            return image;
+        }
+
+        // 半径夹到短边的一半：再大就没有「直边」可留，整张会被切成一枚椭圆甚至什么都不剩——
+        // 用户把半径调到 60 而截的是一枚小图标时，要的绝不是把内容切光
+        const auto capped = std::min(radiusPhysical, std::min(image.width(), image.height()) / 2);
+        if (capped <= 0)
         {
             return image;
         }
@@ -229,7 +251,7 @@ namespace GyanisScribe::Capture
             maskPainter.setRenderHint(QPainter::Antialiasing, true);
             maskPainter.setPen(Qt::NoPen);
             maskPainter.setBrush(Qt::black);
-            maskPainter.drawRoundedRect(QRectF{mask.rect()}, radiusPhysical, radiusPhysical);
+            maskPainter.drawRoundedRect(QRectF{mask.rect()}, capped, capped);
         }
         {
             QPainter painter(&rounded);

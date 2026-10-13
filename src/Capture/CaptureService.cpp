@@ -70,7 +70,16 @@ namespace GyanisScribe::Capture
         // 圆角截图：成品的一步加工，排在记账之前——切圆失败不该发生，真发生了也没截坏原帧
         if (m_settings.boolValue(Settings::kCaptureRoundCorners, Settings::kDefaultCaptureRoundCorners))
         {
-            frame->image = roundedCornerImage(frame->image, qRound(kCaptureCornerRadiusLogical * frame->devicePixelRatio));
+            // 半径跟着设置那一格走；越界或坏值按默认档继续并记一条中文原因——
+            // 一张截好的图不该因为一个几何参数被拒在外面
+            const auto stored = m_settings.intValue(Settings::kCaptureCornerRadius, kCaptureCornerRadiusDefault);
+            const auto parsed = parseCaptureCornerRadius(stored);
+            if (!parsed)
+            {
+                Core::Logger::warning(parsed.error().message);
+            }
+            const auto logical = parsed.value_or(kCaptureCornerRadiusDefault);
+            frame->image       = roundedCornerImage(frame->image, qRound(logical * frame->devicePixelRatio));
         }
 
         // 选区记账排在成功之后：失败也写就会把用户上次的好选区顶掉

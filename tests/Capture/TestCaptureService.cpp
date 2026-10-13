@@ -959,6 +959,65 @@ TEST_F(CaptureServiceFixture, RoundCornersToggleShapesTheRegionProduct)
 }
 
 /**
+ * @brief 钉住圆角半径这一格真的作用到成品上，坏值按默认档继续
+ * @details 判据数的是整张成品上全透明的像素数，不取某一探点：弧的边界正好压在格点上时抗锯齿会让那一点
+ *          既不实心也不全透。四个角各切掉约 0.2146·r²，r 从 24 物理（默认 12 逻辑）到 40 物理（20 逻辑）
+ *          全图透出的格数从约 500 涨到约 1370，差得远；而「坏值回落默认档」要求数出来的格数与默认档逐格相同。
+ */
+TEST_F(CaptureServiceFixture, CornerRadiusSettingShapesTheRoundedProduct)
+{
+    // 数整张成品上被切透的格子：只看全透明，边界上那些半透明的格子两种半径都算不进
+    const auto cutPixels = [](const CapturedImage &product)
+    {
+        auto cut = 0;
+        for (auto y = 0; y < product.image.height(); ++y)
+        {
+            for (auto x = 0; x < product.image.width(); ++x)
+            {
+                if (product.image.pixelColor(x, y).alpha() == 0)
+                {
+                    ++cut;
+                }
+            }
+        }
+        return cut;
+    };
+
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureRoundCorners, QVariant(true)).has_value());
+
+    FakeCaptureSource defaultSource;
+    CaptureService    defaultService(defaultSource, settings, *platform);
+    Outcome           atDefault;
+    wire(defaultService, atDefault);
+    defaultService.captureRegion(QRect(0, 0, 40, 40), QStringLiteral("FakeScreen-1"));
+    ASSERT_TRUE(atDefault.image.has_value()) << (atDefault.error ? atDefault.error->message : std::string{});
+    const auto defaultCut = cutPixels(*atDefault.image);
+    EXPECT_GT(defaultCut, 0) << "默认档就该把四角切透";
+    EXPECT_NE(atDefault.image->image.pixelColor(40, 40).alpha(), 0) << "切圆不该把中间一起吃掉";
+
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureCornerRadius, QVariant(20)).has_value());
+    FakeCaptureSource wideSource;
+    CaptureService    wideService(wideSource, settings, *platform);
+    Outcome           atWide;
+    wire(wideService, atWide);
+    wideService.captureRegion(QRect(0, 0, 40, 40), QStringLiteral("FakeScreen-1"));
+    ASSERT_TRUE(atWide.image.has_value());
+    const auto wideCut = cutPixels(*atWide.image);
+    EXPECT_GT(wideCut, defaultCut + 200) << "半径从 12 调到 20 该多切出一大片角：这一格没被吃进几何";
+
+    // 坏值（0）不该让截图失败，也不该悄悄按 0 切：记一条原因之后按默认档继续
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureCornerRadius, QVariant(0)).has_value());
+    FakeCaptureSource brokenSource;
+    CaptureService    brokenService(brokenSource, settings, *platform);
+    Outcome           atBroken;
+    wire(brokenService, atBroken);
+    brokenService.captureRegion(QRect(0, 0, 40, 40), QStringLiteral("FakeScreen-1"));
+    ASSERT_TRUE(atBroken.image.has_value()) << "半径填坏了不该把这一次截图拒掉";
+    EXPECT_EQ(cutPixels(*atBroken.image), defaultCut) << "坏值要回落到默认 12 格，而不是按 0 处理（那等于没切）";
+}
+
+/**
  * @brief 钉住遮罩翻出来的那一档压过配置
  * @details 配置关着而这一轮说要含：交出去的帧必须带上指针，否则 `P` 那一档只是界面上一行字。
  */

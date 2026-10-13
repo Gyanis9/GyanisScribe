@@ -2,6 +2,7 @@
 #include "App/MainWindow.h"
 #include "App/TrayController.h"
 #include "App/UpdateCheck.h"
+#include "Capture/ScreenUtils.h"
 #include "Core/ImageFormat.h"
 #include "Core/Logger.h"
 #include "Core/Paths.h"
@@ -628,6 +629,37 @@ namespace
                          [&settings, title](int value)
                          {
                              if (auto written = settings.setValue(GyanisScribe::Settings::kCaptureDelaySeconds, value); !written)
+                             {
+                                 Logger::warning(std::format("{} 没能写入：{}", title.toStdString(), written.error().message));
+                             }
+                         });
+        return spin;
+    }
+
+    /**
+     * @brief 圆角截图的半径
+     * @param settings 配置存储
+     * @return 归调用方所有的数字框
+     * @details 切不切由「圆角截图」那一格决定，这一格只管切多圆，所以它一直可编辑（把两处绑成
+     *          开关联动只会让人以为半径本身是个开关）。范围与默认档住在截图那一侧，读端遇到越界值按默认档继续。
+     */
+    QSpinBox *makeCornerRadiusSpin(ISettingsStore &settings)
+    {
+        auto *spin = new QSpinBox;
+        spin->setRange(GyanisScribe::Capture::kCaptureCornerRadiusMinimum, GyanisScribe::Capture::kCaptureCornerRadiusMaximum);
+        spin->setSuffix(GyanisScribe::Core::uiText(" 像素"));
+        spin->setAccessibleName(GyanisScribe::Core::uiText("圆角半径"));
+        spin->setToolTip(GyanisScribe::Core::uiText("开着「圆角截图」时把四角切多圆：只对区域截图生效，整屏、窗口与滚动长截图不带"));
+
+        const auto title  = GyanisScribe::Core::uiText("圆角半径");
+        const auto stored = settings.intValue(GyanisScribe::Settings::kCaptureCornerRadius, GyanisScribe::Capture::kCaptureCornerRadiusDefault);
+        const auto parsed = GyanisScribe::Capture::parseCaptureCornerRadius(stored);
+        spin->setValue(shownValueForSetting(title, stored, parsed, GyanisScribe::Capture::kCaptureCornerRadiusDefault));
+
+        QObject::connect(spin, &QSpinBox::valueChanged, spin,
+                         [&settings, title](int value)
+                         {
+                             if (auto written = settings.setValue(GyanisScribe::Settings::kCaptureCornerRadius, value); !written)
                              {
                                  Logger::warning(std::format("{} 没能写入：{}", title.toStdString(), written.error().message));
                              }
@@ -1500,7 +1532,8 @@ namespace GyanisScribe::App
         form->addRow(GyanisScribe::Core::uiText("圆角截图"),
                      makeSettingCheck(m_settings, Settings::kCaptureRoundCorners, Settings::kDefaultCaptureRoundCorners, GyanisScribe::Core::uiText("成品四角切圆"),
                                       GyanisScribe::Core::uiText("圆角截图"),
-                                      GyanisScribe::Core::uiText("区域截图生效：按固定半径把成品四角切圆，角上是透明像素；整屏、窗口与滚动长截图不带")));
+                                      GyanisScribe::Core::uiText("区域截图生效：把成品四角切圆，角上是透明像素；切多圆由下面那一格定；整屏、窗口与滚动长截图不带")));
+        form->addRow(GyanisScribe::Core::uiText("圆角半径"), makeCornerRadiusSpin(m_settings));
         form->addRow(GyanisScribe::Core::uiText("自动保存"),
                      makeSettingCheck(m_settings, GyanisScribe::Settings::kCaptureAutoSave, false, GyanisScribe::Core::uiText("每张截图都先存一份进上面的目录"),
                                       GyanisScribe::Core::uiText("自动保存所有截图"),
