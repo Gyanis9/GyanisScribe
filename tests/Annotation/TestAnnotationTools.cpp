@@ -1089,6 +1089,114 @@ TEST_F(AnnotationFixture, TextBackgroundPlatesTheGlyphs)
 }
 
 /**
+ * @brief 钉住描边粗细那一档真的改变轮廓厚度，且默认档与旧的写死值同解
+ * @details 靶子取「白字 + 指定黑描边」压在**白底那一半**上：字身与底同色（数不出来），
+ *          黑描边的内半边随后被白字盖住，剩下的只有露在字外的那一圈——于是「暗像素数」量的就是轮廓厚度本身。
+ *          三档要严格递增，而第四处不写档号（走默认那一档）要与「中」逐个数相同——这条兜住「新加一档把起点挪走了」。
+ */
+TEST_F(AnnotationFixture, TextOutlineWidthFollowsTheStep)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Text).has_value());
+
+    const auto darkCount = [this](const QRect &box)
+    {
+        const QImage drawn = m_engine.exportImage();
+        int          count{};
+        for (int y = box.top(); y <= box.bottom(); ++y)
+        {
+            for (int x = box.left(); x <= box.right(); ++x)
+            {
+                if (drawn.pixelColor(x, y).lightness() < 100)
+                {
+                    ++count;
+                }
+            }
+        }
+        return count;
+    };
+
+    // step 传 -1 表示「这一档不写、走默认」：默认值与显式中档要交出同一个数
+    const auto drawAt = [this](const int x, const int step)
+    {
+        auto parameters = PenParameters{.color = QColor(255, 255, 255), .lineWidth = 4, .fontSize = 32, .fillStyle = 0, .textOutline = true, .textStrokeColorStep = 2};
+        if (step >= 0)
+        {
+            parameters.textOutlineWidthStep = step;
+        }
+        ASSERT_TRUE(m_engine.setPenParameters(parameters).has_value());
+        m_engine.beginStroke(QPoint(x, 60));
+        ASSERT_TRUE(m_engine.setPendingText(QStringLiteral("H")).has_value());
+        ASSERT_TRUE(m_engine.endStroke().has_value());
+    };
+
+    drawAt(30, 0);
+    const auto thin = darkCount({QPoint(18, 25), QPoint(66, 72)});
+    drawAt(110, 1);
+    const auto middle = darkCount({QPoint(98, 25), QPoint(146, 72)});
+    drawAt(190, 2);
+    const auto wide = darkCount({QPoint(178, 25), QPoint(226, 72)});
+    drawAt(270, -1);
+    const auto fromDefault = darkCount({QPoint(258, 25), QPoint(306, 72)});
+
+    EXPECT_GT(middle, thin) << "中档比细档还薄，粗细档没落到画上";
+    EXPECT_GT(wide, middle) << "粗档比中档还薄，粗细档没落到画上";
+    EXPECT_GT(thin, 0) << "一处轮廓都没画出来，上面的递增是在比零";
+    EXPECT_EQ(fromDefault, middle) << "默认档不再是旧的写死值，老图样重画会换个厚度";
+}
+
+/**
+ * @brief 钉住底板色四档各自取哪一色，其中「用标注色」那一档把字身换成反差色
+ * @details 取样点放在字形左侧的留白带（板比字框每边多出 8 像素）。板是不透明 200/255 的实底，叠出来的数能手算：
+ *          白 200 压黑 = (200,200,200)、黑 200 压白 = 255×(1−200/255) = (55,55,55)。
+ *          自动档跟着字色走：白字的自动档取黑，所以「白字 + 白档」与「白字 + 自动」在带上分别是 (200,200,200) 与全黑，
+ *          这一对照同时钉住「指定色没被自动档顶掉」。最后一档还要看字身：板用了形状自己的色时字必须翻成反差色，
+ *          否则字压在同色板上等于不存在——判据是板里没有一处纯白（字身已换成黑）。
+ */
+TEST_F(AnnotationFixture, TextPlateColorFollowsTheStep)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Text).has_value());
+
+    const auto plateAt = [this](const QPoint &position, const QColor &color, const int step)
+    {
+        ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = color, .lineWidth = 4, .fontSize = 32, .fillStyle = 0, .textBackground = true, .textPlateColorStep = step})
+                            .has_value());
+        m_engine.beginStroke(position);
+        ASSERT_TRUE(m_engine.setPendingText(QStringLiteral("H")).has_value());
+        ASSERT_TRUE(m_engine.endStroke().has_value());
+    };
+
+    // 自动档 × 白字：反差取黑，压在黑底上看不出来
+    plateAt(QPoint(30, 150), QColor(255, 255, 255), 0);
+    EXPECT_EQ(m_engine.exportImage().pixelColor(26, 150), QColor(0, 0, 0)) << "白字的自动档底板该取黑";
+
+    // 白档：同一点变成白 200 叠黑
+    plateAt(QPoint(110, 150), QColor(255, 255, 255), 1);
+    EXPECT_EQ(m_engine.exportImage().pixelColor(106, 150), QColor(200, 200, 200)) << "白档没把指定色交出去";
+
+    // 黑档 × 红字画在白底半幅：黑 200 叠白
+    plateAt(QPoint(190, 60), QColor(255, 0, 0), 2);
+    EXPECT_EQ(m_engine.exportImage().pixelColor(186, 60), QColor(55, 55, 55)) << "黑档的板压不出手算的那个数";
+
+    // 形状色档：板是白 200（与白档同数，差别在字身），字身翻成黑
+    plateAt(QPoint(270, 150), QColor(255, 255, 255), 3);
+    EXPECT_EQ(m_engine.exportImage().pixelColor(266, 150), QColor(200, 200, 200)) << "形状色档没把这一支色垫到底下";
+
+    const QImage drawn = m_engine.exportImage();
+    int          whiteOnPlate{};
+    for (int y = 118; y <= 155; ++y)
+    {
+        for (int x = 262; x <= 312; ++x)
+        {
+            if (drawn.pixelColor(x, y) == QColor(255, 255, 255))
+            {
+                ++whiteOnPlate;
+            }
+        }
+    }
+    EXPECT_EQ(whiteOnPlate, 0) << "底板用了形状自己的色却没把字身换成反差色，字压在同色板上看不见";
+}
+
+/**
  * @brief 钉住文字外接框的锚点与画字同解：position 是基线，框要盖住字、不许整框压在字底下
  * @details 渲染探针核过：position.y=60、字号 24 时墨迹在 [35,59]——postion 是基线。
  *          框顶须从基线往上退一个 ascent（约 0.9 字号），基线须落在框内。按左上角估的老写法

@@ -8,13 +8,12 @@
 #include <QPainter>
 #include <QPainterPath>
 
+#include <algorithm>
+
 namespace GyanisScribe::Annotation
 {
     namespace
     {
-        /// 描边线宽相对字号的比例：太大糊成一坨、太小看不见
-        constexpr double kTextOutlineWidthPerFontSize = 0.125;
-
         /// 底板透明度（0-255）：近实体又透一点底，压得住杂背景
         constexpr int kTextPlateAlpha = 200;
 
@@ -24,7 +23,44 @@ namespace GyanisScribe::Annotation
             return color.lightness() > 128 ? QColor(0, 0, 0) : QColor(255, 255, 255);
         }
 
-        /// 描边色按图形自己的档取：自动档走反差色，白 / 黑两档是指定色（只作用在描边上，底板照旧自动）
+        /// 字身那一色：底板用了形状自己的色时换成反差色，否则字压在同类色上等于不存在
+        QColor textFillColorFor(const AnnotationShape &shape)
+        {
+            if (shape.textBackground && shape.textPlateColorStep == kTextPlateColorFromShape)
+            {
+                return contrastingColorFor(shape.color);
+            }
+            return shape.color;
+        }
+
+        /// 描边粗细按形状自己那一档取：下标夹进阶梯里，手工构造的形状不能把数组读越界
+        double textOutlineWidthFor(const AnnotationShape &shape)
+        {
+            const auto step = std::clamp(shape.textOutlineWidthStep, 0, static_cast<int>(kTextOutlineWidths.size()) - 1);
+            // 两端各留一个界：再细就看不见、再粗糊成一坨，这两个界值与这一格出现之前同解
+            return qBound(1.0, static_cast<double>(shape.fontSize) * kTextOutlineWidths[static_cast<std::size_t>(step)], 6.0);
+        }
+
+        /// 底板那一块的颜色：自动档取与字色反差的一色，白 / 黑是指定色，最后一档用形状自己那支色
+        QColor plateColorFor(const AnnotationShape &shape)
+        {
+            const auto step = std::clamp(shape.textPlateColorStep, 0, kTextPlateColorCount - 1);
+            if (step == kTextPlateColorWhite)
+            {
+                return QColor(255, 255, 255);
+            }
+            if (step == kTextPlateColorBlack)
+            {
+                return QColor(0, 0, 0);
+            }
+            if (step == kTextPlateColorFromShape)
+            {
+                return shape.color;
+            }
+            return contrastingColorFor(textFillColorFor(shape));
+        }
+
+        /// 描边色按图形自己的档取：自动档走反差色，白 / 黑两档是指定色（只作用在描边上）
         QColor textStrokeColorOf(const AnnotationShape &shape)
         {
             if (shape.textStrokeColorStep == kTextStrokeColorWhite)
@@ -35,7 +71,7 @@ namespace GyanisScribe::Annotation
             {
                 return QColor(0, 0, 0);
             }
-            return contrastingColorFor(shape.color);
+            return contrastingColorFor(textFillColorFor(shape));
         }
     } // namespace
 
@@ -88,7 +124,7 @@ namespace GyanisScribe::Annotation
         if (shape.textBackground)
         {
             const double padding = qMax(3.0, shape.fontSize / 4.0);
-            auto         plate   = contrastingColorFor(shape.color);
+            auto         plate   = plateColorFor(shape);
             plate.setAlpha(kTextPlateAlpha);
             painter.setPen(Qt::NoPen);
             painter.setBrush(plate);
@@ -103,18 +139,18 @@ namespace GyanisScribe::Annotation
             {
                 glyphs.addText(lineOriginOf(index), font, lines[index]);
             }
-            const double outlineWidth = qBound(1.0, shape.fontSize * kTextOutlineWidthPerFontSize, 6.0);
+            const double outlineWidth = textOutlineWidthFor(shape);
             painter.setBrush(Qt::NoBrush);
             painter.setPen(QPen(textStrokeColorOf(shape), outlineWidth * 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
             painter.drawPath(glyphs);
             painter.setPen(Qt::NoPen);
-            painter.setBrush(shape.color);
+            painter.setBrush(textFillColorFor(shape));
             painter.drawPath(glyphs);
             return;
         }
 
         painter.setFont(font);
-        painter.setPen(shape.color);
+        painter.setPen(textFillColorFor(shape));
         for (int index = 0; index < lines.size(); ++index)
         {
             // Qt 的 drawText 不收换行，逐行按各自的基线落笔；单行内容与老写法逐像素同解

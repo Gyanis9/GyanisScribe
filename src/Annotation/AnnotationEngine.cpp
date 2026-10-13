@@ -555,6 +555,8 @@ namespace GyanisScribe::Annotation
             tool->setTextOutline(m_penParameters.textOutline);
             tool->setTextBackground(m_penParameters.textBackground);
             tool->setTextStrokeColorStep(m_penParameters.textStrokeColorStep);
+            tool->setTextOutlineWidthStep(m_penParameters.textOutlineWidthStep);
+            tool->setTextPlateColorStep(m_penParameters.textPlateColorStep);
         }
     }
 

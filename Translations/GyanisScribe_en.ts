@@ -204,12 +204,20 @@
             <translation>Stroke color</translation>
         </message>
         <message>
+            <source>描边粗细</source>
+            <translation>Outline width</translation>
+        </message>
+        <message>
             <source>计数组</source>
             <translation>Counting group</translation>
         </message>
         <message>
             <source>背景</source>
             <translation>Background</translation>
+        </message>
+        <message>
+            <source>底板色</source>
+            <translation>Plate color</translation>
         </message>
         <message>
             <source>撤销（Ctrl+Z）</source>
@@ -382,6 +390,34 @@
         <message>
             <source>描边色：自动</source>
             <translation>Stroke color: automatic</translation>
+        </message>
+        <message>
+            <source>描边粗细：细</source>
+            <translation>Outline width: thin</translation>
+        </message>
+        <message>
+            <source>描边粗细：中</source>
+            <translation>Outline width: medium</translation>
+        </message>
+        <message>
+            <source>描边粗细：粗</source>
+            <translation>Outline width: thick</translation>
+        </message>
+        <message>
+            <source>底板色：白</source>
+            <translation>Plate color: white</translation>
+        </message>
+        <message>
+            <source>底板色：黑</source>
+            <translation>Plate color: black</translation>
+        </message>
+        <message>
+            <source>底板色：用标注色</source>
+            <translation>Plate color: use the annotation color</translation>
+        </message>
+        <message>
+            <source>底板色：自动</source>
+            <translation>Plate color: automatic</translation>
         </message>
         <message>
             <source>计数组：第 1 组</source>

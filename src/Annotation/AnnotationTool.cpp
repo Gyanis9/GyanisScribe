@@ -67,6 +67,8 @@ namespace GyanisScribe::Annotation
         m_pending.textOutline          = m_textOutline;
         m_pending.textBackground       = m_textBackground;
         m_pending.textStrokeColorStep  = m_textStrokeColorStep;
+        m_pending.textOutlineWidthStep = m_textOutlineWidthStep;
+        m_pending.textPlateColorStep   = m_textPlateColorStep;
         m_pending.position             = point;
         m_pending.rect                 = QRect(point, point);
         m_pending.points               = {point, point};
@@ -168,6 +170,8 @@ namespace GyanisScribe::Annotation
         shape.textOutline          = parameters.textOutline;
         shape.textBackground       = parameters.textBackground;
         shape.textStrokeColorStep  = parameters.textStrokeColorStep;
+        shape.textOutlineWidthStep = parameters.textOutlineWidthStep;
+        shape.textPlateColorStep   = parameters.textPlateColorStep;
         return true;
     }
 
@@ -373,6 +377,16 @@ namespace GyanisScribe::Annotation
     void AnnotationTool::setTextStrokeColorStep(const int step) noexcept
     {
         m_textStrokeColorStep = std::clamp(step, 0, kTextStrokeColorCount - 1);
+    }
+
+    void AnnotationTool::setTextOutlineWidthStep(const int step) noexcept
+    {
+        m_textOutlineWidthStep = std::clamp(step, 0, static_cast<int>(kTextOutlineWidths.size()) - 1);
+    }
+
+    void AnnotationTool::setTextPlateColorStep(const int step) noexcept
+    {
+        m_textPlateColorStep = std::clamp(step, 0, kTextPlateColorCount - 1);
     }
 
     void AnnotationTool::setMosaicBlockSize(const int blockSize) noexcept

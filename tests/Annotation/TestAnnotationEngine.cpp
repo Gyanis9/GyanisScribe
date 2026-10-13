@@ -937,6 +937,91 @@ TEST_F(EngineFixture, TextStrokeColorRestylesAndUndoesBack)
 }
 
 /**
+ * @brief 钉住描边粗细档也走改样式命令：切到细档那一圈立刻变薄、撤销回中档
+ * @details 白字画在白底上、描边指定黑档：非白像素只可能来自描边那一圈（字身与底同色，数不出来）。
+ *          与描边色那条同样只做一次改样式——连着两次会被撤销栈合并成一步，「撤销一次」回的就是两处之前的状态。
+ */
+TEST_F(EngineFixture, TextOutlineWidthRestylesAndUndoesBack)
+{
+    const auto inkIn = [this](const QRect &box)
+    {
+        const QImage drawn = m_engine.exportImage();
+        int          ink   = 0;
+        for (int y = box.top(); y <= box.bottom(); ++y)
+        {
+            for (int x = box.left(); x <= box.right(); ++x)
+            {
+                if (drawn.pixelColor(x, y) != QColor(255, 255, 255))
+                {
+                    ++ink;
+                }
+            }
+        }
+        return ink;
+    };
+
+    ASSERT_TRUE(
+            m_engine.setPenParameters(PenParameters{.color = QColor(255, 255, 255), .lineWidth = 4, .fontSize = 24, .fillStyle = 0, .textOutline = true, .textStrokeColorStep = 2})
+                    .has_value());
+    const auto  text = placeText(m_engine, QPoint(20, 50), QStringLiteral("H"));
+    const QRect box{QPoint(10, 20), QPoint(120, 55)};
+    const auto  middleInk = inkIn(box);
+    ASSERT_GT(middleInk, 0) << "默认那一档的轮廓没画出来，后面的对照没有基准";
+
+    ASSERT_TRUE(m_engine.select(text).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color                = QColor(255, 255, 255),
+                                                        .lineWidth            = 4,
+                                                        .fontSize             = 24,
+                                                        .fillStyle            = 0,
+                                                        .textOutline          = true,
+                                                        .textStrokeColorStep  = 2,
+                                                        .textOutlineWidthStep = 0})
+                        .has_value());
+    EXPECT_LT(inkIn(box), middleInk) << "切到细档之后轮廓还是那么厚：粗细档没落到那条图形上";
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_EQ(inkIn(box), middleInk) << "撤销没把粗细退回默认那一档";
+}
+
+/**
+ * @brief 钉住底板色档也走改样式命令：黑档垫出一整块板、撤销退回自动档
+ * @details 白底上红字的自动档取白（与底同色，多出的是看不见的白），切到黑档多出来的是**一整块板**，
+ *          所以判据按增量给下限（+200 格），而不是「多了一个像素」——后者在字身重画时也能凑出来。
+ */
+TEST_F(EngineFixture, TextPlateColorRestylesAndUndoesBack)
+{
+    const auto inkIn = [this](const QRect &box)
+    {
+        const QImage drawn = m_engine.exportImage();
+        int          ink   = 0;
+        for (int y = box.top(); y <= box.bottom(); ++y)
+        {
+            for (int x = box.left(); x <= box.right(); ++x)
+            {
+                if (drawn.pixelColor(x, y) != QColor(255, 255, 255))
+                {
+                    ++ink;
+                }
+            }
+        }
+        return ink;
+    };
+
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 24, .fillStyle = 0, .textBackground = true}).has_value());
+    const auto  text = placeText(m_engine, QPoint(20, 50), QStringLiteral("H"));
+    const QRect box{QPoint(10, 20), QPoint(120, 55)};
+    const auto  automaticInk = inkIn(box);
+    ASSERT_GT(automaticInk, 0) << "红字本身没画出来，后面的对照没有基准";
+
+    ASSERT_TRUE(m_engine.select(text).has_value());
+    ASSERT_TRUE(
+            m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 24, .fillStyle = 0, .textBackground = true, .textPlateColorStep = 2})
+                    .has_value());
+    EXPECT_GT(inkIn(box), automaticInk + 200) << "切到黑档没垫出那一块板，底板色档没落到那条图形上";
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_EQ(inkIn(box), automaticInk) << "撤销没把底板色退回自动档";
+}
+
+/**
  * @brief 钉住层叠按创建顺序跨工具生效：后画的压住先画的
  * @details 旧口径是按工具登记顺序画（椭圆永远盖得住矩形，与画的先后无关）；
  *          层叠号改成落定发号之后，后画的必须先被点中——这条同时钉住「发号、绘制、

@@ -226,6 +226,18 @@ namespace GyanisScribe::Annotation
         /// 描边色走一档（自动 → 白 → 黑 → 自动），并发出 textStrokeColorStepChanged
         void cycleTextStrokeColor();
 
+        /// 当前描边粗细档：0 细、1 中、2 粗（取值表 kTextOutlineWidths，中档与这一格出现之前的写死值同解）
+        [[nodiscard]] int currentTextOutlineWidthStep() const;
+
+        /// 描边粗细走一档（细 → 中 → 粗 → 细），并发出 textOutlineWidthStepChanged
+        void cycleTextOutlineWidth();
+
+        /// 当前底板色档：0 自动（与字色反差）、1 白、2 黑、3 用这一形状自己的色
+        [[nodiscard]] int currentTextPlateColorStep() const;
+
+        /// 底板色走一档（自动 → 白 → 黑 → 形状色 → 自动），并发出 textPlateColorStepChanged
+        void cycleTextPlateColor();
+
         /// 当前计数组（1..kNumberGroupCount；序号工具用，新落的牌记在它上面）
         [[nodiscard]] int currentNumberGroup() const;
 
@@ -293,6 +305,10 @@ namespace GyanisScribe::Annotation
         void textOutlineChanged(bool enabled);
         /// 用户改了文字描边色档
         void textStrokeColorStepChanged(int step);
+        /// 用户切了文字描边的粗细档
+        void textOutlineWidthStepChanged(int step);
+        /// 用户切了文字底板的颜色档
+        void textPlateColorStepChanged(int step);
         /// 用户切了序号的计数组
         void numberGroupChanged(int group);
         /// 用户开了/关了文字反色底板
@@ -407,24 +423,28 @@ namespace GyanisScribe::Annotation
         QToolButton                                             *m_highlightAlphaButton = nullptr;                                    ///< 高亮透明度按钮，点一下走一档
         int                                                      m_highlightAlphaStep = static_cast<int>(kDefaultHighlightAlphaStep); ///< 当前透明度档下标，值表是 kHighlightAlphas
         QToolButton                                             *m_highlightWidthButton = nullptr;                                    ///< 高亮加宽按钮，点一下走一档
-        int                m_highlightWidthStep   = static_cast<int>(kDefaultHighlightWidthStep);  ///< 当前加宽档下标，值表是 kHighlightWidthFactors
-        QToolButton       *m_arrowHeadStyleButton = nullptr;                                       ///< 箭头款式按钮，点一下走一档
-        int                m_arrowHeadStyle       = kArrowHeadFilled;                              ///< 当前头部款式：0 实心、1 空心、2 开口两翼
-        QToolButton       *m_arrowHeadScaleButton = nullptr;                                       ///< 箭头大小按钮，点一下走一档
-        int                m_arrowHeadScaleStep   = static_cast<int>(kDefaultArrowHeadScaleStep);  ///< 当前大小档下标，值表是 kArrowHeadScales
-        QFontComboBox     *m_fontCombo            = nullptr;                                       ///< 文字字体族下拉，列系统字体
-        QToolButton       *m_boldButton           = nullptr;                                       ///< 文字粗体开关，按下表示粗
-        QToolButton       *m_italicButton         = nullptr;                                       ///< 文字斜体开关，按下表示斜
-        QToolButton       *m_outlineButton        = nullptr;                                       ///< 文字描边开关，按下表示围一圈反色轮廓
-        QToolButton       *m_strokeColorButton    = nullptr;                                       ///< 文字描边色按钮，点一下走一档
-        int                m_textStrokeColorStep  = static_cast<int>(kDefaultTextStrokeColorStep); ///< 当前描边色档，值表是 kTextStrokeColor* 三档
-        QToolButton       *m_numberGroupButton    = nullptr;                                       ///< 计数组按钮，点一下走一档（序号工具用）
-        int                m_numberGroup          = 1;                                             ///< 当前计数组（1..kNumberGroupCount）
-        QToolButton       *m_backgroundButton     = nullptr;                                       ///< 文字底板开关，按下表示垫一块反色圆角板
-        QColor             m_currentColor;                                                         ///< 当前颜色，初值取色板第一格
-        QHash<int, QColor> m_colorsByTool;                                                         ///< 每种形状各记一格颜色（键是 ToolKind 的底层值）；没挑过的形状不在表里
-        bool               m_stateIsInitial = true;                                                ///< 还在构造期：起点值不回写配置，坏值要留在文件里让人看得见
-        ToolKind           m_activeTool;                                                           ///< 当前工具，用来挡住「重复点同一个工具」的二次信号
+        int                m_highlightWidthStep   = static_cast<int>(kDefaultHighlightWidthStep);   ///< 当前加宽档下标，值表是 kHighlightWidthFactors
+        QToolButton       *m_arrowHeadStyleButton = nullptr;                                        ///< 箭头款式按钮，点一下走一档
+        int                m_arrowHeadStyle       = kArrowHeadFilled;                               ///< 当前头部款式：0 实心、1 空心、2 开口两翼
+        QToolButton       *m_arrowHeadScaleButton = nullptr;                                        ///< 箭头大小按钮，点一下走一档
+        int                m_arrowHeadScaleStep   = static_cast<int>(kDefaultArrowHeadScaleStep);   ///< 当前大小档下标，值表是 kArrowHeadScales
+        QFontComboBox     *m_fontCombo            = nullptr;                                        ///< 文字字体族下拉，列系统字体
+        QToolButton       *m_boldButton           = nullptr;                                        ///< 文字粗体开关，按下表示粗
+        QToolButton       *m_italicButton         = nullptr;                                        ///< 文字斜体开关，按下表示斜
+        QToolButton       *m_outlineButton        = nullptr;                                        ///< 文字描边开关，按下表示围一圈反色轮廓
+        QToolButton       *m_strokeColorButton    = nullptr;                                        ///< 文字描边色按钮，点一下走一档
+        int                m_textStrokeColorStep  = static_cast<int>(kDefaultTextStrokeColorStep);  ///< 当前描边色档，值表是 kTextStrokeColor* 三档
+        QToolButton       *m_outlineWidthButton   = nullptr;                                        ///< 文字描边粗细按钮，点一下走一档
+        int                m_textOutlineWidthStep = static_cast<int>(kDefaultTextOutlineWidthStep); ///< 当前描边粗细档，值表是 kTextOutlineWidths 三档
+        QToolButton       *m_numberGroupButton    = nullptr;                                        ///< 计数组按钮，点一下走一档（序号工具用）
+        int                m_numberGroup          = 1;                                              ///< 当前计数组（1..kNumberGroupCount）
+        QToolButton       *m_backgroundButton     = nullptr;                                        ///< 文字底板开关，按下表示垫一块反色圆角板
+        QToolButton       *m_plateColorButton     = nullptr;                                        ///< 文字底板色按钮，点一下走一档
+        int                m_textPlateColorStep   = static_cast<int>(kDefaultTextPlateColorStep);   ///< 当前底板色档，值表是 kTextPlateColor* 四档
+        QColor             m_currentColor;                                                          ///< 当前颜色，初值取色板第一格
+        QHash<int, QColor> m_colorsByTool;                                                          ///< 每种形状各记一格颜色（键是 ToolKind 的底层值）；没挑过的形状不在表里
+        bool               m_stateIsInitial = true;                                                 ///< 还在构造期：起点值不回写配置，坏值要留在文件里让人看得见
+        ToolKind           m_activeTool;                                                            ///< 当前工具，用来挡住「重复点同一个工具」的二次信号
     };
 
 } // namespace GyanisScribe::Annotation

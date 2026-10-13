@@ -51,6 +51,20 @@ namespace GyanisScribe::Annotation
     /// 文字描边色起点档（「自动」，与这一格出现之前同解）
     inline constexpr std::size_t kDefaultTextStrokeColorStep = 0;
 
+    /// 文字描边粗细阶梯：描边露出来的那一半 = 字号乘这个倍数；中档与这一格出现之前的写死值同解
+    inline constexpr std::array<double, 3> kTextOutlineWidths{0.06, 0.125, 0.2};
+    /// 文字描边粗细起点档在阶梯里的下标（「中」=0.125，老图样不受影响）
+    inline constexpr std::size_t kDefaultTextOutlineWidthStep = 1;
+
+    /// 文字底板色档：0 自动（与字色反差）、1 白、2 黑、3 用这一形状自己的色（此时字色换成反差色，否则字压在同色底上看不见）
+    inline constexpr int kTextPlateColorAutomatic = 0;
+    inline constexpr int kTextPlateColorWhite     = 1;
+    inline constexpr int kTextPlateColorBlack     = 2;
+    inline constexpr int kTextPlateColorFromShape = 3;
+    inline constexpr int kTextPlateColorCount     = 4;
+    /// 文字底板色起点档（「自动」，与这一格出现之前同解）
+    inline constexpr std::size_t kDefaultTextPlateColorStep = 0;
+
     /// 计数组数量：序号可以开几组各自连排的序列（第 1..3 组，工具栏按这个数循环）
     inline constexpr int kNumberGroupCount = 3;
 
@@ -92,13 +106,15 @@ namespace GyanisScribe::Annotation
         int             arrowHeadStyle       = kArrowHeadFilled;                                   ///< 箭头头部款式：0 实心、1 空心、2 开口两翼（仅箭头工具用）
         qreal           arrowHeadScale       = kArrowHeadScales[kDefaultArrowHeadScaleStep];       ///< 箭头头部大小：头长相对线宽的倍数（仅箭头工具用），默认为阶梯里的「中」档
         QString         fontFamily;                                                                ///< 字体族，空串=跟随应用默认字体（仅文字工具用）
-        bool            textBold            = false;                                               ///< 粗体（仅文字工具用）
-        bool            textItalic          = false;                                               ///< 斜体（仅文字工具用）
-        bool            textOutline         = false;                                               ///< 反色描边：字形围一圈与字色反差的轮廓（仅文字工具用）
-        bool            textBackground      = false;                                               ///< 反色底板：字形后面垫一块半透明的反差圆角板（仅文字工具用）
-        int             textStrokeColorStep = static_cast<int>(kDefaultTextStrokeColorStep);       ///< 描边色档：0 自动（反差色）、1 白、2 黑（仅文字工具用）
-        qreal           rotationDeg         = 0.0;                                                 ///< 旋转角，度，顺时针为正；绕图形自己的外接框中心转（画与命中测试同解）
-        int             zOrder              = 0;                                                   ///< 全局层叠序号：越大越靠上，由引擎落定时发号，不用手工维护
+        bool            textBold             = false;                                              ///< 粗体（仅文字工具用）
+        bool            textItalic           = false;                                              ///< 斜体（仅文字工具用）
+        bool            textOutline          = false;                                              ///< 反色描边：字形围一圈与字色反差的轮廓（仅文字工具用）
+        bool            textBackground       = false;                                              ///< 反色底板：字形后面垫一块半透明的反差圆角板（仅文字工具用）
+        int             textStrokeColorStep  = static_cast<int>(kDefaultTextStrokeColorStep);      ///< 描边色档：0 自动（反差色）、1 白、2 黑（仅文字工具用）
+        int             textOutlineWidthStep = static_cast<int>(kDefaultTextOutlineWidthStep);     ///< 描边粗细档：0 细、1 中、2 粗，取值表 kTextOutlineWidths（仅文字工具用）
+        int             textPlateColorStep   = static_cast<int>(kDefaultTextPlateColorStep);       ///< 底板色档：0 自动反差、1 白、2 黑、3 用形状自己的色（仅文字工具用）
+        qreal           rotationDeg          = 0.0;                                                ///< 旋转角，度，顺时针为正；绕图形自己的外接框中心转（画与命中测试同解）
+        int             zOrder               = 0;                                                  ///< 全局层叠序号：越大越靠上，由引擎落定时发号，不用手工维护
     };
 
     /**

@@ -273,6 +273,10 @@ namespace GyanisScribe::Annotation
         m_strokeColorButton = makeButton("StrokeColor", GyanisScribe::Core::uiText("描边色"), false);
         QObject::connect(m_strokeColorButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleTextStrokeColor);
         layout->addWidget(m_strokeColorButton);
+        // 描边粗细：描边开着时那一圈有多厚，点一下走一档（细 → 中 → 粗）
+        m_outlineWidthButton = makeButton("TextOutlineWidth", GyanisScribe::Core::uiText("描边粗细"), false);
+        QObject::connect(m_outlineWidthButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleTextOutlineWidth);
+        layout->addWidget(m_outlineWidthButton);
         // 计数组：序号工具用得上，点一下走一档（第 1 组 → 第 2 组 → 第 3 组 → 第 1 组）
         m_numberGroupButton = makeButton("NumberGroup", GyanisScribe::Core::uiText("计数组"), false);
         QObject::connect(m_numberGroupButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleNumberGroup);
@@ -280,6 +284,10 @@ namespace GyanisScribe::Annotation
         m_backgroundButton = makeButton("TextBackground", GyanisScribe::Core::uiText("背景"), true);
         QObject::connect(m_backgroundButton, &QToolButton::clicked, this, [this] { setTextBackground(m_backgroundButton->isChecked()); });
         layout->addWidget(m_backgroundButton);
+        // 底板色：背景开着时垫哪一色，点一下走一档（自动 → 白 → 黑 → 这一形状自己的色）
+        m_plateColorButton = makeButton("PlateColor", GyanisScribe::Core::uiText("底板色"), false);
+        QObject::connect(m_plateColorButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleTextPlateColor);
+        layout->addWidget(m_plateColorButton);
         layout->addWidget(makeSeparator());
 
         m_undoButton = makeButton("Undo", GyanisScribe::Core::uiText("撤销（Ctrl+Z）"), false);
@@ -594,6 +602,45 @@ namespace GyanisScribe::Annotation
             m_strokeColorButton->setAccessibleName(label);
         }
         emit textStrokeColorStepChanged(m_textStrokeColorStep);
+    }
+
+    int AnnotationToolbar::currentTextOutlineWidthStep() const
+    {
+        return m_textOutlineWidthStep;
+    }
+
+    void AnnotationToolbar::cycleTextOutlineWidth()
+    {
+        m_textOutlineWidthStep = (m_textOutlineWidthStep + 1) % static_cast<int>(kTextOutlineWidths.size());
+        if (m_outlineWidthButton != nullptr)
+        {
+            const auto label = m_textOutlineWidthStep == 0   ? GyanisScribe::Core::uiText("描边粗细：细")
+                               : m_textOutlineWidthStep == 1 ? GyanisScribe::Core::uiText("描边粗细：中")
+                                                             : GyanisScribe::Core::uiText("描边粗细：粗");
+            m_outlineWidthButton->setToolTip(label);
+            m_outlineWidthButton->setAccessibleName(label);
+        }
+        emit textOutlineWidthStepChanged(m_textOutlineWidthStep);
+    }
+
+    int AnnotationToolbar::currentTextPlateColorStep() const
+    {
+        return m_textPlateColorStep;
+    }
+
+    void AnnotationToolbar::cycleTextPlateColor()
+    {
+        m_textPlateColorStep = (m_textPlateColorStep + 1) % kTextPlateColorCount;
+        if (m_plateColorButton != nullptr)
+        {
+            const auto label = m_textPlateColorStep == kTextPlateColorWhite       ? GyanisScribe::Core::uiText("底板色：白")
+                               : m_textPlateColorStep == kTextPlateColorBlack     ? GyanisScribe::Core::uiText("底板色：黑")
+                               : m_textPlateColorStep == kTextPlateColorFromShape ? GyanisScribe::Core::uiText("底板色：用标注色")
+                                                                                  : GyanisScribe::Core::uiText("底板色：自动");
+            m_plateColorButton->setToolTip(label);
+            m_plateColorButton->setAccessibleName(label);
+        }
+        emit textPlateColorStepChanged(m_textPlateColorStep);
     }
 
     int AnnotationToolbar::currentNumberGroup() const

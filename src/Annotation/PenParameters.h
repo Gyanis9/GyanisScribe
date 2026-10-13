@@ -41,11 +41,13 @@ namespace GyanisScribe::Annotation
         int     arrowHeadStyle       = kArrowHeadFilled;                                   ///< 箭头头部款式：0 实心、1 空心、2 开口两翼（仅箭头工具用）
         qreal   arrowHeadScale       = kArrowHeadScales[kDefaultArrowHeadScaleStep];       ///< 箭头头部大小：头长相对线宽的倍数（仅箭头工具用）
         QString fontFamily;                                                                ///< 字体族，空串=跟随应用默认字体（仅文字工具用）
-        bool    textBold            = false;                                               ///< 粗体（仅文字工具用）
-        bool    textItalic          = false;                                               ///< 斜体（仅文字工具用）
-        bool    textOutline         = false;                                               ///< 反色描边（仅文字工具用）
-        bool    textBackground      = false;                                               ///< 反色底板（仅文字工具用）
-        int     textStrokeColorStep = static_cast<int>(kDefaultTextStrokeColorStep);       ///< 描边色档：0 自动（反差色）、1 白、2 黑（仅文字工具用）
+        bool    textBold             = false;                                              ///< 粗体（仅文字工具用）
+        bool    textItalic           = false;                                              ///< 斜体（仅文字工具用）
+        bool    textOutline          = false;                                              ///< 反色描边（仅文字工具用）
+        bool    textBackground       = false;                                              ///< 反色底板（仅文字工具用）
+        int     textStrokeColorStep  = static_cast<int>(kDefaultTextStrokeColorStep);      ///< 描边色档：0 自动（反差色）、1 白、2 黑（仅文字工具用）
+        int     textOutlineWidthStep = static_cast<int>(kDefaultTextOutlineWidthStep);     ///< 描边粗细档：0 细、1 中、2 粗（仅文字工具用）
+        int     textPlateColorStep   = static_cast<int>(kDefaultTextPlateColorStep);       ///< 底板色档：0 自动反差、1 白、2 黑、3 用形状自己的色（仅文字工具用）
 
         [[nodiscard]] bool operator==(const PenParameters &) const = default;
     };
@@ -75,7 +77,9 @@ namespace GyanisScribe::Annotation
                              .textItalic           = shape.textItalic,
                              .textOutline          = shape.textOutline,
                              .textBackground       = shape.textBackground,
-                             .textStrokeColorStep  = shape.textStrokeColorStep};
+                             .textStrokeColorStep  = shape.textStrokeColorStep,
+                             .textOutlineWidthStep = shape.textOutlineWidthStep,
+                             .textPlateColorStep   = shape.textPlateColorStep};
     }
 
 } // namespace GyanisScribe::Annotation

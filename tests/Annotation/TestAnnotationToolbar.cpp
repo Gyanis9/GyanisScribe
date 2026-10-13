@@ -130,6 +130,8 @@ namespace
             std::vector<int>      doubleHeaded;     ///< doubleHeadedChanged 收到的开关（1 开 0 关）
             std::vector<int>      ellipticals;      ///< ellipticalChanged 收到的开关（1 椭圆 0 矩形）
             std::vector<int>      strokeSteps;      ///< textStrokeColorStepChanged 收到的档（0 自动、1 白、2 黑）
+            std::vector<int>      outlineWidths;    ///< textOutlineWidthStepChanged 收到的档（0 细、1 中、2 粗）
+            std::vector<int>      plateSteps;       ///< textPlateColorStepChanged 收到的档（0 自动、1 白、2 黑、3 用标注色）
             std::vector<int>      numberGroups;     ///< numberGroupChanged 收到的组号（1..3）
             std::vector<int>      mosaicBlockSizes; ///< mosaicBlockSizeChanged 收到的粒度
             std::vector<int>      highlightAlphas;  ///< highlightAlphaChanged 收到的透明度
@@ -160,6 +162,8 @@ namespace
             QObject::connect(toolbar.get(), &AnnotationToolbar::doubleHeadedChanged, [&log](bool enabled) { log.doubleHeaded.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::ellipticalChanged, [&log](bool enabled) { log.ellipticals.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::textStrokeColorStepChanged, [&log](int step) { log.strokeSteps.push_back(step); });
+            QObject::connect(toolbar.get(), &AnnotationToolbar::textOutlineWidthStepChanged, [&log](int step) { log.outlineWidths.push_back(step); });
+            QObject::connect(toolbar.get(), &AnnotationToolbar::textPlateColorStepChanged, [&log](int step) { log.plateSteps.push_back(step); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::numberGroupChanged, [&log](int group) { log.numberGroups.push_back(group); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::mosaicBlockSizeChanged, [&log](int blockSize) { log.mosaicBlockSizes.push_back(blockSize); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::highlightAlphaChanged, [&log](int alpha) { log.highlightAlphas.push_back(alpha); });
@@ -363,6 +367,63 @@ namespace
         button->click();
         EXPECT_EQ(toolbar->currentTextStrokeColorStep(), 0) << "三档之后该回到「自动」";
         EXPECT_EQ(button->accessibleName(), QString::fromUtf8("描边色：自动")) << "无障碍名没跟上当前档";
+    }
+
+    /**
+     * @brief 钉住描边粗细按钮的三档循环：起点「中」（与旧的写死值同解），信号与提示一起走
+     * @details 起点档必须落在中档：这一格出现之前只有一种厚度，起点挪走等于把老图样重画成别的粗细。
+     */
+    TEST_F(ToolbarFixture, TextOutlineWidthButtonCyclesAndNamesTheStep)
+    {
+        SignalLog log;
+        auto      toolbar = makeToolbarLogged(log);
+        auto     *button  = buttonByLabel(*toolbar, "描边粗细");
+        ASSERT_NE(button, nullptr) << "工具栏上找不到描边粗细按钮";
+
+        EXPECT_EQ(toolbar->currentTextOutlineWidthStep(), 1) << "起点该是「中」：与这一格出现之前的写死值同解";
+        button->click();
+        EXPECT_EQ(toolbar->currentTextOutlineWidthStep(), 2);
+        EXPECT_EQ(log.outlineWidths, std::vector<int>{2}) << "走了一档却没把信号发出去";
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("描边粗细：粗")) << "提示没跟上当前档";
+
+        button->click();
+        EXPECT_EQ(toolbar->currentTextOutlineWidthStep(), 0);
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("描边粗细：细"));
+
+        button->click();
+        EXPECT_EQ(toolbar->currentTextOutlineWidthStep(), 1) << "三档之后该回到「中」";
+        EXPECT_EQ(button->accessibleName(), QString::fromUtf8("描边粗细：中")) << "无障碍名没跟上当前档";
+    }
+
+    /**
+     * @brief 钉住底板色按钮的四档循环：起点「自动」，白 / 黑 / 用标注色各占一档
+     * @details 比描边色多出的那一档「用标注色」是本形状那支色当底板，字身跟着换成反差色；
+     *          读数写在提示里，因为按钮上那一枚图标说不出现在是哪一色。
+     */
+    TEST_F(ToolbarFixture, TextPlateColorButtonCyclesAndNamesTheStep)
+    {
+        SignalLog log;
+        auto      toolbar = makeToolbarLogged(log);
+        auto     *button  = buttonByLabel(*toolbar, "底板色");
+        ASSERT_NE(button, nullptr) << "工具栏上找不到底板色按钮";
+
+        EXPECT_EQ(toolbar->currentTextPlateColorStep(), 0) << "起点该是「自动」：与这一格出现之前同解";
+        button->click();
+        EXPECT_EQ(toolbar->currentTextPlateColorStep(), 1);
+        EXPECT_EQ(log.plateSteps, std::vector<int>{1}) << "走了一档却没把信号发出去";
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("底板色：白")) << "提示没跟上当前档";
+
+        button->click();
+        EXPECT_EQ(toolbar->currentTextPlateColorStep(), 2);
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("底板色：黑"));
+
+        button->click();
+        EXPECT_EQ(toolbar->currentTextPlateColorStep(), 3);
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("底板色：用标注色"));
+
+        button->click();
+        EXPECT_EQ(toolbar->currentTextPlateColorStep(), 0) << "四档之后该回到「自动」";
+        EXPECT_EQ(button->accessibleName(), QString::fromUtf8("底板色：自动")) << "无障碍名没跟上当前档";
     }
 
     /**

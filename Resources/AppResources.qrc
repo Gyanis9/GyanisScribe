@@ -32,7 +32,9 @@
     <file alias="Import.svg">Icons/Import.svg</file>
     <file alias="Italic.svg">Icons/Italic.svg</file>
     <file alias="TextOutline.svg">Icons/TextOutline.svg</file>
+    <file alias="TextOutlineWidth.svg">Icons/TextOutlineWidth.svg</file>
     <file alias="TextBackground.svg">Icons/TextBackground.svg</file>
+    <file alias="PlateColor.svg">Icons/PlateColor.svg</file>
     <file alias="Highlight.svg">Icons/Highlight.svg</file>
     <file alias="HighlightOpacity.svg">Icons/HighlightOpacity.svg</file>
     <file alias="HighlightWidth.svg">Icons/HighlightWidth.svg</file>

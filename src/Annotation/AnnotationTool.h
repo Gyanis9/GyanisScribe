@@ -331,6 +331,18 @@ namespace GyanisScribe::Annotation
         void setTextStrokeColorStep(int step) noexcept;
 
         /**
+         * @brief 设文字描边粗细档
+         * @param step 0 细、1 中、2 粗，取值表 kTextOutlineWidths；越界按最近的一档夹取
+         */
+        void setTextOutlineWidthStep(int step) noexcept;
+
+        /**
+         * @brief 设文字底板颜色档
+         * @param step 0 自动（与字色反差）、1 白、2 黑、3 用这一形状自己的色；越界按最近的一档夹取
+         */
+        void setTextPlateColorStep(int step) noexcept;
+
+        /**
          * @brief 设马赛克粒度
          * @param blockSize 方块边长，逻辑像素；越界按 1..64 夹取
          * @details 只有马赛克工具用得上；当前粒度随新画的图形带走，选中的那条改粒度走改样式命令。
@@ -458,11 +470,13 @@ namespace GyanisScribe::Annotation
         int             m_arrowHeadStyle       = kArrowHeadFilled;                                   ///< 默认箭头头部款式（仅箭头工具用）
         qreal           m_arrowHeadScale       = kArrowHeadScales[kDefaultArrowHeadScaleStep];       ///< 默认箭头头部大小：头长相对线宽的倍数（仅箭头工具用）
         QString         m_fontFamily;                                                                ///< 默认文字字体族，空串=跟随应用默认（仅文字工具用）
-        bool            m_textBold            = false;                                               ///< 默认文字粗体（仅文字工具用）
-        bool            m_textItalic          = false;                                               ///< 默认文字斜体（仅文字工具用）
-        bool            m_textOutline         = false;                                               ///< 默认反色描边（仅文字工具用）
-        bool            m_textBackground      = false;                                               ///< 默认反色底板（仅文字工具用）
-        int             m_textStrokeColorStep = static_cast<int>(kDefaultTextStrokeColorStep);       ///< 默认文字描边色档（仅文字工具用）
+        bool            m_textBold             = false;                                              ///< 默认文字粗体（仅文字工具用）
+        bool            m_textItalic           = false;                                              ///< 默认文字斜体（仅文字工具用）
+        bool            m_textOutline          = false;                                              ///< 默认反色描边（仅文字工具用）
+        bool            m_textBackground       = false;                                              ///< 默认反色底板（仅文字工具用）
+        int             m_textStrokeColorStep  = static_cast<int>(kDefaultTextStrokeColorStep);      ///< 默认文字描边色档（仅文字工具用）
+        int             m_textOutlineWidthStep = static_cast<int>(kDefaultTextOutlineWidthStep);     ///< 默认文字描边粗细档（仅文字工具用）
+        int             m_textPlateColorStep   = static_cast<int>(kDefaultTextPlateColorStep);       ///< 默认文字底板色档（仅文字工具用）
         int             m_fontSize;                                                                  ///< 默认字号
 
     private:

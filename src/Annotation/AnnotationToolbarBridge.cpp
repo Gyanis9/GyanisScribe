@@ -10,7 +10,7 @@ namespace GyanisScribe::Annotation
 {
     AnnotationToolbarBridge::AnnotationToolbarBridge(AnnotationToolbar &toolbar, IAnnotationEngine &engine, QObject *parent) : QObject(parent), m_toolbar(toolbar), m_engine(engine)
     {
-        // 起点参数整套照工具栏的初值抄一遍：十七处必须与工具栏同解，否则第一笔的样式与按钮显示的不一致
+        // 起点参数整套照工具栏的初值抄一遍：每一档都必须与工具栏同解，否则第一笔的样式与按钮显示的不一致
         m_penParameters = PenParameters{.color                = toolbar.currentColor(),
                                         .lineWidth            = toolbar.currentWidth(),
                                         .fontSize             = toolbar.currentFontSize(),
@@ -29,7 +29,9 @@ namespace GyanisScribe::Annotation
                                         .textItalic           = toolbar.currentTextItalic(),
                                         .textOutline          = toolbar.currentTextOutline(),
                                         .textBackground       = toolbar.currentTextBackground(),
-                                        .textStrokeColorStep  = toolbar.currentTextStrokeColorStep()};
+                                        .textStrokeColorStep  = toolbar.currentTextStrokeColorStep(),
+                                        .textOutlineWidthStep = toolbar.currentTextOutlineWidthStep(),
+                                        .textPlateColorStep   = toolbar.currentTextPlateColorStep()};
 
         QObject::connect(&toolbar, &AnnotationToolbar::toolChanged, this,
                          [this](const ToolKind kind)
@@ -151,6 +153,18 @@ namespace GyanisScribe::Annotation
                          [this](const int step)
                          {
                              m_penParameters.textStrokeColorStep = step;
+                             applyPenParameters();
+                         });
+        QObject::connect(&toolbar, &AnnotationToolbar::textOutlineWidthStepChanged, this,
+                         [this](const int step)
+                         {
+                             m_penParameters.textOutlineWidthStep = step;
+                             applyPenParameters();
+                         });
+        QObject::connect(&toolbar, &AnnotationToolbar::textPlateColorStepChanged, this,
+                         [this](const int step)
+                         {
+                             m_penParameters.textPlateColorStep = step;
                              applyPenParameters();
                          });
         // 计数组不是画笔样式（不进 PenParameters）：它是序号工具自己的计数状态，直接交给引擎
