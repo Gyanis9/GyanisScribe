@@ -3,6 +3,7 @@
 #include "Annotation/AnnotationEngine.h"
 #include "Annotation/AnnotationToolbar.h"
 #include "Annotation/AnnotationWindow.h"
+#include "Annotation/BlankCanvas.h"
 #include "App/ClipboardPin.h"
 #include "Capture/CaptureService.h"
 #include "Capture/IScreenCaptureSource.h"
@@ -357,6 +358,28 @@ namespace GyanisScribe::App
         scheduleCapture([this] { m_capture->startLongCapture(); });
     }
 
+    void AppController::startBlankCanvas()
+    {
+        auto *screen = QGuiApplication::screenAt(QCursor::pos());
+        if (screen == nullptr)
+        {
+            screen = QGuiApplication::primaryScreen();
+        }
+        if (screen == nullptr)
+        {
+            // 一块屏都拿不到就不摆窗：标注窗没有可依附的几何，硬摆会落在一块不存在的屏幕上
+            notifyUser(GyanisScribe::Core::uiText("空白画布没开起来：Qt 没有报出任何可用的屏幕。请在图形会话里重试"), Ui::ToastKind::Danger);
+            return;
+        }
+
+        const auto canvas    = Annotation::makeBlankCanvas(Annotation::kBlankCanvasSize, screen->devicePixelRatio(), screen->name());
+        const auto available = screen->availableGeometry();
+        // 不碰截图那条链：没有帧、不记「上次选区」、也不触发音效/自动保存/历史——那一串都挂在「抓到了屏上的一块」上
+        m_annotationWindow->startAnnotation(canvas, available, Annotation::blankCanvasRegion(available, canvas.logicalSize));
+        Core::Logger::info(std::format("空白画布已开：逻辑 {}×{}，物理 {}×{}，屏 {}", canvas.logicalSize.width(), canvas.logicalSize.height(), canvas.image.width(),
+                                       canvas.image.height(), canvas.screenName.toStdString()));
+    }
+
     void AppController::scheduleCapture(std::function<void()> begin)
     {
         const auto stored = m_settings->intValue(Settings::kCaptureDelaySeconds, 0);
@@ -456,6 +479,9 @@ namespace GyanisScribe::App
             case TrayAction::CaptureLongRegion:
                 // 长截图的入口只做「去框那一条区域」，接与收口都在截图服务里
                 startLongCapture();
+                return;
+            case TrayAction::BlankCanvas:
+                startBlankCanvas();
                 return;
             case TrayAction::ToggleRecord:
                 toggleRecording();

@@ -496,6 +496,10 @@
             <translation>These global hotkeys could not be registered:</translation>
         </message>
         <message>
+            <source>空白画布没开起来：Qt 没有报出任何可用的屏幕。请在图形会话里重试</source>
+            <translation>The blank canvas did not open: Qt reported no usable screen. Retry inside a graphical session.</translation>
+        </message>
+        <message>
             <source>上一次延时截图还在等，等它弹出来之后再按</source>
             <translation>The previous delayed capture is still waiting - press again once it comes up</translation>
         </message>
@@ -1382,6 +1386,10 @@
         <message>
             <source>截取当前窗口</source>
             <translation>Capture the foreground window</translation>
+        </message>
+        <message>
+            <source>新建空白画布标注</source>
+            <translation>New blank canvas</translation>
         </message>
         <message>
             <source>开始 / 停止录屏</source>

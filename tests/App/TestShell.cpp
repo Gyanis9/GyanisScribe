@@ -61,7 +61,7 @@ TEST(TrayMenuTable, ListsEachActionOnceWithRealIcons)
                                          TrayAction::ToggleRecord,      TrayAction::Recognize,         TrayAction::RecognizeFile,     TrayAction::PickColor,
                                          TrayAction::CloseAllPins,      TrayAction::OpenSettings,      TrayAction::OpenAbout,         TrayAction::Quit,
                                          TrayAction::CaptureLongRegion, TrayAction::ClearPinsThrough,  TrayAction::TogglePinsVisible, TrayAction::PasteClipboard,
-                                         TrayAction::NextPinGroup};
+                                         TrayAction::NextPinGroup,      TrayAction::BlankCanvas};
 
     const auto actions = actionsInTable();
     EXPECT_EQ(actions.size(), expectedActions.size()) << "表里的动作项数与这份清单不同解";

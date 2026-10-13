@@ -3,7 +3,8 @@ add_executable(TestAnnotation
         TestAnnotationTools.cpp
         TestAnnotationToolbar.cpp
         TestAnnotationTransform.cpp
-        TestAnnotationWindow.cpp)
+        TestAnnotationWindow.cpp
+        TestBlankCanvas.cpp)
 
 target_link_libraries(TestAnnotation PRIVATE
         Annotation

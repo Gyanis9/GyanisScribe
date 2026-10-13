@@ -50,7 +50,9 @@ add_library(Annotation STATIC
         AnnotationWindow.cpp
         IAnnotationEngine.h
         AnnotationEngine.h
-        AnnotationEngine.cpp)
+        AnnotationEngine.cpp
+        BlankCanvas.h
+        BlankCanvas.cpp)
 
 target_include_directories(Annotation PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(Annotation PUBLIC
