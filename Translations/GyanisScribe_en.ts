@@ -408,6 +408,10 @@
             <translation>Select annotation color</translation>
         </message>
         <message>
+            <source>自定义颜色（当前不透明度 %1%；在色板这一排上滚滚轮调节）</source>
+            <translation>Custom color (current opacity %1%; scroll on the color row to adjust)</translation>
+        </message>
+        <message>
             <source>最近使用 %1</source>
             <translation>Recent %1</translation>
         </message>
@@ -1821,7 +1825,7 @@
         </message>
         <message>
             <source>{} "{}" 不在 {} 到 {} 之间：请在设置的截图页重选一个值，或删掉这一项回到默认档</source>
-            <translation>{} &quot;{}&quot; is outside {} to {}: pick a new value on the Shot page of Settings, or delete this entry to fall back to the default</translation>
+            <translation>{} "{}" is outside {} to {}: pick a new value on the Shot page of Settings, or delete this entry to fall back to the default</translation>
         </message>
         <message>
             <source>边框颜色 "{}" 不是一段认得出的颜色写法（如 #RRGGBB）：请在设置的截图页重填，或留空回到默认的中灰</source>

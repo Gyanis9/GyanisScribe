@@ -21,8 +21,11 @@
 #include <QSlider>
 #include <QString>
 #include <QToolButton>
+#include <QWheelEvent>
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <format>
 #include <string_view>
 #include <tuple>
@@ -37,6 +40,15 @@ namespace
     using GyanisScribe::Ui::kDefaultAnnotationWidthStep;
     using GyanisScribe::Ui::kFontSizes;
     using GyanisScribe::Ui::stepIndexOf;
+
+    /// 滚轮一格改多少不透明度（百分点）：二十下从满到最淡，一下改太多会让人滚过头找不到原来那一档
+    constexpr int kColorOpacityStepPercent = 5;
+
+    /// 不透明度下限（百分点）：再淡就等于没画，标注是要给人看见的东西
+    constexpr int kMinimumColorOpacityPercent = 10;
+
+    /// 不透明度上限（百分点）
+    constexpr int kMaximumColorOpacityPercent = 100;
 
     /// 配置里没存过、或存的值不在阶梯里时用的起点档：值在 Ui 的阶梯常量里，设置页与这里同解
     constexpr int kDefaultWidthStep     = static_cast<int>(kDefaultAnnotationWidthStep);
@@ -310,6 +322,7 @@ namespace GyanisScribe::Annotation
         applyStoredDefaults();
         m_stateIsInitial = false;
         m_currentColor   = kAnnotationPalette[0];
+        updateOpacityHint();
     }
 
     int AnnotationToolbar::currentFillStyle() const
@@ -754,6 +767,7 @@ namespace GyanisScribe::Annotation
         m_currentColor = color;
         // 按 ToolKind 的底层值作键：往后加一档工具不必改这张表，也不用假设工具数与按钮数相等
         m_colorsByTool.insert(static_cast<int>(m_activeTool), color);
+        updateOpacityHint();
         emit colorChanged(color);
     }
 
@@ -768,7 +782,68 @@ namespace GyanisScribe::Annotation
         m_currentColor = found.value();
         // 按下的那一格要跟着走：互斥组会把别的放开，留着旧按下态就是在说「现在是上一个形状的颜色」
         syncColorButtonChecked();
+        updateOpacityHint();
         emit colorChanged(m_currentColor);
+    }
+
+    int AnnotationToolbar::currentColorOpacityPercent() const
+    {
+        // 读数从颜色自己的 alpha 换算：再存一份「当前不透明度」就会与颜色分家（画的是 alpha，说的是另一格）
+        return static_cast<int>(std::lround(static_cast<double>(m_currentColor.alpha()) * 100.0 / 255.0));
+    }
+
+    bool AnnotationToolbar::overColorRow(const QPoint &localPoint) const
+    {
+        // 色块那一排是连续的：从第一枚预设色块到自定义按钮的合矩形内才算「在色板上滚」
+        QRect row;
+        for (const auto *button: m_colorButtons)
+        {
+            if (button != nullptr)
+            {
+                row = row.united(button->geometry());
+            }
+        }
+        for (const auto *button: m_recentButtons)
+        {
+            if (button != nullptr)
+            {
+                row = row.united(button->geometry());
+            }
+        }
+        if (m_customColorButton != nullptr)
+        {
+            row = row.united(m_customColorButton->geometry());
+        }
+        return !row.isNull() && row.contains(localPoint);
+    }
+
+    void AnnotationToolbar::updateOpacityHint()
+    {
+        if (m_customColorButton == nullptr)
+        {
+            return;
+        }
+        // 无障碍名保持「自定义颜色」：那是这一枚按钮的本名，读屏要的是动作而不是状态
+        m_customColorButton->setToolTip(GyanisScribe::Core::uiText("自定义颜色（当前不透明度 %1%；在色板这一排上滚滚轮调节）").arg(currentColorOpacityPercent()));
+    }
+
+    void AnnotationToolbar::wheelEvent(QWheelEvent *event)
+    {
+        const auto notches = event->angleDelta().y() / 120; // 一格 120 度：与 Qt 的缺省档同解
+        if (notches == 0 || !overColorRow(event->position().toPoint()))
+        {
+            // 不在色板上（或只是惯性滚了一小丝）就交回默认：滑块与下拉框自己吃轮，到不了这一档的也不该改色
+            QWidget::wheelEvent(event);
+            return;
+        }
+
+        const auto percent = std::clamp(currentColorOpacityPercent() + notches * kColorOpacityStepPercent, kMinimumColorOpacityPercent, kMaximumColorOpacityPercent);
+        auto       dimmed  = m_currentColor;
+        dimmed.setAlpha(static_cast<int>(std::lround(static_cast<double>(percent) * 255.0 / 100.0)));
+        // 走同一条上色路：于是这一档的不透明度也记在当前形状那一格上，切回来还是这支淡色
+        applyColorToActiveTool(dimmed);
+        updateOpacityHint();
+        event->accept();
     }
 
     void AnnotationToolbar::syncColorButtonChecked()

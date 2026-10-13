@@ -242,6 +242,12 @@ namespace GyanisScribe::Annotation
         void setTextBackground(bool enabled);
 
         /**
+         * @brief 当前颜色的不透明度档位（百分比，四舍五入到整数）
+         * @return 10 到 100 之间的整数；颜色本身带着 alpha，这里只是把读数说给界面与用例听
+         */
+        [[nodiscard]] int currentColorOpacityPercent() const;
+
+        /**
          * @brief 指定序号的工具按钮，用例与调试用它核对状态
          * @param index 按钮序号，越界返回空指针
          */
@@ -307,6 +313,15 @@ namespace GyanisScribe::Annotation
         /// 识别二维码/条形码
         void scanClicked();
 
+    protected:
+        /**
+         * @brief 在色板那一排上滚滚轮：调当前形状那一格颜色的不透明度
+         * @param event 滚轮事件
+         * @details 重写 QWidget::wheelEvent：只在色块那一段矩形里生效，滚到工具按钮或滑块上不改颜色——
+         *          「在这排上滚滚轮」是这一档唯一的手势出口，滚哪儿都改会让调线宽的手势顺手把颜色调淡。
+         */
+        void wheelEvent(QWheelEvent *event) override;
+
     private:
         /**
          * @brief 建一个带图标、tooltip 与无障碍名称的按钮
@@ -354,6 +369,12 @@ namespace GyanisScribe::Annotation
 
         /// 按当前颜色把色块行里的按下态挪到匹配的那一格；没有匹配格就落到自定义那一格
         void syncColorButtonChecked();
+
+        /// 这个窗口内落点是否在色板那一段上（预设 + 最近使用 + 自定义那一枚的合矩形）
+        [[nodiscard]] bool overColorRow(const QPoint &localPoint) const;
+
+        /// 把当前不透明度写进自定义按钮的提示：读数要有出口，不然「滚了一下到底改没改」只能靠画一笔去看
+        void updateOpacityHint();
 
         Settings::ISettingsStore  &m_settings;                    ///< 最近使用颜色的读写去处
         std::vector<QColor>        m_recentColors;                ///< 最近用过的自定义颜色，首位最新

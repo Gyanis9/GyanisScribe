@@ -16,12 +16,14 @@
 #include <QFontComboBox>
 #include <QFontDatabase>
 #include <QImage>
+#include <QPoint>
 #include <QRect>
 #include <QSize>
 #include <QSlider>
 #include <QString>
 #include <QStringList>
 #include <QToolButton>
+#include <QWheelEvent>
 #include <QWidget>
 
 #include <array>
@@ -179,6 +181,17 @@ namespace
             return toolbar;
         }
 
+        /// 建一把工具栏并把布局跑实：按钮几何要有真值，滚轮的落点才算得出来
+        [[nodiscard]] std::unique_ptr<AnnotationToolbar> makeToolbarLaidOut(SignalLog &log)
+        {
+            auto toolbar = makeToolbarLogged(log);
+            // 隐藏的窗口上布局不给子控件算位置（全是 (0,0)+sizeHint 叠成一堆），show 才走一遍 doLayout；
+            // WA_DontShowOnScreen 让这一趟不真的往桌面上落一块窗
+            toolbar->setAttribute(Qt::WA_DontShowOnScreen);
+            toolbar->show();
+            return toolbar;
+        }
+
         /// 按无障碍名称找按钮：名称是需求的可访问性契约，用它定位比记序号更稳
         [[nodiscard]] static QToolButton *buttonByLabel(const AnnotationToolbar &toolbar, std::string_view label)
         {
@@ -190,6 +203,15 @@ namespace
                 }
             }
             return nullptr;
+        }
+
+        /// 往工具栏投一条滚轮事件：落点是窗口内坐标，角度增量按 Qt 的缺省档给 120 的整数倍
+        static void wheelOn(QWidget &target, const QPoint &localPoint, const int angleDeltaY)
+        {
+            const QPointF local{localPoint};
+            const QPointF global{target.mapToGlobal(localPoint)};
+            QWheelEvent   event{local, global, QPoint{}, QPoint{0, angleDeltaY}, Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false};
+            QApplication::sendEvent(&target, &event);
         }
     };
 
@@ -1064,4 +1086,122 @@ TEST_F(ToolbarFixture, PressedSwatchFollowsTheShapeColor)
 
     EXPECT_TRUE(secondSwatch->isChecked()) << "切回矩形后按下的色块还停在箭头那一格";
     EXPECT_FALSE(fifthSwatch->isChecked()) << "两排色块同时按下：互斥组没起作用";
+}
+
+/**
+ * @brief 钉住色板那一排上的滚轮改的是当前形状颜色的不透明度
+ * @details 判据盯两处最容易算错的地方：一档的百分比（5）与「百分比 → alpha」的换算。
+ *          少一次换算（把 95 当成 alpha 写进去）会得到几乎全黑的一笔；RGB 被顺带改掉的话，
+ *          用户看到的就不是「淡一点」而是换了个颜色。
+ */
+TEST_F(ToolbarFixture, WheelOnTheColorRowDimsTheShapeColor)
+{
+    SignalLog log;
+    auto      toolbar = makeToolbarLaidOut(log);
+
+    auto *fifthSwatch = buttonByLabel(*toolbar, "颜色 5");
+    ASSERT_NE(fifthSwatch, nullptr);
+    ASSERT_FALSE(fifthSwatch->geometry().isEmpty()) << "布局没跑实，滚轮落点算不出来";
+    fifthSwatch->click();
+    ASSERT_EQ(toolbar->currentColorOpacityPercent(), 100) << "色板那一格该以完全不透明起步";
+
+    wheelOn(*toolbar, fifthSwatch->geometry().center(), -120);
+
+    EXPECT_EQ(toolbar->currentColorOpacityPercent(), 95);
+    EXPECT_EQ(toolbar->currentColor().alpha(), 242) << "一档 5% 要落进 alpha：95% × 255 四舍五入 = 242";
+    EXPECT_EQ(toolbar->currentColor().red(), kAnnotationPalette[4].red()) << "滚轮只该改 alpha，不该动色相";
+    EXPECT_EQ(toolbar->currentColor().green(), kAnnotationPalette[4].green());
+    EXPECT_EQ(toolbar->currentColor().blue(), kAnnotationPalette[4].blue());
+
+    // 点那一格发一次、滚一档再发一次：两次都对，第二次带的才是淡掉的那支
+    ASSERT_EQ(log.colors.size(), 2u) << "滚了一档却没把颜色通知宿主";
+    EXPECT_EQ(log.colors.back().alpha(), 242);
+    EXPECT_EQ(buttonByLabel(*toolbar, "自定义颜色")->toolTip(), QString::fromUtf8("自定义颜色（当前不透明度 95%；在色板这一排上滚滚轮调节）")) << "读数没跟上";
+}
+
+/**
+ * @brief 钉住不透明度的两头：滚过头停在最淡那一档，滚回来停在完全不透明
+ * @details 20 档 × 5% 正好把 100% 减到 0：夹住的这一档是「还能看得见」的下界。
+ *          越界不设限的话 alpha 会被写成 0，那一笔就彻底消失，用户只会以为程序没画上。
+ */
+TEST_F(ToolbarFixture, WheelOpacityClampsAtBothEnds)
+{
+    SignalLog log;
+    auto      toolbar = makeToolbarLaidOut(log);
+
+    auto *fifthSwatch = buttonByLabel(*toolbar, "颜色 5");
+    ASSERT_NE(fifthSwatch, nullptr);
+    fifthSwatch->click();
+    const auto center = fifthSwatch->geometry().center();
+
+    for (int notch = 0; notch < 20; ++notch)
+    {
+        wheelOn(*toolbar, center, -120);
+    }
+    EXPECT_EQ(toolbar->currentColorOpacityPercent(), 10) << "往下滚过头要停在最淡那一档，不许把 alpha 滚成 0";
+
+    for (int notch = 0; notch < 30; ++notch)
+    {
+        wheelOn(*toolbar, center, 120);
+    }
+    EXPECT_EQ(toolbar->currentColorOpacityPercent(), 100) << "往上滚过头要停在完全不透明";
+    EXPECT_EQ(toolbar->currentColor().alpha(), 255);
+}
+
+/**
+ * @brief 钉住滚轮只吃色板那一段：落在工具按钮上什么都不改
+ * @details 工具栏是一整条横排，滑块与下拉框自己也吃轮。整个控件都收轮的话，
+ *          调线宽时颜色会跟着变淡，而用户从没想过要改颜色。
+ */
+TEST_F(ToolbarFixture, WheelOffTheColorRowLeavesTheColorAlone)
+{
+    SignalLog log;
+    auto      toolbar = makeToolbarLaidOut(log);
+
+    auto *fifthSwatch = buttonByLabel(*toolbar, "颜色 5");
+    ASSERT_NE(fifthSwatch, nullptr);
+    fifthSwatch->click();
+
+    auto *arrowButton = buttonByLabel(*toolbar, "箭头");
+    ASSERT_NE(arrowButton, nullptr);
+    ASSERT_NE(arrowButton->geometry(), fifthSwatch->geometry()) << "两枚按钮叠在同一格，这条验不出落点在哪";
+
+    const auto colorsBeforeWheel = log.colors.size();
+    wheelOn(*toolbar, arrowButton->geometry().center(), -120);
+
+    EXPECT_EQ(toolbar->currentColorOpacityPercent(), 100) << "滚轮落在工具按钮上不该改颜色";
+    EXPECT_EQ(log.colors.size(), colorsBeforeWheel) << "没改色也别发信号：宿主收到一次就要重下一遍画笔参数";
+}
+
+/**
+ * @brief 钉住不透明度记在形状那一格上：切回这个形状还是它自己那一档
+ * @details 滚轮走的是「给当前形状上色」同一条路，所以淡掉的那支色进了形状色表。
+ *          只改 m_currentColor 而不进表的话，切个工具回来不透明度就丢了。
+ */
+TEST_F(ToolbarFixture, WheelOpacityIsRememberedPerShape)
+{
+    SignalLog log;
+    auto      toolbar = makeToolbarLaidOut(log);
+
+    auto *fifthSwatch = buttonByLabel(*toolbar, "颜色 5");
+    ASSERT_NE(fifthSwatch, nullptr);
+    const auto center = fifthSwatch->geometry().center();
+
+    wheelOn(*toolbar, center, -120);
+    ASSERT_EQ(toolbar->currentColorOpacityPercent(), 95);
+
+    auto *arrowButton = buttonByLabel(*toolbar, "箭头");
+    ASSERT_NE(arrowButton, nullptr);
+    arrowButton->click();
+    wheelOn(*toolbar, center, -120);
+    wheelOn(*toolbar, center, -120);
+    ASSERT_EQ(toolbar->currentColorOpacityPercent(), 85);
+
+    auto *rectangleButton = buttonByLabel(*toolbar, "矩形");
+    ASSERT_NE(rectangleButton, nullptr);
+    rectangleButton->click();
+    EXPECT_EQ(toolbar->currentColorOpacityPercent(), 95) << "切回矩形该拿回它自己那一档不透明度";
+
+    arrowButton->click();
+    EXPECT_EQ(toolbar->currentColorOpacityPercent(), 85) << "再切回箭头，箭头那一档不许被矩形盖掉";
 }
