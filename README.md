@@ -754,18 +754,17 @@ docs/           需求、识别后端、第三方许可证、界面样式说明
 
 ## 路线图（后续计划）
 
-按需求条目核对过，剩下这些没做。与 Snipaste 逐条对过的那两组里，「标注精修」组已经清零
-（最后一格——箭头头部的款式与大小——照对方专业版的档位补上了，三档款式加三档大小）；
-「贴图」组只剩下面这一条属于「做法不同」的说明，不是欠账：
+按需求条目核对过，剩下这些没做。与参照面（一款同形态的截图/贴图工具）逐条对过的那两组里，
+「标注精修」组已经清零（最后一格——箭头头部的款式与大小——照对方专业版的档位补上了，三档款式加三档大小）；
+「贴图」组在 2026-10-13 **重开了账**（见下面那一批）——上一轮那句「只剩做法不同的说明」说早了。
 
 **贴图**
-- 从贴图取色之外的菜单项都已补齐；「在文件夹中查看」按内存图先落一份再打开目录，属于我们的做法。
+- 「在文件夹中查看」按内存图先落一份再打开目录，属于我们的做法（不是欠账）。
 
 下面这一批是 2026-10-12 又做的一轮对外差距审计（对方免费档官网能力 + 专业版逐版本 changelog 的
 [专业版] 条目逐条摘出、对着本仓代码核实）落下来的台账，按性价比排队：
 
 **贴图**（缺口最集中的一组）
-（这一组已清零：窗口阴影这一批补齐了最后一件，只余下面这条「明确不做」的说明。）
 - 虚拟桌面（固定到指定/所有桌面）——**明确不做**：依赖对方的系统集成面，本地单机收益太小。
 
 **标注**
@@ -779,6 +778,104 @@ Conan 直取，许可证正文见 `licenses/Zxing-Apache-2.0.txt` 与 `docs/Thir
 **剪贴板与系统**
 - 热键忽略列表、自定义应用内快捷键、原生分享、绑定按键到自定义输出选项——**明确不做**：
   收益小（应用内键位本就可查可改的那几处已够用）或依赖系统生态（分享面板）。
+
+**2026-10-13 重开的一批**：换了资料面——不再只看对方官网首页那段清单，而是把对方的免费/专业版对比表、
+内置快捷键表、基础操作、高级设置、《常见问题》与逐版本更新日志逐页取回**逐字原文**，再对着本仓代码逐条核。
+上一轮的「已清零」因此被推翻了一部分：免费档里有若干件本仓根本不在。仍按性价比排队，每条都给了本仓的位置
+或写明跑过的零命中检索。
+
+*免费档就有、本仓缺席的*
+
+- **方向键把贴图逐像素移动**：对方快捷键表原文 `| ↑ ← ↓ → | Move the snipping area/image window by 1 pixel if not editing |`。
+  本仓 `Pin/PinWindow.cpp:1543` 的 `keyPressEvent` 只认 Esc/`T`/`R`/`0`/`H`/`V`/`G`/`I`，`Qt::Key_(Left|Right|Up|Down)`
+  在 `src/Pin` 零命中——而遮罩与标注窗都有「方向键一格、`Shift` 十格」这一档，三个出口不同解，漏的是贴图这一头。
+- **贴图与贴图、贴图与别的程序窗口之间吸附对齐**（按住 `Shift` 拖到差不多齐就释放；`高级设置` 里那一格写作
+  「指定贴图贴边吸附的距离阈值，以像素为单位 (>= v2.3)」`magnetic_attach_threshold=50`）：本仓只有
+  `Pin/PinTransform.cpp:130` 的 `snapToScreenEdges`——认屏边那一种。候选矩形从屏边扩到「桌上其他贴图与屏上窗口」即可，
+  容差沿用 `kEdgeSnapTolerance`。
+- **贴图的平滑缩放可以关掉**（《常见问题》：取消后文字显示更清晰锐利）：`Pin/PinWindow.cpp:1178` 把
+  `QPainter::SmoothPixmapTransform` 写死为 `true`，`setTransformationMode` 全仓零命中。对着截图读小字时最近邻才是对的，
+  `Annotation/MosaicTool.cpp:41` 那段注释已经写着「两段都用 FastTransformation」，先例现成。
+- **`Ctrl+V` 用剪贴板内容替换这一张贴图**（原文 `| Ctrl + V | Replace the image with the content in the clipboard |`）：
+  「替换」在 `src/Pin` 零命中，现在只能关掉再贴一张；而把剪贴板转成贴图像素的那条路（`App/ClipboardPin.h:56` 的
+  `pinContentFrom`）已经在。
+- **拖动贴图窗口的边缘改大小**（`高级设置` 里「禁用贴图边缘缩放 (>= v2.3)」这一格反证了能力存在）：
+  `startSystemResize` 与 `SizeHorCursor` 在 `src/Pin` 零命中，缩放只有滚轮一格一格与右键「自定义尺寸…」。
+  无边框窗口的 hit-test 要自己画，比上面几条贵一档。
+- **关闭与销毁分两档**（关掉的还能按贴图键再贴出，条数上限可配；销毁的不再回来）：本仓 `PinManager` 只有一条摘除路径
+  （窗口发 `closedByUser`，管理器把自己记的那份摘掉），关掉就是真没了。退出保留现场那套像素落盘可以直接搬来做这一档。
+- **遮罩里按键临时开关「把指针画进成品」**（原文：反引号键或 `!` 键 = `Show/Hide the captured mouse cursor`）：
+  本仓指针只在设置里定档，`Capture/CaptureOverlay.cpp` 的 `keyPressEvent` 分派的是 Esc/Enter/`A`/`S`/`,`/`.`/`R`/`V`/`C`
+  这几档。截菜单时想把指针带进去得先退出遮罩改设置——冻帧本就不含指针，画与不画只是一次 `update()`。
+- **选区逐像素增缩**（原文 `| Ctrl + ↑ ← ↓ → | Enlarge the snipping area by 1 pixel |` 与
+  `| Shift + ↑ ← ↓ → | Shrink the snipping area by 1 pixel |`）：本仓方向键是整块平移、`Shift`+方向键挪右下角，
+  四条边各自一格的粒度没有。
+- **白板模式**（不抓屏，空画布直接标注再落地；对比表那一行 `| **Whiteboard mode** | ✔️ | ✔️ |`——免费档就有，
+  透明白板那一档才是专业版）：本仓 `loadCanvas` 的两个调用点（`Annotation/AnnotationWindow.cpp:148`、
+  `Pin/PinWindow.cpp:712`）都要先有抓好的图。引擎吃的是任意 `CapturedImage`，塞一张白底或透明图再加一个入口就行。
+- **截图时把选区的位置也指定出来**（对方正文写自定义截图对话框可指定位置/尺寸/延时，而对比表把
+  `| Region size input | ❌ | ✔️ |` 列成专业版——对方侧这两说没对齐，档位按存疑处理）：本仓尺寸输入只吃两个数
+  （`Core/SizeText.cpp:16` 的 `parts.size() != 2`），应用时左上角钉死（`Capture/CaptureOverlay.cpp:565` 那条注释），
+  而坐标本来就在读数里（`Capture/ScreenUtils.cpp:123` 的 `formatSelectionHint`）。解析扩成「x,y 宽x高」即可。
+
+*对方专业版独占、本仓没有的*
+
+- **`Ctrl+A` 选中所有可见贴图**（原文 `| Ctrl + A | Select all visible image windows |`）：选中集与整组操作都已就位
+  （`PinManager.h:178` 的 `togglePinSelection`），差一圈遍历。
+- **批量保存选中的贴图**（v2.5 更新日志 `[专业版] 支持批量保存选中的贴图`）：右键「保存」只动这一张
+  （`Pin/PinWindow.cpp:1710`），整组菜单里只有状态开关。
+- **贴图组管理窗**（添加/删除/重命名/排序，`| Image group management | ❌ | ✔️ |`）：本仓的组只是整数组号
+  （`movePinToGroup(int index, int group)`），组没有名字；改名要动布局记录的格式，先做「命名+删除」更划算。
+- **自由尺寸缩略图**（`| Free-size thumbnail | ❌ | ✔️ |`）：本仓「缩到小图」是固定一档
+  （`Pin/PinWindow.cpp:118` 的 `kThumbnailEdge = 48.0`）。
+- **带透明通道的贴图背景模式**（`| Background modes for images with alpha channel | ❌ | ✔️ |`）：本仓只有纯色垫底
+  （右键「背景色」）。对方那几档的具体名称本轮没逐字核到，按未证实处理。
+- **成品的边框与投影可调颜色与宽度**（`| Save with shadow/border | ❌ | ✔️ |`，v2.5 `[专业版] 支持带边框输出图像，
+  并可以指定边框颜色和宽度`）：本仓只有两个开关（`Settings/SettingsKeys.h:88`、`:89`），宽度与颜色全是编译期常量
+  （`Core/OutputDecoration.h` 的 `kOutputBorderPixels = 2`、`kOutputShadowPixels = 16`、`kOutputShadowMaximumAlpha = 96`、
+  `kOutputBorderColor{0x80,0x80,0x80}`）。`decorateForOutput` 是纯函数，四枚常量换四格设置，用例能直接证伪。
+- **圆角截图的半径可调**（v2.11 `[专业版] 截图时允许使用更大的圆角半径`）：`Capture/ScreenUtils.h:30` 写死
+  `kCaptureCornerRadiusLogical = 12`，而 `roundedCornerImage` 本来就收半径形参，改动面极小。
+- **每种标注形状各记各的颜色**（`| Individual colors for different annotation types | ❌ | ✔️ |`）：本仓全局一色
+  （`Annotation/AnnotationToolbar.h:383` 的 `m_currentColor`），桥里整套样式共用这一份
+  （`AnnotationToolbarBridge.cpp:14` 的 `.color = toolbar.currentColor()`）。按 `ToolKind` 存一张色表即可，不动绘制路径。
+- **滚轮调标注色的不透明度**（`| Scroll on color button to adjust opacity | ❌ | ✔️ |`）：alpha 只在两处写死
+  （`AnnotationShape.h:28` 的 `kHighlightAlphas{60,110,170}`、`FillBrush.h:20` 的 `kFillAlpha = 90`），通用色块没有 alpha 档。
+- **文字描边粗细可调、底板颜色可自定义**（`| Text outline with custom color/width | ❌ | ✔️ |`，v2.4 与 v2.5 两条
+  [专业版] 条目）：粗细是字号比例常量（`Annotation/TextTool.cpp:16` 的 `kTextOutlineWidthPerFontSize = 0.125`），
+  描边色已有三档（`AnnotationShape.h:45`），底板永远自动取反差色（`TextTool.cpp:21` 那条注释写明「描边与底板共用这一条
+  判据」）——缺的只有「宽度一档 + 底板自定义色」。
+- **「保存所有的截图记录」**（专业版原文：勾选后即使未保存的截图也会进入截图历史，有效防止误触 `Esc` 丢失截图）：
+  本仓历史的身份是盘上那一份文件（`AppController::recordHistory` 收 `std::filesystem::path`），只复制进剪贴板或
+  只贴到屏幕上的那一次不进册，`HistoryStore` 还会把成品已不在的记录丢掉。要补的是「内存图先落一份缓存像素再进册」，
+  与贴图恢复数据同源。
+
+*登记为反向结论，免得下一轮把领先的地方当欠账重挖*
+
+- **录屏**：对方《FAQ》把 GIF recording 列为「进度另见 issue 282」的未完成项，而更新日志 v1.0→v2.11.3 全文
+  grep `录屏|录制` 只命中两条与贴图 GIF 有关的行——**没有对等的录屏能力**。本仓这一族（DXGI 抓帧、编码器真探测、
+  两路混音、控制条）与滚动长截图都是超出参照面的部分。
+- **文字识别与二维码/条形码识别**在对方是专业版独占（`| Text Extraction | ❌ | ✔️ |`、`| Decode barcode / QR code | ❌ | ✔️ |`），
+  本仓免费自带。
+- 已具备、判「等价」或「做法不同」的：元素层级 `,`/`.`、输入区域尺寸、`F5` 刷新、固定长宽比、活动窗口、序号分组、
+  放大镜标注、圆角标注、虚线/点线、椭圆形状档、双向箭头、文字底板填充、点空白处选中已有图形再编辑
+  （`Annotation/AnnotationView.cpp:199`）。
+
+*本轮新判「不做」的（写清依据，别再重提）*
+
+- **屏幕触发角**（`| Hot corner | ❌ | ✔️ |`）：专业版独占的桌面手势，与截图工具的形态差得远。
+- **尺寸读数换单位 px/dip**（`| Region size unit (px/dip) | ❌ | ✔️ |`）：本仓遮罩给的已经是**物理像素**尺寸
+  （`V` 键那格写明「缩放屏上给的是会被裁出的物理像素」），再摆一档逻辑单位就是把同一个读数出两个口。
+- **`WASD` 逐像素移光标**（原文 `| W S A D | Move the cursor by 1 pixel |`，免费）：裸键 `S`、`A` 已被尺寸框与比例锁占着，
+  换一组键去移系统光标，收益抵不上键位表多出的两格。
+- **曲线 / 自由多边形 / 图章 / 打码笔 / 渐变 / 图层 / 混合模式 / 对齐分布 / 标注转路径**：对方对比表的工具行只列到
+  矩形、椭圆、直线/折线/箭头、画笔、记号笔、马赛克/模糊、文本、橡皮擦、序号、放大镜标注这十类，除「画笔绘制的曲线
+  更加平滑」外没有任何逐字支撑——**按证据这些不是对方的能力**，不立缺口。
+- **剪贴板历史册**：本轮在对方那几篇文档与全部更新日志里都没取到逐字原文（《常见问题》只把贴图称作「做简易的
+  剪贴板管理」的用法说法），按证据不构成对方能力。
+- **「隐藏所有窗口再截」**：更新日志与文档零命中，外部证据未取得，不列。
+- **识别的在线接口**（v2.11.3 `[专业版] 文字识别：支持腾讯和 OCR.space 接口`）：要第三方密钥与新联网点，
+  与「程序唯一的联网点是检查更新」这条自家口径冲突。
 
 以下这些在等一个能验证它们的环境：
 
