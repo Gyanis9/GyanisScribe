@@ -1160,6 +1160,34 @@
             <translation>Available variables: %date% (date), %time% (time), %ms% (milliseconds); leave blank to use the default. Changes take effect from the next save</translation>
         </message>
         <message>
+            <source>边框宽度</source>
+            <translation>Border Width</translation>
+        </message>
+        <message>
+            <source>开着「成品加边框」时那圈框的宽度（物理像素）：只对离开程序的成品生效，贴到屏幕上那一张不加</source>
+            <translation>How thick that ring is while Add Border is on, in physical pixels. Products leaving the program only; pins on the desk stay unbordered</translation>
+        </message>
+        <message>
+            <source>投影宽度</source>
+            <translation>Shadow Width</translation>
+        </message>
+        <message>
+            <source>开着「成品加投影」时投影向外铺多宽（物理像素）：宽度越大越柔，也越占地方</source>
+            <translation>How far the shadow spreads outward while Add Shadow is on, in physical pixels. Wider is softer, and takes more room</translation>
+        </message>
+        <message>
+            <source>#808080（中灰，留空即这一档）</source>
+            <translation>#808080 (neutral grey; empty means this default)</translation>
+        </message>
+        <message>
+            <source>边框颜色</source>
+            <translation>Border Color</translation>
+        </message>
+        <message>
+            <source>成品那圈边框的颜色，写 #RRGGBB；留空回到默认的中灰</source>
+            <translation>The colour of that ring, written as #RRGGBB. Leave it empty for the default neutral grey</translation>
+        </message>
+        <message>
             <source>截图与标注成品落在这个目录里。取色复制出来的文本按下面的写法格式化。</source>
             <translation>Screenshots and finished annotations land in this folder. Copied colors are formatted with the format chosen below.</translation>
         </message>
@@ -1790,6 +1818,14 @@
         <message>
             <source>日志文件打不开：{}（原因 {}）。请关闭占用它的程序，或换一个日志目录</source>
             <translation>The log file can't be opened: {} (reason {}). Close the program holding it, or pick another log directory.</translation>
+        </message>
+        <message>
+            <source>{} "{}" 不在 {} 到 {} 之间：请在设置的截图页重选一个值，或删掉这一项回到默认档</source>
+            <translation>{} &quot;{}&quot; is outside {} to {}: pick a new value on the Shot page of Settings, or delete this entry to fall back to the default</translation>
+        </message>
+        <message>
+            <source>边框颜色 "{}" 不是一段认得出的颜色写法（如 #RRGGBB）：请在设置的截图页重填，或留空回到默认的中灰</source>
+            <translation>Border colour "{}" is not a colour this program can read (try #RRGGBB). Refill it on the Shot page of Settings, or leave it empty for the default neutral grey</translation>
         </message>
         <message>
             <source>目录创建失败：{}（原因 {}）。请检查该路径是否可写，或在设置里换一个目录</source>

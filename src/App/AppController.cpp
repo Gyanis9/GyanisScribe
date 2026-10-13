@@ -38,6 +38,7 @@
 #include "Record/RecordingHud.h"
 #include "Record/RecordingService.h"
 #include "Settings/NamingRules.h"
+#include "Settings/OutputStyleRules.h"
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
 #include "Ui/IconProvider.h"
@@ -727,7 +728,8 @@ namespace GyanisScribe::App
     {
         const auto border = m_settings->boolValue(Settings::kOutputBorder, false);
         const auto shadow = m_settings->boolValue(Settings::kOutputShadow, false);
-        return Core::decorateForOutput(image, border, shadow, fillBackground);
+        // 宽与色是一份参数、一处读出来：画布尺寸与绘制拿到同一份，才不会出现「框按新值、尺寸按旧值」的错位
+        return Core::decorateForOutput(image, border, shadow, fillBackground, Settings::readOutputDecorationStyle(*m_settings));
     }
 
     void AppController::handleSaveRequested(const QImage &image)

@@ -5,6 +5,7 @@
 #include "Capture/ScreenUtils.h"
 #include "Core/ImageFormat.h"
 #include "Core/Logger.h"
+#include "Core/OutputDecoration.h"
 #include "Core/Paths.h"
 #include "Core/Text.h"
 #include "History/HistoryRules.h"
@@ -1522,6 +1523,103 @@ namespace GyanisScribe::App
         return edit;
     }
 
+    /**
+     * @brief 成品边框的宽度，物理像素
+     * @param settings 配置存储
+     * @return 归调用方所有的数字框
+     */
+    QSpinBox *makeBorderWidthSpin(ISettingsStore &settings)
+    {
+        auto *spin = new QSpinBox;
+        spin->setRange(GyanisScribe::Core::kMinimumOutputBorderPixels, GyanisScribe::Core::kMaximumOutputBorderPixels);
+        spin->setSuffix(GyanisScribe::Core::uiText(" 像素"));
+        spin->setAccessibleName(GyanisScribe::Core::uiText("边框宽度"));
+        spin->setToolTip(GyanisScribe::Core::uiText("开着「成品加边框」时那圈框的宽度（物理像素）：只对离开程序的成品生效，贴到屏幕上那一张不加"));
+
+        const auto title  = GyanisScribe::Core::uiText("边框宽度");
+        const auto stored = settings.intValue(GyanisScribe::Settings::kOutputBorderWidth, GyanisScribe::Core::kOutputBorderPixels);
+        const auto parsed = GyanisScribe::Core::parseOutputBorderPixels(stored);
+        spin->setValue(shownValueForSetting(title, stored, parsed, GyanisScribe::Core::kOutputBorderPixels));
+
+        QObject::connect(spin, &QSpinBox::valueChanged, spin,
+                         [&settings, title](int value)
+                         {
+                             if (auto written = settings.setValue(GyanisScribe::Settings::kOutputBorderWidth, value); !written)
+                             {
+                                 Logger::warning(std::format("{} 没能写入：{}", title.toStdString(), written.error().message));
+                             }
+                         });
+        return spin;
+    }
+
+    /**
+     * @brief 成品投影向外延伸的宽度，物理像素
+     * @param settings 配置存储
+     * @return 归调用方所有的数字框
+     */
+    QSpinBox *makeShadowWidthSpin(ISettingsStore &settings)
+    {
+        auto *spin = new QSpinBox;
+        spin->setRange(GyanisScribe::Core::kMinimumOutputShadowPixels, GyanisScribe::Core::kMaximumOutputShadowPixels);
+        spin->setSuffix(GyanisScribe::Core::uiText(" 像素"));
+        spin->setAccessibleName(GyanisScribe::Core::uiText("投影宽度"));
+        spin->setToolTip(GyanisScribe::Core::uiText("开着「成品加投影」时投影向外铺多宽（物理像素）：宽度越大越柔，也越占地方"));
+
+        const auto title  = GyanisScribe::Core::uiText("投影宽度");
+        const auto stored = settings.intValue(GyanisScribe::Settings::kOutputShadowWidth, GyanisScribe::Core::kOutputShadowPixels);
+        const auto parsed = GyanisScribe::Core::parseOutputShadowPixels(stored);
+        spin->setValue(shownValueForSetting(title, stored, parsed, GyanisScribe::Core::kOutputShadowPixels));
+
+        QObject::connect(spin, &QSpinBox::valueChanged, spin,
+                         [&settings, title](int value)
+                         {
+                             if (auto written = settings.setValue(GyanisScribe::Settings::kOutputShadowWidth, value); !written)
+                             {
+                                 Logger::warning(std::format("{} 没能写入：{}", title.toStdString(), written.error().message));
+                             }
+                         });
+        return spin;
+    }
+
+    /**
+     * @brief 成品边框的颜色：一段 #RRGGBB 文本
+     * @param settings 配置存储
+     * @return 归调用方所有的输入框
+     * @details 与文件名模板同一套纪律：写法不对就不写进配置，把原因挂在 tooltip 上让他就地改——
+     *          存进去只会在下一次输出时静默回落成中灰，那种「改了没生效」最难查。留空是默认档。
+     */
+    QLineEdit *makeBorderColorEdit(ISettingsStore &settings)
+    {
+        auto *edit = new QLineEdit;
+        edit->setText(settings.stringValue(GyanisScribe::Settings::kOutputBorderColor, QString{}));
+        edit->setPlaceholderText(GyanisScribe::Core::uiText("#808080（中灰，留空即这一档）"));
+        edit->setClearButtonEnabled(true);
+        edit->setAccessibleName(GyanisScribe::Core::uiText("边框颜色"));
+
+        const auto explainHint = [edit](const QString &reason)
+        { edit->setToolTip(reason.isEmpty() ? GyanisScribe::Core::uiText("成品那圈边框的颜色，写 #RRGGBB；留空回到默认的中灰") : reason); };
+        explainHint(QString{});
+
+        QObject::connect(edit, &QLineEdit::editingFinished, edit,
+                         [&settings, edit, explainHint]
+                         {
+                             const auto text   = edit->text();
+                             const auto parsed = GyanisScribe::Core::parseOutputBorderColor(text);
+                             if (!parsed)
+                             {
+                                 explainHint(QString::fromUtf8(parsed.error().message));
+                                 return;
+                             }
+                             if (const auto written = settings.setValue(GyanisScribe::Settings::kOutputBorderColor, text.trimmed()); !written)
+                             {
+                                 explainHint(QString::fromUtf8(written.error().message));
+                                 return;
+                             }
+                             explainHint(QString{});
+                         });
+        return edit;
+    }
+
     QWidget *MainWindow::buildCapturePage()
     {
         auto *page = new QWidget{this};
@@ -1545,9 +1643,12 @@ namespace GyanisScribe::App
                      makeSettingCheck(m_settings, GyanisScribe::Settings::kOutputBorder, false, GyanisScribe::Core::uiText("出程序时围一圈中灰边框"),
                                       GyanisScribe::Core::uiText("成品加边框"),
                                       GyanisScribe::Core::uiText("存文件、交剪贴板与打印都加上；贴到屏幕上那一张不加——那是显示，不是输出")));
+        form->addRow(GyanisScribe::Core::uiText("边框宽度"), makeBorderWidthSpin(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("边框颜色"), makeBorderColorEdit(m_settings));
         form->addRow(GyanisScribe::Core::uiText("成品加投影"),
                      makeSettingCheck(m_settings, GyanisScribe::Settings::kOutputShadow, false, GyanisScribe::Core::uiText("出程序时带一圈轻投影"),
                                       GyanisScribe::Core::uiText("成品加投影"), GyanisScribe::Core::uiText("与边框同一组：存文件、交剪贴板与打印都加上；存 JPG 时投影底下垫白")));
+        form->addRow(GyanisScribe::Core::uiText("投影宽度"), makeShadowWidthSpin(m_settings));
         form->addRow(GyanisScribe::Core::uiText("截图与标注成品目录"),
                      makePathRow(m_settings, GyanisScribe::Settings::kPathScreenshot, GyanisScribe::Core::uiText("截图目录"), Core::Paths::defaultScreenshotDirectory(), m_icons));
         form->addRow(GyanisScribe::Core::uiText("保存格式"), makeImageFormatCombo(m_settings));

@@ -22,6 +22,7 @@
 #include "Platform/IPlatformIntegration.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/NamingRules.h"
+#include "Settings/OutputStyleRules.h"
 #include "Settings/SettingsKeys.h"
 
 #include <QAction>
@@ -555,7 +556,9 @@ namespace GyanisScribe::Pin
     {
         const auto border = m_settings.boolValue(Settings::kOutputBorder, false);
         const auto shadow = m_settings.boolValue(Settings::kOutputShadow, false);
-        return Core::decorateForOutput(image, border, shadow, fillBackground);
+        // 宽与色从同一处读出来的一份参数：贴图保存这一路与标注窗那一头必须拿到同一档，
+        // 否则同一张图从两处出去会带出两种边框
+        return Core::decorateForOutput(image, border, shadow, fillBackground, Settings::readOutputDecorationStyle(m_settings));
     }
 
     Core::Expected<std::filesystem::path> PinWindow::saveWithDefaultName()

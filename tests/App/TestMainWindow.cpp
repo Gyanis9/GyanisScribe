@@ -12,6 +12,8 @@
 #include "Pin/PinLayout.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Record/RecorderConfig.h"
+#include "Core/Logger.h"
+#include "Core/OutputDecoration.h"
 #include "Core/Text.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
@@ -277,6 +279,61 @@ namespace
         const auto parsed = GyanisScribe::Pin::parseOpacityPercentSetting(stored);
         ASSERT_TRUE(static_cast<bool>(parsed));
         EXPECT_DOUBLE_EQ(*parsed, 0.4);
+    }
+
+    /**
+     * @brief 钉住装饰那两格宽度写进自己的键，且数字框范围与读端的拒绝面同解
+     * @details 数字框能给出读端要拒的值，用户就会存下一个自己用不了的档位；而下一回输出只记一条日志
+     *          按默认档走，那种「改了没生效」比拒在输入时更难查。
+     */
+    TEST_F(MainWindowFixture, DecorationWidthRowsWriteTheirOwnKeys)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::Capture);
+
+        auto *border = qobject_cast<QSpinBox *>(controlInCurrentPage("边框宽度"));
+        auto *shadow = qobject_cast<QSpinBox *>(controlInCurrentPage("投影宽度"));
+        ASSERT_NE(border, nullptr) << "截图页里没有「边框宽度」这一格";
+        ASSERT_NE(shadow, nullptr) << "截图页里没有「投影宽度」这一格";
+        EXPECT_EQ(border->minimum(), GyanisScribe::Core::kMinimumOutputBorderPixels);
+        EXPECT_EQ(border->maximum(), GyanisScribe::Core::kMaximumOutputBorderPixels);
+        EXPECT_EQ(border->value(), GyanisScribe::Core::kOutputBorderPixels) << "没存过时要显示默认那一档";
+        EXPECT_EQ(shadow->minimum(), GyanisScribe::Core::kMinimumOutputShadowPixels);
+        EXPECT_EQ(shadow->maximum(), GyanisScribe::Core::kMaximumOutputShadowPixels);
+
+        border->setValue(6);
+        shadow->setValue(40);
+        closeWindowAndFlush();
+
+        const auto reopened = makeStore();
+        EXPECT_EQ(reopened->intValue(GyanisScribe::Settings::kOutputBorderWidth, -1), 6) << "边框宽写到了别的键上";
+        EXPECT_EQ(reopened->intValue(GyanisScribe::Settings::kOutputShadowWidth, -1), 40) << "投影宽写到了别的键上";
+    }
+
+    /**
+     * @brief 钉住边框颜色那一格：认得的写法落盘，认不出的留在框里并把原因挂在提示上
+     * @details 填歪还写进配置，下一次输出会静默回落成中灰——用户看到的是「我填的颜色没了」；
+     *          就地说明原因并把文本留着，他改一次就对。
+     */
+    TEST_F(MainWindowFixture, BorderColorRowStoresReadableColorsAndRejectsOthers)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::Capture);
+
+        auto *edit = qobject_cast<QLineEdit *>(controlInCurrentPage("边框颜色"));
+        ASSERT_NE(edit, nullptr) << "截图页里没有「边框颜色」这一格";
+
+        edit->setText(QStringLiteral("#334455"));
+        emit edit->editingFinished();
+        EXPECT_EQ(edit->toolTip(), GyanisScribe::Core::uiText("成品那圈边框的颜色，写 #RRGGBB；留空回到默认的中灰")) << "认得的写法不该挂着一条报错";
+
+        edit->setText(QStringLiteral("#1a2b"));
+        emit edit->editingFinished();
+        EXPECT_NE(edit->toolTip().toStdString().find("边框颜色"), std::string::npos) << "填歪了要就地点名是哪一格，实际提示：" << edit->toolTip().toStdString();
+
+        closeWindowAndFlush();
+        const auto reopened = makeStore();
+        EXPECT_EQ(reopened->stringValue(GyanisScribe::Settings::kOutputBorderColor, QString{}), QStringLiteral("#334455")) << "坏值把上一条好值顶掉了";
     }
 
     /**

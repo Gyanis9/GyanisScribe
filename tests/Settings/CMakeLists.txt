@@ -1,5 +1,6 @@
 add_executable(TestSettings
         TestNamingRules.cpp
+        TestOutputStyleRules.cpp
         TestSettingsStore.cpp)
 
 target_link_libraries(TestSettings PRIVATE
