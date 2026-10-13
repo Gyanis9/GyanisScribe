@@ -846,3 +846,41 @@ TEST_F(CaptureOverlayFixture, SizeEditorAppliesTypedSizeAtTheSameOrigin)
     QApplication::sendEvent(editor, &commit);
     EXPECT_EQ(overlay->selectedRegion(), QRect(100, 100, 700, 500)) << "越界的尺寸没夹回屏内";
 }
+
+/**
+ * @brief 钉住裸按 `P` 翻这一轮的「成品含不含指针」，且只报一次意图
+ * @details 这一档是一次性的：不写配置，也不许在滚动长截图那一轮出现（按帧接图会把一枚指针复制成一串）。
+
+ */
+TEST_F(CaptureOverlayFixture, PointerKeyTogglesCursorForThisRound)
+{
+    auto overlay = makeOverlay();
+    overlay->setCursorIncluded(false);
+
+    int reports = 0;
+    int last    = -1;
+    QObject::connect(overlay.get(), &CaptureOverlay::cursorIncludeChanged,
+                     [&](const bool included)
+                     {
+                         ++reports;
+                         last = included ? 1 : 0;
+                     });
+
+    pressKey(*overlay, Qt::Key_P);
+    EXPECT_TRUE(overlay->cursorIncluded().value_or(false)) << "按一次该翻成含指针";
+    EXPECT_EQ(reports, 1) << "翻一次只报一次";
+    EXPECT_EQ(last, 1);
+
+    pressKey(*overlay, Qt::Key_P);
+    EXPECT_FALSE(overlay->cursorIncluded().value_or(true)) << "再按一次翻回来";
+    EXPECT_EQ(reports, 2);
+
+    pressKey(*overlay, Qt::Key_P, Qt::ControlModifier);
+    EXPECT_EQ(reports, 2) << "带修饰键的不认，别抢 Ctrl 那一类组合";
+
+    // 滚动长截图那一轮初值就是空：按 P 不该凭空造出一档来
+    auto longRound = makeOverlay();
+    longRound->setCursorIncluded(std::nullopt);
+    pressKey(*longRound, Qt::Key_P);
+    EXPECT_FALSE(longRound->cursorIncluded().has_value()) << "这一轮没有这一档时，P 该交回 Qt";
+}

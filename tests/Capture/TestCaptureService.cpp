@@ -957,3 +957,63 @@ TEST_F(CaptureServiceFixture, RoundCornersToggleShapesTheRegionProduct)
     EXPECT_EQ(rounded.image->image.pixelColor(0, 0).alpha(), 0) << "开了圆角，角尖还是实心";
     EXPECT_NE(rounded.image->image.pixelColor(10, 10).alpha(), 0) << "开了圆角，内里被一起切了";
 }
+
+/**
+ * @brief 钉住遮罩翻出来的那一档压过配置
+ * @details 配置关着而这一轮说要含：交出去的帧必须带上指针，否则 `P` 那一档只是界面上一行字。
+ */
+TEST_F(CaptureServiceFixture, CursorToggleFromOverlayBeatsTheSetting)
+{
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureIncludeCursor, QVariant(false)).has_value());
+
+    FakeCaptureSource source;
+    source.cursorSprite = makeGreenSprite(QPoint(10, 10));
+
+    CaptureService service(source, settings, *platform);
+    service.setCursorIncludedForRound(true);
+    Outcome outcome;
+    wire(service, outcome);
+    service.captureFullScreen();
+
+    ASSERT_TRUE(outcome.image.has_value());
+    EXPECT_EQ(outcome.image->image.pixelColor(20, 20), QColor(0, 255, 0)) << "遮罩里按了 P，交出去的帧就该带上指针";
+}
+
+/**
+ * @brief 钉住这一档只活到下一次交付
+ * @details 没有遮罩参与的那几路（托盘、热键、命令行）不该被上一轮的临时档污染。
+ */
+TEST_F(CaptureServiceFixture, CursorOverrideExpiresAfterTheDelivery)
+{
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureIncludeCursor, QVariant(false)).has_value());
+
+    FakeCaptureSource source;
+    source.cursorSprite = makeGreenSprite(QPoint(10, 10));
+
+    CaptureService service(source, settings, *platform);
+    service.setCursorIncludedForRound(true);
+    service.captureFullScreen();
+    service.captureFullScreen();
+
+    EXPECT_EQ(source.requestedCursorScreens.size(), 1U) << "那一档只该活一次：第二张又去问指针形状，就是被上一轮污染了";
+}
+
+/**
+ * @brief 钉住拒绝面：配置开着而这一轮说不含，就不该去问指针的形状
+ */
+TEST_F(CaptureServiceFixture, CursorToggleCanTurnTheCursorOffForOneRound)
+{
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureIncludeCursor, QVariant(true)).has_value());
+
+    FakeCaptureSource source;
+    source.cursorSprite = makeGreenSprite(QPoint(10, 10));
+
+    CaptureService service(source, settings, *platform);
+    service.setCursorIncludedForRound(false);
+    service.captureFullScreen();
+
+    EXPECT_TRUE(source.requestedCursorScreens.empty()) << "翻成不含指针之后还去画指针，那一档就成了摆设";
+}

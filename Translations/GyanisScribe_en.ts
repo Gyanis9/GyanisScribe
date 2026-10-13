@@ -1500,6 +1500,14 @@
             <translation>(locked %1)</translation>
         </message>
         <message>
+            <source>（含指针）</source>
+            <translation> (cursor included)</translation>
+        </message>
+        <message>
+            <source>（不含指针）</source>
+            <translation> (cursor excluded)</translation>
+        </message>
+        <message>
             <source>已复制尺寸 %1</source>
             <translation>Copied size %1</translation>
         </message>

@@ -342,6 +342,11 @@ namespace GyanisScribe::Capture
                 // 锁着比例时在读数后面标出来：不标的话「拖不出想要的形状」会被当成手抖
                 hint += GyanisScribe::Core::uiText("（锁定 %1）").arg(aspectRatioToText(m_aspectRatio));
             }
+            if (m_cursorTouched && m_cursorIncluded)
+            {
+                // 翻过指针档就把当下那一档写进读数：带不带指针看不出来，比一律不带更糟
+                hint += *m_cursorIncluded ? GyanisScribe::Core::uiText("（含指针）") : GyanisScribe::Core::uiText("（不含指针）");
+            }
             QFont hintFont = font();
             hintFont.setPointSize(GyanisScribe::Ui::kHintFontSize);
             painter.setFont(hintFont);
@@ -661,6 +666,20 @@ namespace GyanisScribe::Capture
                 m_readoutFormat = *Pick::colorFormatAt((Pick::indexOfColorFormat(m_readoutFormat) + 1) % static_cast<int>(Pick::kColorFormatCount));
                 update();
                 return;
+            case Qt::Key_P:
+                // 裸按 P 翻这一轮的「成品含不含指针」：截菜单与悬停提示时想带指针，下一张又想要干净的，
+                // 为这个先退出遮罩去设置里改两趟不是出路。只改这一轮，配置那一格不动。
+                // 滚动长截图那一轮根本没有这一档（按帧接图会把一枚指针复制成一串），这时 P 交回 Qt。
+                if (event->modifiers() != Qt::NoModifier || !m_cursorIncluded.has_value())
+                {
+                    QWidget::keyPressEvent(event);
+                    return;
+                }
+                m_cursorIncluded = !*m_cursorIncluded;
+                m_cursorTouched  = true;
+                emit cursorIncludeChanged(*m_cursorIncluded);
+                update();
+                return;
             default:
                 QWidget::keyPressEvent(event);
                 return;
@@ -676,6 +695,18 @@ namespace GyanisScribe::Capture
         m_aspectRatio  = ratio;
         m_aspectLocked = true;
         update();
+    }
+
+    void CaptureOverlay::setCursorIncluded(const std::optional<bool> included)
+    {
+        // 换档时把「翻过没有」一并清掉：新一轮的初值来自配置，读数不该带着上一轮的痕迹
+        m_cursorIncluded = included;
+        m_cursorTouched  = false;
+    }
+
+    std::optional<bool> CaptureOverlay::cursorIncluded() const noexcept
+    {
+        return m_cursorIncluded;
     }
 
     QSize CaptureOverlay::lockedAspectRatio() const

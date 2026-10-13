@@ -165,6 +165,9 @@ namespace GyanisScribe::Capture
             regionHistory = std::vector<RegionHistoryEntry>{};
         }
 
+        // 上一轮遮罩里翻出来的那一档不带进这一轮：这一档是一次性的，起点永远是配置
+        m_cursorOverride.reset();
+
         for (auto *screen: screens)
         {
             const auto frame = m_source.grabScreen(screen->name());
@@ -194,6 +197,10 @@ namespace GyanisScribe::Capture
             {
                 overlay->setLockedAspectRatio(*ratio);
             }
+            // 指针这一档：普通截图把配置里那一档送进遮罩（`P` 能在这一轮里翻它）；
+            // 滚动长截图送空——按帧接图带指针会把一枚指针复制成一串，那一轮根本不该有这一档
+            overlay->setCursorIncluded(longCapture ? std::nullopt : std::optional<bool>{cursorIncludedForThisRound()});
+            QObject::connect(overlay, &CaptureOverlay::cursorIncludeChanged, this, [this](const bool included) { setCursorIncludedForRound(included); });
             QObject::connect(overlay, &CaptureOverlay::regionSelected, this,
                              [this, screen, overlay, longCapture](const QRect &region)
                              {
@@ -230,9 +237,20 @@ namespace GyanisScribe::Capture
         }
     }
 
+    void CaptureService::setCursorIncludedForRound(const std::optional<bool> included)
+    {
+        m_cursorOverride = included;
+    }
+
+    bool CaptureService::cursorIncludedForThisRound() const
+    {
+        // 遮罩里翻过一档就以那一档为准（只这一轮）；没有遮罩参与的那几路照旧读设置里那一格
+        return m_cursorOverride.value_or(m_settings.boolValue(Settings::kCaptureIncludeCursor, Settings::kDefaultCaptureIncludeCursor));
+    }
+
     Core::Expected<Core::CapturedImage> CaptureService::withCursorIfWanted(const Core::Expected<Core::CapturedImage> &frame) const
     {
-        if (!frame || !m_settings.boolValue(Settings::kCaptureIncludeCursor, Settings::kDefaultCaptureIncludeCursor))
+        if (!frame || !cursorIncludedForThisRound())
         {
             return frame;
         }
@@ -242,7 +260,7 @@ namespace GyanisScribe::Capture
         if (!sprite || sprite->image.isNull())
         {
             // 平台给不出形状（指针隐藏、非 Windows 后端）：说明白这次不含指针，别按「含了」交下去
-            Core::Logger::warning(std::format("设置里要含鼠标指针，但这次取不到指针的形状，交出去的图里没有指针"));
+            Core::Logger::warning(std::format("这一轮要含鼠标指针（设置里那一档，或遮罩上按 P 翻出来的那一档），但这次取不到指针的形状，交出去的图里没有指针"));
             return frame;
         }
 
@@ -253,6 +271,8 @@ namespace GyanisScribe::Capture
 
     void CaptureService::deliver(const Core::Expected<Core::CapturedImage> &result)
     {
+        // 这一轮的临时档到此为止：它只属于刚刚那趟遮罩，下一张没有遮罩的截图该回到配置那一档上
+        m_cursorOverride.reset();
         if (result)
         {
             Core::Logger::info(std::format("截图完成：{}×{} 像素，逻辑 {}×{}，屏 {}", result->image.width(), result->image.height(), result->logicalSize.width(),

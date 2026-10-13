@@ -137,6 +137,18 @@ namespace GyanisScribe::Capture
          */
         [[nodiscard]] QSize lockedAspectRatio() const;
 
+        /**
+         * @brief 装上这一轮「成品要不要含鼠标指针」的初值
+         * @param included nullopt 表示这一轮没有这一档可翻：滚动长截图按帧接图，
+         *          带指针会把一枚指针复制成一串，所以那一趟根本不碰这一档
+         * @details 遮罩里裸按 `P` 可以临时翻这一档，翻完只影响这一轮、不写回配置：
+         *          截菜单时想带指针、下一张又想要干净的，改设置来回两次不是出路。
+         */
+        void setCursorIncluded(std::optional<bool> included);
+
+        /// 这一轮要不要把指针画进成品；这一档不存在时返回空
+        [[nodiscard]] std::optional<bool> cursorIncluded() const noexcept;
+
     signals:
         /**
          * @brief 选区已确认
@@ -164,6 +176,13 @@ namespace GyanisScribe::Capture
          *          锁着的档跨轮次记住这件事就是它在办
          */
         void aspectRatioLockChanged(const QSize &ratio);
+
+        /**
+         * @brief 这一轮「要不要把指针画进成品」被 `P` 翻了
+         * @param included 翻过之后的那一档
+         * @details 只报意图不写配置：这一档是临时的，配置里那一格照旧管着没有遮罩的那几路。
+         */
+        void cursorIncludeChanged(bool included);
 
     protected:
         /**
@@ -301,19 +320,21 @@ namespace GyanisScribe::Capture
         bool              m_hasCursorPoint = false;                  ///< 是否收到过鼠标移动：没有就不摆放大镜，别把 (0,0) 当成光标
         Pick::ColorFormat m_readoutFormat  = Pick::ColorFormat::Hex; ///< 读数里颜色那格的写法，按 C 轮换
 
-        std::vector<QRect>           m_regionHistory;          ///< 这块屏上的历史选区，最近的在前；由 CaptureService 推过来
-        int                          m_historyIndex = -1;      ///< 当前选区取自历史里的哪一条；-1 表示不是取自历史（用户自己框/改的）
-        QString                      m_copiedSizeHint;         ///< 「已复制尺寸 …」那行提示，指针一动就清
-        bool                         m_isAdjusting = false;    ///< 是否正拖着某个抓点改选区
-        std::optional<SelectionGrip> m_draggedGrip;            ///< 拖着的那个抓点，没拖时为空
-        QPoint                       m_adjustPoint;            ///< 上一帧的鼠标位置，拖抓点时按增量走
-        bool                         m_isSelecting = false;    ///< 是否正在拖动框选
-        std::vector<QRect>           m_windowCandidates;       ///< 窗口候选，已换成局部逻辑坐标，按 z 序排
-        std::vector<QRect>           m_elementChain;           ///< 光标处的元素链，已换成局部逻辑坐标，由深到浅；相邻同矩形已并档
-        std::size_t                  m_elementAscent = 0;      ///< 从这里往上数了几级（0 = 最深一级）；等于链长时看整扇窗口
-        std::optional<QRect>         m_hoveredRegion;          ///< 光标压在上的那一个候选，没有则空
-        QSize                        m_aspectRatio;            ///< 上一次锁过的长宽比（已约分）；空 = 还没有过
-        bool                         m_aspectLocked = false;   ///< 长宽比锁此刻是不是开着
-        QLineEdit                   *m_sizeEditor   = nullptr; ///< 尺寸输入框，开着时才有
+        std::vector<QRect>           m_regionHistory;         ///< 这块屏上的历史选区，最近的在前；由 CaptureService 推过来
+        int                          m_historyIndex = -1;     ///< 当前选区取自历史里的哪一条；-1 表示不是取自历史（用户自己框/改的）
+        QString                      m_copiedSizeHint;        ///< 「已复制尺寸 …」那行提示，指针一动就清
+        bool                         m_isAdjusting = false;   ///< 是否正拖着某个抓点改选区
+        std::optional<SelectionGrip> m_draggedGrip;           ///< 拖着的那个抓点，没拖时为空
+        QPoint                       m_adjustPoint;           ///< 上一帧的鼠标位置，拖抓点时按增量走
+        bool                         m_isSelecting = false;   ///< 是否正在拖动框选
+        std::vector<QRect>           m_windowCandidates;      ///< 窗口候选，已换成局部逻辑坐标，按 z 序排
+        std::vector<QRect>           m_elementChain;          ///< 光标处的元素链，已换成局部逻辑坐标，由深到浅；相邻同矩形已并档
+        std::size_t                  m_elementAscent = 0;     ///< 从这里往上数了几级（0 = 最深一级）；等于链长时看整扇窗口
+        std::optional<QRect>         m_hoveredRegion;         ///< 光标压在上的那一个候选，没有则空
+        QSize                        m_aspectRatio;           ///< 上一次锁过的长宽比（已约分）；空 = 还没有过
+        bool                         m_aspectLocked  = false; ///< 长宽比锁此刻是不是开着
+        bool                         m_cursorTouched = false; ///< 指针档被 `P` 翻过没有：没翻过就不必多占读数那一格
+        std::optional<bool>          m_cursorIncluded;        ///< 这一轮成品要不要含指针；空 = 这一轮没有这一档
+        QLineEdit                   *m_sizeEditor = nullptr;  ///< 尺寸输入框，开着时才有
     };
 } // namespace GyanisScribe::Capture

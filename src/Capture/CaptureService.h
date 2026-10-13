@@ -102,6 +102,14 @@ namespace GyanisScribe::Capture
         void captureWindow(quintptr windowHandle) override;
 
         /**
+         * @brief 收下这一轮遮罩里用 `P` 翻出来的「成品含不含指针」
+         * @param included nullopt 表示回到配置里那一档
+         * @details 遮罩只报意图，画不画指针由本服务在交付前决定；这一档只活到下一次 `deliver`，
+         *          没有遮罩参与的那几路（托盘、热键、命令行）不受它影响。
+         */
+        void setCursorIncludedForRound(std::optional<bool> included);
+
+        /**
          * @brief 复用上次区域，见 ICaptureService::captureLastRegion()
          */
         void captureLastRegion() override;
@@ -165,6 +173,13 @@ namespace GyanisScribe::Capture
          *          不悄悄按「含了」交下去。
          */
         [[nodiscard]] Core::Expected<Core::CapturedImage> withCursorIfWanted(const Core::Expected<Core::CapturedImage> &frame) const;
+
+        /**
+         * @brief 这一轮成品要不要含鼠标指针
+         * @details 遮罩里按 `P` 翻出来那一档优先（只管这一轮，`deliver` 之后就还回配置那一路）；
+         *          没有遮罩参与的那几路（托盘、热键、命令行）照旧读设置里那一格。
+         */
+        [[nodiscard]] bool cursorIncludedForThisRound() const;
 
         /**
          * @brief 收掉全部遮罩，不发任何信号
@@ -234,6 +249,7 @@ namespace GyanisScribe::Capture
         QRect                                 m_longRegion;                     ///< 反复抓的那块区域，该屏内的逻辑坐标
         QString                               m_longScreenName;                 ///< 这一轮所在的那块屏
         std::optional<QPoint>                 m_lastElementQuery;               ///< 上一格问过的悬停点，同一个点不重复问
+        std::optional<bool>                   m_cursorOverride;                 ///< 这一轮遮罩里按 `P` 翻出来的「成品含不含指针」；空即照配置
         bool                                  m_elementFailureReported = false; ///< 元素问询的失败原因本轮是否已经报过
         bool                                  m_longActive             = false; ///< 正在按节拍接帧
     };
