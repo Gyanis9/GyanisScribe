@@ -1458,6 +1458,49 @@ namespace GyanisScribe::App
         return check;
     }
 
+    /**
+     * @brief 「分组轮换顺序」那一格：逗号分隔的正整数组号，留空即按组号升序
+     * @details 填歪的名单不写进配置：轮换顺序错了只是切组绕远，而把坏值存下去会让下一次启动也读不通，
+     *          那时用户已经离开这一格了，说不清是谁改坏的。
+     */
+    QLineEdit *makeGroupRotationEdit(ISettingsStore &settings)
+    {
+        auto *edit = new QLineEdit;
+        edit->setText(settings.stringListValue(GyanisScribe::Settings::kPinGroupRotationOrder, {}).join(QStringLiteral(", ")));
+        edit->setPlaceholderText(GyanisScribe::Core::uiText("留空即按组号升序，例如 2, 1, 3"));
+        edit->setClearButtonEnabled(true);
+        edit->setAccessibleName(GyanisScribe::Core::uiText("分组轮换顺序"));
+
+        const auto explainHint = [edit](const QString &reason)
+        { edit->setToolTip(reason.isEmpty() ? GyanisScribe::Core::uiText("切组按键走的那一圈按这里的顺序排，没写到的组补在末尾") : reason); };
+        explainHint(QString{});
+
+        QObject::connect(edit, &QLineEdit::editingFinished, edit,
+                         [&settings, edit, explainHint]
+                         {
+                             const auto tokens = edit->text().split(QChar{','}, Qt::SkipEmptyParts);
+                             const auto parsed = GyanisScribe::Pin::parseGroupRotation(tokens);
+                             if (!parsed)
+                             {
+                                 explainHint(QString::fromUtf8(parsed.error().message));
+                                 return;
+                             }
+                             QStringList canonical;
+                             canonical.reserve(static_cast<int>(parsed->size()));
+                             for (const auto group: *parsed)
+                             {
+                                 canonical << QString::number(group);
+                             }
+                             if (const auto written = settings.setValue(GyanisScribe::Settings::kPinGroupRotationOrder, canonical); !written)
+                             {
+                                 explainHint(QString::fromUtf8(written.error().message));
+                                 return;
+                             }
+                             explainHint(QString{});
+                         });
+        return edit;
+    }
+
     QWidget *MainWindow::buildGeneralPage()
     {
         auto *page = new QWidget{this};
@@ -1480,6 +1523,7 @@ namespace GyanisScribe::App
                                                                                    "勾上后每张截图都在程序数据目录里留一份像素，误触 Esc 丢掉的那一张也还在历史里（最多留 {} 张）"),
                                                                            static_cast<int>(GyanisScribe::History::kUnsavedArchiveCapacity))
                                                       .c_str())));
+        form->addRow(GyanisScribe::Core::uiText("分组轮换顺序"), makeGroupRotationEdit(m_settings));
         form->addRow(GyanisScribe::Core::uiText("开机自启动"), makeAutostartCheck(m_integration));
         form->addRow(GyanisScribe::Core::uiText("备份与恢复"), buildTransferRow());
         return page;

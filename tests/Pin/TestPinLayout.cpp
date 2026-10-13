@@ -327,3 +327,64 @@ TEST(PinLayoutGroupNames, RoundTripsAndRejectsMalformedRecords)
         EXPECT_NE(rejected.error().message.find("Pin/GroupNames"), std::string::npos) << "拒绝要说清去哪一项补救，实际：" << rejected.error().message;
     }
 }
+
+/**
+ * @brief 钉住轮换顺序读的是「顺序」本身：照抄名单顺序、容忍空白、拒掉非正数与重复
+ * @details
+ * 重复组号必须拒而不是后写的盖掉前写的：那一格在一圈里出现两次，切组就会在同一处多跳一步，
+ *          而界面上只看得到「顺序不对」，说不清是哪一条填歪了。
+
+ */
+TEST_F(PinLayoutFixture, GroupRotationParseKeepsOrderAndRejectsBadTokens)
+{
+    const auto clean = parseGroupRotation(QStringList{QStringLiteral("3"), QStringLiteral(" 1 "), QStringLiteral("2")});
+    ASSERT_TRUE(clean.has_value()) << clean.error().message;
+    EXPECT_EQ(*clean, (QVector<int>{3, 1, 2})) << "名单被读成了升序，那一圈就白排了";
+
+    const auto blank = parseGroupRotation(QStringList{});
+    ASSERT_TRUE(blank.has_value()) << "空名单就是「按升序」，不该报坏：" << blank.error().message;
+    EXPECT_TRUE(blank->isEmpty());
+
+    const auto holes = parseGroupRotation(QStringList{QStringLiteral("2"), QStringLiteral(""), QStringLiteral("  ")});
+    ASSERT_TRUE(holes.has_value()) << "连写的逗号与首尾空白是分隔符，不是坏值：" << holes.error().message;
+    EXPECT_EQ(*holes, (QVector<int>{2}));
+
+    for (const char *bad: {"0", "-2", "x", "1.5", "2a"})
+    {
+        const auto rejected = parseGroupRotation(QStringList{QString::fromLatin1(bad)});
+        ASSERT_FALSE(rejected.has_value()) << "这一格被当成了合法组号：" << bad;
+        EXPECT_NE(rejected.error().message.find("分组轮换顺序"), std::string::npos) << "要说清坏在哪一格：" << rejected.error().message;
+    }
+
+    const auto twice = parseGroupRotation(QStringList{QStringLiteral("2"), QStringLiteral("3"), QStringLiteral("2")});
+    ASSERT_FALSE(twice.has_value()) << "重复的组号被当成了合法名单，切组会在同一处多跳一步";
+    EXPECT_NE(twice.error().message.find("两次"), std::string::npos) << twice.error().message;
+}
+
+/**
+ * @brief 钉住真正走的那一圈：在册的按名单排，没点名的补在末尾，一个都不落
+ * @details 「没点名的补上」是这一档的可用性底线——新建一组之后切组切不到它，那一组在键盘上就是死角。
+
+ * *          名单里留着早已并掉的组号要跳过：停在一组不存在的贴图前，等于按一次键什么都不动。
+ */
+TEST_F(PinLayoutFixture, RotationCycleKeepsEveryGroupReachable)
+{
+    const QVector<int> inUse{1, 2, 3};
+
+    EXPECT_EQ(rotationCycle({}, inUse), inUse) << "空名单该就是升序";
+    EXPECT_EQ(rotationCycle({3, 1}, inUse), (QVector<int>{3, 1, 2})) << "没点名的第二组没补在末尾";
+    EXPECT_EQ(rotationCycle({9, 3, 2}, inUse), (QVector<int>{3, 2, 1})) << "不在册的组号该跳过，剩下的照名单排";
+    EXPECT_EQ(rotationCycle({2, 1, 3}, inUse), (QVector<int>{2, 1, 3})) << "名单完整时就该原样走";
+
+    // 不变式：一圈里的组恰好是「在册的那些」，不重不漏——多一格或少一格都会让切组停在看不见的位置上
+    const std::array<QVector<int>, 6> orders{QVector<int>{}, QVector<int>{1}, QVector<int>{3, 2, 1}, QVector<int>{9}, QVector<int>{2, 9, 1}, QVector<int>{1, 1}};
+    for (std::size_t index = 0; index < orders.size(); ++index)
+    {
+        const auto cycle = rotationCycle(orders[index], inUse);
+        ASSERT_EQ(cycle.size(), inUse.size()) << "第 " << index << " 份名单算出的一圈长度与在册组数不同";
+        for (const auto group: inUse)
+        {
+            EXPECT_EQ(cycle.count(group), 1) << "第 " << index << " 份名单里，组 " << group << " 在一圈中出现了 " << cycle.count(group) << " 次";
+        }
+    }
+}

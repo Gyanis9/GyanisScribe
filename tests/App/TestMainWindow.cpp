@@ -1119,3 +1119,31 @@ TEST_F(MainWindowFixture, HotkeyEntriesFollowTheGlobalHotkeyCapability)
         EXPECT_FALSE(edit->isEnabled()) << "这台机器上改完不会生效，入口就该是灰的";
     }
 }
+
+/**
+ * @brief 钉住「分组轮换顺序」这一格写的是切组现读的那个键，填歪的那一次不写、原因进提示
+ * @details 存的是 QStringList 而不是整串原文：顺序、空白与重复都在解析那一步定下来。
+
+ * *          坏值当场拒掉、上一条好值留着——存下去等下一次启动再读它，那时用户已经离开这一格，说不清是谁改坏的。
+ */
+TEST_F(MainWindowFixture, GroupRotationRowStoresCleanTokensAndKeepsBadOnes)
+{
+    makeWindow();
+    m_window->open(MainWindowPage::General);
+
+    auto *edit = qobject_cast<QLineEdit *>(controlInCurrentPage("分组轮换顺序"));
+    ASSERT_NE(edit, nullptr) << "通用页没有这一格";
+    EXPECT_TRUE(edit->text().isEmpty()) << "没存过时要显示空，空就是「按组号升序」";
+
+    edit->setText(QStringLiteral("3, 1, 2"));
+    emit edit->editingFinished();
+    EXPECT_EQ(edit->toolTip(), GyanisScribe::Core::uiText("切组按键走的那一圈按这里的顺序排，没写到的组补在末尾")) << "认得的名单不该挂着一条报错";
+
+    edit->setText(QStringLiteral("2, 2"));
+    emit edit->editingFinished();
+    EXPECT_NE(edit->toolTip().toStdString().find("两次"), std::string::npos) << "填歪了要就地点名坏在哪一格，实际提示：" << edit->toolTip().toStdString();
+
+    closeWindowAndFlush();
+    const QStringList expected{QStringLiteral("3"), QStringLiteral("1"), QStringLiteral("2")};
+    EXPECT_EQ(makeStore()->stringListValue(GyanisScribe::Settings::kPinGroupRotationOrder, {}), expected) << "名单没照顺序存，或被填歪的那一次顶掉了，或写去了别的键";
+}

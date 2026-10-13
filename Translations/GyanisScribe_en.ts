@@ -1164,6 +1164,18 @@
             <translation>Start this copy of the program at sign-in; the state is read from the system's startup items and takes effect immediately</translation>
         </message>
         <message>
+            <source>留空即按组号升序，例如 2, 1, 3</source>
+            <translation>Leave empty for ascending group numbers, e.g. 2, 1, 3</translation>
+        </message>
+        <message>
+            <source>分组轮换顺序</source>
+            <translation>Group rotation order</translation>
+        </message>
+        <message>
+            <source>切组按键走的那一圈按这里的顺序排，没写到的组补在末尾</source>
+            <translation>The switch-group cycle follows this order; groups not listed are appended at the end</translation>
+        </message>
+        <message>
             <source>界面语言决定菜单、托盘提示与这些设置页的措辞，切换后要重启智录才生效。下面两格管历史留多少，填到 0 就是不限。</source>
             <translation>The interface language sets the wording of the menus, the tray hints and these settings pages; a change takes effect after restarting GyanisScribe. The two rows below decide how much history is kept; 0 means no limit.</translation>
         </message>
@@ -2274,6 +2286,10 @@
         <message>
             <source>贴图分组名字第 {} 组的值不是一段文本。请在设置里清除 Pin/GroupNames 这一项，让程序重新记一次</source>
             <translation>The stored name for pin group {} is not a string. Clear Pin/GroupNames in Settings and let the program record them again</translation>
+        </message>
+        <message>
+            <source>分组轮换顺序里 "{}" {}。请在设置的通用页改这一格，或整格清空回到按组号升序</source>
+            <translation>Group rotation order has "{}" {}. Fix this field on the General page of Settings, or clear it to fall back to ascending order</translation>
         </message>
         <message>
             <source>贴图默认不透明度 "{}" 不在 1 到 100 之间：请在设置的贴图页重选一个值，或删掉 Pin/DefaultOpacity 这一项回到完全不透明</source>

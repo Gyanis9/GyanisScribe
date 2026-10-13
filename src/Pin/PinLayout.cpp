@@ -273,6 +273,65 @@ namespace GyanisScribe::Pin
         return parseGroupNames(stored.toStdString());
     }
 
+    Core::Expected<QVector<int>> parseGroupRotation(const QStringList &stored)
+    {
+        QVector<int> order;
+        order.reserve(stored.size());
+        for (const auto &token: stored)
+        {
+            const auto trimmed = token.trimmed();
+            if (trimmed.isEmpty())
+            {
+                // 逗号连写与首尾的空格：多出来的是分隔符而不是坏值，跳过它才谈得上「这一格能用」
+                continue;
+            }
+
+            bool       numeric = false;
+            const auto group   = trimmed.toInt(&numeric);
+            const auto bad     = [&trimmed](const QString &why)
+            {
+                return Core::Expected<QVector<int>>{std::unexpected{Core::Error{
+                        .code    = Core::ErrorCode::InvalidArgument,
+                        .message = GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("分组轮换顺序里 \"{}\" {}。请在设置的通用页改这一格，或整格清空回到按组号升序"),
+                                                                trimmed.toStdString(), why.toStdString()),
+                }}};
+            };
+            if (!numeric || group < kFirstPinGroup)
+            {
+                return bad(QStringLiteral("不是一个正整数"));
+            }
+            if (order.contains(group))
+            {
+                return bad(QStringLiteral("出现了两次：同一个组在一圈里走两次，切组就会在同一处多跳一步"));
+            }
+            order.push_back(group);
+        }
+        return order;
+    }
+
+    QVector<int> rotationCycle(const QVector<int> &order, const QVector<int> &groupsInUse)
+    {
+        QVector<int> cycle;
+        cycle.reserve(groupsInUse.size());
+        for (const auto group: order)
+        {
+            // 只列在册的组：名单里留着早已并掉的组号，切组就会停在一组不存在的贴图前
+            if (groupsInUse.contains(group) && !cycle.contains(group))
+            {
+                cycle.push_back(group);
+            }
+        }
+        // 没被点名的组按升序补在末尾：新建的那一组立刻就能切到，不必先回设置里补一笔
+        for (const auto group: groupsInUse)
+        {
+            if (!cycle.contains(group))
+            {
+                cycle.push_back(group);
+            }
+        }
+        return cycle;
+    }
+
     Core::Expected<double> parseOpacityPercentSetting(const int percent)
     {
         if (percent >= 1 && percent <= 100)

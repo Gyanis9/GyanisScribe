@@ -542,8 +542,18 @@ namespace GyanisScribe::Pin
         }
 
         // 活动组不在册（刚被关掉最后一张）时从第一组接着走：indexOf 给 -1，加一取模正好落回 0
-        const auto current = groups.indexOf(m_activeGroup);
-        m_activeGroup      = groups[(current + 1) % groups.size()];
+        // 顺序现读而不是启动时抄一份：设置页改了这一格，下一次按键就该照新的走，不必重启
+        const auto stored = m_settings.stringListValue(Settings::kPinGroupRotationOrder, {});
+        const auto parsed = Pin::parseGroupRotation(stored);
+        if (!parsed)
+        {
+            // 名单坏了不放弃切组：报一句原因，按组号升序继续走，键盘上的切组不该被一格填歪的配置卡死
+            Core::Logger::warning(parsed.error().message);
+        }
+        const auto cycle = rotationCycle(parsed.value_or(QVector<int>{}), groups);
+
+        const auto current = cycle.indexOf(m_activeGroup);
+        m_activeGroup      = cycle[(current + 1) % cycle.size()];
         // 换组换的是一桌人：留着的选中集与「只看这一张」都会指向看不见的那几张，先清掉
         clearPinSelection();
         m_solo = nullptr;

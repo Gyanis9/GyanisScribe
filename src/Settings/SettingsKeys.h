@@ -123,6 +123,9 @@ namespace GyanisScribe::Settings
     /// 贴图分组的名字（JSON 对象文本，形如 {"2":"参照"}），与布局一起读写：没起过名字时这一格是空的
     inline constexpr std::string_view kPinGroupNames = "Pin/GroupNames";
 
+    /// 分组轮换的顺序（十进制组号的列表，顺序就是切组走的那一圈）；空表即按组号升序，没被点名的组补在末尾
+    inline constexpr std::string_view kPinGroupRotationOrder = "Pin/GroupRotationOrder";
+
     /// 「收起 / 摆回全部贴图」的那一档状态，与布局一起读写：退出时收着一整桌，回来还是收着
     inline constexpr std::string_view kPinAllConcealed = "Pin/AllConcealed";
 

@@ -120,6 +120,24 @@ namespace GyanisScribe::Pin
      */
     [[nodiscard]] Core::Expected<QMap<int, QString>> loadGroupNames(const Settings::ISettingsStore &settings);
 
+    /**
+     * @brief 读配置里那份分组轮换顺序
+     * @param stored 十进制组号，顺序就是切组走的那一圈；空表表示「按组号升序」
+     * @return 清掉空白项之后的组号表；出现非数字、非正数或重复组号时返回 InvalidArgument 并写明坏的是哪一格
+     * @note 重复组号要拒而不是后写的盖掉先写的：那一格在圈里出现两次，切组就会在同一个地方多走一步，
+     *       而界面上只看得到「顺序不对」，说不清是哪一条填歪了。
+     */
+    [[nodiscard]] Core::Expected<QVector<int>> parseGroupRotation(const QStringList &stored);
+
+    /**
+     * @brief 算出真正走一圈的组序
+     * @param order parseGroupRotation 的产出（用户定的顺序）
+     * @param groupsInUse 桌上现在有哪些组（升序）
+     * @return 先按用户顺序列出在册的那些，再把没被点名的组按升序补在末尾
+     * @note 没点名的组必须补上：新建一组之后切组切不到它，比顺序没排好更糟——那一组在键盘上成了死角。
+     */
+    [[nodiscard]] QVector<int> rotationCycle(const QVector<int> &order, const QVector<int> &groupsInUse);
+
     /// 新建贴图的默认不透明度（百分比）：配置里没有或值不合法时用它，即完全不透明
     inline constexpr int kDefaultOpacityPercent = 100;
 

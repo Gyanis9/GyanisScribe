@@ -1002,4 +1002,58 @@ namespace GyanisScribe
         EXPECT_TRUE(stored->isEmpty()) << "内存里清了名字而记录里还留着：下次启动那个空壳组又带着名字回来";
     }
 
+    /**
+     * @brief 钉住切组走的是设置里那一圈，而不是组号升序
+     * @details 三组各摆一张，顺序填「9, 1, 3, 2」：9 早已不在册要跳过，剩下的照名单排成 1,3,2。
+     *          从第一组按下去该到第三组——升序的话这里是第二组，两条判据分得开；走完一圈回第一组。
+     */
+    TEST_F(PinManagerFixture, GroupRotationOrderDrivesWhichGroupComesNext)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(10, 10));
+        pins.addPin(makeImage(), QPoint(60, 60));
+        pins.addPin(makeImage(), QPoint(120, 120));
+        ASSERT_TRUE(pins.movePinToGroup(1, 3).has_value());
+        ASSERT_TRUE(pins.movePinToGroup(2, 2).has_value());
+        ASSERT_EQ(pins.groupsInUse(), (QVector<int>{1, 2, 3})) << "三组各一张的前提没摆出来";
+
+        ASSERT_TRUE(
+                settings()
+                        .setValue(GyanisScribe::Settings::kPinGroupRotationOrder, QStringList{QStringLiteral("9"), QStringLiteral("1"), QStringLiteral("3"), QStringLiteral("2")})
+                        .has_value());
+
+        const auto first = pins.switchToNextGroup();
+        ASSERT_TRUE(first.has_value()) << first.error().message;
+        EXPECT_EQ(*first, 3) << "按 1,3,2 这一圈，第一组的下一组是第三组，不是升序里的第二组";
+
+        const auto second = pins.switchToNextGroup();
+        ASSERT_TRUE(second.has_value()) << second.error().message;
+        EXPECT_EQ(*second, 2) << "第三组之后该是第二组";
+
+        const auto third = pins.switchToNextGroup();
+        ASSERT_TRUE(third.has_value()) << third.error().message;
+        EXPECT_EQ(*third, 1) << "走完一圈该回第一组";
+    }
+
+    /**
+     * @brief 钉住名单填歪时切组照旧能用，退回升序
+     * @details 一格填歪不该把键盘上的切组整个卡死：报一句原因，按组号升序继续走。
+     *          「2, 2」是重复组号那一类坏值——它看上去能用，但那一组在一圈里出现两次。
+     */
+    TEST_F(PinManagerFixture, BrokenRotationOrderFallsBackToAscending)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(10, 10));
+        pins.addPin(makeImage(), QPoint(60, 60));
+        pins.addPin(makeImage(), QPoint(120, 120));
+        ASSERT_TRUE(pins.movePinToGroup(1, 3).has_value());
+        ASSERT_TRUE(pins.movePinToGroup(2, 2).has_value());
+
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kPinGroupRotationOrder, QStringList{QStringLiteral("2"), QStringLiteral("2")}).has_value());
+
+        const auto switched = pins.switchToNextGroup();
+        ASSERT_TRUE(switched.has_value()) << "名单坏了切组就该退回升序，而不是拒掉这一次：" << switched.error().message;
+        EXPECT_EQ(*switched, 2) << "升序里第一组的下一组是第二组";
+    }
+
 } // namespace GyanisScribe
