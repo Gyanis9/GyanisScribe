@@ -108,6 +108,17 @@ namespace GyanisScribe::Capture
     [[nodiscard]] Core::Expected<QRect> regionFromText(std::string_view text);
 
     /**
+     * @brief 把遮罩尺寸框里那一行换成一块选区
+     * @param text 框里的文本，认两种写法：「宽x高」（左上角不动）与「x,y,宽,高」（连位置一起指定）
+     * @param anchor 只给尺寸时选区的左上角（还没有选区时是这块屏的原点）
+     * @param limit 允许的范围，即这块屏的矩形
+     * @return 成功返回夹在 limit 内的选区；两种写法都不认时返回空
+     * @details 后一种与配置里那条「上次选区」的记录同一套写法（`regionFromText`），
+     *          不必为了「把位置也敲进去」再造第三种文本格式。
+     */
+    [[nodiscard]] std::optional<QRect> regionFromSizeText(const QString &text, const QPoint &anchor, const QRect &limit);
+
+    /**
      * @brief 把一张图按给定半径切圆四角
      * @param image 源图
      * @param radiusPhysical 圆角半径，物理像素；非正时原样交回

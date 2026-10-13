@@ -782,23 +782,21 @@ namespace GyanisScribe::Capture
             return;
         }
 
-        const auto parsed = GyanisScribe::Core::parseSizeText(m_sizeEditor->text());
-        if (!parsed)
-        {
-            // 敲不成尺寸就留在框里继续改：把「看不懂」变成「框没了」是最坏的一种反馈
-            return;
-        }
-
-        // 以选区左上角为锚点铺开；还没有选区时从屏的左上角起。越界按屏收——输错一个大数
-        // 之后画面里只剩一小角，比夹住更让人摸不着头脑
         const auto region = selectedRegion();
         const auto anchor = region.isNull() ? QPoint{0, 0} : region.topLeft();
         const auto limit  = QRect{QPoint{0, 0}, size()};
-        const int  width  = std::clamp(parsed->width(), 1, std::max(1, limit.width() - anchor.x()));
-        const int  height = std::clamp(parsed->height(), 1, std::max(1, limit.height() - anchor.y()));
-        m_anchorPoint     = anchor;
-        m_currentPoint    = QPoint(anchor.x() + width - 1, anchor.y() + height - 1);
-        m_historyIndex    = -1;
+        // 两种写法都认：「宽x高」保住左上角，「x,y,宽,高」连位置一起指定（与配置里那条选区记录同一套写法）；
+        // 越界的那一边由 regionFromSizeText 夹回屏内——输错一个大数之后画面里只剩一小角，比夹住更让人摸不着头脑
+        const auto next = regionFromSizeText(m_sizeEditor->text(), anchor, limit);
+        if (!next)
+        {
+            // 看不懂就留在框里继续改：把「看不懂」变成「框没了」是最坏的一种反馈
+            return;
+        }
+
+        m_anchorPoint  = next->topLeft();
+        m_currentPoint = next->bottomRight();
+        m_historyIndex = -1;
         closeSizeEditor();
         update();
     }

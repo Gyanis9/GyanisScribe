@@ -1,5 +1,6 @@
 #include "Capture/ScreenUtils.h"
 
+#include "Core/SizeText.h"
 #include "Core/Text.h"
 
 #include <QApplication>
@@ -7,6 +8,7 @@
 #include <QPainter>
 #include <QScreen>
 
+#include <algorithm>
 #include <cmath>
 #include <format>
 #include <charconv>
@@ -179,6 +181,34 @@ namespace GyanisScribe::Capture
         }
 
         return QRect(numbers[0], numbers[1], numbers[2], numbers[3]);
+    }
+
+    std::optional<QRect> regionFromSizeText(const QString &text, const QPoint &anchor, const QRect &limit)
+    {
+        if (limit.isEmpty())
+        {
+            return {};
+        }
+
+        // 先认「宽x高」：只改大小、左上角钉住，是「差一格」时最常敲的那一句
+        if (const auto size = GyanisScribe::Core::parseSizeText(text); size)
+        {
+            const auto width  = std::clamp(size->width(), 1, std::max(1, limit.right() + 1 - anchor.x()));
+            const auto height = std::clamp(size->height(), 1, std::max(1, limit.bottom() + 1 - anchor.y()));
+            return QRect{anchor, QSize{width, height}};
+        }
+
+        // 再认「x,y,宽,高」：位置与尺寸一起给，写法沿用配置里那条选区记录，不另造第三种格式
+        const auto placed = regionFromText(text.trimmed().toStdString());
+        if (!placed)
+        {
+            return {};
+        }
+        const auto width  = std::clamp(placed->width(), 1, std::max(1, limit.width()));
+        const auto height = std::clamp(placed->height(), 1, std::max(1, limit.height()));
+        const auto left   = std::clamp(placed->left(), limit.left(), limit.left() + limit.width() - width);
+        const auto top    = std::clamp(placed->top(), limit.top(), limit.top() + limit.height() - height);
+        return QRect{QPoint{left, top}, QSize{width, height}};
     }
 
     QImage roundedCornerImage(const QImage &image, const int radiusPhysical)

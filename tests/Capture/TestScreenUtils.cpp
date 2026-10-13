@@ -25,6 +25,7 @@ using GyanisScribe::Capture::kSelectionGripTolerance;
 using GyanisScribe::Capture::nudgeRegion;
 using GyanisScribe::Capture::ratioLockedPoint;
 using GyanisScribe::Capture::regionAtPoint;
+using GyanisScribe::Capture::regionFromSizeText;
 using GyanisScribe::Capture::regionFromText;
 using GyanisScribe::Capture::regionToText;
 using GyanisScribe::Capture::resizeRegion;
@@ -591,4 +592,38 @@ TEST(StretchRegionByEdge, StopsAtOneCellAndAtTheLimit)
 
     const QRect atEdge{80, 10, 20, 5}; // 右边已在 limit 的右边界上
     EXPECT_EQ(stretchRegionByEdge(atEdge, QPoint{1, 0}, false, limit), (QRect{80, 10, 20, 5})) << "贴着屏边那条边不该被扩出界去";
+}
+
+/**
+ * @brief 钉住尺寸框认两种写法：「宽x高」保住左上角，「x,y,宽,高」连位置一起给
+ */
+TEST(RegionFromSizeText, AcceptsBothForms)
+{
+    const QRect  limit{0, 0, 800, 600};
+    const QPoint anchor{100, 80};
+
+    const auto sized = regionFromSizeText(QStringLiteral("300x200"), anchor, limit);
+    ASSERT_TRUE(sized.has_value()) << "「宽x高」是既有写法，不该读不出";
+    EXPECT_EQ(*sized, (QRect{100, 80, 300, 200})) << "只给尺寸时左上角必须钉住";
+
+    const auto placed = regionFromSizeText(QStringLiteral("20,30,300,200"), anchor, limit);
+    ASSERT_TRUE(placed.has_value()) << "位置与尺寸一起给时读不出，这一档就退化成只能改大小";
+    EXPECT_EQ(*placed, (QRect{20, 30, 300, 200})) << "给了 x,y 就按那个位置铺，不再用锚点";
+}
+
+/**
+ * @brief 钉住尺寸框的夹取与拒绝：越界夹回屏内，读不懂交回空而不是猜一个
+ */
+TEST(RegionFromSizeText, ClampsIntoTheScreenAndRejectsGarbage)
+{
+    const QRect  limit{0, 0, 800, 600};
+    const QPoint anchor{700, 550};
+
+    const auto clamped = regionFromSizeText(QStringLiteral("300x200"), anchor, limit);
+    ASSERT_TRUE(clamped.has_value());
+    EXPECT_EQ(*clamped, (QRect{700, 550, 100, 50})) << "越界的宽与高要夹到屏里：既不悄悄挪原点，也不交出一块屏外的选区";
+
+    EXPECT_FALSE(regionFromSizeText(QStringLiteral("宽x高"), anchor, limit).has_value()) << "非数字不能当成「按零处理」";
+    EXPECT_FALSE(regionFromSizeText(QStringLiteral("1,2,3"), anchor, limit).has_value()) << "少一段就是读不懂，交回空让调用方留在框里继续改";
+    EXPECT_FALSE(regionFromSizeText(QStringLiteral("20,30,-4,10"), anchor, limit).has_value()) << "负尺寸不是「一小格」，该拒";
 }
