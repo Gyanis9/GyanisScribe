@@ -186,6 +186,18 @@ namespace GyanisScribe::Capture
     [[nodiscard]] QRect resizeRegion(const QRect &region, const QPoint &step, const QRect &limit);
 
     /**
+     * @brief 把选区在 step 指的那一侧那条边外扩或内收若干格，对边不动
+     * @param region 当前选区
+     * @param step 要动哪条边（方向键翻译来的单位向量，两轴可以都有）
+     * @param shrink true 表示把那条边往里收（选区变小）
+     * @param limit 允许的范围
+     * @return 改好后的选区；宽或高已经是一格时那一轴不再收，越出 limit 的边被夹回来
+     * @details 与 `resizeRegion`（只动右下角）分开的理由：已经框好后要补的那一像素常在起始边那一侧
+     *          （图标左边缘差一格），只动右下角会把差的那格补到对面去，越改越偏。
+     */
+    [[nodiscard]] QRect stretchRegionByEdge(const QRect &region, const QPoint &step, bool shrink, const QRect &limit);
+
+    /**
      * @brief 选区上可以抓住的那个点
      * @details Inside 是整块平移，None 表示这一点不该动选区。
      *          被用例钉住的枚举新成员只能追加在末尾。

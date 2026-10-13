@@ -519,17 +519,20 @@ namespace GyanisScribe::Capture
 
     void CaptureOverlay::keyPressEvent(QKeyEvent *event)
     {
-        // 方向键微调：单独按是整块挪，按住 Shift 是挪右下角。已经点中窗口或拖出一块之后，
-        // 差一像素就得重框一遍，这条键就是为了不必重框
+        // 方向键微调：裸按整块挪、`Shift` 挪右下角、`Ctrl` 把这一侧的边外扩一格、
+        // `Ctrl+Shift` 把这一侧的边往里收一格。已经点中窗口或拖出一块之后，
+        // 差一像素就得重框一遍，这几条键就是为了不必重框
         if (const auto step = GyanisScribe::Ui::arrowStepFor(event->key()))
         {
             const auto region = selectedRegion();
             if (!region.isNull())
             {
-                const auto limit = QRect{QPoint{0, 0}, size()};
-                const auto moved = event->modifiers().testFlag(Qt::ShiftModifier) ? resizeRegion(region, *step, limit) : nudgeRegion(region, *step, limit);
-                m_anchorPoint    = moved.topLeft();
-                m_currentPoint   = moved.bottomRight();
+                const auto limit   = QRect{QPoint{0, 0}, size()};
+                const auto control = event->modifiers().testFlag(Qt::ControlModifier);
+                const auto shift   = event->modifiers().testFlag(Qt::ShiftModifier);
+                const auto changed = control ? stretchRegionByEdge(region, *step, shift, limit) : (shift ? resizeRegion(region, *step, limit) : nudgeRegion(region, *step, limit));
+                m_anchorPoint      = changed.topLeft();
+                m_currentPoint     = changed.bottomRight();
                 update();
             }
             return;

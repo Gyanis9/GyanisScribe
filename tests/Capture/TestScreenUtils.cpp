@@ -30,6 +30,7 @@ using GyanisScribe::Capture::regionToText;
 using GyanisScribe::Capture::resizeRegion;
 using GyanisScribe::Capture::SelectionGrip;
 using GyanisScribe::Capture::squareLockedPoint;
+using GyanisScribe::Capture::stretchRegionByEdge;
 using GyanisScribe::Capture::toPhysicalRect;
 using GyanisScribe::Core::CapturedImage;
 using GyanisScribe::Core::ErrorCode;
@@ -563,4 +564,31 @@ TEST(ScreenUtils, ThirdsGridSplitsTheRegionIntoThirds)
     EXPECT_EQ(lines[1], (QLine(160, 50, 160, 109))) << "第二条竖线不在三分之二处";
     EXPECT_EQ(lines[2], (QLine(100, 70, 189, 70))) << "第一条横线不在三分之一处";
     EXPECT_EQ(lines[3], (QLine(100, 90, 189, 90))) << "第二条横线不在三分之二处";
+}
+
+/**
+ * @brief 钉住逐边增缩：只动 step 指的那条边，对边钉住，扩与收共用一套算式
+ */
+TEST(StretchRegionByEdge, MovesOnlyTheEdgeTheStepPointsAt)
+{
+    const QRect limit{0, 0, 200, 200};
+    const QRect region{50, 40, 30, 20};
+
+    EXPECT_EQ(stretchRegionByEdge(region, QPoint{1, 0}, false, limit), (QRect{50, 40, 31, 20})) << "向右扩一格该只把右边挪一格";
+    EXPECT_EQ(stretchRegionByEdge(region, QPoint{-1, 0}, false, limit), (QRect{49, 40, 31, 20})) << "向左扩该动左边而不是右边";
+    EXPECT_EQ(stretchRegionByEdge(region, QPoint{0, 1}, true, limit), (QRect{50, 40, 30, 19})) << "往下收该把底边往里挪一格";
+    EXPECT_EQ(stretchRegionByEdge(region, QPoint{0, -1}, true, limit), (QRect{50, 41, 30, 19})) << "往上收该把顶边往里挪一格";
+}
+
+/**
+ * @brief 钉住逐边增缩的两道边界：已经一格时不再往里收，越过允许范围就地停住
+ */
+TEST(StretchRegionByEdge, StopsAtOneCellAndAtTheLimit)
+{
+    const QRect limit{0, 0, 100, 100};
+    const QRect oneWide{10, 10, 1, 5};
+    EXPECT_EQ(stretchRegionByEdge(oneWide, QPoint{1, 0}, true, limit), (QRect{10, 10, 1, 5})) << "一格宽还往里收就该停住：收没就是没有这块选区了";
+
+    const QRect atEdge{80, 10, 20, 5}; // 右边已在 limit 的右边界上
+    EXPECT_EQ(stretchRegionByEdge(atEdge, QPoint{1, 0}, false, limit), (QRect{80, 10, 20, 5})) << "贴着屏边那条边不该被扩出界去";
 }

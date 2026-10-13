@@ -339,6 +339,57 @@ namespace GyanisScribe::Capture
         return QRect{region.topLeft(), QPoint{right, bottom}};
     }
 
+    QRect stretchRegionByEdge(const QRect &region, const QPoint &step, const bool shrink, const QRect &limit)
+    {
+        if (region.isEmpty() || limit.isEmpty())
+        {
+            return region;
+        }
+
+        // 每轴只动 step 指的那一侧那条边，对边钉住；单位是 -1 / +1（扩与收同一套算式）
+        const auto unit   = shrink ? -1 : 1;
+        auto       left   = region.left();
+        auto       right  = region.right();
+        auto       top    = region.top();
+        auto       bottom = region.bottom();
+
+        // 落点越出 limit、或收下去会少于「一格宽」时，这一轴原样不动：夹一半会把选区搬到别处去，
+        // 而贴着屏边那条边本来就不该越界——「停在边界」比「挪一半」更好解释
+        if (step.x() > 0)
+        {
+            const auto moved = right + unit;
+            if (moved >= left && moved <= limit.right())
+            {
+                right = moved;
+            }
+        } else if (step.x() < 0)
+        {
+            const auto moved = left - unit;
+            if (moved <= right && moved >= limit.left())
+            {
+                left = moved;
+            }
+        }
+
+        if (step.y() > 0)
+        {
+            const auto moved = bottom + unit;
+            if (moved >= top && moved <= limit.bottom())
+            {
+                bottom = moved;
+            }
+        } else if (step.y() < 0)
+        {
+            const auto moved = top - unit;
+            if (moved <= bottom && moved >= limit.top())
+            {
+                top = moved;
+            }
+        }
+
+        return QRect{QPoint{left, top}, QPoint{right, bottom}};
+    }
+
     SelectionGrip gripAt(const QRect &region, const QPoint &point, const int tolerance)
     {
         if (region.isEmpty() || tolerance < 0)
