@@ -273,21 +273,24 @@ namespace GyanisScribe::App
         // 整组「批量保存」落完账：一次写走 N 份文件，不说清去了哪儿就等于没存
         QObject::connect(m_pins.get(), &Pin::PinManager::pinBatchSaveReported, this, &AppController::reportBatchSave);
         // 移到别的组那一下它就从桌上消失了：说清它去了哪、怎么切过去，免得像「贴图自己没了」
-        QObject::connect(
-                m_pins.get(), &Pin::PinManager::pinMovedToGroup, this,
-                [this](int group)
-                {
-                    if (m_pins->activeGroup() == group)
-                    {
-                        notifyUser(GyanisScribe::Core::uiText("这张贴图已移到当前分组，就摆在原处"), Ui::ToastKind::Information);
-                        return;
-                    }
-                    // 热键文本从设置现读：用户改过组合键之后，提示里那个键还得是按得动的那个
-                    notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图已移到分组 {}，先收了起来；按 {} 或从托盘切到那一组就能看见"),
-                                                                              group, m_hotkeys->bindingText(Hotkey::HotkeyAction::NextPinGroup).toStdString())
-                                                         .c_str()),
-                               Ui::ToastKind::Information);
-                });
+        QObject::connect(m_pins.get(), &Pin::PinManager::pinMovedToGroup, this,
+                         [this](int group)
+                         {
+                             if (m_pins->activeGroup() == group)
+                             {
+                                 notifyUser(GyanisScribe::Core::uiText("这张贴图已移到当前分组，就摆在原处"), Ui::ToastKind::Information);
+                                 return;
+                             }
+                             // 热键文本从设置现读：用户改过组合键之后，提示里那个键还得是按得动的那个
+                             notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图已移到{}，先收了起来；按 {} 或从托盘切到那一组就能看见"),
+                                                                                       groupLabel(group).toStdString(),
+                                                                                       m_hotkeys->bindingText(Hotkey::HotkeyAction::NextPinGroup).toStdString())
+                                                                  .c_str()),
+                                        Ui::ToastKind::Information);
+                         });
+        // 改组名与删组都在管理器落账，这两句是它们的回声：菜单早就收起来了，不出声就成了「敲了字什么也没变」
+        QObject::connect(m_pins.get(), &Pin::PinManager::pinGroupRenamed, this, &AppController::reportGroupRenamed);
+        QObject::connect(m_pins.get(), &Pin::PinManager::pinGroupDeleted, this, &AppController::reportGroupDeleted);
 
         // 启动把上一次会话留下的那几张摆回来；退出前把在存的这批连像素一起记下
         if (const auto restored = m_pins->restoreLayout(); !restored)
@@ -394,6 +397,27 @@ namespace GyanisScribe::App
 
         m_pins->addPin(taken->image, QCursor::pos(), taken->sourceFile);
         notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已重新贴出那张关掉的贴图，还能按回来 {} 张"), m_pins->closedPinCount()).c_str()),
+                   Ui::ToastKind::Success);
+    }
+
+    QString AppController::groupLabel(const int group) const
+    {
+        // 号还是那个号：切组、菜单与布局都按号走，名字只是挂在后面的标签，替掉号会让人认不出自己在哪一组
+        const auto name = m_pins->groupName(group);
+        return name.isEmpty() ? GyanisScribe::Core::uiText("分组 %1").arg(group) : GyanisScribe::Core::uiText("分组 %1：%2").arg(group).arg(name);
+    }
+
+    void AppController::reportGroupRenamed(const int group, const QString &name)
+    {
+        notifyUser(name.isEmpty() ? GyanisScribe::Core::uiText("已取消分组 %1 的名字，切组与菜单里重新按号叫它").arg(group)
+                                  : GyanisScribe::Core::uiText("分组 %1 改名为「%2」").arg(group).arg(name),
+                   name.isEmpty() ? Ui::ToastKind::Information : Ui::ToastKind::Success);
+    }
+
+    void AppController::reportGroupDeleted(const int group, const int movedCount)
+    {
+        notifyUser(movedCount > 0 ? GyanisScribe::Core::uiText("已删掉分组 %1，把 %2 张并回第一组").arg(group).arg(movedCount)
+                                  : GyanisScribe::Core::uiText("分组 %1 上本来没摆贴图，名字一并清了").arg(group),
                    Ui::ToastKind::Success);
     }
 
@@ -574,7 +598,7 @@ namespace GyanisScribe::App
                     notifyUser(QString::fromUtf8(switched.error().message.c_str()), Ui::ToastKind::Information);
                     return;
                 }
-                notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已切到贴图分组 {}，桌上是这一组"), *switched).c_str()),
+                notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已切到{}，桌上是这一组"), groupLabel(*switched).toStdString()).c_str()),
                            Ui::ToastKind::Success);
                 return;
             }

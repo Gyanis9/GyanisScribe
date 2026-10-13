@@ -492,8 +492,8 @@ namespace GyanisScribe
         ASSERT_NE(groupMenu, nullptr) << "右键菜单里没有「移动到分组」这一项";
 
         const auto entries = groupMenu->actions();
-        // 三项现有分组 + 一条分隔线 + 新建分组
-        ASSERT_EQ(entries.size(), 5) << "分组子菜单的条目数与推过来的分组清单不同解";
+        // 三项现有分组 + 分隔线 + 新建分组 + 分隔线 + 重命名与删组（改名与删组是后加的整组入口）
+        ASSERT_EQ(entries.size(), 8) << "分组子菜单的条目数与推过来的分组清单不同解";
         EXPECT_EQ(entries[0]->text(), QString::fromUtf8("分组 1"));
         EXPECT_EQ(entries[1]->text(), QString::fromUtf8("分组 2"));
         EXPECT_EQ(entries[2]->text(), QString::fromUtf8("分组 4"));
@@ -505,9 +505,88 @@ namespace GyanisScribe
         ASSERT_EQ(requested.size(), 1);
         EXPECT_EQ(requested.front(), 1) << "点「分组 1」要的是 1 号组";
 
-        entries.back()->trigger();
+        // 「新建分组」不再长在末尾（后面还有改名与删组两项），按文案定位
+        QAction *create = nullptr;
+        for (auto *action: entries)
+        {
+            if (action->text() == QString::fromUtf8("新建分组"))
+            {
+                create = action;
+            }
+        }
+        ASSERT_NE(create, nullptr) << "分组子菜单里少了「新建分组」";
+        create->trigger();
         ASSERT_EQ(requested.size(), 2);
         EXPECT_EQ(requested.back(), 5) << "新建分组该按现有最大组号 +1，而不是按现有组数重数";
+    }
+
+    /**
+     * @brief 钉住分组标签带出名字，而删组那一项在第一组上灰着
+     * @details 名字是管理器推下来的账，窗口只照它写标签：没起过名字的组必须还是「分组 N」，
+     *          不然老桌面的菜单会凭空多出「分组 2：」这种尾巴。第一组是并回来的落点，删它要说得出为什么点不动。
+     */
+    TEST_F(PinWindowFixture, GroupSubmenuShowsNamesAndRefusesToDeleteTheFirstGroup)
+    {
+        auto &window = makeWindow();
+        window.setGroup(2);
+        window.setGroupChoices({1, 2});
+        window.setGroupNames(QMap<int, QString>{{2, QStringLiteral("参照对比")}});
+
+        const std::unique_ptr<QMenu> menu{window.buildContextMenu()};
+        QMenu                       *groupMenu = nullptr;
+        for (QAction *action: menu->actions())
+        {
+            if (action->menu() != nullptr && action->text() == QString::fromUtf8("移动到分组"))
+            {
+                groupMenu = action->menu();
+            }
+        }
+        ASSERT_NE(groupMenu, nullptr);
+
+        const auto entries = groupMenu->actions();
+        EXPECT_EQ(entries[0]->text(), QString::fromUtf8("分组 1")) << "没起过名字的组被加上了一个空名字尾巴";
+        EXPECT_EQ(entries[1]->text(), QString::fromUtf8("分组 2：参照对比")) << "起了名字的组没带出名字";
+
+        QAction *rename = nullptr;
+        QAction *remove = nullptr;
+        for (auto *action: entries)
+        {
+            if (action->text() == QString::fromUtf8("重命名这一组…"))
+            {
+                rename = action;
+            }
+            if (action->text() == QString::fromUtf8("删除这一组"))
+            {
+                remove = action;
+            }
+        }
+        ASSERT_NE(rename, nullptr) << "分组子菜单里少了「重命名这一组…」";
+        ASSERT_NE(remove, nullptr) << "分组子菜单里少了「删除这一组」";
+        EXPECT_TRUE(remove->isEnabled()) << "站在第二组上，删组这一项该是点得动的";
+
+        // 换到第一组：那一项要灰着并说明为什么
+        window.setGroup(1);
+        const std::unique_ptr<QMenu> firstGroupMenu{window.buildContextMenu()};
+        QMenu                       *innerMenu = nullptr;
+        for (QAction *action: firstGroupMenu->actions())
+        {
+            if (action->menu() != nullptr && action->text() == QString::fromUtf8("移动到分组"))
+            {
+                innerMenu = action->menu();
+            }
+        }
+        ASSERT_NE(innerMenu, nullptr);
+        QAction *firstDelete = nullptr;
+        for (auto *action: innerMenu->actions())
+        {
+            if (action->text() == QString::fromUtf8("删除这一组"))
+            {
+                firstDelete = action;
+            }
+        }
+        ASSERT_NE(firstDelete, nullptr);
+        EXPECT_FALSE(firstDelete->isEnabled()) << "第一组是并回来的落点，这一项必须点不动";
+        EXPECT_FALSE(firstDelete->toolTip().isEmpty()) << "灰着而不说原因，用户只会反复点它";
     }
 
     /**

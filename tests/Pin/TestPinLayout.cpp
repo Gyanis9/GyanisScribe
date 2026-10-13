@@ -7,6 +7,7 @@
 #include "Settings/SettingsStore.h"
 
 #include <QCoreApplication>
+#include <QMap>
 #include <QPoint>
 #include <QSizeF>
 #include <QString>
@@ -265,5 +266,33 @@ TEST(PinLayoutOpacitySetting, ConvertsPercentAndRejectsZeroAndOver)
         ASSERT_FALSE(parsed.has_value()) << bad;
         EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument) << bad;
         EXPECT_NE(parsed.error().message.find("Pin/DefaultOpacity"), std::string::npos) << bad;
+    }
+}
+
+/**
+ * @brief 钉住分组名字的记录：空值不算名字，形状坏了要报出补救的那一格
+ * @details 名字只是标签，但坏记录不能当成「都没起过名字」——那一桌的标签会集体消失，
+ *          而用户看到的是「我起的名字自己没了」。拒绝文案要点名 Pin/GroupNames，才知道去哪清。
+ */
+TEST(PinLayoutGroupNames, RoundTripsAndRejectsMalformedRecords)
+{
+    const QMap<int, QString> names{{2, QStringLiteral("参照对比")}, {3, QStringLiteral("  ")}};
+    const auto               text = GyanisScribe::Pin::serializeGroupNames(names);
+    EXPECT_EQ(text.indexOf(QStringLiteral("3")), -1) << "只有空白的名字不该被写进记录：读回来会多一条没人认领的键";
+
+    const auto parsed = GyanisScribe::Pin::parseGroupNames(text.toStdString());
+    ASSERT_TRUE(parsed.has_value()) << parsed.error().message;
+    ASSERT_EQ(parsed->size(), 1);
+    EXPECT_EQ(parsed->value(2), QStringLiteral("参照对比")) << "名字过了记录一圈就变样";
+
+    const auto empty = GyanisScribe::Pin::parseGroupNames(std::string_view{});
+    ASSERT_TRUE(empty.has_value()) << "没存过就是空表，不该报坏记录：" << empty.error().message;
+    EXPECT_TRUE(empty->isEmpty());
+
+    for (const char *bad: {R"([{"2":"参照"}])", R"({"0":"第一组不存在的号"})", R"({"x":"键不是数"})", R"({"2":7})"})
+    {
+        const auto rejected = GyanisScribe::Pin::parseGroupNames(bad);
+        ASSERT_FALSE(rejected.has_value()) << "这一条坏记录被当成没起过名字了：" << bad;
+        EXPECT_NE(rejected.error().message.find("Pin/GroupNames"), std::string::npos) << "拒绝要说清去哪一项补救，实际：" << rejected.error().message;
     }
 }

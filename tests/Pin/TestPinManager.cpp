@@ -895,4 +895,111 @@ namespace GyanisScribe
         std::filesystem::remove(blocked, ignored);
     }
 
+    /**
+     * @brief 钉住分组名字过了记录一圈还在，而且首尾空白被剪掉
+     * @details 名字表住在配置里那一格，是「哪组叫什么」的唯一凭据；重启读不回来就等于一整桌的标签丢了。
+     */
+    TEST_F(PinManagerFixture, GroupNamesSurviveARestart)
+    {
+        {
+            auto &pins = makeManager();
+            pins.addPin(makeImage(), QPoint(20, 20));
+            pins.addPin(makeImage(), QPoint(200, 40));
+            ASSERT_TRUE(pins.movePinToGroup(1, 2).has_value());
+            ASSERT_TRUE(pins.renameGroup(2, QStringLiteral("  参照对比  ")).has_value()) << "改名被拒";
+            EXPECT_EQ(pins.groupName(2), QStringLiteral("参照对比")) << "首尾空白没剪：菜单里带空格的名字像没对齐";
+            ASSERT_TRUE(pins.saveLayout().has_value()) << "布局没写下去";
+        }
+
+        const auto stored = Pin::loadGroupNames(settings());
+        ASSERT_TRUE(stored.has_value()) << stored.error().message;
+        EXPECT_EQ(stored->value(2), QStringLiteral("参照对比")) << "名字没落进配置";
+
+        auto      &reopened = makeManager();
+        const auto restored = reopened.restoreLayout();
+        ASSERT_TRUE(restored.has_value()) << restored.error().message;
+        EXPECT_EQ(reopened.groupName(2), QStringLiteral("参照对比")) << "名字没过夜：重启后一整桌又变回「分组 N」";
+    }
+
+    /**
+     * @brief 钉住取消命名回到「分组 N」那一档：表里不留空值
+     */
+    TEST_F(PinManagerFixture, ClearingAGroupNameRemovesTheEntry)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(20, 20));
+        pins.addPin(makeImage(), QPoint(200, 40));
+        ASSERT_TRUE(pins.movePinToGroup(1, 2).has_value());
+        ASSERT_TRUE(pins.renameGroup(2, QStringLiteral("参照对比")).has_value());
+
+        ASSERT_TRUE(pins.renameGroup(2, QStringLiteral("   ")).has_value());
+        EXPECT_TRUE(pins.groupName(2).isEmpty()) << "留了一串空白的名字，菜单里就会多出一个看不见的尾巴";
+    }
+
+    /**
+     * @brief 钉住删一组把成员并回第一组，名字跟着清
+     * @details 删的是「这一组」这个标签，不是上面摆着的图：图要回到落点并重新摆在桌上。
+     */
+    TEST_F(PinManagerFixture, DeletingAGroupMovesItsMembersBackToTheFirstGroup)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(20, 20));
+        pins.addPin(makeImage(), QPoint(200, 40));
+        pins.addPin(makeImage(), QPoint(400, 40));
+        ASSERT_TRUE(pins.movePinToGroup(1, 2).has_value());
+        ASSERT_TRUE(pins.movePinToGroup(2, 2).has_value());
+        ASSERT_TRUE(pins.renameGroup(2, QStringLiteral("参照对比")).has_value());
+        ASSERT_EQ(pins.groupsInUse(), (QVector<int>{1, 2})) << "前提不对：没形成两组";
+
+        const auto deleted = pins.deleteGroup(2);
+        ASSERT_TRUE(deleted.has_value()) << deleted.error().message;
+        EXPECT_EQ(*deleted, 2) << "并回去的张数不对：少了就是有人被扔在看不见的一组";
+        EXPECT_EQ(pins.groupsInUse().size(), 1) << "组还没了：切组会在一个空壳上停一站";
+        EXPECT_TRUE(pins.groupName(2).isEmpty()) << "组没了名字还挂着";
+        for (auto index = 0; index < pins.count(); ++index)
+        {
+            EXPECT_TRUE(isOnDesk(pins.pinAt(index))) << "并回第一组之后这几张该重新摆在桌上";
+        }
+    }
+
+    /**
+     * @brief 钉住第一组删不掉，且拒绝的理由说清它是落点
+     * @details 这一档的拒绝面比成功面更要紧：删掉落点之后，别组再删就无处可并。
+     */
+    TEST_F(PinManagerFixture, DeletingTheFirstGroupIsRefusedWithTheLandingPlaceReason)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(20, 20));
+
+        const auto refused = pins.deleteGroup(Pin::kFirstPinGroup);
+        ASSERT_FALSE(refused.has_value()) << "第一组被删掉了，后面删别组就没有并回去的地方";
+        EXPECT_EQ(refused.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument);
+        EXPECT_NE(refused.error().message.find("落点"), std::string::npos) << "拒绝要说明为什么删不掉，实际：" << refused.error().message;
+        EXPECT_EQ(pins.count(), 1) << "拒删归拒删，那张图不该跟着没";
+    }
+
+    /**
+     * @brief 钉住一组的最后一张关掉之后，它的名字也跟着没
+     * @details 不留空壳组是切组那一条的规矩：名字若活得比组长，下次切组就停在一个看不见的站上。
+     */
+    TEST_F(PinManagerFixture, GroupNameGoesAwayWithItsLastPin)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(20, 20));
+        pins.addPin(makeImage(), QPoint(200, 40));
+        ASSERT_TRUE(pins.movePinToGroup(1, 2).has_value());
+        ASSERT_TRUE(pins.renameGroup(2, QStringLiteral("待办")).has_value());
+        ASSERT_EQ(pins.groupName(2), QStringLiteral("待办"));
+
+        auto *second = dynamic_cast<Pin::PinWindow *>(pins.pinAt(1));
+        ASSERT_NE(second, nullptr);
+        emit second->closedByUser();
+
+        EXPECT_TRUE(pins.groupName(2).isEmpty()) << "组里最后一张关掉了，名字还挂在册子上";
+        ASSERT_TRUE(pins.saveLayout().has_value()) << "布局没写下去";
+        const auto stored = Pin::loadGroupNames(settings());
+        ASSERT_TRUE(stored.has_value()) << stored.error().message;
+        EXPECT_TRUE(stored->isEmpty()) << "内存里清了名字而记录里还留着：下次启动那个空壳组又带着名字回来";
+    }
+
 } // namespace GyanisScribe

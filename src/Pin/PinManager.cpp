@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <format>
+#include <iterator>
 
 namespace
 {
@@ -141,6 +142,32 @@ namespace GyanisScribe::Pin
                                  Core::Logger::warning(moved.error().message);
                              }
                          });
+        // 改名与删组同理：窗口收用户敲的那一串与那一下意图，名字表、谁在哪一组、显隐都在这层落账
+        QObject::connect(raw, &PinWindow::renameGroupRequested, this,
+                         [this, raw](const int group, const QString &name)
+                         {
+                             // 菜单还开着时那张可能已被关掉：这一击没有可落账的对象（与「移动到分组」同一道闸门）
+                             if (std::ranges::find_if(m_pins, [raw](const auto &held) { return held.get() == raw; }) == m_pins.end())
+                             {
+                                 return;
+                             }
+                             if (const auto renamed = renameGroup(group, name); !renamed)
+                             {
+                                 Core::Logger::warning(renamed.error().message);
+                             }
+                         });
+        QObject::connect(raw, &PinWindow::deleteGroupRequested, this,
+                         [this, raw](const int group)
+                         {
+                             if (std::ranges::find_if(m_pins, [raw](const auto &held) { return held.get() == raw; }) == m_pins.end())
+                             {
+                                 return;
+                             }
+                             if (const auto deleted = deleteGroup(group); !deleted)
+                             {
+                                 Core::Logger::warning(deleted.error().message);
+                             }
+                         });
 
         // 多选：切选与清空都是这一层的账；拖动与缩放只叫其余的几张跟着动（发起的那张自己已经动过）
         // Solo：只接意图，「谁在屏上」由 applyGroupVisibility 那一条判据统一算
@@ -253,12 +280,30 @@ namespace GyanisScribe::Pin
         {
             return grouped;
         }
+        // 名字表也在这一步落盘：某一组清空时被挤掉的那些名字要跟着一起留下，
+        // 否则下次启动会读回一堆挂在空壳组上的标签
+        if (const auto named = Pin::saveGroupNames(m_settings, m_groupNames); !named)
+        {
+            return named;
+        }
         // 「收起全部」那一档也记：退出时收着一整桌，回来还是收着（托盘那句「摆回全部贴图」是出口）
         return m_settings.setValue(Settings::kPinAllConcealed, m_allConcealed);
     }
 
     Core::Expected<int> PinManager::restoreLayout()
     {
+        // 名字先读：一份坏掉的布局不该把名字表也带成「什么都没起过名字」，那一桌的标签会集体消失
+        if (const auto names = Pin::loadGroupNames(m_settings); names)
+        {
+            m_groupNames = *names;
+        } else
+        {
+            // 名字只是标签：坏记录报一条中文原因后按「都没起过名字」继续摆这一桌，
+            // 为了一个标签把这桌还留着位置的贴图全放弃恢复不值得
+            Core::Logger::warning(names.error().message);
+            m_groupNames.clear();
+        }
+
         const auto loaded = Pin::loadLayout(m_settings);
         if (!loaded)
         {
@@ -548,6 +593,13 @@ namespace GyanisScribe::Pin
     void PinManager::normalizeActiveGroup()
     {
         const auto groups = groupsInUse();
+        // 名字跟着「这一组还有人在用」走：组空了名字还留着，切组就会停在一个看不见的组上，
+        // 与「不留空壳组」那条规矩正好相反
+        for (auto iterator = m_groupNames.begin(); iterator != m_groupNames.end();)
+        {
+            iterator = groups.contains(iterator.key()) ? std::next(iterator) : m_groupNames.erase(iterator);
+        }
+
         if (groups.isEmpty())
         {
             m_activeGroup = kFirstPinGroup;
@@ -558,6 +610,70 @@ namespace GyanisScribe::Pin
             // 活动组的最后一张被关掉了：回落到第一组，否则桌上是一张都看不见，用户不知道去哪找
             m_activeGroup = groups.front();
         }
+    }
+
+    QString PinManager::groupName(const int group) const
+    {
+        return m_groupNames.value(group);
+    }
+
+    Core::Expected<void> PinManager::renameGroup(const int group, const QString &name)
+    {
+        if (group < kFirstPinGroup)
+        {
+            return std::unexpected(Core::Error{
+                    Core::ErrorCode::InvalidArgument,
+                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("要改名字的分组号不对：{}。分组从 {} 起，请在贴图右键菜单里操作"), group, kFirstPinGroup)});
+        }
+
+        // 空名就是取消命名：表里不留空值，界面对没名字的组一律显示「分组 N」
+        const auto trimmed = name.trimmed();
+        if (trimmed.isEmpty())
+        {
+            m_groupNames.remove(group);
+        } else
+        {
+            m_groupNames.insert(group, trimmed);
+        }
+
+        if (const auto saved = Pin::saveGroupNames(m_settings, m_groupNames); !saved)
+        {
+            return saved;
+        }
+        // 菜单里那些标签读的是窗口手里的那份名字表，落账之后要重推一次才会当场改口
+        applyGroupVisibility();
+        emit pinGroupRenamed(group, trimmed);
+        return {};
+    }
+
+    Core::Expected<int> PinManager::deleteGroup(const int group)
+    {
+        if (group == kFirstPinGroup)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("第一组是删掉别的组时成员并回去的落点，这一组删不掉。"
+                                                                                                                "要把这一张从第一组挪走请用「移动到分组」")});
+        }
+
+        auto moved = 0;
+        for (auto &pin: m_pins)
+        {
+            if (pin != nullptr && pin->group() == group)
+            {
+                // 并回第一组而不是扔掉：删一组要清的是「这一组」这个标签，不是上面摆着的图
+                pin->setGroup(kFirstPinGroup);
+                ++moved;
+            }
+        }
+        m_groupNames.remove(group);
+
+        if (const auto saved = Pin::saveGroupNames(m_settings, m_groupNames); !saved)
+        {
+            return std::unexpected(saved.error());
+        }
+        normalizeActiveGroup();
+        applyGroupVisibility();
+        emit pinGroupDeleted(group, moved);
+        return moved;
     }
 
     int PinManager::applyGroupVisibility()
@@ -571,6 +687,8 @@ namespace GyanisScribe::Pin
                 continue;
             }
             pin->setGroupChoices(groups);
+            // 名字与清单一起推：菜单里那一行既要组号也要名字，分两次推就会有一拍是新组号配旧名字
+            pin->setGroupNames(m_groupNames);
 
             // 显隐的唯一判据：整桌收起 > Solo > 分组。Solo 开着时不看分组——「只看这一张」就是只看这一张
             const bool concealed = m_allConcealed || (m_solo != nullptr ? pin.get() != m_solo : pin->group() != m_activeGroup);

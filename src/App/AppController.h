@@ -359,6 +359,27 @@ namespace GyanisScribe::App
         void reportBatchSave(const Pin::PinBatchSaveReport &report);
 
         /**
+         * @brief 一句里用到的分组标签：起过名字就带上名字，没起过就是「分组 N」
+         * @param group 组号
+         * @return 界面用的一段文本
+         */
+        [[nodiscard]] QString groupLabel(int group) const;
+
+        /**
+         * @brief 改完组名那一句回声
+         * @param group 哪一组
+         * @param name 新名字；空串表示取消了命名
+         */
+        void reportGroupRenamed(int group, const QString &name);
+
+        /**
+         * @brief 删掉一组之后那句：并回去了几张，还是那组本来就空着
+         * @param group 被删的组号
+         * @param movedCount 并回第一组的张数
+         */
+        void reportGroupDeleted(int group, int movedCount);
+
+        /**
          * @brief 贴出一批之后的一句提示
          * @param outcome 贴出的张数与没贴成的文件名
          * @details 拖放落图与剪贴板贴图两处共用：贴上一部分也要说清另一半去哪了，

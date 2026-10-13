@@ -11,6 +11,7 @@
 
 #include "Core/Types.h"
 
+#include <QMap>
 #include <QPoint>
 #include <QSizeF>
 #include <QString>
@@ -85,6 +86,37 @@ namespace GyanisScribe::Pin
      * @return 成功返回状态列表；没存过返回空列表；存的文本坏掉返回 InvalidArgument
      */
     [[nodiscard]] Core::Expected<QVector<PinState>> loadLayout(const Settings::ISettingsStore &settings);
+
+    /**
+     * @brief 把分组名字表序列化成 JSON 对象文本（键是组号，值是名字）
+     * @param names 组号 → 名字；空表写成 "{}"
+     * @return 可直接写进配置的文本
+     */
+    [[nodiscard]] QString serializeGroupNames(const QMap<int, QString> &names);
+
+    /**
+     * @brief 解析分组名字表
+     * @param text serializeGroupNames 产出的文本
+     * @return 成功返回名字表（没存过就是空表）；形状不对返回 InvalidArgument 并写明怎么补救
+     * @note 值是空串的那一条当作「没起过名字」丢掉：界面本来就按「分组 N」显示它
+     */
+    [[nodiscard]] Core::Expected<QMap<int, QString>> parseGroupNames(std::string_view text);
+
+    /**
+     * @brief 把分组名字写进配置
+     * @param settings 目标配置
+     * @param names 组号 → 名字
+     * @return 成功返回空载荷；配置写入失败时带回原因
+     */
+    [[nodiscard]] Core::Expected<void> saveGroupNames(Settings::ISettingsStore &settings, const QMap<int, QString> &names);
+
+    /**
+     * @brief 从配置读回分组名字
+     * @param settings 来源配置
+     * @return 成功返回名字表；没存过是空表；存的文本坏掉返回 InvalidArgument
+     * @note 与 loadLayout 同一条口径：坏记录要报出来，不悄悄当「都没起过名字」——那一桌的标签会集体消失
+     */
+    [[nodiscard]] Core::Expected<QMap<int, QString>> loadGroupNames(const Settings::ISettingsStore &settings);
 
     /// 新建贴图的默认不透明度（百分比）：配置里没有或值不合法时用它，即完全不透明
     inline constexpr int kDefaultOpacityPercent = 100;

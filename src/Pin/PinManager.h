@@ -13,6 +13,7 @@
 #include "Pin/PinLayout.h"
 
 #include <QImage>
+#include <QMap>
 #include <QObject>
 #include <QPoint>
 #include <QVector>
@@ -199,6 +200,31 @@ namespace GyanisScribe::Pin
         [[nodiscard]] Core::Expected<void> movePinToGroup(int index, int group);
 
         /**
+         * @brief 这一组的名字
+         * @param group 组号
+         * @return 起过名字就是那个名字；没起过返回空串，界面按「分组 N」显示
+         */
+        [[nodiscard]] QString groupName(int group) const;
+
+        /**
+         * @brief 给一组起名字
+         * @param group 组号，从 1 起
+         * @param name 名字，首尾空白会被去掉；空串表示取消命名，回到「分组 N」那种叫法
+         * @return 成功返回空载荷；配置写不下去时带回原因
+         * @details 名字只跟着在册的组存在：一组的最后一张被关掉，它的名字也跟着没——
+         *          留着的名字会在一个看不见的组上停一站，与不留空壳组那条规矩相反
+         */
+        [[nodiscard]] Core::Expected<void> renameGroup(int group, const QString &name);
+
+        /**
+         * @brief 删掉一组：成员并回第一组，名字跟着清
+         * @param group 要删的组号
+         * @return 成功返回并过来的张数（这一组本来没人在册就是 0）
+         * @return 删第一组时返回 InvalidArgument：它是删别组时成员并回去的落点，删了就没有落点
+         */
+        [[nodiscard]] Core::Expected<int> deleteGroup(int group);
+
+        /**
          * @brief 把某张贴图的内容换成给定的那份像素
          * @param index 贴图在册表里的序号
          * @param image 新内容，物理像素
@@ -278,6 +304,21 @@ namespace GyanisScribe::Pin
          * @details 管理器只报事实：要不要提示用户「它被收起来了、切到那一组才看得见」是界面层的分寸
          */
         void pinMovedToGroup(int group);
+
+        /**
+         * @brief 一组改完了名字
+         * @param group 哪一组
+         * @param name 新名字；空串表示取消了命名
+         * @details 菜单早就收起来了，改完没一句回声就成了「敲了字然后什么也没变」
+         */
+        void pinGroupRenamed(int group, const QString &name);
+
+        /**
+         * @brief 一组被删掉
+         * @param group 被删的那一组
+         * @param movedCount 并回第一组的张数
+         */
+        void pinGroupDeleted(int group, int movedCount);
 
         /**
          * @brief 某张贴图上取到了颜色
@@ -368,6 +409,7 @@ namespace GyanisScribe::Pin
         bool                                    m_allConcealed = false;          ///< 全局收起是不是开着
         PinWindow                              *m_solo         = nullptr;        ///< 「只看这一张」的主角；空表示没开
         std::deque<ClosedPin>                   m_closedPins;                    ///< 最近关掉的贴图（新的在前），上限 kClosedPinHistorySize
+        QMap<int, QString>                      m_groupNames;                    ///< 各组名字，没起过名字的组不在表里；与配置里那一格同内容
     };
 
 } // namespace GyanisScribe::Pin

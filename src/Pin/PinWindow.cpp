@@ -755,6 +755,11 @@ namespace GyanisScribe::Pin
         m_groupChoices = groups;
     }
 
+    void PinWindow::setGroupNames(const QMap<int, QString> &names)
+    {
+        m_groupNames = names;
+    }
+
     void PinWindow::setAnimatedSource(const QString &file)
     {
         m_sourceFile.clear();
@@ -2040,7 +2045,10 @@ namespace GyanisScribe::Pin
         auto *groupMenu = menu->addMenu(GyanisScribe::Core::uiText("移动到分组"));
         for (const int group: m_groupChoices)
         {
-            auto *groupAction = groupMenu->addAction(GyanisScribe::Core::uiText("分组 %1").arg(group));
+            // 起过名字的组带出名字，没起过的还是「分组 N」：加一档命名不该把老账改写成另一种样子
+            const auto name = m_groupNames.value(group);
+            auto      *groupAction =
+                    groupMenu->addAction(name.isEmpty() ? GyanisScribe::Core::uiText("分组 %1").arg(group) : GyanisScribe::Core::uiText("分组 %1：%2").arg(group).arg(name));
             groupAction->setCheckable(true);
             groupAction->setChecked(group == m_group);
             groupAction->setEnabled(group != m_group);
@@ -2049,6 +2057,29 @@ namespace GyanisScribe::Pin
         groupMenu->addSeparator();
         const auto nextGroup = m_groupChoices.isEmpty() ? kFirstPinGroup : m_groupChoices.back() + 1;
         QObject::connect(groupMenu->addAction(GyanisScribe::Core::uiText("新建分组")), &QAction::triggered, this, [this, nextGroup] { emit moveToGroupRequested(nextGroup); });
+        groupMenu->addSeparator();
+
+        // 改名与删组都只管报出去：名字表与谁在哪一组是管理器的账，这一层收用户敲的那一串
+        QObject::connect(groupMenu->addAction(GyanisScribe::Core::uiText("重命名这一组…")), &QAction::triggered, this,
+                         [this]
+                         {
+                             bool       accepted = false;
+                             const auto text = QInputDialog::getText(this, GyanisScribe::Core::uiText("给分组起名字"),
+                                                                     GyanisScribe::Core::uiText("这一组的名字（留空就回到「分组 %1」这种叫法）").arg(m_group), QLineEdit::Normal,
+                                                                     m_groupNames.value(m_group), &accepted);
+                             if (!accepted)
+                             {
+                                 return; // 取消是一种正常收场：什么都没发生，也什么都不用说
+                             }
+                             emit renameGroupRequested(m_group, text.trimmed());
+                         });
+        auto *deleteGroupAction = groupMenu->addAction(GyanisScribe::Core::uiText("删除这一组"), this, [this] { emit deleteGroupRequested(m_group); });
+        // 第一组是删别组时成员并回去的落点：把它删了就没有落点，这一项在这儿灰着并说明为什么
+        deleteGroupAction->setEnabled(m_group != kFirstPinGroup);
+        if (m_group == kFirstPinGroup)
+        {
+            deleteGroupAction->setToolTip(GyanisScribe::Core::uiText("第一组是删掉别的组时成员并回去的落点，删不掉；想把这一张挪走请用上面的分组"));
+        }
 
         menu->addSeparator();
 

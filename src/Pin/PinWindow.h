@@ -13,6 +13,7 @@
 #include "Pin/PinTransform.h"
 
 #include <QImage>
+#include <QMap>
 #include <QPoint>
 #include <QRectF>
 #include <QVector>
@@ -166,6 +167,14 @@ namespace GyanisScribe::Pin
          *          窗口只是在菜单里替它列出可选项，清单由管理器推过来。
          */
         void setGroupChoices(const QVector<int> &groups);
+
+        /**
+         * @brief 告诉这张贴图「各组都叫什么名字」
+         * @param names 组号 → 名字，没有名字的组不在表里
+         * @details 与 setGroupChoices 同一份账、同一个时机推过来：菜单里那一行既要组号也要名字，
+         *          分两次推就会有一拍是「新组号配旧名字」。
+         */
+        void setGroupNames(const QMap<int, QString> &names);
 
         /**
          * @brief 进出取色模式
@@ -502,6 +511,21 @@ namespace GyanisScribe::Pin
         void moveToGroupRequested(int group);
 
         /**
+         * @brief 用户给这张贴图所在的分组起了个新名字（空串表示取消命名，回到「分组 N」）
+         * @param group 哪一组
+         * @param name 名字，首尾空白已经去掉
+         * @details 输入框在这儿，落账归管理器：与「自定义尺寸…」同一分工——窗口收用户敲的那一串，管理器改模型
+         */
+        void renameGroupRequested(int group, const QString &name);
+
+        /**
+         * @brief 用户要求删掉这张贴图所在的分组（成员并回第一组）
+         * @param group 要删的那一组
+         * @details 一次只删一组：整组删除在右键菜单里没有对等入口（选中集跨组时按哪一组都不对）
+         */
+        void deleteGroupRequested(int group);
+
+        /**
          * @brief 取色模式下点中了一个像素
          * @param color 那一像素的颜色
          * @details 只报颜色：排成哪种写法、复制到剪贴板还是存起来，都是界面层的事；
@@ -791,6 +815,7 @@ namespace GyanisScribe::Pin
         bool                                                 m_pinned                = true;             ///< 是否置顶
         int                                                  m_group                 = kFirstPinGroup;   ///< 所属贴图分组，菜单与布局记录都取它
         QVector<int>                                         m_groupChoices{kFirstPinGroup};             ///< 现有分组号（升序），由管理器推过来
+        QMap<int, QString>                                   m_groupNames;                               ///< 各组名字（管理器推过来），菜单标签与改名输入框的预填都读它
         bool                                                 m_colorPickMode = false;                    ///< 取色模式：鼠标读像素而不是拖动
         QPointF                                              m_pickPoint;                                ///< 取色模式下光标在窗口里的位置，读数框跟它走
         ScreenEdge                                           m_edgeDock = ScreenEdge::None;              ///< 贴的是哪条屏边；None 表示没贴

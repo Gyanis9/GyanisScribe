@@ -111,6 +111,9 @@ namespace GyanisScribe::Settings
     /// 当前显示的是第几个贴图分组（从 1 起），与布局一起读写：重启后回到同一组
     inline constexpr std::string_view kPinActiveGroup = "Pin/ActiveGroup";
 
+    /// 贴图分组的名字（JSON 对象文本，形如 {"2":"参照"}），与布局一起读写：没起过名字时这一格是空的
+    inline constexpr std::string_view kPinGroupNames = "Pin/GroupNames";
+
     /// 「收起 / 摆回全部贴图」的那一档状态，与布局一起读写：退出时收着一整桌，回来还是收着
     inline constexpr std::string_view kPinAllConcealed = "Pin/AllConcealed";
 

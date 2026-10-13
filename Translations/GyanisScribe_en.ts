@@ -488,8 +488,8 @@
             <translation>This pin has been moved into the group on screen; it stays where it is</translation>
         </message>
         <message>
-            <source>贴图已移到分组 {}，先收了起来；按 {} 或从托盘切到那一组就能看见</source>
-            <translation>The pin was moved to group {}, so it is put away for now; press {} or switch to that group from the tray to see it</translation>
+            <source>贴图已移到{}，先收了起来；按 {} 或从托盘切到那一组就能看见</source>
+            <translation>Moved this pin to {}; it is tucked away for now. Press {} (or use the tray) to switch to that group</translation>
         </message>
         <message>
             <source>这些全局热键没能登记上：</source>
@@ -506,6 +506,30 @@
         <message>
             <source>已重新贴出那张关掉的贴图，还能按回来 {} 张</source>
             <translation>The closed pin is back on the desk; {} more can still be pinned back.</translation>
+        </message>
+        <message>
+            <source>分组 %1</source>
+            <translation>Group %1</translation>
+        </message>
+        <message>
+            <source>分组 %1：%2</source>
+            <translation>Group %1: %2</translation>
+        </message>
+        <message>
+            <source>已取消分组 %1 的名字，切组与菜单里重新按号叫它</source>
+            <translation>Cleared the name of group %1; the menu and the switcher call it by its number again</translation>
+        </message>
+        <message>
+            <source>分组 %1 改名为「%2」</source>
+            <translation>Group %1 is now named “%2”</translation>
+        </message>
+        <message>
+            <source>已删掉分组 %1，把 %2 张并回第一组</source>
+            <translation>Deleted group %1 and folded %2 pins back into group 1</translation>
+        </message>
+        <message>
+            <source>分组 %1 上本来没摆贴图，名字一并清了</source>
+            <translation>Group %1 had no pins on it; its name was cleared too</translation>
         </message>
         <message>
             <source>原因见日志</source>
@@ -552,8 +576,8 @@
             <translation>No pinned images on the desk</translation>
         </message>
         <message>
-            <source>已切到贴图分组 {}，桌上是这一组</source>
-            <translation>Switched to pin group {}; that is the group on screen now</translation>
+            <source>已切到{}，桌上是这一组</source>
+            <translation>Switched to {}; the desk now shows that group</translation>
         </message>
         <message>
             <source>已保存并复制：{}</source>
@@ -2124,6 +2148,18 @@
             <translation>Entry {} of the pin layout has a non-boolean mouse-through field. Clear that entry and let the app record it again</translation>
         </message>
         <message>
+            <source>贴图分组名字不是一段 JSON 对象：{}。请在设置里清除 Pin/GroupNames 这一项，让程序重新记一次</source>
+            <translation>Pin group names are not a JSON object: {}. Clear Pin/GroupNames in Settings and let the program record them again</translation>
+        </message>
+        <message>
+            <source>贴图分组名字里有一条的键不是正整数：{}。请在设置里清除 Pin/GroupNames 这一项，让程序重新记一次</source>
+            <translation>A pin group name entry has a key that is not a positive integer: {}. Clear Pin/GroupNames in Settings and let the program record them again</translation>
+        </message>
+        <message>
+            <source>贴图分组名字第 {} 组的值不是一段文本。请在设置里清除 Pin/GroupNames 这一项，让程序重新记一次</source>
+            <translation>The stored name for pin group {} is not a string. Clear Pin/GroupNames in Settings and let the program record them again</translation>
+        </message>
+        <message>
             <source>贴图默认不透明度 "{}" 不在 1 到 100 之间：请在设置的贴图页重选一个值，或删掉 Pin/DefaultOpacity 这一项回到完全不透明</source>
             <translation>Pin default opacity "{}" is not between 1 and 100: pick a value again on the Pin page of Settings, or remove the Pin/DefaultOpacity entry to go back to fully opaque</translation>
         </message>
@@ -2142,6 +2178,14 @@
         <message>
             <source>动图不能替换内容：下一帧会把换来的那一份盖掉。请先保存成静态图，再把那张贴出来替换</source>
             <translation>An animated pin cannot be replaced: the next frame would cover the new content. Save it as a still image first, then pin that image and replace it.</translation>
+        </message>
+        <message>
+            <source>要改名字的分组号不对：{}。分组从 {} 起，请在贴图右键菜单里操作</source>
+            <translation>Bad group number to rename: {}. Groups start at 1. Use the context menu on a pin</translation>
+        </message>
+        <message>
+            <source>第一组是删掉别的组时成员并回去的落点，这一组删不掉。要把这一张从第一组挪走请用「移动到分组」</source>
+            <translation>Group 1 is where pins land when another group is deleted, so it cannot be deleted. To move this pin out of it, use Move to Group</translation>
         </message>
         <message>
             <source>这台机器的 Qt 写不出「{}」这一档保存格式。请在设置的截图页改选一档</source>
@@ -2256,12 +2300,28 @@
             <translation>Move to group</translation>
         </message>
         <message>
-            <source>分组 %1</source>
-            <translation>Group %1</translation>
-        </message>
-        <message>
             <source>新建分组</source>
             <translation>New group</translation>
+        </message>
+        <message>
+            <source>重命名这一组…</source>
+            <translation>Rename This Group…</translation>
+        </message>
+        <message>
+            <source>给分组起名字</source>
+            <translation>Name This Group</translation>
+        </message>
+        <message>
+            <source>这一组的名字（留空就回到「分组 %1」这种叫法）</source>
+            <translation>Name for this group; leave it empty to fall back to Group %1</translation>
+        </message>
+        <message>
+            <source>删除这一组</source>
+            <translation>Delete This Group</translation>
+        </message>
+        <message>
+            <source>第一组是删掉别的组时成员并回去的落点，删不掉；想把这一张挪走请用上面的分组</source>
+            <translation>Group 1 is where pins land when another group is deleted, so it cannot be removed; to move this pin, pick a group above</translation>
         </message>
         <message>
             <source>保持置顶</source>

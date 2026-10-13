@@ -34,6 +34,12 @@ namespace GyanisScribe::Pin
         {
             return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, std::move(reason)});
         }
+
+        /// 名字表那条通道的同一条失败形状：载荷类型不同，不能共用上面那个
+        Core::Expected<QMap<int, QString>> failNamesWith(std::string reason)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, std::move(reason)});
+        }
     } // namespace
 
     QString serializeLayout(const QVector<PinState> &states)
@@ -174,6 +180,76 @@ namespace GyanisScribe::Pin
     {
         const auto stored = settings.stringValue(Settings::kPinLayout, QString());
         return parseLayout(stored.toStdString());
+    }
+
+    QString serializeGroupNames(const QMap<int, QString> &names)
+    {
+        QJsonObject entries;
+        for (auto iterator = names.constBegin(); iterator != names.constEnd(); ++iterator)
+        {
+            // 空名就是「没起过名字」：写进去只会在下次读回来时多一条没人认领的键
+            if (iterator.value().trimmed().isEmpty())
+            {
+                continue;
+            }
+            entries.insert(QString::number(iterator.key()), iterator.value().trimmed());
+        }
+        return QString::fromUtf8(QJsonDocument(entries).toJson(QJsonDocument::Compact));
+    }
+
+    Core::Expected<QMap<int, QString>> parseGroupNames(std::string_view text)
+    {
+        QMap<int, QString> names;
+        if (text.empty())
+        {
+            // 没存过与一组都没起过名字是同一件事：交回空表，界面按「分组 N」显示每一组
+            return names;
+        }
+
+        QJsonParseError parseError{};
+        const auto      document = QJsonDocument::fromJson(QByteArray(text.data(), static_cast<qsizetype>(text.size())), &parseError);
+        if (parseError.error != QJsonParseError::NoError || !document.isObject())
+        {
+            return failNamesWith(
+                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图分组名字不是一段 JSON 对象：{}。请在设置里清除 Pin/GroupNames 这一项，让程序重新记一次"),
+                                                 parseError.errorString().toStdString()));
+        }
+
+        const auto entries = document.object();
+        for (auto iterator = entries.constBegin(); iterator != entries.constEnd(); ++iterator)
+        {
+            bool       ok    = false;
+            const auto group = iterator.key().toInt(&ok);
+            if (!ok || group < kFirstPinGroup)
+            {
+                return failNamesWith(GyanisScribe::Core::uiFormat(
+                        GyanisScribe::Core::uiTextUtf8("贴图分组名字里有一条的键不是正整数：{}。请在设置里清除 Pin/GroupNames 这一项，让程序重新记一次"),
+                        iterator.key().toStdString()));
+            }
+            if (!iterator.value().isString())
+            {
+                return failNamesWith(GyanisScribe::Core::uiFormat(
+                        GyanisScribe::Core::uiTextUtf8("贴图分组名字第 {} 组的值不是一段文本。请在设置里清除 Pin/GroupNames 这一项，让程序重新记一次"), group));
+            }
+            const auto name = iterator.value().toString().trimmed();
+            if (name.isEmpty())
+            {
+                continue; // 与序列化那一侧同一口径：空名不当成名字
+            }
+            names.insert(group, name);
+        }
+        return names;
+    }
+
+    Core::Expected<void> saveGroupNames(Settings::ISettingsStore &settings, const QMap<int, QString> &names)
+    {
+        return settings.setValue(Settings::kPinGroupNames, QVariant(serializeGroupNames(names)));
+    }
+
+    Core::Expected<QMap<int, QString>> loadGroupNames(const Settings::ISettingsStore &settings)
+    {
+        const auto stored = settings.stringValue(Settings::kPinGroupNames, QString());
+        return parseGroupNames(stored.toStdString());
     }
 
     Core::Expected<double> parseOpacityPercentSetting(const int percent)
