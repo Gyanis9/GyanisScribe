@@ -10,6 +10,7 @@
 #include "Core/Text.h"
 #include "History/HistoryRules.h"
 #include "History/HistoryView.h"
+#include "History/UnsavedArchive.h"
 #include "Ocr/OcrEngineFactory.h"
 #include "Pick/ColorFormat.h"
 #include "Pin/PinLayout.h"
@@ -1471,6 +1472,14 @@ namespace GyanisScribe::App
         form->addRow(GyanisScribe::Core::uiText("历史最久留多少天"),
                      makeOptionalLimitSpin(m_settings, GyanisScribe::Settings::kHistoryRetentionDays, GyanisScribe::Core::uiText("历史最久留多少天"),
                                            GyanisScribe::Core::uiText(" 天"), kRetentionDaysLimit, GyanisScribe::History::kDefaultRetentionDays));
+        form->addRow(GyanisScribe::Core::uiText("未保存的截图也进历史"),
+                     makeSettingCheck(m_settings, GyanisScribe::Settings::kHistoryKeepUnsaved, false, GyanisScribe::Core::uiText("未保存的截图也进历史"),
+                                      GyanisScribe::Core::uiText("未保存的截图也进历史"),
+                                      QString::fromUtf8(
+                                              GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8(
+                                                                                   "勾上后每张截图都在程序数据目录里留一份像素，误触 Esc 丢掉的那一张也还在历史里（最多留 {} 张）"),
+                                                                           static_cast<int>(GyanisScribe::History::kUnsavedArchiveCapacity))
+                                                      .c_str())));
         form->addRow(GyanisScribe::Core::uiText("开机自启动"), makeAutostartCheck(m_integration));
         form->addRow(GyanisScribe::Core::uiText("备份与恢复"), buildTransferRow());
         return page;

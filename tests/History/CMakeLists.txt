@@ -1,5 +1,6 @@
 add_executable(TestHistory
         TestHistory.cpp
+        TestUnsavedArchive.cpp
         TestHistoryView.cpp)
 
 # 视图与图标那一半要 Qt 的 GUI 栈，所以这里连 Widgets 与 Ui

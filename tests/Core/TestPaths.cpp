@@ -65,6 +65,21 @@ TEST_F(PathsFixture, LogDirectoryHangsUnderApplicationData)
 }
 
 /**
+ * @brief 钉住未保存截图那一份挂在可写数据目录下，而不是系统缓存位置
+ * @details 这一份存在的理由是「误触 Esc 也还在」：挂在缓存位置等于把承诺交给别人的回收策略，
+ *          清理工具扫一遍之后，历史里那些条目全指到空处。
+ */
+TEST_F(PathsFixture, UnsavedCapturesHangUnderApplicationDataNotCache)
+{
+    const auto data    = Paths::applicationDataDirectory();
+    const auto unsaved = Paths::unsavedCaptureDirectory();
+
+    EXPECT_EQ(unsaved.parent_path(), data) << "兜底那一份不在数据目录之下，实际是 " << unsaved.string();
+    EXPECT_EQ(unsaved.filename(), "Unsaved");
+    EXPECT_NE(unsaved.parent_path(), Paths::cacheDirectory()) << "挂在缓存位置下，清理工具会把「还在历史里」的那几张先删掉";
+}
+
+/**
  * @brief 钉住截图与录屏默认目录都带应用同名的一层，且分别落在图片与视频位置
  */
 TEST_F(PathsFixture, UserFacingDirectoriesCarryApplicationFolder)

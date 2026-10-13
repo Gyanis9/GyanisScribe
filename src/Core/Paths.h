@@ -57,6 +57,14 @@ namespace GyanisScribe::Core
         [[nodiscard]] static std::filesystem::path cacheDirectory();
 
         /**
+         * @brief 未保存截图的存放目录
+         * @return 应用数据目录下的 Unsaved
+         * @details 落在可写数据根而不是缓存目录：这一份存在的唯一理由就是「误触 Esc 也还在」，
+         *          放在会被系统或清理工具随手删掉的缓存位置，等于把承诺交给别人的回收策略。
+         */
+        [[nodiscard]] static std::filesystem::path unsavedCaptureDirectory();
+
+        /**
          * @brief 截图默认目录
          * @return 用户图片目录下的 GyanisScribe
          */

@@ -8,6 +8,8 @@ add_library(History STATIC
         HistoryStore.cpp
         HistoryThumbnail.h
         HistoryThumbnail.cpp
+        UnsavedArchive.h
+        UnsavedArchive.cpp
         HistoryView.h
         HistoryView.cpp)
 

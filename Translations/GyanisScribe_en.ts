@@ -1184,6 +1184,14 @@
             <translation> days</translation>
         </message>
         <message>
+            <source>未保存的截图也进历史</source>
+            <translation>Keep unsaved screenshots in history</translation>
+        </message>
+        <message>
+            <source>勾上后每张截图都在程序数据目录里留一份像素，误触 Esc 丢掉的那一张也还在历史里（最多留 {} 张）</source>
+            <translation>When on, every capture keeps a pixel copy in the app data folder, so one lost to Esc is still in history (up to {} kept)</translation>
+        </message>
+        <message>
             <source>开机自启动</source>
             <translation>Start at sign-in</translation>
         </message>
@@ -2002,6 +2010,14 @@
         <message>
             <source>（删除只从历史里去掉这条，成品文件留在原处）</source>
             <translation>(Delete only removes this entry from the history; the file itself stays where it is)</translation>
+        </message>
+        <message>
+            <source>这张截图是空的，没东西可留进历史。请重新截一次</source>
+            <translation>This capture is empty, so there is nothing to keep in history. Take it again</translation>
+        </message>
+        <message>
+            <source>「{}」写不进去。请检查这个目录能不能写，或关掉「未保存的截图也进历史」这一档</source>
+            <translation>"{}" could not be written. Check that the folder is writable, or turn off "Keep unsaved screenshots in history"</translation>
         </message>
         <message>
             <source>组合键「{}」里有一段是空的（相邻的 + 之间没有内容）。请写成 Ctrl+Alt+A 这种每段都有内容的形式</source>

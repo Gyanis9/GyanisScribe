@@ -19,6 +19,7 @@
 #include "History/HistoryRules.h"
 #include "History/HistoryStore.h"
 #include "History/HistoryTypes.h"
+#include "History/UnsavedArchive.h"
 #include "Hotkey/HotkeyManager.h"
 #include "Hotkey/IHotkeyManager.h"
 #include "Ocr/IOcrEngine.h"
@@ -655,6 +656,25 @@ namespace GyanisScribe::App
             {
                 // 自动保存失败要说出来：用户开着这一档就是指望盘上那份在，静默会把「没有备份」瞒到最后
                 notifyUser(QString::fromStdString(saved.error().message), Ui::ToastKind::Danger);
+            }
+        }
+
+        // 「没存文件的截图也进历史」接在截图完成这一刻：误触 Esc 关掉标注窗之后，这一张还在历史里。
+        // 已经在这一轮落盘的那几路（存文件、快速保存、自动保存）不重复进——两条指同一张图的历史记录是噪声
+        const auto alreadyOnDisk =
+                m_captureIntent == CaptureIntent::SaveToFile || m_captureIntent == CaptureIntent::QuickSave || m_settings->boolValue(Settings::kCaptureAutoSave, false);
+        if (m_settings->boolValue(Settings::kHistoryKeepUnsaved, false) && !alreadyOnDisk)
+        {
+            if (const auto archived =
+                        History::archiveUnsavedCapture(image.image, QDateTime::currentDateTime(), Core::Paths::unsavedCaptureDirectory(), History::kUnsavedArchiveCapacity);
+                archived)
+            {
+                // 记的是像素尺寸而不是逻辑尺寸：历史缩略图与「重新贴图」都按这份文件读回来
+                recordHistory(*archived, History::HistoryKind::Screenshot, image.image.size());
+            } else
+            {
+                // 开着这一档就是指望这一张还在，静默失败等于骗人
+                notifyUser(QString::fromStdString(archived.error().message), Ui::ToastKind::Danger);
             }
         }
 

@@ -522,6 +522,26 @@ namespace
     }
 
     /**
+     * @brief 钉住「未保存的截图也进历史」这一格写的是截图那条路现读的键，默认档是关
+     * @details 这个键只在「截图完成」那一刻被读一次：写错一格不会报错，只会表现成
+     *          「开关拨了却没多留一份」，而用户以为误触 Esc 也丢不掉的那一张其实从没进过历史。
+     */
+    TEST_F(MainWindowFixture, UnsavedHistoryRowWritesTheKeyTheCapturePathReads)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::General);
+
+        auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage("未保存的截图也进历史"));
+        ASSERT_NE(check, nullptr) << "通用页没有这一格";
+        EXPECT_FALSE(check->isChecked()) << "默认档该是关：一开就每张截图往数据目录里落一份像素";
+        check->setChecked(true);
+        closeWindowAndFlush();
+
+        const auto reopened = makeStore();
+        EXPECT_TRUE(reopened->boolValue(GyanisScribe::Settings::kHistoryKeepUnsaved, false)) << "开关没写进 History/KeepUnsaved";
+    }
+
+    /**
      * @brief 钉住录制范围这一行写的是 Record 词表里的 token，且界面默认档就是读端初值那一档
      * @details 存中文标签的话下次录屏读不出来（parseRecordScope 认的是 FullScreen/Region/Window），
      *          而「录什么」猜错比帧率猜错重得多：用户以为录的是那片选区，实际录了整个桌面。

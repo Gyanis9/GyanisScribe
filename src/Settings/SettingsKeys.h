@@ -145,6 +145,9 @@ namespace GyanisScribe::Settings
     /// 历史最久留多少天，0 表示不限时长
     inline constexpr std::string_view kHistoryRetentionDays = "History/RetentionDays";
 
+    /// 没存过文件的截图也进历史：像素另存一份到应用数据目录下的 Unsaved（读端在 AppController::handleCaptured，写端在 History::archiveUnsavedCapture）
+    inline constexpr std::string_view kHistoryKeepUnsaved = "History/KeepUnsaved";
+
     /// 标注色板的最近使用颜色（#RRGGBB 列表，最新的在前），读写都在 Annotation::AnnotationToolbar
     inline constexpr std::string_view kAnnotationRecentColors = "Annotation/RecentColors";
 

@@ -72,6 +72,11 @@ namespace GyanisScribe::Core
         return fromQt(QStandardPaths::writableLocation(QStandardPaths::CacheLocation));
     }
 
+    std::filesystem::path Paths::unsavedCaptureDirectory()
+    {
+        return applicationDataDirectory() / "Unsaved";
+    }
+
     std::filesystem::path Paths::defaultScreenshotDirectory()
     {
         return fromQt(QStandardPaths::writableLocation(QStandardPaths::PicturesLocation)) / std::string(kApplicationFolder);
