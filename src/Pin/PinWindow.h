@@ -566,6 +566,12 @@ namespace GyanisScribe::Pin
          */
         void closedByUser();
 
+        /**
+         * @brief 这张贴图要求「销毁」而不是「关闭」：摘掉它，但别把它抄进可恢复的那份册子
+         * @details 两者的差别只在还能不能按回来：关闭过的那几张还能从托盘重新贴出，销毁过的不回。
+         */
+        void destroyRequested();
+
     protected:
         /**
          * @brief 绘制图片、选中边框与手柄

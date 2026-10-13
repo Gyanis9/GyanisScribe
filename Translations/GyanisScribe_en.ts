@@ -500,6 +500,14 @@
             <translation>The blank canvas did not open: Qt reported no usable screen. Retry inside a graphical session.</translation>
         </message>
         <message>
+            <source>没有可以重新贴出的贴图：关掉的那几张最多记 5 张，「销毁」掉的不算</source>
+            <translation>There is nothing to pin back: only the last 5 closed pins are kept, and destroyed ones never come back.</translation>
+        </message>
+        <message>
+            <source>已重新贴出那张关掉的贴图，还能按回来 {} 张</source>
+            <translation>The closed pin is back on the desk; {} more can still be pinned back.</translation>
+        </message>
+        <message>
             <source>上一次延时截图还在等，等它弹出来之后再按</source>
             <translation>The previous delayed capture is still waiting - press again once it comes up</translation>
         </message>
@@ -1416,6 +1424,10 @@
             <translation>Paste the clipboard image onto the screen</translation>
         </message>
         <message>
+            <source>重新贴出最近关掉的贴图</source>
+            <translation>Pin back the most recently closed image</translation>
+        </message>
+        <message>
             <source>切到下一组贴图</source>
             <translation>Switch to the next pin group</translation>
         </message>
@@ -2282,6 +2294,14 @@
         <message>
             <source>取消选择（%1 张）</source>
             <translation>Deselect (%1)</translation>
+        </message>
+        <message>
+            <source>销毁这一张</source>
+            <translation>Destroy this image</translation>
+        </message>
+        <message>
+            <source>彻底关掉这一张：它不再留在「重新贴出最近关掉的贴图」那五张里。只想暂时腾个地方请用「关闭」</source>
+            <translation>Close this image for good: it will not stay in the five recoverable closed images. Use Close if you only need the space back.</translation>
         </message>
         <message>
             <source>Linux（降级实现）</source>

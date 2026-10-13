@@ -64,6 +64,7 @@ namespace GyanisScribe::App
         PasteClipboard,    ///< 把剪贴板里的图贴到屏幕上；新成员只追加在末尾
         NextPinGroup,      ///< 切到下一组贴图；新成员只追加在末尾
         BlankCanvas,       ///< 新建空白画布直接进标注；新成员只追加在末尾
+        RepinClosed,       ///< 重新贴出最近关掉的贴图（销毁过的不算）；新成员只追加在末尾
     };
 
     /**

@@ -2003,6 +2003,15 @@ namespace GyanisScribe::Pin
                             close();
                             emit closedByUser();
                         });
+        // 销毁与关闭只差在「还能不能按回来」：这一张整组动作不参与（一次毁掉一桌太顺手了），
+        // 也不进那份可恢复的册子
+        auto *destroyAction = menu->addAction(GyanisScribe::Core::uiText("销毁这一张"), this,
+                                              [this]
+                                              {
+                                                  close();
+                                                  emit destroyRequested();
+                                              });
+        destroyAction->setToolTip(GyanisScribe::Core::uiText("彻底关掉这一张：它不再留在「重新贴出最近关掉的贴图」那五张里。只想暂时腾个地方请用「关闭」"));
         return menu;
     }
 

@@ -64,6 +64,8 @@ namespace GyanisScribe::App
         entries.append(TrayMenuEntry{TrayAction::TogglePinsVisible, "Pin", GyanisScribe::Core::uiText("收起 / 摆回全部贴图"), GyanisScribe::Settings::kHotkeyTogglePins});
         entries.append(TrayMenuEntry{TrayAction::ClearPinsThrough, "PinMouseThrough", GyanisScribe::Core::uiText("取消全部贴图穿透"), {}});
         entries.append(TrayMenuEntry{TrayAction::PasteClipboard, "PinCopy", GyanisScribe::Core::uiText("把剪贴板里的图贴到屏幕上"), {}});
+        // 关闭与销毁是两档：这一条只按得回「关闭」的那几张，销毁过的一张都不回来
+        entries.append(TrayMenuEntry{TrayAction::RepinClosed, "Refresh", GyanisScribe::Core::uiText("重新贴出最近关掉的贴图"), {}});
         entries.append(TrayMenuEntry{TrayAction::NextPinGroup, "PinGroup", GyanisScribe::Core::uiText("切到下一组贴图"), GyanisScribe::Settings::kHotkeyNextPinGroup});
         entries.append(TrayMenuEntry{});
         entries.append(TrayMenuEntry{TrayAction::OpenSettings, "Settings", GyanisScribe::Core::uiText("设置"), {}});

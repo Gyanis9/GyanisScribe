@@ -18,6 +18,8 @@
 #include <QVector>
 
 #include <memory>
+#include <deque>
+#include <optional>
 #include <vector>
 
 class QMimeData;
@@ -34,6 +36,22 @@ namespace GyanisScribe::Settings
 
 namespace GyanisScribe::Pin
 {
+
+    /**
+     * @brief 刚被关掉的贴图抄下来的那一份
+     * @details 「关闭」与「销毁」的差别就在这份有没有被抄走：关掉的还能从托盘按回来，销毁过的不回。
+     */
+    struct ClosedPin
+    {
+        QImage  image;      ///< 关掉那一刻的原始像素（物理像素）
+        QString sourceFile; ///< 动图的来源文件；静图是空串，重新贴出时靠它接着播
+    };
+
+    /**
+     * @brief 可重新贴出的贴图条数上限
+     * @details 再多就是拿一份越来越大的像素常驻内存：这一档要的是「手滑关错了能按回来」，不是历史册。
+     */
+    inline constexpr std::size_t kClosedPinHistorySize = 5;
     class PinWindow;
 
     /**
@@ -194,6 +212,15 @@ namespace GyanisScribe::Pin
          */
         void selectAllVisiblePins();
 
+        /**
+         * @brief 摘走最近关掉的那一张（没有时返回空）
+         * @details 后进的先出：用户手滑关掉的总是刚摆上去那一张，与最近选区那几档同一取向。
+         */
+        [[nodiscard]] std::optional<ClosedPin> takeClosedPin();
+
+        /// 此刻还能重新贴出几张（托盘那句提示与用例都读它）
+        [[nodiscard]] int closedPinCount() const noexcept;
+
         /// 清空选中集（贴图自己的「取消选择」、切组与整桌收起时都走这里）
         void clearPinSelection();
 
@@ -264,8 +291,22 @@ namespace GyanisScribe::Pin
         void pinClipboardReplaceRequested(int index);
 
     private:
-        /// 把某个已自行关闭的窗口从登记里摘掉
-        void forget(PinWindow *window);
+        /// 一张贴图离开在册表的两条路：关闭留得回，销毁回不来
+        enum class PinClosure
+        {
+            Closed,    ///< 用户关掉（单张、整组或整桌）：抄进可恢复的那份册子
+            Destroyed, ///< 用户销毁：不抄，托盘那句「重新贴出」再也碰不到它
+        };
+
+        /// 把某个已自行关闭的窗口从登记里摘掉；Destroyed 那一档不抄进可恢复的那份册子
+        void forget(PinWindow *window, PinClosure closure = PinClosure::Closed);
+
+        /**
+         * @brief 把这一张抄进「最近关掉的贴图」那份册子
+         * @param pin 还在册上的那张窗口（像素要趁窗口没析构前抄）
+         * @details 满了就挤掉最旧的一条：上限之内的像素才是「按得回来」的代价，超出就成了无声的内存增长。
+         */
+        void recordClosedPin(const PinWindow &pin);
 
         /**
          * @brief 一次动作作用到哪些贴图上
@@ -297,6 +338,7 @@ namespace GyanisScribe::Pin
         int                                     m_activeGroup  = kFirstPinGroup; ///< 当前显示的分组号
         bool                                    m_allConcealed = false;          ///< 全局收起是不是开着
         PinWindow                              *m_solo         = nullptr;        ///< 「只看这一张」的主角；空表示没开
+        std::deque<ClosedPin>                   m_closedPins;                    ///< 最近关掉的贴图（新的在前），上限 kClosedPinHistorySize
     };
 
 } // namespace GyanisScribe::Pin

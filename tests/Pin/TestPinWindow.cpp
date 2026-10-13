@@ -1600,4 +1600,27 @@ namespace GyanisScribe
         delete menu;
     }
 
+    /**
+     * @brief 钉住右键「销毁这一张」报销的是销毁，不是关闭
+     * @details 两条路只差在管理器要不要把那份像素抄进可恢复的册子，所以判据落在信号上：
+     *          同时报关闭就等于销毁过了还能按回来，那一档的区分当场作废。
+     */
+    TEST_F(PinWindowFixture, DestroyMenuItemReportsDestructionNotClosure)
+    {
+        auto &window       = makeWindow();
+        int   closures     = 0;
+        int   destructions = 0;
+        ASSERT_TRUE(QObject::connect(&window, &Pin::PinWindow::closedByUser, [&closures] { ++closures; }));
+        ASSERT_TRUE(QObject::connect(&window, &Pin::PinWindow::destroyRequested, [&destructions] { ++destructions; }));
+
+        auto *menu   = window.buildContextMenu();
+        auto *action = findMenuAction(*menu, QString::fromUtf8("销毁这一张"));
+        ASSERT_NE(action, nullptr) << "右键菜单里没有「销毁这一张」这一项";
+        action->trigger();
+        delete menu;
+
+        EXPECT_EQ(destructions, 1) << "点一下该报一次销毁";
+        EXPECT_EQ(closures, 0) << "销毁不该同时被当成关闭：那样它又会进那份可恢复的册子";
+    }
+
 } // namespace GyanisScribe

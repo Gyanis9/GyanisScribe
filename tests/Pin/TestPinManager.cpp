@@ -765,4 +765,61 @@ namespace GyanisScribe
         EXPECT_EQ(pins.selectedPinCount(), 0) << "全选之后清不干净，后面的整组操作就没有出口";
     }
 
+    /**
+     * @brief 钉住关闭留下可恢复的一份、销毁不留，以及取完要报「没有了」
+     * @details 两条路都会把窗口从在册表摘掉，区别只在那份像素抄没抄——用户按的就是这一格差别。
+     */
+    TEST_F(PinManagerFixture, ClosedPinsAreRecoverableAndDestroyedOnesAreNot)
+    {
+        auto &pins = makeManager();
+        // 两张给成不同颜色：只数张数认不出「抄走的是哪一份」——把两档反过来照样数得对
+        QImage closedImage{QSize{8, 8}, QImage::Format_ARGB32};
+        closedImage.fill(QColor{200, 30, 30});
+        QImage destroyedImage{QSize{8, 8}, QImage::Format_ARGB32};
+        destroyedImage.fill(QColor{30, 30, 200});
+        pins.addPin(closedImage, QPoint(10, 10));
+        pins.addPin(destroyedImage, QPoint(60, 60));
+        auto *first  = dynamic_cast<Pin::PinWindow *>(pins.pinAt(0));
+        auto *second = dynamic_cast<Pin::PinWindow *>(pins.pinAt(1));
+        ASSERT_NE(first, nullptr);
+        ASSERT_NE(second, nullptr);
+
+        emit first->closedByUser();
+        emit second->destroyRequested();
+
+        EXPECT_EQ(pins.count(), 0) << "两条路都得把这一张从在册表里摘掉";
+        EXPECT_EQ(pins.closedPinCount(), 1) << "关闭的那张该留下一份可按回来的，销毁的那张不该留";
+
+        const auto taken = pins.takeClosedPin();
+        ASSERT_TRUE(taken.has_value()) << "关掉的那张该按得回来";
+        const QColor closedCorner = taken->image.pixelColor(0, 0);
+        EXPECT_EQ(closedCorner, QColor(200, 30, 30)) << "留下的必须是被关闭那一张的像素：抄错人等于两张都回不来";
+        EXPECT_FALSE(taken->image.isNull()) << "抄下来的那份不能是空图：空图按出来是一张看不见的贴图";
+        EXPECT_EQ(pins.closedPinCount(), 0);
+        EXPECT_FALSE(pins.takeClosedPin().has_value()) << "取完就该说没有了，别让调用方去猜册子空没空";
+    }
+
+    /**
+     * @brief 钉住可恢复那份册子只留最新五条
+     * @details 上限之内的像素是「手滑关错了」的代价，超出就变成一份没人认领的内存：这条判据钉的是它真的会挤掉。
+     */
+    TEST_F(PinManagerFixture, ClosedPinHistoryKeepsOnlyTheNewestFive)
+    {
+        auto &pins = makeManager();
+        for (auto index = 0; index < 7; ++index)
+        {
+            pins.addPin(makeImage(), QPoint(10 * index, 10 * index));
+        }
+        ASSERT_EQ(pins.count(), 7);
+
+        while (pins.count() > 0)
+        {
+            auto *pin = dynamic_cast<Pin::PinWindow *>(pins.pinAt(0));
+            ASSERT_NE(pin, nullptr);
+            emit pin->closedByUser();
+        }
+
+        EXPECT_EQ(pins.closedPinCount(), static_cast<int>(Pin::kClosedPinHistorySize)) << "关掉七张只该留得回五张";
+    }
+
 } // namespace GyanisScribe

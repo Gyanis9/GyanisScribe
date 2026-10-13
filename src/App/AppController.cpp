@@ -380,6 +380,21 @@ namespace GyanisScribe::App
                                        canvas.image.height(), canvas.screenName.toStdString()));
     }
 
+    void AppController::repinLastClosedPin()
+    {
+        const auto taken = m_pins->takeClosedPin();
+        if (!taken)
+        {
+            // 空册也要回一句：这条入口在托盘上，不出声就成了「按了没反应」
+            notifyUser(GyanisScribe::Core::uiText("没有可以重新贴出的贴图：关掉的那几张最多记 5 张，「销毁」掉的不算"), Ui::ToastKind::Information);
+            return;
+        }
+
+        m_pins->addPin(taken->image, QCursor::pos(), taken->sourceFile);
+        notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已重新贴出那张关掉的贴图，还能按回来 {} 张"), m_pins->closedPinCount()).c_str()),
+                   Ui::ToastKind::Success);
+    }
+
     void AppController::scheduleCapture(std::function<void()> begin)
     {
         const auto stored = m_settings->intValue(Settings::kCaptureDelaySeconds, 0);
@@ -482,6 +497,9 @@ namespace GyanisScribe::App
                 return;
             case TrayAction::BlankCanvas:
                 startBlankCanvas();
+                return;
+            case TrayAction::RepinClosed:
+                repinLastClosedPin();
                 return;
             case TrayAction::ToggleRecord:
                 toggleRecording();

@@ -66,6 +66,8 @@ namespace GyanisScribe::Pin
                                  forget(pin);
                              }
                          });
+        // 销毁：走同一条摘除路，只是不抄那份像素——之后再也按不回来，这一档不参与整组动作
+        QObject::connect(raw, &PinWindow::destroyRequested, this, [this, raw] { forget(raw, PinClosure::Destroyed); });
         // 识别请求逐张转发出去：贴图在外头拿不到，出口不收在这一层就没人能替它识别
         QObject::connect(raw, &PinWindow::ocrRequested, this, &PinManager::pinOcrRequested);
         // 取色同理：窗口只管「点到了哪一格」，复制到剪贴板与提示都是界面层的事
@@ -558,6 +560,8 @@ namespace GyanisScribe::Pin
         m_pins.clear();
         for (auto &pin: pending)
         {
+            // 整桌关掉走的也是「关闭」那一档：这些像素还按得回来，与销毁不是一回事
+            recordClosedPin(*pin);
             pin->close();
         }
         // 一张都不剩时活动组回到第一组：下次贴一张回来落在有名字的一组上，而不是一个幽灵组号
@@ -565,7 +569,34 @@ namespace GyanisScribe::Pin
         emit pinCountChanged(0);
     }
 
-    void PinManager::forget(PinWindow *window)
+    void PinManager::recordClosedPin(const PinWindow &pin)
+    {
+        m_closedPins.push_front(ClosedPin{pin.image(), pin.state().sourceFile});
+        // 超出上限就挤掉最旧的一条：这份册子的用途是「手滑关错了按回来」，不是历史册
+        while (m_closedPins.size() > kClosedPinHistorySize)
+        {
+            m_closedPins.pop_back();
+        }
+    }
+
+    std::optional<ClosedPin> PinManager::takeClosedPin()
+    {
+        if (m_closedPins.empty())
+        {
+            return {};
+        }
+        // 后进的先出：手滑关掉的那张总是刚摆上去的那一张，与最近选区那几档同一取向
+        auto taken = m_closedPins.front();
+        m_closedPins.pop_front();
+        return taken;
+    }
+
+    int PinManager::closedPinCount() const noexcept
+    {
+        return static_cast<int>(m_closedPins.size());
+    }
+
+    void PinManager::forget(PinWindow *window, const PinClosure closure)
     {
         const auto found = std::ranges::find_if(m_pins, [window](const auto &held) { return held.get() == window; });
         if (found == m_pins.end())
@@ -573,6 +604,11 @@ namespace GyanisScribe::Pin
             return;
         }
 
+        // 抄像素要趁窗口还在：销毁那一档就是不抄，托盘的「重新贴出」从此再也碰不到它
+        if (closure == PinClosure::Closed)
+        {
+            recordClosedPin(**found);
+        }
         (*found)->deleteLater(); // 回调可能来自该窗口自己的事件处理，立即析构会踩在栈上
         m_pins.erase(found);
         // 关掉的若正是 Solo 的主角，这一档先落掉：下面的显隐重算才看得见其余几张
