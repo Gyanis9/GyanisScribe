@@ -111,6 +111,9 @@ namespace GyanisScribe::Annotation
                                      return;
                                  }
                                  m_activeTool = kind;
+                                 // 先把这一格形状记着的颜色换过来再发信号：宿主在 toolChanged 里读 currentColor()，
+                                 // 顺序反过来它会拿到上一个形状的颜色
+                                 adoptColorForTool(kind);
                                  emit toolChanged(kind);
                              });
             layout->addWidget(button);
@@ -129,12 +132,7 @@ namespace GyanisScribe::Annotation
             button->setIcon(QIcon{colorSwatchPixmap(color, m_icons.tintColor())});
             m_colorButtons[index] = button;
             colorGroup->addButton(button, static_cast<int>(index));
-            QObject::connect(button, &QToolButton::clicked, this,
-                             [this, color]
-                             {
-                                 m_currentColor = color;
-                                 emit colorChanged(color);
-                             });
+            QObject::connect(button, &QToolButton::clicked, this, [this, color] { applyColorToActiveTool(color); });
             layout->addWidget(button);
         }
         // 最近使用颜色：读回上一次留下的清单，插在预设色板之后、自定义按钮之前。
@@ -738,8 +736,8 @@ namespace GyanisScribe::Annotation
             // 用户按了取消：什么都不发，颜色停在上一格
             return;
         }
-        m_currentColor = picked;
-        emit colorChanged(picked);
+        // 自定义色也记在「当前形状」那一格上，与色板那两排同一条路
+        applyColorToActiveTool(picked);
 
         // 记进「最近使用」并立刻重建色块行：需求要求这一排跟着用户最近的动作走，
         // 落盘失败只记日志——颜色本身已经生效了，不该因为存不上就回退
@@ -748,6 +746,53 @@ namespace GyanisScribe::Annotation
         if (auto written = m_settings.setValue(Settings::kAnnotationRecentColors, Pick::serializeRecentColors(m_recentColors)); !written)
         {
             Core::Logger::warning(std::format("最近使用颜色没能保存：{}", written.error().message));
+        }
+    }
+
+    void AnnotationToolbar::applyColorToActiveTool(const QColor &color)
+    {
+        m_currentColor = color;
+        // 按 ToolKind 的底层值作键：往后加一档工具不必改这张表，也不用假设工具数与按钮数相等
+        m_colorsByTool.insert(static_cast<int>(m_activeTool), color);
+        emit colorChanged(color);
+    }
+
+    void AnnotationToolbar::adoptColorForTool(const ToolKind kind)
+    {
+        const auto found = m_colorsByTool.find(static_cast<int>(kind));
+        // 这个形状没被挑过色就什么都不动：把用户正在用的颜色凭空换成色板第一格，比沿用更让人莫名
+        if (found == m_colorsByTool.end() || found.value() == m_currentColor)
+        {
+            return;
+        }
+        m_currentColor = found.value();
+        // 按下的那一格要跟着走：互斥组会把别的放开，留着旧按下态就是在说「现在是上一个形状的颜色」
+        syncColorButtonChecked();
+        emit colorChanged(m_currentColor);
+    }
+
+    void AnnotationToolbar::syncColorButtonChecked()
+    {
+        for (std::size_t index = 0; index < m_colorButtons.size(); ++index)
+        {
+            if (m_colorButtons[index] != nullptr && Ui::kAnnotationPalette[index] == m_currentColor)
+            {
+                m_colorButtons[index]->setChecked(true);
+                return;
+            }
+        }
+        for (std::size_t index = 0; index < m_recentButtons.size() && index < m_recentColors.size(); ++index)
+        {
+            if (m_recentButtons[index] != nullptr && m_recentColors[index] == m_currentColor)
+            {
+                m_recentButtons[index]->setChecked(true);
+                return;
+            }
+        }
+        // 两排色块都对不上就是自定义色：按下那一枚
+        if (m_customColorButton != nullptr)
+        {
+            m_customColorButton->setChecked(true);
         }
     }
 
@@ -769,12 +814,7 @@ namespace GyanisScribe::Annotation
             // 图标换成色块：与预设那八格同一个画法，两排放在一起才看不出是两套控件
             button->setIcon(QIcon{colorSwatchPixmap(color, m_icons.tintColor())});
             m_colorGroup->addButton(button, static_cast<int>(Ui::kAnnotationPalette.size() + index));
-            QObject::connect(button, &QToolButton::clicked, this,
-                             [this, color]
-                             {
-                                 m_currentColor = color;
-                                 emit colorChanged(color);
-                             });
+            QObject::connect(button, &QToolButton::clicked, this, [this, color] { applyColorToActiveTool(color); });
             m_layout->insertWidget(m_recentInsertIndex + static_cast<int>(index), button);
             m_recentButtons.push_back(button);
         }

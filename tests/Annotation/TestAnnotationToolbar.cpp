@@ -981,3 +981,87 @@ TEST_F(ToolbarFixture, OffLadderStoredDefaultsFallBackWithoutRewriting)
     EXPECT_EQ(m_settings->intValue(GyanisScribe::Settings::kAnnotationDefaultWidth, -1), 5) << "构造期把坏值改写了";
     EXPECT_EQ(m_settings->intValue(GyanisScribe::Settings::kAnnotationDefaultFontSize, -1), 15);
 }
+
+/**
+ * @brief 钉住每种形状各记各的颜色：切回一个形状就换回它自己那格色
+ * @details 判据喂的是两格不同的色板色（矩形第二格、箭头第五格）——只断「切回去有颜色」认不出「两档共用一份色」，
+ *          那是这张色表最省事的坏法（记表的那一步被去掉，切换就退化成沿用上一次的颜色）。
+ */
+TEST_F(ToolbarFixture, EachShapeRemembersItsOwnColor)
+{
+    SignalLog log;
+    auto      toolbar = makeToolbarLogged(log);
+
+    // 起点是矩形：给它挑色板第二格
+    auto *secondSwatch = buttonByLabel(*toolbar, "颜色 2");
+    ASSERT_NE(secondSwatch, nullptr);
+    secondSwatch->click();
+    ASSERT_EQ(toolbar->currentColor(), kAnnotationPalette[1]);
+
+    auto *arrowButton = buttonByLabel(*toolbar, "箭头");
+    ASSERT_NE(arrowButton, nullptr);
+    arrowButton->click();
+    auto *fifthSwatch = buttonByLabel(*toolbar, "颜色 5");
+    ASSERT_NE(fifthSwatch, nullptr);
+    fifthSwatch->click();
+    ASSERT_EQ(toolbar->currentColor(), kAnnotationPalette[4]);
+
+    auto *rectangleButton = buttonByLabel(*toolbar, "矩形");
+    ASSERT_NE(rectangleButton, nullptr);
+    rectangleButton->click();
+    EXPECT_EQ(toolbar->currentColor(), kAnnotationPalette[1]) << "切回矩形该拿回矩形自己那格色";
+
+    arrowButton->click();
+    EXPECT_EQ(toolbar->currentColor(), kAnnotationPalette[4]) << "再切回箭头，箭头那格不许被矩形那次覆盖掉";
+}
+
+/**
+ * @brief 钉住没挑过色的形状沿用当前颜色，不回落到色板第一格
+ * @details 「新形状从默认色起步」听着也合理，但它会把用户正在用的那支色凭空换掉——切个工具颜色就跳，
+ *          比多记一格更让人以为程序出错。
+ */
+TEST_F(ToolbarFixture, ShapeWithoutItsOwnColorKeepsTheOneInUse)
+{
+    SignalLog log;
+    auto      toolbar = makeToolbarLogged(log);
+
+    auto *thirdSwatch = buttonByLabel(*toolbar, "颜色 3");
+    ASSERT_NE(thirdSwatch, nullptr);
+    thirdSwatch->click();
+
+    const auto colorsBeforeSwitch = log.colors.size();
+    auto      *penButton          = buttonByLabel(*toolbar, "画笔");
+    ASSERT_NE(penButton, nullptr);
+    penButton->click();
+
+    EXPECT_EQ(toolbar->currentColor(), kAnnotationPalette[2]) << "没挑过色的形状该沿用当前色";
+    EXPECT_EQ(log.colors.size(), colorsBeforeSwitch) << "没换色也别发信号：宿主收到一次 colorChanged 就要重下一遍画笔参数";
+}
+
+/**
+ * @brief 钉住按下的那一格色块跟着形状色走
+ * @details 色块行是互斥的：切了形状、颜色换了而按下的还是上一格，界面就在说「现在是箭头那格色」，
+ *          而实际画出来用的是另一格——读屏与眼睛都会被它骗一次。
+ */
+TEST_F(ToolbarFixture, PressedSwatchFollowsTheShapeColor)
+{
+    SignalLog log;
+    auto      toolbar = makeToolbarLogged(log);
+
+    auto *secondSwatch = buttonByLabel(*toolbar, "颜色 2");
+    auto *fifthSwatch  = buttonByLabel(*toolbar, "颜色 5");
+    ASSERT_NE(secondSwatch, nullptr);
+    ASSERT_NE(fifthSwatch, nullptr);
+
+    secondSwatch->click();
+    auto *arrowButton = buttonByLabel(*toolbar, "箭头");
+    ASSERT_NE(arrowButton, nullptr);
+    arrowButton->click();
+    fifthSwatch->click();
+    ASSERT_TRUE(fifthSwatch->isChecked());
+
+    buttonByLabel(*toolbar, "矩形")->click();
+
+    EXPECT_TRUE(secondSwatch->isChecked()) << "切回矩形后按下的色块还停在箭头那一格";
+    EXPECT_FALSE(fifthSwatch->isChecked()) << "两排色块同时按下：互斥组没起作用";
+}
