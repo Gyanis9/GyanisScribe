@@ -64,6 +64,21 @@ namespace GyanisScribe::Pin
         return clampScale(initialScale * (currentDistance / initialDistance));
     }
 
+    double clampThumbnailEdge(const double edge) noexcept
+    {
+        return std::clamp(edge, kMinimumThumbnailEdge, kMaximumThumbnailEdge);
+    }
+
+    double thumbnailEdgeFromDrag(const double initialEdge, const double initialDistance, const double currentDistance) noexcept
+    {
+        if (initialDistance <= 0.0)
+        {
+            // 与 scaleFromDrag 同一条口径：在中心点上按下没有比值可算，保持原边长而不是瞬间缩没
+            return clampThumbnailEdge(initialEdge);
+        }
+        return clampThumbnailEdge(initialEdge * (currentDistance / initialDistance));
+    }
+
     double normalizeDegrees(double degrees) noexcept
     {
         double folded = std::fmod(degrees, 360.0);

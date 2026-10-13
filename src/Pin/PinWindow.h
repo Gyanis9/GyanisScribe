@@ -126,6 +126,17 @@ namespace GyanisScribe::Pin
         [[nodiscard]] bool isThumbnailMode() const noexcept;
 
         /**
+         * @brief 设缩略图那枚方块的边长
+         * @param edge 逻辑像素；越界夹进 [24,240]，不静默吞掉越界值
+         * @details 方块定多大与「这张图缩放到几倍」是两件事：这一格只改方块的尺寸，
+         *          退出缩略图后回到的是用户自己调好的那份缩放，一点不被碰。
+         */
+        void setThumbnailEdge(double edge);
+
+        /// 缩略图方块的当前边长，逻辑像素（不在这档时也留着，下次缩起来还是这个大小）
+        [[nodiscard]] double thumbnailEdge() const noexcept;
+
+        /**
          * @brief 在贴图上直接标注：进入标注模式
          * @details 把这张贴图当作画布交给标注引擎，标注视图铺满整窗，工具栏浮在旁边——
          *          与标注窗是同一套引擎、视图与快捷键表。
@@ -718,7 +729,6 @@ namespace GyanisScribe::Pin
          * @brief 这一落点归哪一档「改大小」：先认那八枚手柄，再认窗口四边那一条带子
          * @param localPoint 本窗口内坐标
          * @return 命中的那一档；带子与手柄都没碰上时为空——那才是整张平移的落点
-         * @note 缩略图那一档不认边带：那枚 48 格的小方块是「先让开地方」，四边一带就没了挪它的落点
          */
         [[nodiscard]] std::optional<HandleKind> resizeHandleAt(const QPointF &localPoint) const;
 
@@ -789,59 +799,61 @@ namespace GyanisScribe::Pin
         QSizeF m_logicalSize; ///< 图片逻辑尺寸
         /// 显示用的像素：灰度/反色两档按需算一份并挂住（同一版像素只算一次）
         [[nodiscard]] const QImage                          &displayImage() const;
-        double                                               m_scale                = 1.0;               ///< 缩放因子
-        double                                               m_rotationDegrees      = 0.0;               ///< 旋转角度
-        bool                                                 m_mirroredHorizontally = false;             ///< 左右翻转（视图变换）
-        bool                                                 m_mirroredVertically   = false;             ///< 上下翻转（视图变换）
-        bool                                                 m_grayscale            = false;             ///< 灰度显示（视图滤镜）
-        bool                                                 m_inverted             = false;             ///< 反色（视图滤镜）
-        bool                                                 m_cropping             = false;             ///< 裁剪模式
-        bool                                                 m_selected             = false;             ///< 在不在多选集中
-        int                                                  m_selectionCount       = 0;                 ///< 选中集里的张数（管理器推下来）
-        bool                                                 m_soloState            = false;             ///< 是不是「只看这一张」的主角（管理器推下来）
-        QColor                                               m_backgroundColor;                          ///< 背景色（白板）；无效色表示没垫
-        std::optional<QPointF>                               m_cropAnchor;                               ///< 裁剪框起笔点（窗口坐标）；没拖过时为空
-        std::optional<QPointF>                               m_cropCurrent;                              ///< 裁剪框当前点（窗口坐标）
-        double                                               m_rotationBeforeCrop           = 0.0;       ///< 进裁剪前的旋转角，退出时恢复
-        bool                                                 m_mirrorHorizontallyBeforeCrop = false;     ///< 进裁剪前的左右翻转，退出时恢复
-        bool                                                 m_mirrorVerticallyBeforeCrop   = false;     ///< 进裁剪前的上下翻转，退出时恢复
-        mutable QImage                                       m_viewFiltered;                             ///< 灰度/反色算出来的显示图；两档全关时为空
-        mutable qint64                                       m_viewFilteredSourceKey = 0;                ///< 上面那份缓存对的是哪一版像素（cacheKey）
-        double                                               m_opacity               = 1.0;              ///< 不透明度
-        bool                                                 m_mouseThrough          = false;            ///< 是否鼠标穿透
-        bool                                                 m_thumbnail             = false;            ///< 缩略图模式：窗口缩成小方块，缩放等设定原样留着
-        bool                                                 m_shadowEnabled         = false;            ///< 窗口阴影：窗口比内容每边大 kShadowMargin，投影画在带子里
-        bool                                                 m_smoothScaleEnabled    = true;             ///< 平滑缩放：关着时放大画的是硬边像素格（读小字用）
-        bool                                                 m_pinned                = true;             ///< 是否置顶
-        int                                                  m_group                 = kFirstPinGroup;   ///< 所属贴图分组，菜单与布局记录都取它
-        QVector<int>                                         m_groupChoices{kFirstPinGroup};             ///< 现有分组号（升序），由管理器推过来
-        QMap<int, QString>                                   m_groupNames;                               ///< 各组名字（管理器推过来），菜单标签与改名输入框的预填都读它
-        bool                                                 m_colorPickMode = false;                    ///< 取色模式：鼠标读像素而不是拖动
-        QPointF                                              m_pickPoint;                                ///< 取色模式下光标在窗口里的位置，读数框跟它走
-        ScreenEdge                                           m_edgeDock = ScreenEdge::None;              ///< 贴的是哪条屏边；None 表示没贴
-        QRect                                                m_dockArea;                                 ///< 贴边那一刻那块屏的可用区，收起与展开都按它算
-        bool                                                 m_dockCollapsed = false;                    ///< 贴边后是不是收成了那一条
-        bool                                                 m_dragMoved     = false;                    ///< 这一轮按下之后真拖动过没有（只点一下不吸边）
-        class QMovie                                        *m_movie         = nullptr;                  ///< 动图播放器；静图这张贴图时为空
-        QString                                              m_sourceFile;                               ///< 动图的来源文件；进布局记录，重启后按它接上动画
-        QPoint                                               m_dragOffset;                               ///< 移动时起笔点与窗口左上角的差
-        std::function<std::vector<QRect>()>                  m_snapCandidates;                           ///< 起笔时取参照矩形的口径，由管理器供给
-        std::vector<QRect>                                   m_dragCandidates;                           ///< 这一趟拖动的参照快照，整趟都用它，不在每帧重新枚举
-        std::optional<HandleKind>                            m_draggedHandle;                            ///< 正在拖的手柄，没拖时为空
-        double                                               m_dragInitialScale                 = 1.0;   ///< 起拖时的缩放
-        double                                               m_dragInitialDistance              = 0.0;   ///< 起拖时指针到中心的距离
-        bool                                                 m_annotating                       = false; ///< 正在贴图上直接标注
-        double                                               m_rotationBeforeAnnotate           = 0.0;   ///< 进标注前的旋转角，退出时恢复
-        bool                                                 m_mirrorHorizontallyBeforeAnnotate = false; ///< 进标注前的左右翻转，退出时恢复
-        bool                                                 m_mirrorVerticallyBeforeAnnotate   = false; ///< 进标注前的上下翻转，退出时恢复
-        bool                                                 m_dockCollapsedBeforeAnnotate      = false; ///< 进标注前的贴边收起态，退出时恢复
-        std::unique_ptr<Annotation::AnnotationEngine>        m_annotateEngine;                           ///< 标注引擎，首次进入标注时创建
-        Annotation::AnnotationView                          *m_annotateView    = nullptr;                ///< 铺在贴图上的标注视图，本窗口的子控件
-        Annotation::AnnotationToolbar                       *m_annotateToolbar = nullptr;                ///< 浮着的标注工具栏
-        std::unique_ptr<Annotation::AnnotationToolbarBridge> m_annotateBridge;                           ///< 工具栏与引擎的接线
-        std::unique_ptr<Ui::IconProvider>                    m_icons;                                    ///< 工具栏要的图标供给器，首次进入标注时创建
-        Settings::ISettingsStore                            &m_settings;                                 ///< 配置来源（保存目录）
-        const Platform::IPlatformIntegration                &m_integration;                              ///< 平台能力查询
+        double                                               m_scale                = 1.0;                    ///< 缩放因子
+        double                                               m_rotationDegrees      = 0.0;                    ///< 旋转角度
+        bool                                                 m_mirroredHorizontally = false;                  ///< 左右翻转（视图变换）
+        bool                                                 m_mirroredVertically   = false;                  ///< 上下翻转（视图变换）
+        bool                                                 m_grayscale            = false;                  ///< 灰度显示（视图滤镜）
+        bool                                                 m_inverted             = false;                  ///< 反色（视图滤镜）
+        bool                                                 m_cropping             = false;                  ///< 裁剪模式
+        bool                                                 m_selected             = false;                  ///< 在不在多选集中
+        int                                                  m_selectionCount       = 0;                      ///< 选中集里的张数（管理器推下来）
+        bool                                                 m_soloState            = false;                  ///< 是不是「只看这一张」的主角（管理器推下来）
+        QColor                                               m_backgroundColor;                               ///< 背景色（白板）；无效色表示没垫
+        std::optional<QPointF>                               m_cropAnchor;                                    ///< 裁剪框起笔点（窗口坐标）；没拖过时为空
+        std::optional<QPointF>                               m_cropCurrent;                                   ///< 裁剪框当前点（窗口坐标）
+        double                                               m_rotationBeforeCrop           = 0.0;            ///< 进裁剪前的旋转角，退出时恢复
+        bool                                                 m_mirrorHorizontallyBeforeCrop = false;          ///< 进裁剪前的左右翻转，退出时恢复
+        bool                                                 m_mirrorVerticallyBeforeCrop   = false;          ///< 进裁剪前的上下翻转，退出时恢复
+        mutable QImage                                       m_viewFiltered;                                  ///< 灰度/反色算出来的显示图；两档全关时为空
+        mutable qint64                                       m_viewFilteredSourceKey = 0;                     ///< 上面那份缓存对的是哪一版像素（cacheKey）
+        double                                               m_opacity               = 1.0;                   ///< 不透明度
+        bool                                                 m_mouseThrough          = false;                 ///< 是否鼠标穿透
+        bool                                                 m_thumbnail             = false;                 ///< 缩略图模式：窗口缩成小方块，缩放等设定原样留着
+        double                                               m_thumbnailEdge         = kDefaultThumbnailEdge; ///< 缩略图方块的边长，逻辑像素：拖那枚方块的边就是改它
+        bool                                                 m_shadowEnabled         = false;                 ///< 窗口阴影：窗口比内容每边大 kShadowMargin，投影画在带子里
+        bool                                                 m_smoothScaleEnabled    = true;                  ///< 平滑缩放：关着时放大画的是硬边像素格（读小字用）
+        bool                                                 m_pinned                = true;                  ///< 是否置顶
+        int                                                  m_group                 = kFirstPinGroup;        ///< 所属贴图分组，菜单与布局记录都取它
+        QVector<int>                                         m_groupChoices{kFirstPinGroup};                  ///< 现有分组号（升序），由管理器推过来
+        QMap<int, QString>                                   m_groupNames;                                    ///< 各组名字（管理器推过来），菜单标签与改名输入框的预填都读它
+        bool                                                 m_colorPickMode = false;                         ///< 取色模式：鼠标读像素而不是拖动
+        QPointF                                              m_pickPoint;                                     ///< 取色模式下光标在窗口里的位置，读数框跟它走
+        ScreenEdge                                           m_edgeDock = ScreenEdge::None;                   ///< 贴的是哪条屏边；None 表示没贴
+        QRect                                                m_dockArea;                                      ///< 贴边那一刻那块屏的可用区，收起与展开都按它算
+        bool                                                 m_dockCollapsed = false;                         ///< 贴边后是不是收成了那一条
+        bool                                                 m_dragMoved     = false;                         ///< 这一轮按下之后真拖动过没有（只点一下不吸边）
+        class QMovie                                        *m_movie         = nullptr;                       ///< 动图播放器；静图这张贴图时为空
+        QString                                              m_sourceFile;                                    ///< 动图的来源文件；进布局记录，重启后按它接上动画
+        QPoint                                               m_dragOffset;                                    ///< 移动时起笔点与窗口左上角的差
+        std::function<std::vector<QRect>()>                  m_snapCandidates;                                ///< 起笔时取参照矩形的口径，由管理器供给
+        std::vector<QRect>                                   m_dragCandidates;                                ///< 这一趟拖动的参照快照，整趟都用它，不在每帧重新枚举
+        std::optional<HandleKind>                            m_draggedHandle;                                 ///< 正在拖的手柄，没拖时为空
+        double                                               m_dragInitialScale                 = 1.0;        ///< 起拖时的缩放
+        double                                               m_dragInitialEdge                  = kDefaultThumbnailEdge; ///< 起拖时缩略图方块的边长
+        double                                               m_dragInitialDistance              = 0.0;                   ///< 起拖时指针到中心的距离
+        bool                                                 m_annotating                       = false;                 ///< 正在贴图上直接标注
+        double                                               m_rotationBeforeAnnotate           = 0.0;                   ///< 进标注前的旋转角，退出时恢复
+        bool                                                 m_mirrorHorizontallyBeforeAnnotate = false;                 ///< 进标注前的左右翻转，退出时恢复
+        bool                                                 m_mirrorVerticallyBeforeAnnotate   = false;                 ///< 进标注前的上下翻转，退出时恢复
+        bool                                                 m_dockCollapsedBeforeAnnotate      = false;                 ///< 进标注前的贴边收起态，退出时恢复
+        std::unique_ptr<Annotation::AnnotationEngine>        m_annotateEngine;                                           ///< 标注引擎，首次进入标注时创建
+        Annotation::AnnotationView                          *m_annotateView    = nullptr;                                ///< 铺在贴图上的标注视图，本窗口的子控件
+        Annotation::AnnotationToolbar                       *m_annotateToolbar = nullptr;                                ///< 浮着的标注工具栏
+        std::unique_ptr<Annotation::AnnotationToolbarBridge> m_annotateBridge;                                           ///< 工具栏与引擎的接线
+        std::unique_ptr<Ui::IconProvider>                    m_icons;                                                    ///< 工具栏要的图标供给器，首次进入标注时创建
+        Settings::ISettingsStore                            &m_settings;                                                 ///< 配置来源（保存目录）
+        const Platform::IPlatformIntegration                &m_integration;                                              ///< 平台能力查询
     };
 
 } // namespace GyanisScribe::Pin

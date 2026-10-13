@@ -1838,28 +1838,101 @@ namespace GyanisScribe
     }
 
     /**
-     * @brief 钉住缩略图那一档不吃边带：拖小方块还是挪，不是改大小
-     * @details 那枚方块固定 48 格，改大小在这档里根本无从表现；更关键的是它本来的用途就是
-     *          「先让开地方」，四边一带就没有挪它的落点了。
+     * @brief 钉住拖缩略图的边是给那枚方块定大小，不碰用户调好的缩放
+     * @details 旧口径是「缩略图不吃边带」（方块只有 48 格，怕四边一带就没处挪它）；这一档把方块本身做成可定大小的，
+     *          于是边上拖改的是方块边长。两条断言配着用：方块长大了还不够——若实现顺手去改 m_scale，
+     *          退出缩略图时用户那张图的倍率就被偷偷换掉了。
      */
-    TEST_F(PinWindowFixture, ThumbnailEdgeDragStillPans)
+    TEST_F(PinWindowFixture, ThumbnailEdgeDragSizesTheSquareAndLeavesTheZoomAlone)
+    {
+        auto &window = makeWindow();
+        window.setScale(3.0);
+        window.setThumbnailMode(true);
+        window.move(QPoint{100, 100});
+        const auto before      = QRect(window.pos(), window.size());
+        const auto scaleBefore = window.scale();
+
+        // 右边带里、那枚手柄之外的一格：48 格的方块，右边手柄只盖住纵向中线 ±5
+        const QPointF pressLocal{44.0, 36.0};
+        const QPoint  pressGlobal{window.pos() + pressLocal.toPoint()};
+        QMouseEvent   press{QEvent::MouseButtonPress, pressLocal, pressGlobal, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &press);
+
+        const QPointF draggedLocal{64.0, 36.0};
+        const QPoint  draggedGlobal{window.pos() + draggedLocal.toPoint()};
+        QMouseEvent   drag{QEvent::MouseMove, draggedLocal, draggedGlobal, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &drag);
+
+        EXPECT_GT(window.width(), before.width()) << "拖缩略图的边该把方块放大，而不是整块挪走";
+        EXPECT_TRUE(window.isThumbnailMode()) << "定大小不该把方块弹回原样";
+        EXPECT_NEAR(window.scale(), scaleBefore, kScaleTolerance) << "方块的大小与那张图的倍率是两件事：这一拖不该动缩放";
+
+        window.setThumbnailMode(false);
+        EXPECT_NEAR(window.scale(), scaleBefore, kScaleTolerance) << "退出缩略图后回到的是用户自己调好的那 3 倍";
+    }
+
+    /**
+     * @brief 钉住缩略图方块中间那一片还是平移的落点
+     * @details 边上给的是定大小，中间没人抢：那枚方块的本职是「先让开地方」，挪不动它这一档就没用了。
+     */
+    TEST_F(PinWindowFixture, ThumbnailInteriorDragStillPans)
     {
         auto &window = makeWindow();
         window.setThumbnailMode(true);
         window.move(QPoint{100, 100});
 
-        const QPointF pressLocal{46.0, 32.0};
+        const QPointF pressLocal{24.0, 24.0};
         const QPoint  pressGlobal{window.pos() + pressLocal.toPoint()};
         QMouseEvent   press{QEvent::MouseButtonPress, pressLocal, pressGlobal, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
         QApplication::sendEvent(&window, &press);
 
-        const QPointF draggedLocal{66.0, 52.0};
+        const QPointF draggedLocal{44.0, 44.0};
         const QPoint  draggedGlobal{window.pos() + draggedLocal.toPoint()};
         QMouseEvent   drag{QEvent::MouseMove, draggedLocal, draggedGlobal, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
         QApplication::sendEvent(&window, &drag);
 
         const QPoint panned(120, 120);
-        EXPECT_EQ(window.pos(), panned) << "缩略图上也按住边拖，该是整块挪走而不是改大小（这一档的尺寸是钉死的）";
+        EXPECT_EQ(window.pos(), panned) << "方块中间那一按一拖该是整块挪走";
+        EXPECT_EQ(window.width(), 48) << "从中间拖不该顺手改了方块的大小";
+    }
+
+    /**
+     * @brief 钉住缩略图边长的取值范围：越界夹住而不是照收
+     * @details 上限防的是「让地方的方块盖住半屏」，下限防的是小得认不出上面是什么；
+     *          两个方向都夹不住的话，一次误拖就把这一档变成另一种东西。
+     */
+    TEST_F(PinWindowFixture, ThumbnailEdgeClampsToItsRange)
+    {
+        auto &window = makeWindow();
+        window.setThumbnailMode(true);
+
+        window.setThumbnailEdge(1000.0);
+        EXPECT_NEAR(window.thumbnailEdge(), 240.0, kScaleTolerance) << "上限没夹住：一枚盖住半屏的『缩略图』不叫让地方";
+
+        window.setThumbnailEdge(5.0);
+        EXPECT_NEAR(window.thumbnailEdge(), 24.0, kScaleTolerance) << "下限没夹住：小到这步就只剩一个点，谁也点不着它";
+
+        window.setThumbnailEdge(96.0);
+        EXPECT_EQ(window.width(), 96) << "合法值该当场落到窗口尺寸上";
+    }
+
+    /**
+     * @brief 钉住方块的大小留着用：退出再缩起来还是那一档
+     * @details 用户给它定的大小是「这一张摆多大地方」的选择，跟着这张贴图走；
+     *          每次缩回去都从 48 重新开始的话，每一次都得重拖一遍。
+     */
+    TEST_F(PinWindowFixture, ThumbnailEdgeSurvivesToggling)
+    {
+        auto &window = makeWindow();
+        window.setThumbnailEdge(120.0);
+        EXPECT_EQ(window.width(), 40) << "没缩起来的时候这一格不该改窗口大小";
+
+        window.setThumbnailMode(true);
+        EXPECT_EQ(window.width(), 120) << "缩起来用的是用户定过的那档边长";
+
+        window.setThumbnailMode(false);
+        window.setThumbnailMode(true);
+        EXPECT_EQ(window.width(), 120) << "弹回原样再缩起来，方块的大小不该掉回默认的 48";
     }
 
 } // namespace GyanisScribe

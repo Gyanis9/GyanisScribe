@@ -30,6 +30,15 @@ namespace GyanisScribe::Pin
     /// 透明度下限：完全不透明的穿透模式会看不见，留 5% 至少有个影子
     constexpr double kMinimumOpacity = 0.05;
 
+    /// 缩略图方块的默认边长，逻辑像素
+    constexpr double kDefaultThumbnailEdge = 48.0;
+
+    /// 缩略图方块的可拖下限：再小就只剩一枚图标的大小，看不出上面是什么
+    constexpr double kMinimumThumbnailEdge = 24.0;
+
+    /// 缩略图方块的可拖上限：方块的用途是「先让开地方」，大到盖住半屏就不是让地方了
+    constexpr double kMaximumThumbnailEdge = 240.0;
+
     /**
      * @brief 缩放手柄的八个方位
      * @details 取值可能被写进布局文件，新成员只能追加在末尾。
@@ -95,6 +104,24 @@ namespace GyanisScribe::Pin
      *       按 0 处理会把贴图瞬间缩成不可见，那比「拖不动」更糟
      */
     [[nodiscard]] double scaleFromDrag(double initialScale, double initialDistance, double currentDistance) noexcept;
+
+    /**
+     * @brief 把缩略图方块的边长夹进合法区间
+     * @param edge 待夹的边长，允许非正（视为太小）
+     * @return 夹到 [kMinimumThumbnailEdge, kMaximumThumbnailEdge] 之间的值
+     */
+    [[nodiscard]] double clampThumbnailEdge(double edge) noexcept;
+
+    /**
+     * @brief 按拖拽距离算缩略图方块的新边长
+     * @param initialEdge 起拖时的边长
+     * @param initialDistance 起拖时指针到中心的距离
+     * @param currentDistance 当前指针到中心的距离
+     * @return 夹进合法区间的新边长
+     * @details 与 scaleFromDrag 同一条距离口径：方块与整张图共用「拖边按到中心的距离给倍率」这一只手感，
+     *          只是落到的量不一样——方块改的是那枚方块的边长，不碰用户调好的缩放。
+     */
+    [[nodiscard]] double thumbnailEdgeFromDrag(double initialEdge, double initialDistance, double currentDistance) noexcept;
 
     /**
      * @brief 把角度折进 [0, 360)

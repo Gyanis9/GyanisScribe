@@ -121,9 +121,6 @@ namespace GyanisScribe::Pin
         /// 贴图的最小边长，逻辑像素：再小就找不到也拖不动
         constexpr double kMinimumEdge = 8.0;
 
-        /// 缩略图模式那枚小方块的边长，逻辑像素
-        constexpr double kThumbnailEdge = 48.0;
-
         /// 手柄档对哪一个光标形状：八个档只有三种形状，两条对角各一枚
         Qt::CursorShape resizeCursorFor(const HandleKind handle) noexcept
         {
@@ -635,12 +632,6 @@ namespace GyanisScribe::Pin
 
     std::optional<HandleKind> PinWindow::edgeHandleAt(const QPointF &localPoint) const
     {
-        // 缩略图那一档不认边带：那枚小方块是「先让开地方」，四边一带就没有挪它的落点了
-        if (m_thumbnail)
-        {
-            return {};
-        }
-
         // 带子夹到最短那一边的三分之一以内：图小的时候四边的带子会叠到一起，
         // 整张都成了「改大小」就再没有平移的地方
         const auto band       = std::min(kEdgeResizeBand, std::min(width(), height()) / 3.0);
@@ -738,6 +729,27 @@ namespace GyanisScribe::Pin
     bool PinWindow::isThumbnailMode() const noexcept
     {
         return m_thumbnail;
+    }
+
+    void PinWindow::setThumbnailEdge(const double edge)
+    {
+        const auto clamped = clampThumbnailEdge(edge);
+        if (clamped == m_thumbnailEdge)
+        {
+            return;
+        }
+        m_thumbnailEdge = clamped;
+        // 只有缩着的时候这一格才看得见：正摊开的那张不该被方块的尺寸挪动分毫
+        if (m_thumbnail)
+        {
+            applyGeometry();
+        }
+        update();
+    }
+
+    double PinWindow::thumbnailEdge() const noexcept
+    {
+        return m_thumbnailEdge;
     }
 
     void PinWindow::setGroup(const int group)
@@ -1285,7 +1297,7 @@ namespace GyanisScribe::Pin
 
     void PinWindow::applyGeometry()
     {
-        const auto scaled   = m_thumbnail ? QSizeF{kThumbnailEdge, kThumbnailEdge} : windowSizeFor(m_logicalSize, m_scale);
+        const auto scaled   = m_thumbnail ? QSizeF{m_thumbnailEdge, m_thumbnailEdge} : windowSizeFor(m_logicalSize, m_scale);
         const auto rotation = m_thumbnail ? 0.0 : m_rotationDegrees;
         const auto width    = std::max(kMinimumEdge, scaled.width());
         const auto height   = std::max(kMinimumEdge, scaled.height());
@@ -1337,7 +1349,7 @@ namespace GyanisScribe::Pin
 
     QRectF PinWindow::contentRect() const
     {
-        const auto   scaled = m_thumbnail ? QSizeF{kThumbnailEdge, kThumbnailEdge} : windowSizeFor(m_logicalSize, m_scale);
+        const auto   scaled = m_thumbnail ? QSizeF{m_thumbnailEdge, m_thumbnailEdge} : windowSizeFor(m_logicalSize, m_scale);
         const double width  = std::max(kMinimumEdge, scaled.width());
         const double height = std::max(kMinimumEdge, scaled.height());
 
@@ -1532,6 +1544,7 @@ namespace GyanisScribe::Pin
         {
             m_draggedHandle       = *handle;
             m_dragInitialScale    = m_scale;
+            m_dragInitialEdge     = m_thumbnailEdge;
             m_dragInitialDistance = std::hypot(point.x() - rect().center().x(), point.y() - rect().center().y());
             return;
         }
@@ -1570,7 +1583,14 @@ namespace GyanisScribe::Pin
             const auto point    = event->position();
             const auto distance = std::hypot(point.x() - rect().center().x(), point.y() - rect().center().y());
             const auto before   = QRect(pos(), size());
-            setScale(scaleFromDrag(m_dragInitialScale, m_dragInitialDistance, distance));
+            // 缩着的那一枚改的是方块边长，摊开的那张改的是缩放：同一只手感（按到中心的距离给倍率），落到各自的量上
+            if (m_thumbnail)
+            {
+                setThumbnailEdge(thumbnailEdgeFromDrag(m_dragInitialEdge, m_dragInitialDistance, distance));
+            } else
+            {
+                setScale(scaleFromDrag(m_dragInitialScale, m_dragInitialDistance, distance));
+            }
             // applyGeometry 是按中心重算尺寸的；这里把对面那条边钉回原位——按住右边往外拖时
             // 左边不该一起跑，那看着像整张在漂而不是在改大小
             move(anchoredTopLeft(*m_draggedHandle, before, QRect(pos(), size())));
@@ -1995,6 +2015,7 @@ namespace GyanisScribe::Pin
                                                 });
         thumbnailAction->setCheckable(true);
         thumbnailAction->setChecked(m_thumbnail);
+        thumbnailAction->setToolTip(GyanisScribe::Core::uiText("缩成屏上一枚小方块先让开地方；拖它的四边与四角能给这枚方块定大小，缩放与旋转原样留着，再点一下回到原样"));
 
         // 背景色（白板）：垫在图的后面，透明像素处露出来的就是它；「无背景」回到透出桌面那一档。
         // 四项预设各一项，外加一个开取色对话框的自定义

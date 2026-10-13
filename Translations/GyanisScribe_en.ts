@@ -2264,6 +2264,10 @@
             <translation>Shrink to thumbnail</translation>
         </message>
         <message>
+            <source>缩成屏上一枚小方块先让开地方；拖它的四边与四角能给这枚方块定大小，缩放与旋转原样留着，再点一下回到原样</source>
+            <translation>Shrink it to a small square to clear the way; drag its edges or corners to size that square, while the zoom and the angle stay as they were. Choose it again to restore.</translation>
+        </message>
+        <message>
             <source>背景色</source>
             <translation>Background</translation>
         </message>

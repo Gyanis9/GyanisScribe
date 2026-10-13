@@ -110,6 +110,20 @@ TEST(PinTransform, HandlesSitOnCornersAndEdgeMidpoints)
 }
 
 /**
+ * @brief 钉住缩略图方块按同一只距离比例定大小，并夹在自己的取值范围里
+ * @details 与 scaleFromDrag 共用一条手感，但落到另一个量上：上限防的是「让地方的方块盖住半屏」，
+ *          下限防的是小得认不出上面是什么。中心点起拖那一档同样保持原样。
+ */
+TEST(PinTransform, ThumbnailEdgeFollowsDragRatioAndClamps)
+{
+    EXPECT_TRUE(nearEqual(thumbnailEdgeFromDrag(48.0, 50.0, 100.0), 96.0)) << "拖到两倍远该把方块放大一倍";
+    EXPECT_TRUE(nearEqual(thumbnailEdgeFromDrag(96.0, 100.0, 50.0), 48.0)) << "拖回一半该缩一半";
+    EXPECT_TRUE(nearEqual(thumbnailEdgeFromDrag(60.0, 0.0, 500.0), 60.0)) << "在中心点起拖不该把方块瞬间缩到下限";
+    EXPECT_TRUE(nearEqual(thumbnailEdgeFromDrag(48.0, 10.0, 100000.0), kMaximumThumbnailEdge)) << "放大要停在上限";
+    EXPECT_TRUE(nearEqual(thumbnailEdgeFromDrag(48.0, 100.0, 1.0), kMinimumThumbnailEdge)) << "缩要停在下限";
+}
+
+/**
  * @brief 钉住拖拽改缩放的比例关系与两个退化分支
  */
 TEST(PinTransform, DragScalesByDistanceRatio)
