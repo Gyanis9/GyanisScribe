@@ -265,10 +265,6 @@ namespace GyanisScribe
 
 
     /**
-     * @brief 钉住缩略图模式：缩成小方块、缩放与旋转原样留着、退出回原样
-     * @details 缩略图只是「先让开地方」：它不进恢复布局，也不改用户调好的缩放与旋转。
-     */
-    /**
      * @brief 钉住方向键把贴图逐像素挪走：裸按一格、按住 Shift 十格，带 Ctrl 的不认
      * @details 遮罩与标注窗早就是这个口径，贴图这一头以前只能拿鼠标拖，贴着别的窗对边线时
      *          差的那几格摸不出来。带 Ctrl 的方向键留给别的用途（行内文字框按词移光标那一类），
@@ -313,6 +309,63 @@ namespace GyanisScribe
         EXPECT_NE(window.mirroredVertically(), mirroredBefore) << "裸按 V 走的还是上下翻转那一条";
     }
 
+    /**
+     * @brief 钉住右键「平滑缩放」默认勾着，点一下换档，且勾选态与读数同解
+     */
+    TEST_F(PinWindowFixture, SmoothScaleMenuItemIsCheckedByDefaultAndToggles)
+    {
+        auto &window = makeWindow();
+        EXPECT_TRUE(window.smoothScaleEnabled()) << "平滑缩放默认该开着（与 Qt 的绘图缺省档一致）";
+
+        auto    *menu   = window.buildContextMenu();
+        QAction *action = nullptr;
+        for (auto *candidate: menu->actions())
+        {
+            if (candidate->text() == QString::fromUtf8("平滑缩放"))
+            {
+                action = candidate;
+                break;
+            }
+        }
+        ASSERT_NE(action, nullptr) << "右键菜单里没有「平滑缩放」这一项";
+        EXPECT_TRUE(action->isChecked()) << "菜单勾选态与该档的当前读数不同解";
+        action->trigger();
+        EXPECT_FALSE(window.smoothScaleEnabled()) << "点一下该把它关掉";
+        delete menu;
+    }
+
+    /**
+     * @brief 钉住关掉平滑缩放后，放大画出来的确实不是同一份像素
+     * @details 判据用两次取图的对照而不是某个采样点：插值与最近邻在放大后的图上必然给出不同的铺法。
+     *          若绘制那一步没读这一档，两张图会一模一样——那正是这条用例要打的缺陷形状。
+     */
+    TEST_F(PinWindowFixture, SmoothScaleOffPaintsDifferentPixelsThanOn)
+    {
+        QImage image{QSize{4, 4}, QImage::Format_ARGB32};
+        image.setDevicePixelRatio(1.0);
+        for (auto y = 0; y < 4; ++y)
+        {
+            for (auto x = 0; x < 4; ++x)
+            {
+                image.setPixelColor(x, y, QColor{x * 80, y * 80, 40});
+            }
+        }
+
+        auto &window = makeWindow(image);
+        window.setScale(3.0);
+        const auto smoothed = window.grab().toImage();
+        window.setSmoothScaleEnabled(false);
+        const auto nearest = window.grab().toImage();
+
+        ASSERT_EQ(smoothed.size(), nearest.size()) << "换档不该改这张贴图的大小";
+        const bool identical = smoothed == nearest;
+        EXPECT_FALSE(identical) << "关掉平滑缩放后画出来的与开着的一模一样：这一档没进到绘制里";
+    }
+
+    /**
+     * @brief 钉住缩略图模式：缩成小方块、缩放与旋转原样留着、退出回原样
+     * @details 缩略图只是「先让开地方」：它不进恢复布局，也不改用户调好的缩放与旋转。
+     */
     TEST_F(PinWindowFixture, ThumbnailModeShrinksTheWindowAndRestoresIt)
     {
         auto &window = makeWindow();

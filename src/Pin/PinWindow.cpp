@@ -1127,6 +1127,22 @@ namespace GyanisScribe::Pin
         return m_shadowEnabled;
     }
 
+    void PinWindow::setSmoothScaleEnabled(const bool enabled)
+    {
+        // 只重画，不动几何：这一档改的是像素怎么铺大，不是这张贴图有多大、摆在哪儿
+        if (m_smoothScaleEnabled == enabled)
+        {
+            return;
+        }
+        m_smoothScaleEnabled = enabled;
+        update();
+    }
+
+    bool PinWindow::smoothScaleEnabled() const noexcept
+    {
+        return m_smoothScaleEnabled;
+    }
+
     void PinWindow::applyGeometry()
     {
         const auto scaled   = m_thumbnail ? QSizeF{kThumbnailEdge, kThumbnailEdge} : windowSizeFor(m_logicalSize, m_scale);
@@ -1195,7 +1211,8 @@ namespace GyanisScribe::Pin
         Q_UNUSED(event);
 
         QPainter painter(this);
-        painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+        // 平滑缩放跟着这一张的档位走：关着时放大画的是硬边像素格，读截图里的小字要的就是这一档
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, m_smoothScaleEnabled);
 
         const auto content = contentRect();
         painter.translate(content.center());
@@ -1900,6 +1917,13 @@ namespace GyanisScribe::Pin
         shadowAction->setCheckable(true);
         shadowAction->setChecked(m_shadowEnabled);
         shadowAction->setToolTip(GyanisScribe::Core::uiText("给这一张围一圈投影：窗口比内容大一圈，内容坐标与吸附位置都不变；缩到小方块（T）时不带"));
+
+        // 平滑缩放：放大看截图里的小字时，插值会把笔画糊成一片灰——关掉就是硬边像素格。
+        // 与窗口阴影同一档形状：只改「看」，复制、保存、标注与识别拿到的仍是原始像素
+        auto *smoothAction = menu->addAction(GyanisScribe::Core::uiText("平滑缩放"), this, [this] { setSmoothScaleEnabled(!m_smoothScaleEnabled); });
+        smoothAction->setCheckable(true);
+        smoothAction->setChecked(m_smoothScaleEnabled);
+        smoothAction->setToolTip(GyanisScribe::Core::uiText("放大时把像素铺平：关掉这一档，一格源像素就是屏上一块硬边方格，读小字更清楚（只改显示，不进成品）"));
 
         // 视图变换四档：翻转与灰度/反色都只改「看」，复制、保存、标注拿到的仍是原始像素——
         // 与旋转同一条规矩。菜单项的勾选态就是当前读数，键位与它们同一条路（H/V/G/I）

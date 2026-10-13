@@ -253,6 +253,17 @@ namespace GyanisScribe::Pin
         [[nodiscard]] bool shadowEnabled() const noexcept;
 
         /**
+         * @brief 开/关这一张的平滑缩放（放大时像素之间要不要插值）
+         * @param enabled true 按插值铺大，false 用最近邻——一格源像素就是屏上一块硬边方格
+         * @details 只改「看」：复制、保存、标注与识别拿到的仍是原始像素，与翻转/灰度同一条规矩。
+         *          放大到 2 倍以上读截图里的小字时，平滑会把笔画糊成一片灰，关掉才认得出那一格是什么。
+         */
+        void setSmoothScaleEnabled(bool enabled);
+
+        /// 当前是否开着平滑缩放（默认开着，与 Qt 的绘图缺省档一致）
+        [[nodiscard]] bool smoothScaleEnabled() const noexcept;
+
+        /**
          * @brief 设旋转角度，见 IPinWindow::setRotationDegrees()
          * @param degrees 顺时针角度，折进 [0,360)
          */
@@ -722,6 +733,7 @@ namespace GyanisScribe::Pin
         bool                                                 m_mouseThrough          = false;            ///< 是否鼠标穿透
         bool                                                 m_thumbnail             = false;            ///< 缩略图模式：窗口缩成小方块，缩放等设定原样留着
         bool                                                 m_shadowEnabled         = false;            ///< 窗口阴影：窗口比内容每边大 kShadowMargin，投影画在带子里
+        bool                                                 m_smoothScaleEnabled    = true;             ///< 平滑缩放：关着时放大画的是硬边像素格（读小字用）
         bool                                                 m_pinned                = true;             ///< 是否置顶
         int                                                  m_group                 = kFirstPinGroup;   ///< 所属贴图分组，菜单与布局记录都取它
         QVector<int>                                         m_groupChoices{kFirstPinGroup};             ///< 现有分组号（升序），由管理器推过来

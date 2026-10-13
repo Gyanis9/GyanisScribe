@@ -2240,6 +2240,14 @@
             <translation>Draw a shadow around this pin: the window grows one ring larger than the content while content coordinates and snap positions stay unchanged; not applied in thumbnail mode (T)</translation>
         </message>
         <message>
+            <source>平滑缩放</source>
+            <translation>Smooth scaling</translation>
+        </message>
+        <message>
+            <source>放大时把像素铺平：关掉这一档，一格源像素就是屏上一块硬边方格，读小字更清楚（只改显示，不进成品）</source>
+            <translation>Smooth pixels when enlarging: turn this off and each source pixel becomes a hard-edged block on screen, which reads small text better (display only, never in the output).</translation>
+        </message>
+        <message>
             <source>左右翻转</source>
             <translation>Flip horizontally</translation>
         </message>
