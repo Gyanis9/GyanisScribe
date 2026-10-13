@@ -268,6 +268,51 @@ namespace GyanisScribe
      * @brief 钉住缩略图模式：缩成小方块、缩放与旋转原样留着、退出回原样
      * @details 缩略图只是「先让开地方」：它不进恢复布局，也不改用户调好的缩放与旋转。
      */
+    /**
+     * @brief 钉住方向键把贴图逐像素挪走：裸按一格、按住 Shift 十格，带 Ctrl 的不认
+     * @details 遮罩与标注窗早就是这个口径，贴图这一头以前只能拿鼠标拖，贴着别的窗对边线时
+     *          差的那几格摸不出来。带 Ctrl 的方向键留给别的用途（行内文字框按词移光标那一类），
+     *          这一档刻意不绑。
+     */
+    TEST_F(PinWindowFixture, ArrowKeysNudgeThePinByOneAndTenPixels)
+    {
+        auto &window = makeWindow();
+        window.move(QPoint{300, 200});
+
+        pressKey(window, Qt::Key_Left);
+        const QPoint oneLeft{299, 200};
+        EXPECT_EQ(window.pos(), oneLeft) << "裸按方向键该挪一个逻辑像素";
+        pressKey(window, Qt::Key_Down);
+        const QPoint oneDown{299, 201};
+        EXPECT_EQ(window.pos(), oneDown) << "向下那一格同样是一像素";
+        pressKey(window, Qt::Key_Right, Qt::ShiftModifier);
+        const QPoint tenRight{309, 201};
+        EXPECT_EQ(window.pos(), tenRight) << "按住 Shift 该走十格（与标注窗那档粗调同值）";
+        pressKey(window, Qt::Key_Up, Qt::ControlModifier);
+        EXPECT_EQ(window.pos(), tenRight) << "带 Ctrl 的方向键没绑，贴图不该动";
+    }
+
+    /**
+     * @brief 钉住 `Ctrl+V` 只报「这一张要换内容」，而裸按 `V` 仍是上下翻转
+     * @details 窗口不碰剪贴板：内容转换归界面层、「动图不换」那道拒绝归管理器，
+     *          所以这里判的是上报次数——一次按键只该有一次，且不能顺手把翻转也带上。
+     */
+    TEST_F(PinWindowFixture, ControlVAsksToReplaceContentWhileBareVFlips)
+    {
+        auto      &window   = makeWindow();
+        int        requests = 0;
+        const auto hook     = QObject::connect(&window, &Pin::PinWindow::clipboardReplaceRequested, [&requests] { ++requests; });
+        ASSERT_TRUE(hook) << "信号没接上，后面的计数就毫无意义";
+
+        pressKey(window, Qt::Key_V, Qt::ControlModifier);
+        EXPECT_EQ(requests, 1) << "Ctrl+V 该报一次「要换内容」";
+
+        const auto mirroredBefore = window.mirroredVertically();
+        pressKey(window, Qt::Key_V);
+        EXPECT_EQ(requests, 1) << "裸按 V 不该被当成替换";
+        EXPECT_NE(window.mirroredVertically(), mirroredBefore) << "裸按 V 走的还是上下翻转那一条";
+    }
+
     TEST_F(PinWindowFixture, ThumbnailModeShrinksTheWindowAndRestoresIt)
     {
         auto &window = makeWindow();

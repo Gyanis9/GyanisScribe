@@ -77,6 +77,17 @@ namespace GyanisScribe::Pin
                          });
         // 拖放同理：窗口只报「谁被拖到了哪」，渲染与建帖是界面层的事（载荷指针当场有效，直接转发）
         QObject::connect(raw, &PinWindow::dropRequested, this, &PinManager::pinDropRequested);
+        // `Ctrl+V` 换内容同理：剪贴板在这一层之外，只把「第几张按了」报出去，序号是界面层认人的凭据
+        QObject::connect(raw, &PinWindow::clipboardReplaceRequested, this,
+                         [this, raw]
+                         {
+                             const auto found = std::ranges::find_if(m_pins, [raw](const auto &held) { return held.get() == raw; });
+                             if (found == m_pins.end())
+                             {
+                                 return; // 与分组那条同一个道理：对象已不在册时这一击没有可替换的东西
+                             }
+                             emit pinClipboardReplaceRequested(static_cast<int>(found - m_pins.begin()));
+                         });
         // 分组改动只接意图、由管理器落账：哪张在哪组是这一层的账，窗口自己改会与管理器各记一半
         QObject::connect(raw, &PinWindow::moveToGroupRequested, this,
                          [this, raw](int group)
@@ -433,6 +444,28 @@ namespace GyanisScribe::Pin
         normalizeActiveGroup();
         applyGroupVisibility();
         emit pinMovedToGroup(clamped);
+        return {};
+    }
+
+    Core::Expected<void> PinManager::replacePinContent(const int index, const QImage &image)
+    {
+        if (index < 0 || index >= count() || m_pins[static_cast<std::size_t>(index)] == nullptr)
+        {
+            return std::unexpected(
+                    Core::Error{Core::ErrorCode::InvalidArgument,
+                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("要替换内容的贴图不在册：索引 {}。请在还摆在桌上的那张贴图上按 Ctrl+V"), index)});
+        }
+
+        auto &pin = *m_pins[static_cast<std::size_t>(index)];
+        // 动图不换：下一帧一到，换来的那份静态像素就被盖回去了——与「动图不能标注/不能裁剪」同一道闸门
+        if (pin.isAnimated())
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Core::uiTextUtf8("动图不能替换内容：下一帧会把换来的那一份盖掉。请先保存成静态图，再把那张贴出来替换")});
+        }
+
+        // 摆位、缩放与角度都不动：这一条只换「这张图」，替换前后用户看到的还是桌上同一个位置
+        pin.replaceContent(image);
         return {};
     }
 

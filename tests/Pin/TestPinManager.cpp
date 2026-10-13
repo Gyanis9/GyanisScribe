@@ -677,4 +677,64 @@ namespace GyanisScribe
         EXPECT_EQ(pins.selectedPinCount(), 0) << "开 Solo 之后选中集还留着：那几张已经不在屏上了";
     }
 
+    /**
+     * @brief 钉住替换内容只换像素：逻辑尺寸跟着新图走，倍率与摆的中心都不动
+     * @details 按 `Ctrl+V` 要的是「这张图换了」，不是「这张贴图挪了位、又回到 1:1」——
+     *          尺寸、倍率、中心三样里只有尺寸该动。
+     */
+    TEST_F(PinManagerFixture, ReplacingContentSwapsTheImageAndKeepsWhereItSits)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(40, 40));
+        auto *pin = pins.pinAt(0);
+        ASSERT_NE(pin, nullptr);
+        pin->setScale(2.0);
+        const auto  centerBefore = pin->globalRect().center();
+        const QSize replacementSize{7, 3};
+        ASSERT_GT(pin->state().logicalSize.width(), replacementSize.width()) << "前提不对：原图得比替换那张宽，不然判不出换没换";
+
+        QImage replacement{replacementSize, QImage::Format_ARGB32};
+        replacement.fill(QColor{10, 200, 30});
+        const auto replaced = pins.replacePinContent(0, replacement);
+        ASSERT_TRUE(replaced.has_value()) << replaced.error().message;
+
+        EXPECT_EQ(pin->state().logicalSize, QSizeF{replacementSize}) << "逻辑尺寸该跟着新图走";
+        EXPECT_NEAR(pin->state().scale, 2.0, 1e-9) << "换内容不该动缩放倍率";
+        // 尺寸变了而中心不动：applyGeometry 就是按中心重算矩形的，取整会带来一像素以内的差
+        EXPECT_NEAR(pin->globalRect().center().x(), centerBefore.x(), 1.0) << "换内容不该把贴图挪走";
+        EXPECT_NEAR(pin->globalRect().center().y(), centerBefore.y(), 1.0) << "换内容不该把贴图挪走";
+    }
+
+    /**
+     * @brief 钉住替换的两道拒绝：动图不换（下一帧会盖回来），不在册的索引直接拒
+     * @details 两道都回中文原因与出路，且原来那份像素一律不动——「替换失败」不该把贴图刷白。
+     */
+    TEST_F(PinManagerFixture, ReplacingContentRefusesAnimatedPinsAndUnknownIndexes)
+    {
+        // 素材文件名按用例名给：ctest 把每条用例当独立进程起，共用一个路径会互相盖掉
+        const auto gifPath = PinTestAssets::writeTwoFrameGif(std::filesystem::temp_directory_path() / "GyanisScribe-PinManager-replace-refuses-animated.gif");
+        ASSERT_FALSE(gifPath.isEmpty()) << "素材没落到临时文件上";
+
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(30, 30), gifPath);
+        auto *pin = dynamic_cast<Pin::PinWindow *>(pins.pinAt(0));
+        ASSERT_NE(pin, nullptr) << "管理器里的贴图不是 PinWindow，动图这一判据接不上";
+        ASSERT_TRUE(pin->isAnimated()) << "前提不对：这一张没被当成动图接上";
+
+        QImage replacement{7, 3, QImage::Format_ARGB32};
+        replacement.fill(QColor{10, 200, 30});
+
+        const auto refused = pins.replacePinContent(0, replacement);
+        ASSERT_FALSE(refused.has_value()) << "动图被换掉了：下一帧一到就把它盖回去";
+        EXPECT_EQ(refused.error().code, Core::ErrorCode::InvalidArgument);
+        EXPECT_NE(refused.error().message.find("动图"), std::string::npos) << "拒绝文案要点名动图，实际：" << refused.error().message;
+        EXPECT_NE(refused.error().message.find("静态图"), std::string::npos) << "拒绝文案要给出出路（先存成静态图），实际：" << refused.error().message;
+        const QSizeF originalSize{kImageWidth, kImageHeight};
+        EXPECT_EQ(pin->state().logicalSize, originalSize) << "被拒的那一次不该留下半份替换";
+
+        const auto missing = pins.replacePinContent(pins.count(), replacement);
+        ASSERT_FALSE(missing.has_value()) << "不在册的索引被放过了";
+        EXPECT_EQ(missing.error().code, Core::ErrorCode::InvalidArgument);
+    }
+
 } // namespace GyanisScribe

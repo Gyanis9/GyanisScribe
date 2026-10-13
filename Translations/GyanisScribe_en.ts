@@ -2092,6 +2092,14 @@
             <translation>The pin to move is not registered: index {}. Open the menu on that pin again</translation>
         </message>
         <message>
+            <source>要替换内容的贴图不在册：索引 {}。请在还摆在桌上的那张贴图上按 Ctrl+V</source>
+            <translation>The pin whose content should be replaced is not in the list (index {}). Press Ctrl+V on a pin that is still on the desk.</translation>
+        </message>
+        <message>
+            <source>动图不能替换内容：下一帧会把换来的那一份盖掉。请先保存成静态图，再把那张贴出来替换</source>
+            <translation>An animated pin cannot be replaced: the next frame would cover the new content. Save it as a still image first, then pin that image and replace it.</translation>
+        </message>
+        <message>
             <source>这台机器的 Qt 写不出「{}」这一档保存格式。请在设置的截图页改选一档</source>
             <translation>This Qt build cannot write the "{}" save format. Pick another one on the Shot page of Settings</translation>
         </message>

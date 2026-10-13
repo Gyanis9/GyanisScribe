@@ -168,6 +168,17 @@ namespace GyanisScribe::Pin
          */
         [[nodiscard]] Core::Expected<void> movePinToGroup(int index, int group);
 
+        /**
+         * @brief 把某张贴图的内容换成给定的那份像素
+         * @param index 贴图在册表里的序号
+         * @param image 新内容，物理像素
+         * @return 成功返回空值
+         * @return 失败带中文原因：贴图不在册，或那是一张动图（换上去的静态像素会被下一帧盖掉）
+         * @details 摆位、缩放与角度都不动：这一条换的是「这张图」，不是「这张贴图摆在哪儿」。
+         *          像素从剪贴板来，所以内容转换归界面层，这里只管在册与动图两道拒绝。
+         */
+        [[nodiscard]] Core::Expected<void> replacePinContent(int index, const QImage &image);
+
         /// 选中集里有几张（0 表示一张都没选）
         [[nodiscard]] int selectedPinCount() const noexcept;
 
@@ -237,6 +248,14 @@ namespace GyanisScribe::Pin
          *          就没人能替它把载荷渲染成新贴图
          */
         void pinDropRequested(const QMimeData *data, const QPoint &globalTopLeft);
+
+        /**
+         * @brief 某张贴图要求用剪贴板里的内容替换自己（`Ctrl+V`）
+         * @param index 发起那一张在册表里的序号，界面层据此找回是谁按的
+         * @details 与 pinOcrRequested 同一条形状：剪贴板在这一层之外，出口只报「第几张按了替换键」，
+         *          取什么内容、换成什么样都由界面层判。
+         */
+        void pinClipboardReplaceRequested(int index);
 
     private:
         /// 把某个已自行关闭的窗口从登记里摘掉

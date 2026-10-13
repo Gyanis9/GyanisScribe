@@ -105,6 +105,9 @@ namespace GyanisScribe::Pin
         /// 键盘一挡转过的角度：滚轮那 5° 是细调，按一次 `R` 要的是「转正一首」
         constexpr double kKeyboardRotationStride = 90.0;
 
+        /// 方向键按住 `Shift` 时一次挪多少格：与标注窗那档粗调同值（一格太慢，几十格会跳过目标）
+        constexpr int kKeyboardNudgeStride = 10;
+
         /// 选中边框与悬停边框的描边宽度
         constexpr int kBorderWidth = 1;
 
@@ -897,6 +900,23 @@ namespace GyanisScribe::Pin
         update();
     }
 
+    void PinWindow::replaceContent(const QImage &image)
+    {
+        // 空图原样留着：拿不到内容时该由调用方说清原因，而不是把这一张贴图刷成空白
+        if (image.isNull())
+        {
+            return;
+        }
+
+        m_image       = image;
+        m_logicalSize = image.devicePixelRatio() > 0.0 ? QSizeF(image.width() / image.devicePixelRatio(), image.height() / image.devicePixelRatio()) : QSizeF(image.size());
+        // 视图滤镜作废：灰度/反色那份镜像是照旧图算出来的，留着就会把旧像素的镜像盖在新内容上
+        m_viewFiltered = {};
+        // 摆位与缩放倍率都不动：换的是「这张图」，不是「这张贴图摆在哪儿」
+        applyGeometry();
+        update();
+    }
+
     void PinWindow::routeAnnotationKey(QKeyEvent *event)
     {
         // 序号工具在用时的 `+`/`-`/`0`：与标注窗同一口径（改的是「下一个号」，不动画布）
@@ -1605,6 +1625,28 @@ namespace GyanisScribe::Pin
         {
             resetScaleAndRotation();
             return;
+        }
+
+        // `Ctrl+V` 拿剪贴板里那一份换掉这一张：裸 `V` 是上下翻转，两者共用一个字母，靠修饰键分开
+        if (event->key() == Qt::Key_V && event->modifiers() == Qt::ControlModifier)
+        {
+            emit clipboardReplaceRequested();
+            return;
+        }
+
+        // 方向键把这一张逐像素挪走：一格、`Shift` 十格——遮罩与标注窗早就是这个口径，
+        // 贴图这一头原先只能用鼠标拖，贴着别的窗对边线时差的那几格摸不出来
+        if (event->modifiers() == Qt::NoModifier || event->modifiers() == Qt::ShiftModifier)
+        {
+            if (const auto step = Ui::arrowStepFor(event->key()); step)
+            {
+                const int    stride = event->modifiers().testFlag(Qt::ShiftModifier) ? kKeyboardNudgeStride : 1;
+                const QPoint delta{step->x() * stride, step->y() * stride};
+                move(pos() + delta);
+                // 与鼠标拖动同一只信号：这一张已经挪过，选中的其余那几张由管理器按同一位移跟上
+                emit draggedWithSelection(delta);
+                return;
+            }
         }
 
         // `H`/`V` 翻转、`G` 灰度、`I` 反色：都是视图变换，再按一次原样退回

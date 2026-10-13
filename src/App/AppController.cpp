@@ -267,6 +267,8 @@ namespace GyanisScribe::App
                              }
                              notifyPinnedDrop(*dropped);
                          });
+        // 贴图窗上的 `Ctrl+V`：只有序号能认人——剪贴板在这一层，像素在哪一张上也只有管理器知道
+        QObject::connect(m_pins.get(), &Pin::PinManager::pinClipboardReplaceRequested, this, &AppController::replacePinWithClipboard);
         // 移到别的组那一下它就从桌上消失了：说清它去了哪、怎么切过去，免得像「贴图自己没了」
         QObject::connect(
                 m_pins.get(), &Pin::PinManager::pinMovedToGroup, this,
@@ -812,6 +814,24 @@ namespace GyanisScribe::App
         // 落在光标那一处：剪贴板来的图没有「原来那块位置」，跟着鼠标走才是用户此刻的落点
         m_pins->addPin(*image, QCursor::pos());
         Core::Logger::info(std::format("剪贴板里的图已贴出：{}×{} 像素", image->width(), image->height()));
+    }
+
+    void AppController::replacePinWithClipboard(const int index)
+    {
+        // 与「把剪贴板贴到屏幕上」共用同一条内容判据：图像原样换，纯文本与颜色写法换成各自的卡片
+        const auto image = pinContentFrom(QGuiApplication::clipboard()->mimeData(), QGuiApplication::font());
+        if (!image)
+        {
+            notifyUser(QString::fromUtf8(image.error().message), Ui::ToastKind::Information);
+            return;
+        }
+        if (const auto replaced = m_pins->replacePinContent(index, *image); !replaced)
+        {
+            // 拒绝面都带中文原因（动图不换、那张已不在册），原来的那份一律保持不动
+            notifyUser(QString::fromUtf8(replaced.error().message), Ui::ToastKind::Information);
+            return;
+        }
+        Core::Logger::info(std::format("贴图内容已换成剪贴板里那一份：{}×{} 像素", image->width(), image->height()));
     }
 
     void AppController::handleOcrRequested(const QImage &image)

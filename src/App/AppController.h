@@ -325,6 +325,14 @@ namespace GyanisScribe::App
          *          一次贴多件、动图连来源带走；取不到图时把原因与替代做法发给用户，不静默什么都不做
          */
         void pasteClipboardAsPin();
+        /**
+         * @brief 把某张贴图的内容换成剪贴板里那一份（贴图窗上按 `Ctrl+V` 的落点）
+         * @param index 发起那一张在册表里的序号，由贴图管理器报上来
+         * @details 内容转换与「把剪贴板贴到屏幕上」共用同一条判据（图像、纯文本卡片、颜色卡片三种都能换）；
+         *          文件列表不在这一条里——替换只有一张目标，选哪一件都没有唯一答案。
+         *          取不到内容或那张是动图时把原因发给用户，不动原来那一份。
+         */
+        void replacePinWithClipboard(int index);
 
         /**
          * @brief 贴出一批之后的一句提示

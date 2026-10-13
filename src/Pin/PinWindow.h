@@ -233,6 +233,14 @@ namespace GyanisScribe::Pin
         void setExactSize(const QSize &size);
 
         /**
+         * @brief 用新像素换掉这一张贴图的内容，摆位与缩放不动
+         * @param image 新内容，物理像素；空图时什么都不做（调用方该报原因，不该把贴图刷白）
+         * @details 逻辑尺寸按新图的 devicePixelRatio 重算（与裁剪落定同一条口径），视图滤镜作废：
+         *          灰度/反色那份镜像是照旧图算出来的，留着就会把旧像素的镜像盖在新内容上。
+         */
+        void replaceContent(const QImage &image);
+
+        /**
          * @brief 开/关窗口阴影
          * @param enabled true 表示窗口比内容每边大一圈，投影画在带子里
          * @details 只改「看」：内容坐标（选中框、取色、标注覆盖）都按 contentRect 算，
@@ -519,6 +527,13 @@ namespace GyanisScribe::Pin
          * @details 窗口只报「谁被拖到了哪」：渲染成什么、贴几张、失败怎么说，都是界面层的事。
          */
         void dropRequested(const QMimeData *data, const QPoint &globalTopLeft);
+
+        /**
+         * @brief 这张贴图要求拿剪贴板里那一份换掉自己的内容（`Ctrl+V`）
+         * @details 窗口不知道剪贴板里是什么、能不能换：内容与旧像素的转换在界面层，
+         *          「动图换了会被下一帧盖掉」这类拒绝在管理器，这里只报「这一张要换」。
+         */
+        void clipboardReplaceRequested();
 
         /**
          * @brief 贴图被关闭，管理器据此把自己记的那一份摘掉
