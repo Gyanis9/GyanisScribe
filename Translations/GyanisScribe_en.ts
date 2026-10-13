@@ -508,6 +508,22 @@
             <translation>The closed pin is back on the desk; {} more can still be pinned back.</translation>
         </message>
         <message>
+            <source>原因见日志</source>
+            <translation>See the log for the reason.</translation>
+        </message>
+        <message>
+            <source>贴图一张都没写成：</source>
+            <translation>Not a single pin was saved: </translation>
+        </message>
+        <message>
+            <source>已把 {} 张贴图存成文件，就在设置里的截图目录</source>
+            <translation>Saved {} pins as files, in the screenshot folder from Settings.</translation>
+        </message>
+        <message>
+            <source>已存好 {} 张贴图，另有 {} 张没写成：</source>
+            <translation>Saved {} pins, {} more failed: </translation>
+        </message>
+        <message>
             <source>上一次延时截图还在等，等它弹出来之后再按</source>
             <translation>The previous delayed capture is still waiting - press again once it comes up</translation>
         </message>
@@ -2290,6 +2306,10 @@
         <message>
             <source>反色</source>
             <translation>Invert colors</translation>
+        </message>
+        <message>
+            <source>批量保存（%1 张）</source>
+            <translation>Save All (%1 pins)</translation>
         </message>
         <message>
             <source>取消选择（%1 张）</source>

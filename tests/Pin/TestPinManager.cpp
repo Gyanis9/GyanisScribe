@@ -4,6 +4,7 @@
 #include "Pin/IPinWindow.h"
 #include "Pin/PinWindow.h"
 
+#include "Core/Paths.h"
 #include "PinTestAssets.h"
 #include "Pin/PinLayout.h"
 #include "Pin/PinManager.h"
@@ -26,9 +27,11 @@
 #include <QWheelEvent>
 #include <QMimeData>
 #include <QPoint>
+#include <QVariant>
 
 #include <filesystem>
 #include <format>
+#include <fstream>
 #include <memory>
 #include <optional>
 #include <string>
@@ -820,6 +823,76 @@ namespace GyanisScribe
         }
 
         EXPECT_EQ(pins.closedPinCount(), static_cast<int>(Pin::kClosedPinHistorySize)) << "关掉七张只该留得回五张";
+    }
+
+    /**
+     * @brief 钉住整组「批量保存」逐张落盘：选中两张写两份，没选的那张不参与
+     * @details 同一次里几张的模板名会撞在同一个时间戳上，让位去重那一档正是这种时候才走；
+     *          判据取目录里的文件数，不只看报出去的那个计数——两者不同解就算实现坏了。
+     */
+    TEST_F(PinManagerFixture, SavingSelectionWritesOneFilePerSelectedPin)
+    {
+        const auto target = std::filesystem::temp_directory_path() / std::format("GyanisScribe-PinManager-{}", ::testing::UnitTest::GetInstance()->current_test_info()->name());
+        std::error_code ignored;
+        std::filesystem::remove_all(target, ignored);
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kPathScreenshot, QVariant(Core::Paths::toDisplayText(target))).has_value());
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kSaveImageFormat, QVariant(QStringLiteral("Png"))).has_value());
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kSaveNameTemplate, QVariant(QStringLiteral("pin_%date%"))).has_value());
+
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(10, 10));
+        pins.addPin(makeImage(), QPoint(60, 10));
+        pins.addPin(makeImage(), QPoint(110, 10));
+        auto *first  = dynamic_cast<Pin::PinWindow *>(pins.pinAt(0));
+        auto *second = dynamic_cast<Pin::PinWindow *>(pins.pinAt(1));
+        ASSERT_NE(first, nullptr);
+        ASSERT_NE(second, nullptr);
+        pins.togglePinSelection(*first);
+        pins.togglePinSelection(*second);
+
+        const auto report = pins.saveSelectedPins(*first);
+        EXPECT_EQ(report.saved, 2) << "选中两张就该写成两份文件，没选的那张不该跟着存";
+        EXPECT_EQ(report.failed, 0) << "这一档不该有失败，原因：" << report.reason.toStdString();
+
+        int files = 0;
+        for (const auto &entry: std::filesystem::directory_iterator(target, ignored))
+        {
+            EXPECT_EQ(entry.path().extension().string(), ".png") << "后缀没跟着设置里那一档格式：" << entry.path().filename().string();
+            ++files;
+        }
+        EXPECT_EQ(files, 2) << "目录里的文件数与报出去的张数不同解";
+
+        std::filesystem::remove_all(target, ignored);
+    }
+
+    /**
+     * @brief 钉住批量保存把失败原因带出来：目录那一格被一个普通文件占着
+     * @details 整组通常撞同一个坑，「一张都没写成」这一档必须给一句还能做的事（换一个目录），
+     *          只报个数等于让人对着一个不动的目录猜。
+     */
+    TEST_F(PinManagerFixture, SavingSelectionReportsTheReasonWhenTheDirectoryIsUnusable)
+    {
+        const auto blocked = std::filesystem::temp_directory_path() / std::format("GyanisScribe-PinManager-{}", ::testing::UnitTest::GetInstance()->current_test_info()->name());
+        std::error_code ignored;
+        std::filesystem::remove(blocked, ignored);
+        {
+            std::ofstream occupant{blocked};
+            occupant << "占位的不是一个目录";
+        }
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kPathScreenshot, QVariant(Core::Paths::toDisplayText(blocked))).has_value());
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kSaveImageFormat, QVariant(QStringLiteral("Png"))).has_value());
+
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(10, 10));
+        auto *first = dynamic_cast<Pin::PinWindow *>(pins.pinAt(0));
+        ASSERT_NE(first, nullptr);
+
+        const auto report = pins.saveSelectedPins(*first);
+        EXPECT_EQ(report.saved, 0) << "目录写不出来却报了写成的张数";
+        EXPECT_EQ(report.failed, 1) << "没写成那一张也要入账，不然提示会说「全存好了」";
+        EXPECT_FALSE(report.reason.isEmpty()) << "失败要带原因：换目录是这里唯一还能做的事";
+
+        std::filesystem::remove(blocked, ignored);
     }
 
 } // namespace GyanisScribe

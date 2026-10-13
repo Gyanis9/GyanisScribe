@@ -2132,6 +2132,9 @@ namespace GyanisScribe::Pin
         if (inMultiSelection)
         {
             menu->addSeparator();
+            // 整组出口：一次把选中集里每一张都存一份。存哪、叫什么名是每张自己的账（都走同一个目录与命名模板），
+            // 谁在选中集里是管理器的账，这一层只报「有人要批量存」
+            menu->addAction(GyanisScribe::Core::uiText("批量保存（%1 张）").arg(m_selectionCount), this, [this] { emit batchSaveRequested(); });
             menu->addAction(GyanisScribe::Core::uiText("取消选择（%1 张）").arg(m_selectionCount), this, [this] { emit clearSelectionRequested(); });
         }
 

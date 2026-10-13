@@ -81,6 +81,13 @@ namespace GyanisScribe::Pin
                          });
         // 拖放同理：窗口只报「谁被拖到了哪」，渲染与建帖是界面层的事（载荷指针当场有效，直接转发）
         QObject::connect(raw, &PinWindow::dropRequested, this, &PinManager::pinDropRequested);
+        // 整组「批量保存」收在这一层：谁在选中集里只有这里知道，而存哪、叫什么名借每张自己的出口
+        QObject::connect(raw, &PinWindow::batchSaveRequested, this,
+                         [this, raw]
+                         {
+                             const auto report = saveSelectedPins(*raw);
+                             emit       pinBatchSaveReported(report);
+                         });
         // `Ctrl+V` 换内容同理：剪贴板在这一层之外，只把「第几张按了」报出去，序号是界面层认人的凭据
         QObject::connect(raw, &PinWindow::clipboardReplaceRequested, this,
                          [this, raw]
@@ -378,6 +385,30 @@ namespace GyanisScribe::Pin
             }
         }
         publishSelection();
+    }
+
+    PinBatchSaveReport PinManager::saveSelectedPins(PinWindow &source)
+    {
+        PinBatchSaveReport report;
+        for (auto *pin: pinsAffectedBy(source))
+        {
+            // 逐张借那个出口：目录、命名模板与装饰都在贴图自己那儿，批量这一路只负责「谁要存」
+            const auto saved = pin->saveWithDefaultName();
+            if (saved)
+            {
+                ++report.saved;
+                continue;
+            }
+            ++report.failed;
+            // 只留第一条原因：整组通常撞同一个坑（目录不能写、格式那格存坏了），
+            // 逐条报会把一句能行动的提示淹在 N 行重复里——剩下的记在日志里
+            if (report.reason.isEmpty())
+            {
+                report.reason = QString::fromStdString(saved.error().message);
+            }
+            Core::Logger::warning(saved.error().message);
+        }
+        return report;
     }
 
     bool PinManager::pinIsSolo(const PinWindow &pin) const noexcept

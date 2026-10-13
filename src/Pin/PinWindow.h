@@ -466,6 +466,17 @@ namespace GyanisScribe::Pin
         [[nodiscard]] std::vector<QRectF> handleRects() const;
 
         /**
+         * @brief 按设置里的目录与命名模板把这张贴图存一份成品
+         * @return 成功返回写下的目录；失败返回带原因的错误
+         * @details 右键「保存」、「在文件夹中查看」与整组的批量保存共用这一处起名与写盘：三处各写一份，
+         *          将来改命名模板就会漏掉一处。写出去的是装好饰的成品；缓存与布局那一路走 saveToFile（原图），
+         *          那些文件是给程序自己读回来的，装过饰下次恢复出来的贴图就多一圈边。
+         * @note 公开出来是给贴图管理器的批量保存用：整组只有一只手能伸进每张自己的文件名下，
+         *       挨个再实现一遍起名就是第二个出处。
+         */
+        [[nodiscard]] Core::Expected<std::filesystem::path> saveWithDefaultName();
+
+        /**
          * @brief 建右键菜单
          * @return 菜单对象，所有权交调用方（Qt 的 exec 路径）
          * @note 公开出来是给用例核对菜单结构与接线：菜单项的动作都握在 lambda 里，
@@ -571,6 +582,13 @@ namespace GyanisScribe::Pin
          * @details 两者的差别只在还能不能按回来：关闭过的那几张还能从托盘重新贴出，销毁过的不回。
          */
         void destroyRequested();
+
+        /**
+         * @brief 这张贴图要求把选中集里每一张都存成文件（整组菜单里的「批量保存」）
+         * @details 存哪、叫什么名是每张自己的账（都走同一个目录与命名模板），但谁在选中集里是管理器的账，
+         *          窗口只报「有人要批量存」。
+         */
+        void batchSaveRequested();
 
     protected:
         /**
@@ -709,14 +727,6 @@ namespace GyanisScribe::Pin
          *          用户看到什么就能复制到什么。
          */
         void paintColorReadout(QPainter &painter);
-
-        /**
-         * @brief 按设置里的目录与命名模板把这张贴图存一份
-         * @return 成功返回写下的目录；失败返回带原因的错误
-         * @details 「保存」与「在文件夹中查看」共用这一处起名与写盘：两处各写一份，
-         *          将来改命名模板就会漏掉一处。写出去的是装好饰的成品，缓存恢复不受影响。
-         */
-        [[nodiscard]] Core::Expected<std::filesystem::path> saveWithDefaultName();
 
         /**
          * @brief 落盘的实际动作：建目录、按后缀写文件

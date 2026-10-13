@@ -1722,6 +1722,43 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住右键「批量保存」属于多选集：单张时不给这一项，多选里点一下报的是整组意图
+     * @details 单张本来就有「保存」，再摆一项就是重复；多选里窗口不知道兄弟是谁，
+     *          所以判据落在信号上而不是「存了几份文件」——后者由管理器的用例看。
+     */
+    TEST_F(PinWindowFixture, BatchSaveMenuItemBelongsToTheMultiSelection)
+    {
+        // 按前缀找：张数长在文案里，单张那一档要是漏出来会写成「批量保存（0 张）」这类，exact 匹配反而认不出
+        const auto findBatch = [](QMenu &menu) -> QAction *
+        {
+            for (auto *action: menu.actions())
+            {
+                if (action->text().startsWith(QString::fromUtf8("批量保存")))
+                {
+                    return action;
+                }
+            }
+            return nullptr;
+        };
+
+        auto                  &window = makeWindow();
+        std::unique_ptr<QMenu> singleMenu{window.buildContextMenu()};
+        EXPECT_EQ(findBatch(*singleMenu), nullptr) << "没进多选集就不该有整组那一项（单张有「保存」就够）";
+
+        int fires = 0;
+        ASSERT_TRUE(QObject::connect(&window, &Pin::PinWindow::batchSaveRequested, [&fires] { ++fires; }));
+        window.setSelected(true);
+        window.setSelectionCount(2);
+        const std::unique_ptr<QMenu> groupMenu{window.buildContextMenu()};
+        auto                        *action = findBatch(*groupMenu);
+        ASSERT_NE(action, nullptr) << "多选里右键菜单少了「批量保存」这一项";
+        EXPECT_EQ(action->text(), QString::fromUtf8("批量保存（2 张）")) << "那一项要把整组的张数写在名字上";
+        action->trigger();
+
+        EXPECT_EQ(fires, 1) << "点一下该报一次整组保存的意图，存几张归管理器算";
+    }
+
+    /**
      * @brief 钉住缩略图那一档不吃边带：拖小方块还是挪，不是改大小
      * @details 那枚方块固定 48 格，改大小在这档里根本无从表现；更关键的是它本来的用途就是
      *          「先让开地方」，四边一带就没有挪它的落点了。

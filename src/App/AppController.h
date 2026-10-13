@@ -64,6 +64,7 @@ namespace GyanisScribe::Pick
 namespace GyanisScribe::Pin
 {
     class PinManager;
+    struct PinBatchSaveReport;
 } // namespace GyanisScribe::Pin
 
 namespace GyanisScribe::Record
@@ -348,6 +349,14 @@ namespace GyanisScribe::App
          *          取不到内容或那张是动图时把原因发给用户，不动原来那一份。
          */
         void replacePinWithClipboard(int index);
+
+        /**
+         * @brief 整组「批量保存」落完账后那一句提示
+         * @param report 写成几张、几张没写成，与第一条没写成的原因
+         * @details 一次写走 N 份文件，不出声就成了「按了不知道存没存上」；一张都没写成时把原因原样报出来，
+         *          那是唯一还能行动的那一句（改目录或改格式那一格）。
+         */
+        void reportBatchSave(const Pin::PinBatchSaveReport &report);
 
         /**
          * @brief 贴出一批之后的一句提示

@@ -270,6 +270,8 @@ namespace GyanisScribe::App
                          });
         // 贴图窗上的 `Ctrl+V`：只有序号能认人——剪贴板在这一层，像素在哪一张上也只有管理器知道
         QObject::connect(m_pins.get(), &Pin::PinManager::pinClipboardReplaceRequested, this, &AppController::replacePinWithClipboard);
+        // 整组「批量保存」落完账：一次写走 N 份文件，不说清去了哪儿就等于没存
+        QObject::connect(m_pins.get(), &Pin::PinManager::pinBatchSaveReported, this, &AppController::reportBatchSave);
         // 移到别的组那一下它就从桌上消失了：说清它去了哪、怎么切过去，免得像「贴图自己没了」
         QObject::connect(
                 m_pins.get(), &Pin::PinManager::pinMovedToGroup, this,
@@ -393,6 +395,27 @@ namespace GyanisScribe::App
         m_pins->addPin(taken->image, QCursor::pos(), taken->sourceFile);
         notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已重新贴出那张关掉的贴图，还能按回来 {} 张"), m_pins->closedPinCount()).c_str()),
                    Ui::ToastKind::Success);
+    }
+
+    void AppController::reportBatchSave(const Pin::PinBatchSaveReport &report)
+    {
+        // 三档收尾各一句：全写成要说「去哪儿看」，成了一半要点名还有几张没成，一张都没成时原因就是主角
+        if (report.saved == 0)
+        {
+            const auto reason = report.reason.isEmpty() ? QString::fromUtf8(GyanisScribe::Core::uiTextUtf8("原因见日志")) : report.reason;
+            notifyUser(QString::fromUtf8(GyanisScribe::Core::uiTextUtf8("贴图一张都没写成：")) + reason, Ui::ToastKind::Danger);
+            return;
+        }
+        if (report.failed == 0)
+        {
+            notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已把 {} 张贴图存成文件，就在设置里的截图目录"), report.saved).c_str()),
+                       Ui::ToastKind::Success);
+            return;
+        }
+        const auto reason = report.reason.isEmpty() ? QString::fromUtf8(GyanisScribe::Core::uiTextUtf8("原因见日志")) : report.reason;
+        notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已存好 {} 张贴图，另有 {} 张没写成："), report.saved, report.failed).c_str()) +
+                           reason,
+                   Ui::ToastKind::Danger);
     }
 
     void AppController::scheduleCapture(std::function<void()> begin)

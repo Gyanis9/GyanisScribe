@@ -48,6 +48,18 @@ namespace GyanisScribe::Pin
     };
 
     /**
+     * @brief 一次批量保存的落账结果
+     * @details 整组里每张各写各的文件，「全成」与「全败」之间还有「成了三张、两张被拒」这一档，
+     *          所以回报的是两个计数加第一条原因，而不是一个 Expected。
+     */
+    struct PinBatchSaveReport
+    {
+        int     saved  = 0; ///< 写成盘的张数
+        int     failed = 0; ///< 没写成盘的张数
+        QString reason;     ///< 第一条没写成的原因（中文）；全写成为空串
+    };
+
+    /**
      * @brief 可重新贴出的贴图条数上限
      * @details 再多就是拿一份越来越大的像素常驻内存：这一档要的是「手滑关错了能按回来」，不是历史册。
      */
@@ -236,6 +248,15 @@ namespace GyanisScribe::Pin
          */
         void setPinSolo(PinWindow &pin, bool solo);
 
+        /**
+         * @brief 把这一张所在的整组（选中集）逐张按设置里的目录与命名模板存成文件
+         * @param source 发起那一张；它没在选中集里时就只存它自己（与其余整组入口同一套范围判据）
+         * @return 写成几张、几张没写成，以及第一条原因
+         * @details 谁在选中集里是这一层的账，而「存哪、叫什么名」住在贴图自己那儿——
+         *          批量这一路只逐张借那个出口，不在这儿另起一套起名。
+         */
+        [[nodiscard]] PinBatchSaveReport saveSelectedPins(PinWindow &source);
+
     signals:
         /**
          * @brief 贴图张数变了
@@ -289,6 +310,14 @@ namespace GyanisScribe::Pin
          *          取什么内容、换成什么样都由界面层判。
          */
         void pinClipboardReplaceRequested(int index);
+
+        /**
+         * @brief 一次批量保存落了账，把结果交出去（整组菜单里那项「批量保存」）
+         * @param report 写成几张、几张没写成与第一条原因
+         * @details 提示条住在哪里由界面层判，这一层只管谁在选中集里与逐张借那个存文件的出口；
+         *          「一张都没写成」与「全写成」都从这里出，界面层不用猜。
+         */
+        void pinBatchSaveReported(const Pin::PinBatchSaveReport &report);
 
     private:
         /// 一张贴图离开在册表的两条路：关闭留得回，销毁回不来
