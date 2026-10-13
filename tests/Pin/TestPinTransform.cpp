@@ -316,3 +316,40 @@ TEST(PinTransform, CropRectFoldsLeftClosedRightOpen)
     EXPECT_FALSE(imagePixelRect(QRectF(-50.0, -50.0, 10.0, 10.0), content, pixels).has_value()) << "整框都在画布外该交回空";
     EXPECT_FALSE(imagePixelRect(QRectF(10.0, 10.0, 5.0, 5.0), QRectF{}, pixels).has_value()) << "退化画布要交回空";
 }
+
+/**
+ * @brief 钉住贴图对齐吸附：每轴吸一条线，容差之内取位移最小的那一条
+ */
+TEST(SnapToCandidateEdges, TakesTheSmallestShiftWithinTolerance)
+{
+    const QRect       moved{100, 100, 40, 40};
+    const std::vector candidates{QRect{143, 200, 10, 10}};
+
+    // 候选的左边线 143 距 moved 的右边线 139 只差 4，比它的中心线（148，差 9）更近；y 轴没有够近的线，原地不动
+    EXPECT_EQ(snapToCandidateEdges(moved, candidates), (QRect{104, 100, 40, 40})) << "没吸到候选的左边线上";
+}
+
+/**
+ * @brief 钉住中心线也参与对齐：一窄一宽两张要「居中摆齐」，只比外边线就永远差半格
+ */
+TEST(SnapToCandidateEdges, AlignsCenterLinesToo)
+{
+    const QRect       moved{101, 100, 40, 40};
+    const std::vector candidates{QRect{60, 900, 120, 10}};
+
+    EXPECT_EQ(snapToCandidateEdges(moved, candidates), (QRect{100, 100, 40, 40})) << "moved 的中心线 121 该吸到候选的中心线 120 上";
+}
+
+/**
+ * @brief 钉住没有参照、够不着参照与容差非法时都原样交回
+ */
+TEST(SnapToCandidateEdges, LeavesTheRectAloneWhenNothingQualifies)
+{
+    const QRect              moved{100, 100, 40, 40};
+    const std::vector<QRect> none;
+    const std::vector        far{QRect{400, 400, 10, 10}};
+
+    EXPECT_EQ(snapToCandidateEdges(moved, none), moved) << "没有参照就该原样交回";
+    EXPECT_EQ(snapToCandidateEdges(moved, far), moved) << "最近的线也在容差之外就不该吸";
+    EXPECT_EQ(snapToCandidateEdges(moved, far, -1), moved) << "容差为负是非法输入，不该被当成全都算够近";
+}

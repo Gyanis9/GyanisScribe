@@ -363,6 +363,55 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住 `Ctrl+A` 只报「把桌上看得见的贴图一起选上」的意图，裸按 A 不抢
+     * @details 谁在屏上是管理器的账（收着的、别组的都不算），窗口这一层只报意图，
+     *          判据因此落在「报了几次」而不是「选中了几张」。
+     */
+    TEST_F(PinWindowFixture, ControlAAsksToSelectAllVisiblePins)
+    {
+        auto      &window   = makeWindow();
+        int        requests = 0;
+        const auto hook     = QObject::connect(&window, &Pin::PinWindow::selectAllRequested, [&requests] { ++requests; });
+        ASSERT_TRUE(hook) << "信号没接上，后面的计数毫无意义";
+
+        pressKey(window, Qt::Key_A, Qt::ControlModifier);
+        EXPECT_EQ(requests, 1) << "Ctrl+A 该报一次全选";
+        pressKey(window, Qt::Key_A);
+        EXPECT_EQ(requests, 1) << "裸按 A 不该被当成全选";
+    }
+
+    /**
+     * @brief 钉住按住 `Shift` 拖动贴图会吸到参照矩形的边线上，不按住时不吸
+     * @details 走真的按下-拖动那一路，钉的是「吸附确实接在拖动上」而不只是那个纯函数；
+     *          参照在起笔时取一次快照，所以这里给的候选窗口移动过程中不会变。
+     */
+    TEST_F(PinWindowFixture, ShiftDragSnapsThePinOntoACandidateEdge)
+    {
+        auto        &window = makeWindow();
+        const QPoint freeTarget{140, 120};
+        const QRect  dragged{freeTarget, window.size()};
+        // 候选放在「拖动后那条右边线再往外三格」上，且远在屏外那一头：只有 x 轴够得着，y 轴一律不动
+        const QRect candidate{dragged.right() + 3, 900, 1, 1};
+        window.setSnapCandidateProvider([candidate] { return std::vector<QRect>{candidate}; });
+
+        const auto dragTo = [&window, &freeTarget](const Qt::KeyboardModifiers modifiers)
+        {
+            window.move(QPoint{100, 100});
+            QMouseEvent press{QEvent::MouseButtonPress, QPointF{20.0, 20.0}, QPoint{120, 120}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+            QApplication::sendEvent(&window, &press);
+            QMouseEvent drag{QEvent::MouseMove, QPointF{60.0, 40.0}, QPoint{160, 140}, Qt::LeftButton, Qt::LeftButton, modifiers};
+            QApplication::sendEvent(&window, &drag);
+        };
+
+        dragTo(Qt::NoModifier);
+        EXPECT_EQ(window.pos(), freeTarget) << "不按住 Shift 的拖动不该被参照抢走";
+
+        dragTo(Qt::ShiftModifier);
+        const QPoint snapped = freeTarget + QPoint{3, 0};
+        EXPECT_EQ(window.pos(), snapped) << "按住 Shift 拖动该把右边线吸到参照上（差三格那一档）";
+    }
+
+    /**
      * @brief 钉住缩略图模式：缩成小方块、缩放与旋转原样留着、退出回原样
      * @details 缩略图只是「先让开地方」：它不进恢复布局，也不改用户调好的缩放与旋转。
      */

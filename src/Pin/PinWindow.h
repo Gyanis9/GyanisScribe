@@ -20,6 +20,7 @@
 #include <QWidget>
 
 #include <optional>
+#include <functional>
 #include <vector>
 
 class QMimeData;
@@ -262,6 +263,14 @@ namespace GyanisScribe::Pin
 
         /// 当前是否开着平滑缩放（默认开着，与 Qt 的绘图缺省档一致）
         [[nodiscard]] bool smoothScaleEnabled() const noexcept;
+
+        /**
+         * @brief 交出「此刻桌上还有什么可以对着对齐」的口径
+         * @param provider 起笔时调用一次，返回参照矩形（全局逻辑坐标）；空函数表示这一档没有参照
+         * @details 拖动每帧都枚举窗口会把鼠标移动拖慢，所以参照在起笔那一刻取一次快照，整趟拖动都用它。
+         *          由管理器供给：谁在桌上是它的账，窗口自己不该去数兄弟。
+         */
+        void setSnapCandidateProvider(std::function<std::vector<QRect>()> provider);
 
         /**
          * @brief 设旋转角度，见 IPinWindow::setRotationDegrees()
@@ -547,6 +556,12 @@ namespace GyanisScribe::Pin
         void clipboardReplaceRequested();
 
         /**
+         * @brief 这张贴图要求把桌上所有看得见的贴图一起选进多选集（`Ctrl+A`）
+         * @details 谁在屏上是管理器的账（收着的、别组的都不算），窗口只报「有人按了全选」。
+         */
+        void selectAllRequested();
+
+        /**
          * @brief 贴图被关闭，管理器据此把自己记的那一份摘掉
          */
         void closedByUser();
@@ -746,6 +761,8 @@ namespace GyanisScribe::Pin
         class QMovie                                        *m_movie         = nullptr;                  ///< 动图播放器；静图这张贴图时为空
         QString                                              m_sourceFile;                               ///< 动图的来源文件；进布局记录，重启后按它接上动画
         QPoint                                               m_dragOffset;                               ///< 移动时起笔点与窗口左上角的差
+        std::function<std::vector<QRect>()>                  m_snapCandidates;                           ///< 起笔时取参照矩形的口径，由管理器供给
+        std::vector<QRect>                                   m_dragCandidates;                           ///< 这一趟拖动的参照快照，整趟都用它，不在每帧重新枚举
         std::optional<HandleKind>                            m_draggedHandle;                            ///< 正在拖的手柄，没拖时为空
         double                                               m_dragInitialScale                 = 1.0;   ///< 起拖时的缩放
         double                                               m_dragInitialDistance              = 0.0;   ///< 起拖时指针到中心的距离

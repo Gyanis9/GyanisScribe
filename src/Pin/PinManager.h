@@ -188,6 +188,12 @@ namespace GyanisScribe::Pin
          */
         void togglePinSelection(PinWindow &pin);
 
+        /**
+         * @brief 把桌上看得见的贴图全部选进多选集（`Ctrl+A` 的落点）
+         * @details 收着的与在别的组的那几张一律不选：整组动作落在看不见的东西上，比没生效更难解释。
+         */
+        void selectAllVisiblePins();
+
         /// 清空选中集（贴图自己的「取消选择」、切组与整桌收起时都走这里）
         void clearPinSelection();
 

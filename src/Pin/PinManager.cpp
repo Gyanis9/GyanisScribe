@@ -4,6 +4,8 @@
 #include "Core/Paths.h"
 #include "Core/Text.h"
 #include "Pin/PinWindow.h"
+#include "Platform/IPlatformIntegration.h"
+#include "Platform/WindowGeometry.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
 
@@ -88,6 +90,34 @@ namespace GyanisScribe::Pin
                              }
                              emit pinClipboardReplaceRequested(static_cast<int>(found - m_pins.begin()));
                          });
+        // `Ctrl+A` 全选：谁在屏上是这一层的账，窗口只报意图
+        QObject::connect(raw, &PinWindow::selectAllRequested, this, &PinManager::selectAllVisiblePins);
+        // 对齐参照的口径：桌上其他贴图的矩形 + 屏上别的程序窗口，起笔时取一次快照（见 PinWindow::setSnapCandidateProvider）
+        raw->setSnapCandidateProvider(
+                [this, raw]
+                {
+                    std::vector<QRect> rects;
+                    for (const auto &held: m_pins)
+                    {
+                        // 自己不参与：拿自己的边吸自己只会原地不动，白算一遍
+                        if (held == nullptr || held.get() == raw || held->isConcealed())
+                        {
+                            continue;
+                        }
+                        rects.push_back(held->globalRect());
+                    }
+                    if (const auto windows = m_integration.screenWindows(); windows)
+                    {
+                        for (const auto &window: *windows)
+                        {
+                            if (!window.logicalGlobal.isEmpty())
+                            {
+                                rects.push_back(window.logicalGlobal);
+                            }
+                        }
+                    }
+                    return rects;
+                });
         // 分组改动只接意图、由管理器落账：哪张在哪组是这一层的账，窗口自己改会与管理器各记一半
         QObject::connect(raw, &PinWindow::moveToGroupRequested, this,
                          [this, raw](int group)
@@ -331,6 +361,19 @@ namespace GyanisScribe::Pin
         for (auto &pin: m_pins)
         {
             pin->setSelected(false);
+        }
+        publishSelection();
+    }
+
+    void PinManager::selectAllVisiblePins()
+    {
+        // 只挑在桌上的：收着的与在别组的都不算——整组动作落到看不见的东西上，比没生效更难解释
+        for (auto &pin: m_pins)
+        {
+            if (pin && !pin->isConcealed())
+            {
+                pin->setSelected(true);
+            }
         }
         publishSelection();
     }

@@ -172,6 +172,17 @@ namespace GyanisScribe::Pin
     [[nodiscard]] EdgeSnap snapToScreenEdges(const QRect &draggedRect, const QRect &available, int tolerance = kEdgeSnapTolerance);
 
     /**
+     * @brief 把拖动的矩形吸向候选矩形的边线（每轴最多吸一条）
+     * @param draggedRect 拖到的位置（窗口矩形）
+     * @param candidates 参照矩形：桌上其他贴图与屏上别的程序窗口
+     * @param tolerance 判「够近」的容差，逻辑像素
+     * @return 吸好的矩形；两轴都没有够近的线时原样返回
+     * @details 一条轴上取「位移最小的那一条线」，六条线一起比（左/中/右 与 上/中/下）：
+     *          只比外边线时，窄条贴图对宽贴图永远差半格，而那正是「两张图并排摆齐」最常要做的事。
+     */
+    [[nodiscard]] QRect snapToCandidateEdges(const QRect &draggedRect, const std::vector<QRect> &candidates, int tolerance = kEdgeSnapTolerance);
+
+    /**
      * @brief 贴边之后的窗口矩形：露着还是收成一条
      * @param revealed 贴边后完全露出的矩形
      * @param available 那块屏的可用区

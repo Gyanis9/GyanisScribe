@@ -3,7 +3,9 @@
 #include <QLineF>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstdlib>
 #include <numbers>
 
 namespace GyanisScribe::Pin
@@ -162,6 +164,61 @@ namespace GyanisScribe::Pin
         }
         snap.rect = rect;
         return snap;
+    }
+
+    QRect snapToCandidateEdges(const QRect &draggedRect, const std::vector<QRect> &candidates, const int tolerance)
+    {
+        if (candidates.empty() || tolerance < 0)
+        {
+            return draggedRect;
+        }
+
+        // 候选给出的线与本矩形的一一对齐都算一次位移，取绝对值最小的那一条；
+        // 中心线也进去，是因为「两张同宽的图并排」靠的是左右边，而「一窄一宽居中摆齐」靠的是中心
+        std::vector<int> xTargets;
+        std::vector<int> yTargets;
+        xTargets.reserve(candidates.size() * 3);
+        yTargets.reserve(candidates.size() * 3);
+        for (const auto &candidate: candidates)
+        {
+            const auto center = candidate.center();
+            xTargets.push_back(candidate.left());
+            xTargets.push_back(center.x());
+            xTargets.push_back(candidate.right());
+            yTargets.push_back(candidate.top());
+            yTargets.push_back(center.y());
+            yTargets.push_back(candidate.bottom());
+        }
+
+        const auto       draggedCenter = draggedRect.center();
+        const std::array xLines{draggedRect.left(), draggedCenter.x(), draggedRect.right()};
+        const std::array yLines{draggedRect.top(), draggedCenter.y(), draggedRect.bottom()};
+
+        // 每轴一个最佳位移：容差之内取最小的那一档；都没有就这一轴不动
+        const auto bestDelta = [&tolerance](const std::array<int, 3> &sources, const std::vector<int> &targets)
+        {
+            std::optional<int> best;
+            for (const auto target: targets)
+            {
+                for (const auto source: sources)
+                {
+                    const auto delta = target - source;
+                    if (std::abs(delta) > tolerance)
+                    {
+                        continue;
+                    }
+                    if (!best || std::abs(delta) < std::abs(*best))
+                    {
+                        best = delta;
+                    }
+                }
+            }
+            return best;
+        };
+
+        auto shifted = draggedRect;
+        shifted.translate(bestDelta(xLines, xTargets).value_or(0), bestDelta(yLines, yTargets).value_or(0));
+        return shifted;
     }
 
     QRect dockedRect(const QRect &revealed, const QRect &available, const ScreenEdge edge, const bool collapsed, const int stripWidth)

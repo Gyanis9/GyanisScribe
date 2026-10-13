@@ -1143,6 +1143,11 @@ namespace GyanisScribe::Pin
         return m_smoothScaleEnabled;
     }
 
+    void PinWindow::setSnapCandidateProvider(std::function<std::vector<QRect>()> provider)
+    {
+        m_snapCandidates = std::move(provider);
+    }
+
     void PinWindow::applyGeometry()
     {
         const auto scaled   = m_thumbnail ? QSizeF{kThumbnailEdge, kThumbnailEdge} : windowSizeFor(m_logicalSize, m_scale);
@@ -1383,6 +1388,8 @@ namespace GyanisScribe::Pin
         }
 
         m_dragMoved = false;
+        // 起笔时取一次参照快照：整趟拖动都用它，每帧重新枚举窗口会把鼠标移动拖慢
+        m_dragCandidates = m_snapCandidates ? m_snapCandidates() : std::vector<QRect>{};
 
         const auto point   = event->position();
         const auto handles = handleRects();
@@ -1437,9 +1444,15 @@ namespace GyanisScribe::Pin
 
         if (event->buttons().testFlag(Qt::LeftButton))
         {
-            m_dragMoved         = true;
-            const QPoint target = event->globalPosition().toPoint() - m_dragOffset;
-            const QPoint delta  = target - pos();
+            m_dragMoved = true;
+            auto target = event->globalPosition().toPoint() - m_dragOffset;
+            // 按住 Shift 拖动 = 把这一张对到桌上别的贴图或屏上窗口：差一格就松手也能齐，
+            // 不按住时一律不吸——自由摆放的手感不能被参照抢走
+            if (event->modifiers().testFlag(Qt::ShiftModifier) && !m_dragCandidates.empty())
+            {
+                target = snapToCandidateEdges(QRect(target, size()), m_dragCandidates).topLeft();
+            }
+            const QPoint delta = target - pos();
             move(target);
             // 选中集里其余几张按同一位移跟着挪：本张已经挪过，管理器只动其余的
             emit draggedWithSelection(delta);
@@ -1453,6 +1466,10 @@ namespace GyanisScribe::Pin
         {
             return;
         }
+
+        // 这一趟拖动的参照到此为止：下一次起笔重新取快照，别拿上一趟的位置当参照
+        m_dragCandidates.clear();
+
         if (m_cropping)
         {
             if (m_cropAnchor.has_value())
@@ -1641,6 +1658,13 @@ namespace GyanisScribe::Pin
         if (event->key() == Qt::Key_0 && event->modifiers() == Qt::NoModifier)
         {
             resetScaleAndRotation();
+            return;
+        }
+
+        // `Ctrl+A` 把桌上看得见的贴图一起选进多选集：谁在屏上是管理器的账，这一层只报意图
+        if (event->key() == Qt::Key_A && event->modifiers() == Qt::ControlModifier)
+        {
+            emit selectAllRequested();
             return;
         }
 

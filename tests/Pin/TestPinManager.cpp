@@ -737,4 +737,32 @@ namespace GyanisScribe
         EXPECT_EQ(missing.error().code, Core::ErrorCode::InvalidArgument);
     }
 
+    /**
+     * @brief 钉住 `Ctrl+A` 那一路只选在桌上的那几张
+     * @details 收着的与在别组的那几张不在屏上，整组动作落在它们身上没人看得见，等于凭空改状态。
+     */
+    TEST_F(PinManagerFixture, SelectAllVisiblePinsPicksOnlyTheOnesOnTheDesk)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(10, 10));
+        pins.addPin(makeImage(), QPoint(60, 60));
+        pins.addPin(makeImage(), QPoint(120, 120));
+        ASSERT_TRUE(pins.movePinToGroup(2, 2).has_value()) << "把第三张移到别组没成功";
+        ASSERT_TRUE(isOnDesk(pins.pinAt(0)) && isOnDesk(pins.pinAt(1))) << "前两张该还在桌上";
+        ASSERT_FALSE(isOnDesk(pins.pinAt(2))) << "移走的那张该从桌上收起";
+
+        pins.selectAllVisiblePins();
+        EXPECT_EQ(pins.selectedPinCount(), 2) << "全选只该挑在桌上的那两张";
+
+        auto *first     = dynamic_cast<Pin::PinWindow *>(pins.pinAt(0));
+        auto *concealed = dynamic_cast<Pin::PinWindow *>(pins.pinAt(2));
+        ASSERT_NE(first, nullptr);
+        ASSERT_NE(concealed, nullptr);
+        EXPECT_TRUE(first->isSelected()) << "在桌上的那张没被选进集";
+        EXPECT_FALSE(concealed->isSelected()) << "收着的那张被选进了集：整组动作会落到看不见的图上";
+
+        pins.clearPinSelection();
+        EXPECT_EQ(pins.selectedPinCount(), 0) << "全选之后清不干净，后面的整组操作就没有出口";
+    }
+
 } // namespace GyanisScribe
