@@ -131,6 +131,7 @@ namespace
             std::vector<int>      lineStyles;       ///< lineStyleChanged 收到的线型档
             std::vector<int>      roundedRects;     ///< roundedRectChanged 收到的开关（1 开 0 关）
             std::vector<int>      doubleHeaded;     ///< doubleHeadedChanged 收到的开关（1 开 0 关）
+            std::vector<int>      arrowReversed;    ///< arrowReversedChanged 收到的开关（1 开 0 关）
             std::vector<int>      ellipticals;      ///< ellipticalChanged 收到的开关（1 椭圆 0 矩形）
             std::vector<int>      strokeSteps;      ///< textStrokeColorStepChanged 收到的档（0 自动、1 白、2 黑）
             std::vector<int>      outlineWidths;    ///< textOutlineWidthStepChanged 收到的档（0 细、1 中、2 粗）
@@ -163,6 +164,7 @@ namespace
             QObject::connect(toolbar.get(), &AnnotationToolbar::lineStyleChanged, [&log](int style) { log.lineStyles.push_back(style); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::roundedRectChanged, [&log](bool enabled) { log.roundedRects.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::doubleHeadedChanged, [&log](bool enabled) { log.doubleHeaded.push_back(enabled ? 1 : 0); });
+            QObject::connect(toolbar.get(), &AnnotationToolbar::arrowReversedChanged, [&log](bool enabled) { log.arrowReversed.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::ellipticalChanged, [&log](bool enabled) { log.ellipticals.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::textStrokeColorStepChanged, [&log](int step) { log.strokeSteps.push_back(step); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::textOutlineWidthStepChanged, [&log](int step) { log.outlineWidths.push_back(step); });
@@ -283,6 +285,41 @@ namespace
         EXPECT_EQ(log.doubleHeaded, (std::vector<int>{1, 0}));
         EXPECT_FALSE(button->isChecked()) << "关掉之后按钮还按着";
         EXPECT_EQ(button->accessibleName(), QString::fromUtf8("双向箭头：关")) << "无障碍名没跟上开关";
+    }
+
+    /**
+     * @brief 钉住反向箭头开关：点一下开、再点一下关，按下态、提示与信号三者同解
+     * @details 与双向那一枚同为保持按下态的开关，但两档各自记账：开反向不该把双向弹掉，
+     *          否则用户「先开双向再开反向」这一步就偷偷改了两个参数。
+     */
+    TEST_F(ToolbarFixture, ReversedArrowButtonTogglesAndNamesTheState)
+    {
+        SignalLog log;
+        auto      toolbar = makeToolbarLogged(log);
+        auto     *button  = buttonByLabel(*toolbar, "反向箭头");
+        ASSERT_NE(button, nullptr) << "工具栏上找不到反向箭头按钮";
+
+        EXPECT_FALSE(toolbar->currentArrowReversed()) << "起点该是关";
+        EXPECT_FALSE(button->isChecked()) << "起点按钮该是弹起态";
+
+        button->click();
+        EXPECT_TRUE(toolbar->currentArrowReversed());
+        EXPECT_EQ(log.arrowReversed, std::vector<int>{1}) << "开了却没把信号发出去";
+        EXPECT_TRUE(button->isChecked()) << "开关开了按钮却没保持按下";
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("反向箭头：开")) << "提示没跟上开关";
+
+        button->click();
+        EXPECT_FALSE(toolbar->currentArrowReversed());
+        EXPECT_EQ(log.arrowReversed, (std::vector<int>{1, 0}));
+        EXPECT_EQ(button->accessibleName(), QString::fromUtf8("反向箭头：关")) << "无障碍名没跟上开关";
+
+        // 两档独立：开反向不动双向，开双向也不动反向
+        button->click();
+        auto *doubleButton = buttonByLabel(*toolbar, "双向箭头");
+        ASSERT_NE(doubleButton, nullptr);
+        doubleButton->click();
+        EXPECT_TRUE(toolbar->currentArrowReversed()) << "开双向把反向偷偷关掉了";
+        EXPECT_TRUE(toolbar->currentDoubleHeaded());
     }
 
     /**

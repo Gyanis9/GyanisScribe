@@ -316,6 +316,14 @@ namespace GyanisScribe::Annotation
         void setDoubleHeaded(bool enabled) noexcept;
 
         /**
+         * @brief 设箭头方向
+         * @param enabled true 表示箭头画在起点那一头（拖的方向与指的方向相反）
+         * @details 只有箭头工具用得上；与双向同时为真时两端都有头，这一档就看不出来——
+         *          两个开关各自独立记着，不做互斥回弹，因为用户先开哪个都不该被偷偷关掉。
+         */
+        void setArrowReversed(bool enabled) noexcept;
+
+        /**
          * @brief 开关椭圆档
          * @param enabled true 表示圆的那一档：马赛克/高斯模糊把作用区收进内切椭圆，高亮/橡皮擦换圆头圆角笔尖
          * @details 四件工具（马赛克、高斯模糊、高亮、橡皮擦）用得上；开关随新画的图形带走，
@@ -462,6 +470,7 @@ namespace GyanisScribe::Annotation
         int             m_fillStyle            = 0;                                                  ///< 默认填充档（0 无、1 半透明、2 实心）
         bool            m_roundedRect          = false;                                              ///< 默认圆角矩形（仅矩形工具用）
         bool            m_doubleHeaded         = false;                                              ///< 默认双向箭头（仅箭头工具用）
+        bool            m_arrowReversed        = false;                                              ///< 默认箭头在起点那一头（仅箭头工具用）
         bool            m_elliptical           = false;                                              ///< 默认椭圆档（马赛克/高斯模糊/高亮/橡皮擦用）
         int             m_mosaicBlockSize      = kMosaicBlockSizes[kDefaultMosaicBlockStep];         ///< 默认马赛克粒度（仅马赛克工具用）
         int             m_highlightAlpha       = kHighlightAlphas[kDefaultHighlightAlphaStep];       ///< 默认高亮透明度（仅高亮工具用）

@@ -99,8 +99,12 @@ namespace GyanisScribe::Annotation
         // 开口两翼没有底边可收：杆要伸到尖上，收回来会在 V 中间露半截
         const bool sinkShaftAtHead = shape.arrowHeadStyle != kArrowHeadOpenWings;
 
-        // 箭杆只画到箭头底边那一处，否则杆头会从三角中间冒出来；双头箭杆两头都收
-        painter.drawLine(shape.doubleHeaded && sinkShaftAtHead ? start + headSink : start, sinkShaftAtHead ? end - headSink : end);
+        // 头在哪两头由两个开关合力定：双向＝两头，反向＝只有起点那头；两个都开还是两头（双向把那一档盖住了）
+        const bool headAtStart = shape.doubleHeaded || shape.arrowReversed;
+        const bool headAtEnd   = shape.doubleHeaded || !shape.arrowReversed;
+
+        // 箭杆只画到箭头底边那一处，否则杆头会从三角中间冒出来；两头有头就两头都收
+        painter.drawLine(headAtStart && sinkShaftAtHead ? start + headSink : start, headAtEnd && sinkShaftAtHead ? end - headSink : end);
 
         if (shape.arrowHeadStyle == kArrowHeadFilled)
         {
@@ -113,8 +117,11 @@ namespace GyanisScribe::Annotation
             painter.setBrush(Qt::NoBrush);
         }
 
-        drawArrowHead(painter, end, angle, headLength, shape.arrowHeadStyle);
-        if (shape.doubleHeaded)
+        if (headAtEnd)
+        {
+            drawArrowHead(painter, end, angle, headLength, shape.arrowHeadStyle);
+        }
+        if (headAtStart)
         {
             // 起点端的头指向相反：从起点端看出去，仍是「从杆尾指向这一头」
             drawArrowHead(painter, start, angle + std::numbers::pi, headLength, shape.arrowHeadStyle);

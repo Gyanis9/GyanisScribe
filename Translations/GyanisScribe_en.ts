@@ -168,6 +168,10 @@
             <translation>Double-headed arrow</translation>
         </message>
         <message>
+            <source>反向箭头</source>
+            <translation>Reversed arrow</translation>
+        </message>
+        <message>
             <source>椭圆形状</source>
             <translation>Ellipse shape</translation>
         </message>
@@ -298,6 +302,14 @@
         <message>
             <source>双向箭头：关</source>
             <translation>Double-headed arrow: off</translation>
+        </message>
+        <message>
+            <source>反向箭头：开</source>
+            <translation>Reversed arrow: on</translation>
+        </message>
+        <message>
+            <source>反向箭头：关</source>
+            <translation>Reversed arrow: off</translation>
         </message>
         <message>
             <source>椭圆形状：椭圆</source>

@@ -160,6 +160,12 @@ namespace GyanisScribe::Annotation
          */
         void setDoubleHeaded(bool enabled);
 
+        /// 当前是不是反向箭头（箭头画在起点那一头）
+        [[nodiscard]] bool currentArrowReversed() const;
+
+        /// 开/关反向箭头：把箭头换到起点那一头
+        void setArrowReversed(bool enabled);
+
         /// 当前是不是椭圆档（马赛克/高斯模糊/高亮/橡皮擦用；新建的图形按它选形状）
         [[nodiscard]] bool currentElliptical() const;
 
@@ -291,6 +297,8 @@ namespace GyanisScribe::Annotation
         void lineStyleChanged(int style);
         /// 用户开了/关了双向箭头
         void doubleHeadedChanged(bool enabled);
+        /// 用户开了/关了反向箭头
+        void arrowReversedChanged(bool enabled);
         /// 用户开了/关了椭圆档
         void ellipticalChanged(bool enabled);
         /// 用户改了马赛克粒度
@@ -448,6 +456,8 @@ namespace GyanisScribe::Annotation
         int                                         m_lineStyle            = static_cast<int>(kDefaultLineStyleStep);        ///< 当前线型档，值表是 kAnnotationLineStyles
         QToolButton                                *m_doubleArrowButton    = nullptr;                                        ///< 双向箭头开关按钮，按下表示两端有头
         bool                                        m_doubleHeaded         = false;                                          ///< 当前是不是双向箭头
+        QToolButton                                *m_reversedArrowButton  = nullptr;                                        ///< 反向箭头开关按钮，按下表示箭头在起点那头
+        bool                                        m_arrowReversed        = false;                                          ///< 当前是不是反向箭头
         QToolButton                                *m_ellipticalButton     = nullptr;                                        ///< 椭圆形状开关按钮，按下表示收进内切椭圆/换圆头
         bool                                        m_elliptical           = false;                                          ///< 当前是不是椭圆档
         QToolButton                                *m_mosaicGrainButton    = nullptr;                                        ///< 马赛克粒度按钮，点一下走一档

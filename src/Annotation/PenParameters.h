@@ -34,6 +34,7 @@ namespace GyanisScribe::Annotation
         int     lineStyle            = static_cast<int>(kDefaultLineStyleStep);            ///< 线型档：0 实线、1 虚线、2 点线（描边类工具用）
         bool    roundedRect          = false;                                              ///< 圆角矩形（仅矩形工具用）
         bool    doubleHeaded         = false;                                              ///< 双向箭头：两端各画一个箭头（仅箭头工具用）
+        bool    arrowReversed        = false;                                              ///< 箭头换到起点那一头（仅箭头工具用）
         bool    elliptical           = false;                                              ///< 椭圆档：马赛克/高斯模糊收进内切椭圆，高亮/橡皮擦换圆头圆角（默认方档）
         int     mosaicBlockSize      = kMosaicBlockSizes[kDefaultMosaicBlockStep];         ///< 马赛克方块边长，逻辑像素（仅马赛克工具用）
         int     highlightAlpha       = kHighlightAlphas[kDefaultHighlightAlphaStep];       ///< 高亮透明度，0-255（仅高亮工具用）
@@ -66,6 +67,7 @@ namespace GyanisScribe::Annotation
                              .lineStyle            = shape.lineStyle,
                              .roundedRect          = shape.roundedRect,
                              .doubleHeaded         = shape.doubleHeaded,
+                             .arrowReversed        = shape.arrowReversed,
                              .elliptical           = shape.elliptical,
                              .mosaicBlockSize      = shape.mosaicBlockSize,
                              .highlightAlpha       = shape.highlightAlpha,

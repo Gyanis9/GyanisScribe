@@ -410,6 +410,44 @@ TEST_F(AnnotationFixture, DoubleHeadedArrowDrawsAHeadOnBothEnds)
 }
 
 /**
+ * @brief 钉住反向箭头：arrowReversed 打开后头长在起点那一头，终点那头只剩杆
+ * @details 与「实心三角」「双向箭头」两条用同一组坐标互为对照：(30,63) 该有墨、(170,63) 该是白的。
+ *          这条走完「参数下发 → 新画的图形带上开关 → 头换边」整条路。
+ */
+TEST_F(AnnotationFixture, ReversedArrowPutsTheHeadOnTheStartEnd)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Arrow).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 16, .fillStyle = 0, .arrowReversed = true}).has_value());
+    m_engine.beginStroke(QPoint(20, 60));
+    m_engine.moveStroke(QPoint(180, 60));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+
+    const auto drawn = m_engine.exportImage();
+    EXPECT_EQ(drawn.pixelColor(30, 63), QColor(255, 0, 0)) << "起点端没长出箭头：反向开关没落到新画的图形上";
+    EXPECT_EQ(drawn.pixelColor(170, 63), QColor(255, 255, 255)) << "终点端还留着那头：方向根本没换过来";
+    EXPECT_EQ(drawn.pixelColor(100, 60), QColor(255, 0, 0)) << "两头之间箭杆断了";
+}
+
+/**
+ * @brief 钉住「反向 + 双向」同时开着时两端都有头，而且谁都不被偷偷关掉
+ * @details 两档是独立开关：互斥回弹会让用户开一个就把另一个丢了，而双向本来就该是两端有头。
+ *          读数上判的是「双向盖住反向的结果」，不是反向失效——把 doubleHeaded 关掉仍该只剩起点那头。
+ */
+TEST_F(AnnotationFixture, DoubleHeadedWinsOverReversedWithoutTurningItOff)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Arrow).has_value());
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 16, .fillStyle = 0, .doubleHeaded = true, .arrowReversed = true})
+                        .has_value());
+    m_engine.beginStroke(QPoint(20, 60));
+    m_engine.moveStroke(QPoint(180, 60));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+
+    const auto drawn = m_engine.exportImage();
+    EXPECT_EQ(drawn.pixelColor(30, 63), QColor(255, 0, 0)) << "起点端该有头";
+    EXPECT_EQ(drawn.pixelColor(170, 63), QColor(255, 0, 0)) << "双向开着，终点端不该被反向收掉";
+}
+
+/**
  * @brief 钉住直线的命中走线距而不是外接框
  * @details 与箭头同一套判据：外接框会把一条斜线的整片空白矩形算成命中，用户点 nowhere 却选中了这条线。
  */

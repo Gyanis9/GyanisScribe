@@ -18,6 +18,7 @@ namespace GyanisScribe::Annotation
                                         .lineStyle            = toolbar.currentLineStyle(),
                                         .roundedRect          = toolbar.currentRoundedRect(),
                                         .doubleHeaded         = toolbar.currentDoubleHeaded(),
+                                        .arrowReversed        = toolbar.currentArrowReversed(),
                                         .elliptical           = toolbar.currentElliptical(),
                                         .mosaicBlockSize      = toolbar.currentMosaicBlockSize(),
                                         .highlightAlpha       = toolbar.currentHighlightAlpha(),
@@ -81,6 +82,13 @@ namespace GyanisScribe::Annotation
                          [this](const bool enabled)
                          {
                              m_penParameters.doubleHeaded = enabled;
+                             applyPenParameters();
+                         });
+        // 反向箭头与双向各走各的一格：两个开关同时为真时两端都有头，不做互斥回弹
+        QObject::connect(&toolbar, &AnnotationToolbar::arrowReversedChanged, this,
+                         [this](const bool enabled)
+                         {
+                             m_penParameters.arrowReversed = enabled;
                              applyPenParameters();
                          });
         QObject::connect(&toolbar, &AnnotationToolbar::ellipticalChanged, this,
@@ -176,7 +184,6 @@ namespace GyanisScribe::Annotation
                                  Core::Logger::warning(std::format("切计数组没成：{}", applied.error().message));
                              }
                          });
-
         QObject::connect(&toolbar, &AnnotationToolbar::undoClicked, this,
                          [this]
                          {

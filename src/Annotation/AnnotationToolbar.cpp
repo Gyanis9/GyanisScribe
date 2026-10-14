@@ -265,6 +265,11 @@ namespace GyanisScribe::Annotation
         m_doubleArrowButton = makeButton("ArrowDouble", GyanisScribe::Core::uiText("双向箭头"), true);
         QObject::connect(m_doubleArrowButton, &QToolButton::clicked, this, [this] { setDoubleHeaded(m_doubleArrowButton->isChecked()); });
         layout->addWidget(m_doubleArrowButton);
+        // 反向箭头：同一枚箭头工具的第二档开关，把箭头换到起点那一头（拖的方向与指的方向相反）。
+        // 与双向不互斥——两个都开就是两端都有头，谁也没被偷偷关掉
+        m_reversedArrowButton = makeButton("ArrowReversed", GyanisScribe::Core::uiText("反向箭头"), true);
+        QObject::connect(m_reversedArrowButton, &QToolButton::clicked, this, [this] { setArrowReversed(m_reversedArrowButton->isChecked()); });
+        layout->addWidget(m_reversedArrowButton);
         // 椭圆形状：马赛克/高斯模糊/高亮/橡皮擦四件用得上，同为保持按下态的开关；
         // 名字带「形状」是为了与工具组里那枚「椭圆」区分——那枚是切工具，这枚是切当前工具的落笔形状
         m_ellipticalButton = makeButton("EllipseShape", GyanisScribe::Core::uiText("椭圆形状"), true);
@@ -447,6 +452,24 @@ namespace GyanisScribe::Annotation
             m_doubleArrowButton->setAccessibleName(label);
         }
         emit doubleHeadedChanged(enabled);
+    }
+
+    bool AnnotationToolbar::currentArrowReversed() const
+    {
+        return m_arrowReversed;
+    }
+
+    void AnnotationToolbar::setArrowReversed(const bool enabled)
+    {
+        m_arrowReversed = enabled;
+        if (m_reversedArrowButton != nullptr)
+        {
+            m_reversedArrowButton->setChecked(enabled);
+            const auto label = enabled ? GyanisScribe::Core::uiText("反向箭头：开") : GyanisScribe::Core::uiText("反向箭头：关");
+            m_reversedArrowButton->setToolTip(label);
+            m_reversedArrowButton->setAccessibleName(label);
+        }
+        emit arrowReversedChanged(enabled);
     }
 
     bool AnnotationToolbar::currentElliptical() const

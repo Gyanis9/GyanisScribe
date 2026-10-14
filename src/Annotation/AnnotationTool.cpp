@@ -55,6 +55,7 @@ namespace GyanisScribe::Annotation
         m_pending.fontSize             = m_fontSize;
         m_pending.roundedRect          = m_roundedRect;
         m_pending.doubleHeaded         = m_doubleHeaded;
+        m_pending.arrowReversed        = m_arrowReversed;
         m_pending.elliptical           = m_elliptical;
         m_pending.mosaicBlockSize      = m_mosaicBlockSize;
         m_pending.highlightAlpha       = m_highlightAlpha;
@@ -158,6 +159,7 @@ namespace GyanisScribe::Annotation
         shape.roundedRect          = parameters.roundedRect;
         shape.lineStyle            = parameters.lineStyle;
         shape.doubleHeaded         = parameters.doubleHeaded;
+        shape.arrowReversed        = parameters.arrowReversed;
         shape.elliptical           = parameters.elliptical;
         shape.mosaicBlockSize      = parameters.mosaicBlockSize;
         shape.highlightAlpha       = parameters.highlightAlpha;
@@ -367,6 +369,11 @@ namespace GyanisScribe::Annotation
     void AnnotationTool::setDoubleHeaded(const bool enabled) noexcept
     {
         m_doubleHeaded = enabled;
+    }
+
+    void AnnotationTool::setArrowReversed(const bool enabled) noexcept
+    {
+        m_arrowReversed = enabled;
     }
 
     void AnnotationTool::setElliptical(const bool enabled) noexcept
