@@ -2226,4 +2226,73 @@ namespace GyanisScribe
         EXPECT_TRUE(nearEqual(window.rotationDegrees(), 0.0, kDegreesTolerance)) << "带 Ctrl 的那一下该交回系统，不该转角";
     }
 
+    /**
+     * @brief 钉住「吸附距离」那一格接到按住 `Shift` 的参照对齐上
+     * @details 参照摆在「再往外三格」：默认 12 格吸得上，拨成 2 格就该吸不到，拨到 24 格时摆在二十格外也够得着。
+     *          这条钉的是设置接到拖动那一路；容差本身的语义归 TestPinTransform 的纯函数判据。
+     */
+    TEST_F(PinWindowFixture, EdgeSnapDistanceSettingMovesTheAlignmentGrip)
+    {
+        auto        &window = makeWindow();
+        const QPoint freeTarget{140, 120};
+        const QRect  dragged{freeTarget, window.size()};
+
+        const auto dragTo = [&window](const QRect &candidate)
+        {
+            window.setSnapCandidateProvider([candidate] { return std::vector<QRect>{candidate}; });
+            window.move(QPoint{100, 100});
+            QMouseEvent press{QEvent::MouseButtonPress, QPointF{20.0, 20.0}, QPoint{120, 120}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+            QApplication::sendEvent(&window, &press);
+            QMouseEvent drag{QEvent::MouseMove, QPointF{60.0, 40.0}, QPoint{160, 140}, Qt::LeftButton, Qt::LeftButton, Qt::ShiftModifier};
+            QApplication::sendEvent(&window, &drag);
+        };
+
+        dragTo(QRect{dragged.right() + 3, 900, 1, 1});
+        ASSERT_EQ(window.pos(), freeTarget + QPoint(3, 0)) << "默认那一档该吸到参照上";
+
+        ASSERT_TRUE(static_cast<bool>(settings().setValue(Settings::kPinEdgeSnapDistance, 2))) << "写入失败";
+        dragTo(QRect{dragged.right() + 3, 900, 1, 1});
+        EXPECT_EQ(window.pos(), freeTarget) << "吸附距离那一格没接到拖动这条路上：容差收到两格时差三格不该吸";
+
+        ASSERT_TRUE(static_cast<bool>(settings().setValue(Settings::kPinEdgeSnapDistance, 24))) << "写入失败";
+        dragTo(QRect{dragged.right() + 20, 900, 1, 1});
+        EXPECT_EQ(window.pos(), freeTarget + QPoint(20, 0)) << "把距离调到二十四格，同一落点该吸得更远";
+    }
+
+    /**
+     * @brief 钉住「不许拖边改大小」关掉的是改尺寸的落点，同一落点转成整张平移
+     * @details 手柄与边带的命中、悬停光标与按下分派都在 `resizeHandleAt` 一处收口：只改按下那一头，
+     *          光标会说「能改大小」而点下去只是拖着走，那种半接上的形状最难查。
+     *          平移与位置这条一路照常，滚轮缩放与右键那几档不受这一格影响。
+     */
+    TEST_F(PinWindowFixture, FrameResizeSwitchTurnsTheEdgeGripIntoPanning)
+    {
+        auto &window = makeWindow();
+        window.move(300, 300);
+
+        const auto dragFromRightEdge = [&window](const qreal span)
+        {
+            const QPointF onEdge{static_cast<qreal>(window.width() - 1), static_cast<qreal>(window.height() / 2)};
+            const QPoint  global{window.pos() + onEdge.toPoint()};
+            QMouseEvent   press{QEvent::MouseButtonPress, onEdge, global, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+            QApplication::sendEvent(&window, &press);
+            const QPointF moved = onEdge + QPointF{span, 0.0};
+            QMouseEvent   drag{QEvent::MouseMove, moved, global + QPoint{static_cast<int>(span), 0}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+            QApplication::sendEvent(&window, &drag);
+            QMouseEvent release{QEvent::MouseButtonRelease, moved, global + QPoint{static_cast<int>(span), 0}, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+            QApplication::sendEvent(&window, &release);
+        };
+
+        const auto startSize = window.size();
+        dragFromRightEdge(24.0);
+        EXPECT_GT(window.width(), startSize.width()) << "默认档下按在右边拖一把该把这张改宽";
+
+        ASSERT_TRUE(static_cast<bool>(settings().setValue(Settings::kPinDisableFrameResize, true))) << "写入失败";
+        const auto keptSize    = window.size();
+        const auto keptPattern = window.pos();
+        dragFromRightEdge(24.0);
+        EXPECT_EQ(window.size(), keptSize) << "关掉之后同一落点不该再改尺寸";
+        EXPECT_NE(window.pos(), keptPattern) << "同一落点该转成整张平移，而不是什么都不做";
+    }
+
 } // namespace GyanisScribe

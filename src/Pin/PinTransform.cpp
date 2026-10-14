@@ -1,5 +1,7 @@
 #include "Pin/PinTransform.h"
 
+#include "Core/Text.h"
+
 #include <QLineF>
 #include <QPainter>
 
@@ -143,6 +145,20 @@ namespace GyanisScribe::Pin
                 std::clamp(static_cast<int>(std::ceil(fold(clamped.bottom(), content.top(), content.height(), imagePixelSize.height()))) - 1, 0, imagePixelSize.height() - 1);
 
         return QRect(QPoint(x0, y0), QPoint(x1, y1));
+    }
+
+    Core::Expected<int> parseEdgeSnapDistance(const int distance)
+    {
+        if (distance >= kEdgeSnapDistanceMinimum && distance <= kEdgeSnapDistanceMaximum)
+        {
+            return distance;
+        }
+        return Core::Expected<int>{std::unexpected{Core::Error{
+                .code    = Core::ErrorCode::InvalidArgument,
+                .message = GyanisScribe::Core::uiFormat(
+                        GyanisScribe::Core::uiTextUtf8("吸附距离 \"{}\" 不在 {} 到 {} 之间：请在设置的贴图页重填这一格，或删掉 Pin/EdgeSnapDistance 这一项回到默认的 {} 格"),
+                        distance, kEdgeSnapDistanceMinimum, kEdgeSnapDistanceMaximum, kEdgeSnapTolerance),
+        }}};
     }
 
     EdgeSnap snapToScreenEdges(const QRect &draggedRect, const QRect &available, const int tolerance)

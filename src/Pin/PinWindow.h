@@ -796,6 +796,14 @@ namespace GyanisScribe::Pin
         [[nodiscard]] std::optional<HandleKind> resizeHandleAt(const QPointF &localPoint) const;
 
         /**
+         * @brief 这一张用的吸附距离，逻辑像素
+         * @return 设置里那一格的值；越界的手填值回落到默认那一段
+         * @details 贴边收起与按住 `Shift` 对齐共用这一个口径：两处各读一份就会差出一格，
+         *          而那正是「明明对齐了却吸不上」最难查的形状。
+         */
+        [[nodiscard]] int edgeSnapDistance() const;
+
+        /**
          * @brief 窗口四边那一条带子里的落点归哪一档（角上优先，其次是那一条边）
          * @param localPoint 本窗口内坐标
          * @return 对应的手柄档；落在带子外（或缩略图那一档）为空

@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include "Core/Types.h"
+
 #include <QColor>
 #include <QImage>
 #include <QPoint>
@@ -205,8 +207,20 @@ namespace GyanisScribe::Pin
      */
     [[nodiscard]] std::optional<QRect> imagePixelRect(const QRectF &windowRect, const QRectF &content, const QSize &imagePixelSize);
 
-    /// 拖到离屏幕边多近就算「要贴上去」，逻辑像素
+    /// 拖到离屏幕边多近就算「要贴上去」，逻辑像素；也是设置里「吸附距离」那一格的默认值
     inline constexpr int kEdgeSnapTolerance = 12;
+
+    /// 「吸附距离」的取值区间：0 是一档有意义的设置（不吸附），不是坏值；上限给到手能稳过的距离
+    inline constexpr int kEdgeSnapDistanceMinimum = 0;
+    inline constexpr int kEdgeSnapDistanceMaximum = 64;
+
+    /**
+     * @brief 校验「吸附距离」那一格存的整数
+     * @param distance 待校验的值，逻辑像素
+     * @return 在区间内原样交回；越界返回 InvalidArgument，文案写明去哪一格改、删掉哪个键能回默认
+     * @details 区间只住在这一处：设置页的数字框与贴图读端都从这里取值，两处各写一遍就会一处放行一处拒绝。
+     */
+    [[nodiscard]] Core::Expected<int> parseEdgeSnapDistance(int distance);
 
     /// 贴边收起后留在屏上的那条边，逻辑像素：全藏进去用户就再也找不回它了
     inline constexpr int kEdgeStripWidth = 6;

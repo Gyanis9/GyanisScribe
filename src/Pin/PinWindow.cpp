@@ -761,8 +761,24 @@ namespace GyanisScribe::Pin
         return {};
     }
 
+    int PinWindow::edgeSnapDistance() const
+    {
+        const auto stored = m_settings.intValue(GyanisScribe::Settings::kPinEdgeSnapDistance, kEdgeSnapTolerance);
+        const auto parsed = parseEdgeSnapDistance(stored);
+        // 区间判据与设置页共用那一个校验函数。这里不记日志：这条路每帧鼠标移动都要走一次，
+        // 同一句话会被刷成一片，把真正有用的现场埋掉；设置页那一格读到时会说一次
+        return parsed ? *parsed : kEdgeSnapTolerance;
+    }
+
     std::optional<HandleKind> PinWindow::resizeHandleAt(const QPointF &localPoint) const
     {
+        // 设置里「不许拖边改大小」这一档关掉的是这一处：手柄与边带的命中、悬停光标、按下分派都从这条走，
+        // 只在按下那一头拦会让光标仍显示「能改大小」而点下去没反应
+        if (m_settings.boolValue(GyanisScribe::Settings::kPinDisableFrameResize, false))
+        {
+            return std::nullopt;
+        }
+
         const auto handles = handleRects();
         for (std::size_t index = 0; index < handles.size(); ++index)
         {
@@ -1696,7 +1712,7 @@ namespace GyanisScribe::Pin
             // 不按住时一律不吸——自由摆放的手感不能被参照抢走
             if (event->modifiers().testFlag(Qt::ShiftModifier) && !m_dragCandidates.empty())
             {
-                target = snapToCandidateEdges(QRect(target, size()), m_dragCandidates).topLeft();
+                target = snapToCandidateEdges(QRect(target, size()), m_dragCandidates, edgeSnapDistance()).topLeft();
             }
             const QPoint delta = target - pos();
             move(target);
@@ -1749,7 +1765,7 @@ namespace GyanisScribe::Pin
         const auto *screen = QGuiApplication::screenAt(QRectF(pos(), size()).center().toPoint());
         if (screen != nullptr)
         {
-            const auto snapped = snapToScreenEdges(QRect(pos(), size()), screen->availableGeometry());
+            const auto snapped = snapToScreenEdges(QRect(pos(), size()), screen->availableGeometry(), edgeSnapDistance());
             if (snapped.edge != ScreenEdge::None)
             {
                 m_dockArea = screen->availableGeometry();

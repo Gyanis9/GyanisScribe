@@ -1060,6 +1060,18 @@
             <translation>The right click is the platform's own menu, and a double click already counted as a single click when the first one was released — these two slots cover only these two clicks</translation>
         </message>
         <message>
+            <source> 像素</source>
+            <translation> px</translation>
+        </message>
+        <message>
+            <source>吸附距离</source>
+            <translation>Snap distance</translation>
+        </message>
+        <message>
+            <source>按住 Shift 拖动对齐、贴到屏边收起这两处共用的距离：填 0 就是完全不吸</source>
+            <translation>The distance shared by Shift-held alignment and edge docking: 0 means nothing snaps at all</translation>
+        </message>
+        <message>
             <source>默认不透明度</source>
             <translation>Default opacity</translation>
         </message>
@@ -1090,10 +1102,6 @@
         <message>
             <source>按下截图后等这么久再开始，用来截菜单、悬停提示这类一碰就没的画面；0 表示不延时</source>
             <translation>Wait this long after the key before capturing, for menus and hover hints that vanish as soon as you touch them; 0 means no delay</translation>
-        </message>
-        <message>
-            <source> 像素</source>
-            <translation> px</translation>
         </message>
         <message>
             <source>圆角半径</source>
@@ -1522,6 +1530,18 @@
         <message>
             <source>新建贴图的默认不透明度</source>
             <translation>Opacity for new pins</translation>
+        </message>
+        <message>
+            <source>不许拖边改大小</source>
+            <translation>No border resizing</translation>
+        </message>
+        <message>
+            <source>这一张不许拖边或拖手柄改大小</source>
+            <translation>This pin cannot be resized by its border or handles</translation>
+        </message>
+        <message>
+            <source>只关掉改尺寸的落点：整张平移、滚轮缩放与右键那几档都不受影响</source>
+            <translation>Only the resize grips are turned off: moving the pin, wheel scaling and the right-click items all keep working</translation>
         </message>
         <message>
             <source>录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。存成 GIF 时帧率上限比 MP4 低（选了 GIF 那一格只到 24）。画面码率填 0 就交给编码器的质量档，给了具体数值就按那个码率控，GIF 用不上这一项。编码器可以钉住某一家，默认自动就是编码前逐个真探、挑第一个开得起来的。倒计时 0 表示立即开始。取声那两格列不出设备时只剩「不取这一路」，把鼠标停在框上能看到原因；存成 GIF 时这两格会灰掉，那种文件带不了声音。这几项都从下一次开始录屏时生效。</source>
@@ -2722,6 +2742,10 @@
         <message>
             <source>第 {} 组现在没有贴图，摆不出这一组。要把别的图挪过来，请在贴图的右键菜单里选「移动到分组」</source>
             <translation>Group {} has no pins, so it cannot be shown. To move pins over, use "Move to group" in a pin's context menu</translation>
+        </message>
+        <message>
+            <source>吸附距离 "{}" 不在 {} 到 {} 之间：请在设置的贴图页重填这一格，或删掉 Pin/EdgeSnapDistance 这一项回到默认的 {} 格</source>
+            <translation>Snap distance "{}" is outside {} to {}: refill this field on the Pin settings page, or delete the Pin/EdgeSnapDistance entry to go back to the default {} pixels</translation>
         </message>
         <message>
             <source>这台机器的 Qt 写不出「{}」这一档保存格式。请在设置的截图页改选一档</source>

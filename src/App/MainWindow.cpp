@@ -713,6 +713,40 @@ namespace
      * @param settings 配置存储
      * @return 归调用方所有的数字框
      */
+    /**
+     * @brief 贴图的吸附距离（逻辑像素）
+     * @param settings 配置存储
+     * @return 归调用方所有的数字框
+     * @details 0 是一档有意义的设置（不吸附），因此这里不能像「历史留多少条」那样把最小值显示成「不限」。
+     */
+    QSpinBox *makeEdgeSnapDistanceSpin(ISettingsStore &settings)
+    {
+        auto *spin = new QSpinBox;
+        spin->setRange(GyanisScribe::Pin::kEdgeSnapDistanceMinimum, GyanisScribe::Pin::kEdgeSnapDistanceMaximum);
+        spin->setSuffix(GyanisScribe::Core::uiText(" 像素"));
+        spin->setAccessibleName(GyanisScribe::Core::uiText("吸附距离"));
+        spin->setToolTip(GyanisScribe::Core::uiText("按住 Shift 拖动对齐、贴到屏边收起这两处共用的距离：填 0 就是完全不吸"));
+
+        const auto title  = GyanisScribe::Core::uiText("吸附距离");
+        const auto stored = settings.intValue(GyanisScribe::Settings::kPinEdgeSnapDistance, GyanisScribe::Pin::kEdgeSnapTolerance);
+        spin->setValue(shownValueForSetting(title, stored, GyanisScribe::Pin::parseEdgeSnapDistance(stored), GyanisScribe::Pin::kEdgeSnapTolerance));
+
+        QObject::connect(spin, &QSpinBox::valueChanged, spin,
+                         [&settings, title](int value)
+                         {
+                             if (auto written = settings.setValue(GyanisScribe::Settings::kPinEdgeSnapDistance, value); !written)
+                             {
+                                 Logger::warning(std::format("{} 没能写入：{}", title.toStdString(), written.error().message));
+                             }
+                         });
+        return spin;
+    }
+
+    /**
+     * @brief 新建贴图的默认不透明度（百分比）
+     * @param settings 配置存储
+     * @return 归调用方所有的数字框
+     */
     QSpinBox *makeOpacitySpin(ISettingsStore &settings)
     {
         auto *spin = new QSpinBox;
@@ -2099,6 +2133,10 @@ namespace GyanisScribe::App
         auto *page = new QWidget{this};
         auto *form = makePageForm(page, GyanisScribe::Core::uiText("新贴到屏幕上的图按这个不透明度开始。滚轮调透明度只影响那一张贴图，不改这里。"));
         form->addRow(GyanisScribe::Core::uiText("新建贴图的默认不透明度"), makeOpacitySpin(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("吸附距离"), makeEdgeSnapDistanceSpin(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("不许拖边改大小"),
+                     makeSettingCheck(m_settings, GyanisScribe::Settings::kPinDisableFrameResize, false, GyanisScribe::Core::uiText("这一张不许拖边或拖手柄改大小"),
+                                      GyanisScribe::Core::uiText("不许拖边改大小"), GyanisScribe::Core::uiText("只关掉改尺寸的落点：整张平移、滚轮缩放与右键那几档都不受影响")));
         return page;
     }
 

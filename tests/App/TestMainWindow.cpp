@@ -11,6 +11,7 @@
 #include "History/HistoryRules.h"
 #include "History/HistoryStore.h"
 #include "Pin/PinLayout.h"
+#include "Pin/PinTransform.h"
 #include "Pick/PickGeometry.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Record/RecorderConfig.h"
@@ -232,7 +233,7 @@ namespace
                 Expectation{MainWindowPage::General, {"界面语言", "历史最多留多少条", "历史最久留多少天", "左键单击", "中键单击", "导出配置", "导入配置"}, true},
                 Expectation{MainWindowPage::Capture, {"截完之后", "延时截图", "截图目录", "颜色写法", "自动保存所有截图", "截图音效", "成品加边框", "成品加投影"}, true},
                 Expectation{MainWindowPage::Annotation, {"默认线宽", "默认字号"}, true},
-                Expectation{MainWindowPage::Pin, {"默认不透明度"}, true},
+                Expectation{MainWindowPage::Pin, {"默认不透明度", "吸附距离", "不许拖边改大小"}, true},
                 Expectation{MainWindowPage::Record,
                             {"录屏目录", "录制范围", "输出格式", "默认帧率", "录屏倒计时", "画面码率", "视频编码器", "光标高亮", "麦克风设备", "系统声音设备"},
                             true},
@@ -611,6 +612,35 @@ namespace
 
         const auto reopened = makeStore();
         EXPECT_EQ(reopened->stringValue(GyanisScribe::Settings::kCaptureSizeUnit, QStringLiteral("?")), QStringLiteral("px")) << "存的必须是标记，不是界面上那几个字";
+    }
+
+    /**
+     * @brief 钉住贴图页那两行写的是各自那一格，且默认显示的就是读端初值
+     * @details 数字框显示一档、读端回落另一档时，用户看到「12」而实际生效的是别的数；
+     *          两行若共用一个键，拨一个另一个跟着变，界面与配置就对不上了。
+     */
+    TEST_F(MainWindowFixture, PinSnapDistanceAndFrameResizeRowsWriteTheirOwnKeys)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::Pin);
+
+        auto *spin = qobject_cast<QSpinBox *>(controlInCurrentPage("吸附距离"));
+        ASSERT_NE(spin, nullptr) << "贴图页没有「吸附距离」这一格";
+        EXPECT_EQ(spin->value(), GyanisScribe::Pin::kEdgeSnapTolerance) << "没存过时要显示的那一档，必须就是贴图读端回落的那一档";
+        EXPECT_EQ(spin->minimum(), GyanisScribe::Pin::kEdgeSnapDistanceMinimum) << "0 是一档有意义的设置，数字框不该把它当初值以外的东西";
+        EXPECT_EQ(spin->maximum(), GyanisScribe::Pin::kEdgeSnapDistanceMaximum) << "数字框的上限与校验函数不同解，界面就能填出一个读端拒掉的值";
+        spin->setValue(24);
+
+        auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage("不许拖边改大小"));
+        ASSERT_NE(check, nullptr) << "贴图页没有「不许拖边改大小」这一格";
+        EXPECT_FALSE(check->isChecked()) << "默认不该把拖边改大小关掉：那是本仓此前的形状";
+        check->setChecked(true);
+
+        closeWindowAndFlush();
+
+        const auto reopened = makeStore();
+        EXPECT_EQ(reopened->intValue(GyanisScribe::Settings::kPinEdgeSnapDistance, -1), 24) << "吸附距离没写进自己那一格";
+        EXPECT_TRUE(reopened->boolValue(GyanisScribe::Settings::kPinDisableFrameResize, false)) << "开关没写进 Pin/DisableFrameResize";
     }
 
     /**

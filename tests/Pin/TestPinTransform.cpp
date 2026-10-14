@@ -409,3 +409,26 @@ TEST(PinCheckerColors, OnlyTheTwoCheckerModesDrawATile)
     EXPECT_GT(light->first.lightness(), light->second.lightness()) << "亮色档同理";
     EXPECT_NE(dark->first, light->first) << "深浅两档撞成同一组色，那一档等于白给";
 }
+
+/**
+ * @brief 钉住「吸附距离」的校验区间：0 是一档合法设置，越界要给出路
+ * @details 0 意味着「完全不吸」，不是「没填」，把它当坏值拒会让这一档填不出来；
+ *          区间只住在这一个函数里——设置页的数字框与贴图的读端都从这里取，两处各写一遍就会一处放行一处拒绝。
+ */
+TEST(PinEdgeSnapDistance, AcceptsZeroAndRejectsOutOfRange)
+{
+    for (const int good: {GyanisScribe::Pin::kEdgeSnapDistanceMinimum, 1, GyanisScribe::Pin::kEdgeSnapTolerance, GyanisScribe::Pin::kEdgeSnapDistanceMaximum})
+    {
+        const auto parsed = GyanisScribe::Pin::parseEdgeSnapDistance(good);
+        ASSERT_TRUE(parsed.has_value()) << good << "：" << parsed.error().message;
+        EXPECT_EQ(*parsed, good);
+    }
+
+    for (const int bad: {-1, GyanisScribe::Pin::kEdgeSnapDistanceMaximum + 1})
+    {
+        const auto rejected = GyanisScribe::Pin::parseEdgeSnapDistance(bad);
+        ASSERT_FALSE(rejected.has_value()) << bad << " 这个越界值被收下了";
+        EXPECT_EQ(rejected.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument) << bad;
+        EXPECT_NE(rejected.error().message.find("Pin/EdgeSnapDistance"), std::string::npos) << "拒绝要说清删哪一格能回默认，实际：" << rejected.error().message;
+    }
+}
