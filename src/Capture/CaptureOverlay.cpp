@@ -89,6 +89,14 @@ namespace GyanisScribe::Capture
             Core::Logger::warning(std::format("放大镜视野读不出：{}，这一轮按窄档（9×9）走", complaint));
         }
 
+        // 尺寸单位也是这一轮开始时读一次：读数、复制与尺寸框三处共用它，中途换档会让刚看到的数敲回去变成另一块选区
+        m_sizeUnit =
+                sizeUnitOrDefault(m_settings.stringValue(GyanisScribe::Settings::kCaptureSizeUnit, QString::fromUtf8(sizeUnitToken(SizeUnit::Logical))).toStdString(), complaint);
+        if (!complaint.empty())
+        {
+            Core::Logger::warning(std::format("尺寸单位读不出：{}", complaint));
+        }
+
         // 无边框 + 置顶 + Tool：Tool 让它不进任务栏，截图时不该多出一个窗口条目
         setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
         setGeometry(m_screenGeometry);
@@ -323,6 +331,22 @@ namespace GyanisScribe::Capture
         return Pick::formatColor(colorUnderCursor(), m_readoutFormat, casing);
     }
 
+    SizeUnit CaptureOverlay::sizeUnit() const noexcept
+    {
+        return m_sizeUnit;
+    }
+
+    QRect CaptureOverlay::measuredRect(const QRect &logicalRegion) const
+    {
+        return rectInUnit(logicalRegion, m_devicePixelRatio, m_sizeUnit);
+    }
+
+    QString CaptureOverlay::selectionSizeText() const
+    {
+        const auto measured = measuredRect(selectedRegion());
+        return QStringLiteral("%1×%2").arg(measured.width()).arg(measured.height());
+    }
+
     QString CaptureOverlay::formatCursorReadout() const
     {
         const auto global = globalCursorPoint();
@@ -417,7 +441,8 @@ namespace GyanisScribe::Capture
                 }
             }
 
-            auto hint = formatSelectionHint(shown);
+            // 读数按这一轮那一档量：拖框时看到的宽高要与复制出去、敲回尺寸框的那一组数是同一个口径
+            auto hint = formatSelectionHint(measuredRect(shown));
             if (m_aspectLocked)
             {
                 // 锁着比例时在读数后面标出来：不标的话「拖不出想要的形状」会被当成手抖
@@ -669,13 +694,11 @@ namespace GyanisScribe::Capture
             case RebindableKeyAction::CopySelectedSize:
                 if (const auto region = selectedRegion(); !region.isNull())
                 {
-                    if (const auto physical = toPhysicalRect(region, m_devicePixelRatio); physical)
-                    {
-                        const auto text = QStringLiteral("%1×%2").arg(physical->width()).arg(physical->height());
-                        QGuiApplication::clipboard()->setText(text);
-                        m_copiedSizeHint = GyanisScribe::Core::uiText("已复制尺寸 %1").arg(text);
-                        update();
-                    }
+                    // 复制的那一串跟着读数那一档走：照着屏幕上看到的数复制却得到另一组数，比哪种都难查
+                    const auto text = selectionSizeText();
+                    QGuiApplication::clipboard()->setText(text);
+                    m_copiedSizeHint = GyanisScribe::Core::uiText("已复制尺寸 %1").arg(text);
+                    update();
                 }
                 return;
             case RebindableKeyAction::CycleColorFormat:
@@ -833,11 +856,16 @@ namespace GyanisScribe::Capture
         const auto region = selectedRegion();
         if (!region.isNull())
         {
-            m_sizeEditor->setText(QStringLiteral("%1x%2").arg(region.width()).arg(region.height()));
+            // 框里预填的与读数是同一档：看到 1500 却要在框里敲 1000 才是同一块，这种换算没人记得住
+            // 框里预填的与读数是同一档：看到 1500 却要在框里敲 1000 才是同一块，这种换算没人记得住
+            const auto measured = measuredRect(region);
+            m_sizeEditor->setText(QStringLiteral("%1x%2").arg(measured.width()).arg(measured.height()));
         } else
         {
             m_sizeEditor->setText({});
         }
+        m_sizeEditor->setToolTip(QString::fromUtf8(
+                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("按{}填；这一档跟着设置里的「尺寸单位」走"), sizeUnitLabel(m_sizeUnit).toStdString()).c_str()));
 
         // 摆在读数框那一格（贴顶时会翻到选区下方）；还没有选区就摆光标右下
         const auto base = region.isNull()
@@ -863,7 +891,7 @@ namespace GyanisScribe::Capture
         const auto limit  = QRect{QPoint{0, 0}, size()};
         // 两种写法都认：「宽x高」保住左上角，「x,y,宽,高」连位置一起指定（与配置里那条选区记录同一套写法）；
         // 越界的那一边由 regionFromSizeText 夹回屏内——输错一个大数之后画面里只剩一小角，比夹住更让人摸不着头脑
-        const auto next = regionFromSizeText(m_sizeEditor->text(), anchor, limit);
+        const auto next = regionFromSizeText(m_sizeEditor->text(), anchor, limit, m_devicePixelRatio, m_sizeUnit);
         if (!next)
         {
             // 看不懂就留在框里继续改：把「看不懂」变成「框没了」是最坏的一种反馈

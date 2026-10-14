@@ -622,6 +622,48 @@ namespace
     }
 
     /**
+     * @brief 遮罩上那几处数字按哪种像素量的一格
+     * @param settings 配置存储
+     * @return 归调用方所有的下拉框
+     * @details 这一档管三处：遮罩上的尺寸读数、`V` 复制出去的那一串、`S` 尺寸框里填进去的那组数。
+     *          只接一处就会出现「看到的与复制的不是同一组数」，而那只在高 DPI 屏上才看得出来。
+     */
+    QComboBox *makeSizeUnitCombo(ISettingsStore &settings)
+    {
+        auto                                                 combo = new QComboBox;
+        const std::array<GyanisScribe::Capture::SizeUnit, 2> units{GyanisScribe::Capture::SizeUnit::Logical, GyanisScribe::Capture::SizeUnit::Physical};
+        for (const auto unit: units)
+        {
+            combo->addItem(GyanisScribe::Capture::sizeUnitLabel(unit));
+        }
+        combo->setAccessibleName(GyanisScribe::Core::uiText("尺寸单位"));
+        combo->setToolTip(GyanisScribe::Core::uiText("高 DPI 屏上这两组数差着一个缩放倍率；这一档管遮罩读数、复制尺寸与尺寸输入框三处"));
+        std::string complaint;
+        const auto  stored =
+                GyanisScribe::Capture::sizeUnitOrDefault(settings.stringValue(GyanisScribe::Settings::kCaptureSizeUnit, QStringLiteral("dip")).toStdString(), complaint);
+        if (!complaint.empty())
+        {
+            Logger::warning(std::format("尺寸单位读不出：{}，下拉框按逻辑像素摆", complaint));
+        }
+        const auto at = std::ranges::find(units, stored);
+        combo->setCurrentIndex(at == units.end() ? 0 : static_cast<int>(std::distance(units.begin(), at)));
+        QObject::connect(combo, &QComboBox::currentIndexChanged, combo,
+                         [&settings, units](const int index)
+                         {
+                             if (index < 0 || static_cast<std::size_t>(index) >= units.size())
+                             {
+                                 return;
+                             }
+                             const auto token = QString::fromUtf8(GyanisScribe::Capture::sizeUnitToken(units[static_cast<std::size_t>(index)]).data());
+                             if (auto written = settings.setValue(GyanisScribe::Settings::kCaptureSizeUnit, token); !written)
+                             {
+                                 Logger::warning(std::format("尺寸单位没能保存：{}", written.error().message));
+                             }
+                         });
+        return combo;
+    }
+
+    /**
      * @brief 托盘上那一下鼠标做什么的一格
      * @param settings 配置存储
      * @param role 左键单击还是中键单击
@@ -1923,6 +1965,7 @@ namespace GyanisScribe::App
         form->addRow(GyanisScribe::Core::uiText("文件名模板"), makeNameTemplateEdit(m_settings));
         form->addRow(GyanisScribe::Core::uiText("复制用的写法"), makeColorFormatCombo(m_settings));
         form->addRow(GyanisScribe::Core::uiText("放大镜视野"), makeMagnifierViewCombo(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("尺寸单位"), makeSizeUnitCombo(m_settings));
         form->addRow(GyanisScribe::Core::uiText("HEX 字母"),
                      makeSettingCheck(m_settings, GyanisScribe::Settings::kPickHexUppercase, true, GyanisScribe::Core::uiText("十六进制用大写"),
                                       GyanisScribe::Core::uiText("十六进制用大写"),

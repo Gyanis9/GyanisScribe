@@ -9,10 +9,13 @@
 #include <QScreen>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <format>
 #include <charconv>
+#include <cstddef>
 #include <numeric>
+#include <string>
 #include <vector>
 
 namespace GyanisScribe::Capture
@@ -209,6 +212,86 @@ namespace GyanisScribe::Capture
         const auto left   = std::clamp(placed->left(), limit.left(), limit.left() + limit.width() - width);
         const auto top    = std::clamp(placed->top(), limit.top(), limit.top() + limit.height() - height);
         return QRect{QPoint{left, top}, QSize{width, height}};
+    }
+
+    namespace
+    {
+        // 两档的标记按下标互指（界面名在下面那条开关里给）：加一档只改这两处
+        constexpr std::array<std::string_view, 2> kSizeUnitTokens = {"dip", "px"};
+    } // namespace
+
+    QString sizeUnitLabel(const SizeUnit unit)
+    {
+        return unit == SizeUnit::Physical ? GyanisScribe::Core::uiText("物理像素") : GyanisScribe::Core::uiText("逻辑像素");
+    }
+
+    std::string_view sizeUnitToken(const SizeUnit unit)
+    {
+        const auto index = static_cast<std::size_t>(unit);
+        return index < kSizeUnitTokens.size() ? kSizeUnitTokens[index] : kSizeUnitTokens[0];
+    }
+
+    SizeUnit sizeUnitOrDefault(const std::string_view token, std::string &complaint)
+    {
+        complaint.clear();
+        for (std::size_t index = 0; index < kSizeUnitTokens.size(); ++index)
+        {
+            if (kSizeUnitTokens[index] == token)
+            {
+                return static_cast<SizeUnit>(index);
+            }
+        }
+
+        // 认不出就回逻辑档，不夹成「看着最像的那一档」：把「pix」读成物理像素是猜用户的意思，
+        // 而猜错的那组数与填的那组差着一个缩放倍率，比回到默认档更难查
+        complaint = std::format("尺寸单位「{}」不是可用取值。可用的是 dip（逻辑像素）与 px（物理像素）；这一轮按 dip 走", std::string(token));
+        return SizeUnit::Logical;
+    }
+
+    QRect rectInUnit(const QRect &logicalRegion, const qreal devicePixelRatio, const SizeUnit unit)
+    {
+        if (unit == SizeUnit::Logical)
+        {
+            return logicalRegion;
+        }
+
+        // 物理档交回的就是抓帧真正拿到的那一片（复用 toPhysicalRect 的向下取整起点与向上取整终点）：
+        // 读数与成品宽高分家时，用户照着读数做的图永远差一格
+        const auto physical = toPhysicalRect(logicalRegion, devicePixelRatio);
+        return physical ? *physical : logicalRegion;
+    }
+
+    QRect rectFromUnit(const QRect &unitRegion, const qreal devicePixelRatio, const SizeUnit unit)
+    {
+        if (unit == SizeUnit::Logical || devicePixelRatio <= 0.0)
+        {
+            return unitRegion;
+        }
+
+        const auto toLogical = [devicePixelRatio](const int measured) { return static_cast<int>(std::lround(static_cast<double>(measured) / devicePixelRatio)); };
+        // 只有宽高保底一格：0 是「位置」的一种合法取值，一起夹会把左上角挪走
+        const auto width  = std::max(1, toLogical(unitRegion.width()));
+        const auto height = std::max(1, toLogical(unitRegion.height()));
+        return QRect{QPoint{toLogical(unitRegion.left()), toLogical(unitRegion.top())}, QSize{width, height}};
+    }
+
+    std::optional<QRect> regionFromSizeText(const QString &text, const QPoint &anchor, const QRect &limit, const qreal devicePixelRatio, const SizeUnit unit)
+    {
+        if (unit == SizeUnit::Logical)
+        {
+            return regionFromSizeText(text, anchor, limit);
+        }
+
+        // 夹回屏内要在填数的那一档里夹：拿逻辑的范围去夹物理的数，越界判断差着倍率，
+        // 结果是「输错一个大数之后画面里只剩一小角」那种最难查的形状
+        const auto unitAnchor = rectInUnit(QRect{anchor, QSize{1, 1}}, devicePixelRatio, unit).topLeft();
+        const auto unitLimit  = rectInUnit(limit, devicePixelRatio, unit);
+        const auto measured   = regionFromSizeText(text, unitAnchor, unitLimit);
+        if (!measured)
+        {
+            return {};
+        }
+        return rectFromUnit(*measured, devicePixelRatio, unit);
     }
 
     Core::Expected<int> parseCaptureCornerRadius(const int logical)

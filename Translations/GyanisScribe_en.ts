@@ -1048,6 +1048,14 @@
             <translation>Picking "don't show" only drops the pixel illustration; the coordinate and colour strip stays where it was</translation>
         </message>
         <message>
+            <source>尺寸单位</source>
+            <translation>Size unit</translation>
+        </message>
+        <message>
+            <source>高 DPI 屏上这两组数差着一个缩放倍率；这一档管遮罩读数、复制尺寸与尺寸输入框三处</source>
+            <translation>On a HiDPI screen these two numbers differ by the scale factor; this slot covers the mask readout, the copied size and the size editor</translation>
+        </message>
+        <message>
             <source>右键那一下归系统自己弹菜单，双击在第一下松开时就算过一次单击——这两档只管这两下</source>
             <translation>The right click is the platform's own menu, and a double click already counted as a single click when the first one was released — these two slots cover only these two clicks</translation>
         </message>
@@ -1904,6 +1912,10 @@
             <translation>Selection size</translation>
         </message>
         <message>
+            <source>按{}填；这一档跟着设置里的「尺寸单位」走</source>
+            <translation>Fill in {}; this follows the "Size unit" setting</translation>
+        </message>
+        <message>
             <source>还没有可复用的上次区域：先框选截图一次，或改用区域截图</source>
             <translation>No previous region to reuse yet: drag out one capture first, or use region capture.</translation>
         </message>
@@ -2070,6 +2082,14 @@
         <message>
             <source>上次选区的宽高必须是正数，收到的是 {}×{}。请删掉这一项，让程序重新记一次</source>
             <translation>The last selection's width and height must be positive; got {}x{}. Delete this entry and let the program record it again.</translation>
+        </message>
+        <message>
+            <source>物理像素</source>
+            <translation>physical pixels</translation>
+        </message>
+        <message>
+            <source>逻辑像素</source>
+            <translation>logical pixels</translation>
         </message>
         <message>
             <source>圆角半径 "{}" 不在 {} 到 {} 之间：请在设置的截图页重选一个值，或删掉 Capture/CornerRadius 这一项回到默认的 {} 格</source>

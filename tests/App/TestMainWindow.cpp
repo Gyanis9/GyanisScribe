@@ -592,6 +592,28 @@ namespace
     }
 
     /**
+     * @brief 钉住「尺寸单位」那一行写的是遮罩读端认的那两个标记，且默认摆的是逻辑像素
+     * @details 存中文标签的话下一次遮罩读不出来（词表认的是 dip / px），而读不出只表现成「我明明选了物理像素」；
+     *          默认那一格必须与读端没填时回落的那一档同值，否则设置页显示一套、遮罩算一套。
+     */
+    TEST_F(MainWindowFixture, SizeUnitComboWritesTheTierToken)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::Capture);
+
+        auto *combo = qobject_cast<QComboBox *>(controlInCurrentPage("尺寸单位"));
+        ASSERT_NE(combo, nullptr) << "截图页没有这一格";
+        ASSERT_EQ(combo->count(), 2) << "两档：逻辑像素与物理像素";
+        EXPECT_EQ(combo->currentIndex(), 0) << "默认档该是逻辑像素，与本仓此前遮罩上那组数的形状同值";
+
+        combo->setCurrentIndex(1);
+        closeWindowAndFlush();
+
+        const auto reopened = makeStore();
+        EXPECT_EQ(reopened->stringValue(GyanisScribe::Settings::kCaptureSizeUnit, QStringLiteral("?")), QStringLiteral("px")) << "存的必须是标记，不是界面上那几个字";
+    }
+
+    /**
      * @brief 钉住录制范围这一行写的是 Record 词表里的 token，且界面默认档就是读端初值那一档
      * @details 存中文标签的话下次录屏读不出来（parseRecordScope 认的是 FullScreen/Region/Window），
      *          而「录什么」猜错比帧率猜错重得多：用户以为录的是那片选区，实际录了整个桌面。

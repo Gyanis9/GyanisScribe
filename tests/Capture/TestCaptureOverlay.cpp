@@ -28,6 +28,7 @@
 #include <vector>
 
 using GyanisScribe::Capture::CaptureOverlay;
+using GyanisScribe::Capture::SizeUnit;
 using GyanisScribe::Pick::ColorFormat;
 
 namespace
@@ -555,25 +556,60 @@ TEST_F(CaptureOverlayFixture, ShiftDragLocksTheSelectionToASquare)
 }
 
 /**
- * @brief 钉住 Ctrl+A 选中整块屏、V 复制成品像素尺寸
- * @details
- * 尺寸复制的是「会被裁出来多少像素」而不是逻辑格：缩放屏上两者不等，
+ * @brief 钉住「尺寸单位」这一格接到遮罩的三处出口上
+ * @details 期望值手算：这块屏是 800x600 逻辑格，1.5 倍时从 (100,50) 拖到 (599,449) 框出 500x400 逻辑格，
+ *          物理那一片起点是 (150,75)，终点向上取整到 (900,675)，所以宽高是 750x600。
+ *          换算本身归 TestScreenUtils 的纯函数判据，这里钉的是「这一档接没接到遮罩」：
+ *          读数、`V` 复制与尺寸框三处都从 measuredRect / selectionSizeText 取数，接错一处就只错一处。
+ */
+TEST_F(CaptureOverlayFixture, SizeUnitSettingMovesEveryOverlayReadoutTogether)
+{
+    const auto frame = makeFrame(kScreenGeometry.size());
 
- * * 复制逻辑格会让用户对不上产物。判据直接读剪贴板，与用户粘出来的是同一份。
+    // 没拨过这一格时按逻辑像素：与本仓此前的读数形状逐位相同，也证明这一档是每个遮罩在构造时各读一次的
+    auto logical = makeOverlay(frame, 1.5);
+    EXPECT_EQ(logical->sizeUnit(), SizeUnit::Logical) << "默认档不是逻辑像素，遮罩上的读数会凭空乘上一个倍率";
+    dragOut(*logical, QPoint{100, 50}, QPoint{599, 449});
+    ASSERT_EQ(logical->selectedRegion(), QRect(100, 50, 500, 400));
+    EXPECT_EQ(logical->selectionSizeText(), QStringLiteral("500×400")) << "默认档的读数不能凭空带上倍率";
+    EXPECT_EQ(copySizeAndReadBack(*logical, QStringLiteral("500×400")), QStringLiteral("500×400")) << "默认档复制的该是屏幕上看到的这一组数";
+
+    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Settings::kCaptureSizeUnit, QStringLiteral("px")))) << "写入失败";
+    auto physical = makeOverlay(frame, 1.5);
+    EXPECT_EQ(physical->sizeUnit(), SizeUnit::Physical) << "遮罩没把这一档读进来";
+    dragOut(*physical, QPoint{100, 50}, QPoint{599, 449});
+
+    // 选区那一层还是逻辑坐标（配置里的记录、抓取与裁剪都按它走），换的只是给人看的那几处
+    ASSERT_EQ(physical->selectedRegion(), QRect(100, 50, 500, 400));
+    EXPECT_EQ(physical->measuredRect(physical->selectedRegion()), QRect(150, 75, 750, 600));
+    EXPECT_EQ(physical->selectionSizeText(), QStringLiteral("750×600")) << "读数没跟着这一档走";
+    EXPECT_EQ(copySizeAndReadBack(*physical, QStringLiteral("750×600")), QStringLiteral("750×600")) << "V 自己再算一遍倍率：屏幕上写着 750×600，剪贴板里却是别的数";
+}
+
+/**
+ * @brief 钉住 Ctrl+A 选中整块屏、V 复制的是当前那一档的尺寸
+ * @details 默认档是逻辑像素（与遮罩读数、尺寸框同一口径）；缩放屏上想要「会被裁出多少像素」
+ *          就把设置里那一格拨成物理像素，判据按两档各钉一次。剪贴板直接读回，与用户粘出来的是同一份。
  */
 TEST_F(CaptureOverlayFixture, ControlASelectsEverythingAndVCopiesThePixelSize)
 {
     auto overlay = makeOverlay();
 
-    // 先框一块 201×101 的：V 复制的就是它的成品像素尺寸（这块遮罩的缩放因子是 1，逻辑与物理同值）
+    // 先框一块 201×101 的：这块遮罩的缩放因子是 1，两档同值
     dragOut(*overlay, QPoint{100, 100}, QPoint{300, 200});
     EXPECT_EQ(copySizeAndReadBack(*overlay, QStringLiteral("201×101")), QStringLiteral("201×101")) << "V 没把尺寸复制进剪贴板";
 
-    // 缩放屏上复制的是「会被裁出多少像素」而不是逻辑格：两者不等时以物理为准
+    // 缩放屏上默认交回逻辑格：与屏幕上那行读数同解
     const auto background = makeFrame(kScreenGeometry.size());
     auto       scaled     = makeOverlay(background, 2.0);
     dragOut(*scaled, QPoint{100, 100}, QPoint{300, 200});
-    EXPECT_EQ(copySizeAndReadBack(*scaled, QStringLiteral("402×202")), QStringLiteral("402×202")) << "V 复制的是逻辑格而不是成品像素";
+    EXPECT_EQ(copySizeAndReadBack(*scaled, QStringLiteral("201×101")), QStringLiteral("201×101")) << "默认档复制的是逻辑格：与遮罩读数、尺寸框同一口径";
+
+    // 拨成物理像素后要交回「会被裁出多少像素」：两者不等时这一档才是设计工具里那把尺子
+    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Settings::kCaptureSizeUnit, QStringLiteral("px")))) << "写入失败";
+    const auto physical = makeOverlay(background, 2.0);
+    dragOut(*physical, QPoint{100, 100}, QPoint{300, 200});
+    EXPECT_EQ(copySizeAndReadBack(*physical, QStringLiteral("402×202")), QStringLiteral("402×202")) << "拨成物理像素后 V 交回的不是成品像素数";
 
     // 裸按 A 什么都不该发生（不许把 A 也当成选全屏）
     const auto before = overlay->selectedRegion();

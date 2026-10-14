@@ -132,6 +132,77 @@ namespace GyanisScribe::Capture
     [[nodiscard]] std::optional<QRect> regionFromSizeText(const QString &text, const QPoint &anchor, const QRect &limit);
 
     /**
+     * @brief 遮罩上那些数字用哪种像素写
+     * @details 高 DPI 屏上这两组数不一样：一块 1000 逻辑像素宽的选区在 1.5 倍屏上是 1500 物理像素。
+     *          选区自己那一层永远存逻辑像素（配置里的记录、抓取与裁剪都按它走），这一档只管**给人看的那几处**。
+     */
+    enum class SizeUnit
+    {
+        Logical,  ///< 逻辑像素（dip）：与遮罩上其余一切同一套坐标
+        Physical, ///< 物理像素（px）：与成品图的宽高同一把尺子
+    };
+
+    /**
+     * @brief 单位档的界面名
+     * @param unit 哪一档
+     * @return 设置页与提示里的那两个字
+     */
+    [[nodiscard]] QString sizeUnitLabel(SizeUnit unit);
+
+    /**
+     * @brief 单位档存进配置的标记
+     * @param unit 哪一档
+     * @return 「dip」或「px」
+     */
+    [[nodiscard]] std::string_view sizeUnitToken(SizeUnit unit);
+
+    /**
+     * @brief 把配置里那串标记换成单位档
+     * @param token 配置里的值
+     * @param complaint 出参：读坏时写进原因，没读坏时留空
+     * @return 认得的档原样交回；认不出的落回逻辑像素
+     * @details 落回逻辑而不是夹成「看着最像的那一档」：把「pix」读成物理像素是猜用户的意思，
+     *          而猜错的数与填的数差着一个缩放倍率，比回到默认档更难查。
+     */
+    [[nodiscard]] SizeUnit sizeUnitOrDefault(std::string_view token, std::string &complaint);
+
+    /**
+     * @brief 把一块逻辑矩形换成某一档的那一块
+     * @param logicalRegion 选区的逻辑矩形
+     * @param devicePixelRatio 这块屏的缩放因子
+     * @param unit 按哪一档量
+     * @return 逻辑档原样交回；物理档是抓帧真正拿到的那一片
+     * @details 起点与尺寸成对换算，只换一半会把读数摆到别处去。物理档复用 `toPhysicalRect`：
+     *          它按「起点向下取整、终点向上取整」算，交回的就是成品图的真实宽高，读数与产物不会分家。
+     *          缩放因子坏了时按逻辑那一份交回——这一条只服务读数；抓帧交付那条链自己会报错并给出路。
+     */
+    [[nodiscard]] QRect rectInUnit(const QRect &logicalRegion, qreal devicePixelRatio, SizeUnit unit);
+
+    /**
+     * @brief 把按某一档填出来的矩形换回逻辑那一份
+     * @param unitRegion 按那一档量出来的矩形
+     * @param devicePixelRatio 这块屏的缩放因子
+     * @param unit 填的是哪一档
+     * @return 遮罩那一层用得上的逻辑矩形（宽高至少一格）
+     * @details 换算按四舍五入：分数倍屏上不是每个物理数都落得回整格逻辑数，
+     *          换回去之后读数会显示真正拿到的那一格，不会把「敲进去的」与「拿到的」写成两个数。
+     */
+    [[nodiscard]] QRect rectFromUnit(const QRect &unitRegion, qreal devicePixelRatio, SizeUnit unit);
+
+    /**
+     * @brief 尺寸框里那一行按指定的单位换成一块选区
+     * @param text 框里的文本，认两种写法：「宽x高」与「x,y,宽,高」
+     * @param anchor 只给尺寸时选区的左上角，逻辑坐标
+     * @param limit 允许的范围，逻辑坐标
+     * @param devicePixelRatio 这块屏的缩放因子
+     * @param unit 敲的那组数按哪一档量
+     * @return 成功返回夹在 limit 内的逻辑选区；两种写法都不认时返回空
+     * @details 读数、复制与输入框三处共用这一档：输入按另一档解释的话，
+     *          刚看到的数敲回去会得到另一块选区。
+     */
+    [[nodiscard]] std::optional<QRect> regionFromSizeText(const QString &text, const QPoint &anchor, const QRect &limit, qreal devicePixelRatio, SizeUnit unit);
+
+    /**
      * @brief 把一张图按给定半径切圆四角
      * @param image 源图
      * @param radiusPhysical 圆角半径，物理像素；非正时原样交回

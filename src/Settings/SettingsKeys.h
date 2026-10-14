@@ -103,6 +103,9 @@ namespace GyanisScribe::Settings
     inline constexpr std::string_view kCaptureSound = "Capture/Sound";
     /// 放大镜视野档：off（只留读数条）、narrow（9×9，默认）、medium（15×15）、wide（21×21）；词表在 Pick/PickGeometry.h
     inline constexpr std::string_view kCaptureMagnifierView = "Capture/MagnifierView";
+    /// 遮罩上那几处数字按哪种像素量：dip（逻辑像素，默认）或 px（物理像素）；词表在 Capture/ScreenUtils.h，
+    /// 读数、`V` 复制与 `S` 尺寸框三处同读这一格
+    inline constexpr std::string_view kCaptureSizeUnit = "Capture/SizeUnit";
 
     /**
      * @brief 截图成功后起跑的一条外部命令，形如「上传工具 --path "%file%"」；留空即不跑

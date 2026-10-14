@@ -27,12 +27,18 @@ using GyanisScribe::Capture::kSelectionGripTolerance;
 using GyanisScribe::Capture::nudgeRegion;
 using GyanisScribe::Capture::parseCaptureCornerRadius;
 using GyanisScribe::Capture::ratioLockedPoint;
+using GyanisScribe::Capture::rectFromUnit;
+using GyanisScribe::Capture::rectInUnit;
 using GyanisScribe::Capture::regionAtPoint;
 using GyanisScribe::Capture::regionFromSizeText;
 using GyanisScribe::Capture::regionFromText;
 using GyanisScribe::Capture::regionToText;
 using GyanisScribe::Capture::resizeRegion;
 using GyanisScribe::Capture::SelectionGrip;
+using GyanisScribe::Capture::SizeUnit;
+using GyanisScribe::Capture::sizeUnitLabel;
+using GyanisScribe::Capture::sizeUnitOrDefault;
+using GyanisScribe::Capture::sizeUnitToken;
 using GyanisScribe::Capture::squareLockedPoint;
 using GyanisScribe::Capture::stretchRegionByEdge;
 using GyanisScribe::Capture::toPhysicalRect;
@@ -670,4 +676,93 @@ TEST(ParseCaptureCornerRadius, AcceptsItsRangeAndRejectsBothEndsOutside)
         EXPECT_EQ(rejected.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument) << bad;
         EXPECT_NE(rejected.error().message.find("Capture/CornerRadius"), std::string::npos) << "拒绝要说清去哪一格补救，实际：" << rejected.error().message;
     }
+}
+
+/**
+ * @brief 钉住尺寸单位两档的标记、界面名与坏值回落
+ * @details 两档各差着一个缩放倍率：把「pix」夹成 px 是猜用户的意思，猜错时读数与成品差 1.5 倍，
+ *          比回落到逻辑档更难查。回落那一支必须留下点名原话。
+ */
+TEST(SizeUnitTable, TiersRoundTripAndBadTokensFallBackToLogical)
+{
+    EXPECT_EQ(sizeUnitToken(SizeUnit::Logical), "dip");
+    EXPECT_EQ(sizeUnitToken(SizeUnit::Physical), "px");
+    EXPECT_NE(sizeUnitLabel(SizeUnit::Logical), sizeUnitLabel(SizeUnit::Physical)) << "两档同名，设置页上就分不出自己选的是哪个";
+    EXPECT_FALSE(sizeUnitLabel(SizeUnit::Logical).isEmpty());
+
+    std::string complaint;
+    EXPECT_EQ(sizeUnitOrDefault("dip", complaint), SizeUnit::Logical);
+    EXPECT_TRUE(complaint.empty()) << "可用取值不该吭声";
+    EXPECT_EQ(sizeUnitOrDefault("px", complaint), SizeUnit::Physical);
+    EXPECT_TRUE(complaint.empty()) << complaint;
+
+    EXPECT_EQ(sizeUnitOrDefault("pix", complaint), SizeUnit::Logical) << "认不出的要回逻辑档，不夹成物理档";
+    EXPECT_NE(complaint.find("pix"), std::string::npos) << "文案要点名那串坏值，实际：" << complaint;
+    EXPECT_NE(complaint.find("dip"), std::string::npos) << "也要列出可用取值，实际：" << complaint;
+}
+
+/**
+ * @brief 钉住物理档交回的就是抓帧真正拿到的那一片
+ * @details 期望值全部手算：1.5 倍屏上 (100,50) 起、1000x700 逻辑格的选区，
+ *          起点向下取整得 (150,75)，终点向上取整得 (1650,1125)，所以宽高是 1500x1050。
+ *          读数若另算一套（直接乘再四舍五入），用户照着读数做的图就永远差一格。
+ */
+TEST(SizeUnitConversion, PhysicalReadoutIsTheCropYouActuallyGet)
+{
+    const QRect logical{100, 50, 1000, 700};
+    EXPECT_EQ(rectInUnit(logical, 1.5, SizeUnit::Logical), logical) << "逻辑档必须原样交回，别动一下就把读数换单位了";
+    EXPECT_EQ(rectInUnit(logical, 1.5, SizeUnit::Physical), (QRect{150, 75, 1500, 1050}));
+    EXPECT_EQ(rectInUnit(logical, 1.0, SizeUnit::Physical), logical) << "1 倍屏上两档本来就是同一组数";
+
+    // 起点带小数的那一格：终点向上取整留给选区，这条规则在物理读数里也得看得见
+    EXPECT_EQ(rectInUnit(QRect{1, 0, 5, 1}, 1.5, SizeUnit::Physical), (QRect{1, 0, 8, 2}));
+}
+
+/**
+ * @brief 钉住「看到的那一组数敲回去还是这一块」
+ * @details 换算两个方向都要过一遍同一组矩形：只钉一边时，把除号写成乘号照样能过物理那半。
+ *          1.5 倍屏上取的是四舍五入，这几组都是能整回去的；换不回去的数不在这条判据里静默放过。
+ */
+TEST(SizeUnitConversion, UnitRectsRoundTripOnAFractionalScale)
+{
+    const std::vector<QRect> samples{QRect{0, 0, 100, 100}, QRect{100, 50, 1000, 700}, QRect{1, 1, 3, 3}, QRect{7, 3, 41, 23}};
+    for (const auto &sample: samples)
+    {
+        const auto physical = rectInUnit(sample, 1.5, SizeUnit::Physical);
+        EXPECT_EQ(rectFromUnit(physical, 1.5, SizeUnit::Physical), sample) << "物理档来回换了一次就不是原选区";
+        EXPECT_EQ(rectFromUnit(sample, 1.5, SizeUnit::Logical), sample) << "逻辑档不该动这块矩形";
+    }
+
+    // 缩放因子坏了时不要凭空造出一块挪了位的选区
+    EXPECT_EQ(rectFromUnit(QRect{10, 10, 100, 100}, 0.0, SizeUnit::Physical), (QRect{10, 10, 100, 100}));
+}
+
+/**
+ * @brief 钉住尺寸框里那一行按当前这一档解释
+ * @details 期望值手算：1.5 倍屏、锚点 (100,80) 逻辑、屏 800x600 逻辑（即 1200x900 物理）。
+ *          物理档敲「900x600」拿到的是 600x400 逻辑格；「1000x700」换不整时按四舍五入落 667x467，
+ *          而读数随后就显示换算后真正拿到的那一格——不把「敲的」与「拿到的」写成两个数。
+ */
+TEST(RegionFromSizeText, ReadsTheNumbersInTheChosenUnit)
+{
+    const QRect  limit{0, 0, 800, 600};
+    const QPoint anchor{100, 80};
+
+    const auto logical = regionFromSizeText(QStringLiteral("600x400"), anchor, limit, 1.5, SizeUnit::Logical);
+    ASSERT_TRUE(logical.has_value());
+    EXPECT_EQ(*logical, (QRect{100, 80, 600, 400})) << "逻辑档要与本仓此前的形状逐位相同";
+
+    const auto physical = regionFromSizeText(QStringLiteral("900x600"), anchor, limit, 1.5, SizeUnit::Physical);
+    ASSERT_TRUE(physical.has_value());
+    EXPECT_EQ(*physical, (QRect{100, 80, 600, 400})) << "物理档那一串要除回倍率";
+
+    const auto rounded = regionFromSizeText(QStringLiteral("1000x700"), anchor, limit, 1.5, SizeUnit::Physical);
+    ASSERT_TRUE(rounded.has_value());
+    EXPECT_EQ(*rounded, (QRect{100, 80, 667, 467})) << "换不整时按四舍五入落格，不截断也不回绕";
+
+    const auto placed = regionFromSizeText(QStringLiteral("150,120,900,600"), anchor, limit, 1.5, SizeUnit::Physical);
+    ASSERT_TRUE(placed.has_value());
+    EXPECT_EQ(*placed, (QRect{100, 80, 600, 400})) << "「x,y,宽,高」那一种也要按同一档解释，两种写法差一个单位最难查";
+
+    EXPECT_FALSE(regionFromSizeText(QStringLiteral("abc"), anchor, limit, 1.5, SizeUnit::Physical).has_value()) << "看不懂还是交回空，不猜一块选区";
 }

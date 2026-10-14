@@ -173,6 +173,29 @@ namespace GyanisScribe::Capture
         [[nodiscard]] QString readoutColorText() const;
 
         /**
+         * @brief 这一轮那几处数字按哪种像素量
+         * @return 构造时从配置读定的那一档
+         */
+        [[nodiscard]] SizeUnit sizeUnit() const noexcept;
+
+        /**
+         * @brief 把遮罩上的一块逻辑矩形换成这一档单位的那一块
+         * @param logicalRegion 遮罩那一层的逻辑矩形（选区或悬停预览）
+         * @return 逻辑档原样交回；物理档就是成品图的真实宽高与起点
+         * @details 读数、`V` 复制与 `S` 尺寸框三处都从这一条取数：各处自己乘一遍倍率，
+         *          就会有一处忘了乘，而这种错只在高分屏上露出来，1 倍屏上一切照旧。
+         */
+        [[nodiscard]] QRect measuredRect(const QRect &logicalRegion) const;
+
+        /**
+         * @brief 当前选区的宽高文本，按这一轮那一档量
+         * @return 形如「1500×1050」；没有选区时宽高都是 0
+         * @details `V` 复制的就是这一串，判据也读这一处：把排版留在按键分派里，
+         *          「看到的与复制的不是一组数」就只能靠肉眼对画布。
+         */
+        [[nodiscard]] QString selectionSizeText() const;
+
+        /**
          * @brief 光标正压在上的那一个候选
          * @return 已经在框选、或没有候选含住光标时返回空
          */
@@ -392,6 +415,7 @@ namespace GyanisScribe::Capture
         bool                      m_hasCursorPoint = false;                  ///< 是否收到过鼠标移动：没有就不摆放大镜，别把 (0,0) 当成光标
         Pick::ColorFormat         m_readoutFormat  = Pick::ColorFormat::Hex; ///< 读数里颜色那格的写法，按 C 轮换
         Pick::MagnifierView       m_magnifierView;                           ///< 这一轮的放大镜视野档，构造时读一次
+        SizeUnit                  m_sizeUnit = SizeUnit::Logical;            ///< 这一轮那几处数字用的单位，构造时读一次
 
         std::vector<QRect>           m_regionHistory;         ///< 这块屏上的历史选区，最近的在前；由 CaptureService 推过来
         int                          m_historyIndex = -1;     ///< 当前选区取自历史里的哪一条；-1 表示不是取自历史（用户自己框/改的）
