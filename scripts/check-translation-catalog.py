@@ -37,11 +37,25 @@ CALL = re.compile(r'uiText[A-Za-z0-9]*\(\s*"((?:\\.|[^"\\])*)"')
 # 相邻字面量拼接：字符串收尾引号 + 空白 + 下一片起始引号
 JOINED = re.compile(r'"\s+"')
 ENTRY = re.compile(r"<source>([^<]*)</source>\s*<translation([^>]*)>([^<]*)</translation>", re.S)
+# 表行的标签不走字面量实参：只认「大写开头的聚合名{…}」这一形，且必须在同一行内，
+# 否则两个大括号之间的跨度会吃掉整段代码，把日志文案也算成表行
+AGGREGATE_ROW = re.compile(r"[A-Z][A-Za-z0-9_]*\{[^{}\n]*\}")
+# 另一形是按位置对齐的字符串数组：`kXxxLabels = {"…", "…"}`。标签与档位各占一份表、
+# 显示时才按行下标互指，因此这一形同样进不了 CALL。此前门禁只认上一形，
+# 「十进制」这类档位名在英文档下就一直是中文（实测目录里 0 条）
+INITIALIZER_LIST = re.compile(r"=\s*\{([^{}\n]*)\}")
+LITERAL = re.compile(r'"((?:\\.|[^"\\])*)"')
+CJK = re.compile(r"[\u4e00-\u9fff]")
 
 SELF_PROBE = (
     'auto a = Core::uiTextUtf8("甲 \\"{}\\" 乙"\n     "丙");'
     'auto b = Core::uiText("单条");'
     'auto c = Core::uiTextUtf8("整条 {}");'
+)
+
+SELF_PROBE_ROWS = (
+    'constexpr auto kRows = Row{"丁", 0, "戊"};\n'
+    'constexpr std::array<std::string_view, 3> kLabels = {"己", "HEX", "庚"};\n'
 )
 
 
@@ -51,17 +65,19 @@ def unescape_cpp(text: str) -> str:
 
 
 def collect_required(scan_root: pathlib.Path) -> list[str]:
-    """穷举源码里用到的界面文案：uiText 的字面量实参 + constexpr 表行里的中文标签。"""
+    """穷举源码里用到的界面文案：uiText 的字面量实参 + constexpr 表与标签数组里的中文。"""
     required: list[str] = []
     for source in sorted(list(scan_root.rglob("*.cpp")) + list(scan_root.rglob("*.h"))):
-        flat = JOINED.sub("", source.read_text(encoding="utf-8").replace("\n", " "))
+        text = source.read_text(encoding="utf-8")
+        flat = JOINED.sub("", text.replace("\n", " "))
         required += [unescape_cpp(match) for match in CALL.findall(flat)]
-        # 表行的标签不走字面量实参：只认「大写开头的聚合名{…}」这一形，且必须在同一行内，
+        # 两种「按下标互指」的表形都不走字面量实参，只能在同一行内认，
         # 否则两个大括号之间的跨度会吃掉整段代码，把日志文案也算成表行
-        for row in re.finditer(r"[A-Z][A-Za-z0-9_]*\{[^{}\n]*\}", source.read_text(encoding="utf-8")):
-            for cell in re.finditer(r'"((?:\\.|[^"\\])*)"', row.group(0)):
+        table_rows = list(AGGREGATE_ROW.finditer(text)) + list(INITIALIZER_LIST.finditer(text))
+        for row in sorted(table_rows, key=lambda match: match.start()):
+            for cell in LITERAL.finditer(row.group(0)):
                 value = unescape_cpp(cell.group(1))
-                if any("\u4e00" <= char <= "\u9fff" for char in value):
+                if CJK.search(value):
                     required.append(value)
 
     ordered = list(dict.fromkeys(required))
@@ -90,6 +106,17 @@ def self_probe() -> None:
         raise RuntimeError("自检失败：两片字面量没被拼成一条，目录会生成永远查不中的半截文案")
     if "单条" not in hits or "整条 {}" not in hits:
         raise RuntimeError("自检失败：带 {} 或紧随其他代码的文案没被抓到")
+
+    # 表形探针：两种按下标互指的写法都要抓到，纯 ASCII 的档位标记不该被当成文案收进目录
+    row_hits = []
+    for pattern in (AGGREGATE_ROW, INITIALIZER_LIST):
+        for row in pattern.finditer(SELF_PROBE_ROWS):
+            for cell in LITERAL.finditer(row.group(0)):
+                value = unescape_cpp(cell.group(1))
+                if CJK.search(value):
+                    row_hits.append(value)
+    if len(row_hits) != 4 or set(row_hits) != {"丁", "戊", "己", "庚"}:
+        raise RuntimeError(f"自检失败：合成表行抓到 {row_hits}（应为 丁、戊、己、庚 四条，多抓说明两种表形重复计，少抓说明有一形没认）")
 
 
 def generate(scan_root: pathlib.Path, catalog: pathlib.Path, required: list[str]) -> int:

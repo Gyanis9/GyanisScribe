@@ -2444,6 +2444,10 @@
             <translation>Unrecognised colour format “{}”. Available values are Hex, Rgb, Hsl, Hsv, Hsi and Decimal (case-sensitive); pick again on the Colour page of Settings</translation>
         </message>
         <message>
+            <source>十进制</source>
+            <translation>Decimal</translation>
+        </message>
+        <message>
             <source>取色器</source>
             <translation>Color picker</translation>
         </message>
