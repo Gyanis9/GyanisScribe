@@ -1416,6 +1416,18 @@
             <translation>Format used when copying</translation>
         </message>
         <message>
+            <source>HEX 字母</source>
+            <translation>HEX letters</translation>
+        </message>
+        <message>
+            <source>十六进制用大写</source>
+            <translation>Uppercase hex digits</translation>
+        </message>
+        <message>
+            <source>关掉后复制出来的是 #3c78c8 这一形。只影响 HEX 那一档写法，其余五档不动</source>
+            <translation>With this off, copied text looks like #3c78c8. It only affects the HEX notation; the other five are untouched.</translation>
+        </message>
+        <message>
             <source>留空即内置那八格；形如 #FF0000, #00FF00</source>
             <translation>Leave empty for the built-in eight; written as #FF0000, #00FF00</translation>
         </message>

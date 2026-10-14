@@ -5,6 +5,7 @@
 
 #include "Pick/ColorFormat.h"
 #include "Pick/PickGeometry.h"
+#include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
 #include "Ui/AppShortcuts.h"
 
@@ -275,6 +276,27 @@ TEST_F(CaptureOverlayFixture, ReadoutFollowsTheFramePixelNotTheLocalPoint)
 
     const QColor expected{10, 200, 20};
     EXPECT_EQ(overlay->colorUnderCursor(), expected) << "读数没按缩放因子折到帧像素";
+}
+
+/**
+ * @brief 钉住放大镜读数条里颜色那一格按配置里的字母档排字
+ * @details 判据读的就是画上去的同一串（readoutColorText 是绘图与用例共用的那一个出口）：
+ *          关掉大写还出 #0AC814，就是「设置里拨了、界面上没接上」那一类现场。
+ *          手算：R=10→0A、G=200→C8、B=20→14。
+ */
+TEST_F(CaptureOverlayFixture, ReadoutColorHonoursTheHexCasingSetting)
+{
+    QImage frame{QSize{kScreenGeometry.width() * 2, kScreenGeometry.height() * 2}, QImage::Format_ARGB32};
+    frame.fill(Qt::black);
+    const QPoint local{100, 150};
+    frame.setPixelColor(QPoint{local.x() * 2, local.y() * 2}, QColor{10, 200, 20});
+
+    auto overlay = makeOverlay(frame, 2.0);
+    moveOver(*overlay, local);
+    EXPECT_EQ(overlay->readoutColorText(), QStringLiteral("#0AC814")) << "默认档该是本仓此前的大写";
+
+    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Settings::kPickHexUppercase, false))) << "写入失败";
+    EXPECT_EQ(overlay->readoutColorText(), QStringLiteral("#0ac814")) << "关掉大写后读数还在折成大写";
 }
 
 /**

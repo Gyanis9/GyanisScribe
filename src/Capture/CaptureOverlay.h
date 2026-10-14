@@ -141,6 +141,14 @@ namespace GyanisScribe::Capture
         [[nodiscard]] Pick::ColorFormat readoutFormat() const noexcept;
 
         /**
+         * @brief 放大镜读数条里颜色那一格的文本
+         * @return 按当前写法与配置里的字母档排好的那一串
+         * @details 画读数条与判据共读这一处：排版埋在 paintEvent 里的话，
+         *          「设置里的字母档没接上」就只能靠肉眼看画布，而画布上的像素判不住一串字。
+         */
+        [[nodiscard]] QString readoutColorText() const;
+
+        /**
          * @brief 光标正压在上的那一个候选
          * @return 已经在框选、或没有候选含住光标时返回空
          */

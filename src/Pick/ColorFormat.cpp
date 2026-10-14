@@ -107,8 +107,15 @@ namespace GyanisScribe::Pick
         return ColorFormat::Hex;
     }
 
-    QString formatColor(const QColor &color, const ColorFormat format)
+    QString formatColor(const QColor &color, const ColorFormat format, const HexCasing casing)
     {
+        // 字母档只管 HEX 那一串：QColor::name() 给的是小写，大写档在它之后再折一次
+        const auto hexText = [&color, casing]
+        {
+            const auto lower = color.name(QColor::HexRgb);
+            return casing == HexCasing::Uppercase ? lower.toUpper() : lower;
+        };
+
         switch (format)
         {
             case ColorFormat::Rgb:
@@ -136,9 +143,15 @@ namespace GyanisScribe::Pick
                 // 十进制三元组：逗号加空格分隔，粘进代码当数组元素、粘进设计工具的 RGB 输入栏都是这个形状
                 return QString::fromUtf8(std::format("{}, {}, {}", color.red(), color.green(), color.blue()).c_str());
             case ColorFormat::Hex:
-                return color.name(QColor::HexRgb).toUpper();
+                return hexText();
         }
-        return color.name(QColor::HexRgb).toUpper();
+        // 写法表加了一档却忘了接分支：交出去的是 HEX 那一形，而不是空串——空串会被粘进对面当空值
+        return hexText();
+    }
+
+    HexCasing hexCasingOf(const bool uppercase)
+    {
+        return uppercase ? HexCasing::Uppercase : HexCasing::Lowercase;
     }
 
 } // namespace GyanisScribe::Pick

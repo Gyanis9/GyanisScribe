@@ -33,9 +33,9 @@ namespace
 
 namespace GyanisScribe::Pick
 {
-    ColorPickerOverlay::ColorPickerOverlay(const Core::CapturedImage &frame, const QRect &screenGeometry, const ColorFormat format, const Ui::ThemeManager &theme,
-                                           QWidget *parent) :
-        QWidget(parent), m_frame(frame), m_screenGeometry(screenGeometry), m_format(format), m_theme(theme), m_cursor(QCursor::pos())
+    ColorPickerOverlay::ColorPickerOverlay(const Core::CapturedImage &frame, const QRect &screenGeometry, const ColorFormat format, const HexCasing casing,
+                                           const Ui::ThemeManager &theme, QWidget *parent) :
+        QWidget(parent), m_frame(frame), m_screenGeometry(screenGeometry), m_format(format), m_hexCasing(casing), m_theme(theme), m_cursor(QCursor::pos())
     {
         // 遮罩盖住整块屏幕，坐标一律用屏幕坐标：逻辑坐标与冻帧像素之间靠 framePixelFor 换算
         setGeometry(m_screenGeometry);
@@ -62,7 +62,7 @@ namespace GyanisScribe::Pick
 
     QString ColorPickerOverlay::currentText() const
     {
-        return formatColor(colorAt(m_cursor), m_format);
+        return formatColor(colorAt(m_cursor), m_format, m_hexCasing);
     }
 
     void ColorPickerOverlay::setRecentColors(std::vector<QColor> colors)
@@ -209,7 +209,7 @@ namespace GyanisScribe::Pick
 
     void ColorPickerOverlay::deliverColor(const QColor &color)
     {
-        emit colorPicked(color, formatColor(color, m_format));
+        emit colorPicked(color, formatColor(color, m_format, m_hexCasing));
         close();
     }
 

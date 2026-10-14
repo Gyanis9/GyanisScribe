@@ -591,6 +591,34 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住贴图取色的读数按「十六进制用大写」那一格走，而 RGB 那一形不受它影响
+     * @details 这一条把配置与文本两头接上：字母档只该动 HEX。读数与复制出去走的是同一条排版，
+     *          所以它红了就是「设置里关掉了、粘出去还是大写」那种拆家。
+     *          写法仍现读 Pick/Format：关掉字母档不该顺手把写法也换成 HEX。
+     */
+    TEST_F(PinWindowFixture, ColorReadoutFollowsTheHexCasingSetting)
+    {
+        QImage red{kImageEdge, kImageEdge, QImage::Format_ARGB32};
+        red.fill(QColor{255, 0, 0});
+        auto &window = makeWindow(red);
+
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kPickFormat, QVariant(QStringLiteral("Hex"))).has_value()) << "写入失败";
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kPickHexUppercase, false).has_value()) << "写入失败";
+        window.setColorPickMode(true);
+
+        QMouseEvent hover{QEvent::MouseMove, QPointF{1.0, 1.0}, QPointF{1.0, 1.0}, Qt::NoButton, Qt::NoButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &hover);
+        const auto readout = window.hoveredColorText();
+        ASSERT_TRUE(readout.has_value()) << "取色模式下没有读数";
+        EXPECT_EQ(*readout, QStringLiteral("#ff0000")) << "字母档关掉了还出大写";
+
+        // 换成 RGB 写法：字母档不参与那一形，串里也不该多出大小写折算
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kPickFormat, QVariant(QStringLiteral("Rgb"))).has_value()) << "写入失败";
+        QApplication::sendEvent(&window, &hover);
+        EXPECT_EQ(window.hoveredColorText().value_or(QString{}), QStringLiteral("rgb(255, 0, 0)")) << "字母档动了不该动的写法";
+    }
+
+    /**
      * @brief 钉住取色模式：菜单进模式、悬停出读数、点一下交出一个像素的颜色、Esc 先退出模式
      * @details 取色判据要能分辨「取到的是哪一格」：用左右两半不同色的图，并在 2 倍缩放下点两处，
      *          换算错一格（比如把窗口坐标当成像素坐标）就会取到隔壁那一半的颜色。

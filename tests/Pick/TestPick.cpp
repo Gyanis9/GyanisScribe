@@ -32,6 +32,8 @@ using GyanisScribe::Pick::colorFormatToken;
 using GyanisScribe::Pick::ColorPickerOverlay;
 using GyanisScribe::Pick::formatColor;
 using GyanisScribe::Pick::framePixelFor;
+using GyanisScribe::Pick::HexCasing;
+using GyanisScribe::Pick::hexCasingOf;
 using GyanisScribe::Pick::indexOfColorFormat;
 using GyanisScribe::Pick::kMagnifierSampleEdge;
 using GyanisScribe::Pick::magnifierLayoutFor;
@@ -94,9 +96,10 @@ namespace
             std::filesystem::remove(m_iniPath, cleanup);
         }
 
-        [[nodiscard]] std::unique_ptr<ColorPickerOverlay> makeOverlay(const CapturedImage &frame, const QRect &geometry, const ColorFormat format) const
+        [[nodiscard]] std::unique_ptr<ColorPickerOverlay> makeOverlay(const CapturedImage &frame, const QRect &geometry, const ColorFormat format,
+                                                                      const HexCasing casing = HexCasing::Uppercase) const
         {
-            return std::make_unique<ColorPickerOverlay>(frame, geometry, format, *m_theme);
+            return std::make_unique<ColorPickerOverlay>(frame, geometry, format, casing, *m_theme);
         }
 
         std::filesystem::path          m_iniPath; ///< 本用例的设置文件路径，收尾删掉
@@ -173,19 +176,19 @@ TEST(PickColorFormat, TokensLabelsAndHandComputedTexts)
     // 手算第二组：#3C78C8 的 HSV 是 max=200、chroma=140 → v=78%、s=140/200=70%；
     // HSI 的 i=(60+120+200)/3=126.7 → 50%、s=1-60/126.7=53%
     const QColor sample{60, 120, 200};
-    EXPECT_EQ(formatColor(sample, ColorFormat::Hex), QStringLiteral("#3C78C8"));
-    EXPECT_EQ(formatColor(sample, ColorFormat::Rgb), QStringLiteral("rgb(60, 120, 200)"));
-    EXPECT_EQ(formatColor(sample, ColorFormat::Hsl), QStringLiteral("hsl(214, 56%, 51%)"));
-    EXPECT_EQ(formatColor(sample, ColorFormat::Hsv), QStringLiteral("hsv(214, 70%, 78%)"));
-    EXPECT_EQ(formatColor(sample, ColorFormat::Hsi), QStringLiteral("hsi(214, 53%, 50%)"));
-    EXPECT_EQ(formatColor(sample, ColorFormat::Decimal), QStringLiteral("60, 120, 200"));
+    EXPECT_EQ(formatColor(sample, ColorFormat::Hex, HexCasing::Uppercase), QStringLiteral("#3C78C8"));
+    EXPECT_EQ(formatColor(sample, ColorFormat::Rgb, HexCasing::Uppercase), QStringLiteral("rgb(60, 120, 200)"));
+    EXPECT_EQ(formatColor(sample, ColorFormat::Hsl, HexCasing::Uppercase), QStringLiteral("hsl(214, 56%, 51%)"));
+    EXPECT_EQ(formatColor(sample, ColorFormat::Hsv, HexCasing::Uppercase), QStringLiteral("hsv(214, 70%, 78%)"));
+    EXPECT_EQ(formatColor(sample, ColorFormat::Hsi, HexCasing::Uppercase), QStringLiteral("hsi(214, 53%, 50%)"));
+    EXPECT_EQ(formatColor(sample, ColorFormat::Decimal, HexCasing::Uppercase), QStringLiteral("60, 120, 200"));
 
-    EXPECT_EQ(formatColor(QColor{0, 0, 0}, ColorFormat::Hsl), QStringLiteral("hsl(0, 0%, 0%)"));
-    EXPECT_EQ(formatColor(QColor{255, 255, 255}, ColorFormat::Hsl), QStringLiteral("hsl(0, 0%, 100%)"));
-    EXPECT_EQ(formatColor(QColor{0, 0, 0}, ColorFormat::Hsv), QStringLiteral("hsv(0, 0%, 0%)")) << "纯黑的无彩色相按 0 记，饱和 0";
-    EXPECT_EQ(formatColor(QColor{0, 0, 0}, ColorFormat::Hsi), QStringLiteral("hsi(0, 0%, 0%)")) << "I 为 0 时饱和按 0 记，不许除零";
-    EXPECT_EQ(formatColor(QColor{255, 255, 255}, ColorFormat::Hsi), QStringLiteral("hsi(0, 0%, 100%)"));
-    EXPECT_EQ(formatColor(QColor{255, 0, 0}, ColorFormat::Hsi), QStringLiteral("hsi(0, 100%, 33%)")) << "纯红 i=85/255→33%，s=1-0/i=100%";
+    EXPECT_EQ(formatColor(QColor{0, 0, 0}, ColorFormat::Hsl, HexCasing::Uppercase), QStringLiteral("hsl(0, 0%, 0%)"));
+    EXPECT_EQ(formatColor(QColor{255, 255, 255}, ColorFormat::Hsl, HexCasing::Uppercase), QStringLiteral("hsl(0, 0%, 100%)"));
+    EXPECT_EQ(formatColor(QColor{0, 0, 0}, ColorFormat::Hsv, HexCasing::Uppercase), QStringLiteral("hsv(0, 0%, 0%)")) << "纯黑的无彩色相按 0 记，饱和 0";
+    EXPECT_EQ(formatColor(QColor{0, 0, 0}, ColorFormat::Hsi, HexCasing::Uppercase), QStringLiteral("hsi(0, 0%, 0%)")) << "I 为 0 时饱和按 0 记，不许除零";
+    EXPECT_EQ(formatColor(QColor{255, 255, 255}, ColorFormat::Hsi, HexCasing::Uppercase), QStringLiteral("hsi(0, 0%, 100%)"));
+    EXPECT_EQ(formatColor(QColor{255, 0, 0}, ColorFormat::Hsi, HexCasing::Uppercase), QStringLiteral("hsi(0, 100%, 33%)")) << "纯红 i=85/255→33%，s=1-0/i=100%";
 }
 
 /**
@@ -279,6 +282,49 @@ TEST_F(PickFixture, OverlayPicksThePixelUnderTheCursor)
     QMouseEvent move{QEvent::MouseMove, QPointF{50.0, 50.0}, QPointF{50.0, 50.0}, Qt::NoButton, Qt::NoButton, Qt::NoModifier};
     QApplication::sendEvent(overlay.get(), &move);
     EXPECT_EQ(overlay->currentText(), QStringLiteral("#C81E28")) << "文本按当前写法排好";
+}
+
+/**
+ * @brief 钉住字母档只动 HEX 那一档写法，其余五档在两种字母档下逐字节相同
+ * @details 这一条挡的是「把大小写当成全局的文字处理」：给 rgb() / hsl() 那种串折大小写会把函数名本身改坏，
+ *          粘进 CSS 就成了不认识的值，而那比「字母不对」难查得多。
+ *          手算：#3C78C8 与 #3c78c8 是同一个色，两边只差字母那三位。
+ */
+TEST(PickColorFormat, HexCasingOnlyTouchesTheHexFormat)
+{
+    const QColor sample{60, 120, 200};
+
+    EXPECT_EQ(formatColor(sample, ColorFormat::Hex, hexCasingOf(true)), QStringLiteral("#3C78C8")) << "默认那一档就是本仓此前的写法";
+    EXPECT_EQ(formatColor(sample, ColorFormat::Hex, hexCasingOf(false)), QStringLiteral("#3c78c8"));
+
+    for (const auto format: {ColorFormat::Rgb, ColorFormat::Hsl, ColorFormat::Hsv, ColorFormat::Hsi, ColorFormat::Decimal})
+    {
+        EXPECT_EQ(formatColor(sample, format, HexCasing::Uppercase), formatColor(sample, format, HexCasing::Lowercase))
+                << "写法序号 " << static_cast<int>(format) << " 被字母档改动了";
+    }
+}
+
+/**
+ * @brief 钉住取色遮罩的读数与交出的文本都按构造时给的那一字母档走
+ * @details 遮罩把同一串文本排两遍：一遍给放大镜，一遍随颜色发出去。两处读的是同一个成员——
+ *          少接一处就会出现「放大镜里大写、复制出去小写」这种最难查的分家。
+ */
+TEST_F(PickFixture, OverlayAppliesTheHexCasingItWasBuiltWith)
+{
+    const auto mark    = QColor{200, 30, 40};
+    const auto frame   = makeFrame({200, 200}, 2.0, {100, 100}, mark);
+    auto       overlay = makeOverlay(frame, {0, 0, 100, 100}, ColorFormat::Hex, HexCasing::Lowercase);
+
+    QMouseEvent move{QEvent::MouseMove, QPointF{50.0, 50.0}, QPointF{50.0, 50.0}, Qt::NoButton, Qt::NoButton, Qt::NoModifier};
+    QApplication::sendEvent(overlay.get(), &move);
+    EXPECT_EQ(overlay->currentText(), QStringLiteral("#c81e28")) << "放大镜那一格读出的不该还是大写";
+
+    QString delivered;
+    auto   *pointer = overlay.get();
+    QObject::connect(pointer, &ColorPickerOverlay::colorPicked, pointer, [&delivered](const QColor &, const QString &text) { delivered = text; });
+    QMouseEvent press{QEvent::MouseButtonPress, QPointF{50.0, 50.0}, QPointF{50.0, 50.0}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QApplication::sendEvent(pointer, &press);
+    EXPECT_EQ(delivered, QStringLiteral("#c81e28")) << "复制出去的那一串与放大镜读数分家了";
 }
 
 /**

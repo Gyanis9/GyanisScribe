@@ -1339,8 +1339,9 @@ namespace GyanisScribe::Pin
             // 读数不因坏配置停摆：按 HEX 顶上，原因照旧只进日志（同一句在界面那次取色时会弹给用户）
             Core::Logger::warning(std::format("取色写法读不出：{}，贴图取色按 HEX 顶上", complaint));
         }
-        // 读的是显示用的那一份：开了灰度/反色之后，用户看到的就是这个颜色
-        return Pick::formatColor(displayImage().pixelColor(*pixel), format);
+        // 读的是显示用的那一份：开了灰度/反色之后，用户看到的就是这个颜色。字母档现读配置，只管 HEX 那一形
+        const auto casing = Pick::hexCasingOf(m_settings.boolValue(Settings::kPickHexUppercase, true));
+        return Pick::formatColor(displayImage().pixelColor(*pixel), format, casing);
     }
 
     void PinWindow::setShadowEnabled(const bool enabled)

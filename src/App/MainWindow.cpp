@@ -1826,6 +1826,10 @@ namespace GyanisScribe::App
         form->addRow(GyanisScribe::Core::uiText("保存质量"), makeImageQualitySpin(m_settings));
         form->addRow(GyanisScribe::Core::uiText("文件名模板"), makeNameTemplateEdit(m_settings));
         form->addRow(GyanisScribe::Core::uiText("复制用的写法"), makeColorFormatCombo(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("HEX 字母"),
+                     makeSettingCheck(m_settings, GyanisScribe::Settings::kPickHexUppercase, true, GyanisScribe::Core::uiText("十六进制用大写"),
+                                      GyanisScribe::Core::uiText("十六进制用大写"),
+                                      GyanisScribe::Core::uiText("关掉后复制出来的是 #3c78c8 这一形。只影响 HEX 那一档写法，其余五档不动")));
         return page;
     }
 

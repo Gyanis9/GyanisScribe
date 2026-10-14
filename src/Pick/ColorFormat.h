@@ -90,14 +90,35 @@ namespace GyanisScribe::Pick
     [[nodiscard]] ColorFormat colorFormatOrDefault(std::string_view token, std::string &complaint);
 
     /**
+     * @brief HEX 里字母那几位用大写还是小写
+     * @details 单列一档而不是「按语言/按写法」推：粘进 CSS 与设计工具时两种形状都有人用，
+     *          而这不是能从别处读出来的偏好——只有用户自己知道对面收哪一种。
+     */
+    enum class HexCasing
+    {
+        Uppercase, ///< #3C78C8：本仓此前的唯一写法
+        Lowercase, ///< #3c78c8：CSS 与不少前端工具里更常见的形状
+    };
+
+    /**
      * @brief 按写法把颜色排成一串可复制的文本
      * @param color 颜色
      * @param format 写法
+     * @param casing HEX 字母那几位的大小写；只有写法是 HEX 时才起作用
      * @return 例如 #3C78C8、rgb(60, 120, 200)、hsl(214, 56%, 51%)、hsv(214, 70%, 78%)、
      *         hsi(214, 53%, 50%)、60, 120, 200
      * @details 角度与百分数都四舍五入到整数：小数位再多也不比一格的色差更有信息，
      *          而复制出去粘进 CSS 时带小数反而要被再裁一次。
      */
-    [[nodiscard]] QString formatColor(const QColor &color, ColorFormat format);
+    [[nodiscard]] QString formatColor(const QColor &color, ColorFormat format, HexCasing casing);
+
+    /**
+     * @brief 配置里那一格「用大写」开关对应的字母档
+     * @param uppercase 配置读出来的布尔值
+     * @return 该用的字母档
+     * @details 读法只有这一处：三处现读的地方各写一遍三元，就会有人漏掉一处而让同一个颜色在不同界面里
+     *          写出两种形状。
+     */
+    [[nodiscard]] HexCasing hexCasingOf(bool uppercase);
 
 } // namespace GyanisScribe::Pick

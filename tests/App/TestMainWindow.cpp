@@ -547,6 +547,27 @@ namespace
     }
 
     /**
+     * @brief 钉住「十六进制用大写」这一格写的是三处读数共用的那个键，默认档是开
+     * @details 这一格管的是取色遮罩、遮罩放大镜与贴图取色三处复制出去的文本形状：写错一格不会报错，
+     *          只会表现成「设置里关掉了、粘出去还是大写」。默认开是本仓此前的唯一写法，
+     *          改掉它等于给所有老用户换形状，所以那一档必须留在「跟以前一样」。
+     */
+    TEST_F(MainWindowFixture, HexCasingRowWritesTheKeyTheReadoutsRead)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::Capture);
+
+        auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage("十六进制用大写"));
+        ASSERT_NE(check, nullptr) << "截图页没有这一格";
+        EXPECT_TRUE(check->isChecked()) << "默认档该是开：关掉会把所有老用户复制出去的形状换掉";
+        check->setChecked(false);
+        closeWindowAndFlush();
+
+        const auto reopened = makeStore();
+        EXPECT_FALSE(reopened->boolValue(GyanisScribe::Settings::kPickHexUppercase, true)) << "开关没写进 Pick/HexUppercase";
+    }
+
+    /**
      * @brief 钉住录制范围这一行写的是 Record 词表里的 token，且界面默认档就是读端初值那一档
      * @details 存中文标签的话下次录屏读不出来（parseRecordScope 认的是 FullScreen/Region/Window），
      *          而「录什么」猜错比帧率猜错重得多：用户以为录的是那片选区，实际录了整个桌面。

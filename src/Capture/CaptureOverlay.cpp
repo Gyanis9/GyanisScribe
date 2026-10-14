@@ -7,6 +7,7 @@
 #include "Pick/ColorFormat.h"
 #include "Pick/PickGeometry.h"
 #include "Settings/ISettingsStore.h"
+#include "Settings/SettingsKeys.h"
 #include "Ui/AppShortcuts.h"
 #include "Ui/DesignTokens.h"
 #include "Ui/KeyStep.h"
@@ -256,7 +257,7 @@ namespace GyanisScribe::Capture
 
         // 读数条压在放大镜下沿：光标那一点的坐标与颜色，不必松手就能核对框到的是哪一格
         const auto stripRect = QRect{viewRect.left(), viewRect.bottom() + kMagnifierPenWidth, viewRect.width(), kMagnifierStripHeight};
-        const auto readout   = QStringLiteral("%1  %2").arg(formatCursorReadout(), Pick::formatColor(colorUnderCursor(), m_readoutFormat));
+        const auto readout   = QStringLiteral("%1  %2").arg(formatCursorReadout(), readoutColorText());
         painter.setPen(Qt::NoPen);
         painter.setBrush(GyanisScribe::Ui::kCaptureHintBackgroundColor);
         painter.drawRect(stripRect);
@@ -265,6 +266,13 @@ namespace GyanisScribe::Capture
         painter.setFont(stripFont);
         painter.setPen(GyanisScribe::Ui::kCaptureHintTextColor);
         painter.drawText(stripRect.adjusted(GyanisScribe::Ui::kHintPadding, 0, -GyanisScribe::Ui::kHintPadding, 0), Qt::AlignVCenter | Qt::AlignLeft, readout);
+    }
+
+    QString CaptureOverlay::readoutColorText() const
+    {
+        // 字母档现读配置：这一格只管 HEX 写法，其它写法读出来不受它影响
+        const auto casing = Pick::hexCasingOf(m_settings.boolValue(GyanisScribe::Settings::kPickHexUppercase, true));
+        return Pick::formatColor(colorUnderCursor(), m_readoutFormat, casing);
     }
 
     QString CaptureOverlay::formatCursorReadout() const

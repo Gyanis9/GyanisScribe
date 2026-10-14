@@ -1264,7 +1264,9 @@ namespace GyanisScribe::App
             notifyUser(QString::fromStdString(complaint), Ui::ToastKind::Danger);
         }
 
-        const auto text = Pick::formatColor(color, format);
+        // 字母档现读配置：这一档只管 HEX 那一形，写法是别的时读出来也一样
+        const auto casing = Pick::hexCasingOf(m_settings->boolValue(Settings::kPickHexUppercase, true));
+        const auto text   = Pick::formatColor(color, format, casing);
         QGuiApplication::clipboard()->setText(text);
         notifyUser(GyanisScribe::Core::uiText("已复制颜色 ") + text, Ui::ToastKind::Success);
     }
@@ -1366,7 +1368,7 @@ namespace GyanisScribe::App
             notifyUser(QString::fromStdString(complaint), Ui::ToastKind::Danger);
         }
 
-        m_picker = new Pick::ColorPickerOverlay{*frame, screen->geometry(), format, *m_theme};
+        m_picker = new Pick::ColorPickerOverlay{*frame, screen->geometry(), format, Pick::hexCasingOf(m_settings->boolValue(Settings::kPickHexUppercase, true)), *m_theme};
         // 最近取色跟着这一轮摆上遮罩：点色块或按数字键就能重新取回，不必回原处对像素
         m_picker->setRecentColors(recentPickedColors());
         QObject::connect(m_picker, &Pick::ColorPickerOverlay::colorPicked, this,

@@ -160,6 +160,9 @@ namespace GyanisScribe::Settings
     /// 取色复制用的写法：Hex、Rgb、Hsl、Hsv、Hsi 或 Decimal（词表在 Pick/ColorFormat.h）
     inline constexpr std::string_view kPickFormat = "Pick/Format";
 
+    /// HEX 里字母那几位用大写（默认开）；关掉是给粘进 CSS 与某些前端工具用的
+    inline constexpr std::string_view kPickHexUppercase = "Pick/HexUppercase";
+
     /// 最近取过的颜色（#RRGGBB 列表，最新在前，上限见 Pick::kPickColorHistoryCapacity）；
     /// 屏幕取色与贴图取色共用这一份，取色遮罩底部的色块行按它摆
     inline constexpr std::string_view kPickRecentColors = "Pick/RecentColors";

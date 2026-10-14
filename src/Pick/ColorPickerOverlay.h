@@ -43,10 +43,12 @@ namespace GyanisScribe::Pick
          * @param frame 这一屏的冻帧
          * @param screenGeometry frame 对应屏幕的几何，屏幕坐标
          * @param format 复制用的颜色写法
+         * @param casing HEX 字母那几位的大小写（写法不是 HEX 时不起作用）
          * @param theme 主题管理器，放大镜边框与文字色随主题
          * @param parent Qt 父对象
          */
-        ColorPickerOverlay(const Core::CapturedImage &frame, const QRect &screenGeometry, ColorFormat format, const Ui::ThemeManager &theme, QWidget *parent = nullptr);
+        ColorPickerOverlay(const Core::CapturedImage &frame, const QRect &screenGeometry, ColorFormat format, HexCasing casing, const Ui::ThemeManager &theme,
+                           QWidget *parent = nullptr);
 
         /**
          * @brief 某一屏幕坐标处的颜色
@@ -105,6 +107,7 @@ namespace GyanisScribe::Pick
         Core::CapturedImage     m_frame;              ///< 这一屏的冻帧
         QRect                   m_screenGeometry;     ///< 冻帧对应屏幕的几何
         ColorFormat             m_format;             ///< 复制用的写法
+        HexCasing               m_hexCasing;          ///< 写法是 HEX 时字母那几位的大小写
         const Ui::ThemeManager &m_theme;              ///< 主题管理器，画放大镜边框用主色
         QPoint                  m_cursor;             ///< 当前光标的屏幕坐标
         std::vector<QColor>     m_recent;             ///< 最近取色清单，最近的在前；命中的下标与色块行同序
