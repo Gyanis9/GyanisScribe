@@ -68,6 +68,19 @@ namespace GyanisScribe::Ui
     }
 
 
+    void HotkeyEdit::clearBinding()
+    {
+        // 空 QVariant 是「把这一项删掉」：存一个空串的话，每次读它都算「填的是空文本」并记一条警告
+        if (auto written = m_settings.setValue(m_key, QVariant{}); !written)
+        {
+            Core::Logger::warning(std::format("取消热键绑定没能写入：{}", written.error().message));
+            showPrompt(GyanisScribe::Core::uiText("写入失败"));
+            return;
+        }
+        m_display->clear();
+    }
+
+
     Core::Expected<void> HotkeyEdit::applyCombination(const Hotkey::HotkeyCombination &combination)
     {
         if (auto usable = combination.checkUsableGlobally(); !usable)

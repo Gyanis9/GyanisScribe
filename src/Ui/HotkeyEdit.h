@@ -57,6 +57,13 @@ namespace GyanisScribe::Ui
          */
         void bindTo(std::string_view key, const QString &title, const QString &defaultText);
 
+        /**
+         * @brief 取消这一格的绑定：把键从配置里去掉，显示也清空
+         * @details 固定那八个动作没有这一档（它们各有默认组合，去掉键等于把用户的改动悄悄还原）；
+         *          只有「可绑可不绑」的那几行给这个出口。删键而不是存一个空串：空文本每次读都算「填坏了」。
+         */
+        void clearBinding();
+
 
         /**
          * @brief 校验并写入一个组合

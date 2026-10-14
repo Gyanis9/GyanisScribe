@@ -5,6 +5,7 @@
 #include "Annotation/AnnotationWindow.h"
 #include "Annotation/BlankCanvas.h"
 #include "App/ClipboardPin.h"
+#include "App/CustomHotkeys.h"
 #include "Capture/CaptureService.h"
 #include "Capture/IScreenCaptureSource.h"
 #include "Capture/RegionHistory.h"
@@ -201,6 +202,34 @@ namespace GyanisScribe::App
                              }
                          });
 
+        // 自定义绑定的那一路：热键层只报回一个标识，功能名到动作的映射住在这一层（词表在 App/CustomHotkeys.h）
+        QObject::connect(m_hotkeys.get(), &Hotkey::IHotkeyManager::customActionTriggered, this,
+                         [this](const QString &token)
+                         {
+                             const auto action = trayActionForToken(token);
+                             if (!action)
+                             {
+                                 // 配置里留着一个不再可绑的标识：说清是没认出来，而不是按了没反应
+                                 Core::Logger::warning(std::format("自定义热键报回没认出的功能标识「{}」，已忽略", token.toStdString()));
+                                 return;
+                             }
+                             handleTrayAction(*action);
+                         });
+        // 自定义键不在热键层那八个的订阅里：改完这一族的任何一格，由这里重登一次，不必重启
+        QObject::connect(m_settings.get(), &Settings::ISettingsStore::valueChanged, this,
+                         [this](const QString &key)
+                         {
+                             const auto prefix = QString::fromUtf8(Settings::kHotkeyCustomPrefix.data(), static_cast<qsizetype>(Settings::kHotkeyCustomPrefix.size()));
+                             if (!key.startsWith(prefix))
+                             {
+                                 return;
+                             }
+                             if (const auto report = registerHotkeys(); !report)
+                             {
+                                 Core::Logger::warning(std::format("自定义热键重登没走通：{}", report.error().message));
+                             }
+                         });
+
         QObject::connect(m_capture.get(), &Capture::ICaptureService::captured, this, &AppController::handleCaptured);
         QObject::connect(m_capture.get(), &Capture::ICaptureService::captureCancelled, this, [] { Core::Logger::info("截图已取消"); });
         QObject::connect(m_capture.get(), &Capture::ICaptureService::captureFailed, this,
@@ -330,6 +359,8 @@ namespace GyanisScribe::App
 
     Core::Expected<Hotkey::HotkeyReloadReport> AppController::registerHotkeys()
     {
+        // 先把手绑的那一批交给热键层再重登：登记要的是「这一批」，中间态不必单独登一次
+        m_hotkeys->setCustomBindings(collectCustomBindings(*m_settings));
         auto report = m_hotkeys->reload();
         if (report && !report->failures.empty())
         {
@@ -341,6 +372,18 @@ namespace GyanisScribe::App
                 lines << QStringLiteral("%1（%2）").arg(failure.combination, QString::fromStdString(failure.error.message));
             }
             notifyUser(GyanisScribe::Core::uiText("这些全局热键没能登记上：") + lines.join(QStringLiteral("；")), Ui::ToastKind::Danger);
+        }
+        if (report && !report->customFailures.empty())
+        {
+            // 自定义那一批单独报一句：这里要点的是功能名（「整屏截图」），只报组合键没人知道是哪件事没绑上
+            QStringList lines;
+            for (const auto &failure: report->customFailures)
+            {
+                const auto bound = trayActionForToken(failure.token);
+                const auto label = bound ? bindableActionLabel(*bound) : failure.token;
+                lines << QStringLiteral("%1（%2）").arg(label + QStringLiteral(" ") + failure.combination, QString::fromStdString(failure.error.message));
+            }
+            notifyUser(GyanisScribe::Core::uiText("这些自定义热键没能登记上：") + lines.join(QStringLiteral("；")), Ui::ToastKind::Danger);
         }
         return report;
     }

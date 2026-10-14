@@ -2,6 +2,7 @@
 // 逐格核对的写法来自一个具体的坑：设置页的每一行都同时有「界面里的控件」和「另一头的读端」，
 // 只测其中一头时，另一头改成别的键也照样全绿。
 #include "App/CaptureIntent.h"
+#include "App/CustomHotkeys.h"
 #include "App/MainWindow.h"
 
 #include "App/TrayController.h"
@@ -17,6 +18,7 @@
 #include "Core/Text.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
+#include "Hotkey/HotkeyCombination.h"
 #include "Settings/SettingsStore.h"
 #include "Ui/DesignTokens.h"
 #include "Ui/HotkeyEdit.h"
@@ -1098,22 +1100,26 @@ TEST_F(MainWindowFixture, ActionBarLandsEveryVisibleTrayEntrySomewhere)
  * @brief 钉住热键页的登记入口跟着平台能力位走：没有登记口的平台上不许装作改了会生效
  * @details 两格都判：能力位为真时每一行都能编辑（少了这一格，把 setEnabled 摘掉也不会红），
  *          为假时所有行都灰掉但仍在——行消失了用户就看不见自己配过什么。
+ *          行数由「固定八个动作 + 可绑词表每一项」算出，自定义那一排也归同一道能力位管：
+ *          填了不生效的组合比不填更坑人，两排必须一起灰。
  */
 TEST_F(MainWindowFixture, HotkeyEntriesFollowTheGlobalHotkeyCapability)
 {
+    const int expectedRows = 8 + static_cast<int>(GyanisScribe::App::bindableActions().size());
+
     makeWindow(true);
     m_window->open(MainWindowPage::Hotkey);
     auto edits = m_window->findChildren<GyanisScribe::Ui::HotkeyEdit *>();
-    ASSERT_EQ(edits.size(), 8) << "热键页该有截图、录屏、文字识别、屏幕取色、滚动长截图、快速保存、收起/摆回贴图、切换贴图分组八行";
+    ASSERT_EQ(edits.size(), expectedRows) << "热键页该有固定八行，再给每个可绑功能一行";
     for (auto *edit: edits)
     {
-        EXPECT_TRUE(edit->isEnabled()) << "有登记口的平台上这八行要能改";
+        EXPECT_TRUE(edit->isEnabled()) << "有登记口的平台上这些行要能改";
     }
 
     makeWindow(false);
     m_window->open(MainWindowPage::Hotkey);
     edits = m_window->findChildren<GyanisScribe::Ui::HotkeyEdit *>();
-    ASSERT_EQ(edits.size(), 8) << "没有登记口也不能把行藏掉：用户配过的组合键要还在眼前";
+    ASSERT_EQ(edits.size(), expectedRows) << "没有登记口也不能把行藏掉：用户配过的组合键要还在眼前";
     for (auto *edit: edits)
     {
         EXPECT_FALSE(edit->isEnabled()) << "这台机器上改完不会生效，入口就该是灰的";
@@ -1333,4 +1339,66 @@ TEST_F(MainWindowFixture, FailedPaletteImportKeepsTheOldRow)
     closeWindowAndFlush();
     EXPECT_EQ(makeStore()->stringListValue(GyanisScribe::Settings::kAnnotationPalette, {}), stored) << "坏文件把旧色板顶掉了";
     EXPECT_GE(messages.size(), 2) << "两次失败都该各有一句原因";
+}
+
+
+/**
+ * @brief 钉住「给某个功能绑全局热键」那一行写的是 Hotkey/Custom/<标识> 这一族键
+ * @details 一格一签而不是整串存一个列表：列表要在界面上找「哪一行是第几项」，删一项还会让后面全体挪位。
+ */
+TEST_F(MainWindowFixture, CustomHotkeyRowWritesItsOwnKey)
+{
+    makeWindow();
+    m_window->open(MainWindowPage::Hotkey);
+
+    GyanisScribe::Ui::HotkeyEdit *edit = nullptr;
+    for (auto *candidate: m_window->findChildren<GyanisScribe::Ui::HotkeyEdit *>())
+    {
+        if (candidate->accessibleName() == QStringLiteral("整屏截图"))
+        {
+            edit = candidate;
+        }
+    }
+    ASSERT_NE(edit, nullptr) << "快捷键页没有「整屏截图」这一行可绑的编辑框";
+
+    ASSERT_TRUE(static_cast<bool>(edit->applyCombination(GyanisScribe::Hotkey::HotkeyCombination{Qt::ControlModifier | Qt::AltModifier, Qt::Key_F2})));
+
+    closeWindowAndFlush();
+    EXPECT_EQ(makeStore()->stringValue(std::string{"Hotkey/Custom/CaptureFullScreen"}, QStringLiteral("没填")), QStringLiteral("Ctrl+Alt+F2"))
+            << "这一行写的不是它自己那个键，收集那一步就找不到它";
+}
+
+/**
+ * @brief 钉住「取消绑定」把那一项从配置里删掉，而不是留一个读起来算坏值的空串
+ * @details 空文本每次读都会被记成「这一格填坏了」；删键才是「没填」那一档，下一次收集直接跳过。
+ */
+TEST_F(MainWindowFixture, UnbindRemovesTheCustomHotkeyEntry)
+{
+    makeWindow();
+    m_window->open(MainWindowPage::Hotkey);
+
+    GyanisScribe::Ui::HotkeyEdit *edit = nullptr;
+    for (auto *candidate: m_window->findChildren<GyanisScribe::Ui::HotkeyEdit *>())
+    {
+        if (candidate->accessibleName() == QStringLiteral("整屏截图"))
+        {
+            edit = candidate;
+        }
+    }
+    ASSERT_NE(edit, nullptr);
+    ASSERT_TRUE(static_cast<bool>(edit->applyCombination(GyanisScribe::Hotkey::HotkeyCombination{Qt::ControlModifier | Qt::AltModifier, Qt::Key_F2})));
+
+    QPushButton *clear = nullptr;
+    for (auto *candidate: m_window->findChildren<QPushButton *>())
+    {
+        if (candidate->accessibleName() == QStringLiteral("取消 整屏截图 的绑定"))
+        {
+            clear = candidate;
+        }
+    }
+    ASSERT_NE(clear, nullptr) << "每一行都要有自己的取消按钮，且名字带功能名才分得清按的是哪一行";
+    clear->click();
+
+    closeWindowAndFlush();
+    EXPECT_EQ(makeStore()->stringValue(std::string{"Hotkey/Custom/CaptureFullScreen"}, QStringLiteral("没填")), QStringLiteral("没填")) << "取消绑定没把这一项删干净";
 }

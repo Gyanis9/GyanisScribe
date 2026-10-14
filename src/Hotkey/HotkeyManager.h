@@ -16,6 +16,7 @@
 #include <memory>
 #include <optional>
 #include <string_view>
+#include <vector>
 
 namespace GyanisScribe::Platform
 {
@@ -74,6 +75,12 @@ namespace GyanisScribe::Hotkey
          */
         [[nodiscard]] QString bindingText(HotkeyAction action) const override;
 
+        /**
+         * @brief 换一批自定义绑定，见 IHotkeyManager::setCustomBindings()
+         * @param bindings 要登记的那一批（组合非空、标识由调用方自己认领）
+         */
+        void setCustomBindings(std::vector<CustomHotkeyBinding> bindings) override;
+
     private:
         /// 全部受管动作，顺序与登记顺序一致，是「有几项」的唯一出处
         [[nodiscard]] static std::span<const HotkeyAction> managedActions();
@@ -90,9 +97,16 @@ namespace GyanisScribe::Hotkey
         /// 编号反查动作，不在册时返回空
         [[nodiscard]] static std::optional<HotkeyAction> actionForIdentifier(int identifier);
 
-        Settings::ISettingsStore                 &m_settings;    ///< 组合文本与变更通知的来源
-        Platform::IPlatformIntegration           &m_integration; ///< 后端工厂
-        std::unique_ptr<Platform::IHotkeyBackend> m_backend;     ///< 当前后端，第一次 reload() 时建立
+        /// 自定义绑定的编号起点：固定动作按「枚举序号 + 1」只占到个位数，这一段留给自定义，两边不会撞号
+        static constexpr int kCustomIdentifierBase = 1000;
+
+        /// 编号反查自定义绑定的序号（表内下标），不在这批里时返回空
+        [[nodiscard]] std::optional<std::size_t> customIndexForIdentifier(int identifier) const;
+
+        Settings::ISettingsStore                 &m_settings;       ///< 组合文本与变更通知的来源
+        Platform::IPlatformIntegration           &m_integration;    ///< 后端工厂
+        std::unique_ptr<Platform::IHotkeyBackend> m_backend;        ///< 当前后端，第一次 reload() 时建立
+        std::vector<CustomHotkeyBinding>          m_customBindings; ///< 这一批自定义绑定，顺序就是登记顺序（编号按下标算）
     };
 
 } // namespace GyanisScribe::Hotkey

@@ -148,6 +148,12 @@ namespace GyanisScribe::Hotkey
             QObject::connect(m_backend.get(), &Platform::IHotkeyBackend::activated, this,
                              [this](int identifier)
                              {
+                                 if (const auto slot = customIndexForIdentifier(identifier); slot)
+                                 {
+                                     // 编号区间已经分开了，先认自定义那一段：这一路的标识是调用方给的，热键层不解释它
+                                     emit customActionTriggered(m_customBindings[*slot].token);
+                                     return;
+                                 }
                                  const auto action = actionForIdentifier(identifier);
                                  if (!action)
                                  {
@@ -183,7 +189,44 @@ namespace GyanisScribe::Hotkey
             ++report.registered;
         }
 
+        // 自定义那一批：编号从 kCustomIdentifierBase 起按表序排，两项同一条组合撞上了就各自记一条失败（后端会拒第二个）
+        for (std::size_t slot = 0; slot < m_customBindings.size(); ++slot)
+        {
+            const auto &binding     = m_customBindings[slot];
+            const auto  combination = HotkeyCombination::fromText(binding.combination.toStdString());
+            if (!combination)
+            {
+                report.customFailures.push_back(CustomHotkeyFailure{binding.token, binding.combination, combination.error()});
+                continue;
+            }
+            if (const auto registered = m_backend->registerHotkey(kCustomIdentifierBase + static_cast<int>(slot), combination->modifiers(), combination->key()); !registered)
+            {
+                report.customFailures.push_back(CustomHotkeyFailure{binding.token, binding.combination, registered.error()});
+                continue;
+            }
+            ++report.registered;
+        }
+
         return report;
+    }
+
+    void HotkeyManager::setCustomBindings(std::vector<CustomHotkeyBinding> bindings)
+    {
+        m_customBindings = std::move(bindings);
+    }
+
+    std::optional<std::size_t> HotkeyManager::customIndexForIdentifier(const int identifier) const
+    {
+        if (identifier < kCustomIdentifierBase)
+        {
+            return {};
+        }
+        const auto slot = static_cast<std::size_t>(identifier - kCustomIdentifierBase);
+        if (slot >= m_customBindings.size())
+        {
+            return {};
+        }
+        return slot;
     }
 
     QString HotkeyManager::bindingText(HotkeyAction action) const

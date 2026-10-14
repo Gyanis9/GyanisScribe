@@ -30,6 +30,13 @@ namespace GyanisScribe::Settings
     /// 快速保存的全局热键：截图后直接存成文件并复制，不走「截完之后」那一档
     inline constexpr std::string_view kHotkeyQuickSave = "Hotkey/QuickSave";
 
+    /**
+     * @brief 自定义全局热键那一族（`Hotkey/Custom/<功能标识>`），键名不在这里逐个登记
+     * @details 一份词表住在 App/CustomHotkeys.h 的 bindableActions()：可绑的功能、标识与配置键都在那一处算，
+     *          这里再逐个列一遍就会出现「加一个功能要改两处」。存的文本是组合（如 Ctrl+Alt+F），空即不绑。
+     */
+    inline constexpr std::string_view kHotkeyCustomPrefix = "Hotkey/Custom/";
+
     /// 主题档位，取值只能是 Light、Dark、System、HighContrast
     inline constexpr std::string_view kThemeMode = "Theme/Mode";
 

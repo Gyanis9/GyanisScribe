@@ -47,12 +47,34 @@ namespace GyanisScribe::Hotkey
     };
 
     /**
+     * @brief 一次自定义绑定的输入：功能标识与要绑的组合
+     * @details 标识（token）是调用方自己的词表——热键这一层不认识「截图」「贴图组管理」这些功能名，
+     *          它只负责「这一串组合按下时，把这个标识报回去」。
+     */
+    struct CustomHotkeyBinding
+    {
+        QString token;       ///< 功能标识，注册方自己认领
+        QString combination; ///< 组合文本，例如 Ctrl+Alt+F
+    };
+
+    /**
+     * @brief 一条自定义绑定没登记上
+     */
+    struct CustomHotkeyFailure
+    {
+        QString     token;       ///< 哪个功能没登记上
+        QString     combination; ///< 当时用的组合文本
+        Core::Error error;       ///< 原因，含中文与替代做法
+    };
+
+    /**
      * @brief 一轮登记的结果
      */
     struct HotkeyReloadReport
     {
-        int                        registered = 0; ///< 成功登记的条数
-        std::vector<HotkeyFailure> failures;       ///< 没登记上的条目，一条不落全在这里
+        int                              registered = 0; ///< 成功登记的条数（固定的与自定义的一起算）
+        std::vector<HotkeyFailure>       failures;       ///< 固定动作里没登记上的，一条不落全在这里
+        std::vector<CustomHotkeyFailure> customFailures; ///< 自定义绑定里没登记上的；与上面那组分开记，界面按各自的名字报
     };
 
     /**
@@ -85,12 +107,28 @@ namespace GyanisScribe::Hotkey
          */
         [[nodiscard]] virtual QString bindingText(HotkeyAction action) const = 0;
 
+        /**
+         * @brief 换一批自定义绑定（给「固定动作之外的功能」绑全局热键）
+         * @param bindings 要登记的绑定；组合为空的那些由调用方自己滤掉，这里不再判「算不算没绑」
+         * @details 只存下这一批，不顺手 reload：设置页一次改好几格时，逐格重登会把中间态报到用户脸上。
+         *          调用方存完再调 reload()（或 registerHotkeys()）那一条路。
+         */
+        virtual void setCustomBindings(std::vector<CustomHotkeyBinding> bindings) = 0;
+
     signals:
         /**
          * @brief 某个已登记的热键被按下
          * @param action 对应的动作
          */
         void actionTriggered(GyanisScribe::Hotkey::HotkeyAction action);
+
+        /**
+         * @brief 一条自定义绑定被按下
+         * @param token 登记时那个功能标识，原样报回
+         * @details 与 actionTriggered 分两条信号：固定动作的枚举住在热键层，其余功能的词表住在界面层，
+         *          硬并成一个枚举就会让热键层去认识「贴图组管理」这类它不该知道的东西。
+         */
+        void customActionTriggered(const QString &token);
     };
 
 } // namespace GyanisScribe::Hotkey

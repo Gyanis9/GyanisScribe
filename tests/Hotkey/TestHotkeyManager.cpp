@@ -20,9 +20,11 @@
 using GyanisScribe::Core::Error;
 using GyanisScribe::Core::ErrorCode;
 using GyanisScribe::Core::Expected;
+using GyanisScribe::Hotkey::CustomHotkeyBinding;
 using GyanisScribe::Hotkey::HotkeyAction;
 using GyanisScribe::Hotkey::HotkeyManager;
 using GyanisScribe::Hotkey::HotkeyReloadReport;
+using GyanisScribe::Hotkey::IHotkeyManager;
 using GyanisScribe::Platform::ForegroundWindow;
 using GyanisScribe::Platform::IHotkeyBackend;
 using GyanisScribe::Platform::IPlatformIntegration;
@@ -436,4 +438,99 @@ TEST_F(HotkeyManagerFixture, LongCaptureHotkeyUsesItsOwnSetting)
     EXPECT_EQ(registrations[7].key, Qt::Key_S) << "改长截图不该带动快速保存那条";
 
     EXPECT_EQ(manager.bindingText(HotkeyAction::CaptureLong), QStringLiteral("Ctrl+Alt+F9")) << "设置里存的那一条要能在界面上读回来";
+}
+
+
+/**
+ * @brief 钉住自定义绑定登记在固定动作之外的编号段，并按登记的标识报回
+ * @details 两边共用的编号空间一旦重叠，「按下 A 的键」就可能报成 B 的功能；分段是这里的唯一防线。
+ */
+TEST_F(HotkeyManagerFixture, CustomBindingsRegisterInTheirOwnRangeAndFireByToken)
+{
+    SettingsStore           settings(m_iniFile);
+    FakePlatformIntegration integration;
+    HotkeyManager           manager(settings, integration);
+
+    const std::vector<CustomHotkeyBinding> bindings{
+            CustomHotkeyBinding{QStringLiteral("ManagePinGroups"), QStringLiteral("Ctrl+Alt+M")},
+            CustomHotkeyBinding{QStringLiteral("BlankCanvas"), QStringLiteral("Ctrl+Alt+B")},
+    };
+    manager.setCustomBindings(bindings);
+
+    const auto report = manager.reload();
+    ASSERT_TRUE(report.has_value());
+    EXPECT_EQ(report->registered, 10) << "八个固定动作加两条自定义都该登记上；失败项：" << report->failures.size() + report->customFailures.size();
+    EXPECT_TRUE(report->customFailures.empty());
+
+    const auto &registrations = integration.m_backendMirror->registrations;
+    ASSERT_EQ(registrations.size(), 10U);
+    EXPECT_EQ(registrations[8].identifier, 1000) << "自定义那一段要从固定动作占不到的编号起排";
+    EXPECT_EQ(registrations[8].key, Qt::Key_M);
+    EXPECT_EQ(registrations[9].identifier, 1001);
+    EXPECT_EQ(registrations[9].key, Qt::Key_B);
+
+    std::vector<QString> fired;
+    QObject::connect(&manager, &IHotkeyManager::customActionTriggered, [&fired](const QString &token) { fired.push_back(token); });
+    integration.m_backendMirror->fire(1001);
+    ASSERT_EQ(fired.size(), 1u);
+    EXPECT_EQ(fired[0], QStringLiteral("BlankCanvas")) << "报回的标识与登记的那一条对不上：编号按下标算，两边顺序必须同解";
+
+    std::vector<HotkeyAction> actions;
+    QObject::connect(&manager, &IHotkeyManager::actionTriggered, [&actions](const HotkeyAction action) { actions.push_back(action); });
+    integration.m_backendMirror->fire(1);
+    ASSERT_EQ(actions.size(), 1u);
+    EXPECT_EQ(actions[0], HotkeyAction::Capture) << "自定义那一段把固定动作的编号也吞了";
+}
+
+/**
+ * @brief 钉住自定义的失败另记一组，并把是哪个功能、哪串组合带回去
+ * @details 与固定动作那组分开放：那一组带的是枚举，界面拿它去查「截图」这类名字；
+ *          混在一处就要给热键层塞一个它不该认识的功能词表。
+ */
+TEST_F(HotkeyManagerFixture, CustomFailuresAreReportedSeparatelyWithTheToken)
+{
+    SettingsStore           settings(m_iniFile);
+    FakePlatformIntegration integration;
+    integration.m_identifiersToReject = {1000}; // 模拟组合键已被系统内别的程序占走
+
+    HotkeyManager manager(settings, integration);
+    manager.setCustomBindings({
+            CustomHotkeyBinding{QStringLiteral("CloseAllPins"), QStringLiteral("Ctrl+Alt+Q")},
+            CustomHotkeyBinding{QStringLiteral("RepinClosed"), QStringLiteral("Alt")},
+    });
+
+    const auto report = manager.reload();
+    ASSERT_TRUE(report.has_value());
+    EXPECT_EQ(report->registered, 8) << "两条自定义都没登记上，只有八个固定动作该计数";
+    EXPECT_TRUE(report->failures.empty()) << "固定动作那一组不该被自定义的失败污染";
+    ASSERT_EQ(report->customFailures.size(), 2u);
+
+    EXPECT_EQ(report->customFailures[0].token, QStringLiteral("CloseAllPins"));
+    EXPECT_EQ(report->customFailures[0].error.code, ErrorCode::Busy) << "被占用那一条的原因该原样带回去";
+    EXPECT_EQ(report->customFailures[0].combination, QStringLiteral("Ctrl+Alt+Q"));
+    EXPECT_EQ(report->customFailures[1].token, QStringLiteral("RepinClosed"));
+    EXPECT_EQ(report->customFailures[1].error.code, ErrorCode::InvalidArgument) << "「Alt」缺主键，属组合本身不合法";
+}
+
+/**
+ * @brief 钉住没登记的编号不代替谁发动作信号
+ */
+TEST_F(HotkeyManagerFixture, UnknownIdentifiersFireNothing)
+{
+    SettingsStore           settings(m_iniFile);
+    FakePlatformIntegration integration;
+    HotkeyManager           manager(settings, integration);
+    manager.setCustomBindings({CustomHotkeyBinding{QStringLiteral("BlankCanvas"), QStringLiteral("Ctrl+Alt+B")}});
+    ASSERT_TRUE(manager.reload().has_value());
+
+    int customFired  = 0;
+    int actionsFired = 0;
+    QObject::connect(&manager, &IHotkeyManager::customActionTriggered, [&customFired](const QString &) { ++customFired; });
+    QObject::connect(&manager, &IHotkeyManager::actionTriggered, [&actionsFired](const HotkeyAction) { ++actionsFired; });
+
+    integration.m_backendMirror->fire(1007); // 这批里只登记了 1000 那一条
+    integration.m_backendMirror->fire(42);
+
+    EXPECT_EQ(customFired, 0) << "没登记的编号不该被当成某条自定义绑定";
+    EXPECT_EQ(actionsFired, 0);
 }

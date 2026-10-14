@@ -1,4 +1,5 @@
 #include "App/CaptureIntent.h"
+#include "App/CustomHotkeys.h"
 #include "App/MainWindow.h"
 #include "App/TrayController.h"
 #include "App/UpdateCheck.h"
@@ -1995,16 +1996,44 @@ namespace GyanisScribe::App
                                      std::tuple{GyanisScribe::Settings::kHotkeyTogglePins, GyanisScribe::Core::uiText("收起 / 摆回贴图"), QStringLiteral("Ctrl+Alt+H")},
                                      std::tuple{GyanisScribe::Settings::kHotkeyNextPinGroup, GyanisScribe::Core::uiText("切换贴图分组"), QStringLiteral("Ctrl+Alt+G")}};
 
-        const auto intro = m_capabilities.globalHotkeys
-                                   ? GyanisScribe::Core::uiText("%1 个全局热键随时可改，改完立即重新登记，不需要重启。").arg(static_cast<int>(rows.size()))
-                                   : GyanisScribe::Core::uiText("这个平台没有登记全局热键的接口，下面 %1 项改了也不会生效。").arg(static_cast<int>(rows.size()));
-        auto      *form  = makePageForm(page, intro);
+        const auto intro =
+                m_capabilities.globalHotkeys
+                        ? GyanisScribe::Core::uiText("上面 %1 个是固定动作，它们各有一条默认组合；下面 %2 个功能可以再各绑一条，留空就是不绑。改完立即重新登记，不需要重启。")
+                                  .arg(static_cast<int>(rows.size()))
+                                  .arg(static_cast<int>(GyanisScribe::App::bindableActions().size()))
+                        : GyanisScribe::Core::uiText("这个平台没有登记全局热键的接口，下面 %1 项改了也不会生效。")
+                                  .arg(static_cast<int>(rows.size() + GyanisScribe::App::bindableActions().size()));
+        auto *form = makePageForm(page, intro);
         for (const auto [key, title, defaultText]: rows)
         {
             auto *edit = new GyanisScribe::Ui::HotkeyEdit{m_settings, page};
             edit->bindTo(key, title, defaultText);
             edit->setEnabled(m_capabilities.globalHotkeys);
             form->addRow(GyanisScribe::Core::uiText("%1 的全局热键").arg(title), edit);
+        }
+
+        // 固定八个之外的功能：一格一签，可绑可不绑，「取消绑定」把那一项从配置里删掉
+        for (const auto &entry: GyanisScribe::App::bindableActions())
+        {
+            const auto label  = GyanisScribe::App::bindableActionLabel(entry.action);
+            auto      *row    = new QWidget{page};
+            auto      *layout = new QHBoxLayout{row};
+            layout->setContentsMargins(0, 0, 0, 0);
+
+            auto *edit = new GyanisScribe::Ui::HotkeyEdit{m_settings, row};
+            edit->bindTo(GyanisScribe::App::customHotkeyKey(entry.token).toStdString(), label, QString{});
+            edit->setEnabled(m_capabilities.globalHotkeys);
+
+            auto *clear = new QPushButton{GyanisScribe::Core::uiText("取消绑定"), row};
+            // 名字带上功能：十行都叫「取消绑定」时，读屏与判据都分不清按下的是哪一行
+            clear->setAccessibleName(GyanisScribe::Core::uiText("取消 %1 的绑定").arg(label));
+            clear->setToolTip(GyanisScribe::Core::uiText("清掉这一项，那个组合键就不再归这个功能管"));
+            clear->setEnabled(m_capabilities.globalHotkeys);
+            QObject::connect(clear, &QPushButton::clicked, clear, [edit] { edit->clearBinding(); });
+
+            layout->addWidget(edit, 1);
+            layout->addWidget(clear);
+            form->addRow(GyanisScribe::Core::uiText("给「%1」绑全局热键").arg(label), row);
         }
         return page;
     }

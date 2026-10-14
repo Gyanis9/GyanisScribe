@@ -548,6 +548,10 @@
             <translation>These global hotkeys could not be registered:</translation>
         </message>
         <message>
+            <source>这些自定义热键没能登记上：</source>
+            <translation>These custom hotkeys were not registered:</translation>
+        </message>
+        <message>
             <source>空白画布没开起来：Qt 没有报出任何可用的屏幕。请在图形会话里重试</source>
             <translation>The blank canvas did not open: Qt reported no usable screen. Retry inside a graphical session.</translation>
         </message>
@@ -1552,8 +1556,8 @@
             <translation>Switch pin group</translation>
         </message>
         <message>
-            <source>%1 个全局热键随时可改，改完立即重新登记，不需要重启。</source>
-            <translation>%1 global hotkeys can be changed any time; each change is re-registered right away, no restart needed.</translation>
+            <source>上面 %1 个是固定动作，它们各有一条默认组合；下面 %2 个功能可以再各绑一条，留空就是不绑。改完立即重新登记，不需要重启。</source>
+            <translation>The %1 rows above are fixed actions, each with its own default combination; the %2 features below can each take another combination, and leaving one empty means it is not bound. Changes are registered again right away, no restart needed.</translation>
         </message>
         <message>
             <source>这个平台没有登记全局热键的接口，下面 %1 项改了也不会生效。</source>
@@ -1562,6 +1566,22 @@
         <message>
             <source>%1 的全局热键</source>
             <translation>Global hotkey for %1</translation>
+        </message>
+        <message>
+            <source>取消绑定</source>
+            <translation>Unbind</translation>
+        </message>
+        <message>
+            <source>取消 %1 的绑定</source>
+            <translation>Unbind %1</translation>
+        </message>
+        <message>
+            <source>清掉这一项，那个组合键就不再归这个功能管</source>
+            <translation>Clears this entry, so that combination no longer belongs to this feature</translation>
+        </message>
+        <message>
+            <source>给「%1」绑全局热键</source>
+            <translation>Global hotkey for "%1"</translation>
         </message>
         <message>
             <source>配色方案即时生效。高对比度档是纯黑正文、纯白底与加粗边框。</source>
