@@ -34,7 +34,8 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 子控件用 `::indicator`、`::handle`。三份 QSS 逐条同构，覆盖同一批选择器
 （`QPushButton`、`QToolButton`、`QLineEdit`/`QComboBox`/`QSpinBox`、`QCheckBox`、`QSlider`、`QMenu`、
 `QToolTip`、`QListWidget`、`QTextEdit`、`QScrollBar`，以及具名容器 `#appRoot`/`#pageCard`/`#hudRoot`/
-`#AnnotationToolbar`/`#toolbarSeparator`/`#annotationTextEditor` 与文字角色 `#pageTitle`/`#pageHint`/`#metricValue`），差异只在色值。
+`#AnnotationToolbar`/`#toolbarSeparator`/`#annotationTextEditor`/`#settingsScroll` 与文字角色 `#pageTitle`/`#pageHint`/`#metricValue`），差异只在色值。
+`#settingsScroll` 是设置页那一层滚动区：它自己与视口都要透明，否则卡片 `#pageCard` 四周会多出一圈与主题不合的底色。
 应用里没用到的控件（`QGroupBox`、`QRadioButton`、`QProgressBar`、`QTabBar`）刻意不写规则——
 没人吃的样式表和没人吃的配置键一样是债。
 其中 `#annotationTextEditor`（标注窗里那个多行行内输入框）单列一档而没并进 `QTextEdit` 那条：
