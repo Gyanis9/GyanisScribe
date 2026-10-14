@@ -231,6 +231,22 @@ namespace GyanisScribe::App
          */
         void importSettingsFromFile(const QString &filePath);
 
+        /**
+         * @brief 把现在用的那份色板写成一份可分享的文件（一行一格 #RRGGBB）
+         * @param filePath 目标路径；界面上来自「导出色板…」的对话框
+         * @details 公开是为了让判据能驱动「选好路径以后发生的事」——文件对话框要人点。
+         *          配置里那份读不出时报原样原因，不拿内置那八格冒充用户存的那份。
+         */
+        void exportPaletteToFile(const QString &filePath);
+
+        /**
+         * @brief 从一份色板文件读回来，整份替换配置里那一格
+         * @param filePath 来源路径，一行一格 #RRGGBB（逗号分隔的手写清单也认）
+         * @details 整份替换而不是追加：追加会把两次导入变成两份重复的色块；
+         *          写坏的那一次保持旧色板，工具栏在下一次打开标注窗时换成新的一份。
+         */
+        void importPaletteFromFile(const QString &filePath);
+
     signals:
         /**
          * @brief 动作条或「更多」菜单里点了一步
@@ -288,6 +304,8 @@ namespace GyanisScribe::App
         QWidget *buildGeneralPage();
         /// 通用页里「导出 / 导入配置」那一行：两个按钮各开一个文件对话框，活交给上面的两个公开方法做
         QWidget *buildTransferRow();
+        /// 标注页里「导出 / 导入色板」那一行：同一对按钮的形状，活交给色板那两个公开方法做
+        QWidget *buildPaletteTransferRow();
         /// 截图页：成品目录与取色复制的写法
         QWidget *buildCapturePage();
         /// 标注页：默认线宽与字号

@@ -1191,3 +1191,146 @@ TEST_F(MainWindowFixture, ExecCommandRowClearsWhenEmptied)
     // 旧命令还留在配置里时，读出来的是「旧命令.exe」而不是这一格给的「没填」
     EXPECT_EQ(makeStore()->stringValue(GyanisScribe::Settings::kCaptureExecCommand, QStringLiteral("没填")), QStringLiteral("没填")) << "清空没落进配置，下一次截图还会跑旧命令";
 }
+
+/**
+ * @brief 钉住「自定义色板」这一格：填对的存成规范写法，填错的当场点名且不顶掉上一份好值
+ * @details 工具栏摆的就是这一格，存歪着切过去会少几格颜色——那比「存不进」更难查。
+ *
+ * 清空那一档单独一条用例钉，因为它存的是「空名单」而不是空串，两回事。
+ */
+TEST_F(MainWindowFixture, PaletteRowStoresCleanTokensAndKeepsBadOnes)
+{
+    makeWindow();
+    m_window->open(MainWindowPage::Annotation);
+
+    auto *edit = qobject_cast<QLineEdit *>(controlInCurrentPage("自定义色板"));
+    ASSERT_NE(edit, nullptr) << "标注页没有这一格";
+    EXPECT_TRUE(edit->text().isEmpty()) << "没存过时要显示空，空就是内置那八格";
+
+    edit->setText(QStringLiteral("  #ff0000 , #0078ff  "));
+    emit edit->editingFinished();
+
+    // 填歪的那一次：要点名是哪一格坏了，并且不把刚存好的那份顶掉
+    edit->setText(QStringLiteral("crimson"));
+    emit edit->editingFinished();
+    EXPECT_NE(edit->toolTip().toStdString().find("crimson"), std::string::npos) << "填歪了要点名是哪一格：" << edit->toolTip().toStdString();
+
+    closeWindowAndFlush();
+    const QStringList written{QStringLiteral("#FF0000"), QStringLiteral("#0078FF")};
+    EXPECT_EQ(makeStore()->stringListValue(GyanisScribe::Settings::kAnnotationPalette, {}), written) << "没写成规范的 #RRGGBB，或坏值把好名单顶掉了";
+}
+
+/**
+ * @brief 钉住清空这一格存的是「空名单」，下一次读要回落到内置那八格
+ */
+TEST_F(MainWindowFixture, EmptyingThePaletteRowStoresAnEmptyList)
+{
+    makeWindow();
+    m_window->open(MainWindowPage::Annotation);
+    auto *edit = qobject_cast<QLineEdit *>(controlInCurrentPage("自定义色板"));
+    ASSERT_NE(edit, nullptr);
+
+    edit->setText(QStringLiteral("#FF0000"));
+    emit edit->editingFinished();
+    edit->clear();
+    emit edit->editingFinished();
+
+    closeWindowAndFlush();
+    // 空名单读出来是「空列表」，与「没存过这一项」（回落成哨兵值）是两回事：这一档要的就是前者
+    EXPECT_TRUE(makeStore()->stringListValue(GyanisScribe::Settings::kAnnotationPalette, QStringList{QStringLiteral("没存过")}).isEmpty())
+            << "清空没落进配置：下一次打开标注窗还是那一格旧色板";
+}
+
+/**
+ * @brief 钉住导出的写的就是当前这一排，导入的是整份替换
+ * @details 「分享色板」要能真的把一份配色发给同事：写出去的是「一行一格」，读回来整份换掉，
+ *
+ * 手写的逗号与空行也认（那份文件是给人改的）。
+ */
+TEST_F(MainWindowFixture, PaletteFileRoundTripsThroughTheTwoMethods)
+{
+    makeWindow();
+    // 色板那一格与那两个按钮都在标注页：不先切页就找不到控件
+    m_window->open(MainWindowPage::Annotation);
+    std::optional<GyanisScribe::Ui::ToastKind> kind;
+    QStringList                                messages;
+    QObject                                    receiver;
+    QObject::connect(m_window.get(), &MainWindow::messageForUser, &receiver,
+                     [&messages, &kind](const QString &message, const GyanisScribe::Ui::ToastKind sent)
+                     {
+                         messages << message;
+                         kind = sent;
+                     });
+
+    // 先在窗上把这一排定成三格，导出的就该是这三格
+    auto *edit = qobject_cast<QLineEdit *>(controlInCurrentPage("自定义色板"));
+    ASSERT_NE(edit, nullptr);
+    edit->setText(QStringLiteral("#FF0000, #00FF00, #0000FF"));
+    emit edit->editingFinished();
+
+    const auto exportedPath = QString::fromStdWString((m_directory / "palette.txt").wstring());
+    m_window->exportPaletteToFile(exportedPath);
+    ASSERT_TRUE(QFileInfo::exists(exportedPath)) << "导出色板没落盘";
+    QFile written{exportedPath};
+    ASSERT_TRUE(written.open(QIODevice::ReadOnly));
+    const auto text = QString::fromUtf8(written.readAll());
+    EXPECT_TRUE(text.contains(QStringLiteral("#FF0000")) && text.contains(QStringLiteral("#00FF00")) && text.contains(QStringLiteral("#0000FF")))
+            << "写出去的那份少了格子：" << text.toStdString();
+
+    // 换一份三格不同的进来：整份替换，不是往后面追加
+    const auto incomingPath = QString::fromStdWString((m_directory / "incoming.txt").wstring());
+    QFile      incoming{incomingPath};
+    ASSERT_TRUE(incoming.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    incoming.write("#010203, #040506\n\n#070809\n");
+    incoming.close();
+
+    m_window->importPaletteFromFile(incomingPath);
+    ASSERT_TRUE(kind.has_value());
+    EXPECT_EQ(*kind, GyanisScribe::Ui::ToastKind::Success) << messages.join(QStringLiteral(" / ")).toStdString();
+
+    closeWindowAndFlush();
+    const QStringList replaced{QStringLiteral("#010203"), QStringLiteral("#040506"), QStringLiteral("#070809")};
+    EXPECT_EQ(makeStore()->stringListValue(GyanisScribe::Settings::kAnnotationPalette, {}), replaced) << "导入没整份替换，或手写的逗号与空行没被认下来";
+}
+
+/**
+ * @brief 钉住导入失败那一路保住旧色板，并把原因说一句
+ * @details 拿一份不存在的文件或坏写法去覆盖，后果是「我的色板没了」：那种事要当场拒绝并说清坏在哪一格。
+
+ */
+TEST_F(MainWindowFixture, FailedPaletteImportKeepsTheOldRow)
+{
+    makeWindow();
+    m_window->open(MainWindowPage::Annotation);
+    std::optional<GyanisScribe::Ui::ToastKind> kinds;
+    QStringList                                messages;
+    QObject                                    receiver;
+    QObject::connect(m_window.get(), &MainWindow::messageForUser, &receiver,
+                     [&messages, &kinds](const QString &message, const GyanisScribe::Ui::ToastKind sent)
+                     {
+                         messages << message;
+                         kinds = sent;
+                     });
+
+    const auto stored = QStringList{QStringLiteral("#FF0000"), QStringLiteral("#00FF00")};
+    auto      *edit   = qobject_cast<QLineEdit *>(controlInCurrentPage("自定义色板"));
+    ASSERT_NE(edit, nullptr);
+    edit->setText(stored.join(QStringLiteral(", ")));
+    emit edit->editingFinished();
+
+    m_window->importPaletteFromFile(QString::fromStdWString((m_directory / "missing.txt").wstring()));
+    EXPECT_FALSE(messages.isEmpty()) << "读不到文件也要说一句，不然就成了「点了没反应」";
+    ASSERT_TRUE(kinds.has_value());
+    EXPECT_EQ(*kinds, GyanisScribe::Ui::ToastKind::Danger);
+
+    const auto brokenPath = QString::fromStdWString((m_directory / "broken.txt").wstring());
+    QFile      broken{brokenPath};
+    ASSERT_TRUE(broken.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    broken.write("crimson\n");
+    broken.close();
+    m_window->importPaletteFromFile(brokenPath);
+
+    closeWindowAndFlush();
+    EXPECT_EQ(makeStore()->stringListValue(GyanisScribe::Settings::kAnnotationPalette, {}), stored) << "坏文件把旧色板顶掉了";
+    EXPECT_GE(messages.size(), 2) << "两次失败都该各有一句原因";
+}

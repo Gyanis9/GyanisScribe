@@ -1,5 +1,6 @@
 #include "Annotation/AnnotationToolbar.h"
 
+#include "Annotation/AnnotationPalette.h"
 #include "Annotation/AnnotationTool.h"
 #include "Pick/RecentColors.h"
 #include "Core/Logger.h"
@@ -34,7 +35,6 @@ namespace
 {
     using GyanisScribe::Annotation::ToolKind;
     using GyanisScribe::Ui::IconSize;
-    using GyanisScribe::Ui::kAnnotationPalette;
     using GyanisScribe::Ui::kAnnotationWidths;
     using GyanisScribe::Ui::kDefaultAnnotationFontSizeIndex;
     using GyanisScribe::Ui::kDefaultAnnotationWidthStep;
@@ -132,17 +132,27 @@ namespace GyanisScribe::Annotation
         }
         layout->addWidget(makeSeparator());
 
-        // 颜色组：八个预设色块、最近使用的色块与一枚取色按钮，同样互斥，自定义色选中时也只亮一个
+        // 颜色组：色板那几格、最近使用的色块与一枚取色按钮，同样互斥，自定义色选中时也只亮一个
         auto *colorGroup = new QButtonGroup{this};
         m_colorGroup     = colorGroup;
         colorGroup->setExclusive(true);
-        for (std::size_t index = 0; index < kAnnotationPalette.size(); ++index)
+        // 色板读配置里那一份：没填就是内置那八格。读坏了记一条警告再回落（与「最近使用」那一路同一口径），
+        // 不静默把坏值当成「一格都没存」——用户手改配置文件时那句警告是唯一能看见的线索
+        if (const auto resolved = annotationPalette(m_settings); resolved)
         {
-            const auto color  = kAnnotationPalette[index];
-            auto      *button = makeButton("Close", GyanisScribe::Core::uiText("颜色 %1").arg(index + 1), true);
+            m_palette = *resolved;
+        } else
+        {
+            Core::Logger::warning(std::format("自定义色板读不出：{}，本次按内置那八格摆", resolved.error().message));
+            m_palette = defaultAnnotationPalette();
+        }
+        for (std::size_t index = 0; index < m_palette.size(); ++index)
+        {
+            const auto color  = m_palette[index];
+            auto      *button = makeButton("Close", GyanisScribe::Core::uiText("颜色 %1").arg(static_cast<int>(index) + 1), true);
             // 图标换成色块：makeButton 那份图标只保证按钮尺寸合适，色块才是这一格要表达的东西
             button->setIcon(QIcon{colorSwatchPixmap(color, m_icons.tintColor())});
-            m_colorButtons[index] = button;
+            m_paletteButtons.push_back(button);
             colorGroup->addButton(button, static_cast<int>(index));
             QObject::connect(button, &QToolButton::clicked, this, [this, color] { applyColorToActiveTool(color); });
             layout->addWidget(button);
@@ -165,7 +175,7 @@ namespace GyanisScribe::Annotation
         rebuildRecentColors();
 
         m_customColorButton = makeButton("ColorPicker", GyanisScribe::Core::uiText("自定义颜色"), true);
-        // 固定编号：最近使用的色块从 kAnnotationPalette.size() 起排，用相邻编号会撞车
+        // 固定编号：最近使用的色块从色板那一排的格数起排，用相邻编号会撞车
         colorGroup->addButton(m_customColorButton, kCustomColorButtonId);
         QObject::connect(m_customColorButton, &QToolButton::clicked, this, &AnnotationToolbar::chooseCustomColor);
         layout->addWidget(m_customColorButton);
@@ -329,7 +339,7 @@ namespace GyanisScribe::Annotation
         colorGroup->button(0)->setChecked(true);
         applyStoredDefaults();
         m_stateIsInitial = false;
-        m_currentColor   = kAnnotationPalette[0];
+        m_currentColor   = m_palette.front();
         updateOpacityHint();
     }
 
@@ -751,8 +761,8 @@ namespace GyanisScribe::Annotation
 
     int AnnotationToolbar::colorButtonCount() const
     {
-        // 预设八格 + 最近使用若干 + 自定义一枚；最近使用是空的时候这一格与改动前逐字相同
-        return static_cast<int>(Ui::kAnnotationPalette.size() + m_recentButtons.size()) + 1;
+        // 色板若干格 + 最近使用若干 + 自定义一枚；没自定义时这一格与改动前逐字相同（内置就是八格）
+        return static_cast<int>(m_palette.size() + m_recentButtons.size()) + 1;
     }
 
     QColor AnnotationToolbar::currentColor() const
@@ -843,7 +853,7 @@ namespace GyanisScribe::Annotation
     {
         // 色块那一排是连续的：从第一枚预设色块到自定义按钮的合矩形内才算「在色板上滚」
         QRect row;
-        for (const auto *button: m_colorButtons)
+        for (const auto *button: m_paletteButtons)
         {
             if (button != nullptr)
             {
@@ -895,11 +905,11 @@ namespace GyanisScribe::Annotation
 
     void AnnotationToolbar::syncColorButtonChecked()
     {
-        for (std::size_t index = 0; index < m_colorButtons.size(); ++index)
+        for (std::size_t index = 0; index < m_paletteButtons.size() && index < m_palette.size(); ++index)
         {
-            if (m_colorButtons[index] != nullptr && Ui::kAnnotationPalette[index] == m_currentColor)
+            if (m_paletteButtons[index] != nullptr && m_palette[index] == m_currentColor)
             {
-                m_colorButtons[index]->setChecked(true);
+                m_paletteButtons[index]->setChecked(true);
                 return;
             }
         }
@@ -935,7 +945,7 @@ namespace GyanisScribe::Annotation
             auto      *button = makeButton("Close", GyanisScribe::Core::uiText("最近使用 %1").arg(static_cast<int>(index) + 1), true);
             // 图标换成色块：与预设那八格同一个画法，两排放在一起才看不出是两套控件
             button->setIcon(QIcon{colorSwatchPixmap(color, m_icons.tintColor())});
-            m_colorGroup->addButton(button, static_cast<int>(Ui::kAnnotationPalette.size() + index));
+            m_colorGroup->addButton(button, static_cast<int>(m_palette.size() + index));
             QObject::connect(button, &QToolButton::clicked, this, [this, color] { applyColorToActiveTool(color); });
             m_layout->insertWidget(m_recentInsertIndex + static_cast<int>(index), button);
             m_recentButtons.push_back(button);

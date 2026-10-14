@@ -44,6 +44,8 @@ add_library(Annotation STATIC
         AnnotationToolbar.cpp
         AnnotationToolbarBridge.h
         AnnotationToolbarBridge.cpp
+        AnnotationPalette.h
+        AnnotationPalette.cpp
         AnnotationView.h
         AnnotationView.cpp
         AnnotationWindow.h

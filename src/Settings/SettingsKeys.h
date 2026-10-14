@@ -161,6 +161,13 @@ namespace GyanisScribe::Settings
     /// 标注色板的最近使用颜色（#RRGGBB 列表，最新的在前），读写都在 Annotation::AnnotationToolbar
     inline constexpr std::string_view kAnnotationRecentColors = "Annotation/RecentColors";
 
+    /**
+     * @brief 自定义色板（#RRGGBB 列表，顺序就是色板上从左到右）；留空即内置那八格
+     * @details 读端在 Annotation::annotationPalette（工具栏那一排与设置页共用一份换算），
+     *          写端是设置页那一格与工具栏上的拖动重排、加色与去色。上限与坏写法都拒，见 Annotation/AnnotationPalette.h。
+     */
+    inline constexpr std::string_view kAnnotationPalette = "Annotation/Palette";
+
     /// 标注的默认线宽，取值必须是 Ui::kAnnotationWidths 里的一档；工具栏起点与持久化都读它
     inline constexpr std::string_view kAnnotationDefaultWidth = "Annotation/DefaultWidth";
 

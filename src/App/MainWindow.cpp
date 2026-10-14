@@ -2,6 +2,7 @@
 #include "App/MainWindow.h"
 #include "App/TrayController.h"
 #include "App/UpdateCheck.h"
+#include "Annotation/AnnotationPalette.h"
 #include "Capture/ScreenUtils.h"
 #include "Core/ImageFormat.h"
 #include "Core/Logger.h"
@@ -33,6 +34,7 @@
 #include <QDesktopServices>
 #include <QDir>
 #include <QFileDialog>
+#include <QFile>
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -52,7 +54,6 @@
 #include <filesystem>
 #include <format>
 #include <string>
-
 namespace
 {
     using GyanisScribe::Core::Expected;
@@ -1298,6 +1299,66 @@ namespace GyanisScribe::App
                             GyanisScribe::Ui::ToastKind::Success);
     }
 
+    void MainWindow::exportPaletteToFile(const QString &filePath)
+    {
+        const auto palette = GyanisScribe::Annotation::annotationPalette(m_settings);
+        if (!palette)
+        {
+            // 手改过的配置里那份坏名单：报原样原因，而不是拿内置那八格冒充「你存的色板」导出去
+            Logger::warning(std::format("色板导出失败：{}", palette.error().message));
+            emit messageForUser(QString::fromUtf8(palette.error().message.c_str()), GyanisScribe::Ui::ToastKind::Danger);
+            return;
+        }
+
+        QFile file{filePath};
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        {
+            const auto reason = GyanisScribe::Core::uiText("色板没写进去：这个路径开不了。换一个能写的目录再试一次");
+            Logger::warning(std::format("色板写不下去：{}（{}）", reason.toStdString(), filePath.toStdString()));
+            emit messageForUser(reason, GyanisScribe::Ui::ToastKind::Danger);
+            return;
+        }
+        const auto text = GyanisScribe::Annotation::paletteFileText(*palette);
+        file.write(text.toUtf8());
+        file.close();
+
+        Logger::info(std::format("色板已导出：{} 格写到 {}", palette->size(), filePath.toStdString()));
+        emit messageForUser(GyanisScribe::Core::uiText("色板已导出：%1 格").arg(static_cast<int>(palette->size())), GyanisScribe::Ui::ToastKind::Success);
+    }
+
+    void MainWindow::importPaletteFromFile(const QString &filePath)
+    {
+        QFile file{filePath};
+        if (!file.open(QIODevice::ReadOnly))
+        {
+            const auto reason = GyanisScribe::Core::uiText("读不到这份色板文件：「%1」不存在或打不开。请确认路径，或重新导出一份").arg(filePath);
+            Logger::warning(std::format("色板读不到：{}", filePath.toStdString()));
+            emit messageForUser(reason, GyanisScribe::Ui::ToastKind::Danger);
+            return;
+        }
+        const auto bytes  = file.readAll();
+        const auto parsed = GyanisScribe::Annotation::parsePaletteFileText(QString::fromUtf8(bytes.constData(), static_cast<qsizetype>(bytes.size())));
+        if (!parsed)
+        {
+            Logger::warning(std::format("色板导入被拒：{}", parsed.error().message));
+            emit messageForUser(QString::fromUtf8(parsed.error().message.c_str()), GyanisScribe::Ui::ToastKind::Danger);
+            return;
+        }
+
+        // 整份替换：追加会把两次导入变成两份重复色块；写坏的那一次保持旧名单，界面上不会出现「半份新色板」
+        const auto written = m_settings.setValue(GyanisScribe::Settings::kAnnotationPalette, GyanisScribe::Annotation::paletteToTokens(*parsed));
+        if (!written)
+        {
+            Logger::warning(std::format("色板没能写入：{}", written.error().message));
+            emit messageForUser(QString::fromUtf8(written.error().message.c_str()), GyanisScribe::Ui::ToastKind::Danger);
+            return;
+        }
+        m_settings.sync();
+        Logger::info(std::format("色板已导入：{} 格来自 {}", parsed->size(), filePath.toStdString()));
+        emit messageForUser(GyanisScribe::Core::uiText("色板已导入：%1 格。工具栏那一排在下一次打开标注窗时换成这一份。").arg(static_cast<int>(parsed->size())),
+                            GyanisScribe::Ui::ToastKind::Success);
+    }
+
     QWidget *MainWindow::buildTransferRow()
     {
         auto *row    = new QWidget{this};
@@ -1742,16 +1803,124 @@ namespace GyanisScribe::App
         return page;
     }
 
+    /**
+     * @brief 自定义色板那一格：逗号分隔的 #RRGGBB 清单
+     * @param settings 配置存储
+     * @return 归调用方所有的输入框
+     * @details 留空就是「不自定义了」：存一份空名单，读端回落到内置那八格——清空与填成坏值不是一回事，
+     *          后者要当场点名并保住上一份好值（工具栏摆的是用户存的那排颜色，存歪着切过去会少格）。
+     */
+    QLineEdit *makePaletteEdit(ISettingsStore &settings)
+    {
+        auto *edit = new QLineEdit;
+        edit->setText(settings.stringListValue(GyanisScribe::Settings::kAnnotationPalette, {}).join(QStringLiteral(", ")));
+        edit->setPlaceholderText(GyanisScribe::Core::uiText("留空即内置那八格；形如 #FF0000, #00FF00"));
+        edit->setClearButtonEnabled(true);
+        edit->setAccessibleName(GyanisScribe::Core::uiText("自定义色板"));
+
+        const auto explainHint = [edit](const QString &reason)
+        { edit->setToolTip(reason.isEmpty() ? GyanisScribe::Core::uiText("色板上摆的那几格，这里的顺序就是从左到右") : reason); };
+        explainHint(QString{});
+
+        QObject::connect(edit, &QLineEdit::editingFinished, edit,
+                         [&settings, edit, explainHint]
+                         {
+                             const auto text = edit->text().trimmed();
+                             if (text.isEmpty())
+                             {
+                                 if (const auto written = settings.setValue(GyanisScribe::Settings::kAnnotationPalette, QStringList{}); !written)
+                                 {
+                                     explainHint(QString::fromUtf8(written.error().message.c_str()));
+                                     return;
+                                 }
+                                 explainHint(QString{});
+                                 return;
+                             }
+
+                             QStringList tokens;
+                             for (const auto &piece: text.split(QLatin1Char(',')))
+                             {
+                                 const auto one = piece.trimmed();
+                                 if (!one.isEmpty())
+                                 {
+                                     tokens << one;
+                                 }
+                             }
+                             const auto parsed = GyanisScribe::Annotation::paletteFromTokens(tokens);
+                             if (!parsed)
+                             {
+                                 explainHint(QString::fromUtf8(parsed.error().message.c_str()));
+                                 return;
+                             }
+                             if (const auto written = settings.setValue(GyanisScribe::Settings::kAnnotationPalette, GyanisScribe::Annotation::paletteToTokens(*parsed)); !written)
+                             {
+                                 explainHint(QString::fromUtf8(written.error().message.c_str()));
+                                 return;
+                             }
+                             explainHint(QString{});
+                         });
+        return edit;
+    }
+
+    QWidget *MainWindow::buildPaletteTransferRow()
+    {
+        auto *row    = new QWidget{this};
+        auto *layout = new QHBoxLayout{row};
+        layout->setContentsMargins(0, 0, 0, 0);
+
+        auto *exportButton = new QPushButton{GyanisScribe::Core::uiText("导出色板…"), row};
+        m_icons.applyIcon(*exportButton, "Export");
+        exportButton->setAccessibleName(GyanisScribe::Core::uiText("导出色板"));
+        exportButton->setToolTip(GyanisScribe::Core::uiText("把现在用的那排颜色写成一个文本文件（一行一格 #RRGGBB），发给同事或换机器时用"));
+
+        auto *importButton = new QPushButton{GyanisScribe::Core::uiText("导入色板…"), row};
+        m_icons.applyIcon(*importButton, "Import");
+        importButton->setAccessibleName(GyanisScribe::Core::uiText("导入色板"));
+        importButton->setToolTip(GyanisScribe::Core::uiText("从一份色板文件整份替换当前这一排；下一次打开标注窗就是这一份"));
+
+        // 对话框取消时 picked 是空串：那不是失败，一句话都不多说
+        QObject::connect(exportButton, &QPushButton::clicked, row,
+                         [this]
+                         {
+                             const auto suggested = GyanisScribe::Core::Paths::toDisplayText(Core::Paths::applicationDataDirectory() / "GyanisScribe-palette.txt");
+                             const auto picked =
+                                     QFileDialog::getSaveFileName(this, GyanisScribe::Core::uiText("导出色板"), suggested, GyanisScribe::Core::uiText("色板文件 (*.txt)"));
+                             if (picked.isEmpty())
+                             {
+                                 return;
+                             }
+                             exportPaletteToFile(picked);
+                         });
+        QObject::connect(importButton, &QPushButton::clicked, row,
+                         [this]
+                         {
+                             const auto picked =
+                                     QFileDialog::getOpenFileName(this, GyanisScribe::Core::uiText("导入色板"), QDir::homePath(), GyanisScribe::Core::uiText("色板文件 (*.txt)"));
+                             if (picked.isEmpty())
+                             {
+                                 return;
+                             }
+                             importPaletteFromFile(picked);
+                         });
+
+        layout->addWidget(exportButton);
+        layout->addWidget(importButton);
+        return row;
+    }
+
     QWidget *MainWindow::buildAnnotationPage()
     {
         auto *page = new QWidget{this};
-        auto *form = makePageForm(page, GyanisScribe::Core::uiText("新打开的标注窗按这两档起步。画过之后的改动会被工具栏记下来，下次仍以最近用的那一档开始。"));
+        auto *form = makePageForm(page, GyanisScribe::Core::uiText("新打开的标注窗按这两档起步，画过之后的改动会被工具栏记下来，下次仍以最近用的那一档开始。"
+                                                                   "色板那一排也可以换成自己的一套：留空就是内置那八格，下面两个按钮负责把一份配色发给同事或收回来。"));
         form->addRow(GyanisScribe::Core::uiText("默认线宽"),
                      makeStepCombo(m_settings, GyanisScribe::Settings::kAnnotationDefaultWidth, GyanisScribe::Ui::kAnnotationWidths,
                                    GyanisScribe::Ui::kAnnotationWidths[GyanisScribe::Ui::kDefaultAnnotationWidthStep], GyanisScribe::Core::uiText("默认线宽")));
         form->addRow(GyanisScribe::Core::uiText("默认字号"),
                      makeStepCombo(m_settings, GyanisScribe::Settings::kAnnotationDefaultFontSize, GyanisScribe::Ui::kFontSizes,
                                    GyanisScribe::Ui::kFontSizes[GyanisScribe::Ui::kDefaultAnnotationFontSizeIndex], GyanisScribe::Core::uiText("默认字号")));
+        form->addRow(GyanisScribe::Core::uiText("自定义色板"), makePaletteEdit(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("分享色板"), buildPaletteTransferRow());
         return page;
     }
 

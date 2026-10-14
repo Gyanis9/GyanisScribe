@@ -1266,3 +1266,46 @@ TEST_F(ToolbarFixture, WheelOpacityIsRememberedPerShape)
     arrowButton->click();
     EXPECT_EQ(toolbar->currentColorOpacityPercent(), 85) << "再切回箭头，箭头那一档不许被矩形盖掉";
 }
+
+/**
+ * @brief 钉住色板那一排读的是配置里那一份，而不是写死的八格
+ * @details 自定义色板换的是整排：格数、顺序与颜色都跟着配置走；「最近使用」与自定义那两枚仍排在其后，
+ *
+ * 那是两件事的账，不该被自定义色板挤掉。
+ */
+TEST_F(ToolbarFixture, PaletteFromSettingsDrivesTheSwatchRow)
+{
+    const QStringList tokens{QStringLiteral("#112233"), QStringLiteral("#445566"), QStringLiteral("#778899")};
+    ASSERT_TRUE(m_settings->setValue(GyanisScribe::Settings::kAnnotationPalette, tokens).has_value());
+    m_settings->sync();
+    m_settings = std::make_unique<SettingsStore>(m_iniPath);
+
+    SignalLog log;
+    auto      toolbar = makeToolbarLogged(log);
+
+    ASSERT_EQ(toolbar->colorButtonCount(), static_cast<int>(tokens.size()) + 1) << "三格色板加自定义一枚；预设那八格不该还摆着";
+
+    auto *second = buttonByLabel(*toolbar, "颜色 2");
+    ASSERT_NE(second, nullptr) << "色板那一排没按存进来的顺序摆出来";
+    second->click();
+    ASSERT_EQ(log.colors.size(), 1U);
+    EXPECT_EQ(log.colors[0], QColor(0x44, 0x55, 0x66)) << "按下第二格，发出来的却是别的颜色";
+}
+
+/**
+ * @brief 钉住色板名单被改坏时回落到内置那八格，而不是摆出一排空的
+ * @details 配置是能手改的：那一格写坏了不该让工具栏少一整排颜色，一句警告进日志、桌面照常用。
+
+ */
+TEST_F(ToolbarFixture, BrokenPaletteFallsBackToTheBuiltinRow)
+{
+    ASSERT_TRUE(m_settings->setValue(GyanisScribe::Settings::kAnnotationPalette, QStringList{QStringLiteral("crimson")}).has_value());
+    m_settings->sync();
+    m_settings = std::make_unique<SettingsStore>(m_iniPath);
+
+    SignalLog log;
+    auto      toolbar = makeToolbarLogged(log);
+
+    EXPECT_EQ(toolbar->colorButtonCount(), static_cast<int>(kAnnotationPalette.size()) + 1) << "坏名单把整排色板带走了";
+    EXPECT_EQ(toolbar->currentColor(), kAnnotationPalette[0]) << "回落的那一排第一格该是内置的第一格";
+}

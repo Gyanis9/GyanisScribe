@@ -124,6 +124,14 @@
             <translation>None of the tools in the clipboard are registered, so there is nowhere to paste</translation>
         </message>
         <message>
+            <source>色板是空的：至少要留一格。想回到内置那八格，请把设置里那一格清掉而不是填成空白</source>
+            <translation>The palette is empty: keep at least one swatch. To go back to the built-in eight, clear that field rather than leaving it blank</translation>
+        </message>
+        <message>
+            <source>色板有 {} 格，超出上限 {} 格：请删掉几格再存</source>
+            <translation>The palette has {} swatches, above the limit of {}: remove a few before saving</translation>
+        </message>
+        <message>
             <source>颜色 %1</source>
             <translation>Color %1</translation>
         </message>
@@ -1160,6 +1168,22 @@
             <translation>Imported %1 settings. This page still shows the values from before the import: close the settings window and open it again. The interface language takes effect only after restarting GyanisScribe.</translation>
         </message>
         <message>
+            <source>色板没写进去：这个路径开不了。换一个能写的目录再试一次</source>
+            <translation>The palette was not written: this path could not be opened. Pick a directory you can write to and try again</translation>
+        </message>
+        <message>
+            <source>色板已导出：%1 格</source>
+            <translation>Palette exported: %1 swatches</translation>
+        </message>
+        <message>
+            <source>读不到这份色板文件：「%1」不存在或打不开。请确认路径，或重新导出一份</source>
+            <translation>This palette file could not be read: "%1" does not exist or cannot be opened. Check the path, or export a new one</translation>
+        </message>
+        <message>
+            <source>色板已导入：%1 格。工具栏那一排在下一次打开标注窗时换成这一份。</source>
+            <translation>Palette imported: %1 swatches. The toolbar row switches to them the next time an annotation window opens.</translation>
+        </message>
+        <message>
             <source>导出配置…</source>
             <translation>Export settings…</translation>
         </message>
@@ -1384,8 +1408,48 @@
             <translation>Format used when copying</translation>
         </message>
         <message>
-            <source>新打开的标注窗按这两档起步。画过之后的改动会被工具栏记下来，下次仍以最近用的那一档开始。</source>
-            <translation>A newly opened annotation window starts from these two steps. Once you have drawn, the toolbar remembers the step you actually used and starts from that next time.</translation>
+            <source>留空即内置那八格；形如 #FF0000, #00FF00</source>
+            <translation>Leave empty for the built-in eight; written as #FF0000, #00FF00</translation>
+        </message>
+        <message>
+            <source>自定义色板</source>
+            <translation>Custom palette</translation>
+        </message>
+        <message>
+            <source>色板上摆的那几格，这里的顺序就是从左到右</source>
+            <translation>The swatches shown on the palette; the order here is left to right</translation>
+        </message>
+        <message>
+            <source>导出色板…</source>
+            <translation>Export palette…</translation>
+        </message>
+        <message>
+            <source>导出色板</source>
+            <translation>Export palette</translation>
+        </message>
+        <message>
+            <source>把现在用的那排颜色写成一个文本文件（一行一格 #RRGGBB），发给同事或换机器时用</source>
+            <translation>Writes the swatches in use to a text file (one #RRGGBB per line) to hand to a colleague or move to another machine</translation>
+        </message>
+        <message>
+            <source>导入色板…</source>
+            <translation>Import palette…</translation>
+        </message>
+        <message>
+            <source>导入色板</source>
+            <translation>Import palette</translation>
+        </message>
+        <message>
+            <source>从一份色板文件整份替换当前这一排；下一次打开标注窗就是这一份</source>
+            <translation>Replaces the whole row from a palette file; the next annotation window uses that one</translation>
+        </message>
+        <message>
+            <source>色板文件 (*.txt)</source>
+            <translation>Palette files (*.txt)</translation>
+        </message>
+        <message>
+            <source>新打开的标注窗按这两档起步，画过之后的改动会被工具栏记下来，下次仍以最近用的那一档开始。色板那一排也可以换成自己的一套：留空就是内置那八格，下面两个按钮负责把一份配色发给同事或收回来。</source>
+            <translation>A new annotation window starts from these two settings; changes made while drawing are remembered, so the next window opens with the last one used. The palette row can be replaced with your own set: leave it empty for the built-in eight, and use the two buttons below to hand a palette to a colleague or take one in.</translation>
         </message>
         <message>
             <source>默认线宽</source>
@@ -1394,6 +1458,10 @@
         <message>
             <source>默认字号</source>
             <translation>Default font size</translation>
+        </message>
+        <message>
+            <source>分享色板</source>
+            <translation>Share palette</translation>
         </message>
         <message>
             <source>新贴到屏幕上的图按这个不透明度开始。滚轮调透明度只影响那一张贴图，不改这里。</source>
