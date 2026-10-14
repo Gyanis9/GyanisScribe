@@ -232,4 +232,9 @@ namespace GyanisScribe::Settings
     /// 编码器下拉里「自动」那一项的取值：与「没填」区分开，用户能显式选回自动
     inline constexpr std::string_view kRecordVideoEncoderAutoToken = "Auto";
 
+    /// 托盘图标上那两下鼠标各做什么，存的是动作标记（词表与默认档在 App/TrayClick.h）；
+    /// 读端在 TrayController::trayClicked，写端在设置的通用页
+    inline constexpr std::string_view kTrayLeftClick   = "Tray/LeftClick";
+    inline constexpr std::string_view kTrayMiddleClick = "Tray/MiddleClick";
+
 } // namespace GyanisScribe::Settings

@@ -49,11 +49,11 @@ PATH_DOT_STRING = re.compile(r"(?:\.|->)string\(\)")
 
 #按枚举分派的开关：(枚举名, 声明所在文件, 分派所在文件)
 DISPATCH_TABLES = (
-    ("TrayAction", "src/App/TrayController.h", "src/App/AppController.cpp"),
+    ("TrayAction", "src/App/TrayAction.h", "src/App/AppController.cpp"),
     ("MainWindowPage", "src/App/MainWindow.h", "src/App/MainWindow.cpp"),
+    ("TrayClickRole", "src/App/TrayClick.h", "src/App/TrayClick.cpp"),
+    ("TrayClickOutcome", "src/App/TrayClick.h", "src/App/TrayController.cpp"),
 )
-
-ENUM_BODY = re.compile(r"enum class (\w+)\s*\{([^}]*)\}", re.S)
 
 
 def is_path_narrow(text: str) -> bool:
@@ -74,11 +74,13 @@ def is_message_narrow(text: str) -> bool:
 
 def enumerate_names(text: str, enum_name: str) -> list[str]:
     """从声明文本里取某个 enum class 的成员名：注释掉的一行不算，带行尾注释的一行该算。"""
-    match = ENUM_BODY.search(text.replace(CARRIAGE_RETURN + NEWLINE, NEWLINE))
-    if not match or match.group(1) != enum_name:
+    # 按名字找那一个声明体，而不是取文件里的第一个再比名字：一个头里放两个枚举是常态
+    # （鼠标动作那一族就是档位与结果两个枚举同住一个头），取第一个会把第二个判成「真源形状变了」
+    match = re.search(r"enum class " + enum_name + r"\s*\{([^}]*)\}", text.replace(CARRIAGE_RETURN + NEWLINE, NEWLINE), re.S)
+    if not match:
         raise RuntimeError(f"找不到 enum class {enum_name} 的声明体：真源形状变了，这条门禁要跟着改，不能静默放行")
     names: list[str] = []
-    for line in match.group(2).splitlines():
+    for line in match.group(1).splitlines():
         stripped = line.split("///")[0].split("//")[0].strip()
         identifier = re.fullmatch(r"([A-Z][A-Za-z0-9_]*)\s*,?", stripped)
         if identifier:

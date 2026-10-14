@@ -229,7 +229,7 @@ namespace
 
         // 「这一类有什么」的用词取自界面里的无障碍名，不是从配置键推的：读的人要能对着窗口核对
         const std::vector<Expectation> expectations = {
-                Expectation{MainWindowPage::General, {"界面语言", "历史最多留多少条", "历史最久留多少天", "导出配置", "导入配置"}, true},
+                Expectation{MainWindowPage::General, {"界面语言", "历史最多留多少条", "历史最久留多少天", "左键单击", "中键单击", "导出配置", "导入配置"}, true},
                 Expectation{MainWindowPage::Capture, {"截完之后", "延时截图", "截图目录", "颜色写法", "自动保存所有截图", "截图音效", "成品加边框", "成品加投影"}, true},
                 Expectation{MainWindowPage::Annotation, {"默认线宽", "默认字号"}, true},
                 Expectation{MainWindowPage::Pin, {"默认不透明度"}, true},
@@ -1029,6 +1029,106 @@ namespace
                 EXPECT_FALSE(combo->itemData(index, Qt::DecorationRole).isNull()) << name.toStdString() << " 的第 " << index << " 项没有图标";
             }
         }
+    }
+
+    /**
+     * @brief 钉住托盘那两下按各自那一格发出对应动作
+     * @details 两档共用一条通路时最容易出现的坏法是「中键跟着左键跑」（读端只认一个键），
+     *          所以两档各配一个不同的动作再各按一下：两条信号、两个动作，少一条或串了位都红。
+     */
+    TEST_F(MainWindowFixture, TrayClickEmitsTheActionEachRoleIsSetTo)
+    {
+        ASSERT_TRUE(m_store->setValue(GyanisScribe::Settings::kTrayLeftClick, QStringLiteral("Recognize")).has_value());
+        ASSERT_TRUE(m_store->setValue(GyanisScribe::Settings::kTrayMiddleClick, QStringLiteral("PickColor")).has_value());
+
+        GyanisScribe::App::TrayController          tray{*m_icons, *m_theme, *m_store, *m_integration};
+        std::vector<GyanisScribe::App::TrayAction> seen;
+        QObject::connect(&tray, &GyanisScribe::App::TrayController::actionRequested, [&seen](const GyanisScribe::App::TrayAction action) { seen.push_back(action); });
+
+        tray.trayClicked(GyanisScribe::App::TrayClickRole::Left);
+        tray.trayClicked(GyanisScribe::App::TrayClickRole::Middle);
+
+        ASSERT_EQ(seen.size(), 2U) << "两下各发一条：只发一条说明其中一档是假的";
+        EXPECT_EQ(seen[0], GyanisScribe::App::TrayAction::Recognize);
+        EXPECT_EQ(seen[1], GyanisScribe::App::TrayAction::PickColor) << "两档串了位：中键读成了左键那一格";
+    }
+
+    /**
+     * @brief 钉住「什么都不做」与「弹出菜单」两格都不发动作，且后者在菜单没装出来时也不崩
+     * @details 哨兵档发得出动作就等于把它读成了某个功能；而这一台机器上的托盘控制器没走过 install()，
+     *          菜单还是空的——按到「弹出菜单」时不崩就是这一格的判据（少了那道空指针检查会当场死在这里）。
+     */
+    TEST_F(MainWindowFixture, TrayClickSentinelsEmitNoActionAndSurviveAnUninstalledMenu)
+    {
+        ASSERT_TRUE(m_store->setValue(GyanisScribe::Settings::kTrayLeftClick, QStringLiteral("none")).has_value());
+        ASSERT_TRUE(m_store->setValue(GyanisScribe::Settings::kTrayMiddleClick, QStringLiteral("menu")).has_value());
+
+        GyanisScribe::App::TrayController          tray{*m_icons, *m_theme, *m_store, *m_integration};
+        std::vector<GyanisScribe::App::TrayAction> seen;
+        QObject::connect(&tray, &GyanisScribe::App::TrayController::actionRequested, [&seen](const GyanisScribe::App::TrayAction action) { seen.push_back(action); });
+
+        tray.trayClicked(GyanisScribe::App::TrayClickRole::Left);
+        tray.trayClicked(GyanisScribe::App::TrayClickRole::Middle);
+        EXPECT_TRUE(seen.empty()) << "两格哨兵都不该发一个功能出去";
+    }
+
+    /**
+     * @brief 钉住配坏了的那一下照样按默认档做事，而不是报一句就不动
+     * @details 「填坏了」要落回默认并给出原因；只报不做的形状最难查——用户看到的是「我配了，也报错了，可它什么都不干」。
+     */
+    TEST_F(MainWindowFixture, TrayClickWithABadValueStillRunsTheDefaultAction)
+    {
+        ASSERT_TRUE(m_store->setValue(GyanisScribe::Settings::kTrayLeftClick, QStringLiteral("Screenshot")).has_value());
+
+        GyanisScribe::App::TrayController          tray{*m_icons, *m_theme, *m_store, *m_integration};
+        std::vector<GyanisScribe::App::TrayAction> seen;
+        QObject::connect(&tray, &GyanisScribe::App::TrayController::actionRequested, [&seen](const GyanisScribe::App::TrayAction action) { seen.push_back(action); });
+
+        tray.trayClicked(GyanisScribe::App::TrayClickRole::Left);
+        ASSERT_EQ(seen.size(), 1U) << "填坏了也要按回落的那一档做事";
+        EXPECT_EQ(seen[0], GyanisScribe::App::TrayAction::CaptureRegion) << "回落的必须是左键这一档的默认";
+    }
+
+    /**
+     * @brief 钉住通用页那两行摆的是标记而不是界面名，且各写各的键
+     * @details 存中文标签的话下一次托盘读不出来（词表认的是 none/menu/动作标记），
+     *          而读不出只表现成「我明明选了识别文字，按下去还是截图」；两行共用一个键则拨一处改两处。
+     */
+    TEST_F(MainWindowFixture, TrayClickRowsOnTheGeneralPageWriteTheTokens)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::General);
+
+        struct Row
+        {
+            const char      *controlName;
+            std::string_view key;
+            std::string_view defaultToken;
+        };
+        const std::vector<Row> rows{
+                Row{"左键单击", GyanisScribe::Settings::kTrayLeftClick, "CaptureRegion"},
+                Row{"中键单击", GyanisScribe::Settings::kTrayMiddleClick, "TogglePinsVisible"},
+        };
+
+        const auto choices = GyanisScribe::App::trayClickChoices(m_capabilities);
+        ASSERT_GE(choices.size(), 3U);
+        for (const auto &row: rows)
+        {
+            auto *combo = qobject_cast<QComboBox *>(controlInCurrentPage(row.controlName));
+            ASSERT_NE(combo, nullptr) << std::string{row.controlName};
+            ASSERT_EQ(combo->count(), static_cast<int>(choices.size())) << "下拉项数与清单不同解";
+
+            const auto expected = static_cast<int>(std::ranges::find(choices, row.defaultToken, &GyanisScribe::App::TrayClickChoice::token) - choices.begin());
+            EXPECT_EQ(combo->currentIndex(), expected) << "配置里没填时显示的那一档，必须就是托盘读端回落的那一档";
+
+            // 摆到清单第一格（什么都不做）：写进去的必须是标记，界面名一个字都不能进配置
+            combo->setCurrentIndex(0);
+        }
+        closeWindowAndFlush();
+
+        const auto reopened = makeStore();
+        EXPECT_EQ(reopened->stringValue(rows[0].key, QStringLiteral("?")), QStringLiteral("none")) << "存的必须是标记，不是界面上那四个字";
+        EXPECT_EQ(reopened->stringValue(rows[1].key, QStringLiteral("?")), QStringLiteral("none")) << "两行共用了一个键：拨一处改两处";
     }
 
 } // namespace

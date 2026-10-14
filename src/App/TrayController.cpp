@@ -11,6 +11,7 @@
 #include "Ui/ThemeManager.h"
 
 #include <QAction>
+#include <QCursor>
 #include <QMenu>
 #include <QSystemTrayIcon>
 
@@ -130,6 +131,9 @@ namespace GyanisScribe::App
         {
             m_icon = new QSystemTrayIcon{this};
             m_menu = std::make_unique<QMenu>();
+            // 左键与中键各按设置里那一格走；这条连接只在这里挂一次——install() 会随主题重跑，
+            // 挂在外面每次重跑就多接一条，一次点击会发出好几个动作
+            QObject::connect(m_icon, &QSystemTrayIcon::activated, this, &TrayController::onActivated);
         }
         m_menu->clear();
 
@@ -169,6 +173,45 @@ namespace GyanisScribe::App
         m_icon->setContextMenu(m_menu.get());
         m_icon->show();
         return true;
+    }
+
+    void TrayController::onActivated(const QSystemTrayIcon::ActivationReason reason)
+    {
+        // 右键、双击与未知原因换成空档：那几种不归这两下管，平台自己那一套不去抢
+        if (const auto role = trayClickRoleForReason(reason); role)
+        {
+            trayClicked(*role);
+        }
+    }
+
+    void TrayController::trayClicked(const TrayClickRole role)
+    {
+        std::string complaint;
+        const auto  decision = resolveTrayClick(m_settings, role, complaint);
+        if (!complaint.empty())
+        {
+            // 填坏了照样按回落的那一档走：一声不响地不做事，用户分不清「没配上」与「配的是什么都不做」
+            Core::Logger::warning(std::format("托盘点击读不出：{}", complaint));
+        }
+
+        switch (decision.outcome)
+        {
+            case TrayClickOutcome::Nothing:
+                return;
+            case TrayClickOutcome::ShowMenu:
+                // 菜单没装出来（这台机器没有托盘，或还没走到 install()）时按不出东西，但不能崩
+                if (m_menu != nullptr)
+                {
+                    m_menu->popup(QCursor::pos());
+                }
+                return;
+            case TrayClickOutcome::RunAction:
+                if (decision.action)
+                {
+                    emit actionRequested(*decision.action);
+                }
+                return;
+        }
     }
 
 

@@ -1048,6 +1048,10 @@
             <translation>Picking "don't show" only drops the pixel illustration; the coordinate and colour strip stays where it was</translation>
         </message>
         <message>
+            <source>右键那一下归系统自己弹菜单，双击在第一下松开时就算过一次单击——这两档只管这两下</source>
+            <translation>The right click is the platform's own menu, and a double click already counted as a single click when the first one was released — these two slots cover only these two clicks</translation>
+        </message>
+        <message>
             <source>默认不透明度</source>
             <translation>Default opacity</translation>
         </message>
@@ -1706,6 +1710,22 @@
         <message>
             <source>中文</source>
             <translation>中文</translation>
+        </message>
+        <message>
+            <source>什么都不做</source>
+            <translation>Do nothing</translation>
+        </message>
+        <message>
+            <source>弹出托盘菜单</source>
+            <translation>Open the tray menu</translation>
+        </message>
+        <message>
+            <source>左键单击</source>
+            <translation>Left click</translation>
+        </message>
+        <message>
+            <source>中键单击</source>
+            <translation>Middle click</translation>
         </message>
         <message>
             <source>智录 · 录制已暂停 %1</source>

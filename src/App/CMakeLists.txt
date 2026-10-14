@@ -16,6 +16,9 @@ add_library(App STATIC
         ClipboardPin.cpp
         MainWindow.h
         MainWindow.cpp
+        TrayAction.h
+        TrayClick.h
+        TrayClick.cpp
         TrayController.h
         TrayController.cpp
         UpdateCheck.h

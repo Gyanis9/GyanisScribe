@@ -1,6 +1,7 @@
 #include "App/CaptureIntent.h"
 #include "App/CustomHotkeys.h"
 #include "App/MainWindow.h"
+#include "App/TrayClick.h"
 #include "App/TrayController.h"
 #include "App/UpdateCheck.h"
 #include "Annotation/AnnotationPalette.h"
@@ -615,6 +616,51 @@ namespace
                              if (auto written = settings.setValue(GyanisScribe::Settings::kCaptureMagnifierView, token); !written)
                              {
                                  Logger::warning(std::format("放大镜视野没能保存：{}", written.error().message));
+                             }
+                         });
+        return combo;
+    }
+
+    /**
+     * @brief 托盘上那一下鼠标做什么的一格
+     * @param settings 配置存储
+     * @param role 左键单击还是中键单击
+     * @param capabilities 平台能力表：这台机器做不出的动作不列进清单
+     * @return 归调用方所有的下拉框
+     * @details 清单前两格是「什么都不做」与「弹出托盘菜单」，其后照托盘菜单的顺序排，
+     *          标签与菜单同源——同一件事在两处各写一遍名字，改一处就会分家。
+     *          读坏了不替用户改写配置：下拉框按默认那一档摆，日志点名那串原文。
+     */
+    QComboBox *makeTrayClickCombo(ISettingsStore &settings, const GyanisScribe::App::TrayClickRole role, const GyanisScribe::Platform::PlatformCapabilities &capabilities)
+    {
+        auto        combo   = new QComboBox;
+        const auto &info    = GyanisScribe::App::trayClickRoleInfo(role);
+        const auto  choices = GyanisScribe::App::trayClickChoices(capabilities);
+        std::string complaint;
+        const auto  decision = GyanisScribe::App::resolveTrayClick(settings, role, complaint);
+        for (const auto &choice: choices)
+        {
+            combo->addItem(choice.label);
+        }
+        combo->setAccessibleName(GyanisScribe::Core::uiText(info.label.data()));
+        combo->setToolTip(GyanisScribe::Core::uiText("右键那一下归系统自己弹菜单，双击在第一下松开时就算过一次单击——这两档只管这两下"));
+        if (!complaint.empty())
+        {
+            Logger::warning(std::format("托盘点击读不出：{}，下拉框按默认那一档摆", complaint));
+        }
+        const auto at = std::ranges::find(choices, decision.token, &GyanisScribe::App::TrayClickChoice::token);
+        combo->setCurrentIndex(at == choices.end() ? 0 : static_cast<int>(std::distance(choices.begin(), at)));
+        QObject::connect(combo, &QComboBox::currentIndexChanged, combo,
+                         [&settings, key = std::string{info.key}, choices](const int index)
+                         {
+                             if (index < 0 || static_cast<std::size_t>(index) >= choices.size())
+                             {
+                                 return;
+                             }
+                             // 键是这一档自己的那一格，值才是选中的标记：拿标记当键写下去，配置里就多一条没人读的行
+                             if (auto written = settings.setValue(key, QString::fromUtf8(choices[static_cast<std::size_t>(index)].token.data())); !written)
+                             {
+                                 Logger::warning(std::format("托盘点击没能保存：{}", written.error().message));
                              }
                          });
         return combo;
@@ -1656,6 +1702,11 @@ namespace GyanisScribe::App
                                                                            static_cast<int>(GyanisScribe::History::kUnsavedArchiveCapacity))
                                                       .c_str())));
         form->addRow(GyanisScribe::Core::uiText("分组轮换顺序"), makeGroupRotationEdit(m_settings));
+        // 托盘那两下：这一族动作在菜单、热键与鼠标点击三处都走同一个出口，这里只多两个入口而不多一份实现
+        for (const auto &role: GyanisScribe::App::trayClickRoles())
+        {
+            form->addRow(GyanisScribe::Core::uiText(role.label.data()), makeTrayClickCombo(m_settings, role.role, m_capabilities));
+        }
         form->addRow(GyanisScribe::Core::uiText("开机自启动"), makeAutostartCheck(m_integration));
         form->addRow(GyanisScribe::Core::uiText("备份与恢复"), buildTransferRow());
         return page;

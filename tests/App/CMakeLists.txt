@@ -6,6 +6,7 @@ add_executable(TestShell
         TestCaptureDelivery.cpp
         TestCommandLine.cpp
         TestCustomHotkeys.cpp
+        TestTrayClick.cpp
         TestUpdateCheck.cpp)
 
 target_link_libraries(TestShell PRIVATE

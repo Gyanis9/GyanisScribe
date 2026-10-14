@@ -9,6 +9,9 @@
 
 #pragma once
 
+#include "App/TrayAction.h"
+#include "App/TrayClick.h"
+
 #include <QList>
 #include <QObject>
 #include <QString>
@@ -18,7 +21,6 @@
 #include <string_view>
 
 class QMenu;
-class QSystemTrayIcon;
 
 namespace GyanisScribe::Settings
 {
@@ -39,34 +41,6 @@ namespace GyanisScribe::Ui
 
 namespace GyanisScribe::App
 {
-
-    /**
-     * @brief 托盘菜单的一项动作
-     * @details 用例按这张表核对「菜单里有几项、各指向哪儿」，不依赖真的托盘图标。
-     */
-    enum class TrayAction
-    {
-        CaptureRegion,     ///< 框选截图
-        CaptureFullScreen, ///< 整屏截图
-        CaptureLastRegion, ///< 重复上一次选区
-        CaptureWindow,     ///< 截取当前前台窗口，没有该能力的平台不在菜单里放这一项
-        ToggleRecord,      ///< 开始或停止录屏
-        Recognize,         ///< 框选后识别文字
-        PickColor,         ///< 屏幕取色
-        OpenSettings,      ///< 打开设置页
-        OpenAbout,         ///< 打开关于页
-        RecognizeFile,     ///< 挑一张盘上的图去识别
-        Quit,              ///< 退出程序
-        CloseAllPins,      ///< 关掉全部贴图；新成员只追加在末尾，表用例按名字钉住了这一张表
-        CaptureLongRegion, ///< 滚动长截图：先框一条区域，再反复抓同一块把新的一段接上去
-        ClearPinsThrough,  ///< 取消全部贴图的鼠标穿透；新成员只追加在末尾
-        TogglePinsVisible, ///< 收起或摆回全部贴图；新成员只追加在末尾
-        PasteClipboard,    ///< 把剪贴板里的图贴到屏幕上；新成员只追加在末尾
-        NextPinGroup,      ///< 切到下一组贴图；新成员只追加在末尾
-        BlankCanvas,       ///< 新建空白画布直接进标注；新成员只追加在末尾
-        RepinClosed,       ///< 重新贴出最近关掉的贴图（销毁过的不算）；新成员只追加在末尾
-        ManagePinGroups,   ///< 打开贴图组管理窗（哪几组、各有几张、叫什么）；新成员只追加在末尾
-    };
 
     /**
      * @brief 菜单项的静态描述
@@ -153,11 +127,27 @@ namespace GyanisScribe::App
          */
         void setRecordingStatus(int recordedSeconds, bool paused);
 
+        /**
+         * @brief 托盘图标上的一下鼠标按配置该做成什么
+         * @param role 左键单击还是中键单击
+         * @details 这是那两下的公开出口：真的托盘在这台机器上不一定建得出来，而「这一格配的是什么、
+         *          落成哪个动作」直接调用就核得出来。配置每按一下现读一次，不缓存也不等重装托盘，
+         *          设置页拨完下一次按就生效。
+         */
+        void trayClicked(TrayClickRole role);
+
     signals:
         /// 用户点了某一项
         void actionRequested(TrayAction action);
 
     private:
+        /**
+         * @brief 把托盘报回的激活原因换成那一档，再交给 trayClicked
+         * @param reason Qt 的激活原因
+         * @details 右键、双击与未知原因在这条路上不做事（换成空档），平台自己那一套不去抢。
+         */
+        void onActivated(QSystemTrayIcon::ActivationReason reason);
+
         GyanisScribe::Ui::IconProvider &m_icons;                   ///< 图标供给器，不拥有
         GyanisScribe::Ui::ThemeManager &m_theme;                   ///< 主题管理器，不拥有
         Settings::ISettingsStore       &m_settings;                ///< 配置存储，不拥有
