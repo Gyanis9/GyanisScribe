@@ -65,6 +65,7 @@ namespace GyanisScribe::App
         NextPinGroup,      ///< 切到下一组贴图；新成员只追加在末尾
         BlankCanvas,       ///< 新建空白画布直接进标注；新成员只追加在末尾
         RepinClosed,       ///< 重新贴出最近关掉的贴图（销毁过的不算）；新成员只追加在末尾
+        ManagePinGroups,   ///< 打开贴图组管理窗（哪几组、各有几张、叫什么）；新成员只追加在末尾
     };
 
     /**

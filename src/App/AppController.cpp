@@ -32,6 +32,7 @@
 #include "Ocr/OcrTypes.h"
 #include "Scan/BarcodeDecoder.h"
 #include "Ocr/RecognitionRunner.h"
+#include "Pin/PinGroupManagerWindow.h"
 #include "Pin/PinManager.h"
 #include "App/TrayController.h"
 #include "Platform/IPlatformIntegration.h"
@@ -525,6 +526,18 @@ namespace GyanisScribe::App
         m_mainWindow->open(page);
     }
 
+    void AppController::openPinGroupManager()
+    {
+        // 开着一扇就抬那一扇重读：两扇表对着同一桌贴图，晚打开的那一扇会把「摆在桌上」那一列停在旧账上。
+        // 不给父对象：挂在设置窗上会让这扇窗跟着设置窗一起被藏起来，用户回头找不着它；
+        // 关掉即自己销毁（窗口构造里挂了 WA_DeleteOnClose），这里这份 QPointer 随即变空
+        if (m_groupManager.isNull())
+        {
+            m_groupManager = new Pin::PinGroupManagerWindow(*m_pins);
+        }
+        m_groupManager->openAndRefresh();
+    }
+
     void AppController::handleTrayAction(const TrayAction action)
     {
         switch (action)
@@ -609,6 +622,9 @@ namespace GyanisScribe::App
                 // 一次点关掉全部：张数由 pinCountChanged 通知托盘刷新，这里只留一条日志，不再弹提示吵人
                 Core::Logger::info(std::format("托盘要求关闭全部贴图：{} 张", m_pins->count()));
                 m_pins->closeAll();
+                return;
+            case TrayAction::ManagePinGroups:
+                openPinGroupManager();
                 return;
             case TrayAction::OpenSettings:
                 openMainWindow(MainWindowPage::General);

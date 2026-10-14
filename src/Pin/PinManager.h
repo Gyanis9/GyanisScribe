@@ -61,6 +61,19 @@ namespace GyanisScribe::Pin
     };
 
     /**
+     * @brief 一组的概况，贴图组管理窗的一行
+     * @details 计数算的是「在册」而不是「看得见」：收着的与在别组的那几张都属于这一组，
+     *          窗口要回答的是「哪几组、各有几张」，不是「此刻桌上摆了几张」。
+     */
+    struct PinGroupSummary
+    {
+        int     group = kFirstPinGroup; ///< 组号，从 1 起
+        QString name;                   ///< 起过的名字；空串表示没起过，界面按「分组 N」显示
+        int     pinCount = 0;           ///< 这一组在册的张数
+        bool    isActive = false;       ///< 是不是此刻摆在桌上的那一组
+    };
+
+    /**
      * @brief 可重新贴出的贴图条数上限
      * @details 再多就是拿一份越来越大的像素常驻内存：这一档要的是「手滑关错了能按回来」，不是历史册。
      */
@@ -223,6 +236,30 @@ namespace GyanisScribe::Pin
          * @return 删第一组时返回 InvalidArgument：它是删别组时成员并回去的落点，删了就没有落点
          */
         [[nodiscard]] Core::Expected<int> deleteGroup(int group);
+
+        /**
+         * @brief 每一组的概况，按组号升序
+         * @return 一册读数；一张贴图都没有时为空表
+         * @details 名字与活动标记都取自管理器现值：管理窗每次刷新读一次，不在界面上留第二份账。
+         */
+        [[nodiscard]] QVector<PinGroupSummary> groupSummaries() const;
+
+        /**
+         * @brief 切到点名那一组（管理窗里那一条「摆出这一组」）
+         * @param group 目标组号，从 1 起
+         * @return 成功返回现在摆在桌上的组号；这一组没有贴图在册时返回 InvalidArgument 并说清怎么多出一组
+         * @details 与按键切组只差「走到哪一组」，显隐、清选中、收 Solo 与布局落账走同一条实现。
+         */
+        [[nodiscard]] Core::Expected<int> showGroup(int group);
+
+        /**
+         * @brief 关掉一组里全部贴图（管理窗里那一条「腾空这一组」）
+         * @param group 目标组号
+         * @return 真的关掉的张数；这一组本来就没人时返回 0
+         * @details 走的是「关闭」那一档而不是销毁：这些像素还按得回来，与右键菜单里的「销毁这一张」不是一回事。
+         *          关掉最后一张，这一组就从在册表上消失（不留空壳组），活动组跟着回落。
+         */
+        int closeGroup(int group);
 
         /**
          * @brief 把某张贴图的内容换成给定的那份像素

@@ -67,6 +67,8 @@ namespace GyanisScribe::App
         // 关闭与销毁是两档：这一条只按得回「关闭」的那几张，销毁过的一张都不回来
         entries.append(TrayMenuEntry{TrayAction::RepinClosed, "Refresh", GyanisScribe::Core::uiText("重新贴出最近关掉的贴图"), {}});
         entries.append(TrayMenuEntry{TrayAction::NextPinGroup, "PinGroup", GyanisScribe::Core::uiText("切到下一组贴图"), GyanisScribe::Settings::kHotkeyNextPinGroup});
+        // 图标与「切到下一组贴图」同族（都是分组这一件事），两行的文字各自表意，不会读成同一件事
+        entries.append(TrayMenuEntry{TrayAction::ManagePinGroups, "PinGroup", GyanisScribe::Core::uiText("贴图组管理…"), {}});
         entries.append(TrayMenuEntry{});
         entries.append(TrayMenuEntry{TrayAction::OpenSettings, "Settings", GyanisScribe::Core::uiText("设置"), {}});
         entries.append(TrayMenuEntry{TrayAction::OpenAbout, "About", GyanisScribe::Core::uiText("关于智录"), {}});

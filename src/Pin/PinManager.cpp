@@ -688,6 +688,82 @@ namespace GyanisScribe::Pin
         return moved;
     }
 
+    QVector<PinGroupSummary> PinManager::groupSummaries() const
+    {
+        QVector<PinGroupSummary> summaries;
+        for (const auto group: groupsInUse())
+        {
+            auto count = 0;
+            for (const auto &pin: m_pins)
+            {
+                if (pin != nullptr && pin->group() == group)
+                {
+                    ++count;
+                }
+            }
+            summaries.append(PinGroupSummary{group, m_groupNames.value(group), count, group == m_activeGroup});
+        }
+        return summaries;
+    }
+
+    Core::Expected<int> PinManager::showGroup(const int group)
+    {
+        if (!groupsInUse().contains(group))
+        {
+            // 不说「已经切过去」：切到一个没人的一组等于把整桌收空，用户找不到那几张图
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("第 {} 组现在没有贴图，摆不出这一组。"
+                                                                                                           "要把别的图挪过来，请在贴图的右键菜单里选「移动到分组」"),
+                                                                            group)});
+        }
+        if (group == m_activeGroup)
+        {
+            // 已经是这一组就不重算：重复 hide()/show() 会让窗口自己闪一下，清选中也会把用户刚挑的那几张弄丢
+            return m_activeGroup;
+        }
+        m_activeGroup = group;
+        // 换组换的是一桌人：留着的选中集与「只看这一张」都会指向看不见的那几张，先清掉
+        clearPinSelection();
+        m_solo = nullptr;
+        publishSolo();
+        applyGroupVisibility();
+        return m_activeGroup;
+    }
+
+    int PinManager::closeGroup(const int group)
+    {
+        // 先整份挑出来再收尾：窗口关的时候会回调 forget，边遍历边 erase 会跳过下一张
+        std::vector<std::unique_ptr<PinWindow>> pending;
+        std::vector<std::unique_ptr<PinWindow>> kept;
+        kept.reserve(m_pins.size());
+        for (auto &pin: m_pins)
+        {
+            if (pin != nullptr && pin->group() == group)
+            {
+                pending.push_back(std::move(pin));
+            } else
+            {
+                kept.push_back(std::move(pin));
+            }
+        }
+        m_pins = std::move(kept);
+
+        for (auto &pin: pending)
+        {
+            // 走的也是「关闭」那一档：这些像素还按得回来，与销毁不是一回事
+            recordClosedPin(*pin);
+            pin->close();
+        }
+        if (pending.empty())
+        {
+            return 0;
+        }
+        normalizeActiveGroup();
+        applyGroupVisibility();
+        emit pinCountChanged(count());
+        return static_cast<int>(pending.size());
+    }
+
     int PinManager::applyGroupVisibility()
     {
         const auto groups  = groupsInUse();

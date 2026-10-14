@@ -11,7 +11,9 @@ add_library(Pin STATIC
         PinWindow.h
         PinWindow.cpp
         PinManager.h
-        PinManager.cpp)
+        PinManager.cpp
+        PinGroupManagerWindow.h
+        PinGroupManagerWindow.cpp)
 
 target_include_directories(Pin PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(Pin PUBLIC

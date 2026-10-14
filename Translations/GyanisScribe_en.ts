@@ -921,7 +921,7 @@
         </message>
         <message>
             <source>  --to=&lt;去处&gt;       只配 --capture：这一次落哪几处，逗号分隔，可取 file / clipboard / pin\n                    交付顺序恒为 file → clipboard → pin；点了 pin 就留在桌面上不退出（同 --pin）\n  --exec=&lt;命令&gt;      只配 --capture：截完之后起跑一条外部命令，参数里的 %file% 换成成品路径\n                    整串用引号包住；没点 file 时这一轮没有成品，带 %file% 的命令会被拒\n  --pin &lt;文件&gt;       把盘上的图片贴到屏幕上（保持运行）\n  --pick             进入屏幕取色（保持运行）\n</source>
-            <translation>  --to=&lt;destinations&gt;  only with --capture: where this shot goes, comma-separated, the choices being file / clipboard / pin\n                    delivery order is always file -> clipboard -> pin; naming pin leaves the process on the desk (like --pin)\n  --exec=&lt;command&gt;      only with --capture: start one external command after the capture, with %file% in its arguments replaced by the saved file path\n                    wrap the whole line in quotes; without file named this round has no output file, so a command carrying %file% is rejected\n  --pin &lt;file&gt;        pin an image file from the disk (stays running)\n  --pick             enter screen colour picking (stays running)\n</translation>
+            <translation>  --to=&lt;destinations&gt;  only with --capture: where this shot goes, comma-separated, the choices being file / clipboard / pin\n                    delivery order is always file -&gt; clipboard -&gt; pin; naming pin leaves the process on the desk (like --pin)\n  --exec=&lt;command&gt;      only with --capture: start one external command after the capture, with %file% in its arguments replaced by the saved file path\n                    wrap the whole line in quotes; without file named this round has no output file, so a command carrying %file% is rejected\n  --pin &lt;file&gt;        pin an image file from the disk (stays running)\n  --pick             enter screen colour picking (stays running)\n</translation>
         </message>
         <message>
             <source>整块屏</source>
@@ -1620,6 +1620,10 @@
             <translation>Switch to the next pin group</translation>
         </message>
         <message>
+            <source>贴图组管理…</source>
+            <translation>Pin Group Manager…</translation>
+        </message>
+        <message>
             <source>设置</source>
             <translation>Settings</translation>
         </message>
@@ -2296,6 +2300,102 @@
             <translation>Color picker overlay</translation>
         </message>
         <message>
+            <source>贴图组管理</source>
+            <translation>Pin Group Manager</translation>
+        </message>
+        <message>
+            <source>贴图组管理窗</source>
+            <translation>Pin group manager window</translation>
+        </message>
+        <message>
+            <source>贴图组清单</source>
+            <translation>Pin group list</translation>
+        </message>
+        <message>
+            <source>分组</source>
+            <translation>Group</translation>
+        </message>
+        <message>
+            <source>张数</source>
+            <translation>Count</translation>
+        </message>
+        <message>
+            <source>摆在桌上</source>
+            <translation>On the desk</translation>
+        </message>
+        <message>
+            <source>摆出这一组</source>
+            <translation>Show this group</translation>
+        </message>
+        <message>
+            <source>重命名…</source>
+            <translation>Rename…</translation>
+        </message>
+        <message>
+            <source>腾空这一组</source>
+            <translation>Empty this group</translation>
+        </message>
+        <message>
+            <source>删掉这一组</source>
+            <translation>Delete this group</translation>
+        </message>
+        <message>
+            <source>重命名这一组</source>
+            <translation>Rename this group</translation>
+        </message>
+        <message>
+            <source>删掉的是「这一组」这个标签：组里的图并回第一组，不会被扔掉。第一组是并回去的落点，删不掉</source>
+            <translation>Deleting takes away the group label only: the pins in it move back to group 1 instead of being thrown away. Group 1 is where they land, so it cannot be deleted</translation>
+        </message>
+        <message>
+            <source>贴图组管理提示</source>
+            <translation>Pin group manager status</translation>
+        </message>
+        <message>
+            <source>%1 张</source>
+            <translation>%1</translation>
+        </message>
+        <message>
+            <source>是</source>
+            <translation>Yes</translation>
+        </message>
+        <message>
+            <source>现在一张贴图都没有，也就没有分组。贴出一张图，再把另一张「移动到分组 → 新建分组」，这里才会多出第二行。</source>
+            <translation>There is not a single pin on the desk, so there are no groups either. Put one image up, then move another one with "Move to group -> New group" and a second row shows up here.</translation>
+        </message>
+        <message>
+            <source>桌上是第 {} 组。</source>
+            <translation>Group {} is on the desk.</translation>
+        </message>
+        <message>
+            <source>给分组起名字</source>
+            <translation>Name This Group</translation>
+        </message>
+        <message>
+            <source>名字（留空就是取消命名）</source>
+            <translation>Name (leaving it empty cancels the naming)</translation>
+        </message>
+        <message>
+            <source>已取消命名，这一组回到「分组 N」那种叫法。</source>
+            <translation>Naming cancelled; this group is called "Group N" again.</translation>
+        </message>
+        <message>
+            <source>第 {} 组改名为「{}」。</source>
+            <translation>Group {} is now called "{}".</translation>
+        </message>
+        <message>
+            <source>这一组本来就没有贴图。</source>
+            <translation>This group had no pins to begin with.</translation>
+        </message>
+        <message>
+            <source>已关掉这一组的 {} 张。托盘的「重新贴出最近关掉的贴图」还能按回最近 {} 张，更早的找不回来。</source>
+            <translation>Closed the {} pins of this group. The tray's "Re-pin the most recently closed pins" brings back only the newest {}; older ones do not come back.</translation>
+        </message>
+        <message>
+            <source>第 {} 组已经没了，{} 张并回第一组。</source>
+            <translation>Group {} is gone; {} pins moved back to group 1.</translation>
+        </message>
+        <message>
             <source>贴图布局不是一段 JSON 数组：{}。请在设置里清除这一项，让程序重新记一次</source>
             <translation>The pin layout isn't a JSON array: {}. Clear this entry in Settings and let the program record it again.</translation>
         </message>
@@ -2382,6 +2482,10 @@
         <message>
             <source>第一组是删掉别的组时成员并回去的落点，这一组删不掉。要把这一张从第一组挪走请用「移动到分组」</source>
             <translation>Group 1 is where pins land when another group is deleted, so it cannot be deleted. To move this pin out of it, use Move to Group</translation>
+        </message>
+        <message>
+            <source>第 {} 组现在没有贴图，摆不出这一组。要把别的图挪过来，请在贴图的右键菜单里选「移动到分组」</source>
+            <translation>Group {} has no pins, so it cannot be shown. To move pins over, use "Move to group" in a pin's context menu</translation>
         </message>
         <message>
             <source>这台机器的 Qt 写不出「{}」这一档保存格式。请在设置的截图页改选一档</source>
@@ -2542,10 +2646,6 @@
         <message>
             <source>重命名这一组…</source>
             <translation>Rename This Group…</translation>
-        </message>
-        <message>
-            <source>给分组起名字</source>
-            <translation>Name This Group</translation>
         </message>
         <message>
             <source>这一组的名字（留空就回到「分组 %1」这种叫法）</source>

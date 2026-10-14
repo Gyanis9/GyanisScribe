@@ -1,6 +1,7 @@
 add_executable(TestPin
         TestPinLayout.cpp
         TestPinManager.cpp
+        TestPinGroupManager.cpp
         TestPinTransform.cpp
         TestPinViewFilter.cpp
         TestPinWindow.cpp)

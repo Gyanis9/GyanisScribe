@@ -65,6 +65,7 @@ namespace GyanisScribe::Pick
 namespace GyanisScribe::Pin
 {
     class PinManager;
+    class PinGroupManagerWindow;
     struct PinBatchSaveReport;
 } // namespace GyanisScribe::Pin
 
@@ -203,6 +204,13 @@ namespace GyanisScribe::App
          * @details 复用拖放那套内容转换：图片读像素、动图连来源带走、读不出的说清是哪一件
          */
         [[nodiscard]] Core::Expected<void> pinImageFile(const QString &filePath);
+
+        /**
+         * @brief 打开贴图组管理窗（托盘与主窗口的动作条都走这一条）
+         * @details 窗已开着就把它抬到前面并重读一遍，不开第二扇：两扇表对着同一桌贴图，
+         *          其中一扇按下去切了组，另一扇上那一列「摆在桌上」就成了旧账。
+         */
+        void openPinGroupManager();
 
         /**
          * @brief 起一层全屏取色遮罩（热键、托盘与命令行共用这一条）
@@ -547,6 +555,7 @@ namespace GyanisScribe::App
         QPointer<Ocr::OcrResultWindow>                       m_ocrWindow;                                    ///< 识别结果窗口，关了就重建，不拥有
         std::unique_ptr<GyanisScribe::History::HistoryStore> m_history;                                      ///< 历史清单：成品文件的索引，删记录不删文件
         QPointer<Pick::ColorPickerOverlay>                   m_picker;                                       ///< 取色遮罩，关掉即重建
+        QPointer<Pin::PinGroupManagerWindow>                 m_groupManager;                                 ///< 贴图组管理窗，开着一扇就复用那一扇
         QPointer<Record::RecordingHud>                       m_hud;                                          ///< 录屏控制条，一轮一个，收起即销毁
         QTimer                                              *m_hudTicker          = nullptr;                 ///< 控制条的每秒轮询，随一轮录屏起停
         int                                                  m_countdownRemaining = 0;                       ///< 倒计时剩余整秒，推给控制条的大字
