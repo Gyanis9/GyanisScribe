@@ -676,6 +676,10 @@
             <translation>None of the copied files can be pinned as an image: copy the image file itself, or copy the image content</translation>
         </message>
         <message>
+            <source>这块屏幕已经不在了，重抓不到画面。把贴图挪回还在的屏幕上再刷新</source>
+            <translation>This screen is gone, so there is nothing to re-capture. Move the pin back onto a screen that is still there, then refresh it</translation>
+        </message>
+        <message>
             <source>这一张里没认出二维码或条形码</source>
             <translation>No QR code or barcode was found in this image</translation>
         </message>
@@ -2361,7 +2365,7 @@
         </message>
         <message>
             <source>现在一张贴图都没有，也就没有分组。贴出一张图，再把另一张「移动到分组 → 新建分组」，这里才会多出第二行。</source>
-            <translation>There is not a single pin on the desk, so there are no groups either. Put one image up, then move another one with "Move to group -> New group" and a second row shows up here.</translation>
+            <translation>There is not a single pin on the desk, so there are no groups either. Put one image up, then move another one with "Move to group -&gt; New group" and a second row shows up here.</translation>
         </message>
         <message>
             <source>桌上是第 {} 组。</source>
@@ -2476,6 +2480,22 @@
             <translation>An animated pin cannot be replaced: the next frame would cover the new content. Save it as a still image first, then pin that image and replace it.</translation>
         </message>
         <message>
+            <source>要刷新的贴图不在册：索引 {}。请在还摆在桌上的那张贴图上按 F5</source>
+            <translation>The pin to refresh is not in the register: index {}. Press F5 on a pin that is still on the desk</translation>
+        </message>
+        <message>
+            <source>缩到小图这一档不刷新：那枚方块的面积不是这张图的面积。按 T 摆回原大小再刷新</source>
+            <translation>The thumbnail state does not refresh: that square's area is not the area of this image. Press T to restore the size, then refresh</translation>
+        </message>
+        <message>
+            <source>动图不刷新：换上的那一帧会被下一帧盖掉。要盯实时画面请先存成静态图，再把那张贴出来</source>
+            <translation>Animated pins do not refresh: the frame captured here would be covered by the next one. To watch a live area, save a still image first and pin that one out</translation>
+        </message>
+        <message>
+            <source>要暂时藏起来抓屏的那张贴图不在册：索引 {}</source>
+            <translation>The pin to hide for this grab is not in the register: index {}</translation>
+        </message>
+        <message>
             <source>要改名字的分组号不对：{}。分组从 {} 起，请在贴图右键菜单里操作</source>
             <translation>Bad group number to rename: {}. Groups start at 1. Use the context menu on a pin</translation>
         </message>
@@ -2558,6 +2578,22 @@
         <message>
             <source>动图不能裁剪：裁完会被下一帧盖回原尺寸。请先保存成静态图，再把那张贴出来裁</source>
             <translation>An animated pin cannot be cropped: the next frame would restore the original size. Save it as a still image and pin that one to crop it.</translation>
+        </message>
+        <message>
+            <source>刷新这一张</source>
+            <translation>Refresh this pin</translation>
+        </message>
+        <message>
+            <source>重抓这块屏幕换成新的画面，标注之外的设定都不动；按住 `F5` 可以连着刷新，松手定在最后抓到的那一帧</source>
+            <translation>Re-captures this patch of screen and swaps in the new picture; every setting but the annotation stays put. Holding `F5` keeps refreshing, and releasing keeps the frame grabbed last</translation>
+        </message>
+        <message>
+            <source>动图不刷新：换上的那一帧静态像素会被下一帧盖掉。要盯实时画面请先存成静态图再贴出来</source>
+            <translation>Animated pins do not refresh: the still pixels put here would be covered by the next frame. To watch a live area, save a still image first and pin that one out</translation>
+        </message>
+        <message>
+            <source>缩到小图这一档不刷新：那枚方块的面积不是这张图的面积。按 `T` 摆回原大小再刷新</source>
+            <translation>The thumbnail state does not refresh: that square's area is not the area of this image. Press `T` to restore the size, then refresh</translation>
         </message>
         <message>
             <source>缩到小图</source>

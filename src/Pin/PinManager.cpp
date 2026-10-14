@@ -100,6 +100,17 @@ namespace GyanisScribe::Pin
                              }
                              emit pinClipboardReplaceRequested(static_cast<int>(found - m_pins.begin()));
                          });
+        // `F5` 与右键「刷新这一张」同理：抓屏的口子在这一层之外，只把「第几张要重抓」报出去
+        QObject::connect(raw, &PinWindow::refreshRequested, this,
+                         [this, raw]
+                         {
+                             const auto found = std::ranges::find_if(m_pins, [raw](const auto &held) { return held.get() == raw; });
+                             if (found == m_pins.end())
+                             {
+                                 return; // 已经不在册的那一张没有可重抓的东西
+                             }
+                             emit pinRefreshRequested(static_cast<int>(found - m_pins.begin()));
+                         });
         // `Ctrl+A` 全选：谁在屏上是这一层的账，窗口只报意图
         QObject::connect(raw, &PinWindow::selectAllRequested, this, &PinManager::selectAllVisiblePins);
         // 对齐参照的口径：桌上其他贴图的矩形 + 屏上别的程序窗口，起笔时取一次快照（见 PinWindow::setSnapCandidateProvider）
@@ -600,6 +611,47 @@ namespace GyanisScribe::Pin
         // 摆位、缩放与角度都不动：这一条只换「这张图」，替换前后用户看到的还是桌上同一个位置
         pin.replaceContent(image);
         return {};
+    }
+
+    Core::Expected<QRect> PinManager::pinRefreshTarget(const int index) const
+    {
+        if (index < 0 || index >= count() || m_pins[static_cast<std::size_t>(index)] == nullptr)
+        {
+            return std::unexpected(
+                    Core::Error{Core::ErrorCode::InvalidArgument,
+                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("要刷新的贴图不在册：索引 {}。请在还摆在桌上的那张贴图上按 F5"), index)});
+        }
+
+        auto &pin = *m_pins[static_cast<std::size_t>(index)];
+        if (pin.isThumbnailMode())
+        {
+            return std::unexpected(
+                    Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("缩到小图这一档不刷新：那枚方块的面积不是这张图的面积。按 T 摆回原大小再刷新")});
+        }
+        if (pin.isAnimated())
+        {
+            // 与「动图不能替换内容」「动图不能裁剪」同一道闸门：重抓回来的是一张静态像素，下一帧一到就盖回去了
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Core::uiTextUtf8("动图不刷新：换上的那一帧会被下一帧盖掉。要盯实时画面请先存成静态图，再把那张贴出来")});
+        }
+        return pin.imageGlobalRect();
+    }
+
+    Core::Expected<Core::CapturedImage> PinManager::grabWithPinHidden(const int index, const std::function<Core::Expected<Core::CapturedImage>()> &grab)
+    {
+        auto *pin = index >= 0 && index < count() ? m_pins[static_cast<std::size_t>(index)].get() : nullptr;
+        if (pin == nullptr)
+        {
+            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("要暂时藏起来抓屏的那张贴图不在册：索引 {}"), index)});
+        }
+
+        // 贴图压在普通窗口之上：不藏就会抓到「贴图的自己」，从第二次刷新起画面就冻在第一帧上。
+        // 藏与摆回收进同一个函数，是为了让「抓失败」「屏幕没了」这些提前返回的路径也不会把那张图留在桌上不见
+        pin->setTemporarilyHidden(true);
+        auto result = grab();
+        pin->setTemporarilyHidden(false);
+        return result;
     }
 
     void PinManager::normalizeActiveGroup()

@@ -644,6 +644,38 @@ namespace GyanisScribe::Pin
         return QRect(mapToGlobal(QPoint(0, 0)), size());
     }
 
+    QRect PinWindow::imageGlobalRect() const
+    {
+        // 与 applyGeometry 同一套算法：先按「图本身」算出窗口里居中的那块矩形，再换成全屏坐标。
+        // 刻意不拿 globalRect() 去抓——那是旋转后的外接框（斜着时比图大一圈），照它抓会把邻居窗口的像素
+        // 一起框进这张图；窗口为投影留的那一圈带子也不能算进来，那里面画的是桌面而不是内容
+        const auto scaled = m_thumbnail ? QSizeF{m_thumbnailEdge, m_thumbnailEdge} : windowSizeFor(m_logicalSize, m_scale);
+        const auto width  = std::max(kMinimumEdge, scaled.width());
+        const auto height = std::max(kMinimumEdge, scaled.height());
+
+        const QPointF center = QRectF(QPointF(0.0, 0.0), QSizeF(size())).center();
+        const QRectF  local{center - QPointF{width / 2.0, height / 2.0}, QSizeF{width, height}};
+        const QRect   aligned = local.toAlignedRect();
+        return QRect(aligned.topLeft() + mapToGlobal(QPoint(0, 0)), aligned.size());
+    }
+
+    void PinWindow::setTemporarilyHidden(const bool hidden)
+    {
+        if (hidden)
+        {
+            // 记下藏之前它在不在桌上：收着的那一张（整桌收起、或在别的组）本来就不可见，
+            // 摆回那一步要是无条件 show()，就把用户刻意收起来的东西摆回了桌面
+            m_hiddenForGrab = isVisible();
+            hide();
+            return;
+        }
+        if (m_hiddenForGrab)
+        {
+            show();
+            m_hiddenForGrab = false;
+        }
+    }
+
     PinState PinWindow::state() const
     {
         PinState state{globalRect().topLeft(), m_logicalSize, m_scale, m_rotationDegrees, m_opacity};
@@ -1869,6 +1901,13 @@ namespace GyanisScribe::Pin
             return;
         }
 
+        // `F5` 重抓这块屏幕：按住不放由键盘的自动重复连着报，于是能盯着实时画面挑一帧，松手定在最后那一帧
+        if (event->key() == Qt::Key_F5 && event->modifiers() == Qt::NoModifier)
+        {
+            emit refreshRequested();
+            return;
+        }
+
         // `Ctrl+V` 拿剪贴板里那一份换掉这一张：裸 `V` 是上下翻转，两者共用一个字母，靠修饰键分开
         if (event->key() == Qt::Key_V && event->modifiers() == Qt::ControlModifier)
         {
@@ -2040,6 +2079,21 @@ namespace GyanisScribe::Pin
         {
             cropAction->setEnabled(false);
             cropAction->setToolTip(GyanisScribe::Core::uiText("动图不能裁剪：裁完会被下一帧盖回原尺寸。请先保存成静态图，再把那张贴出来裁"));
+        }
+
+        // 刷新这一张：重抓图本身此刻盖住的那块屏幕。动图与缩到小图那两档都不进——
+        // 前者会被下一帧盖回去，后者那块小方块的面积不是这张图的面积
+        auto *refreshAction = menu->addAction(GyanisScribe::Core::uiText("刷新这一张"), this, [this] { emit refreshRequested(); });
+        refreshAction->setToolTip(GyanisScribe::Core::uiText("重抓这块屏幕换成新的画面，标注之外的设定都不动；按住 `F5` 可以连着刷新，松手定在最后抓到的那一帧"));
+        if (isAnimated())
+        {
+            refreshAction->setEnabled(false);
+            refreshAction->setToolTip(GyanisScribe::Core::uiText("动图不刷新：换上的那一帧静态像素会被下一帧盖掉。要盯实时画面请先存成静态图再贴出来"));
+        }
+        if (m_thumbnail)
+        {
+            refreshAction->setEnabled(false);
+            refreshAction->setToolTip(GyanisScribe::Core::uiText("缩到小图这一档不刷新：那枚方块的面积不是这张图的面积。按 `T` 摆回原大小再刷新"));
         }
 
         auto *thumbnailAction = menu->addAction(GyanisScribe::Core::uiText("缩到小图"), this,

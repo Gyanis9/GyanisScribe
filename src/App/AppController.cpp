@@ -274,6 +274,8 @@ namespace GyanisScribe::App
                          });
         // 贴图窗上的 `Ctrl+V`：只有序号能认人——剪贴板在这一层，像素在哪一张上也只有管理器知道
         QObject::connect(m_pins.get(), &Pin::PinManager::pinClipboardReplaceRequested, this, &AppController::replacePinWithClipboard);
+        // `F5` 与右键「刷新这一张」：抓屏的口子在这里，管理器只管谁在册与哪几档不许刷
+        QObject::connect(m_pins.get(), &Pin::PinManager::pinRefreshRequested, this, &AppController::refreshPinWithScreenUnder);
         // 整组「批量保存」落完账：一次写走 N 份文件，不说清去了哪儿就等于没存
         QObject::connect(m_pins.get(), &Pin::PinManager::pinBatchSaveReported, this, &AppController::reportBatchSave);
         // 移到别的组那一下它就从桌上消失了：说清它去了哪、怎么切过去，免得像「贴图自己没了」
@@ -1041,6 +1043,48 @@ namespace GyanisScribe::App
             return;
         }
         Core::Logger::info(std::format("贴图内容已换成剪贴板里那一份：{}×{} 像素", image->width(), image->height()));
+    }
+
+    void AppController::refreshPinWithScreenUnder(const int index)
+    {
+        const auto target = m_pins->pinRefreshTarget(index);
+        if (!target)
+        {
+            // 缩到小图与动图那两档按 F5 就该说清为什么不动：不出声就成了「按键坏了」
+            notifyUser(QString::fromUtf8(target.error().message.c_str()), Ui::ToastKind::Information);
+            return;
+        }
+
+        auto *screen = Capture::screenAtGlobalPoint(target->center());
+        if (screen == nullptr)
+        {
+            notifyUser(GyanisScribe::Core::uiText("这块屏幕已经不在了，重抓不到画面。把贴图挪回还在的屏幕上再刷新"), Ui::ToastKind::Danger);
+            return;
+        }
+
+        // 全局逻辑坐标换成那一块屏内的坐标：抓帧那一路按「哪块屏 + 屏内区域」取图，与标注窗的 F5 同一个口子
+        const QRect   local      = target->translated(-screen->geometry().topLeft());
+        const QString screenName = screen->name();
+        const auto    frame      = m_pins->grabWithPinHidden(index, [this, local, screenName] { return m_capture->grabRegionNow(local, screenName); });
+        if (!frame)
+        {
+            notifyUser(QString::fromUtf8(frame.error().message.c_str()), Ui::ToastKind::Danger);
+            return;
+        }
+
+        // 换内容仍走那一个出口：动图与不在册那两道拒绝只有一份判据
+        auto pixels = frame->image;
+        // 抓回来的图按物理像素交回（dpr 被清成 1），而贴图的显示尺寸是「像素 ÷ dpr」折出来的：
+        // 不把这块屏的 dpr 带回去，刷新一次就把这张图放大 dpr 倍（1.5 倍屏上肉眼可见地跳大）
+        pixels.setDevicePixelRatio(frame->devicePixelRatio > 0.0 ? frame->devicePixelRatio : 1.0);
+        const auto replaced = m_pins->replacePinContent(index, pixels);
+        if (!replaced)
+        {
+            notifyUser(QString::fromUtf8(replaced.error().message.c_str()), Ui::ToastKind::Danger);
+            return;
+        }
+        // 成功不弹提示：按住 F5 连着刷时，每一下弹一条会把要看的画面挡掉（标注窗那条 F5 也是这个做法）
+        Core::Logger::info(std::format("贴图已重抓这块屏幕：{}×{} 像素", frame->image.width(), frame->image.height()));
     }
 
     void AppController::handleOcrRequested(const QImage &image)

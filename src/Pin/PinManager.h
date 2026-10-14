@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <deque>
+#include <functional>
 #include <optional>
 #include <vector>
 
@@ -269,8 +270,29 @@ namespace GyanisScribe::Pin
          * @return 失败带中文原因：贴图不在册，或那是一张动图（换上去的静态像素会被下一帧盖掉）
          * @details 摆位、缩放与角度都不动：这一条换的是「这张图」，不是「这张贴图摆在哪儿」。
          *          像素从剪贴板来，所以内容转换归界面层，这里只管在册与动图两道拒绝。
+         * @note 交进来的像素要带着它来自的那块屏的 dpr：显示尺寸按「像素 ÷ dpr」折算，
+         *       dpr 丢了就等于把这张图放大 dpr 倍（刷新那一路在调用点补这一格，见 AppController）。
          */
         [[nodiscard]] Core::Expected<void> replacePinContent(int index, const QImage &image);
+
+        /**
+         * @brief 这一张要重抓的那块屏幕矩形（全屏逻辑坐标）
+         * @param index 在册表里的序号
+         * @return 那块矩形；不许刷新的那几档返回中文原因（不在册、缩到小图、动图在播）
+         * @details 判据收在这一层而不是界面上：右键那一项的灰态与 `F5` 的拒绝要共用同一份「哪些档不许」。
+         */
+        [[nodiscard]] Core::Expected<QRect> pinRefreshTarget(int index) const;
+
+        /**
+         * @brief 把点名那一暂时从桌上拿走，跑一次取图，再摆回原样
+         * @param index 哪一张
+         * @param grab 真正去抓的那一步（由调用方给，因为抓屏的口子在采集服务那一侧）
+         * @return 抓回来的图；grab 自己失败时原样转回它的错误
+         * @details 藏起来是必须的：贴图压在普通窗口之上，不藏就会抓到「贴图的自己」，
+         *          从第二次刷新起画面就冻在第一帧上。做成一进一出而不是两个方法，
+         *          是为了让「抓失败」「屏幕没了」这些提前返回的路径也不会把那张图留在桌上不见。
+         */
+        [[nodiscard]] Core::Expected<Core::CapturedImage> grabWithPinHidden(int index, const std::function<Core::Expected<Core::CapturedImage>()> &grab);
 
         /// 选中集里有几张（0 表示一张都没选）
         [[nodiscard]] int selectedPinCount() const noexcept;
@@ -388,6 +410,14 @@ namespace GyanisScribe::Pin
          *          取什么内容、换成什么样都由界面层判。
          */
         void pinClipboardReplaceRequested(int index);
+
+        /**
+         * @brief 某张贴图要求重抓自己此刻盖住的那块屏幕（`F5` 与右键「刷新这一张」）
+         * @param index 发起那一张在册表里的序号
+         * @details 与 pinClipboardReplaceRequested 同一条形状：抓屏的口子在采集服务那边（Pin 不链接 Capture），
+         *          这一层只管谁在册、哪些档不许刷新，抓回来的像素仍走 replacePinContent 那个出口。
+         */
+        void pinRefreshRequested(int index);
 
         /**
          * @brief 一次批量保存落了账，把结果交出去（整组菜单里那项「批量保存」）

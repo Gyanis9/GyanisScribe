@@ -5,6 +5,7 @@
 #include "Pin/PinWindow.h"
 
 #include "Core/Paths.h"
+#include "Core/Text.h"
 #include "PinTestAssets.h"
 #include "Pin/PinLayout.h"
 #include "Pin/PinManager.h"
@@ -1054,6 +1055,147 @@ namespace GyanisScribe
         const auto switched = pins.switchToNextGroup();
         ASSERT_TRUE(switched.has_value()) << "名单坏了切组就该退回升序，而不是拒掉这一次：" << switched.error().message;
         EXPECT_EQ(*switched, 2) << "升序里第一组的下一组是第二组";
+    }
+
+
+    /**
+     * @brief 钉住「刷新这一张」要重抓的那块矩形就是图本身占的那块
+     * @details 判据取窗口自己的
+     * globalRect：刷新抓的是「图此刻盖住的屏幕」，
+
+     * * 拿窗口的外接框去抓，斜着的一张会把邻居窗口的像素也框进来。
+     */
+    TEST_F(PinManagerFixture, RefreshTargetIsTheRectTheImageCovers)
+    {
+        auto &pins  = makeManager();
+        auto &first = pins.addPin(makeImage(), QPoint(120, 80));
+
+        const auto target = pins.pinRefreshTarget(0);
+        ASSERT_TRUE(target.has_value()) << target.error().message;
+        EXPECT_EQ(*target, first.globalRect()) << "静图、没旋转时，重抓的矩形就该是这张图占的那块";
+    }
+
+    /**
+     * @brief 钉住不许刷新的那两档与不在册的索引，各自把出路说清
+     * @details
+     * 缩略图那块方块的面积不是这张图的面积；动图换上去的静态像素会被下一帧盖掉——
+
+     * * 两档都该拒绝并报出原因，而不是抓一块错的画面糊上去。
+     */
+    TEST_F(PinManagerFixture, RefreshTargetRefusesThumbnailsAnimatedPinsAndUnknownIndexes)
+    {
+        auto &pins  = makeManager();
+        auto &first = pins.addPin(makeImage(), QPoint(20, 20));
+
+        const auto gifPath = PinTestAssets::writeTwoFrameGif(std::filesystem::temp_directory_path() / "GyanisScribe-PinManager-refresh-refuses-animated.gif");
+        ASSERT_FALSE(gifPath.isEmpty()) << "素材没落到临时文件上";
+        auto &animated = pins.addPin(makeImage(), QPoint(200, 20), gifPath);
+        ASSERT_TRUE(static_cast<Pin::PinWindow *>(&animated)->isAnimated()) << "前提不对：这一张没被当成动图接上";
+
+        const auto refusedAnimated = pins.pinRefreshTarget(1);
+        ASSERT_FALSE(refusedAnimated.has_value());
+        EXPECT_NE(refusedAnimated.error().message.find("动图"), std::string::npos) << refusedAnimated.error().message;
+
+        static_cast<Pin::PinWindow *>(&first)->setThumbnailMode(true);
+        const auto refusedThumbnail = pins.pinRefreshTarget(0);
+        ASSERT_FALSE(refusedThumbnail.has_value());
+        EXPECT_NE(refusedThumbnail.error().message.find("小图"), std::string::npos) << refusedThumbnail.error().message;
+
+        const auto missing = pins.pinRefreshTarget(7);
+        ASSERT_FALSE(missing.has_value());
+        EXPECT_NE(missing.error().message.find("不在册"), std::string::npos) << missing.error().message;
+    }
+
+    /**
+     * @brief 钉住「有人按了刷新」报的是那一张的在册序号
+     * @details
+     * 管理器只把像素交回界面层，认人靠的就是这个序号：报错一张刷成另一张，
+
+     * * 用户看到的是「我按的这张没动，别的那张跳了」。
+     */
+    TEST_F(PinManagerFixture, RefreshRequestCarriesTheIndexOfThePinThatAsked)
+    {
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(20, 20));
+        auto &second = pins.addPin(makeImage(), QPoint(200, 20));
+
+        std::vector<int> seen;
+        QObject::connect(&pins, &Pin::PinManager::pinRefreshRequested, [&seen](const int index) { seen.push_back(index); });
+
+        QKeyEvent press{QEvent::KeyPress, Qt::Key_F5, Qt::NoModifier};
+        QApplication::sendEvent(static_cast<Pin::PinWindow *>(&second), &press);
+
+        ASSERT_EQ(seen.size(), 1u);
+        EXPECT_EQ(seen.front(), 1) << "按在第二张上，报出的却是别的序号";
+    }
+
+    /**
+     * @brief 钉住「抓屏那一刻把这一张藏起来」的两半：抓的时候它不在桌上，抓完一定摆回
+     * @details
+     * 贴图是置顶窗：不藏就会抓到贴图的自己，第二次刷新起画面冻在第一帧。
+
+     * *          摆回要覆盖抓取失败那一路——只藏不回等于把用户的一张图刷没了。
+     */
+    TEST_F(PinManagerFixture, GrabWithPinHiddenHidesItDuringTheGrabAndAlwaysBringsItBack)
+    {
+        auto &pins   = makeManager();
+        auto &first  = pins.addPin(makeImage(), QPoint(60, 60));
+        auto *window = static_cast<Pin::PinWindow *>(&first);
+        window->setAttribute(Qt::WA_DontShowOnScreen);
+        window->show();
+        ASSERT_TRUE(window->isVisible()) << "前提不对：这张该在桌上";
+
+        std::vector<bool> visibleDuringGrab;
+        const auto        grab = [&visibleDuringGrab, window]() -> Core::Expected<Core::CapturedImage>
+        {
+            visibleDuringGrab.push_back(window->isVisible());
+            return Core::CapturedImage{};
+        };
+        const auto ok = pins.grabWithPinHidden(0, grab);
+        ASSERT_TRUE(ok.has_value());
+        ASSERT_EQ(visibleDuringGrab.size(), 1u);
+        EXPECT_FALSE(visibleDuringGrab.front()) << "抓的时候没把这一张藏起来：抓回来的会是贴图的自己";
+        EXPECT_TRUE(window->isVisible()) << "抓完没摆回：那张图从此不在桌上";
+
+        // 抓取失败那一路同样要摆回
+        visibleDuringGrab.clear();
+        const auto failingGrab = [&visibleDuringGrab, window]() -> Core::Expected<Core::CapturedImage>
+        {
+            visibleDuringGrab.push_back(window->isVisible());
+            return std::unexpected(Core::Error{Core::ErrorCode::ScreenUnavailable, GyanisScribe::Core::uiTextUtf8("抓不到这块屏幕")});
+        };
+        const auto failed = pins.grabWithPinHidden(0, failingGrab);
+        ASSERT_FALSE(failed.has_value());
+        EXPECT_FALSE(visibleDuringGrab.front()) << "失败那一路也得先藏起来";
+        EXPECT_TRUE(window->isVisible()) << "抓取失败就把这一张留在桌上不见了";
+    }
+
+
+    /**
+     * @brief 钉住「换内容之后的显示尺寸 = 像素 ÷ 那份像素自带的 dpr」
+     * @details 抓屏那一路交回的是物理像素（图像的 dpr 被清成 1），贴图刷新那一路要把这块屏的
+     * dpr
+     * 带回去，
+     *          否则换一次内容就把图放大 dpr 倍。这一格折算是 replaceContent 唯一的尺寸来源，先把它钉住：
+     *          丢 dpr 的那一版在这里当场红（80×40
+     * 当成 80×40 逻辑像素摆出来）。
+     */
+    TEST_F(PinManagerFixture, ReplacingContentDerivesTheDisplayedSizeFromTheImageDpr)
+    {
+        // 宏里的花括号会被逗号拆开，两份期望尺寸先落名字
+        const QSize startSize{32, 24};
+        const QSize refreshedSize{40, 20};
+
+        auto &pins = makeManager();
+        auto &pin  = pins.addPin(makeImage(), QPoint(40, 40));
+        ASSERT_EQ(pin.globalRect().size(), startSize) << "前提不对：起点该是按原图折出来的那块";
+
+        QImage physical{QSize{80, 40}, QImage::Format_ARGB32};
+        physical.fill(QColor{20, 80, 160});
+        physical.setDevicePixelRatio(2.0);
+        ASSERT_TRUE(pins.replacePinContent(0, physical).has_value()) << "换内容被拒";
+
+        EXPECT_EQ(pin.globalRect().size(), refreshedSize) << "显示尺寸没按 dpr 折算：这张图被摆成了物理像素那么大";
     }
 
 } // namespace GyanisScribe

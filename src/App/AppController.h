@@ -385,6 +385,14 @@ namespace GyanisScribe::App
         void replacePinWithClipboard(int index);
 
         /**
+         * @brief 把某张贴图此刻盖住的那块屏幕重抓一次，换掉它的画面（`F5` 与右键那一项的落点）
+         * @param index 发起那一张在册表里的序号
+         * @details 抓之前那一张要暂时从桌上拿走（贴图是置顶窗，不藏就会抓到贴图的自己），抓完摆回原样；
+         *          摆位、缩放、旋转与透明度都不动。按住不放时键盘自动重复连着报，就成了持续刷新。
+         */
+        void refreshPinWithScreenUnder(int index);
+
+        /**
          * @brief 整组「批量保存」落完账后那一句提示
          * @param report 写成几张、几张没写成，与第一条没写成的原因
          * @details 一次写走 N 份文件，不出声就成了「按了不知道存没存上」；一张都没写成时把原因原样报出来，

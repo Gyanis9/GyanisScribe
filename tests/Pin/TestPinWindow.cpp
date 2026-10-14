@@ -2071,4 +2071,89 @@ namespace GyanisScribe
         EXPECT_EQ(reopenedChecked, 1) << "换档之后菜单上的按下态没跟着走";
     }
 
+
+    /**
+     * @brief 钉住 `F5` 每一下都要一次重抓请求，按住不放（自动重复）时连着报
+     * @details
+     * 长按持续刷新靠的就是键盘自动重复：每重复一下＝一次真重抓，松手定在最后那一帧。
+
+     * *          判据自己造 repeat 标志的那几条事件，不赌这台机器的按键重复设置。
+     */
+    TEST_F(PinWindowFixture, F5AsksForOneRefreshAndKeepsAskingWhileHeld)
+    {
+        auto &window = makeWindow();
+        auto  asks   = 0;
+        QObject::connect(&window, &Pin::PinWindow::refreshRequested, [&asks] { ++asks; });
+
+        pressKey(window, Qt::Key_F5);
+        EXPECT_EQ(asks, 1) << "按一下没要到重抓";
+
+        for (auto attempt = 0; attempt < 2; ++attempt)
+        {
+            QKeyEvent repeated{QEvent::KeyPress, Qt::Key_F5, Qt::NoModifier, QString{}, true};
+            QApplication::sendEvent(&window, &repeated);
+        }
+        EXPECT_EQ(asks, 3) << "自动重复那几下没当成刷新：长按就刷不出实时画面";
+
+        pressKey(window, Qt::Key_F5, Qt::ControlModifier);
+        EXPECT_EQ(asks, 3) << "带修饰键的 F5 不该抢这一条";
+    }
+
+    /**
+     * @brief 钉住旋转时「图本身那块矩形」不跟着外接框一起变大
+     * @details 刷新抓的是图此刻盖住的屏幕。拿旋转后的外接框去抓，斜着的一张会把左右邻居的像素
+
+     * * 一起框进这张图里；中心不动那条规矩则由窗口自己保证。
+     */
+    TEST_F(PinWindowFixture, ImageGlobalRectStaysTheImageAreaWhenRotated)
+    {
+        QImage image{QSize{60, 30}, QImage::Format_ARGB32};
+        image.fill(QColor{10, 200, 30});
+        image.setDevicePixelRatio(1.0);
+        const QSize imageArea{60, 30}; // 宏里的花括号会被逗号拆开，期望值先落一个名字
+        auto       &window = makeWindow(image);
+        window.setAttribute(Qt::WA_DontShowOnScreen);
+        window.show();
+
+        const QRect unrotated = window.imageGlobalRect();
+        EXPECT_EQ(unrotated.size(), imageArea) << "没旋转时重抓的矩形就是图本身那块";
+        EXPECT_EQ(unrotated, window.globalRect()) << "没旋转时两个矩形该重合：投影留边与外接框都不该算进来";
+
+        window.setRotationDegrees(90.0);
+        const QRect turned = window.imageGlobalRect();
+        EXPECT_EQ(turned.size(), imageArea) << "转 90 度后还照外接框抓：那块里一半是别人的屏幕";
+        EXPECT_EQ(turned.center(), window.globalRect().center()) << "旋转后图本身那块还该以窗口为中心";
+
+        window.setRotationDegrees(30.0);
+        const QRect tilted = window.imageGlobalRect();
+        EXPECT_EQ(tilted.size(), imageArea);
+        // QRect 没有 area()：面积按宽高现乘，判据是「斜着时窗口的外接框确实比图本身大一块」
+        EXPECT_GT(window.globalRect().width() * window.globalRect().height(), tilted.width() * tilted.height()) << "斜着时外接框比图本身大，两者混用就说明取错了那块";
+    }
+
+    /**
+     * @brief 钉住「暂时藏起来抓屏」只碰可见性，不碰「收起」那本账
+     * @details 收着的那一张（整桌收起、或在别的组）不该因为刷一次就被摆回桌面——
+
+     * * 那是程序替用户改了他刻意选的状态；反过来，摆在桌上的那张抓完必须摆回来。
+     */
+    TEST_F(PinWindowFixture, TemporarilyHiddenLeavesConcealedPinsConcealed)
+    {
+        auto &window = makeWindow();
+        window.setAttribute(Qt::WA_DontShowOnScreen);
+        window.show();
+        ASSERT_TRUE(window.isVisible()) << "前提不对：这张该在桌上";
+
+        window.setTemporarilyHidden(true);
+        EXPECT_FALSE(window.isVisible()) << "抓屏那一刻没把它拿走：抓回来的会是贴图的自己";
+        window.setTemporarilyHidden(false);
+        EXPECT_TRUE(window.isVisible()) << "摆回那一步没做事：一次刷新就把一张图从桌上弄丢了";
+
+        window.setConcealed(true);
+        ASSERT_FALSE(window.isVisible()) << "前提不对：收起那一档该让它从桌上消失";
+        window.setTemporarilyHidden(true);
+        window.setTemporarilyHidden(false);
+        EXPECT_FALSE(window.isVisible()) << "刷新把用户刻意收起的贴图摆回了桌面";
+    }
+
 } // namespace GyanisScribe

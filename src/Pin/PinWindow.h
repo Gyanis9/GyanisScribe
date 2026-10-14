@@ -126,6 +126,22 @@ namespace GyanisScribe::Pin
         [[nodiscard]] bool isThumbnailMode() const noexcept;
 
         /**
+         * @brief 这张图本身在全屏坐标里占的那块矩形，不算旋转后的外接框
+         * @return 全局逻辑坐标
+         * @details 「刷新这一张」要重抓的就是这一块：旋转后的外接框比图本身大一圈（斜着时更明显），
+         *          照它抓会把邻居窗口的像素也框进这张图里。窗口留的那圈投影带子同样不算进来。
+         */
+        [[nodiscard]] QRect imageGlobalRect() const;
+
+        /**
+         * @brief 抓屏那一刻把这一张从桌上暂时拿走，抓完摆回
+         * @param hidden true 表示藏起来，false 表示摆回藏之前的样子
+         * @details 贴图是置顶窗：不藏就会抓到「贴图的自己」，从第二次刷新起画面就冻在第一帧上。
+         *          摆回只认藏之前它在不在这桌上——收着的那一张（整桌收起或在别的组）不该被这一步摆回桌面。
+         */
+        void setTemporarilyHidden(bool hidden);
+
+        /**
          * @brief 设缩略图那枚方块的边长
          * @param edge 逻辑像素；越界夹进 [24,240]，不静默吞掉越界值
          * @details 方块定多大与「这张图缩放到几倍」是两件事：这一格只改方块的尺寸，
@@ -614,6 +630,14 @@ namespace GyanisScribe::Pin
         void clipboardReplaceRequested();
 
         /**
+         * @brief 这张贴图要求重抓此刻盖住的那块屏幕（`F5` 与右键「刷新这一张」）
+         * @details 抓屏的口子在采集服务那边，窗口不碰来源，只报「这一张要重抓」。按住不放时键盘的自动重复
+         *          会连着报这一下，于是画面持续刷新，松手留下的就是最后抓到的那一帧——这一档不是节流开关，
+         *          每一下都是一次真重抓。
+         */
+        void refreshRequested();
+
+        /**
          * @brief 这张贴图要求把桌上所有看得见的贴图一起选进多选集（`Ctrl+A`）
          * @details 谁在屏上是管理器的账（收着的、别组的都不算），窗口只报「有人按了全选」。
          */
@@ -833,26 +857,27 @@ namespace GyanisScribe::Pin
         bool                                                 m_mouseThrough          = false;                          ///< 是否鼠标穿透
         TransparentBackdrop                                  m_transparentBackdrop   = TransparentBackdrop::ThemeBase; ///< 透明像素底下画哪一档
         bool                                                 m_thumbnail             = false;                          ///< 缩略图模式：窗口缩成小方块，缩放等设定原样留着
-        double                                               m_thumbnailEdge         = kDefaultThumbnailEdge;          ///< 缩略图方块的边长，逻辑像素：拖那枚方块的边就是改它
-        bool                                                 m_shadowEnabled         = false;                          ///< 窗口阴影：窗口比内容每边大 kShadowMargin，投影画在带子里
-        bool                                                 m_smoothScaleEnabled    = true;                           ///< 平滑缩放：关着时放大画的是硬边像素格（读小字用）
-        bool                                                 m_pinned                = true;                           ///< 是否置顶
-        int                                                  m_group                 = kFirstPinGroup;                 ///< 所属贴图分组，菜单与布局记录都取它
-        QVector<int>                                         m_groupChoices{kFirstPinGroup};                           ///< 现有分组号（升序），由管理器推过来
-        QMap<int, QString>                                   m_groupNames;                             ///< 各组名字（管理器推过来），菜单标签与改名输入框的预填都读它
-        bool                                                 m_colorPickMode = false;                  ///< 取色模式：鼠标读像素而不是拖动
-        QPointF                                              m_pickPoint;                              ///< 取色模式下光标在窗口里的位置，读数框跟它走
-        ScreenEdge                                           m_edgeDock = ScreenEdge::None;            ///< 贴的是哪条屏边；None 表示没贴
-        QRect                                                m_dockArea;                               ///< 贴边那一刻那块屏的可用区，收起与展开都按它算
-        bool                                                 m_dockCollapsed = false;                  ///< 贴边后是不是收成了那一条
-        bool                                                 m_dragMoved     = false;                  ///< 这一轮按下之后真拖动过没有（只点一下不吸边）
-        class QMovie                                        *m_movie         = nullptr;                ///< 动图播放器；静图这张贴图时为空
-        QString                                              m_sourceFile;                             ///< 动图的来源文件；进布局记录，重启后按它接上动画
-        QPoint                                               m_dragOffset;                             ///< 移动时起笔点与窗口左上角的差
-        std::function<std::vector<QRect>()>                  m_snapCandidates;                         ///< 起笔时取参照矩形的口径，由管理器供给
-        std::vector<QRect>                                   m_dragCandidates;                         ///< 这一趟拖动的参照快照，整趟都用它，不在每帧重新枚举
-        std::optional<HandleKind>                            m_draggedHandle;                          ///< 正在拖的手柄，没拖时为空
-        double                                               m_dragInitialScale                 = 1.0; ///< 起拖时的缩放
+        bool                                                 m_hiddenForGrab         = false;                 ///< 抓屏那一刻被暂时拿走的那张：摆回时只认这一格，不认「收起」那本账
+        double                                               m_thumbnailEdge         = kDefaultThumbnailEdge; ///< 缩略图方块的边长，逻辑像素：拖那枚方块的边就是改它
+        bool                                                 m_shadowEnabled         = false;                 ///< 窗口阴影：窗口比内容每边大 kShadowMargin，投影画在带子里
+        bool                                                 m_smoothScaleEnabled    = true;                  ///< 平滑缩放：关着时放大画的是硬边像素格（读小字用）
+        bool                                                 m_pinned                = true;                  ///< 是否置顶
+        int                                                  m_group                 = kFirstPinGroup;        ///< 所属贴图分组，菜单与布局记录都取它
+        QVector<int>                                         m_groupChoices{kFirstPinGroup};                  ///< 现有分组号（升序），由管理器推过来
+        QMap<int, QString>                                   m_groupNames;                                    ///< 各组名字（管理器推过来），菜单标签与改名输入框的预填都读它
+        bool                                                 m_colorPickMode = false;                         ///< 取色模式：鼠标读像素而不是拖动
+        QPointF                                              m_pickPoint;                                     ///< 取色模式下光标在窗口里的位置，读数框跟它走
+        ScreenEdge                                           m_edgeDock = ScreenEdge::None;                   ///< 贴的是哪条屏边；None 表示没贴
+        QRect                                                m_dockArea;                                      ///< 贴边那一刻那块屏的可用区，收起与展开都按它算
+        bool                                                 m_dockCollapsed = false;                         ///< 贴边后是不是收成了那一条
+        bool                                                 m_dragMoved     = false;                         ///< 这一轮按下之后真拖动过没有（只点一下不吸边）
+        class QMovie                                        *m_movie         = nullptr;                       ///< 动图播放器；静图这张贴图时为空
+        QString                                              m_sourceFile;                                    ///< 动图的来源文件；进布局记录，重启后按它接上动画
+        QPoint                                               m_dragOffset;                                    ///< 移动时起笔点与窗口左上角的差
+        std::function<std::vector<QRect>()>                  m_snapCandidates;                                ///< 起笔时取参照矩形的口径，由管理器供给
+        std::vector<QRect>                                   m_dragCandidates;                                ///< 这一趟拖动的参照快照，整趟都用它，不在每帧重新枚举
+        std::optional<HandleKind>                            m_draggedHandle;                                 ///< 正在拖的手柄，没拖时为空
+        double                                               m_dragInitialScale                 = 1.0;        ///< 起拖时的缩放
         double                                               m_dragInitialEdge                  = kDefaultThumbnailEdge; ///< 起拖时缩略图方块的边长
         double                                               m_dragInitialDistance              = 0.0;                   ///< 起拖时指针到中心的距离
         bool                                                 m_annotating                       = false;                 ///< 正在贴图上直接标注
