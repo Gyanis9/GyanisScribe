@@ -53,6 +53,7 @@
 #include <format>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -1209,6 +1210,37 @@ TEST_F(MainWindowFixture, EverySettingsPageIsWrappedInAScrollArea)
         EXPECT_TRUE(scroll->widgetResizable()) << "第 " << index << " 页没让内容跟着宽度走：长句会被挤成竖条";
         EXPECT_NE(scroll->widget(), nullptr) << "第 " << index << " 页的滚动区里没装东西";
     }
+}
+
+/**
+ * @brief 钉住界面按键按族分了小标题：二十五行平铺在一起，读的人分不清哪颗键归哪个窗
+ * @details 标题数由清册算出，不是数一遍界面：加一族却忘了给名字（族名返回空串）时，
+ *          前一条判据会红在「标识没有对应的界面名」上，这一条则红在标题数对不上——两处都要有出口。
+ */
+TEST_F(MainWindowFixture, InWindowShortcutRowsAreGroupedUnderFamilyHeadings)
+{
+    makeWindow();
+    m_window->open(MainWindowPage::Hotkey);
+
+    std::set<QString> families;
+    for (const auto &entry: GyanisScribe::Ui::appShortcutEntries())
+    {
+        const auto *name = GyanisScribe::Ui::appShortcutFamilyName(entry.token).data();
+        ASSERT_NE(nullptr, name);
+        families.insert(GyanisScribe::Core::uiText(name));
+    }
+    ASSERT_EQ(families.size(), 3U) << "清册里的族数变了，这一页的小标题与这条判据都要跟着改";
+
+    int headings = 0;
+    for (auto *label: m_window->findChildren<QLabel *>())
+    {
+        if (label->accessibleName() == GyanisScribe::Core::uiText("界面按键的分组标题"))
+        {
+            ++headings;
+            EXPECT_TRUE(families.contains(label->text())) << "多出一个没在清册里的分组标题：" << label->text().toStdString();
+        }
+    }
+    EXPECT_EQ(headings, static_cast<int>(families.size())) << "少一个小标题：那一族的按键就混在别人那一堆里";
 }
 
 /**

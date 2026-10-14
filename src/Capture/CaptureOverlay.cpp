@@ -6,6 +6,8 @@
 #include "Core/Text.h"
 #include "Pick/ColorFormat.h"
 #include "Pick/PickGeometry.h"
+#include "Settings/ISettingsStore.h"
+#include "Ui/AppShortcuts.h"
 #include "Ui/DesignTokens.h"
 #include "Ui/KeyStep.h"
 
@@ -20,13 +22,36 @@
 #include <QGuiApplication>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <numeric>
+#include <string_view>
 
 namespace
 {
     /// 放大镜边框线宽，逻辑像素：与取色遮罩同一档，两处放大镜不能看起来是两个东西
     constexpr int kMagnifierPenWidth = 2;
+
+    /**
+     * @brief 遮罩上可换键的那一档
+     * @details 标识取自 Ui/AppShortcuts.h 那份清册：那颗键现在认给谁，界面上与按键上都由清册说了算。
+     *          表里的顺序不参与判定——同一族的默认那颗互不相同（这一判由 TestAppShortcuts 钉住）。
+     */
+    struct RebindableRow
+    {
+        std::string_view                           token;                     ///< 清册里的标识
+        GyanisScribe::Capture::RebindableKeyAction action;                    ///< 命中之后要走哪个动作
+        bool                                       allowShiftVariant = false; ///< 认不认「同一颗键多按一个 Shift」那一档
+    };
+
+    constexpr std::array<RebindableRow, 6> kRebindableRows = {
+            RebindableRow{"Mask/AspectRatio", GyanisScribe::Capture::RebindableKeyAction::ToggleAspectRatio, false},
+            RebindableRow{"Mask/SizeEditor", GyanisScribe::Capture::RebindableKeyAction::OpenSizeEditor, false},
+            RebindableRow{"Mask/RegionCycle", GyanisScribe::Capture::RebindableKeyAction::CycleRegionHistory, true},
+            RebindableRow{"Mask/CopySize", GyanisScribe::Capture::RebindableKeyAction::CopySelectedSize, false},
+            RebindableRow{"Mask/ColorFormat", GyanisScribe::Capture::RebindableKeyAction::CycleColorFormat, false},
+            RebindableRow{"Mask/PointerToggle", GyanisScribe::Capture::RebindableKeyAction::ToggleCursor, false},
+    };
 
     /// 放大镜下面那条读数条的高度，逻辑像素
     constexpr int kMagnifierStripHeight = 24;
@@ -44,8 +69,8 @@ namespace
 namespace GyanisScribe::Capture
 {
 
-    CaptureOverlay::CaptureOverlay(const QImage &background, const QRect &screenGeometry, qreal devicePixelRatio, QWidget *parent) :
-        QWidget(parent), m_screenGeometry(screenGeometry), m_devicePixelRatio(devicePixelRatio)
+    CaptureOverlay::CaptureOverlay(const QImage &background, const QRect &screenGeometry, qreal devicePixelRatio, Settings::ISettingsStore &settings, QWidget *parent) :
+        QWidget(parent), m_settings(settings), m_screenGeometry(screenGeometry), m_devicePixelRatio(devicePixelRatio)
     {
         // 物理像素图按该屏缩放因子标记一次，之后的绘制一律用逻辑坐标，读数与选区才对得上同一个点
         m_background = background;
@@ -543,80 +568,29 @@ namespace GyanisScribe::Capture
             return;
         }
 
-        switch (event->key())
+        // 可换键的那几档排在按颗键判定的 switch 之前：它们认的是清册里现在那颗键，整颗组合相等才算命中。
+        // 换上去的键与既有组合（如 Ctrl+A）撞上时这一层先赢——用户把它换上来就是要这颗键归这一档
+        switch (const auto action = rebindableActionFor(event); action)
         {
-            case Qt::Key_Escape:
-                emit dismissed();
+            case RebindableKeyAction::None:
+                break;
+            case RebindableKeyAction::ToggleAspectRatio:
+                toggleAspectRatioLock();
                 return;
-            case Qt::Key_Return:
-            case Qt::Key_Enter:
-                confirmSelection();
-                return;
-            case Qt::Key_A:
-                // 裸按 A 锁/解长宽比；Ctrl+A 选整块屏：多屏上省掉从一角拖到另一角这一趟
-                if (event->modifiers() == Qt::NoModifier)
-                {
-                    toggleAspectRatioLock();
-                    return;
-                }
-                if (event->modifiers() != Qt::ControlModifier)
-                {
-                    QWidget::keyPressEvent(event);
-                    return;
-                }
-                m_anchorPoint  = QPoint{0, 0};
-                m_currentPoint = QPoint{size().width() - 1, size().height() - 1};
-                m_historyIndex = -1; // 整屏不是取自历史：下一次 R 该从最近一条重新起
-                update();
-                return;
-            case Qt::Key_S:
-                // 裸按 S 开尺寸输入框：敲「宽x高」回车应用，选区左上角不动
-                if (event->modifiers() != Qt::NoModifier)
-                {
-                    QWidget::keyPressEvent(event);
-                    return;
-                }
+            case RebindableKeyAction::OpenSizeEditor:
                 openSizeEditor();
                 return;
-            case Qt::Key_Comma:
-            case Qt::Key_Period:
+            case RebindableKeyAction::CycleRegionHistory:
             {
-                // `,` 往上一层、`.` 往回一层：悬停认出的界面元素从最深一级起，按这两个键在层级间走，
-                // 走到最外层再往上就是整扇窗口，与「悬停认窗」正好接上。没有元素链时什么都不做，别留哑键
-                if (event->modifiers() != Qt::NoModifier || m_elementChain.empty())
-                {
-                    QWidget::keyPressEvent(event);
-                    return;
-                }
-                if (event->key() == Qt::Key_Comma)
-                {
-                    // 上限是链长：等于链长那一档看的就是整扇窗口
-                    m_elementAscent = std::min(m_elementAscent + 1, m_elementChain.size());
-                } else if (m_elementAscent > 0)
-                {
-                    --m_elementAscent;
-                }
-                refreshHoveredRegion();
-                update();
-                return;
-            }
-            case Qt::Key_R:
-            {
-                // `R` / `Shift+R` 在最近几次选区之间循环挑：转一圈回到起点。方向键那一档是「挪一格」，
-                // 这一档是「换一块」。没有历史时什么都不做，不留一个按了没反应的哑键
-                if (event->modifiers() != Qt::NoModifier && event->modifiers() != Qt::ShiftModifier)
-                {
-                    QWidget::keyPressEvent(event);
-                    return;
-                }
+                // 没有历史时什么都不做，不留一个按了没反应的哑键
                 if (m_regionHistory.empty())
                 {
                     QWidget::keyPressEvent(event);
                     return;
                 }
-
                 const auto count = static_cast<int>(m_regionHistory.size());
-                const auto step  = event->modifiers().testFlag(Qt::ShiftModifier) ? -1 : 1;
+                // 多按了一个 Shift 就是反向：转一圈回到起点。方向键那一档是「挪一格」，这一档是「换一块」
+                const auto step = event->modifiers().testFlag(Qt::ShiftModifier) ? -1 : 1;
                 if (m_historyIndex < 0)
                 {
                     // 还没从历史里挑过：正向从最近一条起、反向从最久一条起——两头各自从各自那一端起步
@@ -636,13 +610,7 @@ namespace GyanisScribe::Capture
                 update();
                 return;
             }
-            case Qt::Key_V:
-                // 裸按 V 把当前选区的成品像素尺寸复制进剪贴板：贴给别人时先报一句「多大」
-                if (event->modifiers() != Qt::NoModifier)
-                {
-                    QWidget::keyPressEvent(event);
-                    return;
-                }
+            case RebindableKeyAction::CopySelectedSize:
                 if (const auto region = selectedRegion(); !region.isNull())
                 {
                     if (const auto physical = toPhysicalRect(region, m_devicePixelRatio); physical)
@@ -654,23 +622,16 @@ namespace GyanisScribe::Capture
                     }
                 }
                 return;
-            case Qt::Key_C:
-                // 裸按 C 轮换读数里颜色那一格的写法（词表见 Pick/ColorFormat，六个轮一圈）：对着目标程序核对配色时
-                // 常常要换一种写法看，不必为这个先离开截图去设置里改一档。
-                // 带修饰键的不认——Shift 已经被「挪右下角」用掉了，Ctrl/Alt 留给系统组合
-                if (event->modifiers() != Qt::NoModifier)
-                {
-                    QWidget::keyPressEvent(event);
-                    return;
-                }
+            case RebindableKeyAction::CycleColorFormat:
+                // 读数里颜色那一格换一种写法（词表见 Pick/ColorFormat，六个轮一圈）：对着目标程序核对配色时
+                // 常常要换一种写法看，不必为这个先离开截图去设置里改一档
                 m_readoutFormat = *Pick::colorFormatAt((Pick::indexOfColorFormat(m_readoutFormat) + 1) % static_cast<int>(Pick::kColorFormatCount));
                 update();
                 return;
-            case Qt::Key_P:
-                // 裸按 P 翻这一轮的「成品含不含指针」：截菜单与悬停提示时想带指针，下一张又想要干净的，
-                // 为这个先退出遮罩去设置里改两趟不是出路。只改这一轮，配置那一格不动。
-                // 滚动长截图那一轮根本没有这一档（按帧接图会把一枚指针复制成一串），这时 P 交回 Qt。
-                if (event->modifiers() != Qt::NoModifier || !m_cursorIncluded.has_value())
+            case RebindableKeyAction::ToggleCursor:
+                // 只改这一轮，配置那一格不动。滚动长截图那一轮根本没有这一档（按帧接图会把一枚指针复制成一串），
+                // 这时交回 Qt
+                if (!m_cursorIncluded.has_value())
                 {
                     QWidget::keyPressEvent(event);
                     return;
@@ -680,10 +641,69 @@ namespace GyanisScribe::Capture
                 emit cursorIncludeChanged(*m_cursorIncluded);
                 update();
                 return;
+        }
+
+        switch (event->key())
+        {
+            case Qt::Key_Escape:
+                emit dismissed();
+                return;
+            case Qt::Key_Return:
+            case Qt::Key_Enter:
+                confirmSelection();
+                return;
+            case Qt::Key_A:
+                // Ctrl+A 选整块屏：多屏上省掉从一角拖到另一角这一趟。裸按那一档归清册，在上面已经判过
+                if (event->modifiers() != Qt::ControlModifier)
+                {
+                    QWidget::keyPressEvent(event);
+                    return;
+                }
+                m_anchorPoint  = QPoint{0, 0};
+                m_currentPoint = QPoint{size().width() - 1, size().height() - 1};
+                m_historyIndex = -1; // 整屏不是取自历史：下一次挑历史选区该从最近一条重新起
+                update();
+                return;
+            case Qt::Key_Comma:
+            case Qt::Key_Period:
+            {
+                // `,` 往上一层、`.` 往回一层：悬停认出的界面元素从最深一级起，按这两个键在层级间走，
+                // 走到最外层再往上就是整扇窗口，与「悬停认窗」正好接上。没有元素链时什么都不做，别留哑键。
+                // 这两颗不给换：符号键不在允许集合里（不同布局上落点不同），而且它们是一对，改一颗另一颗就配不成对
+                if (event->modifiers() != Qt::NoModifier || m_elementChain.empty())
+                {
+                    QWidget::keyPressEvent(event);
+                    return;
+                }
+                if (event->key() == Qt::Key_Comma)
+                {
+                    // 上限是链长：等于链长那一档看的就是整扇窗口
+                    m_elementAscent = std::min(m_elementAscent + 1, m_elementChain.size());
+                } else if (m_elementAscent > 0)
+                {
+                    --m_elementAscent;
+                }
+                refreshHoveredRegion();
+                update();
+                return;
+            }
             default:
                 QWidget::keyPressEvent(event);
                 return;
         }
+    }
+
+    RebindableKeyAction CaptureOverlay::rebindableActionFor(const QKeyEvent *event) const
+    {
+        for (const auto &row: kRebindableRows)
+        {
+            const auto *entry = GyanisScribe::Ui::appShortcutEntry(row.token);
+            if (entry != nullptr && GyanisScribe::Ui::isAppShortcutHit(m_settings, *entry, event->key(), event->modifiers(), row.allowShiftVariant))
+            {
+                return row.action;
+            }
+        }
+        return RebindableKeyAction::None;
     }
 
     void CaptureOverlay::setLockedAspectRatio(const QSize &ratio)

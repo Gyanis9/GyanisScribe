@@ -57,7 +57,7 @@ namespace GyanisScribe::Pin
      * @brief 可以「整组动」的状态开关
      * @details 多选时这些动作对整组生效（范围由 PinManager 决定：这张在选中集里就整组，否则只有它自己）；
      *          内容相关的操作（标注、裁剪、取色、保存、识别文字、分组）不走这一档，它们指向的是
-     *          「这一张的内容」；键位（`R`/`0`/`H`/`V`/`G`/`I`/`T`）也只动这一张——菜单是整组的入口。
+     *          「这一张的内容」；键位（默认的 `R`/`0`/`H`/`V`/`G`/`I`/`T`，其中几档可在快捷键页换）也只动这一张——菜单是整组的入口。
      */
     enum class PinBatchAction
     {
@@ -68,6 +68,23 @@ namespace GyanisScribe::Pin
         Inverted,       ///< 反色
         FlipHorizontal, ///< 左右翻转
         FlipVertical,   ///< 上下翻转
+    };
+
+    /**
+     * @brief 贴图窗上一条可换键的裸键对应哪个动作
+     * @details 用例按这张表逐条钉：清册读出的那颗键要落到对应的动作上，落错一档就是「按了灰度却翻了面」。
+     *          `0` 与 Ctrl+A / Ctrl+V / F5 不在这一批里——前者是「回到原样」那一档的固定入口，
+     *          后三者是带修饰键的组合，归系统惯例那一档。
+     */
+    enum class RebindablePinKeyAction
+    {
+        None,           ///< 这颗键没绑给这个窗口的任何一档
+        Thumbnail,      ///< 缩到小图 / 还原
+        Rotate,         ///< 转正一挡；多按一个 Shift 是逆转一挡
+        FlipHorizontal, ///< 左右翻转
+        FlipVertical,   ///< 上下翻转
+        Gray,           ///< 灰度显示
+        Invert,         ///< 反色
     };
 
     /// 前置声明：整组动那一档的落地函数在两处共用（见下）
@@ -730,6 +747,16 @@ namespace GyanisScribe::Pin
          * @param event 键盘事件；带 Ctrl 的字母不归这里管，交回 Qt
          */
         void keyPressEvent(QKeyEvent *event) override;
+
+        /**
+         * @brief 这一次按键落在贴图窗哪一档可换键上
+         * @param event 按键事件
+         * @return 对应动作；一颗都没认到时返回 None
+         * @details 键位读 Ui/AppShortcuts.h 那份清册，整颗组合相等才算命中；「转正」那一档还认
+         *          多按一个 Shift 的反向挡，方向由调用处按 Shift 位判。撞上 Ctrl+A / Ctrl+V 这类
+         *          既有组合时这一层先赢——用户把它换上来就是要这颗键归这一档。
+         */
+        [[nodiscard]] RebindablePinKeyAction rebindableActionFor(const QKeyEvent *event) const;
 
         /**
          * @brief 右键弹出菜单

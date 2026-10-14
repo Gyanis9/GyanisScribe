@@ -24,8 +24,28 @@
 
 class QLineEdit;
 
+namespace GyanisScribe::Settings
+{
+    class ISettingsStore;
+} // namespace GyanisScribe::Settings
+
 namespace GyanisScribe::Capture
 {
+
+    /**
+     * @brief 遮罩上一条可换键的裸键对应哪个动作
+     * @details 用例按这张表逐条钉：清册读出的那颗键要落到对应的动作上，落错一档就是「按了锁比例却开了尺寸框」。
+     */
+    enum class RebindableKeyAction
+    {
+        None,               ///< 这颗键不归可换那一批管
+        ToggleAspectRatio,  ///< 锁 / 解长宽比
+        OpenSizeEditor,     ///< 开尺寸输入框
+        CycleRegionHistory, ///< 在最近几次选区之间循环挑（多按一个 Shift 是反向）
+        CopySelectedSize,   ///< 把选区的成品像素尺寸复制进剪贴板
+        CycleColorFormat,   ///< 放大镜读数里颜色那一格换一种写法
+        ToggleCursor,       ///< 翻这一轮的「成品含鼠标指针」
+    };
 
     /**
      * @brief 一块屏幕上的框选遮罩
@@ -43,9 +63,10 @@ namespace GyanisScribe::Capture
          * @param background 该屏的物理像素图，选区内显示它的原图
          * @param screenGeometry 该屏的全局逻辑几何，遮罩就铺在这一块上
          * @param devicePixelRatio 该屏缩放因子，必须大于 0
+         * @param settings 配置存储：裸键那几档从 Ui/AppShortcuts.h 那份清册现读；生命周期必须长于本遮罩
          * @param parent 父窗口，默认无
          */
-        CaptureOverlay(const QImage &background, const QRect &screenGeometry, qreal devicePixelRatio, QWidget *parent = nullptr);
+        CaptureOverlay(const QImage &background, const QRect &screenGeometry, qreal devicePixelRatio, Settings::ISettingsStore &settings, QWidget *parent = nullptr);
 
         /**
          * @brief 析构遮罩
@@ -306,19 +327,30 @@ namespace GyanisScribe::Capture
         void closeSizeEditor();
 
         /**
+         * @brief 这一次按键落在清册里哪一档可换键上
+         * @param event 按键事件
+         * @return 对应动作；一颗都没认到时返回 None
+         * @details 键位读 Ui/AppShortcuts.h 那份清册，整颗组合相等才算命中；「挑最近选区」那一档
+         *          还认多按一个 Shift 的反向档，方向由调用处按 Shift 位判。
+         *          这一层排在 switch 之前，所以 Ctrl+A 这类既有组合与换上去的键撞上时，换上去的那一档赢。
+         */
+        [[nodiscard]] RebindableKeyAction rebindableActionFor(const QKeyEvent *event) const;
+
+        /**
          * @brief 放大镜读数条上的坐标部分
          * @return 形如「(1920, 300)」的全局逻辑坐标
          */
         [[nodiscard]] QString formatCursorReadout() const;
 
-        QImage            m_background;                              ///< 该屏的物理像素图，按缩放因子画成逻辑大小
-        QRect             m_screenGeometry;                          ///< 该屏的全局逻辑几何
-        qreal             m_devicePixelRatio = 1.0;                  ///< 该屏缩放因子
-        QPoint            m_anchorPoint;                             ///< 本次框选的按下点，局部逻辑坐标
-        QPoint            m_currentPoint;                            ///< 框选过程中的当前点
-        QPoint            m_cursorPoint;                             ///< 光标最近所在点，只喂辅助线、悬停与放大镜，不参与选区计算
-        bool              m_hasCursorPoint = false;                  ///< 是否收到过鼠标移动：没有就不摆放大镜，别把 (0,0) 当成光标
-        Pick::ColorFormat m_readoutFormat  = Pick::ColorFormat::Hex; ///< 读数里颜色那格的写法，按 C 轮换
+        QImage                    m_background;                              ///< 该屏的物理像素图，按缩放因子画成逻辑大小
+        Settings::ISettingsStore &m_settings;                                ///< 裸键那几档的读端（Ui/AppShortcuts.h 那份清册），不拥有
+        QRect                     m_screenGeometry;                          ///< 该屏的全局逻辑几何
+        qreal                     m_devicePixelRatio = 1.0;                  ///< 该屏缩放因子
+        QPoint                    m_anchorPoint;                             ///< 本次框选的按下点，局部逻辑坐标
+        QPoint                    m_currentPoint;                            ///< 框选过程中的当前点
+        QPoint                    m_cursorPoint;                             ///< 光标最近所在点，只喂辅助线、悬停与放大镜，不参与选区计算
+        bool                      m_hasCursorPoint = false;                  ///< 是否收到过鼠标移动：没有就不摆放大镜，别把 (0,0) 当成光标
+        Pick::ColorFormat         m_readoutFormat  = Pick::ColorFormat::Hex; ///< 读数里颜色那格的写法，按 C 轮换
 
         std::vector<QRect>           m_regionHistory;         ///< 这块屏上的历史选区，最近的在前；由 CaptureService 推过来
         int                          m_historyIndex = -1;     ///< 当前选区取自历史里的哪一条；-1 表示不是取自历史（用户自己框/改的）

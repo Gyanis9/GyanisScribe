@@ -26,9 +26,11 @@ namespace
     using GyanisScribe::Ui::appShortcutEntries;
     using GyanisScribe::Ui::AppShortcutEntry;
     using GyanisScribe::Ui::appShortcutEntry;
+    using GyanisScribe::Ui::appShortcutFamilyName;
     using GyanisScribe::Ui::appShortcutKey;
     using GyanisScribe::Ui::appShortcutText;
     using GyanisScribe::Ui::appShortcutValue;
+    using GyanisScribe::Ui::isAppShortcutHit;
 
     /**
      * @brief 一份用例独占的配置文件
@@ -112,15 +114,16 @@ namespace
     }
 
     /**
-     * @brief 钉住清册本身是自洽的：默认那颗能当界面按键、彼此不撞、标识不重复，且键名落在 Ui/Shortcut/ 那一族
-     * @details 这条是「表写错了会在运行期表现为某档工具切不动」的前置闸门：
-     *          默认那颗读不出、或两档共用一颗键，都是建表时就该红的事。
+     * @brief 钉住清册本身是自洽的：默认那颗能当界面按键、同族内不撞、标识不重复，而且键名落在 Ui/Shortcut/ 那一族
+     * @details 这条是「表写错了会在运行期表现为某档按键没反应」的前置闸门：默认那颗读不出、
+     *          同窗两档共用一颗键、或标识撞了，都该在建表这一步就红。
+     *          唯一性按族分组判：不同窗口撞字母是常态（遮罩的 V 复制尺寸、贴图的 V 上下翻转），
+     *          整体判唯一会把这种正常形状当错误——那正是上一版这条判据红掉的原因。
      */
     TEST_F(AppShortcutFixture, RegistryRowsAreBindableUniqueAndKeyedUnderThePrefix)
     {
         ASSERT_FALSE(appShortcutEntries().empty()) << "清册空着，下面每一段循环都是空跑";
 
-        std::vector<std::string> keys;
         std::vector<std::string> tokens;
         for (const auto &entry: appShortcutEntries())
         {
@@ -130,15 +133,50 @@ namespace
             // 默认那颗都是裸键：它们不该顺手成为一条全局热键，否则在别的程序里也会抢键
             EXPECT_FALSE(parsed->checkUsableGlobally().has_value()) << std::string{entry.token} << " 的默认键带修饰键，那是全局档的事";
 
-            keys.push_back(std::string{entry.defaultKey});
-            tokens.push_back(std::string{entry.token});
+            // 族名空 = 设置页那一栏没有小标题，读的人分不清这颗键归哪个窗
+            EXPECT_FALSE(appShortcutFamilyName(entry.token).empty()) << std::string{entry.token} << " 的标识前缀没有对应的界面名";
             EXPECT_EQ(appShortcutKey(entry.token), QStringLiteral("Ui/Shortcut/") + QString::fromUtf8(entry.token.data(), static_cast<int>(entry.token.size())))
                     << "键名要落在 kAppShortcutPrefix 那一族里，设置页与订阅都按这个前缀找";
-        }
 
-        std::ranges::sort(keys);
+            tokens.push_back(std::string{entry.token});
+        }
         std::ranges::sort(tokens);
-        EXPECT_EQ(std::ranges::adjacent_find(keys), keys.end()) << "两档默认共用一颗键，按下它谁都不该赢";
         EXPECT_EQ(std::ranges::adjacent_find(tokens), tokens.end()) << "标识重复会让两档读到同一个配置键";
+
+        // 同族之内一颗键只能归一档：按下它时有两档认领就是「谁都不该赢」的那件事
+        for (const auto &entry: appShortcutEntries())
+        {
+            int shared = 0;
+            for (const auto &other: appShortcutEntries())
+            {
+                if (other.defaultKey == entry.defaultKey && appShortcutFamilyName(other.token) == appShortcutFamilyName(entry.token))
+                {
+                    ++shared;
+                }
+            }
+            EXPECT_EQ(shared, 1) << std::string{entry.token} << " 与同族的另一档共用了默认那颗键";
+        }
+    }
+
+    /**
+     * @brief 钉住带反向档的那两档：反向档跟着用户换过的那颗键走，而不是钉死在原来那个字母上
+     * @details 贴图「转正」与遮罩「挑最近选区」各有一个按住 Shift 的反向挡。判三件事：
+     *          默认那颗认裸按也认 Shift、不认带 Ctrl 的；换成带 Ctrl 的组合后正向与反向都搬过去；
+     *          以及不申请反向挡时 Shift 那一下不算命中（标注那十三档就没有反向挡）。
+     */
+    TEST_F(AppShortcutFixture, ShiftVariantTravelsWithTheBoundKey)
+    {
+        const auto *rotate = appShortcutEntry("Pin/Rotate");
+        ASSERT_NE(rotate, nullptr);
+
+        EXPECT_TRUE(isAppShortcutHit(*m_settings, *rotate, Qt::Key_R, Qt::NoModifier, true)) << "默认那颗的裸按该命中";
+        EXPECT_TRUE(isAppShortcutHit(*m_settings, *rotate, Qt::Key_R, Qt::ShiftModifier, true)) << "反向挡就是同一颗键多按一个 Shift";
+        EXPECT_FALSE(isAppShortcutHit(*m_settings, *rotate, Qt::Key_R, Qt::ShiftModifier)) << "不申请反向挡时 Shift 那一下不算命中";
+        EXPECT_FALSE(isAppShortcutHit(*m_settings, *rotate, Qt::Key_R, Qt::ControlModifier, true)) << "带 Ctrl 的那一下归组合键，不归这一档";
+
+        ASSERT_TRUE(storeKey(rotate->token, QStringLiteral("Ctrl+G"))) << "写入失败";
+        EXPECT_TRUE(isAppShortcutHit(*m_settings, *rotate, Qt::Key_G, Qt::ControlModifier, true)) << "换过之后正向挡要跟着搬";
+        EXPECT_TRUE(isAppShortcutHit(*m_settings, *rotate, Qt::Key_G, Qt::ControlModifier | Qt::ShiftModifier, true)) << "反向挡也跟着搬：那颗组合再加一个 Shift";
+        EXPECT_FALSE(isAppShortcutHit(*m_settings, *rotate, Qt::Key_R, Qt::NoModifier, true)) << "旧那颗键不再归这一档";
     }
 } // namespace

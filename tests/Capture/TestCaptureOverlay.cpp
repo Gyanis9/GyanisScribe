@@ -5,6 +5,8 @@
 
 #include "Pick/ColorFormat.h"
 #include "Pick/PickGeometry.h"
+#include "Settings/SettingsStore.h"
+#include "Ui/AppShortcuts.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -19,6 +21,8 @@
 
 #include <gtest/gtest.h>
 
+#include <filesystem>
+#include <format>
 #include <memory>
 #include <vector>
 
@@ -49,18 +53,45 @@ namespace
             application.reset();
         }
 
+        void SetUp() override
+        {
+            // 一条用例一份 INI：遮罩的裸键读数从这里来，并行跑时两个进程写同一份会互相盖掉
+            const auto *info = ::testing::UnitTest::GetInstance()->current_test_info();
+            m_iniPath        = std::filesystem::temp_directory_path() / std::format("GyanisScribe-CaptureOverlay-{}-{}.ini", info->test_suite_name(), info->name());
+            std::error_code ignored;
+            std::filesystem::remove(m_iniPath, ignored);
+            m_settings = std::make_unique<GyanisScribe::Settings::SettingsStore>(m_iniPath);
+        }
+
+        void TearDown() override
+        {
+            // 先放 store（它会冲刷配置），再删文件
+            m_settings.reset();
+            std::error_code ignored;
+            std::filesystem::remove(m_iniPath, ignored);
+        }
+
+        /// 换键那几条判据要往配置里写一颗新键，读端就是这一份
+        [[nodiscard]] GyanisScribe::Settings::ISettingsStore &settings() const
+        {
+            return *m_settings;
+        }
+
         [[nodiscard]] std::unique_ptr<CaptureOverlay> makeOverlay() const
         {
             QImage background(kScreenGeometry.size(), QImage::Format_ARGB32_Premultiplied);
             background.fill(Qt::white);
-            return std::make_unique<CaptureOverlay>(background, kScreenGeometry, 1.0);
+            return std::make_unique<CaptureOverlay>(background, kScreenGeometry, 1.0, *m_settings);
         }
 
         /// 用给定的冻帧与缩放因子造遮罩：放大镜的两笔换算都要在这条路上验
         [[nodiscard]] std::unique_ptr<CaptureOverlay> makeOverlay(const QImage &background, qreal devicePixelRatio) const
         {
-            return std::make_unique<CaptureOverlay>(background, kScreenGeometry, devicePixelRatio);
+            return std::make_unique<CaptureOverlay>(background, kScreenGeometry, devicePixelRatio, *m_settings);
         }
+
+        std::filesystem::path                                  m_iniPath;  ///< 本次用例专用的设置文件
+        std::unique_ptr<GyanisScribe::Settings::SettingsStore> m_settings; ///< 裸键清册的读端
     };
 
     /// 事件的局部坐标给控件自己读（position()），全局那一份按这块屏的原点推出去
@@ -883,4 +914,74 @@ TEST_F(CaptureOverlayFixture, PointerKeyTogglesCursorForThisRound)
     longRound->setCursorIncluded(std::nullopt);
     pressKey(*longRound, Qt::Key_P);
     EXPECT_FALSE(longRound->cursorIncluded().has_value()) << "这一轮没有这一档时，P 该交回 Qt";
+}
+
+/**
+ * @brief 钉住「在设置页换过一颗键」之后遮罩跟着换，旧那颗当场让位
+ * @details 这条钉的是「键位只住在 Ui/AppShortcuts.h 那份清册一处」：锁比例换成 G 之后，
+ *          按 G 锁得上、按 A 不再动它。默认那颗由别几条判据钉着落对动作，这一条钉的是分派读的是清册；
+ *          两处缺一个就会出现「设置改了没反应」或「按屏幕上写的键没反应」。
+ */
+TEST_F(CaptureOverlayFixture, ReboundAspectRatioKeyMovesToTheNewLetter)
+{
+    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Ui::appShortcutKey("Mask/AspectRatio").toStdString(), QStringLiteral("G")))) << "写入失败";
+
+    auto overlay = makeOverlay();
+    dragOut(*overlay, QPoint{100, 100}, QPoint{299, 199});
+    ASSERT_EQ(overlay->selectedRegion(), QRect(100, 100, 200, 100)) << "前提不对：先自由框一块 200×100";
+
+    pressKey(*overlay, Qt::Key_A);
+    EXPECT_TRUE(overlay->lockedAspectRatio().isEmpty()) << "换走之后 A 还管锁比例，同一件事就有了两个入口";
+
+    pressKey(*overlay, Qt::Key_G);
+    EXPECT_EQ(overlay->lockedAspectRatio(), (QSize(2, 1))) << "G 没接住锁比例这一档";
+}
+
+/**
+ * @brief 钉住「挑最近框过的选区」换成别的字母后，Shift 那个反向挡也一起搬过去
+ * @details 这一档是唯一带反向挡的遮罩键：反向不是另一颗键，而是同一颗键多按一个 Shift。
+ *          判据按「旧字母不再动、新字母正反向都动」三件事钉，缺一条就是清册与分派分家。
+ */
+TEST_F(CaptureOverlayFixture, ReboundRegionCycleKeyCarriesItsReverse)
+{
+    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Ui::appShortcutKey("Mask/RegionCycle").toStdString(), QStringLiteral("J")))) << "写入失败";
+
+    auto overlay = makeOverlay();
+    overlay->setRegionHistory({QRect{10, 10, 50, 40}, QRect{200, 200, 60, 60}});
+
+    pressKey(*overlay, Qt::Key_R);
+    EXPECT_TRUE(overlay->selectedRegion().isNull()) << "旧那颗 R 还在挑历史选区";
+
+    pressKey(*overlay, Qt::Key_J);
+    EXPECT_EQ(overlay->selectedRegion(), QRect(10, 10, 50, 40)) << "J 没接住「挑最近框过的选区」";
+
+    pressKey(*overlay, Qt::Key_J, Qt::ShiftModifier);
+    EXPECT_EQ(overlay->selectedRegion(), QRect(200, 200, 60, 60)) << "反向挡没跟着搬：Shift 那一下仍归旧字母";
+}
+
+/**
+ * @brief 钉住指针那一档换了字母仍然只翻「这一轮」，而且这一轮没有这一档时照样交回 Qt
+ * @details 换键不能把「不写回配置」与「长截图那一轮没有这一档」这两条规矩一起改掉——
+ *          那两条是这一档存在的理由，判据把它们跟新字母一起钉住。
+ */
+TEST_F(CaptureOverlayFixture, ReboundPointerKeyKeepsTheRoundScopedRules)
+{
+    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Ui::appShortcutKey("Mask/PointerToggle").toStdString(), QStringLiteral("B")))) << "写入失败";
+
+    int  reports = 0;
+    auto overlay = makeOverlay();
+    overlay->setCursorIncluded(false);
+    QObject::connect(overlay.get(), &CaptureOverlay::cursorIncludeChanged, [&](const bool) { ++reports; });
+
+    pressKey(*overlay, Qt::Key_P);
+    EXPECT_EQ(reports, 0) << "换走之后 P 还在翻指针那一档";
+    pressKey(*overlay, Qt::Key_B);
+    EXPECT_EQ(reports, 1) << "B 没接住这一档";
+    EXPECT_TRUE(overlay->cursorIncluded().value_or(false)) << "翻出来的不是「含指针」";
+
+    // 滚动长截图那一轮初值就是空：换了字母也不该凭空造出一档来
+    auto longRound = makeOverlay();
+    longRound->setCursorIncluded(std::nullopt);
+    pressKey(*longRound, Qt::Key_B);
+    EXPECT_FALSE(longRound->cursorIncluded().has_value()) << "这一轮没有这一档时，新那颗键也该交回 Qt";
 }

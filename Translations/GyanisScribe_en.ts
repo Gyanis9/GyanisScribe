@@ -1592,6 +1592,10 @@
             <translation>Heading of the in-window keys section</translation>
         </message>
         <message>
+            <source>界面按键的分组标题</source>
+            <translation>Heading of an in-window key group</translation>
+        </message>
+        <message>
             <source>恢复默认</source>
             <translation>Restore default</translation>
         </message>
@@ -3230,6 +3234,38 @@
         <message>
             <source>配置导入文件不是一个 JSON 对象：{}（{}）。请导出本程序生成的那份再导入</source>
             <translation>The settings import file isn't a JSON object: {} ({}). Import the file this program exported instead.</translation>
+        </message>
+        <message>
+            <source>锁定长宽比</source>
+            <translation>Lock the aspect ratio</translation>
+        </message>
+        <message>
+            <source>开尺寸输入框</source>
+            <translation>Open the size box</translation>
+        </message>
+        <message>
+            <source>挑最近框过的选区</source>
+            <translation>Pick a recently framed region</translation>
+        </message>
+        <message>
+            <source>复制选区尺寸</source>
+            <translation>Copy the selection size</translation>
+        </message>
+        <message>
+            <source>颜色写法换一种</source>
+            <translation>Switch the color notation</translation>
+        </message>
+        <message>
+            <source>这一张含不含鼠标指针</source>
+            <translation>Whether this shot includes the mouse pointer</translation>
+        </message>
+        <message>
+            <source>转正一挡</source>
+            <translation>Rotate a quarter turn</translation>
+        </message>
+        <message>
+            <source>缩到小图 / 还原</source>
+            <translation>Shrink to thumbnail / restore</translation>
         </message>
         <message>
             <source>点击后按下快捷键</source>

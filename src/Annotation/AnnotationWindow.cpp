@@ -93,11 +93,10 @@ namespace GyanisScribe::Annotation
     {
         // 整颗组合相等才算命中：默认那十三颗是裸字母，于是 Ctrl+Z 这类组合不会顺手把撤销当成换工具；
         // 用户把某一档换成带修饰键的组合后，那颗组合也就归这一档了
-        const GyanisScribe::Hotkey::HotkeyCombination pressed{modifiers, static_cast<Qt::Key>(key)};
         for (const auto &entry: kToolTable)
         {
             const auto *shortcut = GyanisScribe::Ui::appShortcutEntry(std::get<3>(entry));
-            if (shortcut != nullptr && GyanisScribe::Ui::appShortcutValue(settings, *shortcut) == pressed)
+            if (shortcut != nullptr && GyanisScribe::Ui::isAppShortcutHit(settings, *shortcut, key, modifiers))
             {
                 return std::get<0>(entry);
             }

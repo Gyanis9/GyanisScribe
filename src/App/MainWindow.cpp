@@ -116,7 +116,7 @@ namespace
      * @brief 把一页设置裹进滚动区
      * @param page 已经搭好的那一页，所有权交给滚动区
      * @return 交给页容器的那一层滚动区
-     * @details 页比窗口高时底下那一截要够得着：快捷键那两栏加起来二十多行，默认窗口高度摆不下，
+     * @details 页比窗口高时底下那一截要够得着：快捷键这两栏加起来四十来行，默认窗口高度摆不下，
      *          没有滚动区就是「看不见也改不到」，而且一声不吭。
      *          对象名是给样式表用的：#settingsScroll 把这一层与它的视口都设成透明，
      *          不然卡片四周会多出一圈与主题不合的底色。
@@ -1237,9 +1237,11 @@ namespace GyanisScribe::App
             }
             decoratePage(*content, GyanisScribe::Core::uiText(choice.label.data()));
             auto *entry = new QListWidgetItem{m_icons.icon(choice.icon), GyanisScribe::Core::uiText(choice.label.data())};
-            // 图标名留在行上：QIcon 是取色那一刻的快照，换主题时要按这个名字重取
+            // 图标名留在行上：QIcon 是取色那一刻的快照，换主题时要按这个名字再取一次
             entry->setData(kNavIconNameRole, QString::fromUtf8(choice.icon));
             m_nav->addItem(entry);
+            // 每一页都裹一层滚动区：快捷键那一页现在有四十来行，默认窗口高度摆不下——
+            // 不裹就是底下那一截永远够不着，而且一声不吭
             m_stack->addWidget(wrapSettingsPage(*content));
         }
 
@@ -2067,8 +2069,19 @@ namespace GyanisScribe::App
         inAppTitle->setObjectName(QStringLiteral("pageHint"));
         inAppTitle->setAccessibleName(GyanisScribe::Core::uiText("界面按键这一段的标题"));
         form->addRow(inAppTitle);
+        std::string_view lastFamily;
         for (const auto &entry: GyanisScribe::Ui::appShortcutEntries())
         {
+            // 按族分小标题：二十五行平铺在一起，读的人分不清哪颗键归哪个窗——同名不同窗是常态
+            const auto family = GyanisScribe::Ui::appShortcutFamilyName(entry.token);
+            if (family != lastFamily)
+            {
+                lastFamily    = family;
+                auto *heading = new QLabel{GyanisScribe::Core::uiText(family.data()), page};
+                heading->setAccessibleName(GyanisScribe::Core::uiText("界面按键的分组标题"));
+                form->addRow(heading);
+            }
+
             const auto label  = GyanisScribe::Core::uiText(entry.label.data());
             auto      *row    = new QWidget{page};
             auto      *layout = new QHBoxLayout{row};
@@ -2080,7 +2093,7 @@ namespace GyanisScribe::App
             edit->bindTo(GyanisScribe::Ui::appShortcutKey(entry.token).toStdString(), label, defaultKey, GyanisScribe::Ui::HotkeyEditScope::InWindow);
 
             auto *reset = new QPushButton{GyanisScribe::Core::uiText("恢复默认"), row};
-            // 名字带上那一档：十三行都叫「恢复默认」时，读屏与判据都分不清按下的是哪一行
+            // 名字带上那一档：二十五行都叫「恢复默认」时，读屏与判据都分不清按下的是哪一行
             reset->setAccessibleName(GyanisScribe::Core::uiText("把「%1」的按键恢复成默认那颗").arg(label));
             reset->setToolTip(GyanisScribe::Core::uiText("清掉这一项：那颗键回到默认的 %1，配置里不留一个读起来算坏值的空串").arg(defaultKey));
             QObject::connect(reset, &QPushButton::clicked, reset, [edit] { edit->clearBinding(); });

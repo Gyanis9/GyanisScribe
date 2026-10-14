@@ -77,4 +77,26 @@ namespace GyanisScribe::Ui
      */
     [[nodiscard]] QString appShortcutText(const Settings::ISettingsStore &settings, const AppShortcutEntry &entry);
 
+    /**
+     * @brief 标识所属那一段界面在设置页上的名字
+     * @param token 清册里的标识，取第一段（Annotation/Rectangle 就是 Annotation）
+     * @return 「标注窗」「截图遮罩」「贴图窗」之一；前缀认不出来时返回空串
+     * @details 设置页按这一栏分组列出各段界面的按键：二十五行平铺在一起，读的人分不清哪颗键归哪个窗。
+     */
+    [[nodiscard]] std::string_view appShortcutFamilyName(std::string_view token);
+
+    /**
+     * @brief 这一次按键算不算按到了某一档
+     * @param settings 配置存储
+     * @param entry 清册里的哪一档
+     * @param key 事件里的键值
+     * @param modifiers 事件里的修饰键
+     * @param allowShiftVariant 认不认「同一颗键多按一个 Shift」那一档：选区循环与贴图转正各带一个反向档
+     * @return 命中返回真
+     * @details 整颗组合相等才算命中，所以 Ctrl+Z 这类组合不会顺手被当成裸键那一档；
+     *          反向档是把 Shift 位摘掉再比一次，用户把正向档换成带 Ctrl 的组合时反向档跟着换。
+     */
+    [[nodiscard]] bool isAppShortcutHit(const Settings::ISettingsStore &settings, const AppShortcutEntry &entry, int key, Qt::KeyboardModifiers modifiers,
+                                        bool allowShiftVariant = false);
+
 } // namespace GyanisScribe::Ui

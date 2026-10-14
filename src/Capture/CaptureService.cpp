@@ -188,7 +188,7 @@ namespace GyanisScribe::Capture
                 return;
             }
 
-            auto *overlay = new CaptureOverlay(frame->image, screen->geometry(), screen->devicePixelRatio());
+            auto *overlay = new CaptureOverlay(frame->image, screen->geometry(), screen->devicePixelRatio(), m_settings);
             // 只留与这块屏有交集的那几扇，并裁到屏内：跨屏的窗口截到的就是它在屏上看得见的那部分
             std::vector<QRect> onThisScreen;
             for (const auto &rect: candidates)

@@ -16,6 +16,7 @@
 #include "Pin/PinLayout.h"
 #include "Pin/PinViewFilter.h"
 #include "Pick/ColorFormat.h"
+#include "Ui/AppShortcuts.h"
 #include "Ui/DesignTokens.h"
 #include "Ui/IconProvider.h"
 #include "Ui/KeyStep.h"
@@ -109,6 +110,27 @@ namespace GyanisScribe::Pin
 
         /// 键盘一挡转过的角度：滚轮那 5° 是细调，按一次 `R` 要的是「转正一首」
         constexpr double kKeyboardRotationStride = 90.0;
+
+        /**
+         * @brief 贴图窗上可换键的那一档
+         * @details 标识取自 Ui/AppShortcuts.h 那份清册：那颗键现在认给谁，设置页与按键上都是同一个读数。
+         *          表里的顺序不参与判定——同一窗口里各档的默认那颗互不相同（这一判由 TestAppShortcuts 钉住）。
+         */
+        struct RebindablePinRow
+        {
+            std::string_view       token;                     ///< 清册里的标识
+            RebindablePinKeyAction action;                    ///< 命中之后走哪个动作
+            bool                   allowShiftVariant = false; ///< 认不认「同一颗键多按一个 Shift」那一挡
+        };
+
+        constexpr std::array<RebindablePinRow, 6> kRebindablePinRows = {
+                RebindablePinRow{"Pin/Thumbnail", RebindablePinKeyAction::Thumbnail},
+                RebindablePinRow{"Pin/Rotate", RebindablePinKeyAction::Rotate, true},
+                RebindablePinRow{"Pin/FlipHorizontal", RebindablePinKeyAction::FlipHorizontal},
+                RebindablePinRow{"Pin/FlipVertical", RebindablePinKeyAction::FlipVertical},
+                RebindablePinRow{"Pin/Gray", RebindablePinKeyAction::Gray},
+                RebindablePinRow{"Pin/Invert", RebindablePinKeyAction::Invert},
+        };
 
         /// 方向键按住 `Shift` 时一次挪多少格：与标注窗那档粗调同值（一格太慢，几十格会跳过目标）
         constexpr int kKeyboardNudgeStride = 10;
@@ -1873,19 +1895,38 @@ namespace GyanisScribe::Pin
             return;
         }
 
-        // 裸按 `T` 缩到小图 / 还原：与右键菜单那一项同一条路
-        if (event->key() == Qt::Key_T && event->modifiers() == Qt::NoModifier)
+        // 可换键的那几档先过一遍：那颗键现在认给谁由 Ui/AppShortcuts.h 那份清册说了算，
+        // 整颗组合相等才算命中；「转正」那一档还认多按一个 Shift 的反向挡
+        if (const auto action = rebindableActionFor(event); action != RebindablePinKeyAction::None)
         {
-            setThumbnailMode(!m_thumbnail);
-            return;
-        }
-
-        // `R` 顺转一挡、`Shift+R` 逆转一挡：带 Ctrl 的同一个字母不认，那是另一类组合键的地盘
-        if (event->key() == Qt::Key_R && (event->modifiers() == Qt::NoModifier || event->modifiers() == Qt::ShiftModifier))
-        {
-            const auto stride = event->modifiers().testFlag(Qt::ShiftModifier) ? -kKeyboardRotationStride : kKeyboardRotationStride;
-            setRotationDegrees(m_rotationDegrees + stride);
-            return;
+            switch (action)
+            {
+                case RebindablePinKeyAction::Thumbnail:
+                    // 与右键菜单那一项同一条路
+                    setThumbnailMode(!m_thumbnail);
+                    return;
+                case RebindablePinKeyAction::Rotate:
+                {
+                    // 顺转一挡 / 逆转一挡：带 Ctrl 的同一个字母不认，那是另一类组合键的地盘
+                    const auto stride = event->modifiers().testFlag(Qt::ShiftModifier) ? -kKeyboardRotationStride : kKeyboardRotationStride;
+                    setRotationDegrees(m_rotationDegrees + stride);
+                    return;
+                }
+                case RebindablePinKeyAction::FlipHorizontal:
+                    setMirroredHorizontally(!m_mirroredHorizontally);
+                    return;
+                case RebindablePinKeyAction::FlipVertical:
+                    setMirroredVertically(!m_mirroredVertically);
+                    return;
+                case RebindablePinKeyAction::Gray:
+                    setGrayscale(!m_grayscale);
+                    return;
+                case RebindablePinKeyAction::Invert:
+                    setInverted(!m_inverted);
+                    return;
+                case RebindablePinKeyAction::None:
+                    break;
+            }
         }
 
         if (event->key() == Qt::Key_0 && event->modifiers() == Qt::NoModifier)
@@ -1930,29 +1971,23 @@ namespace GyanisScribe::Pin
             }
         }
 
-        // `H`/`V` 翻转、`G` 灰度、`I` 反色：都是视图变换，再按一次原样退回
-        if (event->modifiers() == Qt::NoModifier)
-        {
-            switch (event->key())
-            {
-                case Qt::Key_H:
-                    setMirroredHorizontally(!m_mirroredHorizontally);
-                    return;
-                case Qt::Key_V:
-                    setMirroredVertically(!m_mirroredVertically);
-                    return;
-                case Qt::Key_G:
-                    setGrayscale(!m_grayscale);
-                    return;
-                case Qt::Key_I:
-                    setInverted(!m_inverted);
-                    return;
-                default:
-                    break;
-            }
-        }
+        // 翻转、灰度、反色那四档与「缩到小图」「转正」都在上面按清册判过了；
+        // 再往下就是没绑定的键，交回 Qt（输入法与系统组合键因此还归它们自己）
 
         QWidget::keyPressEvent(event);
+    }
+
+    RebindablePinKeyAction PinWindow::rebindableActionFor(const QKeyEvent *event) const
+    {
+        for (const auto &row: kRebindablePinRows)
+        {
+            const auto *entry = GyanisScribe::Ui::appShortcutEntry(row.token);
+            if (entry != nullptr && GyanisScribe::Ui::isAppShortcutHit(m_settings, *entry, event->key(), event->modifiers(), row.allowShiftVariant))
+            {
+                return row.action;
+            }
+        }
+        return RebindablePinKeyAction::None;
     }
 
     void PinWindow::mouseDoubleClickEvent(QMouseEvent *event)

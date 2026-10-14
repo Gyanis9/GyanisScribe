@@ -14,6 +14,7 @@
 #include "Platform/PlatformCapabilities.h"
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
+#include "Ui/AppShortcuts.h"
 
 #include <gtest/gtest.h>
 
@@ -2154,6 +2155,47 @@ namespace GyanisScribe
         window.setTemporarilyHidden(true);
         window.setTemporarilyHidden(false);
         EXPECT_FALSE(window.isVisible()) << "刷新把用户刻意收起的贴图摆回了桌面";
+    }
+
+    /**
+     * @brief 钉住「在设置页换过一颗键」之后贴图窗跟着换，旧那颗当场让位
+     * @details 默认那颗由「H/V/G/I/T/R 各管哪一档」那几条判据钉着，这一条钉的是分派读的是
+     *          Ui/AppShortcuts.h 那份清册而不是写死的字母：灰度换成 K 之后按 G 不动、按 K 翻得动。
+     *          两处缺一个就是「设置改了没反应」或「按屏幕上写的键没反应」。
+     */
+    TEST_F(PinWindowFixture, ReboundPinKeysMoveToTheNewLetter)
+    {
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Ui::appShortcutKey("Pin/Gray").toStdString(), QStringLiteral("K")).has_value()) << "写入失败";
+        auto &window = makeWindow();
+
+        pressKey(window, Qt::Key_G);
+        EXPECT_FALSE(window.grayscale()) << "换走之后 G 还管灰度，同一件事就有了两个入口";
+
+        pressKey(window, Qt::Key_K);
+        EXPECT_TRUE(window.grayscale()) << "K 没接住灰度这一档";
+    }
+
+    /**
+     * @brief 钉住「转正」换字母后，Shift 那个反向挡跟着搬，而带 Ctrl 的那一下仍不归这一档
+     * @details 反向不是另一颗键，而是同一颗键多按一个 Shift：换走正向挡时反向挡必须一起搬过去，
+     *          否则用户只改成了一半。「带 Ctrl 不认」这条在默认字母上已有判据，这里换到新字母上再钉一次。
+     */
+    TEST_F(PinWindowFixture, ReboundRotateKeyCarriesItsReverse)
+    {
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Ui::appShortcutKey("Pin/Rotate").toStdString(), QStringLiteral("J")).has_value()) << "写入失败";
+        auto &window = makeWindow();
+
+        pressKey(window, Qt::Key_R);
+        EXPECT_TRUE(nearEqual(window.rotationDegrees(), 0.0, kDegreesTolerance)) << "旧那颗 R 还在转角";
+
+        pressKey(window, Qt::Key_J);
+        EXPECT_TRUE(nearEqual(window.rotationDegrees(), 90.0, kDegreesTolerance)) << "J 没接住转正这一挡";
+
+        pressKey(window, Qt::Key_J, Qt::ShiftModifier);
+        EXPECT_TRUE(nearEqual(window.rotationDegrees(), 0.0, kDegreesTolerance)) << "反向挡没跟着搬：Shift 那一下仍归旧字母";
+
+        pressKey(window, Qt::Key_J, Qt::ControlModifier);
+        EXPECT_TRUE(nearEqual(window.rotationDegrees(), 0.0, kDegreesTolerance)) << "带 Ctrl 的那一下该交回系统，不该转角";
     }
 
 } // namespace GyanisScribe
