@@ -4,6 +4,7 @@
 #include "Annotation/AnnotationTool.h"
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
+#include "Ui/AppShortcuts.h"
 #include "Ui/DesignTokens.h"
 #include "Ui/IconProvider.h"
 
@@ -55,7 +56,7 @@ namespace
     /// 工具按钮的中文名，顺序与工具表同解；这一份是照需求第五节抄来的独立期望值
     constexpr std::array<std::string_view, 13> kToolLabels = {"矩形", "椭圆", "箭头", "画笔", "高亮", "马赛克", "文字", "序号", "直线", "高斯模糊", "橡皮擦", "折线", "放大镜"};
 
-    /// 工具按钮该在提示里带上的字母键位，同样是一份独立抄来的期望值：与 kToolTable 第四列交叉核对
+    /// 工具按钮该在提示里带上的字母键位，同样是一份独立抄来的期望值：与 Ui/AppShortcuts.h 那份清册的默认那颗交叉核对
     constexpr std::array<std::string_view, 13> kToolShortcuts = {"R", "E", "A", "P", "H", "M", "T", "N", "L", "B", "X", "G", "F"};
 
     /// 动作按钮的中文名，同样按需求第六节的排列顺序抄一份
@@ -806,6 +807,31 @@ TEST_F(ToolbarFixture, ExposesEveryRequiredControlWithAccessibleNames)
     }
     EXPECT_NE(buttonByLabel(*toolbar, "撤销（Ctrl+Z）"), nullptr);
     EXPECT_NE(buttonByLabel(*toolbar, "重做（Ctrl+Y）"), nullptr);
+}
+
+/**
+ * @brief 钉住工具按钮的键位提示跟着清册走：建窗前改过的要读对，建完后改的也要当场跟上
+ * @details 按键分派读的是清册，提示若停在写死的那一颗字母上，用户照着屏幕按键就切不动工具——
+ *          「改了设置没反应」正是这条要挡的。两截各钉一处：起步就读对，改完当场重排（订阅配置变更）。
+ */
+TEST_F(ToolbarFixture, ToolKeyHintsFollowTheShortcutRegistry)
+{
+    ASSERT_TRUE(m_settings->setValue(GyanisScribe::Ui::appShortcutKey("Annotation/Pen").toStdString(), QStringLiteral("K")).has_value()) << "写入失败";
+
+    SignalLog log;
+    auto      toolbar = makeToolbarLogged(log);
+
+    auto *pen = buttonByLabel(*toolbar, "画笔");
+    ASSERT_NE(pen, nullptr);
+    EXPECT_EQ(pen->toolTip(), text("画笔") + QStringLiteral(" (K)")) << "清册里换过的那一档，提示要读换成后的那颗";
+
+    auto *rect = buttonByLabel(*toolbar, "矩形");
+    ASSERT_NE(rect, nullptr);
+    EXPECT_EQ(rect->toolTip(), text("矩形") + QStringLiteral(" (R)")) << "没改过的那一档该停在默认那颗上";
+
+    // 建完之后再改：不订阅配置变更就停在启动那一刻的旧键上
+    ASSERT_TRUE(m_settings->setValue(GyanisScribe::Ui::appShortcutKey("Annotation/Rectangle").toStdString(), QStringLiteral("Q")).has_value()) << "写入失败";
+    EXPECT_EQ(rect->toolTip(), text("矩形") + QStringLiteral(" (Q)")) << "设置页改完，按钮提示没跟着重排";
 }
 
 /**

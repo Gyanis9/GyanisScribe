@@ -7,6 +7,7 @@
 #include "Core/Text.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
+#include "Ui/AppShortcuts.h"
 #include "Ui/DesignTokens.h"
 
 #include <QApplication>
@@ -110,10 +111,10 @@ namespace GyanisScribe::Annotation
         toolGroup->setExclusive(true);
         for (std::size_t index = 0; index < kToolTable.size(); ++index)
         {
-            const auto [kind, iconName, label, shortcut] = kToolTable[index];
-            auto *button                                 = makeButton(iconName, GyanisScribe::Core::uiText(label.data()), true);
-            // 字母快捷键只进 tooltip：无障碍名要保持与标签同名，读屏报出来的才是工具本名而不是键位
-            button->setToolTip(GyanisScribe::Core::uiText(label.data()) + QStringLiteral(" (") + QString::fromUtf8(shortcut.data()) + QStringLiteral(")"));
+            const auto kind      = std::get<0>(kToolTable[index]);
+            const auto iconName  = std::get<1>(kToolTable[index]);
+            const auto label     = std::get<2>(kToolTable[index]);
+            auto      *button    = makeButton(iconName, GyanisScribe::Core::uiText(label.data()), true);
             m_toolButtons[index] = button;
             m_toolKinds[index]   = kind;
             // id 取工具序号：与 ToolKind 的底层值同解，反向查按钮时不必再存一张表
@@ -134,6 +135,19 @@ namespace GyanisScribe::Annotation
                              });
             layout->addWidget(button);
         }
+        // 键位提示排在按钮建好之后：那一串要从清册现读，与按键分派吃到的是同一颗键
+        refreshToolKeyHints();
+        // 设置页换过某档的键就重排提示：按钮只在建窗时排一次，不订阅就停在启动那一刻的旧键上，
+        // 于是「按屏幕上写的那颗键没反应」
+        QObject::connect(
+                &m_settings, &GyanisScribe::Settings::ISettingsStore::valueChanged, this,
+                [this](const QString &key)
+                {
+                    if (key.startsWith(QString::fromUtf8(GyanisScribe::Settings::kAppShortcutPrefix.data(), static_cast<int>(GyanisScribe::Settings::kAppShortcutPrefix.size()))))
+                    {
+                        refreshToolKeyHints();
+                    }
+                });
         layout->addWidget(makeSeparator());
 
         // 颜色组：色板那几格、最近使用的色块与一枚取色按钮，同样互斥，自定义色选中时也只亮一个
@@ -898,6 +912,19 @@ namespace GyanisScribe::Annotation
         }
         // 无障碍名保持「自定义颜色」：那是这一枚按钮的本名，读屏要的是动作而不是状态
         m_customColorButton->setToolTip(GyanisScribe::Core::uiText("自定义颜色（当前不透明度 %1%；在色板这一排上滚滚轮调节）").arg(currentColorOpacityPercent()));
+    }
+
+    void AnnotationToolbar::refreshToolKeyHints()
+    {
+        for (std::size_t index = 0; index < kToolTable.size(); ++index)
+        {
+            const auto label = std::get<2>(kToolTable[index]);
+            const auto text  = GyanisScribe::Core::uiText(label.data());
+            // 字母键位只进 tooltip：无障碍名要保持与标签同名，读屏报出来的才是工具本名而不是键位
+            // 清册里找不到这一档（标识写歪）就只报工具名：括号里空一格，读的人会以为那颗键坏了
+            const auto *entry = GyanisScribe::Ui::appShortcutEntry(std::get<3>(kToolTable[index]));
+            m_toolButtons[index]->setToolTip(entry == nullptr ? text : text + QStringLiteral(" (") + GyanisScribe::Ui::appShortcutText(m_settings, *entry) + QStringLiteral(")"));
+        }
     }
 
     void AnnotationToolbar::wheelEvent(QWheelEvent *event)

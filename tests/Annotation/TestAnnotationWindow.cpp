@@ -9,6 +9,7 @@
 #include "Annotation/PenParameters.h"
 
 #include "Settings/SettingsStore.h"
+#include "Ui/AppShortcuts.h"
 #include "Ui/IconProvider.h"
 
 #include <gtest/gtest.h>
@@ -126,7 +127,7 @@ namespace
             {
                 m_settings = std::make_unique<SettingsStore>(m_iniPath);
             }
-            return std::make_unique<AnnotationWindow>(engine(), std::make_unique<AnnotationToolbar>(*m_settings, *m_icons));
+            return std::make_unique<AnnotationWindow>(engine(), *m_settings, std::make_unique<AnnotationToolbar>(*m_settings, *m_icons));
         }
 
         /// 画一条并选中，返回选中项的包围盒
@@ -239,31 +240,63 @@ TEST(ViewShortcuts, ShapeAndLayerShortcutsMapExactlyTheDocumentedKeys)
 }
 
 /**
- * @brief 钉住字母键位与登记表同解，且只认裸字母
- * @details 键位取自 kToolTable 的第四列，界面提示与按键分派共用那一张表：十三档逐个钉住，
- *          再钉两位拒绝面——没绑工具的字母不许换工具，带修饰键的组合也不许
+ * @brief 钉住字母键位与清册同解，且只认按下就相等的那一颗
+ * @details 键位住在 Ui/AppShortcuts.h 那份清册里（默认那颗就是登记表的字母），界面提示与按键分派读的是同一处：
+ *          十三档逐个钉住，再钉两位拒绝面——没绑工具的字母不许换工具，带修饰键的组合也不许
  *          （Ctrl+Z 里的 z 若当成字母键位，撤销就变成换工具）。
  */
 TEST(ViewShortcuts, ToolShortcutTableMapsEveryRegisteredTool)
 {
-    EXPECT_EQ(toolShortcutFor(Qt::Key_R, Qt::NoModifier), ToolKind::Rectangle);
-    EXPECT_EQ(toolShortcutFor(Qt::Key_E, Qt::NoModifier), ToolKind::Ellipse);
-    EXPECT_EQ(toolShortcutFor(Qt::Key_A, Qt::NoModifier), ToolKind::Arrow);
-    EXPECT_EQ(toolShortcutFor(Qt::Key_P, Qt::NoModifier), ToolKind::Pen);
-    EXPECT_EQ(toolShortcutFor(Qt::Key_H, Qt::NoModifier), ToolKind::Highlight);
-    EXPECT_EQ(toolShortcutFor(Qt::Key_M, Qt::NoModifier), ToolKind::Mosaic);
-    EXPECT_EQ(toolShortcutFor(Qt::Key_T, Qt::NoModifier), ToolKind::Text);
-    EXPECT_EQ(toolShortcutFor(Qt::Key_N, Qt::NoModifier), ToolKind::Number);
-    EXPECT_EQ(toolShortcutFor(Qt::Key_L, Qt::NoModifier), ToolKind::Line);
-    EXPECT_EQ(toolShortcutFor(Qt::Key_B, Qt::NoModifier), ToolKind::Blur);
-    EXPECT_EQ(toolShortcutFor(Qt::Key_X, Qt::NoModifier), ToolKind::Eraser);
-    EXPECT_EQ(toolShortcutFor(Qt::Key_G, Qt::NoModifier), ToolKind::Polyline);
-    EXPECT_EQ(toolShortcutFor(Qt::Key_F, Qt::NoModifier), ToolKind::Magnifier);
+    // 一份独占的空配置：这条判的是「没人改过键」那一档，所以清册要现读默认的十三颗
+    const auto      iniPath = std::filesystem::temp_directory_path() / std::format("GyanisScribe-ToolKeys-{}.ini", ::testing::UnitTest::GetInstance()->current_test_info()->name());
+    std::error_code ignored;
+    std::filesystem::remove(iniPath, ignored);
+    const SettingsStore settings{iniPath};
 
-    EXPECT_FALSE(toolShortcutFor(Qt::Key_S, Qt::NoModifier).has_value()) << "s 没绑任何工具，不该把当前工具换掉";
-    EXPECT_FALSE(toolShortcutFor(Qt::Key_Z, Qt::NoModifier).has_value()) << "z 只归 Ctrl+Z 那一档用";
-    EXPECT_FALSE(toolShortcutFor(Qt::Key_T, Qt::ControlModifier).has_value()) << "带修饰键的字母要交回原组合，不能当成换工具";
-    EXPECT_FALSE(toolShortcutFor(Qt::Key_Escape, Qt::NoModifier).has_value()) << "非字母键不该落进这张表";
+    EXPECT_EQ(toolShortcutFor(Qt::Key_R, Qt::NoModifier, settings), ToolKind::Rectangle);
+    EXPECT_EQ(toolShortcutFor(Qt::Key_E, Qt::NoModifier, settings), ToolKind::Ellipse);
+    EXPECT_EQ(toolShortcutFor(Qt::Key_A, Qt::NoModifier, settings), ToolKind::Arrow);
+    EXPECT_EQ(toolShortcutFor(Qt::Key_P, Qt::NoModifier, settings), ToolKind::Pen);
+    EXPECT_EQ(toolShortcutFor(Qt::Key_H, Qt::NoModifier, settings), ToolKind::Highlight);
+    EXPECT_EQ(toolShortcutFor(Qt::Key_M, Qt::NoModifier, settings), ToolKind::Mosaic);
+    EXPECT_EQ(toolShortcutFor(Qt::Key_T, Qt::NoModifier, settings), ToolKind::Text);
+    EXPECT_EQ(toolShortcutFor(Qt::Key_N, Qt::NoModifier, settings), ToolKind::Number);
+    EXPECT_EQ(toolShortcutFor(Qt::Key_L, Qt::NoModifier, settings), ToolKind::Line);
+    EXPECT_EQ(toolShortcutFor(Qt::Key_B, Qt::NoModifier, settings), ToolKind::Blur);
+    EXPECT_EQ(toolShortcutFor(Qt::Key_X, Qt::NoModifier, settings), ToolKind::Eraser);
+    EXPECT_EQ(toolShortcutFor(Qt::Key_G, Qt::NoModifier, settings), ToolKind::Polyline);
+    EXPECT_EQ(toolShortcutFor(Qt::Key_F, Qt::NoModifier, settings), ToolKind::Magnifier);
+
+    EXPECT_FALSE(toolShortcutFor(Qt::Key_S, Qt::NoModifier, settings).has_value()) << "s 没绑任何工具，不该把当前工具换掉";
+    EXPECT_FALSE(toolShortcutFor(Qt::Key_Z, Qt::NoModifier, settings).has_value()) << "z 只归 Ctrl+Z 那一档用";
+    EXPECT_FALSE(toolShortcutFor(Qt::Key_T, Qt::ControlModifier, settings).has_value()) << "带修饰键的字母要交回原组合，不能当成换工具";
+    EXPECT_FALSE(toolShortcutFor(Qt::Key_Escape, Qt::NoModifier, settings).has_value()) << "非字母键不该落进这张表";
+}
+
+/**
+ * @brief 钉住「用户在设置页换过一颗键」之后分派当场跟着换
+ * @details 这条钉的是「键位只住在清册一处」：画笔换成 K 之后 K 换画笔、P 不再换画笔，
+ *          两处只要有一处还读默认值，按钮提示与按下的结果就分家。
+ *          顺带钉两位边界：换成带修饰键的组合也算（那一颗组合从此归这一档），
+ *          填歪的那一串落回默认那颗而不是替用户猜一颗键。
+ */
+TEST(ViewShortcuts, ReboundToolKeyFollowsTheRegistry)
+{
+    const auto      iniPath = std::filesystem::temp_directory_path() / std::format("GyanisScribe-ToolKeys-{}.ini", ::testing::UnitTest::GetInstance()->current_test_info()->name());
+    std::error_code ignored;
+    std::filesystem::remove(iniPath, ignored);
+    SettingsStore settings{iniPath};
+
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Ui::appShortcutKey("Annotation/Pen").toStdString(), QStringLiteral("K")).has_value()) << "写入失败";
+    EXPECT_EQ(toolShortcutFor(Qt::Key_K, Qt::NoModifier, settings), ToolKind::Pen);
+    EXPECT_FALSE(toolShortcutFor(Qt::Key_P, Qt::NoModifier, settings).has_value()) << "换走之后，旧那颗键不该还认这一档";
+
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Ui::appShortcutKey("Annotation/Text").toStdString(), QStringLiteral("Ctrl+K")).has_value()) << "写入失败";
+    EXPECT_EQ(toolShortcutFor(Qt::Key_K, Qt::ControlModifier, settings), ToolKind::Text) << "换成组合键也算：整颗组合相等就命中";
+    EXPECT_FALSE(toolShortcutFor(Qt::Key_T, Qt::NoModifier, settings).has_value()) << "文字换走之后 T 不再切工具";
+
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Ui::appShortcutKey("Annotation/Arrow").toStdString(), QStringLiteral("Ctrl+")).has_value()) << "写入失败";
+    EXPECT_EQ(toolShortcutFor(Qt::Key_A, Qt::NoModifier, settings), ToolKind::Arrow) << "填歪的那一档要落回默认键";
 }
 
 /**

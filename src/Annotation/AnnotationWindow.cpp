@@ -4,10 +4,11 @@
 #include "Annotation/IAnnotationEngine.h"
 #include "Annotation/AnnotationToolbarGeometry.h"
 #include "Core/Logger.h"
+#include "Settings/ISettingsStore.h"
+#include "Ui/AppShortcuts.h"
 #include "Ui/KeyStep.h"
 #include "Core/Types.h"
 
-#include <QChar>
 #include <QKeyEvent>
 #include <QVBoxLayout>
 
@@ -88,20 +89,15 @@ namespace GyanisScribe::Annotation
         }
     }
 
-    std::optional<ToolKind> toolShortcutFor(const int key, const Qt::KeyboardModifiers modifiers)
+    std::optional<ToolKind> toolShortcutFor(const int key, const Qt::KeyboardModifiers modifiers, const Settings::ISettingsStore &settings)
     {
-        // 裸字母才切工具：Ctrl+Z、Ctrl+Shift+Z、Ctrl+S 这些组合里也含字母，认了就把撤销当成换工具
-        if (modifiers != Qt::NoModifier)
-        {
-            return std::nullopt;
-        }
-
-        const auto letter = QChar(static_cast<ushort>(key)).toUpper();
+        // 整颗组合相等才算命中：默认那十三颗是裸字母，于是 Ctrl+Z 这类组合不会顺手把撤销当成换工具；
+        // 用户把某一档换成带修饰键的组合后，那颗组合也就归这一档了
+        const GyanisScribe::Hotkey::HotkeyCombination pressed{modifiers, static_cast<Qt::Key>(key)};
         for (const auto &entry: kToolTable)
         {
-            // 键位就取登记表的第四列：界面上提示的那枚字母与这里认的是同一个字符，两处不会各说各话
-            const auto shortcut = std::get<3>(entry);
-            if (!shortcut.empty() && QChar(static_cast<ushort>(shortcut.front())) == letter)
+            const auto *shortcut = GyanisScribe::Ui::appShortcutEntry(std::get<3>(entry));
+            if (shortcut != nullptr && GyanisScribe::Ui::appShortcutValue(settings, *shortcut) == pressed)
             {
                 return std::get<0>(entry);
             }
@@ -109,8 +105,8 @@ namespace GyanisScribe::Annotation
         return std::nullopt;
     }
 
-    AnnotationWindow::AnnotationWindow(IAnnotationEngine &engine, std::unique_ptr<AnnotationToolbar> toolbar, QWidget *parent) :
-        QWidget(parent), m_engine(engine), m_toolbar(std::move(toolbar))
+    AnnotationWindow::AnnotationWindow(IAnnotationEngine &engine, Settings::ISettingsStore &settings, std::unique_ptr<AnnotationToolbar> toolbar, QWidget *parent) :
+        QWidget(parent), m_engine(engine), m_settings(settings), m_toolbar(std::move(toolbar))
     {
         // 无边框 + 置顶：标注的是刚刚截下的那一块，界面不该被别的窗口盖住，也不该带一条系统标题栏
         setWindowFlags(Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
@@ -213,8 +209,8 @@ namespace GyanisScribe::Annotation
         const auto action = shortcutActionFor(event->key(), event->modifiers());
         if (action == ShortcutAction::None)
         {
-            // 裸字母是换工具：引擎才是真源，切成了要回灌按钮态，否则按钮亮着一个、画的却是另一个
-            if (const auto tool = toolShortcutFor(event->key(), event->modifiers()); tool)
+            // 字母键是换工具：引擎才是真源，切成了要回灌按钮态，否则按钮亮着一个、画的却是另一个
+            if (const auto tool = toolShortcutFor(event->key(), event->modifiers(), m_settings); tool)
             {
                 if (auto switched = m_engine.setActiveTool(*tool); switched)
                 {

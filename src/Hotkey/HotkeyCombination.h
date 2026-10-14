@@ -53,6 +53,15 @@ namespace GyanisScribe::Hotkey
         [[nodiscard]] static Core::Expected<HotkeyCombination> fromText(std::string_view text);
 
         /**
+         * @brief 从文本解析组合，但不判「能不能拿去登记」
+         * @param text 形如 Ctrl+Alt+A 或单键 A 的文本
+         * @return 成功返回组合本体；失败返回 InvalidArgument 与点名那一段的文案
+         * @details 与 fromText() 差在最后那道全局档检查：界面内的按键允许裸键，
+         *          「至少要带一个修饰键」是登记到系统才需要的限制。
+         */
+        [[nodiscard]] static Core::Expected<HotkeyCombination> parse(std::string_view text);
+
+        /**
          * @brief 检查能否用作全局热键
          * @return 成功返回空载荷
          * @return 失败返回 InvalidArgument 与中文原因（缺修饰键、按键是修饰键本身、或按键不在允许集合内）
@@ -60,8 +69,18 @@ namespace GyanisScribe::Hotkey
         [[nodiscard]] Core::Expected<void> checkUsableGlobally() const;
 
         /**
+         * @brief 检查能否用作本程序窗口里的按键
+         * @return 成功返回空载荷
+         * @return 失败返回 InvalidArgument 与中文原因（按键是修饰键本身，或不在允许集合内）
+         * @note 裸键在这一档合法：窗口里的按键只在程序自己有焦点时才吃到，不会像全局单键那样
+         *       把别的程序的打字吞掉，所以只少「至少一个修饰键」那一条。
+         */
+        [[nodiscard]] Core::Expected<void> checkUsableInWindow() const;
+
+        /**
          * @brief 转成统一文本形态
-         * @return 供设置项存储、菜单提示与工具提示使用的字符串；未设的组合返回空文本
+         * @return 供设置项存储、菜单提示与工具提示使用的字符串；没有按键本体时返回空文本
+         * @note 裸键（界面按键用的那一形）返回的就是那一颗键自己，例如「R」
          */
         [[nodiscard]] QString toText() const;
 

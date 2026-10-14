@@ -5,6 +5,7 @@ add_executable(TestUi
         TestLanguage.cpp
         TestThemeManager.cpp
         TestHotkeyEdit.cpp
+        TestAppShortcuts.cpp
         TestToast.cpp)
 
 target_link_libraries(TestUi PRIVATE

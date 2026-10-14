@@ -38,28 +38,27 @@ namespace GyanisScribe::Annotation
 {
 
     /**
-     * @brief 工具按钮的登记表：顺序、图标名、中文名与字母快捷键一处对齐
+     * @brief 工具按钮的登记表：顺序、图标名、中文名与界面按键标识一处对齐
      * @details 顺序必须与 ToolKind 的声明顺序一致，用例按序号逐个核图标名与标签。
      *          放在头文件是因为按钮数组的大小由它算：写死一个数量时，加一档工具就会写出数组外
      *          （Debug 档当场 fast-fail，Release 档静默越界）。
-     *          第四列是标注窗的字母快捷键，取英文工具名首字母且十一档互不撞：橡皮擦的英文首字母
-     *          E 已被椭圆占着，取的是中文首字母 X；按钮提示与按键分派都读这一列，
-     *          另记一张键位表就会与按钮各说各话。
+     *          第四列是 Ui/AppShortcuts.h 那份清册里的标识：认哪颗键（默认那颗与用户改后的那颗）
+     *          只住在清册一处，这里再存一份字母就会出现「按键改了、按钮提示还是旧的」。
      */
     inline constexpr std::array<std::tuple<ToolKind, std::string_view, std::string_view, std::string_view>, 13> kToolTable = {
-            std::tuple{ToolKind::Rectangle, "Rectangle", "矩形", "R"},
-            std::tuple{ToolKind::Ellipse, "Ellipse", "椭圆", "E"},
-            std::tuple{ToolKind::Arrow, "Arrow", "箭头", "A"},
-            std::tuple{ToolKind::Pen, "Pen", "画笔", "P"},
-            std::tuple{ToolKind::Highlight, "Highlight", "高亮", "H"},
-            std::tuple{ToolKind::Mosaic, "Mosaic", "马赛克", "M"},
-            std::tuple{ToolKind::Text, "Text", "文字", "T"},
-            std::tuple{ToolKind::Number, "Number", "序号", "N"},
-            std::tuple{ToolKind::Line, "Line", "直线", "L"},
-            std::tuple{ToolKind::Blur, "Blur", "高斯模糊", "B"},
-            std::tuple{ToolKind::Eraser, "Eraser", "橡皮擦", "X"},
-            std::tuple{ToolKind::Polyline, "Polyline", "折线", "G"},
-            std::tuple{ToolKind::Magnifier, "Magnifier", "放大镜", "F"},
+            std::tuple{ToolKind::Rectangle, "Rectangle", "矩形", "Annotation/Rectangle"},
+            std::tuple{ToolKind::Ellipse, "Ellipse", "椭圆", "Annotation/Ellipse"},
+            std::tuple{ToolKind::Arrow, "Arrow", "箭头", "Annotation/Arrow"},
+            std::tuple{ToolKind::Pen, "Pen", "画笔", "Annotation/Pen"},
+            std::tuple{ToolKind::Highlight, "Highlight", "高亮", "Annotation/Highlight"},
+            std::tuple{ToolKind::Mosaic, "Mosaic", "马赛克", "Annotation/Mosaic"},
+            std::tuple{ToolKind::Text, "Text", "文字", "Annotation/Text"},
+            std::tuple{ToolKind::Number, "Number", "序号", "Annotation/Number"},
+            std::tuple{ToolKind::Line, "Line", "直线", "Annotation/Line"},
+            std::tuple{ToolKind::Blur, "Blur", "高斯模糊", "Annotation/Blur"},
+            std::tuple{ToolKind::Eraser, "Eraser", "橡皮擦", "Annotation/Eraser"},
+            std::tuple{ToolKind::Polyline, "Polyline", "折线", "Annotation/Polyline"},
+            std::tuple{ToolKind::Magnifier, "Magnifier", "放大镜", "Annotation/Magnifier"},
     };
 
     /// 工具栏上的工具按钮数量，由登记表算出：加一档工具只改表，数组跟着长
@@ -418,6 +417,9 @@ namespace GyanisScribe::Annotation
 
         /// 把当前不透明度写进自定义按钮的提示：读数要有出口，不然「滚了一下到底改没改」只能靠画一笔去看
         void updateOpacityHint();
+
+        /// 按清册现读的键位重排工具按钮的提示；设置页换过键要能重算，所以不并进建按钮那一段
+        void refreshToolKeyHints();
 
         Settings::ISettingsStore  &m_settings;                  ///< 最近使用颜色的读写去处
         std::vector<QColor>        m_recentColors;              ///< 最近用过的自定义颜色，首位最新

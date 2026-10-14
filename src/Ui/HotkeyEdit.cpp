@@ -55,16 +55,25 @@ namespace GyanisScribe::Ui
         setFocusPolicy(Qt::ClickFocus);
     }
 
-    void HotkeyEdit::bindTo(const std::string_view key, const QString &title, const QString &defaultText)
+    void HotkeyEdit::bindTo(const std::string_view key, const QString &title, const QString &defaultText, const HotkeyEditScope scope)
     {
-        m_key = std::string{key};
+        m_key   = std::string{key};
+        m_scope = scope;
         // 无障碍名称与 tooltip 都写中文名：只有「Ctrl+Alt+A」这块文本时，读屏说不清它管哪个动作
         setAccessibleName(title);
         m_display->setAccessibleName(title);
-        setToolTip(GyanisScribe::Core::uiText("%1 的全局热键。点击这一格后按下组合键即可替换，按 Esc 取消").arg(title));
+        // 两档的作用域各有各的规矩，提示要写清这一格能不能只按一颗键：
+        // 界面按键里那颗裸键是合法值，用户在提示的误导下会以为「按了没反应」是控件坏了
+        setToolTip(scope == HotkeyEditScope::Global ? GyanisScribe::Core::uiText("%1 的全局热键。点击这一格后按下组合键即可替换，按 Esc 取消").arg(title)
+                                                    : GyanisScribe::Core::uiText("%1 的界面按键。点击这一格后按下要用的那颗键，裸键也算，按 Esc 取消").arg(title));
 
         const auto stored = m_settings.stringValue(key, defaultText);
         m_display->setText(stored);
+    }
+
+    std::string_view HotkeyEdit::boundKey() const noexcept
+    {
+        return m_key;
     }
 
 
@@ -83,7 +92,9 @@ namespace GyanisScribe::Ui
 
     Core::Expected<void> HotkeyEdit::applyCombination(const Hotkey::HotkeyCombination &combination)
     {
-        if (auto usable = combination.checkUsableGlobally(); !usable)
+        // 两档的松紧不同：全局那一档不许裸键（会把别的程序的按键吞掉），界面那一档只看按键本体
+        const auto usable = m_scope == HotkeyEditScope::InWindow ? combination.checkUsableInWindow() : combination.checkUsableGlobally();
+        if (!usable)
         {
             // 不合格就什么都不写：半截组合落进配置，重启后热键直接登记不上，比现在改不动更难查
             showPrompt(combination.toText());

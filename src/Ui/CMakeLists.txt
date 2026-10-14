@@ -13,6 +13,8 @@ add_library(Ui STATIC
         AppResources.cpp
         HotkeyEdit.h
         HotkeyEdit.cpp
+        AppShortcuts.h
+        AppShortcuts.cpp
         IconProvider.h
         IconProvider.cpp
         Toast.h

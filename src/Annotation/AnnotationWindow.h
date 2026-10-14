@@ -23,6 +23,11 @@ namespace GyanisScribe::Core
     struct CapturedImage;
 } // namespace GyanisScribe::Core
 
+namespace GyanisScribe::Settings
+{
+    class ISettingsStore;
+} // namespace GyanisScribe::Settings
+
 namespace GyanisScribe::Annotation
 {
     class IAnnotationEngine;
@@ -66,14 +71,16 @@ namespace GyanisScribe::Annotation
     [[nodiscard]] ShortcutAction shortcutActionFor(int key, Qt::KeyboardModifiers modifiers);
 
     /**
-     * @brief 把字母键翻成要切过去的标注工具
+     * @brief 把按键翻成要切过去的标注工具
      * @param key 事件里的键值
      * @param modifiers 当时的修饰键
-     * @return 那一档工具；这个字母没绑工具、或按下了任何修饰键时返回空
-     * @details 键位取自 kToolTable 的第四列，界面提示与分派共用同一张表。带修饰键一律不认：
-     *          Ctrl+Z、Ctrl+Shift+Z 这些组合里也含字母，切工具只走裸字母才分得清。
+     * @param settings 配置存储：键位从 Ui/AppShortcuts.h 那份清册现读
+     * @return 那一档工具；没有一档认这颗键时返回空
+     * @details 整颗组合相等才算命中，所以默认那十三颗裸字母照旧，而 Ctrl+Z 这类组合不会被当成换工具。
+     *          键位只有清册一处：按钮提示读的是同一处，用户在设置页换过一颗，两边一起跟上。
+     *          宿主先按 shortcutActionFor() 分派，撞进既有组合键的那一次归组合键那一档。
      */
-    [[nodiscard]] std::optional<ToolKind> toolShortcutFor(int key, Qt::KeyboardModifiers modifiers);
+    [[nodiscard]] std::optional<ToolKind> toolShortcutFor(int key, Qt::KeyboardModifiers modifiers, const Settings::ISettingsStore &settings);
 
     /**
      * @brief 标注窗口
@@ -89,10 +96,11 @@ namespace GyanisScribe::Annotation
         /**
          * @brief 构造窗口
          * @param engine 标注引擎，所有权在宿主
+         * @param settings 配置存储，字母键位从 Ui/AppShortcuts.h 那份清册现读；生命周期必须长于本窗口
          * @param toolbar 工具栏，所有权交给本窗口（它是本窗口的浮层子窗）
          * @param parent Qt 父对象
          */
-        AnnotationWindow(IAnnotationEngine &engine, std::unique_ptr<AnnotationToolbar> toolbar, QWidget *parent = nullptr);
+        AnnotationWindow(IAnnotationEngine &engine, Settings::ISettingsStore &settings, std::unique_ptr<AnnotationToolbar> toolbar, QWidget *parent = nullptr);
 
         AnnotationWindow(const AnnotationWindow &)            = delete;
         AnnotationWindow &operator=(const AnnotationWindow &) = delete;
@@ -170,6 +178,7 @@ namespace GyanisScribe::Annotation
         void deliver(ShortcutAction action);
 
         IAnnotationEngine                       &m_engine;            ///< 标注引擎，不拥有
+        Settings::ISettingsStore                &m_settings;          ///< 字母键位的读端（Ui/AppShortcuts.h 那份清册），不拥有
         std::unique_ptr<AnnotationToolbar>       m_toolbar;           ///< 浮层工具栏，本窗口拥有
         std::unique_ptr<AnnotationToolbarBridge> m_toolbarBridge;     ///< 工具栏与引擎的接线：样式、工具、撤销重做都在桥里
         AnnotationView                          *m_view = nullptr;    ///< 画布视图，父对象是本窗口

@@ -1260,8 +1260,8 @@ namespace GyanisScribe::Pin
                 return;
         }
 
-        // 裸字母切工具：与标注窗共用 kToolTable 的键位列，切完回灌按钮态
-        if (const auto tool = Annotation::toolShortcutFor(event->key(), event->modifiers()); tool)
+        // 字母键切工具：与标注窗读的是同一份键位清册，切完回灌按钮态
+        if (const auto tool = Annotation::toolShortcutFor(event->key(), event->modifiers(), m_settings); tool)
         {
             if (auto switched = m_annotateEngine->setActiveTool(*tool); switched)
             {

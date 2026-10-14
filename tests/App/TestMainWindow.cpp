@@ -20,6 +20,7 @@
 #include "Settings/SettingsKeys.h"
 #include "Hotkey/HotkeyCombination.h"
 #include "Settings/SettingsStore.h"
+#include "Ui/AppShortcuts.h"
 #include "Ui/DesignTokens.h"
 #include "Ui/HotkeyEdit.h"
 #include "Ui/IconProvider.h"
@@ -1101,29 +1102,88 @@ TEST_F(MainWindowFixture, ActionBarLandsEveryVisibleTrayEntrySomewhere)
  * @details 两格都判：能力位为真时每一行都能编辑（少了这一格，把 setEnabled 摘掉也不会红），
  *          为假时所有行都灰掉但仍在——行消失了用户就看不见自己配过什么。
  *          行数由「固定八个动作 + 可绑词表每一项」算出，自定义那一排也归同一道能力位管：
- *          填了不生效的组合比不填更坑人，两排必须一起灰。
+ *          填了不生效的组合比不填更坑人，两排必须一起灰。界面按键那一栏不吃这道能力位，
+ *          因此按配置键前缀只数全局那一排，混在一起判就看不出哪一批被灰掉了。
  */
 TEST_F(MainWindowFixture, HotkeyEntriesFollowTheGlobalHotkeyCapability)
 {
     const int expectedRows = 8 + static_cast<int>(GyanisScribe::App::bindableActions().size());
 
+    const auto globalRows = [this]
+    {
+        std::vector<GyanisScribe::Ui::HotkeyEdit *> rows;
+        for (auto *edit: m_window->findChildren<GyanisScribe::Ui::HotkeyEdit *>())
+        {
+            if (edit->boundKey().starts_with("Hotkey/"))
+            {
+                rows.push_back(edit);
+            }
+        }
+        return rows;
+    };
+
     makeWindow(true);
     m_window->open(MainWindowPage::Hotkey);
-    auto edits = m_window->findChildren<GyanisScribe::Ui::HotkeyEdit *>();
-    ASSERT_EQ(edits.size(), expectedRows) << "热键页该有固定八行，再给每个可绑功能一行";
-    for (auto *edit: edits)
+    auto rows = globalRows();
+    ASSERT_EQ(rows.size(), expectedRows) << "热键页该有固定八行，再给每个可绑功能一行";
+    for (auto *edit: rows)
     {
         EXPECT_TRUE(edit->isEnabled()) << "有登记口的平台上这些行要能改";
     }
 
     makeWindow(false);
     m_window->open(MainWindowPage::Hotkey);
-    edits = m_window->findChildren<GyanisScribe::Ui::HotkeyEdit *>();
-    ASSERT_EQ(edits.size(), expectedRows) << "没有登记口也不能把行藏掉：用户配过的组合键要还在眼前";
-    for (auto *edit: edits)
+    rows = globalRows();
+    ASSERT_EQ(rows.size(), expectedRows) << "没有登记口也不能把行藏掉：用户配过的组合键要还在眼前";
+    for (auto *edit: rows)
     {
         EXPECT_FALSE(edit->isEnabled()) << "这台机器上改完不会生效，入口就该是灰的";
     }
+}
+
+/**
+ * @brief 钉住「界面里的按键」那一栏：清册每档一行、不受平台能力位管、而且收裸键
+ * @details 三个口径合成一条判：行数与清册同解（少一行就是加了清册那一档却忘了改页面）；
+ *          没有全局登记口的机器上照样能改（这一批只在程序自己的窗口里认）；
+ *          同一颗裸键交给全局那一排必须被拒——两档松紧不同这件事要有出口，
+ *          否则设置页会收下一条既登记不上、又会吞掉别的程序按键的组合。
+ *          applyCombination 是直接调用，不吃 setEnabled：这里判的是校验而不是入口灰不灰。
+ */
+TEST_F(MainWindowFixture, InWindowShortcutRowsIgnoreTheHotkeyCapabilityAndAcceptBareKeys)
+{
+    const auto collect = [this]
+    {
+        std::tuple<std::vector<GyanisScribe::Ui::HotkeyEdit *>, GyanisScribe::Ui::HotkeyEdit *> found{{}, nullptr};
+        for (auto *edit: m_window->findChildren<GyanisScribe::Ui::HotkeyEdit *>())
+        {
+            if (edit->boundKey().starts_with("Hotkey/"))
+            {
+                if (std::get<1>(found) == nullptr)
+                {
+                    std::get<1>(found) = edit;
+                }
+            } else
+            {
+                std::get<0>(found).push_back(edit);
+            }
+        }
+        return found;
+    };
+
+    makeWindow(false);
+    m_window->open(MainWindowPage::Hotkey);
+    const auto [inWindow, globalRow] = collect();
+    ASSERT_EQ(inWindow.size(), GyanisScribe::Ui::appShortcutEntries().size()) << "清册里每一档都该在这一页上有一行";
+    ASSERT_NE(globalRow, nullptr) << "这一页上没有全局那一排，对照的那半条判据就没接线";
+
+    for (auto *edit: inWindow)
+    {
+        EXPECT_TRUE(edit->isEnabled()) << std::string{edit->boundKey()} << " 被平台能力位灰掉了：界面按键在自己的窗口里认，与登记口无关";
+        EXPECT_TRUE(static_cast<bool>(edit->applyCombination(GyanisScribe::Hotkey::HotkeyCombination{Qt::NoModifier, Qt::Key_K})))
+                << std::string{edit->boundKey()} << " 该收下裸键";
+    }
+
+    EXPECT_FALSE(globalRow->applyCombination(GyanisScribe::Hotkey::HotkeyCombination{Qt::NoModifier, Qt::Key_K}).has_value()) << "全局那一档收了裸键，登记阶段才会报「组合不合格」";
 }
 
 /**

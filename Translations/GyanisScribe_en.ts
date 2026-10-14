@@ -1556,12 +1556,12 @@
             <translation>Switch pin group</translation>
         </message>
         <message>
-            <source>上面 %1 个是固定动作，它们各有一条默认组合；下面 %2 个功能可以再各绑一条，留空就是不绑。改完立即重新登记，不需要重启。</source>
-            <translation>The %1 rows above are fixed actions, each with its own default combination; the %2 features below can each take another combination, and leaving one empty means it is not bound. Changes are registered again right away, no restart needed.</translation>
+            <source>上面 %1 个是固定动作，它们各有一条默认组合；接着 %2 个功能可以再各绑一条，留空就是不绑。改完立即重新登记，不需要重启。最下面那一栏是界面里的按键，只在本程序的窗口里认，任何平台上都生效。</source>
+            <translation>The %1 boxes above are fixed actions, each with a default combination; the next %2 features can each bind one more, and leaving a box empty means not binding it. Changes are re-registered right away, no restart needed. The last section lists the in-window keys, which only count inside this program's own windows and work on every platform.</translation>
         </message>
         <message>
-            <source>这个平台没有登记全局热键的接口，下面 %1 项改了也不会生效。</source>
-            <translation>This platform has no way to register global hotkeys, so changing the %1 entries below has no effect.</translation>
+            <source>这个平台没有登记全局热键的接口，上面 %1 项改了也不会生效。最下面那一栏是界面里的按键，不吃这项能力，照常生效。</source>
+            <translation>This platform has no way to register global hotkeys, so changing the %1 boxes above has no effect. The last section lists the in-window keys, which ignore that capability and keep working.</translation>
         </message>
         <message>
             <source>%1 的全局热键</source>
@@ -1582,6 +1582,30 @@
         <message>
             <source>给「%1」绑全局热键</source>
             <translation>Global hotkey for "%1"</translation>
+        </message>
+        <message>
+            <source>界面里的按键</source>
+            <translation>In-window keys</translation>
+        </message>
+        <message>
+            <source>界面按键这一段的标题</source>
+            <translation>Heading of the in-window keys section</translation>
+        </message>
+        <message>
+            <source>恢复默认</source>
+            <translation>Restore default</translation>
+        </message>
+        <message>
+            <source>把「%1」的按键恢复成默认那颗</source>
+            <translation>Restore the default key for %1</translation>
+        </message>
+        <message>
+            <source>清掉这一项：那颗键回到默认的 %1，配置里不留一个读起来算坏值的空串</source>
+            <translation>Clears this entry: the key goes back to the default %1, and no empty string that would read as a broken value is left in the configuration</translation>
+        </message>
+        <message>
+            <source>「%1」用的键</source>
+            <translation>Key for %1</translation>
         </message>
         <message>
             <source>配色方案即时生效。高对比度档是纯黑正文、纯白底与加粗边框。</source>
@@ -2196,6 +2220,10 @@
             <translation>"{}" could not be written. Check that the folder is writable, or turn off "Keep unsaved screenshots in history"</translation>
         </message>
         <message>
+            <source>组合键的按键部分不能是修饰键本身：请在 Ctrl、Alt、Shift、Win 之外再选一个字母、数字、空格或 F1-F24</source>
+            <translation>The key part of a shortcut cannot be a modifier itself: pick a letter, digit, Space or F1-F24 besides Ctrl, Alt, Shift and Win.</translation>
+        </message>
+        <message>
             <source>组合键「{}」里有一段是空的（相邻的 + 之间没有内容）。请写成 Ctrl+Alt+A 这种每段都有内容的形式</source>
             <translation>The shortcut "{}" has an empty part (nothing between two neighbouring +). Write it with content in every part, like Ctrl+Alt+A.</translation>
         </message>
@@ -2212,16 +2240,16 @@
             <translation>The shortcut "{}" uses the key "{}", which is not supported. Use a letter A-Z, a digit 0-9, Space or F1-F24.</translation>
         </message>
         <message>
-            <source>组合键的按键部分不能是修饰键本身：请在 Ctrl、Alt、Shift、Win 之外再选一个字母、数字、空格或 F1-F24</source>
-            <translation>The key part of a shortcut cannot be a modifier itself: pick a letter, digit, Space or F1-F24 besides Ctrl, Alt, Shift and Win.</translation>
-        </message>
-        <message>
-            <source>按键 0x{:X} 不能用作全局热键。请改用字母 A-Z、数字 0-9、空格或 F1-F24</source>
-            <translation>Key 0x{:X} can't be used as a global hotkey. Use a letter A-Z, a digit 0-9, Space or F1-F24.</translation>
+            <source>按键 0x{:X} 不能用作全局热键。请改用字母、数字、空格或 F1-F24 之一</source>
+            <translation>Key 0x{:X} can't be used as a global hotkey. Use a letter, a digit, Space or one of F1-F24.</translation>
         </message>
         <message>
             <source>全局热键至少要带一个修饰键：单键 {} 会把其它程序的普通按键吞掉。请加上 Ctrl 或 Alt</source>
             <translation>A global hotkey needs at least one modifier: the single key {} would swallow other programs' ordinary keystrokes. Add Ctrl or Alt.</translation>
+        </message>
+        <message>
+            <source>按键 0x{:X} 不能用作界面按键。请改用字母、数字、空格或 F1-F24 之一</source>
+            <translation>Key 0x{:X} can't be used as an in-window key. Use a letter, a digit, Space or one of F1-F24.</translation>
         </message>
         <message>
             <source>找遍了设置项 {}、环境变量 TESSDATA_PREFIX 与这些目录都没有语言包：{}。语言包本该随安装包一起装好，请先试重新安装本程序；也可以把 eng.traineddata（要认中文再放 chi_sim.traineddata）放进其中一处，或在设置的 OCR 页把语言包目录指过去</source>
@@ -2900,10 +2928,6 @@
             <translation>Modifiers alone can't be a global hotkey: mask 0x{:X}. Use only combinations of Ctrl, Alt, Shift and Win.</translation>
         </message>
         <message>
-            <source>按键 0x{:X} 不能用作全局热键。请改用字母、数字、空格或 F1-F24 之一</source>
-            <translation>Key 0x{:X} can't be used as a global hotkey. Use a letter, a digit, Space or one of F1-F24.</translation>
-        </message>
-        <message>
             <source>现在没有一个在前台的窗口可截（可能锁了屏或焦点在桌面上）。请先点一下要截的那个窗口，再回来用这一项</source>
             <translation>No window is in the foreground right now (the screen may be locked, or focus is on the desktop). Click the window you want first, then use this item again</translation>
         </message>
@@ -3214,6 +3238,10 @@
         <message>
             <source>%1 的全局热键。点击这一格后按下组合键即可替换，按 Esc 取消</source>
             <translation>Global hotkey for %1. Click this cell and press the combination to replace it; press Esc to cancel.</translation>
+        </message>
+        <message>
+            <source>%1 的界面按键。点击这一格后按下要用的那颗键，裸键也算，按 Esc 取消</source>
+            <translation>In-window key for %1. Click this box, then press the key you want to use; a bare key counts too. Press Esc to cancel.</translation>
         </message>
         <message>
             <source>写入失败</source>

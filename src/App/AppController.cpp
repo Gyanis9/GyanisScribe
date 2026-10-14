@@ -161,7 +161,7 @@ namespace GyanisScribe::App
         QObject::connect(m_tray.get(), &TrayController::actionRequested, this, &AppController::handleTrayAction);
         // 装没装上要留到接线全部完成之后再处置：现身的这一刻起用户就能点，每个入口都得已经接好
         const bool trayInstalled = m_tray->install();
-        m_annotationWindow       = std::make_unique<Annotation::AnnotationWindow>(*m_annotation, std::make_unique<Annotation::AnnotationToolbar>(*m_settings, *m_icons));
+        m_annotationWindow = std::make_unique<Annotation::AnnotationWindow>(*m_annotation, *m_settings, std::make_unique<Annotation::AnnotationToolbar>(*m_settings, *m_icons));
 
         // 热键 → 动作：唯一的接线处，界面加菜单项时也是发同一个信号而不是再走一条路径
         QObject::connect(m_hotkeys.get(), &Hotkey::IHotkeyManager::actionTriggered, this,

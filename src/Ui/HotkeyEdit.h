@@ -33,6 +33,17 @@ namespace GyanisScribe::Ui
     [[nodiscard]] std::optional<Qt::Key> editableKeyFromEvent(int keyCode);
 
     /**
+     * @brief 这一格录下来的键要拿去干什么
+     * @details 校验的松紧与提示文案都由它决定：登记到系统的那一档必须是组合，
+     *          界面里的那一档一颗裸键就够。
+     */
+    enum class HotkeyEditScope
+    {
+        Global,   ///< 全局热键：至少一个修饰键，登记到操作系统
+        InWindow, ///< 界面按键：裸键合法，只在程序自己有焦点的窗口里认
+    };
+
+    /**
      * @brief 快捷键录制框
      * @details 认识配置键而不是认识某个具体设置：设置页只管把键名给它，
      *          读写与校验都走 ISettingsStore 与 HotkeyCombination 那两处真源。
@@ -54,8 +65,16 @@ namespace GyanisScribe::Ui
          * @param key 键名，例如 Hotkey/Capture
          * @param title 中文名，用于无障碍名称与提示
          * @param defaultText 键不存在时的默认取值文本
+         * @param scope 这一格是全局热键还是界面按键：决定校验松紧与提示文案
          */
-        void bindTo(std::string_view key, const QString &title, const QString &defaultText);
+        void bindTo(std::string_view key, const QString &title, const QString &defaultText, HotkeyEditScope scope);
+
+        /**
+         * @brief 这一格绑着的配置键名
+         * @return bindTo 传进来的那个键；没绑过时为空
+         * @note 给「同一页上混着两档作用域」的读端用：设置页要按前缀挑出全局那一批
+         */
+        [[nodiscard]] std::string_view boundKey() const noexcept;
 
         /**
          * @brief 取消这一格的绑定：把键从配置里去掉，显示也清空
@@ -88,10 +107,11 @@ namespace GyanisScribe::Ui
     private:
         void showPrompt(const QString &text);
 
-        Settings::ISettingsStore &m_settings;            ///< 配置存储，不拥有
-        std::string               m_key;                 ///< 绑定的配置键名
-        QLabel                   *m_display   = nullptr; ///< 显示组合文本的标签，也是录制状态的提示位
-        bool                      m_recording = false;   ///< 是否正在等一次按键
+        Settings::ISettingsStore &m_settings;                            ///< 配置存储，不拥有
+        std::string               m_key;                                 ///< 绑定的配置键名
+        HotkeyEditScope           m_scope     = HotkeyEditScope::Global; ///< 这一格录下来的键归哪一档
+        QLabel                   *m_display   = nullptr;                 ///< 显示组合文本的标签，也是录制状态的提示位
+        bool                      m_recording = false;                   ///< 是否正在等一次按键
     };
 
 } // namespace GyanisScribe::Ui

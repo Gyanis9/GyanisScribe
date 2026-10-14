@@ -22,6 +22,7 @@
 #include "Platform/IPlatformIntegration.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
+#include "Ui/AppShortcuts.h"
 #include "Ui/DesignTokens.h"
 #include "Ui/HotkeyEdit.h"
 #include "Ui/IconProvider.h"
@@ -1998,16 +1999,18 @@ namespace GyanisScribe::App
 
         const auto intro =
                 m_capabilities.globalHotkeys
-                        ? GyanisScribe::Core::uiText("上面 %1 个是固定动作，它们各有一条默认组合；下面 %2 个功能可以再各绑一条，留空就是不绑。改完立即重新登记，不需要重启。")
+                        ? GyanisScribe::Core::uiText("上面 %1 个是固定动作，它们各有一条默认组合；接着 %2 个功能可以再各绑一条，留空就是不绑。改完立即重新登记，不需要重启。"
+                                                     "最下面那一栏是界面里的按键，只在本程序的窗口里认，任何平台上都生效。")
                                   .arg(static_cast<int>(rows.size()))
                                   .arg(static_cast<int>(GyanisScribe::App::bindableActions().size()))
-                        : GyanisScribe::Core::uiText("这个平台没有登记全局热键的接口，下面 %1 项改了也不会生效。")
+                        : GyanisScribe::Core::uiText("这个平台没有登记全局热键的接口，上面 %1 项改了也不会生效。"
+                                                     "最下面那一栏是界面里的按键，不吃这项能力，照常生效。")
                                   .arg(static_cast<int>(rows.size() + GyanisScribe::App::bindableActions().size()));
         auto *form = makePageForm(page, intro);
         for (const auto [key, title, defaultText]: rows)
         {
             auto *edit = new GyanisScribe::Ui::HotkeyEdit{m_settings, page};
-            edit->bindTo(key, title, defaultText);
+            edit->bindTo(key, title, defaultText, GyanisScribe::Ui::HotkeyEditScope::Global);
             edit->setEnabled(m_capabilities.globalHotkeys);
             form->addRow(GyanisScribe::Core::uiText("%1 的全局热键").arg(title), edit);
         }
@@ -2021,7 +2024,7 @@ namespace GyanisScribe::App
             layout->setContentsMargins(0, 0, 0, 0);
 
             auto *edit = new GyanisScribe::Ui::HotkeyEdit{m_settings, row};
-            edit->bindTo(GyanisScribe::App::customHotkeyKey(entry.token).toStdString(), label, QString{});
+            edit->bindTo(GyanisScribe::App::customHotkeyKey(entry.token).toStdString(), label, QString{}, GyanisScribe::Ui::HotkeyEditScope::Global);
             edit->setEnabled(m_capabilities.globalHotkeys);
 
             auto *clear = new QPushButton{GyanisScribe::Core::uiText("取消绑定"), row};
@@ -2034,6 +2037,35 @@ namespace GyanisScribe::App
             layout->addWidget(edit, 1);
             layout->addWidget(clear);
             form->addRow(GyanisScribe::Core::uiText("给「%1」绑全局热键").arg(label), row);
+        }
+
+        // 界面里的按键：这一批不吃平台能力位——没有全局登记口也照样在自己的窗口里认，
+        // 所以它们既不灰也不进上面那句「改了也不会生效」的计数里
+        auto *inAppTitle = new QLabel{GyanisScribe::Core::uiText("界面里的按键"), page};
+        inAppTitle->setObjectName(QStringLiteral("pageHint"));
+        inAppTitle->setAccessibleName(GyanisScribe::Core::uiText("界面按键这一段的标题"));
+        form->addRow(inAppTitle);
+        for (const auto &entry: GyanisScribe::Ui::appShortcutEntries())
+        {
+            const auto label  = GyanisScribe::Core::uiText(entry.label.data());
+            auto      *row    = new QWidget{page};
+            auto      *layout = new QHBoxLayout{row};
+            layout->setContentsMargins(0, 0, 0, 0);
+
+            const auto defaultKey = QString::fromUtf8(entry.defaultKey.data(), static_cast<int>(entry.defaultKey.size()));
+
+            auto *edit = new GyanisScribe::Ui::HotkeyEdit{m_settings, row};
+            edit->bindTo(GyanisScribe::Ui::appShortcutKey(entry.token).toStdString(), label, defaultKey, GyanisScribe::Ui::HotkeyEditScope::InWindow);
+
+            auto *reset = new QPushButton{GyanisScribe::Core::uiText("恢复默认"), row};
+            // 名字带上那一档：十三行都叫「恢复默认」时，读屏与判据都分不清按下的是哪一行
+            reset->setAccessibleName(GyanisScribe::Core::uiText("把「%1」的按键恢复成默认那颗").arg(label));
+            reset->setToolTip(GyanisScribe::Core::uiText("清掉这一项：那颗键回到默认的 %1，配置里不留一个读起来算坏值的空串").arg(defaultKey));
+            QObject::connect(reset, &QPushButton::clicked, reset, [edit] { edit->clearBinding(); });
+
+            layout->addWidget(edit, 1);
+            layout->addWidget(reset);
+            form->addRow(GyanisScribe::Core::uiText("「%1」用的键").arg(label), row);
         }
         return page;
     }

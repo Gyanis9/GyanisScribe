@@ -57,6 +57,40 @@ TEST(HotkeyCombination, AcceptsBoundaryKeys)
 }
 
 /**
+ * @brief 钉住两档松紧：解析收裸键、全局那一档仍拒，而界面那一档收裸键却照样拒修饰键本身
+ * @details 「至少要带一个修饰键」是登记到系统才需要的限制。把它留在解析那一步，
+ *          界面按键就存不出「R」这一形；拆成两档之后，各自的拒绝面都要能红。
+ *          toText() 一并钉：裸键要吐出那颗键自己，写进配置的才是「R」而不是空串——
+ *          空文本每次读都算「填的是空」，还会带出一条警告。
+ */
+TEST(HotkeyCombination, ParsingAcceptsBareKeysWhileTheGlobalCheckStillRejectsThem)
+{
+    const auto bare = HotkeyCombination::parse("R");
+    ASSERT_TRUE(bare.has_value()) << bare.error().message;
+    EXPECT_EQ(bare->key(), Qt::Key_R);
+    EXPECT_EQ(bare->modifiers(), Qt::NoModifier);
+    EXPECT_EQ(bare->toText(), QStringLiteral("R")) << "裸键要吐出那颗键自己，不然存进配置的是空串";
+    EXPECT_TRUE(bare->checkUsableInWindow().has_value()) << "界面那一档该收裸键";
+    ASSERT_FALSE(bare->checkUsableGlobally().has_value()) << "全局那一档仍要拒：单键会把别的程序的按键吞掉";
+    EXPECT_NE(bare->checkUsableGlobally().error().message.find("至少要带一个修饰键"), std::string::npos);
+
+    EXPECT_FALSE(HotkeyCombination::fromText("R").has_value()) << "fromText 归全局那一档，不能因为多了 parse 就放行裸键";
+
+    // 界面那一档也不是什么都收：修饰键本身与不在允许集合里的键照样拒，且文案点名的是这一档
+    EXPECT_FALSE(HotkeyCombination(Qt::ControlModifier, Qt::Key_Control).checkUsableInWindow().has_value());
+    const auto symbol = HotkeyCombination(Qt::NoModifier, Qt::Key_Escape);
+    ASSERT_FALSE(symbol.checkUsableInWindow().has_value());
+    EXPECT_NE(symbol.checkUsableInWindow().error().message.find("界面按键"), std::string::npos) << "两档的文案要各自说自己那一档，混着说用户不知道该改成什么";
+
+    // 组合在两档都合法，文本形态与全局那一条同形
+    const auto combo = HotkeyCombination::parse("Ctrl+Shift+Z");
+    ASSERT_TRUE(combo.has_value()) << combo.error().message;
+    EXPECT_EQ(combo->toText(), QStringLiteral("Ctrl+Shift+Z"));
+    EXPECT_TRUE(combo->checkUsableInWindow().has_value());
+    EXPECT_TRUE(combo->checkUsableGlobally().has_value());
+}
+
+/**
  * @brief 钉住拒绝面：单键、空段、越界功能键与不支持的键一律回绝并给替代做法
  */
 TEST(HotkeyCombination, RejectsUnusableTexts)

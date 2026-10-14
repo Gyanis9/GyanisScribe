@@ -37,6 +37,14 @@ namespace GyanisScribe::Settings
      */
     inline constexpr std::string_view kHotkeyCustomPrefix = "Hotkey/Custom/";
 
+    /**
+     * @brief 可换键的界面动作那一族（`Ui/Shortcut/<动作标识>`），键名不在这里逐个登记
+     * @details 清册住在 Ui/AppShortcuts.h 的 appShortcutEntries()：默认按键、中文名与配置键都在那一处算，
+     *          这里再逐个列一遍就成了第二份真源。存的文本是一颗星键或一个组合（如 R、Ctrl+Shift+Z），
+     *          没填过与填了空串都按默认那颗走。
+     */
+    inline constexpr std::string_view kAppShortcutPrefix = "Ui/Shortcut/";
+
     /// 主题档位，取值只能是 Light、Dark、System、HighContrast
     inline constexpr std::string_view kThemeMode = "Theme/Mode";
 
