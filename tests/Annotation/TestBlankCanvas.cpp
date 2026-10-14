@@ -27,7 +27,7 @@ TEST(BlankCanvas, KeepsPhysicalLogicalAndRatioConsistent)
     const QSize   logical{800, 600};
     const QString screenName{QString::fromUtf8("HDMI-0")};
 
-    const auto canvas = makeBlankCanvas(logical, 2.0, screenName);
+    const auto canvas = makeBlankCanvas(logical, 2.0, screenName, false);
 
     EXPECT_EQ(canvas.image.width(), 1600) << "dpr 2 下物理宽该是逻辑的两倍";
     EXPECT_EQ(canvas.image.height(), 1200);
@@ -45,7 +45,7 @@ TEST(BlankCanvas, KeepsPhysicalLogicalAndRatioConsistent)
  */
 TEST(BlankCanvas, CarriesNoSourceRegion)
 {
-    const auto canvas = makeBlankCanvas(kBlankCanvasSize, 1.0, QStringLiteral("eDP-1"));
+    const auto canvas = makeBlankCanvas(kBlankCanvasSize, 1.0, QStringLiteral("eDP-1"), false);
 
     EXPECT_TRUE(canvas.logicalRegion.isNull()) << "来源区域被填上了：F5 会去重抓一块并不存在的来源";
 }
@@ -57,11 +57,11 @@ TEST(BlankCanvas, FallsBackToDefaultsOnDegenerateInputs)
 {
     const QSize zero{0, 500};
 
-    const auto badRatio = makeBlankCanvas(kBlankCanvasSize, 0.0, QString{});
+    const auto badRatio = makeBlankCanvas(kBlankCanvasSize, 0.0, QString{}, false);
     EXPECT_EQ(badRatio.image.width(), kBlankCanvasSize.width()) << "dpr 非正时按 1.0 处理，而不是把尺寸收成 0";
     EXPECT_DOUBLE_EQ(badRatio.devicePixelRatio, 1.0);
 
-    const auto badSize = makeBlankCanvas(zero, 1.0, QString{});
+    const auto badSize = makeBlankCanvas(zero, 1.0, QString{}, false);
     EXPECT_EQ(badSize.logicalSize, kBlankCanvasSize) << "尺寸有一维非正就整张退回默认档，而不是留一条 0 宽的画布";
     EXPECT_GT(badSize.image.height(), 0);
 }
@@ -85,4 +85,33 @@ TEST(BlankCanvasRegion, CentersAndShrinksToTheAvailableArea)
     EXPECT_EQ(cramped, available) << "可用区给不起这张画布时退回可用区本身：宁可顶满也不甩到屏外";
 
     EXPECT_TRUE(blankCanvasRegion(QRect{}, small).isNull()) << "可用区为空时不该凭空造一块位置";
+}
+
+/**
+ * @brief 钉住透明底那一档：整张全透明，而几何与白底那一档逐位相同
+ * @details 判据打在手的绝对值上（每一格都是 0x00000000，白底那一路是 0xFFFFFFFF），不判「有没有变」——
+ *          只钉一边时，「顺手把白底也改成半透明」这种坏法照样全绿。两档只差那一次填充。
+ */
+TEST(BlankCanvas, TransparentTierIsFullyTransparentWhileGeometryStays)
+{
+    const QSize   logical{400, 200};
+    const QString screenName{QString::fromUtf8("DP-2")};
+
+    const auto white       = makeBlankCanvas(logical, 2.0, screenName, false);
+    const auto transparent = makeBlankCanvas(logical, 2.0, screenName, true);
+
+    ASSERT_EQ(transparent.image.size(), white.image.size()) << "换底不该改画布大小";
+    EXPECT_EQ(transparent.logicalSize, logical);
+    EXPECT_EQ(transparent.devicePixelRatio, 2.0);
+    EXPECT_EQ(transparent.screenName, screenName);
+    EXPECT_TRUE(transparent.logicalRegion.isNull()) << "透明底也不该有来源区域：这一张不是从屏上抓来的";
+
+    for (int y = 0; y < transparent.image.height(); y += 37)
+    {
+        for (int x = 0; x < transparent.image.width(); x += 41)
+        {
+            EXPECT_EQ(transparent.image.pixel(x, y), 0x00000000u) << x << ',' << y << " 这一格该是全透明";
+        }
+    }
+    EXPECT_EQ(white.image.pixel(0, 0), 0xFFFFFFFFu) << "白底那一档要逐位是白且不透明";
 }

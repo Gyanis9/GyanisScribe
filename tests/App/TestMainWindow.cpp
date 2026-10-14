@@ -232,7 +232,7 @@ namespace
         const std::vector<Expectation> expectations = {
                 Expectation{MainWindowPage::General, {"界面语言", "历史最多留多少条", "历史最久留多少天", "左键单击", "中键单击", "导出配置", "导入配置"}, true},
                 Expectation{MainWindowPage::Capture, {"截完之后", "延时截图", "截图目录", "颜色写法", "自动保存所有截图", "截图音效", "成品加边框", "成品加投影"}, true},
-                Expectation{MainWindowPage::Annotation, {"默认线宽", "默认字号"}, true},
+                Expectation{MainWindowPage::Annotation, {"默认线宽", "默认字号", "空白画布用透明底"}, true},
                 Expectation{MainWindowPage::Pin, {"默认不透明度", "吸附距离", "不许拖边改大小"}, true},
                 Expectation{MainWindowPage::Record,
                             {"录屏目录", "录制范围", "输出格式", "默认帧率", "录屏倒计时", "画面码率", "视频编码器", "光标高亮", "麦克风设备", "系统声音设备"},
@@ -641,6 +641,27 @@ namespace
         const auto reopened = makeStore();
         EXPECT_EQ(reopened->intValue(GyanisScribe::Settings::kPinEdgeSnapDistance, -1), 24) << "吸附距离没写进自己那一格";
         EXPECT_TRUE(reopened->boolValue(GyanisScribe::Settings::kPinDisableFrameResize, false)) << "开关没写进 Pin/DisableFrameResize";
+    }
+
+    /**
+     * @brief 钉住「空白画布用透明底」写的是画布读端认的那个键，且默认不勾
+     * @details 默认必须还是白底：这一档改的是成品带不带 alpha，多数人是拿画布直接存出去的，
+     *          把默认换成透明等于给所有人换底。勾上之后透明区在画布上垫一层棋盘格显示，存 JPG 前会先垫白。
+     */
+    TEST_F(MainWindowFixture, BlankCanvasTransparentCheckWritesTheKeyTheCanvasReads)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::Annotation);
+
+        auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage("空白画布用透明底"));
+        ASSERT_NE(check, nullptr) << "标注页没有这一格";
+        EXPECT_FALSE(check->isChecked()) << "默认该是白底，与本仓此前的形状同值";
+
+        check->setChecked(true);
+        closeWindowAndFlush();
+
+        const auto reopened = makeStore();
+        EXPECT_TRUE(reopened->boolValue(GyanisScribe::Settings::kAnnotationBlankCanvasTransparent, false)) << "勾了没写进 Annotation/BlankCanvasTransparent";
     }
 
     /**

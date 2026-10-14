@@ -426,12 +426,14 @@ namespace GyanisScribe::App
             return;
         }
 
-        const auto canvas    = Annotation::makeBlankCanvas(Annotation::kBlankCanvasSize, screen->devicePixelRatio(), screen->name());
-        const auto available = screen->availableGeometry();
+        // 底是白的还是透明的由设置里那一格定：有人要拿画布当垫在别的图上面的一层，白底会把下面那层整个盖掉
+        const auto transparentCanvas = m_settings->boolValue(Settings::kAnnotationBlankCanvasTransparent, false);
+        const auto canvas            = Annotation::makeBlankCanvas(Annotation::kBlankCanvasSize, screen->devicePixelRatio(), screen->name(), transparentCanvas);
+        const auto available         = screen->availableGeometry();
         // 不碰截图那条链：没有帧、不记「上次选区」、也不触发音效/自动保存/历史——那一串都挂在「抓到了屏上的一块」上
         m_annotationWindow->startAnnotation(canvas, available, Annotation::blankCanvasRegion(available, canvas.logicalSize));
-        Core::Logger::info(std::format("空白画布已开：逻辑 {}×{}，物理 {}×{}，屏 {}", canvas.logicalSize.width(), canvas.logicalSize.height(), canvas.image.width(),
-                                       canvas.image.height(), canvas.screenName.toStdString()));
+        Core::Logger::info(std::format("空白画布已开：逻辑 {}×{}，物理 {}×{}，屏 {}，底{}", canvas.logicalSize.width(), canvas.logicalSize.height(), canvas.image.width(),
+                                       canvas.image.height(), canvas.screenName.toStdString(), transparentCanvas ? "透明" : "白"));
     }
 
     void AppController::repinLastClosedPin()

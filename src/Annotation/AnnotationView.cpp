@@ -23,6 +23,21 @@ namespace
 {
     using GyanisScribe::Annotation::IAnnotationEngine;
 
+    /// 透明底垫的那格棋盘：一格取主题底色、一格取它深一档，两格并成一块可平铺的图
+    [[nodiscard]] QPixmap checkerTile(const QColor &base)
+    {
+        constexpr int kCell = 8;
+        QPixmap       tile{QSize{kCell * 2, kCell * 2}};
+        tile.fill(base);
+        QPainter painter{&tile};
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(base.darker(118));
+        painter.drawRect(0, 0, kCell, kCell);
+        painter.drawRect(kCell, kCell, kCell, kCell);
+        painter.end();
+        return tile;
+    }
+
     /// 行内文字输入框的默认宽度，逻辑像素：再窄就打不开一个像样的句子
     constexpr int kTextEditorWidth = 180;
 
@@ -113,6 +128,12 @@ namespace GyanisScribe::Annotation
 
         QPainter painter{this};
         painter.setRenderHint(QPainter::SmoothPixmapTransform);
+
+        // 透明底要有东西衬着才看得出来：先垫一层棋盘格。白底那一路完全不透明，垫在上面也看不见
+        if (canvas.image.hasAlphaChannel())
+        {
+            painter.fillRect(rect, QBrush{checkerTile(palette().color(QPalette::Base))});
+        }
 
         // 底图按物理像素给源矩形、按逻辑矩形给目标：这样高 DPI 下两者对齐，不需要再乘一遍倍比
         painter.drawImage(QRectF{rect}, canvas.image, QRectF{{0.0, 0.0}, QSizeF{canvas.image.size()}});

@@ -2125,6 +2125,10 @@ namespace GyanisScribe::App
                                    GyanisScribe::Ui::kFontSizes[GyanisScribe::Ui::kDefaultAnnotationFontSizeIndex], GyanisScribe::Core::uiText("默认字号")));
         form->addRow(GyanisScribe::Core::uiText("自定义色板"), makePaletteEdit(m_settings));
         form->addRow(GyanisScribe::Core::uiText("分享色板"), buildPaletteTransferRow());
+        form->addRow(GyanisScribe::Core::uiText("空白画布用透明底"),
+                     makeSettingCheck(m_settings, GyanisScribe::Settings::kAnnotationBlankCanvasTransparent, false, GyanisScribe::Core::uiText("新建的空白画布不带白底"),
+                                      GyanisScribe::Core::uiText("空白画布用透明底"),
+                                      GyanisScribe::Core::uiText("透明区在画布上垫一层棋盘格显示；存 PNG/WebP 留得住透明，存 JPG 前会先垫白")));
         return page;
     }
 

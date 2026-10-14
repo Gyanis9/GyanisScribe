@@ -1524,6 +1524,18 @@
             <translation>Share palette</translation>
         </message>
         <message>
+            <source>空白画布用透明底</source>
+            <translation>Transparent blank canvas</translation>
+        </message>
+        <message>
+            <source>新建的空白画布不带白底</source>
+            <translation>New blank canvases start without a white fill</translation>
+        </message>
+        <message>
+            <source>透明区在画布上垫一层棋盘格显示；存 PNG/WebP 留得住透明，存 JPG 前会先垫白</source>
+            <translation>Transparent areas show as a checkerboard on the canvas; PNG/WebP keep the alpha, JPG gets a white fill first</translation>
+        </message>
+        <message>
             <source>新贴到屏幕上的图按这个不透明度开始。滚轮调透明度只影响那一张贴图，不改这里。</source>
             <translation>A newly pinned image starts at this opacity. Scrolling to change opacity affects only that pin, not this setting.</translation>
         </message>
