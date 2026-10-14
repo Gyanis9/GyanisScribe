@@ -3,6 +3,7 @@
 #include "Capture/RegionHistory.h"
 #include "Capture/ScreenUtils.h"
 #include "Core/SizeText.h"
+#include "Core/Logger.h"
 #include "Core/Text.h"
 #include "Pick/ColorFormat.h"
 #include "Pick/PickGeometry.h"
@@ -76,6 +77,17 @@ namespace GyanisScribe::Capture
         // 物理像素图按该屏缩放因子标记一次，之后的绘制一律用逻辑坐标，读数与选区才对得上同一个点
         m_background = background;
         m_background.setDevicePixelRatio(devicePixelRatio);
+
+        // 视野档在这一轮开始时读一次：读坏了只记一条日志，而不是每帧绘制都刷一句同样的话
+        std::string complaint;
+        m_magnifierView = Pick::magnifierViewOrDefault(
+                m_settings.stringValue(GyanisScribe::Settings::kCaptureMagnifierView, QString::fromUtf8(GyanisScribe::Pick::magnifierViewToken(Pick::MagnifierView::Narrow)))
+                        .toStdString(),
+                complaint);
+        if (!complaint.empty())
+        {
+            Core::Logger::warning(std::format("放大镜视野读不出：{}，这一轮按窄档（9×9）走", complaint));
+        }
 
         // 无边框 + 置顶 + Tool：Tool 让它不进任务栏，截图时不该多出一个窗口条目
         setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
@@ -169,14 +181,29 @@ namespace GyanisScribe::Capture
         return m_background.pixelColor(pixel);
     }
 
-    QRect CaptureOverlay::magnifierRect() const
+    Pick::MagnifierLayout CaptureOverlay::magnifierLayout() const
     {
         if (!m_hasCursorPoint)
         {
             return {};
         }
-        return Pick::magnifierLayoutFor(globalCursorPoint(), m_screenGeometry, m_screenGeometry, Pick::kMagnifierSampleEdge, Pick::kMagnifierViewEdge)
-                .viewRect.translated(-m_screenGeometry.topLeft());
+        // 「不显示」也按窄档摆一次：读数条要留在原位，插图由 isMagnifierVisible() 挡住
+        const auto edge = Pick::magnifierSampleEdgeFor(m_magnifierView);
+        return Pick::magnifierLayoutFor(globalCursorPoint(), m_screenGeometry, m_screenGeometry, edge > 0 ? edge : Pick::kMagnifierSampleEdge, Pick::kMagnifierViewEdge);
+    }
+
+    Pick::MagnifierView CaptureOverlay::magnifierView() const noexcept
+    {
+        return m_magnifierView;
+    }
+
+    QRect CaptureOverlay::magnifierRect() const
+    {
+        if (!isMagnifierVisible())
+        {
+            return {};
+        }
+        return magnifierLayout().viewRect.translated(-m_screenGeometry.topLeft());
     }
 
     QPoint CaptureOverlay::globalCursorPoint() const
@@ -187,8 +214,23 @@ namespace GyanisScribe::Capture
 
     bool CaptureOverlay::isMagnifierVisible() const noexcept
     {
-        // 与画那一侧同一判据：光标亮过，且这块屏的冻帧真的抓到了（抓不到就没什么可放大的）
-        return m_hasCursorPoint && !m_background.isNull() && !magnifierRect().isNull();
+        // 光标亮过、这块屏的冻帧真的抓到了，且这一档不是「不显示」
+        return m_hasCursorPoint && !m_background.isNull() && m_magnifierView != Pick::MagnifierView::Off;
+    }
+
+    bool CaptureOverlay::isReadoutVisible() const noexcept
+    {
+        return m_hasCursorPoint && !m_background.isNull();
+    }
+
+    QRect CaptureOverlay::readoutStripRect() const
+    {
+        if (!isReadoutVisible())
+        {
+            return {};
+        }
+        const auto viewRect = magnifierLayout().viewRect.translated(-m_screenGeometry.topLeft());
+        return QRect{viewRect.left(), viewRect.bottom() + kMagnifierPenWidth, viewRect.width(), kMagnifierStripHeight};
     }
 
     Pick::ColorFormat CaptureOverlay::readoutFormat() const noexcept
@@ -219,44 +261,50 @@ namespace GyanisScribe::Capture
 
     void CaptureOverlay::paintMagnifier(QPainter &painter)
     {
-        if (m_background.isNull())
+        if (!isReadoutVisible())
         {
             return;
         }
 
-        const auto layout    = Pick::magnifierLayoutFor(globalCursorPoint(), m_screenGeometry, m_screenGeometry, Pick::kMagnifierSampleEdge, Pick::kMagnifierViewEdge);
-        const auto viewRect  = layout.viewRect.translated(-m_screenGeometry.topLeft());
-        const auto cropPixel = Pick::framePixelFor(layout.sourceRect.topLeft(), m_screenGeometry, m_devicePixelRatio, m_background.size());
+        const auto layout   = magnifierLayout();
+        const auto viewRect = layout.viewRect.translated(-m_screenGeometry.topLeft());
         if (!viewRect.isValid())
         {
             return;
         }
 
-        // 取样范围是逻辑像素，抓帧是设备像素：边长要乘缩放比，夹到帧内而不是让它越界画出一片空白
-        const auto cropSpan = static_cast<int>(std::lround(Pick::kMagnifierSampleEdge * m_devicePixelRatio));
-        const auto cropSize = QSize{std::clamp(cropSpan, 1, m_background.width() - cropPixel.x()), std::clamp(cropSpan, 1, m_background.height() - cropPixel.y())};
-
-        // 最近邻放大：Smooth 会把格子糊成一团，放大镜就没有存在的意义了
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(Qt::NoBrush);
-        painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
-        painter.drawImage(viewRect, m_background.copy(QRect{cropPixel, cropSize}));
-
-        auto borderPen = QPen(GyanisScribe::Ui::kAccentColor);
-        borderPen.setWidth(kMagnifierPenWidth);
-        painter.setPen(borderPen);
-        painter.drawRect(viewRect);
-
-        painter.setPen(QPen{GyanisScribe::Ui::kCrosshairColor, 1});
-        for (auto step = 1; step < Pick::kMagnifierSampleEdge; ++step)
+        // 视野档是「不显示」时只跳过这枚插图，下面那条读数条照旧画在原位
+        if (isMagnifierVisible())
         {
-            const auto offset = step * layout.cellSize;
-            painter.drawLine(viewRect.left() + offset, viewRect.top(), viewRect.left() + offset, viewRect.bottom());
-            painter.drawLine(viewRect.left(), viewRect.top() + offset, viewRect.right(), viewRect.top() + offset);
+            const auto cropPixel  = Pick::framePixelFor(layout.sourceRect.topLeft(), m_screenGeometry, m_devicePixelRatio, m_background.size());
+            const auto sampleEdge = Pick::magnifierSampleEdgeFor(m_magnifierView);
+
+            // 取样范围是逻辑像素，抓帧是设备像素：边长要乘缩放比，夹到帧内而不是让它越界画出一片空白
+            const auto cropSpan = static_cast<int>(std::lround(sampleEdge * m_devicePixelRatio));
+            const auto cropSize = QSize{std::clamp(cropSpan, 1, m_background.width() - cropPixel.x()), std::clamp(cropSpan, 1, m_background.height() - cropPixel.y())};
+
+            // 最近邻放大：Smooth 会把格子糊成一团，放大镜就没有存在的意义了
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(Qt::NoBrush);
+            painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+            painter.drawImage(viewRect, m_background.copy(QRect{cropPixel, cropSize}));
+
+            auto borderPen = QPen(GyanisScribe::Ui::kAccentColor);
+            borderPen.setWidth(kMagnifierPenWidth);
+            painter.setPen(borderPen);
+            painter.drawRect(viewRect);
+
+            painter.setPen(QPen{GyanisScribe::Ui::kCrosshairColor, 1});
+            for (auto step = 1; step < sampleEdge; ++step)
+            {
+                const auto offset = step * layout.cellSize;
+                painter.drawLine(viewRect.left() + offset, viewRect.top(), viewRect.left() + offset, viewRect.bottom());
+                painter.drawLine(viewRect.left(), viewRect.top() + offset, viewRect.right(), viewRect.top() + offset);
+            }
         }
 
         // 读数条压在放大镜下沿：光标那一点的坐标与颜色，不必松手就能核对框到的是哪一格
-        const auto stripRect = QRect{viewRect.left(), viewRect.bottom() + kMagnifierPenWidth, viewRect.width(), kMagnifierStripHeight};
+        const auto stripRect = readoutStripRect();
         const auto readout   = QStringLiteral("%1  %2").arg(formatCursorReadout(), readoutColorText());
         painter.setPen(Qt::NoPen);
         painter.setBrush(GyanisScribe::Ui::kCaptureHintBackgroundColor);
@@ -417,7 +465,7 @@ namespace GyanisScribe::Capture
 
         // 放大镜排在最后画：它会挡住底下那片，但用户正要看的就是光标那一点，优先级比背景高。
         // 只要光标亮过就显示，不限于拖框途中——挑起始角与拉手柄这两处同样要像素级读数
-        if (isMagnifierVisible())
+        if (isReadoutVisible())
         {
             paintMagnifier(painter);
         }

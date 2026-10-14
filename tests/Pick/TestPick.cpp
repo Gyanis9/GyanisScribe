@@ -17,10 +17,14 @@
 #include <QPoint>
 #include <QRect>
 
+#include <algorithm>
 #include <filesystem>
 #include <format>
 #include <memory>
 #include <optional>
+#include <ranges>
+#include <string>
+#include <vector>
 
 using GyanisScribe::Core::CapturedImage;
 using GyanisScribe::Pick::ColorFormat;
@@ -37,6 +41,12 @@ using GyanisScribe::Pick::hexCasingOf;
 using GyanisScribe::Pick::indexOfColorFormat;
 using GyanisScribe::Pick::kMagnifierSampleEdge;
 using GyanisScribe::Pick::magnifierLayoutFor;
+using GyanisScribe::Pick::magnifierSampleEdgeFor;
+using GyanisScribe::Pick::MagnifierView;
+using GyanisScribe::Pick::magnifierViewLabel;
+using GyanisScribe::Pick::magnifierViewOrDefault;
+using GyanisScribe::Pick::magnifierViews;
+using GyanisScribe::Pick::magnifierViewToken;
 using GyanisScribe::Pick::parseColorFormat;
 using GyanisScribe::Pick::recentSwatchRects;
 using GyanisScribe::Settings::SettingsStore;
@@ -97,9 +107,9 @@ namespace
         }
 
         [[nodiscard]] std::unique_ptr<ColorPickerOverlay> makeOverlay(const CapturedImage &frame, const QRect &geometry, const ColorFormat format,
-                                                                      const HexCasing casing = HexCasing::Uppercase) const
+                                                                      const HexCasing casing = HexCasing::Uppercase, const MagnifierView view = MagnifierView::Narrow) const
         {
-            return std::make_unique<ColorPickerOverlay>(frame, geometry, format, casing, *m_theme);
+            return std::make_unique<ColorPickerOverlay>(frame, geometry, format, casing, view, *m_theme);
         }
 
         std::filesystem::path          m_iniPath; ///< 本用例的设置文件路径，收尾删掉
@@ -209,6 +219,54 @@ TEST(PickColorFormat, StoredTokenFallsBackToHexWithAComplaint)
     // 再来一次：上一次的原因要清掉，不然调用方会把陈年旧账报给用户
     EXPECT_EQ(colorFormatOrDefault("Rgb", complaint), ColorFormat::Rgb);
     EXPECT_TRUE(complaint.empty()) << "成功后原因没清空，调用方会拿上一次那条去弹提示";
+}
+
+/**
+ * @brief 钉住放大镜视野四档自洽：标记读得回来、边长各有其值，坏值回落窄档并点名那串坏值
+ * @details 这条钉的是表本身：标记、界面名与取样边长按下标互指，加一档只改这三份表。
+ *          坏值不夹到最近一档而是回落默认——把手写的 wide2 夹成 wide，是替用户做了他没要过的事。
+ */
+TEST(PickGeometry, MagnifierViewTiersRoundTripAndBadTokensFallBack)
+{
+    EXPECT_EQ(magnifierSampleEdgeFor(MagnifierView::Off), 0) << "「不显示」要给 0，几何那一层才知道别摆";
+    EXPECT_EQ(magnifierSampleEdgeFor(MagnifierView::Narrow), kMagnifierSampleEdge) << "默认档要与本仓此前的形状同值";
+    EXPECT_EQ(magnifierSampleEdgeFor(MagnifierView::Medium), 15);
+    EXPECT_EQ(magnifierSampleEdgeFor(MagnifierView::Wide), 21);
+
+    std::vector<std::string> tokens;
+    for (const auto view: magnifierViews())
+    {
+        const auto token = std::string{magnifierViewToken(view)};
+        tokens.push_back(token);
+        std::string complaint;
+        EXPECT_EQ(magnifierViewOrDefault(token, complaint), view) << token << " 读不回来";
+        EXPECT_TRUE(complaint.empty()) << token;
+        EXPECT_FALSE(magnifierViewLabel(view).isEmpty()) << token;
+    }
+    std::ranges::sort(tokens);
+    EXPECT_EQ(std::ranges::adjacent_find(tokens), tokens.end()) << "两档共用一个标记，配置里就分不出谁是谁";
+
+    std::string complaint;
+    EXPECT_EQ(magnifierViewOrDefault("wide2", complaint), MagnifierView::Narrow) << "坏值要回落窄档";
+    EXPECT_NE(complaint.find("wide2"), std::string::npos) << "文案要点名那串坏值";
+    EXPECT_NE(complaint.find("medium"), std::string::npos) << "也要列出可用取值";
+}
+
+/**
+ * @brief 钉住取色遮罩的「不显示」只收掉那枚像素插图，信息条的文本照旧
+ * @details 这一档与截图遮罩共用同一格设置：两处都是「看格子」这一件事，只接一处就会出现
+ *          「设置里关了，另一处还挡着」。信息条读的还是同一串文本，不收插图的影响。
+ */
+TEST_F(PickFixture, PickerHidesTheMagnifierButKeepsTheInfoText)
+{
+    const auto frame  = makeFrame({100, 100}, 1.0, {30, 40}, QColor{10, 200, 20});
+    auto       shown  = makeOverlay(frame, {0, 0, 100, 100}, ColorFormat::Hex);
+    auto       hidden = makeOverlay(frame, {0, 0, 100, 100}, ColorFormat::Hex, HexCasing::Uppercase, MagnifierView::Off);
+
+    EXPECT_TRUE(shown->isMagnifierVisible()) << "默认档该画出插图";
+    EXPECT_FALSE(hidden->isMagnifierVisible()) << "选了不显示还在画";
+    // 不比较具体那一串：光标位置是构造时读的真实鼠标，两扇遮罩读同一格才是要判的事
+    EXPECT_EQ(hidden->currentText(), shown->currentText()) << "收掉插图把信息条的文本也举报了";
 }
 
 /**

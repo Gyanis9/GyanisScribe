@@ -1040,6 +1040,14 @@
             <translation>Color format</translation>
         </message>
         <message>
+            <source>放大镜视野</source>
+            <translation>Magnifier field of view</translation>
+        </message>
+        <message>
+            <source>选「不显示」只收掉那枚像素插图，光标处的坐标与颜色读数条留在原位</source>
+            <translation>Picking "don't show" only drops the pixel illustration; the coordinate and colour strip stays where it was</translation>
+        </message>
+        <message>
             <source>默认不透明度</source>
             <translation>Default opacity</translation>
         </message>
@@ -2454,6 +2462,22 @@
         <message>
             <source>取色遮罩</source>
             <translation>Color picker overlay</translation>
+        </message>
+        <message>
+            <source>不显示</source>
+            <translation>Don't show</translation>
+        </message>
+        <message>
+            <source>窄（9×9）</source>
+            <translation>Narrow (9×9)</translation>
+        </message>
+        <message>
+            <source>中（15×15）</source>
+            <translation>Medium (15×15)</translation>
+        </message>
+        <message>
+            <source>宽（21×21）</source>
+            <translation>Wide (21×21)</translation>
         </message>
         <message>
             <source>贴图组管理</source>

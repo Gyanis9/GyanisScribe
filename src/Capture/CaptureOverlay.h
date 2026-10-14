@@ -17,6 +17,7 @@
 
 #include "Capture/ScreenUtils.h"
 #include "Pick/ColorFormat.h"
+#include "Pick/PickGeometry.h"
 
 #include <array>
 #include <optional>
@@ -120,19 +121,42 @@ namespace GyanisScribe::Capture
 
         /**
          * @brief 放大镜占的位置
-         * @return 该屏内的逻辑矩形；还没收到鼠标移动时返回空矩形
+         * @return 该屏内的逻辑矩形；还没收到鼠标移动、或视野档是「不显示」时返回空矩形
          * @details 默认摆在光标右下，摆不下就翻到左上：贴到屏角时不翻就会有一半跑出这块屏，
          *          用户看到的格子里根本没有他正要框的那个像素。
          */
         [[nodiscard]] QRect magnifierRect() const;
 
         /**
-         * @brief 此刻会不会画出放大镜
-         * @return 光标在这块屏上出现过就为真
+         * @brief 此刻会不会画出放大镜那枚像素插图
+         * @return 光标在这块屏上出现过、冻帧在、且视野档不是「不显示」时为真
          * @details 与 magnifierRect() 同一判据：悬停挑窗口、拖手柄、平移选区这三处都要像素级读数，
          *          「只在拖框时显示」不够用——挑起始角那一下正是最需要它的时候。
          */
         [[nodiscard]] bool isMagnifierVisible() const noexcept;
+
+        /**
+         * @brief 此刻会不会画出读数条（坐标 + 颜色那一横条）
+         * @return 光标在这块屏上出现过且冻帧在时为真
+         * @details 关掉放大镜插图不该把读数条一起没收：那两条信息本来就是这枚工具的另一半用途。
+         */
+        [[nodiscard]] bool isReadoutVisible() const noexcept;
+
+        /**
+         * @brief 读数条占的位置
+         * @return 该屏内的逻辑矩形；读数条不画时返回空矩形
+         * @details 摆在放大镜下沿，「不显示」那一档也按窄档的位置摆——同一处东西不该因为关一档就跳位。
+         *          绘制与判据共读这一处，各自算一遍就会出现「点在条上却读不到」。
+         */
+        [[nodiscard]] QRect readoutStripRect() const;
+
+        /**
+         * @brief 这一轮生效的放大镜视野档
+         * @return 构造时从配置读定的那一档
+         * @details 遮罩一次会话只活几秒，所以这一档在构造时读一次：读坏了只记一条日志，
+         *          而不是每帧绘制都刷一句同样的话。
+         */
+        [[nodiscard]] Pick::MagnifierView magnifierView() const noexcept;
 
         /**
          * @brief 放大镜读数里颜色那一格用的写法
@@ -345,6 +369,14 @@ namespace GyanisScribe::Capture
         [[nodiscard]] RebindableKeyAction rebindableActionFor(const QKeyEvent *event) const;
 
         /**
+         * @brief 放大镜这一轮的取样与摆放
+         * @return 布局；还没收到鼠标移动时三个量都不可用
+         * @details 视野档是「不显示」时也按窄档算一遍位置：读数条要留在它一直在的那一处，
+         *          关掉插图不该让那一条跳到别的位置。
+         */
+        [[nodiscard]] Pick::MagnifierLayout magnifierLayout() const;
+
+        /**
          * @brief 放大镜读数条上的坐标部分
          * @return 形如「(1920, 300)」的全局逻辑坐标
          */
@@ -359,6 +391,7 @@ namespace GyanisScribe::Capture
         QPoint                    m_cursorPoint;                             ///< 光标最近所在点，只喂辅助线、悬停与放大镜，不参与选区计算
         bool                      m_hasCursorPoint = false;                  ///< 是否收到过鼠标移动：没有就不摆放大镜，别把 (0,0) 当成光标
         Pick::ColorFormat         m_readoutFormat  = Pick::ColorFormat::Hex; ///< 读数里颜色那格的写法，按 C 轮换
+        Pick::MagnifierView       m_magnifierView;                           ///< 这一轮的放大镜视野档，构造时读一次
 
         std::vector<QRect>           m_regionHistory;         ///< 这块屏上的历史选区，最近的在前；由 CaptureService 推过来
         int                          m_historyIndex = -1;     ///< 当前选区取自历史里的哪一条；-1 表示不是取自历史（用户自己框/改的）

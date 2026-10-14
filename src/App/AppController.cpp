@@ -1368,7 +1368,16 @@ namespace GyanisScribe::App
             notifyUser(QString::fromStdString(complaint), Ui::ToastKind::Danger);
         }
 
-        m_picker = new Pick::ColorPickerOverlay{*frame, screen->geometry(), format, Pick::hexCasingOf(m_settings->boolValue(Settings::kPickHexUppercase, true)), *m_theme};
+        // 放大镜视野与字母档都现读这一处的配置：取色遮罩自己不持设置，读坏了在这里说给用户
+        std::string magnifierComplaint;
+        const auto  magnifierView =
+                Pick::magnifierViewOrDefault(m_settings->stringValue(Settings::kCaptureMagnifierView, QStringLiteral("narrow")).toStdString(), magnifierComplaint);
+        if (!magnifierComplaint.empty())
+        {
+            notifyUser(QString::fromStdString(magnifierComplaint), Ui::ToastKind::Danger);
+        }
+        m_picker = new Pick::ColorPickerOverlay{*frame,  screen->geometry(), format, Pick::hexCasingOf(m_settings->boolValue(Settings::kPickHexUppercase, true)), magnifierView,
+                                                *m_theme};
         // 最近取色跟着这一轮摆上遮罩：点色块或按数字键就能重新取回，不必回原处对像素
         m_picker->setRecentColors(recentPickedColors());
         QObject::connect(m_picker, &Pick::ColorPickerOverlay::colorPicked, this,

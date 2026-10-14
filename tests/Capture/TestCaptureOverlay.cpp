@@ -300,6 +300,35 @@ TEST_F(CaptureOverlayFixture, ReadoutColorHonoursTheHexCasingSetting)
 }
 
 /**
+ * @brief 钉住放大镜视野三档改的是那枚插图，读数条留在原位；「不显示」不收读数条
+ * @details 期望值手算：显示边长固定 180，一格多大按 180/取样格数 取整——窄档 9 格 → 20×9=180，
+ *          宽档 21 格 → 8×21=168（宁可少几像素也不出现半格）。两档宽度不同这一判，
+ *          钉的就是「视野档真的传到了几何那一层」，而不是只有下拉框上写了字。
+ *          「不显示」那一档的读数条仍按窄档摆位：关掉插图不该让那一条跳到别的位置。
+ */
+TEST_F(CaptureOverlayFixture, MagnifierViewTiersChangeTheIllustrationAndKeepTheReadout)
+{
+    auto narrow = makeOverlay();
+    moveOver(*narrow, QPoint{300, 300});
+    ASSERT_TRUE(narrow->isMagnifierVisible()) << "默认档该是窄（9×9）";
+    ASSERT_EQ(narrow->magnifierRect().width(), 180);
+    const auto narrowStrip = narrow->readoutStripRect();
+    ASSERT_FALSE(narrowStrip.isNull()) << "读数条没位置";
+
+    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Settings::kCaptureMagnifierView, QStringLiteral("wide")))) << "写入失败";
+    auto wide = makeOverlay();
+    moveOver(*wide, QPoint{300, 300});
+    EXPECT_EQ(wide->magnifierRect().width(), 168) << "视野档没传到几何那一层";
+
+    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Settings::kCaptureMagnifierView, QStringLiteral("off")))) << "写入失败";
+    auto off = makeOverlay();
+    moveOver(*off, QPoint{300, 300});
+    EXPECT_FALSE(off->isMagnifierVisible()) << "选了不显示还在画插图";
+    EXPECT_TRUE(off->magnifierRect().isNull()) << "magnifierRect 没跟着说没有";
+    EXPECT_EQ(off->readoutStripRect(), narrowStrip) << "关掉插图把坐标与颜色一起没收、或让读数条跳了位";
+}
+
+/**
  * @brief 钉住放大镜摆在光标右下、贴到屏角时翻到左上，并且整枚留在屏内
  * @details 摆在光标右下是为了不挡住正要看的像素；翻边判据失效时放大镜有一半跑到屏外，
  *          用户照着抄的格子根本不是光标那一片。

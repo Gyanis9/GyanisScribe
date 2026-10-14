@@ -34,8 +34,8 @@ namespace
 namespace GyanisScribe::Pick
 {
     ColorPickerOverlay::ColorPickerOverlay(const Core::CapturedImage &frame, const QRect &screenGeometry, const ColorFormat format, const HexCasing casing,
-                                           const Ui::ThemeManager &theme, QWidget *parent) :
-        QWidget(parent), m_frame(frame), m_screenGeometry(screenGeometry), m_format(format), m_hexCasing(casing), m_theme(theme), m_cursor(QCursor::pos())
+                                           const MagnifierView view, const Ui::ThemeManager &theme, QWidget *parent) :
+        QWidget(parent), m_frame(frame), m_screenGeometry(screenGeometry), m_format(format), m_hexCasing(casing), m_magnifierView(view), m_theme(theme), m_cursor(QCursor::pos())
     {
         // 遮罩盖住整块屏幕，坐标一律用屏幕坐标：逻辑坐标与冻帧像素之间靠 framePixelFor 换算
         setGeometry(m_screenGeometry);
@@ -63,6 +63,11 @@ namespace GyanisScribe::Pick
     QString ColorPickerOverlay::currentText() const
     {
         return formatColor(colorAt(m_cursor), m_format, m_hexCasing);
+    }
+
+    bool ColorPickerOverlay::isMagnifierVisible() const noexcept
+    {
+        return m_magnifierView != MagnifierView::Off;
     }
 
     void ColorPickerOverlay::setRecentColors(std::vector<QColor> colors)
@@ -106,14 +111,16 @@ namespace GyanisScribe::Pick
         painter.setPen(crossPen);
         painter.drawPoint(local);
 
-        const auto layout   = magnifierLayoutFor(m_cursor, m_screenGeometry, m_screenGeometry, kMagnifierSampleEdge, kMagnifierViewEdge);
-        const auto viewRect = layout.viewRect.translated(-m_screenGeometry.topLeft());
-        if (viewRect.isValid())
+        // 视野档是「不显示」时也按窄档算一次位置：下面那条信息条要留在原位
+        const auto sampleEdge = magnifierSampleEdgeFor(m_magnifierView);
+        const auto layout     = magnifierLayoutFor(m_cursor, m_screenGeometry, m_screenGeometry, sampleEdge > 0 ? sampleEdge : kMagnifierSampleEdge, kMagnifierViewEdge);
+        const auto viewRect   = layout.viewRect.translated(-m_screenGeometry.topLeft());
+        if (viewRect.isValid() && isMagnifierVisible())
         {
             // 取样框是屏幕逻辑坐标，抓帧是设备像素：先换算左上角，再按缩放比放大尺寸，
             // 只减不乘会在高 DPI 屏上把整片放大镜偏到左上角
             const auto cropOrigin = framePixelFor(layout.sourceRect.topLeft(), m_screenGeometry, m_frame.devicePixelRatio, m_frame.image.size());
-            const auto cropSpan   = static_cast<int>(std::lround(kMagnifierSampleEdge * m_frame.devicePixelRatio));
+            const auto cropSpan   = static_cast<int>(std::lround(sampleEdge * m_frame.devicePixelRatio));
             const auto cropSize   = QSize{std::clamp(cropSpan, 1, m_frame.image.width() - cropOrigin.x()), std::clamp(cropSpan, 1, m_frame.image.height() - cropOrigin.y())};
             // 像素格用最近邻放大，Smooth 会把格子糊成一片，放大镜就白摆了
             painter.drawImage(viewRect, m_frame.image.copy(QRect{cropOrigin, cropSize}));
@@ -123,7 +130,7 @@ namespace GyanisScribe::Pick
             painter.drawRect(viewRect);
 
             painter.setPen(QPen{QColor{128, 128, 128, 140}, kGridPenWidth});
-            for (auto step = 1; step < kMagnifierSampleEdge; ++step)
+            for (auto step = 1; step < sampleEdge; ++step)
             {
                 const auto offset = step * layout.cellSize;
                 painter.drawLine(viewRect.left() + offset, viewRect.top(), viewRect.left() + offset, viewRect.bottom());

@@ -44,10 +44,11 @@ namespace GyanisScribe::Pick
          * @param screenGeometry frame 对应屏幕的几何，屏幕坐标
          * @param format 复制用的颜色写法
          * @param casing HEX 字母那几位的大小写（写法不是 HEX 时不起作用）
+         * @param view 放大镜视野档；「不显示」只收掉那枚像素插图，当前像素的十字与信息条照旧
          * @param theme 主题管理器，放大镜边框与文字色随主题
          * @param parent Qt 父对象
          */
-        ColorPickerOverlay(const Core::CapturedImage &frame, const QRect &screenGeometry, ColorFormat format, HexCasing casing, const Ui::ThemeManager &theme,
+        ColorPickerOverlay(const Core::CapturedImage &frame, const QRect &screenGeometry, ColorFormat format, HexCasing casing, MagnifierView view, const Ui::ThemeManager &theme,
                            QWidget *parent = nullptr);
 
         /**
@@ -68,6 +69,14 @@ namespace GyanisScribe::Pick
          * @return 与 colorPicked 里那条文本同源
          */
         [[nodiscard]] QString currentText() const;
+
+        /**
+         * @brief 这一轮会不会画出那枚像素插图
+         * @return 视野档不是「不显示」时为真
+         * @details 判据要有出口：画在遮罩里的东西没法从外面看，而「设置里选了不显示却没接上」
+         *          正是只能靠这一类核对才发现的错。
+         */
+        [[nodiscard]] bool isMagnifierVisible() const noexcept;
 
         /**
          * @brief 交给遮罩的「最近取色」清单
@@ -108,6 +117,7 @@ namespace GyanisScribe::Pick
         QRect                   m_screenGeometry;     ///< 冻帧对应屏幕的几何
         ColorFormat             m_format;             ///< 复制用的写法
         HexCasing               m_hexCasing;          ///< 写法是 HEX 时字母那几位的大小写
+        MagnifierView           m_magnifierView;      ///< 放大镜视野档，「不显示」时只画十字与信息条
         const Ui::ThemeManager &m_theme;              ///< 主题管理器，画放大镜边框用主色
         QPoint                  m_cursor;             ///< 当前光标的屏幕坐标
         std::vector<QColor>     m_recent;             ///< 最近取色清单，最近的在前；命中的下标与色块行同序

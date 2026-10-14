@@ -15,6 +15,7 @@
 #include "History/UnsavedArchive.h"
 #include "Ocr/OcrEngineFactory.h"
 #include "Pick/ColorFormat.h"
+#include "Pick/PickGeometry.h"
 #include "Pin/PinLayout.h"
 #include "Record/FfmpegAudioDevices.h"
 #include "Record/FfmpegVideoEncoderEnumerator.h"
@@ -570,6 +571,50 @@ namespace
                              if (auto written = settings.setValue(GyanisScribe::Settings::kPickFormat, token); !written)
                              {
                                  Logger::warning(std::format("颜色写法没能保存：{}", written.error().message));
+                             }
+                         });
+        return combo;
+    }
+
+    /**
+     * @brief 放大镜视野下拉：四档都来自 Pick 那张表，标记与界面名同源
+     * @param settings 配置存储
+     * @return 归调用方所有的下拉框
+     * @details 这一档截图遮罩与屏幕取色共用：两处原本是同一枚放大镜的两个化身，
+     *          各存一份就会出现「遮罩里关掉了、取色时还挡着」。
+     */
+    QComboBox *makeMagnifierViewCombo(ISettingsStore &settings)
+    {
+        auto *combo = new QComboBox;
+        for (const auto view: GyanisScribe::Pick::magnifierViews())
+        {
+            combo->addItem(GyanisScribe::Pick::magnifierViewLabel(view));
+        }
+        combo->setAccessibleName(GyanisScribe::Core::uiText("放大镜视野"));
+        combo->setToolTip(GyanisScribe::Core::uiText("选「不显示」只收掉那枚像素插图，光标处的坐标与颜色读数条留在原位"));
+        std::string complaint;
+        const auto  stored =
+                GyanisScribe::Pick::magnifierViewOrDefault(settings.stringValue(GyanisScribe::Settings::kCaptureMagnifierView, QStringLiteral("narrow")).toStdString(), complaint);
+        if (!complaint.empty())
+        {
+            // 下拉框按顶上那一档摆，配置里那串原文不动：静默改写等于把用户填坏的证据抹掉
+            Logger::warning(std::format("放大镜视野读不出：{}，下拉框按窄档摆", complaint));
+        }
+        const auto views = GyanisScribe::Pick::magnifierViews();
+        const auto at    = std::ranges::find(views, stored);
+        combo->setCurrentIndex(at == views.end() ? 0 : static_cast<int>(std::distance(views.begin(), at)));
+        QObject::connect(combo, &QComboBox::currentIndexChanged, combo,
+                         [&settings, combo](const int index)
+                         {
+                             const auto views = GyanisScribe::Pick::magnifierViews();
+                             if (index < 0 || static_cast<std::size_t>(index) >= views.size())
+                             {
+                                 return;
+                             }
+                             const auto token = QString::fromUtf8(GyanisScribe::Pick::magnifierViewToken(views[static_cast<std::size_t>(index)]).data());
+                             if (auto written = settings.setValue(GyanisScribe::Settings::kCaptureMagnifierView, token); !written)
+                             {
+                                 Logger::warning(std::format("放大镜视野没能保存：{}", written.error().message));
                              }
                          });
         return combo;
@@ -1826,6 +1871,7 @@ namespace GyanisScribe::App
         form->addRow(GyanisScribe::Core::uiText("保存质量"), makeImageQualitySpin(m_settings));
         form->addRow(GyanisScribe::Core::uiText("文件名模板"), makeNameTemplateEdit(m_settings));
         form->addRow(GyanisScribe::Core::uiText("复制用的写法"), makeColorFormatCombo(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("放大镜视野"), makeMagnifierViewCombo(m_settings));
         form->addRow(GyanisScribe::Core::uiText("HEX 字母"),
                      makeSettingCheck(m_settings, GyanisScribe::Settings::kPickHexUppercase, true, GyanisScribe::Core::uiText("十六进制用大写"),
                                       GyanisScribe::Core::uiText("十六进制用大写"),

@@ -11,6 +11,7 @@
 #include "History/HistoryRules.h"
 #include "History/HistoryStore.h"
 #include "Pin/PinLayout.h"
+#include "Pick/PickGeometry.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Record/RecorderConfig.h"
 #include "Core/Logger.h"
@@ -565,6 +566,29 @@ namespace
 
         const auto reopened = makeStore();
         EXPECT_FALSE(reopened->boolValue(GyanisScribe::Settings::kPickHexUppercase, true)) << "开关没写进 Pick/HexUppercase";
+    }
+
+    /**
+     * @brief 钉住「放大镜视野」下拉写的是两处共用的那个键，存的还是标记而不是界面名
+     * @details 这一档同时管截图遮罩与屏幕取色：两处读同一个键，改一处另一处必须跟着变。
+     *          存中文标签的话下次遮罩读不出来（parse 认的是 off/narrow/medium/wide），
+     *          而读不出只会表现成「我明明选了不显示」——所以标记与项数都要钉。
+     */
+    TEST_F(MainWindowFixture, MagnifierViewComboWritesTheTierToken)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::Capture);
+
+        auto *combo = qobject_cast<QComboBox *>(controlInCurrentPage("放大镜视野"));
+        ASSERT_NE(combo, nullptr) << "截图页没有这一格";
+        ASSERT_EQ(combo->count(), static_cast<int>(GyanisScribe::Pick::magnifierViews().size())) << "下拉项数与清册不同解";
+        EXPECT_EQ(combo->currentIndex(), 1) << "默认档该是窄：与本仓此前的形状同值";
+
+        combo->setCurrentIndex(0);
+        closeWindowAndFlush();
+
+        const auto reopened = makeStore();
+        EXPECT_EQ(reopened->stringValue(GyanisScribe::Settings::kCaptureMagnifierView, QStringLiteral("?")), QStringLiteral("off")) << "存的必须是标记，不是界面上那三个字";
     }
 
     /**

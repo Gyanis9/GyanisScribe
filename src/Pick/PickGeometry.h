@@ -26,6 +26,56 @@ namespace GyanisScribe::Pick
     /// 放大镜相对光标的默认偏移，逻辑像素：贴着光标会挡住正要看的像素
     inline constexpr int kMagnifierCursorOffset = 18;
 
+    /**
+     * @brief 放大镜的视野档
+     * @details 显示边长固定 180，改的是取样格数：视野越窄每格放得越大，越宽看得越多但每格越小。
+     *          「不显示」只收掉那枚像素插图，读数条仍在原位——坐标与颜色是放大镜另一件有用的东西，
+     *          不想看格子的用户没理由连带失去它。
+     */
+    enum class MagnifierView
+    {
+        Off,    ///< 不显示放大镜插图
+        Narrow, ///< 9×9：默认档，与本仓此前的形状同值
+        Medium, ///< 15×15
+        Wide,   ///< 21×21
+    };
+
+    /**
+     * @brief 视野档对应的取样边长
+     * @param view 哪一档
+     * @return 逻辑像素边长；「不显示」给 0，几何那侧按「这枚放大镜不成立」处理
+     */
+    [[nodiscard]] int magnifierSampleEdgeFor(MagnifierView view);
+
+    /**
+     * @brief 视野档的存储标记
+     * @param view 哪一档
+     * @return 写进配置的短标记（off/narrow/medium/wide），区分大小写
+     */
+    [[nodiscard]] std::string_view magnifierViewToken(MagnifierView view);
+
+    /**
+     * @brief 视野档的界面名
+     * @param view 哪一档
+     * @return 下拉框里那四个字以内的短标签
+     */
+    [[nodiscard]] QString magnifierViewLabel(MagnifierView view);
+
+    /**
+     * @brief 全部视野档，按下拉框顺序
+     * @return 与 magnifierViewToken 同序的列表
+     */
+    [[nodiscard]] std::vector<MagnifierView> magnifierViews();
+
+    /**
+     * @brief 把配置里存的标记读回视野档
+     * @param token 存储标记，来自设置项
+     * @param complaint 读不出时的中文原因，供调用方记日志；成功时清空
+     * @return 可用的档；坏值回落「窄」（= 本仓此前的形状）
+     * @details 与颜色写法那一档同一口径：两处都是「读坏了不让功能停摆，但要说清按了哪一档顶上」。
+     */
+    [[nodiscard]] MagnifierView magnifierViewOrDefault(std::string_view token, std::string &complaint);
+
     /// 最近取色色块的边长与间距，逻辑像素；距屏幕底边的留白与它同一档
     inline constexpr int kRecentSwatchEdge = 28;
     inline constexpr int kRecentSwatchGap  = 6;

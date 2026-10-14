@@ -1,10 +1,71 @@
 #include "Pick/PickGeometry.h"
 
+#include "Core/Text.h"
+
+#include <QString>
+
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <string_view>
+
+namespace
+{
+    using GyanisScribe::Pick::MagnifierView;
+
+    // 四档一列到底：标记、界面名与取样边长按下标互指，加一档只改这三份表
+    constexpr std::array<std::string_view, 4> kMagnifierTokens = {"off", "narrow", "medium", "wide"};
+    constexpr std::array<std::string_view, 4> kMagnifierLabels = {"不显示", "窄（9×9）", "中（15×15）", "宽（21×21）"};
+    constexpr std::array<int, 4>              kMagnifierEdges  = {0, 9, 15, 21};
+} // namespace
 
 namespace GyanisScribe::Pick
 {
+    int magnifierSampleEdgeFor(const MagnifierView view)
+    {
+        const auto index = static_cast<std::size_t>(view);
+        return index < kMagnifierEdges.size() ? kMagnifierEdges[index] : kMagnifierEdges[1];
+    }
+
+    std::string_view magnifierViewToken(const MagnifierView view)
+    {
+        const auto index = static_cast<std::size_t>(view);
+        return index < kMagnifierTokens.size() ? kMagnifierTokens[index] : kMagnifierTokens[1];
+    }
+
+    QString magnifierViewLabel(const MagnifierView view)
+    {
+        const auto index = static_cast<std::size_t>(view);
+        return GyanisScribe::Core::uiText(index < kMagnifierLabels.size() ? kMagnifierLabels[index].data() : kMagnifierLabels[1].data());
+    }
+
+    std::vector<MagnifierView> magnifierViews()
+    {
+        std::vector<MagnifierView> views;
+        views.reserve(kMagnifierTokens.size());
+        for (std::size_t index = 0; index < kMagnifierTokens.size(); ++index)
+        {
+            views.push_back(static_cast<MagnifierView>(index));
+        }
+        return views;
+    }
+
+    MagnifierView magnifierViewOrDefault(const std::string_view token, std::string &complaint)
+    {
+        complaint.clear();
+        for (std::size_t index = 0; index < kMagnifierTokens.size(); ++index)
+        {
+            if (kMagnifierTokens[index] == token)
+            {
+                return static_cast<MagnifierView>(index);
+            }
+        }
+
+        // 坏值回落「窄」而不是夹到最近一档：夹会把手写的 wide2 变成 wide，而这两件事差得远
+        complaint = std::format("放大镜视野「{}」不是可用取值。可用的是 off、narrow、medium、wide；这一轮按 narrow（9×9，本仓此前的形状）走", std::string(token));
+        return MagnifierView::Narrow;
+    }
+
     MagnifierLayout magnifierLayoutFor(const QPoint &cursor, const QRect &screen, const QRect &available, const int sampleEdge, const int viewEdge)
     {
         if (sampleEdge <= 0 || viewEdge <= 0 || screen.isEmpty())
