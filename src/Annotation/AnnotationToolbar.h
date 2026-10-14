@@ -108,8 +108,18 @@ namespace GyanisScribe::Annotation
         /// 工具按钮数量，由登记表算出：布局与用例据此核对「每一档工具都有一枚按钮」
         [[nodiscard]] static int toolButtonCount();
 
-        /// 色块按钮数量：八个预设色加一个自定义取色
+        /// 色块按钮数量：色板那几格加一个自定义取色（色板是几格由配置里那一格定）
         [[nodiscard]] int colorButtonCount() const;
+
+        /**
+         * @brief 把色板里的一格挪到另一格那儿，并把新的顺序写回配置
+         * @param from 拖走的那一格序号
+         * @param to 落点那一格序号（都以挪走之前的表为准）
+         * @details 越界、原地不动与「名单被别处改坏」都不写配置：前者是手抖，最后一写下去会把工具栏
+         *          正在摆的那一排顶成另一份。公开这一格是给判据用的——拖动要三个鼠标事件与真实几何，
+         *          而那一步是那一串的最后一下。
+         */
+        void requestPaletteMove(int from, int to);
 
         /// 当前选中的颜色，含自定义取回来的那一个
         [[nodiscard]] QColor currentColor() const;
@@ -338,6 +348,17 @@ namespace GyanisScribe::Annotation
          */
         void wheelEvent(QWheelEvent *event) override;
 
+        /**
+         * @brief 色板那几格上的按住拖动：把这一格拖到另一格那儿就重排
+         * @param watched 被观察的控件（这里只有色板那几枚色块）
+         * @param event 来的事件
+         * @return 交回基类的结果：这一路只看不吞，按下与点击照旧走完
+         * @details 重写 QWidget::eventFilter：只看不动——按下、移动、抬起三下都在基类流程里照常走完，
+         *          这一路只在走过阈值且落到另一格上时挪一次顺序。松手落在别格上时 Qt 本就不发 clicked()，
+         *          所以重排不会顺手把在用的颜色换掉，这里不需要额外挡一道。
+         */
+        bool eventFilter(QObject *watched, QEvent *event) override;
+
     private:
         /**
          * @brief 建一个带图标、tooltip 与无障碍名称的按钮
@@ -389,17 +410,25 @@ namespace GyanisScribe::Annotation
         /// 这个窗口内落点是否在色板那一段上（预设 + 最近使用 + 自定义那一枚的合矩形）
         [[nodiscard]] bool overColorRow(const QPoint &localPoint) const;
 
+        /// 全局落点落在色板第几格上；不在那一排上返回 -1（最近使用与自定义那两枚不参与重排）
+        [[nodiscard]] int paletteIndexAtGlobalPoint(const QPoint &globalPoint) const;
+
+        /// 按 m_palette 重画色块图标：重排只换图标，不重建按钮（拖的那一下正跑在按钮的事件里，删它会当场踩空）
+        void repaintPaletteSwatches();
+
         /// 把当前不透明度写进自定义按钮的提示：读数要有出口，不然「滚了一下到底改没改」只能靠画一笔去看
         void updateOpacityHint();
 
-        Settings::ISettingsStore  &m_settings;                    ///< 最近使用颜色的读写去处
-        std::vector<QColor>        m_recentColors;                ///< 最近用过的自定义颜色，首位最新
-        std::vector<QToolButton *> m_recentButtons;               ///< 与 m_recentColors 同序的色块按钮
-        std::vector<QToolButton *> m_paletteButtons;              ///< 色板那几格的按钮，与 m_palette 同序（自定义色板时格数不是写死的八格）
-        std::vector<QColor>        m_palette;                     ///< 这一排摆的色板：配置里那份，没填就是内置那八格
-        int                        m_recentInsertIndex = 0;       ///< 色块插进布局的位置（预设色板之后、自定义按钮之前）
-        class QHBoxLayout         *m_layout            = nullptr; ///< 工具栏主布局，重建色块时要往这里插
-        QButtonGroup              *m_colorGroup        = nullptr; ///< 色块的互斥组，重建最近使用时要同步它的成员
+        Settings::ISettingsStore  &m_settings;                  ///< 最近使用颜色的读写去处
+        std::vector<QColor>        m_recentColors;              ///< 最近用过的自定义颜色，首位最新
+        std::vector<QToolButton *> m_recentButtons;             ///< 与 m_recentColors 同序的色块按钮
+        std::vector<QToolButton *> m_paletteButtons;            ///< 色板那几格的按钮，与 m_palette 同序（自定义色板时格数不是写死的八格）
+        std::vector<QColor>        m_palette;                   ///< 这一排摆的色板：配置里那份，没填就是内置那八格
+        int                        m_recentInsertIndex    = 0;  ///< 色块插进布局的位置（预设色板之后、自定义按钮之前）
+        int                        m_draggingPaletteIndex = -1; ///< 正在被拖的色板格序号，-1 表示没在拖
+        QPoint                     m_dragStartGlobal;           ///< 按下那一下的全局位置：走过 Qt 的拖动阈值才算拖
+        class QHBoxLayout         *m_layout     = nullptr;      ///< 工具栏主布局，重建色块时要往这里插
+        QButtonGroup              *m_colorGroup = nullptr;      ///< 色块的互斥组，重建最近使用时要同步它的成员
 
         const Ui::IconProvider                     &m_icons;                                                                 ///< 图标出口，不拥有
         std::array<QToolButton *, kToolButtonCount> m_toolButtons{};                                                         ///< 工具按钮，按 ToolKind 顺序

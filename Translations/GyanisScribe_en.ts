@@ -136,6 +136,10 @@
             <translation>Color %1</translation>
         </message>
         <message>
+            <source>按住拖动可以把这一格挪到另一格那儿；上限是 16 格，顺序存在设置的标注页里</source>
+            <translation>Hold and drag to move this swatch next to another one; the palette holds up to 16 swatches and the order is stored on the annotation page of the settings</translation>
+        </message>
+        <message>
             <source>自定义颜色</source>
             <translation>Custom color</translation>
         </message>

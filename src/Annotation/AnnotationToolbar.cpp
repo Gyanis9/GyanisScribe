@@ -9,13 +9,16 @@
 #include "Settings/SettingsKeys.h"
 #include "Ui/DesignTokens.h"
 
+#include <QApplication>
 #include <QButtonGroup>
 #include <QColorDialog>
 #include <QComboBox>
+#include <QEvent>
 #include <QFontComboBox>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QIcon>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QPen>
 #include <QPixmap>
@@ -28,6 +31,7 @@
 #include <array>
 #include <cmath>
 #include <format>
+#include <ranges>
 #include <string_view>
 #include <tuple>
 
@@ -149,12 +153,24 @@ namespace GyanisScribe::Annotation
         for (std::size_t index = 0; index < m_palette.size(); ++index)
         {
             const auto color  = m_palette[index];
-            auto      *button = makeButton("Close", GyanisScribe::Core::uiText("颜色 %1").arg(static_cast<int>(index) + 1), true);
+            const int  slot   = static_cast<int>(index);
+            auto      *button = makeButton("Close", GyanisScribe::Core::uiText("颜色 %1").arg(slot + 1), true);
             // 图标换成色块：makeButton 那份图标只保证按钮尺寸合适，色块才是这一格要表达的东西
             button->setIcon(QIcon{colorSwatchPixmap(color, m_icons.tintColor())});
+            button->setToolTip(GyanisScribe::Core::uiText("按住拖动可以把这一格挪到另一格那儿；上限是 16 格，顺序存在设置的标注页里"));
             m_paletteButtons.push_back(button);
-            colorGroup->addButton(button, static_cast<int>(index));
-            QObject::connect(button, &QToolButton::clicked, this, [this, color] { applyColorToActiveTool(color); });
+            colorGroup->addButton(button, slot);
+            // 按序号取色而不是把颜色抄进 lambda：重排换的就是「第几格摆哪一支」，抄值会让拖完的按钮还发旧色
+            QObject::connect(button, &QToolButton::clicked, this,
+                             [this, slot]
+                             {
+                                 if (slot >= 0 && static_cast<std::size_t>(slot) < m_palette.size())
+                                 {
+                                     applyColorToActiveTool(m_palette[static_cast<std::size_t>(slot)]);
+                                 }
+                             });
+            // 拖动重排靠事件过滤器看着这三下（按下 / 移动 / 抬起），不吞事件：点击与滚轮那两路照旧走
+            button->installEventFilter(this);
             layout->addWidget(button);
         }
         // 最近使用颜色：读回上一次留下的清单，插在预设色板之后、自定义按钮之前。
@@ -926,6 +942,105 @@ namespace GyanisScribe::Annotation
         {
             m_customColorButton->setChecked(true);
         }
+    }
+
+    void AnnotationToolbar::requestPaletteMove(const int from, const int to)
+    {
+        if (from < 0 || to < 0 || static_cast<std::size_t>(from) >= m_palette.size() || static_cast<std::size_t>(to) >= m_palette.size())
+        {
+            // 越界只会来自算错的坐标：既不动表，也不写配置——写下去会把工具栏正摆着的那一排顶成另一份
+            return;
+        }
+        const auto moved = movePaletteColor(m_palette, static_cast<std::size_t>(from), static_cast<std::size_t>(to));
+        if (moved == m_palette)
+        {
+            return; // 原地：顺序没变，就不该惊动配置
+        }
+        m_palette = moved;
+        repaintPaletteSwatches();
+        if (const auto written = m_settings.setValue(Settings::kAnnotationPalette, paletteToTokens(m_palette)); !written)
+        {
+            // 屏上已经换了、盘上还是旧的：这句警告是唯一能看出「下次开又变回去」从哪来的线索
+            Core::Logger::warning(std::format("色板顺序没能写进配置：{}", written.error().message));
+        }
+        syncColorButtonChecked();
+    }
+
+    void AnnotationToolbar::repaintPaletteSwatches()
+    {
+        // 重排换的是「第几格摆哪一支」，按钮一颗都不动：拖的那一下正跑在按钮的事件里，删它就是当场踩空
+        for (std::size_t index = 0; index < m_paletteButtons.size() && index < m_palette.size(); ++index)
+        {
+            if (auto *button = m_paletteButtons[index]; button != nullptr)
+            {
+                button->setIcon(QIcon{colorSwatchPixmap(m_palette[index], m_icons.tintColor())});
+            }
+        }
+    }
+
+    int AnnotationToolbar::paletteIndexAtGlobalPoint(const QPoint &globalPoint) const
+    {
+        for (std::size_t index = 0; index < m_paletteButtons.size(); ++index)
+        {
+            const auto *button = m_paletteButtons[index];
+            if (button != nullptr && button->rect().contains(button->mapFromGlobal(globalPoint)))
+            {
+                return static_cast<int>(index);
+            }
+        }
+        return -1;
+    }
+
+    bool AnnotationToolbar::eventFilter(QObject *watched, QEvent *event)
+    {
+        const auto found = std::ranges::find_if(m_paletteButtons, [watched](const QToolButton *button) { return button == watched; });
+        if (found == m_paletteButtons.end())
+        {
+            return QWidget::eventFilter(watched, event);
+        }
+        const auto slot = static_cast<int>(std::ranges::distance(m_paletteButtons.begin(), found));
+
+        switch (event->type())
+        {
+            case QEvent::MouseButtonPress:
+            {
+                const auto *press = static_cast<const QMouseEvent *>(event);
+                if (press->button() == Qt::LeftButton)
+                {
+                    m_draggingPaletteIndex = slot;
+                    m_dragStartGlobal      = press->globalPosition().toPoint();
+                }
+                break;
+            }
+            case QEvent::MouseMove:
+            {
+                if (m_draggingPaletteIndex < 0)
+                {
+                    break;
+                }
+                const auto global = static_cast<const QMouseEvent *>(event)->globalPosition().toPoint();
+                // 没过 Qt 的拖动阈值就当普通移动：手抖一两像素就把色板重排，比不动更让人以为是程序疯了
+                if ((global - m_dragStartGlobal).manhattanLength() < QApplication::startDragDistance())
+                {
+                    break;
+                }
+                const int target = paletteIndexAtGlobalPoint(global);
+                if (target < 0 || target == m_draggingPaletteIndex)
+                {
+                    break;
+                }
+                requestPaletteMove(m_draggingPaletteIndex, target);
+                // 拖着的这一格跟着光标走：下一段再以它为新起点，才会一路拖到最右
+                m_draggingPaletteIndex = target;
+                break;
+            }
+            case QEvent::MouseButtonRelease:
+                m_draggingPaletteIndex = -1;
+                break;
+            default:
+                break;
+        }
+        return QWidget::eventFilter(watched, event);
     }
 
     void AnnotationToolbar::rebuildRecentColors()

@@ -12,6 +12,7 @@
 #include <QApplication>
 #include <QColor>
 #include <QComboBox>
+#include <QEvent>
 #include <QFont>
 #include <QFontComboBox>
 #include <QFontDatabase>
@@ -22,6 +23,7 @@
 #include <QSlider>
 #include <QString>
 #include <QStringList>
+#include <QMouseEvent>
 #include <QToolButton>
 #include <QWheelEvent>
 #include <QWidget>
@@ -186,6 +188,14 @@ namespace
         }
 
         /// 建一把工具栏并把布局跑实：按钮几何要有真值，滚轮的落点才算得出来
+        /// 把色板预置成指定的那几格：重开一份 store，等价于用户改完设置再回到工具栏
+        void presetPalette(const QStringList &tokens)
+        {
+            ASSERT_TRUE(m_settings->setValue(GyanisScribe::Settings::kAnnotationPalette, tokens).has_value());
+            m_settings->sync();
+            m_settings = std::make_unique<SettingsStore>(m_iniPath);
+        }
+
         [[nodiscard]] std::unique_ptr<AnnotationToolbar> makeToolbarLaidOut(SignalLog &log)
         {
             auto toolbar = makeToolbarLogged(log);
@@ -1270,8 +1280,8 @@ TEST_F(ToolbarFixture, WheelOpacityIsRememberedPerShape)
 /**
  * @brief 钉住色板那一排读的是配置里那一份，而不是写死的八格
  * @details 自定义色板换的是整排：格数、顺序与颜色都跟着配置走；「最近使用」与自定义那两枚仍排在其后，
- *
- * 那是两件事的账，不该被自定义色板挤掉。
+
+ * * 那是两件事的账，不该被自定义色板挤掉。
  */
 TEST_F(ToolbarFixture, PaletteFromSettingsDrivesTheSwatchRow)
 {
@@ -1294,7 +1304,8 @@ TEST_F(ToolbarFixture, PaletteFromSettingsDrivesTheSwatchRow)
 
 /**
  * @brief 钉住色板名单被改坏时回落到内置那八格，而不是摆出一排空的
- * @details 配置是能手改的：那一格写坏了不该让工具栏少一整排颜色，一句警告进日志、桌面照常用。
+ * @details
+ * 配置是能手改的：那一格写坏了不该让工具栏少一整排颜色，一句警告进日志、桌面照常用。
 
  */
 TEST_F(ToolbarFixture, BrokenPaletteFallsBackToTheBuiltinRow)
@@ -1308,4 +1319,124 @@ TEST_F(ToolbarFixture, BrokenPaletteFallsBackToTheBuiltinRow)
 
     EXPECT_EQ(toolbar->colorButtonCount(), static_cast<int>(kAnnotationPalette.size()) + 1) << "坏名单把整排色板带走了";
     EXPECT_EQ(toolbar->currentColor(), kAnnotationPalette[0]) << "回落的那一排第一格该是内置的第一格";
+}
+
+
+namespace
+{
+    /// 投一条鼠标事件：局部与全局两个位置按控件自己的映射算，形状与 Qt 自己发的一致
+    void sendMouse(QWidget &target, const QEvent::Type type, const QPoint &local, const Qt::MouseButton button = Qt::LeftButton)
+    {
+        const QPoint global = target.mapToGlobal(local);
+        QMouseEvent  event{type, QPointF{local}, QPointF{global}, button, button, Qt::NoModifier};
+        QApplication::sendEvent(&target, &event);
+    }
+} // namespace
+
+/**
+ * @brief 钉住色板重排的两半：表换过来了、配置里那份也换了，而按钮按「第几格」发色
+ * @details 重排只换图标不改按钮；点击要是还发当初抄进去的那支色，拖完的一排就会发旧色。
+
+ */
+TEST_F(ToolbarFixture, PaletteMoveRewritesTheRowAndPersistsIt)
+{
+    const QStringList tokens{QStringLiteral("#112233"), QStringLiteral("#445566"), QStringLiteral("#778899")};
+    presetPalette(tokens);
+
+    SignalLog log;
+    auto      toolbar = makeToolbarLaidOut(log);
+
+    toolbar->requestPaletteMove(2, 0);
+    const QStringList expected{QStringLiteral("#778899"), QStringLiteral("#112233"), QStringLiteral("#445566")};
+    EXPECT_EQ(m_settings->stringListValue(GyanisScribe::Settings::kAnnotationPalette, {}), expected) << "顺序没写回配置，或挪的算法不对";
+
+    auto *first = buttonByLabel(*toolbar, "颜色 1");
+    ASSERT_NE(first, nullptr);
+    first->click();
+    ASSERT_EQ(log.colors.size(), 1U);
+    EXPECT_EQ(log.colors[0], QColor(0x77, 0x88, 0x99)) << "第一格发的还是拖之前那一支：点击抄的是色而不是格";
+}
+
+/**
+ * @brief 钉住坏落点与原地不动都不写配置
+ * @details 越界的序号只会来自算错的坐标；把它写下去就等于把工具栏正摆着那一排换成另一份没摆过的。
+
+ */
+TEST_F(ToolbarFixture, PaletteMoveIgnoresBadSlotsAndNoOps)
+{
+    const QStringList tokens{QStringLiteral("#112233"), QStringLiteral("#445566"), QStringLiteral("#778899")};
+    presetPalette(tokens);
+
+    SignalLog log;
+    auto      toolbar = makeToolbarLaidOut(log);
+
+    toolbar->requestPaletteMove(0, 0);
+    toolbar->requestPaletteMove(0, 99);
+    toolbar->requestPaletteMove(-1, 1);
+    toolbar->requestPaletteMove(3, 0);
+
+    EXPECT_EQ(m_settings->stringListValue(GyanisScribe::Settings::kAnnotationPalette, {}), tokens) << "越界或原地的那几次动了色板";
+    EXPECT_TRUE(log.colors.empty()) << "重排不该顺手把当前颜色也换了";
+}
+
+/**
+ * @brief 钉住「按住一格拖到另一格那儿」真的把那一格挪过去，并且那一下不改当前颜色
+ * @details 松手落在别的格上时 Qt 不发 clicked()，所以重排不该有任何选色副作用——这条判据钉的就是「只挪序、不换色」。
+
+ */
+TEST_F(ToolbarFixture, DraggingASwatchOntoAnotherReordersThem)
+{
+    const QStringList tokens{QStringLiteral("#112233"), QStringLiteral("#445566"), QStringLiteral("#778899")};
+    presetPalette(tokens);
+
+    SignalLog log;
+    auto      toolbar = makeToolbarLaidOut(log);
+
+    auto *first = buttonByLabel(*toolbar, "颜色 1");
+    auto *third = buttonByLabel(*toolbar, "颜色 3");
+    ASSERT_NE(first, nullptr);
+    ASSERT_NE(third, nullptr);
+    ASSERT_NE(first->geometry(), third->geometry()) << "两格挤在同一处，拖动就没法判";
+
+    const QPoint start   = first->rect().center();
+    const QPoint onThird = first->mapFromGlobal(third->mapToGlobal(third->rect().center()));
+
+    sendMouse(*first, QEvent::MouseButtonPress, start);
+    // 先走过 Qt 的拖动阈值，再落到第三格上：两下都投在这枚被按住的按钮上（Qt 的鼠标抓取就是这样）
+    sendMouse(*first, QEvent::MouseMove, start + QPoint{first->width(), 0});
+    sendMouse(*first, QEvent::MouseMove, onThird);
+    sendMouse(*first, QEvent::MouseButtonRelease, onThird);
+
+    const QStringList expected{QStringLiteral("#445566"), QStringLiteral("#778899"), QStringLiteral("#112233")};
+    EXPECT_EQ(m_settings->stringListValue(GyanisScribe::Settings::kAnnotationPalette, {}), expected) << "拖了一趟没重排，或落点算错";
+    EXPECT_TRUE(log.colors.empty()) << "拖完那一下被当成选色：整理色板不该改在用的颜色";
+}
+
+/**
+ * @brief 钉住没过拖动阈值的抖动不重排
+ * @details 手抖一两像素就把色板重排，比不动更让人以为是程序疯了。
+ */
+TEST_F(ToolbarFixture, JitterBelowTheDragThresholdDoesNotReorder)
+{
+    const QStringList tokens{QStringLiteral("#112233"), QStringLiteral("#445566"), QStringLiteral("#778899")};
+    presetPalette(tokens);
+
+    SignalLog log;
+    auto      toolbar = makeToolbarLaidOut(log);
+
+    auto *first = buttonByLabel(*toolbar, "颜色 1");
+    auto *third = buttonByLabel(*toolbar, "颜色 3");
+    ASSERT_NE(first, nullptr);
+    ASSERT_NE(third, nullptr);
+
+    const QPoint start    = first->rect().center();
+    const QPoint onThird  = first->mapFromGlobal(third->mapToGlobal(third->rect().center()));
+    const int    oneShort = QApplication::startDragDistance() - 1;
+    ASSERT_GT(oneShort, 0) << "这台机器的拖动阈值太小，这条判据构造不出「没过阈值」的现场";
+
+    sendMouse(*first, QEvent::MouseButtonPress, start);
+    sendMouse(*first, QEvent::MouseMove, start + QPoint{oneShort, 0});
+    sendMouse(*first, QEvent::MouseButtonRelease, start + QPoint{oneShort, 0});
+
+    EXPECT_EQ(m_settings->stringListValue(GyanisScribe::Settings::kAnnotationPalette, {}), tokens) << "阈值之内的一抖就把色板重排了";
 }
