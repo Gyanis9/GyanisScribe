@@ -87,6 +87,13 @@ namespace GyanisScribe::Settings
     /// 截图完成时响一声系统提示音；默认关
     inline constexpr std::string_view kCaptureSound = "Capture/Sound";
 
+    /**
+     * @brief 截图成功后起跑的一条外部命令，形如「上传工具 --path "%file%"」；留空即不跑
+     * @details `%file%` 换成这一轮落盘的成品路径，没落盘时带它的命令会被拒并说明原因。
+     *          读端在 AppController::runAfterCaptureCommand，写端在设置的截图页；命令行的 --exec 压过这一格。
+     */
+    inline constexpr std::string_view kCaptureExecCommand = "Capture/ExecCommand";
+
     /// 成品出程序（存文件或交剪贴板）时加的装饰，两格独立；默认都关，装饰是「要的时候才有」的东西
     inline constexpr std::string_view kOutputBorder = "Save/OutputBorder";
     inline constexpr std::string_view kOutputShadow = "Save/OutputShadow";

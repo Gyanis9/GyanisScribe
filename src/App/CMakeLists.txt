@@ -8,6 +8,8 @@ add_library(App STATIC
         CommandLine.cpp
         CaptureIntent.h
         CaptureIntent.cpp
+        CaptureDelivery.h
+        CaptureDelivery.cpp
         ClipboardPin.h
         ClipboardPin.cpp
         MainWindow.h

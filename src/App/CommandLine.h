@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "App/CaptureDelivery.h"
 #include "Core/Types.h"
 
 #include <QString>
@@ -42,8 +43,11 @@ namespace GyanisScribe::App
      */
     struct CommandLineRequest
     {
-        CommandLineAction action = CommandLineAction::None;
-        QString           filePath; ///< --pin 要用到的文件路径；其余动作为空
+        CommandLineAction action = CommandLineAction::None; ///< 要走的动作
+        QString           filePath;                         ///< --pin 要用到的文件路径；其余动作为空
+        CaptureOutputSet  outputs;                          ///< --capture 这一轮点名的去处，已按交付顺序排好；没点名的动作留空
+        QString           execCommand;                      ///< --exec 写的那一条命令；空表示这一轮截完不跑外部命令
+        bool              outputsGiven = false;             ///< 命令行上到底写没写 --to：控制器要据此决定「这一次」压过设置里那一格
     };
 
     /// --capture 的取值词表：token、对应动作与用法说明里那句人话
@@ -76,7 +80,8 @@ namespace GyanisScribe::App
      * @param arguments 命令行参数（不含 argv[0]）
      * @return 请求或报错
      * @details 认这些：-h/--help、-v/--version、--selftest、--capture <full|region|window>、
-     *          --pin <文件>、--pick。取值可以写成「--capture=full」或「--capture full」两种。
+     *          --pin <文件>、--pick，以及只配 --capture 用的 --to <去处> 与 --exec <命令>。
+     *          取值可以写成「--capture=full」或「--capture full」两种，两种都适用于 --to 与 --exec。
      *          一次只认一个动作：同时给两个就报错，不替用户挑一个执行。
      */
     [[nodiscard]] CommandLineParseResult parseStartupArguments(const QStringList &arguments);

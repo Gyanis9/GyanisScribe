@@ -90,11 +90,12 @@ public:
 
 private:
     /**
-     * @brief 一次性命令行截图：等落盘或失败，打印结果并返回退出码
-     * @param action 三档范围之一
-     * @return 0 表示已落盘并打印了路径；1 表示失败并把原因打到了标准错误
+     * @brief 一次性命令行截图：等交付完或失败，打印结果并返回退出码
+     * @param request 启动请求，要用其中的范围、`--to` 点名的去处与 `--exec` 那一条命令
+     * @return 0 表示点名的去处都交付完（落了盘就把路径打到标准输出）；1 表示失败并把原因打到了标准错误
+     * @details 点了 `pin` 的那一次不退出：贴出来的那张属于这个进程，退出就把它一起带走（与 --pin 同一档做法）。
      */
-    int runOneShotCapture(GyanisScribe::App::CommandLineAction action);
+    int runOneShotCapture(const GyanisScribe::App::CommandLineRequest &request);
 
     std::unique_ptr<GyanisScribe::App::AppController>  m_controller;                ///< 串起配置、平台、热键与截图的核心控制器；非主实例时为空
     std::unique_ptr<GyanisScribe::App::SingleInstance> m_singleInstance;            ///< 单实例守卫，第二次启动靠它把前一份唤出来

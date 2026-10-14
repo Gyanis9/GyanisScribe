@@ -16,7 +16,9 @@ add_library(Core STATIC
         OutputDecoration.h
         OutputDecoration.cpp
         ClipboardFile.h
-        ClipboardFile.cpp)
+        ClipboardFile.cpp
+        ExternalCommand.h
+        ExternalCommand.cpp)
 
 target_include_directories(Core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 

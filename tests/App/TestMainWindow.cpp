@@ -1147,3 +1147,47 @@ TEST_F(MainWindowFixture, GroupRotationRowStoresCleanTokensAndKeepsBadOnes)
     const QStringList expected{QStringLiteral("3"), QStringLiteral("1"), QStringLiteral("2")};
     EXPECT_EQ(makeStore()->stringListValue(GyanisScribe::Settings::kPinGroupRotationOrder, {}), expected) << "名单没照顺序存，或被填歪的那一次顶掉了，或写去了别的键";
 }
+
+/**
+ * @brief 钉住「截图后运行命令」这一格写的是截图那一路读的键，存的是原文（去掉前后空格）
+ * @details 这一格刻意不在写入时校验：程序在不在场、`%file%` 有没有成品可换，都得到真的起跑那一刻才知道，
+ *          而拆不开或起不来都会把中文原因报出来。因此判据是「落到哪个键、落的是哪串」，不是「坏值被拒」。
+ */
+TEST_F(MainWindowFixture, ExecCommandRowStoresRawLineOnCaptureKey)
+{
+    makeWindow();
+    m_window->open(MainWindowPage::Capture);
+
+    auto *edit = qobject_cast<QLineEdit *>(controlInCurrentPage("截图后运行命令"));
+    ASSERT_NE(edit, nullptr) << "截图页没有这一格";
+    EXPECT_TRUE(edit->text().isEmpty()) << "没填过时要显示空，空就是「截完不跑外部命令」";
+
+    const QString trimmedExpected = QStringLiteral("上传工具 --path \"%file%\"");
+    edit->setText(QStringLiteral("  %1  ").arg(trimmedExpected));
+    emit edit->editingFinished();
+
+    closeWindowAndFlush();
+    EXPECT_EQ(makeStore()->stringValue(GyanisScribe::Settings::kCaptureExecCommand, QString{}), trimmedExpected) << "命令没照原文存进截图那一路读的键，或被写去了别处";
+}
+
+/**
+ * @brief 清空那一格之后，下一次截图不该还跑旧命令
+ * @details 留空就是「不跑」这一档的唯一写法；存着旧串的话，用户清掉了却还在起跑，那是一条关不掉的副作用
+ */
+TEST_F(MainWindowFixture, ExecCommandRowClearsWhenEmptied)
+{
+    makeWindow();
+    m_window->open(MainWindowPage::Capture);
+
+    auto *edit = qobject_cast<QLineEdit *>(controlInCurrentPage("截图后运行命令"));
+    ASSERT_NE(edit, nullptr);
+    edit->setText(QStringLiteral("旧命令.exe"));
+    emit edit->editingFinished();
+    edit->clear();
+    emit edit->editingFinished();
+
+    closeWindowAndFlush();
+    // 空文本在读取那一层就按「没填」算（SettingsStore 的口径），所以判据是「带着默认值读要读出那个默认值」：
+    // 旧命令还留在配置里时，读出来的是「旧命令.exe」而不是这一格给的「没填」
+    EXPECT_EQ(makeStore()->stringValue(GyanisScribe::Settings::kCaptureExecCommand, QStringLiteral("没填")), QStringLiteral("没填")) << "清空没落进配置，下一次截图还会跑旧命令";
+}

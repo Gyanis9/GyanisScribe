@@ -6,6 +6,18 @@ namespace
 {
     using GyanisScribe::App::CommandLineAction;
 
+    /// 这三个动作才有「截完之后落到哪儿」这一步：--to 与 --exec 只配它们用
+    [[nodiscard]] bool isCaptureAction(const CommandLineAction action) noexcept
+    {
+        return action == CommandLineAction::CaptureFullScreen || action == CommandLineAction::CaptureLastRegion || action == CommandLineAction::CaptureWindow;
+    }
+
+    /// 报错文案里列出可取的去处，出处只有 App/CaptureDelivery.h 那张词表
+    [[nodiscard]] QString outputTokenListText()
+    {
+        return QString::fromStdString(GyanisScribe::App::captureOutputTokenList());
+    }
+
     /// 动作的说法，报冲突时点名用
     [[nodiscard]] QString actionName(const CommandLineAction action)
     {
@@ -86,11 +98,53 @@ namespace GyanisScribe::App
 
         // 请求先在本地攒着：中途报错时不留半个结果（文档里的承诺由这一处保证）
         CommandLineRequest request;
+        bool               execGiven = false;
         for (int index = 0; index < arguments.size(); ++index)
         {
             const auto       &argument = arguments[index];
             CommandLineAction action   = CommandLineAction::None;
             QString           value;
+
+            // --to 与 --exec 是「修饰」而不是动作：它们改的是这一次截图的交付方式，认完就接着看下一个参数
+            QString optionValue;
+            if (matchWithValue(argument, arguments, index, QStringLiteral("--to"), optionValue))
+            {
+                if (request.outputsGiven)
+                {
+                    result.errorText = Core::uiText("--to 只给一次：把要落的几处去处写进同一串，用逗号分开");
+                    return result;
+                }
+                if (optionValue.trimmed().isEmpty())
+                {
+                    result.errorText = Core::uiText("--to 要带至少一处目的地：可取的只有 %1").arg(outputTokenListText());
+                    return result;
+                }
+                const auto parsed = GyanisScribe::App::parseCaptureOutputs(optionValue);
+                if (!parsed)
+                {
+                    result.errorText = QString::fromUtf8(parsed.error().message.c_str());
+                    return result;
+                }
+                request.outputs      = *parsed;
+                request.outputsGiven = true;
+                continue;
+            }
+            if (matchWithValue(argument, arguments, index, QStringLiteral("--exec"), optionValue))
+            {
+                if (execGiven)
+                {
+                    result.errorText = Core::uiText("--exec 只给一次：一条命令行用引号包住整串，参数照旧写在里面");
+                    return result;
+                }
+                if (optionValue.trimmed().isEmpty())
+                {
+                    result.errorText = Core::uiText("--exec 要带一条命令：形如 --exec=\"上传工具 --path %file%\"，参数里的 %file% 会换成成品路径");
+                    return result;
+                }
+                request.execCommand = optionValue;
+                execGiven           = true;
+                continue;
+            }
 
             if (argument == QStringLiteral("--selftest"))
             {
@@ -143,6 +197,18 @@ namespace GyanisScribe::App
             request.action = action;
         }
 
+        // --to 与 --exec 描述的是「截完之后」，别的动作没有这一步：悄悄收下会让脚本以为生效了
+        if (!isCaptureAction(request.action) && (request.outputsGiven || execGiven))
+        {
+            result.errorText = Core::uiText("--to 与 --exec 只配 --capture 用：--pin 与 --pick 没有「截完之后落到哪儿」这一步");
+            return result;
+        }
+        // 没点名时仍是早先那两处（落盘 + 剪贴板）：默认值写在这一处，旧脚本的输出形状不会因为加了开关而变
+        if (isCaptureAction(request.action) && !request.outputsGiven)
+        {
+            request.outputs = GyanisScribe::App::defaultCaptureOutputs();
+        }
+
         result.request = request;
         return result;
     }
@@ -162,9 +228,13 @@ namespace GyanisScribe::App
                             "  -h, --help         打这份说明后退出\n"
                             "  -v, --version      打版本号后退出\n"
                             "  --selftest         把启动路径跑完就退出：热键登记与日志就绪算通过（退出码 0），否则 1\n"
-                            "  --capture=<范围>   截一张并直接存成文件（同时进剪贴板），把文件路径打到标准输出后退出：\n") +
+                            "  --capture=<范围>   截一张，默认存成文件并复制进剪贴板，把文件路径打到标准输出后退出：\n") +
                captureLines +
-               Core::uiText("  --pin <文件>       把盘上的图片贴到屏幕上（保持运行）\n"
+               Core::uiText("  --to=<去处>       只配 --capture：这一次落哪几处，逗号分隔，可取 file / clipboard / pin\n"
+                            "                    交付顺序恒为 file → clipboard → pin；点了 pin 就留在桌面上不退出（同 --pin）\n"
+                            "  --exec=<命令>      只配 --capture：截完之后起跑一条外部命令，参数里的 %file% 换成成品路径\n"
+                            "                    整串用引号包住；没点 file 时这一轮没有成品，带 %file% 的命令会被拒\n"
+                            "  --pin <文件>       把盘上的图片贴到屏幕上（保持运行）\n"
                             "  --pick             进入屏幕取色（保持运行）\n");
     }
 

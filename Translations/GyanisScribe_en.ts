@@ -804,6 +804,22 @@
             <translation>Recording cancelled: this take wasn't saved and its temporary frames are gone.</translation>
         </message>
         <message>
+            <source>至少要写一处目的地：可取的只有 {}</source>
+            <translation>Name at least one destination: the only choices are {}</translation>
+        </message>
+        <message>
+            <source>逗号两边都要有内容：把多余的逗号去掉（比如结尾那一个）</source>
+            <translation>Both sides of a comma need a value: drop the extra comma (the trailing one, for example)</translation>
+        </message>
+        <message>
+            <source>目的地「{}」不认识：可取的只有 {}（区分大小写）</source>
+            <translation>Unknown destination "{}": the only choices are {} (case-sensitive)</translation>
+        </message>
+        <message>
+            <source>目的地「{}」写了两次：一处写一次就够</source>
+            <translation>Destination "{}" is listed twice: writing a destination once is enough</translation>
+        </message>
+        <message>
             <source>延时截图的秒数 "{}" 不在可用范围（0 到 {} 秒，0 表示不延时）里：请在设置的截图页重选，或删掉 Capture/DelaySeconds 这一项回到默认档</source>
             <translation>The capture delay "{}" is outside the usable range (0 to {} seconds, 0 means no delay): pick a value again on the Capture page in Settings, or delete the Capture/DelaySeconds entry to fall back to the default</translation>
         </message>
@@ -856,6 +872,22 @@
             <translation>The dropped files are not images or cannot be read: {}. Image files, links and text can all be pinned</translation>
         </message>
         <message>
+            <source>--to 只给一次：把要落的几处去处写进同一串，用逗号分开</source>
+            <translation>--to may be given only once: write every destination in one list, separated by commas</translation>
+        </message>
+        <message>
+            <source>--to 要带至少一处目的地：可取的只有 %1</source>
+            <translation>--to needs at least one destination: the only choices are %1</translation>
+        </message>
+        <message>
+            <source>--exec 只给一次：一条命令行用引号包住整串，参数照旧写在里面</source>
+            <translation>--exec may be given only once: wrap the whole command line in quotes and keep its arguments inside</translation>
+        </message>
+        <message>
+            <source>--exec 要带一条命令：形如 --exec="上传工具 --path %file%"，参数里的 %file% 会换成成品路径</source>
+            <translation>--exec needs one command, written as --exec="uploader --path %file%"; %file% in the arguments becomes the saved file path</translation>
+        </message>
+        <message>
             <source>--capture 要带一个范围取值：full、region 或 window</source>
             <translation>--capture needs a scope value: full, region or window</translation>
         </message>
@@ -876,16 +908,20 @@
             <translation>Only one action can be given at a time: %1 and %2 are mutually exclusive</translation>
         </message>
         <message>
+            <source>--to 与 --exec 只配 --capture 用：--pin 与 --pick 没有「截完之后落到哪儿」这一步</source>
+            <translation>--to and --exec only apply to --capture: --pin and --pick have no step that decides where a capture goes</translation>
+        </message>
+        <message>
             <source>    --capture=%1       %2\n</source>
             <translation>    --capture=%1       %2\n</translation>
         </message>
         <message>
-            <source>智录：截图、标注、贴图、取色、录屏与文字识别。不带参数启动即常驻（托盘 + 全局热键）。\n\n用法：GyanisScribe [参数]\n  -h, --help         打这份说明后退出\n  -v, --version      打版本号后退出\n  --selftest         把启动路径跑完就退出：热键登记与日志就绪算通过（退出码 0），否则 1\n  --capture=&lt;范围&gt;   截一张并直接存成文件（同时进剪贴板），把文件路径打到标准输出后退出：\n</source>
-            <translation>GyanisScribe: capture, annotate, pin, pick colours, record and OCR.\nStarting without arguments keeps it resident (tray + global hotkeys).\n\nUsage: GyanisScribe [options]\n  -h, --help         print this help and exit\n  -v, --version      print the version and exit\n  --selftest         run the startup path once and exit: code 0 when hotkeys and logging are ready, 1 otherwise\n  --capture=&lt;scope&gt;  take one shot, save it straight to a file (and the clipboard), print the path to stdout, exit:\n</translation>
+            <source>智录：截图、标注、贴图、取色、录屏与文字识别。不带参数启动即常驻（托盘 + 全局热键）。\n\n用法：GyanisScribe [参数]\n  -h, --help         打这份说明后退出\n  -v, --version      打版本号后退出\n  --selftest         把启动路径跑完就退出：热键登记与日志就绪算通过（退出码 0），否则 1\n  --capture=&lt;范围&gt;   截一张，默认存成文件并复制进剪贴板，把文件路径打到标准输出后退出：\n</source>
+            <translation>ZhiLu: screenshots, annotation, pins, colour picking, recording and text recognition. Starting without arguments keeps it resident (tray + global hotkeys).\n\nUsage: GyanisScribe [arguments]\n  -h, --help         print this help and exit\n  -v, --version      print the version and exit\n  --selftest         run the whole startup path and exit: hotkey registration plus a working log pass (exit code 0), otherwise 1\n  --capture=&lt;scope&gt;  take one shot, by default saving it to a file and copying it to the clipboard, then print the file path to standard output and exit:\n</translation>
         </message>
         <message>
-            <source>  --pin &lt;文件&gt;       把盘上的图片贴到屏幕上（保持运行）\n  --pick             进入屏幕取色（保持运行）\n</source>
-            <translation>  --pin &lt;file&gt;       pin an image file onto the screen (keeps running)\n  --pick             enter screen colour picking (keeps running)\n</translation>
+            <source>  --to=&lt;去处&gt;       只配 --capture：这一次落哪几处，逗号分隔，可取 file / clipboard / pin\n                    交付顺序恒为 file → clipboard → pin；点了 pin 就留在桌面上不退出（同 --pin）\n  --exec=&lt;命令&gt;      只配 --capture：截完之后起跑一条外部命令，参数里的 %file% 换成成品路径\n                    整串用引号包住；没点 file 时这一轮没有成品，带 %file% 的命令会被拒\n  --pin &lt;文件&gt;       把盘上的图片贴到屏幕上（保持运行）\n  --pick             进入屏幕取色（保持运行）\n</source>
+            <translation>  --to=&lt;destinations&gt;  only with --capture: where this shot goes, comma-separated, the choices being file / clipboard / pin\n                    delivery order is always file -> clipboard -> pin; naming pin leaves the process on the desk (like --pin)\n  --exec=&lt;command&gt;      only with --capture: start one external command after the capture, with %file% in its arguments replaced by the saved file path\n                    wrap the whole line in quotes; without file named this round has no output file, so a command carrying %file% is rejected\n  --pin &lt;file&gt;        pin an image file from the disk (stays running)\n  --pick             enter screen colour picking (stays running)\n</translation>
         </message>
         <message>
             <source>整块屏</source>
@@ -1246,6 +1282,18 @@
         <message>
             <source>成品那圈边框的颜色，写 #RRGGBB；留空回到默认的中灰</source>
             <translation>The colour of that ring, written as #RRGGBB. Leave it empty for the default neutral grey</translation>
+        </message>
+        <message>
+            <source>留空即不跑；形如 上传工具 --path "%file%"</source>
+            <translation>Leave empty to skip it; written as, for example, uploader --path "%file%"</translation>
+        </message>
+        <message>
+            <source>截图后运行命令</source>
+            <translation>Run a command after a capture</translation>
+        </message>
+        <message>
+            <source>每次截图交付完之后起跑这一串，参数里的 %file% 换成这一轮落盘的成品路径。这一轮没落成文件时（「截完之后」选了进标注窗等）带 %file% 的命令会被拒并说明原因；命令行给了 --exec 时以那一条为准，这一格不参与那一次。</source>
+            <translation>Starts this command once every destination of this capture has been delivered. In its arguments %file% becomes the file written this round; when this round wrote no file ("After a capture" set to the annotation window, for example) a command carrying %file% is rejected with the reason shown. A command line that passed --exec runs that one instead, and this field does not take part in that run.</translation>
         </message>
         <message>
             <source>截图与标注成品落在这个目录里。取色复制出来的文本按下面的写法格式化。</source>
@@ -1858,6 +1906,22 @@
         <message>
             <source>复制为文件失败：{} 写不下去。请检查这个目录是否可写</source>
             <translation>Copy as file failed: cannot write {}. Check that this directory is writable</translation>
+        </message>
+        <message>
+            <source>外部命令是空的：填成「程序名 参数1 参数2」这样一串，只写占位符 %file% 不算一条命令</source>
+            <translation>The external command is empty: write it as "program argument1 argument2"; the placeholder %file% alone is not a command</translation>
+        </message>
+        <message>
+            <source>外部命令的第一个词「{}」里带着 %file%：%file% 是成品路径，只能出现在参数里。程序名要写在最前面</source>
+            <translation>The first word of the external command, "{}", carries %file%: %file% is the saved file path and can only appear among the arguments. Write the program name first.</translation>
+        </message>
+        <message>
+            <source>这条外部命令要 %file%，可这一轮截图没有落成文件。把设置的「截完之后」选成「直接存成文件」或「快速保存」，或者删掉命令里的 %file%</source>
+            <translation>This external command needs %file%, but this capture wrote no file. Set "After a capture" to "Save straight to a file" or "Quick save (file + clipboard)", or remove %file% from the command.</translation>
+        </message>
+        <message>
+            <source>没能起跑外部命令：「{}」开不起来。检查程序名与路径是否还在，路径带空格时要把整段用引号包起来</source>
+            <translation>The external command could not start: "{}" would not launch. Check that the program name and path still exist; quote the whole path when it contains spaces.</translation>
         </message>
         <message>
             <source>截图页</source>

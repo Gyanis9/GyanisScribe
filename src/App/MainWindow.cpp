@@ -1673,6 +1673,36 @@ namespace GyanisScribe::App
         return edit;
     }
 
+    /**
+     * @brief 截图成功后起跑的那一条外部命令
+     * @param settings 配置存储
+     * @return 归调用方所有的输入框
+     * @details 写入时不设校验：这一串对不对，只有到真的起跑那一刻才知道（程序在不在场、`%file%` 有没有成品可换），
+     *          而拆不开或起不来都会把中文原因报出来并落日志。在这里拦只拦得住「看着像空的」那一格，
+     *          反而会给用户「填了就该立刻报错」的错觉。
+     */
+    QLineEdit *makeExecCommandEdit(ISettingsStore &settings)
+    {
+        auto *edit = new QLineEdit;
+        edit->setText(settings.stringValue(GyanisScribe::Settings::kCaptureExecCommand, QString{}));
+        edit->setPlaceholderText(GyanisScribe::Core::uiText("留空即不跑；形如 上传工具 --path \"%file%\""));
+        edit->setClearButtonEnabled(true);
+        edit->setAccessibleName(GyanisScribe::Core::uiText("截图后运行命令"));
+        edit->setToolTip(GyanisScribe::Core::uiText("每次截图交付完之后起跑这一串，参数里的 %file% 换成这一轮落盘的成品路径。"
+                                                    "这一轮没落成文件时（「截完之后」选了进标注窗等）带 %file% 的命令会被拒并说明原因；"
+                                                    "命令行给了 --exec 时以那一条为准，这一格不参与那一次。"));
+
+        QObject::connect(edit, &QLineEdit::editingFinished, edit,
+                         [&settings, edit]
+                         {
+                             if (const auto written = settings.setValue(GyanisScribe::Settings::kCaptureExecCommand, edit->text().trimmed()); !written)
+                             {
+                                 Core::Logger::warning(std::format("截图后运行命令没能写入：{}", written.error().message));
+                             }
+                         });
+        return edit;
+    }
+
     QWidget *MainWindow::buildCapturePage()
     {
         auto *page = new QWidget{this};
@@ -1692,6 +1722,7 @@ namespace GyanisScribe::App
         form->addRow(GyanisScribe::Core::uiText("截图音效"),
                      makeSettingCheck(m_settings, GyanisScribe::Settings::kCaptureSound, false, GyanisScribe::Core::uiText("截图完成时响一声系统提示音"),
                                       GyanisScribe::Core::uiText("截图音效"), GyanisScribe::Core::uiText("用系统的提示音，不需要放音频文件")));
+        form->addRow(GyanisScribe::Core::uiText("截图后运行命令"), makeExecCommandEdit(m_settings));
         form->addRow(GyanisScribe::Core::uiText("成品加边框"),
                      makeSettingCheck(m_settings, GyanisScribe::Settings::kOutputBorder, false, GyanisScribe::Core::uiText("出程序时围一圈中灰边框"),
                                       GyanisScribe::Core::uiText("成品加边框"),

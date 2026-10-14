@@ -3,6 +3,7 @@ add_executable(TestShell
         TestSingleInstance.cpp
         TestCrashGuard.cpp
         TestCaptureIntent.cpp
+        TestCaptureDelivery.cpp
         TestCommandLine.cpp
         TestUpdateCheck.cpp)
 

@@ -140,33 +140,44 @@ const GyanisScribe::Hotkey::HotkeyReloadReport &Application::hotkeyReport() cons
     return m_hotkeyReport;
 }
 
-int Application::runOneShotCapture(const GyanisScribe::App::CommandLineAction action)
+int Application::runOneShotCapture(const GyanisScribe::App::CommandLineRequest &request)
 {
+    using GyanisScribe::App::captureOutputsContain;
+
     int  exitCode  = 1;
-    bool completed = false;
+    bool finished  = false;
+    // 点了 pin 就要留在桌面上：那一张贴图活在本进程里，退出就把它一起带走（与 --pin 同一档做法）
+    const bool keepRunning = captureOutputsContain(request.outputs, GyanisScribe::App::CaptureOutput::Pin);
     // 落盘路径走标准输出、失败原因走标准错误：脚本按这两条接着干活；
     // 文本按本地码页打（控制台那一侧的编码），与日志文件名那条同一处口径
-    QObject::connect(m_controller.get(), &GyanisScribe::App::AppController::imageFileSaved, this,
-                     [&exitCode, &completed](const QString &filePath)
+    QObject::connect(m_controller.get(), &GyanisScribe::App::AppController::commandLineCaptureDelivered, this,
+                     [&exitCode, &finished, keepRunning](const QString &savedPath)
                      {
-                         std::cout << filePath.toLocal8Bit().constData() << std::endl;
-                         exitCode  = 0;
-                         completed = true;
-                         QCoreApplication::quit();
+                         // 没点名 file 时这一轮没有路径可打：空串不打，免得脚本把空行当成文件名
+                         if (!savedPath.isEmpty())
+                         {
+                             std::cout << savedPath.toLocal8Bit().constData() << std::endl;
+                         }
+                         exitCode = 0;
+                         finished = true;
+                         if (!keepRunning)
+                         {
+                             QCoreApplication::quit();
+                         }
                      });
     QObject::connect(m_controller.get(), &GyanisScribe::App::AppController::commandLineActionFailed, this,
-                     [&exitCode, &completed](const QString &reason)
+                     [&exitCode, &finished](const QString &reason)
                      {
                          std::fprintf(stderr, "%s\n", reason.toLocal8Bit().constData());
-                         exitCode  = 1;
-                         completed = true;
+                         exitCode = 1;
+                         finished = true;
                          QCoreApplication::quit();
                      });
 
     // 抓帧当下就是同步完成的（整屏那一路尤其如此）：结果可能在 exec() 之前就到，
     // 而那时 quit() 是个空动作——不认这一格，事件循环一进去就再没人叫停
-    m_controller->startCommandLineCapture(action);
-    if (!completed)
+    m_controller->startCommandLineCapture(request);
+    if (!finished || keepRunning)
     {
         QApplication::exec();
     }
@@ -203,7 +214,7 @@ int Application::executeCommandLine(const GyanisScribe::App::CommandLineRequest 
                 std::fprintf(stderr, "命令行动作没能开始：控制器没建起来（多半是日志目录不可用）\n");
                 return 1;
             }
-            return runOneShotCapture(request.action);
+            return runOneShotCapture(request);
         case CommandLineAction::PinFile:
         {
             if (m_controller == nullptr)

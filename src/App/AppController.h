@@ -25,6 +25,7 @@
 #include <QSize>
 
 class QTimer;
+class QScreen;
 
 #include <functional>
 #include <memory>
@@ -187,12 +188,13 @@ namespace GyanisScribe::App
         void openMainWindow(MainWindowPage page);
 
         /**
-         * @brief 命令行那次截图：处理固定走「快速保存」那一档（落盘 + 剪贴板），不做任何交互
-         * @param action 三档范围之一：整屏 / 上次选区 / 前台窗口
-         * @details 命令行没有界面可等，也不走延时那道闸。落盘成功从 imageFileSaved 交回路径，
-         *          取不到条件（比如没有前台窗口）时从 commandLineActionFailed 交回中文原因。
+         * @brief 命令行那次截图：按请求里点名的去处逐处交付，不做任何交互
+         * @param request 已解析的启动请求：范围、`--to` 点名的去处与 `--exec` 那一条命令
+         * @details 命令行没有界面可等，也不走延时那道闸。交付顺序恒为「存文件 → 剪贴板 → 贴到屏幕上」；
+         *          全部去处都交付完从 commandLineCaptureDelivered 交回成品路径（没点 file 时为空），
+         *          取不到条件（比如没有前台窗口）或某一路交付失败时从 commandLineActionFailed 交回中文原因。
          */
-        void startCommandLineCapture(CommandLineAction action);
+        void startCommandLineCapture(const CommandLineRequest &request);
 
         /**
          * @brief 命令行贴图：把盘上的图片贴到光标处
@@ -236,14 +238,15 @@ namespace GyanisScribe::App
 
     Q_SIGNALS:
         /**
-         * @brief 成品落盘：存文件、快速保存与自动保存三条路共用这一处
-         * @param filePath 写下的完整路径
-         * @details 命令行那次截图靠它把路径打到标准输出；界面这一侧没有人监听
+         * @brief 命令行那一次截图交付完事
+         * @param savedPath 这一轮落盘的成品路径；没点名 `file` 时为空
+         * @details 脚本靠它把路径打到标准输出并定退出码；`--to` 里点了 `pin` 时进程不退出，
+         *          那一张贴图属于这个进程，退出就把它一起带走了
          */
-        void imageFileSaved(const QString &filePath);
+        void commandLineCaptureDelivered(const QString &savedPath);
 
         /**
-         * @brief 命令行动作当场失败（还没走到截图就取不到条件）
+         * @brief 命令行动作当场失败（还没走到截图就取不到条件，或某一路交付没成）
          * @param reason 中文原因
          */
         void commandLineActionFailed(const QString &reason);
@@ -255,6 +258,29 @@ namespace GyanisScribe::App
          * @details 截完不再直接进剪贴板：标注窗的「复制」就是原来的那一步，只是多了先标一笔的机会
          */
         void handleCaptured(const Core::CapturedImage &image);
+
+        /**
+         * @brief 按「截完之后」那一档把这一帧交出去，最后一档是开标注窗
+         * @param image 抓到的图
+         * @param screen 截图所在那块屏（调用方已确认它在场）
+         * @details 与「截图完成」那串记账分开写：外部命令要在交付之后才跑，而这一处每个档位都自己 return。
+         */
+        void deliverCapturedFrame(const QImage &image, QScreen &screen);
+
+        /**
+         * @brief 命令行那一次的交付：把点名的几处逐处走完
+         * @details 交付顺序只由 App/CaptureDelivery.h 那张词表定；任一处失败就整次报错退出码 1，
+         *          不把「成了两路、少了一路」说成成功。
+         */
+        void deliverCommandLineOutputs();
+
+        /**
+         * @brief 截图成功后起跑那条外部命令（设置里那一格，或命令行 `--exec` 点名的那一条）
+         * @details 只在「这一轮真的截到了一张屏上的图」之后跑：标注窗里再存一次、从历史重新贴出都不算一次截图，
+         *          把这些也算进去会让一个上传脚本被同一次截图喂两遍。
+         *          命令为空就什么都不做；跑不起来只报一句，不把截图本身判成失败。
+         */
+        void runAfterCaptureCommand();
 
         /**
          * @brief 读设置里那一档「截完之后做什么」
@@ -525,8 +551,12 @@ namespace GyanisScribe::App
         QTimer                                              *m_hudTicker          = nullptr;                 ///< 控制条的每秒轮询，随一轮录屏起停
         int                                                  m_countdownRemaining = 0;                       ///< 倒计时剩余整秒，推给控制条的大字
         CaptureIntent                                        m_captureIntent      = CaptureIntent::Annotate; ///< 这一帧截完要去做的事
-        bool                                                 m_commandLineActive  = false;   ///< 正在跑命令行那次截图：失败路径要往 commandLineActionFailed 也交一份
-        QTimer                                              *m_captureDelayTimer  = nullptr; ///< 延时截图那一枚，一次只允许有一个在等
+        CaptureOutputSet                                     m_commandLineOutputs;                           ///< 命令行那一次点名的去处，已按交付顺序排好
+        QString                                              m_commandLineExec;              ///< --exec 写的那一条命令；只在 m_commandLineExecGiven 为真时压过设置里那一格
+        bool                                                 m_commandLineExecGiven = false; ///< 命令行到底给没给 --exec：给了就只跑那一条，不与设置里的命令叠着跑两次
+        QString                                              m_writtenFilePath;              ///< 这一轮落盘的成品路径（显示文本）；没落盘时为空，外部命令的 %file% 用它填
+        bool                                                 m_commandLineActive = false;    ///< 正在跑命令行那次截图：失败路径要往 commandLineActionFailed 也交一份
+        QTimer                                              *m_captureDelayTimer = nullptr;  ///< 延时截图那一枚，一次只允许有一个在等
         std::function<void()>                                m_pendingCapture;               ///< 延时到点要走的那一步，随定时器一起活到触发
         Core::CapturedImage                                  m_lastCapture;                  ///< 本轮抓到的帧，贴图与识别要用它定位
         QRect                                                m_lastSelection;                ///< 本轮选区（全局逻辑坐标），标注窗与贴图的位置来源

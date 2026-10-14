@@ -9,10 +9,19 @@
 
 #include <string>
 
+using GyanisScribe::App::CaptureOutput;
+using GyanisScribe::App::CaptureOutputSet;
 using GyanisScribe::App::CommandLineAction;
 using GyanisScribe::App::commandLineUsageText;
 using GyanisScribe::App::kCommandLineCaptureChoices;
 using GyanisScribe::App::parseStartupArguments;
+
+namespace
+{
+    const CaptureOutputSet kFileAndClipboard{CaptureOutput::File, CaptureOutput::Clipboard};
+    const CaptureOutputSet kAllThree{CaptureOutput::File, CaptureOutput::Clipboard, CaptureOutput::Pin};
+    const CaptureOutputSet kFileAndPin{CaptureOutput::File, CaptureOutput::Pin};
+} // namespace
 
 /**
  * @brief 空参数是正常启动，不是错误
@@ -126,8 +135,88 @@ TEST(CommandLineParsing, UsageTextMentionsEveryCaptureScopeAndFlag)
         const auto token = QString::fromUtf8(choice.token.data(), static_cast<qsizetype>(choice.token.size()));
         EXPECT_TRUE(usage.contains(token)) << "用法说明里少了取值：" << std::string{choice.token};
     }
-    for (const auto *flag: {"--help", "--version", "--selftest", "--capture", "--pin", "--pick"})
+    for (const auto *flag: {"--help", "--version", "--selftest", "--capture", "--to", "--exec", "--pin", "--pick"})
     {
         EXPECT_TRUE(usage.contains(QLatin1String(flag))) << "用法说明里少了参数：" << flag;
     }
+    // 交付顺序与占位符是这一族参数的用法本体，说明里点不到就等于没写
+    EXPECT_TRUE(usage.contains(QStringLiteral("%file%"))) << "说明里要写出 %file% 这一格怎么用";
+}
+
+/**
+ * @brief --to 的两种写法与默认档：没点名时仍是「落盘 + 剪贴板」那两处
+ * @details 默认值一变，旧脚本就少一半输出而退出码照旧是 0，所以这一格要钉住
+ */
+TEST(CommandLineParsing, OutputDestinationsParseInBothWritingStyles)
+{
+    const auto withEquals = parseStartupArguments({QStringLiteral("--capture=full"), QStringLiteral("--to=file,clipboard,pin")});
+    ASSERT_TRUE(withEquals.errorText.isEmpty()) << withEquals.errorText.toStdString();
+    EXPECT_EQ(withEquals.request.outputs, kAllThree);
+    EXPECT_TRUE(withEquals.request.outputsGiven);
+
+    const auto spaced = parseStartupArguments({QStringLiteral("--capture"), QStringLiteral("full"), QStringLiteral("--to"), QStringLiteral("pin,file")});
+    ASSERT_TRUE(spaced.errorText.isEmpty()) << spaced.errorText.toStdString();
+    EXPECT_EQ(spaced.request.outputs, kFileAndPin) << "输入里的先后不定交付顺序";
+
+    const auto omitted = parseStartupArguments({QStringLiteral("--capture=full")});
+    ASSERT_TRUE(omitted.errorText.isEmpty());
+    EXPECT_EQ(omitted.request.outputs, kFileAndClipboard);
+    EXPECT_FALSE(omitted.request.outputsGiven) << "没点名时「点没点名」这一格要留假，控制器据此区分默认档与显式写法";
+}
+
+/**
+ * @brief --to 的坏写法逐条拒：不认识的值、重复、空清单都当场报错，不执行那一次截图
+ */
+TEST(CommandLineParsing, OutputDestinationsRejectBadWrites)
+{
+    for (const auto *value: {"bogus", "File", "file,,clipboard", "file,", "clipboard,clipboard", "", " "})
+    {
+        const auto parsed = parseStartupArguments({QStringLiteral("--capture=full"), QString{QLatin1String("--to=")} + QLatin1String(value)});
+        EXPECT_EQ(parsed.request.action, CommandLineAction::None) << value;
+        EXPECT_FALSE(parsed.errorText.isEmpty()) << value;
+    }
+
+    // --to 给两次：不去「取后一次」，那会把前一处目的地悄悄丢掉
+    const auto twice = parseStartupArguments({QStringLiteral("--capture=full"), QStringLiteral("--to=file"), QStringLiteral("--to=clipboard")});
+    EXPECT_FALSE(twice.errorText.isEmpty());
+    EXPECT_TRUE(twice.errorText.contains(QStringLiteral("只给一次"))) << twice.errorText.toStdString();
+}
+
+/**
+ * @brief --exec 带的是一条完整命令行：原样收进请求，引号里的内容不在此处拆
+ */
+TEST(CommandLineParsing, ExecCarriesTheWholeCommandLine)
+{
+    const auto withEquals = parseStartupArguments({QStringLiteral("--capture=region"), QStringLiteral("--exec=上传工具 --path \"%file%\"")});
+    ASSERT_TRUE(withEquals.errorText.isEmpty()) << withEquals.errorText.toStdString();
+    EXPECT_EQ(withEquals.request.execCommand, QStringLiteral("上传工具 --path \"%file%\""));
+
+    const auto withSpace = parseStartupArguments({QStringLiteral("--capture=full"), QStringLiteral("--exec"), QStringLiteral(" notifier.exe  截好了")});
+    ASSERT_TRUE(withSpace.errorText.isEmpty()) << withSpace.errorText.toStdString();
+    EXPECT_EQ(withSpace.request.execCommand, QStringLiteral(" notifier.exe  截好了")) << "整串按一个参数交给解析器，前后空格留给拆分那一层";
+
+    EXPECT_FALSE(parseStartupArguments({QStringLiteral("--capture=full"), QStringLiteral("--exec")}).errorText.isEmpty());
+    EXPECT_FALSE(parseStartupArguments({QStringLiteral("--capture=full"), QStringLiteral("--exec=")}).errorText.isEmpty());
+    const auto twice = parseStartupArguments({QStringLiteral("--capture=full"), QStringLiteral("--exec=a.exe"), QStringLiteral("--exec=b.exe")});
+    EXPECT_FALSE(twice.errorText.isEmpty());
+}
+
+/**
+ * @brief --to 与 --exec 只配 --capture 用：给 --pin / --pick / --selftest 时报错而不是收下不生效
+ * @details 这两条描述的是「截完之后」，别的动作没有这一步；悄悄收下就是脚本里最难查的那种「以为生效了」
+ */
+TEST(CommandLineParsing, DeliveryFlagsNeedACaptureAction)
+{
+    for (const auto *action: {"--pin=a.png", "--pick", "--selftest"})
+    {
+        const auto withTo = parseStartupArguments({QString::fromLatin1(action), QStringLiteral("--to=file")});
+        EXPECT_FALSE(withTo.errorText.isEmpty()) << action;
+        EXPECT_TRUE(withTo.errorText.contains(QStringLiteral("--capture"))) << "报错要点出该配哪一个：" << withTo.errorText.toStdString();
+
+        const auto withExec = parseStartupArguments({QString::fromLatin1(action), QStringLiteral("--exec=a.exe")});
+        EXPECT_FALSE(withExec.errorText.isEmpty()) << action;
+    }
+
+    // 单独给 --to（一个动作都没给）也算错：那条请求既不是截图也没有去处可落
+    EXPECT_FALSE(parseStartupArguments({QStringLiteral("--to=file")}).errorText.isEmpty());
 }

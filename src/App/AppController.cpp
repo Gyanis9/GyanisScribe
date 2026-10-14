@@ -10,6 +10,7 @@
 #include "Capture/RegionHistory.h"
 #include "Capture/ScreenCaptureSourceFactory.h"
 #include "Capture/ScreenUtils.h"
+#include "Core/ExternalCommand.h"
 #include "Core/ImageFit.h"
 #include "Core/ImageFormat.h"
 #include "Core/Logger.h"
@@ -660,9 +661,11 @@ namespace GyanisScribe::App
         }
 
         // 「没存文件的截图也进历史」接在截图完成这一刻：误触 Esc 关掉标注窗之后，这一张还在历史里。
-        // 已经在这一轮落盘的那几路（存文件、快速保存、自动保存）不重复进——两条指同一张图的历史记录是噪声
-        const auto alreadyOnDisk =
-                m_captureIntent == CaptureIntent::SaveToFile || m_captureIntent == CaptureIntent::QuickSave || m_settings->boolValue(Settings::kCaptureAutoSave, false);
+        // 已经在这一轮落盘的那几路（存文件、快速保存、自动保存）不重复进——两条指同一张图的历史记录是噪声。
+        // 命令行那一次看的是点名的去处里有没有 file：只点 clipboard 时这一轮同样没落盘，那一步该走
+        const auto alreadyOnDisk = m_commandLineActive ? captureOutputsContain(m_commandLineOutputs, CaptureOutput::File)
+                                                       : (m_captureIntent == CaptureIntent::SaveToFile || m_captureIntent == CaptureIntent::QuickSave ||
+                                                          m_settings->boolValue(Settings::kCaptureAutoSave, false));
         if (m_settings->boolValue(Settings::kHistoryKeepUnsaved, false) && !alreadyOnDisk)
         {
             if (const auto archived =
@@ -685,6 +688,11 @@ namespace GyanisScribe::App
             // 而不是把画面摆到一块不存在的屏幕上
             QGuiApplication::clipboard()->setImage(image.image);
             Core::Logger::warning(std::format("截图所在屏幕 {} 已不可用，标注没开启，画面已直接交剪贴板", image.screenName.toStdString()));
+            // 命令行那一次也要收个口：脚本的事件循环等的是交付信号，不发出去它就停在「截完了但没人说结束」
+            if (m_commandLineActive)
+            {
+                emit commandLineCaptureDelivered(m_writtenFilePath);
+            }
             return;
         }
 
@@ -697,41 +705,112 @@ namespace GyanisScribe::App
         }
         m_lastSelection = selection;
 
+        // 命令行那一次按点名的去处逐处交付，不开标注窗：脚本要的是截完就走，多一层窗就是多一次要人点的取消
+        if (m_commandLineActive)
+        {
+            deliverCommandLineOutputs();
+            return;
+        }
+
+        deliverCapturedFrame(image.image, *screen);
+        // 外部命令接在「这一轮交付完」之后：命令里多半要拿盘上那份，交付没完就跑等于喂给它一个还不存在的文件
+        runAfterCaptureCommand();
+    }
+
+    void AppController::deliverCapturedFrame(const QImage &image, QScreen &screen)
+    {
         // 交完帧之后做什么由那一档决定；开关覆盖到每一个枚举值，新加一档忘了接会在这里就编不过
         switch (m_captureIntent)
         {
             case CaptureIntent::Recognize:
                 // 识别这条不弹标注窗：用户点的是「识别文字」，先弹一个要再点一次的界面就是多一跳
-                handleOcrRequested(image.image);
+                handleOcrRequested(image);
                 return;
             case CaptureIntent::CopyToClipboard:
-                handleCopyRequested(image.image);
+                handleCopyRequested(image);
                 return;
             case CaptureIntent::SaveToFile:
-                handleSaveRequested(image.image);
+                handleSaveRequested(image);
                 return;
             case CaptureIntent::QuickSave:
             {
                 // 快速保存：落盘 + 交剪贴板，一句提示收尾。失败时不做剪贴板那一半——
                 // 「存下了也复制了」不能说半句真话，用户会以为盘上有一份
-                const auto saved = writeImageToDisk(image.image);
+                const auto saved = writeImageToDisk(image);
                 if (!saved)
                 {
                     notifyUser(QString::fromStdString(saved.error().message), Ui::ToastKind::Danger);
                     return;
                 }
-                QGuiApplication::clipboard()->setImage(decorateOutput(image.image, false));
+                QGuiApplication::clipboard()->setImage(decorateOutput(image, false));
                 notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已保存并复制：{}"), saved->toStdString()).c_str()),
                            Ui::ToastKind::Success);
                 return;
             }
             case CaptureIntent::PinToDesk:
-                handlePinRequested(image.image);
+                handlePinRequested(image);
                 return;
             case CaptureIntent::Annotate:
                 break;
         }
-        m_annotationWindow->startAnnotation(image, screen->availableGeometry(), selection);
+        m_annotationWindow->startAnnotation(m_lastCapture, screen.availableGeometry(), m_lastSelection);
+    }
+
+    void AppController::deliverCommandLineOutputs()
+    {
+        // 交付顺序只由词表定：先盘上那份（外部命令的 %file% 要用它），再剪贴板，最后贴到屏幕上
+        for (const auto output: m_commandLineOutputs)
+        {
+            switch (output)
+            {
+                case CaptureOutput::File:
+                {
+                    const auto saved = writeImageToDisk(m_lastCapture.image);
+                    if (!saved)
+                    {
+                        // 落盘失败就整次报错、退出码 1：把「成了两路、少了一路」说成成功，脚本会拿着假信号往下走
+                        emit commandLineActionFailed(QString::fromStdString(saved.error().message));
+                        return;
+                    }
+                    break;
+                }
+                case CaptureOutput::Clipboard:
+                    // 与「复制到剪贴板」那一档同一套装饰口径：剪贴板带得了透明通道，不垫白
+                    QGuiApplication::clipboard()->setImage(decorateOutput(m_lastCapture.image, false));
+                    break;
+                case CaptureOutput::Pin:
+                    handlePinRequested(m_lastCapture.image);
+                    break;
+            }
+        }
+        runAfterCaptureCommand();
+        emit commandLineCaptureDelivered(m_writtenFilePath);
+    }
+
+    void AppController::runAfterCaptureCommand()
+    {
+        // 命令行给了 --exec 就只跑那一条：与设置里那一格叠着跑会跑出两份副作用，而脚本要的是「这一次照我说的做」
+        const auto commandLine = m_commandLineExecGiven ? m_commandLineExec : m_settings->stringValue(Settings::kCaptureExecCommand, QString{});
+        if (commandLine.trimmed().isEmpty())
+        {
+            return;
+        }
+
+        const auto planned = Core::planExternalCommand(commandLine, m_writtenFilePath);
+        if (!planned)
+        {
+            Core::Logger::error(std::format("截图后的外部命令没拆开：{}", planned.error().message));
+            notifyUser(QString::fromStdString(planned.error().message), Ui::ToastKind::Danger);
+            return;
+        }
+        const auto started = Core::startExternalCommand(*planned);
+        if (!started)
+        {
+            Core::Logger::error(std::format("截图后的外部命令没起跑：{}", started.error().message));
+            notifyUser(QString::fromStdString(started.error().message), Ui::ToastKind::Danger);
+            return;
+        }
+        Core::Logger::info(std::format("截图后已交外部程序起跑：{}", planned->program.toStdString()));
     }
 
     void AppController::handleCopyRequested(const QImage &image)
@@ -816,8 +895,9 @@ namespace GyanisScribe::App
         Core::Logger::info(std::format("成品已保存：{}", Core::Paths::toDisplayText(filePath).toStdString()));
         // 历史记的是盘上那份的尺寸：开着装饰时成品比原图大一围，记小了缩略图会裁边
         recordHistory(filePath, History::HistoryKind::Screenshot, decorated.size());
-        // 三条落盘路（存文件/快速保存/自动保存）共用这一处：交出去一次路径，命令行的脚本靠它接着干活
-        emit imageFileSaved(Core::Paths::toDisplayText(filePath));
+        // 路径留在成员上，三条落盘路（存文件/快速保存/自动保存）与命令行的交付共用这一处读数：
+        // 外部命令的 %file% 与命令行打到标准输出的都是它，两处各算一次就会在装饰开关上分家
+        m_writtenFilePath = Core::Paths::toDisplayText(filePath);
         return fileName;
     }
 
@@ -1006,13 +1086,17 @@ namespace GyanisScribe::App
         }
     }
 
-    void AppController::startCommandLineCapture(const CommandLineAction action)
+    void AppController::startCommandLineCapture(const CommandLineRequest &request)
     {
-        // 命令行那条路没有界面可等：去处定死为「快速保存」（落盘 + 交剪贴板），也不走延时那道闸——
-        // 延时是给手动截菜单留的，脚本要的是按下即截
-        m_commandLineActive = true;
-        m_captureIntent     = CaptureIntent::QuickSave;
-        switch (action)
+        // 命令行那条路没有界面可等，也不走延时那道闸——延时是给手动截菜单留的，脚本要的是按下即截。
+        // 去处由 --to 点名（没点名时解析器已填上默认的「文件 + 剪贴板」），意图仍定在「快速保存」那一档：
+        // 上面那串「截图完成」的记账（历史留一份）读的是它
+        m_commandLineActive    = true;
+        m_captureIntent        = CaptureIntent::QuickSave;
+        m_commandLineOutputs   = request.outputs.empty() ? defaultCaptureOutputs() : request.outputs;
+        m_commandLineExec      = request.execCommand;
+        m_commandLineExecGiven = !request.execCommand.trimmed().isEmpty();
+        switch (request.action)
         {
             case CommandLineAction::CaptureFullScreen:
                 m_capture->captureFullScreen();
