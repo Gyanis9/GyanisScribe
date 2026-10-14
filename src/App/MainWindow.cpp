@@ -46,6 +46,7 @@
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QSpinBox>
+#include <QScrollArea>
 #include <QStackedWidget>
 #include <QToolButton>
 #include <QUrl>
@@ -110,6 +111,27 @@ namespace
 
     /// 历史天数这一格能填到的最大值，按十年给：比这更久的留法就是「不限」那一档
     constexpr int kRetentionDaysLimit = 3650;
+
+    /**
+     * @brief 把一页设置裹进滚动区
+     * @param page 已经搭好的那一页，所有权交给滚动区
+     * @return 交给页容器的那一层滚动区
+     * @details 页比窗口高时底下那一截要够得着：快捷键那两栏加起来二十多行，默认窗口高度摆不下，
+     *          没有滚动区就是「看不见也改不到」，而且一声不吭。
+     *          对象名是给样式表用的：#settingsScroll 把这一层与它的视口都设成透明，
+     *          不然卡片四周会多出一圈与主题不合的底色。
+     */
+    QScrollArea *wrapSettingsPage(QWidget &page)
+    {
+        auto *scroll = new QScrollArea;
+        scroll->setObjectName(QStringLiteral("settingsScroll"));
+        scroll->setWidgetResizable(true);
+        scroll->setFrameShape(QFrame::NoFrame);
+        // 横向不出杠：表单的宽度跟着窗口走，出杠说明是排版坏了而不是内容太长
+        scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        scroll->setWidget(&page);
+        return scroll;
+    }
 
     /**
      * @brief 一页设置的骨架：顶部一行说明文字加一张空表单
@@ -1218,7 +1240,7 @@ namespace GyanisScribe::App
             // 图标名留在行上：QIcon 是取色那一刻的快照，换主题时要按这个名字重取
             entry->setData(kNavIconNameRole, QString::fromUtf8(choice.icon));
             m_nav->addItem(entry);
-            m_stack->addWidget(content);
+            m_stack->addWidget(wrapSettingsPage(*content));
         }
 
         // 换主题时重取图标：样式表与调色板都会自己跟上，只有已经发出去的 QIcon 需要按名字再取一次

@@ -41,6 +41,7 @@
 #include <QMenu>
 #include <QPushButton>
 #include <QSpinBox>
+#include <QScrollArea>
 #include <QStackedWidget>
 #include <QString>
 #include <QStringList>
@@ -1184,6 +1185,30 @@ TEST_F(MainWindowFixture, InWindowShortcutRowsIgnoreTheHotkeyCapabilityAndAccept
     }
 
     EXPECT_FALSE(globalRow->applyCombination(GyanisScribe::Hotkey::HotkeyCombination{Qt::NoModifier, Qt::Key_K}).has_value()) << "全局那一档收了裸键，登记阶段才会报「组合不合格」";
+}
+
+/**
+ * @brief 钉住每一页设置都裹在滚动区里：页比窗口高时底下那一截要够得着
+ * @details 这条不能按「控件找不找得到」判——findChildren 本来就是递归的，没裹滚动区照样找得到，
+ *          判据就跟着假绿。判的是形状：页容器里那一层必须是 QScrollArea，它得裹着内容、
+ *          并且让内容跟着宽度走（不裹等于「看不见也改不到」，而且一声不吭）。
+ *          对象名也钉住：样式表按这个名字把这层与它的视口设成透明，改了名字卡片四周会多出一圈底色。
+ */
+TEST_F(MainWindowFixture, EverySettingsPageIsWrappedInAScrollArea)
+{
+    makeWindow();
+    auto *pages = stack();
+    ASSERT_NE(pages, nullptr);
+    ASSERT_GT(pages->count(), 0) << "一页都没有，这条判据就是空跑";
+
+    for (int index = 0; index < pages->count(); ++index)
+    {
+        auto *scroll = qobject_cast<QScrollArea *>(pages->widget(index));
+        ASSERT_NE(scroll, nullptr) << "第 " << index << " 页没裹在滚动区里：底下那一截在默认窗口高度下够不着";
+        EXPECT_EQ(scroll->objectName(), QStringLiteral("settingsScroll")) << "样式表按这个名字把这层设成透明，名字改了就会多出一圈底色";
+        EXPECT_TRUE(scroll->widgetResizable()) << "第 " << index << " 页没让内容跟着宽度走：长句会被挤成竖条";
+        EXPECT_NE(scroll->widget(), nullptr) << "第 " << index << " 页的滚动区里没装东西";
+    }
 }
 
 /**

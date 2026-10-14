@@ -322,6 +322,17 @@ QListWidget#settingsNav::item {
     min-height: 32px;
 }
 
+/* ---- 设置页的滚动层 ---- */
+/* 卡片底画在里面的 #pageCard 上：这一层与它的视口都不带底色，否则卡片四周会多出一圈与主题不合的边 */
+QScrollArea#settingsScroll {
+    background-color: transparent;
+    border: none;
+}
+
+QScrollArea#settingsScroll > QWidget {
+    background-color: transparent;
+}
+
 /* ---- 文本区（识别结果） ---- */
 QTextEdit {
     background-color: #FFFFFF;
