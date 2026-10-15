@@ -23,10 +23,10 @@
 
 class QMimeData;
 
-namespace GyanisScribe::Pin
+namespace GyanisScribe::Gui
 {
     class PinManager;
-} // namespace GyanisScribe::Pin
+} // namespace GyanisScribe::Gui
 
 namespace GyanisScribe::App
 {
@@ -127,6 +127,6 @@ namespace GyanisScribe::App
      * @return 成功返回贴出的张数与没贴成的文件名；一件都贴不出来时返回原因
      * @details 与「把剪贴板里的内容贴到屏幕上」共用同一套内容渲染，两处不会将来只改一处。
      */
-    [[nodiscard]] Base::Expected<DropPinOutcome> pinDroppedContent(Pin::PinManager &pins, const QMimeData *data, const QPoint &globalTopLeft, const QFont &font);
+    [[nodiscard]] Base::Expected<DropPinOutcome> pinDroppedContent(Gui::PinManager &pins, const QMimeData *data, const QPoint &globalTopLeft, const QFont &font);
 
 } // namespace GyanisScribe::App

@@ -2,9 +2,9 @@
 // 判据分两层——管理器的公开读数（activeGroup、groupsInUse、closedPinCount）钉语义，
 // 窗上的 tableReadout()/hintText() 钉「界面真摆出来了什么」；按钮一律发 clicked() 走的是用户那一条路。
 
-#include "Pin/IPinWindow.h"
-#include "Pin/PinGroupManagerWindow.h"
-#include "Pin/PinManager.h"
+#include "Core/Pin/IPinWindow.h"
+#include "Gui/Pin/PinGroupManagerWindow.h"
+#include "Gui/Pin/PinManager.h"
 
 #include "Platform/IPlatformIntegration.h"
 #include "Core/Settings/SettingsStore.h"
@@ -64,7 +64,7 @@ namespace GyanisScribe
 
                 m_settings    = std::make_unique<Core::SettingsStore>(m_iniFile);
                 m_integration = Platform::createPlatformIntegration();
-                m_pins        = std::make_unique<Pin::PinManager>(*m_settings, *m_integration);
+                m_pins        = std::make_unique<Gui::PinManager>(*m_settings, *m_integration);
             }
 
             void TearDown() override
@@ -77,7 +77,7 @@ namespace GyanisScribe
                 std::filesystem::remove(m_iniFile, ignored);
             }
 
-            [[nodiscard]] Pin::PinManager &pins() const
+            [[nodiscard]] Gui::PinManager &pins() const
             {
                 return *m_pins;
             }
@@ -87,9 +87,9 @@ namespace GyanisScribe
              * @details 隐藏的窗口上布局不给子控件算位置，但这里的判据读的是模型与文本，不吃几何；
              *          要按下的按钮走的是 clicked() 信号，也不需要真的能看见。
              */
-            [[nodiscard]] Pin::PinGroupManagerWindow &makeWindow()
+            [[nodiscard]] Gui::PinGroupManagerWindow &makeWindow()
             {
-                m_window = std::make_unique<Pin::PinGroupManagerWindow>(*m_pins);
+                m_window = std::make_unique<Gui::PinGroupManagerWindow>(*m_pins);
                 m_window->setAttribute(Qt::WA_DontShowOnScreen);
                 m_window->openAndRefresh();
                 return *m_window;
@@ -141,10 +141,10 @@ namespace GyanisScribe
 
         private:
             std::filesystem::path                           m_iniFile;     ///< 本用例专用的设置文件
-            std::unique_ptr<Core::SettingsStore>        m_settings;    ///< 布局与组名的读写处
+            std::unique_ptr<Core::SettingsStore>            m_settings;    ///< 布局与组名的读写处
             std::unique_ptr<Platform::IPlatformIntegration> m_integration; ///< 贴图窗要的平台能力
-            std::unique_ptr<Pin::PinManager>                m_pins;        ///< 被测管理器
-            std::unique_ptr<Pin::PinGroupManagerWindow>     m_window;      ///< 被测窗口
+            std::unique_ptr<Gui::PinManager>                m_pins;        ///< 被测管理器
+            std::unique_ptr<Gui::PinGroupManagerWindow>     m_window;      ///< 被测窗口
         };
 
     } // namespace

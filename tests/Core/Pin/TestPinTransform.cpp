@@ -1,4 +1,4 @@
-#include "Pin/PinTransform.h"
+#include "Core/Pin/PinTransform.h"
 
 #include <QPoint>
 #include <QColor>
@@ -14,7 +14,7 @@
 #include <cmath>
 #include <numbers>
 
-using namespace GyanisScribe::Pin;
+using namespace GyanisScribe::Core;
 
 namespace
 {
@@ -417,16 +417,16 @@ TEST(PinCheckerColors, OnlyTheTwoCheckerModesDrawATile)
  */
 TEST(PinEdgeSnapDistance, AcceptsZeroAndRejectsOutOfRange)
 {
-    for (const int good: {GyanisScribe::Pin::kEdgeSnapDistanceMinimum, 1, GyanisScribe::Pin::kEdgeSnapTolerance, GyanisScribe::Pin::kEdgeSnapDistanceMaximum})
+    for (const int good: {GyanisScribe::Core::kEdgeSnapDistanceMinimum, 1, GyanisScribe::Core::kEdgeSnapTolerance, GyanisScribe::Core::kEdgeSnapDistanceMaximum})
     {
-        const auto parsed = GyanisScribe::Pin::parseEdgeSnapDistance(good);
+        const auto parsed = GyanisScribe::Core::parseEdgeSnapDistance(good);
         ASSERT_TRUE(parsed.has_value()) << good << "：" << parsed.error().message;
         EXPECT_EQ(*parsed, good);
     }
 
-    for (const int bad: {-1, GyanisScribe::Pin::kEdgeSnapDistanceMaximum + 1})
+    for (const int bad: {-1, GyanisScribe::Core::kEdgeSnapDistanceMaximum + 1})
     {
-        const auto rejected = GyanisScribe::Pin::parseEdgeSnapDistance(bad);
+        const auto rejected = GyanisScribe::Core::parseEdgeSnapDistance(bad);
         ASSERT_FALSE(rejected.has_value()) << bad << " 这个越界值被收下了";
         EXPECT_EQ(rejected.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument) << bad;
         EXPECT_NE(rejected.error().message.find("Pin/EdgeSnapDistance"), std::string::npos) << "拒绝要说清删哪一格能回默认，实际：" << rejected.error().message;
@@ -440,9 +440,9 @@ TEST(PinEdgeSnapDistance, AcceptsZeroAndRejectsOutOfRange)
  */
 TEST(PinTransform, ScalesASizeByRatioRoundingHalfUp)
 {
-    EXPECT_EQ(GyanisScribe::Pin::sizeScaledBy(QSize{101, 51}, 1.5), QSize(152, 77)) << "除不尽时四舍五入，不是截断";
-    EXPECT_EQ(GyanisScribe::Pin::sizeScaledBy(QSize{101, 51}, 0.5), QSize(51, 26));
-    EXPECT_EQ(GyanisScribe::Pin::sizeScaledBy(QSize{640, 360}, 2.0), QSize(1280, 720)) << "整数倍要逐位相等";
-    EXPECT_EQ(GyanisScribe::Pin::sizeScaledBy(QSize{100, 100}, 0.001), QSize(1, 1)) << "缩到零格就没有窗口了，每维保底一格";
-    EXPECT_EQ(GyanisScribe::Pin::sizeScaledBy(QSize{100, 100}, 0.0), QSize(100, 100)) << "非正倍率不是「缩到零」，原样交回";
+    EXPECT_EQ(GyanisScribe::Core::sizeScaledBy(QSize{101, 51}, 1.5), QSize(152, 77)) << "除不尽时四舍五入，不是截断";
+    EXPECT_EQ(GyanisScribe::Core::sizeScaledBy(QSize{101, 51}, 0.5), QSize(51, 26));
+    EXPECT_EQ(GyanisScribe::Core::sizeScaledBy(QSize{640, 360}, 2.0), QSize(1280, 720)) << "整数倍要逐位相等";
+    EXPECT_EQ(GyanisScribe::Core::sizeScaledBy(QSize{100, 100}, 0.001), QSize(1, 1)) << "缩到零格就没有窗口了，每维保底一格";
+    EXPECT_EQ(GyanisScribe::Core::sizeScaledBy(QSize{100, 100}, 0.0), QSize(100, 100)) << "非正倍率不是「缩到零」，原样交回";
 }

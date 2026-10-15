@@ -11,7 +11,7 @@
 
 #include <QImage>
 
-namespace GyanisScribe::Pin
+namespace GyanisScribe::Core
 {
 
     /**
@@ -27,4 +27,4 @@ namespace GyanisScribe::Pin
      */
     [[nodiscard]] QImage pinViewFiltered(const QImage &source, bool grayscale, bool inverted);
 
-} // namespace GyanisScribe::Pin
+} // namespace GyanisScribe::Core

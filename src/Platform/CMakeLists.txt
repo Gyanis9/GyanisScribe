@@ -13,8 +13,10 @@ set(PlatformCommonSources
 add_library(Platform STATIC ${PlatformCommonSources})
 
 target_include_directories(Platform PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
+# 平台层只用值类型/日志/文案（Base），不碰领域逻辑：这样 Core 侧的编排（截图/录屏）能
+# 反向依赖 Platform 而不成环——服务都以接口引用注入，平台实现只在装配层构造。
 target_link_libraries(Platform PUBLIC
-        Core
+        Base
         Qt6::Core
         Qt6::Gui)
 

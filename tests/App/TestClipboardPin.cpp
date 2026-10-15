@@ -3,7 +3,7 @@
 // 不再放在没有应用对象的 TestShell 里。
 
 #include "App/ClipboardPin.h"
-#include "Pin/ColorCard.h"
+#include "Gui/Pin/ColorCard.h"
 
 #include "PinTestAssets.h"
 
@@ -26,15 +26,15 @@
 #include <string>
 
 using GyanisScribe::App::dropContentFrom;
-using GyanisScribe::Pin::kColorCardHeight;
-using GyanisScribe::Pin::kColorCardStripHeight;
-using GyanisScribe::Pin::kColorCardWidth;
+using GyanisScribe::Gui::kColorCardHeight;
+using GyanisScribe::Gui::kColorCardStripHeight;
+using GyanisScribe::Gui::kColorCardWidth;
 using GyanisScribe::App::kMaximumTextCardCharacters;
 using GyanisScribe::App::kTextCardMaximumWidth;
 using GyanisScribe::App::kTextCardMinimumWidth;
 using GyanisScribe::App::colorCardColorOf;
 using GyanisScribe::App::pinContentFrom;
-using GyanisScribe::Pin::renderColorCard;
+using GyanisScribe::Gui::renderColorCard;
 using GyanisScribe::App::renderTextCard;
 using GyanisScribe::Base::ErrorCode;
 

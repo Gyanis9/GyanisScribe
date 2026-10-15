@@ -16,7 +16,7 @@ class QLabel;
 class QPushButton;
 class QTableWidget;
 
-namespace GyanisScribe::Pin
+namespace GyanisScribe::Gui
 {
     class PinManager;
 
@@ -111,4 +111,4 @@ namespace GyanisScribe::Pin
         QPushButton  *m_closeButton  = nullptr; ///< 关掉这扇窗
     };
 
-} // namespace GyanisScribe::Pin
+} // namespace GyanisScribe::Gui

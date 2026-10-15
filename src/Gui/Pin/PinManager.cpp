@@ -1,9 +1,9 @@
-#include "Pin/PinManager.h"
+#include "Gui/Pin/PinManager.h"
 
 #include "Base/Logger.h"
 #include "Base/Paths.h"
 #include "Base/Text.h"
-#include "Pin/PinWindow.h"
+#include "Gui/Pin/PinWindow.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Platform/WindowGeometry.h"
 #include "Core/Settings/ISettingsStore.h"
@@ -37,7 +37,7 @@ namespace
 
 } // namespace
 
-namespace GyanisScribe::Pin
+namespace GyanisScribe::Gui
 {
 
     PinManager::PinManager(Core::ISettingsStore &settings, Platform::IPlatformIntegration &integration, QObject *parent) :
@@ -50,7 +50,7 @@ namespace GyanisScribe::Pin
         closeAll();
     }
 
-    IPinWindow &PinManager::addPin(const QImage &image, const QPoint &globalTopLeft, const QString &animatedSource, const std::optional<QColor> &colorCard)
+    Core::IPinWindow &PinManager::addPin(const QImage &image, const QPoint &globalTopLeft, const QString &animatedSource, const std::optional<QColor> &colorCard)
     {
         auto  pin = std::make_unique<PinWindow>(image, m_settings, m_integration);
         auto *raw = pin.get();
@@ -241,7 +241,7 @@ namespace GyanisScribe::Pin
         return static_cast<int>(m_pins.size());
     }
 
-    IPinWindow *PinManager::pinAt(int index) const
+    Core::IPinWindow *PinManager::pinAt(int index) const
     {
         if (index < 0 || index >= static_cast<int>(m_pins.size()))
         {
@@ -265,7 +265,7 @@ namespace GyanisScribe::Pin
             }
         }
 
-        QVector<PinState> states;
+        QVector<Core::PinState> states;
         states.reserve(static_cast<int>(m_pins.size()));
         for (int index = 0; index < count(); ++index)
         {
@@ -284,7 +284,7 @@ namespace GyanisScribe::Pin
             states.push_back(state);
         }
 
-        if (const auto written = Pin::saveLayout(m_settings, states); !written)
+        if (const auto written = Core::saveLayout(m_settings, states); !written)
         {
             return written;
         }
@@ -295,7 +295,7 @@ namespace GyanisScribe::Pin
         }
         // 名字表也在这一步落盘：某一组清空时被挤掉的那些名字要跟着一起留下，
         // 否则下次启动会读回一堆挂在空壳组上的标签
-        if (const auto named = Pin::saveGroupNames(m_settings, m_groupNames); !named)
+        if (const auto named = Core::saveGroupNames(m_settings, m_groupNames); !named)
         {
             return named;
         }
@@ -306,7 +306,7 @@ namespace GyanisScribe::Pin
     Base::Expected<int> PinManager::restoreLayout()
     {
         // 名字先读：一份坏掉的布局不该把名字表也带成「什么都没起过名字」，那一桌的标签会集体消失
-        if (const auto names = Pin::loadGroupNames(m_settings); names)
+        if (const auto names = Core::loadGroupNames(m_settings); names)
         {
             m_groupNames = *names;
         } else
@@ -317,7 +317,7 @@ namespace GyanisScribe::Pin
             m_groupNames.clear();
         }
 
-        const auto loaded = Pin::loadLayout(m_settings);
+        const auto loaded = Core::loadLayout(m_settings);
         if (!loaded)
         {
             return std::unexpected(loaded.error());
@@ -325,7 +325,7 @@ namespace GyanisScribe::Pin
 
         // 活动组先落定再摆图：addPin 把新贴图挂在活动组上，晚落定会让这一批全挤进第一组；
         // 「收起全部」那一档同样先读回来，最后那一次 applyGroupVisibility 才会把整桌收着
-        m_activeGroup  = m_settings.intValue(Core::kPinActiveGroup, kFirstPinGroup);
+        m_activeGroup  = m_settings.intValue(Core::kPinActiveGroup, Core::kFirstPinGroup);
         m_allConcealed = m_settings.boolValue(Core::kPinAllConcealed, false);
 
         int restored = 0;
@@ -557,13 +557,13 @@ namespace GyanisScribe::Pin
         // 活动组不在册（刚被关掉最后一张）时从第一组接着走：indexOf 给 -1，加一取模正好落回 0
         // 顺序现读而不是启动时抄一份：设置页改了这一格，下一次按键就该照新的走，不必重启
         const auto stored = m_settings.stringListValue(Core::kPinGroupRotationOrder, {});
-        const auto parsed = Pin::parseGroupRotation(stored);
+        const auto parsed = Core::parseGroupRotation(stored);
         if (!parsed)
         {
             // 名单坏了不放弃切组：报一句原因，按组号升序继续走，键盘上的切组不该被一格填歪的配置卡死
             Base::Logger::warning(parsed.error().message);
         }
-        const auto cycle = rotationCycle(parsed.value_or(QVector<int>{}), groups);
+        const auto cycle = Core::rotationCycle(parsed.value_or(QVector<int>{}), groups);
 
         const auto current = cycle.indexOf(m_activeGroup);
         m_activeGroup      = cycle[(current + 1) % cycle.size()];
@@ -583,7 +583,7 @@ namespace GyanisScribe::Pin
                                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("要移到分组的贴图不在册：索引 {}。请重新在贴图上打开菜单"), index)});
         }
 
-        const int clamped = group < kFirstPinGroup ? kFirstPinGroup : group;
+        const int clamped = group < Core::kFirstPinGroup ? Core::kFirstPinGroup : group;
         m_pins[static_cast<std::size_t>(index)]->setGroup(clamped);
 
         // 移出当前组的当场收起、留在当前组的照旧显示：一次调用把显隐与菜单里的分组清单都重算
@@ -671,7 +671,7 @@ namespace GyanisScribe::Pin
 
         if (groups.isEmpty())
         {
-            m_activeGroup = kFirstPinGroup;
+            m_activeGroup = Core::kFirstPinGroup;
             return;
         }
         if (!groups.contains(m_activeGroup))
@@ -688,11 +688,11 @@ namespace GyanisScribe::Pin
 
     Base::Expected<void> PinManager::renameGroup(const int group, const QString &name)
     {
-        if (group < kFirstPinGroup)
+        if (group < Core::kFirstPinGroup)
         {
             return std::unexpected(Base::Error{
                     Base::ErrorCode::InvalidArgument,
-                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("要改名字的分组号不对：{}。分组从 {} 起，请在贴图右键菜单里操作"), group, kFirstPinGroup)});
+                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("要改名字的分组号不对：{}。分组从 {} 起，请在贴图右键菜单里操作"), group, Core::kFirstPinGroup)});
         }
 
         // 空名就是取消命名：表里不留空值，界面对没名字的组一律显示「分组 N」
@@ -705,7 +705,7 @@ namespace GyanisScribe::Pin
             m_groupNames.insert(group, trimmed);
         }
 
-        if (const auto saved = Pin::saveGroupNames(m_settings, m_groupNames); !saved)
+        if (const auto saved = Core::saveGroupNames(m_settings, m_groupNames); !saved)
         {
             return saved;
         }
@@ -717,7 +717,7 @@ namespace GyanisScribe::Pin
 
     Base::Expected<int> PinManager::deleteGroup(const int group)
     {
-        if (group == kFirstPinGroup)
+        if (group == Core::kFirstPinGroup)
         {
             return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("第一组是删掉别的组时成员并回去的落点，这一组删不掉。"
                                                                                                                 "要把这一张从第一组挪走请用「移动到分组」")});
@@ -729,13 +729,13 @@ namespace GyanisScribe::Pin
             if (pin != nullptr && pin->group() == group)
             {
                 // 并回第一组而不是扔掉：删一组要清的是「这一组」这个标签，不是上面摆着的图
-                pin->setGroup(kFirstPinGroup);
+                pin->setGroup(Core::kFirstPinGroup);
                 ++moved;
             }
         }
         m_groupNames.remove(group);
 
-        if (const auto saved = Pin::saveGroupNames(m_settings, m_groupNames); !saved)
+        if (const auto saved = Core::saveGroupNames(m_settings, m_groupNames); !saved)
         {
             return std::unexpected(saved.error());
         }
@@ -919,4 +919,4 @@ namespace GyanisScribe::Pin
         emit pinCountChanged(count());
     }
 
-} // namespace GyanisScribe::Pin
+} // namespace GyanisScribe::Gui

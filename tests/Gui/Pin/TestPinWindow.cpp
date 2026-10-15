@@ -2,7 +2,7 @@
 // 不读私有成员——将来把几何搬到别处，这几条仍然判的是用户看得见的那一件事。
 // 单测几何数学的部分住在 TestPinTransform.cpp，重启恢复住在 TestPinLayout.cpp，这里只补窗口本身那一格。
 
-#include "Pin/PinWindow.h"
+#include "Gui/Pin/PinWindow.h"
 
 #include "Annotation/AnnotationView.h"
 
@@ -127,15 +127,15 @@ namespace GyanisScribe
             }
 
             /// 开一张贴图：不 show，事件由 sendEvent 直投，判据只看状态量
-            [[nodiscard]] Pin::PinWindow &makeWindow()
+            [[nodiscard]] Gui::PinWindow &makeWindow()
             {
                 return makeWindow(makeImage());
             }
 
             /// 用指定图片开一张贴图：需要判「取到的是哪一半」这类位置判据时用它
-            [[nodiscard]] Pin::PinWindow &makeWindow(const QImage &image)
+            [[nodiscard]] Gui::PinWindow &makeWindow(const QImage &image)
             {
-                m_window = std::make_unique<Pin::PinWindow>(image, *m_settings, *m_integration);
+                m_window = std::make_unique<Gui::PinWindow>(image, *m_settings, *m_integration);
                 return *m_window;
             }
 
@@ -146,9 +146,9 @@ namespace GyanisScribe
 
         private:
             std::filesystem::path                           m_iniPath;     ///< 本用例专用的设置文件
-            std::unique_ptr<Core::SettingsStore>        m_settings;    ///< 贴图窗要的保存目录来源
+            std::unique_ptr<Core::SettingsStore>            m_settings;    ///< 贴图窗要的保存目录来源
             std::unique_ptr<Platform::IPlatformIntegration> m_integration; ///< 平台能力查询（本组用例只读能力表）
-            std::unique_ptr<Pin::PinWindow>                 m_window;      ///< 被测窗口
+            std::unique_ptr<Gui::PinWindow>                 m_window;      ///< 被测窗口
         };
 
     } // namespace
@@ -239,7 +239,7 @@ namespace GyanisScribe
         auto &window = makeWindow();
 
         int closedSignals = 0;
-        QObject::connect(&window, &Pin::PinWindow::closedByUser, &window, [&closedSignals] { ++closedSignals; });
+        QObject::connect(&window, &Gui::PinWindow::closedByUser, &window, [&closedSignals] { ++closedSignals; });
 
         pressKey(window, Qt::Key_Escape);
         EXPECT_EQ(closedSignals, 1) << "Esc 没通知管理器，那一张贴图会一直留在册上";
@@ -299,7 +299,7 @@ namespace GyanisScribe
     {
         auto      &window   = makeWindow();
         int        requests = 0;
-        const auto hook     = QObject::connect(&window, &Pin::PinWindow::clipboardReplaceRequested, [&requests] { ++requests; });
+        const auto hook     = QObject::connect(&window, &Gui::PinWindow::clipboardReplaceRequested, [&requests] { ++requests; });
         ASSERT_TRUE(hook) << "信号没接上，后面的计数就毫无意义";
 
         pressKey(window, Qt::Key_V, Qt::ControlModifier);
@@ -373,7 +373,7 @@ namespace GyanisScribe
     {
         auto      &window   = makeWindow();
         int        requests = 0;
-        const auto hook     = QObject::connect(&window, &Pin::PinWindow::selectAllRequested, [&requests] { ++requests; });
+        const auto hook     = QObject::connect(&window, &Gui::PinWindow::selectAllRequested, [&requests] { ++requests; });
         ASSERT_TRUE(hook) << "信号没接上，后面的计数毫无意义";
 
         pressKey(window, Qt::Key_A, Qt::ControlModifier);
@@ -480,7 +480,7 @@ namespace GyanisScribe
         window.setGroupChoices({1, 2, 4});
 
         std::vector<int> requested;
-        QObject::connect(&window, &Pin::PinWindow::moveToGroupRequested, &window, [&requested](const int group) { requested.push_back(group); });
+        QObject::connect(&window, &Gui::PinWindow::moveToGroupRequested, &window, [&requested](const int group) { requested.push_back(group); });
 
         const std::unique_ptr<QMenu> menu{window.buildContextMenu()};
         QMenu                       *groupMenu = nullptr;
@@ -641,7 +641,7 @@ namespace GyanisScribe
         window.setScale(2.0);
 
         std::vector<QColor> picked;
-        QObject::connect(&window, &Pin::PinWindow::colorPicked, &window, [&picked](const QColor &color) { picked.push_back(color); });
+        QObject::connect(&window, &Gui::PinWindow::colorPicked, &window, [&picked](const QColor &color) { picked.push_back(color); });
 
         // 菜单与它的动作同生共死：菜单一析构，动作就跟着没了（动作归菜单持有），
         // 所以这里把菜单留在手上，只借用里面那一条
@@ -697,7 +697,7 @@ namespace GyanisScribe
         pickAction->trigger();
         ASSERT_TRUE(window.isColorPickMode());
         int closedSignals = 0;
-        QObject::connect(&window, &Pin::PinWindow::closedByUser, &window, [&closedSignals] { ++closedSignals; });
+        QObject::connect(&window, &Gui::PinWindow::closedByUser, &window, [&closedSignals] { ++closedSignals; });
         pressKey(window, Qt::Key_Escape);
         EXPECT_FALSE(window.isColorPickMode()) << "取色模式里 Esc 没退出取色";
         EXPECT_EQ(closedSignals, 0) << "取色模式里按 Esc 把贴图关掉了：这一下多半只是想不取了";
@@ -760,7 +760,7 @@ namespace GyanisScribe
 
         auto &window = makeWindow();
         window.move(available.left() + 5, available.top() + 200);
-        ASSERT_EQ(window.edgeDock(), Pin::ScreenEdge::None);
+        ASSERT_EQ(window.edgeDock(), Core::ScreenEdge::None);
 
         // 拖一下再松手（只点一下不触发吸边，这一条顺带钉住）。
         // 落点取窗口正中：八个手柄的占位框贴着四边，按在边上会成为「拖手柄改大小」而不是「拖窗口」
@@ -772,14 +772,14 @@ namespace GyanisScribe
         QMouseEvent release{QEvent::MouseButtonRelease, grip + QPointF{7.0, 7.0}, grip + QPointF{7.0, 7.0}, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
         QApplication::sendEvent(&window, &release);
 
-        EXPECT_EQ(window.edgeDock(), Pin::ScreenEdge::Left) << "拖到左边附近松手没贴上去";
+        EXPECT_EQ(window.edgeDock(), Core::ScreenEdge::Left) << "拖到左边附近松手没贴上去";
         EXPECT_EQ(window.x(), available.left()) << "贴上之后没有贴齐那条边";
         const auto revealedWidth = window.width();
 
         // 指针离开：收成一条
         QEvent leave{QEvent::Leave};
         QApplication::sendEvent(&window, &leave);
-        EXPECT_EQ(window.geometry().right(), Pin::kEdgeStripWidth - 1) << "指针走了没收起来，或者收得太多（整张藏进了屏外）";
+        EXPECT_EQ(window.geometry().right(), Core::kEdgeStripWidth - 1) << "指针走了没收起来，或者收得太多（整张藏进了屏外）";
         EXPECT_EQ(window.width(), revealedWidth) << "收起只挪位置，不改尺寸";
 
         // 悬停：露回来
@@ -805,7 +805,7 @@ namespace GyanisScribe
         const auto dockActionOf = [](QWidget &target)
         {
             // 菜单与它的动作同生共死：借用之后要让菜单活到用完（动作归菜单持有）
-            return std::unique_ptr<QMenu>{static_cast<Pin::PinWindow &>(target).buildContextMenu()};
+            return std::unique_ptr<QMenu>{static_cast<Gui::PinWindow &>(target).buildContextMenu()};
         };
         const auto triggerDock = [](QMenu &menu)
         {
@@ -822,19 +822,19 @@ namespace GyanisScribe
 
         auto menu = dockActionOf(window);
         ASSERT_TRUE(triggerDock(*menu)) << "右键菜单里没有「贴边隐藏」这一项";
-        EXPECT_EQ(window.edgeDock(), Pin::ScreenEdge::Left) << "菜单点了之后没贴边";
-        EXPECT_EQ(window.geometry().right(), Pin::kEdgeStripWidth - 1) << "菜单点的这一档该当场收起来";
+        EXPECT_EQ(window.edgeDock(), Core::ScreenEdge::Left) << "菜单点了之后没贴边";
+        EXPECT_EQ(window.geometry().right(), Core::kEdgeStripWidth - 1) << "菜单点的这一档该当场收起来";
 
         menu = dockActionOf(window);
         ASSERT_TRUE(triggerDock(*menu));
-        EXPECT_EQ(window.edgeDock(), Pin::ScreenEdge::None) << "再点一次该取消贴边";
+        EXPECT_EQ(window.edgeDock(), Core::ScreenEdge::None) << "再点一次该取消贴边";
         EXPECT_EQ(window.x(), available.left()) << "取消贴边后没整张摆回屏上";
 
         // 贴上去再拖走：拖离屏边要自动脱开。收起状态下能按到的只有露在屏上的那一条，
         // 所以先悬停把它展开，再按窗口正中（避开手柄）
         menu = dockActionOf(window);
         ASSERT_TRUE(triggerDock(*menu));
-        ASSERT_EQ(window.edgeDock(), Pin::ScreenEdge::Left);
+        ASSERT_EQ(window.edgeDock(), Core::ScreenEdge::Left);
         QEnterEvent hover{QPointF{1.0, 1.0}, QPointF{1.0, 1.0}, QPointF{1.0, 1.0}};
         QApplication::sendEvent(&window, &hover);
         ASSERT_EQ(window.x(), available.left()) << "悬停没展开，拖走的判据就落不到实处";
@@ -846,7 +846,7 @@ namespace GyanisScribe
         QApplication::sendEvent(&window, &dragAway);
         QMouseEvent dragRelease{QEvent::MouseButtonRelease, grip + QPointF{420.0, 330.0}, grip + QPointF{420.0, 330.0}, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
         QApplication::sendEvent(&window, &dragRelease);
-        EXPECT_EQ(window.edgeDock(), Pin::ScreenEdge::None) << "拖到屏中间松手还贴着边";
+        EXPECT_EQ(window.edgeDock(), Core::ScreenEdge::None) << "拖到屏中间松手还贴着边";
         EXPECT_GT(window.x(), available.left()) << "松手之后没停在拖到的位置";
     }
 
@@ -941,7 +941,7 @@ namespace GyanisScribe
     {
         auto &window = makeWindow();
         auto  closed = false;
-        QObject::connect(&window, &Pin::PinWindow::closedByUser, [&closed] { closed = true; });
+        QObject::connect(&window, &Gui::PinWindow::closedByUser, [&closed] { closed = true; });
 
         window.startAnnotation();
         auto *view = window.findChild<Annotation::AnnotationView *>();
@@ -1062,7 +1062,7 @@ namespace GyanisScribe
     {
         auto                 &window = makeWindow();
         std::optional<QImage> another;
-        QObject::connect(&window, &Pin::PinWindow::pinAnotherRequested, [&another](const QImage &image) { another = image; });
+        QObject::connect(&window, &Gui::PinWindow::pinAnotherRequested, [&another](const QImage &image) { another = image; });
 
         window.startAnnotation();
         pressKey(window, Qt::Key_D, Qt::ControlModifier);
@@ -1116,7 +1116,7 @@ namespace GyanisScribe
 
         const QMimeData      *seen = nullptr;
         std::optional<QPoint> at;
-        QObject::connect(&window, &Pin::PinWindow::dropRequested,
+        QObject::connect(&window, &Gui::PinWindow::dropRequested,
                          [&](const QMimeData *data, const QPoint &globalTopLeft)
                          {
                              seen = data;
@@ -1154,7 +1154,7 @@ namespace GyanisScribe
         EXPECT_TRUE(accepted.isAccepted()) << "带文本的拖动没收下";
 
         auto dropped = false;
-        QObject::connect(&window, &Pin::PinWindow::dropRequested, [&dropped](const QMimeData *, const QPoint &) { dropped = true; });
+        QObject::connect(&window, &Gui::PinWindow::dropRequested, [&dropped](const QMimeData *, const QPoint &) { dropped = true; });
 
         window.startAnnotation();
         QDragEnterEvent during{QPoint{5, 5}, Qt::CopyAction, &text, Qt::LeftButton, Qt::NoModifier};
@@ -1324,7 +1324,7 @@ namespace GyanisScribe
         auto &window = makeWindow();
 
         std::optional<bool> requested;
-        QObject::connect(&window, &Pin::PinWindow::soloRequested, [&requested](bool solo) { requested = solo; });
+        QObject::connect(&window, &Gui::PinWindow::soloRequested, [&requested](bool solo) { requested = solo; });
 
         QMenu *menu  = window.buildContextMenu();
         auto  *entry = findMenuAction(*menu, QString::fromUtf8("只显示这一张"));
@@ -1670,19 +1670,19 @@ namespace GyanisScribe
 
         window.setShadowEnabled(true);
         EXPECT_TRUE(window.shadowEnabled());
-        EXPECT_EQ(window.size(), QSize(40 + 2 * Pin::kShadowMargin, 40 + 2 * Pin::kShadowMargin)) << "窗口没比内容每边大一圈";
+        EXPECT_EQ(window.size(), QSize(40 + 2 * Core::kShadowMargin, 40 + 2 * Core::kShadowMargin)) << "窗口没比内容每边大一圈";
 
         QImage canvas{window.size(), QImage::Format_ARGB32};
         canvas.fill(Qt::transparent);
         window.render(&canvas);
 
         // 内容在窗口里居中：留边出现之后四个色块的相对位置与颜色都不变
-        EXPECT_EQ(canvas.pixelColor(Pin::kShadowMargin + 10, Pin::kShadowMargin + 10), QColor(255, 0, 0)) << "留边把内容挤偏了";
-        EXPECT_EQ(canvas.pixelColor(Pin::kShadowMargin + 30, Pin::kShadowMargin + 10), QColor(0, 255, 0));
+        EXPECT_EQ(canvas.pixelColor(Core::kShadowMargin + 10, Core::kShadowMargin + 10), QColor(255, 0, 0)) << "留边把内容挤偏了";
+        EXPECT_EQ(canvas.pixelColor(Core::kShadowMargin + 30, Core::kShadowMargin + 10), QColor(0, 255, 0));
 
         // 带子里有投影：贴内容那一圈比更外的一圈深（亮度小）
-        const auto near = canvas.pixelColor(Pin::kShadowMargin - 2, Pin::kShadowMargin + 20).lightness();
-        const auto far  = canvas.pixelColor(2, Pin::kShadowMargin + 20).lightness();
+        const auto near = canvas.pixelColor(Core::kShadowMargin - 2, Core::kShadowMargin + 20).lightness();
+        const auto far  = canvas.pixelColor(2, Core::kShadowMargin + 20).lightness();
         EXPECT_LT(near, far) << "带子里没有「贴内容深、往外淡」的投影";
 
         window.setShadowEnabled(false);
@@ -1719,8 +1719,8 @@ namespace GyanisScribe
         auto &window       = makeWindow();
         int   closures     = 0;
         int   destructions = 0;
-        ASSERT_TRUE(QObject::connect(&window, &Pin::PinWindow::closedByUser, [&closures] { ++closures; }));
-        ASSERT_TRUE(QObject::connect(&window, &Pin::PinWindow::destroyRequested, [&destructions] { ++destructions; }));
+        ASSERT_TRUE(QObject::connect(&window, &Gui::PinWindow::closedByUser, [&closures] { ++closures; }));
+        ASSERT_TRUE(QObject::connect(&window, &Gui::PinWindow::destroyRequested, [&destructions] { ++destructions; }));
 
         auto *menu   = window.buildContextMenu();
         auto *action = findMenuAction(*menu, QString::fromUtf8("销毁这一张"));
@@ -1855,7 +1855,7 @@ namespace GyanisScribe
         EXPECT_EQ(findBatch(*singleMenu), nullptr) << "没进多选集就不该有整组那一项（单张有「保存」就够）";
 
         int fires = 0;
-        ASSERT_TRUE(QObject::connect(&window, &Pin::PinWindow::batchSaveRequested, [&fires] { ++fires; }));
+        ASSERT_TRUE(QObject::connect(&window, &Gui::PinWindow::batchSaveRequested, [&fires] { ++fires; }));
         window.setSelected(true);
         window.setSelectionCount(2);
         const std::unique_ptr<QMenu> groupMenu{window.buildContextMenu()};
@@ -2000,7 +2000,7 @@ namespace GyanisScribe
         const QColor before = painted().pixelColor(24, 4);
         EXPECT_TRUE(before != darkFirst && before != darkSecond) << "没开棋盘档时透明区就被画上了棋盘色";
 
-        window.setTransparentBackdrop(Pin::TransparentBackdrop::DarkChecker);
+        window.setTransparentBackdrop(Core::TransparentBackdrop::DarkChecker);
         const QImage dark = painted();
         EXPECT_EQ(dark.pixelColor(10, 10), QColor(255, 0, 0)) << "棋盘盖住了图上本来不透明的那一块";
         // 贴片 16 见方、一格 8 像素：(24,4) 与 (32,4) 落在贴片里两个不同的格上
@@ -2011,7 +2011,7 @@ namespace GyanisScribe
 
         const QColor lightFirst{255, 255, 255};
         const QColor lightSecond{204, 204, 204};
-        window.setTransparentBackdrop(Pin::TransparentBackdrop::LightChecker);
+        window.setTransparentBackdrop(Core::TransparentBackdrop::LightChecker);
         const QImage light         = painted();
         const QColor atLightFirst  = light.pixelColor(24, 4);
         const QColor atLightSecond = light.pixelColor(32, 4);
@@ -2028,13 +2028,13 @@ namespace GyanisScribe
     TEST_F(PinWindowFixture, SeeThroughModeDrivesTheTranslucentAttribute)
     {
         auto &window = makeWindow();
-        EXPECT_EQ(window.transparentBackdrop(), Pin::TransparentBackdrop::ThemeBase) << "起点该是「跟随窗口底色」，也就是这一格出现之前的行为";
+        EXPECT_EQ(window.transparentBackdrop(), Core::TransparentBackdrop::ThemeBase) << "起点该是「跟随窗口底色」，也就是这一格出现之前的行为";
         EXPECT_FALSE(window.testAttribute(Qt::WA_TranslucentBackground)) << "默认档不该把窗口开成逐像素合成";
 
-        window.setTransparentBackdrop(Pin::TransparentBackdrop::SeeThrough);
+        window.setTransparentBackdrop(Core::TransparentBackdrop::SeeThrough);
         EXPECT_TRUE(window.testAttribute(Qt::WA_TranslucentBackground)) << "切到桌面透出，窗口属性没跟着走";
 
-        window.setTransparentBackdrop(Pin::TransparentBackdrop::ThemeBase);
+        window.setTransparentBackdrop(Core::TransparentBackdrop::ThemeBase);
         EXPECT_FALSE(window.testAttribute(Qt::WA_TranslucentBackground)) << "退回默认档之后窗口还留着逐像素合成";
     }
 
@@ -2078,7 +2078,7 @@ namespace GyanisScribe
                 break;
             }
         }
-        EXPECT_EQ(window.transparentBackdrop(), Pin::TransparentBackdrop::DarkChecker) << "点「深色棋盘」没换档";
+        EXPECT_EQ(window.transparentBackdrop(), Core::TransparentBackdrop::DarkChecker) << "点「深色棋盘」没换档";
 
         const std::unique_ptr<QMenu> reopened{window.buildContextMenu()};
         QMenu                       *again = nullptr;
@@ -2113,7 +2113,7 @@ namespace GyanisScribe
     {
         auto &window = makeWindow();
         auto  asks   = 0;
-        QObject::connect(&window, &Pin::PinWindow::refreshRequested, [&asks] { ++asks; });
+        QObject::connect(&window, &Gui::PinWindow::refreshRequested, [&asks] { ++asks; });
 
         pressKey(window, Qt::Key_F5);
         EXPECT_EQ(asks, 1) << "按一下没要到重抓";

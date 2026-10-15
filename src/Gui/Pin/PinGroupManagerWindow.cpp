@@ -1,7 +1,7 @@
-#include "Pin/PinGroupManagerWindow.h"
+#include "Gui/Pin/PinGroupManagerWindow.h"
 
 #include "Base/Text.h"
-#include "Pin/PinManager.h"
+#include "Gui/Pin/PinManager.h"
 
 #include <QAbstractItemView>
 #include <QHBoxLayout>
@@ -13,7 +13,7 @@
 #include <QTableWidget>
 #include <QVBoxLayout>
 
-namespace GyanisScribe::Pin
+namespace GyanisScribe::Gui
 {
     namespace
     {
@@ -271,4 +271,4 @@ namespace GyanisScribe::Pin
         m_hint->setText(message);
     }
 
-} // namespace GyanisScribe::Pin
+} // namespace GyanisScribe::Gui

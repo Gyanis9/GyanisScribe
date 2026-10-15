@@ -1,7 +1,7 @@
-#include "Pin/PinLayout.h"
+#include "Core/Pin/PinLayout.h"
 
 #include "Base/Text.h"
-#include "Pin/PinTransform.h"
+#include "Core/Pin/PinTransform.h"
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
 
@@ -12,7 +12,7 @@
 #include <format>
 #include <string>
 
-namespace GyanisScribe::Pin
+namespace GyanisScribe::Core
 {
     namespace
     {
@@ -354,4 +354,4 @@ namespace GyanisScribe::Pin
         }}};
     }
 
-} // namespace GyanisScribe::Pin
+} // namespace GyanisScribe::Core

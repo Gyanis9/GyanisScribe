@@ -15,8 +15,8 @@
 #include "Base/Types.h"
 #include "Ocr/IOcrEngine.h"
 #include "Ocr/OcrEngineFactory.h"
-#include "Pin/IPinWindow.h"
-#include "Pin/PinManager.h"
+#include "Core/Pin/IPinWindow.h"
+#include "Gui/Pin/PinManager.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Core/Settings/SettingsStore.h"
 
@@ -258,7 +258,7 @@ namespace GyanisScribe
             // 只许出现在换算后的位置上：整张图里框外一个都没有，才算「逻辑→物理」这一步没算错两遍或漏一遍
             EXPECT_EQ(hitsTotal, hitsInside) << "图形落在了换算位置之外：全图 " << hitsTotal << " 个，框内 " << hitsInside << " 个";
 
-            GyanisScribe::Pin::PinManager pins(settings, *integration);
+            GyanisScribe::Gui::PinManager pins(settings, *integration);
             auto                         &pin = pins.addPin(exported, QPoint(700, 300));
             EXPECT_EQ(pins.count(), 1);
             EXPECT_EQ(pin.globalRect().topLeft(), QPoint(700, 300)) << "贴图没落在请求的全局位置";
@@ -285,7 +285,7 @@ namespace GyanisScribe
             double originalOpacity = 0.0;
 
             {
-                GyanisScribe::Pin::PinManager pins(settings, *integration);
+                GyanisScribe::Gui::PinManager pins(settings, *integration);
                 auto                         &first = pins.addPin(image, QPoint(120, 80));
                 first.setScale(1.5);
                 first.setRotationDegrees(30.0);
@@ -304,7 +304,7 @@ namespace GyanisScribe
                 ASSERT_TRUE(saved.has_value()) << "布局没写下去：" << saved.error().message;
             }
 
-            GyanisScribe::Pin::PinManager reopened(settings, *integration);
+            GyanisScribe::Gui::PinManager reopened(settings, *integration);
             const auto                    restored = reopened.restoreLayout();
             ASSERT_TRUE(restored.has_value()) << "摆不回来：" << restored.error().message;
             EXPECT_EQ(*restored, 2) << "两张都该摆回来";
@@ -332,7 +332,7 @@ namespace GyanisScribe
             image.fill(Qt::green);
 
             {
-                GyanisScribe::Pin::PinManager pins(settings, *integration);
+                GyanisScribe::Gui::PinManager pins(settings, *integration);
                 pins.addPin(image, QPoint(40, 40));
                 pins.addPin(image, QPoint(80, 80));
                 ASSERT_TRUE(pins.saveLayout().has_value()) << "布局没写下去";
@@ -342,7 +342,7 @@ namespace GyanisScribe
             std::error_code ignored;
             ASSERT_TRUE(std::filesystem::remove(cacheDirectory / "pin-0.png", ignored)) << "缓存里没有那张图，用例前提就没构造出来";
 
-            GyanisScribe::Pin::PinManager reopened(settings, *integration);
+            GyanisScribe::Gui::PinManager reopened(settings, *integration);
             const auto                    restored = reopened.restoreLayout();
             ASSERT_TRUE(restored.has_value()) << "少一张图不该让整次还原失败：" << restored.error().message;
             EXPECT_EQ(*restored, 1);
@@ -409,7 +409,7 @@ namespace GyanisScribe
         FakeScreenSource                      source(makeFakeFrame());
         const auto                            frame = captureOneFrame(settings, source);
 
-        GyanisScribe::Pin::PinManager pins(settings, *integration);
+        GyanisScribe::Gui::PinManager pins(settings, *integration);
         auto                         &through   = pins.addPin(frame.image, QPoint(700, 300));
         auto                         &clickable = pins.addPin(frame.image, QPoint(900, 300));
         ASSERT_TRUE(through.setMouseThrough(true).has_value()) << "能力位说有穿透，开起来却失败：能力表与实现不同解";
@@ -436,7 +436,7 @@ namespace GyanisScribe
         FakeScreenSource                      source(makeFakeFrame());
         const auto                            frame = captureOneFrame(settings, source);
 
-        GyanisScribe::Pin::PinManager pins(settings, *integration);
+        GyanisScribe::Gui::PinManager pins(settings, *integration);
         auto                         &first  = pins.addPin(frame.image, QPoint(700, 300));
         auto                         &second = pins.addPin(frame.image, QPoint(900, 300));
         ASSERT_FALSE(first.isConcealed()) << "刚贴出来的图就该在桌面上";
@@ -477,7 +477,7 @@ namespace GyanisScribe
         mime.setUrls({QUrl::fromLocalFile(QString::fromStdString(firstPath.string())), QUrl::fromLocalFile(QString::fromStdString(secondPath.string()))});
 
         Core::SettingsStore settings(m_iniFile);
-        Pin::PinManager         pins(settings, *integration);
+        Gui::PinManager         pins(settings, *integration);
         const auto              dropped = App::pinDroppedContent(pins, &mime, QPoint(400, 300), QApplication::font());
         ASSERT_TRUE(dropped.has_value()) << dropped.error().message;
         EXPECT_EQ(dropped->pinnedCount, 2);

@@ -64,12 +64,12 @@ namespace GyanisScribe::Gui
     class ColorPickerOverlay;
 } // namespace GyanisScribe::Gui
 
-namespace GyanisScribe::Pin
+namespace GyanisScribe::Gui
 {
     class PinManager;
     class PinGroupManagerWindow;
     struct PinBatchSaveReport;
-} // namespace GyanisScribe::Pin
+} // namespace GyanisScribe::Gui
 
 namespace GyanisScribe::Record
 {
@@ -433,7 +433,7 @@ namespace GyanisScribe::App
          * @details 一次写走 N 份文件，不出声就成了「按了不知道存没存上」；一张都没写成时把原因原样报出来，
          *          那是唯一还能行动的那一句（改目录或改格式那一格）。
          */
-        void reportBatchSave(const Pin::PinBatchSaveReport &report);
+        void reportBatchSave(const Gui::PinBatchSaveReport &report);
 
         /**
          * @brief 一句里用到的分组标签：起过名字就带上名字，没起过就是「分组 N」
@@ -602,7 +602,7 @@ namespace GyanisScribe::App
         std::unique_ptr<GyanisScribe::Gui::IconProvider>  m_icons;                                        ///< 图标供给器，描边色跟主题
         std::unique_ptr<Annotation::AnnotationEngine>     m_annotation;                                   ///< 标注引擎，跨轮次保留（载入新帧会清空）
         std::unique_ptr<Annotation::AnnotationWindow>     m_annotationWindow;                             ///< 标注窗口，复用同一把工具栏
-        std::unique_ptr<Pin::PinManager>                  m_pins;                                         ///< 贴图管理器
+        std::unique_ptr<Gui::PinManager>                  m_pins;                                         ///< 贴图管理器
         std::unique_ptr<ImageFetcher>                     m_imageFetcher;                                 ///< 网页取图：拖进来的可以是一条图片地址
         std::optional<QPoint>                             m_pendingFetchPoint;                            ///< 在飞那一张取回来落在哪儿；空表示跟光标走
         std::unique_ptr<Ocr::IOcrEngine>                  m_ocr;                                          ///< 识别后端，按设置与平台能力选一次
@@ -616,7 +616,7 @@ namespace GyanisScribe::App
         QPointer<Ocr::OcrResultWindow>                    m_ocrWindow;                                    ///< 识别结果窗口，关了就重建，不拥有
         std::unique_ptr<GyanisScribe::Core::HistoryStore> m_history;                                      ///< 历史清单：成品文件的索引，删记录不删文件
         QPointer<Gui::ColorPickerOverlay>                 m_picker;                                       ///< 取色遮罩，关掉即重建
-        QPointer<Pin::PinGroupManagerWindow>              m_groupManager;                                 ///< 贴图组管理窗，开着一扇就复用那一扇
+        QPointer<Gui::PinGroupManagerWindow>              m_groupManager;                                 ///< 贴图组管理窗，开着一扇就复用那一扇
         QPointer<Record::RecordingHud>                    m_hud;                                          ///< 录屏控制条，一轮一个，收起即销毁
         QTimer                                           *m_hudTicker          = nullptr;                 ///< 控制条的每秒轮询，随一轮录屏起停
         int                                               m_countdownRemaining = 0;                       ///< 倒计时剩余整秒，推给控制条的大字

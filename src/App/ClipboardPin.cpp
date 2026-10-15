@@ -4,8 +4,8 @@
 
 #include "Base/Paths.h"
 #include "Base/Text.h"
-#include "Pin/ColorCard.h"
-#include "Pin/PinManager.h"
+#include "Gui/Pin/ColorCard.h"
+#include "Gui/Pin/PinManager.h"
 
 #include <QFontMetrics>
 #include <QImageReader>
@@ -152,7 +152,7 @@ namespace GyanisScribe::App
         const auto text = data->text();
         if (const auto color = colorTextOf(text); color)
         {
-            return Pin::renderColorCard(*color, text.trimmed());
+            return Gui::renderColorCard(*color, text.trimmed());
         }
 
         const auto trimmed = text.trimmed();
@@ -231,7 +231,7 @@ namespace GyanisScribe::App
         return content;
     }
 
-    Base::Expected<DropPinOutcome> pinDroppedContent(Pin::PinManager &pins, const QMimeData *data, const QPoint &globalTopLeft, const QFont &font)
+    Base::Expected<DropPinOutcome> pinDroppedContent(Gui::PinManager &pins, const QMimeData *data, const QPoint &globalTopLeft, const QFont &font)
     {
         const auto content = dropContentFrom(data, font);
         if (!content)
@@ -253,7 +253,7 @@ namespace GyanisScribe::App
     QImage renderTextCard(const QString &text, const QFont &font)
     {
         QFont cardFont = font;
-        cardFont.setPointSize(Pin::kCardFontPointSize);
+        cardFont.setPointSize(Gui::kCardFontPointSize);
 
         const auto metrics   = QFontMetrics{cardFont};
         const auto textWidth = kTextCardMaximumWidth - 2 * kTextCardPadding;
@@ -269,14 +269,14 @@ namespace GyanisScribe::App
         const QSize cardSize{std::max(kTextCardMinimumWidth, wrapped.width() + 2 * kTextCardPadding), wrapped.height() + 2 * kTextCardPadding};
 
         QImage card{cardSize, QImage::Format_ARGB32_Premultiplied};
-        card.fill(Pin::kCardBackground);
+        card.fill(Gui::kCardBackground);
 
         QPainter painter{&card};
         painter.setRenderHint(QPainter::Antialiasing, true);
-        painter.setPen(QPen{Pin::kCardBorder, 1});
+        painter.setPen(QPen{Gui::kCardBorder, 1});
         painter.drawRect(QRectF{0.5, 0.5, cardSize.width() - 1.0, cardSize.height() - 1.0});
         painter.setFont(cardFont);
-        painter.setPen(Pin::kCardText);
+        painter.setPen(Gui::kCardText);
         // 量的时候用的哪一档，画的时候用同一档：两处各写一个会把断行位置分开
         painter.drawText(QRect{kTextCardPadding, kTextCardPadding, wrapped.width(), wrapped.height()}, wrapFlags, text);
         painter.end();

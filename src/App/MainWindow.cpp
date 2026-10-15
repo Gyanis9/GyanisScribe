@@ -17,7 +17,7 @@
 #include "Ocr/OcrEngineFactory.h"
 #include "Core/Pick/ColorFormat.h"
 #include "Core/Pick/PickGeometry.h"
-#include "Pin/PinLayout.h"
+#include "Core/Pin/PinLayout.h"
 #include "Record/FfmpegAudioDevices.h"
 #include "Record/FfmpegVideoEncoderEnumerator.h"
 #include "Record/RecorderConfig.h"
@@ -725,14 +725,14 @@ namespace
     QSpinBox *makeEdgeSnapDistanceSpin(ISettingsStore &settings)
     {
         auto *spin = new QSpinBox;
-        spin->setRange(GyanisScribe::Pin::kEdgeSnapDistanceMinimum, GyanisScribe::Pin::kEdgeSnapDistanceMaximum);
+        spin->setRange(GyanisScribe::Core::kEdgeSnapDistanceMinimum, GyanisScribe::Core::kEdgeSnapDistanceMaximum);
         spin->setSuffix(GyanisScribe::Base::uiText(" 像素"));
         spin->setAccessibleName(GyanisScribe::Base::uiText("吸附距离"));
         spin->setToolTip(GyanisScribe::Base::uiText("按住 Shift 拖动对齐、贴到屏边收起这两处共用的距离：填 0 就是完全不吸"));
 
         const auto title  = GyanisScribe::Base::uiText("吸附距离");
-        const auto stored = settings.intValue(GyanisScribe::Core::kPinEdgeSnapDistance, GyanisScribe::Pin::kEdgeSnapTolerance);
-        spin->setValue(shownValueForSetting(title, stored, GyanisScribe::Pin::parseEdgeSnapDistance(stored), GyanisScribe::Pin::kEdgeSnapTolerance));
+        const auto stored = settings.intValue(GyanisScribe::Core::kPinEdgeSnapDistance, GyanisScribe::Core::kEdgeSnapTolerance);
+        spin->setValue(shownValueForSetting(title, stored, GyanisScribe::Core::parseEdgeSnapDistance(stored), GyanisScribe::Core::kEdgeSnapTolerance));
 
         QObject::connect(spin, &QSpinBox::valueChanged, spin,
                          [&settings, title](int value)
@@ -759,9 +759,9 @@ namespace
         spin->setAccessibleName(GyanisScribe::Base::uiText("默认不透明度"));
 
         const auto title  = GyanisScribe::Base::uiText("贴图默认不透明度");
-        const auto stored = settings.intValue(GyanisScribe::Core::kPinDefaultOpacity, GyanisScribe::Pin::kDefaultOpacityPercent);
-        const auto parsed = GyanisScribe::Pin::parseOpacityPercentSetting(stored);
-        spin->setValue(shownValueForSetting(title, stored, parsed, GyanisScribe::Pin::kDefaultOpacityPercent));
+        const auto stored = settings.intValue(GyanisScribe::Core::kPinDefaultOpacity, GyanisScribe::Core::kDefaultOpacityPercent);
+        const auto parsed = GyanisScribe::Core::parseOpacityPercentSetting(stored);
+        spin->setValue(shownValueForSetting(title, stored, parsed, GyanisScribe::Core::kDefaultOpacityPercent));
 
         QObject::connect(spin, &QSpinBox::valueChanged, spin,
                          [&settings, title](int value)
@@ -1829,7 +1829,7 @@ namespace GyanisScribe::App
                          [&settings, edit, explainHint]
                          {
                              const auto tokens = edit->text().split(QChar{','}, Qt::SkipEmptyParts);
-                             const auto parsed = GyanisScribe::Pin::parseGroupRotation(tokens);
+                             const auto parsed = GyanisScribe::Core::parseGroupRotation(tokens);
                              if (!parsed)
                              {
                                  explainHint(QString::fromUtf8(parsed.error().message));

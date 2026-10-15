@@ -9,8 +9,8 @@
 
 #pragma once
 
-#include "Pin/IPinWindow.h"
-#include "Pin/PinLayout.h"
+#include "Core/Pin/IPinWindow.h"
+#include "Core/Pin/PinLayout.h"
 
 #include <QImage>
 #include <QMap>
@@ -36,7 +36,7 @@ namespace GyanisScribe::Core
     class ISettingsStore;
 } // namespace GyanisScribe::Core
 
-namespace GyanisScribe::Pin
+namespace GyanisScribe::Gui
 {
 
     /**
@@ -68,10 +68,10 @@ namespace GyanisScribe::Pin
      */
     struct PinGroupSummary
     {
-        int     group = kFirstPinGroup; ///< 组号，从 1 起
-        QString name;                   ///< 起过的名字；空串表示没起过，界面按「分组 N」显示
-        int     pinCount = 0;           ///< 这一组在册的张数
-        bool    isActive = false;       ///< 是不是此刻摆在桌上的那一组
+        int     group = Core::kFirstPinGroup; ///< 组号，从 1 起
+        QString name;                         ///< 起过的名字；空串表示没起过，界面按「分组 N」显示
+        int     pinCount = 0;                 ///< 这一组在册的张数
+        bool    isActive = false;             ///< 是不是此刻摆在桌上的那一组
     };
 
     /**
@@ -120,7 +120,7 @@ namespace GyanisScribe::Pin
          * 内容是从一段颜色写法渲染出来时，那个颜色本身；空表示这张不是色卡
          * @return 新建的贴图窗口引用，所有权仍在管理器手里
          */
-        IPinWindow &addPin(const QImage &image, const QPoint &globalTopLeft, const QString &animatedSource = {}, const std::optional<QColor> &colorCard = {});
+        Core::IPinWindow &addPin(const QImage &image, const QPoint &globalTopLeft, const QString &animatedSource = {}, const std::optional<QColor> &colorCard = {});
 
         /**
          * @brief 当前贴图张数
@@ -133,7 +133,7 @@ namespace GyanisScribe::Pin
          * @param index 索引
          * @return 窗口引用；越界时返回空指针，调用方应先按 count() 判过界
          */
-        [[nodiscard]] IPinWindow *pinAt(int index) const;
+        [[nodiscard]] Core::IPinWindow *pinAt(int index) const;
 
         /**
          * @brief 把当前布局写进配置，并把每张贴图的像素落到缓存目录
@@ -428,7 +428,7 @@ namespace GyanisScribe::Pin
          * @details 提示条住在哪里由界面层判，这一层只管谁在选中集里与逐张借那个存文件的出口；
          *          「一张都没写成」与「全写成」都从这里出，界面层不用猜。
          */
-        void pinBatchSaveReported(const Pin::PinBatchSaveReport &report);
+        void pinBatchSaveReported(const Gui::PinBatchSaveReport &report);
 
     private:
         /// 一张贴图离开在册表的两条路：关闭留得回，销毁回不来
@@ -472,14 +472,14 @@ namespace GyanisScribe::Pin
          */
         int applyGroupVisibility();
 
-        Core::ISettingsStore               &m_settings;                      ///< 布局读写处
-        Platform::IPlatformIntegration         &m_integration;                   ///< 平台能力来源
-        std::vector<std::unique_ptr<PinWindow>> m_pins;                          ///< 在册贴图，按创建顺序
-        int                                     m_activeGroup  = kFirstPinGroup; ///< 当前显示的分组号
-        bool                                    m_allConcealed = false;          ///< 全局收起是不是开着
-        PinWindow                              *m_solo         = nullptr;        ///< 「只看这一张」的主角；空表示没开
-        std::deque<ClosedPin>                   m_closedPins;                    ///< 最近关掉的贴图（新的在前），上限 kClosedPinHistorySize
-        QMap<int, QString>                      m_groupNames;                    ///< 各组名字，没起过名字的组不在表里；与配置里那一格同内容
+        Core::ISettingsStore                   &m_settings;                            ///< 布局读写处
+        Platform::IPlatformIntegration         &m_integration;                         ///< 平台能力来源
+        std::vector<std::unique_ptr<PinWindow>> m_pins;                                ///< 在册贴图，按创建顺序
+        int                                     m_activeGroup  = Core::kFirstPinGroup; ///< 当前显示的分组号
+        bool                                    m_allConcealed = false;                ///< 全局收起是不是开着
+        PinWindow                              *m_solo         = nullptr;              ///< 「只看这一张」的主角；空表示没开
+        std::deque<ClosedPin>                   m_closedPins;                          ///< 最近关掉的贴图（新的在前），上限 kClosedPinHistorySize
+        QMap<int, QString>                      m_groupNames;                          ///< 各组名字，没起过名字的组不在表里；与配置里那一格同内容
     };
 
-} // namespace GyanisScribe::Pin
+} // namespace GyanisScribe::Gui

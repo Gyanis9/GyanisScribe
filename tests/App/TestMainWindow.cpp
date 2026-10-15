@@ -10,8 +10,8 @@
 #include "Capture/ScreenUtils.h"
 #include "Core/History/HistoryRules.h"
 #include "Core/History/HistoryStore.h"
-#include "Pin/PinLayout.h"
-#include "Pin/PinTransform.h"
+#include "Core/Pin/PinLayout.h"
+#include "Core/Pin/PinTransform.h"
 #include "Core/Pick/PickGeometry.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Record/RecorderConfig.h"
@@ -344,7 +344,7 @@ namespace
         m_window->open(MainWindowPage::Pin);
         auto *spin = qobject_cast<QSpinBox *>(controlInCurrentPage("默认不透明度"));
         ASSERT_NE(spin, nullptr);
-        EXPECT_EQ(spin->value(), GyanisScribe::Pin::kDefaultOpacityPercent) << "没有存过时要显示完全不透明";
+        EXPECT_EQ(spin->value(), GyanisScribe::Core::kDefaultOpacityPercent) << "没有存过时要显示完全不透明";
         EXPECT_EQ(spin->minimum(), 1) << "下限要与 parseOpacityPercentSetting 的拒绝面同解";
         EXPECT_EQ(spin->maximum(), 100);
 
@@ -354,7 +354,7 @@ namespace
         const auto reopened = makeStore();
         const auto stored   = reopened->intValue(GyanisScribe::Core::kPinDefaultOpacity, -1);
         EXPECT_EQ(stored, 40);
-        const auto parsed = GyanisScribe::Pin::parseOpacityPercentSetting(stored);
+        const auto parsed = GyanisScribe::Core::parseOpacityPercentSetting(stored);
         ASSERT_TRUE(static_cast<bool>(parsed));
         EXPECT_DOUBLE_EQ(*parsed, 0.4);
     }
@@ -734,9 +734,9 @@ namespace
 
         auto *spin = qobject_cast<QSpinBox *>(controlInCurrentPage("吸附距离"));
         ASSERT_NE(spin, nullptr) << "贴图页没有「吸附距离」这一格";
-        EXPECT_EQ(spin->value(), GyanisScribe::Pin::kEdgeSnapTolerance) << "没存过时要显示的那一档，必须就是贴图读端回落的那一档";
-        EXPECT_EQ(spin->minimum(), GyanisScribe::Pin::kEdgeSnapDistanceMinimum) << "0 是一档有意义的设置，数字框不该把它当初值以外的东西";
-        EXPECT_EQ(spin->maximum(), GyanisScribe::Pin::kEdgeSnapDistanceMaximum) << "数字框的上限与校验函数不同解，界面就能填出一个读端拒掉的值";
+        EXPECT_EQ(spin->value(), GyanisScribe::Core::kEdgeSnapTolerance) << "没存过时要显示的那一档，必须就是贴图读端回落的那一档";
+        EXPECT_EQ(spin->minimum(), GyanisScribe::Core::kEdgeSnapDistanceMinimum) << "0 是一档有意义的设置，数字框不该把它当初值以外的东西";
+        EXPECT_EQ(spin->maximum(), GyanisScribe::Core::kEdgeSnapDistanceMaximum) << "数字框的上限与校验函数不同解，界面就能填出一个读端拒掉的值";
         spin->setValue(24);
 
         auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage("不许拖边改大小"));

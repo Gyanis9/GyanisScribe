@@ -1,10 +1,10 @@
-#include "Pin/ColorCard.h"
+#include "Gui/Pin/ColorCard.h"
 
 #include <QFont>
 #include <QPainter>
 #include <QPen>
 
-namespace GyanisScribe::Pin
+namespace GyanisScribe::Gui
 {
     QImage renderColorCard(const QColor &color, const QString &label)
     {
@@ -27,4 +27,4 @@ namespace GyanisScribe::Pin
         return card;
     }
 
-} // namespace GyanisScribe::Pin
+} // namespace GyanisScribe::Gui

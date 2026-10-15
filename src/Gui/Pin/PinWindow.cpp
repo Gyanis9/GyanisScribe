@@ -1,4 +1,4 @@
-#include "Pin/PinWindow.h"
+#include "Gui/Pin/PinWindow.h"
 
 #include "Annotation/AnnotationEngine.h"
 #include "Annotation/AnnotationToolbar.h"
@@ -13,9 +13,9 @@
 #include "Base/Paths.h"
 #include "Base/SizeText.h"
 #include "Base/Text.h"
-#include "Pin/ColorCard.h"
-#include "Pin/PinLayout.h"
-#include "Pin/PinViewFilter.h"
+#include "Gui/Pin/ColorCard.h"
+#include "Core/Pin/PinLayout.h"
+#include "Core/Pin/PinViewFilter.h"
 #include "Core/Pick/ColorFormat.h"
 #include "Gui/Controls/AppShortcuts.h"
 #include "Gui/Theme/DesignTokens.h"
@@ -57,7 +57,7 @@
 #include <cmath>
 #include <format>
 
-namespace GyanisScribe::Pin
+namespace GyanisScribe::Gui
 {
     void applyPinBatchAction(PinWindow &pin, const PinBatchAction action, const bool value)
     {
@@ -146,33 +146,33 @@ namespace GyanisScribe::Pin
         constexpr double kMinimumEdge = 8.0;
 
         /// 手柄档对哪一个光标形状：八个档只有三种形状，两条对角各一枚
-        Qt::CursorShape resizeCursorFor(const HandleKind handle) noexcept
+        Qt::CursorShape resizeCursorFor(const Core::HandleKind handle) noexcept
         {
             switch (handle)
             {
-                case HandleKind::TopLeft:
-                case HandleKind::BottomRight:
+                case Core::HandleKind::TopLeft:
+                case Core::HandleKind::BottomRight:
                     return Qt::SizeFDiagCursor;
-                case HandleKind::TopRight:
-                case HandleKind::BottomLeft:
+                case Core::HandleKind::TopRight:
+                case Core::HandleKind::BottomLeft:
                     return Qt::SizeBDiagCursor;
-                case HandleKind::Top:
-                case HandleKind::Bottom:
+                case Core::HandleKind::Top:
+                case Core::HandleKind::Bottom:
                     return Qt::SizeVerCursor;
-                case HandleKind::Left:
-                case HandleKind::Right:
+                case Core::HandleKind::Left:
+                case Core::HandleKind::Right:
                     return Qt::SizeHorCursor;
             }
             return Qt::ArrowCursor; // 走到这里说明枚举加了新档没配形状
         }
 
         /// 改完大小之后窗口该摆在哪：抓哪条边就把对面那条钉住，没人抓的那一轴让中心原地不动
-        QPoint anchoredTopLeft(const HandleKind handle, const QRect &before, const QRect &after)
+        QPoint anchoredTopLeft(const Core::HandleKind handle, const QRect &before, const QRect &after)
         {
-            const bool grabsLeft   = handle == HandleKind::Left || handle == HandleKind::TopLeft || handle == HandleKind::BottomLeft;
-            const bool grabsRight  = handle == HandleKind::Right || handle == HandleKind::TopRight || handle == HandleKind::BottomRight;
-            const bool grabsTop    = handle == HandleKind::Top || handle == HandleKind::TopLeft || handle == HandleKind::TopRight;
-            const bool grabsBottom = handle == HandleKind::Bottom || handle == HandleKind::BottomLeft || handle == HandleKind::BottomRight;
+            const bool grabsLeft   = handle == Core::HandleKind::Left || handle == Core::HandleKind::TopLeft || handle == Core::HandleKind::BottomLeft;
+            const bool grabsRight  = handle == Core::HandleKind::Right || handle == Core::HandleKind::TopRight || handle == Core::HandleKind::BottomRight;
+            const bool grabsTop    = handle == Core::HandleKind::Top || handle == Core::HandleKind::TopLeft || handle == Core::HandleKind::TopRight;
+            const bool grabsBottom = handle == Core::HandleKind::Bottom || handle == Core::HandleKind::BottomLeft || handle == Core::HandleKind::BottomRight;
 
             // 横向：抓的是左边就让那一条线跟着走（对面即右边界钉住），抓右边则左边界钉住；
             // QRect 的右边界含最后一格，所以对面那条线在 right()+1 上
@@ -272,7 +272,7 @@ namespace GyanisScribe::Pin
 
         // 起点不透明度取自配置。恢复布局那一条之后还会再覆盖一次，
         // 所以每张旧贴图各自的透明度不受这一条影响
-        if (const auto parsed = parseOpacityPercentSetting(m_settings.intValue(Core::kPinDefaultOpacity, kDefaultOpacityPercent)); parsed)
+        if (const auto parsed = Core::parseOpacityPercentSetting(m_settings.intValue(Core::kPinDefaultOpacity, Core::kDefaultOpacityPercent)); parsed)
         {
             m_opacity = *parsed;
         } else
@@ -288,7 +288,7 @@ namespace GyanisScribe::Pin
 
     void PinWindow::setScale(double scale)
     {
-        m_scale = clampScale(scale);
+        m_scale = Core::clampScale(scale);
         applyGeometry();
         update();
     }
@@ -317,7 +317,7 @@ namespace GyanisScribe::Pin
 
     void PinWindow::setRotationDegrees(double degrees)
     {
-        m_rotationDegrees = normalizeDegrees(degrees);
+        m_rotationDegrees = Core::normalizeDegrees(degrees);
         applyGeometry();
         update();
     }
@@ -425,7 +425,7 @@ namespace GyanisScribe::Pin
         // 缓存按「哪一版像素」认：动图每换一帧都会换掉 m_image，cacheKey 跟着变，这里自然重算
         if (m_viewFiltered.isNull() || m_viewFilteredSourceKey != m_image.cacheKey())
         {
-            m_viewFiltered          = pinViewFiltered(m_image, m_grayscale, m_inverted);
+            m_viewFiltered          = Core::pinViewFiltered(m_image, m_grayscale, m_inverted);
             m_viewFilteredSourceKey = m_image.cacheKey();
         }
         return m_viewFiltered;
@@ -433,7 +433,7 @@ namespace GyanisScribe::Pin
 
     void PinWindow::setOpacityLevel(double opacity)
     {
-        m_opacity = clampOpacity(opacity);
+        m_opacity = Core::clampOpacity(opacity);
         setWindowOpacity(m_opacity);
     }
 
@@ -466,7 +466,7 @@ namespace GyanisScribe::Pin
         return m_mouseThrough;
     }
 
-    void PinWindow::setTransparentBackdrop(const TransparentBackdrop mode)
+    void PinWindow::setTransparentBackdrop(const Core::TransparentBackdrop mode)
     {
         if (mode == m_transparentBackdrop)
         {
@@ -479,7 +479,7 @@ namespace GyanisScribe::Pin
         {
             hide();
         }
-        setAttribute(Qt::WA_TranslucentBackground, mode == TransparentBackdrop::SeeThrough);
+        setAttribute(Qt::WA_TranslucentBackground, mode == Core::TransparentBackdrop::SeeThrough);
         m_transparentBackdrop = mode;
         if (wasVisible)
         {
@@ -488,7 +488,7 @@ namespace GyanisScribe::Pin
         update();
     }
 
-    TransparentBackdrop PinWindow::transparentBackdrop() const noexcept
+    Core::TransparentBackdrop PinWindow::transparentBackdrop() const noexcept
     {
         return m_transparentBackdrop;
     }
@@ -523,7 +523,7 @@ namespace GyanisScribe::Pin
         return !isVisible();
     }
 
-    ScreenEdge PinWindow::edgeDock() const noexcept
+    Core::ScreenEdge PinWindow::edgeDock() const noexcept
     {
         return m_edgeDock;
     }
@@ -533,12 +533,12 @@ namespace GyanisScribe::Pin
         if (!docked)
         {
             // 取消贴边 = 摆回贴上那条边、整张露出来；之后的拖动照旧，拖离屏边就自动脱开
-            if (m_edgeDock != ScreenEdge::None)
+            if (m_edgeDock != Core::ScreenEdge::None)
             {
                 m_dockCollapsed = false;
                 applyDockGeometry();
             }
-            m_edgeDock = ScreenEdge::None;
+            m_edgeDock = Core::ScreenEdge::None;
             update();
             return;
         }
@@ -556,21 +556,21 @@ namespace GyanisScribe::Pin
         const auto toRight  = std::abs(m_dockArea.right() - rect.right());
         const auto toTop    = std::abs(rect.top() - m_dockArea.top());
         const auto toBottom = std::abs(m_dockArea.bottom() - rect.bottom());
-        auto       nearest  = ScreenEdge::Left;
+        auto       nearest  = Core::ScreenEdge::Left;
         auto       best     = toLeft;
         if (toRight < best)
         {
-            nearest = ScreenEdge::Right;
+            nearest = Core::ScreenEdge::Right;
             best    = toRight;
         }
         if (toTop < best)
         {
-            nearest = ScreenEdge::Top;
+            nearest = Core::ScreenEdge::Top;
             best    = toTop;
         }
         if (toBottom < best)
         {
-            nearest = ScreenEdge::Bottom;
+            nearest = Core::ScreenEdge::Bottom;
         }
 
         m_edgeDock = nearest;
@@ -672,7 +672,7 @@ namespace GyanisScribe::Pin
         // 与 applyGeometry 同一套算法：先按「图本身」算出窗口里居中的那块矩形，再换成全屏坐标。
         // 刻意不拿 globalRect() 去抓——那是旋转后的外接框（斜着时比图大一圈），照它抓会把邻居窗口的像素
         // 一起框进这张图；窗口为投影留的那一圈带子也不能算进来，那里面画的是桌面而不是内容
-        const auto scaled = m_thumbnail ? QSizeF{m_thumbnailEdge, m_thumbnailEdge} : windowSizeFor(m_logicalSize, m_scale);
+        const auto scaled = m_thumbnail ? QSizeF{m_thumbnailEdge, m_thumbnailEdge} : Core::windowSizeFor(m_logicalSize, m_scale);
         const auto width  = std::max(kMinimumEdge, scaled.width());
         const auto height = std::max(kMinimumEdge, scaled.height());
 
@@ -699,9 +699,9 @@ namespace GyanisScribe::Pin
         }
     }
 
-    PinState PinWindow::state() const
+    Core::PinState PinWindow::state() const
     {
-        PinState state{globalRect().topLeft(), m_logicalSize, m_scale, m_rotationDegrees, m_opacity};
+        Core::PinState state{globalRect().topLeft(), m_logicalSize, m_scale, m_rotationDegrees, m_opacity};
         state.group               = m_group;
         state.alwaysOnTop         = m_pinned;
         state.mouseThrough        = m_mouseThrough;
@@ -714,10 +714,10 @@ namespace GyanisScribe::Pin
 
     std::vector<QRectF> PinWindow::handleRects() const
     {
-        return Pin::handleRects(contentRect(), kHandleSize);
+        return Core::handleRects(contentRect(), kHandleSize);
     }
 
-    std::optional<HandleKind> PinWindow::edgeHandleAt(const QPointF &localPoint) const
+    std::optional<Core::HandleKind> PinWindow::edgeHandleAt(const QPointF &localPoint) const
     {
         // 带子夹到最短那一边的三分之一以内：图小的时候四边的带子会叠到一起，
         // 整张都成了「改大小」就再没有平移的地方
@@ -730,49 +730,49 @@ namespace GyanisScribe::Pin
         // 角先判：同时贴着两条边的落点要的是「两个方向一起给」，按边判会把它降成一维
         if (nearLeft && nearTop)
         {
-            return HandleKind::TopLeft;
+            return Core::HandleKind::TopLeft;
         }
         if (nearRight && nearTop)
         {
-            return HandleKind::TopRight;
+            return Core::HandleKind::TopRight;
         }
         if (nearRight && nearBottom)
         {
-            return HandleKind::BottomRight;
+            return Core::HandleKind::BottomRight;
         }
         if (nearLeft && nearBottom)
         {
-            return HandleKind::BottomLeft;
+            return Core::HandleKind::BottomLeft;
         }
         if (nearTop)
         {
-            return HandleKind::Top;
+            return Core::HandleKind::Top;
         }
         if (nearRight)
         {
-            return HandleKind::Right;
+            return Core::HandleKind::Right;
         }
         if (nearBottom)
         {
-            return HandleKind::Bottom;
+            return Core::HandleKind::Bottom;
         }
         if (nearLeft)
         {
-            return HandleKind::Left;
+            return Core::HandleKind::Left;
         }
         return {};
     }
 
     int PinWindow::edgeSnapDistance() const
     {
-        const auto stored = m_settings.intValue(GyanisScribe::Core::kPinEdgeSnapDistance, kEdgeSnapTolerance);
-        const auto parsed = parseEdgeSnapDistance(stored);
+        const auto stored = m_settings.intValue(GyanisScribe::Core::kPinEdgeSnapDistance, Core::kEdgeSnapTolerance);
+        const auto parsed = Core::parseEdgeSnapDistance(stored);
         // 区间判据与设置页共用那一个校验函数。这里不记日志：这条路每帧鼠标移动都要走一次，
         // 同一句话会被刷成一片，把真正有用的现场埋掉；设置页那一格读到时会说一次
-        return parsed ? *parsed : kEdgeSnapTolerance;
+        return parsed ? *parsed : Core::kEdgeSnapTolerance;
     }
 
-    std::optional<HandleKind> PinWindow::resizeHandleAt(const QPointF &localPoint) const
+    std::optional<Core::HandleKind> PinWindow::resizeHandleAt(const QPointF &localPoint) const
     {
         // 设置里「不许拖边改大小」这一档关掉的是这一处：手柄与边带的命中、悬停光标、按下分派都从这条走，
         // 只在按下那一头拦会让光标仍显示「能改大小」而点下去没反应
@@ -786,7 +786,7 @@ namespace GyanisScribe::Pin
         {
             if (handles[index].contains(localPoint))
             {
-                return static_cast<HandleKind>(index);
+                return static_cast<Core::HandleKind>(index);
             }
         }
         return edgeHandleAt(localPoint);
@@ -836,7 +836,7 @@ namespace GyanisScribe::Pin
 
     void PinWindow::setThumbnailEdge(const double edge)
     {
-        const auto clamped = clampThumbnailEdge(edge);
+        const auto clamped = Core::clampThumbnailEdge(edge);
         if (clamped == m_thumbnailEdge)
         {
             return;
@@ -857,7 +857,7 @@ namespace GyanisScribe::Pin
 
     void PinWindow::setGroup(const int group)
     {
-        m_group = group < kFirstPinGroup ? kFirstPinGroup : group;
+        m_group = group < Core::kFirstPinGroup ? Core::kFirstPinGroup : group;
     }
 
     int PinWindow::group() const noexcept
@@ -895,7 +895,7 @@ namespace GyanisScribe::Pin
         // 条上写的写法跟着设置里那一档走：与读数条、「已复制」那几处同一把尺子，改完不会多出一种写法
         const auto casing = Core::hexCasingOf(m_settings.boolValue(GyanisScribe::Core::kPickHexUppercase, true));
         setColorCard(color);
-        replaceContent(Pin::renderColorCard(color, Core::formatColor(color, Core::ColorFormat::Hex, casing)));
+        replaceContent(Gui::renderColorCard(color, Core::formatColor(color, Core::ColorFormat::Hex, casing)));
     }
 
     std::optional<QColor> PinWindow::colorCardColor() const noexcept
@@ -1169,7 +1169,7 @@ namespace GyanisScribe::Pin
 
         if (commit && rect.has_value())
         {
-            if (const auto pixels = imagePixelRect(*rect, contentRect(), m_image.size()); pixels.has_value())
+            if (const auto pixels = Core::imagePixelRect(*rect, contentRect(), m_image.size()); pixels.has_value())
             {
                 if (pixels->width() >= kMinimumCropEdge && pixels->height() >= kMinimumCropEdge)
                 {
@@ -1387,7 +1387,7 @@ namespace GyanisScribe::Pin
             return std::nullopt;
         }
         // 缩略图态不旋转、翻转照常：与绘制用的是同一个口径，不然读数会取到偏一格的颜色
-        const auto pixel = imagePixelAt(m_pickPoint, contentRect(), m_image.size(), m_thumbnail ? 0.0 : m_rotationDegrees, m_mirroredHorizontally, m_mirroredVertically);
+        const auto pixel = Core::imagePixelAt(m_pickPoint, contentRect(), m_image.size(), m_thumbnail ? 0.0 : m_rotationDegrees, m_mirroredHorizontally, m_mirroredVertically);
         if (!pixel)
         {
             return std::nullopt;
@@ -1444,18 +1444,18 @@ namespace GyanisScribe::Pin
 
     void PinWindow::applyGeometry()
     {
-        const auto scaled   = m_thumbnail ? QSizeF{m_thumbnailEdge, m_thumbnailEdge} : windowSizeFor(m_logicalSize, m_scale);
+        const auto scaled   = m_thumbnail ? QSizeF{m_thumbnailEdge, m_thumbnailEdge} : Core::windowSizeFor(m_logicalSize, m_scale);
         const auto rotation = m_thumbnail ? 0.0 : m_rotationDegrees;
         const auto width    = std::max(kMinimumEdge, scaled.width());
         const auto height   = std::max(kMinimumEdge, scaled.height());
 
         const QPointF center = QRectF(pos(), size()).center();
-        const auto    box    = rotatedBoundingBox(center, QSizeF(width, height), rotation);
+        const auto    box    = Core::rotatedBoundingBox(center, QSizeF(width, height), rotation);
 
         // 窗口阴影：窗口比外接框每边大一圈，投影画在带子里；内容在窗口里居中（见 contentRect），
         // 于是留边出现或消失时内容一个像素都不动。缩略图态不铺——那枚小方块是临时让位用的
         const bool   shadowOn = m_shadowEnabled && !m_thumbnail;
-        const QRectF padded   = shadowOn ? box.adjusted(-kShadowMargin, -kShadowMargin, kShadowMargin, kShadowMargin) : box;
+        const QRectF padded   = shadowOn ? box.adjusted(-Core::kShadowMargin, -Core::kShadowMargin, Core::kShadowMargin, Core::kShadowMargin) : box;
 
         // 尺寸取外接框（有阴影时再套上留边），绘制时按同样的角度转回去：命中、拖动与手柄都落在这个轴对齐框里算
         setGeometry(padded.toAlignedRect());
@@ -1467,7 +1467,7 @@ namespace GyanisScribe::Pin
 
     void PinWindow::applyDockGeometry()
     {
-        if (m_edgeDock == ScreenEdge::None || m_dockArea.isEmpty())
+        if (m_edgeDock == Core::ScreenEdge::None || m_dockArea.isEmpty())
         {
             return;
         }
@@ -1476,27 +1476,27 @@ namespace GyanisScribe::Pin
         auto revealed = QRect(pos(), size());
         switch (m_edgeDock)
         {
-            case ScreenEdge::Left:
+            case Core::ScreenEdge::Left:
                 revealed.moveLeft(m_dockArea.left());
                 break;
-            case ScreenEdge::Right:
+            case Core::ScreenEdge::Right:
                 revealed.moveLeft(m_dockArea.right() - revealed.width() + 1);
                 break;
-            case ScreenEdge::Top:
+            case Core::ScreenEdge::Top:
                 revealed.moveTop(m_dockArea.top());
                 break;
-            case ScreenEdge::Bottom:
+            case Core::ScreenEdge::Bottom:
                 revealed.moveTop(m_dockArea.bottom() - revealed.height() + 1);
                 break;
-            case ScreenEdge::None:
+            case Core::ScreenEdge::None:
                 return;
         }
-        setGeometry(dockedRect(revealed, m_dockArea, m_edgeDock, m_dockCollapsed));
+        setGeometry(Core::dockedRect(revealed, m_dockArea, m_edgeDock, m_dockCollapsed));
     }
 
     QRectF PinWindow::contentRect() const
     {
-        const auto   scaled = m_thumbnail ? QSizeF{m_thumbnailEdge, m_thumbnailEdge} : windowSizeFor(m_logicalSize, m_scale);
+        const auto   scaled = m_thumbnail ? QSizeF{m_thumbnailEdge, m_thumbnailEdge} : Core::windowSizeFor(m_logicalSize, m_scale);
         const double width  = std::max(kMinimumEdge, scaled.width());
         const double height = std::max(kMinimumEdge, scaled.height());
 
@@ -1517,7 +1517,7 @@ namespace GyanisScribe::Pin
         painter.translate(content.center());
         // 缩略图态不旋转：一枚小方块里转起来看不清是什么，退出后旋转照旧。翻转不改外框，照常生效
         painter.rotate(m_thumbnail ? 0.0 : m_rotationDegrees);
-        // 翻转在旋转之前做：转的是翻好的那一份，与 imagePixelAt 的反变换成对（先反旋转、后反翻转）
+        // 翻转在旋转之前做：转的是翻好的那一份，与 Core::imagePixelAt 的反变换成对（先反旋转、后反翻转）
         painter.scale(m_mirroredHorizontally ? -1.0 : 1.0, m_mirroredVertically ? -1.0 : 1.0);
         painter.translate(-content.center());
 
@@ -1526,11 +1526,11 @@ namespace GyanisScribe::Pin
         if (m_shadowEnabled && !m_thumbnail)
         {
             painter.setBrush(Qt::NoBrush);
-            for (int layer = 1; layer <= kShadowLayers; ++layer)
+            for (int layer = 1; layer <= Core::kShadowLayers; ++layer)
             {
                 QColor shadow{0, 0, 0};
                 // 贴着内容那一圈最深、往外一格格淡下去：常数越小越像「远处的一圈光晕」
-                shadow.setAlpha(8 + 32 * (kShadowLayers - layer) / kShadowLayers);
+                shadow.setAlpha(8 + 32 * (Core::kShadowLayers - layer) / Core::kShadowLayers);
                 QPen pen{shadow};
                 pen.setWidth(2);
                 painter.setPen(pen);
@@ -1543,9 +1543,9 @@ namespace GyanisScribe::Pin
             painter.fillRect(content, m_backgroundColor);
         }
         // 透明区两档棋盘：画在底板之后、图之前，于是只有图上是透明的地方才看得见它
-        if (const auto checker = checkerColorsFor(m_transparentBackdrop); checker)
+        if (const auto checker = Core::checkerColorsFor(m_transparentBackdrop); checker)
         {
-            painter.fillRect(content, QBrush{checkerboardTile(checker->first, checker->second, kCheckerCellPixels)});
+            painter.fillRect(content, QBrush{Core::checkerboardTile(checker->first, checker->second, Core::kCheckerCellPixels)});
         }
         painter.drawImage(content, displayImage(), QRectF(QPointF(0.0, 0.0), QSizeF(m_image.width(), m_image.height())));
         painter.resetTransform();
@@ -1602,7 +1602,7 @@ namespace GyanisScribe::Pin
     void PinWindow::paintColorReadout(QPainter &painter)
     {
         const auto text  = hoveredColorText();
-        const auto pixel = imagePixelAt(m_pickPoint, contentRect(), m_image.size(), m_thumbnail ? 0.0 : m_rotationDegrees, m_mirroredHorizontally, m_mirroredVertically);
+        const auto pixel = Core::imagePixelAt(m_pickPoint, contentRect(), m_image.size(), m_thumbnail ? 0.0 : m_rotationDegrees, m_mirroredHorizontally, m_mirroredVertically);
         if (!text || !pixel)
         {
             return;
@@ -1676,7 +1676,8 @@ namespace GyanisScribe::Pin
         // 取色模式：点一下就把那一像素的颜色交出去，点完自己退出——与屏幕取色那边「点一下拿一个色」同一口径
         if (m_colorPickMode)
         {
-            const auto pixel = imagePixelAt(event->position(), contentRect(), m_image.size(), m_thumbnail ? 0.0 : m_rotationDegrees, m_mirroredHorizontally, m_mirroredVertically);
+            const auto pixel =
+                    Core::imagePixelAt(event->position(), contentRect(), m_image.size(), m_thumbnail ? 0.0 : m_rotationDegrees, m_mirroredHorizontally, m_mirroredVertically);
             if (pixel)
             {
                 // 交出去的是显示色：开了灰度/反色之后，用户挑中的就是屏上那一个
@@ -1738,10 +1739,10 @@ namespace GyanisScribe::Pin
             // 缩着的那一枚改的是方块边长，摊开的那张改的是缩放：同一只手感（按到中心的距离给倍率），落到各自的量上
             if (m_thumbnail)
             {
-                setThumbnailEdge(thumbnailEdgeFromDrag(m_dragInitialEdge, m_dragInitialDistance, distance));
+                setThumbnailEdge(Core::thumbnailEdgeFromDrag(m_dragInitialEdge, m_dragInitialDistance, distance));
             } else
             {
-                setScale(scaleFromDrag(m_dragInitialScale, m_dragInitialDistance, distance));
+                setScale(Core::scaleFromDrag(m_dragInitialScale, m_dragInitialDistance, distance));
             }
             // applyGeometry 是按中心重算尺寸的；这里把对面那条边钉回原位——按住右边往外拖时
             // 左边不该一起跑，那看着像整张在漂而不是在改大小
@@ -1757,7 +1758,7 @@ namespace GyanisScribe::Pin
             // 不按住时一律不吸——自由摆放的手感不能被参照抢走
             if (event->modifiers().testFlag(Qt::ShiftModifier) && !m_dragCandidates.empty())
             {
-                target = snapToCandidateEdges(QRect(target, size()), m_dragCandidates, edgeSnapDistance()).topLeft();
+                target = Core::snapToCandidateEdges(QRect(target, size()), m_dragCandidates, edgeSnapDistance()).topLeft();
             }
             const QPoint delta = target - pos();
             move(target);
@@ -1810,18 +1811,18 @@ namespace GyanisScribe::Pin
         const auto *screen = QGuiApplication::screenAt(QRectF(pos(), size()).center().toPoint());
         if (screen != nullptr)
         {
-            const auto snapped = snapToScreenEdges(QRect(pos(), size()), screen->availableGeometry(), edgeSnapDistance());
-            if (snapped.edge != ScreenEdge::None)
+            const auto snapped = Core::snapToScreenEdges(QRect(pos(), size()), screen->availableGeometry(), edgeSnapDistance());
+            if (snapped.edge != Core::ScreenEdge::None)
             {
                 m_dockArea = screen->availableGeometry();
                 m_edgeDock = snapped.edge;
                 // 松手那一刻指针还在这张图上：先露着，等指针离开再收回去（见 leaveEvent）
                 m_dockCollapsed = false;
-                setGeometry(dockedRect(snapped.rect, m_dockArea, m_edgeDock, false));
+                setGeometry(Core::dockedRect(snapped.rect, m_dockArea, m_edgeDock, false));
                 update();
                 return;
             }
-            m_edgeDock      = ScreenEdge::None;
+            m_edgeDock      = Core::ScreenEdge::None;
             m_dockCollapsed = false;
         }
 
@@ -1832,7 +1833,7 @@ namespace GyanisScribe::Pin
     {
         QWidget::enterEvent(event);
         // 贴边收着的时候悬停要露出来：收成一条之后能接到的交互只有那条边
-        if (m_edgeDock != ScreenEdge::None && m_dockCollapsed)
+        if (m_edgeDock != Core::ScreenEdge::None && m_dockCollapsed)
         {
             m_dockCollapsed = false;
             applyDockGeometry();
@@ -1849,7 +1850,7 @@ namespace GyanisScribe::Pin
         }
         // 指针走了就收回去：贴边这一档本来就是「别占着地方」；标注中不收——
         // 光标去点工具栏就是一次离开窗口，把贴图收走等于把正在画的这张纸抽掉
-        if (m_edgeDock != ScreenEdge::None && !m_dockCollapsed && !m_annotating)
+        if (m_edgeDock != Core::ScreenEdge::None && !m_dockCollapsed && !m_annotating)
         {
             m_dockCollapsed = true;
             applyDockGeometry();
@@ -2124,7 +2125,7 @@ namespace GyanisScribe::Pin
                             if (const auto ratio = GyanisScribe::Base::parseScaleRatio(text); ratio)
                             {
                                 // 倍率按当前这份尺寸算：与滚轮缩放同一档口径，改的是这一张自己的大小
-                                const auto scaled = sizeScaledBy(QSize{qRound(m_logicalSize.width()), qRound(m_logicalSize.height())}, *ratio);
+                                const auto scaled = Core::sizeScaledBy(QSize{qRound(m_logicalSize.width()), qRound(m_logicalSize.height())}, *ratio);
                                 setExactSize(scaled);
                                 return;
                             }
@@ -2251,7 +2252,7 @@ namespace GyanisScribe::Pin
 
         // 透明区：带透明通道的图，那些像素底下画什么。四档各管一件事，所以把「露底色」与「让桌面透出来」摆在前面
         auto      *backdropMenu      = menu->addMenu(GyanisScribe::Base::uiText("透明区"));
-        const auto addBackdropChoice = [this, backdropMenu](const QString &label, const TransparentBackdrop mode, const QString &hint)
+        const auto addBackdropChoice = [this, backdropMenu](const QString &label, const Core::TransparentBackdrop mode, const QString &hint)
         {
             auto *item = backdropMenu->addAction(label);
             item->setCheckable(true);
@@ -2259,10 +2260,14 @@ namespace GyanisScribe::Pin
             item->setToolTip(hint);
             QObject::connect(item, &QAction::triggered, this, [this, mode] { setTransparentBackdrop(mode); });
         };
-        addBackdropChoice(GyanisScribe::Base::uiText("跟随窗口底色"), TransparentBackdrop::ThemeBase, GyanisScribe::Base::uiText("透明像素露出窗口的底色（一直以来的那一档）"));
-        addBackdropChoice(GyanisScribe::Base::uiText("桌面透出"), TransparentBackdrop::SeeThrough, GyanisScribe::Base::uiText("整窗改成逐像素合成，透明那几块把底下的桌面透出来"));
-        addBackdropChoice(GyanisScribe::Base::uiText("深色棋盘"), TransparentBackdrop::DarkChecker, GyanisScribe::Base::uiText("按深色棋盘画出透明区，摆在白文档上看得出边界"));
-        addBackdropChoice(GyanisScribe::Base::uiText("亮色棋盘"), TransparentBackdrop::LightChecker, GyanisScribe::Base::uiText("按亮色棋盘画出透明区，摆在深色桌面上看得出边界"));
+        addBackdropChoice(GyanisScribe::Base::uiText("跟随窗口底色"), Core::TransparentBackdrop::ThemeBase,
+                          GyanisScribe::Base::uiText("透明像素露出窗口的底色（一直以来的那一档）"));
+        addBackdropChoice(GyanisScribe::Base::uiText("桌面透出"), Core::TransparentBackdrop::SeeThrough,
+                          GyanisScribe::Base::uiText("整窗改成逐像素合成，透明那几块把底下的桌面透出来"));
+        addBackdropChoice(GyanisScribe::Base::uiText("深色棋盘"), Core::TransparentBackdrop::DarkChecker,
+                          GyanisScribe::Base::uiText("按深色棋盘画出透明区，摆在白文档上看得出边界"));
+        addBackdropChoice(GyanisScribe::Base::uiText("亮色棋盘"), Core::TransparentBackdrop::LightChecker,
+                          GyanisScribe::Base::uiText("按亮色棋盘画出透明区，摆在深色桌面上看得出边界"));
 
         // 只显示这一张：其余的收起来，屏幕腾给这一张；再点一下恢复按组的那套规则。
         // 与「标注」那两档不同，它对谁用都成立（动图也一样）
@@ -2271,9 +2276,9 @@ namespace GyanisScribe::Pin
         soloAction->setChecked(m_soloState);
 
         // 贴边隐藏：贴着屏边收成一条，悬停展开。拖着放到屏边也会进这一档（见 mouseReleaseEvent）
-        auto *dockAction = menu->addAction(GyanisScribe::Base::uiText("贴边隐藏"), this, [this] { setEdgeDocked(m_edgeDock == ScreenEdge::None); });
+        auto *dockAction = menu->addAction(GyanisScribe::Base::uiText("贴边隐藏"), this, [this] { setEdgeDocked(m_edgeDock == Core::ScreenEdge::None); });
         dockAction->setCheckable(true);
-        dockAction->setChecked(m_edgeDock != ScreenEdge::None);
+        dockAction->setChecked(m_edgeDock != Core::ScreenEdge::None);
 
         // 移动到分组：列出管理器推过来的现有分组号，当前那一项带勾且灰掉（「现在就在这儿」），
         // 末尾一项按现有最大组号 +1 现建新组。移过去等于把它从当前这组暂时收起来，
@@ -2291,7 +2296,7 @@ namespace GyanisScribe::Pin
             QObject::connect(groupAction, &QAction::triggered, this, [this, group] { emit moveToGroupRequested(group); });
         }
         groupMenu->addSeparator();
-        const auto nextGroup = m_groupChoices.isEmpty() ? kFirstPinGroup : m_groupChoices.back() + 1;
+        const auto nextGroup = m_groupChoices.isEmpty() ? Core::kFirstPinGroup : m_groupChoices.back() + 1;
         QObject::connect(groupMenu->addAction(GyanisScribe::Base::uiText("新建分组")), &QAction::triggered, this, [this, nextGroup] { emit moveToGroupRequested(nextGroup); });
         groupMenu->addSeparator();
 
@@ -2311,8 +2316,8 @@ namespace GyanisScribe::Pin
                          });
         auto *deleteGroupAction = groupMenu->addAction(GyanisScribe::Base::uiText("删除这一组"), this, [this] { emit deleteGroupRequested(m_group); });
         // 第一组是删别组时成员并回去的落点：把它删了就没有落点，这一项在这儿灰着并说明为什么
-        deleteGroupAction->setEnabled(m_group != kFirstPinGroup);
-        if (m_group == kFirstPinGroup)
+        deleteGroupAction->setEnabled(m_group != Core::kFirstPinGroup);
+        if (m_group == Core::kFirstPinGroup)
         {
             deleteGroupAction->setToolTip(GyanisScribe::Base::uiText("第一组是删掉别的组时成员并回去的落点，删不掉；想把这一张挪走请用上面的分组"));
         }
@@ -2476,4 +2481,4 @@ namespace GyanisScribe::Pin
         emit dropRequested(event->mimeData(), mapToGlobal(event->position().toPoint()));
     }
 
-} // namespace GyanisScribe::Pin
+} // namespace GyanisScribe::Gui

@@ -22,7 +22,7 @@
 #include <optional>
 #include <vector>
 
-namespace GyanisScribe::Pin
+namespace GyanisScribe::Core
 {
 
     /**
@@ -290,4 +290,4 @@ namespace GyanisScribe::Pin
      */
     [[nodiscard]] QRect dockedRect(const QRect &revealed, const QRect &available, ScreenEdge edge, bool collapsed, int stripWidth = kEdgeStripWidth);
 
-} // namespace GyanisScribe::Pin
+} // namespace GyanisScribe::Core

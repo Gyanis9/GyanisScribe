@@ -33,8 +33,8 @@
 #include "Ocr/OcrTypes.h"
 #include "Plugins/Barcode/BarcodeDecoder.h"
 #include "Ocr/RecognitionRunner.h"
-#include "Pin/PinGroupManagerWindow.h"
-#include "Pin/PinManager.h"
+#include "Gui/Pin/PinGroupManagerWindow.h"
+#include "Gui/Pin/PinManager.h"
 #include "App/TrayController.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Record/FfmpegRecordingEncoder.h"
@@ -159,7 +159,7 @@ namespace GyanisScribe::App
 
         // 标注一套：引擎跨轮次复用（载入新帧自己会清空历史），窗口与工具栏也只建一次
         m_annotation = std::make_unique<Annotation::AnnotationEngine>();
-        m_pins       = std::make_unique<Pin::PinManager>(*m_settings, *m_integration);
+        m_pins       = std::make_unique<Gui::PinManager>(*m_settings, *m_integration);
         m_ocr        = Ocr::createOcrEngine(*m_settings, *m_integration);
         // Runner 拿着引擎的引用，它的析构必须排在引擎之前：成员的析构按声明反序，头文件里那份声明就排在 m_ocr 后面
         m_ocrRunner = std::make_unique<Ocr::RecognitionRunner>(*m_ocr);
@@ -310,20 +310,20 @@ namespace GyanisScribe::App
         // 「整屏截图：<屏名>」那一条：与整屏截图同一个出口，只是把屏名点了出来
         QObject::connect(m_mainWindow.get(), &MainWindow::captureScreenRequested, this, &AppController::captureNamedScreen);
         // 贴图张数走托盘悬停提示：贴图常被压在别的窗口后面，这是唯一还能看出「挂着几张」的地方
-        QObject::connect(m_pins.get(), &Pin::PinManager::pinCountChanged, m_tray.get(), &TrayController::setPinCount);
+        QObject::connect(m_pins.get(), &Gui::PinManager::pinCountChanged, m_tray.get(), &TrayController::setPinCount);
         // 贴图菜单里的「识别文字」与热键、标注窗走的是同一个出口：一处接线管所有张（含启动恢复的那些）
-        QObject::connect(m_pins.get(), &Pin::PinManager::pinOcrRequested, this, &AppController::handleOcrRequested);
+        QObject::connect(m_pins.get(), &Gui::PinManager::pinOcrRequested, this, &AppController::handleOcrRequested);
         // 贴图上取的色与屏幕取色共用写法和复制那两句：两处各写一份，复制到的文本格式就会分家
-        QObject::connect(m_pins.get(), &Pin::PinManager::pinColorPicked, this, &AppController::handlePinColorPicked);
+        QObject::connect(m_pins.get(), &Gui::PinManager::pinColorPicked, this, &AppController::handlePinColorPicked);
         // 贴图标注时的「另贴一张」：与回车复制出去的结果一样走 addPin，一处入口管所有新贴图
-        QObject::connect(m_pins.get(), &Pin::PinManager::pinAnotherRequested, this,
+        QObject::connect(m_pins.get(), &Gui::PinManager::pinAnotherRequested, this,
                          [this](const QImage &image, const QPoint &globalTopLeft)
                          {
                              // 留底再贴一份：不动原来那张，新的一张摆在它右下一点
                              m_pins->addPin(image, globalTopLeft);
                          });
         // 拖到贴图上的文件/链接/文本：与「把剪贴板里的内容贴到屏幕上」共用同一套内容渲染
-        QObject::connect(m_pins.get(), &Pin::PinManager::pinDropRequested, this,
+        QObject::connect(m_pins.get(), &Gui::PinManager::pinDropRequested, this,
                          [this](const QMimeData *data, const QPoint &globalTopLeft)
                          {
                              // 网页上的图：拖进来的是一条 http/https 地址时去取回来，落在拖到的那一点上
@@ -341,13 +341,13 @@ namespace GyanisScribe::App
                              notifyPinnedDrop(*dropped);
                          });
         // 贴图窗上的 `Ctrl+V`：只有序号能认人——剪贴板在这一层，像素在哪一张上也只有管理器知道
-        QObject::connect(m_pins.get(), &Pin::PinManager::pinClipboardReplaceRequested, this, &AppController::replacePinWithClipboard);
+        QObject::connect(m_pins.get(), &Gui::PinManager::pinClipboardReplaceRequested, this, &AppController::replacePinWithClipboard);
         // `F5` 与右键「刷新这一张」：抓屏的口子在这里，管理器只管谁在册与哪几档不许刷
-        QObject::connect(m_pins.get(), &Pin::PinManager::pinRefreshRequested, this, &AppController::refreshPinWithScreenUnder);
+        QObject::connect(m_pins.get(), &Gui::PinManager::pinRefreshRequested, this, &AppController::refreshPinWithScreenUnder);
         // 整组「批量保存」落完账：一次写走 N 份文件，不说清去了哪儿就等于没存
-        QObject::connect(m_pins.get(), &Pin::PinManager::pinBatchSaveReported, this, &AppController::reportBatchSave);
+        QObject::connect(m_pins.get(), &Gui::PinManager::pinBatchSaveReported, this, &AppController::reportBatchSave);
         // 移到别的组那一下它就从桌上消失了：说清它去了哪、怎么切过去，免得像「贴图自己没了」
-        QObject::connect(m_pins.get(), &Pin::PinManager::pinMovedToGroup, this,
+        QObject::connect(m_pins.get(), &Gui::PinManager::pinMovedToGroup, this,
                          [this](int group)
                          {
                              if (m_pins->activeGroup() == group)
@@ -363,8 +363,8 @@ namespace GyanisScribe::App
                                         Gui::ToastKind::Information);
                          });
         // 改组名与删组都在管理器落账，这两句是它们的回声：菜单早就收起来了，不出声就成了「敲了字什么也没变」
-        QObject::connect(m_pins.get(), &Pin::PinManager::pinGroupRenamed, this, &AppController::reportGroupRenamed);
-        QObject::connect(m_pins.get(), &Pin::PinManager::pinGroupDeleted, this, &AppController::reportGroupDeleted);
+        QObject::connect(m_pins.get(), &Gui::PinManager::pinGroupRenamed, this, &AppController::reportGroupRenamed);
+        QObject::connect(m_pins.get(), &Gui::PinManager::pinGroupDeleted, this, &AppController::reportGroupDeleted);
 
         // 启动把上一次会话留下的那几张摆回来；退出前把在存的这批连像素一起记下
         if (const auto restored = m_pins->restoreLayout(); !restored)
@@ -518,7 +518,7 @@ namespace GyanisScribe::App
                    Gui::ToastKind::Success);
     }
 
-    void AppController::reportBatchSave(const Pin::PinBatchSaveReport &report)
+    void AppController::reportBatchSave(const Gui::PinBatchSaveReport &report)
     {
         // 三档收尾各一句：全写成要说「去哪儿看」，成了一半要点名还有几张没成，一张都没成时原因就是主角
         if (report.saved == 0)
@@ -628,7 +628,7 @@ namespace GyanisScribe::App
         // 关掉即自己销毁（窗口构造里挂了 WA_DeleteOnClose），这里这份 QPointer 随即变空
         if (m_groupManager.isNull())
         {
-            m_groupManager = new Pin::PinGroupManagerWindow(*m_pins);
+            m_groupManager = new Gui::PinGroupManagerWindow(*m_pins);
         }
         m_groupManager->openAndRefresh();
     }

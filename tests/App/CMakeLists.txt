@@ -48,14 +48,13 @@ add_executable(TestMainWindow
         TestClipboardPin.cpp
         TestMainWindow.cpp)
 
-# 两帧 GIF 那条小素材住在 tests/Pin/PinTestAssets.h：拖放里的动图分支与 Pin 组共用它，
+# 两帧 GIF 那条小素材住在 tests/Core/Pin/PinTestAssets.h：拖放里的动图分支与 Pin 组共用它，
 # 不在两处各打一份字节（两份会随着将来改素材而分家）
-target_include_directories(TestMainWindow PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../Pin)
+target_include_directories(TestMainWindow PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../Core/Pin)
 
 target_link_libraries(TestMainWindow PRIVATE
         App
         Annotation
-        Pin
         Record
         Gui
         Core
@@ -84,7 +83,6 @@ target_link_libraries(TestModuleFlow PRIVATE
         Capture
         Core
         Ocr
-        Pin
         Platform
         Gui
         GTest::gtest
@@ -116,7 +114,6 @@ target_link_libraries(TestAppController PRIVATE
         Capture
         Core
         Ocr
-        Pin
         Platform
         Record
         Gui

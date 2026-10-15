@@ -36,7 +36,6 @@ target_link_libraries(App PUBLIC
         Capture
         Core
         Ocr
-        Pin
         Platform
         Record
         Plugins

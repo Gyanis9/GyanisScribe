@@ -1,6 +1,6 @@
-#include "Pin/PinViewFilter.h"
+#include "Core/Pin/PinViewFilter.h"
 
-namespace GyanisScribe::Pin
+namespace GyanisScribe::Core
 {
     QImage pinViewFiltered(const QImage &source, const bool grayscale, const bool inverted)
     {
@@ -36,4 +36,4 @@ namespace GyanisScribe::Pin
         return result;
     }
 
-} // namespace GyanisScribe::Pin
+} // namespace GyanisScribe::Core

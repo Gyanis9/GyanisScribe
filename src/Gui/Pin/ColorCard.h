@@ -13,7 +13,7 @@
 #include <QImage>
 #include <QString>
 
-namespace GyanisScribe::Pin
+namespace GyanisScribe::Gui
 {
 
     /// 颜色卡片：色块加底部一条写法条
@@ -41,4 +41,4 @@ namespace GyanisScribe::Pin
      */
     [[nodiscard]] QImage renderColorCard(const QColor &color, const QString &label);
 
-} // namespace GyanisScribe::Pin
+} // namespace GyanisScribe::Gui

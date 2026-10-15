@@ -10,7 +10,7 @@
 #pragma once
 
 #include "Base/Types.h"
-#include "Pin/PinTransform.h"
+#include "Core/Pin/PinTransform.h"
 
 #include <QMap>
 #include <QPoint>
@@ -25,7 +25,7 @@ namespace GyanisScribe::Core
     class ISettingsStore;
 } // namespace GyanisScribe::Core
 
-namespace GyanisScribe::Pin
+namespace GyanisScribe::Core
 {
 
     /**
@@ -151,4 +151,4 @@ namespace GyanisScribe::Pin
      */
     [[nodiscard]] Base::Expected<double> parseOpacityPercentSetting(int percent);
 
-} // namespace GyanisScribe::Pin
+} // namespace GyanisScribe::Core

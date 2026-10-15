@@ -1,14 +1,14 @@
 // 贴图分组的直测：哪张在哪一组、切组时谁显谁隐、活动组怎么落账。
 // 判据只走公开读数（isConcealed、activeGroup、groupsInUse 与写下的布局文本），不读私有成员。
 
-#include "Pin/IPinWindow.h"
-#include "Pin/PinWindow.h"
+#include "Core/Pin/IPinWindow.h"
+#include "Gui/Pin/PinWindow.h"
 
 #include "Base/Paths.h"
 #include "Base/Text.h"
 #include "PinTestAssets.h"
-#include "Pin/PinLayout.h"
-#include "Pin/PinManager.h"
+#include "Core/Pin/PinLayout.h"
+#include "Gui/Pin/PinManager.h"
 
 #include "Platform/IPlatformIntegration.h"
 #include "Core/Settings/SettingsKeys.h"
@@ -92,9 +92,9 @@ namespace GyanisScribe
                 std::filesystem::remove(m_iniFile, ignored);
             }
 
-            [[nodiscard]] Pin::PinManager &makeManager()
+            [[nodiscard]] Gui::PinManager &makeManager()
             {
-                m_pins = std::make_unique<Pin::PinManager>(*m_settings, *m_integration);
+                m_pins = std::make_unique<Gui::PinManager>(*m_settings, *m_integration);
                 return *m_pins;
             }
 
@@ -110,13 +110,13 @@ namespace GyanisScribe
 
         private:
             std::filesystem::path                           m_iniFile;     ///< 本用例专用的设置文件
-            std::unique_ptr<Core::SettingsStore>        m_settings;    ///< 布局的读写处
+            std::unique_ptr<Core::SettingsStore>            m_settings;    ///< 布局的读写处
             std::unique_ptr<Platform::IPlatformIntegration> m_integration; ///< 贴图窗要的平台能力
-            std::unique_ptr<Pin::PinManager>                m_pins;        ///< 被测管理器
+            std::unique_ptr<Gui::PinManager>                m_pins;        ///< 被测管理器
         };
 
         /// 这张贴图此刻在桌上吗：显隐只有 setConcealed 一个出口，判据就直接读它
-        [[nodiscard]] bool isOnDesk(const Pin::IPinWindow *pin)
+        [[nodiscard]] bool isOnDesk(const Core::IPinWindow *pin)
         {
             return pin != nullptr && !pin->isConcealed();
         }
@@ -232,7 +232,7 @@ namespace GyanisScribe
 
         // 布局文本是「哪张在哪组」的唯一凭据：从配置里现读现解一遍
         const auto text   = settings().stringValue(Core::kPinLayout, QString());
-        const auto states = Pin::parseLayout(text.toStdString());
+        const auto states = Core::parseLayout(text.toStdString());
         ASSERT_TRUE(states.has_value()) << "写下的布局读不回来：" << states.error().message;
         ASSERT_EQ(states->size(), 2);
         EXPECT_EQ((*states)[0].group, 1);
@@ -309,7 +309,7 @@ namespace GyanisScribe
         ASSERT_TRUE(restored.has_value()) << restored.error().message;
         ASSERT_EQ(reopened.count(), 1);
 
-        auto *pin = dynamic_cast<Pin::PinWindow *>(reopened.pinAt(0));
+        auto *pin = dynamic_cast<Gui::PinWindow *>(reopened.pinAt(0));
         ASSERT_NE(pin, nullptr) << "管理器里的贴图不是 PinWindow，这一条判据接不上";
         EXPECT_TRUE(pin->isAnimated()) << "动图过夜回来变成了静图：布局里那条来源路径没用上";
         EXPECT_EQ(pin->state().sourceFile, gifPath) << "恢复之后来源路径又丢了";
@@ -346,11 +346,11 @@ namespace GyanisScribe
     {
         auto &pins = makeManager();
         pins.addPin(makeImage(), QPoint(100, 100));
-        auto *window = dynamic_cast<Pin::PinWindow *>(pins.pinAt(0));
+        auto *window = dynamic_cast<Gui::PinWindow *>(pins.pinAt(0));
         ASSERT_NE(window, nullptr) << "管理器里的贴图不是 PinWindow，这一条判据接不上";
 
         std::optional<QPoint> at;
-        QObject::connect(&pins, &Pin::PinManager::pinAnotherRequested, [&at](const QImage &, const QPoint &globalTopLeft) { at = globalTopLeft; });
+        QObject::connect(&pins, &Gui::PinManager::pinAnotherRequested, [&at](const QImage &, const QPoint &globalTopLeft) { at = globalTopLeft; });
 
         window->startAnnotation();
         QKeyEvent press{QEvent::KeyPress, Qt::Key_D, Qt::ControlModifier};
@@ -368,7 +368,7 @@ namespace GyanisScribe
     {
         auto &pins = makeManager();
         pins.addPin(makeImage(), QPoint(50, 60));
-        auto *window = dynamic_cast<Pin::PinWindow *>(pins.pinAt(0));
+        auto *window = dynamic_cast<Gui::PinWindow *>(pins.pinAt(0));
         ASSERT_NE(window, nullptr) << "管理器里的贴图不是 PinWindow，这一条判据接不上";
         window->move(50, 60);
 
@@ -377,7 +377,7 @@ namespace GyanisScribe
 
         const QMimeData      *seen = nullptr;
         std::optional<QPoint> at;
-        QObject::connect(&pins, &Pin::PinManager::pinDropRequested,
+        QObject::connect(&pins, &Gui::PinManager::pinDropRequested,
                          [&](const QMimeData *data, const QPoint &globalTopLeft)
                          {
                              seen = data;
@@ -403,8 +403,8 @@ namespace GyanisScribe
     TEST_F(PinManagerFixture, ControllerClickTogglesTheSelectionAndPublishesTheCount)
     {
         auto &pins  = makeManager();
-        auto &first = static_cast<Pin::PinWindow &>(pins.addPin(makeImage(), QPoint(10, 10)));
-        auto &other = static_cast<Pin::PinWindow &>(pins.addPin(makeImage(), QPoint(80, 80)));
+        auto &first = static_cast<Gui::PinWindow &>(pins.addPin(makeImage(), QPoint(10, 10)));
+        auto &other = static_cast<Gui::PinWindow &>(pins.addPin(makeImage(), QPoint(80, 80)));
 
         const auto controlClick = [](QWidget &target)
         {
@@ -441,15 +441,15 @@ namespace GyanisScribe
         ASSERT_NE(first, nullptr);
         ASSERT_NE(other, nullptr);
 
-        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*first));
-        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*other));
+        pins.togglePinSelection(static_cast<Gui::PinWindow &>(*first));
+        pins.togglePinSelection(static_cast<Gui::PinWindow &>(*other));
         ASSERT_EQ(pins.selectedPinCount(), 2);
 
         const QPoint otherBefore = other->globalRect().topLeft();
         const QPoint firstBefore = first->globalRect().topLeft();
 
         // 从窗口正中起手：角与边中点上摆着缩放手柄，按在那里会变成「改大小」而不是「挪位置」
-        auto       *target = static_cast<Pin::PinWindow *>(first);
+        auto       *target = static_cast<Gui::PinWindow *>(first);
         QMouseEvent press{QEvent::MouseButtonPress, QPointF{16.0, 16.0}, QPointF{16.0, 16.0}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
         QApplication::sendEvent(target, &press);
         QMouseEvent move{QEvent::MouseMove, QPointF{36.0, 26.0}, QPointF{36.0, 26.0}, Qt::NoButton, Qt::LeftButton, Qt::NoModifier};
@@ -475,11 +475,11 @@ namespace GyanisScribe
         ASSERT_NE(first, nullptr);
         ASSERT_NE(other, nullptr);
 
-        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*first));
-        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*other));
+        pins.togglePinSelection(static_cast<Gui::PinWindow &>(*first));
+        pins.togglePinSelection(static_cast<Gui::PinWindow &>(*other));
 
         QWheelEvent wheel{QPointF{5.0, 5.0}, QPointF{5.0, 5.0}, QPoint{0, 0}, QPoint{0, 120}, Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false};
-        QApplication::sendEvent(static_cast<Pin::PinWindow *>(first), &wheel);
+        QApplication::sendEvent(static_cast<Gui::PinWindow *>(first), &wheel);
 
         EXPECT_GT(first->scale(), 1.0) << "在这一张上滚一格它自己没缩";
         EXPECT_NEAR(other->scale(), first->scale(), 0.0001) << "选中集里的另一张没按同一倍率跟着缩";
@@ -498,11 +498,11 @@ namespace GyanisScribe
         ASSERT_NE(first, nullptr);
         ASSERT_NE(other, nullptr);
 
-        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*first));
-        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*other));
+        pins.togglePinSelection(static_cast<Gui::PinWindow &>(*first));
+        pins.togglePinSelection(static_cast<Gui::PinWindow &>(*other));
         ASSERT_TRUE(first->isAlwaysOnTop());
 
-        auto *menu      = static_cast<Pin::PinWindow *>(first)->buildContextMenu();
+        auto *menu      = static_cast<Gui::PinWindow *>(first)->buildContextMenu();
         auto *pinAction = findAction(*menu, QString::fromUtf8("保持置顶"));
         ASSERT_NE(pinAction, nullptr) << "菜单里没有「保持置顶」这一项";
         pinAction->trigger();
@@ -525,10 +525,10 @@ namespace GyanisScribe
         ASSERT_NE(first, nullptr);
         ASSERT_NE(other, nullptr);
 
-        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*first));
-        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*other));
+        pins.togglePinSelection(static_cast<Gui::PinWindow &>(*first));
+        pins.togglePinSelection(static_cast<Gui::PinWindow &>(*other));
 
-        auto *menu      = static_cast<Pin::PinWindow *>(first)->buildContextMenu();
+        auto *menu      = static_cast<Gui::PinWindow *>(first)->buildContextMenu();
         auto *closeItem = findAction(*menu, QString::fromUtf8("关闭"));
         ASSERT_NE(closeItem, nullptr);
         // 菜单是那一张的子对象：整组关闭把宿主也析构了，菜单跟着一起没——这里不再自己 delete
@@ -550,8 +550,8 @@ namespace GyanisScribe
         ASSERT_NE(first, nullptr);
         ASSERT_NE(other, nullptr);
 
-        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*first));
-        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*other));
+        pins.togglePinSelection(static_cast<Gui::PinWindow &>(*first));
+        pins.togglePinSelection(static_cast<Gui::PinWindow &>(*other));
 
         const auto escape = [](QWidget &target)
         {
@@ -559,11 +559,11 @@ namespace GyanisScribe
             QApplication::sendEvent(&target, &event);
         };
 
-        escape(*static_cast<Pin::PinWindow *>(first));
+        escape(*static_cast<Gui::PinWindow *>(first));
         EXPECT_EQ(pins.selectedPinCount(), 0) << "第一次 Esc 没清选择";
         EXPECT_EQ(pins.count(), 2) << "第一次 Esc 把贴图也关了：关闭是一组一起的动作，得再按一次";
 
-        escape(*static_cast<Pin::PinWindow *>(first));
+        escape(*static_cast<Gui::PinWindow *>(first));
         EXPECT_EQ(pins.count(), 1) << "第二次 Esc 该关掉这一张";
     }
 
@@ -576,8 +576,8 @@ namespace GyanisScribe
         pins.addPin(makeImage(), QPoint(10, 10));
         pins.addPin(makeImage(), QPoint(80, 80));
 
-        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*pins.pinAt(0)));
-        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*pins.pinAt(1)));
+        pins.togglePinSelection(static_cast<Gui::PinWindow &>(*pins.pinAt(0)));
+        pins.togglePinSelection(static_cast<Gui::PinWindow &>(*pins.pinAt(1)));
         ASSERT_EQ(pins.selectedPinCount(), 2);
 
         // 建第二组再切过去：选中集该清空
@@ -585,7 +585,7 @@ namespace GyanisScribe
         ASSERT_TRUE(pins.switchToNextGroup().has_value());
         EXPECT_EQ(pins.selectedPinCount(), 0) << "切组之后选中集还留着：那几张已经不在屏上了";
 
-        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*pins.pinAt(0)));
+        pins.togglePinSelection(static_cast<Gui::PinWindow &>(*pins.pinAt(0)));
         ASSERT_EQ(pins.selectedPinCount(), 1);
         static_cast<void>(pins.setAllPinsConcealed(true));
         EXPECT_EQ(pins.selectedPinCount(), 0) << "整桌收起之后选中集还留着";
@@ -603,16 +603,16 @@ namespace GyanisScribe
         auto *first = pins.pinAt(0);
         ASSERT_NE(first, nullptr);
 
-        pins.setPinSolo(static_cast<Pin::PinWindow &>(*first), true);
-        EXPECT_TRUE(pins.pinIsSolo(static_cast<const Pin::PinWindow &>(*first)));
-        EXPECT_TRUE(static_cast<Pin::PinWindow *>(pins.pinAt(0))->isSolo()) << "主角态没推给窗口（菜单项的勾选态照它走）";
-        EXPECT_FALSE(static_cast<Pin::PinWindow *>(pins.pinAt(1))->isSolo()) << "非主角被推成了主角";
+        pins.setPinSolo(static_cast<Gui::PinWindow &>(*first), true);
+        EXPECT_TRUE(pins.pinIsSolo(static_cast<const Gui::PinWindow &>(*first)));
+        EXPECT_TRUE(static_cast<Gui::PinWindow *>(pins.pinAt(0))->isSolo()) << "主角态没推给窗口（菜单项的勾选态照它走）";
+        EXPECT_FALSE(static_cast<Gui::PinWindow *>(pins.pinAt(1))->isSolo()) << "非主角被推成了主角";
         EXPECT_TRUE(isOnDesk(pins.pinAt(0))) << "主角自己该留在屏上";
         EXPECT_FALSE(isOnDesk(pins.pinAt(1))) << "其余的没收起来，Solo 没生效";
         EXPECT_FALSE(isOnDesk(pins.pinAt(2)));
 
-        pins.setPinSolo(static_cast<Pin::PinWindow &>(*first), false);
-        EXPECT_FALSE(pins.pinIsSolo(static_cast<const Pin::PinWindow &>(*first)));
+        pins.setPinSolo(static_cast<Gui::PinWindow &>(*first), false);
+        EXPECT_FALSE(pins.pinIsSolo(static_cast<const Gui::PinWindow &>(*first)));
         EXPECT_TRUE(isOnDesk(pins.pinAt(0)) && isOnDesk(pins.pinAt(1)) && isOnDesk(pins.pinAt(2))) << "关掉 Solo 之后其余几张没回来";
     }
 
@@ -626,13 +626,13 @@ namespace GyanisScribe
         pins.addPin(makeImage(), QPoint(80, 80));
         auto *solo = pins.pinAt(0);
         ASSERT_NE(solo, nullptr);
-        pins.setPinSolo(static_cast<Pin::PinWindow &>(*solo), true);
+        pins.setPinSolo(static_cast<Gui::PinWindow &>(*solo), true);
         ASSERT_FALSE(isOnDesk(pins.pinAt(1)));
 
-        static_cast<Pin::PinWindow *>(solo)->close();
-        emit static_cast<Pin::PinWindow *>(solo)->closedByUser();
+        static_cast<Gui::PinWindow *>(solo)->close();
+        emit static_cast<Gui::PinWindow *>(solo)->closedByUser();
 
-        EXPECT_FALSE(pins.pinIsSolo(static_cast<const Pin::PinWindow &>(*pins.pinAt(0)))) << "主角没了 Solo 还挂着";
+        EXPECT_FALSE(pins.pinIsSolo(static_cast<const Gui::PinWindow &>(*pins.pinAt(0)))) << "主角没了 Solo 还挂着";
         EXPECT_TRUE(isOnDesk(pins.pinAt(0))) << "主角被关掉之后其余几张没回来";
     }
 
@@ -644,7 +644,7 @@ namespace GyanisScribe
         auto &pins = makeManager();
         pins.addPin(makeImage(), QPoint(10, 10));
         pins.addPin(makeImage(), QPoint(80, 80));
-        pins.setPinSolo(static_cast<Pin::PinWindow &>(*pins.pinAt(0)), true);
+        pins.setPinSolo(static_cast<Gui::PinWindow &>(*pins.pinAt(0)), true);
         pins.addPin(makeImage(), QPoint(150, 150));
 
         EXPECT_TRUE(isOnDesk(pins.pinAt(2))) << "新贴的一张被 Solo 挡在屏外";
@@ -659,10 +659,10 @@ namespace GyanisScribe
         auto &pins = makeManager();
         pins.addPin(makeImage(), QPoint(10, 10));
         pins.addPin(makeImage(), QPoint(80, 80));
-        pins.setPinSolo(static_cast<Pin::PinWindow &>(*pins.pinAt(0)), true);
+        pins.setPinSolo(static_cast<Gui::PinWindow &>(*pins.pinAt(0)), true);
         ASSERT_TRUE(pins.movePinToGroup(1, 2).has_value());
         ASSERT_TRUE(pins.switchToNextGroup().has_value());
-        EXPECT_FALSE(pins.pinIsSolo(static_cast<const Pin::PinWindow &>(*pins.pinAt(0)))) << "切组之后 Solo 还挂着";
+        EXPECT_FALSE(pins.pinIsSolo(static_cast<const Gui::PinWindow &>(*pins.pinAt(0)))) << "切组之后 Solo 还挂着";
     }
 
     /**
@@ -673,11 +673,11 @@ namespace GyanisScribe
         auto &pins = makeManager();
         pins.addPin(makeImage(), QPoint(10, 10));
         pins.addPin(makeImage(), QPoint(80, 80));
-        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*pins.pinAt(0)));
-        pins.togglePinSelection(static_cast<Pin::PinWindow &>(*pins.pinAt(1)));
+        pins.togglePinSelection(static_cast<Gui::PinWindow &>(*pins.pinAt(0)));
+        pins.togglePinSelection(static_cast<Gui::PinWindow &>(*pins.pinAt(1)));
         ASSERT_EQ(pins.selectedPinCount(), 2);
 
-        pins.setPinSolo(static_cast<Pin::PinWindow &>(*pins.pinAt(0)), true);
+        pins.setPinSolo(static_cast<Gui::PinWindow &>(*pins.pinAt(0)), true);
         EXPECT_EQ(pins.selectedPinCount(), 0) << "开 Solo 之后选中集还留着：那几张已经不在屏上了";
     }
 
@@ -721,7 +721,7 @@ namespace GyanisScribe
 
         auto &pins = makeManager();
         pins.addPin(makeImage(), QPoint(30, 30), gifPath);
-        auto *pin = dynamic_cast<Pin::PinWindow *>(pins.pinAt(0));
+        auto *pin = dynamic_cast<Gui::PinWindow *>(pins.pinAt(0));
         ASSERT_NE(pin, nullptr) << "管理器里的贴图不是 PinWindow，动图这一判据接不上";
         ASSERT_TRUE(pin->isAnimated()) << "前提不对：这一张没被当成动图接上";
 
@@ -758,8 +758,8 @@ namespace GyanisScribe
         pins.selectAllVisiblePins();
         EXPECT_EQ(pins.selectedPinCount(), 2) << "全选只该挑在桌上的那两张";
 
-        auto *first     = dynamic_cast<Pin::PinWindow *>(pins.pinAt(0));
-        auto *concealed = dynamic_cast<Pin::PinWindow *>(pins.pinAt(2));
+        auto *first     = dynamic_cast<Gui::PinWindow *>(pins.pinAt(0));
+        auto *concealed = dynamic_cast<Gui::PinWindow *>(pins.pinAt(2));
         ASSERT_NE(first, nullptr);
         ASSERT_NE(concealed, nullptr);
         EXPECT_TRUE(first->isSelected()) << "在桌上的那张没被选进集";
@@ -783,8 +783,8 @@ namespace GyanisScribe
         destroyedImage.fill(QColor{30, 30, 200});
         pins.addPin(closedImage, QPoint(10, 10));
         pins.addPin(destroyedImage, QPoint(60, 60));
-        auto *first  = dynamic_cast<Pin::PinWindow *>(pins.pinAt(0));
-        auto *second = dynamic_cast<Pin::PinWindow *>(pins.pinAt(1));
+        auto *first  = dynamic_cast<Gui::PinWindow *>(pins.pinAt(0));
+        auto *second = dynamic_cast<Gui::PinWindow *>(pins.pinAt(1));
         ASSERT_NE(first, nullptr);
         ASSERT_NE(second, nullptr);
 
@@ -818,12 +818,12 @@ namespace GyanisScribe
 
         while (pins.count() > 0)
         {
-            auto *pin = dynamic_cast<Pin::PinWindow *>(pins.pinAt(0));
+            auto *pin = dynamic_cast<Gui::PinWindow *>(pins.pinAt(0));
             ASSERT_NE(pin, nullptr);
             emit pin->closedByUser();
         }
 
-        EXPECT_EQ(pins.closedPinCount(), static_cast<int>(Pin::kClosedPinHistorySize)) << "关掉七张只该留得回五张";
+        EXPECT_EQ(pins.closedPinCount(), static_cast<int>(Gui::kClosedPinHistorySize)) << "关掉七张只该留得回五张";
     }
 
     /**
@@ -844,8 +844,8 @@ namespace GyanisScribe
         pins.addPin(makeImage(), QPoint(10, 10));
         pins.addPin(makeImage(), QPoint(60, 10));
         pins.addPin(makeImage(), QPoint(110, 10));
-        auto *first  = dynamic_cast<Pin::PinWindow *>(pins.pinAt(0));
-        auto *second = dynamic_cast<Pin::PinWindow *>(pins.pinAt(1));
+        auto *first  = dynamic_cast<Gui::PinWindow *>(pins.pinAt(0));
+        auto *second = dynamic_cast<Gui::PinWindow *>(pins.pinAt(1));
         ASSERT_NE(first, nullptr);
         ASSERT_NE(second, nullptr);
         pins.togglePinSelection(*first);
@@ -885,7 +885,7 @@ namespace GyanisScribe
 
         auto &pins = makeManager();
         pins.addPin(makeImage(), QPoint(10, 10));
-        auto *first = dynamic_cast<Pin::PinWindow *>(pins.pinAt(0));
+        auto *first = dynamic_cast<Gui::PinWindow *>(pins.pinAt(0));
         ASSERT_NE(first, nullptr);
 
         const auto report = pins.saveSelectedPins(*first);
@@ -912,7 +912,7 @@ namespace GyanisScribe
             ASSERT_TRUE(pins.saveLayout().has_value()) << "布局没写下去";
         }
 
-        const auto stored = Pin::loadGroupNames(settings());
+        const auto stored = Core::loadGroupNames(settings());
         ASSERT_TRUE(stored.has_value()) << stored.error().message;
         EXPECT_EQ(stored->value(2), QStringLiteral("参照对比")) << "名字没落进配置";
 
@@ -972,7 +972,7 @@ namespace GyanisScribe
         auto &pins = makeManager();
         pins.addPin(makeImage(), QPoint(20, 20));
 
-        const auto refused = pins.deleteGroup(Pin::kFirstPinGroup);
+        const auto refused = pins.deleteGroup(Core::kFirstPinGroup);
         ASSERT_FALSE(refused.has_value()) << "第一组被删掉了，后面删别组就没有并回去的地方";
         EXPECT_EQ(refused.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument);
         EXPECT_NE(refused.error().message.find("落点"), std::string::npos) << "拒绝要说明为什么删不掉，实际：" << refused.error().message;
@@ -992,13 +992,13 @@ namespace GyanisScribe
         ASSERT_TRUE(pins.renameGroup(2, QStringLiteral("待办")).has_value());
         ASSERT_EQ(pins.groupName(2), QStringLiteral("待办"));
 
-        auto *second = dynamic_cast<Pin::PinWindow *>(pins.pinAt(1));
+        auto *second = dynamic_cast<Gui::PinWindow *>(pins.pinAt(1));
         ASSERT_NE(second, nullptr);
         emit second->closedByUser();
 
         EXPECT_TRUE(pins.groupName(2).isEmpty()) << "组里最后一张关掉了，名字还挂在册子上";
         ASSERT_TRUE(pins.saveLayout().has_value()) << "布局没写下去";
-        const auto stored = Pin::loadGroupNames(settings());
+        const auto stored = Core::loadGroupNames(settings());
         ASSERT_TRUE(stored.has_value()) << stored.error().message;
         EXPECT_TRUE(stored->isEmpty()) << "内存里清了名字而记录里还留着：下次启动那个空壳组又带着名字回来";
     }
@@ -1018,10 +1018,9 @@ namespace GyanisScribe
         ASSERT_TRUE(pins.movePinToGroup(2, 2).has_value());
         ASSERT_EQ(pins.groupsInUse(), (QVector<int>{1, 2, 3})) << "三组各一张的前提没摆出来";
 
-        ASSERT_TRUE(
-                settings()
-                        .setValue(GyanisScribe::Core::kPinGroupRotationOrder, QStringList{QStringLiteral("9"), QStringLiteral("1"), QStringLiteral("3"), QStringLiteral("2")})
-                        .has_value());
+        ASSERT_TRUE(settings()
+                            .setValue(GyanisScribe::Core::kPinGroupRotationOrder, QStringList{QStringLiteral("9"), QStringLiteral("1"), QStringLiteral("3"), QStringLiteral("2")})
+                            .has_value());
 
         const auto first = pins.switchToNextGroup();
         ASSERT_TRUE(first.has_value()) << first.error().message;
@@ -1090,13 +1089,13 @@ namespace GyanisScribe
         const auto gifPath = PinTestAssets::writeTwoFrameGif(std::filesystem::temp_directory_path() / "GyanisScribe-PinManager-refresh-refuses-animated.gif");
         ASSERT_FALSE(gifPath.isEmpty()) << "素材没落到临时文件上";
         auto &animated = pins.addPin(makeImage(), QPoint(200, 20), gifPath);
-        ASSERT_TRUE(static_cast<Pin::PinWindow *>(&animated)->isAnimated()) << "前提不对：这一张没被当成动图接上";
+        ASSERT_TRUE(static_cast<Gui::PinWindow *>(&animated)->isAnimated()) << "前提不对：这一张没被当成动图接上";
 
         const auto refusedAnimated = pins.pinRefreshTarget(1);
         ASSERT_FALSE(refusedAnimated.has_value());
         EXPECT_NE(refusedAnimated.error().message.find("动图"), std::string::npos) << refusedAnimated.error().message;
 
-        static_cast<Pin::PinWindow *>(&first)->setThumbnailMode(true);
+        static_cast<Gui::PinWindow *>(&first)->setThumbnailMode(true);
         const auto refusedThumbnail = pins.pinRefreshTarget(0);
         ASSERT_FALSE(refusedThumbnail.has_value());
         EXPECT_NE(refusedThumbnail.error().message.find("小图"), std::string::npos) << refusedThumbnail.error().message;
@@ -1120,10 +1119,10 @@ namespace GyanisScribe
         auto &second = pins.addPin(makeImage(), QPoint(200, 20));
 
         std::vector<int> seen;
-        QObject::connect(&pins, &Pin::PinManager::pinRefreshRequested, [&seen](const int index) { seen.push_back(index); });
+        QObject::connect(&pins, &Gui::PinManager::pinRefreshRequested, [&seen](const int index) { seen.push_back(index); });
 
         QKeyEvent press{QEvent::KeyPress, Qt::Key_F5, Qt::NoModifier};
-        QApplication::sendEvent(static_cast<Pin::PinWindow *>(&second), &press);
+        QApplication::sendEvent(static_cast<Gui::PinWindow *>(&second), &press);
 
         ASSERT_EQ(seen.size(), 1u);
         EXPECT_EQ(seen.front(), 1) << "按在第二张上，报出的却是别的序号";
@@ -1140,7 +1139,7 @@ namespace GyanisScribe
     {
         auto &pins   = makeManager();
         auto &first  = pins.addPin(makeImage(), QPoint(60, 60));
-        auto *window = static_cast<Pin::PinWindow *>(&first);
+        auto *window = static_cast<Gui::PinWindow *>(&first);
         window->setAttribute(Qt::WA_DontShowOnScreen);
         window->show();
         ASSERT_TRUE(window->isVisible()) << "前提不对：这张该在桌上";
@@ -1198,36 +1197,36 @@ namespace GyanisScribe
         EXPECT_EQ(pin.globalRect().size(), refreshedSize) << "显示尺寸没按 dpr 折算：这张图被摆成了物理像素那么大";
     }
 
-/**
- * @brief 钉住色卡身份从「贴出来」与「换内容」这两条路进来、并在换成别的内容时被摘干净
- * @details 界面层把颜色认出来之后是走 addPin / replacePinContent 进来的：漏掉一处，
- *          贴出来的色卡就改不了色，或换走之后那张照片上还挂着「改这一张的颜色…」。
- */
-TEST_F(PinManagerFixture, ColorCardIdentityFollowsTheContentOnBothRoutes)
-{
-    auto        &pins = makeManager();
-    const QColor orange{255, 136, 0};
+    /**
+     * @brief 钉住色卡身份从「贴出来」与「换内容」这两条路进来、并在换成别的内容时被摘干净
+     * @details 界面层把颜色认出来之后是走 addPin / replacePinContent 进来的：漏掉一处，
+     *          贴出来的色卡就改不了色，或换走之后那张照片上还挂着「改这一张的颜色…」。
+     */
+    TEST_F(PinManagerFixture, ColorCardIdentityFollowsTheContentOnBothRoutes)
+    {
+        auto        &pins = makeManager();
+        const QColor orange{255, 136, 0};
 
-    pins.addPin(makeImage(), QPoint(100, 100), {}, orange);
-    auto *card = pins.pinAt(0);
-    ASSERT_NE(card, nullptr);
-    ASSERT_TRUE(card->colorCardColor().has_value()) << "贴出来时交下去的原色没进窗口";
-    EXPECT_EQ(*card->colorCardColor(), orange);
+        pins.addPin(makeImage(), QPoint(100, 100), {}, orange);
+        auto *card = pins.pinAt(0);
+        ASSERT_NE(card, nullptr);
+        ASSERT_TRUE(card->colorCardColor().has_value()) << "贴出来时交下去的原色没进窗口";
+        EXPECT_EQ(*card->colorCardColor(), orange);
 
-    pins.addPin(makeImage(), QPoint(400, 100));
-    auto *photo = pins.pinAt(1);
-    ASSERT_NE(photo, nullptr);
-    EXPECT_FALSE(photo->colorCardColor().has_value()) << "普通贴图凭空多出一个原色";
+        pins.addPin(makeImage(), QPoint(400, 100));
+        auto *photo = pins.pinAt(1);
+        ASSERT_NE(photo, nullptr);
+        EXPECT_FALSE(photo->colorCardColor().has_value()) << "普通贴图凭空多出一个原色";
 
-    // 换成另一个颜色写法：身份与记下的色一起换
-    const QColor teal{0x12, 0x34, 0x56};
-    ASSERT_TRUE(static_cast<bool>(pins.replacePinContent(1, makeImage(), teal))) << "替换被拒了";
-    ASSERT_TRUE(photo->colorCardColor().has_value()) << "换成颜色写法之后没记下新色";
-    EXPECT_EQ(*photo->colorCardColor(), teal);
+        // 换成另一个颜色写法：身份与记下的色一起换
+        const QColor teal{0x12, 0x34, 0x56};
+        ASSERT_TRUE(static_cast<bool>(pins.replacePinContent(1, makeImage(), teal))) << "替换被拒了";
+        ASSERT_TRUE(photo->colorCardColor().has_value()) << "换成颜色写法之后没记下新色";
+        EXPECT_EQ(*photo->colorCardColor(), teal);
 
-    // 换成一张照片（没有颜色交进来）：这一档要摘掉，否则那张照片上还挂着改色这一项
-    ASSERT_TRUE(static_cast<bool>(pins.replacePinContent(0, makeImage()))) << "替换被拒了";
-    EXPECT_FALSE(card->colorCardColor().has_value()) << "换成照片之后还认得出原色，菜单里那一项会点坏这张图";
-}
+        // 换成一张照片（没有颜色交进来）：这一档要摘掉，否则那张照片上还挂着改色这一项
+        ASSERT_TRUE(static_cast<bool>(pins.replacePinContent(0, makeImage()))) << "替换被拒了";
+        EXPECT_FALSE(card->colorCardColor().has_value()) << "换成照片之后还认得出原色，菜单里那一项会点坏这张图";
+    }
 
 } // namespace GyanisScribe

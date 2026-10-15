@@ -1,11 +1,11 @@
-#include "Pin/PinViewFilter.h"
+#include "Core/Pin/PinViewFilter.h"
 
 #include <QColor>
 #include <QImage>
 
 #include <gtest/gtest.h>
 
-using GyanisScribe::Pin::pinViewFiltered;
+using GyanisScribe::Core::pinViewFiltered;
 
 namespace
 {

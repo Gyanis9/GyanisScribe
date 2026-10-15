@@ -1,6 +1,6 @@
-#include "Pin/PinLayout.h"
+#include "Core/Pin/PinLayout.h"
 
-#include "Pin/PinTransform.h"
+#include "Core/Pin/PinTransform.h"
 
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
@@ -22,7 +22,7 @@
 #include <memory>
 #include <string>
 
-using namespace GyanisScribe::Pin;
+using namespace GyanisScribe::Core;
 using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Core::SettingsStore;
 
@@ -288,13 +288,13 @@ TEST_F(PinLayoutFixture, LoadWithoutStoredLayoutIsEmpty)
  */
 TEST(PinLayoutOpacitySetting, ConvertsPercentAndRejectsZeroAndOver)
 {
-    EXPECT_DOUBLE_EQ(GyanisScribe::Pin::parseOpacityPercentSetting(100).value(), 1.0);
-    EXPECT_DOUBLE_EQ(GyanisScribe::Pin::parseOpacityPercentSetting(50).value(), 0.5);
-    EXPECT_DOUBLE_EQ(GyanisScribe::Pin::parseOpacityPercentSetting(1).value(), 0.01);
+    EXPECT_DOUBLE_EQ(GyanisScribe::Core::parseOpacityPercentSetting(100).value(), 1.0);
+    EXPECT_DOUBLE_EQ(GyanisScribe::Core::parseOpacityPercentSetting(50).value(), 0.5);
+    EXPECT_DOUBLE_EQ(GyanisScribe::Core::parseOpacityPercentSetting(1).value(), 0.01);
 
     for (const int bad: {0, -10, 101})
     {
-        const auto parsed = GyanisScribe::Pin::parseOpacityPercentSetting(bad);
+        const auto parsed = GyanisScribe::Core::parseOpacityPercentSetting(bad);
         ASSERT_FALSE(parsed.has_value()) << bad;
         EXPECT_EQ(parsed.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument) << bad;
         EXPECT_NE(parsed.error().message.find("Pin/DefaultOpacity"), std::string::npos) << bad;
@@ -309,21 +309,21 @@ TEST(PinLayoutOpacitySetting, ConvertsPercentAndRejectsZeroAndOver)
 TEST(PinLayoutGroupNames, RoundTripsAndRejectsMalformedRecords)
 {
     const QMap<int, QString> names{{2, QStringLiteral("参照对比")}, {3, QStringLiteral("  ")}};
-    const auto               text = GyanisScribe::Pin::serializeGroupNames(names);
+    const auto               text = GyanisScribe::Core::serializeGroupNames(names);
     EXPECT_EQ(text.indexOf(QStringLiteral("3")), -1) << "只有空白的名字不该被写进记录：读回来会多一条没人认领的键";
 
-    const auto parsed = GyanisScribe::Pin::parseGroupNames(text.toStdString());
+    const auto parsed = GyanisScribe::Core::parseGroupNames(text.toStdString());
     ASSERT_TRUE(parsed.has_value()) << parsed.error().message;
     ASSERT_EQ(parsed->size(), 1);
     EXPECT_EQ(parsed->value(2), QStringLiteral("参照对比")) << "名字过了记录一圈就变样";
 
-    const auto empty = GyanisScribe::Pin::parseGroupNames(std::string_view{});
+    const auto empty = GyanisScribe::Core::parseGroupNames(std::string_view{});
     ASSERT_TRUE(empty.has_value()) << "没存过就是空表，不该报坏记录：" << empty.error().message;
     EXPECT_TRUE(empty->isEmpty());
 
     for (const char *bad: {R"([{"2":"参照"}])", R"({"0":"第一组不存在的号"})", R"({"x":"键不是数"})", R"({"2":7})"})
     {
-        const auto rejected = GyanisScribe::Pin::parseGroupNames(bad);
+        const auto rejected = GyanisScribe::Core::parseGroupNames(bad);
         ASSERT_FALSE(rejected.has_value()) << "这一条坏记录被当成没起过名字了：" << bad;
         EXPECT_NE(rejected.error().message.find("Pin/GroupNames"), std::string::npos) << "拒绝要说清去哪一项补救，实际：" << rejected.error().message;
     }
@@ -333,7 +333,8 @@ TEST(PinLayoutGroupNames, RoundTripsAndRejectsMalformedRecords)
  * @brief 钉住轮换顺序读的是「顺序」本身：照抄名单顺序、容忍空白、拒掉非正数与重复
  * @details
  * 重复组号必须拒而不是后写的盖掉前写的：那一格在一圈里出现两次，切组就会在同一处多跳一步，
- *          而界面上只看得到「顺序不对」，说不清是哪一条填歪了。
+ *
+ * 而界面上只看得到「顺序不对」，说不清是哪一条填歪了。
 
  */
 TEST_F(PinLayoutFixture, GroupRotationParseKeepsOrderAndRejectsBadTokens)
@@ -364,7 +365,8 @@ TEST_F(PinLayoutFixture, GroupRotationParseKeepsOrderAndRejectsBadTokens)
 
 /**
  * @brief 钉住真正走的那一圈：在册的按名单排，没点名的补在末尾，一个都不落
- * @details 「没点名的补上」是这一档的可用性底线——新建一组之后切组切不到它，那一组在键盘上就是死角。
+ * @details
+ * 「没点名的补上」是这一档的可用性底线——新建一组之后切组切不到它，那一组在键盘上就是死角。
 
  * *          名单里留着早已并掉的组号要跳过：停在一组不存在的贴图前，等于按一次键什么都不动。
  */
@@ -397,7 +399,7 @@ TEST_F(PinLayoutFixture, RotationCycleKeepsEveryGroupReachable)
  */
 TEST_F(PinLayoutFixture, ColorCardHexRoundTripsAndDefaultsToEmpty)
 {
-    auto card = sample(5, 5, 1.0, 0.0, 1.0);
+    auto card         = sample(5, 5, 1.0, 0.0, 1.0);
     card.colorCardHex = QColor(0x12, 0x34, 0x56).name(QColor::HexArgb);
     const auto parsed = parseLayout(serializeLayout(QVector<PinState>{card}).toStdString());
     ASSERT_TRUE(parsed.has_value()) << parsed.error().message;
@@ -409,7 +411,7 @@ TEST_F(PinLayoutFixture, ColorCardHexRoundTripsAndDefaultsToEmpty)
     EXPECT_TRUE(legacy->front().colorCardHex.isEmpty()) << "缺省该是「不是色卡」";
 
     // 普通贴图那一份同样写这一格（空串），与 sourceFile 同一条约定：字段齐全，读端按空串判「不是色卡」
-    const auto plain = sample(5, 5, 1.0, 0.0, 1.0);
+    const auto plain     = sample(5, 5, 1.0, 0.0, 1.0);
     const auto roundTrip = parseLayout(serializeLayout(QVector<PinState>{plain}).toStdString());
     ASSERT_TRUE(roundTrip.has_value());
     EXPECT_TRUE(roundTrip->front().colorCardHex.isEmpty()) << "普通贴图往返一趟多出一个原色";

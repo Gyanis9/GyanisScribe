@@ -1,4 +1,4 @@
-#include "Pin/PinTransform.h"
+#include "Core/Pin/PinTransform.h"
 
 #include "Base/Text.h"
 
@@ -11,7 +11,7 @@
 #include <cstdlib>
 #include <numbers>
 
-namespace GyanisScribe::Pin
+namespace GyanisScribe::Core
 {
 
     double clampScale(double scale) noexcept
@@ -330,4 +330,4 @@ namespace GyanisScribe::Pin
         return tile;
     }
 
-} // namespace GyanisScribe::Pin
+} // namespace GyanisScribe::Core

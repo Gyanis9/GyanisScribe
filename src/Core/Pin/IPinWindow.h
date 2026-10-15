@@ -11,7 +11,7 @@
 
 #include "Base/Types.h"
 
-#include "Pin/PinLayout.h"
+#include "Core/Pin/PinLayout.h"
 
 #include <QColor>
 #include <QImage>
@@ -20,7 +20,7 @@
 #include <filesystem>
 #include <optional>
 
-namespace GyanisScribe::Pin
+namespace GyanisScribe::Core
 {
 
     /**
@@ -160,4 +160,4 @@ namespace GyanisScribe::Pin
         [[nodiscard]] virtual PinState state() const = 0;
     };
 
-} // namespace GyanisScribe::Pin
+} // namespace GyanisScribe::Core
