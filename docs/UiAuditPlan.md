@@ -63,6 +63,19 @@
 影响面：`AnnotationToolbar.cpp` 布局结构、`AnnotationToolbarGeometry` 的摆放判据与用例、
 文档图与 README 界面一览重出。
 
+**已修**：两刀——① 可见段按当前工具收放（`AnnotationToolbar::updateContextVisibility`，可适用性以
+`AnnotationShape.h` 字段注释（「仅 X 用」）为准；描边色/描边粗细挂在描边开关下、底板色挂在底板开关下）；
+② 按钮最小尺寸与行距各收一档（三份 QSS 加 `QWidget#AnnotationToolbar QToolButton` 26px，布局间距 8→4，
+节距 42→36）。收敛后带样式表实测（UiAuditTool 读数）：矩形档 1356px（原 2518）、最宽一档
+（文字+描边+底板）1670、满配色板（16 预设+6 最近）1902——都收进了 1920 桌面宽；切工具时宿主
+按新尺寸重新居中（新信号 `contextLayoutChanged`，标注窗与贴图标注两处接线）。判据四条：可见集合
+映射表（`ContextSectionsFollowTheActiveTool`）、文字子档联动（`TextSwitchesRevealTheirSubOptions`）、
+每档宽度 ≤1920（`EveryToolStaysWithinTheCommonScreenWidth`）、换工具重新居中
+（`SwitchingToolsReplacesTheToolbarAgainstTheSelection`——剪掉接线实测变红；第一版判据只量宽度与
+「动没动」抓不住它，因为 Qt 顶层窗会自己跟宽度，已改成居中不变式）。文档图十张不含工具栏，无需重出。
+残留：1536 逻辑宽（2K@125%）下文字档仍切 ~17px、描边全开 ~95px；1280 下矩形档切 76px——
+再窄得动「两行布局」那条路，本轮不做。
+
 ## 二、取证设施（P0 先建，其余条目都靠它）
 
 1. **离屏钉样台**：扩 `tests/App/UiShotTool.cpp`（或新增并列的 `UiAuditTool`），给每面浮窗
@@ -107,13 +120,13 @@
 
 | 编号 | 假设 | 线索 | 判定标准 | 取证方式 |
 | --- | --- | --- | --- | --- |
-| UI-20 | 色板满配（16 格）+ 最近色 6 格时工具栏再宽 ~590px（按 chip 节距 42px 算），2560 屏也会被切 | 色板上限 16、最近色上限 6（`AnnotationToolbar.cpp` 注释） | 满配宽度 ≤ 目标屏宽（否则坐实 B 的功能级后果） | 钉样台塞满配置出图 + 量宽 |
+| UI-20 | （已随 B 修复查实）色板满配 + 最近色满格：收敛+压缩后实测 1902px ≤ 1920，判定不成立；更窄的屏上满配仍会切 | 色板上限 16、最近色上限 6 | 满配宽度 ≤ 目标屏宽 | 钉样台满配出图（已做：annotation-toolbar-full-palette） |
 | UI-21 | 高 DPI（dpr 2）下 20px 图标与 1px 描边清晰度 | 图标按 Medium=20 固定 | 合成 dpr 2 出图看不清即为缺陷 | 离屏 `QT_SCALE_FACTOR=2` 合成 |
 | UI-22 | 工具栏摆放：选区贴屏幕上/下边、选区极小时与任务栏遮挡 | `placeToolbar` 纯函数已有用例（几何），但真机上从未看过观感 | 工具栏不压住选区读不到的位置、不缺角 | 钉样台按退化选区出图 |
 | UI-23 | 行内文字框（`annotationTextEditor`）高度算式与 QSS padding 联动回归 | `resizeTextEditorToContent` 与 `#annotationTextEditor` 注释互相点名 | 多行文字无半行裁切 | 标注窗出图（2/3/5 行） |
 | UI-24 | 撤销/重做功不可用时的禁用态是否「看起来可点」 | QSS `QToolButton:disabled` 存在 | 禁用态无饱和色残留 | 出图 + 像素抽查 |
 | UI-25 | 「保持按下态」的开关（圆角/双向箭头/描边…）勾选态在深色档是否明显 | `:checked` 三态在 QSS | 亮/暗档都能一眼看出开/关 | 三档出图对比 |
-| UI-26 | 工具切换后工具相关按钮的可用状态（不适用时是灰是藏）无定义 | 现状全常显（B 已查实） | 与 B 的修法一并定案 | 随 B 走 |
+| UI-26 | （已随 B 修复定案）不适用时收起来而不是变灰；恒显的是工具组、色板、线宽滑块（除文字/序号/放大镜）、撤销重做与动作区 | — | 与 B 的修法一并定案 | 已由 `ContextSectionsFollowTheActiveTool` 钉住 |
 
 ### 组 3：截图遮罩与取色器
 
@@ -158,7 +171,7 @@
 ## 四、执行顺序与产出
 
 - [ ] **P0 取证设施**：钉样台（浮窗出图 + 尺寸读数）+ 量尺脚本 + 主窗口两档尺寸。
-- [ ] **P1 直报两条定案**：A 出「左对齐现状 vs 右对齐」对照 PNG 定案并修；B 出「按工具收敛 vs 两行」对照 PNG 定案并修。两条修完各落用例。
+- [x] **P1 直报两条定案**：A 已修（右对齐 + 像素判据 + 文档图重出）；B 已修（按工具收放 + 节距收档 + 四条判据）。
 - [ ] **P2 浮窗逐面**：组 2/3/4 按表逐条出图并判定。
 - [ ] **P3 设置页与主窗**：组 1 逐条出图/量尺并判定。
 - [ ] **P4 矩阵**：组 5（三档主题 × dpr 合成）。
