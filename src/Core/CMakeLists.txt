@@ -1,13 +1,8 @@
-# Core：领域逻辑的静态库；App 与后续模块都只往这里链接一次
-add_library(Core STATIC
-        ImageFit.h
-        ImageFit.cpp
-        ImageFormat.h
-        ImageFormat.cpp
-        OutputDecoration.h
-        OutputDecoration.cpp
-        ClipboardFile.h
-        ClipboardFile.cpp)
+# Core：领域逻辑的静态库；各子目录在叶子 CMakeLists 里登记自己的源文件，这里只做聚合与对外接口
+add_subdirectory(Image)
+
+get_property(CoreSources GLOBAL PROPERTY GyanisScribeCoreSources)
+add_library(Core STATIC ${CoreSources})
 
 target_include_directories(Core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 

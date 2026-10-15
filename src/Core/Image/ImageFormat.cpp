@@ -1,4 +1,4 @@
-#include "Core/ImageFormat.h"
+#include "Core/Image/ImageFormat.h"
 
 #include "Base/Choices.h"
 #include "Base/Text.h"

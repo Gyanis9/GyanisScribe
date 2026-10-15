@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/OutputDecoration.h"
+#include "Core/Image/OutputDecoration.h"
 
 namespace GyanisScribe::Settings
 {

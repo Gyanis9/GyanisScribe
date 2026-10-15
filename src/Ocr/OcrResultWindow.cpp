@@ -1,6 +1,6 @@
 #include "Ocr/OcrResultWindow.h"
 
-#include "Core/ImageFit.h"
+#include "Core/Image/ImageFit.h"
 #include "Base/Logger.h"
 #include "Base/Paths.h"
 #include "Base/Text.h"

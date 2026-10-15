@@ -1,6 +1,6 @@
 // 输出装饰的像素级直测：尺寸、边框的圈数与颜色、投影的衰减方向、垫白与保透明两档，
 // 以及「宽与色都可调」之后参数确实驱动几何。期望值全部手算写死，不叫被测函数自己算期望（那条路会让规范怎么改都绿）。
-#include "Core/OutputDecoration.h"
+#include "Core/Image/OutputDecoration.h"
 
 #include <QColor>
 #include <QImage>

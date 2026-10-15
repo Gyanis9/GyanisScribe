@@ -1,6 +1,6 @@
 #include "Annotation/AnnotationView.h"
 
-#include "Core/ImageFit.h"
+#include "Core/Image/ImageFit.h"
 #include "Base/Logger.h"
 #include "Base/Text.h"
 #include "Ui/DesignTokens.h"

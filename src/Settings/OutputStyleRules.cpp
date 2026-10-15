@@ -1,7 +1,7 @@
 #include "Settings/OutputStyleRules.h"
 
 #include "Base/Logger.h"
-#include "Core/OutputDecoration.h"
+#include "Core/Image/OutputDecoration.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
 

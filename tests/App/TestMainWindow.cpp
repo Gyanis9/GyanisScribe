@@ -16,7 +16,7 @@
 #include "Platform/IPlatformIntegration.h"
 #include "Record/RecorderConfig.h"
 #include "Base/Logger.h"
-#include "Core/OutputDecoration.h"
+#include "Core/Image/OutputDecoration.h"
 #include "Base/Text.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"

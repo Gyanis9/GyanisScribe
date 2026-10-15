@@ -1,4 +1,4 @@
-#include "Core/ImageFit.h"
+#include "Core/Image/ImageFit.h"
 
 #include <algorithm>
 #include <cmath>

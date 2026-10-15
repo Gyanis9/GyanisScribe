@@ -1,7 +1,7 @@
 // 装饰三格的读取判据：没填过是默认档，填了就照收，某一格填歪只把那一格打回默认。
 // 三格共用一个出口（Settings::readOutputDecorationStyle），画布尺寸与绘制拿到同一份参数才不会错位。
 
-#include "Core/OutputDecoration.h"
+#include "Core/Image/OutputDecoration.h"
 #include "Settings/OutputStyleRules.h"
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"

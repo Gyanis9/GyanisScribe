@@ -123,7 +123,7 @@ namespace GyanisScribe::Settings
     inline constexpr std::string_view kOutputShadow = "Save/OutputShadow";
 
     /// 装饰的三格参数：边框宽与投影宽是物理像素的整数，边框色是一段 #RRGGBB 文本（留空即默认的中灰）。
-    /// 区间与默认档住在 Core/OutputDecoration.h，读端是 Settings::readOutputDecorationStyle
+    /// 区间与默认档住在 Core/Image/OutputDecoration.h，读端是 Settings::readOutputDecorationStyle
     inline constexpr std::string_view kOutputBorderWidth = "Save/OutputBorderWidth";
     inline constexpr std::string_view kOutputBorderColor = "Save/OutputBorderColor";
     inline constexpr std::string_view kOutputShadowWidth = "Save/OutputShadowWidth";

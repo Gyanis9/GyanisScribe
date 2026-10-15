@@ -1,6 +1,6 @@
 // 成品保存格式的词表：token、标签、后缀三者要同解，越界的质量档要回绝而不是夹取。
 
-#include "Core/ImageFormat.h"
+#include "Core/Image/ImageFormat.h"
 #include "Base/Paths.h"
 #include "Base/Types.h"
 

@@ -1,4 +1,4 @@
-#include "Core/OutputDecoration.h"
+#include "Core/Image/OutputDecoration.h"
 
 #include "Base/Text.h"
 

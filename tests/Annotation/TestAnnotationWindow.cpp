@@ -1,6 +1,6 @@
 #include "Annotation/AnnotationView.h"
 
-#include "Core/ImageFit.h"
+#include "Core/Image/ImageFit.h"
 #include "Annotation/AnnotationWindow.h"
 
 #include "Annotation/AnnotationEngine.h"
