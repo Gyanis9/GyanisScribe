@@ -132,6 +132,21 @@ int main(int argc, char *argv[])
             std::printf("place @%d: frame w=%d; toolbar min w=%d -> %s\n", screenWidth, placed->frame.width(), minimum.width(),
                         placed->frame.width() < minimum.width() ? "RIGHT SIDE CLIPPED" : "fits");
         }
+
+        // 每种工具收放可见段之后的宽度：台账 B 条「收敛后最宽是哪一档」的读数与对照图
+        for (std::size_t index = 0; index < GyanisScribe::Annotation::kToolTable.size(); ++index)
+        {
+            toolbar.setActiveTool(std::get<0>(GyanisScribe::Annotation::kToolTable[index]));
+            QCoreApplication::processEvents();
+            shoot(toolbar, outputDirectory, std::format("annotation-toolbar-{}", std::get<1>(GyanisScribe::Annotation::kToolTable[index])).c_str());
+        }
+
+        // 文字工具的两个子档：描边开着多两枚（描边色/描边粗细）、底板开着多一枚（底板色）
+        toolbar.setActiveTool(GyanisScribe::Annotation::ToolKind::Text);
+        toolbar.setTextOutline(true);
+        shoot(toolbar, outputDirectory, "annotation-toolbar-text-outline");
+        toolbar.setTextBackground(true);
+        shoot(toolbar, outputDirectory, "annotation-toolbar-text-outline-background");
     }
 
     // 面 2：标注工具栏满配态——16 格色板 + 6 格最近色，这是它能长到的最宽形状
