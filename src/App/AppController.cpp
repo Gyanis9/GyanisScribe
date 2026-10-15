@@ -598,6 +598,8 @@ namespace GyanisScribe::App
     void AppController::captureForegroundWindow()
     {
         // 走与其他截图入口同一条延时通道：到点才取前台窗口，才截得到「等的那几秒里摆出来的」那一扇
+        // 去向也与其他入口同解：从「截完之后」那一格现读，不沿用上一次截图留下的那个值
+        m_captureIntent = settingsCaptureIntent();
         scheduleCapture(
                 [this]
                 {
