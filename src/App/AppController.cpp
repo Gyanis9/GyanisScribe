@@ -37,10 +37,10 @@
 #include "Gui/Pin/PinManager.h"
 #include "App/TrayController.h"
 #include "Platform/IPlatformIntegration.h"
-#include "Record/FfmpegRecordingEncoder.h"
-#include "Record/RecorderConfig.h"
-#include "Record/RecordingHud.h"
-#include "Record/RecordingService.h"
+#include "Plugins/Recording/FfmpegRecordingEncoder.h"
+#include "Core/Record/RecorderConfig.h"
+#include "Gui/Record/RecordingHud.h"
+#include "Plugins/Recording/RecordingService.h"
 #include "Core/Settings/NamingRules.h"
 #include "Core/Settings/OutputStyleRules.h"
 #include "Core/Settings/SettingsKeys.h"
@@ -285,18 +285,18 @@ namespace GyanisScribe::App
         QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::refreshRequested, this, &AppController::refreshLastCapture);
 
         // 录屏：编码器与服务各一个，热键再按一次就是「停止并编码」
-        m_recorder  = std::make_unique<Record::FfmpegRecordingEncoder>();
-        m_recording = std::make_unique<Record::RecordingService>(*m_captureSource, *m_recorder, *m_integration);
-        QObject::connect(m_recording.get(), &Record::RecordingService::finished, this, &AppController::handleRecordingFinished);
-        QObject::connect(m_recording.get(), &Record::RecordingService::failed, this, &AppController::handleRecordingFailed);
-        QObject::connect(m_recording.get(), &Record::RecordingService::aborted, this, &AppController::handleRecordingAborted);
-        QObject::connect(m_recording.get(), &Record::RecordingService::countdownChanged, this,
+        m_recorder  = std::make_unique<Plugins::FfmpegRecordingEncoder>();
+        m_recording = std::make_unique<Plugins::RecordingService>(*m_captureSource, *m_recorder, *m_integration);
+        QObject::connect(m_recording.get(), &Plugins::RecordingService::finished, this, &AppController::handleRecordingFinished);
+        QObject::connect(m_recording.get(), &Plugins::RecordingService::failed, this, &AppController::handleRecordingFailed);
+        QObject::connect(m_recording.get(), &Plugins::RecordingService::aborted, this, &AppController::handleRecordingAborted);
+        QObject::connect(m_recording.get(), &Plugins::RecordingService::countdownChanged, this,
                          [this](int remainingSeconds)
                          {
                              m_countdownRemaining = remainingSeconds;
                              updateRecordingHud();
                          });
-        QObject::connect(m_recording.get(), &Record::RecordingService::frameStored, this, [this] { updateRecordingHud(); });
+        QObject::connect(m_recording.get(), &Plugins::RecordingService::frameStored, this, [this] { updateRecordingHud(); });
 
         // 历史页的三个出口：贴图与识别都要先把成品读回内存，删除只动清单不动文件
         QObject::connect(m_mainWindow.get(), &MainWindow::historyPinRequested, this, &AppController::handleHistoryPin);
@@ -779,8 +779,7 @@ namespace GyanisScribe::App
                                                           m_settings->boolValue(Core::kCaptureAutoSave, false));
         if (m_settings->boolValue(Core::kHistoryKeepUnsaved, false) && !alreadyOnDisk)
         {
-            if (const auto archived =
-                        Core::archiveUnsavedCapture(image.image, QDateTime::currentDateTime(), Base::Paths::unsavedCaptureDirectory(), Core::kUnsavedArchiveCapacity);
+            if (const auto archived = Core::archiveUnsavedCapture(image.image, QDateTime::currentDateTime(), Base::Paths::unsavedCaptureDirectory(), Core::kUnsavedArchiveCapacity);
                 archived)
             {
                 // 记的是像素尺寸而不是逻辑尺寸：历史缩略图与「重新贴图」都按这份文件读回来
@@ -1437,14 +1436,13 @@ namespace GyanisScribe::App
 
         // 放大镜视野与字母档都现读这一处的配置：取色遮罩自己不持设置，读坏了在这里说给用户
         std::string magnifierComplaint;
-        const auto  magnifierView =
-                Core::magnifierViewOrDefault(m_settings->stringValue(Core::kCaptureMagnifierView, QStringLiteral("narrow")).toStdString(), magnifierComplaint);
+        const auto  magnifierView = Core::magnifierViewOrDefault(m_settings->stringValue(Core::kCaptureMagnifierView, QStringLiteral("narrow")).toStdString(), magnifierComplaint);
         if (!magnifierComplaint.empty())
         {
             notifyUser(QString::fromStdString(magnifierComplaint), Gui::ToastKind::Danger);
         }
-        m_picker = new Gui::ColorPickerOverlay{*frame,  screen->geometry(), format, Core::hexCasingOf(m_settings->boolValue(Core::kPickHexUppercase, true)), magnifierView,
-                                                *m_theme};
+        m_picker =
+                new Gui::ColorPickerOverlay{*frame, screen->geometry(), format, Core::hexCasingOf(m_settings->boolValue(Core::kPickHexUppercase, true)), magnifierView, *m_theme};
         // 最近取色跟着这一轮摆上遮罩：点色块或按数字键就能重新取回，不必回原处对像素
         m_picker->setRecentColors(recentPickedColors());
         QObject::connect(m_picker, &Gui::ColorPickerOverlay::colorPicked, this,
@@ -1460,7 +1458,7 @@ namespace GyanisScribe::App
         m_picker->activateWindow();
     }
 
-    Base::Expected<Record::RecorderConfig> AppController::makeRecordingConfig() const
+    Base::Expected<Core::RecorderConfig> AppController::makeRecordingConfig() const
     {
         // 录哪块屏跟着光标走：多屏机器上人在副屏干活，只盯着主屏就是把用户要的画面录丢了；
         // 抓帧那一侧（QScreenCaptureSource）本来就是按光标选屏的，两处口径要一致。
@@ -1474,14 +1472,14 @@ namespace GyanisScribe::App
             return std::unexpected(Base::Error{Base::ErrorCode::ScreenUnavailable, GyanisScribe::Base::uiTextUtf8("当前没有可用屏幕，录屏没法开始。请接回显示器后重试")});
         }
 
-        Record::RecorderConfig config;
+        Core::RecorderConfig config;
         config.screenName      = screen->name();
         const auto configured  = m_settings->stringValue(Core::kPathRecording, QString());
         config.outputDirectory = configured.isEmpty() ? Base::Paths::defaultRecordingDirectory() : Base::Paths::fromDisplayText(configured);
 
         // 帧率取用户记下的那一档；读不出时记一条并按 RecorderConfig 的初值走，
         // 不拿一个"看起来能用"的值替用户决定（validateRecorderConfig 会在真正开始前再判一次范围）
-        if (const auto parsed = Record::parseFrameRateSetting(m_settings->intValue(Core::kRecordDefaultFrameRate, Record::kDefaultFrameRate)); parsed)
+        if (const auto parsed = Core::parseFrameRateSetting(m_settings->intValue(Core::kRecordDefaultFrameRate, Core::kDefaultFrameRate)); parsed)
         {
             config.frameRate = *parsed;
         } else
@@ -1489,7 +1487,7 @@ namespace GyanisScribe::App
             Base::Logger::warning(std::format("录屏默认帧率读不出：{}，本次按 {} 帧开始", parsed.error().message, config.frameRate));
         }
         // 最长时长同一条形状：读不出就记一条并按初值走，validateRecorderConfig 开始前还会再判一次范围
-        if (const auto parsed = Record::parseMaximumDurationSetting(m_settings->intValue(Core::kRecordMaximumDuration, Record::kDefaultMaximumDurationSeconds)); parsed)
+        if (const auto parsed = Core::parseMaximumDurationSetting(m_settings->intValue(Core::kRecordMaximumDuration, Core::kDefaultMaximumDurationSeconds)); parsed)
         {
             config.maximumDurationSeconds = *parsed;
         } else
@@ -1498,7 +1496,7 @@ namespace GyanisScribe::App
         }
 
         // 画面码率与帧率同一条形状：读不出就记一条并按初值（按质量优先）走，不替用户挑一档
-        if (const auto parsed = Record::parseVideoBitrateSetting(m_settings->intValue(Core::kRecordVideoBitrate, Record::kDefaultVideoBitrateKbps)); parsed)
+        if (const auto parsed = Core::parseVideoBitrateSetting(m_settings->intValue(Core::kRecordVideoBitrate, Core::kDefaultVideoBitrateKbps)); parsed)
         {
             config.videoBitrateKbps = *parsed;
         } else
@@ -1522,8 +1520,8 @@ namespace GyanisScribe::App
 
         // 输出容器按用户选的那一档来：GIF 走两遍调色板，帧率上限比 MP4 低，
         // 那一档的天花板由 validateRecorderConfig 在真正开录之前判
-        const auto storedFormat = m_settings->stringValue(Core::kRecordFormat, QString::fromUtf8(std::string{Record::recordFormatText(config.format)}));
-        const auto parsedFormat = Record::parseRecordFormat(storedFormat);
+        const auto storedFormat = m_settings->stringValue(Core::kRecordFormat, QString::fromUtf8(std::string{Core::recordFormatText(config.format)}));
+        const auto parsedFormat = Core::parseRecordFormat(storedFormat);
         if (!parsedFormat)
         {
             return std::unexpected(parsedFormat.error());
@@ -1532,15 +1530,15 @@ namespace GyanisScribe::App
 
         // 录制范围按用户选的那一档来；读不出或做不出来时把原因交回去，不悄悄换成整屏——
         // 那会让用户以为录的是他选的那片，实际录下整个桌面
-        const auto storedScope = m_settings->stringValue(Core::kRecordScope, QString::fromUtf8(std::string{Record::recordScopeText(config.mode)}));
-        const auto parsedScope = Record::parseRecordScope(storedScope);
+        const auto storedScope = m_settings->stringValue(Core::kRecordScope, QString::fromUtf8(std::string{Core::recordScopeText(config.mode)}));
+        const auto parsedScope = Core::parseRecordScope(storedScope);
         if (!parsedScope)
         {
             return std::unexpected(parsedScope.error());
         }
         config.mode = *parsedScope;
 
-        if (config.mode == Record::RecordMode::Region)
+        if (config.mode == Core::RecordMode::Region)
         {
             // 「上次选区」取历史首条：与截图那边「重复上次选区」同一条（选区历史见 Core/Capture/RegionHistory.h）
             const auto history = Core::loadRegionHistory(*m_settings);
@@ -1554,7 +1552,7 @@ namespace GyanisScribe::App
                                                    GyanisScribe::Base::uiTextUtf8("还没有可录的选区：先按截图热键框一次选区，再开始录屏；也可以把录制范围改回整屏")});
             }
             config.region = history->front().region;
-        } else if (config.mode == Record::RecordMode::Window)
+        } else if (config.mode == Core::RecordMode::Window)
         {
             const auto window = m_integration->foregroundWindow();
             if (!window)
@@ -1569,7 +1567,7 @@ namespace GyanisScribe::App
     void AppController::toggleRecording()
     {
         const auto state = m_recording->state();
-        if (state == Record::RecordingState::Idle || state == Record::RecordingState::Done || state == Record::RecordingState::Failed)
+        if (state == Core::RecordingState::Idle || state == Core::RecordingState::Done || state == Core::RecordingState::Failed)
         {
             const auto config = makeRecordingConfig();
             if (!config)
@@ -1579,8 +1577,8 @@ namespace GyanisScribe::App
             }
             showRecordingHud();
             // 倒计时取用户记下的那一档；读不出时记一条并回到默认 3 秒（validate 那道不在这里，值本身是 0..10 的整数）
-            auto countdown = Record::kDefaultCountdownSeconds;
-            if (const auto parsed = Record::parseCountdownSetting(m_settings->intValue(Core::kRecordCountdownSeconds, Record::kDefaultCountdownSeconds)); parsed)
+            auto countdown = Core::kDefaultCountdownSeconds;
+            if (const auto parsed = Core::parseCountdownSetting(m_settings->intValue(Core::kRecordCountdownSeconds, Core::kDefaultCountdownSeconds)); parsed)
             {
                 countdown = *parsed;
             } else
@@ -1606,7 +1604,8 @@ namespace GyanisScribe::App
         {
             hideRecordingHud();
             Base::Logger::error(std::format("录屏收尾失败：{}", stopped.error().message));
-            notifyUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("录屏收尾失败：{}"), stopped.error().message).c_str()), Gui::ToastKind::Danger);
+            notifyUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("录屏收尾失败：{}"), stopped.error().message).c_str()),
+                       Gui::ToastKind::Danger);
             return;
         }
         hideRecordingHud();
@@ -1621,22 +1620,22 @@ namespace GyanisScribe::App
             return;
         }
 
-        m_hud = new Record::RecordingHud(*m_icons, screen->availableGeometry());
-        QObject::connect(m_hud, &Record::RecordingHud::pauseRequested, this,
+        m_hud = new Gui::RecordingHud(*m_icons, screen->availableGeometry());
+        QObject::connect(m_hud, &Gui::RecordingHud::pauseRequested, this,
                          [this]
                          {
                              m_recording->pause();
                              updateRecordingHud();
                          });
-        QObject::connect(m_hud, &Record::RecordingHud::resumeRequested, this,
+        QObject::connect(m_hud, &Gui::RecordingHud::resumeRequested, this,
                          [this]
                          {
                              m_recording->resume();
                              updateRecordingHud();
                          });
-        QObject::connect(m_hud, &Record::RecordingHud::stopRequested, this, &AppController::toggleRecording);
-        QObject::connect(m_hud, &Record::RecordingHud::cancelRequested, this, &AppController::cancelRecording);
-        QObject::connect(m_hud, &Record::RecordingHud::minimized, this,
+        QObject::connect(m_hud, &Gui::RecordingHud::stopRequested, this, &AppController::toggleRecording);
+        QObject::connect(m_hud, &Gui::RecordingHud::cancelRequested, this, &AppController::cancelRecording);
+        QObject::connect(m_hud, &Gui::RecordingHud::minimized, this,
                          [this]
                          {
                              // 最小化只是收起这一层：托盘菜单的录屏项还在，用户照样能停
@@ -1661,7 +1660,7 @@ namespace GyanisScribe::App
         }
         m_hud->applyState(m_recording->state(), m_countdownRemaining, m_recording->recordedSeconds());
         // 控制条收进托盘后，这一行读数就是用户唯一的出口：每秒推一次，暂停与在录分开显示
-        m_tray->setRecordingStatus(m_recording->recordedSeconds(), m_recording->state() == Record::RecordingState::Paused);
+        m_tray->setRecordingStatus(m_recording->recordedSeconds(), m_recording->state() == Core::RecordingState::Paused);
     }
 
     void AppController::hideRecordingHud()
@@ -1686,7 +1685,7 @@ namespace GyanisScribe::App
         hideRecordingHud();
         Base::Logger::info(std::format("录屏成品：{}", outputPath.toStdString()));
         // 中途丢了声音要当面说一句：只写日志等于让用户拿到一个安静的成品，再自己发现没录上
-        if (m_recording->audioOutcome() == Record::AudioCaptureOutcome::Failed)
+        if (m_recording->audioOutcome() == Plugins::AudioCaptureOutcome::Failed)
         {
             notifyUser(GyanisScribe::Base::uiText("成品已出，但没带上声音：取声那一步中途失败了，原因写在日志里"), Gui::ToastKind::Information);
         }

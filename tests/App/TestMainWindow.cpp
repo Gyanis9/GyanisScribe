@@ -14,7 +14,7 @@
 #include "Core/Pin/PinTransform.h"
 #include "Core/Pick/PickGeometry.h"
 #include "Platform/IPlatformIntegration.h"
-#include "Record/RecorderConfig.h"
+#include "Core/Record/RecorderConfig.h"
 #include "Base/Logger.h"
 #include "Core/Image/OutputDecoration.h"
 #include "Base/Text.h"
@@ -449,9 +449,9 @@ namespace
         m_window->open(MainWindowPage::Record);
         auto *spin = qobject_cast<QSpinBox *>(controlInCurrentPage("默认帧率"));
         ASSERT_NE(spin, nullptr);
-        EXPECT_EQ(spin->value(), GyanisScribe::Record::kDefaultFrameRate);
+        EXPECT_EQ(spin->value(), GyanisScribe::Core::kDefaultFrameRate);
         EXPECT_EQ(spin->minimum(), 1);
-        EXPECT_EQ(spin->maximum(), GyanisScribe::Record::kMaximumFrameRate) << "上限要与读端拒收的那一格同解，否则界面能给出运行期不收的帧率";
+        EXPECT_EQ(spin->maximum(), GyanisScribe::Core::kMaximumFrameRate) << "上限要与读端拒收的那一格同解，否则界面能给出运行期不收的帧率";
 
         spin->setValue(30);
         closeWindowAndFlush();
@@ -459,7 +459,7 @@ namespace
         const auto reopened = makeStore();
         const auto stored   = reopened->intValue(GyanisScribe::Core::kRecordDefaultFrameRate, -1);
         EXPECT_EQ(stored, 30);
-        const auto parsed = GyanisScribe::Record::parseFrameRateSetting(stored);
+        const auto parsed = GyanisScribe::Core::parseFrameRateSetting(stored);
         ASSERT_TRUE(static_cast<bool>(parsed));
         EXPECT_EQ(*parsed, 30);
     }
@@ -475,9 +475,9 @@ namespace
         m_window->open(MainWindowPage::Record);
         auto *spin = qobject_cast<QSpinBox *>(controlInCurrentPage("画面码率"));
         ASSERT_NE(spin, nullptr);
-        EXPECT_EQ(spin->value(), GyanisScribe::Record::kDefaultVideoBitrateKbps);
-        EXPECT_EQ(spin->minimum(), GyanisScribe::Record::kDefaultVideoBitrateKbps) << "界面给不出 0 就没法表达按质量优先";
-        EXPECT_EQ(spin->maximum(), GyanisScribe::Record::kMaximumVideoBitrateKbps) << "上限要与读端拒收的那一格同解，否则界面能给出运行期不收的码率";
+        EXPECT_EQ(spin->value(), GyanisScribe::Core::kDefaultVideoBitrateKbps);
+        EXPECT_EQ(spin->minimum(), GyanisScribe::Core::kDefaultVideoBitrateKbps) << "界面给不出 0 就没法表达按质量优先";
+        EXPECT_EQ(spin->maximum(), GyanisScribe::Core::kMaximumVideoBitrateKbps) << "上限要与读端拒收的那一格同解，否则界面能给出运行期不收的码率";
         // textFromValue 是 protected，读用户真看见的那一格：把码率改成 0 之后行编辑里应当是这一档的名字
         auto *bitrateEdit = spin->findChild<QLineEdit *>();
         ASSERT_NE(bitrateEdit, nullptr);
@@ -490,7 +490,7 @@ namespace
         const auto reopened = makeStore();
         const auto stored   = reopened->intValue(GyanisScribe::Core::kRecordVideoBitrate, -1);
         EXPECT_EQ(stored, 4000);
-        const auto parsed = GyanisScribe::Record::parseVideoBitrateSetting(stored);
+        const auto parsed = GyanisScribe::Core::parseVideoBitrateSetting(stored);
         ASSERT_TRUE(static_cast<bool>(parsed));
         EXPECT_EQ(*parsed, 4000);
     }
@@ -507,7 +507,7 @@ namespace
         auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage("光标高亮"));
         ASSERT_NE(check, nullptr);
         EXPECT_FALSE(check->isChecked()) << "默认要关着：圈住光标会改画面，用户没要求时不该动它";
-        EXPECT_FALSE(GyanisScribe::Record::RecorderConfig{}.cursorHighlight) << "读端初值与界面默认档不同解";
+        EXPECT_FALSE(GyanisScribe::Core::RecorderConfig{}.cursorHighlight) << "读端初值与界面默认档不同解";
 
         check->setChecked(true);
         closeWindowAndFlush();
@@ -528,8 +528,8 @@ namespace
 
         auto *spin = qobject_cast<QSpinBox *>(controlInCurrentPage("最长录多久"));
         ASSERT_NE(spin, nullptr) << "录屏页没有这一格：录满上限自动停这件事用户看不到也说不了";
-        EXPECT_EQ(spin->value(), GyanisScribe::Record::kDefaultMaximumDurationSeconds) << "默认该是十分钟";
-        EXPECT_EQ(spin->maximum(), GyanisScribe::Record::kMaximumDurationSeconds) << "上限要与校验那一处的常量同解，否则界面能给出运行期不收的值";
+        EXPECT_EQ(spin->value(), GyanisScribe::Core::kDefaultMaximumDurationSeconds) << "默认该是十分钟";
+        EXPECT_EQ(spin->maximum(), GyanisScribe::Core::kMaximumDurationSeconds) << "上限要与校验那一处的常量同解，否则界面能给出运行期不收的值";
 
         spin->setValue(1800);
         closeWindowAndFlush();
@@ -555,7 +555,7 @@ namespace
     }
     /**
      * @brief 钉住 GIF 档下帧率那一格的天花板，以及切回 MP4 时用户那一档的还原
-     * @details 上限来自 Record::kMaximumGifFrameRate 一处真源（与 validateRecorderConfig 同解）：
+     * @details 上限来自 Core::kMaximumGifFrameRate 一处真源（与 validateRecorderConfig 同解）：
      *          不联动的话设置页允许到 60，用户配到 60 选了 GIF，到开录那一刻才被拒。
      *          夹取只影响显示：把 60 写回配置就等于用户切回 MP4 时丢了原来那一档。
      */
@@ -569,24 +569,24 @@ namespace
         ASSERT_NE(rate, nullptr);
 
         // 先把帧率调到 60：MP4 档下这一格必须让它过得去，并写进配置
-        rate->setValue(GyanisScribe::Record::kMaximumFrameRate);
-        EXPECT_EQ(rate->maximum(), GyanisScribe::Record::kMaximumFrameRate);
+        rate->setValue(GyanisScribe::Core::kMaximumFrameRate);
+        EXPECT_EQ(rate->maximum(), GyanisScribe::Core::kMaximumFrameRate);
 
         // 选到 GIF：上限收到 24、显示值被夹住，配置里那份 60 原样留着
         const int gifIndex = format->findData(QStringLiteral("Gif"));
         ASSERT_GE(gifIndex, 0) << "输出格式下拉里没有 GIF 这一档";
         format->setCurrentIndex(gifIndex);
-        EXPECT_EQ(rate->maximum(), GyanisScribe::Record::kMaximumGifFrameRate) << "选了 GIF 帧率那格的天花板没跟着收";
-        EXPECT_EQ(rate->value(), GyanisScribe::Record::kMaximumGifFrameRate) << "高过上限的显示值该夹到上限";
-        EXPECT_EQ(makeStore()->intValue(GyanisScribe::Core::kRecordDefaultFrameRate, 0), GyanisScribe::Record::kMaximumFrameRate)
+        EXPECT_EQ(rate->maximum(), GyanisScribe::Core::kMaximumGifFrameRate) << "选了 GIF 帧率那格的天花板没跟着收";
+        EXPECT_EQ(rate->value(), GyanisScribe::Core::kMaximumGifFrameRate) << "高过上限的显示值该夹到上限";
+        EXPECT_EQ(makeStore()->intValue(GyanisScribe::Core::kRecordDefaultFrameRate, 0), GyanisScribe::Core::kMaximumFrameRate)
                 << "夹取只影响显示：把 60 写回配置，切回 MP4 时用户就丢了原来那一档";
 
         // 切回 MP4：天花板放开，用户原来那一档回来
         const int mp4Index = format->findData(QStringLiteral("Mp4"));
         ASSERT_GE(mp4Index, 0);
         format->setCurrentIndex(mp4Index);
-        EXPECT_EQ(rate->maximum(), GyanisScribe::Record::kMaximumFrameRate);
-        EXPECT_EQ(rate->value(), GyanisScribe::Record::kMaximumFrameRate) << "切回 MP4 没还回用户原定那一档";
+        EXPECT_EQ(rate->maximum(), GyanisScribe::Core::kMaximumFrameRate);
+        EXPECT_EQ(rate->value(), GyanisScribe::Core::kMaximumFrameRate) << "切回 MP4 没还回用户原定那一档";
     }
 
     /**
@@ -598,8 +598,8 @@ namespace
         m_window->open(MainWindowPage::Record);
         auto *spin = qobject_cast<QSpinBox *>(controlInCurrentPage("录屏倒计时"));
         ASSERT_NE(spin, nullptr);
-        EXPECT_EQ(spin->value(), GyanisScribe::Record::kDefaultCountdownSeconds) << "默认档要与起录那一侧的缺省同解";
-        EXPECT_EQ(spin->maximum(), GyanisScribe::Record::kMaximumCountdownSeconds);
+        EXPECT_EQ(spin->value(), GyanisScribe::Core::kDefaultCountdownSeconds) << "默认档要与起录那一侧的缺省同解";
+        EXPECT_EQ(spin->maximum(), GyanisScribe::Core::kMaximumCountdownSeconds);
 
         spin->setValue(1);
         closeWindowAndFlush();
@@ -840,8 +840,8 @@ namespace
         m_window->open(MainWindowPage::Record);
         auto *combo = qobject_cast<QComboBox *>(controlInCurrentPage("录制范围"));
         ASSERT_NE(combo, nullptr);
-        EXPECT_EQ(combo->count(), static_cast<int>(GyanisScribe::Record::kRecordScopeChoices.size())) << "下拉框的行数与词表不同解";
-        EXPECT_EQ(combo->currentData().toString(), QString::fromUtf8(std::string{GyanisScribe::Record::recordScopeText(GyanisScribe::Record::RecorderConfig{}.mode)}))
+        EXPECT_EQ(combo->count(), static_cast<int>(GyanisScribe::Core::kRecordScopeChoices.size())) << "下拉框的行数与词表不同解";
+        EXPECT_EQ(combo->currentData().toString(), QString::fromUtf8(std::string{GyanisScribe::Core::recordScopeText(GyanisScribe::Core::RecorderConfig{}.mode)}))
                 << "没存过时要显示的那一档，必须就是录屏读端自己回落的那一档";
 
         const auto regionRow = combo->findData(QStringLiteral("Region"));
@@ -852,9 +852,9 @@ namespace
         const auto reopened = makeStore();
         const auto stored   = reopened->stringValue(GyanisScribe::Core::kRecordScope, QString{});
         EXPECT_EQ(stored, QStringLiteral("Region"));
-        const auto parsed = GyanisScribe::Record::parseRecordScope(stored);
+        const auto parsed = GyanisScribe::Core::parseRecordScope(stored);
         ASSERT_TRUE(static_cast<bool>(parsed));
-        EXPECT_EQ(*parsed, GyanisScribe::Record::RecordMode::Region);
+        EXPECT_EQ(*parsed, GyanisScribe::Core::RecordMode::Region);
     }
 
     /**
@@ -907,7 +907,7 @@ namespace
     /**
      * @brief 钉住「GIF 带不了声音」时取声那两格是灰的，改回 MP4 又亮
      * @details 灰掉而不是允许选：允许选就会起一份取声的 ffmpeg，录完才发现那种容器没有音轨，
-     *          那份 wav 除了占磁盘没有别的用处。判据取自 Record::outputFormatCarriesAudio，与服务端同一句。
+     *          那份 wav 除了占磁盘没有别的用处。判据取自 Core::outputFormatCarriesAudio，与服务端同一句。
      */
     TEST_F(MainWindowFixture, AudioRowsGreyOutForTheFormatThatCannotCarrySound)
     {
@@ -946,7 +946,7 @@ namespace
         EXPECT_EQ(combo->currentData().toString(), QStringLiteral("FullScreen")) << "读不出时按初值档显示";
         EXPECT_EQ(m_store->stringValue(GyanisScribe::Core::kRecordScope, QString{}), QStringLiteral("region")) << "回落不该顺手把文件里的坏值改掉：它要留着让人查得到";
 
-        const auto parsed = GyanisScribe::Record::parseRecordScope(QStringLiteral("region"));
+        const auto parsed = GyanisScribe::Core::parseRecordScope(QStringLiteral("region"));
         ASSERT_FALSE(static_cast<bool>(parsed)) << "读端把坏值认成一整档，就是拿整屏去录用户要的选区";
     }
 
@@ -963,11 +963,11 @@ namespace
         m_window->open(MainWindowPage::Record);
         auto *combo = qobject_cast<QComboBox *>(controlInCurrentPage("输出格式"));
         ASSERT_NE(combo, nullptr);
-        EXPECT_EQ(combo->count(), static_cast<int>(GyanisScribe::Record::kRecordFormatChoices.size())) << "下拉框的行数与词表不同解";
-        EXPECT_EQ(combo->currentData().toString(), QString::fromUtf8(std::string{GyanisScribe::Record::recordFormatText(GyanisScribe::Record::RecorderConfig{}.format)}))
+        EXPECT_EQ(combo->count(), static_cast<int>(GyanisScribe::Core::kRecordFormatChoices.size())) << "下拉框的行数与词表不同解";
+        EXPECT_EQ(combo->currentData().toString(), QString::fromUtf8(std::string{GyanisScribe::Core::recordFormatText(GyanisScribe::Core::RecorderConfig{}.format)}))
                 << "读不出时按初值档显示";
         EXPECT_EQ(m_store->stringValue(GyanisScribe::Core::kRecordFormat, QString{}), QStringLiteral("gif")) << "回落不该顺手把文件里的坏值改掉：它要留着让人查得到";
-        ASSERT_FALSE(static_cast<bool>(GyanisScribe::Record::parseRecordFormat(QStringLiteral("gif")))) << "读端把坏值认成一档，就是拿错的容器压已经抓完的帧";
+        ASSERT_FALSE(static_cast<bool>(GyanisScribe::Core::parseRecordFormat(QStringLiteral("gif")))) << "读端把坏值认成一档，就是拿错的容器压已经抓完的帧";
 
         const auto gifRow = combo->findData(QStringLiteral("Gif"));
         ASSERT_NE(gifRow, -1) << "词表里没有 Gif 这一档，设置页选得出却写不进配置";
@@ -977,9 +977,9 @@ namespace
         const auto reopened = makeStore();
         const auto stored   = reopened->stringValue(GyanisScribe::Core::kRecordFormat, QString{});
         EXPECT_EQ(stored, QStringLiteral("Gif"));
-        const auto parsed = GyanisScribe::Record::parseRecordFormat(stored);
+        const auto parsed = GyanisScribe::Core::parseRecordFormat(stored);
         ASSERT_TRUE(static_cast<bool>(parsed));
-        EXPECT_EQ(*parsed, GyanisScribe::Record::OutputFormat::Gif);
+        EXPECT_EQ(*parsed, GyanisScribe::Core::OutputFormat::Gif);
     }
 
     /**

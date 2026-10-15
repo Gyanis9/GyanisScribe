@@ -7,6 +7,7 @@ add_subdirectory(History)
 add_subdirectory(Pin)
 add_subdirectory(Capture)
 add_subdirectory(Ocr)
+add_subdirectory(Record)
 
 get_property(CoreSources GLOBAL PROPERTY GyanisScribeCoreSources)
 add_library(Core STATIC ${CoreSources})

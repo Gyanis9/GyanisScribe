@@ -1,3 +1,4 @@
+#include "Core/Record/CursorHighlight.h"
 #include "Gui/Theme/DesignTokens.h"
 
 #include <gtest/gtest.h>
@@ -5,6 +6,7 @@
 #include <array>
 #include <optional>
 
+using GyanisScribe::Gui::kAccentColor;
 using GyanisScribe::Gui::kAnnotationWidths;
 using GyanisScribe::Gui::kFontSizes;
 using GyanisScribe::Gui::stepIndexOf;
@@ -43,4 +45,12 @@ TEST(DesignTokenSteps, RejectsValuesOffTheLadderWithoutSnapping)
     {
         EXPECT_FALSE(stepIndexOf(kFontSizes, offLadder).has_value()) << offLadder;
     }
+}
+
+/**
+ * @brief 光标高亮的圈色必须跟着主色走：两处各写一份字面量就会在某天分家
+ */
+TEST(DesignTokens, CursorHighlightColorFollowsTheAccent)
+{
+    EXPECT_EQ(GyanisScribe::Core::kCursorHighlightColor, kAccentColor);
 }

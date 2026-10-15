@@ -55,7 +55,6 @@ target_include_directories(TestMainWindow PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..
 target_link_libraries(TestMainWindow PRIVATE
         App
         Annotation
-        Record
         Gui
         Core
         GTest::gtest
@@ -111,7 +110,6 @@ target_link_libraries(TestAppController PRIVATE
         Annotation
         Core
         Platform
-        Record
         Gui
         GTest::gtest
         GTest::gtest_main

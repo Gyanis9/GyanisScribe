@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "Core/Record/CursorHighlight.h"
 #include "Gui/Theme/ThemeKind.h"
 
 #include <QColor>
@@ -56,24 +57,9 @@ namespace GyanisScribe::Gui
     /// 选区抓点小方块的边长，逻辑像素：要盖住那条一像素的边界，又不能大到挡住要看的内容
     inline constexpr int kSelectionGripEdge = 8;
 
-    /**
-     * @brief 录屏光标高亮圈的半径，逻辑像素
-     * @details 取 4/8/12/16/24 阶梯里的 16 这一档：再小会被任务栏一类密集像素吃掉，再大就挡住被指的内容。
-     *          半径按逻辑像素给，物理像素由乘缩放因子得到，这样 200% 缩放的屏上圈的大小与视觉一致。
-     */
-    inline constexpr int kCursorHighlightRadius = 16;
-
-    /// 录屏光标高亮的主圈色，用主色（浅色与深色画面上都满足非文本对比）
-    inline constexpr QColor kCursorHighlightColor = kAccentColor;
-
-    /// 录屏光标高亮的外圈衬色：半透明白压在深色画面上才看得出圈的存在
-    inline constexpr QColor kCursorHighlightHaloColor{255, 255, 255, 210};
-
-    /// 主圈的描边宽度，逻辑像素
-    inline constexpr int kCursorHighlightPenWidth = 2;
-
-    /// 衬圈的描边宽度，逻辑像素：比主圈宽才会在两侧都露出白边
-    inline constexpr int kCursorHighlightHaloPenWidth = 5;
+    // 光标高亮的形状与配色住在录屏那边（Core/Record/CursorHighlight.h）；
+    // 「主圈色必须跟着主色走」这条关系在这里钉死，两处各写一份就会分家
+    // （QColor 不是 constexpr 可比，这条关系由 Gui 的用例钉住：TestDesignTokens.CursorHighlightColorFollowsTheAccent）
 
     /**
      * @brief 一套主题的全部语义色

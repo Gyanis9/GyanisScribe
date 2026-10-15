@@ -5,7 +5,6 @@ add_subdirectory(Gui)
 add_subdirectory(Platform)
 add_subdirectory(Annotation)
 add_subdirectory(Plugins)
-add_subdirectory(Record)
 add_subdirectory(App)
 
 # Debug 档的 Qt DLL 带 d 后缀，Release 不带；这条后缀只在 MSVC + Debug 下成立

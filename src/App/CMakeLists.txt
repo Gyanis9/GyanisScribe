@@ -35,7 +35,6 @@ target_link_libraries(App PUBLIC
         Annotation
         Core
         Platform
-        Record
         Plugins
         Gui
         Qt6::Core

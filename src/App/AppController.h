@@ -79,13 +79,21 @@ namespace GyanisScribe::Gui
     struct PinBatchSaveReport;
 } // namespace GyanisScribe::Gui
 
-namespace GyanisScribe::Record
+namespace GyanisScribe::Core
+{
+    struct RecorderConfig;
+} // namespace GyanisScribe::Core
+
+namespace GyanisScribe::Gui
+{
+    class RecordingHud;
+} // namespace GyanisScribe::Gui
+
+namespace GyanisScribe::Plugins
 {
     class FfmpegRecordingEncoder;
-    class RecordingHud;
-    struct RecorderConfig;
     class RecordingService;
-} // namespace GyanisScribe::Record
+} // namespace GyanisScribe::Plugins
 
 namespace GyanisScribe::Core
 {
@@ -355,7 +363,7 @@ namespace GyanisScribe::App
         void handleTrayAction(TrayAction action);
 
         /// 拼这一轮录屏的参数：屏幕名与输出目录都从这里取
-        [[nodiscard]] Base::Expected<Record::RecorderConfig> makeRecordingConfig() const;
+        [[nodiscard]] Base::Expected<Core::RecorderConfig> makeRecordingConfig() const;
 
         /// 起一层录屏控制条并开始每秒推一次状态
         void showRecordingHud();
@@ -615,8 +623,8 @@ namespace GyanisScribe::App
         std::optional<QPoint>                             m_pendingFetchPoint;                            ///< 在飞那一张取回来落在哪儿；空表示跟光标走
         std::unique_ptr<Core::IOcrEngine>                 m_ocr;                                          ///< 识别后端，按设置与平台能力选一次
         std::unique_ptr<Core::RecognitionRunner>          m_ocrRunner;                                    ///< 识别的线程搬运工
-        std::unique_ptr<Record::FfmpegRecordingEncoder>   m_recorder;                                     ///< 录屏的编码步
-        std::unique_ptr<Record::RecordingService>         m_recording;                                    ///< 录屏服务，一轮一个会话
+        std::unique_ptr<Plugins::FfmpegRecordingEncoder>  m_recorder;                                     ///< 录屏的编码步
+        std::unique_ptr<Plugins::RecordingService>        m_recording;                                    ///< 录屏服务，一轮一个会话
         std::unique_ptr<TrayController>                   m_tray;                                         ///< 托盘图标与菜单
         std::unique_ptr<MainWindow>                       m_mainWindow;                                   ///< 设置与关于的入口
         std::unique_ptr<GyanisScribe::Gui::Toast>         m_toast;                                        ///< 右下角提示气泡，操作结果的落地处
@@ -625,7 +633,7 @@ namespace GyanisScribe::App
         std::unique_ptr<GyanisScribe::Core::HistoryStore> m_history;                                      ///< 历史清单：成品文件的索引，删记录不删文件
         QPointer<Gui::ColorPickerOverlay>                 m_picker;                                       ///< 取色遮罩，关掉即重建
         QPointer<Gui::PinGroupManagerWindow>              m_groupManager;                                 ///< 贴图组管理窗，开着一扇就复用那一扇
-        QPointer<Record::RecordingHud>                    m_hud;                                          ///< 录屏控制条，一轮一个，收起即销毁
+        QPointer<Gui::RecordingHud>                       m_hud;                                          ///< 录屏控制条，一轮一个，收起即销毁
         QTimer                                           *m_hudTicker          = nullptr;                 ///< 控制条的每秒轮询，随一轮录屏起停
         int                                               m_countdownRemaining = 0;                       ///< 倒计时剩余整秒，推给控制条的大字
         CaptureIntent                                     m_captureIntent      = CaptureIntent::Annotate; ///< 这一帧截完要去做的事

@@ -18,9 +18,9 @@
 #include "Core/Pick/ColorFormat.h"
 #include "Core/Pick/PickGeometry.h"
 #include "Core/Pin/PinLayout.h"
-#include "Record/FfmpegAudioDevices.h"
-#include "Record/FfmpegVideoEncoderEnumerator.h"
-#include "Record/RecorderConfig.h"
+#include "Plugins/Recording/FfmpegAudioDevices.h"
+#include "Plugins/Recording/FfmpegVideoEncoderEnumerator.h"
+#include "Core/Record/RecorderConfig.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
@@ -789,15 +789,15 @@ namespace
     QSpinBox *makeMaximumDurationSpin(ISettingsStore &settings)
     {
         auto *spin = new QSpinBox;
-        spin->setRange(1, GyanisScribe::Record::kMaximumDurationSeconds);
+        spin->setRange(1, GyanisScribe::Core::kMaximumDurationSeconds);
         spin->setSingleStep(60);
         spin->setSuffix(GyanisScribe::Base::uiText(" 秒"));
         spin->setAccessibleName(GyanisScribe::Base::uiText("最长录多久"));
         spin->setToolTip(GyanisScribe::Base::uiText("录到这个时长就自动收尾并保存：默认 600 秒（10 分钟），上限 7200 秒（2 小时）"));
 
         const auto title  = GyanisScribe::Base::uiText("最长录多久");
-        const auto stored = settings.intValue(GyanisScribe::Core::kRecordMaximumDuration, GyanisScribe::Record::kDefaultMaximumDurationSeconds);
-        spin->setValue(shownValueForSetting(title, stored, GyanisScribe::Record::parseMaximumDurationSetting(stored), GyanisScribe::Record::kDefaultMaximumDurationSeconds));
+        const auto stored = settings.intValue(GyanisScribe::Core::kRecordMaximumDuration, GyanisScribe::Core::kDefaultMaximumDurationSeconds);
+        spin->setValue(shownValueForSetting(title, stored, GyanisScribe::Core::parseMaximumDurationSetting(stored), GyanisScribe::Core::kDefaultMaximumDurationSeconds));
 
         QObject::connect(spin, &QSpinBox::valueChanged, spin,
                          [&settings, title](int value)
@@ -813,14 +813,14 @@ namespace
     QSpinBox *makeFrameRateSpin(ISettingsStore &settings)
     {
         auto *spin = new QSpinBox;
-        spin->setRange(1, GyanisScribe::Record::kMaximumFrameRate);
+        spin->setRange(1, GyanisScribe::Core::kMaximumFrameRate);
         spin->setSuffix(GyanisScribe::Base::uiText(" 帧/秒"));
         spin->setAccessibleName(GyanisScribe::Base::uiText("默认帧率"));
 
         const auto title  = GyanisScribe::Base::uiText("录屏默认帧率");
-        const auto stored = settings.intValue(GyanisScribe::Core::kRecordDefaultFrameRate, GyanisScribe::Record::kDefaultFrameRate);
-        const auto parsed = GyanisScribe::Record::parseFrameRateSetting(stored);
-        spin->setValue(shownValueForSetting(title, stored, parsed, GyanisScribe::Record::kDefaultFrameRate));
+        const auto stored = settings.intValue(GyanisScribe::Core::kRecordDefaultFrameRate, GyanisScribe::Core::kDefaultFrameRate);
+        const auto parsed = GyanisScribe::Core::parseFrameRateSetting(stored);
+        spin->setValue(shownValueForSetting(title, stored, parsed, GyanisScribe::Core::kDefaultFrameRate));
 
         QObject::connect(spin, &QSpinBox::valueChanged, spin,
                          [&settings, title](int value)
@@ -904,15 +904,15 @@ namespace
     QSpinBox *makeCountdownSpin(ISettingsStore &settings)
     {
         auto *spin = new QSpinBox;
-        spin->setRange(0, GyanisScribe::Record::kMaximumCountdownSeconds);
+        spin->setRange(0, GyanisScribe::Core::kMaximumCountdownSeconds);
         spin->setSuffix(GyanisScribe::Base::uiText(" 秒"));
         spin->setAccessibleName(GyanisScribe::Base::uiText("录屏倒计时"));
         spin->setToolTip(GyanisScribe::Base::uiText("按下录屏键后先数这么几秒再开始录，用来把要录的画面摆好；0 表示立即开始"));
 
         const auto title  = GyanisScribe::Base::uiText("录屏倒计时");
-        const auto stored = settings.intValue(GyanisScribe::Core::kRecordCountdownSeconds, GyanisScribe::Record::kDefaultCountdownSeconds);
-        const auto parsed = GyanisScribe::Record::parseCountdownSetting(stored);
-        spin->setValue(shownValueForSetting(title, stored, parsed, GyanisScribe::Record::kDefaultCountdownSeconds));
+        const auto stored = settings.intValue(GyanisScribe::Core::kRecordCountdownSeconds, GyanisScribe::Core::kDefaultCountdownSeconds);
+        const auto parsed = GyanisScribe::Core::parseCountdownSetting(stored);
+        spin->setValue(shownValueForSetting(title, stored, parsed, GyanisScribe::Core::kDefaultCountdownSeconds));
 
         QObject::connect(spin, &QSpinBox::valueChanged, spin,
                          [&settings, title](int value)
@@ -935,16 +935,16 @@ namespace
     QSpinBox *makeVideoBitrateSpin(ISettingsStore &settings)
     {
         auto *spin = new QSpinBox;
-        spin->setRange(GyanisScribe::Record::kDefaultVideoBitrateKbps, GyanisScribe::Record::kMaximumVideoBitrateKbps);
+        spin->setRange(GyanisScribe::Core::kDefaultVideoBitrateKbps, GyanisScribe::Core::kMaximumVideoBitrateKbps);
         spin->setSingleStep(500);
         spin->setSuffix(GyanisScribe::Base::uiText(" kbps"));
         spin->setSpecialValueText(GyanisScribe::Base::uiText("按质量优先"));
         spin->setAccessibleName(GyanisScribe::Base::uiText("画面码率"));
 
         const auto title  = GyanisScribe::Base::uiText("画面码率");
-        const auto stored = settings.intValue(GyanisScribe::Core::kRecordVideoBitrate, GyanisScribe::Record::kDefaultVideoBitrateKbps);
-        const auto parsed = GyanisScribe::Record::parseVideoBitrateSetting(stored);
-        spin->setValue(shownValueForSetting(title, stored, parsed, GyanisScribe::Record::kDefaultVideoBitrateKbps));
+        const auto stored = settings.intValue(GyanisScribe::Core::kRecordVideoBitrate, GyanisScribe::Core::kDefaultVideoBitrateKbps);
+        const auto parsed = GyanisScribe::Core::parseVideoBitrateSetting(stored);
+        spin->setValue(shownValueForSetting(title, stored, parsed, GyanisScribe::Core::kDefaultVideoBitrateKbps));
 
         QObject::connect(spin, &QSpinBox::valueChanged, spin,
                          [&settings, title](int value)
@@ -969,7 +969,7 @@ namespace
     }
 
     /**
-     * @brief 录屏范围下拉：档位、配置里的取值与设置页标签都取自 Record::kRecordScopeChoices
+     * @brief 录屏范围下拉：档位、配置里的取值与设置页标签都取自 Core::kRecordScopeChoices
      * @param settings 配置存储
      * @return 归调用方所有的下拉框
      * @details 初值按 RecorderConfig 的 mode 初值回落，而不是在这里另写一档：
@@ -978,7 +978,7 @@ namespace
     QComboBox *makeRecordScopeCombo(ISettingsStore &settings, const IconProvider &icons)
     {
         auto *combo = new QComboBox;
-        for (const auto &choice: GyanisScribe::Record::kRecordScopeChoices)
+        for (const auto &choice: GyanisScribe::Core::kRecordScopeChoices)
         {
             // 图标名与标签同在词表里：三档录法的字形不一样，扫一眼就分得出，不必逐条读字
             combo->addItem(icons.icon(choice.iconName), GyanisScribe::Base::uiText(choice.label.data()), tokenText(choice.token));
@@ -986,16 +986,16 @@ namespace
         combo->setAccessibleName(GyanisScribe::Base::uiText("录制范围"));
         combo->setToolTip(GyanisScribe::Base::uiText("「上次选区」用最近一次截图框出的那块矩形；「当前窗口」录按下开始时最靠前的那个窗口。改完从下一次录屏开始生效"));
 
-        const auto defaultScope = GyanisScribe::Record::RecorderConfig{}.mode;
-        const auto stored       = settings.stringValue(GyanisScribe::Core::kRecordScope, tokenText(GyanisScribe::Record::recordScopeText(defaultScope)));
-        const auto parsed       = GyanisScribe::Record::parseRecordScope(stored);
+        const auto defaultScope = GyanisScribe::Core::RecorderConfig{}.mode;
+        const auto stored       = settings.stringValue(GyanisScribe::Core::kRecordScope, tokenText(GyanisScribe::Core::recordScopeText(defaultScope)));
+        const auto parsed       = GyanisScribe::Core::parseRecordScope(stored);
         if (!parsed)
         {
             // 读不出时下拉框显示默认档，但原因要落进日志：只把界面悄悄拨回整屏，用户会以为是自己选错的
             Logger::warning(std::format("设置页读不出录制范围：{}，下拉框按默认档显示", parsed.error().message));
         }
         const auto chosen = parsed ? *parsed : defaultScope;
-        combo->setCurrentIndex(combo->findData(tokenText(GyanisScribe::Record::recordScopeText(chosen))));
+        combo->setCurrentIndex(combo->findData(tokenText(GyanisScribe::Core::recordScopeText(chosen))));
 
         // 接线排在设初值之后：否则「把界面摆到位」这一步会被当成用户改动写回配置
         QObject::connect(combo, &QComboBox::currentIndexChanged, combo,
@@ -1140,15 +1140,15 @@ namespace
      *          下拉框回到「不取这一路」而配置原样不动——取不到声会由录屏那一步拒绝开始并说明原因，
      *          在这里顺手改掉用户的选择不但掩盖了设备被占用，还会让下一次插回设备时用回他原来的选择。
      */
-    QComboBox *makeAudioDeviceCombo(ISettingsStore &settings, const std::string_view key, const QString &title, GyanisScribe::Record::FfmpegAudioDeviceEnumerator &enumerator)
+    QComboBox *makeAudioDeviceCombo(ISettingsStore &settings, const std::string_view key, const QString &title, GyanisScribe::Plugins::FfmpegAudioDeviceEnumerator &enumerator)
     {
         auto *combo = new QComboBox;
         combo->addItem(GyanisScribe::Base::uiText("不取这一路"), QString());
         combo->setAccessibleName(title);
 
         const auto stored = settings.stringValue(key, QString());
-        QObject::connect(&enumerator, &GyanisScribe::Record::FfmpegAudioDeviceEnumerator::updated, combo,
-                         [combo, stored, title](const QVector<GyanisScribe::Record::AudioInputDevice> &devices)
+        QObject::connect(&enumerator, &GyanisScribe::Plugins::FfmpegAudioDeviceEnumerator::updated, combo,
+                         [combo, stored, title](const QVector<GyanisScribe::Plugins::AudioInputDevice> &devices)
                          {
                              for (const auto &device: devices)
                              {
@@ -1162,7 +1162,7 @@ namespace
                                  Logger::warning(std::format("设置页列不出{}：上次选的设备 {} 这次不在清单里，配置原样留着", title.toStdString(), stored.toStdString()));
                              }
                          });
-        QObject::connect(&enumerator, &GyanisScribe::Record::FfmpegAudioDeviceEnumerator::failed, combo,
+        QObject::connect(&enumerator, &GyanisScribe::Plugins::FfmpegAudioDeviceEnumerator::failed, combo,
                          [combo, title](const GyanisScribe::Base::Error &error)
                          {
                              // 列不出来时这一格只剩「不取这一路」：原因挂在悬停提示上，用户不必去翻日志才知道这里为什么没有可选项
@@ -1192,7 +1192,7 @@ namespace
      *          选中即钉死（真编码前还会按真实尺寸复核一次，探不过退回自动并把原因写进日志）。
      *          清单是异步拿的：先只摆「自动」，探测器回来再补候选并把她上次钉的那一档选中。
      */
-    QComboBox *makeVideoEncoderCombo(ISettingsStore &settings, GyanisScribe::Record::FfmpegVideoEncoderEnumerator &enumerator)
+    QComboBox *makeVideoEncoderCombo(ISettingsStore &settings, GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator &enumerator)
     {
         auto *combo = new QComboBox;
         combo->addItem(GyanisScribe::Base::uiText("自动（逐个探测）"), QString::fromUtf8(std::string{GyanisScribe::Core::kRecordVideoEncoderAutoToken}));
@@ -1200,7 +1200,7 @@ namespace
         combo->setToolTip(GyanisScribe::Base::uiText("列出的是这台机器上前不久真探通的编码器；自动档会在每次编码前按偏好顺序探一遍"));
 
         const auto stored = settings.stringValue(GyanisScribe::Core::kRecordVideoEncoder, QString::fromUtf8(std::string{GyanisScribe::Core::kRecordVideoEncoderAutoToken}));
-        QObject::connect(&enumerator, &GyanisScribe::Record::FfmpegVideoEncoderEnumerator::updated, combo,
+        QObject::connect(&enumerator, &GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator::updated, combo,
                          [combo, stored](const QStringList &usable)
                          {
                              for (const auto &name: usable)
@@ -1215,7 +1215,7 @@ namespace
                                  Logger::warning(std::format("设置页列不出上次钉的编码器 {}：这次没探通，配置原样留着，编码时会按自动档走", stored.toStdString()));
                              }
                          });
-        QObject::connect(&enumerator, &GyanisScribe::Record::FfmpegVideoEncoderEnumerator::failed, combo,
+        QObject::connect(&enumerator, &GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator::failed, combo,
                          [combo](const GyanisScribe::Base::Error &error)
                          {
                              // 列不出来时只剩「自动」：原因挂在悬停提示上，用户不必翻日志才知道这里为什么没有候选
@@ -1241,19 +1241,19 @@ namespace
      * @param formatCombo 输出格式下拉
      * @param frameRateSpin 帧率那一格
      * @param settings 配置存储
-     * @details GIF 的上限比 MP4 低（阈值单源：Record::kMaximumGifFrameRate，与 validateRecorderConfig 同解）：
+     * @details GIF 的上限比 MP4 低（阈值单源：Core::kMaximumGifFrameRate，与 validateRecorderConfig 同解）：
      *          选了 GIF 就把这一格的上限收到 24，不让用户配出一个到录制那一刻才被拒的组合。
      *          显示的夹取不写回配置——切回 MP4 要还回用户原来填的那一档；配置里那份仍由
      *          validateRecorderConfig 在开录前把关（手改配置绕过界面时它兜着）。
      */
     void applyFrameRateAvailability(const QComboBox &formatCombo, QSpinBox &frameRateSpin, ISettingsStore &settings)
     {
-        const auto parsed = GyanisScribe::Record::parseRecordFormat(formatCombo.currentData().toString());
-        const auto chosen = parsed ? *parsed : GyanisScribe::Record::RecorderConfig{}.format;
-        const auto gif    = chosen == GyanisScribe::Record::OutputFormat::Gif;
+        const auto parsed = GyanisScribe::Core::parseRecordFormat(formatCombo.currentData().toString());
+        const auto chosen = parsed ? *parsed : GyanisScribe::Core::RecorderConfig{}.format;
+        const auto gif    = chosen == GyanisScribe::Core::OutputFormat::Gif;
 
-        const auto maximum = gif ? GyanisScribe::Record::kMaximumGifFrameRate : GyanisScribe::Record::kMaximumFrameRate;
-        const auto stored  = settings.intValue(GyanisScribe::Core::kRecordDefaultFrameRate, GyanisScribe::Record::kDefaultFrameRate);
+        const auto maximum = gif ? GyanisScribe::Core::kMaximumGifFrameRate : GyanisScribe::Core::kMaximumFrameRate;
+        const auto stored  = settings.intValue(GyanisScribe::Core::kRecordDefaultFrameRate, GyanisScribe::Core::kDefaultFrameRate);
 
         const QSignalBlocker blocker{frameRateSpin};
         frameRateSpin.setMaximum(maximum);
@@ -1272,15 +1272,15 @@ namespace
      */
     void applyAudioAvailability(const QComboBox &formatCombo, QComboBox &microphoneCombo, QComboBox &systemSoundCombo)
     {
-        const auto parsed       = GyanisScribe::Record::parseRecordFormat(formatCombo.currentData().toString());
-        const auto chosen       = parsed ? *parsed : GyanisScribe::Record::RecorderConfig{}.format;
-        const auto carriesAudio = GyanisScribe::Record::outputFormatCarriesAudio(chosen);
+        const auto parsed       = GyanisScribe::Core::parseRecordFormat(formatCombo.currentData().toString());
+        const auto chosen       = parsed ? *parsed : GyanisScribe::Core::RecorderConfig{}.format;
+        const auto carriesAudio = GyanisScribe::Core::outputFormatCarriesAudio(chosen);
         microphoneCombo.setEnabled(carriesAudio);
         systemSoundCombo.setEnabled(carriesAudio);
     }
 
     /**
-     * @brief 录屏输出格式下拉：档位、配置里的取值与设置页标签都取自 Record::kRecordFormatChoices
+     * @brief 录屏输出格式下拉：档位、配置里的取值与设置页标签都取自 Core::kRecordFormatChoices
      * @param settings 配置存储
      * @return 归调用方所有的下拉框
      * @details 格式定错比范围定错更贵：帧已经抓完才按错的容器压出去，整段成品作废。
@@ -1289,24 +1289,24 @@ namespace
     QComboBox *makeRecordFormatCombo(ISettingsStore &settings)
     {
         auto *combo = new QComboBox;
-        for (const auto &choice: GyanisScribe::Record::kRecordFormatChoices)
+        for (const auto &choice: GyanisScribe::Core::kRecordFormatChoices)
         {
             combo->addItem(GyanisScribe::Base::uiText(choice.label.data()), tokenText(choice.token));
         }
         combo->setAccessibleName(GyanisScribe::Base::uiText("输出格式"));
         // 上限那一个数取自 kMaximumGifFrameRate：写死了就会在阈值调那天变成一句假话
         combo->setToolTip(GyanisScribe::Base::uiText("GIF 走两遍调色板，帧率上限只有 %1 帧/秒，比 MP4 低；MP4 适合长片段。改完从下一次录屏开始生效")
-                                  .arg(GyanisScribe::Record::kMaximumGifFrameRate));
+                                  .arg(GyanisScribe::Core::kMaximumGifFrameRate));
 
-        const auto defaultFormat = GyanisScribe::Record::RecorderConfig{}.format;
-        const auto stored        = settings.stringValue(GyanisScribe::Core::kRecordFormat, tokenText(GyanisScribe::Record::recordFormatText(defaultFormat)));
-        const auto parsed        = GyanisScribe::Record::parseRecordFormat(stored);
+        const auto defaultFormat = GyanisScribe::Core::RecorderConfig{}.format;
+        const auto stored        = settings.stringValue(GyanisScribe::Core::kRecordFormat, tokenText(GyanisScribe::Core::recordFormatText(defaultFormat)));
+        const auto parsed        = GyanisScribe::Core::parseRecordFormat(stored);
         if (!parsed)
         {
             Logger::warning(std::format("设置页读不出输出格式：{}，下拉框按默认档显示", parsed.error().message));
         }
         const auto chosen = parsed ? *parsed : defaultFormat;
-        combo->setCurrentIndex(combo->findData(tokenText(GyanisScribe::Record::recordFormatText(chosen))));
+        combo->setCurrentIndex(combo->findData(tokenText(GyanisScribe::Core::recordFormatText(chosen))));
 
         QObject::connect(combo, &QComboBox::currentIndexChanged, combo,
                          [&settings, combo](int)
@@ -1402,8 +1402,8 @@ namespace GyanisScribe::App
     MainWindow::MainWindow(ISettingsStore &settings, ThemeManager &theme, IconProvider &icons, Core::HistoryStore &historyStore, Platform::PlatformCapabilities capabilities,
                            Platform::IPlatformIntegration &integration, QWidget *parent) :
         QWidget(parent), m_settings(settings), m_theme(theme), m_icons(icons), m_capabilities(capabilities), m_integration(integration),
-        m_audioDevices(std::make_unique<GyanisScribe::Record::FfmpegAudioDeviceEnumerator>()),
-        m_videoEncoders(std::make_unique<GyanisScribe::Record::FfmpegVideoEncoderEnumerator>()), m_historyStore(historyStore)
+        m_audioDevices(std::make_unique<GyanisScribe::Plugins::FfmpegAudioDeviceEnumerator>()),
+        m_videoEncoders(std::make_unique<GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator>()), m_historyStore(historyStore)
     {
         setWindowTitle(GyanisScribe::Base::uiText("智录 设置"));
         setWindowIcon(icons.icon("App"));

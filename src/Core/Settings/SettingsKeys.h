@@ -214,14 +214,14 @@ namespace GyanisScribe::Core
     /// 不许拖边/拖手柄改这张的大小：只关掉改尺寸的落点，整张平移与滚轮缩放都不受影响（默认关）
     inline constexpr std::string_view kPinDisableFrameResize = "Pin/DisableFrameResize";
 
-    /// 录屏的默认帧率（1 到 Record::kMaximumFrameRate），读端在 AppController 造参数那一处，写端在设置的录屏页
+    /// 录屏的默认帧率（1 到 Core::kMaximumFrameRate），读端在 AppController 造参数那一处，写端在设置的录屏页
     inline constexpr std::string_view kRecordDefaultFrameRate = "Record/DefaultFrameRate";
 
-    /// 录屏输出容器：Mp4 / Gif，取值词表在 Record::kRecordFormatChoices；
+    /// 录屏输出容器：Mp4 / Gif，取值词表在 Core::kRecordFormatChoices；
     /// 读端在 AppController 造参数那一处，写端在设置的录屏页
     inline constexpr std::string_view kRecordFormat = "Record/Format";
 
-    /// 录屏范围：整屏 / 上次选区 / 当前窗口，取值词表在 Record::kRecordScopeChoices；
+    /// 录屏范围：整屏 / 上次选区 / 当前窗口，取值词表在 Core::kRecordScopeChoices；
     /// 读端在 AppController 造参数那一处，写端在设置的录屏页
     inline constexpr std::string_view kRecordScope = "Record/Scope";
 
@@ -236,7 +236,7 @@ namespace GyanisScribe::Core
     /// 读端在 AppController 造参数那一处，写端在设置的录屏页
     inline constexpr std::string_view kRecordVideoBitrate = "Record/VideoBitrateKbps";
 
-    /// 一轮录屏最长多少秒（1 到 Record::kMaximumDurationSeconds，缺省 kDefaultMaximumDurationSeconds）；
+    /// 一轮录屏最长多少秒（1 到 Core::kMaximumDurationSeconds，缺省 kDefaultMaximumDurationSeconds）；
     /// 到点自动收尾，读端在 AppController 造参数那一处，写端在设置的录屏页
     inline constexpr std::string_view kRecordMaximumDuration = "Record/MaximumDurationSeconds";
 
@@ -246,7 +246,7 @@ namespace GyanisScribe::Core
     /// 开始录屏前的倒计时秒数（0 到 10，0 表示立即开始）；读端在 AppController 起录那一处，写端在设置的录屏页
     inline constexpr std::string_view kRecordCountdownSeconds = "Record/CountdownSeconds";
 
-    /// 钉死的视频编码器名（取值来自 Record::kPreferredVideoEncoders），"Auto" 或空表示逐个探测自动选；
+    /// 钉死的视频编码器名（取值来自 Core::kPreferredVideoEncoders），"Auto" 或空表示逐个探测自动选；
     /// 读端在 AppController 造参数那一处，写端在设置的录屏页，选型规则见 FfmpegVideoEncoders
     inline constexpr std::string_view kRecordVideoEncoder = "Record/VideoEncoder";
 

@@ -25,6 +25,7 @@ endif ()
 add_subdirectory(Barcode)
 add_subdirectory(CaptureSources)
 add_subdirectory(OcrEngines)
+add_subdirectory(Recording)
 
 get_property(PluginsSources GLOBAL PROPERTY GyanisScribePluginsSources)
 add_library(Plugins STATIC ${PluginsSources})
@@ -32,6 +33,7 @@ add_library(Plugins STATIC ${PluginsSources})
 target_include_directories(Plugins PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(Plugins PUBLIC
         Core
+        Platform
         Qt6::Core
         Qt6::Gui)
 

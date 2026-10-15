@@ -4,7 +4,7 @@
 #include "Base/Text.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Platform/PlatformCapabilities.h"
-#include "Record/RecordingHud.h"
+#include "Gui/Record/RecordingHud.h"
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Gui/Resources/IconProvider.h"
@@ -36,7 +36,7 @@ namespace GyanisScribe::App
         {
             // 控制条收起后这就是唯一的读数处：暂停与在录要分得开，否则用户不知道帧还在不在走
             const auto label = paused ? GyanisScribe::Base::uiText("智录 · 录制已暂停 %1") : GyanisScribe::Base::uiText("智录 · 正在录制 %1");
-            return label.arg(GyanisScribe::Record::formatDuration(recordedSeconds));
+            return label.arg(GyanisScribe::Gui::formatDuration(recordedSeconds));
         }
         if (pinCount <= 0)
         {
