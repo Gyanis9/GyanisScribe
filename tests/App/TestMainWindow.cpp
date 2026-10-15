@@ -37,12 +37,15 @@ using GyanisScribe::App::screenCaptureLabels;
 #include <QCheckBox>
 #include <QFile>
 #include <QFileInfo>
+#include <QFormLayout>
 #include <QComboBox>
 #include <QIcon>
+#include <QImage>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMenu>
+#include <QPixmap>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QScrollArea>
@@ -55,6 +58,7 @@ using GyanisScribe::App::screenCaptureLabels;
 #include <algorithm>
 #include <filesystem>
 #include <format>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <set>
@@ -264,6 +268,69 @@ namespace
                 EXPECT_NE(controlInCurrentPage(controlName), nullptr) << "第 " << index << " 页里没有「" << std::string{controlName} << "」";
             }
         }
+    }
+
+    /**
+     * @brief 设置页的标签与字段对得上：每一行的「标签文字右缘 → 字段左缘」的缝要恒定
+     * @details 这条钉的是标签右对齐那一处：左对齐时这条缝随标签长短忽宽忽窄（实测 4 字 81px、
+     *          10 字只剩 9px，同一页里两种都见得到）。只断 labelAlignment 属性的话，将来 Qt
+     *          换了绘制行为这条不会红，所以量的是画出来的像素——做法与 UiStyleGuide §3 那条
+     *          渲染判据同路。跨列行（分组标题一类）没有字段，不参与这条。
+     */
+    TEST_F(MainWindowFixture, SettingsFormKeepsAUniformLabelToFieldGap)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::General);
+        auto *page = stack()->currentWidget();
+        ASSERT_NE(page, nullptr);
+        auto *form = page->findChild<QFormLayout *>();
+        ASSERT_NE(form, nullptr) << "通用页没有表单骨架，判据的前提就没构造出来";
+        EXPECT_TRUE(form->labelAlignment().testFlag(Qt::AlignRight)) << "标签右对齐是「缝恒定」的来历，一并钉住";
+
+        const QImage pixmap    = page->grab().toImage();
+        const auto   scale     = pixmap.devicePixelRatio();
+        int          rows      = 0;
+        int          narrowest = std::numeric_limits<int>::max();
+        int          widest    = 0;
+        for (int row = 0; row < form->rowCount(); ++row)
+        {
+            const auto *labelItem = form->itemAt(row, QFormLayout::LabelRole);
+            const auto *fieldItem = form->itemAt(row, QFormLayout::FieldRole);
+            if (labelItem == nullptr || fieldItem == nullptr || labelItem->widget() == nullptr || fieldItem->widget() == nullptr)
+            {
+                continue;
+            }
+            auto *label = labelItem->widget();
+            auto *field = fieldItem->widget();
+
+            const QRect labelRect{label->mapTo(page, QPoint{0, 0}), label->size()};
+            const int   fieldLeft = field->mapTo(page, QPoint{0, 0}).x();
+
+            // 标签文字右缘：在标签控件自己的矩形里从右往左找最右的墨迹像素
+            int textRight = -1;
+            for (int x = labelRect.right(); x >= labelRect.left() && textRight < 0; --x)
+            {
+                for (int y = labelRect.top(); y <= labelRect.bottom(); ++y)
+                {
+                    const auto pixel = pixmap.pixelColor(qRound(x * scale), qRound(y * scale));
+                    if (pixel.red() + pixel.green() + pixel.blue() < 3 * 200)
+                    {
+                        textRight = x;
+                        break;
+                    }
+                }
+            }
+            ASSERT_GE(textRight, 0) << "第 " << row << " 行的标签一个字都没画出来";
+            const int gap = fieldLeft - textRight;
+            narrowest     = std::min(narrowest, gap);
+            widest        = std::max(widest, gap);
+            ++rows;
+        }
+
+        ASSERT_GE(rows, 5) << "通用页参与判据的行太少，前提没构造出来";
+        EXPECT_LE(widest - narrowest, 3) << "缝忽宽忽窄又回来了：最窄 " << narrowest << "px、最宽 " << widest << "px";
+        EXPECT_GE(narrowest, 4) << "缝比行距还窄，标签已经贴上字段";
+        EXPECT_LE(widest, 16) << "缝最宽 " << widest << "px，标签与字段已经不成对";
     }
 
     /**

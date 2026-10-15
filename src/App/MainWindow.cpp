@@ -160,8 +160,10 @@ namespace
 
         auto *form = new QFormLayout;
         form->setSpacing(GyanisScribe::Ui::kSpacingSmall);
-        // 标签左对齐并与字段同一水平线：右对齐会让标签与字段之间那条缝忽宽忽窄，顶对齐让单行字段看着下沉
-        form->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+        // 标签右对齐并与字段同一水平线：这一列的右端要与字段左缘只隔一个行距，左对齐时那条缝会随
+        // 标签长短忽宽忽窄（实测 4 字 81px、10 字只剩 9px，同一页里两种都见得到）；
+        // 顶对齐会让单行字段看着下沉，竖直方向取居中
+        form->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
         form->setFormAlignment(Qt::AlignLeft | Qt::AlignTop);
         layout->addLayout(form);
         layout->addStretch();
