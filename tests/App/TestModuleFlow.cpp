@@ -7,9 +7,9 @@
 #include "Annotation/AnnotationEngine.h"
 #include "Annotation/AnnotationTool.h"
 #include "Annotation/PenParameters.h"
-#include "Capture/CaptureService.h"
-#include "Capture/ICaptureService.h"
-#include "Capture/IScreenCaptureSource.h"
+#include "Gui/Capture/CaptureService.h"
+#include "Core/Capture/ICaptureService.h"
+#include "Core/Capture/IScreenCaptureSource.h"
 #include "Base/Paths.h"
 #include "App/ClipboardPin.h"
 #include "Base/Types.h"
@@ -132,7 +132,7 @@ namespace GyanisScribe
         }
 
         /// 替掉真实抓屏：只回报固定的一帧，并把交下来的屏幕名留住
-        class FakeScreenSource final : public GyanisScribe::Capture::IScreenCaptureSource
+        class FakeScreenSource final : public GyanisScribe::Core::IScreenCaptureSource
         {
         public:
             explicit FakeScreenSource(Base::CapturedImage frame) : m_frame(std::move(frame))
@@ -201,9 +201,9 @@ namespace GyanisScribe
              */
             [[nodiscard]] Base::CapturedImage captureOneFrame(GyanisScribe::Core::SettingsStore &settings, FakeScreenSource &source) const
             {
-                GyanisScribe::Capture::CaptureService service(source, settings, *integration);
+                GyanisScribe::Gui::CaptureService service(source, settings, *integration);
                 std::optional<Base::CapturedImage>    received;
-                QObject::connect(&service, &GyanisScribe::Capture::ICaptureService::captured, &service, [&received](const Base::CapturedImage &image) { received = image; });
+                QObject::connect(&service, &GyanisScribe::Core::ICaptureService::captured, &service, [&received](const Base::CapturedImage &image) { received = image; });
 
                 service.captureFullScreen(QString::fromLatin1(kFakeScreenName));
                 EXPECT_TRUE(received.has_value()) << "captureFullScreen 没把帧从 captured 信号交出来";

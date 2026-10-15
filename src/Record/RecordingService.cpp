@@ -1,6 +1,6 @@
 #include "Record/RecordingService.h"
 
-#include "Capture/ScreenUtils.h"
+#include "Core/Capture/ScreenUtils.h"
 #include "Base/Logger.h"
 #include "Base/Paths.h"
 #include "Base/Text.h"
@@ -43,7 +43,7 @@ namespace
      */
     std::optional<QPoint> screenGlobalOrigin(const QString &screenName)
     {
-        const auto *screen = GyanisScribe::Capture::screenByName(screenName);
+        const auto *screen = GyanisScribe::Core::screenByName(screenName);
         if (screen == nullptr)
         {
             return {};
@@ -76,7 +76,7 @@ namespace GyanisScribe::Record
         return std::nullopt;
     }
 
-    RecordingService::RecordingService(Capture::IScreenCaptureSource &source, IRecordingEncoder &encoder, Platform::IPlatformIntegration &integration, QObject *parent) :
+    RecordingService::RecordingService(Core::IScreenCaptureSource &source, IRecordingEncoder &encoder, Platform::IPlatformIntegration &integration, QObject *parent) :
         QObject(parent), m_source(source), m_encoder(encoder), m_integration(integration)
     {
         m_timer.setTimerType(Qt::PreciseTimer);
@@ -354,7 +354,7 @@ namespace GyanisScribe::Record
         }
 
         // 选区模式在整屏帧上裁：抓屏接口只给整屏与窗口两种，逐区抓屏要等平台上的 WGC 接入才有
-        auto cropped = Capture::cropToLogicalRect(*grabbed, m_config.region);
+        auto cropped = Core::cropToLogicalRect(*grabbed, m_config.region);
         if (cropped)
         {
             // 裁出来的这一帧离全局原点的距离 = 屏的原点 + 选区在屏内的位置，两段都要算进去

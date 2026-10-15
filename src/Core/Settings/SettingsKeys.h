@@ -59,7 +59,7 @@ namespace GyanisScribe::Core
 
     /**
      * @brief 最近若干次截图的选区历史
-     * @details 每条「x,y,width,height,屏名」，段间以 ';' 相连、最近的一条在最前；上限与去重见 Capture/RegionHistory.h。
+     * @details 每条「x,y,width,height,屏名」，段间以 ';' 相连、最近的一条在最前；上限与去重见 Core/Capture/RegionHistory.h。
      *          框选时的 R / Shift+R 在这份历史里循环挑，「重复上次选区」与录屏的「上次选区」取第一条。
      *          上面那两把单值键由同一个写点照写一份（记录 = 历史首条），老读法不受升级影响。
      */
@@ -69,7 +69,7 @@ namespace GyanisScribe::Core
      * @brief 框选时锁住的长宽比，形如「16:9」；空串表示没锁
      * @details 遮罩上按 A 把当前选区的比例锁上、再按一次解开；锁着的时候它跨轮次记住
      *          （下次开截图还是这一档），解开就清空——用户明确松开的档不该在下一轮里复活。
-     *          读端在 Capture::CaptureService（开遮罩时装进去），写端跟着遮罩的信号落盘。
+     *          读端在 Gui::CaptureService（开遮罩时装进去），写端跟着遮罩的信号落盘。
      */
     inline constexpr std::string_view kCaptureAspectRatio = "Capture/AspectRatio";
 
@@ -79,21 +79,21 @@ namespace GyanisScribe::Core
     /// 按下截图后等几秒再开始（0 到 60，0 表示不延时）：用来截菜单、提示这类一碰就没的状态
     inline constexpr std::string_view kCaptureDelaySeconds = "Capture/DelaySeconds";
 
-    /// 截图要不要把鼠标指针画进去，读端在 Capture::CaptureService，写端在设置的截图页；
+    /// 截图要不要把鼠标指针画进去，读端在 Gui::CaptureService，写端在设置的截图页；
     /// 只有整屏与区域截图吃这一格，滚动长截图按帧接图，画进去会在长图上留下一串指针
     inline constexpr std::string_view kCaptureIncludeCursor = "Capture/IncludeCursor";
 
     /// 「没填」那一档取不含指针：区域截图刚松手时指针就在选区里，默认画进去会让成品多出一只箭头
     inline constexpr bool kDefaultCaptureIncludeCursor = false;
 
-    /// 区域截图的成品要不要把四角切圆（读端在 Capture::CaptureService，写端在设置的截图页）；
+    /// 区域截图的成品要不要把四角切圆（读端在 Gui::CaptureService，写端在设置的截图页）；
     /// 只作用在区域这一路：整屏、窗口与滚动长截图的成品形状改起来各有各的意外，不做
     inline constexpr std::string_view kCaptureRoundCorners = "Capture/RoundCorners";
 
     /// 「圆角截图」没填时的默认档：不切
     inline constexpr bool kDefaultCaptureRoundCorners = false;
 
-    /// 圆角截图的半径，逻辑像素（取值范围与默认档见 `Capture/ScreenUtils.h`）；开关开着才起作用
+    /// 圆角截图的半径，逻辑像素（取值范围与默认档见 `Core/Capture/ScreenUtils.h`）；开关开着才起作用
     inline constexpr std::string_view kCaptureCornerRadius = "Capture/CornerRadius";
 
     /// 每张截图都顺手存一份进截图目录（不进标注、不弹窗）；默认关，开了之后每次截图都会在盘上留一份
@@ -104,10 +104,10 @@ namespace GyanisScribe::Core
     /// 放大镜视野档：off（只留读数条）、narrow（9×9，默认）、medium（15×15）、wide（21×21）；词表在 Core/Pick/PickGeometry.h
     inline constexpr std::string_view kCaptureMagnifierView = "Capture/MagnifierView";
     /// 「不参与窗口检测的程序」：逗号分隔的可执行文件名（如 `chrome.exe, cmd.exe`），大小写不敏感；留空即谁都不排除。
-    /// 读端在 CaptureService::windowCandidates，写端在设置的截图页；解析与比对在 Capture/ScreenUtils.h
+    /// 读端在 CaptureService::windowCandidates，写端在设置的截图页；解析与比对在 Core/Capture/ScreenUtils.h
     inline constexpr std::string_view kCaptureDetectionExcludes = "Capture/DetectionExcludes";
 
-    /// 遮罩上那几处数字按哪种像素量：dip（逻辑像素，默认）或 px（物理像素）；词表在 Capture/ScreenUtils.h，
+    /// 遮罩上那几处数字按哪种像素量：dip（逻辑像素，默认）或 px（物理像素）；词表在 Core/Capture/ScreenUtils.h，
     /// 读数、`V` 复制与 `S` 尺寸框三处同读这一格
     inline constexpr std::string_view kCaptureSizeUnit = "Capture/SizeUnit";
 

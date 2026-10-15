@@ -80,7 +80,7 @@ namespace GyanisScribe::Platform
 
     std::size_t monitorIndexForPoint(const QPoint &physicalPoint, const std::vector<MonitorMapping> &monitors)
     {
-        // 接缝上的点按声明顺序取第一块命中的：与 Capture::screenAtGlobalPoint() 同一条规则，
+        // 接缝上的点按声明顺序取第一块命中的：与 Core::screenAtGlobalPoint() 同一条规则，
         // 两处不一致会让同一个窗口两次算出不同的位置
         for (std::size_t index = 0; index < monitors.size(); ++index)
         {

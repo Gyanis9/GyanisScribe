@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Capture/IScreenCaptureSource.h"
+#include "Core/Capture/IScreenCaptureSource.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Record/FfmpegRecordingEncoder.h"
 #include "Record/RecorderConfig.h"
@@ -77,7 +77,7 @@ namespace GyanisScribe::Record
          * @param integration 平台集成，用来问「录的这扇窗在屏幕上的哪儿」，所有权在宿主
          * @param parent Qt 父对象
          */
-        RecordingService(Capture::IScreenCaptureSource &source, IRecordingEncoder &encoder, Platform::IPlatformIntegration &integration, QObject *parent = nullptr);
+        RecordingService(Core::IScreenCaptureSource &source, IRecordingEncoder &encoder, Platform::IPlatformIntegration &integration, QObject *parent = nullptr);
 
         /**
          * @brief 析构：收掉还在跑的取声进程，并等手上的编码跑完
@@ -216,7 +216,7 @@ namespace GyanisScribe::Record
         [[nodiscard]] virtual QPoint cursorGlobalPosition() const;
 
     private:
-        Capture::IScreenCaptureSource      &m_source;                                           ///< 抓帧来源，不拥有
+        Core::IScreenCaptureSource      &m_source;                                           ///< 抓帧来源，不拥有
         IRecordingEncoder                  &m_encoder;                                          ///< 编码器，不拥有
         Platform::IPlatformIntegration     &m_integration;                                      ///< 平台集成，问窗口位置用，不拥有
         QTimer                              m_timer;                                            ///< 抓帧定时器

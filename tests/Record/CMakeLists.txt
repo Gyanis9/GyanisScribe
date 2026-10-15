@@ -7,7 +7,6 @@ add_executable(TestRecord
 
 target_link_libraries(TestRecord PRIVATE
         Record
-        Capture
         Core
         Gui
         GTest::gtest
@@ -29,7 +28,6 @@ add_executable(TestRecordingService
 
 target_link_libraries(TestRecordingService PRIVATE
         Record
-        Capture
         Core
         Gui
         GTest::gtest

@@ -6,6 +6,7 @@ add_subdirectory(Resources)
 add_subdirectory(Pick)
 add_subdirectory(History)
 add_subdirectory(Pin)
+add_subdirectory(Capture)
 
 get_property(GuiSources GLOBAL PROPERTY GyanisScribeGuiSources)
 add_library(Gui STATIC ${GuiSources})

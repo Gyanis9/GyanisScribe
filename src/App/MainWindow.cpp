@@ -5,7 +5,7 @@
 #include "App/TrayController.h"
 #include "App/UpdateCheck.h"
 #include "Annotation/AnnotationPalette.h"
-#include "Capture/ScreenUtils.h"
+#include "Core/Capture/ScreenUtils.h"
 #include "Core/Image/ImageFormat.h"
 #include "Base/Logger.h"
 #include "Core/Image/OutputDecoration.h"
@@ -634,16 +634,16 @@ namespace
     QComboBox *makeSizeUnitCombo(ISettingsStore &settings)
     {
         auto                                                 combo = new QComboBox;
-        const std::array<GyanisScribe::Capture::SizeUnit, 2> units{GyanisScribe::Capture::SizeUnit::Logical, GyanisScribe::Capture::SizeUnit::Physical};
+        const std::array<GyanisScribe::Core::SizeUnit, 2> units{GyanisScribe::Core::SizeUnit::Logical, GyanisScribe::Core::SizeUnit::Physical};
         for (const auto unit: units)
         {
-            combo->addItem(GyanisScribe::Capture::sizeUnitLabel(unit));
+            combo->addItem(GyanisScribe::Core::sizeUnitLabel(unit));
         }
         combo->setAccessibleName(GyanisScribe::Base::uiText("尺寸单位"));
         combo->setToolTip(GyanisScribe::Base::uiText("高 DPI 屏上这两组数差着一个缩放倍率；这一档管遮罩读数、复制尺寸与尺寸输入框三处"));
         std::string complaint;
         const auto  stored =
-                GyanisScribe::Capture::sizeUnitOrDefault(settings.stringValue(GyanisScribe::Core::kCaptureSizeUnit, QStringLiteral("dip")).toStdString(), complaint);
+                GyanisScribe::Core::sizeUnitOrDefault(settings.stringValue(GyanisScribe::Core::kCaptureSizeUnit, QStringLiteral("dip")).toStdString(), complaint);
         if (!complaint.empty())
         {
             Logger::warning(std::format("尺寸单位读不出：{}，下拉框按逻辑像素摆", complaint));
@@ -657,7 +657,7 @@ namespace
                              {
                                  return;
                              }
-                             const auto token = QString::fromUtf8(GyanisScribe::Capture::sizeUnitToken(units[static_cast<std::size_t>(index)]).data());
+                             const auto token = QString::fromUtf8(GyanisScribe::Core::sizeUnitToken(units[static_cast<std::size_t>(index)]).data());
                              if (auto written = settings.setValue(GyanisScribe::Core::kCaptureSizeUnit, token); !written)
                              {
                                  Logger::warning(std::format("尺寸单位没能保存：{}", written.error().message));
@@ -874,15 +874,15 @@ namespace
     QSpinBox *makeCornerRadiusSpin(ISettingsStore &settings)
     {
         auto *spin = new QSpinBox;
-        spin->setRange(GyanisScribe::Capture::kCaptureCornerRadiusMinimum, GyanisScribe::Capture::kCaptureCornerRadiusMaximum);
+        spin->setRange(GyanisScribe::Core::kCaptureCornerRadiusMinimum, GyanisScribe::Core::kCaptureCornerRadiusMaximum);
         spin->setSuffix(GyanisScribe::Base::uiText(" 像素"));
         spin->setAccessibleName(GyanisScribe::Base::uiText("圆角半径"));
         spin->setToolTip(GyanisScribe::Base::uiText("开着「圆角截图」时把四角切多圆：只对区域截图生效，整屏、窗口与滚动长截图不带"));
 
         const auto title  = GyanisScribe::Base::uiText("圆角半径");
-        const auto stored = settings.intValue(GyanisScribe::Core::kCaptureCornerRadius, GyanisScribe::Capture::kCaptureCornerRadiusDefault);
-        const auto parsed = GyanisScribe::Capture::parseCaptureCornerRadius(stored);
-        spin->setValue(shownValueForSetting(title, stored, parsed, GyanisScribe::Capture::kCaptureCornerRadiusDefault));
+        const auto stored = settings.intValue(GyanisScribe::Core::kCaptureCornerRadius, GyanisScribe::Core::kCaptureCornerRadiusDefault);
+        const auto parsed = GyanisScribe::Core::parseCaptureCornerRadius(stored);
+        spin->setValue(shownValueForSetting(title, stored, parsed, GyanisScribe::Core::kCaptureCornerRadiusDefault));
 
         QObject::connect(spin, &QSpinBox::valueChanged, spin,
                          [&settings, title](int value)
@@ -1791,7 +1791,7 @@ namespace GyanisScribe::App
      * @param settings 配置存储
      * @return 归调用方所有的输入框
      * @details 这一格没有「填坏」的面：认不出的名字只是排不掉任何窗口，原文照存；
-     *          大小写在解析那一层统一（见 `Capture::parseProcessExcludes`），这里不做改写。
+     *          大小写在解析那一层统一（见 `Core::parseProcessExcludes`），这里不做改写。
      */
     QLineEdit *makeDetectionExcludesEdit(ISettingsStore &settings)
     {

@@ -80,7 +80,6 @@ add_executable(TestModuleFlow
 target_link_libraries(TestModuleFlow PRIVATE
         App
         Annotation
-        Capture
         Core
         Ocr
         Platform
@@ -111,7 +110,6 @@ add_executable(TestAppController
 target_link_libraries(TestAppController PRIVATE
         App
         Annotation
-        Capture
         Core
         Ocr
         Platform

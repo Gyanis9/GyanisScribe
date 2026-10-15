@@ -5,6 +5,7 @@ add_subdirectory(Hotkey)
 add_subdirectory(Pick)
 add_subdirectory(History)
 add_subdirectory(Pin)
+add_subdirectory(Capture)
 
 get_property(CoreSources GLOBAL PROPERTY GyanisScribeCoreSources)
 add_library(Core STATIC ${CoreSources})

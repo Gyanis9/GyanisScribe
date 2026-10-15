@@ -6,11 +6,11 @@
 #include "Annotation/BlankCanvas.h"
 #include "App/ClipboardPin.h"
 #include "App/CustomHotkeys.h"
-#include "Capture/CaptureService.h"
-#include "Capture/IScreenCaptureSource.h"
-#include "Capture/RegionHistory.h"
-#include "Capture/ScreenCaptureSourceFactory.h"
-#include "Capture/ScreenUtils.h"
+#include "Gui/Capture/CaptureService.h"
+#include "Core/Capture/IScreenCaptureSource.h"
+#include "Core/Capture/RegionHistory.h"
+#include "Plugins/CaptureSources/ScreenCaptureSourceFactory.h"
+#include "Core/Capture/ScreenUtils.h"
 #include "Base/ExternalCommand.h"
 #include "Core/Image/ImageFit.h"
 #include "Core/Image/ImageFormat.h"
@@ -122,13 +122,13 @@ namespace GyanisScribe::App
 
     AppController::AppController(AppControllerParts parts, QObject *parent) :
         AppController(parts.settings ? std::move(parts.settings) : createSettingsStore(), parts.integration ? std::move(parts.integration) : Platform::createPlatformIntegration(),
-                      parts.captureSource ? std::move(parts.captureSource) : Capture::createScreenCaptureSource(),
+                      parts.captureSource ? std::move(parts.captureSource) : Plugins::createScreenCaptureSource(),
                       parts.historyStoragePath.empty() ? Core::HistoryStore::defaultStoragePath() : std::move(parts.historyStoragePath), parent)
     {
     }
 
     AppController::AppController(std::unique_ptr<Core::SettingsStore> settings, std::unique_ptr<Platform::IPlatformIntegration> integration,
-                                 std::unique_ptr<Capture::IScreenCaptureSource> captureSource, std::filesystem::path historyStoragePath, QObject *parent) :
+                                 std::unique_ptr<Core::IScreenCaptureSource> captureSource, std::filesystem::path historyStoragePath, QObject *parent) :
         QObject(parent), m_settings(std::move(settings)), m_integration(std::move(integration)), m_captureSource(std::move(captureSource))
     {
         // 语言要排在所有界面对象之前：translator 装晚了，已经建好的控件仍然拿源码文案
@@ -147,7 +147,7 @@ namespace GyanisScribe::App
             Base::Logger::warning(std::format("界面语言的配置值读不出：{}，按中文继续", parsed.error().message));
         }
 
-        m_capture = std::make_unique<Capture::CaptureService>(*m_captureSource, *m_settings, *m_integration);
+        m_capture = std::make_unique<Gui::CaptureService>(*m_captureSource, *m_settings, *m_integration);
         m_hotkeys = std::make_unique<Core::HotkeyManager>(*m_settings, *m_integration);
 
         // 主题与图标：样式表落下去、图标描边色跟着走。这里挂一次连接，之后所有取图标的地方都不用再过问主题
@@ -261,9 +261,9 @@ namespace GyanisScribe::App
                              }
                          });
 
-        QObject::connect(m_capture.get(), &Capture::ICaptureService::captured, this, &AppController::handleCaptured);
-        QObject::connect(m_capture.get(), &Capture::ICaptureService::captureCancelled, this, [] { Base::Logger::info("截图已取消"); });
-        QObject::connect(m_capture.get(), &Capture::ICaptureService::captureFailed, this,
+        QObject::connect(m_capture.get(), &Core::ICaptureService::captured, this, &AppController::handleCaptured);
+        QObject::connect(m_capture.get(), &Core::ICaptureService::captureCancelled, this, [] { Base::Logger::info("截图已取消"); });
+        QObject::connect(m_capture.get(), &Core::ICaptureService::captureFailed, this,
                          [this](const Base::Error &error)
                          {
                              Base::Logger::error(std::format("截图未完成：{}", error.message));
@@ -810,7 +810,7 @@ namespace GyanisScribe::App
         // 选区存的是「屏幕内」的逻辑坐标，回读后要加屏幕原点换成全局坐标；
         // 没有可用记录时按整块可用区处理，工具栏照摆不误
         auto selection = screen->availableGeometry();
-        if (const auto parsed = Capture::regionFromText(m_settings->stringValue(Core::kCaptureLastRegion, QString{}).toStdString()); parsed)
+        if (const auto parsed = Core::regionFromText(m_settings->stringValue(Core::kCaptureLastRegion, QString{}).toStdString()); parsed)
         {
             selection = QRect{parsed->topLeft() + screen->geometry().topLeft(), parsed->size()};
         }
@@ -1165,7 +1165,7 @@ namespace GyanisScribe::App
             return;
         }
 
-        auto *screen = Capture::screenAtGlobalPoint(target->center());
+        auto *screen = Core::screenAtGlobalPoint(target->center());
         if (screen == nullptr)
         {
             notifyUser(GyanisScribe::Base::uiText("这块屏幕已经不在了，重抓不到画面。把贴图挪回还在的屏幕上再刷新"), Gui::ToastKind::Danger);
@@ -1542,8 +1542,8 @@ namespace GyanisScribe::App
 
         if (config.mode == Record::RecordMode::Region)
         {
-            // 「上次选区」取历史首条：与截图那边「重复上次选区」同一条（选区历史见 Capture/RegionHistory.h）
-            const auto history = Capture::loadRegionHistory(*m_settings);
+            // 「上次选区」取历史首条：与截图那边「重复上次选区」同一条（选区历史见 Core/Capture/RegionHistory.h）
+            const auto history = Core::loadRegionHistory(*m_settings);
             if (!history)
             {
                 return std::unexpected(history.error());

@@ -74,7 +74,7 @@ namespace GyanisScribe::Platform
      * @param monitors 各块屏的读数
      * @return 命中的下标；一块都不含这个点时返回 monitors.size()（拔屏后的陈旧读数）
      * @details 跨屏窗口的中心只会落在一块屏上，落点由这条选屏后再做换算；接缝上的点按声明顺序取第一块，
-     *          与 Capture::screenAtGlobalPoint() 同一条规则，两处不一致会让同一个窗口两次算出不同位置。
+     *          与 Core::screenAtGlobalPoint() 同一条规则，两处不一致会让同一个窗口两次算出不同位置。
      */
     [[nodiscard]] std::size_t monitorIndexForPoint(const QPoint &physicalPoint, const std::vector<MonitorMapping> &monitors);
 

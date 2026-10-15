@@ -3,7 +3,7 @@
 // 以及临时帧的处置（编码失败留着好重编码，取消则整棵删掉且一次编码都不叫）。
 // 假编码器把 encode() 停在门闩上，「调用已返回而活还没干完」因此成了可断言的事。
 
-#include "Capture/IScreenCaptureSource.h"
+#include "Core/Capture/IScreenCaptureSource.h"
 #include "Base/Paths.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Base/Types.h"
@@ -38,7 +38,7 @@
 #include <thread>
 #include <vector>
 
-using GyanisScribe::Capture::IScreenCaptureSource;
+using GyanisScribe::Core::IScreenCaptureSource;
 using GyanisScribe::Base::CapturedImage;
 using GyanisScribe::Base::Error;
 using GyanisScribe::Base::ErrorCode;

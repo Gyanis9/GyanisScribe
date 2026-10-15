@@ -7,7 +7,7 @@
 
 #include "App/TrayController.h"
 #include "Annotation/AnnotationToolbar.h"
-#include "Capture/ScreenUtils.h"
+#include "Core/Capture/ScreenUtils.h"
 #include "Core/History/HistoryRules.h"
 #include "Core/History/HistoryStore.h"
 #include "Core/Pin/PinLayout.h"
@@ -425,9 +425,9 @@ namespace
         m_window->open(MainWindowPage::Capture);
         auto *spin = qobject_cast<QSpinBox *>(controlInCurrentPage("圆角半径"));
         ASSERT_NE(spin, nullptr) << "截图页里没有「圆角半径」这一格";
-        EXPECT_EQ(spin->value(), GyanisScribe::Capture::kCaptureCornerRadiusDefault) << "没存过时要显示默认那一档";
-        EXPECT_EQ(spin->minimum(), GyanisScribe::Capture::kCaptureCornerRadiusMinimum) << "下限要与 parseCaptureCornerRadius 的拒绝面同解";
-        EXPECT_EQ(spin->maximum(), GyanisScribe::Capture::kCaptureCornerRadiusMaximum) << "上限要与 parseCaptureCornerRadius 的拒绝面同解";
+        EXPECT_EQ(spin->value(), GyanisScribe::Core::kCaptureCornerRadiusDefault) << "没存过时要显示默认那一档";
+        EXPECT_EQ(spin->minimum(), GyanisScribe::Core::kCaptureCornerRadiusMinimum) << "下限要与 parseCaptureCornerRadius 的拒绝面同解";
+        EXPECT_EQ(spin->maximum(), GyanisScribe::Core::kCaptureCornerRadiusMaximum) << "上限要与 parseCaptureCornerRadius 的拒绝面同解";
 
         spin->setValue(25);
         closeWindowAndFlush();
@@ -435,7 +435,7 @@ namespace
         const auto reopened = makeStore();
         const auto stored   = reopened->intValue(GyanisScribe::Core::kCaptureCornerRadius, -1);
         EXPECT_EQ(stored, 25) << "这一行没把值写进 Capture/CornerRadius";
-        const auto parsed = GyanisScribe::Capture::parseCaptureCornerRadius(stored);
+        const auto parsed = GyanisScribe::Core::parseCaptureCornerRadius(stored);
         ASSERT_TRUE(static_cast<bool>(parsed)) << parsed.error().message;
         EXPECT_EQ(*parsed, 25);
     }

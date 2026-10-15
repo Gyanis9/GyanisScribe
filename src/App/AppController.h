@@ -33,11 +33,15 @@ class QScreen;
 #include <memory>
 #include <optional>
 
-namespace GyanisScribe::Capture
+namespace GyanisScribe::Core
+{
+    class IScreenCaptureSource;
+} // namespace GyanisScribe::Core
+
+namespace GyanisScribe::Gui
 {
     class CaptureService;
-    class IScreenCaptureSource;
-} // namespace GyanisScribe::Capture
+} // namespace GyanisScribe::Gui
 
 namespace GyanisScribe::Annotation
 {
@@ -116,7 +120,7 @@ namespace GyanisScribe::App
     {
         std::unique_ptr<Core::SettingsStore>            settings;           ///< 配置存储；空 = 按便携标记自建
         std::unique_ptr<Platform::IPlatformIntegration> integration;        ///< 平台集成；空 = 本机那一份
-        std::unique_ptr<Capture::IScreenCaptureSource>  captureSource;      ///< 抓帧来源；空 = 本机抓屏
+        std::unique_ptr<Core::IScreenCaptureSource>     captureSource;      ///< 抓帧来源；空 = 本机抓屏
         std::filesystem::path                           historyStoragePath; ///< 历史清单落点；空 = 默认位置
     };
 
@@ -293,7 +297,7 @@ namespace GyanisScribe::App
          * @param parent QObject 父对象
          */
         AppController(std::unique_ptr<Core::SettingsStore> settings, std::unique_ptr<Platform::IPlatformIntegration> integration,
-                      std::unique_ptr<Capture::IScreenCaptureSource> captureSource, std::filesystem::path historyStoragePath, QObject *parent);
+                      std::unique_ptr<Core::IScreenCaptureSource> captureSource, std::filesystem::path historyStoragePath, QObject *parent);
 
         /**
          * @brief 抓到一帧之后的收尾：开启一轮标注
@@ -595,8 +599,8 @@ namespace GyanisScribe::App
 
         std::unique_ptr<Core::SettingsStore>              m_settings;                                     ///< 配置存储
         std::unique_ptr<Platform::IPlatformIntegration>   m_integration;                                  ///< 平台集成
-        std::unique_ptr<Capture::IScreenCaptureSource>    m_captureSource;                                ///< 抓帧来源
-        std::unique_ptr<Capture::CaptureService>          m_capture;                                      ///< 截图编排
+        std::unique_ptr<Core::IScreenCaptureSource>       m_captureSource;                                ///< 抓帧来源
+        std::unique_ptr<Gui::CaptureService>              m_capture;                                      ///< 截图编排
         std::unique_ptr<Core::HotkeyManager>              m_hotkeys;                                      ///< 热键登记与触发
         std::unique_ptr<GyanisScribe::Gui::ThemeManager>  m_theme;                                        ///< 主题档位与样式表
         std::unique_ptr<GyanisScribe::Gui::IconProvider>  m_icons;                                        ///< 图标供给器，描边色跟主题

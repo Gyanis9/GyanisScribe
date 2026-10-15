@@ -6,7 +6,7 @@
 #include "App/AppController.h"
 
 #include "App/CaptureIntent.h"
-#include "Capture/IScreenCaptureSource.h"
+#include "Core/Capture/IScreenCaptureSource.h"
 #include "Base/Paths.h"
 #include "Base/Types.h"
 #include "Core/History/HistoryRules.h"
@@ -67,7 +67,7 @@ namespace GyanisScribe
          * @details 计数是这几条判据的落脚点：延时那一档要判「到点之前一次都没被叫」，
          *          换入口那一档要判「叫的是哪一路」。
          */
-        class CountingScreenSource final : public GyanisScribe::Capture::IScreenCaptureSource
+        class CountingScreenSource final : public GyanisScribe::Core::IScreenCaptureSource
         {
         public:
             explicit CountingScreenSource(Base::CapturedImage frame) : m_frame(std::move(frame))
