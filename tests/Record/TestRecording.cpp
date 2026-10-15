@@ -531,6 +531,28 @@ TEST(RecorderFrameRateSetting, AcceptsInRangeAndRejectsOutside)
 }
 
 /**
+ * @brief 钉住最长录制时长的范围、拒绝面与缺省那一处真源
+ * @details 上限必须与 `validateRecorderConfig` 用的是同一个常量：设置页摆得出去、开始那一刻却拒收，
+ *          是这一格最容易出的岔子。缺省那一条同时钉住「结构体初值与解析回落是同一个数」——
+ *          两处各写 600 时改一处漏一处，用户会看到「设置里默认十分钟、录起来却是别的」。
+ */
+TEST(RecorderDurationSetting, DefaultsComeFromOneConstantAndOutOfRangeIsRejected)
+{
+    EXPECT_EQ(GyanisScribe::Record::RecorderConfig{}.maximumDurationSeconds, GyanisScribe::Record::kDefaultMaximumDurationSeconds) << "结构体初值与该常量分家";
+    EXPECT_EQ(GyanisScribe::Record::parseMaximumDurationSetting(1).value(), 1) << "1 秒也是可用值，不许当坏值";
+    EXPECT_EQ(GyanisScribe::Record::parseMaximumDurationSetting(GyanisScribe::Record::kDefaultMaximumDurationSeconds).value(), 600);
+    EXPECT_EQ(GyanisScribe::Record::parseMaximumDurationSetting(GyanisScribe::Record::kMaximumDurationSeconds).value(), 7200);
+
+    for (const int bad: {0, -1, 7201})
+    {
+        const auto parsed = GyanisScribe::Record::parseMaximumDurationSetting(bad);
+        ASSERT_FALSE(parsed.has_value()) << bad;
+        EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument) << bad;
+        EXPECT_NE(parsed.error().message.find("Record/MaximumDurationSeconds"), std::string::npos) << bad;
+    }
+}
+
+/**
  * @brief 钉住画面码率的读法：0 是一档而不是「没填」，越界要点名范围与配置键
  * @details 0 这一档叫「按质量优先」，把它当成没配而回落某个具体数值，就等于替用户选了另一种控法。
  */

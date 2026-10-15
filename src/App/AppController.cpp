@@ -1465,6 +1465,15 @@ namespace GyanisScribe::App
         {
             Core::Logger::warning(std::format("录屏默认帧率读不出：{}，本次按 {} 帧开始", parsed.error().message, config.frameRate));
         }
+        // 最长时长同一条形状：读不出就记一条并按初值走，validateRecorderConfig 开始前还会再判一次范围
+        if (const auto parsed = Record::parseMaximumDurationSetting(m_settings->intValue(Settings::kRecordMaximumDuration, Record::kDefaultMaximumDurationSeconds)); parsed)
+        {
+            config.maximumDurationSeconds = *parsed;
+        } else
+        {
+            Core::Logger::warning(std::format("最长录制时长读不出：{}，本次按 {} 秒开始", parsed.error().message, config.maximumDurationSeconds));
+        }
+
         // 画面码率与帧率同一条形状：读不出就记一条并按初值（按质量优先）走，不替用户挑一档
         if (const auto parsed = Record::parseVideoBitrateSetting(m_settings->intValue(Settings::kRecordVideoBitrate, Record::kDefaultVideoBitrateKbps)); parsed)
         {

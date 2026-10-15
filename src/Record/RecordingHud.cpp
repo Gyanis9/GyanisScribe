@@ -141,6 +141,7 @@ namespace GyanisScribe::Record
         m_elapsed = new QLabel{formatDuration(0), this};
         m_elapsed->setObjectName(QStringLiteral("metricValue"));
         m_elapsed->setAccessibleName(GyanisScribe::Core::uiText("已录时长"));
+        m_elapsed->setToolTip(GyanisScribe::Core::uiText("已录了多久。录到设置里「最长录多久」那一格就自动收尾并保存（默认 10 分钟）"));
         // 等宽数字：一秒一跳时这一列的宽度不能变，否则整条控制条每秒钟抖一次
         GyanisScribe::Ui::applyTextRole(*m_elapsed, GyanisScribe::Ui::TextRole::Metric);
         line->addWidget(m_elapsed);

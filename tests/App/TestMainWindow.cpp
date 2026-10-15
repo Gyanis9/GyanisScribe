@@ -237,7 +237,7 @@ namespace
                 Expectation{MainWindowPage::Annotation, {"默认线宽", "默认字号", "空白画布用透明底"}, true},
                 Expectation{MainWindowPage::Pin, {"默认不透明度", "吸附距离", "不许拖边改大小"}, true},
                 Expectation{MainWindowPage::Record,
-                            {"录屏目录", "录制范围", "输出格式", "默认帧率", "录屏倒计时", "画面码率", "视频编码器", "光标高亮", "麦克风设备", "系统声音设备"},
+                            {"录屏目录", "录制范围", "输出格式", "默认帧率", "录屏倒计时", "最长录多久", "画面码率", "视频编码器", "光标高亮", "麦克风设备", "系统声音设备"},
                             true},
                 Expectation{MainWindowPage::Ocr, {"识别语言", "语言包目录"}, true},
                 Expectation{MainWindowPage::Hotkey, {"截图", "录屏", "文字识别", "屏幕取色", "快速保存", "允许单键当全局热键"}, true},
@@ -447,6 +447,27 @@ namespace
         EXPECT_TRUE(reopened->boolValue(GyanisScribe::Settings::kRecordCursorHighlight, false));
     }
 
+    /**
+     * @brief 钉住「最长录多久」这一格：写进读端认的键、范围与校验同解、默认十分钟
+     * @details 这一格此前根本没有（录满十分钟自己停，界面上一句都不说），所以判据先从「有这一格」起，
+     *          再钉范围与认错面：摆得出去的值必须收得下，默认那一档要与结构体初值同值。
+     */
+    TEST_F(MainWindowFixture, MaximumDurationRowWritesTheKeyTheRecorderReads)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::Record);
+
+        auto *spin = qobject_cast<QSpinBox *>(controlInCurrentPage("最长录多久"));
+        ASSERT_NE(spin, nullptr) << "录屏页没有这一格：录满上限自动停这件事用户看不到也说不了";
+        EXPECT_EQ(spin->value(), GyanisScribe::Record::kDefaultMaximumDurationSeconds) << "默认该是十分钟";
+        EXPECT_EQ(spin->maximum(), GyanisScribe::Record::kMaximumDurationSeconds) << "上限要与校验那一处的常量同解，否则界面能给出运行期不收的值";
+
+        spin->setValue(1800);
+        closeWindowAndFlush();
+
+        const auto reopened = makeStore();
+        EXPECT_EQ(reopened->intValue(GyanisScribe::Settings::kRecordMaximumDuration, -1), 1800) << "没写进 Record/MaximumDurationSeconds";
+    }
     /**
      * @brief 钉住 GIF 档下帧率那一格的天花板，以及切回 MP4 时用户那一档的还原
      * @details 上限来自 Record::kMaximumGifFrameRate 一处真源（与 validateRecorderConfig 同解）：

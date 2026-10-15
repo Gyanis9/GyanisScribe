@@ -1112,6 +1112,18 @@
             <translation>Pin default opacity</translation>
         </message>
         <message>
+            <source> 秒</source>
+            <translation> s</translation>
+        </message>
+        <message>
+            <source>最长录多久</source>
+            <translation>Maximum recording length</translation>
+        </message>
+        <message>
+            <source>录到这个时长就自动收尾并保存：默认 600 秒（10 分钟），上限 7200 秒（2 小时）</source>
+            <translation>Recording stops and saves itself at this length: 600 seconds (10 minutes) by default, up to 7200 seconds (2 hours)</translation>
+        </message>
+        <message>
             <source> 帧/秒</source>
             <translation> fps</translation>
         </message>
@@ -1122,10 +1134,6 @@
         <message>
             <source>录屏默认帧率</source>
             <translation>Recording default frame rate</translation>
-        </message>
-        <message>
-            <source> 秒</source>
-            <translation> s</translation>
         </message>
         <message>
             <source>延时截图</source>
@@ -3276,6 +3284,10 @@
             <translation>Video bitrate "{}" is not in the available range (0 to {} kbps, where 0 means quality first): pick a value again on the recording page of Settings, or delete the Record/VideoBitrateKbps entry to fall back to the default</translation>
         </message>
         <message>
+            <source>最长录制时长「{}」不在可用范围（1 到 {} 秒，即最多 {} 分钟）里：请在设置的录屏页重选，或删掉 Record/MaximumDurationSeconds 这一项回到默认的 {} 秒</source>
+            <translation>Maximum recording length "{}" is outside the usable range (1 to {} seconds, i.e. up to {} minutes): pick another value on the Record settings page, or delete the Record/MaximumDurationSeconds entry to go back to the default {} seconds</translation>
+        </message>
+        <message>
             <source>倒计时「{}」不在可用范围（0 到 {} 秒，0 表示立即开始）里：请在设置的录屏页重选，或删掉 Record/CountdownSeconds 这一项回到默认档</source>
             <translation>Countdown “{}” is outside the range (0 to {} seconds; 0 starts immediately): reselect it on the Record page of Settings, or remove Record/CountdownSeconds to fall back to the default</translation>
         </message>
@@ -3342,6 +3354,10 @@
         <message>
             <source>已录时长</source>
             <translation>Time recorded</translation>
+        </message>
+        <message>
+            <source>已录了多久。录到设置里「最长录多久」那一格就自动收尾并保存（默认 10 分钟）</source>
+            <translation>How long this recording has been running. It stops and saves itself at the "maximum recording length" set in the settings (10 minutes by default)</translation>
         </message>
         <message>
             <source>放弃这一段，不保存成品</source>

@@ -776,6 +776,37 @@ namespace
      * @param settings 配置存储
      * @return 归调用方所有的数字框
      */
+    /**
+     * @brief 「最长录多久」那一格（秒）
+     * @param settings 配置存储
+     * @return 归调用方所有的数字框
+     * @details 范围与 `parseMaximumDurationSetting` 同解（1 到两小时）：摆得出去的值得是开始那一刻收得下的值。
+     *          步长给一分钟——这一格是按分钟想的（默认十分钟），但配置与校验都按秒，换算只在这一处步长里。
+     */
+    QSpinBox *makeMaximumDurationSpin(ISettingsStore &settings)
+    {
+        auto *spin = new QSpinBox;
+        spin->setRange(1, GyanisScribe::Record::kMaximumDurationSeconds);
+        spin->setSingleStep(60);
+        spin->setSuffix(GyanisScribe::Core::uiText(" 秒"));
+        spin->setAccessibleName(GyanisScribe::Core::uiText("最长录多久"));
+        spin->setToolTip(GyanisScribe::Core::uiText("录到这个时长就自动收尾并保存：默认 600 秒（10 分钟），上限 7200 秒（2 小时）"));
+
+        const auto title  = GyanisScribe::Core::uiText("最长录多久");
+        const auto stored = settings.intValue(GyanisScribe::Settings::kRecordMaximumDuration, GyanisScribe::Record::kDefaultMaximumDurationSeconds);
+        spin->setValue(shownValueForSetting(title, stored, GyanisScribe::Record::parseMaximumDurationSetting(stored), GyanisScribe::Record::kDefaultMaximumDurationSeconds));
+
+        QObject::connect(spin, &QSpinBox::valueChanged, spin,
+                         [&settings, title](int value)
+                         {
+                             if (auto written = settings.setValue(GyanisScribe::Settings::kRecordMaximumDuration, value); !written)
+                             {
+                                 Logger::warning(std::format("{} 没能写入：{}", title.toStdString(), written.error().message));
+                             }
+                         });
+        return spin;
+    }
+
     QSpinBox *makeFrameRateSpin(ISettingsStore &settings)
     {
         auto *spin = new QSpinBox;
@@ -2189,6 +2220,7 @@ namespace GyanisScribe::App
         auto *frameRateSpin = makeFrameRateSpin(m_settings);
         form->addRow(GyanisScribe::Core::uiText("默认帧率"), frameRateSpin);
         form->addRow(GyanisScribe::Core::uiText("倒计时"), makeCountdownSpin(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("最长录多久"), makeMaximumDurationSpin(m_settings));
         form->addRow(GyanisScribe::Core::uiText("画面码率"), makeVideoBitrateSpin(m_settings));
         form->addRow(GyanisScribe::Core::uiText("视频编码器"), makeVideoEncoderCombo(m_settings, *m_videoEncoders));
         form->addRow(GyanisScribe::Core::uiText("光标高亮"), makeCursorHighlightCheck(m_settings, m_icons));

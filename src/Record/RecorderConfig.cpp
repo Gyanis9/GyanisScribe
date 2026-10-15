@@ -100,6 +100,21 @@ namespace GyanisScribe::Record
         }}};
     }
 
+    Core::Expected<int> parseMaximumDurationSetting(const int stored)
+    {
+        if (stored >= 1 && stored <= kMaximumDurationSeconds)
+        {
+            return stored;
+        }
+        return Core::Expected<int>{std::unexpected{Core::Error{
+                .code = Core::ErrorCode::InvalidArgument,
+                .message =
+                        GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("最长录制时长「{}」不在可用范围（1 到 {} 秒，即最多 {} 分钟）里：请在设置的录屏页重选，或删掉 "
+                                                                                    "Record/MaximumDurationSeconds 这一项回到默认的 {} 秒"),
+                                                     stored, kMaximumDurationSeconds, kMaximumDurationSeconds / 60, kDefaultMaximumDurationSeconds),
+        }}};
+    }
+
     Core::Expected<int> parseCountdownSetting(const int stored)
     {
         // 0 是「立即开始」这一档，不是没填：负值与超出上限的大值才是手改配置写歪了

@@ -236,6 +236,10 @@ namespace GyanisScribe::Settings
     /// 读端在 AppController 造参数那一处，写端在设置的录屏页
     inline constexpr std::string_view kRecordVideoBitrate = "Record/VideoBitrateKbps";
 
+    /// 一轮录屏最长多少秒（1 到 Record::kMaximumDurationSeconds，缺省 kDefaultMaximumDurationSeconds）；
+    /// 到点自动收尾，读端在 AppController 造参数那一处，写端在设置的录屏页
+    inline constexpr std::string_view kRecordMaximumDuration = "Record/MaximumDurationSeconds";
+
     /// 录屏时是否把光标位置圈在帧上，读端在 AppController 造参数那一处，写端在设置的录屏页
     inline constexpr std::string_view kRecordCursorHighlight = "Record/CursorHighlight";
 

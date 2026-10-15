@@ -21,6 +21,9 @@
 namespace GyanisScribe::Record
 {
 
+    /// 一轮录屏的最长时长缺省值，秒：十分钟够录一段操作说明，也远不到把磁盘写满
+    inline constexpr int kDefaultMaximumDurationSeconds = 600;
+
     /// 录什么：整屏、选区还是一个窗口
     enum class RecordMode
     {
@@ -43,20 +46,20 @@ namespace GyanisScribe::Record
      */
     struct RecorderConfig
     {
-        RecordMode            mode                   = RecordMode::FullScreen; ///< 录什么
-        OutputFormat          format                 = OutputFormat::Mp4;      ///< 存成什么
-        int                   frameRate              = 15;                     ///< 目标帧率，逻辑每秒帧数
-        int                   videoBitrateKbps       = 0;                      ///< 画面码率 kbps，0 表示按质量优先（CRF），只对 MP4 起作用
-        int                   maximumDurationSeconds = 600;                    ///< 最长录多久，到点自动收
-        QRect                 region;                                          ///< Region 模式的选区，屏幕内逻辑坐标
-        QString               screenName;                                      ///< 录哪块屏幕，全部模式必填
-        quintptr              windowHandle = 0;                                ///< Window 模式的平台窗口句柄（Qt 的 WId）
-        std::filesystem::path outputDirectory;                                 ///< 成品文件落在哪个目录
-        QString               nameTemplate;                                    ///< 成品文件名模板，留空即默认档；读端在 FfmpegRecordingEncoder
-        bool                  cursorHighlight = false;                         ///< 是否在帧上圈出光标位置
-        QString               microphoneDevice;                                ///< 麦克风那一路的 dshow 标识，空表示不取这一路
-        QString               systemSoundDevice;                               ///< 系统声音那一路的 dshow 标识，空表示不取这一路
-        std::string           videoEncoder;                                    ///< 钉死的 MP4 编码器名；空表示按偏好顺序逐个探测自动选
+        RecordMode            mode                   = RecordMode::FullScreen;         ///< 录什么
+        OutputFormat          format                 = OutputFormat::Mp4;              ///< 存成什么
+        int                   frameRate              = 15;                             ///< 目标帧率，逻辑每秒帧数
+        int                   videoBitrateKbps       = 0;                              ///< 画面码率 kbps，0 表示按质量优先（CRF），只对 MP4 起作用
+        int                   maximumDurationSeconds = kDefaultMaximumDurationSeconds; ///< 最长录多久，到点自动收
+        QRect                 region;                                                  ///< Region 模式的选区，屏幕内逻辑坐标
+        QString               screenName;                                              ///< 录哪块屏幕，全部模式必填
+        quintptr              windowHandle = 0;                                        ///< Window 模式的平台窗口句柄（Qt 的 WId）
+        std::filesystem::path outputDirectory;                                         ///< 成品文件落在哪个目录
+        QString               nameTemplate;                                            ///< 成品文件名模板，留空即默认档；读端在 FfmpegRecordingEncoder
+        bool                  cursorHighlight = false;                                 ///< 是否在帧上圈出光标位置
+        QString               microphoneDevice;                                        ///< 麦克风那一路的 dshow 标识，空表示不取这一路
+        QString               systemSoundDevice;                                       ///< 系统声音那一路的 dshow 标识，空表示不取这一路
+        std::string           videoEncoder;                                            ///< 钉死的 MP4 编码器名；空表示按偏好顺序逐个探测自动选
     };
 
     /**
@@ -129,6 +132,15 @@ namespace GyanisScribe::Record
      * @details 0 是合法值而不是「没填」：它就是「立即开始」这一档的名字。
      */
     [[nodiscard]] Core::Expected<int> parseCountdownSetting(int stored);
+
+    /**
+     * @brief 解析配置里存的最长录制时长
+     * @param stored 配置读出的秒数
+     * @return 1 到 kMaximumDurationSeconds 之间的秒数；越界时返回带范围的中文原因
+     * @details 与 validateRecorderConfig 用的是同一个上限（一处真源）：
+     *          设置页摆得出去、开始那一刻却拒收，是这一格最容易出的岔子。
+     */
+    [[nodiscard]] Core::Expected<int> parseMaximumDurationSetting(int stored);
 
     /// 一档录制范围：存进配置的 token，与设置页显示的中文标签
     struct RecordScopeChoice
