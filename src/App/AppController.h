@@ -10,7 +10,7 @@
 #pragma once
 
 #include "Base/Types.h"
-#include "Hotkey/IHotkeyManager.h"
+#include "Core/Hotkey/IHotkeyManager.h"
 
 #include "App/MainWindow.h"
 #include "App/CaptureIntent.h"
@@ -79,10 +79,10 @@ namespace GyanisScribe::Record
     class RecordingService;
 } // namespace GyanisScribe::Record
 
-namespace GyanisScribe::Hotkey
+namespace GyanisScribe::Core
 {
     class HotkeyManager;
-} // namespace GyanisScribe::Hotkey
+} // namespace GyanisScribe::Core
 
 namespace GyanisScribe::Platform
 {
@@ -160,7 +160,7 @@ namespace GyanisScribe::App
          * @return 成功返回本轮登记结果；热键一项都没登记上也返回成功结果，失败项在报告里
          * @note 托盘、设置页与热键重载都调这一个，避免出现第二套登记路径
          */
-        [[nodiscard]] Base::Expected<Hotkey::HotkeyReloadReport> registerHotkeys();
+        [[nodiscard]] Base::Expected<Core::HotkeyReloadReport> registerHotkeys();
 
         /**
          * @brief 进入截图框选
@@ -597,7 +597,7 @@ namespace GyanisScribe::App
         std::unique_ptr<Platform::IPlatformIntegration>      m_integration;                                  ///< 平台集成
         std::unique_ptr<Capture::IScreenCaptureSource>       m_captureSource;                                ///< 抓帧来源
         std::unique_ptr<Capture::CaptureService>             m_capture;                                      ///< 截图编排
-        std::unique_ptr<Hotkey::HotkeyManager>               m_hotkeys;                                      ///< 热键登记与触发
+        std::unique_ptr<Core::HotkeyManager>               m_hotkeys;                                      ///< 热键登记与触发
         std::unique_ptr<GyanisScribe::Gui::ThemeManager>      m_theme;                                        ///< 主题档位与样式表
         std::unique_ptr<GyanisScribe::Gui::IconProvider>      m_icons;                                        ///< 图标供给器，描边色跟主题
         std::unique_ptr<Annotation::AnnotationEngine>        m_annotation;                                   ///< 标注引擎，跨轮次保留（载入新帧会清空）

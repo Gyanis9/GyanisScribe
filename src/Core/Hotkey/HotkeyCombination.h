@@ -17,7 +17,7 @@
 
 class QString;
 
-namespace GyanisScribe::Hotkey
+namespace GyanisScribe::Core
 {
 
     /**
@@ -105,4 +105,4 @@ namespace GyanisScribe::Hotkey
         Qt::Key               m_key       = Qt::Key_unknown; ///< 按键本体
     };
 
-} // namespace GyanisScribe::Hotkey
+} // namespace GyanisScribe::Core

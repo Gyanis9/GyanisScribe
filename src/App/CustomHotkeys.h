@@ -10,7 +10,7 @@
 #pragma once
 
 #include "App/TrayController.h"
-#include "Hotkey/IHotkeyManager.h"
+#include "Core/Hotkey/IHotkeyManager.h"
 
 #include <QString>
 
@@ -70,6 +70,6 @@ namespace GyanisScribe::App
      * @param settings 配置存储
      * @return 组合非空的那些；顺序就是 bindableActions() 的顺序（编号按下标算，两边必须同序）
      */
-    [[nodiscard]] std::vector<Hotkey::CustomHotkeyBinding> collectCustomBindings(const Core::ISettingsStore &settings);
+    [[nodiscard]] std::vector<Core::CustomHotkeyBinding> collectCustomBindings(const Core::ISettingsStore &settings);
 
 } // namespace GyanisScribe::App

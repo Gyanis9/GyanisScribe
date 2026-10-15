@@ -20,7 +20,7 @@
 #include "Base/Text.h"
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
-#include "Hotkey/HotkeyCombination.h"
+#include "Core/Hotkey/HotkeyCombination.h"
 #include "Core/Settings/SettingsStore.h"
 #include "Gui/Controls/AppShortcuts.h"
 #include "Gui/Theme/DesignTokens.h"
@@ -813,7 +813,7 @@ namespace
         }
         ASSERT_NE(captureEdit, nullptr) << "快捷键页没有「截图」那一格";
 
-        const GyanisScribe::Hotkey::HotkeyCombination bare{Qt::NoModifier, Qt::Key_R};
+        const GyanisScribe::Core::HotkeyCombination bare{Qt::NoModifier, Qt::Key_R};
         EXPECT_FALSE(static_cast<bool>(captureEdit->applyCombination(bare))) << "默认那一档要拒裸键：单键会把别的程序的打字吞掉";
 
         auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage("允许单键当全局热键"));
@@ -1564,11 +1564,11 @@ TEST_F(MainWindowFixture, InWindowShortcutRowsIgnoreTheHotkeyCapabilityAndAccept
     for (auto *edit: inWindow)
     {
         EXPECT_TRUE(edit->isEnabled()) << std::string{edit->boundKey()} << " 被平台能力位灰掉了：界面按键在自己的窗口里认，与登记口无关";
-        EXPECT_TRUE(static_cast<bool>(edit->applyCombination(GyanisScribe::Hotkey::HotkeyCombination{Qt::NoModifier, Qt::Key_K})))
+        EXPECT_TRUE(static_cast<bool>(edit->applyCombination(GyanisScribe::Core::HotkeyCombination{Qt::NoModifier, Qt::Key_K})))
                 << std::string{edit->boundKey()} << " 该收下裸键";
     }
 
-    EXPECT_FALSE(globalRow->applyCombination(GyanisScribe::Hotkey::HotkeyCombination{Qt::NoModifier, Qt::Key_K}).has_value()) << "全局那一档收了裸键，登记阶段才会报「组合不合格」";
+    EXPECT_FALSE(globalRow->applyCombination(GyanisScribe::Core::HotkeyCombination{Qt::NoModifier, Qt::Key_K}).has_value()) << "全局那一档收了裸键，登记阶段才会报「组合不合格」";
 }
 
 /**
@@ -1861,7 +1861,7 @@ TEST_F(MainWindowFixture, CustomHotkeyRowWritesItsOwnKey)
     }
     ASSERT_NE(edit, nullptr) << "快捷键页没有「整屏截图」这一行可绑的编辑框";
 
-    ASSERT_TRUE(static_cast<bool>(edit->applyCombination(GyanisScribe::Hotkey::HotkeyCombination{Qt::ControlModifier | Qt::AltModifier, Qt::Key_F2})));
+    ASSERT_TRUE(static_cast<bool>(edit->applyCombination(GyanisScribe::Core::HotkeyCombination{Qt::ControlModifier | Qt::AltModifier, Qt::Key_F2})));
 
     closeWindowAndFlush();
     EXPECT_EQ(makeStore()->stringValue(std::string{"Hotkey/Custom/CaptureFullScreen"}, QStringLiteral("没填")), QStringLiteral("Ctrl+Alt+F2"))
@@ -1886,7 +1886,7 @@ TEST_F(MainWindowFixture, UnbindRemovesTheCustomHotkeyEntry)
         }
     }
     ASSERT_NE(edit, nullptr);
-    ASSERT_TRUE(static_cast<bool>(edit->applyCombination(GyanisScribe::Hotkey::HotkeyCombination{Qt::ControlModifier | Qt::AltModifier, Qt::Key_F2})));
+    ASSERT_TRUE(static_cast<bool>(edit->applyCombination(GyanisScribe::Core::HotkeyCombination{Qt::ControlModifier | Qt::AltModifier, Qt::Key_F2})));
 
     QPushButton *clear = nullptr;
     for (auto *candidate: m_window->findChildren<QPushButton *>())

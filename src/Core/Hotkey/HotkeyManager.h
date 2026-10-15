@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Hotkey/IHotkeyManager.h"
+#include "Core/Hotkey/IHotkeyManager.h"
 
 #include <array>
 #include <span>
@@ -29,7 +29,7 @@ namespace GyanisScribe::Core
     class ISettingsStore;
 } // namespace GyanisScribe::Core
 
-namespace GyanisScribe::Hotkey
+namespace GyanisScribe::Core
 {
 
     /**
@@ -103,10 +103,10 @@ namespace GyanisScribe::Hotkey
         /// 编号反查自定义绑定的序号（表内下标），不在这批里时返回空
         [[nodiscard]] std::optional<std::size_t> customIndexForIdentifier(int identifier) const;
 
-        Core::ISettingsStore                 &m_settings;       ///< 组合文本与变更通知的来源
+        Core::ISettingsStore                     &m_settings;       ///< 组合文本与变更通知的来源
         Platform::IPlatformIntegration           &m_integration;    ///< 后端工厂
         std::unique_ptr<Platform::IHotkeyBackend> m_backend;        ///< 当前后端，第一次 reload() 时建立
         std::vector<CustomHotkeyBinding>          m_customBindings; ///< 这一批自定义绑定，顺序就是登记顺序（编号按下标算）
     };
 
-} // namespace GyanisScribe::Hotkey
+} // namespace GyanisScribe::Core

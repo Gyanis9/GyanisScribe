@@ -1,11 +1,11 @@
-#include "Hotkey/HotkeyCombination.h"
+#include "Core/Hotkey/HotkeyCombination.h"
 
 #include <QString>
 
 #include <gtest/gtest.h>
 
 using GyanisScribe::Base::ErrorCode;
-using GyanisScribe::Hotkey::HotkeyCombination;
+using GyanisScribe::Core::HotkeyCombination;
 
 namespace
 {

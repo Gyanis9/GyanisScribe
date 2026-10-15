@@ -36,7 +36,6 @@ target_link_libraries(App PUBLIC
         Capture
         Core
         History
-        Hotkey
         Ocr
         Pick
         Pin

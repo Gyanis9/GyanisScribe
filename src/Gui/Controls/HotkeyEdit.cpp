@@ -91,7 +91,7 @@ namespace GyanisScribe::Gui
     }
 
 
-    Base::Expected<void> HotkeyEdit::applyCombination(const Hotkey::HotkeyCombination &combination)
+    Base::Expected<void> HotkeyEdit::applyCombination(const Core::HotkeyCombination &combination)
     {
         // 两档的松紧不同：全局那一档不许裸键（会把别的程序的按键吞掉），界面那一档只看按键本体
         // 「允许单键当全局热键」那一格现读：把它写进本控件就得处理「设置改了控件还停在旧口径」
@@ -151,7 +151,7 @@ namespace GyanisScribe::Gui
         }
 
         m_recording = false;
-        if (auto applied = applyCombination(Hotkey::HotkeyCombination{event->modifiers(), *key}); !applied)
+        if (auto applied = applyCombination(Core::HotkeyCombination{event->modifiers(), *key}); !applied)
         {
             Base::Logger::warning(std::format("快捷键没能写入：{}", applied.error().message));
         }

@@ -2,7 +2,7 @@
 // 这条链的下游是「按屏幕上写的那颗键能不能切到工具」，所以三档都要钉住，不能只测快乐路径。
 #include "Gui/Controls/AppShortcuts.h"
 
-#include "Hotkey/HotkeyCombination.h"
+#include "Core/Hotkey/HotkeyCombination.h"
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Settings/SettingsStore.h"
@@ -21,7 +21,7 @@
 
 namespace
 {
-    using GyanisScribe::Hotkey::HotkeyCombination;
+    using GyanisScribe::Core::HotkeyCombination;
     using GyanisScribe::Core::SettingsStore;
     using GyanisScribe::Gui::appShortcutEntries;
     using GyanisScribe::Gui::AppShortcutEntry;

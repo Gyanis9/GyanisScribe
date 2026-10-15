@@ -1,4 +1,4 @@
-#include "Hotkey/HotkeyManager.h"
+#include "Core/Hotkey/HotkeyManager.h"
 
 #include "Platform/IHotkeyBackend.h"
 #include "Platform/IPlatformIntegration.h"
@@ -20,18 +20,18 @@
 using GyanisScribe::Base::Error;
 using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Base::Expected;
-using GyanisScribe::Hotkey::CustomHotkeyBinding;
-using GyanisScribe::Hotkey::HotkeyAction;
-using GyanisScribe::Hotkey::HotkeyManager;
-using GyanisScribe::Hotkey::HotkeyReloadReport;
-using GyanisScribe::Hotkey::IHotkeyManager;
+using GyanisScribe::Core::CustomHotkeyBinding;
+using GyanisScribe::Core::HotkeyAction;
+using GyanisScribe::Core::HotkeyManager;
+using GyanisScribe::Core::HotkeyReloadReport;
+using GyanisScribe::Core::IHotkeyManager;
+using GyanisScribe::Core::SettingsStore;
 using GyanisScribe::Platform::ForegroundWindow;
 using GyanisScribe::Platform::IHotkeyBackend;
 using GyanisScribe::Platform::IPlatformIntegration;
 using GyanisScribe::Platform::PlatformCapabilities;
 using GyanisScribe::Platform::ScreenWindow;
 using GyanisScribe::Platform::UnsupportedHotkeyBackend;
-using GyanisScribe::Core::SettingsStore;
 
 namespace
 {

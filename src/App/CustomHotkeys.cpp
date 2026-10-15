@@ -67,9 +67,9 @@ namespace GyanisScribe::App
         return {};
     }
 
-    std::vector<Hotkey::CustomHotkeyBinding> collectCustomBindings(const Core::ISettingsStore &settings)
+    std::vector<Core::CustomHotkeyBinding> collectCustomBindings(const Core::ISettingsStore &settings)
     {
-        std::vector<Hotkey::CustomHotkeyBinding> bindings;
+        std::vector<Core::CustomHotkeyBinding> bindings;
         for (const auto &entry: kBindableActions)
         {
             const auto text = settings.stringValue(customHotkeyKey(entry.token).toStdString(), QString{}).trimmed();
@@ -78,7 +78,7 @@ namespace GyanisScribe::App
                 // 没绑的功能不登记也不报错：这一批是按「有没有填」来收的，空文本是正常档
                 continue;
             }
-            bindings.push_back(Hotkey::CustomHotkeyBinding{tokenText(entry.token), text});
+            bindings.push_back(Core::CustomHotkeyBinding{tokenText(entry.token), text});
         }
         return bindings;
     }

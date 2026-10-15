@@ -1,4 +1,4 @@
-#include "Hotkey/HotkeyCombination.h"
+#include "Core/Hotkey/HotkeyCombination.h"
 
 #include "Base/Text.h"
 
@@ -16,7 +16,7 @@
 #include <string_view>
 #include <vector>
 
-namespace GyanisScribe::Hotkey
+namespace GyanisScribe::Core
 {
     namespace
     {
@@ -329,4 +329,4 @@ namespace GyanisScribe::Hotkey
         return m_key;
     }
 
-} // namespace GyanisScribe::Hotkey
+} // namespace GyanisScribe::Core

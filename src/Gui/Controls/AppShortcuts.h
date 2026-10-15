@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Hotkey/HotkeyCombination.h"
+#include "Core/Hotkey/HotkeyCombination.h"
 
 #include <QString>
 
@@ -67,7 +67,7 @@ namespace GyanisScribe::Gui
      * @warning 填歪的那一串不拦调用方：读不出的原因进日志，界面那一格仍显示原文，
      *            用户看得见自己敲了什么。分派按默认键走，不按半截文本猜一个近似的键。
      */
-    [[nodiscard]] Hotkey::HotkeyCombination appShortcutValue(const Core::ISettingsStore &settings, const AppShortcutEntry &entry);
+    [[nodiscard]] Core::HotkeyCombination appShortcutValue(const Core::ISettingsStore &settings, const AppShortcutEntry &entry);
 
     /**
      * @brief 界面上该提示的那颗键

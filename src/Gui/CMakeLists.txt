@@ -12,11 +12,9 @@ add_library(Gui STATIC ${GuiSources})
 set_target_properties(Gui PROPERTIES AUTORCC ON)
 
 target_include_directories(Gui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
-# HotkeyEdit 要在校验组合键能否全局登记时才写配置，所以直接吃 Hotkey；
-# Hotkey 只依赖 Base/Platform/Core，反向不指回 Gui，加这条不会成环
+# HotkeyEdit 要在校验组合键能否全局登记时才写配置：热键管理在 Core，热键后端在 Platform
 target_link_libraries(Gui PUBLIC
         Core
-        Hotkey
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets

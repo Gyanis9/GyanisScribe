@@ -22,8 +22,8 @@
 #include "History/HistoryStore.h"
 #include "History/HistoryTypes.h"
 #include "History/UnsavedArchive.h"
-#include "Hotkey/HotkeyManager.h"
-#include "Hotkey/IHotkeyManager.h"
+#include "Core/Hotkey/HotkeyManager.h"
+#include "Core/Hotkey/IHotkeyManager.h"
 #include "Ocr/IOcrEngine.h"
 #include "Ocr/OcrEngineFactory.h"
 #include "Pick/ColorFormat.h"
@@ -148,7 +148,7 @@ namespace GyanisScribe::App
         }
 
         m_capture = std::make_unique<Capture::CaptureService>(*m_captureSource, *m_settings, *m_integration);
-        m_hotkeys = std::make_unique<Hotkey::HotkeyManager>(*m_settings, *m_integration);
+        m_hotkeys = std::make_unique<Core::HotkeyManager>(*m_settings, *m_integration);
 
         // 主题与图标：样式表落下去、图标描边色跟着走。这里挂一次连接，之后所有取图标的地方都不用再过问主题
         m_theme = std::make_unique<Gui::ThemeManager>(*m_settings);
@@ -195,37 +195,37 @@ namespace GyanisScribe::App
         m_annotationWindow = std::make_unique<Annotation::AnnotationWindow>(*m_annotation, *m_settings, std::make_unique<Annotation::AnnotationToolbar>(*m_settings, *m_icons));
 
         // 热键 → 动作：唯一的接线处，界面加菜单项时也是发同一个信号而不是再走一条路径
-        QObject::connect(m_hotkeys.get(), &Hotkey::IHotkeyManager::actionTriggered, this,
-                         [this](Hotkey::HotkeyAction action)
+        QObject::connect(m_hotkeys.get(), &Core::IHotkeyManager::actionTriggered, this,
+                         [this](Core::HotkeyAction action)
                          {
                              switch (action)
                              {
-                                 case Hotkey::HotkeyAction::Capture:
+                                 case Core::HotkeyAction::Capture:
                                      startCapture();
                                      return;
-                                 case Hotkey::HotkeyAction::Record:
+                                 case Core::HotkeyAction::Record:
                                      toggleRecording();
                                      return;
-                                 case Hotkey::HotkeyAction::CaptureLong:
+                                 case Core::HotkeyAction::CaptureLong:
                                      // 与托盘那一行同一条路：热键不该有一条自己的截图逻辑
                                      startLongCapture();
                                      return;
-                                 case Hotkey::HotkeyAction::Pick:
+                                 case Core::HotkeyAction::Pick:
                                      startColorPick();
                                      return;
-                                 case Hotkey::HotkeyAction::Ocr:
+                                 case Core::HotkeyAction::Ocr:
                                      // 识别热键：截完直接进结果窗口，中间不弹标注窗
                                      startCapture(CaptureIntent::Recognize);
                                      return;
-                                 case Hotkey::HotkeyAction::TogglePins:
+                                 case Core::HotkeyAction::TogglePins:
                                      // 走托盘那一条：开关的方向与提示文案都只有一份
                                      handleTrayAction(TrayAction::TogglePinsVisible);
                                      return;
-                                 case Hotkey::HotkeyAction::NextPinGroup:
+                                 case Core::HotkeyAction::NextPinGroup:
                                      // 同上：切组只有一条实现，热键与托盘那一行不发散
                                      handleTrayAction(TrayAction::NextPinGroup);
                                      return;
-                                 case Hotkey::HotkeyAction::QuickSave:
+                                 case Core::HotkeyAction::QuickSave:
                                      // 快速保存走的就是「截完之后」那一档的实体：热键只是替用户把这一档定死，
                                      // 不另写一条截图→存盘的捷径，两条各写一遍就会两边行为漂移
                                      startCapture(CaptureIntent::QuickSave);
@@ -234,7 +234,7 @@ namespace GyanisScribe::App
                          });
 
         // 自定义绑定的那一路：热键层只报回一个标识，功能名到动作的映射住在这一层（词表在 App/CustomHotkeys.h）
-        QObject::connect(m_hotkeys.get(), &Hotkey::IHotkeyManager::customActionTriggered, this,
+        QObject::connect(m_hotkeys.get(), &Core::IHotkeyManager::customActionTriggered, this,
                          [this](const QString &token)
                          {
                              const auto action = trayActionForToken(token);
@@ -358,7 +358,7 @@ namespace GyanisScribe::App
                              // 热键文本从设置现读：用户改过组合键之后，提示里那个键还得是按得动的那个
                              notifyUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图已移到{}，先收了起来；按 {} 或从托盘切到那一组就能看见"),
                                                                                        groupLabel(group).toStdString(),
-                                                                                       m_hotkeys->bindingText(Hotkey::HotkeyAction::NextPinGroup).toStdString())
+                                                                                       m_hotkeys->bindingText(Core::HotkeyAction::NextPinGroup).toStdString())
                                                                   .c_str()),
                                         Gui::ToastKind::Information);
                          });
@@ -396,7 +396,7 @@ namespace GyanisScribe::App
 
     AppController::~AppController() = default;
 
-    Base::Expected<Hotkey::HotkeyReloadReport> AppController::registerHotkeys()
+    Base::Expected<Core::HotkeyReloadReport> AppController::registerHotkeys()
     {
         // 先把手绑的那一批交给热键层再重登：登记要的是「这一批」，中间态不必单独登一次
         m_hotkeys->setCustomBindings(collectCustomBindings(*m_settings));

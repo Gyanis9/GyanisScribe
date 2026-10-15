@@ -117,7 +117,6 @@ target_link_libraries(TestAppController PRIVATE
         Capture
         Core
         History
-        Hotkey
         Ocr
         Pin
         Platform

@@ -16,7 +16,7 @@
 
 #include <vector>
 
-namespace GyanisScribe::Hotkey
+namespace GyanisScribe::Core
 {
 
     /**
@@ -120,7 +120,7 @@ namespace GyanisScribe::Hotkey
          * @brief 某个已登记的热键被按下
          * @param action 对应的动作
          */
-        void actionTriggered(GyanisScribe::Hotkey::HotkeyAction action);
+        void actionTriggered(GyanisScribe::Core::HotkeyAction action);
 
         /**
          * @brief 一条自定义绑定被按下
@@ -131,4 +131,4 @@ namespace GyanisScribe::Hotkey
         void customActionTriggered(const QString &token);
     };
 
-} // namespace GyanisScribe::Hotkey
+} // namespace GyanisScribe::Core

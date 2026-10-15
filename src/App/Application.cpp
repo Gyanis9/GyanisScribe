@@ -4,7 +4,7 @@
 #include "App/SingleInstance.h"
 #include "Base/Logger.h"
 #include "Base/Paths.h"
-#include "Hotkey/IHotkeyManager.h"
+#include "Core/Hotkey/IHotkeyManager.h"
 #include "Gui/Theme/DesignTokens.h"
 
 #include <QFileInfo>
@@ -135,7 +135,7 @@ bool Application::isReady() const noexcept
     return m_isReady;
 }
 
-const GyanisScribe::Hotkey::HotkeyReloadReport &Application::hotkeyReport() const noexcept
+const GyanisScribe::Core::HotkeyReloadReport &Application::hotkeyReport() const noexcept
 {
     return m_hotkeyReport;
 }

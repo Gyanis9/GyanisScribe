@@ -66,9 +66,9 @@ namespace GyanisScribe::Gui
         return QString::fromStdString(std::string{GyanisScribe::Core::kAppShortcutPrefix} + std::string{token});
     }
 
-    Hotkey::HotkeyCombination appShortcutValue(const Core::ISettingsStore &settings, const AppShortcutEntry &entry)
+    Core::HotkeyCombination appShortcutValue(const Core::ISettingsStore &settings, const AppShortcutEntry &entry)
     {
-        const auto fallback = Hotkey::HotkeyCombination::parse(entry.defaultKey);
+        const auto fallback = Core::HotkeyCombination::parse(entry.defaultKey);
         if (!fallback)
         {
             // 清册自己写错了默认键：这里没有更下一档可回落，报出来并交回「未设」，
@@ -79,7 +79,7 @@ namespace GyanisScribe::Gui
 
         // 默认值直接给默认按键文本：没填过与填了空串都落回这一格，不会多读一次键
         const auto stored = settings.stringValue(appShortcutKey(entry.token).toStdString(), QString::fromUtf8(entry.defaultKey.data(), static_cast<int>(entry.defaultKey.size())));
-        const auto resolved = Hotkey::HotkeyCombination::parse(stored.toStdString());
+        const auto resolved = Core::HotkeyCombination::parse(stored.toStdString());
         if (resolved && resolved->checkUsableInWindow())
         {
             return *resolved;
@@ -119,7 +119,7 @@ namespace GyanisScribe::Gui
     bool isAppShortcutHit(const Core::ISettingsStore &settings, const AppShortcutEntry &entry, const int key, const Qt::KeyboardModifiers modifiers,
                           const bool allowShiftVariant)
     {
-        const Hotkey::HotkeyCombination pressed{modifiers, static_cast<Qt::Key>(key)};
+        const Core::HotkeyCombination pressed{modifiers, static_cast<Qt::Key>(key)};
         const auto                      bound = appShortcutValue(settings, entry);
         if (pressed == bound)
         {
@@ -133,7 +133,7 @@ namespace GyanisScribe::Gui
             return false;
         }
         // 摘位而不是相减：Shift 是一个位，别的位还挂在上面
-        return Hotkey::HotkeyCombination(modifiers & ~Qt::ShiftModifier, static_cast<Qt::Key>(key)) == bound;
+        return Core::HotkeyCombination(modifiers & ~Qt::ShiftModifier, static_cast<Qt::Key>(key)) == bound;
     }
 
 } // namespace GyanisScribe::Gui

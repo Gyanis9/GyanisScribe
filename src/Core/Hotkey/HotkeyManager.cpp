@@ -1,7 +1,7 @@
-#include "Hotkey/HotkeyManager.h"
+#include "Core/Hotkey/HotkeyManager.h"
 
 #include "Base/Logger.h"
-#include "Hotkey/HotkeyCombination.h"
+#include "Core/Hotkey/HotkeyCombination.h"
 #include "Platform/IHotkeyBackend.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Core/Settings/ISettingsStore.h"
@@ -9,7 +9,7 @@
 
 #include <format>
 
-namespace GyanisScribe::Hotkey
+namespace GyanisScribe::Core
 {
     namespace
     {
@@ -192,8 +192,8 @@ namespace GyanisScribe::Hotkey
         // 自定义那一批：编号从 kCustomIdentifierBase 起按表序排，两项同一条组合撞上了就各自记一条失败（后端会拒第二个）
         for (std::size_t slot = 0; slot < m_customBindings.size(); ++slot)
         {
-            const auto &binding    = m_customBindings[slot];
-            const auto combination = HotkeyCombination::fromText(binding.combination.toStdString(), m_settings.boolValue(GyanisScribe::Core::kAllowSimpleGlobalHotkeys, false));
+            const auto &binding     = m_customBindings[slot];
+            const auto  combination = HotkeyCombination::fromText(binding.combination.toStdString(), m_settings.boolValue(GyanisScribe::Core::kAllowSimpleGlobalHotkeys, false));
             if (!combination)
             {
                 report.customFailures.push_back(CustomHotkeyFailure{binding.token, binding.combination, combination.error()});
@@ -243,4 +243,4 @@ namespace GyanisScribe::Hotkey
         return combination->toText();
     }
 
-} // namespace GyanisScribe::Hotkey
+} // namespace GyanisScribe::Core
