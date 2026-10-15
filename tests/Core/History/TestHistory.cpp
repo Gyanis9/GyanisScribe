@@ -1,6 +1,6 @@
-#include "History/HistoryRules.h"
-#include "History/HistoryStore.h"
-#include "History/HistoryTypes.h"
+#include "Core/History/HistoryRules.h"
+#include "Core/History/HistoryStore.h"
+#include "Core/History/HistoryTypes.h"
 
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Settings/SettingsStore.h"
@@ -20,20 +20,20 @@
 #include <optional>
 #include <string>
 
-using GyanisScribe::History::HistoryEntry;
-using GyanisScribe::History::HistoryKind;
-using GyanisScribe::History::historyKindLabel;
-using GyanisScribe::History::historyKindToken;
-using GyanisScribe::History::HistoryRetentionPolicy;
-using GyanisScribe::History::HistoryStore;
-using GyanisScribe::History::kDefaultMaximumEntries;
-using GyanisScribe::History::kDefaultRetentionDays;
-using GyanisScribe::History::matchesFilter;
-using GyanisScribe::History::parseHistoryKind;
-using GyanisScribe::History::policyFromSettings;
-using GyanisScribe::History::pruneForPolicy;
-using GyanisScribe::History::sortNewestFirst;
+using GyanisScribe::Core::HistoryEntry;
+using GyanisScribe::Core::HistoryKind;
+using GyanisScribe::Core::historyKindLabel;
+using GyanisScribe::Core::historyKindToken;
+using GyanisScribe::Core::HistoryRetentionPolicy;
+using GyanisScribe::Core::HistoryStore;
+using GyanisScribe::Core::kDefaultMaximumEntries;
+using GyanisScribe::Core::kDefaultRetentionDays;
+using GyanisScribe::Core::matchesFilter;
+using GyanisScribe::Core::parseHistoryKind;
+using GyanisScribe::Core::policyFromSettings;
+using GyanisScribe::Core::pruneForPolicy;
 using GyanisScribe::Core::SettingsStore;
+using GyanisScribe::Core::sortNewestFirst;
 
 namespace
 {

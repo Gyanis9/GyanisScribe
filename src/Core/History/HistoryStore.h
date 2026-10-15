@@ -10,15 +10,15 @@
 #pragma once
 
 #include "Base/Types.h"
-#include "History/HistoryRules.h"
-#include "History/HistoryTypes.h"
+#include "Core/History/HistoryRules.h"
+#include "Core/History/HistoryTypes.h"
 
 #include <QDateTime>
 #include <QVector>
 
 #include <filesystem>
 
-namespace GyanisScribe::History
+namespace GyanisScribe::Core
 {
 
     /**
@@ -96,4 +96,4 @@ namespace GyanisScribe::History
         std::filesystem::path m_storagePath; ///< 清单文件位置
     };
 
-} // namespace GyanisScribe::History
+} // namespace GyanisScribe::Core

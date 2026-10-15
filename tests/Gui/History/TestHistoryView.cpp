@@ -1,7 +1,7 @@
-#include "History/HistoryThumbnail.h"
-#include "History/HistoryView.h"
+#include "Core/History/HistoryThumbnail.h"
+#include "Gui/History/HistoryView.h"
 
-#include "History/HistoryStore.h"
+#include "Core/History/HistoryStore.h"
 #include "Core/Settings/SettingsStore.h"
 #include "Gui/Resources/IconProvider.h"
 
@@ -21,19 +21,19 @@
 #include <memory>
 #include <optional>
 
-using GyanisScribe::History::entryCaption;
-using GyanisScribe::History::HistoryEntry;
-using GyanisScribe::History::historyFilterLabels;
-using GyanisScribe::History::HistoryKind;
-using GyanisScribe::History::HistoryRetentionPolicy;
-using GyanisScribe::History::HistoryStore;
-using GyanisScribe::History::HistoryView;
-using GyanisScribe::History::kindFilterAt;
-using GyanisScribe::History::kThumbnailCornerRadius;
-using GyanisScribe::History::kThumbnailEdge;
-using GyanisScribe::History::makeThumbnail;
+using GyanisScribe::Core::HistoryEntry;
+using GyanisScribe::Core::HistoryKind;
+using GyanisScribe::Core::HistoryRetentionPolicy;
+using GyanisScribe::Core::HistoryStore;
+using GyanisScribe::Core::kThumbnailCornerRadius;
+using GyanisScribe::Core::kThumbnailEdge;
+using GyanisScribe::Core::makeThumbnail;
 using GyanisScribe::Core::SettingsStore;
+using GyanisScribe::Gui::entryCaption;
+using GyanisScribe::Gui::historyFilterLabels;
+using GyanisScribe::Gui::HistoryView;
 using GyanisScribe::Gui::IconProvider;
+using GyanisScribe::Gui::kindFilterAt;
 
 namespace
 {

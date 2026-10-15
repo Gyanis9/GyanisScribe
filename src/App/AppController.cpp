@@ -18,10 +18,10 @@
 #include "Core/Image/OutputDecoration.h"
 #include "Base/Paths.h"
 #include "Base/Text.h"
-#include "History/HistoryRules.h"
-#include "History/HistoryStore.h"
-#include "History/HistoryTypes.h"
-#include "History/UnsavedArchive.h"
+#include "Core/History/HistoryRules.h"
+#include "Core/History/HistoryStore.h"
+#include "Core/History/HistoryTypes.h"
+#include "Core/History/UnsavedArchive.h"
 #include "Core/Hotkey/HotkeyManager.h"
 #include "Core/Hotkey/IHotkeyManager.h"
 #include "Ocr/IOcrEngine.h"
@@ -123,7 +123,7 @@ namespace GyanisScribe::App
     AppController::AppController(AppControllerParts parts, QObject *parent) :
         AppController(parts.settings ? std::move(parts.settings) : createSettingsStore(), parts.integration ? std::move(parts.integration) : Platform::createPlatformIntegration(),
                       parts.captureSource ? std::move(parts.captureSource) : Capture::createScreenCaptureSource(),
-                      parts.historyStoragePath.empty() ? History::HistoryStore::defaultStoragePath() : std::move(parts.historyStoragePath), parent)
+                      parts.historyStoragePath.empty() ? Core::HistoryStore::defaultStoragePath() : std::move(parts.historyStoragePath), parent)
     {
     }
 
@@ -186,7 +186,7 @@ namespace GyanisScribe::App
                              m_pendingFetchPoint.reset();
                              notifyUser(reason, Gui::ToastKind::Information);
                          });
-        m_history    = std::make_unique<History::HistoryStore>(std::move(historyStoragePath));
+        m_history    = std::make_unique<Core::HistoryStore>(std::move(historyStoragePath));
         m_mainWindow = std::make_unique<MainWindow>(*m_settings, *m_theme, *m_icons, *m_history, m_integration->capabilities(), *m_integration);
         m_toast      = std::make_unique<Gui::Toast>(*m_icons, *m_theme);
         QObject::connect(m_tray.get(), &TrayController::actionRequested, this, &AppController::handleTrayAction);
@@ -780,11 +780,11 @@ namespace GyanisScribe::App
         if (m_settings->boolValue(Core::kHistoryKeepUnsaved, false) && !alreadyOnDisk)
         {
             if (const auto archived =
-                        History::archiveUnsavedCapture(image.image, QDateTime::currentDateTime(), Base::Paths::unsavedCaptureDirectory(), History::kUnsavedArchiveCapacity);
+                        Core::archiveUnsavedCapture(image.image, QDateTime::currentDateTime(), Base::Paths::unsavedCaptureDirectory(), Core::kUnsavedArchiveCapacity);
                 archived)
             {
                 // 记的是像素尺寸而不是逻辑尺寸：历史缩略图与「重新贴图」都按这份文件读回来
-                recordHistory(*archived, History::HistoryKind::Screenshot, image.image.size());
+                recordHistory(*archived, Core::HistoryKind::Screenshot, image.image.size());
             } else
             {
                 // 开着这一档就是指望这一张还在，静默失败等于骗人
@@ -1005,7 +1005,7 @@ namespace GyanisScribe::App
         }
         Base::Logger::info(std::format("成品已保存：{}", Base::Paths::toDisplayText(filePath).toStdString()));
         // 历史记的是盘上那份的尺寸：开着装饰时成品比原图大一围，记小了缩略图会裁边
-        recordHistory(filePath, History::HistoryKind::Screenshot, decorated.size());
+        recordHistory(filePath, Core::HistoryKind::Screenshot, decorated.size());
         // 路径留在成员上，三条落盘路（存文件/快速保存/自动保存）与命令行的交付共用这一处读数：
         // 外部命令的 %file% 与命令行打到标准输出的都是它，两处各算一次就会在装饰开关上分家
         m_writtenFilePath = Base::Paths::toDisplayText(filePath);
@@ -1691,18 +1691,18 @@ namespace GyanisScribe::App
             notifyUser(GyanisScribe::Base::uiText("成品已出，但没带上声音：取声那一步中途失败了，原因写在日志里"), Gui::ToastKind::Information);
         }
         // 尺寸取信号里这一轮自己那份：编码在后台跑的时候用户可以再开一轮，回读成员拿到的会是后一轮的
-        recordHistory(Base::Paths::fromDisplayText(outputPath), History::HistoryKind::Recording, frameSize);
+        recordHistory(Base::Paths::fromDisplayText(outputPath), Core::HistoryKind::Recording, frameSize);
     }
 
-    void AppController::recordHistory(const std::filesystem::path &filePath, const History::HistoryKind kind, const QSize &size)
+    void AppController::recordHistory(const std::filesystem::path &filePath, const Core::HistoryKind kind, const QSize &size)
     {
-        const auto entry = History::HistoryEntry{
+        const auto entry = Core::HistoryEntry{
                 .moment   = QDateTime::currentDateTime(),
                 .kind     = kind,
                 .filePath = filePath,
                 .size     = size,
         };
-        if (auto stored = m_history->append(entry, History::policyFromSettings(*m_settings), QDateTime::currentDateTime()); !stored)
+        if (auto stored = m_history->append(entry, Core::policyFromSettings(*m_settings), QDateTime::currentDateTime()); !stored)
         {
             // 清单写不进去不该让「保存成功」变成假话：成品已经在盘上，只是下次打开找不到它
             Base::Logger::warning(std::format("成品没进历史清单：{}", stored.error().message));

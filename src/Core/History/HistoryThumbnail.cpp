@@ -1,11 +1,11 @@
-#include "History/HistoryThumbnail.h"
+#include "Core/History/HistoryThumbnail.h"
 
 #include <QPainter>
 #include <QPainterPath>
 
 #include <algorithm>
 
-namespace GyanisScribe::History
+namespace GyanisScribe::Core
 {
     QImage makeThumbnail(const QImage &source, const QSize &target, const int cornerRadius)
     {
@@ -30,4 +30,4 @@ namespace GyanisScribe::History
         return canvas;
     }
 
-} // namespace GyanisScribe::History
+} // namespace GyanisScribe::Core

@@ -1,4 +1,4 @@
-#include "History/HistoryTypes.h"
+#include "Core/History/HistoryTypes.h"
 
 #include "Base/Text.h"
 
@@ -8,13 +8,13 @@
 
 namespace
 {
-    using GyanisScribe::History::HistoryKind;
+    using GyanisScribe::Core::HistoryKind;
 
     /// 存储标记与中文显示名按下标互指，新增类别只能追加在末尾
     constexpr std::array<std::string_view, 2> kKindTokens = {"Screenshot", "Recording"};
 } // namespace
 
-namespace GyanisScribe::History
+namespace GyanisScribe::Core
 {
     std::string_view historyKindToken(const HistoryKind kind)
     {
@@ -52,4 +52,4 @@ namespace GyanisScribe::History
         }}};
     }
 
-} // namespace GyanisScribe::History
+} // namespace GyanisScribe::Core

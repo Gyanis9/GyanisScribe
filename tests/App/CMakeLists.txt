@@ -55,7 +55,6 @@ target_include_directories(TestMainWindow PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..
 target_link_libraries(TestMainWindow PRIVATE
         App
         Annotation
-        History
         Pin
         Record
         Gui
@@ -116,7 +115,6 @@ target_link_libraries(TestAppController PRIVATE
         Annotation
         Capture
         Core
-        History
         Ocr
         Pin
         Platform
@@ -144,7 +142,6 @@ add_executable(UiShotTool
 
 target_link_libraries(UiShotTool PRIVATE
         App
-        History
         Platform
         Gui
         Core
@@ -165,7 +162,6 @@ add_executable(UiAuditTool
 
 target_link_libraries(UiAuditTool PRIVATE
         App
-        History
         Platform
         Gui
         Core

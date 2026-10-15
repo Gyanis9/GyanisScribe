@@ -11,9 +11,9 @@
 #include "Core/Image/OutputDecoration.h"
 #include "Base/Paths.h"
 #include "Base/Text.h"
-#include "History/HistoryRules.h"
-#include "History/HistoryView.h"
-#include "History/UnsavedArchive.h"
+#include "Core/History/HistoryRules.h"
+#include "Gui/History/HistoryView.h"
+#include "Core/History/UnsavedArchive.h"
 #include "Ocr/OcrEngineFactory.h"
 #include "Core/Pick/ColorFormat.h"
 #include "Core/Pick/PickGeometry.h"
@@ -289,7 +289,7 @@ namespace
         spin->setSpecialValueText(GyanisScribe::Base::uiText("不限"));
         spin->setSuffix(suffix);
         spin->setAccessibleName(title);
-        // 配置里的负数会被范围夹到 0 那一档，也就是「不限」——与 History::policyFromSettings 的读法同解
+        // 配置里的负数会被范围夹到 0 那一档，也就是「不限」——与 Core::policyFromSettings 的读法同解
         spin->setValue(settings.intValue(key, fallback));
 
         QObject::connect(spin, &QSpinBox::valueChanged, spin,
@@ -1399,7 +1399,7 @@ namespace GyanisScribe::App
 
     MainWindow::~MainWindow() = default;
 
-    MainWindow::MainWindow(ISettingsStore &settings, ThemeManager &theme, IconProvider &icons, History::HistoryStore &historyStore, Platform::PlatformCapabilities capabilities,
+    MainWindow::MainWindow(ISettingsStore &settings, ThemeManager &theme, IconProvider &icons, Core::HistoryStore &historyStore, Platform::PlatformCapabilities capabilities,
                            Platform::IPlatformIntegration &integration, QWidget *parent) :
         QWidget(parent), m_settings(settings), m_theme(theme), m_icons(icons), m_capabilities(capabilities), m_integration(integration),
         m_audioDevices(std::make_unique<GyanisScribe::Record::FfmpegAudioDeviceEnumerator>()),
@@ -1857,21 +1857,21 @@ namespace GyanisScribe::App
         auto *form =
                 makePageForm(page, GyanisScribe::Base::uiText("界面语言决定菜单、托盘提示与这些设置页的措辞，切换后要重启智录才生效。下面两格管历史留多少，填到 0 就是不限。"));
         form->addRow(GyanisScribe::Base::uiText("界面语言"), makeUiLanguageCombo(m_settings));
-        // 保留策略的读端在 History::policyFromSettings，而那条负数提示写着「请在设置的通用页改回来」——
+        // 保留策略的读端在 Core::policyFromSettings，而那条负数提示写着「请在设置的通用页改回来」——
         // 这一页没有这两格时，那句提示就是把用户指到一个不存在的地方
         form->addRow(GyanisScribe::Base::uiText("历史最多留多少条"),
                      makeOptionalLimitSpin(m_settings, GyanisScribe::Core::kHistoryMaximumEntries, GyanisScribe::Base::uiText("历史最多留多少条"),
-                                           GyanisScribe::Base::uiText(" 条"), kMaximumEntriesLimit, GyanisScribe::History::kDefaultMaximumEntries));
+                                           GyanisScribe::Base::uiText(" 条"), kMaximumEntriesLimit, GyanisScribe::Core::kDefaultMaximumEntries));
         form->addRow(GyanisScribe::Base::uiText("历史最久留多少天"),
                      makeOptionalLimitSpin(m_settings, GyanisScribe::Core::kHistoryRetentionDays, GyanisScribe::Base::uiText("历史最久留多少天"),
-                                           GyanisScribe::Base::uiText(" 天"), kRetentionDaysLimit, GyanisScribe::History::kDefaultRetentionDays));
+                                           GyanisScribe::Base::uiText(" 天"), kRetentionDaysLimit, GyanisScribe::Core::kDefaultRetentionDays));
         form->addRow(GyanisScribe::Base::uiText("未保存的截图也进历史"),
                      makeSettingCheck(m_settings, GyanisScribe::Core::kHistoryKeepUnsaved, false, GyanisScribe::Base::uiText("未保存的截图也进历史"),
                                       GyanisScribe::Base::uiText("未保存的截图也进历史"),
                                       QString::fromUtf8(
                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8(
                                                                                    "勾上后每张截图都在程序数据目录里留一份像素，误触 Esc 丢掉的那一张也还在历史里（最多留 {} 张）"),
-                                                                           static_cast<int>(GyanisScribe::History::kUnsavedArchiveCapacity))
+                                                                           static_cast<int>(GyanisScribe::Core::kUnsavedArchiveCapacity))
                                                       .c_str())));
         form->addRow(GyanisScribe::Base::uiText("分组轮换顺序"), makeGroupRotationEdit(m_settings));
         // 托盘那两下：这一族动作在菜单、热键与鼠标点击三处都走同一个出口，这里只多两个入口而不多一份实现
@@ -2410,16 +2410,16 @@ namespace GyanisScribe::App
     {
         auto *page  = new QWidget{this};
         auto *inner = new QVBoxLayout{page};
-        m_history   = new History::HistoryView{m_historyStore, History::policyFromSettings(m_settings), m_icons, page};
+        m_history   = new Gui::HistoryView{m_historyStore, Core::policyFromSettings(m_settings), m_icons, page};
         inner->addWidget(m_history);
 
         // 三个出口原样转给控制器：主窗口不知道贴图与识别各自要做什么
-        QObject::connect(m_history, &History::HistoryView::pinRequested, this, &MainWindow::historyPinRequested);
-        QObject::connect(m_history, &History::HistoryView::ocrRequested, this, &MainWindow::historyOcrRequested);
-        QObject::connect(m_history, &History::HistoryView::removeRequested, this, &MainWindow::historyRemoveRequested);
-        QObject::connect(m_history, &History::HistoryView::openFolderRequested, this, &MainWindow::historyOpenFolderRequested);
-        QObject::connect(m_history, &History::HistoryView::clearAllRequested, this, &MainWindow::historyClearRequested);
-        QObject::connect(m_history, &History::HistoryView::messageForUser, this, &MainWindow::messageForUser);
+        QObject::connect(m_history, &Gui::HistoryView::pinRequested, this, &MainWindow::historyPinRequested);
+        QObject::connect(m_history, &Gui::HistoryView::ocrRequested, this, &MainWindow::historyOcrRequested);
+        QObject::connect(m_history, &Gui::HistoryView::removeRequested, this, &MainWindow::historyRemoveRequested);
+        QObject::connect(m_history, &Gui::HistoryView::openFolderRequested, this, &MainWindow::historyOpenFolderRequested);
+        QObject::connect(m_history, &Gui::HistoryView::clearAllRequested, this, &MainWindow::historyClearRequested);
+        QObject::connect(m_history, &Gui::HistoryView::messageForUser, this, &MainWindow::messageForUser);
         return page;
     }
 

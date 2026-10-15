@@ -16,7 +16,7 @@
 | 跨模块共用的绘制常量 | 同上：`kCaptureMaskColor`、`kAccentColor`、`kCaptureHintTextColor`、`kCaptureHintBackgroundColor`、`kCrosshairColor`、`kHintFontSize`、`kHintPadding`、`kToolbarSliderWidth`、`kSelectionBorderWidth`、光标高亮一族 | 遮罩、选区读数、工具栏滑块、录屏高亮这些「两个模块都要用到」的尺寸与色 |
 | 字号与线宽的阶梯 | 同上：`kFontSizes`（12/13/14/16/20/24）、`kAnnotationWidths`（2/4/6/8）、默认档位下标 `kDefaultAnnotationWidthStep`/`kDefaultAnnotationFontSizeIndex`、找回函数 `stepIndexOf` | 界面只允许走阶梯；配置里存了阶梯外的值时 `stepIndexOf` 返回空，调用方记日志后回落默认档，不就近取一档 |
 | 标注色板 | 同上：`kAnnotationPalette` 八色与 `annotationColorAt` | 序号越界返回空色而不是夹到最后一名，少画一个色块要能被发现 |
-| 模块自身的几何常量 | 与消费者同目录：`History/HistoryThumbnail.h` 的 `kThumbnailEdge`、`Pick/ColorPickerOverlay.cpp` 的 `kMagnifier*`/`kInfoStripHeight`、`Record/RecordingHud.cpp` 的 `kHudEdgeGap`/`kCountdownFontPointSize`、`Ocr/OcrResultWindow.cpp` 的 `kPreviewMinimum*` | 只有一个消费者的尺寸不上收到全局，避免造没人吃的键 |
+| 模块自身的几何常量 | 与消费者同目录：`Core/History/HistoryThumbnail.h` 的 `kThumbnailEdge`、`Pick/ColorPickerOverlay.cpp` 的 `kMagnifier*`/`kInfoStripHeight`、`Record/RecordingHud.cpp` 的 `kHudEdgeGap`/`kCountdownFontPointSize`、`Ocr/OcrResultWindow.cpp` 的 `kPreviewMinimum*` | 只有一个消费者的尺寸不上收到全局，避免造没人吃的键 |
 | 控件外观（内边距、圆角、边框宽度、状态色） | `src/Gui/Resources/Styles/Light.qss`、`Dark.qss`、`HighContrast.qss` | 样式表是这些属性的唯一出处；三份逐条同构、只差色值（高对比度档另把 1px 实色描边升到 2px），勾的对勾是 `src/Gui/Resources/Styles/CheckmarkOnAccent*.svg` 两份 |
 | 动效 | 刻意没有 | 需求 §九 的禁止项：动画不得干扰截图、标注与录屏。全仓没有 `QPropertyAnimation`/`transition`；Toast 的停留时间是固定毫秒数，不是补间动画 |
 

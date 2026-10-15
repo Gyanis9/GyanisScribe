@@ -12,7 +12,7 @@
 #include <QImage>
 #include <QSize>
 
-namespace GyanisScribe::History
+namespace GyanisScribe::Core
 {
 
     /// 缩略图边长，逻辑像素：需求要求整列表统一尺寸，混排会让列表像拼凑的
@@ -32,4 +32,4 @@ namespace GyanisScribe::History
      */
     [[nodiscard]] QImage makeThumbnail(const QImage &source, const QSize &target, int cornerRadius);
 
-} // namespace GyanisScribe::History
+} // namespace GyanisScribe::Core

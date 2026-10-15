@@ -35,7 +35,6 @@ target_link_libraries(App PUBLIC
         Annotation
         Capture
         Core
-        History
         Ocr
         Pin
         Platform

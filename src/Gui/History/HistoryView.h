@@ -9,9 +9,9 @@
 
 #pragma once
 
-#include "History/HistoryRules.h"
-#include "History/HistoryStore.h"
-#include "History/HistoryTypes.h"
+#include "Core/History/HistoryRules.h"
+#include "Core/History/HistoryStore.h"
+#include "Core/History/HistoryTypes.h"
 
 #include "Gui/Controls/Toast.h"
 
@@ -31,7 +31,7 @@ namespace GyanisScribe::Gui
     class IconProvider;
 } // namespace GyanisScribe::Gui
 
-namespace GyanisScribe::History
+namespace GyanisScribe::Gui
 {
 
     /**
@@ -42,7 +42,7 @@ namespace GyanisScribe::History
      * @details 相对日期放在最前：用户找的是「今天上午那几张」，绝对日期要先心算一次。
      *          尺寸为空是「这一轮没落下帧」这类读不出的现场，硬打 0×0 等于把不知道报成一个数。
      */
-    [[nodiscard]] QString entryCaption(const HistoryEntry &entry, const QDateTime &now);
+    [[nodiscard]] QString entryCaption(const Core::HistoryEntry &entry, const QDateTime &now);
 
     /**
      * @brief 筛选下拉的项文本，顺序与 kindFilterAt 互指
@@ -55,7 +55,7 @@ namespace GyanisScribe::History
      * @param index 下拉序号
      * @return 类别；第 0 档表示不限类别，序号越界也按不限处理
      */
-    [[nodiscard]] std::optional<HistoryKind> kindFilterAt(int index);
+    [[nodiscard]] std::optional<Core::HistoryKind> kindFilterAt(int index);
 
     /**
      * @brief 按搜索词与类别筛出一页记录
@@ -64,7 +64,7 @@ namespace GyanisScribe::History
      * @param kindFilter 类别，空表示不限
      * @return 保持原次序的可见记录
      */
-    [[nodiscard]] QVector<HistoryEntry> visibleEntries(const QVector<HistoryEntry> &entries, const QString &query, const std::optional<HistoryKind> &kindFilter);
+    [[nodiscard]] QVector<Core::HistoryEntry> visibleEntries(const QVector<Core::HistoryEntry> &entries, const QString &query, const std::optional<Core::HistoryKind> &kindFilter);
 
     /**
      * @brief 历史页控件
@@ -85,7 +85,7 @@ namespace GyanisScribe::History
          * @param parent 父控件
          * @note 主题不进构造：列表配色全走 QSS，这里没有需要现取的主题色，多接一个引用就是死字段
          */
-        HistoryView(HistoryStore &store, const HistoryRetentionPolicy &policy, Gui::IconProvider &icons, QWidget *parent = nullptr);
+        HistoryView(Core::HistoryStore &store, const Core::HistoryRetentionPolicy &policy, Gui::IconProvider &icons, QWidget *parent = nullptr);
 
         /**
          * @brief 重读清单并按当前条件重填列表
@@ -153,18 +153,18 @@ namespace GyanisScribe::History
         void refillList();
 
         /// 读缩略图；读不到就退回这一类的图标
-        [[nodiscard]] QIcon iconFor(const HistoryEntry &entry) const;
+        [[nodiscard]] QIcon iconFor(const Core::HistoryEntry &entry) const;
 
         /// 删除选中项：先去掉记录，再刷新列表
         void removeSelected();
 
-        HistoryStore          &m_store;            ///< 历史清单
-        HistoryRetentionPolicy m_policy;           ///< 读清单时用的保留策略
-        Gui::IconProvider      &m_icons;            ///< 图标供给器
-        QVector<HistoryEntry>  m_entries;          ///< 本次读到的全量记录，时间倒序
-        QLineEdit             *m_search = nullptr; ///< 搜索框
-        QComboBox             *m_filter = nullptr; ///< 类别筛选下拉
-        QListWidget           *m_list   = nullptr; ///< 缩略图列表
+        Core::HistoryStore          &m_store;            ///< 历史清单
+        Core::HistoryRetentionPolicy m_policy;           ///< 读清单时用的保留策略
+        Gui::IconProvider           &m_icons;            ///< 图标供给器
+        QVector<Core::HistoryEntry>  m_entries;          ///< 本次读到的全量记录，时间倒序
+        QLineEdit                   *m_search = nullptr; ///< 搜索框
+        QComboBox                   *m_filter = nullptr; ///< 类别筛选下拉
+        QListWidget                 *m_list   = nullptr; ///< 缩略图列表
     };
 
-} // namespace GyanisScribe::History
+} // namespace GyanisScribe::Gui

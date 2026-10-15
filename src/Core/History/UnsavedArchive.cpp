@@ -1,4 +1,4 @@
-#include "History/UnsavedArchive.h"
+#include "Core/History/UnsavedArchive.h"
 
 #include "Base/Logger.h"
 #include "Base/Paths.h"
@@ -10,7 +10,7 @@
 #include <utility>
 #include <vector>
 
-namespace GyanisScribe::History
+namespace GyanisScribe::Core
 {
     namespace
     {
@@ -93,4 +93,4 @@ namespace GyanisScribe::History
         return filePath;
     }
 
-} // namespace GyanisScribe::History
+} // namespace GyanisScribe::Core

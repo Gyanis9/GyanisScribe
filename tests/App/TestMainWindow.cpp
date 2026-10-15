@@ -8,8 +8,8 @@
 #include "App/TrayController.h"
 #include "Annotation/AnnotationToolbar.h"
 #include "Capture/ScreenUtils.h"
-#include "History/HistoryRules.h"
-#include "History/HistoryStore.h"
+#include "Core/History/HistoryRules.h"
+#include "Core/History/HistoryStore.h"
 #include "Pin/PinLayout.h"
 #include "Pin/PinTransform.h"
 #include "Core/Pick/PickGeometry.h"
@@ -72,7 +72,7 @@ namespace
     using GyanisScribe::App::MainWindow;
     using GyanisScribe::App::MainWindowPage;
     using GyanisScribe::App::pageChoices;
-    using GyanisScribe::History::HistoryStore;
+    using GyanisScribe::Core::HistoryStore;
     using GyanisScribe::Core::SettingsStore;
     using GyanisScribe::Gui::AppLanguage;
     using GyanisScribe::Gui::IconProvider;
@@ -1074,7 +1074,7 @@ namespace
 
     /**
      * @brief 钉住历史保留策略的两格写进策略读的那两个键，并且 0 这一档在两处都叫「不限」
-     * @details 需求第「SettingsDialog」一节点名要能改历史保留策略，而 History::policyFromSettings 那条
+     * @details 需求第「SettingsDialog」一节点名要能改历史保留策略，而 Core::policyFromSettings 那条
      *          负数提示写着「请在设置的通用页改回来」——这一页没这两格时，那句提示指向一个不存在的地方。
      *          0 的读法也要两处同解：界面上摆个「0」而读端当它是「不限」，用户会以为历史一条都留不住。
      */
@@ -1087,8 +1087,8 @@ namespace
         ASSERT_NE(entries, nullptr);
         ASSERT_NE(days, nullptr);
 
-        EXPECT_EQ(entries->value(), GyanisScribe::History::kDefaultMaximumEntries) << "界面默认档要与策略默认档同解";
-        EXPECT_EQ(days->value(), GyanisScribe::History::kDefaultRetentionDays);
+        EXPECT_EQ(entries->value(), GyanisScribe::Core::kDefaultMaximumEntries) << "界面默认档要与策略默认档同解";
+        EXPECT_EQ(days->value(), GyanisScribe::Core::kDefaultRetentionDays);
         EXPECT_EQ(entries->specialValueText(), QStringLiteral("不限"));
         EXPECT_EQ(days->specialValueText(), QStringLiteral("不限"));
         // 「不限」只在数字框的下限那一格显示：下限不是 0 时用户填不到它，读端那条「0 表示不限」就成空话
@@ -1102,7 +1102,7 @@ namespace
         const auto reopened = makeStore();
         EXPECT_EQ(reopened->intValue(GyanisScribe::Core::kHistoryMaximumEntries, -1), 50);
         EXPECT_EQ(reopened->intValue(GyanisScribe::Core::kHistoryRetentionDays, -1), 0);
-        const auto policy = GyanisScribe::History::policyFromSettings(*reopened);
+        const auto policy = GyanisScribe::Core::policyFromSettings(*reopened);
         EXPECT_EQ(policy.maximumEntries, 50);
         EXPECT_EQ(policy.retentionDays, 0) << "0 要按「不限」读，而不是「一条都不留」";
     }
@@ -1123,7 +1123,7 @@ namespace
         EXPECT_EQ(entries->value(), 0);
         EXPECT_EQ(entries->text().trimmed(), QStringLiteral("不限"));
 
-        const auto policy = GyanisScribe::History::policyFromSettings(*m_store);
+        const auto policy = GyanisScribe::Core::policyFromSettings(*m_store);
         EXPECT_EQ(policy.maximumEntries, 0) << "界面摆到「不限」而策略读成别的数";
         EXPECT_EQ(m_store->intValue(GyanisScribe::Core::kHistoryMaximumEntries, -999), -1) << "回落不该顺手把文件里的坏值改掉：它要留着让人查得到";
     }

@@ -37,11 +37,15 @@ namespace GyanisScribe::Gui
     class ThemeManager;
 } // namespace GyanisScribe::Gui
 
-namespace GyanisScribe::History
+namespace GyanisScribe::Core
 {
     class HistoryStore;
+} // namespace GyanisScribe::Core
+
+namespace GyanisScribe::Gui
+{
     class HistoryView;
-} // namespace GyanisScribe::History
+} // namespace GyanisScribe::Gui
 
 namespace GyanisScribe::Record
 {
@@ -117,7 +121,7 @@ namespace GyanisScribe::App
     struct ThemeChoice
     {
         GyanisScribe::Gui::ThemeKind kind;  ///< 选中这一行时应用的档位
-        std::string_view            label; ///< 下拉框里显示的中文名
+        std::string_view             label; ///< 下拉框里显示的中文名
     };
 
     /**
@@ -148,7 +152,7 @@ namespace GyanisScribe::App
     struct LanguageChoice
     {
         GyanisScribe::Gui::AppLanguage language; ///< 选中这一行时写入配置的档位
-        std::string_view              label;    ///< 下拉框里显示的自称文本
+        std::string_view               label;    ///< 下拉框里显示的自称文本
     };
 
 
@@ -198,7 +202,7 @@ namespace GyanisScribe::App
          * @note 刻意不认识 AppController：热键与语言的改动由各自的订阅者接走，
          *       设置页不需要为了「生效」去拖一个控制器进来。历史页的三个出口同样只发信号。
          */
-        explicit MainWindow(Core::ISettingsStore &settings, GyanisScribe::Gui::ThemeManager &theme, GyanisScribe::Gui::IconProvider &icons, History::HistoryStore &historyStore,
+        explicit MainWindow(Core::ISettingsStore &settings, GyanisScribe::Gui::ThemeManager &theme, GyanisScribe::Gui::IconProvider &icons, Core::HistoryStore &historyStore,
                             Platform::PlatformCapabilities capabilities, Platform::IPlatformIntegration &integration, QWidget *parent = nullptr);
 
         /**
@@ -348,9 +352,9 @@ namespace GyanisScribe::App
         /// 历史页：缩略图列表与三个出口
         QWidget *buildHistoryPage();
 
-        Core::ISettingsStore                             &m_settings;          ///< 配置存储，不拥有
-        GyanisScribe::Gui::ThemeManager                       &m_theme;             ///< 主题管理器，不拥有
-        GyanisScribe::Gui::IconProvider                       &m_icons;             ///< 图标供给器，不拥有
+        Core::ISettingsStore                                 &m_settings;          ///< 配置存储，不拥有
+        GyanisScribe::Gui::ThemeManager                      &m_theme;             ///< 主题管理器，不拥有
+        GyanisScribe::Gui::IconProvider                      &m_icons;             ///< 图标供给器，不拥有
         Platform::PlatformCapabilities                        m_capabilities;      ///< 平台能力表：热键页按它给不给登记入口
         QListWidget                                          *m_nav   = nullptr;   ///< 左侧导航，一行一页
         QStackedWidget                                       *m_stack = nullptr;   ///< 右侧页容器，序号与导航行同解
@@ -358,8 +362,8 @@ namespace GyanisScribe::App
         std::unique_ptr<Record::FfmpegVideoEncoderEnumerator> m_videoEncoders;     ///< 录屏页编码器清单的来源：逐个候选真探一遍
         std::unique_ptr<App::UpdateChecker>                   m_updateChecker;     ///< 检查更新那一条：关于页按一下才发请求，不是启动就联网
         Platform::IPlatformIntegration                       &m_integration;       ///< 平台动作（当前只有开机启动那一格）：能力位可以造假，动作要有真对象
-        History::HistoryStore                                &m_historyStore;      ///< 历史清单，历史页从它读
-        History::HistoryView                                 *m_history = nullptr; ///< 历史页控件，重读清单时刷新它
+        Core::HistoryStore                                   &m_historyStore;      ///< 历史清单，历史页从它读
+        Gui::HistoryView                                     *m_history = nullptr; ///< 历史页控件，重读清单时刷新它
     };
 
 } // namespace GyanisScribe::App

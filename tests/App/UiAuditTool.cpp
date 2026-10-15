@@ -9,7 +9,7 @@
 #include "Annotation/AnnotationToolbar.h"
 #include "Annotation/AnnotationToolbarGeometry.h"
 #include "App/MainWindow.h"
-#include "History/HistoryStore.h"
+#include "Core/History/HistoryStore.h"
 #include "Core/Pick/RecentColors.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Core/Settings/SettingsKeys.h"
@@ -174,7 +174,7 @@ int main(int argc, char *argv[])
 
     // 面 3：主窗口初始尺寸档（MainWindow 构造里 resize(680, 560)，实际被最小宽顶住，读数行会报真实值）
     {
-        GyanisScribe::History::HistoryStore history(dataDirectory / "history.json");
+        GyanisScribe::Core::HistoryStore history(dataDirectory / "history.json");
         const auto                          integration = GyanisScribe::Platform::createPlatformIntegration();
         GyanisScribe::App::MainWindow       window(settings, theme, icons, history, integration->capabilities(), *integration);
         window.resize(680, 560);

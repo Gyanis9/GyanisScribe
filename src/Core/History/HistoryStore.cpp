@@ -1,4 +1,4 @@
-#include "History/HistoryStore.h"
+#include "Core/History/HistoryStore.h"
 
 #include "Base/Logger.h"
 #include "Base/Paths.h"
@@ -21,7 +21,7 @@ namespace
     using GyanisScribe::Base::Error;
     using GyanisScribe::Base::ErrorCode;
     using GyanisScribe::Base::Expected;
-    using GyanisScribe::History::HistoryEntry;
+    using GyanisScribe::Core::HistoryEntry;
 
     /// 清单里各字段的键名：写在纸上就是协议，改名等于换格式
     constexpr const char *kRootKeyEntries = "entries";
@@ -63,7 +63,7 @@ namespace
     }
 } // namespace
 
-namespace GyanisScribe::History
+namespace GyanisScribe::Core
 {
     HistoryStore::HistoryStore(std::filesystem::path storagePath) : m_storagePath(std::move(storagePath))
     {
@@ -247,4 +247,4 @@ namespace GyanisScribe::History
         return Expected<void>{};
     }
 
-} // namespace GyanisScribe::History
+} // namespace GyanisScribe::Core

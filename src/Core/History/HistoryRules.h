@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "History/HistoryTypes.h"
+#include "Core/History/HistoryTypes.h"
 
 #include <QVector>
 
@@ -20,7 +20,7 @@ namespace GyanisScribe::Core
     class ISettingsStore;
 } // namespace GyanisScribe::Core
 
-namespace GyanisScribe::History
+namespace GyanisScribe::Core
 {
 
     /// 默认最多留 200 条：再多的历史列表要靠滚动条找，等于没有列表
@@ -77,4 +77,4 @@ namespace GyanisScribe::History
      */
     [[nodiscard]] bool matchesFilter(const HistoryEntry &entry, const QString &query, const std::optional<HistoryKind> &kindFilter);
 
-} // namespace GyanisScribe::History
+} // namespace GyanisScribe::Core

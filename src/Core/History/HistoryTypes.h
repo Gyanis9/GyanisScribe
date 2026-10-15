@@ -18,7 +18,7 @@
 #include <filesystem>
 #include <string_view>
 
-namespace GyanisScribe::History
+namespace GyanisScribe::Core
 {
 
     /**
@@ -67,4 +67,4 @@ namespace GyanisScribe::History
         QSize                 size;     ///< 成品像素尺寸；视频记的是画面尺寸
     };
 
-} // namespace GyanisScribe::History
+} // namespace GyanisScribe::Core

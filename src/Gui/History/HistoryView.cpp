@@ -1,9 +1,9 @@
-#include "History/HistoryView.h"
+#include "Gui/History/HistoryView.h"
 
 #include "Base/Logger.h"
 #include "Base/Paths.h"
 #include "Base/Text.h"
-#include "History/HistoryThumbnail.h"
+#include "Core/History/HistoryThumbnail.h"
 #include "Gui/Resources/IconProvider.h"
 
 #include <QComboBox>
@@ -28,8 +28,8 @@
 
 namespace
 {
-    using GyanisScribe::History::HistoryEntry;
-    using GyanisScribe::History::HistoryKind;
+    using GyanisScribe::Core::HistoryEntry;
+    using GyanisScribe::Core::HistoryKind;
 
     /// 列表项里存成品路径的那个角色
     constexpr int kPathRole = Qt::UserRole + 1;
@@ -40,9 +40,9 @@ namespace
     // 路径与界面字符串的换算沿用 Base::Paths::toDisplayText / fromDisplayText，这里不再抄一份
 } // namespace
 
-namespace GyanisScribe::History
+namespace GyanisScribe::Gui
 {
-    QString entryCaption(const HistoryEntry &entry, const QDateTime &now)
+    QString entryCaption(const Core::HistoryEntry &entry, const QDateTime &now)
     {
         // 相对日期放最前：用户找的是「今天上午那几张」，绝对日期要先在心里换算一次
         const auto dayDifference = entry.moment.date().daysTo(now.date());
@@ -60,7 +60,7 @@ namespace GyanisScribe::History
 
         // 尺寸那一格只在两侧都落到 1 以上的时候写：默认构造是 (-1,-1)，而旧清单里还躺着 0×0 的记录，
         // 两种都是「读不出」，硬打一个 0×0 等于把不知道报成一个数
-        QString caption = dayText + QStringLiteral(" · ") + historyKindLabel(entry.kind);
+        QString caption = dayText + QStringLiteral(" · ") + Core::historyKindLabel(entry.kind);
         if (!entry.size.isEmpty())
         {
             caption += QStringLiteral(" · ") + QString::number(entry.size.width()) + QStringLiteral("×") + QString::number(entry.size.height());
@@ -70,30 +70,30 @@ namespace GyanisScribe::History
 
     QStringList historyFilterLabels()
     {
-        // 类别名沿用 historyKindLabel：改中文说法时下拉与列表一起改，不会只改一半
-        return {GyanisScribe::Base::uiText("全部"), historyKindLabel(HistoryKind::Screenshot), historyKindLabel(HistoryKind::Recording)};
+        // 类别名沿用 Core::historyKindLabel：改中文说法时下拉与列表一起改，不会只改一半
+        return {GyanisScribe::Base::uiText("全部"), Core::historyKindLabel(Core::HistoryKind::Screenshot), Core::historyKindLabel(Core::HistoryKind::Recording)};
     }
 
-    std::optional<HistoryKind> kindFilterAt(const int index)
+    std::optional<Core::HistoryKind> kindFilterAt(const int index)
     {
         switch (index)
         {
             case 1:
-                return HistoryKind::Screenshot;
+                return Core::HistoryKind::Screenshot;
             case 2:
-                return HistoryKind::Recording;
+                return Core::HistoryKind::Recording;
             default:
                 // 第 0 档与越界都按「不限」：列表宁可多给几行，也不该出现一个谁都不选的空白
                 return {};
         }
     }
 
-    QVector<HistoryEntry> visibleEntries(const QVector<HistoryEntry> &entries, const QString &query, const std::optional<HistoryKind> &kindFilter)
+    QVector<Core::HistoryEntry> visibleEntries(const QVector<Core::HistoryEntry> &entries, const QString &query, const std::optional<Core::HistoryKind> &kindFilter)
     {
-        QVector<HistoryEntry> visible;
+        QVector<Core::HistoryEntry> visible;
         for (const auto &entry: entries)
         {
-            if (matchesFilter(entry, query, kindFilter))
+            if (Core::matchesFilter(entry, query, kindFilter))
             {
                 visible.append(entry);
             }
@@ -101,7 +101,7 @@ namespace GyanisScribe::History
         return visible;
     }
 
-    HistoryView::HistoryView(HistoryStore &store, const HistoryRetentionPolicy &policy, Gui::IconProvider &icons, QWidget *parent) :
+    HistoryView::HistoryView(Core::HistoryStore &store, const Core::HistoryRetentionPolicy &policy, Gui::IconProvider &icons, QWidget *parent) :
         QWidget(parent), m_store(store), m_policy(policy), m_icons(icons)
     {
         auto *root = new QVBoxLayout{this};
@@ -139,7 +139,7 @@ namespace GyanisScribe::History
 
         m_list = new QListWidget{this};
         m_list->setViewMode(QListView::IconMode);
-        m_list->setIconSize(QSize{kThumbnailEdge, kThumbnailEdge});
+        m_list->setIconSize(QSize{Core::kThumbnailEdge, Core::kThumbnailEdge});
         m_list->setUniformItemSizes(true);
         m_list->setResizeMode(QListView::Adjust);
         m_list->setMovement(QListView::Static);
@@ -261,7 +261,7 @@ namespace GyanisScribe::History
         }
     }
 
-    QIcon HistoryView::iconFor(const HistoryEntry &entry) const
+    QIcon HistoryView::iconFor(const Core::HistoryEntry &entry) const
     {
         QImageReader reader{GyanisScribe::Base::Paths::toDisplayText(entry.filePath)};
         reader.setAutoTransform(true);
@@ -269,9 +269,9 @@ namespace GyanisScribe::History
         if (image.isNull())
         {
             // 视频与读不了的图都给一枚类别图标：列表里出现一片空白方块比图标更难看
-            return m_icons.icon(entry.kind == HistoryKind::Recording ? "Record" : "CaptureRegion");
+            return m_icons.icon(entry.kind == Core::HistoryKind::Recording ? "Record" : "CaptureRegion");
         }
-        return QIcon{QPixmap::fromImage(makeThumbnail(image, QSize{kThumbnailEdge, kThumbnailEdge}, kThumbnailCornerRadius))};
+        return QIcon{QPixmap::fromImage(Core::makeThumbnail(image, QSize{Core::kThumbnailEdge, Core::kThumbnailEdge}, Core::kThumbnailCornerRadius))};
     }
 
     void HistoryView::removeSelected()
@@ -285,4 +285,4 @@ namespace GyanisScribe::History
         emit removeRequested(*path);
     }
 
-} // namespace GyanisScribe::History
+} // namespace GyanisScribe::Gui

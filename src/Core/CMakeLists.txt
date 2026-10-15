@@ -3,6 +3,7 @@ add_subdirectory(Image)
 add_subdirectory(Settings)
 add_subdirectory(Hotkey)
 add_subdirectory(Pick)
+add_subdirectory(History)
 
 get_property(CoreSources GLOBAL PROPERTY GyanisScribeCoreSources)
 add_library(Core STATIC ${CoreSources})

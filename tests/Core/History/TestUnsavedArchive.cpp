@@ -1,6 +1,6 @@
 // 未保存截图那一份像素的落盘：写得出去、读得回来、按张数裁最旧的、撞名不覆盖别人的那一份。
 // 目录由用例自己给（每条用例一份临时目录），并行跑时两条用例不会互相裁掉对方的文件。
-#include "History/UnsavedArchive.h"
+#include "Core/History/UnsavedArchive.h"
 
 #include "Base/Paths.h"
 #include "Base/Types.h"
@@ -20,8 +20,8 @@
 #include <fstream>
 
 using GyanisScribe::Base::ErrorCode;
-using GyanisScribe::History::archiveUnsavedCapture;
-using GyanisScribe::History::kUnsavedArchiveCapacity;
+using GyanisScribe::Core::archiveUnsavedCapture;
+using GyanisScribe::Core::kUnsavedArchiveCapacity;
 
 namespace
 {

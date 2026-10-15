@@ -9,9 +9,9 @@
 #include "Capture/IScreenCaptureSource.h"
 #include "Base/Paths.h"
 #include "Base/Types.h"
-#include "History/HistoryRules.h"
-#include "History/HistoryStore.h"
-#include "History/HistoryTypes.h"
+#include "Core/History/HistoryRules.h"
+#include "Core/History/HistoryStore.h"
+#include "Core/History/HistoryTypes.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Platform/PlatformCapabilities.h"
 #include "Core/Settings/SettingsKeys.h"
@@ -253,10 +253,10 @@ namespace GyanisScribe
             }
 
             /// 读回注入的那份历史清单；条目里指向的成品文件由 load() 自己检查存在性
-            [[nodiscard]] Base::Expected<QVector<History::HistoryEntry>> readHistory() const
+            [[nodiscard]] Base::Expected<QVector<Core::HistoryEntry>> readHistory() const
             {
-                const History::HistoryStore store(m_root / "history.json");
-                return store.load(History::policyFromSettings(*m_settings), QDateTime::currentDateTime());
+                const Core::HistoryStore store(m_root / "history.json");
+                return store.load(Core::policyFromSettings(*m_settings), QDateTime::currentDateTime());
             }
 
             /// 钉住成品落在哪个目录：拿两边的等价文件系统状态判，不抄字符串比前缀
@@ -394,7 +394,7 @@ namespace GyanisScribe
         const auto entries = readHistory();
         ASSERT_TRUE(entries.has_value()) << "历史清单读不回：" << entries.error().message;
         ASSERT_EQ(entries->size(), 1) << "快速保存该正好记一条";
-        EXPECT_EQ(entries->front().kind, History::HistoryKind::Screenshot);
+        EXPECT_EQ(entries->front().kind, Core::HistoryKind::Screenshot);
         EXPECT_EQ(entries->front().size, QSize(kFrameWidth, kFrameHeight)) << "记的该是落盘那份的像素尺寸";
         expectUnderDirectory(entries->front().filePath, m_root / "shots");
     }
@@ -414,7 +414,7 @@ namespace GyanisScribe
         const auto entries = readHistory();
         ASSERT_TRUE(entries.has_value()) << "历史清单读不回：" << entries.error().message;
         ASSERT_EQ(entries->size(), 1) << "开着「未保存也进历史」时该正好记一条";
-        EXPECT_EQ(entries->front().kind, History::HistoryKind::Screenshot);
+        EXPECT_EQ(entries->front().kind, Core::HistoryKind::Screenshot);
         expectUnderDirectory(entries->front().filePath, Base::Paths::unsavedCaptureDirectory());
     }
 

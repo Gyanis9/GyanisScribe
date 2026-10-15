@@ -9,7 +9,6 @@ add_subdirectory(Pin)
 add_subdirectory(Ocr)
 add_subdirectory(Scan)
 add_subdirectory(Record)
-add_subdirectory(History)
 add_subdirectory(App)
 
 # Debug 档的 Qt DLL 带 d 后缀，Release 不带；这条后缀只在 MSVC + Debug 下成立

@@ -4,6 +4,7 @@ add_subdirectory(Theme)
 add_subdirectory(Controls)
 add_subdirectory(Resources)
 add_subdirectory(Pick)
+add_subdirectory(History)
 
 get_property(GuiSources GLOBAL PROPERTY GyanisScribeGuiSources)
 add_library(Gui STATIC ${GuiSources})

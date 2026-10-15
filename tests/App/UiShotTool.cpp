@@ -4,7 +4,7 @@
 
 #include "App/MainWindow.h"
 
-#include "History/HistoryStore.h"
+#include "Core/History/HistoryStore.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Settings/SettingsStore.h"
@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
 
     GyanisScribe::Gui::IconProvider      icons;
     GyanisScribe::Gui::ThemeManager      theme(settings);
-    GyanisScribe::History::HistoryStore history(dataDirectory / "history.json");
+    GyanisScribe::Core::HistoryStore history(dataDirectory / "history.json");
     const auto                          integration = GyanisScribe::Platform::createPlatformIntegration();
     // 样式表要落一次：真实程序里这一步在 AppController 构造里做，这里没有控制器
     theme.applyFromSettings();

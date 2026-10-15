@@ -17,7 +17,7 @@
 #include <cstddef>
 #include <filesystem>
 
-namespace GyanisScribe::History
+namespace GyanisScribe::Core
 {
 
     /// 这一份最多留几张：存的是像素而不是记录，上限要比历史清单的条数收得更紧
@@ -38,4 +38,4 @@ namespace GyanisScribe::History
     [[nodiscard]] Base::Expected<std::filesystem::path> archiveUnsavedCapture(const QImage &image, const QDateTime &moment, const std::filesystem::path &directory,
                                                                               std::size_t capacity);
 
-} // namespace GyanisScribe::History
+} // namespace GyanisScribe::Core

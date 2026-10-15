@@ -1,4 +1,4 @@
-#include "History/HistoryRules.h"
+#include "Core/History/HistoryRules.h"
 
 #include "Base/Logger.h"
 #include "Core/Settings/ISettingsStore.h"
@@ -11,14 +11,14 @@
 
 namespace
 {
-    using GyanisScribe::History::HistoryEntry;
-    using GyanisScribe::History::HistoryKind;
+    using GyanisScribe::Core::HistoryEntry;
+    using GyanisScribe::Core::HistoryKind;
 
     /// 列表日期那一栏的格式：与文件名里的时间戳同一口径，用户搜日期能搜到
     constexpr const char *kDateTextFormat = "yyyy-MM-dd";
 } // namespace
 
-namespace GyanisScribe::History
+namespace GyanisScribe::Core
 {
     void sortNewestFirst(QVector<HistoryEntry> &entries)
     {
@@ -92,4 +92,4 @@ namespace GyanisScribe::History
         return fileName.contains(query, Qt::CaseInsensitive) || historyKindLabel(entry.kind).contains(query, Qt::CaseInsensitive) || dateText.contains(query, Qt::CaseInsensitive);
     }
 
-} // namespace GyanisScribe::History
+} // namespace GyanisScribe::Core
