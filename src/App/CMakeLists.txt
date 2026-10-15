@@ -39,7 +39,7 @@ target_link_libraries(App PUBLIC
         Pin
         Platform
         Record
-        Scan
+        Plugins
         Gui
         Qt6::Core
         Qt6::Gui

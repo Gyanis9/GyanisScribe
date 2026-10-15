@@ -1,4 +1,4 @@
-#include "Scan/BarcodeDecoder.h"
+#include "Plugins/Barcode/BarcodeDecoder.h"
 
 #include "Base/Text.h"
 
@@ -7,7 +7,7 @@
 #include <ZXing/ReadBarcode.h>
 #endif
 
-namespace GyanisScribe::Scan
+namespace GyanisScribe::Plugins
 {
 
     bool barcodeBackendAvailable() noexcept
@@ -62,4 +62,4 @@ namespace GyanisScribe::Scan
         return readings.empty() ? std::nullopt : std::optional<BarcodeReading>{readings.front()};
     }
 
-} // namespace GyanisScribe::Scan
+} // namespace GyanisScribe::Plugins

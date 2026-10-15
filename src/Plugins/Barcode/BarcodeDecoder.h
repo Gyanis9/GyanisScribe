@@ -17,7 +17,7 @@
 #include <optional>
 #include <vector>
 
-namespace GyanisScribe::Scan
+namespace GyanisScribe::Plugins
 {
 
     /**
@@ -56,4 +56,4 @@ namespace GyanisScribe::Scan
      */
     [[nodiscard]] std::optional<BarcodeReading> preferredReading(const std::vector<BarcodeReading> &readings);
 
-} // namespace GyanisScribe::Scan
+} // namespace GyanisScribe::Plugins

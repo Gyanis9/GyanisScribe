@@ -31,7 +31,7 @@
 #include "Gui/Pick/ColorPickerOverlay.h"
 #include "Ocr/OcrResultWindow.h"
 #include "Ocr/OcrTypes.h"
-#include "Scan/BarcodeDecoder.h"
+#include "Plugins/Barcode/BarcodeDecoder.h"
 #include "Ocr/RecognitionRunner.h"
 #include "Pin/PinGroupManagerWindow.h"
 #include "Pin/PinManager.h"
@@ -1206,7 +1206,7 @@ namespace GyanisScribe::App
 
     void AppController::handleScanRequested(const QImage &image)
     {
-        const auto readings = Scan::readBarcodes(image);
+        const auto readings = Plugins::readBarcodes(image);
         if (!readings)
         {
             // 后端没编进来这类原因原样播出去：文案里已经写明出路
@@ -1221,7 +1221,7 @@ namespace GyanisScribe::App
 
         // 认出多个就报第一个二维的（一维在二维码花纹里偶发假阳性，见 preferredReading）；
         // 提示里说明数量
-        const auto preferred = Scan::preferredReading(*readings);
+        const auto preferred = Plugins::preferredReading(*readings);
         if (!preferred)
         {
             return; // 空列表在上面已经报过了，这里只是不变量兜底

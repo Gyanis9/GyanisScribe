@@ -1,7 +1,7 @@
 // 二维码/条形码识别的直测：自造一张码再认回来、噪声与空图都该是「一个都没认出」而不是错误。
 // 后端是可选的（见 src/Scan/CMakeLists.txt）：宏按档给，没编后端时这一支只断言桩的行为——
 // 两种形状各有用例看住，不留「没编过」的分支。
-#include "Scan/BarcodeDecoder.h"
+#include "Plugins/Barcode/BarcodeDecoder.h"
 
 #include <QColor>
 #include <QImage>
@@ -18,10 +18,10 @@
 #include <string>
 #endif
 
-using GyanisScribe::Scan::barcodeBackendAvailable;
-using GyanisScribe::Scan::BarcodeReading;
-using GyanisScribe::Scan::preferredReading;
-using GyanisScribe::Scan::readBarcodes;
+using GyanisScribe::Plugins::barcodeBackendAvailable;
+using GyanisScribe::Plugins::BarcodeReading;
+using GyanisScribe::Plugins::preferredReading;
+using GyanisScribe::Plugins::readBarcodes;
 
 /**
  * @brief 钉住空图的那一格：后端在册时是「没认出」空列表，不在册时是明确的 DependencyMissing
