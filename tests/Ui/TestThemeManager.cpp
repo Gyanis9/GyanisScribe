@@ -453,9 +453,13 @@ TEST_F(ThemeManagerFixture, WidgetsRenderThePaletteSurfacePerTheme)
     {
         // setStyleSheet 是 QWidget 的成员而不是静态函数，这里挂在套件持有的应用对象上
         application->setStyleSheet(ThemeManager::styleSheetFor(kind));
-        QPushButton button;
-        button.resize(120, 32);
-        const QPixmap pixmap = button.grab();
+        // 探针挑阅读面卡片而不是空按钮：珍珠玻璃里按钮平时是透明底（悬停才显玻璃块），
+        // 拿按钮取中部像素会取到它背后的窗口底；#pageCard 的底色就是 surface 角色本身
+        QWidget card;
+        card.setObjectName(QStringLiteral("pageCard"));
+        card.setAttribute(Qt::WA_StyledBackground, true);
+        card.resize(120, 32);
+        const QPixmap pixmap = card.grab();
         EXPECT_FALSE(pixmap.isNull()) << "这一档没画出任何像素：" << static_cast<int>(kind);
         return pixmap.toImage().pixelColor(20, 16);
     };

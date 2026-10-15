@@ -25,14 +25,15 @@ namespace GyanisScribe::Ui
     /// 截图遮罩用的半透明黑：压得住背景，又不让用户看不清自己在框什么
     inline constexpr QColor kCaptureMaskColor{0, 0, 0, 120};
 
-    /// 选区边框与焦点圈的主色：遮罩压在任意画面上，这一支不随主题走，只看「深浅两种背景上都够重」
-    inline constexpr QColor kAccentColor{43, 103, 216};
+    /// 选区边框与焦点圈的主色：遮罩压在任意画面上，这一支不随主题走，只看「深浅两种背景上都够重」；
+    /// 与浅色档 accent 同值（珍珠玻璃的蓝）
+    inline constexpr QColor kAccentColor{35, 109, 233};
 
-    /// 遮罩上的读数文本色
-    inline constexpr QColor kCaptureHintTextColor{240, 240, 240};
+    /// 遮罩上的读数文本色：借珍珠玻璃的深色铭牌文字档（--plate-ink）
+    inline constexpr QColor kCaptureHintTextColor{242, 245, 244};
 
-    /// 选区读数文本的底衬色，保证读数压在任何画面上都读得出
-    inline constexpr QColor kCaptureHintBackgroundColor{24, 24, 24, 200};
+    /// 选区读数文本的底衬色，保证读数压在任何画面上都读得出：借设计的深色铭牌底（--plate-bg 的 .9 档）
+    inline constexpr QColor kCaptureHintBackgroundColor{21, 24, 26, 230};
 
     /// 十字辅助线色（虚线）
     inline constexpr QColor kCrosshairColor{160, 160, 160, 180};
@@ -102,46 +103,47 @@ namespace GyanisScribe::Ui
         QColor borderStrong;     ///< 输入类控件的默认描边，比 border 重一档，好让「能填的」一眼分得出
     };
 
-    /// 浅色主题的语义色
+    /// 浅色主题的语义色：珍珠玻璃（scaffold-vue）浅色档的移植；
+    /// 逐条对比度现算与设计原值的差异见 docs/UiRestylePlan.md 附录的冻结值表
     inline constexpr ThemePalette kLightPalette{
-            QColor{244, 245, 247}, // windowBackground
-            QColor{255, 255, 255}, // surface
-            QColor{27, 31, 36},    // text
-            QColor{73, 81, 98},    // secondaryText
-            QColor{220, 224, 230}, // border
+            QColor{246, 248, 247}, // windowBackground
+            QColor{251, 252, 252}, // surface
+            QColor{16, 20, 24},    // text
+            QColor{73, 83, 88},    // secondaryText：设计原值 #596368 对底色只有 5.8:1，压深保色相到 7.4:1
+            QColor{228, 231, 231}, // border
             kAccentColor,          // accent
             QColor{255, 255, 255}, // onAccent
-            QColor{207, 225, 248}, // selection
-            QColor{74, 82, 96},    // icon
-            QColor{18, 105, 60},   // success
-            QColor{179, 38, 30},   // danger
-            QColor{237, 239, 242}, // mutedFill
-            QColor{239, 241, 244}, // hover
-            QColor{227, 231, 236}, // pressed
-            QColor{36, 88, 189},   // accentHover
-            QColor{230, 238, 251}, // accentSoft
-            QColor{195, 201, 210}, // borderStrong
+            QColor{216, 229, 249}, // selection
+            QColor{126, 136, 140}, // icon
+            QColor{59, 125, 33},   // success：设计原值 #58A021 当文字只有 3.3:1，压深保色相
+            QColor{202, 57, 50},   // danger：设计原值 #E0443B 当文字只有 4.2:1，压深保色相
+            QColor{238, 242, 240}, // mutedFill
+            QColor{242, 243, 243}, // hover
+            QColor{236, 237, 238}, // pressed
+            QColor{29, 97, 213},   // accentHover
+            QColor{229, 238, 250}, // accentSoft
+            QColor{214, 217, 218}, // borderStrong
     };
 
-    /// 深色主题的语义色：底色不是把浅色取反，而是各自另给一档；主色在这一档要更亮才压得住
+    /// 深色主题的语义色：同一套语义换材质（设计深色档的移植）
     inline constexpr ThemePalette kDarkPalette{
-            QColor{23, 25, 29},    // windowBackground
-            QColor{31, 34, 40},    // surface
-            QColor{232, 234, 237}, // text
-            QColor{174, 183, 196}, // secondaryText
-            QColor{56, 62, 72},    // border
-            QColor{78, 139, 245},  // accent
-            QColor{11, 18, 32},    // onAccent：这一档主色偏亮，压深字才够 AA（Fluent 深色同做法）
-            QColor{44, 78, 119},   // selection
-            QColor{201, 207, 216}, // icon
-            QColor{92, 203, 134},  // success
-            QColor{244, 121, 126}, // danger
-            QColor{42, 46, 54},    // mutedFill
-            QColor{44, 49, 58},    // hover
-            QColor{53, 59, 70},    // pressed
-            QColor{107, 160, 248}, // accentHover
-            QColor{30, 51, 82},    // accentSoft
-            QColor{74, 82, 94},    // borderStrong
+            QColor{18, 21, 23},    // windowBackground
+            QColor{27, 31, 33},    // surface
+            QColor{238, 242, 241}, // text
+            QColor{176, 186, 189}, // secondaryText
+            QColor{35, 37, 39},    // border
+            QColor{76, 141, 255},  // accent
+            QColor{11, 18, 32},    // onAccent：这一档主色偏亮，压白字只有 3.2:1，压深字才够 AA
+            QColor{39, 57, 86},    // selection
+            QColor{141, 151, 154}, // icon
+            QColor{155, 227, 90},  // success
+            QColor{255, 122, 113}, // danger
+            QColor{21, 24, 26},    // mutedFill
+            QColor{38, 42, 44},    // hover
+            QColor{45, 49, 51},    // pressed
+            QColor{61, 127, 242},  // accentHover
+            QColor{35, 49, 69},    // accentSoft
+            QColor{50, 53, 55},    // borderStrong
     };
 
     /**
@@ -301,7 +303,7 @@ namespace GyanisScribe::Ui
             QColor{242, 141, 50}, // 橙
             QColor{240, 195, 60}, // 黄
             QColor{70, 180, 90},  // 绿
-            QColor{43, 103, 216}, // 蓝，与主色同值
+            QColor{35, 109, 233}, // 蓝，与主色同值
             QColor{150, 90, 200}, // 紫
             QColor{24, 24, 24},   // 黑
             QColor{252, 252, 252} // 白

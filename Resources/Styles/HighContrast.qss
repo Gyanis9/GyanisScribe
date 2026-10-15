@@ -1,18 +1,26 @@
 /* HighContrast 主题的界面样式表。
    与 Light.qss 逐条同构，只差色值：选择器、顺序、圆角与尺寸三份保持一致，
-   色值同样取自 src/Ui/DesignTokens.h 的 kHighContrastPalette，用例双向核对同解。 */
+   色值取自 src/Ui/DesignTokens.h 的 kHighContrastPalette，用例双向核对同解。
+   这一档的可辨识差异是「描边加粗到 2px + 纯黑纯白 + 纯黄选区」，不靠底色分层次。 */
 
-/* ---- 面：只有具名的根与卡片铺底。裸 QWidget 一律不铺——铺了就是每个子控件各画一块底，
-        表单里会排出一条条灰带 ---- */
+/* ---- 面：只有具名的根与卡片铺底。裸 QWidget 一律不铺——铺了就是每个子控件各画一块底 ---- */
 QWidget#appRoot {
     background-color: #FFFFFF;
 }
 
-/* 卡片：设置页的一页、录屏控制条与标注工具栏共用一档形状（悬浮件靠描边与底色分出来，Qt 的样式表没有投影） */
-QWidget#pageCard, QWidget#hudRoot, QWidget#AnnotationToolbar {
+/* 阅读面（设置页卡片）：纯白底 + 2px 纯黑描边 */
+QWidget#pageCard {
     background-color: #FFFFFF;
     border: 2px solid #000000;
-    border-radius: 12px;
+    border-radius: 20px;
+}
+
+/* 悬浮条（录屏控制条、标注工具栏）：浮层档，圆角比阅读面收一档；
+   Qt 的样式表没有投影，浮层靠描边与底色分出来 */
+QWidget#hudRoot, QWidget#AnnotationToolbar {
+    background-color: #FFFFFF;
+    border: 2px solid #000000;
+    border-radius: 16px;
 }
 
 /* ---- 文字颜色层级（字号见 applyTextRole） ---- */
@@ -28,14 +36,15 @@ QLabel:disabled {
     color: #000000;
 }
 
-/* ---- 按钮：中性底 + 一档悬停、一档按下；主按钮（default）走填充主色 ---- */
+/* ---- 按钮：这一档按钮一律白底 + 2px 纯黑描边（不透明是它的可辨识特征）；
+   悬停与按下只换底，主按钮（default）走主色填充 ---- */
 QPushButton {
     background-color: #FFFFFF;
     color: #000000;
     border: 2px solid #000000;
-    border-radius: 8px;
-    padding: 0 12px;
-    min-height: 28px;
+    border-radius: 12px;
+    padding: 0 15px;
+    min-height: 32px;
 }
 
 QPushButton:hover {
@@ -71,6 +80,12 @@ QPushButton:default:pressed {
     background-color: #0B57D0;
 }
 
+QPushButton:default:disabled {
+    background-color: #FFFFFF;
+    color: #000000;
+    border-color: #000000;
+}
+
 /* ---- 工具按钮：平时透明，只在悬停/选中时给出底 ---- */
 QToolButton {
     background-color: transparent;
@@ -104,10 +119,11 @@ QToolButton:disabled {
     border-color: transparent;
 }
 
-/* ---- 标注工具栏的按钮：一排最多五十几件控件，最小尺寸比全局那档各收 2px，宽度省上百像素 ---- */
+/* ---- 标注工具栏的按钮：这一档描边 2px（比浅色档重一档），内容尺寸相应各让 1px，
+        节距与另两档同宽——否则一排五十几件控件会把宽度顶出 1920 契约 ---- */
 QWidget#AnnotationToolbar QToolButton {
-    min-width: 26px;
-    min-height: 26px;
+    min-width: 24px;
+    min-height: 24px;
 }
 
 /* ---- 输入类：描边比分隔线重一档，好让「能填的」一眼分得出 ---- */
@@ -115,9 +131,9 @@ QLineEdit, QComboBox, QSpinBox {
     background-color: #FFFFFF;
     color: #000000;
     border: 2px solid #000000;
-    border-radius: 8px;
-    padding: 0 8px;
-    min-height: 28px;
+    border-radius: 12px;
+    padding: 0 12px;
+    min-height: 34px;
     selection-background-color: #FFE500;
     selection-color: #000000;
 }
@@ -144,7 +160,7 @@ QTextEdit#annotationTextEditor {
     background-color: #FFFFFF;
     color: #000000;
     border: 2px solid #000000;
-    border-radius: 8px;
+    border-radius: 12px;
     padding: 0 8px;
     selection-background-color: #FFE500;
     selection-color: #000000;
@@ -154,20 +170,25 @@ QTextEdit#annotationTextEditor:focus {
     border: 2px solid #0B57D0;
 }
 
+/* 下拉箭头由原生风格画在右侧这一条里：留出宽度，长选项的文字才不会压在箭头上 */
+QComboBox {
+    padding-right: 26px;
+}
+
 QComboBox QAbstractItemView {
     background-color: #FFFFFF;
     color: #000000;
     border: 2px solid #000000;
-    border-radius: 8px;
-    padding: 4px;
+    border-radius: 12px;
+    padding: 6px;
     outline: none;
     selection-background-color: #D6E4FB;
     selection-color: #000000;
 }
 
 QComboBox QAbstractItemView::item {
-    min-height: 24px;
-    border-radius: 6px;
+    min-height: 30px;
+    border-radius: 8px;
     padding: 0 8px;
 }
 
@@ -176,10 +197,8 @@ QComboBox QAbstractItemView::item:hover {
 }
 
 /* 下拉与微调框的箭头刻意不在这里出现：给 ::drop-down / ::up-button 写过规则之后，
-   原生风格就不再画箭头了——界面只剩一个空白方块，用户看不出这一格能点。
-   箭头由原生风格按 QPalette 画，深浅两档都跟着走。 */
-/* 勾选框自己画：不覆盖 ::indicator 时，原生风格按系统深浅色画那枚方框，
-   应用切成深色而系统留在浅色就会带进一块白底。勾的形状是 Resources/Styles 下的两份 SVG。 */
+   原生风格就不再画箭头了——箭头由原生风格按 QPalette 画，这一档不受影响。 */
+/* 勾选框自己画：勾的形状是 Resources/Styles 下的两份 SVG */
 QCheckBox {
     spacing: 8px;
     color: #000000;
@@ -213,7 +232,7 @@ QCheckBox:disabled {
     color: #000000;
 }
 
-/* ---- 滑块：槽给一档描边（高对比度档靠这一档才看得见轨道），已走过的部分用主色 ---- */
+/* ---- 滑块：槽给一档描边（这一档靠它才看得见轨道），已走过的部分用主色 ---- */
 QSlider::groove:horizontal {
     height: 6px;
     background-color: #FFFFFF;
@@ -223,7 +242,7 @@ QSlider::groove:horizontal {
 
 QSlider::sub-page:horizontal {
     background-color: #0B57D0;
-    border: 1px solid #0B57D0;
+    border: 2px solid #0B57D0;
     border-radius: 4px;
 }
 
@@ -241,15 +260,15 @@ QSlider::handle:horizontal:hover {
 }
 
 QSlider:disabled::groove:horizontal {
-    background-color: #000000;
+    background-color: #E0E0E0;
 }
 
 QSlider:disabled::sub-page:horizontal {
-    background-color: #000000;
+    background-color: #C8C8C8;
 }
 
 QSlider:disabled::handle:horizontal {
-    background-color: #000000;
+    background-color: #C8C8C8;
     border-color: #FFFFFF;
 }
 
@@ -257,18 +276,18 @@ QSlider:disabled::handle:horizontal {
 QMenu {
     background-color: #FFFFFF;
     border: 2px solid #000000;
-    border-radius: 10px;
-    padding: 4px;
+    border-radius: 16px;
+    padding: 6px;
 }
 
 QMenu::item {
-    padding: 6px 24px 6px 12px;
-    border-radius: 6px;
+    padding: 6px 24px 6px 10px;
+    border-radius: 8px;
     color: #000000;
 }
 
 QMenu::item:selected {
-    background-color: #D6E4FB;
+    background-color: #E0E0E0;
     color: #000000;
 }
 
@@ -277,7 +296,7 @@ QMenu::item:disabled {
 }
 
 QMenu::separator {
-    height: 2px;
+    height: 1px;
     background-color: #000000;
     margin: 4px 8px;
 }
@@ -286,7 +305,7 @@ QToolTip {
     background-color: #FFFFFF;
     color: #000000;
     border: 2px solid #000000;
-    border-radius: 6px;
+    border-radius: 8px;
     padding: 4px 8px;
 }
 
@@ -294,16 +313,16 @@ QToolTip {
 QListWidget {
     background-color: #FFFFFF;
     border: 2px solid #000000;
-    border-radius: 10px;
-    padding: 4px;
+    border-radius: 16px;
+    padding: 6px;
     outline: none;
 }
 
 QListWidget::item {
-    min-height: 24px;
+    min-height: 28px;
     padding: 4px 8px;
     margin: 1px 2px;
-    border: 2px solid transparent;
+    border: 1px solid transparent;
     border-radius: 8px;
     color: #000000;
 }
@@ -325,11 +344,11 @@ QListWidget#settingsNav {
 }
 
 QListWidget#settingsNav::item {
-    min-height: 32px;
+    min-height: 34px;
 }
 
 /* ---- 设置页的滚动层 ---- */
-/* 卡片底画在里面的 #pageCard 上：这一层与它的视口都不带底色，否则卡片四周会多出一圈与主题不合的边 */
+/* 卡片底画在里面的 #pageCard 上：这一层与它的视口都不带底色 */
 QScrollArea#settingsScroll {
     background-color: transparent;
     border: none;
@@ -344,7 +363,7 @@ QTextEdit {
     background-color: #FFFFFF;
     color: #000000;
     border: 2px solid #000000;
-    border-radius: 10px;
+    border-radius: 16px;
     padding: 8px;
     selection-background-color: #FFE500;
     selection-color: #000000;
@@ -353,11 +372,11 @@ QTextEdit {
 /* ---- 工具栏分段用的竖线，代码里按对象名给出 ---- */
 QFrame#toolbarSeparator {
     background-color: #000000;
-    max-width: 2px;
-    min-width: 2px;
+    max-width: 1px;
+    min-width: 1px;
 }
 
-/* ---- 滚动条：细、无箭头、平时淡一档 ---- */
+/* ---- 滚动条：细、无箭头、纯黑滑块（这一档不靠淡化分层次） ---- */
 QScrollBar:vertical {
     background-color: transparent;
     width: 10px;
@@ -366,7 +385,7 @@ QScrollBar:vertical {
 
 QScrollBar::handle:vertical {
     background-color: #000000;
-    border-radius: 3px;
+    border-radius: 4px;
     min-height: 24px;
 }
 
@@ -382,7 +401,7 @@ QScrollBar:horizontal {
 
 QScrollBar::handle:horizontal {
     background-color: #000000;
-    border-radius: 3px;
+    border-radius: 4px;
     min-width: 24px;
 }
 
