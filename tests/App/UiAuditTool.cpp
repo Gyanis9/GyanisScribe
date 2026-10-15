@@ -12,8 +12,8 @@
 #include "History/HistoryStore.h"
 #include "Pick/RecentColors.h"
 #include "Platform/IPlatformIntegration.h"
-#include "Settings/SettingsKeys.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsStore.h"
 #include "Gui/Resources/IconProvider.h"
 #include "Gui/Theme/ThemeManager.h"
 
@@ -113,7 +113,7 @@ int main(int argc, char *argv[])
     std::filesystem::remove_all(dataDirectory, ignored);
     std::filesystem::create_directories(dataDirectory, ignored);
 
-    GyanisScribe::Settings::SettingsStore settings(dataDirectory / "settings.ini");
+    GyanisScribe::Core::SettingsStore settings(dataDirectory / "settings.ini");
     GyanisScribe::Gui::IconProvider        icons;
     GyanisScribe::Gui::ThemeManager        theme(settings);
     // 样式表要落一次：真实程序里这一步在 AppController 构造里做，这里没有控制器
@@ -160,8 +160,8 @@ int main(int argc, char *argv[])
 
     // 面 2：标注工具栏满配态——16 格色板 + 6 格最近色，这是它能长到的最宽形状
     {
-        const auto paletteSeeded = settings.setValue(GyanisScribe::Settings::kAnnotationPalette, GyanisScribe::Annotation::paletteToTokens(fullPalette()));
-        const auto recentSeeded  = settings.setValue(GyanisScribe::Settings::kAnnotationRecentColors, GyanisScribe::Pick::serializeRecentColors(fullRecentColors()));
+        const auto paletteSeeded = settings.setValue(GyanisScribe::Core::kAnnotationPalette, GyanisScribe::Annotation::paletteToTokens(fullPalette()));
+        const auto recentSeeded  = settings.setValue(GyanisScribe::Core::kAnnotationRecentColors, GyanisScribe::Pick::serializeRecentColors(fullRecentColors()));
         if (!paletteSeeded || !recentSeeded)
         {
             std::fprintf(stderr, "failed to seed the full palette\n");
@@ -196,7 +196,7 @@ int main(int argc, char *argv[])
         // 面 4：深色与高对比度档的对应图（换肤观感核对；浅色已在前面出过）
         for (const auto &[mode, name]: std::array<std::pair<const char *, const char *>, 2>{{{"Dark", "dark"}, {"HighContrast", "hc"}}})
         {
-            if (const auto written = settings.setValue(GyanisScribe::Settings::kThemeMode, QString::fromUtf8(mode)); !written)
+            if (const auto written = settings.setValue(GyanisScribe::Core::kThemeMode, QString::fromUtf8(mode)); !written)
             {
                 std::fprintf(stderr, "failed to switch the theme\n");
                 return 1;

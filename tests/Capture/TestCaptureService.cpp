@@ -4,8 +4,8 @@
 #include "Capture/IScreenCaptureSource.h"
 #include "Base/Logger.h"
 #include "Platform/IPlatformIntegration.h"
-#include "Settings/SettingsKeys.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsStore.h"
 
 #include <QApplication>
 #include <QColor>
@@ -35,7 +35,7 @@ using GyanisScribe::Base::CapturedImage;
 using GyanisScribe::Base::Error;
 using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Base::Expected;
-using GyanisScribe::Settings::SettingsStore;
+using GyanisScribe::Core::SettingsStore;
 
 namespace
 {
@@ -195,9 +195,9 @@ TEST_F(CaptureServiceFixture, RegionCaptureRemembersTheRegion)
 
     settings.sync();
     SettingsStore reopened(m_iniFile);
-    EXPECT_EQ(reopened.stringValue(GyanisScribe::Settings::kCaptureLastRegion, QString()), QStringLiteral("10,10,40,15")) << "成功抓过的选区没记下，「上次区域」就永远复用不了";
-    EXPECT_EQ(reopened.stringValue(GyanisScribe::Settings::kCaptureLastScreen, QString()), QStringLiteral("FakeScreen-1")) << "所在屏没记下，多显示器下上次区域会回到错的那一块屏";
-    EXPECT_EQ(reopened.stringValue(GyanisScribe::Settings::kCaptureRegionHistory, QString()), QStringLiteral("10,10,40,15,FakeScreen-1"))
+    EXPECT_EQ(reopened.stringValue(GyanisScribe::Core::kCaptureLastRegion, QString()), QStringLiteral("10,10,40,15")) << "成功抓过的选区没记下，「上次区域」就永远复用不了";
+    EXPECT_EQ(reopened.stringValue(GyanisScribe::Core::kCaptureLastScreen, QString()), QStringLiteral("FakeScreen-1")) << "所在屏没记下，多显示器下上次区域会回到错的那一块屏";
+    EXPECT_EQ(reopened.stringValue(GyanisScribe::Core::kCaptureRegionHistory, QString()), QStringLiteral("10,10,40,15,FakeScreen-1"))
             << "选区历史没记下，框选时的 R/Shift+R 就没有可挑的";
 }
 
@@ -229,8 +229,8 @@ TEST_F(CaptureServiceFixture, GrabRegionNowReturnsTheFrameWithoutEmittingOrRemem
 
     settings.sync();
     SettingsStore reopened(m_iniFile);
-    EXPECT_EQ(reopened.stringValue(GyanisScribe::Settings::kCaptureLastRegion, QString()), QStringLiteral("5,5,20,10")) << "重抓把最近选区顶掉了";
-    EXPECT_EQ(reopened.stringValue(GyanisScribe::Settings::kCaptureRegionHistory, QString()), QStringLiteral("5,5,20,10,FakeScreen-1")) << "重抓往选区历史里记了账";
+    EXPECT_EQ(reopened.stringValue(GyanisScribe::Core::kCaptureLastRegion, QString()), QStringLiteral("5,5,20,10")) << "重抓把最近选区顶掉了";
+    EXPECT_EQ(reopened.stringValue(GyanisScribe::Core::kCaptureRegionHistory, QString()), QStringLiteral("5,5,20,10,FakeScreen-1")) << "重抓往选区历史里记了账";
 }
 
 /**
@@ -249,7 +249,7 @@ TEST_F(CaptureServiceFixture, RegionHistoryKeepsNewestFirstAndLastRegionReusesTh
 
     settings.sync();
     SettingsStore reopened(m_iniFile);
-    EXPECT_EQ(reopened.stringValue(GyanisScribe::Settings::kCaptureRegionHistory, QString()), QStringLiteral("50,5,30,20,FakeScreen-1;10,10,40,15,FakeScreen-1"))
+    EXPECT_EQ(reopened.stringValue(GyanisScribe::Core::kCaptureRegionHistory, QString()), QStringLiteral("50,5,30,20,FakeScreen-1;10,10,40,15,FakeScreen-1"))
             << "历史该按最近在前排，两条都在";
 
     Outcome outcome;
@@ -265,8 +265,8 @@ TEST_F(CaptureServiceFixture, RegionHistoryKeepsNewestFirstAndLastRegionReusesTh
 TEST_F(CaptureServiceFixture, FailedRegionKeepsPreviouslyRememberedRegion)
 {
     SettingsStore settings(m_iniFile);
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureLastRegion, QVariant(QStringLiteral("1,2,3,4"))).has_value());
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureLastScreen, QVariant(QStringLiteral("FakeScreen-1"))).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureLastRegion, QVariant(QStringLiteral("1,2,3,4"))).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureLastScreen, QVariant(QStringLiteral("FakeScreen-1"))).has_value());
     settings.sync();
 
     FakeCaptureSource source;
@@ -283,7 +283,7 @@ TEST_F(CaptureServiceFixture, FailedRegionKeepsPreviouslyRememberedRegion)
 
     settings.sync();
     SettingsStore reopened(m_iniFile);
-    EXPECT_EQ(reopened.stringValue(GyanisScribe::Settings::kCaptureLastRegion, QString()), QStringLiteral("1,2,3,4")) << "一次失败的抓取把上次的好选区顶掉了";
+    EXPECT_EQ(reopened.stringValue(GyanisScribe::Core::kCaptureLastRegion, QString()), QStringLiteral("1,2,3,4")) << "一次失败的抓取把上次的好选区顶掉了";
 }
 
 /**
@@ -306,8 +306,8 @@ TEST_F(CaptureServiceFixture, LastRegionReusesStoredRegionOrFails)
     }
 
     // 记下过之后：按记下的选区与所在屏重抓
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureLastRegion, QVariant(QStringLiteral("10,10,40,15"))).has_value());
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureLastScreen, QVariant(QStringLiteral("FakeScreen-1"))).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureLastRegion, QVariant(QStringLiteral("10,10,40,15"))).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureLastScreen, QVariant(QStringLiteral("FakeScreen-1"))).has_value());
     {
         Outcome outcome;
         wire(service, outcome);
@@ -319,7 +319,7 @@ TEST_F(CaptureServiceFixture, LastRegionReusesStoredRegionOrFails)
 
     // 记的文本坏了：拒绝，且不猜成任意一块屏。两本账各验一次——
     // 历史键是现在的真源；升级前留下的单值键只在历史为空时才被回退读，坏文本同样不许补全
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureRegionHistory, QVariant(QStringLiteral("10,20,30"))).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureRegionHistory, QVariant(QStringLiteral("10,20,30"))).has_value());
     {
         Outcome outcome;
         wire(service, outcome);
@@ -328,8 +328,8 @@ TEST_F(CaptureServiceFixture, LastRegionReusesStoredRegionOrFails)
         EXPECT_EQ(outcome.error->code, ErrorCode::InvalidArgument);
     }
 
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureRegionHistory, QVariant(QString())).has_value());
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureLastRegion, QVariant(QStringLiteral("10,20,30"))).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureRegionHistory, QVariant(QString())).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureLastRegion, QVariant(QStringLiteral("10,20,30"))).has_value());
     {
         Outcome outcome;
         wire(service, outcome);
@@ -512,7 +512,7 @@ TEST_F(CaptureServiceFixture, CancellingLongCaptureDiscardsTheImageOnly)
 
     EXPECT_FALSE(finished.has_value()) << "取消之后还交了成品";
     EXPECT_EQ(cancellations, 1) << "取消没让这一轮可观察地收掉";
-    EXPECT_EQ(settings.stringValue(GyanisScribe::Settings::kCaptureLastRegion, QString()), QStringLiteral("10,5,40,20")) << "取消把选区账也退掉了";
+    EXPECT_EQ(settings.stringValue(GyanisScribe::Core::kCaptureLastRegion, QString()), QStringLiteral("10,5,40,20")) << "取消把选区账也退掉了";
 }
 
 /**
@@ -615,7 +615,7 @@ TEST_F(CaptureServiceFixture, CursorIsDrawnOnlyWhenTheSettingIsOn)
         EXPECT_TRUE(source.requestedCursorScreens.empty()) << "开关关着时连形状都不该去问，白跑一次平台调用";
     }
 
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureIncludeCursor, QVariant(true)).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureIncludeCursor, QVariant(true)).has_value());
     {
         CaptureService service(source, settings, *platform);
         Outcome        outcome;
@@ -649,7 +649,7 @@ TEST_F(CaptureServiceFixture, CursorIsDrawnOnlyWhenTheSettingIsOn)
 TEST_F(CaptureServiceFixture, RegionCropKeepsCursorOnlyWhereItFalls)
 {
     SettingsStore settings(m_iniFile);
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureIncludeCursor, QVariant(true)).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureIncludeCursor, QVariant(true)).has_value());
     FakeCaptureSource source;
     source.cursorSprite = makeGreenSprite(QPoint(10, 10));
 
@@ -694,7 +694,7 @@ TEST_F(CaptureServiceFixture, MissingCursorShapeStillDeliversAFrameAndSaysSo)
     ASSERT_TRUE(GyanisScribe::Base::Logger::initialize(logDirectory).has_value());
 
     SettingsStore settings(m_iniFile);
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureIncludeCursor, QVariant(true)).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureIncludeCursor, QVariant(true)).has_value());
 
     FakeCaptureSource source; // cursorSprite 留空，等于本平台取不到形状
     CaptureService    service(source, settings, *platform);
@@ -722,7 +722,7 @@ TEST_F(CaptureServiceFixture, MissingCursorShapeStillDeliversAFrameAndSaysSo)
 TEST_F(CaptureServiceFixture, LongCaptureFramesNeverCarryTheCursor)
 {
     SettingsStore settings(m_iniFile);
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureIncludeCursor, QVariant(true)).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureIncludeCursor, QVariant(true)).has_value());
 
     FakeCaptureSource source;
     source.cursorSprite = makeGreenSprite(QPoint(10, 10));
@@ -903,7 +903,7 @@ TEST_F(CaptureServiceFixture, AspectRatioLockLoadsAppliesAndPersists)
     }
 
     SettingsStore settings(m_iniFile);
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureAspectRatio, QVariant(QStringLiteral("2:1"))).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureAspectRatio, QVariant(QStringLiteral("2:1"))).has_value());
     settings.sync();
 
     FakeCaptureSource       source;
@@ -930,7 +930,7 @@ TEST_F(CaptureServiceFixture, AspectRatioLockLoadsAppliesAndPersists)
     QApplication::sendEvent(overlay, &unlock);
     settings.sync();
     SettingsStore reopened(m_iniFile);
-    EXPECT_TRUE(reopened.stringValue(GyanisScribe::Settings::kCaptureAspectRatio, QString()).isEmpty()) << "解开没有落盘，下一轮会又锁上";
+    EXPECT_TRUE(reopened.stringValue(GyanisScribe::Core::kCaptureAspectRatio, QString()).isEmpty()) << "解开没有落盘，下一轮会又锁上";
 }
 
 /**
@@ -951,7 +951,7 @@ TEST_F(CaptureServiceFixture, RoundCornersToggleShapesTheRegionProduct)
     ASSERT_TRUE(outcome.image.has_value()) << (outcome.error ? outcome.error->message : std::string{});
     EXPECT_NE(outcome.image->image.pixelColor(0, 0).alpha(), 0) << "默认档不该切圆角";
 
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureRoundCorners, QVariant(true)).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureRoundCorners, QVariant(true)).has_value());
     Outcome rounded;
     wire(service, rounded);
     service.captureRegion(QRect(0, 0, 20, 20), QStringLiteral("FakeScreen-1"));
@@ -986,7 +986,7 @@ TEST_F(CaptureServiceFixture, CornerRadiusSettingShapesTheRoundedProduct)
     };
 
     SettingsStore settings(m_iniFile);
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureRoundCorners, QVariant(true)).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureRoundCorners, QVariant(true)).has_value());
 
     FakeCaptureSource defaultSource;
     CaptureService    defaultService(defaultSource, settings, *platform);
@@ -998,7 +998,7 @@ TEST_F(CaptureServiceFixture, CornerRadiusSettingShapesTheRoundedProduct)
     EXPECT_GT(defaultCut, 0) << "默认档就该把四角切透";
     EXPECT_NE(atDefault.image->image.pixelColor(40, 40).alpha(), 0) << "切圆不该把中间一起吃掉";
 
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureCornerRadius, QVariant(20)).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureCornerRadius, QVariant(20)).has_value());
     FakeCaptureSource wideSource;
     CaptureService    wideService(wideSource, settings, *platform);
     Outcome           atWide;
@@ -1009,7 +1009,7 @@ TEST_F(CaptureServiceFixture, CornerRadiusSettingShapesTheRoundedProduct)
     EXPECT_GT(wideCut, defaultCut + 200) << "半径从 12 调到 20 该多切出一大片角：这一格没被吃进几何";
 
     // 坏值（0）不该让截图失败，也不该悄悄按 0 切：记一条原因之后按默认档继续
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureCornerRadius, QVariant(0)).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureCornerRadius, QVariant(0)).has_value());
     FakeCaptureSource brokenSource;
     CaptureService    brokenService(brokenSource, settings, *platform);
     Outcome           atBroken;
@@ -1026,7 +1026,7 @@ TEST_F(CaptureServiceFixture, CornerRadiusSettingShapesTheRoundedProduct)
 TEST_F(CaptureServiceFixture, CursorToggleFromOverlayBeatsTheSetting)
 {
     SettingsStore settings(m_iniFile);
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureIncludeCursor, QVariant(false)).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureIncludeCursor, QVariant(false)).has_value());
 
     FakeCaptureSource source;
     source.cursorSprite = makeGreenSprite(QPoint(10, 10));
@@ -1048,7 +1048,7 @@ TEST_F(CaptureServiceFixture, CursorToggleFromOverlayBeatsTheSetting)
 TEST_F(CaptureServiceFixture, CursorOverrideExpiresAfterTheDelivery)
 {
     SettingsStore settings(m_iniFile);
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureIncludeCursor, QVariant(false)).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureIncludeCursor, QVariant(false)).has_value());
 
     FakeCaptureSource source;
     source.cursorSprite = makeGreenSprite(QPoint(10, 10));
@@ -1067,7 +1067,7 @@ TEST_F(CaptureServiceFixture, CursorOverrideExpiresAfterTheDelivery)
 TEST_F(CaptureServiceFixture, CursorToggleCanTurnTheCursorOffForOneRound)
 {
     SettingsStore settings(m_iniFile);
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureIncludeCursor, QVariant(true)).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureIncludeCursor, QVariant(true)).has_value());
 
     FakeCaptureSource source;
     source.cursorSprite = makeGreenSprite(QPoint(10, 10));
@@ -1096,7 +1096,7 @@ TEST_F(CaptureServiceFixture, ExcludedProcessesDropOutOfHoverCandidates)
     FakeCaptureSource       source;
     FakePlatformIntegration fake;
     fake.capabilitiesValue.windowEnumeration = true;
-    ASSERT_TRUE(static_cast<bool>(settings.setValue(GyanisScribe::Settings::kCaptureDetectionExcludes, QStringLiteral("chrome.exe")))) << "写入失败";
+    ASSERT_TRUE(static_cast<bool>(settings.setValue(GyanisScribe::Core::kCaptureDetectionExcludes, QStringLiteral("chrome.exe")))) << "写入失败";
 
     const auto screenRect  = QGuiApplication::primaryScreen()->geometry();
     const auto bannedRect  = QRect{screenRect.left() + 40, screenRect.top() + 40, screenRect.width() / 3, screenRect.height() / 3};

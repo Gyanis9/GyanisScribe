@@ -6,7 +6,6 @@ add_executable(TestHistory
 # 视图与图标那一半要 Qt 的 GUI 栈，所以这里连 Widgets 与 Gui
 target_link_libraries(TestHistory PRIVATE
         History
-        Settings
         Core
         Gui
         GTest::gtest

@@ -23,10 +23,10 @@ namespace GyanisScribe::Platform
     struct PlatformCapabilities;
 } // namespace GyanisScribe::Platform
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
     class ISettingsStore;
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core
 
 namespace GyanisScribe::App
 {
@@ -133,6 +133,6 @@ namespace GyanisScribe::App
      * @details 空文本（没填）与填坏了两重含义分开：没填按默认档走且不吭声，填坏了要回一句原因并把这一档
      *          落回默认，而不是悄悄当成没填——填坏的用户需要知道自己填的那一串为什么没生效。
      */
-    [[nodiscard]] TrayClickDecision resolveTrayClick(const Settings::ISettingsStore &settings, TrayClickRole role, std::string &complaint);
+    [[nodiscard]] TrayClickDecision resolveTrayClick(const Core::ISettingsStore &settings, TrayClickRole role, std::string &complaint);
 
 } // namespace GyanisScribe::App

@@ -4,7 +4,7 @@
 #include "Annotation/IAnnotationEngine.h"
 #include "Annotation/AnnotationToolbarGeometry.h"
 #include "Base/Logger.h"
-#include "Settings/ISettingsStore.h"
+#include "Core/Settings/ISettingsStore.h"
 #include "Gui/Controls/AppShortcuts.h"
 #include "Gui/Controls/KeyStep.h"
 #include "Base/Types.h"
@@ -89,7 +89,7 @@ namespace GyanisScribe::Annotation
         }
     }
 
-    std::optional<ToolKind> toolShortcutFor(const int key, const Qt::KeyboardModifiers modifiers, const Settings::ISettingsStore &settings)
+    std::optional<ToolKind> toolShortcutFor(const int key, const Qt::KeyboardModifiers modifiers, const Core::ISettingsStore &settings)
     {
         // 整颗组合相等才算命中：默认那十三颗是裸字母，于是 Ctrl+Z 这类组合不会顺手把撤销当成换工具；
         // 用户把某一档换成带修饰键的组合后，那颗组合也就归这一档了
@@ -104,7 +104,7 @@ namespace GyanisScribe::Annotation
         return std::nullopt;
     }
 
-    AnnotationWindow::AnnotationWindow(IAnnotationEngine &engine, Settings::ISettingsStore &settings, std::unique_ptr<AnnotationToolbar> toolbar, QWidget *parent) :
+    AnnotationWindow::AnnotationWindow(IAnnotationEngine &engine, Core::ISettingsStore &settings, std::unique_ptr<AnnotationToolbar> toolbar, QWidget *parent) :
         QWidget(parent), m_engine(engine), m_settings(settings), m_toolbar(std::move(toolbar))
     {
         // 无边框 + 置顶：标注的是刚刚截下的那一块，界面不该被别的窗口盖住，也不该带一条系统标题栏

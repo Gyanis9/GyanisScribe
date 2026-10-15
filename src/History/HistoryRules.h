@@ -15,10 +15,10 @@
 
 #include <optional>
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
     class ISettingsStore;
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core
 
 namespace GyanisScribe::History
 {
@@ -47,7 +47,7 @@ namespace GyanisScribe::History
      * @details 负数不当上限用：把 -1 编进「最多 -1 条」会让下一条记录刚写进去就被删掉，
      *          而这看起来像「历史功能坏了」。
      */
-    [[nodiscard]] HistoryRetentionPolicy policyFromSettings(const Settings::ISettingsStore &settings);
+    [[nodiscard]] HistoryRetentionPolicy policyFromSettings(const Core::ISettingsStore &settings);
 
     /**
      * @brief 按时间倒序排（新的在前）

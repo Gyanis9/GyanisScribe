@@ -8,7 +8,6 @@ add_executable(TestPin
 
 target_link_libraries(TestPin PRIVATE
         Pin
-        Settings
         Core
         GTest::gtest
         GTest::gtest_main)

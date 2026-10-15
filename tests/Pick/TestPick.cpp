@@ -4,7 +4,7 @@
 
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Theme/ThemeManager.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/SettingsStore.h"
 
 #include <gtest/gtest.h>
 
@@ -49,7 +49,7 @@ using GyanisScribe::Pick::magnifierViews;
 using GyanisScribe::Pick::magnifierViewToken;
 using GyanisScribe::Pick::parseColorFormat;
 using GyanisScribe::Pick::recentSwatchRects;
-using GyanisScribe::Settings::SettingsStore;
+using GyanisScribe::Core::SettingsStore;
 using GyanisScribe::Gui::ThemeManager;
 
 namespace

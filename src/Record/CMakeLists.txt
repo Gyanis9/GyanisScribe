@@ -32,7 +32,6 @@ target_include_directories(Record PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(Record PUBLIC
         Capture
         Core
-        Settings
         Gui
         Qt6::Core
         Qt6::Gui

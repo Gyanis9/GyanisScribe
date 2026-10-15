@@ -1,4 +1,4 @@
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/SettingsStore.h"
 
 #include "Base/Paths.h"
 #include "Base/Logger.h"
@@ -19,7 +19,7 @@
 #include <format>
 #include <system_error>
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
     namespace
     {
@@ -307,4 +307,4 @@ namespace GyanisScribe::Settings
         return imported;
     }
 
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core

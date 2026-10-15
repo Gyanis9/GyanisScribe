@@ -10,7 +10,6 @@ add_executable(TestAnnotation
 target_link_libraries(TestAnnotation PRIVATE
         Annotation
         Core
-        Settings
         GTest::gtest
         GTest::gtest_main)
 

@@ -41,10 +41,10 @@
 #include "Record/RecorderConfig.h"
 #include "Record/RecordingHud.h"
 #include "Record/RecordingService.h"
-#include "Settings/NamingRules.h"
-#include "Settings/OutputStyleRules.h"
-#include "Settings/SettingsKeys.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/NamingRules.h"
+#include "Core/Settings/OutputStyleRules.h"
+#include "Core/Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsStore.h"
 #include "Gui/Resources/IconProvider.h"
 #include "Gui/Theme/Language.h"
 #include "Gui/Theme/ThemeManager.h"
@@ -103,16 +103,16 @@ namespace GyanisScribe::App
      * @return 便携模式下是程序目录旁那份 INI，否则是系统默认位置（Windows 是注册表）
      * @details 只有配置跟着程序走：日志、历史、缓存与成品目录仍在各自的位置，README 里写清了边界。
      */
-    std::unique_ptr<Settings::SettingsStore> createSettingsStore()
+    std::unique_ptr<Core::SettingsStore> createSettingsStore()
     {
         const auto portableFile = Base::Paths::portableConfigFile();
         if (portableFile.isEmpty())
         {
-            return std::make_unique<Settings::SettingsStore>();
+            return std::make_unique<Core::SettingsStore>();
         }
 
         Base::Logger::info(std::format("便携模式：配置读写 {}", portableFile.toStdString()));
-        return std::make_unique<Settings::SettingsStore>(Base::Paths::fromDisplayText(portableFile));
+        return std::make_unique<Core::SettingsStore>(Base::Paths::fromDisplayText(portableFile));
     }
 
 
@@ -127,13 +127,13 @@ namespace GyanisScribe::App
     {
     }
 
-    AppController::AppController(std::unique_ptr<Settings::SettingsStore> settings, std::unique_ptr<Platform::IPlatformIntegration> integration,
+    AppController::AppController(std::unique_ptr<Core::SettingsStore> settings, std::unique_ptr<Platform::IPlatformIntegration> integration,
                                  std::unique_ptr<Capture::IScreenCaptureSource> captureSource, std::filesystem::path historyStoragePath, QObject *parent) :
         QObject(parent), m_settings(std::move(settings)), m_integration(std::move(integration)), m_captureSource(std::move(captureSource))
     {
         // 语言要排在所有界面对象之前：translator 装晚了，已经建好的控件仍然拿源码文案
         const auto defaultLanguageText = QString::fromUtf8(std::string{Gui::appLanguageText(Gui::AppLanguage::Chinese)});
-        const auto storedLanguage      = m_settings->stringValue(Settings::kUiLanguage, defaultLanguageText);
+        const auto storedLanguage      = m_settings->stringValue(Core::kUiLanguage, defaultLanguageText);
         if (const auto parsed = Gui::parseAppLanguage(storedLanguage.toStdString()); parsed)
         {
             if (auto applied = Gui::applyLanguage(*parsed); !applied)
@@ -247,10 +247,10 @@ namespace GyanisScribe::App
                              handleTrayAction(*action);
                          });
         // 自定义键不在热键层那八个的订阅里：改完这一族的任何一格，由这里重登一次，不必重启
-        QObject::connect(m_settings.get(), &Settings::ISettingsStore::valueChanged, this,
+        QObject::connect(m_settings.get(), &Core::ISettingsStore::valueChanged, this,
                          [this](const QString &key)
                          {
-                             const auto prefix = QString::fromUtf8(Settings::kHotkeyCustomPrefix.data(), static_cast<qsizetype>(Settings::kHotkeyCustomPrefix.size()));
+                             const auto prefix = QString::fromUtf8(Core::kHotkeyCustomPrefix.data(), static_cast<qsizetype>(Core::kHotkeyCustomPrefix.size()));
                              if (!key.startsWith(prefix))
                              {
                                  return;
@@ -473,7 +473,7 @@ namespace GyanisScribe::App
         }
 
         // 底是白的还是透明的由设置里那一格定：有人要拿画布当垫在别的图上面的一层，白底会把下面那层整个盖掉
-        const auto transparentCanvas = m_settings->boolValue(Settings::kAnnotationBlankCanvasTransparent, false);
+        const auto transparentCanvas = m_settings->boolValue(Core::kAnnotationBlankCanvasTransparent, false);
         const auto canvas            = Annotation::makeBlankCanvas(Annotation::kBlankCanvasSize, screen->devicePixelRatio(), screen->name(), transparentCanvas);
         const auto available         = screen->availableGeometry();
         // 不碰截图那条链：没有帧、不记「上次选区」、也不触发音效/自动保存/历史——那一串都挂在「抓到了屏上的一块」上
@@ -541,7 +541,7 @@ namespace GyanisScribe::App
 
     void AppController::scheduleCapture(std::function<void()> begin)
     {
-        const auto stored = m_settings->intValue(Settings::kCaptureDelaySeconds, 0);
+        const auto stored = m_settings->intValue(Core::kCaptureDelaySeconds, 0);
         const auto delay  = parseCaptureDelay(stored);
         if (!delay)
         {
@@ -579,7 +579,7 @@ namespace GyanisScribe::App
 
     CaptureIntent AppController::settingsCaptureIntent() const
     {
-        const auto stored = m_settings->stringValue(Settings::kCaptureAfterAction, QString{});
+        const auto stored = m_settings->stringValue(Core::kCaptureAfterAction, QString{});
         if (stored.isEmpty())
         {
             return defaultCaptureIntent();
@@ -734,7 +734,7 @@ namespace GyanisScribe::App
         }
     }
 
-    Settings::SettingsStore &AppController::settings() const noexcept
+    Core::SettingsStore &AppController::settings() const noexcept
     {
         return *m_settings;
     }
@@ -755,11 +755,11 @@ namespace GyanisScribe::App
 
         // 音效与自动保存接在「截图完成」这一刻：不管之后去哪一步，先响一声、先在盘上留一份。
         // 自动保存走「存成文件」同一条落盘路（装饰与历史记账都在里面），只是不弹成功提示
-        if (m_settings->boolValue(Settings::kCaptureSound, false))
+        if (m_settings->boolValue(Core::kCaptureSound, false))
         {
             QApplication::beep();
         }
-        if (m_settings->boolValue(Settings::kCaptureAutoSave, false) && m_captureIntent != CaptureIntent::SaveToFile && m_captureIntent != CaptureIntent::QuickSave)
+        if (m_settings->boolValue(Core::kCaptureAutoSave, false) && m_captureIntent != CaptureIntent::SaveToFile && m_captureIntent != CaptureIntent::QuickSave)
         {
             if (const auto saved = writeImageToDisk(image.image); saved)
             {
@@ -776,8 +776,8 @@ namespace GyanisScribe::App
         // 命令行那一次看的是点名的去处里有没有 file：只点 clipboard 时这一轮同样没落盘，那一步该走
         const auto alreadyOnDisk = m_commandLineActive ? captureOutputsContain(m_commandLineOutputs, CaptureOutput::File)
                                                        : (m_captureIntent == CaptureIntent::SaveToFile || m_captureIntent == CaptureIntent::QuickSave ||
-                                                          m_settings->boolValue(Settings::kCaptureAutoSave, false));
-        if (m_settings->boolValue(Settings::kHistoryKeepUnsaved, false) && !alreadyOnDisk)
+                                                          m_settings->boolValue(Core::kCaptureAutoSave, false));
+        if (m_settings->boolValue(Core::kHistoryKeepUnsaved, false) && !alreadyOnDisk)
         {
             if (const auto archived =
                         History::archiveUnsavedCapture(image.image, QDateTime::currentDateTime(), Base::Paths::unsavedCaptureDirectory(), History::kUnsavedArchiveCapacity);
@@ -810,7 +810,7 @@ namespace GyanisScribe::App
         // 选区存的是「屏幕内」的逻辑坐标，回读后要加屏幕原点换成全局坐标；
         // 没有可用记录时按整块可用区处理，工具栏照摆不误
         auto selection = screen->availableGeometry();
-        if (const auto parsed = Capture::regionFromText(m_settings->stringValue(Settings::kCaptureLastRegion, QString{}).toStdString()); parsed)
+        if (const auto parsed = Capture::regionFromText(m_settings->stringValue(Core::kCaptureLastRegion, QString{}).toStdString()); parsed)
         {
             selection = QRect{parsed->topLeft() + screen->geometry().topLeft(), parsed->size()};
         }
@@ -901,7 +901,7 @@ namespace GyanisScribe::App
     void AppController::runAfterCaptureCommand()
     {
         // 命令行给了 --exec 就只跑那一条：与设置里那一格叠着跑会跑出两份副作用，而脚本要的是「这一次照我说的做」
-        const auto commandLine = m_commandLineExecGiven ? m_commandLineExec : m_settings->stringValue(Settings::kCaptureExecCommand, QString{});
+        const auto commandLine = m_commandLineExecGiven ? m_commandLineExec : m_settings->stringValue(Core::kCaptureExecCommand, QString{});
         if (commandLine.trimmed().isEmpty())
         {
             return;
@@ -936,10 +936,10 @@ namespace GyanisScribe::App
 
     QImage AppController::decorateOutput(const QImage &image, const bool fillBackground) const
     {
-        const auto border = m_settings->boolValue(Settings::kOutputBorder, false);
-        const auto shadow = m_settings->boolValue(Settings::kOutputShadow, false);
+        const auto border = m_settings->boolValue(Core::kOutputBorder, false);
+        const auto shadow = m_settings->boolValue(Core::kOutputShadow, false);
         // 宽与色是一份参数、一处读出来：画布尺寸与绘制拿到同一份，才不会出现「框按新值、尺寸按旧值」的错位
-        return Core::decorateForOutput(image, border, shadow, fillBackground, Settings::readOutputDecorationStyle(*m_settings));
+        return Core::decorateForOutput(image, border, shadow, fillBackground, Core::readOutputDecorationStyle(*m_settings));
     }
 
     void AppController::handleSaveRequested(const QImage &image)
@@ -963,21 +963,21 @@ namespace GyanisScribe::App
             return std::unexpected(Base::Error{reason.code, message});
         };
 
-        const auto                  configured = m_settings->stringValue(Settings::kPathScreenshot, QString{});
+        const auto                  configured = m_settings->stringValue(Core::kPathScreenshot, QString{});
         const std::filesystem::path directory  = configured.isEmpty() ? Base::Paths::defaultScreenshotDirectory() : Base::Paths::fromDisplayText(configured);
         if (const auto ensured = Base::Paths::ensureDirectory(directory); !ensured)
         {
             return fail(ensured.error());
         }
 
-        const auto storedFormat = m_settings->stringValue(Settings::kSaveImageFormat, QStringLiteral("Png"));
+        const auto storedFormat = m_settings->stringValue(Core::kSaveImageFormat, QStringLiteral("Png"));
         const auto format       = Core::parseImageFormat(storedFormat);
         if (!format)
         {
             // 不猜一档：猜错就是把成品按另一种压缩写出去，事后无从找回原样
             return fail(format.error());
         }
-        const auto quality = m_settings->intValue(Settings::kSaveImageQuality, Core::kDefaultImageQuality);
+        const auto quality = m_settings->intValue(Core::kSaveImageQuality, Core::kDefaultImageQuality);
         if (const auto checked = Core::parseImageQuality(quality); !checked)
         {
             return fail(checked.error());
@@ -995,7 +995,7 @@ namespace GyanisScribe::App
 
         // 名字规则来自设置里那一格（留空即默认档）；起好名再让一次位：模板里去掉 %ms% 之后
         // 同一秒连拍会撞名，直接写就是把前一张悄悄盖掉
-        const auto fileName = Base::Paths::imageFileName(QDateTime::currentDateTime(), Core::imageFormatExtension(*format), Settings::nameTemplateOrDefault(*m_settings));
+        const auto fileName = Base::Paths::imageFileName(QDateTime::currentDateTime(), Core::imageFormatExtension(*format), Core::nameTemplateOrDefault(*m_settings));
         const auto filePath = Base::Paths::uniqueFilePath(directory, fileName);
         // 格式不单独传给 Qt：它按后缀挑编码器，再传一次格式名就是第二个出处
         if (!decorated.save(Base::Paths::toDisplayText(filePath), nullptr, quality))
@@ -1201,7 +1201,7 @@ namespace GyanisScribe::App
     {
         m_ocrImage = image;
         // 语言取上一次的选择：换过一次就该记住，而不是每轮都退回默认档
-        recognizeWithLanguage(m_settings->stringValue(Settings::kOcrLanguage, QString::fromUtf8(Ocr::kDefaultOcrLanguage)));
+        recognizeWithLanguage(m_settings->stringValue(Core::kOcrLanguage, QString::fromUtf8(Ocr::kDefaultOcrLanguage)));
     }
 
     void AppController::handleScanRequested(const QImage &image)
@@ -1238,7 +1238,7 @@ namespace GyanisScribe::App
 
     std::vector<QColor> AppController::recentPickedColors() const
     {
-        const auto parsed = Pick::parseRecentColors(m_settings->stringListValue(Settings::kPickRecentColors, {}));
+        const auto parsed = Pick::parseRecentColors(m_settings->stringListValue(Core::kPickRecentColors, {}));
         if (!parsed)
         {
             Base::Logger::warning(std::format("最近取色清单读不出，按空清单继续：{}", parsed.error().message));
@@ -1250,7 +1250,7 @@ namespace GyanisScribe::App
     void AppController::rememberPickedColor(const QColor &color)
     {
         const auto updated = Pick::pushRecentColor(recentPickedColors(), color, Pick::kPickColorHistoryCapacity);
-        if (auto written = m_settings->setValue(Settings::kPickRecentColors, Pick::serializeRecentColors(updated)); !written)
+        if (auto written = m_settings->setValue(Core::kPickRecentColors, Pick::serializeRecentColors(updated)); !written)
         {
             Base::Logger::warning(std::format("最近取色清单没能写入：{}", written.error().message));
         }
@@ -1325,14 +1325,14 @@ namespace GyanisScribe::App
 
         // 与屏幕取色同一套：写法从设置现读，读坏了按 HEX 顶上并把原因说给用户
         std::string complaint;
-        const auto  format = Pick::colorFormatOrDefault(m_settings->stringValue(Settings::kPickFormat, QStringLiteral("Hex")).toStdString(), complaint);
+        const auto  format = Pick::colorFormatOrDefault(m_settings->stringValue(Core::kPickFormat, QStringLiteral("Hex")).toStdString(), complaint);
         if (!complaint.empty())
         {
             notifyUser(QString::fromStdString(complaint), Gui::ToastKind::Danger);
         }
 
         // 字母档现读配置：这一档只管 HEX 那一形，写法是别的时读出来也一样
-        const auto casing = Pick::hexCasingOf(m_settings->boolValue(Settings::kPickHexUppercase, true));
+        const auto casing = Pick::hexCasingOf(m_settings->boolValue(Core::kPickHexUppercase, true));
         const auto text   = Pick::formatColor(color, format, casing);
         QGuiApplication::clipboard()->setText(text);
         notifyUser(GyanisScribe::Base::uiText("已复制颜色 ") + text, Gui::ToastKind::Success);
@@ -1363,7 +1363,7 @@ namespace GyanisScribe::App
     void AppController::handleOcrSucceeded(const QImage &image, const QString &language, const Ocr::OcrResult &result)
     {
         // 认出多少算多少：空结果也要开窗，摘要里那句「这一张没认出文字」比一条三秒就消失的提示有用
-        if (auto stored = m_settings->setValue(Settings::kOcrLanguage, language); !stored)
+        if (auto stored = m_settings->setValue(Core::kOcrLanguage, language); !stored)
         {
             Base::Logger::warning(std::format("识别语言没能记住：{}", stored.error().message));
         }
@@ -1371,7 +1371,7 @@ namespace GyanisScribe::App
         // 底图用发出请求时那一张：期间用户可能又截了新图，而方框是按送去认的那一张算的，换了图就整体错位
         if (m_ocrWindow == nullptr)
         {
-            m_ocrWindow = new Ocr::OcrResultWindow{image, result, *m_icons, *m_theme, Settings::nameTemplateOrDefault(*m_settings)};
+            m_ocrWindow = new Ocr::OcrResultWindow{image, result, *m_icons, *m_theme, Core::nameTemplateOrDefault(*m_settings)};
             // 关掉就自毁，控制器只持 QPointer：下一次识别会重新建一个，不会往已析构的对象里塞结果
             m_ocrWindow->setAttribute(Qt::WA_DeleteOnClose);
             QObject::connect(m_ocrWindow, &Ocr::OcrResultWindow::recognizeRequested, this, &AppController::recognizeWithLanguage);
@@ -1429,7 +1429,7 @@ namespace GyanisScribe::App
 
         // 写法读坏了不拦取色：按默认写法继续，并把这一条告诉用户，免得他复制到的格式莫名其妙变了
         std::string complaint;
-        const auto  format = Pick::colorFormatOrDefault(m_settings->stringValue(Settings::kPickFormat, QStringLiteral("Hex")).toStdString(), complaint);
+        const auto  format = Pick::colorFormatOrDefault(m_settings->stringValue(Core::kPickFormat, QStringLiteral("Hex")).toStdString(), complaint);
         if (!complaint.empty())
         {
             notifyUser(QString::fromStdString(complaint), Gui::ToastKind::Danger);
@@ -1438,12 +1438,12 @@ namespace GyanisScribe::App
         // 放大镜视野与字母档都现读这一处的配置：取色遮罩自己不持设置，读坏了在这里说给用户
         std::string magnifierComplaint;
         const auto  magnifierView =
-                Pick::magnifierViewOrDefault(m_settings->stringValue(Settings::kCaptureMagnifierView, QStringLiteral("narrow")).toStdString(), magnifierComplaint);
+                Pick::magnifierViewOrDefault(m_settings->stringValue(Core::kCaptureMagnifierView, QStringLiteral("narrow")).toStdString(), magnifierComplaint);
         if (!magnifierComplaint.empty())
         {
             notifyUser(QString::fromStdString(magnifierComplaint), Gui::ToastKind::Danger);
         }
-        m_picker = new Pick::ColorPickerOverlay{*frame,  screen->geometry(), format, Pick::hexCasingOf(m_settings->boolValue(Settings::kPickHexUppercase, true)), magnifierView,
+        m_picker = new Pick::ColorPickerOverlay{*frame,  screen->geometry(), format, Pick::hexCasingOf(m_settings->boolValue(Core::kPickHexUppercase, true)), magnifierView,
                                                 *m_theme};
         // 最近取色跟着这一轮摆上遮罩：点色块或按数字键就能重新取回，不必回原处对像素
         m_picker->setRecentColors(recentPickedColors());
@@ -1476,12 +1476,12 @@ namespace GyanisScribe::App
 
         Record::RecorderConfig config;
         config.screenName      = screen->name();
-        const auto configured  = m_settings->stringValue(Settings::kPathRecording, QString());
+        const auto configured  = m_settings->stringValue(Core::kPathRecording, QString());
         config.outputDirectory = configured.isEmpty() ? Base::Paths::defaultRecordingDirectory() : Base::Paths::fromDisplayText(configured);
 
         // 帧率取用户记下的那一档；读不出时记一条并按 RecorderConfig 的初值走，
         // 不拿一个"看起来能用"的值替用户决定（validateRecorderConfig 会在真正开始前再判一次范围）
-        if (const auto parsed = Record::parseFrameRateSetting(m_settings->intValue(Settings::kRecordDefaultFrameRate, Record::kDefaultFrameRate)); parsed)
+        if (const auto parsed = Record::parseFrameRateSetting(m_settings->intValue(Core::kRecordDefaultFrameRate, Record::kDefaultFrameRate)); parsed)
         {
             config.frameRate = *parsed;
         } else
@@ -1489,7 +1489,7 @@ namespace GyanisScribe::App
             Base::Logger::warning(std::format("录屏默认帧率读不出：{}，本次按 {} 帧开始", parsed.error().message, config.frameRate));
         }
         // 最长时长同一条形状：读不出就记一条并按初值走，validateRecorderConfig 开始前还会再判一次范围
-        if (const auto parsed = Record::parseMaximumDurationSetting(m_settings->intValue(Settings::kRecordMaximumDuration, Record::kDefaultMaximumDurationSeconds)); parsed)
+        if (const auto parsed = Record::parseMaximumDurationSetting(m_settings->intValue(Core::kRecordMaximumDuration, Record::kDefaultMaximumDurationSeconds)); parsed)
         {
             config.maximumDurationSeconds = *parsed;
         } else
@@ -1498,7 +1498,7 @@ namespace GyanisScribe::App
         }
 
         // 画面码率与帧率同一条形状：读不出就记一条并按初值（按质量优先）走，不替用户挑一档
-        if (const auto parsed = Record::parseVideoBitrateSetting(m_settings->intValue(Settings::kRecordVideoBitrate, Record::kDefaultVideoBitrateKbps)); parsed)
+        if (const auto parsed = Record::parseVideoBitrateSetting(m_settings->intValue(Core::kRecordVideoBitrate, Record::kDefaultVideoBitrateKbps)); parsed)
         {
             config.videoBitrateKbps = *parsed;
         } else
@@ -1506,23 +1506,23 @@ namespace GyanisScribe::App
             Base::Logger::warning(std::format("录屏画面码率读不出：{}，本次按质量优先开始", parsed.error().message));
         }
         // 光标高亮是个开关，没有「读不出」这一档：配置里没有就按关；到了画不出位置的那一种模式，RecordingService 会自己报一句
-        config.cursorHighlight = m_settings->boolValue(Settings::kRecordCursorHighlight, false);
+        config.cursorHighlight = m_settings->boolValue(Core::kRecordCursorHighlight, false);
         // 编码器钉子：选的是「自动」或没填就是空串（全自动逐探）；钉的是具体名字就原样交给编码器那一层去探
-        const auto pinnedEncoder = m_settings->stringValue(Settings::kRecordVideoEncoder, QString::fromUtf8(std::string{Settings::kRecordVideoEncoderAutoToken}));
-        if (pinnedEncoder != QString::fromUtf8(std::string{Settings::kRecordVideoEncoderAutoToken}) && !pinnedEncoder.isEmpty())
+        const auto pinnedEncoder = m_settings->stringValue(Core::kRecordVideoEncoder, QString::fromUtf8(std::string{Core::kRecordVideoEncoderAutoToken}));
+        if (pinnedEncoder != QString::fromUtf8(std::string{Core::kRecordVideoEncoderAutoToken}) && !pinnedEncoder.isEmpty())
         {
             config.videoEncoder = pinnedEncoder.toStdString();
         }
         // 成品文件名模板：与截图、贴图保存、识别导出同一格，几个写盘口各取一次、各按同一规则回落
-        config.nameTemplate = Settings::nameTemplateOrDefault(*m_settings);
+        config.nameTemplate = Core::nameTemplateOrDefault(*m_settings);
 
         // 取声的两路：留空就是不取那一路。存的是 dshow 的稳定标识，换系统显示语言也不漂
-        config.microphoneDevice  = m_settings->stringValue(Settings::kRecordAudioMicrophone, QString());
-        config.systemSoundDevice = m_settings->stringValue(Settings::kRecordAudioSystemSound, QString());
+        config.microphoneDevice  = m_settings->stringValue(Core::kRecordAudioMicrophone, QString());
+        config.systemSoundDevice = m_settings->stringValue(Core::kRecordAudioSystemSound, QString());
 
         // 输出容器按用户选的那一档来：GIF 走两遍调色板，帧率上限比 MP4 低，
         // 那一档的天花板由 validateRecorderConfig 在真正开录之前判
-        const auto storedFormat = m_settings->stringValue(Settings::kRecordFormat, QString::fromUtf8(std::string{Record::recordFormatText(config.format)}));
+        const auto storedFormat = m_settings->stringValue(Core::kRecordFormat, QString::fromUtf8(std::string{Record::recordFormatText(config.format)}));
         const auto parsedFormat = Record::parseRecordFormat(storedFormat);
         if (!parsedFormat)
         {
@@ -1532,7 +1532,7 @@ namespace GyanisScribe::App
 
         // 录制范围按用户选的那一档来；读不出或做不出来时把原因交回去，不悄悄换成整屏——
         // 那会让用户以为录的是他选的那片，实际录下整个桌面
-        const auto storedScope = m_settings->stringValue(Settings::kRecordScope, QString::fromUtf8(std::string{Record::recordScopeText(config.mode)}));
+        const auto storedScope = m_settings->stringValue(Core::kRecordScope, QString::fromUtf8(std::string{Record::recordScopeText(config.mode)}));
         const auto parsedScope = Record::parseRecordScope(storedScope);
         if (!parsedScope)
         {
@@ -1580,7 +1580,7 @@ namespace GyanisScribe::App
             showRecordingHud();
             // 倒计时取用户记下的那一档；读不出时记一条并回到默认 3 秒（validate 那道不在这里，值本身是 0..10 的整数）
             auto countdown = Record::kDefaultCountdownSeconds;
-            if (const auto parsed = Record::parseCountdownSetting(m_settings->intValue(Settings::kRecordCountdownSeconds, Record::kDefaultCountdownSeconds)); parsed)
+            if (const auto parsed = Record::parseCountdownSetting(m_settings->intValue(Core::kRecordCountdownSeconds, Record::kDefaultCountdownSeconds)); parsed)
             {
                 countdown = *parsed;
             } else

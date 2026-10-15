@@ -21,7 +21,6 @@ endif ()
 
 target_link_libraries(TestOcr PRIVATE
         Ocr
-        Settings
         Platform
         Core
         GTest::gtest

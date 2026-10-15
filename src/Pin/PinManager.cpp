@@ -6,8 +6,8 @@
 #include "Pin/PinWindow.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Platform/WindowGeometry.h"
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
 
 #include <QImage>
 #include <QMimeData>
@@ -40,7 +40,7 @@ namespace
 namespace GyanisScribe::Pin
 {
 
-    PinManager::PinManager(Settings::ISettingsStore &settings, Platform::IPlatformIntegration &integration, QObject *parent) :
+    PinManager::PinManager(Core::ISettingsStore &settings, Platform::IPlatformIntegration &integration, QObject *parent) :
         QObject(parent), m_settings(settings), m_integration(integration)
     {
     }
@@ -289,7 +289,7 @@ namespace GyanisScribe::Pin
             return written;
         }
         // 活动组跟着布局一起记：不记的话重启后停在第一组，别的组里的贴图就像丢了
-        if (const auto grouped = m_settings.setValue(Settings::kPinActiveGroup, m_activeGroup); !grouped)
+        if (const auto grouped = m_settings.setValue(Core::kPinActiveGroup, m_activeGroup); !grouped)
         {
             return grouped;
         }
@@ -300,7 +300,7 @@ namespace GyanisScribe::Pin
             return named;
         }
         // 「收起全部」那一档也记：退出时收着一整桌，回来还是收着（托盘那句「摆回全部贴图」是出口）
-        return m_settings.setValue(Settings::kPinAllConcealed, m_allConcealed);
+        return m_settings.setValue(Core::kPinAllConcealed, m_allConcealed);
     }
 
     Base::Expected<int> PinManager::restoreLayout()
@@ -325,8 +325,8 @@ namespace GyanisScribe::Pin
 
         // 活动组先落定再摆图：addPin 把新贴图挂在活动组上，晚落定会让这一批全挤进第一组；
         // 「收起全部」那一档同样先读回来，最后那一次 applyGroupVisibility 才会把整桌收着
-        m_activeGroup  = m_settings.intValue(Settings::kPinActiveGroup, kFirstPinGroup);
-        m_allConcealed = m_settings.boolValue(Settings::kPinAllConcealed, false);
+        m_activeGroup  = m_settings.intValue(Core::kPinActiveGroup, kFirstPinGroup);
+        m_allConcealed = m_settings.boolValue(Core::kPinAllConcealed, false);
 
         int restored = 0;
         for (const auto &state: *loaded)
@@ -556,7 +556,7 @@ namespace GyanisScribe::Pin
 
         // 活动组不在册（刚被关掉最后一张）时从第一组接着走：indexOf 给 -1，加一取模正好落回 0
         // 顺序现读而不是启动时抄一份：设置页改了这一格，下一次按键就该照新的走，不必重启
-        const auto stored = m_settings.stringListValue(Settings::kPinGroupRotationOrder, {});
+        const auto stored = m_settings.stringListValue(Core::kPinGroupRotationOrder, {});
         const auto parsed = Pin::parseGroupRotation(stored);
         if (!parsed)
         {

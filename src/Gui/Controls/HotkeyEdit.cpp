@@ -1,7 +1,7 @@
 #include "Gui/Controls/HotkeyEdit.h"
 
 #include "Base/Logger.h"
-#include "Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsKeys.h"
 #include "Base/Text.h"
 
 #include <QKeyEvent>
@@ -41,7 +41,7 @@ namespace GyanisScribe::Gui
         return static_cast<Qt::Key>(keyCode);
     }
 
-    HotkeyEdit::HotkeyEdit(Settings::ISettingsStore &settings, QWidget *parent) : QWidget(parent), m_settings(settings)
+    HotkeyEdit::HotkeyEdit(Core::ISettingsStore &settings, QWidget *parent) : QWidget(parent), m_settings(settings)
     {
         auto *layout = new QVBoxLayout{this};
         layout->setContentsMargins(0, 0, 0, 0);
@@ -95,7 +95,7 @@ namespace GyanisScribe::Gui
     {
         // 两档的松紧不同：全局那一档不许裸键（会把别的程序的按键吞掉），界面那一档只看按键本体
         // 「允许单键当全局热键」那一格现读：把它写进本控件就得处理「设置改了控件还停在旧口径」
-        const auto allowBareKeys = m_settings.boolValue(GyanisScribe::Settings::kAllowSimpleGlobalHotkeys, false);
+        const auto allowBareKeys = m_settings.boolValue(GyanisScribe::Core::kAllowSimpleGlobalHotkeys, false);
         const auto usable        = m_scope == HotkeyEditScope::InWindow ? combination.checkUsableInWindow() : combination.checkUsableGlobally(allowBareKeys);
         if (!usable)
         {

@@ -39,10 +39,10 @@ namespace GyanisScribe::Platform
     class IPlatformIntegration;
 } // namespace GyanisScribe::Platform
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
     class ISettingsStore;
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core
 
 namespace GyanisScribe::Gui
 {
@@ -121,7 +121,7 @@ namespace GyanisScribe::Pin
          * @param integration 平台集成，用于查鼠标穿透能力
          * @param parent 父窗口，默认无（顶层）
          */
-        PinWindow(const QImage &image, Settings::ISettingsStore &settings, const Platform::IPlatformIntegration &integration, QWidget *parent = nullptr);
+        PinWindow(const QImage &image, Core::ISettingsStore &settings, const Platform::IPlatformIntegration &integration, QWidget *parent = nullptr);
 
         /**
          * @brief 析构窗口
@@ -958,7 +958,7 @@ namespace GyanisScribe::Pin
         Annotation::AnnotationToolbar                       *m_annotateToolbar = nullptr;                                ///< 浮着的标注工具栏
         std::unique_ptr<Annotation::AnnotationToolbarBridge> m_annotateBridge;                                           ///< 工具栏与引擎的接线
         std::unique_ptr<Gui::IconProvider>                    m_icons;                                                    ///< 工具栏要的图标供给器，首次进入标注时创建
-        Settings::ISettingsStore                            &m_settings;                                                 ///< 配置来源（保存目录）
+        Core::ISettingsStore                            &m_settings;                                                 ///< 配置来源（保存目录）
         const Platform::IPlatformIntegration                &m_integration;                                              ///< 平台能力查询
     };
 

@@ -1,11 +1,11 @@
-#include "Settings/OutputStyleRules.h"
+#include "Core/Settings/OutputStyleRules.h"
 
 #include "Base/Logger.h"
 #include "Core/Image/OutputDecoration.h"
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
 
     Core::OutputDecorationStyle readOutputDecorationStyle(const ISettingsStore &settings)
@@ -44,4 +44,4 @@ namespace GyanisScribe::Settings
         return style;
     }
 
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core

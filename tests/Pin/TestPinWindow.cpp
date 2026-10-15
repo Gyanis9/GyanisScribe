@@ -12,8 +12,8 @@
 #include "Base/Types.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Platform/PlatformCapabilities.h"
-#include "Settings/SettingsKeys.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsStore.h"
 #include "Gui/Controls/AppShortcuts.h"
 
 #include <gtest/gtest.h>
@@ -113,7 +113,7 @@ namespace GyanisScribe
                 std::error_code ignored;
                 std::filesystem::remove(m_iniPath, ignored);
 
-                m_settings    = std::make_unique<Settings::SettingsStore>(m_iniPath);
+                m_settings    = std::make_unique<Core::SettingsStore>(m_iniPath);
                 m_integration = Platform::createPlatformIntegration();
             }
 
@@ -139,14 +139,14 @@ namespace GyanisScribe
                 return *m_window;
             }
 
-            [[nodiscard]] Settings::ISettingsStore &settings() const
+            [[nodiscard]] Core::ISettingsStore &settings() const
             {
                 return *m_settings;
             }
 
         private:
             std::filesystem::path                           m_iniPath;     ///< 本用例专用的设置文件
-            std::unique_ptr<Settings::SettingsStore>        m_settings;    ///< 贴图窗要的保存目录来源
+            std::unique_ptr<Core::SettingsStore>        m_settings;    ///< 贴图窗要的保存目录来源
             std::unique_ptr<Platform::IPlatformIntegration> m_integration; ///< 平台能力查询（本组用例只读能力表）
             std::unique_ptr<Pin::PinWindow>                 m_window;      ///< 被测窗口
         };
@@ -603,8 +603,8 @@ namespace GyanisScribe
         red.fill(QColor{255, 0, 0});
         auto &window = makeWindow(red);
 
-        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kPickFormat, QVariant(QStringLiteral("Hex"))).has_value()) << "写入失败";
-        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kPickHexUppercase, false).has_value()) << "写入失败";
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kPickFormat, QVariant(QStringLiteral("Hex"))).has_value()) << "写入失败";
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kPickHexUppercase, false).has_value()) << "写入失败";
         window.setColorPickMode(true);
 
         QMouseEvent hover{QEvent::MouseMove, QPointF{1.0, 1.0}, QPointF{1.0, 1.0}, Qt::NoButton, Qt::NoButton, Qt::NoModifier};
@@ -614,7 +614,7 @@ namespace GyanisScribe
         EXPECT_EQ(*readout, QStringLiteral("#ff0000")) << "字母档关掉了还出大写";
 
         // 换成 RGB 写法：字母档不参与那一形，串里也不该多出大小写折算
-        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kPickFormat, QVariant(QStringLiteral("Rgb"))).has_value()) << "写入失败";
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kPickFormat, QVariant(QStringLiteral("Rgb"))).has_value()) << "写入失败";
         QApplication::sendEvent(&window, &hover);
         EXPECT_EQ(window.hoveredColorText().value_or(QString{}), QStringLiteral("rgb(255, 0, 0)")) << "字母档动了不该动的写法";
     }
@@ -658,7 +658,7 @@ namespace GyanisScribe
         };
 
         // 悬停：读数跟着光标走，文本按设置里那一档写法
-        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kPickFormat, QVariant(QStringLiteral("Rgb"))).has_value());
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kPickFormat, QVariant(QStringLiteral("Rgb"))).has_value());
         auto  menu       = std::unique_ptr<QMenu>{window.buildContextMenu()};
         auto *pickAction = pickActionIn(*menu);
         ASSERT_NE(pickAction, nullptr) << "右键菜单里没有「取色」这一项";
@@ -713,9 +713,9 @@ namespace GyanisScribe
         const auto      target = std::filesystem::temp_directory_path() / std::format("GyanisScribe-PinSave-{}", ::testing::UnitTest::GetInstance()->current_test_info()->name());
         std::error_code ignored;
         std::filesystem::remove_all(target, ignored);
-        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kPathScreenshot, QVariant(Base::Paths::toDisplayText(target))).has_value());
-        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kSaveImageFormat, QVariant(QStringLiteral("Png"))).has_value());
-        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kSaveNameTemplate, QVariant(QStringLiteral("pin_%date%"))).has_value());
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kPathScreenshot, QVariant(Base::Paths::toDisplayText(target))).has_value());
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kSaveImageFormat, QVariant(QStringLiteral("Png"))).has_value());
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kSaveNameTemplate, QVariant(QStringLiteral("pin_%date%"))).has_value());
 
         auto                        &window = makeWindow();
         const std::unique_ptr<QMenu> menu{window.buildContextMenu()};
@@ -2251,11 +2251,11 @@ namespace GyanisScribe
         dragTo(QRect{dragged.right() + 3, 900, 1, 1});
         ASSERT_EQ(window.pos(), freeTarget + QPoint(3, 0)) << "默认那一档该吸到参照上";
 
-        ASSERT_TRUE(static_cast<bool>(settings().setValue(Settings::kPinEdgeSnapDistance, 2))) << "写入失败";
+        ASSERT_TRUE(static_cast<bool>(settings().setValue(Core::kPinEdgeSnapDistance, 2))) << "写入失败";
         dragTo(QRect{dragged.right() + 3, 900, 1, 1});
         EXPECT_EQ(window.pos(), freeTarget) << "吸附距离那一格没接到拖动这条路上：容差收到两格时差三格不该吸";
 
-        ASSERT_TRUE(static_cast<bool>(settings().setValue(Settings::kPinEdgeSnapDistance, 24))) << "写入失败";
+        ASSERT_TRUE(static_cast<bool>(settings().setValue(Core::kPinEdgeSnapDistance, 24))) << "写入失败";
         dragTo(QRect{dragged.right() + 20, 900, 1, 1});
         EXPECT_EQ(window.pos(), freeTarget + QPoint(20, 0)) << "把距离调到二十四格，同一落点该吸得更远";
     }
@@ -2288,7 +2288,7 @@ namespace GyanisScribe
         dragFromRightEdge(24.0);
         EXPECT_GT(window.width(), startSize.width()) << "默认档下按在右边拖一把该把这张改宽";
 
-        ASSERT_TRUE(static_cast<bool>(settings().setValue(Settings::kPinDisableFrameResize, true))) << "写入失败";
+        ASSERT_TRUE(static_cast<bool>(settings().setValue(Core::kPinDisableFrameResize, true))) << "写入失败";
         const auto keptSize    = window.size();
         const auto keptPattern = window.pos();
         dragFromRightEdge(24.0);

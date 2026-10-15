@@ -22,10 +22,10 @@
 
 class QMenu;
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
     class ISettingsStore;
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core
 
 namespace GyanisScribe::Platform
 {
@@ -94,7 +94,7 @@ namespace GyanisScribe::App
          * @param integration 平台能力来源，决定菜单上放不放「截取当前窗口」这一项
          * @param parent Qt 父对象
          */
-        TrayController(GyanisScribe::Gui::IconProvider &icons, GyanisScribe::Gui::ThemeManager &theme, Settings::ISettingsStore &settings,
+        TrayController(GyanisScribe::Gui::IconProvider &icons, GyanisScribe::Gui::ThemeManager &theme, Core::ISettingsStore &settings,
                        Platform::IPlatformIntegration &integration, QObject *parent = nullptr);
 
 
@@ -150,7 +150,7 @@ namespace GyanisScribe::App
 
         GyanisScribe::Gui::IconProvider &m_icons;                   ///< 图标供给器，不拥有
         GyanisScribe::Gui::ThemeManager &m_theme;                   ///< 主题管理器，不拥有
-        Settings::ISettingsStore       &m_settings;                ///< 配置存储，不拥有
+        Core::ISettingsStore       &m_settings;                ///< 配置存储，不拥有
         Platform::IPlatformIntegration &m_integration;             ///< 平台能力来源，决定菜单放不放哪几项，不拥有
         QSystemTrayIcon                *m_icon = nullptr;          ///< 托盘图标，父对象是本控制器
         std::unique_ptr<QMenu>          m_menu;                    ///< 右键菜单：QSystemTrayIcon 不接管菜单所有权，由本类持有

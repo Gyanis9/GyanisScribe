@@ -26,10 +26,10 @@
 class QListWidget;
 class QStackedWidget;
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
     class ISettingsStore;
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core
 
 namespace GyanisScribe::Gui
 {
@@ -198,7 +198,7 @@ namespace GyanisScribe::App
          * @note 刻意不认识 AppController：热键与语言的改动由各自的订阅者接走，
          *       设置页不需要为了「生效」去拖一个控制器进来。历史页的三个出口同样只发信号。
          */
-        explicit MainWindow(Settings::ISettingsStore &settings, GyanisScribe::Gui::ThemeManager &theme, GyanisScribe::Gui::IconProvider &icons, History::HistoryStore &historyStore,
+        explicit MainWindow(Core::ISettingsStore &settings, GyanisScribe::Gui::ThemeManager &theme, GyanisScribe::Gui::IconProvider &icons, History::HistoryStore &historyStore,
                             Platform::PlatformCapabilities capabilities, Platform::IPlatformIntegration &integration, QWidget *parent = nullptr);
 
         /**
@@ -348,7 +348,7 @@ namespace GyanisScribe::App
         /// 历史页：缩略图列表与三个出口
         QWidget *buildHistoryPage();
 
-        Settings::ISettingsStore                             &m_settings;          ///< 配置存储，不拥有
+        Core::ISettingsStore                             &m_settings;          ///< 配置存储，不拥有
         GyanisScribe::Gui::ThemeManager                       &m_theme;             ///< 主题管理器，不拥有
         GyanisScribe::Gui::IconProvider                       &m_icons;             ///< 图标供给器，不拥有
         Platform::PlatformCapabilities                        m_capabilities;      ///< 平台能力表：热键页按它给不给登记入口

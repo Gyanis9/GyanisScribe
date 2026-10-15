@@ -3,9 +3,9 @@
 
 #include "Annotation/AnnotationPalette.h"
 
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsStore.h"
 #include "Gui/Theme/DesignTokens.h"
 
 #include <gtest/gtest.h>
@@ -45,7 +45,7 @@ namespace GyanisScribe
                 m_iniPath           = std::filesystem::temp_directory_path() / std::format("GyanisScribe-Palette-{}.ini", caseName);
                 std::error_code ignored;
                 std::filesystem::remove(m_iniPath, ignored);
-                m_settings = std::make_unique<Settings::SettingsStore>(m_iniPath);
+                m_settings = std::make_unique<Core::SettingsStore>(m_iniPath);
             }
 
             void TearDown() override
@@ -55,7 +55,7 @@ namespace GyanisScribe
                 std::filesystem::remove(m_iniPath, ignored);
             }
 
-            [[nodiscard]] Settings::ISettingsStore &settings() const
+            [[nodiscard]] Core::ISettingsStore &settings() const
             {
                 return *m_settings;
             }
@@ -80,7 +80,7 @@ namespace GyanisScribe
 
         private:
             std::filesystem::path                    m_iniPath;
-            std::unique_ptr<Settings::SettingsStore> m_settings;
+            std::unique_ptr<Core::SettingsStore> m_settings;
         };
 
     } // namespace
@@ -104,7 +104,7 @@ namespace GyanisScribe
     TEST_F(AnnotationPaletteFixture, StoredPaletteReadsBackInOrder)
     {
         const QStringList tokens{QStringLiteral("#101010"), QStringLiteral("#0F0E0D"), QStringLiteral("#010203")};
-        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kAnnotationPalette, tokens).has_value());
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kAnnotationPalette, tokens).has_value());
 
         const auto palette = annotationPalette(settings());
         ASSERT_TRUE(palette.has_value()) << palette.error().message;

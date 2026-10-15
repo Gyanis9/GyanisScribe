@@ -10,7 +10,7 @@
 #pragma once
 
 #include "Hotkey/HotkeyCombination.h"
-#include "Settings/ISettingsStore.h"
+#include "Core/Settings/ISettingsStore.h"
 
 #include <QString>
 #include <QWidget>
@@ -58,7 +58,7 @@ namespace GyanisScribe::Gui
          * @param settings 配置存储，生命周期必须长于本控件
          * @param parent Qt 父对象
          */
-        explicit HotkeyEdit(Settings::ISettingsStore &settings, QWidget *parent = nullptr);
+        explicit HotkeyEdit(Core::ISettingsStore &settings, QWidget *parent = nullptr);
 
         /**
          * @brief 绑定到某个配置键并载入现值
@@ -107,7 +107,7 @@ namespace GyanisScribe::Gui
     private:
         void showPrompt(const QString &text);
 
-        Settings::ISettingsStore &m_settings;                            ///< 配置存储，不拥有
+        Core::ISettingsStore &m_settings;                            ///< 配置存储，不拥有
         std::string               m_key;                                 ///< 绑定的配置键名
         HotkeyEditScope           m_scope     = HotkeyEditScope::Global; ///< 这一格录下来的键归哪一档
         QLabel                   *m_display   = nullptr;                 ///< 显示组合文本的标签，也是录制状态的提示位

@@ -5,8 +5,8 @@
 
 #include "Pick/ColorFormat.h"
 #include "Pick/PickGeometry.h"
-#include "Settings/SettingsKeys.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsStore.h"
 #include "Gui/Controls/AppShortcuts.h"
 
 #include <QApplication>
@@ -62,7 +62,7 @@ namespace
             m_iniPath        = std::filesystem::temp_directory_path() / std::format("GyanisScribe-CaptureOverlay-{}-{}.ini", info->test_suite_name(), info->name());
             std::error_code ignored;
             std::filesystem::remove(m_iniPath, ignored);
-            m_settings = std::make_unique<GyanisScribe::Settings::SettingsStore>(m_iniPath);
+            m_settings = std::make_unique<GyanisScribe::Core::SettingsStore>(m_iniPath);
         }
 
         void TearDown() override
@@ -74,7 +74,7 @@ namespace
         }
 
         /// 换键那几条判据要往配置里写一颗新键，读端就是这一份
-        [[nodiscard]] GyanisScribe::Settings::ISettingsStore &settings() const
+        [[nodiscard]] GyanisScribe::Core::ISettingsStore &settings() const
         {
             return *m_settings;
         }
@@ -93,7 +93,7 @@ namespace
         }
 
         std::filesystem::path                                  m_iniPath;  ///< 本次用例专用的设置文件
-        std::unique_ptr<GyanisScribe::Settings::SettingsStore> m_settings; ///< 裸键清册的读端
+        std::unique_ptr<GyanisScribe::Core::SettingsStore> m_settings; ///< 裸键清册的读端
     };
 
     /// 事件的局部坐标给控件自己读（position()），全局那一份按这块屏的原点推出去
@@ -296,7 +296,7 @@ TEST_F(CaptureOverlayFixture, ReadoutColorHonoursTheHexCasingSetting)
     moveOver(*overlay, local);
     EXPECT_EQ(overlay->readoutColorText(), QStringLiteral("#0AC814")) << "默认档该是本仓此前的大写";
 
-    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Settings::kPickHexUppercase, false))) << "写入失败";
+    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Core::kPickHexUppercase, false))) << "写入失败";
     EXPECT_EQ(overlay->readoutColorText(), QStringLiteral("#0ac814")) << "关掉大写后读数还在折成大写";
 }
 
@@ -316,12 +316,12 @@ TEST_F(CaptureOverlayFixture, MagnifierViewTiersChangeTheIllustrationAndKeepTheR
     const auto narrowStrip = narrow->readoutStripRect();
     ASSERT_FALSE(narrowStrip.isNull()) << "读数条没位置";
 
-    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Settings::kCaptureMagnifierView, QStringLiteral("wide")))) << "写入失败";
+    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Core::kCaptureMagnifierView, QStringLiteral("wide")))) << "写入失败";
     auto wide = makeOverlay();
     moveOver(*wide, QPoint{300, 300});
     EXPECT_EQ(wide->magnifierRect().width(), 168) << "视野档没传到几何那一层";
 
-    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Settings::kCaptureMagnifierView, QStringLiteral("off")))) << "写入失败";
+    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Core::kCaptureMagnifierView, QStringLiteral("off")))) << "写入失败";
     auto off = makeOverlay();
     moveOver(*off, QPoint{300, 300});
     EXPECT_FALSE(off->isMagnifierVisible()) << "选了不显示还在画插图";
@@ -574,7 +574,7 @@ TEST_F(CaptureOverlayFixture, SizeUnitSettingMovesEveryOverlayReadoutTogether)
     EXPECT_EQ(logical->selectionSizeText(), QStringLiteral("500×400")) << "默认档的读数不能凭空带上倍率";
     EXPECT_EQ(copySizeAndReadBack(*logical, QStringLiteral("500×400")), QStringLiteral("500×400")) << "默认档复制的该是屏幕上看到的这一组数";
 
-    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Settings::kCaptureSizeUnit, QStringLiteral("px")))) << "写入失败";
+    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Core::kCaptureSizeUnit, QStringLiteral("px")))) << "写入失败";
     auto physical = makeOverlay(frame, 1.5);
     EXPECT_EQ(physical->sizeUnit(), SizeUnit::Physical) << "遮罩没把这一档读进来";
     dragOut(*physical, QPoint{100, 50}, QPoint{599, 449});
@@ -606,7 +606,7 @@ TEST_F(CaptureOverlayFixture, ControlASelectsEverythingAndVCopiesThePixelSize)
     EXPECT_EQ(copySizeAndReadBack(*scaled, QStringLiteral("201×101")), QStringLiteral("201×101")) << "默认档复制的是逻辑格：与遮罩读数、尺寸框同一口径";
 
     // 拨成物理像素后要交回「会被裁出多少像素」：两者不等时这一档才是设计工具里那把尺子
-    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Settings::kCaptureSizeUnit, QStringLiteral("px")))) << "写入失败";
+    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Core::kCaptureSizeUnit, QStringLiteral("px")))) << "写入失败";
     const auto physical = makeOverlay(background, 2.0);
     dragOut(*physical, QPoint{100, 100}, QPoint{300, 200});
     EXPECT_EQ(copySizeAndReadBack(*physical, QStringLiteral("402×202")), QStringLiteral("402×202")) << "拨成物理像素后 V 交回的不是成品像素数";

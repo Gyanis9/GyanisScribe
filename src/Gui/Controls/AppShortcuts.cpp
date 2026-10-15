@@ -1,8 +1,8 @@
 #include "Gui/Controls/AppShortcuts.h"
 
 #include "Base/Logger.h"
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
 
 #include <algorithm>
 #include <array>
@@ -63,10 +63,10 @@ namespace GyanisScribe::Gui
     QString appShortcutKey(const std::string_view token)
     {
         // 前缀 + 标识：一格一签，「分组轮换顺序」那一档用的也是「前缀 + 项」这一形
-        return QString::fromStdString(std::string{GyanisScribe::Settings::kAppShortcutPrefix} + std::string{token});
+        return QString::fromStdString(std::string{GyanisScribe::Core::kAppShortcutPrefix} + std::string{token});
     }
 
-    Hotkey::HotkeyCombination appShortcutValue(const Settings::ISettingsStore &settings, const AppShortcutEntry &entry)
+    Hotkey::HotkeyCombination appShortcutValue(const Core::ISettingsStore &settings, const AppShortcutEntry &entry)
     {
         const auto fallback = Hotkey::HotkeyCombination::parse(entry.defaultKey);
         if (!fallback)
@@ -89,7 +89,7 @@ namespace GyanisScribe::Gui
         return *fallback;
     }
 
-    QString appShortcutText(const Settings::ISettingsStore &settings, const AppShortcutEntry &entry)
+    QString appShortcutText(const Core::ISettingsStore &settings, const AppShortcutEntry &entry)
     {
         const auto value = appShortcutValue(settings, entry);
         const auto text  = value.toText();
@@ -116,7 +116,7 @@ namespace GyanisScribe::Gui
         return {};
     }
 
-    bool isAppShortcutHit(const Settings::ISettingsStore &settings, const AppShortcutEntry &entry, const int key, const Qt::KeyboardModifiers modifiers,
+    bool isAppShortcutHit(const Core::ISettingsStore &settings, const AppShortcutEntry &entry, const int key, const Qt::KeyboardModifiers modifiers,
                           const bool allowShiftVariant)
     {
         const Hotkey::HotkeyCombination pressed{modifiers, static_cast<Qt::Key>(key)};

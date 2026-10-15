@@ -19,7 +19,7 @@
 #include <filesystem>
 #include <string_view>
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
 
     /**
@@ -119,4 +119,4 @@ namespace GyanisScribe::Settings
         void valueChanged(const QString &key);
     };
 
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core

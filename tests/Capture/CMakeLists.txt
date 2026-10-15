@@ -11,7 +11,6 @@ add_executable(TestCapture
 
 target_link_libraries(TestCapture PRIVATE
         Capture
-        Settings
         Core
         GTest::gtest
         GTest::gtest_main)

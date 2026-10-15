@@ -89,10 +89,10 @@ namespace GyanisScribe::Platform
     class IPlatformIntegration;
 } // namespace GyanisScribe::Platform
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
     class SettingsStore;
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core
 
 namespace GyanisScribe::Gui
 {
@@ -114,7 +114,7 @@ namespace GyanisScribe::App
      */
     struct AppControllerParts
     {
-        std::unique_ptr<Settings::SettingsStore>        settings;           ///< 配置存储；空 = 按便携标记自建
+        std::unique_ptr<Core::SettingsStore>        settings;           ///< 配置存储；空 = 按便携标记自建
         std::unique_ptr<Platform::IPlatformIntegration> integration;        ///< 平台集成；空 = 本机那一份
         std::unique_ptr<Capture::IScreenCaptureSource>  captureSource;      ///< 抓帧来源；空 = 本机抓屏
         std::filesystem::path                           historyStoragePath; ///< 历史清单落点；空 = 默认位置
@@ -254,7 +254,7 @@ namespace GyanisScribe::App
          * @brief 配置存储，供设置页与后续模块取用
          * @return 本控制器持有的那一份，所有权不在调用方
          */
-        [[nodiscard]] Settings::SettingsStore &settings() const noexcept;
+        [[nodiscard]] Core::SettingsStore &settings() const noexcept;
 
         /**
          * @brief 主题管理器
@@ -292,7 +292,7 @@ namespace GyanisScribe::App
          * @param historyStoragePath 历史清单落点，非空
          * @param parent QObject 父对象
          */
-        AppController(std::unique_ptr<Settings::SettingsStore> settings, std::unique_ptr<Platform::IPlatformIntegration> integration,
+        AppController(std::unique_ptr<Core::SettingsStore> settings, std::unique_ptr<Platform::IPlatformIntegration> integration,
                       std::unique_ptr<Capture::IScreenCaptureSource> captureSource, std::filesystem::path historyStoragePath, QObject *parent);
 
         /**
@@ -593,7 +593,7 @@ namespace GyanisScribe::App
         /// 清空历史清单：只清记录，成品文件留在各自目录里
         void handleHistoryClear();
 
-        std::unique_ptr<Settings::SettingsStore>             m_settings;                                     ///< 配置存储
+        std::unique_ptr<Core::SettingsStore>             m_settings;                                     ///< 配置存储
         std::unique_ptr<Platform::IPlatformIntegration>      m_integration;                                  ///< 平台集成
         std::unique_ptr<Capture::IScreenCaptureSource>       m_captureSource;                                ///< 抓帧来源
         std::unique_ptr<Capture::CaptureService>             m_capture;                                      ///< 截图编排

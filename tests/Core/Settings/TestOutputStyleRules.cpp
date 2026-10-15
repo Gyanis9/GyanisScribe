@@ -1,10 +1,10 @@
 // 装饰三格的读取判据：没填过是默认档，填了就照收，某一格填歪只把那一格打回默认。
-// 三格共用一个出口（Settings::readOutputDecorationStyle），画布尺寸与绘制拿到同一份参数才不会错位。
+// 三格共用一个出口（Core::readOutputDecorationStyle），画布尺寸与绘制拿到同一份参数才不会错位。
 
 #include "Core/Image/OutputDecoration.h"
-#include "Settings/OutputStyleRules.h"
-#include "Settings/SettingsKeys.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/OutputStyleRules.h"
+#include "Core/Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsStore.h"
 
 #include <QColor>
 #include <QCoreApplication>
@@ -16,12 +16,12 @@
 #include <format>
 #include <memory>
 
-using GyanisScribe::Core::kOutputBorderColor;
+using GyanisScribe::Core::kDefaultOutputBorderColor;
 using GyanisScribe::Core::kOutputBorderPixels;
 using GyanisScribe::Core::kOutputShadowPixels;
 using GyanisScribe::Core::OutputDecorationStyle;
-using GyanisScribe::Settings::readOutputDecorationStyle;
-using GyanisScribe::Settings::SettingsStore;
+using GyanisScribe::Core::readOutputDecorationStyle;
+using GyanisScribe::Core::SettingsStore;
 
 namespace
 {
@@ -74,7 +74,7 @@ TEST_F(OutputStyleFixture, MissingCellsReadAsTheDefaultLayer)
 {
     const auto style = readOutputDecorationStyle(*m_store);
     EXPECT_EQ(style.borderPixels, kOutputBorderPixels);
-    EXPECT_EQ(style.borderColor, kOutputBorderColor);
+    EXPECT_EQ(style.borderColor, kDefaultOutputBorderColor);
     EXPECT_EQ(style.shadowPixels, kOutputShadowPixels);
 }
 
@@ -84,9 +84,9 @@ TEST_F(OutputStyleFixture, MissingCellsReadAsTheDefaultLayer)
  */
 TEST_F(OutputStyleFixture, StoredCellsRoundTrip)
 {
-    ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kOutputBorderWidth, 7)));
-    ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kOutputBorderColor, QStringLiteral("#00ff00"))));
-    ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kOutputShadowWidth, 30)));
+    ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Core::kOutputBorderWidth, 7)));
+    ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Core::kOutputBorderColor, QStringLiteral("#00ff00"))));
+    ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Core::kOutputShadowWidth, 30)));
 
     const auto style = readOutputDecorationStyle(*m_store);
     EXPECT_EQ(style.borderPixels, 7) << "边框宽没按这一档读出来";
@@ -101,9 +101,9 @@ TEST_F(OutputStyleFixture, StoredCellsRoundTrip)
  */
 TEST_F(OutputStyleFixture, OneBrokenCellFallsBackOnItsOwn)
 {
-    ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kOutputBorderWidth, 999)));
-    ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kOutputBorderColor, QStringLiteral("#0f0"))));
-    ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kOutputShadowWidth, 24)));
+    ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Core::kOutputBorderWidth, 999)));
+    ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Core::kOutputBorderColor, QStringLiteral("#0f0"))));
+    ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Core::kOutputShadowWidth, 24)));
 
     const auto style = readOutputDecorationStyle(*m_store);
     EXPECT_EQ(style.borderPixels, kOutputBorderPixels) << "越界的边框宽被照收进参数里了";

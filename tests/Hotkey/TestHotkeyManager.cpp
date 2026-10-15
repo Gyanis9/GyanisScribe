@@ -3,8 +3,8 @@
 #include "Platform/IHotkeyBackend.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Platform/UnsupportedHotkeyBackend.h"
-#include "Settings/SettingsKeys.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsStore.h"
 
 #include <QCoreApplication>
 
@@ -31,7 +31,7 @@ using GyanisScribe::Platform::IPlatformIntegration;
 using GyanisScribe::Platform::PlatformCapabilities;
 using GyanisScribe::Platform::ScreenWindow;
 using GyanisScribe::Platform::UnsupportedHotkeyBackend;
-using GyanisScribe::Settings::SettingsStore;
+using GyanisScribe::Core::SettingsStore;
 
 namespace
 {
@@ -266,7 +266,7 @@ TEST_F(HotkeyManagerFixture, StoredCombinationOverridesDefault)
     FakePlatformIntegration integration;
     HotkeyManager           manager(settings, integration);
 
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kHotkeyCapture, QVariant(QStringLiteral("Ctrl+Shift+F1"))).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kHotkeyCapture, QVariant(QStringLiteral("Ctrl+Shift+F1"))).has_value());
     // 写设置已经通过 valueChanged 触发过重登，这里不再手动 reload
 
     ASSERT_NE(integration.m_backendMirror, nullptr) << "改快捷键后没有建后端，说明 valueChanged 没接到 reload 上";
@@ -293,13 +293,13 @@ TEST_F(HotkeyManagerFixture, SimpleHotkeySettingDecidesWhetherStoredBareKeysRegi
     FakePlatformIntegration integration;
     HotkeyManager           manager(settings, integration);
 
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kHotkeyCapture, QVariant(QStringLiteral("R"))).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kHotkeyCapture, QVariant(QStringLiteral("R"))).has_value());
     ASSERT_NE(integration.m_backendMirror, nullptr);
     EXPECT_EQ(integration.m_backendMirror->registrations[0].key, Qt::Key_R) << "开关关着也把裸键登记上了：默认那一档太松";
     EXPECT_EQ(manager.bindingText(HotkeyAction::Capture), QStringLiteral("Ctrl+Alt+A")) << "被拒的那条该退回默认，而不是显示一颗用不了的键";
 
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kAllowSimpleGlobalHotkeys, true).has_value());
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kHotkeyCapture, QVariant(QStringLiteral("R"))).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kAllowSimpleGlobalHotkeys, true).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kHotkeyCapture, QVariant(QStringLiteral("R"))).has_value());
     ASSERT_NE(integration.m_backendMirror, nullptr);
     EXPECT_EQ(integration.m_backendMirror->registrations[0].key, Qt::Key_R) << "开关开了，配置里存着的单键还是没登记上：读端没带这一格";
     EXPECT_EQ(integration.m_backendMirror->registrations[0].modifiers, Qt::NoModifier);
@@ -308,7 +308,7 @@ TEST_F(HotkeyManagerFixture, SimpleHotkeySettingDecidesWhetherStoredBareKeysRegi
 TEST_F(HotkeyManagerFixture, OneFailureDoesNotStopTheOthers)
 {
     SettingsStore settings(m_iniFile);
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kHotkeyRecord, QVariant(QStringLiteral("Alt"))).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kHotkeyRecord, QVariant(QStringLiteral("Alt"))).has_value());
 
     FakePlatformIntegration integration;
     integration.m_identifiersToReject = {3}; // 让 OCR 那一条被系统拒绝
@@ -401,7 +401,7 @@ TEST_F(HotkeyManagerFixture, UnrelatedSettingChangeDoesNotReload)
     ASSERT_TRUE(settings.setValue("Paths/Screenshot", QVariant(QStringLiteral("D:/Shots"))).has_value());
     EXPECT_EQ(integration.m_backendMirror->unregisterAllCalls, callsBefore) << "改了截图目录也去重登热键，白占一次登记窗口";
 
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kHotkeyOcr, QVariant(QStringLiteral("Ctrl+Alt+O"))).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kHotkeyOcr, QVariant(QStringLiteral("Ctrl+Alt+O"))).has_value());
     EXPECT_GT(integration.m_backendMirror->unregisterAllCalls, callsBefore) << "改了热键却没重登，新组合不会生效";
 }
 
@@ -414,7 +414,7 @@ TEST_F(HotkeyManagerFixture, BindingTextFallsBackWhenStoredCombinationIsBroken)
     FakePlatformIntegration integration;
     HotkeyManager           manager(settings, integration);
 
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kHotkeyCapture, QVariant(QStringLiteral("Ctrl+?"))).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kHotkeyCapture, QVariant(QStringLiteral("Ctrl+?"))).has_value());
     EXPECT_EQ(manager.bindingText(HotkeyAction::Capture), QStringLiteral("Ctrl+Alt+A")) << "坏值要回落到默认组合的显示文本";
     EXPECT_EQ(manager.bindingText(HotkeyAction::Record), QStringLiteral("Ctrl+Alt+R")) << "没被改动的动作不受影响";
 }
@@ -449,7 +449,7 @@ TEST_F(HotkeyManagerFixture, LongCaptureHotkeyUsesItsOwnSetting)
     FakePlatformIntegration integration;
     HotkeyManager           manager(settings, integration);
 
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kHotkeyCaptureLong, QVariant(QStringLiteral("Ctrl+Alt+F9"))).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kHotkeyCaptureLong, QVariant(QStringLiteral("Ctrl+Alt+F9"))).has_value());
 
     const auto &registrations = integration.m_backendMirror->registrations;
     ASSERT_EQ(registrations.size(), 8U) << "改一项设置没触发重登，后端那份登记还是旧的";

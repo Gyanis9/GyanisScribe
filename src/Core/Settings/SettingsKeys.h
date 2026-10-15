@@ -3,7 +3,7 @@
 
 #include <string_view>
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
 
     /// 截图的全局热键文本，例如 Ctrl+Alt+A
@@ -123,7 +123,7 @@ namespace GyanisScribe::Settings
     inline constexpr std::string_view kOutputShadow = "Save/OutputShadow";
 
     /// 装饰的三格参数：边框宽与投影宽是物理像素的整数，边框色是一段 #RRGGBB 文本（留空即默认的中灰）。
-    /// 区间与默认档住在 Core/Image/OutputDecoration.h，读端是 Settings::readOutputDecorationStyle
+    /// 区间与默认档住在 Core/Image/OutputDecoration.h，读端是 Core::readOutputDecorationStyle
     inline constexpr std::string_view kOutputBorderWidth = "Save/OutputBorderWidth";
     inline constexpr std::string_view kOutputBorderColor = "Save/OutputBorderColor";
     inline constexpr std::string_view kOutputShadowWidth = "Save/OutputShadowWidth";
@@ -136,7 +136,7 @@ namespace GyanisScribe::Settings
     inline constexpr std::string_view kSaveImageQuality = "Save/ImageQuality";
 
     /// 成品文件名的模板，变量只有 %date%、%time%、%ms%（Base::Paths::parseNameTemplate 校验）；
-    /// 留空表示默认档，读端见 Settings::nameTemplateOrDefault
+    /// 留空表示默认档，读端见 Core::nameTemplateOrDefault
     inline constexpr std::string_view kSaveNameTemplate = "Save/NameTemplate";
 
     /// 贴图保存的默认目录，为空时用系统图片目录下的 GyanisScribe
@@ -262,4 +262,4 @@ namespace GyanisScribe::Settings
     inline constexpr std::string_view kTrayLeftClick   = "Tray/LeftClick";
     inline constexpr std::string_view kTrayMiddleClick = "Tray/MiddleClick";
 
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core

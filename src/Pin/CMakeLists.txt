@@ -23,7 +23,6 @@ target_link_libraries(Pin PUBLIC
         Core
         Pick
         Platform
-        Settings
         Gui
         Qt6::Core
         Qt6::Gui

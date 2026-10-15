@@ -12,7 +12,6 @@ add_executable(TestShell
 
 target_link_libraries(TestShell PRIVATE
         App
-        Settings
         Gui
         Core
         GTest::gtest
@@ -59,7 +58,6 @@ target_link_libraries(TestMainWindow PRIVATE
         History
         Pin
         Record
-        Settings
         Gui
         Core
         GTest::gtest
@@ -89,7 +87,6 @@ target_link_libraries(TestModuleFlow PRIVATE
         Ocr
         Pin
         Platform
-        Settings
         Gui
         GTest::gtest
         GTest::gtest_main
@@ -125,7 +122,6 @@ target_link_libraries(TestAppController PRIVATE
         Pin
         Platform
         Record
-        Settings
         Gui
         GTest::gtest
         GTest::gtest_main
@@ -151,7 +147,6 @@ target_link_libraries(UiShotTool PRIVATE
         App
         History
         Platform
-        Settings
         Gui
         Core
         Qt6::Core
@@ -173,7 +168,6 @@ target_link_libraries(UiAuditTool PRIVATE
         App
         History
         Platform
-        Settings
         Gui
         Core
         Qt6::Core

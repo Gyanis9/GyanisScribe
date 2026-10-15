@@ -3,9 +3,9 @@
 #include "Gui/Controls/AppShortcuts.h"
 
 #include "Hotkey/HotkeyCombination.h"
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsStore.h"
 
 #include <gtest/gtest.h>
 
@@ -22,7 +22,7 @@
 namespace
 {
     using GyanisScribe::Hotkey::HotkeyCombination;
-    using GyanisScribe::Settings::SettingsStore;
+    using GyanisScribe::Core::SettingsStore;
     using GyanisScribe::Gui::appShortcutEntries;
     using GyanisScribe::Gui::AppShortcutEntry;
     using GyanisScribe::Gui::appShortcutEntry;

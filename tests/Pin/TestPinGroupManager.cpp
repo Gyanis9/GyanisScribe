@@ -7,7 +7,7 @@
 #include "Pin/PinManager.h"
 
 #include "Platform/IPlatformIntegration.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/SettingsStore.h"
 
 #include <gtest/gtest.h>
 
@@ -62,7 +62,7 @@ namespace GyanisScribe
                 std::error_code ignored;
                 std::filesystem::remove(m_iniFile, ignored);
 
-                m_settings    = std::make_unique<Settings::SettingsStore>(m_iniFile);
+                m_settings    = std::make_unique<Core::SettingsStore>(m_iniFile);
                 m_integration = Platform::createPlatformIntegration();
                 m_pins        = std::make_unique<Pin::PinManager>(*m_settings, *m_integration);
             }
@@ -141,7 +141,7 @@ namespace GyanisScribe
 
         private:
             std::filesystem::path                           m_iniFile;     ///< 本用例专用的设置文件
-            std::unique_ptr<Settings::SettingsStore>        m_settings;    ///< 布局与组名的读写处
+            std::unique_ptr<Core::SettingsStore>        m_settings;    ///< 布局与组名的读写处
             std::unique_ptr<Platform::IPlatformIntegration> m_integration; ///< 贴图窗要的平台能力
             std::unique_ptr<Pin::PinManager>                m_pins;        ///< 被测管理器
             std::unique_ptr<Pin::PinGroupManagerWindow>     m_window;      ///< 被测窗口

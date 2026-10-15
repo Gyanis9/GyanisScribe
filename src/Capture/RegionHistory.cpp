@@ -3,8 +3,8 @@
 #include "Capture/ScreenUtils.h"
 #include "Base/Logger.h"
 #include "Base/Text.h"
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
 
 #include <QStringList>
 #include <QVariant>
@@ -88,16 +88,16 @@ namespace GyanisScribe::Capture
         return regions;
     }
 
-    Base::Expected<std::vector<RegionHistoryEntry>> loadRegionHistory(Settings::ISettingsStore &settings)
+    Base::Expected<std::vector<RegionHistoryEntry>> loadRegionHistory(Core::ISettingsStore &settings)
     {
-        const auto stored = settings.stringValue(Settings::kCaptureRegionHistory, QString());
+        const auto stored = settings.stringValue(Core::kCaptureRegionHistory, QString());
         if (!stored.trimmed().isEmpty())
         {
             return regionHistoryFromText(stored.toStdString());
         }
 
         // 升级前的配置里只有「最近一条」那把单值键：读到就当作一条历史，让旧记录还复用得上
-        const auto legacyRegion = settings.stringValue(Settings::kCaptureLastRegion, QString());
+        const auto legacyRegion = settings.stringValue(Core::kCaptureLastRegion, QString());
         if (legacyRegion.trimmed().isEmpty())
         {
             return std::vector<RegionHistoryEntry>{};
@@ -107,10 +107,10 @@ namespace GyanisScribe::Capture
         {
             return std::unexpected(region.error());
         }
-        return std::vector<RegionHistoryEntry>{RegionHistoryEntry{*region, settings.stringValue(Settings::kCaptureLastScreen, QString())}};
+        return std::vector<RegionHistoryEntry>{RegionHistoryEntry{*region, settings.stringValue(Core::kCaptureLastScreen, QString())}};
     }
 
-    void rememberRegion(Settings::ISettingsStore &settings, const RegionHistoryEntry &entry)
+    void rememberRegion(Core::ISettingsStore &settings, const RegionHistoryEntry &entry)
     {
         auto history = loadRegionHistory(settings);
         if (!history)
@@ -121,16 +121,16 @@ namespace GyanisScribe::Capture
         }
 
         const auto updated = pushedRegionHistory(*history, entry);
-        if (const auto stored = settings.setValue(Settings::kCaptureRegionHistory, QVariant(regionHistoryToText(updated))); !stored)
+        if (const auto stored = settings.setValue(Core::kCaptureRegionHistory, QVariant(regionHistoryToText(updated))); !stored)
         {
             Base::Logger::warning(std::format("选区历史没能记下：{}", stored.error().message));
         }
         // 单值键与历史首条同一个写点一起写：升级前后的两种读法永远指向同一条
-        if (const auto stored = settings.setValue(Settings::kCaptureLastRegion, QVariant(regionToText(entry.region))); !stored)
+        if (const auto stored = settings.setValue(Core::kCaptureLastRegion, QVariant(regionToText(entry.region))); !stored)
         {
             Base::Logger::warning(std::format("上次截图区域没能记下：{}", stored.error().message));
         }
-        if (const auto stored = settings.setValue(Settings::kCaptureLastScreen, QVariant(entry.screenName)); !stored)
+        if (const auto stored = settings.setValue(Core::kCaptureLastScreen, QVariant(entry.screenName)); !stored)
         {
             Base::Logger::warning(std::format("上次截图所在屏没能记下：{}", stored.error().message));
         }

@@ -7,8 +7,8 @@
 #include "Base/Text.h"
 #include "Pick/ColorFormat.h"
 #include "Pick/PickGeometry.h"
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
 #include "Gui/Controls/AppShortcuts.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Controls/KeyStep.h"
@@ -71,7 +71,7 @@ namespace
 namespace GyanisScribe::Capture
 {
 
-    CaptureOverlay::CaptureOverlay(const QImage &background, const QRect &screenGeometry, qreal devicePixelRatio, Settings::ISettingsStore &settings, QWidget *parent) :
+    CaptureOverlay::CaptureOverlay(const QImage &background, const QRect &screenGeometry, qreal devicePixelRatio, Core::ISettingsStore &settings, QWidget *parent) :
         QWidget(parent), m_settings(settings), m_screenGeometry(screenGeometry), m_devicePixelRatio(devicePixelRatio)
     {
         // 物理像素图按该屏缩放因子标记一次，之后的绘制一律用逻辑坐标，读数与选区才对得上同一个点
@@ -81,7 +81,7 @@ namespace GyanisScribe::Capture
         // 视野档在这一轮开始时读一次：读坏了只记一条日志，而不是每帧绘制都刷一句同样的话
         std::string complaint;
         m_magnifierView = Pick::magnifierViewOrDefault(
-                m_settings.stringValue(GyanisScribe::Settings::kCaptureMagnifierView, QString::fromUtf8(GyanisScribe::Pick::magnifierViewToken(Pick::MagnifierView::Narrow)))
+                m_settings.stringValue(GyanisScribe::Core::kCaptureMagnifierView, QString::fromUtf8(GyanisScribe::Pick::magnifierViewToken(Pick::MagnifierView::Narrow)))
                         .toStdString(),
                 complaint);
         if (!complaint.empty())
@@ -91,7 +91,7 @@ namespace GyanisScribe::Capture
 
         // 尺寸单位也是这一轮开始时读一次：读数、复制与尺寸框三处共用它，中途换档会让刚看到的数敲回去变成另一块选区
         m_sizeUnit =
-                sizeUnitOrDefault(m_settings.stringValue(GyanisScribe::Settings::kCaptureSizeUnit, QString::fromUtf8(sizeUnitToken(SizeUnit::Logical))).toStdString(), complaint);
+                sizeUnitOrDefault(m_settings.stringValue(GyanisScribe::Core::kCaptureSizeUnit, QString::fromUtf8(sizeUnitToken(SizeUnit::Logical))).toStdString(), complaint);
         if (!complaint.empty())
         {
             Base::Logger::warning(std::format("尺寸单位读不出：{}", complaint));
@@ -327,7 +327,7 @@ namespace GyanisScribe::Capture
     QString CaptureOverlay::readoutColorText() const
     {
         // 字母档现读配置：这一格只管 HEX 写法，其它写法读出来不受它影响
-        const auto casing = Pick::hexCasingOf(m_settings.boolValue(GyanisScribe::Settings::kPickHexUppercase, true));
+        const auto casing = Pick::hexCasingOf(m_settings.boolValue(GyanisScribe::Core::kPickHexUppercase, true));
         return Pick::formatColor(colorUnderCursor(), m_readoutFormat, casing);
     }
 

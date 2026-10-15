@@ -9,13 +9,13 @@
 
 #pragma once
 
-#include "Settings/ISettingsStore.h"
+#include "Core/Settings/ISettingsStore.h"
 
 #include <memory>
 
 class QSettings;
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
 
     /**
@@ -137,4 +137,4 @@ namespace GyanisScribe::Settings
         std::unique_ptr<QSettings> m_settings; ///< 配置后端，所有权在本对象手里
     };
 
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core

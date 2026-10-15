@@ -3,9 +3,9 @@
 #include "Gui/Theme/ThemeManager.h"
 
 #include "Base/Logger.h"
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsStore.h"
 
 #include <gtest/gtest.h>
 
@@ -47,8 +47,8 @@
 
 using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Base::Logger;
-using GyanisScribe::Settings::kThemeMode;
-using GyanisScribe::Settings::SettingsStore;
+using GyanisScribe::Core::kThemeMode;
+using GyanisScribe::Core::SettingsStore;
 using GyanisScribe::Gui::paletteFor;
 using GyanisScribe::Gui::parseThemeKind;
 using GyanisScribe::Gui::resolveThemeKind;
@@ -157,7 +157,7 @@ namespace
         {
             return *m_manager;
         }
-        GyanisScribe::Settings::ISettingsStore &store() const
+        GyanisScribe::Core::ISettingsStore &store() const
         {
             return *m_store;
         }
@@ -172,7 +172,7 @@ namespace
 
     private:
         std::filesystem::path                                   m_iniPath; ///< 本用例专属的临时 INI
-        std::unique_ptr<GyanisScribe::Settings::ISettingsStore> m_store;   ///< 配置后端
+        std::unique_ptr<GyanisScribe::Core::ISettingsStore> m_store;   ///< 配置后端
         std::unique_ptr<ThemeManager>                           m_manager; ///< 被测管理器
     };
 

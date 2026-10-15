@@ -14,10 +14,10 @@
 
 #include <QObject>
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
     class ISettingsStore;
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core
 
 namespace GyanisScribe::Gui
 {
@@ -38,7 +38,7 @@ namespace GyanisScribe::Gui
          * @param parent Qt 父对象
          * @note 构造不做任何应用层动作：档位由调用方随后 applyFromSettings() 取，避免半路覆盖界面已定的样式
          */
-        explicit ThemeManager(Settings::ISettingsStore &settings, QObject *parent = nullptr);
+        explicit ThemeManager(Core::ISettingsStore &settings, QObject *parent = nullptr);
 
         /**
          * @brief 从配置读档位并立刻生效
@@ -96,7 +96,7 @@ namespace GyanisScribe::Gui
         /// 读系统回报的深浅色偏好
         [[nodiscard]] SystemScheme currentSystemScheme() const;
 
-        Settings::ISettingsStore &m_settings;  ///< 配置存储，档位从这里读、也写回这里
+        Core::ISettingsStore &m_settings;  ///< 配置存储，档位从这里读、也写回这里
         ThemeKind                 m_requested; ///< 用户选的档位
         ThemeKind                 m_resolved;  ///< 解算后生效的档位
     };

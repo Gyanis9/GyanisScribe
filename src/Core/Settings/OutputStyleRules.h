@@ -11,7 +11,7 @@
 
 #include "Core/Image/OutputDecoration.h"
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
     class ISettingsStore;
 
@@ -24,4 +24,4 @@ namespace GyanisScribe::Settings
      */
     [[nodiscard]] Core::OutputDecorationStyle readOutputDecorationStyle(const ISettingsStore &settings);
 
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core

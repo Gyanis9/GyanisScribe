@@ -11,8 +11,8 @@
 #include "Pin/PinManager.h"
 
 #include "Platform/IPlatformIntegration.h"
-#include "Settings/SettingsKeys.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsStore.h"
 
 #include <gtest/gtest.h>
 
@@ -79,7 +79,7 @@ namespace GyanisScribe
                 std::error_code ignored;
                 std::filesystem::remove(m_iniFile, ignored);
 
-                m_settings    = std::make_unique<Settings::SettingsStore>(m_iniFile);
+                m_settings    = std::make_unique<Core::SettingsStore>(m_iniFile);
                 m_integration = Platform::createPlatformIntegration();
             }
 
@@ -98,7 +98,7 @@ namespace GyanisScribe
                 return *m_pins;
             }
 
-            [[nodiscard]] Settings::ISettingsStore &settings() const
+            [[nodiscard]] Core::ISettingsStore &settings() const
             {
                 return *m_settings;
             }
@@ -110,7 +110,7 @@ namespace GyanisScribe
 
         private:
             std::filesystem::path                           m_iniFile;     ///< 本用例专用的设置文件
-            std::unique_ptr<Settings::SettingsStore>        m_settings;    ///< 布局的读写处
+            std::unique_ptr<Core::SettingsStore>        m_settings;    ///< 布局的读写处
             std::unique_ptr<Platform::IPlatformIntegration> m_integration; ///< 贴图窗要的平台能力
             std::unique_ptr<Pin::PinManager>                m_pins;        ///< 被测管理器
         };
@@ -231,7 +231,7 @@ namespace GyanisScribe
         }
 
         // 布局文本是「哪张在哪组」的唯一凭据：从配置里现读现解一遍
-        const auto text   = settings().stringValue(Settings::kPinLayout, QString());
+        const auto text   = settings().stringValue(Core::kPinLayout, QString());
         const auto states = Pin::parseLayout(text.toStdString());
         ASSERT_TRUE(states.has_value()) << "写下的布局读不回来：" << states.error().message;
         ASSERT_EQ(states->size(), 2);
@@ -328,7 +328,7 @@ namespace GyanisScribe
             ASSERT_TRUE(pins.saveLayout().has_value());
         }
         // 手工把活动组改成一个没有贴图的组号：模拟「上一次会话留下的那个组已经空了」
-        ASSERT_TRUE(settings().setValue(Settings::kPinActiveGroup, 7).has_value());
+        ASSERT_TRUE(settings().setValue(Core::kPinActiveGroup, 7).has_value());
         settings().sync();
 
         auto      &reopened = makeManager();
@@ -836,9 +836,9 @@ namespace GyanisScribe
         const auto target = std::filesystem::temp_directory_path() / std::format("GyanisScribe-PinManager-{}", ::testing::UnitTest::GetInstance()->current_test_info()->name());
         std::error_code ignored;
         std::filesystem::remove_all(target, ignored);
-        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kPathScreenshot, QVariant(Base::Paths::toDisplayText(target))).has_value());
-        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kSaveImageFormat, QVariant(QStringLiteral("Png"))).has_value());
-        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kSaveNameTemplate, QVariant(QStringLiteral("pin_%date%"))).has_value());
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kPathScreenshot, QVariant(Base::Paths::toDisplayText(target))).has_value());
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kSaveImageFormat, QVariant(QStringLiteral("Png"))).has_value());
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kSaveNameTemplate, QVariant(QStringLiteral("pin_%date%"))).has_value());
 
         auto &pins = makeManager();
         pins.addPin(makeImage(), QPoint(10, 10));
@@ -880,8 +880,8 @@ namespace GyanisScribe
             std::ofstream occupant{blocked};
             occupant << "占位的不是一个目录";
         }
-        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kPathScreenshot, QVariant(Base::Paths::toDisplayText(blocked))).has_value());
-        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kSaveImageFormat, QVariant(QStringLiteral("Png"))).has_value());
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kPathScreenshot, QVariant(Base::Paths::toDisplayText(blocked))).has_value());
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kSaveImageFormat, QVariant(QStringLiteral("Png"))).has_value());
 
         auto &pins = makeManager();
         pins.addPin(makeImage(), QPoint(10, 10));
@@ -1020,7 +1020,7 @@ namespace GyanisScribe
 
         ASSERT_TRUE(
                 settings()
-                        .setValue(GyanisScribe::Settings::kPinGroupRotationOrder, QStringList{QStringLiteral("9"), QStringLiteral("1"), QStringLiteral("3"), QStringLiteral("2")})
+                        .setValue(GyanisScribe::Core::kPinGroupRotationOrder, QStringList{QStringLiteral("9"), QStringLiteral("1"), QStringLiteral("3"), QStringLiteral("2")})
                         .has_value());
 
         const auto first = pins.switchToNextGroup();
@@ -1050,7 +1050,7 @@ namespace GyanisScribe
         ASSERT_TRUE(pins.movePinToGroup(1, 3).has_value());
         ASSERT_TRUE(pins.movePinToGroup(2, 2).has_value());
 
-        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kPinGroupRotationOrder, QStringList{QStringLiteral("2"), QStringLiteral("2")}).has_value());
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kPinGroupRotationOrder, QStringList{QStringLiteral("2"), QStringLiteral("2")}).has_value());
 
         const auto switched = pins.switchToNextGroup();
         ASSERT_TRUE(switched.has_value()) << "名单坏了切组就该退回升序，而不是拒掉这一次：" << switched.error().message;

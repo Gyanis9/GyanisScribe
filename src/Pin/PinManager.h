@@ -31,10 +31,10 @@ namespace GyanisScribe::Platform
     class IPlatformIntegration;
 } // namespace GyanisScribe::Platform
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
     class ISettingsStore;
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core
 
 namespace GyanisScribe::Pin
 {
@@ -101,7 +101,7 @@ namespace GyanisScribe::Pin
          * @param integration 平台能力来源，透传给每张贴图，生命周期必须长于本管理器
          * @param parent QObject 父对象，默认无
          */
-        PinManager(Settings::ISettingsStore &settings, Platform::IPlatformIntegration &integration, QObject *parent = nullptr);
+        PinManager(Core::ISettingsStore &settings, Platform::IPlatformIntegration &integration, QObject *parent = nullptr);
 
         /**
          * @brief 析构：关掉还在的贴图窗口
@@ -472,7 +472,7 @@ namespace GyanisScribe::Pin
          */
         int applyGroupVisibility();
 
-        Settings::ISettingsStore               &m_settings;                      ///< 布局读写处
+        Core::ISettingsStore               &m_settings;                      ///< 布局读写处
         Platform::IPlatformIntegration         &m_integration;                   ///< 平台能力来源
         std::vector<std::unique_ptr<PinWindow>> m_pins;                          ///< 在册贴图，按创建顺序
         int                                     m_activeGroup  = kFirstPinGroup; ///< 当前显示的分组号

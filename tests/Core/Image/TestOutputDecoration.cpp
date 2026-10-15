@@ -10,7 +10,7 @@
 
 using GyanisScribe::Core::decoratedOutputSize;
 using GyanisScribe::Core::decorateForOutput;
-using GyanisScribe::Core::kOutputBorderColor;
+using GyanisScribe::Core::kDefaultOutputBorderColor;
 using GyanisScribe::Core::kOutputBorderPixels;
 using GyanisScribe::Core::kOutputShadowPixels;
 using GyanisScribe::Core::OutputDecorationStyle;
@@ -83,14 +83,14 @@ TEST(OutputDecoration, BorderDrawsThickNeutralFrameAndKeepsTheImageIntact)
     // 左上角那 2×2 都是边框灰；图的第一行从 (border, border) 起
     for (int offset = 0; offset < border; ++offset)
     {
-        EXPECT_EQ(output.pixelColor(offset, offset), kOutputBorderColor) << "外圈第 " << offset << " 圈不是边框色";
-        EXPECT_EQ(output.pixelColor(4 + border + offset, 4 + border + offset), kOutputBorderColor) << "右下外圈不是边框色";
+        EXPECT_EQ(output.pixelColor(offset, offset), kDefaultOutputBorderColor) << "外圈第 " << offset << " 圈不是边框色";
+        EXPECT_EQ(output.pixelColor(4 + border + offset, 4 + border + offset), kDefaultOutputBorderColor) << "右下外圈不是边框色";
     }
     EXPECT_EQ(output.pixelColor(border, border), QColor(255, 0, 0)) << "图心被边框侵占了";
     EXPECT_EQ(output.pixelColor(4 + border - 1, 4 + border - 1), QColor(255, 0, 0)) << "图的右下角被边框侵占";
     // 边框四边对称：右边缘与下边缘的灰色条也要在
-    EXPECT_EQ(output.pixelColor(output.width() - 1, output.height() / 2), kOutputBorderColor) << "右边没有边框";
-    EXPECT_EQ(output.pixelColor(output.width() / 2, output.height() - 1), kOutputBorderColor) << "下边没有边框";
+    EXPECT_EQ(output.pixelColor(output.width() - 1, output.height() / 2), kDefaultOutputBorderColor) << "右边没有边框";
+    EXPECT_EQ(output.pixelColor(output.width() / 2, output.height() - 1), kDefaultOutputBorderColor) << "下边没有边框";
 }
 
 /**
@@ -120,7 +120,7 @@ TEST(OutputDecoration, StyleDrivesWidthsAndColor)
 TEST(OutputDecoration, ShadowWidthIsInertWhenShadowIsOff)
 {
     const auto                  image{makeRedImage()};
-    const OutputDecorationStyle style{.borderPixels = 3, .borderColor = kOutputBorderColor, .shadowPixels = 40};
+    const OutputDecorationStyle style{.borderPixels = 3, .borderColor = kDefaultOutputBorderColor, .shadowPixels = 40};
 
     EXPECT_EQ(decoratedOutputSize(image.size(), true, false, style), QSize(4 + 6, 4 + 6)) << "投影关着还按投影宽撑画布";
 }
@@ -237,7 +237,7 @@ TEST(OutputDecorationStyleParsers, ReadsBorderColorAndRejectsUnreadableNames)
 {
     const auto fallback = parseOutputBorderColor(QStringLiteral("   "));
     ASSERT_TRUE(fallback.has_value()) << fallback.error().message;
-    EXPECT_EQ(*fallback, kOutputBorderColor) << "留空该回到默认的中灰";
+    EXPECT_EQ(*fallback, kDefaultOutputBorderColor) << "留空该回到默认的中灰";
 
     const auto hex = parseOutputBorderColor(QStringLiteral("#1a2b3c"));
     ASSERT_TRUE(hex.has_value()) << hex.error().message;

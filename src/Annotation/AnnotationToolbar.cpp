@@ -5,8 +5,8 @@
 #include "Pick/RecentColors.h"
 #include "Base/Logger.h"
 #include "Base/Text.h"
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
 #include "Gui/Controls/AppShortcuts.h"
 #include "Gui/Theme/DesignTokens.h"
 
@@ -94,7 +94,7 @@ namespace
 
 namespace GyanisScribe::Annotation
 {
-    AnnotationToolbar::AnnotationToolbar(Settings::ISettingsStore &settings, const Gui::IconProvider &icons, QWidget *parent) :
+    AnnotationToolbar::AnnotationToolbar(Core::ISettingsStore &settings, const Gui::IconProvider &icons, QWidget *parent) :
         QWidget(parent), m_settings(settings), m_icons(icons), m_activeTool(ToolKind::Rectangle)
     {
         setObjectName(QStringLiteral("AnnotationToolbar"));
@@ -145,10 +145,10 @@ namespace GyanisScribe::Annotation
         // 设置页换过某档的键就重排提示：按钮只在建窗时排一次，不订阅就停在启动那一刻的旧键上，
         // 于是「按屏幕上写的那颗键没反应」
         QObject::connect(
-                &m_settings, &GyanisScribe::Settings::ISettingsStore::valueChanged, this,
+                &m_settings, &GyanisScribe::Core::ISettingsStore::valueChanged, this,
                 [this](const QString &key)
                 {
-                    if (key.startsWith(QString::fromUtf8(GyanisScribe::Settings::kAppShortcutPrefix.data(), static_cast<int>(GyanisScribe::Settings::kAppShortcutPrefix.size()))))
+                    if (key.startsWith(QString::fromUtf8(GyanisScribe::Core::kAppShortcutPrefix.data(), static_cast<int>(GyanisScribe::Core::kAppShortcutPrefix.size()))))
                     {
                         refreshToolKeyHints();
                     }
@@ -195,7 +195,7 @@ namespace GyanisScribe::Annotation
         // 最近使用颜色：读回上一次留下的清单，插在预设色板之后、自定义按钮之前。
         // 记下这个插入点，之后每次重建成品色块都要落回同一排位置
         m_recentInsertIndex = layout->count();
-        if (const auto parsed = Pick::parseRecentColors(m_settings.stringListValue(Settings::kAnnotationRecentColors, {})); parsed)
+        if (const auto parsed = Pick::parseRecentColors(m_settings.stringListValue(Core::kAnnotationRecentColors, {})); parsed)
         {
             m_recentColors = *parsed;
             // 手改过的配置文件可能超出上限：按上限截断，色板不会被撑到放不下
@@ -755,7 +755,7 @@ namespace GyanisScribe::Annotation
 
     void AnnotationToolbar::applyStoredDefaults()
     {
-        const auto storedWidth = m_settings.intValue(Settings::kAnnotationDefaultWidth, kAnnotationWidths[kDefaultWidthStep]);
+        const auto storedWidth = m_settings.intValue(Core::kAnnotationDefaultWidth, kAnnotationWidths[kDefaultWidthStep]);
         if (const auto step = stepIndexOf(kAnnotationWidths, storedWidth); step)
         {
             m_widthSlider->setValue(*step);
@@ -766,7 +766,7 @@ namespace GyanisScribe::Annotation
             m_widthSlider->setValue(kDefaultWidthStep);
         }
 
-        const auto storedFontSize = m_settings.intValue(Settings::kAnnotationDefaultFontSize, kFontSizes[kDefaultFontSizeIndex]);
+        const auto storedFontSize = m_settings.intValue(Core::kAnnotationDefaultFontSize, kFontSizes[kDefaultFontSizeIndex]);
         if (const auto index = stepIndexOf(kFontSizes, storedFontSize); index)
         {
             m_fontSizeCombo->setCurrentIndex(*index);
@@ -784,11 +784,11 @@ namespace GyanisScribe::Annotation
         {
             return;
         }
-        if (auto written = m_settings.setValue(Settings::kAnnotationDefaultWidth, currentWidth()); !written)
+        if (auto written = m_settings.setValue(Core::kAnnotationDefaultWidth, currentWidth()); !written)
         {
             Base::Logger::warning(std::format("默认线宽没能保存：{}", written.error().message));
         }
-        if (auto written = m_settings.setValue(Settings::kAnnotationDefaultFontSize, currentFontSize()); !written)
+        if (auto written = m_settings.setValue(Core::kAnnotationDefaultFontSize, currentFontSize()); !written)
         {
             Base::Logger::warning(std::format("默认字号没能保存：{}", written.error().message));
         }
@@ -931,7 +931,7 @@ namespace GyanisScribe::Annotation
         // 落盘失败只记日志——颜色本身已经生效了，不该因为存不上就回退
         m_recentColors = Pick::pushRecentColor(m_recentColors, picked);
         rebuildRecentColors();
-        if (auto written = m_settings.setValue(Settings::kAnnotationRecentColors, Pick::serializeRecentColors(m_recentColors)); !written)
+        if (auto written = m_settings.setValue(Core::kAnnotationRecentColors, Pick::serializeRecentColors(m_recentColors)); !written)
         {
             Base::Logger::warning(std::format("最近使用颜色没能保存：{}", written.error().message));
         }
@@ -1073,7 +1073,7 @@ namespace GyanisScribe::Annotation
         }
         m_palette = moved;
         repaintPaletteSwatches();
-        if (const auto written = m_settings.setValue(Settings::kAnnotationPalette, paletteToTokens(m_palette)); !written)
+        if (const auto written = m_settings.setValue(Core::kAnnotationPalette, paletteToTokens(m_palette)); !written)
         {
             // 屏上已经换了、盘上还是旧的：这句警告是唯一能看出「下次开又变回去」从哪来的线索
             Base::Logger::warning(std::format("色板顺序没能写进配置：{}", written.error().message));

@@ -13,10 +13,9 @@ set_target_properties(Gui PROPERTIES AUTORCC ON)
 
 target_include_directories(Gui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 # HotkeyEdit 要在校验组合键能否全局登记时才写配置，所以直接吃 Hotkey；
-# Hotkey 只依赖 Base/Platform/Settings，反向不指回 Gui，加这条不会成环
+# Hotkey 只依赖 Base/Platform/Core，反向不指回 Gui，加这条不会成环
 target_link_libraries(Gui PUBLIC
         Core
-        Settings
         Hotkey
         Qt6::Core
         Qt6::Gui

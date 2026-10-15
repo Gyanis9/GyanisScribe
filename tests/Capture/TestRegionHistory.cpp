@@ -3,8 +3,8 @@
 
 #include "Capture/RegionHistory.h"
 
-#include "Settings/SettingsKeys.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsStore.h"
 
 #include <gtest/gtest.h>
 
@@ -25,7 +25,7 @@ using GyanisScribe::Capture::regionHistoryToText;
 using GyanisScribe::Capture::regionsOnScreen;
 using GyanisScribe::Capture::rememberRegion;
 using GyanisScribe::Base::ErrorCode;
-using GyanisScribe::Settings::SettingsStore;
+using GyanisScribe::Core::SettingsStore;
 
 namespace
 {
@@ -143,8 +143,8 @@ TEST_F(RegionHistoryFixture, LoadPrefersHistoryAndFallsBackToLegacyKeys)
     SettingsStore settings(m_iniFile);
 
     // 只有升级前的单值键：当作一条历史，旧记录还复用得上
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureLastRegion, QVariant(QStringLiteral("5,6,7,8"))).has_value());
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureLastScreen, QVariant(QStringLiteral("Legacy-Screen"))).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureLastRegion, QVariant(QStringLiteral("5,6,7,8"))).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureLastScreen, QVariant(QStringLiteral("Legacy-Screen"))).has_value());
     {
         const auto loaded = loadRegionHistory(settings);
         ASSERT_TRUE(loaded.has_value()) << loaded.error().message;
@@ -154,7 +154,7 @@ TEST_F(RegionHistoryFixture, LoadPrefersHistoryAndFallsBackToLegacyKeys)
     }
 
     // 历史键在：不再看旧键
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureRegionHistory, QVariant(QStringLiteral("1,1,2,2,Fresh-Screen"))).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureRegionHistory, QVariant(QStringLiteral("1,1,2,2,Fresh-Screen"))).has_value());
     {
         const auto loaded = loadRegionHistory(settings);
         ASSERT_TRUE(loaded.has_value()) << loaded.error().message;
@@ -192,7 +192,7 @@ TEST_F(RegionHistoryFixture, RememberWritesHistoryAndTheLegacyHeadTogether)
 
     settings.sync();
     SettingsStore reopened(m_iniFile);
-    EXPECT_EQ(reopened.stringValue(GyanisScribe::Settings::kCaptureRegionHistory, QString()), QStringLiteral("5,6,7,8,S2;1,2,3,4,S1"));
-    EXPECT_EQ(reopened.stringValue(GyanisScribe::Settings::kCaptureLastRegion, QString()), QStringLiteral("5,6,7,8")) << "单值键该与历史首条同一条";
-    EXPECT_EQ(reopened.stringValue(GyanisScribe::Settings::kCaptureLastScreen, QString()), QStringLiteral("S2"));
+    EXPECT_EQ(reopened.stringValue(GyanisScribe::Core::kCaptureRegionHistory, QString()), QStringLiteral("5,6,7,8,S2;1,2,3,4,S1"));
+    EXPECT_EQ(reopened.stringValue(GyanisScribe::Core::kCaptureLastRegion, QString()), QStringLiteral("5,6,7,8")) << "单值键该与历史首条同一条";
+    EXPECT_EQ(reopened.stringValue(GyanisScribe::Core::kCaptureLastScreen, QString()), QStringLiteral("S2"));
 }

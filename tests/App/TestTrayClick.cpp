@@ -4,9 +4,9 @@
 
 #include "App/TrayController.h"
 #include "Platform/PlatformCapabilities.h"
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsStore.h"
 
 #include <gtest/gtest.h>
 
@@ -36,7 +36,7 @@ using GyanisScribe::App::trayClickRoleForReason;
 using GyanisScribe::App::trayClickRoleInfo;
 using GyanisScribe::App::trayClickRoles;
 using GyanisScribe::Platform::PlatformCapabilities;
-using GyanisScribe::Settings::SettingsStore;
+using GyanisScribe::Core::SettingsStore;
 
 namespace
 {
@@ -236,7 +236,7 @@ TEST(TrayClickResolve, TokensRoundTripWhileAnEmptyValueStaysSilent)
 
     for (const auto &one: cases)
     {
-        ASSERT_TRUE(settings->setValue(GyanisScribe::Settings::kTrayLeftClick, QString::fromUtf8(one.token)).has_value()) << one.token;
+        ASSERT_TRUE(settings->setValue(GyanisScribe::Core::kTrayLeftClick, QString::fromUtf8(one.token)).has_value()) << one.token;
         std::string complaint;
         const auto  decision = resolveTrayClick(*settings, TrayClickRole::Left, complaint);
         EXPECT_EQ(decision.outcome, one.outcome) << one.token;
@@ -245,7 +245,7 @@ TEST(TrayClickResolve, TokensRoundTripWhileAnEmptyValueStaysSilent)
     }
 
     // 清空这一格：按「没填」算，落回左键那一档的默认，且不当成填坏
-    ASSERT_TRUE(settings->setValue(GyanisScribe::Settings::kTrayLeftClick, QString{}).has_value());
+    ASSERT_TRUE(settings->setValue(GyanisScribe::Core::kTrayLeftClick, QString{}).has_value());
     std::string complaint;
     const auto  emptied = resolveTrayClick(*settings, TrayClickRole::Left, complaint);
     EXPECT_TRUE(complaint.empty()) << "清空按「没填」算，不该报填坏";
@@ -260,8 +260,8 @@ TEST(TrayClickResolve, TokensRoundTripWhileAnEmptyValueStaysSilent)
 TEST(TrayClickResolve, BadTokenFallsBackToThatRolesDefaultAndNamesIt)
 {
     const auto settings = makeStore("bad");
-    ASSERT_TRUE(settings->setValue(GyanisScribe::Settings::kTrayLeftClick, QStringLiteral("Screenshot")).has_value());
-    ASSERT_TRUE(settings->setValue(GyanisScribe::Settings::kTrayMiddleClick, QStringLiteral("  ")).has_value());
+    ASSERT_TRUE(settings->setValue(GyanisScribe::Core::kTrayLeftClick, QStringLiteral("Screenshot")).has_value());
+    ASSERT_TRUE(settings->setValue(GyanisScribe::Core::kTrayMiddleClick, QStringLiteral("  ")).has_value());
 
     std::string leftComplaint;
     const auto  left = resolveTrayClick(*settings, TrayClickRole::Left, leftComplaint);

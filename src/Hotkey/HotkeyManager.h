@@ -24,10 +24,10 @@ namespace GyanisScribe::Platform
     class IPlatformIntegration;
 } // namespace GyanisScribe::Platform
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
     class ISettingsStore;
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core
 
 namespace GyanisScribe::Hotkey
 {
@@ -50,7 +50,7 @@ namespace GyanisScribe::Hotkey
          * @param integration 平台集成，生命周期必须长于本管理器：后端由它创建
          * @param parent QObject 父对象，默认无
          */
-        HotkeyManager(Settings::ISettingsStore &settings, Platform::IPlatformIntegration &integration, QObject *parent = nullptr);
+        HotkeyManager(Core::ISettingsStore &settings, Platform::IPlatformIntegration &integration, QObject *parent = nullptr);
 
         /**
          * @brief 析构：注销全部热键并交出后端对象
@@ -103,7 +103,7 @@ namespace GyanisScribe::Hotkey
         /// 编号反查自定义绑定的序号（表内下标），不在这批里时返回空
         [[nodiscard]] std::optional<std::size_t> customIndexForIdentifier(int identifier) const;
 
-        Settings::ISettingsStore                 &m_settings;       ///< 组合文本与变更通知的来源
+        Core::ISettingsStore                 &m_settings;       ///< 组合文本与变更通知的来源
         Platform::IPlatformIntegration           &m_integration;    ///< 后端工厂
         std::unique_ptr<Platform::IHotkeyBackend> m_backend;        ///< 当前后端，第一次 reload() 时建立
         std::vector<CustomHotkeyBinding>          m_customBindings; ///< 这一批自定义绑定，顺序就是登记顺序（编号按下标算）

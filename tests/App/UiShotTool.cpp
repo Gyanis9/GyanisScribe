@@ -6,8 +6,8 @@
 
 #include "History/HistoryStore.h"
 #include "Platform/IPlatformIntegration.h"
-#include "Settings/SettingsKeys.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsStore.h"
 #include "Gui/Resources/IconProvider.h"
 #include "Gui/Theme/ThemeManager.h"
 
@@ -77,12 +77,12 @@ int main(int argc, char *argv[])
     std::filesystem::remove_all(dataDirectory, ignored);
     std::filesystem::create_directories(dataDirectory, ignored);
 
-    GyanisScribe::Settings::SettingsStore settings(dataDirectory / "settings.ini");
+    GyanisScribe::Core::SettingsStore settings(dataDirectory / "settings.ini");
     // 目录几格给一条中性占位，别把出图这台机器的真实路径（用户名、临时目录）印进文档图里
     const auto placeholdersSeeded =
-            settings.setValue(GyanisScribe::Settings::kPathScreenshot, QStringLiteral("C:/Users/Example/Pictures/GyanisScribe")) &&
-            settings.setValue(GyanisScribe::Settings::kPathRecording, QStringLiteral("C:/Users/Example/Videos/GyanisScribe")) &&
-            settings.setValue(GyanisScribe::Settings::kOcrTessDataDirectory, QStringLiteral("C:/Users/Example/AppData/Roaming/Gyanis/GyanisScribe/tessdata"));
+            settings.setValue(GyanisScribe::Core::kPathScreenshot, QStringLiteral("C:/Users/Example/Pictures/GyanisScribe")) &&
+            settings.setValue(GyanisScribe::Core::kPathRecording, QStringLiteral("C:/Users/Example/Videos/GyanisScribe")) &&
+            settings.setValue(GyanisScribe::Core::kOcrTessDataDirectory, QStringLiteral("C:/Users/Example/AppData/Roaming/Gyanis/GyanisScribe/tessdata"));
     if (!placeholdersSeeded)
     {
         std::fprintf(stderr, "failed to seed placeholder paths\n");

@@ -6,7 +6,6 @@ add_executable(TestGuiTheme
 target_link_libraries(TestGuiTheme PRIVATE
         Gui
         Core
-        Settings
         GTest::gtest
         GTest::gtest_main)
 

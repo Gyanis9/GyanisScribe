@@ -4,8 +4,8 @@
 #include "Hotkey/HotkeyCombination.h"
 #include "Platform/IHotkeyBackend.h"
 #include "Platform/IPlatformIntegration.h"
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
 
 #include <format>
 
@@ -32,11 +32,11 @@ namespace GyanisScribe::Hotkey
         constexpr std::string_view kDefaultQuickSave = "Ctrl+Alt+S";
     } // namespace
 
-    HotkeyManager::HotkeyManager(Settings::ISettingsStore &settings, Platform::IPlatformIntegration &integration, QObject *parent) :
+    HotkeyManager::HotkeyManager(Core::ISettingsStore &settings, Platform::IPlatformIntegration &integration, QObject *parent) :
         IHotkeyManager(parent), m_settings(settings), m_integration(integration)
     {
         // 订阅设置变更：改完快捷键立刻重登，不需要重启也不需要用户在设置页点「应用」
-        QObject::connect(&m_settings, &Settings::ISettingsStore::valueChanged, this,
+        QObject::connect(&m_settings, &Core::ISettingsStore::valueChanged, this,
                          [this](const QString &key)
                          {
                              for (const auto action: managedActions())
@@ -75,25 +75,25 @@ namespace GyanisScribe::Hotkey
         switch (action)
         {
             case HotkeyAction::Capture:
-                return Settings::kHotkeyCapture;
+                return Core::kHotkeyCapture;
             case HotkeyAction::Record:
-                return Settings::kHotkeyRecord;
+                return Core::kHotkeyRecord;
             case HotkeyAction::Ocr:
-                return Settings::kHotkeyOcr;
+                return Core::kHotkeyOcr;
             case HotkeyAction::Pick:
-                return Settings::kHotkeyPick;
+                return Core::kHotkeyPick;
             case HotkeyAction::CaptureLong:
-                return Settings::kHotkeyCaptureLong;
+                return Core::kHotkeyCaptureLong;
             case HotkeyAction::TogglePins:
-                return Settings::kHotkeyTogglePins;
+                return Core::kHotkeyTogglePins;
             case HotkeyAction::NextPinGroup:
-                return Settings::kHotkeyNextPinGroup;
+                return Core::kHotkeyNextPinGroup;
             case HotkeyAction::QuickSave:
-                return Settings::kHotkeyQuickSave;
+                return Core::kHotkeyQuickSave;
         }
         // 上面穷举过；走到这里说明新增了动作而这里没跟上，交回兜底键名并在日志里点名
         Base::Logger::error(std::format("动作枚举 {} 没有对应的设置键，请把 settingsKeyFor 补全", static_cast<int>(action)));
-        return Settings::kHotkeyCapture;
+        return Core::kHotkeyCapture;
     }
 
     std::string_view HotkeyManager::defaultCombinationTextFor(HotkeyAction action)
@@ -173,7 +173,7 @@ namespace GyanisScribe::Hotkey
         {
             const auto storedText = m_settings.stringValue(settingsKeyFor(action), QString::fromUtf8(defaultCombinationTextFor(action)));
 
-            const auto combination = HotkeyCombination::fromText(storedText.toStdString(), m_settings.boolValue(GyanisScribe::Settings::kAllowSimpleGlobalHotkeys, false));
+            const auto combination = HotkeyCombination::fromText(storedText.toStdString(), m_settings.boolValue(GyanisScribe::Core::kAllowSimpleGlobalHotkeys, false));
             if (!combination)
             {
                 // 设置里的值坏掉时按项记失败，不用默认组合顶上：顶上去用户按到的就不是他设的那个键
@@ -193,7 +193,7 @@ namespace GyanisScribe::Hotkey
         for (std::size_t slot = 0; slot < m_customBindings.size(); ++slot)
         {
             const auto &binding    = m_customBindings[slot];
-            const auto combination = HotkeyCombination::fromText(binding.combination.toStdString(), m_settings.boolValue(GyanisScribe::Settings::kAllowSimpleGlobalHotkeys, false));
+            const auto combination = HotkeyCombination::fromText(binding.combination.toStdString(), m_settings.boolValue(GyanisScribe::Core::kAllowSimpleGlobalHotkeys, false));
             if (!combination)
             {
                 report.customFailures.push_back(CustomHotkeyFailure{binding.token, binding.combination, combination.error()});
@@ -232,7 +232,7 @@ namespace GyanisScribe::Hotkey
     QString HotkeyManager::bindingText(HotkeyAction action) const
     {
         const auto storedText  = m_settings.stringValue(settingsKeyFor(action), QString::fromUtf8(defaultCombinationTextFor(action)));
-        const auto combination = HotkeyCombination::fromText(storedText.toStdString(), m_settings.boolValue(GyanisScribe::Settings::kAllowSimpleGlobalHotkeys, false));
+        const auto combination = HotkeyCombination::fromText(storedText.toStdString(), m_settings.boolValue(GyanisScribe::Core::kAllowSimpleGlobalHotkeys, false));
         if (!combination)
         {
             // 界面提示不能出现一个按不出来的组合：坏值就退回默认组合的文本，并把原因留在设置里

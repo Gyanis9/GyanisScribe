@@ -40,12 +40,11 @@ endif ()
 add_library(Ocr STATIC ${OcrSources})
 
 target_include_directories(Ocr PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
-# 结果窗口要图标与主题色，所以 Ocr 吃 Gui；Gui 只依赖 Core/Settings/Hotkey，不指回 Ocr
+# 结果窗口要图标与主题色，所以 Ocr 吃 Gui；Gui 只依赖 Core/Hotkey，不指回 Ocr
 # Concurrent 只被 RecognitionRunner 用（把一次识别丢进 Qt 的全局线程池），它是 Qt 自带模块，不引新第三方
 target_link_libraries(Ocr PUBLIC
         Core
         Platform
-        Settings
         Gui
         Qt6::Core
         Qt6::Gui

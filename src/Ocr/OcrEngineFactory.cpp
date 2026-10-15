@@ -11,8 +11,8 @@
 #endif
 #include "Ocr/UnavailableOcrEngine.h"
 #include "Platform/IPlatformIntegration.h"
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
 
 #include <filesystem>
 #include <format>
@@ -60,12 +60,12 @@ namespace GyanisScribe::Ocr
 #endif
     } // namespace
 
-    std::vector<std::filesystem::path> tessDataCandidateDirectories(const Settings::ISettingsStore &settings, const std::filesystem::path &applicationDirectory)
+    std::vector<std::filesystem::path> tessDataCandidateDirectories(const Core::ISettingsStore &settings, const std::filesystem::path &applicationDirectory)
     {
         std::vector<std::filesystem::path> candidates;
 
         // 界面与环境变量里的文本换成路径要走 wstring：窄串按本地码页解释，装不下就抛
-        const auto configuredText = settings.stringValue(Settings::kOcrTessDataDirectory, QString()).trimmed();
+        const auto configuredText = settings.stringValue(Core::kOcrTessDataDirectory, QString()).trimmed();
         if (!configuredText.isEmpty())
         {
             candidates.push_back(Base::Paths::fromDisplayText(configuredText));
@@ -106,12 +106,12 @@ namespace GyanisScribe::Ocr
         return {};
     }
 
-    std::filesystem::path locateTessDataDirectory(const Settings::ISettingsStore &settings)
+    std::filesystem::path locateTessDataDirectory(const Core::ISettingsStore &settings)
     {
         return firstDirectoryWithLanguagePacks(tessDataCandidateDirectories(settings, Base::Paths::applicationDirectory()));
     }
 
-    std::unique_ptr<IOcrEngine> createOcrEngine(const Settings::ISettingsStore &settings, const Platform::IPlatformIntegration &integration)
+    std::unique_ptr<IOcrEngine> createOcrEngine(const Core::ISettingsStore &settings, const Platform::IPlatformIntegration &integration)
     {
 #if defined(GYANISSCRIBE_HAS_WINRT_OCR)
         // 系统识别排第一：它不要求用户放语言包，语言包由 Windows 自己装；
@@ -130,7 +130,7 @@ namespace GyanisScribe::Ocr
         if (tessData.empty())
         {
             // 一处都没有语言包：这一格与「后端没编进来」要分开说，用户能自己做的只有重装或放文件
-            const auto reason = describeMissingLanguagePacks(Settings::kOcrTessDataDirectory, tessDataCandidateDirectories(settings, Base::Paths::applicationDirectory()));
+            const auto reason = describeMissingLanguagePacks(Core::kOcrTessDataDirectory, tessDataCandidateDirectories(settings, Base::Paths::applicationDirectory()));
             Base::Logger::warning(std::format("文字识别不可用（平台 {}）：{}", integration.displayName().toStdString(), reason.toStdString()));
             return std::make_unique<UnavailableOcrEngine>(reason);
         }

@@ -4,7 +4,6 @@ add_executable(TestHotkey
 
 target_link_libraries(TestHotkey PRIVATE
         Hotkey
-        Settings
         Platform
         GTest::gtest
         GTest::gtest_main)

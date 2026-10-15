@@ -22,10 +22,10 @@
 #include "Gui/Resources/IconProvider.h"
 #include "Gui/Controls/KeyStep.h"
 #include "Platform/IPlatformIntegration.h"
-#include "Settings/ISettingsStore.h"
-#include "Settings/NamingRules.h"
-#include "Settings/OutputStyleRules.h"
-#include "Settings/SettingsKeys.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/NamingRules.h"
+#include "Core/Settings/OutputStyleRules.h"
+#include "Core/Settings/SettingsKeys.h"
 
 #include <QAction>
 #include <QApplication>
@@ -207,9 +207,9 @@ namespace GyanisScribe::Pin
          * @param settings 配置来源
          * @return 可直接写文件的目录
          */
-        std::filesystem::path screenshotDirectory(const Settings::ISettingsStore &settings)
+        std::filesystem::path screenshotDirectory(const Core::ISettingsStore &settings)
         {
-            const auto configured = settings.stringValue(Settings::kPathScreenshot, QString());
+            const auto configured = settings.stringValue(Core::kPathScreenshot, QString());
             if (!configured.trimmed().isEmpty())
             {
                 return Base::Paths::fromDisplayText(configured);
@@ -225,16 +225,16 @@ namespace GyanisScribe::Pin
          *          PNG 是无损的，质量那一格对它不起作用，交给 Qt 自己忽略。
          *          交回的是档位而不是后缀：装饰那一步要知道这一档带不带透明通道（JPG 垫白）。
          */
-        [[nodiscard]] Base::Expected<std::pair<Core::ImageFormat, int>> imageSaveTarget(const Settings::ISettingsStore &settings)
+        [[nodiscard]] Base::Expected<std::pair<Core::ImageFormat, int>> imageSaveTarget(const Core::ISettingsStore &settings)
         {
-            const auto stored = settings.stringValue(Settings::kSaveImageFormat, QStringLiteral("Png"));
+            const auto stored = settings.stringValue(Core::kSaveImageFormat, QStringLiteral("Png"));
             const auto format = Core::parseImageFormat(stored);
             if (!format)
             {
                 return std::unexpected(format.error());
             }
 
-            const auto quality = settings.intValue(Settings::kSaveImageQuality, Core::kDefaultImageQuality);
+            const auto quality = settings.intValue(Core::kSaveImageQuality, Core::kDefaultImageQuality);
             if (const auto checked = Core::parseImageQuality(quality); !checked)
             {
                 return std::unexpected(checked.error());
@@ -250,7 +250,7 @@ namespace GyanisScribe::Pin
         }
     } // namespace
 
-    PinWindow::PinWindow(const QImage &image, Settings::ISettingsStore &settings, const Platform::IPlatformIntegration &integration, QWidget *parent) :
+    PinWindow::PinWindow(const QImage &image, Core::ISettingsStore &settings, const Platform::IPlatformIntegration &integration, QWidget *parent) :
         QWidget(parent), m_settings(settings), m_integration(integration)
     {
         // 无边框 + 置顶 + Tool：Tool 让它不进任务栏，贴图是浮在屏幕上的东西，不该占一个窗口条目
@@ -272,7 +272,7 @@ namespace GyanisScribe::Pin
 
         // 起点不透明度取自配置。恢复布局那一条之后还会再覆盖一次，
         // 所以每张旧贴图各自的透明度不受这一条影响
-        if (const auto parsed = parseOpacityPercentSetting(m_settings.intValue(Settings::kPinDefaultOpacity, kDefaultOpacityPercent)); parsed)
+        if (const auto parsed = parseOpacityPercentSetting(m_settings.intValue(Core::kPinDefaultOpacity, kDefaultOpacityPercent)); parsed)
         {
             m_opacity = *parsed;
         } else
@@ -604,11 +604,11 @@ namespace GyanisScribe::Pin
 
     QImage PinWindow::decorateForOutput(const QImage &image, const bool fillBackground) const
     {
-        const auto border = m_settings.boolValue(Settings::kOutputBorder, false);
-        const auto shadow = m_settings.boolValue(Settings::kOutputShadow, false);
+        const auto border = m_settings.boolValue(Core::kOutputBorder, false);
+        const auto shadow = m_settings.boolValue(Core::kOutputShadow, false);
         // 宽与色从同一处读出来的一份参数：贴图保存这一路与标注窗那一头必须拿到同一档，
         // 否则同一张图从两处出去会带出两种边框
-        return Core::decorateForOutput(image, border, shadow, fillBackground, Settings::readOutputDecorationStyle(m_settings));
+        return Core::decorateForOutput(image, border, shadow, fillBackground, Core::readOutputDecorationStyle(m_settings));
     }
 
     Base::Expected<std::filesystem::path> PinWindow::saveWithDefaultName()
@@ -623,7 +623,7 @@ namespace GyanisScribe::Pin
         const auto directory = screenshotDirectory(m_settings);
         // 起名按设置里那一格的模板（留空即默认档），撞名时让一次位；
         // 管理器成批写缓存那一路不走这里，那一路按设计就是要覆盖
-        const auto fileName = Base::Paths::imageFileName(QDateTime::currentDateTime(), Core::imageFormatExtension(target->first), Settings::nameTemplateOrDefault(m_settings));
+        const auto fileName = Base::Paths::imageFileName(QDateTime::currentDateTime(), Core::imageFormatExtension(target->first), Core::nameTemplateOrDefault(m_settings));
         const auto unique   = Base::Paths::toDisplayText(Base::Paths::uniqueFilePath(directory, fileName).filename());
         // 右键「保存」是给用户拿走的成品：按外观设置装好饰再写。缓存与布局那一路走 saveToFile（原图），
         // 那些文件是给程序自己读回来的，装过饰下次恢复出来的贴图就多一圈边
@@ -765,7 +765,7 @@ namespace GyanisScribe::Pin
 
     int PinWindow::edgeSnapDistance() const
     {
-        const auto stored = m_settings.intValue(GyanisScribe::Settings::kPinEdgeSnapDistance, kEdgeSnapTolerance);
+        const auto stored = m_settings.intValue(GyanisScribe::Core::kPinEdgeSnapDistance, kEdgeSnapTolerance);
         const auto parsed = parseEdgeSnapDistance(stored);
         // 区间判据与设置页共用那一个校验函数。这里不记日志：这条路每帧鼠标移动都要走一次，
         // 同一句话会被刷成一片，把真正有用的现场埋掉；设置页那一格读到时会说一次
@@ -776,7 +776,7 @@ namespace GyanisScribe::Pin
     {
         // 设置里「不许拖边改大小」这一档关掉的是这一处：手柄与边带的命中、悬停光标、按下分派都从这条走，
         // 只在按下那一头拦会让光标仍显示「能改大小」而点下去没反应
-        if (m_settings.boolValue(GyanisScribe::Settings::kPinDisableFrameResize, false))
+        if (m_settings.boolValue(GyanisScribe::Core::kPinDisableFrameResize, false))
         {
             return std::nullopt;
         }
@@ -893,7 +893,7 @@ namespace GyanisScribe::Pin
     void PinWindow::applyColorCardChange(const QColor &color)
     {
         // 条上写的写法跟着设置里那一档走：与读数条、「已复制」那几处同一把尺子，改完不会多出一种写法
-        const auto casing = Pick::hexCasingOf(m_settings.boolValue(GyanisScribe::Settings::kPickHexUppercase, true));
+        const auto casing = Pick::hexCasingOf(m_settings.boolValue(GyanisScribe::Core::kPickHexUppercase, true));
         setColorCard(color);
         replaceContent(Pin::renderColorCard(color, Pick::formatColor(color, Pick::ColorFormat::Hex, casing)));
     }
@@ -1394,14 +1394,14 @@ namespace GyanisScribe::Pin
         }
 
         std::string complaint;
-        const auto  format = Pick::colorFormatOrDefault(m_settings.stringValue(Settings::kPickFormat, QStringLiteral("Hex")).toStdString(), complaint);
+        const auto  format = Pick::colorFormatOrDefault(m_settings.stringValue(Core::kPickFormat, QStringLiteral("Hex")).toStdString(), complaint);
         if (!complaint.empty())
         {
             // 读数不因坏配置停摆：按 HEX 顶上，原因照旧只进日志（同一句在界面那次取色时会弹给用户）
             Base::Logger::warning(std::format("取色写法读不出：{}，贴图取色按 HEX 顶上", complaint));
         }
         // 读的是显示用的那一份：开了灰度/反色之后，用户看到的就是这个颜色。字母档现读配置，只管 HEX 那一形
-        const auto casing = Pick::hexCasingOf(m_settings.boolValue(Settings::kPickHexUppercase, true));
+        const auto casing = Pick::hexCasingOf(m_settings.boolValue(Core::kPickHexUppercase, true));
         return Pick::formatColor(displayImage().pixelColor(*pixel), format, casing);
     }
 

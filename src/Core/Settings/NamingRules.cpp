@@ -1,13 +1,13 @@
-#include "Settings/NamingRules.h"
+#include "Core/Settings/NamingRules.h"
 
 #include "Base/Logger.h"
 #include "Base/Paths.h"
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
 
 #include <format>
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
     QString nameTemplateOrDefault(const ISettingsStore &settings)
     {
@@ -26,4 +26,4 @@ namespace GyanisScribe::Settings
         Base::Logger::warning(std::format("设置里的文件名模板不可用：{}，本次按默认档命名", parsed.error().message));
         return Base::Paths::defaultNameTemplate();
     }
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core

@@ -3,8 +3,8 @@
 #include "App/TrayController.h"
 #include "Base/Text.h"
 #include "Platform/PlatformCapabilities.h"
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
 
 #include <QString>
 
@@ -77,8 +77,8 @@ namespace GyanisScribe::App
         // 默认那两下就是这一批要交付的形状：左键框选截图、中键收起 / 摆回全部贴图。
         // 这两下在本仓此前都不做事，所以默认值改在 README 里写明，要旧形状就在清单里显式选「什么都不做」
         constexpr std::array<TrayClickRoleInfo, 2> kRoleInfos = {
-                TrayClickRoleInfo{GyanisScribe::Settings::kTrayLeftClick, "左键单击", TrayClickRole::Left, trayActionToken(TrayAction::CaptureRegion)},
-                TrayClickRoleInfo{GyanisScribe::Settings::kTrayMiddleClick, "中键单击", TrayClickRole::Middle, trayActionToken(TrayAction::TogglePinsVisible)},
+                TrayClickRoleInfo{GyanisScribe::Core::kTrayLeftClick, "左键单击", TrayClickRole::Left, trayActionToken(TrayAction::CaptureRegion)},
+                TrayClickRoleInfo{GyanisScribe::Core::kTrayMiddleClick, "中键单击", TrayClickRole::Middle, trayActionToken(TrayAction::TogglePinsVisible)},
         };
 
         /**
@@ -144,7 +144,7 @@ namespace GyanisScribe::App
         return buildChoices(&capabilities);
     }
 
-    TrayClickDecision resolveTrayClick(const Settings::ISettingsStore &settings, const TrayClickRole role, std::string &complaint)
+    TrayClickDecision resolveTrayClick(const Core::ISettingsStore &settings, const TrayClickRole role, std::string &complaint)
     {
         complaint.clear();
 

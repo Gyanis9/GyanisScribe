@@ -23,10 +23,10 @@ namespace GyanisScribe::Base
     struct CapturedImage;
 } // namespace GyanisScribe::Base
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
     class ISettingsStore;
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core
 
 namespace GyanisScribe::Annotation
 {
@@ -80,7 +80,7 @@ namespace GyanisScribe::Annotation
      *          键位只有清册一处：按钮提示读的是同一处，用户在设置页换过一颗，两边一起跟上。
      *          宿主先按 shortcutActionFor() 分派，撞进既有组合键的那一次归组合键那一档。
      */
-    [[nodiscard]] std::optional<ToolKind> toolShortcutFor(int key, Qt::KeyboardModifiers modifiers, const Settings::ISettingsStore &settings);
+    [[nodiscard]] std::optional<ToolKind> toolShortcutFor(int key, Qt::KeyboardModifiers modifiers, const Core::ISettingsStore &settings);
 
     /**
      * @brief 标注窗口
@@ -100,7 +100,7 @@ namespace GyanisScribe::Annotation
          * @param toolbar 工具栏，所有权交给本窗口（它是本窗口的浮层子窗）
          * @param parent Qt 父对象
          */
-        AnnotationWindow(IAnnotationEngine &engine, Settings::ISettingsStore &settings, std::unique_ptr<AnnotationToolbar> toolbar, QWidget *parent = nullptr);
+        AnnotationWindow(IAnnotationEngine &engine, Core::ISettingsStore &settings, std::unique_ptr<AnnotationToolbar> toolbar, QWidget *parent = nullptr);
 
         AnnotationWindow(const AnnotationWindow &)            = delete;
         AnnotationWindow &operator=(const AnnotationWindow &) = delete;
@@ -181,7 +181,7 @@ namespace GyanisScribe::Annotation
         void placeToolbarForSelection();
 
         IAnnotationEngine                       &m_engine;                ///< 标注引擎，不拥有
-        Settings::ISettingsStore                &m_settings;              ///< 字母键位的读端（Gui/Controls/AppShortcuts.h 那份清册），不拥有
+        Core::ISettingsStore                &m_settings;              ///< 字母键位的读端（Gui/Controls/AppShortcuts.h 那份清册），不拥有
         std::unique_ptr<AnnotationToolbar>       m_toolbar;               ///< 浮层工具栏，本窗口拥有
         std::unique_ptr<AnnotationToolbarBridge> m_toolbarBridge;         ///< 工具栏与引擎的接线：样式、工具、撤销重做都在桥里
         AnnotationView                          *m_view = nullptr;        ///< 画布视图，父对象是本窗口

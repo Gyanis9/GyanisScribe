@@ -19,10 +19,10 @@
 #include <string_view>
 #include <vector>
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
     class ISettingsStore;
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core
 
 namespace GyanisScribe::App
 {
@@ -70,6 +70,6 @@ namespace GyanisScribe::App
      * @param settings 配置存储
      * @return 组合非空的那些；顺序就是 bindableActions() 的顺序（编号按下标算，两边必须同序）
      */
-    [[nodiscard]] std::vector<Hotkey::CustomHotkeyBinding> collectCustomBindings(const Settings::ISettingsStore &settings);
+    [[nodiscard]] std::vector<Hotkey::CustomHotkeyBinding> collectCustomBindings(const Core::ISettingsStore &settings);
 
 } // namespace GyanisScribe::App

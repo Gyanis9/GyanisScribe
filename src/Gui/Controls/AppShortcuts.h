@@ -16,10 +16,10 @@
 #include <span>
 #include <string_view>
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
     class ISettingsStore;
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core
 
 namespace GyanisScribe::Gui
 {
@@ -67,7 +67,7 @@ namespace GyanisScribe::Gui
      * @warning 填歪的那一串不拦调用方：读不出的原因进日志，界面那一格仍显示原文，
      *            用户看得见自己敲了什么。分派按默认键走，不按半截文本猜一个近似的键。
      */
-    [[nodiscard]] Hotkey::HotkeyCombination appShortcutValue(const Settings::ISettingsStore &settings, const AppShortcutEntry &entry);
+    [[nodiscard]] Hotkey::HotkeyCombination appShortcutValue(const Core::ISettingsStore &settings, const AppShortcutEntry &entry);
 
     /**
      * @brief 界面上该提示的那颗键
@@ -75,7 +75,7 @@ namespace GyanisScribe::Gui
      * @param entry 清册里的哪一档
      * @return 现成的按键文本（如「R」），与 appShortcutValue() 同解
      */
-    [[nodiscard]] QString appShortcutText(const Settings::ISettingsStore &settings, const AppShortcutEntry &entry);
+    [[nodiscard]] QString appShortcutText(const Core::ISettingsStore &settings, const AppShortcutEntry &entry);
 
     /**
      * @brief 标识所属那一段界面在设置页上的名字
@@ -96,7 +96,7 @@ namespace GyanisScribe::Gui
      * @details 整颗组合相等才算命中，所以 Ctrl+Z 这类组合不会顺手被当成裸键那一档；
      *          反向档是把 Shift 位摘掉再比一次，用户把正向档换成带 Ctrl 的组合时反向档跟着换。
      */
-    [[nodiscard]] bool isAppShortcutHit(const Settings::ISettingsStore &settings, const AppShortcutEntry &entry, int key, Qt::KeyboardModifiers modifiers,
+    [[nodiscard]] bool isAppShortcutHit(const Core::ISettingsStore &settings, const AppShortcutEntry &entry, int key, Qt::KeyboardModifiers modifiers,
                                         bool allowShiftVariant = false);
 
 } // namespace GyanisScribe::Gui

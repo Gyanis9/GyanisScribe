@@ -1,8 +1,8 @@
 #include "Gui/Theme/ThemeManager.h"
 
 #include "Base/Logger.h"
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
 #include "Gui/Resources/AppResources.h"
 
 #include <QApplication>
@@ -24,7 +24,7 @@ namespace
      */
     QString themeModeKey()
     {
-        return QString::fromUtf8(GyanisScribe::Settings::kThemeMode.data(), static_cast<qsizetype>(GyanisScribe::Settings::kThemeMode.size()));
+        return QString::fromUtf8(GyanisScribe::Core::kThemeMode.data(), static_cast<qsizetype>(GyanisScribe::Core::kThemeMode.size()));
     }
 
     /**
@@ -49,7 +49,7 @@ namespace
 
 namespace GyanisScribe::Gui
 {
-    ThemeManager::ThemeManager(Settings::ISettingsStore &settings, QObject *parent) :
+    ThemeManager::ThemeManager(Core::ISettingsStore &settings, QObject *parent) :
         QObject(parent), m_settings(settings)
         // 档位默认跟随系统：需求第五节的缺省档，用户没进过设置页时界面不该硬选一套色
         ,
@@ -60,7 +60,7 @@ namespace GyanisScribe::Gui
         m_resolved(ThemeKind::System)
     {
         // 设置页改档位走配置通知，主题层不认识对话框，也不需要对话框反过来认识它
-        QObject::connect(&m_settings, &Settings::ISettingsStore::valueChanged, this,
+        QObject::connect(&m_settings, &Core::ISettingsStore::valueChanged, this,
                          [this](const QString &key)
                          {
                              if (key == themeModeKey())
@@ -78,7 +78,7 @@ namespace GyanisScribe::Gui
 
     void ThemeManager::applyFromSettings()
     {
-        const auto stored = m_settings.stringValue(Settings::kThemeMode, QStringLiteral("System")).toStdString();
+        const auto stored = m_settings.stringValue(Core::kThemeMode, QStringLiteral("System")).toStdString();
         if (const auto parsed = parseThemeKind(stored); parsed)
         {
             m_requested = *parsed;
@@ -86,7 +86,7 @@ namespace GyanisScribe::Gui
         {
             // 坏值多半来自手改配置文件：先报清是哪个键、只能取哪三个值，再按 System 走，
             // 界面不能因为一个错拼的取值停在「没主题」
-            GyanisScribe::Base::Logger::warning(std::format("配置项 {} 的主题取值不合法，本项按 System 处理。{}", std::string{Settings::kThemeMode}, parsed.error().message));
+            GyanisScribe::Base::Logger::warning(std::format("配置项 {} 的主题取值不合法，本项按 System 处理。{}", std::string{Core::kThemeMode}, parsed.error().message));
             m_requested = ThemeKind::System;
         }
         refresh();
@@ -95,7 +95,7 @@ namespace GyanisScribe::Gui
     Base::Expected<void> ThemeManager::setTheme(const ThemeKind themeKind)
     {
         // 先写配置再改内存：写不进去时状态得留在原样，否则界面与配置文件从此不一致
-        if (auto written = m_settings.setValue(Settings::kThemeMode, QString::fromUtf8(std::string{themeKindText(themeKind)})); !written)
+        if (auto written = m_settings.setValue(Core::kThemeMode, QString::fromUtf8(std::string{themeKindText(themeKind)})); !written)
         {
             return written;
         }

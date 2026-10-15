@@ -2,8 +2,8 @@
 #include "History/HistoryStore.h"
 #include "History/HistoryTypes.h"
 
-#include "Settings/SettingsKeys.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsStore.h"
 
 #include <gtest/gtest.h>
 
@@ -33,7 +33,7 @@ using GyanisScribe::History::parseHistoryKind;
 using GyanisScribe::History::policyFromSettings;
 using GyanisScribe::History::pruneForPolicy;
 using GyanisScribe::History::sortNewestFirst;
-using GyanisScribe::Settings::SettingsStore;
+using GyanisScribe::Core::SettingsStore;
 
 namespace
 {
@@ -178,8 +178,8 @@ TEST_F(HistoryFixture, PolicyReadingDefaultsAndNegativeFallsBackToUnlimited)
     EXPECT_EQ(policyFromSettings(store).maximumEntries, kDefaultMaximumEntries);
     EXPECT_EQ(policyFromSettings(store).retentionDays, kDefaultRetentionDays);
 
-    ASSERT_TRUE(static_cast<bool>(store.setValue(GyanisScribe::Settings::kHistoryMaximumEntries, QVariant{3})));
-    ASSERT_TRUE(static_cast<bool>(store.setValue(GyanisScribe::Settings::kHistoryRetentionDays, QVariant{-7})));
+    ASSERT_TRUE(static_cast<bool>(store.setValue(GyanisScribe::Core::kHistoryMaximumEntries, QVariant{3})));
+    ASSERT_TRUE(static_cast<bool>(store.setValue(GyanisScribe::Core::kHistoryRetentionDays, QVariant{-7})));
     store.sync();
 
     const auto policy = policyFromSettings(store);

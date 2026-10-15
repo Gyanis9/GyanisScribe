@@ -1,6 +1,6 @@
 #include "Gui/Controls/Toast.h"
 
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/SettingsStore.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Resources/IconProvider.h"
 #include "Gui/Theme/ThemeManager.h"
@@ -19,7 +19,7 @@
 #include <memory>
 #include <string>
 
-using GyanisScribe::Settings::SettingsStore;
+using GyanisScribe::Core::SettingsStore;
 using GyanisScribe::Gui::kDarkPalette;
 using GyanisScribe::Gui::kLightPalette;
 using GyanisScribe::Gui::paletteFor;

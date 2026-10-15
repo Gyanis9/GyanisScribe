@@ -16,10 +16,10 @@
 
 #include <vector>
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
     class ISettingsStore;
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core
 
 namespace GyanisScribe::Capture
 {
@@ -78,7 +78,7 @@ namespace GyanisScribe::Capture
      * @details 历史键为空时回退读升级前的两把单值键（读到就当作一条）：旧配置里那份「上次选区」
      *          还复用得上，第一次成功截图后会连历史一起补齐。
      */
-    [[nodiscard]] Base::Expected<std::vector<RegionHistoryEntry>> loadRegionHistory(Settings::ISettingsStore &settings);
+    [[nodiscard]] Base::Expected<std::vector<RegionHistoryEntry>> loadRegionHistory(Core::ISettingsStore &settings);
 
     /**
      * @brief 记一次选区：压进历史并写回配置
@@ -87,6 +87,6 @@ namespace GyanisScribe::Capture
      * @details 历史与两把单值键在同一个写点一起写（单值键 = 历史首条），升级前后的读法指向同一条；
      *          写不下去只记日志——截图本身已经成功，不该为记账把它变成失败。
      */
-    void rememberRegion(Settings::ISettingsStore &settings, const RegionHistoryEntry &entry);
+    void rememberRegion(Core::ISettingsStore &settings, const RegionHistoryEntry &entry);
 
 } // namespace GyanisScribe::Capture

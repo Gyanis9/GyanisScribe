@@ -2,7 +2,7 @@
 #include "History/HistoryView.h"
 
 #include "History/HistoryStore.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/SettingsStore.h"
 #include "Gui/Resources/IconProvider.h"
 
 #include <gtest/gtest.h>
@@ -32,7 +32,7 @@ using GyanisScribe::History::kindFilterAt;
 using GyanisScribe::History::kThumbnailCornerRadius;
 using GyanisScribe::History::kThumbnailEdge;
 using GyanisScribe::History::makeThumbnail;
-using GyanisScribe::Settings::SettingsStore;
+using GyanisScribe::Core::SettingsStore;
 using GyanisScribe::Gui::IconProvider;
 
 namespace

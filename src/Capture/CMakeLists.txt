@@ -28,7 +28,6 @@ target_link_libraries(Capture PUBLIC
         Core
         Pick
         Platform
-        Settings
         Gui
         Qt6::Core
         Qt6::Gui

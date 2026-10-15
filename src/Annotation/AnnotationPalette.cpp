@@ -1,8 +1,8 @@
 #include "Annotation/AnnotationPalette.h"
 
 #include "Pick/RecentColors.h"
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
 #include "Gui/Theme/DesignTokens.h"
 
 #include "Base/Text.h"
@@ -18,9 +18,9 @@ namespace GyanisScribe::Annotation
         return std::vector<QColor>(table.begin(), table.end());
     }
 
-    Base::Expected<std::vector<QColor>> annotationPalette(const Settings::ISettingsStore &settings)
+    Base::Expected<std::vector<QColor>> annotationPalette(const Core::ISettingsStore &settings)
     {
-        const auto stored = settings.stringListValue(Settings::kAnnotationPalette, {});
+        const auto stored = settings.stringListValue(Core::kAnnotationPalette, {});
         if (stored.isEmpty())
         {
             // 「没填」与「填了八个」之间还有「填成空白」：清掉那一格就是回到内置那八格，不是留一张空表

@@ -28,10 +28,10 @@ namespace GyanisScribe::Capture
     class LongCaptureHud;
 } // namespace GyanisScribe::Capture
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
     class ISettingsStore;
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core
 
 namespace GyanisScribe::Platform
 {
@@ -60,7 +60,7 @@ namespace GyanisScribe::Capture
          * @param integration 平台集成，只用来问「屏上有哪些窗口」，生命周期必须长于本服务
          * @param parent QObject 父对象，默认无
          */
-        CaptureService(const IScreenCaptureSource &source, Settings::ISettingsStore &settings, const Platform::IPlatformIntegration &integration, QObject *parent = nullptr);
+        CaptureService(const IScreenCaptureSource &source, Core::ISettingsStore &settings, const Platform::IPlatformIntegration &integration, QObject *parent = nullptr);
 
         /**
          * @brief 析构服务，顺带收掉还开着的遮罩
@@ -240,7 +240,7 @@ namespace GyanisScribe::Capture
         void placeLongHud();
 
         const IScreenCaptureSource           &m_source;                         ///< 抓帧来源
-        Settings::ISettingsStore             &m_settings;                       ///< 「上次区域」的读写处
+        Core::ISettingsStore             &m_settings;                       ///< 「上次区域」的读写处
         const Platform::IPlatformIntegration &m_integration;                    ///< 窗口候选与界面元素的来源，不拥有
         std::vector<QPointer<CaptureOverlay>> m_overlays;                       ///< 在屏的遮罩，每块屏一张；窗口自己析构后要认得空指针
         QTimer                                m_longTimer;                      ///< 滚动拼接的取帧节拍，只在有选区之后跑

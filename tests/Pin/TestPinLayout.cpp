@@ -2,9 +2,9 @@
 
 #include "Pin/PinTransform.h"
 
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsStore.h"
 
 #include <QColor>
 #include <QCoreApplication>
@@ -24,7 +24,7 @@
 
 using namespace GyanisScribe::Pin;
 using GyanisScribe::Base::ErrorCode;
-using GyanisScribe::Settings::SettingsStore;
+using GyanisScribe::Core::SettingsStore;
 
 namespace
 {
@@ -267,7 +267,7 @@ TEST_F(PinLayoutFixture, SaveAndLoadThroughSettingsStore)
     EXPECT_NEAR(loaded->front().opacity, 0.6, 1e-6);
     EXPECT_EQ(loaded->front().imageFile, states.front().imageFile) << "布局过了配置一道，路径就不一样了";
 
-    EXPECT_TRUE(reopened.allKeys().contains(QString::fromUtf8(GyanisScribe::Settings::kPinLayout.data()))) << "布局键名与 SettingsKeys 里的常量不同解";
+    EXPECT_TRUE(reopened.allKeys().contains(QString::fromUtf8(GyanisScribe::Core::kPinLayout.data()))) << "布局键名与 SettingsKeys 里的常量不同解";
 }
 
 /**

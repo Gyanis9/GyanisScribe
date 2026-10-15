@@ -2,8 +2,8 @@
 
 #include "Base/Text.h"
 #include "Pin/PinTransform.h"
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -200,14 +200,14 @@ namespace GyanisScribe::Pin
         return states;
     }
 
-    Base::Expected<void> saveLayout(Settings::ISettingsStore &settings, const QVector<PinState> &states)
+    Base::Expected<void> saveLayout(Core::ISettingsStore &settings, const QVector<PinState> &states)
     {
-        return settings.setValue(Settings::kPinLayout, QVariant(serializeLayout(states)));
+        return settings.setValue(Core::kPinLayout, QVariant(serializeLayout(states)));
     }
 
-    Base::Expected<QVector<PinState>> loadLayout(const Settings::ISettingsStore &settings)
+    Base::Expected<QVector<PinState>> loadLayout(const Core::ISettingsStore &settings)
     {
-        const auto stored = settings.stringValue(Settings::kPinLayout, QString());
+        const auto stored = settings.stringValue(Core::kPinLayout, QString());
         return parseLayout(stored.toStdString());
     }
 
@@ -270,14 +270,14 @@ namespace GyanisScribe::Pin
         return names;
     }
 
-    Base::Expected<void> saveGroupNames(Settings::ISettingsStore &settings, const QMap<int, QString> &names)
+    Base::Expected<void> saveGroupNames(Core::ISettingsStore &settings, const QMap<int, QString> &names)
     {
-        return settings.setValue(Settings::kPinGroupNames, QVariant(serializeGroupNames(names)));
+        return settings.setValue(Core::kPinGroupNames, QVariant(serializeGroupNames(names)));
     }
 
-    Base::Expected<QMap<int, QString>> loadGroupNames(const Settings::ISettingsStore &settings)
+    Base::Expected<QMap<int, QString>> loadGroupNames(const Core::ISettingsStore &settings)
     {
-        const auto stored = settings.stringValue(Settings::kPinGroupNames, QString());
+        const auto stored = settings.stringValue(Core::kPinGroupNames, QString());
         return parseGroupNames(stored.toStdString());
     }
 

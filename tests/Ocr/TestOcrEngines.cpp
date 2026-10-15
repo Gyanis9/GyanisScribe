@@ -12,8 +12,8 @@
 #endif
 #include "Base/Text.h"
 #include "Platform/IPlatformIntegration.h"
-#include "Settings/SettingsKeys.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsStore.h"
 
 #include <QCoreApplication>
 #include <QFont>
@@ -37,7 +37,7 @@
 using namespace GyanisScribe::Ocr;
 using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Platform::createPlatformIntegration;
-using GyanisScribe::Settings::SettingsStore;
+using GyanisScribe::Core::SettingsStore;
 
 namespace
 {
@@ -243,13 +243,13 @@ TEST_F(OcrFixture, LocatesTessDataBySettingThenReturnsEmptyWhenMissing)
     EXPECT_TRUE(locateTessDataDirectory(settings).empty()) << "什么都没放时该交回空路径，让调用方给补法";
 
     const auto directory = makeModelDirectoryWith("eng.traineddata");
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kOcrTessDataDirectory, QVariant(QString::fromLocal8Bit(directory.string().c_str()))).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kOcrTessDataDirectory, QVariant(QString::fromLocal8Bit(directory.string().c_str()))).has_value());
     EXPECT_EQ(locateTessDataDirectory(settings), directory) << "设置里指了有模型文件的目录却找不到";
 
     // 空目录（只有子目录、没有 traineddata）不算
     const auto emptyDirectory = m_root / "empty-tessdata";
     std::filesystem::create_directories(emptyDirectory);
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kOcrTessDataDirectory, QVariant(QString::fromLocal8Bit(emptyDirectory.string().c_str()))).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kOcrTessDataDirectory, QVariant(QString::fromLocal8Bit(emptyDirectory.string().c_str()))).has_value());
     EXPECT_TRUE(locateTessDataDirectory(settings).empty()) << "空目录被当成了有语言包，初始化时才在下一层报错";
 }
 
@@ -303,7 +303,7 @@ TEST_F(OcrFixture, ReportsMissingBackendSeparatelyFromMissingLanguagePacks)
 
     const auto    directory = makeModelDirectoryWith("eng.traineddata");
     SettingsStore settings(m_iniFile);
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kOcrTessDataDirectory, QVariant(QString::fromLocal8Bit(directory.string().c_str()))).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kOcrTessDataDirectory, QVariant(QString::fromLocal8Bit(directory.string().c_str()))).has_value());
 
     const auto engine = createOcrEngine(settings, *integration);
     ASSERT_FALSE(engine->isAvailable());
@@ -322,7 +322,7 @@ TEST_F(OcrFixture, PrefersTesseractWhenLanguagePacksArePresent)
 {
     const auto    directory = makeModelDirectoryWith("eng.traineddata");
     SettingsStore settings(m_iniFile);
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kOcrTessDataDirectory, QVariant(QString::fromLocal8Bit(directory.string().c_str()))).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kOcrTessDataDirectory, QVariant(QString::fromLocal8Bit(directory.string().c_str()))).has_value());
 
     // 系统识别在场时工厂不会把 Tesseract 交出来（那条顺序归上面那条用例钉），所以这里按能力取
     // 要验的那份后端：两种形状断的是同一件事——语言包在位时这条路是通的

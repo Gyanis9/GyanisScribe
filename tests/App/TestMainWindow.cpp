@@ -18,10 +18,10 @@
 #include "Base/Logger.h"
 #include "Core/Image/OutputDecoration.h"
 #include "Base/Text.h"
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
 #include "Hotkey/HotkeyCombination.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/SettingsStore.h"
 #include "Gui/Controls/AppShortcuts.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Controls/HotkeyEdit.h"
@@ -73,7 +73,7 @@ namespace
     using GyanisScribe::App::MainWindowPage;
     using GyanisScribe::App::pageChoices;
     using GyanisScribe::History::HistoryStore;
-    using GyanisScribe::Settings::SettingsStore;
+    using GyanisScribe::Core::SettingsStore;
     using GyanisScribe::Gui::AppLanguage;
     using GyanisScribe::Gui::IconProvider;
     using GyanisScribe::Gui::ThemeManager;
@@ -352,7 +352,7 @@ namespace
         closeWindowAndFlush();
 
         const auto reopened = makeStore();
-        const auto stored   = reopened->intValue(GyanisScribe::Settings::kPinDefaultOpacity, -1);
+        const auto stored   = reopened->intValue(GyanisScribe::Core::kPinDefaultOpacity, -1);
         EXPECT_EQ(stored, 40);
         const auto parsed = GyanisScribe::Pin::parseOpacityPercentSetting(stored);
         ASSERT_TRUE(static_cast<bool>(parsed));
@@ -384,8 +384,8 @@ namespace
         closeWindowAndFlush();
 
         const auto reopened = makeStore();
-        EXPECT_EQ(reopened->intValue(GyanisScribe::Settings::kOutputBorderWidth, -1), 6) << "边框宽写到了别的键上";
-        EXPECT_EQ(reopened->intValue(GyanisScribe::Settings::kOutputShadowWidth, -1), 40) << "投影宽写到了别的键上";
+        EXPECT_EQ(reopened->intValue(GyanisScribe::Core::kOutputBorderWidth, -1), 6) << "边框宽写到了别的键上";
+        EXPECT_EQ(reopened->intValue(GyanisScribe::Core::kOutputShadowWidth, -1), 40) << "投影宽写到了别的键上";
     }
 
     /**
@@ -411,7 +411,7 @@ namespace
 
         closeWindowAndFlush();
         const auto reopened = makeStore();
-        EXPECT_EQ(reopened->stringValue(GyanisScribe::Settings::kOutputBorderColor, QString{}), QStringLiteral("#334455")) << "坏值把上一条好值顶掉了";
+        EXPECT_EQ(reopened->stringValue(GyanisScribe::Core::kOutputBorderColor, QString{}), QStringLiteral("#334455")) << "坏值把上一条好值顶掉了";
     }
 
     /**
@@ -433,7 +433,7 @@ namespace
         closeWindowAndFlush();
 
         const auto reopened = makeStore();
-        const auto stored   = reopened->intValue(GyanisScribe::Settings::kCaptureCornerRadius, -1);
+        const auto stored   = reopened->intValue(GyanisScribe::Core::kCaptureCornerRadius, -1);
         EXPECT_EQ(stored, 25) << "这一行没把值写进 Capture/CornerRadius";
         const auto parsed = GyanisScribe::Capture::parseCaptureCornerRadius(stored);
         ASSERT_TRUE(static_cast<bool>(parsed)) << parsed.error().message;
@@ -457,7 +457,7 @@ namespace
         closeWindowAndFlush();
 
         const auto reopened = makeStore();
-        const auto stored   = reopened->intValue(GyanisScribe::Settings::kRecordDefaultFrameRate, -1);
+        const auto stored   = reopened->intValue(GyanisScribe::Core::kRecordDefaultFrameRate, -1);
         EXPECT_EQ(stored, 30);
         const auto parsed = GyanisScribe::Record::parseFrameRateSetting(stored);
         ASSERT_TRUE(static_cast<bool>(parsed));
@@ -488,7 +488,7 @@ namespace
         closeWindowAndFlush();
 
         const auto reopened = makeStore();
-        const auto stored   = reopened->intValue(GyanisScribe::Settings::kRecordVideoBitrate, -1);
+        const auto stored   = reopened->intValue(GyanisScribe::Core::kRecordVideoBitrate, -1);
         EXPECT_EQ(stored, 4000);
         const auto parsed = GyanisScribe::Record::parseVideoBitrateSetting(stored);
         ASSERT_TRUE(static_cast<bool>(parsed));
@@ -513,7 +513,7 @@ namespace
         closeWindowAndFlush();
 
         const auto reopened = makeStore();
-        EXPECT_TRUE(reopened->boolValue(GyanisScribe::Settings::kRecordCursorHighlight, false));
+        EXPECT_TRUE(reopened->boolValue(GyanisScribe::Core::kRecordCursorHighlight, false));
     }
 
     /**
@@ -535,7 +535,7 @@ namespace
         closeWindowAndFlush();
 
         const auto reopened = makeStore();
-        EXPECT_EQ(reopened->intValue(GyanisScribe::Settings::kRecordMaximumDuration, -1), 1800) << "没写进 Record/MaximumDurationSeconds";
+        EXPECT_EQ(reopened->intValue(GyanisScribe::Core::kRecordMaximumDuration, -1), 1800) << "没写进 Record/MaximumDurationSeconds";
     }
     /**
      * @brief 钉住「整屏截图：<屏名>」那一组只在多屏时出现，且每块屏一条
@@ -578,7 +578,7 @@ namespace
         format->setCurrentIndex(gifIndex);
         EXPECT_EQ(rate->maximum(), GyanisScribe::Record::kMaximumGifFrameRate) << "选了 GIF 帧率那格的天花板没跟着收";
         EXPECT_EQ(rate->value(), GyanisScribe::Record::kMaximumGifFrameRate) << "高过上限的显示值该夹到上限";
-        EXPECT_EQ(makeStore()->intValue(GyanisScribe::Settings::kRecordDefaultFrameRate, 0), GyanisScribe::Record::kMaximumFrameRate)
+        EXPECT_EQ(makeStore()->intValue(GyanisScribe::Core::kRecordDefaultFrameRate, 0), GyanisScribe::Record::kMaximumFrameRate)
                 << "夹取只影响显示：把 60 写回配置，切回 MP4 时用户就丢了原来那一档";
 
         // 切回 MP4：天花板放开，用户原来那一档回来
@@ -605,7 +605,7 @@ namespace
         closeWindowAndFlush();
 
         const auto reopened = makeStore();
-        EXPECT_EQ(reopened->intValue(GyanisScribe::Settings::kRecordCountdownSeconds, -1), 1) << "倒计时没写进 Record/CountdownSeconds";
+        EXPECT_EQ(reopened->intValue(GyanisScribe::Core::kRecordCountdownSeconds, -1), 1) << "倒计时没写进 Record/CountdownSeconds";
     }
 
     /**
@@ -618,8 +618,8 @@ namespace
         makeWindow();
         m_window->open(MainWindowPage::Capture);
 
-        const auto rows = std::array{std::pair{"自动保存所有截图", GyanisScribe::Settings::kCaptureAutoSave}, std::pair{"截图音效", GyanisScribe::Settings::kCaptureSound},
-                                     std::pair{"成品加边框", GyanisScribe::Settings::kOutputBorder}, std::pair{"成品加投影", GyanisScribe::Settings::kOutputShadow}};
+        const auto rows = std::array{std::pair{"自动保存所有截图", GyanisScribe::Core::kCaptureAutoSave}, std::pair{"截图音效", GyanisScribe::Core::kCaptureSound},
+                                     std::pair{"成品加边框", GyanisScribe::Core::kOutputBorder}, std::pair{"成品加投影", GyanisScribe::Core::kOutputShadow}};
         for (const auto &[name, key]: rows)
         {
             auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage(name));
@@ -653,7 +653,7 @@ namespace
         closeWindowAndFlush();
 
         const auto reopened = makeStore();
-        EXPECT_TRUE(reopened->boolValue(GyanisScribe::Settings::kHistoryKeepUnsaved, false)) << "开关没写进 History/KeepUnsaved";
+        EXPECT_TRUE(reopened->boolValue(GyanisScribe::Core::kHistoryKeepUnsaved, false)) << "开关没写进 History/KeepUnsaved";
     }
 
     /**
@@ -674,7 +674,7 @@ namespace
         closeWindowAndFlush();
 
         const auto reopened = makeStore();
-        EXPECT_FALSE(reopened->boolValue(GyanisScribe::Settings::kPickHexUppercase, true)) << "开关没写进 Pick/HexUppercase";
+        EXPECT_FALSE(reopened->boolValue(GyanisScribe::Core::kPickHexUppercase, true)) << "开关没写进 Pick/HexUppercase";
     }
 
     /**
@@ -697,7 +697,7 @@ namespace
         closeWindowAndFlush();
 
         const auto reopened = makeStore();
-        EXPECT_EQ(reopened->stringValue(GyanisScribe::Settings::kCaptureMagnifierView, QStringLiteral("?")), QStringLiteral("off")) << "存的必须是标记，不是界面上那三个字";
+        EXPECT_EQ(reopened->stringValue(GyanisScribe::Core::kCaptureMagnifierView, QStringLiteral("?")), QStringLiteral("off")) << "存的必须是标记，不是界面上那三个字";
     }
 
     /**
@@ -719,7 +719,7 @@ namespace
         closeWindowAndFlush();
 
         const auto reopened = makeStore();
-        EXPECT_EQ(reopened->stringValue(GyanisScribe::Settings::kCaptureSizeUnit, QStringLiteral("?")), QStringLiteral("px")) << "存的必须是标记，不是界面上那几个字";
+        EXPECT_EQ(reopened->stringValue(GyanisScribe::Core::kCaptureSizeUnit, QStringLiteral("?")), QStringLiteral("px")) << "存的必须是标记，不是界面上那几个字";
     }
 
     /**
@@ -747,8 +747,8 @@ namespace
         closeWindowAndFlush();
 
         const auto reopened = makeStore();
-        EXPECT_EQ(reopened->intValue(GyanisScribe::Settings::kPinEdgeSnapDistance, -1), 24) << "吸附距离没写进自己那一格";
-        EXPECT_TRUE(reopened->boolValue(GyanisScribe::Settings::kPinDisableFrameResize, false)) << "开关没写进 Pin/DisableFrameResize";
+        EXPECT_EQ(reopened->intValue(GyanisScribe::Core::kPinEdgeSnapDistance, -1), 24) << "吸附距离没写进自己那一格";
+        EXPECT_TRUE(reopened->boolValue(GyanisScribe::Core::kPinDisableFrameResize, false)) << "开关没写进 Pin/DisableFrameResize";
     }
 
     /**
@@ -769,7 +769,7 @@ namespace
         closeWindowAndFlush();
 
         const auto reopened = makeStore();
-        EXPECT_TRUE(reopened->boolValue(GyanisScribe::Settings::kAnnotationBlankCanvasTransparent, false)) << "勾了没写进 Annotation/BlankCanvasTransparent";
+        EXPECT_TRUE(reopened->boolValue(GyanisScribe::Core::kAnnotationBlankCanvasTransparent, false)) << "勾了没写进 Annotation/BlankCanvasTransparent";
     }
 
     /**
@@ -789,7 +789,7 @@ namespace
         closeWindowAndFlush();
 
         const auto reopened = makeStore();
-        EXPECT_EQ(reopened->stringValue(GyanisScribe::Settings::kCaptureDetectionExcludes, QStringLiteral("?")), QStringLiteral(" chrome.exe , cmd.exe "))
+        EXPECT_EQ(reopened->stringValue(GyanisScribe::Core::kCaptureDetectionExcludes, QStringLiteral("?")), QStringLiteral(" chrome.exe , cmd.exe "))
                 << "存的该是用户填的原文（解析在读端做，界面不改写它）";
     }
 
@@ -825,8 +825,8 @@ namespace
 
         closeWindowAndFlush();
         const auto reopened = makeStore();
-        EXPECT_TRUE(reopened->boolValue(GyanisScribe::Settings::kAllowSimpleGlobalHotkeys, false)) << "开关没写进 Hotkey/AllowSimpleGlobalHotkeys";
-        EXPECT_EQ(reopened->stringValue(GyanisScribe::Settings::kHotkeyCapture, QStringLiteral("?")), QStringLiteral("R")) << "收下的该是那颗裸键本身";
+        EXPECT_TRUE(reopened->boolValue(GyanisScribe::Core::kAllowSimpleGlobalHotkeys, false)) << "开关没写进 Hotkey/AllowSimpleGlobalHotkeys";
+        EXPECT_EQ(reopened->stringValue(GyanisScribe::Core::kHotkeyCapture, QStringLiteral("?")), QStringLiteral("R")) << "收下的该是那颗裸键本身";
     }
 
     /**
@@ -850,7 +850,7 @@ namespace
         closeWindowAndFlush();
 
         const auto reopened = makeStore();
-        const auto stored   = reopened->stringValue(GyanisScribe::Settings::kRecordScope, QString{});
+        const auto stored   = reopened->stringValue(GyanisScribe::Core::kRecordScope, QString{});
         EXPECT_EQ(stored, QStringLiteral("Region"));
         const auto parsed = GyanisScribe::Record::parseRecordScope(stored);
         ASSERT_TRUE(static_cast<bool>(parsed));
@@ -878,7 +878,7 @@ namespace
         closeWindowAndFlush();
 
         const auto reopened = makeStore();
-        const auto stored   = reopened->stringValue(GyanisScribe::Settings::kCaptureAfterAction, QString{});
+        const auto stored   = reopened->stringValue(GyanisScribe::Core::kCaptureAfterAction, QString{});
         EXPECT_EQ(stored, QStringLiteral("Save"));
         const auto parsed = GyanisScribe::App::parseCaptureIntent(stored);
         ASSERT_TRUE(static_cast<bool>(parsed));
@@ -892,7 +892,7 @@ namespace
      */
     TEST_F(MainWindowFixture, AudioDeviceRowKeepsTheStoredSelectionWhenListingFails)
     {
-        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kRecordAudioMicrophone, QStringLiteral("@device_cm_{GUID}\\wave_{MIC}"))));
+        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Core::kRecordAudioMicrophone, QStringLiteral("@device_cm_{GUID}\\wave_{MIC}"))));
 
         makeWindow();
         m_window->open(MainWindowPage::Record);
@@ -900,7 +900,7 @@ namespace
         ASSERT_NE(combo, nullptr);
         EXPECT_EQ(combo->count(), 1) << "这台机器上没有真 ffmpeg 与音频设备，清单就该只有「不取这一路」这一项";
         EXPECT_EQ(combo->currentIndex(), 0) << "列不出设备时下拉框不许停在一个凭空的位置上";
-        EXPECT_EQ(m_store->stringValue(GyanisScribe::Settings::kRecordAudioMicrophone, QString()), QStringLiteral("@device_cm_{GUID}\\wave_{MIC}"))
+        EXPECT_EQ(m_store->stringValue(GyanisScribe::Core::kRecordAudioMicrophone, QString()), QStringLiteral("@device_cm_{GUID}\\wave_{MIC}"))
                 << "列不出来就把用户选的那一路清掉，是替他做了一个他没见过的原因导致的决定";
     }
 
@@ -911,7 +911,7 @@ namespace
      */
     TEST_F(MainWindowFixture, AudioRowsGreyOutForTheFormatThatCannotCarrySound)
     {
-        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kRecordFormat, QStringLiteral("Gif"))));
+        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Core::kRecordFormat, QStringLiteral("Gif"))));
 
         makeWindow();
         m_window->open(MainWindowPage::Record);
@@ -937,14 +937,14 @@ namespace
      */
     TEST_F(MainWindowFixture, GarbageStoredScopeShowsDefaultButStillBlocksTheStart)
     {
-        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kRecordScope, QStringLiteral("region"))));
+        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Core::kRecordScope, QStringLiteral("region"))));
 
         makeWindow();
         m_window->open(MainWindowPage::Record);
         const auto *combo = qobject_cast<QComboBox *>(controlInCurrentPage("录制范围"));
         ASSERT_NE(combo, nullptr);
         EXPECT_EQ(combo->currentData().toString(), QStringLiteral("FullScreen")) << "读不出时按初值档显示";
-        EXPECT_EQ(m_store->stringValue(GyanisScribe::Settings::kRecordScope, QString{}), QStringLiteral("region")) << "回落不该顺手把文件里的坏值改掉：它要留着让人查得到";
+        EXPECT_EQ(m_store->stringValue(GyanisScribe::Core::kRecordScope, QString{}), QStringLiteral("region")) << "回落不该顺手把文件里的坏值改掉：它要留着让人查得到";
 
         const auto parsed = GyanisScribe::Record::parseRecordScope(QStringLiteral("region"));
         ASSERT_FALSE(static_cast<bool>(parsed)) << "读端把坏值认成一整档，就是拿整屏去录用户要的选区";
@@ -957,7 +957,7 @@ namespace
      */
     TEST_F(MainWindowFixture, RecordFormatRowWritesTheTokenRecordingStartUses)
     {
-        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kRecordFormat, QStringLiteral("gif"))));
+        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Core::kRecordFormat, QStringLiteral("gif"))));
 
         makeWindow();
         m_window->open(MainWindowPage::Record);
@@ -966,7 +966,7 @@ namespace
         EXPECT_EQ(combo->count(), static_cast<int>(GyanisScribe::Record::kRecordFormatChoices.size())) << "下拉框的行数与词表不同解";
         EXPECT_EQ(combo->currentData().toString(), QString::fromUtf8(std::string{GyanisScribe::Record::recordFormatText(GyanisScribe::Record::RecorderConfig{}.format)}))
                 << "读不出时按初值档显示";
-        EXPECT_EQ(m_store->stringValue(GyanisScribe::Settings::kRecordFormat, QString{}), QStringLiteral("gif")) << "回落不该顺手把文件里的坏值改掉：它要留着让人查得到";
+        EXPECT_EQ(m_store->stringValue(GyanisScribe::Core::kRecordFormat, QString{}), QStringLiteral("gif")) << "回落不该顺手把文件里的坏值改掉：它要留着让人查得到";
         ASSERT_FALSE(static_cast<bool>(GyanisScribe::Record::parseRecordFormat(QStringLiteral("gif")))) << "读端把坏值认成一档，就是拿错的容器压已经抓完的帧";
 
         const auto gifRow = combo->findData(QStringLiteral("Gif"));
@@ -975,7 +975,7 @@ namespace
         closeWindowAndFlush();
 
         const auto reopened = makeStore();
-        const auto stored   = reopened->stringValue(GyanisScribe::Settings::kRecordFormat, QString{});
+        const auto stored   = reopened->stringValue(GyanisScribe::Core::kRecordFormat, QString{});
         EXPECT_EQ(stored, QStringLiteral("Gif"));
         const auto parsed = GyanisScribe::Record::parseRecordFormat(stored);
         ASSERT_TRUE(static_cast<bool>(parsed));
@@ -1001,8 +1001,8 @@ namespace
         closeWindowAndFlush();
 
         const auto reopened = makeStore();
-        EXPECT_EQ(reopened->intValue(GyanisScribe::Settings::kAnnotationDefaultWidth, -1), 6);
-        EXPECT_EQ(reopened->intValue(GyanisScribe::Settings::kAnnotationDefaultFontSize, -1), 20);
+        EXPECT_EQ(reopened->intValue(GyanisScribe::Core::kAnnotationDefaultWidth, -1), 6);
+        EXPECT_EQ(reopened->intValue(GyanisScribe::Core::kAnnotationDefaultFontSize, -1), 20);
 
         AnnotationToolbar toolbar{*reopened, *m_icons};
         EXPECT_EQ(toolbar.currentWidth(), 6);
@@ -1036,7 +1036,7 @@ namespace
     TEST_F(MainWindowFixture, OffLadderAnnotationWidthFallsBackInBothEntries)
     {
         // 坏值直接写进夹具那份存储：同一个文件同时开两份 QSettings 时，读到的是缓存还是盘上的那份并不可靠
-        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kAnnotationDefaultWidth, 5)));
+        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Core::kAnnotationDefaultWidth, 5)));
 
         makeWindow();
         m_window->open(MainWindowPage::Annotation);
@@ -1047,7 +1047,7 @@ namespace
         AnnotationToolbar toolbar{*m_store, *m_icons};
         EXPECT_EQ(toolbar.currentWidth(), width->currentData().toInt()) << "设置页与工具栏对同一个坏值给出了两档";
         // 坏值要留在配置里让人看得见：界面回落不该顺手把文件改掉
-        EXPECT_EQ(m_store->intValue(GyanisScribe::Settings::kAnnotationDefaultWidth, -1), 5);
+        EXPECT_EQ(m_store->intValue(GyanisScribe::Core::kAnnotationDefaultWidth, -1), 5);
     }
 
     /**
@@ -1065,7 +1065,7 @@ namespace
         closeWindowAndFlush();
 
         const auto reopened = makeStore();
-        const auto stored   = reopened->stringValue(GyanisScribe::Settings::kUiLanguage, QString{});
+        const auto stored   = reopened->stringValue(GyanisScribe::Core::kUiLanguage, QString{});
         EXPECT_EQ(stored, QStringLiteral("en"));
         const auto parsed = GyanisScribe::Gui::parseAppLanguage(stored.toStdString());
         ASSERT_TRUE(static_cast<bool>(parsed));
@@ -1100,8 +1100,8 @@ namespace
         closeWindowAndFlush();
 
         const auto reopened = makeStore();
-        EXPECT_EQ(reopened->intValue(GyanisScribe::Settings::kHistoryMaximumEntries, -1), 50);
-        EXPECT_EQ(reopened->intValue(GyanisScribe::Settings::kHistoryRetentionDays, -1), 0);
+        EXPECT_EQ(reopened->intValue(GyanisScribe::Core::kHistoryMaximumEntries, -1), 50);
+        EXPECT_EQ(reopened->intValue(GyanisScribe::Core::kHistoryRetentionDays, -1), 0);
         const auto policy = GyanisScribe::History::policyFromSettings(*reopened);
         EXPECT_EQ(policy.maximumEntries, 50);
         EXPECT_EQ(policy.retentionDays, 0) << "0 要按「不限」读，而不是「一条都不留」";
@@ -1114,7 +1114,7 @@ namespace
      */
     TEST_F(MainWindowFixture, NegativeStoredLimitShowsAsUnlimitedOnBothSides)
     {
-        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kHistoryMaximumEntries, -1)));
+        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Core::kHistoryMaximumEntries, -1)));
 
         makeWindow();
         m_window->open(MainWindowPage::General);
@@ -1125,7 +1125,7 @@ namespace
 
         const auto policy = GyanisScribe::History::policyFromSettings(*m_store);
         EXPECT_EQ(policy.maximumEntries, 0) << "界面摆到「不限」而策略读成别的数";
-        EXPECT_EQ(m_store->intValue(GyanisScribe::Settings::kHistoryMaximumEntries, -999), -1) << "回落不该顺手把文件里的坏值改掉：它要留着让人查得到";
+        EXPECT_EQ(m_store->intValue(GyanisScribe::Core::kHistoryMaximumEntries, -999), -1) << "回落不该顺手把文件里的坏值改掉：它要留着让人查得到";
     }
 
     /**
@@ -1136,15 +1136,15 @@ namespace
      */
     TEST_F(MainWindowFixture, ExportThenImportRoundTripWakesTheSubscribers)
     {
-        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kHistoryMaximumEntries, 77)));
-        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kOcrLanguage, QStringLiteral("eng"))));
+        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Core::kHistoryMaximumEntries, 77)));
+        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Core::kOcrLanguage, QStringLiteral("eng"))));
         makeWindow();
 
         QStringList                                notified;
         QObject                                    receiver;
         std::optional<GyanisScribe::Gui::ToastKind> kind;
         QString                                    toast;
-        QObject::connect(m_store.get(), &GyanisScribe::Settings::ISettingsStore::valueChanged, &receiver, [&notified](const QString &key) { notified << key; });
+        QObject::connect(m_store.get(), &GyanisScribe::Core::ISettingsStore::valueChanged, &receiver, [&notified](const QString &key) { notified << key; });
         QObject::connect(m_window.get(), &MainWindow::messageForUser, &receiver,
                          [&toast, &kind](const QString &message, const GyanisScribe::Gui::ToastKind received)
                          {
@@ -1158,12 +1158,12 @@ namespace
         EXPECT_TRUE(notified.isEmpty()) << "导出只是读配置，不该改动任何一项";
 
         // 先把本地这一项改掉，导入才看得出「值真的回来了」而不是「什么都没动」
-        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kHistoryMaximumEntries, 1)));
+        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Core::kHistoryMaximumEntries, 1)));
         notified.clear();
 
         m_window->importSettingsFromFile(packed);
-        EXPECT_EQ(m_store->intValue(GyanisScribe::Settings::kHistoryMaximumEntries, -1), 77) << "导入没把值搬回来";
-        EXPECT_EQ(m_store->stringValue(GyanisScribe::Settings::kOcrLanguage, QString{}), QStringLiteral("eng"));
+        EXPECT_EQ(m_store->intValue(GyanisScribe::Core::kHistoryMaximumEntries, -1), 77) << "导入没把值搬回来";
+        EXPECT_EQ(m_store->stringValue(GyanisScribe::Core::kOcrLanguage, QString{}), QStringLiteral("eng"));
         EXPECT_TRUE(notified.contains(QStringLiteral("History/MaximumEntries"))) << "导入没发变更通知：订阅热键与主题的模块会停在旧值";
         ASSERT_TRUE(kind.has_value()) << "导入没落一条气泡提示";
         EXPECT_EQ(*kind, GyanisScribe::Gui::ToastKind::Success);
@@ -1186,7 +1186,7 @@ namespace
             file.close();
         }
 
-        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Settings::kHistoryMaximumEntries, 42)));
+        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Core::kHistoryMaximumEntries, 42)));
         makeWindow();
 
         QObject                                    receiver;
@@ -1203,7 +1203,7 @@ namespace
         ASSERT_TRUE(kind.has_value()) << "坏文件走掉了却没给任何提示";
         EXPECT_EQ(*kind, GyanisScribe::Gui::ToastKind::Danger) << toast.toStdString();
         EXPECT_NE(toast.indexOf(QStringLiteral("JSON")), -1) << "拒绝要指名是形状不对：" << toast.toStdString();
-        EXPECT_EQ(m_store->intValue(GyanisScribe::Settings::kHistoryMaximumEntries, -1), 42) << "被拒的导入动了已有配置";
+        EXPECT_EQ(m_store->intValue(GyanisScribe::Core::kHistoryMaximumEntries, -1), 42) << "被拒的导入动了已有配置";
     }
 
 
@@ -1276,8 +1276,8 @@ namespace
      */
     TEST_F(MainWindowFixture, TrayClickEmitsTheActionEachRoleIsSetTo)
     {
-        ASSERT_TRUE(m_store->setValue(GyanisScribe::Settings::kTrayLeftClick, QStringLiteral("Recognize")).has_value());
-        ASSERT_TRUE(m_store->setValue(GyanisScribe::Settings::kTrayMiddleClick, QStringLiteral("PickColor")).has_value());
+        ASSERT_TRUE(m_store->setValue(GyanisScribe::Core::kTrayLeftClick, QStringLiteral("Recognize")).has_value());
+        ASSERT_TRUE(m_store->setValue(GyanisScribe::Core::kTrayMiddleClick, QStringLiteral("PickColor")).has_value());
 
         GyanisScribe::App::TrayController          tray{*m_icons, *m_theme, *m_store, *m_integration};
         std::vector<GyanisScribe::App::TrayAction> seen;
@@ -1298,8 +1298,8 @@ namespace
      */
     TEST_F(MainWindowFixture, TrayClickSentinelsEmitNoActionAndSurviveAnUninstalledMenu)
     {
-        ASSERT_TRUE(m_store->setValue(GyanisScribe::Settings::kTrayLeftClick, QStringLiteral("none")).has_value());
-        ASSERT_TRUE(m_store->setValue(GyanisScribe::Settings::kTrayMiddleClick, QStringLiteral("menu")).has_value());
+        ASSERT_TRUE(m_store->setValue(GyanisScribe::Core::kTrayLeftClick, QStringLiteral("none")).has_value());
+        ASSERT_TRUE(m_store->setValue(GyanisScribe::Core::kTrayMiddleClick, QStringLiteral("menu")).has_value());
 
         GyanisScribe::App::TrayController          tray{*m_icons, *m_theme, *m_store, *m_integration};
         std::vector<GyanisScribe::App::TrayAction> seen;
@@ -1316,7 +1316,7 @@ namespace
      */
     TEST_F(MainWindowFixture, TrayClickWithABadValueStillRunsTheDefaultAction)
     {
-        ASSERT_TRUE(m_store->setValue(GyanisScribe::Settings::kTrayLeftClick, QStringLiteral("Screenshot")).has_value());
+        ASSERT_TRUE(m_store->setValue(GyanisScribe::Core::kTrayLeftClick, QStringLiteral("Screenshot")).has_value());
 
         GyanisScribe::App::TrayController          tray{*m_icons, *m_theme, *m_store, *m_integration};
         std::vector<GyanisScribe::App::TrayAction> seen;
@@ -1344,8 +1344,8 @@ namespace
             std::string_view defaultToken;
         };
         const std::vector<Row> rows{
-                Row{"左键单击", GyanisScribe::Settings::kTrayLeftClick, "CaptureRegion"},
-                Row{"中键单击", GyanisScribe::Settings::kTrayMiddleClick, "TogglePinsVisible"},
+                Row{"左键单击", GyanisScribe::Core::kTrayLeftClick, "CaptureRegion"},
+                Row{"中键单击", GyanisScribe::Core::kTrayMiddleClick, "TogglePinsVisible"},
         };
 
         const auto choices = GyanisScribe::App::trayClickChoices(m_capabilities);
@@ -1379,7 +1379,7 @@ namespace
  */
 TEST_F(MainWindowFixture, IconsReResolveWhenTheThemeChangesLive)
 {
-    ASSERT_TRUE(m_store->setValue(GyanisScribe::Settings::kThemeMode, QStringLiteral("Light")).has_value());
+    ASSERT_TRUE(m_store->setValue(GyanisScribe::Core::kThemeMode, QStringLiteral("Light")).has_value());
     makeWindow();
 
     auto *list = nav();
@@ -1651,7 +1651,7 @@ TEST_F(MainWindowFixture, GroupRotationRowStoresCleanTokensAndKeepsBadOnes)
 
     closeWindowAndFlush();
     const QStringList expected{QStringLiteral("3"), QStringLiteral("1"), QStringLiteral("2")};
-    EXPECT_EQ(makeStore()->stringListValue(GyanisScribe::Settings::kPinGroupRotationOrder, {}), expected) << "名单没照顺序存，或被填歪的那一次顶掉了，或写去了别的键";
+    EXPECT_EQ(makeStore()->stringListValue(GyanisScribe::Core::kPinGroupRotationOrder, {}), expected) << "名单没照顺序存，或被填歪的那一次顶掉了，或写去了别的键";
 }
 
 /**
@@ -1673,7 +1673,7 @@ TEST_F(MainWindowFixture, ExecCommandRowStoresRawLineOnCaptureKey)
     emit edit->editingFinished();
 
     closeWindowAndFlush();
-    EXPECT_EQ(makeStore()->stringValue(GyanisScribe::Settings::kCaptureExecCommand, QString{}), trimmedExpected) << "命令没照原文存进截图那一路读的键，或被写去了别处";
+    EXPECT_EQ(makeStore()->stringValue(GyanisScribe::Core::kCaptureExecCommand, QString{}), trimmedExpected) << "命令没照原文存进截图那一路读的键，或被写去了别处";
 }
 
 /**
@@ -1695,7 +1695,7 @@ TEST_F(MainWindowFixture, ExecCommandRowClearsWhenEmptied)
     closeWindowAndFlush();
     // 空文本在读取那一层就按「没填」算（SettingsStore 的口径），所以判据是「带着默认值读要读出那个默认值」：
     // 旧命令还留在配置里时，读出来的是「旧命令.exe」而不是这一格给的「没填」
-    EXPECT_EQ(makeStore()->stringValue(GyanisScribe::Settings::kCaptureExecCommand, QStringLiteral("没填")), QStringLiteral("没填")) << "清空没落进配置，下一次截图还会跑旧命令";
+    EXPECT_EQ(makeStore()->stringValue(GyanisScribe::Core::kCaptureExecCommand, QStringLiteral("没填")), QStringLiteral("没填")) << "清空没落进配置，下一次截图还会跑旧命令";
 }
 
 /**
@@ -1723,7 +1723,7 @@ TEST_F(MainWindowFixture, PaletteRowStoresCleanTokensAndKeepsBadOnes)
 
     closeWindowAndFlush();
     const QStringList written{QStringLiteral("#FF0000"), QStringLiteral("#0078FF")};
-    EXPECT_EQ(makeStore()->stringListValue(GyanisScribe::Settings::kAnnotationPalette, {}), written) << "没写成规范的 #RRGGBB，或坏值把好名单顶掉了";
+    EXPECT_EQ(makeStore()->stringListValue(GyanisScribe::Core::kAnnotationPalette, {}), written) << "没写成规范的 #RRGGBB，或坏值把好名单顶掉了";
 }
 
 /**
@@ -1743,7 +1743,7 @@ TEST_F(MainWindowFixture, EmptyingThePaletteRowStoresAnEmptyList)
 
     closeWindowAndFlush();
     // 空名单读出来是「空列表」，与「没存过这一项」（回落成哨兵值）是两回事：这一档要的就是前者
-    EXPECT_TRUE(makeStore()->stringListValue(GyanisScribe::Settings::kAnnotationPalette, QStringList{QStringLiteral("没存过")}).isEmpty())
+    EXPECT_TRUE(makeStore()->stringListValue(GyanisScribe::Core::kAnnotationPalette, QStringList{QStringLiteral("没存过")}).isEmpty())
             << "清空没落进配置：下一次打开标注窗还是那一格旧色板";
 }
 
@@ -1796,7 +1796,7 @@ TEST_F(MainWindowFixture, PaletteFileRoundTripsThroughTheTwoMethods)
 
     closeWindowAndFlush();
     const QStringList replaced{QStringLiteral("#010203"), QStringLiteral("#040506"), QStringLiteral("#070809")};
-    EXPECT_EQ(makeStore()->stringListValue(GyanisScribe::Settings::kAnnotationPalette, {}), replaced) << "导入没整份替换，或手写的逗号与空行没被认下来";
+    EXPECT_EQ(makeStore()->stringListValue(GyanisScribe::Core::kAnnotationPalette, {}), replaced) << "导入没整份替换，或手写的逗号与空行没被认下来";
 }
 
 /**
@@ -1837,7 +1837,7 @@ TEST_F(MainWindowFixture, FailedPaletteImportKeepsTheOldRow)
     m_window->importPaletteFromFile(brokenPath);
 
     closeWindowAndFlush();
-    EXPECT_EQ(makeStore()->stringListValue(GyanisScribe::Settings::kAnnotationPalette, {}), stored) << "坏文件把旧色板顶掉了";
+    EXPECT_EQ(makeStore()->stringListValue(GyanisScribe::Core::kAnnotationPalette, {}), stored) << "坏文件把旧色板顶掉了";
     EXPECT_GE(messages.size(), 2) << "两次失败都该各有一句原因";
 }
 

@@ -3,9 +3,9 @@
 #include "App/CustomHotkeys.h"
 
 #include "App/TrayController.h"
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsStore.h"
 
 #include <gtest/gtest.h>
 
@@ -25,7 +25,7 @@ using GyanisScribe::App::collectCustomBindings;
 using GyanisScribe::App::customHotkeyKey;
 using GyanisScribe::App::TrayAction;
 using GyanisScribe::App::trayActionForToken;
-using GyanisScribe::Settings::SettingsStore;
+using GyanisScribe::Core::SettingsStore;
 
 namespace
 {

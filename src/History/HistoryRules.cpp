@@ -1,8 +1,8 @@
 #include "History/HistoryRules.h"
 
 #include "Base/Logger.h"
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
 
 #include <QString>
 
@@ -34,10 +34,10 @@ namespace GyanisScribe::History
                           });
     }
 
-    HistoryRetentionPolicy policyFromSettings(const Settings::ISettingsStore &settings)
+    HistoryRetentionPolicy policyFromSettings(const Core::ISettingsStore &settings)
     {
-        const auto maximumEntries = settings.intValue(Settings::kHistoryMaximumEntries, kDefaultMaximumEntries);
-        const auto retentionDays  = settings.intValue(Settings::kHistoryRetentionDays, kDefaultRetentionDays);
+        const auto maximumEntries = settings.intValue(Core::kHistoryMaximumEntries, kDefaultMaximumEntries);
+        const auto retentionDays  = settings.intValue(Core::kHistoryRetentionDays, kDefaultRetentionDays);
 
         if (maximumEntries < 0 || retentionDays < 0)
         {

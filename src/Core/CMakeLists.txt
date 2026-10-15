@@ -1,5 +1,6 @@
 # Core：领域逻辑的静态库；各子目录在叶子 CMakeLists 里登记自己的源文件，这里只做聚合与对外接口
 add_subdirectory(Image)
+add_subdirectory(Settings)
 
 get_property(CoreSources GLOBAL PROPERTY GyanisScribeCoreSources)
 add_library(Core STATIC ${CoreSources})

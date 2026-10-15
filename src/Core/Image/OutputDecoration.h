@@ -41,7 +41,7 @@ namespace GyanisScribe::Core
     inline constexpr int kOutputShadowMaximumAlpha = 96;
 
     /// 边框的默认颜色：中灰，深浅底上都看得出边界，又不像纯黑那样把成品框死
-    inline const QColor kOutputBorderColor{0x80, 0x80, 0x80};
+    inline const QColor kDefaultOutputBorderColor{0x80, 0x80, 0x80};
 
     /**
      * @brief 一档成品装饰的参数
@@ -50,9 +50,9 @@ namespace GyanisScribe::Core
      */
     struct OutputDecorationStyle
     {
-        int    borderPixels = kOutputBorderPixels; ///< 边框宽，物理像素
-        QColor borderColor  = kOutputBorderColor;  ///< 边框色
-        int    shadowPixels = kOutputShadowPixels; ///< 投影向外延伸的宽度，物理像素
+        int    borderPixels = kOutputBorderPixels;       ///< 边框宽，物理像素
+        QColor borderColor  = kDefaultOutputBorderColor; ///< 边框色
+        int    shadowPixels = kOutputShadowPixels;       ///< 投影向外延伸的宽度，物理像素
     };
 
     /**

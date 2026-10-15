@@ -8,7 +8,7 @@
 #include "Annotation/IAnnotationEngine.h"
 #include "Annotation/PenParameters.h"
 
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/SettingsStore.h"
 #include "Gui/Controls/AppShortcuts.h"
 #include "Gui/Resources/IconProvider.h"
 
@@ -47,7 +47,7 @@ using GyanisScribe::Annotation::toWidgetPoint;
 using GyanisScribe::Base::CapturedImage;
 using GyanisScribe::Core::displayRectFor;
 using GyanisScribe::Base::ErrorCode;
-using GyanisScribe::Settings::SettingsStore;
+using GyanisScribe::Core::SettingsStore;
 using GyanisScribe::Gui::IconProvider;
 
 namespace

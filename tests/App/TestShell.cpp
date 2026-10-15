@@ -2,7 +2,7 @@
 #include "App/TrayController.h"
 
 #include "Platform/PlatformCapabilities.h"
-#include "Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsKeys.h"
 #include "Gui/Resources/IconProvider.h"
 
 #include <gtest/gtest.h>
@@ -185,8 +185,8 @@ TEST(TrayTooltip, ShowsRecordingProgressAndSeparatesPaused)
 TEST(TrayMenuTable, HotkeyHintsBindToRealSettingKeys)
 {
     const std::vector<std::string_view> knownKeys = {
-            GyanisScribe::Settings::kHotkeyCapture,     GyanisScribe::Settings::kHotkeyRecord,     GyanisScribe::Settings::kHotkeyOcr,         GyanisScribe::Settings::kHotkeyPick,
-            GyanisScribe::Settings::kHotkeyCaptureLong, GyanisScribe::Settings::kHotkeyTogglePins, GyanisScribe::Settings::kHotkeyNextPinGroup};
+            GyanisScribe::Core::kHotkeyCapture,     GyanisScribe::Core::kHotkeyRecord,     GyanisScribe::Core::kHotkeyOcr,         GyanisScribe::Core::kHotkeyPick,
+            GyanisScribe::Core::kHotkeyCaptureLong, GyanisScribe::Core::kHotkeyTogglePins, GyanisScribe::Core::kHotkeyNextPinGroup};
 
     int hinted = 0;
     for (const auto &entry: trayMenuEntries())

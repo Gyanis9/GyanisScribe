@@ -1,7 +1,7 @@
 #include "App/CustomHotkeys.h"
 
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
 
 #include <array>
 
@@ -39,7 +39,7 @@ namespace GyanisScribe::App
     QString customHotkeyKey(const std::string_view token)
     {
         // 前缀只有 SettingsKeys.h 那一处：设置页写键、这里算键，两处各写一份就会在改名那天分家
-        return QString::fromUtf8(Settings::kHotkeyCustomPrefix.data(), static_cast<qsizetype>(Settings::kHotkeyCustomPrefix.size())) + tokenText(token);
+        return QString::fromUtf8(Core::kHotkeyCustomPrefix.data(), static_cast<qsizetype>(Core::kHotkeyCustomPrefix.size())) + tokenText(token);
     }
 
     std::optional<TrayAction> trayActionForToken(const QString &token)
@@ -67,7 +67,7 @@ namespace GyanisScribe::App
         return {};
     }
 
-    std::vector<Hotkey::CustomHotkeyBinding> collectCustomBindings(const Settings::ISettingsStore &settings)
+    std::vector<Hotkey::CustomHotkeyBinding> collectCustomBindings(const Core::ISettingsStore &settings)
     {
         std::vector<Hotkey::CustomHotkeyBinding> bindings;
         for (const auto &entry: kBindableActions)

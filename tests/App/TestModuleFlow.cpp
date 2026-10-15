@@ -18,7 +18,7 @@
 #include "Pin/IPinWindow.h"
 #include "Pin/PinManager.h"
 #include "Platform/IPlatformIntegration.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/SettingsStore.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -199,7 +199,7 @@ namespace GyanisScribe
              * @param source 假屏来源
              * @return 交出来的帧；没交出来时返回空帧并留下失败
              */
-            [[nodiscard]] Base::CapturedImage captureOneFrame(GyanisScribe::Settings::SettingsStore &settings, FakeScreenSource &source) const
+            [[nodiscard]] Base::CapturedImage captureOneFrame(GyanisScribe::Core::SettingsStore &settings, FakeScreenSource &source) const
             {
                 GyanisScribe::Capture::CaptureService service(source, settings, *integration);
                 std::optional<Base::CapturedImage>    received;
@@ -226,7 +226,7 @@ namespace GyanisScribe
          */
         TEST_F(ModuleFlowFixture, FrameKeepsItsCoordinateSystemFromCaptureToPin)
         {
-            GyanisScribe::Settings::SettingsStore settings(m_iniFile);
+            GyanisScribe::Core::SettingsStore settings(m_iniFile);
             FakeScreenSource                      source(makeFakeFrame());
 
             const auto frame = captureOneFrame(settings, source);
@@ -275,7 +275,7 @@ namespace GyanisScribe
          */
         TEST_F(ModuleFlowFixture, StoredLayoutRestoresPinsWithTheirGeometry)
         {
-            GyanisScribe::Settings::SettingsStore settings(m_iniFile);
+            GyanisScribe::Core::SettingsStore settings(m_iniFile);
             QImage                                image(40, 24, QImage::Format_ARGB32);
             image.fill(Qt::red);
 
@@ -327,7 +327,7 @@ namespace GyanisScribe
          */
         TEST_F(ModuleFlowFixture, RestoreSkipsOnlyThePinWhoseImageFileIsGone)
         {
-            GyanisScribe::Settings::SettingsStore settings(m_iniFile);
+            GyanisScribe::Core::SettingsStore settings(m_iniFile);
             QImage                                image(20, 20, QImage::Format_ARGB32);
             image.fill(Qt::green);
 
@@ -358,7 +358,7 @@ namespace GyanisScribe
          */
         TEST_F(ModuleFlowFixture, OcrUsesTheSharedLanguageVocabulary)
         {
-            GyanisScribe::Settings::SettingsStore settings(m_iniFile);
+            GyanisScribe::Core::SettingsStore settings(m_iniFile);
             const auto                            engine = GyanisScribe::Ocr::createOcrEngine(settings, *integration);
             ASSERT_NE(engine, nullptr) << "选型不许交回空指针";
 
@@ -405,7 +405,7 @@ namespace GyanisScribe
             GTEST_SKIP() << "本平台没有鼠标穿透能力，开不出穿透中的贴图，这条出口在这里没有可复现的现场";
         }
 
-        GyanisScribe::Settings::SettingsStore settings(m_iniFile);
+        GyanisScribe::Core::SettingsStore settings(m_iniFile);
         FakeScreenSource                      source(makeFakeFrame());
         const auto                            frame = captureOneFrame(settings, source);
 
@@ -432,7 +432,7 @@ namespace GyanisScribe
      */
     TEST_F(ModuleFlowFixture, TrayToggleConcealsAndRestoresEveryPin)
     {
-        GyanisScribe::Settings::SettingsStore settings(m_iniFile);
+        GyanisScribe::Core::SettingsStore settings(m_iniFile);
         FakeScreenSource                      source(makeFakeFrame());
         const auto                            frame = captureOneFrame(settings, source);
 
@@ -476,7 +476,7 @@ namespace GyanisScribe
         QMimeData mime;
         mime.setUrls({QUrl::fromLocalFile(QString::fromStdString(firstPath.string())), QUrl::fromLocalFile(QString::fromStdString(secondPath.string()))});
 
-        Settings::SettingsStore settings(m_iniFile);
+        Core::SettingsStore settings(m_iniFile);
         Pin::PinManager         pins(settings, *integration);
         const auto              dropped = App::pinDroppedContent(pins, &mime, QPoint(400, 300), QApplication::font());
         ASSERT_TRUE(dropped.has_value()) << dropped.error().message;

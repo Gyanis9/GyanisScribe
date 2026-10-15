@@ -3,7 +3,7 @@
 #include "App/CaptureIntent.h"
 
 #include <QString>
-#include "Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsKeys.h"
 
 #include <gtest/gtest.h>
 

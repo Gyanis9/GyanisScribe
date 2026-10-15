@@ -29,10 +29,10 @@ class QHBoxLayout;
 class QSlider;
 class QToolButton;
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
     class ISettingsStore;
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core
 
 namespace GyanisScribe::Annotation
 {
@@ -85,7 +85,7 @@ namespace GyanisScribe::Annotation
          * @param icons 图标供给器，生命周期由应用保证，必须活过本控件
          * @param parent Qt 父对象
          */
-        explicit AnnotationToolbar(Settings::ISettingsStore &settings, const Gui::IconProvider &icons, QWidget *parent = nullptr);
+        explicit AnnotationToolbar(Core::ISettingsStore &settings, const Gui::IconProvider &icons, QWidget *parent = nullptr);
 
         AnnotationToolbar(const AnnotationToolbar &)            = delete;
         AnnotationToolbar &operator=(const AnnotationToolbar &) = delete;
@@ -441,7 +441,7 @@ namespace GyanisScribe::Annotation
          */
         void updateContextVisibility();
 
-        Settings::ISettingsStore  &m_settings;                  ///< 最近使用颜色的读写去处
+        Core::ISettingsStore  &m_settings;                  ///< 最近使用颜色的读写去处
         std::vector<QColor>        m_recentColors;              ///< 最近用过的自定义颜色，首位最新
         std::vector<QToolButton *> m_recentButtons;             ///< 与 m_recentColors 同序的色块按钮
         std::vector<QToolButton *> m_paletteButtons;            ///< 色板那几格的按钮，与 m_palette 同序（自定义色板时格数不是写死的八格）

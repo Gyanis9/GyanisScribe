@@ -2,8 +2,8 @@
 #include "Annotation/AnnotationToolbarGeometry.h"
 
 #include "Annotation/AnnotationTool.h"
-#include "Settings/SettingsKeys.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsStore.h"
 #include "Gui/Controls/AppShortcuts.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Resources/IconProvider.h"
@@ -44,7 +44,7 @@ using GyanisScribe::Annotation::placeToolbar;
 using GyanisScribe::Annotation::ToolbarSide;
 using GyanisScribe::Annotation::ToolKind;
 using GyanisScribe::Base::ErrorCode;
-using GyanisScribe::Settings::SettingsStore;
+using GyanisScribe::Core::SettingsStore;
 using GyanisScribe::Gui::IconProvider;
 using GyanisScribe::Gui::kAnnotationPalette;
 using GyanisScribe::Gui::kAnnotationWidths;
@@ -196,7 +196,7 @@ namespace
         /// 把色板预置成指定的那几格：重开一份 store，等价于用户改完设置再回到工具栏
         void presetPalette(const QStringList &tokens)
         {
-            ASSERT_TRUE(m_settings->setValue(GyanisScribe::Settings::kAnnotationPalette, tokens).has_value());
+            ASSERT_TRUE(m_settings->setValue(GyanisScribe::Core::kAnnotationPalette, tokens).has_value());
             m_settings->sync();
             m_settings = std::make_unique<SettingsStore>(m_iniPath);
         }
@@ -1194,7 +1194,7 @@ TEST_F(ToolbarFixture, ColorSwatchesAndActionButtonsEmitTheirOwnSignals)
  */
 TEST_F(ToolbarFixture, RecentColorsFromSettingsBecomeSwatches)
 {
-    ASSERT_TRUE(m_settings->setValue(GyanisScribe::Settings::kAnnotationRecentColors, QStringList{QStringLiteral("#FF0000"), QStringLiteral("#0078FF")}).has_value());
+    ASSERT_TRUE(m_settings->setValue(GyanisScribe::Core::kAnnotationRecentColors, QStringList{QStringLiteral("#FF0000"), QStringLiteral("#0078FF")}).has_value());
     m_settings->sync();
     m_settings = std::make_unique<SettingsStore>(m_iniPath);
 
@@ -1232,8 +1232,8 @@ TEST_F(ToolbarFixture, AdjustedWidthAndFontSizeAreRememberedAcrossRestart)
     }
 
     m_settings = std::make_unique<SettingsStore>(m_iniPath);
-    EXPECT_EQ(m_settings->intValue(GyanisScribe::Settings::kAnnotationDefaultWidth, -1), 8) << "调过线宽没写进配置";
-    EXPECT_EQ(m_settings->intValue(GyanisScribe::Settings::kAnnotationDefaultFontSize, -1), 24) << "调过字号没写进配置";
+    EXPECT_EQ(m_settings->intValue(GyanisScribe::Core::kAnnotationDefaultWidth, -1), 8) << "调过线宽没写进配置";
+    EXPECT_EQ(m_settings->intValue(GyanisScribe::Core::kAnnotationDefaultFontSize, -1), 24) << "调过字号没写进配置";
 
     SignalLog log;
     auto      second = makeToolbarLogged(log);
@@ -1248,8 +1248,8 @@ TEST_F(ToolbarFixture, AdjustedWidthAndFontSizeAreRememberedAcrossRestart)
  */
 TEST_F(ToolbarFixture, OffLadderStoredDefaultsFallBackWithoutRewriting)
 {
-    ASSERT_TRUE(m_settings->setValue(GyanisScribe::Settings::kAnnotationDefaultWidth, 5).has_value());
-    ASSERT_TRUE(m_settings->setValue(GyanisScribe::Settings::kAnnotationDefaultFontSize, 15).has_value());
+    ASSERT_TRUE(m_settings->setValue(GyanisScribe::Core::kAnnotationDefaultWidth, 5).has_value());
+    ASSERT_TRUE(m_settings->setValue(GyanisScribe::Core::kAnnotationDefaultFontSize, 15).has_value());
     m_settings->sync();
 
     SignalLog log;
@@ -1258,8 +1258,8 @@ TEST_F(ToolbarFixture, OffLadderStoredDefaultsFallBackWithoutRewriting)
     EXPECT_EQ(toolbar->currentFontSize(), 14) << "字号同理";
 
     m_settings->sync();
-    EXPECT_EQ(m_settings->intValue(GyanisScribe::Settings::kAnnotationDefaultWidth, -1), 5) << "构造期把坏值改写了";
-    EXPECT_EQ(m_settings->intValue(GyanisScribe::Settings::kAnnotationDefaultFontSize, -1), 15);
+    EXPECT_EQ(m_settings->intValue(GyanisScribe::Core::kAnnotationDefaultWidth, -1), 5) << "构造期把坏值改写了";
+    EXPECT_EQ(m_settings->intValue(GyanisScribe::Core::kAnnotationDefaultFontSize, -1), 15);
 }
 
 /**
@@ -1473,7 +1473,7 @@ TEST_F(ToolbarFixture, WheelOpacityIsRememberedPerShape)
 TEST_F(ToolbarFixture, PaletteFromSettingsDrivesTheSwatchRow)
 {
     const QStringList tokens{QStringLiteral("#112233"), QStringLiteral("#445566"), QStringLiteral("#778899")};
-    ASSERT_TRUE(m_settings->setValue(GyanisScribe::Settings::kAnnotationPalette, tokens).has_value());
+    ASSERT_TRUE(m_settings->setValue(GyanisScribe::Core::kAnnotationPalette, tokens).has_value());
     m_settings->sync();
     m_settings = std::make_unique<SettingsStore>(m_iniPath);
 
@@ -1497,7 +1497,7 @@ TEST_F(ToolbarFixture, PaletteFromSettingsDrivesTheSwatchRow)
  */
 TEST_F(ToolbarFixture, BrokenPaletteFallsBackToTheBuiltinRow)
 {
-    ASSERT_TRUE(m_settings->setValue(GyanisScribe::Settings::kAnnotationPalette, QStringList{QStringLiteral("crimson")}).has_value());
+    ASSERT_TRUE(m_settings->setValue(GyanisScribe::Core::kAnnotationPalette, QStringList{QStringLiteral("crimson")}).has_value());
     m_settings->sync();
     m_settings = std::make_unique<SettingsStore>(m_iniPath);
 
@@ -1535,7 +1535,7 @@ TEST_F(ToolbarFixture, PaletteMoveRewritesTheRowAndPersistsIt)
 
     toolbar->requestPaletteMove(2, 0);
     const QStringList expected{QStringLiteral("#778899"), QStringLiteral("#112233"), QStringLiteral("#445566")};
-    EXPECT_EQ(m_settings->stringListValue(GyanisScribe::Settings::kAnnotationPalette, {}), expected) << "顺序没写回配置，或挪的算法不对";
+    EXPECT_EQ(m_settings->stringListValue(GyanisScribe::Core::kAnnotationPalette, {}), expected) << "顺序没写回配置，或挪的算法不对";
 
     auto *first = buttonByLabel(*toolbar, "颜色 1");
     ASSERT_NE(first, nullptr);
@@ -1562,7 +1562,7 @@ TEST_F(ToolbarFixture, PaletteMoveIgnoresBadSlotsAndNoOps)
     toolbar->requestPaletteMove(-1, 1);
     toolbar->requestPaletteMove(3, 0);
 
-    EXPECT_EQ(m_settings->stringListValue(GyanisScribe::Settings::kAnnotationPalette, {}), tokens) << "越界或原地的那几次动了色板";
+    EXPECT_EQ(m_settings->stringListValue(GyanisScribe::Core::kAnnotationPalette, {}), tokens) << "越界或原地的那几次动了色板";
     EXPECT_TRUE(log.colors.empty()) << "重排不该顺手把当前颜色也换了";
 }
 
@@ -1595,7 +1595,7 @@ TEST_F(ToolbarFixture, DraggingASwatchOntoAnotherReordersThem)
     sendMouse(*first, QEvent::MouseButtonRelease, onThird);
 
     const QStringList expected{QStringLiteral("#445566"), QStringLiteral("#778899"), QStringLiteral("#112233")};
-    EXPECT_EQ(m_settings->stringListValue(GyanisScribe::Settings::kAnnotationPalette, {}), expected) << "拖了一趟没重排，或落点算错";
+    EXPECT_EQ(m_settings->stringListValue(GyanisScribe::Core::kAnnotationPalette, {}), expected) << "拖了一趟没重排，或落点算错";
     EXPECT_TRUE(log.colors.empty()) << "拖完那一下被当成选色：整理色板不该改在用的颜色";
 }
 
@@ -1625,5 +1625,5 @@ TEST_F(ToolbarFixture, JitterBelowTheDragThresholdDoesNotReorder)
     sendMouse(*first, QEvent::MouseMove, start + QPoint{oneShort, 0});
     sendMouse(*first, QEvent::MouseButtonRelease, start + QPoint{oneShort, 0});
 
-    EXPECT_EQ(m_settings->stringListValue(GyanisScribe::Settings::kAnnotationPalette, {}), tokens) << "阈值之内的一抖就把色板重排了";
+    EXPECT_EQ(m_settings->stringListValue(GyanisScribe::Core::kAnnotationPalette, {}), tokens) << "阈值之内的一抖就把色板重排了";
 }

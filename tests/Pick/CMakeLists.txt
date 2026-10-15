@@ -4,7 +4,6 @@ add_executable(TestPick
 
 target_link_libraries(TestPick PRIVATE
         Pick
-        Settings
         Core
         Gui
         GTest::gtest

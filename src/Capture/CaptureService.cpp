@@ -9,8 +9,8 @@
 #include "Base/Logger.h"
 #include "Base/Text.h"
 #include "Platform/IPlatformIntegration.h"
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
 
 #include <QGuiApplication>
 #include <QScreen>
@@ -24,9 +24,9 @@ namespace
     constexpr int kLongCaptureIntervalMs = 250;
 
     /// 比例锁落盘的那一处：空尺寸＝解开，把配置里这一档清掉（下一次开遮罩就是自由的）
-    void rememberAspectRatio(GyanisScribe::Settings::ISettingsStore &settings, const QSize &ratio)
+    void rememberAspectRatio(GyanisScribe::Core::ISettingsStore &settings, const QSize &ratio)
     {
-        if (const auto stored = settings.setValue(GyanisScribe::Settings::kCaptureAspectRatio, QVariant(GyanisScribe::Capture::aspectRatioToText(ratio))); !stored)
+        if (const auto stored = settings.setValue(GyanisScribe::Core::kCaptureAspectRatio, QVariant(GyanisScribe::Capture::aspectRatioToText(ratio))); !stored)
         {
             GyanisScribe::Base::Logger::warning(std::format("长宽比锁没能记下：{}", stored.error().message));
         }
@@ -39,7 +39,7 @@ namespace
 namespace GyanisScribe::Capture
 {
 
-    CaptureService::CaptureService(const IScreenCaptureSource &source, Settings::ISettingsStore &settings, const Platform::IPlatformIntegration &integration, QObject *parent) :
+    CaptureService::CaptureService(const IScreenCaptureSource &source, Core::ISettingsStore &settings, const Platform::IPlatformIntegration &integration, QObject *parent) :
         ICaptureService(parent), m_source(source), m_settings(settings), m_integration(integration)
     {
     }
@@ -68,11 +68,11 @@ namespace GyanisScribe::Capture
         }
 
         // 圆角截图：成品的一步加工，排在记账之前——切圆失败不该发生，真发生了也没截坏原帧
-        if (m_settings.boolValue(Settings::kCaptureRoundCorners, Settings::kDefaultCaptureRoundCorners))
+        if (m_settings.boolValue(Core::kCaptureRoundCorners, Core::kDefaultCaptureRoundCorners))
         {
             // 半径跟着设置那一格走；越界或坏值按默认档继续并记一条中文原因——
             // 一张截好的图不该因为一个几何参数被拒在外面
-            const auto stored = m_settings.intValue(Settings::kCaptureCornerRadius, kCaptureCornerRadiusDefault);
+            const auto stored = m_settings.intValue(Core::kCaptureCornerRadius, kCaptureCornerRadiusDefault);
             const auto parsed = parseCaptureCornerRadius(stored);
             if (!parsed)
             {
@@ -202,7 +202,7 @@ namespace GyanisScribe::Capture
             // 只给同屏的几条：R/Shift+R 循环挑的是这块屏上的几块，别屏的矩形放上来会露出一块越界的框
             overlay->setRegionHistory(regionsOnScreen(*regionHistory, screen->name()));
             // 记住的长宽比在开遮罩时装上：上一轮锁着哪一档，这一轮接着锁
-            if (const auto ratio = aspectRatioFromText(m_settings.stringValue(Settings::kCaptureAspectRatio, QString())); ratio)
+            if (const auto ratio = aspectRatioFromText(m_settings.stringValue(Core::kCaptureAspectRatio, QString())); ratio)
             {
                 overlay->setLockedAspectRatio(*ratio);
             }
@@ -254,7 +254,7 @@ namespace GyanisScribe::Capture
     bool CaptureService::cursorIncludedForThisRound() const
     {
         // 遮罩里翻过一档就以那一档为准（只这一轮）；没有遮罩参与的那几路照旧读设置里那一格
-        return m_cursorOverride.value_or(m_settings.boolValue(Settings::kCaptureIncludeCursor, Settings::kDefaultCaptureIncludeCursor));
+        return m_cursorOverride.value_or(m_settings.boolValue(Core::kCaptureIncludeCursor, Core::kDefaultCaptureIncludeCursor));
     }
 
     Base::Expected<Base::CapturedImage> CaptureService::withCursorIfWanted(const Base::Expected<Base::CapturedImage> &frame) const
@@ -494,7 +494,7 @@ namespace GyanisScribe::Capture
 
         // 排除清单按进程的可执行文件名比：被排掉的那些连高亮都不出现，悬停就落回手动框选
         // （清单每取一次读一遍：这一格改完下一次截图就生效，不必重开程序）
-        const auto excludes = parseProcessExcludes(m_settings.stringValue(Settings::kCaptureDetectionExcludes, QString{}));
+        const auto excludes = parseProcessExcludes(m_settings.stringValue(Core::kCaptureDetectionExcludes, QString{}));
 
         std::vector<QRect> rects;
         rects.reserve(windows->size());

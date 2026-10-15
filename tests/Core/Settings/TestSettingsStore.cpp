@@ -1,5 +1,5 @@
 #include "Base/Logger.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/SettingsStore.h"
 
 #include <QCoreApplication>
 #include <QSettings>
@@ -15,7 +15,7 @@
 #include <vector>
 
 using GyanisScribe::Base::ErrorCode;
-using GyanisScribe::Settings::SettingsStore;
+using GyanisScribe::Core::SettingsStore;
 
 namespace
 {

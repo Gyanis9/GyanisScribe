@@ -14,8 +14,8 @@
 #include "History/HistoryTypes.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Platform/PlatformCapabilities.h"
-#include "Settings/SettingsKeys.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsStore.h"
 
 #include <gtest/gtest.h>
 
@@ -228,14 +228,14 @@ namespace GyanisScribe
             /// 用替身把控制器支起来：延时、去向与「未保存也进历史」都从上面那几格字段读
             void makeController()
             {
-                auto settings = std::make_unique<Settings::SettingsStore>(m_root / "settings.ini");
-                ASSERT_TRUE(settings->setValue(Settings::kCaptureDelaySeconds, m_delaySeconds).has_value());
-                ASSERT_TRUE(settings->setValue(Settings::kPathScreenshot, Base::Paths::toDisplayText(m_root / "shots")).has_value());
-                ASSERT_TRUE(settings->setValue(Settings::kHistoryKeepUnsaved, m_keepUnsaved).has_value());
-                ASSERT_TRUE(settings->setValue(Settings::kCaptureAutoSave, m_autoSave).has_value());
+                auto settings = std::make_unique<Core::SettingsStore>(m_root / "settings.ini");
+                ASSERT_TRUE(settings->setValue(Core::kCaptureDelaySeconds, m_delaySeconds).has_value());
+                ASSERT_TRUE(settings->setValue(Core::kPathScreenshot, Base::Paths::toDisplayText(m_root / "shots")).has_value());
+                ASSERT_TRUE(settings->setValue(Core::kHistoryKeepUnsaved, m_keepUnsaved).has_value());
+                ASSERT_TRUE(settings->setValue(Core::kCaptureAutoSave, m_autoSave).has_value());
                 if (m_afterAction != std::nullopt)
                 {
-                    ASSERT_TRUE(settings->setValue(Settings::kCaptureAfterAction, QString::fromUtf8(std::string{App::captureIntentText(*m_afterAction)}.c_str())).has_value());
+                    ASSERT_TRUE(settings->setValue(Core::kCaptureAfterAction, QString::fromUtf8(std::string{App::captureIntentText(*m_afterAction)}.c_str())).has_value());
                 }
                 m_settings = settings.get();
 
@@ -295,7 +295,7 @@ namespace GyanisScribe
             }
 
             std::filesystem::path               m_root;                                                    ///< 这一格用例自己的临时目录
-            Settings::SettingsStore            *m_settings    = nullptr;                                   ///< 被控制器接管的配置存储（读回历史策略用）
+            Core::SettingsStore            *m_settings    = nullptr;                                   ///< 被控制器接管的配置存储（读回历史策略用）
             CountingScreenSource               *m_source      = nullptr;                                   ///< 被抓帧服务接管的替身
             ForegroundWindowStub               *m_integration = nullptr;                                   ///< 被平台那一侧接管的替身
             std::unique_ptr<App::AppController> m_controller;                                              ///< 被测对象

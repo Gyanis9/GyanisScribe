@@ -25,10 +25,10 @@
 
 class QLineEdit;
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
     class ISettingsStore;
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core
 
 namespace GyanisScribe::Capture
 {
@@ -67,7 +67,7 @@ namespace GyanisScribe::Capture
          * @param settings 配置存储：裸键那几档从 Gui/Controls/AppShortcuts.h 那份清册现读；生命周期必须长于本遮罩
          * @param parent 父窗口，默认无
          */
-        CaptureOverlay(const QImage &background, const QRect &screenGeometry, qreal devicePixelRatio, Settings::ISettingsStore &settings, QWidget *parent = nullptr);
+        CaptureOverlay(const QImage &background, const QRect &screenGeometry, qreal devicePixelRatio, Core::ISettingsStore &settings, QWidget *parent = nullptr);
 
         /**
          * @brief 析构遮罩
@@ -406,7 +406,7 @@ namespace GyanisScribe::Capture
         [[nodiscard]] QString formatCursorReadout() const;
 
         QImage                    m_background;                              ///< 该屏的物理像素图，按缩放因子画成逻辑大小
-        Settings::ISettingsStore &m_settings;                                ///< 裸键那几档的读端（Gui/Controls/AppShortcuts.h 那份清册），不拥有
+        Core::ISettingsStore &m_settings;                                ///< 裸键那几档的读端（Gui/Controls/AppShortcuts.h 那份清册），不拥有
         QRect                     m_screenGeometry;                          ///< 该屏的全局逻辑几何
         qreal                     m_devicePixelRatio = 1.0;                  ///< 该屏缩放因子
         QPoint                    m_anchorPoint;                             ///< 本次框选的按下点，局部逻辑坐标

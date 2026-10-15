@@ -17,10 +17,10 @@
 #include <cstddef>
 #include <vector>
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
     class ISettingsStore;
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core
 
 namespace GyanisScribe::Annotation
 {
@@ -42,7 +42,7 @@ namespace GyanisScribe::Annotation
      * @details 存的形状坏掉时不替用户猜一档：那会把「我存的色板呢」变成「程序给我换了八格别的」。
      *          读端与写端都在这一层，工具栏与设置页不发第二套解析。
      */
-    [[nodiscard]] Base::Expected<std::vector<QColor>> annotationPalette(const Settings::ISettingsStore &settings);
+    [[nodiscard]] Base::Expected<std::vector<QColor>> annotationPalette(const Core::ISettingsStore &settings);
 
     /**
      * @brief 把色板换成配置里能存的那个列表

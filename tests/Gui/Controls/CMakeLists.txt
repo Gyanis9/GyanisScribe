@@ -7,7 +7,6 @@ add_executable(TestGuiControls
 target_link_libraries(TestGuiControls PRIVATE
         Gui
         Core
-        Settings
         GTest::gtest
         GTest::gtest_main)
 

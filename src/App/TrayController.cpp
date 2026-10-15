@@ -5,8 +5,8 @@
 #include "Platform/IPlatformIntegration.h"
 #include "Platform/PlatformCapabilities.h"
 #include "Record/RecordingHud.h"
-#include "Settings/ISettingsStore.h"
-#include "Settings/SettingsKeys.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
 #include "Gui/Resources/IconProvider.h"
 #include "Gui/Theme/ThemeManager.h"
 
@@ -48,26 +48,26 @@ namespace GyanisScribe::App
     QList<TrayMenuEntry> trayMenuEntries()
     {
         QList<TrayMenuEntry> entries;
-        entries.append(TrayMenuEntry{TrayAction::CaptureRegion, "CaptureRegion", GyanisScribe::Base::uiText("框选截图"), GyanisScribe::Settings::kHotkeyCapture});
+        entries.append(TrayMenuEntry{TrayAction::CaptureRegion, "CaptureRegion", GyanisScribe::Base::uiText("框选截图"), GyanisScribe::Core::kHotkeyCapture});
         entries.append(TrayMenuEntry{TrayAction::CaptureFullScreen, "CaptureFullScreen", GyanisScribe::Base::uiText("整屏截图"), {}});
         entries.append(TrayMenuEntry{TrayAction::CaptureLastRegion, "CaptureLastRegion", GyanisScribe::Base::uiText("重复上次选区"), {}});
         // 图标用 CaptureWindow 那一枚：与「框选截图」共用同一枚会让两行在菜单里长得一模一样
         entries.append(TrayMenuEntry{TrayAction::CaptureWindow, "CaptureWindow", GyanisScribe::Base::uiText("截取当前窗口"), {}});
-        entries.append(TrayMenuEntry{TrayAction::CaptureLongRegion, "CaptureRegion", GyanisScribe::Base::uiText("滚动长截图"), GyanisScribe::Settings::kHotkeyCaptureLong});
+        entries.append(TrayMenuEntry{TrayAction::CaptureLongRegion, "CaptureRegion", GyanisScribe::Base::uiText("滚动长截图"), GyanisScribe::Core::kHotkeyCaptureLong});
         // 不抓屏，直接摆一张白底画布进标注窗：写字、画框、拼几张截图说明时不必先随便截一块屏当底
         entries.append(TrayMenuEntry{TrayAction::BlankCanvas, "Annotation", GyanisScribe::Base::uiText("新建空白画布标注"), {}});
         entries.append(TrayMenuEntry{}); // 分隔线
-        entries.append(TrayMenuEntry{TrayAction::ToggleRecord, "Record", GyanisScribe::Base::uiText("开始 / 停止录屏"), GyanisScribe::Settings::kHotkeyRecord});
-        entries.append(TrayMenuEntry{TrayAction::Recognize, "Ocr", GyanisScribe::Base::uiText("识别文字"), GyanisScribe::Settings::kHotkeyOcr});
+        entries.append(TrayMenuEntry{TrayAction::ToggleRecord, "Record", GyanisScribe::Base::uiText("开始 / 停止录屏"), GyanisScribe::Core::kHotkeyRecord});
+        entries.append(TrayMenuEntry{TrayAction::Recognize, "Ocr", GyanisScribe::Base::uiText("识别文字"), GyanisScribe::Core::kHotkeyOcr});
         entries.append(TrayMenuEntry{TrayAction::RecognizeFile, "OcrImage", GyanisScribe::Base::uiText("识别图片文件…"), {}});
-        entries.append(TrayMenuEntry{TrayAction::PickColor, "ColorPicker", GyanisScribe::Base::uiText("屏幕取色"), GyanisScribe::Settings::kHotkeyPick});
+        entries.append(TrayMenuEntry{TrayAction::PickColor, "ColorPicker", GyanisScribe::Base::uiText("屏幕取色"), GyanisScribe::Core::kHotkeyPick});
         entries.append(TrayMenuEntry{TrayAction::CloseAllPins, "PinClose", GyanisScribe::Base::uiText("关闭全部贴图"), {}});
-        entries.append(TrayMenuEntry{TrayAction::TogglePinsVisible, "Pin", GyanisScribe::Base::uiText("收起 / 摆回全部贴图"), GyanisScribe::Settings::kHotkeyTogglePins});
+        entries.append(TrayMenuEntry{TrayAction::TogglePinsVisible, "Pin", GyanisScribe::Base::uiText("收起 / 摆回全部贴图"), GyanisScribe::Core::kHotkeyTogglePins});
         entries.append(TrayMenuEntry{TrayAction::ClearPinsThrough, "PinMouseThrough", GyanisScribe::Base::uiText("取消全部贴图穿透"), {}});
         entries.append(TrayMenuEntry{TrayAction::PasteClipboard, "PinCopy", GyanisScribe::Base::uiText("把剪贴板里的图贴到屏幕上"), {}});
         // 关闭与销毁是两档：这一条只按得回「关闭」的那几张，销毁过的一张都不回来
         entries.append(TrayMenuEntry{TrayAction::RepinClosed, "Refresh", GyanisScribe::Base::uiText("重新贴出最近关掉的贴图"), {}});
-        entries.append(TrayMenuEntry{TrayAction::NextPinGroup, "PinGroup", GyanisScribe::Base::uiText("切到下一组贴图"), GyanisScribe::Settings::kHotkeyNextPinGroup});
+        entries.append(TrayMenuEntry{TrayAction::NextPinGroup, "PinGroup", GyanisScribe::Base::uiText("切到下一组贴图"), GyanisScribe::Core::kHotkeyNextPinGroup});
         // 图标与「切到下一组贴图」同族（都是分组这一件事），两行的文字各自表意，不会读成同一件事
         entries.append(TrayMenuEntry{TrayAction::ManagePinGroups, "PinGroup", GyanisScribe::Base::uiText("贴图组管理…"), {}});
         entries.append(TrayMenuEntry{});
@@ -100,7 +100,7 @@ namespace GyanisScribe::App
         return visible;
     }
 
-    TrayController::TrayController(GyanisScribe::Gui::IconProvider &icons, GyanisScribe::Gui::ThemeManager &theme, Settings::ISettingsStore &settings,
+    TrayController::TrayController(GyanisScribe::Gui::IconProvider &icons, GyanisScribe::Gui::ThemeManager &theme, Core::ISettingsStore &settings,
                                    Platform::IPlatformIntegration &integration, QObject *parent) :
         QObject(parent), m_icons(icons), m_theme(theme), m_settings(settings), m_integration(integration)
     {
@@ -157,9 +157,9 @@ namespace GyanisScribe::App
             }
             if (!entry.hotkeyKey.empty())
             {
-                const auto fallback = entry.hotkeyKey == GyanisScribe::Settings::kHotkeyRecord
+                const auto fallback = entry.hotkeyKey == GyanisScribe::Core::kHotkeyRecord
                                               ? kDefaultRecordHotkey
-                                              : (entry.hotkeyKey == GyanisScribe::Settings::kHotkeyOcr ? kDefaultOcrHotkey : kDefaultCaptureHotkey);
+                                              : (entry.hotkeyKey == GyanisScribe::Core::kHotkeyOcr ? kDefaultOcrHotkey : kDefaultCaptureHotkey);
                 const auto text     = m_settings.stringValue(entry.hotkeyKey, QString::fromUtf8(fallback));
                 // 菜单项上带快捷键提示是需求第五节的原话；显示的是配置里的真值，不是写死的样例。
                 // 用制表符分开：Qt 的菜单会把 \t 之后的文字右对齐，这正是系统菜单里快捷键提示的排法

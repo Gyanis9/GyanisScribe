@@ -20,10 +20,10 @@
 
 #include <string_view>
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
     class ISettingsStore;
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core
 
 namespace GyanisScribe::Pin
 {
@@ -81,14 +81,14 @@ namespace GyanisScribe::Pin
      * @param states 全部贴图的状态
      * @return 成功返回空载荷；配置写入失败时带回原因
      */
-    [[nodiscard]] Base::Expected<void> saveLayout(Settings::ISettingsStore &settings, const QVector<PinState> &states);
+    [[nodiscard]] Base::Expected<void> saveLayout(Core::ISettingsStore &settings, const QVector<PinState> &states);
 
     /**
      * @brief 从配置读回布局
      * @param settings 来源配置
      * @return 成功返回状态列表；没存过返回空列表；存的文本坏掉返回 InvalidArgument
      */
-    [[nodiscard]] Base::Expected<QVector<PinState>> loadLayout(const Settings::ISettingsStore &settings);
+    [[nodiscard]] Base::Expected<QVector<PinState>> loadLayout(const Core::ISettingsStore &settings);
 
     /**
      * @brief 把分组名字表序列化成 JSON 对象文本（键是组号，值是名字）
@@ -111,7 +111,7 @@ namespace GyanisScribe::Pin
      * @param names 组号 → 名字
      * @return 成功返回空载荷；配置写入失败时带回原因
      */
-    [[nodiscard]] Base::Expected<void> saveGroupNames(Settings::ISettingsStore &settings, const QMap<int, QString> &names);
+    [[nodiscard]] Base::Expected<void> saveGroupNames(Core::ISettingsStore &settings, const QMap<int, QString> &names);
 
     /**
      * @brief 从配置读回分组名字
@@ -119,7 +119,7 @@ namespace GyanisScribe::Pin
      * @return 成功返回名字表；没存过是空表；存的文本坏掉返回 InvalidArgument
      * @note 与 loadLayout 同一条口径：坏记录要报出来，不悄悄当「都没起过名字」——那一桌的标签会集体消失
      */
-    [[nodiscard]] Base::Expected<QMap<int, QString>> loadGroupNames(const Settings::ISettingsStore &settings);
+    [[nodiscard]] Base::Expected<QMap<int, QString>> loadGroupNames(const Core::ISettingsStore &settings);
 
     /**
      * @brief 读配置里那份分组轮换顺序

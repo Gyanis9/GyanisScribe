@@ -11,7 +11,7 @@
 
 #include <QString>
 
-namespace GyanisScribe::Settings
+namespace GyanisScribe::Core
 {
     class ISettingsStore;
 
@@ -24,4 +24,4 @@ namespace GyanisScribe::Settings
      */
     [[nodiscard]] QString nameTemplateOrDefault(const ISettingsStore &settings);
 
-} // namespace GyanisScribe::Settings
+} // namespace GyanisScribe::Core

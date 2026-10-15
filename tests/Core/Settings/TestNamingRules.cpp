@@ -1,11 +1,11 @@
 // 文件名模板的读取判据：读不出、空着、写歪三条路各自落到哪儿。
-// 读取与回落只有 Settings::nameTemplateOrDefault 这一处，四个写盘口都吃它的输出。
+// 读取与回落只有 Core::nameTemplateOrDefault 这一处，四个写盘口都吃它的输出。
 
-#include "Settings/NamingRules.h"
+#include "Core/Settings/NamingRules.h"
 
 #include "Base/Paths.h"
-#include "Settings/SettingsKeys.h"
-#include "Settings/SettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
+#include "Core/Settings/SettingsStore.h"
 
 #include <QCoreApplication>
 #include <QString>
@@ -17,9 +17,9 @@
 #include <memory>
 
 using GyanisScribe::Base::Paths;
-using GyanisScribe::Settings::kSaveNameTemplate;
-using GyanisScribe::Settings::nameTemplateOrDefault;
-using GyanisScribe::Settings::SettingsStore;
+using GyanisScribe::Core::kSaveNameTemplate;
+using GyanisScribe::Core::nameTemplateOrDefault;
+using GyanisScribe::Core::SettingsStore;
 
 namespace
 {

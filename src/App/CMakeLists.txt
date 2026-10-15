@@ -43,7 +43,6 @@ target_link_libraries(App PUBLIC
         Platform
         Record
         Scan
-        Settings
         Gui
         Qt6::Core
         Qt6::Gui

@@ -63,7 +63,7 @@ namespace GyanisScribe::Core
         if (stored.trimmed().isEmpty())
         {
             // 没存过就是默认档：这一条不是「读不懂」，不该报成坏值
-            return kOutputBorderColor;
+            return kDefaultOutputBorderColor;
         }
         // Qt 6 的 setNamedColor 没有返回值，判「认不认得」要用 isValidColorName：它认 CSS 风格的颜色名，
         // 不只是 #RRGGBB——界面提示写的是 #RRGGBB，多收下的那些写法（如 red）也在同一档里能用

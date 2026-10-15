@@ -10,7 +10,6 @@ target_include_directories(Hotkey PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(Hotkey PUBLIC
         Core
         Platform
-        Settings
         Qt6::Core)
 
 if (MSVC)
