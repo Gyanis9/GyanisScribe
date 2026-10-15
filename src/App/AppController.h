@@ -43,11 +43,15 @@ namespace GyanisScribe::Gui
     class CaptureService;
 } // namespace GyanisScribe::Gui
 
-namespace GyanisScribe::Annotation
+namespace GyanisScribe::Core
 {
     class AnnotationEngine;
+} // namespace GyanisScribe::Core
+
+namespace GyanisScribe::Gui
+{
     class AnnotationWindow;
-} // namespace GyanisScribe::Annotation
+} // namespace GyanisScribe::Gui
 
 namespace GyanisScribe::Core
 {
@@ -616,8 +620,8 @@ namespace GyanisScribe::App
         std::unique_ptr<Core::HotkeyManager>              m_hotkeys;                                      ///< 热键登记与触发
         std::unique_ptr<GyanisScribe::Gui::ThemeManager>  m_theme;                                        ///< 主题档位与样式表
         std::unique_ptr<GyanisScribe::Gui::IconProvider>  m_icons;                                        ///< 图标供给器，描边色跟主题
-        std::unique_ptr<Annotation::AnnotationEngine>     m_annotation;                                   ///< 标注引擎，跨轮次保留（载入新帧会清空）
-        std::unique_ptr<Annotation::AnnotationWindow>     m_annotationWindow;                             ///< 标注窗口，复用同一把工具栏
+        std::unique_ptr<Core::AnnotationEngine>           m_annotation;                                   ///< 标注引擎，跨轮次保留（载入新帧会清空）
+        std::unique_ptr<Gui::AnnotationWindow>            m_annotationWindow;                             ///< 标注窗口，复用同一把工具栏
         std::unique_ptr<Gui::PinManager>                  m_pins;                                         ///< 贴图管理器
         std::unique_ptr<ImageFetcher>                     m_imageFetcher;                                 ///< 网页取图：拖进来的可以是一条图片地址
         std::optional<QPoint>                             m_pendingFetchPoint;                            ///< 在飞那一张取回来落在哪儿；空表示跟光标走

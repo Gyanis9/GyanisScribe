@@ -1,9 +1,9 @@
 #include "App/AppController.h"
 
-#include "Annotation/AnnotationEngine.h"
-#include "Annotation/AnnotationToolbar.h"
-#include "Annotation/AnnotationWindow.h"
-#include "Annotation/BlankCanvas.h"
+#include "Core/Annotation/AnnotationEngine.h"
+#include "Gui/Annotation/AnnotationToolbar.h"
+#include "Gui/Annotation/AnnotationWindow.h"
+#include "Core/Annotation/BlankCanvas.h"
 #include "App/ClipboardPin.h"
 #include "App/CustomHotkeys.h"
 #include "Gui/Capture/CaptureService.h"
@@ -158,7 +158,7 @@ namespace GyanisScribe::App
         m_theme->applyFromSettings();
 
         // 标注一套：引擎跨轮次复用（载入新帧自己会清空历史），窗口与工具栏也只建一次
-        m_annotation = std::make_unique<Annotation::AnnotationEngine>();
+        m_annotation = std::make_unique<Core::AnnotationEngine>();
         m_pins       = std::make_unique<Gui::PinManager>(*m_settings, *m_integration);
         m_ocr        = Plugins::createOcrEngine(*m_settings, *m_integration);
         // Runner 拿着引擎的引用，它的析构必须排在引擎之前：成员的析构按声明反序，头文件里那份声明就排在 m_ocr 后面
@@ -192,7 +192,7 @@ namespace GyanisScribe::App
         QObject::connect(m_tray.get(), &TrayController::actionRequested, this, &AppController::handleTrayAction);
         // 装没装上要留到接线全部完成之后再处置：现身的这一刻起用户就能点，每个入口都得已经接好
         const bool trayInstalled = m_tray->install();
-        m_annotationWindow = std::make_unique<Annotation::AnnotationWindow>(*m_annotation, *m_settings, std::make_unique<Annotation::AnnotationToolbar>(*m_settings, *m_icons));
+        m_annotationWindow = std::make_unique<Gui::AnnotationWindow>(*m_annotation, *m_settings, std::make_unique<Gui::AnnotationToolbar>(*m_settings, *m_icons));
 
         // 热键 → 动作：唯一的接线处，界面加菜单项时也是发同一个信号而不是再走一条路径
         QObject::connect(m_hotkeys.get(), &Core::IHotkeyManager::actionTriggered, this,
@@ -276,13 +276,13 @@ namespace GyanisScribe::App
                          });
 
         // 标注窗的四个出口：动作只有一个入口，界面不需要知道用户是点了按钮还是按了键盘
-        QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::copyRequested, this, &AppController::handleCopyRequested);
-        QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::saveRequested, this, &AppController::handleSaveRequested);
-        QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::pinRequested, this, &AppController::handlePinRequested);
-        QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::ocrRequested, this, &AppController::handleOcrRequested);
-        QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::scanRequested, this, &AppController::handleScanRequested);
-        QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::printRequested, this, &AppController::handlePrintRequested);
-        QObject::connect(m_annotationWindow.get(), &Annotation::AnnotationWindow::refreshRequested, this, &AppController::refreshLastCapture);
+        QObject::connect(m_annotationWindow.get(), &Gui::AnnotationWindow::copyRequested, this, &AppController::handleCopyRequested);
+        QObject::connect(m_annotationWindow.get(), &Gui::AnnotationWindow::saveRequested, this, &AppController::handleSaveRequested);
+        QObject::connect(m_annotationWindow.get(), &Gui::AnnotationWindow::pinRequested, this, &AppController::handlePinRequested);
+        QObject::connect(m_annotationWindow.get(), &Gui::AnnotationWindow::ocrRequested, this, &AppController::handleOcrRequested);
+        QObject::connect(m_annotationWindow.get(), &Gui::AnnotationWindow::scanRequested, this, &AppController::handleScanRequested);
+        QObject::connect(m_annotationWindow.get(), &Gui::AnnotationWindow::printRequested, this, &AppController::handlePrintRequested);
+        QObject::connect(m_annotationWindow.get(), &Gui::AnnotationWindow::refreshRequested, this, &AppController::refreshLastCapture);
 
         // 录屏：编码器与服务各一个，热键再按一次就是「停止并编码」
         m_recorder  = std::make_unique<Plugins::FfmpegRecordingEncoder>();
@@ -474,10 +474,10 @@ namespace GyanisScribe::App
 
         // 底是白的还是透明的由设置里那一格定：有人要拿画布当垫在别的图上面的一层，白底会把下面那层整个盖掉
         const auto transparentCanvas = m_settings->boolValue(Core::kAnnotationBlankCanvasTransparent, false);
-        const auto canvas            = Annotation::makeBlankCanvas(Annotation::kBlankCanvasSize, screen->devicePixelRatio(), screen->name(), transparentCanvas);
+        const auto canvas            = Core::makeBlankCanvas(Core::kBlankCanvasSize, screen->devicePixelRatio(), screen->name(), transparentCanvas);
         const auto available         = screen->availableGeometry();
         // 不碰截图那条链：没有帧、不记「上次选区」、也不触发音效/自动保存/历史——那一串都挂在「抓到了屏上的一块」上
-        m_annotationWindow->startAnnotation(canvas, available, Annotation::blankCanvasRegion(available, canvas.logicalSize));
+        m_annotationWindow->startAnnotation(canvas, available, Core::blankCanvasRegion(available, canvas.logicalSize));
         Base::Logger::info(std::format("空白画布已开：逻辑 {}×{}，物理 {}×{}，屏 {}，底{}", canvas.logicalSize.width(), canvas.logicalSize.height(), canvas.image.width(),
                                        canvas.image.height(), canvas.screenName.toStdString(), transparentCanvas ? "透明" : "白"));
     }

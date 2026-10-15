@@ -4,7 +4,7 @@
 #include "App/TrayClick.h"
 #include "App/TrayController.h"
 #include "App/UpdateCheck.h"
-#include "Annotation/AnnotationPalette.h"
+#include "Core/Annotation/AnnotationPalette.h"
 #include "Core/Capture/ScreenUtils.h"
 #include "Core/Image/ImageFormat.h"
 #include "Base/Logger.h"
@@ -1528,7 +1528,7 @@ namespace GyanisScribe::App
 
     void MainWindow::exportPaletteToFile(const QString &filePath)
     {
-        const auto palette = GyanisScribe::Annotation::annotationPalette(m_settings);
+        const auto palette = GyanisScribe::Core::annotationPalette(m_settings);
         if (!palette)
         {
             // 手改过的配置里那份坏名单：报原样原因，而不是拿内置那八格冒充「你存的色板」导出去
@@ -1545,7 +1545,7 @@ namespace GyanisScribe::App
             emit messageForUser(reason, GyanisScribe::Gui::ToastKind::Danger);
             return;
         }
-        const auto text = GyanisScribe::Annotation::paletteFileText(*palette);
+        const auto text = GyanisScribe::Core::paletteFileText(*palette);
         file.write(text.toUtf8());
         file.close();
 
@@ -1564,7 +1564,7 @@ namespace GyanisScribe::App
             return;
         }
         const auto bytes  = file.readAll();
-        const auto parsed = GyanisScribe::Annotation::parsePaletteFileText(QString::fromUtf8(bytes.constData(), static_cast<qsizetype>(bytes.size())));
+        const auto parsed = GyanisScribe::Core::parsePaletteFileText(QString::fromUtf8(bytes.constData(), static_cast<qsizetype>(bytes.size())));
         if (!parsed)
         {
             Logger::warning(std::format("色板导入被拒：{}", parsed.error().message));
@@ -1573,7 +1573,7 @@ namespace GyanisScribe::App
         }
 
         // 整份替换：追加会把两次导入变成两份重复色块；写坏的那一次保持旧名单，界面上不会出现「半份新色板」
-        const auto written = m_settings.setValue(GyanisScribe::Core::kAnnotationPalette, GyanisScribe::Annotation::paletteToTokens(*parsed));
+        const auto written = m_settings.setValue(GyanisScribe::Core::kAnnotationPalette, GyanisScribe::Core::paletteToTokens(*parsed));
         if (!written)
         {
             Logger::warning(std::format("色板没能写入：{}", written.error().message));
@@ -2147,13 +2147,13 @@ namespace GyanisScribe::App
                                      tokens << one;
                                  }
                              }
-                             const auto parsed = GyanisScribe::Annotation::paletteFromTokens(tokens);
+                             const auto parsed = GyanisScribe::Core::paletteFromTokens(tokens);
                              if (!parsed)
                              {
                                  explainHint(QString::fromUtf8(parsed.error().message.c_str()));
                                  return;
                              }
-                             if (const auto written = settings.setValue(GyanisScribe::Core::kAnnotationPalette, GyanisScribe::Annotation::paletteToTokens(*parsed)); !written)
+                             if (const auto written = settings.setValue(GyanisScribe::Core::kAnnotationPalette, GyanisScribe::Core::paletteToTokens(*parsed)); !written)
                              {
                                  explainHint(QString::fromUtf8(written.error().message.c_str()));
                                  return;

@@ -1,11 +1,11 @@
 #include "Gui/Pin/PinWindow.h"
 
-#include "Annotation/AnnotationEngine.h"
-#include "Annotation/AnnotationToolbar.h"
-#include "Annotation/AnnotationToolbarBridge.h"
-#include "Annotation/AnnotationToolbarGeometry.h"
-#include "Annotation/AnnotationView.h"
-#include "Annotation/AnnotationWindow.h"
+#include "Core/Annotation/AnnotationEngine.h"
+#include "Gui/Annotation/AnnotationToolbar.h"
+#include "Gui/Annotation/AnnotationToolbarBridge.h"
+#include "Gui/Annotation/AnnotationToolbarGeometry.h"
+#include "Gui/Annotation/AnnotationView.h"
+#include "Gui/Annotation/AnnotationWindow.h"
 #include "Core/Image/ImageFormat.h"
 #include "Core/Image/ClipboardFile.h"
 #include "Base/Logger.h"
@@ -987,7 +987,7 @@ namespace GyanisScribe::Gui
 
         if (m_annotateEngine == nullptr)
         {
-            m_annotateEngine = std::make_unique<Annotation::AnnotationEngine>();
+            m_annotateEngine = std::make_unique<Core::AnnotationEngine>();
         }
         Base::CapturedImage canvas;
         canvas.image            = m_image;
@@ -998,7 +998,7 @@ namespace GyanisScribe::Gui
 
         if (m_annotateView == nullptr)
         {
-            m_annotateView = new Annotation::AnnotationView{*m_annotateEngine, this};
+            m_annotateView = new Gui::AnnotationView{*m_annotateEngine, this};
         }
         // 视图铺满整窗：此时旋转已归零，窗口框就是画布框
         m_annotateView->setGeometry(contentRect().toRect());
@@ -1011,21 +1011,21 @@ namespace GyanisScribe::Gui
             {
                 m_icons = std::make_unique<Gui::IconProvider>();
             }
-            m_annotateToolbar = new Annotation::AnnotationToolbar{m_settings, *m_icons, this};
+            m_annotateToolbar = new Gui::AnnotationToolbar{m_settings, *m_icons, this};
             // 与标注窗同一条摆法：工具栏是独立浮窗，摆在贴图旁边
             m_annotateToolbar->setParent(this, Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
-            m_annotateBridge = std::make_unique<Annotation::AnnotationToolbarBridge>(*m_annotateToolbar, *m_annotateEngine, this);
+            m_annotateBridge = std::make_unique<Gui::AnnotationToolbarBridge>(*m_annotateToolbar, *m_annotateEngine, this);
             // 可见段收放让工具栏尺寸变了就重摆一次，钉子仍贴着贴图中心
-            QObject::connect(m_annotateToolbar, &Annotation::AnnotationToolbar::contextLayoutChanged, this, [this] { placeAnnotateToolbar(); });
+            QObject::connect(m_annotateToolbar, &Gui::AnnotationToolbar::contextLayoutChanged, this, [this] { placeAnnotateToolbar(); });
 
             // 四个动作按钮都是「收工并做这件事」：与标注窗里「按下即交出去」同一条形状
-            QObject::connect(m_annotateBridge.get(), &Annotation::AnnotationToolbarBridge::copyRequested, this,
+            QObject::connect(m_annotateBridge.get(), &Gui::AnnotationToolbarBridge::copyRequested, this,
                              [this]
                              {
                                  finishAnnotation();
                                  copyToClipboard();
                              });
-            QObject::connect(m_annotateBridge.get(), &Annotation::AnnotationToolbarBridge::saveRequested, this,
+            QObject::connect(m_annotateBridge.get(), &Gui::AnnotationToolbarBridge::saveRequested, this,
                              [this]
                              {
                                  finishAnnotation();
@@ -1034,13 +1034,13 @@ namespace GyanisScribe::Gui
                                      Base::Logger::error(saved.error().message);
                                  }
                              });
-            QObject::connect(m_annotateBridge.get(), &Annotation::AnnotationToolbarBridge::pinRequested, this,
+            QObject::connect(m_annotateBridge.get(), &Gui::AnnotationToolbarBridge::pinRequested, this,
                              [this]
                              {
                                  finishAnnotation();
                                  emit pinAnotherRequested(m_image);
                              });
-            QObject::connect(m_annotateBridge.get(), &Annotation::AnnotationToolbarBridge::ocrRequested, this,
+            QObject::connect(m_annotateBridge.get(), &Gui::AnnotationToolbarBridge::ocrRequested, this,
                              [this]
                              {
                                  finishAnnotation();
@@ -1066,7 +1066,7 @@ namespace GyanisScribe::Gui
         }
         const auto *screen    = QGuiApplication::screenAt(globalRect().center());
         const auto  available = screen != nullptr ? screen->availableGeometry() : QRect{};
-        const auto  placed    = Annotation::placeToolbar(available, m_annotateToolbar->sizeHint(), globalRect());
+        const auto  placed    = Gui::placeToolbar(available, m_annotateToolbar->sizeHint(), globalRect());
         if (placed)
         {
             m_annotateToolbar->setGeometry(placed->frame);
@@ -1213,7 +1213,7 @@ namespace GyanisScribe::Gui
     void PinWindow::routeAnnotationKey(QKeyEvent *event)
     {
         // 序号工具在用时的 `+`/`-`/`0`：与标注窗同一口径（改的是「下一个号」，不动画布）
-        if (m_annotateEngine->activeTool() == Annotation::ToolKind::Number && event->modifiers() == Qt::NoModifier)
+        if (m_annotateEngine->activeTool() == Core::ToolKind::Number && event->modifiers() == Qt::NoModifier)
         {
             switch (event->key())
             {
@@ -1238,28 +1238,28 @@ namespace GyanisScribe::Gui
             }
         }
 
-        const auto action = Annotation::shortcutActionFor(event->key(), event->modifiers());
+        const auto action = Gui::shortcutActionFor(event->key(), event->modifiers());
         switch (action)
         {
-            case Annotation::ShortcutAction::None:
+            case Gui::ShortcutAction::None:
                 break; // 还可能是字母工具键，落到下面那张表
-            case Annotation::ShortcutAction::Close:
+            case Gui::ShortcutAction::Close:
                 // Esc 在这里是收工保留：贴图本来就存在，丢弃它不是一个可用的选择
                 finishAnnotation();
                 return;
-            case Annotation::ShortcutAction::Undo:
+            case Gui::ShortcutAction::Undo:
                 if (auto undone = m_annotateEngine->undo(); !undone)
                 {
                     Base::Logger::info(std::format("撤销没做成：{}", undone.error().message));
                 }
                 return;
-            case Annotation::ShortcutAction::Redo:
+            case Gui::ShortcutAction::Redo:
                 if (auto redone = m_annotateEngine->redo(); !redone)
                 {
                     Base::Logger::info(std::format("重做没做成：{}", redone.error().message));
                 }
                 return;
-            case Annotation::ShortcutAction::NudgeSelection:
+            case Gui::ShortcutAction::NudgeSelection:
             {
                 const auto step = Gui::arrowStepFor(event->key());
                 if (!step)
@@ -1273,13 +1273,13 @@ namespace GyanisScribe::Gui
                 }
                 return;
             }
-            case Annotation::ShortcutAction::DeleteSelection:
+            case Gui::ShortcutAction::DeleteSelection:
                 if (auto removed = m_annotateEngine->removeSelection(); !removed)
                 {
                     Base::Logger::info(std::format("删除没做成：{}", removed.error().message));
                 }
                 return;
-            case Annotation::ShortcutAction::CopyShape:
+            case Gui::ShortcutAction::CopyShape:
                 if (m_annotateEngine->selections().empty())
                 {
                     finishAnnotation();
@@ -1291,60 +1291,60 @@ namespace GyanisScribe::Gui
                     Base::Logger::info(std::format("复制没做成：{}", copied.error().message));
                 }
                 return;
-            case Annotation::ShortcutAction::PasteShape:
+            case Gui::ShortcutAction::PasteShape:
                 if (auto pasted = m_annotateEngine->pasteClipboard(); !pasted)
                 {
                     Base::Logger::info(std::format("粘贴没做成：{}", pasted.error().message));
                 }
                 return;
-            case Annotation::ShortcutAction::RaiseSelection:
+            case Gui::ShortcutAction::RaiseSelection:
                 if (auto raised = m_annotateEngine->raiseSelection(); !raised)
                 {
                     Base::Logger::info(std::format("上移一层没做成：{}", raised.error().message));
                 }
                 return;
-            case Annotation::ShortcutAction::LowerSelection:
+            case Gui::ShortcutAction::LowerSelection:
                 if (auto lowered = m_annotateEngine->lowerSelection(); !lowered)
                 {
                     Base::Logger::info(std::format("下移一层没做成：{}", lowered.error().message));
                 }
                 return;
-            case Annotation::ShortcutAction::BringToFront:
+            case Gui::ShortcutAction::BringToFront:
                 if (auto fronted = m_annotateEngine->bringSelectionToFront(); !fronted)
                 {
                     Base::Logger::info(std::format("置顶没做成：{}", fronted.error().message));
                 }
                 return;
-            case Annotation::ShortcutAction::SendToBack:
+            case Gui::ShortcutAction::SendToBack:
                 if (auto backed = m_annotateEngine->sendSelectionToBack(); !backed)
                 {
                     Base::Logger::info(std::format("置底没做成：{}", backed.error().message));
                 }
                 return;
-            case Annotation::ShortcutAction::Copy:
+            case Gui::ShortcutAction::Copy:
                 // 与标注窗一致：回车=复制成品并收工；工具栏那个按钮走桥的 copyRequested，同一形状
                 finishAnnotation();
                 copyToClipboard();
                 return;
-            case Annotation::ShortcutAction::Save:
+            case Gui::ShortcutAction::Save:
                 finishAnnotation();
                 if (const auto saved = saveWithDefaultName(); !saved)
                 {
                     Base::Logger::error(saved.error().message);
                 }
                 return;
-            case Annotation::ShortcutAction::Pin:
+            case Gui::ShortcutAction::Pin:
                 finishAnnotation();
                 emit pinAnotherRequested(m_image);
                 return;
-            case Annotation::ShortcutAction::Ocr:
+            case Gui::ShortcutAction::Ocr:
                 finishAnnotation();
                 emit ocrRequested(m_image);
                 return;
         }
 
         // 字母键切工具：与标注窗读的是同一份键位清册，切完回灌按钮态
-        if (const auto tool = Annotation::toolShortcutFor(event->key(), event->modifiers(), m_settings); tool)
+        if (const auto tool = Gui::toolShortcutFor(event->key(), event->modifiers(), m_settings); tool)
         {
             if (auto switched = m_annotateEngine->setActiveTool(*tool); switched)
             {

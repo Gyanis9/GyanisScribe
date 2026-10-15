@@ -5,9 +5,9 @@
 // 与 CrashProbe / UiShotTool 同一条理由不是产品的一部分：不进安装包、不挂产品入口。
 // 跑法：UiAuditTool <输出目录>；stdout 每行是「图名: 实际尺寸 sizeHint minimumSizeHint」。
 
-#include "Annotation/AnnotationPalette.h"
-#include "Annotation/AnnotationToolbar.h"
-#include "Annotation/AnnotationToolbarGeometry.h"
+#include "Core/Annotation/AnnotationPalette.h"
+#include "Gui/Annotation/AnnotationToolbar.h"
+#include "Gui/Annotation/AnnotationToolbarGeometry.h"
 #include "App/MainWindow.h"
 #include "Core/History/HistoryStore.h"
 #include "Core/Pick/RecentColors.h"
@@ -65,8 +65,8 @@ namespace
     std::vector<QColor> fullPalette()
     {
         std::vector<QColor> palette;
-        const auto          step = 360 / static_cast<int>(GyanisScribe::Annotation::kPaletteCapacity);
-        for (int index = 0; index < static_cast<int>(GyanisScribe::Annotation::kPaletteCapacity); ++index)
+        const auto          step = 360 / static_cast<int>(GyanisScribe::Core::kPaletteCapacity);
+        for (int index = 0; index < static_cast<int>(GyanisScribe::Core::kPaletteCapacity); ++index)
         {
             palette.push_back(QColor::fromHsv((index * step) % 360, 200, 220));
         }
@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
 
     // 面 1：标注工具栏默认态（设置里没存过色板，= 全新安装那一份）
     {
-        GyanisScribe::Annotation::AnnotationToolbar toolbar{settings, icons, nullptr};
+        GyanisScribe::Gui::AnnotationToolbar toolbar{settings, icons, nullptr};
         toolbar.show();
         shoot(toolbar, outputDirectory, "annotation-toolbar-default");
 
@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
         for (const int screenWidth: {2560, 2048, 1920, 1536, 1280})
         {
             const QRect available{0, 0, screenWidth, 1040};
-            const auto  placed = GyanisScribe::Annotation::placeToolbar(available, hint, QRect{200, 200, 900, 600});
+            const auto  placed = GyanisScribe::Gui::placeToolbar(available, hint, QRect{200, 200, 900, 600});
             if (!placed)
             {
                 std::printf("place @%d: failed (%s)\n", screenWidth, placed.error().message.c_str());
@@ -143,15 +143,15 @@ int main(int argc, char *argv[])
         }
 
         // 每种工具收放可见段之后的宽度：台账 B 条「收敛后最宽是哪一档」的读数与对照图
-        for (std::size_t index = 0; index < GyanisScribe::Annotation::kToolTable.size(); ++index)
+        for (std::size_t index = 0; index < GyanisScribe::Gui::kToolTable.size(); ++index)
         {
-            toolbar.setActiveTool(std::get<0>(GyanisScribe::Annotation::kToolTable[index]));
+            toolbar.setActiveTool(std::get<0>(GyanisScribe::Gui::kToolTable[index]));
             QCoreApplication::processEvents();
-            shoot(toolbar, outputDirectory, std::format("annotation-toolbar-{}", std::get<1>(GyanisScribe::Annotation::kToolTable[index])).c_str());
+            shoot(toolbar, outputDirectory, std::format("annotation-toolbar-{}", std::get<1>(GyanisScribe::Gui::kToolTable[index])).c_str());
         }
 
         // 文字工具的两个子档：描边开着多两枚（描边色/描边粗细）、底板开着多一枚（底板色）
-        toolbar.setActiveTool(GyanisScribe::Annotation::ToolKind::Text);
+        toolbar.setActiveTool(GyanisScribe::Core::ToolKind::Text);
         toolbar.setTextOutline(true);
         shoot(toolbar, outputDirectory, "annotation-toolbar-text-outline");
         toolbar.setTextBackground(true);
@@ -160,14 +160,14 @@ int main(int argc, char *argv[])
 
     // 面 2：标注工具栏满配态——16 格色板 + 6 格最近色，这是它能长到的最宽形状
     {
-        const auto paletteSeeded = settings.setValue(GyanisScribe::Core::kAnnotationPalette, GyanisScribe::Annotation::paletteToTokens(fullPalette()));
+        const auto paletteSeeded = settings.setValue(GyanisScribe::Core::kAnnotationPalette, GyanisScribe::Core::paletteToTokens(fullPalette()));
         const auto recentSeeded  = settings.setValue(GyanisScribe::Core::kAnnotationRecentColors, GyanisScribe::Core::serializeRecentColors(fullRecentColors()));
         if (!paletteSeeded || !recentSeeded)
         {
             std::fprintf(stderr, "failed to seed the full palette\n");
             return 1;
         }
-        GyanisScribe::Annotation::AnnotationToolbar toolbar{settings, icons, nullptr};
+        GyanisScribe::Gui::AnnotationToolbar toolbar{settings, icons, nullptr};
         toolbar.show();
         shoot(toolbar, outputDirectory, "annotation-toolbar-full-palette");
     }
@@ -204,7 +204,7 @@ int main(int argc, char *argv[])
             theme.applyFromSettings();
             window.open(GyanisScribe::App::MainWindowPage::General);
             shoot(window, outputDirectory, std::format("theme-{}-general", name).c_str());
-            GyanisScribe::Annotation::AnnotationToolbar toolbar{settings, icons, nullptr};
+            GyanisScribe::Gui::AnnotationToolbar toolbar{settings, icons, nullptr};
             toolbar.show();
             shoot(toolbar, outputDirectory, std::format("theme-{}-toolbar", name).c_str());
         }

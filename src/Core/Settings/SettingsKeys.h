@@ -185,13 +185,13 @@ namespace GyanisScribe::Core
     /// 没存过文件的截图也进历史：像素另存一份到应用数据目录下的 Unsaved（读端在 AppController::handleCaptured，写端在 Core::archiveUnsavedCapture）
     inline constexpr std::string_view kHistoryKeepUnsaved = "History/KeepUnsaved";
 
-    /// 标注色板的最近使用颜色（#RRGGBB 列表，最新的在前），读写都在 Annotation::AnnotationToolbar
+    /// 标注色板的最近使用颜色（#RRGGBB 列表，最新的在前），读写都在 Gui::AnnotationToolbar
     inline constexpr std::string_view kAnnotationRecentColors = "Annotation/RecentColors";
 
     /**
      * @brief 自定义色板（#RRGGBB 列表，顺序就是色板上从左到右）；留空即内置那八格
-     * @details 读端在 Annotation::annotationPalette（工具栏那一排与设置页共用一份换算），
-     *          写端是设置页那一格与工具栏上的拖动重排、加色与去色。上限与坏写法都拒，见 Annotation/AnnotationPalette.h。
+     * @details 读端在 Core::annotationPalette（工具栏那一排与设置页共用一份换算），
+     *          写端是设置页那一格与工具栏上的拖动重排、加色与去色。上限与坏写法都拒，见 Core/Annotation/AnnotationPalette.h。
      */
     inline constexpr std::string_view kAnnotationPalette = "Annotation/Palette";
 

@@ -4,7 +4,7 @@
 
 #include "Gui/Pin/PinWindow.h"
 
-#include "Annotation/AnnotationView.h"
+#include "Gui/Annotation/AnnotationView.h"
 
 #include "PinTestAssets.h"
 
@@ -927,7 +927,7 @@ namespace GyanisScribe
         delete menu;
 
         EXPECT_TRUE(window.isAnnotating()) << "点了「标注」没进标注模式";
-        auto *view = window.findChild<Annotation::AnnotationView *>();
+        auto *view = window.findChild<Gui::AnnotationView *>();
         ASSERT_NE(view, nullptr) << "标注视图没挂到贴图窗上";
         EXPECT_EQ(view->geometry(), window.rect()) << "标注视图该铺满整窗";
     }
@@ -944,7 +944,7 @@ namespace GyanisScribe
         QObject::connect(&window, &Gui::PinWindow::closedByUser, [&closed] { closed = true; });
 
         window.startAnnotation();
-        auto *view = window.findChild<Annotation::AnnotationView *>();
+        auto *view = window.findChild<Gui::AnnotationView *>();
         ASSERT_NE(view, nullptr) << "标注视图没挂上";
         ASSERT_TRUE(window.isAnnotating());
 
@@ -1081,7 +1081,7 @@ namespace GyanisScribe
     {
         auto &window = makeWindow();
         window.startAnnotation();
-        auto *view = window.findChild<Annotation::AnnotationView *>();
+        auto *view = window.findChild<Gui::AnnotationView *>();
         ASSERT_NE(view, nullptr);
 
         pressKey(window, Qt::Key_P);

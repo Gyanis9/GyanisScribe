@@ -279,21 +279,8 @@ namespace GyanisScribe::Gui
     /// 页顶说明行的最大宽度：整窗宽的一行长句读起来要回头数，收到这一档就按行折
     inline constexpr int kIntroMaximumWidth = 420;
 
-    /**
-     * @brief 标注默认色板
-     * @details 需求第五节点名的八色（红橙黄绿蓝紫黑白），自定义色由工具栏的取色对话框追加，
-     *          不在这里占位；消费方是标注工具栏的色块按钮，序号即按钮顺序。
-     */
-    inline constexpr std::array<QColor, 8> kAnnotationPalette{
-            QColor{232, 62, 62},  // 红
-            QColor{242, 141, 50}, // 橙
-            QColor{240, 195, 60}, // 黄
-            QColor{70, 180, 90},  // 绿
-            QColor{35, 109, 233}, // 蓝，与主色同值
-            QColor{150, 90, 200}, // 紫
-            QColor{24, 24, 24},   // 黑
-            QColor{252, 252, 252} // 白
-    };
+    // 标注默认色板住在 Core/Annotation/AnnotationPalette.h（kAnnotationPaletteColors）；
+    // 其中「蓝」与主色同值这条关系由 Gui 的用例钉住（TestDesignTokens.AnnotationPaletteBlueFollowsTheAccent）
 
     /// 标注线宽阶梯，工具栏的滑块按这几档走，不允许连续取值
     inline constexpr std::array<int, 4> kAnnotationWidths{2, 4, 6, 8};

@@ -54,7 +54,6 @@ target_include_directories(TestMainWindow PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..
 
 target_link_libraries(TestMainWindow PRIVATE
         App
-        Annotation
         Gui
         Core
         GTest::gtest
@@ -78,7 +77,6 @@ add_executable(TestModuleFlow
 
 target_link_libraries(TestModuleFlow PRIVATE
         App
-        Annotation
         Core
         Platform
         Gui
@@ -107,7 +105,6 @@ add_executable(TestAppController
 
 target_link_libraries(TestAppController PRIVATE
         App
-        Annotation
         Core
         Platform
         Gui

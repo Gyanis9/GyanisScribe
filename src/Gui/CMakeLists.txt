@@ -9,6 +9,7 @@ add_subdirectory(Pin)
 add_subdirectory(Capture)
 add_subdirectory(Ocr)
 add_subdirectory(Record)
+add_subdirectory(Annotation)
 
 get_property(GuiSources GLOBAL PROPERTY GyanisScribeGuiSources)
 add_library(Gui STATIC ${GuiSources})
@@ -20,9 +21,8 @@ set_target_properties(Gui PROPERTIES AUTORCC ON)
 target_include_directories(Gui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 # HotkeyEdit 要在校验组合键能否全局登记时才写配置：热键管理在 Core，热键后端在 Platform；
 # 贴图窗口族（穿透/置顶/吸附）同样要用平台能力，所以 Platform 直接吃在这里。
-# Annotation 是临时依赖：贴图窗的「直接标注」用标注工具与视图；批 16 标注并入 Gui/Core 后撤掉。
+# Annotation 的界面件已并入本模块（Gui/Annotation）与 Core，不再单列依赖。
 target_link_libraries(Gui PUBLIC
-        Annotation
         Core
         Platform
         Qt6::Core

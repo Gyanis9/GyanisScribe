@@ -14,7 +14,7 @@ namespace GyanisScribe::Gui
 {
     namespace
     {
-        // 可换键的界面动作。默认那颗与中文名与各自模块的分派同解：标注窗那十三档对齐 Annotation::kToolTable
+        // 可换键的界面动作。默认那颗与中文名与各自模块的分派同解：标注窗那十三档对齐 Gui::kToolTable
         // （由 TestAnnotationToolbar 的独立清单钉住），遮罩与贴图那十二颗对齐两边的按键判据。
         // 同一窗口里两档不许共用一颗键；不同窗口撞字母是常态（遮罩的 V 复制尺寸、贴图的 V 上下翻转，各管各的）
         constexpr std::array<AppShortcutEntry, 25> kAppShortcutEntries = {

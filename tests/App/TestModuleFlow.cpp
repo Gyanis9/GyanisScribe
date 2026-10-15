@@ -4,9 +4,9 @@
 // （见 src/Capture/QScreenCaptureSource.cpp），于是「标注吃逻辑坐标 → 导出物理像素 → 贴图开窗」
 // 这三步之间的换算一旦被漏掉，就只有这条链上看得见。
 
-#include "Annotation/AnnotationEngine.h"
-#include "Annotation/AnnotationTool.h"
-#include "Annotation/PenParameters.h"
+#include "Core/Annotation/AnnotationEngine.h"
+#include "Core/Annotation/AnnotationTool.h"
+#include "Core/Annotation/PenParameters.h"
 #include "Gui/Capture/CaptureService.h"
 #include "Core/Capture/ICaptureService.h"
 #include "Core/Capture/IScreenCaptureSource.h"
@@ -235,10 +235,10 @@ namespace GyanisScribe
             EXPECT_EQ(frame.logicalSize, QSize(kLogicalWidth, kLogicalHeight));
             EXPECT_EQ(frame.screenName, QString::fromLatin1(kFakeScreenName));
 
-            GyanisScribe::Annotation::AnnotationEngine engine;
+            GyanisScribe::Core::AnnotationEngine engine;
             engine.loadCanvas(frame);
-            ASSERT_TRUE(engine.setActiveTool(GyanisScribe::Annotation::ToolKind::Rectangle).has_value());
-            ASSERT_TRUE(engine.setPenParameters(GyanisScribe::Annotation::PenParameters{.color = kAnnotationColor, .lineWidth = 6, .fontSize = 12, .fillStyle = 0}).has_value());
+            ASSERT_TRUE(engine.setActiveTool(GyanisScribe::Core::ToolKind::Rectangle).has_value());
+            ASSERT_TRUE(engine.setPenParameters(GyanisScribe::Core::PenParameters{.color = kAnnotationColor, .lineWidth = 6, .fontSize = 12, .fillStyle = 0}).has_value());
             engine.beginStroke(kStrokeLogicalRect.topLeft());
             engine.moveStroke(kStrokeLogicalRect.bottomRight());
             ASSERT_TRUE(engine.endStroke().has_value()) << "矩形退化，没能进撤销栈";

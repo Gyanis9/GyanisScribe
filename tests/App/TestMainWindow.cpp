@@ -6,7 +6,7 @@
 #include "App/MainWindow.h"
 
 #include "App/TrayController.h"
-#include "Annotation/AnnotationToolbar.h"
+#include "Gui/Annotation/AnnotationToolbar.h"
 #include "Core/Capture/ScreenUtils.h"
 #include "Core/History/HistoryRules.h"
 #include "Core/History/HistoryStore.h"
@@ -68,7 +68,7 @@ using GyanisScribe::App::screenCaptureLabels;
 
 namespace
 {
-    using GyanisScribe::Annotation::AnnotationToolbar;
+    using GyanisScribe::Gui::AnnotationToolbar;
     using GyanisScribe::App::MainWindow;
     using GyanisScribe::App::MainWindowPage;
     using GyanisScribe::App::pageChoices;

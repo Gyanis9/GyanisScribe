@@ -1,3 +1,4 @@
+#include "Core/Annotation/AnnotationPalette.h"
 #include "Core/Record/CursorHighlight.h"
 #include "Gui/Theme/DesignTokens.h"
 
@@ -53,4 +54,12 @@ TEST(DesignTokenSteps, RejectsValuesOffTheLadderWithoutSnapping)
 TEST(DesignTokens, CursorHighlightColorFollowsTheAccent)
 {
     EXPECT_EQ(GyanisScribe::Core::kCursorHighlightColor, kAccentColor);
+}
+
+/**
+ * @brief 标注默认色板里「蓝」那一格必须与主色同值：色板搬去 Core 之后两处字面量最容易分家
+ */
+TEST(DesignTokens, AnnotationPaletteBlueFollowsTheAccent)
+{
+    EXPECT_EQ(GyanisScribe::Core::kAnnotationPaletteColors[4], kAccentColor);
 }
