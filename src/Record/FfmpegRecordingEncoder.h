@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 #include "Record/RecorderConfig.h"
 
 #include <QSize>
@@ -46,7 +46,7 @@ namespace GyanisScribe::Record
          * @details 帧数与时长必须成对交进来：机器跟不上目标帧率时帧序列是短的，
          *          只按 config 里的目标帧率编会把六秒编成两秒（实测），画面加速、音轨被截尾。
          */
-        [[nodiscard]] virtual Core::Expected<std::filesystem::path> encode(const RecorderConfig &config, const std::filesystem::path &frameDirectory, int frameCount,
+        [[nodiscard]] virtual Base::Expected<std::filesystem::path> encode(const RecorderConfig &config, const std::filesystem::path &frameDirectory, int frameCount,
                                                                            qint64 recordedDurationMs, const std::filesystem::path &audioWav) = 0;
     };
 
@@ -82,7 +82,7 @@ namespace GyanisScribe::Record
          * @param audioWav 配音文件路径，空表示无声
          * @return 成品路径或原因
          */
-        [[nodiscard]] Core::Expected<std::filesystem::path> encode(const RecorderConfig &config, const std::filesystem::path &frameDirectory, int frameCount,
+        [[nodiscard]] Base::Expected<std::filesystem::path> encode(const RecorderConfig &config, const std::filesystem::path &frameDirectory, int frameCount,
                                                                    qint64 recordedDurationMs, const std::filesystem::path &audioWav) override;
 
     private:
@@ -93,14 +93,14 @@ namespace GyanisScribe::Record
          * @param stepName 这一步的名字，出错时进文案
          * @return 成功返回空载荷；失败返回带退出码与末段输出的原因
          */
-        [[nodiscard]] static Core::Expected<void> run(const QStringList &arguments, int timeoutMs, std::string_view stepName);
+        [[nodiscard]] static Base::Expected<void> run(const QStringList &arguments, int timeoutMs, std::string_view stepName);
 
         /**
          * @brief 读出这一轮帧序列的尺寸
          * @param frameDirectory 帧序列目录
          * @return 成功返回首帧尺寸，像素；一帧都没写成或 PNG 读不出时返回中文原因
          */
-        [[nodiscard]] static Core::Expected<QSize> firstFrameSize(const std::filesystem::path &frameDirectory);
+        [[nodiscard]] static Base::Expected<QSize> firstFrameSize(const std::filesystem::path &frameDirectory);
 
         /**
          * @brief 按真录屏的尺寸探出这台机器上开得起来的编码器
@@ -108,7 +108,7 @@ namespace GyanisScribe::Record
          * @param frameSize 首帧尺寸，像素
          * @return 成功返回编码器名；候选全开不起来返回原因
          */
-        [[nodiscard]] static Core::Expected<std::string> selectEncoder(const RecorderConfig &config, const QSize &frameSize);
+        [[nodiscard]] static Base::Expected<std::string> selectEncoder(const RecorderConfig &config, const QSize &frameSize);
     };
 
 } // namespace GyanisScribe::Record

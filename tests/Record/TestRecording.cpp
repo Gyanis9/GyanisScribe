@@ -23,9 +23,9 @@
 #include <string>
 #include <vector>
 
-using GyanisScribe::Core::CapturedImage;
-using GyanisScribe::Core::ErrorCode;
-using GyanisScribe::Core::Expected;
+using GyanisScribe::Base::CapturedImage;
+using GyanisScribe::Base::ErrorCode;
+using GyanisScribe::Base::Expected;
 using GyanisScribe::Record::achievedFrameRateArgument;
 using GyanisScribe::Record::FrameClock;
 using GyanisScribe::Record::frameCountFor;
@@ -73,7 +73,7 @@ namespace
             if (index == failAt)
             {
                 // 失败的那一帧不记账：否则 writtenFrames 会把没落盘的一帧也算进去
-                return std::unexpected(GyanisScribe::Core::Error{ErrorCode::FileWriteFailed, "第 2 帧写坏了"});
+                return std::unexpected(GyanisScribe::Base::Error{ErrorCode::FileWriteFailed, "第 2 帧写坏了"});
             }
             indices.push_back(index);
             sizes.push_back({frame.width(), frame.height()});
@@ -85,7 +85,7 @@ namespace
             ++sealCalls;
             if (indices.empty())
             {
-                return std::unexpected(GyanisScribe::Core::Error{ErrorCode::InternalError, "一帧都没有"});
+                return std::unexpected(GyanisScribe::Base::Error{ErrorCode::InternalError, "一帧都没有"});
             }
             return {};
         }
@@ -524,7 +524,7 @@ TEST(RecorderFrameRateSetting, AcceptsInRangeAndRejectsOutside)
     {
         const auto parsed = GyanisScribe::Record::parseFrameRateSetting(bad);
         ASSERT_FALSE(parsed.has_value()) << bad;
-        EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument) << bad;
+        EXPECT_EQ(parsed.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument) << bad;
         EXPECT_NE(parsed.error().message.find("60"), std::string::npos) << bad;
         EXPECT_NE(parsed.error().message.find("Record/DefaultFrameRate"), std::string::npos) << bad;
     }
@@ -547,7 +547,7 @@ TEST(RecorderDurationSetting, DefaultsComeFromOneConstantAndOutOfRangeIsRejected
     {
         const auto parsed = GyanisScribe::Record::parseMaximumDurationSetting(bad);
         ASSERT_FALSE(parsed.has_value()) << bad;
-        EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument) << bad;
+        EXPECT_EQ(parsed.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument) << bad;
         EXPECT_NE(parsed.error().message.find("Record/MaximumDurationSeconds"), std::string::npos) << bad;
     }
 }
@@ -566,7 +566,7 @@ TEST(RecorderVideoBitrateSetting, ZeroIsAChoiceAndOutsideRangeIsRejected)
     {
         const auto parsed = GyanisScribe::Record::parseVideoBitrateSetting(bad);
         ASSERT_FALSE(parsed.has_value()) << bad;
-        EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument) << bad;
+        EXPECT_EQ(parsed.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument) << bad;
         EXPECT_NE(parsed.error().message.find("50000"), std::string::npos) << bad;
         EXPECT_NE(parsed.error().message.find("Record/VideoBitrateKbps"), std::string::npos) << bad;
     }
@@ -586,7 +586,7 @@ TEST(RecordCountdownSetting, ParsesWithItsOwnRange)
     {
         const auto parsed = GyanisScribe::Record::parseCountdownSetting(bad);
         ASSERT_FALSE(parsed.has_value()) << bad;
-        EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument) << bad;
+        EXPECT_EQ(parsed.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument) << bad;
         EXPECT_NE(parsed.error().message.find("10"), std::string::npos) << bad;
         EXPECT_NE(parsed.error().message.find("Record/CountdownSeconds"), std::string::npos) << bad;
     }
@@ -634,7 +634,7 @@ TEST(RecordScopeSetting, TableRoundTripsEveryModeAndRejectsUnknownToken)
     {
         const auto parsed = GyanisScribe::Record::parseRecordScope(bad);
         ASSERT_FALSE(static_cast<bool>(parsed)) << bad.toStdString();
-        EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument) << bad.toStdString();
+        EXPECT_EQ(parsed.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument) << bad.toStdString();
         EXPECT_NE(parsed.error().message.find("FullScreen"), std::string::npos) << bad.toStdString();
         EXPECT_NE(parsed.error().message.find("Record/Scope"), std::string::npos) << bad.toStdString();
     }
@@ -653,7 +653,7 @@ TEST(FfmpegAudioCaptureArguments, BuildsOneOrTwoInputsAndRefusesNone)
 
     const auto none = GyanisScribe::Record::audioCaptureArguments(QString(), QString(), wav);
     ASSERT_FALSE(static_cast<bool>(none)) << "两路都没给却拼出了一条命令";
-    EXPECT_EQ(none.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument);
+    EXPECT_EQ(none.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument);
     EXPECT_NE(none.error().message.find("设备"), std::string::npos);
 
     const auto one = GyanisScribe::Record::audioCaptureArguments(mic, QString(), wav);
@@ -737,7 +737,7 @@ TEST(RecordFormatSetting, TableRoundTripsEveryFormatAndRejectsUnknownToken)
     {
         const auto parsed = GyanisScribe::Record::parseRecordFormat(bad);
         ASSERT_FALSE(static_cast<bool>(parsed)) << bad.toStdString();
-        EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument) << bad.toStdString();
+        EXPECT_EQ(parsed.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument) << bad.toStdString();
         EXPECT_NE(parsed.error().message.find("Gif"), std::string::npos) << bad.toStdString();
         EXPECT_NE(parsed.error().message.find("Record/Format"), std::string::npos) << bad.toStdString();
     }

@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QImage>
 
@@ -29,6 +29,6 @@ namespace GyanisScribe::Core
      *          「复制文件」是两条出口：前者粘进文档里是一张图，后者粘进资源管理器/聊天窗口
      *          落一份 .png 文件。
      */
-    [[nodiscard]] Expected<std::filesystem::path> copyImageAsFile(const QImage &image, const std::filesystem::path &directory);
+    [[nodiscard]] Base::Expected<std::filesystem::path> copyImageAsFile(const QImage &image, const std::filesystem::path &directory);
 
 } // namespace GyanisScribe::Core

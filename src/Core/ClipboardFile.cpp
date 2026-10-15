@@ -1,8 +1,8 @@
 #include "Core/ClipboardFile.h"
 
-#include "Core/Logger.h"
-#include "Core/Paths.h"
-#include "Core/Text.h"
+#include "Base/Logger.h"
+#include "Base/Paths.h"
+#include "Base/Text.h"
 
 #include <QByteArray>
 #include <QClipboard>
@@ -26,34 +26,34 @@ namespace GyanisScribe::Core
         }
     } // namespace
 
-    Expected<std::filesystem::path> copyImageAsFile(const QImage &image, const std::filesystem::path &directory)
+    Base::Expected<std::filesystem::path> copyImageAsFile(const QImage &image, const std::filesystem::path &directory)
     {
         if (image.isNull())
         {
-            return std::unexpected(Error{ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("这张图是空的，没有可复制成文件的内容")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("这张图是空的，没有可复制成文件的内容")});
         }
 
-        if (const auto ensured = Paths::ensureDirectory(directory); !ensured)
+        if (const auto ensured = Base::Paths::ensureDirectory(directory); !ensured)
         {
             return std::unexpected(ensured.error());
         }
 
         // 输出路径交给 Paths 那一处换算：窄串与宽串的转换只在它那儿发生
-        const auto filePath = directory / Paths::fromDisplayText(contentStemOf(image) + QStringLiteral(".png"));
-        if (!image.save(Paths::toDisplayText(filePath), "PNG"))
+        const auto filePath = directory / Base::Paths::fromDisplayText(contentStemOf(image) + QStringLiteral(".png"));
+        if (!image.save(Base::Paths::toDisplayText(filePath), "PNG"))
         {
-            return std::unexpected(
-                    Error{ErrorCode::FileWriteFailed, GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("复制为文件失败：{} 写不下去。请检查这个目录是否可写"),
-                                                                                   Paths::toDisplayText(filePath).toStdString())});
+            return std::unexpected(Base::Error{Base::ErrorCode::FileWriteFailed,
+                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("复制为文件失败：{} 写不下去。请检查这个目录是否可写"),
+                                                                            Base::Paths::toDisplayText(filePath).toStdString())});
         }
 
         auto *mime = new QMimeData;
-        mime->setUrls({QUrl::fromLocalFile(Paths::toDisplayText(filePath))});
+        mime->setUrls({QUrl::fromLocalFile(Base::Paths::toDisplayText(filePath))});
         // 交给剪贴板之后载荷归它持有：Qt 在 Windows 上会把本地文件 URL 发布成 CF_HDROP，
         // 资源管理器与聊天窗口由此能直接吃下这一份
         QGuiApplication::clipboard()->setMimeData(mime);
 
-        Logger::info(std::format("复制为文件：{}", Paths::toDisplayText(filePath).toStdString()));
+        Base::Logger::info(std::format("复制为文件：{}", Base::Paths::toDisplayText(filePath).toStdString()));
         return filePath;
     }
 

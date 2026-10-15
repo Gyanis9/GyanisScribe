@@ -36,7 +36,7 @@ using GyanisScribe::App::colorCardColorOf;
 using GyanisScribe::App::pinContentFrom;
 using GyanisScribe::Pin::renderColorCard;
 using GyanisScribe::App::renderTextCard;
-using GyanisScribe::Core::ErrorCode;
+using GyanisScribe::Base::ErrorCode;
 
 namespace
 {

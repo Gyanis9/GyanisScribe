@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QImage>
 #include <QString>
@@ -44,7 +44,7 @@ namespace GyanisScribe::Scan
      * @details 「图里一个码都没有」是成功且列表为空，不是错误——调用方要能把这件事与
      *          「后端没编进来」分开说。转灰度后一遍扫全部码制，方向由后端自己掰正。
      */
-    [[nodiscard]] Core::Expected<std::vector<BarcodeReading>> readBarcodes(const QImage &image);
+    [[nodiscard]] Base::Expected<std::vector<BarcodeReading>> readBarcodes(const QImage &image);
 
     /**
      * @brief 从认出的列表里挑一条报给用户：优先二维

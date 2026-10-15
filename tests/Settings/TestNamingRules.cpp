@@ -3,7 +3,7 @@
 
 #include "Settings/NamingRules.h"
 
-#include "Core/Paths.h"
+#include "Base/Paths.h"
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
 
@@ -16,7 +16,7 @@
 #include <format>
 #include <memory>
 
-using GyanisScribe::Core::Paths;
+using GyanisScribe::Base::Paths;
 using GyanisScribe::Settings::kSaveNameTemplate;
 using GyanisScribe::Settings::nameTemplateOrDefault;
 using GyanisScribe::Settings::SettingsStore;

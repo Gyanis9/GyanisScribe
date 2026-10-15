@@ -1,6 +1,6 @@
 #include "Scan/BarcodeDecoder.h"
 
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 #if defined(GYANISSCRIBE_HAS_ZXING)
 #include <ZXing/BarcodeFormat.h>
@@ -19,7 +19,7 @@ namespace GyanisScribe::Scan
 #endif
     }
 
-    Core::Expected<std::vector<BarcodeReading>> readBarcodes(const QImage &image)
+    Base::Expected<std::vector<BarcodeReading>> readBarcodes(const QImage &image)
     {
 #if defined(GYANISSCRIBE_HAS_ZXING)
         if (image.isNull())
@@ -46,7 +46,7 @@ namespace GyanisScribe::Scan
         return readings;
 #else
         Q_UNUSED(image);
-        return std::unexpected(Core::Error{Core::ErrorCode::DependencyMissing, Core::uiText("本档没带二维码/条形码识别后端。请用随包发布的安装版，或让构建依赖里带上 zxing-cpp")});
+        return std::unexpected(Base::Error{Base::ErrorCode::DependencyMissing, Base::uiText("本档没带二维码/条形码识别后端。请用随包发布的安装版，或让构建依赖里带上 zxing-cpp")});
 #endif
     }
 

@@ -1,4 +1,4 @@
-#include "Core/Logger.h"
+#include "Base/Logger.h"
 #include "Settings/SettingsStore.h"
 
 #include <QCoreApplication>
@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-using GyanisScribe::Core::ErrorCode;
+using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Settings::SettingsStore;
 
 namespace
@@ -138,7 +138,7 @@ TEST_F(SettingsFixture, MalformedValuesFallBackInsteadOfCoercing)
     const auto      logDirectory = std::filesystem::temp_directory_path() / std::format("GyanisScribe-Settings-{}-logs", caseName);
     std::error_code cleanupError;
     std::filesystem::remove_all(logDirectory, cleanupError);
-    ASSERT_TRUE(GyanisScribe::Core::Logger::initialize(logDirectory).has_value()) << "用例自带的日志目录建不出来";
+    ASSERT_TRUE(GyanisScribe::Base::Logger::initialize(logDirectory).has_value()) << "用例自带的日志目录建不出来";
 
     SettingsStore store(iniFile);
     EXPECT_EQ(store.intValue("Record/Fps", 15), 15) << "把 \"12abc\" 截断成 12 就是静默变形";
@@ -149,7 +149,7 @@ TEST_F(SettingsFixture, MalformedValuesFallBackInsteadOfCoercing)
     EXPECT_NE(logText.find("不是十进制整数"), std::string::npos) << "整数回落没留日志，配置写错的人永远不会知道";
     EXPECT_NE(logText.find("不在布尔词表"), std::string::npos) << "布尔回落没留日志";
     EXPECT_NE(logText.find("空文本"), std::string::npos) << "文本回落没留日志";
-    GyanisScribe::Core::Logger::shutdown();
+    GyanisScribe::Base::Logger::shutdown();
 }
 
 /**
@@ -252,7 +252,7 @@ TEST_F(SettingsFixture, ExportThenImportRestoresIntoAnotherStore)
  * @brief 钉住「路径里有本地码页装不下的字」时导出与导入仍指到同一条路
  * @details Windows 上 std::filesystem::path::string() 按本地 ANSI 码页给窄串（实测本机 ACP=936，
  *          窄串就是 cp936 字节），码页装不下的字会被写成问号，于是「导出成功」而文件躺在另一条路上。
- *          本工程一律走 wstring（Core::Paths::toDisplayText 是同一条规则的唯一出处）。
+ *          本工程一律走 wstring（Base::Paths::toDisplayText 是同一条规则的唯一出处）。
  *          目录名刻意带上表情符号：只用汉字或西里尔字母时 cp936 装得下，窄串路线自洽，
  *          这条判据就退化成恒过——要它真的能红，得放一个本机码页表示不了的字。
  */

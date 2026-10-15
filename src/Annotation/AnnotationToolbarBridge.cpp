@@ -2,7 +2,7 @@
 
 #include "Annotation/AnnotationToolbar.h"
 #include "Annotation/IAnnotationEngine.h"
-#include "Core/Logger.h"
+#include "Base/Logger.h"
 
 #include <format>
 
@@ -39,7 +39,7 @@ namespace GyanisScribe::Annotation
                          {
                              if (auto switched = m_engine.setActiveTool(kind); !switched)
                              {
-                                 Core::Logger::warning(std::format("切工具没成：{}", switched.error().message));
+                                 Base::Logger::warning(std::format("切工具没成：{}", switched.error().message));
                              }
                          });
         QObject::connect(&toolbar, &AnnotationToolbar::colorChanged, this,
@@ -181,7 +181,7 @@ namespace GyanisScribe::Annotation
                          {
                              if (auto applied = m_engine.setNumberGroup(group); !applied)
                              {
-                                 Core::Logger::warning(std::format("切计数组没成：{}", applied.error().message));
+                                 Base::Logger::warning(std::format("切计数组没成：{}", applied.error().message));
                              }
                          });
         QObject::connect(&toolbar, &AnnotationToolbar::undoClicked, this,
@@ -189,7 +189,7 @@ namespace GyanisScribe::Annotation
                          {
                              if (auto undone = m_engine.undo(); !undone)
                              {
-                                 Core::Logger::info(std::format("撤销没做成：{}", undone.error().message));
+                                 Base::Logger::info(std::format("撤销没做成：{}", undone.error().message));
                              }
                          });
         QObject::connect(&toolbar, &AnnotationToolbar::redoClicked, this,
@@ -197,7 +197,7 @@ namespace GyanisScribe::Annotation
                          {
                              if (auto redone = m_engine.redo(); !redone)
                              {
-                                 Core::Logger::info(std::format("重做没做成：{}", redone.error().message));
+                                 Base::Logger::info(std::format("重做没做成：{}", redone.error().message));
                              }
                          });
 
@@ -229,7 +229,7 @@ namespace GyanisScribe::Annotation
     {
         if (auto applied = m_engine.setPenParameters(m_penParameters); !applied)
         {
-            Core::Logger::warning(std::format("画笔参数没下发：{}", applied.error().message));
+            Base::Logger::warning(std::format("画笔参数没下发：{}", applied.error().message));
         }
     }
 

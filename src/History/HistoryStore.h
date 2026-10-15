@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 #include "History/HistoryRules.h"
 #include "History/HistoryTypes.h"
 
@@ -51,7 +51,7 @@ namespace GyanisScribe::History
          *          比列表少一条更难解释。
          * @note 读不懂的清单会整体报错而不是读出半份：静默丢行会让人以为历史自己少了。
          */
-        [[nodiscard]] Core::Expected<QVector<HistoryEntry>> load(const HistoryRetentionPolicy &policy, const QDateTime &now) const;
+        [[nodiscard]] Base::Expected<QVector<HistoryEntry>> load(const HistoryRetentionPolicy &policy, const QDateTime &now) const;
 
         /**
          * @brief 追加一条并按策略裁剪，随后落盘
@@ -60,7 +60,7 @@ namespace GyanisScribe::History
          * @param now 判过期用的时刻
          * @return 成功返回空载荷；失败返回带路径与原因的 Error
          */
-        [[nodiscard]] Core::Expected<void> append(const HistoryEntry &entry, const HistoryRetentionPolicy &policy, const QDateTime &now);
+        [[nodiscard]] Base::Expected<void> append(const HistoryEntry &entry, const HistoryRetentionPolicy &policy, const QDateTime &now);
 
         /**
          * @brief 从清单里去掉一条
@@ -68,14 +68,14 @@ namespace GyanisScribe::History
          * @return 成功返回空载荷；清单里没有这条记录时返回 InvalidArgument
          * @note 只删记录不删文件：用户的成品目录由用户自己清，软件不替他做不可逆的那一步。
          */
-        [[nodiscard]] Core::Expected<void> remove(const std::filesystem::path &filePath);
+        [[nodiscard]] Base::Expected<void> remove(const std::filesystem::path &filePath);
 
         /**
          * @brief 清空整份清单
          * @return 成功返回空载荷；写不回去时返回带路径与原因的 Error
          * @note 与 remove() 同一条口径：只清记录不动成品文件，用户的图与视频由用户自己决定去留
          */
-        [[nodiscard]] Core::Expected<void> clear();
+        [[nodiscard]] Base::Expected<void> clear();
 
     private:
         /**
@@ -83,7 +83,7 @@ namespace GyanisScribe::History
          * @return 记录表；文件不存在时返回空表
          * @details 任一条读不懂就整体报错并指出第几条：读半份清单会让用户以为历史自己少了。
          */
-        [[nodiscard]] Core::Expected<QVector<HistoryEntry>> readRaw() const;
+        [[nodiscard]] Base::Expected<QVector<HistoryEntry>> readRaw() const;
 
         /**
          * @brief 把整份记录表写回清单
@@ -91,7 +91,7 @@ namespace GyanisScribe::History
          * @return 成功返回空载荷；失败返回带路径与原因的 Error
          * @details 先写临时名再原子替换：中途断电留下一份截断的清单，下次启动就读不出历史了。
          */
-        [[nodiscard]] Core::Expected<void> writeRaw(const QVector<HistoryEntry> &entries) const;
+        [[nodiscard]] Base::Expected<void> writeRaw(const QVector<HistoryEntry> &entries) const;
 
         std::filesystem::path m_storagePath; ///< 清单文件位置
     };

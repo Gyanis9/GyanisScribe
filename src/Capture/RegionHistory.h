@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QRect>
 #include <QString>
@@ -52,7 +52,7 @@ namespace GyanisScribe::Capture
      * @param text 来自配置的文本；空串是合法输入，表示「还没有历史」
      * @return 成功返回历史（最多取 kRegionHistoryLimit 条）；形状不对时返回 InvalidArgument 并点名第几段
      */
-    [[nodiscard]] Core::Expected<std::vector<RegionHistoryEntry>> regionHistoryFromText(std::string_view text);
+    [[nodiscard]] Base::Expected<std::vector<RegionHistoryEntry>> regionHistoryFromText(std::string_view text);
 
     /**
      * @brief 把一条记录压进历史
@@ -78,7 +78,7 @@ namespace GyanisScribe::Capture
      * @details 历史键为空时回退读升级前的两把单值键（读到就当作一条）：旧配置里那份「上次选区」
      *          还复用得上，第一次成功截图后会连历史一起补齐。
      */
-    [[nodiscard]] Core::Expected<std::vector<RegionHistoryEntry>> loadRegionHistory(Settings::ISettingsStore &settings);
+    [[nodiscard]] Base::Expected<std::vector<RegionHistoryEntry>> loadRegionHistory(Settings::ISettingsStore &settings);
 
     /**
      * @brief 记一次选区：压进历史并写回配置

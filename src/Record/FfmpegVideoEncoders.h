@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QString>
 #include <QStringList>
@@ -66,6 +66,6 @@ namespace GyanisScribe::Record
      *          把「钉的那一档这次没开起来」写进日志）——到了编码这一步帧已经录完，
      *          宁可按自动档编出来，也不让这一段白录。钉子不在候选表里时直接退回自动。
      */
-    [[nodiscard]] Core::Expected<std::string> selectVideoEncoder(const std::function<bool(const QStringList &)> &run, int width, int height, int frameRate, int videoBitrateKbps,
+    [[nodiscard]] Base::Expected<std::string> selectVideoEncoder(const std::function<bool(const QStringList &)> &run, int width, int height, int frameRate, int videoBitrateKbps,
                                                                  std::string_view pinnedEncoder = {});
 } // namespace GyanisScribe::Record

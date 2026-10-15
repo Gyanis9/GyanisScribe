@@ -10,7 +10,7 @@
 #pragma once
 
 #include "Capture/IScreenCaptureSource.h"
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QLine>
 #include <QPoint>
@@ -41,7 +41,7 @@ namespace GyanisScribe::Capture
      * @param logical 配置读出的整数（逻辑像素）
      * @return 成功返回可用的半径；不在 [1,60] 里时返回带范围与补救办法的中文原因
      */
-    [[nodiscard]] Core::Expected<int> parseCaptureCornerRadius(int logical);
+    [[nodiscard]] Base::Expected<int> parseCaptureCornerRadius(int logical);
 
     /**
      * @brief 把某块屏幕内的逻辑矩形换成同一块屏幕上的物理像素矩形
@@ -51,7 +51,7 @@ namespace GyanisScribe::Capture
      * @note 判据是「两套换算互指同一个点」：cropToLogicalRect() 用同一份取整规则，
      *       两边不一致时标注层与最终像素会错位半格。缩放因子非正一律拒，不悄悄按 1 处理。
      */
-    [[nodiscard]] Core::Expected<QRect> toPhysicalRect(const QRect &logicalRect, qreal devicePixelRatio);
+    [[nodiscard]] Base::Expected<QRect> toPhysicalRect(const QRect &logicalRect, qreal devicePixelRatio);
 
     /**
      * @brief 从一帧抓屏结果里裁出选区
@@ -60,7 +60,7 @@ namespace GyanisScribe::Capture
      * @return 成功返回裁剪后的帧，其 logicalSize 与 devicePixelRatio 同步改好
      * @return 失败返回 ScreenUnavailable，文案指出选区超出哪一条边
      */
-    [[nodiscard]] Core::Expected<Core::CapturedImage> cropToLogicalRect(const Core::CapturedImage &source, const QRect &logicalRegion);
+    [[nodiscard]] Base::Expected<Base::CapturedImage> cropToLogicalRect(const Base::CapturedImage &source, const QRect &logicalRegion);
 
     /**
      * @brief 按屏幕名取屏幕
@@ -79,7 +79,7 @@ namespace GyanisScribe::Capture
      * @details 两份抓帧来源（Qt 与 DXGI）共用这一处：两处各写一份时，缩放因子标错会表现为
      *          「高 DPI 屏上标注与成品错位」，而那种错位只在特定屏上出现，很难在现场看出根因。
      */
-    [[nodiscard]] Core::CapturedImage frameFromGrabbedImage(const QImage &grabbed, const QScreen *screen, const QSize &logicalSize);
+    [[nodiscard]] Base::CapturedImage frameFromGrabbedImage(const QImage &grabbed, const QScreen *screen, const QSize &logicalSize);
 
     /**
      * @brief 取覆盖某个全局逻辑点的屏幕
@@ -119,7 +119,7 @@ namespace GyanisScribe::Capture
      * @return 成功返回选区
      * @return 失败返回 InvalidArgument，文案写明期望的形状与实际收到的内容
      */
-    [[nodiscard]] Core::Expected<QRect> regionFromText(std::string_view text);
+    [[nodiscard]] Base::Expected<QRect> regionFromText(std::string_view text);
 
     /**
      * @brief 把遮罩尺寸框里那一行换成一块选区
@@ -381,6 +381,6 @@ namespace GyanisScribe::Capture
      * @details 算好落点交给 QPainter 做源-over 混合：部分透明与贴屏边裁切都由它兜，
      *          自己写逐像素回绕会在高缩放屏上把指针画糊。
      */
-    void drawCursorInto(Core::CapturedImage &frame, const CursorSprite &sprite);
+    void drawCursorInto(Base::CapturedImage &frame, const CursorSprite &sprite);
 
 } // namespace GyanisScribe::Capture

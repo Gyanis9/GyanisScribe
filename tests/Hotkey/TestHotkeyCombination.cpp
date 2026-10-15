@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-using GyanisScribe::Core::ErrorCode;
+using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Hotkey::HotkeyCombination;
 
 namespace

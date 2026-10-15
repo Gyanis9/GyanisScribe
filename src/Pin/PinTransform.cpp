@@ -1,6 +1,6 @@
 #include "Pin/PinTransform.h"
 
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 #include <QLineF>
 #include <QPainter>
@@ -156,16 +156,16 @@ namespace GyanisScribe::Pin
         return QSize{std::max(1, static_cast<int>(std::lround(current.width() * ratio))), std::max(1, static_cast<int>(std::lround(current.height() * ratio)))};
     }
 
-    Core::Expected<int> parseEdgeSnapDistance(const int distance)
+    Base::Expected<int> parseEdgeSnapDistance(const int distance)
     {
         if (distance >= kEdgeSnapDistanceMinimum && distance <= kEdgeSnapDistanceMaximum)
         {
             return distance;
         }
-        return Core::Expected<int>{std::unexpected{Core::Error{
-                .code    = Core::ErrorCode::InvalidArgument,
-                .message = GyanisScribe::Core::uiFormat(
-                        GyanisScribe::Core::uiTextUtf8("吸附距离 \"{}\" 不在 {} 到 {} 之间：请在设置的贴图页重填这一格，或删掉 Pin/EdgeSnapDistance 这一项回到默认的 {} 格"),
+        return Base::Expected<int>{std::unexpected{Base::Error{
+                .code    = Base::ErrorCode::InvalidArgument,
+                .message = GyanisScribe::Base::uiFormat(
+                        GyanisScribe::Base::uiTextUtf8("吸附距离 \"{}\" 不在 {} 到 {} 之间：请在设置的贴图页重填这一格，或删掉 Pin/EdgeSnapDistance 这一项回到默认的 {} 格"),
                         distance, kEdgeSnapDistanceMinimum, kEdgeSnapDistanceMaximum, kEdgeSnapTolerance),
         }}};
     }

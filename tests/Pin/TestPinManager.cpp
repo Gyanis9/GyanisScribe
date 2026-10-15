@@ -4,8 +4,8 @@
 #include "Pin/IPinWindow.h"
 #include "Pin/PinWindow.h"
 
-#include "Core/Paths.h"
-#include "Core/Text.h"
+#include "Base/Paths.h"
+#include "Base/Text.h"
 #include "PinTestAssets.h"
 #include "Pin/PinLayout.h"
 #include "Pin/PinManager.h"
@@ -180,7 +180,7 @@ namespace GyanisScribe
 
         const auto switched = pins.switchToNextGroup();
         ASSERT_FALSE(switched.has_value());
-        EXPECT_EQ(switched.error().code, Core::ErrorCode::InvalidArgument);
+        EXPECT_EQ(switched.error().code, Base::ErrorCode::InvalidArgument);
         EXPECT_NE(switched.error().message.find("新建分组"), std::string::npos) << "拒绝文案要给出多出一组的做法，实际：" << switched.error().message;
 
         EXPECT_EQ(pins.activeGroup(), 1) << "切不动时活动组被改掉了";
@@ -730,7 +730,7 @@ namespace GyanisScribe
 
         const auto refused = pins.replacePinContent(0, replacement);
         ASSERT_FALSE(refused.has_value()) << "动图被换掉了：下一帧一到就把它盖回去";
-        EXPECT_EQ(refused.error().code, Core::ErrorCode::InvalidArgument);
+        EXPECT_EQ(refused.error().code, Base::ErrorCode::InvalidArgument);
         EXPECT_NE(refused.error().message.find("动图"), std::string::npos) << "拒绝文案要点名动图，实际：" << refused.error().message;
         EXPECT_NE(refused.error().message.find("静态图"), std::string::npos) << "拒绝文案要给出出路（先存成静态图），实际：" << refused.error().message;
         const QSizeF originalSize{kImageWidth, kImageHeight};
@@ -738,7 +738,7 @@ namespace GyanisScribe
 
         const auto missing = pins.replacePinContent(pins.count(), replacement);
         ASSERT_FALSE(missing.has_value()) << "不在册的索引被放过了";
-        EXPECT_EQ(missing.error().code, Core::ErrorCode::InvalidArgument);
+        EXPECT_EQ(missing.error().code, Base::ErrorCode::InvalidArgument);
     }
 
     /**
@@ -836,7 +836,7 @@ namespace GyanisScribe
         const auto target = std::filesystem::temp_directory_path() / std::format("GyanisScribe-PinManager-{}", ::testing::UnitTest::GetInstance()->current_test_info()->name());
         std::error_code ignored;
         std::filesystem::remove_all(target, ignored);
-        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kPathScreenshot, QVariant(Core::Paths::toDisplayText(target))).has_value());
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kPathScreenshot, QVariant(Base::Paths::toDisplayText(target))).has_value());
         ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kSaveImageFormat, QVariant(QStringLiteral("Png"))).has_value());
         ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kSaveNameTemplate, QVariant(QStringLiteral("pin_%date%"))).has_value());
 
@@ -880,7 +880,7 @@ namespace GyanisScribe
             std::ofstream occupant{blocked};
             occupant << "占位的不是一个目录";
         }
-        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kPathScreenshot, QVariant(Core::Paths::toDisplayText(blocked))).has_value());
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kPathScreenshot, QVariant(Base::Paths::toDisplayText(blocked))).has_value());
         ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kSaveImageFormat, QVariant(QStringLiteral("Png"))).has_value());
 
         auto &pins = makeManager();
@@ -974,7 +974,7 @@ namespace GyanisScribe
 
         const auto refused = pins.deleteGroup(Pin::kFirstPinGroup);
         ASSERT_FALSE(refused.has_value()) << "第一组被删掉了，后面删别组就没有并回去的地方";
-        EXPECT_EQ(refused.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument);
+        EXPECT_EQ(refused.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument);
         EXPECT_NE(refused.error().message.find("落点"), std::string::npos) << "拒绝要说明为什么删不掉，实际：" << refused.error().message;
         EXPECT_EQ(pins.count(), 1) << "拒删归拒删，那张图不该跟着没";
     }
@@ -1146,10 +1146,10 @@ namespace GyanisScribe
         ASSERT_TRUE(window->isVisible()) << "前提不对：这张该在桌上";
 
         std::vector<bool> visibleDuringGrab;
-        const auto        grab = [&visibleDuringGrab, window]() -> Core::Expected<Core::CapturedImage>
+        const auto        grab = [&visibleDuringGrab, window]() -> Base::Expected<Base::CapturedImage>
         {
             visibleDuringGrab.push_back(window->isVisible());
-            return Core::CapturedImage{};
+            return Base::CapturedImage{};
         };
         const auto ok = pins.grabWithPinHidden(0, grab);
         ASSERT_TRUE(ok.has_value());
@@ -1159,10 +1159,10 @@ namespace GyanisScribe
 
         // 抓取失败那一路同样要摆回
         visibleDuringGrab.clear();
-        const auto failingGrab = [&visibleDuringGrab, window]() -> Core::Expected<Core::CapturedImage>
+        const auto failingGrab = [&visibleDuringGrab, window]() -> Base::Expected<Base::CapturedImage>
         {
             visibleDuringGrab.push_back(window->isVisible());
-            return std::unexpected(Core::Error{Core::ErrorCode::ScreenUnavailable, GyanisScribe::Core::uiTextUtf8("抓不到这块屏幕")});
+            return std::unexpected(Base::Error{Base::ErrorCode::ScreenUnavailable, GyanisScribe::Base::uiTextUtf8("抓不到这块屏幕")});
         };
         const auto failed = pins.grabWithPinHidden(0, failingGrab);
         ASSERT_FALSE(failed.has_value());

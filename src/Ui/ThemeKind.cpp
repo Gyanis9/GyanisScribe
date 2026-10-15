@@ -1,6 +1,6 @@
 #include "Ui/ThemeKind.h"
 
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 #include <array>
 #include <format>
@@ -17,7 +17,7 @@ namespace
 
 namespace GyanisScribe::Ui
 {
-    Core::Expected<ThemeKind> parseThemeKind(const std::string_view text)
+    Base::Expected<ThemeKind> parseThemeKind(const std::string_view text)
     {
         for (std::size_t index = 0; index < kKindTexts.size(); ++index)
         {
@@ -28,10 +28,10 @@ namespace GyanisScribe::Ui
         }
 
         // 逐项列出可用取值：只报「取值不对」用户不知道该填什么
-        return Core::Expected<ThemeKind>{std::unexpected{Core::Error{
-                .code    = Core::ErrorCode::InvalidArgument,
-                .message = GyanisScribe::Core::uiFormat(
-                        GyanisScribe::Core::uiTextUtf8(
+        return Base::Expected<ThemeKind>{std::unexpected{Base::Error{
+                .code    = Base::ErrorCode::InvalidArgument,
+                .message = GyanisScribe::Base::uiFormat(
+                        GyanisScribe::Base::uiTextUtf8(
                                 "主题取值 \"{}\" 不在可用档位里：请在设置的主题页从 Light、Dark、System、HighContrast 四项里选一项，手写配置文件时只能是这四个词（区分大小写）"),
                         text),
         }}};

@@ -14,7 +14,7 @@
 
 #include <optional>
 
-namespace GyanisScribe::Core
+namespace GyanisScribe::Base
 {
 
     /**
@@ -38,4 +38,4 @@ namespace GyanisScribe::Core
      */
     [[nodiscard]] std::optional<double> parseScaleRatio(const QString &text);
 
-} // namespace GyanisScribe::Core
+} // namespace GyanisScribe::Base

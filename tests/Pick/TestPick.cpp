@@ -26,7 +26,7 @@
 #include <string>
 #include <vector>
 
-using GyanisScribe::Core::CapturedImage;
+using GyanisScribe::Base::CapturedImage;
 using GyanisScribe::Pick::ColorFormat;
 using GyanisScribe::Pick::colorFormatAt;
 using GyanisScribe::Pick::colorFormatLabel;

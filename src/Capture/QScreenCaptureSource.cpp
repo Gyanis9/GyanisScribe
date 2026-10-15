@@ -2,8 +2,8 @@
 #include "Capture/QScreenCaptureSource.h"
 
 #include "Capture/ScreenUtils.h"
-#include "Core/Logger.h"
-#include "Core/Text.h"
+#include "Base/Logger.h"
+#include "Base/Text.h"
 
 #include <QApplication>
 #include <QGuiApplication>
@@ -58,19 +58,19 @@ namespace GyanisScribe::Capture
         // 装成同一形状，两处各写一份时缩放因子标错只在特定屏上现形
     } // namespace
 
-    Core::Expected<Core::CapturedImage> QScreenCaptureSource::grabScreen(const QString &screenName) const
+    Base::Expected<Base::CapturedImage> QScreenCaptureSource::grabScreen(const QString &screenName) const
     {
         QScreen *target = screenForGrab(screenName);
         if (target == nullptr)
         {
             if (!screenName.isEmpty())
             {
-                return std::unexpected(Core::Error{
-                        Core::ErrorCode::ScreenUnavailable,
-                        GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("找不到名为「{}」的屏幕：多半已经被拔掉。请在不填屏幕名的情况下重抓一次（那样按光标所在屏走）"),
+                return std::unexpected(Base::Error{
+                        Base::ErrorCode::ScreenUnavailable,
+                        GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("找不到名为「{}」的屏幕：多半已经被拔掉。请在不填屏幕名的情况下重抓一次（那样按光标所在屏走）"),
                                                      screenName.toStdString())});
             }
-            return std::unexpected(Core::Error{Core::ErrorCode::ScreenUnavailable, GyanisScribe::Core::uiTextUtf8("Qt 没有报出任何屏幕：请在 QGuiApplication 建好之后再抓图")});
+            return std::unexpected(Base::Error{Base::ErrorCode::ScreenUnavailable, GyanisScribe::Base::uiTextUtf8("Qt 没有报出任何屏幕：请在 QGuiApplication 建好之后再抓图")});
         }
 
         // 先转成目标指针以外的量：grabWindow 里 Qt 自己会再取一次屏幕几何
@@ -78,21 +78,21 @@ namespace GyanisScribe::Capture
         if (grabbed.isNull() || grabbed.width() <= 0 || grabbed.height() <= 0)
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::ScreenUnavailable,
-                                GyanisScribe::Core::uiFormat(
-                                        GyanisScribe::Core::uiTextUtf8("抓「{}」这块屏拿到了空图：本平台可能不允许直接抓取屏幕。请检查会话类型（远程会话、Wayland 沙箱）后重试"),
+                    Base::Error{Base::ErrorCode::ScreenUnavailable,
+                                GyanisScribe::Base::uiFormat(
+                                        GyanisScribe::Base::uiTextUtf8("抓「{}」这块屏拿到了空图：本平台可能不允许直接抓取屏幕。请检查会话类型（远程会话、Wayland 沙箱）后重试"),
                                         target->name().toStdString())});
         }
 
         return frameFromGrabbedImage(grabbed, target, target->geometry().size());
     }
 
-    Core::Expected<Core::CapturedImage> QScreenCaptureSource::grabWindow(quintptr windowHandle) const
+    Base::Expected<Base::CapturedImage> QScreenCaptureSource::grabWindow(quintptr windowHandle) const
     {
         if (windowHandle == 0)
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("抓窗口失败：传进来的窗口句柄是空的。请确认窗口还没有被关闭，或改用区域截图")});
+                    Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("抓窗口失败：传进来的窗口句柄是空的。请确认窗口还没有被关闭，或改用区域截图")});
         }
 
         // 本进程的顶层窗口里有它自己的逻辑几何与所属屏幕，用它算最准
@@ -106,8 +106,8 @@ namespace GyanisScribe::Capture
                 if (grabbed.isNull() || grabbed.width() <= 0)
                 {
                     return std::unexpected(
-                            Core::Error{Core::ErrorCode::PlatformUnsupported,
-                                        GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("本平台抓不出窗口像素（句柄 {}）。请改用区域截图框住那个窗口"), windowHandle)});
+                            Base::Error{Base::ErrorCode::PlatformUnsupported,
+                                        GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("本平台抓不出窗口像素（句柄 {}）。请改用区域截图框住那个窗口"), windowHandle)});
                 }
                 return frameFromGrabbedImage(grabbed, target, window->geometry().size());
             }
@@ -119,14 +119,14 @@ namespace GyanisScribe::Capture
         if (grabbed.isNull() || grabbed.width() <= 0)
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::PlatformUnsupported,
-                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("抓不到句柄 {} 对应的窗口：本平台不允许抓取他人窗口，或窗口已关闭。请改用区域截图"),
+                    Base::Error{Base::ErrorCode::PlatformUnsupported,
+                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("抓不到句柄 {} 对应的窗口：本平台不允许抓取他人窗口，或窗口已关闭。请改用区域截图"),
                                                              windowHandle)});
         }
 
         const auto  dpr = target->devicePixelRatio();
         const QSize logicalSize(qRound(static_cast<double>(grabbed.width()) / dpr), qRound(static_cast<double>(grabbed.height()) / dpr));
-        Core::Logger::info(std::format("按外部窗口抓取：句柄 {}，像素 {}×{}，按 dpr {} 回算逻辑尺寸 {}×{}", windowHandle, grabbed.width(), grabbed.height(), dpr,
+        Base::Logger::info(std::format("按外部窗口抓取：句柄 {}，像素 {}×{}，按 dpr {} 回算逻辑尺寸 {}×{}", windowHandle, grabbed.width(), grabbed.height(), dpr,
                                        logicalSize.width(), logicalSize.height()));
         return frameFromGrabbedImage(grabbed, target, logicalSize);
     }

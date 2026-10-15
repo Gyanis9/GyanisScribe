@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 #include "Hotkey/IHotkeyManager.h"
 
 #include "App/MainWindow.h"
@@ -160,7 +160,7 @@ namespace GyanisScribe::App
          * @return 成功返回本轮登记结果；热键一项都没登记上也返回成功结果，失败项在报告里
          * @note 托盘、设置页与热键重载都调这一个，避免出现第二套登记路径
          */
-        [[nodiscard]] Core::Expected<Hotkey::HotkeyReloadReport> registerHotkeys();
+        [[nodiscard]] Base::Expected<Hotkey::HotkeyReloadReport> registerHotkeys();
 
         /**
          * @brief 进入截图框选
@@ -227,7 +227,7 @@ namespace GyanisScribe::App
          * @return 成功返回空载荷；文件不在、或不是能贴的图片时返回中文原因
          * @details 复用拖放那套内容转换：图片读像素、动图连来源带走、读不出的说清是哪一件
          */
-        [[nodiscard]] Core::Expected<void> pinImageFile(const QString &filePath);
+        [[nodiscard]] Base::Expected<void> pinImageFile(const QString &filePath);
 
         /**
          * @brief 打开贴图组管理窗（托盘与主窗口的动作条都走这一条）
@@ -300,7 +300,7 @@ namespace GyanisScribe::App
          * @param image 抓屏产物
          * @details 截完不再直接进剪贴板：标注窗的「复制」就是原来的那一步，只是多了先标一笔的机会
          */
-        void handleCaptured(const Core::CapturedImage &image);
+        void handleCaptured(const Base::CapturedImage &image);
 
         /**
          * @brief 按「截完之后」那一档把这一帧交出去，最后一档是开标注窗
@@ -347,7 +347,7 @@ namespace GyanisScribe::App
         void handleTrayAction(TrayAction action);
 
         /// 拼这一轮录屏的参数：屏幕名与输出目录都从这里取
-        [[nodiscard]] Core::Expected<Record::RecorderConfig> makeRecordingConfig() const;
+        [[nodiscard]] Base::Expected<Record::RecorderConfig> makeRecordingConfig() const;
 
         /// 起一层录屏控制条并开始每秒推一次状态
         void showRecordingHud();
@@ -384,7 +384,7 @@ namespace GyanisScribe::App
          * @details 「存成文件」「快速保存」与「自动保存」三条路共用：三条各写一遍落盘
          *          就迟早出现「这边记了历史那边没记」这类暗差
          */
-        [[nodiscard]] Core::Expected<QString> writeImageToDisk(const QImage &image);
+        [[nodiscard]] Base::Expected<QString> writeImageToDisk(const QImage &image);
 
         /**
          * @brief 按设置里的两格给成品装边框与投影
@@ -534,7 +534,7 @@ namespace GyanisScribe::App
          * @brief 识别失败：把后端给的中文原因原样报给用户
          * @param error 后端给的故障类别与文案
          */
-        void handleOcrFailed(const Core::Error &error);
+        void handleOcrFailed(const Base::Error &error);
 
         /// 给用户看的一条提示：有气泡就用气泡，没有（例如起不来托盘的那类环境）就落日志
         void notifyUser(const QString &message, GyanisScribe::Ui::ToastKind kind);
@@ -569,7 +569,7 @@ namespace GyanisScribe::App
          * @param filePath 图片路径
          * @return 图；读不出时返回写明原因的错误
          */
-        [[nodiscard]] Core::Expected<QImage> loadImageFile(const std::filesystem::path &filePath) const;
+        [[nodiscard]] Base::Expected<QImage> loadImageFile(const std::filesystem::path &filePath) const;
 
         /// 历史页要求把一条成品重新贴回屏幕
         void handleHistoryPin(const std::filesystem::path &filePath);
@@ -628,7 +628,7 @@ namespace GyanisScribe::App
         bool                                                 m_commandLineActive = false;    ///< 正在跑命令行那次截图：失败路径要往 commandLineActionFailed 也交一份
         QTimer                                              *m_captureDelayTimer = nullptr;  ///< 延时截图那一枚，一次只允许有一个在等
         std::function<void()>                                m_pendingCapture;               ///< 延时到点要走的那一步，随定时器一起活到触发
-        Core::CapturedImage                                  m_lastCapture;                  ///< 本轮抓到的帧，贴图与识别要用它定位
+        Base::CapturedImage                                  m_lastCapture;                  ///< 本轮抓到的帧，贴图与识别要用它定位
         QRect                                                m_lastSelection;                ///< 本轮选区（全局逻辑坐标），标注窗与贴图的位置来源
     };
 

@@ -1,8 +1,8 @@
 #include "Record/FfmpegCommand.h"
 
-#include "Core/Paths.h"
-#include "Core/Logger.h"
-#include "Core/Text.h"
+#include "Base/Paths.h"
+#include "Base/Logger.h"
+#include "Base/Text.h"
 #include "Record/FfmpegVideoEncoders.h"
 
 #include <QCoreApplication>
@@ -131,7 +131,7 @@ namespace GyanisScribe::Record
         };
     }
 
-    Core::Expected<QStringList> audioCaptureArguments(const QString &microphoneDevice, const QString &systemSoundDevice, const std::filesystem::path &wavFile)
+    Base::Expected<QStringList> audioCaptureArguments(const QString &microphoneDevice, const QString &systemSoundDevice, const std::filesystem::path &wavFile)
     {
         // 顺序固定：麦克风在前、系统声在后，滤镜图里的 [0:a]/[1:a] 就是按这个次序数出来的
         QStringList devices;
@@ -145,9 +145,9 @@ namespace GyanisScribe::Record
         }
         if (devices.isEmpty())
         {
-            return std::unexpected(Core::Error{
-                    .code    = Core::ErrorCode::InvalidArgument,
-                    .message = GyanisScribe::Core::uiTextUtf8("要取声音却一路设备都没给。请在设置的录屏页选一路，或把取声关掉"),
+            return std::unexpected(Base::Error{
+                    .code    = Base::ErrorCode::InvalidArgument,
+                    .message = GyanisScribe::Base::uiTextUtf8("要取声音却一路设备都没给。请在设置的录屏页选一路，或把取声关掉"),
             });
         }
 
@@ -187,7 +187,7 @@ namespace GyanisScribe::Record
         return candidate.isFile() ? candidate.absoluteFilePath() : QString{};
     }
 
-    Core::Expected<QString> locateFfmpeg()
+    Base::Expected<QString> locateFfmpeg()
     {
         // 先要随包那份：软件装完即用，不要求用户再装 ffmpeg 或把它加进 PATH
         if (const auto bundled = bundledFfmpegPath(QCoreApplication::applicationDirPath()); !bundled.isEmpty())
@@ -203,10 +203,10 @@ namespace GyanisScribe::Record
         // 两处都没有：安装包本该自带这一件，所以第一句是「重装」，第二句才留给自带构建的用户。
         // 不写具体网址与包名，避免哪天源变了这条提示就成了误导
         // 一条字面量：拆成相邻片段会让翻译目录只收到第一片（ctest 用例 Style.TranslationCatalog 会当场报红）
-        const auto hint = GyanisScribe::Core::uiText(
+        const auto hint = GyanisScribe::Base::uiText(
                 "没找到 ffmpeg 命令行程序，录屏的编码这一步要用它。它本该随安装包一起装好，请重新安装本程序；也可以自行安装一份并把所在目录加入 PATH，然后重启本程序");
-        Core::Logger::warning(hint.toStdString());
-        return std::unexpected(Core::Error{Core::ErrorCode::DependencyMissing, hint.toStdString()});
+        Base::Logger::warning(hint.toStdString());
+        return std::unexpected(Base::Error{Base::ErrorCode::DependencyMissing, hint.toStdString()});
     }
 
 } // namespace GyanisScribe::Record

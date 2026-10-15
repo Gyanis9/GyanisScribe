@@ -18,7 +18,7 @@
 #include <string>
 
 using namespace GyanisScribe::Record;
-using GyanisScribe::Core::ErrorCode;
+using GyanisScribe::Base::ErrorCode;
 
 namespace
 {
@@ -143,7 +143,7 @@ TEST_F(FfmpegAudioDevicesEndToEndFixture, ListsThisMachineDevicesWithTheFfmpegTh
                          settled = true;
                      });
     QObject::connect(&enumerator, &FfmpegAudioDeviceEnumerator::failed,
-                     [&failure, &settled](const GyanisScribe::Core::Error &error)
+                     [&failure, &settled](const GyanisScribe::Base::Error &error)
                      {
                          failure = error.message;
                          settled = true;

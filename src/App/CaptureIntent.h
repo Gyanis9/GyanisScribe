@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QString>
 
@@ -67,7 +67,7 @@ namespace GyanisScribe::App
      * @details 不替用户猜一档：悄悄回落到「进标注窗」会把一个不想弹窗的用户的每一下截图都变成一次弹窗。
      *          读不出的那一格由调用方报给用户（设置页按默认档显示并把原因落进日志）。
      */
-    [[nodiscard]] Core::Expected<CaptureIntent> parseCaptureIntent(const QString &stored);
+    [[nodiscard]] Base::Expected<CaptureIntent> parseCaptureIntent(const QString &stored);
 
     /**
      * @brief 词表的第一档：配置里没有这一项时的回落档
@@ -86,6 +86,6 @@ namespace GyanisScribe::App
      * @details 越界不取整也不夹到上限：把 600 秒悄悄夹成 60，用户等到的是「莫名其妙弹出一层窗」，
      *          而那一眼就能看出是手改配置写歪了。
      */
-    [[nodiscard]] Core::Expected<int> parseCaptureDelay(int stored);
+    [[nodiscard]] Base::Expected<int> parseCaptureDelay(int stored);
 
 } // namespace GyanisScribe::App

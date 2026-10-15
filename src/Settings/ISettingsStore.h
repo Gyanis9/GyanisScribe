@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QObject>
 #include <QString>
@@ -83,7 +83,7 @@ namespace GyanisScribe::Settings
          * @return 成功返回空载荷；失败返回原因（键名为空或存储不可写）
          * @note 成功之后会发 valueChanged(key)，订阅者据此即时生效，不需要重启
          */
-        virtual Core::Expected<void> setValue(std::string_view key, const QVariant &value) = 0;
+        virtual Base::Expected<void> setValue(std::string_view key, const QVariant &value) = 0;
 
         /**
          * @brief 立刻落盘
@@ -101,7 +101,7 @@ namespace GyanisScribe::Settings
          * @param filePath 目标文件，已存在则覆盖
          * @return 成功返回空载荷；失败返回带路径与原因的 Error
          */
-        virtual Core::Expected<void> exportToFile(const std::filesystem::path &filePath) const = 0;
+        virtual Base::Expected<void> exportToFile(const std::filesystem::path &filePath) const = 0;
 
         /**
          * @brief 从 JSON 文本导入配置
@@ -109,7 +109,7 @@ namespace GyanisScribe::Settings
          * @return 成功返回导入的键数；失败返回带路径与原因的 Error
          * @note 只覆盖文件里出现的那些键，文件里没有的键保持原值；每个被覆盖的键各发一次 valueChanged
          */
-        virtual Core::Expected<int> importFromFile(const std::filesystem::path &filePath) = 0;
+        virtual Base::Expected<int> importFromFile(const std::filesystem::path &filePath) = 0;
 
     signals:
         /**

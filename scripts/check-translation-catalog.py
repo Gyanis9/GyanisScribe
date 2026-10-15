@@ -2,7 +2,7 @@
 """界面文案与翻译目录的对照门禁，两用模式（校验 / 生成骨架）。
 
 为什么不用 lupdate：界面文案有一部分存在按位置对齐的 constexpr 表里（档位—标签只能有一个真源），
-显示时走 Core::uiText(row.label.data()) 运行期查表；lupdate 只认字面量实参，认不出这批。
+显示时走 Base::uiText(row.label.data()) 运行期查表；lupdate 只认字面量实参，认不出这批。
 于是目录由本脚本从源码穷举生成，并把「源码用到的每条都在目录里、且译文非空」钉成 ctest 用例
 Style.TranslationCatalog——漏掉的那几处在英文档下只会安静地显示中文。
 
@@ -48,9 +48,9 @@ LITERAL = re.compile(r'"((?:\\.|[^"\\])*)"')
 CJK = re.compile(r"[\u4e00-\u9fff]")
 
 SELF_PROBE = (
-    'auto a = Core::uiTextUtf8("甲 \\"{}\\" 乙"\n     "丙");'
-    'auto b = Core::uiText("单条");'
-    'auto c = Core::uiTextUtf8("整条 {}");'
+    'auto a = Base::uiTextUtf8("甲 \\"{}\\" 乙"\n     "丙");'
+    'auto b = Base::uiText("单条");'
+    'auto c = Base::uiTextUtf8("整条 {}");'
 )
 
 SELF_PROBE_ROWS = (

@@ -1,4 +1,4 @@
-#include "Core/Paths.h"
+#include "Base/Paths.h"
 #include "Ocr/OcrEngineFactory.h"
 
 #include "Ocr/IOcrEngine.h"
@@ -10,7 +10,7 @@
 #if defined(GYANISSCRIBE_HAS_WINRT_OCR)
 #include "Ocr/WinRTImageOcrEngine.h"
 #endif
-#include "Core/Text.h"
+#include "Base/Text.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
@@ -35,7 +35,7 @@
 #include <string>
 
 using namespace GyanisScribe::Ocr;
-using GyanisScribe::Core::ErrorCode;
+using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Platform::createPlatformIntegration;
 using GyanisScribe::Settings::SettingsStore;
 
@@ -271,7 +271,7 @@ TEST_F(OcrFixture, FactoryPrefersSystemOcrAndFallsBackWithActionableReason)
     {
         // 系统后端在场就不许再要用户放语言包：这条断言钉住「先问系统」的顺序本身
         EXPECT_TRUE(engine->isAvailable()) << "系统识别可用，工厂却说不可用";
-        EXPECT_EQ(engine->name(), QString::fromUtf8(GyanisScribe::Core::uiTextUtf8("Windows 系统识别"))) << "拿到的不是系统后端";
+        EXPECT_EQ(engine->name(), QString::fromUtf8(GyanisScribe::Base::uiTextUtf8("Windows 系统识别"))) << "拿到的不是系统后端";
         return;
     }
 
@@ -337,7 +337,7 @@ TEST_F(OcrFixture, PrefersTesseractWhenLanguagePacksArePresent)
     const auto recognized = engine->recognize(image, QStringLiteral("en"));
     ASSERT_FALSE(recognized.has_value()) << "空文件冒充的模型被当成认出来了";
     EXPECT_NE(recognized.error().message.find("初始化语言"), std::string::npos) << recognized.error().message;
-    EXPECT_EQ(recognized.error().code, GyanisScribe::Core::ErrorCode::InternalError);
+    EXPECT_EQ(recognized.error().code, GyanisScribe::Base::ErrorCode::InternalError);
 }
 #endif
 
@@ -372,7 +372,7 @@ TEST_F(OcrFixture, TessDataCandidatesPutTheBundledDirectoryBeforeUserData)
         return found == candidates.end() ? -1 : static_cast<int>(std::ranges::distance(candidates.begin(), found));
     };
 
-    const auto userDataDirectory = GyanisScribe::Core::Paths::applicationDataDirectory() / "tessdata";
+    const auto userDataDirectory = GyanisScribe::Base::Paths::applicationDataDirectory() / "tessdata";
     ASSERT_GE(indexOf(bundledDirectory), 0) << "候选里没有程序目录下的 tessdata";
     ASSERT_GE(indexOf(userDataDirectory), 0) << "候选里没有应用数据目录下的 tessdata";
     EXPECT_LT(indexOf(bundledDirectory), indexOf(userDataDirectory)) << "随包那份排在用户数据目录之后，装完还得自己放语言包";

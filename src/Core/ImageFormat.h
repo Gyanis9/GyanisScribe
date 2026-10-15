@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QString>
 
@@ -68,7 +68,7 @@ namespace GyanisScribe::Core
      * @return 对应档位；读不出时返回 InvalidArgument 并列出可取的几个值
      * @details 不替用户猜一档：猜错就是把同一批成品按另一种压缩写出去，事后无从找回原样。
      */
-    [[nodiscard]] Core::Expected<ImageFormat> parseImageFormat(const QString &stored);
+    [[nodiscard]] Base::Expected<ImageFormat> parseImageFormat(const QString &stored);
 
     /**
      * @brief 这台机器的 Qt 真写得出来的格式档位
@@ -110,6 +110,6 @@ namespace GyanisScribe::Core
      * @return 在区间内时返回原值；越界返回 InvalidArgument，文案点名可取区间
      * @details 越界不夹取：把 0 悄悄当成「按默认」会让用户以为压得不够狠而实际压到最低。
      */
-    [[nodiscard]] Core::Expected<int> parseImageQuality(int stored);
+    [[nodiscard]] Base::Expected<int> parseImageQuality(int stored);
 
 } // namespace GyanisScribe::Core

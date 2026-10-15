@@ -15,7 +15,7 @@
 
 using GyanisScribe::Capture::appendFrame;
 using GyanisScribe::Capture::overlapRowCount;
-using GyanisScribe::Core::ErrorCode;
+using GyanisScribe::Base::ErrorCode;
 
 namespace
 {

@@ -17,8 +17,8 @@ using GyanisScribe::Annotation::PenParameters;
 using GyanisScribe::Annotation::SelectionDragModifiers;
 using GyanisScribe::Annotation::SelectionHandle;
 using GyanisScribe::Annotation::ToolKind;
-using GyanisScribe::Core::CapturedImage;
-using GyanisScribe::Core::ErrorCode;
+using GyanisScribe::Base::CapturedImage;
+using GyanisScribe::Base::ErrorCode;
 
 namespace
 {

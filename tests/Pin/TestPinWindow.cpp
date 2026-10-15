@@ -8,8 +8,8 @@
 
 #include "PinTestAssets.h"
 
-#include "Core/Paths.h"
-#include "Core/Types.h"
+#include "Base/Paths.h"
+#include "Base/Types.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Platform/PlatformCapabilities.h"
 #include "Settings/SettingsKeys.h"
@@ -47,7 +47,7 @@
 #include <optional>
 #include <vector>
 
-// 整份用例 nest 进工程命名空间：匿名命名空间在外面时 `Core::Expected` 这类写法认不到名字
+// 整份用例 nest 进工程命名空间：匿名命名空间在外面时 `Base::Expected` 这类写法认不到名字
 namespace GyanisScribe
 {
     namespace
@@ -713,7 +713,7 @@ namespace GyanisScribe
         const auto      target = std::filesystem::temp_directory_path() / std::format("GyanisScribe-PinSave-{}", ::testing::UnitTest::GetInstance()->current_test_info()->name());
         std::error_code ignored;
         std::filesystem::remove_all(target, ignored);
-        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kPathScreenshot, QVariant(Core::Paths::toDisplayText(target))).has_value());
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kPathScreenshot, QVariant(Base::Paths::toDisplayText(target))).has_value());
         ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kSaveImageFormat, QVariant(QStringLiteral("Png"))).has_value());
         ASSERT_TRUE(settings().setValue(GyanisScribe::Settings::kSaveNameTemplate, QVariant(QStringLiteral("pin_%date%"))).has_value());
 

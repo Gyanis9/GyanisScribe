@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 #include "Ocr/OcrTypes.h"
 #include "Ui/Toast.h"
 
@@ -120,14 +120,14 @@ namespace GyanisScribe::Ocr
          * @param filePath 目标文件，已存在则覆盖
          * @return 成功返回空载荷；失败返回带路径与原因的 Error
          */
-        [[nodiscard]] Core::Expected<void> exportTxt(const std::filesystem::path &filePath);
+        [[nodiscard]] Base::Expected<void> exportTxt(const std::filesystem::path &filePath);
 
         /**
          * @brief 导出 JSON
          * @param filePath 目标文件，已存在则覆盖
          * @return 成功返回空载荷；失败返回带路径与原因的 Error
          */
-        [[nodiscard]] Core::Expected<void> exportJson(const std::filesystem::path &filePath);
+        [[nodiscard]] Base::Expected<void> exportJson(const std::filesystem::path &filePath);
 
         /// 状态摘要那一行的文本，供用例与外部提示读取
         [[nodiscard]] QString statusText() const;

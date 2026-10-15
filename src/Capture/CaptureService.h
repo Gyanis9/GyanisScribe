@@ -10,7 +10,7 @@
 #pragma once
 
 #include "Capture/ICaptureService.h"
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QPointer>
 #include <QRect>
@@ -93,7 +93,7 @@ namespace GyanisScribe::Capture
          * @details 刷新截图（标注窗里按 F5）走这条：它不是一次新截图，不该触发「截图完成」
          *          那一串反应（音效、自动保存、意图分派），也不该往最近选区里再记一遍。
          */
-        [[nodiscard]] Core::Expected<Core::CapturedImage> grabRegionNow(const QRect &logicalRegion, const QString &screenName = {});
+        [[nodiscard]] Base::Expected<Base::CapturedImage> grabRegionNow(const QRect &logicalRegion, const QString &screenName = {});
 
         /**
          * @brief 抓一个窗口，见 ICaptureService::captureWindow()
@@ -162,7 +162,7 @@ namespace GyanisScribe::Capture
          * @brief 把一次抓帧结果转成信号
          * @param result 抓帧或裁剪的结果
          */
-        void deliver(const Core::Expected<Core::CapturedImage> &result);
+        void deliver(const Base::Expected<Base::CapturedImage> &result);
 
         /**
          * @brief 按设置把鼠标指针合成进整帧
@@ -172,7 +172,7 @@ namespace GyanisScribe::Capture
          *          不必在裁完之后再来一次坐标换算。取不到形状时写一条日志说明这次不含指针，
          *          不悄悄按「含了」交下去。
          */
-        [[nodiscard]] Core::Expected<Core::CapturedImage> withCursorIfWanted(const Core::Expected<Core::CapturedImage> &frame) const;
+        [[nodiscard]] Base::Expected<Base::CapturedImage> withCursorIfWanted(const Base::Expected<Base::CapturedImage> &frame) const;
 
         /**
          * @brief 这一轮成品要不要含鼠标指针
@@ -245,7 +245,7 @@ namespace GyanisScribe::Capture
         std::vector<QPointer<CaptureOverlay>> m_overlays;                       ///< 在屏的遮罩，每块屏一张；窗口自己析构后要认得空指针
         QTimer                                m_longTimer;                      ///< 滚动拼接的取帧节拍，只在有选区之后跑
         QPointer<LongCaptureHud>              m_longHud;                        ///< 长截图控制条，一轮一个
-        Core::CapturedImage                   m_longImage;                      ///< 已经接好的长图，第一帧就是它的开头
+        Base::CapturedImage                   m_longImage;                      ///< 已经接好的长图，第一帧就是它的开头
         QRect                                 m_longRegion;                     ///< 反复抓的那块区域，该屏内的逻辑坐标
         QString                               m_longScreenName;                 ///< 这一轮所在的那块屏
         std::optional<QPoint>                 m_lastElementQuery;               ///< 上一格问过的悬停点，同一个点不重复问

@@ -125,7 +125,7 @@ TEST(RecentColorsRoundTrip, RejectsAnyTokenThatIsNotSixHexDigits)
     {
         const auto parsed = parseRecentColors({QStringLiteral("#123456"), QString::fromUtf8(bad)});
         ASSERT_FALSE(parsed.has_value()) << bad;
-        EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument) << bad;
+        EXPECT_EQ(parsed.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument) << bad;
         // 原因要点出是哪一条词与怎么恢复，否则用户只能对着配置文件猜
         EXPECT_NE(parsed.error().message.find(QString::fromUtf8(bad).toStdString()), std::string::npos) << bad;
         EXPECT_NE(parsed.error().message.find("Annotation/RecentColors"), std::string::npos) << bad;

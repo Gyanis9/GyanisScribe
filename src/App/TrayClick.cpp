@@ -1,7 +1,7 @@
 #include "App/TrayClick.h"
 
 #include "App/TrayController.h"
-#include "Core/Text.h"
+#include "Base/Text.h"
 #include "Platform/PlatformCapabilities.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
@@ -89,8 +89,8 @@ namespace GyanisScribe::App
         [[nodiscard]] std::vector<TrayClickChoice> buildChoices(const Platform::PlatformCapabilities *capabilities)
         {
             std::vector<TrayClickChoice> choices;
-            choices.push_back(TrayClickChoice{kNoneToken, GyanisScribe::Core::uiText("什么都不做"), TrayClickOutcome::Nothing, std::nullopt});
-            choices.push_back(TrayClickChoice{kMenuToken, GyanisScribe::Core::uiText("弹出托盘菜单"), TrayClickOutcome::ShowMenu, std::nullopt});
+            choices.push_back(TrayClickChoice{kNoneToken, GyanisScribe::Base::uiText("什么都不做"), TrayClickOutcome::Nothing, std::nullopt});
+            choices.push_back(TrayClickChoice{kMenuToken, GyanisScribe::Base::uiText("弹出托盘菜单"), TrayClickOutcome::ShowMenu, std::nullopt});
 
             const auto entries = capabilities ? visibleTrayMenuEntries(*capabilities) : trayMenuEntries();
             for (const auto &entry: entries)

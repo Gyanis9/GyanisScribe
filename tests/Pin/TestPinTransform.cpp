@@ -428,7 +428,7 @@ TEST(PinEdgeSnapDistance, AcceptsZeroAndRejectsOutOfRange)
     {
         const auto rejected = GyanisScribe::Pin::parseEdgeSnapDistance(bad);
         ASSERT_FALSE(rejected.has_value()) << bad << " 这个越界值被收下了";
-        EXPECT_EQ(rejected.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument) << bad;
+        EXPECT_EQ(rejected.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument) << bad;
         EXPECT_NE(rejected.error().message.find("Pin/EdgeSnapDistance"), std::string::npos) << "拒绝要说清删哪一格能回默认，实际：" << rejected.error().message;
     }
 }

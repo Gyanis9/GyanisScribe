@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QString>
 
@@ -66,7 +66,7 @@ namespace GyanisScribe::App
      * @return 按交付顺序排好的去处；空清单、词表外的词、空段（`file,`）与重复点名都返回中文原因
      * @details 重复不代劳去重：`clipboard,clipboard` 是手抖，报出来比按一处算更能让人发现命令写歪了。
      */
-    [[nodiscard]] Core::Expected<CaptureOutputSet> parseCaptureOutputs(const QString &text);
+    [[nodiscard]] Base::Expected<CaptureOutputSet> parseCaptureOutputs(const QString &text);
 
     /**
      * @brief 这一轮点没点名某一处

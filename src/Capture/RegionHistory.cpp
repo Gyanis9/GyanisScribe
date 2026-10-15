@@ -1,8 +1,8 @@
 #include "Capture/RegionHistory.h"
 
 #include "Capture/ScreenUtils.h"
-#include "Core/Logger.h"
-#include "Core/Text.h"
+#include "Base/Logger.h"
+#include "Base/Text.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
 
@@ -25,7 +25,7 @@ namespace GyanisScribe::Capture
         return parts.join(QLatin1Char(';'));
     }
 
-    Core::Expected<std::vector<RegionHistoryEntry>> regionHistoryFromText(const std::string_view text)
+    Base::Expected<std::vector<RegionHistoryEntry>> regionHistoryFromText(const std::string_view text)
     {
         const auto trimmed = QString::fromUtf8(text).trimmed();
         if (trimmed.isEmpty())
@@ -42,8 +42,8 @@ namespace GyanisScribe::Capture
             if (fields.size() < 5)
             {
                 return std::unexpected(
-                        Core::Error{Core::ErrorCode::InvalidArgument,
-                                    Core::uiFormat(Core::uiTextUtf8("选区历史的记录格式不对：第 {} 段「{}」应为「x,y,width,height,屏名」。请删掉这一项，让程序重新记一次"),
+                        Base::Error{Base::ErrorCode::InvalidArgument,
+                                    Base::uiFormat(Base::uiTextUtf8("选区历史的记录格式不对：第 {} 段「{}」应为「x,y,width,height,屏名」。请删掉这一项，让程序重新记一次"),
                                                    index + 1, segment.toStdString())});
             }
 
@@ -88,7 +88,7 @@ namespace GyanisScribe::Capture
         return regions;
     }
 
-    Core::Expected<std::vector<RegionHistoryEntry>> loadRegionHistory(Settings::ISettingsStore &settings)
+    Base::Expected<std::vector<RegionHistoryEntry>> loadRegionHistory(Settings::ISettingsStore &settings)
     {
         const auto stored = settings.stringValue(Settings::kCaptureRegionHistory, QString());
         if (!stored.trimmed().isEmpty())
@@ -116,23 +116,23 @@ namespace GyanisScribe::Capture
         if (!history)
         {
             // 旧记录坏了：这次从新的一条重新记起，别让一条坏文本把「记事本」整体卡死
-            Core::Logger::warning(std::format("选区历史读不出，这次从新的一条重新记起：{}", history.error().message));
+            Base::Logger::warning(std::format("选区历史读不出，这次从新的一条重新记起：{}", history.error().message));
             history = std::vector<RegionHistoryEntry>{};
         }
 
         const auto updated = pushedRegionHistory(*history, entry);
         if (const auto stored = settings.setValue(Settings::kCaptureRegionHistory, QVariant(regionHistoryToText(updated))); !stored)
         {
-            Core::Logger::warning(std::format("选区历史没能记下：{}", stored.error().message));
+            Base::Logger::warning(std::format("选区历史没能记下：{}", stored.error().message));
         }
         // 单值键与历史首条同一个写点一起写：升级前后的两种读法永远指向同一条
         if (const auto stored = settings.setValue(Settings::kCaptureLastRegion, QVariant(regionToText(entry.region))); !stored)
         {
-            Core::Logger::warning(std::format("上次截图区域没能记下：{}", stored.error().message));
+            Base::Logger::warning(std::format("上次截图区域没能记下：{}", stored.error().message));
         }
         if (const auto stored = settings.setValue(Settings::kCaptureLastScreen, QVariant(entry.screenName)); !stored)
         {
-            Core::Logger::warning(std::format("上次截图所在屏没能记下：{}", stored.error().message));
+            Base::Logger::warning(std::format("上次截图所在屏没能记下：{}", stored.error().message));
         }
     }
 

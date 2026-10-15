@@ -1,6 +1,6 @@
 #include "Record/FfmpegVideoEncoders.h"
 
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 #include <algorithm>
 #include <array>
@@ -67,7 +67,7 @@ namespace GyanisScribe::Record
         return arguments;
     }
 
-    Core::Expected<std::string> selectVideoEncoder(const std::function<bool(const QStringList &)> &run, const int width, const int height, const int frameRate,
+    Base::Expected<std::string> selectVideoEncoder(const std::function<bool(const QStringList &)> &run, const int width, const int height, const int frameRate,
                                                    const int videoBitrateKbps, const std::string_view pinnedEncoder)
     {
         // 钉了某一档就先探它：探得过就用，探不过退到自动（调用方按返回值与钉子的差异记日志）
@@ -95,9 +95,9 @@ namespace GyanisScribe::Record
         {
             tried << QString::fromUtf8(encoder.data(), static_cast<qsizetype>(encoder.size()));
         }
-        return std::unexpected(Core::Error{
-                .code    = Core::ErrorCode::DependencyMissing,
-                .message = Core::uiFormat(Core::uiTextUtf8("你这份 ffmpeg 里没有能开起来的视频编码器（试过 {}）。请换装一个带 libx264 的完整 ffmpeg 构建，"
+        return std::unexpected(Base::Error{
+                .code    = Base::ErrorCode::DependencyMissing,
+                .message = Base::uiFormat(Base::uiTextUtf8("你这份 ffmpeg 里没有能开起来的视频编码器（试过 {}）。请换装一个带 libx264 的完整 ffmpeg 构建，"
                                                            "或者先把这一帧序列自己用 ffmpeg 编一次看报什么"),
                                           tried.join(QStringLiteral("、")).toStdString()),
         });

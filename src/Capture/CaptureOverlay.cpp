@@ -2,9 +2,9 @@
 
 #include "Capture/RegionHistory.h"
 #include "Capture/ScreenUtils.h"
-#include "Core/SizeText.h"
-#include "Core/Logger.h"
-#include "Core/Text.h"
+#include "Base/SizeText.h"
+#include "Base/Logger.h"
+#include "Base/Text.h"
 #include "Pick/ColorFormat.h"
 #include "Pick/PickGeometry.h"
 #include "Settings/ISettingsStore.h"
@@ -86,7 +86,7 @@ namespace GyanisScribe::Capture
                 complaint);
         if (!complaint.empty())
         {
-            Core::Logger::warning(std::format("放大镜视野读不出：{}，这一轮按窄档（9×9）走", complaint));
+            Base::Logger::warning(std::format("放大镜视野读不出：{}，这一轮按窄档（9×9）走", complaint));
         }
 
         // 尺寸单位也是这一轮开始时读一次：读数、复制与尺寸框三处共用它，中途换档会让刚看到的数敲回去变成另一块选区
@@ -94,7 +94,7 @@ namespace GyanisScribe::Capture
                 sizeUnitOrDefault(m_settings.stringValue(GyanisScribe::Settings::kCaptureSizeUnit, QString::fromUtf8(sizeUnitToken(SizeUnit::Logical))).toStdString(), complaint);
         if (!complaint.empty())
         {
-            Core::Logger::warning(std::format("尺寸单位读不出：{}", complaint));
+            Base::Logger::warning(std::format("尺寸单位读不出：{}", complaint));
         }
 
         // 无边框 + 置顶 + Tool：Tool 让它不进任务栏，截图时不该多出一个窗口条目
@@ -446,12 +446,12 @@ namespace GyanisScribe::Capture
             if (m_aspectLocked)
             {
                 // 锁着比例时在读数后面标出来：不标的话「拖不出想要的形状」会被当成手抖
-                hint += GyanisScribe::Core::uiText("（锁定 %1）").arg(aspectRatioToText(m_aspectRatio));
+                hint += GyanisScribe::Base::uiText("（锁定 %1）").arg(aspectRatioToText(m_aspectRatio));
             }
             if (m_cursorTouched && m_cursorIncluded)
             {
                 // 翻过指针档就把当下那一档写进读数：带不带指针看不出来，比一律不带更糟
-                hint += *m_cursorIncluded ? GyanisScribe::Core::uiText("（含指针）") : GyanisScribe::Core::uiText("（不含指针）");
+                hint += *m_cursorIncluded ? GyanisScribe::Base::uiText("（含指针）") : GyanisScribe::Base::uiText("（不含指针）");
             }
             QFont hintFont = font();
             hintFont.setPointSize(GyanisScribe::Ui::kHintFontSize);
@@ -697,7 +697,7 @@ namespace GyanisScribe::Capture
                     // 复制的那一串跟着读数那一档走：照着屏幕上看到的数复制却得到另一组数，比哪种都难查
                     const auto text = selectionSizeText();
                     QGuiApplication::clipboard()->setText(text);
-                    m_copiedSizeHint = GyanisScribe::Core::uiText("已复制尺寸 %1").arg(text);
+                    m_copiedSizeHint = GyanisScribe::Base::uiText("已复制尺寸 %1").arg(text);
                     update();
                 }
                 return;
@@ -849,7 +849,7 @@ namespace GyanisScribe::Capture
             m_sizeEditor->setObjectName(QStringLiteral("overlaySizeEditor"));
             m_sizeEditor->setAlignment(Qt::AlignCenter);
             m_sizeEditor->setFixedWidth(kSizeEditorWidth);
-            m_sizeEditor->setAccessibleName(GyanisScribe::Core::uiText("选区尺寸"));
+            m_sizeEditor->setAccessibleName(GyanisScribe::Base::uiText("选区尺寸"));
             m_sizeEditor->installEventFilter(this);
         }
 
@@ -865,7 +865,7 @@ namespace GyanisScribe::Capture
             m_sizeEditor->setText({});
         }
         m_sizeEditor->setToolTip(QString::fromUtf8(
-                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("按{}填；这一档跟着设置里的「尺寸单位」走"), sizeUnitLabel(m_sizeUnit).toStdString()).c_str()));
+                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("按{}填；这一档跟着设置里的「尺寸单位」走"), sizeUnitLabel(m_sizeUnit).toStdString()).c_str()));
 
         // 摆在读数框那一格（贴顶时会翻到选区下方）；还没有选区就摆光标右下
         const auto base = region.isNull()

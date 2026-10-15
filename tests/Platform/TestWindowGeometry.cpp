@@ -106,12 +106,12 @@ TEST(WindowGeometry, RejectsNonPositiveScaleInsteadOfGuessing)
 
         const auto forward = logicalToPhysicalGlobal(windowOnPrimary, broken);
         ASSERT_FALSE(forward.has_value()) << "缩放因子 " << ratio << " 被当成能算";
-        EXPECT_EQ(forward.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument);
+        EXPECT_EQ(forward.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument);
         EXPECT_NE(forward.error().message.find("缩放因子"), std::string::npos) << forward.error().message;
 
         const auto backward = physicalToLogicalGlobal(QRect{150, 75, 600, 300}, broken);
         ASSERT_FALSE(backward.has_value()) << "缩放因子 " << ratio << " 被当成能算（反方向）";
-        EXPECT_EQ(backward.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument);
+        EXPECT_EQ(backward.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument);
     }
 }
 
@@ -146,7 +146,7 @@ TEST(WindowGeometry, RejectsPointConversionWithNonPositiveScale)
 
     const auto rejected = logicalPointToPhysicalGlobal(QPoint{10, 10}, broken);
     ASSERT_FALSE(rejected.has_value()) << "缩放因子 0 被当成能算";
-    EXPECT_EQ(rejected.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument);
+    EXPECT_EQ(rejected.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument);
 }
 
 /**

@@ -2,8 +2,8 @@
 
 #include "App/AppController.h"
 #include "App/SingleInstance.h"
-#include "Core/Logger.h"
-#include "Core/Paths.h"
+#include "Base/Logger.h"
+#include "Base/Paths.h"
 #include "Hotkey/IHotkeyManager.h"
 #include "Ui/DesignTokens.h"
 
@@ -47,19 +47,19 @@ Application::Application(int &argc, char **argv, const GyanisScribe::App::Comman
     // 托盘图标与挂在屏幕上的贴图一起消失
     setQuitOnLastWindowClosed(false);
 
-    const auto logDirectory = GyanisScribe::Core::Paths::logDirectory();
-    if (const auto ensured = GyanisScribe::Core::Paths::ensureDirectory(logDirectory); !ensured)
+    const auto logDirectory = GyanisScribe::Base::Paths::logDirectory();
+    if (const auto ensured = GyanisScribe::Base::Paths::ensureDirectory(logDirectory); !ensured)
     {
         // 目录都建不出来时初始化必然也失败，原因走 Logger 的 stderr 兜底报出去；
         // 不提前 return：日志坏了不该让用户用不了截图，剩下的步骤照常走
-        GyanisScribe::Core::Logger::error(std::format("启动时日志不可用：{}", ensured.error().message));
-    } else if (const auto initialized = GyanisScribe::Core::Logger::initialize(logDirectory); !initialized)
+        GyanisScribe::Base::Logger::error(std::format("启动时日志不可用：{}", ensured.error().message));
+    } else if (const auto initialized = GyanisScribe::Base::Logger::initialize(logDirectory); !initialized)
     {
-        GyanisScribe::Core::Logger::error(std::format("启动时日志初始化失败：{}", initialized.error().message));
+        GyanisScribe::Base::Logger::error(std::format("启动时日志初始化失败：{}", initialized.error().message));
     } else
     {
-        GyanisScribe::Core::Logger::info(
-                std::format("智录 {} 启动，日志目录 {}", applicationVersion().toStdString(), GyanisScribe::Core::Paths::toDisplayText(logDirectory).toStdString()));
+        GyanisScribe::Base::Logger::info(
+                std::format("智录 {} 启动，日志目录 {}", applicationVersion().toStdString(), GyanisScribe::Base::Paths::toDisplayText(logDirectory).toStdString()));
     }
 
     // 单实例探测排在控制器与热键之前：落败的那一次启动不该装托盘、不该建主窗口、更不该去抢那七个
@@ -68,7 +68,7 @@ Application::Application(int &argc, char **argv, const GyanisScribe::App::Comman
     // 用户那一侧看到的是第二个托盘图标一闪，外加一次白启动
     if (transientCommandLine)
     {
-        GyanisScribe::Core::Logger::info("命令行动作启动：不锁单实例、不登记热键");
+        GyanisScribe::Base::Logger::info("命令行动作启动：不锁单实例、不登记热键");
         m_isPrimaryInstance = true;
         m_controller        = std::make_unique<GyanisScribe::App::AppController>();
     } else
@@ -79,7 +79,7 @@ Application::Application(int &argc, char **argv, const GyanisScribe::App::Comman
     if (!m_isPrimaryInstance)
     {
         // 唤醒与退出的判断在 Main 里；界面这一侧只留一条日志，别的一概不建
-        GyanisScribe::Core::Logger::info("本次启动不是主实例：不建界面、不登记热键，交给 Main 去唤前一份");
+        GyanisScribe::Base::Logger::info("本次启动不是主实例：不建界面、不登记热键，交给 Main 去唤前一份");
     } else if (!transientCommandLine)
     {
         m_controller = std::make_unique<GyanisScribe::App::AppController>();
@@ -90,31 +90,31 @@ Application::Application(int &argc, char **argv, const GyanisScribe::App::Comman
             m_hotkeyReport = *report;
             for (const auto &failure: m_hotkeyReport.failures)
             {
-                GyanisScribe::Core::Logger::warning(std::format("热键「{}」没能登记：{}", failure.combination.toStdString(), failure.error.message));
+                GyanisScribe::Base::Logger::warning(std::format("热键「{}」没能登记：{}", failure.combination.toStdString(), failure.error.message));
             }
         } else
         {
-            GyanisScribe::Core::Logger::error(std::format("热键登记没走通：{}", report.error().message));
+            GyanisScribe::Base::Logger::error(std::format("热键登记没走通：{}", report.error().message));
         }
 
         // 有人再来启动时唤前一份：唤的是控制器管着的那些窗口，因此这条接线只在主实例这一支上
         QObject::connect(m_singleInstance.get(), &GyanisScribe::App::SingleInstance::secondLaunchRequested, this,
                          [this]
                          {
-                             GyanisScribe::Core::Logger::info("又有人启动智录：把设置窗口唤到前台，不再开第二份");
+                             GyanisScribe::Base::Logger::info("又有人启动智录：把设置窗口唤到前台，不再开第二份");
                              m_controller->openMainWindow(GyanisScribe::App::MainWindowPage::General);
                          });
     }
 
     // 就绪判据只看日志有没有接管成功：界面在日志坏掉时照样能用，但 CI 的自检要把这一格判红
-    m_isReady = GyanisScribe::Core::Logger::isInitialized();
+    m_isReady = GyanisScribe::Base::Logger::isInitialized();
 }
 
 Application::~Application()
 {
     // 控制器先走：它负责注销热键、收掉遮罩；日志最后冲刷，才能把这些收尾也记下来
     m_controller.reset();
-    GyanisScribe::Core::Logger::shutdown();
+    GyanisScribe::Base::Logger::shutdown();
 }
 
 
@@ -202,7 +202,7 @@ int Application::executeCommandLine(const GyanisScribe::App::CommandLineRequest 
                     ++visibleTopLevels;
                 }
             }
-            GyanisScribe::Core::Logger::info(
+            GyanisScribe::Base::Logger::info(
                     std::format("自检：热键登记 {} 项、未登记 {} 项，日志就绪 {}，可见顶层窗口 {} 个", report.registered, report.failures.size(), isReady(), visibleTopLevels));
             return isReady() ? 0 : 1;
         }

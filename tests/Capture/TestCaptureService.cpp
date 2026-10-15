@@ -2,7 +2,7 @@
 
 #include "Capture/CaptureOverlay.h"
 #include "Capture/IScreenCaptureSource.h"
-#include "Core/Logger.h"
+#include "Base/Logger.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
@@ -31,10 +31,10 @@ using GyanisScribe::Capture::CaptureOverlay;
 using GyanisScribe::Capture::CaptureService;
 using GyanisScribe::Capture::ICaptureService;
 using GyanisScribe::Capture::IScreenCaptureSource;
-using GyanisScribe::Core::CapturedImage;
-using GyanisScribe::Core::Error;
-using GyanisScribe::Core::ErrorCode;
-using GyanisScribe::Core::Expected;
+using GyanisScribe::Base::CapturedImage;
+using GyanisScribe::Base::Error;
+using GyanisScribe::Base::ErrorCode;
+using GyanisScribe::Base::Expected;
 using GyanisScribe::Settings::SettingsStore;
 
 namespace
@@ -370,7 +370,7 @@ TEST_F(CaptureServiceFixture, FailuresAreWrittenToLog)
     const auto      logDirectory = std::filesystem::temp_directory_path() / std::format("GyanisScribe-Capture-{}-logs", caseName);
     std::error_code ignored;
     std::filesystem::remove_all(logDirectory, ignored);
-    ASSERT_TRUE(GyanisScribe::Core::Logger::initialize(logDirectory).has_value());
+    ASSERT_TRUE(GyanisScribe::Base::Logger::initialize(logDirectory).has_value());
 
     SettingsStore     settings(m_iniFile);
     FakeCaptureSource source;
@@ -383,7 +383,7 @@ TEST_F(CaptureServiceFixture, FailuresAreWrittenToLog)
     ASSERT_TRUE(outcome.error.has_value());
 
     // 先把 logger 收掉再去读文件：sink 是带缓冲的，边写边读就把「这行到没到盘上」交给了调度
-    GyanisScribe::Core::Logger::shutdown();
+    GyanisScribe::Base::Logger::shutdown();
 
     std::ifstream     input(logDirectory / "GyanisScribe.log", std::ios::binary);
     const std::string logText{std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{}};
@@ -691,7 +691,7 @@ TEST_F(CaptureServiceFixture, MissingCursorShapeStillDeliversAFrameAndSaysSo)
     const auto      logDirectory = std::filesystem::temp_directory_path() / std::format("GyanisScribe-Capture-{}-logs", caseName);
     std::error_code ignored;
     std::filesystem::remove_all(logDirectory, ignored);
-    ASSERT_TRUE(GyanisScribe::Core::Logger::initialize(logDirectory).has_value());
+    ASSERT_TRUE(GyanisScribe::Base::Logger::initialize(logDirectory).has_value());
 
     SettingsStore settings(m_iniFile);
     ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kCaptureIncludeCursor, QVariant(true)).has_value());
@@ -706,7 +706,7 @@ TEST_F(CaptureServiceFixture, MissingCursorShapeStillDeliversAFrameAndSaysSo)
     EXPECT_EQ(outcome.image->image.pixelColor(20, 20), QColor(255, 0, 0));
 
     // 先收 logger 再读文件：sink 带缓冲，边写边读就把「这行到没到盘上」交给了调度
-    GyanisScribe::Core::Logger::shutdown();
+    GyanisScribe::Base::Logger::shutdown();
 
     std::ifstream     input(logDirectory / "GyanisScribe.log", std::ios::binary);
     const std::string logText{std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{}};

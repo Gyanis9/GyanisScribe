@@ -1,7 +1,7 @@
 #include "Ocr/WinRTImageOcrEngine.h"
 
-#include "Core/Logger.h"
-#include "Core/Text.h"
+#include "Base/Logger.h"
+#include "Base/Text.h"
 #include "Ocr/OcrEngineFactory.h"
 #include "Ocr/OcrPreprocessor.h"
 
@@ -105,7 +105,7 @@ namespace GyanisScribe::Ocr
                     } catch (const winrt::hresult_error &failure)
                     {
                         // 枚举本身报错说明系统组件不在场，与「装了语言但没一个对得上」在用户侧是同一条提示
-                        Core::Logger::warning(
+                        Base::Logger::warning(
                                 std::format("Windows 系统识别语言枚举失败：{}（HRESULT 0x{:08X}）", winrt::to_string(failure.message()), static_cast<uint32_t>(failure.code())));
                     }
                     return tags;
@@ -127,7 +127,7 @@ namespace GyanisScribe::Ocr
 
     QString WinRTImageOcrEngine::name() const
     {
-        return QString::fromUtf8(GyanisScribe::Core::uiTextUtf8("Windows 系统识别").c_str());
+        return QString::fromUtf8(GyanisScribe::Base::uiTextUtf8("Windows 系统识别").c_str());
     }
 
     bool WinRTImageOcrEngine::isAvailable() const
@@ -141,7 +141,7 @@ namespace GyanisScribe::Ocr
         {
             return {};
         }
-        return QString::fromUtf8(GyanisScribe::Core::uiTextUtf8("这台机器的 Windows 没装本程序认识的识别语言包（系统识别一个可用语言都没有）。请在 设置 → 时间和语言 → 语音 "
+        return QString::fromUtf8(GyanisScribe::Base::uiTextUtf8("这台机器的 Windows 没装本程序认识的识别语言包（系统识别一个可用语言都没有）。请在 设置 → 时间和语言 → 语音 "
                                                                 "里装上「光学字符识别」，或在设置的 OCR 页改用 Tesseract 并放好语言包")
                                          .c_str());
     }
@@ -159,12 +159,12 @@ namespace GyanisScribe::Ocr
         return found;
     }
 
-    Core::Expected<OcrResult> WinRTImageOcrEngine::recognize(const QImage &image, const QString &language)
+    Base::Expected<OcrResult> WinRTImageOcrEngine::recognize(const QImage &image, const QString &language)
     {
         if (image.isNull() || image.width() < kMinimumImageEdge || image.height() < kMinimumImageEdge)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("图片太小或为空（{}×{}），认不出字。请至少框住 {}×{} 的区域"),
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("图片太小或为空（{}×{}），认不出字。请至少框住 {}×{} 的区域"),
                                                                             image.width(), image.height(), kMinimumImageEdge, kMinimumImageEdge)});
         }
 
@@ -173,9 +173,9 @@ namespace GyanisScribe::Ocr
         if (systemTag.isEmpty())
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::DependencyMissing,
-                                GyanisScribe::Core::uiFormat(
-                                        GyanisScribe::Core::uiTextUtf8(
+                    Base::Error{Base::ErrorCode::DependencyMissing,
+                                GyanisScribe::Base::uiFormat(
+                                        GyanisScribe::Base::uiTextUtf8(
                                                 "系统里没有「{}」的识别语言包。现在能用的是 {}。请在 设置 → 时间和语言 → 语音 里装上需要的语言包，或在设置的 OCR 页改选语言"),
                                         requestedLanguage.toStdString(), supportedLanguages().join(QStringLiteral("、")).toStdString())});
         }
@@ -191,7 +191,7 @@ namespace GyanisScribe::Ocr
         if (!prepared.save(&bytesDevice, "PNG") || encoded.isEmpty())
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::InternalError, GyanisScribe::Core::uiTextUtf8("这一张图没能编成 PNG。请重试一次，或先在标注窗里另存一份 PNG 再识别")});
+                    Base::Error{Base::ErrorCode::InternalError, GyanisScribe::Base::uiTextUtf8("这一张图没能编成 PNG。请重试一次，或先在标注窗里另存一份 PNG 再识别")});
         }
 
         std::vector<uint8_t> pngBytes(static_cast<size_t>(encoded.size()));
@@ -200,7 +200,7 @@ namespace GyanisScribe::Ocr
         const QString      publicTag = requestedLanguage;
 
         return runOnWinRTThread(
-                [pngBytes = std::move(pngBytes), tag, publicTag, enlargeFactor]() -> Core::Expected<OcrResult>
+                [pngBytes = std::move(pngBytes), tag, publicTag, enlargeFactor]() -> Base::Expected<OcrResult>
                 {
                     try
                     {
@@ -224,9 +224,9 @@ namespace GyanisScribe::Ocr
                         if (static_cast<uint32_t>(bitmap.PixelWidth()) > maximumDimension || static_cast<uint32_t>(bitmap.PixelHeight()) > maximumDimension)
                         {
                             return std::unexpected(
-                                    Core::Error{Core::ErrorCode::InvalidArgument,
-                                                GyanisScribe::Core::uiFormat(
-                                                        GyanisScribe::Core::uiTextUtf8(
+                                    Base::Error{Base::ErrorCode::InvalidArgument,
+                                                GyanisScribe::Base::uiFormat(
+                                                        GyanisScribe::Base::uiTextUtf8(
                                                                 "这张图放大到识别尺寸（{}×{}）后超过系统上限（最长边 {}）。请分段截图后再识别，或先在标注窗里裁掉不需要的部分"),
                                                         bitmap.PixelWidth(), bitmap.PixelHeight(), maximumDimension)});
                         }
@@ -235,9 +235,9 @@ namespace GyanisScribe::Ocr
                         if (!engine)
                         {
                             return std::unexpected(
-                                    Core::Error{Core::ErrorCode::DependencyMissing,
-                                                GyanisScribe::Core::uiFormat(
-                                                        GyanisScribe::Core::uiTextUtf8("系统说装有「{}」的识别语言，但建不出识别器。请在 设置 → 时间和语言 → 语音 里重装该语言包"),
+                                    Base::Error{Base::ErrorCode::DependencyMissing,
+                                                GyanisScribe::Base::uiFormat(
+                                                        GyanisScribe::Base::uiTextUtf8("系统说装有「{}」的识别语言，但建不出识别器。请在 设置 → 时间和语言 → 语音 里重装该语言包"),
                                                         publicTag.toStdString())});
                         }
 
@@ -270,9 +270,9 @@ namespace GyanisScribe::Ocr
                         return mapped;
                     } catch (const winrt::hresult_error &failure)
                     {
-                        return std::unexpected(Core::Error{
-                                Core::ErrorCode::InternalError,
-                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("系统识别这一张图失败（{}，错误码 0x{}）。请重试一次，或改用 Tesseract 后端"),
+                        return std::unexpected(Base::Error{
+                                Base::ErrorCode::InternalError,
+                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("系统识别这一张图失败（{}，错误码 0x{}）。请重试一次，或改用 Tesseract 后端"),
                                                              fromWinRTString(failure.message()).toStdString(), std::format("{:08X}", static_cast<uint32_t>(failure.code())))});
                     }
                 });

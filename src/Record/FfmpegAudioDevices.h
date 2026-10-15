@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QObject>
 #include <QString>
@@ -51,7 +51,7 @@ namespace GyanisScribe::Record
      * @details 一张空表在这里不算「这台机器没有音频设备」：分不清是真相还是解析跟不上 ffmpeg 的新格式，
      *          静默交回空表就等于让界面显示「没有设备」而误导用户。
      */
-    [[nodiscard]] Core::Expected<QVector<AudioInputDevice>> audioDevicesFromListing(const QString &ffmpegOutput);
+    [[nodiscard]] Base::Expected<QVector<AudioInputDevice>> audioDevicesFromListing(const QString &ffmpegOutput);
 
     /**
      * @brief 异步问 ffmpeg 要一份音频输入清单
@@ -94,7 +94,7 @@ namespace GyanisScribe::Record
          * @brief 这一档拿不到清单
          * @param error 带中文原因：平台不支持、没装 ffmpeg，或进程起不动
          */
-        void failed(const GyanisScribe::Core::Error &error);
+        void failed(const GyanisScribe::Base::Error &error);
 
     private:
         /// 进程收尾：按输出解析，退出码在这里不作判据

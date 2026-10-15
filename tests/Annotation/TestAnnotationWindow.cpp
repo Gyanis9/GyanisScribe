@@ -44,9 +44,9 @@ using GyanisScribe::Annotation::toCanvasPoint;
 using GyanisScribe::Annotation::ToolKind;
 using GyanisScribe::Annotation::toolShortcutFor;
 using GyanisScribe::Annotation::toWidgetPoint;
-using GyanisScribe::Core::CapturedImage;
+using GyanisScribe::Base::CapturedImage;
 using GyanisScribe::Core::displayRectFor;
-using GyanisScribe::Core::ErrorCode;
+using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Settings::SettingsStore;
 using GyanisScribe::Ui::IconProvider;
 

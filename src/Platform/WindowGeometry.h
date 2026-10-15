@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QRect>
 #include <QString>
@@ -57,7 +57,7 @@ namespace GyanisScribe::Platform
      *          所以多显示器与每显示器缩放（Per-Monitor）都走同一条公式。
      *          取整沿用 ScreenUtils::toPhysicalRect 那一条规则（起点向下、终点向上），两边互指同一个点。
      */
-    [[nodiscard]] Core::Expected<QRect> physicalToLogicalGlobal(const QRect &physicalGlobal, const MonitorMapping &monitor);
+    [[nodiscard]] Base::Expected<QRect> physicalToLogicalGlobal(const QRect &physicalGlobal, const MonitorMapping &monitor);
 
     /**
      * @brief physicalToLogicalGlobal() 的反方向：逻辑全局矩形换成物理全局矩形
@@ -66,7 +66,7 @@ namespace GyanisScribe::Platform
      * @return 成功返回物理矩形；缩放因子非正时返回 InvalidArgument
      * @note 两条换算必须成对改：只改一边就会得到「高亮框与像素不一致」这类静默错位
      */
-    [[nodiscard]] Core::Expected<QRect> logicalToPhysicalGlobal(const QRect &logicalGlobal, const MonitorMapping &monitor);
+    [[nodiscard]] Base::Expected<QRect> logicalToPhysicalGlobal(const QRect &logicalGlobal, const MonitorMapping &monitor);
 
     /**
      * @brief 找一个物理点落在哪块屏上
@@ -87,6 +87,6 @@ namespace GyanisScribe::Platform
      *          平台侧按物理点做命中（窗口矩形包含、UIA 命中），取整若与矩形换算不同源，
      *          边界上的那一格会两边各说各话。
      */
-    [[nodiscard]] Core::Expected<QPoint> logicalPointToPhysicalGlobal(const QPoint &logicalPoint, const MonitorMapping &monitor);
+    [[nodiscard]] Base::Expected<QPoint> logicalPointToPhysicalGlobal(const QPoint &logicalPoint, const MonitorMapping &monitor);
 
 } // namespace GyanisScribe::Platform

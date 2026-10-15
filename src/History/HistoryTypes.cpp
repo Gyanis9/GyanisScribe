@@ -1,6 +1,6 @@
 #include "History/HistoryTypes.h"
 
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 #include <array>
 #include <cstddef>
@@ -31,10 +31,10 @@ namespace GyanisScribe::History
     QString historyKindLabel(const HistoryKind kind)
     {
         // 显示名与存储标记分开：改中文说法不该让已经写在盘上的历史文件读不出来
-        return kind == HistoryKind::Recording ? GyanisScribe::Core::uiText("录屏") : GyanisScribe::Core::uiText("截图");
+        return kind == HistoryKind::Recording ? GyanisScribe::Base::uiText("录屏") : GyanisScribe::Base::uiText("截图");
     }
 
-    Core::Expected<HistoryKind> parseHistoryKind(const std::string_view token)
+    Base::Expected<HistoryKind> parseHistoryKind(const std::string_view token)
     {
         for (std::size_t index = 0; index < kKindTokens.size(); ++index)
         {
@@ -45,10 +45,10 @@ namespace GyanisScribe::History
         }
 
         // 逐项列出可用标记：只报「不认识」用户不知道该把这一行改成什么
-        return Core::Expected<HistoryKind>{std::unexpected{Core::Error{
-                .code    = Core::ErrorCode::InvalidArgument,
-                .message = GyanisScribe::Core::uiFormat(
-                        GyanisScribe::Core::uiTextUtf8("历史文件里的类别 \"{}\" 不认识。可用取值只有 Screenshot 与 Recording（区分大小写），改不回任一取值就把这一行删掉"), token),
+        return Base::Expected<HistoryKind>{std::unexpected{Base::Error{
+                .code    = Base::ErrorCode::InvalidArgument,
+                .message = GyanisScribe::Base::uiFormat(
+                        GyanisScribe::Base::uiTextUtf8("历史文件里的类别 \"{}\" 不认识。可用取值只有 Screenshot 与 Recording（区分大小写），改不回任一取值就把这一行删掉"), token),
         }}};
     }
 

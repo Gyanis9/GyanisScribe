@@ -459,7 +459,7 @@ namespace GyanisScribe::Pin
          * @details 重写接口：走 Qt 的 WindowTransparentForInput 标志（平台原生能力），
          *          穿透时同时去掉焦点接受，避免贴图吃不到鼠标却又抢走焦点。
          */
-        Core::Expected<void> setMouseThrough(bool through) override;
+        Base::Expected<void> setMouseThrough(bool through) override;
 
         /// 是否穿透，见 IPinWindow::isMouseThrough()
         [[nodiscard]] bool isMouseThrough() const noexcept override;
@@ -539,7 +539,7 @@ namespace GyanisScribe::Pin
          *          否则同一毫秒里的两张会写到同一个文件上，只剩最后一张。
          *          这一条写的是 m_image 的原样（管理器缓存与布局恢复用）；给用户的成品走 saveWithDefaultName()
          */
-        [[nodiscard]] Core::Expected<QString> saveToFile(const std::filesystem::path &directory, const QString &fileName, int quality) override;
+        [[nodiscard]] Base::Expected<QString> saveToFile(const std::filesystem::path &directory, const QString &fileName, int quality) override;
 
         /// 全屏坐标里的位置，见 IPinWindow::globalRect()
         [[nodiscard]] QRect globalRect() const override;
@@ -563,7 +563,7 @@ namespace GyanisScribe::Pin
          * @note 公开出来是给贴图管理器的批量保存用：整组只有一只手能伸进每张自己的文件名下，
          *       挨个再实现一遍起名就是第二个出处。
          */
-        [[nodiscard]] Core::Expected<std::filesystem::path> saveWithDefaultName();
+        [[nodiscard]] Base::Expected<std::filesystem::path> saveWithDefaultName();
 
         /**
          * @brief 建右键菜单
@@ -873,7 +873,7 @@ namespace GyanisScribe::Pin
          * @param quality 有损档质量
          * @return 成功返回写下的完整路径；失败返回带路径的原因
          */
-        [[nodiscard]] Core::Expected<QString> writeFile(const std::filesystem::path &directory, const QString &fileName, const QImage &contents, int quality);
+        [[nodiscard]] Base::Expected<QString> writeFile(const std::filesystem::path &directory, const QString &fileName, const QImage &contents, int quality);
 
         /**
          * @brief 按现在的尺寸与贴边档把窗口摆到贴上那条边上（露出或收成一条）

@@ -2,7 +2,7 @@
 #include "Annotation/StrokePen.h"
 
 #include "Annotation/FillBrush.h"
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 #include <QPainter>
 
@@ -22,7 +22,7 @@ namespace GyanisScribe::Annotation
 
     QString RectangleTool::displayName() const
     {
-        return GyanisScribe::Core::uiText("矩形");
+        return GyanisScribe::Base::uiText("矩形");
     }
 
     void RectangleTool::paintShape(QPainter &painter, const AnnotationShape &shape, const PaintContext &context) const

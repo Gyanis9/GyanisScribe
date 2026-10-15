@@ -1,7 +1,7 @@
 #include "Core/ImageFormat.h"
 
-#include "Core/Choices.h"
-#include "Core/Text.h"
+#include "Base/Choices.h"
+#include "Base/Text.h"
 
 #include <QImageWriter>
 
@@ -36,7 +36,7 @@ namespace GyanisScribe::Core
         return "png";
     }
 
-    Core::Expected<ImageFormat> parseImageFormat(const QString &stored)
+    Base::Expected<ImageFormat> parseImageFormat(const QString &stored)
     {
         const auto wanted = stored.toStdString();
         for (const auto &choice: kImageFormatChoices)
@@ -47,7 +47,7 @@ namespace GyanisScribe::Core
             }
         }
         // 猜一档就是把同一批成品按另一种压缩写出去，事后无从找回原样
-        return std::unexpected(Core::unknownTokenError(kImageFormatChoices, stored, Core::uiTextUtf8("保存格式"), Core::uiTextUtf8("截图页"), "Save/ImageFormat"));
+        return std::unexpected(Base::unknownTokenError(kImageFormatChoices, stored, Base::uiTextUtf8("保存格式"), Base::uiTextUtf8("截图页"), "Save/ImageFormat"));
     }
 
     std::vector<ImageFormat> writableImageFormats()
@@ -77,14 +77,14 @@ namespace GyanisScribe::Core
         return format != ImageFormat::Jpeg;
     }
 
-    Core::Expected<int> parseImageQuality(const int stored)
+    Base::Expected<int> parseImageQuality(const int stored)
     {
         if (stored < kMinimumImageQuality || stored > kMaximumImageQuality)
         {
-            return std::unexpected(Core::Error{
-                    .code = Core::ErrorCode::InvalidArgument,
+            return std::unexpected(Base::Error{
+                    .code = Base::ErrorCode::InvalidArgument,
                     .message =
-                            Core::uiFormat(Core::uiTextUtf8("保存质量：取值 {} 不在可取区间里，只能是 {} 到 {}。请在设置的截图页重选，或删掉 Save/ImageQuality 这一项回到默认档"),
+                            Base::uiFormat(Base::uiTextUtf8("保存质量：取值 {} 不在可取区间里，只能是 {} 到 {}。请在设置的截图页重选，或删掉 Save/ImageQuality 这一项回到默认档"),
                                            stored, kMinimumImageQuality, kMaximumImageQuality),
             });
         }

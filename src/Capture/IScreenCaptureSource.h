@@ -10,7 +10,7 @@
 #pragma once
 
 #include "Capture/CursorPixels.h"
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QtGlobal>
 
@@ -42,7 +42,7 @@ namespace GyanisScribe::Capture
          * @return 成功返回整帧
          * @return 屏幕不存在或抓回空图时返回 ScreenUnavailable，文案点名是哪块屏
          */
-        [[nodiscard]] virtual Core::Expected<Core::CapturedImage> grabScreen(const QString &screenName) const = 0;
+        [[nodiscard]] virtual Base::Expected<Base::CapturedImage> grabScreen(const QString &screenName) const = 0;
 
         /**
          * @brief 抓一个窗口
@@ -50,7 +50,7 @@ namespace GyanisScribe::Capture
          * @return 成功返回该窗口的帧，逻辑尺寸按所在屏的缩放因子算
          * @return 句柄已失效、或本平台抓不出窗口时返回原因
          */
-        [[nodiscard]] virtual Core::Expected<Core::CapturedImage> grabWindow(quintptr windowHandle) const = 0;
+        [[nodiscard]] virtual Base::Expected<Base::CapturedImage> grabWindow(quintptr windowHandle) const = 0;
 
         /**
          * @brief 取鼠标指针当前的形状与落点

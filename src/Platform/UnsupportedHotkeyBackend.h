@@ -43,14 +43,14 @@ namespace GyanisScribe::Platform
          * @param key 按键，桩不使用
          * @return 恒为失败：ErrorCode::PlatformUnsupported，文案写明本平台没有全局热键与替代做法
          */
-        Core::Expected<void> registerHotkey(int identifier, Qt::KeyboardModifiers modifiers, Qt::Key key) override;
+        Base::Expected<void> registerHotkey(int identifier, Qt::KeyboardModifiers modifiers, Qt::Key key) override;
 
         /**
          * @brief 注销热键，见 IHotkeyBackend::unregisterHotkey()
          * @param identifier 编号
          * @return 恒为失败，原因与登记一致；本来就没有登记过，不能报成功
          */
-        Core::Expected<void> unregisterHotkey(int identifier) override;
+        Base::Expected<void> unregisterHotkey(int identifier) override;
 
         /**
          * @brief 注销全部，见 IHotkeyBackend::unregisterAll()

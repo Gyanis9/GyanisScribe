@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QColor>
 #include <QFont>
@@ -48,7 +48,7 @@ namespace GyanisScribe::App
      * @details 优先序：图像 → 颜色 → 纯文本。颜色只认 `#`、`rgb(`、`hsl(` 开头的短单行，
      *          免得把「red」这类普通单词渲染成色卡；HTML、链接与文件路径不在这条里冒充。
      */
-    [[nodiscard]] Core::Expected<QImage> pinContentFrom(const QMimeData *data, const QFont &font);
+    [[nodiscard]] Base::Expected<QImage> pinContentFrom(const QMimeData *data, const QFont &font);
 
     /**
      * @brief 把一段纯文本渲染成一张卡片
@@ -107,7 +107,7 @@ namespace GyanisScribe::App
      *          链接渲染成文本卡片；没有文件时退回剪贴板那套单件内容（图像 / 颜色卡 / 文本卡）。
      *          不是图片的文件不拦整次拖放：能贴的照贴，名字记进 rejectedNames 由调用方提示。
      */
-    [[nodiscard]] Core::Expected<DropContent> dropContentFrom(const QMimeData *data, const QFont &font);
+    [[nodiscard]] Base::Expected<DropContent> dropContentFrom(const QMimeData *data, const QFont &font);
 
     /**
      * @brief 一次拖放的贴图结果
@@ -127,6 +127,6 @@ namespace GyanisScribe::App
      * @return 成功返回贴出的张数与没贴成的文件名；一件都贴不出来时返回原因
      * @details 与「把剪贴板里的内容贴到屏幕上」共用同一套内容渲染，两处不会将来只改一处。
      */
-    [[nodiscard]] Core::Expected<DropPinOutcome> pinDroppedContent(Pin::PinManager &pins, const QMimeData *data, const QPoint &globalTopLeft, const QFont &font);
+    [[nodiscard]] Base::Expected<DropPinOutcome> pinDroppedContent(Pin::PinManager &pins, const QMimeData *data, const QPoint &globalTopLeft, const QFont &font);
 
 } // namespace GyanisScribe::App

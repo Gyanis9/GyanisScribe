@@ -66,14 +66,14 @@ namespace GyanisScribe::Capture
          * @param screenName 目标屏幕名；空串表示光标所在那块
          * @return 成功返回整帧；拿不到 DXGI 帧时回落 Qt 那一份并把原因记进日志
          */
-        [[nodiscard]] Core::Expected<Core::CapturedImage> grabScreen(const QString &screenName) const override;
+        [[nodiscard]] Base::Expected<Base::CapturedImage> grabScreen(const QString &screenName) const override;
 
         /**
          * @brief 抓一个窗口，见 IScreenCaptureSource::grabWindow()
          * @param windowHandle 平台窗口句柄
          * @return 转发给 Qt 那一份的结果
          */
-        [[nodiscard]] Core::Expected<Core::CapturedImage> grabWindow(quintptr windowHandle) const override;
+        [[nodiscard]] Base::Expected<Base::CapturedImage> grabWindow(quintptr windowHandle) const override;
 
         /**
          * @brief 取鼠标指针形状，见 IScreenCaptureSource::grabCursor()

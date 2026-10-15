@@ -50,20 +50,20 @@ namespace GyanisScribe::Annotation
          * @param image 抓屏产物
          * @details 重写基类接口：清图形、清撤销栈、清选中——换一帧就是换一张画布。
          */
-        void loadCanvas(Core::CapturedImage image) override;
+        void loadCanvas(Base::CapturedImage image) override;
 
         /**
          * @brief 换底图保标注，见 IAnnotationEngine::refreshCanvas()
          * @param image 重新抓到的那一帧
          * @details 重写基类接口：只换 m_canvas 这一份，图形、选中、层序与撤销历史原地留着。
          */
-        void refreshCanvas(Core::CapturedImage image) override;
+        void refreshCanvas(Base::CapturedImage image) override;
 
         /**
          * @brief 当前画布，见 IAnnotationEngine::canvas()
          * @return 载入的那一帧
          */
-        [[nodiscard]] const Core::CapturedImage &canvas() const noexcept override;
+        [[nodiscard]] const Base::CapturedImage &canvas() const noexcept override;
 
         /**
          * @brief 导出烘焙好的图，见 IAnnotationEngine::exportImage()
@@ -79,7 +79,7 @@ namespace GyanisScribe::Annotation
          * @param kind 目标种类
          * @return 成功返回空载荷；种类不在册返回 InvalidArgument
          */
-        Core::Expected<void> setActiveTool(ToolKind kind) override;
+        Base::Expected<void> setActiveTool(ToolKind kind) override;
 
         /**
          * @brief 当前工具种类，见 IAnnotationEngine::activeTool()
@@ -94,7 +94,7 @@ namespace GyanisScribe::Annotation
          * @details 有选中项时把改样式记进撤销栈，并与栈顶同一条图形的上一次改动合并：
          *          滑块拖一趟只算一步，撤销一次回到抬手之前。
          */
-        Core::Expected<void> setPenParameters(const PenParameters &parameters) override;
+        Base::Expected<void> setPenParameters(const PenParameters &parameters) override;
 
         /**
          * @brief 起笔，见 IAnnotationEngine::beginStroke()
@@ -112,14 +112,14 @@ namespace GyanisScribe::Annotation
          * @brief 收笔入栈，见 IAnnotationEngine::endStroke()
          * @return 新图形的位置；退化时 InvalidArgument
          */
-        Core::Expected<AnnotationSelection> endStroke() override;
+        Base::Expected<AnnotationSelection> endStroke() override;
 
         /**
          * @brief 设定在途文字，见 IAnnotationEngine::setPendingText()
          * @param text 文本
          * @return 成功返回空载荷；当前工具不是文字时返回 InvalidArgument
          */
-        Core::Expected<void> setPendingText(const QString &text) override;
+        Base::Expected<void> setPendingText(const QString &text) override;
 
         /**
          * @brief 点名序号的下一个号，见 IAnnotationEngine::setNextNumber()
@@ -130,8 +130,8 @@ namespace GyanisScribe::Annotation
          * @brief 把在途的那条落定，见 IAnnotationEngine::finishPendingStroke()
          * @return 成功返回刚落定那条的位置；没有在途图形时返回 InvalidArgument
          */
-        [[nodiscard]] Core::Expected<AnnotationSelection> finishPendingStroke() override;
-        Core::Expected<void>                              setNextNumber(int number) override;
+        [[nodiscard]] Base::Expected<AnnotationSelection> finishPendingStroke() override;
+        Base::Expected<void>                              setNextNumber(int number) override;
 
         /// 序号回到自动编号，见 IAnnotationEngine::resetNumbering()
         void resetNumbering() override;
@@ -144,7 +144,7 @@ namespace GyanisScribe::Annotation
          * @param group 组号，夹在 1..kNumberGroupCount
          * @return 成功返回空载荷；序号工具不在册时返回 InternalError
          */
-        Core::Expected<void> setNumberGroup(int group) override;
+        Base::Expected<void> setNumberGroup(int group) override;
 
         /// 当前计数组，见 IAnnotationEngine::numberGroup()
         [[nodiscard]] int numberGroup() const override;
@@ -156,7 +156,7 @@ namespace GyanisScribe::Annotation
          * @details 重写基类接口：与移动、改样式同一形状——先验选中，再压一条撤销命令，
          *          界面不需要知道撤销栈的存在。
          */
-        Core::Expected<void> setTextOfSelection(const QString &text) override;
+        Base::Expected<void> setTextOfSelection(const QString &text) override;
 
         /**
          * @brief 取选中那条文字的内容，见 IAnnotationEngine::textOfSelection()
@@ -177,21 +177,21 @@ namespace GyanisScribe::Annotation
          * @param selection 目标
          * @return 成功返回空载荷；不在册返回 InvalidArgument
          */
-        Core::Expected<void> select(const AnnotationSelection &selection) override;
+        Base::Expected<void> select(const AnnotationSelection &selection) override;
 
         /**
          * @brief 把一条图形并进选中集，见 IAnnotationEngine::addToSelection()
          * @param selection 目标
          * @return 成功返回空载荷；不在册返回 InvalidArgument
          */
-        Core::Expected<void> addToSelection(const AnnotationSelection &selection) override;
+        Base::Expected<void> addToSelection(const AnnotationSelection &selection) override;
 
         /**
          * @brief 在选中集里翻转一条图形，见 IAnnotationEngine::toggleSelection()
          * @param selection 目标
          * @return 成功返回空载荷；不在册返回 InvalidArgument
          */
-        Core::Expected<void> toggleSelection(const AnnotationSelection &selection) override;
+        Base::Expected<void> toggleSelection(const AnnotationSelection &selection) override;
 
         /// 清空选中集，见 IAnnotationEngine::clearSelection()
         void clearSelection() override;
@@ -221,7 +221,7 @@ namespace GyanisScribe::Annotation
          * @param point 按下点
          * @return 成功返回空载荷；四种拒法各带自己的原因
          */
-        Core::Expected<void> beginSelectionDrag(SelectionHandle handle, const QPoint &point) override;
+        Base::Expected<void> beginSelectionDrag(SelectionHandle handle, const QPoint &point) override;
 
         /**
          * @brief 手柄拖动中，见 IAnnotationEngine::updateSelectionDrag()
@@ -229,28 +229,28 @@ namespace GyanisScribe::Annotation
          * @param modifiers 此刻按住的修饰键（Ctrl 中心点缩放、Shift 等比例缩放）
          * @return 成功返回空载荷；没有开场过或那条已不在册时返回 InvalidArgument
          */
-        Core::Expected<void> updateSelectionDrag(const QPoint &point, const SelectionDragModifiers &modifiers) override;
+        Base::Expected<void> updateSelectionDrag(const QPoint &point, const SelectionDragModifiers &modifiers) override;
 
         /// 结束手柄拖动，见 IAnnotationEngine::endSelectionDrag()
         void endSelectionDrag() override;
 
         /// 上移一层，见 IAnnotationEngine::raiseSelection()
-        Core::Expected<void> raiseSelection() override;
+        Base::Expected<void> raiseSelection() override;
 
         /// 下移一层，见 IAnnotationEngine::lowerSelection()
-        Core::Expected<void> lowerSelection() override;
+        Base::Expected<void> lowerSelection() override;
 
         /// 置顶，见 IAnnotationEngine::bringSelectionToFront()
-        Core::Expected<void> bringSelectionToFront() override;
+        Base::Expected<void> bringSelectionToFront() override;
 
         /// 置底，见 IAnnotationEngine::sendSelectionToBack()
-        Core::Expected<void> sendSelectionToBack() override;
+        Base::Expected<void> sendSelectionToBack() override;
 
         /// 复制选中项到引擎内剪贴板，见 IAnnotationEngine::copySelection()
-        Core::Expected<void> copySelection() override;
+        Base::Expected<void> copySelection() override;
 
         /// 粘贴剪贴板，见 IAnnotationEngine::pasteClipboard()
-        Core::Expected<void> pasteClipboard() override;
+        Base::Expected<void> pasteClipboard() override;
 
         /**
          * @brief 画全部图形给界面，见 IAnnotationEngine::paintShapes()
@@ -267,13 +267,13 @@ namespace GyanisScribe::Annotation
          * @details 重写基类接口：压一条平移命令，并与栈顶同一条图形的上一次位移并成一步，
          *          拖一趟与连按方向键都只算一步撤销。
          */
-        Core::Expected<void> moveSelectionBy(const QPoint &delta) override;
+        Base::Expected<void> moveSelectionBy(const QPoint &delta) override;
 
         /**
          * @brief 删除选中项，见 IAnnotationEngine::removeSelection()
          * @return 成功返回空载荷；没选中返回 InvalidArgument
          */
-        Core::Expected<void> removeSelection() override;
+        Base::Expected<void> removeSelection() override;
 
         /**
          * @brief 能否撤销，见 IAnnotationEngine::canUndo()
@@ -291,13 +291,13 @@ namespace GyanisScribe::Annotation
          * @brief 撤销一步，见 IAnnotationEngine::undo()
          * @return 成功返回空载荷；没得撤返回 InvalidArgument
          */
-        Core::Expected<void> undo() override;
+        Base::Expected<void> undo() override;
 
         /**
          * @brief 重做一步，见 IAnnotationEngine::redo()
          * @return 成功返回空载荷；没得重做返回 InvalidArgument
          */
-        Core::Expected<void> redo() override;
+        Base::Expected<void> redo() override;
 
     private:
         /// 全局层叠表里的一条：哪个工具的哪一条图形、压在第几层
@@ -348,9 +348,9 @@ namespace GyanisScribe::Annotation
         };
 
         /// 上移/下移/置顶/置底的共同实现：排出目标次序、逐个换号、一步撤销
-        Core::Expected<void> reorderSelection(ReorderMode mode);
+        Base::Expected<void> reorderSelection(ReorderMode mode);
 
-        Core::CapturedImage                               m_canvas;                           ///< 当前画布
+        Base::CapturedImage                               m_canvas;                           ///< 当前画布
         std::vector<std::unique_ptr<AnnotationTool>>      m_tools;                            ///< 全部工具，按 ToolKind 顺序登记
         QUndoStack                                        m_undoStack;                        ///< 图形级撤销历史
         std::vector<AnnotationSelection>                  m_selection;                        ///< 当前选中集：多选是常态，单条只是它的一格

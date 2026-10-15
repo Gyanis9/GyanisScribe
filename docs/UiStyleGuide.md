@@ -119,7 +119,7 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 
 ## 4. 高 DPI 与多屏适配
 
-- 抓帧的形状：物理像素住在 `QImage` 里，倍比住在 `Core::CapturedImage.devicePixelRatio` 与
+- 抓帧的形状：物理像素住在 `QImage` 里，倍比住在 `Base::CapturedImage.devicePixelRatio` 与
   `logicalSize` 里；`src/Capture/QScreenCaptureSource.cpp` 刻意把 `QImage` 自己的倍比标成 1.0，
   避免同一事实有两处读数。
 - 逻辑→物理的换算是唯一一处：`ScreenUtils::toPhysicalRect` 左上角向下取整、右下角向上取整，

@@ -9,13 +9,13 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <filesystem>
 #include <source_location>
 #include <string_view>
 
-namespace GyanisScribe::Core
+namespace GyanisScribe::Base
 {
 
     /**
@@ -90,4 +90,4 @@ namespace GyanisScribe::Core
         Logger() = default;
     };
 
-} // namespace GyanisScribe::Core
+} // namespace GyanisScribe::Base

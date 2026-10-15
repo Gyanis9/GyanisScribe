@@ -1,7 +1,7 @@
 #include "Record/FfmpegVideoEncoderEnumerator.h"
 
-#include "Core/Logger.h"
-#include "Core/Text.h"
+#include "Base/Logger.h"
+#include "Base/Text.h"
 #include "Record/FfmpegCommand.h"
 #include "Record/FfmpegVideoEncoders.h"
 
@@ -57,9 +57,9 @@ namespace GyanisScribe::Record
             m_busy = false;
             if (m_usable.isEmpty())
             {
-                emit failed(Core::Error{
-                        .code    = Core::ErrorCode::DependencyMissing,
-                        .message = Core::uiTextUtf8("你这份 ffmpeg 里一个候选编码器都开不起来（逐个真探过）。请换装一个带 libx264 的完整 ffmpeg 构建，"
+                emit failed(Base::Error{
+                        .code    = Base::ErrorCode::DependencyMissing,
+                        .message = Base::uiTextUtf8("你这份 ffmpeg 里一个候选编码器都开不起来（逐个真探过）。请换装一个带 libx264 的完整 ffmpeg 构建，"
                                                     "录屏仍可进行——编码时会再试一遍，全不行才报错"),
                 });
                 return;
@@ -80,7 +80,7 @@ namespace GyanisScribe::Record
         const auto candidate = m_remaining.constFirst();
         // 探测参数与真编码同一形状（按取样档），末了输出到 null：判据是「这条命令真跑得通」
         const auto arguments = videoEncoderProbeArguments(candidate.toStdString(), 0, kEncoderProbeWidth, kEncoderProbeHeight, kEncoderProbeFrameRate);
-        Core::Logger::info(std::format("探编码器 {}（{}x{}@{}）", candidate.toStdString(), kEncoderProbeWidth, kEncoderProbeHeight, kEncoderProbeFrameRate));
+        Base::Logger::info(std::format("探编码器 {}（{}x{}@{}）", candidate.toStdString(), kEncoderProbeWidth, kEncoderProbeHeight, kEncoderProbeFrameRate));
 
         m_process = std::make_unique<QProcess>();
         m_process->setProcessChannelMode(QProcess::MergedChannels);
@@ -89,9 +89,9 @@ namespace GyanisScribe::Record
                          [this, candidate](QProcess::ProcessError)
                          {
                              m_busy = false;
-                             emit failed(Core::Error{
-                                     .code    = Core::ErrorCode::InternalError,
-                                     .message = Core::uiFormat(Core::uiTextUtf8("探测编码器 {} 的那一步起不动 ffmpeg。请确认它还能运行，或重新安装"), candidate.toStdString())});
+                             emit failed(Base::Error{
+                                     .code    = Base::ErrorCode::InternalError,
+                                     .message = Base::uiFormat(Base::uiTextUtf8("探测编码器 {} 的那一步起不动 ffmpeg。请确认它还能运行，或重新安装"), candidate.toStdString())});
                          });
         m_process->start(*program, arguments);
     }

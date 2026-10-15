@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QRect>
 #include <QString>
@@ -82,7 +82,7 @@ namespace GyanisScribe::Record
      * @details 全部规则在开始之前判，不边录边判：录到一半才发现帧率不合法，
      *          用户已经白等了十几秒，那比开始就拒绝更糟。
      */
-    [[nodiscard]] Core::Expected<void> validateRecorderConfig(const RecorderConfig &config);
+    [[nodiscard]] Base::Expected<void> validateRecorderConfig(const RecorderConfig &config);
 
     /// MP4 允许的最高帧率：再高就是浪费，屏幕本身也只给到 60
     inline constexpr int kMaximumFrameRate = 60;
@@ -114,7 +114,7 @@ namespace GyanisScribe::Record
      * @return 可用的码率；不在 0..kMaximumVideoBitrateKbps 里时返回带范围与替代做法的中文原因
      * @details 0 是合法值而不是「没填」：它是这一档的名字（交给 CRF），读不出时才回落缺省档。
      */
-    [[nodiscard]] Core::Expected<int> parseVideoBitrateSetting(int stored);
+    [[nodiscard]] Base::Expected<int> parseVideoBitrateSetting(int stored);
 
     /**
      * @brief 解析配置里存的默认帧率
@@ -123,7 +123,7 @@ namespace GyanisScribe::Record
      * @details 帧率的上限按输出格式分两档（GIF 更低），但那要等格式定了才知道；
      *          这里只按两档共用的上限判，格式那一层仍由 validateRecorderConfig 把关。
      */
-    [[nodiscard]] Core::Expected<int> parseFrameRateSetting(int stored);
+    [[nodiscard]] Base::Expected<int> parseFrameRateSetting(int stored);
 
     /**
      * @brief 解析配置里存的倒计时秒数
@@ -131,7 +131,7 @@ namespace GyanisScribe::Record
      * @return 可用的秒数；不在 0..kMaximumCountdownSeconds 里时返回带范围的中文原因
      * @details 0 是合法值而不是「没填」：它就是「立即开始」这一档的名字。
      */
-    [[nodiscard]] Core::Expected<int> parseCountdownSetting(int stored);
+    [[nodiscard]] Base::Expected<int> parseCountdownSetting(int stored);
 
     /**
      * @brief 解析配置里存的最长录制时长
@@ -140,7 +140,7 @@ namespace GyanisScribe::Record
      * @details 与 validateRecorderConfig 用的是同一个上限（一处真源）：
      *          设置页摆得出去、开始那一刻却拒收，是这一格最容易出的岔子。
      */
-    [[nodiscard]] Core::Expected<int> parseMaximumDurationSetting(int stored);
+    [[nodiscard]] Base::Expected<int> parseMaximumDurationSetting(int stored);
 
     /// 一档录制范围：存进配置的 token，与设置页显示的中文标签
     struct RecordScopeChoice
@@ -172,7 +172,7 @@ namespace GyanisScribe::Record
      * @details 不替用户猜一档：手改配置写成 "region"（小写）就该报出来，
      *          悄悄按整屏开始录会录到完全不同的画面。
      */
-    [[nodiscard]] Core::Expected<RecordMode> parseRecordScope(const QString &stored);
+    [[nodiscard]] Base::Expected<RecordMode> parseRecordScope(const QString &stored);
 
     /// 一档输出格式：存进配置的 token，与设置页显示的中文标签
     struct RecordFormatChoice
@@ -202,6 +202,6 @@ namespace GyanisScribe::Record
      * @details 格式定不下来就不能开录：MP4 与 GIF 走的是两条编码路线（后者两遍调色板），
      *          猜错的那一种会把已经抓完的帧按错的容器压出去。
      */
-    [[nodiscard]] Core::Expected<OutputFormat> parseRecordFormat(const QString &stored);
+    [[nodiscard]] Base::Expected<OutputFormat> parseRecordFormat(const QString &stored);
 
 } // namespace GyanisScribe::Record

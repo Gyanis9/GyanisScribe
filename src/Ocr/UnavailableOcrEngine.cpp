@@ -1,6 +1,6 @@
 #include "Ocr/UnavailableOcrEngine.h"
 
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 namespace GyanisScribe::Ocr
 {
@@ -13,7 +13,7 @@ namespace GyanisScribe::Ocr
 
     QString UnavailableOcrEngine::name() const
     {
-        return GyanisScribe::Core::uiText("无可用识别后端");
+        return GyanisScribe::Base::uiText("无可用识别后端");
     }
 
     bool UnavailableOcrEngine::isAvailable() const
@@ -31,9 +31,9 @@ namespace GyanisScribe::Ocr
         return {};
     }
 
-    Core::Expected<OcrResult> UnavailableOcrEngine::recognize(const QImage &, const QString &)
+    Base::Expected<OcrResult> UnavailableOcrEngine::recognize(const QImage &, const QString &)
     {
-        return std::unexpected(Core::Error{Core::ErrorCode::DependencyMissing, m_reason.toStdString()});
+        return std::unexpected(Base::Error{Base::ErrorCode::DependencyMissing, m_reason.toStdString()});
     }
 
 } // namespace GyanisScribe::Ocr

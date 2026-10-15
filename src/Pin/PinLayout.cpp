@@ -1,6 +1,6 @@
 #include "Pin/PinLayout.h"
 
-#include "Core/Text.h"
+#include "Base/Text.h"
 #include "Pin/PinTransform.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
@@ -32,15 +32,15 @@ namespace GyanisScribe::Pin
         constexpr std::string_view kKeyBackdrop  = "transparentBackdrop";
         constexpr std::string_view kKeyColorCard = "colorCardHex";
 
-        Core::Expected<QVector<PinState>> failWith(std::string reason)
+        Base::Expected<QVector<PinState>> failWith(std::string reason)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, std::move(reason)});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, std::move(reason)});
         }
 
         /// 名字表那条通道的同一条失败形状：载荷类型不同，不能共用上面那个
-        Core::Expected<QMap<int, QString>> failNamesWith(std::string reason)
+        Base::Expected<QMap<int, QString>> failNamesWith(std::string reason)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, std::move(reason)});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, std::move(reason)});
         }
     } // namespace
 
@@ -69,7 +69,7 @@ namespace GyanisScribe::Pin
         return QString::fromUtf8(QJsonDocument(entries).toJson(QJsonDocument::Compact));
     }
 
-    Core::Expected<QVector<PinState>> parseLayout(std::string_view text)
+    Base::Expected<QVector<PinState>> parseLayout(std::string_view text)
     {
         if (text.empty())
         {
@@ -81,7 +81,7 @@ namespace GyanisScribe::Pin
         const auto      document = QJsonDocument::fromJson(QByteArray(text.data(), static_cast<qsizetype>(text.size())), &parseError);
         if (parseError.error != QJsonParseError::NoError || !document.isArray())
         {
-            return failWith(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局不是一段 JSON 数组：{}。请在设置里清除这一项，让程序重新记一次"),
+            return failWith(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图布局不是一段 JSON 数组：{}。请在设置里清除这一项，让程序重新记一次"),
                                                          parseError.errorString().toStdString()));
         }
 
@@ -92,7 +92,7 @@ namespace GyanisScribe::Pin
             if (!entries[index].isObject())
             {
                 // 一项坏就整体失败：跳过它等于悄悄少恢复一张贴图，用户会以为那张被删了
-                return failWith(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局第 {} 项不是对象。请清除这一项后让程序重新记一次"), index + 1));
+                return failWith(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图布局第 {} 项不是对象。请清除这一项后让程序重新记一次"), index + 1));
             }
 
             const auto entry = entries[index].toObject();
@@ -100,7 +100,7 @@ namespace GyanisScribe::Pin
             {
                 if (!entry.contains(QLatin1String(key.data())))
                 {
-                    return failWith(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局第 {} 项缺少字段 {}。请清除这一项后让程序重新记一次"), index + 1,
+                    return failWith(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图布局第 {} 项缺少字段 {}。请清除这一项后让程序重新记一次"), index + 1,
                                                                  std::string(key)));
                 }
             }
@@ -116,17 +116,17 @@ namespace GyanisScribe::Pin
             if (state.imageFile.isEmpty())
             {
                 // 像素进不了配置，路径就是恢复的唯一凭据：空路径那张图无论如何也摆不回去
-                return failWith(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局第 {} 项没有图片位置。请清除这一项后让程序重新记一次"), index + 1));
+                return failWith(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图布局第 {} 项没有图片位置。请清除这一项后让程序重新记一次"), index + 1));
             }
 
             if (state.logicalSize.width() <= 0.0 || state.logicalSize.height() <= 0.0)
             {
-                return failWith(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局第 {} 项的尺寸不是正数（{}×{}）。请清除这一项后让程序重新记一次"), index + 1,
+                return failWith(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图布局第 {} 项的尺寸不是正数（{}×{}）。请清除这一项后让程序重新记一次"), index + 1,
                                                              state.logicalSize.width(), state.logicalSize.height()));
             }
             if (state.opacity <= 0.0 || state.opacity > 1.0)
             {
-                return failWith(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局第 {} 项的不透明度不在 (0,1] 里：{}。请清除这一项后让程序重新记一次"),
+                return failWith(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图布局第 {} 项的不透明度不在 (0,1] 里：{}。请清除这一项后让程序重新记一次"),
                                                              index + 1, state.opacity));
             }
 
@@ -137,7 +137,7 @@ namespace GyanisScribe::Pin
                 const auto group = entry[QLatin1String(kKeyGroup.data())].toInt();
                 if (group < kFirstPinGroup)
                 {
-                    return failWith(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局第 {} 项的分组号不是正整数：{}。请清除这一项后让程序重新记一次"),
+                    return failWith(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图布局第 {} 项的分组号不是正整数：{}。请清除这一项后让程序重新记一次"),
                                                                  index + 1, group));
                 }
                 state.group = group;
@@ -150,7 +150,7 @@ namespace GyanisScribe::Pin
                 if (!entry[QLatin1String(kKeyOnTop.data())].isBool())
                 {
                     return failWith(
-                            GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局第 {} 项的置顶字段不是布尔值。请清除这一项后让程序重新记一次"), index + 1));
+                            GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图布局第 {} 项的置顶字段不是布尔值。请清除这一项后让程序重新记一次"), index + 1));
                 }
                 state.alwaysOnTop = entry[QLatin1String(kKeyOnTop.data())].toBool();
             }
@@ -159,7 +159,7 @@ namespace GyanisScribe::Pin
                 if (!entry[QLatin1String(kKeyThrough.data())].isBool())
                 {
                     return failWith(
-                            GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局第 {} 项的穿透字段不是布尔值。请清除这一项后让程序重新记一次"), index + 1));
+                            GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图布局第 {} 项的穿透字段不是布尔值。请清除这一项后让程序重新记一次"), index + 1));
                 }
                 state.mouseThrough = entry[QLatin1String(kKeyThrough.data())].toBool();
             }
@@ -184,12 +184,12 @@ namespace GyanisScribe::Pin
                 if (!stored.isDouble())
                 {
                     return failWith(
-                            GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局第 {} 项的透明区档位不是整数。请清除这一项后让程序重新记一次"), index + 1));
+                            GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图布局第 {} 项的透明区档位不是整数。请清除这一项后让程序重新记一次"), index + 1));
                 }
                 const auto raw = stored.toInt();
                 if (raw < 0 || raw >= kTransparentBackdropCount)
                 {
-                    return failWith(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图布局第 {} 项的透明区档位不在 0 到 {} 里：{}。请清除这一项后让程序重新记一次"),
+                    return failWith(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图布局第 {} 项的透明区档位不在 0 到 {} 里：{}。请清除这一项后让程序重新记一次"),
                                                                  index + 1, kTransparentBackdropCount - 1, raw));
                 }
                 state.transparentBackdrop = static_cast<TransparentBackdrop>(raw);
@@ -200,12 +200,12 @@ namespace GyanisScribe::Pin
         return states;
     }
 
-    Core::Expected<void> saveLayout(Settings::ISettingsStore &settings, const QVector<PinState> &states)
+    Base::Expected<void> saveLayout(Settings::ISettingsStore &settings, const QVector<PinState> &states)
     {
         return settings.setValue(Settings::kPinLayout, QVariant(serializeLayout(states)));
     }
 
-    Core::Expected<QVector<PinState>> loadLayout(const Settings::ISettingsStore &settings)
+    Base::Expected<QVector<PinState>> loadLayout(const Settings::ISettingsStore &settings)
     {
         const auto stored = settings.stringValue(Settings::kPinLayout, QString());
         return parseLayout(stored.toStdString());
@@ -226,7 +226,7 @@ namespace GyanisScribe::Pin
         return QString::fromUtf8(QJsonDocument(entries).toJson(QJsonDocument::Compact));
     }
 
-    Core::Expected<QMap<int, QString>> parseGroupNames(std::string_view text)
+    Base::Expected<QMap<int, QString>> parseGroupNames(std::string_view text)
     {
         QMap<int, QString> names;
         if (text.empty())
@@ -240,7 +240,7 @@ namespace GyanisScribe::Pin
         if (parseError.error != QJsonParseError::NoError || !document.isObject())
         {
             return failNamesWith(
-                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图分组名字不是一段 JSON 对象：{}。请在设置里清除 Pin/GroupNames 这一项，让程序重新记一次"),
+                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图分组名字不是一段 JSON 对象：{}。请在设置里清除 Pin/GroupNames 这一项，让程序重新记一次"),
                                                  parseError.errorString().toStdString()));
         }
 
@@ -251,14 +251,14 @@ namespace GyanisScribe::Pin
             const auto group = iterator.key().toInt(&ok);
             if (!ok || group < kFirstPinGroup)
             {
-                return failNamesWith(GyanisScribe::Core::uiFormat(
-                        GyanisScribe::Core::uiTextUtf8("贴图分组名字里有一条的键不是正整数：{}。请在设置里清除 Pin/GroupNames 这一项，让程序重新记一次"),
+                return failNamesWith(GyanisScribe::Base::uiFormat(
+                        GyanisScribe::Base::uiTextUtf8("贴图分组名字里有一条的键不是正整数：{}。请在设置里清除 Pin/GroupNames 这一项，让程序重新记一次"),
                         iterator.key().toStdString()));
             }
             if (!iterator.value().isString())
             {
-                return failNamesWith(GyanisScribe::Core::uiFormat(
-                        GyanisScribe::Core::uiTextUtf8("贴图分组名字第 {} 组的值不是一段文本。请在设置里清除 Pin/GroupNames 这一项，让程序重新记一次"), group));
+                return failNamesWith(GyanisScribe::Base::uiFormat(
+                        GyanisScribe::Base::uiTextUtf8("贴图分组名字第 {} 组的值不是一段文本。请在设置里清除 Pin/GroupNames 这一项，让程序重新记一次"), group));
             }
             const auto name = iterator.value().toString().trimmed();
             if (name.isEmpty())
@@ -270,18 +270,18 @@ namespace GyanisScribe::Pin
         return names;
     }
 
-    Core::Expected<void> saveGroupNames(Settings::ISettingsStore &settings, const QMap<int, QString> &names)
+    Base::Expected<void> saveGroupNames(Settings::ISettingsStore &settings, const QMap<int, QString> &names)
     {
         return settings.setValue(Settings::kPinGroupNames, QVariant(serializeGroupNames(names)));
     }
 
-    Core::Expected<QMap<int, QString>> loadGroupNames(const Settings::ISettingsStore &settings)
+    Base::Expected<QMap<int, QString>> loadGroupNames(const Settings::ISettingsStore &settings)
     {
         const auto stored = settings.stringValue(Settings::kPinGroupNames, QString());
         return parseGroupNames(stored.toStdString());
     }
 
-    Core::Expected<QVector<int>> parseGroupRotation(const QStringList &stored)
+    Base::Expected<QVector<int>> parseGroupRotation(const QStringList &stored)
     {
         QVector<int> order;
         order.reserve(stored.size());
@@ -298,9 +298,9 @@ namespace GyanisScribe::Pin
             const auto group   = trimmed.toInt(&numeric);
             const auto bad     = [&trimmed](const QString &why)
             {
-                return Core::Expected<QVector<int>>{std::unexpected{Core::Error{
-                        .code    = Core::ErrorCode::InvalidArgument,
-                        .message = GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("分组轮换顺序里 \"{}\" {}。请在设置的通用页改这一格，或整格清空回到按组号升序"),
+                return Base::Expected<QVector<int>>{std::unexpected{Base::Error{
+                        .code    = Base::ErrorCode::InvalidArgument,
+                        .message = GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("分组轮换顺序里 \"{}\" {}。请在设置的通用页改这一格，或整格清空回到按组号升序"),
                                                                 trimmed.toStdString(), why.toStdString()),
                 }}};
             };
@@ -340,16 +340,16 @@ namespace GyanisScribe::Pin
         return cycle;
     }
 
-    Core::Expected<double> parseOpacityPercentSetting(const int percent)
+    Base::Expected<double> parseOpacityPercentSetting(const int percent)
     {
         if (percent >= 1 && percent <= 100)
         {
             return static_cast<double>(percent) / 100.0;
         }
-        return Core::Expected<double>{std::unexpected{Core::Error{
-                .code    = Core::ErrorCode::InvalidArgument,
-                .message = GyanisScribe::Core::uiFormat(
-                        GyanisScribe::Core::uiTextUtf8("贴图默认不透明度 \"{}\" 不在 1 到 100 之间：请在设置的贴图页重选一个值，或删掉 Pin/DefaultOpacity 这一项回到完全不透明"),
+        return Base::Expected<double>{std::unexpected{Base::Error{
+                .code    = Base::ErrorCode::InvalidArgument,
+                .message = GyanisScribe::Base::uiFormat(
+                        GyanisScribe::Base::uiTextUtf8("贴图默认不透明度 \"{}\" 不在 1 到 100 之间：请在设置的贴图页重选一个值，或删掉 Pin/DefaultOpacity 这一项回到完全不透明"),
                         percent),
         }}};
     }

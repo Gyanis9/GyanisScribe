@@ -2,6 +2,7 @@
 # 框架统一 GoogleTest（不引入 Catch2），用例由 gtest_discover_tests 注册给 ctest
 find_package(GTest REQUIRED CONFIG)
 
+add_subdirectory(Base)
 add_subdirectory(Core)
 add_subdirectory(Ui)
 add_subdirectory(Platform)

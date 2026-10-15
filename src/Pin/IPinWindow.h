@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include "Pin/PinLayout.h"
 
@@ -77,7 +77,7 @@ namespace GyanisScribe::Pin
          * @param through true 表示鼠标事件穿过贴图
          * @note 平台没有这个能力时返回 PlatformUnsupported 并保持原状，不让用户以为开关生效了
          */
-        virtual Core::Expected<void> setMouseThrough(bool through) = 0;
+        virtual Base::Expected<void> setMouseThrough(bool through) = 0;
 
         /**
          * @brief 是否处于鼠标穿透
@@ -145,7 +145,7 @@ namespace GyanisScribe::Pin
          *                传 -1 表示交给 Qt 的默认档
          * @return 成功返回写下的文件完整路径；失败返回带路径与原因的 Error
          */
-        [[nodiscard]] virtual Core::Expected<QString> saveToFile(const std::filesystem::path &directory, const QString &fileName, int quality) = 0;
+        [[nodiscard]] virtual Base::Expected<QString> saveToFile(const std::filesystem::path &directory, const QString &fileName, int quality) = 0;
 
         /**
          * @brief 贴图当前在全屏坐标里的位置

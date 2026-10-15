@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QImage>
 #include <QPoint>
@@ -32,6 +32,6 @@ namespace GyanisScribe::Record
      * @note 帧上原来标的 devicePixelRatio 会被临时清成 1 再画：本函数一律按物理像素算，
      *       而整屏帧不带标记、选区裁出的帧带标记，两种都得给同一个结果。
      */
-    [[nodiscard]] Core::Expected<bool> paintCursorHighlight(QImage &frame, const QPoint &cursorGlobalLogical, const QPoint &frameGlobalOriginLogical, qreal devicePixelRatio);
+    [[nodiscard]] Base::Expected<bool> paintCursorHighlight(QImage &frame, const QPoint &cursorGlobalLogical, const QPoint &frameGlobalOriginLogical, qreal devicePixelRatio);
 
 } // namespace GyanisScribe::Record

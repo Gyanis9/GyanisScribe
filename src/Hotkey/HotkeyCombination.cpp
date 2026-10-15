@@ -1,6 +1,6 @@
 #include "Hotkey/HotkeyCombination.h"
 
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 #include <QChar>
 #include <QString>
@@ -77,10 +77,10 @@ namespace GyanisScribe::Hotkey
         }
 
         /// 「按键是修饰键本身」这一条两档说的是同一句话，所以错误对象也只造一份
-        Core::Error modifierItselfError()
+        Base::Error modifierItselfError()
         {
-            return {Core::ErrorCode::InvalidArgument,
-                    GyanisScribe::Core::uiTextUtf8("组合键的按键部分不能是修饰键本身：请在 Ctrl、Alt、Shift、Win 之外再选一个字母、数字、空格或 F1-F24")};
+            return {Base::ErrorCode::InvalidArgument,
+                    GyanisScribe::Base::uiTextUtf8("组合键的按键部分不能是修饰键本身：请在 Ctrl、Alt、Shift、Win 之外再选一个字母、数字、空格或 F1-F24")};
         }
 
         QString keyTokenText(Qt::Key key)
@@ -157,7 +157,7 @@ namespace GyanisScribe::Hotkey
     {
     }
 
-    Core::Expected<HotkeyCombination> HotkeyCombination::parse(std::string_view text)
+    Base::Expected<HotkeyCombination> HotkeyCombination::parse(std::string_view text)
     {
         const auto segments = splitOnPlus(text);
 
@@ -170,9 +170,9 @@ namespace GyanisScribe::Hotkey
             if (lowered.empty())
             {
                 return std::unexpected(
-                        Core::Error{Core::ErrorCode::InvalidArgument,
-                                    GyanisScribe::Core::uiFormat(
-                                            GyanisScribe::Core::uiTextUtf8("组合键「{}」里有一段是空的（相邻的 + 之间没有内容）。请写成 Ctrl+Alt+A 这种每段都有内容的形式"),
+                        Base::Error{Base::ErrorCode::InvalidArgument,
+                                    GyanisScribe::Base::uiFormat(
+                                            GyanisScribe::Base::uiTextUtf8("组合键「{}」里有一段是空的（相邻的 + 之间没有内容）。请写成 Ctrl+Alt+A 这种每段都有内容的形式"),
                                             std::string(text))});
             }
 
@@ -198,9 +198,9 @@ namespace GyanisScribe::Hotkey
             } else
             {
                 return std::unexpected(
-                        Core::Error{Core::ErrorCode::InvalidArgument,
-                                    GyanisScribe::Core::uiFormat(
-                                            GyanisScribe::Core::uiTextUtf8("组合键「{}」里的「{}」不是修饰键。修饰键只认 Ctrl、Alt、Shift、Win（Control/Option/Meta/Super 同义）"),
+                        Base::Error{Base::ErrorCode::InvalidArgument,
+                                    GyanisScribe::Base::uiFormat(
+                                            GyanisScribe::Base::uiTextUtf8("组合键「{}」里的「{}」不是修饰键。修饰键只认 Ctrl、Alt、Shift、Win（Control/Option/Meta/Super 同义）"),
                                             std::string(text), segments[index])});
             }
             // 同一修饰键重复写按并位处理：与 toText() 的输出保持同形，比较才不会因重复段落判成不相等
@@ -208,17 +208,17 @@ namespace GyanisScribe::Hotkey
 
         if (keyToken.empty())
         {
-            return std::unexpected(Core::Error{
-                    Core::ErrorCode::InvalidArgument,
-                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("组合键「{}」最后没有按键。请写成 Ctrl+Alt+A 这种「修饰键+按键」的形式"), std::string(text))});
+            return std::unexpected(Base::Error{
+                    Base::ErrorCode::InvalidArgument,
+                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("组合键「{}」最后没有按键。请写成 Ctrl+Alt+A 这种「修饰键+按键」的形式"), std::string(text))});
         }
 
         const auto parsedKey = parseKeyToken(keyToken);
         if (!parsedKey)
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument,
-                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("组合键「{}」里的按键「{}」不支持。请改用字母 A-Z、数字 0-9、Space 或 F1-F24"),
+                    Base::Error{Base::ErrorCode::InvalidArgument,
+                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("组合键「{}」里的按键「{}」不支持。请改用字母 A-Z、数字 0-9、Space 或 F1-F24"),
                                                              std::string(text), std::string(keyToken))});
         }
 
@@ -227,7 +227,7 @@ namespace GyanisScribe::Hotkey
         return HotkeyCombination(modifiers, *parsedKey);
     }
 
-    Core::Expected<HotkeyCombination> HotkeyCombination::fromText(const std::string_view text, const bool allowBareKeys)
+    Base::Expected<HotkeyCombination> HotkeyCombination::fromText(const std::string_view text, const bool allowBareKeys)
     {
         auto parsed = parse(text);
         if (!parsed)
@@ -242,7 +242,7 @@ namespace GyanisScribe::Hotkey
         return parsed;
     }
 
-    Core::Expected<void> HotkeyCombination::checkUsableGlobally(const bool allowBareKeys) const
+    Base::Expected<void> HotkeyCombination::checkUsableGlobally(const bool allowBareKeys) const
     {
         switch (keyShapeProblem(m_key))
         {
@@ -250,8 +250,8 @@ namespace GyanisScribe::Hotkey
                 return std::unexpected(modifierItselfError());
             case KeyShapeProblem::NotInAllowedSet:
                 return std::unexpected(
-                        Core::Error{Core::ErrorCode::InvalidArgument,
-                                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("按键 0x{:X} 不能用作全局热键。请改用字母、数字、空格或 F1-F24 之一"),
+                        Base::Error{Base::ErrorCode::InvalidArgument,
+                                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("按键 0x{:X} 不能用作全局热键。请改用字母、数字、空格或 F1-F24 之一"),
                                                                  static_cast<int>(m_key))});
             case KeyShapeProblem::None:
                 break;
@@ -260,14 +260,14 @@ namespace GyanisScribe::Hotkey
         if (m_modifiers == Qt::NoModifier && !allowBareKeys)
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument,
-                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("全局热键至少要带一个修饰键：单键 {} 会把其它程序的普通按键吞掉。请加上 Ctrl 或 Alt"),
+                    Base::Error{Base::ErrorCode::InvalidArgument,
+                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("全局热键至少要带一个修饰键：单键 {} 会把其它程序的普通按键吞掉。请加上 Ctrl 或 Alt"),
                                                              keyTokenText(m_key).toStdString())});
         }
         return {};
     }
 
-    Core::Expected<void> HotkeyCombination::checkUsableInWindow() const
+    Base::Expected<void> HotkeyCombination::checkUsableInWindow() const
     {
         // 界面内的按键只少「至少一个修饰键」这一条：窗口里的裸键只在程序自己有焦点时吃到，
         // 不会像全局单键那样把别的程序的打字吞掉。文案各自说自己是哪一档，
@@ -278,8 +278,8 @@ namespace GyanisScribe::Hotkey
                 return std::unexpected(modifierItselfError());
             case KeyShapeProblem::NotInAllowedSet:
                 return std::unexpected(
-                        Core::Error{Core::ErrorCode::InvalidArgument,
-                                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("按键 0x{:X} 不能用作界面按键。请改用字母、数字、空格或 F1-F24 之一"),
+                        Base::Error{Base::ErrorCode::InvalidArgument,
+                                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("按键 0x{:X} 不能用作界面按键。请改用字母、数字、空格或 F1-F24 之一"),
                                                                  static_cast<int>(m_key))});
             case KeyShapeProblem::None:
                 return {};

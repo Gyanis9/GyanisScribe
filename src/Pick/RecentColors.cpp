@@ -53,7 +53,7 @@ namespace GyanisScribe::Pick
         return tokens;
     }
 
-    Core::Expected<std::vector<QColor>> parseRecentColors(const QStringList &tokens)
+    Base::Expected<std::vector<QColor>> parseRecentColors(const QStringList &tokens)
     {
         std::vector<QColor> colors;
         colors.reserve(static_cast<std::size_t>(tokens.size()));
@@ -62,8 +62,8 @@ namespace GyanisScribe::Pick
         {
             if (token.size() != 7 || token.at(0) != QLatin1Char('#'))
             {
-                return Core::Expected<std::vector<QColor>>{std::unexpected{Core::Error{
-                        .code    = Core::ErrorCode::InvalidArgument,
+                return Base::Expected<std::vector<QColor>>{std::unexpected{Base::Error{
+                        .code    = Base::ErrorCode::InvalidArgument,
                         .message = std::format("最近使用颜色里有一条不是 #RRGGBB 写法：\"{}\"。删掉配置里的 Annotation/RecentColors 这一项可以恢复默认", token.toStdString()),
                 }}};
             }
@@ -73,8 +73,8 @@ namespace GyanisScribe::Pick
             const auto value    = digits.toUInt(&accepted, 16);
             if (!accepted)
             {
-                return Core::Expected<std::vector<QColor>>{std::unexpected{Core::Error{
-                        .code    = Core::ErrorCode::InvalidArgument,
+                return Base::Expected<std::vector<QColor>>{std::unexpected{Base::Error{
+                        .code    = Base::ErrorCode::InvalidArgument,
                         .message = std::format("最近使用颜色里有一条不是十六进制：\"{}\"。删掉配置里的 Annotation/RecentColors 这一项可以恢复默认", token.toStdString()),
                 }}};
             }

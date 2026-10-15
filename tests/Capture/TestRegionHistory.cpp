@@ -24,7 +24,7 @@ using GyanisScribe::Capture::regionHistoryFromText;
 using GyanisScribe::Capture::regionHistoryToText;
 using GyanisScribe::Capture::regionsOnScreen;
 using GyanisScribe::Capture::rememberRegion;
-using GyanisScribe::Core::ErrorCode;
+using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Settings::SettingsStore;
 
 namespace

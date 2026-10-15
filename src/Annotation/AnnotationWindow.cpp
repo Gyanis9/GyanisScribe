@@ -3,11 +3,11 @@
 #include "Annotation/AnnotationEngine.h"
 #include "Annotation/IAnnotationEngine.h"
 #include "Annotation/AnnotationToolbarGeometry.h"
-#include "Core/Logger.h"
+#include "Base/Logger.h"
 #include "Settings/ISettingsStore.h"
 #include "Ui/AppShortcuts.h"
 #include "Ui/KeyStep.h"
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QKeyEvent>
 #include <QVBoxLayout>
@@ -136,7 +136,7 @@ namespace GyanisScribe::Annotation
         QObject::connect(m_toolbarBridge.get(), &AnnotationToolbarBridge::scanRequested, this, [this] { emit scanRequested(m_engine.exportImage()); });
     }
 
-    void AnnotationWindow::startAnnotation(const Core::CapturedImage &captured, const QRect &screenAvailable, const QRect &selection)
+    void AnnotationWindow::startAnnotation(const Base::CapturedImage &captured, const QRect &screenAvailable, const QRect &selection)
     {
         // 记下这一轮抓的是哪块屏、哪块区域：刷新截图（F5）要对着同一块地方重抓
         m_refreshScreenName = captured.screenName;
@@ -175,7 +175,7 @@ namespace GyanisScribe::Annotation
             return;
         }
         // 摆不出来的情况只在入参退化时出现，这里给一个不至于让工具栏消失的兜底位置
-        Core::Logger::warning(std::format("工具栏摆放失败，改用窗口下沿兜底：{}", placed.error().message));
+        Base::Logger::warning(std::format("工具栏摆放失败，改用窗口下沿兜底：{}", placed.error().message));
         m_toolbar->move(m_placedSelection.left(), m_placedSelection.bottom() + 1);
     }
 
@@ -184,7 +184,7 @@ namespace GyanisScribe::Annotation
         return *m_toolbar;
     }
 
-    void AnnotationWindow::refreshCapture(const Core::CapturedImage &captured)
+    void AnnotationWindow::refreshCapture(const Base::CapturedImage &captured)
     {
         // 刷新的区域就是原来那块：尺寸该同形；真差了一点也不动窗口——用户的标注坐标还是老坐标系，
         // 挪窗口只会让画面与标注错开。引擎只换底图这一份，标注与撤销栈原地留着
@@ -203,13 +203,13 @@ namespace GyanisScribe::Annotation
                 case Qt::Key_Equal:
                     if (const auto changed = m_engine.setNextNumber(m_engine.nextNumber() + 1); !changed)
                     {
-                        Core::Logger::warning(std::format("改下一个序号没成：{}", changed.error().message));
+                        Base::Logger::warning(std::format("改下一个序号没成：{}", changed.error().message));
                     }
                     return;
                 case Qt::Key_Minus:
                     if (const auto changed = m_engine.setNextNumber(m_engine.nextNumber() - 1); !changed)
                     {
-                        Core::Logger::warning(std::format("改下一个序号没成：{}", changed.error().message));
+                        Base::Logger::warning(std::format("改下一个序号没成：{}", changed.error().message));
                     }
                     return;
                 case Qt::Key_0:
@@ -232,7 +232,7 @@ namespace GyanisScribe::Annotation
                     m_toolbar->setActiveTool(*tool);
                 } else
                 {
-                    Core::Logger::info(std::format("工具没换成：{}", switched.error().message));
+                    Base::Logger::info(std::format("工具没换成：{}", switched.error().message));
                 }
                 return;
             }
@@ -251,13 +251,13 @@ namespace GyanisScribe::Annotation
             case ShortcutAction::Undo:
                 if (auto undone = m_engine.undo(); !undone)
                 {
-                    Core::Logger::info(std::format("撤销没做成：{}", undone.error().message));
+                    Base::Logger::info(std::format("撤销没做成：{}", undone.error().message));
                 }
                 return;
             case ShortcutAction::Redo:
                 if (auto redone = m_engine.redo(); !redone)
                 {
-                    Core::Logger::info(std::format("重做没做成：{}", redone.error().message));
+                    Base::Logger::info(std::format("重做没做成：{}", redone.error().message));
                 }
                 return;
             case ShortcutAction::NudgeSelection:
@@ -271,14 +271,14 @@ namespace GyanisScribe::Annotation
                 const auto stride = event->modifiers().testFlag(Qt::ShiftModifier) ? kCoarseNudgeStride : 1;
                 if (auto moved = m_engine.moveSelectionBy(*step * stride); !moved)
                 {
-                    Core::Logger::info(std::format("微调没做成：{}", moved.error().message));
+                    Base::Logger::info(std::format("微调没做成：{}", moved.error().message));
                 }
                 return;
             }
             case ShortcutAction::DeleteSelection:
                 if (auto removed = m_engine.removeSelection(); !removed)
                 {
-                    Core::Logger::info(std::format("删除没做成：{}", removed.error().message));
+                    Base::Logger::info(std::format("删除没做成：{}", removed.error().message));
                 }
                 return;
             case ShortcutAction::CopyShape:
@@ -290,37 +290,37 @@ namespace GyanisScribe::Annotation
                 }
                 if (auto copied = m_engine.copySelection(); !copied)
                 {
-                    Core::Logger::info(std::format("复制没做成：{}", copied.error().message));
+                    Base::Logger::info(std::format("复制没做成：{}", copied.error().message));
                 }
                 return;
             case ShortcutAction::PasteShape:
                 if (auto pasted = m_engine.pasteClipboard(); !pasted)
                 {
-                    Core::Logger::info(std::format("粘贴没做成：{}", pasted.error().message));
+                    Base::Logger::info(std::format("粘贴没做成：{}", pasted.error().message));
                 }
                 return;
             case ShortcutAction::RaiseSelection:
                 if (auto raised = m_engine.raiseSelection(); !raised)
                 {
-                    Core::Logger::info(std::format("上移一层没做成：{}", raised.error().message));
+                    Base::Logger::info(std::format("上移一层没做成：{}", raised.error().message));
                 }
                 return;
             case ShortcutAction::LowerSelection:
                 if (auto lowered = m_engine.lowerSelection(); !lowered)
                 {
-                    Core::Logger::info(std::format("下移一层没做成：{}", lowered.error().message));
+                    Base::Logger::info(std::format("下移一层没做成：{}", lowered.error().message));
                 }
                 return;
             case ShortcutAction::BringToFront:
                 if (auto fronted = m_engine.bringSelectionToFront(); !fronted)
                 {
-                    Core::Logger::info(std::format("置顶没做成：{}", fronted.error().message));
+                    Base::Logger::info(std::format("置顶没做成：{}", fronted.error().message));
                 }
                 return;
             case ShortcutAction::SendToBack:
                 if (auto backed = m_engine.sendSelectionToBack(); !backed)
                 {
-                    Core::Logger::info(std::format("置底没做成：{}", backed.error().message));
+                    Base::Logger::info(std::format("置底没做成：{}", backed.error().message));
                 }
                 return;
             case ShortcutAction::Refresh:

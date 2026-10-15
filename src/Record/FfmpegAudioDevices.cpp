@@ -1,7 +1,7 @@
 #include "Record/FfmpegAudioDevices.h"
 
-#include "Core/Logger.h"
-#include "Core/Text.h"
+#include "Base/Logger.h"
+#include "Base/Text.h"
 #include "Record/FfmpegCommand.h"
 
 #include <QProcess>
@@ -52,15 +52,15 @@ namespace GyanisScribe::Record
         return devices;
     }
 
-    Core::Expected<QVector<AudioInputDevice>> audioDevicesFromListing(const QString &ffmpegOutput)
+    Base::Expected<QVector<AudioInputDevice>> audioDevicesFromListing(const QString &ffmpegOutput)
     {
         const auto devices = parseDshowAudioDevices(ffmpegOutput);
         if (devices.isEmpty())
         {
-            return std::unexpected(Core::Error{
-                    .code    = Core::ErrorCode::InternalError,
-                    .message = GyanisScribe::Core::uiFormat(
-                            GyanisScribe::Core::uiTextUtf8("列不出音频设备：ffmpeg 的输出里没有认得出的设备行（末段：{}）。请更新 ffmpeg 后重试，录屏仍可静音进行"),
+            return std::unexpected(Base::Error{
+                    .code    = Base::ErrorCode::InternalError,
+                    .message = GyanisScribe::Base::uiFormat(
+                            GyanisScribe::Base::uiTextUtf8("列不出音频设备：ffmpeg 的输出里没有认得出的设备行（末段：{}）。请更新 ffmpeg 后重试，录屏仍可静音进行"),
                             tailOf(ffmpegOutput).toStdString()),
             });
         }
@@ -104,8 +104,8 @@ namespace GyanisScribe::Record
                          [this](QProcess::ProcessError)
                          {
                              m_busy = false;
-                             emit failed(GyanisScribe::Core::Error{.code    = GyanisScribe::Core::ErrorCode::InternalError,
-                                                                   .message = GyanisScribe::Core::uiTextUtf8("列音频设备的那一步起不动 ffmpeg。请确认它还能运行，或重新安装")});
+                             emit failed(GyanisScribe::Base::Error{.code    = GyanisScribe::Base::ErrorCode::InternalError,
+                                                                   .message = GyanisScribe::Base::uiTextUtf8("列音频设备的那一步起不动 ffmpeg。请确认它还能运行，或重新安装")});
                          });
         m_process->start(*program, {QStringLiteral("-hide_banner"), QStringLiteral("-loglevel"), QStringLiteral("info"), QStringLiteral("-f"), QStringLiteral("dshow"),
                                     QStringLiteral("-list_devices"), QStringLiteral("true"), QStringLiteral("-i"), QStringLiteral("dummy")});

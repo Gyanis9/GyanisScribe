@@ -2,7 +2,7 @@
 #include "Ui/ThemeKind.h"
 #include "Ui/ThemeManager.h"
 
-#include "Core/Logger.h"
+#include "Base/Logger.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
@@ -45,8 +45,8 @@
 #include <QCheckBox>
 #include <string>
 
-using GyanisScribe::Core::ErrorCode;
-using GyanisScribe::Core::Logger;
+using GyanisScribe::Base::ErrorCode;
+using GyanisScribe::Base::Logger;
 using GyanisScribe::Settings::kThemeMode;
 using GyanisScribe::Settings::SettingsStore;
 using GyanisScribe::Ui::paletteFor;

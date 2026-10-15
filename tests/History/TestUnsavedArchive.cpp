@@ -2,8 +2,8 @@
 // 目录由用例自己给（每条用例一份临时目录），并行跑时两条用例不会互相裁掉对方的文件。
 #include "History/UnsavedArchive.h"
 
-#include "Core/Paths.h"
-#include "Core/Types.h"
+#include "Base/Paths.h"
+#include "Base/Types.h"
 
 #include <gtest/gtest.h>
 
@@ -19,7 +19,7 @@
 #include <format>
 #include <fstream>
 
-using GyanisScribe::Core::ErrorCode;
+using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::History::archiveUnsavedCapture;
 using GyanisScribe::History::kUnsavedArchiveCapacity;
 
@@ -91,7 +91,7 @@ namespace
         EXPECT_TRUE(std::filesystem::is_regular_file(*archived)) << "返回的路径上并没有文件";
         EXPECT_EQ(archived->extension(), std::filesystem::path(L".png")) << "兜底那一份必须是无损档，有损档会把用户没存过的图再压一次";
 
-        const QImage restored{GyanisScribe::Core::Paths::toDisplayText(*archived)};
+        const QImage restored{GyanisScribe::Base::Paths::toDisplayText(*archived)};
         ASSERT_FALSE(restored.isNull());
         const QSize expectedSize{3, 2};
         EXPECT_EQ(restored.size(), expectedSize);
@@ -170,7 +170,7 @@ namespace
 
         EXPECT_NE(*first, *second) << "同一时刻的两张交出了同一个路径，前一张已经被盖掉";
         EXPECT_EQ(pngCount(directory()), 2u);
-        const QImage earlier{GyanisScribe::Core::Paths::toDisplayText(*first)};
+        const QImage earlier{GyanisScribe::Base::Paths::toDisplayText(*first)};
         const QColor firstColor{200, 0, 0};
         EXPECT_EQ(earlier.pixelColor(0, 0), firstColor) << "旧的那一张内容已经变了";
     }

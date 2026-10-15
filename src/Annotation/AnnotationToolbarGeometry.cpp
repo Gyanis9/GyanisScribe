@@ -1,36 +1,36 @@
 #include "Annotation/AnnotationToolbarGeometry.h"
 
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 #include <algorithm>
 #include <format>
 
 namespace GyanisScribe::Annotation
 {
-    Core::Expected<ToolbarPlacement> placeToolbar(const QRect &screenAvailable, const QSize &toolbarSize, const QRect &selection)
+    Base::Expected<ToolbarPlacement> placeToolbar(const QRect &screenAvailable, const QSize &toolbarSize, const QRect &selection)
     {
         // 尺寸与选区先判：这三项为 0 或负数时后面的加减还能跑，但算出来的是一个看不见的工具栏，
         // 那种结果传下去比当场拒掉更难查
         if (toolbarSize.width() <= 0 || toolbarSize.height() <= 0)
         {
-            return Core::Expected<ToolbarPlacement>{std::unexpected{Core::Error{
-                    .code    = Core::ErrorCode::InvalidArgument,
-                    .message = GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("工具栏尺寸 {}x{} 不成立，摆放前要先有有效的 sizeHint"), toolbarSize.width(), toolbarSize.height()),
+            return Base::Expected<ToolbarPlacement>{std::unexpected{Base::Error{
+                    .code    = Base::ErrorCode::InvalidArgument,
+                    .message = GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("工具栏尺寸 {}x{} 不成立，摆放前要先有有效的 sizeHint"), toolbarSize.width(), toolbarSize.height()),
             }}};
         }
         if (selection.width() <= 0 || selection.height() <= 0)
         {
-            return Core::Expected<ToolbarPlacement>{std::unexpected{Core::Error{
-                    .code    = Core::ErrorCode::InvalidArgument,
-                    .message = GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("选区 {}x{} 是空的，没有可参照的位置"), selection.width(), selection.height()),
+            return Base::Expected<ToolbarPlacement>{std::unexpected{Base::Error{
+                    .code    = Base::ErrorCode::InvalidArgument,
+                    .message = GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("选区 {}x{} 是空的，没有可参照的位置"), selection.width(), selection.height()),
             }}};
         }
         if (screenAvailable.width() <= 0 || screenAvailable.height() <= 0)
         {
-            return Core::Expected<ToolbarPlacement>{std::unexpected{Core::Error{
-                    .code = Core::ErrorCode::ScreenUnavailable,
+            return Base::Expected<ToolbarPlacement>{std::unexpected{Base::Error{
+                    .code = Base::ErrorCode::ScreenUnavailable,
                     .message =
-                            GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("屏幕可用区 {}x{} 放不下任何东西，请确认目标屏幕还在"), screenAvailable.width(), screenAvailable.height()),
+                            GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("屏幕可用区 {}x{} 放不下任何东西，请确认目标屏幕还在"), screenAvailable.width(), screenAvailable.height()),
             }}};
         }
 

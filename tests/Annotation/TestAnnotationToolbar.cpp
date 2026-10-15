@@ -43,7 +43,7 @@ using GyanisScribe::Annotation::AnnotationToolbar;
 using GyanisScribe::Annotation::placeToolbar;
 using GyanisScribe::Annotation::ToolbarSide;
 using GyanisScribe::Annotation::ToolKind;
-using GyanisScribe::Core::ErrorCode;
+using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Settings::SettingsStore;
 using GyanisScribe::Ui::IconProvider;
 using GyanisScribe::Ui::kAnnotationPalette;

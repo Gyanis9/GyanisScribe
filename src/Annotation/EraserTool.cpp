@@ -1,7 +1,7 @@
 #include "Annotation/EraserTool.h"
 
 #include "Annotation/AnnotationGeometry.h"
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 #include <QImage>
 #include <QPainter>
@@ -24,7 +24,7 @@ namespace GyanisScribe::Annotation
 
     QString EraserTool::displayName() const
     {
-        return GyanisScribe::Core::uiText("橡皮擦");
+        return GyanisScribe::Base::uiText("橡皮擦");
     }
 
     void EraserTool::paintShape(QPainter &painter, const AnnotationShape &shape, const PaintContext &context) const

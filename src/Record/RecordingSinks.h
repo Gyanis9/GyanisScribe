@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QImage>
 
@@ -38,13 +38,13 @@ namespace GyanisScribe::Record
          * @param index 帧序号，从 0 开始且连续
          * @return 成功返回空载荷；失败返回带路径与原因的错误
          */
-        [[nodiscard]] virtual Core::Expected<void> write(const QImage &frame, int index) = 0;
+        [[nodiscard]] virtual Base::Expected<void> write(const QImage &frame, int index) = 0;
 
         /**
          * @brief 收尾：把这一轮写的东西定下来
          * @return 成功返回空载荷；失败返回原因
          */
-        [[nodiscard]] virtual Core::Expected<void> seal() = 0;
+        [[nodiscard]] virtual Base::Expected<void> seal() = 0;
 
         /// 已经写下的帧数
         [[nodiscard]] virtual int writtenFrames() const = 0;
@@ -72,13 +72,13 @@ namespace GyanisScribe::Record
          * @param index 帧序号
          * @return 成功返回空载荷；目录建不出或写失败返回 FileWriteFailed
          */
-        [[nodiscard]] Core::Expected<void> write(const QImage &frame, int index) override;
+        [[nodiscard]] Base::Expected<void> write(const QImage &frame, int index) override;
 
         /**
          * @brief 收尾：检查至少写过一帧
          * @return 一帧都没有时返回 InternalError，别把一个空目录交给编码器
          */
-        [[nodiscard]] Core::Expected<void> seal() override;
+        [[nodiscard]] Base::Expected<void> seal() override;
 
         /// 已写帧数
         [[nodiscard]] int writtenFrames() const override;

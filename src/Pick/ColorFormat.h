@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QColor>
 #include <QString>
@@ -77,7 +77,7 @@ namespace GyanisScribe::Pick
      * @param token 存储标记
      * @return 写法；不认识时返回错误并列出可用标记
      */
-    [[nodiscard]] Core::Expected<ColorFormat> parseColorFormat(std::string_view token);
+    [[nodiscard]] Base::Expected<ColorFormat> parseColorFormat(std::string_view token);
 
     /**
      * @brief 把配置里存的标记读回写法，坏值按 HEX 顶上

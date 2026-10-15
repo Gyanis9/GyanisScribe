@@ -1,6 +1,6 @@
 #include "Ui/ThemeManager.h"
 
-#include "Core/Logger.h"
+#include "Base/Logger.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
 #include "Ui/AppResources.h"
@@ -86,13 +86,13 @@ namespace GyanisScribe::Ui
         {
             // 坏值多半来自手改配置文件：先报清是哪个键、只能取哪三个值，再按 System 走，
             // 界面不能因为一个错拼的取值停在「没主题」
-            GyanisScribe::Core::Logger::warning(std::format("配置项 {} 的主题取值不合法，本项按 System 处理。{}", std::string{Settings::kThemeMode}, parsed.error().message));
+            GyanisScribe::Base::Logger::warning(std::format("配置项 {} 的主题取值不合法，本项按 System 处理。{}", std::string{Settings::kThemeMode}, parsed.error().message));
             m_requested = ThemeKind::System;
         }
         refresh();
     }
 
-    Core::Expected<void> ThemeManager::setTheme(const ThemeKind themeKind)
+    Base::Expected<void> ThemeManager::setTheme(const ThemeKind themeKind)
     {
         // 先写配置再改内存：写不进去时状态得留在原样，否则界面与配置文件从此不一致
         if (auto written = m_settings.setValue(Settings::kThemeMode, QString::fromUtf8(std::string{themeKindText(themeKind)})); !written)
@@ -132,7 +132,7 @@ namespace GyanisScribe::Ui
         if (!file.open(QIODevice::ReadOnly))
         {
             // 报路径而不是只报「读不到」：这类缺失要么是 qrc 少了一行，要么是文件没进仓库
-            GyanisScribe::Core::Logger::error(
+            GyanisScribe::Base::Logger::error(
                     std::format("样式表资源 {} 读不出来，请确认它在 Resources/Styles 下且已登记进 AppResources.qrc", styleSheetPath(resolvedKind).toStdString()));
             return {};
         }

@@ -1,6 +1,6 @@
 #include "Ui/AppShortcuts.h"
 
-#include "Core/Logger.h"
+#include "Base/Logger.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
 
@@ -73,7 +73,7 @@ namespace GyanisScribe::Ui
         {
             // 清册自己写错了默认键：这里没有更下一档可回落，报出来并交回「未设」，
             // 让那一档按键按下去没反应，也比替用户猜一颗键安全
-            Core::Logger::error(std::format("界面按键清册的默认键「{}」读不出：{}", entry.defaultKey, fallback.error().message));
+            Base::Logger::error(std::format("界面按键清册的默认键「{}」读不出：{}", entry.defaultKey, fallback.error().message));
             return {};
         }
 
@@ -85,7 +85,7 @@ namespace GyanisScribe::Ui
             return *resolved;
         }
 
-        Core::Logger::warning(std::format("界面按键「{}」那一格填的是「{}」，读不出或不能当按键：这一档按默认键 {} 走", entry.token, stored.toStdString(), entry.defaultKey));
+        Base::Logger::warning(std::format("界面按键「{}」那一格填的是「{}」，读不出或不能当按键：这一档按默认键 {} 走", entry.token, stored.toStdString(), entry.defaultKey));
         return *fallback;
     }
 

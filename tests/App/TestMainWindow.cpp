@@ -15,9 +15,9 @@
 #include "Pick/PickGeometry.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Record/RecorderConfig.h"
-#include "Core/Logger.h"
+#include "Base/Logger.h"
 #include "Core/OutputDecoration.h"
-#include "Core/Text.h"
+#include "Base/Text.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
 #include "Hotkey/HotkeyCombination.h"
@@ -403,7 +403,7 @@ namespace
 
         edit->setText(QStringLiteral("#334455"));
         emit edit->editingFinished();
-        EXPECT_EQ(edit->toolTip(), GyanisScribe::Core::uiText("成品那圈边框的颜色，写 #RRGGBB；留空回到默认的中灰")) << "认得的写法不该挂着一条报错";
+        EXPECT_EQ(edit->toolTip(), GyanisScribe::Base::uiText("成品那圈边框的颜色，写 #RRGGBB；留空回到默认的中灰")) << "认得的写法不该挂着一条报错";
 
         edit->setText(QStringLiteral("#1a2b"));
         emit edit->editingFinished();
@@ -1219,7 +1219,7 @@ namespace
         QCheckBox *check = nullptr;
         for (auto *candidate: m_window->findChildren<QCheckBox *>())
         {
-            if (candidate->accessibleName() == GyanisScribe::Core::uiText("开机时自动启动"))
+            if (candidate->accessibleName() == GyanisScribe::Base::uiText("开机时自动启动"))
             {
                 check = candidate;
                 break;
@@ -1389,7 +1389,7 @@ TEST_F(MainWindowFixture, IconsReResolveWhenTheThemeChangesLive)
     QPushButton *exportButton = nullptr;
     for (auto *button: m_window->findChildren<QPushButton *>())
     {
-        if (button->accessibleName() == GyanisScribe::Core::uiText("导出配置"))
+        if (button->accessibleName() == GyanisScribe::Base::uiText("导出配置"))
         {
             exportButton = button;
             break;
@@ -1610,14 +1610,14 @@ TEST_F(MainWindowFixture, InWindowShortcutRowsAreGroupedUnderFamilyHeadings)
     {
         const auto *name = GyanisScribe::Ui::appShortcutFamilyName(entry.token).data();
         ASSERT_NE(nullptr, name);
-        families.insert(GyanisScribe::Core::uiText(name));
+        families.insert(GyanisScribe::Base::uiText(name));
     }
     ASSERT_EQ(families.size(), 3U) << "清册里的族数变了，这一页的小标题与这条判据都要跟着改";
 
     int headings = 0;
     for (auto *label: m_window->findChildren<QLabel *>())
     {
-        if (label->accessibleName() == GyanisScribe::Core::uiText("界面按键的分组标题"))
+        if (label->accessibleName() == GyanisScribe::Base::uiText("界面按键的分组标题"))
         {
             ++headings;
             EXPECT_TRUE(families.contains(label->text())) << "多出一个没在清册里的分组标题：" << label->text().toStdString();
@@ -1643,7 +1643,7 @@ TEST_F(MainWindowFixture, GroupRotationRowStoresCleanTokensAndKeepsBadOnes)
 
     edit->setText(QStringLiteral("3, 1, 2"));
     emit edit->editingFinished();
-    EXPECT_EQ(edit->toolTip(), GyanisScribe::Core::uiText("切组按键走的那一圈按这里的顺序排，没写到的组补在末尾")) << "认得的名单不该挂着一条报错";
+    EXPECT_EQ(edit->toolTip(), GyanisScribe::Base::uiText("切组按键走的那一圈按这里的顺序排，没写到的组补在末尾")) << "认得的名单不该挂着一条报错";
 
     edit->setText(QStringLiteral("2, 2"));
     emit edit->editingFinished();

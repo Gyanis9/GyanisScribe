@@ -1,6 +1,6 @@
 #include "App/CommandLine.h"
 
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 namespace
 {
@@ -111,12 +111,12 @@ namespace GyanisScribe::App
             {
                 if (request.outputsGiven)
                 {
-                    result.errorText = Core::uiText("--to 只给一次：把要落的几处去处写进同一串，用逗号分开");
+                    result.errorText = Base::uiText("--to 只给一次：把要落的几处去处写进同一串，用逗号分开");
                     return result;
                 }
                 if (optionValue.trimmed().isEmpty())
                 {
-                    result.errorText = Core::uiText("--to 要带至少一处目的地：可取的只有 %1").arg(outputTokenListText());
+                    result.errorText = Base::uiText("--to 要带至少一处目的地：可取的只有 %1").arg(outputTokenListText());
                     return result;
                 }
                 const auto parsed = GyanisScribe::App::parseCaptureOutputs(optionValue);
@@ -133,12 +133,12 @@ namespace GyanisScribe::App
             {
                 if (execGiven)
                 {
-                    result.errorText = Core::uiText("--exec 只给一次：一条命令行用引号包住整串，参数照旧写在里面");
+                    result.errorText = Base::uiText("--exec 只给一次：一条命令行用引号包住整串，参数照旧写在里面");
                     return result;
                 }
                 if (optionValue.trimmed().isEmpty())
                 {
-                    result.errorText = Core::uiText("--exec 要带一条命令：形如 --exec=\"上传工具 --path %file%\"，参数里的 %file% 会换成成品路径");
+                    result.errorText = Base::uiText("--exec 要带一条命令：形如 --exec=\"上传工具 --path %file%\"，参数里的 %file% 会换成成品路径");
                     return result;
                 }
                 request.execCommand = optionValue;
@@ -156,7 +156,7 @@ namespace GyanisScribe::App
             {
                 if (!matchWithValue(argument, arguments, index, QStringLiteral("--capture"), value) || value.isEmpty())
                 {
-                    result.errorText = Core::uiText("--capture 要带一个范围取值：full、region 或 window");
+                    result.errorText = Base::uiText("--capture 要带一个范围取值：full、region 或 window");
                     return result;
                 }
                 for (const auto &choice: kCommandLineCaptureChoices)
@@ -170,28 +170,28 @@ namespace GyanisScribe::App
                 if (action == CommandLineAction::None)
                 {
                     // 区分大小写，且只认表里那三个：拼错一个字母就当没这条参数，不就近取一个
-                    result.errorText = Core::uiText("--capture 的取值「%1」不认识：只能是 full、region 或 window（区分大小写）").arg(value);
+                    result.errorText = Base::uiText("--capture 的取值「%1」不认识：只能是 full、region 或 window（区分大小写）").arg(value);
                     return result;
                 }
             } else if (argument == QStringLiteral("--pin") || argument.startsWith(QStringLiteral("--pin=")))
             {
                 if (!matchWithValue(argument, arguments, index, QStringLiteral("--pin"), value) || value.isEmpty())
                 {
-                    result.errorText = Core::uiText("--pin 要带一个图片文件路径");
+                    result.errorText = Base::uiText("--pin 要带一个图片文件路径");
                     return result;
                 }
                 action           = CommandLineAction::PinFile;
                 request.filePath = value;
             } else
             {
-                result.errorText = Core::uiText("不认识的参数：%1。可用参数见 --help").arg(argument);
+                result.errorText = Base::uiText("不认识的参数：%1。可用参数见 --help").arg(argument);
                 return result;
             }
 
             // 一次只执行一个动作：同时给了两个就报错，不替用户挑一个
             if (request.action != CommandLineAction::None)
             {
-                result.errorText = Core::uiText("一次只能给一个动作：%1 与 %2 只能选一个").arg(actionName(request.action), actionName(action));
+                result.errorText = Base::uiText("一次只能给一个动作：%1 与 %2 只能选一个").arg(actionName(request.action), actionName(action));
                 return result;
             }
             request.action = action;
@@ -200,7 +200,7 @@ namespace GyanisScribe::App
         // --to 与 --exec 描述的是「截完之后」，别的动作没有这一步：悄悄收下会让脚本以为生效了
         if (!isCaptureAction(request.action) && (request.outputsGiven || execGiven))
         {
-            result.errorText = Core::uiText("--to 与 --exec 只配 --capture 用：--pin 与 --pick 没有「截完之后落到哪儿」这一步");
+            result.errorText = Base::uiText("--to 与 --exec 只配 --capture 用：--pin 与 --pick 没有「截完之后落到哪儿」这一步");
             return result;
         }
         // 没点名时仍是早先那两处（落盘 + 剪贴板）：默认值写在这一处，旧脚本的输出形状不会因为加了开关而变
@@ -219,10 +219,10 @@ namespace GyanisScribe::App
         for (const auto &choice: kCommandLineCaptureChoices)
         {
             const auto token = QString::fromUtf8(choice.token.data(), static_cast<qsizetype>(choice.token.size()));
-            captureLines += Core::uiText("    --capture=%1       %2\n").arg(token, Core::uiText(choice.description.data()));
+            captureLines += Base::uiText("    --capture=%1       %2\n").arg(token, Base::uiText(choice.description.data()));
         }
 
-        return Core::uiText("智录：截图、标注、贴图、取色、录屏与文字识别。不带参数启动即常驻（托盘 + 全局热键）。\n"
+        return Base::uiText("智录：截图、标注、贴图、取色、录屏与文字识别。不带参数启动即常驻（托盘 + 全局热键）。\n"
                             "\n"
                             "用法：GyanisScribe [参数]\n"
                             "  -h, --help         打这份说明后退出\n"
@@ -230,7 +230,7 @@ namespace GyanisScribe::App
                             "  --selftest         把启动路径跑完就退出：热键登记与日志就绪算通过（退出码 0），否则 1\n"
                             "  --capture=<范围>   截一张，默认存成文件并复制进剪贴板，把文件路径打到标准输出后退出：\n") +
                captureLines +
-               Core::uiText("  --to=<去处>       只配 --capture：这一次落哪几处，逗号分隔，可取 file / clipboard / pin\n"
+               Base::uiText("  --to=<去处>       只配 --capture：这一次落哪几处，逗号分隔，可取 file / clipboard / pin\n"
                             "                    交付顺序恒为 file → clipboard → pin；点了 pin 就留在桌面上不退出（同 --pin）\n"
                             "  --exec=<命令>      只配 --capture：截完之后起跑一条外部命令，参数里的 %file% 换成成品路径\n"
                             "                    整串用引号包住；没点 file 时这一轮没有成品，带 %file% 的命令会被拒\n"

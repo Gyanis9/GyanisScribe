@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QByteArray>
 #include <QNetworkReply>
@@ -40,7 +40,7 @@ namespace GyanisScribe::App
      * @param payload 响应正文（JSON）
      * @return 成功返回标签与发布页；不是对象、缺字段或字段不是字符串时返回 InvalidArgument 并点名缺了什么
      */
-    [[nodiscard]] Core::Expected<UpdateRelease> parseLatestRelease(const QByteArray &payload);
+    [[nodiscard]] Base::Expected<UpdateRelease> parseLatestRelease(const QByteArray &payload);
 
     /// 这一次检查该怎么告诉用户
     struct UpdateVerdict

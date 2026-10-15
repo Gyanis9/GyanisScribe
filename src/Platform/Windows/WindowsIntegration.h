@@ -61,7 +61,7 @@ namespace GyanisScribe::Platform
          * @details 没有前台窗口（会话锁屏、开机后还没人点过窗口）时返回 ScreenUnavailable，
          *          文案给的是「请先点一下要截的那个窗口」这类可操作的下一步
          */
-        [[nodiscard]] Core::Expected<ForegroundWindow> foregroundWindow() const override;
+        [[nodiscard]] Base::Expected<ForegroundWindow> foregroundWindow() const override;
 
         /**
          * @brief 枚举屏上可见窗口，见 IPlatformIntegration::screenWindows()
@@ -70,7 +70,7 @@ namespace GyanisScribe::Platform
          *          被 DWM 藏起来（切到别的虚拟桌面）与工具窗都不进候选。
          * @note 一块屏都配不上名时返回 ScreenUnavailable：宁可不给候选，也不拿另一块屏的缩放因子硬算
          */
-        [[nodiscard]] Core::Expected<std::vector<ScreenWindow>> screenWindows() const override;
+        [[nodiscard]] Base::Expected<std::vector<ScreenWindow>> screenWindows() const override;
 
         /**
          * @brief 光标处的界面元素，见 IPlatformIntegration::elementChainAtPoint()
@@ -82,7 +82,7 @@ namespace GyanisScribe::Platform
          *          再从这扇窗的 UIA 根元素按「子元素含住点」逐级下钻。工具窗在这一轮里不排除（与窗口候选不同）：
          *          这里问的是「光标下看得见的是什么」，浮动面板、贴图这类工具窗就摆在屏幕上。
          */
-        [[nodiscard]] Core::Expected<std::vector<QRect>> elementChainAtPoint(const QPoint &globalLogicalPoint, const std::vector<quintptr> &excludeWindowHandles) const override;
+        [[nodiscard]] Base::Expected<std::vector<QRect>> elementChainAtPoint(const QPoint &globalLogicalPoint, const std::vector<quintptr> &excludeWindowHandles) const override;
 
         /**
          * @brief 查开机启动，见 IPlatformIntegration::autostartEnabled()
@@ -90,14 +90,14 @@ namespace GyanisScribe::Platform
          * @details 重写接口：写的是 HKCU 的 Run 键，值指着别的副本路径时按「本份没开」算，
          *          因为这一格问的是「这台机器开机时会不会起我这一份」。
          */
-        [[nodiscard]] Core::Expected<bool> autostartEnabled() const override;
+        [[nodiscard]] Base::Expected<bool> autostartEnabled() const override;
 
         /**
          * @brief 开关开机启动，见 IPlatformIntegration::setAutostart()
          * @param enabled true 写入 Run 键，false 摘掉那一条
          * @return 成功返回空载荷；取不到自身路径或注册表写不进去时返回中文原因
          */
-        [[nodiscard]] Core::Expected<void> setAutostart(bool enabled) override;
+        [[nodiscard]] Base::Expected<void> setAutostart(bool enabled) override;
 
     private:
         /**

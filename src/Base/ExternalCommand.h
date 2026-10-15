@@ -9,14 +9,14 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QString>
 #include <QStringList>
 
 #include <string_view>
 
-namespace GyanisScribe::Core
+namespace GyanisScribe::Base
 {
 
     /// 成品路径的占位符：命令里写这一串，起跑前换成这一轮落盘的那份文件；没落盘时带它的命令会被拒
@@ -40,7 +40,7 @@ namespace GyanisScribe::Core
      *          而路径带空格时 shell 那一侧的转义写法更难对。替换按整串逐个参数做，
      *          所以 `%file%` 与它前面的文字可以连写（`--path=%file%` 这种也认）。
      */
-    [[nodiscard]] Core::Expected<ExternalCommandPlan> planExternalCommand(const QString &commandLine, const QString &filePath);
+    [[nodiscard]] Base::Expected<ExternalCommandPlan> planExternalCommand(const QString &commandLine, const QString &filePath);
 
     /**
      * @brief 起跑一份拆好的计划：不等它结束
@@ -49,6 +49,6 @@ namespace GyanisScribe::Core
      * @details 起进程这一步没有「拆错了」这一类可判的中间态：能 startDetached 就算交出去了，
      *          外部程序自己跑得怎样不由这一层负责（它多半是个上传脚本，等它就等于卡住截图这条路）。
      */
-    [[nodiscard]] Core::Expected<void> startExternalCommand(const ExternalCommandPlan &plan);
+    [[nodiscard]] Base::Expected<void> startExternalCommand(const ExternalCommandPlan &plan);
 
-} // namespace GyanisScribe::Core
+} // namespace GyanisScribe::Base

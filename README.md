@@ -508,7 +508,7 @@ Enter / Esc / 方向键与带 `Ctrl` 的那几组不给换：它们是系统惯�
 | 崩溃转储 | 同一个日志目录下的 `GyanisScribe_<版本>_<时刻>_<进程号>.dmp`；反馈时把日志与这份一起发回来才定位得动 |
 | 贴图恢复数据 | 缓存目录里的像素文件，配置里只存路径与几何 |
 
-界面文案是中文，走 `Core::uiText()` / `Core::uiTextUtf8()`；英文档需要
+界面文案是中文，走 `Base::uiText()` / `Base::uiTextUtf8()`；英文档需要
 `translations/GyanisScribe_en.qm`（随包分发，缺包时按中文继续并给出放置位置）。
 翻译目录 `translations/GyanisScribe_en.ts` 是唯一真源，`.qm` 由构建期的 lrelease 产出。
 改完文案要重新生成目录：
@@ -1267,7 +1267,7 @@ Conan 直取，许可证正文见 `licenses/Zxing-Apache-2.0.txt` 与 `docs/Thir
   注释只留「为什么」，不写实现历史与「旧实现怎样、现在怎样」。
 - 可恢复错误返回 `std::expected<T, Error>`，错误文案中文且可操作（写清「原因 + 替代做法」）；
   不许静默失败、取整、回绕、把「不支持」悄悄当成「按默认处理」。
-- 一切要显示给用户的文本走 `Core::uiText()`，并且同步进翻译目录（`Style.TranslationCatalog` 会拦漏项）。
+- 一切要显示给用户的文本走 `Base::uiText()`，并且同步进翻译目录（`Style.TranslationCatalog` 会拦漏项）。
 - 图标必须是原创 SVG：`viewBox="0 0 24 24"`、`currentColor`、描边 1.5 或 2、圆角端点，
   只经 `IconProvider` 加载；不下载、不引用、不复制任何现成图标库或任何现有产品的素材。
 - 零告警是硬判据：MSVC 侧每个目标都带 `/W4 /WX`；编译器不报的漏项

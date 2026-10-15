@@ -1,6 +1,6 @@
 #include "Platform/WindowGeometry.h"
 
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 #include <cmath>
 #include <format>
@@ -8,8 +8,8 @@
 
 namespace
 {
-    using GyanisScribe::Core::Error;
-    using GyanisScribe::Core::ErrorCode;
+    using GyanisScribe::Base::Error;
+    using GyanisScribe::Base::ErrorCode;
 
     /**
      * @brief 缩放因子的唯一一处判据
@@ -25,8 +25,8 @@ namespace
             return {};
         }
         return Error{ErrorCode::InvalidArgument,
-                     GyanisScribe::Core::uiFormat(
-                             GyanisScribe::Core::uiTextUtf8("换算窗口位置要有一个大于 0 的缩放因子，收到的是 {}。请把这块屏自己的读数（QScreen::devicePixelRatio）交进来"),
+                     GyanisScribe::Base::uiFormat(
+                             GyanisScribe::Base::uiTextUtf8("换算窗口位置要有一个大于 0 的缩放因子，收到的是 {}。请把这块屏自己的读数（QScreen::devicePixelRatio）交进来"),
                              devicePixelRatio)};
     }
 
@@ -44,7 +44,7 @@ namespace
 
 namespace GyanisScribe::Platform
 {
-    Core::Expected<QRect> physicalToLogicalGlobal(const QRect &physicalGlobal, const MonitorMapping &monitor)
+    Base::Expected<QRect> physicalToLogicalGlobal(const QRect &physicalGlobal, const MonitorMapping &monitor)
     {
         if (const auto problem = scalingProblem(monitor.devicePixelRatio); problem)
         {
@@ -61,7 +61,7 @@ namespace GyanisScribe::Platform
         return QRect{monitor.logicalGlobal.x() + left, monitor.logicalGlobal.y() + top, right - left, bottom - top};
     }
 
-    Core::Expected<QRect> logicalToPhysicalGlobal(const QRect &logicalGlobal, const MonitorMapping &monitor)
+    Base::Expected<QRect> logicalToPhysicalGlobal(const QRect &logicalGlobal, const MonitorMapping &monitor)
     {
         if (const auto problem = scalingProblem(monitor.devicePixelRatio); problem)
         {
@@ -92,7 +92,7 @@ namespace GyanisScribe::Platform
         return monitors.size();
     }
 
-    Core::Expected<QPoint> logicalPointToPhysicalGlobal(const QPoint &logicalPoint, const MonitorMapping &monitor)
+    Base::Expected<QPoint> logicalPointToPhysicalGlobal(const QPoint &logicalPoint, const MonitorMapping &monitor)
     {
         if (const auto problem = scalingProblem(monitor.devicePixelRatio); problem)
         {

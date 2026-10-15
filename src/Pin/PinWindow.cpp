@@ -8,11 +8,11 @@
 #include "Annotation/AnnotationWindow.h"
 #include "Core/ImageFormat.h"
 #include "Core/ClipboardFile.h"
-#include "Core/Logger.h"
+#include "Base/Logger.h"
 #include "Core/OutputDecoration.h"
-#include "Core/Paths.h"
-#include "Core/SizeText.h"
-#include "Core/Text.h"
+#include "Base/Paths.h"
+#include "Base/SizeText.h"
+#include "Base/Text.h"
 #include "Pin/ColorCard.h"
 #include "Pin/PinLayout.h"
 #include "Pin/PinViewFilter.h"
@@ -70,7 +70,7 @@ namespace GyanisScribe::Pin
                 if (const auto applied = pin.setMouseThrough(value); !applied)
                 {
                     // 没能力的平台上穿透这一项在菜单里根本不出现；走到这里仍是能力表与菜单不一致的那条兜底
-                    Core::Logger::error(applied.error().message);
+                    Base::Logger::error(applied.error().message);
                 }
                 break;
             case PinBatchAction::Thumbnail:
@@ -212,9 +212,9 @@ namespace GyanisScribe::Pin
             const auto configured = settings.stringValue(Settings::kPathScreenshot, QString());
             if (!configured.trimmed().isEmpty())
             {
-                return Core::Paths::fromDisplayText(configured);
+                return Base::Paths::fromDisplayText(configured);
             }
-            return Core::Paths::defaultScreenshotDirectory();
+            return Base::Paths::defaultScreenshotDirectory();
         }
 
         /**
@@ -225,7 +225,7 @@ namespace GyanisScribe::Pin
          *          PNG 是无损的，质量那一格对它不起作用，交给 Qt 自己忽略。
          *          交回的是档位而不是后缀：装饰那一步要知道这一档带不带透明通道（JPG 垫白）。
          */
-        [[nodiscard]] Core::Expected<std::pair<Core::ImageFormat, int>> imageSaveTarget(const Settings::ISettingsStore &settings)
+        [[nodiscard]] Base::Expected<std::pair<Core::ImageFormat, int>> imageSaveTarget(const Settings::ISettingsStore &settings)
         {
             const auto stored = settings.stringValue(Settings::kSaveImageFormat, QStringLiteral("Png"));
             const auto format = Core::parseImageFormat(stored);
@@ -242,9 +242,9 @@ namespace GyanisScribe::Pin
             if (!Core::isImageFormatWritable(*format))
             {
                 // 编码器没装这一档：说清是格式的问题，别让用户去查目录权限
-                return std::unexpected(Core::Error{
-                        Core::ErrorCode::PlatformUnsupported,
-                        GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("这台机器的 Qt 写不出「{}」这一档保存格式。请在设置的截图页改选一档"), stored.toStdString())});
+                return std::unexpected(Base::Error{
+                        Base::ErrorCode::PlatformUnsupported,
+                        GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("这台机器的 Qt 写不出「{}」这一档保存格式。请在设置的截图页改选一档"), stored.toStdString())});
             }
             return std::pair{*format, quality};
         }
@@ -267,8 +267,8 @@ namespace GyanisScribe::Pin
             m_logicalSize = QSizeF(image.width() / image.devicePixelRatio(), image.height() / image.devicePixelRatio());
         }
 
-        setWindowTitle(GyanisScribe::Core::uiText("智录贴图"));
-        setAccessibleName(GyanisScribe::Core::uiText("贴图窗口"));
+        setWindowTitle(GyanisScribe::Base::uiText("智录贴图"));
+        setAccessibleName(GyanisScribe::Base::uiText("贴图窗口"));
 
         // 起点不透明度取自配置。恢复布局那一条之后还会再覆盖一次，
         // 所以每张旧贴图各自的透明度不受这一条影响
@@ -277,7 +277,7 @@ namespace GyanisScribe::Pin
             m_opacity = *parsed;
         } else
         {
-            Core::Logger::warning(std::format("贴图默认不透明度读不出：{}，本次按完全不透明开始", parsed.error().message));
+            Base::Logger::warning(std::format("贴图默认不透明度读不出：{}，本次按完全不透明开始", parsed.error().message));
         }
 
         applyGeometry();
@@ -442,13 +442,13 @@ namespace GyanisScribe::Pin
         return m_opacity;
     }
 
-    Core::Expected<void> PinWindow::setMouseThrough(bool through)
+    Base::Expected<void> PinWindow::setMouseThrough(bool through)
     {
         if (through && !m_integration.capabilities().clickThrough)
         {
-            return std::unexpected(Core::Error{
-                    Core::ErrorCode::PlatformUnsupported,
-                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("{}不支持鼠标穿透：这一项在本平台没有实现。请把贴图挪到不挡操作的位置，或降低透明度后从别处点击"),
+            return std::unexpected(Base::Error{
+                    Base::ErrorCode::PlatformUnsupported,
+                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("{}不支持鼠标穿透：这一项在本平台没有实现。请把贴图挪到不挡操作的位置，或降低透明度后从别处点击"),
                                                  m_integration.displayName().toStdString())});
         }
 
@@ -590,15 +590,15 @@ namespace GyanisScribe::Pin
         // 剪贴板带得了透明通道：装饰按「不垫白」来（与标注窗那边同一条规矩）。
         // 这一路本来就静默：复制过没有从别处看得出来，不需要再补一句
         QApplication::clipboard()->setImage(decorateForOutput(m_image, false));
-        Core::Logger::info(std::format("贴图已交剪贴板：{}×{} 像素", m_image.width(), m_image.height()));
+        Base::Logger::info(std::format("贴图已交剪贴板：{}×{} 像素", m_image.width(), m_image.height()));
     }
 
     void PinWindow::copyAsFileToClipboard()
     {
         // 落在缓存目录下一个专用子目录：这是给剪贴板用的中转文件，不往用户的图片目录里塞
-        if (const auto written = Core::copyImageAsFile(m_image, Core::Paths::cacheDirectory() / "Clipboard"); !written)
+        if (const auto written = Core::copyImageAsFile(m_image, Base::Paths::cacheDirectory() / "Clipboard"); !written)
         {
-            Core::Logger::warning(std::format("复制为文件没成：{}", written.error().message));
+            Base::Logger::warning(std::format("复制为文件没成：{}", written.error().message));
         }
     }
 
@@ -611,7 +611,7 @@ namespace GyanisScribe::Pin
         return Core::decorateForOutput(image, border, shadow, fillBackground, Settings::readOutputDecorationStyle(m_settings));
     }
 
-    Core::Expected<std::filesystem::path> PinWindow::saveWithDefaultName()
+    Base::Expected<std::filesystem::path> PinWindow::saveWithDefaultName()
     {
         const auto target = imageSaveTarget(m_settings);
         if (!target)
@@ -623,8 +623,8 @@ namespace GyanisScribe::Pin
         const auto directory = screenshotDirectory(m_settings);
         // 起名按设置里那一格的模板（留空即默认档），撞名时让一次位；
         // 管理器成批写缓存那一路不走这里，那一路按设计就是要覆盖
-        const auto fileName = Core::Paths::imageFileName(QDateTime::currentDateTime(), Core::imageFormatExtension(target->first), Settings::nameTemplateOrDefault(m_settings));
-        const auto unique   = Core::Paths::toDisplayText(Core::Paths::uniqueFilePath(directory, fileName).filename());
+        const auto fileName = Base::Paths::imageFileName(QDateTime::currentDateTime(), Core::imageFormatExtension(target->first), Settings::nameTemplateOrDefault(m_settings));
+        const auto unique   = Base::Paths::toDisplayText(Base::Paths::uniqueFilePath(directory, fileName).filename());
         // 右键「保存」是给用户拿走的成品：按外观设置装好饰再写。缓存与布局那一路走 saveToFile（原图），
         // 那些文件是给程序自己读回来的，装过饰下次恢复出来的贴图就多一圈边
         const auto decorated = decorateForOutput(m_image, !Core::imageFormatHasAlpha(target->first));
@@ -635,31 +635,31 @@ namespace GyanisScribe::Pin
         return directory;
     }
 
-    Core::Expected<QString> PinWindow::saveToFile(const std::filesystem::path &directory, const QString &fileName, const int quality)
+    Base::Expected<QString> PinWindow::saveToFile(const std::filesystem::path &directory, const QString &fileName, const int quality)
     {
         return writeFile(directory, fileName, m_image, quality);
     }
 
-    Core::Expected<QString> PinWindow::writeFile(const std::filesystem::path &directory, const QString &fileName, const QImage &contents, const int quality)
+    Base::Expected<QString> PinWindow::writeFile(const std::filesystem::path &directory, const QString &fileName, const QImage &contents, const int quality)
     {
-        if (const auto ensured = Core::Paths::ensureDirectory(directory); !ensured)
+        if (const auto ensured = Base::Paths::ensureDirectory(directory); !ensured)
         {
             return std::unexpected(ensured.error());
         }
 
-        // 文件名归调用方：右键菜单那一路用 Core::Paths::imageFileName 起名（后缀按设置里那一档），
+        // 文件名归调用方：右键菜单那一路用 Base::Paths::imageFileName 起名（后缀按设置里那一档），
         // 布局那一路用序号。格式不单独传：Qt 按后缀挑编码器，再传一次格式名就是第二个出处
-        const auto filePath = directory / Core::Paths::fromDisplayText(fileName);
+        const auto filePath = directory / Base::Paths::fromDisplayText(fileName);
 
-        if (!contents.save(Core::Paths::toDisplayText(filePath), nullptr, quality))
+        if (!contents.save(Base::Paths::toDisplayText(filePath), nullptr, quality))
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::FileWriteFailed,
-                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("贴图保存失败：{}。请检查目录是否可写，或先把这一张复制进剪贴板"),
-                                                                            Core::Paths::toDisplayText(filePath).toStdString())});
+            return std::unexpected(Base::Error{Base::ErrorCode::FileWriteFailed,
+                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图保存失败：{}。请检查目录是否可写，或先把这一张复制进剪贴板"),
+                                                                            Base::Paths::toDisplayText(filePath).toStdString())});
         }
 
-        Core::Logger::info(std::format("贴图已保存：{}", Core::Paths::toDisplayText(filePath).toStdString()));
-        return Core::Paths::toDisplayText(filePath);
+        Base::Logger::info(std::format("贴图已保存：{}", Base::Paths::toDisplayText(filePath).toStdString()));
+        return Base::Paths::toDisplayText(filePath);
     }
 
     QRect PinWindow::globalRect() const
@@ -882,7 +882,7 @@ namespace GyanisScribe::Pin
 
     void PinWindow::editColorCard(const QColor &seed)
     {
-        const auto chosen = QColorDialog::getColor(seed, this, GyanisScribe::Core::uiText("改这一张的颜色"));
+        const auto chosen = QColorDialog::getColor(seed, this, GyanisScribe::Base::uiText("改这一张的颜色"));
         if (!chosen.isValid())
         {
             return; // 取消是一种正常收场：什么都没发生，也什么都不用说
@@ -923,7 +923,7 @@ namespace GyanisScribe::Pin
         {
             delete m_movie;
             m_movie = nullptr;
-            Core::Logger::warning(std::format("动图读不出，这张贴图按静图放着：{}", file.toStdString()));
+            Base::Logger::warning(std::format("动图读不出，这张贴图按静图放着：{}", file.toStdString()));
             return;
         }
 
@@ -965,7 +965,7 @@ namespace GyanisScribe::Pin
         if (m_movie != nullptr)
         {
             // 标注画在一帧上，下一帧就把成品盖掉了：拒绝并说清出路，而不是收下这一轮注定丢掉的改动
-            Core::Logger::info("动图不进直接标注：标注会被下一帧盖掉。请先保存成静态图再贴一张来标");
+            Base::Logger::info("动图不进直接标注：标注会被下一帧盖掉。请先保存成静态图再贴一张来标");
             return;
         }
 
@@ -989,7 +989,7 @@ namespace GyanisScribe::Pin
         {
             m_annotateEngine = std::make_unique<Annotation::AnnotationEngine>();
         }
-        Core::CapturedImage canvas;
+        Base::CapturedImage canvas;
         canvas.image            = m_image;
         canvas.devicePixelRatio = m_image.devicePixelRatio();
         canvas.logicalSize      = m_logicalSize.toSize();
@@ -1031,7 +1031,7 @@ namespace GyanisScribe::Pin
                                  finishAnnotation();
                                  if (const auto saved = saveWithDefaultName(); !saved)
                                  {
-                                     Core::Logger::error(saved.error().message);
+                                     Base::Logger::error(saved.error().message);
                                  }
                              });
             QObject::connect(m_annotateBridge.get(), &Annotation::AnnotationToolbarBridge::pinRequested, this,
@@ -1055,7 +1055,7 @@ namespace GyanisScribe::Pin
 
         m_annotating = true;
         update();
-        Core::Logger::info(std::format("贴图进入直接标注：{}×{} 逻辑像素", m_logicalSize.width(), m_logicalSize.height()));
+        Base::Logger::info(std::format("贴图进入直接标注：{}×{} 逻辑像素", m_logicalSize.width(), m_logicalSize.height()));
     }
 
     void PinWindow::placeAnnotateToolbar()
@@ -1073,7 +1073,7 @@ namespace GyanisScribe::Pin
             return;
         }
         // 与标注窗同一条兜底：摆不出来时别让工具栏消失
-        Core::Logger::warning(std::format("标注工具栏摆放失败，改用贴图下沿兜底：{}", placed.error().message));
+        Base::Logger::warning(std::format("标注工具栏摆放失败，改用贴图下沿兜底：{}", placed.error().message));
         m_annotateToolbar->move(globalRect().left(), globalRect().bottom() + 1);
     }
 
@@ -1151,7 +1151,7 @@ namespace GyanisScribe::Pin
         m_cropCurrent.reset();
         setCursor(Qt::CrossCursor);
         update();
-        Core::Logger::info(std::format("贴图进入裁剪：{}×{} 逻辑像素，拖一个框后回车裁到那一块", m_logicalSize.width(), m_logicalSize.height()));
+        Base::Logger::info(std::format("贴图进入裁剪：{}×{} 逻辑像素，拖一个框后回车裁到那一块", m_logicalSize.width(), m_logicalSize.height()));
     }
 
     void PinWindow::finishCropping(const bool commit)
@@ -1177,10 +1177,10 @@ namespace GyanisScribe::Pin
                     m_logicalSize  = m_image.devicePixelRatio() > 0.0 ? QSizeF(m_image.width() / m_image.devicePixelRatio(), m_image.height() / m_image.devicePixelRatio())
                                                                       : QSizeF(m_image.size());
                     m_viewFiltered = {};
-                    Core::Logger::info(std::format("贴图裁剪完成：留 {}×{} 像素", m_image.width(), m_image.height()));
+                    Base::Logger::info(std::format("贴图裁剪完成：留 {}×{} 像素", m_image.width(), m_image.height()));
                 } else
                 {
-                    Core::Logger::info(std::format("这一框太小（{}×{} 像素），没有裁", pixels->width(), pixels->height()));
+                    Base::Logger::info(std::format("这一框太小（{}×{} 像素），没有裁", pixels->width(), pixels->height()));
                 }
             }
         }
@@ -1221,13 +1221,13 @@ namespace GyanisScribe::Pin
                 case Qt::Key_Equal:
                     if (const auto changed = m_annotateEngine->setNextNumber(m_annotateEngine->nextNumber() + 1); !changed)
                     {
-                        Core::Logger::warning(std::format("改下一个序号没成：{}", changed.error().message));
+                        Base::Logger::warning(std::format("改下一个序号没成：{}", changed.error().message));
                     }
                     return;
                 case Qt::Key_Minus:
                     if (const auto changed = m_annotateEngine->setNextNumber(m_annotateEngine->nextNumber() - 1); !changed)
                     {
-                        Core::Logger::warning(std::format("改下一个序号没成：{}", changed.error().message));
+                        Base::Logger::warning(std::format("改下一个序号没成：{}", changed.error().message));
                     }
                     return;
                 case Qt::Key_0:
@@ -1250,13 +1250,13 @@ namespace GyanisScribe::Pin
             case Annotation::ShortcutAction::Undo:
                 if (auto undone = m_annotateEngine->undo(); !undone)
                 {
-                    Core::Logger::info(std::format("撤销没做成：{}", undone.error().message));
+                    Base::Logger::info(std::format("撤销没做成：{}", undone.error().message));
                 }
                 return;
             case Annotation::ShortcutAction::Redo:
                 if (auto redone = m_annotateEngine->redo(); !redone)
                 {
-                    Core::Logger::info(std::format("重做没做成：{}", redone.error().message));
+                    Base::Logger::info(std::format("重做没做成：{}", redone.error().message));
                 }
                 return;
             case Annotation::ShortcutAction::NudgeSelection:
@@ -1269,14 +1269,14 @@ namespace GyanisScribe::Pin
                 const auto stride = event->modifiers().testFlag(Qt::ShiftModifier) ? kAnnotateCoarseNudgeStride : 1;
                 if (auto moved = m_annotateEngine->moveSelectionBy(*step * stride); !moved)
                 {
-                    Core::Logger::info(std::format("微调没做成：{}", moved.error().message));
+                    Base::Logger::info(std::format("微调没做成：{}", moved.error().message));
                 }
                 return;
             }
             case Annotation::ShortcutAction::DeleteSelection:
                 if (auto removed = m_annotateEngine->removeSelection(); !removed)
                 {
-                    Core::Logger::info(std::format("删除没做成：{}", removed.error().message));
+                    Base::Logger::info(std::format("删除没做成：{}", removed.error().message));
                 }
                 return;
             case Annotation::ShortcutAction::CopyShape:
@@ -1288,37 +1288,37 @@ namespace GyanisScribe::Pin
                 }
                 if (auto copied = m_annotateEngine->copySelection(); !copied)
                 {
-                    Core::Logger::info(std::format("复制没做成：{}", copied.error().message));
+                    Base::Logger::info(std::format("复制没做成：{}", copied.error().message));
                 }
                 return;
             case Annotation::ShortcutAction::PasteShape:
                 if (auto pasted = m_annotateEngine->pasteClipboard(); !pasted)
                 {
-                    Core::Logger::info(std::format("粘贴没做成：{}", pasted.error().message));
+                    Base::Logger::info(std::format("粘贴没做成：{}", pasted.error().message));
                 }
                 return;
             case Annotation::ShortcutAction::RaiseSelection:
                 if (auto raised = m_annotateEngine->raiseSelection(); !raised)
                 {
-                    Core::Logger::info(std::format("上移一层没做成：{}", raised.error().message));
+                    Base::Logger::info(std::format("上移一层没做成：{}", raised.error().message));
                 }
                 return;
             case Annotation::ShortcutAction::LowerSelection:
                 if (auto lowered = m_annotateEngine->lowerSelection(); !lowered)
                 {
-                    Core::Logger::info(std::format("下移一层没做成：{}", lowered.error().message));
+                    Base::Logger::info(std::format("下移一层没做成：{}", lowered.error().message));
                 }
                 return;
             case Annotation::ShortcutAction::BringToFront:
                 if (auto fronted = m_annotateEngine->bringSelectionToFront(); !fronted)
                 {
-                    Core::Logger::info(std::format("置顶没做成：{}", fronted.error().message));
+                    Base::Logger::info(std::format("置顶没做成：{}", fronted.error().message));
                 }
                 return;
             case Annotation::ShortcutAction::SendToBack:
                 if (auto backed = m_annotateEngine->sendSelectionToBack(); !backed)
                 {
-                    Core::Logger::info(std::format("置底没做成：{}", backed.error().message));
+                    Base::Logger::info(std::format("置底没做成：{}", backed.error().message));
                 }
                 return;
             case Annotation::ShortcutAction::Copy:
@@ -1330,7 +1330,7 @@ namespace GyanisScribe::Pin
                 finishAnnotation();
                 if (const auto saved = saveWithDefaultName(); !saved)
                 {
-                    Core::Logger::error(saved.error().message);
+                    Base::Logger::error(saved.error().message);
                 }
                 return;
             case Annotation::ShortcutAction::Pin:
@@ -1351,7 +1351,7 @@ namespace GyanisScribe::Pin
                 m_annotateToolbar->setActiveTool(*tool);
             } else
             {
-                Core::Logger::info(std::format("工具没换成：{}", switched.error().message));
+                Base::Logger::info(std::format("工具没换成：{}", switched.error().message));
             }
         }
     }
@@ -1398,7 +1398,7 @@ namespace GyanisScribe::Pin
         if (!complaint.empty())
         {
             // 读数不因坏配置停摆：按 HEX 顶上，原因照旧只进日志（同一句在界面那次取色时会弹给用户）
-            Core::Logger::warning(std::format("取色写法读不出：{}，贴图取色按 HEX 顶上", complaint));
+            Base::Logger::warning(std::format("取色写法读不出：{}，贴图取色按 HEX 顶上", complaint));
         }
         // 读的是显示用的那一份：开了灰度/反色之后，用户看到的就是这个颜色。字母档现读配置，只管 HEX 那一形
         const auto casing = Pick::hexCasingOf(m_settings.boolValue(Settings::kPickHexUppercase, true));
@@ -2092,44 +2092,44 @@ namespace GyanisScribe::Pin
         const bool inMultiSelection = m_selected && m_selectionCount > 1;
         if (inMultiSelection)
         {
-            auto *countLabel = menu->addAction(GyanisScribe::Core::uiText("已选中 %1 张").arg(m_selectionCount));
+            auto *countLabel = menu->addAction(GyanisScribe::Base::uiText("已选中 %1 张").arg(m_selectionCount));
             countLabel->setEnabled(false);
             menu->addSeparator();
         }
 
-        menu->addAction(GyanisScribe::Core::uiText("复制"), this, &PinWindow::copyToClipboard);
+        menu->addAction(GyanisScribe::Base::uiText("复制"), this, &PinWindow::copyToClipboard);
         // 复制为文件：剪贴板里放的是一条本地文件路径，粘进资源管理器/聊天窗口得到一份 .png
         // （与「复制」是两条出口：那一条粘进文档里是一张图）
-        menu->addAction(GyanisScribe::Core::uiText("复制为文件"), this, &PinWindow::copyAsFileToClipboard);
+        menu->addAction(GyanisScribe::Base::uiText("复制为文件"), this, &PinWindow::copyAsFileToClipboard);
 
         // 自定义尺寸：滚轮是一格一格缩，这一项要的是「正好 1280 宽」这种精确值，或「放大一半」这种倍率。
         // 对话框预填当前尺寸：两种写法各走一条解析（「宽x高」与截图选区那个输入框同一处，「倍率」单独一条）
-        menu->addAction(GyanisScribe::Core::uiText("自定义尺寸…"), this,
+        menu->addAction(GyanisScribe::Base::uiText("自定义尺寸…"), this,
                         [this]
                         {
                             const auto current  = QStringLiteral("%1x%2").arg(qRound(m_logicalSize.width())).arg(qRound(m_logicalSize.height()));
                             bool       accepted = false;
                             const auto text =
-                                    QInputDialog::getText(this, GyanisScribe::Core::uiText("自定义贴图尺寸"),
-                                                          GyanisScribe::Core::uiText("填「宽x高」（如 640x360）或倍率（如 2x、50%）"), QLineEdit::Normal, current, &accepted);
+                                    QInputDialog::getText(this, GyanisScribe::Base::uiText("自定义贴图尺寸"),
+                                                          GyanisScribe::Base::uiText("填「宽x高」（如 640x360）或倍率（如 2x、50%）"), QLineEdit::Normal, current, &accepted);
                             if (!accepted)
                             {
                                 return; // 取消是一种正常收场：什么都没发生，也什么都不用说
                             }
-                            if (const auto parsed = GyanisScribe::Core::parseSizeText(text); parsed)
+                            if (const auto parsed = GyanisScribe::Base::parseSizeText(text); parsed)
                             {
                                 setExactSize(*parsed);
                                 return;
                             }
-                            if (const auto ratio = GyanisScribe::Core::parseScaleRatio(text); ratio)
+                            if (const auto ratio = GyanisScribe::Base::parseScaleRatio(text); ratio)
                             {
                                 // 倍率按当前这份尺寸算：与滚轮缩放同一档口径，改的是这一张自己的大小
                                 const auto scaled = sizeScaledBy(QSize{qRound(m_logicalSize.width()), qRound(m_logicalSize.height())}, *ratio);
                                 setExactSize(scaled);
                                 return;
                             }
-                            QMessageBox::information(this, GyanisScribe::Core::uiText("自定义贴图尺寸"),
-                                                     GyanisScribe::Core::uiText("没读懂这个尺寸：按「宽x高」写（如 640x360），或填一个倍率（如 2x、50%）"));
+                            QMessageBox::information(this, GyanisScribe::Base::uiText("自定义贴图尺寸"),
+                                                     GyanisScribe::Base::uiText("没读懂这个尺寸：按「宽x高」写（如 640x360），或填一个倍率（如 2x、50%）"));
                         });
 
         // 保存与「在文件夹中查看」是同一条路：后者在存下之后再打开那个目录，
@@ -2137,18 +2137,18 @@ namespace GyanisScribe::Pin
         // 色卡还能改色：只在「这张是色卡」时出现（创建时记下了原本那个色），点开就是取色器，选完当场重画这张卡
         if (const auto seed = colorCardColor(); seed.has_value())
         {
-            menu->addAction(GyanisScribe::Core::uiText("改这一张的颜色…"), this, [this, seed] { editColorCard(*seed); });
+            menu->addAction(GyanisScribe::Base::uiText("改这一张的颜色…"), this, [this, seed] { editColorCard(*seed); });
         }
 
-        menu->addAction(GyanisScribe::Core::uiText("保存"), this,
+        menu->addAction(GyanisScribe::Base::uiText("保存"), this,
                         [this]
                         {
                             if (const auto saved = saveWithDefaultName(); !saved)
                             {
-                                Core::Logger::error(saved.error().message);
+                                Base::Logger::error(saved.error().message);
                             }
                         });
-        menu->addAction(GyanisScribe::Core::uiText("在文件夹中查看"), this,
+        menu->addAction(GyanisScribe::Base::uiText("在文件夹中查看"), this,
                         [this]
                         {
                             const auto directory = screenshotDirectory(m_settings);
@@ -2156,57 +2156,57 @@ namespace GyanisScribe::Pin
                             // 再把那个目录打开——用户要的是「这张图在盘上的样子」
                             if (const auto saved = saveWithDefaultName(); !saved)
                             {
-                                Core::Logger::error(saved.error().message);
+                                Base::Logger::error(saved.error().message);
                                 return;
                             }
-                            const auto shown = Core::Paths::toDisplayText(directory);
+                            const auto shown = Base::Paths::toDisplayText(directory);
                             if (!QDesktopServices::openUrl(QUrl::fromLocalFile(shown)))
                             {
-                                Core::Logger::warning(std::format("文件夹打不开：{}", shown.toStdString()));
+                                Base::Logger::warning(std::format("文件夹打不开：{}", shown.toStdString()));
                             }
                         });
 
-        menu->addAction(GyanisScribe::Core::uiText("识别文字"), this, [this] { emit ocrRequested(m_image); });
+        menu->addAction(GyanisScribe::Base::uiText("识别文字"), this, [this] { emit ocrRequested(m_image); });
 
         // 标注：在贴图上直接标注。动图不进这一档（标注会被下一帧盖掉），灰掉并写明出路，
         // 不把「点了没反应」留给用户猜
-        auto *annotateAction = menu->addAction(GyanisScribe::Core::uiText("标注"), this, [this] { startAnnotation(); });
+        auto *annotateAction = menu->addAction(GyanisScribe::Base::uiText("标注"), this, [this] { startAnnotation(); });
         if (isAnimated())
         {
             annotateAction->setEnabled(false);
-            annotateAction->setToolTip(GyanisScribe::Core::uiText("动图不能直接标注：标注会被下一帧盖掉。请先保存成静态图，再把那张贴出来标注"));
+            annotateAction->setToolTip(GyanisScribe::Base::uiText("动图不能直接标注：标注会被下一帧盖掉。请先保存成静态图，再把那张贴出来标注"));
         }
 
         // 取色：进模式之后鼠标只读像素，点一下把那一格的颜色交出去（见 mousePressEvent）
-        auto *pickAction = menu->addAction(GyanisScribe::Core::uiText("取色"), this, [this] { setColorPickMode(!m_colorPickMode); });
+        auto *pickAction = menu->addAction(GyanisScribe::Base::uiText("取色"), this, [this] { setColorPickMode(!m_colorPickMode); });
         pickAction->setCheckable(true);
         pickAction->setChecked(m_colorPickMode);
 
         // 裁剪：拖一个框、回车裁到那一块。动图不进这一档（裁完会被下一帧盖回原尺寸），
         // 与「标注」同一条口径：灰掉并写明出路
-        auto *cropAction = menu->addAction(GyanisScribe::Core::uiText("裁剪"), this, [this] { startCropping(); });
+        auto *cropAction = menu->addAction(GyanisScribe::Base::uiText("裁剪"), this, [this] { startCropping(); });
         if (isAnimated())
         {
             cropAction->setEnabled(false);
-            cropAction->setToolTip(GyanisScribe::Core::uiText("动图不能裁剪：裁完会被下一帧盖回原尺寸。请先保存成静态图，再把那张贴出来裁"));
+            cropAction->setToolTip(GyanisScribe::Base::uiText("动图不能裁剪：裁完会被下一帧盖回原尺寸。请先保存成静态图，再把那张贴出来裁"));
         }
 
         // 刷新这一张：重抓图本身此刻盖住的那块屏幕。动图与缩到小图那两档都不进——
         // 前者会被下一帧盖回去，后者那块小方块的面积不是这张图的面积
-        auto *refreshAction = menu->addAction(GyanisScribe::Core::uiText("刷新这一张"), this, [this] { emit refreshRequested(); });
-        refreshAction->setToolTip(GyanisScribe::Core::uiText("重抓这块屏幕换成新的画面，标注之外的设定都不动；按住 `F5` 可以连着刷新，松手定在最后抓到的那一帧"));
+        auto *refreshAction = menu->addAction(GyanisScribe::Base::uiText("刷新这一张"), this, [this] { emit refreshRequested(); });
+        refreshAction->setToolTip(GyanisScribe::Base::uiText("重抓这块屏幕换成新的画面，标注之外的设定都不动；按住 `F5` 可以连着刷新，松手定在最后抓到的那一帧"));
         if (isAnimated())
         {
             refreshAction->setEnabled(false);
-            refreshAction->setToolTip(GyanisScribe::Core::uiText("动图不刷新：换上的那一帧静态像素会被下一帧盖掉。要盯实时画面请先存成静态图再贴出来"));
+            refreshAction->setToolTip(GyanisScribe::Base::uiText("动图不刷新：换上的那一帧静态像素会被下一帧盖掉。要盯实时画面请先存成静态图再贴出来"));
         }
         if (m_thumbnail)
         {
             refreshAction->setEnabled(false);
-            refreshAction->setToolTip(GyanisScribe::Core::uiText("缩到小图这一档不刷新：那枚方块的面积不是这张图的面积。按 `T` 摆回原大小再刷新"));
+            refreshAction->setToolTip(GyanisScribe::Base::uiText("缩到小图这一档不刷新：那枚方块的面积不是这张图的面积。按 `T` 摆回原大小再刷新"));
         }
 
-        auto *thumbnailAction = menu->addAction(GyanisScribe::Core::uiText("缩到小图"), this,
+        auto *thumbnailAction = menu->addAction(GyanisScribe::Base::uiText("缩到小图"), this,
                                                 [this]
                                                 {
                                                     const bool wanted = !m_thumbnail;
@@ -2215,11 +2215,11 @@ namespace GyanisScribe::Pin
                                                 });
         thumbnailAction->setCheckable(true);
         thumbnailAction->setChecked(m_thumbnail);
-        thumbnailAction->setToolTip(GyanisScribe::Core::uiText("缩成屏上一枚小方块先让开地方；拖它的四边与四角能给这枚方块定大小，缩放与旋转原样留着，再点一下回到原样"));
+        thumbnailAction->setToolTip(GyanisScribe::Base::uiText("缩成屏上一枚小方块先让开地方；拖它的四边与四角能给这枚方块定大小，缩放与旋转原样留着，再点一下回到原样"));
 
         // 背景色（白板）：垫在图的后面，透明像素处露出来的就是它；「无背景」回到透出桌面那一档。
         // 四项预设各一项，外加一个开取色对话框的自定义
-        auto      *backgroundMenu      = menu->addMenu(GyanisScribe::Core::uiText("背景色"));
+        auto      *backgroundMenu      = menu->addMenu(GyanisScribe::Base::uiText("背景色"));
         const auto addBackgroundChoice = [this, backgroundMenu](const QString &label, const QColor &color)
         {
             auto *item = backgroundMenu->addAction(label);
@@ -2230,19 +2230,19 @@ namespace GyanisScribe::Pin
         {
             // 这张窗口不是透明背景的（见构造里那行 WA_TranslucentBackground）：不垫背景色时
             // 透明像素处露出来的是主题的窗口底色，所以这一项的写法是「跟随主题」而不是「无背景」
-            auto *none = backgroundMenu->addAction(GyanisScribe::Core::uiText("跟随主题"));
+            auto *none = backgroundMenu->addAction(GyanisScribe::Base::uiText("跟随主题"));
             none->setCheckable(true);
             none->setChecked(!m_backgroundColor.isValid());
             QObject::connect(none, &QAction::triggered, this, [this] { setBackgroundColor(QColor{}); });
         }
-        addBackgroundChoice(GyanisScribe::Core::uiText("白色"), QColor(255, 255, 255));
-        addBackgroundChoice(GyanisScribe::Core::uiText("黑色"), QColor(0, 0, 0));
-        addBackgroundChoice(GyanisScribe::Core::uiText("灰色"), QColor(128, 128, 128));
+        addBackgroundChoice(GyanisScribe::Base::uiText("白色"), QColor(255, 255, 255));
+        addBackgroundChoice(GyanisScribe::Base::uiText("黑色"), QColor(0, 0, 0));
+        addBackgroundChoice(GyanisScribe::Base::uiText("灰色"), QColor(128, 128, 128));
         backgroundMenu->addSeparator();
-        QObject::connect(backgroundMenu->addAction(GyanisScribe::Core::uiText("自定义…")), &QAction::triggered, this,
+        QObject::connect(backgroundMenu->addAction(GyanisScribe::Base::uiText("自定义…")), &QAction::triggered, this,
                          [this]
                          {
-                             const QColor picked = QColorDialog::getColor(m_backgroundColor, this, GyanisScribe::Core::uiText("背景色"));
+                             const QColor picked = QColorDialog::getColor(m_backgroundColor, this, GyanisScribe::Base::uiText("背景色"));
                              if (picked.isValid())
                              {
                                  setBackgroundColor(picked);
@@ -2250,7 +2250,7 @@ namespace GyanisScribe::Pin
                          });
 
         // 透明区：带透明通道的图，那些像素底下画什么。四档各管一件事，所以把「露底色」与「让桌面透出来」摆在前面
-        auto      *backdropMenu      = menu->addMenu(GyanisScribe::Core::uiText("透明区"));
+        auto      *backdropMenu      = menu->addMenu(GyanisScribe::Base::uiText("透明区"));
         const auto addBackdropChoice = [this, backdropMenu](const QString &label, const TransparentBackdrop mode, const QString &hint)
         {
             auto *item = backdropMenu->addAction(label);
@@ -2259,32 +2259,32 @@ namespace GyanisScribe::Pin
             item->setToolTip(hint);
             QObject::connect(item, &QAction::triggered, this, [this, mode] { setTransparentBackdrop(mode); });
         };
-        addBackdropChoice(GyanisScribe::Core::uiText("跟随窗口底色"), TransparentBackdrop::ThemeBase, GyanisScribe::Core::uiText("透明像素露出窗口的底色（一直以来的那一档）"));
-        addBackdropChoice(GyanisScribe::Core::uiText("桌面透出"), TransparentBackdrop::SeeThrough, GyanisScribe::Core::uiText("整窗改成逐像素合成，透明那几块把底下的桌面透出来"));
-        addBackdropChoice(GyanisScribe::Core::uiText("深色棋盘"), TransparentBackdrop::DarkChecker, GyanisScribe::Core::uiText("按深色棋盘画出透明区，摆在白文档上看得出边界"));
-        addBackdropChoice(GyanisScribe::Core::uiText("亮色棋盘"), TransparentBackdrop::LightChecker, GyanisScribe::Core::uiText("按亮色棋盘画出透明区，摆在深色桌面上看得出边界"));
+        addBackdropChoice(GyanisScribe::Base::uiText("跟随窗口底色"), TransparentBackdrop::ThemeBase, GyanisScribe::Base::uiText("透明像素露出窗口的底色（一直以来的那一档）"));
+        addBackdropChoice(GyanisScribe::Base::uiText("桌面透出"), TransparentBackdrop::SeeThrough, GyanisScribe::Base::uiText("整窗改成逐像素合成，透明那几块把底下的桌面透出来"));
+        addBackdropChoice(GyanisScribe::Base::uiText("深色棋盘"), TransparentBackdrop::DarkChecker, GyanisScribe::Base::uiText("按深色棋盘画出透明区，摆在白文档上看得出边界"));
+        addBackdropChoice(GyanisScribe::Base::uiText("亮色棋盘"), TransparentBackdrop::LightChecker, GyanisScribe::Base::uiText("按亮色棋盘画出透明区，摆在深色桌面上看得出边界"));
 
         // 只显示这一张：其余的收起来，屏幕腾给这一张；再点一下恢复按组的那套规则。
         // 与「标注」那两档不同，它对谁用都成立（动图也一样）
-        auto *soloAction = menu->addAction(GyanisScribe::Core::uiText("只显示这一张"), this, [this] { emit soloRequested(!m_soloState); });
+        auto *soloAction = menu->addAction(GyanisScribe::Base::uiText("只显示这一张"), this, [this] { emit soloRequested(!m_soloState); });
         soloAction->setCheckable(true);
         soloAction->setChecked(m_soloState);
 
         // 贴边隐藏：贴着屏边收成一条，悬停展开。拖着放到屏边也会进这一档（见 mouseReleaseEvent）
-        auto *dockAction = menu->addAction(GyanisScribe::Core::uiText("贴边隐藏"), this, [this] { setEdgeDocked(m_edgeDock == ScreenEdge::None); });
+        auto *dockAction = menu->addAction(GyanisScribe::Base::uiText("贴边隐藏"), this, [this] { setEdgeDocked(m_edgeDock == ScreenEdge::None); });
         dockAction->setCheckable(true);
         dockAction->setChecked(m_edgeDock != ScreenEdge::None);
 
         // 移动到分组：列出管理器推过来的现有分组号，当前那一项带勾且灰掉（「现在就在这儿」），
         // 末尾一项按现有最大组号 +1 现建新组。移过去等于把它从当前这组暂时收起来，
         // 与实际改动都由管理器一处落账
-        auto *groupMenu = menu->addMenu(GyanisScribe::Core::uiText("移动到分组"));
+        auto *groupMenu = menu->addMenu(GyanisScribe::Base::uiText("移动到分组"));
         for (const int group: m_groupChoices)
         {
             // 起过名字的组带出名字，没起过的还是「分组 N」：加一档命名不该把老账改写成另一种样子
             const auto name = m_groupNames.value(group);
             auto      *groupAction =
-                    groupMenu->addAction(name.isEmpty() ? GyanisScribe::Core::uiText("分组 %1").arg(group) : GyanisScribe::Core::uiText("分组 %1：%2").arg(group).arg(name));
+                    groupMenu->addAction(name.isEmpty() ? GyanisScribe::Base::uiText("分组 %1").arg(group) : GyanisScribe::Base::uiText("分组 %1：%2").arg(group).arg(name));
             groupAction->setCheckable(true);
             groupAction->setChecked(group == m_group);
             groupAction->setEnabled(group != m_group);
@@ -2292,16 +2292,16 @@ namespace GyanisScribe::Pin
         }
         groupMenu->addSeparator();
         const auto nextGroup = m_groupChoices.isEmpty() ? kFirstPinGroup : m_groupChoices.back() + 1;
-        QObject::connect(groupMenu->addAction(GyanisScribe::Core::uiText("新建分组")), &QAction::triggered, this, [this, nextGroup] { emit moveToGroupRequested(nextGroup); });
+        QObject::connect(groupMenu->addAction(GyanisScribe::Base::uiText("新建分组")), &QAction::triggered, this, [this, nextGroup] { emit moveToGroupRequested(nextGroup); });
         groupMenu->addSeparator();
 
         // 改名与删组都只管报出去：名字表与谁在哪一组是管理器的账，这一层收用户敲的那一串
-        QObject::connect(groupMenu->addAction(GyanisScribe::Core::uiText("重命名这一组…")), &QAction::triggered, this,
+        QObject::connect(groupMenu->addAction(GyanisScribe::Base::uiText("重命名这一组…")), &QAction::triggered, this,
                          [this]
                          {
                              bool       accepted = false;
-                             const auto text = QInputDialog::getText(this, GyanisScribe::Core::uiText("给分组起名字"),
-                                                                     GyanisScribe::Core::uiText("这一组的名字（留空就回到「分组 %1」这种叫法）").arg(m_group), QLineEdit::Normal,
+                             const auto text = QInputDialog::getText(this, GyanisScribe::Base::uiText("给分组起名字"),
+                                                                     GyanisScribe::Base::uiText("这一组的名字（留空就回到「分组 %1」这种叫法）").arg(m_group), QLineEdit::Normal,
                                                                      m_groupNames.value(m_group), &accepted);
                              if (!accepted)
                              {
@@ -2309,18 +2309,18 @@ namespace GyanisScribe::Pin
                              }
                              emit renameGroupRequested(m_group, text.trimmed());
                          });
-        auto *deleteGroupAction = groupMenu->addAction(GyanisScribe::Core::uiText("删除这一组"), this, [this] { emit deleteGroupRequested(m_group); });
+        auto *deleteGroupAction = groupMenu->addAction(GyanisScribe::Base::uiText("删除这一组"), this, [this] { emit deleteGroupRequested(m_group); });
         // 第一组是删别组时成员并回去的落点：把它删了就没有落点，这一项在这儿灰着并说明为什么
         deleteGroupAction->setEnabled(m_group != kFirstPinGroup);
         if (m_group == kFirstPinGroup)
         {
-            deleteGroupAction->setToolTip(GyanisScribe::Core::uiText("第一组是删掉别的组时成员并回去的落点，删不掉；想把这一张挪走请用上面的分组"));
+            deleteGroupAction->setToolTip(GyanisScribe::Base::uiText("第一组是删掉别的组时成员并回去的落点，删不掉；想把这一张挪走请用上面的分组"));
         }
 
         menu->addSeparator();
 
         const auto capabilities = m_integration.capabilities();
-        auto      *pinAction    = menu->addAction(GyanisScribe::Core::uiText("保持置顶"), this,
+        auto      *pinAction    = menu->addAction(GyanisScribe::Base::uiText("保持置顶"), this,
                                                   [this]
                                                   {
                                               const bool wanted = !m_pinned;
@@ -2330,7 +2330,7 @@ namespace GyanisScribe::Pin
         pinAction->setCheckable(true);
         pinAction->setChecked(m_pinned);
 
-        auto *throughAction = menu->addAction(GyanisScribe::Core::uiText("鼠标穿透"), this,
+        auto *throughAction = menu->addAction(GyanisScribe::Base::uiText("鼠标穿透"), this,
                                               [this]
                                               {
                                                   const bool wanted = !m_mouseThrough;
@@ -2340,26 +2340,26 @@ namespace GyanisScribe::Pin
         throughAction->setCheckable(true);
         throughAction->setChecked(m_mouseThrough);
         throughAction->setVisible(capabilities.clickThrough);
-        throughAction->setToolTip(GyanisScribe::Core::uiText("滚轮缩放，Ctrl+滚轮旋转，Shift+滚轮调透明度，R 转正一挡（Shift+R 反向），0 或双击回到原始比例，Esc 关闭"));
+        throughAction->setToolTip(GyanisScribe::Base::uiText("滚轮缩放，Ctrl+滚轮旋转，Shift+滚轮调透明度，R 转正一挡（Shift+R 反向），0 或双击回到原始比例，Esc 关闭"));
 
         // 窗口阴影：窗口比内容每边大一圈、投影画在带子里，内容坐标不动（见 setShadowEnabled）。
         // 缩略图态不铺：那枚小方块是临时让位用的
-        auto *shadowAction = menu->addAction(GyanisScribe::Core::uiText("窗口阴影"), this, [this] { setShadowEnabled(!m_shadowEnabled); });
+        auto *shadowAction = menu->addAction(GyanisScribe::Base::uiText("窗口阴影"), this, [this] { setShadowEnabled(!m_shadowEnabled); });
         shadowAction->setCheckable(true);
         shadowAction->setChecked(m_shadowEnabled);
-        shadowAction->setToolTip(GyanisScribe::Core::uiText("给这一张围一圈投影：窗口比内容大一圈，内容坐标与吸附位置都不变；缩到小方块（T）时不带"));
+        shadowAction->setToolTip(GyanisScribe::Base::uiText("给这一张围一圈投影：窗口比内容大一圈，内容坐标与吸附位置都不变；缩到小方块（T）时不带"));
 
         // 平滑缩放：放大看截图里的小字时，插值会把笔画糊成一片灰——关掉就是硬边像素格。
         // 与窗口阴影同一档形状：只改「看」，复制、保存、标注与识别拿到的仍是原始像素
-        auto *smoothAction = menu->addAction(GyanisScribe::Core::uiText("平滑缩放"), this, [this] { setSmoothScaleEnabled(!m_smoothScaleEnabled); });
+        auto *smoothAction = menu->addAction(GyanisScribe::Base::uiText("平滑缩放"), this, [this] { setSmoothScaleEnabled(!m_smoothScaleEnabled); });
         smoothAction->setCheckable(true);
         smoothAction->setChecked(m_smoothScaleEnabled);
-        smoothAction->setToolTip(GyanisScribe::Core::uiText("放大时把像素铺平：关掉这一档，一格源像素就是屏上一块硬边方格，读小字更清楚（只改显示，不进成品）"));
+        smoothAction->setToolTip(GyanisScribe::Base::uiText("放大时把像素铺平：关掉这一档，一格源像素就是屏上一块硬边方格，读小字更清楚（只改显示，不进成品）"));
 
         // 视图变换四档：翻转与灰度/反色都只改「看」，复制、保存、标注拿到的仍是原始像素——
         // 与旋转同一条规矩。菜单项的勾选态就是当前读数，键位与它们同一条路（H/V/G/I）
         menu->addSeparator();
-        auto *flipHorizontalAction = menu->addAction(GyanisScribe::Core::uiText("左右翻转"), this,
+        auto *flipHorizontalAction = menu->addAction(GyanisScribe::Base::uiText("左右翻转"), this,
                                                      [this]
                                                      {
                                                          const bool wanted = !m_mirroredHorizontally;
@@ -2368,7 +2368,7 @@ namespace GyanisScribe::Pin
                                                      });
         flipHorizontalAction->setCheckable(true);
         flipHorizontalAction->setChecked(m_mirroredHorizontally);
-        auto *flipVerticalAction = menu->addAction(GyanisScribe::Core::uiText("上下翻转"), this,
+        auto *flipVerticalAction = menu->addAction(GyanisScribe::Base::uiText("上下翻转"), this,
                                                    [this]
                                                    {
                                                        const bool wanted = !m_mirroredVertically;
@@ -2377,7 +2377,7 @@ namespace GyanisScribe::Pin
                                                    });
         flipVerticalAction->setCheckable(true);
         flipVerticalAction->setChecked(m_mirroredVertically);
-        auto *grayscaleAction = menu->addAction(GyanisScribe::Core::uiText("灰度显示"), this,
+        auto *grayscaleAction = menu->addAction(GyanisScribe::Base::uiText("灰度显示"), this,
                                                 [this]
                                                 {
                                                     const bool wanted = !m_grayscale;
@@ -2386,7 +2386,7 @@ namespace GyanisScribe::Pin
                                                 });
         grayscaleAction->setCheckable(true);
         grayscaleAction->setChecked(m_grayscale);
-        auto *invertAction = menu->addAction(GyanisScribe::Core::uiText("反色"), this,
+        auto *invertAction = menu->addAction(GyanisScribe::Base::uiText("反色"), this,
                                              [this]
                                              {
                                                  const bool wanted = !m_inverted;
@@ -2401,12 +2401,12 @@ namespace GyanisScribe::Pin
             menu->addSeparator();
             // 整组出口：一次把选中集里每一张都存一份。存哪、叫什么名是每张自己的账（都走同一个目录与命名模板），
             // 谁在选中集里是管理器的账，这一层只报「有人要批量存」
-            menu->addAction(GyanisScribe::Core::uiText("批量保存（%1 张）").arg(m_selectionCount), this, [this] { emit batchSaveRequested(); });
-            menu->addAction(GyanisScribe::Core::uiText("取消选择（%1 张）").arg(m_selectionCount), this, [this] { emit clearSelectionRequested(); });
+            menu->addAction(GyanisScribe::Base::uiText("批量保存（%1 张）").arg(m_selectionCount), this, [this] { emit batchSaveRequested(); });
+            menu->addAction(GyanisScribe::Base::uiText("取消选择（%1 张）").arg(m_selectionCount), this, [this] { emit clearSelectionRequested(); });
         }
 
         menu->addSeparator();
-        menu->addAction(GyanisScribe::Core::uiText("关闭"), this,
+        menu->addAction(GyanisScribe::Base::uiText("关闭"), this,
                         [this]
                         {
                             // 与 Esc 那条同一条次序：先自己收场再报出去（管理器收到后会现场析构这一张）
@@ -2415,13 +2415,13 @@ namespace GyanisScribe::Pin
                         });
         // 销毁与关闭只差在「还能不能按回来」：这一张整组动作不参与（一次毁掉一桌太顺手了），
         // 也不进那份可恢复的册子
-        auto *destroyAction = menu->addAction(GyanisScribe::Core::uiText("销毁这一张"), this,
+        auto *destroyAction = menu->addAction(GyanisScribe::Base::uiText("销毁这一张"), this,
                                               [this]
                                               {
                                                   close();
                                                   emit destroyRequested();
                                               });
-        destroyAction->setToolTip(GyanisScribe::Core::uiText("彻底关掉这一张：它不再留在「重新贴出最近关掉的贴图」那五张里。只想暂时腾个地方请用「关闭」"));
+        destroyAction->setToolTip(GyanisScribe::Base::uiText("彻底关掉这一张：它不再留在「重新贴出最近关掉的贴图」那五张里。只想暂时腾个地方请用「关闭」"));
         return menu;
     }
 

@@ -1,8 +1,8 @@
 // 截图后那条外部命令的两层判据：拆得对不对（纯逻辑）与起不起得来（真起一个进程）。
 // 拆错只会让脚本拿着错参数跑下去，起不来则有「静默什么都没发生」这一种更难查的失败，所以两层都要钉。
-#include "Core/ExternalCommand.h"
+#include "Base/ExternalCommand.h"
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QString>
 #include <QStringList>
@@ -11,10 +11,10 @@
 
 #include <string>
 
-using GyanisScribe::Core::ExternalCommandPlan;
-using GyanisScribe::Core::kExternalCommandFilePlaceholder;
-using GyanisScribe::Core::planExternalCommand;
-using GyanisScribe::Core::startExternalCommand;
+using GyanisScribe::Base::ExternalCommandPlan;
+using GyanisScribe::Base::kExternalCommandFilePlaceholder;
+using GyanisScribe::Base::planExternalCommand;
+using GyanisScribe::Base::startExternalCommand;
 
 namespace
 {
@@ -75,7 +75,7 @@ TEST(ExternalCommandPlan, RejectsPlaceholderAsProgramAndEmptyLine)
 {
     const auto placeholderAsProgram = planExternalCommand(QStringLiteral("%file% --path x"), QStringLiteral("D:/a.png"));
     ASSERT_FALSE(placeholderAsProgram.has_value());
-    EXPECT_EQ(placeholderAsProgram.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument);
+    EXPECT_EQ(placeholderAsProgram.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument);
     EXPECT_NE(placeholderAsProgram.error().message.find("%file%"), std::string::npos) << placeholderAsProgram.error().message;
 
     for (const auto *empty: {"", "   "})
@@ -94,7 +94,7 @@ TEST(ExternalCommandPlan, RejectsPlaceholderWhenNothingWasSaved)
 {
     const auto planned = planExternalCommand(QStringLiteral("上传.exe --path %file%"), QString{});
     ASSERT_FALSE(planned.has_value());
-    EXPECT_EQ(planned.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument);
+    EXPECT_EQ(planned.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument);
     EXPECT_NE(planned.error().message.find("文件"), std::string::npos) << planned.error().message;
 }
 
@@ -117,6 +117,6 @@ TEST(ExternalCommandStart, ReportsWhichProgramDidNotStart)
     const ExternalCommandPlan plan{.program = QStringLiteral("GyanisScribeNoSuchProgram-3f9a.exe"), .arguments = {}};
     const auto                started = startExternalCommand(plan);
     ASSERT_FALSE(started.has_value());
-    EXPECT_EQ(started.error().code, GyanisScribe::Core::ErrorCode::DependencyMissing);
+    EXPECT_EQ(started.error().code, GyanisScribe::Base::ErrorCode::DependencyMissing);
     EXPECT_NE(started.error().message.find("GyanisScribeNoSuchProgram-3f9a.exe"), std::string::npos) << started.error().message;
 }

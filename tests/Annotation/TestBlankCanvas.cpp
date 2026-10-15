@@ -2,7 +2,7 @@
 
 #include "Annotation/BlankCanvas.h"
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <gtest/gtest.h>
 

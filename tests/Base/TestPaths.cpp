@@ -1,4 +1,4 @@
-#include "Core/Paths.h"
+#include "Base/Paths.h"
 
 #include <QCoreApplication>
 #include <QDateTime>
@@ -13,8 +13,8 @@
 #include <memory>
 #include <string>
 
-using GyanisScribe::Core::ErrorCode;
-using GyanisScribe::Core::Paths;
+using GyanisScribe::Base::ErrorCode;
+using GyanisScribe::Base::Paths;
 
 namespace
 {

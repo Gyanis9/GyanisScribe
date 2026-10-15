@@ -52,7 +52,7 @@ namespace GyanisScribe::Ui
          * @param themeKind 选定的档位
          * @return 写配置失败时返回原因；成功返回空载荷
          */
-        Core::Expected<void> setTheme(ThemeKind themeKind);
+        Base::Expected<void> setTheme(ThemeKind themeKind);
 
         /**
          * @brief 当前生效的语义色

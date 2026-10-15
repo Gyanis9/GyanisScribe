@@ -1,12 +1,9 @@
 add_executable(TestCore
-        TestLogger.cpp
-        TestPaths.cpp
         TestImageFit.cpp
         TestImageFormat.cpp
         TestOutputDecoration.cpp
         TestClipboardImage.cpp
-        TestClipboardFile.cpp
-        TestExternalCommand.cpp)
+        TestClipboardFile.cpp)
 
 target_link_libraries(TestCore PRIVATE
         Core
@@ -25,7 +22,3 @@ include(GoogleTest)
 # 剪贴板用例（TestClipboardImage）真的往系统剪贴板里放东西：与别的借用剪贴板的套件同拿一把锁，
 # 否则并行跑时读到的是别人写着半截的内容。分号要转义——裸分号会被 CMake 当列表分隔吃掉（旧账）
 gtest_discover_tests(TestCore PROPERTIES RESOURCE_LOCK "clipboardShared")
-
-# 外部命令的「真起一个进程」那两条用例拿这一份测试可执行体自己当探针：
-# 带一个匹配不到任何用例的过滤器，起得来、立刻退，不会递归再跑一遍套件。路径由构建系统给，不写死本机位置
-target_compile_definitions(TestCore PRIVATE GYANISSCRIBE_EXTERNAL_COMMAND_PROBE="$<TARGET_FILE:TestCore>")

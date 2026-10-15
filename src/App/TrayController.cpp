@@ -1,7 +1,7 @@
 #include "App/TrayController.h"
 
-#include "Core/Logger.h"
-#include "Core/Text.h"
+#include "Base/Logger.h"
+#include "Base/Text.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Platform/PlatformCapabilities.h"
 #include "Record/RecordingHud.h"
@@ -35,46 +35,46 @@ namespace GyanisScribe::App
         if (recordedSeconds >= 0)
         {
             // 控制条收起后这就是唯一的读数处：暂停与在录要分得开，否则用户不知道帧还在不在走
-            const auto label = paused ? GyanisScribe::Core::uiText("智录 · 录制已暂停 %1") : GyanisScribe::Core::uiText("智录 · 正在录制 %1");
+            const auto label = paused ? GyanisScribe::Base::uiText("智录 · 录制已暂停 %1") : GyanisScribe::Base::uiText("智录 · 正在录制 %1");
             return label.arg(GyanisScribe::Record::formatDuration(recordedSeconds));
         }
         if (pinCount <= 0)
         {
-            return GyanisScribe::Core::uiText("智录");
+            return GyanisScribe::Base::uiText("智录");
         }
-        return GyanisScribe::Core::uiText("智录 · 贴图 %1 张").arg(pinCount);
+        return GyanisScribe::Base::uiText("智录 · 贴图 %1 张").arg(pinCount);
     }
 
     QList<TrayMenuEntry> trayMenuEntries()
     {
         QList<TrayMenuEntry> entries;
-        entries.append(TrayMenuEntry{TrayAction::CaptureRegion, "CaptureRegion", GyanisScribe::Core::uiText("框选截图"), GyanisScribe::Settings::kHotkeyCapture});
-        entries.append(TrayMenuEntry{TrayAction::CaptureFullScreen, "CaptureFullScreen", GyanisScribe::Core::uiText("整屏截图"), {}});
-        entries.append(TrayMenuEntry{TrayAction::CaptureLastRegion, "CaptureLastRegion", GyanisScribe::Core::uiText("重复上次选区"), {}});
+        entries.append(TrayMenuEntry{TrayAction::CaptureRegion, "CaptureRegion", GyanisScribe::Base::uiText("框选截图"), GyanisScribe::Settings::kHotkeyCapture});
+        entries.append(TrayMenuEntry{TrayAction::CaptureFullScreen, "CaptureFullScreen", GyanisScribe::Base::uiText("整屏截图"), {}});
+        entries.append(TrayMenuEntry{TrayAction::CaptureLastRegion, "CaptureLastRegion", GyanisScribe::Base::uiText("重复上次选区"), {}});
         // 图标用 CaptureWindow 那一枚：与「框选截图」共用同一枚会让两行在菜单里长得一模一样
-        entries.append(TrayMenuEntry{TrayAction::CaptureWindow, "CaptureWindow", GyanisScribe::Core::uiText("截取当前窗口"), {}});
-        entries.append(TrayMenuEntry{TrayAction::CaptureLongRegion, "CaptureRegion", GyanisScribe::Core::uiText("滚动长截图"), GyanisScribe::Settings::kHotkeyCaptureLong});
+        entries.append(TrayMenuEntry{TrayAction::CaptureWindow, "CaptureWindow", GyanisScribe::Base::uiText("截取当前窗口"), {}});
+        entries.append(TrayMenuEntry{TrayAction::CaptureLongRegion, "CaptureRegion", GyanisScribe::Base::uiText("滚动长截图"), GyanisScribe::Settings::kHotkeyCaptureLong});
         // 不抓屏，直接摆一张白底画布进标注窗：写字、画框、拼几张截图说明时不必先随便截一块屏当底
-        entries.append(TrayMenuEntry{TrayAction::BlankCanvas, "Annotation", GyanisScribe::Core::uiText("新建空白画布标注"), {}});
+        entries.append(TrayMenuEntry{TrayAction::BlankCanvas, "Annotation", GyanisScribe::Base::uiText("新建空白画布标注"), {}});
         entries.append(TrayMenuEntry{}); // 分隔线
-        entries.append(TrayMenuEntry{TrayAction::ToggleRecord, "Record", GyanisScribe::Core::uiText("开始 / 停止录屏"), GyanisScribe::Settings::kHotkeyRecord});
-        entries.append(TrayMenuEntry{TrayAction::Recognize, "Ocr", GyanisScribe::Core::uiText("识别文字"), GyanisScribe::Settings::kHotkeyOcr});
-        entries.append(TrayMenuEntry{TrayAction::RecognizeFile, "OcrImage", GyanisScribe::Core::uiText("识别图片文件…"), {}});
-        entries.append(TrayMenuEntry{TrayAction::PickColor, "ColorPicker", GyanisScribe::Core::uiText("屏幕取色"), GyanisScribe::Settings::kHotkeyPick});
-        entries.append(TrayMenuEntry{TrayAction::CloseAllPins, "PinClose", GyanisScribe::Core::uiText("关闭全部贴图"), {}});
-        entries.append(TrayMenuEntry{TrayAction::TogglePinsVisible, "Pin", GyanisScribe::Core::uiText("收起 / 摆回全部贴图"), GyanisScribe::Settings::kHotkeyTogglePins});
-        entries.append(TrayMenuEntry{TrayAction::ClearPinsThrough, "PinMouseThrough", GyanisScribe::Core::uiText("取消全部贴图穿透"), {}});
-        entries.append(TrayMenuEntry{TrayAction::PasteClipboard, "PinCopy", GyanisScribe::Core::uiText("把剪贴板里的图贴到屏幕上"), {}});
+        entries.append(TrayMenuEntry{TrayAction::ToggleRecord, "Record", GyanisScribe::Base::uiText("开始 / 停止录屏"), GyanisScribe::Settings::kHotkeyRecord});
+        entries.append(TrayMenuEntry{TrayAction::Recognize, "Ocr", GyanisScribe::Base::uiText("识别文字"), GyanisScribe::Settings::kHotkeyOcr});
+        entries.append(TrayMenuEntry{TrayAction::RecognizeFile, "OcrImage", GyanisScribe::Base::uiText("识别图片文件…"), {}});
+        entries.append(TrayMenuEntry{TrayAction::PickColor, "ColorPicker", GyanisScribe::Base::uiText("屏幕取色"), GyanisScribe::Settings::kHotkeyPick});
+        entries.append(TrayMenuEntry{TrayAction::CloseAllPins, "PinClose", GyanisScribe::Base::uiText("关闭全部贴图"), {}});
+        entries.append(TrayMenuEntry{TrayAction::TogglePinsVisible, "Pin", GyanisScribe::Base::uiText("收起 / 摆回全部贴图"), GyanisScribe::Settings::kHotkeyTogglePins});
+        entries.append(TrayMenuEntry{TrayAction::ClearPinsThrough, "PinMouseThrough", GyanisScribe::Base::uiText("取消全部贴图穿透"), {}});
+        entries.append(TrayMenuEntry{TrayAction::PasteClipboard, "PinCopy", GyanisScribe::Base::uiText("把剪贴板里的图贴到屏幕上"), {}});
         // 关闭与销毁是两档：这一条只按得回「关闭」的那几张，销毁过的一张都不回来
-        entries.append(TrayMenuEntry{TrayAction::RepinClosed, "Refresh", GyanisScribe::Core::uiText("重新贴出最近关掉的贴图"), {}});
-        entries.append(TrayMenuEntry{TrayAction::NextPinGroup, "PinGroup", GyanisScribe::Core::uiText("切到下一组贴图"), GyanisScribe::Settings::kHotkeyNextPinGroup});
+        entries.append(TrayMenuEntry{TrayAction::RepinClosed, "Refresh", GyanisScribe::Base::uiText("重新贴出最近关掉的贴图"), {}});
+        entries.append(TrayMenuEntry{TrayAction::NextPinGroup, "PinGroup", GyanisScribe::Base::uiText("切到下一组贴图"), GyanisScribe::Settings::kHotkeyNextPinGroup});
         // 图标与「切到下一组贴图」同族（都是分组这一件事），两行的文字各自表意，不会读成同一件事
-        entries.append(TrayMenuEntry{TrayAction::ManagePinGroups, "PinGroup", GyanisScribe::Core::uiText("贴图组管理…"), {}});
+        entries.append(TrayMenuEntry{TrayAction::ManagePinGroups, "PinGroup", GyanisScribe::Base::uiText("贴图组管理…"), {}});
         entries.append(TrayMenuEntry{});
-        entries.append(TrayMenuEntry{TrayAction::OpenSettings, "Settings", GyanisScribe::Core::uiText("设置"), {}});
-        entries.append(TrayMenuEntry{TrayAction::OpenAbout, "About", GyanisScribe::Core::uiText("关于智录"), {}});
+        entries.append(TrayMenuEntry{TrayAction::OpenSettings, "Settings", GyanisScribe::Base::uiText("设置"), {}});
+        entries.append(TrayMenuEntry{TrayAction::OpenAbout, "About", GyanisScribe::Base::uiText("关于智录"), {}});
         entries.append(TrayMenuEntry{});
-        entries.append(TrayMenuEntry{TrayAction::Quit, "Exit", GyanisScribe::Core::uiText("退出"), {}});
+        entries.append(TrayMenuEntry{TrayAction::Quit, "Exit", GyanisScribe::Base::uiText("退出"), {}});
         return entries;
     }
 
@@ -123,7 +123,7 @@ namespace GyanisScribe::App
         if (!QSystemTrayIcon::isSystemTrayAvailable())
         {
             // 容器与部分精简桌面环境没有托盘：这不是致命错误，界面层要改用别的入口
-            Core::Logger::warning("这台机器上没有可用的系统托盘，菜单功能只能改由主窗口提供");
+            Base::Logger::warning("这台机器上没有可用的系统托盘，菜单功能只能改由主窗口提供");
             return false;
         }
 
@@ -164,7 +164,7 @@ namespace GyanisScribe::App
                 // 菜单项上带快捷键提示是需求第五节的原话；显示的是配置里的真值，不是写死的样例。
                 // 用制表符分开：Qt 的菜单会把 \t 之后的文字右对齐，这正是系统菜单里快捷键提示的排法
                 action->setText(QStringLiteral("%1\t%2").arg(entry.label, text));
-                action->setToolTip(GyanisScribe::Core::uiText("快捷键：%1，可在设置页改").arg(text));
+                action->setToolTip(GyanisScribe::Base::uiText("快捷键：%1，可在设置页改").arg(text));
             }
             const auto trayAction = *entry.action;
             QObject::connect(action, &QAction::triggered, this, [this, trayAction] { emit actionRequested(trayAction); });
@@ -191,7 +191,7 @@ namespace GyanisScribe::App
         if (!complaint.empty())
         {
             // 填坏了照样按回落的那一档走：一声不响地不做事，用户分不清「没配上」与「配的是什么都不做」
-            Core::Logger::warning(std::format("托盘点击读不出：{}", complaint));
+            Base::Logger::warning(std::format("托盘点击读不出：{}", complaint));
         }
 
         switch (decision.outcome)

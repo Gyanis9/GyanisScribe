@@ -1,6 +1,6 @@
 #include "Capture/CursorPixels.h"
 
-#include "Core/Logger.h"
+#include "Base/Logger.h"
 
 #include <QtGlobal>
 
@@ -134,7 +134,7 @@ namespace GyanisScribe::Capture
         const int height = isMono ? sizeBitmap.bmHeight / 2 : sizeBitmap.bmHeight;
         if (width > kMaximumCursorEdge || height > kMaximumCursorEdge)
         {
-            Core::Logger::warning(std::format("鼠标指针的尺寸读出来是 {}×{}，超出可信范围，这次截图不含指针", width, height));
+            Base::Logger::warning(std::format("鼠标指针的尺寸读出来是 {}×{}，超出可信范围，这次截图不含指针", width, height));
             return std::nullopt;
         }
 
@@ -205,12 +205,12 @@ namespace GyanisScribe::Capture
         if (!hasColorPlane && !isMono)
         {
             // 颜色面读不出来时不能只靠掩码画个空壳：整枚指针放弃，让上层照常出图
-            Core::Logger::warning(std::format("鼠标指针的颜色面读不出来（{}×{}），这次截图不含指针", width, height));
+            Base::Logger::warning(std::format("鼠标指针的颜色面读不出来（{}×{}），这次截图不含指针", width, height));
             return std::nullopt;
         }
         if (!hasMaskPlane)
         {
-            Core::Logger::warning(std::format("鼠标指针的掩码面读不出来（{}×{}），这次截图不含指针", width, height));
+            Base::Logger::warning(std::format("鼠标指针的掩码面读不出来（{}×{}），这次截图不含指针", width, height));
             return std::nullopt;
         }
 

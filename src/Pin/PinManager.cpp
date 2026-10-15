@@ -1,8 +1,8 @@
 #include "Pin/PinManager.h"
 
-#include "Core/Logger.h"
-#include "Core/Paths.h"
-#include "Core/Text.h"
+#include "Base/Logger.h"
+#include "Base/Paths.h"
+#include "Base/Text.h"
 #include "Pin/PinWindow.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Platform/WindowGeometry.h"
@@ -23,7 +23,7 @@ namespace
     /// 布局用的贴图缓存目录：像素放这儿，配置里只留路径
     std::filesystem::path pinCacheDirectory()
     {
-        return GyanisScribe::Core::Paths::cacheDirectory() / "Pins";
+        return GyanisScribe::Base::Paths::cacheDirectory() / "Pins";
     }
 
     /// 缓存里的文件名按张序给：一次写整批时，时间戳名会撞在同一个毫秒上，剩下最后一张
@@ -152,7 +152,7 @@ namespace GyanisScribe::Pin
                              }
                              if (const auto moved = movePinToGroup(static_cast<int>(found - m_pins.begin()), group); !moved)
                              {
-                                 Core::Logger::warning(moved.error().message);
+                                 Base::Logger::warning(moved.error().message);
                              }
                          });
         // 改名与删组同理：窗口收用户敲的那一串与那一下意图，名字表、谁在哪一组、显隐都在这层落账
@@ -166,7 +166,7 @@ namespace GyanisScribe::Pin
                              }
                              if (const auto renamed = renameGroup(group, name); !renamed)
                              {
-                                 Core::Logger::warning(renamed.error().message);
+                                 Base::Logger::warning(renamed.error().message);
                              }
                          });
         QObject::connect(raw, &PinWindow::deleteGroupRequested, this,
@@ -178,7 +178,7 @@ namespace GyanisScribe::Pin
                              }
                              if (const auto deleted = deleteGroup(group); !deleted)
                              {
-                                 Core::Logger::warning(deleted.error().message);
+                                 Base::Logger::warning(deleted.error().message);
                              }
                          });
 
@@ -250,14 +250,14 @@ namespace GyanisScribe::Pin
         return m_pins[static_cast<std::size_t>(index)].get();
     }
 
-    Core::Expected<void> PinManager::saveLayout()
+    Base::Expected<void> PinManager::saveLayout()
     {
         const auto directory = pinCacheDirectory();
 
         // 先把这个专用目录里上一次留下的清掉：目录只装本功能写下的图，
         // 张数变少时旧的那几张若不清，就成了布局指不到的残留
         std::error_code cleared;
-        if (const auto ensured = Core::Paths::ensureDirectory(directory); ensured)
+        if (const auto ensured = Base::Paths::ensureDirectory(directory); ensured)
         {
             for (const auto &entry: std::filesystem::directory_iterator(directory, std::filesystem::directory_options::skip_permission_denied, cleared))
             {
@@ -303,7 +303,7 @@ namespace GyanisScribe::Pin
         return m_settings.setValue(Settings::kPinAllConcealed, m_allConcealed);
     }
 
-    Core::Expected<int> PinManager::restoreLayout()
+    Base::Expected<int> PinManager::restoreLayout()
     {
         // 名字先读：一份坏掉的布局不该把名字表也带成「什么都没起过名字」，那一桌的标签会集体消失
         if (const auto names = Pin::loadGroupNames(m_settings); names)
@@ -313,7 +313,7 @@ namespace GyanisScribe::Pin
         {
             // 名字只是标签：坏记录报一条中文原因后按「都没起过名字」继续摆这一桌，
             // 为了一个标签把这桌还留着位置的贴图全放弃恢复不值得
-            Core::Logger::warning(names.error().message);
+            Base::Logger::warning(names.error().message);
             m_groupNames.clear();
         }
 
@@ -335,7 +335,7 @@ namespace GyanisScribe::Pin
             if (!image.load(state.imageFile))
             {
                 // 图被用户删掉了：少摆一张是他自己的结果，不该因此把还在的那几张也放弃还原
-                Core::Logger::warning(std::format("贴图恢复跳过一张：{} 读不出图来。布局里的几何也一并丢了", state.imageFile.toStdString()));
+                Base::Logger::warning(std::format("贴图恢复跳过一张：{} 读不出图来。布局里的几何也一并丢了", state.imageFile.toStdString()));
                 continue;
             }
 
@@ -350,7 +350,7 @@ namespace GyanisScribe::Pin
             // 不为一张贴图的一个开关把整次恢复放弃掉
             if (const auto through = pin.setMouseThrough(state.mouseThrough); !through)
             {
-                Core::Logger::warning(std::format("贴图恢复时设穿透没成：{}", through.error().message));
+                Base::Logger::warning(std::format("贴图恢复时设穿透没成：{}", through.error().message));
             }
             // 透明区这一档不需要平台能力，直接退回去：重启前是棋盘，回来还是棋盘
             pin.setTransparentBackdrop(state.transparentBackdrop);
@@ -384,7 +384,7 @@ namespace GyanisScribe::Pin
                 ++restored;
             } else
             {
-                Core::Logger::warning(std::format("有一张贴图的穿透没取消掉：{}", result.error().message));
+                Base::Logger::warning(std::format("有一张贴图的穿透没取消掉：{}", result.error().message));
             }
         }
         return restored;
@@ -466,7 +466,7 @@ namespace GyanisScribe::Pin
             {
                 report.reason = QString::fromStdString(saved.error().message);
             }
-            Core::Logger::warning(saved.error().message);
+            Base::Logger::warning(saved.error().message);
         }
         return report;
     }
@@ -545,12 +545,12 @@ namespace GyanisScribe::Pin
         return groups;
     }
 
-    Core::Expected<int> PinManager::switchToNextGroup()
+    Base::Expected<int> PinManager::switchToNextGroup()
     {
         const auto groups = groupsInUse();
         if (groups.size() < 2)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("现在只有 1 个贴图分组，没有下一组可切。"
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("现在只有 1 个贴图分组，没有下一组可切。"
                                                                                                                 "在贴图的右键菜单里选「移动到分组 → 新建分组」才会多出一组")});
         }
 
@@ -561,7 +561,7 @@ namespace GyanisScribe::Pin
         if (!parsed)
         {
             // 名单坏了不放弃切组：报一句原因，按组号升序继续走，键盘上的切组不该被一格填歪的配置卡死
-            Core::Logger::warning(parsed.error().message);
+            Base::Logger::warning(parsed.error().message);
         }
         const auto cycle = rotationCycle(parsed.value_or(QVector<int>{}), groups);
 
@@ -575,12 +575,12 @@ namespace GyanisScribe::Pin
         return m_activeGroup;
     }
 
-    Core::Expected<void> PinManager::movePinToGroup(const int index, const int group)
+    Base::Expected<void> PinManager::movePinToGroup(const int index, const int group)
     {
         if (index < 0 || index >= count() || m_pins[static_cast<std::size_t>(index)] == nullptr)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("要移到分组的贴图不在册：索引 {}。请重新在贴图上打开菜单"), index)});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("要移到分组的贴图不在册：索引 {}。请重新在贴图上打开菜单"), index)});
         }
 
         const int clamped = group < kFirstPinGroup ? kFirstPinGroup : group;
@@ -593,21 +593,21 @@ namespace GyanisScribe::Pin
         return {};
     }
 
-    Core::Expected<void> PinManager::replacePinContent(const int index, const QImage &image, const std::optional<QColor> &colorCard)
+    Base::Expected<void> PinManager::replacePinContent(const int index, const QImage &image, const std::optional<QColor> &colorCard)
     {
         if (index < 0 || index >= count() || m_pins[static_cast<std::size_t>(index)] == nullptr)
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument,
-                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("要替换内容的贴图不在册：索引 {}。请在还摆在桌上的那张贴图上按 Ctrl+V"), index)});
+                    Base::Error{Base::ErrorCode::InvalidArgument,
+                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("要替换内容的贴图不在册：索引 {}。请在还摆在桌上的那张贴图上按 Ctrl+V"), index)});
         }
 
         auto &pin = *m_pins[static_cast<std::size_t>(index)];
         // 动图不换：下一帧一到，换来的那份静态像素就被盖回去了——与「动图不能标注/不能裁剪」同一道闸门
         if (pin.isAnimated())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Core::uiTextUtf8("动图不能替换内容：下一帧会把换来的那一份盖掉。请先保存成静态图，再把那张贴出来替换")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Base::uiTextUtf8("动图不能替换内容：下一帧会把换来的那一份盖掉。请先保存成静态图，再把那张贴出来替换")});
         }
 
         // 摆位、缩放与角度都不动：这一条只换「这张图」，替换前后用户看到的还是桌上同一个位置
@@ -618,37 +618,37 @@ namespace GyanisScribe::Pin
         return {};
     }
 
-    Core::Expected<QRect> PinManager::pinRefreshTarget(const int index) const
+    Base::Expected<QRect> PinManager::pinRefreshTarget(const int index) const
     {
         if (index < 0 || index >= count() || m_pins[static_cast<std::size_t>(index)] == nullptr)
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument,
-                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("要刷新的贴图不在册：索引 {}。请在还摆在桌上的那张贴图上按 F5"), index)});
+                    Base::Error{Base::ErrorCode::InvalidArgument,
+                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("要刷新的贴图不在册：索引 {}。请在还摆在桌上的那张贴图上按 F5"), index)});
         }
 
         auto &pin = *m_pins[static_cast<std::size_t>(index)];
         if (pin.isThumbnailMode())
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("缩到小图这一档不刷新：那枚方块的面积不是这张图的面积。按 T 摆回原大小再刷新")});
+                    Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("缩到小图这一档不刷新：那枚方块的面积不是这张图的面积。按 T 摆回原大小再刷新")});
         }
         if (pin.isAnimated())
         {
             // 与「动图不能替换内容」「动图不能裁剪」同一道闸门：重抓回来的是一张静态像素，下一帧一到就盖回去了
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Core::uiTextUtf8("动图不刷新：换上的那一帧会被下一帧盖掉。要盯实时画面请先存成静态图，再把那张贴出来")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Base::uiTextUtf8("动图不刷新：换上的那一帧会被下一帧盖掉。要盯实时画面请先存成静态图，再把那张贴出来")});
         }
         return pin.imageGlobalRect();
     }
 
-    Core::Expected<Core::CapturedImage> PinManager::grabWithPinHidden(const int index, const std::function<Core::Expected<Core::CapturedImage>()> &grab)
+    Base::Expected<Base::CapturedImage> PinManager::grabWithPinHidden(const int index, const std::function<Base::Expected<Base::CapturedImage>()> &grab)
     {
         auto *pin = index >= 0 && index < count() ? m_pins[static_cast<std::size_t>(index)].get() : nullptr;
         if (pin == nullptr)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("要暂时藏起来抓屏的那张贴图不在册：索引 {}"), index)});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("要暂时藏起来抓屏的那张贴图不在册：索引 {}"), index)});
         }
 
         // 贴图压在普通窗口之上：不藏就会抓到「贴图的自己」，从第二次刷新起画面就冻在第一帧上。
@@ -686,13 +686,13 @@ namespace GyanisScribe::Pin
         return m_groupNames.value(group);
     }
 
-    Core::Expected<void> PinManager::renameGroup(const int group, const QString &name)
+    Base::Expected<void> PinManager::renameGroup(const int group, const QString &name)
     {
         if (group < kFirstPinGroup)
         {
-            return std::unexpected(Core::Error{
-                    Core::ErrorCode::InvalidArgument,
-                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("要改名字的分组号不对：{}。分组从 {} 起，请在贴图右键菜单里操作"), group, kFirstPinGroup)});
+            return std::unexpected(Base::Error{
+                    Base::ErrorCode::InvalidArgument,
+                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("要改名字的分组号不对：{}。分组从 {} 起，请在贴图右键菜单里操作"), group, kFirstPinGroup)});
         }
 
         // 空名就是取消命名：表里不留空值，界面对没名字的组一律显示「分组 N」
@@ -715,11 +715,11 @@ namespace GyanisScribe::Pin
         return {};
     }
 
-    Core::Expected<int> PinManager::deleteGroup(const int group)
+    Base::Expected<int> PinManager::deleteGroup(const int group)
     {
         if (group == kFirstPinGroup)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("第一组是删掉别的组时成员并回去的落点，这一组删不掉。"
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("第一组是删掉别的组时成员并回去的落点，这一组删不掉。"
                                                                                                                 "要把这一张从第一组挪走请用「移动到分组」")});
         }
 
@@ -763,13 +763,13 @@ namespace GyanisScribe::Pin
         return summaries;
     }
 
-    Core::Expected<int> PinManager::showGroup(const int group)
+    Base::Expected<int> PinManager::showGroup(const int group)
     {
         if (!groupsInUse().contains(group))
         {
             // 不说「已经切过去」：切到一个没人的一组等于把整桌收空，用户找不到那几张图
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("第 {} 组现在没有贴图，摆不出这一组。"
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("第 {} 组现在没有贴图，摆不出这一组。"
                                                                                                            "要把别的图挪过来，请在贴图的右键菜单里选「移动到分组」"),
                                                                             group)});
         }

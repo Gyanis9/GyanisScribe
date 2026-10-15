@@ -57,14 +57,14 @@ namespace GyanisScribe::Platform
          * @details 重写基类接口：在这里做 Qt → Win32 的取值转换（见 Win32HotkeyMapping），
          *          转换不过一律拒绝而不是挑一个相近的键顶上——静默换键会让界面上写的组合与实际生效的组合不一致。
          */
-        Core::Expected<void> registerHotkey(int identifier, Qt::KeyboardModifiers modifiers, Qt::Key key) override;
+        Base::Expected<void> registerHotkey(int identifier, Qt::KeyboardModifiers modifiers, Qt::Key key) override;
 
         /**
          * @brief 注销一个热键，见 IHotkeyBackend::unregisterHotkey()
          * @param identifier 登记时那个编号
          * @return 成功返回空载荷；没登记过返回 InvalidArgument，系统拒绝返回 Busy 并带错误码
          */
-        Core::Expected<void> unregisterHotkey(int identifier) override;
+        Base::Expected<void> unregisterHotkey(int identifier) override;
 
         /**
          * @brief 注销全部已登记的热键，见 IHotkeyBackend::unregisterAll()

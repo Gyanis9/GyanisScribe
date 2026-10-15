@@ -73,7 +73,7 @@ TEST(CaptureIntentVocabulary, RejectsUnknownTokenWithTheVocabulary)
     {
         const auto parsed = parseCaptureIntent(QString::fromUtf8(stored));
         ASSERT_FALSE(parsed.has_value()) << "取值 \"" << stored << "\" 不在词表里，却被接下了";
-        EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument);
+        EXPECT_EQ(parsed.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument);
         EXPECT_NE(parsed.error().message.find("不在可选值里"), std::string::npos) << parsed.error().message;
         EXPECT_NE(parsed.error().message.find("Annotate / Copy / Save / QuickSave / Pin / Recognize"), std::string::npos) << "没列出可取值：" << parsed.error().message;
         EXPECT_NE(parsed.error().message.find("Capture/AfterAction"), std::string::npos) << "没点出键名：" << parsed.error().message;
@@ -118,7 +118,7 @@ TEST(CaptureIntentSettings, DelayAcceptsZeroAndRejectsOutOfRange)
     {
         const auto parsed = parseCaptureDelay(stored);
         ASSERT_FALSE(parsed.has_value()) << "延时秒数 " << stored << " 被当成了可用值";
-        EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument);
+        EXPECT_EQ(parsed.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument);
         EXPECT_NE(parsed.error().message.find("0 到 60"), std::string::npos) << "文案没写清可用范围：" << parsed.error().message;
         EXPECT_NE(parsed.error().message.find("Capture/DelaySeconds"), std::string::npos) << "文案没点出键名：" << parsed.error().message;
     }

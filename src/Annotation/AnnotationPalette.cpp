@@ -5,7 +5,7 @@
 #include "Settings/SettingsKeys.h"
 #include "Ui/DesignTokens.h"
 
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 #include <algorithm>
 
@@ -18,7 +18,7 @@ namespace GyanisScribe::Annotation
         return std::vector<QColor>(table.begin(), table.end());
     }
 
-    Core::Expected<std::vector<QColor>> annotationPalette(const Settings::ISettingsStore &settings)
+    Base::Expected<std::vector<QColor>> annotationPalette(const Settings::ISettingsStore &settings)
     {
         const auto stored = settings.stringListValue(Settings::kAnnotationPalette, {});
         if (stored.isEmpty())
@@ -34,18 +34,18 @@ namespace GyanisScribe::Annotation
         return Pick::serializeRecentColors(palette);
     }
 
-    Core::Expected<std::vector<QColor>> paletteFromTokens(const QStringList &tokens)
+    Base::Expected<std::vector<QColor>> paletteFromTokens(const QStringList &tokens)
     {
         if (tokens.isEmpty())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Core::uiTextUtf8("色板是空的：至少要留一格。想回到内置那八格，请把设置里那一格清掉而不是填成空白")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Base::uiTextUtf8("色板是空的：至少要留一格。想回到内置那八格，请把设置里那一格清掉而不是填成空白")});
         }
         if (tokens.size() > static_cast<qsizetype>(kPaletteCapacity))
         {
             // 不截断：悄悄丢掉后面几格，用户看到的是「我存的八格少了两格」，而原因哪儿都没有
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("色板有 {} 格，超出上限 {} 格：请删掉几格再存"),
+                    Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("色板有 {} 格，超出上限 {} 格：请删掉几格再存"),
                                                                                                tokens.size(), static_cast<int>(kPaletteCapacity))});
         }
         const auto parsed = Pick::parseRecentColors(tokens);
@@ -107,7 +107,7 @@ namespace GyanisScribe::Annotation
         return lines.join(QLatin1Char('\n')) + QLatin1Char('\n');
     }
 
-    Core::Expected<std::vector<QColor>> parsePaletteFileText(const QString &text)
+    Base::Expected<std::vector<QColor>> parsePaletteFileText(const QString &text)
     {
         QStringList tokens;
         for (const auto &line: text.split(QLatin1Char('\n')))

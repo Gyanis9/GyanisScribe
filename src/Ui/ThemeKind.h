@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QtGlobal>
 
@@ -48,7 +48,7 @@ namespace GyanisScribe::Ui
      * @param text 配置存的文本，取值只能是 Light、Dark、System、HighContrast
      * @return 解析出的档位；文本不合法时返回 InvalidArgument 并列出这四档
      */
-    [[nodiscard]] Core::Expected<ThemeKind> parseThemeKind(std::string_view text);
+    [[nodiscard]] Base::Expected<ThemeKind> parseThemeKind(std::string_view text);
 
     /**
      * @brief 取主题档位对应的配置文本

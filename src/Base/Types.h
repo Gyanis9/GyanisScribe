@@ -16,7 +16,7 @@
 #include <string>
 #include <string_view>
 
-namespace GyanisScribe::Core
+namespace GyanisScribe::Base
 {
 
     /**
@@ -81,4 +81,4 @@ namespace GyanisScribe::Core
         QRect   logicalRegion;          ///< 来自哪一块屏幕内逻辑区域；整屏抓取或来源未知时是空矩形
     };
 
-} // namespace GyanisScribe::Core
+} // namespace GyanisScribe::Base

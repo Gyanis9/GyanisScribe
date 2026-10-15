@@ -1,6 +1,6 @@
 #include "Pick/ColorPickerOverlay.h"
 
-#include "Core/Text.h"
+#include "Base/Text.h"
 #include "Ui/DesignTokens.h"
 #include "Ui/ThemeManager.h"
 
@@ -33,7 +33,7 @@ namespace
 
 namespace GyanisScribe::Pick
 {
-    ColorPickerOverlay::ColorPickerOverlay(const Core::CapturedImage &frame, const QRect &screenGeometry, const ColorFormat format, const HexCasing casing,
+    ColorPickerOverlay::ColorPickerOverlay(const Base::CapturedImage &frame, const QRect &screenGeometry, const ColorFormat format, const HexCasing casing,
                                            const MagnifierView view, const Ui::ThemeManager &theme, QWidget *parent) :
         QWidget(parent), m_frame(frame), m_screenGeometry(screenGeometry), m_format(format), m_hexCasing(casing), m_magnifierView(view), m_theme(theme), m_cursor(QCursor::pos())
     {
@@ -41,8 +41,8 @@ namespace GyanisScribe::Pick
         setGeometry(m_screenGeometry);
         setMouseTracking(true);
         setCursor(Qt::CrossCursor);
-        setWindowTitle(GyanisScribe::Core::uiText("取色器"));
-        setAccessibleName(GyanisScribe::Core::uiText("取色遮罩"));
+        setWindowTitle(GyanisScribe::Base::uiText("取色器"));
+        setAccessibleName(GyanisScribe::Base::uiText("取色遮罩"));
     }
 
     QColor ColorPickerOverlay::colorAt(const QPoint &globalPos) const

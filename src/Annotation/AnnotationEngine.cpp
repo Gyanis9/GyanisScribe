@@ -14,7 +14,7 @@
 #include "Annotation/RectangleTool.h"
 #include "Annotation/ShapeTransform.h"
 #include "Annotation/TextTool.h"
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 #include <QImage>
 #include <QPainter>
@@ -399,7 +399,7 @@ namespace GyanisScribe::Annotation
 
     AnnotationEngine::~AnnotationEngine() = default;
 
-    void AnnotationEngine::loadCanvas(Core::CapturedImage image)
+    void AnnotationEngine::loadCanvas(Base::CapturedImage image)
     {
         m_canvas = std::move(image);
 
@@ -420,7 +420,7 @@ namespace GyanisScribe::Annotation
         emit canvasChanged();
     }
 
-    void AnnotationEngine::refreshCanvas(Core::CapturedImage image)
+    void AnnotationEngine::refreshCanvas(Base::CapturedImage image)
     {
         // 只换底图这一份：图形、选中、层序、编号与撤销历史全部原地留着。
         // 取底图像素的工具（马赛克、模糊、放大镜）下一次绘制时自然读到新底图
@@ -428,7 +428,7 @@ namespace GyanisScribe::Annotation
         emit canvasChanged();
     }
 
-    const Core::CapturedImage &AnnotationEngine::canvas() const noexcept
+    const Base::CapturedImage &AnnotationEngine::canvas() const noexcept
     {
         return m_canvas;
     }
@@ -467,14 +467,14 @@ namespace GyanisScribe::Annotation
         return result;
     }
 
-    Core::Expected<void> AnnotationEngine::setActiveTool(ToolKind kind)
+    Base::Expected<void> AnnotationEngine::setActiveTool(ToolKind kind)
     {
         auto *target = toolFor(kind);
         if (target == nullptr)
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument,
-                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("工具种类 0x{:X} 没有对应的工具：请把新工具登记进构造列表"), static_cast<int>(kind))});
+                    Base::Error{Base::ErrorCode::InvalidArgument,
+                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("工具种类 0x{:X} 没有对应的工具：请把新工具登记进构造列表"), static_cast<int>(kind))});
         }
 
         for (const auto &tool: m_tools)
@@ -490,19 +490,19 @@ namespace GyanisScribe::Annotation
         return m_activeTool;
     }
 
-    Core::Expected<void> AnnotationEngine::setPenParameters(const PenParameters &parameters)
+    Base::Expected<void> AnnotationEngine::setPenParameters(const PenParameters &parameters)
     {
         if (parameters.lineWidth <= 0)
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument,
-                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("线宽必须是正数，收到的是 {}。请取 1 到 50 之间的整数"), parameters.lineWidth)});
+                    Base::Error{Base::ErrorCode::InvalidArgument,
+                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("线宽必须是正数，收到的是 {}。请取 1 到 50 之间的整数"), parameters.lineWidth)});
         }
         if (parameters.fontSize <= 0)
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument,
-                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("字号必须是正数，收到的是 {}。请取 8 到 72 之间的整数"), parameters.fontSize)});
+                    Base::Error{Base::ErrorCode::InvalidArgument,
+                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("字号必须是正数，收到的是 {}。请取 8 到 72 之间的整数"), parameters.fontSize)});
         }
 
         m_penParameters = parameters;
@@ -577,12 +577,12 @@ namespace GyanisScribe::Annotation
         }
     }
 
-    Core::Expected<AnnotationSelection> AnnotationEngine::endStroke()
+    Base::Expected<AnnotationSelection> AnnotationEngine::endStroke()
     {
         auto *tool = toolFor(m_activeTool);
         if (tool == nullptr)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InternalError, GyanisScribe::Core::uiTextUtf8("当前工具种类没有对应的工具实现，请检查 setActiveTool 与构造列表")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InternalError, GyanisScribe::Base::uiTextUtf8("当前工具种类没有对应的工具实现，请检查 setActiveTool 与构造列表")});
         }
 
         const int  index     = tool->shapeCount();
@@ -593,10 +593,10 @@ namespace GyanisScribe::Annotation
             // 这不是失败，错误码用 Busy 让界面与日志把它与「真没画成」分开
             if (tool->hasPending())
             {
-                return std::unexpected(Core::Error{Core::ErrorCode::Busy, GyanisScribe::Core::uiTextUtf8("这一笔还没收：折线继续点下一个折点，双击收笔")});
+                return std::unexpected(Base::Error{Base::ErrorCode::Busy, GyanisScribe::Base::uiTextUtf8("这一笔还没收：折线继续点下一个折点，双击收笔")});
             }
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Core::uiText("这一笔没有落定：尺寸太小或内容为空。请按住鼠标拖出可见的范围后再松手").toStdString()});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Base::uiText("这一笔没有落定：尺寸太小或内容为空。请按住鼠标拖出可见的范围后再松手").toStdString()});
         }
 
         // 落定这一刻领号：新图形总压在最上层，「后画的压在先画的上面」就靠这个号
@@ -606,29 +606,29 @@ namespace GyanisScribe::Annotation
         return AnnotationSelection{m_activeTool, index};
     }
 
-    Core::Expected<void> AnnotationEngine::setPendingText(const QString &text)
+    Base::Expected<void> AnnotationEngine::setPendingText(const QString &text)
     {
         auto *tool = toolFor(ToolKind::Text);
         if (tool == nullptr)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InternalError, GyanisScribe::Core::uiTextUtf8("文字工具不在册")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InternalError, GyanisScribe::Base::uiTextUtf8("文字工具不在册")});
         }
         if (m_activeTool != ToolKind::Text)
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiText("只有文字工具在用时才需要设定文本内容。请先切到文字工具再输入").toStdString()});
+                    Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiText("只有文字工具在用时才需要设定文本内容。请先切到文字工具再输入").toStdString()});
         }
 
         static_cast<TextTool *>(tool)->setPendingText(text);
         return {};
     }
 
-    Core::Expected<AnnotationSelection> AnnotationEngine::finishPendingStroke()
+    Base::Expected<AnnotationSelection> AnnotationEngine::finishPendingStroke()
     {
         auto *tool = toolFor(m_activeTool);
         if (tool == nullptr)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InternalError, GyanisScribe::Core::uiTextUtf8("当前工具种类没有对应的工具实现，请检查 setActiveTool 与构造列表")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InternalError, GyanisScribe::Base::uiTextUtf8("当前工具种类没有对应的工具实现，请检查 setActiveTool 与构造列表")});
         }
 
         tool->requestFinish();
@@ -636,7 +636,7 @@ namespace GyanisScribe::Annotation
         const auto committed = tool->end();
         if (!committed)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiText("现在没有在途的笔画可以收笔。折线至少要点出两个折点").toStdString()});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiText("现在没有在途的笔画可以收笔。折线至少要点出两个折点").toStdString()});
         }
 
         // 与 endStroke 同一口径：落定即领号，压在现有全部图形之上
@@ -646,12 +646,12 @@ namespace GyanisScribe::Annotation
         return AnnotationSelection{m_activeTool, index};
     }
 
-    Core::Expected<void> AnnotationEngine::setNextNumber(const int number)
+    Base::Expected<void> AnnotationEngine::setNextNumber(const int number)
     {
         auto *tool = toolFor(ToolKind::Number);
         if (tool == nullptr)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InternalError, GyanisScribe::Core::uiTextUtf8("序号工具不在册")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InternalError, GyanisScribe::Base::uiTextUtf8("序号工具不在册")});
         }
         static_cast<NumberTool *>(tool)->setNextNumber(number);
         return {};
@@ -672,12 +672,12 @@ namespace GyanisScribe::Annotation
         return tool != nullptr ? static_cast<const NumberTool *>(tool)->nextNumber() : 1;
     }
 
-    Core::Expected<void> AnnotationEngine::setNumberGroup(const int group)
+    Base::Expected<void> AnnotationEngine::setNumberGroup(const int group)
     {
         auto *tool = toolFor(ToolKind::Number);
         if (tool == nullptr)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InternalError, GyanisScribe::Core::uiTextUtf8("序号工具不在册")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InternalError, GyanisScribe::Base::uiTextUtf8("序号工具不在册")});
         }
         static_cast<NumberTool *>(tool)->setNumberGroup(group);
         return {};
@@ -709,12 +709,12 @@ namespace GyanisScribe::Annotation
         return tool != nullptr && selection.shapeIndex >= 0 && selection.shapeIndex < tool->shapeCount();
     }
 
-    Core::Expected<void> AnnotationEngine::select(const AnnotationSelection &selection)
+    Base::Expected<void> AnnotationEngine::select(const AnnotationSelection &selection)
     {
         if (!selectionIsValid(selection))
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("要选中的图形不在册：工具 0x{:X} 索引 {}。请重新点选"),
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("要选中的图形不在册：工具 0x{:X} 索引 {}。请重新点选"),
                                                                             static_cast<int>(selection.tool), selection.shapeIndex)});
         }
 
@@ -723,12 +723,12 @@ namespace GyanisScribe::Annotation
         return {};
     }
 
-    Core::Expected<void> AnnotationEngine::addToSelection(const AnnotationSelection &selection)
+    Base::Expected<void> AnnotationEngine::addToSelection(const AnnotationSelection &selection)
     {
         if (!selectionIsValid(selection))
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("要加选的图形不在册：工具 0x{:X} 索引 {}。请重新点选"),
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("要加选的图形不在册：工具 0x{:X} 索引 {}。请重新点选"),
                                                                             static_cast<int>(selection.tool), selection.shapeIndex)});
         }
 
@@ -743,12 +743,12 @@ namespace GyanisScribe::Annotation
         return {};
     }
 
-    Core::Expected<void> AnnotationEngine::toggleSelection(const AnnotationSelection &selection)
+    Base::Expected<void> AnnotationEngine::toggleSelection(const AnnotationSelection &selection)
     {
         if (!selectionIsValid(selection))
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("要反选的图形不在册：工具 0x{:X} 索引 {}。请重新点选"),
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("要反选的图形不在册：工具 0x{:X} 索引 {}。请重新点选"),
                                                                             static_cast<int>(selection.tool), selection.shapeIndex)});
         }
 
@@ -863,11 +863,11 @@ namespace GyanisScribe::Annotation
         return entries;
     }
 
-    Core::Expected<void> AnnotationEngine::moveSelectionBy(const QPoint &delta)
+    Base::Expected<void> AnnotationEngine::moveSelectionBy(const QPoint &delta)
     {
         if (m_selection.empty())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("没有选中任何图形，无法移动。请先点中要移动的那一条")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("没有选中任何图形，无法移动。请先点中要移动的那一条")});
         }
 
         std::vector<MoveShapesCommand::Target> targets;
@@ -877,7 +877,7 @@ namespace GyanisScribe::Annotation
             auto *tool = toolFor(item.tool);
             if (tool == nullptr || item.shapeIndex >= tool->shapeCount())
             {
-                return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("选中的图形已经不在了（多半刚被撤销或删除）。请重新点选")});
+                return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("选中的图形已经不在了（多半刚被撤销或删除）。请重新点选")});
             }
             targets.push_back({tool, item.shapeIndex});
         }
@@ -886,30 +886,30 @@ namespace GyanisScribe::Annotation
         return {};
     }
 
-    Core::Expected<void> AnnotationEngine::setTextOfSelection(const QString &text)
+    Base::Expected<void> AnnotationEngine::setTextOfSelection(const QString &text)
     {
         if (m_selection.empty())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("没有选中任何图形，改不了文字。请先双击要改的那条文字")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("没有选中任何图形，改不了文字。请先双击要改的那条文字")});
         }
         // 序号图形的文本是从编号派生的，让它被随手改掉就等于把编号与显示分家；
         // 多选里有整有零也说不清改的是哪一条，所以这里只认「恰好选中一条文字图形」
         if (m_selection.size() != 1 || m_selection.front().tool != ToolKind::Text)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Core::uiTextUtf8("改内容要恰好选中一条文字图形：多选或别的图形都改不了。只有文字工具画出来的那几条可以双击重编")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Base::uiTextUtf8("改内容要恰好选中一条文字图形：多选或别的图形都改不了。只有文字工具画出来的那几条可以双击重编")});
         }
         if (text.isEmpty())
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("文字不能是空的：不要这一条就按 Delete 删掉，或按 Ctrl+Z 撤销这次改动")});
+                    Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("文字不能是空的：不要这一条就按 Delete 删掉，或按 Ctrl+Z 撤销这次改动")});
         }
 
         const auto &subject = m_selection.front();
         auto       *tool    = toolFor(subject.tool);
         if (tool == nullptr || subject.shapeIndex >= tool->shapeCount())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("选中的图形已经不在了（多半刚被撤销或删除）。请重新点选")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("选中的图形已经不在了（多半刚被撤销或删除）。请重新点选")});
         }
 
         m_undoStack.push(new SetTextCommand(tool, subject.shapeIndex, tool->shapeAt(subject.shapeIndex).text, text));
@@ -930,11 +930,11 @@ namespace GyanisScribe::Annotation
         return tool->shapeAt(m_selection.front().shapeIndex).text;
     }
 
-    Core::Expected<void> AnnotationEngine::removeSelection()
+    Base::Expected<void> AnnotationEngine::removeSelection()
     {
         if (m_selection.empty())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("没有选中任何图形，无需删除。请先点中要删的那一条")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("没有选中任何图形，无需删除。请先点中要删的那一条")});
         }
 
         // 先收集再删：同一工具内删掉小索引会让大索引整体前移，按索引从大到小的次序删才不会互相踩
@@ -951,7 +951,7 @@ namespace GyanisScribe::Annotation
             auto *tool = toolFor(item.tool);
             if (tool == nullptr || item.shapeIndex < 0 || item.shapeIndex >= tool->shapeCount())
             {
-                return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("选中的图形已经不在了。请重新点选")});
+                return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("选中的图形已经不在了。请重新点选")});
             }
             victims.push_back({tool, item.shapeIndex, tool->shapeAt(item.shapeIndex)});
         }
@@ -984,11 +984,11 @@ namespace GyanisScribe::Annotation
         return m_undoStack.canRedo();
     }
 
-    Core::Expected<void> AnnotationEngine::undo()
+    Base::Expected<void> AnnotationEngine::undo()
     {
         if (!m_undoStack.canUndo())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("没有可撤销的标注动作了")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("没有可撤销的标注动作了")});
         }
         m_undoStack.undo();
         m_handleDrag.reset();
@@ -997,33 +997,33 @@ namespace GyanisScribe::Annotation
         return {};
     }
 
-    Core::Expected<void> AnnotationEngine::redo()
+    Base::Expected<void> AnnotationEngine::redo()
     {
         if (!m_undoStack.canRedo())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("没有可重做的标注动作了")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("没有可重做的标注动作了")});
         }
         m_undoStack.redo();
         m_handleDrag.reset();
         return {};
     }
 
-    Core::Expected<void> AnnotationEngine::beginSelectionDrag(const SelectionHandle handle, const QPoint &point)
+    Base::Expected<void> AnnotationEngine::beginSelectionDrag(const SelectionHandle handle, const QPoint &point)
     {
         if (handle == SelectionHandle::None)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("没有抓住任何手柄。请对准选中框上的小方块或框外的圆点再拖")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("没有抓住任何手柄。请对准选中框上的小方块或框外的圆点再拖")});
         }
         if (m_selection.size() != 1)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("缩放手柄只在选中一条图形时出现。请先只选中一条再拖手柄")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("缩放手柄只在选中一条图形时出现。请先只选中一条再拖手柄")});
         }
 
         const auto &subject = m_selection.front();
         auto       *tool    = toolFor(subject.tool);
         if (tool == nullptr || subject.shapeIndex < 0 || subject.shapeIndex >= tool->shapeCount())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("选中的图形已经不在了（多半刚被撤销或删除）。请重新点选")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("选中的图形已经不在了（多半刚被撤销或删除）。请重新点选")});
         }
 
         HandleDrag drag;
@@ -1038,18 +1038,18 @@ namespace GyanisScribe::Annotation
         return {};
     }
 
-    Core::Expected<void> AnnotationEngine::updateSelectionDrag(const QPoint &point, const SelectionDragModifiers &modifiers)
+    Base::Expected<void> AnnotationEngine::updateSelectionDrag(const QPoint &point, const SelectionDragModifiers &modifiers)
     {
         if (!m_handleDrag)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("现在没有在拖手柄。请先按下选中框上的手柄再拖")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("现在没有在拖手柄。请先按下选中框上的手柄再拖")});
         }
 
         const HandleDrag session = *m_handleDrag;
         auto            *tool    = toolFor(session.tool);
         if (tool == nullptr || session.shapeIndex < 0 || session.shapeIndex >= tool->shapeCount())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("拖的那条图形已经不在了。请重新点选")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("拖的那条图形已经不在了。请重新点选")});
         }
 
         AnnotationShape target = session.before;
@@ -1083,31 +1083,31 @@ namespace GyanisScribe::Annotation
         m_handleDrag.reset();
     }
 
-    Core::Expected<void> AnnotationEngine::raiseSelection()
+    Base::Expected<void> AnnotationEngine::raiseSelection()
     {
         return reorderSelection(ReorderMode::Raise);
     }
 
-    Core::Expected<void> AnnotationEngine::lowerSelection()
+    Base::Expected<void> AnnotationEngine::lowerSelection()
     {
         return reorderSelection(ReorderMode::Lower);
     }
 
-    Core::Expected<void> AnnotationEngine::bringSelectionToFront()
+    Base::Expected<void> AnnotationEngine::bringSelectionToFront()
     {
         return reorderSelection(ReorderMode::ToFront);
     }
 
-    Core::Expected<void> AnnotationEngine::sendSelectionToBack()
+    Base::Expected<void> AnnotationEngine::sendSelectionToBack()
     {
         return reorderSelection(ReorderMode::ToBack);
     }
 
-    Core::Expected<void> AnnotationEngine::reorderSelection(const ReorderMode mode)
+    Base::Expected<void> AnnotationEngine::reorderSelection(const ReorderMode mode)
     {
         if (m_selection.empty())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("没有选中任何图形，改不了层叠顺序。请先点中要挪层的那一条")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("没有选中任何图形，改不了层叠顺序。请先点中要挪层的那一条")});
         }
 
         // 层叠表按升序拿（最底层的在前）；选中的那几条做个标记，跟着排
@@ -1125,7 +1125,7 @@ namespace GyanisScribe::Annotation
         if (selectedCount == 0)
         {
             // 选中的那几条都已经被撤没了：与「没选中」同一句交代，不写进栈
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("选中的图形已经不在了（多半刚被撤销或删除）。请重新点选")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("选中的图形已经不在了（多半刚被撤销或删除）。请重新点选")});
         }
 
         std::vector<ZEntry> arranged     = entries;
@@ -1227,11 +1227,11 @@ namespace GyanisScribe::Annotation
         return {};
     }
 
-    Core::Expected<void> AnnotationEngine::copySelection()
+    Base::Expected<void> AnnotationEngine::copySelection()
     {
         if (m_selection.empty())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("没有选中任何图形，没有可复制的。请先点中要复制的那一条")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("没有选中任何图形，没有可复制的。请先点中要复制的那一条")});
         }
 
         // 按层叠号的升序抄：粘出来那批的相对压叠与原件一致，不是随手按点选顺序摞
@@ -1247,7 +1247,7 @@ namespace GyanisScribe::Annotation
         }
         if (copies.empty())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("选中的图形已经不在了。请重新点选")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("选中的图形已经不在了。请重新点选")});
         }
 
         m_clipboard   = std::move(copies);
@@ -1255,11 +1255,11 @@ namespace GyanisScribe::Annotation
         return {};
     }
 
-    Core::Expected<void> AnnotationEngine::pasteClipboard()
+    Base::Expected<void> AnnotationEngine::pasteClipboard()
     {
         if (m_clipboard.empty())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("剪贴板里还没有图形：先用 Ctrl+C 复制一条，再按 Ctrl+V 粘贴")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("剪贴板里还没有图形：先用 Ctrl+C 复制一条，再按 Ctrl+V 粘贴")});
         }
 
         // 连续粘贴逐次多偏一格：两次都落在同一点会让人以为只粘上了一份
@@ -1286,7 +1286,7 @@ namespace GyanisScribe::Annotation
 
         if (pasted.empty())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InternalError, GyanisScribe::Core::uiTextUtf8("剪贴板里的工具都不在册，粘贴没有落点")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InternalError, GyanisScribe::Base::uiTextUtf8("剪贴板里的工具都不在册，粘贴没有落点")});
         }
         // 粘出来的这批成为新的选中集：接着就能拖它、改它
         m_selection = std::move(pasted);

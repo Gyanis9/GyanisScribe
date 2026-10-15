@@ -1,6 +1,6 @@
 #include "Settings/OutputStyleRules.h"
 
-#include "Core/Logger.h"
+#include "Base/Logger.h"
 #include "Core/OutputDecoration.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
@@ -19,7 +19,7 @@ namespace GyanisScribe::Settings
             style.borderPixels = *border;
         } else
         {
-            Core::Logger::warning(border.error().message);
+            Base::Logger::warning(border.error().message);
         }
 
         const auto shadow = Core::parseOutputShadowPixels(settings.intValue(kOutputShadowWidth, Core::kOutputShadowPixels));
@@ -28,7 +28,7 @@ namespace GyanisScribe::Settings
             style.shadowPixels = *shadow;
         } else
         {
-            Core::Logger::warning(shadow.error().message);
+            Base::Logger::warning(shadow.error().message);
         }
 
         // 颜色那一格没存过时 stringValue 给空串，parse 把空串当默认档（不是坏值）
@@ -38,7 +38,7 @@ namespace GyanisScribe::Settings
             style.borderColor = *color;
         } else
         {
-            Core::Logger::warning(color.error().message);
+            Base::Logger::warning(color.error().message);
         }
 
         return style;

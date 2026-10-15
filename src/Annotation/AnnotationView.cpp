@@ -1,8 +1,8 @@
 #include "Annotation/AnnotationView.h"
 
 #include "Core/ImageFit.h"
-#include "Core/Logger.h"
-#include "Core/Text.h"
+#include "Base/Logger.h"
+#include "Base/Text.h"
 #include "Ui/DesignTokens.h"
 
 #include <QFontMetricsF>
@@ -211,7 +211,7 @@ namespace GyanisScribe::Annotation
                 m_handleDragging = true;
             } else
             {
-                Core::Logger::warning(std::format("手柄拖动没开场：{}", begun.error().message));
+                Base::Logger::warning(std::format("手柄拖动没开场：{}", begun.error().message));
             }
             event->accept();
             return;
@@ -227,7 +227,7 @@ namespace GyanisScribe::Annotation
                 const auto changed = modifiers.testFlag(Qt::ControlModifier) ? m_engine.toggleSelection(*hit) : m_engine.addToSelection(*hit);
                 if (!changed)
                 {
-                    Core::Logger::warning(std::format("多选没改成：{}", changed.error().message));
+                    Base::Logger::warning(std::format("多选没改成：{}", changed.error().message));
                 }
                 event->accept();
                 return;
@@ -240,7 +240,7 @@ namespace GyanisScribe::Annotation
             {
                 if (auto selected = m_engine.select(*hit); !selected)
                 {
-                    Core::Logger::warning(std::format("命中测试给出的图形没能选中：{}", selected.error().message));
+                    Base::Logger::warning(std::format("命中测试给出的图形没能选中：{}", selected.error().message));
                     return;
                 }
             }
@@ -338,12 +338,12 @@ namespace GyanisScribe::Annotation
                     // 刚画完的那条立刻选中：下一步就能直接拖它，不用再对准一次
                     if (auto selected = m_engine.select(*settled); !selected)
                     {
-                        Core::Logger::warning(std::format("新画好的图形没能选中：{}", selected.error().message));
+                        Base::Logger::warning(std::format("新画好的图形没能选中：{}", selected.error().message));
                     }
                 } else
                 {
                     // 退化图形（点一下没拖动）不是错误，报一条 Info 让用户知道为什么没留下东西
-                    Core::Logger::info(std::format("这一笔没有落成图形：{}", settled.error().message));
+                    Base::Logger::info(std::format("这一笔没有落成图形：{}", settled.error().message));
                 }
             }
             m_stroking = false;
@@ -372,7 +372,7 @@ namespace GyanisScribe::Annotation
         m_textEditor->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         // Tab 交回界面（与单行时代同解）：在标注里插个制表符没有意义
         m_textEditor->setTabChangesFocus(true);
-        m_textEditor->setPlaceholderText(GyanisScribe::Core::uiText("输入文字，回车换行，Ctrl+回车提交"));
+        m_textEditor->setPlaceholderText(GyanisScribe::Base::uiText("输入文字，回车换行，Ctrl+回车提交"));
         m_textEditor->setFont(font());
         m_textEditor->setPlainText(initial);
         // 重编时光标落到文末，不摆全选：全选之下按个回车就把原文整段替成一个换行，
@@ -424,7 +424,7 @@ namespace GyanisScribe::Annotation
             // 改已放下的那一条：走撤销栈，界面不碰图形本体
             if (auto applied = m_engine.setTextOfSelection(text); !applied)
             {
-                Core::Logger::warning(std::format("这条文字没能改成：{}", applied.error().message));
+                Base::Logger::warning(std::format("这条文字没能改成：{}", applied.error().message));
             }
             m_reEditingText = false;
             update();
@@ -434,11 +434,11 @@ namespace GyanisScribe::Annotation
         // 提交路径：先填内容再收笔，收笔会把这条图形放进撤销栈
         if (auto filled = m_engine.setPendingText(text); !filled)
         {
-            Core::Logger::warning(std::format("文字标注没能落定：{}", filled.error().message));
+            Base::Logger::warning(std::format("文字标注没能落定：{}", filled.error().message));
         }
         if (auto settled = m_engine.endStroke(); !settled)
         {
-            Core::Logger::info(std::format("这条文字标注是空的，没有留下图形"));
+            Base::Logger::info(std::format("这条文字标注是空的，没有留下图形"));
         }
         m_stroking     = false;
         m_awaitingText = false;
@@ -457,7 +457,7 @@ namespace GyanisScribe::Annotation
         // 取消这一条：文本没提交过，引擎会把这条退化图形拒掉——拒掉正是「取消成功」的样子
         if (auto cancelled = m_engine.endStroke(); cancelled)
         {
-            Core::Logger::warning("按 Esc 取消文字标注，但引擎仍然收下了一条图形：这条不该走到这里");
+            Base::Logger::warning("按 Esc 取消文字标注，但引擎仍然收下了一条图形：这条不该走到这里");
         }
         m_stroking     = false;
         m_awaitingText = false;
@@ -497,12 +497,12 @@ namespace GyanisScribe::Annotation
             {
                 if (auto selected = m_engine.select(*finished); !selected)
                 {
-                    Core::Logger::warning(std::format("刚收笔的折线没能选中：{}", selected.error().message));
+                    Base::Logger::warning(std::format("刚收笔的折线没能选中：{}", selected.error().message));
                 }
                 m_ignoreNextRelease = true;
             } else
             {
-                Core::Logger::info(std::format("这次双击没有可收笔的折线：{}", finished.error().message));
+                Base::Logger::info(std::format("这次双击没有可收笔的折线：{}", finished.error().message));
             }
             event->accept();
             return;
@@ -515,7 +515,7 @@ namespace GyanisScribe::Annotation
                 openTextEditor(point, m_engine.textOfSelection().value_or(QString{}), true);
             } else
             {
-                Core::Logger::warning(std::format("双击要改的那条文字没能选中：{}", selected.error().message));
+                Base::Logger::warning(std::format("双击要改的那条文字没能选中：{}", selected.error().message));
             }
             event->accept();
             return;

@@ -1,7 +1,7 @@
-#include "Core/Logger.h"
+#include "Base/Logger.h"
 
-#include "Core/Paths.h"
-#include "Core/Text.h"
+#include "Base/Paths.h"
+#include "Base/Text.h"
 
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/sinks/stdout_sinks.h>
@@ -14,7 +14,7 @@
 #include <mutex>
 #include <system_error>
 
-namespace GyanisScribe::Core
+namespace GyanisScribe::Base
 {
     namespace
     {
@@ -88,7 +88,7 @@ namespace GyanisScribe::Core
         {
             return std::unexpected(
                     Error{ErrorCode::FileWriteFailed,
-                          GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("日志目录建不出来：{}（原因 {}）。请把 Paths 里的日志目录改到一个可写的路径再重启"),
+                          GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("日志目录建不出来：{}（原因 {}）。请把 Paths 里的日志目录改到一个可写的路径再重启"),
                                                        Paths::toDisplayText(logDirectory).toStdString(), error.message())});
         }
 
@@ -108,7 +108,7 @@ namespace GyanisScribe::Core
         {
             // spdlog 只抛这一种；文件被别的进程独占时走到这里，交回调用方提示用户
             return std::unexpected(Error{ErrorCode::FileWriteFailed,
-                                         GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("日志文件打不开：{}（原因 {}）。请关闭占用它的程序，或换一个日志目录"),
+                                         GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("日志文件打不开：{}（原因 {}）。请关闭占用它的程序，或换一个日志目录"),
                                                                       Paths::toDisplayText(logDirectory / std::string(kLogFileBaseName)).toStdString(), exception.what())});
         }
 
@@ -161,4 +161,4 @@ namespace GyanisScribe::Core
         log(Severity::Error, message, location);
     }
 
-} // namespace GyanisScribe::Core
+} // namespace GyanisScribe::Base

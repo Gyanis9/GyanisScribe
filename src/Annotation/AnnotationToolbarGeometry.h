@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QRect>
 #include <QSize>
@@ -46,6 +46,6 @@ namespace GyanisScribe::Annotation
      *          空隙更大的一侧并把纵坐标夹回可用区——工具栏不许出现「只露出一半」的情况。
      *          横向永远以选区中心对齐，超出可用区时夹住，宽度按可用区收缩。
      */
-    [[nodiscard]] Core::Expected<ToolbarPlacement> placeToolbar(const QRect &screenAvailable, const QSize &toolbarSize, const QRect &selection);
+    [[nodiscard]] Base::Expected<ToolbarPlacement> placeToolbar(const QRect &screenAvailable, const QSize &toolbarSize, const QRect &selection);
 
 } // namespace GyanisScribe::Annotation

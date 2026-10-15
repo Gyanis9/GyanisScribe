@@ -2,7 +2,7 @@
 #include "Annotation/StrokePen.h"
 
 #include "Annotation/FillBrush.h"
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 #include <QPainter>
 
@@ -17,7 +17,7 @@ namespace GyanisScribe::Annotation
 
     QString EllipseTool::displayName() const
     {
-        return GyanisScribe::Core::uiText("椭圆");
+        return GyanisScribe::Base::uiText("椭圆");
     }
 
     void EllipseTool::paintShape(QPainter &painter, const AnnotationShape &shape, const PaintContext &context) const

@@ -17,9 +17,9 @@
 #include <string>
 #include <vector>
 
-using GyanisScribe::Core::Error;
-using GyanisScribe::Core::ErrorCode;
-using GyanisScribe::Core::Expected;
+using GyanisScribe::Base::Error;
+using GyanisScribe::Base::ErrorCode;
+using GyanisScribe::Base::Expected;
 using GyanisScribe::Hotkey::CustomHotkeyBinding;
 using GyanisScribe::Hotkey::HotkeyAction;
 using GyanisScribe::Hotkey::HotkeyManager;

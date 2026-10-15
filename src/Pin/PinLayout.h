@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 #include "Pin/PinTransform.h"
 
 #include <QMap>
@@ -73,7 +73,7 @@ namespace GyanisScribe::Pin
      * @note 单个对象里的字段缺失或取值非法会让整次解析失败，而不是跳过那一项：
      *       悄悄少恢复一张贴图，用户会以为它被删了
      */
-    [[nodiscard]] Core::Expected<QVector<PinState>> parseLayout(std::string_view text);
+    [[nodiscard]] Base::Expected<QVector<PinState>> parseLayout(std::string_view text);
 
     /**
      * @brief 把布局写进配置
@@ -81,14 +81,14 @@ namespace GyanisScribe::Pin
      * @param states 全部贴图的状态
      * @return 成功返回空载荷；配置写入失败时带回原因
      */
-    [[nodiscard]] Core::Expected<void> saveLayout(Settings::ISettingsStore &settings, const QVector<PinState> &states);
+    [[nodiscard]] Base::Expected<void> saveLayout(Settings::ISettingsStore &settings, const QVector<PinState> &states);
 
     /**
      * @brief 从配置读回布局
      * @param settings 来源配置
      * @return 成功返回状态列表；没存过返回空列表；存的文本坏掉返回 InvalidArgument
      */
-    [[nodiscard]] Core::Expected<QVector<PinState>> loadLayout(const Settings::ISettingsStore &settings);
+    [[nodiscard]] Base::Expected<QVector<PinState>> loadLayout(const Settings::ISettingsStore &settings);
 
     /**
      * @brief 把分组名字表序列化成 JSON 对象文本（键是组号，值是名字）
@@ -103,7 +103,7 @@ namespace GyanisScribe::Pin
      * @return 成功返回名字表（没存过就是空表）；形状不对返回 InvalidArgument 并写明怎么补救
      * @note 值是空串的那一条当作「没起过名字」丢掉：界面本来就按「分组 N」显示它
      */
-    [[nodiscard]] Core::Expected<QMap<int, QString>> parseGroupNames(std::string_view text);
+    [[nodiscard]] Base::Expected<QMap<int, QString>> parseGroupNames(std::string_view text);
 
     /**
      * @brief 把分组名字写进配置
@@ -111,7 +111,7 @@ namespace GyanisScribe::Pin
      * @param names 组号 → 名字
      * @return 成功返回空载荷；配置写入失败时带回原因
      */
-    [[nodiscard]] Core::Expected<void> saveGroupNames(Settings::ISettingsStore &settings, const QMap<int, QString> &names);
+    [[nodiscard]] Base::Expected<void> saveGroupNames(Settings::ISettingsStore &settings, const QMap<int, QString> &names);
 
     /**
      * @brief 从配置读回分组名字
@@ -119,7 +119,7 @@ namespace GyanisScribe::Pin
      * @return 成功返回名字表；没存过是空表；存的文本坏掉返回 InvalidArgument
      * @note 与 loadLayout 同一条口径：坏记录要报出来，不悄悄当「都没起过名字」——那一桌的标签会集体消失
      */
-    [[nodiscard]] Core::Expected<QMap<int, QString>> loadGroupNames(const Settings::ISettingsStore &settings);
+    [[nodiscard]] Base::Expected<QMap<int, QString>> loadGroupNames(const Settings::ISettingsStore &settings);
 
     /**
      * @brief 读配置里那份分组轮换顺序
@@ -128,7 +128,7 @@ namespace GyanisScribe::Pin
      * @note 重复组号要拒而不是后写的盖掉先写的：那一格在圈里出现两次，切组就会在同一个地方多走一步，
      *       而界面上只看得到「顺序不对」，说不清是哪一条填歪了。
      */
-    [[nodiscard]] Core::Expected<QVector<int>> parseGroupRotation(const QStringList &stored);
+    [[nodiscard]] Base::Expected<QVector<int>> parseGroupRotation(const QStringList &stored);
 
     /**
      * @brief 算出真正走一圈的组序
@@ -149,6 +149,6 @@ namespace GyanisScribe::Pin
      * @details 取 1 而不是 0 作下限：0% 的贴图在屏幕上是看不见的存在，
      *          用户会以为贴图功能坏了，而鼠标还会被它挡住。
      */
-    [[nodiscard]] Core::Expected<double> parseOpacityPercentSetting(int percent);
+    [[nodiscard]] Base::Expected<double> parseOpacityPercentSetting(int percent);
 
 } // namespace GyanisScribe::Pin

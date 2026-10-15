@@ -1,6 +1,6 @@
 #include "App/SingleInstance.h"
 
-#include "Core/Logger.h"
+#include "Base/Logger.h"
 
 #include <QLocalServer>
 #include <QLocalSocket>
@@ -73,7 +73,7 @@ namespace GyanisScribe::App
 
         if (!m_server->listen(instanceKey()))
         {
-            Core::Logger::warning(std::format("单实例检测没能建立监听（{}）：本次启动按「已有实例」退出，以免两份实例抢同一批全局热键", m_server->errorString().toStdString()));
+            Base::Logger::warning(std::format("单实例检测没能建立监听（{}）：本次启动按「已有实例」退出，以免两份实例抢同一批全局热键", m_server->errorString().toStdString()));
             delete m_server;
             m_server = nullptr;
             return false;

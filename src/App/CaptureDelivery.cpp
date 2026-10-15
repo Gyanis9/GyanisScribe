@@ -1,6 +1,6 @@
 #include "App/CaptureDelivery.h"
 
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 #include <algorithm>
 
@@ -27,12 +27,12 @@ namespace GyanisScribe::App
         return {CaptureOutput::File, CaptureOutput::Clipboard};
     }
 
-    Core::Expected<CaptureOutputSet> parseCaptureOutputs(const QString &text)
+    Base::Expected<CaptureOutputSet> parseCaptureOutputs(const QString &text)
     {
         if (text.trimmed().isEmpty())
         {
-            return std::unexpected(Core::Error{.code    = Core::ErrorCode::InvalidArgument,
-                                               .message = Core::uiFormat(Core::uiTextUtf8("至少要写一处目的地：可取的只有 {}"), captureOutputTokenList())});
+            return std::unexpected(Base::Error{.code    = Base::ErrorCode::InvalidArgument,
+                                               .message = Base::uiFormat(Base::uiTextUtf8("至少要写一处目的地：可取的只有 {}"), captureOutputTokenList())});
         }
 
         CaptureOutputSet outputs;
@@ -43,7 +43,7 @@ namespace GyanisScribe::App
             if (piece.isEmpty())
             {
                 return std::unexpected(
-                        Core::Error{.code = Core::ErrorCode::InvalidArgument, .message = Core::uiTextUtf8("逗号两边都要有内容：把多余的逗号去掉（比如结尾那一个）")});
+                        Base::Error{.code = Base::ErrorCode::InvalidArgument, .message = Base::uiTextUtf8("逗号两边都要有内容：把多余的逗号去掉（比如结尾那一个）")});
             }
 
             const auto found = std::ranges::find_if(kCaptureOutputChoices, [&](const CaptureOutputChoice &choice) { return piece == tokenText(choice.token); });
@@ -51,13 +51,13 @@ namespace GyanisScribe::App
             {
                 // 不就近取一个：拼错一个字母就当没这一处，脚本会把「少了一路输出」当成程序没跑对
                 return std::unexpected(
-                        Core::Error{.code    = Core::ErrorCode::InvalidArgument,
-                                    .message = Core::uiFormat(Core::uiTextUtf8("目的地「{}」不认识：可取的只有 {}（区分大小写）"), piece.toStdString(), captureOutputTokenList())});
+                        Base::Error{.code    = Base::ErrorCode::InvalidArgument,
+                                    .message = Base::uiFormat(Base::uiTextUtf8("目的地「{}」不认识：可取的只有 {}（区分大小写）"), piece.toStdString(), captureOutputTokenList())});
             }
             if (std::ranges::find(outputs, found->output) != outputs.end())
             {
-                return std::unexpected(Core::Error{.code    = Core::ErrorCode::InvalidArgument,
-                                                   .message = Core::uiFormat(Core::uiTextUtf8("目的地「{}」写了两次：一处写一次就够"), piece.toStdString())});
+                return std::unexpected(Base::Error{.code    = Base::ErrorCode::InvalidArgument,
+                                                   .message = Base::uiFormat(Base::uiTextUtf8("目的地「{}」写了两次：一处写一次就够"), piece.toStdString())});
             }
             outputs.push_back(found->output);
         }

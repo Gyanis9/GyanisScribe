@@ -1,6 +1,6 @@
 #include "Ui/IconProvider.h"
 
-#include "Core/Logger.h"
+#include "Base/Logger.h"
 #include "Ui/AppResources.h"
 
 #include <QApplication>
@@ -115,7 +115,7 @@ namespace GyanisScribe::Ui
         const auto tint = tintColor();
         if (!tint.isValid())
         {
-            GyanisScribe::Core::Logger::error(std::format("图标 {} 取不到描边色：既没有设置主题色，也没有可用的应用对象", name));
+            GyanisScribe::Base::Logger::error(std::format("图标 {} 取不到描边色：既没有设置主题色，也没有可用的应用对象", name));
             return {};
         }
 
@@ -132,7 +132,7 @@ namespace GyanisScribe::Ui
         const auto source = loadTintedSource(name, tint);
         if (source.isEmpty())
         {
-            GyanisScribe::Core::Logger::error(std::format("图标 {} 不在资源里：请把同名 SVG 放进 Resources/Icons 并更新 AppResources.qrc，"
+            GyanisScribe::Base::Logger::error(std::format("图标 {} 不在资源里：请把同名 SVG 放进 Resources/Icons 并更新 AppResources.qrc，"
                                                           "现有 {} 枚可用名字由 availableIconNames() 列出",
                                                           name, availableIconNames().size()));
             return {};
@@ -142,7 +142,7 @@ namespace GyanisScribe::Ui
         if (!renderer.isValid())
         {
             // 只有源文件语法坏了才会走到这里：报文件本身，不报名字，免得用户去翻名字表
-            GyanisScribe::Core::Logger::error(std::format("图标 {} 的 SVG 源码解析失败，请检查 Resources/Icons 里那一份", name));
+            GyanisScribe::Base::Logger::error(std::format("图标 {} 的 SVG 源码解析失败，请检查 Resources/Icons 里那一份", name));
             return {};
         }
 

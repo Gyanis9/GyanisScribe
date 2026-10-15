@@ -1,7 +1,7 @@
-#include "Core/Paths.h"
+#include "Base/Paths.h"
 
-#include "Core/Logger.h"
-#include "Core/Text.h"
+#include "Base/Logger.h"
+#include "Base/Text.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -17,7 +17,7 @@
 #include <system_error>
 #include <utility>
 
-namespace GyanisScribe::Core
+namespace GyanisScribe::Base
 {
     namespace
     {
@@ -107,8 +107,8 @@ namespace GyanisScribe::Core
         {
             return std::unexpected(
                     Error{ErrorCode::FileWriteFailed,
-                          GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("目录创建失败：{}（原因 {}）。请检查该路径是否可写，或在设置里换一个目录"),
-                                                       toDisplayText(directory).toStdString(), error ? error.message() : GyanisScribe::Core::uiTextUtf8("路径存在但不是目录"))});
+                          GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("目录创建失败：{}（原因 {}）。请检查该路径是否可写，或在设置里换一个目录"),
+                                                       toDisplayText(directory).toStdString(), error ? error.message() : GyanisScribe::Base::uiTextUtf8("路径存在但不是目录"))});
         }
         return {};
     }
@@ -158,12 +158,12 @@ namespace GyanisScribe::Core
         const auto trimmed = text.trimmed();
         if (trimmed.isEmpty())
         {
-            return std::unexpected(Error{ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("文件名模板不能为空：可以填 %date%_%time%，或留空用默认档")});
+            return std::unexpected(Error{ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("文件名模板不能为空：可以填 %date%_%time%，或留空用默认档")});
         }
         if (trimmed.size() > kMaximumNameTemplateLength)
         {
             return std::unexpected(Error{ErrorCode::InvalidArgument,
-                                         GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("文件名模板太长（{} 个字，上限 {}）：太长的名字在别的程序里也常常打不开"),
+                                         GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("文件名模板太长（{} 个字，上限 {}）：太长的名字在别的程序里也常常打不开"),
                                                                       trimmed.size(), static_cast<int>(kMaximumNameTemplateLength))});
         }
         for (const auto character: kForbiddenNameCharacters)
@@ -172,7 +172,7 @@ namespace GyanisScribe::Core
             if (trimmed.contains(forbidden))
             {
                 return std::unexpected(Error{ErrorCode::InvalidArgument,
-                                             GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("文件名模板里不能有「{}」：它会把文件写到别的目录，或让系统直接拒绝写盘"),
+                                             GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("文件名模板里不能有「{}」：它会把文件写到别的目录，或让系统直接拒绝写盘"),
                                                                           QString{forbidden}.toStdString())});
             }
         }
@@ -200,7 +200,7 @@ namespace GyanisScribe::Core
                 if (!known)
                 {
                     return std::unexpected(Error{ErrorCode::InvalidArgument,
-                                                 GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8(
+                                                 GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8(
                                                                                       "文件名模板里的变量「%{}%」不认得：可用的只有 %date%（日期）、%time%（时刻）、%ms%（毫秒）"),
                                                                               token.toStdString())});
                 }
@@ -243,4 +243,4 @@ namespace GyanisScribe::Core
         return candidate;
     }
 
-} // namespace GyanisScribe::Core
+} // namespace GyanisScribe::Base

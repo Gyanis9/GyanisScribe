@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QObject>
 #include <QStringList>
@@ -70,7 +70,7 @@ namespace GyanisScribe::Record
          * @brief 一个候选都没探过、或 ffmpeg 本身不在场
          * @param error 带中文原因与替代做法
          */
-        void failed(const GyanisScribe::Core::Error &error);
+        void failed(const GyanisScribe::Base::Error &error);
 
     private:
         /// 探下一个候选；候选探完了就在这里收口

@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QDateTime>
 #include <QSize>
@@ -52,7 +52,7 @@ namespace GyanisScribe::History
      * @details 不认得就报错而不是回落成 Screenshot：历史文件是用户能手工改的，
      *          静默改写类别会让下一条「重新贴图」找错文件。
      */
-    [[nodiscard]] Core::Expected<HistoryKind> parseHistoryKind(std::string_view token);
+    [[nodiscard]] Base::Expected<HistoryKind> parseHistoryKind(std::string_view token);
 
     /**
      * @brief 一条历史记录

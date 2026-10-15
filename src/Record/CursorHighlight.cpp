@@ -1,6 +1,6 @@
 #include "Record/CursorHighlight.h"
 
-#include "Core/Text.h"
+#include "Base/Text.h"
 #include "Ui/DesignTokens.h"
 
 #include <QPainter>
@@ -14,9 +14,9 @@
 
 namespace
 {
-    using GyanisScribe::Core::Error;
-    using GyanisScribe::Core::ErrorCode;
-    using GyanisScribe::Core::Expected;
+    using GyanisScribe::Base::Error;
+    using GyanisScribe::Base::ErrorCode;
+    using GyanisScribe::Base::Expected;
 
     /**
      * @brief 把物理像素尺寸换成逻辑尺寸
@@ -34,20 +34,20 @@ namespace
 
 namespace GyanisScribe::Record
 {
-    Core::Expected<bool> paintCursorHighlight(QImage &frame, const QPoint &cursorGlobalLogical, const QPoint &frameGlobalOriginLogical, const qreal devicePixelRatio)
+    Base::Expected<bool> paintCursorHighlight(QImage &frame, const QPoint &cursorGlobalLogical, const QPoint &frameGlobalOriginLogical, const qreal devicePixelRatio)
     {
         // 缩放因子是这里唯一的换算依据：0 或负数会把整圈折到原点上，画出一个「光标永远在左上角」的假象
         if (devicePixelRatio <= 0.0)
         {
             return std::unexpected(
                     Error{ErrorCode::InvalidArgument,
-                          GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("光标高亮的缩放因子必须是正数，收到的是 {}。请传这一块屏幕的 devicePixelRatio"),
+                          GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("光标高亮的缩放因子必须是正数，收到的是 {}。请传这一块屏幕的 devicePixelRatio"),
                                                        devicePixelRatio)});
         }
         if (frame.isNull())
         {
             return std::unexpected(
-                    Error{ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("光标高亮的目标帧是空的：抓帧没成功时不该来画圈。请先确认抓到的帧，再调用这一步")});
+                    Error{ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("光标高亮的目标帧是空的：抓帧没成功时不该来画圈。请先确认抓到的帧，再调用这一步")});
         }
 
         // 全局读数减去帧左上角，得到光标在这一帧里的逻辑位置；两个读数必须来自同一套全局坐标

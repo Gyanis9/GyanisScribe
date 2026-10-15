@@ -1,8 +1,8 @@
 #include "Ocr/OcrEngineFactory.h"
 
-#include "Core/Logger.h"
-#include "Core/Paths.h"
-#include "Core/Text.h"
+#include "Base/Logger.h"
+#include "Base/Paths.h"
+#include "Base/Text.h"
 #if defined(GYANISSCRIBE_HAS_TESSERACT)
 #include "Ocr/TesseractOcrEngine.h"
 #endif
@@ -34,11 +34,11 @@ namespace GyanisScribe::Ocr
             {
                 if (!candidate.empty())
                 {
-                    searched << Core::Paths::toDisplayText(candidate);
+                    searched << Base::Paths::toDisplayText(candidate);
                 }
             }
             return QString::fromUtf8(
-                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("找遍了设置项 {}、环境变量 TESSDATA_PREFIX 与这些目录都没有语言包：{}。语言包本该随安装包一起装好，"
+                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("找遍了设置项 {}、环境变量 TESSDATA_PREFIX 与这些目录都没有语言包：{}。语言包本该随安装包一起装好，"
                                                                                 "请先试重新安装本程序；也可以把 eng.traineddata（要认中文再放 chi_sim.traineddata）放进其中一处，"
                                                                                 "或在设置的 OCR 页把语言包目录指过去"),
                                                  std::string{configuredKey}, searched.join(QStringLiteral("；")).toStdString())
@@ -52,9 +52,9 @@ namespace GyanisScribe::Ocr
         QString describeMissingBackend(const std::filesystem::path &tessData)
         {
             return QString::fromUtf8(
-                    GyanisScribe::Core::uiFormat(
-                            GyanisScribe::Core::uiTextUtf8("语言包已就位于 {}，但本次构建没有编入任何识别后端。见 docs/OcrBackends.md：这是 Debug 档的形状，Release 档带真后端"),
-                            Core::Paths::toDisplayText(tessData).toStdString())
+                    GyanisScribe::Base::uiFormat(
+                            GyanisScribe::Base::uiTextUtf8("语言包已就位于 {}，但本次构建没有编入任何识别后端。见 docs/OcrBackends.md：这是 Debug 档的形状，Release 档带真后端"),
+                            Base::Paths::toDisplayText(tessData).toStdString())
                             .c_str());
         }
 #endif
@@ -68,13 +68,13 @@ namespace GyanisScribe::Ocr
         const auto configuredText = settings.stringValue(Settings::kOcrTessDataDirectory, QString()).trimmed();
         if (!configuredText.isEmpty())
         {
-            candidates.push_back(Core::Paths::fromDisplayText(configuredText));
+            candidates.push_back(Base::Paths::fromDisplayText(configuredText));
         }
 
         const auto environmentText = qEnvironmentVariable("TESSDATA_PREFIX");
         if (!environmentText.isEmpty())
         {
-            candidates.push_back(Core::Paths::fromDisplayText(environmentText));
+            candidates.push_back(Base::Paths::fromDisplayText(environmentText));
         }
 
         // 随包那份排在用户数据目录之前：装完即用是本软件的要求，语言包在安装包里
@@ -82,7 +82,7 @@ namespace GyanisScribe::Ocr
         {
             candidates.push_back(applicationDirectory / kTessDataFolder);
         }
-        candidates.push_back(Core::Paths::applicationDataDirectory() / kTessDataFolder);
+        candidates.push_back(Base::Paths::applicationDataDirectory() / kTessDataFolder);
         return candidates;
     }
 
@@ -108,7 +108,7 @@ namespace GyanisScribe::Ocr
 
     std::filesystem::path locateTessDataDirectory(const Settings::ISettingsStore &settings)
     {
-        return firstDirectoryWithLanguagePacks(tessDataCandidateDirectories(settings, Core::Paths::applicationDirectory()));
+        return firstDirectoryWithLanguagePacks(tessDataCandidateDirectories(settings, Base::Paths::applicationDirectory()));
     }
 
     std::unique_ptr<IOcrEngine> createOcrEngine(const Settings::ISettingsStore &settings, const Platform::IPlatformIntegration &integration)
@@ -119,19 +119,19 @@ namespace GyanisScribe::Ocr
         auto systemEngine = std::make_unique<WinRTImageOcrEngine>();
         if (systemEngine->isAvailable())
         {
-            Core::Logger::info(std::format("文字识别后端 Windows 系统识别就绪（平台 {}），可用语言 {}", integration.displayName().toStdString(),
+            Base::Logger::info(std::format("文字识别后端 Windows 系统识别就绪（平台 {}），可用语言 {}", integration.displayName().toStdString(),
                                            systemEngine->supportedLanguages().join(QStringLiteral("、")).toStdString()));
             return systemEngine;
         }
-        Core::Logger::info(std::format("Windows 系统识别不可用，继续找 Tesseract：{}", systemEngine->unavailableReason().toStdString()));
+        Base::Logger::info(std::format("Windows 系统识别不可用，继续找 Tesseract：{}", systemEngine->unavailableReason().toStdString()));
 #endif
 
         const auto tessData = locateTessDataDirectory(settings);
         if (tessData.empty())
         {
             // 一处都没有语言包：这一格与「后端没编进来」要分开说，用户能自己做的只有重装或放文件
-            const auto reason = describeMissingLanguagePacks(Settings::kOcrTessDataDirectory, tessDataCandidateDirectories(settings, Core::Paths::applicationDirectory()));
-            Core::Logger::warning(std::format("文字识别不可用（平台 {}）：{}", integration.displayName().toStdString(), reason.toStdString()));
+            const auto reason = describeMissingLanguagePacks(Settings::kOcrTessDataDirectory, tessDataCandidateDirectories(settings, Base::Paths::applicationDirectory()));
+            Base::Logger::warning(std::format("文字识别不可用（平台 {}）：{}", integration.displayName().toStdString(), reason.toStdString()));
             return std::make_unique<UnavailableOcrEngine>(reason);
         }
 
@@ -141,15 +141,15 @@ namespace GyanisScribe::Ocr
         auto tesseract = std::make_unique<TesseractOcrEngine>(tessData);
         if (tesseract->isAvailable())
         {
-            Core::Logger::info(std::format("文字识别后端 Tesseract 就绪（平台 {}），语言包目录 {}", integration.displayName().toStdString(),
-                                           Core::Paths::toDisplayText(tessData).toStdString()));
+            Base::Logger::info(std::format("文字识别后端 Tesseract 就绪（平台 {}），语言包目录 {}", integration.displayName().toStdString(),
+                                           Base::Paths::toDisplayText(tessData).toStdString()));
             return tesseract;
         }
         const auto unavailable = tesseract->unavailableReason();
 #else
         const auto unavailable = describeMissingBackend(tessData);
 #endif
-        Core::Logger::warning(std::format("文字识别不可用（平台 {}）：{}", integration.displayName().toStdString(), unavailable.toStdString()));
+        Base::Logger::warning(std::format("文字识别不可用（平台 {}）：{}", integration.displayName().toStdString(), unavailable.toStdString()));
         return std::make_unique<UnavailableOcrEngine>(unavailable);
     }
 

@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QObject>
 #include <QRect>
@@ -86,13 +86,13 @@ namespace GyanisScribe::Capture
          * @brief 抓到了一帧
          * @param image 抓屏产物，物理像素与逻辑尺寸、缩放因子三者自洽
          */
-        void captured(const GyanisScribe::Core::CapturedImage &image);
+        void captured(const GyanisScribe::Base::CapturedImage &image);
 
         /**
          * @brief 这次截图没成
          * @param error 原因，中文且带可操作的下一步
          */
-        void captureFailed(const GyanisScribe::Core::Error &error);
+        void captureFailed(const GyanisScribe::Base::Error &error);
 
         /**
          * @brief 用户取消了框选，或取消了滚动长截图

@@ -1,6 +1,6 @@
 #include "Hotkey/HotkeyManager.h"
 
-#include "Core/Logger.h"
+#include "Base/Logger.h"
 #include "Hotkey/HotkeyCombination.h"
 #include "Platform/IHotkeyBackend.h"
 #include "Platform/IPlatformIntegration.h"
@@ -46,7 +46,7 @@ namespace GyanisScribe::Hotkey
                                      if (const auto report = reload(); report && !report->failures.empty())
                                      {
                                          // 重载里带了失败项也要出声，否则用户以为改成功了
-                                         Core::Logger::warning(std::format("快捷键改动后仍有 {} 项没能登记", report->failures.size()));
+                                         Base::Logger::warning(std::format("快捷键改动后仍有 {} 项没能登记", report->failures.size()));
                                      }
                                      return;
                                  }
@@ -92,7 +92,7 @@ namespace GyanisScribe::Hotkey
                 return Settings::kHotkeyQuickSave;
         }
         // 上面穷举过；走到这里说明新增了动作而这里没跟上，交回兜底键名并在日志里点名
-        Core::Logger::error(std::format("动作枚举 {} 没有对应的设置键，请把 settingsKeyFor 补全", static_cast<int>(action)));
+        Base::Logger::error(std::format("动作枚举 {} 没有对应的设置键，请把 settingsKeyFor 补全", static_cast<int>(action)));
         return Settings::kHotkeyCapture;
     }
 
@@ -117,7 +117,7 @@ namespace GyanisScribe::Hotkey
             case HotkeyAction::QuickSave:
                 return kDefaultQuickSave;
         }
-        Core::Logger::error(std::format("动作枚举 {} 没有对应的默认组合，请把 defaultCombinationTextFor 补全", static_cast<int>(action)));
+        Base::Logger::error(std::format("动作枚举 {} 没有对应的默认组合，请把 defaultCombinationTextFor 补全", static_cast<int>(action)));
         return kDefaultCapture;
     }
 
@@ -139,7 +139,7 @@ namespace GyanisScribe::Hotkey
         return std::nullopt;
     }
 
-    Core::Expected<HotkeyReloadReport> HotkeyManager::reload()
+    Base::Expected<HotkeyReloadReport> HotkeyManager::reload()
     {
         if (!m_backend)
         {
@@ -158,7 +158,7 @@ namespace GyanisScribe::Hotkey
                                  if (!action)
                                  {
                                      // 不在册的编号别替它消费，也别替它发动作信号
-                                     Core::Logger::warning(std::format("收到没登记过的热键编号 {}，已忽略", identifier));
+                                     Base::Logger::warning(std::format("收到没登记过的热键编号 {}，已忽略", identifier));
                                      return;
                                  }
                                  emit actionTriggered(*action);
@@ -236,7 +236,7 @@ namespace GyanisScribe::Hotkey
         if (!combination)
         {
             // 界面提示不能出现一个按不出来的组合：坏值就退回默认组合的文本，并把原因留在设置里
-            Core::Logger::warning(std::format("设置项 {} 的组合「{}」无效（{}），提示改按默认组合显示", std::string(settingsKeyFor(action)), storedText.toStdString(),
+            Base::Logger::warning(std::format("设置项 {} 的组合「{}」无效（{}），提示改按默认组合显示", std::string(settingsKeyFor(action)), storedText.toStdString(),
                                               combination.error().message));
             return QString::fromUtf8(defaultCombinationTextFor(action));
         }

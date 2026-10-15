@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 #include "Ocr/OcrTypes.h"
 
 #include <QString>
@@ -42,6 +42,6 @@ namespace GyanisScribe::Ocr
      * @param text 内容
      * @return 成功返回空载荷；失败返回带路径与原因的 Error
      */
-    [[nodiscard]] Core::Expected<void> writeTextFile(const std::filesystem::path &filePath, const QString &text);
+    [[nodiscard]] Base::Expected<void> writeTextFile(const std::filesystem::path &filePath, const QString &text);
 
 } // namespace GyanisScribe::Ocr

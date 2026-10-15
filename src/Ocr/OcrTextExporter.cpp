@@ -1,7 +1,7 @@
 #include "Ocr/OcrTextExporter.h"
 
-#include "Core/Paths.h"
-#include "Core/Text.h"
+#include "Base/Paths.h"
+#include "Base/Text.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -58,30 +58,30 @@ namespace GyanisScribe::Ocr
         return QString::fromUtf8(QJsonDocument(root).toJson(QJsonDocument::Indented));
     }
 
-    Core::Expected<void> writeTextFile(const std::filesystem::path &filePath, const QString &text)
+    Base::Expected<void> writeTextFile(const std::filesystem::path &filePath, const QString &text)
     {
         if (const auto parent = filePath.parent_path(); !parent.empty())
         {
-            if (const auto ensured = Core::Paths::ensureDirectory(parent); !ensured)
+            if (const auto ensured = Base::Paths::ensureDirectory(parent); !ensured)
             {
                 return std::unexpected(ensured.error());
             }
         }
 
-        QSaveFile output(Core::Paths::toDisplayText(filePath));
+        QSaveFile output(Base::Paths::toDisplayText(filePath));
         if (!output.open(QIODevice::WriteOnly))
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::FileWriteFailed,
-                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("识别结果写不出去：{}（{}）。请换一个可写的目录，或直接复制到剪贴板"),
-                                                                            Core::Paths::toDisplayText(filePath).toStdString(), output.errorString().toStdString())});
+            return std::unexpected(Base::Error{Base::ErrorCode::FileWriteFailed,
+                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("识别结果写不出去：{}（{}）。请换一个可写的目录，或直接复制到剪贴板"),
+                                                                            Base::Paths::toDisplayText(filePath).toStdString(), output.errorString().toStdString())});
         }
 
         output.write(text.toUtf8());
         if (!output.commit())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::FileWriteFailed,
-                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("识别结果没落盘：{}（{}）。请检查磁盘空间后重试"),
-                                                                            Core::Paths::toDisplayText(filePath).toStdString(), output.errorString().toStdString())});
+            return std::unexpected(Base::Error{Base::ErrorCode::FileWriteFailed,
+                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("识别结果没落盘：{}（{}）。请检查磁盘空间后重试"),
+                                                                            Base::Paths::toDisplayText(filePath).toStdString(), output.errorString().toStdString())});
         }
         return {};
     }

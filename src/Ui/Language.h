@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QObject>
 #include <QStringList>
@@ -34,7 +34,7 @@ namespace GyanisScribe::Ui
      * @param text 配置文本，只认词表里的 zh 与 en（大小写与首尾空格忽略）
      * @return 解析出的档位；文本不在词表里时返回带可用取值清单的原因
      */
-    [[nodiscard]] Core::Expected<AppLanguage> parseAppLanguage(std::string_view text);
+    [[nodiscard]] Base::Expected<AppLanguage> parseAppLanguage(std::string_view text);
 
     /**
      * @brief 取档位对应的配置文本
@@ -71,6 +71,6 @@ namespace GyanisScribe::Ui
      * @return 成功返回空载荷；English 档找不到语言包、或语言包读不开时返回原因
      * @details 必须在任何界面对象构造之前调用，否则已经建好的控件仍拿源码文案。
      */
-    [[nodiscard]] Core::Expected<void> applyLanguage(AppLanguage language, const QStringList &directories = defaultTranslationDirectories());
+    [[nodiscard]] Base::Expected<void> applyLanguage(AppLanguage language, const QStringList &directories = defaultTranslationDirectories());
 
 } // namespace GyanisScribe::Ui

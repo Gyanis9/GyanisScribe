@@ -7,7 +7,7 @@
 
 #include "Capture/ScreenCaptureSourceFactory.h"
 #include "Capture/ScreenUtils.h"
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #ifdef Q_OS_WIN
 #include "Capture/DxgiCaptureSource.h"
@@ -33,7 +33,7 @@ using GyanisScribe::Capture::CursorSprite;
 using GyanisScribe::Capture::drawCursorInto;
 using GyanisScribe::Capture::IScreenCaptureSource;
 using GyanisScribe::Capture::QScreenCaptureSource;
-using GyanisScribe::Core::CapturedImage;
+using GyanisScribe::Base::CapturedImage;
 
 namespace
 {

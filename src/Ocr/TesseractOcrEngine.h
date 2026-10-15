@@ -72,7 +72,7 @@ namespace GyanisScribe::Ocr
          * @param language 语言标签，取 zh-Hans 或 en（本后端映射成 chi_sim/eng）
          * @return 成功返回结果；图太小、语言不支持、初始化失败各给对应原因
          */
-        [[nodiscard]] Core::Expected<OcrResult> recognize(const QImage &image, const QString &language) override;
+        [[nodiscard]] Base::Expected<OcrResult> recognize(const QImage &image, const QString &language) override;
 
         /**
          * @brief 把对外语言标签换成 Tesseract 的模型名
@@ -89,7 +89,7 @@ namespace GyanisScribe::Ocr
          * @param languageTag 语言标签
          * @return 成功返回空载荷；失败返回原因
          */
-        [[nodiscard]] Core::Expected<void> ensureLoaded(const QString &languageTag);
+        [[nodiscard]] Base::Expected<void> ensureLoaded(const QString &languageTag);
 
         /// 语言包目录（构造时给定，不随设置变化）
         std::filesystem::path m_dataDirectory;

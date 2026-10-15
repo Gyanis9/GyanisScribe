@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 #include "Ocr/OcrTypes.h"
 
 #include <QFutureWatcher>
@@ -27,7 +27,7 @@ namespace GyanisScribe::Ocr
     /**
      * @brief 一次识别的载荷：成功带来结果，失败带来原因
      */
-    using OcrOutcome = Core::Expected<OcrResult>;
+    using OcrOutcome = Base::Expected<OcrResult>;
 
     /**
      * @brief 识别的线程搬运工
@@ -81,7 +81,7 @@ namespace GyanisScribe::Ocr
          * @brief 一次识别失败了
          * @param error 后端给的中文原因（含下一步怎么做）
          */
-        void failed(const Core::Error &error);
+        void failed(const Base::Error &error);
 
     private:
         /// 起一条线程去认，并把这一次的图与语言记下来，结果回来时按原样配走

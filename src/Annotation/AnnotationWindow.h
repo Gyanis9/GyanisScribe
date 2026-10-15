@@ -18,10 +18,10 @@
 #include <memory>
 #include <optional>
 
-namespace GyanisScribe::Core
+namespace GyanisScribe::Base
 {
     struct CapturedImage;
-} // namespace GyanisScribe::Core
+} // namespace GyanisScribe::Base
 
 namespace GyanisScribe::Settings
 {
@@ -112,7 +112,7 @@ namespace GyanisScribe::Annotation
          * @param selection 选区，逻辑坐标；工具栏贴着它摆
          * @details 会载入画布、清掉上一轮的图形，并按 placeToolbar 重新摆工具栏。
          */
-        void startAnnotation(const Core::CapturedImage &captured, const QRect &screenAvailable, const QRect &selection);
+        void startAnnotation(const Base::CapturedImage &captured, const QRect &screenAvailable, const QRect &selection);
 
         /// 浮着的工具栏，测试与调试用它核对摆放
         [[nodiscard]] AnnotationToolbar &toolbar() const noexcept;
@@ -122,7 +122,7 @@ namespace GyanisScribe::Annotation
          * @param captured 重抓的产物，应与开窗时那一帧同形（同一块区域再抓一帧）
          * @details 引擎的 refreshCanvas 就是这个语义；与 loadCanvas 分开正是为了不把标注清掉。
          */
-        void refreshCapture(const Core::CapturedImage &captured);
+        void refreshCapture(const Base::CapturedImage &captured);
 
     signals:
         /**

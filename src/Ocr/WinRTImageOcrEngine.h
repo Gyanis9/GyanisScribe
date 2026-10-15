@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 #include "Ocr/IOcrEngine.h"
 
 #include <QHash>
@@ -72,7 +72,7 @@ namespace GyanisScribe::Ocr
          * @note 超过系统尺寸上限直接报错而不是缩小：缩小会让方框坐标与原图对不上，
          *       而界面上「点文字定位」靠的就是这一套坐标
          */
-        [[nodiscard]] Core::Expected<OcrResult> recognize(const QImage &image, const QString &language) override;
+        [[nodiscard]] Base::Expected<OcrResult> recognize(const QImage &image, const QString &language) override;
 
     private:
         QHash<QString, QString> m_systemTagByPublicTag; ///< 对外语言标签 → 系统语言标签，只收系统装了的那几项

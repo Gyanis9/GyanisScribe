@@ -66,7 +66,7 @@ namespace GyanisScribe::Hotkey
          * @details 重写基类接口：逐项独立登记——一个动作失败不影响其余动作，
          *          早退会让用户看到「另一些热键也没反应」这种更难查的现场。
          */
-        [[nodiscard]] Core::Expected<HotkeyReloadReport> reload() override;
+        [[nodiscard]] Base::Expected<HotkeyReloadReport> reload() override;
 
         /**
          * @brief 取动作当前的组合文本，见 IHotkeyManager::bindingText()

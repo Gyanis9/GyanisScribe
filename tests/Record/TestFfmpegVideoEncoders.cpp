@@ -2,8 +2,8 @@
 // 真跑却分别报「MFX 不支持」和「amfrt64.dll 打不开」，而 libx264 干脆没有——所以「在名单里」不能当选型依据，
 // 只有真跑三帧到 null 输出的成功才算。
 
-#include "Core/Paths.h"
-#include "Core/Types.h"
+#include "Base/Paths.h"
+#include "Base/Types.h"
 #include "Record/FfmpegCommand.h"
 #include "Record/FfmpegRecordingEncoder.h"
 #include "Record/FfmpegVideoEncoders.h"
@@ -29,8 +29,8 @@
 #include <string_view>
 #include <vector>
 
-using GyanisScribe::Core::Error;
-using GyanisScribe::Core::ErrorCode;
+using GyanisScribe::Base::Error;
+using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Record::mp4Arguments;
 using GyanisScribe::Record::selectVideoEncoder;
 using GyanisScribe::Record::videoEncoderProbeArguments;
@@ -271,7 +271,7 @@ namespace
         ASSERT_FALSE(ignored) << "encode() 报成功却没留下成品：" << encoded->string();
         EXPECT_GT(bytes, 1024u) << "一千字节以内的 mp4 只剩容器头，画面没进去";
 
-        QFile container{GyanisScribe::Core::Paths::toDisplayText(*encoded)};
+        QFile container{GyanisScribe::Base::Paths::toDisplayText(*encoded)};
         ASSERT_TRUE(container.open(QIODevice::ReadOnly));
         const auto header = container.read(16);
         EXPECT_TRUE(header.contains("ftyp")) << "成品不是 MP4 容器：" << header.toStdString();
@@ -281,7 +281,7 @@ namespace
         // 这一条钉的是用户实际看到的东西——按 config 里那 15 帧编，成品会变成 0.2 秒的快放
         QProcess report;
         report.setProgram(program);
-        report.setArguments({QStringLiteral("-hide_banner"), QStringLiteral("-i"), GyanisScribe::Core::Paths::toDisplayText(*encoded)});
+        report.setArguments({QStringLiteral("-hide_banner"), QStringLiteral("-i"), GyanisScribe::Base::Paths::toDisplayText(*encoded)});
         report.start();
         ASSERT_TRUE(report.waitForFinished(5000)) << "ffmpeg 读自己的成品都没读完";
         const auto reading = QString::fromUtf8(report.readAllStandardError());

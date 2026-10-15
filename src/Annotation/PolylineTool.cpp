@@ -2,7 +2,7 @@
 #include "Annotation/StrokePen.h"
 
 #include "Annotation/AnnotationGeometry.h"
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 #include <QPainter>
 #include <QPainterPath>
@@ -15,7 +15,7 @@ namespace GyanisScribe::Annotation
 
     QString PolylineTool::displayName() const
     {
-        return GyanisScribe::Core::uiText("折线");
+        return GyanisScribe::Base::uiText("折线");
     }
 
     void PolylineTool::begin(const QPoint &point)

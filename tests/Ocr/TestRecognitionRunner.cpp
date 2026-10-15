@@ -1,7 +1,7 @@
 // 识别搬运工的用例。一条假后端把 recognize() 停在门闩上等用例放行，四件事因此是可观察的：
 // 引擎不在界面线程被调用、它阻塞期间界面循环还能接别的活、忙时后到的请求说了算、析构会等手上的识别跑完。
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 #include "Ocr/IOcrEngine.h"
 #include "Ocr/OcrTypes.h"
 #include "Ocr/RecognitionRunner.h"
@@ -30,9 +30,9 @@
 #include <thread>
 #include <vector>
 
-using GyanisScribe::Core::Error;
-using GyanisScribe::Core::ErrorCode;
-using GyanisScribe::Core::Expected;
+using GyanisScribe::Base::Error;
+using GyanisScribe::Base::ErrorCode;
+using GyanisScribe::Base::Expected;
 using GyanisScribe::Ocr::IOcrEngine;
 using GyanisScribe::Ocr::OcrLine;
 using GyanisScribe::Ocr::OcrResult;

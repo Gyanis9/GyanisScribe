@@ -1,6 +1,6 @@
 #include "Pin/PinGroupManagerWindow.h"
 
-#include "Core/Text.h"
+#include "Base/Text.h"
 #include "Pin/PinManager.h"
 
 #include <QAbstractItemView>
@@ -28,20 +28,20 @@ namespace GyanisScribe::Pin
         /// 没起过名字的那一组显示成什么（与右键菜单里那一份同一句式）
         [[nodiscard]] QString displayGroupName(const PinGroupSummary &summary)
         {
-            return summary.name.isEmpty() ? GyanisScribe::Core::uiText("分组 %1").arg(summary.group) : summary.name;
+            return summary.name.isEmpty() ? GyanisScribe::Base::uiText("分组 %1").arg(summary.group) : summary.name;
         }
     } // namespace
 
     PinGroupManagerWindow::PinGroupManagerWindow(PinManager &pins, QWidget *parent) : QWidget(parent), m_pins(pins)
     {
-        setWindowTitle(GyanisScribe::Core::uiText("贴图组管理"));
-        setAccessibleName(GyanisScribe::Core::uiText("贴图组管理窗"));
+        setWindowTitle(GyanisScribe::Base::uiText("贴图组管理"));
+        setAccessibleName(GyanisScribe::Base::uiText("贴图组管理窗"));
         // 关掉即销毁：控制器拿的是 QPointer，这一档让它那份指针当场变空，下一次开的是新读的一份表
         setAttribute(Qt::WA_DeleteOnClose);
 
         m_table = new QTableWidget(0, kColumnCount, this);
-        m_table->setAccessibleName(GyanisScribe::Core::uiText("贴图组清单"));
-        m_table->setHorizontalHeaderLabels({GyanisScribe::Core::uiText("分组"), GyanisScribe::Core::uiText("张数"), GyanisScribe::Core::uiText("摆在桌上")});
+        m_table->setAccessibleName(GyanisScribe::Base::uiText("贴图组清单"));
+        m_table->setHorizontalHeaderLabels({GyanisScribe::Base::uiText("分组"), GyanisScribe::Base::uiText("张数"), GyanisScribe::Base::uiText("摆在桌上")});
         m_table->verticalHeader()->setVisible(false);
         // 整行选中：四个动作针对的是一组，选到某一格上会让人以为只改那一格
         m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -52,19 +52,19 @@ namespace GyanisScribe::Pin
         m_table->setColumnWidth(kActiveColumn, 90);
         m_table->horizontalHeader()->setStretchLastSection(true);
 
-        m_showButton   = new QPushButton(GyanisScribe::Core::uiText("摆出这一组"), this);
-        m_renameButton = new QPushButton(GyanisScribe::Core::uiText("重命名…"), this);
-        m_voidButton   = new QPushButton(GyanisScribe::Core::uiText("腾空这一组"), this);
-        m_deleteButton = new QPushButton(GyanisScribe::Core::uiText("删掉这一组"), this);
-        m_closeButton  = new QPushButton(GyanisScribe::Core::uiText("关闭"), this);
-        m_showButton->setAccessibleName(GyanisScribe::Core::uiText("摆出这一组"));
-        m_renameButton->setAccessibleName(GyanisScribe::Core::uiText("重命名这一组"));
-        m_voidButton->setAccessibleName(GyanisScribe::Core::uiText("腾空这一组"));
-        m_deleteButton->setAccessibleName(GyanisScribe::Core::uiText("删掉这一组"));
-        m_deleteButton->setToolTip(GyanisScribe::Core::uiText("删掉的是「这一组」这个标签：组里的图并回第一组，不会被扔掉。第一组是并回去的落点，删不掉"));
+        m_showButton   = new QPushButton(GyanisScribe::Base::uiText("摆出这一组"), this);
+        m_renameButton = new QPushButton(GyanisScribe::Base::uiText("重命名…"), this);
+        m_voidButton   = new QPushButton(GyanisScribe::Base::uiText("腾空这一组"), this);
+        m_deleteButton = new QPushButton(GyanisScribe::Base::uiText("删掉这一组"), this);
+        m_closeButton  = new QPushButton(GyanisScribe::Base::uiText("关闭"), this);
+        m_showButton->setAccessibleName(GyanisScribe::Base::uiText("摆出这一组"));
+        m_renameButton->setAccessibleName(GyanisScribe::Base::uiText("重命名这一组"));
+        m_voidButton->setAccessibleName(GyanisScribe::Base::uiText("腾空这一组"));
+        m_deleteButton->setAccessibleName(GyanisScribe::Base::uiText("删掉这一组"));
+        m_deleteButton->setToolTip(GyanisScribe::Base::uiText("删掉的是「这一组」这个标签：组里的图并回第一组，不会被扔掉。第一组是并回去的落点，删不掉"));
 
         m_hint = new QLabel(this);
-        m_hint->setAccessibleName(GyanisScribe::Core::uiText("贴图组管理提示"));
+        m_hint->setAccessibleName(GyanisScribe::Base::uiText("贴图组管理提示"));
         m_hint->setWordWrap(true);
 
         auto *buttons = new QHBoxLayout;
@@ -141,14 +141,14 @@ namespace GyanisScribe::Pin
             auto *nameItem = new QTableWidgetItem(displayGroupName(summary));
             nameItem->setData(kGroupNumberRole, summary.group);
             m_table->setItem(row, kNameColumn, nameItem);
-            m_table->setItem(row, kCountColumn, new QTableWidgetItem(GyanisScribe::Core::uiText("%1 张").arg(summary.pinCount)));
+            m_table->setItem(row, kCountColumn, new QTableWidgetItem(GyanisScribe::Base::uiText("%1 张").arg(summary.pinCount)));
             // 活动组那一格写「是」，别的留空：满表都是「否」会把眼睛从要读的那一格上引开
-            m_table->setItem(row, kActiveColumn, new QTableWidgetItem(summary.isActive ? GyanisScribe::Core::uiText("是") : QString{}));
+            m_table->setItem(row, kActiveColumn, new QTableWidgetItem(summary.isActive ? GyanisScribe::Base::uiText("是") : QString{}));
         }
         if (summaries.isEmpty())
         {
             // 一张贴图都没有时桌上没有一组在册，这句要说出来：空表读起来像窗体坏了
-            say(GyanisScribe::Core::uiText("现在一张贴图都没有，也就没有分组。贴出一张图，再把另一张「移动到分组 → 新建分组」，这里才会多出第二行。"));
+            say(GyanisScribe::Base::uiText("现在一张贴图都没有，也就没有分组。贴出一张图，再把另一张「移动到分组 → 新建分组」，这里才会多出第二行。"));
         }
         updateButtonStates();
     }
@@ -193,7 +193,7 @@ namespace GyanisScribe::Pin
         // 活动组换了但管理器不发信号（它只在张数与名单变动时出声）：「摆在桌上」那一列得自己重读，
         // 否则表上还指着上一组写着「是」
         refresh();
-        say(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("桌上是第 {} 组。"), group).c_str()));
+        say(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("桌上是第 {} 组。"), group).c_str()));
     }
 
     void PinGroupManagerWindow::askAndRenameSelectedGroup()
@@ -204,7 +204,7 @@ namespace GyanisScribe::Pin
             return;
         }
         bool       accepted = false;
-        const auto text     = QInputDialog::getText(this, GyanisScribe::Core::uiText("给分组起名字"), GyanisScribe::Core::uiText("名字（留空就是取消命名）"), QLineEdit::Normal,
+        const auto text     = QInputDialog::getText(this, GyanisScribe::Base::uiText("给分组起名字"), GyanisScribe::Base::uiText("名字（留空就是取消命名）"), QLineEdit::Normal,
                                                     m_pins.groupName(group), &accepted);
         // 取消输入框是正常结果：什么都不做，也不把上一句回声顶掉
         if (!accepted)
@@ -227,8 +227,8 @@ namespace GyanisScribe::Pin
             return;
         }
         const auto trimmed = name.trimmed();
-        say(trimmed.isEmpty() ? GyanisScribe::Core::uiText("已取消命名，这一组回到「分组 N」那种叫法。")
-                              : QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("第 {} 组改名为「{}」。"), group, trimmed.toStdString()).c_str()));
+        say(trimmed.isEmpty() ? GyanisScribe::Base::uiText("已取消命名，这一组回到「分组 N」那种叫法。")
+                              : QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("第 {} 组改名为「{}」。"), group, trimmed.toStdString()).c_str()));
     }
 
     void PinGroupManagerWindow::voidGroupRow(const int group)
@@ -240,12 +240,12 @@ namespace GyanisScribe::Pin
         const auto closed = m_pins.closeGroup(group);
         if (closed == 0)
         {
-            say(GyanisScribe::Core::uiText("这一组本来就没有贴图。"));
+            say(GyanisScribe::Base::uiText("这一组本来就没有贴图。"));
             return;
         }
         // 说清还能按回来几张：走的仍是「关闭」那一档，而那份册子只留最近这么多张
         say(QString::fromUtf8(
-                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已关掉这一组的 {} 张。托盘的「重新贴出最近关掉的贴图」还能按回最近 {} 张，更早的找不回来。"), closed,
+                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已关掉这一组的 {} 张。托盘的「重新贴出最近关掉的贴图」还能按回最近 {} 张，更早的找不回来。"), closed,
                                              static_cast<int>(kClosedPinHistorySize))
                         .c_str()));
     }
@@ -263,7 +263,7 @@ namespace GyanisScribe::Pin
             say(QString::fromUtf8(deleted.error().message.c_str()));
             return;
         }
-        say(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("第 {} 组已经没了，{} 张并回第一组。"), group, *deleted).c_str()));
+        say(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("第 {} 组已经没了，{} 张并回第一组。"), group, *deleted).c_str()));
     }
 
     void PinGroupManagerWindow::say(const QString &message)

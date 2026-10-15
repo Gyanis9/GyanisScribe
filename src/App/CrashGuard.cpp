@@ -1,8 +1,8 @@
 #include "App/CrashGuard.h"
 
-#include "Core/Logger.h"
-#include "Core/Paths.h"
-#include "Core/Text.h"
+#include "Base/Logger.h"
+#include "Base/Paths.h"
+#include "Base/Text.h"
 
 #include <QtGlobal>
 
@@ -116,7 +116,7 @@ namespace GyanisScribe::App
     QString crashMessageFor(const std::exception_ptr &error, const std::string_view logDirectory)
     {
         const auto text =
-                QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8(
+                QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8(
                                                                        "智录遇到未处理的错误：{}。现场已尽量落到日志与崩溃转储，请到 {} 找最近一份日志（同目录下的 .dmp 是转储）；"
                                                                        "如果反复出现，请把日志、转储与出错的操作步骤一起反馈"),
                                                                describeException(error), logDirectory)
@@ -130,9 +130,9 @@ namespace GyanisScribe::App
         std::set_terminate(
                 []
                 {
-                    const auto message = crashMessageFor(std::current_exception(), Core::Paths::toDisplayText(Core::Paths::logDirectory()).toStdString());
-                    Core::Logger::error(message.toStdString());
-                    Core::Logger::shutdown();
+                    const auto message = crashMessageFor(std::current_exception(), Base::Paths::toDisplayText(Base::Paths::logDirectory()).toStdString());
+                    Base::Logger::error(message.toStdString());
+                    Base::Logger::shutdown();
                     std::abort();
                 });
     }
@@ -151,9 +151,9 @@ namespace GyanisScribe::App
 
     void installCrashDumpWriter(const std::filesystem::path &dumpDirectory, const std::wstring_view applicationVersion)
     {
-        if (const auto ready = Core::Paths::ensureDirectory(dumpDirectory); !ready)
+        if (const auto ready = Base::Paths::ensureDirectory(dumpDirectory); !ready)
         {
-            Core::Logger::warning(std::format("崩溃转储的目录建不出来，崩了不会留下 minidump：{}", ready.error().message));
+            Base::Logger::warning(std::format("崩溃转储的目录建不出来，崩了不会留下 minidump：{}", ready.error().message));
             return;
         }
 
@@ -161,7 +161,7 @@ namespace GyanisScribe::App
         copyTruncated(g_dumpDirectoryPath, kPathCapacity, dumpDirectory.wstring());
         copyTruncated(g_applicationVersion, std::size(g_applicationVersion), applicationVersion.empty() ? std::wstring_view{L"unknown"} : applicationVersion);
         SetUnhandledExceptionFilter(writeMiniDump);
-        Core::Logger::info(std::format("崩溃转储会写到 {}", Core::Paths::toDisplayText(dumpDirectory).toStdString()));
+        Base::Logger::info(std::format("崩溃转储会写到 {}", Base::Paths::toDisplayText(dumpDirectory).toStdString()));
     }
 
 } // namespace GyanisScribe::App

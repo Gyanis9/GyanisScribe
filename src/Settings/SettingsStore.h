@@ -40,7 +40,7 @@ namespace GyanisScribe::Settings
          * @param iniFile 配置文件路径
          * @param parent QObject 父对象，默认无
          * @note 生产路径也走这一支：程序目录里有 portable.txt 标记时，AppController 就按
-         *       Core::Paths::portableConfigFile() 指的那份 INI 构造（绿色版把配置摆在程序旁边）；
+         *       Base::Paths::portableConfigFile() 指的那份 INI 构造（绿色版把配置摆在程序旁边）；
          *       没有标记时恒用系统默认位置（Windows 是注册表）。
          */
         explicit SettingsStore(const std::filesystem::path &iniFile, QObject *parent = nullptr);
@@ -97,7 +97,7 @@ namespace GyanisScribe::Settings
          * @param value 载荷
          * @return 成功返回空载荷；失败返回原因
          */
-        Core::Expected<void> setValue(std::string_view key, const QVariant &value) override;
+        Base::Expected<void> setValue(std::string_view key, const QVariant &value) override;
 
         /**
          * @brief 落盘，并把改动同步到后端
@@ -117,14 +117,14 @@ namespace GyanisScribe::Settings
          * @details 列表导出成 JSON 数组，其余一律导出成文本：文本档在两个后端（注册表与 INI）之间
          *          是唯一都能放得下的形状。
          */
-        Core::Expected<void> exportToFile(const std::filesystem::path &filePath) const override;
+        Base::Expected<void> exportToFile(const std::filesystem::path &filePath) const override;
 
         /**
          * @brief 从 JSON 导入，见 ISettingsStore::importFromFile()
          * @param filePath 来源文件
          * @return 成功返回写入的键数（可以为 0）；失败返回带路径与原因的错误
          */
-        Core::Expected<int> importFromFile(const std::filesystem::path &filePath) override;
+        Base::Expected<int> importFromFile(const std::filesystem::path &filePath) override;
 
     private:
         /**

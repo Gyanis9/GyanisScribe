@@ -2,7 +2,7 @@
 
 #include "Annotation/MagnifierLayout.h"
 #include "Annotation/StrokePen.h"
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 #include <QImage>
 #include <QPainter>
@@ -21,7 +21,7 @@ namespace GyanisScribe::Annotation
 
     QString MagnifierTool::displayName() const
     {
-        return GyanisScribe::Core::uiText("放大镜");
+        return GyanisScribe::Base::uiText("放大镜");
     }
 
     void MagnifierTool::paintShape(QPainter &painter, const AnnotationShape &shape, const PaintContext &context) const

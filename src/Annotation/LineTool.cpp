@@ -2,7 +2,7 @@
 #include "Annotation/StrokePen.h"
 
 #include "Annotation/AnnotationGeometry.h"
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 #include <QLineF>
 #include <QPainter>
@@ -22,7 +22,7 @@ namespace GyanisScribe::Annotation
 
     QString LineTool::displayName() const
     {
-        return GyanisScribe::Core::uiText("直线");
+        return GyanisScribe::Base::uiText("直线");
     }
 
     void LineTool::paintShape(QPainter &painter, const AnnotationShape &shape, const PaintContext &context) const

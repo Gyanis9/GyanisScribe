@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QString>
 
@@ -18,7 +18,7 @@
 
 class QDateTime;
 
-namespace GyanisScribe::Core
+namespace GyanisScribe::Base
 {
 
     /**
@@ -166,4 +166,4 @@ namespace GyanisScribe::Core
         [[nodiscard]] static std::filesystem::path uniqueFilePath(const std::filesystem::path &directory, const QString &fileName);
     };
 
-} // namespace GyanisScribe::Core
+} // namespace GyanisScribe::Base

@@ -5,8 +5,8 @@
 #include "Capture/BgraFrame.h"
 #include "Capture/QScreenCaptureSource.h"
 #include "Capture/ScreenUtils.h"
-#include "Core/Logger.h"
-#include "Core/Text.h"
+#include "Base/Logger.h"
+#include "Base/Text.h"
 
 #include <QCursor>
 #include <QGuiApplication>
@@ -54,7 +54,7 @@ namespace GyanisScribe::Capture
             winrt::com_ptr<IDXGIFactory1> factory;
             if (FAILED(CreateDXGIFactory1(__uuidof(IDXGIFactory1), factory.put_void())))
             {
-                Core::Logger::warning("DXGI 抓帧：建不了 DXGI 工厂，这一路用不了");
+                Base::Logger::warning("DXGI 抓帧：建不了 DXGI 工厂，这一路用不了");
                 return;
             }
 
@@ -98,14 +98,14 @@ namespace GyanisScribe::Capture
          * @details 认屏按桌面坐标而不是屏名：Qt 在 Windows 上报的是显示器友好名（例如 H27T22S），
          *          与 DXGI 的设备名不是一回事，按名字找必然全部对不上。
          */
-        Core::Expected<QImage> grab(const QRect &screenRect)
+        Base::Expected<QImage> grab(const QRect &screenRect)
         {
             auto *state = stateFor(screenRect);
             if (state == nullptr)
             {
-                return std::unexpected(Core::Error{
-                        Core::ErrorCode::ScreenUnavailable,
-                        Core::uiFormat(Core::uiTextUtf8("DXGI 桌面重复认不出屏幕（{}×{}，原点 {}）：Qt 报的几何与适配器的输出坐标对不上。请重试一次，或改用 Qt 的抓帧原语"),
+                return std::unexpected(Base::Error{
+                        Base::ErrorCode::ScreenUnavailable,
+                        Base::uiFormat(Base::uiTextUtf8("DXGI 桌面重复认不出屏幕（{}×{}，原点 {}）：Qt 报的几何与适配器的输出坐标对不上。请重试一次，或改用 Qt 的抓帧原语"),
                                        screenRect.width(), screenRect.height(), screenRect.left())});
             }
             const auto &deviceName = state->deviceName;
@@ -114,8 +114,8 @@ namespace GyanisScribe::Capture
             if (!ensureDevice(adapter))
             {
                 return std::unexpected(
-                        Core::Error{Core::ErrorCode::PlatformUnsupported,
-                                    Core::uiFormat(Core::uiTextUtf8("这块屏所挂的显示适配器建不起 D3D11 设备（{}）：请改用 Qt 的抓帧原语"), deviceName.toStdString())});
+                        Base::Error{Base::ErrorCode::PlatformUnsupported,
+                                    Base::uiFormat(Base::uiTextUtf8("这块屏所挂的显示适配器建不起 D3D11 设备（{}）：请改用 Qt 的抓帧原语"), deviceName.toStdString())});
             }
 
             for (int attempt = 0; attempt < kMaximumAttempts; ++attempt)
@@ -123,8 +123,8 @@ namespace GyanisScribe::Capture
                 if (state->duplication == nullptr && !openDuplication(*state, adapter, deviceName))
                 {
                     return std::unexpected(
-                            Core::Error{Core::ErrorCode::PlatformUnsupported,
-                                        Core::uiFormat(Core::uiTextUtf8("这块屏开不了 DXGI 桌面重复（{}）：远程会话、驱动或桌面格式可能不支持。请改用 Qt 的抓帧原语"),
+                            Base::Error{Base::ErrorCode::PlatformUnsupported,
+                                        Base::uiFormat(Base::uiTextUtf8("这块屏开不了 DXGI 桌面重复（{}）：远程会话、驱动或桌面格式可能不支持。请改用 Qt 的抓帧原语"),
                                                        deviceName.toStdString())});
                 }
 
@@ -134,7 +134,7 @@ namespace GyanisScribe::Capture
                     ++m_dxgiFrames;
                     return frame;
                 }
-                if (frame.error().code != Core::ErrorCode::Busy)
+                if (frame.error().code != Base::ErrorCode::Busy)
                 {
                     return frame;
                 }
@@ -142,8 +142,8 @@ namespace GyanisScribe::Capture
                 state->reset();
             }
 
-            return std::unexpected(Core::Error{Core::ErrorCode::ScreenUnavailable,
-                                               Core::uiFormat(Core::uiTextUtf8("DXGI 抓帧连续两轮失效（{}）：画面刚切过分辨率或会话被锁。请重试一次"), deviceName.toStdString())});
+            return std::unexpected(Base::Error{Base::ErrorCode::ScreenUnavailable,
+                                               Base::uiFormat(Base::uiTextUtf8("DXGI 抓帧连续两轮失效（{}）：画面刚切过分辨率或会话被锁。请重试一次"), deviceName.toStdString())});
         }
 
     private:
@@ -189,7 +189,7 @@ namespace GyanisScribe::Capture
                                                       static_cast<UINT>(levels.size()), D3D11_SDK_VERSION, context.device.put(), nullptr, context.context.put());
             if (FAILED(created))
             {
-                Core::Logger::warning(std::format("DXGI 抓帧：这块适配器建不起 D3D11 设备（HRESULT 0x{:08X}）", static_cast<unsigned>(created)));
+                Base::Logger::warning(std::format("DXGI 抓帧：这块适配器建不起 D3D11 设备（HRESULT 0x{:08X}）", static_cast<unsigned>(created)));
                 context.device  = nullptr;
                 context.context = nullptr;
                 return false;
@@ -262,7 +262,7 @@ namespace GyanisScribe::Capture
                 // 这里先判一次，把「为什么不行」写进日志，而不是让调用方猜
                 if (description.Rotation != DXGI_MODE_ROTATION_IDENTITY)
                 {
-                    Core::Logger::warning(std::format("DXGI 抓帧：屏「{}」是旋转过的输出，桌面重复不支持", deviceName.toStdString()));
+                    Base::Logger::warning(std::format("DXGI 抓帧：屏「{}」是旋转过的输出，桌面重复不支持", deviceName.toStdString()));
                     return false;
                 }
 
@@ -275,7 +275,7 @@ namespace GyanisScribe::Capture
                 const HRESULT opened = output1->DuplicateOutput(adapter.device.get(), state.duplication.put());
                 if (FAILED(opened))
                 {
-                    Core::Logger::warning(std::format("DXGI 抓帧：DuplicateOutput 失败（HRESULT 0x{:08X}）", static_cast<unsigned>(opened)));
+                    Base::Logger::warning(std::format("DXGI 抓帧：DuplicateOutput 失败（HRESULT 0x{:08X}）", static_cast<unsigned>(opened)));
                     return false;
                 }
                 return true;
@@ -283,7 +283,7 @@ namespace GyanisScribe::Capture
         }
 
         /// 取一帧：等待超时交回上一帧，重复接口失效交回 Busy（调用方据此重开）
-        Core::Expected<QImage> acquireFrame(OutputState &state, AdapterContext &adapter)
+        Base::Expected<QImage> acquireFrame(OutputState &state, AdapterContext &adapter)
         {
             DXGI_OUTDUPL_FRAME_INFO info{};
             auto                    resource = winrt::com_ptr<IDXGIResource>{};
@@ -294,19 +294,19 @@ namespace GyanisScribe::Capture
                 if (state.lastFrame.isNull())
                 {
                     return std::unexpected(
-                            Core::Error{Core::ErrorCode::ScreenUnavailable, Core::uiTextUtf8("DXGI 桌面重复开了之后一直没等到第一帧：画面可能刚被锁屏或切走。请重试一次")});
+                            Base::Error{Base::ErrorCode::ScreenUnavailable, Base::uiTextUtf8("DXGI 桌面重复开了之后一直没等到第一帧：画面可能刚被锁屏或切走。请重试一次")});
                 }
                 // 桌面这一格没变过：交回上一张，录屏的每一格才有帧可写
                 return state.lastFrame;
             }
             if (acquired == DXGI_ERROR_ACCESS_LOST)
             {
-                return std::unexpected(Core::Error{Core::ErrorCode::Busy, Core::uiTextUtf8("DXGI 桌面重复已失效（切分辨率或会话切换）：接口要重开一轮")});
+                return std::unexpected(Base::Error{Base::ErrorCode::Busy, Base::uiTextUtf8("DXGI 桌面重复已失效（切分辨率或会话切换）：接口要重开一轮")});
             }
             if (FAILED(acquired))
             {
                 return std::unexpected(
-                        Core::Error{Core::ErrorCode::ScreenUnavailable, Core::uiFormat(Core::uiTextUtf8("DXGI 取帧失败（HRESULT 0x{:08X}）"), static_cast<unsigned>(acquired))});
+                        Base::Error{Base::ErrorCode::ScreenUnavailable, Base::uiFormat(Base::uiTextUtf8("DXGI 取帧失败（HRESULT 0x{:08X}）"), static_cast<unsigned>(acquired))});
             }
 
             // 拿到帧之后不管走哪条路都要 ReleaseFrame：漏一次这块屏的重复接口就再也取不到帧
@@ -330,7 +330,7 @@ namespace GyanisScribe::Capture
             if (FAILED(resource->QueryInterface(__uuidof(ID3D11Texture2D), texture.put_void())))
             {
                 releaseFrame();
-                return std::unexpected(Core::Error{Core::ErrorCode::InternalError, Core::uiTextUtf8("DXGI 交回的帧不是 2D 纹理：这一版取帧路径与驱动对不上")});
+                return std::unexpected(Base::Error{Base::ErrorCode::InternalError, Base::uiTextUtf8("DXGI 交回的帧不是 2D 纹理：这一版取帧路径与驱动对不上")});
             }
 
             D3D11_TEXTURE2D_DESC description{};
@@ -339,7 +339,7 @@ namespace GyanisScribe::Capture
             {
                 releaseFrame();
                 return std::unexpected(
-                        Core::Error{Core::ErrorCode::PlatformUnsupported, Core::uiFormat(Core::uiTextUtf8("桌面的像素格式是 0x{:X}，这一路只认 B8G8R8A8：请改用 Qt 的抓帧原语"),
+                        Base::Error{Base::ErrorCode::PlatformUnsupported, Base::uiFormat(Base::uiTextUtf8("桌面的像素格式是 0x{:X}，这一路只认 B8G8R8A8：请改用 Qt 的抓帧原语"),
                                                                                          static_cast<unsigned>(description.Format))});
             }
 
@@ -361,7 +361,7 @@ namespace GyanisScribe::Capture
                 if (FAILED(adapter.device->CreateTexture2D(&stagingDescription, nullptr, state.staging.put())))
                 {
                     releaseFrame();
-                    return std::unexpected(Core::Error{Core::ErrorCode::InternalError, Core::uiTextUtf8("DXGI 抓帧：建暂存纹理失败。请重试一次；一直失败请改用 Qt 的抓帧原语")});
+                    return std::unexpected(Base::Error{Base::ErrorCode::InternalError, Base::uiTextUtf8("DXGI 抓帧：建暂存纹理失败。请重试一次；一直失败请改用 Qt 的抓帧原语")});
                 }
             }
 
@@ -371,14 +371,14 @@ namespace GyanisScribe::Capture
             D3D11_MAPPED_SUBRESOURCE mapped{};
             if (FAILED(adapter.context->Map(state.staging.get(), 0, D3D11_MAP_READ, 0, &mapped)))
             {
-                return std::unexpected(Core::Error{Core::ErrorCode::InternalError, Core::uiTextUtf8("DXGI 抓帧：暂存纹理读不出来。请重试一次")});
+                return std::unexpected(Base::Error{Base::ErrorCode::InternalError, Base::uiTextUtf8("DXGI 抓帧：暂存纹理读不出来。请重试一次")});
             }
             QImage image = imageFromBgraRows(static_cast<const uchar *>(mapped.pData), static_cast<int>(mapped.RowPitch), size);
             adapter.context->Unmap(state.staging.get(), 0);
 
             if (image.isNull())
             {
-                return std::unexpected(Core::Error{Core::ErrorCode::InternalError, Core::uiTextUtf8("DXGI 抓帧：读出来的是空图。请重试一次")});
+                return std::unexpected(Base::Error{Base::ErrorCode::InternalError, Base::uiTextUtf8("DXGI 抓帧：读出来的是空图。请重试一次")});
             }
 
             state.lastFrame = image;
@@ -406,18 +406,18 @@ namespace GyanisScribe::Capture
         return m_duplicator != nullptr ? m_duplicator->framesFromDxgi() : 0;
     }
 
-    Core::Expected<Core::CapturedImage> DxgiCaptureSource::grabScreen(const QString &screenName) const
+    Base::Expected<Base::CapturedImage> DxgiCaptureSource::grabScreen(const QString &screenName) const
     {
         QScreen *target = screenName.isEmpty() ? screenAtGlobalPoint(QCursor::pos()) : screenByName(screenName);
         if (target == nullptr)
         {
             if (!screenName.isEmpty())
             {
-                return std::unexpected(Core::Error{Core::ErrorCode::ScreenUnavailable,
-                                                   Core::uiFormat(Core::uiTextUtf8("找不到名为「{}」的屏幕：多半已经被拔掉。请在不填屏幕名的情况下重抓一次（那样按光标所在屏走）"),
+                return std::unexpected(Base::Error{Base::ErrorCode::ScreenUnavailable,
+                                                   Base::uiFormat(Base::uiTextUtf8("找不到名为「{}」的屏幕：多半已经被拔掉。请在不填屏幕名的情况下重抓一次（那样按光标所在屏走）"),
                                                                   screenName.toStdString())});
             }
-            return std::unexpected(Core::Error{Core::ErrorCode::ScreenUnavailable, Core::uiTextUtf8("Qt 没有报出任何屏幕：请在 QGuiApplication 建好之后再抓图")});
+            return std::unexpected(Base::Error{Base::ErrorCode::ScreenUnavailable, Base::uiTextUtf8("Qt 没有报出任何屏幕：请在 QGuiApplication 建好之后再抓图")});
         }
 
         // Qt 的逻辑几何乘缩放因子就是这块屏在 Windows 桌面坐标里的物理矩形；认屏按它来
@@ -428,14 +428,14 @@ namespace GyanisScribe::Capture
         {
             // 降级不是错误：这台机器/这一刻这套原语用不了，Qt 那一份能抓就给用户抓到，
             // 原因照旧从上一句 Error 里落进日志（下一次抓帧还会先试 DXGI，不留「错一次就换原语」的状态）
-            Core::Logger::warning(std::format("DXGI 抓帧回落到 Qt：{}", grabbed.error().message));
+            Base::Logger::warning(std::format("DXGI 抓帧回落到 Qt：{}", grabbed.error().message));
             return m_qtFallback->grabScreen(target->name());
         }
 
         return frameFromGrabbedImage(*grabbed, target, target->geometry().size());
     }
 
-    Core::Expected<Core::CapturedImage> DxgiCaptureSource::grabWindow(const quintptr windowHandle) const
+    Base::Expected<Base::CapturedImage> DxgiCaptureSource::grabWindow(const quintptr windowHandle) const
     {
         return m_qtFallback->grabWindow(windowHandle);
     }

@@ -10,7 +10,7 @@
 #pragma once
 
 #include "App/CaptureDelivery.h"
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QString>
 #include <QStringList>

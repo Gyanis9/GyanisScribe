@@ -23,7 +23,7 @@
 #include <string>
 
 using namespace GyanisScribe::Pin;
-using GyanisScribe::Core::ErrorCode;
+using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Settings::SettingsStore;
 
 namespace
@@ -296,7 +296,7 @@ TEST(PinLayoutOpacitySetting, ConvertsPercentAndRejectsZeroAndOver)
     {
         const auto parsed = GyanisScribe::Pin::parseOpacityPercentSetting(bad);
         ASSERT_FALSE(parsed.has_value()) << bad;
-        EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument) << bad;
+        EXPECT_EQ(parsed.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument) << bad;
         EXPECT_NE(parsed.error().message.find("Pin/DefaultOpacity"), std::string::npos) << bad;
     }
 }

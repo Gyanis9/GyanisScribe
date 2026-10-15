@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QColor>
 #include <QImage>
@@ -220,7 +220,7 @@ namespace GyanisScribe::Pin
      * @return 在区间内原样交回；越界返回 InvalidArgument，文案写明去哪一格改、删掉哪个键能回默认
      * @details 区间只住在这一处：设置页的数字框与贴图读端都从这里取值，两处各写一遍就会一处放行一处拒绝。
      */
-    [[nodiscard]] Core::Expected<int> parseEdgeSnapDistance(int distance);
+    [[nodiscard]] Base::Expected<int> parseEdgeSnapDistance(int distance);
 
     /**
      * @brief 按倍率算一个新尺寸

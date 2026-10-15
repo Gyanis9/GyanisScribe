@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QObject>
 #include <QString>
@@ -43,7 +43,7 @@ namespace GyanisScribe::Hotkey
     {
         HotkeyAction action;      ///< 哪个动作没登记上
         QString      combination; ///< 当时用的组合文本，便于用户直接看懂
-        Core::Error  error;       ///< 原因，含中文与替代做法
+        Base::Error  error;       ///< 原因，含中文与替代做法
     };
 
     /**
@@ -64,7 +64,7 @@ namespace GyanisScribe::Hotkey
     {
         QString     token;       ///< 哪个功能没登记上
         QString     combination; ///< 当时用的组合文本
-        Core::Error error;       ///< 原因，含中文与替代做法
+        Base::Error error;       ///< 原因，含中文与替代做法
     };
 
     /**
@@ -98,7 +98,7 @@ namespace GyanisScribe::Hotkey
          * @return 后端本身不可用（例如本平台没有全局热键）时仍返回结果，把每一项都记进 failures
          * @note 先全注销再重登：设置改过一次就留下旧登记的话，旧组合会继续被占用
          */
-        [[nodiscard]] virtual Core::Expected<HotkeyReloadReport> reload() = 0;
+        [[nodiscard]] virtual Base::Expected<HotkeyReloadReport> reload() = 0;
 
         /**
          * @brief 取某个动作当前生效的组合文本

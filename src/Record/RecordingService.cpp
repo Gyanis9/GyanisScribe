@@ -1,9 +1,9 @@
 #include "Record/RecordingService.h"
 
 #include "Capture/ScreenUtils.h"
-#include "Core/Logger.h"
-#include "Core/Paths.h"
-#include "Core/Text.h"
+#include "Base/Logger.h"
+#include "Base/Paths.h"
+#include "Base/Text.h"
 #include "Record/CursorHighlight.h"
 #include "Record/FfmpegCommand.h"
 
@@ -109,11 +109,11 @@ namespace GyanisScribe::Record
         m_runningEncodes.clear();
     }
 
-    Core::Expected<void> RecordingService::start(const RecorderConfig &config, const int countdownSeconds)
+    Base::Expected<void> RecordingService::start(const RecorderConfig &config, const int countdownSeconds)
     {
         if (m_session != nullptr && m_session->state() != RecordingState::Done && m_session->state() != RecordingState::Failed)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::Busy, GyanisScribe::Core::uiTextUtf8("上一轮录屏还没收尾。请先停止它，再开始新的一轮")});
+            return std::unexpected(Base::Error{Base::ErrorCode::Busy, GyanisScribe::Base::uiTextUtf8("上一轮录屏还没收尾。请先停止它，再开始新的一轮")});
         }
 
         if (auto valid = validateRecorderConfig(config); !valid)
@@ -122,15 +122,15 @@ namespace GyanisScribe::Record
         }
 
         // 成品目录在这一步就建出来：编码落在几十秒之后，那时才发现写不进去，这一轮录下的帧就白丢了
-        if (auto ensured = Core::Paths::ensureDirectory(config.outputDirectory); !ensured)
+        if (auto ensured = Base::Paths::ensureDirectory(config.outputDirectory); !ensured)
         {
             return std::unexpected(ensured.error());
         }
 
         // 临时帧目录带时间戳：两轮录屏不会写进同一个目录，编码器也就不会把上一轮的残帧算进来
         const auto directory =
-                Core::Paths::cacheDirectory() / std::format("Recording/{}", QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd_HHmmss_zzz")).toStdString());
-        if (auto ensured = Core::Paths::ensureDirectory(directory); !ensured)
+                Base::Paths::cacheDirectory() / std::format("Recording/{}", QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd_HHmmss_zzz")).toStdString());
+        if (auto ensured = Base::Paths::ensureDirectory(directory); !ensured)
         {
             return std::unexpected(ensured.error());
         }
@@ -157,8 +157,8 @@ namespace GyanisScribe::Record
         // 间隔取 1000/帧率 再加几毫秒余量：抓屏本身就有抖动，排太紧只会让帧率抖动被放大成丢帧
         const auto interval = static_cast<int>(1000 / std::max(1, config.frameRate)) + kTimerSlackMs;
         m_timer.start(interval);
-        Core::Logger::info(
-                std::format("录屏开始：帧率 {}，上限 {} 秒，临时帧目录 {}", config.frameRate, config.maximumDurationSeconds, Core::Paths::toDisplayText(directory).toStdString()));
+        Base::Logger::info(
+                std::format("录屏开始：帧率 {}，上限 {} 秒，临时帧目录 {}", config.frameRate, config.maximumDurationSeconds, Base::Paths::toDisplayText(directory).toStdString()));
         return {};
     }
 
@@ -178,11 +178,11 @@ namespace GyanisScribe::Record
         }
     }
 
-    Core::Expected<void> RecordingService::stop()
+    Base::Expected<void> RecordingService::stop()
     {
         if (m_session == nullptr)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("当前没有正在进行的录屏")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("当前没有正在进行的录屏")});
         }
 
         m_timer.stop();
@@ -203,17 +203,17 @@ namespace GyanisScribe::Record
         return {};
     }
 
-    Core::Expected<void> RecordingService::cancel()
+    Base::Expected<void> RecordingService::cancel()
     {
         const auto state = m_session == nullptr ? RecordingState::Idle : m_session->state();
         // 只对「还在要帧」的那三档动手：stop() 之后的那一轮正在后台读帧目录编成品，
         // 这时候删等于把它的输入抽走，用户拿到的将是「编码失败」而不是「我取消了」
         if (state != RecordingState::Countdown && state != RecordingState::Recording && state != RecordingState::Paused)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
                                                state == RecordingState::Idle
-                                                       ? GyanisScribe::Core::uiTextUtf8("当前没有正在进行的录屏")
-                                                       : GyanisScribe::Core::uiTextUtf8("这一轮已经停止并在编成品：取消只对在录的那几秒有效，不想要成品就等它编完再删")});
+                                                       ? GyanisScribe::Base::uiTextUtf8("当前没有正在进行的录屏")
+                                                       : GyanisScribe::Base::uiTextUtf8("这一轮已经停止并在编成品：取消只对在录的那几秒有效，不想要成品就等它编完再删")});
         }
 
         m_timer.stop();
@@ -231,7 +231,7 @@ namespace GyanisScribe::Record
         // 控制条与托盘的读数才不说谎，下一轮也不会被「上一轮还没收尾」拦住
         m_session.reset();
         m_sink.reset();
-        Core::Logger::info("录屏已取消：临时帧与中间音频都删掉了，这一轮不出成品");
+        Base::Logger::info("录屏已取消：临时帧与中间音频都删掉了，这一轮不出成品");
         emit aborted();
         return {};
     }
@@ -273,7 +273,7 @@ namespace GyanisScribe::Record
         if (!outcome)
         {
             // 保留临时帧：这已经是录完的内容，删掉就等于让用户白录一次
-            Core::Logger::warning(std::format("录屏编码失败，临时帧保留在 {} 以便重编码", Core::Paths::toDisplayText(frameDirectory).toStdString()));
+            Base::Logger::warning(std::format("录屏编码失败，临时帧保留在 {} 以便重编码", Base::Paths::toDisplayText(frameDirectory).toStdString()));
             emit failed(QString::fromUtf8(outcome.error().message.c_str()));
             return;
         }
@@ -290,10 +290,10 @@ namespace GyanisScribe::Record
         if (cleanupError)
         {
             // 成品已经有了，这里只报一条：清不掉是磁盘占用问题，不是录屏失败
-            Core::Logger::warning(std::format("临时帧目录没清干净：{}（{}）", Core::Paths::toDisplayText(frameDirectory).toStdString(), cleanupError.message()));
+            Base::Logger::warning(std::format("临时帧目录没清干净：{}（{}）", Base::Paths::toDisplayText(frameDirectory).toStdString(), cleanupError.message()));
         }
 
-        emit finished(Core::Paths::toDisplayText(*outcome), frameSize);
+        emit finished(Base::Paths::toDisplayText(*outcome), frameSize);
     }
 
     RecordingState RecordingService::state() const noexcept
@@ -310,7 +310,7 @@ namespace GyanisScribe::Record
         return static_cast<int>(m_session->recordedDurationMs(m_clock.elapsed()) / 1000);
     }
 
-    Core::Expected<Core::CapturedImage> RecordingService::grabFrame()
+    Base::Expected<Base::CapturedImage> RecordingService::grabFrame()
     {
         if (m_config.mode == RecordMode::Window)
         {
@@ -331,7 +331,7 @@ namespace GyanisScribe::Record
                 } else if (!m_cursorHighlightWarned)
                 {
                     m_cursorHighlightWarned = true;
-                    Core::Logger::warning("窗口录屏圈不出光标：平台这一帧没给得出那扇窗的客户区位置（窗口没在清单里、或本平台不枚举窗口）。请改用整屏或选区录屏");
+                    Base::Logger::warning("窗口录屏圈不出光标：平台这一帧没给得出那扇窗的客户区位置（窗口没在清单里、或本平台不枚举窗口）。请改用整屏或选区录屏");
                 }
             }
             return grabbed;
@@ -366,7 +366,7 @@ namespace GyanisScribe::Record
         return cropped;
     }
 
-    void RecordingService::overlayCursorHighlight(Core::CapturedImage &frame, const QPoint &frameGlobalOriginLogical)
+    void RecordingService::overlayCursorHighlight(Base::CapturedImage &frame, const QPoint &frameGlobalOriginLogical)
     {
         if (!m_config.cursorHighlight)
         {
@@ -377,7 +377,7 @@ namespace GyanisScribe::Record
         if (!painted && !m_cursorHighlightWarned)
         {
             m_cursorHighlightWarned = true;
-            Core::Logger::warning(std::format("光标高亮没画出来：{}", painted.error().message));
+            Base::Logger::warning(std::format("光标高亮没画出来：{}", painted.error().message));
         }
     }
 
@@ -400,7 +400,7 @@ namespace GyanisScribe::Record
         {
             // 抓不到帧通常是屏幕没了：这种情况直接收，别录一份一直空转的成品
             const auto reason = frame.error().message;
-            Core::Logger::error(std::format("录屏抓帧失败，这一轮中止：{}", reason));
+            Base::Logger::error(std::format("录屏抓帧失败，这一轮中止：{}", reason));
             m_timer.stop();
             emit failed(QString::fromUtf8(reason.c_str()));
             return;
@@ -439,7 +439,7 @@ namespace GyanisScribe::Record
         }
     }
 
-    Core::Expected<void> RecordingService::startAudioCapture()
+    Base::Expected<void> RecordingService::startAudioCapture()
     {
         m_audioOutcome = AudioCaptureOutcome::NotRequested;
         m_audioWav.clear();
@@ -452,7 +452,7 @@ namespace GyanisScribe::Record
         // 设置页选 GIF 时已经把两格置灰，这里兜的是「导入的配置里两格有值而格式是 GIF」那一路
         if (!outputFormatCarriesAudio(m_config.format))
         {
-            Core::Logger::info("录屏取声跳过：GIF 容器带不了声音。要留声就把输出格式改成 MP4");
+            Base::Logger::info("录屏取声跳过：GIF 容器带不了声音。要留声就把输出格式改成 MP4");
             return {};
         }
 
@@ -475,13 +475,13 @@ namespace GyanisScribe::Record
         if (!m_audio->waitForStarted(kAudioStartTimeoutMs))
         {
             m_audio.reset();
-            return std::unexpected(Core::Error{
-                    Core::ErrorCode::DependencyMissing,
-                    GyanisScribe::Core::uiTextUtf8("取声的 ffmpeg 起不来。设备可能正被别的程序占用，关掉占用者再录，或在设置里把取声关掉"),
+            return std::unexpected(Base::Error{
+                    Base::ErrorCode::DependencyMissing,
+                    GyanisScribe::Base::uiTextUtf8("取声的 ffmpeg 起不来。设备可能正被别的程序占用，关掉占用者再录，或在设置里把取声关掉"),
             });
         }
         m_audioOutcome = AudioCaptureOutcome::Captured;
-        Core::Logger::info(std::format("录屏开始取声：麦克风 {}，系统声音 {}", m_config.microphoneDevice.isEmpty() ? "未选" : m_config.microphoneDevice.toStdString(),
+        Base::Logger::info(std::format("录屏开始取声：麦克风 {}，系统声音 {}", m_config.microphoneDevice.isEmpty() ? "未选" : m_config.microphoneDevice.toStdString(),
                                        m_config.systemSoundDevice.isEmpty() ? "未选" : m_config.systemSoundDevice.toStdString()));
         return {};
     }
@@ -510,7 +510,7 @@ namespace GyanisScribe::Record
         const auto      took  = !sizeError && bytes > kWavHeaderBytes;
         if (!took)
         {
-            Core::Logger::warning(std::format("取声没留下可读的 wav（退出码 {}）：成品按无声交回", m_audio->exitCode()));
+            Base::Logger::warning(std::format("取声没留下可读的 wav（退出码 {}）：成品按无声交回", m_audio->exitCode()));
             m_audioOutcome = AudioCaptureOutcome::Failed;
             m_audio.reset();
             return {};

@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QImage>
 
@@ -41,6 +41,6 @@ namespace GyanisScribe::Capture
      * @return 接好后的新图；两帧宽度不同时报错，内容全重合时接出来的就是原来那一段
      * @details 不新画一份而是造一张更高的图把两段抄进去：调用方要的就是这一张长图本身。
      */
-    [[nodiscard]] Core::Expected<QImage> appendFrame(const QImage &stitched, const QImage &next);
+    [[nodiscard]] Base::Expected<QImage> appendFrame(const QImage &stitched, const QImage &next);
 
 } // namespace GyanisScribe::Capture

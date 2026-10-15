@@ -1,8 +1,8 @@
 #include "History/UnsavedArchive.h"
 
-#include "Core/Logger.h"
-#include "Core/Paths.h"
-#include "Core/Text.h"
+#include "Base/Logger.h"
+#include "Base/Paths.h"
+#include "Base/Text.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -57,35 +57,35 @@ namespace GyanisScribe::History
                 if (removed)
                 {
                     // 删不掉只让目录比上限大一张，不值得把已经写好的这一份也报成失败
-                    Core::Logger::warning(std::format("未保存截图的旧份删不掉：{}", Core::Paths::toDisplayText(archived[index].second).toStdString()));
+                    Base::Logger::warning(std::format("未保存截图的旧份删不掉：{}", Base::Paths::toDisplayText(archived[index].second).toStdString()));
                 }
             }
         }
     } // namespace
 
-    Core::Expected<std::filesystem::path> archiveUnsavedCapture(const QImage &image, const QDateTime &moment, const std::filesystem::path &directory, const std::size_t capacity)
+    Base::Expected<std::filesystem::path> archiveUnsavedCapture(const QImage &image, const QDateTime &moment, const std::filesystem::path &directory, const std::size_t capacity)
     {
         if (image.isNull())
         {
             // 空图写出去是一张 0×0 的 PNG，历史记录会指着它说「有这么一张」——宁可当场报错
-            return std::unexpected(Core::Error{
-                    .code    = Core::ErrorCode::InvalidArgument,
-                    .message = GyanisScribe::Core::uiTextUtf8("这张截图是空的，没东西可留进历史。请重新截一次"),
+            return std::unexpected(Base::Error{
+                    .code    = Base::ErrorCode::InvalidArgument,
+                    .message = GyanisScribe::Base::uiTextUtf8("这张截图是空的，没东西可留进历史。请重新截一次"),
             });
         }
 
-        if (const auto ensured = Core::Paths::ensureDirectory(directory); !ensured)
+        if (const auto ensured = Base::Paths::ensureDirectory(directory); !ensured)
         {
             return std::unexpected(ensured.error());
         }
 
-        const auto filePath = Core::Paths::uniqueFilePath(directory, Core::Paths::imageFileName(moment, "png"));
-        if (!image.save(Core::Paths::toDisplayText(filePath), "PNG"))
+        const auto filePath = Base::Paths::uniqueFilePath(directory, Base::Paths::imageFileName(moment, "png"));
+        if (!image.save(Base::Paths::toDisplayText(filePath), "PNG"))
         {
-            return std::unexpected(Core::Error{
-                    .code    = Core::ErrorCode::FileWriteFailed,
-                    .message = GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("「{}」写不进去。请检查这个目录能不能写，或关掉「未保存的截图也进历史」这一档"),
-                                                            Core::Paths::toDisplayText(filePath).toStdString()),
+            return std::unexpected(Base::Error{
+                    .code    = Base::ErrorCode::FileWriteFailed,
+                    .message = GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("「{}」写不进去。请检查这个目录能不能写，或关掉「未保存的截图也进历史」这一档"),
+                                                            Base::Paths::toDisplayText(filePath).toStdString()),
             });
         }
 

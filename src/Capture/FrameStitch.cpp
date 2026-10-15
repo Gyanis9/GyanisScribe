@@ -1,6 +1,6 @@
 #include "Capture/FrameStitch.h"
 
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 #include <QImage>
 
@@ -58,18 +58,18 @@ namespace GyanisScribe::Capture
         return 0;
     }
 
-    Core::Expected<QImage> appendFrame(const QImage &stitched, const QImage &next)
+    Base::Expected<QImage> appendFrame(const QImage &stitched, const QImage &next)
     {
         const auto base  = asArgb(stitched);
         const auto added = asArgb(next);
         if (base.isNull() || added.isNull())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("长截图接不上：这一帧是空的。请重新截一次")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("长截图接不上：这一帧是空的。请重新截一次")});
         }
         if (base.width() != added.width())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Core::uiTextUtf8("长截图接不上：这一帧的宽度和前面不一致（多半是中途换了屏或改了缩放）。先把已有这一段收好再重来")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Base::uiTextUtf8("长截图接不上：这一帧的宽度和前面不一致（多半是中途换了屏或改了缩放）。先把已有这一段收好再重来")});
         }
 
         // 重叠行数不可能超过新帧本身，所以 fresh 最小就是 0：一帧都没滚时下面只抄旧的那一段

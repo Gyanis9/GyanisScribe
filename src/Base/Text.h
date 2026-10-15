@@ -17,7 +17,7 @@
 #include <string>
 #include <string_view>
 
-namespace GyanisScribe::Core
+namespace GyanisScribe::Base
 {
     /**
      * @brief 翻译目录的 context
@@ -47,7 +47,7 @@ namespace GyanisScribe::Core
      * @brief 取一条界面文案的 std::string 形态
      * @param text 源码里的中文文案，NUL 结尾
      * @return 当前语言下的文本（UTF-8）
-     * @details 错误文案落在 Core::Error.message（std::string）里，界面显示时才转 QString；
+     * @details 错误文案落在 Base::Error.message（std::string）里，界面显示时才转 QString；
      *          在构造点就查表，才能让英文档下报错也跟着变。
      */
     inline std::string uiTextUtf8(const char *text)
@@ -79,4 +79,4 @@ namespace GyanisScribe::Core
         }
     }
 
-} // namespace GyanisScribe::Core
+} // namespace GyanisScribe::Base

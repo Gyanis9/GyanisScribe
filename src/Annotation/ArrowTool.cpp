@@ -2,7 +2,7 @@
 #include "Annotation/StrokePen.h"
 
 #include "Annotation/AnnotationGeometry.h"
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 #include <QLineF>
 #include <QPainter>
@@ -66,7 +66,7 @@ namespace GyanisScribe::Annotation
 
     QString ArrowTool::displayName() const
     {
-        return GyanisScribe::Core::uiText("箭头");
+        return GyanisScribe::Base::uiText("箭头");
     }
 
     void ArrowTool::paintShape(QPainter &painter, const AnnotationShape &shape, const PaintContext &context) const

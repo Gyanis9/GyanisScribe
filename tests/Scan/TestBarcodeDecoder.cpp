@@ -36,7 +36,7 @@ TEST(BarcodeDecoder, EmptyImageYieldsNoReadingsInsteadOfAnError)
 #else
     EXPECT_FALSE(barcodeBackendAvailable()) << "没编后端却报有后端";
     ASSERT_FALSE(readings.has_value()) << "没编后端时该交回明确的错误";
-    EXPECT_EQ(readings.error().code, GyanisScribe::Core::ErrorCode::DependencyMissing) << "错误码该是「依赖不在场」这一档";
+    EXPECT_EQ(readings.error().code, GyanisScribe::Base::ErrorCode::DependencyMissing) << "错误码该是「依赖不在场」这一档";
 #endif
 }
 

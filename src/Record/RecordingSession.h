@@ -87,7 +87,7 @@ namespace GyanisScribe::Record
          * @param nowMs 收尾时刻
          * @return 成功返回空载荷；一帧都没有或写盘报错时返回原因，并把状态置为 Failed
          */
-        [[nodiscard]] Core::Expected<void> finish(qint64 nowMs);
+        [[nodiscard]] Base::Expected<void> finish(qint64 nowMs);
 
         /// 当前状态
         [[nodiscard]] RecordingState state() const noexcept;
@@ -106,7 +106,7 @@ namespace GyanisScribe::Record
          * @brief 失败原因
          * @return 仅在 Failed 状态下非空
          */
-        [[nodiscard]] const Core::Error &failure() const noexcept;
+        [[nodiscard]] const Base::Error &failure() const noexcept;
 
     private:
         /// 把墙上时间换成录制用的虚拟时间
@@ -122,7 +122,7 @@ namespace GyanisScribe::Record
         qint64          m_pausedFromMs      = 0;    ///< 本次暂停起点，未在暂停中为 0
         qint64          m_pausedTotalMs     = 0;    ///< 累计暂停时长
         bool            m_firstFramePending = true; ///< 第一帧无条件写：节拍把第 0 帧算作已取，不补这一帧就白丢开头那 100 毫秒
-        Core::Error     m_failure;                  ///< 失败原因，Failed 时有效
+        Base::Error     m_failure;                  ///< 失败原因，Failed 时有效
     };
 
 } // namespace GyanisScribe::Record

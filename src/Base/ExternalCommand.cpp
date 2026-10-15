@@ -1,14 +1,14 @@
-#include "Core/ExternalCommand.h"
+#include "Base/ExternalCommand.h"
 
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 #include <QProcess>
 
 #include <algorithm>
 
-namespace GyanisScribe::Core
+namespace GyanisScribe::Base
 {
-    Core::Expected<ExternalCommandPlan> planExternalCommand(const QString &commandLine, const QString &filePath)
+    Base::Expected<ExternalCommandPlan> planExternalCommand(const QString &commandLine, const QString &filePath)
     {
         const auto placeholder = QString::fromUtf8(kExternalCommandFilePlaceholder.data(), static_cast<qsizetype>(kExternalCommandFilePlaceholder.size()));
 
@@ -47,7 +47,7 @@ namespace GyanisScribe::Core
         return plan;
     }
 
-    Core::Expected<void> startExternalCommand(const ExternalCommandPlan &plan)
+    Base::Expected<void> startExternalCommand(const ExternalCommandPlan &plan)
     {
         // startDetached 只保证「交出去了」：外部程序自己跑得怎样不由这一层负责。
         // 等它结束就等于把截图这条路卡在别人的脚本上（上传脚本常常要几十秒）
@@ -60,4 +60,4 @@ namespace GyanisScribe::Core
                       .message = uiFormat(uiTextUtf8("没能起跑外部命令：「{}」开不起来。检查程序名与路径是否还在，路径带空格时要把整段用引号包起来"), plan.program.toStdString())});
     }
 
-} // namespace GyanisScribe::Core
+} // namespace GyanisScribe::Base

@@ -1,6 +1,6 @@
 #include "History/HistoryRules.h"
 
-#include "Core/Logger.h"
+#include "Base/Logger.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
 
@@ -41,7 +41,7 @@ namespace GyanisScribe::History
 
         if (maximumEntries < 0 || retentionDays < 0)
         {
-            Core::Logger::warning(
+            Base::Logger::warning(
                     std::format("历史保留策略里有负数（条数 {}、天数 {}），本档按「不限」处理。请在设置的通用页把这两项改回不小于 0 的值", maximumEntries, retentionDays));
         }
 

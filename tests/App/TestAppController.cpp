@@ -7,8 +7,8 @@
 
 #include "App/CaptureIntent.h"
 #include "Capture/IScreenCaptureSource.h"
-#include "Core/Paths.h"
-#include "Core/Types.h"
+#include "Base/Paths.h"
+#include "Base/Types.h"
 #include "History/HistoryRules.h"
 #include "History/HistoryStore.h"
 #include "History/HistoryTypes.h"
@@ -70,18 +70,18 @@ namespace GyanisScribe
         class CountingScreenSource final : public GyanisScribe::Capture::IScreenCaptureSource
         {
         public:
-            explicit CountingScreenSource(Core::CapturedImage frame) : m_frame(std::move(frame))
+            explicit CountingScreenSource(Base::CapturedImage frame) : m_frame(std::move(frame))
             {
             }
 
-            [[nodiscard]] Core::Expected<Core::CapturedImage> grabScreen(const QString &screenName) const override
+            [[nodiscard]] Base::Expected<Base::CapturedImage> grabScreen(const QString &screenName) const override
             {
                 ++screenCalls;
                 requestedScreen = screenName;
                 return m_frame;
             }
 
-            [[nodiscard]] Core::Expected<Core::CapturedImage> grabWindow(const quintptr handle) const override
+            [[nodiscard]] Base::Expected<Base::CapturedImage> grabWindow(const quintptr handle) const override
             {
                 ++windowCalls;
                 requestedWindow = handle;
@@ -94,7 +94,7 @@ namespace GyanisScribe
             mutable quintptr requestedWindow = 0; ///< 最近一次叫的窗口句柄
 
         private:
-            Core::CapturedImage m_frame; ///< 与生产同形状的那一帧假屏
+            Base::CapturedImage m_frame; ///< 与生产同形状的那一帧假屏
         };
 
         /**
@@ -124,33 +124,33 @@ namespace GyanisScribe
                 return nullptr;
             }
 
-            [[nodiscard]] Core::Expected<Platform::ForegroundWindow> foregroundWindow() const override
+            [[nodiscard]] Base::Expected<Platform::ForegroundWindow> foregroundWindow() const override
             {
                 ++foregroundQueries;
                 return Platform::ForegroundWindow{m_handle, QStringLiteral("替身窗口")};
             }
 
-            [[nodiscard]] Core::Expected<bool> autostartEnabled() const override
+            [[nodiscard]] Base::Expected<bool> autostartEnabled() const override
             {
-                return std::unexpected(Core::Error{Core::ErrorCode::PlatformUnsupported, "替身不演开机启动这一项"});
+                return std::unexpected(Base::Error{Base::ErrorCode::PlatformUnsupported, "替身不演开机启动这一项"});
             }
 
-            [[nodiscard]] Core::Expected<void> setAutostart(const bool enabled) override
+            [[nodiscard]] Base::Expected<void> setAutostart(const bool enabled) override
             {
                 static_cast<void>(enabled);
-                return std::unexpected(Core::Error{Core::ErrorCode::PlatformUnsupported, "替身不演开机启动这一项"});
+                return std::unexpected(Base::Error{Base::ErrorCode::PlatformUnsupported, "替身不演开机启动这一项"});
             }
 
-            [[nodiscard]] Core::Expected<std::vector<Platform::ScreenWindow>> screenWindows() const override
+            [[nodiscard]] Base::Expected<std::vector<Platform::ScreenWindow>> screenWindows() const override
             {
-                return std::unexpected(Core::Error{Core::ErrorCode::PlatformUnsupported, "替身不演窗口清单这一项"});
+                return std::unexpected(Base::Error{Base::ErrorCode::PlatformUnsupported, "替身不演窗口清单这一项"});
             }
 
-            [[nodiscard]] Core::Expected<std::vector<QRect>> elementChainAtPoint(const QPoint &globalLogicalPoint, const std::vector<quintptr> &excludeWindowHandles) const override
+            [[nodiscard]] Base::Expected<std::vector<QRect>> elementChainAtPoint(const QPoint &globalLogicalPoint, const std::vector<quintptr> &excludeWindowHandles) const override
             {
                 static_cast<void>(globalLogicalPoint);
                 static_cast<void>(excludeWindowHandles);
-                return std::unexpected(Core::Error{Core::ErrorCode::PlatformUnsupported, "替身不演界面元素这一项"});
+                return std::unexpected(Base::Error{Base::ErrorCode::PlatformUnsupported, "替身不演界面元素这一项"});
             }
 
             mutable int foregroundQueries = 0; ///< 前台窗口被问了几次
@@ -192,8 +192,8 @@ namespace GyanisScribe
                 // 贴图布局与未保存归档读的是真实的（按测试应用名分开的）缓存目录：
                 // 进来先清，别把上一轮留下的摆进这一轮
                 std::error_code ignored;
-                std::filesystem::remove_all(Core::Paths::cacheDirectory() / "Pins", ignored);
-                std::filesystem::remove_all(Core::Paths::unsavedCaptureDirectory(), ignored);
+                std::filesystem::remove_all(Base::Paths::cacheDirectory() / "Pins", ignored);
+                std::filesystem::remove_all(Base::Paths::unsavedCaptureDirectory(), ignored);
 
                 ASSERT_NE(QGuiApplication::primaryScreen(), nullptr) << "离屏平台该有一块屏，帧的屏名要对上它";
                 m_realScreenName = QGuiApplication::primaryScreen()->name();
@@ -207,17 +207,17 @@ namespace GyanisScribe
                 m_controller.reset();
                 std::error_code ignored;
                 std::filesystem::remove_all(m_root, ignored);
-                std::filesystem::remove_all(Core::Paths::cacheDirectory() / "Pins", ignored);
-                std::filesystem::remove_all(Core::Paths::unsavedCaptureDirectory(), ignored);
+                std::filesystem::remove_all(Base::Paths::cacheDirectory() / "Pins", ignored);
+                std::filesystem::remove_all(Base::Paths::unsavedCaptureDirectory(), ignored);
             }
 
             /// 造一帧与生产同形状的假屏：逻辑与物理尺寸一致（倍比 1.0），屏名由用例点名
-            [[nodiscard]] static Core::CapturedImage makeFrame(const QString &screenName)
+            [[nodiscard]] static Base::CapturedImage makeFrame(const QString &screenName)
             {
                 QImage image(kFrameWidth, kFrameHeight, QImage::Format_ARGB32_Premultiplied);
                 image.fill(QColor(36, 87, 166));
 
-                Core::CapturedImage frame;
+                Base::CapturedImage frame;
                 frame.image            = image;
                 frame.logicalSize      = QSize(kFrameWidth, kFrameHeight);
                 frame.devicePixelRatio = 1.0;
@@ -230,7 +230,7 @@ namespace GyanisScribe
             {
                 auto settings = std::make_unique<Settings::SettingsStore>(m_root / "settings.ini");
                 ASSERT_TRUE(settings->setValue(Settings::kCaptureDelaySeconds, m_delaySeconds).has_value());
-                ASSERT_TRUE(settings->setValue(Settings::kPathScreenshot, Core::Paths::toDisplayText(m_root / "shots")).has_value());
+                ASSERT_TRUE(settings->setValue(Settings::kPathScreenshot, Base::Paths::toDisplayText(m_root / "shots")).has_value());
                 ASSERT_TRUE(settings->setValue(Settings::kHistoryKeepUnsaved, m_keepUnsaved).has_value());
                 ASSERT_TRUE(settings->setValue(Settings::kCaptureAutoSave, m_autoSave).has_value());
                 if (m_afterAction != std::nullopt)
@@ -253,7 +253,7 @@ namespace GyanisScribe
             }
 
             /// 读回注入的那份历史清单；条目里指向的成品文件由 load() 自己检查存在性
-            [[nodiscard]] Core::Expected<QVector<History::HistoryEntry>> readHistory() const
+            [[nodiscard]] Base::Expected<QVector<History::HistoryEntry>> readHistory() const
             {
                 const History::HistoryStore store(m_root / "history.json");
                 return store.load(History::policyFromSettings(*m_settings), QDateTime::currentDateTime());
@@ -415,7 +415,7 @@ namespace GyanisScribe
         ASSERT_TRUE(entries.has_value()) << "历史清单读不回：" << entries.error().message;
         ASSERT_EQ(entries->size(), 1) << "开着「未保存也进历史」时该正好记一条";
         EXPECT_EQ(entries->front().kind, History::HistoryKind::Screenshot);
-        expectUnderDirectory(entries->front().filePath, Core::Paths::unsavedCaptureDirectory());
+        expectUnderDirectory(entries->front().filePath, Base::Paths::unsavedCaptureDirectory());
     }
 
     /**

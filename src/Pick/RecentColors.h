@@ -10,7 +10,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QColor>
 #include <QStringList>
@@ -58,6 +58,6 @@ namespace GyanisScribe::Pick
      * @details 整条一起拒绝而不是跳过坏词：跳过的话用户看到的就是「我明明存了八个只剩五个」，
      *          而原因落在日志里他看不见。
      */
-    [[nodiscard]] Core::Expected<std::vector<QColor>> parseRecentColors(const QStringList &tokens);
+    [[nodiscard]] Base::Expected<std::vector<QColor>> parseRecentColors(const QStringList &tokens);
 
 } // namespace GyanisScribe::Pick

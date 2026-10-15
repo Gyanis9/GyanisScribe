@@ -4,8 +4,8 @@
 #include "Platform/Windows/Win32Autostart.h"
 #include "Platform/Windows/Win32HotkeyBackend.h"
 
-#include "Core/Logger.h"
-#include "Core/Text.h"
+#include "Base/Logger.h"
+#include "Base/Text.h"
 
 #include <windows.h>
 
@@ -31,8 +31,8 @@
 
 namespace
 {
-    using GyanisScribe::Core::Error;
-    using GyanisScribe::Core::ErrorCode;
+    using GyanisScribe::Base::Error;
+    using GyanisScribe::Base::ErrorCode;
     using GyanisScribe::Platform::MonitorMapping;
     using GyanisScribe::Platform::ScreenWindow;
 
@@ -263,7 +263,7 @@ namespace
                                        .arg(screen->geometry().height())
                                        .arg(screen->devicePixelRatio());
             }
-            GyanisScribe::Core::Logger::warning(std::format("屏幕配对不完整：配上了 {} 块，平台给了 [{}]，界面给了 [{}]", mappings.size(),
+            GyanisScribe::Base::Logger::warning(std::format("屏幕配对不完整：配上了 {} 块，平台给了 [{}]，界面给了 [{}]", mappings.size(),
                                                             platformNames.join(QStringLiteral(", ")).toStdString(), screenNames.join(QStringLiteral(", ")).toStdString()));
         }
         return mappings;
@@ -310,15 +310,15 @@ namespace GyanisScribe::Platform
         return std::make_unique<Win32HotkeyBackend>();
     }
 
-    Core::Expected<ForegroundWindow> WindowsIntegration::foregroundWindow() const
+    Base::Expected<ForegroundWindow> WindowsIntegration::foregroundWindow() const
     {
         auto *const window = GetForegroundWindow();
         if (window == nullptr)
         {
             // 会话锁屏、刚开机还没人点过窗口都会走到这里：报「先点一下」比报「不支持」更可操作
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::ScreenUnavailable,
-                                GyanisScribe::Core::uiTextUtf8("现在没有一个在前台的窗口可截（可能锁了屏或焦点在桌面上）。请先点一下要截的那个窗口，再回来用这一项")});
+                    Base::Error{Base::ErrorCode::ScreenUnavailable,
+                                GyanisScribe::Base::uiTextUtf8("现在没有一个在前台的窗口可截（可能锁了屏或焦点在桌面上）。请先点一下要截的那个窗口，再回来用这一项")});
         }
 
         ForegroundWindow info;
@@ -332,7 +332,7 @@ namespace GyanisScribe::Platform
         return info;
     }
 
-    Core::Expected<std::vector<ScreenWindow>> WindowsIntegration::screenWindows() const
+    Base::Expected<std::vector<ScreenWindow>> WindowsIntegration::screenWindows() const
     {
         const auto mappings = monitorMappings();
         if (mappings.empty())
@@ -341,7 +341,7 @@ namespace GyanisScribe::Platform
             // 用户看到的是高亮框跑偏，比没有候选更难解释
             return std::unexpected(Error{
                     ErrorCode::ScreenUnavailable,
-                    GyanisScribe::Core::uiTextUtf8("认不出桌面上有哪些窗口：平台的屏幕清单与界面的屏幕清单配不上对。请先用整屏或框选截图，重开一次智录再试"),
+                    GyanisScribe::Base::uiTextUtf8("认不出桌面上有哪些窗口：平台的屏幕清单与界面的屏幕清单配不上对。请先用整屏或框选截图，重开一次智录再试"),
             });
         }
 
@@ -387,14 +387,14 @@ namespace GyanisScribe::Platform
         return m_uia;
     }
 
-    Core::Expected<std::vector<QRect>> WindowsIntegration::elementChainAtPoint(const QPoint &globalLogicalPoint, const std::vector<quintptr> &excludeWindowHandles) const
+    Base::Expected<std::vector<QRect>> WindowsIntegration::elementChainAtPoint(const QPoint &globalLogicalPoint, const std::vector<quintptr> &excludeWindowHandles) const
     {
         const auto mappings = monitorMappings();
         if (mappings.empty())
         {
             // 与窗口枚举同一道闸：配不上对就不猜缩放，认得出来的元素框会落在另一块屏上
             return std::unexpected(Error{ErrorCode::ScreenUnavailable,
-                                         GyanisScribe::Core::uiTextUtf8("认不出光标下的界面元素：平台的屏幕清单与界面的屏幕清单配不上对。可以继续直接框住要截的那一块")});
+                                         GyanisScribe::Base::uiTextUtf8("认不出光标下的界面元素：平台的屏幕清单与界面的屏幕清单配不上对。可以继续直接框住要截的那一块")});
         }
 
         // 点按它所在的那块屏换算：多显示器下拿别块的缩放因子算会整体打偏
@@ -410,7 +410,7 @@ namespace GyanisScribe::Platform
         if (!owner)
         {
             return std::unexpected(Error{ErrorCode::InvalidArgument,
-                                         GyanisScribe::Core::uiTextUtf8("这个光标位置不落在任何一块屏幕上（多半是拔屏或改分辨率之后的陈旧坐标）。请把鼠标动一下再试")});
+                                         GyanisScribe::Base::uiTextUtf8("这个光标位置不落在任何一块屏幕上（多半是拔屏或改分辨率之后的陈旧坐标）。请把鼠标动一下再试")});
         }
         const auto physicalPoint = logicalPointToPhysicalGlobal(globalLogicalPoint, mappings[*owner]);
         if (!physicalPoint)
@@ -432,7 +432,7 @@ namespace GyanisScribe::Platform
         if (uia == nullptr)
         {
             return std::unexpected(Error{ErrorCode::DependencyMissing,
-                                         GyanisScribe::Core::uiTextUtf8("系统的 UI Automation 起不来，认不出界面元素。可以继续用悬停认整扇窗口，或直接框住要的那一块")});
+                                         GyanisScribe::Base::uiTextUtf8("系统的 UI Automation 起不来，认不出界面元素。可以继续用悬停认整扇窗口，或直接框住要的那一块")});
         }
 
         Microsoft::WRL::ComPtr<IUIAutomationElement> element;
@@ -529,7 +529,7 @@ namespace GyanisScribe::Platform
         return chain;
     }
 
-    Core::Expected<bool> WindowsIntegration::autostartEnabled() const
+    Base::Expected<bool> WindowsIntegration::autostartEnabled() const
     {
         QSettings  runKey{QStringLiteral(R"(HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run)"), QSettings::NativeFormat};
         const auto stored = runKey.value(QString::fromLatin1(kAutostartValueName.data(), static_cast<qsizetype>(kAutostartValueName.size()))).toString();
@@ -543,13 +543,13 @@ namespace GyanisScribe::Platform
         return QString::compare(stored, autostartCommandLine(QCoreApplication::applicationFilePath()), Qt::CaseInsensitive) == 0;
     }
 
-    Core::Expected<void> WindowsIntegration::setAutostart(const bool enabled)
+    Base::Expected<void> WindowsIntegration::setAutostart(const bool enabled)
     {
         const auto command = autostartCommandLine(QCoreApplication::applicationFilePath());
         if (command.isEmpty())
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("取不到本程序的完整路径，没法写开机启动项。请从安装目录启动本程序后再试一次")});
+                    Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("取不到本程序的完整路径，没法写开机启动项。请从安装目录启动本程序后再试一次")});
         }
 
         // 写在当前用户的 Run 键下：不需要管理员权限，也不需要计划任务
@@ -566,10 +566,10 @@ namespace GyanisScribe::Platform
         if (runKey.status() != QSettings::NoError)
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::FileWriteFailed,
-                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8(
+                    Base::Error{Base::ErrorCode::FileWriteFailed,
+                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8(
                                                                      "开机启动项没能{}：写系统设置失败（可能是权限或安全软件拦截）。可以在系统的「启动」设置里把本程序自己加进去"),
-                                                             enabled ? GyanisScribe::Core::uiTextUtf8("开启") : GyanisScribe::Core::uiTextUtf8("关闭"))});
+                                                             enabled ? GyanisScribe::Base::uiTextUtf8("开启") : GyanisScribe::Base::uiTextUtf8("关闭"))});
         }
         return {};
     }

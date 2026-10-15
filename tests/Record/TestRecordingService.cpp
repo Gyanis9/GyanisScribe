@@ -4,9 +4,9 @@
 // 假编码器把 encode() 停在门闩上，「调用已返回而活还没干完」因此成了可断言的事。
 
 #include "Capture/IScreenCaptureSource.h"
-#include "Core/Paths.h"
+#include "Base/Paths.h"
 #include "Platform/IPlatformIntegration.h"
-#include "Core/Types.h"
+#include "Base/Types.h"
 #include "Record/FfmpegCommand.h"
 #include "Record/FfmpegRecordingEncoder.h"
 #include "Record/RecorderConfig.h"
@@ -39,10 +39,10 @@
 #include <vector>
 
 using GyanisScribe::Capture::IScreenCaptureSource;
-using GyanisScribe::Core::CapturedImage;
-using GyanisScribe::Core::Error;
-using GyanisScribe::Core::ErrorCode;
-using GyanisScribe::Core::Expected;
+using GyanisScribe::Base::CapturedImage;
+using GyanisScribe::Base::Error;
+using GyanisScribe::Base::ErrorCode;
+using GyanisScribe::Base::Expected;
 using GyanisScribe::Record::AudioCaptureOutcome;
 using GyanisScribe::Record::IRecordingEncoder;
 using GyanisScribe::Record::locateFfmpeg;
@@ -94,7 +94,7 @@ namespace
      */
     [[nodiscard]] QImage readFirstFrame()
     {
-        const auto      root = GyanisScribe::Core::Paths::cacheDirectory() / "Recording";
+        const auto      root = GyanisScribe::Base::Paths::cacheDirectory() / "Recording";
         std::error_code ignored;
         if (!std::filesystem::exists(root, ignored))
         {
@@ -432,7 +432,7 @@ namespace
      */
     [[nodiscard]] std::filesystem::path onlyFrameDirectory()
     {
-        const auto root = GyanisScribe::Core::Paths::cacheDirectory() / "Recording";
+        const auto root = GyanisScribe::Base::Paths::cacheDirectory() / "Recording";
         // 环里带条件才返回：无条件 return 的循环会让 MSVC 在 Debug 档把循环之后那句当成不可达代码（C4702），
         // 而 /W4 /WX 把那条警告直接变成构建失败
         for (const auto &entry: std::filesystem::directory_iterator{root})
@@ -505,7 +505,7 @@ namespace
         {
             // 开始一轮就在缓存里建一个带时间戳的帧目录，不等它收尾会一层层攒下来
             std::error_code ignored;
-            std::filesystem::remove_all(GyanisScribe::Core::Paths::cacheDirectory() / "Recording", ignored);
+            std::filesystem::remove_all(GyanisScribe::Base::Paths::cacheDirectory() / "Recording", ignored);
         }
     };
 
@@ -904,7 +904,7 @@ namespace
 
         const auto started = service.start(config, 0);
         ASSERT_FALSE(static_cast<bool>(started)) << "成品路径是个文件却仍然开始录：这一轮到最后一步才失败";
-        EXPECT_EQ(started.error().code, GyanisScribe::Core::ErrorCode::FileWriteFailed);
+        EXPECT_EQ(started.error().code, GyanisScribe::Base::ErrorCode::FileWriteFailed);
         EXPECT_EQ(service.state(), RecordingState::Idle) << "拒绝之后状态没回到空闲，下一轮会被「上一轮还没收尾」拦住";
 
         std::filesystem::remove(blocker, ignored);

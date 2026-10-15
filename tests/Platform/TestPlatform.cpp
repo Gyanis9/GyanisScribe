@@ -20,7 +20,7 @@
 #include <iostream>
 #include <thread>
 
-using GyanisScribe::Core::ErrorCode;
+using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Platform::autostartCommandLine;
 using GyanisScribe::Platform::createPlatformIntegration;
 using GyanisScribe::Platform::ScreenWindow;

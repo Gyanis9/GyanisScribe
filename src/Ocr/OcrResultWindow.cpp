@@ -1,9 +1,9 @@
 #include "Ocr/OcrResultWindow.h"
 
 #include "Core/ImageFit.h"
-#include "Core/Logger.h"
-#include "Core/Paths.h"
-#include "Core/Text.h"
+#include "Base/Logger.h"
+#include "Base/Paths.h"
+#include "Base/Text.h"
 #include "Ocr/OcrEngineFactory.h"
 #include "Ocr/OcrTextExporter.h"
 #include "Ui/IconProvider.h"
@@ -125,8 +125,8 @@ namespace
     /// 导出对话框的默认文件名：与成品图同一套名字规则，只在末尾换扩展名
     std::filesystem::path suggestedExportPath(const QString &extension, const QString &nameTemplate)
     {
-        return GyanisScribe::Core::Paths::defaultScreenshotDirectory() /
-               GyanisScribe::Core::Paths::fromDisplayText(GyanisScribe::Core::Paths::imageFileName(QDateTime::currentDateTime(), extension.toStdString(), nameTemplate));
+        return GyanisScribe::Base::Paths::defaultScreenshotDirectory() /
+               GyanisScribe::Base::Paths::fromDisplayText(GyanisScribe::Base::Paths::imageFileName(QDateTime::currentDateTime(), extension.toStdString(), nameTemplate));
     }
 } // namespace
 
@@ -168,14 +168,14 @@ namespace GyanisScribe::Ocr
         if (result.isEmpty())
         {
             // 空结果不是失败：把「这一张里没字」与「认不出」分开说，用户才知道下一步该换图还是换语言
-            return QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("这一张图里没认出文字。可以换一种语言再认一次，或重新截一张更清晰的图")).c_str());
+            return QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("这一张图里没认出文字。可以换一种语言再认一次，或重新截一张更清晰的图")).c_str());
         }
 
         // 置信度按后端给不给得出分两种写法：给不出这一路读数就写「未提供」，
         // 打一个 0% 会被读成「这张图认得很差」，可它说的其实是「这个后端不报这个数」
         const std::string confidenceReadout = result.averageConfidence ? std::format("{}%", static_cast<int>(std::lround(*result.averageConfidence * kConfidencePercentScale)))
-                                                                       : GyanisScribe::Core::uiTextUtf8("未提供");
-        return QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("{} 行 · 平均置信度 {} · 图像 {}×{} · 语言 {}"), result.lines.size(),
+                                                                       : GyanisScribe::Base::uiTextUtf8("未提供");
+        return QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("{} 行 · 平均置信度 {} · 图像 {}×{} · 语言 {}"), result.lines.size(),
                                                               confidenceReadout, imageSize.width(), imageSize.height(), result.language.toStdString())
                                          .c_str());
     }
@@ -183,7 +183,7 @@ namespace GyanisScribe::Ocr
     OcrResultWindow::OcrResultWindow(const QImage &image, const OcrResult &result, Ui::IconProvider &icons, const Ui::ThemeManager &theme, const QString &nameTemplate,
                                      QWidget *parent) : QWidget(parent), m_image(image), m_result(result), m_icons(icons), m_theme(theme), m_nameTemplate(nameTemplate)
     {
-        setWindowTitle(GyanisScribe::Core::uiText("识别结果"));
+        setWindowTitle(GyanisScribe::Base::uiText("识别结果"));
         setWindowIcon(m_icons.icon("Ocr"));
         // 顶层窗口自己铺底：样式表只给具名的根上底色
         setObjectName(QStringLiteral("appRoot"));
@@ -199,25 +199,25 @@ namespace GyanisScribe::Ocr
 
         m_text = new QTextEdit;
         m_text->setReadOnly(true);
-        m_text->setAccessibleName(GyanisScribe::Core::uiText("识别文本"));
+        m_text->setAccessibleName(GyanisScribe::Base::uiText("识别文本"));
         right->addWidget(m_text);
 
         m_status = new QLabel{statusLineFor(m_result, m_image.size()), this};
-        m_status->setAccessibleName(GyanisScribe::Core::uiText("识别摘要"));
+        m_status->setAccessibleName(GyanisScribe::Base::uiText("识别摘要"));
         right->addWidget(m_status);
 
         auto *buttons = new QHBoxLayout;
         right->addLayout(buttons);
 
-        auto *copyAll     = makeToolButton(m_icons, "Copy", GyanisScribe::Core::uiText("复制全部"));
-        auto *copyPart    = makeToolButton(m_icons, "OcrCopy", GyanisScribe::Core::uiText("复制选中"));
-        auto *exportTxt   = makeToolButton(m_icons, "OcrExport", GyanisScribe::Core::uiText("导出 TXT"));
-        auto *exportJson  = makeToolButton(m_icons, "Save", GyanisScribe::Core::uiText("导出 JSON"));
-        auto *rerun       = makeToolButton(m_icons, "Refresh", GyanisScribe::Core::uiText("重新识别"));
-        auto *closeButton = makeToolButton(m_icons, "Close", GyanisScribe::Core::uiText("关闭"));
+        auto *copyAll     = makeToolButton(m_icons, "Copy", GyanisScribe::Base::uiText("复制全部"));
+        auto *copyPart    = makeToolButton(m_icons, "OcrCopy", GyanisScribe::Base::uiText("复制选中"));
+        auto *exportTxt   = makeToolButton(m_icons, "OcrExport", GyanisScribe::Base::uiText("导出 TXT"));
+        auto *exportJson  = makeToolButton(m_icons, "Save", GyanisScribe::Base::uiText("导出 JSON"));
+        auto *rerun       = makeToolButton(m_icons, "Refresh", GyanisScribe::Base::uiText("重新识别"));
+        auto *closeButton = makeToolButton(m_icons, "Close", GyanisScribe::Base::uiText("关闭"));
         m_language        = new QComboBox;
         m_language->addItems(supportedOcrLanguageTags());
-        m_language->setAccessibleName(GyanisScribe::Core::uiText("识别语言"));
+        m_language->setAccessibleName(GyanisScribe::Base::uiText("识别语言"));
 
         buttons->addWidget(copyAll);
         buttons->addWidget(copyPart);
@@ -243,20 +243,20 @@ namespace GyanisScribe::Ocr
                          {
                              if (copyAllToClipboard().isEmpty())
                              {
-                                 emit messageForUser(GyanisScribe::Core::uiText("这一张图没有认出可复制的文字"), Ui::ToastKind::Information);
+                                 emit messageForUser(GyanisScribe::Base::uiText("这一张图没有认出可复制的文字"), Ui::ToastKind::Information);
                                  return;
                              }
-                             emit messageForUser(GyanisScribe::Core::uiText("已复制全部文字"), Ui::ToastKind::Success);
+                             emit messageForUser(GyanisScribe::Base::uiText("已复制全部文字"), Ui::ToastKind::Success);
                          });
         QObject::connect(copyPart, &QToolButton::clicked, this,
                          [this]
                          {
                              if (copySelectionToClipboard().isEmpty())
                              {
-                                 emit messageForUser(GyanisScribe::Core::uiText("先在右边选中要复制的文字"), Ui::ToastKind::Information);
+                                 emit messageForUser(GyanisScribe::Base::uiText("先在右边选中要复制的文字"), Ui::ToastKind::Information);
                                  return;
                              }
-                             emit messageForUser(GyanisScribe::Core::uiText("已复制选中文字"), Ui::ToastKind::Success);
+                             emit messageForUser(GyanisScribe::Base::uiText("已复制选中文字"), Ui::ToastKind::Success);
                          });
         QObject::connect(rerun, &QToolButton::clicked, this, [this] { emit recognizeRequested(selectedLanguage()); });
         QObject::connect(m_language, &QComboBox::currentTextChanged, this,
@@ -315,12 +315,12 @@ namespace GyanisScribe::Ocr
         return selected;
     }
 
-    Core::Expected<void> OcrResultWindow::exportTxt(const std::filesystem::path &filePath)
+    Base::Expected<void> OcrResultWindow::exportTxt(const std::filesystem::path &filePath)
     {
         return writeTextFile(filePath, toTxt(m_result));
     }
 
-    Core::Expected<void> OcrResultWindow::exportJson(const std::filesystem::path &filePath)
+    Base::Expected<void> OcrResultWindow::exportJson(const std::filesystem::path &filePath)
     {
         return writeTextFile(filePath, toJson(m_result, m_image.size()));
     }
@@ -348,8 +348,8 @@ namespace GyanisScribe::Ocr
     void OcrResultWindow::chooseAndExportTxt()
     {
         const auto suggested = suggestedExportPath(QStringLiteral("txt"), m_nameTemplate);
-        const auto chosen    = QFileDialog::getSaveFileName(this, GyanisScribe::Core::uiText("导出 TXT"), QString::fromStdWString(suggested.wstring()),
-                                                            GyanisScribe::Core::uiText("文本文件 (*.txt)"));
+        const auto chosen    = QFileDialog::getSaveFileName(this, GyanisScribe::Base::uiText("导出 TXT"), QString::fromStdWString(suggested.wstring()),
+                                                            GyanisScribe::Base::uiText("文本文件 (*.txt)"));
         // 取消对话框不是失败：不提示、也不动已有结果
         if (chosen.isEmpty())
         {
@@ -359,19 +359,19 @@ namespace GyanisScribe::Ocr
         if (auto exported = exportTxt(path); !exported)
         {
             const auto message =
-                    QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("导出 TXT 失败：{}。请换一个目录再试一次"), exported.error().message).c_str());
-            Core::Logger::warning(message.toStdString());
+                    QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("导出 TXT 失败：{}。请换一个目录再试一次"), exported.error().message).c_str());
+            Base::Logger::warning(message.toStdString());
             emit messageForUser(message, Ui::ToastKind::Danger);
             return;
         }
-        emit messageForUser(GyanisScribe::Core::uiText("已导出 TXT：") + chosen, Ui::ToastKind::Success);
+        emit messageForUser(GyanisScribe::Base::uiText("已导出 TXT：") + chosen, Ui::ToastKind::Success);
     }
 
     void OcrResultWindow::chooseAndExportJson()
     {
         const auto suggested = suggestedExportPath(QStringLiteral("json"), m_nameTemplate);
-        const auto chosen    = QFileDialog::getSaveFileName(this, GyanisScribe::Core::uiText("导出 JSON"), QString::fromStdWString(suggested.wstring()),
-                                                            GyanisScribe::Core::uiText("JSON 文件 (*.json)"));
+        const auto chosen    = QFileDialog::getSaveFileName(this, GyanisScribe::Base::uiText("导出 JSON"), QString::fromStdWString(suggested.wstring()),
+                                                            GyanisScribe::Base::uiText("JSON 文件 (*.json)"));
         if (chosen.isEmpty())
         {
             return;
@@ -380,12 +380,12 @@ namespace GyanisScribe::Ocr
         if (auto exported = exportJson(path); !exported)
         {
             const auto message =
-                    QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("导出 JSON 失败：{}。请换一个目录再试一次"), exported.error().message).c_str());
-            Core::Logger::warning(message.toStdString());
+                    QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("导出 JSON 失败：{}。请换一个目录再试一次"), exported.error().message).c_str());
+            Base::Logger::warning(message.toStdString());
             emit messageForUser(message, Ui::ToastKind::Danger);
             return;
         }
-        emit messageForUser(GyanisScribe::Core::uiText("已导出 JSON：") + chosen, Ui::ToastKind::Success);
+        emit messageForUser(GyanisScribe::Base::uiText("已导出 JSON：") + chosen, Ui::ToastKind::Success);
     }
 
 } // namespace GyanisScribe::Ocr

@@ -3,8 +3,8 @@
 #include "Annotation/AnnotationPalette.h"
 #include "Annotation/AnnotationTool.h"
 #include "Pick/RecentColors.h"
-#include "Core/Logger.h"
-#include "Core/Text.h"
+#include "Base/Logger.h"
+#include "Base/Text.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
 #include "Ui/AppShortcuts.h"
@@ -116,7 +116,7 @@ namespace GyanisScribe::Annotation
             const auto kind      = std::get<0>(kToolTable[index]);
             const auto iconName  = std::get<1>(kToolTable[index]);
             const auto label     = std::get<2>(kToolTable[index]);
-            auto      *button    = makeButton(iconName, GyanisScribe::Core::uiText(label.data()), true);
+            auto      *button    = makeButton(iconName, GyanisScribe::Base::uiText(label.data()), true);
             m_toolButtons[index] = button;
             m_toolKinds[index]   = kind;
             // id 取工具序号：与 ToolKind 的底层值同解，反向查按钮时不必再存一张表
@@ -166,17 +166,17 @@ namespace GyanisScribe::Annotation
             m_palette = *resolved;
         } else
         {
-            Core::Logger::warning(std::format("自定义色板读不出：{}，本次按内置那八格摆", resolved.error().message));
+            Base::Logger::warning(std::format("自定义色板读不出：{}，本次按内置那八格摆", resolved.error().message));
             m_palette = defaultAnnotationPalette();
         }
         for (std::size_t index = 0; index < m_palette.size(); ++index)
         {
             const auto color  = m_palette[index];
             const int  slot   = static_cast<int>(index);
-            auto      *button = makeButton("Close", GyanisScribe::Core::uiText("颜色 %1").arg(slot + 1), true);
+            auto      *button = makeButton("Close", GyanisScribe::Base::uiText("颜色 %1").arg(slot + 1), true);
             // 图标换成色块：makeButton 那份图标只保证按钮尺寸合适，色块才是这一格要表达的东西
             button->setIcon(QIcon{colorSwatchPixmap(color, m_icons.tintColor())});
-            button->setToolTip(GyanisScribe::Core::uiText("按住拖动可以把这一格挪到另一格那儿；上限是 16 格，顺序存在设置的标注页里"));
+            button->setToolTip(GyanisScribe::Base::uiText("按住拖动可以把这一格挪到另一格那儿；上限是 16 格，顺序存在设置的标注页里"));
             m_paletteButtons.push_back(button);
             colorGroup->addButton(button, slot);
             // 按序号取色而不是把颜色抄进 lambda：重排换的就是「第几格摆哪一支」，抄值会让拖完的按钮还发旧色
@@ -205,11 +205,11 @@ namespace GyanisScribe::Annotation
             }
         } else
         {
-            Core::Logger::warning(std::format("最近使用颜色读不出：{}，本次从空清单开始", parsed.error().message));
+            Base::Logger::warning(std::format("最近使用颜色读不出：{}，本次从空清单开始", parsed.error().message));
         }
         rebuildRecentColors();
 
-        m_customColorButton = makeButton("ColorPicker", GyanisScribe::Core::uiText("自定义颜色"), true);
+        m_customColorButton = makeButton("ColorPicker", GyanisScribe::Base::uiText("自定义颜色"), true);
         // 固定编号：最近使用的色块从色板那一排的格数起排，用相邻编号会撞车
         colorGroup->addButton(m_customColorButton, kCustomColorButtonId);
         QObject::connect(m_customColorButton, &QToolButton::clicked, this, &AnnotationToolbar::chooseCustomColor);
@@ -221,8 +221,8 @@ namespace GyanisScribe::Annotation
         m_widthSlider->setRange(0, static_cast<int>(kAnnotationWidths.size()) - 1);
         m_widthSlider->setPageStep(1);
         m_widthSlider->setFixedWidth(Ui::kToolbarSliderWidth);
-        m_widthSlider->setAccessibleName(GyanisScribe::Core::uiText("线宽"));
-        m_widthSlider->setToolTip(GyanisScribe::Core::uiText("线宽"));
+        m_widthSlider->setAccessibleName(GyanisScribe::Base::uiText("线宽"));
+        m_widthSlider->setToolTip(GyanisScribe::Base::uiText("线宽"));
         QObject::connect(m_widthSlider, &QSlider::valueChanged, this,
                          [this](int step)
                          {
@@ -241,8 +241,8 @@ namespace GyanisScribe::Annotation
         {
             m_fontSizeCombo->addItem(QString::number(size), size);
         }
-        m_fontSizeCombo->setAccessibleName(GyanisScribe::Core::uiText("字号"));
-        m_fontSizeCombo->setToolTip(GyanisScribe::Core::uiText("字号"));
+        m_fontSizeCombo->setAccessibleName(GyanisScribe::Base::uiText("字号"));
+        m_fontSizeCombo->setToolTip(GyanisScribe::Base::uiText("字号"));
         QObject::connect(m_fontSizeCombo, &QComboBox::currentIndexChanged, this,
                          [this](int index)
                          {
@@ -254,94 +254,94 @@ namespace GyanisScribe::Annotation
                          });
         // 填充档：矩形与椭圆用得上，点一下走一档（无 → 半透明 → 实心）。按钮不进工具栏的互斥组——
         // 它是「这条图形怎么填」而不是「用哪档工具」
-        m_fillButton = makeButton("Fill", GyanisScribe::Core::uiText("填充"), false);
+        m_fillButton = makeButton("Fill", GyanisScribe::Base::uiText("填充"), false);
         QObject::connect(m_fillButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleFillStyle);
         layout->addWidget(m_fillButton);
         // 圆角矩形：矩形工具用得上，是一个保持按下态的开关（与双向箭头同一套口径）
-        m_roundedRectButton = makeButton("RoundedRect", GyanisScribe::Core::uiText("圆角"), true);
+        m_roundedRectButton = makeButton("RoundedRect", GyanisScribe::Base::uiText("圆角"), true);
         QObject::connect(m_roundedRectButton, &QToolButton::clicked, this, [this] { setRoundedRect(m_roundedRectButton->isChecked()); });
         layout->addWidget(m_roundedRectButton);
         // 线型：描边类工具用得上，点一下走一档（实线 → 虚线 → 点线）
-        m_lineStyleButton = makeButton("LineStyle", GyanisScribe::Core::uiText("线型"), false);
+        m_lineStyleButton = makeButton("LineStyle", GyanisScribe::Base::uiText("线型"), false);
         QObject::connect(m_lineStyleButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleLineStyle);
         layout->addWidget(m_lineStyleButton);
         // 双向箭头：箭头工具用得上，是一个保持按下态的开关。同样不进互斥组，
         // 点击时 Qt 先翻 checked 再发 clicked，所以这里读按钮态而不是自己翻一遍
-        m_doubleArrowButton = makeButton("ArrowDouble", GyanisScribe::Core::uiText("双向箭头"), true);
+        m_doubleArrowButton = makeButton("ArrowDouble", GyanisScribe::Base::uiText("双向箭头"), true);
         QObject::connect(m_doubleArrowButton, &QToolButton::clicked, this, [this] { setDoubleHeaded(m_doubleArrowButton->isChecked()); });
         layout->addWidget(m_doubleArrowButton);
         // 反向箭头：同一枚箭头工具的第二档开关，把箭头换到起点那一头（拖的方向与指的方向相反）。
         // 与双向不互斥——两个都开就是两端都有头，谁也没被偷偷关掉
-        m_reversedArrowButton = makeButton("ArrowReversed", GyanisScribe::Core::uiText("反向箭头"), true);
+        m_reversedArrowButton = makeButton("ArrowReversed", GyanisScribe::Base::uiText("反向箭头"), true);
         QObject::connect(m_reversedArrowButton, &QToolButton::clicked, this, [this] { setArrowReversed(m_reversedArrowButton->isChecked()); });
         layout->addWidget(m_reversedArrowButton);
         // 椭圆形状：马赛克/高斯模糊/高亮/橡皮擦四件用得上，同为保持按下态的开关；
         // 名字带「形状」是为了与工具组里那枚「椭圆」区分——那枚是切工具，这枚是切当前工具的落笔形状
-        m_ellipticalButton = makeButton("EllipseShape", GyanisScribe::Core::uiText("椭圆形状"), true);
+        m_ellipticalButton = makeButton("EllipseShape", GyanisScribe::Base::uiText("椭圆形状"), true);
         QObject::connect(m_ellipticalButton, &QToolButton::clicked, this, [this] { setElliptical(m_ellipticalButton->isChecked()); });
         layout->addWidget(m_ellipticalButton);
         // 马赛克粒度：马赛克工具用得上，点一下走一档（细 → 中 → 粗），档位表是 kMosaicBlockSizes
-        m_mosaicGrainButton = makeButton("MosaicGrain", GyanisScribe::Core::uiText("马赛克粒度"), false);
+        m_mosaicGrainButton = makeButton("MosaicGrain", GyanisScribe::Base::uiText("马赛克粒度"), false);
         QObject::connect(m_mosaicGrainButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleMosaicBlockSize);
         layout->addWidget(m_mosaicGrainButton);
         // 高亮透明度：高亮工具用得上，点一下走一档（轻 → 中 → 重），档位表是 kHighlightAlphas
-        m_highlightAlphaButton = makeButton("HighlightOpacity", GyanisScribe::Core::uiText("高亮透明度"), false);
+        m_highlightAlphaButton = makeButton("HighlightOpacity", GyanisScribe::Base::uiText("高亮透明度"), false);
         QObject::connect(m_highlightAlphaButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleHighlightAlpha);
         layout->addWidget(m_highlightAlphaButton);
         // 高亮加宽：高亮工具用得上，点一下走一档（窄 → 中 → 宽），档位表是 kHighlightWidthFactors
-        m_highlightWidthButton = makeButton("HighlightWidth", GyanisScribe::Core::uiText("高亮加宽"), false);
+        m_highlightWidthButton = makeButton("HighlightWidth", GyanisScribe::Base::uiText("高亮加宽"), false);
         QObject::connect(m_highlightWidthButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleHighlightWidthFactor);
         layout->addWidget(m_highlightWidthButton);
         // 箭头款式：箭头工具用得上，点一下走一档（实心 → 空心 → 开口）
-        m_arrowHeadStyleButton = makeButton("ArrowHeadStyle", GyanisScribe::Core::uiText("箭头样式"), false);
+        m_arrowHeadStyleButton = makeButton("ArrowHeadStyle", GyanisScribe::Base::uiText("箭头样式"), false);
         QObject::connect(m_arrowHeadStyleButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleArrowHeadStyle);
         layout->addWidget(m_arrowHeadStyleButton);
         // 箭头大小：箭头工具用得上，点一下走一档（小 → 中 → 大），档位表是 kArrowHeadScales
-        m_arrowHeadScaleButton = makeButton("ArrowHeadSize", GyanisScribe::Core::uiText("箭头大小"), false);
+        m_arrowHeadScaleButton = makeButton("ArrowHeadSize", GyanisScribe::Base::uiText("箭头大小"), false);
         QObject::connect(m_arrowHeadScaleButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleArrowHeadScale);
         layout->addWidget(m_arrowHeadScaleButton);
         // 文字字体族：文字工具用得上，列系统字体。宽度封顶——字体名长的很，放任 sizeHint 会撑出去
         m_fontCombo = new QFontComboBox{this};
         m_fontCombo->setMaximumWidth(Ui::kToolbarFontComboWidth);
-        m_fontCombo->setAccessibleName(GyanisScribe::Core::uiText("字体"));
-        m_fontCombo->setToolTip(GyanisScribe::Core::uiText("字体（文字）"));
+        m_fontCombo->setAccessibleName(GyanisScribe::Base::uiText("字体"));
+        m_fontCombo->setToolTip(GyanisScribe::Base::uiText("字体（文字）"));
         QObject::connect(m_fontCombo, &QFontComboBox::currentFontChanged, this, [this](const QFont &font) { emit fontFamilyChanged(font.family()); });
         layout->addWidget(m_fontCombo);
         layout->addWidget(m_fontSizeCombo);
         // 粗体/斜体：文字工具用得上，保持按下态的开关，与双向箭头同一套口径
-        m_boldButton = makeButton("Bold", GyanisScribe::Core::uiText("粗体"), true);
+        m_boldButton = makeButton("Bold", GyanisScribe::Base::uiText("粗体"), true);
         QObject::connect(m_boldButton, &QToolButton::clicked, this, [this] { setTextBold(m_boldButton->isChecked()); });
         layout->addWidget(m_boldButton);
-        m_italicButton = makeButton("Italic", GyanisScribe::Core::uiText("斜体"), true);
+        m_italicButton = makeButton("Italic", GyanisScribe::Base::uiText("斜体"), true);
         QObject::connect(m_italicButton, &QToolButton::clicked, this, [this] { setTextItalic(m_italicButton->isChecked()); });
         layout->addWidget(m_italicButton);
         // 描边/底板：文字工具用得上，同为保持按下态的开关
-        m_outlineButton = makeButton("TextOutline", GyanisScribe::Core::uiText("描边"), true);
+        m_outlineButton = makeButton("TextOutline", GyanisScribe::Base::uiText("描边"), true);
         QObject::connect(m_outlineButton, &QToolButton::clicked, this, [this] { setTextOutline(m_outlineButton->isChecked()); });
         layout->addWidget(m_outlineButton);
         // 描边色：描边开着时用哪一色，点一下走一档（自动 → 白 → 黑）
-        m_strokeColorButton = makeButton("StrokeColor", GyanisScribe::Core::uiText("描边色"), false);
+        m_strokeColorButton = makeButton("StrokeColor", GyanisScribe::Base::uiText("描边色"), false);
         QObject::connect(m_strokeColorButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleTextStrokeColor);
         layout->addWidget(m_strokeColorButton);
         // 描边粗细：描边开着时那一圈有多厚，点一下走一档（细 → 中 → 粗）
-        m_outlineWidthButton = makeButton("TextOutlineWidth", GyanisScribe::Core::uiText("描边粗细"), false);
+        m_outlineWidthButton = makeButton("TextOutlineWidth", GyanisScribe::Base::uiText("描边粗细"), false);
         QObject::connect(m_outlineWidthButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleTextOutlineWidth);
         layout->addWidget(m_outlineWidthButton);
         // 计数组：序号工具用得上，点一下走一档（第 1 组 → 第 2 组 → 第 3 组 → 第 1 组）
-        m_numberGroupButton = makeButton("NumberGroup", GyanisScribe::Core::uiText("计数组"), false);
+        m_numberGroupButton = makeButton("NumberGroup", GyanisScribe::Base::uiText("计数组"), false);
         QObject::connect(m_numberGroupButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleNumberGroup);
         layout->addWidget(m_numberGroupButton);
-        m_backgroundButton = makeButton("TextBackground", GyanisScribe::Core::uiText("背景"), true);
+        m_backgroundButton = makeButton("TextBackground", GyanisScribe::Base::uiText("背景"), true);
         QObject::connect(m_backgroundButton, &QToolButton::clicked, this, [this] { setTextBackground(m_backgroundButton->isChecked()); });
         layout->addWidget(m_backgroundButton);
         // 底板色：背景开着时垫哪一色，点一下走一档（自动 → 白 → 黑 → 这一形状自己的色）
-        m_plateColorButton = makeButton("PlateColor", GyanisScribe::Core::uiText("底板色"), false);
+        m_plateColorButton = makeButton("PlateColor", GyanisScribe::Base::uiText("底板色"), false);
         QObject::connect(m_plateColorButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleTextPlateColor);
         layout->addWidget(m_plateColorButton);
         layout->addWidget(makeSeparator());
 
-        m_undoButton = makeButton("Undo", GyanisScribe::Core::uiText("撤销（Ctrl+Z）"), false);
-        m_redoButton = makeButton("Redo", GyanisScribe::Core::uiText("重做（Ctrl+Y）"), false);
+        m_undoButton = makeButton("Undo", GyanisScribe::Base::uiText("撤销（Ctrl+Z）"), false);
+        m_redoButton = makeButton("Redo", GyanisScribe::Base::uiText("重做（Ctrl+Y）"), false);
         // 初值不可用：引擎刚建好时没有历史，亮着的撤销按钮点了没反应，比灰着更误导
         m_undoButton->setEnabled(false);
         m_redoButton->setEnabled(false);
@@ -359,11 +359,11 @@ namespace GyanisScribe::Annotation
         };
 
         const std::array actions = {
-                ActionSpec{"Copy", GyanisScribe::Core::uiText("复制到剪贴板"), &AnnotationToolbar::copyClicked},
-                ActionSpec{"Save", GyanisScribe::Core::uiText("保存为文件"), &AnnotationToolbar::saveClicked},
-                ActionSpec{"Pin", GyanisScribe::Core::uiText("贴到屏幕上"), &AnnotationToolbar::pinClicked},
-                ActionSpec{"Ocr", GyanisScribe::Core::uiText("识别文字"), &AnnotationToolbar::ocrClicked},
-                ActionSpec{"QrCode", GyanisScribe::Core::uiText("识别二维码"), &AnnotationToolbar::scanClicked},
+                ActionSpec{"Copy", GyanisScribe::Base::uiText("复制到剪贴板"), &AnnotationToolbar::copyClicked},
+                ActionSpec{"Save", GyanisScribe::Base::uiText("保存为文件"), &AnnotationToolbar::saveClicked},
+                ActionSpec{"Pin", GyanisScribe::Base::uiText("贴到屏幕上"), &AnnotationToolbar::pinClicked},
+                ActionSpec{"Ocr", GyanisScribe::Base::uiText("识别文字"), &AnnotationToolbar::ocrClicked},
+                ActionSpec{"QrCode", GyanisScribe::Base::uiText("识别二维码"), &AnnotationToolbar::scanClicked},
         };
         for (const auto &action: actions)
         {
@@ -395,9 +395,9 @@ namespace GyanisScribe::Annotation
         if (m_fillButton != nullptr)
         {
             // 档名落在提示里：一枚图标说不清现在是哪一档，鼠标一停就该看得见
-            const auto label = m_fillStyle == 0   ? GyanisScribe::Core::uiText("填充：无")
-                               : m_fillStyle == 1 ? GyanisScribe::Core::uiText("填充：半透明")
-                                                  : GyanisScribe::Core::uiText("填充：实心");
+            const auto label = m_fillStyle == 0   ? GyanisScribe::Base::uiText("填充：无")
+                               : m_fillStyle == 1 ? GyanisScribe::Base::uiText("填充：半透明")
+                                                  : GyanisScribe::Base::uiText("填充：实心");
             m_fillButton->setToolTip(label);
             m_fillButton->setAccessibleName(label);
         }
@@ -419,7 +419,7 @@ namespace GyanisScribe::Annotation
         if (m_roundedRectButton != nullptr)
         {
             m_roundedRectButton->setChecked(enabled);
-            const auto label = enabled ? GyanisScribe::Core::uiText("圆角：开") : GyanisScribe::Core::uiText("圆角：关");
+            const auto label = enabled ? GyanisScribe::Base::uiText("圆角：开") : GyanisScribe::Base::uiText("圆角：关");
             m_roundedRectButton->setToolTip(label);
             m_roundedRectButton->setAccessibleName(label);
         }
@@ -437,9 +437,9 @@ namespace GyanisScribe::Annotation
         if (m_lineStyleButton != nullptr)
         {
             // 与另几档同一套口径：提示就是这一档的读数
-            const auto label = m_lineStyle == 0   ? GyanisScribe::Core::uiText("线型：实线")
-                               : m_lineStyle == 1 ? GyanisScribe::Core::uiText("线型：虚线")
-                                                  : GyanisScribe::Core::uiText("线型：点线");
+            const auto label = m_lineStyle == 0   ? GyanisScribe::Base::uiText("线型：实线")
+                               : m_lineStyle == 1 ? GyanisScribe::Base::uiText("线型：虚线")
+                                                  : GyanisScribe::Base::uiText("线型：点线");
             m_lineStyleButton->setToolTip(label);
             m_lineStyleButton->setAccessibleName(label);
         }
@@ -453,7 +453,7 @@ namespace GyanisScribe::Annotation
         {
             // 按下态本身看得见，但提示与无障碍名还是要跟上：读屏报「双向箭头」时得知道箭头现在是开是关
             m_doubleArrowButton->setChecked(enabled);
-            const auto label = enabled ? GyanisScribe::Core::uiText("双向箭头：开") : GyanisScribe::Core::uiText("双向箭头：关");
+            const auto label = enabled ? GyanisScribe::Base::uiText("双向箭头：开") : GyanisScribe::Base::uiText("双向箭头：关");
             m_doubleArrowButton->setToolTip(label);
             m_doubleArrowButton->setAccessibleName(label);
         }
@@ -471,7 +471,7 @@ namespace GyanisScribe::Annotation
         if (m_reversedArrowButton != nullptr)
         {
             m_reversedArrowButton->setChecked(enabled);
-            const auto label = enabled ? GyanisScribe::Core::uiText("反向箭头：开") : GyanisScribe::Core::uiText("反向箭头：关");
+            const auto label = enabled ? GyanisScribe::Base::uiText("反向箭头：开") : GyanisScribe::Base::uiText("反向箭头：关");
             m_reversedArrowButton->setToolTip(label);
             m_reversedArrowButton->setAccessibleName(label);
         }
@@ -490,7 +490,7 @@ namespace GyanisScribe::Annotation
         {
             // 与双向箭头同一套口径：按钮态、提示、无障碍名三者同解
             m_ellipticalButton->setChecked(enabled);
-            const auto label = enabled ? GyanisScribe::Core::uiText("椭圆形状：椭圆") : GyanisScribe::Core::uiText("椭圆形状：矩形");
+            const auto label = enabled ? GyanisScribe::Base::uiText("椭圆形状：椭圆") : GyanisScribe::Base::uiText("椭圆形状：矩形");
             m_ellipticalButton->setToolTip(label);
             m_ellipticalButton->setAccessibleName(label);
         }
@@ -508,9 +508,9 @@ namespace GyanisScribe::Annotation
         if (m_mosaicGrainButton != nullptr)
         {
             // 档名落在提示里：一枚图标说不清现在是哪一档，鼠标一停就该看得见
-            const auto label = m_mosaicBlockStep == 0   ? GyanisScribe::Core::uiText("马赛克粒度：细")
-                               : m_mosaicBlockStep == 1 ? GyanisScribe::Core::uiText("马赛克粒度：中")
-                                                        : GyanisScribe::Core::uiText("马赛克粒度：粗");
+            const auto label = m_mosaicBlockStep == 0   ? GyanisScribe::Base::uiText("马赛克粒度：细")
+                               : m_mosaicBlockStep == 1 ? GyanisScribe::Base::uiText("马赛克粒度：中")
+                                                        : GyanisScribe::Base::uiText("马赛克粒度：粗");
             m_mosaicGrainButton->setToolTip(label);
             m_mosaicGrainButton->setAccessibleName(label);
         }
@@ -528,9 +528,9 @@ namespace GyanisScribe::Annotation
         if (m_highlightAlphaButton != nullptr)
         {
             // 与粒度同一套口径：提示就是这一档的读数
-            const auto label = m_highlightAlphaStep == 0   ? GyanisScribe::Core::uiText("高亮透明度：轻")
-                               : m_highlightAlphaStep == 1 ? GyanisScribe::Core::uiText("高亮透明度：中")
-                                                           : GyanisScribe::Core::uiText("高亮透明度：重");
+            const auto label = m_highlightAlphaStep == 0   ? GyanisScribe::Base::uiText("高亮透明度：轻")
+                               : m_highlightAlphaStep == 1 ? GyanisScribe::Base::uiText("高亮透明度：中")
+                                                           : GyanisScribe::Base::uiText("高亮透明度：重");
             m_highlightAlphaButton->setToolTip(label);
             m_highlightAlphaButton->setAccessibleName(label);
         }
@@ -548,9 +548,9 @@ namespace GyanisScribe::Annotation
         if (m_highlightWidthButton != nullptr)
         {
             // 与另两档同一套口径：提示就是这一档的读数
-            const auto label = m_highlightWidthStep == 0   ? GyanisScribe::Core::uiText("高亮加宽：窄")
-                               : m_highlightWidthStep == 1 ? GyanisScribe::Core::uiText("高亮加宽：中")
-                                                           : GyanisScribe::Core::uiText("高亮加宽：宽");
+            const auto label = m_highlightWidthStep == 0   ? GyanisScribe::Base::uiText("高亮加宽：窄")
+                               : m_highlightWidthStep == 1 ? GyanisScribe::Base::uiText("高亮加宽：中")
+                                                           : GyanisScribe::Base::uiText("高亮加宽：宽");
             m_highlightWidthButton->setToolTip(label);
             m_highlightWidthButton->setAccessibleName(label);
         }
@@ -568,9 +568,9 @@ namespace GyanisScribe::Annotation
         if (m_arrowHeadStyleButton != nullptr)
         {
             // 与另几档同一套口径：提示就是这一档的读数
-            const auto label = m_arrowHeadStyle == kArrowHeadFilled   ? GyanisScribe::Core::uiText("箭头样式：实心")
-                               : m_arrowHeadStyle == kArrowHeadHollow ? GyanisScribe::Core::uiText("箭头样式：空心")
-                                                                      : GyanisScribe::Core::uiText("箭头样式：开口");
+            const auto label = m_arrowHeadStyle == kArrowHeadFilled   ? GyanisScribe::Base::uiText("箭头样式：实心")
+                               : m_arrowHeadStyle == kArrowHeadHollow ? GyanisScribe::Base::uiText("箭头样式：空心")
+                                                                      : GyanisScribe::Base::uiText("箭头样式：开口");
             m_arrowHeadStyleButton->setToolTip(label);
             m_arrowHeadStyleButton->setAccessibleName(label);
         }
@@ -588,9 +588,9 @@ namespace GyanisScribe::Annotation
         if (m_arrowHeadScaleButton != nullptr)
         {
             // 与另几档同一套口径：提示就是这一档的读数
-            const auto label = m_arrowHeadScaleStep == 0   ? GyanisScribe::Core::uiText("箭头大小：小")
-                               : m_arrowHeadScaleStep == 1 ? GyanisScribe::Core::uiText("箭头大小：中")
-                                                           : GyanisScribe::Core::uiText("箭头大小：大");
+            const auto label = m_arrowHeadScaleStep == 0   ? GyanisScribe::Base::uiText("箭头大小：小")
+                               : m_arrowHeadScaleStep == 1 ? GyanisScribe::Base::uiText("箭头大小：中")
+                                                           : GyanisScribe::Base::uiText("箭头大小：大");
             m_arrowHeadScaleButton->setToolTip(label);
             m_arrowHeadScaleButton->setAccessibleName(label);
         }
@@ -612,7 +612,7 @@ namespace GyanisScribe::Annotation
         if (m_boldButton != nullptr)
         {
             m_boldButton->setChecked(enabled);
-            const auto label = enabled ? GyanisScribe::Core::uiText("粗体：开") : GyanisScribe::Core::uiText("粗体：关");
+            const auto label = enabled ? GyanisScribe::Base::uiText("粗体：开") : GyanisScribe::Base::uiText("粗体：关");
             m_boldButton->setToolTip(label);
             m_boldButton->setAccessibleName(label);
         }
@@ -629,7 +629,7 @@ namespace GyanisScribe::Annotation
         if (m_italicButton != nullptr)
         {
             m_italicButton->setChecked(enabled);
-            const auto label = enabled ? GyanisScribe::Core::uiText("斜体：开") : GyanisScribe::Core::uiText("斜体：关");
+            const auto label = enabled ? GyanisScribe::Base::uiText("斜体：开") : GyanisScribe::Base::uiText("斜体：关");
             m_italicButton->setToolTip(label);
             m_italicButton->setAccessibleName(label);
         }
@@ -646,7 +646,7 @@ namespace GyanisScribe::Annotation
         if (m_outlineButton != nullptr)
         {
             m_outlineButton->setChecked(enabled);
-            const auto label = enabled ? GyanisScribe::Core::uiText("描边：开") : GyanisScribe::Core::uiText("描边：关");
+            const auto label = enabled ? GyanisScribe::Base::uiText("描边：开") : GyanisScribe::Base::uiText("描边：关");
             m_outlineButton->setToolTip(label);
             m_outlineButton->setAccessibleName(label);
         }
@@ -666,9 +666,9 @@ namespace GyanisScribe::Annotation
         if (m_strokeColorButton != nullptr)
         {
             // 与另几档同一套口径：提示就是这一档的读数
-            const auto label = m_textStrokeColorStep == kTextStrokeColorWhite   ? GyanisScribe::Core::uiText("描边色：白")
-                               : m_textStrokeColorStep == kTextStrokeColorBlack ? GyanisScribe::Core::uiText("描边色：黑")
-                                                                                : GyanisScribe::Core::uiText("描边色：自动");
+            const auto label = m_textStrokeColorStep == kTextStrokeColorWhite   ? GyanisScribe::Base::uiText("描边色：白")
+                               : m_textStrokeColorStep == kTextStrokeColorBlack ? GyanisScribe::Base::uiText("描边色：黑")
+                                                                                : GyanisScribe::Base::uiText("描边色：自动");
             m_strokeColorButton->setToolTip(label);
             m_strokeColorButton->setAccessibleName(label);
         }
@@ -685,9 +685,9 @@ namespace GyanisScribe::Annotation
         m_textOutlineWidthStep = (m_textOutlineWidthStep + 1) % static_cast<int>(kTextOutlineWidths.size());
         if (m_outlineWidthButton != nullptr)
         {
-            const auto label = m_textOutlineWidthStep == 0   ? GyanisScribe::Core::uiText("描边粗细：细")
-                               : m_textOutlineWidthStep == 1 ? GyanisScribe::Core::uiText("描边粗细：中")
-                                                             : GyanisScribe::Core::uiText("描边粗细：粗");
+            const auto label = m_textOutlineWidthStep == 0   ? GyanisScribe::Base::uiText("描边粗细：细")
+                               : m_textOutlineWidthStep == 1 ? GyanisScribe::Base::uiText("描边粗细：中")
+                                                             : GyanisScribe::Base::uiText("描边粗细：粗");
             m_outlineWidthButton->setToolTip(label);
             m_outlineWidthButton->setAccessibleName(label);
         }
@@ -704,10 +704,10 @@ namespace GyanisScribe::Annotation
         m_textPlateColorStep = (m_textPlateColorStep + 1) % kTextPlateColorCount;
         if (m_plateColorButton != nullptr)
         {
-            const auto label = m_textPlateColorStep == kTextPlateColorWhite       ? GyanisScribe::Core::uiText("底板色：白")
-                               : m_textPlateColorStep == kTextPlateColorBlack     ? GyanisScribe::Core::uiText("底板色：黑")
-                               : m_textPlateColorStep == kTextPlateColorFromShape ? GyanisScribe::Core::uiText("底板色：用标注色")
-                                                                                  : GyanisScribe::Core::uiText("底板色：自动");
+            const auto label = m_textPlateColorStep == kTextPlateColorWhite       ? GyanisScribe::Base::uiText("底板色：白")
+                               : m_textPlateColorStep == kTextPlateColorBlack     ? GyanisScribe::Base::uiText("底板色：黑")
+                               : m_textPlateColorStep == kTextPlateColorFromShape ? GyanisScribe::Base::uiText("底板色：用标注色")
+                                                                                  : GyanisScribe::Base::uiText("底板色：自动");
             m_plateColorButton->setToolTip(label);
             m_plateColorButton->setAccessibleName(label);
         }
@@ -725,9 +725,9 @@ namespace GyanisScribe::Annotation
         if (m_numberGroupButton != nullptr)
         {
             // 与另几档同一套口径：提示就是这一档的读数
-            const auto label = m_numberGroup == 1   ? GyanisScribe::Core::uiText("计数组：第 1 组")
-                               : m_numberGroup == 2 ? GyanisScribe::Core::uiText("计数组：第 2 组")
-                                                    : GyanisScribe::Core::uiText("计数组：第 3 组");
+            const auto label = m_numberGroup == 1   ? GyanisScribe::Base::uiText("计数组：第 1 组")
+                               : m_numberGroup == 2 ? GyanisScribe::Base::uiText("计数组：第 2 组")
+                                                    : GyanisScribe::Base::uiText("计数组：第 3 组");
             m_numberGroupButton->setToolTip(label);
             m_numberGroupButton->setAccessibleName(label);
         }
@@ -744,7 +744,7 @@ namespace GyanisScribe::Annotation
         if (m_backgroundButton != nullptr)
         {
             m_backgroundButton->setChecked(enabled);
-            const auto label = enabled ? GyanisScribe::Core::uiText("背景：开") : GyanisScribe::Core::uiText("背景：关");
+            const auto label = enabled ? GyanisScribe::Base::uiText("背景：开") : GyanisScribe::Base::uiText("背景：关");
             m_backgroundButton->setToolTip(label);
             m_backgroundButton->setAccessibleName(label);
         }
@@ -762,7 +762,7 @@ namespace GyanisScribe::Annotation
         } else
         {
             // 就近取一档会把「配置里存的是 5」这件事藏起来：界面摆了 4，用户以为自己要的那档生效了
-            Core::Logger::warning(std::format("默认线宽 {} 不在阶梯（2/4/6/8）里，本次按默认档显示", storedWidth));
+            Base::Logger::warning(std::format("默认线宽 {} 不在阶梯（2/4/6/8）里，本次按默认档显示", storedWidth));
             m_widthSlider->setValue(kDefaultWidthStep);
         }
 
@@ -772,7 +772,7 @@ namespace GyanisScribe::Annotation
             m_fontSizeCombo->setCurrentIndex(*index);
         } else
         {
-            Core::Logger::warning(std::format("默认字号 {} 不在阶梯（12/13/14/16/20/24）里，本次按默认档显示", storedFontSize));
+            Base::Logger::warning(std::format("默认字号 {} 不在阶梯（12/13/14/16/20/24）里，本次按默认档显示", storedFontSize));
             m_fontSizeCombo->setCurrentIndex(kDefaultFontSizeIndex);
         }
     }
@@ -786,11 +786,11 @@ namespace GyanisScribe::Annotation
         }
         if (auto written = m_settings.setValue(Settings::kAnnotationDefaultWidth, currentWidth()); !written)
         {
-            Core::Logger::warning(std::format("默认线宽没能保存：{}", written.error().message));
+            Base::Logger::warning(std::format("默认线宽没能保存：{}", written.error().message));
         }
         if (auto written = m_settings.setValue(Settings::kAnnotationDefaultFontSize, currentFontSize()); !written)
         {
-            Core::Logger::warning(std::format("默认字号没能保存：{}", written.error().message));
+            Base::Logger::warning(std::format("默认字号没能保存：{}", written.error().message));
         }
     }
 
@@ -918,7 +918,7 @@ namespace GyanisScribe::Annotation
 
     void AnnotationToolbar::chooseCustomColor()
     {
-        const auto picked = QColorDialog::getColor(m_currentColor, this, GyanisScribe::Core::uiText("选择标注颜色"));
+        const auto picked = QColorDialog::getColor(m_currentColor, this, GyanisScribe::Base::uiText("选择标注颜色"));
         if (!picked.isValid())
         {
             // 用户按了取消：什么都不发，颜色停在上一格
@@ -933,7 +933,7 @@ namespace GyanisScribe::Annotation
         rebuildRecentColors();
         if (auto written = m_settings.setValue(Settings::kAnnotationRecentColors, Pick::serializeRecentColors(m_recentColors)); !written)
         {
-            Core::Logger::warning(std::format("最近使用颜色没能保存：{}", written.error().message));
+            Base::Logger::warning(std::format("最近使用颜色没能保存：{}", written.error().message));
         }
     }
 
@@ -999,7 +999,7 @@ namespace GyanisScribe::Annotation
             return;
         }
         // 无障碍名保持「自定义颜色」：那是这一枚按钮的本名，读屏要的是动作而不是状态
-        m_customColorButton->setToolTip(GyanisScribe::Core::uiText("自定义颜色（当前不透明度 %1%；在色板这一排上滚滚轮调节）").arg(currentColorOpacityPercent()));
+        m_customColorButton->setToolTip(GyanisScribe::Base::uiText("自定义颜色（当前不透明度 %1%；在色板这一排上滚滚轮调节）").arg(currentColorOpacityPercent()));
     }
 
     void AnnotationToolbar::refreshToolKeyHints()
@@ -1007,7 +1007,7 @@ namespace GyanisScribe::Annotation
         for (std::size_t index = 0; index < kToolTable.size(); ++index)
         {
             const auto label = std::get<2>(kToolTable[index]);
-            const auto text  = GyanisScribe::Core::uiText(label.data());
+            const auto text  = GyanisScribe::Base::uiText(label.data());
             // 字母键位只进 tooltip：无障碍名要保持与标签同名，读屏报出来的才是工具本名而不是键位
             // 清册里找不到这一档（标识写歪）就只报工具名：括号里空一格，读的人会以为那颗键坏了
             const auto *entry = GyanisScribe::Ui::appShortcutEntry(std::get<3>(kToolTable[index]));
@@ -1076,7 +1076,7 @@ namespace GyanisScribe::Annotation
         if (const auto written = m_settings.setValue(Settings::kAnnotationPalette, paletteToTokens(m_palette)); !written)
         {
             // 屏上已经换了、盘上还是旧的：这句警告是唯一能看出「下次开又变回去」从哪来的线索
-            Core::Logger::warning(std::format("色板顺序没能写进配置：{}", written.error().message));
+            Base::Logger::warning(std::format("色板顺序没能写进配置：{}", written.error().message));
         }
         syncColorButtonChecked();
     }
@@ -1172,7 +1172,7 @@ namespace GyanisScribe::Annotation
         for (std::size_t index = 0; index < m_recentColors.size(); ++index)
         {
             const auto color  = m_recentColors[index];
-            auto      *button = makeButton("Close", GyanisScribe::Core::uiText("最近使用 %1").arg(static_cast<int>(index) + 1), true);
+            auto      *button = makeButton("Close", GyanisScribe::Base::uiText("最近使用 %1").arg(static_cast<int>(index) + 1), true);
             // 图标换成色块：与预设那八格同一个画法，两排放在一起才看不出是两套控件
             button->setIcon(QIcon{colorSwatchPixmap(color, m_icons.tintColor())});
             m_colorGroup->addButton(button, static_cast<int>(m_palette.size() + index));

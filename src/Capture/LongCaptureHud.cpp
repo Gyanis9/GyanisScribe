@@ -1,6 +1,6 @@
 #include "Capture/LongCaptureHud.h"
 
-#include "Core/Text.h"
+#include "Base/Text.h"
 #include "Ui/DesignTokens.h"
 
 #include <QHBoxLayout>
@@ -46,8 +46,8 @@ namespace GyanisScribe::Capture
     LongCaptureHud::LongCaptureHud(QWidget *parent) : QWidget(parent)
     {
         // 工具窗 + 不吃焦点：滚动的是别的窗口，控制条抢了焦点就滚不动了
-        setWindowTitle(GyanisScribe::Core::uiText("长截图控制条"));
-        setAccessibleName(GyanisScribe::Core::uiText("长截图控制条"));
+        setWindowTitle(GyanisScribe::Base::uiText("长截图控制条"));
+        setAccessibleName(GyanisScribe::Base::uiText("长截图控制条"));
         setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
         setObjectName(QStringLiteral("hudRoot"));
         setAttribute(Qt::WA_StyledBackground, true);
@@ -56,13 +56,13 @@ namespace GyanisScribe::Capture
         root->setContentsMargins(GyanisScribe::Ui::kSpacingSmall, GyanisScribe::Ui::kSpacingTiny, GyanisScribe::Ui::kSpacingSmall, GyanisScribe::Ui::kSpacingTiny);
         root->setSpacing(GyanisScribe::Ui::kSpacingTiny);
 
-        auto *hint = new QLabel{GyanisScribe::Core::uiText("滚动要截的页面，接好后按完成"), this};
-        hint->setAccessibleName(GyanisScribe::Core::uiText("长截图提示"));
+        auto *hint = new QLabel{GyanisScribe::Base::uiText("滚动要截的页面，接好后按完成"), this};
+        hint->setAccessibleName(GyanisScribe::Base::uiText("长截图提示"));
         GyanisScribe::Ui::applyTextRole(*hint, GyanisScribe::Ui::TextRole::Body);
         root->addWidget(hint);
 
-        m_readout = new QLabel{GyanisScribe::Core::uiText("还没接上任何一段"), this};
-        m_readout->setAccessibleName(GyanisScribe::Core::uiText("已接高度"));
+        m_readout = new QLabel{GyanisScribe::Base::uiText("还没接上任何一段"), this};
+        m_readout->setAccessibleName(GyanisScribe::Base::uiText("已接高度"));
         // 等宽数字：每接一帧就跳一下，比例字体会让整条控制条左右抖
         GyanisScribe::Ui::applyTextRole(*m_readout, GyanisScribe::Ui::TextRole::Metric);
         root->addWidget(m_readout);
@@ -71,12 +71,12 @@ namespace GyanisScribe::Capture
         line->setSpacing(GyanisScribe::Ui::kSpacingSmall);
         root->addLayout(line);
 
-        auto *cancelButton = new QPushButton{GyanisScribe::Core::uiText("取消"), this};
-        cancelButton->setToolTip(GyanisScribe::Core::uiText("扔掉这一段，不产出长图"));
-        cancelButton->setAccessibleName(GyanisScribe::Core::uiText("取消长截图"));
-        auto *finishButton = new QPushButton{GyanisScribe::Core::uiText("完成"), this};
-        finishButton->setToolTip(GyanisScribe::Core::uiText("结束拼接，把这张长图交给下一步"));
-        finishButton->setAccessibleName(GyanisScribe::Core::uiText("完成长截图"));
+        auto *cancelButton = new QPushButton{GyanisScribe::Base::uiText("取消"), this};
+        cancelButton->setToolTip(GyanisScribe::Base::uiText("扔掉这一段，不产出长图"));
+        cancelButton->setAccessibleName(GyanisScribe::Base::uiText("取消长截图"));
+        auto *finishButton = new QPushButton{GyanisScribe::Base::uiText("完成"), this};
+        finishButton->setToolTip(GyanisScribe::Base::uiText("结束拼接，把这张长图交给下一步"));
+        finishButton->setAccessibleName(GyanisScribe::Base::uiText("完成长截图"));
 
         line->addWidget(cancelButton);
         line->addWidget(finishButton);

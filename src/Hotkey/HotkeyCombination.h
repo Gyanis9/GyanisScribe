@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <Qt>
 
@@ -50,7 +50,7 @@ namespace GyanisScribe::Hotkey
          * @note 修饰键与按键都只认固定词表：字母取 A-Z、数字取 0-9、功能键取 F1-F24、再加 Space。
          *       「至少一个修饰键」也在这里判——一个单键的全局热键会把别的程序的按键吞掉
          */
-        [[nodiscard]] static Core::Expected<HotkeyCombination> fromText(std::string_view text, bool allowBareKeys = false);
+        [[nodiscard]] static Base::Expected<HotkeyCombination> fromText(std::string_view text, bool allowBareKeys = false);
 
         /**
          * @brief 从文本解析组合，但不判「能不能拿去登记」
@@ -59,7 +59,7 @@ namespace GyanisScribe::Hotkey
          * @details 与 fromText() 差在最后那道全局档检查：界面内的按键允许裸键，
          *          「至少要带一个修饰键」是登记到系统才需要的限制。
          */
-        [[nodiscard]] static Core::Expected<HotkeyCombination> parse(std::string_view text);
+        [[nodiscard]] static Base::Expected<HotkeyCombination> parse(std::string_view text);
 
         /**
          * @brief 检查能否用作全局热键
@@ -68,7 +68,7 @@ namespace GyanisScribe::Hotkey
          * @return 成功返回空载荷
          * @return 失败返回 InvalidArgument 与中文原因（缺修饰键、按键是修饰键本身、或按键不在允许集合内）
          */
-        [[nodiscard]] Core::Expected<void> checkUsableGlobally(bool allowBareKeys = false) const;
+        [[nodiscard]] Base::Expected<void> checkUsableGlobally(bool allowBareKeys = false) const;
 
         /**
          * @brief 检查能否用作本程序窗口里的按键
@@ -77,7 +77,7 @@ namespace GyanisScribe::Hotkey
          * @note 裸键在这一档合法：窗口里的按键只在程序自己有焦点时才吃到，不会像全局单键那样
          *       把别的程序的打字吞掉，所以只少「至少一个修饰键」那一条。
          */
-        [[nodiscard]] Core::Expected<void> checkUsableInWindow() const;
+        [[nodiscard]] Base::Expected<void> checkUsableInWindow() const;
 
         /**
          * @brief 转成统一文本形态

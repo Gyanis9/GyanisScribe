@@ -1,8 +1,8 @@
 #include "Settings/SettingsStore.h"
 
-#include "Core/Paths.h"
-#include "Core/Logger.h"
-#include "Core/Text.h"
+#include "Base/Paths.h"
+#include "Base/Logger.h"
+#include "Base/Text.h"
 
 #include <QFile>
 #include <QJsonArray>
@@ -86,7 +86,7 @@ namespace GyanisScribe::Settings
         QString storageFailureReason(std::string_view key)
         {
             return QString::fromUtf8(
-                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("配置项 {} 存不进去：后端返回了错误状态，请检查应用配置目录是否可写"), key).c_str());
+                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("配置项 {} 存不进去：后端返回了错误状态，请检查应用配置目录是否可写"), key).c_str());
         }
     } // namespace
 
@@ -122,7 +122,7 @@ namespace GyanisScribe::Settings
         {
             // 空文本按「没值」处理而不是原样交回：一个空的截图目录会被下游当成合法路径，
             // 到写文件那一刻才炸。与整数·布尔同一口径——坏值记一条 Warning 再回落
-            Core::Logger::warning(std::format("配置项 {} 存的是空文本，按默认值处理；要恢复默认就把这一项删掉", std::string_view(key)));
+            Base::Logger::warning(std::format("配置项 {} 存的是空文本，按默认值处理；要恢复默认就把这一项删掉", std::string_view(key)));
             return defaultValue;
         }
         return text;
@@ -147,7 +147,7 @@ namespace GyanisScribe::Settings
         }
 
         // 坏值记一条 Warning 后回落默认：既不截断也不取整，但也不让一个键把整条启动流程带崩
-        Core::Logger::warning(std::format("配置项 {} 存的值「{}」不是十进制整数，按默认值 {} 继续", std::string_view(key), stored.toString().toStdString(), defaultValue));
+        Base::Logger::warning(std::format("配置项 {} 存的值「{}」不是十进制整数，按默认值 {} 继续", std::string_view(key), stored.toString().toStdString(), defaultValue));
         return defaultValue;
     }
 
@@ -169,7 +169,7 @@ namespace GyanisScribe::Settings
             return parsed;
         }
 
-        Core::Logger::warning(std::format("配置项 {} 存的值「{}」不在布尔词表（true/false/1/0/yes/no）里，按默认值 {} 继续", std::string_view(key), stored.toString().toStdString(),
+        Base::Logger::warning(std::format("配置项 {} 存的值「{}」不在布尔词表（true/false/1/0/yes/no）里，按默认值 {} 继续", std::string_view(key), stored.toString().toStdString(),
                                           defaultValue));
         return defaultValue;
     }
@@ -187,22 +187,22 @@ namespace GyanisScribe::Settings
         }
 
         // 列表被写成了单个文本（手工编辑 INI 很常见）：按一项交回去，并留下线索
-        Core::Logger::warning(std::format("配置项 {} 存的不是列表，按单元素列表处理，原文「{}」", std::string_view(key), stored.toString().toStdString()));
+        Base::Logger::warning(std::format("配置项 {} 存的不是列表，按单元素列表处理，原文「{}」", std::string_view(key), stored.toString().toStdString()));
         return {stored.toString()};
     }
 
-    Core::Expected<void> SettingsStore::setValue(std::string_view key, const QVariant &value)
+    Base::Expected<void> SettingsStore::setValue(std::string_view key, const QVariant &value)
     {
         if (key.empty())
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("写入配置项失败：键名为空。请传「分组/大驼峰」形式的键，例如 Paths/Screenshot")});
+                    Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("写入配置项失败：键名为空。请传「分组/大驼峰」形式的键，例如 Paths/Screenshot")});
         }
 
         m_settings->setValue(toKey(key), value);
         if (m_settings->status() == QSettings::AccessError)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::FileWriteFailed, storageFailureReason(key).toStdString()});
+            return std::unexpected(Base::Error{Base::ErrorCode::FileWriteFailed, storageFailureReason(key).toStdString()});
         }
 
         // 通知发在状态检查之后：失败时不发，订阅者不会为一个没落地的值去重载
@@ -215,7 +215,7 @@ namespace GyanisScribe::Settings
         m_settings->sync();
         if (m_settings->status() == QSettings::AccessError)
         {
-            Core::Logger::warning("配置落盘失败：后端返回访问错误，本次改动可能没写进去，请检查配置目录权限");
+            Base::Logger::warning("配置落盘失败：后端返回访问错误，本次改动可能没写进去，请检查配置目录权限");
         }
     }
 
@@ -224,7 +224,7 @@ namespace GyanisScribe::Settings
         return m_settings->allKeys();
     }
 
-    Core::Expected<void> SettingsStore::exportToFile(const std::filesystem::path &filePath) const
+    Base::Expected<void> SettingsStore::exportToFile(const std::filesystem::path &filePath) const
     {
         QJsonObject root;
         for (const auto &key: m_settings->allKeys())
@@ -243,28 +243,28 @@ namespace GyanisScribe::Settings
         QSaveFile output(QString::fromStdWString(filePath.wstring()));
         if (!output.open(QIODevice::WriteOnly))
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::FileWriteFailed,
-                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("配置导出文件打不开：{}（{}）。请换一个可写的目录再试"),
-                                                                            Core::Paths::toDisplayText(filePath).toStdString(), output.errorString().toStdString())});
+            return std::unexpected(Base::Error{Base::ErrorCode::FileWriteFailed,
+                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("配置导出文件打不开：{}（{}）。请换一个可写的目录再试"),
+                                                                            Base::Paths::toDisplayText(filePath).toStdString(), output.errorString().toStdString())});
         }
         output.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
         if (!output.commit())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::FileWriteFailed,
-                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("配置导出没落盘：{}（{}）。请检查磁盘空间与目录权限"),
-                                                                            Core::Paths::toDisplayText(filePath).toStdString(), output.errorString().toStdString())});
+            return std::unexpected(Base::Error{Base::ErrorCode::FileWriteFailed,
+                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("配置导出没落盘：{}（{}）。请检查磁盘空间与目录权限"),
+                                                                            Base::Paths::toDisplayText(filePath).toStdString(), output.errorString().toStdString())});
         }
         return {};
     }
 
-    Core::Expected<int> SettingsStore::importFromFile(const std::filesystem::path &filePath)
+    Base::Expected<int> SettingsStore::importFromFile(const std::filesystem::path &filePath)
     {
         QFile input(QString::fromStdWString(filePath.wstring()));
         if (!input.open(QIODevice::ReadOnly))
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("配置导入文件读不到：{}（{}）。请确认路径与文件名"),
-                                                                            Core::Paths::toDisplayText(filePath).toStdString(), input.errorString().toStdString())});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("配置导入文件读不到：{}（{}）。请确认路径与文件名"),
+                                                                            Base::Paths::toDisplayText(filePath).toStdString(), input.errorString().toStdString())});
         }
 
         QJsonParseError parseError{};
@@ -272,9 +272,9 @@ namespace GyanisScribe::Settings
         if (parseError.error != QJsonParseError::NoError || !document.isObject())
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument,
-                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("配置导入文件不是一个 JSON 对象：{}（{}）。请导出本程序生成的那份再导入"),
-                                                             Core::Paths::toDisplayText(filePath).toStdString(), parseError.errorString().toStdString())});
+                    Base::Error{Base::ErrorCode::InvalidArgument,
+                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("配置导入文件不是一个 JSON 对象：{}（{}）。请导出本程序生成的那份再导入"),
+                                                             Base::Paths::toDisplayText(filePath).toStdString(), parseError.errorString().toStdString())});
         }
 
         const auto root     = document.object();

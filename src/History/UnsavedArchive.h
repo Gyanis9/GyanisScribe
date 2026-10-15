@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QDateTime>
 #include <QImage>
@@ -27,7 +27,7 @@ namespace GyanisScribe::History
      * @brief 把一张截图写进指定目录，并裁掉超出上限的旧份
      * @param image 截图像素；空图直接报错，不写一张 0×0 的文件
      * @param moment 截图时刻，决定文件名
-     * @param directory 落盘目录，不存在时创建；调用方给 Core::Paths::unsavedCaptureDirectory()
+     * @param directory 落盘目录，不存在时创建；调用方给 Base::Paths::unsavedCaptureDirectory()
      * @param capacity 目录里最多留几张，超出按写入时刻删最旧的；调用方给 kUnsavedArchiveCapacity
      * @return 写出去的文件路径；目录建不出、图写不下或像素是空的，返回可操作的中文错误
      * @details 目录与上限由调用方交出而不是写死在函数里：ctest 并行时每个用例是一个独立进程，
@@ -35,7 +35,7 @@ namespace GyanisScribe::History
      *          永远写 PNG：这一份是给「误触 Esc 也还在」兜底的，有损档会把用户没存过的那张
      *          压出二次损伤，而透明通道丢了就找不回来。
      */
-    [[nodiscard]] Core::Expected<std::filesystem::path> archiveUnsavedCapture(const QImage &image, const QDateTime &moment, const std::filesystem::path &directory,
+    [[nodiscard]] Base::Expected<std::filesystem::path> archiveUnsavedCapture(const QImage &image, const QDateTime &moment, const std::filesystem::path &directory,
                                                                               std::size_t capacity);
 
 } // namespace GyanisScribe::History

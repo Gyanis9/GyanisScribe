@@ -195,7 +195,7 @@ namespace GyanisScribe
 
         const auto shown = pins().showGroup(7);
         ASSERT_FALSE(shown.has_value());
-        EXPECT_EQ(shown.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument);
+        EXPECT_EQ(shown.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument);
         EXPECT_NE(shown.error().message.find("移动到分组"), std::string::npos) << "拒绝要给出路：" << shown.error().message;
         EXPECT_EQ(pins().activeGroup(), 1) << "被拒的那一次不该顺手换了活动组";
     }

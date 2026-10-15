@@ -2,7 +2,7 @@
 // 少任何一套都会把圈画到别的地方，而画歪的圈比不画更误导看录屏的人。
 #include "Record/CursorHighlight.h"
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 #include "Ui/DesignTokens.h"
 
 #include <gtest/gtest.h>
@@ -18,7 +18,7 @@
 
 namespace
 {
-    using GyanisScribe::Core::ErrorCode;
+    using GyanisScribe::Base::ErrorCode;
     using GyanisScribe::Record::paintCursorHighlight;
     using GyanisScribe::Ui::kCursorHighlightRadius;
 

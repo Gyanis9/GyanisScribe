@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 #include "Platform/IHotkeyBackend.h"
 #include "Platform/PlatformCapabilities.h"
 #include "Platform/WindowGeometry.h"
@@ -76,14 +76,14 @@ namespace GyanisScribe::Platform
          * @note 只给句柄不给几何：抓哪一块由抓帧那一步按句柄去问，这里再读一次系统就是两处读数，
          *       窗口正在动的时候两边会不一致
          */
-        [[nodiscard]] virtual Core::Expected<ForegroundWindow> foregroundWindow() const = 0;
+        [[nodiscard]] virtual Base::Expected<ForegroundWindow> foregroundWindow() const = 0;
 
         /**
          * @brief 本程序现在有没有登记开机启动
          * @return 成功返回状态；本平台没有这一能力时返回 PlatformUnsupported 并写明替代做法
          * @note 状态的真源是系统里那一条启动项本身，不在配置里另存一份——两份真源迟早对不上
          */
-        [[nodiscard]] virtual Core::Expected<bool> autostartEnabled() const = 0;
+        [[nodiscard]] virtual Base::Expected<bool> autostartEnabled() const = 0;
 
         /**
          * @brief 开/关开机启动
@@ -91,7 +91,7 @@ namespace GyanisScribe::Platform
          * @return 成功返回空载荷；写不进去或本平台没有这一能力时返回带中文原因的错误
          * @details 入口只从设置页来，且按 capabilities().autostart 决定给不给点
          */
-        [[nodiscard]] virtual Core::Expected<void> setAutostart(bool enabled) = 0;
+        [[nodiscard]] virtual Base::Expected<void> setAutostart(bool enabled) = 0;
 
         /**
          * @brief 桌面上看得见的顶层窗口，按 z 序从最上面排到最下面
@@ -100,7 +100,7 @@ namespace GyanisScribe::Platform
          *          本程序自己的窗口也留在名单里——遮罩那一层盖住全屏，调用方按句柄把自己那几层剔掉，
          *          平台层不替界面决定「谁该出现在候选里」
          */
-        [[nodiscard]] virtual Core::Expected<std::vector<ScreenWindow>> screenWindows() const = 0;
+        [[nodiscard]] virtual Base::Expected<std::vector<ScreenWindow>> screenWindows() const = 0;
 
         /**
          * @brief 光标处一摞界面元素，从最深一级往上排到所在窗口的根
@@ -114,7 +114,7 @@ namespace GyanisScribe::Platform
          *          自己决定几层算一档。实现在 Windows 上先认「光标下第一扇不在排除名单里的可见窗」再问 UI Automation：
          *          UIA 的命中测试穿不过置顶窗（本机探针实测，工具窗也不例外），所以不能直接问「点下的元素」。
          */
-        [[nodiscard]] virtual Core::Expected<std::vector<QRect>> elementChainAtPoint(const QPoint &globalLogicalPoint, const std::vector<quintptr> &excludeWindowHandles) const = 0;
+        [[nodiscard]] virtual Base::Expected<std::vector<QRect>> elementChainAtPoint(const QPoint &globalLogicalPoint, const std::vector<quintptr> &excludeWindowHandles) const = 0;
     };
 
     /**

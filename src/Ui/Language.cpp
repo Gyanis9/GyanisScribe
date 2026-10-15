@@ -1,6 +1,6 @@
 #include "Ui/Language.h"
 
-#include "Core/Logger.h"
+#include "Base/Logger.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -31,7 +31,7 @@ namespace
 
 namespace GyanisScribe::Ui
 {
-    Core::Expected<AppLanguage> parseAppLanguage(const std::string_view text)
+    Base::Expected<AppLanguage> parseAppLanguage(const std::string_view text)
     {
         // 大小写与首尾空格都归一后再比：手改配置文件的人不该因为写了 ZH 就被判坏值
         std::string normalized{text};
@@ -47,8 +47,8 @@ namespace GyanisScribe::Ui
         }
 
         // 逐项列出可用取值：只报「取值不对」用户不知道该填什么
-        return Core::Expected<AppLanguage>{std::unexpected{Core::Error{
-                .code    = Core::ErrorCode::InvalidArgument,
+        return Base::Expected<AppLanguage>{std::unexpected{Base::Error{
+                .code    = Base::ErrorCode::InvalidArgument,
                 .message = std::format("界面语言取值 \"{}\" 不在可用档位里：配置里只能是 zh 或 en（大小写不敏感），"
                                        "也可以在设置的通用页从「中文」「English」两项里选",
                                        text),
@@ -61,7 +61,7 @@ namespace GyanisScribe::Ui
         // 越界档位属调用方 bug：回落到中文会把「新加一档忘了补词表」藏起来，先记一条再回落
         if (index >= kLanguageTokens.size())
         {
-            Core::Logger::warning(std::format("未知的界面语言档位（枚举值 {}），按中文处理", static_cast<int>(language)));
+            Base::Logger::warning(std::format("未知的界面语言档位（枚举值 {}），按中文处理", static_cast<int>(language)));
             return kLanguageTokens[0];
         }
         return kLanguageTokens[index];
@@ -112,7 +112,7 @@ namespace GyanisScribe::Ui
         return directories;
     }
 
-    Core::Expected<void> applyLanguage(const AppLanguage language, const QStringList &directories)
+    Base::Expected<void> applyLanguage(const AppLanguage language, const QStringList &directories)
     {
         const auto candidates = findTranslationFiles(language, directories);
         if (candidates.isEmpty())
@@ -126,8 +126,8 @@ namespace GyanisScribe::Ui
 
             // 报出找过的目录，否则用户只能猜「到底去哪儿找的」
             const auto searched = directories.join(QStringLiteral("；"));
-            return Core::Expected<void>{std::unexpected{Core::Error{
-                    .code    = Core::ErrorCode::DependencyMissing,
+            return Base::Expected<void>{std::unexpected{Base::Error{
+                    .code    = Base::ErrorCode::DependencyMissing,
                     .message = std::format("找不到英文语言包 {}：请把它放在程序目录的 translations 子目录里（构建时由 lrelease 生成在 "
                                            "build/<预设>/translations/）。本次按中文继续，找过的目录：{}",
                                            fileName.toStdString(), searched.toStdString()),
@@ -140,14 +140,14 @@ namespace GyanisScribe::Ui
         {
             // 读不开就别留在应用对象上：它已挂进 parent 的子对象表，留着就是一份永远不会命中的翻译器
             delete translator;
-            return Core::Expected<void>{std::unexpected{Core::Error{
-                    .code    = Core::ErrorCode::DependencyMissing,
+            return Base::Expected<void>{std::unexpected{Base::Error{
+                    .code    = Base::ErrorCode::DependencyMissing,
                     .message = std::format("语言包 {} 读不开：它可能是旧版 lrelease 生成的、或者被截断了。本次按中文继续", candidates.first().toStdString()),
             }}};
         }
 
         QCoreApplication::installTranslator(translator);
-        Core::Logger::info(std::format("界面语言装载完成：{}", candidates.first().toStdString()));
+        Base::Logger::info(std::format("界面语言装载完成：{}", candidates.first().toStdString()));
         return {};
     }
 

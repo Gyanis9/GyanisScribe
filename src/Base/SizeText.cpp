@@ -1,11 +1,11 @@
-#include "Core/SizeText.h"
+#include "Base/SizeText.h"
 
 #include <QRegularExpression>
 
 #include <cmath>
 #include <QStringList>
 
-namespace GyanisScribe::Core
+namespace GyanisScribe::Base
 {
 
     std::optional<QSize> parseSizeText(const QString &text)
@@ -64,4 +64,4 @@ namespace GyanisScribe::Core
         return ratio;
     }
 
-} // namespace GyanisScribe::Core
+} // namespace GyanisScribe::Base

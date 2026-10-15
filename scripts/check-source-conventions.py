@@ -4,7 +4,7 @@
 一、路径不许走窄串。Windows 上 std::filesystem::path::string() 按本地 ANSI 码页给字节，
    码页装不下的字会当场抛 std::system_error——而抛出点多半在承诺返回 std::expected 的通道里。
    反过来把界面里的路径文本换成路径也要走 wstring。唯一的真源是
-   Core::Paths::toDisplayText / fromDisplayText。确属例外（命令行参数要按本地编码交给子进程）
+   Base::Paths::toDisplayText / fromDisplayText。确属例外（命令行参数要按本地编码交给子进程）
    的调用点必须在同一句里写明理由：不写就红，写了就放过。
 
 二、按枚举分派的开关要覆盖每个值。MSVC 默认不对「switch 漏了某个枚举值」报警（C4061/C4062
@@ -43,7 +43,7 @@ PATH_TO_NARROW = re.compile(r"QString::fromLocal8Bit\([^;]*?(?:\.|->)string\(\)"
 NARROW_TO_PATH = re.compile(r"std::filesystem::path\s*[({][^;]*?\.toStdString\(\)")
 
 #文案与日志里的路径实参：std::format("…", path.string()) 会在本地码页装不下时抛出，
-#而抛出点常在「承诺返回 expected」的函数里 —— 该用 Core::Paths::toDisplayText(path).toStdString()
+#而抛出点常在「承诺返回 expected」的函数里 —— 该用 Base::Paths::toDisplayText(path).toStdString()
 MESSAGE_ARG = re.compile(r"(?:std::format|uiFormat|Logger::)")
 PATH_DOT_STRING = re.compile(r"(?:\.|->)string\(\)")
 
@@ -118,7 +118,7 @@ def check_path_encoding(root: pathlib.Path) -> list[str]:
         for number, statement in statements(source.read_text(encoding="utf-8", errors="replace")):
             if is_path_narrow(statement) or is_message_narrow(statement):
                 one_line = " ".join(part.strip() for part in statement.splitlines()).strip()
-                findings.append(f"{source.relative_to(root.parent)}:{number} 路径与窄串互转，要改走 Core::Paths::toDisplayText / fromDisplayText：{one_line}")
+                findings.append(f"{source.relative_to(root.parent)}:{number} 路径与窄串互转，要改走 Base::Paths::toDisplayText / fromDisplayText：{one_line}")
     return findings
 
 
@@ -219,10 +219,10 @@ def self_probe() -> None:
     if is_path_narrow(exempt):
         raise RuntimeError("写了理由的例外仍被拦下：例外口等于没有")
 
-    message_shape = '        Core::Logger::info(std::format("已保存：{}", filePath.string()));'
+    message_shape = '        Base::Logger::info(std::format("已保存：{}", filePath.string()));'
     if not is_message_narrow(message_shape):
         raise RuntimeError("文案里的 path.string() 没被认出来：抛出会被当成可恢复错误漏掉")
-    if is_message_narrow('        Core::Logger::info(std::format("已保存：{}", Core::Paths::toDisplayText(filePath).toStdString()));'):
+    if is_message_narrow('        Base::Logger::info(std::format("已保存：{}", Base::Paths::toDisplayText(filePath).toStdString()));'):
         raise RuntimeError("已经走 toDisplayText 的写法被误报：门禁会红得让人放弃它")
 
     header = "enum class WidgetAction" + NEWLINE + "{" + NEWLINE + "    Open," + NEWLINE + "    Close, ///< 关掉" + NEWLINE + "    // Deleted," + NEWLINE + "};" + NEWLINE

@@ -3,9 +3,9 @@
 
 #include "App/CrashGuard.h"
 
-#include "Core/Logger.h"
-#include "Core/Paths.h"
-#include "Core/Text.h"
+#include "Base/Logger.h"
+#include "Base/Paths.h"
+#include "Base/Text.h"
 
 #include <QApplication>
 #include <QCoreApplication>
@@ -67,14 +67,14 @@ int main(int argc, char *argv[])
     }
 
     // 兜底要在任何可能崩的步骤之前装好：装晚了那条崩就只是「程序没了」
-    GyanisScribe::App::installCrashDumpWriter(GyanisScribe::Core::Paths::logDirectory(), QCoreApplication::applicationVersion().toStdWString());
+    GyanisScribe::App::installCrashDumpWriter(GyanisScribe::Base::Paths::logDirectory(), QCoreApplication::applicationVersion().toStdWString());
     GyanisScribe::App::installTerminateHandler();
 
     // 单实例：第二次启动把前一份唤出来然后自己退出，而不是两个实例抢同一批全局热键
     if (!application.tryBecomePrimaryInstance())
     {
         const auto woken = application.wakePrimaryInstance();
-        GyanisScribe::Core::Logger::info(woken ? "已有一个智录在运行：把它唤到前台后本次启动退出" : "已有一个智录在运行，但没能通知到它：本次启动退出，避免两份实例抢全局热键");
+        GyanisScribe::Base::Logger::info(woken ? "已有一个智录在运行：把它唤到前台后本次启动退出" : "已有一个智录在运行，但没能通知到它：本次启动退出，避免两份实例抢全局热键");
         return 0;
     }
 
@@ -85,8 +85,8 @@ int main(int argc, char *argv[])
     {
         // 事件分发里的异常默认会走到 terminate；这里接住是为了给出退出码与那句人话
         const auto message =
-                GyanisScribe::App::crashMessageFor(std::current_exception(), GyanisScribe::Core::Paths::toDisplayText(GyanisScribe::Core::Paths::logDirectory()).toStdString());
-        GyanisScribe::Core::Logger::error(message.toStdString());
+                GyanisScribe::App::crashMessageFor(std::current_exception(), GyanisScribe::Base::Paths::toDisplayText(GyanisScribe::Base::Paths::logDirectory()).toStdString());
+        GyanisScribe::Base::Logger::error(message.toStdString());
         return GyanisScribe::App::kCrashExitCode;
     }
 }

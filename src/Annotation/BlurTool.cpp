@@ -1,7 +1,7 @@
 #include "Annotation/BlurTool.h"
 
 #include "Annotation/ImageBlur.h"
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 #include <QImage>
 #include <QPainter>
@@ -16,7 +16,7 @@ namespace GyanisScribe::Annotation
 
     QString BlurTool::displayName() const
     {
-        return GyanisScribe::Core::uiText("高斯模糊");
+        return GyanisScribe::Base::uiText("高斯模糊");
     }
 
     void BlurTool::paintShape(QPainter &painter, const AnnotationShape &shape, const PaintContext &context) const

@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 #include "Ocr/OcrTypes.h"
 
 #include <QImage>
@@ -65,7 +65,7 @@ namespace GyanisScribe::Ocr
          * @return 成功返回结果（一行都没认出来也算成功，用 OcrResult::isEmpty() 判）
          * @return 失败返回原因：语言不支持、图太小、后端不可用都各自给中文说明
          */
-        [[nodiscard]] virtual Core::Expected<OcrResult> recognize(const QImage &image, const QString &language) = 0;
+        [[nodiscard]] virtual Base::Expected<OcrResult> recognize(const QImage &image, const QString &language) = 0;
     };
 
 } // namespace GyanisScribe::Ocr

@@ -6,8 +6,8 @@
 #include "Capture/LongCaptureHud.h"
 #include "Capture/RegionHistory.h"
 #include "Capture/ScreenUtils.h"
-#include "Core/Logger.h"
-#include "Core/Text.h"
+#include "Base/Logger.h"
+#include "Base/Text.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
@@ -28,7 +28,7 @@ namespace
     {
         if (const auto stored = settings.setValue(GyanisScribe::Settings::kCaptureAspectRatio, QVariant(GyanisScribe::Capture::aspectRatioToText(ratio))); !stored)
         {
-            GyanisScribe::Core::Logger::warning(std::format("长宽比锁没能记下：{}", stored.error().message));
+            GyanisScribe::Base::Logger::warning(std::format("长宽比锁没能记下：{}", stored.error().message));
         }
     }
 
@@ -76,7 +76,7 @@ namespace GyanisScribe::Capture
             const auto parsed = parseCaptureCornerRadius(stored);
             if (!parsed)
             {
-                Core::Logger::warning(parsed.error().message);
+                Base::Logger::warning(parsed.error().message);
             }
             const auto logical = parsed.value_or(kCaptureCornerRadiusDefault);
             frame->image       = roundedCornerImage(frame->image, qRound(logical * frame->devicePixelRatio));
@@ -88,7 +88,7 @@ namespace GyanisScribe::Capture
         deliver(frame);
     }
 
-    Core::Expected<Core::CapturedImage> CaptureService::grabRegionNow(const QRect &logicalRegion, const QString &screenName)
+    Base::Expected<Base::CapturedImage> CaptureService::grabRegionNow(const QRect &logicalRegion, const QString &screenName)
     {
         // 指针先画进整帧再裁：选区里带不带指针由选区自己决定，不必裁完再来一次坐标换算
         const auto frame = withCursorIfWanted(m_source.grabScreen(screenName));
@@ -112,13 +112,13 @@ namespace GyanisScribe::Capture
         const auto history = loadRegionHistory(m_settings);
         if (!history)
         {
-            deliver(Core::Expected<Core::CapturedImage>(std::unexpected(history.error())));
+            deliver(Base::Expected<Base::CapturedImage>(std::unexpected(history.error())));
             return;
         }
         if (history->empty())
         {
-            deliver(Core::Expected<Core::CapturedImage>(
-                    std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("还没有可复用的上次区域：先框选截图一次，或改用区域截图")})));
+            deliver(Base::Expected<Base::CapturedImage>(
+                    std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("还没有可复用的上次区域：先框选截图一次，或改用区域截图")})));
             return;
         }
 
@@ -142,8 +142,8 @@ namespace GyanisScribe::Capture
         {
             // 上一轮长截图还在接：再铺一层遮罩会让手里那张接了一半的图既没交也没作废。
             // 这一句把选择权交回给用户——完成或取消，再开始下一次
-            deliver(Core::Expected<Core::CapturedImage>(std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument, GyanisScribe::Core::uiTextUtf8("滚动长截图还在接：先在控制条上按完成或取消，再开始下一次截图")})));
+            deliver(Base::Expected<Base::CapturedImage>(std::unexpected(
+                    Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("滚动长截图还在接：先在控制条上按完成或取消，再开始下一次截图")})));
             return;
         }
 
@@ -156,8 +156,8 @@ namespace GyanisScribe::Capture
         const auto screens = QGuiApplication::screens();
         if (screens.isEmpty())
         {
-            deliver(Core::Expected<Core::CapturedImage>(
-                    std::unexpected(Core::Error{Core::ErrorCode::ScreenUnavailable, GyanisScribe::Core::uiTextUtf8("进入框选失败：Qt 没有报出任何屏幕。请在 GUI 会话里重试")})));
+            deliver(Base::Expected<Base::CapturedImage>(
+                    std::unexpected(Base::Error{Base::ErrorCode::ScreenUnavailable, GyanisScribe::Base::uiTextUtf8("进入框选失败：Qt 没有报出任何屏幕。请在 GUI 会话里重试")})));
             return;
         }
 
@@ -170,7 +170,7 @@ namespace GyanisScribe::Capture
         auto regionHistory = loadRegionHistory(m_settings);
         if (!regionHistory)
         {
-            Core::Logger::warning(std::format("选区历史读不出，这一轮的 R/Shift+R 没有可挑的：{}", regionHistory.error().message));
+            Base::Logger::warning(std::format("选区历史读不出，这一轮的 R/Shift+R 没有可挑的：{}", regionHistory.error().message));
             regionHistory = std::vector<RegionHistoryEntry>{};
         }
 
@@ -257,7 +257,7 @@ namespace GyanisScribe::Capture
         return m_cursorOverride.value_or(m_settings.boolValue(Settings::kCaptureIncludeCursor, Settings::kDefaultCaptureIncludeCursor));
     }
 
-    Core::Expected<Core::CapturedImage> CaptureService::withCursorIfWanted(const Core::Expected<Core::CapturedImage> &frame) const
+    Base::Expected<Base::CapturedImage> CaptureService::withCursorIfWanted(const Base::Expected<Base::CapturedImage> &frame) const
     {
         if (!frame || !cursorIncludedForThisRound())
         {
@@ -269,7 +269,7 @@ namespace GyanisScribe::Capture
         if (!sprite || sprite->image.isNull())
         {
             // 平台给不出形状（指针隐藏、非 Windows 后端）：说明白这次不含指针，别按「含了」交下去
-            Core::Logger::warning(std::format("这一轮要含鼠标指针（设置里那一档，或遮罩上按 P 翻出来的那一档），但这次取不到指针的形状，交出去的图里没有指针"));
+            Base::Logger::warning(std::format("这一轮要含鼠标指针（设置里那一档，或遮罩上按 P 翻出来的那一档），但这次取不到指针的形状，交出去的图里没有指针"));
             return frame;
         }
 
@@ -278,19 +278,19 @@ namespace GyanisScribe::Capture
         return result;
     }
 
-    void CaptureService::deliver(const Core::Expected<Core::CapturedImage> &result)
+    void CaptureService::deliver(const Base::Expected<Base::CapturedImage> &result)
     {
         // 这一轮的临时档到此为止：它只属于刚刚那趟遮罩，下一张没有遮罩的截图该回到配置那一档上
         m_cursorOverride.reset();
         if (result)
         {
-            Core::Logger::info(std::format("截图完成：{}×{} 像素，逻辑 {}×{}，屏 {}", result->image.width(), result->image.height(), result->logicalSize.width(),
+            Base::Logger::info(std::format("截图完成：{}×{} 像素，逻辑 {}×{}，屏 {}", result->image.width(), result->image.height(), result->logicalSize.width(),
                                            result->logicalSize.height(), result->screenName.toStdString()));
             emit captured(*result);
             return;
         }
 
-        Core::Logger::error(std::format("截图失败：{}", result.error().message));
+        Base::Logger::error(std::format("截图失败：{}", result.error().message));
         emit captureFailed(result.error());
     }
 
@@ -377,7 +377,7 @@ namespace GyanisScribe::Capture
         if (!appended)
         {
             stopLongRound();
-            deliver(Core::Expected<Core::CapturedImage>(std::unexpected(appended.error())));
+            deliver(Base::Expected<Base::CapturedImage>(std::unexpected(appended.error())));
             return;
         }
 
@@ -392,7 +392,7 @@ namespace GyanisScribe::Capture
         }
         if (m_longImage.logicalSize.height() >= kLongCaptureMaximumLogicalHeight)
         {
-            Core::Logger::warning(std::format("长截图接到逻辑高度 {} 的上限，就地收口", m_longImage.logicalSize.height()));
+            Base::Logger::warning(std::format("长截图接到逻辑高度 {} 的上限，就地收口", m_longImage.logicalSize.height()));
             finishLongCapture();
         }
     }
@@ -407,7 +407,7 @@ namespace GyanisScribe::Capture
         stopLongRound();
 
         // 交出去的形状与一次普通截图完全一样：后续去向不需要知道这是接出来的
-        deliver(Core::Expected<Core::CapturedImage>(m_longImage));
+        deliver(Base::Expected<Base::CapturedImage>(m_longImage));
         m_longImage = {};
     }
 
@@ -459,7 +459,7 @@ namespace GyanisScribe::Capture
         if (screen == nullptr)
         {
             // 名字对不上（多半是这一轮之间拔了屏）：摆不了位也要能收口，控制条留在原地由用户关掉
-            Core::Logger::warning(std::format("长截图没找到那块屏 {}，控制条摆在原处", m_longScreenName.toStdString()));
+            Base::Logger::warning(std::format("长截图没找到那块屏 {}，控制条摆在原处", m_longScreenName.toStdString()));
             return;
         }
 
@@ -472,9 +472,9 @@ namespace GyanisScribe::Capture
         const auto height = m_longImage.logicalSize.height();
         if (!grew)
         {
-            return QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已接 {} 像素高：这一段和上一段一样，往下滚一点再接"), height).c_str());
+            return QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已接 {} 像素高：这一段和上一段一样，往下滚一点再接"), height).c_str());
         }
-        return QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已接 {} 像素高"), height).c_str());
+        return QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已接 {} 像素高"), height).c_str());
     }
 
     std::vector<QRect> CaptureService::windowCandidates() const
@@ -488,7 +488,7 @@ namespace GyanisScribe::Capture
         const auto windows = m_integration.screenWindows();
         if (!windows)
         {
-            Core::Logger::warning(std::format("框选时没拿到窗口候选，这一轮只做手动框选：{}", windows.error().message));
+            Base::Logger::warning(std::format("框选时没拿到窗口候选，这一轮只做手动框选：{}", windows.error().message));
             return {};
         }
 
@@ -533,7 +533,7 @@ namespace GyanisScribe::Capture
             return;
         }
         m_elementFailureReported = true;
-        Core::Logger::warning(std::format("认不出光标下的界面元素，这一轮退回只认整扇窗口：{}", chain.error().message));
+        Base::Logger::warning(std::format("认不出光标下的界面元素，这一轮退回只认整扇窗口：{}", chain.error().message));
     }
 
     std::vector<quintptr> CaptureService::overlayHandles() const

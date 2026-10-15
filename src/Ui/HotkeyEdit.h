@@ -89,7 +89,7 @@ namespace GyanisScribe::Ui
          * @param combination 待写入的组合
          * @return 成功返回空载荷；不合格时返回原因且不写配置，界面把原因显示出来
          */
-        [[nodiscard]] Core::Expected<void> applyCombination(const Hotkey::HotkeyCombination &combination);
+        [[nodiscard]] Base::Expected<void> applyCombination(const Hotkey::HotkeyCombination &combination);
 
     protected:
         /**

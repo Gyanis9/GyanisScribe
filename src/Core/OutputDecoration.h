@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QColor>
 #include <QImage>
@@ -60,21 +60,21 @@ namespace GyanisScribe::Core
      * @param stored 配置读出的整数，物理像素
      * @return 成功返回可用值；不在 [1,12] 里时返回带范围与补救办法的中文原因
      */
-    [[nodiscard]] Expected<int> parseOutputBorderPixels(int stored);
+    [[nodiscard]] Base::Expected<int> parseOutputBorderPixels(int stored);
 
     /**
      * @brief 校验配置里读出的投影宽度
      * @param stored 配置读出的整数，物理像素
      * @return 成功返回可用值；不在 [4,48] 里时返回带范围与补救办法的中文原因
      */
-    [[nodiscard]] Expected<int> parseOutputShadowPixels(int stored);
+    [[nodiscard]] Base::Expected<int> parseOutputShadowPixels(int stored);
 
     /**
      * @brief 校验配置里读出的边框颜色写法
      * @param stored 一段 #RRGGBB 文本（空串表示没存过）
      * @return 成功返回该颜色（空串返回默认的中灰）；写法不对时返回中文原因
      */
-    [[nodiscard]] Expected<QColor> parseOutputBorderColor(const QString &stored);
+    [[nodiscard]] Base::Expected<QColor> parseOutputBorderColor(const QString &stored);
 
     /**
      * @brief 装饰之后的画布尺寸

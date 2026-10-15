@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 #include "Record/RecorderConfig.h"
 
 #include <QStringList>
@@ -100,7 +100,7 @@ namespace GyanisScribe::Record
      *          PATH 那一半用 QStandardPaths 而不是自己剥：Windows 上还要照顾 PATHEXT 的 .exe 后缀，
      *          容器里则要跟着 PATH 找无后缀的 ELF，这两条 Qt 都已经做好了。
      */
-    [[nodiscard]] Core::Expected<QString> locateFfmpeg();
+    [[nodiscard]] Base::Expected<QString> locateFfmpeg();
 
     /**
      * @brief 拼「取声到 wav」那条命令的实参表
@@ -112,6 +112,6 @@ namespace GyanisScribe::Record
      *          两路 amix 出 381774 字节的 2 秒 48k 双声道 wav，都不需要额外转义。
      *          中间格式定 pcm_s16le：与编码那一步解耦，取声失败时画面那一半还能独立出片。
      */
-    [[nodiscard]] Core::Expected<QStringList> audioCaptureArguments(const QString &microphoneDevice, const QString &systemSoundDevice, const std::filesystem::path &wavFile);
+    [[nodiscard]] Base::Expected<QStringList> audioCaptureArguments(const QString &microphoneDevice, const QString &systemSoundDevice, const std::filesystem::path &wavFile);
 
 } // namespace GyanisScribe::Record

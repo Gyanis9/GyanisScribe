@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QColor>
 #include <QString>
@@ -42,7 +42,7 @@ namespace GyanisScribe::Annotation
      * @details 存的形状坏掉时不替用户猜一档：那会把「我存的色板呢」变成「程序给我换了八格别的」。
      *          读端与写端都在这一层，工具栏与设置页不发第二套解析。
      */
-    [[nodiscard]] Core::Expected<std::vector<QColor>> annotationPalette(const Settings::ISettingsStore &settings);
+    [[nodiscard]] Base::Expected<std::vector<QColor>> annotationPalette(const Settings::ISettingsStore &settings);
 
     /**
      * @brief 把色板换成配置里能存的那个列表
@@ -56,7 +56,7 @@ namespace GyanisScribe::Annotation
      * @param tokens 每格一个 #RRGGBB
      * @return 色板；任一格写法不对、或格数超过上限时返回中文原因
      */
-    [[nodiscard]] Core::Expected<std::vector<QColor>> paletteFromTokens(const QStringList &tokens);
+    [[nodiscard]] Base::Expected<std::vector<QColor>> paletteFromTokens(const QStringList &tokens);
 
     /**
      * @brief 拖一格的落点：把第 from 格挪到第 to 格那儿
@@ -101,6 +101,6 @@ namespace GyanisScribe::Annotation
      * @details 认换行与逗号两种分隔（手写的清单与从别处粘的都可能），空行跳过但不算「一格内容都没有」；
      *          读回来的是整份替换，不是往现有色板后面追加——追加会让两次导入变成两份重复。
      */
-    [[nodiscard]] Core::Expected<std::vector<QColor>> parsePaletteFileText(const QString &text);
+    [[nodiscard]] Base::Expected<std::vector<QColor>> parsePaletteFileText(const QString &text);
 
 } // namespace GyanisScribe::Annotation

@@ -39,14 +39,14 @@ namespace GyanisScribe::Capture
          * @param screenName 目标屏幕名，空串取光标所在那块
          * @return 整帧，或在屏幕缺失/抓回空图时的 ScreenUnavailable
          */
-        [[nodiscard]] Core::Expected<Core::CapturedImage> grabScreen(const QString &screenName) const override;
+        [[nodiscard]] Base::Expected<Base::CapturedImage> grabScreen(const QString &screenName) const override;
 
         /**
          * @brief 抓一个窗口，见 IScreenCaptureSource::grabWindow()
          * @param windowHandle 平台窗口句柄
          * @return 窗口那一帧；句柄失效返回 InvalidArgument，本平台抓不出窗口返回 PlatformUnsupported
          */
-        [[nodiscard]] Core::Expected<Core::CapturedImage> grabWindow(quintptr windowHandle) const override;
+        [[nodiscard]] Base::Expected<Base::CapturedImage> grabWindow(quintptr windowHandle) const override;
 
         /**
          * @brief 取鼠标指针当前的形状与落点，见 IScreenCaptureSource::grabCursor()

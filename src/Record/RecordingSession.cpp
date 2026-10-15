@@ -8,9 +8,9 @@
 namespace
 {
     /// 还没出错时 failure() 返回的空错误：用一个函数内静态量，避免在头文件里再铺一个默认构造入口
-    const GyanisScribe::Core::Error &noError()
+    const GyanisScribe::Base::Error &noError()
     {
-        static const GyanisScribe::Core::Error kNone{.code = GyanisScribe::Core::ErrorCode::Unknown, .message = {}};
+        static const GyanisScribe::Base::Error kNone{.code = GyanisScribe::Base::ErrorCode::Unknown, .message = {}};
         return kNone;
     }
 } // namespace
@@ -107,7 +107,7 @@ namespace GyanisScribe::Record
         m_state        = RecordingState::Recording;
     }
 
-    Core::Expected<void> RecordingSession::finish(const qint64 nowMs)
+    Base::Expected<void> RecordingSession::finish(const qint64 nowMs)
     {
         if (m_state == RecordingState::Done)
         {
@@ -153,7 +153,7 @@ namespace GyanisScribe::Record
         return std::max<qint64>(0, virtualTime(nowMs) - m_recordingStartMs);
     }
 
-    const Core::Error &RecordingSession::failure() const noexcept
+    const Base::Error &RecordingSession::failure() const noexcept
     {
         return m_state == RecordingState::Failed ? m_failure : noError();
     }

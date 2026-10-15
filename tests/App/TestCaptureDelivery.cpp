@@ -71,7 +71,7 @@ TEST(CaptureDelivery, RejectsUnknownTokenAndCaseVariants)
     {
         const auto parsed = parseCaptureOutputs(QString::fromUtf8(value));
         ASSERT_FALSE(parsed.has_value()) << value;
-        EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument) << value;
+        EXPECT_EQ(parsed.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument) << value;
         EXPECT_NE(parsed.error().message.find(value), std::string::npos) << "要点名收到的那一个：" << parsed.error().message;
         EXPECT_NE(parsed.error().message.find("file"), std::string::npos) << "要列出可取值：" << parsed.error().message;
     }

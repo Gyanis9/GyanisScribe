@@ -139,9 +139,9 @@ namespace GyanisScribe::Pin
          * @brief 把当前布局写进配置，并把每张贴图的像素落到缓存目录
          * @return 成功返回空载荷；某一张写不下去时整批不存，返回带路径的原因
          * @details 布局里只有几何摆不回像素：保存那一刻给每张在
-         *          Core::Paths::cacheDirectory()/Pins 下写一份 PNG，路径记进布局。
+         *          Base::Paths::cacheDirectory()/Pins 下写一份 PNG，路径记进布局。
          */
-        [[nodiscard]] Core::Expected<void> saveLayout();
+        [[nodiscard]] Base::Expected<void> saveLayout();
 
         /**
          * @brief 按配置里那份布局把贴图摆回来
@@ -150,7 +150,7 @@ namespace GyanisScribe::Pin
          *          单个图片文件读不出 → 只跳过那一张并记一条日志（图是用户自己删的，
          *          让剩下的继续摆回来比整次放弃更接近他留下的桌面）。
          */
-        [[nodiscard]] Core::Expected<int> restoreLayout();
+        [[nodiscard]] Base::Expected<int> restoreLayout();
 
         /**
          * @brief 关闭全部贴图
@@ -203,7 +203,7 @@ namespace GyanisScribe::Pin
          * @details 切换即重算显隐：上一组的收起来，这一组的摆出来。按「现有分组」的升序走一圈，
          *          空组不留停站。
          */
-        [[nodiscard]] Core::Expected<int> switchToNextGroup();
+        [[nodiscard]] Base::Expected<int> switchToNextGroup();
 
         /**
          * @brief 把某张贴图移到别的分组
@@ -213,7 +213,7 @@ namespace GyanisScribe::Pin
          * @details 移出当前组的那张当场收起来——换组放着本来就是「暂时腾地方」的手段；
          *          要看它得切到那一组（托盘或热键）。
          */
-        [[nodiscard]] Core::Expected<void> movePinToGroup(int index, int group);
+        [[nodiscard]] Base::Expected<void> movePinToGroup(int index, int group);
 
         /**
          * @brief 这一组的名字
@@ -230,7 +230,7 @@ namespace GyanisScribe::Pin
          * @details 名字只跟着在册的组存在：一组的最后一张被关掉，它的名字也跟着没——
          *          留着的名字会在一个看不见的组上停一站，与不留空壳组那条规矩相反
          */
-        [[nodiscard]] Core::Expected<void> renameGroup(int group, const QString &name);
+        [[nodiscard]] Base::Expected<void> renameGroup(int group, const QString &name);
 
         /**
          * @brief 删掉一组：成员并回第一组，名字跟着清
@@ -238,7 +238,7 @@ namespace GyanisScribe::Pin
          * @return 成功返回并过来的张数（这一组本来没人在册就是 0）
          * @return 删第一组时返回 InvalidArgument：它是删别组时成员并回去的落点，删了就没有落点
          */
-        [[nodiscard]] Core::Expected<int> deleteGroup(int group);
+        [[nodiscard]] Base::Expected<int> deleteGroup(int group);
 
         /**
          * @brief 每一组的概况，按组号升序
@@ -253,7 +253,7 @@ namespace GyanisScribe::Pin
          * @return 成功返回现在摆在桌上的组号；这一组没有贴图在册时返回 InvalidArgument 并说清怎么多出一组
          * @details 与按键切组只差「走到哪一组」，显隐、清选中、收 Solo 与布局落账走同一条实现。
          */
-        [[nodiscard]] Core::Expected<int> showGroup(int group);
+        [[nodiscard]] Base::Expected<int> showGroup(int group);
 
         /**
          * @brief 关掉一组里全部贴图（管理窗里那一条「腾空这一组」）
@@ -276,7 +276,7 @@ namespace GyanisScribe::Pin
          * @note 交进来的像素要带着它来自的那块屏的 dpr：显示尺寸按「像素 ÷ dpr」折算，
          *       dpr 丢了就等于把这张图放大 dpr 倍（刷新那一路在调用点补这一格，见 AppController）。
          */
-        [[nodiscard]] Core::Expected<void> replacePinContent(int index, const QImage &image, const std::optional<QColor> &colorCard = {});
+        [[nodiscard]] Base::Expected<void> replacePinContent(int index, const QImage &image, const std::optional<QColor> &colorCard = {});
 
         /**
          * @brief 这一张要重抓的那块屏幕矩形（全屏逻辑坐标）
@@ -284,7 +284,7 @@ namespace GyanisScribe::Pin
          * @return 那块矩形；不许刷新的那几档返回中文原因（不在册、缩到小图、动图在播）
          * @details 判据收在这一层而不是界面上：右键那一项的灰态与 `F5` 的拒绝要共用同一份「哪些档不许」。
          */
-        [[nodiscard]] Core::Expected<QRect> pinRefreshTarget(int index) const;
+        [[nodiscard]] Base::Expected<QRect> pinRefreshTarget(int index) const;
 
         /**
          * @brief 把点名那一暂时从桌上拿走，跑一次取图，再摆回原样
@@ -295,7 +295,7 @@ namespace GyanisScribe::Pin
          *          从第二次刷新起画面就冻在第一帧上。做成一进一出而不是两个方法，
          *          是为了让「抓失败」「屏幕没了」这些提前返回的路径也不会把那张图留在桌上不见。
          */
-        [[nodiscard]] Core::Expected<Core::CapturedImage> grabWithPinHidden(int index, const std::function<Core::Expected<Core::CapturedImage>()> &grab);
+        [[nodiscard]] Base::Expected<Base::CapturedImage> grabWithPinHidden(int index, const std::function<Base::Expected<Base::CapturedImage>()> &grab);
 
         /// 选中集里有几张（0 表示一张都没选）
         [[nodiscard]] int selectedPinCount() const noexcept;

@@ -92,7 +92,7 @@ namespace GyanisScribe::Record
          * @param countdownSeconds 倒计时秒数，0 表示立即开始
          * @return 成功返回空载荷；参数不合法、上一轮还在跑或建不出帧目录时返回原因
          */
-        [[nodiscard]] Core::Expected<void> start(const RecorderConfig &config, int countdownSeconds = 3);
+        [[nodiscard]] Base::Expected<void> start(const RecorderConfig &config, int countdownSeconds = 3);
 
         /**
          * @brief 暂停
@@ -111,7 +111,7 @@ namespace GyanisScribe::Record
          *          帧目录与中间 wav 的处置跟着那一次编码走：不等它完成就删，用户换参数重编码的退路就没了；
          *          而期间重新开一轮用的是另一个带时间戳的目录，两轮互不影响。
          */
-        [[nodiscard]] Core::Expected<void> stop();
+        [[nodiscard]] Base::Expected<void> stop();
 
         /**
          * @brief 取消本轮录屏：这一段不要了，不出成品
@@ -119,7 +119,7 @@ namespace GyanisScribe::Record
          * @details 与 stop() 的分别只在收尾：不封盘、不起编码，已落的临时帧与中间 wav 直接删掉，
          *          会话随之交回（state() 回到 Idle），所以下一轮不会被「上一轮还没收尾」拦住。
          */
-        [[nodiscard]] Core::Expected<void> cancel();
+        [[nodiscard]] Base::Expected<void> cancel();
 
         /// 当前状态
         [[nodiscard]] RecordingState state() const noexcept;
@@ -153,7 +153,7 @@ namespace GyanisScribe::Record
         void onTick();
 
         /// 按模式抓到这一跳的画面
-        [[nodiscard]] Core::Expected<Core::CapturedImage> grabFrame();
+        [[nodiscard]] Base::Expected<Base::CapturedImage> grabFrame();
 
         /**
          * @brief 按参数把光标圈叠在这一帧上
@@ -162,7 +162,7 @@ namespace GyanisScribe::Record
          * @details 没开就直接返回。画不出来时只报第一条日志：同一个原因会每帧重复一次，
          *          15 帧率录十分钟能把别的信息全淹掉。
          */
-        void overlayCursorHighlight(Core::CapturedImage &frame, const QPoint &frameGlobalOriginLogical);
+        void overlayCursorHighlight(Base::CapturedImage &frame, const QPoint &frameGlobalOriginLogical);
 
         /**
          * @brief 起取声进程（一路或两路）
@@ -170,7 +170,7 @@ namespace GyanisScribe::Record
          * @details 宁可在开始时拒绝，也不要在结束时交出一个安静的成品。等 started 是有界的
          *          （几秒），设备被别的程序独占时 ffmpeg 会立刻退掉。
          */
-        [[nodiscard]] Core::Expected<void> startAudioCapture();
+        [[nodiscard]] Base::Expected<void> startAudioCapture();
 
         /**
          * @brief 收尾取声进程
@@ -181,7 +181,7 @@ namespace GyanisScribe::Record
         [[nodiscard]] std::filesystem::path finishAudioCapture();
 
         /// 一次编码的结果：成品路径，或原因
-        using EncodeOutcome = Core::Expected<std::filesystem::path>;
+        using EncodeOutcome = Base::Expected<std::filesystem::path>;
 
         /**
          * @brief 把这一帧序列交给工作线程编码

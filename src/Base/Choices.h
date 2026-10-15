@@ -9,8 +9,8 @@
 
 #pragma once
 
-#include "Core/Text.h"
-#include "Core/Types.h"
+#include "Base/Text.h"
+#include "Base/Types.h"
 
 #include <QString>
 
@@ -18,7 +18,7 @@
 #include <string>
 #include <string_view>
 
-namespace GyanisScribe::Core
+namespace GyanisScribe::Base
 {
 
     /**
@@ -52,14 +52,14 @@ namespace GyanisScribe::Core
      *          所以这句只能在一处写，页名与格名由调用方填进来。
      */
     template<typename Choice, std::size_t Count>
-    [[nodiscard]] Core::Error unknownTokenError(const std::array<Choice, Count> &choices, const QString &stored, std::string_view settingName, std::string_view pageName,
+    [[nodiscard]] Base::Error unknownTokenError(const std::array<Choice, Count> &choices, const QString &stored, std::string_view settingName, std::string_view pageName,
                                                 std::string_view key)
     {
-        return Core::Error{
-                .code    = Core::ErrorCode::InvalidArgument,
-                .message = Core::uiFormat(Core::uiTextUtf8("{}：取值 \"{}\" 不在可选值里，可取的只有 {}。请在设置的{}重选，或删掉 {} 这一项回到默认档"), std::string{settingName},
+        return Base::Error{
+                .code    = Base::ErrorCode::InvalidArgument,
+                .message = Base::uiFormat(Base::uiTextUtf8("{}：取值 \"{}\" 不在可选值里，可取的只有 {}。请在设置的{}重选，或删掉 {} 这一项回到默认档"), std::string{settingName},
                                           stored.toStdString(), tokenListText(choices), std::string{pageName}, std::string{key}),
         };
     }
 
-} // namespace GyanisScribe::Core
+} // namespace GyanisScribe::Base

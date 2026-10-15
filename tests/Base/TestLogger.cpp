@@ -1,4 +1,4 @@
-#include "Core/Logger.h"
+#include "Base/Logger.h"
 
 #include <gtest/gtest.h>
 
@@ -7,9 +7,9 @@
 #include <fstream>
 #include <string>
 
-using GyanisScribe::Core::ErrorCode;
-using GyanisScribe::Core::Logger;
-using GyanisScribe::Core::Severity;
+using GyanisScribe::Base::ErrorCode;
+using GyanisScribe::Base::Logger;
+using GyanisScribe::Base::Severity;
 
 namespace
 {

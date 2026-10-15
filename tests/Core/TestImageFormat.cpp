@@ -1,8 +1,8 @@
 // 成品保存格式的词表：token、标签、后缀三者要同解，越界的质量档要回绝而不是夹取。
 
 #include "Core/ImageFormat.h"
-#include "Core/Paths.h"
-#include "Core/Types.h"
+#include "Base/Paths.h"
+#include "Base/Types.h"
 
 #include <QImage>
 #include <QString>
@@ -19,7 +19,7 @@
 #include <string_view>
 #include <vector>
 
-using GyanisScribe::Core::Expected;
+using GyanisScribe::Base::Expected;
 using GyanisScribe::Core::ImageFormat;
 using GyanisScribe::Core::imageFormatExtension;
 using GyanisScribe::Core::imageFormatHasAlpha;
@@ -77,7 +77,7 @@ TEST(ImageFormat, UnknownTokenIsRefusedWithRecoveryHint)
     {
         const auto parsed = parseImageFormat(QString::fromUtf8(stored));
         ASSERT_FALSE(parsed.has_value()) << "取值 \"{}\" 竟然被认下了" << stored;
-        EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument);
+        EXPECT_EQ(parsed.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument);
         EXPECT_NE(parsed.error().message.find("Png / Jpeg / Webp"), std::string::npos) << "回绝的时候要列出可取值：" << parsed.error().message;
         EXPECT_NE(parsed.error().message.find("Save/ImageFormat"), std::string::npos) << "要点名是哪一格：" << parsed.error().message;
     }
@@ -98,7 +98,7 @@ TEST(ImageFormat, QualityIsRangeCheckedNotClamped)
     {
         const auto parsed = parseImageQuality(stored);
         ASSERT_FALSE(parsed.has_value()) << stored;
-        EXPECT_EQ(parsed.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument);
+        EXPECT_EQ(parsed.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument);
         EXPECT_NE(parsed.error().message.find("Save/ImageQuality"), std::string::npos) << parsed.error().message;
     }
 }
@@ -129,7 +129,7 @@ TEST(ImageFormatWrite, ExtensionPicksTheEncoder)
     const auto      directory = std::filesystem::temp_directory_path() / std::format("GyanisScribe-ImageFormat-{}", caseName);
     std::error_code ignored;
     std::filesystem::remove_all(directory, ignored);
-    ASSERT_TRUE(GyanisScribe::Core::Paths::ensureDirectory(directory).has_value());
+    ASSERT_TRUE(GyanisScribe::Base::Paths::ensureDirectory(directory).has_value());
 
     int probed = 0;
     for (const auto &probe: probes)

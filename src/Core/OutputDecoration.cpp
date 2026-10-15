@@ -1,6 +1,6 @@
 #include "Core/OutputDecoration.h"
 
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 #include <QPainter>
 
@@ -27,11 +27,11 @@ namespace
     }
 
     /// 越界拒绝的同一句话：三个校验口只差键名与范围，文案口径要一致
-    [[nodiscard]] GyanisScribe::Core::Error outOfRange(std::string_view key, int stored, int minimum, int maximum)
+    [[nodiscard]] GyanisScribe::Base::Error outOfRange(std::string_view key, int stored, int minimum, int maximum)
     {
-        return GyanisScribe::Core::Error{
-                GyanisScribe::Core::ErrorCode::InvalidArgument,
-                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("{} \"{}\" 不在 {} 到 {} 之间：请在设置的截图页重选一个值，或删掉这一项回到默认档"), std::string{key},
+        return GyanisScribe::Base::Error{
+                GyanisScribe::Base::ErrorCode::InvalidArgument,
+                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("{} \"{}\" 不在 {} 到 {} 之间：请在设置的截图页重选一个值，或删掉这一项回到默认档"), std::string{key},
                                              stored, minimum, maximum),
         };
     }
@@ -40,7 +40,7 @@ namespace
 namespace GyanisScribe::Core
 {
 
-    Expected<int> parseOutputBorderPixels(const int stored)
+    Base::Expected<int> parseOutputBorderPixels(const int stored)
     {
         if (stored >= kMinimumOutputBorderPixels && stored <= kMaximumOutputBorderPixels)
         {
@@ -49,7 +49,7 @@ namespace GyanisScribe::Core
         return std::unexpected(outOfRange("Save/OutputBorderWidth", stored, kMinimumOutputBorderPixels, kMaximumOutputBorderPixels));
     }
 
-    Expected<int> parseOutputShadowPixels(const int stored)
+    Base::Expected<int> parseOutputShadowPixels(const int stored)
     {
         if (stored >= kMinimumOutputShadowPixels && stored <= kMaximumOutputShadowPixels)
         {
@@ -58,7 +58,7 @@ namespace GyanisScribe::Core
         return std::unexpected(outOfRange("Save/OutputShadowWidth", stored, kMinimumOutputShadowPixels, kMaximumOutputShadowPixels));
     }
 
-    Expected<QColor> parseOutputBorderColor(const QString &stored)
+    Base::Expected<QColor> parseOutputBorderColor(const QString &stored)
     {
         if (stored.trimmed().isEmpty())
         {
@@ -70,10 +70,10 @@ namespace GyanisScribe::Core
         const auto text = stored.trimmed();
         if (!QColor::isValidColorName(text))
         {
-            return std::unexpected(Error{
-                    ErrorCode::InvalidArgument,
-                    GyanisScribe::Core::uiFormat(
-                            GyanisScribe::Core::uiTextUtf8("边框颜色 \"{}\" 不是一段认得出的颜色写法（如 #RRGGBB）：请在设置的截图页重填，或留空回到默认的中灰"),
+            return std::unexpected(Base::Error{
+                    Base::ErrorCode::InvalidArgument,
+                    GyanisScribe::Base::uiFormat(
+                            GyanisScribe::Base::uiTextUtf8("边框颜色 \"{}\" 不是一段认得出的颜色写法（如 #RRGGBB）：请在设置的截图页重填，或留空回到默认的中灰"),
                             stored.toStdString()),
             });
         }

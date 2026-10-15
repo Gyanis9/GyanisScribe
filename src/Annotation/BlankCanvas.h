@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <QSize>
 #include <QString>
@@ -34,7 +34,7 @@ namespace GyanisScribe::Annotation
      *          透明底带的是 alpha：存 PNG/WebP 留得住，存 JPG 时保存那条路会先垫一层白（见 `Core::imageFormatHasAlpha` 的消费方），
      *          不会像直接压 JPG 那样把透明区涂成黑色。
      */
-    [[nodiscard]] Core::CapturedImage makeBlankCanvas(const QSize &logicalSize, qreal devicePixelRatio, const QString &screenName, bool transparent);
+    [[nodiscard]] Base::CapturedImage makeBlankCanvas(const QSize &logicalSize, qreal devicePixelRatio, const QString &screenName, bool transparent);
 
     /**
      * @brief 把画布摆在可用区中央

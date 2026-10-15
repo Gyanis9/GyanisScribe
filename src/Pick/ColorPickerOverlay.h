@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 #include "Pick/ColorFormat.h"
 #include "Pick/PickGeometry.h"
 
@@ -48,7 +48,7 @@ namespace GyanisScribe::Pick
          * @param theme 主题管理器，放大镜边框与文字色随主题
          * @param parent Qt 父对象
          */
-        ColorPickerOverlay(const Core::CapturedImage &frame, const QRect &screenGeometry, ColorFormat format, HexCasing casing, MagnifierView view, const Ui::ThemeManager &theme,
+        ColorPickerOverlay(const Base::CapturedImage &frame, const QRect &screenGeometry, ColorFormat format, HexCasing casing, MagnifierView view, const Ui::ThemeManager &theme,
                            QWidget *parent = nullptr);
 
         /**
@@ -113,7 +113,7 @@ namespace GyanisScribe::Pick
         /// 某个屏幕坐标压在色块行的第几块上；不在任何一块上时返回 -1
         [[nodiscard]] int swatchIndexAt(const QPoint &globalPos) const;
 
-        Core::CapturedImage     m_frame;              ///< 这一屏的冻帧
+        Base::CapturedImage     m_frame;              ///< 这一屏的冻帧
         QRect                   m_screenGeometry;     ///< 冻帧对应屏幕的几何
         ColorFormat             m_format;             ///< 复制用的写法
         HexCasing               m_hexCasing;          ///< 写法是 HEX 时字母那几位的大小写

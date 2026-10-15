@@ -1,7 +1,7 @@
 // 「复制为文件」这一路的判据：落地的 PNG 要对得上、命名按内容认人、剪贴板里交出去的是那条路径。
 // 剪贴板那一段要读回自己刚放进去的载荷，与别的借用剪贴板的套件同拿一把锁（tests/Core/CMakeLists.txt）。
 #include "Core/ClipboardFile.h"
-#include "Core/Paths.h"
+#include "Base/Paths.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -22,7 +22,7 @@
 #endif
 
 using GyanisScribe::Core::copyImageAsFile;
-using GyanisScribe::Core::Paths;
+using GyanisScribe::Base::Paths;
 
 namespace
 {

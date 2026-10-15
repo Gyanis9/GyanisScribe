@@ -2,8 +2,8 @@
 
 #include "App/ImageFetcher.h"
 
-#include "Core/Paths.h"
-#include "Core/Text.h"
+#include "Base/Paths.h"
+#include "Base/Text.h"
 #include "Pin/ColorCard.h"
 #include "Pin/PinManager.h"
 
@@ -124,11 +124,11 @@ namespace GyanisScribe::App
         }
     } // namespace
 
-    Core::Expected<QImage> pinContentFrom(const QMimeData *data, const QFont &font)
+    Base::Expected<QImage> pinContentFrom(const QMimeData *data, const QFont &font)
     {
         if (data == nullptr)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, Core::uiTextUtf8("剪贴板里没有可以贴的内容：图像、纯文本或颜色都行。先复制一个再来贴")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("剪贴板里没有可以贴的内容：图像、纯文本或颜色都行。先复制一个再来贴")});
         }
 
         if (data->hasImage())
@@ -138,7 +138,7 @@ namespace GyanisScribe::App
             if (image.isNull())
             {
                 return std::unexpected(
-                        Core::Error{Core::ErrorCode::InvalidArgument, Core::uiTextUtf8("剪贴板里的图像读不出来（来源可能只挂了名目、没给像素）：换一张图复制，或先截图再来贴")});
+                        Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("剪贴板里的图像读不出来（来源可能只挂了名目、没给像素）：换一张图复制，或先截图再来贴")});
             }
             return image;
         }
@@ -146,7 +146,7 @@ namespace GyanisScribe::App
         if (!data->hasText())
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument, Core::uiTextUtf8("剪贴板里没有可以贴的内容：图像、纯文本或颜色都行。链接与文件这一类还没有转贴图的做法")});
+                    Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("剪贴板里没有可以贴的内容：图像、纯文本或颜色都行。链接与文件这一类还没有转贴图的做法")});
         }
 
         const auto text = data->text();
@@ -158,22 +158,22 @@ namespace GyanisScribe::App
         const auto trimmed = text.trimmed();
         if (trimmed.isEmpty())
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, Core::uiTextUtf8("剪贴板里的文本是空的（只有空白）：先复制一段文字再来贴")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("剪贴板里的文本是空的（只有空白）：先复制一段文字再来贴")});
         }
         if (trimmed.size() > kMaximumTextCardCharacters)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument,
-                                               Core::uiFormat(Core::uiTextUtf8("剪贴板里的文本太长（{} 个字，上限 {}）：整张卡片会长到没法看，先把要贴的那一段截短再试"),
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
+                                               Base::uiFormat(Base::uiTextUtf8("剪贴板里的文本太长（{} 个字，上限 {}）：整张卡片会长到没法看，先把要贴的那一段截短再试"),
                                                               trimmed.size(), static_cast<int>(kMaximumTextCardCharacters))});
         }
         return renderTextCard(trimmed, font);
     }
 
-    Core::Expected<DropContent> dropContentFrom(const QMimeData *data, const QFont &font)
+    Base::Expected<DropContent> dropContentFrom(const QMimeData *data, const QFont &font)
     {
         if (data == nullptr)
         {
-            return std::unexpected(Core::Error{Core::ErrorCode::InvalidArgument, Core::uiTextUtf8("拖进来的东西没有可读的内容，贴不出来")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("拖进来的东西没有可读的内容，贴不出来")});
         }
 
         // 有文件就按文件走：拖一叠图片进来该贴出一叠，不是只看第一件
@@ -189,8 +189,8 @@ namespace GyanisScribe::App
                     continue;
                 }
 
-                const auto   path = Core::Paths::fromDisplayText(url.toLocalFile());
-                QImageReader reader{Core::Paths::toDisplayText(path)};
+                const auto   path = Base::Paths::fromDisplayText(url.toLocalFile());
+                QImageReader reader{Base::Paths::toDisplayText(path)};
                 // EXIF 里带方向的照片按显示方向摆正：贴出来的该是「相机给我们看的样子」
                 reader.setAutoTransform(true);
                 const QImage image = reader.read();
@@ -205,7 +205,7 @@ namespace GyanisScribe::App
                 if (reader.supportsAnimation() && reader.imageCount() > 1)
                 {
                     // 动图把来源路径一起带走：贴上去会接着播（与布局恢复那一路同解）
-                    single.animatedSource = Core::Paths::toDisplayText(path);
+                    single.animatedSource = Base::Paths::toDisplayText(path);
                 }
                 content.contents.push_back(std::move(single));
             }
@@ -215,7 +215,7 @@ namespace GyanisScribe::App
                 return content;
             }
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument, Core::uiFormat(Core::uiTextUtf8("拖进来的文件不是图片或读不出来：{}。图片文件、链接与文本都可以贴"),
+                    Base::Error{Base::ErrorCode::InvalidArgument, Base::uiFormat(Base::uiTextUtf8("拖进来的文件不是图片或读不出来：{}。图片文件、链接与文本都可以贴"),
                                                                                  content.rejectedNames.join(QStringLiteral("、")).toStdString())});
         }
 
@@ -231,7 +231,7 @@ namespace GyanisScribe::App
         return content;
     }
 
-    Core::Expected<DropPinOutcome> pinDroppedContent(Pin::PinManager &pins, const QMimeData *data, const QPoint &globalTopLeft, const QFont &font)
+    Base::Expected<DropPinOutcome> pinDroppedContent(Pin::PinManager &pins, const QMimeData *data, const QPoint &globalTopLeft, const QFont &font)
     {
         const auto content = dropContentFrom(data, font);
         if (!content)

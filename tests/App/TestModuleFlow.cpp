@@ -10,9 +10,9 @@
 #include "Capture/CaptureService.h"
 #include "Capture/ICaptureService.h"
 #include "Capture/IScreenCaptureSource.h"
-#include "Core/Paths.h"
+#include "Base/Paths.h"
 #include "App/ClipboardPin.h"
-#include "Core/Types.h"
+#include "Base/Types.h"
 #include "Ocr/IOcrEngine.h"
 #include "Ocr/OcrEngineFactory.h"
 #include "Pin/IPinWindow.h"
@@ -42,7 +42,7 @@
 #include <optional>
 #include <string>
 
-// 整份用例住在工程命名空间里：匿名命名空间在工程之外时 `Core::Expected` 这类写法认不到名字
+// 整份用例住在工程命名空间里：匿名命名空间在工程之外时 `Base::Expected` 这类写法认不到名字
 // （实测 C2061/C2653），而 nest 进 GyanisScribe 就不用给每个类型加前缀
 namespace GyanisScribe
 {
@@ -86,7 +86,7 @@ namespace GyanisScribe
          * @brief 造一帧假屏，形状与生产抓帧一致
          * @return 抓帧产物：QImage 是物理像素且倍比标成 1.0，缩放只写在 devicePixelRatio 与 logicalSize 里
          */
-        Core::CapturedImage makeFakeFrame()
+        Base::CapturedImage makeFakeFrame()
         {
             QImage image(kPhysicalWidth, kPhysicalHeight, QImage::Format_ARGB32_Premultiplied);
             image.fill(Qt::white);
@@ -100,7 +100,7 @@ namespace GyanisScribe
             // 底图按物理像素摆：这一帧的倍比就是 1.0，与 QScreenCaptureSource 给回的形状同解
             painter.drawText(QPoint(30, 110), QStringLiteral("12345"));
 
-            Core::CapturedImage frame;
+            Base::CapturedImage frame;
             frame.image            = image;
             frame.logicalSize      = QSize(kLogicalWidth, kLogicalHeight);
             frame.devicePixelRatio = kDevicePixelRatio;
@@ -135,25 +135,25 @@ namespace GyanisScribe
         class FakeScreenSource final : public GyanisScribe::Capture::IScreenCaptureSource
         {
         public:
-            explicit FakeScreenSource(Core::CapturedImage frame) : m_frame(std::move(frame))
+            explicit FakeScreenSource(Base::CapturedImage frame) : m_frame(std::move(frame))
             {
             }
 
-            [[nodiscard]] GyanisScribe::Core::Expected<Core::CapturedImage> grabScreen(const QString &screenName) const override
+            [[nodiscard]] GyanisScribe::Base::Expected<Base::CapturedImage> grabScreen(const QString &screenName) const override
             {
                 requestedScreen = screenName;
                 return m_frame;
             }
 
-            [[nodiscard]] GyanisScribe::Core::Expected<Core::CapturedImage> grabWindow(quintptr) const override
+            [[nodiscard]] GyanisScribe::Base::Expected<Base::CapturedImage> grabWindow(quintptr) const override
             {
-                return std::unexpected(Core::Error{Core::ErrorCode::PlatformUnsupported, "这条流程不抓窗口"});
+                return std::unexpected(Base::Error{Base::ErrorCode::PlatformUnsupported, "这条流程不抓窗口"});
             }
 
             mutable QString requestedScreen; ///< 屏幕名有没有原样传到底，用例据此判
 
         private:
-            Core::CapturedImage m_frame; ///< 与生产同形状的那一帧假屏
+            Base::CapturedImage m_frame; ///< 与生产同形状的那一帧假屏
         };
 
         class ModuleFlowFixture : public ::testing::Test
@@ -190,7 +190,7 @@ namespace GyanisScribe
                 std::error_code ignored;
                 std::filesystem::remove_all(m_root, ignored);
                 // 贴图布局用例写进的是真实的缓存目录（不在 m_root 里）：在这儿清，用例中途断言失败也清得到
-                std::filesystem::remove_all(Core::Paths::cacheDirectory() / "Pins", ignored);
+                std::filesystem::remove_all(Base::Paths::cacheDirectory() / "Pins", ignored);
             }
 
             /**
@@ -199,16 +199,16 @@ namespace GyanisScribe
              * @param source 假屏来源
              * @return 交出来的帧；没交出来时返回空帧并留下失败
              */
-            [[nodiscard]] Core::CapturedImage captureOneFrame(GyanisScribe::Settings::SettingsStore &settings, FakeScreenSource &source) const
+            [[nodiscard]] Base::CapturedImage captureOneFrame(GyanisScribe::Settings::SettingsStore &settings, FakeScreenSource &source) const
             {
                 GyanisScribe::Capture::CaptureService service(source, settings, *integration);
-                std::optional<Core::CapturedImage>    received;
-                QObject::connect(&service, &GyanisScribe::Capture::ICaptureService::captured, &service, [&received](const Core::CapturedImage &image) { received = image; });
+                std::optional<Base::CapturedImage>    received;
+                QObject::connect(&service, &GyanisScribe::Capture::ICaptureService::captured, &service, [&received](const Base::CapturedImage &image) { received = image; });
 
                 service.captureFullScreen(QString::fromLatin1(kFakeScreenName));
                 EXPECT_TRUE(received.has_value()) << "captureFullScreen 没把帧从 captured 信号交出来";
                 EXPECT_EQ(source.requestedScreen, QString::fromLatin1(kFakeScreenName)) << "屏幕名没原样传到底";
-                return received.value_or(Core::CapturedImage{});
+                return received.value_or(Base::CapturedImage{});
             }
 
             std::filesystem::path m_root;    ///< 每条用例自己的临时目录，避免并行时互相踩
@@ -338,7 +338,7 @@ namespace GyanisScribe
                 ASSERT_TRUE(pins.saveLayout().has_value()) << "布局没写下去";
             }
 
-            const auto      cacheDirectory = Core::Paths::cacheDirectory() / "Pins";
+            const auto      cacheDirectory = Base::Paths::cacheDirectory() / "Pins";
             std::error_code ignored;
             ASSERT_TRUE(std::filesystem::remove(cacheDirectory / "pin-0.png", ignored)) << "缓存里没有那张图，用例前提就没构造出来";
 

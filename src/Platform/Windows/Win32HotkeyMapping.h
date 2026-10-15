@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Core/Types.h"
+#include "Base/Types.h"
 
 #include <Qt>
 
@@ -24,7 +24,7 @@ namespace GyanisScribe::Platform
      * @note 判据取值域：Control/Alt/Shift/Win 四种，Keypad* 与 GroupSwitch 这类一律拒绝，
      *       因为 RegisterHotKey 不认它们，静默丢掉就会让用户设的组合与实际生效的组合不一致
      */
-    [[nodiscard]] Core::Expected<quint32> toWin32ModifierMask(Qt::KeyboardModifiers modifiers);
+    [[nodiscard]] Base::Expected<quint32> toWin32ModifierMask(Qt::KeyboardModifiers modifiers);
 
     /**
      * @brief 把 Qt 按键换成 Win32 虚拟键码
@@ -34,6 +34,6 @@ namespace GyanisScribe::Platform
      * @note 只放开这三段是因为它们在两种键盘布局上的物理位置一致；
      *       符号键（如 Ctrl+Alt+2 在欧洲布局里是别的东西）随布局变，登记了也不是用户按的那个
      */
-    [[nodiscard]] Core::Expected<quint32> toWin32VirtualKey(Qt::Key key);
+    [[nodiscard]] Base::Expected<quint32> toWin32VirtualKey(Qt::Key key);
 
 } // namespace GyanisScribe::Platform

@@ -192,7 +192,7 @@ TEST_F(LanguageFixture, EnglishReportsMissingAndUnreadablePack)
 
     const auto missing = applyLanguage(AppLanguage::English, {toQt(directory)});
     ASSERT_FALSE(missing.has_value());
-    EXPECT_EQ(missing.error().code, GyanisScribe::Core::ErrorCode::DependencyMissing);
+    EXPECT_EQ(missing.error().code, GyanisScribe::Base::ErrorCode::DependencyMissing);
     // 找过的目录要出现在文案里，否则用户只能猜应用去哪儿找的包
     EXPECT_NE(missing.error().message.find(toQt(directory).toStdString()), std::string::npos);
 

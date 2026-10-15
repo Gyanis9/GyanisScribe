@@ -1,6 +1,6 @@
 #include "Capture/ScreenUtils.h"
 
-#include "Core/SizeText.h"
+#include "Base/SizeText.h"
 
 #include <QImage>
 #include <QPoint>
@@ -44,8 +44,8 @@ using GyanisScribe::Capture::sizeUnitToken;
 using GyanisScribe::Capture::squareLockedPoint;
 using GyanisScribe::Capture::stretchRegionByEdge;
 using GyanisScribe::Capture::toPhysicalRect;
-using GyanisScribe::Core::CapturedImage;
-using GyanisScribe::Core::ErrorCode;
+using GyanisScribe::Base::CapturedImage;
+using GyanisScribe::Base::ErrorCode;
 
 namespace
 {
@@ -520,7 +520,7 @@ TEST(ScreenUtilsSelection, SizeAndAspectTextRoundTrip)
 {
     using GyanisScribe::Capture::aspectRatioFromText;
     using GyanisScribe::Capture::aspectRatioToText;
-    using GyanisScribe::Core::parseSizeText;
+    using GyanisScribe::Base::parseSizeText;
 
     EXPECT_EQ(parseSizeText(QStringLiteral("300x200")), (QSize(300, 200)));
     EXPECT_EQ(parseSizeText(QStringLiteral("300×200")), (QSize(300, 200)));
@@ -675,7 +675,7 @@ TEST(ParseCaptureCornerRadius, AcceptsItsRangeAndRejectsBothEndsOutside)
     {
         const auto rejected = parseCaptureCornerRadius(bad);
         ASSERT_FALSE(rejected.has_value()) << bad << " 这个越界值被收下了";
-        EXPECT_EQ(rejected.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument) << bad;
+        EXPECT_EQ(rejected.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument) << bad;
         EXPECT_NE(rejected.error().message.find("Capture/CornerRadius"), std::string::npos) << "拒绝要说清去哪一格补救，实际：" << rejected.error().message;
     }
 }
@@ -796,19 +796,19 @@ TEST(ProcessExcludes, ParsesAndMatchesByNameOnly)
  */
 TEST(SizeTextScaleRatio, AcceptsTheThreeFormsAndRejectsJunk)
 {
-    EXPECT_DOUBLE_EQ(*GyanisScribe::Core::parseScaleRatio(QStringLiteral("2x")), 2.0);
-    EXPECT_DOUBLE_EQ(*GyanisScribe::Core::parseScaleRatio(QStringLiteral("1.5X")), 1.5) << "x 不分大小写";
-    EXPECT_DOUBLE_EQ(*GyanisScribe::Core::parseScaleRatio(QStringLiteral("50%")), 0.5) << "百分数是相对原大小的另一种写法";
-    EXPECT_DOUBLE_EQ(*GyanisScribe::Core::parseScaleRatio(QStringLiteral(" 0.5 ")), 0.5) << "纯数字按倍率算（首尾空白先去过）";
+    EXPECT_DOUBLE_EQ(*GyanisScribe::Base::parseScaleRatio(QStringLiteral("2x")), 2.0);
+    EXPECT_DOUBLE_EQ(*GyanisScribe::Base::parseScaleRatio(QStringLiteral("1.5X")), 1.5) << "x 不分大小写";
+    EXPECT_DOUBLE_EQ(*GyanisScribe::Base::parseScaleRatio(QStringLiteral("50%")), 0.5) << "百分数是相对原大小的另一种写法";
+    EXPECT_DOUBLE_EQ(*GyanisScribe::Base::parseScaleRatio(QStringLiteral(" 0.5 ")), 0.5) << "纯数字按倍率算（首尾空白先去过）";
 
-    EXPECT_FALSE(GyanisScribe::Core::parseScaleRatio(QString{}).has_value());
-    EXPECT_FALSE(GyanisScribe::Core::parseScaleRatio(QStringLiteral("abc")).has_value());
-    EXPECT_FALSE(GyanisScribe::Core::parseScaleRatio(QStringLiteral("1.5.2")).has_value()) << "两个小数点不是倍率";
-    EXPECT_FALSE(GyanisScribe::Core::parseScaleRatio(QStringLiteral("0x")).has_value()) << "0 倍是坏值，不是「缩到看不见」";
-    EXPECT_FALSE(GyanisScribe::Core::parseScaleRatio(QStringLiteral("-2x")).has_value());
-    EXPECT_FALSE(GyanisScribe::Core::parseScaleRatio(QStringLiteral("20000%")).has_value()) << "超过上限要拒，不许夹到 100 倍";
+    EXPECT_FALSE(GyanisScribe::Base::parseScaleRatio(QString{}).has_value());
+    EXPECT_FALSE(GyanisScribe::Base::parseScaleRatio(QStringLiteral("abc")).has_value());
+    EXPECT_FALSE(GyanisScribe::Base::parseScaleRatio(QStringLiteral("1.5.2")).has_value()) << "两个小数点不是倍率";
+    EXPECT_FALSE(GyanisScribe::Base::parseScaleRatio(QStringLiteral("0x")).has_value()) << "0 倍是坏值，不是「缩到看不见」";
+    EXPECT_FALSE(GyanisScribe::Base::parseScaleRatio(QStringLiteral("-2x")).has_value());
+    EXPECT_FALSE(GyanisScribe::Base::parseScaleRatio(QStringLiteral("20000%")).has_value()) << "超过上限要拒，不许夹到 100 倍";
 
     // 「宽x高」那一形不能被这一条吃掉：两条解析各管各的
-    EXPECT_FALSE(GyanisScribe::Core::parseScaleRatio(QStringLiteral("640x360")).has_value()) << "尺寸那一形该由 parseSizeText 接";
-    EXPECT_TRUE(GyanisScribe::Core::parseSizeText(QStringLiteral("640x360")).has_value());
+    EXPECT_FALSE(GyanisScribe::Base::parseScaleRatio(QStringLiteral("640x360")).has_value()) << "尺寸那一形该由 parseSizeText 接";
+    EXPECT_TRUE(GyanisScribe::Base::parseSizeText(QStringLiteral("640x360")).has_value());
 }

@@ -8,7 +8,7 @@ add_test(NAME Style.QtStringPlaceholders
 
 find_program(PYTHON3_EXECUTABLE NAMES python3 python)
 
-# 界面文案与翻译目录的对照门禁：源码里每一条走 Core::uiText 的文案都必须在 .ts 里有非空译文。
+# 界面文案与翻译目录的对照门禁：源码里每一条走 Base::uiText 的文案都必须在 .ts 里有非空译文。
 # 少了这条，英文档下漏掉的那几处会安静地显示中文——没人会把每条菜单、每个报错都点一遍发现它。
 # 用 Python 而不是 CMake 脚本：穷举要把「被 clang-format 断成相邻字面量的长文案」按编译期的规则拼回去，
 # CMake 的正则在跨语句时给出了错误的匹配（实测把十条不相关的文案拼成一条），而这条门一旦误判就是永久假绿。

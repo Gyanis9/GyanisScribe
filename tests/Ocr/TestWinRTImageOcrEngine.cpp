@@ -2,8 +2,8 @@
 // 判据不用「调用成功」就算过——必须读出画上那几个数字，否则后端把任何图都说成
 // 「认出来是空」也照样绿。语料选数字：系统对手写体与艺术字会飘，对大字号数字不飘。
 
-#include "Core/Text.h"
-#include "Core/Types.h"
+#include "Base/Text.h"
+#include "Base/Types.h"
 #include "Ocr/WinRTImageOcrEngine.h"
 
 #include <QApplication>
@@ -135,7 +135,7 @@ namespace
         GyanisScribe::Ocr::WinRTImageOcrEngine engine;
         const auto                             recognized = engine.recognize(makeTextImage(QStringLiteral("12345")), QStringLiteral("fr"));
         ASSERT_FALSE(recognized.has_value()) << "系统里没有 fr 的语言包，却说认出来了";
-        EXPECT_EQ(recognized.error().code, GyanisScribe::Core::ErrorCode::DependencyMissing);
+        EXPECT_EQ(recognized.error().code, GyanisScribe::Base::ErrorCode::DependencyMissing);
 
         // 原因要点名现在能用的是哪几个，否则用户还得自己去设置页一个个试
         const auto reason = QString::fromStdString(recognized.error().message);
@@ -156,7 +156,7 @@ namespace
         const QImage                           tiny(4, 4, QImage::Format_ARGB32);
         const auto                             rejected = engine.recognize(tiny, engine.supportedLanguages().front());
         ASSERT_FALSE(rejected.has_value()) << "比门槛还小的图被送去系统认了";
-        EXPECT_EQ(rejected.error().code, GyanisScribe::Core::ErrorCode::InvalidArgument);
+        EXPECT_EQ(rejected.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument);
         // 两个后端的这一道门槛与文案要一致，界面才能只写一处提示
         EXPECT_NE(QString::fromStdString(rejected.error().message).indexOf(QStringLiteral("8")), -1) << rejected.error().message;
     }
@@ -165,6 +165,6 @@ namespace
     {
         GyanisScribe::Ocr::WinRTImageOcrEngine engine;
         // 名字进过文案目录：英文档下它必须能翻，设置页与结果标题用的就是这一句
-        EXPECT_EQ(engine.name(), QString::fromUtf8(GyanisScribe::Core::uiTextUtf8("Windows 系统识别").c_str()));
+        EXPECT_EQ(engine.name(), QString::fromUtf8(GyanisScribe::Base::uiTextUtf8("Windows 系统识别").c_str()));
     }
 } // namespace

@@ -1,6 +1,6 @@
 #include "Pick/PickGeometry.h"
 
-#include "Core/Text.h"
+#include "Base/Text.h"
 
 #include <QString>
 
@@ -36,7 +36,7 @@ namespace GyanisScribe::Pick
     QString magnifierViewLabel(const MagnifierView view)
     {
         const auto index = static_cast<std::size_t>(view);
-        return GyanisScribe::Core::uiText(index < kMagnifierLabels.size() ? kMagnifierLabels[index].data() : kMagnifierLabels[1].data());
+        return GyanisScribe::Base::uiText(index < kMagnifierLabels.size() ? kMagnifierLabels[index].data() : kMagnifierLabels[1].data());
     }
 
     std::vector<MagnifierView> magnifierViews()

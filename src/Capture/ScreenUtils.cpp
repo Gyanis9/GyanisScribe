@@ -1,7 +1,7 @@
 #include "Capture/ScreenUtils.h"
 
-#include "Core/SizeText.h"
-#include "Core/Text.h"
+#include "Base/SizeText.h"
+#include "Base/Text.h"
 
 #include <QApplication>
 #include <QGuiApplication>
@@ -22,13 +22,13 @@
 namespace GyanisScribe::Capture
 {
 
-    Core::Expected<QRect> toPhysicalRect(const QRect &logicalRect, qreal devicePixelRatio)
+    Base::Expected<QRect> toPhysicalRect(const QRect &logicalRect, qreal devicePixelRatio)
     {
         if (devicePixelRatio <= 0.0)
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument,
-                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("缩放因子必须大于 0，收到的是 {}。请检查这一帧来自哪块屏幕，dpr 不该由调用方自己猜"),
+                    Base::Error{Base::ErrorCode::InvalidArgument,
+                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("缩放因子必须大于 0，收到的是 {}。请检查这一帧来自哪块屏幕，dpr 不该由调用方自己猜"),
                                                              devicePixelRatio)});
         }
 
@@ -42,7 +42,7 @@ namespace GyanisScribe::Capture
         return QRect(left, top, rightExclusive - left, bottomExclusive - top);
     }
 
-    Core::Expected<Core::CapturedImage> cropToLogicalRect(const Core::CapturedImage &source, const QRect &logicalRegion)
+    Base::Expected<Base::CapturedImage> cropToLogicalRect(const Base::CapturedImage &source, const QRect &logicalRegion)
     {
         const auto physical = toPhysicalRect(logicalRegion, source.devicePixelRatio);
         if (!physical)
@@ -53,13 +53,13 @@ namespace GyanisScribe::Capture
         const QRect frameRect(0, 0, source.image.width(), source.image.height());
         if (!frameRect.contains(*physical))
         {
-            return std::unexpected(Core::Error{
-                    Core::ErrorCode::ScreenUnavailable,
-                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("选区超出了这一帧：帧是 {}×{}，换算后要到 {}。请确认这块屏幕有没有被拔掉，或缩放因子有没有变"),
+            return std::unexpected(Base::Error{
+                    Base::ErrorCode::ScreenUnavailable,
+                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("选区超出了这一帧：帧是 {}×{}，换算后要到 {}。请确认这块屏幕有没有被拔掉，或缩放因子有没有变"),
                                                  frameRect.width(), frameRect.height(), physical->width())});
         }
 
-        Core::CapturedImage cropped;
+        Base::CapturedImage cropped;
         cropped.image = source.image.copy(*physical);
         // 裁出来的那一块仍按同一缩放因子显示：像素尺寸与逻辑尺寸各算一次，两者必须互指同一个点
         cropped.image.setDevicePixelRatio(source.devicePixelRatio);
@@ -82,9 +82,9 @@ namespace GyanisScribe::Capture
         return nullptr;
     }
 
-    Core::CapturedImage frameFromGrabbedImage(const QImage &grabbed, const QScreen *screen, const QSize &logicalSize)
+    Base::CapturedImage frameFromGrabbedImage(const QImage &grabbed, const QScreen *screen, const QSize &logicalSize)
     {
-        Core::CapturedImage frame;
+        Base::CapturedImage frame;
         frame.image = grabbed.convertToFormat(QImage::Format_ARGB32_Premultiplied);
         // 抓回来的图按物理像素交回：Qt 有时会把 dpr 标在图上，这里统一清成 1，
         // 免得下游既乘一次又除一次
@@ -134,7 +134,7 @@ namespace GyanisScribe::Capture
         return QString::fromUtf8(std::format("{},{},{},{}", logicalRegion.x(), logicalRegion.y(), logicalRegion.width(), logicalRegion.height()).c_str());
     }
 
-    Core::Expected<QRect> regionFromText(std::string_view text)
+    Base::Expected<QRect> regionFromText(std::string_view text)
     {
         std::vector<std::string_view> fields;
         std::size_t                   position = 0;
@@ -152,9 +152,9 @@ namespace GyanisScribe::Capture
         if (fields.size() != 4)
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument,
-                                GyanisScribe::Core::uiFormat(
-                                        GyanisScribe::Core::uiTextUtf8("上次选区的记录格式不对：收到「{}」，应为「x,y,width,height」四个整数。请删掉这一项，让程序重新记一次"),
+                    Base::Error{Base::ErrorCode::InvalidArgument,
+                                GyanisScribe::Base::uiFormat(
+                                        GyanisScribe::Base::uiTextUtf8("上次选区的记录格式不对：收到「{}」，应为「x,y,width,height」四个整数。请删掉这一项，让程序重新记一次"),
                                         std::string(text))});
         }
 
@@ -170,8 +170,8 @@ namespace GyanisScribe::Capture
             {
                 // 逐段点名是哪一段坏了：四个数字里任何一个被截断或取整都会把选区挪到别处
                 return std::unexpected(
-                        Core::Error{Core::ErrorCode::InvalidArgument,
-                                    GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("上次选区的记录第 {} 段「{}」不是整数。请删掉这一项，让程序重新记一次"), index + 1,
+                        Base::Error{Base::ErrorCode::InvalidArgument,
+                                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("上次选区的记录第 {} 段「{}」不是整数。请删掉这一项，让程序重新记一次"), index + 1,
                                                                  std::string(field))});
             }
         }
@@ -179,8 +179,8 @@ namespace GyanisScribe::Capture
         if (numbers[2] <= 0 || numbers[3] <= 0)
         {
             return std::unexpected(
-                    Core::Error{Core::ErrorCode::InvalidArgument,
-                                GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("上次选区的宽高必须是正数，收到的是 {}×{}。请删掉这一项，让程序重新记一次"), numbers[2],
+                    Base::Error{Base::ErrorCode::InvalidArgument,
+                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("上次选区的宽高必须是正数，收到的是 {}×{}。请删掉这一项，让程序重新记一次"), numbers[2],
                                                              numbers[3])});
         }
 
@@ -195,7 +195,7 @@ namespace GyanisScribe::Capture
         }
 
         // 先认「宽x高」：只改大小、左上角钉住，是「差一格」时最常敲的那一句
-        if (const auto size = GyanisScribe::Core::parseSizeText(text); size)
+        if (const auto size = GyanisScribe::Base::parseSizeText(text); size)
         {
             const auto width  = std::clamp(size->width(), 1, std::max(1, limit.right() + 1 - anchor.x()));
             const auto height = std::clamp(size->height(), 1, std::max(1, limit.bottom() + 1 - anchor.y()));
@@ -223,7 +223,7 @@ namespace GyanisScribe::Capture
 
     QString sizeUnitLabel(const SizeUnit unit)
     {
-        return unit == SizeUnit::Physical ? GyanisScribe::Core::uiText("物理像素") : GyanisScribe::Core::uiText("逻辑像素");
+        return unit == SizeUnit::Physical ? GyanisScribe::Base::uiText("物理像素") : GyanisScribe::Base::uiText("逻辑像素");
     }
 
     std::string_view sizeUnitToken(const SizeUnit unit)
@@ -295,16 +295,16 @@ namespace GyanisScribe::Capture
         return rectFromUnit(*measured, devicePixelRatio, unit);
     }
 
-    Core::Expected<int> parseCaptureCornerRadius(const int logical)
+    Base::Expected<int> parseCaptureCornerRadius(const int logical)
     {
         if (logical >= kCaptureCornerRadiusMinimum && logical <= kCaptureCornerRadiusMaximum)
         {
             return logical;
         }
-        return Core::Expected<int>{std::unexpected{Core::Error{
-                .code    = Core::ErrorCode::InvalidArgument,
-                .message = GyanisScribe::Core::uiFormat(
-                        GyanisScribe::Core::uiTextUtf8("圆角半径 \"{}\" 不在 {} 到 {} 之间：请在设置的截图页重选一个值，或删掉 Capture/CornerRadius 这一项回到默认的 {} 格"),
+        return Base::Expected<int>{std::unexpected{Base::Error{
+                .code    = Base::ErrorCode::InvalidArgument,
+                .message = GyanisScribe::Base::uiFormat(
+                        GyanisScribe::Base::uiTextUtf8("圆角半径 \"{}\" 不在 {} 到 {} 之间：请在设置的截图页重选一个值，或删掉 Capture/CornerRadius 这一项回到默认的 {} 格"),
                         logical, kCaptureCornerRadiusMinimum, kCaptureCornerRadiusMaximum, kCaptureCornerRadiusDefault),
         }}};
     }
@@ -661,7 +661,7 @@ namespace GyanisScribe::Capture
         return QRect{topLeft, sprite.image.size()};
     }
 
-    void drawCursorInto(Core::CapturedImage &frame, const CursorSprite &sprite)
+    void drawCursorInto(Base::CapturedImage &frame, const CursorSprite &sprite)
     {
         if (sprite.image.isNull() || frame.image.isNull())
         {
