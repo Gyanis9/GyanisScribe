@@ -50,7 +50,7 @@ namespace GyanisScribe::Hotkey
          * @note 修饰键与按键都只认固定词表：字母取 A-Z、数字取 0-9、功能键取 F1-F24、再加 Space。
          *       「至少一个修饰键」也在这里判——一个单键的全局热键会把别的程序的按键吞掉
          */
-        [[nodiscard]] static Core::Expected<HotkeyCombination> fromText(std::string_view text);
+        [[nodiscard]] static Core::Expected<HotkeyCombination> fromText(std::string_view text, bool allowBareKeys = false);
 
         /**
          * @brief 从文本解析组合，但不判「能不能拿去登记」
@@ -63,10 +63,12 @@ namespace GyanisScribe::Hotkey
 
         /**
          * @brief 检查能否用作全局热键
+         * @param allowBareKeys 「允许单键当全局热键」那一格开着时传真：放行的只是「必须有修饰键」那一条，
+         *        单键会吞掉别的程序的打字这个后果仍在，这里只是把选择权交回用户
          * @return 成功返回空载荷
          * @return 失败返回 InvalidArgument 与中文原因（缺修饰键、按键是修饰键本身、或按键不在允许集合内）
          */
-        [[nodiscard]] Core::Expected<void> checkUsableGlobally() const;
+        [[nodiscard]] Core::Expected<void> checkUsableGlobally(bool allowBareKeys = false) const;
 
         /**
          * @brief 检查能否用作本程序窗口里的按键

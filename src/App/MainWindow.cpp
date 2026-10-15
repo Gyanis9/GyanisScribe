@@ -2277,6 +2277,15 @@ namespace GyanisScribe::App
             form->addRow(GyanisScribe::Core::uiText("给「%1」绑全局热键").arg(label), row);
         }
 
+        // 单键那一档单独一行，摆在全局热键段的末尾：它放开的是上面那些行的校验，
+        // 与界面按键无关（界面按键本来就允许裸键）
+        auto *simple =
+                makeSettingCheck(m_settings, GyanisScribe::Settings::kAllowSimpleGlobalHotkeys, false,
+                                 GyanisScribe::Core::uiText("允许单键（字母、数字、标点、方向键与 Esc、Enter 那一类）当全局热键"), GyanisScribe::Core::uiText("允许单键当全局热键"),
+                                 GyanisScribe::Core::uiText("默认关。开了之后，比如把 `R` 绑成截图：在别的程序里敲 r 也会触发截图，"
+                                                            "而那个程序收不到这个字母。只在你确实想让某颗键专属于它时才开"));
+        simple->setEnabled(m_capabilities.globalHotkeys);
+        form->addRow(GyanisScribe::Core::uiText("单键也能当全局热键"), simple);
         // 界面里的按键：这一批不吃平台能力位——没有全局登记口也照样在自己的窗口里认，
         // 所以它们既不灰也不进上面那句「改了也不会生效」的计数里
         auto *inAppTitle = new QLabel{GyanisScribe::Core::uiText("界面里的按键"), page};

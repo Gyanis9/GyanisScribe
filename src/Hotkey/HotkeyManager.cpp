@@ -173,7 +173,7 @@ namespace GyanisScribe::Hotkey
         {
             const auto storedText = m_settings.stringValue(settingsKeyFor(action), QString::fromUtf8(defaultCombinationTextFor(action)));
 
-            const auto combination = HotkeyCombination::fromText(storedText.toStdString());
+            const auto combination = HotkeyCombination::fromText(storedText.toStdString(), m_settings.boolValue(GyanisScribe::Settings::kAllowSimpleGlobalHotkeys, false));
             if (!combination)
             {
                 // 设置里的值坏掉时按项记失败，不用默认组合顶上：顶上去用户按到的就不是他设的那个键
@@ -192,8 +192,8 @@ namespace GyanisScribe::Hotkey
         // 自定义那一批：编号从 kCustomIdentifierBase 起按表序排，两项同一条组合撞上了就各自记一条失败（后端会拒第二个）
         for (std::size_t slot = 0; slot < m_customBindings.size(); ++slot)
         {
-            const auto &binding     = m_customBindings[slot];
-            const auto  combination = HotkeyCombination::fromText(binding.combination.toStdString());
+            const auto &binding    = m_customBindings[slot];
+            const auto combination = HotkeyCombination::fromText(binding.combination.toStdString(), m_settings.boolValue(GyanisScribe::Settings::kAllowSimpleGlobalHotkeys, false));
             if (!combination)
             {
                 report.customFailures.push_back(CustomHotkeyFailure{binding.token, binding.combination, combination.error()});
@@ -232,7 +232,7 @@ namespace GyanisScribe::Hotkey
     QString HotkeyManager::bindingText(HotkeyAction action) const
     {
         const auto storedText  = m_settings.stringValue(settingsKeyFor(action), QString::fromUtf8(defaultCombinationTextFor(action)));
-        const auto combination = HotkeyCombination::fromText(storedText.toStdString());
+        const auto combination = HotkeyCombination::fromText(storedText.toStdString(), m_settings.boolValue(GyanisScribe::Settings::kAllowSimpleGlobalHotkeys, false));
         if (!combination)
         {
             // 界面提示不能出现一个按不出来的组合：坏值就退回默认组合的文本，并把原因留在设置里

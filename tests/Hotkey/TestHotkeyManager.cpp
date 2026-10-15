@@ -281,6 +281,30 @@ TEST_F(HotkeyManagerFixture, StoredCombinationOverridesDefault)
 /**
  * @brief 钉住一项失败不牵连其余：坏值与被占用都各自记账，其余照常登记
  */
+/**
+ * @brief 钉住配置里存着的单键，在「允许单键」开着时能真登记上
+ * @details 这是用户按流程走完的那一条路：先开开关、再录一颗裸键、重启后靠配置重建。
+ *          开关不开时同一个值要被拒并记进失败项——两档各钉一次，只钉一档时
+ *          「读端忘了带这一格」会让开了开关的人也登记不上，而那正是这一格的全部价值。
+ */
+TEST_F(HotkeyManagerFixture, SimpleHotkeySettingDecidesWhetherStoredBareKeysRegister)
+{
+    SettingsStore           settings(m_iniFile);
+    FakePlatformIntegration integration;
+    HotkeyManager           manager(settings, integration);
+
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kHotkeyCapture, QVariant(QStringLiteral("R"))).has_value());
+    ASSERT_NE(integration.m_backendMirror, nullptr);
+    EXPECT_EQ(integration.m_backendMirror->registrations[0].key, Qt::Key_R) << "开关关着也把裸键登记上了：默认那一档太松";
+    EXPECT_EQ(manager.bindingText(HotkeyAction::Capture), QStringLiteral("Ctrl+Alt+A")) << "被拒的那条该退回默认，而不是显示一颗用不了的键";
+
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kAllowSimpleGlobalHotkeys, true).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Settings::kHotkeyCapture, QVariant(QStringLiteral("R"))).has_value());
+    ASSERT_NE(integration.m_backendMirror, nullptr);
+    EXPECT_EQ(integration.m_backendMirror->registrations[0].key, Qt::Key_R) << "开关开了，配置里存着的单键还是没登记上：读端没带这一格";
+    EXPECT_EQ(integration.m_backendMirror->registrations[0].modifiers, Qt::NoModifier);
+    EXPECT_EQ(manager.bindingText(HotkeyAction::Capture), QStringLiteral("R"));
+}
 TEST_F(HotkeyManagerFixture, OneFailureDoesNotStopTheOthers)
 {
     SettingsStore settings(m_iniFile);

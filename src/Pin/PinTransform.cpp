@@ -147,6 +147,15 @@ namespace GyanisScribe::Pin
         return QRect(QPoint(x0, y0), QPoint(x1, y1));
     }
 
+    QSize sizeScaledBy(const QSize &current, const double ratio)
+    {
+        if (ratio <= 0.0)
+        {
+            return current;
+        }
+        return QSize{std::max(1, static_cast<int>(std::lround(current.width() * ratio))), std::max(1, static_cast<int>(std::lround(current.height() * ratio)))};
+    }
+
     Core::Expected<int> parseEdgeSnapDistance(const int distance)
     {
         if (distance >= kEdgeSnapDistanceMinimum && distance <= kEdgeSnapDistanceMaximum)

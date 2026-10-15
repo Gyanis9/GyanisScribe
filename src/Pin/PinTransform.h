@@ -222,6 +222,16 @@ namespace GyanisScribe::Pin
      */
     [[nodiscard]] Core::Expected<int> parseEdgeSnapDistance(int distance);
 
+    /**
+     * @brief 按倍率算一个新尺寸
+     * @param current 当前尺寸，逻辑像素
+     * @param ratio 倍率
+     * @return 逐维四舍五入后的尺寸，每维至少一格；倍率非正时原样交回
+     * @details 「自定义尺寸…」的倍率那一形走这里：除不尽时四舍五入而不是截断，
+     *          截断会让 1.5 倍的 101 变成 151（该是 152），两次来回就少几格。
+     */
+    [[nodiscard]] QSize sizeScaledBy(const QSize &current, double ratio);
+
     /// 贴边收起后留在屏上的那条边，逻辑像素：全藏进去用户就再也找不回它了
     inline constexpr int kEdgeStripWidth = 6;
 

@@ -240,7 +240,7 @@ namespace
                             {"录屏目录", "录制范围", "输出格式", "默认帧率", "录屏倒计时", "画面码率", "视频编码器", "光标高亮", "麦克风设备", "系统声音设备"},
                             true},
                 Expectation{MainWindowPage::Ocr, {"识别语言", "语言包目录"}, true},
-                Expectation{MainWindowPage::Hotkey, {"截图", "录屏", "文字识别", "屏幕取色", "快速保存"}, true},
+                Expectation{MainWindowPage::Hotkey, {"截图", "录屏", "文字识别", "屏幕取色", "快速保存", "允许单键当全局热键"}, true},
                 Expectation{MainWindowPage::Theme, {"主题"}, true},
                 Expectation{MainWindowPage::About, {"智录图标"}, false},
                 Expectation{MainWindowPage::History, {"历史列表"}, false},
@@ -685,6 +685,42 @@ namespace
         const auto reopened = makeStore();
         EXPECT_EQ(reopened->stringValue(GyanisScribe::Settings::kCaptureDetectionExcludes, QStringLiteral("?")), QStringLiteral(" chrome.exe , cmd.exe "))
                 << "存的该是用户填的原文（解析在读端做，界面不改写它）";
+    }
+
+    /**
+     * @brief 钉住「允许单键当全局热键」这一格真的换了录入框的松紧
+     * @details 只断设置写没写是空转：这一格的价值全在「录入框认不认裸键」上。
+     *          两档各来一次：默认拒、开了收，且收下的就是那颗键本身。
+     */
+    TEST_F(MainWindowFixture, SimpleHotkeySettingMovesTheRecorderGrip)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::Hotkey);
+
+        GyanisScribe::Ui::HotkeyEdit *captureEdit = nullptr;
+        for (auto *candidate: m_window->findChildren<GyanisScribe::Ui::HotkeyEdit *>())
+        {
+            if (candidate->accessibleName() == QStringLiteral("截图"))
+            {
+                captureEdit = candidate;
+            }
+        }
+        ASSERT_NE(captureEdit, nullptr) << "快捷键页没有「截图」那一格";
+
+        const GyanisScribe::Hotkey::HotkeyCombination bare{Qt::NoModifier, Qt::Key_R};
+        EXPECT_FALSE(static_cast<bool>(captureEdit->applyCombination(bare))) << "默认那一档要拒裸键：单键会把别的程序的打字吞掉";
+
+        auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage("允许单键当全局热键"));
+        ASSERT_NE(check, nullptr) << "快捷键页没有这一格";
+        EXPECT_FALSE(check->isChecked()) << "默认该是关（与对方那一格的默认同值）";
+        check->setChecked(true);
+
+        ASSERT_TRUE(static_cast<bool>(captureEdit->applyCombination(bare))) << "开了之后录入框仍拒裸键：这一格等于没接上";
+
+        closeWindowAndFlush();
+        const auto reopened = makeStore();
+        EXPECT_TRUE(reopened->boolValue(GyanisScribe::Settings::kAllowSimpleGlobalHotkeys, false)) << "开关没写进 Hotkey/AllowSimpleGlobalHotkeys";
+        EXPECT_EQ(reopened->stringValue(GyanisScribe::Settings::kHotkeyCapture, QStringLiteral("?")), QStringLiteral("R")) << "收下的该是那颗裸键本身";
     }
 
     /**

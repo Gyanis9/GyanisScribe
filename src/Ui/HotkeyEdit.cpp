@@ -1,6 +1,7 @@
 #include "Ui/HotkeyEdit.h"
 
 #include "Core/Logger.h"
+#include "Settings/SettingsKeys.h"
 #include "Core/Text.h"
 
 #include <QKeyEvent>
@@ -93,7 +94,9 @@ namespace GyanisScribe::Ui
     Core::Expected<void> HotkeyEdit::applyCombination(const Hotkey::HotkeyCombination &combination)
     {
         // 两档的松紧不同：全局那一档不许裸键（会把别的程序的按键吞掉），界面那一档只看按键本体
-        const auto usable = m_scope == HotkeyEditScope::InWindow ? combination.checkUsableInWindow() : combination.checkUsableGlobally();
+        // 「允许单键当全局热键」那一格现读：把它写进本控件就得处理「设置改了控件还停在旧口径」
+        const auto allowBareKeys = m_settings.boolValue(GyanisScribe::Settings::kAllowSimpleGlobalHotkeys, false);
+        const auto usable        = m_scope == HotkeyEditScope::InWindow ? combination.checkUsableInWindow() : combination.checkUsableGlobally(allowBareKeys);
         if (!usable)
         {
             // 不合格就什么都不写：半截组合落进配置，重启后热键直接登记不上，比现在改不动更难查

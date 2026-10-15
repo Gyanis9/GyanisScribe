@@ -432,3 +432,17 @@ TEST(PinEdgeSnapDistance, AcceptsZeroAndRejectsOutOfRange)
         EXPECT_NE(rejected.error().message.find("Pin/EdgeSnapDistance"), std::string::npos) << "拒绝要说清删哪一格能回默认，实际：" << rejected.error().message;
     }
 }
+
+/**
+ * @brief 钉住按倍率算尺寸：逐维四舍五入、每维保底一格、非正倍率原样交回
+ * @details 期望值手算：1.5 倍的 101×51 是 151.5×76.5，四舍五入到 152×77（截断会得到 151×76，
+ *          来回两次就少几格）；0.5 倍的 101×51 是 50.5×25.5，进位到 51×26。
+ */
+TEST(PinTransform, ScalesASizeByRatioRoundingHalfUp)
+{
+    EXPECT_EQ(GyanisScribe::Pin::sizeScaledBy(QSize{101, 51}, 1.5), QSize(152, 77)) << "除不尽时四舍五入，不是截断";
+    EXPECT_EQ(GyanisScribe::Pin::sizeScaledBy(QSize{101, 51}, 0.5), QSize(51, 26));
+    EXPECT_EQ(GyanisScribe::Pin::sizeScaledBy(QSize{640, 360}, 2.0), QSize(1280, 720)) << "整数倍要逐位相等";
+    EXPECT_EQ(GyanisScribe::Pin::sizeScaledBy(QSize{100, 100}, 0.001), QSize(1, 1)) << "缩到零格就没有窗口了，每维保底一格";
+    EXPECT_EQ(GyanisScribe::Pin::sizeScaledBy(QSize{100, 100}, 0.0), QSize(100, 100)) << "非正倍率不是「缩到零」，原样交回";
+}

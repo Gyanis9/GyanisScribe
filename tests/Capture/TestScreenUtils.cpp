@@ -787,3 +787,28 @@ TEST(ProcessExcludes, ParsesAndMatchesByNameOnly)
     EXPECT_FALSE(isExcludedProcess(QString{}, names)) << "问不出进程名时不许当成「用户点名要排除的那个」";
     EXPECT_FALSE(isExcludedProcess(QStringLiteral("chrome.exe"), {})) << "空名单不排除任何东西";
 }
+
+/**
+ * @brief 钉住倍率那一形的解析：三种写法各认一次，坏值一律拒
+ * @details 「宽x高」与「倍率」是两条解析：混在一起时 `2x` 会被读成「宽 2、高缺失」，
+ *          用户拿到的是「没读懂这个尺寸」，而他填的是个常见写法。越界不夹取——
+ *          把 20000% 悄悄收成 100 倍，用户看到的是另一张图。
+ */
+TEST(SizeTextScaleRatio, AcceptsTheThreeFormsAndRejectsJunk)
+{
+    EXPECT_DOUBLE_EQ(*GyanisScribe::Core::parseScaleRatio(QStringLiteral("2x")), 2.0);
+    EXPECT_DOUBLE_EQ(*GyanisScribe::Core::parseScaleRatio(QStringLiteral("1.5X")), 1.5) << "x 不分大小写";
+    EXPECT_DOUBLE_EQ(*GyanisScribe::Core::parseScaleRatio(QStringLiteral("50%")), 0.5) << "百分数是相对原大小的另一种写法";
+    EXPECT_DOUBLE_EQ(*GyanisScribe::Core::parseScaleRatio(QStringLiteral(" 0.5 ")), 0.5) << "纯数字按倍率算（首尾空白先去过）";
+
+    EXPECT_FALSE(GyanisScribe::Core::parseScaleRatio(QString{}).has_value());
+    EXPECT_FALSE(GyanisScribe::Core::parseScaleRatio(QStringLiteral("abc")).has_value());
+    EXPECT_FALSE(GyanisScribe::Core::parseScaleRatio(QStringLiteral("1.5.2")).has_value()) << "两个小数点不是倍率";
+    EXPECT_FALSE(GyanisScribe::Core::parseScaleRatio(QStringLiteral("0x")).has_value()) << "0 倍是坏值，不是「缩到看不见」";
+    EXPECT_FALSE(GyanisScribe::Core::parseScaleRatio(QStringLiteral("-2x")).has_value());
+    EXPECT_FALSE(GyanisScribe::Core::parseScaleRatio(QStringLiteral("20000%")).has_value()) << "超过上限要拒，不许夹到 100 倍";
+
+    // 「宽x高」那一形不能被这一条吃掉：两条解析各管各的
+    EXPECT_FALSE(GyanisScribe::Core::parseScaleRatio(QStringLiteral("640x360")).has_value()) << "尺寸那一形该由 parseSizeText 接";
+    EXPECT_TRUE(GyanisScribe::Core::parseSizeText(QStringLiteral("640x360")).has_value());
+}

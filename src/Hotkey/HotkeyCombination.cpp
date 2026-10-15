@@ -227,7 +227,7 @@ namespace GyanisScribe::Hotkey
         return HotkeyCombination(modifiers, *parsedKey);
     }
 
-    Core::Expected<HotkeyCombination> HotkeyCombination::fromText(std::string_view text)
+    Core::Expected<HotkeyCombination> HotkeyCombination::fromText(const std::string_view text, const bool allowBareKeys)
     {
         auto parsed = parse(text);
         if (!parsed)
@@ -235,14 +235,14 @@ namespace GyanisScribe::Hotkey
             return parsed;
         }
 
-        if (const auto usable = parsed->checkUsableGlobally(); !usable)
+        if (const auto usable = parsed->checkUsableGlobally(allowBareKeys); !usable)
         {
             return std::unexpected(usable.error());
         }
         return parsed;
     }
 
-    Core::Expected<void> HotkeyCombination::checkUsableGlobally() const
+    Core::Expected<void> HotkeyCombination::checkUsableGlobally(const bool allowBareKeys) const
     {
         switch (keyShapeProblem(m_key))
         {
@@ -257,7 +257,7 @@ namespace GyanisScribe::Hotkey
                 break;
         }
 
-        if (m_modifiers == Qt::NoModifier)
+        if (m_modifiers == Qt::NoModifier && !allowBareKeys)
         {
             return std::unexpected(
                     Core::Error{Core::ErrorCode::InvalidArgument,

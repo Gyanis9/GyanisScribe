@@ -246,6 +246,10 @@ namespace GyanisScribe::Settings
     /// 读端在 AppController 造参数那一处，写端在设置的录屏页，选型规则见 FfmpegVideoEncoders
     inline constexpr std::string_view kRecordVideoEncoder = "Record/VideoEncoder";
 
+    /// 允许单键（字母/数字/标点/方向键与 Esc、Enter 那一类）当全局热键；默认关——单键会把别的程序的打字吞掉。
+    /// 读端在 HotkeyEdit 与 HotkeyManager（两处都读同一格），写端在设置的快捷键页
+    inline constexpr std::string_view kAllowSimpleGlobalHotkeys = "Hotkey/AllowSimpleGlobalHotkeys";
+
     /// 编码器下拉里「自动」那一项的取值：与「没填」区分开，用户能显式选回自动
     inline constexpr std::string_view kRecordVideoEncoderAutoToken = "Auto";
 

@@ -1704,6 +1704,22 @@
             <translation>Global hotkey for "%1"</translation>
         </message>
         <message>
+            <source>允许单键（字母、数字、标点、方向键与 Esc、Enter 那一类）当全局热键</source>
+            <translation>Allow single keys (letters, digits, punctuation, arrow keys, and keys like Esc or Enter) as global hotkeys</translation>
+        </message>
+        <message>
+            <source>允许单键当全局热键</source>
+            <translation>Allow single-key global hotkeys</translation>
+        </message>
+        <message>
+            <source>默认关。开了之后，比如把 `R` 绑成截图：在别的程序里敲 r 也会触发截图，而那个程序收不到这个字母。只在你确实想让某颗键专属于它时才开</source>
+            <translation>Off by default. Once on, say with `R` bound to capture: typing r in another program triggers a capture and that program never sees the letter. Turn it on only when you really want a key to belong to this app alone</translation>
+        </message>
+        <message>
+            <source>单键也能当全局热键</source>
+            <translation>Single keys can be global hotkeys</translation>
+        </message>
+        <message>
             <source>界面里的按键</source>
             <translation>In-window keys</translation>
         </message>
@@ -2848,12 +2864,12 @@
             <translation>Custom pin size</translation>
         </message>
         <message>
-            <source>宽 x 高（像素）</source>
-            <translation>Width x height (pixels)</translation>
+            <source>填「宽x高」（如 640x360）或倍率（如 2x、50%）</source>
+            <translation>Enter "width x height" (e.g. 640x360) or a ratio (e.g. 2x, 50%)</translation>
         </message>
         <message>
-            <source>没读懂这个尺寸：请按「宽x高」写，比如 640x360</source>
-            <translation>Could not read that size: write it as "width x height", for example 640x360</translation>
+            <source>没读懂这个尺寸：按「宽x高」写（如 640x360），或填一个倍率（如 2x、50%）</source>
+            <translation>Could not read this size: write "width x height" (e.g. 640x360), or give a ratio (e.g. 2x, 50%)</translation>
         </message>
         <message>
             <source>改这一张的颜色…</source>

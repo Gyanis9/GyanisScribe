@@ -26,4 +26,16 @@ namespace GyanisScribe::Core
      */
     [[nodiscard]] std::optional<QSize> parseSizeText(const QString &text);
 
+    /// 「倍率」那一形的上限：再大就是拿程序当缩放器用，先挡住
+    inline constexpr double kMaximumScaleRatio = 100.0;
+
+    /**
+     * @brief 把「倍率」文本解析成缩放比
+     * @param text 形如「2x」「1.5X」「50%」「0.5」；末尾一个 x 或 % 都认，纯数字按倍率算
+     * @return 成功返回 (0, 100] 内的倍率；解析不出、非正或超上限时为空
+     * @details 与「宽x高」分成两条解析：混在一起时 `2x` 会被当成「宽 2、高缺失」，
+     *          用户看到的是「没读懂这个尺寸」，而他填的明明是一个常见写法。
+     */
+    [[nodiscard]] std::optional<double> parseScaleRatio(const QString &text);
+
 } // namespace GyanisScribe::Core

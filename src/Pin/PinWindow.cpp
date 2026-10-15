@@ -2091,15 +2091,16 @@ namespace GyanisScribe::Pin
         // （与「复制」是两条出口：那一条粘进文档里是一张图）
         menu->addAction(GyanisScribe::Core::uiText("复制为文件"), this, &PinWindow::copyAsFileToClipboard);
 
-        // 自定义尺寸：滚轮是一格一格缩，这一项要的是「正好 1280 宽」这种精确值。
-        // 对话框预填当前尺寸，认「宽x高」这一套写法（与截图选区那个输入框同一处解析）
+        // 自定义尺寸：滚轮是一格一格缩，这一项要的是「正好 1280 宽」这种精确值，或「放大一半」这种倍率。
+        // 对话框预填当前尺寸：两种写法各走一条解析（「宽x高」与截图选区那个输入框同一处，「倍率」单独一条）
         menu->addAction(GyanisScribe::Core::uiText("自定义尺寸…"), this,
                         [this]
                         {
                             const auto current  = QStringLiteral("%1x%2").arg(qRound(m_logicalSize.width())).arg(qRound(m_logicalSize.height()));
                             bool       accepted = false;
-                            const auto text     = QInputDialog::getText(this, GyanisScribe::Core::uiText("自定义贴图尺寸"), GyanisScribe::Core::uiText("宽 x 高（像素）"),
-                                                                        QLineEdit::Normal, current, &accepted);
+                            const auto text =
+                                    QInputDialog::getText(this, GyanisScribe::Core::uiText("自定义贴图尺寸"),
+                                                          GyanisScribe::Core::uiText("填「宽x高」（如 640x360）或倍率（如 2x、50%）"), QLineEdit::Normal, current, &accepted);
                             if (!accepted)
                             {
                                 return; // 取消是一种正常收场：什么都没发生，也什么都不用说
@@ -2107,11 +2108,17 @@ namespace GyanisScribe::Pin
                             if (const auto parsed = GyanisScribe::Core::parseSizeText(text); parsed)
                             {
                                 setExactSize(*parsed);
-                            } else
-                            {
-                                QMessageBox::information(this, GyanisScribe::Core::uiText("自定义贴图尺寸"),
-                                                         GyanisScribe::Core::uiText("没读懂这个尺寸：请按「宽x高」写，比如 640x360"));
+                                return;
                             }
+                            if (const auto ratio = GyanisScribe::Core::parseScaleRatio(text); ratio)
+                            {
+                                // 倍率按当前这份尺寸算：与滚轮缩放同一档口径，改的是这一张自己的大小
+                                const auto scaled = sizeScaledBy(QSize{qRound(m_logicalSize.width()), qRound(m_logicalSize.height())}, *ratio);
+                                setExactSize(scaled);
+                                return;
+                            }
+                            QMessageBox::information(this, GyanisScribe::Core::uiText("自定义贴图尺寸"),
+                                                     GyanisScribe::Core::uiText("没读懂这个尺寸：按「宽x高」写（如 640x360），或填一个倍率（如 2x、50%）"));
                         });
 
         // 保存与「在文件夹中查看」是同一条路：后者在存下之后再打开那个目录，

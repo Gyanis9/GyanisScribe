@@ -127,3 +127,25 @@ TEST(HotkeyCombination, DefaultConstructedCombinationIsUnusable)
     ASSERT_FALSE(unset.checkUsableGlobally().has_value());
     EXPECT_EQ(unset.checkUsableGlobally().error().code, ErrorCode::InvalidArgument);
 }
+
+/**
+ * @brief 钉住「允许单键当全局热键」那一档放开的只是「必须有修饰键」这一条
+ * @details 放行之后单键确实能登记；修饰键本身与不在允许集合里的键仍要拒——放开的是一格，不是整个校验。
+ *          不传参时保持本仓此前的口径，读端忘了带这一格也不会静默放开。
+ */
+TEST(HotkeyCombination, BareKeysAllowedOnlyWhenTheSettingIsOn)
+{
+    const HotkeyCombination bare{Qt::NoModifier, Qt::Key_R};
+    EXPECT_FALSE(bare.checkUsableGlobally().has_value()) << "默认要照旧拒单键";
+    ASSERT_TRUE(bare.checkUsableGlobally(true).has_value()) << "放开之后单键该能用";
+
+    const HotkeyCombination modifierItself{Qt::NoModifier, Qt::Key_Shift};
+    EXPECT_FALSE(modifierItself.checkUsableGlobally(true).has_value()) << "修饰键本身不是热键，放开的不是这一条";
+
+    const HotkeyCombination outOfSet{Qt::NoModifier, Qt::Key_MediaPlay};
+    EXPECT_FALSE(outOfSet.checkUsableGlobally(true).has_value()) << "不在允许集合里的键仍要拒";
+
+    EXPECT_FALSE(HotkeyCombination::fromText("R").has_value()) << "默认那一档的读端仍拒单键";
+    ASSERT_TRUE(HotkeyCombination::fromText("R", true).has_value()) << "开关开着时，配置里存着单键要能读回来登记";
+    EXPECT_TRUE(HotkeyCombination::fromText("Ctrl+Alt+A", true).has_value()) << "带修饰键的照旧";
+}
