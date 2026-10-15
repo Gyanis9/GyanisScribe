@@ -19,10 +19,10 @@
 
 #include <vector>
 
-namespace GyanisScribe::Ui
+namespace GyanisScribe::Gui
 {
     class ThemeManager;
-} // namespace GyanisScribe::Ui
+} // namespace GyanisScribe::Gui
 
 namespace GyanisScribe::Pick
 {
@@ -48,7 +48,7 @@ namespace GyanisScribe::Pick
          * @param theme 主题管理器，放大镜边框与文字色随主题
          * @param parent Qt 父对象
          */
-        ColorPickerOverlay(const Base::CapturedImage &frame, const QRect &screenGeometry, ColorFormat format, HexCasing casing, MagnifierView view, const Ui::ThemeManager &theme,
+        ColorPickerOverlay(const Base::CapturedImage &frame, const QRect &screenGeometry, ColorFormat format, HexCasing casing, MagnifierView view, const Gui::ThemeManager &theme,
                            QWidget *parent = nullptr);
 
         /**
@@ -118,7 +118,7 @@ namespace GyanisScribe::Pick
         ColorFormat             m_format;             ///< 复制用的写法
         HexCasing               m_hexCasing;          ///< 写法是 HEX 时字母那几位的大小写
         MagnifierView           m_magnifierView;      ///< 放大镜视野档，「不显示」时只画十字与信息条
-        const Ui::ThemeManager &m_theme;              ///< 主题管理器，画放大镜边框用主色
+        const Gui::ThemeManager &m_theme;              ///< 主题管理器，画放大镜边框用主色
         QPoint                  m_cursor;             ///< 当前光标的屏幕坐标
         std::vector<QColor>     m_recent;             ///< 最近取色清单，最近的在前；命中的下标与色块行同序
         int                     m_hoveredSwatch = -1; ///< 光标压在色块行第几块上；-1 表示没压在任何一块上

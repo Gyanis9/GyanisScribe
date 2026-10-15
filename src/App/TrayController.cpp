@@ -7,8 +7,8 @@
 #include "Record/RecordingHud.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
-#include "Ui/IconProvider.h"
-#include "Ui/ThemeManager.h"
+#include "Gui/Resources/IconProvider.h"
+#include "Gui/Theme/ThemeManager.h"
 
 #include <QAction>
 #include <QCursor>
@@ -100,13 +100,13 @@ namespace GyanisScribe::App
         return visible;
     }
 
-    TrayController::TrayController(GyanisScribe::Ui::IconProvider &icons, GyanisScribe::Ui::ThemeManager &theme, Settings::ISettingsStore &settings,
+    TrayController::TrayController(GyanisScribe::Gui::IconProvider &icons, GyanisScribe::Gui::ThemeManager &theme, Settings::ISettingsStore &settings,
                                    Platform::IPlatformIntegration &integration, QObject *parent) :
         QObject(parent), m_icons(icons), m_theme(theme), m_settings(settings), m_integration(integration)
     {
         // 换主题时把托盘图标与菜单重取一遍：这两样都是 install() 里按当前描边色拍的快照，
         // 不重取的话深色档留着深色描边，等于托盘图标看不见（install() 开头就 clear 菜单，可重复调）
-        QObject::connect(&m_theme, &Ui::ThemeManager::themeChanged, this, [this] { install(); });
+        QObject::connect(&m_theme, &Gui::ThemeManager::themeChanged, this, [this] { install(); });
     }
 
     TrayController::~TrayController()

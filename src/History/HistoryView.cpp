@@ -4,7 +4,7 @@
 #include "Base/Paths.h"
 #include "Base/Text.h"
 #include "History/HistoryThumbnail.h"
-#include "Ui/IconProvider.h"
+#include "Gui/Resources/IconProvider.h"
 
 #include <QComboBox>
 #include <QDateTime>
@@ -101,7 +101,7 @@ namespace GyanisScribe::History
         return visible;
     }
 
-    HistoryView::HistoryView(HistoryStore &store, const HistoryRetentionPolicy &policy, Ui::IconProvider &icons, QWidget *parent) :
+    HistoryView::HistoryView(HistoryStore &store, const HistoryRetentionPolicy &policy, Gui::IconProvider &icons, QWidget *parent) :
         QWidget(parent), m_store(store), m_policy(policy), m_icons(icons)
     {
         auto *root = new QVBoxLayout{this};
@@ -157,7 +157,7 @@ namespace GyanisScribe::History
                                  emit pinRequested(*path);
                                  return;
                              }
-                             emit messageForUser(GyanisScribe::Base::uiText("先在历史里选一张图"), Ui::ToastKind::Information);
+                             emit messageForUser(GyanisScribe::Base::uiText("先在历史里选一张图"), Gui::ToastKind::Information);
                          });
         QObject::connect(ocrButton, &QPushButton::clicked, this,
                          [this]
@@ -167,7 +167,7 @@ namespace GyanisScribe::History
                                  emit ocrRequested(*path);
                                  return;
                              }
-                             emit messageForUser(GyanisScribe::Base::uiText("先在历史里选一张图"), Ui::ToastKind::Information);
+                             emit messageForUser(GyanisScribe::Base::uiText("先在历史里选一张图"), Gui::ToastKind::Information);
                          });
         QObject::connect(folderButton, &QPushButton::clicked, this,
                          [this]
@@ -177,7 +177,7 @@ namespace GyanisScribe::History
                                  emit openFolderRequested(*path);
                                  return;
                              }
-                             emit messageForUser(GyanisScribe::Base::uiText("先在历史里选一张图"), Ui::ToastKind::Information);
+                             emit messageForUser(GyanisScribe::Base::uiText("先在历史里选一张图"), Gui::ToastKind::Information);
                          });
         QObject::connect(deleteButton, &QPushButton::clicked, this, &HistoryView::removeSelected);
         QObject::connect(clearButton, &QPushButton::clicked, this,
@@ -185,7 +185,7 @@ namespace GyanisScribe::History
                          {
                              if (m_entries.isEmpty())
                              {
-                                 emit messageForUser(GyanisScribe::Base::uiText("历史列表本来就是空的"), Ui::ToastKind::Information);
+                                 emit messageForUser(GyanisScribe::Base::uiText("历史列表本来就是空的"), Gui::ToastKind::Information);
                                  return;
                              }
                              // 清空是一下去掉一整批：先问一句，别让人一次点击丢掉整个清单
@@ -213,7 +213,7 @@ namespace GyanisScribe::History
             emit messageForUser(
                     QString::fromUtf8(
                             GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("历史清单没能读出来：{}。列表先显示上一次的记录"), loaded.error().message).c_str()),
-                    Ui::ToastKind::Danger);
+                    Gui::ToastKind::Danger);
             return;
         }
 
@@ -279,7 +279,7 @@ namespace GyanisScribe::History
         const auto path = selectedPath();
         if (!path)
         {
-            emit messageForUser(GyanisScribe::Base::uiText("先在历史里选一张图"), Ui::ToastKind::Information);
+            emit messageForUser(GyanisScribe::Base::uiText("先在历史里选一张图"), Gui::ToastKind::Information);
             return;
         }
         emit removeRequested(*path);

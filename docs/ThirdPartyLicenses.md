@@ -49,7 +49,7 @@ Windows 上这一节只在选用 Tesseract 时才用得到：系统识别走 Win
 
 ## 图标与美术资源
 
-`Resources/Icons/*.svg` 全部由本项目生成并拥有：统一的 24×24 视框、1.5/2 描边、圆头圆角，
+`src/Gui/Resources/Icons/*.svg` 全部由本项目生成并拥有：统一的 24×24 视框、1.5/2 描边、圆头圆角，
 颜色由 `IconProvider` 在运行时按主题替换 `currentColor`。不含表情符号、字体图标、
 外部图片或 base64 嵌入。若日后引入任何第三方图标，必须在本页新增一行并写明许可证。
 

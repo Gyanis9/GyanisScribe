@@ -7,7 +7,7 @@
 #include "Pick/PickGeometry.h"
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
-#include "Ui/AppShortcuts.h"
+#include "Gui/Controls/AppShortcuts.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -1005,13 +1005,13 @@ TEST_F(CaptureOverlayFixture, PointerKeyTogglesCursorForThisRound)
 
 /**
  * @brief 钉住「在设置页换过一颗键」之后遮罩跟着换，旧那颗当场让位
- * @details 这条钉的是「键位只住在 Ui/AppShortcuts.h 那份清册一处」：锁比例换成 G 之后，
+ * @details 这条钉的是「键位只住在 Gui/Controls/AppShortcuts.h 那份清册一处」：锁比例换成 G 之后，
  *          按 G 锁得上、按 A 不再动它。默认那颗由别几条判据钉着落对动作，这一条钉的是分派读的是清册；
  *          两处缺一个就会出现「设置改了没反应」或「按屏幕上写的键没反应」。
  */
 TEST_F(CaptureOverlayFixture, ReboundAspectRatioKeyMovesToTheNewLetter)
 {
-    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Ui::appShortcutKey("Mask/AspectRatio").toStdString(), QStringLiteral("G")))) << "写入失败";
+    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Gui::appShortcutKey("Mask/AspectRatio").toStdString(), QStringLiteral("G")))) << "写入失败";
 
     auto overlay = makeOverlay();
     dragOut(*overlay, QPoint{100, 100}, QPoint{299, 199});
@@ -1031,7 +1031,7 @@ TEST_F(CaptureOverlayFixture, ReboundAspectRatioKeyMovesToTheNewLetter)
  */
 TEST_F(CaptureOverlayFixture, ReboundRegionCycleKeyCarriesItsReverse)
 {
-    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Ui::appShortcutKey("Mask/RegionCycle").toStdString(), QStringLiteral("J")))) << "写入失败";
+    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Gui::appShortcutKey("Mask/RegionCycle").toStdString(), QStringLiteral("J")))) << "写入失败";
 
     auto overlay = makeOverlay();
     overlay->setRegionHistory({QRect{10, 10, 50, 40}, QRect{200, 200, 60, 60}});
@@ -1053,7 +1053,7 @@ TEST_F(CaptureOverlayFixture, ReboundRegionCycleKeyCarriesItsReverse)
  */
 TEST_F(CaptureOverlayFixture, ReboundPointerKeyKeepsTheRoundScopedRules)
 {
-    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Ui::appShortcutKey("Mask/PointerToggle").toStdString(), QStringLiteral("B")))) << "写入失败";
+    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Gui::appShortcutKey("Mask/PointerToggle").toStdString(), QStringLiteral("B")))) << "写入失败";
 
     int  reports = 0;
     auto overlay = makeOverlay();

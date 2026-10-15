@@ -27,13 +27,13 @@ add_library(Record STATIC
         RecordingHud.cpp)
 
 target_include_directories(Record PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
-# 控制条要图标与窗口，所以 Record 吃 Ui 与 Widgets
+# 控制条要图标与窗口，所以 Record 吃 Gui 与 Widgets
 # Concurrent 给 stop() 那一步用：把 ffmpeg 编码搬到线程池，界面在编码期间不再停住
 target_link_libraries(Record PUBLIC
         Capture
         Core
         Settings
-        Ui
+        Gui
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets

@@ -44,7 +44,7 @@ target_link_libraries(App PUBLIC
         Record
         Scan
         Settings
-        Ui
+        Gui
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets

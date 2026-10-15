@@ -4,7 +4,7 @@ find_package(GTest REQUIRED CONFIG)
 
 add_subdirectory(Base)
 add_subdirectory(Core)
-add_subdirectory(Ui)
+add_subdirectory(Gui)
 add_subdirectory(Platform)
 add_subdirectory(Settings)
 add_subdirectory(Hotkey)

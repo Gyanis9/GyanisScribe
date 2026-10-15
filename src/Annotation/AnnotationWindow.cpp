@@ -5,8 +5,8 @@
 #include "Annotation/AnnotationToolbarGeometry.h"
 #include "Base/Logger.h"
 #include "Settings/ISettingsStore.h"
-#include "Ui/AppShortcuts.h"
-#include "Ui/KeyStep.h"
+#include "Gui/Controls/AppShortcuts.h"
+#include "Gui/Controls/KeyStep.h"
 #include "Base/Types.h"
 
 #include <QKeyEvent>
@@ -95,8 +95,8 @@ namespace GyanisScribe::Annotation
         // 用户把某一档换成带修饰键的组合后，那颗组合也就归这一档了
         for (const auto &entry: kToolTable)
         {
-            const auto *shortcut = GyanisScribe::Ui::appShortcutEntry(std::get<3>(entry));
-            if (shortcut != nullptr && GyanisScribe::Ui::isAppShortcutHit(settings, *shortcut, key, modifiers))
+            const auto *shortcut = GyanisScribe::Gui::appShortcutEntry(std::get<3>(entry));
+            if (shortcut != nullptr && GyanisScribe::Gui::isAppShortcutHit(settings, *shortcut, key, modifiers))
             {
                 return std::get<0>(entry);
             }
@@ -262,7 +262,7 @@ namespace GyanisScribe::Annotation
                 return;
             case ShortcutAction::NudgeSelection:
             {
-                const auto step = GyanisScribe::Ui::arrowStepFor(event->key());
+                const auto step = GyanisScribe::Gui::arrowStepFor(event->key());
                 if (!step)
                 {
                     // 分派表只从方向键走到这一支；走到别处说明两张表不同解，宁可什么都不做也不瞎挪

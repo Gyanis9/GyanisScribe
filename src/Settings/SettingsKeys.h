@@ -39,7 +39,7 @@ namespace GyanisScribe::Settings
 
     /**
      * @brief 可换键的界面动作那一族（`Ui/Shortcut/<动作标识>`），键名不在这里逐个登记
-     * @details 清册住在 Ui/AppShortcuts.h 的 appShortcutEntries()：默认按键、中文名与配置键都在那一处算，
+     * @details 清册住在 Gui/Controls/AppShortcuts.h 的 appShortcutEntries()：默认按键、中文名与配置键都在那一处算，
      *          这里再逐个列一遍就成了第二份真源。存的文本是一颗星键或一个组合（如 R、Ctrl+Shift+Z），
      *          没填过与填了空串都按默认那颗走。
      */
@@ -48,8 +48,8 @@ namespace GyanisScribe::Settings
     /// 主题档位，取值只能是 Light、Dark、System、HighContrast
     inline constexpr std::string_view kThemeMode = "Theme/Mode";
 
-    /// 界面语言，取值只能是 zh 与 en；en 需要随包的语言包，见 Ui/Language.h
-    inline constexpr std::string_view kUiLanguage = "Ui/Language";
+    /// 界面语言，取值只能是 zh 与 en；en 需要随包的语言包，见 Gui/Theme/Language.h
+    inline constexpr std::string_view kUiLanguage = "Gui/Theme/Language";
 
     /// 上一次成功截图的选区，文本形如「x,y,width,height」；写方与读方都在 Capture 模块
     inline constexpr std::string_view kCaptureLastRegion = "Capture/LastRegion";
@@ -195,10 +195,10 @@ namespace GyanisScribe::Settings
      */
     inline constexpr std::string_view kAnnotationPalette = "Annotation/Palette";
 
-    /// 标注的默认线宽，取值必须是 Ui::kAnnotationWidths 里的一档；工具栏起点与持久化都读它
+    /// 标注的默认线宽，取值必须是 Gui::kAnnotationWidths 里的一档；工具栏起点与持久化都读它
     inline constexpr std::string_view kAnnotationDefaultWidth = "Annotation/DefaultWidth";
 
-    /// 标注的默认字号，取值必须是 Ui::kFontSizes 里的一档
+    /// 标注的默认字号，取值必须是 Gui::kFontSizes 里的一档
     inline constexpr std::string_view kAnnotationDefaultFontSize = "Annotation/DefaultFontSize";
 
     /// 「新建空白画布标注」用透明底还是白底（默认白）；读端在 AppController 起那张画布的那一处，写端在设置的标注页

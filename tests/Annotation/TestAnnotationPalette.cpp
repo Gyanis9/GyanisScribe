@@ -6,7 +6,7 @@
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
-#include "Ui/DesignTokens.h"
+#include "Gui/Theme/DesignTokens.h"
 
 #include <gtest/gtest.h>
 
@@ -93,9 +93,9 @@ namespace GyanisScribe
     {
         const auto palette = annotationPalette(settings());
         ASSERT_TRUE(palette.has_value()) << palette.error().message;
-        EXPECT_EQ(palette->size(), Ui::kAnnotationPalette.size());
+        EXPECT_EQ(palette->size(), Gui::kAnnotationPalette.size());
         EXPECT_EQ(paletteToTokens(*palette), paletteToTokens(defaultAnnotationPalette())) << "默认档与内置那张表不同解";
-        EXPECT_EQ((*palette)[0], Ui::kAnnotationPalette[0]) << "第一格该是内置那八格的第一格";
+        EXPECT_EQ((*palette)[0], Gui::kAnnotationPalette[0]) << "第一格该是内置那八格的第一格";
     }
 
     /**

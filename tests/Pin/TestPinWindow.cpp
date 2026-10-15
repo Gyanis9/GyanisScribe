@@ -14,7 +14,7 @@
 #include "Platform/PlatformCapabilities.h"
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
-#include "Ui/AppShortcuts.h"
+#include "Gui/Controls/AppShortcuts.h"
 
 #include <gtest/gtest.h>
 
@@ -2189,12 +2189,12 @@ namespace GyanisScribe
     /**
      * @brief 钉住「在设置页换过一颗键」之后贴图窗跟着换，旧那颗当场让位
      * @details 默认那颗由「H/V/G/I/T/R 各管哪一档」那几条判据钉着，这一条钉的是分派读的是
-     *          Ui/AppShortcuts.h 那份清册而不是写死的字母：灰度换成 K 之后按 G 不动、按 K 翻得动。
+     *          Gui/Controls/AppShortcuts.h 那份清册而不是写死的字母：灰度换成 K 之后按 G 不动、按 K 翻得动。
      *          两处缺一个就是「设置改了没反应」或「按屏幕上写的键没反应」。
      */
     TEST_F(PinWindowFixture, ReboundPinKeysMoveToTheNewLetter)
     {
-        ASSERT_TRUE(settings().setValue(GyanisScribe::Ui::appShortcutKey("Pin/Gray").toStdString(), QStringLiteral("K")).has_value()) << "写入失败";
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Gui::appShortcutKey("Pin/Gray").toStdString(), QStringLiteral("K")).has_value()) << "写入失败";
         auto &window = makeWindow();
 
         pressKey(window, Qt::Key_G);
@@ -2211,7 +2211,7 @@ namespace GyanisScribe
      */
     TEST_F(PinWindowFixture, ReboundRotateKeyCarriesItsReverse)
     {
-        ASSERT_TRUE(settings().setValue(GyanisScribe::Ui::appShortcutKey("Pin/Rotate").toStdString(), QStringLiteral("J")).has_value()) << "写入失败";
+        ASSERT_TRUE(settings().setValue(GyanisScribe::Gui::appShortcutKey("Pin/Rotate").toStdString(), QStringLiteral("J")).has_value()) << "写入失败";
         auto &window = makeWindow();
 
         pressKey(window, Qt::Key_R);

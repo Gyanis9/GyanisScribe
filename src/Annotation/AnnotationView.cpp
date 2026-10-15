@@ -3,7 +3,7 @@
 #include "Core/Image/ImageFit.h"
 #include "Base/Logger.h"
 #include "Base/Text.h"
-#include "Ui/DesignTokens.h"
+#include "Gui/Theme/DesignTokens.h"
 
 #include <QFontMetricsF>
 #include <QMouseEvent>
@@ -158,14 +158,14 @@ namespace GyanisScribe::Annotation
             {
                 outline << toWidget((*frame)[node]);
             }
-            QPen outlinePen{GyanisScribe::Ui::kAccentColor, 1.0, Qt::DashLine};
+            QPen outlinePen{GyanisScribe::Gui::kAccentColor, 1.0, Qt::DashLine};
             outlinePen.setCapStyle(Qt::FlatCap);
             painter.setPen(outlinePen);
             painter.setBrush(Qt::NoBrush);
             painter.drawPolygon(outline);
 
             // 缩放八枚手柄：白底描边的小方块，压在图形上也看得见
-            QPen handlePen{GyanisScribe::Ui::kAccentColor, 1.0};
+            QPen handlePen{GyanisScribe::Gui::kAccentColor, 1.0};
             painter.setPen(handlePen);
             painter.setBrush(Qt::white);
             for (const auto &node: *frame)
@@ -181,7 +181,7 @@ namespace GyanisScribe::Annotation
         } else if (const auto bounds = m_engine.selectionBounds(); bounds)
         {
             // 多选（或手柄算不出来的退化）：只画联合虚线框
-            QPen outline{GyanisScribe::Ui::kAccentColor, 1.0, Qt::DashLine};
+            QPen outline{GyanisScribe::Gui::kAccentColor, 1.0, Qt::DashLine};
             outline.setCapStyle(Qt::FlatCap);
             painter.setPen(outline);
             painter.setBrush(Qt::NoBrush);

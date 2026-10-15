@@ -24,12 +24,12 @@
 #include "Platform/IPlatformIntegration.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
-#include "Ui/AppShortcuts.h"
-#include "Ui/DesignTokens.h"
-#include "Ui/HotkeyEdit.h"
-#include "Ui/IconProvider.h"
-#include "Ui/Language.h"
-#include "Ui/ThemeManager.h"
+#include "Gui/Controls/AppShortcuts.h"
+#include "Gui/Theme/DesignTokens.h"
+#include "Gui/Controls/HotkeyEdit.h"
+#include "Gui/Resources/IconProvider.h"
+#include "Gui/Theme/Language.h"
+#include "Gui/Theme/ThemeManager.h"
 
 #include <QAction>
 #include <QApplication>
@@ -65,11 +65,11 @@ namespace
     using GyanisScribe::Base::Expected;
     using GyanisScribe::Base::Logger;
     using GyanisScribe::Settings::ISettingsStore;
-    using GyanisScribe::Ui::AppLanguage;
-    using GyanisScribe::Ui::IconProvider;
-    using GyanisScribe::Ui::stepIndexOf;
-    using GyanisScribe::Ui::ThemeKind;
-    using GyanisScribe::Ui::ThemeManager;
+    using GyanisScribe::Gui::AppLanguage;
+    using GyanisScribe::Gui::IconProvider;
+    using GyanisScribe::Gui::stepIndexOf;
+    using GyanisScribe::Gui::ThemeKind;
+    using GyanisScribe::Gui::ThemeManager;
 
     using GyanisScribe::App::appLanguageAt;
     using GyanisScribe::App::indexOfAppLanguage;
@@ -147,19 +147,19 @@ namespace
     QFormLayout *makePageForm(QWidget *page, const QString &intro)
     {
         auto *layout = new QVBoxLayout{page};
-        layout->setContentsMargins(GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge);
-        layout->setSpacing(GyanisScribe::Ui::kSpacingSmall);
+        layout->setContentsMargins(GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge);
+        layout->setSpacing(GyanisScribe::Gui::kSpacingSmall);
 
         auto *text = new QLabel{intro, page};
         text->setObjectName(QStringLiteral("pageHint"));
         text->setWordWrap(true);
-        text->setMaximumWidth(GyanisScribe::Ui::kIntroMaximumWidth);
+        text->setMaximumWidth(GyanisScribe::Gui::kIntroMaximumWidth);
         // 说明行是次要文本，同时要让读屏软件把它当成这一段正文念出来
         text->setAccessibleName(GyanisScribe::Base::uiText("这一类的说明"));
         layout->addWidget(text);
 
         auto *form = new QFormLayout;
-        form->setSpacing(GyanisScribe::Ui::kSpacingSmall);
+        form->setSpacing(GyanisScribe::Gui::kSpacingSmall);
         // 标签右对齐并与字段同一水平线：这一列的右端要与字段左缘只隔一个行距，左对齐时那条缝会随
         // 标签长短忽宽忽窄（实测 4 字 81px、10 字只剩 9px，同一页里两种都见得到）；
         // 顶对齐会让单行字段看着下沉，竖直方向取居中
@@ -189,7 +189,7 @@ namespace
         {
             auto *heading = new QLabel{title, &page};
             heading->setObjectName(QStringLiteral("pageTitle"));
-            GyanisScribe::Ui::applyTextRole(*heading, GyanisScribe::Ui::TextRole::PageTitle);
+            GyanisScribe::Gui::applyTextRole(*heading, GyanisScribe::Gui::TextRole::PageTitle);
             box->insertWidget(0, heading);
         }
 
@@ -202,7 +202,7 @@ namespace
                 {
                     if (auto *widget = field->widget(); widget != nullptr)
                     {
-                        widget->setMaximumWidth(GyanisScribe::Ui::kFieldMaximumWidth);
+                        widget->setMaximumWidth(GyanisScribe::Gui::kFieldMaximumWidth);
                     }
                 }
             }
@@ -308,7 +308,7 @@ namespace
      * @tparam Size 阶梯档数
      * @param settings 配置存储
      * @param key 键名，存进去的就是选中的那个值
-     * @param steps 阶梯表，取值只能是 Ui::kAnnotationWidths 或 Ui::kFontSizes
+     * @param steps 阶梯表，取值只能是 Gui::kAnnotationWidths 或 Gui::kFontSizes
      * @param fallback 配置里没有、或存的值不在阶梯里时的回落档
      * @param title 中文名，用作无障碍名称与日志里的线索
      * @return 归调用方所有的下拉框，由 addRow 挂上父对象
@@ -454,7 +454,7 @@ namespace
     }
 
     /**
-     * @brief 界面语言下拉：档位读写都走 Ui/Language 的词表
+     * @brief 界面语言下拉：档位读写都走 Gui/Theme/Language 的词表
      * @param settings 配置存储
      * @return 归调用方所有的下拉框
      */
@@ -468,8 +468,8 @@ namespace
         combo->setAccessibleName(GyanisScribe::Base::uiText("界面语言"));
         combo->setToolTip(GyanisScribe::Base::uiText("切换语言要重启智录才生效"));
 
-        const auto stored = settings.stringValue(GyanisScribe::Settings::kUiLanguage, QString::fromUtf8(std::string{GyanisScribe::Ui::appLanguageText(AppLanguage::Chinese)}));
-        if (const auto parsed = GyanisScribe::Ui::parseAppLanguage(stored.toStdString()); parsed)
+        const auto stored = settings.stringValue(GyanisScribe::Settings::kUiLanguage, QString::fromUtf8(std::string{GyanisScribe::Gui::appLanguageText(AppLanguage::Chinese)}));
+        if (const auto parsed = GyanisScribe::Gui::parseAppLanguage(stored.toStdString()); parsed)
         {
             combo->setCurrentIndex(indexOfAppLanguage(*parsed));
         } else
@@ -487,7 +487,7 @@ namespace
                              {
                                  return;
                              }
-                             const auto token = QString::fromUtf8(std::string{GyanisScribe::Ui::appLanguageText(*choice)});
+                             const auto token = QString::fromUtf8(std::string{GyanisScribe::Gui::appLanguageText(*choice)});
                              if (auto written = settings.setValue(GyanisScribe::Settings::kUiLanguage, token); !written)
                              {
                                  Logger::warning(std::format("界面语言没能保存：{}（当前选的是 {}）", written.error().message, combo->currentText().toStdString()));
@@ -1415,11 +1415,11 @@ namespace GyanisScribe::App
         // 动作条是给「没有托盘、热键也没登记上」的那一类机器留的常设入口，
         // 也是有托盘时不用先去右下角翻菜单的那条 shortcut。
         auto *root = new QVBoxLayout{this};
-        root->setContentsMargins(GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge);
-        root->setSpacing(GyanisScribe::Ui::kSpacingMedium);
+        root->setContentsMargins(GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge);
+        root->setSpacing(GyanisScribe::Gui::kSpacingMedium);
 
         auto *layout = new QHBoxLayout;
-        layout->setSpacing(GyanisScribe::Ui::kSpacingMedium);
+        layout->setSpacing(GyanisScribe::Gui::kSpacingMedium);
         m_nav   = new QListWidget{this};
         m_stack = new QStackedWidget{this};
         m_nav->setObjectName(QStringLiteral("settingsNav"));
@@ -1498,14 +1498,14 @@ namespace GyanisScribe::App
         if (!exported)
         {
             Logger::warning(std::format("配置导出失败：{}", exported.error().message));
-            emit messageForUser(QString::fromUtf8(exported.error().message.c_str()), GyanisScribe::Ui::ToastKind::Danger);
+            emit messageForUser(QString::fromUtf8(exported.error().message.c_str()), GyanisScribe::Gui::ToastKind::Danger);
             return;
         }
 
         // 条数从存储现取：导出的就是这一份的全部键，界面这层不再数一遍别的口径
         const auto count = static_cast<int>(m_settings.allKeys().size());
         Logger::info(std::format("配置导出完成：{} 项写到 {}", count, Base::Paths::toDisplayText(target).toStdString()));
-        emit messageForUser(GyanisScribe::Base::uiText("已导出 %1 项设置").arg(count), GyanisScribe::Ui::ToastKind::Success);
+        emit messageForUser(GyanisScribe::Base::uiText("已导出 %1 项设置").arg(count), GyanisScribe::Gui::ToastKind::Success);
     }
 
     void MainWindow::importSettingsFromFile(const QString &filePath)
@@ -1515,7 +1515,7 @@ namespace GyanisScribe::App
         if (!imported)
         {
             Logger::warning(std::format("配置导入失败：{}", imported.error().message));
-            emit messageForUser(QString::fromUtf8(imported.error().message.c_str()), GyanisScribe::Ui::ToastKind::Danger);
+            emit messageForUser(QString::fromUtf8(imported.error().message.c_str()), GyanisScribe::Gui::ToastKind::Danger);
             return;
         }
 
@@ -1523,7 +1523,7 @@ namespace GyanisScribe::App
         m_settings.sync();
         Logger::info(std::format("配置导入完成：{} 项来自 {}", *imported, Base::Paths::toDisplayText(source).toStdString()));
         emit messageForUser(GyanisScribe::Base::uiText("已导入 %1 项设置。这一页显示的还是导入前的值，请关掉设置窗口再重新打开；界面语言要重启智录才生效。").arg(*imported),
-                            GyanisScribe::Ui::ToastKind::Success);
+                            GyanisScribe::Gui::ToastKind::Success);
     }
 
     void MainWindow::exportPaletteToFile(const QString &filePath)
@@ -1533,7 +1533,7 @@ namespace GyanisScribe::App
         {
             // 手改过的配置里那份坏名单：报原样原因，而不是拿内置那八格冒充「你存的色板」导出去
             Logger::warning(std::format("色板导出失败：{}", palette.error().message));
-            emit messageForUser(QString::fromUtf8(palette.error().message.c_str()), GyanisScribe::Ui::ToastKind::Danger);
+            emit messageForUser(QString::fromUtf8(palette.error().message.c_str()), GyanisScribe::Gui::ToastKind::Danger);
             return;
         }
 
@@ -1542,7 +1542,7 @@ namespace GyanisScribe::App
         {
             const auto reason = GyanisScribe::Base::uiText("色板没写进去：这个路径开不了。换一个能写的目录再试一次");
             Logger::warning(std::format("色板写不下去：{}（{}）", reason.toStdString(), filePath.toStdString()));
-            emit messageForUser(reason, GyanisScribe::Ui::ToastKind::Danger);
+            emit messageForUser(reason, GyanisScribe::Gui::ToastKind::Danger);
             return;
         }
         const auto text = GyanisScribe::Annotation::paletteFileText(*palette);
@@ -1550,7 +1550,7 @@ namespace GyanisScribe::App
         file.close();
 
         Logger::info(std::format("色板已导出：{} 格写到 {}", palette->size(), filePath.toStdString()));
-        emit messageForUser(GyanisScribe::Base::uiText("色板已导出：%1 格").arg(static_cast<int>(palette->size())), GyanisScribe::Ui::ToastKind::Success);
+        emit messageForUser(GyanisScribe::Base::uiText("色板已导出：%1 格").arg(static_cast<int>(palette->size())), GyanisScribe::Gui::ToastKind::Success);
     }
 
     void MainWindow::importPaletteFromFile(const QString &filePath)
@@ -1560,7 +1560,7 @@ namespace GyanisScribe::App
         {
             const auto reason = GyanisScribe::Base::uiText("读不到这份色板文件：「%1」不存在或打不开。请确认路径，或重新导出一份").arg(filePath);
             Logger::warning(std::format("色板读不到：{}", filePath.toStdString()));
-            emit messageForUser(reason, GyanisScribe::Ui::ToastKind::Danger);
+            emit messageForUser(reason, GyanisScribe::Gui::ToastKind::Danger);
             return;
         }
         const auto bytes  = file.readAll();
@@ -1568,7 +1568,7 @@ namespace GyanisScribe::App
         if (!parsed)
         {
             Logger::warning(std::format("色板导入被拒：{}", parsed.error().message));
-            emit messageForUser(QString::fromUtf8(parsed.error().message.c_str()), GyanisScribe::Ui::ToastKind::Danger);
+            emit messageForUser(QString::fromUtf8(parsed.error().message.c_str()), GyanisScribe::Gui::ToastKind::Danger);
             return;
         }
 
@@ -1577,13 +1577,13 @@ namespace GyanisScribe::App
         if (!written)
         {
             Logger::warning(std::format("色板没能写入：{}", written.error().message));
-            emit messageForUser(QString::fromUtf8(written.error().message.c_str()), GyanisScribe::Ui::ToastKind::Danger);
+            emit messageForUser(QString::fromUtf8(written.error().message.c_str()), GyanisScribe::Gui::ToastKind::Danger);
             return;
         }
         m_settings.sync();
         Logger::info(std::format("色板已导入：{} 格来自 {}", parsed->size(), filePath.toStdString()));
         emit messageForUser(GyanisScribe::Base::uiText("色板已导入：%1 格。工具栏那一排在下一次打开标注窗时换成这一份。").arg(static_cast<int>(parsed->size())),
-                            GyanisScribe::Ui::ToastKind::Success);
+                            GyanisScribe::Gui::ToastKind::Success);
     }
 
     QWidget *MainWindow::buildTransferRow()
@@ -1685,7 +1685,7 @@ namespace GyanisScribe::App
         bar->setObjectName(QStringLiteral("actionBar"));
         auto *row = new QHBoxLayout{bar};
         row->setContentsMargins(0, 0, 0, 0);
-        row->setSpacing(GyanisScribe::Ui::kSpacingSmall);
+        row->setSpacing(GyanisScribe::Gui::kSpacingSmall);
 
         auto *moreMenu = new QMenu{bar};
         for (const auto &entry: GyanisScribe::App::visibleTrayMenuEntries(m_capabilities))
@@ -2215,11 +2215,11 @@ namespace GyanisScribe::App
         auto *form = makePageForm(page, GyanisScribe::Base::uiText("新打开的标注窗按这两档起步，画过之后的改动会被工具栏记下来，下次仍以最近用的那一档开始。"
                                                                    "色板那一排也可以换成自己的一套：留空就是内置那八格，下面两个按钮负责把一份配色发给同事或收回来。"));
         form->addRow(GyanisScribe::Base::uiText("默认线宽"),
-                     makeStepCombo(m_settings, GyanisScribe::Settings::kAnnotationDefaultWidth, GyanisScribe::Ui::kAnnotationWidths,
-                                   GyanisScribe::Ui::kAnnotationWidths[GyanisScribe::Ui::kDefaultAnnotationWidthStep], GyanisScribe::Base::uiText("默认线宽")));
+                     makeStepCombo(m_settings, GyanisScribe::Settings::kAnnotationDefaultWidth, GyanisScribe::Gui::kAnnotationWidths,
+                                   GyanisScribe::Gui::kAnnotationWidths[GyanisScribe::Gui::kDefaultAnnotationWidthStep], GyanisScribe::Base::uiText("默认线宽")));
         form->addRow(GyanisScribe::Base::uiText("默认字号"),
-                     makeStepCombo(m_settings, GyanisScribe::Settings::kAnnotationDefaultFontSize, GyanisScribe::Ui::kFontSizes,
-                                   GyanisScribe::Ui::kFontSizes[GyanisScribe::Ui::kDefaultAnnotationFontSizeIndex], GyanisScribe::Base::uiText("默认字号")));
+                     makeStepCombo(m_settings, GyanisScribe::Settings::kAnnotationDefaultFontSize, GyanisScribe::Gui::kFontSizes,
+                                   GyanisScribe::Gui::kFontSizes[GyanisScribe::Gui::kDefaultAnnotationFontSizeIndex], GyanisScribe::Base::uiText("默认字号")));
         form->addRow(GyanisScribe::Base::uiText("自定义色板"), makePaletteEdit(m_settings));
         form->addRow(GyanisScribe::Base::uiText("分享色板"), buildPaletteTransferRow());
         form->addRow(GyanisScribe::Base::uiText("空白画布用透明底"),
@@ -2317,8 +2317,8 @@ namespace GyanisScribe::App
         auto *form = makePageForm(page, intro);
         for (const auto [key, title, defaultText]: rows)
         {
-            auto *edit = new GyanisScribe::Ui::HotkeyEdit{m_settings, page};
-            edit->bindTo(key, title, defaultText, GyanisScribe::Ui::HotkeyEditScope::Global);
+            auto *edit = new GyanisScribe::Gui::HotkeyEdit{m_settings, page};
+            edit->bindTo(key, title, defaultText, GyanisScribe::Gui::HotkeyEditScope::Global);
             edit->setEnabled(m_capabilities.globalHotkeys);
             form->addRow(GyanisScribe::Base::uiText("%1 的全局热键").arg(title), edit);
         }
@@ -2331,8 +2331,8 @@ namespace GyanisScribe::App
             auto      *layout = new QHBoxLayout{row};
             layout->setContentsMargins(0, 0, 0, 0);
 
-            auto *edit = new GyanisScribe::Ui::HotkeyEdit{m_settings, row};
-            edit->bindTo(GyanisScribe::App::customHotkeyKey(entry.token).toStdString(), label, QString{}, GyanisScribe::Ui::HotkeyEditScope::Global);
+            auto *edit = new GyanisScribe::Gui::HotkeyEdit{m_settings, row};
+            edit->bindTo(GyanisScribe::App::customHotkeyKey(entry.token).toStdString(), label, QString{}, GyanisScribe::Gui::HotkeyEditScope::Global);
             edit->setEnabled(m_capabilities.globalHotkeys);
 
             auto *clear = new QPushButton{GyanisScribe::Base::uiText("取消绑定"), row};
@@ -2363,10 +2363,10 @@ namespace GyanisScribe::App
         inAppTitle->setAccessibleName(GyanisScribe::Base::uiText("界面按键这一段的标题"));
         form->addRow(inAppTitle);
         std::string_view lastFamily;
-        for (const auto &entry: GyanisScribe::Ui::appShortcutEntries())
+        for (const auto &entry: GyanisScribe::Gui::appShortcutEntries())
         {
             // 按族分小标题：二十五行平铺在一起，读的人分不清哪颗键归哪个窗——同名不同窗是常态
-            const auto family = GyanisScribe::Ui::appShortcutFamilyName(entry.token);
+            const auto family = GyanisScribe::Gui::appShortcutFamilyName(entry.token);
             if (family != lastFamily)
             {
                 lastFamily    = family;
@@ -2382,8 +2382,8 @@ namespace GyanisScribe::App
 
             const auto defaultKey = QString::fromUtf8(entry.defaultKey.data(), static_cast<int>(entry.defaultKey.size()));
 
-            auto *edit = new GyanisScribe::Ui::HotkeyEdit{m_settings, row};
-            edit->bindTo(GyanisScribe::Ui::appShortcutKey(entry.token).toStdString(), label, defaultKey, GyanisScribe::Ui::HotkeyEditScope::InWindow);
+            auto *edit = new GyanisScribe::Gui::HotkeyEdit{m_settings, row};
+            edit->bindTo(GyanisScribe::Gui::appShortcutKey(entry.token).toStdString(), label, defaultKey, GyanisScribe::Gui::HotkeyEditScope::InWindow);
 
             auto *reset = new QPushButton{GyanisScribe::Base::uiText("恢复默认"), row};
             // 名字带上那一档：二十五行都叫「恢复默认」时，读屏与判据都分不清按下的是哪一行
@@ -2437,7 +2437,7 @@ namespace GyanisScribe::App
         auto *layout = new QVBoxLayout{page};
 
         auto *logo = new QLabel{page};
-        logo->setPixmap(m_icons.pixmap("AppIcon", GyanisScribe::Ui::IconSize::ExtraLarge));
+        logo->setPixmap(m_icons.pixmap("AppIcon", GyanisScribe::Gui::IconSize::ExtraLarge));
         logo->setAccessibleName(GyanisScribe::Base::uiText("智录图标"));
 
         auto *text = new QLabel{aboutText(QApplication::applicationVersion()), page};

@@ -3,7 +3,7 @@
 #include "Pick/RecentColors.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
-#include "Ui/DesignTokens.h"
+#include "Gui/Theme/DesignTokens.h"
 
 #include "Base/Text.h"
 
@@ -13,8 +13,8 @@ namespace GyanisScribe::Annotation
 {
     std::vector<QColor> defaultAnnotationPalette()
     {
-        // 值只住在 Ui/DesignTokens.h 那一处；这里按区间两端构造 vector，不用 ranges::to（编译器实现进度不一，写法要保守）
-        const auto &table = Ui::kAnnotationPalette;
+        // 值只住在 Gui/Theme/DesignTokens.h 那一处；这里按区间两端构造 vector，不用 ranges::to（编译器实现进度不一，写法要保守）
+        const auto &table = Gui::kAnnotationPalette;
         return std::vector<QColor>(table.begin(), table.end());
     }
 

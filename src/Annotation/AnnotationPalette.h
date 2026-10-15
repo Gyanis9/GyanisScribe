@@ -30,7 +30,7 @@ namespace GyanisScribe::Annotation
 
     /**
      * @brief 内置那八格（没自定义时的默认档）
-     * @return 与 `Ui::kAnnotationPalette` 同序的颜色
+     * @return 与 `Gui::kAnnotationPalette` 同序的颜色
      * @details 出处只有那一处：这一格是把常量表搬成 vector，不在界面上再抄一份颜色值。
      */
     [[nodiscard]] std::vector<QColor> defaultAnnotationPalette();

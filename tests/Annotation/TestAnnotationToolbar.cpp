@@ -4,9 +4,9 @@
 #include "Annotation/AnnotationTool.h"
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
-#include "Ui/AppShortcuts.h"
-#include "Ui/DesignTokens.h"
-#include "Ui/IconProvider.h"
+#include "Gui/Controls/AppShortcuts.h"
+#include "Gui/Theme/DesignTokens.h"
+#include "Gui/Resources/IconProvider.h"
 
 #include <gtest/gtest.h>
 
@@ -45,10 +45,10 @@ using GyanisScribe::Annotation::ToolbarSide;
 using GyanisScribe::Annotation::ToolKind;
 using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Settings::SettingsStore;
-using GyanisScribe::Ui::IconProvider;
-using GyanisScribe::Ui::kAnnotationPalette;
-using GyanisScribe::Ui::kAnnotationWidths;
-using GyanisScribe::Ui::kFontSizes;
+using GyanisScribe::Gui::IconProvider;
+using GyanisScribe::Gui::kAnnotationPalette;
+using GyanisScribe::Gui::kAnnotationWidths;
+using GyanisScribe::Gui::kFontSizes;
 
 namespace
 {
@@ -58,7 +58,7 @@ namespace
     /// 工具按钮的中文名，顺序与工具表同解；这一份是照需求第五节抄来的独立期望值
     constexpr std::array<std::string_view, 13> kToolLabels = {"矩形", "椭圆", "箭头", "画笔", "高亮", "马赛克", "文字", "序号", "直线", "高斯模糊", "橡皮擦", "折线", "放大镜"};
 
-    /// 工具按钮该在提示里带上的字母键位，同样是一份独立抄来的期望值：与 Ui/AppShortcuts.h 那份清册的默认那颗交叉核对
+    /// 工具按钮该在提示里带上的字母键位，同样是一份独立抄来的期望值：与 Gui/Controls/AppShortcuts.h 那份清册的默认那颗交叉核对
     constexpr std::array<std::string_view, 13> kToolShortcuts = {"R", "E", "A", "P", "H", "M", "T", "N", "L", "B", "X", "G", "F"};
 
     /// 动作按钮的中文名，同样按需求第六节的排列顺序抄一份
@@ -977,7 +977,7 @@ TEST_F(ToolbarFixture, ExposesEveryRequiredControlWithAccessibleNames)
  */
 TEST_F(ToolbarFixture, ToolKeyHintsFollowTheShortcutRegistry)
 {
-    ASSERT_TRUE(m_settings->setValue(GyanisScribe::Ui::appShortcutKey("Annotation/Pen").toStdString(), QStringLiteral("K")).has_value()) << "写入失败";
+    ASSERT_TRUE(m_settings->setValue(GyanisScribe::Gui::appShortcutKey("Annotation/Pen").toStdString(), QStringLiteral("K")).has_value()) << "写入失败";
 
     SignalLog log;
     auto      toolbar = makeToolbarLogged(log);
@@ -991,7 +991,7 @@ TEST_F(ToolbarFixture, ToolKeyHintsFollowTheShortcutRegistry)
     EXPECT_EQ(rect->toolTip(), text("矩形") + QStringLiteral(" (R)")) << "没改过的那一档该停在默认那颗上";
 
     // 建完之后再改：不订阅配置变更就停在启动那一刻的旧键上
-    ASSERT_TRUE(m_settings->setValue(GyanisScribe::Ui::appShortcutKey("Annotation/Rectangle").toStdString(), QStringLiteral("Q")).has_value()) << "写入失败";
+    ASSERT_TRUE(m_settings->setValue(GyanisScribe::Gui::appShortcutKey("Annotation/Rectangle").toStdString(), QStringLiteral("Q")).has_value()) << "写入失败";
     EXPECT_EQ(rect->toolTip(), text("矩形") + QStringLiteral(" (Q)")) << "设置页改完，按钮提示没跟着重排";
 }
 

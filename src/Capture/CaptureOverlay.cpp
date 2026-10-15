@@ -9,9 +9,9 @@
 #include "Pick/PickGeometry.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
-#include "Ui/AppShortcuts.h"
-#include "Ui/DesignTokens.h"
-#include "Ui/KeyStep.h"
+#include "Gui/Controls/AppShortcuts.h"
+#include "Gui/Theme/DesignTokens.h"
+#include "Gui/Controls/KeyStep.h"
 
 #include <QFont>
 #include <QFontMetrics>
@@ -36,7 +36,7 @@ namespace
 
     /**
      * @brief 遮罩上可换键的那一档
-     * @details 标识取自 Ui/AppShortcuts.h 那份清册：那颗键现在认给谁，界面上与按键上都由清册说了算。
+     * @details 标识取自 Gui/Controls/AppShortcuts.h 那份清册：那颗键现在认给谁，界面上与按键上都由清册说了算。
      *          表里的顺序不参与判定——同一族的默认那颗互不相同（这一判由 TestAppShortcuts 钉住）。
      */
     struct RebindableRow
@@ -248,13 +248,13 @@ namespace GyanisScribe::Capture
 
     void CaptureOverlay::paintGrips(QPainter &painter, const QRect &region)
     {
-        const auto edge = GyanisScribe::Ui::kSelectionGripEdge;
-        painter.setPen(QPen{GyanisScribe::Ui::kAccentColor, 1});
+        const auto edge = GyanisScribe::Gui::kSelectionGripEdge;
+        painter.setPen(QPen{GyanisScribe::Gui::kAccentColor, 1});
         for (const auto &center: gripCentersFor(region))
         {
             const auto rect = QRect{center - QPoint{edge / 2, edge / 2}, QSize{edge, edge}};
             // 方块里填底色而不是纯填充：压在深色画面上时实心同色块会看不出来
-            painter.setBrush(GyanisScribe::Ui::kCaptureHintBackgroundColor);
+            painter.setBrush(GyanisScribe::Gui::kCaptureHintBackgroundColor);
             painter.drawRect(rect);
         }
     }
@@ -297,12 +297,12 @@ namespace GyanisScribe::Capture
             painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
             painter.drawImage(viewRect, m_background.copy(QRect{cropPixel, cropSize}));
 
-            auto borderPen = QPen(GyanisScribe::Ui::kAccentColor);
+            auto borderPen = QPen(GyanisScribe::Gui::kAccentColor);
             borderPen.setWidth(kMagnifierPenWidth);
             painter.setPen(borderPen);
             painter.drawRect(viewRect);
 
-            painter.setPen(QPen{GyanisScribe::Ui::kCrosshairColor, 1});
+            painter.setPen(QPen{GyanisScribe::Gui::kCrosshairColor, 1});
             for (auto step = 1; step < sampleEdge; ++step)
             {
                 const auto offset = step * layout.cellSize;
@@ -315,13 +315,13 @@ namespace GyanisScribe::Capture
         const auto stripRect = readoutStripRect();
         const auto readout   = QStringLiteral("%1  %2").arg(formatCursorReadout(), readoutColorText());
         painter.setPen(Qt::NoPen);
-        painter.setBrush(GyanisScribe::Ui::kCaptureHintBackgroundColor);
+        painter.setBrush(GyanisScribe::Gui::kCaptureHintBackgroundColor);
         painter.drawRect(stripRect);
         QFont stripFont = font();
-        stripFont.setPointSize(GyanisScribe::Ui::kHintFontSize);
+        stripFont.setPointSize(GyanisScribe::Gui::kHintFontSize);
         painter.setFont(stripFont);
-        painter.setPen(GyanisScribe::Ui::kCaptureHintTextColor);
-        painter.drawText(stripRect.adjusted(GyanisScribe::Ui::kHintPadding, 0, -GyanisScribe::Ui::kHintPadding, 0), Qt::AlignVCenter | Qt::AlignLeft, readout);
+        painter.setPen(GyanisScribe::Gui::kCaptureHintTextColor);
+        painter.drawText(stripRect.adjusted(GyanisScribe::Gui::kHintPadding, 0, -GyanisScribe::Gui::kHintPadding, 0), Qt::AlignVCenter | Qt::AlignLeft, readout);
     }
 
     QString CaptureOverlay::readoutColorText() const
@@ -383,7 +383,7 @@ namespace GyanisScribe::Capture
     QPoint CaptureOverlay::hintPositionFor(const QRect &region) const
     {
         // 读数默认画在选区上方一点；贴到屏顶时改画到选区下方，否则读数会被屏边切掉
-        const auto hintOffset = region.height() + GyanisScribe::Ui::kSelectionBorderWidth + GyanisScribe::Ui::kHintPadding;
+        const auto hintOffset = region.height() + GyanisScribe::Gui::kSelectionBorderWidth + GyanisScribe::Gui::kHintPadding;
         if (region.top() - hintOffset - 4 >= 0)
         {
             return QPoint(region.left(), region.top() - hintOffset);
@@ -405,7 +405,7 @@ namespace GyanisScribe::Capture
 
         // 压暗层用四块矩形围出选区，而不是建偶奇路径：四块矩形是这里最省事也最不容易画错形状的做法
         painter.setPen(Qt::NoPen);
-        painter.setBrush(GyanisScribe::Ui::kCaptureMaskColor);
+        painter.setBrush(GyanisScribe::Gui::kCaptureMaskColor);
         if (shown.isNull())
         {
             painter.drawRect(widgetRect);
@@ -418,8 +418,8 @@ namespace GyanisScribe::Capture
 
         if (!shown.isNull())
         {
-            auto borderPen = QPen(GyanisScribe::Ui::kAccentColor);
-            borderPen.setWidth(GyanisScribe::Ui::kSelectionBorderWidth);
+            auto borderPen = QPen(GyanisScribe::Gui::kAccentColor);
+            borderPen.setWidth(GyanisScribe::Gui::kSelectionBorderWidth);
             painter.setPen(borderPen);
             painter.setBrush(Qt::NoBrush);
             painter.drawRect(shown);
@@ -427,14 +427,14 @@ namespace GyanisScribe::Capture
             if (m_isSelecting)
             {
                 // 拖动中给十字虚线定位，松手后不留在画面上干扰读数
-                auto crossPen = QPen(GyanisScribe::Ui::kCrosshairColor);
+                auto crossPen = QPen(GyanisScribe::Gui::kCrosshairColor);
                 crossPen.setStyle(Qt::DashLine);
                 painter.setPen(crossPen);
                 painter.drawLine(QPoint(m_currentPoint.x(), 0), QPoint(m_currentPoint.x(), widgetRect.height()));
                 painter.drawLine(QPoint(0, m_currentPoint.y()), QPoint(widgetRect.width(), m_currentPoint.y()));
 
                 // 三分网格：两条竖两条横的构图参考线，与十字线同一档（只在拖动途中露面）
-                painter.setPen(QPen(GyanisScribe::Ui::kCrosshairColor));
+                painter.setPen(QPen(GyanisScribe::Gui::kCrosshairColor));
                 for (const auto &line: thirdsGridLinesFor(shown))
                 {
                     painter.drawLine(line);
@@ -454,17 +454,17 @@ namespace GyanisScribe::Capture
                 hint += *m_cursorIncluded ? GyanisScribe::Base::uiText("（含指针）") : GyanisScribe::Base::uiText("（不含指针）");
             }
             QFont hintFont = font();
-            hintFont.setPointSize(GyanisScribe::Ui::kHintFontSize);
+            hintFont.setPointSize(GyanisScribe::Gui::kHintFontSize);
             painter.setFont(hintFont);
             const QFontMetrics metrics(hintFont);
             const auto         textSize    = metrics.size(Qt::TextSingleLine, hint);
             const auto         hintTopLeft = hintPositionFor(shown);
-            const QRect        hintRect(hintTopLeft, textSize + QSize(GyanisScribe::Ui::kHintPadding * 2, GyanisScribe::Ui::kHintPadding));
+            const QRect        hintRect(hintTopLeft, textSize + QSize(GyanisScribe::Gui::kHintPadding * 2, GyanisScribe::Gui::kHintPadding));
 
             painter.setPen(Qt::NoPen);
-            painter.setBrush(GyanisScribe::Ui::kCaptureHintBackgroundColor);
+            painter.setBrush(GyanisScribe::Gui::kCaptureHintBackgroundColor);
             painter.drawRect(hintRect);
-            painter.setPen(GyanisScribe::Ui::kCaptureHintTextColor);
+            painter.setPen(GyanisScribe::Gui::kCaptureHintTextColor);
             painter.drawText(hintRect, Qt::AlignCenter, hint);
 
             // 「已复制尺寸 …」贴在读数框下面一格；指针一动就清（见 mouseMoveEvent），
@@ -473,11 +473,11 @@ namespace GyanisScribe::Capture
             {
                 const auto  copyTextSize = metrics.size(Qt::TextSingleLine, m_copiedSizeHint);
                 const QRect copyRect(hintTopLeft + QPoint(0, textSize.height() + kCopiedHintGap),
-                                     copyTextSize + QSize(GyanisScribe::Ui::kHintPadding * 2, GyanisScribe::Ui::kHintPadding));
+                                     copyTextSize + QSize(GyanisScribe::Gui::kHintPadding * 2, GyanisScribe::Gui::kHintPadding));
                 painter.setPen(Qt::NoPen);
-                painter.setBrush(GyanisScribe::Ui::kCaptureHintBackgroundColor);
+                painter.setBrush(GyanisScribe::Gui::kCaptureHintBackgroundColor);
                 painter.drawRect(copyRect);
-                painter.setPen(GyanisScribe::Ui::kCaptureHintTextColor);
+                painter.setPen(GyanisScribe::Gui::kCaptureHintTextColor);
                 painter.drawText(copyRect, Qt::AlignCenter, m_copiedSizeHint);
             }
         }
@@ -633,7 +633,7 @@ namespace GyanisScribe::Capture
         // 方向键微调：裸按整块挪、`Shift` 挪右下角、`Ctrl` 把这一侧的边外扩一格、
         // `Ctrl+Shift` 把这一侧的边往里收一格。已经点中窗口或拖出一块之后，
         // 差一像素就得重框一遍，这几条键就是为了不必重框
-        if (const auto step = GyanisScribe::Ui::arrowStepFor(event->key()))
+        if (const auto step = GyanisScribe::Gui::arrowStepFor(event->key()))
         {
             const auto region = selectedRegion();
             if (!region.isNull())
@@ -776,8 +776,8 @@ namespace GyanisScribe::Capture
     {
         for (const auto &row: kRebindableRows)
         {
-            const auto *entry = GyanisScribe::Ui::appShortcutEntry(row.token);
-            if (entry != nullptr && GyanisScribe::Ui::isAppShortcutHit(m_settings, *entry, event->key(), event->modifiers(), row.allowShiftVariant))
+            const auto *entry = GyanisScribe::Gui::appShortcutEntry(row.token);
+            if (entry != nullptr && GyanisScribe::Gui::isAppShortcutHit(m_settings, *entry, event->key(), event->modifiers(), row.allowShiftVariant))
             {
                 return row.action;
             }

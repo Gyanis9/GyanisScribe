@@ -14,11 +14,11 @@ add_library(History STATIC
         HistoryView.cpp)
 
 target_include_directories(History PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
-# 历史页要缩略图与图标，所以吃 Ui 与 Widgets
+# 历史页要缩略图与图标，所以吃 Gui 与 Widgets
 target_link_libraries(History PUBLIC
         Core
         Settings
-        Ui
+        Gui
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets)

@@ -24,7 +24,7 @@ target_link_libraries(Pin PUBLIC
         Pick
         Platform
         Settings
-        Ui
+        Gui
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets)

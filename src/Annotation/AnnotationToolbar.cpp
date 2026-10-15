@@ -7,8 +7,8 @@
 #include "Base/Text.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/SettingsKeys.h"
-#include "Ui/AppShortcuts.h"
-#include "Ui/DesignTokens.h"
+#include "Gui/Controls/AppShortcuts.h"
+#include "Gui/Theme/DesignTokens.h"
 
 #include <QApplication>
 #include <QButtonGroup>
@@ -39,12 +39,12 @@
 namespace
 {
     using GyanisScribe::Annotation::ToolKind;
-    using GyanisScribe::Ui::IconSize;
-    using GyanisScribe::Ui::kAnnotationWidths;
-    using GyanisScribe::Ui::kDefaultAnnotationFontSizeIndex;
-    using GyanisScribe::Ui::kDefaultAnnotationWidthStep;
-    using GyanisScribe::Ui::kFontSizes;
-    using GyanisScribe::Ui::stepIndexOf;
+    using GyanisScribe::Gui::IconSize;
+    using GyanisScribe::Gui::kAnnotationWidths;
+    using GyanisScribe::Gui::kDefaultAnnotationFontSizeIndex;
+    using GyanisScribe::Gui::kDefaultAnnotationWidthStep;
+    using GyanisScribe::Gui::kFontSizes;
+    using GyanisScribe::Gui::stepIndexOf;
 
     /// 滚轮一格改多少不透明度（百分点）：二十下从满到最淡，一下改太多会让人滚过头找不到原来那一档
     constexpr int kColorOpacityStepPercent = 5;
@@ -94,7 +94,7 @@ namespace
 
 namespace GyanisScribe::Annotation
 {
-    AnnotationToolbar::AnnotationToolbar(Settings::ISettingsStore &settings, const Ui::IconProvider &icons, QWidget *parent) :
+    AnnotationToolbar::AnnotationToolbar(Settings::ISettingsStore &settings, const Gui::IconProvider &icons, QWidget *parent) :
         QWidget(parent), m_settings(settings), m_icons(icons), m_activeTool(ToolKind::Rectangle)
     {
         setObjectName(QStringLiteral("AnnotationToolbar"));
@@ -103,10 +103,10 @@ namespace GyanisScribe::Annotation
 
         auto *layout = new QHBoxLayout{this};
         m_layout     = layout;
-        layout->setContentsMargins(Ui::kSpacingSmall, Ui::kSpacingSmall, Ui::kSpacingSmall, Ui::kSpacingSmall);
+        layout->setContentsMargins(Gui::kSpacingSmall, Gui::kSpacingSmall, Gui::kSpacingSmall, Gui::kSpacingSmall);
         // 间距取最小那一档而不是行距：这一排最多五十几件控件，8px 的缝累计两百多像素，
         // 按钮自己带 2px 内边距做视觉留白就够了（按钮最小尺寸也按同一理由在样式表里收了一档）
-        layout->setSpacing(Ui::kSpacingTiny);
+        layout->setSpacing(Gui::kSpacingTiny);
 
         // 工具组：互斥交给 QButtonGroup，这样鼠标点击与 setActiveTool 走的是同一套按钮状态
         auto *toolGroup = new QButtonGroup{this};
@@ -216,11 +216,11 @@ namespace GyanisScribe::Annotation
         layout->addWidget(m_customColorButton);
         layout->addWidget(makeSeparator());
 
-        // 线宽：滑块只走阶梯，取值表与 Ui::kAnnotationWidths 同解，不会出现 3.5 这种没定义过的宽度
+        // 线宽：滑块只走阶梯，取值表与 Gui::kAnnotationWidths 同解，不会出现 3.5 这种没定义过的宽度
         m_widthSlider = new QSlider{Qt::Horizontal, this};
         m_widthSlider->setRange(0, static_cast<int>(kAnnotationWidths.size()) - 1);
         m_widthSlider->setPageStep(1);
-        m_widthSlider->setFixedWidth(Ui::kToolbarSliderWidth);
+        m_widthSlider->setFixedWidth(Gui::kToolbarSliderWidth);
         m_widthSlider->setAccessibleName(GyanisScribe::Base::uiText("线宽"));
         m_widthSlider->setToolTip(GyanisScribe::Base::uiText("线宽"));
         QObject::connect(m_widthSlider, &QSlider::valueChanged, this,
@@ -302,7 +302,7 @@ namespace GyanisScribe::Annotation
         layout->addWidget(m_arrowHeadScaleButton);
         // 文字字体族：文字工具用得上，列系统字体。宽度封顶——字体名长的很，放任 sizeHint 会撑出去
         m_fontCombo = new QFontComboBox{this};
-        m_fontCombo->setMaximumWidth(Ui::kToolbarFontComboWidth);
+        m_fontCombo->setMaximumWidth(Gui::kToolbarFontComboWidth);
         m_fontCombo->setAccessibleName(GyanisScribe::Base::uiText("字体"));
         m_fontCombo->setToolTip(GyanisScribe::Base::uiText("字体（文字）"));
         QObject::connect(m_fontCombo, &QFontComboBox::currentFontChanged, this, [this](const QFont &font) { emit fontFamilyChanged(font.family()); });
@@ -1010,8 +1010,8 @@ namespace GyanisScribe::Annotation
             const auto text  = GyanisScribe::Base::uiText(label.data());
             // 字母键位只进 tooltip：无障碍名要保持与标签同名，读屏报出来的才是工具本名而不是键位
             // 清册里找不到这一档（标识写歪）就只报工具名：括号里空一格，读的人会以为那颗键坏了
-            const auto *entry = GyanisScribe::Ui::appShortcutEntry(std::get<3>(kToolTable[index]));
-            m_toolButtons[index]->setToolTip(entry == nullptr ? text : text + QStringLiteral(" (") + GyanisScribe::Ui::appShortcutText(m_settings, *entry) + QStringLiteral(")"));
+            const auto *entry = GyanisScribe::Gui::appShortcutEntry(std::get<3>(kToolTable[index]));
+            m_toolButtons[index]->setToolTip(entry == nullptr ? text : text + QStringLiteral(" (") + GyanisScribe::Gui::appShortcutText(m_settings, *entry) + QStringLiteral(")"));
         }
     }
 

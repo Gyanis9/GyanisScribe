@@ -2,8 +2,8 @@
 #include "Pick/ColorPickerOverlay.h"
 #include "Pick/PickGeometry.h"
 
-#include "Ui/DesignTokens.h"
-#include "Ui/ThemeManager.h"
+#include "Gui/Theme/DesignTokens.h"
+#include "Gui/Theme/ThemeManager.h"
 #include "Settings/SettingsStore.h"
 
 #include <gtest/gtest.h>
@@ -50,7 +50,7 @@ using GyanisScribe::Pick::magnifierViewToken;
 using GyanisScribe::Pick::parseColorFormat;
 using GyanisScribe::Pick::recentSwatchRects;
 using GyanisScribe::Settings::SettingsStore;
-using GyanisScribe::Ui::ThemeManager;
+using GyanisScribe::Gui::ThemeManager;
 
 namespace
 {

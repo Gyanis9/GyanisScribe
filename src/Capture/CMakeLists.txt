@@ -29,7 +29,7 @@ target_link_libraries(Capture PUBLIC
         Pick
         Platform
         Settings
-        Ui
+        Gui
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets)

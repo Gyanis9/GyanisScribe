@@ -3,7 +3,7 @@
 
 #include "Platform/PlatformCapabilities.h"
 #include "Settings/SettingsKeys.h"
-#include "Ui/IconProvider.h"
+#include "Gui/Resources/IconProvider.h"
 
 #include <gtest/gtest.h>
 
@@ -28,8 +28,8 @@ using GyanisScribe::App::trayMenuEntries;
 using GyanisScribe::App::TrayMenuEntry;
 using GyanisScribe::App::visibleTrayMenuEntries;
 using GyanisScribe::Platform::PlatformCapabilities;
-using GyanisScribe::Ui::IconProvider;
-using GyanisScribe::Ui::ThemeKind;
+using GyanisScribe::Gui::IconProvider;
+using GyanisScribe::Gui::ThemeKind;
 
 namespace
 {

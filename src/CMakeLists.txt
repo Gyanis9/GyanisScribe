@@ -1,7 +1,7 @@
 # src 汇总层：各模块先建成自己的库，这里只做「可执行体 + 运行目录接线」，不重复声明依赖
 add_subdirectory(Base)
 add_subdirectory(Core)
-add_subdirectory(Ui)
+add_subdirectory(Gui)
 add_subdirectory(Platform)
 add_subdirectory(Settings)
 add_subdirectory(Hotkey)
@@ -84,7 +84,7 @@ endif ()
 # Qt 的 bin 目录不在 PATH 上，find_program 会静默找不到，于是这条门变成一个永远空操作的目标——
 # 实测「207 条用例全绿」的同时语言包根本没生成。
 # 没装 LinguistTools 的 Qt（QUIET + 目标存在判断）整条跳过：
-# 语言包缺席时应用照旧按中文跑，Ui::Language 会报出该把包放在哪儿。
+# 语言包缺席时应用照旧按中文跑，Gui::Language 会报出该把包放在哪儿。
 file(GLOB TRANSLATION_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/translations/*.ts")
 find_package(Qt6 COMPONENTS LinguistTools QUIET)
 
@@ -96,7 +96,7 @@ if (TARGET Qt6::lrelease AND TRANSLATION_SOURCES)
             COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:GyanisScribe>/translations")
     foreach (TranslationSource ${TRANSLATION_SOURCES})
         # 输出名取自 .ts 的本名（GyanisScribe_en.ts → GyanisScribe_en.qm）：
-        # Ui::Language 按档位找这个文件名，两边必须是同一个算法
+        # Gui::Language 按档位找这个文件名，两边必须是同一个算法
         get_filename_component(TranslationBaseName ${TranslationSource} NAME_WE)
         add_custom_command(TARGET DeployTranslations POST_BUILD
                 COMMAND $<TARGET_FILE:Qt6::lrelease> ${TranslationSource}

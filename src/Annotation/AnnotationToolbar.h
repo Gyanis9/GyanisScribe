@@ -10,8 +10,8 @@
 #pragma once
 
 #include "Annotation/IAnnotationEngine.h"
-#include "Ui/DesignTokens.h"
-#include "Ui/IconProvider.h"
+#include "Gui/Theme/DesignTokens.h"
+#include "Gui/Resources/IconProvider.h"
 
 #include <QColor>
 #include <QHash>
@@ -42,7 +42,7 @@ namespace GyanisScribe::Annotation
      * @details 顺序必须与 ToolKind 的声明顺序一致，用例按序号逐个核图标名与标签。
      *          放在头文件是因为按钮数组的大小由它算：写死一个数量时，加一档工具就会写出数组外
      *          （Debug 档当场 fast-fail，Release 档静默越界）。
-     *          第四列是 Ui/AppShortcuts.h 那份清册里的标识：认哪颗键（默认那颗与用户改后的那颗）
+     *          第四列是 Gui/Controls/AppShortcuts.h 那份清册里的标识：认哪颗键（默认那颗与用户改后的那颗）
      *          只住在清册一处，这里再存一份字母就会出现「按键改了、按钮提示还是旧的」。
      */
     inline constexpr std::array<std::tuple<ToolKind, std::string_view, std::string_view, std::string_view>, 13> kToolTable = {
@@ -85,7 +85,7 @@ namespace GyanisScribe::Annotation
          * @param icons 图标供给器，生命周期由应用保证，必须活过本控件
          * @param parent Qt 父对象
          */
-        explicit AnnotationToolbar(Settings::ISettingsStore &settings, const Ui::IconProvider &icons, QWidget *parent = nullptr);
+        explicit AnnotationToolbar(Settings::ISettingsStore &settings, const Gui::IconProvider &icons, QWidget *parent = nullptr);
 
         AnnotationToolbar(const AnnotationToolbar &)            = delete;
         AnnotationToolbar &operator=(const AnnotationToolbar &) = delete;
@@ -124,10 +124,10 @@ namespace GyanisScribe::Annotation
         /// 当前选中的颜色，含自定义取回来的那一个
         [[nodiscard]] QColor currentColor() const;
 
-        /// 当前线宽（逻辑像素），取值只会落在 Ui::kAnnotationWidths 的阶梯上
+        /// 当前线宽（逻辑像素），取值只会落在 Gui::kAnnotationWidths 的阶梯上
         [[nodiscard]] int currentWidth() const;
 
-        /// 当前字号，取值只会落在 Ui::kFontSizes 的阶梯上
+        /// 当前字号，取值只会落在 Gui::kFontSizes 的阶梯上
         [[nodiscard]] int currentFontSize() const;
 
 
@@ -452,7 +452,7 @@ namespace GyanisScribe::Annotation
         class QHBoxLayout         *m_layout     = nullptr;      ///< 工具栏主布局，重建色块时要往这里插
         QButtonGroup              *m_colorGroup = nullptr;      ///< 色块的互斥组，重建最近使用时要同步它的成员
 
-        const Ui::IconProvider                     &m_icons;                                                                 ///< 图标出口，不拥有
+        const Gui::IconProvider                     &m_icons;                                                                 ///< 图标出口，不拥有
         std::array<QToolButton *, kToolButtonCount> m_toolButtons{};                                                         ///< 工具按钮，按 ToolKind 顺序
         std::array<ToolKind, kToolButtonCount>      m_toolKinds{};                                                           ///< 按钮序号到工具的映射，反向查也用它
         QToolButton                                *m_customColorButton    = nullptr;                                        ///< 自定义取色按钮

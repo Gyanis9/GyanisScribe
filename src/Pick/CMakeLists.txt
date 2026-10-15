@@ -12,7 +12,7 @@ add_library(Pick STATIC
 target_include_directories(Pick PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(Pick PUBLIC
         Core
-        Ui
+        Gui
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets)

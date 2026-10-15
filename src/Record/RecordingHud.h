@@ -21,10 +21,10 @@
 class QLabel;
 class QPushButton;
 
-namespace GyanisScribe::Ui
+namespace GyanisScribe::Gui
 {
     class IconProvider;
-} // namespace GyanisScribe::Ui
+} // namespace GyanisScribe::Gui
 
 namespace GyanisScribe::Record
 {
@@ -81,7 +81,7 @@ namespace GyanisScribe::Record
          * @param screenAvailable 摆放用的可用区，屏幕坐标
          * @param parent Qt 父对象
          */
-        RecordingHud(const Ui::IconProvider &icons, const QRect &screenAvailable, QWidget *parent = nullptr);
+        RecordingHud(const Gui::IconProvider &icons, const QRect &screenAvailable, QWidget *parent = nullptr);
 
         /**
          * @brief 推一次状态
@@ -141,7 +141,7 @@ namespace GyanisScribe::Record
         /// 按当前状态决定暂停键是「暂停」还是「继续」，并只在这两态让它可按
         void reflectPauseAction();
 
-        const Ui::IconProvider &m_icons;                              ///< 图标供给器
+        const Gui::IconProvider &m_icons;                              ///< 图标供给器
         QRect                   m_available;                          ///< 可用区，贴边与夹取都按它算
         QPoint                  m_dragOffset;                         ///< 拖动时指针相对窗口左上角的偏移
         RecordingState          m_state       = RecordingState::Idle; ///< 最近一次推回来的状态

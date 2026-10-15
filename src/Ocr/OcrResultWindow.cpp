@@ -6,8 +6,8 @@
 #include "Base/Text.h"
 #include "Ocr/OcrEngineFactory.h"
 #include "Ocr/OcrTextExporter.h"
-#include "Ui/IconProvider.h"
-#include "Ui/ThemeManager.h"
+#include "Gui/Resources/IconProvider.h"
+#include "Gui/Theme/ThemeManager.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -112,7 +112,7 @@ namespace
      * @param label 中文动作名，同时用作 tooltip 与无障碍名
      * @return 归调用方所有的按钮
      */
-    QToolButton *makeToolButton(GyanisScribe::Ui::IconProvider &icons, std::string_view iconName, const QString &label)
+    QToolButton *makeToolButton(GyanisScribe::Gui::IconProvider &icons, std::string_view iconName, const QString &label)
     {
         auto *button = new QToolButton;
         button->setIcon(icons.icon(iconName));
@@ -180,7 +180,7 @@ namespace GyanisScribe::Ocr
                                          .c_str());
     }
 
-    OcrResultWindow::OcrResultWindow(const QImage &image, const OcrResult &result, Ui::IconProvider &icons, const Ui::ThemeManager &theme, const QString &nameTemplate,
+    OcrResultWindow::OcrResultWindow(const QImage &image, const OcrResult &result, Gui::IconProvider &icons, const Gui::ThemeManager &theme, const QString &nameTemplate,
                                      QWidget *parent) : QWidget(parent), m_image(image), m_result(result), m_icons(icons), m_theme(theme), m_nameTemplate(nameTemplate)
     {
         setWindowTitle(GyanisScribe::Base::uiText("识别结果"));
@@ -190,8 +190,8 @@ namespace GyanisScribe::Ocr
         setAttribute(Qt::WA_StyledBackground, true);
 
         auto *root = new QHBoxLayout{this};
-        root->setContentsMargins(GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge, GyanisScribe::Ui::kSpacingLarge);
-        root->setSpacing(GyanisScribe::Ui::kSpacingMedium);
+        root->setContentsMargins(GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge);
+        root->setSpacing(GyanisScribe::Gui::kSpacingMedium);
         root->addWidget(m_preview = new Preview, 3);
 
         auto *right = new QVBoxLayout;
@@ -243,20 +243,20 @@ namespace GyanisScribe::Ocr
                          {
                              if (copyAllToClipboard().isEmpty())
                              {
-                                 emit messageForUser(GyanisScribe::Base::uiText("这一张图没有认出可复制的文字"), Ui::ToastKind::Information);
+                                 emit messageForUser(GyanisScribe::Base::uiText("这一张图没有认出可复制的文字"), Gui::ToastKind::Information);
                                  return;
                              }
-                             emit messageForUser(GyanisScribe::Base::uiText("已复制全部文字"), Ui::ToastKind::Success);
+                             emit messageForUser(GyanisScribe::Base::uiText("已复制全部文字"), Gui::ToastKind::Success);
                          });
         QObject::connect(copyPart, &QToolButton::clicked, this,
                          [this]
                          {
                              if (copySelectionToClipboard().isEmpty())
                              {
-                                 emit messageForUser(GyanisScribe::Base::uiText("先在右边选中要复制的文字"), Ui::ToastKind::Information);
+                                 emit messageForUser(GyanisScribe::Base::uiText("先在右边选中要复制的文字"), Gui::ToastKind::Information);
                                  return;
                              }
-                             emit messageForUser(GyanisScribe::Base::uiText("已复制选中文字"), Ui::ToastKind::Success);
+                             emit messageForUser(GyanisScribe::Base::uiText("已复制选中文字"), Gui::ToastKind::Success);
                          });
         QObject::connect(rerun, &QToolButton::clicked, this, [this] { emit recognizeRequested(selectedLanguage()); });
         QObject::connect(m_language, &QComboBox::currentTextChanged, this,
@@ -361,10 +361,10 @@ namespace GyanisScribe::Ocr
             const auto message =
                     QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("导出 TXT 失败：{}。请换一个目录再试一次"), exported.error().message).c_str());
             Base::Logger::warning(message.toStdString());
-            emit messageForUser(message, Ui::ToastKind::Danger);
+            emit messageForUser(message, Gui::ToastKind::Danger);
             return;
         }
-        emit messageForUser(GyanisScribe::Base::uiText("已导出 TXT：") + chosen, Ui::ToastKind::Success);
+        emit messageForUser(GyanisScribe::Base::uiText("已导出 TXT：") + chosen, Gui::ToastKind::Success);
     }
 
     void OcrResultWindow::chooseAndExportJson()
@@ -382,10 +382,10 @@ namespace GyanisScribe::Ocr
             const auto message =
                     QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("导出 JSON 失败：{}。请换一个目录再试一次"), exported.error().message).c_str());
             Base::Logger::warning(message.toStdString());
-            emit messageForUser(message, Ui::ToastKind::Danger);
+            emit messageForUser(message, Gui::ToastKind::Danger);
             return;
         }
-        emit messageForUser(GyanisScribe::Base::uiText("已导出 JSON：") + chosen, Ui::ToastKind::Success);
+        emit messageForUser(GyanisScribe::Base::uiText("已导出 JSON：") + chosen, Gui::ToastKind::Success);
     }
 
 } // namespace GyanisScribe::Ocr

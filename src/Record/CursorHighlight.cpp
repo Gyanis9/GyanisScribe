@@ -1,7 +1,7 @@
 #include "Record/CursorHighlight.h"
 
 #include "Base/Text.h"
-#include "Ui/DesignTokens.h"
+#include "Gui/Theme/DesignTokens.h"
 
 #include <QPainter>
 #include <QPen>
@@ -59,7 +59,7 @@ namespace GyanisScribe::Record
         }
 
         const QPointF centerInPhysical{static_cast<qreal>(offsetInFrameLogical.x()) * devicePixelRatio, static_cast<qreal>(offsetInFrameLogical.y()) * devicePixelRatio};
-        const qreal   radiusInPhysical = GyanisScribe::Ui::kCursorHighlightRadius * devicePixelRatio;
+        const qreal   radiusInPhysical = GyanisScribe::Gui::kCursorHighlightRadius * devicePixelRatio;
 
         // 一律按物理像素画：整屏帧不带缩放标记、选区裁出的帧带，画之前先把标记清成 1，画完原样还回去，
         // 否则同一份坐标在两种帧上一个乘一次不乘，圈会偏出一半
@@ -71,9 +71,9 @@ namespace GyanisScribe::Record
             painter.setBrush(Qt::NoBrush);
 
             // 衬圈先画、主圈压在它上面：两侧各露一半白边，深色与浅色画面上都读得出圈的存在
-            painter.setPen(QPen{GyanisScribe::Ui::kCursorHighlightHaloColor, GyanisScribe::Ui::kCursorHighlightHaloPenWidth * devicePixelRatio});
+            painter.setPen(QPen{GyanisScribe::Gui::kCursorHighlightHaloColor, GyanisScribe::Gui::kCursorHighlightHaloPenWidth * devicePixelRatio});
             painter.drawEllipse(centerInPhysical, radiusInPhysical, radiusInPhysical);
-            painter.setPen(QPen{GyanisScribe::Ui::kCursorHighlightColor, GyanisScribe::Ui::kCursorHighlightPenWidth * devicePixelRatio});
+            painter.setPen(QPen{GyanisScribe::Gui::kCursorHighlightColor, GyanisScribe::Gui::kCursorHighlightPenWidth * devicePixelRatio});
             painter.drawEllipse(centerInPhysical, radiusInPhysical, radiusInPhysical);
         }
         frame.setDevicePixelRatio(taggedRatio);

@@ -5,7 +5,7 @@
 #include "Base/Logger.h"
 #include "Base/Paths.h"
 #include "Hotkey/IHotkeyManager.h"
-#include "Ui/DesignTokens.h"
+#include "Gui/Theme/DesignTokens.h"
 
 #include <QFileInfo>
 
@@ -40,7 +40,7 @@ Application::Application(int &argc, char **argv, const GyanisScribe::App::Comman
     setApplicationVersion(QStringLiteral(PROJECT_VERSION));
     // 正文档字号在这一处给一次：各窗口不再各自设字体，点值随系统 DPI 与字体缩放走
     auto bodyFont = font();
-    bodyFont.setPointSize(static_cast<int>(GyanisScribe::Ui::kTextRolePointSizeBody));
+    bodyFont.setPointSize(static_cast<int>(GyanisScribe::Gui::kTextRolePointSizeBody));
     setFont(bodyFont);
     // 主窗口关掉就回托盘：这是常驻工具，退出只走托盘菜单那一条路。
     // Qt 的默认是「最后一个窗口关掉就退进程」，不设这一行时用户关掉设置窗会把程序整个带走，

@@ -1,7 +1,7 @@
 #include "Record/RecordingHud.h"
 
 #include "Record/RecordingSession.h"
-#include "Ui/IconProvider.h"
+#include "Gui/Resources/IconProvider.h"
 
 #include <gtest/gtest.h>
 
@@ -23,7 +23,7 @@ using GyanisScribe::Record::kHudEdgeGap;
 using GyanisScribe::Record::RecordingHud;
 using GyanisScribe::Record::RecordingState;
 using GyanisScribe::Record::snapHudRect;
-using GyanisScribe::Ui::IconProvider;
+using GyanisScribe::Gui::IconProvider;
 
 namespace
 {

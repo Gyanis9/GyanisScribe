@@ -6,7 +6,7 @@ target_link_libraries(TestPick PRIVATE
         Pick
         Settings
         Core
-        Ui
+        Gui
         GTest::gtest
         GTest::gtest_main
         Qt6::Core

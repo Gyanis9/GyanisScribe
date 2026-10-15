@@ -44,10 +44,10 @@ namespace GyanisScribe::Settings
     class ISettingsStore;
 } // namespace GyanisScribe::Settings
 
-namespace GyanisScribe::Ui
+namespace GyanisScribe::Gui
 {
     class IconProvider;
-} // namespace GyanisScribe::Ui
+} // namespace GyanisScribe::Gui
 
 namespace GyanisScribe::Pin
 {
@@ -776,7 +776,7 @@ namespace GyanisScribe::Pin
          * @brief 这一次按键落在贴图窗哪一档可换键上
          * @param event 按键事件
          * @return 对应动作；一颗都没认到时返回 None
-         * @details 键位读 Ui/AppShortcuts.h 那份清册，整颗组合相等才算命中；「转正」那一档还认
+         * @details 键位读 Gui/Controls/AppShortcuts.h 那份清册，整颗组合相等才算命中；「转正」那一档还认
          *          多按一个 Shift 的反向挡，方向由调用处按 Shift 位判。撞上 Ctrl+A / Ctrl+V 这类
          *          既有组合时这一层先赢——用户把它换上来就是要这颗键归这一档。
          */
@@ -957,7 +957,7 @@ namespace GyanisScribe::Pin
         Annotation::AnnotationView                          *m_annotateView    = nullptr;                                ///< 铺在贴图上的标注视图，本窗口的子控件
         Annotation::AnnotationToolbar                       *m_annotateToolbar = nullptr;                                ///< 浮着的标注工具栏
         std::unique_ptr<Annotation::AnnotationToolbarBridge> m_annotateBridge;                                           ///< 工具栏与引擎的接线
-        std::unique_ptr<Ui::IconProvider>                    m_icons;                                                    ///< 工具栏要的图标供给器，首次进入标注时创建
+        std::unique_ptr<Gui::IconProvider>                    m_icons;                                                    ///< 工具栏要的图标供给器，首次进入标注时创建
         Settings::ISettingsStore                            &m_settings;                                                 ///< 配置来源（保存目录）
         const Platform::IPlatformIntegration                &m_integration;                                              ///< 平台能力查询
     };

@@ -11,9 +11,9 @@
 
 #include "App/UpdateCheck.h"
 #include "Platform/PlatformCapabilities.h"
-#include "Ui/Language.h"
-#include "Ui/ThemeKind.h"
-#include "Ui/Toast.h"
+#include "Gui/Theme/Language.h"
+#include "Gui/Theme/ThemeKind.h"
+#include "Gui/Controls/Toast.h"
 
 #include <QString>
 #include <QWidget>
@@ -31,11 +31,11 @@ namespace GyanisScribe::Settings
     class ISettingsStore;
 } // namespace GyanisScribe::Settings
 
-namespace GyanisScribe::Ui
+namespace GyanisScribe::Gui
 {
     class IconProvider;
     class ThemeManager;
-} // namespace GyanisScribe::Ui
+} // namespace GyanisScribe::Gui
 
 namespace GyanisScribe::History
 {
@@ -116,7 +116,7 @@ namespace GyanisScribe::App
      */
     struct ThemeChoice
     {
-        GyanisScribe::Ui::ThemeKind kind;  ///< 选中这一行时应用的档位
+        GyanisScribe::Gui::ThemeKind kind;  ///< 选中这一行时应用的档位
         std::string_view            label; ///< 下拉框里显示的中文名
     };
 
@@ -131,14 +131,14 @@ namespace GyanisScribe::App
      * @param index 下拉框序号
      * @return 对应档位；序号越界返回空
      */
-    [[nodiscard]] std::optional<GyanisScribe::Ui::ThemeKind> themeKindAt(int index);
+    [[nodiscard]] std::optional<GyanisScribe::Gui::ThemeKind> themeKindAt(int index);
 
     /**
      * @brief 主题档位在下拉框里的序号
      * @param themeKind 档位
      * @return 序号；档位不在表里时返回 -1
      */
-    [[nodiscard]] int indexOfThemeKind(GyanisScribe::Ui::ThemeKind themeKind);
+    [[nodiscard]] int indexOfThemeKind(GyanisScribe::Gui::ThemeKind themeKind);
 
     /**
      * @brief 界面语言下拉框的一行
@@ -147,7 +147,7 @@ namespace GyanisScribe::App
      */
     struct LanguageChoice
     {
-        GyanisScribe::Ui::AppLanguage language; ///< 选中这一行时写入配置的档位
+        GyanisScribe::Gui::AppLanguage language; ///< 选中这一行时写入配置的档位
         std::string_view              label;    ///< 下拉框里显示的自称文本
     };
 
@@ -157,14 +157,14 @@ namespace GyanisScribe::App
      * @param index 下拉框序号
      * @return 对应档位；序号越界返回空
      */
-    [[nodiscard]] std::optional<GyanisScribe::Ui::AppLanguage> appLanguageAt(int index);
+    [[nodiscard]] std::optional<GyanisScribe::Gui::AppLanguage> appLanguageAt(int index);
 
     /**
      * @brief 语言档位在下拉框里的序号
      * @param language 档位
      * @return 序号；档位不在表里时返回 -1
      */
-    [[nodiscard]] int indexOfAppLanguage(GyanisScribe::Ui::AppLanguage language);
+    [[nodiscard]] int indexOfAppLanguage(GyanisScribe::Gui::AppLanguage language);
 
     /**
      * @brief 关于页正文
@@ -198,7 +198,7 @@ namespace GyanisScribe::App
          * @note 刻意不认识 AppController：热键与语言的改动由各自的订阅者接走，
          *       设置页不需要为了「生效」去拖一个控制器进来。历史页的三个出口同样只发信号。
          */
-        explicit MainWindow(Settings::ISettingsStore &settings, GyanisScribe::Ui::ThemeManager &theme, GyanisScribe::Ui::IconProvider &icons, History::HistoryStore &historyStore,
+        explicit MainWindow(Settings::ISettingsStore &settings, GyanisScribe::Gui::ThemeManager &theme, GyanisScribe::Gui::IconProvider &icons, History::HistoryStore &historyStore,
                             Platform::PlatformCapabilities capabilities, Platform::IPlatformIntegration &integration, QWidget *parent = nullptr);
 
         /**
@@ -304,7 +304,7 @@ namespace GyanisScribe::App
          * @param message 界面语言的正文（历史页与导入导出共用这一条通道）
          * @param kind 语义种类
          */
-        void messageForUser(const QString &message, GyanisScribe::Ui::ToastKind kind);
+        void messageForUser(const QString &message, GyanisScribe::Gui::ToastKind kind);
 
     private:
         /**
@@ -349,8 +349,8 @@ namespace GyanisScribe::App
         QWidget *buildHistoryPage();
 
         Settings::ISettingsStore                             &m_settings;          ///< 配置存储，不拥有
-        GyanisScribe::Ui::ThemeManager                       &m_theme;             ///< 主题管理器，不拥有
-        GyanisScribe::Ui::IconProvider                       &m_icons;             ///< 图标供给器，不拥有
+        GyanisScribe::Gui::ThemeManager                       &m_theme;             ///< 主题管理器，不拥有
+        GyanisScribe::Gui::IconProvider                       &m_icons;             ///< 图标供给器，不拥有
         Platform::PlatformCapabilities                        m_capabilities;      ///< 平台能力表：热键页按它给不给登记入口
         QListWidget                                          *m_nav   = nullptr;   ///< 左侧导航，一行一页
         QStackedWidget                                       *m_stack = nullptr;   ///< 右侧页容器，序号与导航行同解

@@ -33,11 +33,11 @@ namespace GyanisScribe::Platform
     struct PlatformCapabilities;
 } // namespace GyanisScribe::Platform
 
-namespace GyanisScribe::Ui
+namespace GyanisScribe::Gui
 {
     class IconProvider;
     class ThemeManager;
-} // namespace GyanisScribe::Ui
+} // namespace GyanisScribe::Gui
 
 namespace GyanisScribe::App
 {
@@ -94,7 +94,7 @@ namespace GyanisScribe::App
          * @param integration 平台能力来源，决定菜单上放不放「截取当前窗口」这一项
          * @param parent Qt 父对象
          */
-        TrayController(GyanisScribe::Ui::IconProvider &icons, GyanisScribe::Ui::ThemeManager &theme, Settings::ISettingsStore &settings,
+        TrayController(GyanisScribe::Gui::IconProvider &icons, GyanisScribe::Gui::ThemeManager &theme, Settings::ISettingsStore &settings,
                        Platform::IPlatformIntegration &integration, QObject *parent = nullptr);
 
 
@@ -148,8 +148,8 @@ namespace GyanisScribe::App
          */
         void onActivated(QSystemTrayIcon::ActivationReason reason);
 
-        GyanisScribe::Ui::IconProvider &m_icons;                   ///< 图标供给器，不拥有
-        GyanisScribe::Ui::ThemeManager &m_theme;                   ///< 主题管理器，不拥有
+        GyanisScribe::Gui::IconProvider &m_icons;                   ///< 图标供给器，不拥有
+        GyanisScribe::Gui::ThemeManager &m_theme;                   ///< 主题管理器，不拥有
         Settings::ISettingsStore       &m_settings;                ///< 配置存储，不拥有
         Platform::IPlatformIntegration &m_integration;             ///< 平台能力来源，决定菜单放不放哪几项，不拥有
         QSystemTrayIcon                *m_icon = nullptr;          ///< 托盘图标，父对象是本控制器

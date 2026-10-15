@@ -3,7 +3,7 @@
 #include "Record/CursorHighlight.h"
 
 #include "Base/Types.h"
-#include "Ui/DesignTokens.h"
+#include "Gui/Theme/DesignTokens.h"
 
 #include <gtest/gtest.h>
 
@@ -20,7 +20,7 @@ namespace
 {
     using GyanisScribe::Base::ErrorCode;
     using GyanisScribe::Record::paintCursorHighlight;
-    using GyanisScribe::Ui::kCursorHighlightRadius;
+    using GyanisScribe::Gui::kCursorHighlightRadius;
 
     std::unique_ptr<QGuiApplication> application;
 

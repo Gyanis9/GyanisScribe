@@ -1,7 +1,7 @@
 #include "Capture/LongCaptureHud.h"
 
 #include "Base/Text.h"
-#include "Ui/DesignTokens.h"
+#include "Gui/Theme/DesignTokens.h"
 
 #include <QHBoxLayout>
 #include <QLabel>
@@ -53,22 +53,22 @@ namespace GyanisScribe::Capture
         setAttribute(Qt::WA_StyledBackground, true);
 
         auto *root = new QVBoxLayout{this};
-        root->setContentsMargins(GyanisScribe::Ui::kSpacingSmall, GyanisScribe::Ui::kSpacingTiny, GyanisScribe::Ui::kSpacingSmall, GyanisScribe::Ui::kSpacingTiny);
-        root->setSpacing(GyanisScribe::Ui::kSpacingTiny);
+        root->setContentsMargins(GyanisScribe::Gui::kSpacingSmall, GyanisScribe::Gui::kSpacingTiny, GyanisScribe::Gui::kSpacingSmall, GyanisScribe::Gui::kSpacingTiny);
+        root->setSpacing(GyanisScribe::Gui::kSpacingTiny);
 
         auto *hint = new QLabel{GyanisScribe::Base::uiText("滚动要截的页面，接好后按完成"), this};
         hint->setAccessibleName(GyanisScribe::Base::uiText("长截图提示"));
-        GyanisScribe::Ui::applyTextRole(*hint, GyanisScribe::Ui::TextRole::Body);
+        GyanisScribe::Gui::applyTextRole(*hint, GyanisScribe::Gui::TextRole::Body);
         root->addWidget(hint);
 
         m_readout = new QLabel{GyanisScribe::Base::uiText("还没接上任何一段"), this};
         m_readout->setAccessibleName(GyanisScribe::Base::uiText("已接高度"));
         // 等宽数字：每接一帧就跳一下，比例字体会让整条控制条左右抖
-        GyanisScribe::Ui::applyTextRole(*m_readout, GyanisScribe::Ui::TextRole::Metric);
+        GyanisScribe::Gui::applyTextRole(*m_readout, GyanisScribe::Gui::TextRole::Metric);
         root->addWidget(m_readout);
 
         auto *line = new QHBoxLayout;
-        line->setSpacing(GyanisScribe::Ui::kSpacingSmall);
+        line->setSpacing(GyanisScribe::Gui::kSpacingSmall);
         root->addLayout(line);
 
         auto *cancelButton = new QPushButton{GyanisScribe::Base::uiText("取消"), this};

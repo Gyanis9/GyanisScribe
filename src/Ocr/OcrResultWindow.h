@@ -11,7 +11,7 @@
 
 #include "Base/Types.h"
 #include "Ocr/OcrTypes.h"
-#include "Ui/Toast.h"
+#include "Gui/Controls/Toast.h"
 
 #include <QImage>
 #include <QRect>
@@ -27,11 +27,11 @@ class QComboBox;
 class QResizeEvent;
 class QTextEdit;
 
-namespace GyanisScribe::Ui
+namespace GyanisScribe::Gui
 {
     class IconProvider;
     class ThemeManager;
-} // namespace GyanisScribe::Ui
+} // namespace GyanisScribe::Gui
 
 namespace GyanisScribe::Ocr
 {
@@ -86,7 +86,7 @@ namespace GyanisScribe::Ocr
          * @param nameTemplate 导出时的文件名模板；留空表示默认档（与截图成品同一套名字规则）
          * @param parent 父窗口，可空
          */
-        OcrResultWindow(const QImage &image, const OcrResult &result, Ui::IconProvider &icons, const Ui::ThemeManager &theme, const QString &nameTemplate = {},
+        OcrResultWindow(const QImage &image, const OcrResult &result, Gui::IconProvider &icons, const Gui::ThemeManager &theme, const QString &nameTemplate = {},
                         QWidget *parent = nullptr);
 
         /**
@@ -144,7 +144,7 @@ namespace GyanisScribe::Ocr
          * @param message 中文正文，含原因与下一步
          * @param kind 语义种类：需求写定成功用绿、错误用危险色，由持有气泡的调用方决定落在哪
          */
-        void messageForUser(const QString &message, GyanisScribe::Ui::ToastKind kind);
+        void messageForUser(const QString &message, GyanisScribe::Gui::ToastKind kind);
 
     protected:
         /**
@@ -169,8 +169,8 @@ namespace GyanisScribe::Ocr
 
         QImage                  m_image;               ///< 原图，预览按它算方框
         OcrResult               m_result;              ///< 当前结果，窗口只展示不改写
-        Ui::IconProvider       &m_icons;               ///< 图标供给器
-        const Ui::ThemeManager &m_theme;               ///< 主题管理器，取主色画高亮框
+        Gui::IconProvider       &m_icons;               ///< 图标供给器
+        const Gui::ThemeManager &m_theme;               ///< 主题管理器，取主色画高亮框
         QString                 m_nameTemplate;        ///< 导出用文件名模板，构造时给；空串表示默认档
         QWidget                *m_preview   = nullptr; ///< 左侧预览控件，重绘由 refreshPreview 驱动
         QTextEdit              *m_text      = nullptr; ///< 右侧文本，只读、可选中

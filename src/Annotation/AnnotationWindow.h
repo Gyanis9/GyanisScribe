@@ -74,7 +74,7 @@ namespace GyanisScribe::Annotation
      * @brief 把按键翻成要切过去的标注工具
      * @param key 事件里的键值
      * @param modifiers 当时的修饰键
-     * @param settings 配置存储：键位从 Ui/AppShortcuts.h 那份清册现读
+     * @param settings 配置存储：键位从 Gui/Controls/AppShortcuts.h 那份清册现读
      * @return 那一档工具；没有一档认这颗键时返回空
      * @details 整颗组合相等才算命中，所以默认那十三颗裸字母照旧，而 Ctrl+Z 这类组合不会被当成换工具。
      *          键位只有清册一处：按钮提示读的是同一处，用户在设置页换过一颗，两边一起跟上。
@@ -96,7 +96,7 @@ namespace GyanisScribe::Annotation
         /**
          * @brief 构造窗口
          * @param engine 标注引擎，所有权在宿主
-         * @param settings 配置存储，字母键位从 Ui/AppShortcuts.h 那份清册现读；生命周期必须长于本窗口
+         * @param settings 配置存储，字母键位从 Gui/Controls/AppShortcuts.h 那份清册现读；生命周期必须长于本窗口
          * @param toolbar 工具栏，所有权交给本窗口（它是本窗口的浮层子窗）
          * @param parent Qt 父对象
          */
@@ -181,7 +181,7 @@ namespace GyanisScribe::Annotation
         void placeToolbarForSelection();
 
         IAnnotationEngine                       &m_engine;                ///< 标注引擎，不拥有
-        Settings::ISettingsStore                &m_settings;              ///< 字母键位的读端（Ui/AppShortcuts.h 那份清册），不拥有
+        Settings::ISettingsStore                &m_settings;              ///< 字母键位的读端（Gui/Controls/AppShortcuts.h 那份清册），不拥有
         std::unique_ptr<AnnotationToolbar>       m_toolbar;               ///< 浮层工具栏，本窗口拥有
         std::unique_ptr<AnnotationToolbarBridge> m_toolbarBridge;         ///< 工具栏与引擎的接线：样式、工具、撤销重做都在桥里
         AnnotationView                          *m_view = nullptr;        ///< 画布视图，父对象是本窗口

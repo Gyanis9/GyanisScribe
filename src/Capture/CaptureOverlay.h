@@ -64,7 +64,7 @@ namespace GyanisScribe::Capture
          * @param background 该屏的物理像素图，选区内显示它的原图
          * @param screenGeometry 该屏的全局逻辑几何，遮罩就铺在这一块上
          * @param devicePixelRatio 该屏缩放因子，必须大于 0
-         * @param settings 配置存储：裸键那几档从 Ui/AppShortcuts.h 那份清册现读；生命周期必须长于本遮罩
+         * @param settings 配置存储：裸键那几档从 Gui/Controls/AppShortcuts.h 那份清册现读；生命周期必须长于本遮罩
          * @param parent 父窗口，默认无
          */
         CaptureOverlay(const QImage &background, const QRect &screenGeometry, qreal devicePixelRatio, Settings::ISettingsStore &settings, QWidget *parent = nullptr);
@@ -385,7 +385,7 @@ namespace GyanisScribe::Capture
          * @brief 这一次按键落在清册里哪一档可换键上
          * @param event 按键事件
          * @return 对应动作；一颗都没认到时返回 None
-         * @details 键位读 Ui/AppShortcuts.h 那份清册，整颗组合相等才算命中；「挑最近选区」那一档
+         * @details 键位读 Gui/Controls/AppShortcuts.h 那份清册，整颗组合相等才算命中；「挑最近选区」那一档
          *          还认多按一个 Shift 的反向档，方向由调用处按 Shift 位判。
          *          这一层排在 switch 之前，所以 Ctrl+A 这类既有组合与换上去的键撞上时，换上去的那一档赢。
          */
@@ -406,7 +406,7 @@ namespace GyanisScribe::Capture
         [[nodiscard]] QString formatCursorReadout() const;
 
         QImage                    m_background;                              ///< 该屏的物理像素图，按缩放因子画成逻辑大小
-        Settings::ISettingsStore &m_settings;                                ///< 裸键那几档的读端（Ui/AppShortcuts.h 那份清册），不拥有
+        Settings::ISettingsStore &m_settings;                                ///< 裸键那几档的读端（Gui/Controls/AppShortcuts.h 那份清册），不拥有
         QRect                     m_screenGeometry;                          ///< 该屏的全局逻辑几何
         qreal                     m_devicePixelRatio = 1.0;                  ///< 该屏缩放因子
         QPoint                    m_anchorPoint;                             ///< 本次框选的按下点，局部逻辑坐标

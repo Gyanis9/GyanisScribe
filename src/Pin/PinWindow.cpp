@@ -17,10 +17,10 @@
 #include "Pin/PinLayout.h"
 #include "Pin/PinViewFilter.h"
 #include "Pick/ColorFormat.h"
-#include "Ui/AppShortcuts.h"
-#include "Ui/DesignTokens.h"
-#include "Ui/IconProvider.h"
-#include "Ui/KeyStep.h"
+#include "Gui/Controls/AppShortcuts.h"
+#include "Gui/Theme/DesignTokens.h"
+#include "Gui/Resources/IconProvider.h"
+#include "Gui/Controls/KeyStep.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Settings/ISettingsStore.h"
 #include "Settings/NamingRules.h"
@@ -114,7 +114,7 @@ namespace GyanisScribe::Pin
 
         /**
          * @brief 贴图窗上可换键的那一档
-         * @details 标识取自 Ui/AppShortcuts.h 那份清册：那颗键现在认给谁，设置页与按键上都是同一个读数。
+         * @details 标识取自 Gui/Controls/AppShortcuts.h 那份清册：那颗键现在认给谁，设置页与按键上都是同一个读数。
          *          表里的顺序不参与判定——同一窗口里各档的默认那颗互不相同（这一判由 TestAppShortcuts 钉住）。
          */
         struct RebindablePinRow
@@ -1009,7 +1009,7 @@ namespace GyanisScribe::Pin
         {
             if (m_icons == nullptr)
             {
-                m_icons = std::make_unique<Ui::IconProvider>();
+                m_icons = std::make_unique<Gui::IconProvider>();
             }
             m_annotateToolbar = new Annotation::AnnotationToolbar{m_settings, *m_icons, this};
             // 与标注窗同一条摆法：工具栏是独立浮窗，摆在贴图旁边
@@ -1261,7 +1261,7 @@ namespace GyanisScribe::Pin
                 return;
             case Annotation::ShortcutAction::NudgeSelection:
             {
-                const auto step = Ui::arrowStepFor(event->key());
+                const auto step = Gui::arrowStepFor(event->key());
                 if (!step)
                 {
                     return;
@@ -1555,7 +1555,7 @@ namespace GyanisScribe::Pin
         const bool decorated = underMouse() || m_draggedHandle.has_value() || m_selected;
         if (decorated)
         {
-            auto border = QPen(GyanisScribe::Ui::kAccentColor);
+            auto border = QPen(GyanisScribe::Gui::kAccentColor);
             border.setWidth(m_selected ? kSelectedBorderWidth : kBorderWidth);
             painter.setPen(border);
             painter.setBrush(Qt::NoBrush);
@@ -1590,7 +1590,7 @@ namespace GyanisScribe::Pin
 
             if (box.has_value())
             {
-                QPen cropPen(GyanisScribe::Ui::kAccentColor, 1.0, Qt::DashLine);
+                QPen cropPen(GyanisScribe::Gui::kAccentColor, 1.0, Qt::DashLine);
                 cropPen.setCapStyle(Qt::FlatCap);
                 painter.setPen(cropPen);
                 painter.setBrush(Qt::NoBrush);
@@ -1957,7 +1957,7 @@ namespace GyanisScribe::Pin
             return;
         }
 
-        // 可换键的那几档先过一遍：那颗键现在认给谁由 Ui/AppShortcuts.h 那份清册说了算，
+        // 可换键的那几档先过一遍：那颗键现在认给谁由 Gui/Controls/AppShortcuts.h 那份清册说了算，
         // 整颗组合相等才算命中；「转正」那一档还认多按一个 Shift 的反向挡
         if (const auto action = rebindableActionFor(event); action != RebindablePinKeyAction::None)
         {
@@ -2022,7 +2022,7 @@ namespace GyanisScribe::Pin
         // 贴图这一头原先只能用鼠标拖，贴着别的窗对边线时差的那几格摸不出来
         if (event->modifiers() == Qt::NoModifier || event->modifiers() == Qt::ShiftModifier)
         {
-            if (const auto step = Ui::arrowStepFor(event->key()); step)
+            if (const auto step = Gui::arrowStepFor(event->key()); step)
             {
                 const int    stride = event->modifiers().testFlag(Qt::ShiftModifier) ? kKeyboardNudgeStride : 1;
                 const QPoint delta{step->x() * stride, step->y() * stride};
@@ -2043,8 +2043,8 @@ namespace GyanisScribe::Pin
     {
         for (const auto &row: kRebindablePinRows)
         {
-            const auto *entry = GyanisScribe::Ui::appShortcutEntry(row.token);
-            if (entry != nullptr && GyanisScribe::Ui::isAppShortcutHit(m_settings, *entry, event->key(), event->modifiers(), row.allowShiftVariant))
+            const auto *entry = GyanisScribe::Gui::appShortcutEntry(row.token);
+            if (entry != nullptr && GyanisScribe::Gui::isAppShortcutHit(m_settings, *entry, event->key(), event->modifiers(), row.allowShiftVariant))
             {
                 return row.action;
             }

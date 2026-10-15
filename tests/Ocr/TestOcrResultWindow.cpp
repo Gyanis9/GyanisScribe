@@ -2,8 +2,8 @@
 
 #include "Ocr/OcrTypes.h"
 #include "Settings/SettingsStore.h"
-#include "Ui/IconProvider.h"
-#include "Ui/ThemeManager.h"
+#include "Gui/Resources/IconProvider.h"
+#include "Gui/Theme/ThemeManager.h"
 
 #include <gtest/gtest.h>
 
@@ -29,8 +29,8 @@ using GyanisScribe::Ocr::OcrResultWindow;
 using GyanisScribe::Ocr::OcrWord;
 using GyanisScribe::Ocr::statusLineFor;
 using GyanisScribe::Settings::SettingsStore;
-using GyanisScribe::Ui::IconProvider;
-using GyanisScribe::Ui::ThemeManager;
+using GyanisScribe::Gui::IconProvider;
+using GyanisScribe::Gui::ThemeManager;
 
 namespace
 {

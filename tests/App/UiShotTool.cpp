@@ -8,8 +8,8 @@
 #include "Platform/IPlatformIntegration.h"
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
-#include "Ui/IconProvider.h"
-#include "Ui/ThemeManager.h"
+#include "Gui/Resources/IconProvider.h"
+#include "Gui/Theme/ThemeManager.h"
 
 #include <QApplication>
 #include <QCoreApplication>
@@ -89,8 +89,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    GyanisScribe::Ui::IconProvider      icons;
-    GyanisScribe::Ui::ThemeManager      theme(settings);
+    GyanisScribe::Gui::IconProvider      icons;
+    GyanisScribe::Gui::ThemeManager      theme(settings);
     GyanisScribe::History::HistoryStore history(dataDirectory / "history.json");
     const auto                          integration = GyanisScribe::Platform::createPlatformIntegration();
     // 样式表要落一次：真实程序里这一步在 AppController 构造里做，这里没有控制器

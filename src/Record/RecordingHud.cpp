@@ -1,9 +1,9 @@
 #include "Record/RecordingHud.h"
 
-#include "Ui/DesignTokens.h"
+#include "Gui/Theme/DesignTokens.h"
 
 #include "Base/Text.h"
-#include "Ui/IconProvider.h"
+#include "Gui/Resources/IconProvider.h"
 
 #include <QFont>
 #include <QHBoxLayout>
@@ -109,7 +109,7 @@ namespace GyanisScribe::Record
         return rect;
     }
 
-    RecordingHud::RecordingHud(const Ui::IconProvider &icons, const QRect &screenAvailable, QWidget *parent) :
+    RecordingHud::RecordingHud(const Gui::IconProvider &icons, const QRect &screenAvailable, QWidget *parent) :
         QWidget(parent), m_icons(icons), m_available(screenAvailable.isEmpty() ? QRect{0, 0, 1920, 1080} : screenAvailable)
     {
         // 工具窗：不进任务栏、不抢焦点，录制区里出现一个任务栏按钮会污染成品
@@ -121,11 +121,11 @@ namespace GyanisScribe::Record
         setAttribute(Qt::WA_StyledBackground, true);
 
         auto *root = new QVBoxLayout{this};
-        root->setContentsMargins(GyanisScribe::Ui::kSpacingSmall, GyanisScribe::Ui::kSpacingTiny, GyanisScribe::Ui::kSpacingSmall, GyanisScribe::Ui::kSpacingTiny);
-        root->setSpacing(GyanisScribe::Ui::kSpacingTiny);
+        root->setContentsMargins(GyanisScribe::Gui::kSpacingSmall, GyanisScribe::Gui::kSpacingTiny, GyanisScribe::Gui::kSpacingSmall, GyanisScribe::Gui::kSpacingTiny);
+        root->setSpacing(GyanisScribe::Gui::kSpacingTiny);
 
         auto *line = new QHBoxLayout;
-        line->setSpacing(GyanisScribe::Ui::kSpacingSmall);
+        line->setSpacing(GyanisScribe::Gui::kSpacingSmall);
         root->addLayout(line);
 
         auto *dot = new QLabel{QStringLiteral("●"), this};
@@ -135,7 +135,7 @@ namespace GyanisScribe::Record
 
         m_status = new QLabel{hudStatusText(RecordingState::Idle, 0), this};
         m_status->setAccessibleName(GyanisScribe::Base::uiText("录制状态"));
-        GyanisScribe::Ui::applyTextRole(*m_status, GyanisScribe::Ui::TextRole::Body);
+        GyanisScribe::Gui::applyTextRole(*m_status, GyanisScribe::Gui::TextRole::Body);
         line->addWidget(m_status);
 
         m_elapsed = new QLabel{formatDuration(0), this};
@@ -143,7 +143,7 @@ namespace GyanisScribe::Record
         m_elapsed->setAccessibleName(GyanisScribe::Base::uiText("已录时长"));
         m_elapsed->setToolTip(GyanisScribe::Base::uiText("已录了多久。录到设置里「最长录多久」那一格就自动收尾并保存（默认 10 分钟）"));
         // 等宽数字：一秒一跳时这一列的宽度不能变，否则整条控制条每秒钟抖一次
-        GyanisScribe::Ui::applyTextRole(*m_elapsed, GyanisScribe::Ui::TextRole::Metric);
+        GyanisScribe::Gui::applyTextRole(*m_elapsed, GyanisScribe::Gui::TextRole::Metric);
         line->addWidget(m_elapsed);
 
         // 取消排在最左：它与「停止并保存」之间隔着暂停键，误点一格不会把录好的那段丢掉

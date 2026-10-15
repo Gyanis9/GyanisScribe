@@ -9,8 +9,8 @@
 #include "Annotation/PenParameters.h"
 
 #include "Settings/SettingsStore.h"
-#include "Ui/AppShortcuts.h"
-#include "Ui/IconProvider.h"
+#include "Gui/Controls/AppShortcuts.h"
+#include "Gui/Resources/IconProvider.h"
 
 #include <gtest/gtest.h>
 
@@ -48,7 +48,7 @@ using GyanisScribe::Base::CapturedImage;
 using GyanisScribe::Core::displayRectFor;
 using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Settings::SettingsStore;
-using GyanisScribe::Ui::IconProvider;
+using GyanisScribe::Gui::IconProvider;
 
 namespace
 {
@@ -241,7 +241,7 @@ TEST(ViewShortcuts, ShapeAndLayerShortcutsMapExactlyTheDocumentedKeys)
 
 /**
  * @brief 钉住字母键位与清册同解，且只认按下就相等的那一颗
- * @details 键位住在 Ui/AppShortcuts.h 那份清册里（默认那颗就是登记表的字母），界面提示与按键分派读的是同一处：
+ * @details 键位住在 Gui/Controls/AppShortcuts.h 那份清册里（默认那颗就是登记表的字母），界面提示与按键分派读的是同一处：
  *          十三档逐个钉住，再钉两位拒绝面——没绑工具的字母不许换工具，带修饰键的组合也不许
  *          （Ctrl+Z 里的 z 若当成字母键位，撤销就变成换工具）。
  */
@@ -287,15 +287,15 @@ TEST(ViewShortcuts, ReboundToolKeyFollowsTheRegistry)
     std::filesystem::remove(iniPath, ignored);
     SettingsStore settings{iniPath};
 
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Ui::appShortcutKey("Annotation/Pen").toStdString(), QStringLiteral("K")).has_value()) << "写入失败";
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Gui::appShortcutKey("Annotation/Pen").toStdString(), QStringLiteral("K")).has_value()) << "写入失败";
     EXPECT_EQ(toolShortcutFor(Qt::Key_K, Qt::NoModifier, settings), ToolKind::Pen);
     EXPECT_FALSE(toolShortcutFor(Qt::Key_P, Qt::NoModifier, settings).has_value()) << "换走之后，旧那颗键不该还认这一档";
 
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Ui::appShortcutKey("Annotation/Text").toStdString(), QStringLiteral("Ctrl+K")).has_value()) << "写入失败";
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Gui::appShortcutKey("Annotation/Text").toStdString(), QStringLiteral("Ctrl+K")).has_value()) << "写入失败";
     EXPECT_EQ(toolShortcutFor(Qt::Key_K, Qt::ControlModifier, settings), ToolKind::Text) << "换成组合键也算：整颗组合相等就命中";
     EXPECT_FALSE(toolShortcutFor(Qt::Key_T, Qt::NoModifier, settings).has_value()) << "文字换走之后 T 不再切工具";
 
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Ui::appShortcutKey("Annotation/Arrow").toStdString(), QStringLiteral("Ctrl+")).has_value()) << "写入失败";
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Gui::appShortcutKey("Annotation/Arrow").toStdString(), QStringLiteral("Ctrl+")).has_value()) << "写入失败";
     EXPECT_EQ(toolShortcutFor(Qt::Key_A, Qt::NoModifier, settings), ToolKind::Arrow) << "填歪的那一档要落回默认键";
 }
 

@@ -3,12 +3,12 @@ add_executable(TestHistory
         TestUnsavedArchive.cpp
         TestHistoryView.cpp)
 
-# 视图与图标那一半要 Qt 的 GUI 栈，所以这里连 Widgets 与 Ui
+# 视图与图标那一半要 Qt 的 GUI 栈，所以这里连 Widgets 与 Gui
 target_link_libraries(TestHistory PRIVATE
         History
         Settings
         Core
-        Ui
+        Gui
         GTest::gtest
         GTest::gtest_main
         Qt6::Core

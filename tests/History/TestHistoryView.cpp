@@ -3,7 +3,7 @@
 
 #include "History/HistoryStore.h"
 #include "Settings/SettingsStore.h"
-#include "Ui/IconProvider.h"
+#include "Gui/Resources/IconProvider.h"
 
 #include <gtest/gtest.h>
 
@@ -33,7 +33,7 @@ using GyanisScribe::History::kThumbnailCornerRadius;
 using GyanisScribe::History::kThumbnailEdge;
 using GyanisScribe::History::makeThumbnail;
 using GyanisScribe::Settings::SettingsStore;
-using GyanisScribe::Ui::IconProvider;
+using GyanisScribe::Gui::IconProvider;
 
 namespace
 {
@@ -158,7 +158,7 @@ TEST_F(HistoryViewFixture, EmptyListGuidesInsteadOfActing)
     QString guidance;
     QObject::connect(view.get(), &HistoryView::openFolderRequested, view.get(), [&opens](const std::filesystem::path &) { ++opens; });
     QObject::connect(view.get(), &HistoryView::clearAllRequested, view.get(), [&clears] { ++clears; });
-    QObject::connect(view.get(), &HistoryView::messageForUser, view.get(), [&guidance](const QString &text, GyanisScribe::Ui::ToastKind) { guidance = text; });
+    QObject::connect(view.get(), &HistoryView::messageForUser, view.get(), [&guidance](const QString &text, GyanisScribe::Gui::ToastKind) { guidance = text; });
 
     folder->click();
     EXPECT_EQ(opens, 0) << "没选中就去了开目录";
@@ -304,7 +304,7 @@ TEST_F(HistoryViewFixture, BrokenKeepsPreviousRowsAndTellsTheUser)
     int     emitted = 0;
     auto    viewPtr = view.get();
     QObject::connect(viewPtr, &HistoryView::messageForUser, viewPtr,
-                     [&message, &emitted](const QString &text, GyanisScribe::Ui::ToastKind)
+                     [&message, &emitted](const QString &text, GyanisScribe::Gui::ToastKind)
                      {
                          ++emitted;
                          message = text;

@@ -58,7 +58,7 @@ if (-not (Test-Path $ffmpegExe)) { throw "bundled ffmpeg missing at $ffmpegExe" 
 Copy-Item $ffmpegExe $stage -Force
 Write-Output '[ok] ffmpeg staged next to the executable'
 
-# Ui::Ocr looks for <application directory>/tessdata before the user data folder, so shipping the
+# Ocr looks for <application directory>/tessdata before the user data folder, so shipping the
 # packs here is what makes recognition work straight after installation.
 $tessDataSource = Join-Path 'vendor' 'Tessdata'
 foreach ($required in 'eng.traineddata', 'chi_sim.traineddata') {
@@ -71,7 +71,7 @@ Write-Output '[ok] OCR language packs staged'
 # The English catalog is a build product (DeployTranslations runs lrelease). Without it the
 # packaged app exposes the language setting but can never honour it -- the portable folder and
 # the installer both would ship a Chinese-only binary while claiming the UI is bilingual.
-# The language packs land next to the executable (that is where Ui::Language looks for them),
+# The language packs land next to the executable (that is where Gui::Language looks for them),
 # not under the build root -- pointing at build\release\translations would silently ship a
 # package that can never switch language.
 $translations = Join-Path 'build' 'release\bin\translations'

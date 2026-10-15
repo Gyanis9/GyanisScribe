@@ -17,7 +17,7 @@
 #include "App/ImageFetcher.h"
 #include "App/CommandLine.h"
 #include "App/TrayController.h"
-#include "Ui/Toast.h"
+#include "Gui/Controls/Toast.h"
 
 #include <QObject>
 
@@ -94,12 +94,12 @@ namespace GyanisScribe::Settings
     class SettingsStore;
 } // namespace GyanisScribe::Settings
 
-namespace GyanisScribe::Ui
+namespace GyanisScribe::Gui
 {
     class IconProvider;
     class ThemeManager;
     class Toast;
-} // namespace GyanisScribe::Ui
+} // namespace GyanisScribe::Gui
 
 namespace GyanisScribe::App
 {
@@ -260,13 +260,13 @@ namespace GyanisScribe::App
          * @brief 主题管理器
          * @return 控制器创建的那一个，界面从这里取当前生效的色板与图标描边色
          */
-        [[nodiscard]] GyanisScribe::Ui::ThemeManager &theme() const noexcept;
+        [[nodiscard]] GyanisScribe::Gui::ThemeManager &theme() const noexcept;
 
         /**
          * @brief 图标供给器
          * @return 全应用共用的那一个，描边色已跟着主题接好
          */
-        [[nodiscard]] GyanisScribe::Ui::IconProvider &icons() const noexcept;
+        [[nodiscard]] GyanisScribe::Gui::IconProvider &icons() const noexcept;
 
     Q_SIGNALS:
         /**
@@ -537,7 +537,7 @@ namespace GyanisScribe::App
         void handleOcrFailed(const Base::Error &error);
 
         /// 给用户看的一条提示：有气泡就用气泡，没有（例如起不来托盘的那类环境）就落日志
-        void notifyUser(const QString &message, GyanisScribe::Ui::ToastKind kind);
+        void notifyUser(const QString &message, GyanisScribe::Gui::ToastKind kind);
 
         /**
          * @brief 去把一条图片地址取回来并贴到屏上
@@ -598,8 +598,8 @@ namespace GyanisScribe::App
         std::unique_ptr<Capture::IScreenCaptureSource>       m_captureSource;                                ///< 抓帧来源
         std::unique_ptr<Capture::CaptureService>             m_capture;                                      ///< 截图编排
         std::unique_ptr<Hotkey::HotkeyManager>               m_hotkeys;                                      ///< 热键登记与触发
-        std::unique_ptr<GyanisScribe::Ui::ThemeManager>      m_theme;                                        ///< 主题档位与样式表
-        std::unique_ptr<GyanisScribe::Ui::IconProvider>      m_icons;                                        ///< 图标供给器，描边色跟主题
+        std::unique_ptr<GyanisScribe::Gui::ThemeManager>      m_theme;                                        ///< 主题档位与样式表
+        std::unique_ptr<GyanisScribe::Gui::IconProvider>      m_icons;                                        ///< 图标供给器，描边色跟主题
         std::unique_ptr<Annotation::AnnotationEngine>        m_annotation;                                   ///< 标注引擎，跨轮次保留（载入新帧会清空）
         std::unique_ptr<Annotation::AnnotationWindow>        m_annotationWindow;                             ///< 标注窗口，复用同一把工具栏
         std::unique_ptr<Pin::PinManager>                     m_pins;                                         ///< 贴图管理器
@@ -611,7 +611,7 @@ namespace GyanisScribe::App
         std::unique_ptr<Record::RecordingService>            m_recording;                                    ///< 录屏服务，一轮一个会话
         std::unique_ptr<TrayController>                      m_tray;                                         ///< 托盘图标与菜单
         std::unique_ptr<MainWindow>                          m_mainWindow;                                   ///< 设置与关于的入口
-        std::unique_ptr<GyanisScribe::Ui::Toast>             m_toast;                                        ///< 右下角提示气泡，操作结果的落地处
+        std::unique_ptr<GyanisScribe::Gui::Toast>             m_toast;                                        ///< 右下角提示气泡，操作结果的落地处
         QImage                                               m_ocrImage;                                     ///< 最近一次送去识别的图，换语言重认按它算
         QPointer<Ocr::OcrResultWindow>                       m_ocrWindow;                                    ///< 识别结果窗口，关了就重建，不拥有
         std::unique_ptr<GyanisScribe::History::HistoryStore> m_history;                                      ///< 历史清单：成品文件的索引，删记录不删文件

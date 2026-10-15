@@ -13,7 +13,7 @@
 #include "History/HistoryStore.h"
 #include "History/HistoryTypes.h"
 
-#include "Ui/Toast.h"
+#include "Gui/Controls/Toast.h"
 
 #include <QStringList>
 #include <QVector>
@@ -26,10 +26,10 @@ class QLineEdit;
 class QListWidget;
 class QComboBox;
 
-namespace GyanisScribe::Ui
+namespace GyanisScribe::Gui
 {
     class IconProvider;
-} // namespace GyanisScribe::Ui
+} // namespace GyanisScribe::Gui
 
 namespace GyanisScribe::History
 {
@@ -85,7 +85,7 @@ namespace GyanisScribe::History
          * @param parent 父控件
          * @note 主题不进构造：列表配色全走 QSS，这里没有需要现取的主题色，多接一个引用就是死字段
          */
-        HistoryView(HistoryStore &store, const HistoryRetentionPolicy &policy, Ui::IconProvider &icons, QWidget *parent = nullptr);
+        HistoryView(HistoryStore &store, const HistoryRetentionPolicy &policy, Gui::IconProvider &icons, QWidget *parent = nullptr);
 
         /**
          * @brief 重读清单并按当前条件重填列表
@@ -146,7 +146,7 @@ namespace GyanisScribe::History
          * @param message 中文正文
          * @param kind 语义种类
          */
-        void messageForUser(const QString &message, Ui::ToastKind kind);
+        void messageForUser(const QString &message, Gui::ToastKind kind);
 
     private:
         /// 按当前搜索词与类别重填列表，不动 m_entries
@@ -160,7 +160,7 @@ namespace GyanisScribe::History
 
         HistoryStore          &m_store;            ///< 历史清单
         HistoryRetentionPolicy m_policy;           ///< 读清单时用的保留策略
-        Ui::IconProvider      &m_icons;            ///< 图标供给器
+        Gui::IconProvider      &m_icons;            ///< 图标供给器
         QVector<HistoryEntry>  m_entries;          ///< 本次读到的全量记录，时间倒序
         QLineEdit             *m_search = nullptr; ///< 搜索框
         QComboBox             *m_filter = nullptr; ///< 类别筛选下拉

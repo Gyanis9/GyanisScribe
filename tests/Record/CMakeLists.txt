@@ -9,7 +9,7 @@ target_link_libraries(TestRecord PRIVATE
         Record
         Capture
         Core
-        Ui
+        Gui
         GTest::gtest
         GTest::gtest_main
         Qt6::Gui
@@ -31,7 +31,7 @@ target_link_libraries(TestRecordingService PRIVATE
         Record
         Capture
         Core
-        Ui
+        Gui
         GTest::gtest
         GTest::gtest_main
         Qt6::Gui

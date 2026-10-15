@@ -1,8 +1,8 @@
 #include "Pick/ColorPickerOverlay.h"
 
 #include "Base/Text.h"
-#include "Ui/DesignTokens.h"
-#include "Ui/ThemeManager.h"
+#include "Gui/Theme/DesignTokens.h"
+#include "Gui/Theme/ThemeManager.h"
 
 #include <QCursor>
 #include <QKeyEvent>
@@ -34,7 +34,7 @@ namespace
 namespace GyanisScribe::Pick
 {
     ColorPickerOverlay::ColorPickerOverlay(const Base::CapturedImage &frame, const QRect &screenGeometry, const ColorFormat format, const HexCasing casing,
-                                           const MagnifierView view, const Ui::ThemeManager &theme, QWidget *parent) :
+                                           const MagnifierView view, const Gui::ThemeManager &theme, QWidget *parent) :
         QWidget(parent), m_frame(frame), m_screenGeometry(screenGeometry), m_format(format), m_hexCasing(casing), m_magnifierView(view), m_theme(theme), m_cursor(QCursor::pos())
     {
         // 遮罩盖住整块屏幕，坐标一律用屏幕坐标：逻辑坐标与冻帧像素之间靠 framePixelFor 换算

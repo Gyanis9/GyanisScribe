@@ -22,12 +22,12 @@
 #include "Settings/SettingsKeys.h"
 #include "Hotkey/HotkeyCombination.h"
 #include "Settings/SettingsStore.h"
-#include "Ui/AppShortcuts.h"
-#include "Ui/DesignTokens.h"
-#include "Ui/HotkeyEdit.h"
-#include "Ui/IconProvider.h"
-#include "Ui/Language.h"
-#include "Ui/ThemeManager.h"
+#include "Gui/Controls/AppShortcuts.h"
+#include "Gui/Theme/DesignTokens.h"
+#include "Gui/Controls/HotkeyEdit.h"
+#include "Gui/Resources/IconProvider.h"
+#include "Gui/Theme/Language.h"
+#include "Gui/Theme/ThemeManager.h"
 
 #include <gtest/gtest.h>
 
@@ -74,9 +74,9 @@ namespace
     using GyanisScribe::App::pageChoices;
     using GyanisScribe::History::HistoryStore;
     using GyanisScribe::Settings::SettingsStore;
-    using GyanisScribe::Ui::AppLanguage;
-    using GyanisScribe::Ui::IconProvider;
-    using GyanisScribe::Ui::ThemeManager;
+    using GyanisScribe::Gui::AppLanguage;
+    using GyanisScribe::Gui::IconProvider;
+    using GyanisScribe::Gui::ThemeManager;
 
     std::unique_ptr<QApplication> application;
 
@@ -803,8 +803,8 @@ namespace
         makeWindow();
         m_window->open(MainWindowPage::Hotkey);
 
-        GyanisScribe::Ui::HotkeyEdit *captureEdit = nullptr;
-        for (auto *candidate: m_window->findChildren<GyanisScribe::Ui::HotkeyEdit *>())
+        GyanisScribe::Gui::HotkeyEdit *captureEdit = nullptr;
+        for (auto *candidate: m_window->findChildren<GyanisScribe::Gui::HotkeyEdit *>())
         {
             if (candidate->accessibleName() == QStringLiteral("截图"))
             {
@@ -1025,7 +1025,7 @@ namespace
         AnnotationToolbar toolbar{*m_store, *m_icons};
         EXPECT_EQ(width->currentData().toInt(), toolbar.currentWidth());
         EXPECT_EQ(font->currentData().toInt(), toolbar.currentFontSize());
-        EXPECT_EQ(toolbar.currentWidth(), GyanisScribe::Ui::kAnnotationWidths[GyanisScribe::Ui::kDefaultAnnotationWidthStep]);
+        EXPECT_EQ(toolbar.currentWidth(), GyanisScribe::Gui::kAnnotationWidths[GyanisScribe::Gui::kDefaultAnnotationWidthStep]);
     }
 
     /**
@@ -1042,7 +1042,7 @@ namespace
         m_window->open(MainWindowPage::Annotation);
         const auto *width = qobject_cast<QComboBox *>(controlInCurrentPage("默认线宽"));
         ASSERT_NE(width, nullptr);
-        EXPECT_EQ(width->currentData().toInt(), GyanisScribe::Ui::kAnnotationWidths[GyanisScribe::Ui::kDefaultAnnotationWidthStep]);
+        EXPECT_EQ(width->currentData().toInt(), GyanisScribe::Gui::kAnnotationWidths[GyanisScribe::Gui::kDefaultAnnotationWidthStep]);
 
         AnnotationToolbar toolbar{*m_store, *m_icons};
         EXPECT_EQ(toolbar.currentWidth(), width->currentData().toInt()) << "设置页与工具栏对同一个坏值给出了两档";
@@ -1051,7 +1051,7 @@ namespace
     }
 
     /**
-     * @brief 钉住界面语言这一行写的是 Ui/Language 词表里的 token
+     * @brief 钉住界面语言这一行写的是 Gui/Theme/Language 词表里的 token
      * @details 存中文标签的话下次启动读不出来（parseAppLanguage 认 zh/en），
      *          语言切换就成了「看着生效、重启回到原样」。
      */
@@ -1067,7 +1067,7 @@ namespace
         const auto reopened = makeStore();
         const auto stored   = reopened->stringValue(GyanisScribe::Settings::kUiLanguage, QString{});
         EXPECT_EQ(stored, QStringLiteral("en"));
-        const auto parsed = GyanisScribe::Ui::parseAppLanguage(stored.toStdString());
+        const auto parsed = GyanisScribe::Gui::parseAppLanguage(stored.toStdString());
         ASSERT_TRUE(static_cast<bool>(parsed));
         EXPECT_EQ(*parsed, AppLanguage::English);
     }
@@ -1142,11 +1142,11 @@ namespace
 
         QStringList                                notified;
         QObject                                    receiver;
-        std::optional<GyanisScribe::Ui::ToastKind> kind;
+        std::optional<GyanisScribe::Gui::ToastKind> kind;
         QString                                    toast;
         QObject::connect(m_store.get(), &GyanisScribe::Settings::ISettingsStore::valueChanged, &receiver, [&notified](const QString &key) { notified << key; });
         QObject::connect(m_window.get(), &MainWindow::messageForUser, &receiver,
-                         [&toast, &kind](const QString &message, const GyanisScribe::Ui::ToastKind received)
+                         [&toast, &kind](const QString &message, const GyanisScribe::Gui::ToastKind received)
                          {
                              toast = message;
                              kind  = received;
@@ -1166,7 +1166,7 @@ namespace
         EXPECT_EQ(m_store->stringValue(GyanisScribe::Settings::kOcrLanguage, QString{}), QStringLiteral("eng"));
         EXPECT_TRUE(notified.contains(QStringLiteral("History/MaximumEntries"))) << "导入没发变更通知：订阅热键与主题的模块会停在旧值";
         ASSERT_TRUE(kind.has_value()) << "导入没落一条气泡提示";
-        EXPECT_EQ(*kind, GyanisScribe::Ui::ToastKind::Success);
+        EXPECT_EQ(*kind, GyanisScribe::Gui::ToastKind::Success);
         EXPECT_TRUE(toast.contains(QStringLiteral("已导入"))) << toast.toStdString();
         EXPECT_TRUE(toast.contains(QStringLiteral("重启"))) << toast.toStdString() << "提示里要写明哪些改动还要重启";
     }
@@ -1190,10 +1190,10 @@ namespace
         makeWindow();
 
         QObject                                    receiver;
-        std::optional<GyanisScribe::Ui::ToastKind> kind;
+        std::optional<GyanisScribe::Gui::ToastKind> kind;
         QString                                    toast;
         QObject::connect(m_window.get(), &MainWindow::messageForUser, &receiver,
-                         [&toast, &kind](const QString &message, const GyanisScribe::Ui::ToastKind received)
+                         [&toast, &kind](const QString &message, const GyanisScribe::Gui::ToastKind received)
                          {
                              toast = message;
                              kind  = received;
@@ -1201,7 +1201,7 @@ namespace
 
         m_window->importSettingsFromFile(bogus);
         ASSERT_TRUE(kind.has_value()) << "坏文件走掉了却没给任何提示";
-        EXPECT_EQ(*kind, GyanisScribe::Ui::ToastKind::Danger) << toast.toStdString();
+        EXPECT_EQ(*kind, GyanisScribe::Gui::ToastKind::Danger) << toast.toStdString();
         EXPECT_NE(toast.indexOf(QStringLiteral("JSON")), -1) << "拒绝要指名是形状不对：" << toast.toStdString();
         EXPECT_EQ(m_store->intValue(GyanisScribe::Settings::kHistoryMaximumEntries, -1), 42) << "被拒的导入动了已有配置";
     }
@@ -1401,7 +1401,7 @@ TEST_F(MainWindowFixture, IconsReResolveWhenTheThemeChangesLive)
     const auto navKeyBefore    = list->item(0)->icon().cacheKey();
     const auto buttonKeyBefore = exportButton->icon().cacheKey();
 
-    ASSERT_TRUE(m_theme->setTheme(GyanisScribe::Ui::ThemeKind::Dark).has_value());
+    ASSERT_TRUE(m_theme->setTheme(GyanisScribe::Gui::ThemeKind::Dark).has_value());
 
     EXPECT_NE(list->item(0)->icon().cacheKey(), navKeyBefore) << "换主题后导航行的图标没重取：描边色停在旧档";
     EXPECT_NE(exportButton->icon().cacheKey(), buttonKeyBefore) << "换主题后按钮图标没重取：走的是 setIcon 而不是 applyIcon，名字没记在控件上";
@@ -1496,8 +1496,8 @@ TEST_F(MainWindowFixture, HotkeyEntriesFollowTheGlobalHotkeyCapability)
 
     const auto globalRows = [this]
     {
-        std::vector<GyanisScribe::Ui::HotkeyEdit *> rows;
-        for (auto *edit: m_window->findChildren<GyanisScribe::Ui::HotkeyEdit *>())
+        std::vector<GyanisScribe::Gui::HotkeyEdit *> rows;
+        for (auto *edit: m_window->findChildren<GyanisScribe::Gui::HotkeyEdit *>())
         {
             if (edit->boundKey().starts_with("Hotkey/"))
             {
@@ -1538,8 +1538,8 @@ TEST_F(MainWindowFixture, InWindowShortcutRowsIgnoreTheHotkeyCapabilityAndAccept
 {
     const auto collect = [this]
     {
-        std::tuple<std::vector<GyanisScribe::Ui::HotkeyEdit *>, GyanisScribe::Ui::HotkeyEdit *> found{{}, nullptr};
-        for (auto *edit: m_window->findChildren<GyanisScribe::Ui::HotkeyEdit *>())
+        std::tuple<std::vector<GyanisScribe::Gui::HotkeyEdit *>, GyanisScribe::Gui::HotkeyEdit *> found{{}, nullptr};
+        for (auto *edit: m_window->findChildren<GyanisScribe::Gui::HotkeyEdit *>())
         {
             if (edit->boundKey().starts_with("Hotkey/"))
             {
@@ -1558,7 +1558,7 @@ TEST_F(MainWindowFixture, InWindowShortcutRowsIgnoreTheHotkeyCapabilityAndAccept
     makeWindow(false);
     m_window->open(MainWindowPage::Hotkey);
     const auto [inWindow, globalRow] = collect();
-    ASSERT_EQ(inWindow.size(), GyanisScribe::Ui::appShortcutEntries().size()) << "清册里每一档都该在这一页上有一行";
+    ASSERT_EQ(inWindow.size(), GyanisScribe::Gui::appShortcutEntries().size()) << "清册里每一档都该在这一页上有一行";
     ASSERT_NE(globalRow, nullptr) << "这一页上没有全局那一排，对照的那半条判据就没接线";
 
     for (auto *edit: inWindow)
@@ -1606,9 +1606,9 @@ TEST_F(MainWindowFixture, InWindowShortcutRowsAreGroupedUnderFamilyHeadings)
     m_window->open(MainWindowPage::Hotkey);
 
     std::set<QString> families;
-    for (const auto &entry: GyanisScribe::Ui::appShortcutEntries())
+    for (const auto &entry: GyanisScribe::Gui::appShortcutEntries())
     {
-        const auto *name = GyanisScribe::Ui::appShortcutFamilyName(entry.token).data();
+        const auto *name = GyanisScribe::Gui::appShortcutFamilyName(entry.token).data();
         ASSERT_NE(nullptr, name);
         families.insert(GyanisScribe::Base::uiText(name));
     }
@@ -1758,11 +1758,11 @@ TEST_F(MainWindowFixture, PaletteFileRoundTripsThroughTheTwoMethods)
     makeWindow();
     // 色板那一格与那两个按钮都在标注页：不先切页就找不到控件
     m_window->open(MainWindowPage::Annotation);
-    std::optional<GyanisScribe::Ui::ToastKind> kind;
+    std::optional<GyanisScribe::Gui::ToastKind> kind;
     QStringList                                messages;
     QObject                                    receiver;
     QObject::connect(m_window.get(), &MainWindow::messageForUser, &receiver,
-                     [&messages, &kind](const QString &message, const GyanisScribe::Ui::ToastKind sent)
+                     [&messages, &kind](const QString &message, const GyanisScribe::Gui::ToastKind sent)
                      {
                          messages << message;
                          kind = sent;
@@ -1792,7 +1792,7 @@ TEST_F(MainWindowFixture, PaletteFileRoundTripsThroughTheTwoMethods)
 
     m_window->importPaletteFromFile(incomingPath);
     ASSERT_TRUE(kind.has_value());
-    EXPECT_EQ(*kind, GyanisScribe::Ui::ToastKind::Success) << messages.join(QStringLiteral(" / ")).toStdString();
+    EXPECT_EQ(*kind, GyanisScribe::Gui::ToastKind::Success) << messages.join(QStringLiteral(" / ")).toStdString();
 
     closeWindowAndFlush();
     const QStringList replaced{QStringLiteral("#010203"), QStringLiteral("#040506"), QStringLiteral("#070809")};
@@ -1808,11 +1808,11 @@ TEST_F(MainWindowFixture, FailedPaletteImportKeepsTheOldRow)
 {
     makeWindow();
     m_window->open(MainWindowPage::Annotation);
-    std::optional<GyanisScribe::Ui::ToastKind> kinds;
+    std::optional<GyanisScribe::Gui::ToastKind> kinds;
     QStringList                                messages;
     QObject                                    receiver;
     QObject::connect(m_window.get(), &MainWindow::messageForUser, &receiver,
-                     [&messages, &kinds](const QString &message, const GyanisScribe::Ui::ToastKind sent)
+                     [&messages, &kinds](const QString &message, const GyanisScribe::Gui::ToastKind sent)
                      {
                          messages << message;
                          kinds = sent;
@@ -1827,7 +1827,7 @@ TEST_F(MainWindowFixture, FailedPaletteImportKeepsTheOldRow)
     m_window->importPaletteFromFile(QString::fromStdWString((m_directory / "missing.txt").wstring()));
     EXPECT_FALSE(messages.isEmpty()) << "读不到文件也要说一句，不然就成了「点了没反应」";
     ASSERT_TRUE(kinds.has_value());
-    EXPECT_EQ(*kinds, GyanisScribe::Ui::ToastKind::Danger);
+    EXPECT_EQ(*kinds, GyanisScribe::Gui::ToastKind::Danger);
 
     const auto brokenPath = QString::fromStdWString((m_directory / "broken.txt").wstring());
     QFile      broken{brokenPath};
@@ -1851,8 +1851,8 @@ TEST_F(MainWindowFixture, CustomHotkeyRowWritesItsOwnKey)
     makeWindow();
     m_window->open(MainWindowPage::Hotkey);
 
-    GyanisScribe::Ui::HotkeyEdit *edit = nullptr;
-    for (auto *candidate: m_window->findChildren<GyanisScribe::Ui::HotkeyEdit *>())
+    GyanisScribe::Gui::HotkeyEdit *edit = nullptr;
+    for (auto *candidate: m_window->findChildren<GyanisScribe::Gui::HotkeyEdit *>())
     {
         if (candidate->accessibleName() == QStringLiteral("整屏截图"))
         {
@@ -1877,8 +1877,8 @@ TEST_F(MainWindowFixture, UnbindRemovesTheCustomHotkeyEntry)
     makeWindow();
     m_window->open(MainWindowPage::Hotkey);
 
-    GyanisScribe::Ui::HotkeyEdit *edit = nullptr;
-    for (auto *candidate: m_window->findChildren<GyanisScribe::Ui::HotkeyEdit *>())
+    GyanisScribe::Gui::HotkeyEdit *edit = nullptr;
+    for (auto *candidate: m_window->findChildren<GyanisScribe::Gui::HotkeyEdit *>())
     {
         if (candidate->accessibleName() == QStringLiteral("整屏截图"))
         {
