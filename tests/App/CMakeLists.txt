@@ -141,3 +141,25 @@ add_dependencies(TestAppController DeployQtRuntime)
 # 这一组会碰贴图布局缓存、未保存归档目录与系统剪贴板（快速保存那一条会写剪贴板）：
 # 与 TestModuleFlow 同拿那两把锁——并行跑时一组清的正是另一组在读的。
 gtest_discover_tests(TestAppController PROPERTIES RESOURCE_LOCK "pinLayoutCache\;clipboardShared")
+
+# 文档出图工具：离屏起一份真主窗口逐页拍 PNG（README「界面一览」用）。
+# 与 CrashProbe 同一条理由不是产品的一部分：不进安装包、不挂产品入口，只给文档出图。
+add_executable(UiShotTool
+        UiShotTool.cpp)
+
+target_link_libraries(UiShotTool PRIVATE
+        App
+        History
+        Platform
+        Settings
+        Ui
+        Core
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Widgets)
+
+if (MSVC)
+    target_compile_options(UiShotTool PRIVATE /W4 /WX)
+endif ()
+
+add_dependencies(UiShotTool DeployQtRuntime)
