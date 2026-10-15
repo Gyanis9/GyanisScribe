@@ -1360,3 +1360,27 @@ TEST_F(AnnotationWindowFixture, LayerShortcutsReachTheEngine)
     pressKeyOn(*window, Qt::Key_Down, Qt::ControlModifier | Qt::ShiftModifier);
     EXPECT_EQ(centerColor(), QColor(0, 0, 255)) << "Ctrl+Shift+↓ 没把选中的那条下移一层";
 }
+
+/**
+ * @brief 换工具会按新尺寸把工具栏重摆一次：变宽之后仍以选区为中心
+ * @details 可见段随工具收放（矩形档只剩填充/圆角/线型）。宽度 Qt 自己会跟着布局走，
+ *          位置不会——这条钉的是 contextLayoutChanged 那条接线独有的产物。期望值不重算
+ *          placeToolbar（重算与实现同源会成同义反复），用居中不变式：宽了 Δ，x 该左移 Δ/2。
+ */
+TEST_F(AnnotationWindowFixture, SwitchingToolsReplacesTheToolbarAgainstTheSelection)
+{
+    auto window = makeWindow();
+    // 选区摆在屏幕中间：两侧都不贴边，重新居中的位移才出得来（贴边时被 clamp 吃掉了）
+    window->startAnnotation(makeCanvas({200, 100}), QRect{0, 0, 1920, 1080}, QRect{800, 400, 320, 200});
+    ASSERT_TRUE(window->isVisible());
+
+    auto      &toolbar = window->toolbar();
+    const auto before  = toolbar.geometry();
+    EXPECT_EQ(before.width(), toolbar.sizeHint().width()) << "开局那一次摆放就该用当时的 sizeHint";
+
+    toolbar.setActiveTool(ToolKind::Text);
+    const auto after = toolbar.geometry();
+    EXPECT_EQ(after.width(), toolbar.sizeHint().width()) << "宽度没跟上新尺寸";
+    EXPECT_NE(after.width(), before.width()) << "文字档该比矩形档宽，这条判据的前提没成立";
+    EXPECT_NEAR(after.x(), before.x() - (after.width() - before.width()) / 2.0, 1.0) << "收放后没有按选区重新居中：x " << before.x() << " -> " << after.x();
+}

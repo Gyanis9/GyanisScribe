@@ -104,6 +104,12 @@ QToolButton:disabled {
     border-color: transparent;
 }
 
+/* ---- 标注工具栏的按钮：一排最多五十几件控件，最小尺寸比全局那档各收 2px，宽度省上百像素 ---- */
+QWidget#AnnotationToolbar QToolButton {
+    min-width: 26px;
+    min-height: 26px;
+}
+
 /* ---- 输入类：描边比分隔线重一档，好让「能填的」一眼分得出 ---- */
 QLineEdit, QComboBox, QSpinBox {
     background-color: #FFFFFF;

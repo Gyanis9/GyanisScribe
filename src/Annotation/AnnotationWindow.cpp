@@ -124,6 +124,9 @@ namespace GyanisScribe::Annotation
         // 贴图上直接标注那一处共用同一个桥，将来加新参数不会出现「这边接了那边漏了」
         m_toolbarBridge = std::make_unique<AnnotationToolbarBridge>(*m_toolbar, engine, this);
 
+        // 可见段收放让工具栏尺寸变了就重摆一次：收窄后还钉在旧位置会偏出选区中心
+        QObject::connect(m_toolbar.get(), &AnnotationToolbar::contextLayoutChanged, this, [this] { placeToolbarForSelection(); });
+
         // 四个动作按钮与快捷键汇到同一个出口：谁按的都走 deliver，界面不需要知道来源
         QObject::connect(m_toolbarBridge.get(), &AnnotationToolbarBridge::copyRequested, this, [this] { deliver(ShortcutAction::Copy); });
         QObject::connect(m_toolbarBridge.get(), &AnnotationToolbarBridge::saveRequested, this, [this] { deliver(ShortcutAction::Save); });
@@ -138,6 +141,9 @@ namespace GyanisScribe::Annotation
         // 记下这一轮抓的是哪块屏、哪块区域：刷新截图（F5）要对着同一块地方重抓
         m_refreshScreenName = captured.screenName;
         m_refreshRegion     = captured.logicalRegion;
+        // 摆放依据也记下来：切工具会收放可见段、尺寸跟着变，重摆必须用同一份选区与可用区
+        m_placedScreenAvailable = screenAvailable;
+        m_placedSelection       = QRect{selection.topLeft(), captured.logicalSize};
 
         // 载入会发 canvasChanged，桥在那里把按钮态与当前工具一起回灌，这里不用再同步一次
         m_engine.loadCanvas(captured);
@@ -150,17 +156,27 @@ namespace GyanisScribe::Annotation
         activateWindow();
 
         m_toolbar->adjustSize();
-        if (const auto placed = placeToolbar(screenAvailable, m_toolbar->sizeHint(), QRect{selection.topLeft(), captured.logicalSize}); placed)
-        {
-            m_toolbar->setGeometry(placed->frame);
-        } else
-        {
-            // 摆不出来的情况只在入参退化时出现，这里给一个不至于让工具栏消失的兜底位置
-            Core::Logger::warning(std::format("工具栏摆放失败，改用窗口下沿兜底：{}", placed.error().message));
-            m_toolbar->move(selection.left(), selection.bottom() + 1);
-        }
+        placeToolbarForSelection();
         m_toolbar->show();
         m_toolbar->raise();
+    }
+
+    void AnnotationWindow::placeToolbarForSelection()
+    {
+        // 还没摆过第一轮（构造期或上一轮遗留的回灌）不动：此刻选区与可用区还是空矩形
+        if (!m_placedSelection.isValid() || !m_placedScreenAvailable.isValid())
+        {
+            return;
+        }
+        const auto placed = placeToolbar(m_placedScreenAvailable, m_toolbar->sizeHint(), m_placedSelection);
+        if (placed)
+        {
+            m_toolbar->setGeometry(placed->frame);
+            return;
+        }
+        // 摆不出来的情况只在入参退化时出现，这里给一个不至于让工具栏消失的兜底位置
+        Core::Logger::warning(std::format("工具栏摆放失败，改用窗口下沿兜底：{}", placed.error().message));
+        m_toolbar->move(m_placedSelection.left(), m_placedSelection.bottom() + 1);
     }
 
     AnnotationToolbar &AnnotationWindow::toolbar() const noexcept

@@ -177,13 +177,18 @@ namespace GyanisScribe::Annotation
         /// 把标注结果交出去：先收窗口与工具栏，再发对应信号，避免成品图里带上界面
         void deliver(ShortcutAction action);
 
-        IAnnotationEngine                       &m_engine;            ///< 标注引擎，不拥有
-        Settings::ISettingsStore                &m_settings;          ///< 字母键位的读端（Ui/AppShortcuts.h 那份清册），不拥有
-        std::unique_ptr<AnnotationToolbar>       m_toolbar;           ///< 浮层工具栏，本窗口拥有
-        std::unique_ptr<AnnotationToolbarBridge> m_toolbarBridge;     ///< 工具栏与引擎的接线：样式、工具、撤销重做都在桥里
-        AnnotationView                          *m_view = nullptr;    ///< 画布视图，父对象是本窗口
-        QString                                  m_refreshScreenName; ///< 本轮截图来自哪块屏（F5 重抓用它）
-        QRect                                    m_refreshRegion;     ///< 本轮截的是屏内哪块区域（F5 重抓用它）
+        /// 按记下的选区与屏幕可用区把工具栏摆一次；可见段收放（contextLayoutChanged）后也走这一处
+        void placeToolbarForSelection();
+
+        IAnnotationEngine                       &m_engine;                ///< 标注引擎，不拥有
+        Settings::ISettingsStore                &m_settings;              ///< 字母键位的读端（Ui/AppShortcuts.h 那份清册），不拥有
+        std::unique_ptr<AnnotationToolbar>       m_toolbar;               ///< 浮层工具栏，本窗口拥有
+        std::unique_ptr<AnnotationToolbarBridge> m_toolbarBridge;         ///< 工具栏与引擎的接线：样式、工具、撤销重做都在桥里
+        AnnotationView                          *m_view = nullptr;        ///< 画布视图，父对象是本窗口
+        QString                                  m_refreshScreenName;     ///< 本轮截图来自哪块屏（F5 重抓用它）
+        QRect                                    m_refreshRegion;         ///< 本轮截的是屏内哪块区域（F5 重抓用它）
+        QRect                                    m_placedScreenAvailable; ///< 本轮摆放用的屏幕可用区：可见段变化后重摆要同一份
+        QRect                                    m_placedSelection;       ///< 本轮摆放参照的选区：可见段变化后重摆要同一份
     };
 
 } // namespace GyanisScribe::Annotation

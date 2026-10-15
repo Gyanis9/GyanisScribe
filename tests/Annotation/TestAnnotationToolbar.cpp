@@ -29,12 +29,14 @@
 #include <QWheelEvent>
 #include <QWidget>
 
+#include <algorithm>
 #include <array>
 #include <cstdlib>
 #include <filesystem>
 #include <format>
 #include <memory>
 #include <string_view>
+#include <tuple>
 #include <vector>
 
 using GyanisScribe::Annotation::AnnotationToolbar;
@@ -230,7 +232,129 @@ namespace
             QWheelEvent   event{local, global, QPoint{}, QPoint{0, angleDeltaY}, Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false};
             QApplication::sendEvent(&target, &event);
         }
+
+        /// 按「本名或本名：后缀」找参数控件：开关类按钮随状态改名（「填充：实心」这类），精确名会漏
+        [[nodiscard]] static QWidget *namedControl(const AnnotationToolbar &toolbar, const std::string_view base)
+        {
+            const auto expected = text(base);
+            for (auto *widget: toolbar.findChildren<QWidget *>())
+            {
+                const auto name = widget->accessibleName();
+                if (name == expected || name.startsWith(expected + QStringLiteral("：")))
+                {
+                    return widget;
+                }
+            }
+            return nullptr;
+        }
     };
+
+
+    /**
+     * @brief 参数控件跟着工具收放：每一档只留画出来的东西用得上的那几枚
+     * @details 全常显会把工具栏撑到两千多像素（实测 2374，见 docs/UiAuditPlan.md 的 B 条），
+     *          窄屏上右端的动作按钮整排落在屏外。下面这份表是照 AnnotationShape.h 各字段注释
+     *          （「仅 X 用」）独立抄来的期望值：与实现里那份名单交叉核对，改了一处漏了另一处才会红。
+     */
+    TEST_F(ToolbarFixture, ContextSectionsFollowTheActiveTool)
+    {
+        SignalLog log;
+        auto      toolbar = makeToolbarLaidOut(log);
+
+        // 全部参数控件的名单（按无障碍名）；每档工具下，表里没写「看得见」的都该收起来
+        const std::array<std::string_view, 22> allControls = {"线宽",       "填充",     "圆角",     "线型",     "双向箭头", "反向箭头", "椭圆形状", "马赛克粒度",
+                                                              "高亮透明度", "高亮加宽", "箭头样式", "箭头大小", "字体",     "字号",     "粗体",     "斜体",
+                                                              "描边",       "描边色",   "描边粗细", "计数组",   "背景",     "底板色"};
+        struct Expectation
+        {
+            ToolKind                      tool;
+            std::vector<std::string_view> visible;
+        };
+        const std::vector<Expectation> expectations = {
+                {ToolKind::Rectangle, {"线宽", "填充", "圆角", "线型"}},
+                {ToolKind::Ellipse, {"线宽", "填充", "线型"}},
+                {ToolKind::Arrow, {"线宽", "线型", "双向箭头", "反向箭头", "箭头样式", "箭头大小"}},
+                {ToolKind::Pen, {"线宽", "线型"}},
+                {ToolKind::Highlight, {"线宽", "椭圆形状", "高亮透明度", "高亮加宽"}},
+                {ToolKind::Mosaic, {"椭圆形状", "马赛克粒度"}},
+                {ToolKind::Text, {"字体", "字号", "粗体", "斜体", "描边", "背景"}},
+                {ToolKind::Number, {"字号", "计数组"}},
+                {ToolKind::Line, {"线宽", "线型"}},
+                {ToolKind::Blur, {"椭圆形状"}},
+                {ToolKind::Eraser, {"线宽", "椭圆形状"}},
+                {ToolKind::Polyline, {"线宽", "线型"}},
+                {ToolKind::Magnifier, {"线宽", "线型"}},
+        };
+
+        for (const auto &entry: expectations)
+        {
+            toolbar->setActiveTool(entry.tool);
+            for (const auto &name: allControls)
+            {
+                auto *control = namedControl(*toolbar, name);
+                ASSERT_NE(control, nullptr) << "工具栏上没有「" << std::string{name} << "」这一枚，名单已经过期";
+                const auto wanted = std::find(entry.visible.begin(), entry.visible.end(), name) != entry.visible.end();
+                EXPECT_EQ(!control->isHidden(), wanted) << "工具序号 " << static_cast<int>(entry.tool) << " 下「" << std::string{name} << "」的显隐与表不同解";
+            }
+        }
+    }
+
+    /**
+     * @brief 文字工具的两个开关把各自的子档带出来：描边开门才摆描边色/描边粗细、底板开门才摆底板色
+     * @details 子档改不了「关着的主开关」的任何东西，常摆着只会让人点了以为没反应；
+     *          收放在 setTextOutline/setTextBackground 里与按钮态一起走，这条钉的是那条接线。
+     */
+    TEST_F(ToolbarFixture, TextSwitchesRevealTheirSubOptions)
+    {
+        SignalLog log;
+        auto      toolbar = makeToolbarLaidOut(log);
+        toolbar->setActiveTool(ToolKind::Text);
+
+        auto *strokeColor  = namedControl(*toolbar, "描边色");
+        auto *outlineWidth = namedControl(*toolbar, "描边粗细");
+        auto *plateColor   = namedControl(*toolbar, "底板色");
+        ASSERT_NE(strokeColor, nullptr);
+        ASSERT_NE(outlineWidth, nullptr);
+        ASSERT_NE(plateColor, nullptr);
+        EXPECT_TRUE(strokeColor->isHidden()) << "描边关着，描边色却摆着";
+        EXPECT_TRUE(outlineWidth->isHidden());
+        EXPECT_TRUE(plateColor->isHidden()) << "底板关着，底板色却摆着";
+
+        toolbar->setTextOutline(true);
+        EXPECT_FALSE(strokeColor->isHidden()) << "描边开了，描边色该跟着出来";
+        EXPECT_FALSE(outlineWidth->isHidden());
+        EXPECT_TRUE(plateColor->isHidden()) << "底板还关着，别把底板色也带出来";
+
+        toolbar->setTextBackground(true);
+        EXPECT_FALSE(plateColor->isHidden()) << "底板开了，底板色该跟着出来";
+
+        toolbar->setTextOutline(false);
+        EXPECT_TRUE(strokeColor->isHidden()) << "描边又关了，子档该收回去";
+        EXPECT_TRUE(outlineWidth->isHidden());
+    }
+
+    /**
+     * @brief 每一档工具、连文字那两个开关全开，工具栏都收得进 1920 的桌面宽度
+     * @details 收敛前实测 2374px（见 docs/UiAuditPlan.md 的 B 条），1920 屏上右端动作按钮整排出屏；
+     *          收了两刀：可见段按工具收放（上面两条）＋按钮最小尺寸与行距各收一档（QSS 与布局）。
+     *          这里钉「1920 桌面上整条可见」这条能一眼看到的契约；带样式表实测最宽 1670（文字+描边+底板）。
+     */
+    TEST_F(ToolbarFixture, EveryToolStaysWithinTheCommonScreenWidth)
+    {
+        SignalLog log;
+        auto      toolbar = makeToolbarLaidOut(log);
+
+        for (const auto &entry: GyanisScribe::Annotation::kToolTable)
+        {
+            toolbar->setActiveTool(std::get<0>(entry));
+            EXPECT_LE(toolbar->sizeHint().width(), 1920) << "「" << std::string{std::get<2>(entry)} << "」档工具栏宽度 " << toolbar->sizeHint().width();
+        }
+
+        toolbar->setActiveTool(ToolKind::Text);
+        toolbar->setTextOutline(true);
+        toolbar->setTextBackground(true);
+        EXPECT_LE(toolbar->sizeHint().width(), 1920) << "文字全开档（最宽一档）也放不下 1920 桌面：" << toolbar->sizeHint().width();
+    }
 
 
     /**

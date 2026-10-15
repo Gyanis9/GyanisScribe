@@ -104,7 +104,9 @@ namespace GyanisScribe::Annotation
         auto *layout = new QHBoxLayout{this};
         m_layout     = layout;
         layout->setContentsMargins(Ui::kSpacingSmall, Ui::kSpacingSmall, Ui::kSpacingSmall, Ui::kSpacingSmall);
-        layout->setSpacing(Ui::kSpacingSmall);
+        // 间距取最小那一档而不是行距：这一排最多五十几件控件，8px 的缝累计两百多像素，
+        // 按钮自己带 2px 内边距做视觉留白就够了（按钮最小尺寸也按同一理由在样式表里收了一档）
+        layout->setSpacing(Ui::kSpacingTiny);
 
         // 工具组：互斥交给 QButtonGroup，这样鼠标点击与 setActiveTool 走的是同一套按钮状态
         auto *toolGroup = new QButtonGroup{this};
@@ -131,6 +133,9 @@ namespace GyanisScribe::Annotation
                                  // 先把这一格形状记着的颜色换过来再发信号：宿主在 toolChanged 里读 currentColor()，
                                  // 顺序反过来它会拿到上一个形状的颜色
                                  adoptColorForTool(kind);
+                                 // 可见段先在本地收好再发信号：宿主收到 toolChanged 与 contextLayoutChanged 时
+                                 // 读到的 sizeHint 必须已经是新的一档
+                                 updateContextVisibility();
                                  emit toolChanged(kind);
                              });
             layout->addWidget(button);
@@ -376,6 +381,7 @@ namespace GyanisScribe::Annotation
         m_stateIsInitial = false;
         m_currentColor   = m_palette.front();
         updateOpacityHint();
+        updateContextVisibility();
     }
 
     int AnnotationToolbar::currentFillStyle() const
@@ -644,6 +650,8 @@ namespace GyanisScribe::Annotation
             m_outlineButton->setToolTip(label);
             m_outlineButton->setAccessibleName(label);
         }
+        // 描边色与描边粗细跟着主开关收放：开着才有得改
+        updateContextVisibility();
         emit textOutlineChanged(enabled);
     }
 
@@ -740,6 +748,8 @@ namespace GyanisScribe::Annotation
             m_backgroundButton->setToolTip(label);
             m_backgroundButton->setAccessibleName(label);
         }
+        // 底板色跟着主开关收放：垫板开着才有得改
+        updateContextVisibility();
         emit textBackgroundChanged(enabled);
     }
 
@@ -797,7 +807,62 @@ namespace GyanisScribe::Annotation
             m_toolButtons[index]->setChecked(true);
             // 记下当前工具：不记的话用户之后再点这一个会被上面的守卫吞掉，看起来像「按钮失灵」
             m_activeTool = toolKind;
+            updateContextVisibility();
             return;
+        }
+    }
+
+    void AnnotationToolbar::updateContextVisibility()
+    {
+        // 可适用性以 AnnotationShape.h 各字段注释（「仅 X 用」）为准；加一档工具/参数要在这里对一次表
+        const auto toolIs = [this](const std::initializer_list<ToolKind> kinds) { return std::find(kinds.begin(), kinds.end(), m_activeTool) != kinds.end(); };
+        // 「变没变」按显隐标记比而不是 isVisible()：构造期根窗口还没显示，isVisible() 恒假，
+        // 拿它比会把每一枚都记成「刚变过」，于是每回都发一次没意义的 contextLayoutChanged
+        bool       changed = false;
+        const auto place   = [&changed](QWidget *widget, const bool visible)
+        {
+            if (widget == nullptr || visible == !widget->isHidden())
+            {
+                return;
+            }
+            widget->setVisible(visible);
+            changed = true;
+        };
+
+        const bool text         = toolIs({ToolKind::Text});
+        const bool outlineOn    = m_outlineButton != nullptr && m_outlineButton->isChecked();
+        const bool backgroundOn = m_backgroundButton != nullptr && m_backgroundButton->isChecked();
+
+        // 线宽：描一条笔迹的那些工具用得上（橡皮擦按它算擦除宽度、高亮乘上加宽倍数）；马赛克/高斯模糊/
+        // 文字/序号/放大镜不吃它，藏起来
+        place(m_widthSlider, toolIs({ToolKind::Rectangle, ToolKind::Ellipse, ToolKind::Arrow, ToolKind::Pen, ToolKind::Highlight, ToolKind::Line, ToolKind::Polyline,
+                                     ToolKind::Magnifier, ToolKind::Eraser}));
+        place(m_fillButton, toolIs({ToolKind::Rectangle, ToolKind::Ellipse}));
+        place(m_roundedRectButton, toolIs({ToolKind::Rectangle}));
+        place(m_lineStyleButton, toolIs({ToolKind::Rectangle, ToolKind::Ellipse, ToolKind::Arrow, ToolKind::Pen, ToolKind::Line, ToolKind::Polyline, ToolKind::Magnifier}));
+        place(m_doubleArrowButton, toolIs({ToolKind::Arrow}));
+        place(m_reversedArrowButton, toolIs({ToolKind::Arrow}));
+        place(m_arrowHeadStyleButton, toolIs({ToolKind::Arrow}));
+        place(m_arrowHeadScaleButton, toolIs({ToolKind::Arrow}));
+        place(m_ellipticalButton, toolIs({ToolKind::Mosaic, ToolKind::Blur, ToolKind::Highlight, ToolKind::Eraser}));
+        place(m_mosaicGrainButton, toolIs({ToolKind::Mosaic}));
+        place(m_highlightAlphaButton, toolIs({ToolKind::Highlight}));
+        place(m_highlightWidthButton, toolIs({ToolKind::Highlight}));
+        place(m_fontCombo, text);
+        place(m_fontSizeCombo, text || toolIs({ToolKind::Number}));
+        place(m_boldButton, text);
+        place(m_italicButton, text);
+        place(m_outlineButton, text);
+        // 描边色与描边粗细是描边开关的子档、底板色是底板开关的子档：主开关关着时它们改不了任何东西
+        place(m_strokeColorButton, text && outlineOn);
+        place(m_outlineWidthButton, text && outlineOn);
+        place(m_backgroundButton, text);
+        place(m_plateColorButton, text && backgroundOn);
+        place(m_numberGroupButton, toolIs({ToolKind::Number}));
+
+        if (changed)
+        {
+            emit contextLayoutChanged();
         }
     }
 

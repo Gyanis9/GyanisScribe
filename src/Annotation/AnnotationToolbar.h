@@ -94,6 +94,7 @@ namespace GyanisScribe::Annotation
          * @brief 外部（键盘快捷键）切了工具时同步按钮态
          * @param toolKind 当前生效的工具
          * @note 引擎才是真源：快捷键改了工具必须回灌到这里，否则按钮亮着一个、画的却是另一个
+         * @note 顺带按这一档重收可见段：可见集合真的变了才会发 contextLayoutChanged
          */
         void setActiveTool(ToolKind toolKind);
 
@@ -283,6 +284,8 @@ namespace GyanisScribe::Annotation
     signals:
         /// 用户切了工具
         void toolChanged(ToolKind toolKind);
+        /// 当前工具换过之后可见段与尺寸跟着变了：宿主据此把工具栏重摆一次（保持贴着选区）
+        void contextLayoutChanged();
         /// 用户切了颜色
         void colorChanged(const QColor &color);
         /// 用户改了线宽
@@ -428,6 +431,15 @@ namespace GyanisScribe::Annotation
 
         /// 按清册现读的键位重排工具按钮的提示；设置页换过键要能重算，所以不并进建按钮那一段
         void refreshToolKeyHints();
+
+        /**
+         * @brief 按当前工具与描边/底板两个开关收放中段的参数控件
+         * @details 全部常显会把工具栏撑到 2374px 宽（实测，见 docs/UiAuditPlan.md），窄屏上右端的
+         *          动作按钮整排落在屏外；这里按「画出来的东西用得上」收敛——可适用性以 AnnotationShape.h
+         *          各字段注释（「仅 X 用」）为准，描边色/描边粗细是描边开关的子档、底板色是底板开关的子档。
+         *          可见集合真的变了才发 contextLayoutChanged：宿主拿它重摆，每回都发会让工具栏一直挪。
+         */
+        void updateContextVisibility();
 
         Settings::ISettingsStore  &m_settings;                  ///< 最近使用颜色的读写去处
         std::vector<QColor>        m_recentColors;              ///< 最近用过的自定义颜色，首位最新

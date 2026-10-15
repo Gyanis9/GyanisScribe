@@ -179,6 +179,9 @@ namespace GyanisScribe::Pin
          */
         void startAnnotation();
 
+        /// 按当前贴图位置把标注工具栏摆一次；工具切换收放可见段（contextLayoutChanged）后也走这一处
+        void placeAnnotateToolbar();
+
         /**
          * @brief 结束标注：把画上的图形烘进这张贴图并退出标注模式
          * @details 成品走引擎的 exportImage（与标注窗保存的是同一条路）；旋转角与贴边收起态

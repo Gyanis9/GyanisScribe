@@ -1015,6 +1015,8 @@ namespace GyanisScribe::Pin
             // 与标注窗同一条摆法：工具栏是独立浮窗，摆在贴图旁边
             m_annotateToolbar->setParent(this, Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
             m_annotateBridge = std::make_unique<Annotation::AnnotationToolbarBridge>(*m_annotateToolbar, *m_annotateEngine, this);
+            // 可见段收放让工具栏尺寸变了就重摆一次，钉子仍贴着贴图中心
+            QObject::connect(m_annotateToolbar, &Annotation::AnnotationToolbar::contextLayoutChanged, this, [this] { placeAnnotateToolbar(); });
 
             // 四个动作按钮都是「收工并做这件事」：与标注窗里「按下即交出去」同一条形状
             QObject::connect(m_annotateBridge.get(), &Annotation::AnnotationToolbarBridge::copyRequested, this,
@@ -1047,23 +1049,32 @@ namespace GyanisScribe::Pin
         }
 
         m_annotateToolbar->adjustSize();
-        const auto *screen    = QGuiApplication::screenAt(globalRect().center());
-        const auto  available = screen != nullptr ? screen->availableGeometry() : QRect{};
-        if (const auto placed = Annotation::placeToolbar(available, m_annotateToolbar->sizeHint(), globalRect()); placed)
-        {
-            m_annotateToolbar->setGeometry(placed->frame);
-        } else
-        {
-            // 与标注窗同一条兜底：摆不出来时别让工具栏消失
-            Core::Logger::warning(std::format("标注工具栏摆放失败，改用贴图下沿兜底：{}", placed.error().message));
-            m_annotateToolbar->move(globalRect().left(), globalRect().bottom() + 1);
-        }
+        placeAnnotateToolbar();
         m_annotateToolbar->show();
         m_annotateToolbar->raise();
 
         m_annotating = true;
         update();
         Core::Logger::info(std::format("贴图进入直接标注：{}×{} 逻辑像素", m_logicalSize.width(), m_logicalSize.height()));
+    }
+
+    void PinWindow::placeAnnotateToolbar()
+    {
+        if (m_annotateToolbar == nullptr)
+        {
+            return;
+        }
+        const auto *screen    = QGuiApplication::screenAt(globalRect().center());
+        const auto  available = screen != nullptr ? screen->availableGeometry() : QRect{};
+        const auto  placed    = Annotation::placeToolbar(available, m_annotateToolbar->sizeHint(), globalRect());
+        if (placed)
+        {
+            m_annotateToolbar->setGeometry(placed->frame);
+            return;
+        }
+        // 与标注窗同一条兜底：摆不出来时别让工具栏消失
+        Core::Logger::warning(std::format("标注工具栏摆放失败，改用贴图下沿兜底：{}", placed.error().message));
+        m_annotateToolbar->move(globalRect().left(), globalRect().bottom() + 1);
     }
 
     void PinWindow::finishAnnotation()
