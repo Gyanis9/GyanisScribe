@@ -1,5 +1,5 @@
-# 跨平台构建的硬要求：容器里的 shell 脚本绝不能带 CRLF，否则 bash 会拿 \r 当命令的一部分。
-# 主机是 Windows 且 core.autocrlf=true，因此这里按类型钉死，不依赖每个人本地 git 配置。
+# 主机是 Windows 且 core.autocrlf=true，换行符按文件类型钉死，不依赖每个人本地 git 配置。
+# （将来若加回 shell 脚本：绝不能带 CRLF，bash 会拿 \r 当命令的一部分。）
 * text=auto
 
 *.sh  text eol=lf

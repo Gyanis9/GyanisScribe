@@ -49,7 +49,7 @@
 （`zh-Hans` 对 `zh-Hans-CN` 成立），词表仍是 `supportedOcrLanguageTags()` 那一份，界面不接触映射。
 
 - 编译条件：`if (WIN32 AND MSVC)`，宏 `GYANISSCRIBE_HAS_WINRT_OCR` 发 PUBLIC（用例要知道这一档有没有它，
-  与 `GYANISSCRIBE_HAS_TESSERACT` 同一条理由）。容器那一档这个文件不进编译列表。
+  与 `GYANISSCRIBE_HAS_TESSERACT` 同一条理由）。
 - C++/WinRT 投影头 vendor 在 `Vendor/WinRt/winrt/`（62 个头、3.7 MB，MIT），生成与裁剪办法：
   `G:\Windows Kits\10\bin\10.0.26100.0\x64\cppwinrt.exe -input 10.0.26100.0+ -base -output <目录>`，
   然后从 `base.h`、`Windows.Foundation.h`、`Windows.Foundation.Collections.h`、`Windows.Globalization.h`、

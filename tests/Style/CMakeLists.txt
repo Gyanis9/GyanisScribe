@@ -1,6 +1,6 @@
 # 一条不编译源码的风格门禁：扫 src 里的 Qt 占位符写法。
 # 混用 {} 与 %1 在编译期什么都看不出来，运行时也只留一条 QString::arg 告警，
-# 界面上却会把「选择{}的目录」原样摆给用户——Linux 容器里第一次就是这样撞出来的。
+# 界面上却会把「选择{}的目录」原样摆给用户。
 add_test(NAME Style.QtStringPlaceholders
         COMMAND ${CMAKE_COMMAND}
         -DPLACEHOLDER_SCAN_ROOT=${CMAKE_SOURCE_DIR}/src
@@ -20,7 +20,7 @@ if (PYTHON3_EXECUTABLE)
 
     # 源码约定门禁：路径不许走窄串（Windows 上码页装不下的字会当场抛 std::system_error，
     # 抛出点还在承诺返回 expected 的通道里），以及按枚举分派的开关要覆盖每个值
-    # （MSVC 与容器里 GCC 的预设都不报这种漏项，漏一支就是菜单上一条按了没反应的项）。
+    # （MSVC 不报这种漏项，漏一支就是菜单上一条按了没反应的项）。
     add_test(NAME Style.SourceConventions
             COMMAND ${PYTHON3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/check-source-conventions.py
                     --scan-root ${CMAKE_SOURCE_DIR}/src)

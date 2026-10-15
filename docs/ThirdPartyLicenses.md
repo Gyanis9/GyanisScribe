@@ -7,7 +7,7 @@
 
 | 组件 | 版本 | 许可证 | 用途 | 分发方式 |
 | --- | --- | --- | --- | --- |
-| Qt 6（Core / Gui / Widgets / Concurrent / Svg / Network） | 主机 6.11.1，容器 6.4.2 | LGPL-3.0（或商业授权） | 界面、图像、SVG 图标、把一次文字识别搬到工作线程、本地套接字 | 动态链接 DLL / .so |
+| Qt 6（Core / Gui / Widgets / Concurrent / Svg / Network） | 6.11.1 | LGPL-3.0（或商业授权） | 界面、图像、SVG 图标、把一次文字识别搬到工作线程、本地套接字 | 动态链接 DLL |
 | spdlog | conandata.yml 里那份 | MIT | 日志 | 静态或动态由 Conan 决定 |
 | GoogleTest | conandata.yml 里那份 | BSD-3-Clause | 单元测试 | 只进测试可执行体，不随产品分发 |
 | Tesseract | 5.5.2（仅 Release 档） | Apache-2.0 | 文字识别后端 | 动态链接 |
@@ -46,15 +46,6 @@ Windows 上这一节只在选用 Tesseract 时才用得到：系统识别走 Win
 
 这样做的代价是包体积（ffmpeg 单文件约百 MB 级）。换来的是产品在任何一台干净机器上
 装完就能录屏，且用户换 FFmpeg 版本不影响本程序构建。
-
-## 容器与开发工具（不进产品包）
-
-| 组件 | 许可证 | 说明 |
-| --- | --- | --- |
-| Ubuntu 24.04 基础镜像 | 各自包的许可证 | 仅用于 Linux 侧构建与验证 |
-| GCC 13 / Clang 18 | GPL-3 / Apache-2.0 with LLVM-exception | 编译器不随产品分发 |
-| CMake、Ninja、Conan 2 | BSD-3 / Apache-2.0 等 | 构建工具 |
-| Xvfb、Noto Sans CJK | MIT / OFL-1.1 | 容器内无界面测试与中文字体；Noto 只在容器里，Windows 包用系统字体 |
 
 ## 图标与美术资源
 

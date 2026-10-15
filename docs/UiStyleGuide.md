@@ -138,8 +138,7 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
   200% 屏上圈的视觉大小与 100% 屏一致；主圈 `kCursorHighlightColor` 用主色，衬圈
   `kCursorHighlightHaloColor` 半透明白，压在深色画面上才看得出。
 - 界面缩放不在代码里覆盖：本仓不调 `QApplication::setAttribute` 一类的高 DPI 开关，Qt 6 默认按
-  系统缩放走，每块屏按自己的 `devicePixelRatio` 报几何。没有 X 的容器里读数环境是 offscreen
-  平台（`scripts/container/env.sh`）。
+  系统缩放走，每块屏按自己的 `devicePixelRatio` 报几何。离屏的读数环境走 Qt 的 offscreen 平台插件。
 - **这一节里的倍比结论是在 dpr 1.0 那块屏上加合成倍比验出来的**：几何与像素的换算按
   `devicePixelRatio` 的分母判，用例把 1.5、2.0 这类倍比直接喂进被测函数（`windowSizeFor`、
   裁框与高亮半径那几处），所以「200% 屏上圈的视觉大小与 100% 一致」说的是算法形状。

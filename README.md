@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/C%2B%2B-C%2B%2B23-00599C?logo=c%2B%2B&logoColor=white" alt="C++23">
   <img src="https://img.shields.io/badge/Qt-6.11-41CD52?logo=qt&logoColor=black" alt="Qt 6.11">
   <img src="https://img.shields.io/badge/CMake-3.28%20%2B%20Conan%202-064F5C" alt="CMake and Conan">
-  <img src="https://img.shields.io/badge/Platform-Windows%20%C2%B7%20Linux-informational" alt="Windows and Linux">
+  <img src="https://img.shields.io/badge/Platform-Windows-informational" alt="Windows">
   <img src="https://img.shields.io/badge/version-0.0.1-lightgrey" alt="version 0.0.1">
 </p>
 
@@ -15,7 +15,7 @@ C++23 + Qt 6 Widgets 实现，界面、图标与代码全部为本项目原创�
 - 一个可执行体加随包摆好的 Qt 运行时，绿色目录即可运行；同时产出 zip 与 NSIS 安装器
 - 浅色、深色、高对比度三套主题，另有跟随系统；高 DPI 与多屏；中英双语界面
 - 录屏编码走 `ffmpeg` 子进程，**随包分发、不链接**：装完即用，也不让 GPL 传染本体
-- 每个模块都有单测，另有一条跨模块流程用例；四条验证线（本机两档 + 容器两档）都是必建必测的门禁
+- 每个模块都有单测，另有一条跨模块流程用例；两条验证线（本机 debug 与 release）都是必建必测的门禁
 
 ## 目录
 
@@ -67,8 +67,7 @@ HSL / HSV / HSI / 十进制六种写法之间轮换），卡像素边界时不�
 存成文件时写哪一种格式也可选：PNG（无损，默认档）、JPG、WebP，另有一格质量管着后两种
 （「直接存成文件」与贴图右键的「保存」都吃这一档；退出前存的那份恢复数据永远是 PNG，
 拿有损档存恢复数据会让桌面每次重启都糊一点，而没人要求过这种事）。图像编码器是插件，
-这台机器写不出来的那一档不会摆进设置页——容器那份 Qt 就没有 WebP 的写插件，摆出来只会
-让人选一次、失败一次。
+这台机器写不出来的那一档不会摆进设置页——摆出来只会让人选一次、失败一次。
 「鼠标指针」那一格（默认不含）把指针画进成品：形状取的是系统此刻正在画的那一枚，配色与 DPI 都跟着系统走，
 按指针的热点落位，尖端指哪儿就在哪儿。区域截图是先画进整帧再裁选区，选区里带不带指针就看它落没落在里面。
 滚动长截图那一趟刻意不带——按帧接图会把一枚指针复制成一串。非 Windows 平台取不到系统指针的形状，
@@ -371,7 +370,7 @@ GyanisScribe.exe --selftest # 把启动路径跑完就退：日志接管成功�
 第一次运行要知道的三件事：
 
 1. 程序常驻托盘，关掉主窗口不会退出进程，退出只走托盘菜单那一条路。托盘装不上的环境没有这条路
-   （无托盘的桌面、容器里）：主窗口会在启动时自己现身，关掉它就是退出程序。
+   （无托盘的桌面）：主窗口会在启动时自己现身，关掉它就是退出程序。
 2. 全局热键默认 `Ctrl+Alt+A`（截图）、`Ctrl+Alt+R`（录屏，再按一次停止并保存）、`Ctrl+Alt+O`（识别）、
    `Ctrl+Alt+P`（取色），撞了就撞了——设置里可改，改完立刻重新登记，不用重启。
    哪一条没能登记上，启动时会在气泡里连它各自的原因一起说出来，不留「按了没反应」让人猜。
@@ -532,12 +531,12 @@ python scripts/check-translation-catalog.py --generate   # 把新增文案补进
 | CMake | ≥ 3.28 | — |
 | Ninja | — | 生成器 |
 | Conan | 2 | 依赖：spdlog 1.17.0、GoogleTest 1.17.0，Release 档另领 Tesseract 5.5.2 |
-| Qt | 6.11，含 Core / Gui / Widgets / Concurrent / Svg / Network | Linux 容器里用发行版的 6.4 也可编 |
+| Qt | 6.11，含 Core / Gui / Widgets / Concurrent / Svg / Network | 用 msvc2022_64 套件 |
 | Python | 3 | 两条静态门禁脚本 |
 | ffmpeg | 官方静态构建（gyan.dev） | 打包时需要：`scripts/FetchFfmpeg.ps1` 按钉好的 URL + SHA-256 取进 `Vendor/Ffmpeg/`；开发期 PATH 上有一份也行 |
 | NSIS | — | 可选：只在打安装器时需要 |
 
-机器相关的路径只出现在 `scripts/WindowsBuild.bat` 与 `scripts/container/env.sh` 里，工程不写死绝对路径。
+机器相关的路径只出现在 `scripts/WindowsBuild.bat` 里，工程不写死绝对路径。
 
 ### Windows
 
@@ -552,38 +551,10 @@ build\release\bin\GyanisScribe.exe --selftest
 只有 `release` 额外领 Tesseract——上游 leptonica 的 Debug 包与其 `cpp_info` 对不上，
 细节与撤除判据见 [docs/OcrBackends.md](docs/OcrBackends.md)。
 
-`CMakePresets.json` 里的档位名不分平台：`debug` / `release` / `asan` / `tsan` / `coverage` 五档，
-两侧共用同一份文件。用哪套工具链不由预设名决定，而由进入构建的那一步决定：
-Windows 侧 `WindowsBuild.bat` 先调 `vcvars64`，容器侧 `env.sh` 设 `CC/CXX=gcc-13`，
-Conan 再按各自平台的 profile（`Conan/Profiles/WindowsMsvc2022` 与 `LinuxGcc13`）指过去。
+`CMakePresets.json` 里只有 `debug` 与 `release` 两档；工具链由进入构建的那一步决定：
+`WindowsBuild.bat` 先调 `vcvars64`，Conan 再按主机 profile（`Conan/Profiles/WindowsMsvc2022`）指过去。
 
-### Linux（容器内验证）
 
-```bash
-docker build -f Dockerfile.dev -t gyanisscribe-dev .
-docker run --rm -it -v "$PWD:/work" gyanisscribe-dev bash
-```
-
-容器内五件一键脚本（`scripts/container/`）：
-
-```bash
-scripts/container/init.sh          # 补包并体检工具链（幂等，可 SKIP_APT=1 只体检）
-scripts/container/build.sh debug   # 也支持 release / asan / tsan / coverage
-scripts/container/test.sh debug    # 有 Xvfb 就在虚拟屏下跑，界面用例才算真被跑到
-scripts/container/sanitize.sh      # ASan(+UBSan)；tsan 档另说，见下方边界
-scripts/container/coverage.sh 55   # gcovr 汇总，阈值不过就红（判定由 --fail-under-line 做）
-```
-
-sanitizer 的运行期参数（含 LSan 那张只放过系统库字体缓存的抑制表）统一在 `env.sh` 里导出，
-所以 `sanitize.sh` 与「`build.sh asan` + `test.sh asan`」两条入口给的是同一个结果。
-
-要跑 TSan 这一档得放开 seccomp：这台内核（WSL2 6.18）下 libtsan 必须关 ASLR 才起得来进程，
-而 `setarch -R` 走的 `personality` 被 Docker 默认 seccomp 档拒绝（实测 EPERM）。
-脚本会在建之前先探这一点并当场报红，不会把「没跑」当成「跑过」：
-
-```bash
-docker run --rm -it --security-opt seccomp=unconfined -v "$PWD:/work" gyanisscribe-dev bash
-```
 
 ## 打包
 
@@ -614,8 +585,8 @@ VC++ 运行库也随包带：可执行体导入 `MSVCP140.dll` 与 `VCRUNTIME140
 
 ## 验证与质量门禁
 
-自 2026-10-12 起按用户指示门禁收窄为**只跑本机 Debug 一档**：下表第一行与最后两行分别是
-Release 与容器两档最后一次实测的读数，不作为本批的读数；本批只统计 Debug 那一行。
+自 2026-10-12 起按用户指示门禁收窄为**只跑本机 Debug 一档**：下表第一行是 Release 最后一次
+实测的读数，不作为本批的读数；本批只统计 Debug 那一行。
 下表实测的是 `a0e1801`（图标整套重绘）那一份工作树：
 从 `01dd0d1` 起共 105 个提交，除批一至批三（缺陷整改、标注工具字母快捷键、贴图窗键盘与双击）外还有这些——
 剪贴板里的图与纯文本/颜色贴成图、放大镜常驻与读数写法轮换、文件名模板、检查更新与开机自启、
@@ -633,17 +604,10 @@ Release 与容器两档最后一次实测的读数，不作为本批的读数；
 贴图裁剪（拖框落定，动图不进这一档）、「复制为文件」（剪贴板里交一条本地路径）、贴图多选（Ctrl+点选，整组挪/缩/开关）、「只显示这一张」、贴图背景色（白板，五项预设 + 自定义）、标注线型三档（实线/虚线/点线）、标注圆角矩形、标注缩放的中心点（`Ctrl`）与等比例（`Shift`）两档、标注的椭圆形状档（马赛克/高斯模糊收进内切椭圆，高亮/橡皮擦换圆头）、文字描边色三档（自动反差/白/黑）、序号多组计数（三组各排各的号）、放大镜工具（源框那块 2 倍放大成旁边插图，右侧放不下翻左侧）、标注窗 `F5` 刷新截图（重抓这块区域换底图，标注、选中与撤销历史都留着）、选区尺寸输入（`S`）与任意长宽比锁（`A`，锁着的档跨轮次记住）、圆角截图开关与拖框三分网格、贴图右键「自定义尺寸…」（敲「宽x高」缩到精确宽，或填倍率如 `2x`、`50%`）与「窗口阴影」（围一圈投影，坐标与吸附都不动）、二维码/条形码识别（zxing-cpp 后端，认出即进剪贴板、不关窗）、全套 SVG 图标按统一画法规格重绘（24 网格、内容压 2..22、1.5 单档线宽、截图/录屏两族共用外框，规格与判据进 `docs/UiStyleGuide.md`），并修掉高 DPI 图标副本被渲成两倍大且裁半的 `IconProvider` 口径错误（`render()` 改显式给逻辑边界）、贴图方向键逐像素挪（裸按一格、`Shift` 十格，多选整组按同一位移跟上）与 `Ctrl+V` 用剪贴板内容替换这一张（图像/文本卡片/颜色卡片都能换，摆位与倍率不动，动图当场拒并给出出路）。
 `F5` 刷新这一张：重抓这张图此刻盖住的那块屏幕换上新画面——摆位、缩放、角度与透明度都不动；抓之前这一张要暂时从桌上拿走（贴图是置顶窗，不藏就会抓到「贴图的自己」，第二次起画面就冻在第一帧），抓完无论成败都摆回原样。按住不放由键盘的自动重复连着报，于是能盯着实时画面挑一帧，松手定在最后抓到的那一帧；右键「刷新这一张」是同一条路，缩到小图与动图那两档上它是灰的并写明出路（方块那块面积不是图的面积；换上的静态帧会被下一帧盖掉）。
 批一至批三新增判据 16 条（7 + 3 + 6），此后 Release 名单从 409 一路涨到 634，台账清零那天（2026-10-13）实跑 Release 775 全绿、1 条按依赖跳过（本机没有 ffmpeg，随安装包带）；Debug 名单先随二维码识别批到 677，图标重绘批再加 5 条到 682，贴图键位与内容替换批加 4 条到 686，右键「平滑缩放」档再加 2 条到 688，贴图对齐与选区逐边增缩这批再加 8 条到 696，遮罩指针档与尺寸框位置写法这批再加 6 条到 702，空白画布这条入口再加 4 条到 706，关闭与销毁分两档再加 3 条到 709，贴图边缘拖拽改大小这批再加 5 条到 714，批量保存这一族再加 3 条到 717，分组命名与删除这批再加 7 条到 724，缩略图定大小再加 4 条到 728，圆角半径可调这批再加 4 条到 732，边框与投影可调这批再加 9 条到 741，标注按形状各记各的颜色再加 3 条到 744，滚轮调标注色的不透明度再加 4 条到 748，文字描边粗细与底板色两档再加 6 条到 754，未保存的截图也进历史再加 7 条到 761，贴图透明区四档再加 6 条到 767，分组轮换顺序可自定义再加 5 条到 772，命令行的多目的地与外部命令这一批再加 21 条到 793，贴图组管理窗这批再加 14 条到 807，贴图「刷新这一张」这批再加 8 条到 815，自定义与分享色板这批再加 14 条到 829，色块拖动重排这批再加 4 条到 833，给任意功能绑全局热键这批再加 10 条到 843，界面按键能换这批再加 8 条到 851，遮罩与贴图的裸键接进清册这批再加 8 条到 859，HEX 字母大小写这批再加 5 条到 864，反向箭头这批再加 3 条到 867，放大镜视野这批再加 4 条到 871，托盘那两下鼠标这批再加 10 条到 881，尺寸单位这批再加 6 条到 887，贴图那两格边界手感这批再加 4 条到 891，透明底画布这批再加 2 条到 893，色卡可改色这批再加 4 条到 897，网页图片这批再加 6 条到 903，按程序排除窗口检测这批再加 3 条到 906，倍率与单键那两格这批再加 5 条到 911，录屏最长时长这一格再加 2 条到 913，点名另一块屏这批再加 1 条到 914，AppController 直测这批再加 8 条到 922。
-本机两档就地跑；容器两档把同一份工作树同步进 `/work/scribe13` 再跑——同步按
-`git ls-files` 加 `git ls-files -o --exclude-standard` 的清单打包，不能只跟 `git archive` 走：
-后者只装已跟踪文件，新加的 `tests/Pin/TestPinWindow.cpp` 会被丢在容器外，
-而那一条正好被已改过的 `tests/Pin/CMakeLists.txt` 指着，容器要在 generate 阶段才报「找不到源文件」，一次冷编就白烧了。
-
 | 线 | 命令 | 结果 |
 | --- | --- | --- |
 | Windows Release | `scripts\WindowsBuild.bat release` | 626 条全绿（0 失败），4 条环境门控跳过，名单共 630 条 |
 | Windows Debug | `scripts\WindowsBuild.bat debug` | 742 条全绿（0 失败），2 条跳过，名单共 744 条 |
-| 容器 ASan(+UBSan) | `scripts/container/sanitize.sh asan` | 605 条全绿（0 失败），10 条跳过，名单共 615 条 |
-| 容器覆盖率 | `scripts/container/coverage.sh 55` | 605 条全绿（0 失败），10 条跳过，名单共 615 条；行覆盖 **76.6%**（8132/10612），阈值 55%；主程序在 Xvfb 上 `--selftest` 退出码 0 |
 
 每条新判据都做过突变证伪，且红集能按改动切开：批一是七处（并步、初读、暂停键、落帧尺寸、置信度两格、文案分格，
 同文件的第二处突变在还原后单独一批做，不拿一次覆盖另一次的备份槽）；批二两处——字母不认工具打中
@@ -798,8 +762,8 @@ id 的 mergeWith 通过），「改两次、撤一次」回的是两处之前的
 才见真红。这一批的判据还当场抓到一处存量缺陷：无边界 `render()` 把 viewBox 按物理像素铺满
 画家视口、再叠一次缩放比，dpr=2 的图标一直是两倍大且右下半被裁（拿 HEAD 那版渲同一张 PNG
 三栏对照定案，旧图标同样中招），只是从没在高 DPI 档上量过。
-每批改完都复跑到全绿再进下一批；批二的字母快捷键在容器 GCC 13 下另跑过一次 ASan（本机 MSVC 绿不构成那一档的证据）。
-容器覆盖率档有过一次偶发红（`PinManagerFixture.TopmostThroughAndConcealSurviveARestart`）：根因是 TestPin
+每批改完都复跑到全绿再进下一批。
+全量跑中有过一次偶发红（`PinManagerFixture.TopmostThroughAndConcealSurviveARestart`）：根因是 TestPin
 的布局用例与 TestModuleFlow 读写同一份共享缓存目录（`cacheDirectory()/Pins`）却没挂同一把资源锁，
 一个进程刚清掉的文件正是另一个进程要读的；`tests/Pin/CMakeLists.txt` 补上 `pinLayoutCache` 之后
 这一类窗口不再存在，取证与复跑记录在那笔提交里。同一条纪律后来又拦下一类：几条借系统剪贴板
@@ -812,21 +776,20 @@ id 的 mergeWith 通过），「改两次、撤一次」回的是两处之前的
 直到用 `ctest --show-only=json-v1` 逐条读 `RESOURCE_LOCK` 属性才现形；改完转义复核到两把、
 连跑四轮全量不再复现。加锁的收尾判据从此是「当场 show-only 数一遍每把锁覆盖哪些用例」，
 不只信 CMakeLists 上写的那行。
-`asan` 与 `coverage` 两档的 `build_type` 就是 Debug，而 Debug 档不领 Tesseract（理由与撤除判据见 [docs/OcrBackends.md](docs/OcrBackends.md)）。
-本机 Debug 那一档同样少这 4 条，另多 1 条「后端没编进来」的对照——两档条数不同是这套条件编译的结果，不是漏跑。
+Debug 档不领 Tesseract（理由与撤除判据见 [docs/OcrBackends.md](docs/OcrBackends.md)）。
+本机 Debug 那一档因此少这 4 条，另多 1 条「后端没编进来」的对照——两档条数不同是这套条件编译的结果，不是漏跑。
 本机这一档跳过的四条全是要真 `ffmpeg` 的端到端（编码 2、设备枚举 1、取声 1）：这个工作树没跑
 `scripts/FetchFfmpeg.ps1`，`Vendor/Ffmpeg/` 不在，所以四条一起跳——打过包的本机只跳取声那一条。
-跳过的都是环境门控用例，本机两档与容器各跳哪些是清楚的：
+跳过的都是环境门控用例，本机两档各跳哪些是清楚的：
 
 | 跳过的用例 | 为什么跳 |
 | --- | --- |
-| `LanguageFixture.BuiltEnglishPackTranslatesKnownString` | 容器那份 Qt 6.4 没有 lrelease，出不了真实语言包，只能在有包的一档成立 |
-| `OcrFixture.ReportsMissingBackendSeparatelyFromMissingLanguagePacks`（仅本机 Debug） | 这台机装了系统识别语言包，工厂先问 Windows 就拿到了后端，走不到「语言包在、后端没编进来」那一格；同一格由容器那两档跑 |
+| `OcrFixture.ReportsMissingBackendSeparatelyFromMissingLanguagePacks`（仅本机 Debug） | 这台机装了系统识别语言包，工厂先问 Windows 就拿到了后端，走不到「语言包在、后端没编进来」那一格 |
 | `FfmpegAudioCaptureEndToEnd.*`、`VideoEncoderEndToEndFixture.*`、`FfmpegAudioDevicesEndToEndFixture.*` | 要真 `ffmpeg`；取声那一条还要一路真设备 |
 | `CrashGuardEndToEnd.*` | minidump 走 Windows 的 dbghelp；Linux 侧这一格是空操作（core dump 归宿主配置） |
 | `PlatformIntegration.EnumeratedWindowSitsWhereQtPutsIt` | 「屏上有哪些窗口」只有 Windows 后端给得出；能力位为假时这一格按降级出口跳过，回绝文案由同文件另一条用例钉住 |
 | `ModuleFlowFixture.TrayEscapeHatchMakesThroughPinsClickableAgain` | 要真鼠标穿透能力才开得出「穿透中」的贴图，Linux 侧那一位为假；没有可复现的现场就跳过，不拿假现场充一条通过 |
-| `QScreenCaptureSourceFixture.GrabbedCursorShapeIsSelfConsistent`、`...CursorDrawsIntoARealFrameWithoutBreakingItsGeometry` | 要真桌面才取得到系统指针的形状；容器与离屏档拿不到就跳过，本机在指针此刻隐藏时同样跳（这一档跳过是机器的现场，不是漏跑）。掩码与合成规则不靠这两格——`CursorPixels` 那四条用自造的位平面与自造指针跑，两边都跑得到 |
+| `QScreenCaptureSourceFixture.GrabbedCursorShapeIsSelfConsistent`、`...CursorDrawsIntoARealFrameWithoutBreakingItsGeometry` | 要真桌面才取得到系统指针的形状；离屏档拿不到就跳过，本机在指针此刻隐藏时同样跳（这一档跳过是机器的现场，不是漏跑）。掩码与合成规则不靠这两格——`CursorPixels` 那四条用自造的位平面与自造指针跑，两边都跑得到 |
 
 `scripts\WindowsBuild.bat` 在 `Vendor/Ffmpeg/ffmpeg.exe` 就位时会自动把它交给 `GYANISSCRIBE_FFMPEG`，
 所以打过一次包的本机跑门禁时，编码与设备枚举这两条端到端是真的在跑（跳过的只剩取声那一条）。
@@ -865,7 +828,7 @@ src/App         应用对象、核心控制器、托盘、主窗口、单实例�
 Vendor/WinRt    Windows 系统识别用的 C++/WinRT 投影头（MIT，生成与裁剪办法见 docs/OcrBackends.md）
 tests/          逐级镜像 src 的目录结构；另有一条跨模块流程入口 tests/App/TestModuleFlow.cpp
 Resources/Icons 87 张原创 SVG 图标（未接线的几枚记在路线图「图标接线」那一条）
-scripts/        构建、打包、容器一键脚本与静态门禁
+scripts/        构建、打包脚本与静态门禁
 docs/           需求、识别后端、第三方许可证、界面样式说明
 ```
 
@@ -890,7 +853,7 @@ docs/           需求、识别后端、第三方许可证、界面样式说明
 | 截图延迟 < 100ms | 中位 30–31ms（10 次采样，min 26 / max 35）——**这是换采集原语之前的读数**，抓帧那一格现在已是 6.0ms，整条截图链待按新原语重测 | 独立探针走产品同一条路（`QScreen::grabWindow` → `toImage` → `convertToFormat(ARGB32_Premultiplied)`），丢掉首轮的一次性开销，两次独立运行给出 30 与 31ms。机器：2560×1440、dpr 1.0、单屏、Release Qt |
 | OCR 单张 < 1s | 几十毫秒量级（640×160 的一次识别连同后端构造与 PNG 编解码，单用例计时 43ms） | ctest 的 per-test 计时；跨模块那条用 900×600 的图，337ms 里含 Qt 应用与引擎初始化 |
 | 录屏 1080p30 不掉帧、CPU 占用合理 | **没达成**：1920×1080 选区、30 帧档，十秒实测只存下 113/300 帧（≈11.2fps），最大帧间隔 148ms，这一轮进程占掉 85.7% 一个核 | 真的 `RecordingService` 在真屏幕上跑十秒，数 `frameStored` 与帧间隔；CPU 取 `GetProcessTimes` 的进程时间除以墙钟。两道墙拆开看，第一道已经换掉：抓一帧（2560×1440）原来的中位 34ms 出自 Qt 的 `grabWindow`（GDI 位图往返），换到 DXGI 桌面重复后同一台机器同一次运行实测 **6.0ms**（Qt 那一份同轮 30.5ms，各 12 次中位，量法就是 `QScreenCaptureSourceFixture.ReportsMedianGrabCostOfBothPrimitives` 这条读数用例，它不断言时间）；剩下的墙是 PNG 落盘中位 53ms/帧（约 210KB）还留在界面线程上（见[路线图](#路线图后续计划)），所以 30fps 仍差着——要达标还得把落盘那一段也交出去或换成 `rawvideo` 管道。顺一条反直觉的实测：Qt 的 PNG 压缩档不是省时间的开关，`quality=1` 要 168ms，比默认档慢三倍 |
-| 录屏成品的时长与录的那一段一致 | 6.00 秒那一轮编出来容器自报 6.12 秒；旧写法同一轮是 2.33 秒的快放 | 命令里的 `-framerate`（以及 GIF 滤镜里的 `fps=`）按「这一轮的帧数 × 1000 / 毫秒」写成有理数，不再用配置里那档目标帧率——短了的帧序列按目标帧率铺就是快放，音轨还会被 `-shortest` 截尾。端到端用例读 ffmpeg 自己报的 `Duration` 来断：三帧摊在两秒上，容器里就该写着 2.00 秒 |
+| 录屏成品的时长与录的那一段一致 | 6.00 秒那一轮编出来 ffmpeg 自报 6.12 秒；旧写法同一轮是 2.33 秒的快放 | 命令里的 `-framerate`（以及 GIF 滤镜里的 `fps=`）按「这一轮的帧数 × 1000 / 毫秒」写成有理数，不再用配置里那档目标帧率——短了的帧序列按目标帧率铺就是快放，音轨还会被 `-shortest` 截尾。端到端用例读 ffmpeg 自己报的 `Duration` 来断：三帧摊在两秒上，成品就该写着 2.00 秒 |
 | 编码前的编码器探测耗时 | 本机 1920×1080 单档实测：libx264 60ms（缺件立刻失败）、NVENC 187ms、QSV 1583ms、AMF 574ms、mpeg4 77ms；本机选中 NVENC 走的是前两档共 247ms，五档全试完是 2481ms | 三帧到 `null` 输出的探测命令，参数按真录屏尺寸、帧率与画面码率给；选中即停，只有 MP4 走这一步，GIF 不需要 |
 | 贴图拖动流畅、鼠标穿透不抢焦点 | 定性验证：拖动走 `PinTransform` 的增量换算（有用例钉数值），穿透由平台侧 `setMouseThrough` 落地 | 主观流畅度无法用断言钉；这里只承诺「没有动画在拖动的路上插队」 |
 
@@ -1138,7 +1101,7 @@ Conan 直取，许可证正文见 `licenses/Zxing-Apache-2.0.txt` 与 `docs/Thir
 只认这两种协议（放开 `file:` 就等于把「贴一条地址」变成「把这台机器上的任意文件读上来摆屏幕上」）、15 秒超时、32 MB 上限，
 按 content-type 判是不是图片，失败一律给中文可操作原因（超时与「太大」分开说，用户才知道该换网络还是换图）。
 取图是异步的：这条路只发起，成败都在两条信号上收口，界面线程不等的这 15 秒里还能干别的。
-判据用本机一个一次性 HTTP 服务端喂固定响应，不碰外网（容器与 CI 都能跑）；写它时踩回来一个老坑——
+判据用本机一个一次性 HTTP 服务端喂固定响应，不碰外网；写它时踩回来一个老坑——
 服务端抢在客户端发完请求之前就回话并断开，用例时红时绿（实测 8 次里 4 次红），改成「先读到请求头收尾的那个空行再回话」后连跑 12 次全绿。）
 
 （同日补掉**按程序排除窗口检测**：平台那一层的窗口快照原本只有句柄、标题与两块矩形，「不参与检测」这种判据
@@ -1266,8 +1229,7 @@ Conan 直取，许可证正文见 `licenses/Zxing-Apache-2.0.txt` 与 `docs/Thir
   都走 Qt 的全局线程池，认完/编完由 `QFutureWatcher` / `QFuture::then`（context 是界面线程那个对象）送回界面，
   两处都同一时间只跑一条，析构前等手上的任务跑完。
   **恢复条件**：这一处要与采集循环交接帧与状态，并发改动要有 TSan 才算判据（本机 MSVC 没有 TSan，
-  而容器里 `setarch -R` 被 Docker 默认 seccomp 拒绝），先用 `--security-opt seccomp=unconfined` 起一档、
-  证明旧写法报得出竞态，再动它。没有这一档之前把跨线程手抖写进去，只是把可复现的卡顿换成不可复现的竞态。
+  借 Docker 容器跑 TSan 的那套设施已移除），先让旧写法报得出竞态、再动它。没有这一档之前把跨线程手抖写进去，只是把可复现的卡顿换成不可复现的竞态。
 - **Linux 录屏取声**：Windows 那一路已经落地，Linux 的入口是 ALSA/Pulse，容器与本机的验证环境都没有
   可登记的音频设备，写进去就是一段没人验过的代码。现在那一侧列出设备与取声都直接给出中文降级原因。
 - **Linux 全局热键**：`Platform` 抽象下只有 Windows 后端有真登记，Linux 侧给出中文降级提示；
@@ -1301,8 +1263,8 @@ Conan 直取，许可证正文见 `licenses/Zxing-Apache-2.0.txt` 与 `docs/Thir
 
 1. 按[从源码构建](#从源码构建)跑一次本机的构建脚本——它一条命令包含配置、编译与 `ctest`，绿了才谈改动。
 2. 写完先跑 clang-format（仓库根的 `.clang-format`，`ColumnLimit: 180`），只递给源文件，别把 `CMakeLists.txt` 喂进去。
-3. 再跑对应平台的门禁：本机 `scripts\WindowsBuild.bat <preset>`；改到并发、生命周期或跨线程代码时，
-   容器两档也要跑（`sanitize.sh`、`coverage.sh`）。**本机全绿不构成并发正确性的证据**——MSVC 没有 TSan。
+3. 再跑本机门禁：`scripts\WindowsBuild.bat <preset>`。改到并发、生命周期或跨线程代码时，
+   目前没有 TSan 档可跑（随容器设施移除，恢复条件见上文路线图）——**本机全绿不构成并发正确性的证据**。
 4. 加功能要带用例，`tests/` 的目录结构逐级镜像 `src/`；每条用例说明它钉住什么，并且能红：
    把实现改回缺陷行为确认这一条会失败，再提交。
 5. 提交信息用中文写「为什么」而不是「做了什么」，一次提交只讲一件事，
@@ -1318,8 +1280,8 @@ Conan 直取，许可证正文见 `licenses/Zxing-Apache-2.0.txt` 与 `docs/Thir
 - 一切要显示给用户的文本走 `Core::uiText()`，并且同步进翻译目录（`Style.TranslationCatalog` 会拦漏项）。
 - 图标必须是原创 SVG：`viewBox="0 0 24 24"`、`currentColor`、描边 1.5 或 2、圆角端点，
   只经 `IconProvider` 加载；不下载、不引用、不复制任何现成图标库或任何现有产品的素材。
-- 零告警是硬判据：MSVC 侧每个目标都带 `/W4 /WX`；容器侧的 GCC 预设没开 `-Wall`，
-  这类编译器不报的漏项由 `Style.SourceConventions` 与用例兜住。
+- 零告警是硬判据：MSVC 侧每个目标都带 `/W4 /WX`；编译器不报的漏项
+  由 `Style.SourceConventions` 与用例兜住。
 
 ## 许可与第三方声明
 

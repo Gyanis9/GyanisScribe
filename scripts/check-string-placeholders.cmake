@@ -1,6 +1,6 @@
 # 扫源码里的 QString::arg 占位符写法：Qt 的占位符是 %1..%N，不是 std::format 的 {}。
 # 混用的症状是界面上原样显示「选择{}的目录」，而运行期只留一条 QString::arg: Argument missing
-# 的告警——Linux 容器里第一次跑起设置页就是这样撞出来的，所以把它钉成门禁而不是口头约定。
+# 的告警（第一次跑起设置页就是这样撞出来的），所以把它钉成门禁而不是口头约定。
 #
 # 用法：cmake -DPLACEHOLDER_SCAN_ROOT=<仓库>/src -P scripts/check-string-placeholders.cmake
 #       tests/Style 把它包成一条 ctest 用例（Style.QtStringPlaceholders）
