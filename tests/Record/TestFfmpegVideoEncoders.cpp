@@ -194,7 +194,7 @@ namespace
         EXPECT_TRUE(withNvenc.contains(QStringLiteral("+faststart")));
     }
 
-    // 端到端那一条要起进程：Linux 侧 QProcess 靠应用对象的 socket 通知器收 ffmpeg 的输出，
+    // 端到端那一条要起进程：QProcess 靠应用对象的 socket 通知器收 ffmpeg 的输出，
     // 而这一档不建任何窗口，QCoreApplication 就够
     char  applicationArgument[]  = "TestFfmpegVideoEncoders";
     char *applicationArguments[] = {applicationArgument, nullptr};

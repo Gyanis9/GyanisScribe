@@ -61,7 +61,7 @@ namespace GyanisScribe::App
      * @param capabilities 平台能力表，来自 IPlatformIntegration::capabilities()
      * @return 这一台机器上真能做的条目；顺序与 trayMenuEntries() 一致
      * @details 缺能力的项直接从菜单里拿掉，而不是留着让用户点出一条报错：
-     *          「截取当前窗口」在 Linux 上做不出来（要与会话协议打交道），那里就不该出现这一项
+     *          「截取当前窗口」要平台给得出前台窗口，给不出的档这一项就不该出现
      */
     [[nodiscard]] QList<TrayMenuEntry> visibleTrayMenuEntries(const Platform::PlatformCapabilities &capabilities);
 

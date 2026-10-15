@@ -20,7 +20,7 @@ namespace GyanisScribe::App
 
     /**
      * @brief 本机的实例标识名
-     * @return 由应用名拼成的固定串，Windows 走命名管道、Linux 走域套接字
+     * @return 由应用名拼成的固定串，Windows 走命名管道
      * @details 名字里带应用名而不是写死一个串：两份不同构建（比如开发版与安装版）在同机
      *          共存时不该互相把对方当成「已经有人在跑了」。
      */

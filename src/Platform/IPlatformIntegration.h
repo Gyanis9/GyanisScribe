@@ -34,10 +34,10 @@ namespace GyanisScribe::Platform
 
     /**
      * @brief 平台集成抽象
-     * @details 界面与业务模块只认识本接口；Windows API 一律关在各平台实现的文件里，
-     *          这样容器里编的是同一套头文件，能验出「核心逻辑是不是真的没依赖 Windows」。
+     * @details 界面与业务模块只认识本接口；Windows API 一律关在 Platform/Windows 的文件里，
+     *          将来接别的平台时，核心逻辑不该为它改一行。
      * @note 新增能力时同时补三份：能力表的一位、接口一个方法、以及各平台实现各一份重写。
-     *       只加接口不补 Stub 实现会让 Linux 侧编不过，那正是本层要挡住的错法。
+     *       只加接口不补实现会让那一档编不过，那正是本层要挡住的错法。
      */
     class IPlatformIntegration : public QObject
     {
@@ -120,8 +120,8 @@ namespace GyanisScribe::Platform
     /**
      * @brief 按编译目标挑选平台实现
      * @return 已就绪的集成对象，调用方持有所有权
-     * @details 判据是编译器而不是运行环境：容器里编到 Linux 的 Stub 实现，这正是跨平台隔离要的验证。
-     *          macOS 暂时没有自己的实现，落到 Stub 那一档，能力表全为假并在界面给出「本平台尚未适配」提示。
+     * @details 判据是编译器而不是运行环境：现在只有 Windows 实现，
+     *          将来接别的平台时在这一层挂各自的分支，这正是跨平台隔离要的验证。
      */
     [[nodiscard]] std::unique_ptr<IPlatformIntegration> createPlatformIntegration();
 

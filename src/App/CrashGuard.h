@@ -71,8 +71,7 @@ namespace GyanisScribe::App
      * @param applicationVersion 版本号，进文件名
      * @details Windows 用 SetUnhandledExceptionFilter + MiniDumpWriteDump；处理器里只做三件事：
      *          开文件、写转储、按 kCrashExitCode 结束进程——不写日志（日志的锁可能正被崩掉的那条线程
-     *          持有），也不走 Qt 类型。非 Windows 平台没有 dbghelp，这一格是空操作并记一条日志说明；
-     *          Linux 侧要靠 core dump，那是宿主的配置而不是本程序能决定的事。
+     *          持有），也不走 Qt 类型。
      * @note 会覆盖先前装好的异常过滤器：本程序只有这一处装，链到上游过滤器留给系统自己处理崩溃。
      */
     void installCrashDumpWriter(const std::filesystem::path &dumpDirectory, std::wstring_view applicationVersion);

@@ -88,15 +88,6 @@ namespace GyanisScribe::Record
             return;
         }
 
-#ifndef Q_OS_WIN
-        const auto unsupported = GyanisScribe::Core::Error{
-                .code    = GyanisScribe::Core::ErrorCode::PlatformUnsupported,
-                .message = GyanisScribe::Core::uiTextUtf8("这个平台不经 dshow 列音频设备（Linux 走 ALSA/Pulse，还没接）。录屏可以照录，只是带不了声音"),
-        };
-        Core::Logger::warning(unsupported.message);
-        emit failed(unsupported);
-        return;
-#else
         const auto program = locateFfmpeg();
         if (!program)
         {
@@ -117,8 +108,7 @@ namespace GyanisScribe::Record
                                                                    .message = GyanisScribe::Core::uiTextUtf8("列音频设备的那一步起不动 ffmpeg。请确认它还能运行，或重新安装")});
                          });
         m_process->start(*program, {QStringLiteral("-hide_banner"), QStringLiteral("-loglevel"), QStringLiteral("info"), QStringLiteral("-f"), QStringLiteral("dshow"),
-                                               QStringLiteral("-list_devices"), QStringLiteral("true"), QStringLiteral("-i"), QStringLiteral("dummy")});
-#endif
+                                    QStringLiteral("-list_devices"), QStringLiteral("true"), QStringLiteral("-i"), QStringLiteral("dummy")});
     }
 
     void FfmpegAudioDeviceEnumerator::handleFinished()

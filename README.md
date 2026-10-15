@@ -57,7 +57,7 @@ HSL / HSV / HSI / 十进制六种写法之间轮换），卡像素边界时不�
 它不只出现在拖框途中：悬停挑窗口、拉手柄对齐边线、平移选区时同样跟着——最需要像素级读数的正是「按下之前」那一下。
 想让它别看某些程序：设置截图页有一格「不参与窗口检测的程序」，填逗号分隔的可执行文件名（如 `chrome.exe, cmd.exe`，大小写不敏感），
 写进去的那些窗口悬停时不参与候选识别，手动框选照旧。
-平台列不出窗口时（如 Linux）退回纯手动框选，不假装这一格有；认不出界面元素时悬停只认整扇窗口，
+平台列不出窗口时退回纯手动框选，不假装这一格有；认不出界面元素时悬停只认整扇窗口，
 元素那一级的读数与层级键一并缺席。
 截完之后做什么由设置里那一档决定：默认进标注窗，也可以选复制到剪贴板、直接存成文件、
 直接贴到屏幕上或直接识别文字——这四档都不弹窗，按下去就落到成品上，
@@ -70,8 +70,7 @@ HSL / HSV / HSI / 十进制六种写法之间轮换），卡像素边界时不�
 这台机器写不出来的那一档不会摆进设置页——摆出来只会让人选一次、失败一次。
 「鼠标指针」那一格（默认不含）把指针画进成品：形状取的是系统此刻正在画的那一枚，配色与 DPI 都跟着系统走，
 按指针的热点落位，尖端指哪儿就在哪儿。区域截图是先画进整帧再裁选区，选区里带不带指针就看它落没落在里面。
-滚动长截图那一趟刻意不带——按帧接图会把一枚指针复制成一串。非 Windows 平台取不到系统指针的形状，
-开着也画不出来，只在日志里说明这次不含指针。
+滚动长截图那一趟刻意不带——按帧接图会把一枚指针复制成一串。
 遮罩里裸按 `P` 可以只翻这一轮：截菜单与悬停提示时想把箭头带上，下一张又想要干净的，为这个去设置里改两趟
 不是出路；翻过之后读数后面标出「（含指针）/（不含指针）」，看不见的模式等于没给过这一档。这一档不写回配置，
 也只活到这一次交付——托盘、热键、命令行那几路没有遮罩参与，照旧读设置里那一格。滚动长截图那一轮压根不提供
@@ -377,9 +376,6 @@ GyanisScribe.exe --selftest # 把启动路径跑完就退：日志接管成功�
 3. 录屏用的 `ffmpeg` 与识别语言包都在安装包里，程序目录里就能看见；不需要再装任何东西，
    也不需要往哪个目录放 `traineddata`。
 
-Linux 侧当前是「可构建、可运行、能力降级」：抓帧、标注、贴图、识别可用，
-全局热键与录屏取声没有平台后端——热键页那八行会按能力位灰掉并在页首写明改了也不会生效，
-取声那两格给出中文降级原因，都不会静默失败；托盘同样没有，所以主窗口在启动时就现身。
 
 ## 快捷键
 
@@ -391,7 +387,7 @@ Linux 侧当前是「可构建、可运行、能力降级」：抓帧、标注�
 | 录屏 / 停止并保存 | `Ctrl+Alt+R` | 同一个键进出 |
 | 文字识别 | `Ctrl+Alt+O` | 开一次框选，截完直接进结果窗、不弹标注窗；贴图右键、历史那页与标注窗上的「识别」吃的才是已经有的那一张图 |
 | 屏幕取色 | `Ctrl+Alt+P` | 冻帧 + 放大镜 |
-| 截取当前窗口 | 托盘菜单 | Linux 拿不出窗口句柄，这一项在菜单里根本不出现 |
+| 截取当前窗口 | 托盘菜单 | 平台给出前台窗口；拿不出的平台这一项不出现 |
 | 滚动长截图 | `Ctrl+Alt+L` | 框住区域后自己按节拍抓帧拼接，控制条上按完成或取消 |
 | 快速保存 | `Ctrl+Alt+S` | 不走设置里那一档：截完直接存成文件并同时交剪贴板，一句提示收尾 |
 | 收起 / 摆回全部贴图 | `Ctrl+Alt+H` | 整桌贴图一起从屏上收走，再按一次原样摆回；收着不等于关掉，张数与摆位都不动 |
@@ -504,7 +500,7 @@ Enter / Esc / 方向键与带 `Ctrl` 的那几组不给换：它们是系统惯�
 
 | 用途 | 位置 |
 | --- | --- |
-| 配置 | Windows 注册表 `HKCU\Software\Gyanis\GyanisScribe`；Linux `~/.config/Gyanis/GyanisScribe.conf` |
+| 配置 | Windows 注册表 `HKCU\Software\Gyanis\GyanisScribe` |
 | 配置（便携模式） | 程序目录旁放一个空的 `portable.txt`，配置就改读写同目录下的 `GyanisScribe.ini`——启动日志里会写明「便携模式」；**只有配置跟着走**，日志、历史、缓存与成品目录仍在下面各自的位置（要连数据一起带走得另立一套根路径设计，见路线图） |
 | 截图默认目录 | 用户图片目录下的 `GyanisScribe/`（可在设置里改） |
 | 录屏默认目录 | 用户视频目录下的 `GyanisScribe/`（可在设置里改） |
@@ -527,7 +523,7 @@ python scripts/check-translation-catalog.py --generate   # 把新增文案补进
 
 | 组件 | 版本 | 说明 |
 | --- | --- | --- |
-| 编译器 | MSVC（本机实测 14.51）/ GCC 13 | 需要 C++20/23 的 `std::expected` 与 `std::format` |
+| 编译器 | MSVC（本机实测 14.51） | 需要 C++20/23 的 `std::expected` 与 `std::format` |
 | CMake | ≥ 3.28 | — |
 | Ninja | — | 生成器 |
 | Conan | 2 | 依赖：spdlog 1.17.0、GoogleTest 1.17.0，Release 档另领 Tesseract 5.5.2 |
@@ -786,9 +782,8 @@ Debug 档不领 Tesseract（理由与撤除判据见 [docs/OcrBackends.md](docs/
 | --- | --- |
 | `OcrFixture.ReportsMissingBackendSeparatelyFromMissingLanguagePacks`（仅本机 Debug） | 这台机装了系统识别语言包，工厂先问 Windows 就拿到了后端，走不到「语言包在、后端没编进来」那一格 |
 | `FfmpegAudioCaptureEndToEnd.*`、`VideoEncoderEndToEndFixture.*`、`FfmpegAudioDevicesEndToEndFixture.*` | 要真 `ffmpeg`；取声那一条还要一路真设备 |
-| `CrashGuardEndToEnd.*` | minidump 走 Windows 的 dbghelp；Linux 侧这一格是空操作（core dump 归宿主配置） |
 | `PlatformIntegration.EnumeratedWindowSitsWhereQtPutsIt` | 「屏上有哪些窗口」只有 Windows 后端给得出；能力位为假时这一格按降级出口跳过，回绝文案由同文件另一条用例钉住 |
-| `ModuleFlowFixture.TrayEscapeHatchMakesThroughPinsClickableAgain` | 要真鼠标穿透能力才开得出「穿透中」的贴图，Linux 侧那一位为假；没有可复现的现场就跳过，不拿假现场充一条通过 |
+| `ModuleFlowFixture.TrayEscapeHatchMakesThroughPinsClickableAgain` | 要真鼠标穿透能力才开得出「穿透中」的贴图；没有可复现的现场就跳过，不拿假现场充一条通过 |
 | `QScreenCaptureSourceFixture.GrabbedCursorShapeIsSelfConsistent`、`...CursorDrawsIntoARealFrameWithoutBreakingItsGeometry` | 要真桌面才取得到系统指针的形状；离屏档拿不到就跳过，本机在指针此刻隐藏时同样跳（这一档跳过是机器的现场，不是漏跑）。掩码与合成规则不靠这两格——`CursorPixels` 那四条用自造的位平面与自造指针跑，两边都跑得到 |
 
 `scripts\WindowsBuild.bat` 在 `Vendor/Ffmpeg/ffmpeg.exe` 就位时会自动把它交给 `GYANISSCRIBE_FFMPEG`，
@@ -817,7 +812,7 @@ GYANISSCRIBE_AUDIO_DEVICE=@device_cm_{...}\wave_{...} # 取声端到端（要用
 ```
 src/Core        值类型、日志、目录 provider、图片等比适配几何
 src/Ui          设计令牌、主题、图标供给、Toast、快捷键输入框
-src/Platform    平台能力抽象（Windows / Linux 两套后端）
+src/Platform    平台能力抽象（Windows 后端）
 src/Settings    配置读写与迁移       src/Hotkey    组合键解析与全局登记
 src/Capture     抓帧、选区、遮罩     src/Annotation 标注工具与标注窗
 src/Pin         贴图窗口与贴图管理   src/Record      录屏会话、帧时钟、ffmpeg 编码、控制条
@@ -872,9 +867,6 @@ docs/           需求、识别后端、第三方许可证、界面样式说明
   五个候选全都开不起来才报失败。
 - Debug 档不领 Tesseract：上游 leptonica 的 Debug 包库名与其 `cpp_info` 不一致，
   `conanfile.py` 里按 `build_type` 分岔并写明撤除判据。Windows 的 Debug 档仍能真识别——工厂先问系统识别。
-- Linux 侧能力不全：没有全局热键后端（登记会给出中文提示并降级）、没有开机自启动（设置页那一格灰掉并写明替代做法）、
-  认不出界面元素（悬停只认整扇窗口，元素那一级与 `,`/`.` 层级键一并缺席）、没有录屏取声、
-  无系统托盘时菜单改由主窗口提供、`Qt::ColorScheme` 要 6.8 才有而容器是 6.4（跟随系统会解算到兜底档）。
 - 界面元素检测（Windows）走「先认光标下那扇窗、再按包含关系往 UI Automation 树里钻」：UIA 自己的命中测试
   穿不过全屏置顶的遮罩（本机探针实测，工具窗也不例外），所以不是直接问「点下是哪个元素」，而是把遮罩窗
   从命中名单里排除再往下找。一次查询实测中位 0.78ms（探针窗、链深 2、20 轮，
@@ -1230,10 +1222,8 @@ Conan 直取，许可证正文见 `licenses/Zxing-Apache-2.0.txt` 与 `docs/Thir
   两处都同一时间只跑一条，析构前等手上的任务跑完。
   **恢复条件**：这一处要与采集循环交接帧与状态，并发改动要有 TSan 才算判据（本机 MSVC 没有 TSan，
   借 Docker 容器跑 TSan 的那套设施已移除），先让旧写法报得出竞态、再动它。没有这一档之前把跨线程手抖写进去，只是把可复现的卡顿换成不可复现的竞态。
-- **Linux 录屏取声**：Windows 那一路已经落地，Linux 的入口是 ALSA/Pulse，容器与本机的验证环境都没有
-  可登记的音频设备，写进去就是一段没人验过的代码。现在那一侧列出设备与取声都直接给出中文降级原因。
-- **Linux 全局热键**：`Platform` 抽象下只有 Windows 后端有真登记，Linux 侧给出中文降级提示；
-  要做得接 X11/Wayland 各自的快捷键协议。
+- **Linux 录屏取声**：Windows 那一路已经落地；将来适配 Linux 时入口是 ALSA/Pulse，要有可登记的音频设备才验得动，写进去才不会是一段没人验过的代码。
+- **Linux 全局热键**：`Platform` 抽象下现在只有 Windows 后端有真登记；将来适配时要接 X11/Wayland 各自的快捷键协议。
 - ~~界面截图与演示~~ **截图已补（2026-10-15）**：`docs/images/` 十张主窗口真图（离屏渲染的同一份界面，不是设计稿），
   见上面「界面一览」；动画演示（录一段真实操作）还没做——那要真桌面把整套动作走一遍，等打包产物发出去再说。
 - ~~录屏最长时长是个常量~~ **已补（2026-10-14）**：录屏页多了「最长录多久」那一格（秒，默认 600，上限 7200），

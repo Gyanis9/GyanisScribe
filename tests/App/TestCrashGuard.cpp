@@ -1,4 +1,4 @@
-// 崩溃兜底的两层判据：命名规则（纯函数，两档都跑）与「真崩一次要留下转储」（只有 Windows 跑得动）。
+// 崩溃兜底的两层判据：命名规则（纯函数）与「真崩一次要留下转储」（端到端起探针进程）。
 #include "App/CrashGuard.h"
 
 #include <QtGlobal>
@@ -45,9 +45,6 @@ TEST(CrashGuardNaming, DumpNameCarriesVersionTimestampAndProcessId)
  */
 TEST(CrashGuardEndToEnd, CrashingProcessLeavesAMiniDump)
 {
-#ifndef Q_OS_WIN
-    GTEST_SKIP() << "minidump 走的是 Windows 的 dbghelp；其他平台上这一格是空操作（Linux 的 core dump 归宿主配置）";
-#else
     const auto      directory = scratchDirectory();
     std::error_code ignored;
     std::filesystem::remove_all(directory, ignored);
@@ -72,5 +69,4 @@ TEST(CrashGuardEndToEnd, CrashingProcessLeavesAMiniDump)
     EXPECT_NE(dumps.front().filename().wstring().find(L"9.9.9-probe_"), std::wstring::npos) << "文件名里要带版本号，反馈时才知道是哪一版崩的";
 
     std::filesystem::remove_all(directory, ignored);
-#endif
 }

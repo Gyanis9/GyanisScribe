@@ -19,7 +19,7 @@ namespace GyanisScribe::Platform
      * @details 登记一律返回 PlatformUnsupported 并带中文原因，而不是安静成功：
      *          安静成功会让用户以为按了没反应是自己记错了组合键。设置页据此把快捷键一栏标灰并给替代做法
      *          （在窗口内用普通快捷键，或等平台适配）。
-     * @note Linux 用这一份；macOS 在适配之前也用同一形状。它在任何平台都参与编译，便于在 Windows 上直接测到桩的契约。
+     * @note 将来适配的平台在落地前用这一形状。它在任何平台都参与编译，便于在 Windows 上直接测到桩的契约。
      */
     class UnsupportedHotkeyBackend : public IHotkeyBackend
     {

@@ -42,7 +42,7 @@ namespace
         return Error{.code = code, .message = std::move(message)};
     }
 
-    /// 成品路径在清单里的写法：通用分隔符 + UTF-8 字节，Linux 容器读同一份文件也对得上
+    /// 成品路径在清单里的写法：通用分隔符 + UTF-8 字节
     std::string pathToText(const std::filesystem::path &path)
     {
         const auto utf8 = path.generic_u8string();

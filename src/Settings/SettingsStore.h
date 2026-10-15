@@ -20,7 +20,7 @@ namespace GyanisScribe::Settings
 
     /**
      * @brief ISettingsStore 的 QSettings 实现
-     * @details 生产用默认位置（Windows 走注册表，Linux 走 INI）；传路径的那一个供用例与便携模式使用，
+     * @details 生产用默认位置（Windows 走注册表）；传路径的那一个供用例与便携模式使用，
      *          两者行为一致，只是后端指向不同。写操作不每次落盘，由 sync() 或析构统一刷，
      *          避免设置页每敲一个字符就写一次注册表。
      */

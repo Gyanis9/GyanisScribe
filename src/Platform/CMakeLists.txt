@@ -1,5 +1,5 @@
-# Platform：能力表与热键后端契约在任何平台都编；平台实现按编译目标二选一，
-# 另一档另建一个「只编译不链接」的检查目标，免得那一份实现长期处于从未被编过的状态。
+# Platform：能力表与热键后端契约在任何平台都编；平台实现按编译目标挂载，
+# 将来接别的平台时在下面加各自的分支。
 set(PlatformCommonSources
         PlatformCapabilities.h
         IHotkeyBackend.h
@@ -41,17 +41,4 @@ if (WIN32)
     # 不显式链就是 LNK2019
     target_link_libraries(Platform PRIVATE uiautomationcore)
 
-    # Linux 那一档在 Windows 上不会被选中，给它一条只编译不链接的形状检查：
-    # 桩实现里一旦写了 Windows 才有的调用，这里当场编不过，而不是等到容器里才发现
-    add_library(PlatformLinuxCheck OBJECT
-            Linux/LinuxIntegration.h
-            Linux/LinuxIntegration.cpp)
-    target_link_libraries(PlatformLinuxCheck PRIVATE Platform)
-    if (MSVC)
-        target_compile_options(PlatformLinuxCheck PRIVATE /W4 /WX)
-    endif ()
-else ()
-    target_sources(Platform PRIVATE
-            Linux/LinuxIntegration.h
-            Linux/LinuxIntegration.cpp)
 endif ()

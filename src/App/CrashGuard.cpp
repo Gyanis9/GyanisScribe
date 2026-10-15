@@ -6,10 +6,8 @@
 
 #include <QtGlobal>
 
-#ifdef Q_OS_WIN
 #include <windows.h>
 #include <dbghelp.h>
-#endif
 
 #include <cstdlib>
 #include <exception>
@@ -43,14 +41,12 @@ namespace
     int formatCrashDumpFileName(wchar_t *const buffer, const std::size_t capacity, const wchar_t *const applicationVersion, const GyanisScribe::App::CrashStamp &stamp,
                                 const std::uint32_t processId)
     {
-        // %ls 而不是 %s：宽字符格式串里的 %s 两家标准库理解不一样——MSVC 当宽串，glibc 当窄串
-        // （实测 Linux 侧版本号 "1.2" 只剩 "1"，因为第二个 wchar_t 的低字节就是 0）。
-        // 命名规则是唯一出处，两档要拼出同一个名字，所以写两家都认的 %ls。
+        // 用 %ls 而不是 %s：宽字符格式串里 %s 的语义随标准库而异（MSVC 当宽串），
+        // 命名规则是唯一出处，跨平台时名字拼法不变。
         return std::swprintf(buffer, capacity, L"GyanisScribe_%ls_%04d%02d%02d-%02d%02d%02d_%u.dmp", applicationVersion, stamp.year, stamp.month, stamp.day, stamp.hour,
                              stamp.minute, stamp.second, processId);
     }
 
-#ifdef Q_OS_WIN
     // 崩溃处理器里唯一能读的现场：都在装过滤器之前写好，之后不再改，也不持有所有权
     constexpr std::size_t kPathCapacity                      = 4096;
     wchar_t               g_dumpDirectoryPath[kPathCapacity] = L"";
@@ -113,7 +109,6 @@ namespace
         TerminateProcess(GetCurrentProcess(), static_cast<uint>(GyanisScribe::App::kCrashExitCode));
         return EXCEPTION_EXECUTE_HANDLER;
     }
-#endif
 } // namespace
 
 namespace GyanisScribe::App
@@ -156,7 +151,6 @@ namespace GyanisScribe::App
 
     void installCrashDumpWriter(const std::filesystem::path &dumpDirectory, const std::wstring_view applicationVersion)
     {
-#ifdef Q_OS_WIN
         if (const auto ready = Core::Paths::ensureDirectory(dumpDirectory); !ready)
         {
             Core::Logger::warning(std::format("崩溃转储的目录建不出来，崩了不会留下 minidump：{}", ready.error().message));
@@ -168,11 +162,6 @@ namespace GyanisScribe::App
         copyTruncated(g_applicationVersion, std::size(g_applicationVersion), applicationVersion.empty() ? std::wstring_view{L"unknown"} : applicationVersion);
         SetUnhandledExceptionFilter(writeMiniDump);
         Core::Logger::info(std::format("崩溃转储会写到 {}", Core::Paths::toDisplayText(dumpDirectory).toStdString()));
-#else
-        // 没有 dbghelp 的平台写不出 minidump；Linux 的 core dump 归宿主配置（容器里默认也没开），
-        // 这里不假装能做，只把「崩了只有日志」这件事说在启动日志里
-        Core::Logger::info("本平台没有 dbghelp：崩溃只写日志，不留 minidump（Linux 要靠宿主的 core dump 设置）");
-#endif
     }
 
 } // namespace GyanisScribe::App

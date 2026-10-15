@@ -83,7 +83,7 @@ namespace GyanisScribe::App
         QList<TrayMenuEntry> visible;
         for (const auto &entry: trayMenuEntries())
         {
-            // 「截取当前窗口」要靠平台给出前台窗口，Linux 那一档做不出来：
+            // 「截取当前窗口」要靠平台给出前台窗口，给不出的档做不出来：
             // 留着它就是让用户点出一条报错，所以按能力直接不放
             if (entry.action == TrayAction::CaptureWindow && !capabilities.windowDiscovery)
             {

@@ -57,8 +57,6 @@ namespace GyanisScribe::Record
      * @brief 异步问 ffmpeg 要一份音频输入清单
      * @details 起进程这件事不能压在主线程上：需求第十一条要求耗时操作离开界面线程，
      *          而这里用 QProcess 的信号回调就够了，不引入新线程，也就没有跨线程数据要护。
-     * @note 只支持 Windows：Linux 侧的音频入口是 ALSA/Pulse，另一套取法，
-     *       现在调用会立刻发 failed 信号并给出可操作的中文原因，不返回一张空表冒充「这台机没设备」。
      */
     class FfmpegAudioDeviceEnumerator : public QObject
     {
