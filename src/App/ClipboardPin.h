@@ -16,6 +16,7 @@
 #include <QImage>
 #include <QPoint>
 #include <QString>
+#include <QUrl>
 #include <QStringList>
 
 #include <vector>
@@ -68,6 +69,15 @@ namespace GyanisScribe::App
      *          就会出现「渲染成色卡了但改色找不到初值」这种半接上的形状。
      */
     [[nodiscard]] std::optional<QColor> colorCardColorOf(const QMimeData *data);
+
+    /**
+     * @brief 这一段载荷里那条「网页上的图」的地址
+     * @param data 拖放或剪贴板的 mime 载荷，可为 nullptr
+     * @return 恰好一条 http/https 地址时返回它；带别的件、或不是那种地址时返回空
+     * @details 只认「恰好一条」：拖进来好几条链接时「先取哪一张」没有合理答案，交给原来那条路（渲染成文本卡）。
+     *          本地文件不在这里——它有自己那条读文件的转换。
+     */
+    [[nodiscard]] std::optional<QUrl> imageUrlOf(const QMimeData *data);
 
     /**
      * @brief 一份可以贴出去的内容

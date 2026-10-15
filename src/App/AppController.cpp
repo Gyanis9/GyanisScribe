@@ -154,7 +154,26 @@ namespace GyanisScribe::App
         // 识别在工作线程上跑，回来的两条槽仍然跑在界面线程：结果窗口的建立与刷新不能交给别的线程
         QObject::connect(m_ocrRunner.get(), &Ocr::RecognitionRunner::succeeded, this, &AppController::handleOcrSucceeded);
         QObject::connect(m_ocrRunner.get(), &Ocr::RecognitionRunner::failed, this, &AppController::handleOcrFailed);
-        m_tray       = std::make_unique<TrayController>(*m_icons, *m_theme, *m_settings, *m_integration);
+        m_tray         = std::make_unique<TrayController>(*m_icons, *m_theme, *m_settings, *m_integration);
+        m_imageFetcher = std::make_unique<ImageFetcher>();
+        // 取图的成败都在这一层收口：贴到哪儿、提示什么话，只有界面层知道
+        QObject::connect(m_imageFetcher.get(), &ImageFetcher::fetched, this,
+                         [this](const ImageFetchResult &result)
+                         {
+                             const auto at = m_pendingFetchPoint.value_or(QCursor::pos());
+                             m_pendingFetchPoint.reset();
+                             m_pins->addPin(result.image, at);
+                             notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已从网页取到这张图（{}×{}）并贴到屏幕上"),
+                                                                                       result.image.width(), result.image.height())
+                                                                  .c_str()),
+                                        Ui::ToastKind::Information);
+                         });
+        QObject::connect(m_imageFetcher.get(), &ImageFetcher::failed, this,
+                         [this](const QString &reason)
+                         {
+                             m_pendingFetchPoint.reset();
+                             notifyUser(reason, Ui::ToastKind::Information);
+                         });
         m_history    = std::make_unique<History::HistoryStore>(History::HistoryStore::defaultStoragePath());
         m_mainWindow = std::make_unique<MainWindow>(*m_settings, *m_theme, *m_icons, *m_history, m_integration->capabilities(), *m_integration);
         m_toast      = std::make_unique<Ui::Toast>(*m_icons, *m_theme);
@@ -293,6 +312,12 @@ namespace GyanisScribe::App
         QObject::connect(m_pins.get(), &Pin::PinManager::pinDropRequested, this,
                          [this](const QMimeData *data, const QPoint &globalTopLeft)
                          {
+                             // 网页上的图：拖进来的是一条 http/https 地址时去取回来，落在拖到的那一点上
+                             if (const auto url = imageUrlOf(data); url.has_value())
+                             {
+                                 startImageFetch(*url, globalTopLeft);
+                                 return;
+                             }
                              const auto dropped = pinDroppedContent(*m_pins, data, globalTopLeft, QGuiApplication::font());
                              if (!dropped)
                              {
@@ -1037,6 +1062,15 @@ namespace GyanisScribe::App
         notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("已贴出 {} 张"), outcome.pinnedCount).c_str()), Ui::ToastKind::Success);
     }
 
+    void AppController::startImageFetch(const QUrl &url, std::optional<QPoint> dropPoint)
+    {
+        m_pendingFetchPoint = dropPoint;
+        // 先把「正在取」说出来：取图是异步的，不说这一句用户会以为「按了没反应」
+        notifyUser(QString::fromUtf8(GyanisScribe::Core::uiFormat(GyanisScribe::Core::uiTextUtf8("正在从网页取这张图：{}"), url.toString().toStdString()).c_str()),
+                   Ui::ToastKind::Information);
+        m_imageFetcher->fetch(url);
+    }
+
     void AppController::pasteClipboardAsPin()
     {
         const auto *data = QGuiApplication::clipboard()->mimeData();
@@ -1044,6 +1078,12 @@ namespace GyanisScribe::App
         // 一次可以贴多件；判据只有「能不能当图片贴」这一条，与拖进来的那一份共用
         if (data != nullptr && data->hasUrls() && !data->hasImage())
         {
+            // 网页上的图：剪贴板里只有一条 http/https 地址时去把它取回来（本地文件那条路照旧走下面）
+            if (const auto url = imageUrlOf(data); url.has_value())
+            {
+                startImageFetch(*url, std::nullopt);
+                return;
+            }
             const auto outcome = pinDroppedContent(*m_pins, data, QCursor::pos(), QApplication::font());
             if (!outcome)
             {

@@ -1,5 +1,7 @@
 #include "App/ClipboardPin.h"
 
+#include "App/ImageFetcher.h"
+
 #include "Core/Paths.h"
 #include "Core/Text.h"
 #include "Pin/ColorCard.h"
@@ -53,7 +55,7 @@ namespace GyanisScribe::App
                 return std::nullopt;
             }
 
-            std::array<int, 3> numbers{};
+            std::array<int, 3>  numbers{};
             std::array<bool, 3> percents{};
             for (std::size_t index = 0; index < numbers.size(); ++index)
             {
@@ -279,6 +281,20 @@ namespace GyanisScribe::App
         painter.drawText(QRect{kTextCardPadding, kTextCardPadding, wrapped.width(), wrapped.height()}, wrapFlags, text);
         painter.end();
         return card;
+    }
+
+    std::optional<QUrl> imageUrlOf(const QMimeData *data)
+    {
+        if (data == nullptr || !data->hasUrls())
+        {
+            return std::nullopt;
+        }
+        const auto urls = data->urls();
+        if (urls.size() != 1)
+        {
+            return std::nullopt;
+        }
+        return isFetchableImageUrl(urls.front()) ? std::optional<QUrl>{urls.front()} : std::nullopt;
     }
 
     std::optional<QColor> colorCardColorOf(const QMimeData *data)

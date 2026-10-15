@@ -14,6 +14,7 @@
 
 #include "App/MainWindow.h"
 #include "App/CaptureIntent.h"
+#include "App/ImageFetcher.h"
 #include "App/CommandLine.h"
 #include "App/TrayController.h"
 #include "Ui/Toast.h"
@@ -505,6 +506,14 @@ namespace GyanisScribe::App
         void notifyUser(const QString &message, GyanisScribe::Ui::ToastKind kind);
 
         /**
+         * @brief 去把一条图片地址取回来并贴到屏上
+         * @param url 图片地址，调用方已用 `isFetchableImageUrl` 粗筛过
+         * @param dropPoint 落点；空表示跟着光标走（剪贴板那条路没有「原来那块位置」）
+         * @details 取图是异步的：这里只发起，成败都在 `ImageFetcher` 的两条信号上收口。
+         */
+        void startImageFetch(const QUrl &url, std::optional<QPoint> dropPoint);
+
+        /**
          * @brief 把一份成品记进历史清单并刷新历史页
          * @param filePath 成品文件路径
          * @param kind 成品类别
@@ -552,6 +561,8 @@ namespace GyanisScribe::App
         std::unique_ptr<Annotation::AnnotationEngine>        m_annotation;                                   ///< 标注引擎，跨轮次保留（载入新帧会清空）
         std::unique_ptr<Annotation::AnnotationWindow>        m_annotationWindow;                             ///< 标注窗口，复用同一把工具栏
         std::unique_ptr<Pin::PinManager>                     m_pins;                                         ///< 贴图管理器
+        std::unique_ptr<ImageFetcher>                        m_imageFetcher;                                 ///< 网页取图：拖进来的可以是一条图片地址
+        std::optional<QPoint>                                m_pendingFetchPoint;                            ///< 在飞那一张取回来落在哪儿；空表示跟光标走
         std::unique_ptr<Ocr::IOcrEngine>                     m_ocr;                                          ///< 识别后端，按设置与平台能力选一次
         std::unique_ptr<Ocr::RecognitionRunner>              m_ocrRunner;                                    ///< 识别的线程搬运工
         std::unique_ptr<Record::FfmpegRecordingEncoder>      m_recorder;                                     ///< 录屏的编码步

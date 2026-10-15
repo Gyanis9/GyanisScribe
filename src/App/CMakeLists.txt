@@ -10,6 +10,8 @@ add_library(App STATIC
         CaptureIntent.cpp
         CaptureDelivery.h
         CaptureDelivery.cpp
+        ImageFetcher.h
+        ImageFetcher.cpp
         CustomHotkeys.h
         CustomHotkeys.cpp
         ClipboardPin.h

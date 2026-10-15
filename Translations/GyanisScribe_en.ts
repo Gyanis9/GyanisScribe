@@ -544,6 +544,10 @@
             <translation>Text</translation>
         </message>
         <message>
+            <source>已从网页取到这张图（{}×{}）并贴到屏幕上</source>
+            <translation>Fetched this image from the web ({}×{}) and pinned it to the screen</translation>
+        </message>
+        <message>
             <source>截图未完成：%1。请重试一次</source>
             <translation>Capture did not complete: %1. Try again</translation>
         </message>
@@ -698,6 +702,10 @@
         <message>
             <source>已贴出 {} 张</source>
             <translation>Pinned {} image(s)</translation>
+        </message>
+        <message>
+            <source>正在从网页取这张图：{}</source>
+            <translation>Fetching this image from the web: {}</translation>
         </message>
         <message>
             <source>复制的文件里没有能当图片贴的：请复制图片文件本身，或复制图片内容</source>
@@ -970,6 +978,30 @@
         <message>
             <source>智录遇到未处理的错误：{}。现场已尽量落到日志与崩溃转储，请到 {} 找最近一份日志（同目录下的 .dmp 是转储）；如果反复出现，请把日志、转储与出错的操作步骤一起反馈</source>
             <translation>GyanisScribe hit an unhandled error: {}. What could be saved went to the log and a crash dump; look for the newest log in {} (a .dmp next to it is the dump). If it keeps happening, send the log, the dump and the steps you took</translation>
+        </message>
+        <message>
+            <source>上一条取图还没回来就被新的地址换掉了：这一张没有取到，要它请再贴一次</source>
+            <translation>The previous fetch was replaced by a new address before it returned: this image was not fetched — paste it again if you want it</translation>
+        </message>
+        <message>
+            <source>这张图超过 {} MB 上限，没有取回来；换一张小一点的，或先把它存到盘上再拖进来</source>
+            <translation>This image is over the {} MB limit and was not fetched; try a smaller one, or save it to disk and drag it in</translation>
+        </message>
+        <message>
+            <source>取这张图超过 {} 秒还没回来，已经放弃：检查网络，或先把它存到盘上再拖进来</source>
+            <translation>Fetching this image exceeded {} seconds and was given up: check the network, or save it to disk and drag it in</translation>
+        </message>
+        <message>
+            <source>这张图没取回来：{}。检查地址能不能在浏览器里打开</source>
+            <translation>This image could not be fetched: {}. Check that the address opens in a browser</translation>
+        </message>
+        <message>
+            <source>这条地址给回来的不是图片（{}）：要贴网页上的图，请对着图点右键复制图片地址</source>
+            <translation>This address did not return an image ({}): to pin an image from the web, right-click the image and copy its address</translation>
+        </message>
+        <message>
+            <source>取回来的数据读不出像素（可能不是图片，或格式这台机器认不出）：换一条图片地址再试</source>
+            <translation>The fetched data has no readable pixels (it may not be an image, or this machine cannot decode the format): try another image address</translation>
         </message>
         <message>
             <source>这一类的说明</source>
