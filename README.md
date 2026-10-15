@@ -834,7 +834,7 @@ docs/           需求、识别后端、第三方许可证、界面样式说明
 
 | 文档 | 内容 |
 | --- | --- |
-| [docs/ProjectRequirements.md](docs/ProjectRequirements.md) | 需求原文与硬约束（功能清单、性能指标、UI 约束、交付物） |
+| 仓外 `GyanisScribe-Reports/` | 需求原文（功能清单、性能指标、UI 约束、交付物）与两份界面计划（审查台账、换肤计划）——迁出仓库，随本机开发资料保存 |
 | [docs/OcrBackends.md](docs/OcrBackends.md) | 两个识别后端的选型顺序、语言包查找路径、WinRT 投影头怎么生成 |
 | [docs/ThirdPartyLicenses.md](docs/ThirdPartyLicenses.md) | 随包分发的组件、许可证与合规路线 |
 | [docs/UiStyleGuide.md](docs/UiStyleGuide.md) | 设计令牌、每个窗口的样式与状态、深浅主题对照、高 DPI 适配 |
@@ -1260,7 +1260,7 @@ Conan 直取，许可证正文见 `licenses/Zxing-Apache-2.0.txt` 与 `docs/Thir
 5. 提交信息用中文写「为什么」而不是「做了什么」，一次提交只讲一件事，
    格式是约定式提交 `<类型>[(范围)]: <描述>`（类型取 `feat` / `fix` / `refactor` / `perf` / `test` / `docs` / `build` / `chore`）。
 
-规范要点（细节见 [docs/ProjectRequirements.md](docs/ProjectRequirements.md) 与 `tests/Style/` 三条门禁）：
+规范要点（需求原文已迁至仓外 `GyanisScribe-Reports/`；可跑判据见 `tests/Style/` 三条门禁）：
 
 - 文件与类名 PascalCase、接口 `I` 前缀、函数 camelCase、成员 `m_` 前缀、常量 `k` 前缀，标识符不用缩写。
 - 声明处中文 Doxygen（重写的方法要独立写全），实现体在分支、状态流转、加锁、魔法数字处写中文 `//`；

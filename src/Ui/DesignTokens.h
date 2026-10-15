@@ -104,7 +104,7 @@ namespace GyanisScribe::Ui
     };
 
     /// 浅色主题的语义色：珍珠玻璃（scaffold-vue）浅色档的移植；
-    /// 逐条对比度现算与设计原值的差异见 docs/UiRestylePlan.md 附录的冻结值表
+    /// 逐条对比度现算与设计原值的差异见换肤计划附录的冻结值表（仓外 GyanisScribe-Reports/UiRestylePlan.md）
     inline constexpr ThemePalette kLightPalette{
             QColor{246, 248, 247}, // windowBackground
             QColor{251, 252, 252}, // surface

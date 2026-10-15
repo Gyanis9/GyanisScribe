@@ -1,5 +1,5 @@
 // 界面审查出图工具：离屏起真部件逐面拍 PNG，并把 sizeHint / minimumSizeHint / 实际几何打进 stdout。
-// 证据的去向是 docs/UiAuditPlan.md 那份审查台账。
+// 证据的去向是仓外 GyanisScribe-Reports/ 里那份界面审查台账。
 // 与 UiShotTool 并列而不合并：那一份服务 README 的十张文档图（产物要进 docs/images），
 // 这一份服务审查台账（产物只进临时目录）；两份拍摄清单会各自长，共用一份配置反而互相牵制。
 // 与 CrashProbe / UiShotTool 同一条理由不是产品的一部分：不进安装包、不挂产品入口。

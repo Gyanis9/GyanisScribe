@@ -164,7 +164,7 @@ endif ()
 
 add_dependencies(UiShotTool DeployQtRuntime)
 
-# 界面审查出图工具：离屏起真部件逐面拍 PNG 并把尺寸读数打进 stdout（docs/UiAuditPlan.md 的取证）。
+# 界面审查出图工具：离屏起真部件逐面拍 PNG 并把尺寸读数打进 stdout（界面审查台账的取证，台账在仓外 GyanisScribe-Reports/）。
 # 与 UiShotTool 并列而不是合并：那一份服务 README 的文档图，这一份服务审查台账；理由见文件头。
 add_executable(UiAuditTool
         UiAuditTool.cpp)

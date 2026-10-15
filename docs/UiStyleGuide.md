@@ -2,7 +2,7 @@
 
 需求 §九 的三条交付说明都在这一份里：每个窗口的样式与状态、深浅主题的对照、高 DPI 与多屏适配。
 浅色与深色两档的色板与材质自 2026-10-15 起为珍珠玻璃（scaffold-vue）的移植，裁决见 §1.5 与
-`docs/UiRestylePlan.md`。
+换肤计划（仓外 `GyanisScribe-Reports/UiRestylePlan.md`）。
 文中每一条都能在代码或用例里找到落点；写「由用例钉住」的地方指的是本仓的 ctest 用例，不是计划要加的。
 
 ## 1. 令牌放在哪儿
@@ -33,7 +33,7 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 ## 1.5 视觉语言：珍珠玻璃
 
 浅色与深色两档的色板、材质与形状移植自 scaffold-vue 的「珍珠玻璃」设计（规格在其 `DESIGN.md`，
-移植裁决与 web→Qt 换算表见 `docs/UiRestylePlan.md`）。要点与落点：
+移植裁决与 web→Qt 换算表见换肤计划（仓外 `GyanisScribe-Reports/UiRestylePlan.md`））。要点与落点：
 
 - 语义：蓝（`accent`）= 选择与主操作，`success` = 正常状态，`danger` = 危险；字色在原设计里分五档，
   本仓只落出 `text` / `secondaryText` / `icon` 三个角色（角色表是冻结的，十八个字段之外不加）。
@@ -82,7 +82,7 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 
 三档：浅色、深色、高对比度（`Ui/ThemeKind` 另有 System，解算成前两者之一，解算失败兜底到浅色）。
 浅色与深色是珍珠玻璃（scaffold-vue）两档的移植，高对比度档是本仓自己的无障碍契约档（web 无对应物）。
-逐角色对照（十六进制以 `DesignTokens.h` 为准；设计原值与压深过程见 `UiRestylePlan.md` 附录）：
+逐角色对照（十六进制以 `DesignTokens.h` 为准；设计原值与压深过程见换肤计划附录，仓外 `GyanisScribe-Reports/UiRestylePlan.md`）：
 
 | 角色 | 浅色 | 深色 | 高对比度 | 用途 |
 | --- | --- | --- | --- | --- |
