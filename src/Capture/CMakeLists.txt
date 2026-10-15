@@ -26,7 +26,6 @@ add_library(Capture STATIC
 target_include_directories(Capture PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(Capture PUBLIC
         Core
-        Pick
         Platform
         Gui
         Qt6::Core

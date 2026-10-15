@@ -1,4 +1,4 @@
-#include "Pick/RecentColors.h"
+#include "Core/Pick/RecentColors.h"
 
 #include <gtest/gtest.h>
 
@@ -7,11 +7,11 @@
 
 #include <vector>
 
-using GyanisScribe::Pick::kRecentColorCapacity;
-using GyanisScribe::Pick::parseRecentColors;
-using GyanisScribe::Pick::pushRecentColor;
-using GyanisScribe::Pick::recentColorToken;
-using GyanisScribe::Pick::serializeRecentColors;
+using GyanisScribe::Core::kRecentColorCapacity;
+using GyanisScribe::Core::parseRecentColors;
+using GyanisScribe::Core::pushRecentColor;
+using GyanisScribe::Core::recentColorToken;
+using GyanisScribe::Core::serializeRecentColors;
 
 namespace
 {

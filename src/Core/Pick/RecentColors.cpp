@@ -1,9 +1,9 @@
-#include "Pick/RecentColors.h"
+#include "Core/Pick/RecentColors.h"
 
 #include <algorithm>
 #include <format>
 
-namespace GyanisScribe::Pick
+namespace GyanisScribe::Core
 {
     std::vector<QColor> pushRecentColor(const std::span<const QColor> current, const QColor &picked, const std::size_t capacity)
     {
@@ -86,4 +86,4 @@ namespace GyanisScribe::Pick
         return colors;
     }
 
-} // namespace GyanisScribe::Pick
+} // namespace GyanisScribe::Core

@@ -1,4 +1,4 @@
-#include "Pick/ColorFormat.h"
+#include "Core/Pick/ColorFormat.h"
 
 #include "Base/Text.h"
 
@@ -11,8 +11,8 @@
 
 namespace
 {
-    using GyanisScribe::Pick::ColorFormat;
-    using GyanisScribe::Pick::kColorFormatCount;
+    using GyanisScribe::Core::ColorFormat;
+    using GyanisScribe::Core::kColorFormatCount;
 
     /// 存储标记与界面名按下标互指，顺序与 ColorFormat 一致
     constexpr std::array<std::string_view, kColorFormatCount> kFormatTokens = {"Hex", "Rgb", "Hsl", "Hsv", "Hsi", "Decimal"};
@@ -39,7 +39,7 @@ namespace
     }
 } // namespace
 
-namespace GyanisScribe::Pick
+namespace GyanisScribe::Core
 {
     std::string_view colorFormatToken(const ColorFormat format)
     {
@@ -154,4 +154,4 @@ namespace GyanisScribe::Pick
         return uppercase ? HexCasing::Uppercase : HexCasing::Lowercase;
     }
 
-} // namespace GyanisScribe::Pick
+} // namespace GyanisScribe::Core

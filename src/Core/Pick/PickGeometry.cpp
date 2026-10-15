@@ -1,4 +1,4 @@
-#include "Pick/PickGeometry.h"
+#include "Core/Pick/PickGeometry.h"
 
 #include "Base/Text.h"
 
@@ -11,7 +11,7 @@
 
 namespace
 {
-    using GyanisScribe::Pick::MagnifierView;
+    using GyanisScribe::Core::MagnifierView;
 
     // 四档一列到底：标记、界面名与取样边长按下标互指，加一档只改这三份表
     constexpr std::array<std::string_view, 4> kMagnifierTokens = {"off", "narrow", "medium", "wide"};
@@ -19,7 +19,7 @@ namespace
     constexpr std::array<int, 4>              kMagnifierEdges  = {0, 9, 15, 21};
 } // namespace
 
-namespace GyanisScribe::Pick
+namespace GyanisScribe::Core
 {
     int magnifierSampleEdgeFor(const MagnifierView view)
     {
@@ -144,4 +144,4 @@ namespace GyanisScribe::Pick
         return rects;
     }
 
-} // namespace GyanisScribe::Pick
+} // namespace GyanisScribe::Core

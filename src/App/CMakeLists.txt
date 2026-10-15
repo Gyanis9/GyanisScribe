@@ -37,7 +37,6 @@ target_link_libraries(App PUBLIC
         Core
         History
         Ocr
-        Pick
         Pin
         Platform
         Record

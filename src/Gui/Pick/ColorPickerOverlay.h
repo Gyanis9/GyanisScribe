@@ -10,8 +10,8 @@
 #pragma once
 
 #include "Base/Types.h"
-#include "Pick/ColorFormat.h"
-#include "Pick/PickGeometry.h"
+#include "Core/Pick/ColorFormat.h"
+#include "Core/Pick/PickGeometry.h"
 
 #include <QColor>
 #include <QPoint>
@@ -24,7 +24,7 @@ namespace GyanisScribe::Gui
     class ThemeManager;
 } // namespace GyanisScribe::Gui
 
-namespace GyanisScribe::Pick
+namespace GyanisScribe::Gui
 {
 
     /**
@@ -48,8 +48,8 @@ namespace GyanisScribe::Pick
          * @param theme 主题管理器，放大镜边框与文字色随主题
          * @param parent Qt 父对象
          */
-        ColorPickerOverlay(const Base::CapturedImage &frame, const QRect &screenGeometry, ColorFormat format, HexCasing casing, MagnifierView view, const Gui::ThemeManager &theme,
-                           QWidget *parent = nullptr);
+        ColorPickerOverlay(const Base::CapturedImage &frame, const QRect &screenGeometry, Core::ColorFormat format, Core::HexCasing casing, Core::MagnifierView view,
+                           const Gui::ThemeManager &theme, QWidget *parent = nullptr);
 
         /**
          * @brief 某一屏幕坐标处的颜色
@@ -113,15 +113,15 @@ namespace GyanisScribe::Pick
         /// 某个屏幕坐标压在色块行的第几块上；不在任何一块上时返回 -1
         [[nodiscard]] int swatchIndexAt(const QPoint &globalPos) const;
 
-        Base::CapturedImage     m_frame;              ///< 这一屏的冻帧
-        QRect                   m_screenGeometry;     ///< 冻帧对应屏幕的几何
-        ColorFormat             m_format;             ///< 复制用的写法
-        HexCasing               m_hexCasing;          ///< 写法是 HEX 时字母那几位的大小写
-        MagnifierView           m_magnifierView;      ///< 放大镜视野档，「不显示」时只画十字与信息条
+        Base::CapturedImage      m_frame;              ///< 这一屏的冻帧
+        QRect                    m_screenGeometry;     ///< 冻帧对应屏幕的几何
+        Core::ColorFormat        m_format;             ///< 复制用的写法
+        Core::HexCasing          m_hexCasing;          ///< 写法是 HEX 时字母那几位的大小写
+        Core::MagnifierView      m_magnifierView;      ///< 放大镜视野档，「不显示」时只画十字与信息条
         const Gui::ThemeManager &m_theme;              ///< 主题管理器，画放大镜边框用主色
-        QPoint                  m_cursor;             ///< 当前光标的屏幕坐标
-        std::vector<QColor>     m_recent;             ///< 最近取色清单，最近的在前；命中的下标与色块行同序
-        int                     m_hoveredSwatch = -1; ///< 光标压在色块行第几块上；-1 表示没压在任何一块上
+        QPoint                   m_cursor;             ///< 当前光标的屏幕坐标
+        std::vector<QColor>      m_recent;             ///< 最近取色清单，最近的在前；命中的下标与色块行同序
+        int                      m_hoveredSwatch = -1; ///< 光标压在色块行第几块上；-1 表示没压在任何一块上
     };
 
-} // namespace GyanisScribe::Pick
+} // namespace GyanisScribe::Gui

@@ -26,9 +26,9 @@
 #include "Core/Hotkey/IHotkeyManager.h"
 #include "Ocr/IOcrEngine.h"
 #include "Ocr/OcrEngineFactory.h"
-#include "Pick/ColorFormat.h"
-#include "Pick/RecentColors.h"
-#include "Pick/ColorPickerOverlay.h"
+#include "Core/Pick/ColorFormat.h"
+#include "Core/Pick/RecentColors.h"
+#include "Gui/Pick/ColorPickerOverlay.h"
 #include "Ocr/OcrResultWindow.h"
 #include "Ocr/OcrTypes.h"
 #include "Scan/BarcodeDecoder.h"
@@ -1238,7 +1238,7 @@ namespace GyanisScribe::App
 
     std::vector<QColor> AppController::recentPickedColors() const
     {
-        const auto parsed = Pick::parseRecentColors(m_settings->stringListValue(Core::kPickRecentColors, {}));
+        const auto parsed = Core::parseRecentColors(m_settings->stringListValue(Core::kPickRecentColors, {}));
         if (!parsed)
         {
             Base::Logger::warning(std::format("最近取色清单读不出，按空清单继续：{}", parsed.error().message));
@@ -1249,8 +1249,8 @@ namespace GyanisScribe::App
 
     void AppController::rememberPickedColor(const QColor &color)
     {
-        const auto updated = Pick::pushRecentColor(recentPickedColors(), color, Pick::kPickColorHistoryCapacity);
-        if (auto written = m_settings->setValue(Core::kPickRecentColors, Pick::serializeRecentColors(updated)); !written)
+        const auto updated = Core::pushRecentColor(recentPickedColors(), color, Core::kPickColorHistoryCapacity);
+        if (auto written = m_settings->setValue(Core::kPickRecentColors, Core::serializeRecentColors(updated)); !written)
         {
             Base::Logger::warning(std::format("最近取色清单没能写入：{}", written.error().message));
         }
@@ -1325,15 +1325,15 @@ namespace GyanisScribe::App
 
         // 与屏幕取色同一套：写法从设置现读，读坏了按 HEX 顶上并把原因说给用户
         std::string complaint;
-        const auto  format = Pick::colorFormatOrDefault(m_settings->stringValue(Core::kPickFormat, QStringLiteral("Hex")).toStdString(), complaint);
+        const auto  format = Core::colorFormatOrDefault(m_settings->stringValue(Core::kPickFormat, QStringLiteral("Hex")).toStdString(), complaint);
         if (!complaint.empty())
         {
             notifyUser(QString::fromStdString(complaint), Gui::ToastKind::Danger);
         }
 
         // 字母档现读配置：这一档只管 HEX 那一形，写法是别的时读出来也一样
-        const auto casing = Pick::hexCasingOf(m_settings->boolValue(Core::kPickHexUppercase, true));
-        const auto text   = Pick::formatColor(color, format, casing);
+        const auto casing = Core::hexCasingOf(m_settings->boolValue(Core::kPickHexUppercase, true));
+        const auto text   = Core::formatColor(color, format, casing);
         QGuiApplication::clipboard()->setText(text);
         notifyUser(GyanisScribe::Base::uiText("已复制颜色 ") + text, Gui::ToastKind::Success);
     }
@@ -1429,7 +1429,7 @@ namespace GyanisScribe::App
 
         // 写法读坏了不拦取色：按默认写法继续，并把这一条告诉用户，免得他复制到的格式莫名其妙变了
         std::string complaint;
-        const auto  format = Pick::colorFormatOrDefault(m_settings->stringValue(Core::kPickFormat, QStringLiteral("Hex")).toStdString(), complaint);
+        const auto  format = Core::colorFormatOrDefault(m_settings->stringValue(Core::kPickFormat, QStringLiteral("Hex")).toStdString(), complaint);
         if (!complaint.empty())
         {
             notifyUser(QString::fromStdString(complaint), Gui::ToastKind::Danger);
@@ -1438,23 +1438,23 @@ namespace GyanisScribe::App
         // 放大镜视野与字母档都现读这一处的配置：取色遮罩自己不持设置，读坏了在这里说给用户
         std::string magnifierComplaint;
         const auto  magnifierView =
-                Pick::magnifierViewOrDefault(m_settings->stringValue(Core::kCaptureMagnifierView, QStringLiteral("narrow")).toStdString(), magnifierComplaint);
+                Core::magnifierViewOrDefault(m_settings->stringValue(Core::kCaptureMagnifierView, QStringLiteral("narrow")).toStdString(), magnifierComplaint);
         if (!magnifierComplaint.empty())
         {
             notifyUser(QString::fromStdString(magnifierComplaint), Gui::ToastKind::Danger);
         }
-        m_picker = new Pick::ColorPickerOverlay{*frame,  screen->geometry(), format, Pick::hexCasingOf(m_settings->boolValue(Core::kPickHexUppercase, true)), magnifierView,
+        m_picker = new Gui::ColorPickerOverlay{*frame,  screen->geometry(), format, Core::hexCasingOf(m_settings->boolValue(Core::kPickHexUppercase, true)), magnifierView,
                                                 *m_theme};
         // 最近取色跟着这一轮摆上遮罩：点色块或按数字键就能重新取回，不必回原处对像素
         m_picker->setRecentColors(recentPickedColors());
-        QObject::connect(m_picker, &Pick::ColorPickerOverlay::colorPicked, this,
+        QObject::connect(m_picker, &Gui::ColorPickerOverlay::colorPicked, this,
                          [this](const QColor &color, const QString &text)
                          {
                              rememberPickedColor(color);
                              QGuiApplication::clipboard()->setText(text);
                              notifyUser(GyanisScribe::Base::uiText("已复制颜色 ") + text, Gui::ToastKind::Success);
                          });
-        QObject::connect(m_picker, &Pick::ColorPickerOverlay::cancelled, this, [] { Base::Logger::info("取色已取消"); });
+        QObject::connect(m_picker, &Gui::ColorPickerOverlay::cancelled, this, [] { Base::Logger::info("取色已取消"); });
         m_picker->showFullScreen();
         m_picker->raise();
         m_picker->activateWindow();

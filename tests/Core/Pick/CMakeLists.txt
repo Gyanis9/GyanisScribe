@@ -1,9 +1,8 @@
-add_executable(TestPick
+add_executable(TestCorePick
         TestPick.cpp
         TestRecentColors.cpp)
 
-target_link_libraries(TestPick PRIVATE
-        Pick
+target_link_libraries(TestCorePick PRIVATE
         Core
         Gui
         GTest::gtest
@@ -13,10 +12,10 @@ target_link_libraries(TestPick PRIVATE
         Qt6::Widgets)
 
 if (MSVC)
-    target_compile_options(TestPick PRIVATE /W4 /WX)
+    target_compile_options(TestCorePick PRIVATE /W4 /WX)
 endif ()
 
-add_dependencies(TestPick DeployQtRuntime)
+add_dependencies(TestCorePick DeployQtRuntime)
 
 include(GoogleTest)
-gtest_discover_tests(TestPick)
+gtest_discover_tests(TestCorePick)

@@ -1,6 +1,6 @@
 #include "Annotation/AnnotationPalette.h"
 
-#include "Pick/RecentColors.h"
+#include "Core/Pick/RecentColors.h"
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Gui/Theme/DesignTokens.h"
@@ -31,7 +31,7 @@ namespace GyanisScribe::Annotation
 
     QStringList paletteToTokens(const std::vector<QColor> &palette)
     {
-        return Pick::serializeRecentColors(palette);
+        return Core::serializeRecentColors(palette);
     }
 
     Base::Expected<std::vector<QColor>> paletteFromTokens(const QStringList &tokens)
@@ -48,7 +48,7 @@ namespace GyanisScribe::Annotation
                     Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("色板有 {} 格，超出上限 {} 格：请删掉几格再存"),
                                                                                                tokens.size(), static_cast<int>(kPaletteCapacity))});
         }
-        const auto parsed = Pick::parseRecentColors(tokens);
+        const auto parsed = Core::parseRecentColors(tokens);
         if (!parsed)
         {
             return std::unexpected(parsed.error());
@@ -75,8 +75,8 @@ namespace GyanisScribe::Annotation
         {
             return palette;
         }
-        const auto token = Pick::recentColorToken(color);
-        const auto seen  = std::ranges::any_of(palette, [&](const QColor &held) { return Pick::recentColorToken(held) == token; });
+        const auto token = Core::recentColorToken(color);
+        const auto seen  = std::ranges::any_of(palette, [&](const QColor &held) { return Core::recentColorToken(held) == token; });
         if (seen)
         {
             return palette;
@@ -101,7 +101,7 @@ namespace GyanisScribe::Annotation
         lines.reserve(static_cast<qsizetype>(palette.size()));
         for (const auto &color: palette)
         {
-            lines << Pick::recentColorToken(color);
+            lines << Core::recentColorToken(color);
         }
         // 末尾留一个换行：粘进记事本再导回来，最后一格不会因为「没有行尾」被当成半截
         return lines.join(QLatin1Char('\n')) + QLatin1Char('\n');

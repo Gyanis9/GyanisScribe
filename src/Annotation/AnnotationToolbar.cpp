@@ -2,7 +2,7 @@
 
 #include "Annotation/AnnotationPalette.h"
 #include "Annotation/AnnotationTool.h"
-#include "Pick/RecentColors.h"
+#include "Core/Pick/RecentColors.h"
 #include "Base/Logger.h"
 #include "Base/Text.h"
 #include "Core/Settings/ISettingsStore.h"
@@ -195,13 +195,13 @@ namespace GyanisScribe::Annotation
         // 最近使用颜色：读回上一次留下的清单，插在预设色板之后、自定义按钮之前。
         // 记下这个插入点，之后每次重建成品色块都要落回同一排位置
         m_recentInsertIndex = layout->count();
-        if (const auto parsed = Pick::parseRecentColors(m_settings.stringListValue(Core::kAnnotationRecentColors, {})); parsed)
+        if (const auto parsed = Core::parseRecentColors(m_settings.stringListValue(Core::kAnnotationRecentColors, {})); parsed)
         {
             m_recentColors = *parsed;
             // 手改过的配置文件可能超出上限：按上限截断，色板不会被撑到放不下
-            if (m_recentColors.size() > Pick::kRecentColorCapacity)
+            if (m_recentColors.size() > Core::kRecentColorCapacity)
             {
-                m_recentColors.resize(Pick::kRecentColorCapacity);
+                m_recentColors.resize(Core::kRecentColorCapacity);
             }
         } else
         {
@@ -929,9 +929,9 @@ namespace GyanisScribe::Annotation
 
         // 记进「最近使用」并立刻重建色块行：需求要求这一排跟着用户最近的动作走，
         // 落盘失败只记日志——颜色本身已经生效了，不该因为存不上就回退
-        m_recentColors = Pick::pushRecentColor(m_recentColors, picked);
+        m_recentColors = Core::pushRecentColor(m_recentColors, picked);
         rebuildRecentColors();
-        if (auto written = m_settings.setValue(Core::kAnnotationRecentColors, Pick::serializeRecentColors(m_recentColors)); !written)
+        if (auto written = m_settings.setValue(Core::kAnnotationRecentColors, Core::serializeRecentColors(m_recentColors)); !written)
         {
             Base::Logger::warning(std::format("最近使用颜色没能保存：{}", written.error().message));
         }

@@ -59,10 +59,10 @@ namespace GyanisScribe::History
     class HistoryStore;
 } // namespace GyanisScribe::History
 
-namespace GyanisScribe::Pick
+namespace GyanisScribe::Gui
 {
     class ColorPickerOverlay;
-} // namespace GyanisScribe::Pick
+} // namespace GyanisScribe::Gui
 
 namespace GyanisScribe::Pin
 {
@@ -615,7 +615,7 @@ namespace GyanisScribe::App
         QImage                                               m_ocrImage;                                     ///< 最近一次送去识别的图，换语言重认按它算
         QPointer<Ocr::OcrResultWindow>                       m_ocrWindow;                                    ///< 识别结果窗口，关了就重建，不拥有
         std::unique_ptr<GyanisScribe::History::HistoryStore> m_history;                                      ///< 历史清单：成品文件的索引，删记录不删文件
-        QPointer<Pick::ColorPickerOverlay>                   m_picker;                                       ///< 取色遮罩，关掉即重建
+        QPointer<Gui::ColorPickerOverlay>                   m_picker;                                       ///< 取色遮罩，关掉即重建
         QPointer<Pin::PinGroupManagerWindow>                 m_groupManager;                                 ///< 贴图组管理窗，开着一扇就复用那一扇
         QPointer<Record::RecordingHud>                       m_hud;                                          ///< 录屏控制条，一轮一个，收起即销毁
         QTimer                                              *m_hudTicker          = nullptr;                 ///< 控制条的每秒轮询，随一轮录屏起停

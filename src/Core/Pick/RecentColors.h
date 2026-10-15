@@ -19,7 +19,7 @@
 #include <span>
 #include <vector>
 
-namespace GyanisScribe::Pick
+namespace GyanisScribe::Core
 {
     /// 标注色板「最近使用颜色」的上限：再多就挤满工具栏，也记不住那么多次
     inline constexpr std::size_t kRecentColorCapacity = 6;
@@ -60,4 +60,4 @@ namespace GyanisScribe::Pick
      */
     [[nodiscard]] Base::Expected<std::vector<QColor>> parseRecentColors(const QStringList &tokens);
 
-} // namespace GyanisScribe::Pick
+} // namespace GyanisScribe::Core

@@ -12,7 +12,7 @@
 #include "History/HistoryStore.h"
 #include "Pin/PinLayout.h"
 #include "Pin/PinTransform.h"
-#include "Pick/PickGeometry.h"
+#include "Core/Pick/PickGeometry.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Record/RecorderConfig.h"
 #include "Base/Logger.h"
@@ -690,7 +690,7 @@ namespace
 
         auto *combo = qobject_cast<QComboBox *>(controlInCurrentPage("放大镜视野"));
         ASSERT_NE(combo, nullptr) << "截图页没有这一格";
-        ASSERT_EQ(combo->count(), static_cast<int>(GyanisScribe::Pick::magnifierViews().size())) << "下拉项数与清册不同解";
+        ASSERT_EQ(combo->count(), static_cast<int>(GyanisScribe::Core::magnifierViews().size())) << "下拉项数与清册不同解";
         EXPECT_EQ(combo->currentIndex(), 1) << "默认档该是窄：与本仓此前的形状同值";
 
         combo->setCurrentIndex(0);

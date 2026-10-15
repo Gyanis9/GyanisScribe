@@ -101,7 +101,7 @@ namespace GyanisScribe::Core
 
     /// 截图完成时响一声系统提示音；默认关
     inline constexpr std::string_view kCaptureSound = "Capture/Sound";
-    /// 放大镜视野档：off（只留读数条）、narrow（9×9，默认）、medium（15×15）、wide（21×21）；词表在 Pick/PickGeometry.h
+    /// 放大镜视野档：off（只留读数条）、narrow（9×9，默认）、medium（15×15）、wide（21×21）；词表在 Core/Pick/PickGeometry.h
     inline constexpr std::string_view kCaptureMagnifierView = "Capture/MagnifierView";
     /// 「不参与窗口检测的程序」：逗号分隔的可执行文件名（如 `chrome.exe, cmd.exe`），大小写不敏感；留空即谁都不排除。
     /// 读端在 CaptureService::windowCandidates，写端在设置的截图页；解析与比对在 Capture/ScreenUtils.h
@@ -166,13 +166,13 @@ namespace GyanisScribe::Core
     /// OCR 语言包（tessdata）目录；为空时按环境变量与程序数据目录找
     inline constexpr std::string_view kOcrTessDataDirectory = "Ocr/TessDataDirectory";
 
-    /// 取色复制用的写法：Hex、Rgb、Hsl、Hsv、Hsi 或 Decimal（词表在 Pick/ColorFormat.h）
+    /// 取色复制用的写法：Hex、Rgb、Hsl、Hsv、Hsi 或 Decimal（词表在 Core/Pick/ColorFormat.h）
     inline constexpr std::string_view kPickFormat = "Pick/Format";
 
     /// HEX 里字母那几位用大写（默认开）；关掉是给粘进 CSS 与某些前端工具用的
     inline constexpr std::string_view kPickHexUppercase = "Pick/HexUppercase";
 
-    /// 最近取过的颜色（#RRGGBB 列表，最新在前，上限见 Pick::kPickColorHistoryCapacity）；
+    /// 最近取过的颜色（#RRGGBB 列表，最新在前，上限见 Core::kPickColorHistoryCapacity）；
     /// 屏幕取色与贴图取色共用这一份，取色遮罩底部的色块行按它摆
     inline constexpr std::string_view kPickRecentColors = "Pick/RecentColors";
 

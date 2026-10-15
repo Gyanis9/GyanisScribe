@@ -16,7 +16,7 @@
 #include "Pin/ColorCard.h"
 #include "Pin/PinLayout.h"
 #include "Pin/PinViewFilter.h"
-#include "Pick/ColorFormat.h"
+#include "Core/Pick/ColorFormat.h"
 #include "Gui/Controls/AppShortcuts.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Resources/IconProvider.h"
@@ -893,9 +893,9 @@ namespace GyanisScribe::Pin
     void PinWindow::applyColorCardChange(const QColor &color)
     {
         // 条上写的写法跟着设置里那一档走：与读数条、「已复制」那几处同一把尺子，改完不会多出一种写法
-        const auto casing = Pick::hexCasingOf(m_settings.boolValue(GyanisScribe::Core::kPickHexUppercase, true));
+        const auto casing = Core::hexCasingOf(m_settings.boolValue(GyanisScribe::Core::kPickHexUppercase, true));
         setColorCard(color);
-        replaceContent(Pin::renderColorCard(color, Pick::formatColor(color, Pick::ColorFormat::Hex, casing)));
+        replaceContent(Pin::renderColorCard(color, Core::formatColor(color, Core::ColorFormat::Hex, casing)));
     }
 
     std::optional<QColor> PinWindow::colorCardColor() const noexcept
@@ -1394,15 +1394,15 @@ namespace GyanisScribe::Pin
         }
 
         std::string complaint;
-        const auto  format = Pick::colorFormatOrDefault(m_settings.stringValue(Core::kPickFormat, QStringLiteral("Hex")).toStdString(), complaint);
+        const auto  format = Core::colorFormatOrDefault(m_settings.stringValue(Core::kPickFormat, QStringLiteral("Hex")).toStdString(), complaint);
         if (!complaint.empty())
         {
             // 读数不因坏配置停摆：按 HEX 顶上，原因照旧只进日志（同一句在界面那次取色时会弹给用户）
             Base::Logger::warning(std::format("取色写法读不出：{}，贴图取色按 HEX 顶上", complaint));
         }
         // 读的是显示用的那一份：开了灰度/反色之后，用户看到的就是这个颜色。字母档现读配置，只管 HEX 那一形
-        const auto casing = Pick::hexCasingOf(m_settings.boolValue(Core::kPickHexUppercase, true));
-        return Pick::formatColor(displayImage().pixelColor(*pixel), format, casing);
+        const auto casing = Core::hexCasingOf(m_settings.boolValue(Core::kPickHexUppercase, true));
+        return Core::formatColor(displayImage().pixelColor(*pixel), format, casing);
     }
 
     void PinWindow::setShadowEnabled(const bool enabled)

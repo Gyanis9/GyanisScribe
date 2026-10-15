@@ -14,7 +14,7 @@
 
 #include <vector>
 
-namespace GyanisScribe::Pick
+namespace GyanisScribe::Core
 {
 
     /// 放大镜默认取样的边长，逻辑像素：9x9 足够看清像素格，再多就把屏幕挡完了
@@ -127,4 +127,4 @@ namespace GyanisScribe::Pick
      */
     [[nodiscard]] std::vector<QRect> recentSwatchRects(const QRect &screen, int count);
 
-} // namespace GyanisScribe::Pick
+} // namespace GyanisScribe::Core

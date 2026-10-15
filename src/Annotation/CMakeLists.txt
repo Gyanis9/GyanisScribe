@@ -59,7 +59,6 @@ add_library(Annotation STATIC
 target_include_directories(Annotation PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(Annotation PUBLIC
         Core
-        Pick
         Gui
         Qt6::Core
         Qt6::Gui

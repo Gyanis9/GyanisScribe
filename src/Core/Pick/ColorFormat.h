@@ -18,7 +18,7 @@
 #include <cstddef>
 #include <string_view>
 
-namespace GyanisScribe::Pick
+namespace GyanisScribe::Core
 {
 
     /**
@@ -121,4 +121,4 @@ namespace GyanisScribe::Pick
      */
     [[nodiscard]] HexCasing hexCasingOf(bool uppercase);
 
-} // namespace GyanisScribe::Pick
+} // namespace GyanisScribe::Core

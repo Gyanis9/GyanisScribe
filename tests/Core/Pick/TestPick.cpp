@@ -1,6 +1,6 @@
-#include "Pick/ColorFormat.h"
-#include "Pick/ColorPickerOverlay.h"
-#include "Pick/PickGeometry.h"
+#include "Core/Pick/ColorFormat.h"
+#include "Gui/Pick/ColorPickerOverlay.h"
+#include "Core/Pick/PickGeometry.h"
 
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Theme/ThemeManager.h"
@@ -27,29 +27,29 @@
 #include <vector>
 
 using GyanisScribe::Base::CapturedImage;
-using GyanisScribe::Pick::ColorFormat;
-using GyanisScribe::Pick::colorFormatAt;
-using GyanisScribe::Pick::colorFormatLabel;
-using GyanisScribe::Pick::colorFormatLabels;
-using GyanisScribe::Pick::colorFormatOrDefault;
-using GyanisScribe::Pick::colorFormatToken;
-using GyanisScribe::Pick::ColorPickerOverlay;
-using GyanisScribe::Pick::formatColor;
-using GyanisScribe::Pick::framePixelFor;
-using GyanisScribe::Pick::HexCasing;
-using GyanisScribe::Pick::hexCasingOf;
-using GyanisScribe::Pick::indexOfColorFormat;
-using GyanisScribe::Pick::kMagnifierSampleEdge;
-using GyanisScribe::Pick::magnifierLayoutFor;
-using GyanisScribe::Pick::magnifierSampleEdgeFor;
-using GyanisScribe::Pick::MagnifierView;
-using GyanisScribe::Pick::magnifierViewLabel;
-using GyanisScribe::Pick::magnifierViewOrDefault;
-using GyanisScribe::Pick::magnifierViews;
-using GyanisScribe::Pick::magnifierViewToken;
-using GyanisScribe::Pick::parseColorFormat;
-using GyanisScribe::Pick::recentSwatchRects;
+using GyanisScribe::Core::ColorFormat;
+using GyanisScribe::Core::colorFormatAt;
+using GyanisScribe::Core::colorFormatLabel;
+using GyanisScribe::Core::colorFormatLabels;
+using GyanisScribe::Core::colorFormatOrDefault;
+using GyanisScribe::Core::colorFormatToken;
+using GyanisScribe::Core::formatColor;
+using GyanisScribe::Core::framePixelFor;
+using GyanisScribe::Core::HexCasing;
+using GyanisScribe::Core::hexCasingOf;
+using GyanisScribe::Core::indexOfColorFormat;
+using GyanisScribe::Core::kMagnifierSampleEdge;
+using GyanisScribe::Core::magnifierLayoutFor;
+using GyanisScribe::Core::magnifierSampleEdgeFor;
+using GyanisScribe::Core::MagnifierView;
+using GyanisScribe::Core::magnifierViewLabel;
+using GyanisScribe::Core::magnifierViewOrDefault;
+using GyanisScribe::Core::magnifierViews;
+using GyanisScribe::Core::magnifierViewToken;
+using GyanisScribe::Core::parseColorFormat;
+using GyanisScribe::Core::recentSwatchRects;
 using GyanisScribe::Core::SettingsStore;
+using GyanisScribe::Gui::ColorPickerOverlay;
 using GyanisScribe::Gui::ThemeManager;
 
 namespace

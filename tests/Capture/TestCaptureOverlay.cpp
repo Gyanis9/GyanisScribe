@@ -3,8 +3,8 @@
 // 事件用 sendEvent 直接投给控件，判据不依赖「鼠标恰好在这个时刻移动到位」。
 #include "Capture/CaptureOverlay.h"
 
-#include "Pick/ColorFormat.h"
-#include "Pick/PickGeometry.h"
+#include "Core/Pick/ColorFormat.h"
+#include "Core/Pick/PickGeometry.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Settings/SettingsStore.h"
 #include "Gui/Controls/AppShortcuts.h"
@@ -29,7 +29,7 @@
 
 using GyanisScribe::Capture::CaptureOverlay;
 using GyanisScribe::Capture::SizeUnit;
-using GyanisScribe::Pick::ColorFormat;
+using GyanisScribe::Core::ColorFormat;
 
 namespace
 {
@@ -337,7 +337,7 @@ TEST_F(CaptureOverlayFixture, MagnifierViewTiersChangeTheIllustrationAndKeepTheR
 TEST_F(CaptureOverlayFixture, MagnifierFlipsAsideAtTheScreenCorner)
 {
     auto         overlay = makeOverlay();
-    const QPoint nearCorner{kScreenGeometry.width() - GyanisScribe::Pick::kMagnifierViewEdge - 40, kScreenGeometry.height() - GyanisScribe::Pick::kMagnifierViewEdge - 40};
+    const QPoint nearCorner{kScreenGeometry.width() - GyanisScribe::Core::kMagnifierViewEdge - 40, kScreenGeometry.height() - GyanisScribe::Core::kMagnifierViewEdge - 40};
     moveOver(*overlay, nearCorner);
     const auto roomy = overlay->magnifierRect();
     EXPECT_TRUE(roomy.left() > nearCorner.x()) << "摆得下时放大镜该在光标右下";

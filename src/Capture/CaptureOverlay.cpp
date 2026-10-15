@@ -5,8 +5,8 @@
 #include "Base/SizeText.h"
 #include "Base/Logger.h"
 #include "Base/Text.h"
-#include "Pick/ColorFormat.h"
-#include "Pick/PickGeometry.h"
+#include "Core/Pick/ColorFormat.h"
+#include "Core/Pick/PickGeometry.h"
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Gui/Controls/AppShortcuts.h"
@@ -80,8 +80,8 @@ namespace GyanisScribe::Capture
 
         // 视野档在这一轮开始时读一次：读坏了只记一条日志，而不是每帧绘制都刷一句同样的话
         std::string complaint;
-        m_magnifierView = Pick::magnifierViewOrDefault(
-                m_settings.stringValue(GyanisScribe::Core::kCaptureMagnifierView, QString::fromUtf8(GyanisScribe::Pick::magnifierViewToken(Pick::MagnifierView::Narrow)))
+        m_magnifierView = Core::magnifierViewOrDefault(
+                m_settings.stringValue(GyanisScribe::Core::kCaptureMagnifierView, QString::fromUtf8(GyanisScribe::Core::magnifierViewToken(Core::MagnifierView::Narrow)))
                         .toStdString(),
                 complaint);
         if (!complaint.empty())
@@ -185,22 +185,22 @@ namespace GyanisScribe::Capture
             // 没收到鼠标移动就把 (0,0) 当成光标，报出来的是这块屏左上角的颜色
             return {};
         }
-        const auto pixel = Pick::framePixelFor(globalCursorPoint(), m_screenGeometry, m_devicePixelRatio, m_background.size());
+        const auto pixel = Core::framePixelFor(globalCursorPoint(), m_screenGeometry, m_devicePixelRatio, m_background.size());
         return m_background.pixelColor(pixel);
     }
 
-    Pick::MagnifierLayout CaptureOverlay::magnifierLayout() const
+    Core::MagnifierLayout CaptureOverlay::magnifierLayout() const
     {
         if (!m_hasCursorPoint)
         {
             return {};
         }
         // 「不显示」也按窄档摆一次：读数条要留在原位，插图由 isMagnifierVisible() 挡住
-        const auto edge = Pick::magnifierSampleEdgeFor(m_magnifierView);
-        return Pick::magnifierLayoutFor(globalCursorPoint(), m_screenGeometry, m_screenGeometry, edge > 0 ? edge : Pick::kMagnifierSampleEdge, Pick::kMagnifierViewEdge);
+        const auto edge = Core::magnifierSampleEdgeFor(m_magnifierView);
+        return Core::magnifierLayoutFor(globalCursorPoint(), m_screenGeometry, m_screenGeometry, edge > 0 ? edge : Core::kMagnifierSampleEdge, Core::kMagnifierViewEdge);
     }
 
-    Pick::MagnifierView CaptureOverlay::magnifierView() const noexcept
+    Core::MagnifierView CaptureOverlay::magnifierView() const noexcept
     {
         return m_magnifierView;
     }
@@ -223,7 +223,7 @@ namespace GyanisScribe::Capture
     bool CaptureOverlay::isMagnifierVisible() const noexcept
     {
         // 光标亮过、这块屏的冻帧真的抓到了，且这一档不是「不显示」
-        return m_hasCursorPoint && !m_background.isNull() && m_magnifierView != Pick::MagnifierView::Off;
+        return m_hasCursorPoint && !m_background.isNull() && m_magnifierView != Core::MagnifierView::Off;
     }
 
     bool CaptureOverlay::isReadoutVisible() const noexcept
@@ -241,7 +241,7 @@ namespace GyanisScribe::Capture
         return QRect{viewRect.left(), viewRect.bottom() + kMagnifierPenWidth, viewRect.width(), kMagnifierStripHeight};
     }
 
-    Pick::ColorFormat CaptureOverlay::readoutFormat() const noexcept
+    Core::ColorFormat CaptureOverlay::readoutFormat() const noexcept
     {
         return m_readoutFormat;
     }
@@ -284,8 +284,8 @@ namespace GyanisScribe::Capture
         // 视野档是「不显示」时只跳过这枚插图，下面那条读数条照旧画在原位
         if (isMagnifierVisible())
         {
-            const auto cropPixel  = Pick::framePixelFor(layout.sourceRect.topLeft(), m_screenGeometry, m_devicePixelRatio, m_background.size());
-            const auto sampleEdge = Pick::magnifierSampleEdgeFor(m_magnifierView);
+            const auto cropPixel  = Core::framePixelFor(layout.sourceRect.topLeft(), m_screenGeometry, m_devicePixelRatio, m_background.size());
+            const auto sampleEdge = Core::magnifierSampleEdgeFor(m_magnifierView);
 
             // 取样范围是逻辑像素，抓帧是设备像素：边长要乘缩放比，夹到帧内而不是让它越界画出一片空白
             const auto cropSpan = static_cast<int>(std::lround(sampleEdge * m_devicePixelRatio));
@@ -327,8 +327,8 @@ namespace GyanisScribe::Capture
     QString CaptureOverlay::readoutColorText() const
     {
         // 字母档现读配置：这一格只管 HEX 写法，其它写法读出来不受它影响
-        const auto casing = Pick::hexCasingOf(m_settings.boolValue(GyanisScribe::Core::kPickHexUppercase, true));
-        return Pick::formatColor(colorUnderCursor(), m_readoutFormat, casing);
+        const auto casing = Core::hexCasingOf(m_settings.boolValue(GyanisScribe::Core::kPickHexUppercase, true));
+        return Core::formatColor(colorUnderCursor(), m_readoutFormat, casing);
     }
 
     SizeUnit CaptureOverlay::sizeUnit() const noexcept
@@ -704,7 +704,7 @@ namespace GyanisScribe::Capture
             case RebindableKeyAction::CycleColorFormat:
                 // 读数里颜色那一格换一种写法（词表见 Pick/ColorFormat，六个轮一圈）：对着目标程序核对配色时
                 // 常常要换一种写法看，不必为这个先离开截图去设置里改一档
-                m_readoutFormat = *Pick::colorFormatAt((Pick::indexOfColorFormat(m_readoutFormat) + 1) % static_cast<int>(Pick::kColorFormatCount));
+                m_readoutFormat = *Core::colorFormatAt((Core::indexOfColorFormat(m_readoutFormat) + 1) % static_cast<int>(Core::kColorFormatCount));
                 update();
                 return;
             case RebindableKeyAction::ToggleCursor:

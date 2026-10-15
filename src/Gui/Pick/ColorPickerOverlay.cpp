@@ -1,4 +1,4 @@
-#include "Pick/ColorPickerOverlay.h"
+#include "Gui/Pick/ColorPickerOverlay.h"
 
 #include "Base/Text.h"
 #include "Gui/Theme/DesignTokens.h"
@@ -16,7 +16,7 @@
 
 namespace
 {
-    using GyanisScribe::Pick::ColorPickerOverlay;
+    using GyanisScribe::Gui::ColorPickerOverlay;
 
     /// 信息条的高度，逻辑像素：一行颜色文本加一点上下留白
     constexpr int kInfoStripHeight = 28;
@@ -31,13 +31,13 @@ namespace
     constexpr int kGridPenWidth = 1;
 } // namespace
 
-namespace GyanisScribe::Pick
+namespace GyanisScribe::Gui
 {
-    ColorPickerOverlay::ColorPickerOverlay(const Base::CapturedImage &frame, const QRect &screenGeometry, const ColorFormat format, const HexCasing casing,
-                                           const MagnifierView view, const Gui::ThemeManager &theme, QWidget *parent) :
+    ColorPickerOverlay::ColorPickerOverlay(const Base::CapturedImage &frame, const QRect &screenGeometry, const Core::ColorFormat format, const Core::HexCasing casing,
+                                           const Core::MagnifierView view, const Gui::ThemeManager &theme, QWidget *parent) :
         QWidget(parent), m_frame(frame), m_screenGeometry(screenGeometry), m_format(format), m_hexCasing(casing), m_magnifierView(view), m_theme(theme), m_cursor(QCursor::pos())
     {
-        // 遮罩盖住整块屏幕，坐标一律用屏幕坐标：逻辑坐标与冻帧像素之间靠 framePixelFor 换算
+        // 遮罩盖住整块屏幕，坐标一律用屏幕坐标：逻辑坐标与冻帧像素之间靠 Core::framePixelFor 换算
         setGeometry(m_screenGeometry);
         setMouseTracking(true);
         setCursor(Qt::CrossCursor);
@@ -47,7 +47,7 @@ namespace GyanisScribe::Pick
 
     QColor ColorPickerOverlay::colorAt(const QPoint &globalPos) const
     {
-        const auto pixel = framePixelFor(globalPos, m_screenGeometry, m_frame.devicePixelRatio, m_frame.image.size());
+        const auto pixel = Core::framePixelFor(globalPos, m_screenGeometry, m_frame.devicePixelRatio, m_frame.image.size());
         if (m_frame.image.isNull())
         {
             return {};
@@ -62,12 +62,12 @@ namespace GyanisScribe::Pick
 
     QString ColorPickerOverlay::currentText() const
     {
-        return formatColor(colorAt(m_cursor), m_format, m_hexCasing);
+        return Core::formatColor(colorAt(m_cursor), m_format, m_hexCasing);
     }
 
     bool ColorPickerOverlay::isMagnifierVisible() const noexcept
     {
-        return m_magnifierView != MagnifierView::Off;
+        return m_magnifierView != Core::MagnifierView::Off;
     }
 
     void ColorPickerOverlay::setRecentColors(std::vector<QColor> colors)
@@ -79,7 +79,7 @@ namespace GyanisScribe::Pick
 
     int ColorPickerOverlay::swatchIndexAt(const QPoint &globalPos) const
     {
-        const auto rects = recentSwatchRects(m_screenGeometry, static_cast<int>(m_recent.size()));
+        const auto rects = Core::recentSwatchRects(m_screenGeometry, static_cast<int>(m_recent.size()));
         for (std::size_t index = 0; index < rects.size(); ++index)
         {
             if (rects[index].contains(globalPos))
@@ -112,14 +112,15 @@ namespace GyanisScribe::Pick
         painter.drawPoint(local);
 
         // 视野档是「不显示」时也按窄档算一次位置：下面那条信息条要留在原位
-        const auto sampleEdge = magnifierSampleEdgeFor(m_magnifierView);
-        const auto layout     = magnifierLayoutFor(m_cursor, m_screenGeometry, m_screenGeometry, sampleEdge > 0 ? sampleEdge : kMagnifierSampleEdge, kMagnifierViewEdge);
-        const auto viewRect   = layout.viewRect.translated(-m_screenGeometry.topLeft());
+        const auto sampleEdge = Core::magnifierSampleEdgeFor(m_magnifierView);
+        const auto layout =
+                Core::magnifierLayoutFor(m_cursor, m_screenGeometry, m_screenGeometry, sampleEdge > 0 ? sampleEdge : Core::kMagnifierSampleEdge, Core::kMagnifierViewEdge);
+        const auto viewRect = layout.viewRect.translated(-m_screenGeometry.topLeft());
         if (viewRect.isValid() && isMagnifierVisible())
         {
             // 取样框是屏幕逻辑坐标，抓帧是设备像素：先换算左上角，再按缩放比放大尺寸，
             // 只减不乘会在高 DPI 屏上把整片放大镜偏到左上角
-            const auto cropOrigin = framePixelFor(layout.sourceRect.topLeft(), m_screenGeometry, m_frame.devicePixelRatio, m_frame.image.size());
+            const auto cropOrigin = Core::framePixelFor(layout.sourceRect.topLeft(), m_screenGeometry, m_frame.devicePixelRatio, m_frame.image.size());
             const auto cropSpan   = static_cast<int>(std::lround(sampleEdge * m_frame.devicePixelRatio));
             const auto cropSize   = QSize{std::clamp(cropSpan, 1, m_frame.image.width() - cropOrigin.x()), std::clamp(cropSpan, 1, m_frame.image.height() - cropOrigin.y())};
             // 像素格用最近邻放大，Smooth 会把格子糊成一片，放大镜就白摆了
@@ -145,9 +146,9 @@ namespace GyanisScribe::Pick
         painter.setPen(QPen{m_theme.palette().text});
         painter.drawText(stripRect.adjusted(kColorChipEdge + 12, 0, -4, 0), Qt::AlignVCenter | Qt::AlignLeft, currentText());
 
-        // 最近取色的色块行贴在屏幕底边中间：命中测试与绘制共用 recentSwatchRects 那一处几何
+        // 最近取色的色块行贴在屏幕底边中间：命中测试与绘制共用 Core::recentSwatchRects 那一处几何
         const auto origin   = m_screenGeometry.topLeft();
-        const auto swatches = recentSwatchRects(m_screenGeometry, static_cast<int>(m_recent.size()));
+        const auto swatches = Core::recentSwatchRects(m_screenGeometry, static_cast<int>(m_recent.size()));
         for (std::size_t index = 0; index < swatches.size(); ++index)
         {
             const auto box = swatches[index].translated(-origin.x(), -origin.y());
@@ -216,8 +217,8 @@ namespace GyanisScribe::Pick
 
     void ColorPickerOverlay::deliverColor(const QColor &color)
     {
-        emit colorPicked(color, formatColor(color, m_format, m_hexCasing));
+        emit colorPicked(color, Core::formatColor(color, m_format, m_hexCasing));
         close();
     }
 
-} // namespace GyanisScribe::Pick
+} // namespace GyanisScribe::Gui

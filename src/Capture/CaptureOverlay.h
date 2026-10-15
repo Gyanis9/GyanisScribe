@@ -16,8 +16,8 @@
 #include <QWidget>
 
 #include "Capture/ScreenUtils.h"
-#include "Pick/ColorFormat.h"
-#include "Pick/PickGeometry.h"
+#include "Core/Pick/ColorFormat.h"
+#include "Core/Pick/PickGeometry.h"
 
 #include <array>
 #include <optional>
@@ -156,13 +156,13 @@ namespace GyanisScribe::Capture
          * @details 遮罩一次会话只活几秒，所以这一档在构造时读一次：读坏了只记一条日志，
          *          而不是每帧绘制都刷一句同样的话。
          */
-        [[nodiscard]] Pick::MagnifierView magnifierView() const noexcept;
+        [[nodiscard]] Core::MagnifierView magnifierView() const noexcept;
 
         /**
          * @brief 放大镜读数里颜色那一格用的写法
          * @return 当前档位；按 C 在 Hex、Rgb、Hsl 之间轮换
          */
-        [[nodiscard]] Pick::ColorFormat readoutFormat() const noexcept;
+        [[nodiscard]] Core::ColorFormat readoutFormat() const noexcept;
 
         /**
          * @brief 放大镜读数条里颜色那一格的文本
@@ -397,7 +397,7 @@ namespace GyanisScribe::Capture
          * @details 视野档是「不显示」时也按窄档算一遍位置：读数条要留在它一直在的那一处，
          *          关掉插图不该让那一条跳到别的位置。
          */
-        [[nodiscard]] Pick::MagnifierLayout magnifierLayout() const;
+        [[nodiscard]] Core::MagnifierLayout magnifierLayout() const;
 
         /**
          * @brief 放大镜读数条上的坐标部分
@@ -413,8 +413,8 @@ namespace GyanisScribe::Capture
         QPoint                    m_currentPoint;                            ///< 框选过程中的当前点
         QPoint                    m_cursorPoint;                             ///< 光标最近所在点，只喂辅助线、悬停与放大镜，不参与选区计算
         bool                      m_hasCursorPoint = false;                  ///< 是否收到过鼠标移动：没有就不摆放大镜，别把 (0,0) 当成光标
-        Pick::ColorFormat         m_readoutFormat  = Pick::ColorFormat::Hex; ///< 读数里颜色那格的写法，按 C 轮换
-        Pick::MagnifierView       m_magnifierView;                           ///< 这一轮的放大镜视野档，构造时读一次
+        Core::ColorFormat         m_readoutFormat  = Core::ColorFormat::Hex; ///< 读数里颜色那格的写法，按 C 轮换
+        Core::MagnifierView       m_magnifierView;                           ///< 这一轮的放大镜视野档，构造时读一次
         SizeUnit                  m_sizeUnit = SizeUnit::Logical;            ///< 这一轮那几处数字用的单位，构造时读一次
 
         std::vector<QRect>           m_regionHistory;         ///< 这块屏上的历史选区，最近的在前；由 CaptureService 推过来

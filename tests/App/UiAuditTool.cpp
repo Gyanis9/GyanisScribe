@@ -10,7 +10,7 @@
 #include "Annotation/AnnotationToolbarGeometry.h"
 #include "App/MainWindow.h"
 #include "History/HistoryStore.h"
-#include "Pick/RecentColors.h"
+#include "Core/Pick/RecentColors.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Settings/SettingsStore.h"
@@ -77,7 +77,7 @@ namespace
     std::vector<QColor> fullRecentColors()
     {
         std::vector<QColor> recent;
-        for (int index = 0; index < static_cast<int>(GyanisScribe::Pick::kRecentColorCapacity); ++index)
+        for (int index = 0; index < static_cast<int>(GyanisScribe::Core::kRecentColorCapacity); ++index)
         {
             recent.push_back(QColor::fromHsv(210 - index * 12, 160 + index * 8, 120 + index * 16));
         }
@@ -161,7 +161,7 @@ int main(int argc, char *argv[])
     // 面 2：标注工具栏满配态——16 格色板 + 6 格最近色，这是它能长到的最宽形状
     {
         const auto paletteSeeded = settings.setValue(GyanisScribe::Core::kAnnotationPalette, GyanisScribe::Annotation::paletteToTokens(fullPalette()));
-        const auto recentSeeded  = settings.setValue(GyanisScribe::Core::kAnnotationRecentColors, GyanisScribe::Pick::serializeRecentColors(fullRecentColors()));
+        const auto recentSeeded  = settings.setValue(GyanisScribe::Core::kAnnotationRecentColors, GyanisScribe::Core::serializeRecentColors(fullRecentColors()));
         if (!paletteSeeded || !recentSeeded)
         {
             std::fprintf(stderr, "failed to seed the full palette\n");
