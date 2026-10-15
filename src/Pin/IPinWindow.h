@@ -13,10 +13,12 @@
 
 #include "Pin/PinLayout.h"
 
+#include <QColor>
 #include <QImage>
 #include <QRect>
 
 #include <filesystem>
+#include <optional>
 
 namespace GyanisScribe::Pin
 {
@@ -94,6 +96,14 @@ namespace GyanisScribe::Pin
          * @return 四档之一，初值是跟随窗口底色
          */
         [[nodiscard]] virtual TransparentBackdrop transparentBackdrop() const noexcept = 0;
+
+        /**
+         * @brief 这张贴图是不是色卡、原本是哪个色
+         * @return 是色卡时返回那个色；不是色卡时返回空
+         * @details 内容来源的一个属性：右键菜单里「改这一张的颜色…」按它出现，
+         *          管理器与界面层也可能要问——只收在具体窗口里的话，判据与界面层都得先 static_cast。
+         */
+        [[nodiscard]] virtual std::optional<QColor> colorCardColor() const noexcept = 0;
 
         /**
          * @brief 保持置顶

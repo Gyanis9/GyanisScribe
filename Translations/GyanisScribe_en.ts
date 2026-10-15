@@ -2780,6 +2780,10 @@
             <translation>Saving the pinned image failed: {}. Check that the directory is writable, or copy this image to the clipboard first.</translation>
         </message>
         <message>
+            <source>改这一张的颜色</source>
+            <translation>Change this card's colour</translation>
+        </message>
+        <message>
             <source>已选中 %1 张</source>
             <translation>%1 selected</translation>
         </message>
@@ -2806,6 +2810,10 @@
         <message>
             <source>没读懂这个尺寸：请按「宽x高」写，比如 640x360</source>
             <translation>Could not read that size: write it as "width x height", for example 640x360</translation>
+        </message>
+        <message>
+            <source>改这一张的颜色…</source>
+            <translation>Change this card's colour…</translation>
         </message>
         <message>
             <source>保存</source>

@@ -6,6 +6,7 @@
 #include "Settings/SettingsKeys.h"
 #include "Settings/SettingsStore.h"
 
+#include <QColor>
 #include <QCoreApplication>
 #include <QMap>
 #include <QPoint>
@@ -387,4 +388,29 @@ TEST_F(PinLayoutFixture, RotationCycleKeepsEveryGroupReachable)
             EXPECT_EQ(cycle.count(group), 1) << "第 " << index << " 份名单里，组 " << group << " 在一圈中出现了 " << cycle.count(group) << " 次";
         }
     }
+}
+
+/**
+ * @brief 钉住色卡原色进得了布局，旧记录里没有这一格时不当作坏值
+ * @details 这一格是后加的字段：旧布局里没有它，读回来必须是「不是色卡」而不是整条记录被拒；
+ *          写了就原样带回来——只存不读或只读不存，重启之后改色这一项都会回到改之前。
+ */
+TEST_F(PinLayoutFixture, ColorCardHexRoundTripsAndDefaultsToEmpty)
+{
+    auto card = sample(5, 5, 1.0, 0.0, 1.0);
+    card.colorCardHex = QColor(0x12, 0x34, 0x56).name(QColor::HexArgb);
+    const auto parsed = parseLayout(serializeLayout(QVector<PinState>{card}).toStdString());
+    ASSERT_TRUE(parsed.has_value()) << parsed.error().message;
+    ASSERT_EQ(parsed->size(), 1);
+    EXPECT_EQ(parsed->front().colorCardHex, card.colorCardHex) << "色卡原色没跟着布局走：重启后这一项会消失";
+
+    const auto legacy = parseLayout(R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png"}])");
+    ASSERT_TRUE(legacy.has_value()) << "旧记录里没有色卡那一格，整条记录被拒了";
+    EXPECT_TRUE(legacy->front().colorCardHex.isEmpty()) << "缺省该是「不是色卡」";
+
+    // 普通贴图那一份同样写这一格（空串），与 sourceFile 同一条约定：字段齐全，读端按空串判「不是色卡」
+    const auto plain = sample(5, 5, 1.0, 0.0, 1.0);
+    const auto roundTrip = parseLayout(serializeLayout(QVector<PinState>{plain}).toStdString());
+    ASSERT_TRUE(roundTrip.has_value());
+    EXPECT_TRUE(roundTrip->front().colorCardHex.isEmpty()) << "普通贴图往返一趟多出一个原色";
 }

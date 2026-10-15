@@ -255,6 +255,27 @@ namespace GyanisScribe::Pin
         void setAnimatedSource(const QString &file);
 
         /**
+         * @brief 记下这张是色卡、原本是哪个色（右键「改这一张的颜色…」的初值与出现条件）
+         * @param color 色卡本体那个色；传空表示「这张不再是色卡」（内容被换成别的时要把这一档摘掉）
+         * @details 只有色卡会被调用；进了布局记录，重启之后这一项还在。非色卡不调用，那一项就不出现。
+         */
+        void setColorCard(const std::optional<QColor> &color);
+
+        /**
+         * @brief 这张是不是色卡、原本是什么色
+         * @return 是色卡时返回那个色；不是时返回空
+         */
+        [[nodiscard]] std::optional<QColor> colorCardColor() const noexcept override;
+
+        /**
+         * @brief 把这张色卡换成另一个色：记下新色 + 按当前字母档重画条上的写法 + 换掉像素
+         * @param color 新的颜色
+         * @details 取色器那一步与「换成什么」分开：模态框没法在用例里驱动，判据从这一条进
+         *          （与「自定义尺寸…」把 setExactSize 单独拿出来同一个理由）。
+         */
+        void applyColorCardChange(const QColor &color);
+
+        /**
          * @brief 这张贴图是不是动图
          * @return true 表示有帧序列可播（哪怕此刻暂停着）
          */
@@ -804,6 +825,14 @@ namespace GyanisScribe::Pin
         [[nodiscard]] int edgeSnapDistance() const;
 
         /**
+         * @brief 开着取色器改这张色卡的颜色，选完当场重画
+         * @param seed 取色器的初值，就是这张卡现在那个色
+         * @details 条上写的写法跟着设置里那一档走：三条出口（读数、「已复制」文本、这里）同一把尺子。
+         */
+        void editColorCard(const QColor &seed);
+
+
+        /**
          * @brief 窗口四边那一条带子里的落点归哪一档（角上优先，其次是那一条边）
          * @param localPoint 本窗口内坐标
          * @return 对应的手柄档；落在带子外（或缩略图那一档）为空
@@ -907,6 +936,7 @@ namespace GyanisScribe::Pin
         bool                                                 m_dockCollapsed = false;                         ///< 贴边后是不是收成了那一条
         bool                                                 m_dragMoved     = false;                         ///< 这一轮按下之后真拖动过没有（只点一下不吸边）
         class QMovie                                        *m_movie         = nullptr;                       ///< 动图播放器；静图这张贴图时为空
+        QString                                              m_colorCardHex;                                  ///< 色卡原本那个色（`#AARRGGBB`）；空表示这张不是色卡
         QString                                              m_sourceFile;                                    ///< 动图的来源文件；进布局记录，重启后按它接上动画
         QPoint                                               m_dragOffset;                                    ///< 移动时起笔点与窗口左上角的差
         std::function<std::vector<QRect>()>                  m_snapCandidates;                                ///< 起笔时取参照矩形的口径，由管理器供给

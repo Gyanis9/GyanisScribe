@@ -13,6 +13,7 @@
 #include "Core/Paths.h"
 #include "Core/SizeText.h"
 #include "Core/Text.h"
+#include "Pin/ColorCard.h"
 #include "Pin/PinLayout.h"
 #include "Pin/PinViewFilter.h"
 #include "Pick/ColorFormat.h"
@@ -706,6 +707,7 @@ namespace GyanisScribe::Pin
         state.mouseThrough        = m_mouseThrough;
         state.transparentBackdrop = m_transparentBackdrop;
         state.sourceFile          = m_sourceFile;
+        state.colorCardHex        = m_colorCardHex;
         return state;
     }
 
@@ -871,6 +873,38 @@ namespace GyanisScribe::Pin
     void PinWindow::setGroupNames(const QMap<int, QString> &names)
     {
         m_groupNames = names;
+    }
+
+    void PinWindow::setColorCard(const std::optional<QColor> &color)
+    {
+        m_colorCardHex = color.has_value() ? color->name(QColor::HexArgb) : QString{};
+    }
+
+    void PinWindow::editColorCard(const QColor &seed)
+    {
+        const auto chosen = QColorDialog::getColor(seed, this, GyanisScribe::Core::uiText("改这一张的颜色"));
+        if (!chosen.isValid())
+        {
+            return; // 取消是一种正常收场：什么都没发生，也什么都不用说
+        }
+        applyColorCardChange(chosen);
+    }
+
+    void PinWindow::applyColorCardChange(const QColor &color)
+    {
+        // 条上写的写法跟着设置里那一档走：与读数条、「已复制」那几处同一把尺子，改完不会多出一种写法
+        const auto casing = Pick::hexCasingOf(m_settings.boolValue(GyanisScribe::Settings::kPickHexUppercase, true));
+        setColorCard(color);
+        replaceContent(Pin::renderColorCard(color, Pick::formatColor(color, Pick::ColorFormat::Hex, casing)));
+    }
+
+    std::optional<QColor> PinWindow::colorCardColor() const noexcept
+    {
+        if (m_colorCardHex.isEmpty())
+        {
+            return std::nullopt;
+        }
+        return QColor{m_colorCardHex};
     }
 
     void PinWindow::setAnimatedSource(const QString &file)
@@ -2082,6 +2116,12 @@ namespace GyanisScribe::Pin
 
         // 保存与「在文件夹中查看」是同一条路：后者在存下之后再打开那个目录，
         // 两处各写一份起名与写盘的代码，将来改命名模板就会漏掉一处
+        // 色卡还能改色：只在「这张是色卡」时出现（创建时记下了原本那个色），点开就是取色器，选完当场重画这张卡
+        if (const auto seed = colorCardColor(); seed.has_value())
+        {
+            menu->addAction(GyanisScribe::Core::uiText("改这一张的颜色…"), this, [this, seed] { editColorCard(*seed); });
+        }
+
         menu->addAction(GyanisScribe::Core::uiText("保存"), this,
                         [this]
                         {

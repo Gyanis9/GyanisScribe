@@ -116,9 +116,11 @@ namespace GyanisScribe::Pin
          * @param image 图片（物理像素）
          * @param globalTopLeft 窗口左上角的全局逻辑坐标
          * @param animatedSource 动图来源文件；空表示这张是静图（剪贴板与标注贴出来的都在内存里）
+         * @param colorCard
+         * 内容是从一段颜色写法渲染出来时，那个颜色本身；空表示这张不是色卡
          * @return 新建的贴图窗口引用，所有权仍在管理器手里
          */
-        IPinWindow &addPin(const QImage &image, const QPoint &globalTopLeft, const QString &animatedSource = {});
+        IPinWindow &addPin(const QImage &image, const QPoint &globalTopLeft, const QString &animatedSource = {}, const std::optional<QColor> &colorCard = {});
 
         /**
          * @brief 当前贴图张数
@@ -266,6 +268,7 @@ namespace GyanisScribe::Pin
          * @brief 把某张贴图的内容换成给定的那份像素
          * @param index 贴图在册表里的序号
          * @param image 新内容，物理像素
+         * @param colorCard 新内容是从一段颜色写法渲染出来时那个颜色；空表示新内容不是色卡（原来的色卡身份要一并摘掉）
          * @return 成功返回空值
          * @return 失败带中文原因：贴图不在册，或那是一张动图（换上去的静态像素会被下一帧盖掉）
          * @details 摆位、缩放与角度都不动：这一条换的是「这张图」，不是「这张贴图摆在哪儿」。
@@ -273,7 +276,7 @@ namespace GyanisScribe::Pin
          * @note 交进来的像素要带着它来自的那块屏的 dpr：显示尺寸按「像素 ÷ dpr」折算，
          *       dpr 丢了就等于把这张图放大 dpr 倍（刷新那一路在调用点补这一格，见 AppController）。
          */
-        [[nodiscard]] Core::Expected<void> replacePinContent(int index, const QImage &image);
+        [[nodiscard]] Core::Expected<void> replacePinContent(int index, const QImage &image, const std::optional<QColor> &colorCard = {});
 
         /**
          * @brief 这一张要重抓的那块屏幕矩形（全屏逻辑坐标）

@@ -3,6 +3,7 @@
 // 不再放在没有应用对象的 TestShell 里。
 
 #include "App/ClipboardPin.h"
+#include "Pin/ColorCard.h"
 
 #include "PinTestAssets.h"
 
@@ -25,14 +26,15 @@
 #include <string>
 
 using GyanisScribe::App::dropContentFrom;
-using GyanisScribe::App::kColorCardHeight;
-using GyanisScribe::App::kColorCardStripHeight;
-using GyanisScribe::App::kColorCardWidth;
+using GyanisScribe::Pin::kColorCardHeight;
+using GyanisScribe::Pin::kColorCardStripHeight;
+using GyanisScribe::Pin::kColorCardWidth;
 using GyanisScribe::App::kMaximumTextCardCharacters;
 using GyanisScribe::App::kTextCardMaximumWidth;
 using GyanisScribe::App::kTextCardMinimumWidth;
+using GyanisScribe::App::colorCardColorOf;
 using GyanisScribe::App::pinContentFrom;
-using GyanisScribe::App::renderColorCard;
+using GyanisScribe::Pin::renderColorCard;
 using GyanisScribe::App::renderTextCard;
 using GyanisScribe::Core::ErrorCode;
 
@@ -277,4 +279,44 @@ TEST_F(ClipboardPinFixture, DropOfOnlyNonImagesSaysWhatCameIn)
     const auto dropped = dropContentFrom(&mime, cardFont());
     ASSERT_FALSE(dropped.has_value()) << "全是非图片也当成贴得成，画布上会凭空冒出东西";
     EXPECT_NE(dropped.error().message.find("GyanisScribe-DropPin-only.txt"), std::string::npos) << "要说清是哪个文件不行";
+}
+
+/**
+ * @brief 钉住「这一段是不是颜色写法」：三种形状各认一次，普通单词与多行不认
+ * @details 这条判据同时是色卡身份的来源，两种坏法都打在这里：把 `rgb()`/`hsl()` 当成认不了
+ *          （前缀白名单里写着它们，而 `QColor::fromString` 只认 `#` 与颜色名——不自己拆就是死代码，
+ *          粘进去的会是一张文本卡），以及把「red」这类普通单词当颜色贴出来。
+ */
+TEST(ClipboardPinColorText, OnlyTheThreeColorFormsCount)
+{
+    const auto detection = [](const QString &text)
+    {
+        QMimeData data;
+        data.setText(text);
+        return colorCardColorOf(&data);
+    };
+
+    const auto hex = detection(QStringLiteral("#FF8000"));
+    ASSERT_TRUE(hex.has_value()) << "`#` 那一形是最常用的一种，认不出就等于没有色卡";
+    EXPECT_EQ(*hex, QColor(0xFF, 0x80, 0x00));
+
+    const auto rgb = detection(QStringLiteral("rgb(255, 136, 0)"));
+    ASSERT_TRUE(rgb.has_value()) << "rgb() 那一形要认：白名单里写着它，走不到就是死代码";
+    EXPECT_EQ(*rgb, QColor(255, 136, 0));
+
+    const auto hsl = detection(QStringLiteral("  hsl(30, 100%, 50%)  "));
+    ASSERT_TRUE(hsl.has_value()) << "hsl() 那一形要认（首尾空白先去过）";
+    EXPECT_EQ(hsl->hue(), 30) << "色相那一格换算错了，贴出来的是另一个色";
+
+    EXPECT_FALSE(detection(QStringLiteral("rgb(300, 0, 0)")).has_value()) << "越界的通道值不该夹取：夹出来的不是用户粘的那个色";
+    EXPECT_FALSE(detection(QStringLiteral("rgb(50%, 0, 0)")).has_value()) << "rgb 里带百分号不是这一套写法";
+    EXPECT_FALSE(detection(QStringLiteral("hsl(30, 50, 50)")).has_value()) << "hsl 缺百分号也不认：多一种写法就多一条要守的口径";
+    EXPECT_FALSE(detection(QStringLiteral("red")).has_value()) << "普通单词不该当颜色贴出来";
+    const auto multiLine = QStringLiteral("第一行") + QLatin1Char('\n') + QStringLiteral("#FF8000");
+    EXPECT_FALSE(detection(multiLine).has_value()) << "多行不该当颜色";
+    EXPECT_FALSE(colorCardColorOf(nullptr).has_value()) << "空载荷不该崩也不该猜";
+
+    QMimeData imageOnly;
+    imageOnly.setImageData(QImage{4, 4, QImage::Format_ARGB32});
+    EXPECT_FALSE(colorCardColorOf(&imageOnly).has_value()) << "只有图像时不该报出一个颜色";
 }

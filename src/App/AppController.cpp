@@ -1068,7 +1068,8 @@ namespace GyanisScribe::App
         }
 
         // 落在光标那一处：剪贴板来的图没有「原来那块位置」，跟着鼠标走才是用户此刻的落点
-        m_pins->addPin(*image, QCursor::pos());
+        // 颜色写法贴出来的是色卡：把那个色一起交下去，右键「改这一张的颜色…」以后才有初值
+        m_pins->addPin(*image, QCursor::pos(), {}, colorCardColorOf(data));
         Core::Logger::info(std::format("剪贴板里的图已贴出：{}×{} 像素", image->width(), image->height()));
     }
 
@@ -1081,7 +1082,8 @@ namespace GyanisScribe::App
             notifyUser(QString::fromUtf8(image.error().message), Ui::ToastKind::Information);
             return;
         }
-        if (const auto replaced = m_pins->replacePinContent(index, *image); !replaced)
+        // 色卡身份跟着换进来的内容走：换成颜色写法就记下那个色，换成别的就把这一档摘掉（传空）
+        if (const auto replaced = m_pins->replacePinContent(index, *image, colorCardColorOf(QGuiApplication::clipboard()->mimeData())); !replaced)
         {
             // 拒绝面都带中文原因（动图不换、那张已不在册），原来的那份一律保持不动
             notifyUser(QString::fromUtf8(replaced.error().message), Ui::ToastKind::Information);

@@ -2,6 +2,7 @@
 
 #include "Core/Paths.h"
 #include "Core/Text.h"
+#include "Pin/ColorCard.h"
 #include "Pin/PinManager.h"
 
 #include <QFontMetrics>
@@ -13,18 +14,13 @@
 #include <QVariant>
 
 #include <algorithm>
+#include <array>
 #include <optional>
 
 namespace GyanisScribe::App
 {
     namespace
     {
-        /// 卡片配色：白底、近黑字、浅灰边。写在实现里而不是进主题：卡片是独立成品，
-        /// 深浅主题各渲染一种会让同一段文字在别人桌面上有两种样子
-        const QColor kCardBackground{252, 252, 252};
-        const QColor kCardText{24, 24, 24};
-        const QColor kCardBorder{220, 224, 230};
-
         /// 一次拖放贴出多张时，后一张相对前一张向右下错开的格数：完全叠住会让人以为只贴上一张
         constexpr int kDropPinCascadeStride = 24;
 
@@ -35,6 +31,67 @@ namespace GyanisScribe::App
          * @details 只认 `#`、`rgb(`、`hsl(` 开头的短单行：QColor::fromString 连 `red` 这种单词都认，
          *          全放开就会把普通英文里恰好出现的颜色词渲染成色卡。
          */
+        /**
+         * @brief 拆 `rgb(r, g, b)` 与 `hsl(h, s%, l%)` 这两形
+         * @param text 已经过前缀粗筛的短单行
+         * @return 拆出来的颜色；形状不对、数字不是整数、或取值越界时返回空
+         * @details `QColor::fromString` 只认 `#` 与颜色名，这两形得自己拆（实测 fmt 与 hsl 都返回无效色）。
+         *          越界不夹取：夹出来的色与用户粘的那串不是同一个，贴出来的是「看着像」的色卡；
+         *          认不出就让这段文本走文本卡那条路，用户看得见自己贴的是原文。
+         */
+        [[nodiscard]] std::optional<QColor> parseFunctionalColor(const QString &text)
+        {
+            const auto open = text.indexOf(QLatin1Char('('));
+            if (open <= 0 || !text.endsWith(QLatin1Char(')')))
+            {
+                return std::nullopt;
+            }
+            const auto name  = text.left(open).trimmed().toLower();
+            const auto parts = text.mid(open + 1, text.size() - open - 2).split(QLatin1Char(','));
+            if (parts.size() != 3)
+            {
+                return std::nullopt;
+            }
+
+            std::array<int, 3> numbers{};
+            std::array<bool, 3> percents{};
+            for (std::size_t index = 0; index < numbers.size(); ++index)
+            {
+                auto part = parts[static_cast<qsizetype>(index)].trimmed();
+                if (part.endsWith(QLatin1Char('%')))
+                {
+                    // 百分号只在 hsl 的饱和与明度那两格上成立：rgb(50%, …) 与 hsl 的色相带它都不是这一套写法
+                    percents[index] = true;
+                    part.chop(1);
+                }
+                bool       ok     = false;
+                const auto number = part.toInt(&ok);
+                if (!ok)
+                {
+                    return std::nullopt;
+                }
+                numbers[index] = number;
+            }
+
+            const auto within = [](const int value, const int minimum, const int maximum) { return value >= minimum && value <= maximum; };
+            if (name == QLatin1String("rgb"))
+            {
+                if (percents[0] || percents[1] || percents[2] || !within(numbers[0], 0, 255) || !within(numbers[1], 0, 255) || !within(numbers[2], 0, 255))
+                {
+                    return std::nullopt;
+                }
+                return QColor{numbers[0], numbers[1], numbers[2]};
+            }
+            if (name == QLatin1String("hsl"))
+            {
+                if (percents[0] || !percents[1] || !percents[2] || !within(numbers[0], 0, 360) || !within(numbers[1], 0, 100) || !within(numbers[2], 0, 100))
+                {
+                    return std::nullopt;
+                }
+                return QColor::fromHsl(numbers[0], numbers[1] * 255 / 100, numbers[2] * 255 / 100);
+            }
+            return std::nullopt;
+        }
         [[nodiscard]] std::optional<QColor> colorTextOf(const QString &text)
         {
             const auto trimmed = text.trimmed();
@@ -50,7 +107,13 @@ namespace GyanisScribe::App
                 return std::nullopt;
             }
 
-            const QColor parsed = QColor::fromString(trimmed);
+            // `QColor::fromString` 只认 `#` 与颜色名：rgb()/hsl() 这两形自己拆（实测它俩都返回无效色，
+            // 而上面那条前缀白名单正是为它们写的——不补这一句，那两句前缀检查就是死代码）
+            const QColor parsed = trimmed.startsWith(QLatin1Char('#')) ? QColor::fromString(trimmed) : QColor{};
+            if (!parsed.isValid())
+            {
+                return parseFunctionalColor(trimmed);
+            }
             if (!parsed.isValid())
             {
                 return std::nullopt;
@@ -87,7 +150,7 @@ namespace GyanisScribe::App
         const auto text = data->text();
         if (const auto color = colorTextOf(text); color)
         {
-            return renderColorCard(*color, text.trimmed());
+            return Pin::renderColorCard(*color, text.trimmed());
         }
 
         const auto trimmed = text.trimmed();
@@ -161,7 +224,8 @@ namespace GyanisScribe::App
             return std::unexpected(single.error());
         }
         DropContent content;
-        content.contents.push_back(PinContent{*single, QString()});
+        // 颜色写法这一路要把「原本是哪个色」一起带下去：贴出来的那张色卡以后能改色
+        content.contents.push_back(PinContent{*single, QString(), colorCardColorOf(data)});
         return content;
     }
 
@@ -177,7 +241,7 @@ namespace GyanisScribe::App
         for (const auto &single: content->contents)
         {
             const auto at = globalTopLeft + QPoint{kDropPinCascadeStride * outcome.pinnedCount, kDropPinCascadeStride * outcome.pinnedCount};
-            pins.addPin(single.image, at, single.animatedSource);
+            pins.addPin(single.image, at, single.animatedSource, single.colorCard);
             ++outcome.pinnedCount;
         }
         outcome.rejectedNames = content->rejectedNames;
@@ -187,7 +251,7 @@ namespace GyanisScribe::App
     QImage renderTextCard(const QString &text, const QFont &font)
     {
         QFont cardFont = font;
-        cardFont.setPointSize(kTextCardFontPointSize);
+        cardFont.setPointSize(Pin::kCardFontPointSize);
 
         const auto metrics   = QFontMetrics{cardFont};
         const auto textWidth = kTextCardMaximumWidth - 2 * kTextCardPadding;
@@ -203,38 +267,26 @@ namespace GyanisScribe::App
         const QSize cardSize{std::max(kTextCardMinimumWidth, wrapped.width() + 2 * kTextCardPadding), wrapped.height() + 2 * kTextCardPadding};
 
         QImage card{cardSize, QImage::Format_ARGB32_Premultiplied};
-        card.fill(kCardBackground);
+        card.fill(Pin::kCardBackground);
 
         QPainter painter{&card};
         painter.setRenderHint(QPainter::Antialiasing, true);
-        painter.setPen(QPen{kCardBorder, 1});
+        painter.setPen(QPen{Pin::kCardBorder, 1});
         painter.drawRect(QRectF{0.5, 0.5, cardSize.width() - 1.0, cardSize.height() - 1.0});
         painter.setFont(cardFont);
-        painter.setPen(kCardText);
+        painter.setPen(Pin::kCardText);
         // 量的时候用的哪一档，画的时候用同一档：两处各写一个会把断行位置分开
         painter.drawText(QRect{kTextCardPadding, kTextCardPadding, wrapped.width(), wrapped.height()}, wrapFlags, text);
         painter.end();
         return card;
     }
 
-    QImage renderColorCard(const QColor &color, const QString &label)
+    std::optional<QColor> colorCardColorOf(const QMimeData *data)
     {
-        const QSize cardSize{kColorCardWidth, kColorCardHeight};
-        QImage      card{cardSize, QImage::Format_ARGB32_Premultiplied};
-        card.fill(color);
-
-        QPainter    painter{&card};
-        const QRect strip{0, cardSize.height() - kColorCardStripHeight, cardSize.width(), kColorCardStripHeight};
-        painter.fillRect(strip, kCardBackground);
-        painter.setPen(QPen{kCardBorder, 1});
-        painter.drawLine(strip.topLeft(), strip.topRight());
-
-        QFont labelFont = painter.font();
-        labelFont.setPointSize(kTextCardFontPointSize);
-        painter.setFont(labelFont);
-        painter.setPen(kCardText);
-        painter.drawText(strip, Qt::AlignCenter, label);
-        painter.end();
-        return card;
+        if (data == nullptr || !data->hasText())
+        {
+            return std::nullopt;
+        }
+        return colorTextOf(data->text());
     }
 } // namespace GyanisScribe::App

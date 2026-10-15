@@ -30,6 +30,7 @@ namespace GyanisScribe::Pin
         constexpr std::string_view kKeyThrough   = "mouseThrough";
         constexpr std::string_view kKeySource    = "sourceFile";
         constexpr std::string_view kKeyBackdrop  = "transparentBackdrop";
+        constexpr std::string_view kKeyColorCard = "colorCardHex";
 
         Core::Expected<QVector<PinState>> failWith(std::string reason)
         {
@@ -62,6 +63,7 @@ namespace GyanisScribe::Pin
             entry.insert(QLatin1String(kKeyThrough.data()), state.mouseThrough);
             entry.insert(QLatin1String(kKeySource.data()), state.sourceFile);
             entry.insert(QLatin1String(kKeyBackdrop.data()), static_cast<int>(state.transparentBackdrop));
+            entry.insert(QLatin1String(kKeyColorCard.data()), state.colorCardHex);
             entries.append(entry);
         }
         return QString::fromUtf8(QJsonDocument(entries).toJson(QJsonDocument::Compact));
@@ -166,6 +168,12 @@ namespace GyanisScribe::Pin
             if (entry.contains(QLatin1String(kKeySource.data())))
             {
                 state.sourceFile = entry[QLatin1String(kKeySource.data())].toString();
+            }
+
+            // 色卡原色同样是后加的字段：缺省就是「不是色卡」（旧布局里那几张本来也没有这一档）
+            if (entry.contains(QLatin1String(kKeyColorCard.data())))
+            {
+                state.colorCardHex = entry[QLatin1String(kKeyColorCard.data())].toString();
             }
 
             // 透明区同样是后加的字段，缺省落「跟随窗口底色」（旧布局里那几张露的就是窗口底色）；

@@ -1198,4 +1198,36 @@ namespace GyanisScribe
         EXPECT_EQ(pin.globalRect().size(), refreshedSize) << "显示尺寸没按 dpr 折算：这张图被摆成了物理像素那么大";
     }
 
+/**
+ * @brief 钉住色卡身份从「贴出来」与「换内容」这两条路进来、并在换成别的内容时被摘干净
+ * @details 界面层把颜色认出来之后是走 addPin / replacePinContent 进来的：漏掉一处，
+ *          贴出来的色卡就改不了色，或换走之后那张照片上还挂着「改这一张的颜色…」。
+ */
+TEST_F(PinManagerFixture, ColorCardIdentityFollowsTheContentOnBothRoutes)
+{
+    auto        &pins = makeManager();
+    const QColor orange{255, 136, 0};
+
+    pins.addPin(makeImage(), QPoint(100, 100), {}, orange);
+    auto *card = pins.pinAt(0);
+    ASSERT_NE(card, nullptr);
+    ASSERT_TRUE(card->colorCardColor().has_value()) << "贴出来时交下去的原色没进窗口";
+    EXPECT_EQ(*card->colorCardColor(), orange);
+
+    pins.addPin(makeImage(), QPoint(400, 100));
+    auto *photo = pins.pinAt(1);
+    ASSERT_NE(photo, nullptr);
+    EXPECT_FALSE(photo->colorCardColor().has_value()) << "普通贴图凭空多出一个原色";
+
+    // 换成另一个颜色写法：身份与记下的色一起换
+    const QColor teal{0x12, 0x34, 0x56};
+    ASSERT_TRUE(static_cast<bool>(pins.replacePinContent(1, makeImage(), teal))) << "替换被拒了";
+    ASSERT_TRUE(photo->colorCardColor().has_value()) << "换成颜色写法之后没记下新色";
+    EXPECT_EQ(*photo->colorCardColor(), teal);
+
+    // 换成一张照片（没有颜色交进来）：这一档要摘掉，否则那张照片上还挂着改色这一项
+    ASSERT_TRUE(static_cast<bool>(pins.replacePinContent(0, makeImage()))) << "替换被拒了";
+    EXPECT_FALSE(card->colorCardColor().has_value()) << "换成照片之后还认得出原色，菜单里那一项会点坏这张图";
+}
+
 } // namespace GyanisScribe

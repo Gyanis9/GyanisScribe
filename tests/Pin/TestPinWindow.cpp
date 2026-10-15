@@ -33,6 +33,7 @@
 #include <QMovie>
 #include <QScreen>
 #include <QMouseEvent>
+#include <algorithm>
 #include <QPoint>
 #include <QSize>
 #include <QWheelEvent>
@@ -2293,6 +2294,53 @@ namespace GyanisScribe
         dragFromRightEdge(24.0);
         EXPECT_EQ(window.size(), keptSize) << "关掉之后同一落点不该再改尺寸";
         EXPECT_NE(window.pos(), keptPattern) << "同一落点该转成整张平移，而不是什么都不做";
+    }
+
+    /**
+     * @brief 钉住色卡身份、右键那一项与改色这一步
+     * @details 三处各钉一次：不是色卡就不该出现「改这一张的颜色…」（点下去会把这张照片换成色卡）；
+     *          是色卡时这一项要在菜单里；改完手上那张图的像素、记下的原色与布局记录三者一起走——
+     *          只改一处时，用户会在菜单里看到旧色、或存盘再打开发现这一项没了。
+     *          取色器是模态的，用例驱动不了，所以「换成什么」这一步单独留在公开出口上。
+     */
+    TEST_F(PinWindowFixture, ColorCardIdentitySurvivesTheEditRoute)
+    {
+        auto &window = makeWindow();
+
+        // 菜单是右键那一刻现搭的（不进构造），所以这里直接搭一份来数：动作归菜单持有，借用完随它一起销毁
+        const QString cardItemText = QString::fromUtf8("改这一张的颜色…");
+        const auto    hasCardItem  = [&window, &cardItemText]
+        {
+            const std::unique_ptr<QMenu> menu{window.buildContextMenu()};
+            for (const auto *action: menu->actions())
+            {
+                if (action->text() == cardItemText)
+                {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        EXPECT_FALSE(window.colorCardColor().has_value()) << "普通贴图不该被认成色卡";
+        EXPECT_FALSE(hasCardItem()) << "不是色卡也摆出改色这一项：点下去会把这张图换成色卡";
+
+        const QColor orange{255, 136, 0};
+        window.setColorCard(orange);
+        ASSERT_TRUE(window.colorCardColor().has_value()) << "记下的原色读不回来";
+        EXPECT_EQ(*window.colorCardColor(), orange);
+        EXPECT_TRUE(hasCardItem()) << "是色卡却没有改色这一项";
+
+        const QColor teal{0x12, 0x34, 0x56};
+        window.applyColorCardChange(teal);
+        ASSERT_TRUE(window.colorCardColor().has_value()) << "改完把色卡身份弄丢了（取色器选完就该还是色卡）";
+        EXPECT_EQ(*window.colorCardColor(), teal) << "改完没换掉记下的原色";
+        EXPECT_EQ(window.image().pixelColor(1, 1), teal) << "色块那一半没跟着重画";
+        EXPECT_EQ(window.state().colorCardHex, teal.name(QColor::HexArgb)) << "布局记录里还是旧色，重启后这一项会回到改之前";
+
+        window.setColorCard(std::nullopt);
+        EXPECT_FALSE(window.colorCardColor().has_value()) << "摘掉色卡身份之后还认得出原色";
+        EXPECT_FALSE(hasCardItem()) << "摘掉之后那一项还在";
     }
 
 } // namespace GyanisScribe

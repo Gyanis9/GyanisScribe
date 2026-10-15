@@ -34,13 +34,7 @@ namespace GyanisScribe::App
     inline constexpr int       kTextCardPadding           = 12;
     inline constexpr int       kTextCardMaximumWidth      = 640;
     inline constexpr int       kTextCardMinimumWidth      = 120;
-    inline constexpr int       kTextCardFontPointSize     = 14;
     inline constexpr qsizetype kMaximumTextCardCharacters = 2000; ///< 超过这个字数的文本不渲染：整卡会长到没法看
-
-    /// 颜色卡片：色块加底部一条写法条
-    inline constexpr int kColorCardWidth       = 160;
-    inline constexpr int kColorCardHeight      = 100;
-    inline constexpr int kColorCardStripHeight = 28;
 
     /// 识别颜色文本时的长度上限：一行、短、且必须以 # / rgb( / hsl( 开头才算，别把「red」这种词当成颜色
     inline constexpr int kMaximumColorTextLength = 32;
@@ -66,20 +60,23 @@ namespace GyanisScribe::App
     [[nodiscard]] QImage renderTextCard(const QString &text, const QFont &font);
 
     /**
-     * @brief 把一种颜色渲染成一张卡片
-     * @param color 颜色
-     * @param label 底部条上写的文字（通常是用户复制的那个写法）
-     * @return 上块下条的图：色块本体 + 底部写法条
+     * @brief 这一段载荷是不是「一种颜色写法」，是就交出它
+     * @param data 剪贴板的 mime 载荷，可为 nullptr
+     * @return 认出颜色时返回那个颜色；不是颜色文本时返回空
+     * @details 与 `pinContentFrom` 里那条判据同一个出处：贴图创建方要拿它在贴的时候记下
+     *          「这张色卡原来是哪个色」，供右键「改这一张的颜色…」做初值。两处各写一份识别，
+     *          就会出现「渲染成色卡了但改色找不到初值」这种半接上的形状。
      */
-    [[nodiscard]] QImage renderColorCard(const QColor &color, const QString &label);
+    [[nodiscard]] std::optional<QColor> colorCardColorOf(const QMimeData *data);
 
     /**
      * @brief 一份可以贴出去的内容
      */
     struct PinContent
     {
-        QImage  image;          ///< 要贴的像素
-        QString animatedSource; ///< 动图来源文件；空表示这一份是静图
+        QImage                image;          ///< 要贴的像素
+        QString               animatedSource; ///< 动图来源文件；空表示这一份是静图
+        std::optional<QColor> colorCard;      ///< 这一份是从一段颜色写法渲染出来时，那个颜色本身；空表示不是色卡
     };
 
     /**

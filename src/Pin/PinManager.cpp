@@ -50,12 +50,14 @@ namespace GyanisScribe::Pin
         closeAll();
     }
 
-    IPinWindow &PinManager::addPin(const QImage &image, const QPoint &globalTopLeft, const QString &animatedSource)
+    IPinWindow &PinManager::addPin(const QImage &image, const QPoint &globalTopLeft, const QString &animatedSource, const std::optional<QColor> &colorCard)
     {
         auto  pin = std::make_unique<PinWindow>(image, m_settings, m_integration);
         auto *raw = pin.get();
         // 动图来源接上：不是动图（或文件读不出）时窗口什么都不做，仍显示交进来的那一帧
         raw->setAnimatedSource(animatedSource);
+        // 色卡原色：右键「改这一张的颜色…」据此出现（初值也是它）；不是色卡就什么也不记（这一档留空）
+        raw->setColorCard(colorCard);
 
         // 窗口自己关掉了（Esc 或菜单里的关闭）就要从登记里摘掉，不然这里会留一个已析构的指针
         QObject::connect(raw, &PinWindow::closedByUser, this,
@@ -337,7 +339,7 @@ namespace GyanisScribe::Pin
                 continue;
             }
 
-            auto &pin = addPin(image, state.position, state.sourceFile);
+            auto &pin = addPin(image, state.position, state.sourceFile, state.colorCardHex.isEmpty() ? std::nullopt : std::optional<QColor>{QColor{state.colorCardHex}});
             pin.setScale(state.scale);
             pin.setRotationDegrees(state.rotationDegrees);
             pin.setOpacityLevel(state.opacity);
@@ -591,7 +593,7 @@ namespace GyanisScribe::Pin
         return {};
     }
 
-    Core::Expected<void> PinManager::replacePinContent(const int index, const QImage &image)
+    Core::Expected<void> PinManager::replacePinContent(const int index, const QImage &image, const std::optional<QColor> &colorCard)
     {
         if (index < 0 || index >= count() || m_pins[static_cast<std::size_t>(index)] == nullptr)
         {
@@ -610,6 +612,9 @@ namespace GyanisScribe::Pin
 
         // 摆位、缩放与角度都不动：这一条只换「这张图」，替换前后用户看到的还是桌上同一个位置
         pin.replaceContent(image);
+        // 色卡身份跟着新内容走：换成颜色写法就记下那个色，换成照片/文本就把这一档摘掉——留着旧的原色
+        // 会让「改这一张的颜色…」出现在一张照片上，点下去还会把照片换成色卡
+        pin.setColorCard(colorCard);
         return {};
     }
 
