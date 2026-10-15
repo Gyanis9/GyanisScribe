@@ -60,11 +60,15 @@ namespace GyanisScribe::Platform
 
 namespace GyanisScribe::App
 {
-    /// 主窗口能直接跳到的页面
-    /// @note 新增一项要同时给 pageChoices() 加一行和一个 buildPage() 分支，两处都齐了界面才完整
-    /// 托盘动作的枚举，声明在 TrayController.h；这里只要一个不透明的前向声明，
+    /// 托盘动作的枚举，声明在 App/GyanisScribe::App::TrayController.h；这里只要一个不透明的前向声明，
     /// 为的是动作条能发同一个枚举而不用把整个托盘类拖进这张窗口的头
     enum class TrayAction;
+} // namespace GyanisScribe::App
+
+namespace GyanisScribe::Main
+{
+    /// 主窗口能直接跳到的页面
+    /// @note 新增一项要同时给 pageChoices() 加一行和一个 buildPage() 分支，两处都齐了界面才完整
 
     enum class MainWindowPage
     {
@@ -97,7 +101,7 @@ namespace GyanisScribe::App
     {
         MainWindowPage   page;  ///< 这一行对应的页
         std::string_view label; ///< 导航行上的中文名
-        std::string_view icon;  ///< 导航行的图标名，必须是 IconProvider 真的有的那一个
+        std::string_view icon;  ///< 导航行的图标名，必须是 GyanisScribe::Gui::IconProvider 真的有的那一个
     };
 
     /**
@@ -202,8 +206,9 @@ namespace GyanisScribe::App
          * @note 刻意不认识 AppController：热键与语言的改动由各自的订阅者接走，
          *       设置页不需要为了「生效」去拖一个控制器进来。历史页的三个出口同样只发信号。
          */
-        explicit MainWindow(Core::ISettingsStore &settings, GyanisScribe::Gui::ThemeManager &theme, GyanisScribe::Gui::IconProvider &icons, Core::HistoryStore &historyStore,
-                            Platform::PlatformCapabilities capabilities, Platform::IPlatformIntegration &integration, QWidget *parent = nullptr);
+        explicit MainWindow(GyanisScribe::Core::ISettingsStore &settings, GyanisScribe::Gui::ThemeManager &theme, GyanisScribe::Gui::IconProvider &icons,
+                            GyanisScribe::Core::HistoryStore &historyStore, GyanisScribe::Platform::PlatformCapabilities capabilities,
+                            GyanisScribe::Platform::IPlatformIntegration &integration, QWidget *parent = nullptr);
 
         /**
          * @brief 析构：设备枚举器要在这里才看得到完整类型
@@ -352,18 +357,18 @@ namespace GyanisScribe::App
         /// 历史页：缩略图列表与三个出口
         QWidget *buildHistoryPage();
 
-        Core::ISettingsStore                                  &m_settings;          ///< 配置存储，不拥有
-        GyanisScribe::Gui::ThemeManager                       &m_theme;             ///< 主题管理器，不拥有
-        GyanisScribe::Gui::IconProvider                       &m_icons;             ///< 图标供给器，不拥有
-        Platform::PlatformCapabilities                         m_capabilities;      ///< 平台能力表：热键页按它给不给登记入口
-        QListWidget                                           *m_nav   = nullptr;   ///< 左侧导航，一行一页
-        QStackedWidget                                        *m_stack = nullptr;   ///< 右侧页容器，序号与导航行同解
-        std::unique_ptr<Plugins::FfmpegAudioDeviceEnumerator>  m_audioDevices;      ///< 录屏页那两路设备清单的来源，一次查询两格共用
-        std::unique_ptr<Plugins::FfmpegVideoEncoderEnumerator> m_videoEncoders;     ///< 录屏页编码器清单的来源：逐个候选真探一遍
-        std::unique_ptr<App::UpdateChecker>                    m_updateChecker;     ///< 检查更新那一条：关于页按一下才发请求，不是启动就联网
-        Platform::IPlatformIntegration                        &m_integration;       ///< 平台动作（当前只有开机启动那一格）：能力位可以造假，动作要有真对象
-        Core::HistoryStore                                    &m_historyStore;      ///< 历史清单，历史页从它读
-        Gui::HistoryView                                      *m_history = nullptr; ///< 历史页控件，重读清单时刷新它
+        GyanisScribe::Core::ISettingsStore                                  &m_settings;          ///< 配置存储，不拥有
+        GyanisScribe::Gui::ThemeManager                                     &m_theme;             ///< 主题管理器，不拥有
+        GyanisScribe::Gui::IconProvider                                     &m_icons;             ///< 图标供给器，不拥有
+        GyanisScribe::Platform::PlatformCapabilities                         m_capabilities;      ///< 平台能力表：热键页按它给不给登记入口
+        QListWidget                                                         *m_nav   = nullptr;   ///< 左侧导航，一行一页
+        QStackedWidget                                                      *m_stack = nullptr;   ///< 右侧页容器，序号与导航行同解
+        std::unique_ptr<GyanisScribe::Plugins::FfmpegAudioDeviceEnumerator>  m_audioDevices;      ///< 录屏页那两路设备清单的来源，一次查询两格共用
+        std::unique_ptr<GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator> m_videoEncoders;     ///< 录屏页编码器清单的来源：逐个候选真探一遍
+        std::unique_ptr<GyanisScribe::App::UpdateChecker>                    m_updateChecker;     ///< 检查更新那一条：关于页按一下才发请求，不是启动就联网
+        GyanisScribe::Platform::IPlatformIntegration                        &m_integration;       ///< 平台动作（当前只有开机启动那一格）：能力位可以造假，动作要有真对象
+        GyanisScribe::Core::HistoryStore                                    &m_historyStore;      ///< 历史清单，历史页从它读
+        GyanisScribe::Gui::HistoryView                                      *m_history = nullptr; ///< 历史页控件，重读清单时刷新它
     };
 
-} // namespace GyanisScribe::App
+} // namespace GyanisScribe::Main

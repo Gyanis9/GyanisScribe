@@ -1,4 +1,4 @@
-#include "App/Application.h"
+#include "Main/Application.h"
 #include "App/CommandLine.h"
 
 #include "App/CrashGuard.h"

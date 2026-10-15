@@ -3,7 +3,7 @@
 // 只测其中一头时，另一头改成别的键也照样全绿。
 #include "App/CaptureIntent.h"
 #include "App/CustomHotkeys.h"
-#include "App/MainWindow.h"
+#include "Main/MainWindow.h"
 
 #include "App/TrayController.h"
 #include "Gui/Annotation/AnnotationToolbar.h"
@@ -31,7 +31,7 @@
 
 #include <gtest/gtest.h>
 
-using GyanisScribe::App::screenCaptureLabels;
+using GyanisScribe::Main::screenCaptureLabels;
 
 #include <QApplication>
 #include <QCheckBox>
@@ -68,15 +68,15 @@ using GyanisScribe::App::screenCaptureLabels;
 
 namespace
 {
-    using GyanisScribe::Gui::AnnotationToolbar;
-    using GyanisScribe::App::MainWindow;
-    using GyanisScribe::App::MainWindowPage;
-    using GyanisScribe::App::pageChoices;
     using GyanisScribe::Core::HistoryStore;
     using GyanisScribe::Core::SettingsStore;
+    using GyanisScribe::Gui::AnnotationToolbar;
     using GyanisScribe::Gui::AppLanguage;
     using GyanisScribe::Gui::IconProvider;
     using GyanisScribe::Gui::ThemeManager;
+    using GyanisScribe::Main::MainWindow;
+    using GyanisScribe::Main::MainWindowPage;
+    using GyanisScribe::Main::pageChoices;
 
     std::unique_ptr<QApplication> application;
 
@@ -1140,10 +1140,10 @@ namespace
         ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Core::kOcrLanguage, QStringLiteral("eng"))));
         makeWindow();
 
-        QStringList                                notified;
-        QObject                                    receiver;
+        QStringList                                 notified;
+        QObject                                     receiver;
         std::optional<GyanisScribe::Gui::ToastKind> kind;
-        QString                                    toast;
+        QString                                     toast;
         QObject::connect(m_store.get(), &GyanisScribe::Core::ISettingsStore::valueChanged, &receiver, [&notified](const QString &key) { notified << key; });
         QObject::connect(m_window.get(), &MainWindow::messageForUser, &receiver,
                          [&toast, &kind](const QString &message, const GyanisScribe::Gui::ToastKind received)
@@ -1189,9 +1189,9 @@ namespace
         ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Core::kHistoryMaximumEntries, 42)));
         makeWindow();
 
-        QObject                                    receiver;
+        QObject                                     receiver;
         std::optional<GyanisScribe::Gui::ToastKind> kind;
-        QString                                    toast;
+        QString                                     toast;
         QObject::connect(m_window.get(), &MainWindow::messageForUser, &receiver,
                          [&toast, &kind](const QString &message, const GyanisScribe::Gui::ToastKind received)
                          {
@@ -1564,8 +1564,7 @@ TEST_F(MainWindowFixture, InWindowShortcutRowsIgnoreTheHotkeyCapabilityAndAccept
     for (auto *edit: inWindow)
     {
         EXPECT_TRUE(edit->isEnabled()) << std::string{edit->boundKey()} << " 被平台能力位灰掉了：界面按键在自己的窗口里认，与登记口无关";
-        EXPECT_TRUE(static_cast<bool>(edit->applyCombination(GyanisScribe::Core::HotkeyCombination{Qt::NoModifier, Qt::Key_K})))
-                << std::string{edit->boundKey()} << " 该收下裸键";
+        EXPECT_TRUE(static_cast<bool>(edit->applyCombination(GyanisScribe::Core::HotkeyCombination{Qt::NoModifier, Qt::Key_K}))) << std::string{edit->boundKey()} << " 该收下裸键";
     }
 
     EXPECT_FALSE(globalRow->applyCombination(GyanisScribe::Core::HotkeyCombination{Qt::NoModifier, Qt::Key_K}).has_value()) << "全局那一档收了裸键，登记阶段才会报「组合不合格」";
@@ -1759,8 +1758,8 @@ TEST_F(MainWindowFixture, PaletteFileRoundTripsThroughTheTwoMethods)
     // 色板那一格与那两个按钮都在标注页：不先切页就找不到控件
     m_window->open(MainWindowPage::Annotation);
     std::optional<GyanisScribe::Gui::ToastKind> kind;
-    QStringList                                messages;
-    QObject                                    receiver;
+    QStringList                                 messages;
+    QObject                                     receiver;
     QObject::connect(m_window.get(), &MainWindow::messageForUser, &receiver,
                      [&messages, &kind](const QString &message, const GyanisScribe::Gui::ToastKind sent)
                      {
@@ -1809,8 +1808,8 @@ TEST_F(MainWindowFixture, FailedPaletteImportKeepsTheOldRow)
     makeWindow();
     m_window->open(MainWindowPage::Annotation);
     std::optional<GyanisScribe::Gui::ToastKind> kinds;
-    QStringList                                messages;
-    QObject                                    receiver;
+    QStringList                                 messages;
+    QObject                                     receiver;
     QObject::connect(m_window.get(), &MainWindow::messageForUser, &receiver,
                      [&messages, &kinds](const QString &message, const GyanisScribe::Gui::ToastKind sent)
                      {

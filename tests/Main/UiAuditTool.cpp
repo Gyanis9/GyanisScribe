@@ -8,7 +8,7 @@
 #include "Core/Annotation/AnnotationPalette.h"
 #include "Gui/Annotation/AnnotationToolbar.h"
 #include "Gui/Annotation/AnnotationToolbarGeometry.h"
-#include "App/MainWindow.h"
+#include "Main/MainWindow.h"
 #include "Core/History/HistoryStore.h"
 #include "Core/Pick/RecentColors.h"
 #include "Platform/IPlatformIntegration.h"
@@ -114,8 +114,8 @@ int main(int argc, char *argv[])
     std::filesystem::create_directories(dataDirectory, ignored);
 
     GyanisScribe::Core::SettingsStore settings(dataDirectory / "settings.ini");
-    GyanisScribe::Gui::IconProvider        icons;
-    GyanisScribe::Gui::ThemeManager        theme(settings);
+    GyanisScribe::Gui::IconProvider   icons;
+    GyanisScribe::Gui::ThemeManager   theme(settings);
     // 样式表要落一次：真实程序里这一步在 AppController 构造里做，这里没有控制器
     theme.applyFromSettings();
 
@@ -175,16 +175,16 @@ int main(int argc, char *argv[])
     // 面 3：主窗口初始尺寸档（MainWindow 构造里 resize(680, 560)，实际被最小宽顶住，读数行会报真实值）
     {
         GyanisScribe::Core::HistoryStore history(dataDirectory / "history.json");
-        const auto                          integration = GyanisScribe::Platform::createPlatformIntegration();
-        GyanisScribe::App::MainWindow       window(settings, theme, icons, history, integration->capabilities(), *integration);
+        const auto                       integration = GyanisScribe::Platform::createPlatformIntegration();
+        GyanisScribe::Main::MainWindow   window(settings, theme, icons, history, integration->capabilities(), *integration);
         window.resize(680, 560);
-        for (const auto page: {GyanisScribe::App::MainWindowPage::General, GyanisScribe::App::MainWindowPage::Capture})
+        for (const auto page: {GyanisScribe::Main::MainWindowPage::General, GyanisScribe::Main::MainWindowPage::Capture})
         {
             window.open(page);
-            shoot(window, outputDirectory, page == GyanisScribe::App::MainWindowPage::General ? "main-general-default" : "main-capture-default");
+            shoot(window, outputDirectory, page == GyanisScribe::Main::MainWindowPage::General ? "main-general-default" : "main-capture-default");
         }
         // 快捷键页整页：那一页比窗口高，分组标题行在折叠之下——抓滚动区里那张卡片（内容全高）才看得到
-        window.open(GyanisScribe::App::MainWindowPage::Hotkey);
+        window.open(GyanisScribe::Main::MainWindowPage::Hotkey);
         if (auto *stack = window.findChild<QStackedWidget *>(); stack != nullptr)
         {
             if (auto *scroll = qobject_cast<QScrollArea *>(stack->currentWidget()); scroll != nullptr && scroll->widget() != nullptr)
@@ -202,7 +202,7 @@ int main(int argc, char *argv[])
                 return 1;
             }
             theme.applyFromSettings();
-            window.open(GyanisScribe::App::MainWindowPage::General);
+            window.open(GyanisScribe::Main::MainWindowPage::General);
             shoot(window, outputDirectory, std::format("theme-{}-general", name).c_str());
             GyanisScribe::Gui::AnnotationToolbar toolbar{settings, icons, nullptr};
             toolbar.show();

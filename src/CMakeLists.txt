@@ -5,6 +5,7 @@ add_subdirectory(Gui)
 add_subdirectory(Platform)
 add_subdirectory(Plugins)
 add_subdirectory(App)
+add_subdirectory(Main)
 
 # Debug 档的 Qt DLL 带 d 后缀，Release 不带；这条后缀只在 MSVC + Debug 下成立
 set(QT_DEBUG_SUFFIX)
@@ -101,13 +102,14 @@ endif ()
 # 照抄 WIN32 那一边的写法会在 generate 期报「target was not found」
 if (WIN32)
     add_executable(GyanisScribe WIN32
-            App/Main.cpp)
+            Main/Main.cpp)
 else ()
     add_executable(GyanisScribe
-            App/Main.cpp)
+            Main/Main.cpp)
 endif ()
 
 target_link_libraries(GyanisScribe PRIVATE
+        Main
         App
         Core
         Qt6::Widgets)

@@ -2,7 +2,7 @@
 // 与 CrashProbe 同一条理由不是产品的一部分：不进安装包、不挂任何产品入口，只给文档出图。
 // 跑法：UiShotTool <输出目录>；产图文件名与页面对应关系见下面 kShots 那张表。
 
-#include "App/MainWindow.h"
+#include "Main/MainWindow.h"
 
 #include "Core/History/HistoryStore.h"
 #include "Platform/IPlatformIntegration.h"
@@ -25,7 +25,7 @@
 
 namespace
 {
-    using GyanisScribe::App::MainWindowPage;
+    using GyanisScribe::Main::MainWindowPage;
 
     /// 一页要拍的图：页枚举与产图文件名成对，数组顺序就是拍摄顺序
     struct ShotPage
@@ -79,24 +79,23 @@ int main(int argc, char *argv[])
 
     GyanisScribe::Core::SettingsStore settings(dataDirectory / "settings.ini");
     // 目录几格给一条中性占位，别把出图这台机器的真实路径（用户名、临时目录）印进文档图里
-    const auto placeholdersSeeded =
-            settings.setValue(GyanisScribe::Core::kPathScreenshot, QStringLiteral("C:/Users/Example/Pictures/GyanisScribe")) &&
-            settings.setValue(GyanisScribe::Core::kPathRecording, QStringLiteral("C:/Users/Example/Videos/GyanisScribe")) &&
-            settings.setValue(GyanisScribe::Core::kOcrTessDataDirectory, QStringLiteral("C:/Users/Example/AppData/Roaming/Gyanis/GyanisScribe/tessdata"));
+    const auto placeholdersSeeded = settings.setValue(GyanisScribe::Core::kPathScreenshot, QStringLiteral("C:/Users/Example/Pictures/GyanisScribe")) &&
+                                    settings.setValue(GyanisScribe::Core::kPathRecording, QStringLiteral("C:/Users/Example/Videos/GyanisScribe")) &&
+                                    settings.setValue(GyanisScribe::Core::kOcrTessDataDirectory, QStringLiteral("C:/Users/Example/AppData/Roaming/Gyanis/GyanisScribe/tessdata"));
     if (!placeholdersSeeded)
     {
         std::fprintf(stderr, "failed to seed placeholder paths\n");
         return 1;
     }
 
-    GyanisScribe::Gui::IconProvider      icons;
-    GyanisScribe::Gui::ThemeManager      theme(settings);
+    GyanisScribe::Gui::IconProvider  icons;
+    GyanisScribe::Gui::ThemeManager  theme(settings);
     GyanisScribe::Core::HistoryStore history(dataDirectory / "history.json");
-    const auto                          integration = GyanisScribe::Platform::createPlatformIntegration();
+    const auto                       integration = GyanisScribe::Platform::createPlatformIntegration();
     // 样式表要落一次：真实程序里这一步在 AppController 构造里做，这里没有控制器
     theme.applyFromSettings();
 
-    GyanisScribe::App::MainWindow window(settings, theme, icons, history, integration->capabilities(), *integration);
+    GyanisScribe::Main::MainWindow window(settings, theme, icons, history, integration->capabilities(), *integration);
     window.resize(1000, 680);
 
     for (const auto &shot: kShots)

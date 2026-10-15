@@ -3,7 +3,7 @@
 // 「截取当前窗口绕过延时」就是这么漏下来的；这一批给它一套与 TestModuleFlow 同形状的替身，
 // 从 AppControllerParts 注进去，把「谁在什么时刻被叫到、成品记在哪一份清单上」钉住。
 
-#include "App/AppController.h"
+#include "Main/AppController.h"
 
 #include "App/CaptureIntent.h"
 #include "Core/Capture/IScreenCaptureSource.h"
@@ -244,12 +244,12 @@ namespace GyanisScribe
                 m_source         = source.get();
                 m_integration    = integration.get();
 
-                App::AppControllerParts parts;
+                Main::AppControllerParts parts;
                 parts.settings           = std::move(settings);
                 parts.integration        = std::move(integration);
                 parts.captureSource      = std::move(source);
                 parts.historyStoragePath = m_root / "history.json";
-                m_controller             = std::make_unique<App::AppController>(std::move(parts));
+                m_controller             = std::make_unique<Main::AppController>(std::move(parts));
             }
 
             /// 读回注入的那份历史清单；条目里指向的成品文件由 load() 自己检查存在性
@@ -294,17 +294,17 @@ namespace GyanisScribe
                 }
             }
 
-            std::filesystem::path               m_root;                                                    ///< 这一格用例自己的临时目录
-            Core::SettingsStore            *m_settings    = nullptr;                                   ///< 被控制器接管的配置存储（读回历史策略用）
-            CountingScreenSource               *m_source      = nullptr;                                   ///< 被抓帧服务接管的替身
-            ForegroundWindowStub               *m_integration = nullptr;                                   ///< 被平台那一侧接管的替身
-            std::unique_ptr<App::AppController> m_controller;                                              ///< 被测对象
-            QString                             m_realScreenName;                                          ///< 离屏平台那块真屏的名字
-            int                                 m_delaySeconds    = 0;                                     ///< 延时截图那一格
-            QString                             m_frameScreenName = QString::fromLatin1(kGhostScreenName); ///< 假帧带的屏名
-            std::optional<App::CaptureIntent>   m_afterAction;                                             ///< 「截完之后」那一格；空 = 不写
-            bool                                m_keepUnsaved = false;                                     ///< 「未保存也进历史」那一格
-            bool                                m_autoSave    = false;                                     ///< 「自动保存」那一格
+            std::filesystem::path                m_root;                                                    ///< 这一格用例自己的临时目录
+            Core::SettingsStore                 *m_settings    = nullptr;                                   ///< 被控制器接管的配置存储（读回历史策略用）
+            CountingScreenSource                *m_source      = nullptr;                                   ///< 被抓帧服务接管的替身
+            ForegroundWindowStub                *m_integration = nullptr;                                   ///< 被平台那一侧接管的替身
+            std::unique_ptr<Main::AppController> m_controller;                                              ///< 被测对象
+            QString                              m_realScreenName;                                          ///< 离屏平台那块真屏的名字
+            int                                  m_delaySeconds    = 0;                                     ///< 延时截图那一格
+            QString                              m_frameScreenName = QString::fromLatin1(kGhostScreenName); ///< 假帧带的屏名
+            std::optional<App::CaptureIntent>    m_afterAction;                                             ///< 「截完之后」那一格；空 = 不写
+            bool                                 m_keepUnsaved = false;                                     ///< 「未保存也进历史」那一格
+            bool                                 m_autoSave    = false;                                     ///< 「自动保存」那一格
         };
     } // namespace
 

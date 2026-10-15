@@ -1,4 +1,4 @@
-#include "App/MainWindow.h"
+#include "Main/MainWindow.h"
 #include "App/TrayController.h"
 
 #include "Platform/PlatformCapabilities.h"
@@ -16,13 +16,13 @@
 #include <utility>
 #include <vector>
 
-using GyanisScribe::App::aboutText;
-using GyanisScribe::App::indexOfMainWindowPage;
-using GyanisScribe::App::indexOfThemeKind;
-using GyanisScribe::App::MainWindowPage;
-using GyanisScribe::App::pageChoices;
-using GyanisScribe::App::themeChoices;
-using GyanisScribe::App::themeKindAt;
+using GyanisScribe::Main::aboutText;
+using GyanisScribe::Main::indexOfMainWindowPage;
+using GyanisScribe::Main::indexOfThemeKind;
+using GyanisScribe::Main::MainWindowPage;
+using GyanisScribe::Main::pageChoices;
+using GyanisScribe::Main::themeChoices;
+using GyanisScribe::Main::themeKindAt;
 using GyanisScribe::App::TrayAction;
 using GyanisScribe::App::trayMenuEntries;
 using GyanisScribe::App::TrayMenuEntry;

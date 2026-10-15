@@ -49,8 +49,8 @@ PATH_DOT_STRING = re.compile(r"(?:\.|->)string\(\)")
 
 #按枚举分派的开关：(枚举名, 声明所在文件, 分派所在文件)
 DISPATCH_TABLES = (
-    ("TrayAction", "src/App/TrayAction.h", "src/App/AppController.cpp"),
-    ("MainWindowPage", "src/App/MainWindow.h", "src/App/MainWindow.cpp"),
+    ("TrayAction", "src/App/TrayAction.h", "src/Main/AppController.cpp"),
+    ("MainWindowPage", "src/Main/MainWindow.h", "src/Main/MainWindow.cpp"),
     ("TrayClickRole", "src/App/TrayClick.h", "src/App/TrayClick.cpp"),
     ("TrayClickOutcome", "src/App/TrayClick.h", "src/App/TrayController.cpp"),
 )
@@ -122,13 +122,20 @@ def check_path_encoding(root: pathlib.Path) -> list[str]:
     return findings
 
 
+def dispatched_names(body: str, enum_name: str) -> set[str]:
+    """开关里已分派的枚举值。允许命名空间限定：开关落在无命名空间的外壳里时，
+    标签只能是 case GyanisScribe::App::TrayAction::X: 这种全限定形状——
+    限定前缀不吃掉本体名，而名字只以它结尾的别的枚举（FooTrayAction）不会冒认。"""
+    return set(re.findall(r"case\s+(?:\w+::)*" + enum_name + r"::(\w+)\s*:", body))
+
+
 def check_dispatch_coverage(root: pathlib.Path) -> list[str]:
     """每个按枚举分派的开关，都要覆盖该枚举的全部取值。"""
     findings: list[str] = []
     for enum_name, header, dispatcher in DISPATCH_TABLES:
         declared = enumerate_names((root.parent / header).read_text(encoding="utf-8", errors="replace"), enum_name)
         body = (root.parent / dispatcher).read_text(encoding="utf-8", errors="replace")
-        handled = set(re.findall(r"case\s+" + enum_name + r"::(\w+)\s*:", body))
+        handled = dispatched_names(body, enum_name)
         for name in declared:
             if name not in handled:
                 findings.append(f"{dispatcher} 里没有 {enum_name}::{name} 这一支：按枚举分派漏一格，界面上就是一条按了没反应的项")
@@ -247,8 +254,17 @@ def self_probe() -> None:
 
 #分派检查也要能红：拿一份缺了一支的合成开关喂进去
     missing_case_body = "switch (action)" + NEWLINE + "{" + NEWLINE + "    case WidgetAction::Open:" + NEWLINE + "        return;" + NEWLINE + "}" + NEWLINE
-    if "Close" in set(re.findall(r"case\s+WidgetAction::(\w+)\s*:", missing_case_body)):
+    if "Close" in dispatched_names(missing_case_body, "WidgetAction"):
         raise RuntimeError("分派检查的探针失效：漏掉的那一支应当被认出来")
+
+#外壳里的开关只能写全限定标签：认不出来就是整张表永红（App/Main 拆分后就是这么红的）
+    qualified_case_body = "switch (action)" + NEWLINE + "{" + NEWLINE + "    case ns::App::WidgetAction::Open:" + NEWLINE + "        return;" + NEWLINE + "}" + NEWLINE
+    if "Open" not in dispatched_names(qualified_case_body, "WidgetAction"):
+        raise RuntimeError("分派检查认不出带命名空间限定的 case 标签：全限定形状会被判成整表漏格")
+
+#名字只以它结尾的别的枚举不许冒认：OtherWidgetAction 不是 WidgetAction
+    if "Open" in dispatched_names("switch (action) {" + NEWLINE + "    case OtherWidgetAction::Open:" + NEWLINE + "}" + NEWLINE, "WidgetAction"):
+        raise RuntimeError("分派检查把名字以它结尾的另一个枚举认成了本体")
 
 
 def main() -> int:

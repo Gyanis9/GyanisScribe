@@ -25,18 +25,18 @@
 #include <memory>
 #include <string>
 
+using GyanisScribe::App::colorCardColorOf;
 using GyanisScribe::App::dropContentFrom;
-using GyanisScribe::Gui::kColorCardHeight;
-using GyanisScribe::Gui::kColorCardStripHeight;
-using GyanisScribe::Gui::kColorCardWidth;
 using GyanisScribe::App::kMaximumTextCardCharacters;
 using GyanisScribe::App::kTextCardMaximumWidth;
 using GyanisScribe::App::kTextCardMinimumWidth;
-using GyanisScribe::App::colorCardColorOf;
 using GyanisScribe::App::pinContentFrom;
-using GyanisScribe::Gui::renderColorCard;
 using GyanisScribe::App::renderTextCard;
 using GyanisScribe::Base::ErrorCode;
+using GyanisScribe::Gui::kColorCardHeight;
+using GyanisScribe::Gui::kColorCardStripHeight;
+using GyanisScribe::Gui::kColorCardWidth;
+using GyanisScribe::Gui::renderColorCard;
 
 namespace
 {

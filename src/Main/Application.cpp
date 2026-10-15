@@ -1,6 +1,6 @@
-#include "App/Application.h"
+#include "Main/Application.h"
 
-#include "App/AppController.h"
+#include "Main/AppController.h"
 #include "App/SingleInstance.h"
 #include "Base/Logger.h"
 #include "Base/Paths.h"
@@ -28,9 +28,10 @@ Application::Application(int &argc, char **argv, const GyanisScribe::App::Comman
     // 一次性的命令行动作（截图/贴图/取色）：不锁单实例、不登记热键——它是「跑一件事就走」的启动，
     // 该与常驻实例互不打扰（脚本在托盘常驻时照样能用，也不去抢那八个全局热键）。
     // 托盘与主窗口仍随控制器现一下身：那是控制器构造的一部分，单独剪掉等于再造一条装配路
-    const bool transientCommandLine = request.action == CommandLineAction::CaptureFullScreen || request.action == CommandLineAction::CaptureLastRegion ||
-                                      request.action == CommandLineAction::CaptureWindow || request.action == CommandLineAction::PinFile ||
-                                      request.action == CommandLineAction::ColorPick;
+    const bool transientCommandLine = request.action == GyanisScribe::App::CommandLineAction::CaptureFullScreen ||
+                                      request.action == GyanisScribe::App::CommandLineAction::CaptureLastRegion ||
+                                      request.action == GyanisScribe::App::CommandLineAction::CaptureWindow || request.action == GyanisScribe::App::CommandLineAction::PinFile ||
+                                      request.action == GyanisScribe::App::CommandLineAction::ColorPick;
 
     // 身份三件套必须排在任何 Paths/Settings 调用之前，否则 QStandardPaths 会给出无组织名的路径
     setOrganizationName(QLatin1String(kOrganizationName));
@@ -70,7 +71,7 @@ Application::Application(int &argc, char **argv, const GyanisScribe::App::Comman
     {
         GyanisScribe::Base::Logger::info("命令行动作启动：不锁单实例、不登记热键");
         m_isPrimaryInstance = true;
-        m_controller        = std::make_unique<GyanisScribe::App::AppController>();
+        m_controller        = std::make_unique<GyanisScribe::Main::AppController>();
     } else
     {
         m_singleInstance    = std::make_unique<GyanisScribe::App::SingleInstance>();
@@ -82,7 +83,7 @@ Application::Application(int &argc, char **argv, const GyanisScribe::App::Comman
         GyanisScribe::Base::Logger::info("本次启动不是主实例：不建界面、不登记热键，交给 Main 去唤前一份");
     } else if (!transientCommandLine)
     {
-        m_controller = std::make_unique<GyanisScribe::App::AppController>();
+        m_controller = std::make_unique<GyanisScribe::Main::AppController>();
 
         // 热键登记失败不阻断启动：组合键被别的程序占了也要能让用户从界面里操作
         if (const auto report = m_controller->registerHotkeys(); report)
@@ -102,7 +103,7 @@ Application::Application(int &argc, char **argv, const GyanisScribe::App::Comman
                          [this]
                          {
                              GyanisScribe::Base::Logger::info("又有人启动智录：把设置窗口唤到前台，不再开第二份");
-                             m_controller->openMainWindow(GyanisScribe::App::MainWindowPage::General);
+                             m_controller->openMainWindow(GyanisScribe::Main::MainWindowPage::General);
                          });
     }
 
@@ -144,13 +145,13 @@ int Application::runOneShotCapture(const GyanisScribe::App::CommandLineRequest &
 {
     using GyanisScribe::App::captureOutputsContain;
 
-    int  exitCode  = 1;
-    bool finished  = false;
+    int  exitCode = 1;
+    bool finished = false;
     // 点了 pin 就要留在桌面上：那一张贴图活在本进程里，退出就把它一起带走（与 --pin 同一档做法）
-    const bool keepRunning = captureOutputsContain(request.outputs, GyanisScribe::App::CaptureOutput::Pin);
+    const bool keepRunning = GyanisScribe::App::captureOutputsContain(request.outputs, GyanisScribe::App::CaptureOutput::Pin);
     // 落盘路径走标准输出、失败原因走标准错误：脚本按这两条接着干活；
     // 文本按本地码页打（控制台那一侧的编码），与日志文件名那条同一处口径
-    QObject::connect(m_controller.get(), &GyanisScribe::App::AppController::commandLineCaptureDelivered, this,
+    QObject::connect(m_controller.get(), &GyanisScribe::Main::AppController::commandLineCaptureDelivered, this,
                      [&exitCode, &finished, keepRunning](const QString &savedPath)
                      {
                          // 没点名 file 时这一轮没有路径可打：空串不打，免得脚本把空行当成文件名
@@ -165,7 +166,7 @@ int Application::runOneShotCapture(const GyanisScribe::App::CommandLineRequest &
                              QCoreApplication::quit();
                          }
                      });
-    QObject::connect(m_controller.get(), &GyanisScribe::App::AppController::commandLineActionFailed, this,
+    QObject::connect(m_controller.get(), &GyanisScribe::Main::AppController::commandLineActionFailed, this,
                      [&exitCode, &finished](const QString &reason)
                      {
                          std::fprintf(stderr, "%s\n", reason.toLocal8Bit().constData());
@@ -190,7 +191,7 @@ int Application::executeCommandLine(const GyanisScribe::App::CommandLineRequest 
 
     switch (request.action)
     {
-        case CommandLineAction::SelfTest:
+        case GyanisScribe::App::CommandLineAction::SelfTest:
         {
             const auto &report = hotkeyReport();
             // 可见顶层窗口数也要报出来：托盘装不上时入口就只剩主窗口，这一格是那条降级真的落了地的读数
@@ -206,16 +207,16 @@ int Application::executeCommandLine(const GyanisScribe::App::CommandLineRequest 
                     std::format("自检：热键登记 {} 项、未登记 {} 项，日志就绪 {}，可见顶层窗口 {} 个", report.registered, report.failures.size(), isReady(), visibleTopLevels));
             return isReady() ? 0 : 1;
         }
-        case CommandLineAction::CaptureFullScreen:
-        case CommandLineAction::CaptureLastRegion:
-        case CommandLineAction::CaptureWindow:
+        case GyanisScribe::App::CommandLineAction::CaptureFullScreen:
+        case GyanisScribe::App::CommandLineAction::CaptureLastRegion:
+        case GyanisScribe::App::CommandLineAction::CaptureWindow:
             if (m_controller == nullptr)
             {
                 std::fprintf(stderr, "命令行动作没能开始：控制器没建起来（多半是日志目录不可用）\n");
                 return 1;
             }
             return runOneShotCapture(request);
-        case CommandLineAction::PinFile:
+        case GyanisScribe::App::CommandLineAction::PinFile:
         {
             if (m_controller == nullptr)
             {
@@ -231,7 +232,7 @@ int Application::executeCommandLine(const GyanisScribe::App::CommandLineRequest 
             // 贴图是常驻动作：贴出去之后留在桌面上，事件循环跑到用户自己关掉
             return QApplication::exec();
         }
-        case CommandLineAction::ColorPick:
+        case GyanisScribe::App::CommandLineAction::ColorPick:
             if (m_controller == nullptr)
             {
                 std::fprintf(stderr, "命令行动作没能开始：控制器没建起来（多半是日志目录不可用）\n");

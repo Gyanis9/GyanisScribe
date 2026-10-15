@@ -11,7 +11,7 @@
 | --- | --- | --- |
 | 语义色（三套主题各一份） | `src/Gui/Theme/DesignTokens.h` 的 `ThemePalette`、`kLightPalette`、`kDarkPalette`、`kHighContrastPalette` | 绘制代码只认角色名（`windowBackground`、`surface`、`text`、`secondaryText`、`border`、`accent`、`onAccent`、`selection`、`icon`、`success`、`danger`、`mutedFill`、`hover`、`pressed`、`accentHover`、`accentSoft`、`borderStrong`），不认十六进制 |
 | 应用调色板的映射 | 同上：`buildApplicationPalette`，落在 `ThemeManager::refresh` | 样式表画不到原生那部分（微调框箭头、表头、占位与禁用文字），这些只认 `QPalette`；两份上色路径必须同源，否则深色档会带进一批浅色原生件 |
-| 排版档位 | 同上：`TextRole` 与 `kTextRolePointSize*`、`applyTextRole` | 三档：页标题 15 / 正文 10 / 读数 13（点）。刻意没有「比正文更小」的一档——小字号与次要色是两个独立的弱化手段，一起用就把「灰一点」变成「看不清」；说明行只压色不减号。走点值而不是样式表的 px（px 不随系统 DPI 缩放），正文档由 `App::Application` 设成应用字体 |
+| 排版档位 | 同上：`TextRole` 与 `kTextRolePointSize*`、`applyTextRole` | 三档：页标题 15 / 正文 10 / 读数 13（点）。刻意没有「比正文更小」的一档——小字号与次要色是两个独立的弱化手段，一起用就把「灰一点」变成「看不清」；说明行只压色不减号。走点值而不是样式表的 px（px 不随系统 DPI 缩放），正文档由 `Main::Application` 设成应用字体 |
 | 间距阶梯 | 同上：`kSpacingTiny/Small/Medium/Large`、`kFieldMaximumWidth`、`kIntroMaximumWidth` | 界面里出现的每个间距都取自 4/8/12/16；字段与说明行的宽度上限管住「一行长句」和「整窗宽的输入框」，设置窗默认 680×560、导航 180 宽，让一行就是一条能扫读的行 |
 | 跨模块共用的绘制常量 | 同上：`kCaptureMaskColor`、`kAccentColor`、`kCaptureHintTextColor`、`kCaptureHintBackgroundColor`、`kCrosshairColor`、`kHintFontSize`、`kHintPadding`、`kToolbarSliderWidth`、`kSelectionBorderWidth`、光标高亮一族 | 遮罩、选区读数、工具栏滑块、录屏高亮这些「两个模块都要用到」的尺寸与色 |
 | 字号与线宽的阶梯 | 同上：`kFontSizes`（12/13/14/16/20/24）、`kAnnotationWidths`（2/4/6/8）、默认档位下标 `kDefaultAnnotationWidthStep`/`kDefaultAnnotationFontSizeIndex`、找回函数 `stepIndexOf` | 界面只允许走阶梯；配置里存了阶梯外的值时 `stepIndexOf` 返回空，调用方记日志后回落默认档，不就近取一档 |

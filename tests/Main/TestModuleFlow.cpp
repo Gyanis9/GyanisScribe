@@ -201,8 +201,8 @@ namespace GyanisScribe
              */
             [[nodiscard]] Base::CapturedImage captureOneFrame(GyanisScribe::Core::SettingsStore &settings, FakeScreenSource &source) const
             {
-                GyanisScribe::Gui::CaptureService service(source, settings, *integration);
-                std::optional<Base::CapturedImage>    received;
+                GyanisScribe::Gui::CaptureService  service(source, settings, *integration);
+                std::optional<Base::CapturedImage> received;
                 QObject::connect(&service, &GyanisScribe::Core::ICaptureService::captured, &service, [&received](const Base::CapturedImage &image) { received = image; });
 
                 service.captureFullScreen(QString::fromLatin1(kFakeScreenName));
@@ -227,7 +227,7 @@ namespace GyanisScribe
         TEST_F(ModuleFlowFixture, FrameKeepsItsCoordinateSystemFromCaptureToPin)
         {
             GyanisScribe::Core::SettingsStore settings(m_iniFile);
-            FakeScreenSource                      source(makeFakeFrame());
+            FakeScreenSource                  source(makeFakeFrame());
 
             const auto frame = captureOneFrame(settings, source);
             ASSERT_EQ(frame.image.size(), QSize(kPhysicalWidth, kPhysicalHeight)) << "抓到的帧不是物理尺寸";
@@ -276,7 +276,7 @@ namespace GyanisScribe
         TEST_F(ModuleFlowFixture, StoredLayoutRestoresPinsWithTheirGeometry)
         {
             GyanisScribe::Core::SettingsStore settings(m_iniFile);
-            QImage                                image(40, 24, QImage::Format_ARGB32);
+            QImage                            image(40, 24, QImage::Format_ARGB32);
             image.fill(Qt::red);
 
             QRect  originalRect;
@@ -328,7 +328,7 @@ namespace GyanisScribe
         TEST_F(ModuleFlowFixture, RestoreSkipsOnlyThePinWhoseImageFileIsGone)
         {
             GyanisScribe::Core::SettingsStore settings(m_iniFile);
-            QImage                                image(20, 20, QImage::Format_ARGB32);
+            QImage                            image(20, 20, QImage::Format_ARGB32);
             image.fill(Qt::green);
 
             {
@@ -359,7 +359,7 @@ namespace GyanisScribe
         TEST_F(ModuleFlowFixture, OcrUsesTheSharedLanguageVocabulary)
         {
             GyanisScribe::Core::SettingsStore settings(m_iniFile);
-            const auto                            engine = GyanisScribe::Plugins::createOcrEngine(settings, *integration);
+            const auto                        engine = GyanisScribe::Plugins::createOcrEngine(settings, *integration);
             ASSERT_NE(engine, nullptr) << "选型不许交回空指针";
 
             const auto vocabulary = GyanisScribe::Core::supportedOcrLanguageTags();
@@ -406,8 +406,8 @@ namespace GyanisScribe
         }
 
         GyanisScribe::Core::SettingsStore settings(m_iniFile);
-        FakeScreenSource                      source(makeFakeFrame());
-        const auto                            frame = captureOneFrame(settings, source);
+        FakeScreenSource                  source(makeFakeFrame());
+        const auto                        frame = captureOneFrame(settings, source);
 
         GyanisScribe::Gui::PinManager pins(settings, *integration);
         auto                         &through   = pins.addPin(frame.image, QPoint(700, 300));
@@ -433,8 +433,8 @@ namespace GyanisScribe
     TEST_F(ModuleFlowFixture, TrayToggleConcealsAndRestoresEveryPin)
     {
         GyanisScribe::Core::SettingsStore settings(m_iniFile);
-        FakeScreenSource                      source(makeFakeFrame());
-        const auto                            frame = captureOneFrame(settings, source);
+        FakeScreenSource                  source(makeFakeFrame());
+        const auto                        frame = captureOneFrame(settings, source);
 
         GyanisScribe::Gui::PinManager pins(settings, *integration);
         auto                         &first  = pins.addPin(frame.image, QPoint(700, 300));
@@ -477,8 +477,8 @@ namespace GyanisScribe
         mime.setUrls({QUrl::fromLocalFile(QString::fromStdString(firstPath.string())), QUrl::fromLocalFile(QString::fromStdString(secondPath.string()))});
 
         Core::SettingsStore settings(m_iniFile);
-        Gui::PinManager         pins(settings, *integration);
-        const auto              dropped = App::pinDroppedContent(pins, &mime, QPoint(400, 300), QApplication::font());
+        Gui::PinManager     pins(settings, *integration);
+        const auto          dropped = App::pinDroppedContent(pins, &mime, QPoint(400, 300), QApplication::font());
         ASSERT_TRUE(dropped.has_value()) << dropped.error().message;
         EXPECT_EQ(dropped->pinnedCount, 2);
         ASSERT_EQ(pins.count(), 2);

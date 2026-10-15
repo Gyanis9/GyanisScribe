@@ -1,9 +1,6 @@
-# App：应用对象、核心控制器与入口。带 Q_OBJECT 的头文件必须进源文件列表，AUTOMOC 才找得到
+# App：应用服务集（托盘、单实例、命令行、崩溃守护、更新检查、内容投递与自定义热键）。
+# 带 Q_OBJECT 的头文件必须进源文件列表，AUTOMOC 才找得到
 add_library(App STATIC
-        Application.h
-        Application.cpp
-        AppController.h
-        AppController.cpp
         CommandLine.h
         CommandLine.cpp
         CaptureIntent.h
@@ -16,8 +13,6 @@ add_library(App STATIC
         CustomHotkeys.cpp
         ClipboardPin.h
         ClipboardPin.cpp
-        MainWindow.h
-        MainWindow.cpp
         TrayAction.h
         TrayClick.h
         TrayClick.cpp
