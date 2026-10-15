@@ -107,3 +107,37 @@ add_dependencies(TestModuleFlow DeployQtRuntime)
 # 否则一个进程删掉的文件是另一个进程正要读的。拖放那一条借系统剪贴板读回像素，
 # 与 TestPin / TestCapture / TestOcr 同拿 clipboardShared 那一把。
 gtest_discover_tests(TestModuleFlow PROPERTIES RESOURCE_LOCK "pinLayoutCache\;clipboardShared")
+
+# AppController 那一层的直测：延时截图的路由与成品进历史要判「谁在什么时刻被叫到」，
+# 因此给它一套与 TestModuleFlow 同形状的替身（AppControllerParts 注进去，见 TestAppController.cpp）。
+# 控制器要建真窗口，自己一份 QApplication，与上面几组各占一个可执行体。
+add_executable(TestAppController
+        TestAppController.cpp)
+
+target_link_libraries(TestAppController PRIVATE
+        App
+        Annotation
+        Capture
+        Core
+        History
+        Hotkey
+        Ocr
+        Pin
+        Platform
+        Record
+        Settings
+        Ui
+        GTest::gtest
+        GTest::gtest_main
+        Qt6::Gui
+        Qt6::Widgets)
+
+if (MSVC)
+    target_compile_options(TestAppController PRIVATE /W4 /WX)
+endif ()
+
+add_dependencies(TestAppController DeployQtRuntime)
+
+# 这一组会碰贴图布局缓存、未保存归档目录与系统剪贴板（快速保存那一条会写剪贴板）：
+# 与 TestModuleFlow 同拿那两把锁——并行跑时一组清的正是另一组在读的。
+gtest_discover_tests(TestAppController PROPERTIES RESOURCE_LOCK "pinLayoutCache\;clipboardShared")
