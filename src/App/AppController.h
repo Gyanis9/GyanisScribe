@@ -514,6 +514,14 @@ namespace GyanisScribe::App
         void startImageFetch(const QUrl &url, std::optional<QPoint> dropPoint);
 
         /**
+         * @brief 抓一块点名要的屏
+         * @param screenName 屏幕名
+         * @details 走整屏截图同一条路（含延时那一档）：两处各写一份截全屏的流程，
+         *          延时与成品去向那几档迟早只改一处。
+         */
+        void captureNamedScreen(const QString &screenName);
+
+        /**
          * @brief 把一份成品记进历史清单并刷新历史页
          * @param filePath 成品文件路径
          * @param kind 成品类别

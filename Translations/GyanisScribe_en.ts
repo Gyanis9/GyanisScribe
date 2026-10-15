@@ -1300,6 +1300,10 @@
             <translation>Configuration files (*.json)</translation>
         </message>
         <message>
+            <source>整屏截图：%1</source>
+            <translation>Full-screen capture: %1</translation>
+        </message>
+        <message>
             <source>与托盘菜单、全局热键走同一个出口</source>
             <translation>Same action as the tray menu and the global hotkey</translation>
         </message>

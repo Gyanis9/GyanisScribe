@@ -31,6 +31,8 @@
 
 #include <gtest/gtest.h>
 
+using GyanisScribe::App::screenCaptureLabels;
+
 #include <QApplication>
 #include <QCheckBox>
 #include <QFile>
@@ -467,6 +469,22 @@ namespace
 
         const auto reopened = makeStore();
         EXPECT_EQ(reopened->intValue(GyanisScribe::Settings::kRecordMaximumDuration, -1), 1800) << "没写进 Record/MaximumDurationSeconds";
+    }
+    /**
+     * @brief 钉住「整屏截图：<屏名>」那一组只在多屏时出现，且每块屏一条
+     * @details 只钉「有这一组」不够：单屏上多摆一条同义项是噪声，而两块同型号屏的标签要不带屏名，
+     *          用户在「更多」里分不出点的是哪一块（用例装置里只有一块屏，所以这一条走纯函数那一格）。
+     */
+    TEST(MainWindowScreenList, OnlyAppearsWithMoreThanOneScreen)
+    {
+        EXPECT_TRUE(screenCaptureLabels({}).empty()) << "一块屏都没有时不该摆这一组";
+        EXPECT_TRUE(screenCaptureLabels({QStringLiteral("DP-1")}).empty()) << "单屏上没有「另一块」可点";
+
+        const auto labels = screenCaptureLabels({QStringLiteral("DP-1"), QStringLiteral("HDMI-1")});
+        ASSERT_EQ(labels.size(), 2U) << "每块屏一条";
+        EXPECT_NE(labels[0], labels[1]) << "两条标签一样，用户分不出点的是哪一块";
+        EXPECT_TRUE(labels[0].contains(QStringLiteral("DP-1"))) << "标签里要带屏名";
+        EXPECT_TRUE(labels[1].contains(QStringLiteral("HDMI-1")));
     }
     /**
      * @brief 钉住 GIF 档下帧率那一格的天花板，以及切回 MP4 时用户那一档的还原

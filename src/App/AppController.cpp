@@ -295,6 +295,8 @@ namespace GyanisScribe::App
         QObject::connect(m_mainWindow.get(), &MainWindow::messageForUser, this, [this](const QString &message, Ui::ToastKind kind) { notifyUser(message, kind); });
         // 主窗口动作条与托盘菜单发的是同一个枚举，所以出口也只有这一个 handleTrayAction
         QObject::connect(m_mainWindow.get(), &MainWindow::actionRequested, this, &AppController::handleTrayAction);
+        // 「整屏截图：<屏名>」那一条：与整屏截图同一个出口，只是把屏名点了出来
+        QObject::connect(m_mainWindow.get(), &MainWindow::captureScreenRequested, this, &AppController::captureNamedScreen);
         // 贴图张数走托盘悬停提示：贴图常被压在别的窗口后面，这是唯一还能看出「挂着几张」的地方
         QObject::connect(m_pins.get(), &Pin::PinManager::pinCountChanged, m_tray.get(), &TrayController::setPinCount);
         // 贴图菜单里的「识别文字」与热键、标注窗走的是同一个出口：一处接线管所有张（含启动恢复的那些）
@@ -423,6 +425,13 @@ namespace GyanisScribe::App
     {
         m_captureIntent = intent.value_or(settingsCaptureIntent());
         scheduleCapture([this] { m_capture->captureFullScreen(); });
+    }
+
+    void AppController::captureNamedScreen(const QString &screenName)
+    {
+        // 与整屏截图同一条路（含延时那一档）：两处各写一份流程，延时与成品去向那几档迟早只改一处
+        m_captureIntent = settingsCaptureIntent();
+        scheduleCapture([this, screenName] { m_capture->captureFullScreen(screenName); });
     }
 
     void AppController::startLastRegionCapture(const std::optional<CaptureIntent> intent)

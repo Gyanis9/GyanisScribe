@@ -77,6 +77,14 @@ namespace GyanisScribe::App
     };
 
     /**
+     * @brief 「整屏截图」那一组菜单项：多屏时每块屏一条
+     * @param screenNames 现有屏幕名，按平台给的原样
+     * @return 每块屏一条的标签；只有一块屏（或一块都没有）时返回空表——单屏上没有「另一块」可点
+     * @details 标签里带屏名：两块 1920×1080 的屏在「整屏截图」四个字下分不出谁是谁。
+     */
+    [[nodiscard]] std::vector<QString> screenCaptureLabels(const QStringList &screenNames);
+
+    /**
      * @brief 主窗口的一页
      * @details 页、导航标签与导航图标绑在同一行：托盘菜单、导航行文字与 open() 的序号都从这张表来，
      *          分开放就会出现「菜单写着历史、点开是设置」。
@@ -255,6 +263,14 @@ namespace GyanisScribe::App
          *          要么两处都没了，不允许出现「只在托盘里有」这种在没有托盘的机器上找不到的入口。
          */
         void actionRequested(GyanisScribe::App::TrayAction action);
+
+        /**
+         * @brief 点了「整屏截图：<屏名>」那一条
+         * @param screenName 要点名抓的那块屏
+         * @details 与 actionRequested 分开一条：托盘动作那枚举里不带屏名，
+         *          而取值恰好与「光标所在那块」不同的只有这一条路。
+         */
+        void captureScreenRequested(const QString &screenName);
 
         /**
          * @brief 历史页要求把一条成品重新贴回屏幕

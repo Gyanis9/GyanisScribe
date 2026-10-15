@@ -49,6 +49,7 @@
 #include <QSignalBlocker>
 #include <QSpinBox>
 #include <QScrollArea>
+#include <QScreen>
 #include <QStackedWidget>
 #include <QToolButton>
 #include <QUrl>
@@ -1660,6 +1661,22 @@ namespace GyanisScribe::App
         return nullptr;
     }
 
+    std::vector<QString> screenCaptureLabels(const QStringList &screenNames)
+    {
+        // 单屏上没有「另一块」可点：这一组只在多屏时出现，否则就是给每台机器都多摆一条同义项
+        std::vector<QString> labels;
+        if (screenNames.size() <= 1)
+        {
+            return labels;
+        }
+        labels.reserve(static_cast<std::size_t>(screenNames.size()));
+        for (const auto &name: screenNames)
+        {
+            labels.push_back(GyanisScribe::Core::uiText("整屏截图：%1").arg(name));
+        }
+        return labels;
+    }
+
     QWidget *MainWindow::buildActionBar()
     {
         auto *bar = new QWidget{this};
@@ -1694,6 +1711,25 @@ namespace GyanisScribe::App
             button->setToolTip(GyanisScribe::Core::uiText("与托盘菜单、全局热键走同一个出口"));
             QObject::connect(button, &QPushButton::clicked, this, [this, action] { emit actionRequested(*action); });
             row->addWidget(button);
+        }
+
+        // 多屏时给「整屏截图」补一份屏幕清单：托盘那一份菜单项是扁平的枚举（不带屏名），
+        // 点名另一块屏这条路从主窗口走——两处都能做的就是「光标所在那块」这一档
+        QStringList screenNames;
+        for (const auto *screen: QGuiApplication::screens())
+        {
+            screenNames.append(screen->name());
+        }
+        const auto screenLabels = screenCaptureLabels(screenNames);
+        if (!screenLabels.empty())
+        {
+            moreMenu->addSeparator();
+            for (std::size_t index = 0; index < screenLabels.size(); ++index)
+            {
+                const auto name = screenNames[static_cast<qsizetype>(index)];
+                auto      *item = moreMenu->addAction(screenLabels[index]);
+                QObject::connect(item, &QAction::triggered, this, [this, name] { emit captureScreenRequested(name); });
+            }
         }
 
         auto *more = new QToolButton{bar};
