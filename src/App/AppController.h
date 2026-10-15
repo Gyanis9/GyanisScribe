@@ -28,6 +28,7 @@
 class QTimer;
 class QScreen;
 
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -106,6 +107,19 @@ namespace GyanisScribe::App
     class MainWindow;
     class TrayController;
 
+    /**
+     * @brief 建控制器时可以换掉的几件底物
+     * @details 只有测试用这两档：设置、平台集成、抓帧来源与历史清单落点是构造里唯一碰「本机环境」的根，
+     *          其余模块都由它们派生。每一格留空就按生产那一份自建，两个公开构造因此汇在同一处装配。
+     */
+    struct AppControllerParts
+    {
+        std::unique_ptr<Settings::SettingsStore>        settings;           ///< 配置存储；空 = 按便携标记自建
+        std::unique_ptr<Platform::IPlatformIntegration> integration;        ///< 平台集成；空 = 本机那一份
+        std::unique_ptr<Capture::IScreenCaptureSource>  captureSource;      ///< 抓帧来源；空 = 本机抓屏
+        std::filesystem::path                           historyStoragePath; ///< 历史清单落点；空 = 默认位置
+    };
+
 
     /**
      * @brief 核心控制器
@@ -123,6 +137,15 @@ namespace GyanisScribe::App
          * @note 要在 QApplication 存在之后构造：配置、屏幕列表与热键后端都要靠应用对象
          */
         explicit AppController(QObject *parent = nullptr);
+
+        /**
+         * @brief 用换进来的底物构造控制器（测试注入口）
+         * @param parts 要换掉的底物；留空的格子按生产那一份自建
+         * @param parent QObject 父对象，默认无
+         * @details 与不带参数的那个构造汇到同一处私有构造：装配逻辑只写一份，
+         *          生产路径就相当于把四个格子全留空。
+         */
+        explicit AppController(AppControllerParts parts, QObject *parent = nullptr);
 
         /**
          * @brief 析构控制器，按创建的反向顺序交还各模块
@@ -261,6 +284,17 @@ namespace GyanisScribe::App
         void commandLineActionFailed(const QString &reason);
 
     private:
+        /**
+         * @brief 两个公开构造的汇合点
+         * @param settings 配置存储，所有权交进来
+         * @param integration 平台集成，所有权交进来
+         * @param captureSource 抓帧来源，所有权交进来
+         * @param historyStoragePath 历史清单落点，非空
+         * @param parent QObject 父对象
+         */
+        AppController(std::unique_ptr<Settings::SettingsStore> settings, std::unique_ptr<Platform::IPlatformIntegration> integration,
+                      std::unique_ptr<Capture::IScreenCaptureSource> captureSource, std::filesystem::path historyStoragePath, QObject *parent);
+
         /**
          * @brief 抓到一帧之后的收尾：开启一轮标注
          * @param image 抓屏产物

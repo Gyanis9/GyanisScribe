@@ -116,8 +116,20 @@ namespace GyanisScribe::App
     }
 
 
-    AppController::AppController(QObject *parent) :
-        QObject(parent), m_settings(createSettingsStore()), m_integration(Platform::createPlatformIntegration()), m_captureSource(Capture::createScreenCaptureSource())
+    AppController::AppController(QObject *parent) : AppController(AppControllerParts{}, parent)
+    {
+    }
+
+    AppController::AppController(AppControllerParts parts, QObject *parent) :
+        AppController(parts.settings ? std::move(parts.settings) : createSettingsStore(), parts.integration ? std::move(parts.integration) : Platform::createPlatformIntegration(),
+                      parts.captureSource ? std::move(parts.captureSource) : Capture::createScreenCaptureSource(),
+                      parts.historyStoragePath.empty() ? History::HistoryStore::defaultStoragePath() : std::move(parts.historyStoragePath), parent)
+    {
+    }
+
+    AppController::AppController(std::unique_ptr<Settings::SettingsStore> settings, std::unique_ptr<Platform::IPlatformIntegration> integration,
+                                 std::unique_ptr<Capture::IScreenCaptureSource> captureSource, std::filesystem::path historyStoragePath, QObject *parent) :
+        QObject(parent), m_settings(std::move(settings)), m_integration(std::move(integration)), m_captureSource(std::move(captureSource))
     {
         // 语言要排在所有界面对象之前：translator 装晚了，已经建好的控件仍然拿源码文案
         const auto defaultLanguageText = QString::fromUtf8(std::string{Ui::appLanguageText(Ui::AppLanguage::Chinese)});
@@ -174,7 +186,7 @@ namespace GyanisScribe::App
                              m_pendingFetchPoint.reset();
                              notifyUser(reason, Ui::ToastKind::Information);
                          });
-        m_history    = std::make_unique<History::HistoryStore>(History::HistoryStore::defaultStoragePath());
+        m_history    = std::make_unique<History::HistoryStore>(std::move(historyStoragePath));
         m_mainWindow = std::make_unique<MainWindow>(*m_settings, *m_theme, *m_icons, *m_history, m_integration->capabilities(), *m_integration);
         m_toast      = std::make_unique<Ui::Toast>(*m_icons, *m_theme);
         QObject::connect(m_tray.get(), &TrayController::actionRequested, this, &AppController::handleTrayAction);
