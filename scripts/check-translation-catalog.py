@@ -9,7 +9,7 @@ Style.TranslationCatalog——漏掉的那几处在英文档下只会安静地�
 用法：
     python3 scripts/check-translation-catalog.py                      # 校验（CI/ctest 走这条）
     python3 scripts/check-translation-catalog.py --generate           # 生成/刷新骨架，已有译文原样带过去
-    python3 scripts/check-translation-catalog.py --scan-root src --catalog Translations/GyanisScribe_en.ts
+    python3 scripts/check-translation-catalog.py --scan-root src --catalog translations/GyanisScribe_en.ts
 
 长文案会被 clang-format 在空格处断成相邻字面量，编译期才拼回去；脚本按同样的规则先拼再取，
 否则目录里会出现一条运行期永远查不中的半截文案（这条门禁自己就漏过一次，见 SELF_PROBE）。
@@ -30,7 +30,7 @@ sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 DEFAULT_SCAN_ROOT = REPO_ROOT / "src"
-DEFAULT_CATALOG = REPO_ROOT / "Translations" / "GyanisScribe_en.ts"
+DEFAULT_CATALOG = REPO_ROOT / "translations" / "GyanisScribe_en.ts"
 
 # uiText("…") / uiTextUtf8("…")：函数名带数字，字符类不能只写 [A-Za-z]*
 CALL = re.compile(r'uiText[A-Za-z0-9]*\(\s*"((?:\\.|[^"\\])*)"')

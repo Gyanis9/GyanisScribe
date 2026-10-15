@@ -9,10 +9,10 @@
 #
 # The SHA-256 of the zip is pinned in this file and a verified extraction leaves a stamp next to the
 # executable. Both are required, so neither of these can happen silently: shipping a binary that is
-# not the one this repository was tested with, or reusing a Vendor/Ffmpeg/ffmpeg.exe that somebody
+# not the one this repository was tested with, or reusing a vendor/Ffmpeg/ffmpeg.exe that somebody
 # dropped in without ever verifying it.
 #
-# Offline fallback: put the zip at Vendor/Ffmpeg/<pinned file name> by hand; the checksum still
+# Offline fallback: put the zip at vendor/Ffmpeg/<pinned file name> by hand; the checksum still
 # has to match before anything is extracted.
 
 param(
@@ -31,7 +31,7 @@ $url     = "https://www.gyan.dev/ffmpeg/builds/packages/$zipName"
 # downloaded here -- the two agreed, so this is the release the packager was tested with.
 $expectedSha256 = '60F467265B1E312373DBCD92200C2618A74850F98D3D078E94296BB3FA2047BA'
 
-$vendor = Join-Path 'Vendor' 'Ffmpeg'
+$vendor = Join-Path 'vendor' 'Ffmpeg'
 $zip    = Join-Path $vendor $zipName
 $exe    = Join-Path $vendor 'ffmpeg.exe'
 $stamp  = Join-Path $vendor 'verified-sha256.txt'

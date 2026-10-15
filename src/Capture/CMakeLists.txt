@@ -34,14 +34,14 @@ target_link_libraries(Capture PUBLIC
         Qt6::Gui
         Qt6::Widgets)
 
-# DXGI 桌面重复是 Windows + MSVC 这一档的实现：容器那一档既没有这套头也不需要它，
-# 与 Ocr 的 WinRT 后端同一条规矩——条件分支由平台决定，而不是「可选的第三方依赖」
+# DXGI 桌面重复是 Windows + MSVC 这一档的实现：条件分支由平台决定，
+# 而不是「可选的第三方依赖」（与 Ocr 的 WinRT 后端同一条规矩）
 if (WIN32 AND MSVC)
     target_sources(Capture PRIVATE
             DxgiCaptureSource.h
             DxgiCaptureSource.cpp)
-    # com_ptr 这些投影头 vendor 在 Vendor/WinRt：SYSTEM + /external:W0，生成头里的告警不进零告警门禁
-    target_include_directories(Capture SYSTEM PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../Vendor/WinRt")
+    # com_ptr 这些投影头 vendor 在 vendor/WinRt：SYSTEM + /external:W0，生成头里的告警不进零告警门禁
+    target_include_directories(Capture SYSTEM PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/WinRt")
     target_compile_options(Capture PRIVATE /external:W0)
     # 桌面重复的接口在 dxgi，设备与暂存纹理在 d3d11，winrt 运行时伞库随系统
     target_link_libraries(Capture PRIVATE d3d11 dxgi windowsapp)

@@ -50,7 +50,7 @@
 
 - 编译条件：`if (WIN32 AND MSVC)`，宏 `GYANISSCRIBE_HAS_WINRT_OCR` 发 PUBLIC（用例要知道这一档有没有它，
   与 `GYANISSCRIBE_HAS_TESSERACT` 同一条理由）。
-- C++/WinRT 投影头 vendor 在 `Vendor/WinRt/winrt/`（62 个头、3.7 MB，MIT），生成与裁剪办法：
+- C++/WinRT 投影头 vendor 在 `vendor/WinRt/winrt/`（62 个头、3.7 MB，MIT），生成与裁剪办法：
   `G:\Windows Kits\10\bin\10.0.26100.0\x64\cppwinrt.exe -input 10.0.26100.0+ -base -output <目录>`，
   然后从 `base.h`、`Windows.Foundation.h`、`Windows.Foundation.Collections.h`、`Windows.Globalization.h`、
   `Windows.Graphics.Imaging.h`、`Windows.Media.Ocr.h`、`Windows.Storage.Streams.h` 出发按 `#include <winrt/...>`
@@ -80,8 +80,8 @@
 | --- | --- | --- |
 | Tesseract | Apache-2.0 | 与 Qt/LGPL 并存无冲突 |
 | Leptonica | BSD-2-clause | Tesseract 的传递依赖 |
-| tessdata 训练数据 | Apache-2.0（Google 训练的 eng/chi_sim 系列） | **已随包发布**：`Vendor/Tessdata/` 下两份 fast 变体进安装包的 `tessdata/`，许可证正文在 `licenses/TessData-Apache-2.0.txt` |
+| tessdata 训练数据 | Apache-2.0（Google 训练的 eng/chi_sim 系列） | **已随包发布**：`vendor/Tessdata/` 下两份 fast 变体进安装包的 `tessdata/`，许可证正文在 `licenses/TessData-Apache-2.0.txt` |
 | Windows.Media.Ocr | 系统组件，不随本程序分发 | 只是调用系统 API，不引入第三方代码 |
-| C++/WinRT 投影头（`Vendor/WinRt`） | MIT（微软 cppwinrt 生成） | 只在 Windows 档参与编译，编译进本程序的是我们的代码，头本身不分发 |
+| C++/WinRT 投影头（`vendor/WinRt`） | MIT（微软 cppwinrt 生成） | 只在 Windows 档参与编译，编译进本程序的是我们的代码，头本身不分发 |
 
 第三方清单的总表在交付文档里统一列（打包与交付文档那一批）。

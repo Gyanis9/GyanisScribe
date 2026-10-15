@@ -37,7 +37,7 @@ add_custom_command(TARGET DeployQtRuntime POST_BUILD
         "$<TARGET_FILE_DIR:GyanisScribe>/plugins/platforms")
 
 # Concurrent 不在这份清单里：Qt 6 的 QtConcurrent::run 是模板代码，跑的是 QtCore 的线程池，
-# QFutureWatcher 也在 QtCore 里——实测 Release 成品与容器里的测试二进制都不 import Qt6Concurrent / libQt6Concurrent
+# QFutureWatcher 也在 QtCore 里——实测 Release 成品与测试二进制都不 import Qt6Concurrent / libQt6Concurrent
 # （打包那一步的 windeployqt 同样没拷它）。链 Qt6::Concurrent 只是为了拿到头文件，摆一份没人加载的 DLL 进运行目录是死重量。
 # PrintSupport 在清单里：打印对话框（标注窗 Ctrl+P）真加载它，缺一个 DLL 的表现是构建期枚举整个 .exe 报 0xc0000135
 foreach (QtModule Core Gui Widgets Svg Network PrintSupport)
@@ -77,14 +77,14 @@ add_custom_command(TARGET DeployQtRuntime POST_BUILD
         "$<TARGET_FILE_DIR:GyanisScribe>/plugins/platforms/")
 endif ()
 
-# 语言包：Translations/*.ts 是仓库里的真源，.qm 由 lrelease 在构建期产出。它是本构建图产出的产物，
+# 语言包：translations/*.ts 是仓库里的真源，.qm 由 lrelease 在构建期产出。它是本构建图产出的产物，
 # 所以按规范挂在 ALL 目标上（不是可执行体的 POST_BUILD），改了 .ts 不重新链接可执行体也会刷新副本。
 # lrelease 从 Qt 的 LinguistTools 组件取（Qt6::lrelease 导入目标），不用 find_program：
 # Qt 的 bin 目录不在 PATH 上，find_program 会静默找不到，于是这条门变成一个永远空操作的目标——
 # 实测「207 条用例全绿」的同时语言包根本没生成。
-# 容器里那份 Qt 6.4 没装 LinguistTools（apt 的 qt6-tools 不在环境里），QUIET + 目标存在判断让那一档整条跳过：
+# 没装 LinguistTools 的 Qt（QUIET + 目标存在判断）整条跳过：
 # 语言包缺席时应用照旧按中文跑，Ui::Language 会报出该把包放在哪儿。
-file(GLOB TRANSLATION_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/Translations/*.ts")
+file(GLOB TRANSLATION_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/translations/*.ts")
 find_package(Qt6 COMPONENTS LinguistTools QUIET)
 
 add_custom_target(DeployTranslations ALL
@@ -105,8 +105,8 @@ if (TARGET Qt6::lrelease AND TRANSLATION_SOURCES)
 endif ()
 
 # WIN32 子系统：托盘类程序不该带控制台窗口；WinMain 由 Qt 的 EntryPoint 目标桥回 main()。
-# Linux 上没有这套：main() 就是入口，而 Ubuntu 那份 Qt6 也不提供 EntryPointPrivate 这个目标，
-# 照抄会在 generate 期报「target was not found」——这一条是容器里真跑出来的，不是推测
+# 非 WIN32 档（将来别的平台）没有 EntryPointPrivate 这个目标：
+# 照抄 WIN32 那一边的写法会在 generate 期报「target was not found」
 if (WIN32)
     add_executable(GyanisScribe WIN32
             App/Main.cpp)

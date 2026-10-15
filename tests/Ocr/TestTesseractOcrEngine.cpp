@@ -22,7 +22,7 @@ namespace
 {
     std::unique_ptr<QApplication> application;
 
-    /// 随仓库那份语言包（Vendor/Tessdata）：安装包就带它，用例不许依赖用户往哪放文件
+    /// 随仓库那份语言包（vendor/Tessdata）：安装包就带它，用例不许依赖用户往哪放文件
     const std::filesystem::path kTessDataDirectory{GYANISSCRIBE_VENDORED_TESSDATA};
 
     /**

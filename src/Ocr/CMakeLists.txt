@@ -29,7 +29,7 @@ if (Tesseract_FOUND)
 endif ()
 
 # Windows 系统识别走系统组件 Windows.Media.Ocr：它不是可选依赖而是平台条件——投影头 vendor 在
-# Vendor/WinRt，只有 Windows + MSVC 这一档编得到，容器那一档既没有这套头也不需要它。
+# vendor/WinRt，只有 Windows + MSVC 这一档编得到。
 # 它也不依赖用户放语言包，所以 Debug 档（没有 Tesseract 的那一档）在 Windows 上从此有真后端。
 if (WIN32 AND MSVC)
     list(APPEND OcrSources
@@ -62,7 +62,7 @@ endif ()
 if (WIN32 AND MSVC)
     # SYSTEM：vendor 的生成头在 /W4 /WX 下会报成百条警告，必须按外部头交给编译器（CMake 把它翻成 /external:I），
     # 再配 /external:W0 定外部头的告警档位——只挂 SYSTEM 不改档位，生成头里的警告照样算进零告警门禁
-    target_include_directories(Ocr SYSTEM PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../Vendor/WinRt")
+    target_include_directories(Ocr SYSTEM PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/WinRt")
     target_compile_options(Ocr PRIVATE /external:W0)
     # 激活 WinRT 类要的伞导入库；它不随包分发，运行期用的是系统自带的 API
     target_link_libraries(Ocr PRIVATE windowsapp)

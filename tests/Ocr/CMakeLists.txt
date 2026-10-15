@@ -16,7 +16,7 @@ get_target_property(ocrInterfaceCompileDefinitions Ocr INTERFACE_COMPILE_DEFINIT
 if (ocrInterfaceCompileDefinitions MATCHES "GYANISSCRIBE_HAS_TESSERACT")
     target_sources(TestOcr PRIVATE TestTesseractOcrEngine.cpp)
     # 这份用例认的是随仓库那一份语言包，路径由构建期给；装完即用的判据不该依赖用户把包放哪
-    target_compile_definitions(TestOcr PRIVATE GYANISSCRIBE_VENDORED_TESSDATA="${CMAKE_SOURCE_DIR}/Vendor/Tessdata")
+    target_compile_definitions(TestOcr PRIVATE GYANISSCRIBE_VENDORED_TESSDATA="${CMAKE_SOURCE_DIR}/vendor/Tessdata")
 endif ()
 
 target_link_libraries(TestOcr PRIVATE

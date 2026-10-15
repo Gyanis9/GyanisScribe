@@ -53,14 +53,14 @@ foreach ($document in 'ThirdPartyLicenses.md', 'OcrBackends.md', 'UiStyleGuide.m
 }
 
 & (Join-Path $PSScriptRoot 'FetchFfmpeg.ps1')
-$ffmpegExe = Join-Path (Join-Path 'Vendor' 'Ffmpeg') 'ffmpeg.exe'
+$ffmpegExe = Join-Path (Join-Path 'vendor' 'Ffmpeg') 'ffmpeg.exe'
 if (-not (Test-Path $ffmpegExe)) { throw "bundled ffmpeg missing at $ffmpegExe" }
 Copy-Item $ffmpegExe $stage -Force
 Write-Output '[ok] ffmpeg staged next to the executable'
 
 # Ui::Ocr looks for <application directory>/tessdata before the user data folder, so shipping the
 # packs here is what makes recognition work straight after installation.
-$tessDataSource = Join-Path 'Vendor' 'Tessdata'
+$tessDataSource = Join-Path 'vendor' 'Tessdata'
 foreach ($required in 'eng.traineddata', 'chi_sim.traineddata') {
     if (-not (Test-Path (Join-Path $tessDataSource $required))) { throw "language pack $required missing under $tessDataSource" }
 }

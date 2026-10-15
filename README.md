@@ -510,7 +510,7 @@ Enter / Esc / 方向键与带 `Ctrl` 的那几组不给换：它们是系统惯�
 
 界面文案是中文，走 `Core::uiText()` / `Core::uiTextUtf8()`；英文档需要
 `translations/GyanisScribe_en.qm`（随包分发，缺包时按中文继续并给出放置位置）。
-翻译目录 `Translations/GyanisScribe_en.ts` 是唯一真源，`.qm` 由构建期的 lrelease 产出。
+翻译目录 `translations/GyanisScribe_en.ts` 是唯一真源，`.qm` 由构建期的 lrelease 产出。
 改完文案要重新生成目录：
 
 ```bash
@@ -529,7 +529,7 @@ python scripts/check-translation-catalog.py --generate   # 把新增文案补进
 | Conan | 2 | 依赖：spdlog 1.17.0、GoogleTest 1.17.0，Release 档另领 Tesseract 5.5.2 |
 | Qt | 6.11，含 Core / Gui / Widgets / Concurrent / Svg / Network | 用 msvc2022_64 套件 |
 | Python | 3 | 两条静态门禁脚本 |
-| ffmpeg | 官方静态构建（gyan.dev） | 打包时需要：`scripts/FetchFfmpeg.ps1` 按钉好的 URL + SHA-256 取进 `Vendor/Ffmpeg/`；开发期 PATH 上有一份也行 |
+| ffmpeg | 官方静态构建（gyan.dev） | 打包时需要：`scripts/FetchFfmpeg.ps1` 按钉好的 URL + SHA-256 取进 `vendor/Ffmpeg/`；开发期 PATH 上有一份也行 |
 | NSIS | — | 可选：只在打安装器时需要 |
 
 机器相关的路径只出现在 `scripts/WindowsBuild.bat` 里，工程不写死绝对路径。
@@ -775,7 +775,7 @@ id 的 mergeWith 通过），「改两次、撤一次」回的是两处之前的
 Debug 档不领 Tesseract（理由与撤除判据见 [docs/OcrBackends.md](docs/OcrBackends.md)）。
 本机 Debug 那一档因此少这 4 条，另多 1 条「后端没编进来」的对照——两档条数不同是这套条件编译的结果，不是漏跑。
 本机这一档跳过的四条全是要真 `ffmpeg` 的端到端（编码 2、设备枚举 1、取声 1）：这个工作树没跑
-`scripts/FetchFfmpeg.ps1`，`Vendor/Ffmpeg/` 不在，所以四条一起跳——打过包的本机只跳取声那一条。
+`scripts/FetchFfmpeg.ps1`，`vendor/Ffmpeg/` 不在，所以四条一起跳——打过包的本机只跳取声那一条。
 跳过的都是环境门控用例，本机两档各跳哪些是清楚的：
 
 | 跳过的用例 | 为什么跳 |
@@ -786,7 +786,7 @@ Debug 档不领 Tesseract（理由与撤除判据见 [docs/OcrBackends.md](docs/
 | `ModuleFlowFixture.TrayEscapeHatchMakesThroughPinsClickableAgain` | 要真鼠标穿透能力才开得出「穿透中」的贴图；没有可复现的现场就跳过，不拿假现场充一条通过 |
 | `QScreenCaptureSourceFixture.GrabbedCursorShapeIsSelfConsistent`、`...CursorDrawsIntoARealFrameWithoutBreakingItsGeometry` | 要真桌面才取得到系统指针的形状；离屏档拿不到就跳过，本机在指针此刻隐藏时同样跳（这一档跳过是机器的现场，不是漏跑）。掩码与合成规则不靠这两格——`CursorPixels` 那四条用自造的位平面与自造指针跑，两边都跑得到 |
 
-`scripts\WindowsBuild.bat` 在 `Vendor/Ffmpeg/ffmpeg.exe` 就位时会自动把它交给 `GYANISSCRIBE_FFMPEG`，
+`scripts\WindowsBuild.bat` 在 `vendor/Ffmpeg/ffmpeg.exe` 就位时会自动把它交给 `GYANISSCRIBE_FFMPEG`，
 所以打过一次包的本机跑门禁时，编码与设备枚举这两条端到端是真的在跑（跳过的只剩取声那一条）。
 自己指定仍然优先，本机没有随包那份时这样打开：
 
@@ -820,7 +820,7 @@ src/Ocr         预处理、后端选型、结果窗口与导出
 src/History     历史清单、保留策略、缩略图列表
 src/Pick        取色器：颜色写法与放大镜几何
 src/App         应用对象、核心控制器、托盘、主窗口、单实例、崩溃兜底
-Vendor/WinRt    Windows 系统识别用的 C++/WinRT 投影头（MIT，生成与裁剪办法见 docs/OcrBackends.md）
+vendor/WinRt    Windows 系统识别用的 C++/WinRT 投影头（MIT，生成与裁剪办法见 docs/OcrBackends.md）
 tests/          逐级镜像 src 的目录结构；另有一条跨模块流程入口 tests/App/TestModuleFlow.cpp
 Resources/Icons 87 张原创 SVG 图标（未接线的几枚记在路线图「图标接线」那一条）
 scripts/        构建、打包脚本与静态门禁

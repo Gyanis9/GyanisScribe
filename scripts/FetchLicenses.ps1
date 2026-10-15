@@ -21,7 +21,7 @@ $licenses = @(
     [pscustomobject]@{ File = 'Spdlog-MIT.txt';         Url = 'https://raw.githubusercontent.com/gabime/spdlog/v1.17.0/LICENSE'; Marker = 'MIT License' }
     [pscustomobject]@{ File = 'Zxing-Apache-2.0.txt';   Url = 'https://raw.githubusercontent.com/zxing-cpp/zxing-cpp/v3.1.1/LICENSE'; Marker = 'Apache License' }
     [pscustomobject]@{ File = 'GoogleTest-BSD-3-Clause.txt'; Url = 'https://raw.githubusercontent.com/google/googletest/v1.17.0/LICENSE'; Marker = 'Redistribution and use in source and binary forms' }
-    # The vendored projection reports CPPWINRT_VERSION "2.0.250303.5" (see Vendor/WinRt/winrt/base.h),
+    # The vendored projection reports CPPWINRT_VERSION "2.0.250303.5" (see vendor/WinRt/winrt/base.h),
     # but that build is only published as a NuGet package -- no git tag. 2.0.250303.1 is the nearest
     # tagged ref and its LICENSE is byte-identical to the one shipped with our generated headers.
     [pscustomobject]@{ File = 'WinRtProjection-MIT.txt'; Url = 'https://raw.githubusercontent.com/microsoft/cppwinrt/2.0.250303.1/LICENSE'; Marker = 'MIT License' }

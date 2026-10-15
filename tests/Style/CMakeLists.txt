@@ -16,7 +16,7 @@ if (PYTHON3_EXECUTABLE)
     add_test(NAME Style.TranslationCatalog
             COMMAND ${PYTHON3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/check-translation-catalog.py
                     --scan-root ${CMAKE_SOURCE_DIR}/src
-                    --catalog ${CMAKE_SOURCE_DIR}/Translations/GyanisScribe_en.ts)
+                    --catalog ${CMAKE_SOURCE_DIR}/translations/GyanisScribe_en.ts)
 
     # 源码约定门禁：路径不许走窄串（Windows 上码页装不下的字会当场抛 std::system_error，
     # 抛出点还在承诺返回 expected 的通道里），以及按枚举分派的开关要覆盖每个值

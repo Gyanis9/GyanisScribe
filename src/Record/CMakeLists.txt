@@ -1,4 +1,4 @@
-# Record：录屏。参数校验、节拍、会话状态与命令行拼接都是纯逻辑，容器里无界面也能测；
+# Record：录屏。参数校验、节拍、会话状态与命令行拼接都是纯逻辑，无界面也能测；
 # 只有 RecordingService 那一层胶水要真桌面会话，端到端行为留给验收
 add_library(Record STATIC
         RecorderConfig.h
