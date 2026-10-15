@@ -13,10 +13,10 @@
 | 应用调色板的映射 | 同上：`buildApplicationPalette`，落在 `ThemeManager::refresh` | 样式表画不到原生那部分（微调框箭头、表头、占位与禁用文字），这些只认 `QPalette`；两份上色路径必须同源，否则深色档会带进一批浅色原生件 |
 | 排版档位 | 同上：`TextRole` 与 `kTextRolePointSize*`、`applyTextRole` | 三档：页标题 15 / 正文 10 / 读数 13（点）。刻意没有「比正文更小」的一档——小字号与次要色是两个独立的弱化手段，一起用就把「灰一点」变成「看不清」；说明行只压色不减号。走点值而不是样式表的 px（px 不随系统 DPI 缩放），正文档由 `Main::Application` 设成应用字体 |
 | 间距阶梯 | 同上：`kSpacingTiny/Small/Medium/Large`、`kFieldMaximumWidth`、`kIntroMaximumWidth` | 界面里出现的每个间距都取自 4/8/12/16；字段与说明行的宽度上限管住「一行长句」和「整窗宽的输入框」，设置窗默认 680×560、导航 180 宽，让一行就是一条能扫读的行 |
-| 跨模块共用的绘制常量 | 同上：`kCaptureMaskColor`、`kAccentColor`、`kCaptureHintTextColor`、`kCaptureHintBackgroundColor`、`kCrosshairColor`、`kHintFontSize`、`kHintPadding`、`kToolbarSliderWidth`、`kSelectionBorderWidth`、光标高亮一族 | 遮罩、选区读数、工具栏滑块、录屏高亮这些「两个模块都要用到」的尺寸与色 |
+| 跨模块共用的绘制常量 | 同上：`kCaptureMaskColor`、`kAccentColor`、`kCaptureHintTextColor`、`kCaptureHintBackgroundColor`、`kCrosshairColor`、`kHintFontSize`、`kHintPadding`、`kToolbarSliderWidth`、`kSelectionBorderWidth` | 遮罩、选区读数、工具栏滑块这些「两个模块都要用到」的尺寸与色；录屏光标高亮一族（`kCursorHighlight*`）随绘制代码住在 `Core/Record/CursorHighlight.h`，与 `accent` 同值的关系由 `DesignTokens.CursorHighlightColorFollowsTheAccent` 钉住 |
 | 字号与线宽的阶梯 | 同上：`kFontSizes`（12/13/14/16/20/24）、`kAnnotationWidths`（2/4/6/8）、默认档位下标 `kDefaultAnnotationWidthStep`/`kDefaultAnnotationFontSizeIndex`、找回函数 `stepIndexOf` | 界面只允许走阶梯；配置里存了阶梯外的值时 `stepIndexOf` 返回空，调用方记日志后回落默认档，不就近取一档 |
-| 标注色板 | 同上：`kAnnotationPalette` 八色与 `annotationColorAt` | 序号越界返回空色而不是夹到最后一名，少画一个色块要能被发现 |
-| 模块自身的几何常量 | 与消费者同目录：`Core/History/HistoryThumbnail.h` 的 `kThumbnailEdge`、`Pick/ColorPickerOverlay.cpp` 的 `kMagnifier*`/`kInfoStripHeight`、`Record/RecordingHud.cpp` 的 `kHudEdgeGap`/`kCountdownFontPointSize`、`Ocr/OcrResultWindow.cpp` 的 `kPreviewMinimum*` | 只有一个消费者的尺寸不上收到全局，避免造没人吃的键 |
+| 标注色板 | `Core/Annotation/AnnotationPalette.h`：`kAnnotationPaletteColors` 八色、`defaultAnnotationPalette()`、`annotationPalette(settings)` 与 `paletteToTokens`/`removePaletteColor` | 越界序号原样交回而不是夹到最后一名，少画一个色块要能被发现；蓝那格与主色同值由 `DesignTokens.AnnotationPaletteBlueFollowsTheAccent` 钉住 |
+| 模块自身的几何常量 | 与消费者同目录：`Core/History/HistoryThumbnail.h` 的 `kThumbnailEdge`、`Gui/Pick/ColorPickerOverlay.cpp` 的 `kMagnifier*`/`kInfoStripHeight`、`Gui/Record/RecordingHud.cpp` 的 `kHudEdgeGap`/`kCountdownFontPointSize`、`Gui/Ocr/OcrResultWindow.cpp` 的 `kPreviewMinimum*` | 只有一个消费者的尺寸不上收到全局，避免造没人吃的键 |
 | 控件外观（内边距、圆角、边框宽度、状态色） | `src/Gui/Resources/Styles/Light.qss`、`Dark.qss`、`HighContrast.qss` | 样式表是这些属性的唯一出处；三份逐条同构、只差色值（高对比度档另把 1px 实色描边升到 2px），勾的对勾是 `src/Gui/Resources/Styles/CheckmarkOnAccent*.svg` 两份 |
 | 动效 | 刻意没有 | 需求 §九 的禁止项：动画不得干扰截图、标注与录屏。全仓没有 `QPropertyAnimation`/`transition`；Toast 的停留时间是固定毫秒数，不是补间动画 |
 
@@ -66,17 +66,17 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 
 | 窗口 | 类与文件 | 样式来源 | 状态 |
 | --- | --- | --- | --- |
-| 主窗口（设置 / 历史 / 关于入口） | `src/App/MainWindow.cpp` | 根 `#appRoot` 铺窗口底；顶部一条 `#actionBar`（不铺自己的底色，跟着 `#appRoot` 走）——带热键提示的主操作是图标按钮 `QPushButton`，其余条目收在一个 `QToolButton` 的弹出菜单「更多」里，两张清单都取自托盘那张表（`visibleTrayMenuEntries`），所以不会出现「只有菜单里有」的入口；下面是左侧导航 `QListWidget#settingsNav`（宽 `kNavColumnWidth`=180，无框）+ `QStackedWidget` 十页，每页是一张 `#pageCard` 卡片，页内 `kSpacingLarge` 边距、`kSpacingSmall` 行距、字段宽 ≤ `kFieldMaximumWidth` | 导航项选中走 `::item:selected`（`accentSoft` 底 + 主色描边），悬停走 `::item:hover`；每页顶部是 `#pageTitle`（15pt 半粗）加一条 `#pageHint`（9pt 次要色） |
-| 标注窗 | `src/Annotation/AnnotationWindow.cpp` | 画布 `AnnotationView` 自绘底图与图形；工具栏另计 | 快捷键动作表（复制/保存/贴图/识别/撤销重做），不可撤销时按钮 `:disabled` |
-| 标注工具栏 | `src/Annotation/AnnotationToolbar.cpp` | `#AnnotationToolbar` 卡片 + `kSpacingTiny` 间距与 26px 按钮档（一排最多五十几件控件，宽度 ≤1920 由用例钉死），段与段之间是 `QFrame#toolbarSeparator`；`kToolbarSliderWidth` 固定滑块宽、`kAnnotationPalette` 八色块 + 自定义色、`RecentColors.h` 的 `kRecentColorCapacity`(6) 最近用色 | 当前工具按钮 `:checked`（`accentSoft` 底 + 主色描边，三态都在 QSS 里），线宽/字号只走阶梯；色块选中用主色描边；可见段按当前工具收放（`updateContextVisibility`，换肤批次落地） |
-| 截图遮罩 | `src/Capture/CaptureOverlay.cpp` | 自绘：`kCaptureMaskColor` 压暗背景、`kSelectionBorderWidth`+`kAccentColor` 选区框、`kCrosshairColor` 十字虚线、读数用 `kHintFontSize`/`kHintPadding` 压在 `kCaptureHintBackgroundColor` 上 | 光标亮过之后放大镜一直跟着（`isMagnifierVisible()`，悬停、拖框、拉手柄三处同一判据），读数条报坐标与颜色、裸按 `C` 轮换颜色写法（只影响本次）；拖拽中另显示尺寸与坐标读数；`Esc` 取消、`Enter` 或双击确认（`keyPressEvent`/`mouseDoubleClickEvent`）|
-| 贴图窗口 | `src/Pin/PinWindow.cpp` | 无边框、置顶；只有悬停或正在拖手柄时才画主色边框（`kBorderWidth`），平时一张干净的图不带装饰 | 缩放（滚轮）、旋转、透明度、鼠标穿透、右键菜单；键盘 `R`/`Shift+R` 转正一挡、`0` 与左键双击回到原始比例与角度（两处共用 `resetScaleAndRotation()` 这一个出口）、`Esc` 关闭；`Qt::Tool \| FramelessWindowHint \| WindowStaysOnTopHint`；穿透态下不抢焦点 |
-| 识别结果窗 | `src/Ocr/OcrResultWindow.cpp` | 根 `#appRoot` 铺底，`kSpacingLarge` 边距 + `kSpacingMedium` 分栏间距；预览区最小尺寸 `kPreviewMinimumWidth`/`kPreviewMinimumHeight` | 左侧原图右侧文本，点一行在图上圈出该行；置信度那一格在后端给不出时显示「未提供」（不是 0%） |
-| 录屏控制条 | `src/Record/RecordingHud.cpp` | 无边框悬浮卡片 `#hudRoot`（Qt 的样式表没有投影，靠描边与底色分出来）：`kHudEdgeGap` 屏幕边距、`kSpacingSmall`/`kSpacingTiny` 内间距、`kCountdownFontPointSize` 倒计时字号 | 倒计时→录制中→暂停→停止；按钮可用态随服务状态切换；时长那一格是 `#metricValue`（13pt 半粗 + 等宽数字，秒跳不抖宽） |
-| 取色器 | `src/Pick/ColorPickerOverlay.cpp` | 自绘放大镜：`kMagnifierSampleEdge`/`kMagnifierViewEdge` 取样与显示格数、`kMagnifierPenWidth` 边框、`kInfoStripHeight` 信息条 | 逐像素网格 + 十字线；颜色格式按 `Pick` 的词表切换；取色时按物理像素取样再折算 |
+| 主窗口（设置 / 历史 / 关于入口） | `src/Main/MainWindow.cpp` | 根 `#appRoot` 铺窗口底；顶部一条 `#actionBar`（不铺自己的底色，跟着 `#appRoot` 走）——带热键提示的主操作是图标按钮 `QPushButton`，其余条目收在一个 `QToolButton` 的弹出菜单「更多」里，两张清单都取自托盘那张表（`visibleTrayMenuEntries`），所以不会出现「只有菜单里有」的入口；下面是左侧导航 `QListWidget#settingsNav`（宽 `kNavColumnWidth`=180，无框）+ `QStackedWidget` 十页，每页是一张 `#pageCard` 卡片，页内 `kSpacingLarge` 边距、`kSpacingSmall` 行距、字段宽 ≤ `kFieldMaximumWidth` | 导航项选中走 `::item:selected`（`accentSoft` 底 + 主色描边），悬停走 `::item:hover`；每页顶部是 `#pageTitle`（15pt 半粗）加一条 `#pageHint`（9pt 次要色） |
+| 标注窗 | `src/Gui/Annotation/AnnotationWindow.cpp` | 画布 `AnnotationView` 自绘底图与图形；工具栏另计 | 快捷键动作表（复制/保存/贴图/识别/撤销重做），不可撤销时按钮 `:disabled` |
+| 标注工具栏 | `src/Gui/Annotation/AnnotationToolbar.cpp` | `#AnnotationToolbar` 卡片 + `kSpacingTiny` 间距与 26px 按钮档（一排最多五十几件控件，宽度 ≤1920 由用例钉死），段与段之间是 `QFrame#toolbarSeparator`；`kToolbarSliderWidth` 固定滑块宽、`kAnnotationPaletteColors` 八色块 + 自定义色、`RecentColors.h` 的 `kRecentColorCapacity`(6) 最近用色 | 当前工具按钮 `:checked`（`accentSoft` 底 + 主色描边，三态都在 QSS 里），线宽/字号只走阶梯；色块选中用主色描边；可见段按当前工具收放（`updateContextVisibility`，换肤批次落地） |
+| 截图遮罩 | `src/Gui/Capture/CaptureOverlay.cpp` | 自绘：`kCaptureMaskColor` 压暗背景、`kSelectionBorderWidth`+`kAccentColor` 选区框、`kCrosshairColor` 十字虚线、读数用 `kHintFontSize`/`kHintPadding` 压在 `kCaptureHintBackgroundColor` 上 | 光标亮过之后放大镜一直跟着（`isMagnifierVisible()`，悬停、拖框、拉手柄三处同一判据），读数条报坐标与颜色、裸按 `C` 轮换颜色写法（只影响本次）；拖拽中另显示尺寸与坐标读数；`Esc` 取消、`Enter` 或双击确认（`keyPressEvent`/`mouseDoubleClickEvent`）|
+| 贴图窗口 | `src/Gui/Pin/PinWindow.cpp` | 无边框、置顶；只有悬停或正在拖手柄时才画主色边框（`kBorderWidth`），平时一张干净的图不带装饰 | 缩放（滚轮）、旋转、透明度、鼠标穿透、右键菜单；键盘 `R`/`Shift+R` 转正一挡、`0` 与左键双击回到原始比例与角度（两处共用 `resetScaleAndRotation()` 这一个出口）、`Esc` 关闭；`Qt::Tool \| FramelessWindowHint \| WindowStaysOnTopHint`；穿透态下不抢焦点 |
+| 识别结果窗 | `src/Gui/Ocr/OcrResultWindow.cpp` | 根 `#appRoot` 铺底，`kSpacingLarge` 边距 + `kSpacingMedium` 分栏间距；预览区最小尺寸 `kPreviewMinimumWidth`/`kPreviewMinimumHeight` | 左侧原图右侧文本，点一行在图上圈出该行；置信度那一格在后端给不出时显示「未提供」（不是 0%） |
+| 录屏控制条 | `src/Gui/Record/RecordingHud.cpp` | 无边框悬浮卡片 `#hudRoot`（Qt 的样式表没有投影，靠描边与底色分出来）：`kHudEdgeGap` 屏幕边距、`kSpacingSmall`/`kSpacingTiny` 内间距、`kCountdownFontPointSize` 倒计时字号 | 倒计时→录制中→暂停→停止；按钮可用态随服务状态切换；时长那一格是 `#metricValue`（13pt 半粗 + 等宽数字，秒跳不抖宽） |
+| 取色器 | `src/Gui/Pick/ColorPickerOverlay.cpp` | 自绘放大镜：`kMagnifierSampleEdge`/`kMagnifierViewEdge` 取样与显示格数、`kMagnifierPenWidth` 边框、`kInfoStripHeight` 信息条 | 逐像素网格 + 十字线；颜色格式按 `Pick` 的词表切换；取色时按物理像素取样再折算 |
 | Toast 通知 | `src/Gui/Controls/Toast.cpp` | 用 `palette.success`/`palette.danger`/`palette.secondaryText` 现算内联样式（这几支色不在 QSS 里，用例按消费方名单核对）；气泡走胶囊圆角（999px 由 Qt 按高度收敛） | 三类：Information / Success / Danger；固定毫秒后自收 |
 | 快捷键输入框 | `src/Gui/Controls/HotkeyEdit.cpp` | QSS 控件外观 | 闲置态显示已存的组合，悬浮说明写清「点击这一格后按下组合键即可替换，按 Esc 取消」；进入录制态换成「请按下快捷键（Esc 取消）」的提示 |
-| 历史列表 | `src/History/HistoryView.cpp` | 缩略图边长 `kThumbnailEdge`、圆角 `kThumbnailCornerRadius`；列表项形状与导航共用 `QListWidget::item` | 顶部一枚搜索框（按文件名、类别或日期）加一个类别筛选下拉，次序固定时间倒序；保留策略本身在「通用」页那两格，这一页不重复摆读数。缩略图读不出来时给一枚类别图标（`Record`/`CaptureRegion`），不留空白方块 |
+| 历史列表 | `src/Gui/History/HistoryView.cpp` | 缩略图边长 `kThumbnailEdge`、圆角 `kThumbnailCornerRadius`；列表项形状与导航共用 `QListWidget::item` | 顶部一枚搜索框（按文件名、类别或日期）加一个类别筛选下拉，次序固定时间倒序；保留策略本身在「通用」页那两格，这一页不重复摆读数。缩略图读不出来时给一枚类别图标（`Record`/`CaptureRegion`），不留空白方块 |
 
 ## 3. 深浅主题对照
 
@@ -120,7 +120,7 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 ## 4. 高 DPI 与多屏适配
 
 - 抓帧的形状：物理像素住在 `QImage` 里，倍比住在 `Base::CapturedImage.devicePixelRatio` 与
-  `logicalSize` 里；`src/Capture/QScreenCaptureSource.cpp` 刻意把 `QImage` 自己的倍比标成 1.0，
+  `logicalSize` 里；`src/Plugins/CaptureSources/QScreenCaptureSource.cpp` 刻意把 `QImage` 自己的倍比标成 1.0，
   避免同一事实有两处读数。
 - 逻辑→物理的换算是唯一一处：`ScreenUtils::toPhysicalRect` 左上角向下取整、右下角向上取整，
   保证裁出的框不丢边；倍比 ≤ 0 直接拒绝并给出「dpr 不该由调用方自己猜」的中文原因。
@@ -129,7 +129,7 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
   否则马赛克会显示在一个位置、保存在另一个位置。
 - 导出带倍比：`exportImage()` 在 `pixelScale != 1.0` 时把倍比标回图上，贴图开窗时按它反推逻辑尺寸
   （`PinWindow` 的构造里那段 `m_logicalSize`）。这一环丢了就会把 150% 屏上截的图开成放大 1.5 倍的窗口，
-  判据在跨模块集成入口 `tests/App/TestModuleFlow.cpp` 里。
+  判据在跨模块集成入口 `tests/Main/TestModuleFlow.cpp` 里。
 - 贴图坐标：窗口位置是全局逻辑坐标（截哪儿贴哪儿，回到上一次选区的左上角），尺寸由
   `windowSizeFor(逻辑尺寸, 缩放)` 得出；旋转后的外接框另算（`PinTransform`）。
 - 多显示器：抓帧与取色都按屏幕名走（空屏幕名表示「光标所在那块」），屏幕消失或几何无效时返回

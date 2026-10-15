@@ -337,7 +337,7 @@ HEX 那一形里字母用大写还是小写是单独一格（`Pick/HexUppercase`
 ## 界面一览
 
 下面十张是主窗口真实渲染出来的那一份（离屏抓的控件自绘画面，不是设计稿），按功能页顺序依次为
-通用、截图、标注、贴图、录屏、文字识别、快捷键、主题、历史、关于。图由 `tests/App/UiShotTool.cpp`
+通用、截图、标注、贴图、录屏、文字识别、快捷键、主题、历史、关于。图由 `tests/Main/UiShotTool.cpp`
 生成（`UiShotTool <输出目录>`，跟 `CrashProbe` 一样不进安装包）：真主题、真图标、临时配置，
 出图前把几格目录换成中性占位（别把出图机器的用户名印上去）、并给离屏平台显式装一份中文字体
 （缺字体时字形会全渲染成方框）。改过界面之后重跑它就能刷新这一组图。
@@ -759,13 +759,13 @@ id 的 mergeWith 通过），「改两次、撤一次」回的是两处之前的
 画家视口、再叠一次缩放比，dpr=2 的图标一直是两倍大且右下半被裁（拿 HEAD 那版渲同一张 PNG
 三栏对照定案，旧图标同样中招），只是从没在高 DPI 档上量过。
 每批改完都复跑到全绿再进下一批。
-全量跑中有过一次偶发红（`PinManagerFixture.TopmostThroughAndConcealSurviveARestart`）：根因是 TestPin
+全量跑中有过一次偶发红（`PinManagerFixture.TopmostThroughAndConcealSurviveARestart`）：根因是 TestCorePin
 的布局用例与 TestModuleFlow 读写同一份共享缓存目录（`cacheDirectory()/Pins`）却没挂同一把资源锁，
-一个进程刚清掉的文件正是另一个进程要读的；`tests/Pin/CMakeLists.txt` 补上 `pinLayoutCache` 之后
-这一类窗口不再存在，取证与复跑记录在那笔提交里。同一条纪律后来又拦下一类：几条借系统剪贴板
-传图的用例（TestPin 的动图与直接标注、TestCapture 的选区复制、TestOcr 的结果复制、TestModuleFlow
+一个进程刚清掉的文件正是另一个进程要读的；`tests/Core/Pin` 与 `tests/Gui/Pin` 两份 CMakeLists 都挂上
+`pinLayoutCache` 之后这一类窗口不再存在，取证与复跑记录在那笔提交里。同一条纪律后来又拦下一类：几条借系统剪贴板
+传图的用例（TestGuiPin 的动图与直接标注、TestGuiCapture 的选区复制、TestGuiOcr 的结果复制、TestModuleFlow
 的拖放像素回读）并行时会互相覆盖剪贴板内容，表现是「像素越界读到无效色」的假红（单跑必绿、
-全量偶红，失败轮那条用例耗时 2.7 秒——Qt 在 Windows 上开剪贴板自带重试）。四处 CMakeLists
+全量偶红，失败轮那条用例耗时 2.7 秒——Qt 在 Windows 上开剪贴板自带重试）。六处 CMakeLists
 现在同拿一把 `clipboardShared`——资源锁只对「同拿一把的用例」互斥，漏掉任何一个写者或读者都拦不住。
 这里还踩过一个静默坑：`gtest_discover_tests` 的 `PROPERTIES` 值里两把锁之间的分号要写成转义
 （`"lockA\;lockB"`），裸分号会被 CMake 当列表分隔吃掉、只剩第一把——锁挂了个寂寞，假红又现两轮，
@@ -801,7 +801,7 @@ GYANISSCRIBE_AUDIO_DEVICE=@device_cm_{...}\wave_{...} # 取声端到端（要用
 | --- | --- |
 | `Style.QtStringPlaceholders` | `QString` 占位符不许 `{}` 与 `%1` 混用——混用编译期无声，运行时把「选择{}的目录」原样摆给用户 |
 | `Style.TranslationCatalog` | 源码里每一条走 `uiText` 的文案都必须在 `.ts` 里有非空译文（`uiText("…")` 的字面量、表行里的标签、按位置对齐的档位标签数组这三形都算），否则英文档下会安静地显示中文 |
-| `Style.SourceConventions` | 路径不得按窄串交给第三方库；按枚举分派的开关要覆盖每个值（MSVC 与 GCC 的默认告警都不报这种漏项） |
+| `Style.SourceConventions` | 四件事：路径不得按窄串交给第三方库；按枚举分派的开关要覆盖每个值（MSVC 与 GCC 的默认告警都不报这种漏项）；声明出来的信号要有人接；`src/` 顶层只许七模块目录（见脚本头部四条判据） |
 
 用例结构逐级镜像 `src/`，统一 GoogleTest，不引入第二个测试框架。
 共用同一份外部资源（真实缓存目录、临时文件）的用例用 CMake 的 `RESOURCE_LOCK` 串行化——
@@ -810,24 +810,21 @@ GYANISSCRIBE_AUDIO_DEVICE=@device_cm_{...}\wave_{...} # 取声端到端（要用
 ## 项目结构
 
 ```
-src/Core        值类型、日志、目录 provider、图片等比适配几何
-src/Gui         设计令牌、主题、图标供给、Toast、快捷键输入框
-src/Platform    平台能力抽象（Windows 后端）
-src/Settings    配置读写与迁移       src/Hotkey    组合键解析与全局登记
-src/Capture     抓帧、选区、遮罩     src/Annotation 标注工具与标注窗
-src/Pin         贴图窗口与贴图管理   src/Record      录屏会话、帧时钟、ffmpeg 编码、控制条
-src/Ocr         预处理、后端选型、结果窗口与导出
-src/History     历史清单、保留策略、缩略图列表
-src/Pick        取色器：颜色写法与放大镜几何
-src/App         应用对象、核心控制器、托盘、主窗口、单实例、崩溃兜底
+src/Base        无业务公共底座：值类型、日志、目录 provider、文案与本地化设施
+src/Core        领域实现：图像、设置、热键、取色、历史、贴图、截图、识别、录屏、标注（各自一个子目录）
+src/App         应用服务集：命令行、抓取意图与交付、托盘、剪贴板贴图、自定义热键、单实例、崩溃兜底、更新检查
+src/Main        程序骨架：Application、AppController、MainWindow、Main 入口
+src/Gui         界面层：设计令牌与主题、通用控件、图标与样式表（Resources），及各功能的窗口（Annotation/Capture/History/Ocr/Pick/Pin/Record）
+src/Plugins     可换用后端：条码识别、抓帧来源、识别引擎、录屏编码
+src/Platform    平台能力抽象（热键、窗口几何、自启、系统集成），Windows 后端在 Platform/Windows/ 下
 vendor/WinRt    Windows 系统识别用的 C++/WinRT 投影头（MIT，生成与裁剪办法见 docs/OcrBackends.md）
-tests/          逐级镜像 src 的目录结构；另有一条跨模块流程入口 tests/App/TestModuleFlow.cpp
-src/Gui/Resources/Icons 87 张原创 SVG 图标（未接线的几枚记在路线图「图标接线」那一条）
+tests/          逐级镜像 src 的目录结构；另有一条跨模块流程入口 tests/Main/TestModuleFlow.cpp
+src/Gui/Resources/Icons 90 张原创 SVG 图标（未接线的几枚记在路线图「图标接线」那一条）
 scripts/        构建、打包脚本与静态门禁
-docs/           需求、识别后端、第三方许可证、界面样式说明
+docs/           识别后端、第三方许可证、界面样式说明
 ```
 
-`tests/App/TestModuleFlow.cpp` 按生产形状造替身，钉的是模块接在一起时坐标系与语言词表还对不对——
+`tests/Main/TestModuleFlow.cpp` 按生产形状造替身，钉的是模块接在一起时坐标系与语言词表还对不对——
 这类漂移在单模块用例里看不见。
 
 文档索引：
@@ -963,7 +960,7 @@ Conan 直取，许可证正文见 `licenses/Zxing-Apache-2.0.txt` 与 `docs/Thir
 （2026-10-14 起这一批逐件补，补掉一件就在下面这句里点名并从清单里划走。）
 
 （同日补掉**长按持续刷新截图**这一族，先把一条被证伪的依据记下来：台账那句「本仓只有单次 `F5`」只对了一半——
-标注窗那一条早就由键盘的自动重复兜住了（`src/Annotation/AnnotationWindow.cpp:40` 那句注释自己写明「按住不放由自动重复兜住」），
+标注窗那一条早就由键盘的自动重复兜住了（`src/Gui/Annotation/AnnotationWindow.cpp:40` 那句注释自己写明「按住不放由自动重复兜住」），
 上一轮把它当成「只有单次」是没回代码核。真缺的是**贴图那一头压根没有「刷新这一张」**：现在补上了，`F5` 与右键那一项同一条路，
 重抓的是这张图此刻盖住的那块屏幕（不是旋转后的外接框，斜着时那里面一半是邻居的像素），摆位、缩放、角度与透明度都不动；
 抓之前把这一张暂时从桌上拿走、抓完无论成败都摆回（藏与摆回收进同一个函数，提前返回的路径才不会把一张图留在桌上不见），
@@ -997,7 +994,7 @@ Conan 直取，许可证正文见 `licenses/Zxing-Apache-2.0.txt` 与 `docs/Thir
 （同日补掉**贴图组管理窗**：托盘与动作条一条「贴图组管理…」，三列表把全桌的分组摆在一起（组号与显示名、在册张数、此刻摆在桌上的那一组标「是」），
 选中一行才按得下四个动作——摆出这一组 / 重命名 / 腾空这一组 / 删掉这一组，四个动作全部走管理器已有的公开出口，界面上不留第二套判据。
 两处与对方不同，写清依据：其一，`create-group [GROUPNAME]` 那条「建一个空组」在这里没有对应物——本仓的一组由「有贴图在册」成立，
-留空壳组会让切组停在一个看不见的站上（`src/Pin/PinManager.cpp` 的 `normalizeActiveGroup()` 里那条规矩有自己的用例），所以新组仍由右键「移动到分组 → 新建分组」当场成立，
+留空壳组会让切组停在一个看不见的站上（`src/Gui/Pin/PinManager.cpp` 的 `normalizeActiveGroup()` 里那条规矩有自己的用例），所以新组仍由右键「移动到分组 → 新建分组」当场成立，
 空表的提示里就把这句出路写给用户；其二，「腾空这一组」走的是自家已有的**关闭**那一档（不是销毁），
 提示跟着说清「还能按回最近 5 张」，因为那份册子只有五格。活动组换了而管理器不出声（它只在张数与名单变动时出声），
 所以窗上那一列自己重读——判据读的是表上摆着的文本而不是现从管理器算一份，不然「没重读」这类错正好落在缝里。）
@@ -1034,7 +1031,7 @@ Conan 直取，许可证正文见 `licenses/Zxing-Apache-2.0.txt` 与 `docs/Thir
 存在 `Capture/MagnifierView`；截图遮罩与屏幕取色共用这一格——两处都是「看那一小格像素」这一件事，
 只接一处就会出现「设置里拨了、另一处还挡着」，所以两处各留一个公开读法（`isMagnifierVisible()` 与 `magnifierRect()`），
 否则「没接上」这类错只能靠肉眼盯屏幕，判据也写不出来。
-标记、界面名与取样边长按下标互指存在同一张表里（`src/Pick/PickGeometry.cpp`），加一档只改那三份表；
+标记、界面名与取样边长按下标互指存在同一张表里（`src/Core/Pick/PickGeometry.cpp`），加一档只改那三份表；
 读坏的值落回窄档，并在日志里点名那串原文与可用取值，不夹成最近的一档——`wide2` 与 `wide` 差得很远，悄悄改写等于把用户填坏的证据抹掉。
 「不显示」那一档的摆位仍按窄档算一次：收掉的只是插图，读数条要留在原位，不然它会跟着跳一下。
 档位在这两处都是构造期读一次而不是每次绘制现读，为的是读坏的日志只记一句——遮罩本来就活不过这一轮，每帧刷一句同样的话会把现场埋掉。）
@@ -1134,7 +1131,7 @@ Conan 直取，许可证正文见 `licenses/Zxing-Apache-2.0.txt` 与 `docs/Thir
 未保存归档开关、自动保存与归档不重复记，最后一条钉「窗口截图的去向读『截完之后』那一格」——
 这条同时修掉一个同形状的缺陷：这条入口此前不读设置里那一档，交付用的是上一次截图留下的值。四条突变逐条验过红在哪几条。）
 
-（同日又给文档补了界面图：`docs/images/` 十张主窗口图由 `tests/App/UiShotTool.cpp` 离屏生成——同一套控件
+（同日又给文档补了界面图：`docs/images/` 十张主窗口图由 `tests/Main/UiShotTool.cpp` 离屏生成——同一套控件
 自己渲染出来的那一份，不是设计稿；出图前把几格目录换成中性占位（免得把出图机器的用户名印上去），
 并给离屏平台显式装一份中文字体（缺字体时字形会全渲染成方框）。工具跟 `CrashProbe` 一样不进安装包；
 跑法与「改过界面之后怎么重出这一组图」写在上面「界面一览」那一节。）

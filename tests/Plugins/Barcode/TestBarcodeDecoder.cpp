@@ -1,5 +1,5 @@
 // 二维码/条形码识别的直测：自造一张码再认回来、噪声与空图都该是「一个都没认出」而不是错误。
-// 后端是可选的（见 src/Scan/CMakeLists.txt）：宏按档给，没编后端时这一支只断言桩的行为——
+// 后端是可选的（见 src/Plugins/CMakeLists.txt）：宏按档给，没编后端时这一支只断言桩的行为——
 // 两种形状各有用例看住，不留「没编过」的分支。
 #include "Plugins/Barcode/BarcodeDecoder.h"
 

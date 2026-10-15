@@ -1,6 +1,6 @@
 /* Dark 主题的界面样式表：珍珠玻璃深色档的移植。
    与 Light.qss 逐条同构，只差色值：选择器、顺序、圆角与尺寸三份保持一致，
-   色值取自 src/Ui/DesignTokens.h 的 kDarkPalette，用例双向核对同解；
+   色值取自 src/Gui/Theme/DesignTokens.h 的 kDarkPalette，用例双向核对同解；
    设计里带透明度的线（勾选框描边、滚动条滑块）按 rgba 字面量写，是同解门禁仅有的例外。 */
 
 /* ---- 面：只有具名的根与卡片铺底。裸 QWidget 一律不铺——铺了就是每个子控件各画一块底 ---- */

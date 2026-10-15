@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""源码约定门禁：三条「编译期看不出来、运行时只安静地错」的检查。
+"""源码约定门禁：四条「编译期看不出来、运行时只安静地错」的检查。
 
 一、路径不许走窄串。Windows 上 std::filesystem::path::string() 按本地 ANSI 码页给字节，
    码页装不下的字会当场抛 std::system_error——而抛出点多半在承诺返回 std::expected 的通道里。
@@ -15,6 +15,10 @@
    认的是 &本类名::信号名 这种写法（连到槽、以及信号转信号都算），emit 一处不算消费方。
    类名必须一起参与匹配：只按信号名找，两个类各有一条同名通道时接了的那条会把没人接的那条
    一起冒认掉——贴图那条 ocrRequested 就是这么被放过去过一次的。
+
+四、src 下只允许七个顶层模块目录（App/Base/Core/Gui/Main/Platform/Plugins）。长回旧结构
+   （Ui/Settings/Capture…）时编译与运行都无恙，但这样的目录一多，「哪个模块管什么」重新模糊，
+   下一轮又要拆一遍；白名单把它拦在长出来的那一刻。模块内部的子目录不受限——那是模块自己的事。
 
 跑法：python scripts/check-source-conventions.py [--scan-root src]
 退出码：0 通过；1 有违规；2 工具自己坏了（自检探针跑不起来或真源形状变了）——不许当成通过。
@@ -54,6 +58,9 @@ DISPATCH_TABLES = (
     ("TrayClickRole", "src/App/TrayClick.h", "src/App/TrayClick.cpp"),
     ("TrayClickOutcome", "src/App/TrayClick.h", "src/App/TrayController.cpp"),
 )
+
+#src 下允许的顶层模块目录：七模块之外再长出目录就是又长回了旧结构，先裁决再落地
+MODULE_WHITELIST = ("App", "Base", "Core", "Gui", "Main", "Platform", "Plugins")
 
 
 def is_path_narrow(text: str) -> bool:
@@ -120,6 +127,20 @@ def check_path_encoding(root: pathlib.Path) -> list[str]:
                 one_line = " ".join(part.strip() for part in statement.splitlines()).strip()
                 findings.append(f"{source.relative_to(root.parent)}:{number} 路径与窄串互转，要改走 Base::Paths::toDisplayText / fromDisplayText：{one_line}")
     return findings
+
+
+def unexpected_module_dirs(names: list[str]) -> list[str]:
+    """白名单之外的顶层目录名：判据收成纯函数，探针与检查用同一份。"""
+    return [name for name in names if name not in MODULE_WHITELIST]
+
+
+def check_top_level_modules(root: pathlib.Path) -> list[str]:
+    """src 下只允许七模块这一层目录；长回旧结构（Ui/Settings/Capture…）时当场红。"""
+    names = sorted(child.name for child in root.iterdir() if child.is_dir())
+    return [
+        f"src/ 下出现了七模块白名单之外的顶层目录 {name}：新模块要先在计划里裁决，散装目录搬进所属模块"
+        for name in unexpected_module_dirs(names)
+    ]
 
 
 def dispatched_names(body: str, enum_name: str) -> set[str]:
@@ -266,16 +287,22 @@ def self_probe() -> None:
     if "Open" in dispatched_names("switch (action) {" + NEWLINE + "    case OtherWidgetAction::Open:" + NEWLINE + "}" + NEWLINE, "WidgetAction"):
         raise RuntimeError("分派检查把名字以它结尾的另一个枚举认成了本体")
 
+#顶层模块白名单：七模块原样通过不算红，旧结构名一个都不许漏
+    if unexpected_module_dirs(list(MODULE_WHITELIST)) != []:
+        raise RuntimeError("探针：七模块原样被判成了违规，白名单判据成了永红")
+    if unexpected_module_dirs(["Core", "Ui", "Base"]) != ["Ui"]:
+        raise RuntimeError("探针：白名单之外的目录没被点出来")
+
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="源码约定门禁：路径窄串、枚举分派、信号消费方")
+    parser = argparse.ArgumentParser(description="源码约定门禁：路径窄串、枚举分派、信号消费方、顶层模块白名单")
     parser.add_argument("--scan-root", default=str(pathlib.Path(__file__).resolve().parent.parent / "src"), help="要扫的源码根目录")
     args = parser.parse_args()
 
     root = pathlib.Path(args.scan_root).resolve()
     try:
         self_probe()
-        findings = check_path_encoding(root) + check_dispatch_coverage(root) + check_signal_consumers(root)
+        findings = check_path_encoding(root) + check_dispatch_coverage(root) + check_signal_consumers(root) + check_top_level_modules(root)
     except RuntimeError as failure:
         print(f"[门禁坏了] {failure}", file=sys.stderr)
         return 2

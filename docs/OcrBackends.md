@@ -3,7 +3,8 @@
 ## 现在有什么
 
 - `IOcrEngine`（同步接口）+ `WinRTImageOcrEngine`（Windows 系统识别）+ `TesseractOcrEngine`（跨平台真后端）
-  + `UnavailableOcrEngine`（降级桩）+ 后端选型 `createOcrEngine()`，用例逐条摆在 `tests/Ocr/`（条数不写在这儿，加一条就漂移一次）。
+  + `UnavailableOcrEngine`（降级桩）+ 后端选型 `createOcrEngine()`，用例按三层摆在 `tests/Core/Ocr/`、
+  `tests/Gui/Ocr/`、`tests/Plugins/OcrEngines/`（条数不写在这儿，加一条就漂移一次）。
 - 预处理链只有「灰度 → 最近邻放大（上限 2×）」两环：二值化与中值滤波刻意不做——实测在系统后端上，
   同一张「小字灰底带噪点」的图原样 4 词、灰度+放大 4 词（并把「741g」认回「7419」），再加二值化与中值滤波后 0 词，
   判据与理由写在 `src/Core/Ocr/OcrPreprocessor.h` 的 `@warning`。
@@ -23,7 +24,7 @@
   （`find_dependency(WebP 0.5.0)` 与 libwebp 1.6.0 主版本不同），关掉 webp 之后第二轮卡在库名。
 - 撤掉这条不对称的判据：`conan install --requires=tesseract/5.5.2 -s build_type=Debug --build=missing`
   能 configure 过，就把 `conandata.yml` 的 `releaseOnlyRequirements` 并回 `requirements`，
-  删掉 `conanfile.py` 里那段 `build_type` 判断与 `src/Ocr/CMakeLists.txt` 的 `if (Tesseract_FOUND)` 分支。
+  删掉 `conanfile.py` 里那段 `build_type` 判断与 `src/Plugins/CMakeLists.txt` 的 `if (Tesseract_FOUND)` 分支。
 - 包是按静态库给的（编译行里带 `-DLIBJPEG_STATIC` 一类开关），`bin/` 只有四个 Qt 的 DLL，
   Release 的 `--selftest` 与 120 条用例都能跑起来，不需要额外部署 `tesseract.dll`。
 - 模型可用性只认「目录里有认识的语言对应的 `*.traineddata`」。空文件冒充的模型不算识别成功：
@@ -70,7 +71,7 @@
   用户看到的那张图不同系，而结果窗口「点文字定位」靠的就是这套坐标。
 - 与契约的对齐：系统给逐词方框（`OcrWord::boundingBox` 有值），不给逐词置信度，所以
   `averageConfidence` 恒为 0，界面按「后端给不出」那一格显示。行框由词框并集算出。
-- 用例 `tests/Ocr/TestWinRTImageOcrEngine.cpp` 里「读出画上去的数字」那条是真的跑通系统识别才绿的
+- 用例 `tests/Plugins/OcrEngines/TestWinRTImageOcrEngine.cpp` 里「读出画上去的数字」那条是真的跑通系统识别才绿的
   （不是跳过）；判据可被证伪：摘掉上面第 2 条那句 `Length()`，红正落在它身上。
 
 

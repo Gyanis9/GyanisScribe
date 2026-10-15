@@ -1,7 +1,7 @@
 // 跨模块流程的集成入口（需求 §10：覆盖截图、贴图、OCR 流程）。
 // 单模块用例各测各的，这一条钉的是它们接在一起时坐标系还对不对：抓帧那一步刻意按生产形状
 // 造——QImage 的倍比标成 1.0，真实缩放只住在 CapturedImage.devicePixelRatio 与 logicalSize 里
-// （见 src/Capture/QScreenCaptureSource.cpp），于是「标注吃逻辑坐标 → 导出物理像素 → 贴图开窗」
+// （见 src/Plugins/CaptureSources/QScreenCaptureSource.cpp），于是「标注吃逻辑坐标 → 导出物理像素 → 贴图开窗」
 // 这三步之间的换算一旦被漏掉，就只有这条链上看得见。
 
 #include "Core/Annotation/AnnotationEngine.h"
@@ -380,7 +380,7 @@ namespace GyanisScribe
             const auto recognized = engine->recognize(image, engine->supportedLanguages().front());
             ASSERT_TRUE(recognized.has_value()) << "自报可用的后端连一次完整调用都没走通：" << recognized.error().message;
             EXPECT_TRUE(vocabulary.contains(recognized->language)) << "结果里的语言不在对外词表里：" << recognized->language.toStdString();
-            // 认字质量归 tests/Ocr 的用例钉（那里直接验「画上数字、认回来」）。这一档在 offscreen
+            // 认字质量归 tests/Plugins/OcrEngines 的用例钉（那里直接验「画上数字、认回来」）。这一档在 offscreen
             // 平台上跑，这条腿只钉接线：调用走通、语言对得上、方框落在同一套坐标里。
             for (const auto &line: recognized->lines)
             {

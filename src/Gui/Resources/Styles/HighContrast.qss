@@ -1,6 +1,6 @@
 /* HighContrast 主题的界面样式表。
    与 Light.qss 逐条同构，只差色值：选择器、顺序、圆角与尺寸三份保持一致，
-   色值取自 src/Ui/DesignTokens.h 的 kHighContrastPalette，用例双向核对同解。
+   色值取自 src/Gui/Theme/DesignTokens.h 的 kHighContrastPalette，用例双向核对同解。
    这一档的可辨识差异是「描边加粗到 2px + 纯黑纯白 + 纯黄选区」，不靠底色分层次。 */
 
 /* ---- 面：只有具名的根与卡片铺底。裸 QWidget 一律不铺——铺了就是每个子控件各画一块底 ---- */
