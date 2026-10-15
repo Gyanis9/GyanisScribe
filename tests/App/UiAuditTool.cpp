@@ -26,10 +26,12 @@
 #include <QString>
 #include <QWidget>
 
+#include <array>
 #include <cstdio>
 #include <filesystem>
 #include <format>
 #include <memory>
+#include <utility>
 #include <vector>
 
 namespace
@@ -42,6 +44,13 @@ namespace
      */
     void shoot(QWidget &widget, const std::filesystem::path &outputDirectory, const char *name)
     {
+        // 换肤/换档之后样式是整片重抛的：多泵几轮事件并强制重绘一次，
+        // 免得抓到半新半旧的帧（实测只泵一次会拍到底部一条旧底的带子）
+        for (int round = 0; round < 3; ++round)
+        {
+            QCoreApplication::processEvents();
+        }
+        widget.repaint();
         QCoreApplication::processEvents();
         const auto pixmap   = widget.grab();
         const auto filePath = outputDirectory / std::format("{}.png", name);
@@ -182,6 +191,22 @@ int main(int argc, char *argv[])
             {
                 shoot(*scroll->widget(), outputDirectory, "page-hotkey-full");
             }
+        }
+
+        // 面 4：深色与高对比度档的对应图（换肤观感核对；浅色已在前面出过）
+        for (const auto &[mode, name]: std::array<std::pair<const char *, const char *>, 2>{{{"Dark", "dark"}, {"HighContrast", "hc"}}})
+        {
+            if (const auto written = settings.setValue(GyanisScribe::Settings::kThemeMode, QString::fromUtf8(mode)); !written)
+            {
+                std::fprintf(stderr, "failed to switch the theme\n");
+                return 1;
+            }
+            theme.applyFromSettings();
+            window.open(GyanisScribe::App::MainWindowPage::General);
+            shoot(window, outputDirectory, std::format("theme-{}-general", name).c_str());
+            GyanisScribe::Annotation::AnnotationToolbar toolbar{settings, icons, nullptr};
+            toolbar.show();
+            shoot(toolbar, outputDirectory, std::format("theme-{}-toolbar", name).c_str());
         }
     }
 
