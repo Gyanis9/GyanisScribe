@@ -16,6 +16,7 @@
 #include <QPoint>
 #include <QRect>
 #include <QString>
+#include <QStringList>
 
 #include <array>
 #include <optional>
@@ -354,6 +355,24 @@ namespace GyanisScribe::Capture
      *          再乘一次就会把指针放大一圈。落点 = 屏内逻辑位置乘因子，再按热点回退。
      */
     [[nodiscard]] QRect cursorRectInPixels(const CursorSprite &sprite, qreal devicePixelRatio);
+
+    /**
+     * @brief 解析「不参与窗口检测的程序」那一格
+     * @param text 界面上填的原文，逗号分隔
+     * @return 去空白、转小写、去重之后的名单；空文本给空名单（谁都不排除）
+     * @details 转小写在这一层做掉：Windows 的文件名不区分大小写，用户写 `Chrome.exe` 也该对上 `chrome.exe`。
+     */
+    [[nodiscard]] QStringList parseProcessExcludes(const QString &text);
+
+    /**
+     * @brief 这个进程名在不在排除清单里
+     * @param processName 平台给出的可执行文件名（不含路径）
+     * @param excludes `parseProcessExcludes` 处理过的名单
+     * @return 名单里有它时为真
+     * @details 名字取不到（空串）时一律为假：把「问不出进程名」当成「用户点名要排除的那个」，
+     *          会让悬停识别整片失效，而用户只觉得「这功能坏了」。
+     */
+    [[nodiscard]] bool isExcludedProcess(const QString &processName, const QStringList &excludes);
 
     /**
      * @brief 把指针画进这一帧，就地改 frame.image

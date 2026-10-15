@@ -21,11 +21,13 @@ using GyanisScribe::Capture::dragRegionByGrip;
 using GyanisScribe::Capture::drawCursorInto;
 using GyanisScribe::Capture::formatSelectionHint;
 using GyanisScribe::Capture::gripAt;
+using GyanisScribe::Capture::isExcludedProcess;
 using GyanisScribe::Capture::kCaptureCornerRadiusMaximum;
 using GyanisScribe::Capture::kCaptureCornerRadiusMinimum;
 using GyanisScribe::Capture::kSelectionGripTolerance;
 using GyanisScribe::Capture::nudgeRegion;
 using GyanisScribe::Capture::parseCaptureCornerRadius;
+using GyanisScribe::Capture::parseProcessExcludes;
 using GyanisScribe::Capture::ratioLockedPoint;
 using GyanisScribe::Capture::rectFromUnit;
 using GyanisScribe::Capture::rectInUnit;
@@ -765,4 +767,23 @@ TEST(RegionFromSizeText, ReadsTheNumbersInTheChosenUnit)
     EXPECT_EQ(*placed, (QRect{100, 80, 600, 400})) << "「x,y,宽,高」那一种也要按同一档解释，两种写法差一个单位最难查";
 
     EXPECT_FALSE(regionFromSizeText(QStringLiteral("abc"), anchor, limit, 1.5, SizeUnit::Physical).has_value()) << "看不懂还是交回空，不猜一块选区";
+}
+
+/**
+ * @brief 钉住「不参与窗口检测的程序」那一格的解析与比对
+ * @details 两处口径要一起钉：解析去空白、转小写、去重，比对按整名（大小写不敏感）。
+ *          比对放松成「包含」时，`cmd.exe` 会顺手把 `mycmd.exe` 也排掉——用户没点名它。
+ */
+TEST(ProcessExcludes, ParsesAndMatchesByNameOnly)
+{
+    const auto names = parseProcessExcludes(QStringLiteral(" Chrome.exe , cmd.exe ,, chrome.exe "));
+    ASSERT_EQ(names.size(), 2) << "去空白、去重、转小写这三件事没做全";
+    EXPECT_TRUE(names.contains(QStringLiteral("chrome.exe")));
+    EXPECT_TRUE(names.contains(QStringLiteral("cmd.exe")));
+    EXPECT_TRUE(parseProcessExcludes(QStringLiteral("   ")).isEmpty()) << "只有空白的一格该按「谁都不排除」算";
+
+    EXPECT_TRUE(isExcludedProcess(QStringLiteral("Chrome.EXE"), names)) << "Windows 的文件名不区分大小写";
+    EXPECT_FALSE(isExcludedProcess(QStringLiteral("mycmd.exe"), names)) << "按整名比：包含关系会把没点名的程序一起排掉";
+    EXPECT_FALSE(isExcludedProcess(QString{}, names)) << "问不出进程名时不许当成「用户点名要排除的那个」";
+    EXPECT_FALSE(isExcludedProcess(QStringLiteral("chrome.exe"), {})) << "空名单不排除任何东西";
 }

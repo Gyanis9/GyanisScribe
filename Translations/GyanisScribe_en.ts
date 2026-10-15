@@ -1308,6 +1308,18 @@
             <translation>Start this copy of the program at sign-in; the state is read from the system's startup items and takes effect immediately</translation>
         </message>
         <message>
+            <source>留空即谁都不排除，例如 chrome.exe, cmd.exe</source>
+            <translation>Leave empty to exclude nothing, e.g. chrome.exe, cmd.exe</translation>
+        </message>
+        <message>
+            <source>不参与窗口检测的程序</source>
+            <translation>Programs skipped by window detection</translation>
+        </message>
+        <message>
+            <source>写在这里的程序，悬停识别整扇窗口时会跳过它：适合那些常年压在桌面上的工具栏、笔记窗口</source>
+            <translation>Programs listed here are skipped when hovering to detect a whole window: handy for toolbars and note windows that always sit on top of the desktop</translation>
+        </message>
+        <message>
             <source>留空即按组号升序，例如 2, 1, 3</source>
             <translation>Leave empty for ascending group numbers, e.g. 2, 1, 3</translation>
         </message>

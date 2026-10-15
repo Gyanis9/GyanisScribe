@@ -787,7 +787,8 @@ namespace
 
         [[nodiscard]] Expected<std::vector<GyanisScribe::Platform::ScreenWindow>> screenWindows() const override
         {
-            return std::unexpected(Error{ErrorCode::PlatformUnsupported, "替身不列窗口"});
+            // 默认仍是「没有窗口可列」：判据要验候选筛选时才往 windows 里填几张
+            return windows;
         }
 
         [[nodiscard]] Expected<std::vector<QRect>> elementChainAtPoint(const QPoint &globalLogicalPoint, const std::vector<quintptr> &excludeWindowHandles) const override
@@ -797,10 +798,11 @@ namespace
             return elementChain;
         }
 
-        GyanisScribe::Platform::PlatformCapabilities capabilitiesValue;
-        Expected<std::vector<QRect>>                 elementChain{std::vector<QRect>{}};
-        mutable std::vector<QPoint>                  queriedPoints;
-        mutable std::vector<quintptr>                excludedHandles;
+        GyanisScribe::Platform::PlatformCapabilities      capabilitiesValue;
+        std::vector<GyanisScribe::Platform::ScreenWindow> windows; ///< 这一轮让平台「列」出来的窗口，默认空
+        Expected<std::vector<QRect>>                      elementChain{std::vector<QRect>{}};
+        mutable std::vector<QPoint>                       queriedPoints;
+        mutable std::vector<quintptr>                     excludedHandles;
     };
 
     /// 找这一轮铺出来的遮罩：它是一张顶层控件，按类型认出来
@@ -1075,4 +1077,50 @@ TEST_F(CaptureServiceFixture, CursorToggleCanTurnTheCursorOffForOneRound)
     service.captureFullScreen();
 
     EXPECT_TRUE(source.requestedCursorScreens.empty()) << "翻成不含指针之后还去画指针，那一档就成了摆设";
+}
+
+/**
+ * @brief 钉住排除清单真的从悬停候选里拿掉了那几张
+ * @details 只钉纯函数不够：清单读没读、筛在哪一步、筛完还喂不喂给遮罩，是三件事。
+ *          这里让替身列出两扇窗（一扇在排除清单里、一扇不在），把光标分别挪到两扇窗上：
+ *          被排除的那扇不该被认出来，另一扇要照旧认得——只验「排掉了」会把「整片候选都丢了」也放过。
+ */
+TEST_F(CaptureServiceFixture, ExcludedProcessesDropOutOfHoverCandidates)
+{
+    if (QGuiApplication::screens().isEmpty())
+    {
+        GTEST_SKIP() << "这个环境没有屏幕可枚举，铺不出遮罩";
+    }
+
+    SettingsStore           settings(m_iniFile);
+    FakeCaptureSource       source;
+    FakePlatformIntegration fake;
+    fake.capabilitiesValue.windowEnumeration = true;
+    ASSERT_TRUE(static_cast<bool>(settings.setValue(GyanisScribe::Settings::kCaptureDetectionExcludes, QStringLiteral("chrome.exe")))) << "写入失败";
+
+    const auto screenRect  = QGuiApplication::primaryScreen()->geometry();
+    const auto bannedRect  = QRect{screenRect.left() + 40, screenRect.top() + 40, screenRect.width() / 3, screenRect.height() / 3};
+    const auto allowedRect = QRect{screenRect.left() + screenRect.width() / 2, screenRect.top() + screenRect.height() / 2, screenRect.width() / 3, screenRect.height() / 3};
+    fake.windows           = std::vector<GyanisScribe::Platform::ScreenWindow>{
+            GyanisScribe::Platform::ScreenWindow{1, QStringLiteral("被排除的窗"), QStringLiteral("chrome.exe"), bannedRect, bannedRect},
+            GyanisScribe::Platform::ScreenWindow{2, QStringLiteral("留下的窗"), QStringLiteral("notepad.exe"), allowedRect, allowedRect},
+    };
+
+    CaptureService service(source, settings, fake);
+    service.startInteractive();
+    auto *overlay = findOverlay();
+    ASSERT_NE(overlay, nullptr) << "开始框选之后没铺出遮罩";
+
+    const auto hoverAt = [overlay](const QRect &globalRect)
+    {
+        const auto  local     = globalRect.center() - overlay->geometry().topLeft();
+        const auto  globalPos = QPointF{globalRect.center()};
+        QMouseEvent move{QEvent::MouseMove, QPointF{local}, globalPos, Qt::NoButton, Qt::NoButton, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &move);
+        return overlay->hoveredRegion();
+    };
+
+    EXPECT_FALSE(hoverAt(bannedRect).has_value()) << "被排除的程序还是被认成了候选";
+    ASSERT_TRUE(hoverAt(allowedRect).has_value()) << "没被排除的那扇也没认出来：候选整片丢了，判据分不清这两件事";
+    EXPECT_EQ(*hoverAt(allowedRect), allowedRect.translated(-overlay->geometry().topLeft())) << "认出来的不是那一扇窗";
 }

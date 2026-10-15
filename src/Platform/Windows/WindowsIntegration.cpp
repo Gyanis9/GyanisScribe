@@ -41,6 +41,7 @@ namespace
     {
         HWND    handle;               ///< 窗口句柄
         QString title;                ///< 标题栏文字
+        QString processName;          ///< 进程的可执行文件名（不含路径），取不到时是空串
         QRect   physicalGlobal;       ///< 整窗的全局物理矩形（含标题栏与边框）
         QRect   clientPhysicalGlobal; ///< 客户区的全局物理矩形；取不到时为空矩形
     };
@@ -102,6 +103,40 @@ namespace
         return FALSE;
     }
 
+    /**
+     * @brief 窗口所属进程的可执行文件名（不含路径）
+     * @param window 窗口句柄
+     * @return 文件名（如 chrome.exe）；取不到权限或读不出时返回空串
+     * @details 只留文件名不留全路径：排除清单里写 `chrome.exe` 就够了，写全路径换一台机器就对不上；
+     *          权限只要 QUERY_LIMITED_INFORMATION——列出别人进程的窗口不需要更多，也要不过来。
+     */
+    [[nodiscard]] QString processFileName(const HWND window)
+    {
+        DWORD processId = 0;
+        GetWindowThreadProcessId(window, &processId);
+        if (processId == 0)
+        {
+            return {};
+        }
+
+        const HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
+        if (process == nullptr)
+        {
+            return {};
+        }
+
+        wchar_t    path[32768] = {}; // 长路径的实测上限
+        DWORD      length      = static_cast<DWORD>(std::size(path));
+        const auto read        = QueryFullProcessImageNameW(process, 0, path, &length);
+        CloseHandle(process);
+        if (read == 0 || length == 0)
+        {
+            return {};
+        }
+        // 0x5C 是反斜杠：写字符字面量在这一行里要被转义两层（VS 的 /utf-8 与这里的字符串），用码点更稳
+        return QString::fromWCharArray(path, static_cast<qsizetype>(length)).section(QChar(0x5C), -1);
+    }
+
     BOOL CALLBACK collectVisibleWindow(const HWND window, const LPARAM parameter)
     {
         auto *const collected = reinterpret_cast<std::vector<RawWindow> *>(parameter);
@@ -153,7 +188,7 @@ namespace
             }
         }
 
-        collected->push_back(RawWindow{window, written > 0 ? QString::fromWCharArray(titleBuffer, written) : QString(), physical, clientPhysical});
+        collected->push_back(RawWindow{window, written > 0 ? QString::fromWCharArray(titleBuffer, written) : QString(), processFileName(window), physical, clientPhysical});
         return TRUE;
     }
 
@@ -329,7 +364,7 @@ namespace GyanisScribe::Platform
                 // 客户区跟着同一块屏的读数走：两次换算必须用同一份缩放，否则整窗与客户区会互相错开
                 const auto clientLogical =
                         entry.clientPhysicalGlobal.isNull() ? QRect{} : physicalToLogicalGlobal(entry.clientPhysicalGlobal, mappings[ownerIndex]).value_or(QRect{});
-                windows.push_back(ScreenWindow{reinterpret_cast<quintptr>(entry.handle), entry.title, *logical, clientLogical});
+                windows.push_back(ScreenWindow{reinterpret_cast<quintptr>(entry.handle), entry.title, entry.processName, *logical, clientLogical});
             }
         }
         return windows;

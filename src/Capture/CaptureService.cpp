@@ -492,10 +492,18 @@ namespace GyanisScribe::Capture
             return {};
         }
 
+        // 排除清单按进程的可执行文件名比：被排掉的那些连高亮都不出现，悬停就落回手动框选
+        // （清单每取一次读一遍：这一格改完下一次截图就生效，不必重开程序）
+        const auto excludes = parseProcessExcludes(m_settings.stringValue(Settings::kCaptureDetectionExcludes, QString{}));
+
         std::vector<QRect> rects;
         rects.reserve(windows->size());
         for (const auto &window: *windows)
         {
+            if (isExcludedProcess(window.processName, excludes))
+            {
+                continue;
+            }
             rects.push_back(window.logicalGlobal);
         }
         return rects;

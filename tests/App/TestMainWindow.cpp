@@ -231,7 +231,9 @@ namespace
         // 「这一类有什么」的用词取自界面里的无障碍名，不是从配置键推的：读的人要能对着窗口核对
         const std::vector<Expectation> expectations = {
                 Expectation{MainWindowPage::General, {"界面语言", "历史最多留多少条", "历史最久留多少天", "左键单击", "中键单击", "导出配置", "导入配置"}, true},
-                Expectation{MainWindowPage::Capture, {"截完之后", "延时截图", "截图目录", "颜色写法", "自动保存所有截图", "截图音效", "成品加边框", "成品加投影"}, true},
+                Expectation{MainWindowPage::Capture,
+                            {"截完之后", "延时截图", "截图目录", "颜色写法", "不参与窗口检测的程序", "自动保存所有截图", "截图音效", "成品加边框", "成品加投影"},
+                            true},
                 Expectation{MainWindowPage::Annotation, {"默认线宽", "默认字号", "空白画布用透明底"}, true},
                 Expectation{MainWindowPage::Pin, {"默认不透明度", "吸附距离", "不许拖边改大小"}, true},
                 Expectation{MainWindowPage::Record,
@@ -662,6 +664,27 @@ namespace
 
         const auto reopened = makeStore();
         EXPECT_TRUE(reopened->boolValue(GyanisScribe::Settings::kAnnotationBlankCanvasTransparent, false)) << "勾了没写进 Annotation/BlankCanvasTransparent";
+    }
+
+    /**
+     * @brief 钉住「不参与窗口检测的程序」那一格把原文写进读端认的那个键
+     * @details 这一格没有「填坏」的面，所以判据钉的是两端对得上：写进去的正是截图那条路读的那一格，
+     *          逗号与空格原样留着（解析在消费端做，界面不改写用户填的东西）。
+     */
+    TEST_F(MainWindowFixture, DetectionExcludesRowWritesTheKeyTheCaptureServiceReads)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::Capture);
+
+        auto *edit = qobject_cast<QLineEdit *>(controlInCurrentPage("不参与窗口检测的程序"));
+        ASSERT_NE(edit, nullptr) << "截图页没有这一格";
+        edit->setText(QStringLiteral(" chrome.exe , cmd.exe "));
+        emit edit->editingFinished();
+        closeWindowAndFlush();
+
+        const auto reopened = makeStore();
+        EXPECT_EQ(reopened->stringValue(GyanisScribe::Settings::kCaptureDetectionExcludes, QStringLiteral("?")), QStringLiteral(" chrome.exe , cmd.exe "))
+                << "存的该是用户填的原文（解析在读端做，界面不改写它）";
     }
 
     /**

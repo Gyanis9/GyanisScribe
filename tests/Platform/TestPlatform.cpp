@@ -147,6 +147,19 @@ TEST(PlatformIntegration, WindowEnumerationCapabilityMatchesTheOutcome)
     if (!windows)
     {
         EXPECT_NE(windows.error().code, ErrorCode::PlatformUnsupported) << "能力位说有，这一句却回绝：实际是 " << windows.error().message;
+        return;
+    }
+
+    // 进程名那一格要真能填上：排除清单按它比对，整列都是空串时那一格清单等于白填
+    // （桌面上一扇可见窗口都没有的机器上这条不算数：那是这一台机器没有现场，不是实现的问题）
+    const bool anyNamed = std::ranges::any_of(*windows,
+                                              [](const GyanisScribe::Platform::ScreenWindow &window)
+                                              {
+                                                  return !window.processName.isEmpty();
+                                              });
+    if (!windows->empty())
+    {
+        EXPECT_TRUE(anyNamed) << "列出来 " << windows->size() << " 扇窗，进程名一个都没填上：排除清单没法用";
     }
 }
 

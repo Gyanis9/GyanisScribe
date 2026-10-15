@@ -1717,6 +1717,33 @@ namespace GyanisScribe::App
      * @details 填歪的名单不写进配置：轮换顺序错了只是切组绕远，而把坏值存下去会让下一次启动也读不通，
      *          那时用户已经离开这一格了，说不清是谁改坏的。
      */
+    /**
+     * @brief 「不参与窗口检测的程序」那一格：逗号分隔的可执行文件名
+     * @param settings 配置存储
+     * @return 归调用方所有的输入框
+     * @details 这一格没有「填坏」的面：认不出的名字只是排不掉任何窗口，原文照存；
+     *          大小写在解析那一层统一（见 `Capture::parseProcessExcludes`），这里不做改写。
+     */
+    QLineEdit *makeDetectionExcludesEdit(ISettingsStore &settings)
+    {
+        auto *edit = new QLineEdit;
+        edit->setText(settings.stringValue(GyanisScribe::Settings::kCaptureDetectionExcludes, QString{}));
+        edit->setPlaceholderText(GyanisScribe::Core::uiText("留空即谁都不排除，例如 chrome.exe, cmd.exe"));
+        edit->setClearButtonEnabled(true);
+        edit->setAccessibleName(GyanisScribe::Core::uiText("不参与窗口检测的程序"));
+        edit->setToolTip(GyanisScribe::Core::uiText("写在这里的程序，悬停识别整扇窗口时会跳过它：适合那些常年压在桌面上的工具栏、笔记窗口"));
+
+        QObject::connect(edit, &QLineEdit::editingFinished, edit,
+                         [&settings, edit]
+                         {
+                             if (auto written = settings.setValue(GyanisScribe::Settings::kCaptureDetectionExcludes, edit->text()); !written)
+                             {
+                                 Logger::warning(std::format("不参与窗口检测的程序没能保存：{}", written.error().message));
+                             }
+                         });
+        return edit;
+    }
+
     QLineEdit *makeGroupRotationEdit(ISettingsStore &settings)
     {
         auto *edit = new QLineEdit;
@@ -2000,6 +2027,7 @@ namespace GyanisScribe::App
         form->addRow(GyanisScribe::Core::uiText("复制用的写法"), makeColorFormatCombo(m_settings));
         form->addRow(GyanisScribe::Core::uiText("放大镜视野"), makeMagnifierViewCombo(m_settings));
         form->addRow(GyanisScribe::Core::uiText("尺寸单位"), makeSizeUnitCombo(m_settings));
+        form->addRow(GyanisScribe::Core::uiText("不参与窗口检测的程序"), makeDetectionExcludesEdit(m_settings));
         form->addRow(GyanisScribe::Core::uiText("HEX 字母"),
                      makeSettingCheck(m_settings, GyanisScribe::Settings::kPickHexUppercase, true, GyanisScribe::Core::uiText("十六进制用大写"),
                                       GyanisScribe::Core::uiText("十六进制用大写"),

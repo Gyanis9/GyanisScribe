@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <numeric>
 #include <string>
+#include <QStringList>
 #include <vector>
 
 namespace GyanisScribe::Capture
@@ -674,4 +675,22 @@ namespace GyanisScribe::Capture
         painter.drawImage(target.topLeft(), sprite.image);
     }
 
+    QStringList parseProcessExcludes(const QString &text)
+    {
+        QStringList names;
+        for (auto part: text.split(QLatin1Char(','), Qt::SkipEmptyParts))
+        {
+            const auto trimmed = part.trimmed().toLower();
+            if (!trimmed.isEmpty() && !names.contains(trimmed))
+            {
+                names.append(trimmed);
+            }
+        }
+        return names;
+    }
+
+    bool isExcludedProcess(const QString &processName, const QStringList &excludes)
+    {
+        return !processName.isEmpty() && excludes.contains(processName.toLower());
+    }
 } // namespace GyanisScribe::Capture

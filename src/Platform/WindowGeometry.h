@@ -43,6 +43,7 @@ namespace GyanisScribe::Platform
     {
         quintptr handle = 0;          ///< 平台窗口句柄，与 Qt 的 WId 同一口径
         QString  title;               ///< 标题栏文字，没有标题的窗口是空串
+        QString  processName;         ///< 进程的可执行文件名（不含路径）；平台取不到时是空串——排除清单按它与进程对号
         QRect    logicalGlobal;       ///< 窗口在 Qt 逻辑全局坐标下的矩形（含标题栏与边框）
         QRect    clientLogicalGlobal; ///< 客户区的逻辑全局矩形；平台取不到客户区读数时是空矩形，消费方不许拿整窗矩形顶替
     };
