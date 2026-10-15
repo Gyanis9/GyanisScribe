@@ -160,7 +160,7 @@ namespace GyanisScribe::Core
     /// 「收起 / 摆回全部贴图」的那一档状态，与布局一起读写：退出时收着一整桌，回来还是收着
     inline constexpr std::string_view kPinAllConcealed = "Pin/AllConcealed";
 
-    /// OCR 语言标签，取值见 Ocr::supportedOcrLanguageTags()
+    /// OCR 语言标签，取值见 Core::supportedOcrLanguageTags()
     inline constexpr std::string_view kOcrLanguage = "Ocr/Language";
 
     /// OCR 语言包（tessdata）目录；为空时按环境变量与程序数据目录找

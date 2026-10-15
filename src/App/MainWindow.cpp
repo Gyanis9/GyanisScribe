@@ -14,7 +14,7 @@
 #include "Core/History/HistoryRules.h"
 #include "Gui/History/HistoryView.h"
 #include "Core/History/UnsavedArchive.h"
-#include "Ocr/OcrEngineFactory.h"
+#include "Plugins/OcrEngines/OcrEngineFactory.h"
 #include "Core/Pick/ColorFormat.h"
 #include "Core/Pick/PickGeometry.h"
 #include "Core/Pin/PinLayout.h"
@@ -532,9 +532,9 @@ namespace
     QComboBox *makeOcrLanguageCombo(ISettingsStore &settings)
     {
         auto *combo = new QComboBox;
-        combo->addItems(GyanisScribe::Ocr::supportedOcrLanguageTags());
+        combo->addItems(GyanisScribe::Core::supportedOcrLanguageTags());
         combo->setAccessibleName(GyanisScribe::Base::uiText("识别语言"));
-        const auto stored = settings.stringValue(GyanisScribe::Core::kOcrLanguage, QString::fromUtf8(GyanisScribe::Ocr::kDefaultOcrLanguage));
+        const auto stored = settings.stringValue(GyanisScribe::Core::kOcrLanguage, QString::fromUtf8(GyanisScribe::Core::kDefaultOcrLanguage));
         if (const int index = combo->findText(stored); index >= 0)
         {
             combo->setCurrentIndex(index);

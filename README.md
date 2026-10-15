@@ -1217,7 +1217,7 @@ Conan 直取，许可证正文见 `licenses/Zxing-Apache-2.0.txt` 与 `docs/Thir
   换成喂 ffmpeg `rawvideo` 管道才能放开时长上限。
 - **录屏逐帧写 PNG 仍在界面线程上**：需求的硬约束要求「耗时操作放工作线程」，现在只剩这一处
   （`PngSequenceSink::write`：一帧的写盘时间直接算进下一格的等待）。
-  文字识别与停止后的编码都已交出去：`Ocr::RecognitionRunner` 与 `RecordingService::startEncoding`
+  文字识别与停止后的编码都已交出去：`Core::RecognitionRunner` 与 `RecordingService::startEncoding`
   都走 Qt 的全局线程池，认完/编完由 `QFutureWatcher` / `QFuture::then`（context 是界面线程那个对象）送回界面，
   两处都同一时间只跑一条，析构前等手上的任务跑完。
   **恢复条件**：这一处要与采集循环交接帧与状态，并发改动要有 TSan 才算判据（本机 MSVC 没有 TSan，

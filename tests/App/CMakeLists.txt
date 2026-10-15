@@ -81,7 +81,6 @@ target_link_libraries(TestModuleFlow PRIVATE
         App
         Annotation
         Core
-        Ocr
         Platform
         Gui
         GTest::gtest
@@ -111,7 +110,6 @@ target_link_libraries(TestAppController PRIVATE
         App
         Annotation
         Core
-        Ocr
         Platform
         Record
         Gui

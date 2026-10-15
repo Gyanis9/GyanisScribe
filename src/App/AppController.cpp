@@ -24,15 +24,15 @@
 #include "Core/History/UnsavedArchive.h"
 #include "Core/Hotkey/HotkeyManager.h"
 #include "Core/Hotkey/IHotkeyManager.h"
-#include "Ocr/IOcrEngine.h"
-#include "Ocr/OcrEngineFactory.h"
+#include "Core/Ocr/IOcrEngine.h"
+#include "Plugins/OcrEngines/OcrEngineFactory.h"
 #include "Core/Pick/ColorFormat.h"
 #include "Core/Pick/RecentColors.h"
 #include "Gui/Pick/ColorPickerOverlay.h"
-#include "Ocr/OcrResultWindow.h"
-#include "Ocr/OcrTypes.h"
+#include "Gui/Ocr/OcrResultWindow.h"
+#include "Core/Ocr/OcrTypes.h"
 #include "Plugins/Barcode/BarcodeDecoder.h"
-#include "Ocr/RecognitionRunner.h"
+#include "Core/Ocr/RecognitionRunner.h"
 #include "Gui/Pin/PinGroupManagerWindow.h"
 #include "Gui/Pin/PinManager.h"
 #include "App/TrayController.h"
@@ -160,12 +160,12 @@ namespace GyanisScribe::App
         // 标注一套：引擎跨轮次复用（载入新帧自己会清空历史），窗口与工具栏也只建一次
         m_annotation = std::make_unique<Annotation::AnnotationEngine>();
         m_pins       = std::make_unique<Gui::PinManager>(*m_settings, *m_integration);
-        m_ocr        = Ocr::createOcrEngine(*m_settings, *m_integration);
+        m_ocr        = Plugins::createOcrEngine(*m_settings, *m_integration);
         // Runner 拿着引擎的引用，它的析构必须排在引擎之前：成员的析构按声明反序，头文件里那份声明就排在 m_ocr 后面
-        m_ocrRunner = std::make_unique<Ocr::RecognitionRunner>(*m_ocr);
+        m_ocrRunner = std::make_unique<Core::RecognitionRunner>(*m_ocr);
         // 识别在工作线程上跑，回来的两条槽仍然跑在界面线程：结果窗口的建立与刷新不能交给别的线程
-        QObject::connect(m_ocrRunner.get(), &Ocr::RecognitionRunner::succeeded, this, &AppController::handleOcrSucceeded);
-        QObject::connect(m_ocrRunner.get(), &Ocr::RecognitionRunner::failed, this, &AppController::handleOcrFailed);
+        QObject::connect(m_ocrRunner.get(), &Core::RecognitionRunner::succeeded, this, &AppController::handleOcrSucceeded);
+        QObject::connect(m_ocrRunner.get(), &Core::RecognitionRunner::failed, this, &AppController::handleOcrFailed);
         m_tray         = std::make_unique<TrayController>(*m_icons, *m_theme, *m_settings, *m_integration);
         m_imageFetcher = std::make_unique<ImageFetcher>();
         // 取图的成败都在这一层收口：贴到哪儿、提示什么话，只有界面层知道
@@ -1201,7 +1201,7 @@ namespace GyanisScribe::App
     {
         m_ocrImage = image;
         // 语言取上一次的选择：换过一次就该记住，而不是每轮都退回默认档
-        recognizeWithLanguage(m_settings->stringValue(Core::kOcrLanguage, QString::fromUtf8(Ocr::kDefaultOcrLanguage)));
+        recognizeWithLanguage(m_settings->stringValue(Core::kOcrLanguage, QString::fromUtf8(Core::kDefaultOcrLanguage)));
     }
 
     void AppController::handleScanRequested(const QImage &image)
@@ -1360,7 +1360,7 @@ namespace GyanisScribe::App
         m_ocrRunner->request(m_ocrImage, language);
     }
 
-    void AppController::handleOcrSucceeded(const QImage &image, const QString &language, const Ocr::OcrResult &result)
+    void AppController::handleOcrSucceeded(const QImage &image, const QString &language, const Core::OcrResult &result)
     {
         // 认出多少算多少：空结果也要开窗，摘要里那句「这一张没认出文字」比一条三秒就消失的提示有用
         if (auto stored = m_settings->setValue(Core::kOcrLanguage, language); !stored)
@@ -1371,11 +1371,11 @@ namespace GyanisScribe::App
         // 底图用发出请求时那一张：期间用户可能又截了新图，而方框是按送去认的那一张算的，换了图就整体错位
         if (m_ocrWindow == nullptr)
         {
-            m_ocrWindow = new Ocr::OcrResultWindow{image, result, *m_icons, *m_theme, Core::nameTemplateOrDefault(*m_settings)};
+            m_ocrWindow = new Gui::OcrResultWindow{image, result, *m_icons, *m_theme, Core::nameTemplateOrDefault(*m_settings)};
             // 关掉就自毁，控制器只持 QPointer：下一次识别会重新建一个，不会往已析构的对象里塞结果
             m_ocrWindow->setAttribute(Qt::WA_DeleteOnClose);
-            QObject::connect(m_ocrWindow, &Ocr::OcrResultWindow::recognizeRequested, this, &AppController::recognizeWithLanguage);
-            QObject::connect(m_ocrWindow, &Ocr::OcrResultWindow::messageForUser, this, [this](const QString &message, Gui::ToastKind kind) { notifyUser(message, kind); });
+            QObject::connect(m_ocrWindow, &Gui::OcrResultWindow::recognizeRequested, this, &AppController::recognizeWithLanguage);
+            QObject::connect(m_ocrWindow, &Gui::OcrResultWindow::messageForUser, this, [this](const QString &message, Gui::ToastKind kind) { notifyUser(message, kind); });
         } else
         {
             m_ocrWindow->setResult(image, result);

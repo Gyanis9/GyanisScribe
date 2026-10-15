@@ -13,8 +13,8 @@
 #include "Base/Paths.h"
 #include "App/ClipboardPin.h"
 #include "Base/Types.h"
-#include "Ocr/IOcrEngine.h"
-#include "Ocr/OcrEngineFactory.h"
+#include "Core/Ocr/IOcrEngine.h"
+#include "Plugins/OcrEngines/OcrEngineFactory.h"
 #include "Core/Pin/IPinWindow.h"
 #include "Gui/Pin/PinManager.h"
 #include "Platform/IPlatformIntegration.h"
@@ -359,10 +359,10 @@ namespace GyanisScribe
         TEST_F(ModuleFlowFixture, OcrUsesTheSharedLanguageVocabulary)
         {
             GyanisScribe::Core::SettingsStore settings(m_iniFile);
-            const auto                            engine = GyanisScribe::Ocr::createOcrEngine(settings, *integration);
+            const auto                            engine = GyanisScribe::Plugins::createOcrEngine(settings, *integration);
             ASSERT_NE(engine, nullptr) << "选型不许交回空指针";
 
-            const auto vocabulary = GyanisScribe::Ocr::supportedOcrLanguageTags();
+            const auto vocabulary = GyanisScribe::Core::supportedOcrLanguageTags();
             for (const auto &language: engine->supportedLanguages())
             {
                 EXPECT_TRUE(vocabulary.contains(language)) << "后端给出的语言不在对外词表里：" << language.toStdString();

@@ -6,6 +6,7 @@ add_subdirectory(Pick)
 add_subdirectory(History)
 add_subdirectory(Pin)
 add_subdirectory(Capture)
+add_subdirectory(Ocr)
 
 get_property(CoreSources GLOBAL PROPERTY GyanisScribeCoreSources)
 add_library(Core STATIC ${CoreSources})
@@ -15,7 +16,8 @@ target_include_directories(Core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(Core PUBLIC
         Base
         Qt6::Core
-        Qt6::Gui)
+        Qt6::Gui
+        Qt6::Concurrent)
 
 target_compile_features(Core PUBLIC cxx_std_23)
 

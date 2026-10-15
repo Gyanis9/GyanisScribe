@@ -49,13 +49,17 @@ namespace GyanisScribe::Annotation
     class AnnotationWindow;
 } // namespace GyanisScribe::Annotation
 
-namespace GyanisScribe::Ocr
+namespace GyanisScribe::Core
 {
     class IOcrEngine;
-    class OcrResultWindow;
     class RecognitionRunner;
     struct OcrResult;
-} // namespace GyanisScribe::Ocr
+} // namespace GyanisScribe::Core
+
+namespace GyanisScribe::Gui
+{
+    class OcrResultWindow;
+} // namespace GyanisScribe::Gui
 
 namespace GyanisScribe::Core
 {
@@ -532,7 +536,7 @@ namespace GyanisScribe::App
          * @details 与 handleOcrFailed 分两条槽而不是一条带 Expected：这里两个分支各写各的文案，
          *          合在一条里就要在槽里再判一次有没有值，而 Runner 已经判过了。
          */
-        void handleOcrSucceeded(const QImage &image, const QString &language, const Ocr::OcrResult &result);
+        void handleOcrSucceeded(const QImage &image, const QString &language, const Core::OcrResult &result);
 
         /**
          * @brief 识别失败：把后端给的中文原因原样报给用户
@@ -609,15 +613,15 @@ namespace GyanisScribe::App
         std::unique_ptr<Gui::PinManager>                  m_pins;                                         ///< 贴图管理器
         std::unique_ptr<ImageFetcher>                     m_imageFetcher;                                 ///< 网页取图：拖进来的可以是一条图片地址
         std::optional<QPoint>                             m_pendingFetchPoint;                            ///< 在飞那一张取回来落在哪儿；空表示跟光标走
-        std::unique_ptr<Ocr::IOcrEngine>                  m_ocr;                                          ///< 识别后端，按设置与平台能力选一次
-        std::unique_ptr<Ocr::RecognitionRunner>           m_ocrRunner;                                    ///< 识别的线程搬运工
+        std::unique_ptr<Core::IOcrEngine>                 m_ocr;                                          ///< 识别后端，按设置与平台能力选一次
+        std::unique_ptr<Core::RecognitionRunner>          m_ocrRunner;                                    ///< 识别的线程搬运工
         std::unique_ptr<Record::FfmpegRecordingEncoder>   m_recorder;                                     ///< 录屏的编码步
         std::unique_ptr<Record::RecordingService>         m_recording;                                    ///< 录屏服务，一轮一个会话
         std::unique_ptr<TrayController>                   m_tray;                                         ///< 托盘图标与菜单
         std::unique_ptr<MainWindow>                       m_mainWindow;                                   ///< 设置与关于的入口
         std::unique_ptr<GyanisScribe::Gui::Toast>         m_toast;                                        ///< 右下角提示气泡，操作结果的落地处
         QImage                                            m_ocrImage;                                     ///< 最近一次送去识别的图，换语言重认按它算
-        QPointer<Ocr::OcrResultWindow>                    m_ocrWindow;                                    ///< 识别结果窗口，关了就重建，不拥有
+        QPointer<Gui::OcrResultWindow>                    m_ocrWindow;                                    ///< 识别结果窗口，关了就重建，不拥有
         std::unique_ptr<GyanisScribe::Core::HistoryStore> m_history;                                      ///< 历史清单：成品文件的索引，删记录不删文件
         QPointer<Gui::ColorPickerOverlay>                 m_picker;                                       ///< 取色遮罩，关掉即重建
         QPointer<Gui::PinGroupManagerWindow>              m_groupManager;                                 ///< 贴图组管理窗，开着一扇就复用那一扇
