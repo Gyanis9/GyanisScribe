@@ -6,6 +6,7 @@
 #include "Core/Annotation/BlankCanvas.h"
 #include "App/ClipboardPin.h"
 #include "App/CustomHotkeys.h"
+#include "App/HistoryCoordinator.h"
 #include "App/OcrCoordinator.h"
 #include "Gui/Capture/CaptureService.h"
 #include "Core/Capture/IScreenCaptureSource.h"
@@ -20,7 +21,6 @@
 #include "Core/Image/OutputDecoration.h"
 #include "Base/Paths.h"
 #include "Base/Text.h"
-#include "Core/History/HistoryRules.h"
 #include "Core/History/HistoryStore.h"
 #include "Core/History/HistoryTypes.h"
 #include "Core/History/UnsavedArchive.h"
@@ -61,7 +61,6 @@
 #include <QScreen>
 #include <QCoreApplication>
 #include <QDateTime>
-#include <QDesktopServices>
 #include <QUrl>
 #include <QImage>
 #include <QStringList>
@@ -179,9 +178,18 @@ namespace GyanisScribe::Main
                              m_pendingFetchPoint.reset();
                              notifyUser(reason, GyanisScribe::Gui::ToastKind::Information);
                          });
-        m_history    = std::make_unique<GyanisScribe::Core::HistoryStore>(std::move(historyStoragePath));
-        m_mainWindow = std::make_unique<MainWindow>(*m_settings, *m_theme, *m_icons, *m_history, m_integration->capabilities(), *m_integration);
-        m_toast      = std::make_unique<GyanisScribe::Gui::Toast>(*m_icons, *m_theme);
+        m_historyStore = std::make_unique<GyanisScribe::Core::HistoryStore>(std::move(historyStoragePath));
+        m_mainWindow   = std::make_unique<MainWindow>(*m_settings, *m_theme, *m_icons, *m_historyStore, m_integration->capabilities(), *m_integration);
+        // 历史这一族整族搬进了 HistoryCoordinator（审查台账 A-11）：清单本体仍由这里持有并与主窗口共享，
+        // 协调器只拿引用；「清单变了要刷新窗口」由 changed() 回到这一层接——它不能自己去叫 Main，
+        // 那会让 App 层反向依赖 Main，而 Main 本来就依赖 App
+        m_history = std::make_unique<GyanisScribe::App::HistoryCoordinator>(*m_historyStore, *m_settings);
+        QObject::connect(m_history.get(), &GyanisScribe::App::HistoryCoordinator::messageForUser, this, &AppController::notifyUser);
+        QObject::connect(m_history.get(), &GyanisScribe::App::HistoryCoordinator::changed, this, [this] { m_mainWindow->refreshHistory(); });
+        // 贴图那一族的地盘：贴到哪儿（光标）由这一层决定，协调器只交图与来源
+        QObject::connect(m_history.get(), &GyanisScribe::App::HistoryCoordinator::pinRequested, this,
+                         [this](const QImage &image, const QString &sourceFile) { m_pins->addPin(image, QCursor::pos(), sourceFile); });
+        m_toast = std::make_unique<GyanisScribe::Gui::Toast>(*m_icons, *m_theme);
         QObject::connect(m_tray.get(), &GyanisScribe::App::TrayController::actionRequested, this, &AppController::handleTrayAction);
         // 装没装上要留到接线全部完成之后再处置：现身的这一刻起用户就能点，每个入口都得已经接好
         const bool trayInstalled = m_tray->install();
@@ -294,11 +302,11 @@ namespace GyanisScribe::Main
         QObject::connect(m_recording.get(), &GyanisScribe::Plugins::RecordingService::frameStored, this, [this] { updateRecordingHud(); });
 
         // 历史页的三个出口：贴图与识别都要先把成品读回内存，删除只动清单不动文件
-        QObject::connect(m_mainWindow.get(), &MainWindow::historyPinRequested, this, &AppController::handleHistoryPin);
+        QObject::connect(m_mainWindow.get(), &MainWindow::historyPinRequested, m_history.get(), &GyanisScribe::App::HistoryCoordinator::requestPin);
         QObject::connect(m_mainWindow.get(), &MainWindow::historyOcrRequested, m_ocr.get(), &GyanisScribe::App::OcrCoordinator::recognizeFile);
-        QObject::connect(m_mainWindow.get(), &MainWindow::historyRemoveRequested, this, &AppController::handleHistoryRemove);
-        QObject::connect(m_mainWindow.get(), &MainWindow::historyOpenFolderRequested, this, &AppController::handleHistoryOpenFolder);
-        QObject::connect(m_mainWindow.get(), &MainWindow::historyClearRequested, this, &AppController::handleHistoryClear);
+        QObject::connect(m_mainWindow.get(), &MainWindow::historyRemoveRequested, m_history.get(), &GyanisScribe::App::HistoryCoordinator::remove);
+        QObject::connect(m_mainWindow.get(), &MainWindow::historyOpenFolderRequested, m_history.get(), &GyanisScribe::App::HistoryCoordinator::openContainingFolder);
+        QObject::connect(m_mainWindow.get(), &MainWindow::historyClearRequested, m_history.get(), &GyanisScribe::App::HistoryCoordinator::clear);
         QObject::connect(m_mainWindow.get(), &MainWindow::messageForUser, this, [this](const QString &message, GyanisScribe::Gui::ToastKind kind) { notifyUser(message, kind); });
         // 主窗口动作条与托盘菜单发的是同一个枚举，所以出口也只有这一个 handleTrayAction
         QObject::connect(m_mainWindow.get(), &MainWindow::actionRequested, this, &AppController::handleTrayAction);
@@ -781,7 +789,7 @@ namespace GyanisScribe::Main
                 archived)
             {
                 // 记的是像素尺寸而不是逻辑尺寸：历史缩略图与「重新贴图」都按这份文件读回来
-                recordHistory(*archived, GyanisScribe::Core::HistoryKind::Screenshot, image.image.size());
+                m_history->record(*archived, GyanisScribe::Core::HistoryKind::Screenshot, image.image.size());
             } else
             {
                 // 开着这一档就是指望这一张还在，静默失败等于骗人
@@ -1006,7 +1014,7 @@ namespace GyanisScribe::Main
         }
         GyanisScribe::Base::Logger::info(std::format("成品已保存：{}", GyanisScribe::Base::Paths::toDisplayText(filePath).toStdString()));
         // 历史记的是盘上那份的尺寸：开着装饰时成品比原图大一围，记小了缩略图会裁边
-        recordHistory(filePath, GyanisScribe::Core::HistoryKind::Screenshot, decorated.size());
+        m_history->record(filePath, GyanisScribe::Core::HistoryKind::Screenshot, decorated.size());
         // 路径留在成员上，三条落盘路（存文件/快速保存/自动保存）与命令行的交付共用这一处读数：
         // 外部命令的 %file% 与命令行打到标准输出的都是它，两处各算一次就会在装饰开关上分家
         m_writtenFilePath = GyanisScribe::Base::Paths::toDisplayText(filePath);
@@ -1640,87 +1648,7 @@ namespace GyanisScribe::Main
             notifyUser(GyanisScribe::Base::uiText("成品已出，但没带上声音：取声那一步中途失败了，原因写在日志里"), GyanisScribe::Gui::ToastKind::Information);
         }
         // 尺寸取信号里这一轮自己那份：编码在后台跑的时候用户可以再开一轮，回读成员拿到的会是后一轮的
-        recordHistory(GyanisScribe::Base::Paths::fromDisplayText(outputPath), GyanisScribe::Core::HistoryKind::Recording, frameSize);
-    }
-
-    void AppController::recordHistory(const std::filesystem::path &filePath, const GyanisScribe::Core::HistoryKind kind, const QSize &size)
-    {
-        const auto entry = GyanisScribe::Core::HistoryEntry{
-                .moment   = QDateTime::currentDateTime(),
-                .kind     = kind,
-                .filePath = filePath,
-                .size     = size,
-        };
-        if (auto stored = m_history->append(entry, GyanisScribe::Core::policyFromSettings(*m_settings), QDateTime::currentDateTime()); !stored)
-        {
-            // 清单写不进去不该让「保存成功」变成假话：成品已经在盘上，只是下次打开找不到它
-            GyanisScribe::Base::Logger::warning(std::format("成品没进历史清单：{}", stored.error().message));
-            notifyUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("成品已保存，但没进历史清单：{}"), stored.error().message).c_str()),
-                       GyanisScribe::Gui::ToastKind::Danger);
-            return;
-        }
-        m_mainWindow->refreshHistory();
-    }
-
-    void AppController::handleHistoryPin(const std::filesystem::path &filePath)
-    {
-        auto image = GyanisScribe::Core::loadImageFile(filePath);
-        if (!image)
-        {
-            notifyUser(QString::fromUtf8(image.error().message.c_str()), GyanisScribe::Gui::ToastKind::Danger);
-            return;
-        }
-        // 盘上的原文件一并交过去：动图（GIF/APNG）贴上去要接着播，而不是停在首帧
-        m_pins->addPin(*image, QCursor::pos(), GyanisScribe::Base::Paths::toDisplayText(filePath));
-    }
-
-    void AppController::handleHistoryRemove(const std::filesystem::path &filePath)
-    {
-        if (auto removed = m_history->remove(filePath); !removed)
-        {
-            notifyUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("这条历史没删掉：{}"), removed.error().message).c_str()),
-                       GyanisScribe::Gui::ToastKind::Danger);
-            return;
-        }
-        // 删记录不删文件：这句要让用户看见，否则他会以为图也被清掉了
-        notifyUser(GyanisScribe::Base::uiText("已从历史里去掉，成品文件仍在 ") + GyanisScribe::Base::Paths::toDisplayText(filePath), GyanisScribe::Gui::ToastKind::Success);
-        m_mainWindow->refreshHistory();
-    }
-
-    void AppController::handleHistoryOpenFolder(const std::filesystem::path &filePath)
-    {
-        std::error_code ignored;
-        const auto      directory = filePath.parent_path();
-        if (directory.empty() || !std::filesystem::exists(directory, ignored))
-        {
-            notifyUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("打不开所在目录：{} 已经不在了。成品可能已被移动或删除"),
-                                                                      GyanisScribe::Base::Paths::toDisplayText(directory).toStdString())
-                                                 .c_str()),
-                       GyanisScribe::Gui::ToastKind::Danger);
-            return;
-        }
-        if (!QDesktopServices::openUrl(QUrl::fromLocalFile(QString::fromStdWString(directory.wstring()))))
-        {
-            notifyUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("打不开目录 {}。请自己到设置里那个截图目录去找"),
-                                                                      GyanisScribe::Base::Paths::toDisplayText(directory).toStdString())
-                                                 .c_str()),
-                       GyanisScribe::Gui::ToastKind::Danger);
-            return;
-        }
-        GyanisScribe::Base::Logger::info(std::format("已打开历史成品所在目录：{}", GyanisScribe::Base::Paths::toDisplayText(directory).toStdString()));
-    }
-
-    void AppController::handleHistoryClear()
-    {
-        if (auto cleared = m_history->clear(); !cleared)
-        {
-            notifyUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("历史清单没清空：{}"), cleared.error().message).c_str()),
-                       GyanisScribe::Gui::ToastKind::Danger);
-            return;
-        }
-        // 与单条删除同一条口径：动的是清单，不是用户磁盘上的成品
-        notifyUser(GyanisScribe::Base::uiText("历史列表已清空，成品文件仍在各自目录里"), GyanisScribe::Gui::ToastKind::Success);
-        m_mainWindow->refreshHistory();
+        m_history->record(GyanisScribe::Base::Paths::fromDisplayText(outputPath), GyanisScribe::Core::HistoryKind::Recording, frameSize);
     }
 
     void AppController::handleRecordingFailed(const QString &reason)

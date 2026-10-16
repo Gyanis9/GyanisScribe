@@ -55,6 +55,7 @@ namespace GyanisScribe::Gui
 
 namespace GyanisScribe::App
 {
+    class HistoryCoordinator;
     class OcrCoordinator;
 } // namespace GyanisScribe::App
 
@@ -550,31 +551,6 @@ namespace GyanisScribe::Main
          */
         void captureNamedScreen(const QString &screenName);
 
-        /**
-         * @brief 把一份成品记进历史清单并刷新历史页
-         * @param filePath 成品文件路径
-         * @param kind 成品类别
-         * @param size 成品尺寸，视频记的是录屏区尺寸
-         * @details 记不进清单只警告不报错：成品已经在盘上，把「保存成功」说成失败更糟。
-         */
-        void recordHistory(const std::filesystem::path &filePath, GyanisScribe::Core::HistoryKind kind, const QSize &size);
-
-        /// 历史页要求把一条成品重新贴回屏幕
-        void handleHistoryPin(const std::filesystem::path &filePath);
-
-        /// 历史页要求去掉一条记录（成品文件保留）
-        void handleHistoryRemove(const std::filesystem::path &filePath);
-
-        /**
-         * @brief 在文件管理器里打开这条记录所在的那个目录
-         * @param filePath 选中的那条记录的成品路径
-         * @details 目录而不是文件本身：各家系统「选中并打开所在目录」的接口不一，而打开目录在所有平台上都做得到。
-         */
-        void handleHistoryOpenFolder(const std::filesystem::path &filePath);
-
-        /// 清空历史清单：只清记录，成品文件留在各自目录里
-        void handleHistoryClear();
-
         std::unique_ptr<GyanisScribe::Core::SettingsStore>             m_settings;                     ///< 配置存储
         std::unique_ptr<GyanisScribe::Platform::IPlatformIntegration>  m_integration;                  ///< 平台集成
         std::unique_ptr<GyanisScribe::Core::IScreenCaptureSource>      m_captureSource;                ///< 抓帧来源
@@ -593,7 +569,8 @@ namespace GyanisScribe::Main
         std::unique_ptr<GyanisScribe::App::TrayController>             m_tray;                         ///< 托盘图标与菜单
         std::unique_ptr<MainWindow>                                    m_mainWindow;                   ///< 设置与关于的入口
         std::unique_ptr<GyanisScribe::Gui::Toast>                      m_toast;                        ///< 右下角提示气泡，操作结果的落地处
-        std::unique_ptr<GyanisScribe::Core::HistoryStore>              m_history;                      ///< 历史清单：成品文件的索引，删记录不删文件
+        std::unique_ptr<GyanisScribe::Core::HistoryStore>              m_historyStore;                 ///< 历史清单本体：与主窗口共享同一份，删记录不删文件
+        std::unique_ptr<GyanisScribe::App::HistoryCoordinator>         m_history;                      ///< 历史这一族（增删清空与「这条去哪了」）
         QPointer<GyanisScribe::Gui::ColorPickerOverlay>                m_picker;                       ///< 取色遮罩，关掉即重建
         QPointer<GyanisScribe::Gui::PinGroupManagerWindow>             m_groupManager;                 ///< 贴图组管理窗，开着一扇就复用那一扇
         QPointer<GyanisScribe::Gui::RecordingHud>                      m_hud;                          ///< 录屏控制条，一轮一个，收起即销毁
