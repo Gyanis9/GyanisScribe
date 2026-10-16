@@ -10,6 +10,7 @@
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QPoint>
+#include <QPointer>
 #include <QRect>
 #include <QString>
 
@@ -254,4 +255,21 @@ TEST_F(RecordingHudFixture, CancelButtonRequestsCancelAndNotSave)
     clickOn(button);
     EXPECT_EQ(cancels, 1) << "按下去没发出取消请求";
     EXPECT_EQ(stops, 0) << "取消走成了停止并保存，用户会多一份根本不想要的成品";
+}
+
+/**
+ * @brief 钉住「收起即销毁」：控制器那一头写的就是「一轮一个」，靠的是关掉即销毁
+ * @details 少了这一档，每一轮录屏都会在桌上留一个藏着不用的控制条。判据要过一轮事件循环：
+ *          WA_DeleteOnClose 走的是 deleteLater，close() 当场还不为空。
+ */
+TEST_F(RecordingHudFixture, ClosingTheHudDestroysItInsteadOfOnlyHidingIt)
+{
+    RecordingHud                *hud = new RecordingHud{*icons, QRect{0, 0, 1920, 1040}};
+    const QPointer<RecordingHud> guard{hud};
+
+    hud->close();
+    // deleteLater 要显式派发一次：processEvents() 管不到 DeferredDelete 那一类
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+
+    EXPECT_TRUE(guard.isNull()) << "收起只藏不留销毁：下一轮录屏会再建一个，旧的那个永远留在桌上";
 }

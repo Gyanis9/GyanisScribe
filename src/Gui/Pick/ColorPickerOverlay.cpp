@@ -43,6 +43,9 @@ namespace GyanisScribe::Gui
         setCursor(Qt::CrossCursor);
         setWindowTitle(GyanisScribe::Base::uiText("取色器"));
         setAccessibleName(GyanisScribe::Base::uiText("取色遮罩"));
+        // 关掉即销毁：控制器拿的是 QPointer，下一次取色重建的是新的一份；
+        // 少了这一档，每取一次色就在桌上留一个藏着不用的全屏遮罩（还带着它那张屏幕冻帧）
+        setAttribute(Qt::WA_DeleteOnClose);
     }
 
     QColor ColorPickerOverlay::colorAt(const QPoint &globalPos) const

@@ -119,6 +119,9 @@ namespace GyanisScribe::Gui
         // 这一圈卡片底由样式表的 QWidget#hudRoot 给：无边框悬浮窗不铺底，字就直接压在桌面上
         setObjectName(QStringLiteral("hudRoot"));
         setAttribute(Qt::WA_StyledBackground, true);
+        // 收起即销毁（控制器那一头写的是「一轮一个」）：控制器拿的是 QPointer，收起后它当场变空；
+        // 少了这一档，每一轮录屏都会在桌上留一个藏着不用的控制条
+        setAttribute(Qt::WA_DeleteOnClose);
 
         auto *root = new QVBoxLayout{this};
         root->setContentsMargins(GyanisScribe::Gui::kSpacingSmall, GyanisScribe::Gui::kSpacingTiny, GyanisScribe::Gui::kSpacingSmall, GyanisScribe::Gui::kSpacingTiny);

@@ -15,6 +15,7 @@
 #include <QMouseEvent>
 #include <QPixmap>
 #include <QPoint>
+#include <QPointer>
 #include <QRect>
 
 #include <algorithm>
@@ -512,4 +513,24 @@ TEST_F(PickFixture, OverlayPaintsTheWholeScreenWithoutCrashing)
 
     const QPixmap pixmap = overlay->grab();
     EXPECT_EQ(pixmap.size(), QSize(200, 200));
+}
+
+/**
+ * @brief 钉住「关掉即销毁」：控制器只拿一个 QPointer，下一次取色要建的是新的一份
+ * @details 少了这一档，每取一次色就在桌上留一个藏着不用的全屏遮罩——还带着它那张屏幕冻帧，
+ *          一次十几兆，取几十次色就是这么攒出来的。判据要过一轮事件循环：
+ *          WA_DeleteOnClose 走的是 deleteLater，close() 当场还不为空。
+ */
+TEST_F(PickFixture, ClosingTheOverlayDestroysItInsteadOfOnlyHidingIt)
+{
+    const auto frame = makeFrame({100, 100}, 1.0, {30, 40}, QColor{10, 200, 20});
+    // 与控制器同一种持有形状：不给父对象、只留一个 QPointer（release 掉 unique_ptr 那份所有权）
+    ColorPickerOverlay                *overlay = makeOverlay(frame, {0, 0, 100, 100}, ColorFormat::Hex).release();
+    const QPointer<ColorPickerOverlay> guard{overlay};
+
+    overlay->close();
+    // deleteLater 要显式派发一次：processEvents() 管不到 DeferredDelete 那一类
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+
+    EXPECT_TRUE(guard.isNull()) << "关掉只藏不留销毁：下一次取色会再建一个，旧的那个连同它的屏幕冻帧永远留在桌上";
 }
