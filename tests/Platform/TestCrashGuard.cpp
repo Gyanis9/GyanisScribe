@@ -1,5 +1,5 @@
 // 崩溃兜底的两层判据：命名规则（纯函数）与「真崩一次要留下转储」（端到端起探针进程）。
-#include "App/CrashGuard.h"
+#include "Platform/CrashGuard.h"
 
 #include <QtGlobal>
 
@@ -12,9 +12,9 @@
 #include <string>
 #include <vector>
 
-using GyanisScribe::App::crashDumpFileName;
-using GyanisScribe::App::CrashStamp;
-using GyanisScribe::App::kCrashExitCode;
+using GyanisScribe::Platform::crashDumpFileName;
+using GyanisScribe::Platform::CrashStamp;
+using GyanisScribe::Platform::kCrashExitCode;
 
 namespace
 {
@@ -45,6 +45,12 @@ TEST(CrashGuardNaming, DumpNameCarriesVersionTimestampAndProcessId)
  */
 TEST(CrashGuardEndToEnd, CrashingProcessLeavesAMiniDump)
 {
+#ifndef Q_OS_WIN
+    // 非 Windows 上 installCrashDumpWriter 是空操作（崩溃现场由系统自己的转储策略落地），
+    // 探针那一头也只保证能编；这一条只在装过滤器的那一档上有意义
+    GTEST_SKIP() << "非 Windows 没有进程内转储可装";
+#endif
+
     const auto      directory = scratchDirectory();
     std::error_code ignored;
     std::filesystem::remove_all(directory, ignored);

@@ -8,7 +8,9 @@ set(PlatformCommonSources
         UnsupportedHotkeyBackend.h
         UnsupportedHotkeyBackend.cpp
         WindowGeometry.h
-        WindowGeometry.cpp)
+        WindowGeometry.cpp
+        CrashGuard.h
+        CrashGuard.cpp)
 
 add_library(Platform STATIC ${PlatformCommonSources})
 
@@ -42,5 +44,9 @@ if (WIN32)
     # 界面元素检测走 UI Automation：CLSID_CUIAutomation 与运行期那一份 COM 实现都在这个库里，
     # 不显式链就是 LNK2019
     target_link_libraries(Platform PRIVATE uiautomationcore)
+
+    # 崩溃转储要 MiniDumpWriteDump，它在 dbghelp 里（Windows 才有；CrashGuard.cpp 里非 Windows
+    # 那一条分支是空操作，所以这两行才敢只在 Windows 上写）
+    target_link_libraries(Platform PRIVATE dbghelp)
 
 endif ()

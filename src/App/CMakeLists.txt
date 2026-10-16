@@ -21,9 +21,7 @@ add_library(App STATIC
         UpdateCheck.h
         UpdateCheck.cpp
         SingleInstance.h
-        SingleInstance.cpp
-        CrashGuard.h
-        CrashGuard.cpp)
+        SingleInstance.cpp)
 
 target_include_directories(App PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(App PUBLIC
@@ -43,9 +41,4 @@ target_compile_definitions(App PUBLIC PROJECT_VERSION="${PROJECT_VERSION}")
 
 if (MSVC)
     target_compile_options(App PRIVATE /W4 /WX)
-endif ()
-
-# 崩溃转储要 MiniDumpWriteDump，它在 dbghelp 里（Windows 才有；非 Windows 那一条分支是空操作）
-if (WIN32)
-    target_link_libraries(App PUBLIC dbghelp)
 endif ()

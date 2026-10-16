@@ -1,7 +1,7 @@
 #include "Main/Application.h"
 #include "App/CommandLine.h"
 
-#include "App/CrashGuard.h"
+#include "Platform/CrashGuard.h"
 
 #include "Base/Logger.h"
 #include "Base/Paths.h"
@@ -67,8 +67,8 @@ int main(int argc, char *argv[])
     }
 
     // 兜底要在任何可能崩的步骤之前装好：装晚了那条崩就只是「程序没了」
-    GyanisScribe::App::installCrashDumpWriter(GyanisScribe::Base::Paths::logDirectory(), QCoreApplication::applicationVersion().toStdWString());
-    GyanisScribe::App::installTerminateHandler();
+    GyanisScribe::Platform::installCrashDumpWriter(GyanisScribe::Base::Paths::logDirectory(), QCoreApplication::applicationVersion().toStdWString());
+    GyanisScribe::Platform::installTerminateHandler();
 
     // 单实例：第二次启动把前一份唤出来然后自己退出，而不是两个实例抢同一批全局热键
     if (!application.tryBecomePrimaryInstance())
@@ -84,9 +84,9 @@ int main(int argc, char *argv[])
     } catch (...)
     {
         // 事件分发里的异常默认会走到 terminate；这里接住是为了给出退出码与那句人话
-        const auto message =
-                GyanisScribe::App::crashMessageFor(std::current_exception(), GyanisScribe::Base::Paths::toDisplayText(GyanisScribe::Base::Paths::logDirectory()).toStdString());
+        const auto message = GyanisScribe::Platform::crashMessageFor(std::current_exception(),
+                                                                     GyanisScribe::Base::Paths::toDisplayText(GyanisScribe::Base::Paths::logDirectory()).toStdString());
         GyanisScribe::Base::Logger::error(message.toStdString());
-        return GyanisScribe::App::kCrashExitCode;
+        return GyanisScribe::Platform::kCrashExitCode;
     }
 }

@@ -1,5 +1,5 @@
-#include "App/CrashGuard.h"
 #include "App/SingleInstance.h"
+#include "Platform/CrashGuard.h"
 
 #include <gtest/gtest.h>
 
@@ -14,10 +14,10 @@
 #include <string>
 #include <thread>
 
-using GyanisScribe::App::crashMessageFor;
 using GyanisScribe::App::instanceKey;
-using GyanisScribe::App::kCrashExitCode;
 using GyanisScribe::App::SingleInstance;
+using GyanisScribe::Platform::crashMessageFor;
+using GyanisScribe::Platform::kCrashExitCode;
 
 namespace
 {

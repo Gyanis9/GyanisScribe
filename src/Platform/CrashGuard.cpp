@@ -1,4 +1,4 @@
-#include "App/CrashGuard.h"
+#include "Platform/CrashGuard.h"
 
 #include "Base/Logger.h"
 #include "Base/Paths.h"
@@ -6,8 +6,10 @@
 
 #include <QtGlobal>
 
+#ifdef Q_OS_WIN
 #include <windows.h>
 #include <dbghelp.h>
+#endif
 
 #include <cstdlib>
 #include <exception>
@@ -38,7 +40,7 @@ namespace
     /// 转储命名的唯一一处：宽字符 + 调用方给的缓冲区，崩溃处理器里也要能调它（不许分配）
     constexpr std::size_t kDumpNameCapacity = 512;
 
-    int formatCrashDumpFileName(wchar_t *const buffer, const std::size_t capacity, const wchar_t *const applicationVersion, const GyanisScribe::App::CrashStamp &stamp,
+    int formatCrashDumpFileName(wchar_t *const buffer, const std::size_t capacity, const wchar_t *const applicationVersion, const GyanisScribe::Platform::CrashStamp &stamp,
                                 const std::uint32_t processId)
     {
         // 用 %ls 而不是 %s：宽字符格式串里 %s 的语义随标准库而异（MSVC 当宽串），
@@ -47,6 +49,7 @@ namespace
                              stamp.minute, stamp.second, processId);
     }
 
+#ifdef Q_OS_WIN
     // 崩溃处理器里唯一能读的现场：都在装过滤器之前写好，之后不再改，也不持有所有权
     constexpr std::size_t kPathCapacity                      = 4096;
     wchar_t               g_dumpDirectoryPath[kPathCapacity] = L"";
@@ -78,8 +81,8 @@ namespace
 
         SYSTEMTIME moment{};
         GetLocalTime(&moment);
-        const GyanisScribe::App::CrashStamp stamp{static_cast<int>(moment.wYear), static_cast<int>(moment.wMonth),  static_cast<int>(moment.wDay),
-                                                  static_cast<int>(moment.wHour), static_cast<int>(moment.wMinute), static_cast<int>(moment.wSecond)};
+        const GyanisScribe::Platform::CrashStamp stamp{static_cast<int>(moment.wYear), static_cast<int>(moment.wMonth),  static_cast<int>(moment.wDay),
+                                                       static_cast<int>(moment.wHour), static_cast<int>(moment.wMinute), static_cast<int>(moment.wSecond)};
 
         wchar_t fileName[kPathCapacity] = L"";
         if (formatCrashDumpFileName(fileName, kPathCapacity, g_applicationVersion, stamp, GetCurrentProcessId()) <= 0)
@@ -106,12 +109,13 @@ namespace
         }
 
         // 退出码与「未捕获异常」那一类对齐，CI 与用户都按同一个码认崩溃
-        TerminateProcess(GetCurrentProcess(), static_cast<uint>(GyanisScribe::App::kCrashExitCode));
+        TerminateProcess(GetCurrentProcess(), static_cast<uint>(GyanisScribe::Platform::kCrashExitCode));
         return EXCEPTION_EXECUTE_HANDLER;
     }
+#endif // Q_OS_WIN
 } // namespace
 
-namespace GyanisScribe::App
+namespace GyanisScribe::Platform
 {
     QString crashMessageFor(const std::exception_ptr &error, const std::string_view logDirectory)
     {
@@ -158,10 +162,15 @@ namespace GyanisScribe::App
         }
 
         // 装过滤器之前把现场写进静态缓冲区：处理器里不许再分配，也不许读 std::wstring 的堆内存
+#ifdef Q_OS_WIN
         copyTruncated(g_dumpDirectoryPath, kPathCapacity, dumpDirectory.wstring());
         copyTruncated(g_applicationVersion, std::size(g_applicationVersion), applicationVersion.empty() ? std::wstring_view{L"unknown"} : applicationVersion);
         SetUnhandledExceptionFilter(writeMiniDump);
+#else
+        // 这一档在非 Windows 上是空操作：崩溃现场由系统自己的转储策略落地，进程内没有要对齐的东西
+        static_cast<void>(applicationVersion);
+#endif
         Base::Logger::info(std::format("崩溃转储会写到 {}", Base::Paths::toDisplayText(dumpDirectory).toStdString()));
     }
 
-} // namespace GyanisScribe::App
+} // namespace GyanisScribe::Platform
