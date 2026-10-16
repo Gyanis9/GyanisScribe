@@ -238,3 +238,21 @@ TEST_F(PathsFixture, UniqueFilePathStepsAsideBeforeTheExtension)
 
     std::filesystem::remove_all(directory, ignored);
 }
+
+/**
+ * @brief 钉住界面文本与路径的往返闭合，取的是一条本地码页装不下的路径
+ * @details toDisplayText 那一侧有八个用例文件命中，而它的孪生 fromDisplayText 一处都没有——
+ *          可它有十六个生产调用点，包括用户在设置里填的目录、剪贴板 URL 的 toLocalFile()
+ *          与历史模型里的文本，全都信任这一处换算。走 wstring 而不是 narrow string 是这处换算
+ *          存在的全部理由，所以判据取带中文与空格的一条：换成 toStdString 就会在这一条上红
+ *          （QString::toStdString 给的是 UTF-8 字节，而 path 的窄串构造按本地 ANSI 码页解释，
+ *          一来一回就成了另一串字，用户看到的是「目录不存在」）。
+ */
+TEST_F(PathsFixture, DisplayTextRoundTripsAPathTheLocalCodePageCannotHold)
+{
+    const QString text = QStringLiteral("C:/我的 截图目录/一张图.png");
+
+    const auto path = Paths::fromDisplayText(text);
+    EXPECT_EQ(Paths::toDisplayText(path), text) << "换过去再换回来不是同一串：中文目录会被读成另一条不存在的路";
+    EXPECT_EQ(Paths::fromDisplayText(Paths::toDisplayText(path)), path) << "往返不闭合";
+}
