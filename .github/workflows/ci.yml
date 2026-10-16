@@ -1,0 +1,166 @@
+# Windows 门禁的 CI 版：装上 Qt 与 Conan 依赖，然后走与本机同一条入口（scripts\WindowsBuild.bat）
+# 构建 + ctest 一把过；第二个 job 跑 clang-tidy 门禁（只 configure，出编译数据库后在 src/ 面上扫）。
+# 三处与机器绑定的东西在 CI 上要显式给：Qt 在哪儿（QTDIR）、
+# vcvars64 在哪儿（VCVARS）、以及 Conan 档位里那一行「本机 MSVC 版本号」——它按注释说的
+# 「唯一需要按机器改的一行」在这台上检测出来再换进去，其余字段（x86_64 / dynamic / C++23 /
+# Ninja）仍沿用仓库里那份硬指标。
+name: Windows 门禁
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    # 门禁收窄成 Debug 一档（README「验证与质量门禁」），CI 跟同一条口径
+    name: Debug（构建 + ctest）
+    runs-on: windows-2022
+    timeout-minutes: 90
+
+    env:
+      # 关掉 pip 的进度条与 conan 的动画：CI 日志里这两样只有噪音
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      CONAN_NON_INTERACTIVE: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 装 Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          # 与开发机同一档；版本号写在这里是刻意的：换 Qt 时本机与 CI 一起改
+          version: 6.11.1
+          arch: win64_msvc2022_64
+          cache: true
+
+      - name: 装 Conan 2 与 Ninja
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade "conan>=2,<3"
+          choco install ninja --no-progress -y
+          conan --version
+          cmake --version
+          ninja --version
+
+      - name: 缓存 Conan 包（键里带 conandata 与档位，依赖一改就重建）
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2/p
+          key: conan-${{ runner.os }}-${{ hashFiles('conandata.yml', 'conanfile.py', 'conan/Profiles/WindowsMsvc2022') }}
+
+      - name: 解析 MSVC 的 vcvars64（本机脚本里这一行是写死的，CI 上按 vswhere 找）
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vsPath) { throw "这台 runner 上找不到带 C++ 工具的 Visual Studio" }
+          $vcvars = Join-Path $vsPath "VC\Auxiliary\Build\vcvars64.bat"
+          if (-not (Test-Path $vcvars)) { throw "找不到 vcvars64：$vcvars" }
+          "VCVARS=$vcvars" >> $env:GITHUB_ENV
+          Write-Host "vcvars64 = $vcvars"
+
+      - name: 准备 Conan 档位（只换编译器版本那一行）
+        shell: pwsh
+        run: |
+          conan profile detect --force
+          $default = Join-Path $env:USERPROFILE ".conan2\profiles\default"
+          $detected = (Select-String -Path $default -Pattern '^compiler\.version=(.+)$').Matches[0].Groups[1].Value.Trim()
+          $profile = (Get-Content "conan/Profiles/WindowsMsvc2022" -Raw) -replace '(?m)^compiler\.version=.*$', "compiler.version=$detected"
+          New-Item -ItemType Directory -Force -Path build | Out-Null
+          Set-Content -Path "build/ci-host-profile" -Value $profile -Encoding utf8
+          Write-Host "CI 用 compiler.version=$detected，其余字段沿用仓库里那份"
+
+      - name: 构建与测试（走本机同一条入口）
+        shell: cmd
+        env:
+          CONAN_HOST_PROFILE: ${{ github.workspace }}\build\ci-host-profile
+          QTDIR: ${{ env.QT_ROOT_DIR }}
+        run: scripts\WindowsBuild.bat debug
+
+      - name: 失败时把 ctest 的现场带出来
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctest-last-test-log
+          path: build/debug/Testing/Temporary/LastTest.log
+          if-no-files-found: ignore
+
+  clang-tidy:
+    # 静态检查单独一个 job：只 configure 出编译数据库（clang-tidy 只读它），不 build、不跑 ctest。
+    # 版本没钉：choco 上的 LLVM 未必有开发机的 23.x，钉了反而装不上；检查面在 .clang-tidy 里
+    # 按族固定，两边各自把版本打进日志备查。
+    name: clang-tidy（src/ 面静态检查）
+    runs-on: windows-2022
+    timeout-minutes: 60
+
+    env:
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      CONAN_NON_INTERACTIVE: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 装 Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: 6.11.1
+          arch: win64_msvc2022_64
+          cache: true
+
+      - name: 装 Conan 2、Ninja 与 LLVM
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade "conan>=2,<3"
+          choco install ninja --no-progress -y
+          choco install llvm --no-progress -y
+          conan --version
+          clang-tidy --version
+
+      - name: 缓存 Conan 包（键里带 conandata 与档位，依赖一改就重建）
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2/p
+          key: conan-${{ runner.os }}-${{ hashFiles('conandata.yml', 'conanfile.py', 'conan/Profiles/WindowsMsvc2022') }}
+
+      - name: 解析 MSVC 的 vcvars64
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vsPath) { throw "这台 runner 上找不到带 C++ 工具的 Visual Studio" }
+          $vcvars = Join-Path $vsPath "VC\Auxiliary\Build\vcvars64.bat"
+          if (-not (Test-Path $vcvars)) { throw "找不到 vcvars64：$vcvars" }
+          "VCVARS=$vcvars" >> $env:GITHUB_ENV
+
+      - name: 准备 Conan 档位（只换编译器版本那一行）
+        shell: pwsh
+        run: |
+          conan profile detect --force
+          $default = Join-Path $env:USERPROFILE ".conan2\profiles\default"
+          $detected = (Select-String -Path $default -Pattern '^compiler\.version=(.+)$').Matches[0].Groups[1].Value.Trim()
+          $profile = (Get-Content "conan/Profiles/WindowsMsvc2022" -Raw) -replace '(?m)^compiler\.version=.*$', "compiler.version=$detected"
+          New-Item -ItemType Directory -Force -Path build | Out-Null
+          Set-Content -Path "build/ci-host-profile" -Value $profile -Encoding utf8
+
+      - name: 配置（只出编译数据库，不 build）
+        shell: cmd
+        env:
+          CONAN_HOST_PROFILE: ${{ github.workspace }}\build\ci-host-profile
+          QTDIR: ${{ env.QT_ROOT_DIR }}
+        run: |
+          call "%VCVARS%" >nul
+          cmake --preset debug -DCONAN_HOST_PROFILE="%CONAN_HOST_PROFILE%" || exit /b 1
+
+      - name: 跑 clang-tidy（src/ 面；发现项报告不阻塞，只有本仓解析失败才拦）
+        shell: pwsh
+        run: python scripts/check-clang-tidy.py --report clang-tidy-report.log
+
+      - name: 上传 clang-tidy 报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clang-tidy-report
+          path: clang-tidy-report.log
+          if-no-files-found: warn
