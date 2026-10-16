@@ -33,6 +33,9 @@ jobs:
           # 与开发机同一档；版本号写在这里是刻意的：换 Qt 时本机与 CI 一起改
           version: 6.11.1
           arch: win64_msvc2022_64
+          # qwebp 插件在 qtimageformats 这个 addon 里（默认档不带），而 DeployQtRuntime 要把它
+          # 跟 Qt 运行库一起拷进 bin/——开发机装的是完整 Qt 所以一直没暴露，CI 上少了它就拷失败
+          modules: qtimageformats
           cache: true
           # 6.11 起 Qt 官方仓库的目录改成按工具链分家（…/qt6_6111/qt6_6111_msvc2022_64/Updates.xml），
           # 而 PyPI 上最新的 aqtinstall 3.3.0 还按老路径找、404（「Failed to locate XML data」）。
