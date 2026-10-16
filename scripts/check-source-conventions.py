@@ -215,12 +215,17 @@ CLASS_DECL = re.compile("(class|struct)[ ]+([A-Za-z_][A-Za-z0-9_]*)")
 
 
 def enclosing_class(line: str) -> str | None:
-    """这一行在开一个类定义时给出类名；前向声明和「class QMenu *buildContextMenu();」这种不算。"""
+    """这一行在开一个类定义时给出类名；前向声明和「class QMenu *buildContextMenu();」这种不算。
+
+    取**最后一个**匹配：`template <class T> class Foo` 这行的第一个匹配是模板参数 `T`，
+    取第一个就会把 Foo 的成员记到 T 头上（本仓暂时没有类模板，是潜在坑，留着探针守着）。
+    继承列表里的 `public Bar` 不含 class/struct 关键字，所以最后一个匹配仍是类名本身。
+    """
     stripped = line.strip()
     if stripped.endswith(";"):
         return None
-    match = CLASS_DECL.search(stripped)
-    return match.group(2) if match else None
+    matches = list(CLASS_DECL.finditer(stripped))
+    return matches[-1].group(2) if matches else None
 
 
 def collect_signals(root: pathlib.Path) -> list[tuple[pathlib.Path, str, str]]:
@@ -345,6 +350,18 @@ def self_probe() -> None:
         collected = [(class_name, name) for _, class_name, name in collect_signals(pathlib.Path(probe_root))]
         if collected != [("Outer", "changed")]:
             raise RuntimeError(f"探针：嵌套 struct 之后的信号归属错了，得到 {collected}（应为 [('Outer', 'changed')]）")
+
+#类模板与多重继承：`template <class T> class Foo` 的第一匹配是模板参数，取最后一个才是类名
+    if enclosing_class("template <class T> class Foo") != "Foo":
+        raise RuntimeError("探针：类模板把模板参数当成了类名")
+    if enclosing_class("template <typename T, int N> struct Fixed : public Base") != "Fixed":
+        raise RuntimeError("探针：带默认参数与继承的类模板没认对")
+    if enclosing_class("class Foo final : public A, public B") != "Foo":
+        raise RuntimeError("探针：多重继承把基类当成了类名")
+    if enclosing_class("struct Plain") != "Plain":
+        raise RuntimeError("探针：普通 struct 没认出来")
+    if enclosing_class("class Forward;") is not None:
+        raise RuntimeError("探针：前向声明被当成了类开启")
 
 
 def main() -> int:
