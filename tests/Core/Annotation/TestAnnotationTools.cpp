@@ -532,9 +532,26 @@ TEST_F(AnnotationFixture, TextRequiresTheTextToolAndNonEmptyContent)
     EXPECT_FALSE(m_engine.endStroke().has_value()) << "空文本不该落定成一条图形";
 
     m_engine.beginStroke(QPoint(40, 40));
-    ASSERT_TRUE(m_engine.setPendingText(QStringLiteral("注意")).has_value());
+    ASSERT_TRUE(m_engine.setPendingText(QStringLiteral("A")).has_value());
     ASSERT_TRUE(m_engine.endStroke().has_value());
-    EXPECT_NE(m_engine.exportImage().pixelColor(41, 41), QColor(255, 255, 255)) << "文字没画进导出图";
+    // 两个保险叠在一起用 ASCII 字形与「基线邻域找墨迹」：CI 的 runner 未必有中文字体（`注意` 会一片空白），
+    // 字体度量也随机器不同——赌某一个像素等于赌这台机器上那个字怎么落笔。
+    // 落点是首行**基线**（drawText 口径），墨迹在它上方，所以框取 y 40 往上够一个字高
+    const QImage exported = m_engine.exportImage();
+    ASSERT_FALSE(exported.isNull());
+    bool inked = false;
+    for (int y = 8; y < 48 && !inked; ++y)
+    {
+        for (int x = 36; x < 120; ++x)
+        {
+            if (exported.pixelColor(x, y) != QColor(255, 255, 255))
+            {
+                inked = true;
+                break;
+            }
+        }
+    }
+    EXPECT_TRUE(inked) << "文字没画进导出图";
 }
 
 /**

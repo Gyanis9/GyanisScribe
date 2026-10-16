@@ -5,7 +5,6 @@
 
 #include "App/CaptureCoordinator.h"
 #include "App/TrayController.h"
-#include "Gui/Ocr/OcrResultWindow.h"
 #include "Gui/Pick/ColorPickerOverlay.h"
 #include "Gui/Pin/PinWindow.h"
 #include "Gui/Record/RecordingHud.h"
@@ -19,10 +18,8 @@
 #include "Core/History/HistoryRules.h"
 #include "Core/History/HistoryStore.h"
 #include "Core/History/HistoryTypes.h"
-#include "Core/Ocr/IOcrEngine.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Platform/PlatformCapabilities.h"
-#include "Plugins/OcrEngines/OcrEngineFactory.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Settings/SettingsStore.h"
 
@@ -593,9 +590,11 @@ namespace GyanisScribe
     /**
      * @brief 钉住「识别意图截完图之后，图真的交到了识别那一族」
      * @details 这条缝是拆族时新焊的：截图协调器拿着识别协调器的引用，按意图把帧递过去（CaptureCoordinator → OcrCoordinator）。
-     *          识别链收到图后必然会开口说话——带真后端的档说「正在识别这一张…」，Debug 档说「没有编入识别后端/没有语言包」——
-     *          两档都落在同一件可观测的事上：屏幕上多出一扇新的气泡（整条缝断了的话，一扇都不会多）。
-     *          带后端的档还能走到底：结果窗自己开出来（Debug 档等不到，上面那条提示就是终点）。
+     *          识别链收到图后必然会开口说话——带真后端的档说「正在识别这一张…」，没后端的档说「没有编入识别后端」，
+     *          机器的语言包对不上时会说「没有 zh-Hans」那类失败原因——都落在同一件可观测的事上：
+     *          屏幕上多出一扇新的气泡（整条缝断了的话，一扇都不会多）。
+     *          结果窗开不开取决于这台机器装没装那门语言，不在这条接缝用例的判据里（那是识别族自己的事，
+     *          CI 的 runner 就只装了 en——把它算进来等于让这条用例跟着机器语言包走）。
      */
     TEST_F(AppControllerFixture, CaptureWithRecognizeIntentReachesTheOcrChain)
     {
@@ -606,20 +605,13 @@ namespace GyanisScribe
         m_controller->capture().startFullScreen(App::CaptureIntent::Recognize);
         ASSERT_EQ(m_source->screenCalls, 1) << "0 秒档该在按下时就抓完";
 
-        // 三档文案里都带「识别」或「语言包」两个词之一；拿它把「别的谁弹的提示」挡在外面
+        // 各档文案里都带「识别」或「语言包」两个词之一；拿它把「别的谁弹的提示」挡在外面
         const auto said = [&]
         {
             const QString text = newToastText(before);
             return !text.isEmpty() && (text.contains(QStringLiteral("识别")) || text.contains(QStringLiteral("语言包")));
         };
         EXPECT_TRUE(waitUntil(said)) << "识别意图截完图后识别那一族一句话都没说：截图协调器到识别协调器那条缝断了";
-
-        // 有真后端的构建上走到底：识别是异步的，给它一段预算等结果窗
-        const auto engine = GyanisScribe::Plugins::createOcrEngine(*m_settings, *m_integration);
-        if (engine->isAvailable())
-        {
-            EXPECT_TRUE(waitUntil([] { return countTopLevelWindows<GyanisScribe::Gui::OcrResultWindow>() == 1; }, 15000)) << "后端可用却没开出识别结果窗";
-        }
     }
 
     /**
