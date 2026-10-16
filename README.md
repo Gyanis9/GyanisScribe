@@ -828,8 +828,11 @@ clang-tidy 按 PATH 找，也可用 `GYANISSCRIBE_LLVM_DIR` 指到 bin 的上一
 失败时把 `LastTest.log` 作为 artifact 带出来；`clang-tidy` job 只 configure 出编译数据库再跑上面那条静态检查，
 不 build，报告作为 artifact 上传。runner 上要显式给的三样（Qt 路径、vcvars64、Conan 档位里的 MSVC 版本行）
 在 workflow 注释里逐条写明。
-**状态**：2026-10-16 落到仓库；到收笔为止在 Actions 上**还没有实跑过一次**——本地做过的验证是 YAML 解析
-与两个脚本各自在本机的实跑，首次 Actions 运行的结果以那一页为准。
+**状态**：2026-10-17 **首次全绿**（run `38951666346`：Debug 15m9s、clang-tidy 29m26s；946 条里 939 过、0 失败、
+7 条环境门控跳过——runner 上没有随包的 ffmpeg 与真光标那一档）。首绿之前修了五轮，逐轮死点都记在提交里：
+Qt 6.11 的仓库布局（aqt 钉版）、`qtimageformats` 缺件、本地 VS18 与 runner VS2022 的两处不兼容
+（`constexpr std::cos` 与内联析构的不完整类型）、两条「跟着机器走」的用例判据。
+clang-tidy 的报告每次运行都作 artifact（`clang-tidy-report`）上传。
 
 用例结构逐级镜像 `src/`，统一 GoogleTest，不引入第二个测试框架。
 共用同一份外部资源（真实缓存目录、临时文件）的用例用 CMake 的 `RESOURCE_LOCK` 串行化——
