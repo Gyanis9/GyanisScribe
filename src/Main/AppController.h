@@ -57,6 +57,7 @@ namespace GyanisScribe::App
 {
     class HistoryCoordinator;
     class OcrCoordinator;
+    class CaptureCoordinator;
     class DeliveryCoordinator;
     class PinCoordinator;
     class RecordingCoordinator;
@@ -188,50 +189,6 @@ namespace GyanisScribe::Main
         [[nodiscard]] GyanisScribe::Base::Expected<GyanisScribe::Core::HotkeyReloadReport> registerHotkeys();
 
         /**
-         * @brief 进入截图框选
-         * @param intent 截完之后做什么；不填就按设置里那一档（Capture/AfterAction）走
-         * @note 此处刻意不用 GyanisScribe::App::CaptureIntent 作默认值：默认值只能是「不填」这一个含义，
-         *       写成 = Annotate 就分不清「用户没选」与「用户选了进标注」，设置里那档也就没了读的地方
-         */
-        void startCapture(std::optional<GyanisScribe::App::CaptureIntent> intent = std::nullopt);
-
-        /**
-         * @brief 整屏截图
-         * @param intent 截完之后做什么，不填按设置里那一档
-         */
-        void startFullScreenCapture(std::optional<GyanisScribe::App::CaptureIntent> intent = std::nullopt);
-
-        /**
-         * @brief 重复上一次的选区截图
-         * @param intent 截完之后做什么，不填按设置里那一档
-         */
-        void startLastRegionCapture(std::optional<GyanisScribe::App::CaptureIntent> intent = std::nullopt);
-
-        /**
-         * @brief 起一轮滚动长截图
-         * @details 与 startCapture 同一条延时通道：先等设置里那几秒，再铺遮罩让人框出要滚的那一条。
-         *          接好的长图从 captured 出来，去向仍由设置里那一档决定。
-         */
-        void startLongCapture();
-
-        /**
-         * @brief 新建一张空白画布并直接进标注窗（托盘与主窗口那一条）
-         * @details 不走截图那条链：没有帧、没有选区记录、不碰「上次选区」，也不触发音效、自动保存与历史
-         *          ——那一串都挂在「抓到了一张屏上的图」这个前提上，这里什么都没抓。
-         *          画布摆在光标所在那块屏的可用区中央，来源区域留空，因此 `F5` 刷新会自己拒并说明原因。
-         */
-        void startBlankCanvas();
-
-        /**
-         * @brief 截取当前前台窗口
-         * @details 与 startCapture 同一条延时通道，前台窗口在到点那一刻才取：等的那几秒本就是用来
-         *          把菜单、悬停状态摆出来的，按下时就取走会把这一档的意义抹掉。
-         *          句柄由平台集成给（Windows 走 GetForegroundWindow），抓帧那一步按句柄去问几何；
-         *          平台给不出句柄时把原因发给用户，而不是静默什么都不做。
-         */
-        void captureForegroundWindow();
-
-        /**
          * @brief 打开主窗口的某一页
          * @param page 目标页
          */
@@ -243,6 +200,7 @@ namespace GyanisScribe::Main
          * @details 命令行没有界面可等，也不走延时那道闸。交付顺序恒为「存文件 → 剪贴板 → 贴到屏幕上」；
          *          全部去处都交付完从 commandLineCaptureDelivered 交回成品路径（没点 file 时为空），
          *          取不到条件（比如没有前台窗口）或某一路交付失败时从 commandLineActionFailed 交回中文原因。
+         *          **截图这一族在 `CaptureCoordinator` 里**，这一处只转发：`Application` 那条命令行入口认的是控制器。
          */
         void startCommandLineCapture(const GyanisScribe::App::CommandLineRequest &request);
 
@@ -255,6 +213,12 @@ namespace GyanisScribe::Main
 
         /// 命令行 `--pin` 的入口：识图与贴出那一族在 `PinCoordinator` 里，这里只转发
         [[nodiscard]] GyanisScribe::Base::Expected<void> pinImageFile(const QString &filePath);
+
+        /**
+         * @brief 截图这一族的协调器，供用例与命令行入口取用
+         * @return 本控制器持有的那一份，所有权不在调用方
+         */
+        [[nodiscard]] GyanisScribe::App::CaptureCoordinator &capture() const noexcept;
 
         /**
          * @brief 配置存储，供设置页与后续模块取用
@@ -302,44 +266,10 @@ namespace GyanisScribe::Main
                       std::unique_ptr<GyanisScribe::Core::IScreenCaptureSource> captureSource, std::filesystem::path historyStoragePath, QObject *parent);
 
         /**
-         * @brief 抓到一帧之后的收尾：开启一轮标注
-         * @param image 抓屏产物
-         * @details 截完不再直接进剪贴板：标注窗的「复制」就是原来的那一步，只是多了先标一笔的机会
-         */
-        void handleCaptured(const GyanisScribe::Base::CapturedImage &image);
-
-        /**
-         * @brief 按「截完之后」那一档把这一帧交出去，最后一档是开标注窗
-         * @param image 抓到的图
-         * @param screen 截图所在那块屏（调用方已确认它在场）
-         * @details 与「截图完成」那串记账分开写：外部命令要在交付之后才跑，而这一处每个档位都自己 return。
-         */
-        void deliverCapturedFrame(const QImage &image, QScreen &screen);
-
-        /**
-         * @brief 命令行那一次的交付：把点名的几处逐处走完
-         * @details 交付顺序只由 App/CaptureDelivery.h 那张词表定；任一处失败就整次报错退出码 1，
-         *          不把「成了两路、少了一路」说成成功。
-         */
-        void deliverCommandLineOutputs();
-
-        /**
          * @brief 读设置里那一档「截完之后做什么」
          * @return 配置里存的档位；读不出时回落到词表第一档并把原因落进日志
          */
         [[nodiscard]] GyanisScribe::App::CaptureIntent settingsCaptureIntent() const;
-
-        /**
-         * @brief 按设置里的延时决定「现在就开」还是「等 N 秒再开」
-         * @param begin 真正开始截图的那一步，延时的读端与热键那条走同一个
-         * @details 延时是为「菜单、悬停提示这类一碰就没的画面」留的：没有它就只能整屏截完再裁。
-         *          延时期内再按一次不排队、也不叠第二个定时器——两层遮罩叠着弹出来没人收得干净，
-         *          所以只说一句「上一次还在等」。
-         */
-        void scheduleCapture(std::function<void()> begin);
-
-        /// 标注窗请求复制
-        void handleCopyRequested(const QImage &image);
 
         /// 托盘菜单的一项被点了
         void handleTrayAction(GyanisScribe::App::TrayAction action);
@@ -351,32 +281,6 @@ namespace GyanisScribe::Main
          *          摆位、缩放、旋转与透明度都不动。按住不放时键盘自动重复连着报，就成了持续刷新。
          */
         void refreshPinWithScreenUnder(int index);
-
-        /**
-         * @brief 标注窗请求识别二维码/条形码：认出来就复制到剪贴板并报一声
-         * @param image 成品图（未装饰）
-         * @details 与识别文字不同，这里不另开结果窗：多半只是想知道「这里头是什么」——
-         *          认出来直接进剪贴板，提示里说清认出了几个；一个都没认出来也只报一声，
-         *          标注窗不关（见 AnnotationWindow::scanRequested）
-         */
-        void handleScanRequested(const QImage &image);
-
-        /**
-         * @brief 标注窗请求打印：开系统打印对话框，按纸面等比居中画上去
-         * @param image 成品图（未装饰）
-         * @details 用户取消对话框就静默收场——打印这件事「什么都没发生」也是一种正常结果。
-         *          打到纸上按没有透明通道处理：投影底下垫白，不然透明区会按驱动作自己的解释落色。
-         */
-        void handlePrintRequested(const QImage &image);
-
-        /**
-         * @brief 标注窗请求刷新截图（F5）：重抓这块区域换底图，标注留着
-         * @param screenName 屏幕名
-         * @param region 该屏内的逻辑区域
-         * @details 走采集服务的就地重抓口：不出 captured、不记选区，也就不会触发「截图完成」
-         *          那一串反应（音效、自动保存、意图分派）——刷新不是一次新截图。
-         */
-        void refreshLastCapture(const QString &screenName, const QRect &region);
 
         /**
          * @brief 某张贴图上取到了一个像素的颜色
@@ -409,23 +313,12 @@ namespace GyanisScribe::Main
          */
         void startImageFetch(const QUrl &url, std::optional<QPoint> dropPoint);
 
-        /**
-         * @brief 抓一块点名要的屏
-         * @param screenName 屏幕名
-         * @details 走整屏截图同一条路（含延时那一档）：两处各写一份截全屏的流程，
-         *          延时与成品去向那几档迟早只改一处。
-         */
-        void captureNamedScreen(const QString &screenName);
-
         std::unique_ptr<GyanisScribe::Core::SettingsStore>            m_settings;          ///< 配置存储
         std::unique_ptr<GyanisScribe::Platform::IPlatformIntegration> m_integration;       ///< 平台集成
         std::unique_ptr<GyanisScribe::Core::IScreenCaptureSource>     m_captureSource;     ///< 抓帧来源
-        std::unique_ptr<GyanisScribe::Gui::CaptureService>            m_capture;           ///< 截图编排
         std::unique_ptr<GyanisScribe::Core::HotkeyManager>            m_hotkeys;           ///< 热键登记与触发
         std::unique_ptr<GyanisScribe::Gui::ThemeManager>              m_theme;             ///< 主题档位与样式表
         std::unique_ptr<GyanisScribe::Gui::IconProvider>              m_icons;             ///< 图标供给器，描边色跟主题
-        std::unique_ptr<GyanisScribe::Core::AnnotationEngine>         m_annotation;        ///< 标注引擎，跨轮次保留（载入新帧会清空）
-        std::unique_ptr<GyanisScribe::Gui::AnnotationWindow>          m_annotationWindow;  ///< 标注窗口，复用同一把工具栏
         std::unique_ptr<GyanisScribe::Gui::PinManager>                m_pins;              ///< 贴图管理器
         std::unique_ptr<GyanisScribe::App::ImageFetcher>              m_imageFetcher;      ///< 网页取图：拖进来的可以是一条图片地址
         std::optional<QPoint>                                         m_pendingFetchPoint; ///< 在飞那一张取回来落在哪儿；空表示跟光标走
@@ -437,17 +330,9 @@ namespace GyanisScribe::Main
         std::unique_ptr<GyanisScribe::Core::HistoryStore>             m_historyStore;      ///< 历史清单本体：与主窗口共享同一份，删记录不删文件
         std::unique_ptr<GyanisScribe::App::HistoryCoordinator>        m_history;           ///< 历史这一族（增删清空与「这条去哪了」）
         QPointer<GyanisScribe::Gui::ColorPickerOverlay>               m_picker;            ///< 取色遮罩，关掉即重建
+        std::unique_ptr<GyanisScribe::App::CaptureCoordinator>        m_capture;           ///< 截图这一族（枢纽：入口、延时、抓帧、按意图交付）
         std::unique_ptr<GyanisScribe::App::PinCoordinator>            m_pinCoordinator;    ///< 贴图这一族的贴出动作（剪贴板/文件/回贴/组管理）
-        GyanisScribe::App::CaptureIntent                              m_captureIntent = GyanisScribe::App::CaptureIntent::Annotate; ///< 这一帧截完要去做的事
-        GyanisScribe::App::CaptureOutputSet                           m_commandLineOutputs;                                         ///< 命令行那一次点名的去处，已按交付顺序排好
-        QString                                                       m_commandLineExec;              ///< --exec 写的那一条命令；只在 m_commandLineExecGiven 为真时压过设置里那一格
-        bool                                                          m_commandLineExecGiven = false; ///< 命令行到底给没给 --exec：给了就只跑那一条，不与设置里的命令叠着跑两次
-        std::unique_ptr<GyanisScribe::App::DeliveryCoordinator>       m_delivery;                     ///< 交付这一族（装饰、落盘、外部命令、批量报告）
-        bool                                                          m_commandLineActive = false;    ///< 正在跑命令行那次截图：失败路径要往 commandLineActionFailed 也交一份
-        QTimer                                                       *m_captureDelayTimer = nullptr;  ///< 延时截图那一枚，一次只允许有一个在等
-        std::function<void()>                                         m_pendingCapture;               ///< 延时到点要走的那一步，随定时器一起活到触发
-        GyanisScribe::Base::CapturedImage                             m_lastCapture;                  ///< 本轮抓到的帧，贴图与识别要用它定位
-        QRect                                                         m_lastSelection;                ///< 本轮选区（全局逻辑坐标），标注窗与贴图的位置来源
+        std::unique_ptr<GyanisScribe::App::DeliveryCoordinator>       m_delivery;          ///< 交付这一族（装饰、落盘、外部命令、批量报告）
     };
 
 } // namespace GyanisScribe::Main

@@ -31,7 +31,9 @@ add_library(App STATIC
         PinCoordinator.h
         PinCoordinator.cpp
         DeliveryCoordinator.h
-        DeliveryCoordinator.cpp)
+        DeliveryCoordinator.cpp
+        CaptureCoordinator.h
+        CaptureCoordinator.cpp)
 
 target_include_directories(App PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(App PUBLIC

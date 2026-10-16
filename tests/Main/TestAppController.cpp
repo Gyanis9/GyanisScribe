@@ -3,6 +3,7 @@
 // 「截取当前窗口绕过延时」就是这么漏下来的；这一批给它一套与 TestModuleFlow 同形状的替身，
 // 从 AppControllerParts 注进去，把「谁在什么时刻被叫到、成品记在哪一份清单上」钉住。
 
+#include "App/CaptureCoordinator.h"
 #include "Main/AppController.h"
 
 #include "App/CaptureIntent.h"
@@ -316,7 +317,7 @@ namespace GyanisScribe
     TEST_F(AppControllerFixture, ZeroDelayStartsTheCaptureRightAway)
     {
         makeController();
-        m_controller->startFullScreenCapture(App::CaptureIntent::CopyToClipboard);
+        m_controller->capture().startFullScreen(App::CaptureIntent::CopyToClipboard);
 
         EXPECT_EQ(m_source->screenCalls, 1) << "0 秒档该在按下那一刻抓完";
         EXPECT_EQ(m_source->windowCalls, 0);
@@ -331,7 +332,7 @@ namespace GyanisScribe
     {
         m_delaySeconds = 1;
         makeController();
-        m_controller->startFullScreenCapture(App::CaptureIntent::CopyToClipboard);
+        m_controller->capture().startFullScreen(App::CaptureIntent::CopyToClipboard);
 
         EXPECT_EQ(m_source->screenCalls, 0) << "设了 1 秒延时，按下那一刻不该已经抓完";
         ASSERT_TRUE(waitUntil([this] { return m_source->screenCalls >= 1; })) << "到点了还没抓";
@@ -348,7 +349,7 @@ namespace GyanisScribe
     {
         m_delaySeconds = 1;
         makeController();
-        m_controller->captureForegroundWindow();
+        m_controller->capture().captureForegroundWindow();
 
         EXPECT_EQ(m_integration->foregroundQueries, 0) << "按下那一刻就取前台窗口＝绕过延时";
         EXPECT_EQ(m_source->windowCalls, 0) << "延时没到就开抓窗口";
@@ -368,8 +369,8 @@ namespace GyanisScribe
     {
         m_delaySeconds = 1;
         makeController();
-        m_controller->startFullScreenCapture(App::CaptureIntent::CopyToClipboard);
-        m_controller->captureForegroundWindow(); // 顶上再按一次：该被回绝
+        m_controller->capture().startFullScreen(App::CaptureIntent::CopyToClipboard);
+        m_controller->capture().captureForegroundWindow(); // 顶上再按一次：该被回绝
 
         ASSERT_TRUE(waitUntil([this] { return m_source->screenCalls > 0 || m_source->windowCalls > 0; })) << "先按的那一次都没跑起来";
         pumpFor(700); // 若第二下真排了枚定时器，这一档够它到点
@@ -387,7 +388,7 @@ namespace GyanisScribe
     {
         m_frameScreenName = m_realScreenName;
         makeController();
-        m_controller->startFullScreenCapture(App::CaptureIntent::QuickSave);
+        m_controller->capture().startFullScreen(App::CaptureIntent::QuickSave);
 
         ASSERT_EQ(m_source->screenCalls, 1) << "0 秒档该在按下时就抓完";
 
@@ -409,7 +410,7 @@ namespace GyanisScribe
         m_frameScreenName = m_realScreenName;
         m_keepUnsaved     = true;
         makeController();
-        m_controller->startFullScreenCapture(App::CaptureIntent::CopyToClipboard);
+        m_controller->capture().startFullScreen(App::CaptureIntent::CopyToClipboard);
 
         const auto entries = readHistory();
         ASSERT_TRUE(entries.has_value()) << "历史清单读不回：" << entries.error().message;
@@ -429,7 +430,7 @@ namespace GyanisScribe
         m_autoSave        = true;
         m_keepUnsaved     = true;
         makeController();
-        m_controller->startFullScreenCapture(App::CaptureIntent::CopyToClipboard);
+        m_controller->capture().startFullScreen(App::CaptureIntent::CopyToClipboard);
 
         const auto entries = readHistory();
         ASSERT_TRUE(entries.has_value()) << "历史清单读不回：" << entries.error().message;
@@ -447,7 +448,7 @@ namespace GyanisScribe
         m_frameScreenName = m_realScreenName;
         m_afterAction     = App::CaptureIntent::QuickSave;
         makeController();
-        m_controller->captureForegroundWindow();
+        m_controller->capture().captureForegroundWindow();
 
         ASSERT_EQ(m_source->windowCalls, 1) << "0 秒档该在按下那一刻抓完";
 
