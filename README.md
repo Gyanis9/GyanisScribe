@@ -603,7 +603,7 @@ VC++ 运行库也随包带：可执行体导入 `MSVCP140.dll` 与 `VCRUNTIME140
 | 线 | 命令 | 结果 |
 | --- | --- | --- |
 | Windows Release | `scripts\WindowsBuild.bat release` | 930 条全绿（0 失败），2 条环境门控跳过，名单共 932 条 |
-| Windows Debug | `scripts\WindowsBuild.bat debug` | 926 条全绿（0 失败），3 条环境门控跳过，名单共 929 条 |
+| Windows Debug | `scripts\WindowsBuild.bat debug` | 930 条全绿（0 失败），3 条环境门控跳过，名单共 933 条 |
 
 每条新判据都做过突变证伪，且红集能按改动切开：批一是七处（并步、初读、暂停键、落帧尺寸、置信度两格、文案分格，
 同文件的第二处突变在还原后单独一批做，不拿一次覆盖另一次的备份槽）；批二两处——字母不认工具打中
