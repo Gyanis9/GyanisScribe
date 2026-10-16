@@ -35,6 +35,7 @@ import argparse
 import pathlib
 import re
 import sys
+import tempfile
 
 #判据全文是中文：控制台码页不对就把「违规」那条打成乱码，读的人无法据此改代码
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -223,16 +224,24 @@ def enclosing_class(line: str) -> str | None:
 
 
 def collect_signals(root: pathlib.Path) -> list[tuple[pathlib.Path, str, str]]:
-    """声明在各 signals: 段里的信号，连着所属类名一起返回（纯文本扫：本条门一律不依赖编译）。"""
+    """声明在各 signals: 段里的信号，连着所属类名一起返回（纯文本扫：本条门一律不依赖编译）。
+
+    类名用**栈**跟踪：类里嵌一个 struct（本仓 Dependencies 那种依赖集）时，内层关掉之后
+    当前类要回到外层——只记「最后一次见到的 class/struct」会把外层的 signals 记到内层头上，
+    于是消费方检查去找 `&Dependencies::…`，一条也找不到，报出一串假违规。
+    """
     found: list[tuple[pathlib.Path, str, str]] = []
     for source in sorted(list(root.rglob("*.h")) + list(root.rglob("*.cpp"))):
         inside = False
-        current_class: str | None = None
+        stack: list[str] = []
         for line in source.read_text(encoding="utf-8", errors="replace").splitlines():
             stripped = line.strip()
             declared = enclosing_class(stripped)
             if declared:
-                current_class = declared
+                stack.append(declared)
+            if stripped.startswith("};") and stack:
+                stack.pop()
+            current_class = stack[-1] if stack else None
             if stripped == "signals:":
                 inside = True
                 continue
@@ -323,6 +332,19 @@ def self_probe() -> None:
         raise RuntimeError("探针：全小写的顶层目录被判成了违规，小写判据成了永红")
     if unexpected_case_dirs(["src", "Conan"]) != ["Conan"]:
         raise RuntimeError("探针：大写的顶层目录没被点出来")
+
+#嵌套类型之后的 signals 要记在外层类头上：内层关掉（};）之后当前类必须回到外层。
+# 只记「最后一次见到的 class/struct」会把外层的信号记到内层头上，消费方检查再去找内层名字，
+# 一条也找不到——本仓 CaptureCoordinator 的 Dependencies 就是这么被误报出三条的
+    with tempfile.TemporaryDirectory() as probe_root:
+        probe = pathlib.Path(probe_root) / "Probe.h"
+        probe.write_text(
+                "class Outer" + NEWLINE + "{" + NEWLINE + "public:" + NEWLINE + "    struct Inner" + NEWLINE + "    {" + NEWLINE + "        int value = 0;" + NEWLINE +
+                        "    };" + NEWLINE + "signals:" + NEWLINE + "    void changed();" + NEWLINE + "};" + NEWLINE,
+                encoding="utf-8")
+        collected = [(class_name, name) for _, class_name, name in collect_signals(pathlib.Path(probe_root))]
+        if collected != [("Outer", "changed")]:
+            raise RuntimeError(f"探针：嵌套 struct 之后的信号归属错了，得到 {collected}（应为 [('Outer', 'changed')]）")
 
 
 def main() -> int:
