@@ -8,7 +8,6 @@
   "configurePresets": [
     {
       "name": "debug",
-      "description": "Debug build",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/debug",
       "cacheVariables": {
@@ -22,7 +21,6 @@
     },
     {
       "name": "release",
-      "description": "Optimized release build, keeps debug info so stack traces resolve symbols",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/release",
       "cacheVariables": {

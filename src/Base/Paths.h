@@ -77,11 +77,6 @@ namespace GyanisScribe::Base
         [[nodiscard]] static std::filesystem::path defaultRecordingDirectory();
 
         /**
-         * @brief 确保目录存在
-         * @param directory 目标目录
-         * @return 成功返回 void；失败返回原因，文案里带目录与系统错误
-         */
-        /**
          * @brief 路径换成能直接拼进界面文案的字符串
          * @param path 文件路径
          * @return UTF-16 的那串路径
@@ -97,6 +92,11 @@ namespace GyanisScribe::Base
          */
         [[nodiscard]] static std::filesystem::path fromDisplayText(const QString &text);
 
+        /**
+         * @brief 确保目录存在
+         * @param directory 目标目录
+         * @return 成功返回 void；失败返回原因，文案里带目录与系统错误
+         */
         [[nodiscard]] static Expected<void> ensureDirectory(const std::filesystem::path &directory);
 
         /**
