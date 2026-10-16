@@ -25,7 +25,9 @@ add_library(App STATIC
         OcrCoordinator.h
         OcrCoordinator.cpp
         HistoryCoordinator.h
-        HistoryCoordinator.cpp)
+        HistoryCoordinator.cpp
+        RecordingCoordinator.h
+        RecordingCoordinator.cpp)
 
 target_include_directories(App PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(App PUBLIC
