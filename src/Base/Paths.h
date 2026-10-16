@@ -86,9 +86,11 @@ namespace GyanisScribe::Base
         [[nodiscard]] static QString toDisplayText(const std::filesystem::path &path);
 
         /**
-         * @brief 把 toDisplayText 的结果换回路径
-         * @param text 界面里的那串路径
+         * @brief 界面或配置里的路径文本换成 path
+         * @param text 路径文本：可能是 toDisplayText 的产物，也可能是用户手填的目录、`QUrl::toLocalFile()` 给的串
          * @return 文件路径
+         * @details 与 toDisplayText 的往返只在同一份文本上成立（两边都按 UTF-16 走），
+         *          别把它当「任何路径文本都能规范化」的入口——它不做校验也不做整理。
          */
         [[nodiscard]] static std::filesystem::path fromDisplayText(const QString &text);
 
