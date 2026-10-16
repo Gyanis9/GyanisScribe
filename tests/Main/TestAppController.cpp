@@ -4,19 +4,25 @@
 // 从 AppControllerParts 注进去，把「谁在什么时刻被叫到、成品记在哪一份清单上」钉住。
 
 #include "App/CaptureCoordinator.h"
+#include "App/TrayController.h"
+#include "Gui/Ocr/OcrResultWindow.h"
 #include "Gui/Pick/ColorPickerOverlay.h"
 #include "Gui/Pin/PinWindow.h"
+#include "Gui/Record/RecordingHud.h"
 #include "Main/AppController.h"
 
 #include "App/CaptureIntent.h"
+#include "Base/Text.h"
 #include "Core/Capture/IScreenCaptureSource.h"
 #include "Base/Paths.h"
 #include "Base/Types.h"
 #include "Core/History/HistoryRules.h"
 #include "Core/History/HistoryStore.h"
 #include "Core/History/HistoryTypes.h"
+#include "Core/Ocr/IOcrEngine.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Platform/PlatformCapabilities.h"
+#include "Plugins/OcrEngines/OcrEngineFactory.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Settings/SettingsStore.h"
 
@@ -31,11 +37,14 @@
 #include <QEventLoop>
 #include <QGuiApplication>
 #include <QImage>
+#include <QLabel>
+#include <QPushButton>
 #include <QScreen>
 #include <QSize>
 #include <QString>
 #include <QVector>
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <format>
@@ -240,6 +249,14 @@ namespace GyanisScribe
                 {
                     ASSERT_TRUE(settings->setValue(Core::kCaptureAfterAction, QString::fromUtf8(std::string{App::captureIntentText(*m_afterAction)}.c_str())).has_value());
                 }
+                if (m_recordingDirectory != std::nullopt)
+                {
+                    ASSERT_TRUE(settings->setValue(Core::kPathRecording, Base::Paths::toDisplayText(*m_recordingDirectory)).has_value());
+                }
+                if (m_recordingCountdown != std::nullopt)
+                {
+                    ASSERT_TRUE(settings->setValue(Core::kRecordCountdownSeconds, *m_recordingCountdown).has_value());
+                }
                 m_settings = settings.get();
 
                 auto source      = std::make_unique<CountingScreenSource>(makeFrame(m_frameScreenName));
@@ -269,6 +286,68 @@ namespace GyanisScribe
                     }
                 }
                 return count;
+            }
+
+            /// 屏幕上此刻可见的那些气泡窗：提示是顶层空窗 + 无障碍名「提示」+ ToolTip 窗型（Toast 给自动化留的名字）
+            [[nodiscard]] static std::vector<QWidget *> visibleToastBubbles()
+            {
+                std::vector<QWidget *> bubbles;
+                for (auto *widget: QApplication::topLevelWidgets())
+                {
+                    const bool isToast =
+                            widget->isVisible() && widget->accessibleName() == GyanisScribe::Base::uiText("提示") && (widget->windowFlags() & Qt::WindowType_Mask) == Qt::ToolTip;
+                    if (isToast)
+                    {
+                        bubbles.push_back(widget);
+                    }
+                }
+                return bubbles;
+            }
+
+            /// 屏幕上新冒出来的那一条提示的正文；没有新气泡时为空
+            [[nodiscard]] static QString newToastText(const std::vector<QWidget *> &before)
+            {
+                for (auto *bubble: visibleToastBubbles())
+                {
+                    if (std::ranges::find(before, bubble) != before.end())
+                    {
+                        continue;
+                    }
+                    for (auto *label: bubble->findChildren<QLabel *>())
+                    {
+                        if (label->accessibleName() != GyanisScribe::Base::uiText("提示图标"))
+                        {
+                            return label->text();
+                        }
+                    }
+                }
+                return {};
+            }
+
+            /// 控制器建出来的那扇主窗口：没有托盘的环境里它会自己现身（离屏平台上托盘装不上）
+            [[nodiscard]] static GyanisScribe::Main::MainWindow *mainWindowOnDesk()
+            {
+                for (auto *widget: QApplication::topLevelWidgets())
+                {
+                    if (auto *window = qobject_cast<GyanisScribe::Main::MainWindow *>(widget))
+                    {
+                        return window;
+                    }
+                }
+                return nullptr;
+            }
+
+            /// 动作条上文案是这一句的那个按钮：那些按钮与托盘菜单同一张表，文案从表里取
+            [[nodiscard]] static QPushButton *actionBarButton(QWidget &window, const QString &label)
+            {
+                for (auto *button: window.findChildren<QPushButton *>())
+                {
+                    if (button->text() == label)
+                    {
+                        return button;
+                    }
+                }
+                return nullptr;
             }
 
             /// 读回注入的那份历史清单；条目里指向的成品文件由 load() 自己检查存在性
@@ -324,6 +403,8 @@ namespace GyanisScribe
             std::optional<App::CaptureIntent>    m_afterAction;                                             ///< 「截完之后」那一格；空 = 不写
             bool                                 m_keepUnsaved = false;                                     ///< 「未保存也进历史」那一格
             bool                                 m_autoSave    = false;                                     ///< 「自动保存」那一格
+            std::optional<std::filesystem::path> m_recordingDirectory;                                      ///< 录屏成品目录；非空就写 kPathRecording（只有录屏那一组设它）
+            std::optional<int>                   m_recordingCountdown;                                      ///< 录屏倒计时秒数；不设就按生产默认（3 秒）走
         };
     } // namespace
 
@@ -507,6 +588,85 @@ namespace GyanisScribe
 
         m_controller->startColorPick();
         EXPECT_EQ(countTopLevelWindows<GyanisScribe::Gui::ColorPickerOverlay>(), 1) << "取色入口没铺出遮罩：协调器那条线断了";
+    }
+
+    /**
+     * @brief 钉住「识别意图截完图之后，图真的交到了识别那一族」
+     * @details 这条缝是拆族时新焊的：截图协调器拿着识别协调器的引用，按意图把帧递过去（CaptureCoordinator → OcrCoordinator）。
+     *          识别链收到图后必然会开口说话——带真后端的档说「正在识别这一张…」，Debug 档说「没有编入识别后端/没有语言包」——
+     *          两档都落在同一件可观测的事上：屏幕上多出一扇新的气泡（整条缝断了的话，一扇都不会多）。
+     *          带后端的档还能走到底：结果窗自己开出来（Debug 档等不到，上面那条提示就是终点）。
+     */
+    TEST_F(AppControllerFixture, CaptureWithRecognizeIntentReachesTheOcrChain)
+    {
+        m_frameScreenName = m_realScreenName;
+        makeController();
+        const auto before = visibleToastBubbles();
+
+        m_controller->capture().startFullScreen(App::CaptureIntent::Recognize);
+        ASSERT_EQ(m_source->screenCalls, 1) << "0 秒档该在按下时就抓完";
+
+        // 三档文案里都带「识别」或「语言包」两个词之一；拿它把「别的谁弹的提示」挡在外面
+        const auto said = [&]
+        {
+            const QString text = newToastText(before);
+            return !text.isEmpty() && (text.contains(QStringLiteral("识别")) || text.contains(QStringLiteral("语言包")));
+        };
+        EXPECT_TRUE(waitUntil(said)) << "识别意图截完图后识别那一族一句话都没说：截图协调器到识别协调器那条缝断了";
+
+        // 有真后端的构建上走到底：识别是异步的，给它一段预算等结果窗
+        const auto engine = GyanisScribe::Plugins::createOcrEngine(*m_settings, *m_integration);
+        if (engine->isAvailable())
+        {
+            EXPECT_TRUE(waitUntil([] { return countTopLevelWindows<GyanisScribe::Gui::OcrResultWindow>() == 1; }, 15000)) << "后端可用却没开出识别结果窗";
+        }
+    }
+
+    /**
+     * @brief 钉住「动作条上的录屏键真的叫到了录屏协调器」
+     * @details 这条链是「动作条按钮 → 控制器分派 → 录屏协调器（拼配置、摆控制条、起服务）」，
+     *          拆族时换过接收者，接错一格就是「按了没反应」。离屏平台给不出屏名
+     *          （`validateRecorderConfig` 会拒录），所以这一格钉的是同一下点击里该发生的三件事：
+     *          协调器被叫到、控制条一闪、不能开的原因当面说给用户——接错线时三样一样都不会出现。
+     *          真录一轮 → 出成品 → 进历史那条链由 Core/Plugins 的端到端用例覆盖，这里环境上到不了那一步。
+     */
+    TEST_F(AppControllerFixture, TogglingRecordingFromTheActionBarReachesTheCoordinator)
+    {
+        m_recordingDirectory = m_root / "videos";
+        m_recordingCountdown = 0;
+        makeController();
+
+        auto *window = mainWindowOnDesk();
+        ASSERT_NE(window, nullptr) << "没有托盘的环境里主窗口该自己现身，这条用例就指着它的动作条";
+        const auto recordLabel = [&]
+        {
+            for (const auto &entry: GyanisScribe::App::visibleTrayMenuEntries(Platform::PlatformCapabilities{}))
+            {
+                if (entry.action == GyanisScribe::App::TrayAction::ToggleRecord)
+                {
+                    return entry.label;
+                }
+            }
+            return QString{};
+        }();
+        ASSERT_FALSE(recordLabel.isEmpty()) << "托盘表里没有录屏这一项，用例的前提就没了";
+        auto *recordButton = actionBarButton(*window, recordLabel);
+        ASSERT_NE(recordButton, nullptr) << "动作条上没找到「" << recordLabel.toStdString() << "」那颗按钮";
+
+        const auto before = visibleToastBubbles();
+        recordButton->click();
+
+        // 协调器起步前先把控制条摆出来，随后校验不过（离屏没有屏名）又把它收起——收起的是「藏」，
+        // 销毁要等事件循环，所以这一刻它还数得到；这条同时挡掉「叫到了别的族」：别处不会摆这扇控制条
+        EXPECT_EQ(countTopLevelWindows<GyanisScribe::Gui::RecordingHud>(), 1) << "按了录屏，控制条那一闪都没出现：动作条到录屏协调器那条线断了";
+        const auto said = [&] { return newToastText(before).contains(QStringLiteral("录屏没能开始")); };
+        EXPECT_TRUE(waitUntil(said)) << "录屏没开成，也没把原因说给用户听：接线断在协调器前面";
+
+        // 「没能开始」不许在历史里留下东西：没开始就没成品
+        pumpFor(300);
+        const auto entries = readHistory();
+        ASSERT_TRUE(entries.has_value());
+        EXPECT_TRUE(entries->empty()) << "录屏没开始，历史里却多出了记录";
     }
 
 } // namespace GyanisScribe
