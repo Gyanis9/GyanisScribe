@@ -7,6 +7,7 @@
 #include "Plugins/OcrEngines/WinRTImageOcrEngine.h"
 
 #include <QApplication>
+#include <QElapsedTimer>
 #include <QFont>
 #include <QImage>
 #include <QPainter>
@@ -15,9 +16,12 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cstdio>
 #include <format>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace
 {
@@ -166,5 +170,49 @@ namespace
         GyanisScribe::Plugins::WinRTImageOcrEngine engine;
         // 名字进过文案目录：英文档下它必须能翻，设置页与结果标题用的就是这一句
         EXPECT_EQ(engine.name(), QString::fromUtf8(GyanisScribe::Base::uiTextUtf8("Windows 系统识别").c_str()));
+    }
+
+    /**
+     * @brief 读数用例：一张 4K 图识别一次要多少毫秒（不断言时间）
+     * @details 需求写的是「OCR 单张 < 1s」，而 README 记的两个读数都在小图上（640×160 的 43ms、
+     *          900×600 的 337ms）。放大到 3840×2160 才是真实截图常遇到的尺寸，而识别的代价随像素走，
+     *          这一格得有自己的读数。它不断言时间：跑在什么机器上就报什么数。
+     *          字号跟着图放大：4K 上还用 48 磅那行字小得认不出，量到的就只是「没认出」的耗时。
+     */
+    TEST_F(WinRTImageOcrEngineFixture, ReportsTheCostOfRecognizingA4kImage)
+    {
+        if (!canRunSystemOcr())
+        {
+            GTEST_SKIP() << "这台机器的 Windows 没装本程序认识的识别语言包";
+        }
+
+        GyanisScribe::Plugins::WinRTImageOcrEngine engine;
+        const auto                                 language = engine.supportedLanguages().front();
+
+        QImage image(3840, 2160, QImage::Format_ARGB32);
+        image.fill(Qt::white);
+        {
+            QPainter painter(&image);
+            painter.setPen(Qt::black);
+            QFont font = painter.font();
+            font.setPointSize(96);
+            painter.setFont(font);
+            painter.drawText(80, 320, QStringLiteral("12345"));
+        }
+
+        constexpr int       kRounds = 5;
+        std::vector<double> milliseconds;
+        for (int round = 0; round < kRounds; ++round)
+        {
+            QElapsedTimer watch;
+            watch.start();
+            const auto recognized = engine.recognize(image, language);
+            milliseconds.push_back(static_cast<double>(watch.nsecsElapsed()) / 1'000'000.0);
+            ASSERT_TRUE(recognized.has_value()) << recognized.error().message;
+        }
+
+        std::ranges::sort(milliseconds);
+        std::printf("[读数] 4K（3840×2160）图识别一次：中位 %.1fms（%d 轮，min %.1f / max %.1f）\n", milliseconds[static_cast<std::size_t>(kRounds) / 2U], kRounds,
+                    milliseconds.front(), milliseconds.back());
     }
 } // namespace
