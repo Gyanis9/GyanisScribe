@@ -10,7 +10,7 @@ if not defined VCVARS set "VCVARS=G:\Tools\Microsoft Visual Studio\18\Community\
 set "PATH=G:\Tools\CMake\bin;G:\Tools\ninja;G:\Tools\Python\Python314\Scripts;%PATH%"
 rem Pinned Conan host profile: compiler/runtime/arch/generator come from the file instead of per-machine
 rem autodetection. Only compiler.version inside that file is machine-specific.
-if not defined CONAN_HOST_PROFILE set "CONAN_HOST_PROFILE=%~dp0..\Conan\Profiles\WindowsMsvc2022"
+if not defined CONAN_HOST_PROFILE set "CONAN_HOST_PROFILE=%~dp0..\conan\Profiles\WindowsMsvc2022"
 
 if "%~1"=="" (set "PRESET=debug") else (set "PRESET=%~1")
 cd /d "%~dp0.."

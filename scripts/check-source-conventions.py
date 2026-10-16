@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""源码约定门禁：四条「编译期看不出来、运行时只安静地错」的检查。
+"""源码约定门禁：五条「编译期看不出来、运行时只安静地错」的检查。
 
 一、路径不许走窄串。Windows 上 std::filesystem::path::string() 按本地 ANSI 码页给字节，
    码页装不下的字会当场抛 std::system_error——而抛出点多半在承诺返回 std::expected 的通道里。
@@ -19,6 +19,11 @@
 四、src 下只允许七个顶层模块目录（App/Base/Core/Gui/Main/Platform/Plugins）。长回旧结构
    （Ui/Settings/Capture…）时编译与运行都无恙，但这样的目录一多，「哪个模块管什么」重新模糊，
    下一轮又要拆一遍；白名单把它拦在长出来的那一刻。模块内部的子目录不受限——那是模块自己的事。
+
+五、仓库根的顶层目录一律小写。Windows 大小写不敏感，`Conan/Profiles/…` 在本机一路跑得通，
+   而同一条路径落到大小写敏感的文件系统上（打包机、CI、按 tar 同步进容器的副本）就是「找不到文件」，
+   报错还离真正的成因很远。改名要两跳 `git mv`（A→tmp→a），一步在 Windows 上可能不落盘。
+   `src/` 那一层的模块名不归这一条管——那是第四条的白名单；`docs/` 里的文件名大驼峰是既有裁决，也不归这一条管。
 
 跑法：python scripts/check-source-conventions.py [--scan-root src]
 退出码：0 通过；1 有违规；2 工具自己坏了（自检探针跑不起来或真源形状变了）——不许当成通过。
@@ -140,6 +145,26 @@ def check_top_level_modules(root: pathlib.Path) -> list[str]:
     return [
         f"src/ 下出现了七模块白名单之外的顶层目录 {name}：新模块要先在计划里裁决，散装目录搬进所属模块"
         for name in unexpected_module_dirs(names)
+    ]
+
+
+def unexpected_case_dirs(names: list[str]) -> list[str]:
+    """名字不是全小写的目录：判据收成纯函数，探针与检查用同一份。"""
+    return [name for name in names if name != name.lower()]
+
+
+def check_top_level_dir_case() -> list[str]:
+    """仓库根的顶层目录一律小写；点号开头的（.git/.idea）不参与，那是工具自己的地盘。
+
+    仓库根取自脚本自己的位置而不是 --scan-root 的上一层：这一条查的是仓库形状，
+    与被扫的源码根无关，跟着 scan-root 走会在探针目录下给出错误答案。
+    """
+    repository_root = pathlib.Path(__file__).resolve().parent.parent
+    names = sorted(child.name for child in repository_root.iterdir() if child.is_dir() and not child.name.startswith("."))
+    return [
+        f"仓库根下的顶层目录 {name} 不是全小写：改成 {name.lower()}（Windows 大小写不敏感，要两跳 git mv 才落盘），"
+        f"并同步改引用它的路径"
+        for name in unexpected_case_dirs(names)
     ]
 
 
@@ -293,16 +318,22 @@ def self_probe() -> None:
     if unexpected_module_dirs(["Core", "Ui", "Base"]) != ["Ui"]:
         raise RuntimeError("探针：白名单之外的目录没被点出来")
 
+#仓库根顶层目录的小写口径：全小写原样通过不算红，大写目录要点出来（Conan 就是这么被拦下的）
+    if unexpected_case_dirs(["src", "vendor", "translations"]) != []:
+        raise RuntimeError("探针：全小写的顶层目录被判成了违规，小写判据成了永红")
+    if unexpected_case_dirs(["src", "Conan"]) != ["Conan"]:
+        raise RuntimeError("探针：大写的顶层目录没被点出来")
+
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="源码约定门禁：路径窄串、枚举分派、信号消费方、顶层模块白名单")
+    parser = argparse.ArgumentParser(description="源码约定门禁：路径窄串、枚举分派、信号消费方、顶层模块白名单、顶层目录小写")
     parser.add_argument("--scan-root", default=str(pathlib.Path(__file__).resolve().parent.parent / "src"), help="要扫的源码根目录")
     args = parser.parse_args()
 
     root = pathlib.Path(args.scan_root).resolve()
     try:
         self_probe()
-        findings = check_path_encoding(root) + check_dispatch_coverage(root) + check_signal_consumers(root) + check_top_level_modules(root)
+        findings = check_path_encoding(root) + check_dispatch_coverage(root) + check_signal_consumers(root) + check_top_level_modules(root) + check_top_level_dir_case()
     except RuntimeError as failure:
         print(f"[门禁坏了] {failure}", file=sys.stderr)
         return 2

@@ -548,7 +548,7 @@ build\release\bin\GyanisScribe.exe --selftest
 细节与撤除判据见 [docs/OcrBackends.md](docs/OcrBackends.md)。
 
 `CMakePresets.json` 里只有 `debug` 与 `release` 两档；工具链由进入构建的那一步决定：
-`WindowsBuild.bat` 先调 `vcvars64`，Conan 再按主机 profile（`Conan/Profiles/WindowsMsvc2022`）指过去。
+`WindowsBuild.bat` 先调 `vcvars64`，Conan 再按主机 profile（`conan/Profiles/WindowsMsvc2022`）指过去。
 
 
 
@@ -801,7 +801,7 @@ GYANISSCRIBE_AUDIO_DEVICE=@device_cm_{...}\wave_{...} # 取声端到端（要用
 | --- | --- |
 | `Style.QtStringPlaceholders` | `QString` 占位符不许 `{}` 与 `%1` 混用——混用编译期无声，运行时把「选择{}的目录」原样摆给用户 |
 | `Style.TranslationCatalog` | 源码里每一条走 `uiText` 的文案都必须在 `.ts` 里有非空译文（`uiText("…")` 的字面量、表行里的标签、按位置对齐的档位标签数组这三形都算），否则英文档下会安静地显示中文 |
-| `Style.SourceConventions` | 四件事：路径不得按窄串交给第三方库；按枚举分派的开关要覆盖每个值（MSVC 与 GCC 的默认告警都不报这种漏项）；声明出来的信号要有人接；`src/` 顶层只许七模块目录（见脚本头部四条判据） |
+| `Style.SourceConventions` | 五件事：路径不得按窄串交给第三方库；按枚举分派的开关要覆盖每个值（MSVC 与 GCC 的默认告警都不报这种漏项）；声明出来的信号要有人接；`src/` 顶层只许七模块目录；仓库根的顶层目录一律小写（见脚本头部五条判据） |
 
 用例结构逐级镜像 `src/`，统一 GoogleTest，不引入第二个测试框架。
 共用同一份外部资源（真实缓存目录、临时文件）的用例用 CMake 的 `RESOURCE_LOCK` 串行化——
