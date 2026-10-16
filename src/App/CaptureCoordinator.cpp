@@ -96,6 +96,8 @@ namespace GyanisScribe::App
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::refreshRequested, this, &CaptureCoordinator::refreshLastCapture);
     }
 
+    CaptureCoordinator::~CaptureCoordinator() = default;
+
     void CaptureCoordinator::startInteractive(const std::optional<GyanisScribe::App::CaptureIntent> intent)
     {
         m_intent = intent.value_or(settingsCaptureIntent());

@@ -92,6 +92,15 @@ namespace GyanisScribe::App
          */
         CaptureCoordinator(Dependencies dependencies, QObject *parent = nullptr);
 
+        /**
+         * @brief 析构
+         * @note 声明在头、定义在 .cpp：三个成员的唯一指针各指着一个只前向声明的类型
+         *       （标注引擎、标注窗、截图服务），析构要在类型完整的 TU 里实例化——
+         *       否则 moc 合并 TU（只收头）里内联析构会让严格档的 MSVC 报
+         *       「can't delete an incomplete type」（本地 14.51 放过、CI 的 14.44 不放过）。
+         */
+        ~CaptureCoordinator() override;
+
         /// 框选截图（热键、托盘、标注窗的「重新截」都从这里进）
         void startInteractive(std::optional<GyanisScribe::App::CaptureIntent> intent = std::nullopt);
 
