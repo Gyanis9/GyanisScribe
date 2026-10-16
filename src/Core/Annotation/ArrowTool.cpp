@@ -23,7 +23,8 @@ namespace GyanisScribe::Core
         constexpr double kArrowHeadAngle = 0.52;
 
         /// 头部三角沿杆方向的深度：两翼顶点到尖端的轴向距离，箭杆只该画到这里
-        constexpr double headDepthOf(const double headLength)
+        /// （不标 constexpr：std::cos 的常量求值要新的 STL，CI 的 VS2022 档还没有——本地是 VS18）
+        [[nodiscard]] double headDepthOf(const double headLength)
         {
             return headLength * std::cos(kArrowHeadAngle);
         }
