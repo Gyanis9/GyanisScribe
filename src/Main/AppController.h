@@ -57,6 +57,7 @@ namespace GyanisScribe::App
 {
     class HistoryCoordinator;
     class OcrCoordinator;
+    class PinCoordinator;
     class RecordingCoordinator;
 } // namespace GyanisScribe::App
 
@@ -245,26 +246,14 @@ namespace GyanisScribe::Main
         void startCommandLineCapture(const GyanisScribe::App::CommandLineRequest &request);
 
         /**
-         * @brief 命令行贴图：把盘上的图片贴到光标处
-         * @param filePath 图片文件路径
-         * @return 成功返回空载荷；文件不在、或不是能贴的图片时返回中文原因
-         * @details 复用拖放那套内容转换：图片读像素、动图连来源带走、读不出的说清是哪一件
-         */
-        [[nodiscard]] GyanisScribe::Base::Expected<void> pinImageFile(const QString &filePath);
-
-        /**
-         * @brief 打开贴图组管理窗（托盘与主窗口的动作条都走这一条）
-         * @details 窗已开着就把它抬到前面并重读一遍，不开第二扇：两扇表对着同一桌贴图，
-         *          其中一扇按下去切了组，另一扇上那一列「摆在桌上」就成了旧账。
-         */
-        void openPinGroupManager();
-
-        /**
          * @brief 起一层全屏取色遮罩（热键、托盘与命令行共用这一条）
          * @details 抓的是按下那一刻的那一屏，之后遮罩显示的就是这一帧：放大镜要看的正是当前画面，
          *          实时抓屏会让鼠标一停画面就变，颜色也就抄不准。
          */
         void startColorPick();
+
+        /// 命令行 `--pin` 的入口：识图与贴出那一族在 `PinCoordinator` 里，这里只转发
+        [[nodiscard]] GyanisScribe::Base::Expected<void> pinImageFile(const QString &filePath);
 
         /**
          * @brief 配置存储，供设置页与后续模块取用
@@ -382,31 +371,6 @@ namespace GyanisScribe::Main
          */
         [[nodiscard]] QImage decorateOutput(const QImage &image, bool fillBackground) const;
 
-        /// 标注窗请求贴图
-        void handlePinRequested(const QImage &image);
-        /**
-         * @brief 把剪贴板里的内容贴到光标那一处（托盘那一条的落点）
-         * @details 剪贴板来的图没有「原来那块位置」，跟着鼠标落才是用户此刻的落点；
-         *          剪贴板里是文件（资源管理器里复制的那一份）时走拖放那条内容转换，
-         *          一次贴多件、动图连来源带走；取不到图时把原因与替代做法发给用户，不静默什么都不做
-         */
-        void pasteClipboardAsPin();
-
-        /**
-         * @brief 把最近关掉的那张贴图重新按在光标处（托盘那一条）
-         * @details 只有「关闭」过的按得回来，「销毁」过的不回；册子最多记 5 张，取一张少一张。
-         *          空册也要回一句：这条入口摆在托盘上，不出声就成了「按了没反应」。
-         */
-        void repinLastClosedPin();
-        /**
-         * @brief 把某张贴图的内容换成剪贴板里那一份（贴图窗上按 `Ctrl+V` 的落点）
-         * @param index 发起那一张在册表里的序号，由贴图管理器报上来
-         * @details 内容转换与「把剪贴板贴到屏幕上」共用同一条判据（图像、纯文本卡片、颜色卡片三种都能换）；
-         *          文件列表不在这一条里——替换只有一张目标，选哪一件都没有唯一答案。
-         *          取不到内容或那张是动图时把原因发给用户，不动原来那一份。
-         */
-        void replacePinWithClipboard(int index);
-
         /**
          * @brief 把某张贴图此刻盖住的那块屏幕重抓一次，换掉它的画面（`F5` 与右键那一项的落点）
          * @param index 发起那一张在册表里的序号
@@ -422,35 +386,6 @@ namespace GyanisScribe::Main
          *          那是唯一还能行动的那一句（改目录或改格式那一格）。
          */
         void reportBatchSave(const GyanisScribe::Gui::PinBatchSaveReport &report);
-
-        /**
-         * @brief 一句里用到的分组标签：起过名字就带上名字，没起过就是「分组 N」
-         * @param group 组号
-         * @return 界面用的一段文本
-         */
-        [[nodiscard]] QString groupLabel(int group) const;
-
-        /**
-         * @brief 改完组名那一句回声
-         * @param group 哪一组
-         * @param name 新名字；空串表示取消了命名
-         */
-        void reportGroupRenamed(int group, const QString &name);
-
-        /**
-         * @brief 删掉一组之后那句：并回去了几张，还是那组本来就空着
-         * @param group 被删的组号
-         * @param movedCount 并回第一组的张数
-         */
-        void reportGroupDeleted(int group, int movedCount);
-
-        /**
-         * @brief 贴出一批之后的一句提示
-         * @param outcome 贴出的张数与没贴成的文件名
-         * @details 拖放落图与剪贴板贴图两处共用：贴上一部分也要说清另一半去哪了，
-         *          静默丢掉一件比整次拒绝更让人困惑
-         */
-        void notifyPinnedDrop(const GyanisScribe::App::DropPinOutcome &outcome);
 
         /**
          * @brief 标注窗请求识别二维码/条形码：认出来就复制到剪贴板并报一声
@@ -537,7 +472,7 @@ namespace GyanisScribe::Main
         std::unique_ptr<GyanisScribe::Core::HistoryStore>             m_historyStore;      ///< 历史清单本体：与主窗口共享同一份，删记录不删文件
         std::unique_ptr<GyanisScribe::App::HistoryCoordinator>        m_history;           ///< 历史这一族（增删清空与「这条去哪了」）
         QPointer<GyanisScribe::Gui::ColorPickerOverlay>               m_picker;            ///< 取色遮罩，关掉即重建
-        QPointer<GyanisScribe::Gui::PinGroupManagerWindow>            m_groupManager;      ///< 贴图组管理窗，开着一扇就复用那一扇
+        std::unique_ptr<GyanisScribe::App::PinCoordinator>            m_pinCoordinator;    ///< 贴图这一族的贴出动作（剪贴板/文件/回贴/组管理）
         GyanisScribe::App::CaptureIntent                              m_captureIntent = GyanisScribe::App::CaptureIntent::Annotate; ///< 这一帧截完要去做的事
         GyanisScribe::App::CaptureOutputSet                           m_commandLineOutputs;                                         ///< 命令行那一次点名的去处，已按交付顺序排好
         QString                                                       m_commandLineExec;              ///< --exec 写的那一条命令；只在 m_commandLineExecGiven 为真时压过设置里那一格

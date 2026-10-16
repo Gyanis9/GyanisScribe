@@ -7,6 +7,7 @@
 #include "App/ClipboardPin.h"
 #include "App/CustomHotkeys.h"
 #include "App/HistoryCoordinator.h"
+#include "App/PinCoordinator.h"
 #include "App/OcrCoordinator.h"
 #include "App/RecordingCoordinator.h"
 #include "Gui/Capture/CaptureService.h"
@@ -150,6 +151,11 @@ namespace GyanisScribe::Main
         // 标注一套：引擎跨轮次复用（载入新帧自己会清空历史），窗口与工具栏也只建一次
         m_annotation = std::make_unique<GyanisScribe::Core::AnnotationEngine>();
         m_pins       = std::make_unique<GyanisScribe::Gui::PinManager>(*m_settings, *m_integration);
+        // 贴图这一族的贴出动作也搬进了协调器（审查台账 A-11）：管理器本身仍在这里（别的族也在用），
+        // 要取网页上那张图时走给出去的那条缝——取图那条链在别处，贴图族不自己管它
+        m_pinCoordinator =
+                std::make_unique<GyanisScribe::App::PinCoordinator>(*m_pins, [this](const QUrl &url, const std::optional<QPoint> dropPoint) { startImageFetch(url, dropPoint); });
+        QObject::connect(m_pinCoordinator.get(), &GyanisScribe::App::PinCoordinator::messageForUser, this, &AppController::notifyUser);
         // 识别这一族整族搬进了 OcrCoordinator（审查台账 A-11）：控制器只留「谁要认什么」的接线，
         // 它要说的那句提示（后端没编进来、没有可认的图、认失败了）走 messageForUser 回到这一层出气泡
         m_ocr = std::make_unique<GyanisScribe::App::OcrCoordinator>(*m_settings, *m_integration, *m_icons, *m_theme);
@@ -277,7 +283,8 @@ namespace GyanisScribe::Main
         // 标注窗的四个出口：动作只有一个入口，界面不需要知道用户是点了按钮还是按了键盘
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::copyRequested, this, &AppController::handleCopyRequested);
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::saveRequested, this, &AppController::handleSaveRequested);
-        QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::pinRequested, this, &AppController::handlePinRequested);
+        QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::pinRequested, this,
+                         [this](const QImage &image) { m_pinCoordinator->pinAt(image, m_lastSelection.topLeft()); });
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::ocrRequested, m_ocr.get(), &GyanisScribe::App::OcrCoordinator::requestRecognition);
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::scanRequested, this, &AppController::handleScanRequested);
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::printRequested, this, &AppController::handlePrintRequested);
@@ -332,10 +339,11 @@ namespace GyanisScribe::Main
                                  notifyUser(QString::fromUtf8(dropped.error().message), GyanisScribe::Gui::ToastKind::Information);
                                  return;
                              }
-                             notifyPinnedDrop(*dropped);
+                             m_pinCoordinator->showDropOutcome(*dropped);
                          });
         // 贴图窗上的 `Ctrl+V`：只有序号能认人——剪贴板在这一层，像素在哪一张上也只有管理器知道
-        QObject::connect(m_pins.get(), &GyanisScribe::Gui::PinManager::pinClipboardReplaceRequested, this, &AppController::replacePinWithClipboard);
+        QObject::connect(m_pins.get(), &GyanisScribe::Gui::PinManager::pinClipboardReplaceRequested, m_pinCoordinator.get(),
+                         &GyanisScribe::App::PinCoordinator::replaceWithClipboard);
         // `F5` 与右键「刷新这一张」：抓屏的口子在这里，管理器只管谁在册与哪几档不许刷
         QObject::connect(m_pins.get(), &GyanisScribe::Gui::PinManager::pinRefreshRequested, this, &AppController::refreshPinWithScreenUnder);
         // 整组「批量保存」落完账：一次写走 N 份文件，不说清去了哪儿就等于没存
@@ -351,14 +359,14 @@ namespace GyanisScribe::Main
                              }
                              // 热键文本从设置现读：用户改过组合键之后，提示里那个键还得是按得动的那个
                              notifyUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图已移到{}，先收了起来；按 {} 或从托盘切到那一组就能看见"),
-                                                                                       groupLabel(group).toStdString(),
+                                                                                       m_pinCoordinator->groupLabel(group).toStdString(),
                                                                                        m_hotkeys->bindingText(GyanisScribe::Core::HotkeyAction::NextPinGroup).toStdString())
                                                                   .c_str()),
                                         GyanisScribe::Gui::ToastKind::Information);
                          });
         // 改组名与删组都在管理器落账，这两句是它们的回声：菜单早就收起来了，不出声就成了「敲了字什么也没变」
-        QObject::connect(m_pins.get(), &GyanisScribe::Gui::PinManager::pinGroupRenamed, this, &AppController::reportGroupRenamed);
-        QObject::connect(m_pins.get(), &GyanisScribe::Gui::PinManager::pinGroupDeleted, this, &AppController::reportGroupDeleted);
+        QObject::connect(m_pins.get(), &GyanisScribe::Gui::PinManager::pinGroupRenamed, m_pinCoordinator.get(), &GyanisScribe::App::PinCoordinator::reportGroupRenamed);
+        QObject::connect(m_pins.get(), &GyanisScribe::Gui::PinManager::pinGroupDeleted, m_pinCoordinator.get(), &GyanisScribe::App::PinCoordinator::reportGroupDeleted);
 
         // 启动把上一次会话留下的那几张摆回来；退出前把在存的这批连像素一起记下
         if (const auto restored = m_pins->restoreLayout(); !restored)
@@ -476,42 +484,6 @@ namespace GyanisScribe::Main
                                                      canvas.image.width(), canvas.image.height(), canvas.screenName.toStdString(), transparentCanvas ? "透明" : "白"));
     }
 
-    void AppController::repinLastClosedPin()
-    {
-        const auto taken = m_pins->takeClosedPin();
-        if (!taken)
-        {
-            // 空册也要回一句：这条入口在托盘上，不出声就成了「按了没反应」
-            notifyUser(GyanisScribe::Base::uiText("没有可以重新贴出的贴图：关掉的那几张最多记 5 张，「销毁」掉的不算"), GyanisScribe::Gui::ToastKind::Information);
-            return;
-        }
-
-        m_pins->addPin(taken->image, QCursor::pos(), taken->sourceFile);
-        notifyUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已重新贴出那张关掉的贴图，还能按回来 {} 张"), m_pins->closedPinCount()).c_str()),
-                   GyanisScribe::Gui::ToastKind::Success);
-    }
-
-    QString AppController::groupLabel(const int group) const
-    {
-        // 号还是那个号：切组、菜单与布局都按号走，名字只是挂在后面的标签，替掉号会让人认不出自己在哪一组
-        const auto name = m_pins->groupName(group);
-        return name.isEmpty() ? GyanisScribe::Base::uiText("分组 %1").arg(group) : GyanisScribe::Base::uiText("分组 %1：%2").arg(group).arg(name);
-    }
-
-    void AppController::reportGroupRenamed(const int group, const QString &name)
-    {
-        notifyUser(name.isEmpty() ? GyanisScribe::Base::uiText("已取消分组 %1 的名字，切组与菜单里重新按号叫它").arg(group)
-                                  : GyanisScribe::Base::uiText("分组 %1 改名为「%2」").arg(group).arg(name),
-                   name.isEmpty() ? GyanisScribe::Gui::ToastKind::Information : GyanisScribe::Gui::ToastKind::Success);
-    }
-
-    void AppController::reportGroupDeleted(const int group, const int movedCount)
-    {
-        notifyUser(movedCount > 0 ? GyanisScribe::Base::uiText("已删掉分组 %1，把 %2 张并回第一组").arg(group).arg(movedCount)
-                                  : GyanisScribe::Base::uiText("分组 %1 上本来没摆贴图，名字一并清了").arg(group),
-                   GyanisScribe::Gui::ToastKind::Success);
-    }
-
     void AppController::reportBatchSave(const GyanisScribe::Gui::PinBatchSaveReport &report)
     {
         // 三档收尾各一句：全写成要说「去哪儿看」，成了一半要点名还有几张没成，一张都没成时原因就是主角
@@ -615,16 +587,10 @@ namespace GyanisScribe::Main
         m_mainWindow->open(page);
     }
 
-    void AppController::openPinGroupManager()
+    GyanisScribe::Base::Expected<void> AppController::pinImageFile(const QString &filePath)
     {
-        // 开着一扇就抬那一扇重读：两扇表对着同一桌贴图，晚打开的那一扇会把「摆在桌上」那一列停在旧账上。
-        // 不给父对象：挂在设置窗上会让这扇窗跟着设置窗一起被藏起来，用户回头找不着它；
-        // 关掉即自己销毁（窗口构造里挂了 WA_DeleteOnClose），这里这份 QPointer 随即变空
-        if (m_groupManager.isNull())
-        {
-            m_groupManager = new GyanisScribe::Gui::PinGroupManagerWindow(*m_pins);
-        }
-        m_groupManager->openAndRefresh();
+        // 识图与贴出那一族在 PinCoordinator 里，这里只转发：Application 那条命令行入口认的还是控制器
+        return m_pinCoordinator->pinFile(filePath);
     }
 
     void AppController::handleTrayAction(const GyanisScribe::App::TrayAction action)
@@ -651,7 +617,7 @@ namespace GyanisScribe::Main
                 startBlankCanvas();
                 return;
             case GyanisScribe::App::TrayAction::RepinClosed:
-                repinLastClosedPin();
+                m_pinCoordinator->repinLastClosed();
                 return;
             case GyanisScribe::App::TrayAction::ToggleRecord:
                 m_recording->toggle();
@@ -692,7 +658,7 @@ namespace GyanisScribe::Main
                 return;
             }
             case GyanisScribe::App::TrayAction::PasteClipboard:
-                pasteClipboardAsPin();
+                m_pinCoordinator->pasteClipboard();
                 return;
             case GyanisScribe::App::TrayAction::NextPinGroup:
             {
@@ -703,7 +669,9 @@ namespace GyanisScribe::Main
                     notifyUser(QString::fromUtf8(switched.error().message.c_str()), GyanisScribe::Gui::ToastKind::Information);
                     return;
                 }
-                notifyUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已切到{}，桌上是这一组"), groupLabel(*switched).toStdString()).c_str()),
+                notifyUser(QString::fromUtf8(
+                                   GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已切到{}，桌上是这一组"), m_pinCoordinator->groupLabel(*switched).toStdString())
+                                           .c_str()),
                            GyanisScribe::Gui::ToastKind::Success);
                 return;
             }
@@ -713,7 +681,7 @@ namespace GyanisScribe::Main
                 m_pins->closeAll();
                 return;
             case GyanisScribe::App::TrayAction::ManagePinGroups:
-                openPinGroupManager();
+                m_pinCoordinator->openGroupManager();
                 return;
             case GyanisScribe::App::TrayAction::OpenSettings:
                 openMainWindow(MainWindowPage::General);
@@ -855,7 +823,7 @@ namespace GyanisScribe::Main
                 return;
             }
             case GyanisScribe::App::CaptureIntent::PinToDesk:
-                handlePinRequested(image);
+                m_pinCoordinator->pinAt(image, m_lastSelection.topLeft());
                 return;
             case GyanisScribe::App::CaptureIntent::Annotate:
                 break;
@@ -886,7 +854,7 @@ namespace GyanisScribe::Main
                     QGuiApplication::clipboard()->setImage(decorateOutput(m_lastCapture.image, false));
                     break;
                 case GyanisScribe::App::CaptureOutput::Pin:
-                    handlePinRequested(m_lastCapture.image);
+                    m_pinCoordinator->pinAt(m_lastCapture.image, m_lastSelection.topLeft());
                     break;
             }
         }
@@ -1065,27 +1033,6 @@ namespace GyanisScribe::Main
         notifyUser(GyanisScribe::Base::uiText("已送往打印机"), GyanisScribe::Gui::ToastKind::Success);
     }
 
-    void AppController::handlePinRequested(const QImage &image)
-    {
-        // 贴回原来那块位置：用户截哪儿就贴在哪儿，跳回主屏中央会打断「就地比对」这个用法
-        m_pins->addPin(image, m_lastSelection.topLeft());
-        GyanisScribe::Base::Logger::info(std::format("已贴出 {}×{} 像素", image.width(), image.height()));
-    }
-
-    void AppController::notifyPinnedDrop(const GyanisScribe::App::DropPinOutcome &outcome)
-    {
-        if (!outcome.rejectedNames.isEmpty())
-        {
-            notifyUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已贴出 {} 张；{} 不是图片，没贴"), outcome.pinnedCount,
-                                                                      outcome.rejectedNames.join(QStringLiteral("、")).toStdString())
-                                                 .c_str()),
-                       GyanisScribe::Gui::ToastKind::Information);
-            return;
-        }
-        notifyUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已贴出 {} 张"), outcome.pinnedCount).c_str()),
-                   GyanisScribe::Gui::ToastKind::Success);
-    }
-
     void AppController::startImageFetch(const QUrl &url, std::optional<QPoint> dropPoint)
     {
         m_pendingFetchPoint = dropPoint;
@@ -1093,67 +1040,6 @@ namespace GyanisScribe::Main
         notifyUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("正在从网页取这张图：{}"), url.toString().toStdString()).c_str()),
                    GyanisScribe::Gui::ToastKind::Information);
         m_imageFetcher->fetch(url);
-    }
-
-    void AppController::pasteClipboardAsPin()
-    {
-        const auto *data = QGuiApplication::clipboard()->mimeData();
-        // 剪贴板里是文件（资源管理器里复制的那一份）：走拖放那条内容转换——图片读像素、动图连来源带走，
-        // 一次可以贴多件；判据只有「能不能当图片贴」这一条，与拖进来的那一份共用
-        if (data != nullptr && data->hasUrls() && !data->hasImage())
-        {
-            // 网页上的图：剪贴板里只有一条 http/https 地址时去把它取回来（本地文件那条路照旧走下面）
-            if (const auto url = GyanisScribe::App::imageUrlOf(data); url.has_value())
-            {
-                startImageFetch(*url, std::nullopt);
-                return;
-            }
-            const auto outcome = GyanisScribe::App::pinDroppedContent(*m_pins, data, QCursor::pos(), QApplication::font());
-            if (!outcome)
-            {
-                notifyUser(QString::fromUtf8(outcome.error().message), GyanisScribe::Gui::ToastKind::Information);
-                return;
-            }
-            if (outcome->pinnedCount == 0)
-            {
-                notifyUser(GyanisScribe::Base::uiText("复制的文件里没有能当图片贴的：请复制图片文件本身，或复制图片内容"), GyanisScribe::Gui::ToastKind::Information);
-                return;
-            }
-            notifyPinnedDrop(*outcome);
-            return;
-        }
-
-        const auto image = GyanisScribe::App::pinContentFrom(data, QGuiApplication::font());
-        if (!image)
-        {
-            // 取不到就直说原因与替代做法：这一条的入口在托盘上，附近没有任何输入框能提示
-            notifyUser(QString::fromUtf8(image.error().message), GyanisScribe::Gui::ToastKind::Information);
-            return;
-        }
-
-        // 落在光标那一处：剪贴板来的图没有「原来那块位置」，跟着鼠标走才是用户此刻的落点
-        // 颜色写法贴出来的是色卡：把那个色一起交下去，右键「改这一张的颜色…」以后才有初值
-        m_pins->addPin(*image, QCursor::pos(), {}, GyanisScribe::App::colorCardColorOf(data));
-        GyanisScribe::Base::Logger::info(std::format("剪贴板里的图已贴出：{}×{} 像素", image->width(), image->height()));
-    }
-
-    void AppController::replacePinWithClipboard(const int index)
-    {
-        // 与「把剪贴板贴到屏幕上」共用同一条内容判据：图像原样换，纯文本与颜色写法换成各自的卡片
-        const auto image = GyanisScribe::App::pinContentFrom(QGuiApplication::clipboard()->mimeData(), QGuiApplication::font());
-        if (!image)
-        {
-            notifyUser(QString::fromUtf8(image.error().message), GyanisScribe::Gui::ToastKind::Information);
-            return;
-        }
-        // 色卡身份跟着换进来的内容走：换成颜色写法就记下那个色，换成别的就把这一档摘掉（传空）
-        if (const auto replaced = m_pins->replacePinContent(index, *image, GyanisScribe::App::colorCardColorOf(QGuiApplication::clipboard()->mimeData())); !replaced)
-        {
-            // 拒绝面都带中文原因（动图不换、那张已不在册），原来的那份一律保持不动
-            notifyUser(QString::fromUtf8(replaced.error().message), GyanisScribe::Gui::ToastKind::Information);
-            return;
-        }
-        GyanisScribe::Base::Logger::info(std::format("贴图内容已换成剪贴板里那一份：{}×{} 像素", image->width(), image->height()));
     }
 
     void AppController::refreshPinWithScreenUnder(const int index)
@@ -1284,33 +1170,6 @@ namespace GyanisScribe::Main
                 emit commandLineActionFailed(GyanisScribe::Base::uiText("这个命令行动作不走截图这条路"));
                 return;
         }
-    }
-
-    GyanisScribe::Base::Expected<void> AppController::pinImageFile(const QString &filePath)
-    {
-        const QFileInfo info{filePath};
-        if (!info.exists() || !info.isFile())
-        {
-            return std::unexpected(
-                    GyanisScribe::Base::Error{GyanisScribe::Base::ErrorCode::InvalidArgument,
-                                              GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("没找到这个文件：{}"), info.absoluteFilePath().toStdString())});
-        }
-
-        // 复用拖放那条内容转换：图片读像素（GIF 连来源带走）、链接渲染成卡片，判据只有一份
-        QMimeData mime;
-        mime.setUrls({QUrl::fromLocalFile(info.absoluteFilePath())});
-        const auto outcome = GyanisScribe::App::pinDroppedContent(*m_pins, &mime, QCursor::pos(), QApplication::font());
-        if (!outcome)
-        {
-            return std::unexpected(outcome.error());
-        }
-        if (outcome->pinnedCount == 0)
-        {
-            return std::unexpected(GyanisScribe::Base::Error{
-                    GyanisScribe::Base::ErrorCode::InvalidArgument,
-                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("「{}」不是能贴的图片：支持 PNG / JPG / WebP / GIF 这类格式"), info.fileName().toStdString())});
-        }
-        return {};
     }
 
     void AppController::handlePinColorPicked(const QColor &color)
