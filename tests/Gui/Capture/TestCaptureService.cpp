@@ -31,11 +31,11 @@ using GyanisScribe::Base::CapturedImage;
 using GyanisScribe::Base::Error;
 using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Base::Expected;
-using GyanisScribe::Gui::CaptureService;
 using GyanisScribe::Core::ICaptureService;
 using GyanisScribe::Core::IScreenCaptureSource;
 using GyanisScribe::Core::SettingsStore;
 using GyanisScribe::Gui::CaptureOverlay;
+using GyanisScribe::Gui::CaptureService;
 
 namespace
 {
@@ -1123,4 +1123,100 @@ TEST_F(CaptureServiceFixture, ExcludedProcessesDropOutOfHoverCandidates)
     EXPECT_FALSE(hoverAt(bannedRect).has_value()) << "被排除的程序还是被认成了候选";
     ASSERT_TRUE(hoverAt(allowedRect).has_value()) << "没被排除的那扇也没认出来：候选整片丢了，判据分不清这两件事";
     EXPECT_EQ(*hoverAt(allowedRect), allowedRect.translated(-overlay->geometry().topLeft())) << "认出来的不是那一扇窗";
+}
+
+/**
+ * @brief 钉住滚动长截图那一轮不带指针这一档
+ * @details README 明写「滚动长截图那一趟刻意不带——按帧接图会把一枚指针复制成一串」，而这一格
+ *          只能从生产入口 startLongCapture() 走到：既有的四条长截图用例一律直接调 captureLongRegion，
+ *          于是 beginInteractive 里 longCapture 为真的那一侧从没被走过——那一档悄悄改回「按配置给」
+ *          也不会有人发现。对照见下一条：普通框选必须给，两边都断才分得清「刻意不给」与「整片没给」。
+ */
+TEST_F(CaptureServiceFixture, LongCaptureRoundCarriesNoCursorToggle)
+{
+    if (QGuiApplication::screens().isEmpty())
+    {
+        GTEST_SKIP() << "这个环境没有屏幕可枚举，铺不出遮罩";
+    }
+
+    SettingsStore           settings(m_iniFile);
+    FakeCaptureSource       source;
+    FakePlatformIntegration fake;
+    CaptureService          service(source, settings, fake);
+
+    service.startLongCapture();
+    auto *overlay = findOverlay();
+    ASSERT_NE(overlay, nullptr) << "长截图入口没铺出遮罩";
+    EXPECT_FALSE(overlay->cursorIncluded().has_value()) << "长截图那一轮不该有指针这一档：按帧接图会把一枚指针复制成一串";
+}
+
+/**
+ * @brief 对照：普通框选要把配置里那一档送进遮罩，否则遮罩里的 P 键没得翻
+ */
+TEST_F(CaptureServiceFixture, InteractiveRoundCarriesTheCursorToggleFromSettings)
+{
+    if (QGuiApplication::screens().isEmpty())
+    {
+        GTEST_SKIP() << "这个环境没有屏幕可枚举，铺不出遮罩";
+    }
+
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureIncludeCursor, QVariant(true)).has_value());
+    settings.sync();
+
+    FakeCaptureSource       source;
+    FakePlatformIntegration fake;
+    CaptureService          service(source, settings, fake);
+
+    service.startInteractive();
+    auto *overlay = findOverlay();
+    ASSERT_NE(overlay, nullptr) << "开始框选之后没铺出遮罩";
+    ASSERT_TRUE(overlay->cursorIncluded().has_value()) << "普通框选没把配置里那一档送进遮罩";
+    EXPECT_TRUE(*overlay->cursorIncluded()) << "送进去的不是配置里那一档";
+}
+
+/**
+ * @brief 钉住长截图那一轮的选区落到长截图这条路上，而不是当场交成品
+ * @details 与上面两条同一处代码的另一半：遮罩发出 regionSelected 之后，长截图先把这一块当开头接住，
+ *          普通截图才当场交成品。判据不看内部标志，而是走已有守护——长截图还在接时再开一次框选会被
+ *          拒绝并把出路交回来（StartingAnotherCaptureWhileALongRoundRunsIsRefused 钉的就是那道门），
+ *          所以这里的「被拒绝」等于「选区确实进了长截图这一轮」。这个 if 走反了，用户按 Ctrl+Alt+L
+ *          框一块得到的就是一张普通截图，而既有那四条长截图用例一条也看不见。
+ */
+TEST_F(CaptureServiceFixture, LongCaptureRoutesTheOverlaySelectionIntoTheLongRound)
+{
+    if (QGuiApplication::screens().isEmpty())
+    {
+        GTEST_SKIP() << "这个环境没有屏幕可枚举，铺不出遮罩";
+    }
+
+    SettingsStore           settings(m_iniFile);
+    FakeCaptureSource       source;
+    FakePlatformIntegration fake;
+    CaptureService          service(source, settings, fake);
+    Outcome                 outcome;
+    wire(service, outcome);
+
+    service.startLongCapture();
+    auto *overlay = findOverlay();
+    ASSERT_NE(overlay, nullptr) << "长截图入口没铺出遮罩";
+
+    // 拖一块再确认：走遮罩那条路，而不是用例直接调 captureLongRegion。
+    // 选区要落在替身帧的逻辑尺寸（100×50）里，否则 cropToLogicalRect 当场拒绝，判的就不是路由了
+    const auto  anchor = QPoint{5, 5};
+    const auto  pull   = QPoint{45, 35};
+    const auto  global = overlay->geometry().topLeft();
+    QMouseEvent press{QEvent::MouseButtonPress, QPointF{anchor}, QPointF{global + anchor}, Qt::LeftButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+    QApplication::sendEvent(overlay, &press);
+    QMouseEvent move{QEvent::MouseMove, QPointF{pull}, QPointF{global + pull}, Qt::NoButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+    QApplication::sendEvent(overlay, &move);
+    ASSERT_GT(overlay->selectedRegion().width(), 0) << "拖完没有选区，后面几步无从判起";
+    overlay->confirmSelection();
+
+    EXPECT_FALSE(outcome.image.has_value()) << "长截图那一轮当场交了成品：选区被路由到了普通截图那条";
+    ASSERT_FALSE(outcome.error.has_value()) << "选区一落地就报了错，长截图这一轮没起来：" << (outcome.error ? outcome.error->message : std::string{});
+
+    service.startInteractive();
+    ASSERT_TRUE(outcome.error.has_value()) << "长截图那一轮没在接：选区没进长截图这条路";
+    EXPECT_NE(outcome.error->message.find("滚动长截图还在接"), std::string::npos) << "拒绝的理由不是「长截图还在接」，那就证明不了这一轮活着：" << outcome.error->message;
 }
