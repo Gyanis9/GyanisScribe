@@ -17,8 +17,58 @@
 
 namespace GyanisScribe::App
 {
-    PinCoordinator::PinCoordinator(GyanisScribe::Gui::PinManager &pins, FetchRequest fetch, QObject *parent) : QObject(parent), m_pins(pins), m_fetch(std::move(fetch))
+    PinCoordinator::PinCoordinator(GyanisScribe::Gui::PinManager &pins, QObject *parent) : QObject(parent), m_pins(pins)
     {
+        // 取图的成败都在这一族收口：贴到哪儿、提示什么话，只有拿着贴图管理器的人知道
+        QObject::connect(&m_fetcher, &GyanisScribe::App::ImageFetcher::fetched, this,
+                         [this](const GyanisScribe::App::ImageFetchResult &result)
+                         {
+                             const auto at = m_pendingFetchPoint.value_or(QCursor::pos());
+                             m_pendingFetchPoint.reset();
+                             m_pins.addPin(result.image, at);
+                             emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已从网页取到这张图（{}×{}）并贴到屏幕上"),
+                                                                                                result.image.width(), result.image.height())
+                                                                           .c_str()),
+                                                 GyanisScribe::Gui::ToastKind::Information);
+                         });
+        QObject::connect(&m_fetcher, &GyanisScribe::App::ImageFetcher::failed, this,
+                         [this](const QString &reason)
+                         {
+                             m_pendingFetchPoint.reset();
+                             emit messageForUser(reason, GyanisScribe::Gui::ToastKind::Information);
+                         });
+    }
+
+    void PinCoordinator::pinAnother(const QImage &image, const QPoint &anchor)
+    {
+        // 留底再贴一份：不动原来那张，新的一张摆在它右下一点（落点由管理器算好交进来）
+        m_pins.addPin(image, anchor);
+    }
+
+    void PinCoordinator::handleDrop(const QMimeData *data, const QPoint &anchor)
+    {
+        // 网页上的图：拖进来的是一条 http/https 地址时去取回来，落在拖到的那一点上
+        if (const auto url = GyanisScribe::App::imageUrlOf(data); url.has_value())
+        {
+            fetchImageUrl(*url, anchor);
+            return;
+        }
+        const auto dropped = GyanisScribe::App::pinDroppedContent(m_pins, data, anchor, QApplication::font());
+        if (!dropped)
+        {
+            emit messageForUser(QString::fromUtf8(dropped.error().message), GyanisScribe::Gui::ToastKind::Information);
+            return;
+        }
+        showDropOutcome(*dropped);
+    }
+
+    void PinCoordinator::fetchImageUrl(const QUrl &url, std::optional<QPoint> dropPoint)
+    {
+        m_pendingFetchPoint = dropPoint;
+        // 先把「正在取」说出来：取图是异步的，不说这一句用户会以为「按了没反应」
+        emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("正在从网页取这张图：{}"), url.toString().toStdString()).c_str()),
+                            GyanisScribe::Gui::ToastKind::Information);
+        m_fetcher.fetch(url);
     }
 
     void PinCoordinator::pinAt(const QImage &image, const QPoint &anchor)
@@ -65,7 +115,7 @@ namespace GyanisScribe::App
             // 网页上的图：剪贴板里只有一条 http/https 地址时去把它取回来（本地文件那条路照旧走下面）
             if (const auto url = GyanisScribe::App::imageUrlOf(data); url.has_value())
             {
-                m_fetch(*url, std::nullopt);
+                fetchImageUrl(*url, std::nullopt);
                 return;
             }
             const auto outcome = GyanisScribe::App::pinDroppedContent(m_pins, data, QCursor::pos(), QApplication::font());

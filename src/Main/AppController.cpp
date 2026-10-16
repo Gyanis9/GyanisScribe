@@ -10,6 +10,7 @@
 #include "App/DeliveryCoordinator.h"
 #include "App/CaptureCoordinator.h"
 #include "App/PinCoordinator.h"
+#include "App/PickCoordinator.h"
 #include "App/OcrCoordinator.h"
 #include "App/RecordingCoordinator.h"
 #include "Gui/Capture/CaptureService.h"
@@ -136,34 +137,17 @@ namespace GyanisScribe::Main
         // 标注一套：引擎跨轮次复用（载入新帧自己会清空历史），窗口与工具栏也只建一次
         m_pins = std::make_unique<GyanisScribe::Gui::PinManager>(*m_settings, *m_integration);
         // 贴图这一族的贴出动作也搬进了协调器（审查台账 A-11）：管理器本身仍在这里（别的族也在用），
-        // 要取网页上那张图时走给出去的那条缝——取图那条链在别处，贴图族不自己管它
-        m_pinCoordinator =
-                std::make_unique<GyanisScribe::App::PinCoordinator>(*m_pins, [this](const QUrl &url, const std::optional<QPoint> dropPoint) { startImageFetch(url, dropPoint); });
+        // 取网页图那条链（ImageFetcher、在飞那张的落点）也归它——取图的结果总是「贴到屏幕上」
+        m_pinCoordinator = std::make_unique<GyanisScribe::App::PinCoordinator>(*m_pins);
         QObject::connect(m_pinCoordinator.get(), &GyanisScribe::App::PinCoordinator::messageForUser, this, &AppController::notifyUser);
+        // 取色这一族（遮罩、写法、最近取色）也搬进了协调器：控制器只留提示
+        m_picker = std::make_unique<GyanisScribe::App::PickCoordinator>(*m_settings, *m_theme, *m_captureSource);
+        QObject::connect(m_picker.get(), &GyanisScribe::App::PickCoordinator::messageForUser, this, &AppController::notifyUser);
         // 识别这一族整族搬进了 OcrCoordinator（审查台账 A-11）：控制器只留「谁要认什么」的接线，
         // 它要说的那句提示（后端没编进来、没有可认的图、认失败了）走 messageForUser 回到这一层出气泡
         m_ocr = std::make_unique<GyanisScribe::App::OcrCoordinator>(*m_settings, *m_integration, *m_icons, *m_theme);
         QObject::connect(m_ocr.get(), &GyanisScribe::App::OcrCoordinator::messageForUser, this, &AppController::notifyUser);
         m_tray         = std::make_unique<GyanisScribe::App::TrayController>(*m_icons, *m_theme, *m_settings, *m_integration);
-        m_imageFetcher = std::make_unique<GyanisScribe::App::ImageFetcher>();
-        // 取图的成败都在这一层收口：贴到哪儿、提示什么话，只有界面层知道
-        QObject::connect(m_imageFetcher.get(), &GyanisScribe::App::ImageFetcher::fetched, this,
-                         [this](const GyanisScribe::App::ImageFetchResult &result)
-                         {
-                             const auto at = m_pendingFetchPoint.value_or(QCursor::pos());
-                             m_pendingFetchPoint.reset();
-                             m_pins->addPin(result.image, at);
-                             notifyUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已从网页取到这张图（{}×{}）并贴到屏幕上"),
-                                                                                       result.image.width(), result.image.height())
-                                                                  .c_str()),
-                                        GyanisScribe::Gui::ToastKind::Information);
-                         });
-        QObject::connect(m_imageFetcher.get(), &GyanisScribe::App::ImageFetcher::failed, this,
-                         [this](const QString &reason)
-                         {
-                             m_pendingFetchPoint.reset();
-                             notifyUser(reason, GyanisScribe::Gui::ToastKind::Information);
-                         });
         m_historyStore = std::make_unique<GyanisScribe::Core::HistoryStore>(std::move(historyStoragePath));
         m_mainWindow   = std::make_unique<MainWindow>(*m_settings, *m_theme, *m_icons, *m_historyStore, m_integration->capabilities(), *m_integration);
         // 历史这一族整族搬进了 HistoryCoordinator（审查台账 A-11）：清单本体仍由这里持有并与主窗口共享，
@@ -200,7 +184,7 @@ namespace GyanisScribe::Main
                                      m_capture->startLong();
                                      return;
                                  case GyanisScribe::Core::HotkeyAction::Pick:
-                                     startColorPick();
+                                     m_picker->start();
                                      return;
                                  case GyanisScribe::Core::HotkeyAction::Ocr:
                                      // 识别热键：截完直接进结果窗口，中间不弹标注窗
@@ -284,32 +268,11 @@ namespace GyanisScribe::Main
         // 贴图菜单里的「识别文字」与热键、标注窗走的是同一个出口：一处接线管所有张（含启动恢复的那些）
         QObject::connect(m_pins.get(), &GyanisScribe::Gui::PinManager::pinOcrRequested, m_ocr.get(), &GyanisScribe::App::OcrCoordinator::requestRecognition);
         // 贴图上取的色与屏幕取色共用写法和复制那两句：两处各写一份，复制到的文本格式就会分家
-        QObject::connect(m_pins.get(), &GyanisScribe::Gui::PinManager::pinColorPicked, this, &AppController::handlePinColorPicked);
+        QObject::connect(m_pins.get(), &GyanisScribe::Gui::PinManager::pinColorPicked, m_picker.get(), &GyanisScribe::App::PickCoordinator::copyPickedColor);
         // 贴图标注时的「另贴一张」：与回车复制出去的结果一样走 addPin，一处入口管所有新贴图
-        QObject::connect(m_pins.get(), &GyanisScribe::Gui::PinManager::pinAnotherRequested, this,
-                         [this](const QImage &image, const QPoint &globalTopLeft)
-                         {
-                             // 留底再贴一份：不动原来那张，新的一张摆在它右下一点
-                             m_pins->addPin(image, globalTopLeft);
-                         });
+        QObject::connect(m_pins.get(), &GyanisScribe::Gui::PinManager::pinAnotherRequested, m_pinCoordinator.get(), &GyanisScribe::App::PinCoordinator::pinAnother);
         // 拖到贴图上的文件/链接/文本：与「把剪贴板里的内容贴到屏幕上」共用同一套内容渲染
-        QObject::connect(m_pins.get(), &GyanisScribe::Gui::PinManager::pinDropRequested, this,
-                         [this](const QMimeData *data, const QPoint &globalTopLeft)
-                         {
-                             // 网页上的图：拖进来的是一条 http/https 地址时去取回来，落在拖到的那一点上
-                             if (const auto url = GyanisScribe::App::imageUrlOf(data); url.has_value())
-                             {
-                                 startImageFetch(*url, globalTopLeft);
-                                 return;
-                             }
-                             const auto dropped = GyanisScribe::App::pinDroppedContent(*m_pins, data, globalTopLeft, QGuiApplication::font());
-                             if (!dropped)
-                             {
-                                 notifyUser(QString::fromUtf8(dropped.error().message), GyanisScribe::Gui::ToastKind::Information);
-                                 return;
-                             }
-                             m_pinCoordinator->showDropOutcome(*dropped);
-                         });
+        QObject::connect(m_pins.get(), &GyanisScribe::Gui::PinManager::pinDropRequested, m_pinCoordinator.get(), &GyanisScribe::App::PinCoordinator::handleDrop);
         // 贴图窗上的 `Ctrl+V`：只有序号能认人——剪贴板在这一层，像素在哪一张上也只有管理器知道
         QObject::connect(m_pins.get(), &GyanisScribe::Gui::PinManager::pinClipboardReplaceRequested, m_pinCoordinator.get(),
                          &GyanisScribe::App::PinCoordinator::replaceWithClipboard);
@@ -403,6 +366,12 @@ namespace GyanisScribe::Main
         m_mainWindow->open(page);
     }
 
+    void AppController::startColorPick()
+    {
+        // 取色这一族在 PickCoordinator 里，这里只转发：Application 那条命令行 --pick 入口认的是控制器
+        m_picker->start();
+    }
+
     void AppController::startCommandLineCapture(const GyanisScribe::App::CommandLineRequest &request)
     {
         // 截图这一族在 CaptureCoordinator 里，这里只转发：Application 那条命令行入口认的还是控制器
@@ -458,7 +427,7 @@ namespace GyanisScribe::Main
                 m_ocr->pickImageFileAndRecognize();
                 return;
             case GyanisScribe::App::TrayAction::PickColor:
-                startColorPick();
+                m_picker->start();
                 return;
             case GyanisScribe::App::TrayAction::ClearPinsThrough:
                 m_pinCoordinator->restoreMouseThrough();
@@ -506,15 +475,6 @@ namespace GyanisScribe::Main
         return *m_icons;
     }
 
-    void AppController::startImageFetch(const QUrl &url, std::optional<QPoint> dropPoint)
-    {
-        m_pendingFetchPoint = dropPoint;
-        // 先把「正在取」说出来：取图是异步的，不说这一句用户会以为「按了没反应」
-        notifyUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("正在从网页取这张图：{}"), url.toString().toStdString()).c_str()),
-                   GyanisScribe::Gui::ToastKind::Information);
-        m_imageFetcher->fetch(url);
-    }
-
     void AppController::refreshPinWithScreenUnder(const int index)
     {
         const auto target = m_pins->pinRefreshTarget(index);
@@ -557,46 +517,6 @@ namespace GyanisScribe::Main
         GyanisScribe::Base::Logger::info(std::format("贴图已重抓这块屏幕：{}×{} 像素", frame->image.width(), frame->image.height()));
     }
 
-    std::vector<QColor> AppController::recentPickedColors() const
-    {
-        const auto parsed = GyanisScribe::Core::parseRecentColors(m_settings->stringListValue(GyanisScribe::Core::kPickRecentColors, {}));
-        if (!parsed)
-        {
-            GyanisScribe::Base::Logger::warning(std::format("最近取色清单读不出，按空清单继续：{}", parsed.error().message));
-            return {};
-        }
-        return *parsed;
-    }
-
-    void AppController::rememberPickedColor(const QColor &color)
-    {
-        const auto updated = GyanisScribe::Core::pushRecentColor(recentPickedColors(), color, GyanisScribe::Core::kPickColorHistoryCapacity);
-        if (auto written = m_settings->setValue(GyanisScribe::Core::kPickRecentColors, GyanisScribe::Core::serializeRecentColors(updated)); !written)
-        {
-            GyanisScribe::Base::Logger::warning(std::format("最近取色清单没能写入：{}", written.error().message));
-        }
-    }
-
-    void AppController::handlePinColorPicked(const QColor &color)
-    {
-        // 贴图上取的色也进同一份「最近取色」：下一轮屏幕取色时色块行上就有它
-        rememberPickedColor(color);
-
-        // 与屏幕取色同一套：写法从设置现读，读坏了按 HEX 顶上并把原因说给用户
-        std::string complaint;
-        const auto  format = GyanisScribe::Core::colorFormatOrDefault(m_settings->stringValue(GyanisScribe::Core::kPickFormat, QStringLiteral("Hex")).toStdString(), complaint);
-        if (!complaint.empty())
-        {
-            notifyUser(QString::fromStdString(complaint), GyanisScribe::Gui::ToastKind::Danger);
-        }
-
-        // 字母档现读配置：这一档只管 HEX 那一形，写法是别的时读出来也一样
-        const auto casing = GyanisScribe::Core::hexCasingOf(m_settings->boolValue(GyanisScribe::Core::kPickHexUppercase, true));
-        const auto text   = GyanisScribe::Core::formatColor(color, format, casing);
-        QGuiApplication::clipboard()->setText(text);
-        notifyUser(GyanisScribe::Base::uiText("已复制颜色 ") + text, GyanisScribe::Gui::ToastKind::Success);
-    }
-
     void AppController::notifyUser(const QString &message, const GyanisScribe::Gui::ToastKind kind)
     {
         if (m_toast != nullptr)
@@ -606,60 +526,6 @@ namespace GyanisScribe::Main
         }
         // 气泡还没建起来的那一段（构造早期）不该把话吞掉：日志是兜底出口
         GyanisScribe::Base::Logger::info(std::format("提示：{}", message.toStdString()));
-    }
-
-    void AppController::startColorPick()
-    {
-        auto *screen = QGuiApplication::screenAt(QCursor::pos());
-        if (screen == nullptr)
-        {
-            screen = QGuiApplication::primaryScreen();
-        }
-        if (screen == nullptr)
-        {
-            notifyUser(GyanisScribe::Base::uiText("这台机器上没有可用的屏幕，取色没法开始"), GyanisScribe::Gui::ToastKind::Danger);
-            return;
-        }
-
-        const auto frame = m_captureSource->grabScreen(screen->name());
-        if (!frame)
-        {
-            notifyUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("这一屏抓不下来：{}。请重试一次"), frame.error().message).c_str()),
-                       GyanisScribe::Gui::ToastKind::Danger);
-            return;
-        }
-
-        // 写法读坏了不拦取色：按默认写法继续，并把这一条告诉用户，免得他复制到的格式莫名其妙变了
-        std::string complaint;
-        const auto  format = GyanisScribe::Core::colorFormatOrDefault(m_settings->stringValue(GyanisScribe::Core::kPickFormat, QStringLiteral("Hex")).toStdString(), complaint);
-        if (!complaint.empty())
-        {
-            notifyUser(QString::fromStdString(complaint), GyanisScribe::Gui::ToastKind::Danger);
-        }
-
-        // 放大镜视野与字母档都现读这一处的配置：取色遮罩自己不持设置，读坏了在这里说给用户
-        std::string magnifierComplaint;
-        const auto  magnifierView = GyanisScribe::Core::magnifierViewOrDefault(
-                m_settings->stringValue(GyanisScribe::Core::kCaptureMagnifierView, QStringLiteral("narrow")).toStdString(), magnifierComplaint);
-        if (!magnifierComplaint.empty())
-        {
-            notifyUser(QString::fromStdString(magnifierComplaint), GyanisScribe::Gui::ToastKind::Danger);
-        }
-        m_picker = new GyanisScribe::Gui::ColorPickerOverlay{
-                *frame, screen->geometry(), format, GyanisScribe::Core::hexCasingOf(m_settings->boolValue(GyanisScribe::Core::kPickHexUppercase, true)), magnifierView, *m_theme};
-        // 最近取色跟着这一轮摆上遮罩：点色块或按数字键就能重新取回，不必回原处对像素
-        m_picker->setRecentColors(recentPickedColors());
-        QObject::connect(m_picker, &GyanisScribe::Gui::ColorPickerOverlay::colorPicked, this,
-                         [this](const QColor &color, const QString &text)
-                         {
-                             rememberPickedColor(color);
-                             QGuiApplication::clipboard()->setText(text);
-                             notifyUser(GyanisScribe::Base::uiText("已复制颜色 ") + text, GyanisScribe::Gui::ToastKind::Success);
-                         });
-        QObject::connect(m_picker, &GyanisScribe::Gui::ColorPickerOverlay::cancelled, this, [] { GyanisScribe::Base::Logger::info("取色已取消"); });
-        m_picker->showFullScreen();
-        m_picker->raise();
-        m_picker->activateWindow();
     }
 
 } // namespace GyanisScribe::Main

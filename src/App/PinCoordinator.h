@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "App/ImageFetcher.h"
 #include "Base/Types.h"
 #include "Gui/Controls/Toast.h"
 #include "Gui/Pin/PinGroupManagerWindow.h"
@@ -22,6 +23,7 @@
 #include <functional>
 #include <optional>
 
+class QMimeData;
 class QUrl;
 
 namespace GyanisScribe::App
@@ -50,16 +52,27 @@ namespace GyanisScribe::App
         Q_OBJECT
 
     public:
-        /// 要取一张网页上的图时走这条：签名与 ImageFetcher 那条链的入口同形
-        using FetchRequest = std::function<void(const QUrl &url, std::optional<QPoint> dropPoint)>;
-
         /**
          * @brief 构造
          * @param pins 贴图管理器；**所有权不在这里**，控制器还拿它做别的编排
-         * @param fetch 取网页图片那条链的入口
          * @param parent Qt 父对象
          */
-        PinCoordinator(GyanisScribe::Gui::PinManager &pins, FetchRequest fetch, QObject *parent = nullptr);
+        PinCoordinator(GyanisScribe::Gui::PinManager &pins, QObject *parent = nullptr);
+
+        /// 再贴一份（不动原来那张，新的一张摆在它右下一点）
+        void pinAnother(const QImage &image, const QPoint &anchor);
+
+        /**
+         * @brief 有东西被拖到贴图上：文件/链接/文本按同一套内容渲染贴出来
+         * @param data 拖进来的载荷
+         * @param anchor 落在哪儿（全局逻辑坐标）
+         * @details 拖进来的是一条 http/https 地址时先去把它取回来（见 fetchImageUrl），
+         *          落在拖到的那一点上而不是光标处。
+         */
+        void handleDrop(const QMimeData *data, const QPoint &anchor);
+
+        /// 去把一条图片地址取回来并贴到屏上；成败都在这一族的信号上收口
+        void fetchImageUrl(const QUrl &url, std::optional<QPoint> dropPoint);
 
         /**
          * @brief 把一张图贴回它被截下的位置
@@ -121,9 +134,10 @@ namespace GyanisScribe::App
         void messageForUser(const QString &message, GyanisScribe::Gui::ToastKind kind);
 
     private:
-        GyanisScribe::Gui::PinManager                     &m_pins;   ///< 贴图管理器，不拥有
-        FetchRequest                                       m_fetch;  ///< 取网页图片那条链的入口
-        QPointer<GyanisScribe::Gui::PinGroupManagerWindow> m_window; ///< 组管理窗，开着一扇就复用那一扇
+        GyanisScribe::Gui::PinManager                     &m_pins;              ///< 贴图管理器，不拥有
+        GyanisScribe::App::ImageFetcher                    m_fetcher;           ///< 网页取图：拖进来的可以是一条图片地址
+        std::optional<QPoint>                              m_pendingFetchPoint; ///< 在飞那一张取回来落在哪儿；空表示跟光标走
+        QPointer<GyanisScribe::Gui::PinGroupManagerWindow> m_window;            ///< 组管理窗，开着一扇就复用那一扇
     };
 
 } // namespace GyanisScribe::App

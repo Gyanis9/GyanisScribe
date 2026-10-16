@@ -59,6 +59,7 @@ namespace GyanisScribe::App
     class OcrCoordinator;
     class CaptureCoordinator;
     class DeliveryCoordinator;
+    class PickCoordinator;
     class PinCoordinator;
     class RecordingCoordinator;
 } // namespace GyanisScribe::App
@@ -204,11 +205,7 @@ namespace GyanisScribe::Main
          */
         void startCommandLineCapture(const GyanisScribe::App::CommandLineRequest &request);
 
-        /**
-         * @brief 起一层全屏取色遮罩（热键、托盘与命令行共用这一条）
-         * @details 抓的是按下那一刻的那一屏，之后遮罩显示的就是这一帧：放大镜要看的正是当前画面，
-         *          实时抓屏会让鼠标一停画面就变，颜色也就抄不准。
-         */
+        /// 命令行 `--pick` 的入口：取色这一族在 `PickCoordinator` 里，这里只转发
         void startColorPick();
 
         /// 命令行 `--pin` 的入口：识图与贴出那一族在 `PinCoordinator` 里，这里只转发
@@ -282,57 +279,27 @@ namespace GyanisScribe::Main
          */
         void refreshPinWithScreenUnder(int index);
 
-        /**
-         * @brief 某张贴图上取到了一个像素的颜色
-         * @param color 颜色
-         * @details 排成设置里那一档写法、复制到剪贴板并给一句提示：与屏幕取色那一路同一个格式出口，
-         *          用户从哪一处取的色，粘出来的都是同一种写法；两处都进「最近取色」那一份清单
-         */
-        void handlePinColorPicked(const QColor &color);
-
-        /**
-         * @brief 读「最近取色」清单
-         * @return 设置里那份清单（最近的在前）；坏词整体拒绝、按空清单继续并把原因落进日志
-         */
-        [[nodiscard]] std::vector<QColor> recentPickedColors() const;
-
-        /**
-         * @brief 把刚取到的颜色压进「最近取色」清单并写回设置
-         * @param color 颜色
-         */
-        void rememberPickedColor(const QColor &color);
-
         /// 给用户看的一条提示：有气泡就用气泡，没有（例如起不来托盘的那类环境）就落日志
         void notifyUser(const QString &message, GyanisScribe::Gui::ToastKind kind);
 
-        /**
-         * @brief 去把一条图片地址取回来并贴到屏上
-         * @param url 图片地址，调用方已用 `GyanisScribe::App::isFetchableImageUrl` 粗筛过
-         * @param dropPoint 落点；空表示跟着光标走（剪贴板那条路没有「原来那块位置」）
-         * @details 取图是异步的：这里只发起，成败都在 `GyanisScribe::App::ImageFetcher` 的两条信号上收口。
-         */
-        void startImageFetch(const QUrl &url, std::optional<QPoint> dropPoint);
-
-        std::unique_ptr<GyanisScribe::Core::SettingsStore>            m_settings;          ///< 配置存储
-        std::unique_ptr<GyanisScribe::Platform::IPlatformIntegration> m_integration;       ///< 平台集成
-        std::unique_ptr<GyanisScribe::Core::IScreenCaptureSource>     m_captureSource;     ///< 抓帧来源
-        std::unique_ptr<GyanisScribe::Core::HotkeyManager>            m_hotkeys;           ///< 热键登记与触发
-        std::unique_ptr<GyanisScribe::Gui::ThemeManager>              m_theme;             ///< 主题档位与样式表
-        std::unique_ptr<GyanisScribe::Gui::IconProvider>              m_icons;             ///< 图标供给器，描边色跟主题
-        std::unique_ptr<GyanisScribe::Gui::PinManager>                m_pins;              ///< 贴图管理器
-        std::unique_ptr<GyanisScribe::App::ImageFetcher>              m_imageFetcher;      ///< 网页取图：拖进来的可以是一条图片地址
-        std::optional<QPoint>                                         m_pendingFetchPoint; ///< 在飞那一张取回来落在哪儿；空表示跟光标走
-        std::unique_ptr<GyanisScribe::App::RecordingCoordinator>      m_recording;         ///< 录屏这一族（配置、服务、控制条、倒计时）
-        std::unique_ptr<GyanisScribe::App::OcrCoordinator>            m_ocr;               ///< 识别这一族（后端选型、搬运工、结果窗）
-        std::unique_ptr<GyanisScribe::App::TrayController>            m_tray;              ///< 托盘图标与菜单
-        std::unique_ptr<MainWindow>                                   m_mainWindow;        ///< 设置与关于的入口
-        std::unique_ptr<GyanisScribe::Gui::Toast>                     m_toast;             ///< 右下角提示气泡，操作结果的落地处
-        std::unique_ptr<GyanisScribe::Core::HistoryStore>             m_historyStore;      ///< 历史清单本体：与主窗口共享同一份，删记录不删文件
-        std::unique_ptr<GyanisScribe::App::HistoryCoordinator>        m_history;           ///< 历史这一族（增删清空与「这条去哪了」）
-        QPointer<GyanisScribe::Gui::ColorPickerOverlay>               m_picker;            ///< 取色遮罩，关掉即重建
-        std::unique_ptr<GyanisScribe::App::CaptureCoordinator>        m_capture;           ///< 截图这一族（枢纽：入口、延时、抓帧、按意图交付）
-        std::unique_ptr<GyanisScribe::App::PinCoordinator>            m_pinCoordinator;    ///< 贴图这一族的贴出动作（剪贴板/文件/回贴/组管理）
-        std::unique_ptr<GyanisScribe::App::DeliveryCoordinator>       m_delivery;          ///< 交付这一族（装饰、落盘、外部命令、批量报告）
+        std::unique_ptr<GyanisScribe::Core::SettingsStore>            m_settings;       ///< 配置存储
+        std::unique_ptr<GyanisScribe::Platform::IPlatformIntegration> m_integration;    ///< 平台集成
+        std::unique_ptr<GyanisScribe::Core::IScreenCaptureSource>     m_captureSource;  ///< 抓帧来源
+        std::unique_ptr<GyanisScribe::Core::HotkeyManager>            m_hotkeys;        ///< 热键登记与触发
+        std::unique_ptr<GyanisScribe::Gui::ThemeManager>              m_theme;          ///< 主题档位与样式表
+        std::unique_ptr<GyanisScribe::Gui::IconProvider>              m_icons;          ///< 图标供给器，描边色跟主题
+        std::unique_ptr<GyanisScribe::Gui::PinManager>                m_pins;           ///< 贴图管理器
+        std::unique_ptr<GyanisScribe::App::RecordingCoordinator>      m_recording;      ///< 录屏这一族（配置、服务、控制条、倒计时）
+        std::unique_ptr<GyanisScribe::App::OcrCoordinator>            m_ocr;            ///< 识别这一族（后端选型、搬运工、结果窗）
+        std::unique_ptr<GyanisScribe::App::TrayController>            m_tray;           ///< 托盘图标与菜单
+        std::unique_ptr<MainWindow>                                   m_mainWindow;     ///< 设置与关于的入口
+        std::unique_ptr<GyanisScribe::Gui::Toast>                     m_toast;          ///< 右下角提示气泡，操作结果的落地处
+        std::unique_ptr<GyanisScribe::Core::HistoryStore>             m_historyStore;   ///< 历史清单本体：与主窗口共享同一份，删记录不删文件
+        std::unique_ptr<GyanisScribe::App::HistoryCoordinator>        m_history;        ///< 历史这一族（增删清空与「这条去哪了」）
+        std::unique_ptr<GyanisScribe::App::PickCoordinator>           m_picker;         ///< 取色这一族（遮罩、写法与字母档、最近取色）
+        std::unique_ptr<GyanisScribe::App::CaptureCoordinator>        m_capture;        ///< 截图这一族（枢纽：入口、延时、抓帧、按意图交付）
+        std::unique_ptr<GyanisScribe::App::PinCoordinator>            m_pinCoordinator; ///< 贴图这一族的贴出动作（剪贴板/文件/回贴/组管理）
+        std::unique_ptr<GyanisScribe::App::DeliveryCoordinator>       m_delivery;       ///< 交付这一族（装饰、落盘、外部命令、批量报告）
     };
 
 } // namespace GyanisScribe::Main
