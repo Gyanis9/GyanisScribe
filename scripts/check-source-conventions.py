@@ -211,15 +211,20 @@ def signal_has_handler(texts: list[str], class_name: str, name: str) -> bool:
     return False
 
 
-CLASS_DECL = re.compile("(class|struct)[ ]+([A-Za-z_][A-Za-z0-9_]*)")
+# 开作用域的声明头：类、结构体、联合体、枚举都以 `};` 收尾，四种都要记名进栈，收支才相抵——
+# 少记一种（比如普通 enum），它自己的 `};` 就会把外层类的框弹掉，后面的信号要么记到空头上、
+# 要么直接消失。两个关键字连写的 `enum class Kind` 由前瞻挡掉 `enum class` 这一对，
+# 认到后面的 `class Kind`（见 enclosing_class 的注释）。
+CLASS_DECL = re.compile("(class|struct|union|enum)[ ]+(?!(?:class|struct)\\b)([A-Za-z_][A-Za-z0-9_]*)")
 
 
 def enclosing_class(line: str) -> str | None:
-    """这一行在开一个类定义时给出类名；前向声明和「class QMenu *buildContextMenu();」这种不算。
+    """这一行在开一个带名字的作用域（类/结构体/联合体/枚举）时给出它的名字；前向声明和「class QMenu *buildContextMenu();」这种不算。
 
     取**最后一个**匹配：`template <class T> class Foo` 这行的第一个匹配是模板参数 `T`，
-    取第一个就会把 Foo 的成员记到 T 头上（本仓暂时没有类模板，是潜在坑，留着探针守着）。
-    继承列表里的 `public Bar` 不含 class/struct 关键字，所以最后一个匹配仍是类名本身。
+    取第一个就会把 Foo 的成员记到 T 头上（模板特化 `class Foo<int>` 的前一个匹配是 `class T` 或没有，
+    最后一个匹配仍是 Foo 本身）。
+    继承列表里的 `public Bar` 不含这些关键字，所以最后一个匹配仍是类型名本身。
     """
     stripped = line.strip()
     if stripped.endswith(";"):
@@ -231,8 +236,8 @@ def enclosing_class(line: str) -> str | None:
 def collect_signals(root: pathlib.Path) -> list[tuple[pathlib.Path, str, str]]:
     """声明在各 signals: 段里的信号，连着所属类名一起返回（纯文本扫：本条门一律不依赖编译）。
 
-    类名用**栈**跟踪：类里嵌一个 struct（本仓 Dependencies 那种依赖集）时，内层关掉之后
-    当前类要回到外层——只记「最后一次见到的 class/struct」会把外层的 signals 记到内层头上，
+    类名用**栈**跟踪：类里嵌一个 struct / enum / union（内层也以 `};` 收尾）时，内层关掉之后
+    当前类要回到外层——只记「最后一次见到的声明」会把外层的 signals 记到内层头上，
     于是消费方检查去找 `&Dependencies::…`，一条也找不到，报出一串假违规。
     """
     found: list[tuple[pathlib.Path, str, str]] = []
@@ -351,6 +356,19 @@ def self_probe() -> None:
         if collected != [("Outer", "changed")]:
             raise RuntimeError(f"探针：嵌套 struct 之后的信号归属错了，得到 {collected}（应为 [('Outer', 'changed')]）")
 
+#普通枚举与联合体也开作用域：类里嵌一个之后，信号还得记在外层类头上——
+# 它们各自的 `};` 只能抵自己的框，没进栈就会把外层类弹掉，信号直接消失
+    with tempfile.TemporaryDirectory() as probe_root:
+        probe = pathlib.Path(probe_root) / "Probe.h"
+        probe.write_text(
+                "class Outer" + NEWLINE + "{" + NEWLINE + "public:" + NEWLINE + "    enum Kind" + NEWLINE + "    {" + NEWLINE + "        A," + NEWLINE + "    };" +
+                        NEWLINE + "    union Value" + NEWLINE + "    {" + NEWLINE + "        int number;" + NEWLINE + "    };" + NEWLINE + "signals:" + NEWLINE +
+                        "    void changed();" + NEWLINE + "};" + NEWLINE,
+                encoding="utf-8")
+        collected = [(class_name, name) for _, class_name, name in collect_signals(pathlib.Path(probe_root))]
+        if collected != [("Outer", "changed")]:
+            raise RuntimeError(f"探针：类里嵌了枚举/联合体之后信号归属错了，得到 {collected}（应为 [('Outer', 'changed')]）")
+
 #类模板与多重继承：`template <class T> class Foo` 的第一匹配是模板参数，取最后一个才是类名
     if enclosing_class("template <class T> class Foo") != "Foo":
         raise RuntimeError("探针：类模板把模板参数当成了类名")
@@ -362,6 +380,24 @@ def self_probe() -> None:
         raise RuntimeError("探针：普通 struct 没认出来")
     if enclosing_class("class Forward;") is not None:
         raise RuntimeError("探针：前向声明被当成了类开启")
+
+#模板特化：显式特化与偏特化的头里也会出现 `class`，最后一个匹配仍要是被特化的那个名字
+    if enclosing_class("template <> class Foo<int> : public Base") != "Foo":
+        raise RuntimeError("探针：显式特化把别的东西当成了类名")
+    if enclosing_class("template <class T> class Foo<T*> final : public Base") != "Foo":
+        raise RuntimeError("探针：偏特化把模板参数当成了类名")
+    if enclosing_class("class Foo<int>;") is not None:
+        raise RuntimeError("探针：特化的前向声明被当成了类开启")
+
+#枚举与联合体也开作用域：两种关键字连写的要跳过第一个词，单行的不算开启
+    if enclosing_class("enum class Kind : std::uint8_t") != "Kind":
+        raise RuntimeError("探针：enum class 把第一个词旁的 class 当成了名字")
+    if enclosing_class("enum Kind") != "Kind":
+        raise RuntimeError("探针：普通枚举没认出来")
+    if enclosing_class("union Value") != "Value":
+        raise RuntimeError("探针：联合体没认出来")
+    if enclosing_class("enum class Kind { A, B };") is not None:
+        raise RuntimeError("探针：单行枚举被当成了作用域开启")
 
 
 def main() -> int:
