@@ -44,14 +44,14 @@ namespace GyanisScribe::Platform
          * @return 成功返回空载荷；失败返回中文原因，取值域不合或组合已被占用都算
          * @note 不支持该能力的平台返回 ErrorCode::PlatformUnsupported，绝不静默当成注册成功
          */
-        virtual Base::Expected<void> registerHotkey(int identifier, Qt::KeyboardModifiers modifiers, Qt::Key key) = 0;
+        [[nodiscard]] virtual Base::Expected<void> registerHotkey(int identifier, Qt::KeyboardModifiers modifiers, Qt::Key key) = 0;
 
         /**
          * @brief 注销一个热键
          * @param identifier 登记时用过的编号
          * @return 成功返回空载荷；编号没登记过或平台不支持时返回原因
          */
-        virtual Base::Expected<void> unregisterHotkey(int identifier) = 0;
+        [[nodiscard]] virtual Base::Expected<void> unregisterHotkey(int identifier) = 0;
 
         /**
          * @brief 注销本后端登记的全部热键，退出与重载配置前调用

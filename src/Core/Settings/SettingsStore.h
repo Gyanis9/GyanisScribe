@@ -97,7 +97,7 @@ namespace GyanisScribe::Core
          * @param value 载荷
          * @return 成功返回空载荷；失败返回原因
          */
-        Base::Expected<void> setValue(std::string_view key, const QVariant &value) override;
+        [[nodiscard]] Base::Expected<void> setValue(std::string_view key, const QVariant &value) override;
 
         /**
          * @brief 落盘，并把改动同步到后端
@@ -117,14 +117,14 @@ namespace GyanisScribe::Core
          * @details 列表导出成 JSON 数组，其余一律导出成文本：文本档在两个后端（注册表与 INI）之间
          *          是唯一都能放得下的形状。
          */
-        Base::Expected<void> exportToFile(const std::filesystem::path &filePath) const override;
+        [[nodiscard]] Base::Expected<void> exportToFile(const std::filesystem::path &filePath) const override;
 
         /**
          * @brief 从 JSON 导入，见 ISettingsStore::importFromFile()
          * @param filePath 来源文件
          * @return 成功返回写入的键数（可以为 0）；失败返回带路径与原因的错误
          */
-        Base::Expected<int> importFromFile(const std::filesystem::path &filePath) override;
+        [[nodiscard]] Base::Expected<int> importFromFile(const std::filesystem::path &filePath) override;
 
     private:
         /**

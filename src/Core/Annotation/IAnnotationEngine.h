@@ -122,7 +122,7 @@ namespace GyanisScribe::Core
          * @param kind 目标工具种类
          * @return 成功返回空载荷；种类不在册时返回 InvalidArgument
          */
-        virtual Base::Expected<void> setActiveTool(ToolKind kind) = 0;
+        [[nodiscard]] virtual Base::Expected<void> setActiveTool(ToolKind kind) = 0;
 
         /**
          * @brief 当前工具种类
@@ -138,7 +138,7 @@ namespace GyanisScribe::Core
          * @note 有选中图形时这些图形也按新参数改样式，并记进撤销栈（同一条图形的连续改动合成一步）：
          *       样式是每条图形自己的属性，工具上的值只给之后画出的图形用。全部选中项的样式都与之全等时不进步骤。
          */
-        virtual Base::Expected<void> setPenParameters(const PenParameters &parameters) = 0;
+        [[nodiscard]] virtual Base::Expected<void> setPenParameters(const PenParameters &parameters) = 0;
 
         /**
          * @brief 起笔
@@ -156,14 +156,14 @@ namespace GyanisScribe::Core
          * @brief 收笔并把这条图形放进撤销栈
          * @return 成功返回选中的新图形位置；图形退化时返回 InvalidArgument
          */
-        virtual Base::Expected<AnnotationSelection> endStroke() = 0;
+        [[nodiscard]] virtual Base::Expected<AnnotationSelection> endStroke() = 0;
 
         /**
          * @brief 给在途的文字图形设定内容
          * @param text 文本
          * @return 成功返回空载荷；当前工具不是文字时返回 InvalidArgument
          */
-        virtual Base::Expected<void> setPendingText(const QString &text) = 0;
+        [[nodiscard]] virtual Base::Expected<void> setPendingText(const QString &text) = 0;
 
         /**
          * @brief 把在途的那条落定（折线双击收笔走的这一条）
@@ -215,7 +215,7 @@ namespace GyanisScribe::Core
          * @return 成功返回空载荷；没选中、选中的不是唯一一条文字图形、文本为空、或那条已经不在了都返回 InvalidArgument
          * @details 走撤销栈：改一次文字是一步操作，Ctrl+Z 要回到改之前那一份，而不是把整条抹掉。
          */
-        virtual Base::Expected<void> setTextOfSelection(const QString &text) = 0;
+        [[nodiscard]] virtual Base::Expected<void> setTextOfSelection(const QString &text) = 0;
 
         /**
          * @brief 取选中那条文字图形的内容
@@ -236,7 +236,7 @@ namespace GyanisScribe::Core
          * @param selection 目标图形
          * @return 成功返回空载荷；工具或索引不在册时返回 InvalidArgument
          */
-        virtual Base::Expected<void> select(const AnnotationSelection &selection) = 0;
+        [[nodiscard]] virtual Base::Expected<void> select(const AnnotationSelection &selection) = 0;
 
         /**
          * @brief 把一条图形并进选中集（Shift+点选那一路）
@@ -244,14 +244,14 @@ namespace GyanisScribe::Core
          * @return 成功返回空载荷；工具或索引不在册时返回 InvalidArgument
          * @note 已经在选中集里就什么都不做：Shift 连点同一条不该造出重复项
          */
-        virtual Base::Expected<void> addToSelection(const AnnotationSelection &selection) = 0;
+        [[nodiscard]] virtual Base::Expected<void> addToSelection(const AnnotationSelection &selection) = 0;
 
         /**
          * @brief 在选中集里翻转一条图形（Ctrl+点选那一路）
          * @param selection 目标图形
          * @return 成功返回空载荷；工具或索引不在册时返回 InvalidArgument
          */
-        virtual Base::Expected<void> toggleSelection(const AnnotationSelection &selection) = 0;
+        [[nodiscard]] virtual Base::Expected<void> toggleSelection(const AnnotationSelection &selection) = 0;
 
         /**
          * @brief 清空选中集
@@ -287,7 +287,7 @@ namespace GyanisScribe::Core
          * @details 开场时记下这一步改动之前的整条图形：缩放与旋转都从那一份重新算，
          *          中途的取整不会一格格攒成漂移，撤销也只需要这一份原样放回去。
          */
-        virtual Base::Expected<void> beginSelectionDrag(SelectionHandle handle, const QPoint &point) = 0;
+        [[nodiscard]] virtual Base::Expected<void> beginSelectionDrag(SelectionHandle handle, const QPoint &point) = 0;
 
         /**
          * @brief 手柄拖动中
@@ -296,7 +296,7 @@ namespace GyanisScribe::Core
          * @return 成功返回空载荷；没有开场过或那条已不在册时返回 InvalidArgument
          * @details 一趟拖动并成一步撤销：起点固定在开场时那一份图形上，逐个中间点覆盖命令的终点。
          */
-        virtual Base::Expected<void> updateSelectionDrag(const QPoint &point, const SelectionDragModifiers &modifiers) = 0;
+        [[nodiscard]] virtual Base::Expected<void> updateSelectionDrag(const QPoint &point, const SelectionDragModifiers &modifiers) = 0;
 
         /**
          * @brief 结束手柄拖动（松手那一刻叫）
@@ -309,25 +309,25 @@ namespace GyanisScribe::Core
          * @return 成功返回空载荷；没有选中项时返回 InvalidArgument
          * @note 已经在最上层的再挪是空动作：不进撤销栈
          */
-        virtual Base::Expected<void> raiseSelection() = 0;
+        [[nodiscard]] virtual Base::Expected<void> raiseSelection() = 0;
 
         /**
          * @brief 把选中的图形往下挪一层
          * @return 成功返回空载荷；没有选中项时返回 InvalidArgument
          */
-        virtual Base::Expected<void> lowerSelection() = 0;
+        [[nodiscard]] virtual Base::Expected<void> lowerSelection() = 0;
 
         /**
          * @brief 把选中的图形挪到最上层
          * @return 成功返回空载荷；没有选中项时返回 InvalidArgument
          */
-        virtual Base::Expected<void> bringSelectionToFront() = 0;
+        [[nodiscard]] virtual Base::Expected<void> bringSelectionToFront() = 0;
 
         /**
          * @brief 把选中的图形挪到最下层
          * @return 成功返回空载荷；没有选中项时返回 InvalidArgument
          */
-        virtual Base::Expected<void> sendSelectionToBack() = 0;
+        [[nodiscard]] virtual Base::Expected<void> sendSelectionToBack() = 0;
 
         /**
          * @brief 把选中的图形复制进引擎内的剪贴板
@@ -335,7 +335,7 @@ namespace GyanisScribe::Core
          * @details 剪贴板只是一份图形副本，不碰系统剪贴板：系统剪贴板上放的是成品图，
          *          两者混用会让「复制」这个词一会儿指标注一会儿指整张图。
          */
-        virtual Base::Expected<void> copySelection() = 0;
+        [[nodiscard]] virtual Base::Expected<void> copySelection() = 0;
 
         /**
          * @brief 粘贴剪贴板里的图形
@@ -343,7 +343,7 @@ namespace GyanisScribe::Core
          * @details 粘出来的每条带一点右下偏移（连续粘贴逐次加一个），压在最上层，并成为新的选中集；
          *          一次粘贴是一步撤销，Ctrl+Z 一下收走整批。
          */
-        virtual Base::Expected<void> pasteClipboard() = 0;
+        [[nodiscard]] virtual Base::Expected<void> pasteClipboard() = 0;
 
         /**
          * @brief 把全部图形画给界面
@@ -360,14 +360,14 @@ namespace GyanisScribe::Core
          * @details 多选时整组一起走。同一条图形的连续位移并成一步撤销：拖一趟要发几十次位移，
          *          方向键也能连按好几格，并成一步之后撤销一次就回到这一趟开始之前。
          */
-        virtual Base::Expected<void> moveSelectionBy(const QPoint &delta) = 0;
+        [[nodiscard]] virtual Base::Expected<void> moveSelectionBy(const QPoint &delta) = 0;
 
         /**
          * @brief 删除选中项，进撤销栈
          * @return 成功返回空载荷；没有选中项时返回 InvalidArgument
          * @note 多选时整组一次删掉，也是一步撤销
          */
-        virtual Base::Expected<void> removeSelection() = 0;
+        [[nodiscard]] virtual Base::Expected<void> removeSelection() = 0;
 
         /**
          * @brief 能否撤销
@@ -385,13 +385,13 @@ namespace GyanisScribe::Core
          * @brief 撤销一步
          * @return 成功返回空载荷；没得撤时返回 InvalidArgument，界面对此只需把按钮置灰
          */
-        virtual Base::Expected<void> undo() = 0;
+        [[nodiscard]] virtual Base::Expected<void> undo() = 0;
 
         /**
          * @brief 重做一步
          * @return 成功返回空载荷；没得重做时返回 InvalidArgument
          */
-        virtual Base::Expected<void> redo() = 0;
+        [[nodiscard]] virtual Base::Expected<void> redo() = 0;
 
     signals:
         /**

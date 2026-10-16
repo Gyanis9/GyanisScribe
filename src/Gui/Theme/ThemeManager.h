@@ -52,7 +52,7 @@ namespace GyanisScribe::Gui
          * @param themeKind 选定的档位
          * @return 写配置失败时返回原因；成功返回空载荷
          */
-        Base::Expected<void> setTheme(ThemeKind themeKind);
+        [[nodiscard]] Base::Expected<void> setTheme(ThemeKind themeKind);
 
         /**
          * @brief 当前生效的语义色
@@ -97,8 +97,8 @@ namespace GyanisScribe::Gui
         [[nodiscard]] SystemScheme currentSystemScheme() const;
 
         Core::ISettingsStore &m_settings;  ///< 配置存储，档位从这里读、也写回这里
-        ThemeKind                 m_requested; ///< 用户选的档位
-        ThemeKind                 m_resolved;  ///< 解算后生效的档位
+        ThemeKind             m_requested; ///< 用户选的档位
+        ThemeKind             m_resolved;  ///< 解算后生效的档位
     };
 
 } // namespace GyanisScribe::Gui

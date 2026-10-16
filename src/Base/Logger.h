@@ -43,7 +43,7 @@ namespace GyanisScribe::Base
          * @return 成功返回空载荷；失败返回原因（目录建不出来或文件被占用）
          * @note 重复调用直接返回成功而不重建 sink，避免启动路径上把已打开的句柄踢掉
          */
-        static Expected<void> initialize(const std::filesystem::path &logDirectory, Severity minimumSeverity = Severity::Info);
+        [[nodiscard]] static Expected<void> initialize(const std::filesystem::path &logDirectory, Severity minimumSeverity = Severity::Info);
 
         /**
          * @brief 冲刷并关闭所有 sink，进程退出前调用

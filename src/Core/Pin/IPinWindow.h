@@ -77,7 +77,7 @@ namespace GyanisScribe::Core
          * @param through true 表示鼠标事件穿过贴图
          * @note 平台没有这个能力时返回 PlatformUnsupported 并保持原状，不让用户以为开关生效了
          */
-        virtual Base::Expected<void> setMouseThrough(bool through) = 0;
+        [[nodiscard]] virtual Base::Expected<void> setMouseThrough(bool through) = 0;
 
         /**
          * @brief 是否处于鼠标穿透

@@ -463,7 +463,7 @@ namespace GyanisScribe::Gui
          * @details 重写接口：走 Qt 的 WindowTransparentForInput 标志（平台原生能力），
          *          穿透时同时去掉焦点接受，避免贴图吃不到鼠标却又抢走焦点。
          */
-        Base::Expected<void> setMouseThrough(bool through) override;
+        [[nodiscard]] Base::Expected<void> setMouseThrough(bool through) override;
 
         /// 是否穿透，见 Core::IPinWindow::isMouseThrough()
         [[nodiscard]] bool isMouseThrough() const noexcept override;
