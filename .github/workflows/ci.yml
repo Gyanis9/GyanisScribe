@@ -34,6 +34,11 @@ jobs:
           version: 6.11.1
           arch: win64_msvc2022_64
           cache: true
+          # 6.11 起 Qt 官方仓库的目录改成按工具链分家（…/qt6_6111/qt6_6111_msvc2022_64/Updates.xml），
+          # 而 PyPI 上最新的 aqtinstall 3.3.0 还按老路径找、404（「Failed to locate XML data」）。
+          # 修复已合进上游 master 但 3.4.0 未发版，这一行先钉在含修复的提交上；
+          # 撤掉的条件：PyPI 出现 3.4.0（`pip index versions aqtinstall` 一看即知）。
+          aqtsource: "git+https://github.com/miurahr/aqtinstall@076e1659807d0b362a3ed684d54c2e9c775eb9c7"
 
       - name: 装 Conan 2 与 Ninja
         shell: pwsh
@@ -108,6 +113,8 @@ jobs:
           version: 6.11.1
           arch: win64_msvc2022_64
           cache: true
+          # 与 debug job 同一处补偿，理由写在那一步里（6.11 起 Qt 仓库目录改布局，3.3.0 认不出）
+          aqtsource: "git+https://github.com/miurahr/aqtinstall@076e1659807d0b362a3ed684d54c2e9c775eb9c7"
 
       - name: 装 Conan 2、Ninja 与 LLVM
         shell: pwsh
