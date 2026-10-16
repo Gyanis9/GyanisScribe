@@ -4,6 +4,8 @@
 // 从 AppControllerParts 注进去，把「谁在什么时刻被叫到、成品记在哪一份清单上」钉住。
 
 #include "App/CaptureCoordinator.h"
+#include "Gui/Pick/ColorPickerOverlay.h"
+#include "Gui/Pin/PinWindow.h"
 #include "Main/AppController.h"
 
 #include "App/CaptureIntent.h"
@@ -253,6 +255,22 @@ namespace GyanisScribe
                 m_controller             = std::make_unique<Main::AppController>(std::move(parts));
             }
 
+
+            /// 现在桌上有几扇这种顶层窗：接线断了时这一格就是 0
+            template<typename Widget>
+            [[nodiscard]] static int countTopLevelWindows()
+            {
+                int count = 0;
+                for (auto *widget: QApplication::topLevelWidgets())
+                {
+                    if (qobject_cast<Widget *>(widget) != nullptr)
+                    {
+                        ++count;
+                    }
+                }
+                return count;
+            }
+
             /// 读回注入的那份历史清单；条目里指向的成品文件由 load() 自己检查存在性
             [[nodiscard]] Base::Expected<QVector<Core::HistoryEntry>> readHistory() const
             {
@@ -456,6 +474,39 @@ namespace GyanisScribe
         ASSERT_TRUE(entries.has_value()) << "历史清单读不回：" << entries.error().message;
         ASSERT_EQ(entries->size(), 1) << "设置点的是快速保存，这一张却没按它交出去";
         expectUnderDirectory(entries->front().filePath, m_root / "shots");
+    }
+
+
+    /**
+     * @brief 钉住「命令行 `--pin`」那条入口在拆族之后照走：桌上要多一张贴图
+     * @details 这条链现在是「`Application` → `AppController::pinImageFile`（转发壳）→ `PinCoordinator::pinFile`
+     *          → `PinManager` → 一扇贴图窗」。拆族时换过接收者，而件级用例测的是 `PinManager` 自己——
+     *          接错线它一声不响，只有从这里走一遍才看得见。
+     */
+    TEST_F(AppControllerFixture, PinningAFileThroughThePublicEntryPutsAPinOnTheDesk)
+    {
+        makeController();
+        const auto imagePath = m_root / "to-pin.png";
+        ASSERT_TRUE(makeFrame(m_realScreenName).image.save(Base::Paths::toDisplayText(imagePath), "PNG")) << "样本图都没写出来";
+
+        const auto before = countTopLevelWindows<GyanisScribe::Gui::PinWindow>();
+        const auto pinned = m_controller->pinImageFile(Base::Paths::toDisplayText(imagePath));
+        ASSERT_TRUE(pinned.has_value()) << pinned.error().message;
+        EXPECT_EQ(countTopLevelWindows<GyanisScribe::Gui::PinWindow>(), before + 1) << "命令行 --pin 那条入口没贴出东西：协调器那条线断了";
+    }
+
+    /**
+     * @brief 钉住取色入口在拆族之后照走：命令行 `--pick` 与热键都走它
+     * @details 这一格钉的是「入口 → 取色协调器 → 一扇遮罩」这条链，中间那次改动换掉了接收者。
+     */
+    TEST_F(AppControllerFixture, PickingAColorFromTheEntryPointOpensTheOverlay)
+    {
+        makeController();
+        m_frameScreenName = m_realScreenName;
+        ASSERT_EQ(countTopLevelWindows<GyanisScribe::Gui::ColorPickerOverlay>(), 0) << "开局就不该有取色遮罩";
+
+        m_controller->startColorPick();
+        EXPECT_EQ(countTopLevelWindows<GyanisScribe::Gui::ColorPickerOverlay>(), 1) << "取色入口没铺出遮罩：协调器那条线断了";
     }
 
 } // namespace GyanisScribe
