@@ -57,6 +57,7 @@ namespace GyanisScribe::App
 {
     class HistoryCoordinator;
     class OcrCoordinator;
+    class DeliveryCoordinator;
     class PinCoordinator;
     class RecordingCoordinator;
 } // namespace GyanisScribe::App
@@ -323,14 +324,6 @@ namespace GyanisScribe::Main
         void deliverCommandLineOutputs();
 
         /**
-         * @brief 截图成功后起跑那条外部命令（设置里那一格，或命令行 `--exec` 点名的那一条）
-         * @details 只在「这一轮真的截到了一张屏上的图」之后跑：标注窗里再存一次、从历史重新贴出都不算一次截图，
-         *          把这些也算进去会让一个上传脚本被同一次截图喂两遍。
-         *          命令为空就什么都不做；跑不起来只报一句，不把截图本身判成失败。
-         */
-        void runAfterCaptureCommand();
-
-        /**
          * @brief 读设置里那一档「截完之后做什么」
          * @return 配置里存的档位；读不出时回落到词表第一档并把原因落进日志
          */
@@ -351,26 +344,6 @@ namespace GyanisScribe::Main
         /// 托盘菜单的一项被点了
         void handleTrayAction(GyanisScribe::App::TrayAction action);
 
-        /// 标注窗请求存文件
-        void handleSaveRequested(const QImage &image);
-
-        /**
-         * @brief 把成品写进截图目录：装饰、格式质量校验、起名、落盘与历史记账都在这一处
-         * @param image 成品图（未装饰）
-         * @return 成功返回存下的文件名；失败返回已带中文原因的 Error（调用方负责提示）
-         * @details 「存成文件」「快速保存」与「自动保存」三条路共用：三条各写一遍落盘
-         *          就迟早出现「这边记了历史那边没记」这类暗差
-         */
-        [[nodiscard]] GyanisScribe::Base::Expected<QString> writeImageToDisk(const QImage &image);
-
-        /**
-         * @brief 按设置里的两格给成品装边框与投影
-         * @param image 成品图
-         * @param fillBackground 目标端带不了透明通道时给真（存 JPG、打印到纸面）：投影底下垫白
-         * @return 装好饰的图；两格都关时原样交回
-         */
-        [[nodiscard]] QImage decorateOutput(const QImage &image, bool fillBackground) const;
-
         /**
          * @brief 把某张贴图此刻盖住的那块屏幕重抓一次，换掉它的画面（`F5` 与右键那一项的落点）
          * @param index 发起那一张在册表里的序号
@@ -378,14 +351,6 @@ namespace GyanisScribe::Main
          *          摆位、缩放、旋转与透明度都不动。按住不放时键盘自动重复连着报，就成了持续刷新。
          */
         void refreshPinWithScreenUnder(int index);
-
-        /**
-         * @brief 整组「批量保存」落完账后那一句提示
-         * @param report 写成几张、几张没写成，与第一条没写成的原因
-         * @details 一次写走 N 份文件，不出声就成了「按了不知道存没存上」；一张都没写成时把原因原样报出来，
-         *          那是唯一还能行动的那一句（改目录或改格式那一格）。
-         */
-        void reportBatchSave(const GyanisScribe::Gui::PinBatchSaveReport &report);
 
         /**
          * @brief 标注窗请求识别二维码/条形码：认出来就复制到剪贴板并报一声
@@ -477,7 +442,7 @@ namespace GyanisScribe::Main
         GyanisScribe::App::CaptureOutputSet                           m_commandLineOutputs;                                         ///< 命令行那一次点名的去处，已按交付顺序排好
         QString                                                       m_commandLineExec;              ///< --exec 写的那一条命令；只在 m_commandLineExecGiven 为真时压过设置里那一格
         bool                                                          m_commandLineExecGiven = false; ///< 命令行到底给没给 --exec：给了就只跑那一条，不与设置里的命令叠着跑两次
-        QString                                                       m_writtenFilePath;              ///< 这一轮落盘的成品路径（显示文本）；没落盘时为空，外部命令的 %file% 用它填
+        std::unique_ptr<GyanisScribe::App::DeliveryCoordinator>       m_delivery;                     ///< 交付这一族（装饰、落盘、外部命令、批量报告）
         bool                                                          m_commandLineActive = false;    ///< 正在跑命令行那次截图：失败路径要往 commandLineActionFailed 也交一份
         QTimer                                                       *m_captureDelayTimer = nullptr;  ///< 延时截图那一枚，一次只允许有一个在等
         std::function<void()>                                         m_pendingCapture;               ///< 延时到点要走的那一步，随定时器一起活到触发
