@@ -156,7 +156,7 @@ namespace
 
 /**
  * @brief 钉住两套坐标互指同一个点
- * @details 显示区本身的判据已上收到 tests/Core/TestImageFit.cpp，这里只测点位往返。
+ * @details 显示区本身的判据已上收到 tests/Core/Image/TestImageFit.cpp，这里只测点位往返。
  * @details 只补一套换算就是静默错位：正向、反向各算一遍并断它们落在同一个点上；
  *          同时钉住「画布外夹到边缘」而不是报错——拖出边缘的意思是画到边界。
  */

@@ -2,8 +2,9 @@
 # 消费者是 scripts/WindowsBuild.bat：它把 -DCONAN_HOST_PROFILE 指到这份文件，
 # 于是 conan_provider 在 configure 期用这一档解析依赖，而不是走「default + auto-cmake」——
 # 后者会在每个构建树里现生成一份 conan_host_profile（看不见的产物，随 CMake 变量飘）。
-# 需求第十七节的要求是「Windows 与 Linux 都要有 Conan profile」，两侧因此同一形状：
-# 档位是仓库里的一份文件，不是一次检测结果。
+# 需求第十七节的要求是「Windows 与 Linux 都要有 Conan profile」，形状因此定成：
+# 档位是仓库里的一份文件，不是一次检测结果。Linux 那一份随容器设施一起移除了，
+# 恢复 Linux 适配时按同一形状补回同目录。
 #
 # compiler.version 是**唯一需要按机器改的一行**：这里的 195 对应本机 MSVC 14.51。
 # 换 VS 版本时改这一行；其余字段是本工程的硬指标（x86_64 / dynamic runtime / C++23），不跟机器飘。
@@ -11,7 +12,6 @@
 # 刻意不写 build_type：它由 conan_provider 按预设的 CMAKE_BUILD_TYPE 在命令行上给
 # （-s build_type=…）。写死 Release 的话 Debug 预设也会领到 Release 的依赖图，
 # 而「Debug 不领 Tesseract」正是按 build_type 分岔的（见 conanfile.py 里那处取舍）。
-# 容器侧那份见同目录的 LinuxGcc13，由 scripts/container/env.sh 指过去。
 
 [settings]
 os=Windows
