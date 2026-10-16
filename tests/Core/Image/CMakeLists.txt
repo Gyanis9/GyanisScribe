@@ -1,6 +1,7 @@
 add_executable(TestCoreImage
         TestImageFit.cpp
         TestImageFormat.cpp
+        TestImageLoading.cpp
         TestOutputDecoration.cpp
         TestClipboardImage.cpp
         TestClipboardFile.cpp)

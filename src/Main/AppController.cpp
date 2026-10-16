@@ -6,6 +6,7 @@
 #include "Core/Annotation/BlankCanvas.h"
 #include "App/ClipboardPin.h"
 #include "App/CustomHotkeys.h"
+#include "App/OcrCoordinator.h"
 #include "Gui/Capture/CaptureService.h"
 #include "Core/Capture/IScreenCaptureSource.h"
 #include "Core/Capture/RegionHistory.h"
@@ -13,6 +14,7 @@
 #include "Core/Capture/ScreenUtils.h"
 #include "Base/ExternalCommand.h"
 #include "Core/Image/ImageFit.h"
+#include "Core/Image/ImageLoading.h"
 #include "Core/Image/ImageFormat.h"
 #include "Base/Logger.h"
 #include "Core/Image/OutputDecoration.h"
@@ -24,15 +26,10 @@
 #include "Core/History/UnsavedArchive.h"
 #include "Core/Hotkey/HotkeyManager.h"
 #include "Core/Hotkey/IHotkeyManager.h"
-#include "Core/Ocr/IOcrEngine.h"
-#include "Plugins/OcrEngines/OcrEngineFactory.h"
 #include "Core/Pick/ColorFormat.h"
 #include "Core/Pick/RecentColors.h"
 #include "Gui/Pick/ColorPickerOverlay.h"
-#include "Gui/Ocr/OcrResultWindow.h"
-#include "Core/Ocr/OcrTypes.h"
 #include "Plugins/Barcode/BarcodeDecoder.h"
-#include "Core/Ocr/RecognitionRunner.h"
 #include "Gui/Pin/PinGroupManagerWindow.h"
 #include "Gui/Pin/PinManager.h"
 #include "App/TrayController.h"
@@ -53,8 +50,6 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QDialog>
-#include <QDir>
-#include <QFileDialog>
 #include <QFileInfo>
 #include <QCursor>
 #include <QGuiApplication>
@@ -64,7 +59,6 @@
 #include <QPrintDialog>
 #include <QPrinter>
 #include <QScreen>
-#include <QImageReader>
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QDesktopServices>
@@ -161,12 +155,10 @@ namespace GyanisScribe::Main
         // 标注一套：引擎跨轮次复用（载入新帧自己会清空历史），窗口与工具栏也只建一次
         m_annotation = std::make_unique<GyanisScribe::Core::AnnotationEngine>();
         m_pins       = std::make_unique<GyanisScribe::Gui::PinManager>(*m_settings, *m_integration);
-        m_ocr        = GyanisScribe::Plugins::createOcrEngine(*m_settings, *m_integration);
-        // Runner 拿着引擎的引用，它的析构必须排在引擎之前：成员的析构按声明反序，头文件里那份声明就排在 m_ocr 后面
-        m_ocrRunner = std::make_unique<GyanisScribe::Core::RecognitionRunner>(*m_ocr);
-        // 识别在工作线程上跑，回来的两条槽仍然跑在界面线程：结果窗口的建立与刷新不能交给别的线程
-        QObject::connect(m_ocrRunner.get(), &GyanisScribe::Core::RecognitionRunner::succeeded, this, &AppController::handleOcrSucceeded);
-        QObject::connect(m_ocrRunner.get(), &GyanisScribe::Core::RecognitionRunner::failed, this, &AppController::handleOcrFailed);
+        // 识别这一族整族搬进了 OcrCoordinator（审查台账 A-11）：控制器只留「谁要认什么」的接线，
+        // 它要说的那句提示（后端没编进来、没有可认的图、认失败了）走 messageForUser 回到这一层出气泡
+        m_ocr = std::make_unique<GyanisScribe::App::OcrCoordinator>(*m_settings, *m_integration, *m_icons, *m_theme);
+        QObject::connect(m_ocr.get(), &GyanisScribe::App::OcrCoordinator::messageForUser, this, &AppController::notifyUser);
         m_tray         = std::make_unique<GyanisScribe::App::TrayController>(*m_icons, *m_theme, *m_settings, *m_integration);
         m_imageFetcher = std::make_unique<GyanisScribe::App::ImageFetcher>();
         // 取图的成败都在这一层收口：贴到哪儿、提示什么话，只有界面层知道
@@ -282,7 +274,7 @@ namespace GyanisScribe::Main
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::copyRequested, this, &AppController::handleCopyRequested);
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::saveRequested, this, &AppController::handleSaveRequested);
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::pinRequested, this, &AppController::handlePinRequested);
-        QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::ocrRequested, this, &AppController::handleOcrRequested);
+        QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::ocrRequested, m_ocr.get(), &GyanisScribe::App::OcrCoordinator::requestRecognition);
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::scanRequested, this, &AppController::handleScanRequested);
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::printRequested, this, &AppController::handlePrintRequested);
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::refreshRequested, this, &AppController::refreshLastCapture);
@@ -303,7 +295,7 @@ namespace GyanisScribe::Main
 
         // 历史页的三个出口：贴图与识别都要先把成品读回内存，删除只动清单不动文件
         QObject::connect(m_mainWindow.get(), &MainWindow::historyPinRequested, this, &AppController::handleHistoryPin);
-        QObject::connect(m_mainWindow.get(), &MainWindow::historyOcrRequested, this, &AppController::recognizeImageFile);
+        QObject::connect(m_mainWindow.get(), &MainWindow::historyOcrRequested, m_ocr.get(), &GyanisScribe::App::OcrCoordinator::recognizeFile);
         QObject::connect(m_mainWindow.get(), &MainWindow::historyRemoveRequested, this, &AppController::handleHistoryRemove);
         QObject::connect(m_mainWindow.get(), &MainWindow::historyOpenFolderRequested, this, &AppController::handleHistoryOpenFolder);
         QObject::connect(m_mainWindow.get(), &MainWindow::historyClearRequested, this, &AppController::handleHistoryClear);
@@ -315,7 +307,7 @@ namespace GyanisScribe::Main
         // 贴图张数走托盘悬停提示：贴图常被压在别的窗口后面，这是唯一还能看出「挂着几张」的地方
         QObject::connect(m_pins.get(), &GyanisScribe::Gui::PinManager::pinCountChanged, m_tray.get(), &GyanisScribe::App::TrayController::setPinCount);
         // 贴图菜单里的「识别文字」与热键、标注窗走的是同一个出口：一处接线管所有张（含启动恢复的那些）
-        QObject::connect(m_pins.get(), &GyanisScribe::Gui::PinManager::pinOcrRequested, this, &AppController::handleOcrRequested);
+        QObject::connect(m_pins.get(), &GyanisScribe::Gui::PinManager::pinOcrRequested, m_ocr.get(), &GyanisScribe::App::OcrCoordinator::requestRecognition);
         // 贴图上取的色与屏幕取色共用写法和复制那两句：两处各写一份，复制到的文本格式就会分家
         QObject::connect(m_pins.get(), &GyanisScribe::Gui::PinManager::pinColorPicked, this, &AppController::handlePinColorPicked);
         // 贴图标注时的「另贴一张」：与回车复制出去的结果一样走 addPin，一处入口管所有新贴图
@@ -671,7 +663,7 @@ namespace GyanisScribe::Main
                 return;
             case GyanisScribe::App::TrayAction::RecognizeFile:
                 // 需求给 OCR 列了三种来路：框选区域、贴图、以及盘上的一张图，这一条走最后那种
-                pickImageFileAndRecognize();
+                m_ocr->pickImageFileAndRecognize();
                 return;
             case GyanisScribe::App::TrayAction::PickColor:
                 startColorPick();
@@ -840,7 +832,7 @@ namespace GyanisScribe::Main
         {
             case GyanisScribe::App::CaptureIntent::Recognize:
                 // 识别这条不弹标注窗：用户点的是「识别文字」，先弹一个要再点一次的界面就是多一跳
-                handleOcrRequested(image);
+                m_ocr->requestRecognition(image);
                 return;
             case GyanisScribe::App::CaptureIntent::CopyToClipboard:
                 handleCopyRequested(image);
@@ -1207,13 +1199,6 @@ namespace GyanisScribe::Main
         GyanisScribe::Base::Logger::info(std::format("贴图已重抓这块屏幕：{}×{} 像素", frame->image.width(), frame->image.height()));
     }
 
-    void AppController::handleOcrRequested(const QImage &image)
-    {
-        m_ocrImage = image;
-        // 语言取上一次的选择：换过一次就该记住，而不是每轮都退回默认档
-        recognizeWithLanguage(m_settings->stringValue(GyanisScribe::Core::kOcrLanguage, QString::fromUtf8(GyanisScribe::Core::kDefaultOcrLanguage)));
-    }
-
     void AppController::handleScanRequested(const QImage &image)
     {
         const auto readings = GyanisScribe::Plugins::readBarcodes(image);
@@ -1347,64 +1332,6 @@ namespace GyanisScribe::Main
         const auto text   = GyanisScribe::Core::formatColor(color, format, casing);
         QGuiApplication::clipboard()->setText(text);
         notifyUser(GyanisScribe::Base::uiText("已复制颜色 ") + text, GyanisScribe::Gui::ToastKind::Success);
-    }
-
-    void AppController::recognizeWithLanguage(const QString &language)
-    {
-        if (!m_ocr->isAvailable())
-        {
-            const auto reason = m_ocr->unavailableReason();
-            GyanisScribe::Base::Logger::error(std::format("文字识别没能开始：{}", reason.toStdString()));
-            notifyUser(reason, GyanisScribe::Gui::ToastKind::Danger);
-            return;
-        }
-
-        if (m_ocrImage.isNull())
-        {
-            notifyUser(GyanisScribe::Base::uiText("还没有可识别的图：先按 Ctrl+Alt+A 框选一块屏幕"), GyanisScribe::Gui::ToastKind::Information);
-            return;
-        }
-
-        // 一次识别要跑几十到上千毫秒，放在这条线程上整个程序就停在那儿：交出去之前先说一句，
-        // 否则结果回来之前界面看着像「点了没反应」
-        notifyUser(GyanisScribe::Base::uiText("正在识别这一张…"), GyanisScribe::Gui::ToastKind::Information);
-        m_ocrRunner->request(m_ocrImage, language);
-    }
-
-    void AppController::handleOcrSucceeded(const QImage &image, const QString &language, const GyanisScribe::Core::OcrResult &result)
-    {
-        // 认出多少算多少：空结果也要开窗，摘要里那句「这一张没认出文字」比一条三秒就消失的提示有用
-        if (auto stored = m_settings->setValue(GyanisScribe::Core::kOcrLanguage, language); !stored)
-        {
-            GyanisScribe::Base::Logger::warning(std::format("识别语言没能记住：{}", stored.error().message));
-        }
-
-        // 底图用发出请求时那一张：期间用户可能又截了新图，而方框是按送去认的那一张算的，换了图就整体错位
-        if (m_ocrWindow == nullptr)
-        {
-            m_ocrWindow = new GyanisScribe::Gui::OcrResultWindow{image, result, *m_icons, *m_theme, GyanisScribe::Core::nameTemplateOrDefault(*m_settings)};
-            // 关掉就自毁，控制器只持 QPointer：下一次识别会重新建一个，不会往已析构的对象里塞结果
-            m_ocrWindow->setAttribute(Qt::WA_DeleteOnClose);
-            QObject::connect(m_ocrWindow, &GyanisScribe::Gui::OcrResultWindow::recognizeRequested, this, &AppController::recognizeWithLanguage);
-            QObject::connect(m_ocrWindow, &GyanisScribe::Gui::OcrResultWindow::messageForUser, this,
-                             [this](const QString &message, GyanisScribe::Gui::ToastKind kind) { notifyUser(message, kind); });
-        } else
-        {
-            m_ocrWindow->setResult(image, result);
-        }
-
-        m_ocrWindow->show();
-        m_ocrWindow->raise();
-        m_ocrWindow->activateWindow();
-        GyanisScribe::Base::Logger::info(std::format("文字识别完成：{} 行，语言 {}", result.lines.size(), language.toStdString()));
-    }
-
-    void AppController::handleOcrFailed(const GyanisScribe::Base::Error &error)
-    {
-        const auto message =
-                QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("文字识别失败：{}。请重试一次，或换一种语言再试"), error.message).c_str());
-        GyanisScribe::Base::Logger::error(message.toStdString());
-        notifyUser(message, GyanisScribe::Gui::ToastKind::Danger);
     }
 
     void AppController::notifyUser(const QString &message, const GyanisScribe::Gui::ToastKind kind)
@@ -1735,25 +1662,9 @@ namespace GyanisScribe::Main
         m_mainWindow->refreshHistory();
     }
 
-    GyanisScribe::Base::Expected<QImage> AppController::loadImageFile(const std::filesystem::path &filePath) const
-    {
-        QImageReader reader{GyanisScribe::Base::Paths::toDisplayText(filePath)};
-        reader.setAutoTransform(true);
-        const auto image = reader.read();
-        if (image.isNull())
-        {
-            return GyanisScribe::Base::Expected<QImage>{std::unexpected{GyanisScribe::Base::Error{
-                    .code    = GyanisScribe::Base::ErrorCode::DependencyMissing,
-                    .message = GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("读不出这张图：{}。文件可能已被移动或删掉，或这个构建里没有对应的图片解码插件"),
-                                                            GyanisScribe::Base::Paths::toDisplayText(filePath).toStdString()),
-            }}};
-        }
-        return GyanisScribe::Base::Expected<QImage>{image};
-    }
-
     void AppController::handleHistoryPin(const std::filesystem::path &filePath)
     {
-        auto image = loadImageFile(filePath);
+        auto image = GyanisScribe::Core::loadImageFile(filePath);
         if (!image)
         {
             notifyUser(QString::fromUtf8(image.error().message.c_str()), GyanisScribe::Gui::ToastKind::Danger);
@@ -1761,30 +1672,6 @@ namespace GyanisScribe::Main
         }
         // 盘上的原文件一并交过去：动图（GIF/APNG）贴上去要接着播，而不是停在首帧
         m_pins->addPin(*image, QCursor::pos(), GyanisScribe::Base::Paths::toDisplayText(filePath));
-    }
-
-    void AppController::pickImageFileAndRecognize()
-    {
-        // 没有窗口可当父对象（托盘动作发生时主窗口多半是藏起来的），对话框按应用级模态开
-        const auto picked = QFileDialog::getOpenFileName(nullptr, GyanisScribe::Base::uiText("识别图片文件"), QDir::homePath(),
-                                                         GyanisScribe::Base::uiText("图片文件 (*.png *.jpg *.jpeg *.bmp *.webp *.gif)"));
-        if (picked.isEmpty())
-        {
-            // 取消不是失败：一句都不多说，也不落日志
-            return;
-        }
-        recognizeImageFile(GyanisScribe::Base::Paths::fromDisplayText(picked));
-    }
-
-    void AppController::recognizeImageFile(const std::filesystem::path &filePath)
-    {
-        auto image = loadImageFile(filePath);
-        if (!image)
-        {
-            notifyUser(QString::fromUtf8(image.error().message.c_str()), GyanisScribe::Gui::ToastKind::Danger);
-            return;
-        }
-        handleOcrRequested(*image);
     }
 
     void AppController::handleHistoryRemove(const std::filesystem::path &filePath)
