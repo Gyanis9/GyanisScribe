@@ -9,6 +9,7 @@
 
 #include <QApplication>
 #include <QColor>
+#include <QElapsedTimer>
 #include <QImage>
 #include <QKeyEvent>
 #include <QMouseEvent>
@@ -18,6 +19,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -1219,4 +1221,57 @@ TEST_F(CaptureServiceFixture, LongCaptureRoutesTheOverlaySelectionIntoTheLongRou
     service.startInteractive();
     ASSERT_TRUE(outcome.error.has_value()) << "长截图那一轮没在接：选区没进长截图这条路";
     EXPECT_NE(outcome.error->message.find("滚动长截图还在接"), std::string::npos) << "拒绝的理由不是「长截图还在接」，那就证明不了这一轮活着：" << outcome.error->message;
+}
+
+/**
+ * @brief 读数用例：一次框选从「起一轮」到「交回成品」的耗时（不断言时间）
+ * @details 结论要进 README 的「性能实测」，所以量法写死在这一处：真的铺遮罩、真的拖一块再确认，
+ *          量到成品落地为止——**含铺遮罩与建窗那一份**，因为那正是用户按完热键要等的时间，
+ *          只量抓一帧那一步（另有读数用例管）说明不了整条链。它不断言时间：跑在什么机器上就报什么数，
+ *          红了只说明抓不到帧或没交出成品。
+ *          每轮换一个新的服务，并在轮末把 DeferredDelete 派发掉——遮罩关闭走的是 deleteLater，
+ *          不派发的话下一轮的 findOverlay() 会捡到上一轮那扇还排着队的老遮罩。
+ */
+TEST_F(CaptureServiceFixture, ReportsTheCostOfOneWholeInteractiveCapture)
+{
+    if (QGuiApplication::screens().isEmpty())
+    {
+        GTEST_SKIP() << "这个环境没有屏幕可枚举，铺不出遮罩";
+    }
+
+    constexpr int       kRounds = 5;
+    std::vector<double> milliseconds;
+    for (int round = 0; round < kRounds; ++round)
+    {
+        SettingsStore           settings(m_iniFile);
+        FakeCaptureSource       source;
+        FakePlatformIntegration fake;
+        CaptureService          service(source, settings, fake);
+        Outcome                 outcome;
+        wire(service, outcome);
+
+        QElapsedTimer watch;
+        watch.start();
+
+        service.startInteractive();
+        auto *overlay = findOverlay();
+        ASSERT_NE(overlay, nullptr) << "开始框选之后没铺出遮罩";
+
+        const auto  anchor = QPoint{5, 5};
+        const auto  pull   = QPoint{45, 35};
+        const auto  global = overlay->geometry().topLeft();
+        QMouseEvent press{QEvent::MouseButtonPress, QPointF{anchor}, QPointF{global + anchor}, Qt::LeftButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &press);
+        QMouseEvent move{QEvent::MouseMove, QPointF{pull}, QPointF{global + pull}, Qt::NoButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &move);
+        overlay->confirmSelection();
+
+        milliseconds.push_back(static_cast<double>(watch.nsecsElapsed()) / 1'000'000.0);
+        ASSERT_TRUE(outcome.image.has_value()) << "这一轮没交出成品，读数是假的";
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    }
+
+    std::ranges::sort(milliseconds);
+    std::printf("[读数] 一次框选全链（铺遮罩→拖框→交付成品）中位 %.1fms（%d 轮，min %.1f / max %.1f）\n", milliseconds[static_cast<std::size_t>(kRounds) / 2U], kRounds,
+                milliseconds.front(), milliseconds.back());
 }
