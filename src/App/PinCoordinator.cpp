@@ -179,4 +179,47 @@ namespace GyanisScribe::App
                             GyanisScribe::Gui::ToastKind::Success);
     }
 
+    void PinCoordinator::restoreMouseThrough()
+    {
+        const auto restored = m_pins.clearMouseThrough();
+        // 一张都没恢复也要说一声：用户按这条是因为他觉得贴图「点不动」，
+        // 没有这句他就会一直以为是程序卡住了
+        emit messageForUser(restored > 0 ? QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已让 {} 张贴图重新吃鼠标"), restored).c_str())
+                                         : GyanisScribe::Base::uiText("没有贴图开着鼠标穿透"),
+                            restored > 0 ? GyanisScribe::Gui::ToastKind::Success : GyanisScribe::Gui::ToastKind::Information);
+    }
+
+    void PinCoordinator::toggleVisibility()
+    {
+        // 看得见就先收、一张都看不见就摆回：这一条是开关，不是单向的隐藏。
+        // 收着的贴图用户点不到，摆回这一格只能由托盘与热键给
+        const auto show    = m_pins.visiblePinCount() == 0;
+        const auto changed = m_pins.setAllPinsConcealed(!show);
+        emit       messageForUser(
+                changed > 0 ? QString::fromUtf8(GyanisScribe::Base::uiFormat(
+                                                        show ? GyanisScribe::Base::uiTextUtf8("已摆回 {} 张贴图") : GyanisScribe::Base::uiTextUtf8("已收起 {} 张贴图"), changed)
+                                                        .c_str())
+                            : GyanisScribe::Base::uiText("桌上没有贴图"),
+                changed > 0 ? GyanisScribe::Gui::ToastKind::Success : GyanisScribe::Gui::ToastKind::Information);
+    }
+
+    void PinCoordinator::switchToNextGroup()
+    {
+        const auto switched = m_pins.switchToNextGroup();
+        if (!switched)
+        {
+            // 只有一组时把「怎么多出一组」说清楚：热键按下去毫无动静最容易被当成坏了
+            emit messageForUser(QString::fromUtf8(switched.error().message.c_str()), GyanisScribe::Gui::ToastKind::Information);
+            return;
+        }
+        emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已切到{}，桌上是这一组"), groupLabel(*switched).toStdString()).c_str()),
+                            GyanisScribe::Gui::ToastKind::Success);
+    }
+
+    void PinCoordinator::closeAll()
+    {
+        GyanisScribe::Base::Logger::info(std::format("托盘要求关闭全部贴图：{} 张", m_pins.count()));
+        m_pins.closeAll();
+    }
+
 } // namespace GyanisScribe::App

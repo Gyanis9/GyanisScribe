@@ -634,51 +634,19 @@ namespace GyanisScribe::Main
                 startColorPick();
                 return;
             case GyanisScribe::App::TrayAction::ClearPinsThrough:
-            {
-                const auto restored = m_pins->clearMouseThrough();
-                // 一张都没恢复也要说一声：用户按这条是因为他觉得贴图「点不动」，
-                // 没有这句他就会一直以为是程序卡住了
-                notifyUser(restored > 0 ? QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已让 {} 张贴图重新吃鼠标"), restored).c_str())
-                                        : GyanisScribe::Base::uiText("没有贴图开着鼠标穿透"),
-                           restored > 0 ? GyanisScribe::Gui::ToastKind::Success : GyanisScribe::Gui::ToastKind::Information);
+                m_pinCoordinator->restoreMouseThrough();
                 return;
-            }
             case GyanisScribe::App::TrayAction::TogglePinsVisible:
-            {
-                // 看得见就先收、一张都看不见就摆回：这一条是开关，不是单向的隐藏。
-                // 收着的贴图用户点不到，摆回这一格只能由托盘与热键给
-                const auto show    = m_pins->visiblePinCount() == 0;
-                const auto changed = m_pins->setAllPinsConcealed(!show);
-                notifyUser(changed > 0 ? QString::fromUtf8(GyanisScribe::Base::uiFormat(show ? GyanisScribe::Base::uiTextUtf8("已摆回 {} 张贴图")
-                                                                                             : GyanisScribe::Base::uiTextUtf8("已收起 {} 张贴图"),
-                                                                                        changed)
-                                                                   .c_str())
-                                       : GyanisScribe::Base::uiText("桌上没有贴图"),
-                           changed > 0 ? GyanisScribe::Gui::ToastKind::Success : GyanisScribe::Gui::ToastKind::Information);
+                m_pinCoordinator->toggleVisibility();
                 return;
-            }
             case GyanisScribe::App::TrayAction::PasteClipboard:
                 m_pinCoordinator->pasteClipboard();
                 return;
             case GyanisScribe::App::TrayAction::NextPinGroup:
-            {
-                const auto switched = m_pins->switchToNextGroup();
-                if (!switched)
-                {
-                    // 只有一组时把「怎么多出一组」说清楚：热键按下去毫无动静最容易被当成坏了
-                    notifyUser(QString::fromUtf8(switched.error().message.c_str()), GyanisScribe::Gui::ToastKind::Information);
-                    return;
-                }
-                notifyUser(QString::fromUtf8(
-                                   GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已切到{}，桌上是这一组"), m_pinCoordinator->groupLabel(*switched).toStdString())
-                                           .c_str()),
-                           GyanisScribe::Gui::ToastKind::Success);
+                m_pinCoordinator->switchToNextGroup();
                 return;
-            }
             case GyanisScribe::App::TrayAction::CloseAllPins:
-                // 一次点关掉全部：张数由 pinCountChanged 通知托盘刷新，这里只留一条日志，不再弹提示吵人
-                GyanisScribe::Base::Logger::info(std::format("托盘要求关闭全部贴图：{} 张", m_pins->count()));
-                m_pins->closeAll();
+                m_pinCoordinator->closeAll();
                 return;
             case GyanisScribe::App::TrayAction::ManagePinGroups:
                 m_pinCoordinator->openGroupManager();

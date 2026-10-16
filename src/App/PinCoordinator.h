@@ -104,6 +104,18 @@ namespace GyanisScribe::App
         /// 说一句删组结果：组里的贴图搬去了哪儿要讲清楚
         void reportGroupDeleted(int group, int movedCount);
 
+        /// 让开着鼠标穿透的那几张重新吃鼠标；一张都没恢复也要说一声（用户按这条是因为觉得贴图点不动）
+        void restoreMouseThrough();
+
+        /// 托盘那一条开关：看得见就先收、一张都看不见就摆回（收着的贴图用户点不到，摆回只能由托盘与热键给）
+        void toggleVisibility();
+
+        /// 切到下一组；只有一组时把「怎么多出一组」说清楚（按下去毫无动静最容易被当成坏了）
+        void switchToNextGroup();
+
+        /// 一次关掉全部：张数由管理器自己的信号通知托盘刷新，这里只留一条日志，不再弹提示吵人
+        void closeAll();
+
     signals:
         /// 要说给用户的一句话（由控制器决定用气泡还是落日志）
         void messageForUser(const QString &message, GyanisScribe::Gui::ToastKind kind);
