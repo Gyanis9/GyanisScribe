@@ -8,7 +8,11 @@
 
 #include <gtest/gtest.h>
 
+#include <QApplication>
 #include <QCoreApplication>
+#include <QElapsedTimer>
+#include <QGuiApplication>
+#include <QScreen>
 #include <QFileInfo>
 #include <QProcess>
 #include <QStringList>
@@ -16,6 +20,8 @@
 #include <QString>
 #include <QtGlobal>
 
+#include <algorithm>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -110,6 +116,80 @@ namespace
     std::filesystem::path probeDirectory(const std::string &name)
     {
         return std::filesystem::temp_directory_path() / (std::string{"GyanisScribe-Record-"} + name);
+    }
+
+
+    /**
+     * @brief 读数用例：把一帧**真实屏幕内容**落成 PNG 要多少毫秒（不断言时间）
+     * @details 结论要进 README 的「性能实测」：录屏那条链剩下的墙就在落盘这一段，而这一格一直没读数。
+     *          量法写死在这一处：抓一帧真的屏幕（**合成图不行**——PNG 的代价取决于内容熵，纯色压得过狠、
+     *          逐像素噪声又比真屏幕难压，两头都不像屏幕），交给录屏真正用的那个 sink 写盘，
+     *          12 轮取中位；顺带报落下来的文件多大，好判断这一帧代表不代表屏幕内容。
+     *          它不断言时间：跑在什么机器上就报什么数。
+     */
+    class PngSinkReadoutFixture : public ::testing::Test
+    {
+    protected:
+        static void SetUpTestSuite()
+        {
+            // 直接跑整个二进制时会先起来别的套件那份 QCoreApplication：一个进程只许有一个应用对象，这里不重复建。
+            // 真那样跑时这一条会因为没有屏幕而跳过——读数要的是「抓得到屏幕」的现场。
+            if (QCoreApplication::instance() != nullptr)
+            {
+                return;
+            }
+            static int   argumentCount  = 1;
+            static char  argumentZero[] = "TestRecordingReadout";
+            static char *arguments[]    = {argumentZero, nullptr};
+            readoutApplication          = std::make_unique<QApplication>(argumentCount, arguments);
+        }
+
+        static void TearDownTestSuite()
+        {
+            readoutApplication.reset();
+        }
+
+        static std::unique_ptr<QApplication> readoutApplication;
+    };
+
+    std::unique_ptr<QApplication> PngSinkReadoutFixture::readoutApplication;
+
+    TEST_F(PngSinkReadoutFixture, ReportsTheCostOfWritingOnePngFrameOfRealScreenContent)
+    {
+        auto *screen = QGuiApplication::primaryScreen();
+        if (screen == nullptr)
+        {
+            GTEST_SKIP() << "这个环境没有屏幕可抓，这一格读不到数";
+        }
+
+        const auto frame = screen->grabWindow(0).toImage();
+        ASSERT_FALSE(frame.isNull()) << "抓不到屏幕内容，读数不成立";
+        const auto frameBytes = static_cast<double>(frame.sizeInBytes()) / (1024.0 * 1024.0);
+
+        const auto      directory = std::filesystem::temp_directory_path() / "GyanisScribe-RecordingSinkReadout";
+        std::error_code ignored;
+        std::filesystem::remove_all(directory, ignored);
+        std::filesystem::create_directories(directory, ignored);
+
+        GyanisScribe::Core::PngSequenceSink sink{directory};
+        constexpr int                       kRounds = 12;
+        std::vector<double>                 milliseconds;
+        milliseconds.reserve(kRounds);
+        for (int round = 0; round < kRounds; ++round)
+        {
+            QElapsedTimer watch;
+            watch.start();
+            const auto written = sink.write(frame, round);
+            milliseconds.push_back(static_cast<double>(watch.nsecsElapsed()) / 1'000'000.0);
+            ASSERT_TRUE(written.has_value()) << written.error().message;
+        }
+
+        const auto onDisk = static_cast<double>(std::filesystem::file_size(directory / GyanisScribe::Core::frameFileName(0))) / 1024.0;
+        std::ranges::sort(milliseconds);
+        std::printf("[读数] 一帧 %dx%d 的真屏幕内容落成 PNG：中位 %.1fms（%d 轮，min %.1f / max %.1f；帧内像素 %.1f MiB，落盘 %.0f KiB）%s", frame.width(), frame.height(),
+                    milliseconds[static_cast<std::size_t>(kRounds) / 2U], kRounds, milliseconds.front(), milliseconds.back(), frameBytes, onDisk, "\n");
+
+        std::filesystem::remove_all(directory, ignored);
     }
 
 } // namespace

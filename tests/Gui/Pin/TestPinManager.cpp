@@ -28,6 +28,10 @@
 #include <QWheelEvent>
 #include <QMimeData>
 #include <QPoint>
+#ifdef Q_OS_WIN
+#include <windows.h>
+#include <psapi.h>
+#endif
 #include <QVariant>
 
 #include <filesystem>
@@ -45,6 +49,20 @@ namespace GyanisScribe
 
         constexpr int kImageWidth  = 32;
         constexpr int kImageHeight = 24;
+
+
+        /// 本进程当前的工作集（字节）；报不出来时返回 0，调用方据此跳过（非 Windows 只能这样）
+        std::size_t currentWorkingSetBytes()
+        {
+#ifdef Q_OS_WIN
+            PROCESS_MEMORY_COUNTERS counters{};
+            if (K32GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof(counters)))
+            {
+                return static_cast<std::size_t>(counters.WorkingSetSize);
+            }
+#endif
+            return 0;
+        }
 
         /// 小图一张：分组判据不看内容，只看谁在桌上
         QImage makeImage()
@@ -1229,4 +1247,37 @@ namespace GyanisScribe
         EXPECT_FALSE(card->colorCardColor().has_value()) << "换成照片之后还认得出原色，菜单里那一项会点坏这张图";
     }
 
+    /**
+     * @brief 读数用例：贴 20 张 4K 图之后进程工作集涨了多少（不断言数字）
+     * @details 结论要进 README 的「性能实测」：贴图是这类工具的常驻大头，一张 4K 图的像素就是 33MB 这个量级。
+     *          量法写死在这一处：先记一次基线，再贴 20 张 3840×2160、底色各不相同的图（真的建 20 扇贴图窗），
+     *          再记一次，报「涨了多少、平均每张多少」。它不断言数字：跑在什么机器上就报什么数。
+     */
+    TEST_F(PinManagerFixture, ReportsTheWorkingSetAfterTwentyUltraHdPins)
+    {
+        constexpr int kWide  = 3840;
+        constexpr int kHigh  = 2160;
+        constexpr int kCount = 20;
+
+        const auto baseline = currentWorkingSetBytes();
+        if (baseline == 0)
+        {
+            GTEST_SKIP() << "这台机器报不出工作集，这一格只能跳过";
+        }
+
+        auto &pins = makeManager();
+        for (int index = 0; index < kCount; ++index)
+        {
+            QImage image{kWide, kHigh, QImage::Format_ARGB32};
+            // 底色各不相同：内容完全一样时 Qt 可能在内部共享同一份像素，量出来就不是「20 张」的成本
+            image.fill(QColor{index * 11 % 256, index * 29 % 256, index * 47 % 256});
+            pins.addPin(image, QPoint(20 + index * 6, 20 + index * 6));
+        }
+
+        const auto loaded = currentWorkingSetBytes();
+        const auto growth = loaded > baseline ? loaded - baseline : 0;
+        std::printf("[读数] 贴 %d 张 %d×%d 的图后进程工作集：基线 %.0f MiB → %.0f MiB（涨 %.0f MiB，每张约 %.1f MiB）%s", kCount, kWide, kHigh,
+                    static_cast<double>(baseline) / (1024.0 * 1024.0), static_cast<double>(loaded) / (1024.0 * 1024.0), static_cast<double>(growth) / (1024.0 * 1024.0),
+                    static_cast<double>(growth) / (1024.0 * 1024.0) / kCount, "\n");
+    }
 } // namespace GyanisScribe

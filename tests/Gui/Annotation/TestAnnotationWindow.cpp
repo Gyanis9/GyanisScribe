@@ -16,6 +16,7 @@
 
 #include <QApplication>
 #include <QCoreApplication>
+#include <QElapsedTimer>
 #include <QImage>
 #include <QKeyEvent>
 #include <QMouseEvent>
@@ -27,7 +28,10 @@
 #include <QSize>
 #include <QWidget>
 
+#include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <vector>
 #include <filesystem>
 #include <format>
 #include <memory>
@@ -1383,4 +1387,47 @@ TEST_F(AnnotationWindowFixture, SwitchingToolsReplacesTheToolbarAgainstTheSelect
     EXPECT_EQ(after.width(), toolbar.sizeHint().width()) << "宽度没跟上新尺寸";
     EXPECT_NE(after.width(), before.width()) << "文字档该比矩形档宽，这条判据的前提没成立";
     EXPECT_NEAR(after.x(), before.x() - (after.width() - before.width()) / 2.0, 1.0) << "收放后没有按选区重新居中：x " << before.x() << " -> " << after.x();
+}
+
+/**
+ * @brief 读数用例：底图 2560×1440、画布上 30 个图形时，整窗重绘一次要多少毫秒（不断言时间）
+ * @details 结论要进 README 的「性能实测」。标注窗每次改动都走整幅 `update()`（`canvasChanged` → `update()`），
+ *          成本主要是把底图缩放画一遍、再把图形那一层叠上去，所以这一格要有自己的读数——
+ *          「重绘是不是整幅重画」是形状判据，慢不慢只有量了才知道。
+ *          它不断言时间：跑在什么机器上就报什么数。
+ */
+TEST_F(AnnotationWindowFixture, ReportsTheCostOfRepaintingAWindowFullOfShapes)
+{
+    constexpr int kShapes = 30;
+
+    auto window = makeWindow();
+    window->startAnnotation(makeCanvas(QSize(2560, 1440), 1.0), QRect(0, 0, 1920, 1080), QRect(100, 100, 800, 600));
+    ASSERT_TRUE(window->isVisible());
+
+    // 三十个矩形铺满画布：图形多到一定程度，重绘成本里图形那一层才看得出来
+    for (int index = 0; index < kShapes; ++index)
+    {
+        const auto x = 40 + (index % 10) * 240;
+        const auto y = 40 + (index / 10) * 420;
+        engine().beginStroke({x, y});
+        engine().moveStroke({x + 180, y + 320});
+        ASSERT_TRUE(engine().endStroke().has_value()) << "第 " << index << " 个矩形没画上，后面的读数不成立";
+    }
+
+    constexpr int       kRounds = 10;
+    std::vector<double> milliseconds;
+    milliseconds.reserve(kRounds);
+    for (int round = 0; round < kRounds; ++round)
+    {
+        QElapsedTimer watch;
+        watch.start();
+        const auto frame = window->grab();
+        milliseconds.push_back(static_cast<double>(watch.nsecsElapsed()) / 1'000'000.0);
+        ASSERT_FALSE(frame.isNull()) << "抓不到整窗画面，读数不成立";
+    }
+
+    std::ranges::sort(milliseconds);
+    std::printf("[读数] 标注窗整幅重绘一次：中位 %.1fms（底图 2560×1440、%d 个图形、%d 轮，min %.1f / max %.1f）\n",
+                milliseconds[static_cast<std::size_t>(kRounds) / 2U],
+                kShapes, kRounds, milliseconds.front(), milliseconds.back());
 }
