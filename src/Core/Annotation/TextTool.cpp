@@ -47,11 +47,11 @@ namespace GyanisScribe::Core
             const auto step = std::clamp(shape.textPlateColorStep, 0, kTextPlateColorCount - 1);
             if (step == kTextPlateColorWhite)
             {
-                return QColor(255, 255, 255);
+                return {255, 255, 255};
             }
             if (step == kTextPlateColorBlack)
             {
-                return QColor(0, 0, 0);
+                return {0, 0, 0};
             }
             if (step == kTextPlateColorFromShape)
             {
@@ -65,11 +65,11 @@ namespace GyanisScribe::Core
         {
             if (shape.textStrokeColorStep == kTextStrokeColorWhite)
             {
-                return QColor(255, 255, 255);
+                return {255, 255, 255};
             }
             if (shape.textStrokeColorStep == kTextStrokeColorBlack)
             {
-                return QColor(0, 0, 0);
+                return {0, 0, 0};
             }
             return contrastingColorFor(textFillColorFor(shape));
         }

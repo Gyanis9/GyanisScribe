@@ -72,14 +72,14 @@ namespace GyanisScribe::Core
          * @return true 落在笔迹附近
          * @details 重写基类接口：一条绕圈的画笔在其空心区域里也会被外接框判成命中。
          */
-        bool hitTestShape(const AnnotationShape &shape, const QPoint &point, int tolerance) const override;
+        [[nodiscard]] bool hitTestShape(const AnnotationShape &shape, const QPoint &point, int tolerance) const override;
 
         /**
          * @brief 落定判据，见 AnnotationTool::shapeIsUsable()
          * @param shape 在途图形
          * @return true 至少两个采样点
          */
-        bool shapeIsUsable(const AnnotationShape &shape) const override;
+        [[nodiscard]] bool shapeIsUsable(const AnnotationShape &shape) const override;
 
         /**
          * @brief 轨迹类工具的共同绘制入口

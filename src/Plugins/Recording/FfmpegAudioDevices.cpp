@@ -54,7 +54,7 @@ namespace GyanisScribe::Plugins
 
     Base::Expected<QVector<AudioInputDevice>> audioDevicesFromListing(const QString &ffmpegOutput)
     {
-        const auto devices = parseDshowAudioDevices(ffmpegOutput);
+        auto devices = parseDshowAudioDevices(ffmpegOutput);
         if (devices.isEmpty())
         {
             return std::unexpected(Base::Error{

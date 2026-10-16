@@ -40,20 +40,8 @@ namespace
     /// 转储命名的唯一一处：宽字符 + 调用方给的缓冲区，崩溃处理器里也要能调它（不许分配）
     constexpr std::size_t kDumpNameCapacity = 512;
 
-    int formatCrashDumpFileName(wchar_t *const buffer, const std::size_t capacity, const wchar_t *const applicationVersion, const GyanisScribe::Platform::CrashStamp &stamp,
-                                const std::uint32_t processId)
-    {
-        // 用 %ls 而不是 %s：宽字符格式串里 %s 的语义随标准库而异（MSVC 当宽串），
-        // 命名规则是唯一出处，跨平台时名字拼法不变。
-        return std::swprintf(buffer, capacity, L"GyanisScribe_%ls_%04d%02d%02d-%02d%02d%02d_%u.dmp", applicationVersion, stamp.year, stamp.month, stamp.day, stamp.hour,
-                             stamp.minute, stamp.second, processId);
-    }
-
-#ifdef Q_OS_WIN
-    // 崩溃处理器里唯一能读的现场：都在装过滤器之前写好，之后不再改，也不持有所有权
-    constexpr std::size_t kPathCapacity                      = 4096;
-    wchar_t               g_dumpDirectoryPath[kPathCapacity] = L"";
-    wchar_t               g_applicationVersion[128]          = L"unknown";
+    /// 版本号进名字前先收进栈上这份缓冲：g_applicationVersion 与崩溃处理器那一档共用同一个上限
+    constexpr std::size_t kApplicationVersionCapacity = 128;
 
     /// 把源串截断着拷进固定缓冲区：宁可不完整也不越界（越界会把崩溃现场变成二次故障）
     void copyTruncated(wchar_t *const destination, const std::size_t capacity, const std::wstring_view source)
@@ -65,6 +53,24 @@ namespace
         }
         destination[taken] = L'\0';
     }
+
+    int formatCrashDumpFileName(wchar_t *const buffer, const std::size_t capacity, const std::wstring_view applicationVersion, const GyanisScribe::Platform::CrashStamp &stamp,
+                                const std::uint32_t processId)
+    {
+        // %ls 只吃 NUL 结尾的串，视图不保证这一点：先截断着拷进栈上这份（这一档在崩溃处理器里跑，不许分配）；
+        // 用 %ls 而不是 %s：宽字符格式串里 %s 的语义随标准库而异（MSVC 当宽串），
+        // 命名规则是唯一出处，跨平台时名字拼法不变。
+        wchar_t version[kApplicationVersionCapacity] = L"";
+        copyTruncated(version, kApplicationVersionCapacity, applicationVersion);
+        return std::swprintf(buffer, capacity, L"GyanisScribe_%ls_%04d%02d%02d-%02d%02d%02d_%u.dmp", version, stamp.year, stamp.month, stamp.day, stamp.hour, stamp.minute,
+                             stamp.second, processId);
+    }
+
+#ifdef Q_OS_WIN
+    // 崩溃处理器里唯一能读的现场：都在装过滤器之前写好，之后不再改，也不持有所有权
+    constexpr std::size_t kPathCapacity                                     = 4096;
+    wchar_t               g_dumpDirectoryPath[kPathCapacity]                = L"";
+    wchar_t               g_applicationVersion[kApplicationVersionCapacity] = L"unknown";
 
     /**
      * @brief 未处理异常的兜底：开文件、写 minidump、按约定的退出码结束进程
@@ -96,7 +102,7 @@ namespace
             return EXCEPTION_CONTINUE_SEARCH;
         }
 
-        const HANDLE file = CreateFileW(fullPath, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+        HANDLE file = CreateFileW(fullPath, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
         if (file != INVALID_HANDLE_VALUE)
         {
             MINIDUMP_EXCEPTION_INFORMATION stream{};
@@ -144,13 +150,13 @@ namespace GyanisScribe::Platform
     std::wstring crashDumpFileName(const std::wstring_view applicationVersion, const CrashStamp &stamp, const std::uint32_t processId)
     {
         wchar_t buffer[kDumpNameCapacity] = L"";
-        if (formatCrashDumpFileName(buffer, kDumpNameCapacity, applicationVersion.data(), stamp, processId) <= 0)
+        if (formatCrashDumpFileName(buffer, kDumpNameCapacity, applicationVersion, stamp, processId) <= 0)
         {
             // 版本号里带不上这些格式符的形状才会走到这里；给一句人话而不是留一个空名字，
             // 空名字会让调用方以为「没有转储」而不去找
             throw std::invalid_argument("崩溃转储的文件名拼不出来：版本号或时间戳的形状不对");
         }
-        return std::wstring(buffer);
+        return {buffer};
     }
 
     void installCrashDumpWriter(const std::filesystem::path &dumpDirectory, const std::wstring_view applicationVersion)

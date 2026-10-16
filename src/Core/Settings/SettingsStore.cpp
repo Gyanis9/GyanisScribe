@@ -117,7 +117,7 @@ namespace GyanisScribe::Core
             return defaultValue;
         }
 
-        const auto text = stored.toString();
+        auto text = stored.toString();
         if (text.trimmed().isEmpty())
         {
             // 空文本按「没值」处理而不是原样交回：一个空的截图目录会被下游当成合法路径，

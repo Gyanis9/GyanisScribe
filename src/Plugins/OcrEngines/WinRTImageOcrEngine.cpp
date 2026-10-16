@@ -196,11 +196,10 @@ namespace GyanisScribe::Plugins
 
         std::vector<uint8_t> pngBytes(static_cast<size_t>(encoded.size()));
         std::memcpy(pngBytes.data(), encoded.constData(), static_cast<size_t>(encoded.size()));
-        const std::wstring tag       = systemTag.toStdWString();
-        const QString      publicTag = requestedLanguage;
+        const std::wstring tag = systemTag.toStdWString();
 
         return runOnWinRTThread(
-                [pngBytes = std::move(pngBytes), tag, publicTag, enlargeFactor]() -> Base::Expected<Core::OcrResult>
+                [pngBytes = std::move(pngBytes), tag, publicTag = requestedLanguage]() -> Base::Expected<Core::OcrResult>
                 {
                     try
                     {
@@ -256,7 +255,7 @@ namespace GyanisScribe::Plugins
                                 auto const rect = word.BoundingRect();
                                 // 系统的方框是浮点物理像素，四舍五入到整数格：截断会让整行的框系统性偏左偏上。
                                 // 送进去的是放大过的那一张，所以按同一个倍率折回去，框要与用户看到的原图同系
-                                const auto  fold = [enlargeFactor](const float value) { return static_cast<int>(std::lround(value / static_cast<float>(enlargeFactor))); };
+                                const auto  fold = [](const float value) { return static_cast<int>(std::lround(value / static_cast<float>(enlargeFactor))); };
                                 const QRect box(fold(rect.X), fold(rect.Y), fold(rect.Width), fold(rect.Height));
                                 line.words.push_back(Core::OcrWord{fromWinRTString(word.Text()), box});
                                 line.boundingBox = line.boundingBox.isNull() ? box : line.boundingBox.united(box);

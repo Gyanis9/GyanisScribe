@@ -82,7 +82,7 @@ namespace GyanisScribe::Gui
 
         void setText(const QString &text, const ToastKind kind)
         {
-            const auto accent = toastColorFor(kind, mCurrentPalette);
+            const auto accent = toastColorFor(kind, m_currentPalette);
 
             m_text->setText(text);
             m_text->setStyleSheet(QStringLiteral("color: %1; background: transparent;").arg(accent.name(QColor::HexRgb)));
@@ -94,11 +94,11 @@ namespace GyanisScribe::Gui
 
         void setPalette(const ThemePalette &palette)
         {
-            mCurrentPalette = palette;
+            m_currentPalette = palette;
             // 背景走面板色、边框走语义边框色：气泡是浮层，需求允许轻量阴影但禁玻璃拟态；
             // 圆角取胶囊档（与珍珠玻璃的提示形状同形）——半高以上的大圆角由 Qt 按高度收敛
             setStyleSheet(QStringLiteral("background-color: %1; border: 1px solid %2; border-radius: 999px;")
-                                  .arg(mCurrentPalette.surface.name(QColor::HexRgb), mCurrentPalette.border.name(QColor::HexRgb)));
+                                  .arg(m_currentPalette.surface.name(QColor::HexRgb), m_currentPalette.border.name(QColor::HexRgb)));
         }
 
         [[nodiscard]] QString currentText() const
@@ -107,10 +107,10 @@ namespace GyanisScribe::Gui
         }
 
     private:
-        IconProvider &m_icons;           ///< 图标出口，不拥有
-        QLabel       *m_icon = nullptr;  ///< 种类图标
-        QLabel       *m_text = nullptr;  ///< 提示正文
-        ThemePalette  mCurrentPalette{}; ///< 当前主题的语义色，由 Toast 在显示前灌进来
+        IconProvider &m_icons;            ///< 图标出口，不拥有
+        QLabel       *m_icon = nullptr;   ///< 种类图标
+        QLabel       *m_text = nullptr;   ///< 提示正文
+        ThemePalette  m_currentPalette{}; ///< 当前主题的语义色，由 Toast 在显示前灌进来
     };
 
     Toast::Toast(IconProvider &icons, const ThemeManager &theme, QObject *parent) : QObject(parent), m_icons(icons), m_theme(theme)

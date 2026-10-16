@@ -27,7 +27,7 @@ namespace GyanisScribe::Core
     QSizeF windowSizeFor(const QSizeF &logicalSize, double scale) noexcept
     {
         // 至少留 1×1：零尺寸的顶层窗口既画不出东西也接不到鼠标事件
-        return QSizeF(std::max(1.0, logicalSize.width() * clampScale(scale)), std::max(1.0, logicalSize.height() * clampScale(scale)));
+        return {std::max(1.0, logicalSize.width() * clampScale(scale)), std::max(1.0, logicalSize.height() * clampScale(scale))};
     }
 
     QRectF rotatedBoundingBox(const QPointF &center, const QSizeF &size, double degrees)
@@ -39,7 +39,7 @@ namespace GyanisScribe::Core
         // 外接框 = 宽高各自投影相加；取绝对值让四个象限的旋转都得到同一个框
         const double width  = size.width() * cosine + size.height() * sine;
         const double height = size.width() * sine + size.height() * cosine;
-        return QRectF(center.x() - width / 2.0, center.y() - height / 2.0, width, height);
+        return {center.x() - width / 2.0, center.y() - height / 2.0, width, height};
     }
 
     std::vector<QRectF> handleRects(const QRectF &target, double handleSize)

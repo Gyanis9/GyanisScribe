@@ -465,7 +465,7 @@ namespace
         auto *combo = new QComboBox;
         for (const auto &choice: kLanguageChoices)
         {
-            combo->addItem(GyanisScribe::Base::uiText(choice.label.data()));
+            combo->addItem(GyanisScribe::Base::uiText(choice.label));
         }
         combo->setAccessibleName(GyanisScribe::Base::uiText("界面语言"));
         combo->setToolTip(GyanisScribe::Base::uiText("切换语言要重启智录才生效"));
@@ -508,7 +508,7 @@ namespace
         auto *combo = new QComboBox;
         for (const auto &choice: kThemeChoices)
         {
-            combo->addItem(GyanisScribe::Base::uiText(choice.label.data()));
+            combo->addItem(GyanisScribe::Base::uiText(choice.label));
         }
         combo->setAccessibleName(GyanisScribe::Base::uiText("主题"));
         combo->setCurrentIndex(indexOfThemeKind(theme.requestedKind()));
@@ -565,7 +565,7 @@ namespace
         const auto stored = GyanisScribe::Core::parseColorFormat(settings.stringValue(GyanisScribe::Core::kPickFormat, QStringLiteral("Hex")).toStdString());
         combo->setCurrentIndex(GyanisScribe::Core::indexOfColorFormat(stored ? *stored : GyanisScribe::Core::ColorFormat::Hex));
         QObject::connect(combo, &QComboBox::currentIndexChanged, combo,
-                         [&settings, combo](int index)
+                         [&settings](int index)
                          {
                              const auto format = GyanisScribe::Core::colorFormatAt(index);
                              if (!format)
@@ -610,7 +610,7 @@ namespace
         const auto at    = std::ranges::find(views, stored);
         combo->setCurrentIndex(at == views.end() ? 0 : static_cast<int>(std::distance(views.begin(), at)));
         QObject::connect(combo, &QComboBox::currentIndexChanged, combo,
-                         [&settings, combo](const int index)
+                         [&settings](const int index)
                          {
                              const auto views = GyanisScribe::Core::magnifierViews();
                              if (index < 0 || static_cast<std::size_t>(index) >= views.size())
@@ -689,7 +689,7 @@ namespace
         {
             combo->addItem(choice.label);
         }
-        combo->setAccessibleName(GyanisScribe::Base::uiText(info.label.data()));
+        combo->setAccessibleName(GyanisScribe::Base::uiText(info.label));
         combo->setToolTip(GyanisScribe::Base::uiText("右键那一下归系统自己弹菜单，双击在第一下松开时就算过一次单击——这两档只管这两下"));
         if (!complaint.empty())
         {
@@ -983,7 +983,7 @@ namespace
         for (const auto &choice: GyanisScribe::Core::kRecordScopeChoices)
         {
             // 图标名与标签同在词表里：三档录法的字形不一样，扫一眼就分得出，不必逐条读字
-            combo->addItem(icons.icon(choice.iconName), GyanisScribe::Base::uiText(choice.label.data()), tokenText(choice.token));
+            combo->addItem(icons.icon(choice.iconName), GyanisScribe::Base::uiText(choice.label), tokenText(choice.token));
         }
         combo->setAccessibleName(GyanisScribe::Base::uiText("录制范围"));
         combo->setToolTip(GyanisScribe::Base::uiText("「上次选区」用最近一次截图框出的那块矩形；「当前窗口」录按下开始时最靠前的那个窗口。改完从下一次录屏开始生效"));
@@ -1025,7 +1025,7 @@ namespace
         for (const auto &choice: GyanisScribe::App::kCaptureIntentChoices)
         {
             // 与录制范围那格同一条形状：图标名跟着词表走，界面只负责取
-            combo->addItem(icons.icon(choice.iconName), GyanisScribe::Base::uiText(choice.label.data()), tokenText(choice.token));
+            combo->addItem(icons.icon(choice.iconName), GyanisScribe::Base::uiText(choice.label), tokenText(choice.token));
         }
         combo->setAccessibleName(GyanisScribe::Base::uiText("截完之后"));
         combo->setToolTip(GyanisScribe::Base::uiText("选「复制到剪贴板」「直接存成文件」「直接贴到屏幕上」时都不再弹标注窗；改完从下一次截图开始生效"));
@@ -1064,7 +1064,7 @@ namespace
         for (const auto format: GyanisScribe::Core::writableImageFormats())
         {
             const auto &choice = *std::ranges::find_if(GyanisScribe::Core::kImageFormatChoices, [format](const auto &row) { return row.format == format; });
-            combo->addItem(GyanisScribe::Base::uiText(choice.label.data()), tokenText(choice.token));
+            combo->addItem(GyanisScribe::Base::uiText(choice.label), tokenText(choice.token));
         }
         combo->setAccessibleName(GyanisScribe::Base::uiText("保存格式"));
         combo->setToolTip(GyanisScribe::Base::uiText("「直接存成文件」与贴图右键的「保存」按这一档写文件；PNG 无损，JPG 与 WebP 用来把照片类的截图压小"));
@@ -1294,7 +1294,7 @@ namespace
         auto *combo = new QComboBox;
         for (const auto &choice: GyanisScribe::Core::kRecordFormatChoices)
         {
-            combo->addItem(GyanisScribe::Base::uiText(choice.label.data()), tokenText(choice.token));
+            combo->addItem(GyanisScribe::Base::uiText(choice.label), tokenText(choice.token));
         }
         combo->setAccessibleName(GyanisScribe::Base::uiText("输出格式"));
         // 上限那一个数取自 kMaximumGifFrameRate：写死了就会在阈值调那天变成一句假话
@@ -1405,9 +1405,9 @@ namespace GyanisScribe::Main
     MainWindow::MainWindow(GyanisScribe::Core::ISettingsStore &settings, GyanisScribe::Gui::ThemeManager &theme, GyanisScribe::Gui::IconProvider &icons,
                            GyanisScribe::Core::HistoryStore &historyStore, GyanisScribe::Platform::PlatformCapabilities capabilities,
                            GyanisScribe::Platform::IPlatformIntegration &integration, QWidget *parent) :
-        QWidget(parent), m_settings(settings), m_theme(theme), m_icons(icons), m_capabilities(capabilities), m_integration(integration),
+        QWidget(parent), m_settings(settings), m_theme(theme), m_icons(icons), m_capabilities(capabilities),
         m_audioDevices(std::make_unique<GyanisScribe::Plugins::FfmpegAudioDeviceEnumerator>()),
-        m_videoEncoders(std::make_unique<GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator>()), m_historyStore(historyStore)
+        m_videoEncoders(std::make_unique<GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator>()), m_integration(integration), m_historyStore(historyStore)
     {
         setWindowTitle(GyanisScribe::Base::uiText("智录 设置"));
         setWindowIcon(icons.icon("App"));
@@ -1440,8 +1440,8 @@ namespace GyanisScribe::Main
                 // 这一页还没有搭法：跳开这一行，导航与页容器都少一行，因此仍然同序
                 continue;
             }
-            decoratePage(*content, GyanisScribe::Base::uiText(choice.label.data()));
-            auto *entry = new QListWidgetItem{m_icons.icon(choice.icon), GyanisScribe::Base::uiText(choice.label.data())};
+            decoratePage(*content, GyanisScribe::Base::uiText(choice.label));
+            auto *entry = new QListWidgetItem{m_icons.icon(choice.icon), GyanisScribe::Base::uiText(choice.label)};
             // 图标名留在行上：QIcon 是取色那一刻的快照，换主题时要按这个名字再取一次
             entry->setData(kNavIconNameRole, QString::fromUtf8(choice.icon));
             m_nav->addItem(entry);
@@ -1732,8 +1732,8 @@ namespace GyanisScribe::Main
             moreMenu->addSeparator();
             for (std::size_t index = 0; index < screenLabels.size(); ++index)
             {
-                const auto name = screenNames[static_cast<qsizetype>(index)];
-                auto      *item = moreMenu->addAction(screenLabels[index]);
+                const QString &name = screenNames[static_cast<qsizetype>(index)];
+                auto          *item = moreMenu->addAction(screenLabels[index]);
                 QObject::connect(item, &QAction::triggered, this, [this, name] { emit captureScreenRequested(name); });
             }
         }
@@ -1881,7 +1881,7 @@ namespace GyanisScribe::Main
         // 托盘那两下：这一族动作在菜单、热键与鼠标点击三处都走同一个出口，这里只多两个入口而不多一份实现
         for (const auto &role: GyanisScribe::App::trayClickRoles())
         {
-            form->addRow(GyanisScribe::Base::uiText(role.label.data()), makeTrayClickCombo(m_settings, role.role, m_capabilities));
+            form->addRow(GyanisScribe::Base::uiText(role.label), makeTrayClickCombo(m_settings, role.role, m_capabilities));
         }
         form->addRow(GyanisScribe::Base::uiText("开机自启动"), makeAutostartCheck(m_integration));
         form->addRow(GyanisScribe::Base::uiText("备份与恢复"), buildTransferRow());
@@ -1914,8 +1914,12 @@ namespace GyanisScribe::Main
                              const auto text = edit->text();
                              if (text.trimmed().isEmpty())
                              {
-                                 // 留空是「用默认档」这一档，不是错误：清掉那一格即可
-                                 static_cast<void>(settings.setValue(GyanisScribe::Core::kSaveNameTemplate, QString{}));
+                                 // 留空是「用默认档」这一档，不是错误：清掉那一格即可；
+                                 // 写不进去还是要说一声，否则用户以为恢了默认、实际那格没动
+                                 if (const auto stored = settings.setValue(GyanisScribe::Core::kSaveNameTemplate, QString{}); !stored)
+                                 {
+                                     GyanisScribe::Base::Logger::warning(std::format("文件名模板没能清回默认档：{}", stored.error().message));
+                                 }
                                  explainHint(QString{});
                                  return;
                              }
@@ -2319,7 +2323,7 @@ namespace GyanisScribe::Main
                                                      "最下面那一栏是界面里的按键，不吃这项能力，照常生效。")
                                   .arg(static_cast<int>(rows.size() + GyanisScribe::App::bindableActions().size()));
         auto *form = makePageForm(page, intro);
-        for (const auto [key, title, defaultText]: rows)
+        for (const auto &[key, title, defaultText]: rows)
         {
             auto *edit = new GyanisScribe::Gui::HotkeyEdit{m_settings, page};
             edit->bindTo(key, title, defaultText, GyanisScribe::Gui::HotkeyEditScope::Global);
@@ -2374,12 +2378,12 @@ namespace GyanisScribe::Main
             if (family != lastFamily)
             {
                 lastFamily    = family;
-                auto *heading = new QLabel{GyanisScribe::Base::uiText(family.data()), page};
+                auto *heading = new QLabel{GyanisScribe::Base::uiText(family), page};
                 heading->setAccessibleName(GyanisScribe::Base::uiText("界面按键的分组标题"));
                 form->addRow(heading);
             }
 
-            const auto label  = GyanisScribe::Base::uiText(entry.label.data());
+            const auto label  = GyanisScribe::Base::uiText(entry.label);
             auto      *row    = new QWidget{page};
             auto      *layout = new QHBoxLayout{row};
             layout->setContentsMargins(0, 0, 0, 0);

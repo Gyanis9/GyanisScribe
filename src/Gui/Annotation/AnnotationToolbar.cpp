@@ -116,7 +116,7 @@ namespace GyanisScribe::Gui
             const auto kind      = std::get<0>(kToolTable[index]);
             const auto iconName  = std::get<1>(kToolTable[index]);
             const auto label     = std::get<2>(kToolTable[index]);
-            auto      *button    = makeButton(iconName, GyanisScribe::Base::uiText(label.data()), true);
+            auto      *button    = makeButton(iconName, GyanisScribe::Base::uiText(label), true);
             m_toolButtons[index] = button;
             m_toolKinds[index]   = kind;
             // id 取工具序号：与 Core::ToolKind 的底层值同解，反向查按钮时不必再存一张表
@@ -1007,7 +1007,7 @@ namespace GyanisScribe::Gui
         for (std::size_t index = 0; index < kToolTable.size(); ++index)
         {
             const auto label = std::get<2>(kToolTable[index]);
-            const auto text  = GyanisScribe::Base::uiText(label.data());
+            const auto text  = GyanisScribe::Base::uiText(label);
             // 字母键位只进 tooltip：无障碍名要保持与标签同名，读屏报出来的才是工具本名而不是键位
             // 清册里找不到这一档（标识写歪）就只报工具名：括号里空一格，读的人会以为那颗键坏了
             const auto *entry = GyanisScribe::Gui::appShortcutEntry(std::get<3>(kToolTable[index]));
@@ -1119,7 +1119,7 @@ namespace GyanisScribe::Gui
         {
             case QEvent::MouseButtonPress:
             {
-                const auto *press = static_cast<const QMouseEvent *>(event);
+                const auto *press = dynamic_cast<const QMouseEvent *>(event);
                 if (press->button() == Qt::LeftButton)
                 {
                     m_draggingPaletteIndex = slot;
@@ -1133,7 +1133,7 @@ namespace GyanisScribe::Gui
                 {
                     break;
                 }
-                const auto global = static_cast<const QMouseEvent *>(event)->globalPosition().toPoint();
+                const auto global = dynamic_cast<const QMouseEvent *>(event)->globalPosition().toPoint();
                 // 没过 Qt 的拖动阈值就当普通移动：手抖一两像素就把色板重排，比不动更让人以为是程序疯了
                 if ((global - m_dragStartGlobal).manhattanLength() < QApplication::startDragDistance())
                 {

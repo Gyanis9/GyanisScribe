@@ -14,7 +14,7 @@ namespace GyanisScribe::Core
     {
         // 值只住在本头那一处；这里按区间两端构造 vector，不用 ranges::to（编译器实现进度不一，写法要保守）
         const auto &table = kAnnotationPaletteColors;
-        return std::vector<QColor>(table.begin(), table.end());
+        return {table.begin(), table.end()};
     }
 
     Base::Expected<std::vector<QColor>> annotationPalette(const Core::ISettingsStore &settings)

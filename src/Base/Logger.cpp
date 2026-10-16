@@ -20,7 +20,7 @@ namespace GyanisScribe::Base
     {
 
         /// 单个日志文件大小上限，超出后由 spdlog 轮转，避免长期运行把磁盘写满
-        constexpr std::size_t kMaximumLogFileBytes = 5U * 1024U * 1024U;
+        constexpr std::size_t kMaximumLogFileBytes = 5LL * 1024 * 1024;
 
         /// 轮转保留的历史份数
         constexpr std::size_t kMaximumRotatedFiles = 5U;

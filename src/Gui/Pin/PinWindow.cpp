@@ -453,7 +453,7 @@ namespace GyanisScribe::Gui
         }
 
         // 穿透同时去掉焦点接受：吃不到鼠标却又抢走焦点，会让用户的键盘操作莫名失灵
-        const auto opaque = windowFlags() & ~Qt::WindowTransparentForInput & ~Qt::NoDropShadowWindowHint;
+        const auto opaque = windowFlags() & ~Qt::WindowFlags(Qt::WindowTransparentForInput) & ~Qt::WindowFlags(Qt::NoDropShadowWindowHint);
         setWindowFlags(through ? (opaque | Qt::WindowTransparentForInput) : opaque);
         setFocusPolicy(through ? Qt::NoFocus : Qt::StrongFocus);
         m_mouseThrough = through;
@@ -496,7 +496,7 @@ namespace GyanisScribe::Gui
     void PinWindow::setAlwaysOnTop(bool pinned)
     {
         m_pinned            = pinned;
-        const auto unpinned = windowFlags() & ~Qt::WindowStaysOnTopHint;
+        const auto unpinned = windowFlags() & ~Qt::WindowFlags(Qt::WindowStaysOnTopHint);
         setWindowFlags(pinned ? (unpinned | Qt::WindowStaysOnTopHint) : unpinned);
         show(); // 同上：改标志要重新映射
     }
@@ -620,7 +620,7 @@ namespace GyanisScribe::Gui
             return std::unexpected(target.error());
         }
 
-        const auto directory = screenshotDirectory(m_settings);
+        auto directory = screenshotDirectory(m_settings);
         // 起名按设置里那一格的模板（留空即默认档），撞名时让一次位；
         // 管理器成批写缓存那一路不走这里，那一路按设计就是要覆盖
         const auto fileName = Base::Paths::imageFileName(QDateTime::currentDateTime(), Core::imageFormatExtension(target->first), Core::nameTemplateOrDefault(m_settings));
@@ -664,7 +664,7 @@ namespace GyanisScribe::Gui
 
     QRect PinWindow::globalRect() const
     {
-        return QRect(mapToGlobal(QPoint(0, 0)), size());
+        return {mapToGlobal(QPoint(0, 0)), size()};
     }
 
     QRect PinWindow::imageGlobalRect() const
@@ -679,7 +679,7 @@ namespace GyanisScribe::Gui
         const QPointF center = QRectF(QPointF(0.0, 0.0), QSizeF(size())).center();
         const QRectF  local{center - QPointF{width / 2.0, height / 2.0}, QSizeF{width, height}};
         const QRect   aligned = local.toAlignedRect();
-        return QRect(aligned.topLeft() + mapToGlobal(QPoint(0, 0)), aligned.size());
+        return {aligned.topLeft() + mapToGlobal(QPoint(0, 0)), aligned.size()};
     }
 
     void PinWindow::setTemporarilyHidden(const bool hidden)
@@ -701,7 +701,12 @@ namespace GyanisScribe::Gui
 
     Core::PinState PinWindow::state() const
     {
-        Core::PinState state{globalRect().topLeft(), m_logicalSize, m_scale, m_rotationDegrees, m_opacity};
+        Core::PinState state;
+        state.position            = globalRect().topLeft();
+        state.logicalSize         = m_logicalSize;
+        state.scale               = m_scale;
+        state.rotationDegrees     = m_rotationDegrees;
+        state.opacity             = m_opacity;
         state.group               = m_group;
         state.alwaysOnTop         = m_pinned;
         state.mouseThrough        = m_mouseThrough;
@@ -1341,6 +1346,11 @@ namespace GyanisScribe::Gui
                 finishAnnotation();
                 emit ocrRequested(m_image);
                 return;
+            case Gui::ShortcutAction::Print:
+            case Gui::ShortcutAction::Refresh:
+                // 贴图上不收这两键：打印没有落纸的去处（成品就是桌上这张），
+                // F5 重抓会把正在标注的这张底图从脚下换掉——收工后回贴图本体，F5 走那条刷新路
+                break;
         }
 
         // 字母键切工具：与标注窗读的是同一份键位清册，切完回灌按钮态
@@ -1502,7 +1512,7 @@ namespace GyanisScribe::Gui
 
         // 画布居中在窗口框里：窗口框是旋转后的外接框，两者中心重合时旋转才不会把图甩出窗口
         const QPointF windowCenter = QRectF(QPointF(0.0, 0.0), QSizeF(size())).center();
-        return QRectF(windowCenter - QPointF(width / 2.0, height / 2.0), QSizeF(width, height));
+        return {windowCenter - QPointF(width / 2.0, height / 2.0), QSizeF(width, height)};
     }
 
     void PinWindow::paintEvent(QPaintEvent *event)
@@ -1731,7 +1741,7 @@ namespace GyanisScribe::Gui
             return;
         }
 
-        if (m_draggedHandle)
+        if (const auto handle = m_draggedHandle)
         {
             const auto point    = event->position();
             const auto distance = std::hypot(point.x() - rect().center().x(), point.y() - rect().center().y());
@@ -1746,7 +1756,7 @@ namespace GyanisScribe::Gui
             }
             // applyGeometry 是按中心重算尺寸的；这里把对面那条边钉回原位——按住右边往外拖时
             // 左边不该一起跑，那看着像整张在漂而不是在改大小
-            move(anchoredTopLeft(*m_draggedHandle, before, QRect(pos(), size())));
+            move(anchoredTopLeft(*handle, before, QRect(pos(), size())));
             return;
         }
 

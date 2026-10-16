@@ -66,6 +66,14 @@ namespace GyanisScribe::App
                        GyanisScribe::Gui::ThemeManager &theme, QObject *parent = nullptr);
 
         /**
+         * @brief 析构
+         * @note 声明在头、定义在 .cpp：两个成员的唯一指针各指着一个只前向声明的类型
+         *       （引擎与搬运工），析构要在类型完整的 TU 里实例化——否则别的 TU 里
+         *       内联析构会让 clang/GCC 报 sizeof 应用在不完整类型上（MSVC 默认放过，口径不一）。
+         */
+        ~OcrCoordinator() override;
+
+        /**
          * @brief 给一张要认的图：首次识别、截图后的自动识别、贴图与标注窗的「识别文字」都走这里
          * @param image 待识别的图
          * @details 语言取上一次的选择：换过一次就该记住，而不是每轮都退回默认档。

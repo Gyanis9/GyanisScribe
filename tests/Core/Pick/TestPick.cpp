@@ -414,7 +414,7 @@ TEST_F(PickFixture, LeftClickPicksWhileEscapeAndRightClickCancel)
     const QPointF global{30.0, 40.0};
     QMouseEvent   move{QEvent::MouseMove, local, global, Qt::NoButton, Qt::NoButton, Qt::NoModifier};
     QApplication::sendEvent(pointer, &move);
-    EXPECT_EQ(pointer->cursor(), QPoint(30, 40));
+    EXPECT_EQ(pointer->pointerPosition(), QPoint(30, 40));
 
     QMouseEvent click{QEvent::MouseButtonPress, local, global, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
     QApplication::sendEvent(pointer, &click);

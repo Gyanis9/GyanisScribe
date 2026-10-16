@@ -157,7 +157,7 @@ int Application::runOneShotCapture(const GyanisScribe::App::CommandLineRequest &
                          // 没点名 file 时这一轮没有路径可打：空串不打，免得脚本把空行当成文件名
                          if (!savedPath.isEmpty())
                          {
-                             std::cout << savedPath.toLocal8Bit().constData() << std::endl;
+                             std::cout << savedPath.toLocal8Bit().constData() << '\n';
                          }
                          exitCode = 0;
                          finished = true;

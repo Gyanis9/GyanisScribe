@@ -209,7 +209,7 @@ namespace GyanisScribe::App
             request.outputs = GyanisScribe::App::defaultCaptureOutputs();
         }
 
-        result.request = request;
+        result.request = std::move(request);
         return result;
     }
 
@@ -219,7 +219,7 @@ namespace GyanisScribe::App
         for (const auto &choice: kCommandLineCaptureChoices)
         {
             const auto token = QString::fromUtf8(choice.token.data(), static_cast<qsizetype>(choice.token.size()));
-            captureLines += Base::uiText("    --capture=%1       %2\n").arg(token, Base::uiText(choice.description.data()));
+            captureLines += Base::uiText("    --capture=%1       %2\n").arg(token, Base::uiText(choice.description));
         }
 
         return Base::uiText("智录：截图、标注、贴图、取色、录屏与文字识别。不带参数启动即常驻（托盘 + 全局热键）。\n"

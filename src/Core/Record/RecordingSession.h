@@ -36,10 +36,10 @@ namespace GyanisScribe::Core
      */
     struct SessionTick
     {
-        RecordingState state;                             ///< tick 之后的状态
-        bool           frameStored               = false; ///< 这一跳是否写了一帧
-        bool           durationReached           = false; ///< 是否触到了时长上限，调用方该收尾
-        int            countdownRemainingSeconds = 0;     ///< 倒计时剩余整秒数
+        RecordingState state                     = RecordingState::Idle; ///< tick 之后的状态
+        bool           frameStored               = false;                ///< 这一跳是否写了一帧
+        bool           durationReached           = false;                ///< 是否触到了时长上限，调用方该收尾
+        int            countdownRemainingSeconds = 0;                    ///< 倒计时剩余整秒数
     };
 
     /**
@@ -114,7 +114,6 @@ namespace GyanisScribe::Core
 
         RecorderConfig  m_config;                   ///< 参数
         IRecordingSink &m_sink;                     ///< 帧的去处，不拥有
-        qint64          m_startedAtMs;              ///< 开始时刻
         qint64          m_recordingStartMs;         ///< 倒计时结束、真正开始录的时刻，时长从这里算
         int             m_countdownSeconds;         ///< 倒计时秒数
         RecordingState  m_state;                    ///< 当前状态

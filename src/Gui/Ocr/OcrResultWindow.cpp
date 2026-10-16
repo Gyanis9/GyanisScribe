@@ -28,6 +28,7 @@
 #include <string_view>
 #include <cmath>
 #include <format>
+#include <utility>
 
 namespace
 {
@@ -180,8 +181,8 @@ namespace GyanisScribe::Gui
                                          .c_str());
     }
 
-    OcrResultWindow::OcrResultWindow(const QImage &image, const Core::OcrResult &result, Gui::IconProvider &icons, const Gui::ThemeManager &theme, const QString &nameTemplate,
-                                     QWidget *parent) : QWidget(parent), m_image(image), m_result(result), m_icons(icons), m_theme(theme), m_nameTemplate(nameTemplate)
+    OcrResultWindow::OcrResultWindow(QImage image, Core::OcrResult result, Gui::IconProvider &icons, const Gui::ThemeManager &theme, QString nameTemplate, QWidget *parent) :
+        QWidget(parent), m_image(std::move(image)), m_result(std::move(result)), m_icons(icons), m_theme(theme), m_nameTemplate(std::move(nameTemplate))
     {
         setWindowTitle(GyanisScribe::Base::uiText("识别结果"));
         setWindowIcon(m_icons.icon("Ocr"));
@@ -295,7 +296,7 @@ namespace GyanisScribe::Gui
 
     QString OcrResultWindow::copyAllToClipboard()
     {
-        const auto text = m_result.text();
+        auto text = m_result.text();
         if (text.isEmpty())
         {
             return {};
@@ -306,7 +307,7 @@ namespace GyanisScribe::Gui
 
     QString OcrResultWindow::copySelectionToClipboard()
     {
-        const auto selected = m_text->textCursor().selectedText();
+        auto selected = m_text->textCursor().selectedText();
         if (selected.isEmpty())
         {
             return {};
@@ -339,7 +340,7 @@ namespace GyanisScribe::Gui
 
     void OcrResultWindow::refreshPreview()
     {
-        auto *preview = static_cast<Preview *>(m_preview);
+        auto *preview = dynamic_cast<Preview *>(m_preview);
         preview->setImage(m_image);
         m_highlight = highlightRectFor(m_result, m_lineIndex, m_image.size(), m_preview->size());
         preview->setHighlight(m_highlight, m_theme.palette().accent);

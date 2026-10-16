@@ -73,7 +73,7 @@ namespace GyanisScribe::Core
         QStringList labels;
         for (const auto &label: kFormatLabels)
         {
-            labels.append(GyanisScribe::Base::uiText(label.data()));
+            labels.append(GyanisScribe::Base::uiText(label));
         }
         return labels;
     }

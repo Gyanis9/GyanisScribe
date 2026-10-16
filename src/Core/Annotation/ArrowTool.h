@@ -50,7 +50,7 @@ namespace GyanisScribe::Core
          * @return true 落在箭杆或箭头附近
          * @details 重写基类接口：外接框会把一条斜箭头的整片空白矩形都算成命中。
          */
-        bool hitTestShape(const AnnotationShape &shape, const QPoint &point, int tolerance) const override;
+        [[nodiscard]] bool hitTestShape(const AnnotationShape &shape, const QPoint &point, int tolerance) const override;
 
         /**
          * @brief 落定判据，见 AnnotationTool::shapeIsUsable()
@@ -59,7 +59,7 @@ namespace GyanisScribe::Core
          * @details 重写基类接口：基类按外接框尺寸判，一条 45° 的短线框出来的矩形也非零，
          *          但箭头本身没有方向，这里改用首尾距离。
          */
-        bool shapeIsUsable(const AnnotationShape &shape) const override;
+        [[nodiscard]] bool shapeIsUsable(const AnnotationShape &shape) const override;
     };
 
 } // namespace GyanisScribe::Core

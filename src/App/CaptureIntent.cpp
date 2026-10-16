@@ -37,8 +37,8 @@ namespace GyanisScribe::App
             }
         }
         // 不替用户猜一档：悄悄回落到「进标注窗」会让一个不想弹窗的用户每按一次热键都多出一层窗
-        const auto localizedSetting = GyanisScribe::Base::uiTextUtf8(kSettingName.data());
-        const auto localizedPage    = GyanisScribe::Base::uiTextUtf8(kPageName.data());
+        const auto localizedSetting = GyanisScribe::Base::uiTextUtf8(kSettingName);
+        const auto localizedPage    = GyanisScribe::Base::uiTextUtf8(kPageName);
         return std::unexpected(Base::unknownTokenError(kCaptureIntentChoices, stored, localizedSetting, localizedPage, kSettingKey));
     }
 

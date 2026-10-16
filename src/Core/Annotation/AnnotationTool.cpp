@@ -20,7 +20,7 @@ namespace GyanisScribe::Core
         constexpr int kMinimumHitTolerance = 8;
     } // namespace
 
-    AnnotationTool::AnnotationTool(ToolKind kind) : m_kind(kind), m_color(255, 0, 0), m_lineWidth(3), m_fontSize(16)
+    AnnotationTool::AnnotationTool(ToolKind kind) : m_color(255, 0, 0), m_lineWidth(3), m_fontSize(16), m_kind(kind)
     {
     }
 
@@ -90,7 +90,7 @@ namespace GyanisScribe::Core
         }
 
         // 交出去之后再清在途：引擎要把这条图形放进撤销栈
-        const AnnotationShape committed = m_pending;
+        AnnotationShape committed = m_pending;
         cancel();
         return committed;
     }
@@ -117,7 +117,7 @@ namespace GyanisScribe::Core
     void AnnotationTool::insertShape(int index, const AnnotationShape &shape)
     {
         // 索引钳到末尾：撤销「删除」时传的正是取走时那个位置，越界只会来自调用方算错
-        const int clamped = index < 0 ? 0 : (index > m_shapes.size() ? m_shapes.size() : index);
+        const int clamped = std::clamp(index, 0, static_cast<int>(m_shapes.size()));
         m_shapes.insert(clamped, shape);
     }
 

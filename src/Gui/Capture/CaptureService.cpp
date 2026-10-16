@@ -211,7 +211,7 @@ namespace GyanisScribe::Gui
             overlay->setCursorIncluded(longCapture ? std::nullopt : std::optional<bool>{cursorIncludedForThisRound()});
             QObject::connect(overlay, &CaptureOverlay::cursorIncludeChanged, this, [this](const bool included) { setCursorIncludedForRound(included); });
             QObject::connect(overlay, &CaptureOverlay::regionSelected, this,
-                             [this, screen, overlay, longCapture](const QRect &region)
+                             [this, screen, longCapture](const QRect &region)
                              {
                                  closeOverlays();
                                  // 同一层遮罩两条去处：长截图先把这一块当成开头接住，普通截图当场交成品
@@ -230,7 +230,7 @@ namespace GyanisScribe::Gui
             {
                 QObject::connect(overlay, &CaptureOverlay::hoverPointChanged, this, [this, overlay](const QPoint &globalPoint) { queryElementChain(overlay, globalPoint); });
             }
-            m_overlays.push_back(QPointer<CaptureOverlay>(overlay));
+            m_overlays.emplace_back(overlay);
             overlay->show();
             overlay->activateWindow();
         }

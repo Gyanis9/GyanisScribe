@@ -79,14 +79,14 @@ namespace GyanisScribe::Core
          * @param tolerance 允许的偏差，逻辑像素
          * @return true 落在折线附近
          */
-        bool hitTestShape(const AnnotationShape &shape, const QPoint &point, int tolerance) const override;
+        [[nodiscard]] bool hitTestShape(const AnnotationShape &shape, const QPoint &point, int tolerance) const override;
 
         /**
          * @brief 落定判据，见 AnnotationTool::shapeIsUsable()
          * @param shape 在途图形
          * @return true 至少两个折点
          */
-        bool shapeIsUsable(const AnnotationShape &shape) const override;
+        [[nodiscard]] bool shapeIsUsable(const AnnotationShape &shape) const override;
 
     private:
         QPoint m_previewPoint;            ///< 预览段的终点：跟随光标

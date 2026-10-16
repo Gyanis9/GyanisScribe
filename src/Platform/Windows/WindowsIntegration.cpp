@@ -58,7 +58,7 @@ namespace
     constexpr int kElementChainChildrenBudget = 256;
 
     /// 被 DWM 藏起来的窗口（切到别的虚拟桌面那种）还躺在原坐标上，留着会得到一个看不见却能命中的矩形
-    [[nodiscard]] bool windowIsCloaked(const HWND window)
+    [[nodiscard]] bool windowIsCloaked(HWND window)
     {
         DWORD cloaked = 0;
         return DwmGetWindowAttribute(window, DWMWA_CLOAKED, &cloaked, sizeof(cloaked)) == S_OK && cloaked != 0;
@@ -68,11 +68,11 @@ namespace
     struct AnchorSearch
     {
         QPoint                       physicalPoint; ///< 光标位置，全局物理像素
-        const std::vector<quintptr> *excluded;      ///< 排除名单：命中的窗口直接跳过（截图时是自家遮罩窗）
+        const std::vector<quintptr> *excluded{};    ///< 排除名单：命中的窗口直接跳过（截图时是自家遮罩窗）
         HWND                         found = nullptr;
     };
 
-    BOOL CALLBACK findWindowUnderPoint(const HWND window, const LPARAM parameter)
+    BOOL CALLBACK findWindowUnderPoint(HWND window, const LPARAM parameter)
     {
         auto *const search = reinterpret_cast<AnchorSearch *>(parameter);
         if (!IsWindowVisible(window) || windowIsCloaked(window))
@@ -110,7 +110,7 @@ namespace
      * @details 只留文件名不留全路径：排除清单里写 `chrome.exe` 就够了，写全路径换一台机器就对不上；
      *          权限只要 QUERY_LIMITED_INFORMATION——列出别人进程的窗口不需要更多，也要不过来。
      */
-    [[nodiscard]] QString processFileName(const HWND window)
+    [[nodiscard]] QString processFileName(HWND window)
     {
         DWORD processId = 0;
         GetWindowThreadProcessId(window, &processId);
@@ -119,14 +119,14 @@ namespace
             return {};
         }
 
-        const HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
+        HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
         if (process == nullptr)
         {
             return {};
         }
 
         wchar_t    path[32768] = {}; // 长路径的实测上限
-        DWORD      length      = static_cast<DWORD>(std::size(path));
+        auto       length      = static_cast<DWORD>(std::size(path));
         const auto read        = QueryFullProcessImageNameW(process, 0, path, &length);
         CloseHandle(process);
         if (read == 0 || length == 0)
@@ -137,7 +137,7 @@ namespace
         return QString::fromWCharArray(path, static_cast<qsizetype>(length)).section(QChar(0x5C), -1);
     }
 
-    BOOL CALLBACK collectVisibleWindow(const HWND window, const LPARAM parameter)
+    BOOL CALLBACK collectVisibleWindow(HWND window, const LPARAM parameter)
     {
         auto *const collected = reinterpret_cast<std::vector<RawWindow> *>(parameter);
         if (!IsWindowVisible(window))
@@ -147,7 +147,7 @@ namespace
 
         // 工具窗不进候选：下拉列表的临时层、缩放提示那一类只在被点着的一瞬存在，
         // 把它们当「要截的那一块」会把用户带到一个根本截不动的目标上
-        if ((GetWindowLongW(window, GWL_EXSTYLE) & WS_EX_TOOLWINDOW) != 0)
+        if ((static_cast<DWORD>(GetWindowLongW(window, GWL_EXSTYLE)) & WS_EX_TOOLWINDOW) != 0)
         {
             return TRUE;
         }
@@ -192,7 +192,7 @@ namespace
         return TRUE;
     }
 
-    BOOL CALLBACK collectMonitor(const HMONITOR monitor, const HDC, const LPRECT, const LPARAM parameter)
+    BOOL CALLBACK collectMonitor(HMONITOR monitor, HDC, LPRECT, const LPARAM parameter)
     {
         auto *const collected = reinterpret_cast<std::vector<RawMonitor> *>(parameter);
         // 设备名只在 MONITORINFOEX 里（MONITORINFO 只有矩形与工作区），而它的头几个字段与 MONITORINFO 同形，

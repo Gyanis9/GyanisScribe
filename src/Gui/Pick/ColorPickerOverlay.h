@@ -48,7 +48,7 @@ namespace GyanisScribe::Gui
          * @param theme 主题管理器，放大镜边框与文字色随主题
          * @param parent Qt 父对象
          */
-        ColorPickerOverlay(const Base::CapturedImage &frame, const QRect &screenGeometry, Core::ColorFormat format, Core::HexCasing casing, Core::MagnifierView view,
+        ColorPickerOverlay(Base::CapturedImage frame, const QRect &screenGeometry, Core::ColorFormat format, Core::HexCasing casing, Core::MagnifierView view,
                            const Gui::ThemeManager &theme, QWidget *parent = nullptr);
 
         /**
@@ -61,8 +61,9 @@ namespace GyanisScribe::Gui
         /**
          * @brief 当前光标的屏幕坐标
          * @return 遮罩内最后一次移动到的位置，初始为构造时的光标位置
+         * @note 不叫 cursor()：那会和 QWidget::cursor() 同名，经基类指针一调拿到的是另一个东西
          */
-        [[nodiscard]] QPoint cursor() const;
+        [[nodiscard]] QPoint pointerPosition() const;
 
         /**
          * @brief 当前颜色按当前写法排好的文本

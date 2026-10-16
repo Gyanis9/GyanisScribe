@@ -35,12 +35,26 @@ namespace GyanisScribe::Base
      *          把表改成函数会让每个消费点都跟着改。代价是 lupdate 认不出这些串，
      *          所以目录由 scripts/check-translation-catalog.py 从源码里穷举生成，
      *          并由同一条脚本作为门禁（ctest 用例 Style.TranslationCatalog）断言「源码用到的都在目录里、且译文非空」。
-     * @note text 必须指向 NUL 结尾的 UTF-8；从 std::string_view 传进来时取 .data()，
-     *       这一工程里的表项与字面量都满足，非 NUL 结尾的 view 会读到多出来的字节。
+     * @note 字面量走这一档。从表里取出的 std::string_view 走下面那个重载——不要取 .data() 再传进来：
+     *       查表接口只认过 0 结尾的指针，表项哪天真改成切片（子串），读越界是静默的
+     *       （clang-tidy 的 bugprone-suspicious-stringview-data-usage 会当场报出来）。
      */
     inline QString uiText(const char *text)
     {
         return QCoreApplication::translate(kTextContext, text);
+    }
+
+    /**
+     * @brief 取一条界面文案（文案以 std::string_view 形态拿到时走这一档）
+     * @param text 源码里的中文文案，按长度收，不要求过 0 结尾
+     * @return 与 const char* 那一档同解
+     * @details 查表接口只吃 NUL 结尾的指针，所以先按长度收成一份自有串再查；
+     *          字面量与字符串常量重叠的来路不必担心多这一次拷贝——它们走上面那一档。
+     */
+    inline QString uiText(const std::string_view text)
+    {
+        const std::string owned{text};
+        return QCoreApplication::translate(kTextContext, owned.c_str());
     }
 
     /**
@@ -51,6 +65,16 @@ namespace GyanisScribe::Base
      *          在构造点就查表，才能让英文档下报错也跟着变。
      */
     inline std::string uiTextUtf8(const char *text)
+    {
+        return uiText(text).toStdString();
+    }
+
+    /**
+     * @brief 取一条界面文案的 std::string 形态（文案以 std::string_view 形态拿到时走这一档）
+     * @param text 源码里的中文文案，按长度收，不要求过 0 结尾
+     * @return 与 const char* 那一档同解
+     */
+    inline std::string uiTextUtf8(const std::string_view text)
     {
         return uiText(text).toStdString();
     }

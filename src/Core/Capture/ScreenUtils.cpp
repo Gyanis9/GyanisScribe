@@ -373,7 +373,7 @@ namespace GyanisScribe::Core
         const int clampedY = std::clamp(anchor.y() + signY * extent, limit.top(), limit.bottom());
         // 夹取可能把等边破坏掉：按两轴里更小的那个偏移量收回来，仍是正方形
         const int size = std::min(std::abs(clampedX - anchor.x()), std::abs(clampedY - anchor.y()));
-        return QPoint(anchor.x() + signX * size, anchor.y() + signY * size);
+        return {anchor.x() + signX * size, anchor.y() + signY * size};
     }
 
     QPoint ratioLockedPoint(const QPoint &anchor, const QPoint &current, const QSize &ratio, const QRect &limit)
@@ -406,7 +406,7 @@ namespace GyanisScribe::Core
         {
             return anchor;
         }
-        return QPoint(anchor.x() + signX * (span * ratio.width() - 1), anchor.y() + signY * (span * ratio.height() - 1));
+        return {anchor.x() + signX * (span * ratio.width() - 1), anchor.y() + signY * (span * ratio.height() - 1)};
     }
 
     QString aspectRatioToText(const QSize &ratio)
@@ -677,7 +677,7 @@ namespace GyanisScribe::Core
     QStringList parseProcessExcludes(const QString &text)
     {
         QStringList names;
-        for (auto part: text.split(QLatin1Char(','), Qt::SkipEmptyParts))
+        for (const auto &part: text.split(QLatin1Char(','), Qt::SkipEmptyParts))
         {
             const auto trimmed = part.trimmed().toLower();
             if (!trimmed.isEmpty() && !names.contains(trimmed))

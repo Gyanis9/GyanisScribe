@@ -58,7 +58,7 @@ namespace GyanisScribe::Core
      * @param mode 透明区的档
      * @return 两档棋盘返回颜色对；ThemeBase 与 SeeThrough 不画棋盘，返回空
      */
-    [[nodiscard]] std::optional<CheckerColors> checkerColorsFor(const TransparentBackdrop mode);
+    [[nodiscard]] std::optional<CheckerColors> checkerColorsFor(TransparentBackdrop mode);
 
     /**
      * @brief 拼一枚可平铺的棋盘贴片

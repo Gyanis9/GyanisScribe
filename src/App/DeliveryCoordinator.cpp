@@ -67,7 +67,7 @@ namespace GyanisScribe::App
 
         // 名字规则来自设置里那一格（留空即默认档）；起好名再让一次位：模板里去掉 %ms% 之后
         // 同一秒连拍会撞名，直接写就是把前一张悄悄盖掉
-        const auto fileName = GyanisScribe::Base::Paths::imageFileName(QDateTime::currentDateTime(), GyanisScribe::Core::imageFormatExtension(*format),
+        auto       fileName = GyanisScribe::Base::Paths::imageFileName(QDateTime::currentDateTime(), GyanisScribe::Core::imageFormatExtension(*format),
                                                                        GyanisScribe::Core::nameTemplateOrDefault(m_settings));
         const auto filePath = GyanisScribe::Base::Paths::uniqueFilePath(directory, fileName);
         // 格式不单独传给 Qt：它按后缀挑编码器，再传一次格式名就是第二个出处

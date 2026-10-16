@@ -39,7 +39,7 @@ namespace GyanisScribe::Core
         }
 
         // 输出路径交给 Paths 那一处换算：窄串与宽串的转换只在它那儿发生
-        const auto filePath = directory / Base::Paths::fromDisplayText(contentStemOf(image) + QStringLiteral(".png"));
+        auto filePath = directory / Base::Paths::fromDisplayText(contentStemOf(image) + QStringLiteral(".png"));
         if (!image.save(Base::Paths::toDisplayText(filePath), "PNG"))
         {
             return std::unexpected(Base::Error{Base::ErrorCode::FileWriteFailed,

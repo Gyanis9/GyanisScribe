@@ -453,14 +453,14 @@ namespace GyanisScribe::Core
          * @return true 命中
          * @details 默认按局部外接框判；轨迹类工具必须重写，否则一条绕圈的画笔在其空心区域里也会被选中。
          */
-        virtual bool hitTestShape(const AnnotationShape &shape, const QPoint &point, int tolerance) const;
+        [[nodiscard]] virtual bool hitTestShape(const AnnotationShape &shape, const QPoint &point, int tolerance) const;
 
         /**
          * @brief 落定前的可用性判据
          * @param shape 在途图形
          * @return true 可以落定
          */
-        virtual bool shapeIsUsable(const AnnotationShape &shape) const;
+        [[nodiscard]] virtual bool shapeIsUsable(const AnnotationShape &shape) const;
 
         /// 起笔点，拖拽类图形用它算外接框
         QPoint          m_startPoint;

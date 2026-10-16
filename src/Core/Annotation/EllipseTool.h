@@ -50,7 +50,7 @@ namespace GyanisScribe::Core
          * @details 重写基类接口：外接框判据会把椭圆的四个空心角也算成命中，
          *          这里按归一化半径判「在环上」，四角因此点不中。
          */
-        bool hitTestShape(const AnnotationShape &shape, const QPoint &point, int tolerance) const override;
+        [[nodiscard]] bool hitTestShape(const AnnotationShape &shape, const QPoint &point, int tolerance) const override;
     };
 
 } // namespace GyanisScribe::Core

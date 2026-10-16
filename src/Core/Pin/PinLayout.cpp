@@ -32,6 +32,13 @@ namespace GyanisScribe::Core
         constexpr std::string_view kKeyBackdrop  = "transparentBackdrop";
         constexpr std::string_view kKeyColorCard = "colorCardHex";
 
+        /// 键名是有长度的视图，转 QLatin1String 时按 (指针, 长度) 收：不假设它过 0 结尾
+        /// （QLatin1String 的 const char* 那一档就会去读结尾之外的字节，表项改成切片就静默越界）
+        constexpr QLatin1StringView keyText(const std::string_view key)
+        {
+            return {key.data(), static_cast<qsizetype>(key.size())};
+        }
+
         Base::Expected<QVector<PinState>> failWith(std::string reason)
         {
             return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, std::move(reason)});
@@ -50,20 +57,20 @@ namespace GyanisScribe::Core
         for (const auto &state: states)
         {
             QJsonObject entry;
-            entry.insert(QLatin1String(kKeyPositionX.data()), state.position.x());
-            entry.insert(QLatin1String(kKeyPositionY.data()), state.position.y());
-            entry.insert(QLatin1String(kKeyWidth.data()), state.logicalSize.width());
-            entry.insert(QLatin1String(kKeyHeight.data()), state.logicalSize.height());
-            entry.insert(QLatin1String(kKeyScale.data()), clampScale(state.scale));
-            entry.insert(QLatin1String(kKeyRotation.data()), normalizeDegrees(state.rotationDegrees));
-            entry.insert(QLatin1String(kKeyOpacity.data()), state.opacity);
-            entry.insert(QLatin1String(kKeyImageFile.data()), state.imageFile);
-            entry.insert(QLatin1String(kKeyGroup.data()), state.group);
-            entry.insert(QLatin1String(kKeyOnTop.data()), state.alwaysOnTop);
-            entry.insert(QLatin1String(kKeyThrough.data()), state.mouseThrough);
-            entry.insert(QLatin1String(kKeySource.data()), state.sourceFile);
-            entry.insert(QLatin1String(kKeyBackdrop.data()), static_cast<int>(state.transparentBackdrop));
-            entry.insert(QLatin1String(kKeyColorCard.data()), state.colorCardHex);
+            entry.insert(keyText(kKeyPositionX), state.position.x());
+            entry.insert(keyText(kKeyPositionY), state.position.y());
+            entry.insert(keyText(kKeyWidth), state.logicalSize.width());
+            entry.insert(keyText(kKeyHeight), state.logicalSize.height());
+            entry.insert(keyText(kKeyScale), clampScale(state.scale));
+            entry.insert(keyText(kKeyRotation), normalizeDegrees(state.rotationDegrees));
+            entry.insert(keyText(kKeyOpacity), state.opacity);
+            entry.insert(keyText(kKeyImageFile), state.imageFile);
+            entry.insert(keyText(kKeyGroup), state.group);
+            entry.insert(keyText(kKeyOnTop), state.alwaysOnTop);
+            entry.insert(keyText(kKeyThrough), state.mouseThrough);
+            entry.insert(keyText(kKeySource), state.sourceFile);
+            entry.insert(keyText(kKeyBackdrop), static_cast<int>(state.transparentBackdrop));
+            entry.insert(keyText(kKeyColorCard), state.colorCardHex);
             entries.append(entry);
         }
         return QString::fromUtf8(QJsonDocument(entries).toJson(QJsonDocument::Compact));
@@ -98,7 +105,7 @@ namespace GyanisScribe::Core
             const auto entry = entries[index].toObject();
             for (std::string_view key: {kKeyPositionX, kKeyPositionY, kKeyWidth, kKeyHeight, kKeyScale, kKeyRotation, kKeyOpacity, kKeyImageFile})
             {
-                if (!entry.contains(QLatin1String(key.data())))
+                if (!entry.contains(keyText(key)))
                 {
                     return failWith(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图布局第 {} 项缺少字段 {}。请清除这一项后让程序重新记一次"), index + 1,
                                                                  std::string(key)));
@@ -106,12 +113,12 @@ namespace GyanisScribe::Core
             }
 
             PinState state;
-            state.position        = QPoint(entry[QLatin1String(kKeyPositionX.data())].toInt(), entry[QLatin1String(kKeyPositionY.data())].toInt());
-            state.logicalSize     = QSizeF(entry[QLatin1String(kKeyWidth.data())].toDouble(), entry[QLatin1String(kKeyHeight.data())].toDouble());
-            state.scale           = entry[QLatin1String(kKeyScale.data())].toDouble();
-            state.rotationDegrees = entry[QLatin1String(kKeyRotation.data())].toDouble();
-            state.opacity         = entry[QLatin1String(kKeyOpacity.data())].toDouble();
-            state.imageFile       = entry[QLatin1String(kKeyImageFile.data())].toString();
+            state.position        = QPoint(entry[keyText(kKeyPositionX)].toInt(), entry[keyText(kKeyPositionY)].toInt());
+            state.logicalSize     = QSizeF(entry[keyText(kKeyWidth)].toDouble(), entry[keyText(kKeyHeight)].toDouble());
+            state.scale           = entry[keyText(kKeyScale)].toDouble();
+            state.rotationDegrees = entry[keyText(kKeyRotation)].toDouble();
+            state.opacity         = entry[keyText(kKeyOpacity)].toDouble();
+            state.imageFile       = entry[keyText(kKeyImageFile)].toString();
 
             if (state.imageFile.isEmpty())
             {
@@ -132,9 +139,9 @@ namespace GyanisScribe::Core
 
             // group 是后加的字段，必须容忍缺省：升级后第一次启动要摆回上一版存下的那几张，
             // 缺字段就整项失败等于把用户的桌面清空一次。缺省落第 1 组；写了但不合法才是坏记录
-            if (entry.contains(QLatin1String(kKeyGroup.data())))
+            if (entry.contains(keyText(kKeyGroup)))
             {
-                const auto group = entry[QLatin1String(kKeyGroup.data())].toInt();
+                const auto group = entry[keyText(kKeyGroup)].toInt();
                 if (group < kFirstPinGroup)
                 {
                     return failWith(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图布局第 {} 项的分组号不是正整数：{}。请清除这一项后让程序重新记一次"),
@@ -145,42 +152,42 @@ namespace GyanisScribe::Core
 
             // 置顶与穿透同样是后加的字段、同样容忍缺省（旧布局按今天的新建行为：置顶、不穿透）；
             // 写了但不是布尔值才是坏记录——toBool() 会把任意内容都折成 false，静默读反一个开关
-            if (entry.contains(QLatin1String(kKeyOnTop.data())))
+            if (entry.contains(keyText(kKeyOnTop)))
             {
-                if (!entry[QLatin1String(kKeyOnTop.data())].isBool())
+                if (!entry[keyText(kKeyOnTop)].isBool())
                 {
                     return failWith(
                             GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图布局第 {} 项的置顶字段不是布尔值。请清除这一项后让程序重新记一次"), index + 1));
                 }
-                state.alwaysOnTop = entry[QLatin1String(kKeyOnTop.data())].toBool();
+                state.alwaysOnTop = entry[keyText(kKeyOnTop)].toBool();
             }
-            if (entry.contains(QLatin1String(kKeyThrough.data())))
+            if (entry.contains(keyText(kKeyThrough)))
             {
-                if (!entry[QLatin1String(kKeyThrough.data())].isBool())
+                if (!entry[keyText(kKeyThrough)].isBool())
                 {
                     return failWith(
                             GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图布局第 {} 项的穿透字段不是布尔值。请清除这一项后让程序重新记一次"), index + 1));
                 }
-                state.mouseThrough = entry[QLatin1String(kKeyThrough.data())].toBool();
+                state.mouseThrough = entry[keyText(kKeyThrough)].toBool();
             }
 
             // 动图来源同样是后加的字段：缺省就是静图（旧布局里放着的本来也都是静图）
-            if (entry.contains(QLatin1String(kKeySource.data())))
+            if (entry.contains(keyText(kKeySource)))
             {
-                state.sourceFile = entry[QLatin1String(kKeySource.data())].toString();
+                state.sourceFile = entry[keyText(kKeySource)].toString();
             }
 
             // 色卡原色同样是后加的字段：缺省就是「不是色卡」（旧布局里那几张本来也没有这一档）
-            if (entry.contains(QLatin1String(kKeyColorCard.data())))
+            if (entry.contains(keyText(kKeyColorCard)))
             {
-                state.colorCardHex = entry[QLatin1String(kKeyColorCard.data())].toString();
+                state.colorCardHex = entry[keyText(kKeyColorCard)].toString();
             }
 
             // 透明区同样是后加的字段，缺省落「跟随窗口底色」（旧布局里那几张露的就是窗口底色）；
             // 写了但不是整数、或不在档数里，才是坏记录——越界的数字静默当成第一档，等于把用户选的棋盘偷偷换掉
-            if (entry.contains(QLatin1String(kKeyBackdrop.data())))
+            if (entry.contains(keyText(kKeyBackdrop)))
             {
-                const auto stored = entry[QLatin1String(kKeyBackdrop.data())];
+                const auto stored = entry[keyText(kKeyBackdrop)];
                 if (!stored.isDouble())
                 {
                     return failWith(

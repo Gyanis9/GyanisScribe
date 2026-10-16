@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
     }
     if (parsed.request.action == GyanisScribe::App::CommandLineAction::Help)
     {
-        std::cout << GyanisScribe::App::commandLineUsageText().toLocal8Bit().constData() << std::endl;
+        std::cout << GyanisScribe::App::commandLineUsageText().toLocal8Bit().constData() << '\n';
         return 0;
     }
     if (parsed.request.action == GyanisScribe::App::CommandLineAction::Version)

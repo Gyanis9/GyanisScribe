@@ -42,6 +42,8 @@ namespace GyanisScribe::App
         QObject::connect(m_service.get(), &GyanisScribe::Plugins::RecordingService::frameStored, this, [this] { updateHud(); });
     }
 
+    RecordingCoordinator::~RecordingCoordinator() = default;
+
     GyanisScribe::Base::Expected<GyanisScribe::Core::RecorderConfig> RecordingCoordinator::makeConfig() const
     {
         // 录哪块屏跟着光标走：多屏机器上人在副屏干活，只盯着主屏就是把用户要的画面录丢了；

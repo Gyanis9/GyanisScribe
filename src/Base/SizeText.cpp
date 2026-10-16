@@ -12,8 +12,8 @@ namespace GyanisScribe::Base
     {
         // 宽度与高度之间允许 x/×/逗号/空白：界面上的读数是「宽 × 高」，用户照着敲、
         // 换一种敲都得认
-        static const QRegularExpression separator{QStringLiteral(R"([x×,\s]+)")};
-        const QStringList               parts = text.trimmed().split(separator, Qt::SkipEmptyParts);
+        static const QRegularExpression kSeparator{QStringLiteral(R"([x×,\s]+)")};
+        const QStringList               parts = text.trimmed().split(kSeparator, Qt::SkipEmptyParts);
         if (parts.size() != 2)
         {
             return std::nullopt;

@@ -37,7 +37,7 @@ namespace GyanisScribe::Base
                                                                "或者删掉命令里的 %file%")});
         }
 
-        ExternalCommandPlan plan{.program = pieces.front()};
+        ExternalCommandPlan plan{.program = pieces.front(), .arguments = {}};
         for (auto piece: pieces.mid(1))
         {
             // 整串替换而不是只认独立一段：`--path=%file%` 这种连写也要认

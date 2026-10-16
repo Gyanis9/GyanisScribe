@@ -116,11 +116,10 @@ namespace GyanisScribe::Gui
         return {};
     }
 
-    bool isAppShortcutHit(const Core::ISettingsStore &settings, const AppShortcutEntry &entry, const int key, const Qt::KeyboardModifiers modifiers,
-                          const bool allowShiftVariant)
+    bool isAppShortcutHit(const Core::ISettingsStore &settings, const AppShortcutEntry &entry, const int key, const Qt::KeyboardModifiers modifiers, const bool allowShiftVariant)
     {
         const Core::HotkeyCombination pressed{modifiers, static_cast<Qt::Key>(key)};
-        const auto                      bound = appShortcutValue(settings, entry);
+        const auto                    bound = appShortcutValue(settings, entry);
         if (pressed == bound)
         {
             return true;
@@ -133,7 +132,7 @@ namespace GyanisScribe::Gui
             return false;
         }
         // 摘位而不是相减：Shift 是一个位，别的位还挂在上面
-        return Core::HotkeyCombination(modifiers & ~Qt::ShiftModifier, static_cast<Qt::Key>(key)) == bound;
+        return Core::HotkeyCombination(modifiers & ~Qt::KeyboardModifiers(Qt::ShiftModifier), static_cast<Qt::Key>(key)) == bound;
     }
 
 } // namespace GyanisScribe::Gui

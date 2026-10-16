@@ -102,7 +102,7 @@ namespace GyanisScribe::App
                                  cleanup();
                                  emit failed(QString::fromUtf8(
                                          GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("这张图超过 {} MB 上限，没有取回来；换一张小一点的，或先把它存到盘上再拖进来"),
-                                                                      kMaximumFetchedImageBytes / (1024 * 1024))
+                                                                      kMaximumFetchedImageBytes / (1024LL * 1024))
                                                  .c_str()));
                                  return;
                              }

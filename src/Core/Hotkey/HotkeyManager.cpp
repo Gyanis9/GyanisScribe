@@ -65,9 +65,9 @@ namespace GyanisScribe::Core
     std::span<const HotkeyAction> HotkeyManager::managedActions()
     {
         // 表长度由这份初始化列表自己算：每加一个动作就改三处的日子结束了
-        static constexpr std::array actions = {HotkeyAction::Capture,     HotkeyAction::Record,     HotkeyAction::Ocr,          HotkeyAction::Pick,
-                                               HotkeyAction::CaptureLong, HotkeyAction::TogglePins, HotkeyAction::NextPinGroup, HotkeyAction::QuickSave};
-        return actions;
+        static constexpr std::array kActions = {HotkeyAction::Capture,     HotkeyAction::Record,     HotkeyAction::Ocr,          HotkeyAction::Pick,
+                                                HotkeyAction::CaptureLong, HotkeyAction::TogglePins, HotkeyAction::NextPinGroup, HotkeyAction::QuickSave};
+        return kActions;
     }
 
     std::string_view HotkeyManager::settingsKeyFor(HotkeyAction action)

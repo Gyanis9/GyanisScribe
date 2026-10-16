@@ -58,7 +58,7 @@ namespace GyanisScribe::Core
          * @details 重写父类接口：擦除笔迹比普通画笔宽好几倍，容差按同一个倍数放宽，
          *          否则视觉上一条宽笔迹却只有中间一线点得中。
          */
-        bool hitTestShape(const AnnotationShape &shape, const QPoint &point, int tolerance) const override;
+        [[nodiscard]] bool hitTestShape(const AnnotationShape &shape, const QPoint &point, int tolerance) const override;
     };
 
 } // namespace GyanisScribe::Core

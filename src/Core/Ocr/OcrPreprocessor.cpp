@@ -38,7 +38,7 @@ namespace GyanisScribe::Core
             auto       *outputLine = result.scanLine(y);
             for (int x = 0; x < converted.width(); ++x)
             {
-                const int luminance = (kRedWeight * qRed(line[x]) + kGreenWeight * qGreen(line[x]) + kBlueWeight * qBlue(line[x])) >> 8;
+                const int luminance = static_cast<int>(static_cast<unsigned>(kRedWeight * qRed(line[x]) + kGreenWeight * qGreen(line[x]) + kBlueWeight * qBlue(line[x])) >> 8);
                 outputLine[x]       = static_cast<quint8>(luminance);
             }
         }

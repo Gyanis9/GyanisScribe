@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <format>
+#include <utility>
 
 namespace GyanisScribe::Core
 {
@@ -50,8 +51,8 @@ namespace GyanisScribe::Core
         class InsertShapeCommand : public QUndoCommand
         {
         public:
-            InsertShapeCommand(AnnotationTool *tool, int index, const AnnotationShape &shape, QUndoCommand *parent = nullptr) :
-                QUndoCommand(parent), m_tool(tool), m_index(index), m_shape(shape)
+            InsertShapeCommand(AnnotationTool *tool, int index, AnnotationShape shape, QUndoCommand *parent = nullptr) :
+                QUndoCommand(parent), m_tool(tool), m_index(index), m_shape(std::move(shape))
             {
             }
 
@@ -78,8 +79,8 @@ namespace GyanisScribe::Core
         class RemoveShapeCommand : public QUndoCommand
         {
         public:
-            RemoveShapeCommand(AnnotationTool *tool, int index, const AnnotationShape &shape, QUndoCommand *parent = nullptr) :
-                QUndoCommand(parent), m_tool(tool), m_index(index), m_shape(shape)
+            RemoveShapeCommand(AnnotationTool *tool, int index, AnnotationShape shape, QUndoCommand *parent = nullptr) :
+                QUndoCommand(parent), m_tool(tool), m_index(index), m_shape(std::move(shape))
             {
             }
 
@@ -149,7 +150,7 @@ namespace GyanisScribe::Core
                 {
                     return false;
                 }
-                const auto &next = *static_cast<const MoveShapesCommand *>(other);
+                const auto &next = *dynamic_cast<const MoveShapesCommand *>(other);
                 // 只并同一组图形的位移：换了工具或换了序号，那就是另一趟意图
                 if (next.m_targets != m_targets)
                 {
@@ -183,7 +184,7 @@ namespace GyanisScribe::Core
                 PenParameters   before;          ///< 改动前的整套样式，撤销回它
             };
 
-            RestyleShapesCommand(std::vector<Target> targets, const PenParameters &after) : m_targets(std::move(targets)), m_after(after)
+            RestyleShapesCommand(std::vector<Target> targets, PenParameters after) : m_targets(std::move(targets)), m_after(std::move(after))
             {
             }
 
@@ -214,7 +215,7 @@ namespace GyanisScribe::Core
                 {
                     return false;
                 }
-                const auto &next = *static_cast<const RestyleShapesCommand *>(other);
+                const auto &next = *dynamic_cast<const RestyleShapesCommand *>(other);
                 if (next.m_targets.size() != m_targets.size())
                 {
                     return false;
@@ -246,8 +247,8 @@ namespace GyanisScribe::Core
         class ReplaceShapeCommand : public QUndoCommand
         {
         public:
-            ReplaceShapeCommand(const int typeId, AnnotationTool *tool, const int index, const AnnotationShape &before, const AnnotationShape &after) :
-                m_typeId(typeId), m_tool(tool), m_index(index), m_before(before), m_after(after)
+            ReplaceShapeCommand(const int typeId, AnnotationTool *tool, const int index, AnnotationShape before, AnnotationShape after) :
+                m_typeId(typeId), m_tool(tool), m_index(index), m_before(std::move(before)), m_after(std::move(after))
             {
             }
 
@@ -272,7 +273,7 @@ namespace GyanisScribe::Core
                 {
                     return false;
                 }
-                const auto &next = *static_cast<const ReplaceShapeCommand *>(other);
+                const auto &next = *dynamic_cast<const ReplaceShapeCommand *>(other);
                 if (next.m_tool != m_tool || next.m_index != m_index)
                 {
                     return false;
@@ -347,8 +348,8 @@ namespace GyanisScribe::Core
         class SetTextCommand : public QUndoCommand
         {
         public:
-            SetTextCommand(AnnotationTool *tool, int index, const QString &before, const QString &text, QUndoCommand *parent = nullptr) :
-                QUndoCommand(parent), m_tool(tool), m_index(index), m_before(before), m_text(text)
+            SetTextCommand(AnnotationTool *tool, int index, QString before, QString text, QUndoCommand *parent = nullptr) :
+                QUndoCommand(parent), m_tool(tool), m_index(index), m_before(std::move(before)), m_text(std::move(text))
             {
             }
 
@@ -619,7 +620,7 @@ namespace GyanisScribe::Core
                     Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiText("只有文字工具在用时才需要设定文本内容。请先切到文字工具再输入").toStdString()});
         }
 
-        static_cast<TextTool *>(tool)->setPendingText(text);
+        dynamic_cast<TextTool *>(tool)->setPendingText(text);
         return {};
     }
 
@@ -653,7 +654,7 @@ namespace GyanisScribe::Core
         {
             return std::unexpected(Base::Error{Base::ErrorCode::InternalError, GyanisScribe::Base::uiTextUtf8("序号工具不在册")});
         }
-        static_cast<NumberTool *>(tool)->setNextNumber(number);
+        dynamic_cast<NumberTool *>(tool)->setNextNumber(number);
         return {};
     }
 
@@ -661,7 +662,7 @@ namespace GyanisScribe::Core
     {
         if (auto *tool = toolFor(ToolKind::Number); tool != nullptr)
         {
-            static_cast<NumberTool *>(tool)->clearNextNumber();
+            dynamic_cast<NumberTool *>(tool)->clearNextNumber();
         }
     }
 
@@ -669,7 +670,7 @@ namespace GyanisScribe::Core
     {
         const auto *tool = toolFor(ToolKind::Number);
         // 工具恒在册（构造列表里就有它）；真缺了交回 1，让界面显示一个不含蓄的起点而不是崩溃
-        return tool != nullptr ? static_cast<const NumberTool *>(tool)->nextNumber() : 1;
+        return tool != nullptr ? dynamic_cast<const NumberTool *>(tool)->nextNumber() : 1;
     }
 
     Base::Expected<void> AnnotationEngine::setNumberGroup(const int group)
@@ -679,14 +680,14 @@ namespace GyanisScribe::Core
         {
             return std::unexpected(Base::Error{Base::ErrorCode::InternalError, GyanisScribe::Base::uiTextUtf8("序号工具不在册")});
         }
-        static_cast<NumberTool *>(tool)->setNumberGroup(group);
+        dynamic_cast<NumberTool *>(tool)->setNumberGroup(group);
         return {};
     }
 
     int AnnotationEngine::numberGroup() const
     {
         const auto *tool = toolFor(ToolKind::Number);
-        return tool != nullptr ? static_cast<const NumberTool *>(tool)->numberGroup() : 1;
+        return tool != nullptr ? dynamic_cast<const NumberTool *>(tool)->numberGroup() : 1;
     }
 
     std::optional<AnnotationSelection> AnnotationEngine::selectionAt(const QPoint &point) const

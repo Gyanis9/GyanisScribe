@@ -88,7 +88,7 @@ namespace GyanisScribe::Core
             const auto code = static_cast<int>(key);
             if ((code >= static_cast<int>(Qt::Key_A) && code <= static_cast<int>(Qt::Key_Z)) || (code >= static_cast<int>(Qt::Key_0) && code <= static_cast<int>(Qt::Key_9)))
             {
-                return QString(QChar(static_cast<ushort>(code)));
+                return {QChar(static_cast<ushort>(code))};
             }
             if (code == static_cast<int>(Qt::Key_Space))
             {

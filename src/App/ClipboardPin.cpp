@@ -134,7 +134,7 @@ namespace GyanisScribe::App
         if (data->hasImage())
         {
             // 有图像那一路、却读不出像素：来源只挂了名目没给内容（受保护内容、跨会话拷贝的那类）
-            const QImage image = qvariant_cast<QImage>(data->imageData());
+            auto image = qvariant_cast<QImage>(data->imageData());
             if (image.isNull())
             {
                 return std::unexpected(
@@ -185,7 +185,7 @@ namespace GyanisScribe::App
                 // 链接（网页地址等）按文本卡片贴：URL 本身就是一行字，渲染成卡片才立得住
                 if (!url.isLocalFile())
                 {
-                    content.contents.push_back(PinContent{renderTextCard(url.toString(), font), QString()});
+                    content.contents.push_back(PinContent{renderTextCard(url.toString(), font), QString(), {}});
                     continue;
                 }
 

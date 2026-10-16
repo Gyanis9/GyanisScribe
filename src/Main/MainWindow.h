@@ -357,18 +357,19 @@ namespace GyanisScribe::Main
         /// 历史页：缩略图列表与三个出口
         QWidget *buildHistoryPage();
 
-        GyanisScribe::Core::ISettingsStore                                  &m_settings;          ///< 配置存储，不拥有
-        GyanisScribe::Gui::ThemeManager                                     &m_theme;             ///< 主题管理器，不拥有
-        GyanisScribe::Gui::IconProvider                                     &m_icons;             ///< 图标供给器，不拥有
-        GyanisScribe::Platform::PlatformCapabilities                         m_capabilities;      ///< 平台能力表：热键页按它给不给登记入口
-        QListWidget                                                         *m_nav   = nullptr;   ///< 左侧导航，一行一页
-        QStackedWidget                                                      *m_stack = nullptr;   ///< 右侧页容器，序号与导航行同解
-        std::unique_ptr<GyanisScribe::Plugins::FfmpegAudioDeviceEnumerator>  m_audioDevices;      ///< 录屏页那两路设备清单的来源，一次查询两格共用
-        std::unique_ptr<GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator> m_videoEncoders;     ///< 录屏页编码器清单的来源：逐个候选真探一遍
-        std::unique_ptr<GyanisScribe::App::UpdateChecker>                    m_updateChecker;     ///< 检查更新那一条：关于页按一下才发请求，不是启动就联网
-        GyanisScribe::Platform::IPlatformIntegration                        &m_integration;       ///< 平台动作（当前只有开机启动那一格）：能力位可以造假，动作要有真对象
-        GyanisScribe::Core::HistoryStore                                    &m_historyStore;      ///< 历史清单，历史页从它读
-        GyanisScribe::Gui::HistoryView                                      *m_history = nullptr; ///< 历史页控件，重读清单时刷新它
+        GyanisScribe::Core::ISettingsStore                                  &m_settings;        ///< 配置存储，不拥有
+        GyanisScribe::Gui::ThemeManager                                     &m_theme;           ///< 主题管理器，不拥有
+        GyanisScribe::Gui::IconProvider                                     &m_icons;           ///< 图标供给器，不拥有
+        GyanisScribe::Platform::PlatformCapabilities                         m_capabilities;    ///< 平台能力表：热键页按它给不给登记入口
+        QListWidget                                                         *m_nav   = nullptr; ///< 左侧导航，一行一页
+        QStackedWidget                                                      *m_stack = nullptr; ///< 右侧页容器，序号与导航行同解
+        std::unique_ptr<GyanisScribe::Plugins::FfmpegAudioDeviceEnumerator>  m_audioDevices;    ///< 录屏页那两路设备清单的来源，一次查询两格共用
+        std::unique_ptr<GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator> m_videoEncoders;   ///< 录屏页编码器清单的来源：逐个候选真探一遍
+        GyanisScribe::Platform::IPlatformIntegration                        &m_integration;     ///< 平台动作（当前只有开机启动那一格）：能力位可以造假，动作要有真对象
+        GyanisScribe::Core::HistoryStore                                    &m_historyStore;    ///< 历史清单，历史页从它读
+        // 排在历史后面只为照声明次序初始化（它默认是空的，构造列表里没写它；夹在中间会让后两项的初始化次序与声明不符）
+        std::unique_ptr<GyanisScribe::App::UpdateChecker> m_updateChecker;     ///< 检查更新那一条：关于页按一下才发请求，不是启动就联网
+        GyanisScribe::Gui::HistoryView                   *m_history = nullptr; ///< 历史页控件，重读清单时刷新它
     };
 
 } // namespace GyanisScribe::Main

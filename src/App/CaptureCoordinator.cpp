@@ -61,7 +61,7 @@ namespace
 
 namespace GyanisScribe::App
 {
-    CaptureCoordinator::CaptureCoordinator(Dependencies dependencies, QObject *parent) : QObject(parent), m_dependencies(std::move(dependencies))
+    CaptureCoordinator::CaptureCoordinator(Dependencies dependencies, QObject *parent) : QObject(parent), m_dependencies(dependencies)
     {
         m_annotation = std::make_unique<GyanisScribe::Core::AnnotationEngine>();
         m_capture    = std::make_unique<GyanisScribe::Gui::CaptureService>(m_dependencies.captureSource, m_dependencies.settings, m_dependencies.integration);

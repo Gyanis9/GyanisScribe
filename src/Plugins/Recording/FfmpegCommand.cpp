@@ -185,12 +185,12 @@ namespace GyanisScribe::Plugins
     Base::Expected<QString> locateFfmpeg()
     {
         // 先要随包那份：软件装完即用，不要求用户再装 ffmpeg 或把它加进 PATH
-        if (const auto bundled = bundledFfmpegPath(QCoreApplication::applicationDirPath()); !bundled.isEmpty())
+        if (auto bundled = bundledFfmpegPath(QCoreApplication::applicationDirPath()); !bundled.isEmpty())
         {
             return bundled;
         }
 
-        if (const auto found = QStandardPaths::findExecutable(QStringLiteral("ffmpeg")); !found.isEmpty())
+        if (auto found = QStandardPaths::findExecutable(QStringLiteral("ffmpeg")); !found.isEmpty())
         {
             return found;
         }

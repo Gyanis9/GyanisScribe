@@ -86,7 +86,7 @@ namespace GyanisScribe::Plugins
 
         const auto extension = config.format == Core::OutputFormat::Mp4 ? "mp4" : "gif";
         // 名字按设置里那一格的模板拼，并让一次位：同一秒里连开两轮不会把上一轮悄悄盖掉
-        const auto outputFile = Base::Paths::uniqueFilePath(config.outputDirectory, Base::Paths::imageFileName(QDateTime::currentDateTime(), extension, config.nameTemplate));
+        auto       outputFile = Base::Paths::uniqueFilePath(config.outputDirectory, Base::Paths::imageFileName(QDateTime::currentDateTime(), extension, config.nameTemplate));
         const auto timeout    = encodeTimeoutMs(config.frameRate, frameCount);
 
         if (config.format == Core::OutputFormat::Mp4)

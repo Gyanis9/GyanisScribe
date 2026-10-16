@@ -70,6 +70,14 @@ namespace GyanisScribe::App
                              GyanisScribe::Core::ISettingsStore &settings, GyanisScribe::Gui::IconProvider &icons, QObject *parent = nullptr);
 
         /**
+         * @brief 析构
+         * @note 声明在头、定义在 .cpp：两个成员的唯一指针各指着一个只前向声明的类型
+         *       （编码器与服务），析构要在类型完整的 TU 里实例化——否则别的 TU 里
+         *       内联析构会让 clang/GCC 报 sizeof 应用在不完整类型上（MSVC 默认放过，口径不一）。
+         */
+        ~RecordingCoordinator() override;
+
+        /**
          * @brief 一次按下：空闲时开始这一轮（含倒计时与控制条），在录或暂停时收尾并保存
          * @details 两个方向合成一个入口，是因为热键、托盘菜单与控制条上的停止键按的都是同一个键，
          *          三处各写一份「现在该开始还是该停」就会三处各有一套判据。

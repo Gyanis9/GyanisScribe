@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 namespace
 {
@@ -33,9 +34,10 @@ namespace
 
 namespace GyanisScribe::Gui
 {
-    ColorPickerOverlay::ColorPickerOverlay(const Base::CapturedImage &frame, const QRect &screenGeometry, const Core::ColorFormat format, const Core::HexCasing casing,
+    ColorPickerOverlay::ColorPickerOverlay(Base::CapturedImage frame, const QRect &screenGeometry, const Core::ColorFormat format, const Core::HexCasing casing,
                                            const Core::MagnifierView view, const Gui::ThemeManager &theme, QWidget *parent) :
-        QWidget(parent), m_frame(frame), m_screenGeometry(screenGeometry), m_format(format), m_hexCasing(casing), m_magnifierView(view), m_theme(theme), m_cursor(QCursor::pos())
+        QWidget(parent), m_frame(std::move(frame)), m_screenGeometry(screenGeometry), m_format(format), m_hexCasing(casing), m_magnifierView(view), m_theme(theme),
+        m_cursor(QCursor::pos())
     {
         // 遮罩盖住整块屏幕，坐标一律用屏幕坐标：逻辑坐标与冻帧像素之间靠 Core::framePixelFor 换算
         setGeometry(m_screenGeometry);
@@ -58,7 +60,7 @@ namespace GyanisScribe::Gui
         return m_frame.image.pixelColor(pixel);
     }
 
-    QPoint ColorPickerOverlay::cursor() const
+    QPoint ColorPickerOverlay::pointerPosition() const
     {
         return m_cursor;
     }

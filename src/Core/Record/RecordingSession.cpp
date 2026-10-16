@@ -18,7 +18,7 @@ namespace
 namespace GyanisScribe::Core
 {
     RecordingSession::RecordingSession(const RecorderConfig &config, IRecordingSink &sink, const qint64 startedAtMs, const int countdownSeconds) :
-        m_config(config), m_sink(sink), m_startedAtMs(startedAtMs), m_recordingStartMs(startedAtMs + static_cast<qint64>(std::max(0, countdownSeconds)) * 1000),
+        m_config(config), m_sink(sink), m_recordingStartMs(startedAtMs + static_cast<qint64>(std::max(0, countdownSeconds)) * 1000),
         m_countdownSeconds(std::max(0, countdownSeconds)), m_state(m_countdownSeconds > 0 ? RecordingState::Countdown : RecordingState::Recording)
         // 节拍从「倒计时结束那一刻」起算，这样恢复录制与开始录制的第 0 帧对齐在同一格上
         ,

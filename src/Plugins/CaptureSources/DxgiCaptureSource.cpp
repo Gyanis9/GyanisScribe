@@ -182,11 +182,11 @@ namespace GyanisScribe::Plugins
                 return true;
             }
 
-            constexpr std::array levels{D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1};
+            constexpr std::array kLevels{D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1};
             // 显式指定适配器时驱动类型必须给 UNKNOWN（D3D11CreateDevice 的约定）；
             // BGRA 支持位是桌面重复要的：少了它 DuplicateOutput 直接回 DXGI_ERROR_UNSUPPORTED
-            const HRESULT created = D3D11CreateDevice(context.adapter.get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT, levels.data(),
-                                                      static_cast<UINT>(levels.size()), D3D11_SDK_VERSION, context.device.put(), nullptr, context.context.put());
+            const HRESULT created = D3D11CreateDevice(context.adapter.get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT, kLevels.data(),
+                                                      static_cast<UINT>(kLevels.size()), D3D11_SDK_VERSION, context.device.put(), nullptr, context.context.put());
             if (FAILED(created))
             {
                 Base::Logger::warning(std::format("DXGI 抓帧：这块适配器建不起 D3D11 设备（HRESULT 0x{:08X}）", static_cast<unsigned>(created)));

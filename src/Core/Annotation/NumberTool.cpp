@@ -84,7 +84,7 @@ namespace GyanisScribe::Core
     QRect NumberTool::localBoundingBoxOf(const AnnotationShape &shape) const
     {
         const int diameter = qMax(1, static_cast<int>(shape.fontSize * kBadgeDiameterPerFontSize));
-        return QRect(shape.position.x() - diameter / 2, shape.position.y() - diameter / 2, diameter, diameter);
+        return {shape.position.x() - diameter / 2, shape.position.y() - diameter / 2, diameter, diameter};
     }
 
     void NumberTool::paintShape(QPainter &painter, const AnnotationShape &shape, const PaintContext &context) const

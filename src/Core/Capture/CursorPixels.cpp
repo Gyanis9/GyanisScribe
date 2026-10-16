@@ -29,7 +29,7 @@ namespace GyanisScribe::Core
         [[nodiscard]] bool maskBit(const std::vector<unsigned char> &bits, int rowBytes, int row, int column)
         {
             const auto *const begin = bits.data() + static_cast<std::size_t>(row) * static_cast<std::size_t>(rowBytes);
-            return ((begin[column / 8] >> (7 - column % 8)) & 1U) != 0U;
+            return ((static_cast<unsigned>(begin[column / 8]) >> (7 - column % 8)) & 1U) != 0U;
         }
     } // namespace
 
@@ -73,7 +73,7 @@ namespace GyanisScribe::Core
             }
         }
 
-        return QImage(reinterpret_cast<const uchar *>(pixels.data()), width, height, width * 4, QImage::Format_ARGB32).copy();
+        return QImage(reinterpret_cast<const uchar *>(pixels.data()), width, height, static_cast<qsizetype>(width) * 4, QImage::Format_ARGB32).copy();
     }
 
 #ifdef Q_OS_WIN

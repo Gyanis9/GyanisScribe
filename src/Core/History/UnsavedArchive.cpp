@@ -79,7 +79,7 @@ namespace GyanisScribe::Core
             return std::unexpected(ensured.error());
         }
 
-        const auto filePath = Base::Paths::uniqueFilePath(directory, Base::Paths::imageFileName(moment, "png"));
+        auto filePath = Base::Paths::uniqueFilePath(directory, Base::Paths::imageFileName(moment, "png"));
         if (!image.save(Base::Paths::toDisplayText(filePath), "PNG"))
         {
             return std::unexpected(Base::Error{

@@ -33,7 +33,7 @@ namespace GyanisScribe::Gui
 
         // 小键盘数字归到主键盘数字：同一颗键在两台机器上不该存成两种写法。
         // 摘位而不是相减：KeypadModifier 是一个位，减法在别的组合位上会算错
-        const auto unshifted = keyCode & ~Qt::KeypadModifier;
+        const auto unshifted = static_cast<int>(static_cast<unsigned>(keyCode) & ~static_cast<unsigned>(Qt::KeypadModifier));
         if (unshifted >= Qt::Key_0 && unshifted <= Qt::Key_9)
         {
             return static_cast<Qt::Key>(unshifted);

@@ -91,7 +91,7 @@ namespace GyanisScribe::Core
          * @return 恒为真
          * @details 重写基类接口：序号是点一下落的，没有尺寸可言，外接框判据在这里不适用。
          */
-        bool shapeIsUsable(const AnnotationShape &shape) const override;
+        [[nodiscard]] bool shapeIsUsable(const AnnotationShape &shape) const override;
 
         /**
          * @brief 圆牌的局部外接框，见 AnnotationTool::localBoundingBoxOf()

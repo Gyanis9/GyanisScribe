@@ -386,9 +386,9 @@ namespace GyanisScribe::Gui
         const auto hintOffset = region.height() + GyanisScribe::Gui::kSelectionBorderWidth + GyanisScribe::Gui::kHintPadding;
         if (region.top() - hintOffset - 4 >= 0)
         {
-            return QPoint(region.left(), region.top() - hintOffset);
+            return {region.left(), region.top() - hintOffset};
         }
-        return QPoint(region.left(), region.bottom() + 4);
+        return {region.left(), region.bottom() + 4};
     }
 
     void CaptureOverlay::paintEvent(QPaintEvent *event)
@@ -705,8 +705,11 @@ namespace GyanisScribe::Gui
             case RebindableKeyAction::CycleColorFormat:
                 // 读数里颜色那一格换一种写法（词表见 Pick/ColorFormat，六个轮一圈）：对着目标程序核对配色时
                 // 常常要换一种写法看，不必为这个先离开截图去设置里改一档
-                m_readoutFormat = *Core::colorFormatAt((Core::indexOfColorFormat(m_readoutFormat) + 1) % static_cast<int>(Core::kColorFormatCount));
-                update();
+                if (const auto next = Core::colorFormatAt((Core::indexOfColorFormat(m_readoutFormat) + 1) % static_cast<int>(Core::kColorFormatCount)))
+                {
+                    m_readoutFormat = *next;
+                    update();
+                }
                 return;
             case RebindableKeyAction::ToggleCursor:
                 // 只改这一轮，配置那一格不动。滚动长截图那一轮根本没有这一档（按帧接图会把一枚指针复制成一串），
@@ -927,7 +930,7 @@ namespace GyanisScribe::Gui
     {
         if (watched == m_sizeEditor && event->type() == QEvent::KeyPress)
         {
-            auto *key = static_cast<QKeyEvent *>(event);
+            auto *key = dynamic_cast<QKeyEvent *>(event);
             if (key->key() == Qt::Key_Escape)
             {
                 cancelSizeEditor();

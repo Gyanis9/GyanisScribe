@@ -86,8 +86,7 @@ namespace GyanisScribe::Gui
          * @param nameTemplate 导出时的文件名模板；留空表示默认档（与截图成品同一套名字规则）
          * @param parent 父窗口，可空
          */
-        OcrResultWindow(const QImage &image, const Core::OcrResult &result, Gui::IconProvider &icons, const Gui::ThemeManager &theme, const QString &nameTemplate = {},
-                        QWidget *parent = nullptr);
+        OcrResultWindow(QImage image, Core::OcrResult result, Gui::IconProvider &icons, const Gui::ThemeManager &theme, QString nameTemplate = {}, QWidget *parent = nullptr);
 
         /**
          * @brief 换一份结果与底图（重新识别之后调用）

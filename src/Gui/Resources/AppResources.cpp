@@ -26,12 +26,12 @@ namespace GyanisScribe::Gui
     void ensureApplicationResourcesRegistered()
     {
         // 只在第一次调用时初始化：资源注册本身是进程级动作，重复注册没有额外效果
-        static const bool registered = []
+        static const bool kRegistered = []
         {
             invokeResourceInit();
             return true;
         }();
-        std::ignore = registered;
+        std::ignore = kRegistered;
     }
 
 } // namespace GyanisScribe::Gui

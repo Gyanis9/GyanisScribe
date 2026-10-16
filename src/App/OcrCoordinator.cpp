@@ -34,6 +34,8 @@ namespace GyanisScribe::App
         QObject::connect(m_runner.get(), &GyanisScribe::Core::RecognitionRunner::failed, this, &OcrCoordinator::handleFailed);
     }
 
+    OcrCoordinator::~OcrCoordinator() = default;
+
     void OcrCoordinator::requestRecognition(const QImage &image)
     {
         m_image = image;

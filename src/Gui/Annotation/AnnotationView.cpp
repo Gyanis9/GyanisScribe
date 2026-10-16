@@ -150,7 +150,7 @@ namespace GyanisScribe::Gui
         if (const auto frame = m_engine.selectionFrame(); frame)
         {
             // 单条选中：画跟着图形一起转的定向框，四角连成多边形
-            const auto toWidget = [this, &rect, &canvas](const QPointF &canvasPoint)
+            const auto toWidget = [&rect, &canvas](const QPointF &canvasPoint)
             { return QPointF{toWidgetPoint(QPoint{qRound(canvasPoint.x()), qRound(canvasPoint.y())}, rect, canvas.logicalSize)}; };
 
             QPolygonF outline;
@@ -533,7 +533,7 @@ namespace GyanisScribe::Gui
 
         if (event->type() == QEvent::KeyPress)
         {
-            const auto *key = static_cast<QKeyEvent *>(event);
+            const auto *key = dynamic_cast<QKeyEvent *>(event);
             if (key->key() == Qt::Key_Escape)
             {
                 cancelTextEditor();

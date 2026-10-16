@@ -34,9 +34,6 @@ namespace
     /// 列表项里存成品路径的那个角色
     constexpr int kPathRole = Qt::UserRole + 1;
 
-    /// 筛选下拉的第 0 档：不限类别
-    constexpr int kFilterIndexAll = 0;
-
     // 路径与界面字符串的换算沿用 Base::Paths::toDisplayText / fromDisplayText，这里不再抄一份
 } // namespace
 

@@ -139,7 +139,7 @@ namespace GyanisScribe::Core
         rects.reserve(static_cast<std::size_t>(shown));
         for (int index = 0; index < shown; ++index)
         {
-            rects.push_back(QRect{left + index * stride, top, kRecentSwatchEdge, kRecentSwatchEdge});
+            rects.emplace_back(left + index * stride, top, kRecentSwatchEdge, kRecentSwatchEdge);
         }
         return rects;
     }

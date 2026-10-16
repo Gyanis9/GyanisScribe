@@ -51,7 +51,7 @@ namespace GyanisScribe::Core
          * @return true 文本非空
          * @details 重写基类接口：基类按外接框尺寸判，而文字是点一下落的，框宽为零也照样该成立。
          */
-        bool shapeIsUsable(const AnnotationShape &shape) const override;
+        [[nodiscard]] bool shapeIsUsable(const AnnotationShape &shape) const override;
 
         /**
          * @brief 画一段文字，见 AnnotationTool::paintShape()
