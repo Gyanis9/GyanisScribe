@@ -26,7 +26,7 @@
   能 configure 过，就把 `conandata.yml` 的 `releaseOnlyRequirements` 并回 `requirements`，
   删掉 `conanfile.py` 里那段 `build_type` 判断与 `src/Plugins/CMakeLists.txt` 的 `if (Tesseract_FOUND)` 分支。
 - 包是按静态库给的（编译行里带 `-DLIBJPEG_STATIC` 一类开关），`bin/` 只有四个 Qt 的 DLL，
-  Release 的 `--selftest` 与 120 条用例都能跑起来，不需要额外部署 `tesseract.dll`。
+  Release 的 `--selftest` 与整个用例名单都能跑起来，不需要额外部署 `tesseract.dll`。
 - 模型可用性只认「目录里有认识的语言对应的 `*.traineddata`」。空文件冒充的模型不算识别成功：
   `recognize()` 返回 `InternalError` 并写明「初始化语言 X 失败」，这条由用例
   `PrefersTesseractWhenLanguagePacksArePresent` 钉住（它同时证明库真的在运行，而不是被 `#if` 掉了）。
