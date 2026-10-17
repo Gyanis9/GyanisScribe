@@ -107,11 +107,19 @@ namespace GyanisScribe::Gui
     private:
         void showPrompt(const QString &text);
 
+        /**
+         * @brief 把「正在录制」这一档同步给样式表
+         * @param recording 进入/退出录制态
+         * @details 样式表按 hotkeyDisplay[recording="true"] 换主色描边；属性改了要手动重抛光，
+         *          否则动态属性选择器停在上一次的值。
+         */
+        void setRecordingState(bool recording);
+
         Core::ISettingsStore &m_settings;                            ///< 配置存储，不拥有
-        std::string               m_key;                                 ///< 绑定的配置键名
-        HotkeyEditScope           m_scope     = HotkeyEditScope::Global; ///< 这一格录下来的键归哪一档
-        QLabel                   *m_display   = nullptr;                 ///< 显示组合文本的标签，也是录制状态的提示位
-        bool                      m_recording = false;                   ///< 是否正在等一次按键
+        std::string           m_key;                                 ///< 绑定的配置键名
+        HotkeyEditScope       m_scope     = HotkeyEditScope::Global; ///< 这一格录下来的键归哪一档
+        QLabel               *m_display   = nullptr;                 ///< 显示组合文本的标签，也是录制状态的提示位
+        bool                  m_recording = false;                   ///< 是否正在等一次按键
     };
 
 } // namespace GyanisScribe::Gui

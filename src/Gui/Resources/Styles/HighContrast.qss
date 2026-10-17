@@ -153,6 +153,26 @@ QLineEdit:read-only {
     color: #000000;
 }
 
+/* ---- 快捷键录制框：与输入框同一套外观；录制态把描边换成主色 ---- */
+QLabel#hotkeyDisplay {
+    background-color: #FFFFFF;
+    color: #000000;
+    border: 2px solid #000000;
+    border-radius: 12px;
+    padding: 0 12px;
+    min-height: 30px;
+}
+
+QLabel#hotkeyDisplay[recording="true"] {
+    border: 2px solid #0B57D0;
+}
+
+QLabel#hotkeyDisplay:disabled {
+    background-color: #FFFFFF;
+    color: #000000;
+    border-color: #000000;
+}
+
 /* ---- 标注窗的行内文字输入框：与上面几档输入框同形，别把识别结果区的宽内边距带进去 ----
    上下内边距为零是标注输入框高度算式的前提（AnnotationView::resizeTextEditorToContent 只补边框与余量），
    改这里的 padding 要同步改那边 */

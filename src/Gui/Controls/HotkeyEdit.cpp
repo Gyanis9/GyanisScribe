@@ -7,6 +7,7 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QLabel>
+#include <QStyle>
 #include <QVBoxLayout>
 
 #include <string>
@@ -47,9 +48,11 @@ namespace GyanisScribe::Gui
         layout->setContentsMargins(0, 0, 0, 0);
 
         m_display = new QLabel{this};
-        m_display->setFrameShape(QFrame::Box);
-        m_display->setAlignment(Qt::AlignCenter);
-        m_display->setMinimumWidth(120);
+        m_display->setObjectName(QStringLiteral("hotkeyDisplay"));
+        m_display->setFrameShape(QFrame::NoFrame);
+        m_display->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+        m_display->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        m_display->setMinimumWidth(0);
         m_display->setText(GyanisScribe::Base::uiText("点击后按下快捷键"));
         layout->addWidget(m_display);
 
@@ -122,7 +125,7 @@ namespace GyanisScribe::Gui
             return;
         }
         // 进入录制态并抢焦点：焦点不在本控件上时 keyPressEvent 根本不会送过来
-        m_recording = true;
+        setRecordingState(true);
         setFocus(Qt::MouseFocusReason);
         showPrompt(GyanisScribe::Base::uiText("请按下快捷键（Esc 取消）"));
     }
@@ -138,7 +141,7 @@ namespace GyanisScribe::Gui
         if (event->key() == Qt::Key_Escape)
         {
             // 取消回到现值：用户按 Esc 的意思是「我不改这一项」，把它写成空热键是曲解
-            m_recording = false;
+            setRecordingState(false);
             clearFocus();
             return;
         }
@@ -150,12 +153,20 @@ namespace GyanisScribe::Gui
             return;
         }
 
-        m_recording = false;
+        setRecordingState(false);
         if (auto applied = applyCombination(Core::HotkeyCombination{event->modifiers(), *key}); !applied)
         {
             Base::Logger::warning(std::format("快捷键没能写入：{}", applied.error().message));
         }
         clearFocus();
+    }
+
+    void HotkeyEdit::setRecordingState(const bool recording)
+    {
+        m_recording = recording;
+        m_display->setProperty("recording", recording);
+        m_display->style()->unpolish(m_display);
+        m_display->style()->polish(m_display);
     }
 
     void HotkeyEdit::showPrompt(const QString &text)
