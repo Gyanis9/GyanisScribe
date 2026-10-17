@@ -5,6 +5,7 @@
 // 与 CrashProbe / UiShotTool 同一条理由不是产品的一部分：不进安装包、不挂产品入口。
 // 跑法：UiAuditTool <输出目录>；stdout 每行是「图名: 实际尺寸 sizeHint minimumSizeHint」。
 
+#include "App/TrayController.h"
 #include "Base/Text.h"
 #include "Core/Annotation/AnnotationPalette.h"
 #include "Gui/Annotation/AnnotationToolbar.h"
@@ -37,6 +38,7 @@
 #include <QFormLayout>
 #include <QMenu>
 #include <QMouseEvent>
+#include <QSystemTrayIcon>
 #include <QPainter>
 #include <QScrollArea>
 #include <QStackedWidget>
@@ -268,8 +270,13 @@ namespace
 
 int main(int argc, char *argv[])
 {
-    // 离屏平台要排在 QApplication 之前：出图不该在用户的桌面上闪一串窗口
-    qputenv("QT_QPA_PLATFORM", "offscreen");
+    // 离屏平台要排在 QApplication 之前：出图不该在用户的桌面上闪一串窗口。
+    // 托盘菜单那一面是唯一的例外：离屏没有系统托盘，只能显式要它时换真平台
+    const bool liveTray = qEnvironmentVariableIsSet("GYANISSCRIBE_UI_AUDIT_LIVE_TRAY");
+    if (!liveTray)
+    {
+        qputenv("QT_QPA_PLATFORM", "offscreen");
+    }
 
     QApplication application(argc, argv);
     QCoreApplication::setOrganizationName(QStringLiteral("Gyanis"));
@@ -299,6 +306,41 @@ int main(int argc, char *argv[])
     GyanisScribe::Gui::ThemeManager   theme(settings);
     // 样式表要落一次：真实程序里这一步在 AppController 构造里做，这里没有控制器
     theme.applyFromSettings();
+
+    // 面 0（只在显式要真托盘时跑）：托盘右键菜单的真渲染。菜单本体是 QMenu，真平台下按真图标、
+    // 真主题、真字体排出来；取 contextMenu() 直接抓，不经过系统托盘的鼠标动作
+    if (liveTray)
+    {
+        auto integration = GyanisScribe::Platform::createPlatformIntegration();
+        GyanisScribe::App::TrayController tray{icons, theme, settings, *integration};
+        if (!tray.install())
+        {
+            std::fprintf(stderr, "live tray requested but this shell has no system tray\n");
+            return 1;
+        }
+        auto *icon = tray.findChild<QSystemTrayIcon *>();
+        auto *menu = icon != nullptr ? icon->contextMenu() : nullptr;
+        if (menu == nullptr)
+        {
+            std::fprintf(stderr, "live tray requested but the context menu was not built\n");
+            return 1;
+        }
+        menu->ensurePolished();
+        menu->adjustSize();
+        const auto filePath = outputDirectory / "tray-menu-live.png";
+        if (!menu->grab().save(QString::fromStdWString(filePath.wstring())))
+        {
+            std::fprintf(stderr, "failed to save the tray menu image\n");
+            return 1;
+        }
+        std::printf("tray-menu: %dx%d\n", menu->width(), menu->height());
+        for (auto *action: menu->actions())
+        {
+            std::printf("tray-menu row: %s | icon=%d | enabled=%d | h=%d\n", action->text().toStdString().c_str(), action->isSeparator() ? 0 : !action->icon().isNull(),
+                        static_cast<int>(action->isEnabled()), menu->actionGeometry(action).height());
+        }
+        return 0;
+    }
 
     // 面 1：标注工具栏默认态（设置里没存过色板，= 全新安装那一份）
     {
