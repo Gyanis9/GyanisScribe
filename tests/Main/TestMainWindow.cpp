@@ -38,6 +38,7 @@ using GyanisScribe::Main::screenCaptureLabels;
 #include <QFile>
 #include <QFileInfo>
 #include <QFormLayout>
+#include <QFontMetrics>
 #include <QComboBox>
 #include <QIcon>
 #include <QImage>
@@ -399,6 +400,45 @@ namespace
         ASSERT_NE(aboutLogo, nullptr) << "关于页没有正文控件，判据的前提没构造出来";
         const int aboutLeft = aboutLogo->mapTo(m_window.get(), QPoint{0, 0}).x();
         EXPECT_EQ(aboutLeft, formLeft) << "关于页正文左缘与表单页的网格对不上";
+    }
+
+    /**
+     * @brief 钉住「单键也能当全局热键」的说明不再被右缘截断（界面审查 UI-66）
+     * @details 长句当勾选框标签时 QCheckBox 不折行，右侧句尾直接被裁（实测最右墨迹顶到内容区右缘）。
+     *          改成短标签 + 一行会折行的说明；这条钉「勾选框文本是短名」「说明行开了折行且排成两行以上」。
+     */
+    TEST_F(MainWindowFixture, HotkeySingleKeyExplanationWrapsInsteadOfClipping)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::Hotkey);
+        QCoreApplication::processEvents();
+        auto *page = stack()->currentWidget();
+        ASSERT_NE(page, nullptr);
+
+        QCheckBox *simpleCheck = nullptr;
+        for (auto *check: page->findChildren<QCheckBox *>())
+        {
+            if (check->text() == GyanisScribe::Base::uiText("允许单键当全局热键"))
+            {
+                simpleCheck = check;
+                break;
+            }
+        }
+        ASSERT_NE(simpleCheck, nullptr) << "单键那一档没找到（短标签没落上）";
+
+        QLabel *hint = nullptr;
+        for (auto *label: page->findChildren<QLabel *>())
+        {
+            if (label->text().contains(GyanisScribe::Base::uiText("允许单键（字母")))
+            {
+                hint = label;
+                break;
+            }
+        }
+        ASSERT_NE(hint, nullptr) << "单键说明行没找到：长句还挂在勾选框上";
+        EXPECT_TRUE(hint->wordWrap()) << "说明行没开折行，长句还是会被右缘裁掉";
+        const QFontMetrics metrics{hint->font()};
+        EXPECT_GE(hint->height(), metrics.lineSpacing() * 3 / 2) << "说明没排成两行，折行没生效";
     }
 
     /**
