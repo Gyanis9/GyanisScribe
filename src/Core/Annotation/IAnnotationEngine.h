@@ -104,6 +104,15 @@ namespace GyanisScribe::Core
         virtual void refreshCanvas(Base::CapturedImage image) = 0;
 
         /**
+         * @brief 按新的裁切范围换画布，并把已有图形平移到新坐标系
+         * @param image 新画布（重抓后的范围）
+         * @param offset 旧画布左上角在新画布里的位置（旧左上 − 新左上）
+         * @details 标注窗重裁专用：图形保留并随裁切平移，撤销栈清空——重做会拿旧坐标插回。
+         *          新范围缩小时落在画布外的图形仍留在内存里，但导出会被画布裁掉。
+         */
+        virtual void recropCanvas(Base::CapturedImage image, const QPoint &offset) = 0;
+
+        /**
          * @brief 当前画布
          * @return 载入的那一帧；没载入过时返回空帧（image 为 null）
          */

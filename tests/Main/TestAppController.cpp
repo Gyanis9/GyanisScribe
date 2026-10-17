@@ -4,6 +4,7 @@
 // 从 AppControllerParts 注进去，把「谁在什么时刻被叫到、成品记在哪一份清单上」钉住。
 
 #include "App/CaptureCoordinator.h"
+#include "Gui/Annotation/AnnotationWindow.h"
 #include "App/TrayController.h"
 #include "Gui/Pick/ColorPickerOverlay.h"
 #include "Gui/Pin/PinWindow.h"
@@ -417,6 +418,27 @@ namespace GyanisScribe
 
         EXPECT_EQ(m_source->screenCalls, 1) << "0 秒档该在按下那一刻抓完";
         EXPECT_EQ(m_source->windowCalls, 0);
+    }
+
+    /**
+     * @brief 钉住标注窗拖边框之后按新范围重抓（用户 2026-10-17 直报：交出后还能重裁）
+     * @details 窗口只报新几何；藏窗、重抓、换画布与更新选区都在协调器这一层。
+     */
+    TEST_F(AppControllerFixture, CroppingTheAnnotationWindowRegrabsTheNewRegion)
+    {
+        makeController();
+        auto *screen = QGuiApplication::primaryScreen();
+        ASSERT_NE(screen, nullptr);
+
+        auto       &window = m_controller->capture().annotationWindow();
+        const auto  before = m_source->screenCalls;
+        const QRect region{5, 5, 40, 30};
+        window.cropRequested(screen->name(), region);
+
+        EXPECT_EQ(m_source->screenCalls, before + 1) << "拖完边框没有按新范围重抓";
+        EXPECT_EQ(m_source->requestedScreen, screen->name()) << "重抓跑到别的屏去了";
+        EXPECT_TRUE(window.isVisible()) << "重抓之后标注窗没有重新出现";
+        EXPECT_EQ(window.geometry(), region) << "标注窗没有按新范围摆好";
     }
 
     /**

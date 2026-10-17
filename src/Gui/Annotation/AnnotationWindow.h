@@ -128,6 +128,23 @@ namespace GyanisScribe::Gui
          */
         void refreshCapture(const Base::CapturedImage &captured);
 
+        /**
+         * @brief 按新范围换画布：已有标注随裁切平移，窗口跟着挪/缩
+         * @param captured 按新范围重抓的那一帧
+         * @param screenAvailable 目标屏幕可用区
+         * @param selection 新的全局逻辑选区
+         * @details 与 startAnnotation 的区别是「不清标注」；撤销栈会被引擎清掉。
+         */
+        void recropAnnotation(const Base::CapturedImage &captured, const QRect &screenAvailable, const QRect &selection);
+
+        /**
+         * @brief 重抓失败时把窗口摆回旧几何并重新露出
+         * @param selection 旧的全局逻辑选区
+         * @param screenAvailable 目标屏幕可用区
+         * @details 不碰画布与标注：这一轮新范围没抓到，现场原样留着。
+         */
+        void restoreAfterCrop(const QRect &selection, const QRect &screenAvailable);
+
     signals:
         /**
          * @brief 请求重抓一块区域（F5 刷新截图）
@@ -136,6 +153,14 @@ namespace GyanisScribe::Gui
          * @note 窗口自己不碰抓屏来源：把「哪块屏、哪块区域」报出去，由宿主接上采集服务再送回来
          */
         void refreshRequested(const QString &screenName, const QRect &region);
+
+        /**
+         * @brief 请求按新的窗口范围重抓并换画布（「选择」档拖边框）
+         * @param screenName 屏幕名
+         * @param globalSelection 新的全局逻辑选区
+         * @note 只在还没画过标注时发出：重抓会换掉整张画布
+         */
+        void cropRequested(const QString &screenName, const QRect &globalSelection);
         /**
          * @brief 请求把标注结果送进剪贴板
          * @param image 烘焙好的图，物理像素

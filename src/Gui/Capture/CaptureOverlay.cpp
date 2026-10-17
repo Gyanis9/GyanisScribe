@@ -20,7 +20,6 @@
 #include <QMouseEvent>
 #include <QPainter>
 
-#include <QApplication>
 #include <QClipboard>
 #include <QGuiApplication>
 
@@ -469,7 +468,7 @@ namespace GyanisScribe::Gui
             painter.drawText(hintRect, Qt::AlignCenter, hint);
 
             // 确认/取消怎么写常驻读数下一行：新用户拖完框最容易停在「然后呢」上（审查台账 UI-33）
-            const auto  confirmText = m_isSelecting ? GyanisScribe::Base::uiText("松手落定 · Esc 取消") : GyanisScribe::Base::uiText("拖四边调整 · 单击选区交出 · Esc 取消");
+            const auto  confirmText = m_isSelecting ? GyanisScribe::Base::uiText("松手即完成 · Esc 取消") : GyanisScribe::Base::uiText("拖四边调整 · Enter/双击确认 · Esc 取消");
             const auto  confirmSize = metrics.size(Qt::TextSingleLine, confirmText);
             const QRect confirmRect(hintTopLeft + QPoint(0, textSize.height() + kCopiedHintGap),
                                     confirmSize + QSize(GyanisScribe::Gui::kHintPadding * 2, GyanisScribe::Gui::kHintPadding));
@@ -527,18 +526,7 @@ namespace GyanisScribe::Gui
         // 差几像素要重框是框选里最常见的一次火，八个抓点就是为了不必重框
         if (!region.isNull())
         {
-            const auto grip = Core::gripAt(region, point);
-            if (grip == Core::SelectionGrip::Inside)
-            {
-                // 选区内按下：先当成「单击交出」；真拖起来再改成整块平移
-                m_pendingClickConfirm = true;
-                m_clickConfirmPoint   = point;
-                m_cursorPoint         = point;
-                m_hasCursorPoint      = true;
-                update();
-                return;
-            }
-            if (grip != Core::SelectionGrip::None)
+            if (const auto grip = Core::gripAt(region, point); grip != Core::SelectionGrip::None)
             {
                 m_isAdjusting = true;
                 m_draggedGrip = grip;
@@ -576,20 +564,6 @@ namespace GyanisScribe::Gui
             emit hoverPointChanged(globalCursorPoint());
         }
 
-        if (m_pendingClickConfirm)
-        {
-            // 超过系统拖拽阈值才算「拖整块」；没超过就保持单击，松手时交出选区
-            if ((m_cursorPoint - m_clickConfirmPoint).manhattanLength() < QApplication::startDragDistance())
-            {
-                update();
-                return;
-            }
-            m_pendingClickConfirm = false;
-            m_isAdjusting         = true;
-            m_draggedGrip         = Core::SelectionGrip::Inside;
-            m_adjustPoint         = m_clickConfirmPoint;
-        }
-
         if (m_isAdjusting && m_draggedGrip)
         {
             const auto delta = m_cursorPoint - m_adjustPoint;
@@ -625,15 +599,6 @@ namespace GyanisScribe::Gui
             return;
         }
 
-        if (m_pendingClickConfirm)
-        {
-            // 选区内按一下、没拖动：单击交出。拖边框/拖内部调大小仍然优先。
-            m_pendingClickConfirm = false;
-            update();
-            confirmSelection();
-            return;
-        }
-
         if (m_isAdjusting)
         {
             // 拖抓点改的大小已经写进两个端点了，松手只收状态：
@@ -664,6 +629,9 @@ namespace GyanisScribe::Gui
                 m_historyIndex = -1; // 采纳的是悬停候选，不是历史里那一条
             }
             update();
+            // 松手即交出：选区范围在这一刻定下来，下一个界面就是标注窗；
+            // 重裁边框在标注窗里用「选择」档拖四边完成
+            confirmSelection();
         }
     }
 

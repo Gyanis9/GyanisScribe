@@ -101,8 +101,8 @@ namespace GyanisScribe::Gui
 
     AnnotationView::AnnotationView(Core::IAnnotationEngine &engine, QWidget *parent) : QWidget(parent), m_engine(engine)
     {
-        setMouseTracking(false);
-        setCursor(Qt::CrossCursor);
+        setMouseTracking(true);
+        setCursor(Qt::ArrowCursor);
         // 引擎的图形变了就重绘：这里不缓存合成图，在途的那一条也要立刻看得见
         QObject::connect(&engine, &Core::IAnnotationEngine::canvasChanged, this, [this] { update(); });
     }
@@ -196,6 +196,24 @@ namespace GyanisScribe::Gui
         painter.setPen(QPen{GyanisScribe::Gui::kAccentColor, 2});
         painter.setBrush(Qt::NoBrush);
         painter.drawRect(QRect{QPoint{0, 0}, size()}.adjusted(1, 1, -1, -1));
+
+        // 选择档下四角与四边中点摆出重裁抓点；已有标注会随裁切平移，不丢
+        if (m_engine.activeTool() == Core::ToolKind::Select)
+        {
+            const auto                  frame   = QRect{QPoint{0, 0}, size()};
+            const int                   middleX = (frame.left() + frame.right()) / 2;
+            const int                   middleY = (frame.top() + frame.bottom()) / 2;
+            const int                   edge    = GyanisScribe::Gui::kSelectionGripEdge;
+            const std::array<QPoint, 8> centers{QPoint{frame.left(), frame.top()},    QPoint{middleX, frame.top()},          QPoint{frame.right(), frame.top()},
+                                                QPoint{frame.right(), middleY},       QPoint{frame.right(), frame.bottom()}, QPoint{middleX, frame.bottom()},
+                                                QPoint{frame.left(), frame.bottom()}, QPoint{frame.left(), middleY}};
+            painter.setPen(QPen{GyanisScribe::Gui::kAccentColor, 1});
+            painter.setBrush(GyanisScribe::Gui::kCaptureHintBackgroundColor);
+            for (const auto &center: centers)
+            {
+                painter.drawRect(QRect{center - QPoint{edge / 2, edge / 2}, QSize{edge, edge}});
+            }
+        }
     }
 
     void AnnotationView::mousePressEvent(QMouseEvent *event)
@@ -204,6 +222,21 @@ namespace GyanisScribe::Gui
         {
             QWidget::mousePressEvent(event);
             return;
+        }
+
+        // 选择档下贴着窗口四边/四角按下＝重裁截图范围；重抓后图形会随裁切平移
+        if (m_engine.activeTool() == Core::ToolKind::Select)
+        {
+            const auto grip = Core::gripAt(QRect{QPoint{0, 0}, size()}, event->pos(), Core::kSelectionGripTolerance);
+            if (grip != Core::SelectionGrip::None && grip != Core::SelectionGrip::Inside)
+            {
+                m_captureResizing               = true;
+                m_captureResizeGrip             = grip;
+                m_captureResizeStartGlobal      = event->globalPosition().toPoint();
+                m_captureResizeOriginalGeometry = window()->geometry();
+                event->accept();
+                return;
+            }
         }
 
         const auto rect   = currentDisplayRect();
@@ -282,6 +315,29 @@ namespace GyanisScribe::Gui
         const auto rect  = currentDisplayRect();
         const auto point = toCanvasPoint(event->pos(), rect, m_engine.canvas().logicalSize);
 
+        if (m_captureResizing)
+        {
+            const auto available = window()->screen() != nullptr ? window()->screen()->availableGeometry() : m_captureResizeOriginalGeometry;
+            const auto delta     = event->globalPosition().toPoint() - m_captureResizeStartGlobal;
+            const auto moved     = Core::dragRegionByGrip(m_captureResizeOriginalGeometry, m_captureResizeGrip, delta, available);
+            // 少于 8px 的窗口既放不下工具栏也点不中边框，拖动时直接不跟
+            if (moved.width() >= 8 && moved.height() >= 8)
+            {
+                window()->setGeometry(moved);
+            }
+            event->accept();
+            return;
+        }
+
+        if (m_engine.activeTool() == Core::ToolKind::Select)
+        {
+            const auto grip = Core::gripAt(QRect{QPoint{0, 0}, size()}, event->pos(), Core::kSelectionGripTolerance);
+            setCursor(Core::cursorForGrip(grip));
+        } else
+        {
+            setCursor(Qt::CrossCursor);
+        }
+
         if (m_stroking)
         {
             m_engine.moveStroke(point);
@@ -319,6 +375,15 @@ namespace GyanisScribe::Gui
         if (event->button() != Qt::LeftButton)
         {
             QWidget::mouseReleaseEvent(event);
+            return;
+        }
+
+        if (m_captureResizing)
+        {
+            m_captureResizing = false;
+            setCursor(Qt::ArrowCursor);
+            emit captureResized(window()->geometry());
+            event->accept();
             return;
         }
 

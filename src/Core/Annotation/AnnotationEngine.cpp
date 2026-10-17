@@ -434,6 +434,24 @@ namespace GyanisScribe::Core
         emit canvasChanged();
     }
 
+    void AnnotationEngine::recropCanvas(Base::CapturedImage image, const QPoint &offset)
+    {
+        m_canvas = std::move(image);
+        // 新画布的原点挪了：已有图形整体平移，屏幕上看到的位置不变
+        for (const auto &tool: m_tools)
+        {
+            for (int index = 0; index < tool->shapeCount(); ++index)
+            {
+                tool->translateShapeBy(index, offset);
+            }
+        }
+        m_selection.clear();
+        m_handleDrag.reset();
+        // 撤销命令记的是旧坐标：留着重做会把图形插回裁切前的位置
+        m_undoStack.clear();
+        emit canvasChanged();
+    }
+
     const Base::CapturedImage &AnnotationEngine::canvas() const noexcept
     {
         return m_canvas;

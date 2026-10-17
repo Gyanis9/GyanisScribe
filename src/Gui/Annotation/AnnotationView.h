@@ -10,6 +10,7 @@
 #pragma once
 
 #include "Core/Annotation/IAnnotationEngine.h"
+#include "Core/Capture/ScreenUtils.h"
 
 #include <QPoint>
 #include <QPointF>
@@ -129,6 +130,14 @@ namespace GyanisScribe::Gui
          */
         bool eventFilter(QObject *watched, QEvent *event) override;
 
+    signals:
+        /**
+         * @brief 「选择」档拖完窗口边框，交出新的一圈全局几何
+         * @param globalGeometry 新的窗口几何（全局逻辑坐标）
+         * @details 视图只改窗口几何做预览；重抓与换画布由宿主动手。
+         */
+        void captureResized(const QRect &globalGeometry);
+
     private:
         /**
          * @brief 文字的行内输入框：在按下处摆一个多行的
@@ -192,6 +201,11 @@ namespace GyanisScribe::Gui
         bool       m_reEditingText     = false; ///< 输入框此刻改的是已放下的那一条，而不是新画的一条
         QPoint     m_lastCanvasPoint;           ///< 上一次事件换算到的画布坐标
         QTextEdit *m_textEditor = nullptr;      ///< 行内输入框（多行），用完即销毁
+
+        bool                m_captureResizing   = false;                     ///< 「选择」档正在拖窗口边框
+        Core::SelectionGrip m_captureResizeGrip = Core::SelectionGrip::None; ///< 拖的是哪一条边或哪一个角
+        QPoint              m_captureResizeStartGlobal;                      ///< 按下时的全局坐标
+        QRect               m_captureResizeOriginalGeometry;                 ///< 按下前的窗口几何
     };
 
 } // namespace GyanisScribe::Gui

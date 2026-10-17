@@ -6,6 +6,7 @@
 #include "Core/Annotation/AnnotationEngine.h"
 #include "Gui/Annotation/AnnotationToolbar.h"
 #include "Core/Annotation/IAnnotationEngine.h"
+#include "Core/Annotation/AnnotationPalette.h"
 #include "Core/Annotation/PenParameters.h"
 
 #include "Core/Settings/SettingsStore.h"
@@ -1456,6 +1457,96 @@ TEST_F(AnnotationWindowFixture, ThePendingRectangleIsPaintedWhileDragging)
     const auto edge = shot.pixelColor(70, 20);
     EXPECT_GT(edge.red(), 180) << "拖动中的矩形上边没画出来：松手前还是空白";
     EXPECT_LT(edge.green(), 100);
+}
+
+/**
+ * @brief 钉住「选择」档拖窗口边框能重裁截图范围（用户 2026-10-17 直报）
+ * @details 松手即进标注窗之后，重裁不再回遮罩；窗口把新的全局几何报给宿主，
+ *          宿主负责藏窗重抓。这里只钉窗口这一半：几何变了、信号带的是新范围。
+ */
+TEST_F(AnnotationWindowFixture, SelectToolResizesTheCapturedRegionByDraggingAnEdge)
+{
+    auto window            = makeWindow();
+    auto captured          = makeCanvas(QSize(200, 100));
+    captured.screenName    = QStringLiteral("FakeScreen-9");
+    captured.logicalRegion = QRect(100, 100, 200, 100);
+    window->startAnnotation(captured, QRect(0, 0, 1920, 1080), QRect(100, 100, 200, 100));
+    QApplication::processEvents();
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Select).has_value());
+
+    auto *view = window->findChild<GyanisScribe::Gui::AnnotationView *>();
+    ASSERT_NE(view, nullptr);
+
+    QString seenScreen;
+    QRect   seenSelection;
+    QObject::connect(window.get(), &GyanisScribe::Gui::AnnotationWindow::cropRequested,
+                     [&](const QString &screenName, const QRect &selection)
+                     {
+                         seenScreen    = screenName;
+                         seenSelection = selection;
+                     });
+
+    const auto  globalOf = [view](const QPoint &local) { return QPointF{view->mapToGlobal(local)}; };
+    QMouseEvent press{QEvent::MouseButtonPress, QPointF{0, 50}, globalOf(QPoint{0, 50}), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &press);
+    QMouseEvent move{QEvent::MouseMove, QPointF{-10, 50}, globalOf(QPoint{-10, 50}), Qt::NoButton, Qt::LeftButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &move);
+    QMouseEvent release{QEvent::MouseButtonRelease, QPointF{-10, 50}, globalOf(QPoint{-10, 50}), Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &release);
+
+    EXPECT_EQ(window->geometry(), QRect(90, 100, 210, 100)) << "拖左边框没有把窗口左边带出去";
+    EXPECT_EQ(seenScreen, QStringLiteral("FakeScreen-9"));
+    EXPECT_EQ(seenSelection, QRect(90, 100, 210, 100)) << "报给宿主的新范围不是拖出来的那一块";
+}
+
+/**
+ * @brief 画过标注之后不再允许重裁：重抓会换掉整张画布，标注会一起没
+ */
+TEST_F(AnnotationWindowFixture, SelectToolKeepsAnnotationsWhenResizing)
+{
+    auto window            = makeWindow();
+    auto captured          = makeCanvas(QSize(200, 100));
+    captured.screenName    = QStringLiteral("FakeScreen-9");
+    captured.logicalRegion = QRect(100, 100, 200, 100);
+    window->startAnnotation(captured, QRect(0, 0, 1920, 1080), QRect(100, 100, 200, 100));
+    QApplication::processEvents();
+
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Rectangle).has_value());
+    engine().beginStroke(QPoint{20, 20});
+    engine().moveStroke(QPoint{80, 60});
+    ASSERT_TRUE(engine().endStroke().has_value());
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Select).has_value());
+
+    auto *view = window->findChild<GyanisScribe::Gui::AnnotationView *>();
+    ASSERT_NE(view, nullptr);
+    int   crops = 0;
+    QRect cropRegion;
+    QObject::connect(window.get(), &GyanisScribe::Gui::AnnotationWindow::cropRequested,
+                     [&crops, &cropRegion](const QString &, const QRect &selection)
+                     {
+                         ++crops;
+                         cropRegion = selection;
+                     });
+
+    QMouseEvent press{QEvent::MouseButtonPress, QPointF{0, 50}, QPointF{view->mapToGlobal(QPoint{0, 50})}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &press);
+    QMouseEvent move{QEvent::MouseMove, QPointF{-10, 50}, QPointF{view->mapToGlobal(QPoint{-10, 50})}, Qt::NoButton, Qt::LeftButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &move);
+    QMouseEvent release{QEvent::MouseButtonRelease, QPointF{-10, 50}, QPointF{view->mapToGlobal(QPoint{-10, 50})}, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &release);
+    ASSERT_EQ(crops, 1);
+    EXPECT_EQ(cropRegion, QRect(90, 100, 210, 100));
+
+    auto fresh          = makeCanvas(QSize(210, 100));
+    fresh.screenName    = captured.screenName;
+    fresh.logicalRegion = QRect(90, 100, 210, 100);
+    window->recropAnnotation(fresh, QRect(0, 0, 1920, 1080), QRect(90, 100, 210, 100));
+
+    // 矩形原在逻辑 (20,20)-(80,60)；新画布原点左移 10，图形跟到 (30,20)-(90,60)
+    const auto baked = engine().exportImage();
+    EXPECT_EQ(baked.pixelColor(120, 40), GyanisScribe::Core::kAnnotationPaletteColors[0]) << "重裁之后标注没有跟着平移";
+    EXPECT_EQ(baked.pixelColor(40, 40), QColor(180, 180, 180)) << "旧位置还留着一条，图形被复制了一份";
+    EXPECT_EQ(window->geometry(), QRect(90, 100, 210, 100)) << "窗口没有按新范围摆好";
 }
 
 /**

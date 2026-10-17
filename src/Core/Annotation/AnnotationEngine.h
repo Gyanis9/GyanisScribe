@@ -60,6 +60,14 @@ namespace GyanisScribe::Core
         void refreshCanvas(Base::CapturedImage image) override;
 
         /**
+         * @brief 换裁切范围并平移图形，见 IAnnotationEngine::recropCanvas()
+         * @param image 新画布
+         * @param offset 旧左上在新画布里的位置（旧左上 − 新左上）
+         * @details 重写基类接口：图形保留并平移，撤销栈清空——重做会拿旧坐标插回。
+         */
+        void recropCanvas(Base::CapturedImage image, const QPoint &offset) override;
+
+        /**
          * @brief 当前画布，见 IAnnotationEngine::canvas()
          * @return 载入的那一帧
          */

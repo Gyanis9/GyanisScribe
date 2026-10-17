@@ -1612,12 +1612,12 @@
             <translation> (cursor excluded)</translation>
         </message>
         <message>
-            <source>松手落定 · Esc 取消</source>
-            <translation>Release to settle · Esc to cancel</translation>
+            <source>松手即完成 · Esc 取消</source>
+            <translation>Release to finish · Esc to cancel</translation>
         </message>
         <message>
-            <source>拖四边调整 · 单击选区交出 · Esc 取消</source>
-            <translation>Drag the edges to adjust · click inside to finish · Esc to cancel</translation>
+            <source>拖四边调整 · Enter/双击确认 · Esc 取消</source>
+            <translation>Drag the edges to adjust · Enter/double-click to confirm · Esc to cancel</translation>
         </message>
         <message>
             <source>选择</source>
@@ -1626,6 +1626,10 @@
         <message>
             <source>当前是选择工具，不会落笔</source>
             <translation>The select tool does not draw</translation>
+        </message>
+        <message>
+            <source>这一轮没记录屏幕或选区，改不了截图范围</source>
+            <translation>No screen or selection was recorded for this round, so the capture range cannot be changed</translation>
         </message>
         <message>
             <source>光标所在屏幕</source>

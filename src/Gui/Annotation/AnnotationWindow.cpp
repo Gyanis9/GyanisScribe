@@ -126,6 +126,7 @@ namespace GyanisScribe::Gui
 
         // 可见段收放让工具栏尺寸变了就重摆一次：收窄后还钉在旧位置会偏出选区中心
         QObject::connect(m_toolbar.get(), &AnnotationToolbar::contextLayoutChanged, this, [this] { placeToolbarForSelection(); });
+        QObject::connect(m_view, &AnnotationView::captureResized, this, [this](const QRect &globalGeometry) { emit cropRequested(m_refreshScreenName, globalGeometry); });
 
         // 四个动作按钮与快捷键汇到同一个出口：谁按的都走 deliver，界面不需要知道来源
         QObject::connect(m_toolbarBridge.get(), &AnnotationToolbarBridge::copyRequested, this, [this] { deliver(ShortcutAction::Copy); });
@@ -189,6 +190,43 @@ namespace GyanisScribe::Gui
         // 刷新的区域就是原来那块：尺寸该同形；真差了一点也不动窗口——用户的标注坐标还是老坐标系，
         // 挪窗口只会让画面与标注错开。引擎只换底图这一份，标注与撤销栈原地留着
         m_engine.refreshCanvas(captured);
+    }
+
+    void AnnotationWindow::recropAnnotation(const Base::CapturedImage &captured, const QRect &screenAvailable, const QRect &selection)
+    {
+        // 旧画布左上在新画布里的位置：图形按这个位移搬过去，屏幕上看起来不动
+        const QPoint offset{m_placedSelection.topLeft() - selection.topLeft()};
+        m_placedScreenAvailable = screenAvailable;
+        m_placedSelection       = QRect{selection.topLeft(), captured.logicalSize};
+        m_refreshScreenName     = captured.screenName;
+        m_refreshRegion         = captured.logicalRegion;
+
+        m_engine.recropCanvas(captured, offset);
+        resize(captured.logicalSize);
+        move(selection.topLeft());
+        show();
+        raise();
+        activateWindow();
+
+        m_toolbar->adjustSize();
+        placeToolbarForSelection();
+        m_toolbar->show();
+        m_toolbar->raise();
+    }
+
+    void AnnotationWindow::restoreAfterCrop(const QRect &selection, const QRect &screenAvailable)
+    {
+        m_placedScreenAvailable = screenAvailable;
+        m_placedSelection       = QRect{selection.topLeft(), m_engine.canvas().logicalSize};
+        resize(m_engine.canvas().logicalSize);
+        move(selection.topLeft());
+        show();
+        raise();
+        activateWindow();
+        m_toolbar->adjustSize();
+        placeToolbarForSelection();
+        m_toolbar->show();
+        m_toolbar->raise();
     }
 
     void AnnotationWindow::keyPressEvent(QKeyEvent *event)

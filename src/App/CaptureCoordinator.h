@@ -101,6 +101,13 @@ namespace GyanisScribe::App
          */
         ~CaptureCoordinator() override;
 
+        /**
+         * @brief 取标注窗（裁剪重抓的接线接缝）
+         * @return 复用的标注窗
+         * @details 窗、采集服务与选区三者只有这里能同时看到；用例据此驱动「拖边框→重抓」这一整条。
+         */
+        [[nodiscard]] GyanisScribe::Gui::AnnotationWindow &annotationWindow() const noexcept;
+
         /// 框选截图（热键、托盘、标注窗的「重新截」都从这里进）
         void startInteractive(std::optional<GyanisScribe::App::CaptureIntent> intent = std::nullopt);
 
@@ -168,6 +175,9 @@ namespace GyanisScribe::App
 
         /// 标注窗请求刷新截图（F5）：重抓这块区域换底图，标注留着
         void refreshLastCapture(const QString &screenName, const QRect &region);
+
+        /// 选择档拖完标注窗边框：先藏窗再按新范围重抓，换一张画布
+        void cropLastCapture(const QString &screenName, const QRect &globalSelection);
 
         Dependencies                                          m_dependencies;
         std::unique_ptr<GyanisScribe::Gui::CaptureService>    m_capture;                                             ///< 截图编排

@@ -1105,11 +1105,10 @@ TEST_F(CaptureOverlayFixture, ConfirmHintRidesUnderTheSizeReadout)
 }
 
 /**
- * @brief 钉住松手后选区还在、四边仍可继续拖（用户 2026-10-17 直报第 1 条）
- * @details 松手只结束「画框」这一下，不直接交出选区；贴着右边框拖一下，范围要跟着变，
- *          直到 Enter/双击才真的确认。
+ * @brief 钉住松手即交出选区（用户 2026-10-17 直报：零点击）
+ * @details 松手后不再停在遮罩上调边框；重裁边框由标注窗的「选择」档接。
  */
-TEST_F(CaptureOverlayFixture, ReleasingKeepsTheSelectionAdjustable)
+TEST_F(CaptureOverlayFixture, MouseReleaseConfirmsTheDrawnRegion)
 {
     auto  overlay = makeOverlay();
     int   emitted = 0;
@@ -1125,44 +1124,7 @@ TEST_F(CaptureOverlayFixture, ReleasingKeepsTheSelectionAdjustable)
     moveOver(*overlay, QPoint{400, 300});
     buttonAt(*overlay, QEvent::MouseButtonRelease, QPoint{400, 300});
 
-    EXPECT_EQ(emitted, 0) << "松手就把选区交出去了，四边没机会再调";
-    EXPECT_EQ(overlay->selectedRegion(), QRect(100, 120, 301, 181));
-
-    // 贴右边框往右拖：选区右缘跟着走，左缘不动
-    buttonAt(*overlay, QEvent::MouseButtonPress, QPoint{400, 210});
-    moveOver(*overlay, QPoint{450, 210});
-    buttonAt(*overlay, QEvent::MouseButtonRelease, QPoint{450, 210});
-    EXPECT_EQ(overlay->selectedRegion(), QRect(100, 120, 351, 181));
-
-    overlay->confirmSelection();
-    EXPECT_EQ(emitted, 1) << "确认那一下没有交出调整后的选区";
-    EXPECT_EQ(confirmed, QRect(100, 120, 351, 181));
-}
-
-/**
- * @brief 钉住选区内单击就交出（用户 2026-10-17 直报：不必只认 Enter/双击）
- * @details 按下不动、原地松开＝单击；真拖起来仍然走整块平移，不会误交。
- */
-TEST_F(CaptureOverlayFixture, SingleClickInsideConfirmsTheSelection)
-{
-    auto overlay = makeOverlay();
-    buttonAt(*overlay, QEvent::MouseButtonPress, QPoint{100, 120});
-    moveOver(*overlay, QPoint{400, 300});
-    buttonAt(*overlay, QEvent::MouseButtonRelease, QPoint{400, 300});
-
-    int   emitted = 0;
-    QRect confirmed;
-    QObject::connect(overlay.get(), &CaptureOverlay::regionSelected, overlay.get(),
-                     [&emitted, &confirmed](const QRect &value)
-                     {
-                         ++emitted;
-                         confirmed = value;
-                     });
-
-    buttonAt(*overlay, QEvent::MouseButtonPress, QPoint{250, 200});
-    buttonAt(*overlay, QEvent::MouseButtonRelease, QPoint{250, 200});
-
-    EXPECT_EQ(emitted, 1) << "选区内单击没有交出选区";
+    EXPECT_EQ(emitted, 1) << "松手没有交出选区";
     EXPECT_EQ(confirmed, QRect(100, 120, 301, 181));
 }
 
