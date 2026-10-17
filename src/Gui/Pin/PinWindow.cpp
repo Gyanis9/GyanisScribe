@@ -255,6 +255,8 @@ namespace GyanisScribe::Gui
     {
         // 无边框 + 置顶 + Tool：Tool 让它不进任务栏，贴图是浮在屏幕上的东西，不该占一个窗口条目
         setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
+        // 关掉最后一张贴图不等于退出程序：托盘还在，用户只是不要这张图了
+        setAttribute(Qt::WA_QuitOnClose, false);
         setMouseTracking(true); // 悬停要亮边框，不追踪就等不到进入事件
         setAttribute(Qt::WA_TranslucentBackground, false);
         // 收拖放：盘上的图片文件、链接与文本拖上来贴成新图（见 dragEnterEvent 与 dropEvent）
@@ -2089,8 +2091,9 @@ namespace GyanisScribe::Gui
             return;
         }
 
-        // 左键双击同样回到原始比例与角度：已经在 1:1 且没转角时这是幂等，而不是「按了没反应」
-        resetScaleAndRotation();
+        // 左键双击＝关掉这一张：贴在桌上的图看完了，最顺手的一下就是让它消失
+        close();
+        emit closedByUser();
     }
 
     void PinWindow::resetScaleAndRotation()

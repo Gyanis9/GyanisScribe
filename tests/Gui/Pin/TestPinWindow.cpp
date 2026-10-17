@@ -217,11 +217,10 @@ namespace GyanisScribe
     }
 
     /**
-     * @brief 钉住 `0` 与双击回到 1:1 与 0°，而透明度不受影响
-     * @details 透明度是用户刻意调出来的一档，跟着尺寸一起抹掉就是替他做了没要过的事；
-     *          两处入口（键盘与双击）必须落进同一个出口，否则将来只会改一处。
+     * @brief 钉住 `0` 回到 1:1 与 0°，而透明度不受影响
+     * @details 透明度是用户刻意调出来的一档，跟着尺寸一起抹掉就是替他做了没要过的事。
      */
-    TEST_F(PinWindowFixture, ZeroKeyAndDoubleClickRestoreScaleAndAngleButNotOpacity)
+    TEST_F(PinWindowFixture, ZeroKeyRestoresScaleAndAngleButNotOpacity)
     {
         auto &window = makeWindow();
         window.setScale(2.0);
@@ -232,14 +231,22 @@ namespace GyanisScribe
         EXPECT_TRUE(nearEqual(window.scale(), 1.0, kScaleTolerance)) << "按 0 没回到 1:1";
         EXPECT_TRUE(nearEqual(window.rotationDegrees(), 0.0, kDegreesTolerance)) << "按 0 没把角度转正";
         EXPECT_TRUE(nearEqual(window.opacityLevel(), 0.5, kOpacityTolerance)) << "复位把用户调过的透明度一起抹了";
+    }
 
-        window.setScale(3.0);
-        window.setRotationDegrees(90.0);
+    /**
+     * @brief 钉住左键双击关掉贴图并通知管理器（用户 2026-10-17 直报）
+     * @details 双击是「看完了」的顺手动作；关掉一张不该把整个程序带走。
+     */
+    TEST_F(PinWindowFixture, DoubleClickClosesThePin)
+    {
+        auto &window = makeWindow();
+        auto  closed = false;
+        QObject::connect(&window, &Gui::PinWindow::closedByUser, [&closed] { closed = true; });
+        EXPECT_FALSE(window.testAttribute(Qt::WA_QuitOnClose)) << "贴图关掉不该触发「最后窗口关闭即退出」";
 
         doubleClickLeft(window);
-        EXPECT_TRUE(nearEqual(window.scale(), 1.0, kScaleTolerance)) << "双击没回到 1:1";
-        EXPECT_TRUE(nearEqual(window.rotationDegrees(), 0.0, kDegreesTolerance)) << "双击没把角度转正";
-        EXPECT_TRUE(nearEqual(window.opacityLevel(), 0.5, kOpacityTolerance)) << "双击同样不该动透明度";
+        EXPECT_TRUE(closed) << "双击没通知管理器摘掉这一张";
+        EXPECT_FALSE(window.isVisible()) << "双击之后贴图还留在桌上";
     }
 
     /**
@@ -268,6 +275,7 @@ namespace GyanisScribe
         int closedSignals = 0;
         QObject::connect(&window, &Gui::PinWindow::closedByUser, &window, [&closedSignals] { ++closedSignals; });
 
+        EXPECT_FALSE(window.testAttribute(Qt::WA_QuitOnClose)) << "关一张贴图被当成了「退出程序」的触发点";
         pressKey(window, Qt::Key_Escape);
         EXPECT_EQ(closedSignals, 1) << "Esc 没通知管理器，那一张贴图会一直留在册上";
         EXPECT_FALSE(window.isVisibleTo(&window)) << "Esc 之后窗口还在";
