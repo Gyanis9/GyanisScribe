@@ -7,6 +7,8 @@
 #include "Gui/Controls/AppShortcuts.h"
 #include "Core/Annotation/AnnotationPalette.h"
 #include "Gui/Theme/DesignTokens.h"
+#include "Gui/Theme/ThemeKind.h"
+#include "Gui/Theme/ThemeManager.h"
 #include "Gui/Resources/IconProvider.h"
 
 #include <gtest/gtest.h>
@@ -18,6 +20,7 @@
 #include <QFont>
 #include <QFontComboBox>
 #include <QFontDatabase>
+#include <QHBoxLayout>
 #include <QImage>
 #include <QPoint>
 #include <QRect>
@@ -335,26 +338,58 @@ namespace
     }
 
     /**
-     * @brief 每一档工具、连文字那两个开关全开，工具栏都收得进 1920 的桌面宽度
-     * @details 收敛前实测 2374px（见审查台账 UiAuditPlan 的 B 条，仓外 GyanisScribe-Reports/），1920 屏上右端动作按钮整排出屏；
-     *          收了两刀：可见段按工具收放（上面两条）＋按钮最小尺寸与行距各收一档（QSS 与布局）。
-     *          这里钉「1920 桌面上整条可见」这条能一眼看到的契约；带样式表实测最宽 1670（文字+描边+底板）。
+     * @brief 钉住工具栏的紧凑档参数（用户 2026-10-17 直报第 1 条后半）
+     * @details 只改宽度契约会被「当前已经低于 1536」骗过去；这一条直接量布局与图标，
+     *          没有收档之前必红。
      */
-    TEST_F(ToolbarFixture, EveryToolStaysWithinTheCommonScreenWidth)
+    TEST_F(ToolbarFixture, ToolbarUsesTheCompactMetrics)
     {
         SignalLog log;
         auto      toolbar = makeToolbarLaidOut(log);
 
+        auto *layout = qobject_cast<QHBoxLayout *>(toolbar->layout());
+        ASSERT_NE(layout, nullptr);
+        EXPECT_EQ(layout->contentsMargins().left(), GyanisScribe::Gui::kSpacingTiny);
+        EXPECT_EQ(layout->spacing(), GyanisScribe::Gui::kSpacingHairline);
+
+        auto *button = toolbar->toolButtonAt(0);
+        ASSERT_NE(button, nullptr);
+        // 宏实参里不用花括号：逗号会被 GoogleTest 当成两个参数拆开（既有踩坑记录）
+        EXPECT_EQ(button->iconSize(), QSize(18, 18));
+    }
+
+    /**
+     * @brief 套上真实浅色样式表量最宽一档（用户 2026-10-17 直报「工具栏拉得太长」）
+     * @details 旧判据没有套 QSS，量到的是布局原始值；用户看到的是 QSS 把按钮档叠上去之后的宽度。
+     *          这里用当前主题样式表量真正的屏上宽度，并把门槛从 1920 收到 1536。
+     */
+    TEST_F(ToolbarFixture, EveryToolStaysWithinTheCommonScreenWidth)
+    {
+        struct StyleSheetGuard
+        {
+            QString previous;
+            ~StyleSheetGuard()
+            {
+                application->setStyleSheet(previous);
+            }
+        } guard{application->styleSheet()};
+        application->setStyleSheet(GyanisScribe::Gui::ThemeManager::styleSheetFor(GyanisScribe::Gui::ThemeKind::Light));
+
+        SignalLog log;
+        auto      toolbar = makeToolbarLaidOut(log);
+        toolbar->ensurePolished();
+        toolbar->adjustSize();
+
         for (const auto &entry: GyanisScribe::Gui::kToolTable)
         {
             toolbar->setActiveTool(std::get<0>(entry));
-            EXPECT_LE(toolbar->sizeHint().width(), 1920) << "「" << std::string{std::get<2>(entry)} << "」档工具栏宽度 " << toolbar->sizeHint().width();
+            EXPECT_LE(toolbar->sizeHint().width(), 1536) << "「" << std::string{std::get<2>(entry)} << "」档工具栏宽度 " << toolbar->sizeHint().width();
         }
 
         toolbar->setActiveTool(ToolKind::Text);
         toolbar->setTextOutline(true);
         toolbar->setTextBackground(true);
-        EXPECT_LE(toolbar->sizeHint().width(), 1920) << "文字全开档（最宽一档）也放不下 1920 桌面：" << toolbar->sizeHint().width();
+        EXPECT_LE(toolbar->sizeHint().width(), 1536) << "文字全开档（最宽一档）超过 1536：" << toolbar->sizeHint().width();
     }
 
 
@@ -1008,8 +1043,9 @@ TEST_F(ToolbarFixture, WhiteSwatchKeepsAVisibleOutline)
 
     auto *whiteSwatch = buttonByLabel(*toolbar, "颜色 8");
     ASSERT_NE(whiteSwatch, nullptr);
-    const auto bitmap = whiteSwatch->icon().pixmap(QSize{20, 20}).toImage().convertToFormat(QImage::Format_ARGB32);
-    ASSERT_EQ(bitmap.width(), 20);
+    constexpr int kSwatchEdge = static_cast<int>(GyanisScribe::Gui::IconSize::Compact);
+    const auto    bitmap      = whiteSwatch->icon().pixmap(QSize(kSwatchEdge, kSwatchEdge)).toImage().convertToFormat(QImage::Format_ARGB32);
+    ASSERT_EQ(bitmap.width(), kSwatchEdge);
 
     const auto outline = icons->tintColor();
     const auto fill    = kAnnotationPaletteColors[kAnnotationPaletteColors.size() - 1];

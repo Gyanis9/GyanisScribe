@@ -68,7 +68,7 @@ namespace
      */
     QPixmap colorSwatchPixmap(const QColor &color, const QColor &outline)
     {
-        const auto side = static_cast<int>(IconSize::Medium);
+        const auto side = static_cast<int>(IconSize::Compact);
         QPixmap    bitmap(side, side);
         bitmap.fill(Qt::transparent);
 
@@ -103,10 +103,10 @@ namespace GyanisScribe::Gui
 
         auto *layout = new QHBoxLayout{this};
         m_layout     = layout;
-        layout->setContentsMargins(Gui::kSpacingSmall, Gui::kSpacingSmall, Gui::kSpacingSmall, Gui::kSpacingSmall);
-        // 间距取最小那一档而不是行距：这一排最多五十几件控件，8px 的缝累计两百多像素，
+        layout->setContentsMargins(Gui::kSpacingTiny, Gui::kSpacingTiny, Gui::kSpacingTiny, Gui::kSpacingTiny);
+        // 这一排最多五十几件控件，节距每多 1px 整条就多五十几像素：收到发丝档，
         // 按钮自己带 2px 内边距做视觉留白就够了（按钮最小尺寸也按同一理由在样式表里收了一档）
-        layout->setSpacing(Gui::kSpacingTiny);
+        layout->setSpacing(Gui::kSpacingHairline);
 
         // 工具组：互斥交给 QButtonGroup，这样鼠标点击与 setActiveTool 走的是同一套按钮状态
         auto *toolGroup = new QButtonGroup{this};
@@ -907,7 +907,7 @@ namespace GyanisScribe::Gui
     {
         auto *button = new QToolButton{this};
         button->setIcon(m_icons.icon(iconName));
-        button->setIconSize(QSize{static_cast<int>(IconSize::Medium), static_cast<int>(IconSize::Medium)});
+        button->setIconSize(QSize{static_cast<int>(IconSize::Compact), static_cast<int>(IconSize::Compact)});
         // tooltip 与无障碍名称同名：需求要求每个图标按钮两者都有，只有 tooltip 时读屏拿不到名字
         button->setToolTip(label);
         button->setAccessibleName(label);

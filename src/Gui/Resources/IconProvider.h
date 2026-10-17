@@ -30,6 +30,7 @@ namespace GyanisScribe::Gui
     enum class IconSize
     {
         Small      = 16, ///< 托盘、菜单项行内图标
+        Compact    = 18, ///< 标注工具栏按钮与色块：比紧凑档再小 2px
         Medium     = 20, ///< 紧凑工具栏按钮
         Large      = 24, ///< 工具栏按钮与对话框默认档
         ExtraLarge = 32  ///< 关于页、空状态提示
