@@ -163,6 +163,10 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 - 焦点可见性是硬要求：`:focus` 规则在三份 QSS 里都在；高对比度档把边框加粗到 2px。
   样式表文本由 `ThemeManagerFixture` 核（`2PX SOLID`），画出来的像素由
   `CheckboxAndSliderShowAKeyboardFocusRing` 核勾选框与滑块的焦点形态。
+- 每个可操作控件都要写 `accessibleName`（只有按钮文本不算，图标按钮、滚动区与可聚焦
+  文本一样要写）：`EveryInteractiveControlInTheMainWindowHasAnAccessibleName` 扫整棵
+  控件树；Tab 序由 `TabWalkVisitsVisibleNamedControlsWithoutTraps` 逐页走——焦点每步
+  都换、落点可见且有名字，每页至少四个落点再绕回起点。
   滑块有一条实现约束：QSS 的控件级边框在 `CC_Slider` 的自绘路径里不落笔（换背景色、
   补 `WA_StyledBackground` 都不救），焦点只能挂在 `::handle:horizontal:focus` 上做反转
   （底色芯 + 正文色圈）；别把它「统一」回 `QSlider:focus` 的写法。
