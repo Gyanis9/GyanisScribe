@@ -350,16 +350,16 @@ namespace GyanisScribe::Core
         /// 上移/下移/置顶/置底的共同实现：排出目标次序、逐个换号、一步撤销
         [[nodiscard]] Base::Expected<void> reorderSelection(ReorderMode mode);
 
-        Base::CapturedImage                               m_canvas;                           ///< 当前画布
-        std::vector<std::unique_ptr<AnnotationTool>>      m_tools;                            ///< 全部工具，按 ToolKind 顺序登记
-        QUndoStack                                        m_undoStack;                        ///< 图形级撤销历史
-        std::vector<AnnotationSelection>                  m_selection;                        ///< 当前选中集：多选是常态，单条只是它的一格
-        ToolKind                                          m_activeTool = ToolKind::Rectangle; ///< 当前工具
-        PenParameters                                     m_penParameters;                    ///< 画笔默认参数整套
-        int                                               m_topZ = 0;                         ///< 已发出的最大层叠号：新图形总领到更大的号，落在最上层
-        std::optional<HandleDrag>                         m_handleDrag;                       ///< 进行中的手柄拖动现场
-        std::vector<std::pair<ToolKind, AnnotationShape>> m_clipboard;                        ///< 引擎内剪贴板：复制下来的图形副本，与系统剪贴板无关
-        int                                               m_pasteSeries = 0;                  ///< 连续粘贴的轮次：每粘一次多偏一格，两次粘贴不会完全叠在一起
+        Base::CapturedImage                               m_canvas;                        ///< 当前画布
+        std::vector<std::unique_ptr<AnnotationTool>>      m_tools;                         ///< 全部工具，按 ToolKind 顺序登记
+        QUndoStack                                        m_undoStack;                     ///< 图形级撤销历史
+        std::vector<AnnotationSelection>                  m_selection;                     ///< 当前选中集：多选是常态，单条只是它的一格
+        ToolKind                                          m_activeTool = ToolKind::Select; ///< 当前工具：默认是选择/指针，不落笔
+        PenParameters                                     m_penParameters;                 ///< 画笔默认参数整套
+        int                                               m_topZ = 0;                      ///< 已发出的最大层叠号：新图形总领到更大的号，落在最上层
+        std::optional<HandleDrag>                         m_handleDrag;                    ///< 进行中的手柄拖动现场
+        std::vector<std::pair<ToolKind, AnnotationShape>> m_clipboard;                     ///< 引擎内剪贴板：复制下来的图形副本，与系统剪贴板无关
+        int                                               m_pasteSeries = 0;               ///< 连续粘贴的轮次：每粘一次多偏一格，两次粘贴不会完全叠在一起
     };
 
 } // namespace GyanisScribe::Core

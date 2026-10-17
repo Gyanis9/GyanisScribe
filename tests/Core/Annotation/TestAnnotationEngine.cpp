@@ -89,7 +89,7 @@ TEST_F(EngineFixture, RejectsUnknownToolAndNonPositivePenParameters)
     const auto unknown = m_engine.setActiveTool(static_cast<ToolKind>(99));
     ASSERT_FALSE(unknown.has_value()) << "不认识的种类被当成切成功，当前工具会停在上一个";
     EXPECT_EQ(unknown.error().code, ErrorCode::InvalidArgument);
-    EXPECT_EQ(m_engine.activeTool(), ToolKind::Rectangle) << "失败的选择也不该改到当前工具";
+    EXPECT_EQ(m_engine.activeTool(), ToolKind::Select) << "失败的选择也不该改到当前工具（默认是选择/指针）";
 
     const auto badWidth = m_engine.setPenParameters(PenParameters{.color = QColor(0, 0, 255), .lineWidth = 0, .fontSize = 16, .fillStyle = 0});
     ASSERT_FALSE(badWidth.has_value()) << "线宽 0 会让图形变成看不见的线";

@@ -974,6 +974,8 @@ namespace GyanisScribe
         auto *view = window.findChild<Gui::AnnotationView *>();
         ASSERT_NE(view, nullptr) << "标注视图没挂上";
         ASSERT_TRUE(window.isAnnotating());
+        // 默认是选择/指针档；这一条要画一笔，先按 R 切到矩形
+        pressKey(window, Qt::Key_R);
 
         dragOnView(*view, QPoint{5, 5}, QPoint{17, 17}, QPoint{30, 30});
 
@@ -1413,11 +1415,13 @@ namespace GyanisScribe
         window.show();
         QCoreApplication::processEvents();
 
-        int              updateRequests = 0;
+        int updateRequests = 0;
         struct Counter : QObject
         {
             int *count;
-            explicit Counter(int *target) : count(target) {}
+            explicit Counter(int *target) : count(target)
+            {
+            }
             bool eventFilter(QObject *, QEvent *event) override
             {
                 if (event->type() == QEvent::UpdateRequest)

@@ -312,10 +312,10 @@ TEST_F(AnnotationWindowFixture, LetterKeySwitchesToolInEngineAndToolbarTogether)
 {
     auto window = makeWindow();
 
-    // 登记表里文字排第 7 枚（下标 6）：矩形、椭圆、箭头、画笔、高亮、马赛克、文字
+    // 登记表里文字排第 8 枚（下标 7）：选择、矩形、椭圆、箭头、画笔、高亮、马赛克、文字
     pressKeyOn(*window, Qt::Key_T);
     EXPECT_EQ(engine().activeTool(), ToolKind::Text) << "按 T 没换成文字工具";
-    EXPECT_TRUE(window->toolbar().toolButtonAt(6)->isChecked()) << "引擎换了工具，按钮还亮在原来那一档";
+    EXPECT_TRUE(window->toolbar().toolButtonAt(7)->isChecked()) << "引擎换了工具，按钮还亮在原来那一档";
     EXPECT_FALSE(window->toolbar().toolButtonAt(0)->isChecked()) << "两枚工具按钮同时亮着，用户看不出自己在用哪一档";
 
     // Ctrl+Z 走的还是撤销那一条：没有可撤的一步也不该顺手把当前工具改掉
@@ -332,9 +332,10 @@ TEST_F(AnnotationWindowFixture, ToolButtonTooltipsCarryTheirShortcutLetter)
 {
     auto window = makeWindow();
 
-    EXPECT_EQ(window->toolbar().toolButtonAt(0)->toolTip(), QString::fromUtf8("矩形 (R)"));
-    EXPECT_EQ(window->toolbar().toolButtonAt(6)->toolTip(), QString::fromUtf8("文字 (T)"));
-    EXPECT_EQ(window->toolbar().toolButtonAt(0)->accessibleName(), QString::fromUtf8("矩形"));
+    EXPECT_EQ(window->toolbar().toolButtonAt(0)->toolTip(), QString::fromUtf8("选择 (V)"));
+    EXPECT_EQ(window->toolbar().toolButtonAt(1)->toolTip(), QString::fromUtf8("矩形 (R)"));
+    EXPECT_EQ(window->toolbar().toolButtonAt(7)->toolTip(), QString::fromUtf8("文字 (T)"));
+    EXPECT_EQ(window->toolbar().toolButtonAt(0)->accessibleName(), QString::fromUtf8("选择"));
 }
 
 /**
@@ -1429,6 +1430,32 @@ TEST_F(AnnotationWindowFixture, ReportsTheCostOfRepaintingAWindowFullOfShapes)
     std::ranges::sort(milliseconds);
     std::printf("[读数] 标注窗整幅重绘一次：中位 %.1fms（底图 2560×1440、%d 个图形、%d 轮，min %.1f / max %.1f）\n", milliseconds[static_cast<std::size_t>(kRounds) / 2U], kShapes,
                 kRounds, milliseconds.front(), milliseconds.back());
+}
+
+/**
+ * @brief 钉住矩形在拖动途中就画出来，而不是松手才出现（用户 2026-10-17 直报第 3 条）
+ * @details 引擎默认工具此前没标成 active，paintPending 直接跳过，用户只能看到松手后的成品。
+ */
+TEST_F(AnnotationWindowFixture, ThePendingRectangleIsPaintedWhileDragging)
+{
+    auto window = makeWindow();
+    window->startAnnotation(makeCanvas(QSize(200, 100)), QRect(0, 0, 1920, 1080), QRect(100, 100, 200, 100));
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Rectangle).has_value());
+    ASSERT_TRUE(engine().setPenParameters(PenParameters{.color = QColor{255, 0, 0}, .lineWidth = 4, .fontSize = 16, .fillStyle = 0}).has_value());
+
+    auto *view = window->findChild<GyanisScribe::Gui::AnnotationView *>();
+    ASSERT_NE(view, nullptr);
+
+    QMouseEvent press{QEvent::MouseButtonPress, QPointF{20, 20}, QPointF{20, 20}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &press);
+    QMouseEvent move{QEvent::MouseMove, QPointF{120, 80}, QPointF{120, 80}, Qt::NoButton, Qt::LeftButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &move);
+    QApplication::processEvents();
+
+    const auto shot = view->grab().toImage();
+    const auto edge = shot.pixelColor(70, 20);
+    EXPECT_GT(edge.red(), 180) << "拖动中的矩形上边没画出来：松手前还是空白";
+    EXPECT_LT(edge.green(), 100);
 }
 
 /**

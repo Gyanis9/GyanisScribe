@@ -60,10 +60,11 @@ namespace
     std::unique_ptr<IconProvider> icons;
 
     /// 工具按钮的中文名，顺序与工具表同解；这一份是照需求第五节抄来的独立期望值
-    constexpr std::array<std::string_view, 13> kToolLabels = {"矩形", "椭圆", "箭头", "画笔", "高亮", "马赛克", "文字", "序号", "直线", "高斯模糊", "橡皮擦", "折线", "放大镜"};
+    constexpr std::array<std::string_view, 14> kToolLabels = {"选择", "矩形", "椭圆", "箭头",     "画笔",   "高亮", "马赛克",
+                                                              "文字", "序号", "直线", "高斯模糊", "橡皮擦", "折线", "放大镜"};
 
     /// 工具按钮该在提示里带上的字母键位，同样是一份独立抄来的期望值：与 Gui/Controls/AppShortcuts.h 那份清册的默认那颗交叉核对
-    constexpr std::array<std::string_view, 13> kToolShortcuts = {"R", "E", "A", "P", "H", "M", "T", "N", "L", "B", "X", "G", "F"};
+    constexpr std::array<std::string_view, 14> kToolShortcuts = {"V", "R", "E", "A", "P", "H", "M", "T", "N", "L", "B", "X", "G", "F"};
 
     /// 动作按钮的中文名，同样按需求第六节的排列顺序抄一份
     constexpr std::array<std::string_view, 5> kActionLabels = {"复制到剪贴板", "保存为文件", "贴到屏幕上", "识别文字", "识别二维码"};
@@ -275,6 +276,7 @@ namespace
             std::vector<std::string_view> visible;
         };
         const std::vector<Expectation> expectations = {
+                {ToolKind::Select, {}},
                 {ToolKind::Rectangle, {"线宽", "填充", "圆角", "线型"}},
                 {ToolKind::Ellipse, {"线宽", "填充", "线型"}},
                 {ToolKind::Arrow, {"线宽", "线型", "双向箭头", "反向箭头", "箭头样式", "箭头大小"}},
@@ -1090,7 +1092,7 @@ TEST_F(ToolbarFixture, StartsOnDefinedLadderValues)
     EXPECT_EQ(toolbar->currentColor(), kAnnotationPaletteColors[0]);
     EXPECT_EQ(toolbar->currentWidth(), 4) << "默认线宽应是阶梯里的那一档";
     EXPECT_EQ(toolbar->currentFontSize(), 14);
-    EXPECT_TRUE(toolbar->toolButtonAt(0)->isChecked()) << "默认工具应是矩形";
+    EXPECT_TRUE(toolbar->toolButtonAt(0)->isChecked()) << "默认工具应是选择/指针";
     EXPECT_FALSE(buttonByLabel(*toolbar, "撤销（Ctrl+Z）")->isEnabled()) << "刚建好没有历史，亮着的撤销点了没反应";
     EXPECT_FALSE(buttonByLabel(*toolbar, "重做（Ctrl+Y）")->isEnabled());
 
@@ -1128,13 +1130,13 @@ TEST_F(ToolbarFixture, ClickingToolEmitsOnceAndKeepsExclusive)
     SignalLog log;
     auto      toolbar = makeToolbarLogged(log);
 
-    toolbar->toolButtonAt(3)->click();
+    toolbar->toolButtonAt(4)->click();
     ASSERT_EQ(log.tools.size(), 1u);
     EXPECT_EQ(log.tools[0], ToolKind::Pen);
-    EXPECT_TRUE(toolbar->toolButtonAt(3)->isChecked());
+    EXPECT_TRUE(toolbar->toolButtonAt(4)->isChecked());
     EXPECT_FALSE(toolbar->toolButtonAt(0)->isChecked()) << "两个工具同时亮着，用户看不出自己在用哪个";
 
-    toolbar->toolButtonAt(3)->click();
+    toolbar->toolButtonAt(4)->click();
     EXPECT_EQ(log.tools.size(), 1u) << "重复点已经在用的工具又发了一次信号";
 }
 
@@ -1150,20 +1152,20 @@ TEST_F(ToolbarFixture, SetActiveToolSyncsButtonsWithoutEchoing)
     auto      toolbar = makeToolbarLogged(log);
 
     toolbar->setActiveTool(ToolKind::Mosaic);
-    EXPECT_TRUE(toolbar->toolButtonAt(5)->isChecked());
+    EXPECT_TRUE(toolbar->toolButtonAt(6)->isChecked());
     EXPECT_FALSE(toolbar->toolButtonAt(0)->isChecked());
     EXPECT_TRUE(log.tools.empty()) << "回灌工具态又发了一次 toolChanged，宿主会跟着再切一遍引擎";
 
     // 回灌过的工具已经是当前工具，再点它不该发第二次；点另一个才发
-    toolbar->toolButtonAt(5)->click();
-    EXPECT_TRUE(log.tools.empty()) << "当前工具已经是它，重复点不该再通知宿主";
     toolbar->toolButtonAt(6)->click();
+    EXPECT_TRUE(log.tools.empty()) << "当前工具已经是它，重复点不该再通知宿主";
+    toolbar->toolButtonAt(7)->click();
     ASSERT_EQ(log.tools.size(), 1u);
     EXPECT_EQ(log.tools[0], ToolKind::Text);
 
     // 不存在的工具序号不该把按钮状态带跑
     toolbar->setActiveTool(static_cast<ToolKind>(99));
-    EXPECT_TRUE(toolbar->toolButtonAt(6)->isChecked());
+    EXPECT_TRUE(toolbar->toolButtonAt(7)->isChecked());
 }
 
 /**
@@ -1309,7 +1311,8 @@ TEST_F(ToolbarFixture, EachShapeRemembersItsOwnColor)
     SignalLog log;
     auto      toolbar = makeToolbarLogged(log);
 
-    // 起点是矩形：给它挑色板第二格
+    // 默认是选择/指针；先切到矩形，再给它挑色板第二格
+    buttonByLabel(*toolbar, "矩形")->click();
     auto *secondSwatch = buttonByLabel(*toolbar, "颜色 2");
     ASSERT_NE(secondSwatch, nullptr);
     secondSwatch->click();
@@ -1365,6 +1368,7 @@ TEST_F(ToolbarFixture, PressedSwatchFollowsTheShapeColor)
     SignalLog log;
     auto      toolbar = makeToolbarLogged(log);
 
+    buttonByLabel(*toolbar, "矩形")->click();
     auto *secondSwatch = buttonByLabel(*toolbar, "颜色 2");
     auto *fifthSwatch  = buttonByLabel(*toolbar, "颜色 5");
     ASSERT_NE(secondSwatch, nullptr);
@@ -1478,6 +1482,7 @@ TEST_F(ToolbarFixture, WheelOpacityIsRememberedPerShape)
     SignalLog log;
     auto      toolbar = makeToolbarLaidOut(log);
 
+    buttonByLabel(*toolbar, "矩形")->click();
     auto *fifthSwatch = buttonByLabel(*toolbar, "颜色 5");
     ASSERT_NE(fifthSwatch, nullptr);
     const auto center = fifthSwatch->geometry().center();

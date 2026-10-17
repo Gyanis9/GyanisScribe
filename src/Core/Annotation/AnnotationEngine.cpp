@@ -394,6 +394,11 @@ namespace GyanisScribe::Core
 
         // 参数一次下发：切工具后笔还保持用户调过的那个粗细，才不会出现「换工具就得重调」
         applyPenParametersToTools();
+        // 默认那一档也要标成 active：paintPending 只画 active 工具的在途图形，
+        // 少了这一步拖动中的矩形要等松手才出现
+        const auto defaultActivated = setActiveTool(m_activeTool);
+        Q_ASSERT(defaultActivated.has_value());
+        Q_UNUSED(defaultActivated);
 
         QObject::connect(&m_undoStack, &QUndoStack::indexChanged, this, [this] { emit canvasChanged(); });
     }
@@ -470,6 +475,17 @@ namespace GyanisScribe::Core
 
     Base::Expected<void> AnnotationEngine::setActiveTool(ToolKind kind)
     {
+        // 选择档没有对应的绘制工具：它的意思就是「谁都不落笔」，不该走下面的登记表检查
+        if (kind == ToolKind::Select)
+        {
+            for (const auto &tool: m_tools)
+            {
+                tool->setActive(false);
+            }
+            m_activeTool = kind;
+            return {};
+        }
+
         auto *target = toolFor(kind);
         if (target == nullptr)
         {
@@ -564,6 +580,10 @@ namespace GyanisScribe::Core
 
     void AnnotationEngine::beginStroke(const QPoint &point)
     {
+        if (m_activeTool == ToolKind::Select)
+        {
+            return;
+        }
         if (auto *tool = toolFor(m_activeTool); tool != nullptr)
         {
             tool->begin(point);
@@ -572,6 +592,10 @@ namespace GyanisScribe::Core
 
     void AnnotationEngine::moveStroke(const QPoint &point)
     {
+        if (m_activeTool == ToolKind::Select)
+        {
+            return;
+        }
         if (auto *tool = toolFor(m_activeTool); tool != nullptr)
         {
             tool->update(point);
@@ -580,6 +604,10 @@ namespace GyanisScribe::Core
 
     Base::Expected<AnnotationSelection> AnnotationEngine::endStroke()
     {
+        if (m_activeTool == ToolKind::Select)
+        {
+            return std::unexpected(Base::Error{Base::ErrorCode::Busy, GyanisScribe::Base::uiTextUtf8("当前是选择工具，不会落笔")});
+        }
         auto *tool = toolFor(m_activeTool);
         if (tool == nullptr)
         {

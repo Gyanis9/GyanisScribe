@@ -259,6 +259,12 @@ namespace GyanisScribe::Gui
 
         // 点空白：先清掉选中再起笔——选框不该留着指向「刚才那条」
         m_engine.clearSelection();
+        if (m_engine.activeTool() == Core::ToolKind::Select)
+        {
+            // 选择工具不落笔：空白处按一下只是清选中
+            event->accept();
+            return;
+        }
         m_engine.beginStroke(point);
         m_stroking = true;
 

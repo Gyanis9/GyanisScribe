@@ -1612,12 +1612,20 @@
             <translation> (cursor excluded)</translation>
         </message>
         <message>
-            <source>松手即完成 · Esc 取消</source>
-            <translation>Release to finish · Esc to cancel</translation>
+            <source>松手落定 · Esc 取消</source>
+            <translation>Release to settle · Esc to cancel</translation>
         </message>
         <message>
-            <source>Enter / 双击确认 · 方向键微调 · Esc 取消</source>
-            <translation>Enter / double-click to confirm · arrow keys adjust · Esc to cancel</translation>
+            <source>拖四边调整 · Enter/双击确认 · Esc 取消</source>
+            <translation>Drag the edges to adjust · Enter/double-click to confirm · Esc to cancel</translation>
+        </message>
+        <message>
+            <source>选择</source>
+            <translation>Select</translation>
+        </message>
+        <message>
+            <source>当前是选择工具，不会落笔</source>
+            <translation>The select tool does not draw</translation>
         </message>
         <message>
             <source>光标所在屏幕</source>

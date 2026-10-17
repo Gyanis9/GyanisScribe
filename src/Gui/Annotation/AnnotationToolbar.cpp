@@ -95,7 +95,7 @@ namespace
 namespace GyanisScribe::Gui
 {
     AnnotationToolbar::AnnotationToolbar(Core::ISettingsStore &settings, const Gui::IconProvider &icons, QWidget *parent) :
-        QWidget(parent), m_settings(settings), m_icons(icons), m_activeTool(Core::ToolKind::Rectangle)
+        QWidget(parent), m_settings(settings), m_icons(icons), m_activeTool(Core::ToolKind::Select)
     {
         setObjectName(QStringLiteral("AnnotationToolbar"));
         // 样式表给这个对象名画了一圈卡片底；QWidget 子类不打开这个开关就不会吃样式表的背景
@@ -374,7 +374,7 @@ namespace GyanisScribe::Gui
         // 起点状态：第一个工具、第一个色块按下，线宽与字号取「上次用的那一档」（配置里没有就回到 4 / 14）。
         // 此刻还没有任何外部接收方（宿主是在构造之后才接线的），所以不需要挡信号，
         // 只需要把状态摆对——尤其是 m_activeTool 要与按下的那个工具同解，否则第一次点矩形会被守卫吞掉
-        toolGroup->button(static_cast<int>(Core::ToolKind::Rectangle))->setChecked(true);
+        toolGroup->button(static_cast<int>(Core::ToolKind::Select))->setChecked(true);
         colorGroup->button(0)->setChecked(true);
         applyStoredDefaults();
         m_stateIsInitial = false;
