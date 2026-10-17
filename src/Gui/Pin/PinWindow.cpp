@@ -1842,6 +1842,9 @@ namespace GyanisScribe::Gui
     void PinWindow::enterEvent(QEnterEvent *event)
     {
         QWidget::enterEvent(event);
+        // 悬停边框在 paint 里按 underMouse() 现算：这里不请求重绘，屏上要等下一次别的重绘才亮
+        // （实机真鼠标进出八秒边框一次没出现的根因；grab() 会强制重绘，把这一处盖住了）
+        update();
         // 贴边收着的时候悬停要露出来：收成一条之后能接到的交互只有那条边
         if (m_edgeDock != Core::ScreenEdge::None && m_dockCollapsed)
         {
@@ -1853,6 +1856,8 @@ namespace GyanisScribe::Gui
     void PinWindow::leaveEvent(QEvent *event)
     {
         QWidget::leaveEvent(event);
+        // 与进入同一条：不请求重绘的话，离开后那圈边框会留在屏上
+        update();
         // 悬停时压上的改大小形状跟着收回去：不然下次进来还没移动，第一眼仍是「这条边能拖」
         if (!m_colorPickMode)
         {

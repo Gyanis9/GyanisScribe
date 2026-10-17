@@ -20,6 +20,7 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QCoreApplication>
 #include <QClipboard>
 #include <QDragEnterEvent>
 #include <QDropEvent>
@@ -1396,6 +1397,50 @@ namespace GyanisScribe
         EXPECT_NE(edgeColor(), QColor(200, 60, 60)) << "选中之后边缘还是原色：选中圈没画出来";
         window.setSelected(false);
         EXPECT_EQ(edgeColor(), QColor(200, 60, 60)) << "取消选中之后圈还留着";
+    }
+
+    /**
+     * @brief 钉住进入/离开会请求重绘（界面审查 UI-40 实机取证）
+     * @details 边框是 paint 里按 underMouse() 现算的：进出只改状态不请求重绘，屏上就还是旧帧。
+     *          实机用真鼠标进出八秒（光标坐标在框内 68 帧），边框一次没出现；
+     *          判据盯 update() 投递的 UpdateRequest，而不是 grab()——grab 会强制重绘，
+     *          恰好把这一处漏掉的重绘盖住。
+     */
+    TEST_F(PinWindowFixture, EnterAndLeaveRequestARepaint)
+    {
+        auto &window = makeWindow();
+        window.setAttribute(Qt::WA_DontShowOnScreen);
+        window.show();
+        QCoreApplication::processEvents();
+
+        int              updateRequests = 0;
+        struct Counter : QObject
+        {
+            int *count;
+            explicit Counter(int *target) : count(target) {}
+            bool eventFilter(QObject *, QEvent *event) override
+            {
+                if (event->type() == QEvent::UpdateRequest)
+                {
+                    ++*count;
+                }
+                return false;
+            }
+        } counter{&updateRequests};
+        window.installEventFilter(&counter);
+        QCoreApplication::processEvents();
+        updateRequests = 0;
+
+        QEnterEvent enter{QPointF{1.0, 1.0}, QPointF{1.0, 1.0}, QPointF{1.0, 1.0}};
+        QApplication::sendEvent(&window, &enter);
+        QCoreApplication::processEvents();
+        EXPECT_GT(updateRequests, 0) << "进入只改了状态没请求重绘：悬停边框要等下一次别的重绘才看得见";
+
+        updateRequests = 0;
+        QEvent leave{QEvent::Leave};
+        QApplication::sendEvent(&window, &leave);
+        QCoreApplication::processEvents();
+        EXPECT_GT(updateRequests, 0) << "离开没请求重绘：边框会留在屏上";
     }
 
     /**
