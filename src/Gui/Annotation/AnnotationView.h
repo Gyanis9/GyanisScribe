@@ -138,6 +138,20 @@ namespace GyanisScribe::Gui
          */
         void captureResized(const QRect &globalGeometry);
 
+        /// 拖边框途中每次几何变化都报一次：宿主据此把冻帧裁成实时预览
+        void captureResizeMoved(const QRect &globalGeometry);
+
+    public:
+        /**
+         * @brief 拖边框途中用冻帧裁出来的预览顶替旧画布
+         * @param image 按新范围裁好的冻帧
+         * @param shapeOffset 旧画布原点在新预览里的位置
+         */
+        void setCropPreview(const QImage &image, const QPoint &shapeOffset);
+
+        /// 收起重裁预览，回到引擎画布
+        void clearCropPreview();
+
     private:
         /**
          * @brief 文字的行内输入框：在按下处摆一个多行的
@@ -201,6 +215,13 @@ namespace GyanisScribe::Gui
         bool       m_reEditingText     = false; ///< 输入框此刻改的是已放下的那一条，而不是新画的一条
         QPoint     m_lastCanvasPoint;           ///< 上一次事件换算到的画布坐标
         QTextEdit *m_textEditor = nullptr;      ///< 行内输入框（多行），用完即销毁
+
+        QImage m_cropPreviewImage;       ///< 重裁途中的冻帧预览
+        QPoint m_cropPreviewShapeOffset; ///< 旧画布原点在新预览里的位置
+        bool   m_hasCropPreview = false; ///< 是否正在显示预览
+
+        /// 画屏幕边框与选择档抓点：正常出图与重裁预览共用同一笔
+        void paintCaptureFrame(QPainter &painter);
 
         bool                m_captureResizing   = false;                     ///< 「选择」档正在拖窗口边框
         Core::SelectionGrip m_captureResizeGrip = Core::SelectionGrip::None; ///< 拖的是哪一条边或哪一个角

@@ -2,6 +2,7 @@
 
 #include "Core/Annotation/AnnotationEngine.h"
 #include "Core/Annotation/IAnnotationEngine.h"
+#include "Core/Capture/ScreenUtils.h"
 #include "Gui/Annotation/AnnotationToolbarGeometry.h"
 #include "Base/Logger.h"
 #include "Core/Settings/ISettingsStore.h"
@@ -12,6 +13,7 @@
 #include <QKeyEvent>
 #include <QVBoxLayout>
 
+#include <cmath>
 #include <format>
 #include <utility>
 
@@ -127,6 +129,7 @@ namespace GyanisScribe::Gui
         // 可见段收放让工具栏尺寸变了就重摆一次：收窄后还钉在旧位置会偏出选区中心
         QObject::connect(m_toolbar.get(), &AnnotationToolbar::contextLayoutChanged, this, [this] { placeToolbarForSelection(); });
         QObject::connect(m_view, &AnnotationView::captureResized, this, [this](const QRect &globalGeometry) { emit cropRequested(m_refreshScreenName, globalGeometry); });
+        QObject::connect(m_view, &AnnotationView::captureResizeMoved, this, [this](const QRect &globalGeometry) { updateCropPreview(globalGeometry); });
 
         // 四个动作按钮与快捷键汇到同一个出口：谁按的都走 deliver，界面不需要知道来源
         QObject::connect(m_toolbarBridge.get(), &AnnotationToolbarBridge::copyRequested, this, [this] { deliver(ShortcutAction::Copy); });
@@ -140,8 +143,11 @@ namespace GyanisScribe::Gui
     void AnnotationWindow::startAnnotation(const Base::CapturedImage &captured, const QRect &screenAvailable, const QRect &selection)
     {
         // 记下这一轮抓的是哪块屏、哪块区域：刷新截图（F5）要对着同一块地方重抓
-        m_refreshScreenName = captured.screenName;
-        m_refreshRegion     = captured.logicalRegion;
+        m_refreshScreenName   = captured.screenName;
+        m_refreshRegion       = captured.logicalRegion;
+        m_frozenImage         = captured.frozenImage;
+        m_frozenLogicalSize   = captured.frozenLogicalSize;
+        m_frozenLogicalRegion = captured.frozenLogicalRegion;
         // 摆放依据也记下来：切工具会收放可见段、尺寸跟着变，重摆必须用同一份选区与可用区
         m_placedScreenAvailable = screenAvailable;
         m_placedSelection       = QRect{selection.topLeft(), captured.logicalSize};
@@ -200,6 +206,10 @@ namespace GyanisScribe::Gui
         m_placedSelection       = QRect{selection.topLeft(), captured.logicalSize};
         m_refreshScreenName     = captured.screenName;
         m_refreshRegion         = captured.logicalRegion;
+        m_frozenImage           = captured.frozenImage;
+        m_frozenLogicalSize     = captured.frozenLogicalSize;
+        m_frozenLogicalRegion   = captured.frozenLogicalRegion;
+        m_view->clearCropPreview();
 
         m_engine.recropCanvas(captured, offset);
         resize(captured.logicalSize);
@@ -218,6 +228,7 @@ namespace GyanisScribe::Gui
     {
         m_placedScreenAvailable = screenAvailable;
         m_placedSelection       = QRect{selection.topLeft(), m_engine.canvas().logicalSize};
+        m_view->clearCropPreview();
         resize(m_engine.canvas().logicalSize);
         move(selection.topLeft());
         show();
@@ -227,6 +238,36 @@ namespace GyanisScribe::Gui
         placeToolbarForSelection();
         m_toolbar->show();
         m_toolbar->raise();
+    }
+
+    void AnnotationWindow::updateCropPreview(const QRect &globalSelection)
+    {
+        if (m_frozenImage.isNull() || m_frozenLogicalSize.isEmpty())
+        {
+            return;
+        }
+        auto *screen = GyanisScribe::Core::screenByName(m_refreshScreenName);
+        if (screen == nullptr)
+        {
+            return;
+        }
+
+        const QPoint origin = screen->geometry().topLeft();
+        const QRect  oldLocal{m_placedSelection.topLeft() - origin, m_placedSelection.size()};
+        const QRect  newLocal{globalSelection.topLeft() - origin, globalSelection.size()};
+        const qreal  dpr           = static_cast<qreal>(m_frozenImage.width()) / static_cast<qreal>(m_frozenLogicalSize.width());
+        const QRect  sourceLogical = newLocal.translated(-m_frozenLogicalRegion.topLeft());
+        const QRect  sourcePhysical{QPoint{static_cast<int>(std::lround(sourceLogical.left() * dpr)), static_cast<int>(std::lround(sourceLogical.top() * dpr))},
+                                    QSize{static_cast<int>(std::lround(sourceLogical.width() * dpr)), static_cast<int>(std::lround(sourceLogical.height() * dpr))}};
+        const QRect  clipped = sourcePhysical.intersected(m_frozenImage.rect());
+        if (clipped.isEmpty())
+        {
+            return;
+        }
+
+        QImage preview = m_frozenImage.copy(clipped);
+        preview.setDevicePixelRatio(dpr);
+        m_view->setCropPreview(preview, oldLocal.topLeft() - newLocal.topLeft());
     }
 
     void AnnotationWindow::keyPressEvent(QKeyEvent *event)

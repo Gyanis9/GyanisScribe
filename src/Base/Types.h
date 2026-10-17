@@ -79,6 +79,10 @@ namespace GyanisScribe::Base
         qreal   devicePixelRatio = 1.0; ///< 该屏缩放因子，物理像素 = 逻辑尺寸乘以它
         QString screenName;             ///< 来源屏幕标识，多显示器场景据此回到正确的那一块
         QRect   logicalRegion;          ///< 来自哪一块屏幕内逻辑区域；整屏抓取或来源未知时是空矩形
+
+        QImage frozenImage;         ///< 可选：整屏冻帧，标注窗重裁时从这里取新范围（空表示没有）
+        QSize  frozenLogicalSize;   ///< 冻帧的逻辑尺寸
+        QRect  frozenLogicalRegion; ///< 冻帧在这块屏内的逻辑区域（通常从 (0,0) 起的整屏）
     };
 
 } // namespace GyanisScribe::Base

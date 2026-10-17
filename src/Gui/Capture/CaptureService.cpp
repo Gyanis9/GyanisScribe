@@ -59,7 +59,11 @@ namespace GyanisScribe::Gui
 
     void CaptureService::captureRegion(const QRect &logicalRegion, const QString &screenName)
     {
-        auto frame = grabRegionNow(logicalRegion, screenName);
+        finishRegion(grabRegionNow(logicalRegion, screenName), logicalRegion);
+    }
+
+    void CaptureService::finishRegion(Base::Expected<Base::CapturedImage> frame, const QRect &logicalRegion)
+    {
         if (!frame)
         {
             // 抓帧或裁剪失败：原因原样交回，别在这里补一个「按 0 处理」的形状
@@ -98,7 +102,15 @@ namespace GyanisScribe::Gui
             return std::unexpected(frame.error());
         }
 
-        return Core::cropToLogicalRect(*frame, logicalRegion);
+        auto cropped = Core::cropToLogicalRect(*frame, logicalRegion);
+        if (cropped)
+        {
+            // 整帧留着给标注窗重裁用：裁新范围不必再抓一次屏，内容也就不会变
+            cropped->frozenImage         = frame->image;
+            cropped->frozenLogicalSize   = frame->logicalSize;
+            cropped->frozenLogicalRegion = QRect{QPoint{0, 0}, frame->logicalSize};
+        }
+        return cropped;
     }
 
     void CaptureService::captureWindow(quintptr windowHandle)
@@ -211,7 +223,7 @@ namespace GyanisScribe::Gui
             overlay->setCursorIncluded(longCapture ? std::nullopt : std::optional<bool>{cursorIncludedForThisRound()});
             QObject::connect(overlay, &CaptureOverlay::cursorIncludeChanged, this, [this](const bool included) { setCursorIncludedForRound(included); });
             QObject::connect(overlay, &CaptureOverlay::regionSelected, this,
-                             [this, screen, longCapture](const QRect &region)
+                             [this, screen, longCapture, frame](const QRect &region)
                              {
                                  closeOverlays();
                                  // 同一层遮罩两条去处：长截图先把这一块当成开头接住，普通截图当场交成品
@@ -220,7 +232,22 @@ namespace GyanisScribe::Gui
                                      captureLongRegion(region, screen->name());
                                      return;
                                  }
-                                 captureRegion(region, screen->name());
+                                 // 普通截图从遮罩那张冻帧里裁：再抓一次屏会把遮罩自己/刚切的桌面抓进去，
+                                 // 也会让标注窗重裁时看到的画面与用户框选时不是同一帧
+                                 const auto full = withCursorIfWanted(frame);
+                                 if (!full)
+                                 {
+                                     deliver(full);
+                                     return;
+                                 }
+                                 auto cropped = Core::cropToLogicalRect(*full, region);
+                                 if (cropped)
+                                 {
+                                     cropped->frozenImage         = full->image;
+                                     cropped->frozenLogicalSize   = full->logicalSize;
+                                     cropped->frozenLogicalRegion = QRect{QPoint{0, 0}, full->logicalSize};
+                                 }
+                                 finishRegion(std::move(cropped), region);
                              });
             // 比例锁开/关或换档：落盘的那一处就这一条，锁着的档因此跨轮次记得住
             QObject::connect(overlay, &CaptureOverlay::aspectRatioLockChanged, this, [this](const QSize &ratio) { rememberAspectRatio(m_settings, ratio); });

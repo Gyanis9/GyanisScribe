@@ -434,13 +434,37 @@ namespace GyanisScribe::App
             return;
         }
 
-        // 先藏窗再抓：DXGI 抓到的是整块桌面，不藏就会把标注窗自己抓进新底图
+        const QRect local{globalSelection.topLeft() - screen->geometry().topLeft(), globalSelection.size()};
+
+        // 交互截图带回了整屏冻帧：新范围直接从同一帧裁，画面与用户框选时一致，也不必藏窗再抓
+        if (!m_lastCapture.frozenImage.isNull() && !m_lastCapture.frozenLogicalSize.isEmpty())
+        {
+            Base::CapturedImage source;
+            source.image            = m_lastCapture.frozenImage;
+            source.logicalSize      = m_lastCapture.frozenLogicalSize;
+            source.devicePixelRatio = m_lastCapture.devicePixelRatio;
+            source.screenName       = m_lastCapture.screenName;
+            source.logicalRegion    = m_lastCapture.frozenLogicalRegion;
+            auto cropped            = Core::cropToLogicalRect(source, local);
+            if (cropped)
+            {
+                cropped->frozenImage         = source.image;
+                cropped->frozenLogicalSize   = source.logicalSize;
+                cropped->frozenLogicalRegion = source.logicalRegion;
+                m_lastCapture                = *cropped;
+                m_lastSelection              = globalSelection;
+                Core::rememberRegion(m_dependencies.settings, Core::RegionHistoryEntry{local, screenName});
+                m_annotationWindow->recropAnnotation(m_lastCapture, screen->availableGeometry(), m_lastSelection);
+                return;
+            }
+        }
+
+        // 来源没带冻帧（整屏抓的那几路）：退回重新抓屏；先藏窗，DXGI 抓到的是整块桌面
         m_annotationWindow->hide();
         m_annotationWindow->toolbar().hide();
         QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
 
-        const QRect local{globalSelection.topLeft() - screen->geometry().topLeft(), globalSelection.size()};
-        const auto  frame = m_capture->grabRegionNow(local, screenName);
+        const auto frame = m_capture->grabRegionNow(local, screenName);
         if (!frame)
         {
             // 抓新范围失败就退回原来那一轮：画布与标注都没动，只把窗口摆回旧几何

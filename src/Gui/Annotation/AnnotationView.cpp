@@ -119,6 +119,18 @@ namespace GyanisScribe::Gui
 
     void AnnotationView::paintEvent(QPaintEvent *)
     {
+        if (m_hasCropPreview)
+        {
+            QPainter painter{this};
+            painter.drawImage(QRect{QPoint{0, 0}, size()}, m_cropPreviewImage, m_cropPreviewImage.rect());
+            painter.save();
+            painter.translate(m_cropPreviewShapeOffset);
+            m_engine.paintShapes(painter);
+            painter.restore();
+            paintCaptureFrame(painter);
+            return;
+        }
+
         const auto &canvas = m_engine.canvas();
         const auto  rect   = currentDisplayRect();
         if (canvas.image.isNull() || rect.isEmpty())
@@ -192,6 +204,11 @@ namespace GyanisScribe::Gui
 
         // 截图窗与桌面内容逐像素相同：屏上必须有一圈提示线，用户才知道哪一块是这张截图。
         // 画在控件边缘、只走屏显这一条路——exportImage 从引擎取图，不会带上这一笔。
+        paintCaptureFrame(painter);
+    }
+
+    void AnnotationView::paintCaptureFrame(QPainter &painter)
+    {
         painter.setRenderHint(QPainter::Antialiasing, false);
         painter.setPen(QPen{GyanisScribe::Gui::kAccentColor, 2});
         painter.setBrush(Qt::NoBrush);
@@ -214,6 +231,25 @@ namespace GyanisScribe::Gui
                 painter.drawRect(QRect{center - QPoint{edge / 2, edge / 2}, QSize{edge, edge}});
             }
         }
+    }
+
+    void AnnotationView::setCropPreview(const QImage &image, const QPoint &shapeOffset)
+    {
+        m_cropPreviewImage       = image;
+        m_cropPreviewShapeOffset = shapeOffset;
+        m_hasCropPreview         = !image.isNull();
+        update();
+    }
+
+    void AnnotationView::clearCropPreview()
+    {
+        if (!m_hasCropPreview)
+        {
+            return;
+        }
+        m_hasCropPreview   = false;
+        m_cropPreviewImage = {};
+        update();
     }
 
     void AnnotationView::mousePressEvent(QMouseEvent *event)
@@ -324,6 +360,7 @@ namespace GyanisScribe::Gui
             if (moved.width() >= 8 && moved.height() >= 8)
             {
                 window()->setGeometry(moved);
+                emit captureResizeMoved(moved);
             }
             event->accept();
             return;
@@ -382,6 +419,7 @@ namespace GyanisScribe::Gui
         {
             m_captureResizing = false;
             setCursor(Qt::ArrowCursor);
+            clearCropPreview();
             emit captureResized(window()->geometry());
             event->accept();
             return;

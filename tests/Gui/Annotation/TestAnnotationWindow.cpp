@@ -17,10 +17,12 @@
 
 #include <QApplication>
 #include <QCoreApplication>
+#include <QGuiApplication>
 #include <QElapsedTimer>
 #include <QImage>
 #include <QKeyEvent>
 #include <QMouseEvent>
+#include <QScreen>
 #include <QTextCursor>
 #include <QTextEdit>
 #include <QToolButton>
@@ -1547,6 +1549,65 @@ TEST_F(AnnotationWindowFixture, SelectToolKeepsAnnotationsWhenResizing)
     EXPECT_EQ(baked.pixelColor(120, 40), GyanisScribe::Core::kAnnotationPaletteColors[0]) << "重裁之后标注没有跟着平移";
     EXPECT_EQ(baked.pixelColor(40, 40), QColor(180, 180, 180)) << "旧位置还留着一条，图形被复制了一份";
     EXPECT_EQ(window->geometry(), QRect(90, 100, 210, 100)) << "窗口没有按新范围摆好";
+}
+
+/**
+ * @brief 钉住重裁途中新露出的区域来自整屏冻帧，不是拉伸的旧画布、也不留白边
+ * @details 视图在拖边框时用冻帧裁出的预览填满整窗；没收到的冻帧才退回旧画布。
+ */
+TEST_F(AnnotationWindowFixture, CropPreviewComesFromTheFrozenFrame)
+{
+    auto *screen = QGuiApplication::primaryScreen();
+    ASSERT_NE(screen, nullptr);
+
+    auto full = makeCanvas(QSize(400, 300));
+    full.image.fill(QColor(0, 255, 0));
+    full.frozenImage         = full.image;
+    full.frozenLogicalSize   = full.logicalSize;
+    full.frozenLogicalRegion = QRect(0, 0, 400, 300);
+    full.screenName          = screen->name();
+
+    auto initial = makeCanvas(QSize(200, 100));
+    initial.image.fill(QColor(0, 0, 255));
+    initial.logicalRegion       = QRect(100, 100, 200, 100);
+    initial.screenName          = screen->name();
+    initial.frozenImage         = full.frozenImage;
+    initial.frozenLogicalSize   = full.frozenLogicalSize;
+    initial.frozenLogicalRegion = full.frozenLogicalRegion;
+
+    auto window = makeWindow();
+    window->startAnnotation(initial, screen->availableGeometry(), QRect(100, 100, 200, 100));
+    QApplication::processEvents();
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Select).has_value());
+
+    auto *view = window->findChild<GyanisScribe::Gui::AnnotationView *>();
+    ASSERT_NE(view, nullptr);
+
+    QMouseEvent press{QEvent::MouseButtonPress, QPointF{0, 50}, QPointF{view->mapToGlobal(QPoint{0, 50})}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &press);
+    QMouseEvent move{QEvent::MouseMove, QPointF{-10, 50}, QPointF{view->mapToGlobal(QPoint{-10, 50})}, Qt::NoButton, Qt::LeftButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &move);
+    QApplication::processEvents();
+
+    const auto during = view->grab().toImage();
+    EXPECT_EQ(during.pixelColor(5, 50), QColor(0, 255, 0)) << "新露出的左边不是冻帧内容";
+    EXPECT_NE(during.pixelColor(5, 50), QColor(255, 255, 255)) << "重裁途中出现白边";
+
+    QMouseEvent release{QEvent::MouseButtonRelease, QPointF{-10, 50}, QPointF{view->mapToGlobal(QPoint{-10, 50})}, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &release);
+
+    auto fresh = makeCanvas(QSize(210, 100));
+    fresh.image.fill(QColor(0, 255, 0));
+    fresh.logicalRegion       = QRect(90, 100, 210, 100);
+    fresh.screenName          = screen->name();
+    fresh.frozenImage         = full.frozenImage;
+    fresh.frozenLogicalSize   = full.frozenLogicalSize;
+    fresh.frozenLogicalRegion = full.frozenLogicalRegion;
+    window->recropAnnotation(fresh, screen->availableGeometry(), QRect(90, 100, 210, 100));
+    QApplication::processEvents();
+
+    const auto after = view->grab().toImage();
+    EXPECT_EQ(after.pixelColor(5, 50), QColor(0, 255, 0)) << "重裁之后左边留了一条不是截图的底色";
 }
 
 /**

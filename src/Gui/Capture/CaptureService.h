@@ -165,6 +165,14 @@ namespace GyanisScribe::Gui
         void deliver(const Base::Expected<Base::CapturedImage> &result);
 
         /**
+         * @brief 对裁好的选区做成品加工、记选区并交付
+         * @param frame 裁好的选区（失败时原样交付）
+         * @param logicalRegion 该屏内的逻辑选区
+         * @details 圆角、选区记账与交付这一串只此一处：冻帧裁切与重新抓屏两条来源共用。
+         */
+        void finishRegion(Base::Expected<Base::CapturedImage> frame, const QRect &logicalRegion);
+
+        /**
          * @brief 按设置把鼠标指针合成进整帧
          * @param frame 刚抓好的整帧（可能已经失败）
          * @return 开关关着、抓帧本身失败、或本平台取不到指针形状时原样返回；否则返回画好指针的那一帧
