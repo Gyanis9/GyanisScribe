@@ -229,8 +229,12 @@ namespace
     QWidget *makePathRow(GyanisScribe::Core::ISettingsStore &settings, const std::string_view key, const QString &title, const std::filesystem::path &fallback,
                          GyanisScribe::Gui::IconProvider &icons)
     {
-        auto      *row     = new QWidget;
-        auto      *layout  = new QHBoxLayout{row};
+        auto *row    = new QWidget;
+        auto *layout = new QHBoxLayout{row};
+        // 与 buildTransferRow / buildPaletteTransferRow 同一条纪律：行容器自己不吃布局默认边距，
+        // 否则输入框左缘比字段列右移一截，三处路径行看起来各偏各的
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->setSpacing(GyanisScribe::Gui::kSpacingSmall);
         auto      *editor  = new QLineEdit{row};
         const auto stored  = settings.stringValue(key, QString{});
         const auto display = stored.isEmpty() ? GyanisScribe::Base::Paths::toDisplayText(fallback) : stored;
@@ -243,7 +247,7 @@ namespace
         icons.applyIcon(*browse, "Save");
         browse->setAccessibleName(GyanisScribe::Base::uiText("选择%1的目录").arg(title));
 
-        layout->addWidget(editor);
+        layout->addWidget(editor, 1);
         layout->addWidget(browse);
 
         QObject::connect(browse, &QPushButton::clicked, row,

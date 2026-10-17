@@ -1705,6 +1705,59 @@ TEST_F(MainWindowFixture, CompactSettingsLayoutHasANarrowerFloor)
 }
 
 /**
+ * @brief 钉住三处路径行的输入框左缘与表单字段列同线（用户 2026-10-17 直报第 7 条）
+ * @details 路径行是「QLineEdit + 浏览…」的横向组合，过去漏了 setContentsMargins(0,0,0,0)，
+ *          输入框被布局默认边距向内推了约 9px。判据逐页量：路径输入框左缘 = 同行参照字段左缘。
+ */
+TEST_F(MainWindowFixture, PathEditorsShareTheFormFieldLeftEdge)
+{
+    makeWindow();
+    struct Case
+    {
+        MainWindowPage page;
+        const char    *pathAccessibleName;
+        const char    *referenceAccessibleName;
+    };
+    const std::array cases{
+            Case{MainWindowPage::Capture, "截图目录", "截完之后"},
+            Case{MainWindowPage::Record, "录屏目录", "录制范围"},
+            Case{MainWindowPage::Ocr, "语言包目录", "识别语言"},
+    };
+
+    for (const auto &one: cases)
+    {
+        m_window->open(one.page);
+        QCoreApplication::processEvents();
+        auto *scroll = qobject_cast<QScrollArea *>(m_window->findChild<QStackedWidget *>()->currentWidget());
+        ASSERT_NE(scroll, nullptr);
+        auto *card = scroll->widget();
+        ASSERT_NE(card, nullptr);
+
+        QLineEdit *path      = nullptr;
+        QWidget   *reference = nullptr;
+        for (auto *edit: card->findChildren<QLineEdit *>())
+        {
+            if (edit->accessibleName() == GyanisScribe::Base::uiText(one.pathAccessibleName))
+            {
+                path = edit;
+                break;
+            }
+        }
+        for (auto *widget: card->findChildren<QWidget *>())
+        {
+            if (widget->accessibleName() == GyanisScribe::Base::uiText(one.referenceAccessibleName) && !qobject_cast<QLineEdit *>(widget))
+            {
+                reference = widget;
+                break;
+            }
+        }
+        ASSERT_NE(path, nullptr) << one.pathAccessibleName;
+        ASSERT_NE(reference, nullptr) << one.referenceAccessibleName;
+        EXPECT_EQ(path->mapTo(card, QPoint(0, 0)).x(), reference->mapTo(card, QPoint(0, 0)).x()) << one.pathAccessibleName << " 没和上下字段列对齐";
+    }
+}
+
+/**
  * @brief 钉住多屏时「整屏截图」在托盘菜单里变成带屏名的子菜单（用户 2026-10-17 直报第 3 条）
  * @details 动作条隐藏后，逐屏入口不能跟着消失；子菜单第一项是「光标所在屏幕」，
  *          后面逐块屏点名，触发后走 screenCaptureRequested。
