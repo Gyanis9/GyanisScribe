@@ -5,12 +5,22 @@
 // 与 CrashProbe / UiShotTool 同一条理由不是产品的一部分：不进安装包、不挂产品入口。
 // 跑法：UiAuditTool <输出目录>；stdout 每行是「图名: 实际尺寸 sizeHint minimumSizeHint」。
 
+#include "Base/Text.h"
 #include "Core/Annotation/AnnotationPalette.h"
 #include "Gui/Annotation/AnnotationToolbar.h"
 #include "Gui/Annotation/AnnotationToolbarGeometry.h"
 #include "Main/MainWindow.h"
+#include "Core/History/HistoryRules.h"
 #include "Core/History/HistoryStore.h"
+#include "Core/History/HistoryTypes.h"
+#include "Core/Ocr/OcrTypes.h"
 #include "Core/Pick/RecentColors.h"
+#include "Core/Record/RecordingSession.h"
+#include "Gui/Capture/CaptureOverlay.h"
+#include "Gui/Controls/Toast.h"
+#include "Gui/Ocr/OcrResultWindow.h"
+#include "Gui/Pin/PinWindow.h"
+#include "Gui/Record/RecordingHud.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Settings/SettingsStore.h"
@@ -19,8 +29,12 @@
 
 #include <QApplication>
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QFont>
 #include <QFontDatabase>
+#include <QMenu>
+#include <QMouseEvent>
+#include <QPainter>
 #include <QScrollArea>
 #include <QStackedWidget>
 #include <QString>
@@ -30,6 +44,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <format>
+#include <fstream>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -82,6 +97,115 @@ namespace
             recent.push_back(QColor::fromHsv(210 - index * 12, 160 + index * 8, 120 + index * 16));
         }
         return recent;
+    }
+
+    /// 一张「像屏幕」的假帧：深底 + 三块面板 + 两行字，遮罩读数与放大镜看得到内容
+    QImage syntheticScreen(const QSize &size)
+    {
+        QImage   image{size, QImage::Format_ARGB32_Premultiplied};
+        QPainter painter{&image};
+        painter.fillRect(image.rect(), QColor(32, 38, 46));
+        painter.fillRect(QRect{48, 72, 360, 200}, QColor(52, 60, 70));
+        painter.fillRect(QRect{456, 300, 480, 260}, QColor(70, 80, 92));
+        painter.fillRect(QRect{640, 96, 300, 120}, QColor(45, 52, 61));
+        painter.setPen(QColor(226, 232, 240));
+        painter.drawText(QRect{48, 72, 360, 200}, Qt::AlignCenter, QStringLiteral("preview · 窗口区"));
+        painter.drawText(QRect{456, 300, 480, 260}, Qt::AlignCenter, QStringLiteral("panel 420×260"));
+        return image;
+    }
+
+    /// Toast 的气泡是顶层窗（无障碍名「提示」）：显示之后按名字找到它再抓图
+    QWidget *toastBubble()
+    {
+        for (auto *widget: QApplication::topLevelWidgets())
+        {
+            if (widget->accessibleName() == GyanisScribe::Base::uiText("提示"))
+            {
+                return widget;
+            }
+        }
+        return nullptr;
+    }
+
+    /**
+     * @brief 浮窗族逐面出图：遮罩（默认/放大镜）、贴图窗（默认/悬停）、OCR 结果窗、录屏控制条（四态）、Toast（三类）
+     * @param prefix 文件名前缀（主题档接在名字前，三趟互不覆盖）
+     * @details 构造与生产同路：真 settings / 真图标 / 先按档 applyFromSettings 再建控件；离屏 show + processEvents 后 grab。
+     *          每趟自成一批、控件随作用域销毁——跨档复用一批控件会把上一档的样式残留带进来。
+     */
+    void shootFloatingFaces(GyanisScribe::Core::SettingsStore &settings, GyanisScribe::Gui::IconProvider &icons, const GyanisScribe::Gui::ThemeManager &theme,
+                            const GyanisScribe::Platform::IPlatformIntegration &integration, const std::filesystem::path &outputDirectory, const std::string &prefix)
+    {
+        const QRect screen{0, 0, 1280, 720};
+
+        // 截屏遮罩：默认态 + 放大镜态（放大镜要收到第一次鼠标移动才现身）
+        {
+            GyanisScribe::Gui::CaptureOverlay overlay{syntheticScreen(screen.size()), screen, 1.0, settings};
+            overlay.show();
+            shoot(overlay, outputDirectory, (prefix + "overlay-default").c_str());
+            QMouseEvent moved{QEvent::MouseMove, QPointF{640, 360}, QPointF{640, 360}, Qt::NoButton, Qt::NoButton, Qt::KeyboardModifiers{}};
+            QApplication::sendEvent(&overlay, &moved);
+            shoot(overlay, outputDirectory, (prefix + "overlay-magnifier").c_str());
+        }
+
+        // 贴图窗：默认 + 悬停（悬停出边框）
+        {
+            GyanisScribe::Gui::PinWindow pin{syntheticScreen({480, 320}), settings, integration};
+            pin.show();
+            shoot(pin, outputDirectory, (prefix + "pin-window").c_str());
+            QEvent entered{QEvent::Enter};
+            QApplication::sendEvent(&pin, &entered);
+            shoot(pin, outputDirectory, (prefix + "pin-window-hover").c_str());
+        }
+
+        // OCR 结果窗：两行带词框的结果 + 平均置信度
+        {
+            GyanisScribe::Core::OcrResult result;
+            result.language          = QStringLiteral("zh-Hans");
+            result.averageConfidence = 0.93;
+            const auto addLine = [&result](const QString &text, const QRect &box)
+            {
+                GyanisScribe::Core::OcrLine line;
+                line.boundingBox = box;
+                line.words.push_back({text, box});
+                result.lines.push_back(line);
+            };
+            addLine(QStringLiteral("已保存到截图目录"), QRect{24, 28, 360, 34});
+            addLine(QStringLiteral("Saved to the screenshot folder"), QRect{24, 74, 420, 30});
+            GyanisScribe::Gui::OcrResultWindow window{syntheticScreen({720, 480}), result, icons, theme};
+            window.show();
+            shoot(window, outputDirectory, (prefix + "ocr-result-window").c_str());
+        }
+
+        // 录屏控制条：倒计时 / 在录（9 秒与 605 秒两档看秒数抖不抖宽）/ 暂停
+        {
+            GyanisScribe::Gui::RecordingHud hud{icons, screen};
+            hud.show();
+            hud.applyState(GyanisScribe::Core::RecordingState::Countdown, 3, 0);
+            shoot(hud, outputDirectory, (prefix + "hud-countdown").c_str());
+            hud.applyState(GyanisScribe::Core::RecordingState::Recording, 0, 9);
+            shoot(hud, outputDirectory, (prefix + "hud-recording-9s").c_str());
+            hud.applyState(GyanisScribe::Core::RecordingState::Recording, 0, 605);
+            shoot(hud, outputDirectory, (prefix + "hud-recording-605s").c_str());
+            hud.applyState(GyanisScribe::Core::RecordingState::Paused, 0, 605);
+            shoot(hud, outputDirectory, (prefix + "hud-paused").c_str());
+        }
+
+        // Toast：三类各拍一张气泡本体
+        {
+            GyanisScribe::Gui::Toast toast{icons, theme};
+            const auto              shootToast = [&](const GyanisScribe::Gui::ToastKind kind, const char *name, const QString &text)
+            {
+                toast.show(text, kind);
+                if (auto *bubble = toastBubble(); bubble != nullptr)
+                {
+                    shoot(*bubble, outputDirectory, (prefix + "toast-" + name).c_str());
+                }
+            };
+            shootToast(GyanisScribe::Gui::ToastKind::Information, "information", QStringLiteral("正在识别这一张…"));
+            shootToast(GyanisScribe::Gui::ToastKind::Success, "success", QStringLiteral("已保存到截图目录"));
+            shootToast(GyanisScribe::Gui::ToastKind::Danger, "danger", QStringLiteral("截图失败：屏幕已不在"));
+        }
     }
 } // namespace
 
@@ -193,6 +317,53 @@ int main(int argc, char *argv[])
             }
         }
 
+        // 历史页两态：空态（还没记过任何一条）与有内容态（两条成品已落盘并记账）
+        window.open(GyanisScribe::Main::MainWindowPage::History);
+        shoot(window, outputDirectory, "history-empty");
+        {
+            const auto shotFile = dataDirectory / "history-shot.png";
+            const auto clipFile = dataDirectory / "history-clip.mp4";
+            syntheticScreen({320, 200}).save(QString::fromUtf8(shotFile.string().c_str()));
+            {
+                std::ofstream dummy{clipFile, std::ios::binary};
+                dummy << "not a real video";
+            }
+            const auto policy = GyanisScribe::Core::policyFromSettings(settings);
+            const auto now    = QDateTime::currentDateTime();
+            static_cast<void>(history.append({now.addSecs(-3600), GyanisScribe::Core::HistoryKind::Screenshot, shotFile, QSize{2560, 1440}}, policy, now));
+            static_cast<void>(history.append({now.addSecs(-120), GyanisScribe::Core::HistoryKind::Recording, clipFile, QSize{1920, 1080}}, policy, now));
+            window.refreshHistory();
+            shoot(window, outputDirectory, "history-filled");
+        }
+
+        // 「更多」菜单：离屏尽力拍——拍不出可信的图就明说，不当成图（菜单实机可补拍）
+        if (auto *moreMenu = window.findChild<QMenu *>(); moreMenu != nullptr)
+        {
+            moreMenu->ensurePolished();
+            moreMenu->adjustSize();
+            const auto menuShot = moreMenu->grab();
+            if (!menuShot.isNull() && menuShot.width() > 0 && menuShot.height() > 0)
+            {
+                menuShot.save(QString::fromUtf8((outputDirectory / "menu-more.png").string().c_str()));
+                std::printf("menu-more: actual=%dx%d（离屏直接 grab，未经 popup；观感结论以实机为准）\n", menuShot.width(), menuShot.height());
+            } else
+            {
+                std::printf("menu-more: 离屏拍不出（未验，留给实机走查）\n");
+            }
+        }
+
+        // 设置页滚动条出现态（UI-04 两态对照）：把窗口压矮到内容装不下
+        window.resize(680, 420);
+        window.open(GyanisScribe::Main::MainWindowPage::General);
+        shoot(window, outputDirectory, "main-general-scrolled");
+
+        // 文档档 1000×680 的对照（跨页量尺与动作栏判据的宽窗侧）
+        window.resize(1000, 680);
+        window.open(GyanisScribe::Main::MainWindowPage::General);
+        shoot(window, outputDirectory, "main-general-wide");
+        window.open(GyanisScribe::Main::MainWindowPage::Capture);
+        shoot(window, outputDirectory, "main-capture-wide");
+
         // 面 4：深色与高对比度档的对应图（换肤观感核对；浅色已在前面出过）
         for (const auto &[mode, name]: std::array<std::pair<const char *, const char *>, 2>{{{"Dark", "dark"}, {"HighContrast", "hc"}}})
         {
@@ -207,6 +378,18 @@ int main(int argc, char *argv[])
             GyanisScribe::Gui::AnnotationToolbar toolbar{settings, icons, nullptr};
             toolbar.show();
             shoot(toolbar, outputDirectory, std::format("theme-{}-toolbar", name).c_str());
+        }
+
+        // 面 5：浮窗族三档主题全过（P4 矩阵；浅色那一趟同时供 P2 判定用）
+        for (const auto &[mode, name]: std::array<std::pair<const char *, const char *>, 3>{{{"Light", "light"}, {"Dark", "dark"}, {"HighContrast", "hc"}}})
+        {
+            if (const auto written = settings.setValue(GyanisScribe::Core::kThemeMode, QString::fromUtf8(mode)); !written)
+            {
+                std::fprintf(stderr, "failed to switch the theme\n");
+                return 1;
+            }
+            theme.applyFromSettings();
+            shootFloatingFaces(settings, icons, theme, *integration, outputDirectory, std::format("theme-{}-", name));
         }
     }
 
