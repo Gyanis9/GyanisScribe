@@ -178,6 +178,32 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住旋转后窗口的外接框包得住图，且中心不动（界面审查 UI-40）
+     * @details 图是 40×20：转 90° 后轴对齐外接框应是 20×40；45° 时两边都是
+     *          (40+20)/√2≈42.4。外接框不跟着换，四个角就会被窗口裁掉；中心不守，
+     *          转一下整张图会从原处游走。
+     */
+    TEST_F(PinWindowFixture, RotationEnvelopeGrowsToHoldTheImageAndKeepsTheCenter)
+    {
+        QImage wide{QSize{40, 20}, QImage::Format_ARGB32};
+        wide.fill(QColor{60, 120, 200});
+        wide.setDevicePixelRatio(1.0);
+        auto &window = makeWindow(wide);
+        ASSERT_EQ(window.size(), QSize(40, 20)) << "前提不对：起始窗口该是图片尺寸";
+
+        const QPoint center = window.geometry().center();
+        pressKey(window, Qt::Key_R);
+        EXPECT_EQ(window.size(), QSize(20, 40)) << "转了 90° 外接框没跟着换边";
+        EXPECT_LE((window.geometry().center() - center).manhattanLength(), 1) << "旋转把中心挪走了";
+
+        window.setRotationDegrees(45.0);
+        // 42.4 取整到轴对齐矩形会往外多包一两像素，容差 2 只放过这类取整
+        EXPECT_NEAR(window.width(), 42, 2) << "45° 外接框宽应是 (40+20)/√2";
+        EXPECT_NEAR(window.height(), 42, 2) << "45° 外接框高应是 (40+20)/√2";
+        EXPECT_LE((window.geometry().center() - center).manhattanLength(), 1) << "细调旋转把中心挪走了";
+    }
+
+    /**
      * @brief 钉住角度折进 [0,360)：从 0 逆时针一挡要落到 270 而不是 -90
      * @details 角度这一格会被序列化进恢复布局，负值写进去下次读回来就是「形状对不上」。
      */
