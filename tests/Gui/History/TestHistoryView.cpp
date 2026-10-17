@@ -8,6 +8,8 @@
 #include <gtest/gtest.h>
 
 #include <QApplication>
+#include <QLabel>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QColor>
 #include <QDateTime>
@@ -168,6 +170,33 @@ TEST_F(HistoryViewFixture, EmptyListGuidesInsteadOfActing)
     clear->click();
     EXPECT_EQ(clears, 0) << "空列表还去弹确认框";
     EXPECT_NE(guidance.indexOf(QStringLiteral("空")), -1) << guidance.toStdString();
+}
+
+/**
+ * @brief 钉住空列表与「筛不出记录」各有自己的引导句（界面审查 UI-64）
+ * @details 一片白卡读起来像记录丢了或窗体坏了；两种空又不该共用一句——筛选没命中时说
+ *          「还没有记录」是在撒谎。判据读的是视口里那句提示的文字与显示态。
+ */
+TEST_F(HistoryViewFixture, EmptyListAndNoMatchesExplainThemselves)
+{
+    auto view = makeView();
+    view->refresh();
+    auto *hint = view->findChild<QLabel *>(QStringLiteral("pageHint"));
+    ASSERT_NE(hint, nullptr) << "空态没有引导句";
+    EXPECT_FALSE(hint->isHidden()) << "空列表时引导句没露出来";
+    EXPECT_NE(hint->text().indexOf(QStringLiteral("还没有记录")), -1) << hint->text().toStdString();
+
+    const auto artifact = writeImageArtifact(m_directory, "kept.png", {320, 200});
+    addRecord(artifact, HistoryKind::Screenshot, kNow);
+    view->refresh();
+    EXPECT_TRUE(hint->isHidden()) << "有记录时引导句还盖在列表上";
+
+    auto *search = view->findChild<QLineEdit *>();
+    ASSERT_NE(search, nullptr);
+    search->setText(QStringLiteral("no-such-file"));
+    EXPECT_EQ(view->rowCount(), 0);
+    EXPECT_FALSE(hint->isHidden()) << "筛不出记录时没有提示";
+    EXPECT_NE(hint->text().indexOf(QStringLiteral("没有符合条件")), -1) << hint->text().toStdString();
 }
 
 /**

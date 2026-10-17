@@ -22,6 +22,8 @@
 #include <filesystem>
 #include <optional>
 
+class QEvent;
+class QLabel;
 class QLineEdit;
 class QListWidget;
 class QComboBox;
@@ -148,9 +150,16 @@ namespace GyanisScribe::Gui
          */
         void messageForUser(const QString &message, Gui::ToastKind kind);
 
+    protected:
+        /// 列表视口改尺寸时把空态提示重新摆到中央
+        bool eventFilter(QObject *watched, QEvent *event) override;
+
     private:
         /// 按当前搜索词与类别重填列表，不动 m_entries
         void refillList();
+
+        /// 把空态提示铺满列表视口的内侧（居中由标签自己的对齐做）
+        void placeEmptyHint();
 
         /// 读缩略图；读不到就退回这一类的图标
         [[nodiscard]] QIcon iconFor(const Core::HistoryEntry &entry) const;
@@ -158,13 +167,14 @@ namespace GyanisScribe::Gui
         /// 删除选中项：先去掉记录，再刷新列表
         void removeSelected();
 
-        Core::HistoryStore          &m_store;            ///< 历史清单
-        Core::HistoryRetentionPolicy m_policy;           ///< 读清单时用的保留策略
-        Gui::IconProvider           &m_icons;            ///< 图标供给器
-        QVector<Core::HistoryEntry>  m_entries;          ///< 本次读到的全量记录，时间倒序
-        QLineEdit                   *m_search = nullptr; ///< 搜索框
-        QComboBox                   *m_filter = nullptr; ///< 类别筛选下拉
-        QListWidget                 *m_list   = nullptr; ///< 缩略图列表
+        Core::HistoryStore          &m_store;               ///< 历史清单
+        Core::HistoryRetentionPolicy m_policy;              ///< 读清单时用的保留策略
+        Gui::IconProvider           &m_icons;               ///< 图标供给器
+        QVector<Core::HistoryEntry>  m_entries;             ///< 本次读到的全量记录，时间倒序
+        QLineEdit                   *m_search    = nullptr; ///< 搜索框
+        QComboBox                   *m_filter    = nullptr; ///< 类别筛选下拉
+        QListWidget                 *m_list      = nullptr; ///< 缩略图列表
+        QLabel                      *m_emptyHint = nullptr; ///< 列表为空/筛不出时的引导句
     };
 
 } // namespace GyanisScribe::Gui

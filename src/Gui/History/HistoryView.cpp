@@ -5,12 +5,15 @@
 #include "Base/Text.h"
 #include "Core/History/HistoryThumbnail.h"
 #include "Gui/Resources/IconProvider.h"
+#include "Gui/Theme/DesignTokens.h"
 
 #include <QComboBox>
 #include <QDateTime>
+#include <QEvent>
 #include <QHBoxLayout>
 #include <QIcon>
 #include <QImageReader>
+#include <QLabel>
 #include <QLineEdit>
 #include <QPixmap>
 #include <QListWidget>
@@ -144,6 +147,17 @@ namespace GyanisScribe::Gui
         m_list->setAccessibleName(GyanisScribe::Base::uiText("历史列表"));
         root->addWidget(m_list, 1);
 
+        // 空列表给一句引导（界面审查 UI-64）：一片白卡读起来像记录丢了或窗体坏了。
+        // 提示挂在视口上并居中、不吃鼠标：列表的卡片底与圆角仍由 QSS 画
+        m_emptyHint = new QLabel{m_list->viewport()};
+        m_emptyHint->setObjectName(QStringLiteral("pageHint"));
+        m_emptyHint->setAccessibleName(GyanisScribe::Base::uiText("历史空态提示"));
+        m_emptyHint->setAlignment(Qt::AlignCenter);
+        m_emptyHint->setWordWrap(true);
+        m_emptyHint->setAttribute(Qt::WA_TransparentForMouseEvents);
+        m_list->viewport()->installEventFilter(this);
+        m_emptyHint->setVisible(m_list->count() == 0);
+
         QObject::connect(m_search, &QLineEdit::textChanged, this, [this] { refillList(); });
         QObject::connect(m_filter, &QComboBox::currentIndexChanged, this, [this] { refillList(); });
         QObject::connect(pinButton, &QPushButton::clicked, this,
@@ -218,6 +232,21 @@ namespace GyanisScribe::Gui
         refillList();
     }
 
+    bool HistoryView::eventFilter(QObject *watched, QEvent *event)
+    {
+        if (watched == m_list->viewport() && event->type() == QEvent::Resize)
+        {
+            placeEmptyHint();
+        }
+        return QWidget::eventFilter(watched, event);
+    }
+
+    void HistoryView::placeEmptyHint()
+    {
+        const QRect area = m_list->viewport()->rect();
+        m_emptyHint->setGeometry(area.adjusted(kSpacingLarge, kSpacingLarge, -kSpacingLarge, -kSpacingLarge));
+    }
+
     int HistoryView::rowCount() const
     {
         return m_list == nullptr ? 0 : m_list->count();
@@ -255,6 +284,16 @@ namespace GyanisScribe::Gui
             item->setData(kPathRole, GyanisScribe::Base::Paths::toDisplayText(entry.filePath));
             item->setToolTip(GyanisScribe::Base::Paths::toDisplayText(entry.filePath) + GyanisScribe::Base::uiText("（删除只从历史里去掉这条，成品文件留在原处）"));
             m_list->addItem(item);
+        }
+
+        // 两种「列表是空的」分开说：真没有记录，与筛选后没有命中——后者说「还没有记录」就是撒谎
+        m_emptyHint->setText(m_entries.isEmpty() ? GyanisScribe::Base::uiText("还没有记录。截一张图或录一段屏，成品会出现在这里。")
+                                                 : GyanisScribe::Base::uiText("没有符合条件的记录，换个关键词或类别试试。"));
+        m_emptyHint->setVisible(m_list->count() == 0);
+        if (m_list->count() == 0)
+        {
+            placeEmptyHint();
+            m_emptyHint->raise();
         }
     }
 
