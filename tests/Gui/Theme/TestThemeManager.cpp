@@ -38,6 +38,9 @@
 #include <QPushButton>
 #include <QSlider>
 #include <QSpinBox>
+#include <QStyle>
+#include <QStyleOptionSlider>
+
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -171,9 +174,9 @@ namespace
         int m_changes; ///< themeChanged 的计数，用例据此判「只在真变了时才发」
 
     private:
-        std::filesystem::path                                   m_iniPath; ///< 本用例专属的临时 INI
+        std::filesystem::path                               m_iniPath; ///< 本用例专属的临时 INI
         std::unique_ptr<GyanisScribe::Core::ISettingsStore> m_store;   ///< 配置后端
-        std::unique_ptr<ThemeManager>                           m_manager; ///< 被测管理器
+        std::unique_ptr<ThemeManager>                       m_manager; ///< 被测管理器
     };
 
 } // namespace
@@ -519,4 +522,91 @@ TEST_F(ThemeManagerFixture, ExistingWidgetsRepaintWithTheNewThemeText)
 
     EXPECT_EQ(heading.palette().color(QPalette::WindowText), GyanisScribe::Gui::kDarkPalette.text) << "已存在的标签留着旧主题的正文色，深色档下等于看不见字";
     EXPECT_EQ(editor->palette().color(QPalette::PlaceholderText), GyanisScribe::Gui::kDarkPalette.secondaryText) << "占位文字留着旧档的灰";
+}
+
+/**
+ * @brief 钉住勾选框与线宽滑块的键盘焦点看得见（界面审查 UI-53）
+ * @details 这两类控件此前在三份 QSS 里都没有 :focus 形态：Tab 聚焦过去外观毫无变化，
+ *          而高对比度档正是给键盘可辨识用的。两处判据不赌具体坐标：
+ *          勾选框在聚焦前后各抓一次图，数主色像素，聚焦后必须多出来（指示器换主色描边）；
+ *          滑块数的是手柄矩形里的主色，聚焦时必须掉下去（实心手柄翻成底色芯 + 正文色圈）。
+ */
+TEST_F(ThemeManagerFixture, CheckboxAndSliderShowAKeyboardFocusRing)
+{
+    ASSERT_TRUE(manager().setTheme(ThemeKind::HighContrast).has_value());
+    const auto accent = QColor(0x0B, 0x57, 0xD0);
+
+    const auto accentPixels = [&accent](QWidget &widget)
+    {
+        const auto shot  = widget.grab().toImage();
+        int        count = 0;
+        for (int y = 0; y < shot.height(); ++y)
+        {
+            for (int x = 0; x < shot.width(); ++x)
+            {
+                const auto pixel = shot.pixelColor(x, y);
+                if (std::abs(pixel.red() - accent.red()) <= 16 && std::abs(pixel.green() - accent.green()) <= 16 && std::abs(pixel.blue() - accent.blue()) <= 16)
+                {
+                    ++count;
+                }
+            }
+        }
+        return count;
+    };
+
+    QWidget host;
+    auto   *check  = new QCheckBox{QStringLiteral("check"), &host};
+    auto   *slider = new QSlider{Qt::Horizontal, &host};
+    slider->setRange(0, 100);
+    slider->setValue(100); // 手柄推到右端，groove 左段整条露出来
+    check->move(0, 0);
+    slider->move(0, 30);
+    slider->resize(200, 30);
+    host.resize(220, 80);
+    host.show();
+    QCoreApplication::processEvents();
+    // show 之后第一个可聚焦控件（勾选框）会自动拿到焦点：先把焦点清掉，before 才是真「未聚焦」
+    check->clearFocus();
+    slider->clearFocus();
+    QCoreApplication::processEvents();
+
+    // QSS 的控件级边框在 CC_Slider 的自绘路径里不落笔（实测三份样式表都没画），
+    // 焦点形态只能挂在手柄上：聚焦时手柄从「主色实心」翻成「底色芯 + 正文色圈」。
+    // 判据落在手柄自己的矩形里数主色：实心时上百，翻过来之后归零。
+    const auto handleAccentPixels = [&accent](QSlider &widget)
+    {
+        QStyleOptionSlider option;
+        option.initFrom(&widget);
+        option.orientation    = widget.orientation();
+        option.minimum        = widget.minimum();
+        option.maximum        = widget.maximum();
+        option.sliderPosition = widget.sliderPosition();
+        option.sliderValue    = widget.value();
+        const QRect handle    = widget.style()->subControlRect(QStyle::CC_Slider, &option, QStyle::SC_SliderHandle, &widget);
+        const auto  shot      = widget.grab().toImage();
+        int         count     = 0;
+        for (int y = handle.top(); y <= handle.bottom(); ++y)
+        {
+            for (int x = handle.left(); x <= handle.right(); ++x)
+            {
+                const auto pixel = shot.pixelColor(x, y);
+                if (std::abs(pixel.red() - accent.red()) <= 16 && std::abs(pixel.green() - accent.green()) <= 16 && std::abs(pixel.blue() - accent.blue()) <= 16)
+                {
+                    ++count;
+                }
+            }
+        }
+        return count;
+    };
+
+    const int checkBefore  = accentPixels(*check);
+    const int sliderBefore = handleAccentPixels(*slider);
+
+    check->setFocus(Qt::TabFocusReason);
+    QCoreApplication::processEvents();
+    EXPECT_GT(accentPixels(*check), checkBefore + 10) << "勾选框聚焦后没有主色焦点框";
+    slider->setFocus(Qt::TabFocusReason);
+    QCoreApplication::processEvents();
+    EXPECT_GT(sliderBefore, 50) << "未聚焦时手柄本该是主色实心，判据的前提没构造出来";
+    EXPECT_LT(handleAccentPixels(*slider), 10) << "滑块聚焦后手柄外观没变，键盘焦点看不出来";
 }

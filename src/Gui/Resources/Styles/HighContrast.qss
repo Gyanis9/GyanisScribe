@@ -417,3 +417,15 @@ QScrollBar::add-line, QScrollBar::sub-line {
 QScrollBar::add-page, QScrollBar::sub-page {
     background-color: transparent;
 }
+
+/* ---- 键盘焦点：勾选框与滑块此前都没有 :focus 形态（界面审查 UI-53）——Tab 过去外观不变，
+        高对比度档正是给键盘可辨识用的。勾选框给指示器换主色描边；滑块因控件级边框在
+        CC_Slider 的自绘路径里不落笔，焦点改挂在手柄上反转：底色芯 + 正文色圈 ---- */
+QCheckBox::indicator:focus {
+    border: 2px solid #0B57D0;
+}
+
+QSlider::handle:horizontal:focus {
+    background-color: #FFFFFF;
+    border: 2px solid #000000;
+}
