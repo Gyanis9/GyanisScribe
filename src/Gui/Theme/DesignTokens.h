@@ -276,6 +276,9 @@ namespace GyanisScribe::Gui
     /// 一行设置项里字段的最大宽度：路径与下拉拉到整窗宽时，「这一格填什么」就看不出来了
     inline constexpr int kFieldMaximumWidth = 380;
 
+    /// 设置页标签列的最小宽度：全族统一（取最长标签一页），翻页时字段列不再左右跳（界面审查 UI-01）
+    inline constexpr int kSettingsLabelColumnWidth = 240;
+
     /// 页顶说明行的最大宽度：整窗宽的一行长句读起来要回头数，收到这一档就按行折
     inline constexpr int kIntroMaximumWidth = 420;
 

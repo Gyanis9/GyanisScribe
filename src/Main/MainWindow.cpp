@@ -198,6 +198,12 @@ namespace
         {
             for (int row = 0; row < form->rowCount(); ++row)
             {
+                // 标签列宽也收到统一一档（界面审查 UI-01）：QFormLayout 没有列宽接口，
+                // 给每个标签控件一个最小宽即把整列撑到同一档，翻页时字段列不再左右跳
+                if (auto *label = form->itemAt(row, QFormLayout::LabelRole); label != nullptr && label->widget() != nullptr)
+                {
+                    label->widget()->setMinimumWidth(GyanisScribe::Gui::kSettingsLabelColumnWidth);
+                }
                 if (auto *field = form->itemAt(row, QFormLayout::FieldRole); field != nullptr)
                 {
                     if (auto *widget = field->widget(); widget != nullptr)
@@ -2443,6 +2449,9 @@ namespace GyanisScribe::Main
     {
         auto *page   = new QWidget{this};
         auto *layout = new QVBoxLayout{page};
+        // 与表单页同一条内容网格（界面审查 UI-08）：默认边距比表单页小一圈，翻到这一页正文会左跳 7px
+        layout->setContentsMargins(GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge);
+        layout->setSpacing(GyanisScribe::Gui::kSpacingSmall);
 
         auto *logo = new QLabel{page};
         logo->setPixmap(m_icons.pixmap("AppIcon", GyanisScribe::Gui::IconSize::ExtraLarge));
@@ -2485,7 +2494,8 @@ namespace GyanisScribe::Main
 
         layout->addWidget(logo);
         layout->addWidget(text);
-        layout->addWidget(checkButton);
+        // 左对齐到正文左缘：整宽按钮会把标签居中，看着像一条悬空的字
+        layout->addWidget(checkButton, 0, Qt::AlignLeft);
         layout->addWidget(status);
         layout->addStretch();
         return page;

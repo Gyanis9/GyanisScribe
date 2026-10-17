@@ -334,6 +334,74 @@ namespace
     }
 
     /**
+     * @brief 钉住「标签列宽全族统一」（界面审查 UI-01）：翻页时字段列不许左右跳
+     * @details 改之前字段列在各页从 280 跳到 472——统一的标签列宽（kSettingsLabelColumnWidth）
+     *          把八页收到同一列；这条逐页开过去量第一行的字段左缘，任两页差 1px 都算红。
+     */
+    TEST_F(MainWindowFixture, SettingsColumnsShareOneWidthAcrossPages)
+    {
+        makeWindow();
+        std::optional<int> sharedLeft;
+        const auto         pages = {MainWindowPage::General, MainWindowPage::Capture, MainWindowPage::Annotation, MainWindowPage::Pin,
+                                    MainWindowPage::Record,  MainWindowPage::Ocr,     MainWindowPage::Hotkey,     MainWindowPage::Theme};
+        for (const auto page: pages)
+        {
+            m_window->open(page);
+            QCoreApplication::processEvents();
+            auto *current = stack()->currentWidget();
+            ASSERT_NE(current, nullptr);
+            auto *form = current->findChild<QFormLayout *>();
+            ASSERT_NE(form, nullptr);
+            int fieldLeft = -1;
+            for (int row = 0; row < form->rowCount() && fieldLeft < 0; ++row)
+            {
+                const auto *fieldItem = form->itemAt(row, QFormLayout::FieldRole);
+                if (fieldItem != nullptr && fieldItem->widget() != nullptr)
+                {
+                    fieldLeft = fieldItem->widget()->mapTo(m_window.get(), QPoint{0, 0}).x();
+                }
+            }
+            ASSERT_GE(fieldLeft, 0) << "有一页没量到字段列";
+            if (!sharedLeft.has_value())
+            {
+                sharedLeft = fieldLeft;
+            } else
+            {
+                EXPECT_EQ(fieldLeft, *sharedLeft) << "翻页时字段列跳了";
+            }
+        }
+    }
+
+    /**
+     * @brief 钉住关于页与表单页共用同一列内容网格（界面审查 UI-08）
+     * @details 关于页此前用自己的默认边距（内容左缘比表单页小一圈），翻页时正文左跳 7px；
+     *          这条量「关于页第一个正文控件的左缘」与「通用页标签控件的左缘」相等。
+     */
+    TEST_F(MainWindowFixture, AboutPageSharesTheFormsContentGrid)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::General);
+        QCoreApplication::processEvents();
+        auto *general = stack()->currentWidget();
+        ASSERT_NE(general, nullptr);
+        auto *form = general->findChild<QFormLayout *>();
+        ASSERT_NE(form, nullptr);
+        auto *firstLabel = form->itemAt(0, QFormLayout::LabelRole);
+        ASSERT_NE(firstLabel, nullptr);
+        ASSERT_NE(firstLabel->widget(), nullptr);
+        const int formLeft = firstLabel->widget()->mapTo(m_window.get(), QPoint{0, 0}).x();
+
+        m_window->open(MainWindowPage::About);
+        QCoreApplication::processEvents();
+        auto *about = stack()->currentWidget();
+        ASSERT_NE(about, nullptr);
+        auto *aboutLogo = about->findChild<QLabel *>();
+        ASSERT_NE(aboutLogo, nullptr) << "关于页没有正文控件，判据的前提没构造出来";
+        const int aboutLeft = aboutLogo->mapTo(m_window.get(), QPoint{0, 0}).x();
+        EXPECT_EQ(aboutLeft, formLeft) << "关于页正文左缘与表单页的网格对不上";
+    }
+
+    /**
      * @brief 钉住「不透明度数字框的范围」与读端判据同解，并把写进去的值读回来
      * @details 数字框能给出 0 而读端拒 0，用户就会存下一个自己用不了的值；
      *          反过来写通读通才算这一行不是空控件。
