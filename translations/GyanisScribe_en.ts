@@ -1616,8 +1616,8 @@
             <translation>Release to settle · Esc to cancel</translation>
         </message>
         <message>
-            <source>拖四边调整 · Enter/双击确认 · Esc 取消</source>
-            <translation>Drag the edges to adjust · Enter/double-click to confirm · Esc to cancel</translation>
+            <source>拖四边调整 · 单击选区交出 · Esc 取消</source>
+            <translation>Drag the edges to adjust · click inside to finish · Esc to cancel</translation>
         </message>
         <message>
             <source>选择</source>

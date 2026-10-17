@@ -3,6 +3,7 @@
 #include "Base/SizeText.h"
 
 #include <QImage>
+#include <QPainter>
 #include <QPoint>
 #include <QRect>
 
@@ -811,4 +812,32 @@ TEST(SizeTextScaleRatio, AcceptsTheThreeFormsAndRejectsJunk)
     // 「宽x高」那一形不能被这一条吃掉：两条解析各管各的
     EXPECT_FALSE(GyanisScribe::Base::parseScaleRatio(QStringLiteral("640x360")).has_value()) << "尺寸那一形该由 parseSizeText 接";
     EXPECT_TRUE(GyanisScribe::Base::parseSizeText(QStringLiteral("640x360")).has_value());
+}
+
+/**
+ * @brief 钉住全黑帧的识别：DXGI 偶发全黑时要能回落到 Qt 再抓
+ * @details 只抽样判，整片黑与近黑都算；有一块亮区就不算。空图按全黑处理，
+ *          因为「没抓到」同样不能当成一张好帧交出去。
+ */
+TEST(ScreenUtils, DetectsUniformBlackFrames)
+{
+    QImage black{320, 200, QImage::Format_ARGB32};
+    black.fill(Qt::black);
+    EXPECT_TRUE(GyanisScribe::Core::imageLooksAllBlack(black));
+
+    QImage nearBlack{320, 200, QImage::Format_ARGB32};
+    nearBlack.fill(QColor(3, 4, 5));
+    EXPECT_TRUE(GyanisScribe::Core::imageLooksAllBlack(nearBlack)) << "阈值内的近黑也是坏帧";
+
+    QImage white{320, 200, QImage::Format_ARGB32};
+    white.fill(Qt::white);
+    EXPECT_FALSE(GyanisScribe::Core::imageLooksAllBlack(white));
+
+    QImage   mostlyBlack = black;
+    QPainter painter{&mostlyBlack};
+    painter.fillRect(QRect{100, 60, 50, 50}, Qt::white);
+    painter.end();
+    EXPECT_FALSE(GyanisScribe::Core::imageLooksAllBlack(mostlyBlack)) << "有一块亮区就不该被当成全黑";
+
+    EXPECT_TRUE(GyanisScribe::Core::imageLooksAllBlack(QImage{})) << "空图按没抓到处理";
 }

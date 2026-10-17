@@ -431,6 +431,13 @@ namespace GyanisScribe::Plugins
             Base::Logger::warning(std::format("DXGI 抓帧回落到 Qt：{}", grabbed.error().message));
             return m_qtFallback->grabScreen(target->name());
         }
+        if (Core::imageLooksAllBlack(*grabbed))
+        {
+            // 托盘菜单/桌面合成切换的瞬间，DXGI 偶尔交回一整帧黑：它不是「用户桌面是黑的」，
+            // 落进遮罩就会先看到全黑再截出黑图。改用 Qt 的原语再抓一次，真黑屏也会原样交回。
+            Base::Logger::warning("DXGI 抓帧拿到全黑帧，改用 Qt 抓帧一次");
+            return m_qtFallback->grabScreen(target->name());
+        }
 
         return Core::frameFromGrabbedImage(*grabbed, target, target->geometry().size());
     }

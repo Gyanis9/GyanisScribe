@@ -69,6 +69,28 @@ namespace GyanisScribe::Core
         return cropped;
     }
 
+    bool imageLooksAllBlack(const QImage &image, const int tolerance)
+    {
+        if (image.isNull())
+        {
+            return true;
+        }
+        const int stepX = std::max(1, image.width() / 32);
+        const int stepY = std::max(1, image.height() / 32);
+        for (int y = 0; y < image.height(); y += stepY)
+        {
+            for (int x = 0; x < image.width(); x += stepX)
+            {
+                const auto color = image.pixelColor(x, y);
+                if (color.red() > tolerance || color.green() > tolerance || color.blue() > tolerance)
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     QScreen *screenByName(const QString &screenName)
     {
         for (auto *screen: QGuiApplication::screens())

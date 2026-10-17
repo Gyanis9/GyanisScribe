@@ -1140,6 +1140,33 @@ TEST_F(CaptureOverlayFixture, ReleasingKeepsTheSelectionAdjustable)
 }
 
 /**
+ * @brief 钉住选区内单击就交出（用户 2026-10-17 直报：不必只认 Enter/双击）
+ * @details 按下不动、原地松开＝单击；真拖起来仍然走整块平移，不会误交。
+ */
+TEST_F(CaptureOverlayFixture, SingleClickInsideConfirmsTheSelection)
+{
+    auto overlay = makeOverlay();
+    buttonAt(*overlay, QEvent::MouseButtonPress, QPoint{100, 120});
+    moveOver(*overlay, QPoint{400, 300});
+    buttonAt(*overlay, QEvent::MouseButtonRelease, QPoint{400, 300});
+
+    int   emitted = 0;
+    QRect confirmed;
+    QObject::connect(overlay.get(), &CaptureOverlay::regionSelected, overlay.get(),
+                     [&emitted, &confirmed](const QRect &value)
+                     {
+                         ++emitted;
+                         confirmed = value;
+                     });
+
+    buttonAt(*overlay, QEvent::MouseButtonPress, QPoint{250, 200});
+    buttonAt(*overlay, QEvent::MouseButtonRelease, QPoint{250, 200});
+
+    EXPECT_EQ(emitted, 1) << "选区内单击没有交出选区";
+    EXPECT_EQ(confirmed, QRect(100, 120, 301, 181));
+}
+
+/**
  * @brief 抓点调整的松手不算确认：方向键/抓点那套留给键盘造出的选区
  */
 TEST_F(CaptureOverlayFixture, ReleasingAGripAdjustmentDoesNotConfirm)

@@ -12,6 +12,7 @@
 #include "Core/Capture/IScreenCaptureSource.h"
 #include "Base/Types.h"
 
+#include <QImage>
 #include <QLine>
 #include <QPoint>
 #include <QRect>
@@ -61,6 +62,16 @@ namespace GyanisScribe::Core
      * @return 失败返回 ScreenUnavailable，文案指出选区超出哪一条边
      */
     [[nodiscard]] Base::Expected<Base::CapturedImage> cropToLogicalRect(const Base::CapturedImage &source, const QRect &logicalRegion);
+
+    /**
+     * @brief 判断一张抓帧是不是整片全黑
+     * @param image 待判的抓帧；空图按全黑处理
+     * @param tolerance 每通道允许的亮度上限（0–255）
+     * @return 抽样点全部落在阈值内返回 true
+     * @details 只按 32×32 的网格抽样：4K 帧逐像素扫要多花几毫秒，而这里只用来识别
+     *          DXGI 在托盘菜单/桌面合成切换时偶发的全黑帧，代价是回落到 Qt 再抓一次。
+     */
+    [[nodiscard]] bool imageLooksAllBlack(const QImage &image, int tolerance = 8);
 
     /**
      * @brief 按屏幕名取屏幕
