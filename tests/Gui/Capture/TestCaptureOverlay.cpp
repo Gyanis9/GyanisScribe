@@ -1103,3 +1103,65 @@ TEST_F(CaptureOverlayFixture, ConfirmHintRidesUnderTheSizeReadout)
     }
     EXPECT_GT(bright, 30) << "尺寸读数下一行没有确认提示：新用户看不出拖完框之后怎么确认";
 }
+
+/**
+ * @brief 钉住「松开鼠标就交出选区」（用户 2026-10-17 直报第 1 条）
+ * @details 此前松手只停手，还要再双击或 Enter；用户要的是拖完即定。
+ */
+TEST_F(CaptureOverlayFixture, MouseReleaseConfirmsTheDrawnRegion)
+{
+    auto  overlay = makeOverlay();
+    int   emitted = 0;
+    QRect region;
+    QObject::connect(overlay.get(), &CaptureOverlay::regionSelected, overlay.get(),
+                     [&emitted, &region](const QRect &value)
+                     {
+                         ++emitted;
+                         region = value;
+                     });
+
+    buttonAt(*overlay, QEvent::MouseButtonPress, QPoint{100, 120});
+    moveOver(*overlay, QPoint{400, 300});
+    buttonAt(*overlay, QEvent::MouseButtonRelease, QPoint{400, 300});
+
+    EXPECT_EQ(emitted, 1) << "松手没有交出选区，还得再点一下";
+    EXPECT_EQ(region, QRect(100, 120, 301, 181));
+}
+
+/**
+ * @brief 钉住「点一下悬停的窗口」也当场交出，而不是停在可调选区
+ */
+TEST_F(CaptureOverlayFixture, ClickWithoutDragConfirmsTheHoveredWindow)
+{
+    auto  overlay = makeOverlay();
+    QRect region;
+    overlay->setWindowCandidates(kCandidates);
+    QObject::connect(overlay.get(), &CaptureOverlay::regionSelected, overlay.get(), [&region](const QRect &value) { region = value; });
+
+    moveOver(*overlay, QPoint{200, 160});
+    buttonAt(*overlay, QEvent::MouseButtonPress, QPoint{200, 160});
+    buttonAt(*overlay, QEvent::MouseButtonRelease, QPoint{200, 160});
+
+    EXPECT_EQ(region, QRect(180, 150, 100, 80));
+}
+
+/**
+ * @brief 抓点调整的松手不算确认：方向键/抓点那套留给键盘造出的选区
+ */
+TEST_F(CaptureOverlayFixture, ReleasingAGripAdjustmentDoesNotConfirm)
+{
+    auto overlay = makeOverlay();
+    int  emitted = 0;
+    QObject::connect(overlay.get(), &CaptureOverlay::regionSelected, overlay.get(), [&emitted](const QRect &) { ++emitted; });
+
+    // Ctrl+A 先造一块整屏选区（键盘路径，不经过鼠标松开）
+    QKeyEvent selectAll{QEvent::KeyPress, Qt::Key_A, Qt::ControlModifier};
+    QApplication::sendEvent(overlay.get(), &selectAll);
+    ASSERT_FALSE(overlay->selectedRegion().isNull());
+
+    buttonAt(*overlay, QEvent::MouseButtonPress, QPoint{799, 599});
+    moveOver(*overlay, QPoint{700, 500});
+    buttonAt(*overlay, QEvent::MouseButtonRelease, QPoint{700, 500});
+
+    EXPECT_EQ(emitted, 0) << "拖抓点松手被当成了确认";
+}

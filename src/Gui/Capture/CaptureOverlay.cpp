@@ -468,7 +468,7 @@ namespace GyanisScribe::Gui
             painter.drawText(hintRect, Qt::AlignCenter, hint);
 
             // 确认/取消怎么写常驻读数下一行：新用户拖完框最容易停在「然后呢」上（审查台账 UI-33）
-            const auto  confirmText = GyanisScribe::Base::uiText("双击或 Enter 确认 · Esc 取消");
+            const auto  confirmText = m_isSelecting ? GyanisScribe::Base::uiText("松手即完成 · Esc 取消") : GyanisScribe::Base::uiText("Enter / 双击确认 · 方向键微调 · Esc 取消");
             const auto  confirmSize = metrics.size(Qt::TextSingleLine, confirmText);
             const QRect confirmRect(hintTopLeft + QPoint(0, textSize.height() + kCopiedHintGap),
                                     confirmSize + QSize(GyanisScribe::Gui::kHintPadding * 2, GyanisScribe::Gui::kHintPadding));
@@ -629,6 +629,10 @@ namespace GyanisScribe::Gui
                 m_historyIndex = -1; // 采纳的是悬停候选，不是历史里那一条
             }
             update();
+            // 松手即完成：选区范围在这一刻定下来，不再等第二次点击或 Enter。
+            // 抓点调整走在上面 m_isAdjusting 那一支，不会走到这里；Ctrl+A / R / S 造出的
+            // 键盘选区也不经过鼠标松开，因此仍可微调后按 Enter/双击确认。
+            confirmSelection();
         }
     }
 
