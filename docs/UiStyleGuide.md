@@ -160,8 +160,12 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 
 - 每个动作都有键盘路径：全局热键见 README 的热键表，界面内 `Enter`/`Esc`/`Tab` 顺序由 QSS 的
   `:focus` 焦点圈（主色描边）体现，`QPushButton:default` 给主操作单独配色。
-- 焦点可见性是硬要求：`:focus` 规则在三份 QSS 里都在；高对比度档把边框加粗到 2px，
-  这条由 `ThemeManagerFixture` 在样式表文本里核（`2PX SOLID`）。
+- 焦点可见性是硬要求：`:focus` 规则在三份 QSS 里都在；高对比度档把边框加粗到 2px。
+  样式表文本由 `ThemeManagerFixture` 核（`2PX SOLID`），画出来的像素由
+  `CheckboxAndSliderShowAKeyboardFocusRing` 核勾选框与滑块的焦点形态。
+  滑块有一条实现约束：QSS 的控件级边框在 `CC_Slider` 的自绘路径里不落笔（换背景色、
+  补 `WA_StyledBackground` 都不救），焦点只能挂在 `::handle:horizontal:focus` 上做反转
+  （底色芯 + 正文色圈）；别把它「统一」回 `QSlider:focus` 的写法。
 - 图标全部原创 SVG（24 视框、`currentColor` 描边），描边色由 `IconProvider` 按主题注入；
   用例 `IconProviderFixture` 数的是真的画出来的像素，不是文件名。整套图的画法规格（2026-10-12 全量重绘后）：
   - 网格与安全区：24 视框，内容（含 0.75 描边外缘）压在 **2..22**；直线优先落在整数或 0.5 格点上，
