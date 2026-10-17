@@ -1399,6 +1399,38 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住悬停边缘随进入/离开切换，连着十轮不抖（界面审查 UI-40）
+     * @details 悬停边框由 underMouse() 直接算出来，没有定时器与动画：判据每一轮取贴图
+     *          左缘那一个像素——进入必须是强调色、离开必须回到图自己的色。掉一轮就是
+     *          「进出时闪一下」的形态；两态之间没有第三个中间态。
+     */
+    TEST_F(PinWindowFixture, HoverBorderSwitchesOnEveryEnterAndLeave)
+    {
+        auto &window = makeWindow();
+
+        const auto edgeColor = [&window]
+        {
+            QImage canvas{window.size(), QImage::Format_ARGB32};
+            canvas.fill(Qt::transparent);
+            window.render(&canvas);
+            return canvas.pixelColor(0, window.height() / 2);
+        };
+        const QColor imageEdge{200, 60, 60};
+        ASSERT_EQ(edgeColor(), imageEdge) << "没悬停时边缘该是图自己的色，后面的对照没有基准";
+
+        for (int round = 0; round < 10; ++round)
+        {
+            QEnterEvent enter{QPointF{1.0, 1.0}, QPointF{1.0, 1.0}, QPointF{1.0, 1.0}};
+            QApplication::sendEvent(&window, &enter);
+            EXPECT_NE(edgeColor(), imageEdge) << "第 " << round << " 轮进入后边缘没换色";
+
+            QEvent leave{QEvent::Leave};
+            QApplication::sendEvent(&window, &leave);
+            EXPECT_EQ(edgeColor(), imageEdge) << "第 " << round << " 轮离开后边框还留着";
+        }
+    }
+
+    /**
      * @brief 2×2 的四格图：左上红、右上绿、左下蓝、右下黄——翻转与滤镜在屏上都能一眼读数
      */
     QImage makeQuadImage()
