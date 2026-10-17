@@ -9,6 +9,7 @@
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Gui/Resources/IconProvider.h"
+#include "Gui/Theme/DesignTokens.h"
 #include "Gui/Theme/ThemeManager.h"
 
 #include <QAction>
@@ -137,6 +138,9 @@ namespace GyanisScribe::App
             QObject::connect(m_icon, &QSystemTrayIcon::activated, this, &TrayController::onActivated);
         }
         m_menu->clear();
+        auto menuFont = m_menu->font();
+        menuFont.setPointSize(GyanisScribe::Gui::kMenuTextPointSize);
+        m_menu->setFont(menuFont);
 
         // 托盘描边色跟着主题走：深色任务栏上的深色图标会完全看不见
         m_icons.setTintColor(m_theme.iconTint());

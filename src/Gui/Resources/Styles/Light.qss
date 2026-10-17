@@ -40,25 +40,25 @@ QLabel:disabled {
     color: #495358;
 }
 
-/* ---- 按钮：次级是透明底、悬停才显玻璃块；主按钮（default）走主色填充 ----
-   边框一律占 2px：焦点环与悬停都只换颜色，按下去不会整块抖一格 */
+/* ---- 按钮：次级是透明底 + 一档常驻描边（平时也看得见边界），悬停只换底；
+        主按钮（default）走主色填充。次级按钮的边框宽度不随状态变化 ---- */
 QPushButton {
     background-color: transparent;
     color: #101418;
-    border: 2px solid transparent;
+    border: 1px solid #D6D9DA;
     border-radius: 12px;
     padding: 0 15px;
-    min-height: 32px;
+    min-height: 28px;
 }
 
 QPushButton:hover {
     background-color: #F2F3F3;
-    border-color: #E4E7E7;
+    border-color: #D6D9DA;
 }
 
 QPushButton:pressed {
     background-color: #ECEDEE;
-    border-color: #E4E7E7;
+    border-color: #D6D9DA;
 }
 
 QPushButton:focus {
@@ -68,13 +68,13 @@ QPushButton:focus {
 QPushButton:disabled {
     background-color: transparent;
     color: #495358;
-    border-color: transparent;
+    border-color: #E4E7E7;
 }
 
 QPushButton:default {
     background-color: #236DE9;
     color: #FFFFFF;
-    border-color: #236DE9;
+    border: 2px solid #236DE9;
 }
 
 QPushButton:default:hover {
@@ -284,11 +284,11 @@ QMenu {
     background-color: #FBFCFC;
     border: 1px solid #E4E7E7;
     border-radius: 16px;
-    padding: 6px;
+    padding: 4px;
 }
 
 QMenu::item {
-    padding: 6px 24px 6px 10px;
+    padding: 4px 18px 4px 8px;
     border-radius: 8px;
     color: #101418;
 }
@@ -305,7 +305,7 @@ QMenu::item:disabled {
 QMenu::separator {
     height: 1px;
     background-color: #E4E7E7;
-    margin: 4px 8px;
+    margin: 2px 6px;
 }
 
 QToolTip {

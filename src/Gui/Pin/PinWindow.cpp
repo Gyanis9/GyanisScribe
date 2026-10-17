@@ -2102,7 +2102,10 @@ namespace GyanisScribe::Gui
 
     QMenu *PinWindow::buildContextMenu()
     {
-        auto *menu = new QMenu(this);
+        auto *menu     = new QMenu(this);
+        auto  menuFont = menu->font();
+        menuFont.setPointSize(GyanisScribe::Gui::kMenuTextPointSize);
+        menu->setFont(menuFont);
 
         // 多选里的这一张：菜单头上一句读数，末尾一项取消选择；下面那些状态开关对整组生效
         const bool inMultiSelection = m_selected && m_selectionCount > 1;

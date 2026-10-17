@@ -478,6 +478,50 @@ TEST_F(ThemeManagerFixture, WidgetsRenderThePaletteSurfacePerTheme)
 }
 
 /**
+ * @brief 钉住次级按钮平时就有可见描边（用户 2026-10-17 直报第 6 条）
+ * @details 此前基础规则是 2px 透明边框，只有悬停/聚焦才显形；「导出配置」「导出色板」
+ *          「检查更新」这类次级按钮于是只剩一串文字。取按钮左缘中点：那一列必须是
+ *          borderStrong，且不能等于按钮背后的 surface。
+ */
+TEST_F(ThemeManagerFixture, SecondaryButtonsKeepAVisibleOutlineAtRest)
+{
+    const auto probe = [](const ThemeKind kind)
+    {
+        application->setStyleSheet(ThemeManager::styleSheetFor(kind));
+        QPushButton button(QStringLiteral("导出配置…"));
+        button.resize(140, 36);
+        button.ensurePolished();
+        const auto image = button.grab().toImage();
+        return image.pixelColor(0, image.height() / 2);
+    };
+
+    const auto light = probe(ThemeKind::Light);
+    const auto dark  = probe(ThemeKind::Dark);
+    const auto hc    = probe(ThemeKind::HighContrast);
+    application->setStyleSheet(QString{});
+
+    EXPECT_EQ(light, paletteFor(ThemeKind::Light).borderStrong) << "浅色档次级按钮左缘没有描边";
+    EXPECT_EQ(dark, paletteFor(ThemeKind::Dark).borderStrong) << "深色档次级按钮左缘没有描边";
+    EXPECT_EQ(hc, paletteFor(ThemeKind::HighContrast).borderStrong) << "高对比度档次级按钮左缘没有描边";
+}
+
+/**
+ * @brief 钉住菜单字号与菜单项内边距（用户 2026-10-17 直报第 2 条）
+ * @details 判据只读三份 QSS 的规则文本：字体由代码按 kMenuTextPointSize 落，
+ *          内边距必须三份同构，否则「菜单变小」只在当前主题上成立。
+ */
+TEST_F(ThemeManagerFixture, MenusUseTheCompactMetrics)
+{
+    EXPECT_EQ(GyanisScribe::Gui::kMenuTextPointSize, 9);
+    for (const auto resource: {std::string_view{":/styles/Light.qss"}, std::string_view{":/styles/Dark.qss"}, std::string_view{":/styles/HighContrast.qss"}})
+    {
+        const auto sheet = readStyleSheet(resource);
+        EXPECT_NE(sheet.indexOf(QStringLiteral("padding: 4px 18px 4px 8px")), -1) << resource;
+        EXPECT_NE(sheet.indexOf(QStringLiteral("margin: 2px 6px")), -1) << resource;
+    }
+}
+
+/**
  * @brief 钉住「切主题时应用调色板跟着换」：原生绘制的那部分只认 QPalette
  * @details 样式表覆盖不到勾选的勾、微调框箭头、占位文字与禁用文字——这些走调色板。
  *          只落样式表时文本比对全绿而界面是浅色原生件，所以这里按角色逐个核到令牌上，

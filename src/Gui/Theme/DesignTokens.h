@@ -273,6 +273,9 @@ namespace GyanisScribe::Gui
     inline constexpr int kSpacingMedium = 12;
     inline constexpr int kSpacingLarge  = 16;
 
+    /// 菜单文字的点值：托盘右键菜单与贴图右键菜单比正文小一档，行高才能收到 24px 左右
+    inline constexpr int kMenuTextPointSize = 9;
+
     /// 一行设置项里字段的最大宽度：路径与下拉拉到整窗宽时，「这一格填什么」就看不出来了
     inline constexpr int kFieldMaximumWidth = 380;
 

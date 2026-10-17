@@ -1718,6 +1718,9 @@ namespace GyanisScribe::Main
         row->setSpacing(GyanisScribe::Gui::kSpacingSmall);
 
         auto *moreMenu = new QMenu{bar};
+        auto  menuFont = moreMenu->font();
+        menuFont.setPointSize(GyanisScribe::Gui::kMenuTextPointSize);
+        moreMenu->setFont(menuFont);
         for (const auto &entry: GyanisScribe::App::visibleTrayMenuEntries(m_capabilities))
         {
             const auto action = entry.action;
