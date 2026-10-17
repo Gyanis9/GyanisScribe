@@ -97,5 +97,8 @@
     <file alias="HighContrast.qss">Styles/HighContrast.qss</file>
     <file alias="CheckmarkOnAccent.svg">Styles/CheckmarkOnAccent.svg</file>
     <file alias="CheckmarkOnAccentDark.svg">Styles/CheckmarkOnAccentDark.svg</file>
+    <file alias="ComboChevronLight.svg">Styles/ComboChevronLight.svg</file>
+    <file alias="ComboChevronDark.svg">Styles/ComboChevronDark.svg</file>
+    <file alias="ComboChevronHighContrast.svg">Styles/ComboChevronHighContrast.svg</file>
   </qresource>
 </RCC>

@@ -13,6 +13,8 @@
 #include <QColor>
 #include <QFile>
 #include <QImage>
+#include <string_view>
+#include <tuple>
 #include <QPalette>
 #include <QPixmap>
 #include <QPushButton>
@@ -518,6 +520,24 @@ TEST_F(ThemeManagerFixture, MenusUseTheCompactMetrics)
         const auto sheet = readStyleSheet(resource);
         EXPECT_NE(sheet.indexOf(QStringLiteral("padding: 4px 18px 4px 8px")), -1) << resource;
         EXPECT_NE(sheet.indexOf(QStringLiteral("margin: 2px 6px")), -1) << resource;
+    }
+}
+
+/**
+ * @brief 钉住下拉框的箭头与自绘微调框同一套 chevron（用户 2026-10-17 直报）
+ * @details 只改 QComboBox 的边框、不接 ::down-arrow 时，原生方角箭头会留在圆角框里；
+ *          三档各自的图片资源也必须真的打进 qrc。
+ */
+TEST_F(ThemeManagerFixture, ComboDropDownUsesTheThemeChevron)
+{
+    const auto cases = {std::tuple{ThemeKind::Light, std::string_view{":/styles/ComboChevronLight.svg"}},
+                        std::tuple{ThemeKind::Dark, std::string_view{":/styles/ComboChevronDark.svg"}},
+                        std::tuple{ThemeKind::HighContrast, std::string_view{":/styles/ComboChevronHighContrast.svg"}}};
+    for (const auto &[kind, asset]: cases)
+    {
+        const auto sheet = ThemeManager::styleSheetFor(kind);
+        EXPECT_NE(sheet.indexOf(QString::fromUtf8(asset.data(), static_cast<qsizetype>(asset.size()))), -1) << "样式表没引用这一档的 chevron";
+        EXPECT_TRUE(QFile{QString::fromUtf8(asset.data(), static_cast<qsizetype>(asset.size()))}.exists()) << "chevron 资源没打进 qrc";
     }
 }
 

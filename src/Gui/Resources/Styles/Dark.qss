@@ -192,9 +192,23 @@ QTextEdit#annotationTextEditor:focus {
     border: 2px solid #4C8DFF;
 }
 
-/* 下拉箭头由原生风格画在右侧这一条里：留出宽度，长选项的文字才不会压在箭头上 */
+/* 下拉箭头走 styles 下的 chevron：与自绘微调框同一笔画，不再让原生风格画方角箭头 */
 QComboBox {
     padding-right: 26px;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: center right;
+    width: 26px;
+    border: none;
+    background: transparent;
+}
+
+QComboBox::down-arrow {
+    image: url(:/styles/ComboChevronDark.svg);
+    width: 10px;
+    height: 10px;
 }
 
 QComboBox QAbstractItemView {
@@ -218,8 +232,8 @@ QComboBox QAbstractItemView::item:hover {
     background-color: #262A2C;
 }
 
-/* 下拉与微调框的箭头刻意不在这里出现：给 ::drop-down / ::up-button 写过规则之后，
-   原生风格就不再画箭头了——箭头由原生风格按 QPalette 画，深浅两档都跟着走。 */
+/* 微调框的上下箭头由 Gui::SpinBox 自绘；下拉箭头用 styles 下的 chevron（见上面 QComboBox::down-arrow），
+   两处都不再让原生风格画箭头。 */
 /* 勾选框自己画：勾的形状是 Resources/Styles 下的两份 SVG，深色档压的是深色对勾 */
 QCheckBox {
     spacing: 8px;
