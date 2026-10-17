@@ -1816,6 +1816,10 @@
             <translation>History list</translation>
         </message>
         <message>
+            <source>历史空态提示</source>
+            <translation>History empty-state hint</translation>
+        </message>
+        <message>
             <source>先在历史里选一张图</source>
             <translation>Select an image in the history first</translation>
         </message>
@@ -1838,6 +1842,14 @@
         <message>
             <source>（删除只从历史里去掉这条，成品文件留在原处）</source>
             <translation>(Delete only removes this entry from the history; the file itself stays where it is)</translation>
+        </message>
+        <message>
+            <source>还没有记录。截一张图或录一段屏，成品会出现在这里。</source>
+            <translation>No history yet. Capture a screenshot or record your screen, and the results will show up here.</translation>
+        </message>
+        <message>
+            <source>没有符合条件的记录，换个关键词或类别试试。</source>
+            <translation>No records match. Try another keyword or category.</translation>
         </message>
         <message>
             <source>这一张图里没认出文字。可以换一种语言再认一次，或重新截一张更清晰的图</source>
@@ -3100,16 +3112,16 @@
             <translation>Global hotkey for "%1"</translation>
         </message>
         <message>
-            <source>允许单键（字母、数字、标点、方向键与 Esc、Enter 那一类）当全局热键</source>
-            <translation>Allow single keys (letters, digits, punctuation, arrow keys, and keys like Esc or Enter) as global hotkeys</translation>
-        </message>
-        <message>
             <source>允许单键当全局热键</source>
             <translation>Allow single-key global hotkeys</translation>
         </message>
         <message>
             <source>默认关。开了之后，比如把 `R` 绑成截图：在别的程序里敲 r 也会触发截图，而那个程序收不到这个字母。只在你确实想让某颗键专属于它时才开</source>
             <translation>Off by default. Once on, say with `R` bound to capture: typing r in another program triggers a capture and that program never sees the letter. Turn it on only when you really want a key to belong to this app alone</translation>
+        </message>
+        <message>
+            <source>允许单键（字母、数字、标点、方向键与 Esc、Enter 那一类）当全局热键</source>
+            <translation>Allow single keys (letters, digits, punctuation, arrow keys, and keys like Esc or Enter) as global hotkeys</translation>
         </message>
         <message>
             <source>单键也能当全局热键</source>
