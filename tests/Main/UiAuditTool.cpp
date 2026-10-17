@@ -19,6 +19,8 @@
 #include "Gui/Capture/CaptureOverlay.h"
 #include "Gui/Controls/Toast.h"
 #include "Gui/Ocr/OcrResultWindow.h"
+#include "Gui/Pin/PinGroupManagerWindow.h"
+#include "Gui/Pin/PinManager.h"
 #include "Gui/Pin/PinWindow.h"
 #include "Gui/Record/RecordingHud.h"
 #include "Platform/IPlatformIntegration.h"
@@ -134,7 +136,7 @@ namespace
      *          每趟自成一批、控件随作用域销毁——跨档复用一批控件会把上一档的样式残留带进来。
      */
     void shootFloatingFaces(GyanisScribe::Core::SettingsStore &settings, GyanisScribe::Gui::IconProvider &icons, const GyanisScribe::Gui::ThemeManager &theme,
-                            const GyanisScribe::Platform::IPlatformIntegration &integration, const std::filesystem::path &outputDirectory, const std::string &prefix)
+                            GyanisScribe::Platform::IPlatformIntegration &integration, const std::filesystem::path &outputDirectory, const std::string &prefix)
     {
         const QRect screen{0, 0, 1280, 720};
 
@@ -156,6 +158,50 @@ namespace
             QEvent entered{QEvent::Enter};
             QApplication::sendEvent(&pin, &entered);
             shoot(pin, outputDirectory, (prefix + "pin-window-hover").c_str());
+        }
+
+        // 贴图组管理窗
+        {
+            GyanisScribe::Gui::PinManager              pins{settings, integration};
+            GyanisScribe::Gui::PinGroupManagerWindow   groups{pins};
+            groups.show();
+            shoot(groups, outputDirectory, (prefix + "pin-group-manager").c_str());
+        }
+
+        // 工具栏摆放三景（复合图）：正常选区（下方）/ 选区贴底（翻上方）/ 极小贴底（两侧都紧）
+        {
+            const auto shootPlacement = [&](const QRect &selection, const char *name)
+            {
+                const auto placed = GyanisScribe::Gui::placeToolbar(screen, QSize{1356, 51}, selection);
+                if (!placed)
+                {
+                    std::fprintf(stderr, "placement failed: %s\n", placed.error().message.c_str());
+                    return;
+                }
+                GyanisScribe::Gui::CaptureOverlay overlay{syntheticScreen(screen.size()), screen, 1.0, settings};
+                overlay.show();
+                QMouseEvent moved{QEvent::MouseMove, QPointF{640, 360}, QPointF{640, 360}, Qt::NoButton, Qt::NoButton, Qt::KeyboardModifiers{}};
+                QApplication::sendEvent(&overlay, &moved);
+                QCoreApplication::processEvents();
+                QImage composite = overlay.grab().toImage();
+                {
+                    GyanisScribe::Gui::AnnotationToolbar toolbar{settings, icons, nullptr};
+                    toolbar.show();
+                    QCoreApplication::processEvents();
+                    QPainter painter{&composite};
+                    painter.setPen(QPen{QColor(35, 109, 233), 2});
+                    painter.drawRect(selection);
+                    painter.drawPixmap(placed->frame.topLeft(), toolbar.grab());
+                }
+                composite.save(QString::fromUtf8((outputDirectory / std::format("{}{}.png", prefix, name)).string().c_str()));
+                std::printf("%s%s: frame=%d,%d %dx%d side=%d（选区 %d,%d %dx%d）\n", prefix.c_str(), name, placed->frame.x(), placed->frame.y(), placed->frame.width(),
+                            placed->frame.height(), static_cast<int>(placed->side), selection.x(), selection.y(), selection.width(), selection.height());
+            };
+            // 拖拽没真实鼠标可重放：用合成选区 + 真摆放函数，蓝框把选区画在复合图上当参照。
+            // 三景各打一条分支：正常放得下（下方）/ 贴底（翻上方）/ 上下都放不下（挑空隙大的一侧贴边）
+            shootPlacement(QRect{200, 120, 900, 400}, "placement-below");
+            shootPlacement(QRect{200, 560, 900, 130}, "placement-above");
+            shootPlacement(QRect{200, 20, 900, 660}, "placement-cramped");
         }
 
         // OCR 结果窗：两行带词框的结果 + 平均置信度
