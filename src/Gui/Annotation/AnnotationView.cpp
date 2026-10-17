@@ -189,6 +189,13 @@ namespace GyanisScribe::Gui
             const auto bottomRight = toWidgetPoint(bounds->bottomRight(), rect, canvas.logicalSize);
             painter.drawRect(QRect{topLeft, bottomRight}.adjusted(0, 0, 1, 1));
         }
+
+        // 截图窗与桌面内容逐像素相同：屏上必须有一圈提示线，用户才知道哪一块是这张截图。
+        // 画在控件边缘、只走屏显这一条路——exportImage 从引擎取图，不会带上这一笔。
+        painter.setRenderHint(QPainter::Antialiasing, false);
+        painter.setPen(QPen{GyanisScribe::Gui::kAccentColor, 2});
+        painter.setBrush(Qt::NoBrush);
+        painter.drawRect(QRect{QPoint{0, 0}, size()}.adjusted(1, 1, -1, -1));
     }
 
     void AnnotationView::mousePressEvent(QMouseEvent *event)

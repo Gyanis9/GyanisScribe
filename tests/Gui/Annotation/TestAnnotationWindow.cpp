@@ -1427,7 +1427,29 @@ TEST_F(AnnotationWindowFixture, ReportsTheCostOfRepaintingAWindowFullOfShapes)
     }
 
     std::ranges::sort(milliseconds);
-    std::printf("[读数] 标注窗整幅重绘一次：中位 %.1fms（底图 2560×1440、%d 个图形、%d 轮，min %.1f / max %.1f）\n",
-                milliseconds[static_cast<std::size_t>(kRounds) / 2U],
-                kShapes, kRounds, milliseconds.front(), milliseconds.back());
+    std::printf("[读数] 标注窗整幅重绘一次：中位 %.1fms（底图 2560×1440、%d 个图形、%d 轮，min %.1f / max %.1f）\n", milliseconds[static_cast<std::size_t>(kRounds) / 2U], kShapes,
+                kRounds, milliseconds.front(), milliseconds.back());
+}
+
+/**
+ * @brief 钉住标注窗四周有一圈只上屏的主色提示线（用户 2026-10-17 直报第 1 条）
+ * @details 标注窗与桌面内容逐像素相同，没有这圈线时用户分不清哪一块是截图。
+ *          判据同时反向确认它没有进成品：exportImage 的边缘仍是底图色。
+ */
+TEST_F(AnnotationWindowFixture, TheAnnotationWindowShowsAScreenOnlyFrame)
+{
+    auto window = makeWindow();
+    window->startAnnotation(makeCanvas(QSize(200, 100)), QRect(0, 0, 1920, 1080), QRect(100, 100, 200, 100));
+    QApplication::processEvents();
+
+    const auto frame = window->grab().toImage();
+    ASSERT_FALSE(frame.isNull());
+    const auto accent = GyanisScribe::Gui::kAccentColor;
+    const auto edgeY  = frame.height() / 2;
+    EXPECT_EQ(frame.pixelColor(0, edgeY), accent) << "左边没有提示线";
+    EXPECT_EQ(frame.pixelColor(frame.width() - 1, edgeY), accent) << "右边没有提示线";
+    EXPECT_EQ(frame.pixelColor(frame.width() / 2, 0), accent) << "上边没有提示线";
+    EXPECT_EQ(frame.pixelColor(frame.width() / 2, frame.height() - 1), accent) << "下边没有提示线";
+
+    EXPECT_EQ(engine().exportImage().pixelColor(0, 50), QColor(180, 180, 180)) << "提示线被烘进成品了";
 }
