@@ -467,12 +467,23 @@ namespace GyanisScribe::Gui
             painter.setPen(GyanisScribe::Gui::kCaptureHintTextColor);
             painter.drawText(hintRect, Qt::AlignCenter, hint);
 
-            // 「已复制尺寸 …」贴在读数框下面一格；指针一动就清（见 mouseMoveEvent），
+            // 确认/取消怎么写常驻读数下一行：新用户拖完框最容易停在「然后呢」上（审查台账 UI-33）
+            const auto  confirmText = GyanisScribe::Base::uiText("双击或 Enter 确认 · Esc 取消");
+            const auto  confirmSize = metrics.size(Qt::TextSingleLine, confirmText);
+            const QRect confirmRect(hintTopLeft + QPoint(0, textSize.height() + kCopiedHintGap),
+                                    confirmSize + QSize(GyanisScribe::Gui::kHintPadding * 2, GyanisScribe::Gui::kHintPadding));
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(GyanisScribe::Gui::kCaptureHintBackgroundColor);
+            painter.drawRect(confirmRect);
+            painter.setPen(GyanisScribe::Gui::kCaptureHintTextColor);
+            painter.drawText(confirmRect, Qt::AlignCenter, confirmText);
+
+            // 「已复制尺寸 …」贴在确认行下面一格；指针一动就清（见 mouseMoveEvent），
             // 不为它引一个定时器——那种反馈本来就不必跟秒表绑定
             if (!m_copiedSizeHint.isEmpty())
             {
                 const auto  copyTextSize = metrics.size(Qt::TextSingleLine, m_copiedSizeHint);
-                const QRect copyRect(hintTopLeft + QPoint(0, textSize.height() + kCopiedHintGap),
+                const QRect copyRect(hintTopLeft + QPoint(0, textSize.height() + confirmSize.height() + 2 * kCopiedHintGap),
                                      copyTextSize + QSize(GyanisScribe::Gui::kHintPadding * 2, GyanisScribe::Gui::kHintPadding));
                 painter.setPen(Qt::NoPen);
                 painter.setBrush(GyanisScribe::Gui::kCaptureHintBackgroundColor);

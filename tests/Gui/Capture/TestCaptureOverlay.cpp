@@ -1072,3 +1072,34 @@ TEST_F(CaptureOverlayFixture, ReboundPointerKeyKeepsTheRoundScopedRules)
     pressKey(*longRound, Qt::Key_B);
     EXPECT_FALSE(longRound->cursorIncluded().has_value()) << "这一轮没有这一档时，新那颗键也该交回 Qt";
 }
+
+/**
+ * @brief 钉住「怎么确认」常驻在尺寸读数下一行（审查台账 UI-33）
+ * @details 遮罩此前只画尺寸读数，确认（双击/Enter）与取消（Esc）一个字都不提，新用户拖完框
+ *          会停在「然后呢」上。这条按位查墨迹：拖出屏中部的框（读数与确认行都画在选区上方），
+ *          在读数条再往下那一条带子里找亮色文字——把新增的那行画掉，这条当场变红。
+ */
+TEST_F(CaptureOverlayFixture, ConfirmHintRidesUnderTheSizeReadout)
+{
+    auto overlay = makeOverlay();
+    buttonAt(*overlay, QEvent::MouseButtonPress, QPoint{200, 200});
+    moveOver(*overlay, QPoint{500, 450});
+    buttonAt(*overlay, QEvent::MouseButtonRelease, QPoint{500, 450});
+
+    const auto shot = overlay->grab().toImage();
+    // 尺寸读数的左下角在选区上方一点：读数条的高度按 12pt 一行算，确认行紧贴其下。
+    // 带子取「读数条往下 30..66px」这一段：确认行落在其中，而读数条本体与「已复制」都不在这段
+    int bright = 0;
+    for (int y = 484; y < 520; ++y)
+    {
+        for (int x = 200; x < 560; ++x)
+        {
+            const auto color = shot.pixelColor(x, y);
+            if (color.red() + color.green() + color.blue() >= 3 * 180)
+            {
+                ++bright;
+            }
+        }
+    }
+    EXPECT_GT(bright, 30) << "尺寸读数下一行没有确认提示：新用户看不出拖完框之后怎么确认";
+}
