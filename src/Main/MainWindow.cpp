@@ -1463,7 +1463,10 @@ namespace GyanisScribe::Main
             m_nav->addItem(entry);
             // 每一页都裹一层滚动区：快捷键那一页现在有四十来行，默认窗口高度摆不下——
             // 不裹就是底下那一截永远够不着，而且一声不吭
-            m_stack->addWidget(wrapSettingsPage(*content));
+            auto *scroll = wrapSettingsPage(*content);
+            // Tab 会停在滚动区上（键一停就能用方向键/PageDown 滚页），读屏也该报出这是哪一页
+            scroll->setAccessibleName(GyanisScribe::Base::uiText(choice.label));
+            m_stack->addWidget(scroll);
         }
 
         // 换主题时重取图标：样式表与调色板都会自己跟上，只有已经发出去的 QIcon 需要按名字再取一次
@@ -1737,6 +1740,7 @@ namespace GyanisScribe::Main
             }
             auto *button = new QPushButton{entry.label, bar};
             m_icons.applyIcon(*button, entry.iconName);
+            button->setAccessibleName(entry.label);
             button->setToolTip(GyanisScribe::Base::uiText("与托盘菜单、全局热键走同一个出口"));
             QObject::connect(button, &QPushButton::clicked, this, [this, action] { emit actionRequested(*action); });
             row->addWidget(button);
@@ -1763,6 +1767,7 @@ namespace GyanisScribe::Main
 
         auto *more = new QToolButton{bar};
         more->setText(GyanisScribe::Base::uiText("更多"));
+        more->setAccessibleName(GyanisScribe::Base::uiText("更多"));
         more->setPopupMode(QToolButton::InstantPopup);
         more->setMenu(moreMenu);
         row->addWidget(more);
@@ -2486,6 +2491,7 @@ namespace GyanisScribe::Main
         logo->setAccessibleName(GyanisScribe::Base::uiText("智录图标"));
 
         auto *text = new QLabel{aboutText(QApplication::applicationVersion()), page};
+        text->setAccessibleName(GyanisScribe::Base::uiText("关于智录"));
         text->setWordWrap(true);
         text->setTextInteractionFlags(Qt::TextSelectableByMouse);
 
@@ -2495,6 +2501,7 @@ namespace GyanisScribe::Main
         checkButton->setAccessibleName(GyanisScribe::Base::uiText("检查更新"));
         auto *status = new QLabel{page};
         status->setObjectName(QStringLiteral("pageHint"));
+        status->setAccessibleName(GyanisScribe::Base::uiText("检查更新"));
         status->setWordWrap(true);
         status->setTextInteractionFlags(Qt::TextBrowserInteraction);
         status->setOpenExternalLinks(false);

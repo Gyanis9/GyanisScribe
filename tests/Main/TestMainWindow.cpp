@@ -33,6 +33,10 @@
 
 using GyanisScribe::Main::screenCaptureLabels;
 
+#include <QAbstractButton>
+#include <QAbstractItemView>
+#include <QAbstractSlider>
+#include <QAbstractSpinBox>
 #include <QApplication>
 #include <QCheckBox>
 #include <QFile>
@@ -42,6 +46,7 @@ using GyanisScribe::Main::screenCaptureLabels;
 #include <QComboBox>
 #include <QIcon>
 #include <QImage>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -271,6 +276,93 @@ namespace
             {
                 EXPECT_NE(controlInCurrentPage(controlName), nullptr) << "第 " << index << " 页里没有「" << std::string{controlName} << "」";
             }
+        }
+    }
+
+    /**
+     * @brief 钉住主窗里每一个可操作控件都有无障碍名（界面审查 UI-63）
+     * @details 抽样只能证明抽到的那几个有名字；这里把整栋控件树逐页扫一遍：按钮、输入、下拉、
+     *          数字框、滑块与列表视图一律要有 accessibleName。读屏用户拿到的「按钮 3」就是这里漏的。
+     */
+    TEST_F(MainWindowFixture, EveryInteractiveControlInTheMainWindowHasAnAccessibleName)
+    {
+        makeWindow();
+        QStringList missing;
+        const auto  check = [&missing](QWidget *root)
+        {
+            for (auto *widget: root->findChildren<QWidget *>())
+            {
+                const QLatin1StringView className{widget->metaObject()->className()};
+                // Qt 自绘件的内部子件（滚动条、下拉弹出表、清除按钮、数字框内编辑）不是用户可操作项
+                if (className == "QScrollBar" || className == "QComboBoxListView" || className == "QLineEditIconButton" ||
+                    widget->objectName() == QStringLiteral("qt_spinbox_lineedit"))
+                {
+                    continue;
+                }
+                const bool interactive = qobject_cast<QAbstractButton *>(widget) != nullptr || qobject_cast<QLineEdit *>(widget) != nullptr ||
+                                         qobject_cast<QComboBox *>(widget) != nullptr || qobject_cast<QAbstractSpinBox *>(widget) != nullptr ||
+                                         qobject_cast<QAbstractSlider *>(widget) != nullptr || qobject_cast<QAbstractItemView *>(widget) != nullptr;
+                if (interactive && widget->accessibleName().isEmpty())
+                {
+                    const auto *button = qobject_cast<QAbstractButton *>(widget);
+                    missing << QStringLiteral("%1<%2> text=%3 parent=%4")
+                                       .arg(QString::fromLatin1(widget->metaObject()->className()), widget->objectName(), button != nullptr ? button->text() : QString{},
+                                            widget->parent() != nullptr ? QString::fromLatin1(widget->parent()->metaObject()->className()) : QString{});
+                }
+            }
+        };
+        check(m_window.get());
+        EXPECT_TRUE(missing.isEmpty()) << "这些控件没有无障碍名：" << missing.join(QStringLiteral("、")).toStdString();
+    }
+
+    /**
+     * @brief 钉住 Tab 能把每一页的可见控件走一遍，不落隐藏件、不卡在同一处（界面审查 UI-61）
+     * @details 实机 UIA 走查受前台锁时，焦点链本身可以在进程内逐键走：每按一次 Tab 取一次
+     *          focusWidget，三件事必须成立——焦点真的换、落点可见、落点有可读名字；
+     *          每页还要能走出四个以上落点再绕回起点（少于四个就是卡在某一处）。
+     */
+    TEST_F(MainWindowFixture, TabWalkVisitsVisibleNamedControlsWithoutTraps)
+    {
+        makeWindow();
+        const auto describe = [](const QWidget *widget)
+        {
+            const auto *button = qobject_cast<const QAbstractButton *>(widget);
+            return QStringLiteral("%1<%2>").arg(QString::fromLatin1(widget->metaObject()->className()), button != nullptr ? button->text() : widget->accessibleName());
+        };
+
+        for (const auto &choice: pageChoices())
+        {
+            m_window->open(choice.page);
+            QCoreApplication::processEvents();
+            // 从导航栏起走：不赌 show() 把焦点给了谁，起点自己摆
+            nav()->setFocus(Qt::TabFocusReason);
+            QCoreApplication::processEvents();
+            QWidget *start = m_window->focusWidget();
+            ASSERT_NE(start, nullptr) << choice.label;
+
+            int stops = 0;
+            for (; stops < 200; ++stops)
+            {
+                auto *focused = m_window->focusWidget();
+                ASSERT_NE(focused, nullptr) << "第 " << stops << " 步焦点丢了：" << choice.label;
+                EXPECT_TRUE(focused->isVisible()) << "Tab 落到了看不见的控件：" << describe(focused).toStdString();
+                const auto *button = qobject_cast<QAbstractButton *>(focused);
+                EXPECT_FALSE(focused->accessibleName().isEmpty() && (button == nullptr || button->text().isEmpty())) << "Tab 落点没有可读名字：" << describe(focused).toStdString();
+
+                QKeyEvent tab{QEvent::KeyPress, Qt::Key_Tab, Qt::NoModifier};
+                QApplication::sendEvent(focused, &tab);
+                QCoreApplication::processEvents();
+                if (m_window->focusWidget() == focused)
+                {
+                    ADD_FAILURE() << "Tab 卡在同一处：" << describe(focused).toStdString();
+                    break;
+                }
+                if (m_window->focusWidget() == start)
+                {
+                    break;
+                }
+            }
+            EXPECT_GT(stops, 3) << "这一页的 Tab 链太短或卡住了：" << choice.label;
         }
     }
 
