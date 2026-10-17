@@ -25,6 +25,7 @@
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Gui/Controls/AppShortcuts.h"
+#include "Gui/Controls/SpinBox.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Controls/HotkeyEdit.h"
 #include "Gui/Resources/IconProvider.h"
@@ -298,7 +299,7 @@ namespace
     QSpinBox *makeOptionalLimitSpin(GyanisScribe::Core::ISettingsStore &settings, const std::string_view key, const QString &title, const QString &suffix, const int maximum,
                                     const int fallback)
     {
-        auto *spin = new QSpinBox;
+        auto *spin = new GyanisScribe::Gui::SpinBox;
         spin->setRange(0, maximum);
         spin->setSpecialValueText(GyanisScribe::Base::uiText("不限"));
         spin->setSuffix(suffix);
@@ -738,7 +739,7 @@ namespace
      */
     QSpinBox *makeEdgeSnapDistanceSpin(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *spin = new QSpinBox;
+        auto *spin = new GyanisScribe::Gui::SpinBox;
         spin->setRange(GyanisScribe::Core::kEdgeSnapDistanceMinimum, GyanisScribe::Core::kEdgeSnapDistanceMaximum);
         spin->setSuffix(GyanisScribe::Base::uiText(" 像素"));
         spin->setAccessibleName(GyanisScribe::Base::uiText("吸附距离"));
@@ -766,7 +767,7 @@ namespace
      */
     QSpinBox *makeOpacitySpin(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *spin = new QSpinBox;
+        auto *spin = new GyanisScribe::Gui::SpinBox;
         // 下限取 1：0% 的贴图在屏幕上看不见却还挡鼠标，那种「贴图功能坏了」的现象最难查
         spin->setRange(1, 100);
         spin->setSuffix(QStringLiteral(" %"));
@@ -802,7 +803,7 @@ namespace
      */
     QSpinBox *makeMaximumDurationSpin(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *spin = new QSpinBox;
+        auto *spin = new GyanisScribe::Gui::SpinBox;
         spin->setRange(1, GyanisScribe::Core::kMaximumDurationSeconds);
         spin->setSingleStep(60);
         spin->setSuffix(GyanisScribe::Base::uiText(" 秒"));
@@ -826,7 +827,7 @@ namespace
 
     QSpinBox *makeFrameRateSpin(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *spin = new QSpinBox;
+        auto *spin = new GyanisScribe::Gui::SpinBox;
         spin->setRange(1, GyanisScribe::Core::kMaximumFrameRate);
         spin->setSuffix(GyanisScribe::Base::uiText(" 帧/秒"));
         spin->setAccessibleName(GyanisScribe::Base::uiText("默认帧率"));
@@ -856,7 +857,7 @@ namespace
      */
     QSpinBox *makeCaptureDelaySpin(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *spin = new QSpinBox;
+        auto *spin = new GyanisScribe::Gui::SpinBox;
         spin->setRange(0, GyanisScribe::App::kMaximumCaptureDelaySeconds);
         spin->setSuffix(GyanisScribe::Base::uiText(" 秒"));
         spin->setAccessibleName(GyanisScribe::Base::uiText("延时截图"));
@@ -887,7 +888,7 @@ namespace
      */
     QSpinBox *makeCornerRadiusSpin(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *spin = new QSpinBox;
+        auto *spin = new GyanisScribe::Gui::SpinBox;
         spin->setRange(GyanisScribe::Core::kCaptureCornerRadiusMinimum, GyanisScribe::Core::kCaptureCornerRadiusMaximum);
         spin->setSuffix(GyanisScribe::Base::uiText(" 像素"));
         spin->setAccessibleName(GyanisScribe::Base::uiText("圆角半径"));
@@ -917,7 +918,7 @@ namespace
      */
     QSpinBox *makeCountdownSpin(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *spin = new QSpinBox;
+        auto *spin = new GyanisScribe::Gui::SpinBox;
         spin->setRange(0, GyanisScribe::Core::kMaximumCountdownSeconds);
         spin->setSuffix(GyanisScribe::Base::uiText(" 秒"));
         spin->setAccessibleName(GyanisScribe::Base::uiText("录屏倒计时"));
@@ -948,7 +949,7 @@ namespace
      */
     QSpinBox *makeVideoBitrateSpin(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *spin = new QSpinBox;
+        auto *spin = new GyanisScribe::Gui::SpinBox;
         spin->setRange(GyanisScribe::Core::kDefaultVideoBitrateKbps, GyanisScribe::Core::kMaximumVideoBitrateKbps);
         spin->setSingleStep(500);
         spin->setSuffix(GyanisScribe::Base::uiText(" kbps"));
@@ -1118,7 +1119,7 @@ namespace
      */
     QSpinBox *makeImageQualitySpin(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *spin = new QSpinBox;
+        auto *spin = new GyanisScribe::Gui::SpinBox;
         spin->setRange(GyanisScribe::Core::kMinimumImageQuality, GyanisScribe::Core::kMaximumImageQuality);
         spin->setAccessibleName(GyanisScribe::Base::uiText("保存质量"));
         spin->setToolTip(GyanisScribe::Base::uiText("只有 JPG 与 WebP 吃这一格，PNG 是无损的；数字越大越清晰，文件也越大"));
@@ -1991,7 +1992,7 @@ namespace GyanisScribe::Main
      */
     QSpinBox *makeBorderWidthSpin(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *spin = new QSpinBox;
+        auto *spin = new GyanisScribe::Gui::SpinBox;
         spin->setRange(GyanisScribe::Core::kMinimumOutputBorderPixels, GyanisScribe::Core::kMaximumOutputBorderPixels);
         spin->setSuffix(GyanisScribe::Base::uiText(" 像素"));
         spin->setAccessibleName(GyanisScribe::Base::uiText("边框宽度"));
@@ -2020,7 +2021,7 @@ namespace GyanisScribe::Main
      */
     QSpinBox *makeShadowWidthSpin(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *spin = new QSpinBox;
+        auto *spin = new GyanisScribe::Gui::SpinBox;
         spin->setRange(GyanisScribe::Core::kMinimumOutputShadowPixels, GyanisScribe::Core::kMaximumOutputShadowPixels);
         spin->setSuffix(GyanisScribe::Base::uiText(" 像素"));
         spin->setAccessibleName(GyanisScribe::Base::uiText("投影宽度"));

@@ -2,12 +2,15 @@
 // 与 TestGuiControls 分成两个可执行体：那个目标里的 TestToast 自己持有一份 QApplication，
 // 同一进程不能再造第二份。
 #include "Gui/Controls/HotkeyEdit.h"
+#include "Gui/Controls/SpinBox.h"
 
 #include "Core/Settings/SettingsStore.h"
 
 #include <gtest/gtest.h>
 
+#include <QAbstractButton>
 #include <QApplication>
+#include <QCoreApplication>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMouseEvent>
@@ -94,4 +97,65 @@ TEST_F(HotkeyEditChromeFixture, RecordingStateIsExposedToTheStyleSheet)
     QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier};
     QApplication::sendEvent(&edit, &escape);
     EXPECT_FALSE(display->property("recording").toBool()) << "Esc 取消后录制态属性没落回去";
+}
+
+namespace
+{
+    using GyanisScribe::Gui::SpinBox;
+
+    /// SpinBox 判据与 HotkeyEdit 判据共用同一个进程级 QApplication（见文件头的 Environment）
+    class SpinBoxFixture : public ::testing::Test
+    {
+    };
+} // namespace
+
+/**
+ * @brief 钉住原生上下按钮已关掉、右上/右下两枚自绘按钮接管
+ * @details 用户直报原生微调按钮与圆角输入框背景割裂；NoButtons 是这条修法的事实前提。
+ */
+TEST_F(SpinBoxFixture, UsesItsOwnStepperButtonsInsteadOfTheNativeOnes)
+{
+    SpinBox spin;
+    spin.setRange(0, 10);
+    spin.setAttribute(Qt::WA_DontShowOnScreen);
+    spin.resize(120, 32);
+    spin.show();
+    QCoreApplication::processEvents();
+
+    EXPECT_EQ(spin.buttonSymbols(), QAbstractSpinBox::NoButtons);
+    auto *up   = spin.findChild<QAbstractButton *>(QStringLiteral("spinUp"));
+    auto *down = spin.findChild<QAbstractButton *>(QStringLiteral("spinDown"));
+    ASSERT_NE(up, nullptr);
+    ASSERT_NE(down, nullptr);
+    EXPECT_GE(up->geometry().left(), spin.width() - 24) << "自绘按钮没贴在右缘";
+    EXPECT_LT(up->geometry().bottom(), down->geometry().top()) << "上下两枚叠在一起了";
+}
+
+/**
+ * @brief 钉住点一下加一 / 减一，且键盘与范围逻辑仍由 QSpinBox 负责
+ */
+TEST_F(SpinBoxFixture, ClickingTheStepperStepsTheValue)
+{
+    SpinBox spin;
+    spin.setRange(0, 10);
+    spin.setValue(5);
+    spin.setAttribute(Qt::WA_DontShowOnScreen);
+    spin.resize(120, 32);
+    spin.show();
+    QCoreApplication::processEvents();
+
+    auto *up   = spin.findChild<QAbstractButton *>(QStringLiteral("spinUp"));
+    auto *down = spin.findChild<QAbstractButton *>(QStringLiteral("spinDown"));
+    ASSERT_NE(up, nullptr);
+    ASSERT_NE(down, nullptr);
+
+    up->click();
+    EXPECT_EQ(spin.value(), 6);
+    down->click();
+    down->click();
+    EXPECT_EQ(spin.value(), 4);
+
+    spin.setValue(10);
+    up->click();
+    EXPECT_EQ(spin.value(), 10) << "顶部没有夹住";
 }
