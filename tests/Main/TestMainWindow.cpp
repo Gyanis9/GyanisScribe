@@ -25,6 +25,7 @@
 #include "Gui/Controls/AppShortcuts.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Controls/HotkeyEdit.h"
+#include "Gui/Controls/SpinBox.h"
 #include "Gui/Resources/IconProvider.h"
 #include "Gui/Theme/Language.h"
 #include "Gui/Theme/ThemeManager.h"
@@ -1676,6 +1677,23 @@ TEST_F(MainWindowFixture, TrayMenuHidesTheActionBarButNoTrayKeepsIt)
 
     m_window->setTrayMenuAvailable(false);
     EXPECT_FALSE(bar->isHidden()) << "无托盘的机器把动作条一起藏了，截图入口一个都不剩";
+}
+
+/**
+ * @brief 钉住设置页所有数字框都走同一个自绘微调控件（用户 2026-10-17 直报第 3 条）
+ * @details 混着原生 QSpinBox 时右侧加减按钮会出现两种样式；这一条把「换了一半」钉死。
+ */
+TEST_F(MainWindowFixture, EveryNumericFieldUsesTheCustomStepper)
+{
+    makeWindow();
+    const auto  spins = m_window->findChildren<QSpinBox *>();
+    QStringList inventory;
+    for (auto *spin: spins)
+    {
+        inventory << QStringLiteral("%1/%2").arg(QString::fromLatin1(spin->metaObject()->className()), spin->accessibleName());
+        EXPECT_NE(dynamic_cast<GyanisScribe::Gui::SpinBox *>(spin), nullptr) << "设置页还留着一个原生 QSpinBox：" << spin->metaObject()->className();
+    }
+    EXPECT_EQ(spins.size(), 13) << "设置页数字框数量变了，先确认新加的那一格有没有用 SpinBox：" << inventory.join(QStringLiteral(", ")).toStdString();
 }
 
 /**
