@@ -42,6 +42,7 @@ using GyanisScribe::Main::screenCaptureLabels;
 #include <QFile>
 #include <QFileInfo>
 #include <QFormLayout>
+#include <QVBoxLayout>
 #include <QFontMetrics>
 #include <QComboBox>
 #include <QIcon>
@@ -582,7 +583,8 @@ namespace
         ASSERT_NE(hint, nullptr) << "单键说明行没找到：长句还挂在勾选框上";
         EXPECT_TRUE(hint->wordWrap()) << "说明行没开折行，长句还是会被右缘裁掉";
         const QFontMetrics metrics{hint->font()};
-        EXPECT_GE(hint->height(), metrics.lineSpacing() * 3 / 2) << "说明没排成两行，折行没生效";
+        // 折成两行或一行装得下都算「没被裁」；只按行数判会在窄一档字体/宽度下假红
+        EXPECT_TRUE(hint->height() >= metrics.lineSpacing() * 3 / 2 || hint->width() >= metrics.horizontalAdvance(hint->text())) << "说明既没折行也没装下全文";
     }
 
     /**
@@ -1660,6 +1662,85 @@ TEST_F(MainWindowFixture, IconsReResolveWhenTheThemeChangesLive)
 }
 
 /**
+ * @brief 钉住「托盘可用时那条动作条整条不出现」（用户 2026-10-17 直报第 3 条）
+ * @details 动作条与托盘菜单同源，托盘在场的机器上它就是第二份入口。无托盘的机器仍要留它，
+ *          所以判据分两档：隐藏后 isHidden 为真，放开后主操作按钮仍找得到。
+ */
+TEST_F(MainWindowFixture, TrayMenuHidesTheActionBarButNoTrayKeepsIt)
+{
+    makeWindow();
+    m_window->setTrayMenuAvailable(true);
+    auto *bar = m_window->findChild<QWidget *>(QStringLiteral("actionBar"));
+    ASSERT_NE(bar, nullptr);
+    EXPECT_TRUE(bar->isHidden()) << "托盘可用时动作条还露在上面";
+
+    m_window->setTrayMenuAvailable(false);
+    EXPECT_FALSE(bar->isHidden()) << "无托盘的机器把动作条一起藏了，截图入口一个都不剩";
+}
+
+/**
+ * @brief 钉住设置窗压缩后的版面读数（用户 2026-10-17 直报第 3 条）
+ * @details 980 宽的旧最小宽来自顶部动作条；隐藏之后窗可以收到 860 以下。
+ *          页边距与表单行距也按新档钉住，避免「只藏了动作条、页面还是松的」。
+ */
+TEST_F(MainWindowFixture, CompactSettingsLayoutHasANarrowerFloor)
+{
+    makeWindow();
+    m_window->setTrayMenuAvailable(true);
+    m_window->open(MainWindowPage::General);
+    QCoreApplication::processEvents();
+
+    EXPECT_LE(m_window->minimumSizeHint().width(), 860) << "主窗最小宽没有跟着动作条一起收";
+
+    auto *scroll = qobject_cast<QScrollArea *>(m_window->findChild<QStackedWidget *>()->currentWidget());
+    ASSERT_NE(scroll, nullptr);
+    auto *card = scroll->widget();
+    ASSERT_NE(card, nullptr);
+    auto *box = qobject_cast<QVBoxLayout *>(card->layout());
+    ASSERT_NE(box, nullptr);
+    EXPECT_EQ(box->contentsMargins().left(), GyanisScribe::Gui::kSpacingMedium);
+    auto *form = card->findChild<QFormLayout *>();
+    ASSERT_NE(form, nullptr);
+    EXPECT_EQ(form->verticalSpacing(), GyanisScribe::Gui::kSpacingHairline);
+}
+
+/**
+ * @brief 钉住多屏时「整屏截图」在托盘菜单里变成带屏名的子菜单（用户 2026-10-17 直报第 3 条）
+ * @details 动作条隐藏后，逐屏入口不能跟着消失；子菜单第一项是「光标所在屏幕」，
+ *          后面逐块屏点名，触发后走 screenCaptureRequested。
+ */
+TEST_F(MainWindowFixture, MultiScreenFullCaptureIsASubmenuInTheTrayMenu)
+{
+    makeWindow();
+    GyanisScribe::App::TrayController tray{*m_icons, *m_theme, *m_store, *m_integration};
+    QMenu                             menu;
+    tray.buildMenu(menu, {QStringLiteral("DISPLAY1"), QStringLiteral("DISPLAY2")});
+    EXPECT_EQ(menu.font().pointSize(), GyanisScribe::Gui::kMenuTextPointSize) << "菜单字号没有在构建处落地";
+
+    const auto topActions = menu.actions();
+    const auto found      = std::ranges::find(topActions, GyanisScribe::Base::uiText("整屏截图"), &QAction::text);
+    ASSERT_NE(found, topActions.end());
+    ASSERT_NE((*found)->menu(), nullptr) << "多屏时整屏截图还是扁平项，逐屏入口没地方落";
+
+    const auto  subActions = (*found)->menu()->actions();
+    QStringList labels;
+    for (auto *action: subActions)
+    {
+        labels << action->text();
+    }
+    EXPECT_TRUE(labels.contains(GyanisScribe::Base::uiText("光标所在屏幕")));
+    EXPECT_TRUE(labels.contains(GyanisScribe::Base::uiText("整屏截图：%1").arg(QStringLiteral("DISPLAY1"))));
+    EXPECT_TRUE(labels.contains(GyanisScribe::Base::uiText("整屏截图：%1").arg(QStringLiteral("DISPLAY2"))));
+
+    QString picked;
+    QObject::connect(&tray, &GyanisScribe::App::TrayController::screenCaptureRequested, [&picked](const QString &name) { picked = name; });
+    const auto second = std::ranges::find(subActions, GyanisScribe::Base::uiText("整屏截图：%1").arg(QStringLiteral("DISPLAY2")), &QAction::text);
+    ASSERT_NE(second, subActions.end());
+    (*second)->trigger();
+    EXPECT_EQ(picked, QStringLiteral("DISPLAY2"));
+}
+
+/**
  * @brief 钉住主窗口动作条与托盘菜单同源：能力过滤后的每一条动作都有落点，且不许多出窗口自己的那三条
  * @details 表是唯一出处，所以预期按同一份表算；控件按文字找而不是按下标——findChildren 的顺序
  *          不保证等于创建顺序（工具栏那几条用例已经为此踩过一次）。
@@ -1670,6 +1751,7 @@ TEST_F(MainWindowFixture, ActionBarLandsEveryVisibleTrayEntrySomewhere)
     using GyanisScribe::App::visibleTrayMenuEntries;
 
     makeWindow(true);
+    m_window->setTrayMenuAvailable(false); // 这条判据测的是无托盘时的兜底形态
 
     auto *bar = m_window->findChild<QWidget *>(QStringLiteral("actionBar"));
     ASSERT_NE(bar, nullptr) << "动作条没建出来：没有托盘的机器上就一条常设入口都没有";

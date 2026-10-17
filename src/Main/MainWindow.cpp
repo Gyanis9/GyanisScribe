@@ -105,7 +105,7 @@ namespace
     };
 
     /// 导航列的固定宽度：最长的标签是「文字识别」四个汉字加一枚图标与左右内边距，再宽就要挤右侧的字段了
-    constexpr int kNavColumnWidth = 180;
+    constexpr int kNavColumnWidth = 160;
 
     /// 导航行上记图标名的角色：换主题时按它重取图标，不用把 kPages 与行号再对一遍
     constexpr int kNavIconNameRole = Qt::UserRole + 1;
@@ -148,8 +148,8 @@ namespace
     QFormLayout *makePageForm(QWidget *page, const QString &intro)
     {
         auto *layout = new QVBoxLayout{page};
-        layout->setContentsMargins(GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge);
-        layout->setSpacing(GyanisScribe::Gui::kSpacingSmall);
+        layout->setContentsMargins(GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium);
+        layout->setSpacing(GyanisScribe::Gui::kSpacingTiny);
 
         auto *text = new QLabel{intro, page};
         text->setObjectName(QStringLiteral("pageHint"));
@@ -160,7 +160,8 @@ namespace
         layout->addWidget(text);
 
         auto *form = new QFormLayout;
-        form->setSpacing(GyanisScribe::Gui::kSpacingSmall);
+        form->setVerticalSpacing(GyanisScribe::Gui::kSpacingHairline);
+        form->setHorizontalSpacing(GyanisScribe::Gui::kSpacingSmall);
         // 标签右对齐并与字段同一水平线：这一列的右端要与字段左缘只隔一个行距，左对齐时那条缝会随
         // 标签长短忽宽忽窄（实测 4 字 81px、10 字只剩 9px，同一页里两种都见得到）；
         // 顶对齐会让单行字段看着下沉，竖直方向取居中
@@ -1435,8 +1436,8 @@ namespace GyanisScribe::Main
         // 动作条是给「没有托盘、热键也没登记上」的那一类机器留的常设入口，
         // 也是有托盘时不用先去右下角翻菜单的那条 shortcut。
         auto *root = new QVBoxLayout{this};
-        root->setContentsMargins(GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge);
-        root->setSpacing(GyanisScribe::Gui::kSpacingMedium);
+        root->setContentsMargins(GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium);
+        root->setSpacing(GyanisScribe::Gui::kSpacingSmall);
 
         auto *layout = new QHBoxLayout;
         layout->setSpacing(GyanisScribe::Gui::kSpacingMedium);
@@ -1490,7 +1491,8 @@ namespace GyanisScribe::Main
 
         layout->addWidget(m_nav);
         layout->addWidget(m_stack, 1);
-        root->addWidget(buildActionBar());
+        m_actionBar = buildActionBar();
+        root->addWidget(m_actionBar);
         root->addLayout(layout);
         resize(680, 560);
 
@@ -1517,6 +1519,14 @@ namespace GyanisScribe::Main
         show();
         raise();
         activateWindow();
+    }
+
+    void MainWindow::setTrayMenuAvailable(const bool available)
+    {
+        if (m_actionBar != nullptr)
+        {
+            m_actionBar->setVisible(!available);
+        }
     }
 
     void MainWindow::exportSettingsToFile(const QString &filePath)
@@ -2404,6 +2414,8 @@ namespace GyanisScribe::Main
         simpleHint->setObjectName(QStringLiteral("pageHint"));
         simpleHint->setWordWrap(true);
         simpleHint->setMaximumWidth(GyanisScribe::Gui::kIntroMaximumWidth);
+        // 表单行高按 sizeHint 给：不带这一档时窄窗下只分到一行，折行后的第二行被裁掉
+        simpleHint->setMinimumHeight(simpleHint->fontMetrics().lineSpacing() * 2);
         simpleLayout->addWidget(simpleHint);
         form->addRow(GyanisScribe::Base::uiText("单键也能当全局热键"), simpleRow);
         // 界面里的按键：这一批不吃平台能力位——没有全局登记口也照样在自己的窗口里认，
@@ -2486,7 +2498,7 @@ namespace GyanisScribe::Main
         auto *page   = new QWidget{this};
         auto *layout = new QVBoxLayout{page};
         // 与表单页同一条内容网格（界面审查 UI-08）：默认边距比表单页小一圈，翻到这一页正文会左跳 7px
-        layout->setContentsMargins(GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge);
+        layout->setContentsMargins(GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium);
         layout->setSpacing(GyanisScribe::Gui::kSpacingSmall);
 
         auto *logo = new QLabel{page};

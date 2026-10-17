@@ -15,6 +15,7 @@
 #include <QList>
 #include <QObject>
 #include <QString>
+#include <QStringList>
 
 #include <memory>
 #include <optional>
@@ -121,6 +122,15 @@ namespace GyanisScribe::App
          */
         bool install();
 
+        /**
+         * @brief 按当前配置与平台能力往菜单里摆条目
+         * @param menu 目标菜单，所有权仍在调用方
+         * @param screenNames 屏幕名清单；多屏时「整屏截图」变成带屏名的子菜单
+         * @details 独立成公开方法是为了让用例不依赖真托盘：离屏平台装不出托盘，
+         *          但菜单条目与信号接线照样要能逐条核。
+         */
+        void buildMenu(QMenu &menu, const QStringList &screenNames);
+
 
         /**
          * @brief 把贴图张数写进悬停提示
@@ -149,6 +159,9 @@ namespace GyanisScribe::App
     signals:
         /// 用户点了某一项
         void actionRequested(TrayAction action);
+
+        /// 用户点名了某一块屏做整屏截图
+        void screenCaptureRequested(const QString &screenName);
 
     private:
         /**

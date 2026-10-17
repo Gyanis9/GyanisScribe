@@ -99,8 +99,8 @@ QToolButton {
     border: 1px solid transparent;
     border-radius: 8px;
     padding: 2px;
-    min-width: 28px;
-    min-height: 28px;
+    min-width: 26px;
+    min-height: 26px;
 }
 
 QToolButton:hover {
@@ -138,7 +138,7 @@ QLineEdit, QComboBox, QSpinBox {
     border: 1px solid #D6D9DA;
     border-radius: 12px;
     padding: 0 12px;
-    min-height: 34px;
+    min-height: 30px;
     selection-background-color: #D8E5F9;
     selection-color: #101418;
 }
@@ -209,7 +209,7 @@ QComboBox QAbstractItemView::item:hover {
 QCheckBox {
     spacing: 8px;
     color: #101418;
-    min-height: 24px;
+    min-height: 22px;
 }
 
 QCheckBox::indicator {
@@ -326,7 +326,7 @@ QListWidget {
 }
 
 QListWidget::item {
-    min-height: 28px;
+    min-height: 26px;
     padding: 4px 8px;
     margin: 1px 2px;
     border: 1px solid transparent;
@@ -351,7 +351,7 @@ QListWidget#settingsNav {
 }
 
 QListWidget#settingsNav::item {
-    min-height: 34px;
+    min-height: 30px;
 }
 
 /* ---- 设置页的滚动层 ---- */

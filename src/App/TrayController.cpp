@@ -14,7 +14,9 @@
 
 #include <QAction>
 #include <QCursor>
+#include <QGuiApplication>
 #include <QMenu>
+#include <QScreen>
 #include <QSystemTrayIcon>
 
 #include <format>
@@ -137,25 +139,59 @@ namespace GyanisScribe::App
             // 挂在外面每次重跑就多接一条，一次点击会发出好几个动作
             QObject::connect(m_icon, &QSystemTrayIcon::activated, this, &TrayController::onActivated);
         }
-        m_menu->clear();
-        auto menuFont = m_menu->font();
-        menuFont.setPointSize(GyanisScribe::Gui::kMenuTextPointSize);
-        m_menu->setFont(menuFont);
-
         // 托盘描边色跟着主题走：深色任务栏上的深色图标会完全看不见
         m_icons.setTintColor(m_theme.iconTint());
+
+        m_menu->clear();
+        QStringList screenNames;
+        for (const auto *screen: QGuiApplication::screens())
+        {
+            screenNames.append(screen->name());
+        }
+        buildMenu(*m_menu, screenNames);
+
         m_icon->setIcon(m_icons.icon("Tray"));
         m_icon->setToolTip(trayTooltip(m_pinCount, m_recordedSeconds, m_recordingPaused));
+
+        m_icon->setContextMenu(m_menu.get());
+        m_icon->show();
+        return true;
+    }
+
+    void TrayController::buildMenu(QMenu &menu, const QStringList &screenNames)
+    {
+        auto menuFont = menu.font();
+        menuFont.setPointSize(GyanisScribe::Gui::kMenuTextPointSize);
+        menu.setFont(menuFont);
 
         for (const auto &entry: visibleTrayMenuEntries(m_integration.capabilities()))
         {
             if (!entry.action)
             {
-                m_menu->addSeparator();
+                menu.addSeparator();
                 continue;
             }
 
-            const auto action = m_menu->addAction(entry.label);
+            // 多屏：把「整屏截图」整条换成子菜单，第一项接管原来那一档
+            if (*entry.action == TrayAction::CaptureFullScreen && screenNames.size() > 1)
+            {
+                auto *submenu = menu.addMenu(entry.label);
+                if (!entry.iconName.empty())
+                {
+                    submenu->setIcon(m_icons.icon(entry.iconName));
+                }
+                submenu->setFont(menuFont);
+                auto *cursorScreen = submenu->addAction(GyanisScribe::Base::uiText("光标所在屏幕"));
+                QObject::connect(cursorScreen, &QAction::triggered, this, [this] { emit actionRequested(TrayAction::CaptureFullScreen); });
+                for (const auto &name: screenNames)
+                {
+                    auto *one = submenu->addAction(GyanisScribe::Base::uiText("整屏截图：%1").arg(name));
+                    QObject::connect(one, &QAction::triggered, this, [this, name] { emit screenCaptureRequested(name); });
+                }
+                continue;
+            }
+
+            const auto action = menu.addAction(entry.label);
             if (!entry.iconName.empty())
             {
                 action->setIcon(m_icons.icon(entry.iconName));
@@ -171,10 +207,6 @@ namespace GyanisScribe::App
             const auto trayAction = *entry.action;
             QObject::connect(action, &QAction::triggered, this, [this, trayAction] { emit actionRequested(trayAction); });
         }
-
-        m_icon->setContextMenu(m_menu.get());
-        m_icon->show();
-        return true;
     }
 
     void TrayController::onActivated(const QSystemTrayIcon::ActivationReason reason)
