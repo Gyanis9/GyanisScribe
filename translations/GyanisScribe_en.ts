@@ -1612,8 +1612,24 @@
             <translation> (cursor excluded)</translation>
         </message>
         <message>
-            <source>双击或 Enter 确认 · Esc 取消</source>
-            <translation>Double-click or Enter to confirm · Esc to cancel</translation>
+            <source>松手即完成 · Esc 取消</source>
+            <translation>Release to finish · Esc to cancel</translation>
+        </message>
+        <message>
+            <source>Enter / 双击确认 · 方向键微调 · Esc 取消</source>
+            <translation>Enter / double-click to confirm · arrow keys adjust · Esc to cancel</translation>
+        </message>
+        <message>
+            <source>光标所在屏幕</source>
+            <translation>Screen under the cursor</translation>
+        </message>
+        <message>
+            <source>增加</source>
+            <translation>Increase</translation>
+        </message>
+        <message>
+            <source>减少</source>
+            <translation>Decrease</translation>
         </message>
         <message>
             <source>已复制尺寸 %1</source>

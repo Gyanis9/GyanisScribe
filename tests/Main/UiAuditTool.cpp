@@ -400,6 +400,8 @@ int main(int argc, char *argv[])
         GyanisScribe::Core::HistoryStore history(dataDirectory / "history.json");
         const auto                       integration = GyanisScribe::Platform::createPlatformIntegration();
         GyanisScribe::Main::MainWindow   window(settings, theme, icons, history, integration->capabilities(), *integration);
+        // 这台机器有托盘：生产里动作条会被收起，审查图也要按用户实际看到的形状出
+        window.setTrayMenuAvailable(true);
         window.resize(680, 560);
         for (const auto page: {GyanisScribe::Main::MainWindowPage::General, GyanisScribe::Main::MainWindowPage::Capture})
         {
