@@ -96,6 +96,18 @@ namespace GyanisScribe::Core
         return Core::kHotkeyCapture;
     }
 
+    QString HotkeyManager::defaultCombinationTextForSettingsKey(const std::string_view settingsKey)
+    {
+        for (const auto action: managedActions())
+        {
+            if (settingsKeyFor(action) == settingsKey)
+            {
+                return QString::fromUtf8(defaultCombinationTextFor(action));
+            }
+        }
+        return {};
+    }
+
     std::string_view HotkeyManager::defaultCombinationTextFor(HotkeyAction action)
     {
         switch (action)

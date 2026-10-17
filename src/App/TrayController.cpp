@@ -5,6 +5,7 @@
 #include "Platform/IPlatformIntegration.h"
 #include "Platform/PlatformCapabilities.h"
 #include "Gui/Record/RecordingHud.h"
+#include "Core/Hotkey/HotkeyManager.h"
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Gui/Resources/IconProvider.h"
@@ -21,11 +22,6 @@ namespace
 {
     using GyanisScribe::App::TrayAction;
     using GyanisScribe::App::TrayMenuEntry;
-
-    /// 表里的快捷键文本缺省值：配置没写过这一项时菜单也要能提示用户按什么
-    constexpr const char *kDefaultCaptureHotkey = "Ctrl+Alt+A";
-    constexpr const char *kDefaultRecordHotkey  = "Ctrl+Alt+R";
-    constexpr const char *kDefaultOcrHotkey     = "Ctrl+Alt+O";
 } // namespace
 
 namespace GyanisScribe::App
@@ -43,6 +39,11 @@ namespace GyanisScribe::App
             return GyanisScribe::Base::uiText("智录");
         }
         return GyanisScribe::Base::uiText("智录 · 贴图 %1 张").arg(pinCount);
+    }
+
+    QString trayHotkeyHint(const Core::ISettingsStore &settings, const std::string_view hotkeyKey)
+    {
+        return settings.stringValue(hotkeyKey, Core::HotkeyManager::defaultCombinationTextForSettingsKey(hotkeyKey));
     }
 
     QList<TrayMenuEntry> trayMenuEntries()
@@ -157,10 +158,7 @@ namespace GyanisScribe::App
             }
             if (!entry.hotkeyKey.empty())
             {
-                const auto fallback = entry.hotkeyKey == GyanisScribe::Core::kHotkeyRecord
-                                              ? kDefaultRecordHotkey
-                                              : (entry.hotkeyKey == GyanisScribe::Core::kHotkeyOcr ? kDefaultOcrHotkey : kDefaultCaptureHotkey);
-                const auto text     = m_settings.stringValue(entry.hotkeyKey, QString::fromUtf8(fallback));
+                const auto text = trayHotkeyHint(m_settings, entry.hotkeyKey);
                 // 菜单项上带快捷键提示是需求第五节的原话；显示的是配置里的真值，不是写死的样例。
                 // 用制表符分开：Qt 的菜单会把 \t 之后的文字右对齐，这正是系统菜单里快捷键提示的排法
                 action->setText(QStringLiteral("%1\t%2").arg(entry.label, text));

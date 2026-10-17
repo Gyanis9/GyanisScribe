@@ -14,6 +14,7 @@
 
 #include <QString>
 
+#include <array>
 #include <cstddef>
 #include <filesystem>
 #include <format>
@@ -35,8 +36,9 @@ using GyanisScribe::App::TrayClickRole;
 using GyanisScribe::App::trayClickRoleForReason;
 using GyanisScribe::App::trayClickRoleInfo;
 using GyanisScribe::App::trayClickRoles;
-using GyanisScribe::Platform::PlatformCapabilities;
+using GyanisScribe::App::trayHotkeyHint;
 using GyanisScribe::Core::SettingsStore;
+using GyanisScribe::Platform::PlatformCapabilities;
 
 namespace
 {
@@ -88,6 +90,34 @@ namespace
         return std::make_unique<SettingsStore>(ini);
     }
 } // namespace
+
+/**
+ * @brief 钉住菜单右侧的快捷键提示逐项取各自的默认组合（界面审查 UI-44 实机取证发现）
+ * @details 实机托盘菜单上「滚动长截图 / 屏幕取色 / 收起贴图 / 切到下一组」四行同时显示
+ *          Ctrl+Alt+A——回落表只认识录屏与识别，其余一律当成截图。默认组合在 HotkeyManager
+ *          里已有真源，这里逐动作对表；配置里存过的值仍要压过默认。
+ */
+TEST(TrayClickTable, MenuHotkeyHintsUseEachActionsOwnDefault)
+{
+    const auto store = makeStore("menu-hotkey-hints");
+    // 期望值照 README 的热键表另抄一份：与管理器内部那张默认表分开写，才会发现「菜单跟了错的动作」
+    const std::array<std::pair<std::string_view, std::string_view>, 8> defaults{{
+            {GyanisScribe::Core::kHotkeyCapture, "Ctrl+Alt+A"},
+            {GyanisScribe::Core::kHotkeyRecord, "Ctrl+Alt+R"},
+            {GyanisScribe::Core::kHotkeyOcr, "Ctrl+Alt+O"},
+            {GyanisScribe::Core::kHotkeyPick, "Ctrl+Alt+P"},
+            {GyanisScribe::Core::kHotkeyCaptureLong, "Ctrl+Alt+L"},
+            {GyanisScribe::Core::kHotkeyTogglePins, "Ctrl+Alt+H"},
+            {GyanisScribe::Core::kHotkeyNextPinGroup, "Ctrl+Alt+G"},
+            {GyanisScribe::Core::kHotkeyQuickSave, "Ctrl+Alt+S"},
+    }};
+    for (const auto &[key, expected]: defaults)
+    {
+        EXPECT_EQ(trayHotkeyHint(*store, key), QString::fromUtf8(expected)) << key << " 的默认组合被别的动作顶了";
+    }
+    ASSERT_TRUE(static_cast<bool>(store->setValue(GyanisScribe::Core::kHotkeyPick, QStringLiteral("Ctrl+Shift+P"))));
+    EXPECT_EQ(trayHotkeyHint(*store, GyanisScribe::Core::kHotkeyPick), QStringLiteral("Ctrl+Shift+P")) << "存过的组合没有压过默认";
+}
 
 /**
  * @brief 钉住两档的键互不相同，且默认那一串确实躺在可选清单里

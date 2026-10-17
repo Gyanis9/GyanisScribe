@@ -57,6 +57,16 @@ namespace GyanisScribe::App
     [[nodiscard]] QList<TrayMenuEntry> trayMenuEntries();
 
     /**
+     * @brief 菜单项右侧的快捷键提示
+     * @param settings 配置存储，存过的组合优先
+     * @param hotkeyKey 这一行对应的配置键
+     * @return 该动作当前生效的组合文本
+     * @details 默认组合只有 HotkeyManager 一处真源：此前这里按「不是录屏/识别就当作截图」兜底，
+     *          滚动长截图、屏幕取色、收起贴图与切组四行都会显示成截图那颗键。
+     */
+    [[nodiscard]] QString trayHotkeyHint(const Core::ISettingsStore &settings, std::string_view hotkeyKey);
+
+    /**
      * @brief 按平台能力过滤后的菜单条目表
      * @param capabilities 平台能力表，来自 IPlatformIntegration::capabilities()
      * @return 这一台机器上真能做的条目；顺序与 trayMenuEntries() 一致
@@ -94,8 +104,8 @@ namespace GyanisScribe::App
          * @param integration 平台能力来源，决定菜单上放不放「截取当前窗口」这一项
          * @param parent Qt 父对象
          */
-        TrayController(GyanisScribe::Gui::IconProvider &icons, GyanisScribe::Gui::ThemeManager &theme, Core::ISettingsStore &settings,
-                       Platform::IPlatformIntegration &integration, QObject *parent = nullptr);
+        TrayController(GyanisScribe::Gui::IconProvider &icons, GyanisScribe::Gui::ThemeManager &theme, Core::ISettingsStore &settings, Platform::IPlatformIntegration &integration,
+                       QObject *parent = nullptr);
 
 
         /**
@@ -150,13 +160,13 @@ namespace GyanisScribe::App
 
         GyanisScribe::Gui::IconProvider &m_icons;                   ///< 图标供给器，不拥有
         GyanisScribe::Gui::ThemeManager &m_theme;                   ///< 主题管理器，不拥有
-        Core::ISettingsStore       &m_settings;                ///< 配置存储，不拥有
-        Platform::IPlatformIntegration &m_integration;             ///< 平台能力来源，决定菜单放不放哪几项，不拥有
-        QSystemTrayIcon                *m_icon = nullptr;          ///< 托盘图标，父对象是本控制器
-        std::unique_ptr<QMenu>          m_menu;                    ///< 右键菜单：QSystemTrayIcon 不接管菜单所有权，由本类持有
-        int                             m_pinCount        = 0;     ///< 现在挂着的贴图张数，只用于悬停提示
-        int                             m_recordedSeconds = -1;    ///< 已录秒数，负数表示没在录
-        bool                            m_recordingPaused = false; ///< 录制是否停在暂停那一档
+        Core::ISettingsStore            &m_settings;                ///< 配置存储，不拥有
+        Platform::IPlatformIntegration  &m_integration;             ///< 平台能力来源，决定菜单放不放哪几项，不拥有
+        QSystemTrayIcon                 *m_icon = nullptr;          ///< 托盘图标，父对象是本控制器
+        std::unique_ptr<QMenu>           m_menu;                    ///< 右键菜单：QSystemTrayIcon 不接管菜单所有权，由本类持有
+        int                              m_pinCount        = 0;     ///< 现在挂着的贴图张数，只用于悬停提示
+        int                              m_recordedSeconds = -1;    ///< 已录秒数，负数表示没在录
+        bool                             m_recordingPaused = false; ///< 录制是否停在暂停那一档
     };
 
 } // namespace GyanisScribe::App

@@ -76,6 +76,16 @@ namespace GyanisScribe::Core
         [[nodiscard]] QString bindingText(HotkeyAction action) const override;
 
         /**
+         * @brief 配置键对应的默认组合文本
+         * @param settingsKey 配置键，例如 Hotkey/CaptureLong
+         * @return 默认组合文本；键不在受管动作里时返回空串
+         * @details 菜单这类不持有热键管理器的界面要显示「没设过时该按什么」：
+         *          默认表只有本类那一处真源，界面自己按动作类型兜底就会把长截图、
+         *          取色、收起贴图与切组四行都显示成截图那颗键。
+         */
+        [[nodiscard]] static QString defaultCombinationTextForSettingsKey(std::string_view settingsKey);
+
+        /**
          * @brief 换一批自定义绑定，见 IHotkeyManager::setCustomBindings()
          * @param bindings 要登记的那一批（组合非空、标识由调用方自己认领）
          */
