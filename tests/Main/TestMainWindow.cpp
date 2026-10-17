@@ -47,16 +47,19 @@ using GyanisScribe::Main::screenCaptureLabels;
 #include <QListWidget>
 #include <QMenu>
 #include <QPixmap>
+#include <QPoint>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QScrollArea>
 #include <QStackedWidget>
+#include <QSize>
 #include <QString>
 #include <QStringList>
 #include <QToolButton>
 #include <QWidget>
 
 #include <algorithm>
+#include <cstdlib>
 #include <filesystem>
 #include <format>
 #include <limits>
@@ -269,6 +272,55 @@ namespace
                 EXPECT_NE(controlInCurrentPage(controlName), nullptr) << "第 " << index << " 页里没有「" << std::string{controlName} << "」";
             }
         }
+    }
+
+    /**
+     * @brief 钉住主窗几何跨会话记忆（界面审查 UI-65）
+     * @details 此前全仓没有 save/restoreGeometry：每次启动都回默认的 680×560 与系统摆的位置。
+     *          判据走两趟真存盘：第一趟挪窗、关窗（析构即落盘），换一个 store 实例读回键；
+     *          第二趟拿同一份盘建新窗，尺寸必须原样回来，位置回到同一处（给边框让一点余量）。
+     */
+    TEST_F(MainWindowFixture, WindowGeometrySurvivesARestart)
+    {
+        makeWindow();
+        // 真走一次 show 再摆位置：saveGeometry 存的是带边框的几何，窗口没建过时两者同值，
+        // 还原那一步按边框去估就会差出几像素——生产里用户看到的是已经显示过的窗口
+        m_window->open(MainWindowPage::General);
+        QCoreApplication::processEvents();
+        // 宽度不硬写：窗口有布局最小宽，入参可能被撑大；高度这一档默认 560，600 一定落得下
+        m_window->resize(900, 600);
+        m_window->move(60, 60);
+        QCoreApplication::processEvents();
+        const QSize targetSize = m_window->size();
+        ASSERT_EQ(targetSize.height(), 600) << "用例自己没摆出目标尺寸";
+        closeWindowAndFlush();
+
+        const auto reopened = makeStore();
+        EXPECT_FALSE(reopened->stringValue(GyanisScribe::Core::kMainWindowGeometry, QString{}).isEmpty()) << "关窗时没把几何写进配置";
+
+        m_store = makeStore();
+        m_theme = std::make_unique<ThemeManager>(*m_store);
+        makeWindow();
+        m_window->open(MainWindowPage::General);
+        QCoreApplication::processEvents();
+        EXPECT_EQ(m_window->size(), targetSize) << "第二趟没落回上次的尺寸";
+        // 还原发生在显示之前：Qt 按样式估的边框去落位，真边框到显示时才把窗口挪十几像素。
+        // 未还原的默认位置是 (0,0)，容差 32 比到默认位置的距离小，突变跑不掉
+        const auto restored = m_window->frameGeometry().topLeft();
+        EXPECT_LE(std::abs(restored.x() - 60), 32) << "第二趟没落回上次的位置：" << restored.x();
+        EXPECT_LE(std::abs(restored.y() - 60), 32) << "第二趟没落回上次的位置：" << restored.y();
+    }
+
+    /**
+     * @brief 钉住存坏的几何不会把窗口开成怪形状
+     * @details 手改配置文件与版本回退都会留下解不出几何的文本；这一格只要求回到构造时的默认尺寸，
+     *          并且 restoreGeometry 自己得把这一份拒掉（不是把窗口挪到 (0,0) 或 0×0）。
+     */
+    TEST_F(MainWindowFixture, CorruptStoredGeometryFallsBackToTheDefaultSize)
+    {
+        ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Core::kMainWindowGeometry, QStringLiteral("AAAA"))));
+        makeWindow();
+        EXPECT_EQ(m_window->size(), QSize(680, 560)) << "坏几何没回落默认尺寸";
     }
 
     /**

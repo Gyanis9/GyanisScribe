@@ -51,6 +51,9 @@ namespace GyanisScribe::Core
     /// 界面语言，取值只能是 zh 与 en；en 需要随包的语言包，见 Gui/Theme/Language.h
     inline constexpr std::string_view kUiLanguage = "Gui/Theme/Language";
 
+    /// 主窗口几何（位置与大小），存 QWidget::saveGeometry 载荷的 Base64 文本；坏值按默认尺寸走
+    inline constexpr std::string_view kMainWindowGeometry = "Ui/MainWindowGeometry";
+
     /// 上一次成功截图的选区，文本形如「x,y,width,height」；写方与读方都在 Capture 模块
     inline constexpr std::string_view kCaptureLastRegion = "Capture/LastRegion";
 

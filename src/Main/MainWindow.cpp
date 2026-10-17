@@ -33,6 +33,7 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QByteArray>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDesktopServices>
@@ -1406,7 +1407,16 @@ namespace GyanisScribe::Main
                 .arg(version);
     }
 
-    MainWindow::~MainWindow() = default;
+    MainWindow::~MainWindow()
+    {
+        // 退出前把几何存一份（界面审查 UI-65）：下次开在同一块屏、同一尺寸上。
+        // 存成 Base64 文本而不是 QByteArray：配置导出走 JSON，二进制载荷过不了那一道
+        const auto saved = m_settings.setValue(Core::kMainWindowGeometry, QString::fromLatin1(saveGeometry().toBase64()));
+        if (!saved)
+        {
+            Logger::warning(std::format("主窗口几何没能存下：{}", saved.error().message));
+        }
+    }
 
     MainWindow::MainWindow(GyanisScribe::Core::ISettingsStore &settings, GyanisScribe::Gui::ThemeManager &theme, GyanisScribe::Gui::IconProvider &icons,
                            GyanisScribe::Core::HistoryStore &historyStore, GyanisScribe::Platform::PlatformCapabilities capabilities,
@@ -1480,6 +1490,13 @@ namespace GyanisScribe::Main
         root->addWidget(buildActionBar());
         root->addLayout(layout);
         resize(680, 560);
+
+        // 上次退出时的几何（界面审查 UI-65）：没存过或存坏了就停在上面这档默认尺寸。
+        // restoreGeometry 自己会把越界窗口挪回某块屏的可见区，换了屏也不会开在看不见的地方
+        if (const auto stored = QByteArray::fromBase64(m_settings.stringValue(Core::kMainWindowGeometry, QString{}).toLatin1()); !stored.isEmpty())
+        {
+            restoreGeometry(stored);
+        }
     }
 
     void MainWindow::open(const MainWindowPage page)
