@@ -34,6 +34,7 @@
 #include <QDateTime>
 #include <QFont>
 #include <QFontDatabase>
+#include <QFormLayout>
 #include <QMenu>
 #include <QMouseEvent>
 #include <QPainter>
@@ -140,7 +141,7 @@ namespace
     {
         const QRect screen{0, 0, 1280, 720};
 
-        // 截屏遮罩：默认态 + 放大镜态（放大镜要收到第一次鼠标移动才现身）
+        // 截屏遮罩：默认态 + 放大镜态（放大镜要收到第一次鼠标移动才现身）+ 拖出选区态（2px 框与八角抓点的形状看得清）
         {
             GyanisScribe::Gui::CaptureOverlay overlay{syntheticScreen(screen.size()), screen, 1.0, settings};
             overlay.show();
@@ -148,6 +149,16 @@ namespace
             QMouseEvent moved{QEvent::MouseMove, QPointF{640, 360}, QPointF{640, 360}, Qt::NoButton, Qt::NoButton, Qt::KeyboardModifiers{}};
             QApplication::sendEvent(&overlay, &moved);
             shoot(overlay, outputDirectory, (prefix + "overlay-magnifier").c_str());
+
+            const QPointF pressPoint{200, 150};
+            const QPointF dragPoint{900, 560};
+            QMouseEvent  pressed{QEvent::MouseButtonPress, pressPoint, pressPoint, Qt::LeftButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+            QApplication::sendEvent(&overlay, &pressed);
+            QMouseEvent dragged{QEvent::MouseMove, dragPoint, dragPoint, Qt::NoButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+            QApplication::sendEvent(&overlay, &dragged);
+            QMouseEvent released{QEvent::MouseButtonRelease, dragPoint, dragPoint, Qt::LeftButton, Qt::NoButton, Qt::KeyboardModifiers{}};
+            QApplication::sendEvent(&overlay, &released);
+            shoot(overlay, outputDirectory, (prefix + "overlay-selection").c_str());
         }
 
         // 贴图窗：默认 + 悬停（悬停出边框）
@@ -409,6 +420,47 @@ int main(int argc, char *argv[])
         shoot(window, outputDirectory, "main-general-wide");
         window.open(GyanisScribe::Main::MainWindowPage::Capture);
         shoot(window, outputDirectory, "main-capture-wide");
+
+        // 面 6：表单行列几何（跨页对表：标签右缘 / 字段左缘 / 缝 / 行高，坐标一律映射到窗口）
+        {
+            for (const auto &shot: std::array<std::pair<GyanisScribe::Main::MainWindowPage, const char *>, 8>{
+                         {{GyanisScribe::Main::MainWindowPage::General, "general"},
+                          {GyanisScribe::Main::MainWindowPage::Capture, "capture"},
+                          {GyanisScribe::Main::MainWindowPage::Annotation, "annotation"},
+                          {GyanisScribe::Main::MainWindowPage::Pin, "pin"},
+                          {GyanisScribe::Main::MainWindowPage::Record, "record"},
+                          {GyanisScribe::Main::MainWindowPage::Ocr, "ocr"},
+                          {GyanisScribe::Main::MainWindowPage::Hotkey, "hotkey"},
+                          {GyanisScribe::Main::MainWindowPage::Theme, "theme"}}})
+            {
+                window.open(shot.first);
+                QCoreApplication::processEvents();
+                auto *stack = window.findChild<QStackedWidget *>();
+                if (stack == nullptr)
+                {
+                    continue;
+                }
+                auto *scroll = qobject_cast<QScrollArea *>(stack->currentWidget());
+                QWidget *page = scroll != nullptr && scroll->widget() != nullptr ? scroll->widget() : stack->currentWidget();
+                for (auto *form: page->findChildren<QFormLayout *>())
+                {
+                    for (int row = 0; row < form->rowCount(); ++row)
+                    {
+                        auto *labelItem = form->itemAt(row, QFormLayout::LabelRole);
+                        auto *fieldItem = form->itemAt(row, QFormLayout::FieldRole);
+                        if (labelItem == nullptr || fieldItem == nullptr || labelItem->widget() == nullptr || fieldItem->widget() == nullptr)
+                        {
+                            continue;
+                        }
+                        auto *label = labelItem->widget();
+                        auto *field = fieldItem->widget();
+                        const auto labelRight = label->mapTo(&window, QPoint{label->width(), 0}).x();
+                        const auto fieldLeft  = field->mapTo(&window, QPoint{0, 0}).x();
+                        std::printf("form[%s] row=%d labelRight=%d fieldLeft=%d gap=%d rowH=%d\n", shot.second, row, labelRight, fieldLeft, fieldLeft - labelRight, field->height());
+                    }
+                }
+            }
+        }
 
         // 面 4：深色与高对比度档的对应图（换肤观感核对；浅色已在前面出过）
         for (const auto &[mode, name]: std::array<std::pair<const char *, const char *>, 2>{{{"Dark", "dark"}, {"HighContrast", "hc"}}})
