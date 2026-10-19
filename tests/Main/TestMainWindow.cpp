@@ -1663,7 +1663,7 @@ TEST_F(MainWindowFixture, IconsReResolveWhenTheThemeChangesLive)
 }
 
 /**
- * @brief 钉住「托盘可用时那条动作条整条不出现」（用户 2026-10-17 直报）
+ * @brief 钉住「托盘可用时那条动作条整条不出现」
  * @details 动作条与托盘菜单同源，托盘在场的机器上它就是第二份入口。无托盘的机器仍要留它，
  *          所以判据分两档：隐藏后 isHidden 为真，放开后主操作按钮仍找得到。
  */
@@ -1680,7 +1680,7 @@ TEST_F(MainWindowFixture, TrayMenuHidesTheActionBarButNoTrayKeepsIt)
 }
 
 /**
- * @brief 钉住设置页所有数字框都走同一个自绘微调控件（用户 2026-10-17 直报）
+ * @brief 钉住设置页所有数字框都走同一个自绘微调控件
  * @details 混着原生 QSpinBox 时右侧加减按钮会出现两种样式；这一条把「换了一半」钉死。
  */
 TEST_F(MainWindowFixture, EveryNumericFieldUsesTheCustomStepper)
@@ -1697,7 +1697,7 @@ TEST_F(MainWindowFixture, EveryNumericFieldUsesTheCustomStepper)
 }
 
 /**
- * @brief 钉住设置窗压缩后的版面读数（用户 2026-10-17 直报）
+ * @brief 钉住设置窗压缩后的版面读数
  * @details 980 宽的旧最小宽来自顶部动作条；隐藏之后窗可以收到 860 以下。
  *          页边距与表单行距也按新档钉住，避免「只藏了动作条、页面还是松的」。
  */
@@ -1723,7 +1723,7 @@ TEST_F(MainWindowFixture, CompactSettingsLayoutHasANarrowerFloor)
 }
 
 /**
- * @brief 钉住三处路径行的输入框左缘与表单字段列同线（用户 2026-10-17 直报）
+ * @brief 钉住三处路径行的输入框左缘与表单字段列同线
  * @details 路径行是「QLineEdit + 浏览…」的横向组合，过去漏了 setContentsMargins(0,0,0,0)，
  *          输入框被布局默认边距向内推了约 9px。判据逐页量：路径输入框左缘 = 同行参照字段左缘。
  */
@@ -1776,7 +1776,7 @@ TEST_F(MainWindowFixture, PathEditorsShareTheFormFieldLeftEdge)
 }
 
 /**
- * @brief 钉住多屏时「整屏截图」在托盘菜单里变成带屏名的子菜单（用户 2026-10-17 直报）
+ * @brief 钉住多屏时「整屏截图」在托盘菜单里变成带屏名的子菜单
  * @details 动作条隐藏后，逐屏入口不能跟着消失；子菜单第一项是「光标所在屏幕」，
  *          后面逐块屏点名，触发后走 screenCaptureRequested。
  */

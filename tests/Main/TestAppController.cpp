@@ -421,7 +421,7 @@ namespace GyanisScribe
     }
 
     /**
-     * @brief 钉住标注窗拖边框之后按新范围重抓（用户 2026-10-17 直报：交出后还能重裁）
+     * @brief 钉住标注窗拖边框之后按新范围重抓
      * @details 窗口只报新几何；藏窗、重抓、换画布与更新选区都在协调器这一层。
      */
     TEST_F(AppControllerFixture, CroppingTheAnnotationWindowRegrabsTheNewRegion)

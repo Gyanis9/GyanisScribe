@@ -67,7 +67,7 @@ namespace
 } // namespace
 
 /**
- * @brief 钉住快捷键框走输入框同一套外观（用户 2026-10-17 直报）
+ * @brief 钉住快捷键框走输入框同一套外观
  * @details 此前内部是 QFrame::Box 的裸 QLabel：方角、原生边框、居中文字，与圆角输入框完全是两件东西。
  */
 TEST_F(HotkeyEditChromeFixture, DisplayUsesTheInputFieldChrome)
@@ -111,7 +111,7 @@ namespace
 
 /**
  * @brief 钉住原生上下按钮已关掉、右上/右下两枚自绘按钮接管
- * @details 用户直报原生微调按钮与圆角输入框背景割裂；NoButtons 是这条修法的事实前提。
+ * @details 原生微调按钮与圆角输入框背景割裂；NoButtons 是这条修法的事实前提。
  */
 TEST_F(SpinBoxFixture, UsesItsOwnStepperButtonsInsteadOfTheNativeOnes)
 {

@@ -1103,7 +1103,7 @@ TEST_F(CaptureOverlayFixture, ConfirmHintRidesUnderTheSizeReadout)
 }
 
 /**
- * @brief 钉住松手即交出选区（用户 2026-10-17 直报：零点击）
+ * @brief 钉住松手即交出选区
  * @details 松手后不再停在遮罩上调边框；重裁边框由标注窗的「选择」档接。
  */
 TEST_F(CaptureOverlayFixture, MouseReleaseConfirmsTheDrawnRegion)

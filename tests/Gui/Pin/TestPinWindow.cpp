@@ -234,7 +234,7 @@ namespace GyanisScribe
     }
 
     /**
-     * @brief 钉住左键双击关掉贴图并通知管理器（用户 2026-10-17 直报）
+     * @brief 钉住左键双击关掉贴图并通知管理器
      * @details 双击是「看完了」的顺手动作；关掉一张不该把整个程序带走。
      */
     TEST_F(PinWindowFixture, DoubleClickClosesThePin)
