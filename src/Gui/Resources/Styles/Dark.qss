@@ -121,10 +121,15 @@ QToolButton:disabled {
     border-color: transparent;
 }
 
-/* ---- 标注工具栏的按钮：一排最多五十几件控件，最小尺寸比全局那档各收 2px，宽度省上百像素 ---- */
+/* ---- 标注工具栏的按钮：一排最多五十几件控件，最小尺寸比全局那档各收 2px，宽度省上百像素。
+        颜色入口一枚按钮带菜单，原生小箭头在 20px 图标旁显得脏，收掉——按钮上的色块自己就是入口提示 ---- */
 QWidget#AnnotationToolbar QToolButton {
-    min-width: 24px;
-    min-height: 24px;
+    min-width: 26px;
+    min-height: 26px;
+}
+
+QToolButton#annotationColorButton::menu-indicator {
+    image: none;
 }
 
 /* ---- 输入类：描边比分隔线重一档，好让「能填的」一眼分得出 ---- */

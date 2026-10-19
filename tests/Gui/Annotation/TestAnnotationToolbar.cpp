@@ -16,19 +16,18 @@
 #include <QApplication>
 #include <QColor>
 #include <QComboBox>
-#include <QEvent>
 #include <QFont>
 #include <QFontComboBox>
 #include <QFontDatabase>
 #include <QHBoxLayout>
 #include <QImage>
+#include <QMenu>
 #include <QPoint>
 #include <QRect>
 #include <QSize>
 #include <QSlider>
 #include <QString>
 #include <QStringList>
-#include <QMouseEvent>
 #include <QToolButton>
 #include <QWheelEvent>
 #include <QWidget>
@@ -157,6 +156,7 @@ namespace
             int                   actions{};        ///< 四个动作按钮的合计触发次数
             int                   undo{};           ///< undoClicked 次数
             int                   redo{};           ///< redoClicked 次数
+            int                   closes{};         ///< closeClicked 次数
         };
 
         /// 建一把工具栏，并把它的每条信号都记进 log
@@ -189,6 +189,7 @@ namespace
             QObject::connect(toolbar.get(), &AnnotationToolbar::textBackgroundChanged, [&log](bool enabled) { log.textBackgrounds.push_back(enabled ? 1 : 0); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::undoClicked, [&log] { ++log.undo; });
             QObject::connect(toolbar.get(), &AnnotationToolbar::redoClicked, [&log] { ++log.redo; });
+            QObject::connect(toolbar.get(), &AnnotationToolbar::closeClicked, [&log] { ++log.closes; });
             for (auto signal: {&AnnotationToolbar::copyClicked, &AnnotationToolbar::saveClicked, &AnnotationToolbar::pinClicked, &AnnotationToolbar::ocrClicked,
                                &AnnotationToolbar::scanClicked})
             {
@@ -198,14 +199,6 @@ namespace
         }
 
         /// 建一把工具栏并把布局跑实：按钮几何要有真值，滚轮的落点才算得出来
-        /// 把色板预置成指定的那几格：重开一份 store，等价于用户改完设置再回到工具栏
-        void presetPalette(const QStringList &tokens)
-        {
-            ASSERT_TRUE(m_settings->setValue(GyanisScribe::Core::kAnnotationPalette, tokens).has_value());
-            m_settings->sync();
-            m_settings = std::make_unique<SettingsStore>(m_iniPath);
-        }
-
         [[nodiscard]] std::unique_ptr<AnnotationToolbar> makeToolbarLaidOut(SignalLog &log)
         {
             auto toolbar = makeToolbarLogged(log);
@@ -227,6 +220,18 @@ namespace
                 }
             }
             return nullptr;
+        }
+
+        /// 展开颜色菜单：面板挂在 aboutToShow 上现建，不发这一下，菜单里那几格按钮还不存在
+        [[nodiscard]] static QMenu *openColorMenu(AnnotationToolbar &toolbar)
+        {
+            auto *menu = toolbar.findChild<QMenu *>(QStringLiteral("annotationColorMenu"));
+            if (menu != nullptr)
+            {
+                // 直接发信号而不真把菜单弹出来：用例不需要窗口，也不该让一枚浮层抢走焦点
+                QMetaObject::invokeMethod(menu, "aboutToShow", Qt::DirectConnection);
+            }
+            return menu;
         }
 
         /// 往工具栏投一条滚轮事件：落点是窗口内坐标，角度增量按 Qt 的缺省档给 120 的整数倍
@@ -356,8 +361,9 @@ namespace
 
         auto *button = toolbar->toolButtonAt(0);
         ASSERT_NE(button, nullptr);
-        // 宏实参里不用花括号：逗号会被 GoogleTest 当成两个参数拆开（既有踩坑记录）
-        EXPECT_EQ(button->iconSize(), QSize(18, 18));
+        // 宏实参里不用花括号：逗号会被 GoogleTest 当成两个参数拆开（既有踩坑记录）。
+        // 图标取 20 而不是更小的 18：那批 SVG 按 24 格画，缩到 18 时 1.5px 描边落成 1.125px 灰边，看着糊
+        EXPECT_EQ(button->iconSize(), QSize(20, 20));
     }
 
     /**
@@ -1043,11 +1049,13 @@ TEST_F(ToolbarFixture, WhiteSwatchKeepsAVisibleOutline)
     SignalLog log;
     auto      toolbar = makeToolbarLogged(log);
 
+    ASSERT_NE(openColorMenu(*toolbar), nullptr);
     auto *whiteSwatch = buttonByLabel(*toolbar, "颜色 8");
     ASSERT_NE(whiteSwatch, nullptr);
-    constexpr int kSwatchEdge = static_cast<int>(GyanisScribe::Gui::IconSize::Compact);
+    constexpr int kSwatchEdge = static_cast<int>(GyanisScribe::Gui::IconSize::Medium);
     const auto    bitmap      = whiteSwatch->icon().pixmap(QSize(kSwatchEdge, kSwatchEdge)).toImage().convertToFormat(QImage::Format_ARGB32);
-    ASSERT_EQ(bitmap.width(), kSwatchEdge);
+    ASSERT_FALSE(bitmap.isNull());
+    ASSERT_GT(bitmap.width(), 0);
 
     const auto outline = icons->tintColor();
     const auto fill    = kAnnotationPaletteColors[kAnnotationPaletteColors.size() - 1];
@@ -1190,16 +1198,17 @@ TEST_F(ToolbarFixture, SliderStepsMapToLadderWidths)
 }
 
 /**
- * @brief 钉住色块与动作按钮各归各位
- * @details 点色块发 colorChanged 且只亮一个；点四个动作各发一次对应信号，
- *          混在一起的话「复制」就会去存文件。
+ * @brief 钉住颜色菜单里的色块与动作按钮各归各位
+ * @details 点色块发 colorChanged；点五个动作各发一次对应信号，混在一起的话「复制」就会去存文件。
+ *          最右那枚 X 只发 closeClicked，不能顺手把图交出去。
  */
 TEST_F(ToolbarFixture, ColorSwatchesAndActionButtonsEmitTheirOwnSignals)
 {
     SignalLog log;
     auto      toolbar = makeToolbarLogged(log);
 
-    // 第二格色块按名称取：findChildren 的顺序不保证等于创建顺序，记序号会点错格
+    ASSERT_NE(openColorMenu(*toolbar), nullptr);
+    // 第二格色块按名称取：findChildren 的顺序不保证等于菜单里的摆法，记序号会点错格
     auto *secondSwatch = buttonByLabel(*toolbar, "颜色 2");
     ASSERT_NE(secondSwatch, nullptr);
     secondSwatch->click();
@@ -1222,6 +1231,12 @@ TEST_F(ToolbarFixture, ColorSwatchesAndActionButtonsEmitTheirOwnSignals)
     EXPECT_FALSE(buttonByLabel(*toolbar, "重做（Ctrl+Y）")->isEnabled());
     buttonByLabel(*toolbar, "撤销（Ctrl+Z）")->click();
     EXPECT_EQ(log.undo, 1);
+
+    auto *closeButton = buttonByLabel(*toolbar, "关闭标注");
+    ASSERT_NE(closeButton, nullptr) << "工具栏缺一枚显式的关闭入口";
+    closeButton->click();
+    EXPECT_EQ(log.closes, 1);
+    EXPECT_EQ(log.actions, 5) << "点关闭不该把图交出去";
 }
 
 /**
@@ -1242,6 +1257,7 @@ TEST_F(ToolbarFixture, RecentColorsFromSettingsBecomeSwatches)
 
     ASSERT_EQ(toolbar->colorButtonCount(), static_cast<int>(kAnnotationPaletteColors.size()) + 3) << "预设八格 + 最近两格 + 自定义一枚";
 
+    ASSERT_NE(openColorMenu(*toolbar), nullptr);
     auto *second = buttonByLabel(*toolbar, "最近使用 2");
     ASSERT_NE(second, nullptr) << "第二格没按清单排出来，顺序就不再是「最近」";
     second->click();
@@ -1313,6 +1329,7 @@ TEST_F(ToolbarFixture, EachShapeRemembersItsOwnColor)
 
     // 默认是选择/指针；先切到矩形，再给它挑色板第二格
     buttonByLabel(*toolbar, "矩形")->click();
+    ASSERT_NE(openColorMenu(*toolbar), nullptr);
     auto *secondSwatch = buttonByLabel(*toolbar, "颜色 2");
     ASSERT_NE(secondSwatch, nullptr);
     secondSwatch->click();
@@ -1345,6 +1362,7 @@ TEST_F(ToolbarFixture, ShapeWithoutItsOwnColorKeepsTheOneInUse)
     SignalLog log;
     auto      toolbar = makeToolbarLogged(log);
 
+    ASSERT_NE(openColorMenu(*toolbar), nullptr);
     auto *thirdSwatch = buttonByLabel(*toolbar, "颜色 3");
     ASSERT_NE(thirdSwatch, nullptr);
     thirdSwatch->click();
@@ -1359,36 +1377,39 @@ TEST_F(ToolbarFixture, ShapeWithoutItsOwnColorKeepsTheOneInUse)
 }
 
 /**
- * @brief 钉住按下的那一格色块跟着形状色走
- * @details 色块行是互斥的：切了形状、颜色换了而按下的还是上一格，界面就在说「现在是箭头那格色」，
- *          而实际画出来用的是另一格——读屏与眼睛都会被它骗一次。
+ * @brief 钉住工具栏那枚颜色按钮显示的就是当前形状的颜色
+ * @details 菜单收起之后，按钮上的色块是唯一能看出「现在用的是哪支」的地方；
+ *          形状各记各的色，切回去时按钮也得跟着换。
  */
-TEST_F(ToolbarFixture, PressedSwatchFollowsTheShapeColor)
+TEST_F(ToolbarFixture, ColorButtonShowsTheShapeColor)
 {
     SignalLog log;
     auto      toolbar = makeToolbarLogged(log);
 
-    buttonByLabel(*toolbar, "矩形")->click();
-    auto *secondSwatch = buttonByLabel(*toolbar, "颜色 2");
-    auto *fifthSwatch  = buttonByLabel(*toolbar, "颜色 5");
-    ASSERT_NE(secondSwatch, nullptr);
-    ASSERT_NE(fifthSwatch, nullptr);
+    ASSERT_NE(openColorMenu(*toolbar), nullptr);
+    const auto shownColor = [&toolbar]
+    {
+        auto      *button = buttonByLabel(*toolbar, "颜色");
+        const auto edge   = static_cast<int>(GyanisScribe::Gui::IconSize::Medium);
+        return button->icon().pixmap(QSize(edge, edge)).toImage().pixelColor(edge / 2, edge / 2);
+    };
 
-    secondSwatch->click();
+    buttonByLabel(*toolbar, "矩形")->click();
+    buttonByLabel(*toolbar, "颜色 2")->click();
+    EXPECT_EQ(shownColor().rgb(), kAnnotationPaletteColors[1].rgb());
+
     auto *arrowButton = buttonByLabel(*toolbar, "箭头");
     ASSERT_NE(arrowButton, nullptr);
     arrowButton->click();
-    fifthSwatch->click();
-    ASSERT_TRUE(fifthSwatch->isChecked());
+    buttonByLabel(*toolbar, "颜色 5")->click();
+    EXPECT_EQ(shownColor().rgb(), kAnnotationPaletteColors[4].rgb());
 
     buttonByLabel(*toolbar, "矩形")->click();
-
-    EXPECT_TRUE(secondSwatch->isChecked()) << "切回矩形后按下的色块还停在箭头那一格";
-    EXPECT_FALSE(fifthSwatch->isChecked()) << "两排色块同时按下：互斥组没起作用";
+    EXPECT_EQ(shownColor().rgb(), kAnnotationPaletteColors[1].rgb()) << "切回矩形，颜色按钮还停在箭头那一格";
 }
 
 /**
- * @brief 钉住色板那一排上的滚轮改的是当前形状颜色的不透明度
+ * @brief 钉住颜色按钮上的滚轮改的是当前形状颜色的不透明度
  * @details 判据盯两处最容易算错的地方：一档的百分比（5）与「百分比 → alpha」的换算。
  *          少一次换算（把 95 当成 alpha 写进去）会得到几乎全黑的一笔；RGB 被顺带改掉的话，
  *          用户看到的就不是「淡一点」而是换了个颜色。
@@ -1398,13 +1419,16 @@ TEST_F(ToolbarFixture, WheelOnTheColorRowDimsTheShapeColor)
     SignalLog log;
     auto      toolbar = makeToolbarLaidOut(log);
 
+    ASSERT_NE(openColorMenu(*toolbar), nullptr);
     auto *fifthSwatch = buttonByLabel(*toolbar, "颜色 5");
     ASSERT_NE(fifthSwatch, nullptr);
-    ASSERT_FALSE(fifthSwatch->geometry().isEmpty()) << "布局没跑实，滚轮落点算不出来";
     fifthSwatch->click();
     ASSERT_EQ(toolbar->currentColorOpacityPercent(), 100) << "色板那一格该以完全不透明起步";
 
-    wheelOn(*toolbar, fifthSwatch->geometry().center(), -120);
+    auto *colorButton = buttonByLabel(*toolbar, "颜色");
+    ASSERT_NE(colorButton, nullptr);
+    ASSERT_FALSE(colorButton->geometry().isEmpty()) << "布局没跑实，滚轮落点算不出来";
+    wheelOn(*toolbar, colorButton->geometry().center(), -120);
 
     EXPECT_EQ(toolbar->currentColorOpacityPercent(), 95);
     EXPECT_EQ(toolbar->currentColor().alpha(), 242) << "一档 5% 要落进 alpha：95% × 255 四舍五入 = 242";
@@ -1415,7 +1439,7 @@ TEST_F(ToolbarFixture, WheelOnTheColorRowDimsTheShapeColor)
     // 点那一格发一次、滚一档再发一次：两次都对，第二次带的才是淡掉的那支
     ASSERT_EQ(log.colors.size(), 2u) << "滚了一档却没把颜色通知宿主";
     EXPECT_EQ(log.colors.back().alpha(), 242);
-    EXPECT_EQ(buttonByLabel(*toolbar, "自定义颜色")->toolTip(), QString::fromUtf8("自定义颜色（当前不透明度 95%；在色板这一排上滚滚轮调节）")) << "读数没跟上";
+    EXPECT_EQ(colorButton->toolTip(), QString::fromUtf8("颜色（当前不透明度 95%；在这一枚上滚滚轮调节）")) << "读数没跟上";
 }
 
 /**
@@ -1428,10 +1452,13 @@ TEST_F(ToolbarFixture, WheelOpacityClampsAtBothEnds)
     SignalLog log;
     auto      toolbar = makeToolbarLaidOut(log);
 
+    ASSERT_NE(openColorMenu(*toolbar), nullptr);
     auto *fifthSwatch = buttonByLabel(*toolbar, "颜色 5");
     ASSERT_NE(fifthSwatch, nullptr);
     fifthSwatch->click();
-    const auto center = fifthSwatch->geometry().center();
+    auto *colorButton = buttonByLabel(*toolbar, "颜色");
+    ASSERT_NE(colorButton, nullptr);
+    const auto center = colorButton->geometry().center();
 
     for (int notch = 0; notch < 20; ++notch)
     {
@@ -1448,7 +1475,7 @@ TEST_F(ToolbarFixture, WheelOpacityClampsAtBothEnds)
 }
 
 /**
- * @brief 钉住滚轮只吃色板那一段：落在工具按钮上什么都不改
+ * @brief 钉住滚轮只吃颜色按钮：落在工具按钮上什么都不改
  * @details 工具栏是一整条横排，滑块与下拉框自己也吃轮。整个控件都收轮的话，
  *          调线宽时颜色会跟着变淡，而用户从没想过要改颜色。
  */
@@ -1457,13 +1484,14 @@ TEST_F(ToolbarFixture, WheelOffTheColorRowLeavesTheColorAlone)
     SignalLog log;
     auto      toolbar = makeToolbarLaidOut(log);
 
-    auto *fifthSwatch = buttonByLabel(*toolbar, "颜色 5");
-    ASSERT_NE(fifthSwatch, nullptr);
-    fifthSwatch->click();
+    ASSERT_NE(openColorMenu(*toolbar), nullptr);
+    buttonByLabel(*toolbar, "颜色 5")->click();
 
+    auto *colorButton = buttonByLabel(*toolbar, "颜色");
     auto *arrowButton = buttonByLabel(*toolbar, "箭头");
+    ASSERT_NE(colorButton, nullptr);
     ASSERT_NE(arrowButton, nullptr);
-    ASSERT_NE(arrowButton->geometry(), fifthSwatch->geometry()) << "两枚按钮叠在同一格，这条验不出落点在哪";
+    ASSERT_NE(arrowButton->geometry(), colorButton->geometry()) << "两枚按钮叠在同一格，这条验不出落点在哪";
 
     const auto colorsBeforeWheel = log.colors.size();
     wheelOn(*toolbar, arrowButton->geometry().center(), -120);
@@ -1483,9 +1511,13 @@ TEST_F(ToolbarFixture, WheelOpacityIsRememberedPerShape)
     auto      toolbar = makeToolbarLaidOut(log);
 
     buttonByLabel(*toolbar, "矩形")->click();
+    ASSERT_NE(openColorMenu(*toolbar), nullptr);
     auto *fifthSwatch = buttonByLabel(*toolbar, "颜色 5");
     ASSERT_NE(fifthSwatch, nullptr);
-    const auto center = fifthSwatch->geometry().center();
+    fifthSwatch->click();
+    auto *colorButton = buttonByLabel(*toolbar, "颜色");
+    ASSERT_NE(colorButton, nullptr);
+    const auto center = colorButton->geometry().center();
 
     wheelOn(*toolbar, center, -120);
     ASSERT_EQ(toolbar->currentColorOpacityPercent(), 95);
@@ -1523,6 +1555,7 @@ TEST_F(ToolbarFixture, PaletteFromSettingsDrivesTheSwatchRow)
 
     ASSERT_EQ(toolbar->colorButtonCount(), static_cast<int>(tokens.size()) + 1) << "三格色板加自定义一枚；预设那八格不该还摆着";
 
+    ASSERT_NE(openColorMenu(*toolbar), nullptr);
     auto *second = buttonByLabel(*toolbar, "颜色 2");
     ASSERT_NE(second, nullptr) << "色板那一排没按存进来的顺序摆出来";
     second->click();
@@ -1545,124 +1578,4 @@ TEST_F(ToolbarFixture, BrokenPaletteFallsBackToTheBuiltinRow)
 
     EXPECT_EQ(toolbar->colorButtonCount(), static_cast<int>(kAnnotationPaletteColors.size()) + 1) << "坏名单把整排色板带走了";
     EXPECT_EQ(toolbar->currentColor(), kAnnotationPaletteColors[0]) << "回落的那一排第一格该是内置的第一格";
-}
-
-
-namespace
-{
-    /// 投一条鼠标事件：局部与全局两个位置按控件自己的映射算，形状与 Qt 自己发的一致
-    void sendMouse(QWidget &target, const QEvent::Type type, const QPoint &local, const Qt::MouseButton button = Qt::LeftButton)
-    {
-        const QPoint global = target.mapToGlobal(local);
-        QMouseEvent  event{type, QPointF{local}, QPointF{global}, button, button, Qt::NoModifier};
-        QApplication::sendEvent(&target, &event);
-    }
-} // namespace
-
-/**
- * @brief 钉住色板重排的两半：表换过来了、配置里那份也换了，而按钮按「第几格」发色
- * @details 重排只换图标不改按钮；点击要是还发当初抄进去的那支色，拖完的一排就会发旧色。
-
- */
-TEST_F(ToolbarFixture, PaletteMoveRewritesTheRowAndPersistsIt)
-{
-    const QStringList tokens{QStringLiteral("#112233"), QStringLiteral("#445566"), QStringLiteral("#778899")};
-    presetPalette(tokens);
-
-    SignalLog log;
-    auto      toolbar = makeToolbarLaidOut(log);
-
-    toolbar->requestPaletteMove(2, 0);
-    const QStringList expected{QStringLiteral("#778899"), QStringLiteral("#112233"), QStringLiteral("#445566")};
-    EXPECT_EQ(m_settings->stringListValue(GyanisScribe::Core::kAnnotationPalette, {}), expected) << "顺序没写回配置，或挪的算法不对";
-
-    auto *first = buttonByLabel(*toolbar, "颜色 1");
-    ASSERT_NE(first, nullptr);
-    first->click();
-    ASSERT_EQ(log.colors.size(), 1U);
-    EXPECT_EQ(log.colors[0], QColor(0x77, 0x88, 0x99)) << "第一格发的还是拖之前那一支：点击抄的是色而不是格";
-}
-
-/**
- * @brief 钉住坏落点与原地不动都不写配置
- * @details 越界的序号只会来自算错的坐标；把它写下去就等于把工具栏正摆着那一排换成另一份没摆过的。
-
- */
-TEST_F(ToolbarFixture, PaletteMoveIgnoresBadSlotsAndNoOps)
-{
-    const QStringList tokens{QStringLiteral("#112233"), QStringLiteral("#445566"), QStringLiteral("#778899")};
-    presetPalette(tokens);
-
-    SignalLog log;
-    auto      toolbar = makeToolbarLaidOut(log);
-
-    toolbar->requestPaletteMove(0, 0);
-    toolbar->requestPaletteMove(0, 99);
-    toolbar->requestPaletteMove(-1, 1);
-    toolbar->requestPaletteMove(3, 0);
-
-    EXPECT_EQ(m_settings->stringListValue(GyanisScribe::Core::kAnnotationPalette, {}), tokens) << "越界或原地的那几次动了色板";
-    EXPECT_TRUE(log.colors.empty()) << "重排不该顺手把当前颜色也换了";
-}
-
-/**
- * @brief 钉住「按住一格拖到另一格那儿」真的把那一格挪过去，并且那一下不改当前颜色
- * @details 松手落在别的格上时 Qt 不发 clicked()，所以重排不该有任何选色副作用——这条判据钉的就是「只挪序、不换色」。
-
- */
-TEST_F(ToolbarFixture, DraggingASwatchOntoAnotherReordersThem)
-{
-    const QStringList tokens{QStringLiteral("#112233"), QStringLiteral("#445566"), QStringLiteral("#778899")};
-    presetPalette(tokens);
-
-    SignalLog log;
-    auto      toolbar = makeToolbarLaidOut(log);
-
-    auto *first = buttonByLabel(*toolbar, "颜色 1");
-    auto *third = buttonByLabel(*toolbar, "颜色 3");
-    ASSERT_NE(first, nullptr);
-    ASSERT_NE(third, nullptr);
-    ASSERT_NE(first->geometry(), third->geometry()) << "两格挤在同一处，拖动就没法判";
-
-    const QPoint start   = first->rect().center();
-    const QPoint onThird = first->mapFromGlobal(third->mapToGlobal(third->rect().center()));
-
-    sendMouse(*first, QEvent::MouseButtonPress, start);
-    // 先走过 Qt 的拖动阈值，再落到第三格上：两下都投在这枚被按住的按钮上（Qt 的鼠标抓取就是这样）
-    sendMouse(*first, QEvent::MouseMove, start + QPoint{first->width(), 0});
-    sendMouse(*first, QEvent::MouseMove, onThird);
-    sendMouse(*first, QEvent::MouseButtonRelease, onThird);
-
-    const QStringList expected{QStringLiteral("#445566"), QStringLiteral("#778899"), QStringLiteral("#112233")};
-    EXPECT_EQ(m_settings->stringListValue(GyanisScribe::Core::kAnnotationPalette, {}), expected) << "拖了一趟没重排，或落点算错";
-    EXPECT_TRUE(log.colors.empty()) << "拖完那一下被当成选色：整理色板不该改在用的颜色";
-}
-
-/**
- * @brief 钉住没过拖动阈值的抖动不重排
- * @details 手抖一两像素就把色板重排，比不动更让人以为是程序疯了。
- */
-TEST_F(ToolbarFixture, JitterBelowTheDragThresholdDoesNotReorder)
-{
-    const QStringList tokens{QStringLiteral("#112233"), QStringLiteral("#445566"), QStringLiteral("#778899")};
-    presetPalette(tokens);
-
-    SignalLog log;
-    auto      toolbar = makeToolbarLaidOut(log);
-
-    auto *first = buttonByLabel(*toolbar, "颜色 1");
-    auto *third = buttonByLabel(*toolbar, "颜色 3");
-    ASSERT_NE(first, nullptr);
-    ASSERT_NE(third, nullptr);
-
-    const QPoint start    = first->rect().center();
-    const QPoint onThird  = first->mapFromGlobal(third->mapToGlobal(third->rect().center()));
-    const int    oneShort = QApplication::startDragDistance() - 1;
-    ASSERT_GT(oneShort, 0) << "这台机器的拖动阈值太小，这条判据构造不出「没过阈值」的现场";
-
-    sendMouse(*first, QEvent::MouseButtonPress, start);
-    sendMouse(*first, QEvent::MouseMove, start + QPoint{oneShort, 0});
-    sendMouse(*first, QEvent::MouseButtonRelease, start + QPoint{oneShort, 0});
-
-    EXPECT_EQ(m_settings->stringListValue(GyanisScribe::Core::kAnnotationPalette, {}), tokens) << "阈值之内的一抖就把色板重排了";
 }

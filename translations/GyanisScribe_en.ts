@@ -32,6 +32,10 @@
             <translation>No region was recorded for this capture, so the screenshot cannot be refreshed</translation>
         </message>
         <message>
+            <source>这一轮没记录屏幕或选区，改不了截图范围</source>
+            <translation>No screen or selection was recorded for this round, so the capture range cannot be changed</translation>
+        </message>
+        <message>
             <source>已复制到剪贴板</source>
             <translation>Copied to the clipboard</translation>
         </message>
@@ -552,6 +556,14 @@
             <translation>Quit</translation>
         </message>
         <message>
+            <source>光标所在屏幕</source>
+            <translation>Screen under the cursor</translation>
+        </message>
+        <message>
+            <source>整屏截图：%1</source>
+            <translation>Full-screen capture: %1</translation>
+        </message>
+        <message>
             <source>快捷键：%1，可在设置页改</source>
             <translation>Shortcut: %1. Change it on the Settings page</translation>
         </message>
@@ -690,6 +702,10 @@
         <message>
             <source>字号必须是正数，收到的是 {}。请取 8 到 72 之间的整数</source>
             <translation>Font size must be a positive number; got {}. Use a whole number between 8 and 72.</translation>
+        </message>
+        <message>
+            <source>当前是选择工具，不会落笔</source>
+            <translation>The select tool does not draw</translation>
         </message>
         <message>
             <source>当前工具种类没有对应的工具实现，请检查 setActiveTool 与构造列表</source>
@@ -1248,16 +1264,8 @@
             <translation>The settings import file isn't a JSON object: {} ({}). Import the file this program exported instead.</translation>
         </message>
         <message>
-            <source>颜色 %1</source>
-            <translation>Color %1</translation>
-        </message>
-        <message>
-            <source>按住拖动可以把这一格挪到另一格那儿；上限是 16 格，顺序存在设置的标注页里</source>
-            <translation>Hold and drag to move this swatch next to another one; the palette holds up to 16 swatches and the order is stored on the annotation page of the settings</translation>
-        </message>
-        <message>
-            <source>自定义颜色</source>
-            <translation>Custom color</translation>
+            <source>颜色</source>
+            <translation>Color</translation>
         </message>
         <message>
             <source>线宽</source>
@@ -1370,6 +1378,14 @@
         <message>
             <source>识别二维码</source>
             <translation>Scan QR/barcode</translation>
+        </message>
+        <message>
+            <source>关闭标注</source>
+            <translation>Close annotation</translation>
+        </message>
+        <message>
+            <source>关闭标注（Esc）</source>
+            <translation>Close annotation (Esc)</translation>
         </message>
         <message>
             <source>填充：无</source>
@@ -1576,12 +1592,20 @@
             <translation>Select annotation color</translation>
         </message>
         <message>
-            <source>自定义颜色（当前不透明度 %1%；在色板这一排上滚滚轮调节）</source>
-            <translation>Custom color (current opacity %1%; scroll on the color row to adjust)</translation>
+            <source>颜色 %1</source>
+            <translation>Color %1</translation>
         </message>
         <message>
             <source>最近使用 %1</source>
             <translation>Recent %1</translation>
+        </message>
+        <message>
+            <source>自定义颜色…</source>
+            <translation>Custom color…</translation>
+        </message>
+        <message>
+            <source>颜色（当前不透明度 %1%；在这一枚上滚滚轮调节）</source>
+            <translation>Color (current opacity %1%; scroll on this button to adjust)</translation>
         </message>
         <message>
             <source>工具栏尺寸 {}x{} 不成立，摆放前要先有有效的 sizeHint</source>
@@ -1618,30 +1642,6 @@
         <message>
             <source>拖四边调整 · Enter/双击确认 · Esc 取消</source>
             <translation>Drag the edges to adjust · Enter/double-click to confirm · Esc to cancel</translation>
-        </message>
-        <message>
-            <source>选择</source>
-            <translation>Select</translation>
-        </message>
-        <message>
-            <source>当前是选择工具，不会落笔</source>
-            <translation>The select tool does not draw</translation>
-        </message>
-        <message>
-            <source>这一轮没记录屏幕或选区，改不了截图范围</source>
-            <translation>No screen or selection was recorded for this round, so the capture range cannot be changed</translation>
-        </message>
-        <message>
-            <source>光标所在屏幕</source>
-            <translation>Screen under the cursor</translation>
-        </message>
-        <message>
-            <source>增加</source>
-            <translation>Increase</translation>
-        </message>
-        <message>
-            <source>减少</source>
-            <translation>Decrease</translation>
         </message>
         <message>
             <source>已复制尺寸 %1</source>
@@ -1720,6 +1720,10 @@
             <translation>Finish scrolling capture</translation>
         </message>
         <message>
+            <source>选择</source>
+            <translation>Select</translation>
+        </message>
+        <message>
             <source>锁定长宽比</source>
             <translation>Lock the aspect ratio</translation>
         </message>
@@ -1786,6 +1790,14 @@
         <message>
             <source>请按下快捷键（Esc 取消）</source>
             <translation>Press the shortcut (Esc cancels)</translation>
+        </message>
+        <message>
+            <source>增加</source>
+            <translation>Increase</translation>
+        </message>
+        <message>
+            <source>减少</source>
+            <translation>Decrease</translation>
         </message>
         <message>
             <source>提示</source>
@@ -2742,10 +2754,6 @@
         <message>
             <source>配置文件 (*.json)</source>
             <translation>Configuration files (*.json)</translation>
-        </message>
-        <message>
-            <source>整屏截图：%1</source>
-            <translation>Full-screen capture: %1</translation>
         </message>
         <message>
             <source>与托盘菜单、全局热键走同一个出口</source>

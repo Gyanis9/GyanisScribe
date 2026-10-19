@@ -22,10 +22,9 @@
 #include <tuple>
 #include <vector>
 
-class QButtonGroup;
 class QComboBox;
 class QFontComboBox;
-class QHBoxLayout;
+class QMenu;
 class QSlider;
 class QToolButton;
 
@@ -64,9 +63,6 @@ namespace GyanisScribe::Gui
 
     /// 工具栏上的工具按钮数量，由登记表算出：加一档工具只改表，数组跟着长
     inline constexpr std::size_t kToolButtonCount = kToolTable.size();
-
-    /// 自定义取色按钮在互斥组里的编号：不能紧跟在预设色板后面，最近使用颜色要往那段里插
-    inline constexpr int kCustomColorButtonId = 100;
 
     /**
      * @brief 标注工具栏控件
@@ -109,18 +105,8 @@ namespace GyanisScribe::Gui
         /// 工具按钮数量，由登记表算出：布局与用例据此核对「每一档工具都有一枚按钮」
         [[nodiscard]] static int toolButtonCount();
 
-        /// 色块按钮数量：色板那几格加一个自定义取色（色板是几格由配置里那一格定）
+        /// 颜色入口里的可选颜色数：色板那几格 + 最近使用 + 一枚自定义取色
         [[nodiscard]] int colorButtonCount() const;
-
-        /**
-         * @brief 把色板里的一格挪到另一格那儿，并把新的顺序写回配置
-         * @param from 拖走的那一格序号
-         * @param to 落点那一格序号（都以挪走之前的表为准）
-         * @details 越界、原地不动与「名单被别处改坏」都不写配置：前者是手抖，最后一写下去会把工具栏
-         *          正在摆的那一排顶成另一份。公开这一格是给判据用的——拖动要三个鼠标事件与真实几何，
-         *          而那一步是那一串的最后一下。
-         */
-        void requestPaletteMove(int from, int to);
 
         /// 当前选中的颜色，含自定义取回来的那一个
         [[nodiscard]] QColor currentColor() const;
@@ -350,25 +336,17 @@ namespace GyanisScribe::Gui
         /// 识别二维码/条形码
         void scanClicked();
 
+        /// 关闭标注窗（工具栏最右那枚 X，与 Esc 同一条收场路）
+        void closeClicked();
+
     protected:
         /**
-         * @brief 在色板那一排上滚滚轮：调当前形状那一格颜色的不透明度
+         * @brief 在颜色按钮上滚滚轮：调当前形状那一格颜色的不透明度
          * @param event 滚轮事件
-         * @details 重写 QWidget::wheelEvent：只在色块那一段矩形里生效，滚到工具按钮或滑块上不改颜色——
-         *          「在这排上滚滚轮」是这一档唯一的手势出口，滚哪儿都改会让调线宽的手势顺手把颜色调淡。
+         * @details 重写 QWidget::wheelEvent：只在颜色按钮那一段矩形里生效，滚到工具按钮或滑块上不改颜色——
+         *          「在这一枚上滚滚轮」是这一档唯一的手势出口，滚哪儿都改会让调线宽的手势顺手把颜色调淡。
          */
         void wheelEvent(QWheelEvent *event) override;
-
-        /**
-         * @brief 色板那几格上的按住拖动：把这一格拖到另一格那儿就重排
-         * @param watched 被观察的控件（这里只有色板那几枚色块）
-         * @param event 来的事件
-         * @return 交回基类的结果：这一路只看不吞，按下与点击照旧走完
-         * @details 重写 QWidget::eventFilter：只看不动——按下、移动、抬起三下都在基类流程里照常走完，
-         *          这一路只在走过阈值且落到另一格上时挪一次顺序。松手落在别格上时 Qt 本就不发 clicked()，
-         *          所以重排不会顺手把在用的颜色换掉，这里不需要额外挡一道。
-         */
-        bool eventFilter(QObject *watched, QEvent *event) override;
 
     private:
         /**
@@ -380,8 +358,14 @@ namespace GyanisScribe::Gui
          */
         [[nodiscard]] QToolButton *makeButton(std::string_view iconName, const QString &label, bool checkable);
 
-        /// 打开系统取色对话框并把选中的色并进色块行；用户取消时什么都不发
+        /// 打开系统取色对话框并把选中的色并进最近使用；用户取消时什么都不发
         void chooseCustomColor();
+
+        /// 按当前色板与最近使用重建颜色菜单：每次弹出前重建，选过自定义色之后不用另外通知
+        void rebuildColorMenu();
+
+        /// 把当前颜色画到工具栏那枚颜色按钮上，并把不透明度写进提示
+        void refreshColorButton();
 
         /**
          * @brief 把配置里存的默认线宽与字号落到滑块和下拉框上
@@ -391,13 +375,6 @@ namespace GyanisScribe::Gui
 
         /// 把当前的线宽与字号写回配置，供下次打开标注窗作起点
         void rememberDefaults();
-
-        /**
-         * @brief 按 m_recentColors 重建最近使用的色块
-         * @details 先摘旧按钮再插新的，编号从色板那一排的格数起排（自定义之后格数不是八）；
-         *          自定义按钮固定用 kCustomColorButtonId，才不会和插进来的色块撞编号。
-         */
-        void rebuildRecentColors();
 
         /**
          * @brief 用户挑了一格颜色：把它记到当前形状那一格上，并发出 colorChanged
@@ -411,21 +388,12 @@ namespace GyanisScribe::Gui
          * @brief 切到另一个形状时，把那一格记着的颜色换到当前颜色上
          * @param kind 切过去的形状
          * @details 没记过颜色的形状不动：突然把用户正在用的颜色换成色板第一格，比留着更让人莫名。
-         *          换了色要把按下的色块跟着挪过去，否则按下的那一格说的不是当前色。
+         *          换了色要把颜色按钮的色块跟着换过去，否则按钮上那一格说的不是当前色。
          */
         void adoptColorForTool(Core::ToolKind kind);
 
-        /// 按当前颜色把色块行里的按下态挪到匹配的那一格；没有匹配格就落到自定义那一格
-        void syncColorButtonChecked();
-
-        /// 这个窗口内落点是否在色板那一段上（预设 + 最近使用 + 自定义那一枚的合矩形）
+        /// 这个窗口内落点是否在颜色按钮上（滚轮调不透明度的唯一入口）
         [[nodiscard]] bool overColorRow(const QPoint &localPoint) const;
-
-        /// 全局落点落在色板第几格上；不在那一排上返回 -1（最近使用与自定义那两枚不参与重排）
-        [[nodiscard]] int paletteIndexAtGlobalPoint(const QPoint &globalPoint) const;
-
-        /// 按 m_palette 重画色块图标：重排只换图标，不重建按钮（拖的那一下正跑在按钮的事件里，删它会当场踩空）
-        void repaintPaletteSwatches();
 
         /// 把当前不透明度写进自定义按钮的提示：读数要有出口，不然「滚了一下到底改没改」只能靠画一笔去看
         void updateOpacityHint();
@@ -442,21 +410,16 @@ namespace GyanisScribe::Gui
          */
         void updateContextVisibility();
 
-        Core::ISettingsStore      &m_settings;                  ///< 最近使用颜色的读写去处
-        std::vector<QColor>        m_recentColors;              ///< 最近用过的自定义颜色，首位最新
-        std::vector<QToolButton *> m_recentButtons;             ///< 与 m_recentColors 同序的色块按钮
-        std::vector<QToolButton *> m_paletteButtons;            ///< 色板那几格的按钮，与 m_palette 同序（自定义色板时格数不是写死的八格）
-        std::vector<QColor>        m_palette;                   ///< 这一排摆的色板：配置里那份，没填就是内置那八格
-        int                        m_recentInsertIndex    = 0;  ///< 色块插进布局的位置（预设色板之后、自定义按钮之前）
-        int                        m_draggingPaletteIndex = -1; ///< 正在被拖的色板格序号，-1 表示没在拖
-        QPoint                     m_dragStartGlobal;           ///< 按下那一下的全局位置：走过 Qt 的拖动阈值才算拖
-        class QHBoxLayout         *m_layout     = nullptr;      ///< 工具栏主布局，重建色块时要往这里插
-        QButtonGroup              *m_colorGroup = nullptr;      ///< 色块的互斥组，重建最近使用时要同步它的成员
+        Core::ISettingsStore &m_settings;     ///< 最近使用颜色的读写去处
+        std::vector<QColor>   m_recentColors; ///< 最近用过的自定义颜色，首位最新
+        std::vector<QColor>   m_palette;      ///< 颜色菜单里那排色板：配置里那份，没填就是内置那八格
 
         const Gui::IconProvider                     &m_icons;                                                                   ///< 图标出口，不拥有
         std::array<QToolButton *, kToolButtonCount>  m_toolButtons{};                                                           ///< 工具按钮，按 Core::ToolKind 顺序
         std::array<Core::ToolKind, kToolButtonCount> m_toolKinds{};                                                             ///< 按钮序号到工具的映射，反向查也用它
-        QToolButton                                 *m_customColorButton    = nullptr;                                          ///< 自定义取色按钮
+        QToolButton                                 *m_colorButton          = nullptr;                                          ///< 颜色入口：按钮上是当前色，弹出菜单里才是色板
+        QMenu                                       *m_colorMenu            = nullptr;                                          ///< 颜色弹出菜单，每次弹出前按色板与最近使用重建
+        QToolButton                                 *m_closeButton          = nullptr;                                          ///< 关闭标注窗，与 Esc 同一条收场路
         QToolButton                                 *m_undoButton           = nullptr;                                          ///< 撤销按钮
         QToolButton                                 *m_redoButton           = nullptr;                                          ///< 重做按钮
         QSlider                                     *m_widthSlider          = nullptr;                                          ///< 线宽滑块，档位对齐 kAnnotationWidths

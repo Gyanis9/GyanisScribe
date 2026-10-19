@@ -154,7 +154,7 @@ namespace
 
             const QPointF pressPoint{200, 150};
             const QPointF dragPoint{900, 560};
-            QMouseEvent  pressed{QEvent::MouseButtonPress, pressPoint, pressPoint, Qt::LeftButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+            QMouseEvent   pressed{QEvent::MouseButtonPress, pressPoint, pressPoint, Qt::LeftButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
             QApplication::sendEvent(&overlay, &pressed);
             QMouseEvent dragged{QEvent::MouseMove, dragPoint, dragPoint, Qt::NoButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
             QApplication::sendEvent(&overlay, &dragged);
@@ -175,8 +175,8 @@ namespace
 
         // 贴图组管理窗
         {
-            GyanisScribe::Gui::PinManager              pins{settings, integration};
-            GyanisScribe::Gui::PinGroupManagerWindow   groups{pins};
+            GyanisScribe::Gui::PinManager            pins{settings, integration};
+            GyanisScribe::Gui::PinGroupManagerWindow groups{pins};
             groups.show();
             shoot(groups, outputDirectory, (prefix + "pin-group-manager").c_str());
         }
@@ -222,7 +222,7 @@ namespace
             GyanisScribe::Core::OcrResult result;
             result.language          = QStringLiteral("zh-Hans");
             result.averageConfidence = 0.93;
-            const auto addLine = [&result](const QString &text, const QRect &box)
+            const auto addLine       = [&result](const QString &text, const QRect &box)
             {
                 GyanisScribe::Core::OcrLine line;
                 line.boundingBox = box;
@@ -253,7 +253,7 @@ namespace
         // Toast：三类各拍一张气泡本体
         {
             GyanisScribe::Gui::Toast toast{icons, theme};
-            const auto              shootToast = [&](const GyanisScribe::Gui::ToastKind kind, const char *name, const QString &text)
+            const auto               shootToast = [&](const GyanisScribe::Gui::ToastKind kind, const char *name, const QString &text)
             {
                 toast.show(text, kind);
                 if (auto *bubble = toastBubble(); bubble != nullptr)
@@ -311,7 +311,7 @@ int main(int argc, char *argv[])
     // 真主题、真字体排出来；取 contextMenu() 直接抓，不经过系统托盘的鼠标动作
     if (liveTray)
     {
-        auto integration = GyanisScribe::Platform::createPlatformIntegration();
+        auto                              integration = GyanisScribe::Platform::createPlatformIntegration();
         GyanisScribe::App::TrayController tray{icons, theme, settings, *integration};
         if (!tray.install())
         {
@@ -381,7 +381,7 @@ int main(int argc, char *argv[])
         shoot(toolbar, outputDirectory, "annotation-toolbar-text-outline-background");
     }
 
-    // 面 2：标注工具栏满配态——16 格色板 + 6 格最近色，这是它能长到的最宽形状
+    // 面 2：颜色菜单满配态——16 格色板 + 6 格最近色，菜单能长到的最宽形状
     {
         const auto paletteSeeded = settings.setValue(GyanisScribe::Core::kAnnotationPalette, GyanisScribe::Core::paletteToTokens(fullPalette()));
         const auto recentSeeded  = settings.setValue(GyanisScribe::Core::kAnnotationRecentColors, GyanisScribe::Core::serializeRecentColors(fullRecentColors()));
@@ -392,7 +392,13 @@ int main(int argc, char *argv[])
         }
         GyanisScribe::Gui::AnnotationToolbar toolbar{settings, icons, nullptr};
         toolbar.show();
-        shoot(toolbar, outputDirectory, "annotation-toolbar-full-palette");
+        if (auto *menu = toolbar.findChild<QMenu *>(QStringLiteral("annotationColorMenu")); menu != nullptr)
+        {
+            // 色块挂在 aboutToShow 上现建：不发这一下菜单是空的，抓出来只有一块白板
+            QMetaObject::invokeMethod(menu, "aboutToShow", Qt::DirectConnection);
+            menu->adjustSize();
+            shoot(*menu, outputDirectory, "annotation-color-menu-full-palette");
+        }
     }
 
     // 面 3：主窗口初始尺寸档（MainWindow 构造里 resize(680, 560)，实际被最小宽顶住，读数行会报真实值）
@@ -467,15 +473,14 @@ int main(int argc, char *argv[])
 
         // 面 6：表单行列几何（跨页对表：标签右缘 / 字段左缘 / 缝 / 行高，坐标一律映射到窗口）
         {
-            for (const auto &shot: std::array<std::pair<GyanisScribe::Main::MainWindowPage, const char *>, 8>{
-                         {{GyanisScribe::Main::MainWindowPage::General, "general"},
-                          {GyanisScribe::Main::MainWindowPage::Capture, "capture"},
-                          {GyanisScribe::Main::MainWindowPage::Annotation, "annotation"},
-                          {GyanisScribe::Main::MainWindowPage::Pin, "pin"},
-                          {GyanisScribe::Main::MainWindowPage::Record, "record"},
-                          {GyanisScribe::Main::MainWindowPage::Ocr, "ocr"},
-                          {GyanisScribe::Main::MainWindowPage::Hotkey, "hotkey"},
-                          {GyanisScribe::Main::MainWindowPage::Theme, "theme"}}})
+            for (const auto &shot: std::array<std::pair<GyanisScribe::Main::MainWindowPage, const char *>, 8>{{{GyanisScribe::Main::MainWindowPage::General, "general"},
+                                                                                                               {GyanisScribe::Main::MainWindowPage::Capture, "capture"},
+                                                                                                               {GyanisScribe::Main::MainWindowPage::Annotation, "annotation"},
+                                                                                                               {GyanisScribe::Main::MainWindowPage::Pin, "pin"},
+                                                                                                               {GyanisScribe::Main::MainWindowPage::Record, "record"},
+                                                                                                               {GyanisScribe::Main::MainWindowPage::Ocr, "ocr"},
+                                                                                                               {GyanisScribe::Main::MainWindowPage::Hotkey, "hotkey"},
+                                                                                                               {GyanisScribe::Main::MainWindowPage::Theme, "theme"}}})
             {
                 window.open(shot.first);
                 QCoreApplication::processEvents();
@@ -484,8 +489,8 @@ int main(int argc, char *argv[])
                 {
                     continue;
                 }
-                auto *scroll = qobject_cast<QScrollArea *>(stack->currentWidget());
-                QWidget *page = scroll != nullptr && scroll->widget() != nullptr ? scroll->widget() : stack->currentWidget();
+                auto    *scroll = qobject_cast<QScrollArea *>(stack->currentWidget());
+                QWidget *page   = scroll != nullptr && scroll->widget() != nullptr ? scroll->widget() : stack->currentWidget();
                 for (auto *form: page->findChildren<QFormLayout *>())
                 {
                     for (int row = 0; row < form->rowCount(); ++row)
@@ -496,11 +501,12 @@ int main(int argc, char *argv[])
                         {
                             continue;
                         }
-                        auto *label = labelItem->widget();
-                        auto *field = fieldItem->widget();
+                        auto      *label      = labelItem->widget();
+                        auto      *field      = fieldItem->widget();
                         const auto labelRight = label->mapTo(&window, QPoint{label->width(), 0}).x();
                         const auto fieldLeft  = field->mapTo(&window, QPoint{0, 0}).x();
-                        std::printf("form[%s] row=%d labelRight=%d fieldLeft=%d gap=%d rowH=%d\n", shot.second, row, labelRight, fieldLeft, fieldLeft - labelRight, field->height());
+                        std::printf("form[%s] row=%d labelRight=%d fieldLeft=%d gap=%d rowH=%d\n", shot.second, row, labelRight, fieldLeft, fieldLeft - labelRight,
+                                    field->height());
                     }
                 }
             }

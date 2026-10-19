@@ -206,6 +206,9 @@ namespace GyanisScribe::Gui
         /// 把标注结果交出去：先收窗口与工具栏，再发对应信号，避免成品图里带上界面
         void deliver(ShortcutAction action);
 
+        /// 收起这一轮标注：Esc 与工具栏最右那枚 X 共用同一条收场路
+        void closeAnnotation();
+
         /// 按记下的选区与屏幕可用区把工具栏摆一次；可见段收放（contextLayoutChanged）后也走这一处
         void placeToolbarForSelection();
 

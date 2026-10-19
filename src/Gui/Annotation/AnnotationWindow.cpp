@@ -128,6 +128,8 @@ namespace GyanisScribe::Gui
 
         // 可见段收放让工具栏尺寸变了就重摆一次：收窄后还钉在旧位置会偏出选区中心
         QObject::connect(m_toolbar.get(), &AnnotationToolbar::contextLayoutChanged, this, [this] { placeToolbarForSelection(); });
+        // X 与 Esc 同一条路：用户不必记住「要关只能按键盘」
+        QObject::connect(m_toolbar.get(), &AnnotationToolbar::closeClicked, this, &AnnotationWindow::closeAnnotation);
         QObject::connect(m_view, &AnnotationView::captureResized, this, [this](const QRect &globalGeometry) { emit cropRequested(m_refreshScreenName, globalGeometry); });
         QObject::connect(m_view, &AnnotationView::captureResizeMoved, this, [this](const QRect &globalGeometry) { updateCropPreview(globalGeometry); });
 
@@ -166,6 +168,13 @@ namespace GyanisScribe::Gui
         placeToolbarForSelection();
         m_toolbar->show();
         m_toolbar->raise();
+    }
+
+    void AnnotationWindow::closeAnnotation()
+    {
+        // 工具栏是独立顶层窗：藏这一边不会把它一起带走
+        m_toolbar->hide();
+        hide();
     }
 
     void AnnotationWindow::placeToolbarForSelection()
@@ -324,8 +333,7 @@ namespace GyanisScribe::Gui
         switch (action)
         {
             case ShortcutAction::Close:
-                m_toolbar->hide();
-                hide();
+                closeAnnotation();
                 return;
             case ShortcutAction::Undo:
                 if (auto undone = m_engine.undo(); !undone)

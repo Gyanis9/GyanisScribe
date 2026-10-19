@@ -1289,6 +1289,32 @@ TEST_F(AnnotationWindowFixture, PrintShortcutEmitsTheBakedExportAndKeepsTheWindo
 }
 
 /**
+ * @brief 钉住工具栏最右那枚 X：一点就把窗口与工具栏一起收起，与 Esc 同一条路
+ * @details 工具栏是独立顶层窗，只藏窗口会把它留在桌面上；这条判据两个 visible 都断。
+ */
+TEST_F(AnnotationWindowFixture, ToolbarCloseButtonHidesBothWindows)
+{
+    auto window = makeWindow();
+    window->startAnnotation(makeCanvas({200, 100}), QRect{0, 0, 1920, 1080}, QRect{0, 0, 200, 100});
+    ASSERT_TRUE(window->isVisible());
+    ASSERT_TRUE(window->toolbar().isVisible());
+
+    QToolButton *closeButton = nullptr;
+    for (auto *candidate: window->toolbar().findChildren<QToolButton *>())
+    {
+        if (candidate->accessibleName() == QString::fromUtf8("关闭标注"))
+        {
+            closeButton = candidate;
+        }
+    }
+    ASSERT_NE(closeButton, nullptr) << "工具栏上找不到关闭按钮";
+    closeButton->click();
+
+    EXPECT_FALSE(window->isVisible()) << "点了 X 标注窗还留在屏上";
+    EXPECT_FALSE(window->toolbar().isVisible()) << "点了 X 工具栏还浮在桌面上";
+}
+
+/**
  * @brief 钉住「识别二维码」按钮：交出去的是烘好的成品，而且窗口不收场（与打印同一口径）
  * @details 与识别文字不同：扫码不另开结果窗，认没认出来都该留在标注窗里——多半只是想知道
  *          「这里头是什么」，顺手关掉现场是最烦的一种收场。

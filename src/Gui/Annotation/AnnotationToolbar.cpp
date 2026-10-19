@@ -11,15 +11,16 @@
 #include "Gui/Theme/DesignTokens.h"
 
 #include <QApplication>
+#include <QAction>
 #include <QButtonGroup>
 #include <QColorDialog>
 #include <QComboBox>
-#include <QEvent>
 #include <QFontComboBox>
 #include <QFrame>
+#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QIcon>
-#include <QMouseEvent>
+#include <QMenu>
 #include <QPainter>
 #include <QPen>
 #include <QPixmap>
@@ -27,12 +28,12 @@
 #include <QString>
 #include <QToolButton>
 #include <QWheelEvent>
+#include <QWidgetAction>
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <format>
-#include <ranges>
 #include <string_view>
 #include <tuple>
 
@@ -68,9 +69,14 @@ namespace
      */
     QPixmap colorSwatchPixmap(const QColor &color, const QColor &outline)
     {
-        const auto side = static_cast<int>(IconSize::Compact);
-        QPixmap    bitmap(side, side);
+        const auto side = static_cast<int>(IconSize::Medium);
+        // 按屏缩放比光栅化并写回比例：色块跟着按钮的 20 逻辑格走，125%/150% 屏上才不会被 Qt 整数倍
+        // 拉伸成一片糊边。封顶与 IconProvider 同一档，超过 200% 的屏交给 Qt 就近缩放
+        const auto ratio = qApp != nullptr ? std::clamp(qApp->devicePixelRatio(), 1.0, 3.0) : 1.0;
+        const auto edge  = static_cast<int>(std::ceil(static_cast<qreal>(side) * ratio));
+        QPixmap    bitmap(edge, edge);
         bitmap.fill(Qt::transparent);
+        bitmap.setDevicePixelRatio(ratio);
 
         QPainter painter(&bitmap);
         painter.setRenderHint(QPainter::Antialiasing);
@@ -102,7 +108,6 @@ namespace GyanisScribe::Gui
         setAttribute(Qt::WA_StyledBackground, true);
 
         auto *layout = new QHBoxLayout{this};
-        m_layout     = layout;
         layout->setContentsMargins(Gui::kSpacingTiny, Gui::kSpacingTiny, Gui::kSpacingTiny, Gui::kSpacingTiny);
         // 这一排最多五十几件控件，节距每多 1px 整条就多五十几像素：收到发丝档，
         // 按钮自己带 2px 内边距做视觉留白就够了（按钮最小尺寸也按同一理由在样式表里收了一档）
@@ -154,10 +159,7 @@ namespace GyanisScribe::Gui
                          });
         layout->addWidget(makeSeparator());
 
-        // 颜色组：色板那几格、最近使用的色块与一枚取色按钮，同样互斥，自定义色选中时也只亮一个
-        auto *colorGroup = new QButtonGroup{this};
-        m_colorGroup     = colorGroup;
-        colorGroup->setExclusive(true);
+        // 颜色入口：色板、最近使用与自定义取色都收进这一枚按钮弹出的菜单里，工具栏只占一格。
         // 色板读配置里那一份：没填就是内置那八格。读坏了记一条警告再回落（与「最近使用」那一路同一口径），
         // 不静默把坏值当成「一格都没存」——用户手改配置文件时那句警告是唯一能看见的线索
         if (const auto resolved = Core::annotationPalette(m_settings); resolved)
@@ -168,36 +170,10 @@ namespace GyanisScribe::Gui
             Base::Logger::warning(std::format("自定义色板读不出：{}，本次按内置那八格摆", resolved.error().message));
             m_palette = Core::defaultAnnotationPalette();
         }
-        for (std::size_t index = 0; index < m_palette.size(); ++index)
-        {
-            const auto color  = m_palette[index];
-            const int  slot   = static_cast<int>(index);
-            auto      *button = makeButton("Close", GyanisScribe::Base::uiText("颜色 %1").arg(slot + 1), true);
-            // 图标换成色块：makeButton 那份图标只保证按钮尺寸合适，色块才是这一格要表达的东西
-            button->setIcon(QIcon{colorSwatchPixmap(color, m_icons.tintColor())});
-            button->setToolTip(GyanisScribe::Base::uiText("按住拖动可以把这一格挪到另一格那儿；上限是 16 格，顺序存在设置的标注页里"));
-            m_paletteButtons.push_back(button);
-            colorGroup->addButton(button, slot);
-            // 按序号取色而不是把颜色抄进 lambda：重排换的就是「第几格摆哪一支」，抄值会让拖完的按钮还发旧色
-            QObject::connect(button, &QToolButton::clicked, this,
-                             [this, slot]
-                             {
-                                 if (slot >= 0 && static_cast<std::size_t>(slot) < m_palette.size())
-                                 {
-                                     applyColorToActiveTool(m_palette[static_cast<std::size_t>(slot)]);
-                                 }
-                             });
-            // 拖动重排靠事件过滤器看着这三下（按下 / 移动 / 抬起），不吞事件：点击与滚轮那两路照旧走
-            button->installEventFilter(this);
-            layout->addWidget(button);
-        }
-        // 最近使用颜色：读回上一次留下的清单，插在预设色板之后、自定义按钮之前。
-        // 记下这个插入点，之后每次重建成品色块都要落回同一排位置
-        m_recentInsertIndex = layout->count();
         if (const auto parsed = Core::parseRecentColors(m_settings.stringListValue(Core::kAnnotationRecentColors, {})); parsed)
         {
             m_recentColors = *parsed;
-            // 手改过的配置文件可能超出上限：按上限截断，色板不会被撑到放不下
+            // 手改过的配置文件可能超出上限：按上限截断，菜单不会被撑到放不下
             if (m_recentColors.size() > Core::kRecentColorCapacity)
             {
                 m_recentColors.resize(Core::kRecentColorCapacity);
@@ -206,13 +182,15 @@ namespace GyanisScribe::Gui
         {
             Base::Logger::warning(std::format("最近使用颜色读不出：{}，本次从空清单开始", parsed.error().message));
         }
-        rebuildRecentColors();
-
-        m_customColorButton = makeButton("ColorPicker", GyanisScribe::Base::uiText("自定义颜色"), true);
-        // 固定编号：最近使用的色块从色板那一排的格数起排，用相邻编号会撞车
-        colorGroup->addButton(m_customColorButton, kCustomColorButtonId);
-        QObject::connect(m_customColorButton, &QToolButton::clicked, this, &AnnotationToolbar::chooseCustomColor);
-        layout->addWidget(m_customColorButton);
+        m_colorButton = makeButton("ColorPicker", GyanisScribe::Base::uiText("颜色"), false);
+        m_colorButton->setObjectName(QStringLiteral("annotationColorButton"));
+        m_colorButton->setPopupMode(QToolButton::InstantPopup);
+        m_colorMenu = new QMenu{this};
+        m_colorMenu->setObjectName(QStringLiteral("annotationColorMenu"));
+        m_colorButton->setMenu(m_colorMenu);
+        // 每次弹出前重建：色板与最近使用只在面板里出现，选过一格之后不必另外通知界面
+        QObject::connect(m_colorMenu, &QMenu::aboutToShow, this, &AnnotationToolbar::rebuildColorMenu);
+        layout->addWidget(m_colorButton);
         layout->addWidget(makeSeparator());
 
         // 线宽：滑块只走阶梯，取值表与 Gui::kAnnotationWidths 同解，不会出现 3.5 这种没定义过的宽度
@@ -371,11 +349,17 @@ namespace GyanisScribe::Gui
             layout->addWidget(button);
         }
 
-        // 起点状态：第一个工具、第一个色块按下，线宽与字号取「上次用的那一档」（配置里没有就回到 4 / 14）。
+        // 最右那枚 X 与 Esc 同一条收场路：免得用户以为只能去托盘退出或再截一张
+        layout->addWidget(makeSeparator());
+        m_closeButton = makeButton("Close", GyanisScribe::Base::uiText("关闭标注"), false);
+        m_closeButton->setToolTip(GyanisScribe::Base::uiText("关闭标注（Esc）"));
+        QObject::connect(m_closeButton, &QToolButton::clicked, this, &AnnotationToolbar::closeClicked);
+        layout->addWidget(m_closeButton);
+
+        // 起点状态：选择工具按下，线宽与字号取「上次用的那一档」（配置里没有就回到 4 / 14）。
         // 此刻还没有任何外部接收方（宿主是在构造之后才接线的），所以不需要挡信号，
         // 只需要把状态摆对——尤其是 m_activeTool 要与按下的那个工具同解，否则第一次点矩形会被守卫吞掉
         toolGroup->button(static_cast<int>(Core::ToolKind::Select))->setChecked(true);
-        colorGroup->button(0)->setChecked(true);
         applyStoredDefaults();
         m_stateIsInitial = false;
         m_currentColor   = m_palette.front();
@@ -879,8 +863,8 @@ namespace GyanisScribe::Gui
 
     int AnnotationToolbar::colorButtonCount() const
     {
-        // 色板若干格 + 最近使用若干 + 自定义一枚；没自定义时这一格与改动前逐字相同（内置就是八格）
-        return static_cast<int>(m_palette.size() + m_recentButtons.size()) + 1;
+        // 颜色入口里能挑的颜色数：色板若干格 + 最近使用若干 + 自定义一枚
+        return static_cast<int>(m_palette.size() + m_recentColors.size()) + 1;
     }
 
     QColor AnnotationToolbar::currentColor() const
@@ -907,7 +891,7 @@ namespace GyanisScribe::Gui
     {
         auto *button = new QToolButton{this};
         button->setIcon(m_icons.icon(iconName));
-        button->setIconSize(QSize{static_cast<int>(IconSize::Compact), static_cast<int>(IconSize::Compact)});
+        button->setIconSize(QSize{static_cast<int>(IconSize::Medium), static_cast<int>(IconSize::Medium)});
         // tooltip 与无障碍名称同名：需求要求每个图标按钮两者都有，只有 tooltip 时读屏拿不到名字
         button->setToolTip(label);
         button->setAccessibleName(label);
@@ -924,17 +908,63 @@ namespace GyanisScribe::Gui
             // 用户按了取消：什么都不发，颜色停在上一格
             return;
         }
-        // 自定义色也记在「当前形状」那一格上，与色板那两排同一条路
+        // 自定义色也记在「当前形状」那一格上，与色板那一排同一条路
         applyColorToActiveTool(picked);
 
-        // 记进「最近使用」并立刻重建色块行：需求要求这一排跟着用户最近的动作走，
+        // 记进「最近使用」：菜单下次弹出时按这份清单重建，不必在这里再动按钮；
         // 落盘失败只记日志——颜色本身已经生效了，不该因为存不上就回退
         m_recentColors = Core::pushRecentColor(m_recentColors, picked);
-        rebuildRecentColors();
         if (auto written = m_settings.setValue(Core::kAnnotationRecentColors, Core::serializeRecentColors(m_recentColors)); !written)
         {
             Base::Logger::warning(std::format("最近使用颜色没能保存：{}", written.error().message));
         }
+    }
+
+    void AnnotationToolbar::rebuildColorMenu()
+    {
+        m_colorMenu->clear();
+
+        // 一格一枚色块，八列排开：色板在上、最近使用在下，最后是自定义取色的入口
+        constexpr int kColorColumns = 8;
+        auto         *panel         = new QWidget{m_colorMenu};
+        auto         *grid          = new QGridLayout{panel};
+        grid->setContentsMargins(8, 8, 8, 4);
+        grid->setSpacing(4);
+
+        int  slot      = 0;
+        auto addSwatch = [&](const QColor &color, const QString &label)
+        {
+            auto *button = new QToolButton{panel};
+            button->setAutoRaise(true);
+            button->setIcon(QIcon{colorSwatchPixmap(color, m_icons.tintColor())});
+            button->setIconSize(QSize{static_cast<int>(IconSize::Medium), static_cast<int>(IconSize::Medium)});
+            button->setToolTip(label);
+            button->setAccessibleName(label);
+            QObject::connect(button, &QToolButton::clicked, this,
+                             [this, color]
+                             {
+                                 applyColorToActiveTool(color);
+                                 m_colorMenu->close();
+                             });
+            grid->addWidget(button, slot / kColorColumns, slot % kColorColumns);
+            ++slot;
+        };
+        for (std::size_t index = 0; index < m_palette.size(); ++index)
+        {
+            addSwatch(m_palette[index], GyanisScribe::Base::uiText("颜色 %1").arg(static_cast<int>(index) + 1));
+        }
+        for (std::size_t index = 0; index < m_recentColors.size(); ++index)
+        {
+            addSwatch(m_recentColors[index], GyanisScribe::Base::uiText("最近使用 %1").arg(static_cast<int>(index) + 1));
+        }
+
+        auto *widgetAction = new QWidgetAction{m_colorMenu};
+        widgetAction->setDefaultWidget(panel);
+        m_colorMenu->addAction(widgetAction);
+
+        m_colorMenu->addSeparator();
+        QAction *custom = m_colorMenu->addAction(GyanisScribe::Base::uiText("自定义颜色…"));
+        QObject::connect(custom, &QAction::triggered, this, &AnnotationToolbar::chooseCustomColor);
     }
 
     void AnnotationToolbar::applyColorToActiveTool(const QColor &color)
@@ -955,8 +985,7 @@ namespace GyanisScribe::Gui
             return;
         }
         m_currentColor = found.value();
-        // 按下的那一格要跟着走：互斥组会把别的放开，留着旧按下态就是在说「现在是上一个形状的颜色」
-        syncColorButtonChecked();
+        // 颜色按钮上的色块跟着换：它说的必须是现在这支色
         updateOpacityHint();
         emit colorChanged(m_currentColor);
     }
@@ -969,37 +998,24 @@ namespace GyanisScribe::Gui
 
     bool AnnotationToolbar::overColorRow(const QPoint &localPoint) const
     {
-        // 色块那一排是连续的：从第一枚预设色块到自定义按钮的合矩形内才算「在色板上滚」
-        QRect row;
-        for (const auto *button: m_paletteButtons)
-        {
-            if (button != nullptr)
-            {
-                row = row.united(button->geometry());
-            }
-        }
-        for (const auto *button: m_recentButtons)
-        {
-            if (button != nullptr)
-            {
-                row = row.united(button->geometry());
-            }
-        }
-        if (m_customColorButton != nullptr)
-        {
-            row = row.united(m_customColorButton->geometry());
-        }
-        return !row.isNull() && row.contains(localPoint);
+        // 颜色只剩这一枚按钮：滚轮落在它上面就是调不透明度
+        return m_colorButton != nullptr && m_colorButton->geometry().contains(localPoint);
     }
 
     void AnnotationToolbar::updateOpacityHint()
     {
-        if (m_customColorButton == nullptr)
+        refreshColorButton();
+    }
+
+    void AnnotationToolbar::refreshColorButton()
+    {
+        if (m_colorButton == nullptr)
         {
             return;
         }
-        // 无障碍名保持「自定义颜色」：那是这一枚按钮的本名，读屏要的是动作而不是状态
-        m_customColorButton->setToolTip(GyanisScribe::Base::uiText("自定义颜色（当前不透明度 %1%；在色板这一排上滚滚轮调节）").arg(currentColorOpacityPercent()));
+        // 无障碍名保持「颜色」：那是这一枚按钮的本名，读屏要的是动作而不是状态
+        m_colorButton->setIcon(QIcon{colorSwatchPixmap(m_currentColor, m_icons.tintColor())});
+        m_colorButton->setToolTip(GyanisScribe::Base::uiText("颜色（当前不透明度 %1%；在这一枚上滚滚轮调节）").arg(currentColorOpacityPercent()));
     }
 
     void AnnotationToolbar::refreshToolKeyHints()
@@ -1032,154 +1048,6 @@ namespace GyanisScribe::Gui
         applyColorToActiveTool(dimmed);
         updateOpacityHint();
         event->accept();
-    }
-
-    void AnnotationToolbar::syncColorButtonChecked()
-    {
-        for (std::size_t index = 0; index < m_paletteButtons.size() && index < m_palette.size(); ++index)
-        {
-            if (m_paletteButtons[index] != nullptr && m_palette[index] == m_currentColor)
-            {
-                m_paletteButtons[index]->setChecked(true);
-                return;
-            }
-        }
-        for (std::size_t index = 0; index < m_recentButtons.size() && index < m_recentColors.size(); ++index)
-        {
-            if (m_recentButtons[index] != nullptr && m_recentColors[index] == m_currentColor)
-            {
-                m_recentButtons[index]->setChecked(true);
-                return;
-            }
-        }
-        // 两排色块都对不上就是自定义色：按下那一枚
-        if (m_customColorButton != nullptr)
-        {
-            m_customColorButton->setChecked(true);
-        }
-    }
-
-    void AnnotationToolbar::requestPaletteMove(const int from, const int to)
-    {
-        if (from < 0 || to < 0 || static_cast<std::size_t>(from) >= m_palette.size() || static_cast<std::size_t>(to) >= m_palette.size())
-        {
-            // 越界只会来自算错的坐标：既不动表，也不写配置——写下去会把工具栏正摆着的那一排顶成另一份
-            return;
-        }
-        const auto moved = Core::movePaletteColor(m_palette, static_cast<std::size_t>(from), static_cast<std::size_t>(to));
-        if (moved == m_palette)
-        {
-            return; // 原地：顺序没变，就不该惊动配置
-        }
-        m_palette = moved;
-        repaintPaletteSwatches();
-        if (const auto written = m_settings.setValue(Core::kAnnotationPalette, Core::paletteToTokens(m_palette)); !written)
-        {
-            // 屏上已经换了、盘上还是旧的：这句警告是唯一能看出「下次开又变回去」从哪来的线索
-            Base::Logger::warning(std::format("色板顺序没能写进配置：{}", written.error().message));
-        }
-        syncColorButtonChecked();
-    }
-
-    void AnnotationToolbar::repaintPaletteSwatches()
-    {
-        // 重排换的是「第几格摆哪一支」，按钮一颗都不动：拖的那一下正跑在按钮的事件里，删它就是当场踩空
-        for (std::size_t index = 0; index < m_paletteButtons.size() && index < m_palette.size(); ++index)
-        {
-            if (auto *button = m_paletteButtons[index]; button != nullptr)
-            {
-                button->setIcon(QIcon{colorSwatchPixmap(m_palette[index], m_icons.tintColor())});
-            }
-        }
-    }
-
-    int AnnotationToolbar::paletteIndexAtGlobalPoint(const QPoint &globalPoint) const
-    {
-        for (std::size_t index = 0; index < m_paletteButtons.size(); ++index)
-        {
-            const auto *button = m_paletteButtons[index];
-            if (button != nullptr && button->rect().contains(button->mapFromGlobal(globalPoint)))
-            {
-                return static_cast<int>(index);
-            }
-        }
-        return -1;
-    }
-
-    bool AnnotationToolbar::eventFilter(QObject *watched, QEvent *event)
-    {
-        const auto found = std::ranges::find_if(m_paletteButtons, [watched](const QToolButton *button) { return button == watched; });
-        if (found == m_paletteButtons.end())
-        {
-            return QWidget::eventFilter(watched, event);
-        }
-        const auto slot = static_cast<int>(std::ranges::distance(m_paletteButtons.begin(), found));
-
-        switch (event->type())
-        {
-            case QEvent::MouseButtonPress:
-            {
-                const auto *press = dynamic_cast<const QMouseEvent *>(event);
-                if (press->button() == Qt::LeftButton)
-                {
-                    m_draggingPaletteIndex = slot;
-                    m_dragStartGlobal      = press->globalPosition().toPoint();
-                }
-                break;
-            }
-            case QEvent::MouseMove:
-            {
-                if (m_draggingPaletteIndex < 0)
-                {
-                    break;
-                }
-                const auto global = dynamic_cast<const QMouseEvent *>(event)->globalPosition().toPoint();
-                // 没过 Qt 的拖动阈值就当普通移动：手抖一两像素就把色板重排，比不动更让人以为是程序疯了
-                if ((global - m_dragStartGlobal).manhattanLength() < QApplication::startDragDistance())
-                {
-                    break;
-                }
-                const int target = paletteIndexAtGlobalPoint(global);
-                if (target < 0 || target == m_draggingPaletteIndex)
-                {
-                    break;
-                }
-                requestPaletteMove(m_draggingPaletteIndex, target);
-                // 拖着的这一格跟着光标走：下一段再以它为新起点，才会一路拖到最右
-                m_draggingPaletteIndex = target;
-                break;
-            }
-            case QEvent::MouseButtonRelease:
-                m_draggingPaletteIndex = -1;
-                break;
-            default:
-                break;
-        }
-        return QWidget::eventFilter(watched, event);
-    }
-
-    void AnnotationToolbar::rebuildRecentColors()
-    {
-        // 先摘旧的：编号与布局位置都要按当前清单重排，留着上一批会插出两排色块
-        for (auto it = m_recentButtons.rbegin(); it != m_recentButtons.rend(); ++it)
-        {
-            m_colorGroup->removeButton(*it);
-            m_layout->removeWidget(*it);
-            delete *it;
-        }
-        m_recentButtons.clear();
-
-        for (std::size_t index = 0; index < m_recentColors.size(); ++index)
-        {
-            const auto color  = m_recentColors[index];
-            auto      *button = makeButton("Close", GyanisScribe::Base::uiText("最近使用 %1").arg(static_cast<int>(index) + 1), true);
-            // 图标换成色块：与预设那八格同一个画法，两排放在一起才看不出是两套控件
-            button->setIcon(QIcon{colorSwatchPixmap(color, m_icons.tintColor())});
-            m_colorGroup->addButton(button, static_cast<int>(m_palette.size() + index));
-            QObject::connect(button, &QToolButton::clicked, this, [this, color] { applyColorToActiveTool(color); });
-            m_layout->insertWidget(m_recentInsertIndex + static_cast<int>(index), button);
-            m_recentButtons.push_back(button);
-        }
     }
 
 } // namespace GyanisScribe::Gui
