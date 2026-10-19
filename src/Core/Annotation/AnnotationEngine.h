@@ -130,16 +130,17 @@ namespace GyanisScribe::Core
         [[nodiscard]] Base::Expected<void> setPendingText(const QString &text) override;
 
         /**
-         * @brief 点名序号的下一个号，见 IAnnotationEngine::setNextNumber()
-         * @param number 下一个号，小于 1 会被夹到 1
-         * @return 成功返回空载荷；序号工具不在册时返回 InternalError
-         */
-        /**
          * @brief 把在途的那条落定，见 IAnnotationEngine::finishPendingStroke()
          * @return 成功返回刚落定那条的位置；没有在途图形时返回 InvalidArgument
          */
         [[nodiscard]] Base::Expected<AnnotationSelection> finishPendingStroke() override;
-        [[nodiscard]] Base::Expected<void>                setNextNumber(int number) override;
+
+        /**
+         * @brief 点名序号的下一个号，见 IAnnotationEngine::setNextNumber()
+         * @param number 下一个号，小于 1 会被夹到 1
+         * @return 成功返回空载荷；序号工具不在册时返回 InternalError
+         */
+        [[nodiscard]] Base::Expected<void> setNextNumber(int number) override;
 
         /// 序号回到自动编号，见 IAnnotationEngine::resetNumbering()
         void resetNumbering() override;

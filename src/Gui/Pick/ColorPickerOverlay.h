@@ -99,9 +99,39 @@ namespace GyanisScribe::Gui
         void cancelled();
 
     protected:
+        /**
+         * @brief 画遮罩：冻帧、压暗层、放大镜与底部色块行
+         * @details 重写 QWidget::paintEvent()：抓来的冻帧按逻辑尺寸铺满整窗（高 DPI 下帧比逻辑
+         *          尺寸大，不缩就会画出屏幕外），再压一层半透明黑，最后按光标位置画放大镜与色块行。
+         *          帧还没到手时什么都不画，窗口留成默认底色。
+         * @param event 绘制事件，本实现不读它
+         */
         void paintEvent(QPaintEvent *event) override;
+
+        /**
+         * @brief 记下光标位置并重绘
+         * @details 重写 QWidget::mouseMoveEvent()：光标取全局坐标（放大镜与色块命中都按全局算），
+         *          顺带算出这一格是否压在色块行上，然后请求重绘；不改可见性，也不动窗口几何。
+         * @param event 鼠标移动事件
+         */
         void mouseMoveEvent(QMouseEvent *event) override;
+
+        /**
+         * @brief 左键取色，右键等同 Esc
+         * @details 重写 QWidget::mousePressEvent()：压在色块行上就取那一块（色块行是给「再取一次
+         *          最近用过的色」留的），没压住就按光标取底下的像素，两条出口都随即收窗。右键不发
+         *          颜色，只发 cancelled()——取色中途最想做的就是把这一层关掉。
+         * @param event 鼠标按下事件
+         */
         void mousePressEvent(QMouseEvent *event) override;
+
+        /**
+         * @brief 认 Esc 与数字键 1..8，其余交回 Qt
+         * @details 重写 QWidget::keyPressEvent()：Esc 作废这一轮；不带修饰键的 1..8 取色块行上
+         *          对应那一块，与点击取那一块共用一条出口，光标动没动都不影响；色块行没那么长时
+         *          这个键不作处理，继续交回基类，输入法与系统组合键因此仍归它们自己。
+         * @param event 键盘按下事件
+         */
         void keyPressEvent(QKeyEvent *event) override;
 
     private:

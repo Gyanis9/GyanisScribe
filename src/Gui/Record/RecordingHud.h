@@ -133,8 +133,28 @@ namespace GyanisScribe::Gui
         void minimized();
 
     protected:
+        /**
+         * @brief 左键按下时记下指针在窗内的起拖偏移
+         * @details 重写 QWidget::mousePressEvent()：偏移要在这里定，后面每次 move 都拿全局坐标减它；
+         *          非左键不记，交回基类，按钮与滑块的点击因此照旧走各自的控件路径。
+         * @param event 鼠标按下事件
+         */
         void mousePressEvent(QMouseEvent *event) override;
+
+        /**
+         * @brief 左键按住时拖动这扇无边框控制条
+         * @details 重写 QWidget::mouseMoveEvent()：控制条没有系统标题栏可拖，位置只能自己算——
+         *          全局坐标减去起拖偏移。没按住（键已松开，事件却还在往里发）时直接返回，不搬窗。
+         * @param event 鼠标移动事件
+         */
         void mouseMoveEvent(QMouseEvent *event) override;
+
+        /**
+         * @brief 左键松手后把控制条贴回可用区内
+         * @details 重写 QWidget::mouseReleaseEvent()：拖拽途中可以把它整扇移出屏幕，松手这一档按
+         *          snapHudRect 收回到可用区边界内，免得录完回来找不着控制条；收完交回基类。
+         * @param event 鼠标松开事件
+         */
         void mouseReleaseEvent(QMouseEvent *event) override;
 
     private:

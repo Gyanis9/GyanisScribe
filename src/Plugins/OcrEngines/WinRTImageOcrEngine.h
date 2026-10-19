@@ -36,6 +36,11 @@ namespace GyanisScribe::Plugins
          */
         WinRTImageOcrEngine();
 
+        /**
+         * @brief 析构
+         * @details 重写 Core::IOcrEngine 的虚析构，保持编译器默认实现：本类只有一份语言标签对照表，
+         *          随成员自己析构，没有需要显式归还的系统句柄。
+         */
         ~WinRTImageOcrEngine() override = default;
 
         /**
