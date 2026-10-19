@@ -1,6 +1,6 @@
 /**
  * @file PickCoordinator.h
- * @brief 取色这一族从控制器里搬出来的落脚处（审查台账 A-11）
+ * @brief 取色这一族从控制器里搬出来的落脚处
  * @author Gyanis
  * @date 2026-10-16
  * @version 0.0.1

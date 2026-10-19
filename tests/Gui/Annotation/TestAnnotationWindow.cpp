@@ -1436,7 +1436,7 @@ TEST_F(AnnotationWindowFixture, ReportsTheCostOfRepaintingAWindowFullOfShapes)
 }
 
 /**
- * @brief 钉住矩形在拖动途中就画出来，而不是松手才出现（用户 2026-10-17 直报第 3 条）
+ * @brief 钉住矩形在拖动途中就画出来，而不是松手才出现（用户 2026-10-17 直报）
  * @details 引擎默认工具此前没标成 active，paintPending 直接跳过，用户只能看到松手后的成品。
  */
 TEST_F(AnnotationWindowFixture, ThePendingRectangleIsPaintedWhileDragging)
@@ -1611,7 +1611,7 @@ TEST_F(AnnotationWindowFixture, CropPreviewComesFromTheFrozenFrame)
 }
 
 /**
- * @brief 钉住标注窗四周有一圈只上屏的主色提示线（用户 2026-10-17 直报第 1 条）
+ * @brief 钉住标注窗四周有一圈只上屏的主色提示线（用户 2026-10-17 直报）
  * @details 标注窗与桌面内容逐像素相同，没有这圈线时用户分不清哪一块是截图。
  *          判据同时反向确认它没有进成品：exportImage 的边缘仍是底图色。
  */

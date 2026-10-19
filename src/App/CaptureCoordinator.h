@@ -1,6 +1,6 @@
 /**
  * @file CaptureCoordinator.h
- * @brief 截图这一族（枢纽）从控制器里搬出来的落脚处（审查台账 A-11）
+ * @brief 截图这一族（枢纽）从控制器里搬出来的落脚处
  * @author Gyanis
  * @date 2026-10-16
  * @version 0.0.1

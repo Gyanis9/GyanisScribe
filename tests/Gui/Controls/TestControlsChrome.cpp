@@ -67,7 +67,7 @@ namespace
 } // namespace
 
 /**
- * @brief 钉住快捷键框走输入框同一套外观（用户 2026-10-17 直报第 5 条）
+ * @brief 钉住快捷键框走输入框同一套外观（用户 2026-10-17 直报）
  * @details 此前内部是 QFrame::Box 的裸 QLabel：方角、原生边框、居中文字，与圆角输入框完全是两件东西。
  */
 TEST_F(HotkeyEditChromeFixture, DisplayUsesTheInputFieldChrome)

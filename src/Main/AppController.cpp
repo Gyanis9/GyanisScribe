@@ -136,27 +136,27 @@ namespace GyanisScribe::Main
 
         // 标注一套：引擎跨轮次复用（载入新帧自己会清空历史），窗口与工具栏也只建一次
         m_pins = std::make_unique<GyanisScribe::Gui::PinManager>(*m_settings, *m_integration);
-        // 贴图这一族的贴出动作也搬进了协调器（审查台账 A-11）：管理器本身仍在这里（别的族也在用），
+        // 贴图这一族的贴出动作也搬进了协调器：管理器本身仍在这里（别的族也在用），
         // 取网页图那条链（ImageFetcher、在飞那张的落点）也归它——取图的结果总是「贴到屏幕上」
         m_pinCoordinator = std::make_unique<GyanisScribe::App::PinCoordinator>(*m_pins);
         QObject::connect(m_pinCoordinator.get(), &GyanisScribe::App::PinCoordinator::messageForUser, this, &AppController::notifyUser);
         // 取色这一族（遮罩、写法、最近取色）也搬进了协调器：控制器只留提示
         m_picker = std::make_unique<GyanisScribe::App::PickCoordinator>(*m_settings, *m_theme, *m_captureSource);
         QObject::connect(m_picker.get(), &GyanisScribe::App::PickCoordinator::messageForUser, this, &AppController::notifyUser);
-        // 识别这一族整族搬进了 OcrCoordinator（审查台账 A-11）：控制器只留「谁要认什么」的接线，
+        // 识别这一族整族搬进了 OcrCoordinator：控制器只留「谁要认什么」的接线，
         // 它要说的那句提示（后端没编进来、没有可认的图、认失败了）走 messageForUser 回到这一层出气泡
         m_ocr = std::make_unique<GyanisScribe::App::OcrCoordinator>(*m_settings, *m_integration, *m_icons, *m_theme);
         QObject::connect(m_ocr.get(), &GyanisScribe::App::OcrCoordinator::messageForUser, this, &AppController::notifyUser);
         m_tray         = std::make_unique<GyanisScribe::App::TrayController>(*m_icons, *m_theme, *m_settings, *m_integration);
         m_historyStore = std::make_unique<GyanisScribe::Core::HistoryStore>(std::move(historyStoragePath));
         m_mainWindow   = std::make_unique<MainWindow>(*m_settings, *m_theme, *m_icons, *m_historyStore, m_integration->capabilities(), *m_integration);
-        // 历史这一族整族搬进了 HistoryCoordinator（审查台账 A-11）：清单本体仍由这里持有并与主窗口共享，
+        // 历史这一族整族搬进了 HistoryCoordinator：清单本体仍由这里持有并与主窗口共享，
         // 协调器只拿引用；「清单变了要刷新窗口」由 changed() 回到这一层接——它不能自己去叫 Main，
         // 那会让 App 层反向依赖 Main，而 Main 本来就依赖 App
         m_history = std::make_unique<GyanisScribe::App::HistoryCoordinator>(*m_historyStore, *m_settings);
         QObject::connect(m_history.get(), &GyanisScribe::App::HistoryCoordinator::messageForUser, this, &AppController::notifyUser);
         QObject::connect(m_history.get(), &GyanisScribe::App::HistoryCoordinator::changed, this, [this] { m_mainWindow->refreshHistory(); });
-        // 交付这一族也搬进了协调器（审查台账 A-11）：控制器只留提示与「命令行那条会话状态」的接线
+        // 交付这一族也搬进了协调器：控制器只留提示与「命令行那条会话状态」的接线
         m_delivery = std::make_unique<GyanisScribe::App::DeliveryCoordinator>(*m_settings, *m_history);
         QObject::connect(m_delivery.get(), &GyanisScribe::App::DeliveryCoordinator::messageForUser, this, &AppController::notifyUser);
         // 贴图那一族的地盘：贴到哪儿（光标）由这一层决定，协调器只交图与来源
@@ -238,7 +238,7 @@ namespace GyanisScribe::Main
                              }
                          });
 
-        // 截图这一族（枢纽）整族搬进了 CaptureCoordinator（审查台账 A-11）：入口、延时、抓帧、
+        // 截图这一族（枢纽）整族搬进了 CaptureCoordinator：入口、延时、抓帧、
         // 按意图交付与标注窗都在它身上；控制器只留两根线——要说给用户的话、命令行那次失败的另交一份
         m_capture = std::make_unique<GyanisScribe::App::CaptureCoordinator>(GyanisScribe::App::CaptureCoordinator::Dependencies{
                 *m_settings, *m_integration, *m_theme, *m_icons, *m_captureSource, *m_ocr, *m_pinCoordinator, *m_delivery, *m_history});
@@ -246,7 +246,7 @@ namespace GyanisScribe::Main
         QObject::connect(m_capture.get(), &GyanisScribe::App::CaptureCoordinator::commandLineActionFailed, this, &AppController::commandLineActionFailed);
         QObject::connect(m_capture.get(), &GyanisScribe::App::CaptureCoordinator::commandLineCaptureDelivered, this, &AppController::commandLineCaptureDelivered);
 
-        // 录屏这一族整族搬进了 RecordingCoordinator（审查台账 A-11）：控制器只留三根线——
+        // 录屏这一族整族搬进了 RecordingCoordinator：控制器只留三根线——
         // 要说给用户的话、托盘那一行读数、成品归档进历史
         m_recording = std::make_unique<GyanisScribe::App::RecordingCoordinator>(*m_captureSource, *m_integration, *m_settings, *m_icons);
         QObject::connect(m_recording.get(), &GyanisScribe::App::RecordingCoordinator::messageForUser, this, &AppController::notifyUser);
