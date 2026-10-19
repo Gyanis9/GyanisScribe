@@ -694,11 +694,9 @@ namespace
     }
 
     /**
- * @brief 钉住改号入口穿过引擎之后读数与落号同一口径
- * @details 号落在牌子上，引擎这一层能核对的是「下一个号是多少」；牌子上的数字由 NumberTool
-
-     * * 那一条直测钉住。
- */
+     * @brief 钉住改号入口穿过引擎之后读数与落号同一口径
+     * @details 号落在牌子上，引擎这一层能核对的是「下一个号是多少」；牌子上的数字由 NumberTool 那一条直测钉住。
+     */
     TEST_F(EngineFixture, NextNumberOverrideGoesThroughTheEngine)
     {
         EXPECT_EQ(m_engine.nextNumber(), 1) << "一条都没有时下一个号该是 1";

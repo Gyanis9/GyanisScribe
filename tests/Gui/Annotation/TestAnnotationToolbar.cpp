@@ -1509,8 +1509,7 @@ TEST_F(ToolbarFixture, WheelOpacityIsRememberedPerShape)
 /**
  * @brief 钉住色板那一排读的是配置里那一份，而不是写死的八格
  * @details 自定义色板换的是整排：格数、顺序与颜色都跟着配置走；「最近使用」与自定义那两枚仍排在其后，
-
- * * 那是两件事的账，不该被自定义色板挤掉。
+ *          那是两件事的账，不该被自定义色板挤掉。
  */
 TEST_F(ToolbarFixture, PaletteFromSettingsDrivesTheSwatchRow)
 {
@@ -1533,9 +1532,7 @@ TEST_F(ToolbarFixture, PaletteFromSettingsDrivesTheSwatchRow)
 
 /**
  * @brief 钉住色板名单被改坏时回落到内置那八格，而不是摆出一排空的
- * @details
- * 配置是能手改的：那一格写坏了不该让工具栏少一整排颜色，一句警告进日志、桌面照常用。
-
+ * @details 配置是能手改的：那一格写坏了不该让工具栏少一整排颜色，一句警告进日志、桌面照常用。
  */
 TEST_F(ToolbarFixture, BrokenPaletteFallsBackToTheBuiltinRow)
 {

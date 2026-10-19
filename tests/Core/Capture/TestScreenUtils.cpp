@@ -318,8 +318,7 @@ TEST(ScreenUtils, EachGripShowsItsOwnCursor)
 /**
  * @brief 钉住指针落点：只有位置乘缩放因子，形状尺寸不动
  * @details 热点回退排在乘因子之后，反过来的话高 DPI 屏上尖端会偏出好几个像素；
- *          缩放因子非正时退回按 1
- * 算，而不是判成「画不出去」返回空矩形。
+ *          缩放因子非正时退回按 1 算，而不是判成「画不出去」返回空矩形。
  */
 TEST(ScreenUtils, CursorRectScalesOnlyItsPosition)
 {
@@ -408,7 +407,6 @@ TEST(ScreenUtils, DrawCursorOnHighDpiFrameKeepsSpriteSize)
  * @brief 钉住指针贴到屏边与屏外时的裁切
  * @details 截整屏时光标常在角落：越界的那一半要裁掉而不是回绕到对面，
  *          回绕会在左上角多出一块没人见过的指针。
-
  */
 TEST(ScreenUtils, DrawCursorClipsAtScreenEdges)
 {
@@ -438,8 +436,7 @@ TEST(ScreenUtils, DrawCursorClipsAtScreenEdges)
 /**
  * @brief 钉住半透明的指针边缘真的做了混合
  * @details 指针的抗锯齿边是半透明的：只做整格覆盖就会在浅色背景上留一圈硬边，
- *          这一条钉的是「介于两色之间」，具体数值交给
- * Qt 自己算。
+ *          这一条钉的是「介于两色之间」，具体数值交给 Qt 自己算。
  */
 TEST(ScreenUtils, DrawCursorBlendsSemiTransparentEdges)
 {

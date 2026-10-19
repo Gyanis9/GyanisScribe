@@ -2219,10 +2219,8 @@ namespace GyanisScribe
 
     /**
      * @brief 钉住 `F5` 每一下都要一次重抓请求，按住不放（自动重复）时连着报
-     * @details
-     * 长按持续刷新靠的就是键盘自动重复：每重复一下＝一次真重抓，松手定在最后那一帧。
-
-     * *          判据自己造 repeat 标志的那几条事件，不赌这台机器的按键重复设置。
+     * @details 长按持续刷新靠的就是键盘自动重复：每重复一下＝一次真重抓，松手定在最后那一帧。
+     *          判据自己造 repeat 标志的那几条事件，不赌这台机器的按键重复设置。
      */
     TEST_F(PinWindowFixture, F5AsksForOneRefreshAndKeepsAskingWhileHeld)
     {
@@ -2247,8 +2245,7 @@ namespace GyanisScribe
     /**
      * @brief 钉住旋转时「图本身那块矩形」不跟着外接框一起变大
      * @details 刷新抓的是图此刻盖住的屏幕。拿旋转后的外接框去抓，斜着的一张会把左右邻居的像素
-
-     * * 一起框进这张图里；中心不动那条规矩则由窗口自己保证。
+     *          一起框进这张图里；中心不动那条规矩则由窗口自己保证。
      */
     TEST_F(PinWindowFixture, ImageGlobalRectStaysTheImageAreaWhenRotated)
     {
@@ -2279,8 +2276,7 @@ namespace GyanisScribe
     /**
      * @brief 钉住「暂时藏起来抓屏」只碰可见性，不碰「收起」那本账
      * @details 收着的那一张（整桌收起、或在别的组）不该因为刷一次就被摆回桌面——
-
-     * * 那是程序替用户改了他刻意选的状态；反过来，摆在桌上的那张抓完必须摆回来。
+     *          那是程序替用户改了他刻意选的状态；反过来，摆在桌上的那张抓完必须摆回来。
      */
     TEST_F(PinWindowFixture, TemporarilyHiddenLeavesConcealedPinsConcealed)
     {

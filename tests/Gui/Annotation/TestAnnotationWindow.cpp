@@ -600,7 +600,6 @@ TEST_F(AnnotationWindowFixture, EscCancelsTheEditorWithoutLeavingAShape)
 /**
  * @brief 钉住改号键只在序号工具在用的时候认
  * @details 别的工具在用的时候 `+` 该交回 Qt：它是键盘上的普通字符，不该偷偷改某个工具的档。
-
  */
 TEST_F(AnnotationWindowFixture, NumberKeysAdjustTheNextNumberOnlyForThatTool)
 {

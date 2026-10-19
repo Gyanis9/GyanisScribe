@@ -331,11 +331,8 @@ TEST(PinLayoutGroupNames, RoundTripsAndRejectsMalformedRecords)
 
 /**
  * @brief 钉住轮换顺序读的是「顺序」本身：照抄名单顺序、容忍空白、拒掉非正数与重复
- * @details
- * 重复组号必须拒而不是后写的盖掉前写的：那一格在一圈里出现两次，切组就会在同一处多跳一步，
- *
- * 而界面上只看得到「顺序不对」，说不清是哪一条填歪了。
-
+ * @details 重复组号必须拒而不是后写的盖掉前写的：那一格在一圈里出现两次，切组就会在同一处多跳一步，
+ *          而界面上只看得到「顺序不对」，说不清是哪一条填歪了。
  */
 TEST_F(PinLayoutFixture, GroupRotationParseKeepsOrderAndRejectsBadTokens)
 {
@@ -365,10 +362,8 @@ TEST_F(PinLayoutFixture, GroupRotationParseKeepsOrderAndRejectsBadTokens)
 
 /**
  * @brief 钉住真正走的那一圈：在册的按名单排，没点名的补在末尾，一个都不落
- * @details
- * 「没点名的补上」是这一档的可用性底线——新建一组之后切组切不到它，那一组在键盘上就是死角。
-
- * *          名单里留着早已并掉的组号要跳过：停在一组不存在的贴图前，等于按一次键什么都不动。
+ * @details 「没点名的补上」是这一档的可用性底线——新建一组之后切组切不到它，那一组在键盘上就是死角。
+ *          名单里留着早已并掉的组号要跳过：停在一组不存在的贴图前，等于按一次键什么都不动。
  */
 TEST_F(PinLayoutFixture, RotationCycleKeepsEveryGroupReachable)
 {

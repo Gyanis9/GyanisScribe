@@ -2033,8 +2033,7 @@ TEST_F(MainWindowFixture, InWindowShortcutRowsAreGroupedUnderFamilyHeadings)
 /**
  * @brief 钉住「分组轮换顺序」这一格写的是切组现读的那个键，填歪的那一次不写、原因进提示
  * @details 存的是 QStringList 而不是整串原文：顺序、空白与重复都在解析那一步定下来。
-
- * *          坏值当场拒掉、上一条好值留着——存下去等下一次启动再读它，那时用户已经离开这一格，说不清是谁改坏的。
+ *          坏值当场拒掉、上一条好值留着——存下去等下一次启动再读它，那时用户已经离开这一格，说不清是谁改坏的。
  */
 TEST_F(MainWindowFixture, GroupRotationRowStoresCleanTokensAndKeepsBadOnes)
 {
@@ -2206,7 +2205,6 @@ TEST_F(MainWindowFixture, PaletteFileRoundTripsThroughTheTwoMethods)
 /**
  * @brief 钉住导入失败那一路保住旧色板，并把原因说一句
  * @details 拿一份不存在的文件或坏写法去覆盖，后果是「我的色板没了」：那种事要当场拒绝并说清坏在哪一格。
-
  */
 TEST_F(MainWindowFixture, FailedPaletteImportKeepsTheOldRow)
 {

@@ -116,8 +116,7 @@ namespace GyanisScribe::Gui
          * @param image 图片（物理像素）
          * @param globalTopLeft 窗口左上角的全局逻辑坐标
          * @param animatedSource 动图来源文件；空表示这张是静图（剪贴板与标注贴出来的都在内存里）
-         * @param colorCard
-         * 内容是从一段颜色写法渲染出来时，那个颜色本身；空表示这张不是色卡
+         * @param colorCard 内容是从一段颜色写法渲染出来时，那个颜色本身；空表示这张不是色卡
          * @return 新建的贴图窗口引用，所有权仍在管理器手里
          */
         Core::IPinWindow &addPin(const QImage &image, const QPoint &globalTopLeft, const QString &animatedSource = {}, const std::optional<QColor> &colorCard = {});

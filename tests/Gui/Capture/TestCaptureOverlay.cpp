@@ -515,7 +515,6 @@ TEST_F(CaptureOverlayFixture, DraggingInsideMovesTheSelectionWithoutResizing)
 /**
  * @brief 钉住离选区很远的按下仍然开一块新的
  * @details 这是原有的框选走法，抓点不能把它抢走：认不到抓点就该回到「重新框」。
-
  */
 TEST_F(CaptureOverlayFixture, PressingFarAwayStartsAFreshSelection)
 {
@@ -968,7 +967,6 @@ TEST_F(CaptureOverlayFixture, SizeEditorAppliesTypedSizeAtTheSameOrigin)
 /**
  * @brief 钉住裸按 `P` 翻这一轮的「成品含不含指针」，且只报一次意图
  * @details 这一档是一次性的：不写配置，也不许在滚动长截图那一轮出现（按帧接图会把一枚指针复制成一串）。
-
  */
 TEST_F(CaptureOverlayFixture, PointerKeyTogglesCursorForThisRound)
 {

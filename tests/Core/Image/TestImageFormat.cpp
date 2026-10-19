@@ -176,8 +176,7 @@ TEST(ImageFormatCapability, UnwritableFormatsAreFilteredOut)
 /**
  * @brief 钉住透明通道词表：只有 JPG 带不了透明
  * @details 带投影的输出拿它决定垫不垫白（Core::decorateForOutput 的 fillBackground）：
- *          这一格说反了，存 JPG
- * 时透明区会被压成不可预期的底色、存 PNG 时又被白白垫上一层白。
+ *          这一格说反了，存 JPG 时透明区会被压成不可预期的底色、存 PNG 时又被白白垫上一层白。
  */
 TEST(ImageFormatCapability, OnlyJpegLacksAnAlphaChannel)
 {

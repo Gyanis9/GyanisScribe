@@ -1077,10 +1077,8 @@ namespace GyanisScribe
 
     /**
      * @brief 钉住「刷新这一张」要重抓的那块矩形就是图本身占的那块
-     * @details 判据取窗口自己的
-     * globalRect：刷新抓的是「图此刻盖住的屏幕」，
-
-     * * 拿窗口的外接框去抓，斜着的一张会把邻居窗口的像素也框进来。
+     * @details 判据取窗口自己的 globalRect：刷新抓的是「图此刻盖住的屏幕」，
+     *          拿窗口的外接框去抓，斜着的一张会把邻居窗口的像素也框进来。
      */
     TEST_F(PinManagerFixture, RefreshTargetIsTheRectTheImageCovers)
     {
@@ -1094,10 +1092,8 @@ namespace GyanisScribe
 
     /**
      * @brief 钉住不许刷新的那两档与不在册的索引，各自把出路说清
-     * @details
-     * 缩略图那块方块的面积不是这张图的面积；动图换上去的静态像素会被下一帧盖掉——
-
-     * * 两档都该拒绝并报出原因，而不是抓一块错的画面糊上去。
+     * @details 缩略图那块方块的面积不是这张图的面积；动图换上去的静态像素会被下一帧盖掉——
+     *          两档都该拒绝并报出原因，而不是抓一块错的画面糊上去。
      */
     TEST_F(PinManagerFixture, RefreshTargetRefusesThumbnailsAnimatedPinsAndUnknownIndexes)
     {
@@ -1125,10 +1121,8 @@ namespace GyanisScribe
 
     /**
      * @brief 钉住「有人按了刷新」报的是那一张的在册序号
-     * @details
-     * 管理器只把像素交回界面层，认人靠的就是这个序号：报错一张刷成另一张，
-
-     * * 用户看到的是「我按的这张没动，别的那张跳了」。
+     * @details 管理器只把像素交回界面层，认人靠的就是这个序号：报错一张刷成另一张，
+     *          用户看到的是「我按的这张没动，别的那张跳了」。
      */
     TEST_F(PinManagerFixture, RefreshRequestCarriesTheIndexOfThePinThatAsked)
     {
@@ -1148,10 +1142,8 @@ namespace GyanisScribe
 
     /**
      * @brief 钉住「抓屏那一刻把这一张藏起来」的两半：抓的时候它不在桌上，抓完一定摆回
-     * @details
-     * 贴图是置顶窗：不藏就会抓到贴图的自己，第二次刷新起画面冻在第一帧。
-
-     * *          摆回要覆盖抓取失败那一路——只藏不回等于把用户的一张图刷没了。
+     * @details 贴图是置顶窗：不藏就会抓到贴图的自己，第二次刷新起画面冻在第一帧。
+     *          摆回要覆盖抓取失败那一路——只藏不回等于把用户的一张图刷没了。
      */
     TEST_F(PinManagerFixture, GrabWithPinHiddenHidesItDuringTheGrabAndAlwaysBringsItBack)
     {
@@ -1190,12 +1182,9 @@ namespace GyanisScribe
 
     /**
      * @brief 钉住「换内容之后的显示尺寸 = 像素 ÷ 那份像素自带的 dpr」
-     * @details 抓屏那一路交回的是物理像素（图像的 dpr 被清成 1），贴图刷新那一路要把这块屏的
-     * dpr
-     * 带回去，
+     * @details 抓屏那一路交回的是物理像素（图像的 dpr 被清成 1），贴图刷新那一路要把这块屏的 dpr 带回去，
      *          否则换一次内容就把图放大 dpr 倍。这一格折算是 replaceContent 唯一的尺寸来源，先把它钉住：
-     *          丢 dpr 的那一版在这里当场红（80×40
-     * 当成 80×40 逻辑像素摆出来）。
+     *          丢 dpr 的那一版在这里当场红（80×40 当成 80×40 逻辑像素摆出来）。
      */
     TEST_F(PinManagerFixture, ReplacingContentDerivesTheDisplayedSizeFromTheImageDpr)
     {
