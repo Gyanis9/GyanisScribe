@@ -2036,8 +2036,8 @@ namespace GyanisScribe::Gui
             return;
         }
 
-        // 方向键把这一张逐像素挪走：一格、`Shift` 十格——遮罩与标注窗早就是这个口径，
-        // 贴图这一头原先只能用鼠标拖，贴着别的窗对边线时差的那几格摸不出来
+        // 方向键把这一张逐像素挪走：一格、`Shift` 十格，与遮罩和标注窗同一个口径——
+        // 只靠鼠标拖的时候，贴着别的窗对边线差的那几格摸不出来
         if (event->modifiers() == Qt::NoModifier || event->modifiers() == Qt::ShiftModifier)
         {
             if (const auto step = Gui::arrowStepFor(event->key()); step)

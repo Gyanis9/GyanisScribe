@@ -74,8 +74,8 @@ namespace GyanisScribe::App
         constexpr std::string_view kNoneToken = "none";
         constexpr std::string_view kMenuToken = "menu";
 
-        // 默认那两下就是这一批要交付的形状：左键框选截图、中键收起 / 摆回全部贴图。
-        // 这两下在本仓此前都不做事，所以默认值改在 README 里写明，要旧形状就在清单里显式选「什么都不做」
+        // 默认那两下的形状：左键框选截图、中键收起 / 摆回全部贴图。
+        // README 里那份默认值表要和这一处同解；嫌默认太满，可以在动作清单里显式选「什么都不做」
         constexpr std::array<TrayClickRoleInfo, 2> kRoleInfos = {
                 TrayClickRoleInfo{GyanisScribe::Core::kTrayLeftClick, "左键单击", TrayClickRole::Left, trayActionToken(TrayAction::CaptureRegion)},
                 TrayClickRoleInfo{GyanisScribe::Core::kTrayMiddleClick, "中键单击", TrayClickRole::Middle, trayActionToken(TrayAction::TogglePinsVisible)},

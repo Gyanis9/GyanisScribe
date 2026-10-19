@@ -37,11 +37,11 @@ namespace GyanisScribe::Core
          * @param headLength 两翼到尖端的距离
          * @param style 款式：0 实心三角、1 空心三角、2 开口两翼
          * @details 两翼落在「从尖端沿杆往回转 ±kArrowHeadAngle 走 headLength」处：头长 21 时
-         *          三角纵深 18、最宽 ±11，是常见的实心三角。曾经写成从「尖端往回 headLength
-         *          的底边点」再朝外转 ±角度 走 headLength——那只把两翼顶到尖端旁 0.13×headLength 处，
-         *          画出来的是一小片贴着尖端的扁平扇面，实际观感就是一根光杆（渲染探针核对过）。
-         *          空心是同一圈三角只描边不填芯；开口只画尖端到两翼那两笔，连底边都不画
-         *          （那时箭杆是伸到尖上的，由调用方决定）。
+         *          三角纵深 18、最宽 ±11，是常见的实心三角。若改成从「尖端往回 headLength 的底边点」
+         *          再朝外转 ±角度走 headLength，两翼只到尖端旁 0.13×headLength 处，画出来是一小片
+         *          贴着尖端的扁平扇面，观感就是一根光杆。空心是同一圈三角只描边不填芯；
+         *          开口只画尖端到两翼那两笔，连底边都不画
+         *          （那一档箭杆是伸到尖上的，由调用方决定）。
          */
         void drawArrowHead(QPainter &painter, const QPointF &tip, const double angle, const double headLength, const int style)
         {
