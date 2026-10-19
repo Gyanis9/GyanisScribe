@@ -52,7 +52,7 @@ namespace GyanisScribe::Core
 
         /**
          * @brief 松手：没收笔就把在途图形留在手里，见 AnnotationTool::end()
-         * @return 收到收笔请求时交回整条折线；否则交回空且**不丢弃**在途图形
+         * @return 收到收笔请求时交回整条折线；否则交回空且不丢弃在途图形
          */
         std::optional<AnnotationShape> end() override;
 

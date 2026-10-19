@@ -1226,7 +1226,7 @@ TEST_F(CaptureServiceFixture, LongCaptureRoutesTheOverlaySelectionIntoTheLongRou
 /**
  * @brief 读数用例：一次框选从「起一轮」到「交回成品」的耗时（不断言时间）
  * @details 结论要进 README 的「性能实测」，所以量法写死在这一处：真的铺遮罩、真的拖一块再确认，
- *          量到成品落地为止——**含铺遮罩与建窗那一份**，因为那正是用户按完热键要等的时间，
+ *          量到成品落地为止——含铺遮罩与建窗那一份，因为那正是用户按完热键要等的时间，
  *          只量抓一帧那一步（另有读数用例管）说明不了整条链。它不断言时间：跑在什么机器上就报什么数，
  *          红了只说明抓不到帧或没交出成品。
  *          每轮换一个新的服务，并在轮末把 DeferredDelete 派发掉——遮罩关闭走的是 deleteLater，

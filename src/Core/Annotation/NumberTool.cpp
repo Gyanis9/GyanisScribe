@@ -26,7 +26,7 @@ namespace GyanisScribe::Core
 
     std::optional<AnnotationShape> NumberTool::end()
     {
-        // 编号取交回这一刻**当前组**的条数：起笔之后又被撤销一条的话，这里跟着退一号，不会跳出两个 3
+        // 编号取交回这一刻当前组的条数：起笔之后又被撤销一条的话，这里跟着退一号，不会跳出两个 3
         m_pending.number      = nextNumber();
         m_pending.numberGroup = m_activeGroup;
         m_pending.text        = QString::number(m_pending.number);

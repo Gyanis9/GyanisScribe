@@ -40,7 +40,7 @@ namespace GyanisScribe::Core
         /**
          * @brief 收笔并落定编号，见 AnnotationTool::end()
          * @return 带上编号与计数组的图形
-         * @details 重写基类接口：编号在交回这一刻按**当前组**当时的图形条数 +1 取——起笔之后
+         * @details 重写基类接口：编号在交回这一刻按当前组当时的图形条数 +1 取——起笔之后
          *          又被撤销一条也不会串号；实际入库仍由引擎走撤销栈。
          */
         std::optional<AnnotationShape> end() override;

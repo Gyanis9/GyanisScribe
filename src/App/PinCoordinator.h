@@ -54,7 +54,7 @@ namespace GyanisScribe::App
     public:
         /**
          * @brief 构造
-         * @param pins 贴图管理器；**所有权不在这里**，控制器还拿它做别的编排
+         * @param pins 贴图管理器；所有权不在这里，控制器还拿它做别的编排
          * @param parent Qt 父对象
          */
         PinCoordinator(GyanisScribe::Gui::PinManager &pins, QObject *parent = nullptr);

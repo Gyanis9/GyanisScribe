@@ -33,7 +33,7 @@ namespace GyanisScribe::App
      * @brief 历史清单的增删查与「这条去哪了」
      * @details 只做清单本身的事：记一条、去掉一条、清空、打开所在目录；要贴到屏上的那一下
      *          走 pinRequested 交回控制器（贴图那一族的地盘），要出给用户的话走 messageForUser。
-     *          清单变了发 changed()——**不去直接叫窗口刷新**：那会让 App 层反向依赖 Main，
+     *          清单变了发 changed()——不去直接叫窗口刷新：那会让 App 层反向依赖 Main，
      *          而 Main 本来就依赖 App。
      */
     class HistoryCoordinator : public QObject
@@ -43,7 +43,7 @@ namespace GyanisScribe::App
     public:
         /**
          * @brief 构造
-         * @param history 清单本体；**所有权不在这里**——同一个 store 也交给主窗口读，两边认同一份
+         * @param history 清单本体；所有权不在这里——同一个 store 也交给主窗口读，两边认同一份
          * @param settings 保留策略（留多少条、多少天）从这里读
          * @param parent Qt 父对象
          */

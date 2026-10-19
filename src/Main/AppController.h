@@ -201,7 +201,7 @@ namespace GyanisScribe::Main
          * @details 命令行没有界面可等，也不走延时那道闸。交付顺序恒为「存文件 → 剪贴板 → 贴到屏幕上」；
          *          全部去处都交付完从 commandLineCaptureDelivered 交回成品路径（没点 file 时为空），
          *          取不到条件（比如没有前台窗口）或某一路交付失败时从 commandLineActionFailed 交回中文原因。
-         *          **截图这一族在 `CaptureCoordinator` 里**，这一处只转发：`Application` 那条命令行入口认的是控制器。
+         *          截图这一族在 `CaptureCoordinator` 里，这一处只转发：`Application` 那条命令行入口认的是控制器。
          */
         void startCommandLineCapture(const GyanisScribe::App::CommandLineRequest &request);
 

@@ -770,7 +770,7 @@ TEST_F(AnnotationWindowFixture, EllipticalToggleFromToolbarReachesTheEngine)
 
 /**
  * @brief 钉住描边色按钮从窗口接到引擎：点成「白」档之后新画的文字描边才是白的
- * @details 工具栏默认字色是调色板第一格红 (232,62,62)，亮度 147 → 自动档的反差色是**黑**；
+ * @details 工具栏默认字色是调色板第一格红 (232,62,62)，亮度 147 → 自动档的反差色是黑；
  *          所以判别取「白档」：桥接不上时新字会拿到自动档的黑描边，亮格一个都不会有。
  */
 TEST_F(AnnotationWindowFixture, TextStrokeColorFromToolbarReachesTheEngine)

@@ -100,7 +100,7 @@ namespace GyanisScribe::Gui
      * @param action 哪个开关
      * @param value 要设成什么值
      * @details 菜单项自己先落一遍（裸窗口没有管理器时也照样生效），再发信号让管理器把
-     *          选中集里**其余**几张按同一个值落一遍——两处共用这一个函数，
+     *          选中集里其余几张按同一个值落一遍——两处共用这一个函数，
      *          「设进去哪些字段」不会各写一份。
      */
     void applyPinBatchAction(PinWindow &pin, PinBatchAction action, bool value);

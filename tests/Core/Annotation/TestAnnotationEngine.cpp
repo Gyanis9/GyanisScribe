@@ -891,7 +891,7 @@ TEST_F(EngineFixture, TextPlateAndOutlineRestyleAndUndoBack)
 
 /**
  * @brief 钉住描边色档也走改样式命令：自动档的白轮廓切到黑档当场消失、撤销回自动
- * @details 与上面那条同一个灰底装置，但这里只做**一次**改样式：连续两次改样式会被撤销栈
+ * @details 与上面那条同一个灰底装置，但这里只做一次改样式：连续两次改样式会被撤销栈
  *          合并成一步（引擎对同一条图形的样式命令有 merge），那样「撤销一次」回的是两处
  *          改动之前的状态，判据就指错了地方。
  */
@@ -984,7 +984,7 @@ TEST_F(EngineFixture, TextOutlineWidthRestylesAndUndoesBack)
 
 /**
  * @brief 钉住底板色档也走改样式命令：黑档垫出一整块板、撤销退回自动档
- * @details 白底上红字的自动档取白（与底同色，多出的是看不见的白），切到黑档多出来的是**一整块板**，
+ * @details 白底上红字的自动档取白（与底同色，多出的是看不见的白），切到黑档多出来的是一整块板，
  *          所以判据按增量给下限（+200 格），而不是「多了一个像素」——后者在字身重画时也能凑出来。
  */
 TEST_F(EngineFixture, TextPlateColorRestylesAndUndoesBack)
