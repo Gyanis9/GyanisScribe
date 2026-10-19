@@ -43,9 +43,9 @@ Application::Application(int &argc, char **argv, const GyanisScribe::App::Comman
     auto bodyFont = font();
     bodyFont.setPointSize(static_cast<int>(GyanisScribe::Gui::kTextRolePointSizeBody));
     setFont(bodyFont);
-    // 主窗口关掉就回托盘：这是常驻工具，退出只走托盘菜单那一条路。
-    // Qt 的默认是「最后一个窗口关掉就退进程」，不设这一行时用户关掉设置窗会把程序整个带走，
-    // 托盘图标与挂在屏幕上的贴图一起消失
+    // 关窗不等于退出进程的默认逻辑只留给「关掉的是贴图/标注这类浮窗」：主窗口自己的 closeEvent
+    // 会发 quitRequested，与托盘菜单的「退出」走同一个收场。不设这一行时，关掉任何一枚贴图都会
+    // 把整个程序带走，托盘图标与挂在屏幕上的其它贴图一起消失
     setQuitOnLastWindowClosed(false);
 
     const auto logDirectory = GyanisScribe::Base::Paths::logDirectory();

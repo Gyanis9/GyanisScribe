@@ -36,6 +36,7 @@
 #include <QApplication>
 #include <QByteArray>
 #include <QCheckBox>
+#include <QCloseEvent>
 #include <QComboBox>
 #include <QDesktopServices>
 #include <QDir>
@@ -1422,6 +1423,12 @@ namespace GyanisScribe::Main
         {
             Logger::warning(std::format("主窗口几何没能存下：{}", saved.error().message));
         }
+    }
+
+    void MainWindow::closeEvent(QCloseEvent *event)
+    {
+        emit quitRequested();
+        QWidget::closeEvent(event);
     }
 
     MainWindow::MainWindow(GyanisScribe::Core::ISettingsStore &settings, GyanisScribe::Gui::ThemeManager &theme, GyanisScribe::Gui::IconProvider &icons,

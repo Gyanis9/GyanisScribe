@@ -2304,3 +2304,19 @@ TEST_F(MainWindowFixture, UnbindRemovesTheCustomHotkeyEntry)
     closeWindowAndFlush();
     EXPECT_EQ(makeStore()->stringValue(std::string{"Hotkey/Custom/CaptureFullScreen"}, QStringLiteral("没填")), QStringLiteral("没填")) << "取消绑定没把这一项删干净";
 }
+
+/**
+ * @brief 钉住「关掉主窗口就是退出程序」
+ * @details 常驻托盘不该变成「关掉窗口后还得再去托盘点一次退出」：closeEvent 要发 quitRequested，
+ *          宿主拿它接 QCoreApplication::quit。这里只钉窗口这一端，接没接上由 AppController 的装配保证。
+ */
+TEST_F(MainWindowFixture, ClosingTheWindowAsksTheApplicationToQuit)
+{
+    makeWindow();
+    bool quitRequested = false;
+    QObject::connect(m_window.get(), &MainWindow::quitRequested, [&quitRequested] { quitRequested = true; });
+
+    m_window->close();
+
+    EXPECT_TRUE(quitRequested) << "关掉主窗口没发退出请求，进程会继续挂在托盘里";
+}

@@ -262,6 +262,8 @@ namespace GyanisScribe::Main
         QObject::connect(m_mainWindow.get(), &MainWindow::historyOpenFolderRequested, m_history.get(), &GyanisScribe::App::HistoryCoordinator::openContainingFolder);
         QObject::connect(m_mainWindow.get(), &MainWindow::historyClearRequested, m_history.get(), &GyanisScribe::App::HistoryCoordinator::clear);
         QObject::connect(m_mainWindow.get(), &MainWindow::messageForUser, this, [this](const QString &message, GyanisScribe::Gui::ToastKind kind) { notifyUser(message, kind); });
+        // 关设置窗就是退出程序：托盘常驻指的是「窗口没关时」还活着，不是关掉之后还得再去托盘点一次退出
+        QObject::connect(m_mainWindow.get(), &MainWindow::quitRequested, qApp, &QCoreApplication::quit);
         // 主窗口动作条与托盘菜单发的是同一个枚举，所以出口也只有这一个 handleTrayAction
         QObject::connect(m_mainWindow.get(), &MainWindow::actionRequested, this, &AppController::handleTrayAction);
         // 「整屏截图：<屏名>」那一条：与整屏截图同一个出口，只是把屏名点了出来

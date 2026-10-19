@@ -25,6 +25,7 @@
 
 class QListWidget;
 class QStackedWidget;
+class QCloseEvent;
 
 namespace GyanisScribe::Core
 {
@@ -322,6 +323,21 @@ namespace GyanisScribe::Main
          * @param kind 语义种类
          */
         void messageForUser(const QString &message, GyanisScribe::Gui::ToastKind kind);
+
+        /**
+         * @brief 用户关掉了主窗口，要连同整个程序一起收场
+         * @details 常驻能力（托盘、全局热键）只在「窗口还开着」时才有意义：用户把窗口关掉就是在说
+         *          「这一趟用完了」。没有托盘时 Qt 本来就按最后一个窗口退出，这里把有托盘的那条路
+         *          补齐，免得关窗后进程还挂在后台、还得再去托盘菜单点一次退出。
+         */
+        void quitRequested();
+
+    protected:
+        /**
+         * @brief 关闭主窗口：发出 quitRequested，让宿主把整个程序收掉
+         * @param event 关闭事件
+         */
+        void closeEvent(QCloseEvent *event) override;
 
     private:
         /**
