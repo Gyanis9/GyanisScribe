@@ -2,8 +2,6 @@
 
 #include "Gui/Theme/Motion.h"
 
-#include <QCoreApplication>
-#include <QEvent>
 #include <QPainter>
 #include <QTextLayout>
 #include <QTextOption>
@@ -15,7 +13,7 @@ namespace
 {
     /**
      * @brief 对整张图做多遍可分离盒式模糊
-     * @param image 被模糊的图，就地改写
+     * @param image 被模糊的图，就地改写；必须是预乘格式，逐通道平均才等价于按透明度加权
      * @param radius 半径，按物理像素计
      * @param passes 盒式模糊的遍数，三遍接近高斯
      * @details 只在建层时调用一次；逐帧重算高斯会把打字动画的帧预算吃光。
@@ -166,7 +164,7 @@ namespace GyanisScribe::Gui
         }
         // 按真实时钟取经过时间，固定 +16ms 累积会在掉帧时越走越慢；到头就停在最后一帧
         m_elapsedMs = std::min<qint64>(m_clock.elapsed(), totalDurationMs());
-        requestFrame();
+        update();
     }
 
     void StreamingTextOverlay::advanceForTesting(const qint64 milliseconds)
@@ -182,15 +180,7 @@ namespace GyanisScribe::Gui
             return;
         }
         m_elapsedMs = std::min<qint64>(m_elapsedMs + std::max<qint64>(0, milliseconds), totalDurationMs());
-        requestFrame();
-    }
-
-    void StreamingTextOverlay::requestFrame()
-    {
         update();
-        // 子控件的 update() 由顶层窗口合并成一条重绘请求，控件本身收不到 UpdateRequest；
-        // 补发一条给自己的请求，逐帧重绘在控件一级同样看得见（顶层的合并仍由 Qt 负责）。
-        QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest));
     }
 
     qint64 StreamingTextOverlay::totalDurationMs() const noexcept
@@ -201,6 +191,11 @@ namespace GyanisScribe::Gui
     bool StreamingTextOverlay::isFinished() const noexcept
     {
         return m_finished;
+    }
+
+    int StreamingTextOverlay::paintCount() const noexcept
+    {
+        return m_paintCount;
     }
 
     void StreamingTextOverlay::buildLayers()
@@ -252,7 +247,8 @@ namespace GyanisScribe::Gui
 
         const qreal dpr = devicePixelRatioF();
         const QSize deviceSize{std::max(1, qRound(width() * dpr)), std::max(1, qRound(height() * dpr))};
-        m_sharp = QImage{deviceSize, QImage::Format_ARGB32};
+        // 预乘格式：模糊时逐通道平均才按透明度加权，透明像素不会把语义色拖向黑
+        m_sharp = QImage{deviceSize, QImage::Format_ARGB32_Premultiplied};
         m_sharp.fill(Qt::transparent);
         {
             QPainter painter{&m_sharp};
@@ -268,6 +264,7 @@ namespace GyanisScribe::Gui
 
     void StreamingTextOverlay::paintEvent(QPaintEvent *)
     {
+        ++m_paintCount;
         QPainter painter{this};
         // 先盖掉原生标签：动画期间不该看见整齐的整句，收尾时再一起露出来
         painter.fillRect(rect(), m_background);

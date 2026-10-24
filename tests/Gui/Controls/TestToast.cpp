@@ -1,28 +1,41 @@
 #include "Gui/Controls/Toast.h"
 
 #include "Core/Settings/SettingsStore.h"
-#include "Gui/Theme/DesignTokens.h"
+#include "Gui/Controls/StreamingText.h"
 #include "Gui/Resources/IconProvider.h"
+#include "Gui/Theme/DesignTokens.h"
+#include "Gui/Theme/Motion.h"
 #include "Gui/Theme/ThemeManager.h"
 
 #include <gtest/gtest.h>
 
 #include <QApplication>
 #include <QColor>
+#include <QCoreApplication>
+#include <QEvent>
+#include <QFontInfo>
+#include <QFontMetrics>
+#include <QLabel>
 #include <QPoint>
 #include <QRect>
 #include <QSize>
 #include <QString>
+#include <QWidget>
 
 #include <filesystem>
 #include <format>
 #include <memory>
+#include <optional>
 #include <string>
 
 using GyanisScribe::Core::SettingsStore;
+using GyanisScribe::Gui::IconSize;
+using GyanisScribe::Gui::iconTextTopPad;
 using GyanisScribe::Gui::kDarkPalette;
 using GyanisScribe::Gui::kLightPalette;
 using GyanisScribe::Gui::paletteFor;
+using GyanisScribe::Gui::setAnimationsEnabledForTesting;
+using GyanisScribe::Gui::StreamingTextOverlay;
 using GyanisScribe::Gui::ThemeKind;
 using GyanisScribe::Gui::ThemeManager;
 using GyanisScribe::Gui::Toast;
@@ -92,6 +105,19 @@ namespace
         std::unique_ptr<GyanisScribe::Gui::IconProvider> m_icons;
         std::unique_ptr<Toast>                          m_toast;
     };
+
+    /// 当前可见的 Toast 气泡：没有父窗口的顶层 ToolTip，同一时刻只有一个
+    QWidget *visibleToastBubble()
+    {
+        for (auto *widget: QApplication::topLevelWidgets())
+        {
+            if (widget->isVisible() && widget->windowType() == Qt::ToolTip)
+            {
+                return widget;
+            }
+        }
+        return nullptr;
+    }
 
 } // namespace
 
@@ -204,3 +230,124 @@ TEST(ToastPolicy, IconSitsOneEighthEmBelowTheFirstBaseline)
     EXPECT_EQ(pad, 11);
     EXPECT_NEAR(static_cast<double>(iconBase - textBase), 0.125 * 15.0, 1.0);
 }
+
+/**
+ * @brief 钉住流式覆盖层只出现在成功与信息提示上
+ * @details 错误提示要整句出现；关闭动画时所有提示都直接全显。判的是气泡里真实存在的覆盖层。
+ */
+TEST_F(ToastFixture, StreamingOverlayFollowsKindAndMotionPreference)
+{
+    // 动画开关是全局状态：用例结束恢复默认，避免污染同进程的其它用例
+    struct MotionGuard final
+    {
+        ~MotionGuard()
+        {
+            setAnimationsEnabledForTesting(std::nullopt);
+        }
+    } guard;
+    setAnimationsEnabledForTesting(true);
+
+    toast().show(QStringLiteral("成功提示"), ToastKind::Success);
+    EXPECT_TRUE(toast().hasStreamingOverlay());
+    EXPECT_EQ(toast().streamingOverlayCount(), 1);
+
+    toast().show(QStringLiteral("信息提示"), ToastKind::Information);
+    EXPECT_TRUE(toast().hasStreamingOverlay());
+    EXPECT_EQ(toast().streamingOverlayCount(), 1);
+
+    toast().show(QStringLiteral("错误提示"), ToastKind::Danger);
+    EXPECT_FALSE(toast().hasStreamingOverlay());
+    EXPECT_EQ(toast().streamingOverlayCount(), 0) << "错误提示不该逐字浮现";
+
+    setAnimationsEnabledForTesting(false);
+    toast().show(QStringLiteral("关闭动画的成功提示"), ToastKind::Success);
+    EXPECT_FALSE(toast().hasStreamingOverlay());
+    EXPECT_EQ(toast().streamingOverlayCount(), 0) << "关闭动画后仍盖着覆盖层";
+}
+
+/**
+ * @brief 钉住新提示顶掉旧提示时，旧覆盖层一起销毁
+ * @details 覆盖层挂在同一个标签下：旧层不删就会与新层叠着画，还能看见上一条的残影。
+ */
+TEST_F(ToastFixture, SecondToastReplacesTheFirstOverlay)
+{
+    toast().show(QStringLiteral("第一条"), ToastKind::Success);
+    ASSERT_EQ(toast().streamingOverlayCount(), 1);
+
+    toast().show(QStringLiteral("第二条"), ToastKind::Information);
+    EXPECT_EQ(toast().streamingOverlayCount(), 1) << "旧覆盖层没有随文本一起销毁";
+    EXPECT_TRUE(toast().hasStreamingOverlay());
+    EXPECT_EQ(toast().currentText(), QStringLiteral("第二条"));
+}
+
+/**
+ * @brief 钉住动画走完后覆盖层让开，原生标签仍是文字真身
+ * @details 覆盖层只是画面；收工后必须被删掉，正文仍从 QLabel 读得到。
+ */
+TEST_F(ToastFixture, AdvancingPastTheTimelineRevealsTheNativeLabel)
+{
+    const auto text = QStringLiteral("识别完成");
+    toast().show(text, ToastKind::Success);
+    ASSERT_TRUE(toast().hasStreamingOverlay());
+
+    toast().advanceStreamingForTesting(10000);
+    QCoreApplication::processEvents();
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+
+    EXPECT_FALSE(toast().hasStreamingOverlay());
+    EXPECT_EQ(toast().streamingOverlayCount(), 0);
+    EXPECT_EQ(toast().currentText(), text) << "覆盖层收工后文字真身没有留下";
+}
+
+/**
+ * @brief 钉住气泡图标的描边色等于该条提示的语义色
+ * @details 图标的颜色跟着提示种类走，而供给器同一时刻只持有一个主题色，必须走显式描边入口。
+ */
+TEST_F(ToastFixture, IconTakesTheSemanticTintOfItsKind)
+{
+    for (const auto kind: {ToastKind::Success, ToastKind::Danger, ToastKind::Information})
+    {
+        toast().show(QStringLiteral("提示"), kind);
+        EXPECT_EQ(toast().currentIconTint(), toastColorFor(kind, theme().palette())) << static_cast<int>(kind);
+    }
+}
+
+/**
+ * @brief 钉住文字列上边距用的是标签真实字体度量与 em 高
+ * @details 传 QFontMetrics::height()（行距）会让 -0.125em 的契约变形；这里按标签的
+ *          QFontInfo::pixelSize() 重算一遍，钉住调用方没有拿行距冒充 em。
+ */
+TEST_F(ToastFixture, IconTextPadUsesTheLabelsRealFontMetrics)
+{
+    toast().show(QStringLiteral("基线"), ToastKind::Information);
+
+    QWidget *bubble = visibleToastBubble();
+    ASSERT_NE(bubble, nullptr) << "没有找到可见的 Toast 气泡";
+    const auto *label = bubble->findChild<QLabel *>();
+    ASSERT_NE(label, nullptr) << "气泡里没有原生文本标签";
+
+    const QFont font = label->font();
+    const int   em   = QFontInfo{font}.pixelSize();
+    ASSERT_GT(em, 0);
+    EXPECT_EQ(toast().currentIconTextPad(), iconTextTopPad(static_cast<int>(IconSize::Medium), label->fontMetrics().ascent(), em, 6));
+}
+
+/**
+ * @brief 钉住覆盖层对输入与无障碍都是不可见的
+ * @details 覆盖层只负责画面：鼠标要穿透到可选标签，不能进焦点链，也不该在辅助技术里有名字。
+ */
+TEST_F(ToastFixture, StreamingOverlayIsInvisibleToInputAndAccessibility)
+{
+    toast().show(QStringLiteral("不挡鼠标"), ToastKind::Success);
+    ASSERT_EQ(toast().streamingOverlayCount(), 1);
+
+    QWidget *bubble = visibleToastBubble();
+    ASSERT_NE(bubble, nullptr) << "没有找到可见的 Toast 气泡";
+    auto *overlay = bubble->findChild<StreamingTextOverlay *>();
+    ASSERT_NE(overlay, nullptr) << "气泡里没有流式覆盖层";
+
+    EXPECT_TRUE(overlay->testAttribute(Qt::WA_TransparentForMouseEvents)) << "覆盖层挡住了可选中的文字";
+    EXPECT_EQ(overlay->focusPolicy(), Qt::NoFocus) << "覆盖层进了焦点链";
+    EXPECT_TRUE(overlay->accessibleName().isEmpty()) << "纯画面层不该有可读名称";
+}
+

@@ -545,6 +545,20 @@ TEST_F(IconProviderFixture, ExplicitTintOverridesTheProviderTintAndCachesSeparat
 }
 
 /**
+ * @brief 钉住无效的显式描边色回落到供给器主题色
+ * @details 调用方没拿到语义色时会传一个无效 QColor；此时必须交回主题色的图标，
+ *          而不是一片透明或上一色的残留。
+ */
+TEST_F(IconProviderFixture, InvalidExplicitTintFallsBackToTheProviderTint)
+{
+    const auto fallback = provider().pixmap("Capture", IconSize::Large, 1.0, QColor{});
+    ASSERT_FALSE(fallback.isNull());
+    EXPECT_TRUE(containsColor(fallback, QColor(0, 200, 0))) << "无效描边色没有回落到主题色";
+    // 与三参入口逐位一致：回落走的就是 tintColor() 那一份
+    EXPECT_TRUE(fallback.toImage() == provider().pixmap("Capture", IconSize::Large, 1.0).toImage());
+}
+
+/**
  * @brief 钉住同族图标共用同一份外框几何
  * @details 截图族与录屏族是同两句话（全屏 / 选区 / 上次选区 / 窗口），外框必须逐字一致：
  *          分头画是这条路最容易发生的劣化——改了一处忘了另一处，两枚图标看上去是两家出的。

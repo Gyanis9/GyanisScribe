@@ -70,7 +70,7 @@ namespace GyanisScribe::Gui
      * @brief 算文字列的上边距，把首行基线压到图标下方
      * @param iconHeight 图标逻辑高度
      * @param ascent 文本字体的 ascent
-     * @param emHeight 文本字体的 em 高，取 QFontMetrics::height()
+     * @param emHeight 文本字体的 em 高，取 QFontInfo::pixelSize()，不是 QFontMetrics::height() 的行距
      * @param iconMargin 图标上方的留白
      * @return 文字列的上边距，使图标底边落在首行基线下方 0.125em
      */
@@ -95,6 +95,12 @@ namespace GyanisScribe::Gui
         Toast(class IconProvider &icons, const class ThemeManager &theme, QObject *parent = nullptr);
 
         /**
+         * @brief 销毁提示器，并关掉还亮着的气泡
+         * @details 气泡是没有父控件的顶层窗口，不随 QObject 的父子关系回收。
+         */
+        ~Toast() override;
+
+        /**
          * @brief 显示一条提示
          * @param text 正文，用户看得懂的那句
          * @param kind 种类，决定语义色与图标
@@ -104,6 +110,25 @@ namespace GyanisScribe::Gui
 
         /// 当前显示的气泡文本，空表示没在显示（用例据此判自动隐藏有没有生效）
         [[nodiscard]] QString currentText() const;
+
+        /// 当前气泡是否还盖着流式文字覆盖层
+        [[nodiscard]] bool hasStreamingOverlay() const;
+
+        /// 当前气泡里的流式覆盖层个数，用于判旧层有没有随文本一起销毁
+        [[nodiscard]] int streamingOverlayCount() const;
+
+        /// 当前气泡图标的描边色，应等于该条提示的语义色
+        [[nodiscard]] QColor currentIconTint() const;
+
+        /// 当前气泡文字列的上边距，按标签真实字体算出
+        [[nodiscard]] int currentIconTextPad() const;
+
+        /**
+         * @brief 把当前气泡的流式动画向前推指定毫秒
+         * @param milliseconds 本次推进的毫秒数，负值按 0 处理
+         * @details 只给用例用：不依赖真实时钟，推进到时间轴终点即收工。
+         */
+        void advanceStreamingForTesting(int milliseconds);
 
     private:
         class Bubble;

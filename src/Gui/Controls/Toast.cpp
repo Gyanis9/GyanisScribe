@@ -8,6 +8,7 @@
 #include "Gui/Theme/ThemeManager.h"
 
 #include <QEvent>
+#include <QFontInfo>
 #include <QFontMetrics>
 #include <QGuiApplication>
 #include <QHBoxLayout>
@@ -124,19 +125,31 @@ namespace GyanisScribe::Gui
                 m_scale.animateTo(1.0);
             }
 
+            /// 收回终值：上一条成功提示的弹簧还在跑时，换到不弹的种类不能接着播
+            void reset()
+            {
+                m_scale.setImmediate(1.0);
+            }
+
             /**
              * @brief 图标控件的建议尺寸
-             * @return 位图逻辑尺寸加两侧留白；位图为空时为零
+             * @return 位图的逻辑尺寸加两侧留白；位图为空时为零
              */
             [[nodiscard]] QSize sizeHint() const override
             {
-                return m_icon.isNull() ? QSize{} : m_icon.size() + QSize{2 * kMargin, 2 * kMargin};
+                if (m_icon.isNull())
+                {
+                    return {};
+                }
+                const auto logical = m_icon.deviceIndependentSize().toSize();
+                return logical + QSize{2 * kMargin, 2 * kMargin};
             }
 
         protected:
             /**
              * @brief 按当前弹簧比例居中画图标
-             * @details 重写 QWidget::paintEvent()：缩放围绕控件中心，字形不会从左上角往外长。
+             * @details 重写 QWidget::paintEvent()：缩放围绕控件中心，字形不会从左上角往外长；
+             *          目标矩形按位图的逻辑尺寸算，高 DPI 副本不会被按物理像素放大一圈。
              */
             void paintEvent(QPaintEvent *) override
             {
@@ -146,7 +159,8 @@ namespace GyanisScribe::Gui
                 }
                 QPainter painter{this};
                 painter.setRenderHint(QPainter::SmoothPixmapTransform);
-                const QSizeF scaled = QSizeF(m_icon.size()) * m_scale.value();
+                const QSizeF logical = m_icon.deviceIndependentSize();
+                const QSizeF scaled  = logical * m_scale.value();
                 const QRectF target{(width() - scaled.width()) / 2.0, (height() - scaled.height()) / 2.0, scaled.width(), scaled.height()};
                 painter.drawPixmap(target, m_icon, QRectF{QPointF(0.0, 0.0), QSizeF(m_icon.size())});
             }
@@ -185,8 +199,10 @@ namespace GyanisScribe::Gui
             m_text->setTextInteractionFlags(Qt::TextSelectableByMouse);
             // 覆盖层从标签左上角画起，原生文字也钉在同一处，动画收尾时不会跳一行
             m_text->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-            const auto metrics = m_text->fontMetrics();
-            columnLayout->setContentsMargins(0, iconTextTopPad(static_cast<int>(IconSize::Medium), metrics.ascent(), metrics.height(), SpringIcon::kMargin), 0, 0);
+            const QFont font = m_text->font();
+            // em 高取真实像素字号；QFontMetrics::height() 是行距，会把 -0.125em 的契约撑大
+            m_iconTextPad = iconTextTopPad(static_cast<int>(IconSize::Medium), QFontMetrics{font}.ascent(), QFontInfo{font}.pixelSize(), SpringIcon::kMargin);
+            columnLayout->setContentsMargins(0, m_iconTextPad, 0, 0);
             columnLayout->addWidget(m_text);
 
             layout->addWidget(m_icon, 0, Qt::AlignTop);
@@ -200,12 +216,14 @@ namespace GyanisScribe::Gui
             m_kind = kind;
 
             const auto accent = toastColorFor(kind, m_currentPalette);
+            m_iconTint        = accent;
 
             m_text->setText(text);
             m_text->setStyleSheet(QStringLiteral("color: %1; background: transparent;").arg(accent.name(QColor::HexRgb)));
             // 图标跟着种类换：颜色一样时，认图形比认文字快
             const auto iconName = kind == ToastKind::Success ? std::string_view{"Check"} : (kind == ToastKind::Danger ? "Warning" : "Info");
-            m_icon->setPixmap(m_icons.pixmap(iconName, IconSize::Medium, 1.0, accent));
+            // 按气泡所在屏幕的缩放比取图，高 DPI 上不靠 QPainter 放大糊掉
+            m_icon->setPixmap(m_icons.pixmap(iconName, IconSize::Medium, devicePixelRatioF(), accent));
         }
 
         void setPalette(const ThemePalette &palette)
@@ -227,6 +245,11 @@ namespace GyanisScribe::Gui
             {
                 m_icon->pop();
             }
+            else
+            {
+                // 上一条成功提示的弹簧可能还在跑：不收回终值，信息与错误图标会凭空弹一下
+                m_icon->reset();
+            }
             if (!shouldStreamToast(m_kind, animate) || m_text->text().isEmpty())
             {
                 return;
@@ -242,6 +265,45 @@ namespace GyanisScribe::Gui
         [[nodiscard]] QString currentText() const
         {
             return m_text->text();
+        }
+
+        [[nodiscard]] bool hasStreamingOverlay() const
+        {
+            return m_overlay != nullptr && !m_overlay->isFinished();
+        }
+
+        [[nodiscard]] int streamingOverlayCount() const
+        {
+            return static_cast<int>(m_text->findChildren<StreamingTextOverlay *>().size());
+        }
+
+        [[nodiscard]] QColor currentIconTint() const
+        {
+            return m_iconTint;
+        }
+
+        [[nodiscard]] int currentIconTextPad() const
+        {
+            return m_iconTextPad;
+        }
+
+        /**
+         * @brief 把覆盖层的流式动画向前推指定毫秒
+         * @param milliseconds 本次推进的毫秒数
+         * @details 时间轴到头后覆盖层会先停一帧再收工；测试读口顺手把这一帧走掉，
+         *          相当于 16ms 后的那次 tick，用例不必等真实时钟。
+         */
+        void advanceStreamingForTesting(const int milliseconds)
+        {
+            if (m_overlay == nullptr || m_overlay->isFinished())
+            {
+                return;
+            }
+            m_overlay->advanceForTesting(milliseconds);
+            if (m_overlay != nullptr && !m_overlay->isFinished())
+            {
+                m_overlay->advanceForTesting(0);
+            }
         }
 
     protected:
@@ -273,12 +335,20 @@ namespace GyanisScribe::Gui
         SpringIcon                    *m_icon = nullptr;                ///< 种类图标
         QLabel                        *m_text = nullptr;                ///< 提示正文，流式层收工后露出的真身
         QPointer<StreamingTextOverlay> m_overlay;                       ///< 流式覆盖层，只在动画期间存在
-        ToastKind                      m_kind = ToastKind::Information; ///< 当前提示的种类
-        ThemePalette                   m_currentPalette{};              ///< 当前主题的语义色，由 Toast 在显示前灌进来
+        ToastKind                      m_kind      = ToastKind::Information; ///< 当前提示的种类
+        QColor                         m_iconTint;                           ///< 当前图标的描边色，等于该条提示的语义色
+        int                            m_iconTextPad = 0;                    ///< 文字列的上边距，按标签真实字体算出
+        ThemePalette                   m_currentPalette{};                   ///< 当前主题的语义色，由 Toast 在显示前灌进来
     };
 
     Toast::Toast(IconProvider &icons, const ThemeManager &theme, QObject *parent) : QObject(parent), m_icons(icons), m_theme(theme)
     {
+    }
+
+    Toast::~Toast()
+    {
+        // 气泡是没有父控件的顶层窗口：提示器销毁时它不会自己跟着走
+        delete m_bubble;
     }
 
     void Toast::show(const QString &text, const ToastKind kind, const QRect &screenAvailable)
@@ -326,6 +396,34 @@ namespace GyanisScribe::Gui
     QString Toast::currentText() const
     {
         return m_bubble == nullptr ? QString{} : m_bubble->currentText();
+    }
+
+    bool Toast::hasStreamingOverlay() const
+    {
+        return m_bubble != nullptr && m_bubble->hasStreamingOverlay();
+    }
+
+    int Toast::streamingOverlayCount() const
+    {
+        return m_bubble == nullptr ? 0 : m_bubble->streamingOverlayCount();
+    }
+
+    QColor Toast::currentIconTint() const
+    {
+        return m_bubble == nullptr ? QColor{} : m_bubble->currentIconTint();
+    }
+
+    int Toast::currentIconTextPad() const
+    {
+        return m_bubble == nullptr ? 0 : m_bubble->currentIconTextPad();
+    }
+
+    void Toast::advanceStreamingForTesting(const int milliseconds)
+    {
+        if (m_bubble != nullptr)
+        {
+            m_bubble->advanceStreamingForTesting(milliseconds);
+        }
     }
 
 } // namespace GyanisScribe::Gui

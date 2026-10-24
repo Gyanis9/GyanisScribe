@@ -91,6 +91,9 @@ namespace GyanisScribe::Gui
         /// 是否已收工
         [[nodiscard]] bool isFinished() const noexcept;
 
+        /// 已完成的真实绘制次数，用例据此判每帧有没有重绘
+        [[nodiscard]] int paintCount() const noexcept;
+
     signals:
         /// 动画结束，覆盖层已隐藏，可以销毁
         void finished();
@@ -121,9 +124,6 @@ namespace GyanisScribe::Gui
         /// 用当前字体重排整段文字，并按 DPR 渲染清晰与模糊两层
         void buildLayers();
 
-        /// 请求一帧重绘，并把重绘请求同时发给本控件
-        void requestFrame();
-
         /// 定时器每帧推进一次，按真实时钟取经过时间
         void tick();
 
@@ -141,6 +141,7 @@ namespace GyanisScribe::Gui
         QTimer                m_timer;             ///< 帧定时器
         QElapsedTimer         m_clock;             ///< 真实经过时间
         qint64                m_elapsedMs = 0;     ///< 已推进的毫秒数
+        int                   m_paintCount = 0;    ///< 真实绘制次数，只增不减
         bool                  m_finished  = false; ///< 是否已收工
     };
 } // namespace GyanisScribe::Gui
