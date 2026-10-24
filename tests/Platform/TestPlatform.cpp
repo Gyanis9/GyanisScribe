@@ -1,3 +1,4 @@
+#include "Platform/AnimationSettings.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Platform/UnsupportedHotkeyBackend.h"
 #include "Platform/WindowGeometry.h"
@@ -44,6 +45,18 @@ namespace
         Q_UNUSED(application);
     }
 } // namespace
+
+/**
+ * @brief 钉住系统「显示动画」查询可用：读得出一个稳定值，不因查询失败而崩
+ * @details 这一格的值随用户的系统设置与平台变化，用例不断言具体真假；钉的是调用可用、
+ *          同一进程内前后一致——真值由 Application 装进全局动画开关，测试侧另有注入入口。
+ */
+TEST(AnimationSettings, QueryAnswersAStableValue)
+{
+    const bool first  = GyanisScribe::Platform::animationsEnabled();
+    const bool second = GyanisScribe::Platform::animationsEnabled();
+    EXPECT_EQ(first, second) << "同一进程里两次查询给出了不同的答案";
+}
 
 /**
  * @brief 钉住桩后端的拒绝契约：不支持就说「不支持」，不静默成功

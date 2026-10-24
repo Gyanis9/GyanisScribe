@@ -1477,7 +1477,7 @@ namespace GyanisScribe::Gui
         applyDockGeometry();
     }
 
-    void PinWindow::applyDockGeometry()
+    void PinWindow::applyDockGeometry(const bool animate)
     {
         if (m_edgeDock == Core::ScreenEdge::None || m_dockArea.isEmpty())
         {
@@ -1503,7 +1503,65 @@ namespace GyanisScribe::Gui
             case Core::ScreenEdge::None:
                 return;
         }
-        setGeometry(Core::dockedRect(revealed, m_dockArea, m_edgeDock, m_dockCollapsed));
+        const QRect target = Core::dockedRect(revealed, m_dockArea, m_edgeDock, m_dockCollapsed);
+        if (animate)
+        {
+            animateGeometryTo(target);
+        } else
+        {
+            stopGeometryAnimation();
+            setGeometry(target);
+        }
+    }
+
+    void PinWindow::animateGeometryTo(const QRect &target)
+    {
+        // 减少动效或已经在目标：直接落位，不建一个立刻要推完的弹簧
+        if (!animationsEnabled() || geometry() == target)
+        {
+            stopGeometryAnimation();
+            setGeometry(target);
+            return;
+        }
+
+        // 快速进出时上一段动画可能还在跑：停掉它并从当前几何重新起算，不从旧起点弹回去
+        stopGeometryAnimation();
+        m_geometryStart  = geometry();
+        m_geometryTarget = target;
+        m_geometrySpring = std::make_unique<SpringValue>(this);
+        m_geometrySpring->setSpec(kSnapSpring);
+        m_geometrySpring->setImmediate(0.0);
+        QObject::connect(m_geometrySpring.get(), &SpringValue::valueChanged, this,
+                         [this](const qreal progress)
+                         {
+                             // 四个分量按同一进度在起点与目标之间取整插值，位置与尺寸走同一条公式
+                             const auto lerp = [progress](const int start, const int end) { return qRound(start + (end - start) * progress); };
+                             setGeometry(QRect{QPoint{lerp(m_geometryStart.x(), m_geometryTarget.x()), lerp(m_geometryStart.y(), m_geometryTarget.y())},
+                                               QSize{lerp(m_geometryStart.width(), m_geometryTarget.width()), lerp(m_geometryStart.height(), m_geometryTarget.height())}});
+                         });
+        m_geometrySpring->animateTo(1.0);
+    }
+
+    void PinWindow::stopGeometryAnimation()
+    {
+        if (m_geometrySpring != nullptr)
+        {
+            m_geometrySpring->stop();
+            m_geometrySpring.reset();
+        }
+    }
+
+    bool PinWindow::isGeometryAnimationRunning() const noexcept
+    {
+        return m_geometrySpring != nullptr && m_geometrySpring->isRunning();
+    }
+
+    void PinWindow::advanceGeometryAnimationForTesting(const int milliseconds)
+    {
+        if (m_geometrySpring != nullptr)
+        {
+            m_geometrySpring->advanceBy(milliseconds);
+        }
     }
 
     QRectF PinWindow::contentRect() const
@@ -1664,6 +1722,9 @@ namespace GyanisScribe::Gui
         {
             return;
         }
+
+        // 按下即停：这一下可能起拖或改大小，后续每一帧都由指针说了算，不能与几何弹簧抢窗口
+        stopGeometryAnimation();
 
         // 标注模式：鼠标归标注视图（它铺满整窗收事件），窗口这一层什么都不做
         if (m_annotating)
@@ -1832,7 +1893,7 @@ namespace GyanisScribe::Gui
                 m_edgeDock = snapped.edge;
                 // 松手那一刻指针还在这张图上：先露着，等指针离开再收回去（见 leaveEvent）
                 m_dockCollapsed = false;
-                setGeometry(Core::dockedRect(snapped.rect, m_dockArea, m_edgeDock, false));
+                animateGeometryTo(Core::dockedRect(snapped.rect, m_dockArea, m_edgeDock, false));
                 update();
                 return;
             }
@@ -1853,7 +1914,7 @@ namespace GyanisScribe::Gui
         if (m_edgeDock != Core::ScreenEdge::None && m_dockCollapsed)
         {
             m_dockCollapsed = false;
-            applyDockGeometry();
+            applyDockGeometry(true);
         }
     }
 
@@ -1872,7 +1933,7 @@ namespace GyanisScribe::Gui
         if (m_edgeDock != Core::ScreenEdge::None && !m_dockCollapsed && !m_annotating)
         {
             m_dockCollapsed = true;
-            applyDockGeometry();
+            applyDockGeometry(true);
         }
     }
 
@@ -1888,6 +1949,8 @@ namespace GyanisScribe::Gui
     void PinWindow::hideEvent(QHideEvent *event)
     {
         QWidget::hideEvent(event);
+        // 藏起来之后不该还有一个定时器在挪它：下一次露面按当时的几何重新算
+        stopGeometryAnimation();
         // 收起或关闭发生在标注中途时先收工：已经画上的东西烘进图里，不留一个悬着的会话
         if (m_annotating)
         {

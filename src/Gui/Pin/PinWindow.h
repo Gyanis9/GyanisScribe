@@ -11,6 +11,7 @@
 
 #include "Core/Pin/IPinWindow.h"
 #include "Core/Pin/PinTransform.h"
+#include "Gui/Theme/Motion.h"
 
 #include <QImage>
 #include <QMap>
@@ -22,6 +23,7 @@
 
 #include <optional>
 #include <functional>
+#include <memory>
 #include <vector>
 
 class QMimeData;
@@ -295,6 +297,19 @@ namespace GyanisScribe::Gui
          *          贴边收起后留在屏上最窄的一条，悬停会自动露出来（见 enterEvent）。
          */
         void setEdgeDocked(bool docked);
+
+        /**
+         * @brief 贴边收展或吸附的几何弹簧此刻是否还在跑
+         * @return 有未走完的动画时为 true；瞬时落位与动画收尾之后为 false
+         */
+        [[nodiscard]] bool isGeometryAnimationRunning() const noexcept;
+
+        /**
+         * @brief 按给定毫秒数确定性地推进几何弹簧，供用例不依赖真实时钟
+         * @param milliseconds 本次推进的毫秒数；没有进行中的几何动画时是空操作
+         * @details 只推进时间轴，不代替事件循环：到总时长后精确落到目标并结束动画。
+         */
+        void advanceGeometryAnimationForTesting(int milliseconds);
 
         /**
          * @brief 设缩放，见 Core::IPinWindow::setScale()
@@ -881,8 +896,19 @@ namespace GyanisScribe::Gui
 
         /**
          * @brief 按现在的尺寸与贴边档把窗口摆到贴上那条边上（露出或收成一条）
+         * @param animate true 表示用几何弹簧过渡；菜单、标注等入口保持瞬时落位
          */
-        void applyDockGeometry();
+        void applyDockGeometry(bool animate = false);
+
+        /**
+         * @brief 从当前几何弹簧过渡到目标矩形
+         * @param target 目标矩形
+         * @details 动画关闭或已经在目标时直接落位；上一段动画还在跑时先停掉，从当前几何重新起算。
+         */
+        void animateGeometryTo(const QRect &target);
+
+        /// 停在当前几何并丢掉进行中的几何弹簧
+        void stopGeometryAnimation();
 
         /**
          * @brief 标注模式下的按键路由：查标注窗那张快捷键表并执行
@@ -941,8 +967,11 @@ namespace GyanisScribe::Gui
         Core::ScreenEdge                              m_edgeDock = Core::ScreenEdge::None;                   ///< 贴的是哪条屏边；None 表示没贴
         QRect                                         m_dockArea;                                            ///< 贴边那一刻那块屏的可用区，收起与展开都按它算
         bool                                          m_dockCollapsed = false;                               ///< 贴边后是不是收成了那一条
-        bool                                          m_dragMoved     = false;                               ///< 这一轮按下之后真拖动过没有（只点一下不吸边）
-        class QMovie                                 *m_movie         = nullptr;                             ///< 动图播放器；静图这张贴图时为空
+        std::unique_ptr<SpringValue>                  m_geometrySpring;                                      ///< 吸附与贴边收展的几何弹簧；没有动画时为空
+        QRect                                         m_geometryStart;                                       ///< 本段几何动画的起点
+        QRect                                         m_geometryTarget;                                      ///< 本段几何动画的目标
+        bool                                          m_dragMoved = false;                                   ///< 这一轮按下之后真拖动过没有（只点一下不吸边）
+        class QMovie                                 *m_movie     = nullptr;                                 ///< 动图播放器；静图这张贴图时为空
         QString                                       m_colorCardHex;                                        ///< 色卡原本那个色（`#AARRGGBB`）；空表示这张不是色卡
         QString                                       m_sourceFile;                                          ///< 动图的来源文件；进布局记录，重启后按它接上动画
         QPoint                                        m_dragOffset;                                          ///< 移动时起笔点与窗口左上角的差
