@@ -351,11 +351,11 @@ TEST_F(ThemeManagerFixture, StyleSheetsAndPalettesAgreeInBothDirections)
         const auto palette = paletteFor(kind);
         ASSERT_FALSE(sheet.isEmpty()) << resource;
 
-        // 只列该进样式表的十四个角色：icon/success/danger 是给绘制代码用的（图标描边、Toast 语义色），
+        // 只列该进样式表的十五个角色：icon/success/danger 是给绘制代码用的（图标描边、Toast 语义色），
         // 出现在 QSS 里反而是问题，下面单独反着断言
-        const std::array paletteColors = {palette.windowBackground, palette.surface,     palette.text,       palette.secondaryText, palette.border,
-                                          palette.accent,           palette.onAccent,    palette.selection,  palette.mutedFill,     palette.hover,
-                                          palette.pressed,          palette.accentHover, palette.accentSoft, palette.borderStrong};
+        const std::array paletteColors = {palette.windowBackground, palette.surface,    palette.text,        palette.secondaryText, palette.border, palette.accent,
+                                          palette.onAccent,         palette.selection,  palette.mutedFill,   palette.controlFill,   palette.hover,  palette.pressed,
+                                          palette.accentHover,      palette.accentSoft, palette.borderStrong};
 
         // 正向：QSS 里不许出现色板之外的色值
         QRegularExpression hexPattern{QStringLiteral("#[0-9A-Fa-f]{6}")};
@@ -387,6 +387,20 @@ TEST_F(ThemeManagerFixture, StyleSheetsAndPalettesAgreeInBothDirections)
 }
 
 /**
+ * @brief 钉住浅色与深色样式表里没有不透明纯黑
+ * @details 微明度分层要求最重的一档也是带色相的中性色；纯黑只属于高对比度档，
+ *          在浅深两档里出现就会把微明度阶梯压断。
+ */
+TEST_F(ThemeManagerFixture, LightAndDarkSheetsUseNoOpaqueBlack)
+{
+    for (const auto resource: {std::string_view{":/styles/Light.qss"}, std::string_view{":/styles/Dark.qss"}})
+    {
+        const auto sheet = readStyleSheet(resource).toUpper();
+        EXPECT_EQ(sheet.indexOf(QStringLiteral("#000000")), -1) << resource << " 出现了不透明纯黑";
+    }
+}
+
+/**
  * @brief 钉住两套主题的对比度满足 WCAG AA
  * @details 正文与次要文本按 4.5:1，主色描边与图标按非文本要素 3:1；判据写在测试里而不是「看着还行」。
  */
@@ -414,6 +428,7 @@ TEST_F(ThemeManagerFixture, SemanticColorPairsMeetWcagContrast)
         EXPECT_GE(contrastRatio(palette.secondaryText, palette.hover), 4.5) << label << " 悬停底上的次要文本不足 AA";
         EXPECT_GE(contrastRatio(palette.secondaryText, palette.pressed), 4.5) << label << " 按下底上的次要文本不足 AA";
         EXPECT_GE(contrastRatio(palette.secondaryText, palette.mutedFill), 4.5) << label << " 静默底上的次要文本不足 AA";
+        EXPECT_GE(contrastRatio(palette.secondaryText, palette.controlFill), 4.5) << label << " 静息控件底上的次要文本不足 AA";
         // 导航当前项与勾选的工具按钮压的是 accentSoft：正文与主色描边都要在这一档底上站得住
         EXPECT_GE(contrastRatio(palette.text, palette.accentSoft), 4.5) << label << " 选中底上的正文读不出";
         EXPECT_GE(contrastRatio(palette.accent, palette.accentSoft), 3.0) << label << " 选中项的描边与它自己的底糊成一片";

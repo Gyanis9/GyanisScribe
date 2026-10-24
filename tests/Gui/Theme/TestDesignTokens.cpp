@@ -1,6 +1,7 @@
 #include "Core/Annotation/AnnotationPalette.h"
 #include "Core/Record/CursorHighlight.h"
 #include "Gui/Theme/DesignTokens.h"
+#include "Gui/Theme/ThemeKind.h"
 
 #include <gtest/gtest.h>
 
@@ -9,8 +10,12 @@
 
 using GyanisScribe::Gui::kAccentColor;
 using GyanisScribe::Gui::kAnnotationWidths;
+using GyanisScribe::Gui::kDarkPalette;
 using GyanisScribe::Gui::kFontSizes;
+using GyanisScribe::Gui::kLightPalette;
+using GyanisScribe::Gui::paletteFor;
 using GyanisScribe::Gui::stepIndexOf;
+using GyanisScribe::Gui::ThemeKind;
 
 /**
  * @brief 钉住「阶梯取值 ↔ 控件下标」的互指
@@ -62,4 +67,27 @@ TEST(DesignTokens, CursorHighlightColorFollowsTheAccent)
 TEST(DesignTokens, AnnotationPaletteBlueFollowsTheAccent)
 {
     EXPECT_EQ(GyanisScribe::Core::kAnnotationPaletteColors[4], kAccentColor);
+}
+
+/**
+ * @brief 钉住浅深两档的微明度分层与无纯黑约束
+ * @details 控件静息底必须同时区别于窗口底与卡片底，否则按钮与输入框会融进面里；
+ *          浅色与深色档一律不出现不透明纯黑，纯黑只留给高对比度档。
+ */
+TEST(DesignTokens, MicroLayeringRolesAreDistinctAndFreeOfOpaqueBlack)
+{
+    for (const auto kind: {ThemeKind::Light, ThemeKind::Dark})
+    {
+        const auto &palette = paletteFor(kind);
+        EXPECT_NE(palette.controlFill, palette.surface);
+        EXPECT_NE(palette.controlFill, palette.windowBackground);
+
+        const std::array colors = {palette.windowBackground, palette.surface, palette.controlFill,  palette.hover,     palette.pressed,  palette.mutedFill, palette.text,
+                                   palette.secondaryText,    palette.border,  palette.borderStrong, palette.accent,    palette.onAccent, palette.selection, palette.icon,
+                                   palette.success,          palette.danger,  palette.accentHover,  palette.accentSoft};
+        for (const auto &color: colors)
+        {
+            EXPECT_NE(color, QColor(0, 0, 0)) << "Light/Dark 不该有不透明纯黑";
+        }
+    }
 }

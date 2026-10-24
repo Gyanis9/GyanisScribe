@@ -82,6 +82,7 @@ namespace GyanisScribe::Gui
         QColor success;          ///< 成功语义色，Toast 与状态文字用
         QColor danger;           ///< 危险语义色，出错提示与删除类动作的强调色
         QColor mutedFill;        ///< 静默底：进度槽、输入类控件的禁用底、次级面板
+        QColor controlFill;      ///< 按钮与输入框的静息填充；与 surface 的微明度差是控件可辨识的唯一依据
         QColor hover;            ///< 中性悬停底（按钮、列表项、菜单项）
         QColor pressed;          ///< 中性按下底，比 hover 再重一档
         QColor accentHover;      ///< 主按钮悬停底：填充色的加深档，不换成描边
@@ -92,44 +93,46 @@ namespace GyanisScribe::Gui
     /// 浅色主题的语义色：珍珠玻璃（scaffold-vue）浅色档的移植；
     /// 逐条对比度现算与设计原值的差异见换肤计划附录的冻结值表（仓外 GyanisScribe-Reports/UiRestylePlan.md）
     inline constexpr ThemePalette kLightPalette{
-            QColor{246, 248, 247}, // windowBackground
-            QColor{251, 252, 252}, // surface
-            QColor{16, 20, 24},    // text
-            QColor{73, 83, 88},    // secondaryText：设计原值 #596368 对底色只有 5.8:1，压深保色相到 7.4:1
-            QColor{228, 231, 231}, // border
+            QColor{245, 245, 243}, // windowBackground
+            QColor{252, 252, 251}, // surface
+            QColor{20, 20, 18},    // text
+            QColor{83, 83, 77},    // secondaryText
+            QColor{231, 231, 226}, // border
             kAccentColor,          // accent
             QColor{255, 255, 255}, // onAccent
             QColor{216, 229, 249}, // selection
-            QColor{126, 136, 140}, // icon
-            QColor{59, 125, 33},   // success：设计原值 #58A021 当文字只有 3.3:1，压深保色相
-            QColor{202, 57, 50},   // danger：设计原值 #E0443B 当文字只有 4.2:1，压深保色相
-            QColor{238, 242, 240}, // mutedFill
-            QColor{242, 243, 243}, // hover
-            QColor{236, 237, 238}, // pressed
+            QColor{107, 107, 102}, // icon
+            QColor{59, 125, 33},   // success
+            QColor{202, 57, 50},   // danger
+            QColor{237, 237, 233}, // mutedFill
+            QColor{242, 242, 238}, // controlFill
+            QColor{233, 233, 228}, // hover
+            QColor{227, 227, 222}, // pressed
             QColor{29, 97, 213},   // accentHover
             QColor{229, 238, 250}, // accentSoft
-            QColor{214, 217, 218}, // borderStrong
+            QColor{226, 226, 221}, // borderStrong
     };
 
     /// 深色主题的语义色：同一套语义换材质（设计深色档的移植）
     inline constexpr ThemePalette kDarkPalette{
-            QColor{18, 21, 23},    // windowBackground
-            QColor{27, 31, 33},    // surface
-            QColor{238, 242, 241}, // text
-            QColor{176, 186, 189}, // secondaryText
-            QColor{35, 37, 39},    // border
+            QColor{11, 11, 10},    // windowBackground
+            QColor{21, 21, 21},    // surface
+            QColor{232, 232, 227}, // text
+            QColor{176, 176, 170}, // secondaryText
+            QColor{36, 36, 34},    // border
             QColor{76, 141, 255},  // accent
-            QColor{11, 18, 32},    // onAccent：这一档主色偏亮，压白字只有 3.2:1，压深字才够 AA
-            QColor{39, 57, 86},    // selection
-            QColor{141, 151, 154}, // icon
+            QColor{11, 11, 10},    // onAccent
+            QColor{42, 59, 87},    // selection
+            QColor{138, 138, 132}, // icon
             QColor{155, 227, 90},  // success
             QColor{255, 122, 113}, // danger
-            QColor{21, 24, 26},    // mutedFill
-            QColor{38, 42, 44},    // hover
-            QColor{45, 49, 51},    // pressed
+            QColor{17, 17, 16},    // mutedFill
+            QColor{26, 26, 25},    // controlFill
+            QColor{32, 32, 30},    // hover
+            QColor{38, 38, 36},    // pressed
             QColor{61, 127, 242},  // accentHover
-            QColor{35, 49, 69},    // accentSoft
-            QColor{50, 53, 55},    // borderStrong
+            QColor{34, 52, 77},    // accentSoft
+            QColor{42, 42, 40},    // borderStrong
     };
 
     /**
@@ -151,6 +154,7 @@ namespace GyanisScribe::Gui
             QColor{0, 100, 0},     // success
             QColor{176, 0, 0},     // danger
             QColor{255, 255, 255}, // mutedFill：这一档不靠底色分层次，靠 2px 描边
+            QColor{255, 255, 255}, // controlFill
             QColor{224, 224, 224}, // hover
             QColor{200, 200, 200}, // pressed
             QColor{8, 68, 158},    // accentHover
