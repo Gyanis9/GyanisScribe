@@ -21,6 +21,7 @@
 #include <optional>
 #include <string_view>
 
+class QIcon;
 class QMenu;
 
 namespace GyanisScribe::Core
@@ -121,6 +122,14 @@ namespace GyanisScribe::App
          * @return true 表示这台机器上有托盘可用；false 表示平台不支持托盘，界面层要另找入口
          */
         bool install();
+
+        /**
+         * @brief 托盘实际使用的图标
+         * @return 品牌图标的八档固定色版本
+         * @details 独立成公开方法是为了让用例不依赖真托盘：离屏平台装不出托盘，
+         *          但 install() 挂上去的那一枚图仍要能逐档核对。
+         */
+        [[nodiscard]] QIcon trayIcon() const;
 
         /**
          * @brief 按当前配置与平台能力往菜单里摆条目

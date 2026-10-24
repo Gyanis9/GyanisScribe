@@ -29,14 +29,14 @@ namespace GyanisScribe::Gui
      */
     enum class IconSize
     {
-        Small      = 16,  ///< 菜单项与托盘行内图标
-        Medium     = 20,  ///< 导航、动作条、标注工具栏
-        Large      = 24,  ///< 对话框默认档
-        ExtraLarge = 32,  ///< 较大的按钮与空状态
-        Huge       = 48,  ///< 大尺寸输出
-        Display    = 64,  ///< 展示位
-        History    = 96,  ///< 历史列表类别图标
-        Maximum    = 128  ///< 最大界面图标档
+        Small      = 16, ///< 菜单项与托盘行内图标
+        Medium     = 20, ///< 导航、动作条、标注工具栏
+        Large      = 24, ///< 对话框默认档
+        ExtraLarge = 32, ///< 较大的按钮与空状态
+        Huge       = 48, ///< 大尺寸输出
+        Display    = 64, ///< 展示位
+        History    = 96, ///< 历史列表类别图标
+        Maximum    = 128 ///< 最大界面图标档
     };
 
     /**
@@ -71,7 +71,7 @@ namespace GyanisScribe::Gui
         /**
          * @brief 取一枚多尺寸图标
          * @param name SVG 文件名去掉扩展名，例如 "Capture"
-         * @return 含 16/20/24/32 四档且每档带各屏幕 DPR 副本的图标；名字不存在时返回空图标
+         * @return 含 16/20/24/32/48/64/96/128 八档且每档带各屏幕 DPR 副本的图标；名字不存在时返回空图标
          * @note 名字拼错不会崩也不会静默换成别的图：返回空 QIcon 并记一条含可用名单线索的错误日志。
          */
         [[nodiscard]] QIcon icon(std::string_view name) const;
@@ -86,7 +86,7 @@ namespace GyanisScribe::Gui
          * @brief 取品牌位图
          * @param logicalSize 逻辑边长
          * @param devicePixelRatio 目标屏幕缩放比，夹在 1 到 3
-         * @return 物理边长最接近 logicalSize × ratio 的原生 PNG；读不出时返回空位图
+         * @return 不小于目标物理边长的最小原生 PNG（目标超过 512 时用 512 档）；读不出时返回空位图
          * @details 品牌图不经过 currentColor 替换，也不读取 m_tintColor。
          */
         [[nodiscard]] QPixmap brandPixmap(int logicalSize, qreal devicePixelRatio) const;
@@ -153,7 +153,7 @@ namespace GyanisScribe::Gui
          * @note 描边色必须在键里：少了它，换主题之后旧色那一份会被当成新图标发出去，
          *       正是 applyIcon() 的 @details 明令禁止的那种错。缩放比也要在键里（用夹住之后的值），
          *       否则换到另一块 DPI 的屏上还会拿到低缩放的那一份。
-         *       条目数有界：名字只有 src/Gui/Resources/Icons 里那几十枚，档位四格、缩放比封顶 3、主题三档，
+         *       条目数有界：名字只有 src/Gui/Resources/Icons 里那几十枚，档位八格、缩放比封顶 3、主题三档，
          *       所以不做淘汰。空位图不入表——那是错误出口，下一次调用还要重新报出原因。
          */
         mutable QHash<QString, QPixmap> m_pixmapCache; ///< 光栅化结果，键的四个分量见 @details

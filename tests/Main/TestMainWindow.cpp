@@ -41,6 +41,7 @@ using GyanisScribe::Main::screenCaptureLabels;
 #include <QAbstractSpinBox>
 #include <QApplication>
 #include <QCheckBox>
+#include <QColor>
 #include <QFile>
 #include <QFileInfo>
 #include <QFormLayout>
@@ -67,6 +68,7 @@ using GyanisScribe::Main::screenCaptureLabels;
 #include <QWidget>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <format>
@@ -1526,6 +1528,20 @@ namespace
     }
 
     /**
+     * @brief 钉住托盘挂的是品牌图，而不是某一枚界面图标
+     * @details 离屏平台装不出真托盘，install() 会直接返回；图标的来源仍要能从控制器上核对：
+     *          512 只存在于品牌八档里，界面图标阶梯止于 128。
+     */
+    TEST_F(MainWindowFixture, TrayIconUsesTheBrandMark)
+    {
+        makeWindow();
+        GyanisScribe::App::TrayController tray{*m_icons, *m_theme, *m_store, *m_integration};
+        const auto                        icon = tray.trayIcon();
+        ASSERT_FALSE(icon.isNull()) << "托盘控制器没有图标";
+        EXPECT_TRUE(icon.availableSizes().contains(QSize(512, 512))) << "托盘图标不是品牌入口";
+    }
+
+    /**
      * @brief 钉住托盘那两下按各自那一格发出对应动作
      * @details 两档共用一条通路时最容易出现的坏法是「中键跟着左键跑」（读端只认一个键），
      *          所以两档各配一个不同的动作再各按一下：两条信号、两个动作，少一条或串了位都红。
@@ -2341,12 +2357,13 @@ TEST_F(MainWindowFixture, ClosingTheWindowAsksTheApplicationToQuit)
 /**
  * @brief 钉住品牌图与导航尺寸的接线
  * @details 窗口图标、关于页 64px 品牌图、导航 20px 是三处会被后续重构悄悄改掉的接线。
+ *          窗口图标只查 32 档的话，任何一枚界面图标都能过；品牌图集是唯一带 512 原生档的那一套。
  */
 TEST_F(MainWindowFixture, BrandIconAndNavMetricsAreWired)
 {
     makeWindow();
-    EXPECT_FALSE(m_window->windowIcon().isNull());
-    EXPECT_TRUE(m_window->windowIcon().availableSizes().contains(QSize(32, 32)));
+    ASSERT_FALSE(m_window->windowIcon().isNull());
+    EXPECT_TRUE(m_window->windowIcon().availableSizes().contains(QSize(512, 512))) << "窗口图标没走品牌入口：界面图标阶梯止于 128";
 
     ASSERT_NE(nav(), nullptr);
     EXPECT_EQ(nav()->iconSize(), QSize(20, 20));
@@ -2357,4 +2374,55 @@ TEST_F(MainWindowFixture, BrandIconAndNavMetricsAreWired)
     const auto pixmap = logo->pixmap();
     ASSERT_FALSE(pixmap.isNull());
     EXPECT_DOUBLE_EQ(pixmap.width() / pixmap.devicePixelRatio(), 64.0);
+
+    const auto image         = pixmap.toImage().convertToFormat(QImage::Format_ARGB32);
+    bool       hasBrandGreen = false;
+    for (int y = 0; y < image.height() && !hasBrandGreen; ++y)
+    {
+        const auto *line = reinterpret_cast<const QRgb *>(image.constScanLine(y));
+        for (int x = 0; x < image.width(); ++x)
+        {
+            if (qAlpha(line[x]) != 0 && std::abs(qRed(line[x]) - 0x5B) <= 2 && std::abs(qGreen(line[x]) - 0xE3) <= 2 && std::abs(qBlue(line[x]) - 0x7A) <= 2)
+            {
+                hasBrandGreen = true;
+                break;
+            }
+        }
+    }
+    EXPECT_TRUE(hasBrandGreen) << "关于页挂的不是品牌图：图里没有 #5BE37A 录点";
+}
+
+/**
+ * @brief 钉住深色主题下品牌砖与卡片之间还有一层底板
+ * @details 品牌砖固定 #151515，而深色卡片也是 #151515；没有底板时砖形整片消失，只剩白框与绿点。
+ *          量的是真实画出来的像素：底板取窗口底那一档，砖与底板、底板与卡片都要分得出来。
+ */
+TEST_F(MainWindowFixture, AboutBrandTileKeepsItsLayerOnTheDarkCard)
+{
+    ASSERT_TRUE(m_store->setValue(GyanisScribe::Core::kThemeMode, QStringLiteral("Dark")).has_value());
+    m_theme->applyFromSettings();
+    makeWindow();
+    m_window->open(MainWindowPage::About);
+    QCoreApplication::processEvents();
+
+    auto *page = stack()->currentWidget();
+    ASSERT_NE(page, nullptr);
+    auto *logo = dynamic_cast<QLabel *>(controlInCurrentPage("智录图标"));
+    ASSERT_NE(logo, nullptr) << "关于页没有品牌图，判据的前提没构造出来";
+    ASSERT_EQ(logo->size(), QSize(80, 80)) << "品牌图没有底板，砖与卡片之间的那一层不存在";
+
+    const auto image  = page->grab().toImage();
+    const auto scale  = image.devicePixelRatio();
+    const auto origin = logo->mapTo(page, QPoint(0, 0));
+    const auto sample = [&image, scale, origin](const QPoint local)
+    { return image.pixelColor(static_cast<int>(std::lround((origin.x() + local.x()) * scale)), static_cast<int>(std::lround((origin.y() + local.y()) * scale))); };
+    const auto channelGap = [](const QColor &left, const QColor &right)
+    { return std::max({std::abs(left.red() - right.red()), std::abs(left.green() - right.green()), std::abs(left.blue() - right.blue())}); };
+
+    const auto plate = sample(QPoint{4, 40});
+    const auto tile  = sample(QPoint{20, 40});
+    const auto card  = image.pixelColor(static_cast<int>(page->width() * scale / 2.0), static_cast<int>((page->height() - 10) * scale));
+
+    EXPECT_GE(channelGap(plate, card), 8) << "深色卡片与品牌底板分不出来，砖形仍然会消失";
+    EXPECT_GE(channelGap(tile, plate), 8) << "品牌砖与底板之间没有一层可分的边界";
 }

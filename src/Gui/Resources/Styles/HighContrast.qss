@@ -17,6 +17,13 @@ QWidget#pageCard {
     border-radius: 20px;
 }
 
+/* 关于页品牌底板：这一档卡片本来就是纯白，底板同色即可，
+   黑砖与白框靠自身的高对比分开，不需要额外一层 */
+QLabel#brandPlate {
+    background-color: #FFFFFF;
+    border-radius: 20px;
+}
+
 /* 悬浮条（录屏控制条、标注工具栏）：浮层档，圆角比阅读面收一档；
    Qt 的样式表没有投影，浮层靠描边与底色分出来 */
 QWidget#hudRoot, QWidget#AnnotationToolbar {

@@ -10,6 +10,7 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QComboBox>
+#include <QIcon>
 #include <QImage>
 #include <QLabel>
 #include <QTextEdit>
@@ -311,4 +312,17 @@ TEST_F(OcrResultWindowFixture, StatusUsesTabularFiguresButTheBodyDoesNot)
     EXPECT_EQ(status->font().featureValue(QFont::Tag("tnum")), 1u) << "OCR 摘要没锁等宽，计数与尺寸会跳";
     EXPECT_EQ(body->font().featureValue(QFont::Tag("tnum")), 0u) << "正文被误加了等宽数字，阅读字形变了";
 #endif
+}
+
+/**
+ * @brief 钉住识别结果窗的任务栏图标走品牌入口
+ * @details 结果窗是独立顶层窗口，任务栏会单独占一格；挂界面里的 Ocr 图标时，
+ *          同一进程的两个窗口会显示成两枚不同的标记。512 只有品牌图集才有。
+ */
+TEST_F(OcrResultWindowFixture, WindowIconUsesTheBrandMark)
+{
+    auto       window = makeWindow(makeTwoLineResult());
+    const auto icon   = window->windowIcon();
+    ASSERT_FALSE(icon.isNull()) << "识别结果窗没有窗口图标";
+    EXPECT_TRUE(icon.availableSizes().contains(QSize(512, 512))) << "结果窗没走品牌入口：用的还是界面图标";
 }

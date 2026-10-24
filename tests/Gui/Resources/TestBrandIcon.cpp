@@ -125,6 +125,9 @@ TEST_F(BrandIconAssetTest, PngsHaveEightNativeSizesAndTheThreeBrandColors)
  */
 TEST_F(BrandIconAssetTest, IcoCarriesTheSevenWindowsSizes)
 {
+    // 这一条要拿条目里的 payload 与 qrc 里的 PNG 逐字节比，先把资源树注册上
+    static_cast<void>(GyanisScribe::Gui::IconProvider::availableIconNames());
+
     QFile file(QStringLiteral(GYANIS_BRAND_DIR "/AppIcon.ico"));
     ASSERT_TRUE(file.open(QIODevice::ReadOnly));
     const auto data = file.readAll();
@@ -133,12 +136,26 @@ TEST_F(BrandIconAssetTest, IcoCarriesTheSevenWindowsSizes)
     const auto *bytes = reinterpret_cast<const uchar *>(data.constData());
     const auto  count = static_cast<int>(bytes[4] | (bytes[5] << 8));
     ASSERT_EQ(count, 7);
+    ASSERT_GE(data.size(), 6 + count * 16) << "ICO 目录没装齐";
 
     QSet<int> sizes;
     for (int index = 0; index < count; ++index)
     {
         const auto *entry = bytes + 6 + index * 16;
-        sizes.insert(entry[0] == 0 ? 256 : entry[0]);
+        const auto  size  = entry[0] == 0 ? 256 : static_cast<int>(entry[0]);
+        sizes.insert(size);
+
+        const auto readU32 = [](const uchar *cursor)
+        { return static_cast<quint32>(cursor[0]) | (static_cast<quint32>(cursor[1]) << 8) | (static_cast<quint32>(cursor[2]) << 16) | (static_cast<quint32>(cursor[3]) << 24); };
+        const auto length = readU32(entry + 8);
+        const auto offset = readU32(entry + 12);
+        ASSERT_LE(static_cast<qsizetype>(offset) + static_cast<qsizetype>(length), data.size()) << size << "px 条目越界";
+        const auto payload = data.mid(static_cast<qsizetype>(offset), static_cast<qsizetype>(length));
+        EXPECT_TRUE(payload.startsWith(QByteArray::fromHex("89504e470d0a1a0a"))) << size << "px 条目不是 PNG";
+
+        QFile png{QStringLiteral(":/brand/AppIcon%1.png").arg(size)};
+        ASSERT_TRUE(png.open(QIODevice::ReadOnly)) << size << "px 品牌 PNG 读不出";
+        EXPECT_EQ(payload, png.readAll()) << size << "px 的 ICO payload 与同名 PNG 不一致";
     }
 
     EXPECT_EQ(sizes, (QSet<int>{16, 24, 32, 48, 64, 128, 256}));

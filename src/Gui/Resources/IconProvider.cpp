@@ -149,7 +149,7 @@ namespace GyanisScribe::Gui
         const auto    ratio = std::clamp(devicePixelRatio, 1.0, 3.0);
         const QString key   = pixmapCacheKey(name, size, effectiveTint, ratio);
         // 命中就一次文件读与一次解析都不做：录屏 HUD 每存一帧都按状态重挂暂停按钮的图标，
-        // 一枚图标是四档尺寸 × 若干缩放比，逐帧重画纯属白干
+        // 一枚图标是八档尺寸 × 若干缩放比，逐帧重画纯属白干
         if (const auto cached = m_pixmapCache.constFind(key); cached != m_pixmapCache.constEnd())
         {
             return cached.value();
@@ -232,6 +232,11 @@ namespace GyanisScribe::Gui
         }
         for (const auto ratio: screenDevicePixelRatios())
         {
+            // 1.0 那一轮在上一段已经备齐，重复 addPixmap 只会让同一份位图在引擎里存两遍
+            if (ratio == 1.0)
+            {
+                continue;
+            }
             for (const auto size: {16, 24, 32, 48, 64, 128, 256})
             {
                 const auto bitmap = brandPixmap(size, ratio);
@@ -245,7 +250,8 @@ namespace GyanisScribe::Gui
     }
 
     QIcon IconProvider::icon(const std::string_view name) const
-    {        // 先探最小档：名字不存在时 pixmap 已经报过一次原因，这里直接返回，免得同一条错误刷四遍
+    {
+        // 先探最小档：名字不存在时 pixmap 已经报过一次原因，这里直接返回，免得同一条错误刷八遍
         if (pixmap(name, IconSize::Small).isNull())
         {
             return {};
@@ -255,8 +261,7 @@ namespace GyanisScribe::Gui
 
         // 八档尺寸各备一份所有屏幕倍率的副本：QIcon 按目标屏幕自己挑，跨 DPI 屏拖动不会糊。
         // 光栅化本身由 pixmap() 那张表兜着，重复取同一枚图标不再重画
-        for (const auto size: {IconSize::Small, IconSize::Medium, IconSize::Large, IconSize::ExtraLarge,
-                               IconSize::Huge, IconSize::Display, IconSize::History, IconSize::Maximum})
+        for (const auto size: {IconSize::Small, IconSize::Medium, IconSize::Large, IconSize::ExtraLarge, IconSize::Huge, IconSize::Display, IconSize::History, IconSize::Maximum})
         {
             for (const auto ratio: screenDevicePixelRatios())
             {

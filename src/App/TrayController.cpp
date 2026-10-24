@@ -15,6 +15,7 @@
 #include <QAction>
 #include <QCursor>
 #include <QGuiApplication>
+#include <QIcon>
 #include <QMenu>
 #include <QScreen>
 #include <QSystemTrayIcon>
@@ -150,12 +151,17 @@ namespace GyanisScribe::App
         }
         buildMenu(*m_menu, screenNames);
 
-        m_icon->setIcon(m_icons.brandIcon());
+        m_icon->setIcon(trayIcon());
         m_icon->setToolTip(trayTooltip(m_pinCount, m_recordedSeconds, m_recordingPaused));
 
         m_icon->setContextMenu(m_menu.get());
         m_icon->show();
         return true;
+    }
+
+    QIcon TrayController::trayIcon() const
+    {
+        return m_icons.brandIcon();
     }
 
     void TrayController::buildMenu(QMenu &menu, const QStringList &screenNames)

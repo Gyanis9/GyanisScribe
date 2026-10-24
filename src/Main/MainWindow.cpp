@@ -2516,8 +2516,22 @@ namespace GyanisScribe::Main
         layout->setContentsMargins(GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium);
         layout->setSpacing(GyanisScribe::Gui::kSpacingSmall);
 
+        // 底板与品牌砖拉开一档明度：深色主题的卡片与砖底同为 #151515，没有这层垫底砖形会整片消失。
+        // 位图按所有屏幕里最高的缩放比取，窗口挪到 200% 屏上也不用换图。
+        qreal highestRatio = 1.0;
+        for (const auto *screen: QGuiApplication::screens())
+        {
+            if (screen->devicePixelRatio() > highestRatio)
+            {
+                highestRatio = screen->devicePixelRatio();
+            }
+        }
         auto *logo = new QLabel{page};
-        logo->setPixmap(m_icons.brandPixmap(64, logo->devicePixelRatioF()));
+        logo->setObjectName(QStringLiteral("brandPlate"));
+        logo->setFixedSize(80, 80);
+        logo->setContentsMargins(8, 8, 8, 8);
+        logo->setAlignment(Qt::AlignCenter);
+        logo->setPixmap(m_icons.brandPixmap(64, highestRatio));
         logo->setAccessibleName(GyanisScribe::Base::uiText("智录图标"));
 
         auto *text = new QLabel{aboutText(QApplication::applicationVersion()), page};

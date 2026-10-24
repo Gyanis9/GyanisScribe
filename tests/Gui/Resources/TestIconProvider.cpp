@@ -90,9 +90,8 @@ namespace
     };
 
     /// 尺寸阶梯的八档，按从小到大排列，断言里按索引取
-    constexpr std::array kLadderSizes = {
-            IconSize::Small, IconSize::Medium, IconSize::Large, IconSize::ExtraLarge,
-            IconSize::Huge, IconSize::Display, IconSize::History, IconSize::Maximum};
+    constexpr std::array kLadderSizes = {IconSize::Small, IconSize::Medium,  IconSize::Large,   IconSize::ExtraLarge,
+                                         IconSize::Huge,  IconSize::Display, IconSize::History, IconSize::Maximum};
 
     /// 阶梯对应的逻辑像素数，与 IconSize 的枚举值同解，这条用例把它钉住
     constexpr std::array kLadderPixels = {16, 20, 24, 32, 48, 64, 96, 128};
@@ -192,7 +191,7 @@ namespace
 } // namespace
 
 /**
- * @brief 钉住「资源里真实存在的每一枚都能画出来，且四档尺寸都齐」
+ * @brief 钉住「资源里真实存在的每一枚都能画出来，且八档尺寸都齐」
  * @details 这条同时兜住三种真实故障：qrc 没登记（文件在仓库里但资源树是空的）、
  *          SVG 写法落在 Qt 渲染器子集之外（isValid 为假）、某档尺寸算错了像素。
  */
@@ -216,7 +215,70 @@ TEST_F(IconProviderFixture, EveryBundledIconPaintsAtEveryLadderSize)
         // 多档齐全才谈得上「QIcon 自己按按钮尺寸挑」
         const auto icon = provider().icon(stdName);
         ASSERT_FALSE(icon.isNull()) << name.toStdString() << " 取不到图标";
-        EXPECT_GE(icon.availableSizes().size(), kLadderSizes.size()) << name.toStdString() << " 只备齐了 " << icon.availableSizes().size() << " 档，阶梯是四档";
+        EXPECT_GE(icon.availableSizes().size(), kLadderSizes.size()) << name.toStdString() << " 只备齐了 " << icon.availableSizes().size() << " 档，阶梯是八档";
+    }
+}
+
+/**
+ * @brief 钉住直线与基本形状的坐标落在整数或半格上
+ * @details 2px 描边落在整数/半格上，16px 档才不会因为四分之一格的半像素落点发灰。
+ *          曲线路径（含弧与贝塞尔）的端点和控制点不受这条约束：拐角半径是由描边外缘倒推的，
+ *          强行吸格会把圆角压扁；填充点缀只要形状本身是基本几何，同样按半格检查。
+ */
+TEST_F(IconProviderFixture, BundledStraightGeometrySitsOnTheHalfGrid)
+{
+    const QRegularExpression elementPattern(QStringLiteral(R"(<(path|rect|circle|ellipse|line)\b([^>]*)>)"));
+    const QRegularExpression pathDataPattern(QStringLiteral(R"RE(\bd="([^"]*)")RE"));
+    const QRegularExpression curvePattern(QStringLiteral("[aAcCsSqQtT]"));
+    const QRegularExpression numberPattern(QStringLiteral(R"(-?\d+(?:\.\d+)?)"));
+    const QRegularExpression geometryPattern(QStringLiteral(R"RE(\b(x|y|width|height|rx|ry|cx|cy|r|x1|y1|x2|y2)="([^"]*)")RE"));
+
+    const auto onHalfGrid = [](const QString &text)
+    {
+        bool         parsed = false;
+        const double value  = text.toDouble(&parsed);
+        return parsed && std::abs(value * 2.0 - std::round(value * 2.0)) < 1e-9;
+    };
+
+    for (const auto &name: provider().availableIconNames())
+    {
+        const auto source = readIconSource(name.toStdString());
+        ASSERT_FALSE(source.isEmpty()) << name.toStdString() << " 的资源是空的";
+
+        auto elements = elementPattern.globalMatch(source);
+        while (elements.hasNext())
+        {
+            const auto match = elements.next();
+            const auto tag   = match.captured(1);
+            const auto attrs = match.captured(2);
+
+            QStringList coordinates;
+            const auto  data = pathDataPattern.match(attrs);
+            if (data.hasMatch())
+            {
+                if (curvePattern.match(data.captured(1)).hasMatch())
+                {
+                    continue;
+                }
+                auto numbers = numberPattern.globalMatch(data.captured(1));
+                while (numbers.hasNext())
+                {
+                    coordinates.append(numbers.next().captured(0));
+                }
+            } else
+            {
+                auto geometry = geometryPattern.globalMatch(attrs);
+                while (geometry.hasNext())
+                {
+                    coordinates.append(geometry.next().captured(2));
+                }
+            }
+
+            for (const auto &coordinate: coordinates)
+            {
+                EXPECT_TRUE(onHalfGrid(coordinate)) << name.toStdString() << " 的 <" << tag.toStdString() << "> 坐标 " << coordinate.toStdString() << " 不在整数或半格上";
+            }
+        }
     }
 }
 

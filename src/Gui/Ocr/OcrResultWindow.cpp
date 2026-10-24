@@ -186,7 +186,7 @@ namespace GyanisScribe::Gui
         QWidget(parent), m_image(std::move(image)), m_result(std::move(result)), m_icons(icons), m_theme(theme), m_nameTemplate(std::move(nameTemplate))
     {
         setWindowTitle(GyanisScribe::Base::uiText("识别结果"));
-        setWindowIcon(m_icons.icon("Ocr"));
+        setWindowIcon(m_icons.brandIcon());
         // 顶层窗口自己铺底：样式表只给具名的根上底色
         setObjectName(QStringLiteral("appRoot"));
         setAttribute(Qt::WA_StyledBackground, true);

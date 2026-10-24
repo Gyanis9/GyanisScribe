@@ -226,9 +226,10 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
   无无障碍名（`setAccessibleName` 为空），不吃鼠标。
 - 图标全部原创 SVG（24 视框、`currentColor` 描边、2px 单档），描边色由 `IconProvider` 按主题注入；
   用例 `IconProviderFixture` 数的是真的画出来的像素，不是文件名。整套图的画法规格：
-  - 网格与安全区：24 视框，内容（含 1px 描边外缘）压在 **2..22**；直线优先落在整数或 0.5 格点上，
-    墨迹外接框中心与几何中心相差不超过 2 格。判据 `BundledIconsStayInsideTheSafeZoneAtEveryDevicePixelRatio`
-    与 `BundledIconsSitNearTheOpticalCenter`。
+  - 网格与安全区：24 视框，内容（含 1px 描边外缘）压在 **2..22**；直线与基本形状的坐标落在整数或
+    0.5 格点上（曲线路径的端点与控制点按圆角半径倒推，不受这条约束），墨迹外接框中心与几何中心相差
+    不超过 2 格。判据 `BundledIconsStayInsideTheSafeZoneAtEveryDevicePixelRatio`、
+    `BundledIconsSitNearTheOpticalCenter` 与 `BundledStraightGeometrySitsOnTheHalfGrid`。
   - 线宽收在 **2 一档**（不允许第二档混入）；填充点缀只允许
     `fill="currentColor" stroke="none"`，源码里不许出现写死的色值。判据
     `BundledSourcesKeepOneStrokeWidthAndThemeColorsOnly`。
@@ -243,6 +244,9 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
     `HistoryLadderIncludesNinetySix`。
   - 品牌图在 `src/Gui/Resources/Brand/`：`#151515` 砖、`#F5F5F3` C 框、`#5BE37A` 录点；
     应用图标八档原生 PNG，`.ico` 七档（512 单独 PNG）；品牌图走固定色入口，
-    不参与 `currentColor` 替换。判据 `BrandIconAssetTest`、`BrandPixmapKeepsNativeSizesAndIgnoresTheTint`、
-    `BrandIconExposesTheEightNativeSizes`、`BrandIconAndNavMetricsAreWired`、`CategoryFallbackIconCarriesNinetySix`。
+    不参与 `currentColor` 替换。关于页的 64px 品牌图垫在窗口底色的圆角底板上：
+    Dark 档卡片与砖底同为 `#151515`，没有这层垫底砖形会整片消失。
+    判据 `BrandIconAssetTest`、`BrandPixmapKeepsNativeSizesAndIgnoresTheTint`、
+    `BrandIconExposesTheEightNativeSizes`、`BrandIconAndNavMetricsAreWired`、
+    `AboutBrandTileKeepsItsLayerOnTheDarkCard`、`CategoryFallbackIconCarriesNinetySix`。
   - `App`/`AppIcon` 不再属于界面图标集；`Tray` 保留给录制 HUD 的“最小化到托盘”。

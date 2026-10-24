@@ -2,5 +2,5 @@
 
   <circle cx="12" cy="12" r="8.5"/>
   <path d="M3.5 12h17"/>
-  <ellipse cx="12" cy="12" rx="4.25" ry="8.5"/>
+  <ellipse cx="12" cy="12" rx="4.5" ry="8.5"/>
 </svg>

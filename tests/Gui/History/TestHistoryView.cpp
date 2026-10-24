@@ -349,13 +349,23 @@ TEST_F(HistoryViewFixture, BrokenKeepsPreviousRowsAndTellsTheUser)
 /**
  * @brief 钉住历史列表的类别图标按 96 原生档取
  * @details 缩略图读不出时列表仍显示类别图标；列表 iconSize 是 96，图标必须备 96。
+ *          只查供给器不算接线：这里放一条读不出像素的录屏成品，让视图自己走到兜底分支，
+ *          再从列表项上取回那一枚图标。
  */
 TEST_F(HistoryViewFixture, CategoryFallbackIconCarriesNinetySix)
 {
-    ASSERT_NE(m_icons, nullptr);
-    const auto icon = m_icons->icon("Record");
-    ASSERT_FALSE(icon.isNull());
-    EXPECT_TRUE(icon.availableSizes().contains(QSize(96, 96)));
+    const auto video = writeVideoArtifact(m_directory, "clip.mp4");
+    addRecord(video, HistoryKind::Recording, kNow);
+
+    auto view = makeView();
+    view->refresh();
+    ASSERT_EQ(view->rowCount(), 1);
+
+    auto *list = view->findChild<QListWidget *>();
+    ASSERT_NE(list, nullptr) << "历史页里没有缩略图列表";
+    const auto icon = list->item(0)->icon();
+    ASSERT_FALSE(icon.isNull()) << "读不出缩略图时列表项没有兜底图标";
+    EXPECT_TRUE(icon.availableSizes().contains(QSize(96, 96))) << "列表按 96px 摆图标，兜底图却没有 96 原生档，会被放大发糊";
 }
 
 /**
@@ -365,7 +375,7 @@ TEST_F(HistoryViewFixture, CategoryFallbackIconCarriesNinetySix)
  */
 TEST_F(HistoryViewFixture, ListUsesTabularFigures)
 {
-    auto view = makeView();
+    auto  view = makeView();
     auto *list = view->findChild<QListWidget *>();
     ASSERT_NE(list, nullptr) << "历史页里没有缩略图列表";
     EXPECT_EQ(list->accessibleName(), QStringLiteral("历史列表"));

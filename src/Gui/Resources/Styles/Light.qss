@@ -20,6 +20,13 @@ QWidget#pageCard {
     border-radius: 20px;
 }
 
+/* 关于页品牌底板：品牌砖的砖底是固定色，深色卡片与它同值时砖形会消失；
+   底板取窗口底那一档，让黑砖在每一套主题里都有一层可分的边 */
+QLabel#brandPlate {
+    background-color: #F5F5F3;
+    border-radius: 20px;
+}
+
 /* 悬浮条（录屏控制条、标注工具栏）：浮层压在任意内容上，保留一条 borderStrong 微边缘；
    Qt 的样式表没有投影，浮层靠这条边缘与底色分出来 */
 QWidget#hudRoot, QWidget#AnnotationToolbar {
