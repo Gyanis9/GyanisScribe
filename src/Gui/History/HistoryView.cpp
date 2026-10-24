@@ -145,9 +145,11 @@ namespace GyanisScribe::Gui
         m_list->setMovement(QListView::Static);
         m_list->setSpacing(8);
         m_list->setAccessibleName(GyanisScribe::Base::uiText("历史列表"));
+        // 卡片上的时间与尺寸是读数：锁等宽后整列数字不随条目左右跳
+        applyTabularFigures(*m_list, TextScript::Mixed);
         root->addWidget(m_list, 1);
 
-        // 空列表给一句引导（界面审查 UI-64）：一片白卡读起来像记录丢了或窗体坏了。
+        // 空列表给一句引导：一片白卡读起来像记录丢了或窗体坏了。
         // 提示挂在视口上并居中、不吃鼠标：列表的卡片底与圆角仍由 QSS 画
         m_emptyHint = new QLabel{m_list->viewport()};
         m_emptyHint->setObjectName(QStringLiteral("pageHint"));

@@ -276,3 +276,39 @@ TEST_F(OcrResultWindowFixture, LanguageChangeAsksControllerToRecognizeAgain)
     EXPECT_EQ(emitted, 1) << "选完语言就该要求重认一次，不该等用户再点按钮";
     EXPECT_EQ(emittedLanguage, QStringLiteral("en")) << "信号带的必须是下拉里刚选的那个标签";
 }
+
+/**
+ * @brief 钉住 OCR 摘要锁等宽、正文不加
+ * @details 摘要里的行数、置信度、尺寸、语言是一组读数，比例字体会让这几个数随结果跳动；
+ *          正文是用户要复制走的内容，锁等宽会改变字形观感，不属于排版策略的覆盖面。
+ */
+TEST_F(OcrResultWindowFixture, StatusUsesTabularFiguresButTheBodyDoesNot)
+{
+    auto window = makeWindow(makeTwoLineResult());
+
+    QLabel *status = nullptr;
+    for (auto *label: window->findChildren<QLabel *>())
+    {
+        if (label->accessibleName() == QStringLiteral("识别摘要"))
+        {
+            status = label;
+            break;
+        }
+    }
+    ASSERT_NE(status, nullptr) << "结果窗里没有「识别摘要」标签";
+
+    QTextEdit *body = nullptr;
+    for (auto *edit: window->findChildren<QTextEdit *>())
+    {
+        if (edit->accessibleName() == QStringLiteral("识别文本"))
+        {
+            body = edit;
+            break;
+        }
+    }
+    ASSERT_NE(body, nullptr) << "结果窗里没有「识别文本」正文";
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+    EXPECT_EQ(status->font().featureValue(QFont::Tag("tnum")), 1u) << "OCR 摘要没锁等宽，计数与尺寸会跳";
+    EXPECT_EQ(body->font().featureValue(QFont::Tag("tnum")), 0u) << "正文被误加了等宽数字，阅读字形变了";
+#endif
+}

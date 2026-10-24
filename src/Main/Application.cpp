@@ -6,6 +6,8 @@
 #include "Base/Paths.h"
 #include "Core/Hotkey/IHotkeyManager.h"
 #include "Gui/Theme/DesignTokens.h"
+#include "Gui/Theme/Motion.h"
+#include "Platform/AnimationSettings.h"
 
 #include <QFileInfo>
 
@@ -43,6 +45,9 @@ Application::Application(int &argc, char **argv, const GyanisScribe::App::Comman
     auto bodyFont = font();
     bodyFont.setPointSize(static_cast<int>(GyanisScribe::Gui::kTextRolePointSizeBody));
     setFont(bodyFont);
+    // 系统关掉「显示动画」时全局动效一起瞬时到位：这一档在界面建起来之前装好，
+    // 第一枚 Toast 与第一张贴图就不会先按允许动画跑一拍
+    GyanisScribe::Gui::setAnimationsEnabled(GyanisScribe::Platform::animationsEnabled());
     // 关窗不等于退出进程的默认逻辑只留给「关掉的是贴图/标注这类浮窗」：主窗口自己的 closeEvent
     // 会发 quitRequested，与托盘菜单的「退出」走同一个收场。不设这一行时，关掉任何一枚贴图都会
     // 把整个程序带走，托盘图标与挂在屏幕上的其它贴图一起消失

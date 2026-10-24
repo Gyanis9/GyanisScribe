@@ -15,6 +15,7 @@
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Settings/SettingsStore.h"
 #include "Gui/Controls/AppShortcuts.h"
+#include "Gui/Theme/Motion.h"
 
 #include <gtest/gtest.h>
 
@@ -25,6 +26,7 @@
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QEnterEvent>
+#include <QEvent>
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QImage>
@@ -120,6 +122,8 @@ namespace GyanisScribe
 
             void TearDown() override
             {
+                // 动画开关是进程级状态：每条用例用完都还原，别让下一组用例继承这一条的设定
+                GyanisScribe::Gui::setAnimationsEnabledForTesting(std::nullopt);
                 m_window.reset();
                 m_integration.reset();
                 m_settings.reset();
@@ -791,6 +795,7 @@ namespace GyanisScribe
         {
             GTEST_SKIP() << "这个环境没有屏幕可枚举，贴边的几何无从谈起";
         }
+        GyanisScribe::Gui::setAnimationsEnabledForTesting(true);
         const auto available = screen->availableGeometry();
 
         auto &window = makeWindow();
@@ -806,6 +811,9 @@ namespace GyanisScribe
         QApplication::sendEvent(&window, &drag);
         QMouseEvent release{QEvent::MouseButtonRelease, grip + QPointF{7.0, 7.0}, grip + QPointF{7.0, 7.0}, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
         QApplication::sendEvent(&window, &release);
+        EXPECT_TRUE(window.isGeometryAnimationRunning()) << "松手吸附没有起几何弹簧，贴边是瞬移过去的";
+        // 吸附与收展都走几何弹簧：事件之间没有真实时间，按总时长一次性推完再读落点
+        window.advanceGeometryAnimationForTesting(1000);
 
         EXPECT_EQ(window.edgeDock(), Core::ScreenEdge::Left) << "拖到左边附近松手没贴上去";
         EXPECT_EQ(window.x(), available.left()) << "贴上之后没有贴齐那条边";
@@ -814,12 +822,14 @@ namespace GyanisScribe
         // 指针离开：收成一条
         QEvent leave{QEvent::Leave};
         QApplication::sendEvent(&window, &leave);
+        window.advanceGeometryAnimationForTesting(1000);
         EXPECT_EQ(window.geometry().right(), Core::kEdgeStripWidth - 1) << "指针走了没收起来，或者收得太多（整张藏进了屏外）";
         EXPECT_EQ(window.width(), revealedWidth) << "收起只挪位置，不改尺寸";
 
         // 悬停：露回来
         QEnterEvent enter{QPointF{1.0, 1.0}, QPointF{1.0, 1.0}, QPointF{1.0, 1.0}};
         QApplication::sendEvent(&window, &enter);
+        window.advanceGeometryAnimationForTesting(1000);
         EXPECT_EQ(window.x(), available.left()) << "悬停没有露回来：收起的贴图就再也点不到了";
     }
 
@@ -872,6 +882,8 @@ namespace GyanisScribe
         ASSERT_EQ(window.edgeDock(), Core::ScreenEdge::Left);
         QEnterEvent hover{QPointF{1.0, 1.0}, QPointF{1.0, 1.0}, QPointF{1.0, 1.0}};
         QApplication::sendEvent(&window, &hover);
+        // 悬停展开走几何弹簧：把时间轴一次推完再读落点
+        window.advanceGeometryAnimationForTesting(1000);
         ASSERT_EQ(window.x(), available.left()) << "悬停没展开，拖走的判据就落不到实处";
 
         const QPointF grip = QRectF(QPointF(0, 0), QSizeF(window.size())).center();
@@ -2452,6 +2464,150 @@ namespace GyanisScribe
         window.setColorCard(std::nullopt);
         EXPECT_FALSE(window.colorCardColor().has_value()) << "摘掉色卡身份之后还认得出原色";
         EXPECT_FALSE(hasCardItem()) << "摘掉之后那一项还在";
+    }
+
+    /**
+     * @brief 钉住减少动效档：悬停进出贴边贴图时几何直接落到贴着边的那一档
+     * @details 系统关掉「显示动画」时，收展要与动效引入之前逐像素一致——先起一个弹簧再把值
+     *          瞬间推到目标也会留下一个空转的定时器。判据除了「没在跑」，还按贴左边缘的
+     *          dockedRect 现算收起与展开两个落点，几何停在半途时会被抓出来。
+     */
+    TEST_F(PinWindowFixture, ReducedMotionKeepsDockGeometryImmediate)
+    {
+        QScreen *screen = QGuiApplication::primaryScreen();
+        if (screen == nullptr)
+        {
+            GTEST_SKIP() << "这个环境没有屏幕可枚举，贴边的几何无从谈起";
+        }
+        const auto available = screen->availableGeometry();
+
+        GyanisScribe::Gui::setAnimationsEnabledForTesting(false);
+        auto &window = makeWindow();
+        window.move(available.left() + 100, available.top() + 120);
+        window.show();
+        window.setEdgeDocked(true);
+        ASSERT_EQ(window.edgeDock(), Core::ScreenEdge::Left) << "没有贴到左边，下面的几何判据落不到实处";
+        EXPECT_FALSE(window.isGeometryAnimationRunning()) << "减少动效档不该启动几何弹簧";
+        EXPECT_EQ(window.geometry().right(), available.left() + Core::kEdgeStripWidth - 1) << "菜单贴边后没有当场收成那条边";
+
+        QEvent enter{QEvent::Enter};
+        QApplication::sendEvent(&window, &enter);
+        EXPECT_FALSE(window.isGeometryAnimationRunning()) << "减少动效档的悬停展开不该启动弹簧";
+        EXPECT_EQ(window.x(), available.left()) << "悬停后没有整张摆回贴上那条边";
+
+        QEvent leave{QEvent::Leave};
+        QApplication::sendEvent(&window, &leave);
+        EXPECT_FALSE(window.isGeometryAnimationRunning()) << "减少动效档的悬停收起不该启动弹簧";
+        EXPECT_EQ(window.geometry().right(), available.left() + Core::kEdgeStripWidth - 1) << "指针离开后没有当场收回那条边";
+    }
+
+    /**
+     * @brief 钉住三件事的次序：菜单贴边瞬时落位、悬停展开与收起起弹簧、左键按下即停
+     * @details 拖动与改大小必须逐帧跟手：弹簧还在跑时按下，后续每一帧都会与动画抢几何。
+     *          「按下就停」放在起拖之前，拖到哪里就停在哪里，不会再被拉回上一个目标。
+     */
+    TEST_F(PinWindowFixture, HoverExpandStartsAndMousePressStopsTheGeometrySpring)
+    {
+        GyanisScribe::Gui::setAnimationsEnabledForTesting(true);
+        auto &window = makeWindow();
+        window.show();
+        window.setEdgeDocked(true);
+        EXPECT_FALSE(window.isGeometryAnimationRunning()) << "菜单贴边是瞬时落位，不该先弹一下";
+
+        QEvent enter{QEvent::Enter};
+        QApplication::sendEvent(&window, &enter);
+        EXPECT_TRUE(window.isGeometryAnimationRunning()) << "悬停展开没有启动弹簧";
+
+        // 悬停展开是逐帧推进的：先步进一小段，离开时才有一段展开的几何可收回去
+        window.advanceGeometryAnimationForTesting(48);
+        ASSERT_TRUE(window.isGeometryAnimationRunning()) << "步进之后展开动画应当仍在跑";
+
+        QEvent leave{QEvent::Leave};
+        QApplication::sendEvent(&window, &leave);
+        EXPECT_TRUE(window.isGeometryAnimationRunning()) << "悬停收起没有启动弹簧";
+
+        QMouseEvent press{QEvent::MouseButtonPress, QPointF{5, 5}, QPointF{5, 5}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &press);
+        EXPECT_FALSE(window.isGeometryAnimationRunning()) << "按下拖动时动画还在抢几何";
+
+        GyanisScribe::Gui::setAnimationsEnabledForTesting(std::nullopt);
+    }
+
+    /**
+     * @brief 钉住展开途中点一下（按下即停、没拖动）会把几何落回当前的展开档
+     * @details 按下为了跟手会停掉几何弹簧；这一下没有拖动时必须把停在中途的窗口摆到
+     *          逻辑状态对应的位置，否则贴图会永远停在「露了一半」。
+     */
+    TEST_F(PinWindowFixture, ClickDuringRevealSettlesToTheLogicalDockState)
+    {
+        QScreen *screen = QGuiApplication::primaryScreen();
+        if (screen == nullptr)
+        {
+            GTEST_SKIP() << "这个环境没有屏幕可枚举，贴边的几何无从谈起";
+        }
+        const auto available = screen->availableGeometry();
+
+        GyanisScribe::Gui::setAnimationsEnabledForTesting(true);
+        auto &window = makeWindow();
+        window.move(available.left() + 100, available.top() + 120);
+        window.show();
+        window.setEdgeDocked(true);
+        ASSERT_EQ(window.edgeDock(), Core::ScreenEdge::Left);
+        EXPECT_EQ(window.geometry().right(), available.left() + Core::kEdgeStripWidth - 1);
+
+        QEvent enter{QEvent::Enter};
+        QApplication::sendEvent(&window, &enter);
+        ASSERT_TRUE(window.isGeometryAnimationRunning()) << "悬停展开没有启动弹簧，前提没造出来";
+        window.advanceGeometryAnimationForTesting(48);
+        ASSERT_TRUE(window.isGeometryAnimationRunning());
+        EXPECT_NE(window.x(), available.left()) << "步进 48ms 就展开到终点了，这一条测不到中途停下的情形";
+
+        const QPointF grip = QRectF(QPointF(0, 0), QSizeF(window.size())).center();
+        QMouseEvent   press{QEvent::MouseButtonPress, grip, grip, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &press);
+        EXPECT_FALSE(window.isGeometryAnimationRunning()) << "按下没有停掉展开弹簧";
+
+        QMouseEvent release{QEvent::MouseButtonRelease, grip, grip, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &release);
+        EXPECT_FALSE(window.isGeometryAnimationRunning()) << "没拖动却把展开动画又起了一段";
+        EXPECT_EQ(window.x(), available.left()) << "点一下之后停在展开中途，贴图没有落回当前逻辑档";
+    }
+
+    /**
+     * @brief 钉住动画途中藏起来会先落回逻辑档，再露面时不会停在半途
+     * @details 收起/展开的弹簧不随窗口隐藏停下；隐藏时若只停弹簧不落位，下一次显示
+     *          就是一张露了半截的贴图，而且没有任何事件会再把它推回终值。
+     */
+    TEST_F(PinWindowFixture, HidingMidAnimationSettlesToTheLogicalDockState)
+    {
+        QScreen *screen = QGuiApplication::primaryScreen();
+        if (screen == nullptr)
+        {
+            GTEST_SKIP() << "这个环境没有屏幕可枚举，贴边的几何无从谈起";
+        }
+        const auto available = screen->availableGeometry();
+
+        GyanisScribe::Gui::setAnimationsEnabledForTesting(true);
+        auto &window = makeWindow();
+        window.move(available.left() + 100, available.top() + 120);
+        window.show();
+        window.setEdgeDocked(true);
+        ASSERT_EQ(window.edgeDock(), Core::ScreenEdge::Left);
+
+        QEvent enter{QEvent::Enter};
+        QApplication::sendEvent(&window, &enter);
+        ASSERT_TRUE(window.isGeometryAnimationRunning()) << "悬停展开没有启动弹簧，前提没造出来";
+        window.advanceGeometryAnimationForTesting(48);
+        ASSERT_TRUE(window.isGeometryAnimationRunning());
+        EXPECT_NE(window.x(), available.left()) << "步进 48ms 就展开到终点了，这一条测不到中途藏起";
+
+        window.hide();
+        EXPECT_FALSE(window.isGeometryAnimationRunning()) << "藏起来之后弹簧还在跑";
+        EXPECT_EQ(window.x(), available.left()) << "藏起来之前没有落回展开档，下次露面就是半截";
+
+        window.show();
+        QCoreApplication::processEvents();
+        EXPECT_EQ(window.x(), available.left()) << "再露面时停在展开中途";
     }
 
 } // namespace GyanisScribe

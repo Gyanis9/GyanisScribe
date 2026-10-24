@@ -10,6 +10,7 @@
 #include <QApplication>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QPushButton>
 #include <QColor>
 #include <QDateTime>
@@ -355,4 +356,20 @@ TEST_F(HistoryViewFixture, CategoryFallbackIconCarriesNinetySix)
     const auto icon = m_icons->icon("Record");
     ASSERT_FALSE(icon.isNull());
     EXPECT_TRUE(icon.availableSizes().contains(QSize(96, 96)));
+}
+
+/**
+ * @brief 钉住历史列表锁等宽数字
+ * @details 每张卡片的时间与尺寸都是读数；比例字体会让同一列的数字随条目左右跳。
+ *          列表按 Mixed 只上 tnum：卡片里还有中文标题，不换字族也不降字重。
+ */
+TEST_F(HistoryViewFixture, ListUsesTabularFigures)
+{
+    auto view = makeView();
+    auto *list = view->findChild<QListWidget *>();
+    ASSERT_NE(list, nullptr) << "历史页里没有缩略图列表";
+    EXPECT_EQ(list->accessibleName(), QStringLiteral("历史列表"));
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+    EXPECT_EQ(list->font().featureValue(QFont::Tag("tnum")), 1u) << "历史列表没锁等宽，卡片读数会左右跳";
+#endif
 }

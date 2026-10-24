@@ -1,16 +1,25 @@
 #include "Core/Annotation/AnnotationPalette.h"
 #include "Core/Record/CursorHighlight.h"
 #include "Gui/Theme/DesignTokens.h"
+#include "Gui/Theme/ThemeKind.h"
 
 #include <gtest/gtest.h>
 
 #include <array>
 #include <optional>
 
+using GyanisScribe::Gui::darkReadoutWeight;
 using GyanisScribe::Gui::kAccentColor;
 using GyanisScribe::Gui::kAnnotationWidths;
+using GyanisScribe::Gui::kDarkPalette;
 using GyanisScribe::Gui::kFontSizes;
+using GyanisScribe::Gui::kLightPalette;
+using GyanisScribe::Gui::paletteFor;
 using GyanisScribe::Gui::stepIndexOf;
+using GyanisScribe::Gui::TextRole;
+using GyanisScribe::Gui::textRoleSpec;
+using GyanisScribe::Gui::TextScript;
+using GyanisScribe::Gui::ThemeKind;
 
 /**
  * @brief 钉住「阶梯取值 ↔ 控件下标」的互指
@@ -62,4 +71,79 @@ TEST(DesignTokens, CursorHighlightColorFollowsTheAccent)
 TEST(DesignTokens, AnnotationPaletteBlueFollowsTheAccent)
 {
     EXPECT_EQ(GyanisScribe::Core::kAnnotationPaletteColors[4], kAccentColor);
+}
+
+/**
+ * @brief 钉住浅深两档的微明度分层与无纯黑约束
+ * @details 控件静息底必须同时区别于窗口底与卡片底，否则按钮与输入框会融进面里；
+ *          浅色与深色档一律不出现不透明纯黑，纯黑只留给高对比度档。
+ */
+TEST(DesignTokens, MicroLayeringRolesAreDistinctAndFreeOfOpaqueBlack)
+{
+    for (const auto kind: {ThemeKind::Light, ThemeKind::Dark})
+    {
+        const auto &palette = paletteFor(kind);
+        EXPECT_NE(palette.controlFill, palette.surface);
+        EXPECT_NE(palette.controlFill, palette.windowBackground);
+
+        const std::array colors = {palette.windowBackground, palette.surface, palette.controlFill,  palette.hover,     palette.pressed,  palette.mutedFill, palette.text,
+                                   palette.secondaryText,    palette.border,  palette.borderStrong, palette.accent,    palette.onAccent, palette.selection, palette.icon,
+                                   palette.success,          palette.danger,  palette.accentHover,  palette.accentSoft};
+        for (const auto &color: colors)
+        {
+            EXPECT_NE(color, QColor(0, 0, 0)) << "Light/Dark 不该有不透明纯黑";
+        }
+    }
+}
+
+/**
+ * @brief 钉住暗色档纯 ASCII 读数的降重只在可变字族可用时发生
+ * @details 40 是 600→560 与 400→360 两条路径的共同幅度；取不到可变字族时原样保留，
+ *          否则中文回退会被一起推到 Bold。
+ */
+TEST(DesignTokens, DarkReadoutWeightDropsFortyOnlyWhenVariableFamilyIsAvailable)
+{
+    EXPECT_EQ(darkReadoutWeight(400, true), 360);
+    EXPECT_EQ(darkReadoutWeight(600, true), 560);
+    EXPECT_EQ(darkReadoutWeight(400, false), 400);
+    EXPECT_EQ(darkReadoutWeight(600, false), 600);
+}
+
+/**
+ * @brief 钉住正文与标题在任何字符集档下都不换字族、不降重
+ */
+TEST(DesignTokens, TextRoleSpecKeepsBodyAndTitleAtTheirFixedWeights)
+{
+    const auto bodyDark   = textRoleSpec(TextRole::Body, ThemeKind::Dark, true, TextScript::Mixed);
+    const auto bodyAscii  = textRoleSpec(TextRole::Body, ThemeKind::Dark, true, TextScript::AsciiOnly);
+    const auto titleDark  = textRoleSpec(TextRole::PageTitle, ThemeKind::Dark, true, TextScript::Mixed);
+    const auto titleAscii = textRoleSpec(TextRole::PageTitle, ThemeKind::Dark, true, TextScript::AsciiOnly);
+
+    EXPECT_EQ(bodyDark.weight, 400);
+    EXPECT_FALSE(bodyDark.variableFamily);
+    EXPECT_EQ(bodyAscii.weight, 400);
+    EXPECT_FALSE(bodyAscii.variableFamily);
+    EXPECT_EQ(titleDark.weight, 600);
+    EXPECT_FALSE(titleDark.variableFamily);
+    EXPECT_EQ(titleAscii.weight, 600);
+    EXPECT_FALSE(titleAscii.variableFamily);
+}
+
+/**
+ * @brief 钉住暗色 Metric 只在纯 ASCII 读数上换可变字族并降到 560
+ * @details Mixed 读数里可能含中文，换字族会把中文回退映射到 Bold；取不到可变字族时
+ *          也留在默认字族的 600，这条路径与字符集无关，只看字族是否可用。
+ */
+TEST(DesignTokens, TextRoleSpecSwitchesMetricOnlyForAsciiReadoutsInDark)
+{
+    const auto mixed      = textRoleSpec(TextRole::Metric, ThemeKind::Dark, true, TextScript::Mixed);
+    const auto ascii      = textRoleSpec(TextRole::Metric, ThemeKind::Dark, true, TextScript::AsciiOnly);
+    const auto asciiNoVar = textRoleSpec(TextRole::Metric, ThemeKind::Dark, false, TextScript::AsciiOnly);
+
+    EXPECT_EQ(mixed.weight, 600);
+    EXPECT_FALSE(mixed.variableFamily);
+    EXPECT_EQ(ascii.weight, 560);
+    EXPECT_TRUE(ascii.variableFamily);
+    EXPECT_EQ(asciiNoVar.weight, 600);
+    EXPECT_FALSE(asciiNoVar.variableFamily);
 }

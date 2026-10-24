@@ -3,6 +3,7 @@
 // 同一进程不能再造第二份。
 #include "Gui/Controls/HotkeyEdit.h"
 #include "Gui/Controls/SpinBox.h"
+#include "Gui/Theme/DesignTokens.h"
 
 #include "Core/Settings/SettingsStore.h"
 
@@ -18,6 +19,7 @@
 #include <filesystem>
 #include <format>
 #include <memory>
+#include <optional>
 
 namespace
 {
@@ -28,6 +30,11 @@ namespace
     public:
         void SetUp() override
         {
+            // 焦点环与复选框的像素判据按逻辑像素取样点：真机 125%/150% 下 grab() 给出的是更大的图，
+            // 同一个采样点会落到别处。这个二进制里的像素用例都在同一份 QApplication 下，强制倍比为 1。
+            // 真缩放屏的观感仍留给人在实机上看。
+            qputenv("QT_SCALE_FACTOR", "1");
+
             static int   argumentCount  = 1;
             static char  argumentZero[] = "TestControlsChrome";
             static char *arguments[]    = {argumentZero, nullptr};
@@ -158,4 +165,91 @@ TEST_F(SpinBoxFixture, ClickingTheStepperStepsTheValue)
     spin.setValue(10);
     up->click();
     EXPECT_EQ(spin.value(), 10) << "顶部没有夹住";
+}
+
+/**
+ * @brief 钉住数字框的数字锁定等宽：一秒一跳的读数不能左右抖
+ */
+TEST(SpinBoxChrome, UsesTabularFigures)
+{
+    GyanisScribe::Gui::SpinBox spin;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+    EXPECT_EQ(spin.font().featureValue(QFont::Tag("tnum")), 1u) << "数字框没锁等宽，读数会左右抖";
+#endif
+}
+
+namespace
+{
+    using GyanisScribe::Gui::activeThemeKind;
+    using GyanisScribe::Gui::applyTabularFigures;
+    using GyanisScribe::Gui::applyTextRole;
+    using GyanisScribe::Gui::reapplyTabularFigures;
+    using GyanisScribe::Gui::reapplyTextRole;
+    using GyanisScribe::Gui::setTextThemeKind;
+    using GyanisScribe::Gui::setVariableMetricFamilyAvailableForTesting;
+    using GyanisScribe::Gui::TextRole;
+    using GyanisScribe::Gui::TextScript;
+    using GyanisScribe::Gui::ThemeKind;
+} // namespace
+
+/**
+ * @brief 钉住数字读数切回浅色档后回到基准字重
+ * @details 暗色档的可变字族路径把 400 降到 360；重放时若只还原字族不还原字重，
+ *          控件会一直停在 360，读数在整个浅色档里都偏细。可变字族的可用性由测试钩子钉死，
+ *          不依赖跑测机器装没装 Segoe UI Variable Text。
+ */
+TEST(TabularFiguresChrome, RestoresBaseWeightWhenThemeReturnsToLight)
+{
+    const auto previousTheme = activeThemeKind();
+
+    QLabel label;
+    auto   font = label.font();
+    font.setWeight(QFont::Normal);
+    label.setFont(font);
+
+    setVariableMetricFamilyAvailableForTesting(true);
+    setTextThemeKind(ThemeKind::Dark);
+    applyTabularFigures(label, TextScript::AsciiOnly);
+    EXPECT_EQ(static_cast<int>(label.font().weight()), 360) << "暗色档没有按可变字族降重";
+
+    setTextThemeKind(ThemeKind::Light);
+    reapplyTabularFigures(label);
+    EXPECT_EQ(static_cast<int>(label.font().weight()), 400) << "切回浅色档后字重没有还原";
+
+    setVariableMetricFamilyAvailableForTesting(std::nullopt);
+    setTextThemeKind(previousTheme);
+}
+
+/**
+ * @brief 钉住暗色 Metric 只在 AsciiOnly 时换可变字族与 560，Mixed 停在默认字族 600
+ * @details Mixed 读数里可能含中文，换字族与降重会把中文回退分家；切回浅色档后两种读数
+ *          都要回到 600 与原始字族。可变字族的可用性由测试钩子钉死，不依赖跑测机器。
+ */
+TEST(TabularFiguresChrome, MetricRoleSwitchesFamilyOnlyForAsciiInDark)
+{
+    const auto previousTheme = activeThemeKind();
+    setVariableMetricFamilyAvailableForTesting(true);
+    setTextThemeKind(ThemeKind::Dark);
+
+    QLabel label;
+    auto   font = label.font();
+    font.setWeight(QFont::Normal);
+    label.setFont(font);
+    const auto baseFamily = label.font().family();
+
+    applyTextRole(label, TextRole::Metric, TextScript::Mixed);
+    EXPECT_EQ(static_cast<int>(label.font().weight()), 600) << "Mixed 读数被降重";
+    EXPECT_EQ(label.font().family(), baseFamily) << "Mixed 读数换了可变字族，中文回退会分家";
+
+    applyTextRole(label, TextRole::Metric, TextScript::AsciiOnly);
+    EXPECT_EQ(static_cast<int>(label.font().weight()), 560);
+    EXPECT_EQ(label.font().family(), QStringLiteral("Segoe UI Variable Text"));
+
+    setTextThemeKind(ThemeKind::Light);
+    reapplyTextRole(label);
+    EXPECT_EQ(static_cast<int>(label.font().weight()), 600) << "切回浅色档后没有回到 DemiBold";
+    EXPECT_EQ(label.font().family(), baseFamily) << "切回浅色档后还挂着可变字族";
+
+    setVariableMetricFamilyAvailableForTesting(std::nullopt);
+    setTextThemeKind(previousTheme);
 }

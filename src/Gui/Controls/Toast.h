@@ -12,6 +12,7 @@
 #include "Gui/Theme/DesignTokens.h"
 
 #include <QObject>
+#include <QTimer>
 
 #include <QPoint>
 #include <QRect>
@@ -58,6 +59,25 @@ namespace GyanisScribe::Gui
     [[nodiscard]] QPoint toastPositionFor(const QRect &screenAvailable, const QSize &toastSize);
 
     /**
+     * @brief 判断某类提示要不要逐字显现
+     * @param kind 提示种类
+     * @param animationsEnabled 系统与应用是否允许动画
+     * @return 允许动画时成功与信息提示为 true；错误提示一律 false
+     * @details 错误提示要整句一起出现：逐字浮现会让人先读半句再改口。
+     */
+    [[nodiscard]] bool shouldStreamToast(ToastKind kind, bool animationsEnabled) noexcept;
+
+    /**
+     * @brief 算文字列的上边距，把首行基线压到图标下方
+     * @param iconHeight 图标逻辑高度
+     * @param ascent 文本字体的 ascent
+     * @param emHeight 文本字体的 em 高，取 QFontInfo::pixelSize()，不是 QFontMetrics::height() 的行距
+     * @param iconMargin 图标上方的留白
+     * @return 文字列的上边距，使图标底边落在首行基线下方 0.125em
+     */
+    [[nodiscard]] int iconTextTopPad(int iconHeight, int ascent, int emHeight, int iconMargin) noexcept;
+
+    /**
      * @brief 托盘式气泡提示
      * @details 独立顶层窗口：不属于任何页面，截图、录屏、识别的反馈都用它。
      *          同一时刻只有一个在显示，新的提示直接顶掉旧的——排队会把三秒前的操作当成刚发生的。
@@ -76,6 +96,12 @@ namespace GyanisScribe::Gui
         Toast(class IconProvider &icons, const class ThemeManager &theme, QObject *parent = nullptr);
 
         /**
+         * @brief 销毁提示器，并关掉还亮着的气泡
+         * @details 气泡是没有父控件的顶层窗口，不随 QObject 的父子关系回收。
+         */
+        ~Toast() override;
+
+        /**
          * @brief 显示一条提示
          * @param text 正文，用户看得懂的那句
          * @param kind 种类，决定语义色与图标
@@ -86,12 +112,41 @@ namespace GyanisScribe::Gui
         /// 当前显示的气泡文本，空表示没在显示（用例据此判自动隐藏有没有生效）
         [[nodiscard]] QString currentText() const;
 
+        /// 当前气泡是否还盖着流式文字覆盖层
+        [[nodiscard]] bool hasStreamingOverlay() const;
+
+        /// 当前气泡里的流式覆盖层个数，用于判旧层有没有随文本一起销毁
+        [[nodiscard]] int streamingOverlayCount() const;
+
+        /// 当前气泡图标的描边色，应等于该条提示的语义色
+        [[nodiscard]] QColor currentIconTint() const;
+
+        /// 当前气泡文字列的上边距，按标签真实字体算出
+        [[nodiscard]] int currentIconTextPad() const;
+
+        /**
+         * @brief 把当前气泡的流式动画向前推指定毫秒
+         * @param milliseconds 本次推进的毫秒数，负值按 0 处理
+         * @details 只给用例用：不依赖真实时钟，推进到时间轴终点即收工。
+         */
+        void advanceStreamingForTesting(int milliseconds);
+
+        /**
+         * @brief 改自动隐藏的可见时长
+         * @param milliseconds 从本次显示起算的毫秒数，小于 1 按 1 处理
+         * @details 只给用例用：三秒的真实等待会让定时器用例拖慢整条 ctest；
+         *          每次 show 都按这一档重启同一个隐藏定时器。
+         */
+        void setVisibleDurationForTesting(int milliseconds);
+
     private:
         class Bubble;
 
         IconProvider       &m_icons;    ///< 图标出口，不拥有
         const ThemeManager &m_theme;    ///< 主题来源，不拥有
         Bubble             *m_bubble{}; ///< 当前气泡，同一时刻最多一个
+        QTimer              m_hideTimer;                          ///< 自动隐藏，每次 show 重启；旧的期限推不掉新提示
+        int                 m_visibleDurationMs = kToastVisibleMs; ///< 当前可见时长，用例可缩短
     };
 
 } // namespace GyanisScribe::Gui

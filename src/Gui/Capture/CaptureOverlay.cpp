@@ -319,6 +319,8 @@ namespace GyanisScribe::Gui
         painter.drawRect(stripRect);
         QFont stripFont = font();
         stripFont.setPointSize(GyanisScribe::Gui::kHintFontSize);
+        // 坐标与颜色是读数：锁等宽后扫读不抖；同一行含中文，不换字族与字重
+        stripFont = tabularFont(stripFont, TextScript::Mixed);
         painter.setFont(stripFont);
         painter.setPen(GyanisScribe::Gui::kCaptureHintTextColor);
         painter.drawText(stripRect.adjusted(GyanisScribe::Gui::kHintPadding, 0, -GyanisScribe::Gui::kHintPadding, 0), Qt::AlignVCenter | Qt::AlignLeft, readout);
@@ -455,6 +457,8 @@ namespace GyanisScribe::Gui
             }
             QFont hintFont = font();
             hintFont.setPointSize(GyanisScribe::Gui::kHintFontSize);
+            // 尺寸提示里中文与数字同处一行：只上 tnum，避免中文回退被降重推到 Bold
+            hintFont = tabularFont(hintFont, TextScript::Mixed);
             painter.setFont(hintFont);
             const QFontMetrics metrics(hintFont);
             const auto         textSize    = metrics.size(Qt::TextSingleLine, hint);
@@ -467,7 +471,7 @@ namespace GyanisScribe::Gui
             painter.setPen(GyanisScribe::Gui::kCaptureHintTextColor);
             painter.drawText(hintRect, Qt::AlignCenter, hint);
 
-            // 确认/取消怎么写常驻读数下一行：新用户拖完框最容易停在「然后呢」上（审查台账 UI-33）
+            // 确认/取消怎么写常驻读数下一行：新用户拖完框最容易停在「然后呢」上
             const auto  confirmText = m_isSelecting ? GyanisScribe::Base::uiText("松手即完成 · Esc 取消") : GyanisScribe::Base::uiText("拖四边调整 · Enter/双击确认 · Esc 取消");
             const auto  confirmSize = metrics.size(Qt::TextSingleLine, confirmText);
             const QRect confirmRect(hintTopLeft + QPoint(0, textSize.height() + kCopiedHintGap),

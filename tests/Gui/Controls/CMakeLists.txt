@@ -22,7 +22,10 @@ gtest_discover_tests(TestGuiControls)
 # 控件外观判据单独一个可执行体：TestGuiControls 里的 TestToast 已经持有一份 QApplication，
 # 同一进程不能再造第二份。
 add_executable(TestControlsChrome
-        TestControlsChrome.cpp)
+        TestControlsChrome.cpp
+        TestFocusRing.cpp
+        TestStreamingText.cpp
+        TestCheckBox.cpp)
 
 target_link_libraries(TestControlsChrome PRIVATE
         Gui

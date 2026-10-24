@@ -403,7 +403,7 @@ namespace GyanisScribe::Gui
 
         /**
          * @brief 按当前工具与描边/底板两个开关收放中段的参数控件
-         * @details 全部常显会把工具栏撑到 2374px 宽（实测，见审查台账 UiAuditPlan，仓外 GyanisScribe-Reports/），窄屏上右端的
+         * @details 全部常显会把工具栏撑到 2374px 宽（实测），窄屏上右端的
          *          动作按钮整排落在屏外；这里按「画出来的东西用得上」收敛——可适用性以 Core::AnnotationShape.h
          *          各字段注释（「仅 X 用」）为准，描边色/描边粗细是描边开关的子档、底板色是底板开关的子档。
          *          可见集合真的变了才发 contextLayoutChanged：宿主拿它重摆，每回都发会让工具栏一直挪。

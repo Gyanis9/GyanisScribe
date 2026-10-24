@@ -145,8 +145,9 @@ namespace GyanisScribe::Gui
         m_elapsed->setObjectName(QStringLiteral("metricValue"));
         m_elapsed->setAccessibleName(GyanisScribe::Base::uiText("已录时长"));
         m_elapsed->setToolTip(GyanisScribe::Base::uiText("已录了多久。录到设置里「最长录多久」那一格就自动收尾并保存（默认 10 分钟）"));
-        // 等宽数字：一秒一跳时这一列的宽度不能变，否则整条控制条每秒钟抖一次
-        GyanisScribe::Gui::applyTextRole(*m_elapsed, GyanisScribe::Gui::TextRole::Metric);
+        // 等宽数字：一秒一跳时这一列的宽度不能变，否则整条控制条每秒钟抖一次。
+        // 时长是纯 ASCII 读数，暗色档可换可变字族并降 40
+        GyanisScribe::Gui::applyTextRole(*m_elapsed, GyanisScribe::Gui::TextRole::Metric, GyanisScribe::Gui::TextScript::AsciiOnly);
         line->addWidget(m_elapsed);
 
         // 取消排在最左：它与「停止并保存」之间隔着暂停键，误点一格不会把录好的那段丢掉
@@ -174,6 +175,12 @@ namespace GyanisScribe::Gui
         m_countdown = new QLabel{this};
         m_countdown->setAccessibleName(GyanisScribe::Base::uiText("倒计时"));
         m_countdown->setAlignment(Qt::AlignCenter);
+        // 倒计时大字只在构造时建一次基准字体：先落字号，再交给 applyTabularFigures 记下原始字族与字重。
+        // 之后每次 applyState 只改文本与显隐；若每拍都从当前字体重算，暗色档的降重会一拍掉 40
+        auto countdownFont = m_countdown->font();
+        countdownFont.setPointSize(kCountdownFontPointSize);
+        m_countdown->setFont(countdownFont);
+        GyanisScribe::Gui::applyTabularFigures(*m_countdown, GyanisScribe::Gui::TextScript::AsciiOnly);
         m_countdown->hide();
         root->addWidget(m_countdown);
 
@@ -210,9 +217,6 @@ namespace GyanisScribe::Gui
         const auto countdown = countdownTextFor(countdownRemaining);
         if (countdown)
         {
-            QFont bigFont = m_countdown->font();
-            bigFont.setPointSize(kCountdownFontPointSize);
-            m_countdown->setFont(bigFont);
             m_countdown->setText(*countdown);
             m_countdown->show();
             m_countdown->raise();

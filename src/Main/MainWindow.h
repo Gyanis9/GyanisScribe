@@ -215,7 +215,7 @@ namespace GyanisScribe::Main
          * @brief 析构：设备枚举器要在这里才看得到完整类型，窗口几何也在这里落盘
          * @details 头里对枚举器只有前向声明，而 unique_ptr 的隐式析构会被内联进每个 include 本头的
          *          翻译单元 —— GCC 在那里嫌类型不完整（实测 C++ 侧红，MSVC 侧看不出）。
-         *          顺手把当前几何存进配置（界面审查 UI-65），下次构造按它还原。
+         *          顺手把当前几何存进配置，下次构造按它还原。
          */
         ~MainWindow() override;
 

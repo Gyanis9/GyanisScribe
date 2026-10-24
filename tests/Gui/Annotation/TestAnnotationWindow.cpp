@@ -12,6 +12,8 @@
 #include "Core/Settings/SettingsStore.h"
 #include "Gui/Controls/AppShortcuts.h"
 #include "Gui/Resources/IconProvider.h"
+#include "Gui/Theme/ThemeKind.h"
+#include "Gui/Theme/ThemeManager.h"
 
 #include <gtest/gtest.h>
 
@@ -19,11 +21,14 @@
 #include <QCoreApplication>
 #include <QGuiApplication>
 #include <QElapsedTimer>
+#include <QFontMetricsF>
 #include <QImage>
 #include <QKeyEvent>
 #include <QMouseEvent>
+#include <QRegularExpression>
 #include <QScreen>
 #include <QTextCursor>
+#include <QTextDocument>
 #include <QTextEdit>
 #include <QToolButton>
 #include <QPoint>
@@ -1656,4 +1661,75 @@ TEST_F(AnnotationWindowFixture, TheAnnotationWindowShowsAScreenOnlyFrame)
     EXPECT_EQ(frame.pixelColor(frame.width() / 2, frame.height() - 1), accent) << "下边没有提示线";
 
     EXPECT_EQ(engine().exportImage().pixelColor(0, 50), QColor(180, 180, 180)) << "提示线被烘进成品了";
+}
+
+/**
+ * @brief 钉住行内编辑器去边框后高度仍按内容行数算，文本不被裁
+ * @details 浅色与深色档给 editor 留的是 1px 透明边框占位：可见描边没了，边框仍算在盒模型里。
+ *          resizeTextEditorToContent 的高度按块数乘行距，再加文档边距与 frameWidth 现算；
+ *          两行与四行各核一次，期望值用编辑器自己的度量重算，不靠界面截图目测。
+ *          文本没被裁的判据是视口高度装得下整份文档。
+ */
+TEST_F(AnnotationWindowFixture, BorderlessInlineEditorResizesToItsContent)
+{
+    struct StyleGuard final
+    {
+        QString sheet = qApp->styleSheet();
+        ~StyleGuard()
+        {
+            qApp->setStyleSheet(sheet);
+        }
+    } guard;
+    qApp->setStyleSheet(GyanisScribe::Gui::ThemeManager::styleSheetFor(GyanisScribe::Gui::ThemeKind::Light));
+
+    GyanisScribe::Gui::AnnotationView view{engine()};
+    view.resize(400, 200);
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Text).has_value());
+    engine().beginStroke(QPoint(20, 20));
+    ASSERT_TRUE(engine().setPendingText(QStringLiteral("AB")).has_value());
+    const auto placed = engine().endStroke();
+    ASSERT_TRUE(placed.has_value()) << placed.error().message;
+    ASSERT_TRUE(engine().select(*placed).has_value());
+
+    const auto bounds = engine().selectionBounds();
+    ASSERT_TRUE(bounds.has_value());
+    const QPoint widgetCenter{(bounds->center().x() + 1) * 2, (bounds->center().y() + 1) * 2};
+    QMouseEvent doubleClick{QEvent::MouseButtonDblClick, QPointF{widgetCenter}, QPointF{widgetCenter}, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+    QApplication::sendEvent(&view, &doubleClick);
+
+    auto *editor = view.findChild<QTextEdit *>();
+    ASSERT_NE(editor, nullptr) << "双击一条文字没有打开输入框";
+    editor->ensurePolished();
+    // 去边框之后靠这条 1px 透明占位保住盒模型：可见边缘没有，但边框仍占一格
+    const auto sheet = GyanisScribe::Gui::ThemeManager::styleSheetFor(GyanisScribe::Gui::ThemeKind::Light);
+    const QRegularExpression editorRule{QStringLiteral(R"(QTextEdit#annotationTextEditor\s*\{([^}]*)\})")};
+    const auto               ruleMatch = editorRule.match(sheet);
+    ASSERT_TRUE(ruleMatch.hasMatch()) << "浅色样式表里没有行内编辑器的规则";
+    EXPECT_NE(ruleMatch.captured(1).indexOf(QStringLiteral("border: 1px solid transparent")), -1) << "1px 透明边框占位被删掉了";
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+    EXPECT_EQ(editor->font().featureValue(QFont::Tag("tnum")), 0u) << "标注正文被误加了等宽数字";
+#endif
+
+    for (const auto lineCount: {2, 4})
+    {
+        QString text;
+        for (int line = 0; line < lineCount; ++line)
+        {
+            if (line > 0)
+            {
+                text += QLatin1Char('\n');
+            }
+            text += QStringLiteral("第 %1 行").arg(line + 1);
+        }
+        editor->setPlainText(text);
+        QCoreApplication::processEvents();
+        ASSERT_EQ(editor->document()->blockCount(), lineCount) << "用例造的行数没有落进文档";
+
+        const QFontMetricsF metrics{editor->font()};
+        const auto          contentHeight = static_cast<int>(std::ceil(metrics.lineSpacing() * static_cast<qreal>(lineCount)));
+        const auto          expected      = std::clamp(contentHeight + static_cast<int>(2 * editor->document()->documentMargin()) + 2 * editor->frameWidth() + 6, 24, 200);
+        EXPECT_EQ(editor->height(), expected) << lineCount << " 行时输入框高度与内容行数对不上";
+        // 文本没被裁：视口装得下整份文档（含上下文档边距），不靠截图目测
+        EXPECT_GE(editor->viewport()->height(), editor->document()->size().toSize().height()) << lineCount << " 行时文本被输入框裁掉了一截";
+    }
 }

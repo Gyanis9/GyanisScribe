@@ -1,97 +1,93 @@
-/* Dark 主题的界面样式表：珍珠玻璃深色档的移植。
-   与 Light.qss 逐条同构，只差色值：选择器、顺序、圆角与尺寸三份保持一致，
+/* Dark 主题的界面样式表：微明度分层的深色档。
+   与 Light.qss 逐条同构，只差色值：选择器、顺序、圆角与尺寸两份保持一致，
    色值取自 src/Gui/Theme/DesignTokens.h 的 kDarkPalette，用例双向核对同解；
-   设计里带透明度的线（勾选框描边、滚动条滑块）按 rgba 字面量写，是同解门禁仅有的例外。 */
+   设计里带透明度的线（滚动条滑块）按 rgba 字面量写，是同解门禁仅有的例外。 */
 
 /* ---- 面：只有具名的根与卡片铺底。裸 QWidget 一律不铺——铺了就是每个子控件各画一块底 ---- */
 QWidget#appRoot {
-    background-color: #121517;
+    background-color: #0B0B0A;
 }
 
-/* 阅读面（设置页卡片）：深色档的近黑面 + 细描边，圆角对齐浅色档 */
+/* 阅读面（设置页卡片）：无描边，靠 surface 与窗口底的微明度差分层；圆角对齐浅色档 */
 QWidget#pageCard {
-    background-color: #1B1F21;
-    border: 1px solid #232527;
+    background-color: #151515;
+    border: none;
     border-radius: 20px;
 }
 
-/* 悬浮条（录屏控制条、标注工具栏）：浮层档，圆角比阅读面收一档；
-   Qt 的样式表没有投影，浮层靠描边与底色分出来 */
+/* 悬浮条（录屏控制条、标注工具栏）：浮层压在任意内容上，保留一条 borderStrong 微边缘；
+   Qt 的样式表没有投影，浮层靠这条边缘与底色分出来 */
 QWidget#hudRoot, QWidget#AnnotationToolbar {
-    background-color: #1B1F21;
-    border: 1px solid #232527;
+    background-color: #151515;
+    border: 1px solid #2A2A28;
     border-radius: 16px;
 }
 
 /* ---- 文字颜色层级（字号见 applyTextRole） ---- */
 QLabel#pageHint {
-    color: #B0BABD;
+    color: #B0B0AA;
 }
 
 QLabel#metricValue {
-    color: #EEF2F1;
+    color: #E8E8E3;
 }
 
 QLabel:disabled {
-    color: #B0BABD;
+    color: #B0B0AA;
 }
 
-/* ---- 按钮：次级是透明底 + 一档常驻描边（平时也看得见边界），悬停只换底；
-        主按钮（default）走主色填充。次级按钮的边框宽度不随状态变化 ---- */
+/* ---- 按钮：次级按钮静息是 controlFill 填充、无可见描边，悬停只换底；
+        1px 透明边框是总高 30 的占位，悬停与禁用状态只换底不改尺寸；
+        主按钮（default）走主色填充 ---- */
 QPushButton {
-    background-color: transparent;
-    color: #EEF2F1;
-    border: 1px solid #323537;
+    background-color: #1A1A19;
+    color: #E8E8E3;
+    border: 1px solid transparent;
     border-radius: 12px;
     padding: 0 15px;
     min-height: 28px;
 }
 
 QPushButton:hover {
-    background-color: #262A2C;
-    border-color: #323537;
+    background-color: #20201E;
+    border-color: transparent;
 }
 
 QPushButton:pressed {
-    background-color: #2D3133;
-    border-color: #323537;
-}
-
-QPushButton:focus {
-    border-color: #4C8DFF;
+    background-color: #262624;
+    border-color: transparent;
 }
 
 QPushButton:disabled {
-    background-color: transparent;
-    color: #B0BABD;
-    border-color: #232527;
+    background-color: #111110;
+    color: #B0B0AA;
+    border-color: transparent;
 }
 
 QPushButton:default {
     background-color: #4C8DFF;
-    color: #0B1220;
-    border: 2px solid #4C8DFF;
+    color: #0B0B0A;
+    border: 1px solid transparent;
 }
 
 QPushButton:default:hover {
     background-color: #3D7FF2;
-    border-color: #3D7FF2;
 }
 
 QPushButton:default:pressed {
-    background-color: #4C8DFF;
+    background-color: #3D7FF2;
 }
 
 QPushButton:default:disabled {
-    background-color: #15181A;
-    color: #B0BABD;
+    background-color: #111110;
+    color: #B0B0AA;
     border-color: transparent;
 }
 
-/* ---- 工具按钮：平时透明，只在悬停/选中时给出底 ---- */
+/* ---- 工具按钮：平时透明，只在悬停/选中时给出底；选中不描边 ---- */
 QToolButton {
     background-color: transparent;
-    color: #EEF2F1;
+    color: #E8E8E3;
     border: 1px solid transparent;
     border-radius: 8px;
     padding: 2px;
@@ -100,20 +96,16 @@ QToolButton {
 }
 
 QToolButton:hover {
-    background-color: #262A2C;
+    background-color: #20201E;
 }
 
 QToolButton:pressed {
-    background-color: #2D3133;
-}
-
-QToolButton:focus {
-    border-color: #4C8DFF;
+    background-color: #262624;
 }
 
 QToolButton:checked {
-    background-color: #233145;
-    border-color: #4C8DFF;
+    background-color: #22344D;
+    border-color: transparent;
 }
 
 QToolButton:disabled {
@@ -132,69 +124,76 @@ QToolButton#annotationColorButton::menu-indicator {
     image: none;
 }
 
-/* ---- 输入类：描边比分隔线重一档，好让「能填的」一眼分得出 ---- */
+/* 标注工具栏的紧凑焦点：26px 档不装 6px 双环，只把 1px 透明边框换成主色，尺寸不跳 */
+QWidget#AnnotationToolbar QLineEdit:focus,
+QWidget#AnnotationToolbar QComboBox:focus,
+QWidget#AnnotationToolbar QSpinBox:focus,
+QWidget#AnnotationToolbar QPushButton:focus,
+QWidget#AnnotationToolbar QToolButton:focus {
+    border-color: #4C8DFF;
+}
+
+/* ---- 输入类：静息 controlFill 填充、无可见描边；1px 透明边框占位，总高 32 ---- */
 QLineEdit, QComboBox, QSpinBox {
-    background-color: #1B1F21;
-    color: #EEF2F1;
-    border: 1px solid #323537;
+    background-color: #1A1A19;
+    color: #E8E8E3;
+    border: 1px solid transparent;
     border-radius: 12px;
     padding: 0 12px;
     min-height: 30px;
-    selection-background-color: #273956;
-    selection-color: #EEF2F1;
+    selection-background-color: #2A3B57;
+    selection-color: #E8E8E3;
 }
 
-QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
-    border: 2px solid #4C8DFF;
+/* 数字框的 sizeHint 另带上下各 2px 的自有框：共用 30px 内容高会顶到 36，
+   内容高收到 26 才能与单行输入一样落在总高 32 */
+QSpinBox {
+    min-height: 26px;
 }
 
 QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled {
-    background-color: #15181A;
-    color: #B0BABD;
-    border-color: #232527;
+    background-color: #111110;
+    color: #B0B0AA;
+    border-color: transparent;
 }
 
 QLineEdit:read-only {
-    background-color: #15181A;
-    color: #B0BABD;
+    background-color: #111110;
+    color: #B0B0AA;
 }
 
-/* ---- 快捷键录制框：与输入框同一套外观；录制态把描边换成主色 ---- */
+/* ---- 快捷键录制框：与输入框同一套外观，静息走 controlFill；录制态把底与描边换成主色 ---- */
 QLabel#hotkeyDisplay {
-    background-color: #1B1F21;
-    color: #EEF2F1;
-    border: 1px solid #323537;
+    background-color: #1A1A19;
+    color: #E8E8E3;
+    border: 1px solid transparent;
     border-radius: 12px;
     padding: 0 12px;
     min-height: 30px;
 }
 
 QLabel#hotkeyDisplay[recording="true"] {
-    border: 2px solid #4C8DFF;
-    padding: 0 11px;
+    background-color: #22344D;
+    border-color: #4C8DFF;
 }
 
 QLabel#hotkeyDisplay:disabled {
-    background-color: #15181A;
-    color: #B0BABD;
-    border-color: #232527;
+    background-color: #111110;
+    color: #B0B0AA;
+    border-color: transparent;
 }
 
 /* ---- 标注窗的行内文字输入框：与上面几档输入框同形，别把识别结果区的宽内边距带进去 ----
    上下内边距为零是标注输入框高度算式的前提（AnnotationView::resizeTextEditorToContent 只补边框与余量），
    改这里的 padding 要同步改那边 */
 QTextEdit#annotationTextEditor {
-    background-color: #1B1F21;
-    color: #EEF2F1;
-    border: 1px solid #323537;
+    background-color: #1A1A19;
+    color: #E8E8E3;
+    border: 1px solid transparent;
     border-radius: 12px;
     padding: 0 8px;
-    selection-background-color: #273956;
-    selection-color: #EEF2F1;
-}
-
-QTextEdit#annotationTextEditor:focus {
-    border: 2px solid #4C8DFF;
+    selection-background-color: #2A3B57;
+    selection-color: #E8E8E3;
 }
 
 /* 下拉箭头走 styles 下的 chevron：与自绘微调框同一笔画，不再让原生风格画方角箭头 */
@@ -217,14 +216,14 @@ QComboBox::down-arrow {
 }
 
 QComboBox QAbstractItemView {
-    background-color: #1B1F21;
-    color: #EEF2F1;
-    border: 1px solid #232527;
+    background-color: #151515;
+    color: #E8E8E3;
+    border: 1px solid #2A2A28;
     border-radius: 12px;
     padding: 6px;
     outline: none;
-    selection-background-color: #233145;
-    selection-color: #EEF2F1;
+    selection-background-color: #22344D;
+    selection-color: #E8E8E3;
 }
 
 QComboBox QAbstractItemView::item {
@@ -234,7 +233,7 @@ QComboBox QAbstractItemView::item {
 }
 
 QComboBox QAbstractItemView::item:hover {
-    background-color: #262A2C;
+    background-color: #20201E;
 }
 
 /* 微调框的上下箭头由 Gui::SpinBox 自绘；下拉箭头用 styles 下的 chevron（见上面 QComboBox::down-arrow），
@@ -242,42 +241,48 @@ QComboBox QAbstractItemView::item:hover {
 /* 勾选框自己画：勾的形状是 Resources/Styles 下的两份 SVG，深色档压的是深色对勾 */
 QCheckBox {
     spacing: 8px;
-    color: #EEF2F1;
+    color: #E8E8E3;
     min-height: 22px;
 }
 
 QCheckBox::indicator {
     width: 18px;
     height: 18px;
-    background-color: #1B1F21;
-    border: 1px solid rgba(255, 255, 255, 0.22);
+    background-color: #1A1A19;
+    border: 1px solid transparent;
     border-radius: 5px;
 }
 
 QCheckBox::indicator:hover {
-    border-color: #4C8DFF;
+    background-color: #20201E;
+    border-color: #2A2A28;
 }
 
 QCheckBox::indicator:checked {
     background-color: #4C8DFF;
-    border-color: #4C8DFF;
+    border-color: transparent;
     image: url(:/styles/CheckmarkOnAccentDark.svg);
 }
 
 QCheckBox::indicator:disabled {
-    background-color: #15181A;
-    border-color: #232527;
+    background-color: #111110;
+    border-color: transparent;
 }
 
 QCheckBox:disabled {
-    color: #B0BABD;
+    color: #B0B0AA;
+}
+
+/* 自绘复选框把静态勾图关掉：勾由 Gui::CheckBox 按 onAccent 画，方框仍走上面的底色与圆角 */
+QCheckBox[animatedIndicator="true"]::indicator:checked {
+    image: none;
 }
 
 /* ---- 滑块：槽给一档描边，已走过的部分用主色 ---- */
 QSlider::groove:horizontal {
     height: 6px;
-    background-color: #15181A;
-    border: 1px solid #232527;
+    background-color: #111110;
+    border: 1px solid #242422;
     border-radius: 4px;
 }
 
@@ -292,7 +297,7 @@ QSlider::handle:horizontal {
     height: 14px;
     margin: -6px -2px;
     background-color: #4C8DFF;
-    border: 2px solid #1B1F21;
+    border: 2px solid #151515;
     border-radius: 9px;
 }
 
@@ -301,22 +306,22 @@ QSlider::handle:horizontal:hover {
 }
 
 QSlider:disabled::groove:horizontal {
-    background-color: #232527;
+    background-color: #242422;
 }
 
 QSlider:disabled::sub-page:horizontal {
-    background-color: #323537;
+    background-color: #2A2A28;
 }
 
 QSlider:disabled::handle:horizontal {
-    background-color: #323537;
-    border-color: #1B1F21;
+    background-color: #2A2A28;
+    border-color: #151515;
 }
 
 /* ---- 菜单与工具提示：弹层比卡片再圆一点，靠描边而不是阴影分层 ---- */
 QMenu {
-    background-color: #1B1F21;
-    border: 1px solid #232527;
+    background-color: #151515;
+    border: 1px solid #2A2A28;
     border-radius: 16px;
     padding: 4px;
 }
@@ -324,36 +329,36 @@ QMenu {
 QMenu::item {
     padding: 4px 18px 4px 8px;
     border-radius: 8px;
-    color: #EEF2F1;
+    color: #E8E8E3;
 }
 
 QMenu::item:selected {
-    background-color: #262A2C;
-    color: #EEF2F1;
+    background-color: #20201E;
+    color: #E8E8E3;
 }
 
 QMenu::item:disabled {
-    color: #B0BABD;
+    color: #B0B0AA;
 }
 
 QMenu::separator {
     height: 1px;
-    background-color: #232527;
+    background-color: #242422;
     margin: 2px 6px;
 }
 
 QToolTip {
-    background-color: #1B1F21;
-    color: #EEF2F1;
-    border: 1px solid #323537;
+    background-color: #151515;
+    color: #E8E8E3;
+    border: 1px solid #2A2A28;
     border-radius: 8px;
     padding: 4px 8px;
 }
 
 /* ---- 列表：导航侧栏与历史列表共用一套项形状 ---- */
 QListWidget {
-    background-color: #1B1F21;
-    border: 1px solid #232527;
+    background-color: #151515;
+    border: none;
     border-radius: 16px;
     padding: 6px;
     outline: none;
@@ -363,19 +368,18 @@ QListWidget::item {
     min-height: 26px;
     padding: 4px 8px;
     margin: 1px 2px;
-    border: 1px solid transparent;
+    border: none;
     border-radius: 8px;
-    color: #EEF2F1;
+    color: #E8E8E3;
 }
 
 QListWidget::item:hover {
-    background-color: #262A2C;
+    background-color: #20201E;
 }
 
 QListWidget::item:selected {
-    background-color: #233145;
-    border-color: #4C8DFF;
-    color: #EEF2F1;
+    background-color: #22344D;
+    color: #E8E8E3;
 }
 
 QListWidget#settingsNav {
@@ -401,18 +405,18 @@ QScrollArea#settingsScroll > QWidget {
 
 /* ---- 文本区（识别结果） ---- */
 QTextEdit {
-    background-color: #1B1F21;
-    color: #EEF2F1;
-    border: 1px solid #232527;
+    background-color: #1A1A19;
+    color: #E8E8E3;
+    border: none;
     border-radius: 16px;
     padding: 8px;
-    selection-background-color: #273956;
-    selection-color: #EEF2F1;
+    selection-background-color: #2A3B57;
+    selection-color: #E8E8E3;
 }
 
 /* ---- 工具栏分段用的竖线，代码里按对象名给出 ---- */
 QFrame#toolbarSeparator {
-    background-color: #232527;
+    background-color: #242422;
     max-width: 1px;
     min-width: 1px;
 }
@@ -425,13 +429,13 @@ QScrollBar:vertical {
 }
 
 QScrollBar::handle:vertical {
-    background-color: rgba(255, 255, 255, 0.14);
+    background-color: rgba(232, 232, 227, 0.14);
     border-radius: 4px;
     min-height: 24px;
 }
 
 QScrollBar::handle:vertical:hover {
-    background-color: rgba(255, 255, 255, 0.28);
+    background-color: rgba(232, 232, 227, 0.28);
 }
 
 QScrollBar:horizontal {
@@ -441,13 +445,13 @@ QScrollBar:horizontal {
 }
 
 QScrollBar::handle:horizontal {
-    background-color: rgba(255, 255, 255, 0.14);
+    background-color: rgba(232, 232, 227, 0.14);
     border-radius: 4px;
     min-width: 24px;
 }
 
 QScrollBar::handle:horizontal:hover {
-    background-color: rgba(255, 255, 255, 0.28);
+    background-color: rgba(232, 232, 227, 0.28);
 }
 
 QScrollBar::add-line, QScrollBar::sub-line {
@@ -459,14 +463,10 @@ QScrollBar::add-page, QScrollBar::sub-page {
     background-color: transparent;
 }
 
-/* ---- 键盘焦点：勾选框与滑块此前都没有 :focus 形态（界面审查 UI-53）——Tab 过去外观不变，
-        高对比度档正是给键盘可辨识用的。勾选框给指示器换主色描边；滑块因控件级边框在
-        CC_Slider 的自绘路径里不落笔，焦点改挂在手柄上反转：底色芯 + 正文色圈 ---- */
-QCheckBox::indicator:focus {
-    border: 2px solid #4C8DFF;
-}
-
+/* ---- 键盘焦点：勾选框与输入类的焦点由 Gui::FocusRingController 的覆盖层画；
+        滑块因控件级边框在 CC_Slider 的自绘路径里不落笔，焦点改挂在手柄上反转：
+        底色芯 + 正文色圈 ---- */
 QSlider::handle:horizontal:focus {
-    background-color: #1B1F21;
-    border: 2px solid #EEF2F1;
+    background-color: #151515;
+    border: 2px solid #E8E8E3;
 }

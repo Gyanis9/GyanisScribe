@@ -2,15 +2,23 @@
 
 #include "Base/Logger.h"
 #include "Base/Text.h"
+#include "Gui/Controls/StreamingText.h"
 #include "Gui/Resources/IconProvider.h"
+#include "Gui/Theme/Motion.h"
 #include "Gui/Theme/ThemeManager.h"
 
+#include <QEvent>
+#include <QFontInfo>
+#include <QFontMetrics>
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QPainter>
+#include <QPixmap>
 #include <QPointer>
 #include <QScreen>
 #include <QTimer>
+#include <QVBoxLayout>
 #include <QWindow>
 
 #include <algorithm>
@@ -57,6 +65,112 @@ namespace GyanisScribe::Gui
         return {x, y};
     }
 
+    bool shouldStreamToast(const ToastKind kind, const bool animationsEnabled) noexcept
+    {
+        return animationsEnabled && kind != ToastKind::Danger;
+    }
+
+    int iconTextTopPad(const int iconHeight, const int ascent, const int emHeight, const int iconMargin) noexcept
+    {
+        return std::max(0, qRound(iconMargin + iconHeight - ascent - 0.125 * emHeight));
+    }
+
+    namespace
+    {
+        /**
+         * @brief 气泡左侧的种类图标
+         * @details 成功提示从 0.6 弹到 1.0；四周留出 6px，过冲到约 1.08 倍时字形仍在控件内。
+         */
+        class SpringIcon final : public QWidget
+        {
+        public:
+            /// 图标四周的留白，逻辑像素
+            static constexpr int kMargin = 6;
+
+            /**
+             * @brief 构造图标控件
+             * @param parent Qt 父控件
+             */
+            explicit SpringIcon(QWidget *parent = nullptr) : QWidget{parent}
+            {
+                setAttribute(Qt::WA_TransparentForMouseEvents);
+                setFocusPolicy(Qt::NoFocus);
+                setAccessibleName(GyanisScribe::Base::uiText("提示图标"));
+                m_scale.setSpec(kPopSpring);
+                m_scale.setImmediate(1.0);
+                QObject::connect(&m_scale, &SpringValue::valueChanged, this, [this](qreal) { update(); });
+            }
+
+            /**
+             * @brief 换一枚图标
+             * @param pixmap 已按语义色光栅化的位图
+             * @details 尺寸随位图逻辑尺寸加两侧留白固定下来，布局不会因为换图标而跳。
+             */
+            void setPixmap(const QPixmap &pixmap)
+            {
+                m_icon = pixmap;
+                setFixedSize(sizeHint());
+                update();
+            }
+
+            /// 从 0.6 弹到 1.0；动画关闭时直接停在终值，不闪一下 0.6
+            void pop()
+            {
+                if (!m_scale.animationsEnabled())
+                {
+                    m_scale.setImmediate(1.0);
+                    return;
+                }
+                m_scale.setImmediate(0.6);
+                m_scale.animateTo(1.0);
+            }
+
+            /// 收回终值：上一条成功提示的弹簧还在跑时，换到不弹的种类不能接着播
+            void reset()
+            {
+                m_scale.setImmediate(1.0);
+            }
+
+            /**
+             * @brief 图标控件的建议尺寸
+             * @return 位图的逻辑尺寸加两侧留白；位图为空时为零
+             */
+            [[nodiscard]] QSize sizeHint() const override
+            {
+                if (m_icon.isNull())
+                {
+                    return {};
+                }
+                const auto logical = m_icon.deviceIndependentSize().toSize();
+                return logical + QSize{2 * kMargin, 2 * kMargin};
+            }
+
+        protected:
+            /**
+             * @brief 按当前弹簧比例居中画图标
+             * @details 重写 QWidget::paintEvent()：缩放围绕控件中心，字形不会从左上角往外长；
+             *          目标矩形按位图的逻辑尺寸算，高 DPI 副本不会被按物理像素放大一圈。
+             */
+            void paintEvent(QPaintEvent *) override
+            {
+                if (m_icon.isNull())
+                {
+                    return;
+                }
+                QPainter painter{this};
+                painter.setRenderHint(QPainter::SmoothPixmapTransform);
+                const QSizeF logical = m_icon.deviceIndependentSize();
+                const QSizeF scaled  = logical * m_scale.value();
+                const QRectF target{(width() - scaled.width()) / 2.0, (height() - scaled.height()) / 2.0, scaled.width(), scaled.height()};
+                painter.drawPixmap(target, m_icon, QRectF{QPointF(0.0, 0.0), QSizeF(m_icon.size())});
+            }
+
+        private:
+            QPixmap     m_icon;  ///< 按语义色光栅化的图标
+            SpringValue m_scale; ///< 入场缩放，静息为 1.0
+        };
+    } // namespace
+
     /// 气泡本体：一个无边框、不抢焦点的顶层小窗
     class Toast::Bubble : public QWidget
     {
@@ -68,37 +182,92 @@ namespace GyanisScribe::Gui
             setAccessibleName(GyanisScribe::Base::uiText("提示"));
 
             auto *layout = new QHBoxLayout{this};
-            layout->setContentsMargins(kToastIconSpacing, kToastIconSpacing, kToastIconSpacing * 2, kToastIconSpacing);
-            layout->setSpacing(kToastIconSpacing);
+            // 图标自带 kMargin 的过冲余量：从外边距与间距里扣掉，字形离气泡边、离文字仍是 8px
+            layout->setContentsMargins(kToastIconSpacing - SpringIcon::kMargin, kToastIconSpacing - SpringIcon::kMargin, kToastIconSpacing * 2, kToastIconSpacing);
+            layout->setSpacing(kToastIconSpacing - SpringIcon::kMargin);
 
-            m_icon = new QLabel{this};
-            m_icon->setAccessibleName(GyanisScribe::Base::uiText("提示图标"));
-            m_text = new QLabel{this};
+            m_icon = new SpringIcon{this};
+
+            auto *textColumn   = new QWidget{this};
+            auto *columnLayout = new QVBoxLayout{textColumn};
+            // 气泡的底色与胶囊描边只画在气泡上，文字列保持透明
+            textColumn->setStyleSheet(QStringLiteral("background: transparent; border: none;"));
+            columnLayout->setSpacing(0);
+
+            m_text = new QLabel{textColumn};
             m_text->setWordWrap(true);
             m_text->setTextInteractionFlags(Qt::TextSelectableByMouse);
-            layout->addWidget(m_icon);
-            layout->addWidget(m_text);
+            // 覆盖层从标签左上角画起，原生文字也钉在同一处，动画收尾时不会跳一行
+            m_text->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+            const QFont font = m_text->font();
+            // em 高取真实像素字号；QFontMetrics::height() 是行距，会把 -0.125em 的契约撑大
+            m_iconTextPad = iconTextTopPad(static_cast<int>(IconSize::Medium), QFontMetrics{font}.ascent(), QFontInfo{font}.pixelSize(), SpringIcon::kMargin);
+            columnLayout->setContentsMargins(0, m_iconTextPad, 0, 0);
+            columnLayout->addWidget(m_text);
+
+            layout->addWidget(m_icon, 0, Qt::AlignTop);
+            layout->addWidget(textColumn, 1);
         }
 
-        void setText(const QString &text, const ToastKind kind)
+        /**
+         * @brief 换一段文字、种类与图标
+         * @param text 提示正文
+         * @param kind 提示种类，决定语义色与图标
+         * @param devicePixelRatio 目标屏幕的缩放比
+         * @details 图标按目标屏幕的倍比取图，不能读气泡自己的 devicePixelRatioF：气泡在 setText
+         *          时还没显示、也还没定屏，混合 DPI 的副屏会拿到主屏的比例而糊掉。
+         *          尺寸仍按位图的逻辑尺寸算，高 DPI 只影响清晰度，不改变布局。
+         */
+        void setText(const QString &text, const ToastKind kind, const qreal devicePixelRatio)
         {
+            // 旧覆盖层的定时器还在跑，先收掉，否则它会把新文字重新盖住
+            removeOverlay();
+            m_kind = kind;
+
             const auto accent = toastColorFor(kind, m_currentPalette);
+            m_iconTint        = accent;
 
             m_text->setText(text);
             m_text->setStyleSheet(QStringLiteral("color: %1; background: transparent;").arg(accent.name(QColor::HexRgb)));
             // 图标跟着种类换：颜色一样时，认图形比认文字快
             const auto iconName = kind == ToastKind::Success ? std::string_view{"Check"} : (kind == ToastKind::Danger ? "Warning" : "Info");
-            m_icon->setPixmap(m_icons.pixmap(iconName, IconSize::Medium));
-            m_icon->setFixedSize(QSize{static_cast<int>(IconSize::Medium), static_cast<int>(IconSize::Medium)});
+            m_icon->setPixmap(m_icons.pixmap(iconName, IconSize::Medium, devicePixelRatio, accent));
         }
 
         void setPalette(const ThemePalette &palette)
         {
             m_currentPalette = palette;
-            // 背景走面板色、边框走语义边框色：气泡是浮层，需求允许轻量阴影但禁玻璃拟态；
-            // 圆角取胶囊档（与珍珠玻璃的提示形状同形）——半高以上的大圆角由 Qt 按高度收敛
+            // 背景走面板色、边框走浮层微边缘那一档（borderStrong）：气泡是浮层，不铺投影，
+            // 靠这一圈细边与底下的内容分开；圆角取胶囊档——半高以上的大圆角由 Qt 按高度收敛
             setStyleSheet(QStringLiteral("background-color: %1; border: 1px solid %2; border-radius: 999px;")
-                                  .arg(m_currentPalette.surface.name(QColor::HexRgb), m_currentPalette.border.name(QColor::HexRgb)));
+                                  .arg(m_currentPalette.surface.name(QColor::HexRgb), m_currentPalette.borderStrong.name(QColor::HexRgb)));
+        }
+
+        /**
+         * @brief 播放入场动效
+         * @param animate 是否允许动画；false 时图标直接到 1.0，也不出流式覆盖层
+         */
+        void startMotion(const bool animate)
+        {
+            if (m_kind == ToastKind::Success)
+            {
+                m_icon->pop();
+            }
+            else
+            {
+                // 上一条成功提示的弹簧可能还在跑：不收回终值，信息与错误图标会凭空弹一下
+                m_icon->reset();
+            }
+            if (!shouldStreamToast(m_kind, animate) || m_text->text().isEmpty())
+            {
+                return;
+            }
+            m_overlay = new StreamingTextOverlay{m_text, m_text->text(), m_text->font(), toastColorFor(m_kind, m_currentPalette), m_currentPalette.surface};
+            m_overlay->setGeometry(m_text->rect());
+            m_overlay->show();
+            m_overlay->raise();
+            QObject::connect(m_overlay.data(), &StreamingTextOverlay::finished, m_overlay.data(), &QObject::deleteLater);
+            m_overlay->start();
         }
 
         [[nodiscard]] QString currentText() const
@@ -106,15 +275,99 @@ namespace GyanisScribe::Gui
             return m_text->text();
         }
 
+        [[nodiscard]] bool hasStreamingOverlay() const
+        {
+            return m_overlay != nullptr && !m_overlay->isFinished();
+        }
+
+        [[nodiscard]] int streamingOverlayCount() const
+        {
+            return static_cast<int>(m_text->findChildren<StreamingTextOverlay *>().size());
+        }
+
+        [[nodiscard]] QColor currentIconTint() const
+        {
+            return m_iconTint;
+        }
+
+        [[nodiscard]] int currentIconTextPad() const
+        {
+            return m_iconTextPad;
+        }
+
+        /**
+         * @brief 把覆盖层的流式动画向前推指定毫秒
+         * @param milliseconds 本次推进的毫秒数
+         * @details 时间轴到头后覆盖层会先停一帧再收工；测试读口顺手把这一帧走掉，
+         *          相当于 16ms 后的那次 tick，用例不必等真实时钟。
+         */
+        void advanceStreamingForTesting(const int milliseconds)
+        {
+            if (m_overlay == nullptr || m_overlay->isFinished())
+            {
+                return;
+            }
+            m_overlay->advanceForTesting(milliseconds);
+            if (m_overlay != nullptr && !m_overlay->isFinished())
+            {
+                m_overlay->advanceForTesting(0);
+            }
+        }
+
+    protected:
+        /**
+         * @brief 气泡隐藏时收掉流式覆盖层
+         * @details 重写 QWidget::hideEvent()：覆盖层的帧定时器不随气泡隐藏停下，
+         *          留着会继续推进并在下一次显示时盖住新文字。
+         * @param event 隐藏事件
+         */
+        void hideEvent(QHideEvent *event) override
+        {
+            removeOverlay();
+            QWidget::hideEvent(event);
+        }
+
     private:
-        IconProvider &m_icons;            ///< 图标出口，不拥有
-        QLabel       *m_icon = nullptr;   ///< 种类图标
-        QLabel       *m_text = nullptr;   ///< 提示正文
-        ThemePalette  m_currentPalette{}; ///< 当前主题的语义色，由 Toast 在显示前灌进来
+        /// 立刻销毁流式覆盖层，并让指针回到空
+        void removeOverlay()
+        {
+            if (m_overlay == nullptr)
+            {
+                return;
+            }
+            m_overlay->hide();
+            delete m_overlay.data();
+        }
+
+        IconProvider                  &m_icons;                         ///< 图标出口，不拥有
+        SpringIcon                    *m_icon = nullptr;                ///< 种类图标
+        QLabel                        *m_text = nullptr;                ///< 提示正文，流式层收工后露出的真身
+        QPointer<StreamingTextOverlay> m_overlay;                       ///< 流式覆盖层，只在动画期间存在
+        ToastKind                      m_kind      = ToastKind::Information; ///< 当前提示的种类
+        QColor                         m_iconTint;                           ///< 当前图标的描边色，等于该条提示的语义色
+        int                            m_iconTextPad = 0;                    ///< 文字列的上边距，按标签真实字体算出
+        ThemePalette                   m_currentPalette{};                   ///< 当前主题的语义色，由 Toast 在显示前灌进来
     };
 
     Toast::Toast(IconProvider &icons, const ThemeManager &theme, QObject *parent) : QObject(parent), m_icons(icons), m_theme(theme)
     {
+        // 一个成员定时器服务所有提示：每条 show 都重启它，第一条的期限因此推不掉第二条。
+        // 逐条 singleShot 时，旧提示到点仍会按自己的闭包把新气泡藏掉
+        m_hideTimer.setSingleShot(true);
+        QObject::connect(&m_hideTimer, &QTimer::timeout, this,
+                         [this]
+                         {
+                             if (m_bubble != nullptr)
+                             {
+                                 m_bubble->hide();
+                             }
+                         });
+    }
+
+    Toast::~Toast()
+    {
+        // 气泡是没有父控件的顶层窗口：提示器销毁时它不会自己跟着走
+        delete m_bubble;
     }
 
     void Toast::show(const QString &text, const ToastKind kind, const QRect &screenAvailable)
@@ -137,29 +390,68 @@ namespace GyanisScribe::Gui
         // 每次显示都现取主题色：主题刚换过就冒出来的提示不能还穿着旧衣
         m_bubble->setStyleSheet({});
         m_bubble->setPalette(m_theme.palette());
-        m_bubble->setText(text, kind);
+        // 图标按目标屏幕的倍比取图：气泡这时还没显示，devicePixelRatioF() 只会给主屏的比例，
+        // 混合 DPI 的副屏上图标会被按逻辑像素放大糊掉
+        qreal targetPixelRatio = 1.0;
+        const QScreen *targetScreen = available.isEmpty() ? nullptr : QGuiApplication::screenAt(available.center());
+        if (targetScreen == nullptr)
+        {
+            targetScreen = QGuiApplication::primaryScreen();
+        }
+        if (targetScreen != nullptr)
+        {
+            targetPixelRatio = targetScreen->devicePixelRatio();
+        }
+        m_bubble->setText(text, kind, targetPixelRatio);
         m_bubble->adjustSize();
         const auto width = std::clamp(m_bubble->sizeHint().width(), kToastMinimumWidth, kToastMaximumWidth);
         m_bubble->resize(width, m_bubble->sizeHint().height());
         m_bubble->move(toastPositionFor(available, m_bubble->size()));
         m_bubble->show();
         m_bubble->raise();
+        // 几何落定、标签排好版之后才播：覆盖层按标签矩形建层
+        m_bubble->startMotion(animationsEnabled());
 
-        // 新提示顶掉旧的气泡：排队会让三秒前的操作看起来像刚发生
-        QPointer<Bubble> guard{m_bubble};
-        QTimer::singleShot(kToastVisibleMs, this,
-                           [guard]
-                           {
-                               if (guard != nullptr)
-                               {
-                                   guard->hide();
-                               }
-                           });
+        // 新提示顶掉旧的气泡，同时重启隐藏期限：排队会让三秒前的操作看起来像刚发生
+        m_hideTimer.start(m_visibleDurationMs);
     }
 
     QString Toast::currentText() const
     {
         return m_bubble == nullptr ? QString{} : m_bubble->currentText();
+    }
+
+    bool Toast::hasStreamingOverlay() const
+    {
+        return m_bubble != nullptr && m_bubble->hasStreamingOverlay();
+    }
+
+    int Toast::streamingOverlayCount() const
+    {
+        return m_bubble == nullptr ? 0 : m_bubble->streamingOverlayCount();
+    }
+
+    QColor Toast::currentIconTint() const
+    {
+        return m_bubble == nullptr ? QColor{} : m_bubble->currentIconTint();
+    }
+
+    int Toast::currentIconTextPad() const
+    {
+        return m_bubble == nullptr ? 0 : m_bubble->currentIconTextPad();
+    }
+
+    void Toast::advanceStreamingForTesting(const int milliseconds)
+    {
+        if (m_bubble != nullptr)
+        {
+            m_bubble->advanceStreamingForTesting(milliseconds);
+        }
+    }
+
+    void Toast::setVisibleDurationForTesting(const int milliseconds)
+    {
+        m_visibleDurationMs = std::max(1, milliseconds);
     }
 
 } // namespace GyanisScribe::Gui

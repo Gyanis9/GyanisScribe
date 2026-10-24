@@ -132,8 +132,14 @@ namespace GyanisScribe::Gui
 
     QPixmap IconProvider::pixmap(const std::string_view name, const IconSize size, const qreal devicePixelRatio) const
     {
-        const auto tint = tintColor();
-        if (!tint.isValid())
+        return pixmap(name, size, devicePixelRatio, tintColor());
+    }
+
+    QPixmap IconProvider::pixmap(const std::string_view name, const IconSize size, const qreal devicePixelRatio, const QColor &tint) const
+    {
+        // 显式色无效时跟随主题：调用方拿到的仍是可见图标，而不是一片透明
+        const auto effectiveTint = tint.isValid() ? tint : tintColor();
+        if (!effectiveTint.isValid())
         {
             GyanisScribe::Base::Logger::error(std::format("图标 {} 取不到描边色：既没有设置主题色，也没有可用的应用对象", name));
             return {};
@@ -141,7 +147,7 @@ namespace GyanisScribe::Gui
 
         // 缩放比先夹定再进键：9.0 与 3.0 说的是同一份像素，各存一格会让同一枚图标重复光栅化
         const auto    ratio = std::clamp(devicePixelRatio, 1.0, 3.0);
-        const QString key   = pixmapCacheKey(name, size, tint, ratio);
+        const QString key   = pixmapCacheKey(name, size, effectiveTint, ratio);
         // 命中就一次文件读与一次解析都不做：录屏 HUD 每存一帧都按状态重挂暂停按钮的图标，
         // 一枚图标是四档尺寸 × 若干缩放比，逐帧重画纯属白干
         if (const auto cached = m_pixmapCache.constFind(key); cached != m_pixmapCache.constEnd())
@@ -149,7 +155,7 @@ namespace GyanisScribe::Gui
             return cached.value();
         }
 
-        const auto source = loadTintedSource(name, tint);
+        const auto source = loadTintedSource(name, effectiveTint);
         if (source.isEmpty())
         {
             GyanisScribe::Base::Logger::error(std::format("图标 {} 不在资源里：请把同名 SVG 放进 src/Gui/Resources/Icons 并更新 AppResources.qrc，"

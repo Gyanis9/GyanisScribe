@@ -12,6 +12,7 @@
 #include <QApplication>
 #include <QColor>
 #include <QFile>
+#include <QFont>
 #include <QImage>
 #include <string_view>
 #include <tuple>
@@ -20,6 +21,7 @@
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QString>
+#include <QStringList>
 #include <QVariant>
 
 #include <algorithm>
@@ -29,6 +31,7 @@
 #include <fstream>
 #include <initializer_list>
 #include <memory>
+#include <set>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QFormLayout>
@@ -54,10 +57,14 @@ using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Base::Logger;
 using GyanisScribe::Core::kThemeMode;
 using GyanisScribe::Core::SettingsStore;
+using GyanisScribe::Gui::applyTextRole;
 using GyanisScribe::Gui::paletteFor;
 using GyanisScribe::Gui::parseThemeKind;
 using GyanisScribe::Gui::resolveThemeKind;
+using GyanisScribe::Gui::setVariableMetricFamilyAvailableForTesting;
 using GyanisScribe::Gui::SystemScheme;
+using GyanisScribe::Gui::TextRole;
+using GyanisScribe::Gui::TextScript;
 using GyanisScribe::Gui::ThemeKind;
 using GyanisScribe::Gui::themeKindText;
 using GyanisScribe::Gui::ThemeManager;
@@ -101,6 +108,68 @@ namespace
             return {};
         }
         return QString::fromUtf8(file.readAll());
+    }
+
+    /**
+     * @brief 抽出样式表里所有带 :focus 的选择器，逐个逗号分支拆开
+     * @param sheet 样式表原文
+     * @return 已简化的选择器文本；每条至少含一个 :focus
+     * @details 直接搜全文会把 `QWidget#AnnotationToolbar QPushButton:focus` 里的
+     *          `QPushButton:focus` 也算成控件级焦点，判据必须按选择器分支看前缀。
+     */
+    QStringList focusSelectorsIn(const QString &sheet)
+    {
+        QStringList             selectors;
+        const QRegularExpression rule{QStringLiteral(R"(([^{}]*:focus[^{}]*)\{)")};
+        for (auto match = rule.match(sheet); match.hasMatch(); match = rule.match(sheet, match.capturedEnd()))
+        {
+            for (const auto &branch: match.captured(1).split(QLatin1Char(',')))
+            {
+                const auto selector = branch.simplified();
+                if (selector.contains(QStringLiteral(":focus")))
+                {
+                    selectors.append(selector);
+                }
+            }
+        }
+        return selectors;
+    }
+
+    /// 读一份仓库内的源文件：源目录由 CMake 的 GYANISSCRIBE_SOURCE_DIR 指过来，不赌 ctest 的工作目录
+    std::string readSourceFile(const std::string_view relativePath)
+    {
+        std::ifstream input{std::filesystem::path{std::string{GYANISSCRIBE_SOURCE_DIR}} / std::string{relativePath}, std::ios::binary};
+        if (!input)
+        {
+            return {};
+        }
+        return std::string{std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{}};
+    }
+
+    /// 从函数起点找到与第一个左花括号配对的右花括号：用于断言某次调用落在绘制函数体内
+    std::size_t enclosingFunctionEnd(const std::string &source, const std::size_t functionStart)
+    {
+        const auto open = source.find('{', functionStart);
+        if (open == std::string::npos)
+        {
+            return std::string::npos;
+        }
+        int depth = 0;
+        for (auto index = open; index < source.size(); ++index)
+        {
+            if (source[index] == '{')
+            {
+                ++depth;
+            } else if (source[index] == '}')
+            {
+                --depth;
+                if (depth == 0)
+                {
+                    return index;
+                }
+            }
+        }
+        return std::string::npos;
     }
 
     /**
@@ -338,12 +407,15 @@ TEST_F(ThemeManagerFixture, GarbageStoredValueFallsBackToSystemAndLogsWarning)
 
 /**
  * @brief 钉住样式表与色板同解，双向都查
- * @details 正向：QSS 里出现的每个十六进制色都必须是该主题色板里的一个（禁「代码外再有一套色」）；
- *          反向：色板每个字段都得出现在 QSS 里，除 icon 由 IconProvider 取用——
- *          这一条同时抓出「加了没人用的色板字段」这种死配置。
+ * @details 正向逐主题：QSS 里出现的每个十六进制色都必须是该主题色板里的一个（禁「代码外再有一套色」）；
+ *          反向全局：每个进 QSS 的色板角色至少要有一份样式表用着，icon、success、danger 由绘制代码取用，不计入——
+ *          这一条抓的是「加了没人用的色板字段」这种死配置。色板是三档共用的一张角色表，判据是角色在整个
+ *          样式层有没有消费方；逐主题会把判据改成「每份 QSS 都得用全自己色板的十五个角色」，
+ *          某档刻意少用一个角色就报红，而那不是死配置。
  */
 TEST_F(ThemeManagerFixture, StyleSheetsAndPalettesAgreeInBothDirections)
 {
+    std::set<QString> usedColors;
     for (const auto [kind, resource]: {std::pair{ThemeKind::Light, std::string_view{":/styles/Light.qss"}}, std::pair{ThemeKind::Dark, std::string_view{":/styles/Dark.qss"}},
                                        std::pair{ThemeKind::HighContrast, std::string_view{":/styles/HighContrast.qss"}}})
     {
@@ -351,24 +423,22 @@ TEST_F(ThemeManagerFixture, StyleSheetsAndPalettesAgreeInBothDirections)
         const auto palette = paletteFor(kind);
         ASSERT_FALSE(sheet.isEmpty()) << resource;
 
-        // 只列该进样式表的十四个角色：icon/success/danger 是给绘制代码用的（图标描边、Toast 语义色），
+        // 只列该进样式表的十五个角色：icon/success/danger 是给绘制代码用的（图标描边、Toast 语义色），
         // 出现在 QSS 里反而是问题，下面单独反着断言
-        const std::array paletteColors = {palette.windowBackground, palette.surface,     palette.text,       palette.secondaryText, palette.border,
-                                          palette.accent,           palette.onAccent,    palette.selection,  palette.mutedFill,     palette.hover,
-                                          palette.pressed,          palette.accentHover, palette.accentSoft, palette.borderStrong};
+        const std::array paletteColors = {palette.windowBackground, palette.surface,    palette.text,        palette.secondaryText, palette.border, palette.accent,
+                                          palette.onAccent,         palette.selection,  palette.mutedFill,   palette.controlFill,   palette.hover,  palette.pressed,
+                                          palette.accentHover,      palette.accentSoft, palette.borderStrong};
 
-        // 正向：QSS 里不许出现色板之外的色值
+        // 正向：QSS 里不许出现色板之外的色值；命中的色值进入全局使用集合
         QRegularExpression hexPattern{QStringLiteral("#[0-9A-Fa-f]{6}")};
         for (auto match = hexPattern.match(sheet); match.hasMatch(); match = hexPattern.match(sheet, match.capturedEnd()))
         {
             const auto found = std::ranges::any_of(paletteColors, [&match](const QColor &color) { return hexOf(color) == match.captured(0).toUpper(); });
             EXPECT_TRUE(found) << resource << " 里的 " << match.captured(0).toStdString() << " 不在该主题色板里";
-        }
-
-        // 反向：色板字段必须真的被样式表用着
-        for (const auto &color: paletteColors)
-        {
-            EXPECT_NE(sheet.indexOf(hexOf(color)), -1) << resource << " 没用出色板里的 " << hexOf(color).toStdString();
+            if (found)
+            {
+                usedColors.insert(match.captured(0).toUpper());
+            }
         }
 
         // 绘制专用的三个色反过来断言不在 QSS 里：图标描边只走 IconProvider，
@@ -383,6 +453,32 @@ TEST_F(ThemeManagerFixture, StyleSheetsAndPalettesAgreeInBothDirections)
             }
             EXPECT_EQ(sheet.indexOf(hexOf(codeOnlyColor)), -1) << resource << " 里出现了只该由绘制代码用的语义色 " << hexOf(codeOnlyColor).toStdString();
         }
+    }
+
+    // 反向全局：每个该进 QSS 的角色至少被一份样式表用着
+    for (const auto kind: {ThemeKind::Light, ThemeKind::Dark, ThemeKind::HighContrast})
+    {
+        const auto &palette = paletteFor(kind);
+        for (const auto &color:
+             {palette.windowBackground, palette.surface, palette.text, palette.secondaryText, palette.border, palette.accent, palette.onAccent, palette.selection,
+              palette.mutedFill, palette.controlFill, palette.hover, palette.pressed, palette.accentHover, palette.accentSoft, palette.borderStrong})
+        {
+            EXPECT_TRUE(usedColors.contains(hexOf(color))) << "色板里的 " << hexOf(color).toStdString() << " 一份 QSS 都没用过";
+        }
+    }
+}
+
+/**
+ * @brief 钉住浅色与深色样式表里没有不透明纯黑
+ * @details 微明度分层要求最重的一档也是带色相的中性色；纯黑只属于高对比度档，
+ *          在浅深两档里出现就会把微明度阶梯压断。
+ */
+TEST_F(ThemeManagerFixture, LightAndDarkSheetsUseNoOpaqueBlack)
+{
+    for (const auto resource: {std::string_view{":/styles/Light.qss"}, std::string_view{":/styles/Dark.qss"}})
+    {
+        const auto sheet = readStyleSheet(resource).toUpper();
+        EXPECT_EQ(sheet.indexOf(QStringLiteral("#000000")), -1) << resource << " 出现了不透明纯黑";
     }
 }
 
@@ -414,6 +510,7 @@ TEST_F(ThemeManagerFixture, SemanticColorPairsMeetWcagContrast)
         EXPECT_GE(contrastRatio(palette.secondaryText, palette.hover), 4.5) << label << " 悬停底上的次要文本不足 AA";
         EXPECT_GE(contrastRatio(palette.secondaryText, palette.pressed), 4.5) << label << " 按下底上的次要文本不足 AA";
         EXPECT_GE(contrastRatio(palette.secondaryText, palette.mutedFill), 4.5) << label << " 静默底上的次要文本不足 AA";
+        EXPECT_GE(contrastRatio(palette.secondaryText, palette.controlFill), 4.5) << label << " 静息控件底上的次要文本不足 AA";
         // 导航当前项与勾选的工具按钮压的是 accentSoft：正文与主色描边都要在这一档底上站得住
         EXPECT_GE(contrastRatio(palette.text, palette.accentSoft), 4.5) << label << " 选中底上的正文读不出";
         EXPECT_GE(contrastRatio(palette.accent, palette.accentSoft), 3.0) << label << " 选中项的描边与它自己的底糊成一片";
@@ -450,7 +547,7 @@ TEST_F(ThemeManagerFixture, MissingStyleSheetYieldsEmptyTextNotAFakeTheme)
  * @brief 钉住「两套主题真的画出不一样」：同一件控件按各自样式表渲染后的底色
  * @details 上面的用例核的是令牌与样式表文本同解，这一条核的是画出来的像素：样式表在应用层
  *          没接上、或某一档的资源没打进包时，文本比对仍可全绿而界面是原生灰。
- *          取的是空按钮的中部：判据只依赖底色，不依赖字形与字体可用性。
+ *          取的是阅读面卡片的中部：判据只依赖底色，不依赖字形与字体可用性。
  */
 TEST_F(ThemeManagerFixture, WidgetsRenderThePaletteSurfacePerTheme)
 {
@@ -458,8 +555,8 @@ TEST_F(ThemeManagerFixture, WidgetsRenderThePaletteSurfacePerTheme)
     {
         // setStyleSheet 是 QWidget 的成员而不是静态函数，这里挂在套件持有的应用对象上
         application->setStyleSheet(ThemeManager::styleSheetFor(kind));
-        // 探针挑阅读面卡片而不是空按钮：珍珠玻璃里按钮平时是透明底（悬停才显玻璃块），
-        // 拿按钮取中部像素会取到它背后的窗口底；#pageCard 的底色就是 surface 角色本身
+        // 探针挑阅读面卡片而不是空按钮：按钮平时是 controlFill 填充，拿按钮取中部像素
+        // 测的是另一档角色；#pageCard 的底色就是 surface 角色本身
         QWidget card;
         card.setObjectName(QStringLiteral("pageCard"));
         card.setAttribute(Qt::WA_StyledBackground, true);
@@ -480,31 +577,64 @@ TEST_F(ThemeManagerFixture, WidgetsRenderThePaletteSurfacePerTheme)
 }
 
 /**
- * @brief 钉住次级按钮平时就有可见描边
- * @details 此前基础规则是 2px 透明边框，只有悬停/聚焦才显形；「导出配置」「导出色板」
- *          「检查更新」这类次级按钮于是只剩一串文字。取按钮左缘中点：那一列必须是
- *          borderStrong，且不能等于按钮背后的 surface。
+ * @brief 钉住次级按钮平时就与卡片底分得开
+ * @details 去描边之后按钮只剩 controlFill 与卡片 surface 的微明度差；这一档若被抹平，
+ *          「导出配置」「导出色板」「检查更新」这类次级按钮就只剩一串文字。
+ *          取按钮左内侧（横向距左边缘 10px、纵向居中）与卡片角落各一像素，既要比颜色不等，
+ *          也要比明度差得看得出来。取样点留在左侧内边距里、避开水平居中的文字；往中间挪会落到字形上。
  */
-TEST_F(ThemeManagerFixture, SecondaryButtonsKeepAVisibleOutlineAtRest)
+TEST_F(ThemeManagerFixture, SecondaryButtonsStayDistinguishableAtRest)
 {
     const auto probe = [](const ThemeKind kind)
     {
         application->setStyleSheet(ThemeManager::styleSheetFor(kind));
-        QPushButton button(QStringLiteral("导出配置…"));
-        button.resize(140, 36);
-        button.ensurePolished();
-        const auto image = button.grab().toImage();
-        return image.pixelColor(0, image.height() / 2);
+        QWidget host;
+        host.setObjectName(QStringLiteral("pageCard"));
+        host.setAttribute(Qt::WA_StyledBackground, true);
+        host.resize(200, 80);
+        QPushButton button(QStringLiteral("导出配置…"), &host);
+        button.setGeometry(30, 20, 140, 30);
+        host.show();
+        QCoreApplication::processEvents();
+        const auto image = host.grab().toImage();
+        application->setStyleSheet(QString{});
+        return std::pair{image.pixelColor(40, 35), image.pixelColor(5, 5)};
     };
 
-    const auto light = probe(ThemeKind::Light);
-    const auto dark  = probe(ThemeKind::Dark);
-    const auto hc    = probe(ThemeKind::HighContrast);
-    application->setStyleSheet(QString{});
+    for (const auto kind: {ThemeKind::Light, ThemeKind::Dark})
+    {
+        const auto [button, card] = probe(kind);
+        EXPECT_NE(button, card) << static_cast<int>(kind) << " 静息按钮与卡片同色，只剩一串文字";
+        EXPECT_GT(std::abs(relativeLuminance(button) - relativeLuminance(card)), 0.002) << static_cast<int>(kind) << " 明度差小到看不出来";
+    }
+}
 
-    EXPECT_EQ(light, paletteFor(ThemeKind::Light).borderStrong) << "浅色档次级按钮左缘没有描边";
-    EXPECT_EQ(dark, paletteFor(ThemeKind::Dark).borderStrong) << "深色档次级按钮左缘没有描边";
-    EXPECT_EQ(hc, paletteFor(ThemeKind::HighContrast).borderStrong) << "高对比度档次级按钮左缘没有描边";
+/**
+ * @brief 钉住控件总高按档定死，不随去边框漂移
+ * @details 浅色与深色靠 1px 透明边框占位：按钮 30、输入类 32。
+ *          高对比度档保留 32/34/38：2px 描边是无障碍契约的一部分，不随另两档归一化，
+ *          输入类因此比浅深档各多 2px；数字框另有上下各 2px 的自有框，落在 38。
+ */
+TEST_F(ThemeManagerFixture, ControlHeightsStayPinnedPerTheme)
+{
+    for (const auto kind: {ThemeKind::Light, ThemeKind::Dark, ThemeKind::HighContrast})
+    {
+        application->setStyleSheet(ThemeManager::styleSheetFor(kind));
+        QLineEdit   edit;
+        QPushButton button(QStringLiteral("确定"));
+        QSpinBox    spin;
+        QComboBox   combo;
+        for (QWidget *widget: std::initializer_list<QWidget *>{&edit, &button, &spin, &combo})
+        {
+            widget->ensurePolished();
+        }
+        const auto highContrast = kind == ThemeKind::HighContrast;
+        EXPECT_EQ(edit.sizeHint().height(), highContrast ? 34 : 32) << static_cast<int>(kind) << " 输入框总高变了";
+        EXPECT_EQ(spin.sizeHint().height(), highContrast ? 38 : 32) << static_cast<int>(kind) << " 数字框总高变了";
+        EXPECT_EQ(combo.sizeHint().height(), highContrast ? 34 : 32) << static_cast<int>(kind) << " 下拉框总高变了";
+        EXPECT_EQ(button.sizeHint().height(), highContrast ? 32 : 30) << static_cast<int>(kind) << " 按钮总高变了";
+    }
+    application->setStyleSheet(QString{});
 }
 
 /**
@@ -538,6 +668,25 @@ TEST_F(ThemeManagerFixture, ComboDropDownUsesTheThemeChevron)
         const auto sheet = ThemeManager::styleSheetFor(kind);
         EXPECT_NE(sheet.indexOf(QString::fromUtf8(asset.data(), static_cast<qsizetype>(asset.size()))), -1) << "样式表没引用这一档的 chevron";
         EXPECT_TRUE(QFile{QString::fromUtf8(asset.data(), static_cast<qsizetype>(asset.size()))}.exists()) << "chevron 资源没打进 qrc";
+    }
+}
+
+/**
+ * @brief 钉住三档主题都关掉了自绘复选框的静态勾图
+ * @details 勾由 Gui::CheckBox 按 onAccent 自绘；某一档漏掉抑制规则时，
+ *          静态 SVG 会与自绘勾叠在一起，而另外两档看不出问题。
+ *          判据必须落在抑制规则自己的块里：image: none 在别处也有（标注菜单的指示器），
+ *          只搜全文会把「选择器在、块里没写」的漏洞放过去。
+ */
+TEST_F(ThemeManagerFixture, EveryThemeSuppressesTheStaticCheckImageForAnimatedCheckBoxes)
+{
+    const QRegularExpression rule{QStringLiteral(R"(QCheckBox\[animatedIndicator="true"\]::indicator:checked\s*\{([^}]*)\})")};
+    for (const auto resource: {std::string_view{":/styles/Light.qss"}, std::string_view{":/styles/Dark.qss"}, std::string_view{":/styles/HighContrast.qss"}})
+    {
+        const auto sheet = readStyleSheet(resource);
+        const auto match = rule.match(sheet);
+        ASSERT_TRUE(match.hasMatch()) << resource << " 里没有自绘复选框的抑制规则";
+        EXPECT_NE(match.captured(1).indexOf(QStringLiteral("image: none")), -1) << resource << " 的抑制规则块里没写 image: none";
     }
 }
 
@@ -589,9 +738,8 @@ TEST_F(ThemeManagerFixture, ExistingWidgetsRepaintWithTheNewThemeText)
 }
 
 /**
- * @brief 钉住勾选框与线宽滑块的键盘焦点看得见（界面审查 UI-53）
- * @details 这两类控件此前在三份 QSS 里都没有 :focus 形态：Tab 聚焦过去外观毫无变化，
- *          而高对比度档正是给键盘可辨识用的。两处判据不赌具体坐标：
+ * @brief 钉住勾选框与线宽滑块的键盘焦点看得见
+ * @details 高对比度档不装焦点环覆盖层，这两类控件的焦点只能由 QSS 描边表达。两处判据不赌具体坐标：
  *          勾选框在聚焦前后各抓一次图，数主色像素，聚焦后必须多出来（指示器换主色描边）；
  *          滑块数的是手柄矩形里的主色，聚焦时必须掉下去（实心手柄翻成底色芯 + 正文色圈）。
  */
@@ -673,4 +821,127 @@ TEST_F(ThemeManagerFixture, CheckboxAndSliderShowAKeyboardFocusRing)
     QCoreApplication::processEvents();
     EXPECT_GT(sliderBefore, 50) << "未聚焦时手柄本该是主色实心，判据的前提没构造出来";
     EXPECT_LT(handleAccentPixels(*slider), 10) << "滑块聚焦后手柄外观没变，键盘焦点看不出来";
+}
+
+/**
+ * @brief 钉住 Light/Dark 不再有控件级焦点描边，只留标注工具栏的紧凑焦点与滑块手柄反转
+ * @details 双环由 FocusRingController 的覆盖层画；样式表里若还留着 QPushButton:focus 一类规则，
+ *          会在覆盖层之外再压一圈描边，切主题后同一控件出现两种焦点形态。判据按选择器分支看，
+ *          不能只搜全文——工具栏那五条同样以 QPushButton:focus 收尾。
+ */
+TEST_F(ThemeManagerFixture, LightAndDarkSheetsDropTheControlLevelFocusOutlines)
+{
+    for (const auto resource: {std::string_view{":/styles/Light.qss"}, std::string_view{":/styles/Dark.qss"}})
+    {
+        const auto sheet     = readStyleSheet(resource);
+        const auto selectors = focusSelectorsIn(sheet);
+        ASSERT_FALSE(sheet.isEmpty()) << resource;
+        ASSERT_FALSE(selectors.isEmpty()) << resource << " 一条 :focus 规则都没有，判据没有落点";
+
+        const auto branches = [&selectors](const QString &token)
+        {
+            QStringList matched;
+            for (const auto &selector: selectors)
+            {
+                if (selector.contains(token))
+                {
+                    matched.append(selector);
+                }
+            }
+            return matched;
+        };
+
+        // 标注工具栏是唯一允许控件级焦点的落点：每条命中都必须带 #AnnotationToolbar 前缀
+        for (const auto *token: {"QPushButton:focus", "QToolButton:focus", "QLineEdit:focus", "QComboBox:focus", "QSpinBox:focus"})
+        {
+            const auto matched = branches(QString::fromLatin1(token));
+            EXPECT_EQ(matched.size(), 1) << resource << " 里 " << token << " 的条数不对：应有且只有工具栏那一条";
+            for (const auto &selector: matched)
+            {
+                EXPECT_TRUE(selector.contains(QStringLiteral("#AnnotationToolbar"))) << resource << " 留下了控件级焦点描边：" << selector.toStdString();
+            }
+        }
+
+        // 这两类在浅色与深色档里没有任何合法落点：覆盖层负责，QSS 不该再画
+        EXPECT_TRUE(branches(QStringLiteral("QTextEdit#annotationTextEditor:focus")).isEmpty()) << resource << " 行内编辑器还留着 :focus 描边";
+        EXPECT_TRUE(branches(QStringLiteral("QCheckBox::indicator:focus")).isEmpty()) << resource << " 复选框指示器还留着 :focus 描边";
+
+        // 滑块没有覆盖层：手柄反转是浅深两档唯一的 QSS 焦点形态
+        EXPECT_EQ(branches(QStringLiteral("QSlider::handle:horizontal:focus")).size(), 1) << resource << " 滑块的手柄反转焦点没了";
+        // 高对比度档仍保留控件级 2px 描边，由 SemanticColorPairsMeetWcagContrast 的 2PX SOLID 判据钉住
+    }
+}
+
+/**
+ * @brief 钉住换主题时 ThemeManager 会重放已存在控件的文字角色
+ * @details 只测 applyTextRole 本身漏掉的是 allWidgets 这条接线：控件在浅色档建好、换到深色档后
+ *          若不再重算，暗色纯 ASCII 读数会停在默认字族与 600，可变字族的降重永远不生效。
+ *          可变字族的可用性由测试钩子钉死，不依赖跑测机器装没装该字族。
+ */
+TEST_F(ThemeManagerFixture, ThemeSwitchReplaysAsciiMetricRoleForExistingWidgets)
+{
+    struct VariableFamilyGuard final
+    {
+        ~VariableFamilyGuard()
+        {
+            setVariableMetricFamilyAvailableForTesting(std::nullopt);
+        }
+    } guard;
+    setVariableMetricFamilyAvailableForTesting(true);
+
+    ASSERT_TRUE(manager().setTheme(ThemeKind::Light).has_value());
+    QLabel label;
+    auto   baseFont = label.font();
+    baseFont.setWeight(QFont::Normal);
+    label.setFont(baseFont);
+    const auto baseFamily = label.font().family();
+
+    applyTextRole(label, TextRole::Metric, TextScript::AsciiOnly);
+    EXPECT_EQ(static_cast<int>(label.font().weight()), 600) << "浅色档的读数该停在 DemiBold";
+    EXPECT_EQ(label.font().family(), baseFamily);
+
+    ASSERT_TRUE(manager().setTheme(ThemeKind::Dark).has_value());
+    EXPECT_EQ(static_cast<int>(label.font().weight()), 560) << "换到深色档没有重放文字角色，可变字族的降重没生效";
+    EXPECT_EQ(label.font().family(), QStringLiteral("Segoe UI Variable Text")) << "换到深色档没有换成可变字族";
+
+    ASSERT_TRUE(manager().setTheme(ThemeKind::Light).has_value());
+    EXPECT_EQ(static_cast<int>(label.font().weight()), 600) << "切回浅色档没有把字重还原成 600";
+    EXPECT_EQ(label.font().family(), baseFamily) << "切回浅色档还挂着深色档的可变字族";
+}
+
+/**
+ * @brief 钉住三处自绘读数在绘制函数里确实走了 tabularFont
+ * @details 遮罩读数、取色信息条与贴图颜色读数没有 QLabel 可断言字体：字体直接设在 QPainter 上。
+ *          这里按源码级接线守住那一行调用，并限定它落在绘制函数体内，防止调用被挪到永不执行的分支。
+ *          控件级读数（长截图、OCR 摘要、历史列表、录屏时长与倒计时）另由各自用例逐件断言。
+ */
+TEST_F(ThemeManagerFixture, PaintedReadoutsLockTabularFiguresInsideThePaintFunctions)
+{
+    struct Probe
+    {
+        std::string_view file;
+        std::string_view function;
+        std::string_view call;
+    };
+    const std::array probes = {
+            Probe{"src/Gui/Capture/CaptureOverlay.cpp", "void CaptureOverlay::paintMagnifier", "tabularFont(stripFont, TextScript::Mixed)"},
+            Probe{"src/Gui/Capture/CaptureOverlay.cpp", "void CaptureOverlay::paintEvent", "tabularFont(hintFont, TextScript::Mixed)"},
+            Probe{"src/Gui/Pick/ColorPickerOverlay.cpp", "void ColorPickerOverlay::paintEvent", "tabularFont(painter.font(), TextScript::AsciiOnly)"},
+            Probe{"src/Gui/Pin/PinWindow.cpp", "void PinWindow::paintColorReadout", "tabularFont(font, TextScript::AsciiOnly)"},
+    };
+
+    for (const auto &probe: probes)
+    {
+        const auto source = readSourceFile(probe.file);
+        ASSERT_FALSE(source.empty()) << "读不到源文件：" << std::string{probe.file};
+
+        const auto functionStart = source.find(probe.function);
+        ASSERT_NE(functionStart, std::string::npos) << std::string{probe.file} << " 里找不到绘制函数 " << std::string{probe.function};
+        const auto functionEnd = enclosingFunctionEnd(source, functionStart);
+        ASSERT_NE(functionEnd, std::string::npos) << std::string{probe.file} << " 的绘制函数括号没有配对";
+
+        const auto call = source.find(probe.call, functionStart);
+        ASSERT_NE(call, std::string::npos) << std::string{probe.file} << " 的绘制函数里没有 " << std::string{probe.call};
+        EXPECT_LT(call, functionEnd) << std::string{probe.file} << " 的 tabularFont 调用不在绘制函数体内";
+    }
 }

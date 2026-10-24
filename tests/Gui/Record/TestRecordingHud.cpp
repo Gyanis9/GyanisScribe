@@ -2,11 +2,13 @@
 
 #include "Core/Record/RecordingSession.h"
 #include "Gui/Resources/IconProvider.h"
+#include "Gui/Theme/DesignTokens.h"
 
 #include <gtest/gtest.h>
 
 #include <QApplication>
 #include <QEvent>
+#include <QLabel>
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QPoint>
@@ -18,13 +20,17 @@
 #include <optional>
 
 using GyanisScribe::Core::RecordingState;
+using GyanisScribe::Gui::activeThemeKind;
 using GyanisScribe::Gui::countdownTextFor;
 using GyanisScribe::Gui::formatDuration;
 using GyanisScribe::Gui::hudStatusText;
 using GyanisScribe::Gui::IconProvider;
 using GyanisScribe::Gui::kHudEdgeGap;
 using GyanisScribe::Gui::RecordingHud;
+using GyanisScribe::Gui::setTextThemeKind;
+using GyanisScribe::Gui::setVariableMetricFamilyAvailableForTesting;
 using GyanisScribe::Gui::snapHudRect;
+using GyanisScribe::Gui::ThemeKind;
 
 namespace
 {
@@ -65,6 +71,23 @@ namespace
     [[nodiscard]] QPushButton *buttonOf(const RecordingHud &hud, const QString &accessibleName)
     {
         const auto candidates = hud.findChildren<QPushButton *>();
+        for (auto *candidate: candidates)
+        {
+            if (candidate->accessibleName() == accessibleName)
+            {
+                return candidate;
+            }
+        }
+        return nullptr;
+    }
+
+    /**
+     * @brief 按无障碍名字找控制条上的一枚标签
+     * @return 找到返回那个标签，所有权在控制条；没有则返回空指针
+     */
+    [[nodiscard]] QLabel *labelOf(const RecordingHud &hud, const QString &accessibleName)
+    {
+        const auto candidates = hud.findChildren<QLabel *>();
         for (auto *candidate: candidates)
         {
             if (candidate->accessibleName() == accessibleName)
@@ -182,6 +205,37 @@ TEST_F(RecordingHudFixture, StatePushRefreshesReadoutsAndCountdownOverlay)
 }
 
 /**
+ * @brief 钉住倒计时大字在反复推送状态时不再逐次掉重
+ * @details 暗色档第一次上 AsciiOnly 时按基准字重降 40；若每次 applyState 都从当前字体重算，
+ *          字重会 360→320→280 一路掉完。基准字体只在构造时建一次，后续推送只改文本与显隐。
+ */
+TEST_F(RecordingHudFixture, CountdownWeightStaysStableAcrossRepeatedStatePushes)
+{
+    const auto previousTheme = activeThemeKind();
+    setVariableMetricFamilyAvailableForTesting(true);
+    setTextThemeKind(ThemeKind::Dark);
+
+    auto  hud       = makeHud();
+    auto *countdown = labelOf(*hud, QStringLiteral("倒计时"));
+    if (countdown == nullptr)
+    {
+        setVariableMetricFamilyAvailableForTesting(std::nullopt);
+        setTextThemeKind(previousTheme);
+        FAIL() << "控制条上找不到倒计时标签";
+    }
+
+    hud->applyState(RecordingState::Countdown, 3, 0);
+    const auto firstWeight = static_cast<int>(countdown->font().weight());
+    EXPECT_EQ(firstWeight, 360) << "暗色档的倒计时没有按可变字族降一次重";
+
+    hud->applyState(RecordingState::Countdown, 2, 0);
+    EXPECT_EQ(static_cast<int>(countdown->font().weight()), firstWeight) << "第二次推送又把倒计时字重降了一档";
+
+    setVariableMetricFamilyAvailableForTesting(std::nullopt);
+    setTextThemeKind(previousTheme);
+}
+
+/**
  * @brief 钉住暂停键随状态改口，并且按下去发的是对应请求
  * @details 暂停中再按还发「暂停」，用户按第二下时录制不会恢复，而按钮看起来一切正常。
  */
@@ -272,4 +326,22 @@ TEST_F(RecordingHudFixture, ClosingTheHudDestroysItInsteadOfOnlyHidingIt)
     QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
 
     EXPECT_TRUE(guard.isNull()) << "收起只藏不留销毁：下一轮录屏会再建一个，旧的那个永远留在桌上";
+}
+
+/**
+ * @brief 钉住录屏时长与倒计时都锁等宽数字
+ * @details 这两处一秒一跳；比例字体会让时长列与居中的倒计时逐秒改宽。
+ *          时长走 Metric 角色，倒计时只落基准字体加 tnum，两条路径各断言一次。
+ */
+TEST_F(RecordingHudFixture, ElapsedAndCountdownUseTabularFigures)
+{
+    auto  hud      = makeHud();
+    auto *elapsed  = labelOf(*hud, QStringLiteral("已录时长"));
+    auto *countdown = labelOf(*hud, QStringLiteral("倒计时"));
+    ASSERT_NE(elapsed, nullptr) << "控制条上没有「已录时长」标签";
+    ASSERT_NE(countdown, nullptr) << "控制条上没有「倒计时」标签";
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+    EXPECT_EQ(elapsed->font().featureValue(QFont::Tag("tnum")), 1u) << "录屏时长没锁等宽，秒数一跳整条就抖";
+    EXPECT_EQ(countdown->font().featureValue(QFont::Tag("tnum")), 1u) << "倒计时大字没锁等宽，数字宽度逐秒变";
+#endif
 }

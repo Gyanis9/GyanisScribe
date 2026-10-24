@@ -24,3 +24,6 @@ __pycache__/
 # scripts/FetchFfmpeg.ps1 现场取件与验证，任何一份进历史都是让每次克隆替将来所有版本付空间。
 # vendor/Tessdata 相反：.traineddata 只有几 MB 且是 Apache-2.0，进仓才能让构建不依赖网络
 /vendor/Ffmpeg/
+
+# Superpowers 生成的设计与实施计划文档：按本机协作规则只留本地，不进版本库
+/docs/superpowers/

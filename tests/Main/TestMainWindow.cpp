@@ -23,6 +23,7 @@
 #include "Core/Hotkey/HotkeyCombination.h"
 #include "Core/Settings/SettingsStore.h"
 #include "Gui/Controls/AppShortcuts.h"
+#include "Gui/Controls/CheckBox.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Controls/HotkeyEdit.h"
 #include "Gui/Controls/SpinBox.h"
@@ -282,7 +283,7 @@ namespace
     }
 
     /**
-     * @brief 钉住主窗里每一个可操作控件都有无障碍名（界面审查 UI-63）
+     * @brief 钉住主窗里每一个可操作控件都有无障碍名
      * @details 抽样只能证明抽到的那几个有名字；这里把整栋控件树逐页扫一遍：按钮、输入、下拉、
      *          数字框、滑块与列表视图一律要有 accessibleName。读屏用户拿到的「按钮 3」就是这里漏的。
      */
@@ -318,7 +319,7 @@ namespace
     }
 
     /**
-     * @brief 钉住 Tab 能把每一页的可见控件走一遍，不落隐藏件、不卡在同一处（界面审查 UI-61）
+     * @brief 钉住 Tab 能把每一页的可见控件走一遍，不落隐藏件、不卡在同一处
      * @details 实机 UIA 走查受前台锁时，焦点链本身可以在进程内逐键走：每按一次 Tab 取一次
      *          focusWidget，三件事必须成立——焦点真的换、落点可见、落点有可读名字；
      *          每页还要能走出四个以上落点再绕回起点（少于四个就是卡在某一处）。
@@ -369,7 +370,7 @@ namespace
     }
 
     /**
-     * @brief 钉住主窗几何跨会话记忆（界面审查 UI-65）
+     * @brief 钉住主窗几何跨会话记忆
      * @details 此前全仓没有 save/restoreGeometry：每次启动都回默认的 680×560 与系统摆的位置。
      *          判据走两趟真存盘：第一趟挪窗、关窗（析构即落盘），换一个 store 实例读回键；
      *          第二趟拿同一份盘建新窗，尺寸必须原样回来，位置回到同一处（给边框让一点余量）。
@@ -481,7 +482,7 @@ namespace
     }
 
     /**
-     * @brief 钉住「标签列宽全族统一」（界面审查 UI-01）：翻页时字段列不许左右跳
+     * @brief 钉住「标签列宽全族统一」：翻页时字段列不许左右跳
      * @details 改之前字段列在各页从 280 跳到 472——统一的标签列宽（kSettingsLabelColumnWidth）
      *          把八页收到同一列；这条逐页开过去量第一行的字段左缘，任两页差 1px 都算红。
      */
@@ -520,7 +521,7 @@ namespace
     }
 
     /**
-     * @brief 钉住关于页与表单页共用同一列内容网格（界面审查 UI-08）
+     * @brief 钉住关于页与表单页共用同一列内容网格
      * @details 关于页此前用自己的默认边距（内容左缘比表单页小一圈），翻页时正文左跳 7px；
      *          这条量「关于页第一个正文控件的左缘」与「通用页标签控件的左缘」相等。
      */
@@ -549,7 +550,7 @@ namespace
     }
 
     /**
-     * @brief 钉住「单键也能当全局热键」的说明不再被右缘截断（界面审查 UI-66）
+     * @brief 钉住「单键也能当全局热键」的说明不再被右缘截断
      * @details 长句当勾选框标签时 QCheckBox 不折行，右侧句尾直接被裁（实测最右墨迹顶到内容区右缘）。
      *          改成短标签 + 一行会折行的说明；这条钉「勾选框文本是短名」「说明行开了折行且排成两行以上」。
      */
@@ -1697,6 +1698,22 @@ TEST_F(MainWindowFixture, EveryNumericFieldUsesTheCustomStepper)
 }
 
 /**
+ * @brief 钉住设置页所有复选框都走弹簧自绘的 CheckBox
+ * @details 混着原生 QCheckBox 时勾选会一半弹、一半瞬跳；这一条把「换了一半」钉死。
+ */
+TEST_F(MainWindowFixture, EveryCheckBoxUsesTheElasticIndicator)
+{
+    makeWindow();
+    const auto checks = m_window->findChildren<QCheckBox *>();
+    ASSERT_FALSE(checks.isEmpty()) << "设置页一个复选框都没有，这条判据就没对象了";
+    for (auto *check: checks)
+    {
+        EXPECT_NE(dynamic_cast<GyanisScribe::Gui::CheckBox *>(check), nullptr) << "设置页还留着一个原生 QCheckBox：" << check->metaObject()->className();
+        EXPECT_TRUE(check->property("animatedIndicator").toBool()) << "复选框没带抑制静态勾图的属性：" << check->metaObject()->className();
+    }
+}
+
+/**
  * @brief 钉住设置窗压缩后的版面读数
  * @details 980 宽的旧最小宽来自顶部动作条；隐藏之后窗可以收到 860 以下。
  *          页边距与表单行距也按新档钉住，避免「只藏了动作条、页面还是松的」。
@@ -1719,7 +1736,7 @@ TEST_F(MainWindowFixture, CompactSettingsLayoutHasANarrowerFloor)
     EXPECT_EQ(box->contentsMargins().left(), GyanisScribe::Gui::kSpacingMedium);
     auto *form = card->findChild<QFormLayout *>();
     ASSERT_NE(form, nullptr);
-    EXPECT_EQ(form->verticalSpacing(), GyanisScribe::Gui::kSpacingHairline);
+    EXPECT_EQ(form->verticalSpacing(), GyanisScribe::Gui::kSpacingSmall);
 }
 
 /**

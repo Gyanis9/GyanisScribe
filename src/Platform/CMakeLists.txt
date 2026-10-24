@@ -1,6 +1,8 @@
 # Platform：能力表与热键后端契约在任何平台都编；平台实现按编译目标挂载，
 # 将来接别的平台时在下面加各自的分支。
 set(PlatformCommonSources
+        AnimationSettings.h
+        AnimationSettings.cpp
         PlatformCapabilities.h
         IHotkeyBackend.h
         IPlatformIntegration.h

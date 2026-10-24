@@ -25,6 +25,7 @@
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Gui/Controls/AppShortcuts.h"
+#include "Gui/Controls/CheckBox.h"
 #include "Gui/Controls/SpinBox.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Controls/HotkeyEdit.h"
@@ -162,7 +163,8 @@ namespace
         layout->addWidget(text);
 
         auto *form = new QFormLayout;
-        form->setVerticalSpacing(GyanisScribe::Gui::kSpacingHairline);
+        // 双环要在输入框外占 6px：行距从 2px 提到 8px，环不会压在相邻行上
+        form->setVerticalSpacing(GyanisScribe::Gui::kSpacingSmall);
         form->setHorizontalSpacing(GyanisScribe::Gui::kSpacingSmall);
         // 标签右对齐并与字段同一水平线：这一列的右端要与字段左缘只隔一个行距，左对齐时那条缝会随
         // 标签长短忽宽忽窄（实测 4 字 81px、10 字只剩 9px，同一页里两种都见得到）；
@@ -202,7 +204,7 @@ namespace
         {
             for (int row = 0; row < form->rowCount(); ++row)
             {
-                // 标签列宽也收到统一一档（界面审查 UI-01）：QFormLayout 没有列宽接口，
+                // 标签列宽也收到统一一档：QFormLayout 没有列宽接口，
                 // 给每个标签控件一个最小宽即把整列撑到同一档，翻页时字段列不再左右跳
                 if (auto *label = form->itemAt(row, QFormLayout::LabelRole); label != nullptr && label->widget() != nullptr)
                 {
@@ -391,7 +393,7 @@ namespace
      */
     QCheckBox *makeCursorHighlightCheck(GyanisScribe::Core::ISettingsStore &settings, const GyanisScribe::Gui::IconProvider &icons)
     {
-        auto *check = new QCheckBox;
+        auto *check = new GyanisScribe::Gui::CheckBox;
         check->setIcon(icons.icon("CursorHighlight"));
         check->setText(GyanisScribe::Base::uiText("把光标位置圈在画面里"));
         check->setAccessibleName(GyanisScribe::Base::uiText("光标高亮"));
@@ -419,7 +421,7 @@ namespace
      */
     QCheckBox *makeIncludeCursorCheck(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *check = new QCheckBox;
+        auto *check = new GyanisScribe::Gui::CheckBox;
         check->setText(GyanisScribe::Base::uiText("把鼠标指针画进成品"));
         check->setAccessibleName(GyanisScribe::Base::uiText("含鼠标指针"));
         check->setToolTip(
@@ -452,7 +454,7 @@ namespace
     QCheckBox *makeSettingCheck(GyanisScribe::Core::ISettingsStore &settings, const std::string_view key, const bool defaultOn, const QString &label, const QString &accessibleName,
                                 const QString &tooltip)
     {
-        auto *check = new QCheckBox;
+        auto *check = new GyanisScribe::Gui::CheckBox;
         check->setText(label);
         check->setAccessibleName(accessibleName);
         check->setToolTip(tooltip);
@@ -1416,7 +1418,7 @@ namespace GyanisScribe::Main
 
     MainWindow::~MainWindow()
     {
-        // 退出前把几何存一份（界面审查 UI-65）：下次开在同一块屏、同一尺寸上。
+        // 退出前把几何存一份：下次开在同一块屏、同一尺寸上。
         // 存成 Base64 文本而不是 QByteArray：配置导出走 JSON，二进制载荷过不了那一道
         const auto saved = m_settings.setValue(Core::kMainWindowGeometry, QString::fromLatin1(saveGeometry().toBase64()));
         if (!saved)
@@ -1509,7 +1511,7 @@ namespace GyanisScribe::Main
         root->addLayout(layout);
         resize(680, 560);
 
-        // 上次退出时的几何（界面审查 UI-65）：没存过或存坏了就停在上面这档默认尺寸。
+        // 上次退出时的几何：没存过或存坏了就停在上面这档默认尺寸。
         // restoreGeometry 自己会把越界窗口挪回某块屏的可见区，换了屏也不会开在看不见的地方
         if (const auto stored = QByteArray::fromBase64(m_settings.stringValue(Core::kMainWindowGeometry, QString{}).toLatin1()); !stored.isEmpty())
         {
@@ -1808,7 +1810,7 @@ namespace GyanisScribe::Main
      */
     QCheckBox *makeAutostartCheck(GyanisScribe::Platform::IPlatformIntegration &integration)
     {
-        auto *check = new QCheckBox;
+        auto *check = new GyanisScribe::Gui::CheckBox;
         check->setText(GyanisScribe::Base::uiText("开机时自动启动"));
         check->setAccessibleName(GyanisScribe::Base::uiText("开机时自动启动"));
 
@@ -2411,7 +2413,7 @@ namespace GyanisScribe::Main
 
         // 单键那一档单独一行，摆在全局热键段的末尾：它放开的是上面那些行的校验，
         // 与界面按键无关（界面按键本来就允许裸键）。
-        // 勾选框只写短名（长句当标签时 QCheckBox 不会折行，右缘直接把句尾裁掉——界面审查 UI-66），
+        // 勾选框只写短名（长句当标签时 QCheckBox 不会折行，右缘直接把句尾裁掉），
         // 长句改成下面一行会折行的说明；tooltip 原样保留
         auto *simpleRow    = new QWidget;
         auto *simpleLayout = new QVBoxLayout{simpleRow};
@@ -2510,7 +2512,7 @@ namespace GyanisScribe::Main
     {
         auto *page   = new QWidget{this};
         auto *layout = new QVBoxLayout{page};
-        // 与表单页同一条内容网格（界面审查 UI-08）：默认边距比表单页小一圈，翻到这一页正文会左跳 7px
+        // 与表单页同一条内容网格：默认边距比表单页小一圈，翻到这一页正文会左跳 7px
         layout->setContentsMargins(GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium);
         layout->setSpacing(GyanisScribe::Gui::kSpacingSmall);
 
