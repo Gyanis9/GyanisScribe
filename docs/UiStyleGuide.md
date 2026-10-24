@@ -101,7 +101,7 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 | mutedFill | `#EEF2F0` | `#15181A` | 纯白（这一档不靠底色分层次） | 禁用底、滑块槽 |
 | hover / pressed | `#F2F3F3` / `#ECEDEE` | `#262A2C` / `#2D3133` | `#E0E0E0` / `#C8C8C8` | 中性悬停与按下 |
 | accentHover / accentSoft | `#1D61D5` / `#E5EEFA` | `#3D7FF2` / `#233145` | `#08449E` / `#D6E4FB` | 主按钮悬停 / 导航当前项与勾选的工具按钮 |
-| icon | `#7E888C` | `#8D979A` | 纯黑 | SVG `currentColor` 的替换色 |
+| icon | `#1A1A19` | `#F5F5F3` | `#0B0B0A` | SVG `currentColor` 的替换色 |
 | success / danger | `#3B7D21` / `#CA3932`（设计原值当文字不足 4.5:1，压深保色相） | `#9BE35A` / `#FF7A71` | `#006400` / `#B00000` | Toast 与状态色（不进样式表） |
 
 对比要求由用例算：`ThemeManagerFixture` 里的 `contrastRatio` 逐角色核 WCAG——正文压在本档
@@ -173,12 +173,12 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
   滑块有一条实现约束：QSS 的控件级边框在 `CC_Slider` 的自绘路径里不落笔（换背景色、
   补 `WA_StyledBackground` 都不救），焦点只能挂在 `::handle:horizontal:focus` 上做反转
   （底色芯 + 正文色圈）；别把它「统一」回 `QSlider:focus` 的写法。
-- 图标全部原创 SVG（24 视框、`currentColor` 描边），描边色由 `IconProvider` 按主题注入；
-  用例 `IconProviderFixture` 数的是真的画出来的像素，不是文件名。整套图的画法规格（2026-10-12 全量重绘后）：
-  - 网格与安全区：24 视框，内容（含 0.75 描边外缘）压在 **2..22**；直线优先落在整数或 0.5 格点上，
+- 图标全部原创 SVG（24 视框、`currentColor` 描边、2px 单档），描边色由 `IconProvider` 按主题注入；
+  用例 `IconProviderFixture` 数的是真的画出来的像素，不是文件名。整套图的画法规格：
+  - 网格与安全区：24 视框，内容（含 1px 描边外缘）压在 **2..22**；直线优先落在整数或 0.5 格点上，
     墨迹外接框中心与几何中心相差不超过 2 格。判据 `BundledIconsStayInsideTheSafeZoneAtEveryDevicePixelRatio`
     与 `BundledIconsSitNearTheOpticalCenter`。
-  - 线宽收在 **1.5 一档**（需求允许 1.5/2，本套统一到 1.5 并拒绝第二档混入）；填充点缀只允许
+  - 线宽收在 **2 一档**（不允许第二档混入）；填充点缀只允许
     `fill="currentColor" stroke="none"`，源码里不许出现写死的色值。判据
     `BundledSourcesKeepOneStrokeWidthAndThemeColorsOnly`。
   - 族内共用外框：截图族与录屏族的虚线选区、窗口外框、四角括号是同几行字面量逐字一致——
@@ -186,3 +186,12 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
   - 高 DPI 渲染必须显式给逻辑边界：`render(painter, QRectF{0,0,size,size})`。不带边界的 `render()`
     会把 viewBox 按物理像素铺满画家视口、再叠一次位图缩放比，dpr=2 实测画成两倍大且右下半被裁
     （修复同批，判据把 2×/3× 两档都钉住）。
+  - 尺寸阶梯八档：16/20/24/32/48/64/96/128。16/20/24/32 是控件档位，96 是历史列表类别图标，
+    48/64/128 是同族大尺寸输出；QIcon 备齐八档，并按已连接屏幕的实际倍率（含 1.25/1.5/1.75）出副本。
+    判据 `EveryBundledIconPaintsAtEveryLadderSize`、`FractionalScreenRatiosGetExactPixmaps`、
+    `HistoryLadderIncludesNinetySix`。
+  - 品牌图在 `src/Gui/Resources/Brand/`：`#151515` 砖、`#F5F5F3` C 框、`#5BE37A` 录点；
+    应用图标八档原生 PNG，`.ico` 七档（512 单独 PNG）；品牌图走固定色入口，
+    不参与 `currentColor` 替换。判据 `BrandIconAssetTest`、`BrandPixmapKeepsNativeSizesAndIgnoresTheTint`、
+    `BrandIconExposesTheEightNativeSizes`、`BrandIconAndNavMetricsAreWired`、`CategoryFallbackIconCarriesNinetySix`。
+  - `App`/`AppIcon` 不再属于界面图标集；`Tray` 保留给录制 HUD 的“最小化到托盘”。

@@ -17,6 +17,9 @@ generators/
 # Python 门禁脚本的字节码缓存
 __pycache__/
 
+# Superpowers 过程文档（设计、计划、评审）：落点固定为 docs/superpowers/，不进版本库
+/docs/superpowers/
+
 # 随包分发的 ffmpeg 整棵都不进仓：体积到百 MB 级，二进制、zip、校验戳记都由
 # scripts/FetchFfmpeg.ps1 现场取件与验证，任何一份进历史都是让每次克隆替将来所有版本付空间。
 # vendor/Tessdata 相反：.traineddata 只有几 MB 且是 Apache-2.0，进仓才能让构建不依赖网络

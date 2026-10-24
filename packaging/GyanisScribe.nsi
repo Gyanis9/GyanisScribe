@@ -26,11 +26,10 @@ SetCompressor /SOLID lzma
 
 !define MUI_ABORTWARNING
 !ifndef GyanisScribeIco
-  ; 安装包图标要的是 .ico 资源：可执行体里没有嵌 PE 图标时，拿它当图标源会被 makensis 判成
-  ; 「invalid icon file」而中止。日后若加了 Resources/AppIcon.ico，用
-  ;   makensis -DGyanisScribeIco=... 传进来即可，这里不猜一个不存在的路径。
+  ; 安装包图标要的是 .ico 资源：-DGyanisScribeIco 由 scripts/WindowsPackage.ps1 传入。
 !else
   !define MUI_ICON "${GyanisScribeIco}"
+  !define MUI_UNICON "${GyanisScribeIco}"
 !endif
 
 !insertmacro MUI_PAGE_WELCOME

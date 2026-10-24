@@ -102,7 +102,8 @@ endif ()
 # 照抄 WIN32 那一边的写法会在 generate 期报「target was not found」
 if (WIN32)
     add_executable(GyanisScribe WIN32
-            Main/Main.cpp)
+            Main/Main.cpp
+            Gui/Resources/Brand/AppIcon.rc)
 else ()
     add_executable(GyanisScribe
             Main/Main.cpp)

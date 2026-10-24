@@ -153,7 +153,8 @@ if (Test-Path $Nsis) {
     # (packaging/), not the caller's cwd, so a relative one looked for packaging/dist/... and
     # aborted with "no files found" while the stage folder was plainly full.
     $stageForNsis = (Resolve-Path $stage).Path -replace '\\', '/'
-    & $Nsis "/DGyanisScribeVersion=$version" "/DGyanisScribeStage=$stageForNsis" 'packaging\GyanisScribe.nsi'
+    $ico = (Resolve-Path 'src/Gui/Resources/Brand/AppIcon.ico').Path -replace '\\', '/'
+    & $Nsis "/DGyanisScribeVersion=$version" "/DGyanisScribeStage=$stageForNsis" "/DGyanisScribeIco=$ico" 'packaging\GyanisScribe.nsi'
     if ($LASTEXITCODE -ne 0) { throw 'makensis failed' }
     Write-Output "[ok] installer: dist\GyanisScribe-$version-win64.exe"
 } else {

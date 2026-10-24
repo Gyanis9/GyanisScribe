@@ -355,6 +355,8 @@ HEX 那一形里字母用大写还是小写是单独一格（`Pick/HexUppercase`
 <img src="docs/images/main-about.png" width="460" alt="主窗口 · 关于页">
 </p>
 
+2026-10-24 起，品牌图改为黑砖 + 白色 C 框 + 绿点：应用图标出 16/24/32/48/64/128/256/512 八档原生 PNG，`.ico` 装 16–256 七档，512 单独保留。界面图标全量重绘为 24 格 / 2px / 暖黑暖白，QIcon 备 16/20/24/32/48/64/96/128 八档，并补 125%/150% 等实际屏幕倍率；96 档同时修掉历史类别图标由 32 放大的问题。
+
 ## 快速开始
 
 已经构建好（或拿到打包产物）时：
@@ -854,7 +856,7 @@ src/Plugins     可换用后端：条码识别、抓帧来源、识别引擎、�
 src/Platform    平台能力抽象（热键、窗口几何、自启、系统集成），Windows 后端在 Platform/Windows/ 下
 vendor/WinRt    Windows 系统识别用的 C++/WinRT 投影头（MIT，生成与裁剪办法见 docs/OcrBackends.md）
 tests/          逐级镜像 src 的目录结构；另有一条跨模块流程入口 tests/Main/TestModuleFlow.cpp
-src/Gui/Resources/Icons 90 张原创 SVG 图标（未接线的几枚记在路线图「图标接线」那一条）
+src/Gui/Resources/Icons 88 张原创 SVG 图标（未接线的几枚记在路线图「图标接线」那一条）；品牌图另在 Gui/Resources/Brand（9 个 SVG、8 个 PNG、1 个 .ico）
 scripts/        构建、打包脚本与静态门禁
 docs/           识别后端、第三方许可证、界面样式说明
 ```
@@ -1310,7 +1312,7 @@ Conan 直取，许可证正文见 `licenses/Zxing-Apache-2.0.txt` 与 `docs/Thir
 - 可恢复错误返回 `std::expected<T, Error>`，错误文案中文且可操作（写清「原因 + 替代做法」）；
   不许静默失败、取整、回绕、把「不支持」悄悄当成「按默认处理」。
 - 一切要显示给用户的文本走 `Base::uiText()`，并且同步进翻译目录（`Style.TranslationCatalog` 会拦漏项）。
-- 图标必须是原创 SVG：`viewBox="0 0 24 24"`、`currentColor`、描边 1.5 或 2、圆角端点，
+- 图标必须是原创 SVG：`viewBox="0 0 24 24"`、`currentColor`、描边 2、圆角端点，
   只经 `IconProvider` 加载；不下载、不引用、不复制任何现成图标库或任何现有产品的素材。
 - 零告警是硬判据：MSVC 侧每个目标都带 `/W4 /WX`；编译器不报的漏项
   由 `Style.SourceConventions` 与用例兜住。
