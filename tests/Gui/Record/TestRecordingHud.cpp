@@ -327,3 +327,21 @@ TEST_F(RecordingHudFixture, ClosingTheHudDestroysItInsteadOfOnlyHidingIt)
 
     EXPECT_TRUE(guard.isNull()) << "收起只藏不留销毁：下一轮录屏会再建一个，旧的那个永远留在桌上";
 }
+
+/**
+ * @brief 钉住录屏时长与倒计时都锁等宽数字
+ * @details 这两处一秒一跳；比例字体会让时长列与居中的倒计时逐秒改宽。
+ *          时长走 Metric 角色，倒计时只落基准字体加 tnum，两条路径各断言一次。
+ */
+TEST_F(RecordingHudFixture, ElapsedAndCountdownUseTabularFigures)
+{
+    auto  hud      = makeHud();
+    auto *elapsed  = labelOf(*hud, QStringLiteral("已录时长"));
+    auto *countdown = labelOf(*hud, QStringLiteral("倒计时"));
+    ASSERT_NE(elapsed, nullptr) << "控制条上没有「已录时长」标签";
+    ASSERT_NE(countdown, nullptr) << "控制条上没有「倒计时」标签";
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+    EXPECT_EQ(elapsed->font().featureValue(QFont::Tag("tnum")), 1u) << "录屏时长没锁等宽，秒数一跳整条就抖";
+    EXPECT_EQ(countdown->font().featureValue(QFont::Tag("tnum")), 1u) << "倒计时大字没锁等宽，数字宽度逐秒变";
+#endif
+}

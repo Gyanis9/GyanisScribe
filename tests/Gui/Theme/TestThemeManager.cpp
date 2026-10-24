@@ -12,6 +12,7 @@
 #include <QApplication>
 #include <QColor>
 #include <QFile>
+#include <QFont>
 #include <QImage>
 #include <string_view>
 #include <tuple>
@@ -20,6 +21,7 @@
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QString>
+#include <QStringList>
 #include <QVariant>
 
 #include <algorithm>
@@ -55,10 +57,14 @@ using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Base::Logger;
 using GyanisScribe::Core::kThemeMode;
 using GyanisScribe::Core::SettingsStore;
+using GyanisScribe::Gui::applyTextRole;
 using GyanisScribe::Gui::paletteFor;
 using GyanisScribe::Gui::parseThemeKind;
 using GyanisScribe::Gui::resolveThemeKind;
+using GyanisScribe::Gui::setVariableMetricFamilyAvailableForTesting;
 using GyanisScribe::Gui::SystemScheme;
+using GyanisScribe::Gui::TextRole;
+using GyanisScribe::Gui::TextScript;
 using GyanisScribe::Gui::ThemeKind;
 using GyanisScribe::Gui::themeKindText;
 using GyanisScribe::Gui::ThemeManager;
@@ -102,6 +108,68 @@ namespace
             return {};
         }
         return QString::fromUtf8(file.readAll());
+    }
+
+    /**
+     * @brief 抽出样式表里所有带 :focus 的选择器，逐个逗号分支拆开
+     * @param sheet 样式表原文
+     * @return 已简化的选择器文本；每条至少含一个 :focus
+     * @details 直接搜全文会把 `QWidget#AnnotationToolbar QPushButton:focus` 里的
+     *          `QPushButton:focus` 也算成控件级焦点，判据必须按选择器分支看前缀。
+     */
+    QStringList focusSelectorsIn(const QString &sheet)
+    {
+        QStringList             selectors;
+        const QRegularExpression rule{QStringLiteral(R"(([^{}]*:focus[^{}]*)\{)")};
+        for (auto match = rule.match(sheet); match.hasMatch(); match = rule.match(sheet, match.capturedEnd()))
+        {
+            for (const auto &branch: match.captured(1).split(QLatin1Char(',')))
+            {
+                const auto selector = branch.simplified();
+                if (selector.contains(QStringLiteral(":focus")))
+                {
+                    selectors.append(selector);
+                }
+            }
+        }
+        return selectors;
+    }
+
+    /// 读一份仓库内的源文件：源目录由 CMake 的 GYANISSCRIBE_SOURCE_DIR 指过来，不赌 ctest 的工作目录
+    std::string readSourceFile(const std::string_view relativePath)
+    {
+        std::ifstream input{std::filesystem::path{std::string{GYANISSCRIBE_SOURCE_DIR}} / std::string{relativePath}, std::ios::binary};
+        if (!input)
+        {
+            return {};
+        }
+        return std::string{std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{}};
+    }
+
+    /// 从函数起点找到与第一个左花括号配对的右花括号：用于断言某次调用落在绘制函数体内
+    std::size_t enclosingFunctionEnd(const std::string &source, const std::size_t functionStart)
+    {
+        const auto open = source.find('{', functionStart);
+        if (open == std::string::npos)
+        {
+            return std::string::npos;
+        }
+        int depth = 0;
+        for (auto index = open; index < source.size(); ++index)
+        {
+            if (source[index] == '{')
+            {
+                ++depth;
+            } else if (source[index] == '}')
+            {
+                --depth;
+                if (depth == 0)
+                {
+                    return index;
+                }
+            }
+        }
+        return std::string::npos;
     }
 
     /**
@@ -753,4 +821,127 @@ TEST_F(ThemeManagerFixture, CheckboxAndSliderShowAKeyboardFocusRing)
     QCoreApplication::processEvents();
     EXPECT_GT(sliderBefore, 50) << "未聚焦时手柄本该是主色实心，判据的前提没构造出来";
     EXPECT_LT(handleAccentPixels(*slider), 10) << "滑块聚焦后手柄外观没变，键盘焦点看不出来";
+}
+
+/**
+ * @brief 钉住 Light/Dark 不再有控件级焦点描边，只留标注工具栏的紧凑焦点与滑块手柄反转
+ * @details 双环由 FocusRingController 的覆盖层画；样式表里若还留着 QPushButton:focus 一类规则，
+ *          会在覆盖层之外再压一圈描边，切主题后同一控件出现两种焦点形态。判据按选择器分支看，
+ *          不能只搜全文——工具栏那五条同样以 QPushButton:focus 收尾。
+ */
+TEST_F(ThemeManagerFixture, LightAndDarkSheetsDropTheControlLevelFocusOutlines)
+{
+    for (const auto resource: {std::string_view{":/styles/Light.qss"}, std::string_view{":/styles/Dark.qss"}})
+    {
+        const auto sheet     = readStyleSheet(resource);
+        const auto selectors = focusSelectorsIn(sheet);
+        ASSERT_FALSE(sheet.isEmpty()) << resource;
+        ASSERT_FALSE(selectors.isEmpty()) << resource << " 一条 :focus 规则都没有，判据没有落点";
+
+        const auto branches = [&selectors](const QString &token)
+        {
+            QStringList matched;
+            for (const auto &selector: selectors)
+            {
+                if (selector.contains(token))
+                {
+                    matched.append(selector);
+                }
+            }
+            return matched;
+        };
+
+        // 标注工具栏是唯一允许控件级焦点的落点：每条命中都必须带 #AnnotationToolbar 前缀
+        for (const auto *token: {"QPushButton:focus", "QToolButton:focus", "QLineEdit:focus", "QComboBox:focus", "QSpinBox:focus"})
+        {
+            const auto matched = branches(QString::fromLatin1(token));
+            EXPECT_EQ(matched.size(), 1) << resource << " 里 " << token << " 的条数不对：应有且只有工具栏那一条";
+            for (const auto &selector: matched)
+            {
+                EXPECT_TRUE(selector.contains(QStringLiteral("#AnnotationToolbar"))) << resource << " 留下了控件级焦点描边：" << selector.toStdString();
+            }
+        }
+
+        // 这两类在浅色与深色档里没有任何合法落点：覆盖层负责，QSS 不该再画
+        EXPECT_TRUE(branches(QStringLiteral("QTextEdit#annotationTextEditor:focus")).isEmpty()) << resource << " 行内编辑器还留着 :focus 描边";
+        EXPECT_TRUE(branches(QStringLiteral("QCheckBox::indicator:focus")).isEmpty()) << resource << " 复选框指示器还留着 :focus 描边";
+
+        // 滑块没有覆盖层：手柄反转是浅深两档唯一的 QSS 焦点形态
+        EXPECT_EQ(branches(QStringLiteral("QSlider::handle:horizontal:focus")).size(), 1) << resource << " 滑块的手柄反转焦点没了";
+        // 高对比度档仍保留控件级 2px 描边，由 SemanticColorPairsMeetWcagContrast 的 2PX SOLID 判据钉住
+    }
+}
+
+/**
+ * @brief 钉住换主题时 ThemeManager 会重放已存在控件的文字角色
+ * @details 只测 applyTextRole 本身漏掉的是 allWidgets 这条接线：控件在浅色档建好、换到深色档后
+ *          若不再重算，暗色纯 ASCII 读数会停在默认字族与 600，可变字族的降重永远不生效。
+ *          可变字族的可用性由测试钩子钉死，不依赖跑测机器装没装该字族。
+ */
+TEST_F(ThemeManagerFixture, ThemeSwitchReplaysAsciiMetricRoleForExistingWidgets)
+{
+    struct VariableFamilyGuard final
+    {
+        ~VariableFamilyGuard()
+        {
+            setVariableMetricFamilyAvailableForTesting(std::nullopt);
+        }
+    } guard;
+    setVariableMetricFamilyAvailableForTesting(true);
+
+    ASSERT_TRUE(manager().setTheme(ThemeKind::Light).has_value());
+    QLabel label;
+    auto   baseFont = label.font();
+    baseFont.setWeight(QFont::Normal);
+    label.setFont(baseFont);
+    const auto baseFamily = label.font().family();
+
+    applyTextRole(label, TextRole::Metric, TextScript::AsciiOnly);
+    EXPECT_EQ(static_cast<int>(label.font().weight()), 600) << "浅色档的读数该停在 DemiBold";
+    EXPECT_EQ(label.font().family(), baseFamily);
+
+    ASSERT_TRUE(manager().setTheme(ThemeKind::Dark).has_value());
+    EXPECT_EQ(static_cast<int>(label.font().weight()), 560) << "换到深色档没有重放文字角色，可变字族的降重没生效";
+    EXPECT_EQ(label.font().family(), QStringLiteral("Segoe UI Variable Text")) << "换到深色档没有换成可变字族";
+
+    ASSERT_TRUE(manager().setTheme(ThemeKind::Light).has_value());
+    EXPECT_EQ(static_cast<int>(label.font().weight()), 600) << "切回浅色档没有把字重还原成 600";
+    EXPECT_EQ(label.font().family(), baseFamily) << "切回浅色档还挂着深色档的可变字族";
+}
+
+/**
+ * @brief 钉住三处自绘读数在绘制函数里确实走了 tabularFont
+ * @details 遮罩读数、取色信息条与贴图颜色读数没有 QLabel 可断言字体：字体直接设在 QPainter 上。
+ *          这里按源码级接线守住那一行调用，并限定它落在绘制函数体内，防止调用被挪到永不执行的分支。
+ *          控件级读数（长截图、OCR 摘要、历史列表、录屏时长与倒计时）另由各自用例逐件断言。
+ */
+TEST_F(ThemeManagerFixture, PaintedReadoutsLockTabularFiguresInsideThePaintFunctions)
+{
+    struct Probe
+    {
+        std::string_view file;
+        std::string_view function;
+        std::string_view call;
+    };
+    const std::array probes = {
+            Probe{"src/Gui/Capture/CaptureOverlay.cpp", "void CaptureOverlay::paintMagnifier", "tabularFont(stripFont, TextScript::Mixed)"},
+            Probe{"src/Gui/Capture/CaptureOverlay.cpp", "void CaptureOverlay::paintEvent", "tabularFont(hintFont, TextScript::Mixed)"},
+            Probe{"src/Gui/Pick/ColorPickerOverlay.cpp", "void ColorPickerOverlay::paintEvent", "tabularFont(painter.font(), TextScript::AsciiOnly)"},
+            Probe{"src/Gui/Pin/PinWindow.cpp", "void PinWindow::paintColorReadout", "tabularFont(font, TextScript::AsciiOnly)"},
+    };
+
+    for (const auto &probe: probes)
+    {
+        const auto source = readSourceFile(probe.file);
+        ASSERT_FALSE(source.empty()) << "读不到源文件：" << std::string{probe.file};
+
+        const auto functionStart = source.find(probe.function);
+        ASSERT_NE(functionStart, std::string::npos) << std::string{probe.file} << " 里找不到绘制函数 " << std::string{probe.function};
+        const auto functionEnd = enclosingFunctionEnd(source, functionStart);
+        ASSERT_NE(functionEnd, std::string::npos) << std::string{probe.file} << " 的绘制函数括号没有配对";
+
+        const auto call = source.find(probe.call, functionStart);
+        ASSERT_NE(call, std::string::npos) << std::string{probe.file} << " 的绘制函数里没有 " << std::string{probe.call};
+        EXPECT_LT(call, functionEnd) << std::string{probe.file} << " 的 tabularFont 调用不在绘制函数体内";
+    }
 }

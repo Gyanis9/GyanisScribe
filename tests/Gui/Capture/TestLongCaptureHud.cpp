@@ -122,3 +122,26 @@ TEST_F(LongCaptureHudFixture, ReadoutLandsOnTheLabelInsideTheHud)
     }
     EXPECT_TRUE(found) << "读数没落在控制条里的那行文字上";
 }
+
+/**
+ * @brief 钉住长截图读数锁等宽数字
+ * @details 「已接 N 像素高」每接一帧就跳一次数字；比例字体会让整条控制条左右抖。
+ *          读数含中文，只上 tnum，不换字族也不降字重（那两件事只留给纯 ASCII 读数）。
+ */
+TEST_F(LongCaptureHudFixture, ReadoutUsesTabularFigures)
+{
+    LongCaptureHud hud;
+    QLabel        *readout = nullptr;
+    for (auto *label: hud.findChildren<QLabel *>())
+    {
+        if (label->accessibleName() == QStringLiteral("已接高度"))
+        {
+            readout = label;
+            break;
+        }
+    }
+    ASSERT_NE(readout, nullptr) << "控制条上没有名为「已接高度」的读数标签";
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+    EXPECT_EQ(readout->font().featureValue(QFont::Tag("tnum")), 1u) << "长截图读数没锁等宽，接一帧就左右抖";
+#endif
+}

@@ -30,6 +30,11 @@ namespace
     public:
         void SetUp() override
         {
+            // 焦点环与复选框的像素判据按逻辑像素取样点：真机 125%/150% 下 grab() 给出的是更大的图，
+            // 同一个采样点会落到别处。这个二进制里的像素用例都在同一份 QApplication 下，强制倍比为 1。
+            // 真缩放屏的观感仍留给人在实机上看。
+            qputenv("QT_SCALE_FACTOR", "1");
+
             static int   argumentCount  = 1;
             static char  argumentZero[] = "TestControlsChrome";
             static char *arguments[]    = {argumentZero, nullptr};
