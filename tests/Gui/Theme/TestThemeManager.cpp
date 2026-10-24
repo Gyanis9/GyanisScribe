@@ -29,6 +29,7 @@
 #include <fstream>
 #include <initializer_list>
 #include <memory>
+#include <set>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QFormLayout>
@@ -338,12 +339,14 @@ TEST_F(ThemeManagerFixture, GarbageStoredValueFallsBackToSystemAndLogsWarning)
 
 /**
  * @brief 钉住样式表与色板同解，双向都查
- * @details 正向：QSS 里出现的每个十六进制色都必须是该主题色板里的一个（禁「代码外再有一套色」）；
- *          反向：色板每个字段都得出现在 QSS 里，除 icon 由 IconProvider 取用——
- *          这一条同时抓出「加了没人用的色板字段」这种死配置。
+ * @details 正向逐主题：QSS 里出现的每个十六进制色都必须是该主题色板里的一个（禁「代码外再有一套色」）；
+ *          反向全局：每个进 QSS 的色板角色至少要有一份样式表用着，除 icon 由 IconProvider 取用——
+ *          这一条同时抓出「加了没人用的色板字段」这种死配置。反向不逐主题，是因为高对比度专用角色
+ *          不该被浅色与深色两份样式表判成缺失。
  */
 TEST_F(ThemeManagerFixture, StyleSheetsAndPalettesAgreeInBothDirections)
 {
+    std::set<QString> usedColors;
     for (const auto [kind, resource]: {std::pair{ThemeKind::Light, std::string_view{":/styles/Light.qss"}}, std::pair{ThemeKind::Dark, std::string_view{":/styles/Dark.qss"}},
                                        std::pair{ThemeKind::HighContrast, std::string_view{":/styles/HighContrast.qss"}}})
     {
@@ -357,18 +360,16 @@ TEST_F(ThemeManagerFixture, StyleSheetsAndPalettesAgreeInBothDirections)
                                           palette.onAccent,         palette.selection,  palette.mutedFill,   palette.controlFill,   palette.hover,  palette.pressed,
                                           palette.accentHover,      palette.accentSoft, palette.borderStrong};
 
-        // 正向：QSS 里不许出现色板之外的色值
+        // 正向：QSS 里不许出现色板之外的色值；命中的色值进入全局使用集合
         QRegularExpression hexPattern{QStringLiteral("#[0-9A-Fa-f]{6}")};
         for (auto match = hexPattern.match(sheet); match.hasMatch(); match = hexPattern.match(sheet, match.capturedEnd()))
         {
             const auto found = std::ranges::any_of(paletteColors, [&match](const QColor &color) { return hexOf(color) == match.captured(0).toUpper(); });
             EXPECT_TRUE(found) << resource << " 里的 " << match.captured(0).toStdString() << " 不在该主题色板里";
-        }
-
-        // 反向：色板字段必须真的被样式表用着
-        for (const auto &color: paletteColors)
-        {
-            EXPECT_NE(sheet.indexOf(hexOf(color)), -1) << resource << " 没用出色板里的 " << hexOf(color).toStdString();
+            if (found)
+            {
+                usedColors.insert(match.captured(0).toUpper());
+            }
         }
 
         // 绘制专用的三个色反过来断言不在 QSS 里：图标描边只走 IconProvider，
@@ -382,6 +383,18 @@ TEST_F(ThemeManagerFixture, StyleSheetsAndPalettesAgreeInBothDirections)
                 continue;
             }
             EXPECT_EQ(sheet.indexOf(hexOf(codeOnlyColor)), -1) << resource << " 里出现了只该由绘制代码用的语义色 " << hexOf(codeOnlyColor).toStdString();
+        }
+    }
+
+    // 反向全局：每个该进 QSS 的角色至少被一份样式表用着
+    for (const auto kind: {ThemeKind::Light, ThemeKind::Dark, ThemeKind::HighContrast})
+    {
+        const auto &palette = paletteFor(kind);
+        for (const auto &color:
+             {palette.windowBackground, palette.surface, palette.text, palette.secondaryText, palette.border, palette.accent, palette.onAccent, palette.selection,
+              palette.mutedFill, palette.controlFill, palette.hover, palette.pressed, palette.accentHover, palette.accentSoft, palette.borderStrong})
+        {
+            EXPECT_TRUE(usedColors.contains(hexOf(color))) << "色板里的 " << hexOf(color).toStdString() << " 一份 QSS 都没用过";
         }
     }
 }
@@ -495,31 +508,63 @@ TEST_F(ThemeManagerFixture, WidgetsRenderThePaletteSurfacePerTheme)
 }
 
 /**
- * @brief 钉住次级按钮平时就有可见描边
- * @details 此前基础规则是 2px 透明边框，只有悬停/聚焦才显形；「导出配置」「导出色板」
- *          「检查更新」这类次级按钮于是只剩一串文字。取按钮左缘中点：那一列必须是
- *          borderStrong，且不能等于按钮背后的 surface。
+ * @brief 钉住次级按钮平时就与卡片底分得开
+ * @details 去描边之后按钮只剩 controlFill 与卡片 surface 的微明度差；这一档若被抹平，
+ *          「导出配置」「导出色板」「检查更新」这类次级按钮就只剩一串文字。
+ *          取按钮内部中点与卡片角落各一像素，既要比颜色不等，也要比明度差得看得出来。
  */
-TEST_F(ThemeManagerFixture, SecondaryButtonsKeepAVisibleOutlineAtRest)
+TEST_F(ThemeManagerFixture, SecondaryButtonsStayDistinguishableAtRest)
 {
     const auto probe = [](const ThemeKind kind)
     {
         application->setStyleSheet(ThemeManager::styleSheetFor(kind));
-        QPushButton button(QStringLiteral("导出配置…"));
-        button.resize(140, 36);
-        button.ensurePolished();
-        const auto image = button.grab().toImage();
-        return image.pixelColor(0, image.height() / 2);
+        QWidget host;
+        host.setObjectName(QStringLiteral("pageCard"));
+        host.setAttribute(Qt::WA_StyledBackground, true);
+        host.resize(200, 80);
+        QPushButton button(QStringLiteral("导出配置…"), &host);
+        button.setGeometry(30, 20, 140, 30);
+        host.show();
+        QCoreApplication::processEvents();
+        const auto image = host.grab().toImage();
+        application->setStyleSheet(QString{});
+        return std::pair{image.pixelColor(40, 35), image.pixelColor(5, 5)};
     };
 
-    const auto light = probe(ThemeKind::Light);
-    const auto dark  = probe(ThemeKind::Dark);
-    const auto hc    = probe(ThemeKind::HighContrast);
-    application->setStyleSheet(QString{});
+    for (const auto kind: {ThemeKind::Light, ThemeKind::Dark})
+    {
+        const auto [button, card] = probe(kind);
+        EXPECT_NE(button, card) << static_cast<int>(kind) << " 静息按钮与卡片同色，只剩一串文字";
+        EXPECT_GT(std::abs(relativeLuminance(button) - relativeLuminance(card)), 0.002) << static_cast<int>(kind) << " 明度差小到看不出来";
+    }
+}
 
-    EXPECT_EQ(light, paletteFor(ThemeKind::Light).borderStrong) << "浅色档次级按钮左缘没有描边";
-    EXPECT_EQ(dark, paletteFor(ThemeKind::Dark).borderStrong) << "深色档次级按钮左缘没有描边";
-    EXPECT_EQ(hc, paletteFor(ThemeKind::HighContrast).borderStrong) << "高对比度档次级按钮左缘没有描边";
+/**
+ * @brief 钉住三档主题下控件总高不随去边框漂移
+ * @details 浅色与深色靠 1px 透明边框占位：按钮 30、输入类 32。
+ *          高对比度档的 2px 描边是它的可辨识契约，视觉保持不动，总高因此比另两档各多 2px；
+ *          数字框另有上下各 2px 的自有框，浅深档靠 26px 内容高收进 32，高对比度档落在 38。
+ */
+TEST_F(ThemeManagerFixture, ControlsKeepTheirHeightAcrossThemes)
+{
+    for (const auto kind: {ThemeKind::Light, ThemeKind::Dark, ThemeKind::HighContrast})
+    {
+        application->setStyleSheet(ThemeManager::styleSheetFor(kind));
+        QLineEdit   edit;
+        QPushButton button(QStringLiteral("确定"));
+        QSpinBox    spin;
+        QComboBox   combo;
+        for (QWidget *widget: std::initializer_list<QWidget *>{&edit, &button, &spin, &combo})
+        {
+            widget->ensurePolished();
+        }
+        const auto highContrast = kind == ThemeKind::HighContrast;
+        EXPECT_EQ(edit.sizeHint().height(), highContrast ? 34 : 32) << static_cast<int>(kind) << " 输入框总高变了";
+        EXPECT_EQ(spin.sizeHint().height(), highContrast ? 38 : 32) << static_cast<int>(kind) << " 数字框总高变了";
+        EXPECT_EQ(combo.sizeHint().height(), highContrast ? 34 : 32) << static_cast<int>(kind) << " 下拉框总高变了";
+        EXPECT_EQ(button.sizeHint().height(), highContrast ? 32 : 30) << static_cast<int>(kind) << " 按钮总高变了";
+    }
+    application->setStyleSheet(QString{});
 }
 
 /**

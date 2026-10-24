@@ -1719,7 +1719,7 @@ TEST_F(MainWindowFixture, CompactSettingsLayoutHasANarrowerFloor)
     EXPECT_EQ(box->contentsMargins().left(), GyanisScribe::Gui::kSpacingMedium);
     auto *form = card->findChild<QFormLayout *>();
     ASSERT_NE(form, nullptr);
-    EXPECT_EQ(form->verticalSpacing(), GyanisScribe::Gui::kSpacingHairline);
+    EXPECT_EQ(form->verticalSpacing(), GyanisScribe::Gui::kSpacingSmall);
 }
 
 /**

@@ -162,7 +162,8 @@ namespace
         layout->addWidget(text);
 
         auto *form = new QFormLayout;
-        form->setVerticalSpacing(GyanisScribe::Gui::kSpacingHairline);
+        // 双环要在输入框外占 6px：行距从 2px 提到 8px，环不会压在相邻行上
+        form->setVerticalSpacing(GyanisScribe::Gui::kSpacingSmall);
         form->setHorizontalSpacing(GyanisScribe::Gui::kSpacingSmall);
         // 标签右对齐并与字段同一水平线：这一列的右端要与字段左缘只隔一个行距，左对齐时那条缝会随
         // 标签长短忽宽忽窄（实测 4 字 81px、10 字只剩 9px，同一页里两种都见得到）；
