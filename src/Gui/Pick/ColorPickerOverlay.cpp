@@ -149,6 +149,8 @@ namespace GyanisScribe::Gui
         painter.fillRect(stripRect, m_theme.palette().surface);
         painter.fillRect(stripRect.adjusted(4, 4, -(stripRect.width() - kColorChipEdge - 8), -4), colorAt(m_cursor));
         painter.setPen(QPen{m_theme.palette().text});
+        // 颜色读数是纯 ASCII：锁等宽，暗色档按 ASCII 档换可变字族并降重
+        painter.setFont(tabularFont(painter.font(), TextScript::AsciiOnly));
         painter.drawText(stripRect.adjusted(kColorChipEdge + 12, 0, -4, 0), Qt::AlignVCenter | Qt::AlignLeft, currentText());
 
         // 最近取色的色块行贴在屏幕底边中间：命中测试与绘制共用 Core::recentSwatchRects 那一处几何

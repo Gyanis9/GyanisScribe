@@ -3,6 +3,7 @@
 // 同一进程不能再造第二份。
 #include "Gui/Controls/HotkeyEdit.h"
 #include "Gui/Controls/SpinBox.h"
+#include "Gui/Theme/DesignTokens.h"
 
 #include "Core/Settings/SettingsStore.h"
 
@@ -158,4 +159,15 @@ TEST_F(SpinBoxFixture, ClickingTheStepperStepsTheValue)
     spin.setValue(10);
     up->click();
     EXPECT_EQ(spin.value(), 10) << "顶部没有夹住";
+}
+
+/**
+ * @brief 钉住数字框的数字锁定等宽：一秒一跳的读数不能左右抖
+ */
+TEST(SpinBoxChrome, UsesTabularFigures)
+{
+    GyanisScribe::Gui::SpinBox spin;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+    EXPECT_EQ(spin.font().featureValue(QFont::Tag("tnum")), 1u) << "数字框没锁等宽，读数会左右抖";
+#endif
 }

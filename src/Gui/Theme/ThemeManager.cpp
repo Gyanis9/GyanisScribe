@@ -163,9 +163,13 @@ namespace GyanisScribe::Gui
             // 走 allWidgets 而不是 topLevelWidgets：后者只收已登记的窗口，还没 show 过的顶层控件不在里面
             // （实测用 topLevelWidgets 时一个未显示的窗口拿不到新色）。setPalette 落在窗口上，
             // Qt 会向下传给没有自设调色板的子控件。
+            // 文字排版也要按新档重放：先记下档位，再挨个重算，否则重放读到的还是上一档
+            GyanisScribe::Gui::setTextThemeKind(resolved);
             for (auto *widget: QApplication::allWidgets())
             {
                 widget->setPalette(appPalette);
+                GyanisScribe::Gui::reapplyTextRole(*widget);
+                GyanisScribe::Gui::reapplyTabularFigures(*widget);
             }
         }
         emit themeChanged();

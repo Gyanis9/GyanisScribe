@@ -145,8 +145,9 @@ namespace GyanisScribe::Gui
         m_elapsed->setObjectName(QStringLiteral("metricValue"));
         m_elapsed->setAccessibleName(GyanisScribe::Base::uiText("已录时长"));
         m_elapsed->setToolTip(GyanisScribe::Base::uiText("已录了多久。录到设置里「最长录多久」那一格就自动收尾并保存（默认 10 分钟）"));
-        // 等宽数字：一秒一跳时这一列的宽度不能变，否则整条控制条每秒钟抖一次
-        GyanisScribe::Gui::applyTextRole(*m_elapsed, GyanisScribe::Gui::TextRole::Metric);
+        // 等宽数字：一秒一跳时这一列的宽度不能变，否则整条控制条每秒钟抖一次。
+        // 时长是纯 ASCII 读数，暗色档可换可变字族并降 40
+        GyanisScribe::Gui::applyTextRole(*m_elapsed, GyanisScribe::Gui::TextRole::Metric, GyanisScribe::Gui::TextScript::AsciiOnly);
         line->addWidget(m_elapsed);
 
         // 取消排在最左：它与「停止并保存」之间隔着暂停键，误点一格不会把录好的那段丢掉
@@ -212,6 +213,8 @@ namespace GyanisScribe::Gui
         {
             QFont bigFont = m_countdown->font();
             bigFont.setPointSize(kCountdownFontPointSize);
+            // 倒计时是纯数字读数：暗色档换可变字族时按 ASCII 档降重
+            bigFont = tabularFont(bigFont, TextScript::AsciiOnly);
             m_countdown->setFont(bigFont);
             m_countdown->setText(*countdown);
             m_countdown->show();

@@ -1627,6 +1627,8 @@ namespace GyanisScribe::Gui
         const int swatchEdge = kColorReadoutSwatchEdge;
         QFont     font       = painter.font();
         font.setPointSize(kColorReadoutFontPointSize);
+        // 颜色读数是纯 ASCII：锁等宽，暗色档按 ASCII 档换可变字族并降重
+        font = tabularFont(font, TextScript::AsciiOnly);
         const QFontMetrics metrics(font);
         const int          textWidth = metrics.horizontalAdvance(*text);
 

@@ -8,6 +8,7 @@
 #include <array>
 #include <optional>
 
+using GyanisScribe::Gui::darkReadoutWeight;
 using GyanisScribe::Gui::kAccentColor;
 using GyanisScribe::Gui::kAnnotationWidths;
 using GyanisScribe::Gui::kDarkPalette;
@@ -15,6 +16,8 @@ using GyanisScribe::Gui::kFontSizes;
 using GyanisScribe::Gui::kLightPalette;
 using GyanisScribe::Gui::paletteFor;
 using GyanisScribe::Gui::stepIndexOf;
+using GyanisScribe::Gui::TextRole;
+using GyanisScribe::Gui::textRoleSpec;
 using GyanisScribe::Gui::ThemeKind;
 
 /**
@@ -90,4 +93,37 @@ TEST(DesignTokens, MicroLayeringRolesAreDistinctAndFreeOfOpaqueBlack)
             EXPECT_NE(color, QColor(0, 0, 0)) << "Light/Dark 不该有不透明纯黑";
         }
     }
+}
+
+/**
+ * @brief 钉住暗色档纯 ASCII 读数的降重只在可变字族可用时发生
+ * @details 40 是 600→560 与 400→360 两条路径的共同幅度；取不到可变字族时原样保留，
+ *          否则中文回退会被一起推到 Bold。
+ */
+TEST(DesignTokens, DarkReadoutWeightDropsFortyOnlyWhenVariableFamilyIsAvailable)
+{
+    EXPECT_EQ(darkReadoutWeight(400, true), 360);
+    EXPECT_EQ(darkReadoutWeight(600, true), 560);
+    EXPECT_EQ(darkReadoutWeight(400, false), 400);
+    EXPECT_EQ(darkReadoutWeight(600, false), 600);
+}
+
+/**
+ * @brief 钉住含中文的正文与标题不降重，只有暗色 Metric 换可变字族
+ */
+TEST(DesignTokens, TextRoleSpecKeepsCjkBodyAtFourHundred)
+{
+    const auto metricDark  = textRoleSpec(TextRole::Metric, ThemeKind::Dark, true);
+    const auto metricNoVar = textRoleSpec(TextRole::Metric, ThemeKind::Dark, false);
+    const auto bodyDark    = textRoleSpec(TextRole::Body, ThemeKind::Dark, true);
+    const auto titleDark   = textRoleSpec(TextRole::PageTitle, ThemeKind::Dark, true);
+
+    EXPECT_EQ(metricDark.weight, 560);
+    EXPECT_TRUE(metricDark.variableFamily);
+    EXPECT_EQ(metricNoVar.weight, 600);
+    EXPECT_FALSE(metricNoVar.variableFamily);
+    EXPECT_EQ(bodyDark.weight, 400);
+    EXPECT_FALSE(bodyDark.variableFamily);
+    EXPECT_EQ(titleDark.weight, 600);
+    EXPECT_FALSE(titleDark.variableFamily);
 }

@@ -1,6 +1,7 @@
 #include "Gui/Controls/SpinBox.h"
 
 #include "Base/Text.h"
+#include "Gui/Theme/DesignTokens.h"
 
 #include <QAbstractButton>
 #include <QEnterEvent>
@@ -76,6 +77,8 @@ namespace GyanisScribe::Gui
     {
         setObjectName(QStringLiteral("numericSpin"));
         setButtonSymbols(QAbstractSpinBox::NoButtons);
+        // 数字读数锁等宽：微调时位数变化，后几位不能左右抖
+        applyTabularFigures(*this, TextScript::Mixed);
         // 文本让出右缘那一条：自绘按钮压在上面时数字不会钻到按钮底下
         if (auto *edit = lineEdit(); edit != nullptr)
         {

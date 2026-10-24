@@ -13,6 +13,7 @@
 #include "Gui/Theme/ThemeKind.h"
 
 #include <QColor>
+#include <QFontDatabase>
 #include <QPalette>
 #include <QWidget>
 
@@ -239,36 +240,245 @@ namespace GyanisScribe::Gui
     inline constexpr int kTextRolePointSizeMetric    = 13;
 
     /**
-     * @brief 按角色给控件设字号与字重
-     * @param widget 目标控件，字体随它继承给子控件
-     * @param role 文字角色
-     * @details 标题走半粗（DemiBold）而不是加粗：中文在 Bold 下会糊成一团黑块。
-     *          Metric 另开等宽数字，时长从 9:59 跳到 10:00 时后面那行不该左右抖。
+     * @brief 读数字符集档：纯 ASCII 读数在暗色档可以换可变字族并降重
+     * @details 含中文的句子与西文数字同处一行时，换字族与降重会把中文回退字族映射到 Bold，
+     *          所以只有纯 ASCII 读数允许走可变字族那条路。
      */
-    inline void applyTextRole(QWidget &widget, const TextRole role)
+    enum class TextScript
     {
-        auto font = widget.font();
+        Mixed,     ///< 可能含中文，字重必须保持一致
+        AsciiOnly, ///< 纯数字/西文读数，可变字族可用时可降重
+    };
+
+    /// 一个文字角色在某一档主题下的字号、字重与是否使用可变字族
+    struct TextRoleSpec
+    {
+        int  pointSize      = 10;
+        int  weight         = 400;
+        bool variableFamily = false;
+    };
+
+    /// 暗色档纯 ASCII 读数的降重幅度，同时覆盖 600→560 与 400→360 两条路径
+    inline constexpr int kDarkWeightDrop = 40;
+
+    /**
+     * @brief 暗色档纯 ASCII 读数该用的字重
+     * @param baseWeight 浅色档或默认档的字重
+     * @param variableFamilyAvailable 系统是否装有 Segoe UI Variable Text
+     * @return 可变字族可用时降 kDarkWeightDrop，否则原样返回
+     */
+    [[nodiscard]] constexpr int darkReadoutWeight(const int baseWeight, const bool variableFamilyAvailable)
+    {
+        return variableFamilyAvailable ? baseWeight - kDarkWeightDrop : baseWeight;
+    }
+
+    /**
+     * @brief 某一档主题下某个文字角色的字号、字重与可变字族取舍
+     * @param role 文字角色
+     * @param kind 已解算的主题档
+     * @param variableFamilyAvailable 系统是否装有 Segoe UI Variable Text
+     * @return 角色规格；高对比度与浅色档走同一套固定字重
+     * @details 只有暗色档的 Metric 会在可变字族可用时换成 560 的读出字重；
+     *          PageTitle 与 Body 在任何档都不换字族，避免中文回退分家。
+     */
+    [[nodiscard]] constexpr TextRoleSpec textRoleSpec(const TextRole role, const ThemeKind kind, const bool variableFamilyAvailable)
+    {
         switch (role)
         {
             case TextRole::PageTitle:
-                font.setPointSize(kTextRolePointSizePageTitle);
-                font.setWeight(QFont::DemiBold);
-                break;
+                return {kTextRolePointSizePageTitle, 600, false};
             case TextRole::Body:
-                font.setPointSize(kTextRolePointSizeBody);
-                break;
+                return {kTextRolePointSizeBody, 400, false};
             case TextRole::Metric:
-                font.setPointSize(kTextRolePointSizeMetric);
-                font.setWeight(QFont::DemiBold);
+                if (kind == ThemeKind::Dark && variableFamilyAvailable)
+                {
+                    return {kTextRolePointSizeMetric, 560, true};
+                }
+                return {kTextRolePointSizeMetric, 600, false};
+        }
+        return {kTextRolePointSizeBody, 400, false};
+    }
+
+    /// 当前生效的文字排版档，由 ThemeManager 在切档时写入
+    inline ThemeKind g_textThemeKind = ThemeKind::Light;
+
+    /**
+     * @brief 记录当前生效的主题档，供文字角色与等宽数字按档重算
+     * @param kind 已解算的主题档
+     * @note 必须在重放排版之前调用，否则重放读到的还是上一档
+     */
+    inline void setTextThemeKind(const ThemeKind kind) noexcept
+    {
+        g_textThemeKind = kind;
+    }
+
+    /// 当前生效的主题档
+    [[nodiscard]] inline ThemeKind activeThemeKind() noexcept
+    {
+        return g_textThemeKind;
+    }
+
+    /// 当前主题档的语义色，自绘控件按它取色
+    [[nodiscard]] inline const ThemePalette &activePalette() noexcept
+    {
+        return paletteFor(g_textThemeKind);
+    }
+
+    /**
+     * @brief 系统是否装有 Segoe UI Variable Text
+     * @return 装有该字族时为真
+     * @note 字体库枚举一次就缓存：切档时每个带文字角色的控件都会问这一句
+     */
+    [[nodiscard]] inline bool variableMetricFamilyAvailable()
+    {
+        static const bool available = QFontDatabase::families().contains(QStringLiteral("Segoe UI Variable Text"));
+        return available;
+    }
+
+    /**
+     * @brief 记下控件的原始字族，换过可变字族后仍能还原
+     * @param widget 目标控件
+     * @param font 目标控件当前的字体
+     * @note 只记第一次：重放排版时控件上的字族可能已经是 Segoe UI Variable Text
+     */
+    inline void rememberBaseFamily(QWidget &widget, const QFont &font)
+    {
+        if (!widget.property("uiBaseFamily").isValid())
+        {
+            widget.setProperty("uiBaseFamily", font.family());
+        }
+    }
+
+    /**
+     * @brief 把控件字体还原成记下的原始字族
+     * @param widget 目标控件
+     * @param font 待还原的字体，就地改字族
+     */
+    inline void restoreBaseFamily(QWidget &widget, QFont &font)
+    {
+        const auto base = widget.property("uiBaseFamily").toString();
+        if (!base.isEmpty())
+        {
+            font.setFamily(base);
+        }
+    }
+
+    /**
+     * @brief 给字体上等宽数字，纯 ASCII 读数在暗色档还可换可变字族并降重
+     * @param font 源字体
+     * @param script 读数字符集档
+     * @return 开了 tnum 的字体；AsciiOnly 且暗色档、可变字族可用时换成 Segoe UI Variable Text 并降重
+     * @note tnum 是 Qt 6.7 才有的接口，更老的版本拿不到等宽数字，字体其余部分照旧
+     */
+    [[nodiscard]] inline QFont tabularFont(QFont font, const TextScript script)
+    {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
-                // OpenType 的 tnum 特性：Segoe UI 与 Noto Sans 都带；缺这个特性的字体只是拿不到等宽，不影响可读。
-                // setFeature 是 Qt 6.7 才有的接口（容器那份 6.4 实测报 no member named），按版本分岔：
-                // 拿不到等宽数字时读数只是会抖，不值得为此放弃整档
-                font.setFeature(QFont::Tag("tnum"), 1);
+        font.setFeature(QFont::Tag("tnum"), 1);
 #endif
-                break;
+        if (script == TextScript::AsciiOnly && g_textThemeKind == ThemeKind::Dark && variableMetricFamilyAvailable())
+        {
+            font.setFamily(QStringLiteral("Segoe UI Variable Text"));
+            font.setWeight(static_cast<QFont::Weight>(darkReadoutWeight(static_cast<int>(font.weight()), true)));
+        }
+        return font;
+    }
+
+    /**
+     * @brief 给控件上等宽数字，并记下字符集档供切档时重放
+     * @param widget 目标控件
+     * @param script 读数字符集档；含中文的读数传 Mixed
+     * @details 控件原始字族记在 uiBaseFamily 动态属性上，切回浅色档时据此还原，
+     *          不会把上一次换上的可变字族留在控件上。
+     */
+    inline void applyTabularFigures(QWidget &widget, const TextScript script = TextScript::Mixed)
+    {
+        widget.setProperty("uiTabularScript", static_cast<int>(script));
+        auto font = widget.font();
+        rememberBaseFamily(widget, font);
+        if (script == TextScript::AsciiOnly && g_textThemeKind == ThemeKind::Dark && variableMetricFamilyAvailable())
+        {
+            font = tabularFont(font, script);
+        } else
+        {
+            // 切回浅色档或含中文读数时先还原字族：只补 tnum，不动字重
+            restoreBaseFamily(widget, font);
+            font = tabularFont(font, TextScript::Mixed);
         }
         widget.setFont(font);
+    }
+
+    /**
+     * @brief 按角色给控件设字号与字重
+     * @param widget 目标控件，字体随它继承给子控件
+     * @param role 文字角色
+     * @param script 字符集档：纯 ASCII 读数传 AsciiOnly，含中文的读数传 Mixed
+     * @details 标题走半粗（DemiBold）而不是加粗：中文在 Bold 下会糊成一团黑块。
+     *          Metric 另开等宽数字，时长从 9:59 跳到 10:00 时后面那行不该左右抖。
+     *          暗色档只有纯 ASCII 的 Metric 会换成可变字族并降到 560，其余角色维持原字重。
+     */
+    inline void applyTextRole(QWidget &widget, const TextRole role, const TextScript script = TextScript::Mixed)
+    {
+        widget.setProperty("uiTextRole", static_cast<int>(role));
+        widget.setProperty("uiTextScript", static_cast<int>(script));
+        auto font = widget.font();
+        rememberBaseFamily(widget, font);
+        const auto spec = textRoleSpec(role, g_textThemeKind, variableMetricFamilyAvailable());
+        font.setPointSize(spec.pointSize);
+        if (role == TextRole::Metric)
+        {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+            // OpenType 的 tnum 特性：Segoe UI 与 Noto Sans 都带；缺这个特性的字体只是拿不到等宽，不影响可读。
+            // setFeature 是 Qt 6.7 才有的接口（容器那份 6.4 实测报 no member named），按版本分岔：
+            // 拿不到等宽数字时读数只是会抖，不值得为此放弃整档
+            font.setFeature(QFont::Tag("tnum"), 1);
+#endif
+            if (spec.variableFamily)
+            {
+                font.setFamily(QStringLiteral("Segoe UI Variable Text"));
+                font.setWeight(static_cast<QFont::Weight>(spec.weight));
+            } else
+            {
+                // 中文回退没有 560 这一档：取不到可变字族时留在默认字族的 DemiBold
+                restoreBaseFamily(widget, font);
+                font.setWeight(QFont::DemiBold);
+            }
+        } else
+        {
+            // 正文与标题不换字族：同一句里的中文与西文必须落在同一个字族上
+            restoreBaseFamily(widget, font);
+            font.setWeight(role == TextRole::PageTitle ? QFont::DemiBold : QFont::Normal);
+        }
+        widget.setFont(font);
+    }
+
+    /**
+     * @brief 按控件记下的角色与字符集档重算字体
+     * @param widget 目标控件；没登记过文字角色时原样返回
+     */
+    inline void reapplyTextRole(QWidget &widget)
+    {
+        const auto roleValue = widget.property("uiTextRole");
+        if (!roleValue.isValid())
+        {
+            return;
+        }
+        const auto role   = static_cast<TextRole>(roleValue.toInt());
+        const auto script = static_cast<TextScript>(widget.property("uiTextScript").toInt());
+        applyTextRole(widget, role, script);
+    }
+
+    /**
+     * @brief 按控件记下的字符集档重算等宽数字
+     * @param widget 目标控件；没登记过字符集档时原样返回
+     */
+    inline void reapplyTabularFigures(QWidget &widget)
+    {
+        const auto scriptValue = widget.property("uiTabularScript");
+        if (!scriptValue.isValid())
+        {
+            return;
+        }
+        applyTabularFigures(widget, static_cast<TextScript>(scriptValue.toInt()));
     }
 
     /// 间距阶梯：4 的倍数，界面里出现的每一个间距都取自这几档

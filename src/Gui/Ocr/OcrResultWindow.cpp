@@ -7,6 +7,7 @@
 #include "Plugins/OcrEngines/OcrEngineFactory.h"
 #include "Core/Ocr/OcrTextExporter.h"
 #include "Gui/Resources/IconProvider.h"
+#include "Gui/Theme/DesignTokens.h"
 #include "Gui/Theme/ThemeManager.h"
 
 #include <QApplication>
@@ -205,6 +206,8 @@ namespace GyanisScribe::Gui
 
         m_status = new QLabel{statusLineFor(m_result, m_image.size()), this};
         m_status->setAccessibleName(GyanisScribe::Base::uiText("识别摘要"));
+        // 摘要含中文与计数：只上等宽数字，不降字重
+        applyTabularFigures(*m_status, TextScript::Mixed);
         right->addWidget(m_status);
 
         auto *buttons = new QHBoxLayout;
