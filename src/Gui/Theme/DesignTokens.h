@@ -324,42 +324,69 @@ namespace GyanisScribe::Gui
         return paletteFor(g_textThemeKind);
     }
 
+    /// 测试钩子；std::nullopt 表示按真实字体库判断
+    inline std::optional<bool> g_variableMetricFamilyOverride;
+
+    /**
+     * @brief 测试用：覆盖「是否装有可变字族」的判断
+     * @param available 强制结果；std::nullopt 表示回到真实字体库
+     * @note 只在测试里写这一项，进程内所有控件一起受影响
+     */
+    inline void setVariableMetricFamilyAvailableForTesting(const std::optional<bool> available) noexcept
+    {
+        g_variableMetricFamilyOverride = available;
+    }
+
     /**
      * @brief 系统是否装有 Segoe UI Variable Text
      * @return 装有该字族时为真
-     * @note 字体库枚举一次就缓存：切档时每个带文字角色的控件都会问这一句
+     * @note 字体库枚举一次就缓存：切档时每个带文字角色的控件都会问这一句；
+     *       用例可用 setVariableMetricFamilyAvailableForTesting 覆盖，不依赖跑测机器
      */
     [[nodiscard]] inline bool variableMetricFamilyAvailable()
     {
+        if (g_variableMetricFamilyOverride.has_value())
+        {
+            return *g_variableMetricFamilyOverride;
+        }
         static const bool available = QFontDatabase::families().contains(QStringLiteral("Segoe UI Variable Text"));
         return available;
     }
 
     /**
-     * @brief 记下控件的原始字族，换过可变字族后仍能还原
+     * @brief 记下控件的原始字族与字重，换过可变字族或降过重后仍能还原
      * @param widget 目标控件
      * @param font 目标控件当前的字体
-     * @note 只记第一次：重放排版时控件上的字族可能已经是 Segoe UI Variable Text
+     * @note 只记第一次：重放排版时控件上的字族可能已经是 Segoe UI Variable Text，字重也可能已经降过
      */
-    inline void rememberBaseFamily(QWidget &widget, const QFont &font)
+    inline void rememberBaseFont(QWidget &widget, const QFont &font)
     {
         if (!widget.property("uiBaseFamily").isValid())
         {
             widget.setProperty("uiBaseFamily", font.family());
         }
+        if (!widget.property("uiBaseWeight").isValid())
+        {
+            widget.setProperty("uiBaseWeight", static_cast<int>(font.weight()));
+        }
     }
 
     /**
-     * @brief 把控件字体还原成记下的原始字族
+     * @brief 把控件字体还原成记下的原始字族与字重
      * @param widget 目标控件
-     * @param font 待还原的字体，就地改字族
+     * @param font 待还原的字体，就地改字族与字重
      */
-    inline void restoreBaseFamily(QWidget &widget, QFont &font)
+    inline void restoreBaseFont(QWidget &widget, QFont &font)
     {
         const auto base = widget.property("uiBaseFamily").toString();
         if (!base.isEmpty())
         {
             font.setFamily(base);
+        }
+        const auto baseWeight = widget.property("uiBaseWeight");
+        if (baseWeight.isValid())
+        {
+            font.setWeight(static_cast<QFont::Weight>(baseWeight.toInt()));
         }
     }
 
@@ -387,21 +414,23 @@ namespace GyanisScribe::Gui
      * @brief 给控件上等宽数字，并记下字符集档供切档时重放
      * @param widget 目标控件
      * @param script 读数字符集档；含中文的读数传 Mixed
-     * @details 控件原始字族记在 uiBaseFamily 动态属性上，切回浅色档时据此还原，
-     *          不会把上一次换上的可变字族留在控件上。
+     * @details 控件原始字族与字重记在 uiBaseFamily、uiBaseWeight 动态属性上，切回浅色档时据此还原，
+     *          不会把上一次换上的可变字族与降过的字重留在控件上。降重以记下的基准字重为准，
+     *          暗色档里重复重放也只降一次。
      */
     inline void applyTabularFigures(QWidget &widget, const TextScript script = TextScript::Mixed)
     {
         widget.setProperty("uiTabularScript", static_cast<int>(script));
         auto font = widget.font();
-        rememberBaseFamily(widget, font);
+        rememberBaseFont(widget, font);
         if (script == TextScript::AsciiOnly && g_textThemeKind == ThemeKind::Dark && variableMetricFamilyAvailable())
         {
+            font.setWeight(static_cast<QFont::Weight>(widget.property("uiBaseWeight").toInt()));
             font = tabularFont(font, script);
         } else
         {
-            // 切回浅色档或含中文读数时先还原字族：只补 tnum，不动字重
-            restoreBaseFamily(widget, font);
+            // 切回浅色档或含中文读数时先还原字族与字重：只补 tnum
+            restoreBaseFont(widget, font);
             font = tabularFont(font, TextScript::Mixed);
         }
         widget.setFont(font);
@@ -421,7 +450,7 @@ namespace GyanisScribe::Gui
         widget.setProperty("uiTextRole", static_cast<int>(role));
         widget.setProperty("uiTextScript", static_cast<int>(script));
         auto font = widget.font();
-        rememberBaseFamily(widget, font);
+        rememberBaseFont(widget, font);
         const auto spec = textRoleSpec(role, g_textThemeKind, variableMetricFamilyAvailable());
         font.setPointSize(spec.pointSize);
         if (role == TextRole::Metric)
@@ -439,13 +468,13 @@ namespace GyanisScribe::Gui
             } else
             {
                 // 中文回退没有 560 这一档：取不到可变字族时留在默认字族的 DemiBold
-                restoreBaseFamily(widget, font);
+                restoreBaseFont(widget, font);
                 font.setWeight(QFont::DemiBold);
             }
         } else
         {
             // 正文与标题不换字族：同一句里的中文与西文必须落在同一个字族上
-            restoreBaseFamily(widget, font);
+            restoreBaseFont(widget, font);
             font.setWeight(role == TextRole::PageTitle ? QFont::DemiBold : QFont::Normal);
         }
         widget.setFont(font);

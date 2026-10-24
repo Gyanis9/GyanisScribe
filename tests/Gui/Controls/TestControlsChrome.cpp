@@ -19,6 +19,7 @@
 #include <filesystem>
 #include <format>
 #include <memory>
+#include <optional>
 
 namespace
 {
@@ -170,4 +171,40 @@ TEST(SpinBoxChrome, UsesTabularFigures)
 #if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
     EXPECT_EQ(spin.font().featureValue(QFont::Tag("tnum")), 1u) << "数字框没锁等宽，读数会左右抖";
 #endif
+}
+
+namespace
+{
+    using GyanisScribe::Gui::applyTabularFigures;
+    using GyanisScribe::Gui::reapplyTabularFigures;
+    using GyanisScribe::Gui::setTextThemeKind;
+    using GyanisScribe::Gui::setVariableMetricFamilyAvailableForTesting;
+    using GyanisScribe::Gui::TextScript;
+    using GyanisScribe::Gui::ThemeKind;
+} // namespace
+
+/**
+ * @brief 钉住数字读数切回浅色档后回到基准字重
+ * @details 暗色档的可变字族路径把 400 降到 360；重放时若只还原字族不还原字重，
+ *          控件会一直停在 360，读数在整个浅色档里都偏细。可变字族的可用性由测试钩子钉死，
+ *          不依赖跑测机器装没装 Segoe UI Variable Text。
+ */
+TEST(TabularFiguresChrome, RestoresBaseWeightWhenThemeReturnsToLight)
+{
+    QLabel label;
+    auto   font = label.font();
+    font.setWeight(QFont::Normal);
+    label.setFont(font);
+
+    setVariableMetricFamilyAvailableForTesting(true);
+    setTextThemeKind(ThemeKind::Dark);
+    applyTabularFigures(label, TextScript::AsciiOnly);
+    EXPECT_EQ(static_cast<int>(label.font().weight()), 360) << "暗色档没有按可变字族降重";
+
+    setTextThemeKind(ThemeKind::Light);
+    reapplyTabularFigures(label);
+    EXPECT_EQ(static_cast<int>(label.font().weight()), 400) << "切回浅色档后字重没有还原";
+
+    setTextThemeKind(ThemeKind::Light);
+    setVariableMetricFamilyAvailableForTesting(std::nullopt);
 }
