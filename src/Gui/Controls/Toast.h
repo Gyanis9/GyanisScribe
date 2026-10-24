@@ -58,6 +58,25 @@ namespace GyanisScribe::Gui
     [[nodiscard]] QPoint toastPositionFor(const QRect &screenAvailable, const QSize &toastSize);
 
     /**
+     * @brief 判断某类提示要不要逐字显现
+     * @param kind 提示种类
+     * @param animationsEnabled 系统与应用是否允许动画
+     * @return 允许动画时成功与信息提示为 true；错误提示一律 false
+     * @details 错误提示要整句一起出现：逐字浮现会让人先读半句再改口。
+     */
+    [[nodiscard]] bool shouldStreamToast(ToastKind kind, bool animationsEnabled) noexcept;
+
+    /**
+     * @brief 算文字列的上边距，把首行基线压到图标下方
+     * @param iconHeight 图标逻辑高度
+     * @param ascent 文本字体的 ascent
+     * @param emHeight 文本字体的 em 高，取 QFontMetrics::height()
+     * @param iconMargin 图标上方的留白
+     * @return 文字列的上边距，使图标底边落在首行基线下方 0.125em
+     */
+    [[nodiscard]] int iconTextTopPad(int iconHeight, int ascent, int emHeight, int iconMargin) noexcept;
+
+    /**
      * @brief 托盘式气泡提示
      * @details 独立顶层窗口：不属于任何页面，截图、录屏、识别的反馈都用它。
      *          同一时刻只有一个在显示，新的提示直接顶掉旧的——排队会把三秒前的操作当成刚发生的。

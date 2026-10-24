@@ -175,3 +175,32 @@ TEST_F(ToastFixture, ToastFollowsThemeSwitch)
     EXPECT_EQ(toast().currentText(), QStringLiteral("深色主题下的提示"));
     EXPECT_EQ(toastColorFor(ToastKind::Information, theme().palette()), kDarkPalette.secondaryText);
 }
+
+/**
+ * @brief 钉住只有成功与信息提示走流式，错误提示与关闭动画时一律即时
+ * @details 错误提示的字必须整句出现，逐字浮现会让人先读半句再改口。
+ */
+TEST(ToastPolicy, DangerIsImmediateAndOthersStreamWhenAnimationsAreOn)
+{
+    using GyanisScribe::Gui::shouldStreamToast;
+    using GyanisScribe::Gui::ToastKind;
+    EXPECT_TRUE(shouldStreamToast(ToastKind::Success, true));
+    EXPECT_TRUE(shouldStreamToast(ToastKind::Information, true));
+    EXPECT_FALSE(shouldStreamToast(ToastKind::Danger, true));
+    EXPECT_FALSE(shouldStreamToast(ToastKind::Success, false));
+}
+
+/**
+ * @brief 钉住图标底边落在首行基线下方 0.125em
+ * @details 手算：图标 20 高、上留 6、基线 13、em 高 15 → pad = round(6+20−13−1.875) = 11；
+ *          图标底 26 与文字基线 24 相差 2，正好是 0.125em 的取整结果。
+ */
+TEST(ToastPolicy, IconSitsOneEighthEmBelowTheFirstBaseline)
+{
+    using GyanisScribe::Gui::iconTextTopPad;
+    const int pad      = iconTextTopPad(20, 13, 15, 6);
+    const int iconBase = 6 + 20;
+    const int textBase = pad + 13;
+    EXPECT_EQ(pad, 11);
+    EXPECT_NEAR(static_cast<double>(iconBase - textBase), 0.125 * 15.0, 1.0);
+}

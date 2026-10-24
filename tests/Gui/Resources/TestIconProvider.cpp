@@ -529,6 +529,22 @@ TEST_F(IconProviderFixture, HighDpiVariantsKeepTheGlyphAtFullSize)
 }
 
 /**
+ * @brief 钉住显式描边色优先于供给器主题色，且两种颜色各占一格缓存
+ * @details Toast 的图标跟着提示种类上色，而供给器同一时刻只持有一个主题色；
+ *          描边色不进缓存键就会把绿色那格当成红色发出去。
+ */
+TEST_F(IconProviderFixture, ExplicitTintOverridesTheProviderTintAndCachesSeparately)
+{
+    GyanisScribe::Gui::IconProvider provider;
+    provider.setTintColor(QColor(0, 200, 0));
+    const auto red   = provider.pixmap("Capture", GyanisScribe::Gui::IconSize::Large, 1.0, QColor(200, 0, 0));
+    const auto green = provider.pixmap("Capture", GyanisScribe::Gui::IconSize::Large, 1.0, QColor(0, 200, 0));
+    EXPECT_TRUE(containsColor(red, QColor(200, 0, 0)));
+    EXPECT_FALSE(containsColor(red, QColor(0, 200, 0)));
+    EXPECT_TRUE(containsColor(green, QColor(0, 200, 0)));
+}
+
+/**
  * @brief 钉住同族图标共用同一份外框几何
  * @details 截图族与录屏族是同两句话（全屏 / 选区 / 上次选区 / 窗口），外框必须逐字一致：
  *          分头画是这条路最容易发生的劣化——改了一处忘了另一处，两枚图标看上去是两家出的。

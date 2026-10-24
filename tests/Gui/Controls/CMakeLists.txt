@@ -23,7 +23,8 @@ gtest_discover_tests(TestGuiControls)
 # 同一进程不能再造第二份。
 add_executable(TestControlsChrome
         TestControlsChrome.cpp
-        TestFocusRing.cpp)
+        TestFocusRing.cpp
+        TestStreamingText.cpp)
 
 target_link_libraries(TestControlsChrome PRIVATE
         Gui

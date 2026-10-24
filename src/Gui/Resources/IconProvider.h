@@ -100,6 +100,17 @@ namespace GyanisScribe::Gui
         [[nodiscard]] QPixmap pixmap(std::string_view name, IconSize size, qreal devicePixelRatio = 1.0) const;
 
         /**
+         * @brief 按显式描边色取单档像素图
+         * @param name SVG 文件名去掉扩展名，例如 "Tray"
+         * @param size 尺寸阶梯档位
+         * @param devicePixelRatio 目标屏幕的缩放比，取 1 到 3 之外的值按 3 封顶
+         * @param tint 本次要的描边色；无效时回落到 tintColor()
+         * @return 已写好 devicePixelRatio 的位图；名字不存在时返回空位图
+         * @note 描边色进缓存键：同一枚图标按两种颜色各存一格，不会把上一色的那份当新的发出去。
+         */
+        [[nodiscard]] QPixmap pixmap(std::string_view name, IconSize size, qreal devicePixelRatio, const QColor &tint) const;
+
+        /**
          * @brief 列出资源里真实存在的图标名
          * @return 按字典序排列、不带 .svg 后缀的名字表
          * @details 供设置页、自检与测试用：调用方不需要知道 :/icons 这个前缀，路径规则只在本类里出现一次。
