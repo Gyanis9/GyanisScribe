@@ -340,9 +340,10 @@ TEST_F(ThemeManagerFixture, GarbageStoredValueFallsBackToSystemAndLogsWarning)
 /**
  * @brief 钉住样式表与色板同解，双向都查
  * @details 正向逐主题：QSS 里出现的每个十六进制色都必须是该主题色板里的一个（禁「代码外再有一套色」）；
- *          反向全局：每个进 QSS 的色板角色至少要有一份样式表用着，除 icon 由 IconProvider 取用——
- *          这一条同时抓出「加了没人用的色板字段」这种死配置。反向不逐主题，是因为高对比度专用角色
- *          不该被浅色与深色两份样式表判成缺失。
+ *          反向全局：每个进 QSS 的色板角色至少要有一份样式表用着，icon、success、danger 由绘制代码取用，不计入——
+ *          这一条抓的是「加了没人用的色板字段」这种死配置。色板是三档共用的一张角色表，判据是角色在整个
+ *          样式层有没有消费方；逐主题会把判据改成「每份 QSS 都得用全自己色板的十五个角色」，
+ *          某档刻意少用一个角色就报红，而那不是死配置。
  */
 TEST_F(ThemeManagerFixture, StyleSheetsAndPalettesAgreeInBothDirections)
 {
@@ -511,7 +512,8 @@ TEST_F(ThemeManagerFixture, WidgetsRenderThePaletteSurfacePerTheme)
  * @brief 钉住次级按钮平时就与卡片底分得开
  * @details 去描边之后按钮只剩 controlFill 与卡片 surface 的微明度差；这一档若被抹平，
  *          「导出配置」「导出色板」「检查更新」这类次级按钮就只剩一串文字。
- *          取按钮内部中点与卡片角落各一像素，既要比颜色不等，也要比明度差得看得出来。
+ *          取按钮左内侧（横向距左边缘 10px、纵向居中）与卡片角落各一像素，既要比颜色不等，
+ *          也要比明度差得看得出来。取样点留在左侧内边距里、避开水平居中的文字；往中间挪会落到字形上。
  */
 TEST_F(ThemeManagerFixture, SecondaryButtonsStayDistinguishableAtRest)
 {
@@ -540,12 +542,12 @@ TEST_F(ThemeManagerFixture, SecondaryButtonsStayDistinguishableAtRest)
 }
 
 /**
- * @brief 钉住三档主题下控件总高不随去边框漂移
+ * @brief 钉住控件总高按档定死，不随去边框漂移
  * @details 浅色与深色靠 1px 透明边框占位：按钮 30、输入类 32。
- *          高对比度档的 2px 描边是它的可辨识契约，视觉保持不动，总高因此比另两档各多 2px；
- *          数字框另有上下各 2px 的自有框，浅深档靠 26px 内容高收进 32，高对比度档落在 38。
+ *          高对比度档保留 32/34/38：2px 描边是无障碍契约的一部分，不随另两档归一化，
+ *          输入类因此比浅深档各多 2px；数字框另有上下各 2px 的自有框，落在 38。
  */
-TEST_F(ThemeManagerFixture, ControlsKeepTheirHeightAcrossThemes)
+TEST_F(ThemeManagerFixture, ControlHeightsStayPinnedPerTheme)
 {
     for (const auto kind: {ThemeKind::Light, ThemeKind::Dark, ThemeKind::HighContrast})
     {
