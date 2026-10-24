@@ -1,5 +1,9 @@
 add_executable(TestGuiResources
+        TestBrandIcon.cpp
         TestIconProvider.cpp)
+
+target_compile_definitions(TestGuiResources PRIVATE
+        GYANIS_BRAND_DIR="${CMAKE_SOURCE_DIR}/src/Gui/Resources/Brand")
 
 target_link_libraries(TestGuiResources PRIVATE
         Gui

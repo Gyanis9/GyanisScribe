@@ -101,4 +101,15 @@
     <file alias="ComboChevronDark.svg">Styles/ComboChevronDark.svg</file>
     <file alias="ComboChevronHighContrast.svg">Styles/ComboChevronHighContrast.svg</file>
   </qresource>
+  <qresource prefix="/brand">
+    <file alias="AppIcon.svg">Brand/AppIcon.svg</file>
+    <file alias="AppIcon16.png">Brand/AppIcon16.png</file>
+    <file alias="AppIcon24.png">Brand/AppIcon24.png</file>
+    <file alias="AppIcon32.png">Brand/AppIcon32.png</file>
+    <file alias="AppIcon48.png">Brand/AppIcon48.png</file>
+    <file alias="AppIcon64.png">Brand/AppIcon64.png</file>
+    <file alias="AppIcon128.png">Brand/AppIcon128.png</file>
+    <file alias="AppIcon256.png">Brand/AppIcon256.png</file>
+    <file alias="AppIcon512.png">Brand/AppIcon512.png</file>
+  </qresource>
 </RCC>
