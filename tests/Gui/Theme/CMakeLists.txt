@@ -1,6 +1,7 @@
 add_executable(TestGuiTheme
         TestDesignTokens.cpp
         TestLanguage.cpp
+        TestMotion.cpp
         TestThemeManager.cpp)
 
 target_link_libraries(TestGuiTheme PRIVATE
