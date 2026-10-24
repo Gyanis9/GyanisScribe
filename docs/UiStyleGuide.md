@@ -4,7 +4,7 @@
 浅色与深色两档是微明度分层：窗口底、卡片、控件三档中性色之间只差一点明度，控件不再靠描边分边界；
 选中与勾选改走填充，压在其它内容上的浮层保留一条 1px 微边缘，焦点在输入面上画双环。
 高对比度档保持自己的无障碍契约：纯黑纯白、2px 描边、纯黄选区。
-文中每一条都能在代码或用例里找到落点；写「由用例钉住」的地方指的是本仓的 ctest 用例，不是计划要加的。
+文中每一条都能在代码或用例里找到落点；写「由用例钉住」的地方指的是本仓的 ctest 用例。
 
 ## 1. 令牌放在哪儿
 
@@ -48,7 +48,7 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
   浮层只能靠这道边缘与底下的内容分开。用得上的是 `QMenu`、`QToolTip`、`QComboBox QAbstractItemView`、
   `#hudRoot`、`#AnnotationToolbar` 与 Toast 气泡。
 - 选中与勾选不再描边：导航当前项、列表选中项、勾选的工具按钮走 `accentSoft` 填充；
-  复选框指示器勾选时走 `accent` 填充，勾本身按 `onAccent` 自绘。
+  复选框指示器勾选时走 `accent` 填充，勾本身按 `onAccent` 自绘（勾选且禁用时改取次要文本色，见 §2）。
 - 形状：圆角 8（工具按钮）/ 12（按钮与输入）/ 16（菜单、弹层、浮条）/ 20（阅读面卡片）/ 胶囊（提示，
   999px 由 Qt 按高度收敛）。标注工具栏是 26px 紧凑档（图标 20），节距用 `kSpacingHairline`(2)；
   所有工具档的宽度 ≤1536 由 `ToolbarFixture.EveryToolStaysWithinTheCommonScreenWidth` 钉死。
@@ -95,7 +95,7 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 | 录屏控制条 | `src/Gui/Record/RecordingHud.cpp` | 无边框悬浮卡片 `#hudRoot`（1px `borderStrong` 微边缘，Qt 的样式表没有投影）：`kHudEdgeGap` 屏幕边距、`kSpacingSmall`/`kSpacingTiny` 内间距、`kCountdownFontPointSize` 倒计时字号 | 倒计时→录制中→暂停→停止；按钮可用态随服务状态切换；时长那一格是 `#metricValue`（13pt 半粗 + 等宽数字，秒跳不抖宽）；控制条本身不加动画 |
 | 取色器 | `src/Gui/Pick/ColorPickerOverlay.cpp` | 自绘放大镜：`kMagnifierSampleEdge`/`kMagnifierViewEdge` 取样与显示格数、`kMagnifierPenWidth` 边框、`kInfoStripHeight` 信息条 | 逐像素网格 + 十字线；颜色格式按 `Pick` 的词表切换；取色时按物理像素取样再折算；HEX/RGB 读数上 tabular figures |
 | Toast 通知 | `src/Gui/Controls/Toast.cpp`、`StreamingText.cpp` | 用 `palette.success`/`palette.danger`/`palette.secondaryText` 从色板角色现算内联样式（`success` 与 `danger` 不进 QSS，用例按消费方名单核对）；气泡走 `surface` 底 + 1px `borderStrong` 边缘 + 胶囊圆角（999px 由 Qt 按高度收敛）；图标与文字同一行，图标底边落在首行基线下方 0.125em | 三类：Information / Success / Danger，3 秒后自收。成功与信息提示逐字显现（第 i 字在 i×30ms 起步、单字 90ms 从模糊到清晰，缓动 `cubic-bezier(.215,.61,.355,1)`），错误提示整句即时出现；成功图标从 0.6 弹到 1.0；图标描边取该条提示的语义色；新提示顶掉旧提示时覆盖层一并销毁重启，不叠影 |
-| 复选框（设置页全部勾选项） | `src/Gui/Controls/CheckBox.cpp` + QSS `QCheckBox::indicator` | 方框的填充、圆角与悬停描边仍由 QSS 画：静息 `controlFill`、悬停 `hover` + `borderStrong` 边、勾选 `accent` 填充、禁用 `mutedFill`；勾由 `Gui::CheckBox` 按 `onAccent` 自绘，QSS 用 `[animatedIndicator="true"]` 把静态勾图关掉 | 勾选时从 0.55 弹性到 1.0（`kPopSpring`，约 450ms、过冲约 19.5%），取消勾选不弹；三档的勾都取 `onAccent`（高对比度档是蓝底白勾，与另两档同一套取色）；减少动效时直接到 1.0 |
+| 复选框（设置页全部勾选项） | `src/Gui/Controls/CheckBox.cpp` + QSS `QCheckBox::indicator` | 方框的填充、圆角与悬停描边仍由 QSS 画：静息 `controlFill`、悬停 `hover` + `borderStrong` 边、勾选 `accent` 填充、禁用 `mutedFill`；勾由 `Gui::CheckBox` 自绘：启用时取 `onAccent`，勾选且禁用时取 `secondaryText`（禁用指示器底已落 `mutedFill`，白勾会看不见），QSS 用 `[animatedIndicator="true"]` 把静态勾图关掉 | 启用且勾选时从 0.55 弹性到 1.0（`kPopSpring`，约 450ms、过冲约 19.5%），取消勾选不弹；三档启用档的勾都取 `onAccent`（高对比度档是蓝底白勾，与另两档同一套取色）；勾选且禁用时勾取 `secondaryText`，不播弹簧（控件本来就没有可操作的确认）；减少动效时直接到 1.0 |
 | 焦点态（所有可聚焦控件） | `src/Gui/Controls/FocusRing.cpp` | `FocusRingController` 作为应用事件过滤器，首次聚焦时创建覆盖层；宿主是能装下目标矩形外扩 6px 的最近祖先，几何按宿主坐标系算 | 输入框（`QLineEdit`、`QComboBox`、`QSpinBox`、标注行内 `QTextEdit`、`HotkeyEdit`）双环；按钮、工具按钮、复选框单环（复选框套在 indicator 上）；可编辑下拉框/微调框内部的行编辑映射回外层；只读、禁用与标注工具栏内的控件不装；滑块走手柄反转（见 §5）；切到高对比度档立即撤环、切回时给当前焦点补环 |
 | 快捷键输入框 | `src/Gui/Controls/HotkeyEdit.cpp` | `QLabel#hotkeyDisplay` 与 `QLineEdit` 同一套 `controlFill`/圆角/内边距/1px 透明占位边；录制态按 `[recording="true"]` 换 `accentSoft` 底与主色边（高对比度档不换底：仍是纯白，只把 2px 描边换成主色） | 闲置态显示已存的组合，悬浮说明写清「点击这一格后按下组合键即可替换，按 Esc 取消」；进入录制态换成「请按下快捷键（Esc 取消）」的提示 |
 | 数字输入框 | `src/Gui/Controls/SpinBox.cpp` | 继承 `QSpinBox`，关掉原生上下按钮；右缘叠两枚自绘 chevron，悬停给一档 `mutedFill` 底 | 点击加/减，范围、后缀、`不限` 等语义仍由 `QSpinBox` 负责；键盘上下键照常；数值上 tabular figures |

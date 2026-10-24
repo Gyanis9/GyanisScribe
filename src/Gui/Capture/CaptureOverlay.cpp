@@ -471,7 +471,7 @@ namespace GyanisScribe::Gui
             painter.setPen(GyanisScribe::Gui::kCaptureHintTextColor);
             painter.drawText(hintRect, Qt::AlignCenter, hint);
 
-            // 确认/取消怎么写常驻读数下一行：新用户拖完框最容易停在「然后呢」上（审查台账 UI-33）
+            // 确认/取消怎么写常驻读数下一行：新用户拖完框最容易停在「然后呢」上
             const auto  confirmText = m_isSelecting ? GyanisScribe::Base::uiText("松手即完成 · Esc 取消") : GyanisScribe::Base::uiText("拖四边调整 · Enter/双击确认 · Esc 取消");
             const auto  confirmSize = metrics.size(Qt::TextSingleLine, confirmText);
             const QRect confirmRect(hintTopLeft + QPoint(0, textSize.height() + kCopiedHintGap),

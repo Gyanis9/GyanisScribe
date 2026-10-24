@@ -289,7 +289,7 @@ namespace GyanisScribe::Gui
             }
             return TargetSpec{target, FocusRingStyle::Double, false};
         }
-        // 复选框按基类匹配而不是按具体类型：后续的自绘复选框是 QCheckBox 的子类，同样要单环
+        // 复选框按基类匹配而不是按具体类型：Gui::CheckBox 是 QCheckBox 的子类，同样要单环
         if (qobject_cast<QCheckBox *>(target) != nullptr)
         {
             return TargetSpec{target, FocusRingStyle::Single, true};
