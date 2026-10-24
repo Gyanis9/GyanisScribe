@@ -18,6 +18,7 @@ using GyanisScribe::Gui::paletteFor;
 using GyanisScribe::Gui::stepIndexOf;
 using GyanisScribe::Gui::TextRole;
 using GyanisScribe::Gui::textRoleSpec;
+using GyanisScribe::Gui::TextScript;
 using GyanisScribe::Gui::ThemeKind;
 
 /**
@@ -109,21 +110,40 @@ TEST(DesignTokens, DarkReadoutWeightDropsFortyOnlyWhenVariableFamilyIsAvailable)
 }
 
 /**
- * @brief 钉住含中文的正文与标题不降重，只有暗色 Metric 换可变字族
+ * @brief 钉住正文与标题在任何字符集档下都不换字族、不降重
  */
-TEST(DesignTokens, TextRoleSpecKeepsCjkBodyAtFourHundred)
+TEST(DesignTokens, TextRoleSpecKeepsBodyAndTitleAtTheirFixedWeights)
 {
-    const auto metricDark  = textRoleSpec(TextRole::Metric, ThemeKind::Dark, true);
-    const auto metricNoVar = textRoleSpec(TextRole::Metric, ThemeKind::Dark, false);
-    const auto bodyDark    = textRoleSpec(TextRole::Body, ThemeKind::Dark, true);
-    const auto titleDark   = textRoleSpec(TextRole::PageTitle, ThemeKind::Dark, true);
+    const auto bodyDark   = textRoleSpec(TextRole::Body, ThemeKind::Dark, true, TextScript::Mixed);
+    const auto bodyAscii  = textRoleSpec(TextRole::Body, ThemeKind::Dark, true, TextScript::AsciiOnly);
+    const auto titleDark  = textRoleSpec(TextRole::PageTitle, ThemeKind::Dark, true, TextScript::Mixed);
+    const auto titleAscii = textRoleSpec(TextRole::PageTitle, ThemeKind::Dark, true, TextScript::AsciiOnly);
 
-    EXPECT_EQ(metricDark.weight, 560);
-    EXPECT_TRUE(metricDark.variableFamily);
-    EXPECT_EQ(metricNoVar.weight, 600);
-    EXPECT_FALSE(metricNoVar.variableFamily);
     EXPECT_EQ(bodyDark.weight, 400);
     EXPECT_FALSE(bodyDark.variableFamily);
+    EXPECT_EQ(bodyAscii.weight, 400);
+    EXPECT_FALSE(bodyAscii.variableFamily);
     EXPECT_EQ(titleDark.weight, 600);
     EXPECT_FALSE(titleDark.variableFamily);
+    EXPECT_EQ(titleAscii.weight, 600);
+    EXPECT_FALSE(titleAscii.variableFamily);
+}
+
+/**
+ * @brief 钉住暗色 Metric 只在纯 ASCII 读数上换可变字族并降到 560
+ * @details Mixed 读数里可能含中文，换字族会把中文回退映射到 Bold；取不到可变字族时
+ *          也留在默认字族的 600，这条路径与字符集无关，只看字族是否可用。
+ */
+TEST(DesignTokens, TextRoleSpecSwitchesMetricOnlyForAsciiReadoutsInDark)
+{
+    const auto mixed      = textRoleSpec(TextRole::Metric, ThemeKind::Dark, true, TextScript::Mixed);
+    const auto ascii      = textRoleSpec(TextRole::Metric, ThemeKind::Dark, true, TextScript::AsciiOnly);
+    const auto asciiNoVar = textRoleSpec(TextRole::Metric, ThemeKind::Dark, false, TextScript::AsciiOnly);
+
+    EXPECT_EQ(mixed.weight, 600);
+    EXPECT_FALSE(mixed.variableFamily);
+    EXPECT_EQ(ascii.weight, 560);
+    EXPECT_TRUE(ascii.variableFamily);
+    EXPECT_EQ(asciiNoVar.weight, 600);
+    EXPECT_FALSE(asciiNoVar.variableFamily);
 }

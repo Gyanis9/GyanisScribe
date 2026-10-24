@@ -277,11 +277,13 @@ namespace GyanisScribe::Gui
      * @param role 文字角色
      * @param kind 已解算的主题档
      * @param variableFamilyAvailable 系统是否装有 Segoe UI Variable Text
+     * @param script 读数字符集档
      * @return 角色规格；高对比度与浅色档走同一套固定字重
-     * @details 只有暗色档的 Metric 会在可变字族可用时换成 560 的读出字重；
-     *          PageTitle 与 Body 在任何档都不换字族，避免中文回退分家。
+     * @details 只有暗色档、可变字族可用且字符集为纯 ASCII 的 Metric 换成 560 与可变字族。
+     *          Mixed 的 Metric 可能含中文，换字族会把中文回退映射到 Bold，因此留在默认字族 600；
+     *          PageTitle 与 Body 在任何档、任何字符集下都不换字族。
      */
-    [[nodiscard]] constexpr TextRoleSpec textRoleSpec(const TextRole role, const ThemeKind kind, const bool variableFamilyAvailable)
+    [[nodiscard]] constexpr TextRoleSpec textRoleSpec(const TextRole role, const ThemeKind kind, const bool variableFamilyAvailable, const TextScript script)
     {
         switch (role)
         {
@@ -290,7 +292,7 @@ namespace GyanisScribe::Gui
             case TextRole::Body:
                 return {kTextRolePointSizeBody, 400, false};
             case TextRole::Metric:
-                if (kind == ThemeKind::Dark && variableFamilyAvailable)
+                if (kind == ThemeKind::Dark && variableFamilyAvailable && script == TextScript::AsciiOnly)
                 {
                     return {kTextRolePointSizeMetric, 560, true};
                 }
@@ -357,7 +359,9 @@ namespace GyanisScribe::Gui
      * @brief 记下控件的原始字族与字重，换过可变字族或降过重后仍能还原
      * @param widget 目标控件
      * @param font 目标控件当前的字体
-     * @note 只记第一次：重放排版时控件上的字族可能已经是 Segoe UI Variable Text，字重也可能已经降过
+     * @note 只记第一次：重放排版时控件上的字族可能已经是 Segoe UI Variable Text，字重也可能已经降过。
+     *       uiBaseFamily 与 uiBaseWeight 由 applyTextRole 与 applyTabularFigures 共用，
+     *       同一个控件不要混用两个 helper，除非重新约定先后顺序；主题重放固定先按角色、再按等宽数字。
      */
     inline void rememberBaseFont(QWidget &widget, const QFont &font)
     {
@@ -443,7 +447,8 @@ namespace GyanisScribe::Gui
      * @param script 字符集档：纯 ASCII 读数传 AsciiOnly，含中文的读数传 Mixed
      * @details 标题走半粗（DemiBold）而不是加粗：中文在 Bold 下会糊成一团黑块。
      *          Metric 另开等宽数字，时长从 9:59 跳到 10:00 时后面那行不该左右抖。
-     *          暗色档只有纯 ASCII 的 Metric 会换成可变字族并降到 560，其余角色维持原字重。
+     *          暗色档只有 AsciiOnly 的 Metric 会换成可变字族并降到 560；Mixed 的 Metric
+     *          与其余角色维持默认字族与原字重。
      */
     inline void applyTextRole(QWidget &widget, const TextRole role, const TextScript script = TextScript::Mixed)
     {
@@ -451,7 +456,7 @@ namespace GyanisScribe::Gui
         widget.setProperty("uiTextScript", static_cast<int>(script));
         auto font = widget.font();
         rememberBaseFont(widget, font);
-        const auto spec = textRoleSpec(role, g_textThemeKind, variableMetricFamilyAvailable());
+        const auto spec = textRoleSpec(role, g_textThemeKind, variableMetricFamilyAvailable(), script);
         font.setPointSize(spec.pointSize);
         if (role == TextRole::Metric)
         {
@@ -467,7 +472,7 @@ namespace GyanisScribe::Gui
                 font.setWeight(static_cast<QFont::Weight>(spec.weight));
             } else
             {
-                // 中文回退没有 560 这一档：取不到可变字族时留在默认字族的 DemiBold
+                // 中文回退没有 560 这一档：Mixed 读数或取不到可变字族时留在默认字族的 DemiBold
                 restoreBaseFont(widget, font);
                 font.setWeight(QFont::DemiBold);
             }

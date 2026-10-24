@@ -175,6 +175,12 @@ namespace GyanisScribe::Gui
         m_countdown = new QLabel{this};
         m_countdown->setAccessibleName(GyanisScribe::Base::uiText("倒计时"));
         m_countdown->setAlignment(Qt::AlignCenter);
+        // 倒计时大字只在构造时建一次基准字体：先落字号，再交给 applyTabularFigures 记下原始字族与字重。
+        // 之后每次 applyState 只改文本与显隐；若每拍都从当前字体重算，暗色档的降重会一拍掉 40
+        auto countdownFont = m_countdown->font();
+        countdownFont.setPointSize(kCountdownFontPointSize);
+        m_countdown->setFont(countdownFont);
+        GyanisScribe::Gui::applyTabularFigures(*m_countdown, GyanisScribe::Gui::TextScript::AsciiOnly);
         m_countdown->hide();
         root->addWidget(m_countdown);
 
@@ -211,11 +217,6 @@ namespace GyanisScribe::Gui
         const auto countdown = countdownTextFor(countdownRemaining);
         if (countdown)
         {
-            QFont bigFont = m_countdown->font();
-            bigFont.setPointSize(kCountdownFontPointSize);
-            // 倒计时是纯数字读数：暗色档换可变字族时按 ASCII 档降重
-            bigFont = tabularFont(bigFont, TextScript::AsciiOnly);
-            m_countdown->setFont(bigFont);
             m_countdown->setText(*countdown);
             m_countdown->show();
             m_countdown->raise();

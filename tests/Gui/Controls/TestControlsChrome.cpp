@@ -175,10 +175,14 @@ TEST(SpinBoxChrome, UsesTabularFigures)
 
 namespace
 {
+    using GyanisScribe::Gui::activeThemeKind;
     using GyanisScribe::Gui::applyTabularFigures;
+    using GyanisScribe::Gui::applyTextRole;
     using GyanisScribe::Gui::reapplyTabularFigures;
+    using GyanisScribe::Gui::reapplyTextRole;
     using GyanisScribe::Gui::setTextThemeKind;
     using GyanisScribe::Gui::setVariableMetricFamilyAvailableForTesting;
+    using GyanisScribe::Gui::TextRole;
     using GyanisScribe::Gui::TextScript;
     using GyanisScribe::Gui::ThemeKind;
 } // namespace
@@ -191,6 +195,8 @@ namespace
  */
 TEST(TabularFiguresChrome, RestoresBaseWeightWhenThemeReturnsToLight)
 {
+    const auto previousTheme = activeThemeKind();
+
     QLabel label;
     auto   font = label.font();
     font.setWeight(QFont::Normal);
@@ -205,6 +211,40 @@ TEST(TabularFiguresChrome, RestoresBaseWeightWhenThemeReturnsToLight)
     reapplyTabularFigures(label);
     EXPECT_EQ(static_cast<int>(label.font().weight()), 400) << "切回浅色档后字重没有还原";
 
-    setTextThemeKind(ThemeKind::Light);
     setVariableMetricFamilyAvailableForTesting(std::nullopt);
+    setTextThemeKind(previousTheme);
+}
+
+/**
+ * @brief 钉住暗色 Metric 只在 AsciiOnly 时换可变字族与 560，Mixed 停在默认字族 600
+ * @details Mixed 读数里可能含中文，换字族与降重会把中文回退分家；切回浅色档后两种读数
+ *          都要回到 600 与原始字族。可变字族的可用性由测试钩子钉死，不依赖跑测机器。
+ */
+TEST(TabularFiguresChrome, MetricRoleSwitchesFamilyOnlyForAsciiInDark)
+{
+    const auto previousTheme = activeThemeKind();
+    setVariableMetricFamilyAvailableForTesting(true);
+    setTextThemeKind(ThemeKind::Dark);
+
+    QLabel label;
+    auto   font = label.font();
+    font.setWeight(QFont::Normal);
+    label.setFont(font);
+    const auto baseFamily = label.font().family();
+
+    applyTextRole(label, TextRole::Metric, TextScript::Mixed);
+    EXPECT_EQ(static_cast<int>(label.font().weight()), 600) << "Mixed 读数被降重";
+    EXPECT_EQ(label.font().family(), baseFamily) << "Mixed 读数换了可变字族，中文回退会分家";
+
+    applyTextRole(label, TextRole::Metric, TextScript::AsciiOnly);
+    EXPECT_EQ(static_cast<int>(label.font().weight()), 560);
+    EXPECT_EQ(label.font().family(), QStringLiteral("Segoe UI Variable Text"));
+
+    setTextThemeKind(ThemeKind::Light);
+    reapplyTextRole(label);
+    EXPECT_EQ(static_cast<int>(label.font().weight()), 600) << "切回浅色档后没有回到 DemiBold";
+    EXPECT_EQ(label.font().family(), baseFamily) << "切回浅色档后还挂着可变字族";
+
+    setVariableMetricFamilyAvailableForTesting(std::nullopt);
+    setTextThemeKind(previousTheme);
 }

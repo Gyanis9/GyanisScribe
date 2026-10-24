@@ -64,7 +64,7 @@ namespace GyanisScribe::Gui
         m_readout = new QLabel{GyanisScribe::Base::uiText("还没接上任何一段"), this};
         m_readout->setAccessibleName(GyanisScribe::Base::uiText("已接高度"));
         // 等宽数字：每接一帧就跳一下，比例字体会让整条控制条左右抖。
-        // 读数里含中文（已接高度），只上 tnum 不换字族与字重
+        // 读数里含中文，按 Mixed 只上 tnum：换可变字族或降重会让中文回退字族映射到 Bold
         GyanisScribe::Gui::applyTextRole(*m_readout, GyanisScribe::Gui::TextRole::Metric, GyanisScribe::Gui::TextScript::Mixed);
         root->addWidget(m_readout);
 
