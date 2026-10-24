@@ -8,6 +8,7 @@
 #include <QApplication>
 #include <QCheckBox>
 #include <QImage>
+#include <QImageReader>
 #include <QPainter>
 #include <QSet>
 #include <QStyle>
@@ -143,6 +144,9 @@ TEST_F(CheckBoxFixture, SuppressesTheStaticQssCheckAndAnimatesTheCheck)
  */
 TEST_F(CheckBoxFixture, PaintsTheCheckWhileAnimatedAndMatchesTheStaticPathAtRest)
 {
+    // 缺 qsvg 时 QSS 的 image: url 不报错，只是静默不画，抑制判据会因此空转；这是部署缺陷，不能跳过
+    ASSERT_TRUE(QImageReader::supportedImageFormats().contains("svg")) << "qsvg image plugin missing; the static-check suppression test would be vacuous";
+
     for (const auto kind: {ThemeKind::Light, ThemeKind::HighContrast})
     {
         qApp->setStyleSheet(ThemeManager::styleSheetFor(kind));

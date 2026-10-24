@@ -45,15 +45,17 @@ add_custom_command(TARGET DeployQtRuntime POST_BUILD
         "$<TARGET_FILE_DIR:Qt6::Gui>/../plugins/platforms/qwindows${QT_DEBUG_SUFFIX}.dll"
         "$<TARGET_FILE_DIR:GyanisScribe>/plugins/platforms/")
 
-# 图像格式插件：PNG 编在 Qt6Gui 里，JPG、WebP 与 GIF 是插件。设置页摆出来的档必须真写得出来，
+# 图像格式插件：PNG 编在 Qt6Gui 里，JPG、WebP、GIF 与 SVG 是插件。设置页摆出来的档必须真写得出来，
 # 否则用户选了那一档就得到一次失败（实测开发树里 imageformats 没摆时 jpg 就是写不出）。
 # GIF 是读的一侧要的：「识别图片文件…」的文件过滤器列着 gif，历史里的动图贴图也要读得回来——
 # 少这一份时那些入口在开发树与绿色版上都只会报「读不出图」，而官方安装包走 windeployqt（它默认全拷）看不出问题。
+# SVG 是 QSS 的 image: url 要的：控件的静态图标都是 .svg，缺 qsvg 时它们不报错，只是静默不画；
+# 复选框用例里「静态勾图被抑制」这条判据也要有 qsvg 才不是空转。
 # 打包那一路不用管：windeployqt 默认就把 imageformats 带上（这条链没开 --no-imageformats）。
 add_custom_command(TARGET DeployQtRuntime POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory
         "$<TARGET_FILE_DIR:GyanisScribe>/plugins/imageformats")
-foreach (ImageFormatPlugin jpeg webp gif)
+foreach (ImageFormatPlugin jpeg webp gif svg)
     add_custom_command(TARGET DeployQtRuntime POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "$<TARGET_FILE_DIR:Qt6::Gui>/../plugins/imageformats/q${ImageFormatPlugin}${QT_DEBUG_SUFFIX}.dll"
