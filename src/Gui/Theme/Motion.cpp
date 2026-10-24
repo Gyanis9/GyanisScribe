@@ -159,6 +159,8 @@ namespace GyanisScribe::Gui
 
     void SpringValue::setImmediate(const qreal value)
     {
+        // 落值即结束动画：中途禁用动效时值到目标后不能继续走定时器
+        stop();
         m_value  = value;
         m_target = value;
         emit valueChanged(m_value);

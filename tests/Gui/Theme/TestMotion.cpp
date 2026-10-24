@@ -70,3 +70,17 @@ TEST(Motion, DisabledAnimationsJumpStraightToTheTarget)
     EXPECT_DOUBLE_EQ(spring.value(), 1.0);
     EXPECT_FALSE(spring.isRunning());
 }
+
+TEST(Motion, DisablingAnimationsMidFlightEndsTheAnimation)
+{
+    SpringValue spring;
+    spring.setSpec(kPopSpring);
+    spring.setImmediate(0.0);
+    spring.animateTo(1.0);
+    ASSERT_TRUE(spring.isRunning());
+
+    spring.setAnimationsEnabled(false);
+
+    EXPECT_DOUBLE_EQ(spring.value(), 1.0);
+    EXPECT_FALSE(spring.isRunning());
+}
