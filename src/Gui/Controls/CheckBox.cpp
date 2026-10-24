@@ -98,7 +98,10 @@ namespace GyanisScribe::Gui
         path.lineTo(box.left() + box.width() * 19.0 / 24.0, box.top() + box.height() * 7.0 / 24.0);
 
         painter.setBrush(Qt::NoBrush);
-        painter.setPen(QPen{activePalette().onAccent, 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin});
+        // 勾选且禁用时指示器底落在 mutedFill（高对比度档是白底），onAccent 会在浅底上看不见；
+        // 这一档改用次要文本色，既读得出又与可操作状态拉开
+        const auto checkColor = isEnabled() ? activePalette().onAccent : activePalette().secondaryText;
+        painter.setPen(QPen{checkColor, 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin});
         painter.drawPath(path);
     }
 } // namespace GyanisScribe::Gui

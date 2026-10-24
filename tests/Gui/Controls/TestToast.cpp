@@ -12,7 +12,9 @@
 #include <QApplication>
 #include <QColor>
 #include <QCoreApplication>
+#include <QElapsedTimer>
 #include <QEvent>
+#include <QEventLoop>
 #include <QFontInfo>
 #include <QFontMetrics>
 #include <QLabel>
@@ -20,6 +22,7 @@
 #include <QRect>
 #include <QSize>
 #include <QString>
+#include <QThread>
 #include <QWidget>
 
 #include <filesystem>
@@ -117,6 +120,16 @@ namespace
             }
         }
         return nullptr;
+    }
+
+    /// 处理事件直到墙钟走过指定毫秒：定时器只在事件循环里触发，sleep 等不到它们
+    void spinEventsUntil(QElapsedTimer &clock, const qint64 milliseconds)
+    {
+        while (clock.elapsed() < milliseconds)
+        {
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+            QThread::msleep(1);
+        }
     }
 
 } // namespace
@@ -351,3 +364,62 @@ TEST_F(ToastFixture, StreamingOverlayIsInvisibleToInputAndAccessibility)
     EXPECT_TRUE(overlay->accessibleName().isEmpty()) << "纯画面层不该有可读名称";
 }
 
+
+/**
+ * @brief 钉住每条提示重启同一个隐藏定时器，旧提示的期限推不掉新提示
+ * @details 逐条起 QTimer::singleShot 时，第一条的 3 秒到点仍会把第二条藏掉；
+ *          同一个成员定时器每次 show 重启，B 的期限从 B 出现那一刻重新算。
+ *          可见时长由测试注入，判据不依赖三秒的真实等待。
+ */
+TEST_F(ToastFixture, ANewToastRestartsTheHideDeadline)
+{
+    toast().setVisibleDurationForTesting(600);
+    QElapsedTimer clock;
+    clock.start();
+
+    toast().show(QStringLiteral("第一条"), ToastKind::Information);
+    spinEventsUntil(clock, 300);
+    ASSERT_LT(clock.elapsed(), 600) << "机器太慢，第一条在自己的期限前就没等到第二条";
+
+    toast().show(QStringLiteral("第二条"), ToastKind::Information);
+    // 第一条的 600ms 期限已过，第二条的期限还有约 300ms
+    spinEventsUntil(clock, 750);
+    EXPECT_EQ(toast().currentText(), QStringLiteral("第二条"));
+    EXPECT_NE(visibleToastBubble(), nullptr) << "第一条提示的定时器把第二条藏掉了";
+
+    // 第二条自己的期限（约 900ms）已过
+    spinEventsUntil(clock, 1100);
+    QCoreApplication::processEvents();
+    EXPECT_EQ(visibleToastBubble(), nullptr) << "新提示到了自己的期限没有自动隐藏";
+}
+
+/**
+ * @brief 钉住自动隐藏会把流式覆盖层一起收掉
+ * @details 覆盖层的帧定时器不随气泡隐藏停下；留着会继续推进，下一次显示时盖住新文字。
+ *          判据走真实的隐藏事件：注入短可见时长，等气泡自己藏起来再数覆盖层。
+ */
+TEST_F(ToastFixture, AutoHideRemovesTheStreamingOverlay)
+{
+    struct MotionGuard final
+    {
+        ~MotionGuard()
+        {
+            setAnimationsEnabledForTesting(std::nullopt);
+        }
+    } guard;
+    setAnimationsEnabledForTesting(true);
+    toast().setVisibleDurationForTesting(80);
+
+    toast().show(QStringLiteral("这是一条会自动隐藏的成功提示"), ToastKind::Success);
+    ASSERT_TRUE(toast().hasStreamingOverlay()) << "成功提示没有出流式覆盖层，判据没有落点";
+    ASSERT_EQ(toast().streamingOverlayCount(), 1);
+
+    QElapsedTimer clock;
+    clock.start();
+    spinEventsUntil(clock, 140);
+    QCoreApplication::processEvents();
+
+    EXPECT_EQ(visibleToastBubble(), nullptr) << "注入的可见时长没生效，气泡还在屏上";
+    EXPECT_FALSE(toast().hasStreamingOverlay()) << "气泡藏起来了，流式覆盖层还在跑";
+    EXPECT_EQ(toast().streamingOverlayCount(), 0) << "气泡藏起来了，流式覆盖层还挂着";
+}

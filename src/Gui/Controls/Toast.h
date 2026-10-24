@@ -12,6 +12,7 @@
 #include "Gui/Theme/DesignTokens.h"
 
 #include <QObject>
+#include <QTimer>
 
 #include <QPoint>
 #include <QRect>
@@ -130,12 +131,22 @@ namespace GyanisScribe::Gui
          */
         void advanceStreamingForTesting(int milliseconds);
 
+        /**
+         * @brief 改自动隐藏的可见时长
+         * @param milliseconds 从本次显示起算的毫秒数，小于 1 按 1 处理
+         * @details 只给用例用：三秒的真实等待会让定时器用例拖慢整条 ctest；
+         *          每次 show 都按这一档重启同一个隐藏定时器。
+         */
+        void setVisibleDurationForTesting(int milliseconds);
+
     private:
         class Bubble;
 
         IconProvider       &m_icons;    ///< 图标出口，不拥有
         const ThemeManager &m_theme;    ///< 主题来源，不拥有
         Bubble             *m_bubble{}; ///< 当前气泡，同一时刻最多一个
+        QTimer              m_hideTimer;                          ///< 自动隐藏，每次 show 重启；旧的期限推不掉新提示
+        int                 m_visibleDurationMs = kToastVisibleMs; ///< 当前可见时长，用例可缩短
     };
 
 } // namespace GyanisScribe::Gui

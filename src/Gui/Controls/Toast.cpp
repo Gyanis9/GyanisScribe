@@ -209,7 +209,16 @@ namespace GyanisScribe::Gui
             layout->addWidget(textColumn, 1);
         }
 
-        void setText(const QString &text, const ToastKind kind)
+        /**
+         * @brief 换一段文字、种类与图标
+         * @param text 提示正文
+         * @param kind 提示种类，决定语义色与图标
+         * @param devicePixelRatio 目标屏幕的缩放比
+         * @details 图标按目标屏幕的倍比取图，不能读气泡自己的 devicePixelRatioF：气泡在 setText
+         *          时还没显示、也还没定屏，混合 DPI 的副屏会拿到主屏的比例而糊掉。
+         *          尺寸仍按位图的逻辑尺寸算，高 DPI 只影响清晰度，不改变布局。
+         */
+        void setText(const QString &text, const ToastKind kind, const qreal devicePixelRatio)
         {
             // 旧覆盖层的定时器还在跑，先收掉，否则它会把新文字重新盖住
             removeOverlay();
@@ -222,8 +231,7 @@ namespace GyanisScribe::Gui
             m_text->setStyleSheet(QStringLiteral("color: %1; background: transparent;").arg(accent.name(QColor::HexRgb)));
             // 图标跟着种类换：颜色一样时，认图形比认文字快
             const auto iconName = kind == ToastKind::Success ? std::string_view{"Check"} : (kind == ToastKind::Danger ? "Warning" : "Info");
-            // 按气泡所在屏幕的缩放比取图，高 DPI 上不靠 QPainter 放大糊掉
-            m_icon->setPixmap(m_icons.pixmap(iconName, IconSize::Medium, devicePixelRatioF(), accent));
+            m_icon->setPixmap(m_icons.pixmap(iconName, IconSize::Medium, devicePixelRatio, accent));
         }
 
         void setPalette(const ThemePalette &palette)
@@ -343,6 +351,17 @@ namespace GyanisScribe::Gui
 
     Toast::Toast(IconProvider &icons, const ThemeManager &theme, QObject *parent) : QObject(parent), m_icons(icons), m_theme(theme)
     {
+        // 一个成员定时器服务所有提示：每条 show 都重启它，第一条的期限因此推不掉第二条。
+        // 逐条 singleShot 时，旧提示到点仍会按自己的闭包把新气泡藏掉
+        m_hideTimer.setSingleShot(true);
+        QObject::connect(&m_hideTimer, &QTimer::timeout, this,
+                         [this]
+                         {
+                             if (m_bubble != nullptr)
+                             {
+                                 m_bubble->hide();
+                             }
+                         });
     }
 
     Toast::~Toast()
@@ -371,7 +390,19 @@ namespace GyanisScribe::Gui
         // 每次显示都现取主题色：主题刚换过就冒出来的提示不能还穿着旧衣
         m_bubble->setStyleSheet({});
         m_bubble->setPalette(m_theme.palette());
-        m_bubble->setText(text, kind);
+        // 图标按目标屏幕的倍比取图：气泡这时还没显示，devicePixelRatioF() 只会给主屏的比例，
+        // 混合 DPI 的副屏上图标会被按逻辑像素放大糊掉
+        qreal targetPixelRatio = 1.0;
+        const QScreen *targetScreen = available.isEmpty() ? nullptr : QGuiApplication::screenAt(available.center());
+        if (targetScreen == nullptr)
+        {
+            targetScreen = QGuiApplication::primaryScreen();
+        }
+        if (targetScreen != nullptr)
+        {
+            targetPixelRatio = targetScreen->devicePixelRatio();
+        }
+        m_bubble->setText(text, kind, targetPixelRatio);
         m_bubble->adjustSize();
         const auto width = std::clamp(m_bubble->sizeHint().width(), kToastMinimumWidth, kToastMaximumWidth);
         m_bubble->resize(width, m_bubble->sizeHint().height());
@@ -381,16 +412,8 @@ namespace GyanisScribe::Gui
         // 几何落定、标签排好版之后才播：覆盖层按标签矩形建层
         m_bubble->startMotion(animationsEnabled());
 
-        // 新提示顶掉旧的气泡：排队会让三秒前的操作看起来像刚发生
-        QPointer<Bubble> guard{m_bubble};
-        QTimer::singleShot(kToastVisibleMs, this,
-                           [guard]
-                           {
-                               if (guard != nullptr)
-                               {
-                                   guard->hide();
-                               }
-                           });
+        // 新提示顶掉旧的气泡，同时重启隐藏期限：排队会让三秒前的操作看起来像刚发生
+        m_hideTimer.start(m_visibleDurationMs);
     }
 
     QString Toast::currentText() const
@@ -424,6 +447,11 @@ namespace GyanisScribe::Gui
         {
             m_bubble->advanceStreamingForTesting(milliseconds);
         }
+    }
+
+    void Toast::setVisibleDurationForTesting(const int milliseconds)
+    {
+        m_visibleDurationMs = std::max(1, milliseconds);
     }
 
 } // namespace GyanisScribe::Gui

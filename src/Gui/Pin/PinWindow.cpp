@@ -1874,9 +1874,15 @@ namespace GyanisScribe::Gui
             return;
         }
 
-        // 只是点了一下（没拖动）不吸边：在屏边附近点一下就把图收起来是没人要过的行为
+        // 只是点了一下（没拖动）不吸边：在屏边附近点一下就把图收起来是没人要过的行为。
+        // 但按下时已经停掉了进行中的收展/吸附弹簧：这一下没拖动，几何要落回当前逻辑档，
+        // 否则贴图会停在「露了一半」的中间位置，而没有任何事件会再把它推回终值
         if (!m_dragMoved)
         {
+            if (m_edgeDock != Core::ScreenEdge::None)
+            {
+                applyDockGeometry(false);
+            }
             update();
             return;
         }
@@ -1948,9 +1954,14 @@ namespace GyanisScribe::Gui
 
     void PinWindow::hideEvent(QHideEvent *event)
     {
-        QWidget::hideEvent(event);
-        // 藏起来之后不该还有一个定时器在挪它：下一次露面按当时的几何重新算
+        // 藏之前先落回当前逻辑档：收起/展开的弹簧在隐藏时不跑，停在中途的几何会一直留着，
+        // 下一次露面就是一张露了半截的贴图。先落位再让基类把窗口藏起来。
         stopGeometryAnimation();
+        if (m_edgeDock != Core::ScreenEdge::None)
+        {
+            applyDockGeometry(false);
+        }
+        QWidget::hideEvent(event);
         // 收起或关闭发生在标注中途时先收工：已经画上的东西烘进图里，不留一个悬着的会话
         if (m_annotating)
         {
