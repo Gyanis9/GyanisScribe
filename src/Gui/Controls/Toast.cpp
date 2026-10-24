@@ -229,8 +229,8 @@ namespace GyanisScribe::Gui
         void setPalette(const ThemePalette &palette)
         {
             m_currentPalette = palette;
-            // 背景走面板色、边框走语义边框色：气泡是浮层，需求允许轻量阴影但禁玻璃拟态；
-            // 圆角取胶囊档（与珍珠玻璃的提示形状同形）——半高以上的大圆角由 Qt 按高度收敛
+            // 背景走面板色、边框走分隔线那一档：气泡是浮层，不铺投影，靠这一圈细边与底下的内容分开；
+            // 圆角取胶囊档——半高以上的大圆角由 Qt 按高度收敛
             setStyleSheet(QStringLiteral("background-color: %1; border: 1px solid %2; border-radius: 999px;")
                                   .arg(m_currentPalette.surface.name(QColor::HexRgb), m_currentPalette.border.name(QColor::HexRgb)));
         }

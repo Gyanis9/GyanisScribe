@@ -28,13 +28,13 @@ namespace GyanisScribe::Gui
     inline constexpr QColor kCaptureMaskColor{0, 0, 0, 120};
 
     /// 选区边框与焦点圈的主色：遮罩压在任意画面上，这一支不随主题走，只看「深浅两种背景上都够重」；
-    /// 与浅色档 accent 同值（珍珠玻璃的蓝）
+    /// 与浅色档 accent 同值
     inline constexpr QColor kAccentColor{35, 109, 233};
 
-    /// 遮罩上的读数文本色：借珍珠玻璃的深色铭牌文字档（--plate-ink）
+    /// 遮罩上的读数文本色：近白，压在深色铭牌底上仍是最亮的那一层
     inline constexpr QColor kCaptureHintTextColor{242, 245, 244};
 
-    /// 选区读数文本的底衬色，保证读数压在任何画面上都读得出：借设计的深色铭牌底（--plate-bg 的 .9 档）
+    /// 选区读数文本的底衬色：半透明深色，压在任何画面上都读得出，又不把背后的内容遮死
     inline constexpr QColor kCaptureHintBackgroundColor{21, 24, 26, 230};
 
     /// 十字辅助线色（虚线）
@@ -74,25 +74,25 @@ namespace GyanisScribe::Gui
         QColor windowBackground; ///< 窗口底色，QSS 里顶层窗口的背景
         QColor surface;          ///< 面板底色：卡片、工具栏、列表项、弹层
         QColor text;             ///< 正文色，对 windowBackground 与 surface 都要满足 AA
-        QColor secondaryText;    ///< 次要文本色（说明行、读数），同样要满足 AA
-        QColor border;           ///< 1px 分隔与卡片描边，用中性语义色，不用纯黑或纯白
-        QColor accent;           ///< 主色：焦点圈、主按钮填充、选中项描边
+        QColor secondaryText;    ///< 次要文本色（说明行、占位、禁用文字），三档都要满足 AAA
+        QColor border;           ///< 分隔线：菜单分隔符、工具栏竖线、滑块槽，不做容器描边
+        QColor accent;           ///< 主色：焦点环、主按钮填充、勾选框与选中项的强调色
         QColor onAccent;         ///< 压在主色上的文字色
         QColor selection;        ///< 文本选区底色，正文色压在其上仍要读得出
         QColor icon;             ///< 图标描边色，替换 SVG 里的 currentColor
         QColor success;          ///< 成功语义色，Toast 与状态文字用
         QColor danger;           ///< 危险语义色，出错提示与删除类动作的强调色
-        QColor mutedFill;        ///< 静默底：进度槽、输入类控件的禁用底、次级面板
+        QColor mutedFill;        ///< 静默底：进度槽、输入类控件的禁用底、只读底
         QColor controlFill;      ///< 按钮与输入框的静息填充；与 surface 的微明度差是控件可辨识的唯一依据
         QColor hover;            ///< 中性悬停底（按钮、列表项、菜单项）
         QColor pressed;          ///< 中性按下底，比 hover 再重一档
         QColor accentHover;      ///< 主按钮悬停底：填充色的加深档，不换成描边
         QColor accentSoft;       ///< 选中底：导航当前项、勾选的工具按钮，配 text 与 accent 同时可读
-        QColor borderStrong;     ///< 输入类控件的默认描边，比 border 重一档，好让「能填的」一眼分得出
+        QColor borderStrong;     ///< 浮层微边缘与高对比度档的描边：压在其它内容上的菜单、提示、控制条用它
     };
 
-    /// 浅色主题的语义色：珍珠玻璃（scaffold-vue）浅色档的移植；
-    /// 逐条对比度现算与设计原值的差异见换肤计划附录的冻结值表（仓外 GyanisScribe-Reports/UiRestylePlan.md）
+    /// 浅色主题的语义色：windowBackground、surface、controlFill 三档微明度差配一支主色；
+    /// 对比度阈值由 ThemeManagerFixture.SemanticColorPairsMeetWcagContrast 对三档逐角色现算
     inline constexpr ThemePalette kLightPalette{
             QColor{245, 245, 243}, // windowBackground
             QColor{252, 252, 251}, // surface
@@ -114,7 +114,7 @@ namespace GyanisScribe::Gui
             QColor{226, 226, 221}, // borderStrong
     };
 
-    /// 深色主题的语义色：同一套语义换材质（设计深色档的移植）
+    /// 深色主题的语义色：同一套角色换成暗底一侧的微明度阶梯，正文与次要文本都比浅色档抬高亮度
     inline constexpr ThemePalette kDarkPalette{
             QColor{11, 11, 10},    // windowBackground
             QColor{21, 21, 21},    // surface

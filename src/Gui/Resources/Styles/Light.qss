@@ -1,4 +1,4 @@
-/* Light 主题的界面样式表：珍珠玻璃（scaffold-vue）浅色档的移植。
+/* Light 主题的界面样式表：微明度分层的浅色档。
    色值来自 src/Gui/Theme/DesignTokens.h 的同名语义字段，tests/Gui/Theme/TestThemeManager.cpp 逐色比对两边同解。
    设计里带透明度的线（滚动条滑块）在色板里没有角色，按 rgba 字面量写——
    那道同解门禁只扫 #RRGGBB，这个位置是仅有的例外，改它要连同本注释一起看。
