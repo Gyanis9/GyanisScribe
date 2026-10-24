@@ -3,6 +3,7 @@
 #include "Gui/Controls/HotkeyEdit.h"
 
 #include <QAbstractButton>
+#include <QAbstractSpinBox>
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
@@ -35,6 +36,60 @@ namespace
         for (QWidget *parent = widget; parent != nullptr; parent = parent->parentWidget())
         {
             if (parent->objectName() == QStringLiteral("AnnotationToolbar"))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// 环围绕的矩形，取目标控件自己的坐标系
+    /// 普通控件是整块矩形；复选框只取 indicator，环不圈整行文字
+    QRect ringTargetRect(QWidget *target, bool indicatorOnly)
+    {
+        if (!indicatorOnly)
+        {
+            return {QPoint{0, 0}, target->size()};
+        }
+
+        // 复选框的指示器用样式自己的 subElementRect 取，不按字号与内边距另算一份
+        target->ensurePolished();
+        QStyleOptionButton option;
+        option.initFrom(target);
+        option.rect           = target->rect();
+        const QRect indicator = target->style()->subElementRect(QStyle::SE_CheckBoxIndicator, &option, target);
+        if (indicator.isEmpty())
+        {
+            return {QPoint{0, 0}, target->size()};
+        }
+        return indicator;
+    }
+
+    /// 取能装下目标矩形与四周 6px 外扩的最近祖先
+    /// 零边距的行容器与字段等大，环会被 Qt 裁在行矩形里，必须继续往上找到页卡片或窗口根；
+    /// 一路都装不下时退回最外层祖先，让窗口边界去裁，至少不落在中间某一层的零边距容器上
+    QWidget *hostFor(QWidget *target, const QRect &targetRect)
+    {
+        QWidget *outermost = nullptr;
+        for (QWidget *ancestor = target->parentWidget(); ancestor != nullptr; ancestor = ancestor->parentWidget())
+        {
+            outermost = ancestor;
+            const QRect ring{target->mapTo(ancestor, targetRect.topLeft()), targetRect.size()};
+            if (ancestor->rect().contains(ring.adjusted(-kOverlayMargin, -kOverlayMargin, kOverlayMargin, kOverlayMargin)))
+            {
+                return ancestor;
+            }
+        }
+        return outermost;
+    }
+
+    /// 判断 ancestor 是不是 widget 自己或它的祖先
+    /// 目标所在的零边距行移动、缩放时目标收不到事件，只能旁听祖先的几何变化
+    bool isSelfOrAncestorOf(const QWidget *ancestor, const QWidget *widget)
+    {
+        for (const QWidget *candidate = widget; candidate != nullptr; candidate = candidate->parentWidget())
+        {
+            if (candidate == ancestor)
             {
                 return true;
             }
@@ -97,39 +152,27 @@ namespace GyanisScribe::Gui
         update();
     }
 
-    QRect FocusRingOverlay::targetRectInParent() const
+    QRect FocusRingOverlay::targetRectInHost() const
     {
-        if (m_target.isNull() || m_target->parentWidget() == nullptr)
+        if (m_target.isNull() || parentWidget() == nullptr)
         {
             return {};
         }
-        if (!m_indicatorOnly)
-        {
-            return m_target->geometry();
-        }
 
-        // 复选框的环只套指示器：用样式自己的 subElementRect 取，不按字号与内边距另算一份
-        m_target->ensurePolished();
-        QStyleOptionButton option;
-        option.initFrom(m_target);
-        option.rect           = m_target->rect();
-        const QRect indicator = m_target->style()->subElementRect(QStyle::SE_CheckBoxIndicator, &option, m_target);
-        if (indicator.isEmpty())
-        {
-            return m_target->geometry();
-        }
-        return {m_target->mapTo(m_target->parentWidget(), indicator.topLeft()), indicator.size()};
+        // 目标与宿主之间可能隔着零边距的行容器，必须映射到宿主坐标再画
+        const QRect target = ringTargetRect(m_target, m_indicatorOnly);
+        return {m_target->mapTo(parentWidget(), target.topLeft()), target.size()};
     }
 
     void FocusRingOverlay::syncGeometry()
     {
-        if (m_target.isNull() || m_target->parentWidget() == nullptr || !m_target->isVisible())
+        if (m_target.isNull() || parentWidget() == nullptr || !m_target->isVisible())
         {
             hide();
             return;
         }
         // 单环与双环共用同一外扩：覆盖层透明，单环多出来的空间不画东西，也不占布局
-        setGeometry(targetRectInParent().adjusted(-kOverlayMargin, -kOverlayMargin, kOverlayMargin, kOverlayMargin));
+        setGeometry(targetRectInHost().adjusted(-kOverlayMargin, -kOverlayMargin, kOverlayMargin, kOverlayMargin));
         raise();
     }
 
@@ -141,7 +184,7 @@ namespace GyanisScribe::Gui
         {
             return;
         }
-        const QRect target = targetRectInParent().translated(-geometry().topLeft());
+        const QRect target = targetRectInHost().translated(-geometry().topLeft());
         if (target.isEmpty())
         {
             return;
@@ -170,6 +213,14 @@ namespace GyanisScribe::Gui
 
     FocusRingController::FocusRingController(PaletteProvider palette, QObject *parent) : QObject(parent), m_palette(std::move(palette))
     {
+    }
+
+    FocusRingController::~FocusRingController()
+    {
+        // 收尾阶段不再跑事件循环，deleteLater 不会执行；直接删掉仍活着的覆盖层
+        delete m_ring.data();
+        m_ring   = nullptr;
+        m_target = nullptr;
     }
 
     void FocusRingController::setThemeKind(const ThemeKind kind)
@@ -213,6 +264,15 @@ namespace GyanisScribe::Gui
         {
             return {};
         }
+        // 微调框的只读状态记在 QAbstractSpinBox 上；下拉框则看内部行编辑是否只读
+        if (auto *spin = qobject_cast<QAbstractSpinBox *>(target); spin != nullptr && spin->isReadOnly())
+        {
+            return {};
+        }
+        if (auto *combo = qobject_cast<QComboBox *>(target); combo != nullptr && combo->lineEdit() != nullptr && combo->lineEdit()->isReadOnly())
+        {
+            return {};
+        }
         if (qobject_cast<HotkeyEdit *>(target) != nullptr)
         {
             return TargetSpec{target, FocusRingStyle::Double, false};
@@ -249,10 +309,17 @@ namespace GyanisScribe::Gui
             return;
         }
 
-        auto *overlay = new FocusRingOverlay{spec.widget, spec.style, spec.indicatorOnly, m_palette(), spec.widget->parentWidget()};
+        // 宿主取能装下 6px 外扩的最近祖先：零边距行会把覆盖层裁掉，页卡片或窗口根才画得全
+        QWidget *host = hostFor(spec.widget, ringTargetRect(spec.widget, spec.indicatorOnly));
+        if (host == nullptr)
+        {
+            return;
+        }
+
+        auto *overlay = new FocusRingOverlay{spec.widget, spec.style, spec.indicatorOnly, m_palette(), host};
         m_target      = spec.widget;
         m_ring        = overlay;
-        // 目标先于父控件销毁时，覆盖层跟着退场；父控件先销毁时 Qt 会把它一起带走
+        // 目标先于宿主销毁时，覆盖层跟着退场；宿主先销毁时 Qt 会把它一起带走
         QObject::connect(spec.widget, &QObject::destroyed, overlay, &QObject::deleteLater);
         overlay->syncGeometry();
         if (spec.widget->isVisible())
@@ -315,16 +382,16 @@ namespace GyanisScribe::Gui
             case QEvent::Move:
             case QEvent::Resize:
             case QEvent::Show:
-            case QEvent::Hide:
-                if (m_target != nullptr && widget == m_target)
+                // 目标所在的零边距行先动，目标自身的坐标才跟着变；祖先的几何变化也要重算一次
+                if (m_target != nullptr && isSelfOrAncestorOf(widget, m_target) && m_ring != nullptr)
                 {
-                    if (event->type() == QEvent::Hide)
-                    {
-                        hideRing();
-                    } else if (m_ring != nullptr)
-                    {
-                        m_ring->syncGeometry();
-                    }
+                    m_ring->syncGeometry();
+                }
+                return false;
+            case QEvent::Hide:
+                if (m_target != nullptr && isSelfOrAncestorOf(widget, m_target))
+                {
+                    hideRing();
                 }
                 return false;
             default:

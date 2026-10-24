@@ -1,6 +1,6 @@
 /**
  * @file FocusRing.h
- * @brief 输入面的焦点环覆盖层：在父控件坐标系里画双环或单环
+ * @brief 输入面的焦点环覆盖层：在宿主控件坐标系里画双环或单环
  * @author Gyanis
  * @date 2026-10-24
  * @version 0.0.1
@@ -29,9 +29,11 @@ namespace GyanisScribe::Gui
     };
 
     /**
-     * @brief 画在目标控件父控件上的焦点环
+     * @brief 画在宿主控件上的焦点环
      * @details 自身透明、不吃鼠标、不参与焦点；几何跟着目标控件走，目标不可见时自动收起。
      *          覆盖层不占布局，因此 6px 外扩不会挤动任何控件。
+     *          宿主是能装下 6px 外扩的最近祖先，通常是页卡片或窗口根，而不是目标控件的直接父控件：
+     *          零边距的行容器与目标等大，挂在它上面会被 Qt 裁掉外圈。
      */
     class FocusRingOverlay final : public QWidget
     {
@@ -39,12 +41,12 @@ namespace GyanisScribe::Gui
 
     public:
         /**
-         * @brief 构造覆盖层并挂到目标控件的父控件上
+         * @brief 构造覆盖层并挂到宿主控件上
          * @param target 焦点环围绕的控件，必须已有父控件
          * @param style 双环或单环
          * @param indicatorOnly 为 true 时只圈复选框的指示器，而不是整行
          * @param palette 当前主题的语义色
-         * @param parent 目标控件的父控件，覆盖层作为它的子控件压在最上层
+         * @param parent 能装下 6px 外扩的祖先控件，覆盖层作为它的子控件压在最上层
          */
         FocusRingOverlay(QWidget *target, FocusRingStyle style, bool indicatorOnly, ThemePalette palette, QWidget *parent);
 
@@ -71,10 +73,11 @@ namespace GyanisScribe::Gui
 
     private:
         /**
-         * @brief 目标控件在父控件坐标系里的矩形
-         * @return 普通控件取自身几何；只圈指示器时取复选框的 indicator 矩形
+         * @brief 目标控件的环中心矩形在宿主控件坐标系里的位置
+         * @return 普通控件取自身矩形；只圈指示器时取复选框的 indicator 矩形
+         * @details 目标与宿主之间可能隔着若干层行容器，不能直接用目标在直接父控件里的几何。
          */
-        [[nodiscard]] QRect targetRectInParent() const;
+        [[nodiscard]] QRect targetRectInHost() const;
 
         QPointer<QWidget> m_target;                                 ///< 被围绕的控件，销毁后自动置空
         FocusRingStyle    m_style         = FocusRingStyle::Double; ///< 当前环的形状
@@ -85,7 +88,7 @@ namespace GyanisScribe::Gui
     /**
      * @brief 应用级焦点环控制器：按焦点落点决定画哪种环
      * @details 作为应用事件过滤器使用。只有第一次聚焦到可映射控件时才创建覆盖层；
-     *          失焦、目标隐藏或切到高对比度档时收起。控件销毁时覆盖层随父控件或目标一起回收。
+     *          失焦、目标隐藏或切到高对比度档时收起。控件销毁时覆盖层随宿主或目标一起回收。
      */
     class FocusRingController final : public QObject
     {
@@ -101,6 +104,13 @@ namespace GyanisScribe::Gui
          * @param parent Qt 父对象
          */
         explicit FocusRingController(PaletteProvider palette, QObject *parent = nullptr);
+
+        /**
+         * @brief 销毁控制器并同步删掉仍活着的覆盖层
+         * @details 收尾阶段不再跑事件循环，deleteLater 投递的删除不会执行；这里直接删除，
+         *          避免覆盖层留到宿主控件析构。
+         */
+        ~FocusRingController() override;
 
         /**
          * @brief 声明当前主题档位
