@@ -97,7 +97,7 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 | Toast 通知 | `src/Gui/Controls/Toast.cpp`、`StreamingText.cpp` | 用 `palette.success`/`palette.danger`/`palette.secondaryText` 从色板角色现算内联样式（`success` 与 `danger` 不进 QSS，用例按消费方名单核对）；气泡走 `surface` 底 + 1px `borderStrong` 边缘 + 胶囊圆角（999px 由 Qt 按高度收敛）；图标与文字同一行，图标底边落在首行基线下方 0.125em | 三类：Information / Success / Danger，3 秒后自收。成功与信息提示逐字显现（第 i 字在 i×30ms 起步、单字 90ms 从模糊到清晰，缓动 `cubic-bezier(.215,.61,.355,1)`），错误提示整句即时出现；成功图标从 0.6 弹到 1.0；图标描边取该条提示的语义色；新提示顶掉旧提示时覆盖层一并销毁重启，不叠影 |
 | 复选框（设置页全部勾选项） | `src/Gui/Controls/CheckBox.cpp` + QSS `QCheckBox::indicator` | 方框的填充、圆角与悬停描边仍由 QSS 画：静息 `controlFill`、悬停 `hover` + `borderStrong` 边、勾选 `accent` 填充、禁用 `mutedFill`；勾由 `Gui::CheckBox` 按 `onAccent` 自绘，QSS 用 `[animatedIndicator="true"]` 把静态勾图关掉 | 勾选时从 0.55 弹性到 1.0（`kPopSpring`，约 450ms、过冲约 19.5%），取消勾选不弹；三档的勾都取 `onAccent`（高对比度档是蓝底白勾，与另两档同一套取色）；减少动效时直接到 1.0 |
 | 焦点态（所有可聚焦控件） | `src/Gui/Controls/FocusRing.cpp` | `FocusRingController` 作为应用事件过滤器，首次聚焦时创建覆盖层；宿主是能装下目标矩形外扩 6px 的最近祖先，几何按宿主坐标系算 | 输入框（`QLineEdit`、`QComboBox`、`QSpinBox`、标注行内 `QTextEdit`、`HotkeyEdit`）双环；按钮、工具按钮、复选框单环（复选框套在 indicator 上）；可编辑下拉框/微调框内部的行编辑映射回外层；只读、禁用与标注工具栏内的控件不装；滑块走手柄反转（见 §5）；切到高对比度档立即撤环、切回时给当前焦点补环 |
-| 快捷键输入框 | `src/Gui/Controls/HotkeyEdit.cpp` | `QLabel#hotkeyDisplay` 与 `QLineEdit` 同一套 `controlFill`/圆角/内边距/1px 透明占位边；录制态按 `[recording="true"]` 换 `accentSoft` 底与主色边 | 闲置态显示已存的组合，悬浮说明写清「点击这一格后按下组合键即可替换，按 Esc 取消」；进入录制态换成「请按下快捷键（Esc 取消）」的提示 |
+| 快捷键输入框 | `src/Gui/Controls/HotkeyEdit.cpp` | `QLabel#hotkeyDisplay` 与 `QLineEdit` 同一套 `controlFill`/圆角/内边距/1px 透明占位边；录制态按 `[recording="true"]` 换 `accentSoft` 底与主色边（高对比度档不换底：仍是纯白，只把 2px 描边换成主色） | 闲置态显示已存的组合，悬浮说明写清「点击这一格后按下组合键即可替换，按 Esc 取消」；进入录制态换成「请按下快捷键（Esc 取消）」的提示 |
 | 数字输入框 | `src/Gui/Controls/SpinBox.cpp` | 继承 `QSpinBox`，关掉原生上下按钮；右缘叠两枚自绘 chevron，悬停给一档 `mutedFill` 底 | 点击加/减，范围、后缀、`不限` 等语义仍由 `QSpinBox` 负责；键盘上下键照常；数值上 tabular figures |
 | 历史列表 | `src/Gui/History/HistoryView.cpp` | 缩略图边长 `kThumbnailEdge`、圆角 `kThumbnailCornerRadius`；列表项形状与导航共用 `QListWidget::item` | 顶部一枚搜索框（按文件名、类别或日期）加一个类别筛选下拉，次序固定时间倒序；保留策略本身在「通用」页那两格，这一页不重复摆读数。缩略图读不出来时给一枚类别图标（`Record`/`CaptureRegion`），不留空白方块；时间与尺寸读数上 tabular figures |
 
@@ -126,7 +126,7 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 | success / danger | `#3B7D21` / `#CA3932` | `#9BE35A` / `#FF7A71` | `#006400` / `#B00000` | Toast 与状态色（不进样式表） |
 | accentHover / accentSoft | `#1D61D5` / `#E5EEFA` | `#3D7FF2` / `#22344D` | `#08449E` / `#D6E4FB` | 主按钮悬停 / 导航当前项与勾选的工具按钮 |
 
-浅色与深色里不出现不透明纯黑；半透明色只出现在遮罩（`kCaptureMaskColor`）与滚动条滑块——浅色档是半透明黑，深色档是半透明白（`LightAndDarkSheetsUseNoOpaqueBlack`）。
+浅色与深色里不出现不透明纯黑；半透明色只出现在截图遮罩（`kCaptureMaskColor`、`kCaptureHintBackgroundColor` 与 `kCrosshairColor`，这三支是固定值、不随主题换）与滚动条滑块——滑块的 rgba 在浅色档是半透明黑、深色档是半透明白（`LightAndDarkSheetsUseNoOpaqueBlack`）。
 对比要求由用例算：`ThemeManagerFixture` 里的 `contrastRatio` 逐角色核 WCAG——正文压在本档
 窗口底与卡片底上要 ≥ 4.5（AA），**次要文本三档都 ≥ 7.0（AAA）**（说明行与正文同字号，弱化只能靠色），
 焦点环/主按钮描边与图标色 ≥ 3.0（非文本对比），选区上的正文与主按钮上的文字 ≥ 4.5；

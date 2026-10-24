@@ -204,7 +204,7 @@ namespace
         {
             for (int row = 0; row < form->rowCount(); ++row)
             {
-                // 标签列宽也收到统一一档（界面审查 UI-01）：QFormLayout 没有列宽接口，
+                // 标签列宽也收到统一一档：QFormLayout 没有列宽接口，
                 // 给每个标签控件一个最小宽即把整列撑到同一档，翻页时字段列不再左右跳
                 if (auto *label = form->itemAt(row, QFormLayout::LabelRole); label != nullptr && label->widget() != nullptr)
                 {
@@ -2511,7 +2511,7 @@ namespace GyanisScribe::Main
     {
         auto *page   = new QWidget{this};
         auto *layout = new QVBoxLayout{page};
-        // 与表单页同一条内容网格（界面审查 UI-08）：默认边距比表单页小一圈，翻到这一页正文会左跳 7px
+        // 与表单页同一条内容网格：默认边距比表单页小一圈，翻到这一页正文会左跳 7px
         layout->setContentsMargins(GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium);
         layout->setSpacing(GyanisScribe::Gui::kSpacingSmall);
 

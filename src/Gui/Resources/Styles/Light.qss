@@ -4,7 +4,8 @@
    那道同解门禁只扫 #RRGGBB，这个位置是仅有的例外，改它要连同本注释一起看。
    字号与字重不在这里：排版走 Gui::applyTextRole，点值随系统 DPI 缩放，而样式表的 px 不缩。
    勾与下拉箭头走 Resources/Styles 下的 SVG，微调框上下按钮由 Gui::SpinBox 自绘，
-   都不再由原生风格画；QPalette（Gui::buildApplicationPalette）只补原生文字、占位与禁用几档颜色。 */
+   都不再由原生风格画；QPalette（Gui::buildApplicationPalette）补原生文字、占位与禁用几档颜色，
+   另把 AlternateBase 设成 mutedFill，自绘微调框的上下按钮悬停时取它当底。 */
 
 /* ---- 面：只有具名的根与卡片铺底。裸 QWidget 一律不铺——铺了就是每个子控件各画一块底，
         表单里会排出一条条灰带 ---- */
