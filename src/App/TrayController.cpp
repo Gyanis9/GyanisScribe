@@ -139,7 +139,7 @@ namespace GyanisScribe::App
             // 挂在外面每次重跑就多接一条，一次点击会发出好几个动作
             QObject::connect(m_icon, &QSystemTrayIcon::activated, this, &TrayController::onActivated);
         }
-        // 托盘描边色跟着主题走：深色任务栏上的深色图标会完全看不见
+        // 菜单图标跟主题重取；托盘本身是固定色品牌图
         m_icons.setTintColor(m_theme.iconTint());
 
         m_menu->clear();
@@ -150,7 +150,7 @@ namespace GyanisScribe::App
         }
         buildMenu(*m_menu, screenNames);
 
-        m_icon->setIcon(m_icons.icon("Tray"));
+        m_icon->setIcon(m_icons.brandIcon());
         m_icon->setToolTip(trayTooltip(m_pinCount, m_recordedSeconds, m_recordingPaused));
 
         m_icon->setContextMenu(m_menu.get());

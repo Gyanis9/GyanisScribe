@@ -344,3 +344,15 @@ TEST_F(HistoryViewFixture, BrokenKeepsPreviousRowsAndTellsTheUser)
     EXPECT_NE(message.toStdString().find("历史清单没能读出来"), std::string::npos);
     EXPECT_EQ(view->rowCount(), 1) << "上一次的记录要留着，让用户还能顺着路径找文件";
 }
+
+/**
+ * @brief 钉住历史列表的类别图标按 96 原生档取
+ * @details 缩略图读不出时列表仍显示类别图标；列表 iconSize 是 96，图标必须备 96。
+ */
+TEST_F(HistoryViewFixture, CategoryFallbackIconCarriesNinetySix)
+{
+    ASSERT_NE(m_icons, nullptr);
+    const auto icon = m_icons->icon("Record");
+    ASSERT_FALSE(icon.isNull());
+    EXPECT_TRUE(icon.availableSizes().contains(QSize(96, 96)));
+}

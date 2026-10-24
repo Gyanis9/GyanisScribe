@@ -1439,7 +1439,7 @@ namespace GyanisScribe::Main
         m_videoEncoders(std::make_unique<GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator>()), m_integration(integration), m_historyStore(historyStore)
     {
         setWindowTitle(GyanisScribe::Base::uiText("智录 设置"));
-        setWindowIcon(icons.icon("App"));
+        setWindowIcon(icons.brandIcon());
         // 根容器要自己铺底：样式表只给具名的根与卡片上色，不铺裸 QWidget
         setObjectName(QStringLiteral("appRoot"));
         setAttribute(Qt::WA_StyledBackground, true);
@@ -1456,6 +1456,7 @@ namespace GyanisScribe::Main
         m_nav   = new QListWidget{this};
         m_stack = new QStackedWidget{this};
         m_nav->setObjectName(QStringLiteral("settingsNav"));
+        m_nav->setIconSize(QSize(20, 20));
         m_nav->setFixedWidth(kNavColumnWidth);
         m_nav->setAccessibleName(GyanisScribe::Base::uiText("设置导航"));
         m_nav->setFrameShape(QFrame::NoFrame);
@@ -2514,7 +2515,7 @@ namespace GyanisScribe::Main
         layout->setSpacing(GyanisScribe::Gui::kSpacingSmall);
 
         auto *logo = new QLabel{page};
-        logo->setPixmap(m_icons.pixmap("AppIcon", GyanisScribe::Gui::IconSize::ExtraLarge));
+        logo->setPixmap(m_icons.brandPixmap(64, logo->devicePixelRatioF()));
         logo->setAccessibleName(GyanisScribe::Base::uiText("智录图标"));
 
         auto *text = new QLabel{aboutText(QApplication::applicationVersion()), page};

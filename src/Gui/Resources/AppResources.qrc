@@ -2,8 +2,6 @@
   <qresource prefix="/icons">
     <file alias="About.svg">Icons/About.svg</file>
     <file alias="Annotation.svg">Icons/Annotation.svg</file>
-    <file alias="App.svg">Icons/App.svg</file>
-    <file alias="AppIcon.svg">Icons/AppIcon.svg</file>
     <file alias="Arrow.svg">Icons/Arrow.svg</file>
     <file alias="ArrowDouble.svg">Icons/ArrowDouble.svg</file>
     <file alias="ArrowHeadSize.svg">Icons/ArrowHeadSize.svg</file>

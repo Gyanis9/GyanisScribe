@@ -7,39 +7,59 @@
 #include <QColor>
 #include <QDir>
 #include <QFile>
+#include <QGuiApplication>
 #include <QIcon>
 #include <QWidget>
 #include <QAbstractButton>
 #include <QPalette>
 #include <QPainter>
 #include <QRectF>
+#include <QScreen>
 #include <QSvgRenderer>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <format>
 #include <string>
+#include <vector>
 
 namespace
 {
     /// 图标资源的前缀目录，路径规则只在这里出现一次，调用方只报文件名
     constexpr const char *kIconDirectory = ":/icons";
 
+    /// 品牌资源的前缀目录
+    constexpr const char *kBrandDirectory = ":/brand";
+
+    /// 品牌图的八档原生边长
+    constexpr std::array<int, 8> kBrandSizes{16, 24, 32, 48, 64, 128, 256, 512};
+
     /**
-     * @brief 取要备到几倍缩放比的副本
-     * @return 向上取整并夹在 1 到 3 之间的整数倍
-     * @details 125% 缩放要按 2 倍光栅化才不糊；3 是需求 DPI 阶梯（最高 200%）之上再留一档的封顶，
-     *          超过这个值的屏幕由 Qt 自行缩放。缩放比读的是主屏：更高 DPI 的副屏上图标会由 Qt 就近放大，
-     *          那是可接受的退化，不是错位。
+     * @brief 收集所有屏幕的缩放比
+     * @return 以 1.0 打底、按升序去重的倍率表，每项夹在 1 到 3
+     * @details 125%/150%/175% 屏必须拿到精确倍率；只备整数倍时 QIcon 会拿 2× 再缩。
+     *          读的是全部已连接屏幕，不再只看主屏。
      */
-    int maximumDevicePixelRatio()
+    std::vector<qreal> screenDevicePixelRatios()
     {
-        if (qApp == nullptr)
+        std::vector<qreal> ratios{1.0};
+        for (const auto *screen: QGuiApplication::screens())
         {
-            return 1;
+            const auto ratio = std::clamp(screen->devicePixelRatio(), 1.0, 3.0);
+            ratios.push_back(ratio);
         }
-        return std::clamp<int>(static_cast<int>(std::ceil(qApp->devicePixelRatio())), 1, 3);
+        std::ranges::sort(ratios);
+        ratios.erase(std::unique(ratios.begin(), ratios.end()), ratios.end());
+        return ratios;
     }
+
+    /// 读 /brand 下某个原生边长的品牌 PNG；不参与主题上色
+    QPixmap loadBrandPixmap(int physicalSize)
+    {
+        return QPixmap{QString::fromUtf8(kBrandDirectory) + QStringLiteral("/AppIcon%1.png").arg(physicalSize)};
+    }
+
     /// 由 applyIcon 记在按钮上的动态属性名：refreshIcons 按它找回图标
     constexpr const char *kIconNameProperty = "uiIconName";
 
@@ -162,9 +182,64 @@ namespace GyanisScribe::Gui
         return bitmap;
     }
 
-    QIcon IconProvider::icon(const std::string_view name) const
+    QPixmap IconProvider::brandPixmap(const int logicalSize, const qreal devicePixelRatio) const
     {
-        // 先探最小档：名字不存在时 pixmap 已经报过一次原因，这里直接返回，免得同一条错误刷四遍
+        if (logicalSize <= 0)
+        {
+            return {};
+        }
+
+        const auto ratio  = std::clamp(devicePixelRatio, 1.0, 3.0);
+        const auto wanted = static_cast<int>(std::ceil(static_cast<qreal>(logicalSize) * ratio));
+
+        auto physical = kBrandSizes.back();
+        for (const auto candidate: kBrandSizes)
+        {
+            if (candidate >= wanted)
+            {
+                physical = candidate;
+                break;
+            }
+        }
+
+        auto bitmap = loadBrandPixmap(physical);
+        if (bitmap.isNull())
+        {
+            GyanisScribe::Base::Logger::error(std::format("品牌图标 {}px 读不出：请检查 /brand 下的 PNG", physical));
+            return {};
+        }
+
+        bitmap.setDevicePixelRatio(static_cast<qreal>(physical) / static_cast<qreal>(logicalSize));
+        return bitmap;
+    }
+
+    QIcon IconProvider::brandIcon() const
+    {
+        QIcon result;
+        for (const auto size: kBrandSizes)
+        {
+            const auto bitmap = brandPixmap(size, 1.0);
+            if (!bitmap.isNull())
+            {
+                result.addPixmap(bitmap);
+            }
+        }
+        for (const auto ratio: screenDevicePixelRatios())
+        {
+            for (const auto size: {16, 24, 32, 48, 64, 128, 256})
+            {
+                const auto bitmap = brandPixmap(size, ratio);
+                if (!bitmap.isNull())
+                {
+                    result.addPixmap(bitmap);
+                }
+            }
+        }
+        return result;
+    }
+
+    QIcon IconProvider::icon(const std::string_view name) const
+    {        // 先探最小档：名字不存在时 pixmap 已经报过一次原因，这里直接返回，免得同一条错误刷四遍
         if (pixmap(name, IconSize::Small).isNull())
         {
             return {};
@@ -172,14 +247,14 @@ namespace GyanisScribe::Gui
 
         QIcon result;
 
-        // 每档尺寸都备齐 1 到最大缩放比的副本：QIcon 按目标屏幕自己挑，跨 DPI 屏拖动不会糊。
+        // 八档尺寸各备一份所有屏幕倍率的副本：QIcon 按目标屏幕自己挑，跨 DPI 屏拖动不会糊。
         // 光栅化本身由 pixmap() 那张表兜着，重复取同一枚图标不再重画
-        const auto ratios = maximumDevicePixelRatio();
-        for (const auto size: {IconSize::Small, IconSize::Medium, IconSize::Large, IconSize::ExtraLarge})
+        for (const auto size: {IconSize::Small, IconSize::Medium, IconSize::Large, IconSize::ExtraLarge,
+                               IconSize::Huge, IconSize::Display, IconSize::History, IconSize::Maximum})
         {
-            for (int ratio = 1; ratio <= ratios; ++ratio)
+            for (const auto ratio: screenDevicePixelRatios())
             {
-                result.addPixmap(pixmap(name, size, static_cast<qreal>(ratio)));
+                result.addPixmap(pixmap(name, size, ratio));
             }
         }
         return result;

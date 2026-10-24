@@ -32,9 +32,7 @@ namespace
 {
     // 需求第七节点名的图标清单：这一份是抄来的独立期望值，不从资源目录反推，
     // 否则删掉一枚 SVG 之后用例只会跟着一起改口，就再也抓不住它了
-    constexpr std::array<std::string_view, 56> kRequiredIcons = {
-            "App",
-            "AppIcon",
+    constexpr std::array<std::string_view, 54> kRequiredIcons = {
             "Tray",
             "Capture",
             "CaptureFullScreen",
@@ -91,11 +89,13 @@ namespace
             "Refresh",
     };
 
-    /// 尺寸阶梯的四档，按从小到大排列，断言里按索引取
-    constexpr std::array kLadderSizes = {IconSize::Small, IconSize::Medium, IconSize::Large, IconSize::ExtraLarge};
+    /// 尺寸阶梯的八档，按从小到大排列，断言里按索引取
+    constexpr std::array kLadderSizes = {
+            IconSize::Small, IconSize::Medium, IconSize::Large, IconSize::ExtraLarge,
+            IconSize::Huge, IconSize::Display, IconSize::History, IconSize::Maximum};
 
     /// 阶梯对应的逻辑像素数，与 IconSize 的枚举值同解，这条用例把它钉住
-    constexpr std::array kLadderPixels = {16, 20, 24, 32};
+    constexpr std::array kLadderPixels = {16, 20, 24, 32, 48, 64, 96, 128};
 
     std::unique_ptr<QApplication> application;
 
@@ -250,7 +250,7 @@ TEST_F(IconProviderFixture, BundledSourcesFollowTheSvgContract)
         EXPECT_NE(source.indexOf(QStringLiteral("currentColor")), -1) << name.toStdString() << " 没用 currentColor，换主题时不会跟着变色";
         EXPECT_NE(source.indexOf(QStringLiteral(R"(stroke-linecap="round")")), -1) << name.toStdString() << " 端点不是圆角，风格不统一";
         EXPECT_NE(source.indexOf(QStringLiteral(R"(stroke-linejoin="round")")), -1) << name.toStdString() << " 连接不是圆角，风格不统一";
-        EXPECT_NE(source.indexOf(QStringLiteral(R"(stroke-width="1.5")")), -1) << name.toStdString() << " 线宽不在 1.5 / 2 这两档上";
+        EXPECT_NE(source.indexOf(QStringLiteral(R"(stroke-width="2")")), -1) << name.toStdString() << " 线宽不是 2";
 
         // 需求禁止脚本、外部图片与 base64：出现任一关键字就不是「原创 SVG 源码」了
         EXPECT_EQ(source.indexOf(QStringLiteral("<script")), -1) << name.toStdString() << " 里出现了脚本";
@@ -365,9 +365,9 @@ TEST_F(IconProviderFixture, AppliedIconsReResolveAfterTheTintChanges)
 
 /**
  * @brief 钉住全部图标只用一个线宽档、且颜色只走主题注入
- * @details 设计规格把描边收在唯一的 1.5 档：多出来的粗细会让同一排按钮看上去不是一家人。
+ * @details 设计规格把描边收在唯一的 2 档：多出来的粗细会让同一排按钮看上去不是一家人。
  *          颜色只允许 none / currentColor——写死的色值绕开了 IconProvider 的主题注入，换主题时会留在旧色上。
- *          与 BundledSourcesFollowTheSvgContract 分工：那条查「1.5 这个档位还在不在」，
+ *          与 BundledSourcesFollowTheSvgContract 分工：那条查「2 这个档位还在不在」，
  *          这条查「有没有第二档或写死的色混进来」。
  */
 TEST_F(IconProviderFixture, BundledSourcesKeepOneStrokeWidthAndThemeColorsOnly)
@@ -384,7 +384,7 @@ TEST_F(IconProviderFixture, BundledSourcesKeepOneStrokeWidthAndThemeColorsOnly)
         ASSERT_TRUE(widths.hasNext()) << name.toStdString() << " 没有声明线宽";
         while (widths.hasNext())
         {
-            EXPECT_EQ(widths.next().captured(1), QStringLiteral("1.5")) << name.toStdString() << " 上混进了第二档线宽";
+            EXPECT_EQ(widths.next().captured(1), QStringLiteral("2")) << name.toStdString() << " 上混进了另一档线宽";
         }
 
         auto fills = fillPattern.globalMatch(source);
@@ -555,5 +555,70 @@ TEST_F(IconProviderFixture, CaptureAndRecordFamiliesShareFrameGeometry)
     for (const auto name: {"CaptureFullScreen", "RecordFullScreen"})
     {
         EXPECT_NE(readIconSource(name).indexOf(cornerBracket), -1) << name << " 的角括号不是家族那一份";
+    }
+}
+
+/**
+ * @brief 钉住 125% / 150% 屏拿到的就是精确倍率位图
+ * @details 只备 1×/2× 时 QIcon 会把 2× 再缩到 1.25/1.5，正是发糊的来源。
+ */
+TEST_F(IconProviderFixture, FractionalScreenRatiosGetExactPixmaps)
+{
+    const auto at125 = provider().pixmap("Capture", IconSize::Small, 1.25);
+    ASSERT_FALSE(at125.isNull());
+    EXPECT_EQ(at125.size(), QSize(20, 20));
+    EXPECT_DOUBLE_EQ(at125.devicePixelRatio(), 1.25);
+
+    const auto at150 = provider().pixmap("Capture", IconSize::Small, 1.5);
+    ASSERT_FALSE(at150.isNull());
+    EXPECT_EQ(at150.size(), QSize(24, 24));
+    EXPECT_DOUBLE_EQ(at150.devicePixelRatio(), 1.5);
+}
+
+/**
+ * @brief 钉住 96 档真的存在
+ * @details 历史列表把类别图标按 96px 请求；没有 96 档时 QIcon 会把 32 放大到 96。
+ */
+TEST_F(IconProviderFixture, HistoryLadderIncludesNinetySix)
+{
+    const auto icon = provider().icon("Record");
+    ASSERT_FALSE(icon.isNull());
+    EXPECT_TRUE(icon.availableSizes().contains(QSize(96, 96)));
+}
+
+/**
+ * @brief 钉住品牌图不参与主题上色、且按原生尺寸交付
+ * @details 品牌图是固定三色；一旦被 setTintColor 染成单色，关于页就失去品牌色。
+ */
+TEST_F(IconProviderFixture, BrandPixmapKeepsNativeSizesAndIgnoresTheTint)
+{
+    IconProvider icons;
+    icons.setTintColor(QColor(0, 200, 0));
+
+    const auto small = icons.brandPixmap(16, 1.0);
+    ASSERT_FALSE(small.isNull());
+    EXPECT_EQ(small.size(), QSize(16, 16));
+    EXPECT_TRUE(containsColor(small, QColor("#151515")));
+    EXPECT_TRUE(containsColor(small, QColor("#F5F5F3")));
+    EXPECT_TRUE(containsColor(small, QColor("#5BE37A")));
+    EXPECT_FALSE(containsColor(small, QColor(0, 200, 0)));
+
+    const auto doubled = icons.brandPixmap(64, 2.0);
+    ASSERT_FALSE(doubled.isNull());
+    EXPECT_EQ(doubled.size(), QSize(128, 128));
+    EXPECT_DOUBLE_EQ(doubled.devicePixelRatio(), 2.0);
+}
+
+/**
+ * @brief 钉住品牌 QIcon 备齐 8 个原生尺寸
+ * @details 任务栏、窗口、关于页会分别要 16/32/64/128；只备一档就会拿别的尺寸缩放。
+ */
+TEST_F(IconProviderFixture, BrandIconExposesTheEightNativeSizes)
+{
+    const auto icon = IconProvider{}.brandIcon();
+    ASSERT_FALSE(icon.isNull());
+    for (const auto size: {16, 24, 32, 48, 64, 128, 256, 512})
+    {
+        EXPECT_TRUE(icon.availableSizes().contains(QSize(size, size))) << size << " 档缺席";
     }
 }

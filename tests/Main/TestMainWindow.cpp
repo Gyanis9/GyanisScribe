@@ -2320,3 +2320,24 @@ TEST_F(MainWindowFixture, ClosingTheWindowAsksTheApplicationToQuit)
 
     EXPECT_TRUE(quitRequested) << "关掉主窗口没发退出请求，进程会继续挂在托盘里";
 }
+
+/**
+ * @brief 钉住品牌图与导航尺寸的接线
+ * @details 窗口图标、关于页 64px 品牌图、导航 20px 是三处会被后续重构悄悄改掉的接线。
+ */
+TEST_F(MainWindowFixture, BrandIconAndNavMetricsAreWired)
+{
+    makeWindow();
+    EXPECT_FALSE(m_window->windowIcon().isNull());
+    EXPECT_TRUE(m_window->windowIcon().availableSizes().contains(QSize(32, 32)));
+
+    ASSERT_NE(nav(), nullptr);
+    EXPECT_EQ(nav()->iconSize(), QSize(20, 20));
+
+    m_window->open(MainWindowPage::About);
+    auto *logo = dynamic_cast<QLabel *>(controlInCurrentPage("智录图标"));
+    ASSERT_NE(logo, nullptr);
+    const auto pixmap = logo->pixmap();
+    ASSERT_FALSE(pixmap.isNull());
+    EXPECT_DOUBLE_EQ(pixmap.width() / pixmap.devicePixelRatio(), 64.0);
+}

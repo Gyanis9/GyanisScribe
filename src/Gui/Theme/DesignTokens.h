@@ -100,7 +100,7 @@ namespace GyanisScribe::Gui
             kAccentColor,          // accent
             QColor{255, 255, 255}, // onAccent
             QColor{216, 229, 249}, // selection
-            QColor{126, 136, 140}, // icon
+            QColor{26, 26, 25},    // icon：#1A1A19，暖近黑
             QColor{59, 125, 33},   // success：设计原值 #58A021 当文字只有 3.3:1，压深保色相
             QColor{202, 57, 50},   // danger：设计原值 #E0443B 当文字只有 4.2:1，压深保色相
             QColor{238, 242, 240}, // mutedFill
@@ -121,7 +121,7 @@ namespace GyanisScribe::Gui
             QColor{76, 141, 255},  // accent
             QColor{11, 18, 32},    // onAccent：这一档主色偏亮，压白字只有 3.2:1，压深字才够 AA
             QColor{39, 57, 86},    // selection
-            QColor{141, 151, 154}, // icon
+            QColor{245, 245, 243}, // icon：#F5F5F3，暖白
             QColor{155, 227, 90},  // success
             QColor{255, 122, 113}, // danger
             QColor{21, 24, 26},    // mutedFill
@@ -147,7 +147,7 @@ namespace GyanisScribe::Gui
             QColor{11, 87, 208},   // accent
             QColor{255, 255, 255}, // onAccent
             QColor{255, 229, 0},   // selection
-            QColor{0, 0, 0},       // icon
+            QColor{11, 11, 10},    // icon：#0B0B0A，近黑，不写纯黑
             QColor{0, 100, 0},     // success
             QColor{176, 0, 0},     // danger
             QColor{255, 255, 255}, // mutedFill：这一档不靠底色分层次，靠 2px 描边

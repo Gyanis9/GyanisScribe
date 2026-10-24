@@ -25,15 +25,18 @@ namespace GyanisScribe::Gui
     /**
      * @brief 图标尺寸阶梯
      * @details 枚举值就是逻辑像素数，因此新增一档不需要在第二处登记尺寸表；
-     *          阶梯的四个取值由需求第六节钉死（16 / 20 / 24 / 32）。
+     *          16/20/24/32 是控件真实请求的四档，96 是历史列表类别图标，其余是家族的大尺寸输出。
      */
     enum class IconSize
     {
-        Small      = 16, ///< 托盘、菜单项行内图标
-        Compact    = 18, ///< 标注工具栏按钮与色块：比紧凑档再小 2px
-        Medium     = 20, ///< 紧凑工具栏按钮
-        Large      = 24, ///< 工具栏按钮与对话框默认档
-        ExtraLarge = 32  ///< 关于页、空状态提示
+        Small      = 16,  ///< 菜单项与托盘行内图标
+        Medium     = 20,  ///< 导航、动作条、标注工具栏
+        Large      = 24,  ///< 对话框默认档
+        ExtraLarge = 32,  ///< 较大的按钮与空状态
+        Huge       = 48,  ///< 大尺寸输出
+        Display    = 64,  ///< 展示位
+        History    = 96,  ///< 历史列表类别图标
+        Maximum    = 128  ///< 最大界面图标档
     };
 
     /**
@@ -72,6 +75,21 @@ namespace GyanisScribe::Gui
          * @note 名字拼错不会崩也不会静默换成别的图：返回空 QIcon 并记一条含可用名单线索的错误日志。
          */
         [[nodiscard]] QIcon icon(std::string_view name) const;
+
+        /**
+         * @brief 取品牌图标的多尺寸版本
+         * @return 由 /brand 下 8 个 PNG 组成的 QIcon，固定色、不随主题上色
+         */
+        [[nodiscard]] QIcon brandIcon() const;
+
+        /**
+         * @brief 取品牌位图
+         * @param logicalSize 逻辑边长
+         * @param devicePixelRatio 目标屏幕缩放比，夹在 1 到 3
+         * @return 物理边长最接近 logicalSize × ratio 的原生 PNG；读不出时返回空位图
+         * @details 品牌图不经过 currentColor 替换，也不读取 m_tintColor。
+         */
+        [[nodiscard]] QPixmap brandPixmap(int logicalSize, qreal devicePixelRatio) const;
 
         /**
          * @brief 给按钮挂一枚按名字取的图标，并把这个名字记在控件上
@@ -120,7 +138,7 @@ namespace GyanisScribe::Gui
         /**
          * @brief 光栅化过的位图，键是「名字 # 档位 # 描边色 # 缩放比」四个分量拼出来的
          * @details 取图标的不止界面搭建那一次：录屏 HUD 每存一帧就按状态重挂暂停按钮的图标，
-         *          而一枚图标是四档尺寸 × 若干缩放比的光栅化，每帧重画一遍纯属白干。
+         *          而一枚图标是八档尺寸 × 若干缩放比的光栅化，每帧重画一遍纯属白干。
          * @note 描边色必须在键里：少了它，换主题之后旧色那一份会被当成新图标发出去，
          *       正是 applyIcon() 的 @details 明令禁止的那种错。缩放比也要在键里（用夹住之后的值），
          *       否则换到另一块 DPI 的屏上还会拿到低缩放的那一份。
