@@ -82,7 +82,7 @@ namespace GyanisScribe::Gui
         QColor icon;             ///< 图标描边色，替换 SVG 里的 currentColor
         QColor success;          ///< 成功语义色，Toast 与状态文字用
         QColor danger;           ///< 危险语义色，出错提示与删除类动作的强调色
-        QColor mutedFill;        ///< 静默底：进度槽、输入类控件的禁用底、只读底
+        QColor mutedFill;        ///< 静默底：滑块槽、输入类控件的禁用底与只读底、微调框上下按钮的悬停底
         QColor controlFill;      ///< 按钮与输入框的静息填充；与 surface 的微明度差是控件可辨识的唯一依据
         QColor hover;            ///< 中性悬停底（按钮、列表项、菜单项）
         QColor pressed;          ///< 中性按下底，比 hover 再重一档
@@ -188,8 +188,9 @@ namespace GyanisScribe::Gui
      * @brief 把语义色摊成 Qt 的应用调色板
      * @param palette 已经解算过档位的语义色
      * @return 可直接交给 QApplication::setPalette 的调色板
-     * @details 样式表管不到由原生风格绘制的部分（勾选的勾、微调框的箭头、表头、占位文字、禁用文字），
-     *          那些走 QPalette 的角色。只落样式表不落调色板时，深色档会画出一批浅色原生件——
+     * @details 样式表管不到原生控件的文字、占位与禁用色（表头、占位文字、禁用文字），
+     *          那些走 QPalette 的角色；自绘微调框的悬停底也从这里取 AlternateBase。
+     *          只落样式表不落调色板时，深色档会画出一批浅色原生件——
      *          这就是这一份映射存在的理由，两套上色路径必须同源于 ThemePalette。
      */
     [[nodiscard]] inline QPalette buildApplicationPalette(const ThemePalette &palette)
@@ -524,13 +525,13 @@ namespace GyanisScribe::Gui
     /// 菜单文字的点值：托盘右键菜单与贴图右键菜单比正文小一档，行高才能收到 24px 左右
     inline constexpr int kMenuTextPointSize = 9;
 
-    /// 一排几十件控件（标注工具栏）与设置表单的专用行距：比 4 再收一档
+    /// 标注工具栏一排控件之间的行距：比 4 再收一档
     inline constexpr int kSpacingHairline = 2;
 
     /// 一行设置项里字段的最大宽度：路径与下拉拉到整窗宽时，「这一格填什么」就看不出来了
     inline constexpr int kFieldMaximumWidth = 380;
 
-    /// 设置页标签列的最小宽度：全族统一（取最长标签一页），翻页时字段列不再左右跳（界面审查 UI-01）
+    /// 设置页标签列的最小宽度：全族统一（取最长标签一页），翻页时字段列不再左右跳
     inline constexpr int kSettingsLabelColumnWidth = 240;
 
     /// 页顶说明行的最大宽度：整窗宽的一行长句读起来要回头数，收到这一档就按行折

@@ -479,7 +479,7 @@ TEST_F(ThemeManagerFixture, MissingStyleSheetYieldsEmptyTextNotAFakeTheme)
  * @brief 钉住「两套主题真的画出不一样」：同一件控件按各自样式表渲染后的底色
  * @details 上面的用例核的是令牌与样式表文本同解，这一条核的是画出来的像素：样式表在应用层
  *          没接上、或某一档的资源没打进包时，文本比对仍可全绿而界面是原生灰。
- *          取的是空按钮的中部：判据只依赖底色，不依赖字形与字体可用性。
+ *          取的是阅读面卡片的中部：判据只依赖底色，不依赖字形与字体可用性。
  */
 TEST_F(ThemeManagerFixture, WidgetsRenderThePaletteSurfacePerTheme)
 {
@@ -487,8 +487,8 @@ TEST_F(ThemeManagerFixture, WidgetsRenderThePaletteSurfacePerTheme)
     {
         // setStyleSheet 是 QWidget 的成员而不是静态函数，这里挂在套件持有的应用对象上
         application->setStyleSheet(ThemeManager::styleSheetFor(kind));
-        // 探针挑阅读面卡片而不是空按钮：珍珠玻璃里按钮平时是透明底（悬停才显玻璃块），
-        // 拿按钮取中部像素会取到它背后的窗口底；#pageCard 的底色就是 surface 角色本身
+        // 探针挑阅读面卡片而不是空按钮：按钮平时是 controlFill 填充，拿按钮取中部像素
+        // 测的是另一档角色；#pageCard 的底色就是 surface 角色本身
         QWidget card;
         card.setObjectName(QStringLiteral("pageCard"));
         card.setAttribute(Qt::WA_StyledBackground, true);
@@ -670,9 +670,8 @@ TEST_F(ThemeManagerFixture, ExistingWidgetsRepaintWithTheNewThemeText)
 }
 
 /**
- * @brief 钉住勾选框与线宽滑块的键盘焦点看得见（界面审查 UI-53）
- * @details 这两类控件此前在三份 QSS 里都没有 :focus 形态：Tab 聚焦过去外观毫无变化，
- *          而高对比度档正是给键盘可辨识用的。两处判据不赌具体坐标：
+ * @brief 钉住勾选框与线宽滑块的键盘焦点看得见
+ * @details 高对比度档不装焦点环覆盖层，这两类控件的焦点只能由 QSS 描边表达。两处判据不赌具体坐标：
  *          勾选框在聚焦前后各抓一次图，数主色像素，聚焦后必须多出来（指示器换主色描边）；
  *          滑块数的是手柄矩形里的主色，聚焦时必须掉下去（实心手柄翻成底色芯 + 正文色圈）。
  */

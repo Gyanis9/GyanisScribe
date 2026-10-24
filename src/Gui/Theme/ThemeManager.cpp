@@ -154,8 +154,8 @@ namespace GyanisScribe::Gui
         if (auto *application = qobject_cast<QApplication *>(QGuiApplication::instance()); application != nullptr)
         {
             application->setStyleSheet(styleSheetFor(resolved));
-            // 样式表管不到由原生风格画的那部分（勾选的勾、微调框箭头、表头、占位与禁用文字），
-            // 那些角色只认 QPalette：只落样式表时深色档会画出一批浅色原生件
+            // 样式表管不到由原生风格画的那部分（表头、占位与禁用文字），那些角色只认 QPalette；
+            // 自绘微调框的悬停底也从 AlternateBase 取。只落样式表时深色档会画出一批浅色原生件
             const auto appPalette = buildApplicationPalette(paletteFor(resolved));
             QApplication::setPalette(appPalette);
             // 应用级 setPalette 只规定「之后新建的控件用什么」，已经建好的控件仍留着旧档色：

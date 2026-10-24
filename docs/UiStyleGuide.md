@@ -10,9 +10,9 @@
 
 | 类别 | 真源 | 说明 |
 | --- | --- | --- |
-| 语义色（三套主题各一份） | `src/Gui/Theme/DesignTokens.h` 的 `ThemePalette`、`kLightPalette`、`kDarkPalette`、`kHighContrastPalette` | 绘制代码只认角色名（`windowBackground`、`surface`、`controlFill`、`text`、`secondaryText`、`border`、`accent`、`onAccent`、`selection`、`icon`、`success`、`danger`、`mutedFill`、`hover`、`pressed`、`accentHover`、`accentSoft`、`borderStrong`），不认十六进制。`controlFill` 是按钮与输入框的静息填充，`mutedFill` 只服务禁用底与只读底；`border` 是分隔线，`borderStrong` 是浮层微边缘与高对比度档的描边 |
-| 应用调色板的映射 | 同上：`buildApplicationPalette`，落在 `ThemeManager::refresh` | 样式表画不到原生那部分（微调框箭头、表头、占位与禁用文字），这些只认 `QPalette`；两份上色路径必须同源，否则深色档会带进一批浅色原生件 |
-| 排版档位 | 同上：`TextRole` 与 `kTextRolePointSize*`、`applyTextRole`、`applyTabularFigures` | 三档：页标题 15 / 正文 10 / 读数 13（点）。刻意没有「比正文更小」的一档——小字号与次要色是两个独立的弱化手段，一起用就把「灰一点」变成「看不清」；说明行只压色不减号。走点值而不是样式表的 px（px 不随系统 DPI 缩放），正文档由 `Main::Application` 设成应用字体。读数另开 tabular figures，暗色档的纯 ASCII 读数换可变字族并降 40 字重；含中文的读数不换字族也不降重（见 §3） |
+| 语义色（三套主题各一份） | `src/Gui/Theme/DesignTokens.h` 的 `ThemePalette`、`kLightPalette`、`kDarkPalette`、`kHighContrastPalette` | 绘制代码只认角色名（`windowBackground`、`surface`、`controlFill`、`text`、`secondaryText`、`border`、`accent`、`onAccent`、`selection`、`icon`、`success`、`danger`、`mutedFill`、`hover`、`pressed`、`accentHover`、`accentSoft`、`borderStrong`），不认十六进制。`controlFill` 是按钮与输入框的静息填充，`mutedFill` 服务禁用底与只读底、滑块槽与微调框上下按钮的悬停底；`border` 是分隔线，`borderStrong` 是浮层微边缘与高对比度档的描边 |
+| 应用调色板的映射 | 同上：`buildApplicationPalette`，落在 `ThemeManager::refresh` | 样式表画不到原生那部分（表头、占位与禁用文字），这些只认 `QPalette`；自绘微调框的悬停底也从 `QPalette::AlternateBase` 取。两份上色路径必须同源，否则深色档会带进一批浅色原生件 |
+| 排版档位 | 同上：`TextRole` 与 `kTextRolePointSize*`、`applyTextRole`、`applyTabularFigures` | 三档：页标题 15 / 正文 10 / 读数 13（点）。刻意没有「比正文更小」的一档——小字号与次要色是两个独立的弱化手段，一起用就把「灰一点」变成「看不清」；说明行只压色不减号。走点值而不是样式表的 px（px 不随系统 DPI 缩放），正文档由 `Main::Application` 设成应用字体。读数另开 tabular figures，暗色档的纯 ASCII 读数换可变字族并降 40 字重；含中文的读数不换字族也不降重 |
 | 间距阶梯 | 同上：`kSpacingTiny/Small/Medium/Large`、`kSpacingHairline`、`kFieldMaximumWidth`、`kIntroMaximumWidth` | 界面里出现的每个间距都取自 2/4/8/12/16；字段与说明行的宽度上限管住「一行长句」和「整窗宽的输入框」，设置窗默认 680×560、导航 160 宽，让一行就是一条能扫读的行。设置页表单的纵向间距是 `kSpacingSmall`(8)，给 6px 外扩的焦点环留出呼吸区；只有标注工具栏继续用 `kSpacingHairline`(2) 的紧凑档 |
 | 跨模块共用的绘制常量 | 同上：`kCaptureMaskColor`、`kAccentColor`、`kCaptureHintTextColor`、`kCaptureHintBackgroundColor`、`kCrosshairColor`、`kHintFontSize`、`kHintPadding`、`kToolbarSliderWidth`、`kSelectionBorderWidth` | 遮罩、选区读数、工具栏滑块这些「两个模块都要用到」的尺寸与色；录屏光标高亮一族（`kCursorHighlight*`）随绘制代码住在 `Core/Record/CursorHighlight.h`，与 `accent` 同值的关系由 `DesignTokens.CursorHighlightColorFollowsTheAccent` 钉住 |
 | 字号与线宽的阶梯 | 同上：`kFontSizes`（12/13/14/16/20/24）、`kAnnotationWidths`（2/4/6/8）、默认档位下标 `kDefaultAnnotationWidthStep`/`kDefaultAnnotationFontSizeIndex`、找回函数 `stepIndexOf` | 界面只允许走阶梯；配置里存了阶梯外的值时 `stepIndexOf` 返回空，调用方记日志后回落默认档，不就近取一档 |
@@ -37,7 +37,8 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 浅色与深色两档共用同一套骨架，只换色值：
 
 - 分层：窗口底 `windowBackground`、卡片 `surface`、控件 `controlFill` 三档之间只差一点明度；
-  悬停 `hover` 与按下 `pressed` 再各加深一档；禁用与只读落 `mutedFill`。
+  悬停 `hover` 与按下 `pressed` 再各加深一档；禁用与只读落 `mutedFill`，
+  滑块槽与微调框上下按钮的悬停底也取它。
   卡片的圆角是 20、内边距 `kSpacingMedium`，底色差已经足够分出「这是一块阅读面」。
 - 无容器边框：`#pageCard`、按钮、工具按钮、输入框（含快捷键框与标注行内编辑器）、列表、文本区一律没有可见描边。
   浅色与深色给按钮与输入类保留一条 1px 透明边框占位，让控件总高固定为按钮 30、输入类 32；
@@ -45,7 +46,7 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
   按钮 32、输入类 34、数字框 38，由 `ThemeManagerFixture.ControlHeightsStayPinnedPerTheme` 按档钉住。
 - 浮层微边缘：压在其它内容上的面板保留 1px 边缘（`borderStrong`），因为 Qt 样式表没有 box-shadow，
   浮层只能靠这道边缘与底下的内容分开。用得上的是 `QMenu`、`QToolTip`、`QComboBox QAbstractItemView`、
-  `#hudRoot`、`#AnnotationToolbar`；Toast 气泡同属浮层，边缘取 `border` 那一档。
+  `#hudRoot`、`#AnnotationToolbar` 与 Toast 气泡。
 - 选中与勾选不再描边：导航当前项、列表选中项、勾选的工具按钮走 `accentSoft` 填充；
   复选框指示器勾选时走 `accent` 填充，勾本身按 `onAccent` 自绘。
 - 形状：圆角 8（工具按钮）/ 12（按钮与输入）/ 16（菜单、弹层、浮条）/ 20（阅读面卡片）/ 胶囊（提示，
@@ -57,9 +58,9 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
   （`ThemeManagerFixture.SecondaryButtonsStayDistinguishableAtRest`）。
 - 菜单：字号 9pt（`kMenuTextPointSize`），项内边距 `4px 18px 4px 8px`，分隔线外边距 `2px 6px`；
   托盘、主窗「更多」与贴图右键菜单共用这一档。
-- 焦点：输入面用双环（2px 主色内环、2px 空隙、32% 透明度的 2px 外环），按钮与复选框用单环；
-  浅色与深色的标注工具栏不装环，改用 1px 主色边。环与那条边都由 `Gui::FocusRingController`
-  的覆盖层绘制，高对比度档不装覆盖层、仍走 QSS 的 2px 描边（见 §5）。
+- 焦点：输入面用双环（2px 主色内环、2px 空隙、32% 透明度的 2px 外环），按钮与复选框用单环，
+  由 `Gui::FocusRingController` 的覆盖层绘制；浅色与深色的标注工具栏不装环，改用 QSS 的 1px 主色边。
+  高对比度档不装覆盖层、仍走 QSS 的 2px 描边（见 §5）。
 - 仅有的 rgba 例外：滚动条滑块在色板里没有角色，按 `rgba()` 字面量写在样式表里——同解门禁只扫 `#RRGGBB`，
   改它要连同样式表头注释一起看。其余线（勾选框指示器的悬停边、菜单分隔符、工具栏竖线）一律取实色角色。
 - 高对比度档不随微明度分层：纯黑/纯白 + 2px 描边 + 纯黄选区；标注工具栏那处把内容尺寸各让 1px，
@@ -73,8 +74,9 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 `QToolTip`、`QListWidget`、`QTextEdit`、`QScrollBar`，以及具名容器 `#appRoot`/`#pageCard`/`#hudRoot`/
 `#AnnotationToolbar`/`#toolbarSeparator`/`#annotationTextEditor`/`#settingsScroll`/`#settingsNav`/
 `#hotkeyDisplay`/`#annotationColorButton` 与文字角色 `#pageHint`/`#metricValue`），差异只在色值。
-高对比度档覆盖同一批选择器，但焦点是控件级的 2px 描边，另有一条勾选指示器的 `:focus`
-（三份 QSS 都有滑手柄的焦点反转，见 §5）。
+下表的悬停、选中与焦点描述默认指浅色与深色两档。高对比度档覆盖同一批选择器，但选中与焦点改由描边承担：
+导航与列表的选中项换主色边，标注工具栏与其他工具按钮的选中/聚焦、输入类与勾选框指示器的聚焦都是
+2px 主色描边，快捷键框在录制态换 2px 主色描边；这一档不装焦点环覆盖层，滑块仍走手柄反转（见 §5）。
 `#settingsScroll` 是设置页那一层滚动区：它自己与视口都要透明，否则卡片 `#pageCard` 四周会多出一圈与主题不合的底色。
 应用里没用到的控件（`QGroupBox`、`QRadioButton`、`QProgressBar`、`QTabBar`）刻意不写规则——
 没人吃的样式表和没人吃的配置键一样是债。
@@ -84,19 +86,19 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 
 | 窗口 | 类与文件 | 样式来源 | 状态 |
 | --- | --- | --- | --- |
-| 主窗口（设置 / 历史 / 关于入口） | `src/Main/MainWindow.cpp` | 根 `#appRoot` 铺窗口底；顶部动作条 `#actionBar` 只在托盘不可用时出现——带热键提示的主操作是图标按钮 `QPushButton`，其余条目收在一个 `QToolButton` 的弹出菜单「更多」里，两张清单都取自托盘那张表（`visibleTrayMenuEntries`）；托盘可用时逐屏截图走托盘子菜单。下面是左侧导航 `QListWidget#settingsNav`（宽 `kNavColumnWidth`=160，无框）+ `QStackedWidget` 十页，每页是一张 `#pageCard` 卡片，页内 `kSpacingMedium` 边距、表单纵向与横向间距都是 `kSpacingSmall`(8)、字段宽 ≤ `kFieldMaximumWidth` | 导航项选中走 `::item:selected`（`accentSoft` 填充、无描边），悬停走 `::item:hover`（`hover` 填充）；每页顶部是 `#pageTitle`（15pt 半粗，字号由 `applyTextRole` 给）加一条 `#pageHint`（9pt 次要色，只压色不减号）；换主题时已建好的控件随 `allWidgets` 重设调色板并重放排版 |
+| 主窗口（设置 / 历史 / 关于入口） | `src/Main/MainWindow.cpp` | 根 `#appRoot` 铺窗口底；顶部动作条 `#actionBar` 只在托盘不可用时出现——带热键提示的主操作是图标按钮 `QPushButton`，其余条目收在一个 `QToolButton` 的弹出菜单「更多」里，两张清单都取自托盘那张表（`visibleTrayMenuEntries`）；托盘可用时逐屏截图走托盘子菜单。下面是左侧导航 `QListWidget#settingsNav`（宽 `kNavColumnWidth`=160，无框）+ `QStackedWidget` 十页，每页是一张 `#pageCard` 卡片，页内 `kSpacingMedium` 边距、表单纵向与横向间距都是 `kSpacingSmall`(8)、字段宽 ≤ `kFieldMaximumWidth` | 导航项选中走 `::item:selected`（`accentSoft` 填充、无描边），悬停走 `::item:hover`（`hover` 填充）；每页顶部是 `#pageTitle`（15pt 半粗，字号由 `applyTextRole` 给）加一条 `#pageHint`（10pt 正文档、次要色，只压色不减号）；换主题时已建好的控件随 `allWidgets` 重设调色板并重放排版 |
 | 标注窗 | `src/Gui/Annotation/AnnotationWindow.cpp` | 画布 `AnnotationView` 自绘底图与图形；四周 2px 主色提示线与八枚抓点（「选择」档）只上屏、不进成品；工具栏另计 | 快捷键动作表（复制/保存/贴图/识别/撤销重做），不可撤销时按钮 `:disabled`；选择档拖边框＝重裁截图范围，途中用整屏冻帧预览、松手从同一张冻帧裁，已有标注随裁切平移、撤销栈清空 |
 | 标注工具栏 | `src/Gui/Annotation/AnnotationToolbar.cpp` | `#AnnotationToolbar` 卡片（1px `borderStrong` 微边缘）+ `kSpacingHairline` 间距与 26px 按钮档（图标 20；所有工具档宽度 ≤1536 由用例钉死），段与段之间是 `QFrame#toolbarSeparator`（`border` 分隔线）；`kToolbarSliderWidth`=56、字体下拉上限 120；颜色只占一枚按钮，弹出菜单里才是 `kAnnotationPaletteColors` 八色块、`RecentColors.h` 的 `kRecentColorCapacity`(6) 最近用色与「自定义颜色…」；最右是关闭标注的 `X`（与 `Esc` 同一条收场路） | 默认是「选择」档（`V`，不落笔；点中已有图形才选中、按住可拖动），当前工具按钮 `:checked`（`accentSoft` 填充、无描边），线宽/字号只走阶梯；颜色按钮上的色块即当前形状的色，滚轮落在它上面才调不透明度；可见段按当前工具收放（`updateContextVisibility`）。这一档不装焦点环覆盖层（6px 外扩会压到相邻的 26px 按钮），聚焦只把 1px 透明占位边换成主色，尺寸不跳 |
 | 截图遮罩 | `src/Gui/Capture/CaptureOverlay.cpp` | 自绘：`kCaptureMaskColor` 压暗背景、`kSelectionBorderWidth`+`kAccentColor` 选区框、`kCrosshairColor` 十字虚线、读数用 `kHintFontSize`/`kHintPadding` 压在 `kCaptureHintBackgroundColor` 上 | 光标亮过之后放大镜一直跟着（`isMagnifierVisible()`，悬停、拖框、拉手柄三处同一判据），读数条报坐标与颜色、裸按 `C` 轮换颜色写法（只影响本次）；拖拽中另显示尺寸与坐标读数；`Esc` 取消，鼠标拖框松手即交出（键盘造的选区仍走 `Enter`/双击）。重裁范围在标注窗里做：默认「选择」档拖四边/四角，松手按新范围重抓。这一层不加任何动画 |
-| 贴图窗口 | `src/Gui/Pin/PinWindow.cpp` | 无边框、置顶；只有悬停或正在拖手柄时才画 1px 主色边框（`kBorderWidth`），平时一张干净的图不带装饰 | 缩放（滚轮）、旋转、透明度、鼠标穿透、右键菜单；键盘 `R`/`Shift+R` 转正一挡、`0` 与左键双击回到原始比例与角度（两处共用 `resetScaleAndRotation()` 这一个出口）、`Esc` 关闭；`Qt::Tool \| FramelessWindowHint \| WindowStaysOnTopHint`；穿透态下不抢焦点。松手吸附屏边、贴边收起与悬停展开走 `kSnapSpring`（过阻尼、单调逼近，约 250ms）；拖动与改大小逐帧跟手，按下即停掉进行中的弹簧，快速进出从当前几何重定向，标注期间不收起 |
+| 贴图窗口 | `src/Gui/Pin/PinWindow.cpp` | 无边框、置顶；悬停或正在拖手柄时画 1px 主色边框（`kBorderWidth`），被选中时画 2px（`kSelectedBorderWidth`），平时一张干净的图不带装饰 | 缩放（滚轮）、旋转、透明度、鼠标穿透、右键菜单；键盘 `R`/`Shift+R` 转正一挡、`0` 与左键双击回到原始比例与角度（两处共用 `resetScaleAndRotation()` 这一个出口）、`Esc` 关闭；`Qt::Tool \| FramelessWindowHint \| WindowStaysOnTopHint`；穿透态下不抢焦点。松手吸附屏边、贴边收起与悬停展开走 `kSnapSpring`（过阻尼、单调逼近，约 250ms）；拖动与改大小逐帧跟手，按下即停掉进行中的弹簧，快速进出从当前几何重定向，标注期间不收起 |
 | 识别结果窗 | `src/Gui/Ocr/OcrResultWindow.cpp` | 根 `#appRoot` 铺底，`kSpacingLarge` 边距 + `kSpacingMedium` 分栏间距；预览区最小尺寸 `kPreviewMinimumWidth`/`kPreviewMinimumHeight` | 左侧原图右侧文本，点一行在图上圈出该行；置信度那一格在后端给不出时显示「未提供」（不是 0%）；摘要读数上 tabular figures |
 | 录屏控制条 | `src/Gui/Record/RecordingHud.cpp` | 无边框悬浮卡片 `#hudRoot`（1px `borderStrong` 微边缘，Qt 的样式表没有投影）：`kHudEdgeGap` 屏幕边距、`kSpacingSmall`/`kSpacingTiny` 内间距、`kCountdownFontPointSize` 倒计时字号 | 倒计时→录制中→暂停→停止；按钮可用态随服务状态切换；时长那一格是 `#metricValue`（13pt 半粗 + 等宽数字，秒跳不抖宽）；控制条本身不加动画 |
 | 取色器 | `src/Gui/Pick/ColorPickerOverlay.cpp` | 自绘放大镜：`kMagnifierSampleEdge`/`kMagnifierViewEdge` 取样与显示格数、`kMagnifierPenWidth` 边框、`kInfoStripHeight` 信息条 | 逐像素网格 + 十字线；颜色格式按 `Pick` 的词表切换；取色时按物理像素取样再折算；HEX/RGB 读数上 tabular figures |
-| Toast 通知 | `src/Gui/Controls/Toast.cpp`、`StreamingText.cpp` | 用 `palette.success`/`palette.danger`/`palette.secondaryText` 现算内联样式（这几支色不在 QSS 里，用例按消费方名单核对）；气泡走 `surface` 底 + 1px `border` 边缘 + 胶囊圆角（999px 由 Qt 按高度收敛）；图标与文字同一行，图标底边落在首行基线下方 0.125em | 三类：Information / Success / Danger，3 秒后自收。成功与信息提示逐字显现（第 i 字在 i×30ms 起步、单字 90ms 从模糊到清晰，缓动 `cubic-bezier(.215,.61,.355,1)`），错误提示整句即时出现；成功图标从 0.6 弹到 1.0；图标描边取该条提示的语义色；新提示顶掉旧提示时覆盖层一并销毁重启，不叠影 |
+| Toast 通知 | `src/Gui/Controls/Toast.cpp`、`StreamingText.cpp` | 用 `palette.success`/`palette.danger`/`palette.secondaryText` 从色板角色现算内联样式（`success` 与 `danger` 不进 QSS，用例按消费方名单核对）；气泡走 `surface` 底 + 1px `borderStrong` 边缘 + 胶囊圆角（999px 由 Qt 按高度收敛）；图标与文字同一行，图标底边落在首行基线下方 0.125em | 三类：Information / Success / Danger，3 秒后自收。成功与信息提示逐字显现（第 i 字在 i×30ms 起步、单字 90ms 从模糊到清晰，缓动 `cubic-bezier(.215,.61,.355,1)`），错误提示整句即时出现；成功图标从 0.6 弹到 1.0；图标描边取该条提示的语义色；新提示顶掉旧提示时覆盖层一并销毁重启，不叠影 |
 | 复选框（设置页全部勾选项） | `src/Gui/Controls/CheckBox.cpp` + QSS `QCheckBox::indicator` | 方框的填充、圆角与悬停描边仍由 QSS 画：静息 `controlFill`、悬停 `hover` + `borderStrong` 边、勾选 `accent` 填充、禁用 `mutedFill`；勾由 `Gui::CheckBox` 按 `onAccent` 自绘，QSS 用 `[animatedIndicator="true"]` 把静态勾图关掉 | 勾选时从 0.55 弹性到 1.0（`kPopSpring`，约 450ms、过冲约 19.5%），取消勾选不弹；三档的勾都取 `onAccent`（高对比度档是蓝底白勾，与另两档同一套取色）；减少动效时直接到 1.0 |
 | 焦点态（所有可聚焦控件） | `src/Gui/Controls/FocusRing.cpp` | `FocusRingController` 作为应用事件过滤器，首次聚焦时创建覆盖层；宿主是能装下目标矩形外扩 6px 的最近祖先，几何按宿主坐标系算 | 输入框（`QLineEdit`、`QComboBox`、`QSpinBox`、标注行内 `QTextEdit`、`HotkeyEdit`）双环；按钮、工具按钮、复选框单环（复选框套在 indicator 上）；可编辑下拉框/微调框内部的行编辑映射回外层；只读、禁用与标注工具栏内的控件不装；滑块走手柄反转（见 §5）；切到高对比度档立即撤环、切回时给当前焦点补环 |
 | 快捷键输入框 | `src/Gui/Controls/HotkeyEdit.cpp` | `QLabel#hotkeyDisplay` 与 `QLineEdit` 同一套 `controlFill`/圆角/内边距/1px 透明占位边；录制态按 `[recording="true"]` 换 `accentSoft` 底与主色边 | 闲置态显示已存的组合，悬浮说明写清「点击这一格后按下组合键即可替换，按 Esc 取消」；进入录制态换成「请按下快捷键（Esc 取消）」的提示 |
-| 数字输入框 | `src/Gui/Controls/SpinBox.cpp` | 继承 `QSpinBox`，关掉原生上下按钮；右缘叠两枚自绘 chevron，悬停给一档 `hover` 底 | 点击加/减，范围、后缀、`不限` 等语义仍由 `QSpinBox` 负责；键盘上下键照常；数值上 tabular figures |
+| 数字输入框 | `src/Gui/Controls/SpinBox.cpp` | 继承 `QSpinBox`，关掉原生上下按钮；右缘叠两枚自绘 chevron，悬停给一档 `mutedFill` 底 | 点击加/减，范围、后缀、`不限` 等语义仍由 `QSpinBox` 负责；键盘上下键照常；数值上 tabular figures |
 | 历史列表 | `src/Gui/History/HistoryView.cpp` | 缩略图边长 `kThumbnailEdge`、圆角 `kThumbnailCornerRadius`；列表项形状与导航共用 `QListWidget::item` | 顶部一枚搜索框（按文件名、类别或日期）加一个类别筛选下拉，次序固定时间倒序；保留策略本身在「通用」页那两格，这一页不重复摆读数。缩略图读不出来时给一枚类别图标（`Record`/`CaptureRegion`），不留空白方块；时间与尺寸读数上 tabular figures |
 
 ## 3. 深浅主题对照
@@ -112,11 +114,11 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 | controlFill | `#F2F2EE` | `#1A1A19` | 纯白 | 按钮、输入框、勾选框方框的静息填充 |
 | hover | `#E9E9E4` | `#20201E` | `#E0E0E0` | 中性悬停底 |
 | pressed | `#E3E3DE` | `#262624` | `#C8C8C8` | 中性按下底 |
-| mutedFill | `#EDEDE9` | `#111110` | 纯白（这一档不靠底色分层次） | 禁用底、只读底、滑块槽 |
+| mutedFill | `#EDEDE9` | `#111110` | 纯白（这一档不靠底色分层次） | 禁用底、只读底、滑块槽底、微调框上下按钮的悬停底 |
 | text | `#141412` | `#E8E8E3` | 纯黑 | 正文 |
 | secondaryText | `#53534D`（对窗口底 7.09:1、对卡片底 7.54:1） | `#B0B0AA` | 纯黑（刻意不比正文弱） | 说明行、占位、禁用文字：三档都过 7:1（AAA），因为它承载的是「改了要不要重启」这类关键信息 |
-| border | `#E7E7E2` | `#242422` | 纯黑 + 2px（这一档反过来要求用纯黑） | 分隔线：菜单分隔符、工具栏竖线、滑块槽；不做容器描边 |
-| borderStrong | `#E2E2DD` | `#2A2A28` | 纯黑 + 2px | 浮层微边缘（菜单、提示、下拉弹层、控制条、标注工具栏）与高对比度档的控件描边 |
+| border | `#E7E7E2` | `#242422` | 纯黑 + 2px（这一档反过来要求用纯黑） | 分隔线：菜单分隔符、工具栏竖线、滑块槽描边；不做容器描边 |
+| borderStrong | `#E2E2DD` | `#2A2A28` | 纯黑 + 2px | 浮层微边缘（菜单、提示、下拉弹层、控制条、标注工具栏、Toast）与高对比度档的控件描边 |
 | accent | `#236DE9` | `#4C8DFF` | `#0B57D0` | 焦点环、主按钮、勾选与滑块的强调色（深色档更亮才压得住深底） |
 | onAccent | 纯白 | `#0B0B0A` | 纯白 | 压在主色上的文字与自绘勾：深色档主色偏亮（压白字只有 3.2:1），配深字才够 AA |
 | selection | `#D8E5F9` | `#2A3B57` | 纯黄（让纯黑正文压上去仍是最强对比） | 文本选区 |
@@ -124,7 +126,7 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 | success / danger | `#3B7D21` / `#CA3932` | `#9BE35A` / `#FF7A71` | `#006400` / `#B00000` | Toast 与状态色（不进样式表） |
 | accentHover / accentSoft | `#1D61D5` / `#E5EEFA` | `#3D7FF2` / `#22344D` | `#08449E` / `#D6E4FB` | 主按钮悬停 / 导航当前项与勾选的工具按钮 |
 
-浅色与深色里不出现不透明纯黑；半透明黑只出现在遮罩与滚动条滑块（`LightAndDarkSheetsUseNoOpaqueBlack`）。
+浅色与深色里不出现不透明纯黑；半透明色只出现在遮罩（`kCaptureMaskColor`）与滚动条滑块——浅色档是半透明黑，深色档是半透明白（`LightAndDarkSheetsUseNoOpaqueBlack`）。
 对比要求由用例算：`ThemeManagerFixture` 里的 `contrastRatio` 逐角色核 WCAG——正文压在本档
 窗口底与卡片底上要 ≥ 4.5（AA），**次要文本三档都 ≥ 7.0（AAA）**（说明行与正文同字号，弱化只能靠色），
 焦点环/主按钮描边与图标色 ≥ 3.0（非文本对比），选区上的正文与主按钮上的文字 ≥ 4.5；
@@ -221,7 +223,7 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
   文本一样要写）：`EveryInteractiveControlInTheMainWindowHasAnAccessibleName` 扫整棵
   控件树；Tab 序由 `TabWalkVisitsVisibleNamedControlsWithoutTraps` 逐页走——焦点每步
   都换、落点可见且有名字，每页至少四个落点再绕回起点。焦点环覆盖层自己无焦点策略、
-  不进无障碍树（`setAccessibleName` 为空），不吃鼠标。
+  无无障碍名（`setAccessibleName` 为空），不吃鼠标。
 - 图标全部原创 SVG（24 视框、`currentColor` 描边），描边色由 `IconProvider` 按主题注入；
   用例 `IconProviderFixture` 数的是真的画出来的像素，不是文件名。整套图的画法规格：
   - 网格与安全区：24 视框，内容（含 0.75 描边外缘）压在 **2..22**；直线优先落在整数或 0.5 格点上，

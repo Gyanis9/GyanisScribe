@@ -3,8 +3,8 @@
    设计里带透明度的线（滚动条滑块）在色板里没有角色，按 rgba 字面量写——
    那道同解门禁只扫 #RRGGBB，这个位置是仅有的例外，改它要连同本注释一起看。
    字号与字重不在这里：排版走 Gui::applyTextRole，点值随系统 DPI 缩放，而样式表的 px 不缩。
-   勾选的勾、微调框箭头这类由原生风格画的部分走 QPalette（Gui::buildApplicationPalette），
-   所以这一份只管形状、填充与状态，不去覆盖 ::indicator 之外的箭头。 */
+   勾与下拉箭头走 Resources/Styles 下的 SVG，微调框上下按钮由 Gui::SpinBox 自绘，
+   都不再由原生风格画；QPalette（Gui::buildApplicationPalette）只补原生文字、占位与禁用几档颜色。 */
 
 /* ---- 面：只有具名的根与卡片铺底。裸 QWidget 一律不铺——铺了就是每个子控件各画一块底，
         表单里会排出一条条灰带 ---- */
