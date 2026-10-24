@@ -13,4 +13,6 @@ set_property(GLOBAL APPEND PROPERTY GyanisScribeGuiSources
         ${CMAKE_CURRENT_LIST_DIR}/AppShortcuts.h
         ${CMAKE_CURRENT_LIST_DIR}/AppShortcuts.cpp
         ${CMAKE_CURRENT_LIST_DIR}/FocusRing.h
-        ${CMAKE_CURRENT_LIST_DIR}/FocusRing.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/FocusRing.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/CheckBox.h
+        ${CMAKE_CURRENT_LIST_DIR}/CheckBox.cpp)

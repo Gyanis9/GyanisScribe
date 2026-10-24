@@ -24,7 +24,8 @@ gtest_discover_tests(TestGuiControls)
 add_executable(TestControlsChrome
         TestControlsChrome.cpp
         TestFocusRing.cpp
-        TestStreamingText.cpp)
+        TestStreamingText.cpp
+        TestCheckBox.cpp)
 
 target_link_libraries(TestControlsChrome PRIVATE
         Gui

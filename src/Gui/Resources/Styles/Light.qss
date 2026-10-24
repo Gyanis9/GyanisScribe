@@ -278,6 +278,11 @@ QCheckBox:disabled {
     color: #53534D;
 }
 
+/* 自绘复选框把静态勾图关掉：勾由 Gui::CheckBox 按 onAccent 画，方框仍走上面的底色与圆角 */
+QCheckBox[animatedIndicator="true"]::indicator:checked {
+    image: none;
+}
+
 /* ---- 滑块：槽给一档描边（高对比度档靠这一档才看得见轨道），已走过的部分用主色 ---- */
 QSlider::groove:horizontal {
     height: 6px;

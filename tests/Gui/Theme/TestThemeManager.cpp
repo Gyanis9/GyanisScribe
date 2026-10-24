@@ -604,6 +604,21 @@ TEST_F(ThemeManagerFixture, ComboDropDownUsesTheThemeChevron)
 }
 
 /**
+ * @brief 钉住三档主题都关掉了自绘复选框的静态勾图
+ * @details 勾由 Gui::CheckBox 按 onAccent 自绘；某一档漏掉抑制规则时，
+ *          静态 SVG 会与自绘勾叠在一起，而另外两档看不出问题。
+ */
+TEST_F(ThemeManagerFixture, EveryThemeSuppressesTheStaticCheckImageForAnimatedCheckBoxes)
+{
+    for (const auto resource: {std::string_view{":/styles/Light.qss"}, std::string_view{":/styles/Dark.qss"}, std::string_view{":/styles/HighContrast.qss"}})
+    {
+        const auto sheet = readStyleSheet(resource);
+        EXPECT_NE(sheet.indexOf(QStringLiteral("QCheckBox[animatedIndicator=\"true\"]::indicator:checked")), -1) << resource;
+        EXPECT_NE(sheet.indexOf(QStringLiteral("image: none")), -1) << resource;
+    }
+}
+
+/**
  * @brief 钉住「切主题时应用调色板跟着换」：原生绘制的那部分只认 QPalette
  * @details 样式表覆盖不到勾选的勾、微调框箭头、占位文字与禁用文字——这些走调色板。
  *          只落样式表时文本比对全绿而界面是浅色原生件，所以这里按角色逐个核到令牌上，

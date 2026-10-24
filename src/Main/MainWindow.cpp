@@ -25,6 +25,7 @@
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Gui/Controls/AppShortcuts.h"
+#include "Gui/Controls/CheckBox.h"
 #include "Gui/Controls/SpinBox.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Controls/HotkeyEdit.h"
@@ -392,7 +393,7 @@ namespace
      */
     QCheckBox *makeCursorHighlightCheck(GyanisScribe::Core::ISettingsStore &settings, const GyanisScribe::Gui::IconProvider &icons)
     {
-        auto *check = new QCheckBox;
+        auto *check = new GyanisScribe::Gui::CheckBox;
         check->setIcon(icons.icon("CursorHighlight"));
         check->setText(GyanisScribe::Base::uiText("把光标位置圈在画面里"));
         check->setAccessibleName(GyanisScribe::Base::uiText("光标高亮"));
@@ -420,7 +421,7 @@ namespace
      */
     QCheckBox *makeIncludeCursorCheck(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *check = new QCheckBox;
+        auto *check = new GyanisScribe::Gui::CheckBox;
         check->setText(GyanisScribe::Base::uiText("把鼠标指针画进成品"));
         check->setAccessibleName(GyanisScribe::Base::uiText("含鼠标指针"));
         check->setToolTip(
@@ -453,7 +454,7 @@ namespace
     QCheckBox *makeSettingCheck(GyanisScribe::Core::ISettingsStore &settings, const std::string_view key, const bool defaultOn, const QString &label, const QString &accessibleName,
                                 const QString &tooltip)
     {
-        auto *check = new QCheckBox;
+        auto *check = new GyanisScribe::Gui::CheckBox;
         check->setText(label);
         check->setAccessibleName(accessibleName);
         check->setToolTip(tooltip);
@@ -1808,7 +1809,7 @@ namespace GyanisScribe::Main
      */
     QCheckBox *makeAutostartCheck(GyanisScribe::Platform::IPlatformIntegration &integration)
     {
-        auto *check = new QCheckBox;
+        auto *check = new GyanisScribe::Gui::CheckBox;
         check->setText(GyanisScribe::Base::uiText("开机时自动启动"));
         check->setAccessibleName(GyanisScribe::Base::uiText("开机时自动启动"));
 

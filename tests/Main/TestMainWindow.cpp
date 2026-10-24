@@ -23,6 +23,7 @@
 #include "Core/Hotkey/HotkeyCombination.h"
 #include "Core/Settings/SettingsStore.h"
 #include "Gui/Controls/AppShortcuts.h"
+#include "Gui/Controls/CheckBox.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Controls/HotkeyEdit.h"
 #include "Gui/Controls/SpinBox.h"
@@ -1694,6 +1695,22 @@ TEST_F(MainWindowFixture, EveryNumericFieldUsesTheCustomStepper)
         EXPECT_NE(dynamic_cast<GyanisScribe::Gui::SpinBox *>(spin), nullptr) << "设置页还留着一个原生 QSpinBox：" << spin->metaObject()->className();
     }
     EXPECT_EQ(spins.size(), 13) << "设置页数字框数量变了，先确认新加的那一格有没有用 SpinBox：" << inventory.join(QStringLiteral(", ")).toStdString();
+}
+
+/**
+ * @brief 钉住设置页所有复选框都走弹簧自绘的 CheckBox
+ * @details 混着原生 QCheckBox 时勾选会一半弹、一半瞬跳；这一条把「换了一半」钉死。
+ */
+TEST_F(MainWindowFixture, EveryCheckBoxUsesTheElasticIndicator)
+{
+    makeWindow();
+    const auto checks = m_window->findChildren<QCheckBox *>();
+    ASSERT_FALSE(checks.isEmpty()) << "设置页一个复选框都没有，这条判据就没对象了";
+    for (auto *check: checks)
+    {
+        EXPECT_NE(dynamic_cast<GyanisScribe::Gui::CheckBox *>(check), nullptr) << "设置页还留着一个原生 QCheckBox：" << check->metaObject()->className();
+        EXPECT_TRUE(check->property("animatedIndicator").toBool()) << "复选框没带抑制静态勾图的属性：" << check->metaObject()->className();
+    }
 }
 
 /**
