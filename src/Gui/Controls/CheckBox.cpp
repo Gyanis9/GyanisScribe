@@ -78,8 +78,9 @@ namespace GyanisScribe::Gui
             return;
         }
 
-        // 1px 内缩给 1.5px 的勾线留出落点，线不压到方框描边上
-        const QRect   box    = indicatorRect().adjusted(1, 1, -1, -1);
+        // 内缩给 1.5px 的勾线留出落点，线不压到方框描边上；高对比度档的描边是 2px，内缩跟着加一档
+        const int     inset  = activeThemeKind() == ThemeKind::HighContrast ? 2 : 1;
+        const QRect   box    = indicatorRect().adjusted(inset, inset, -inset, -inset);
         const qreal   scale  = m_checkScale;
         const QPointF center = QRectF{box}.center();
 

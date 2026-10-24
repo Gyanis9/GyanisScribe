@@ -607,14 +607,18 @@ TEST_F(ThemeManagerFixture, ComboDropDownUsesTheThemeChevron)
  * @brief 钉住三档主题都关掉了自绘复选框的静态勾图
  * @details 勾由 Gui::CheckBox 按 onAccent 自绘；某一档漏掉抑制规则时，
  *          静态 SVG 会与自绘勾叠在一起，而另外两档看不出问题。
+ *          判据必须落在抑制规则自己的块里：image: none 在别处也有（标注菜单的指示器），
+ *          只搜全文会把「选择器在、块里没写」的漏洞放过去。
  */
 TEST_F(ThemeManagerFixture, EveryThemeSuppressesTheStaticCheckImageForAnimatedCheckBoxes)
 {
+    const QRegularExpression rule{QStringLiteral(R"(QCheckBox\[animatedIndicator="true"\]::indicator:checked\s*\{([^}]*)\})")};
     for (const auto resource: {std::string_view{":/styles/Light.qss"}, std::string_view{":/styles/Dark.qss"}, std::string_view{":/styles/HighContrast.qss"}})
     {
         const auto sheet = readStyleSheet(resource);
-        EXPECT_NE(sheet.indexOf(QStringLiteral("QCheckBox[animatedIndicator=\"true\"]::indicator:checked")), -1) << resource;
-        EXPECT_NE(sheet.indexOf(QStringLiteral("image: none")), -1) << resource;
+        const auto match = rule.match(sheet);
+        ASSERT_TRUE(match.hasMatch()) << resource << " 里没有自绘复选框的抑制规则";
+        EXPECT_NE(match.captured(1).indexOf(QStringLiteral("image: none")), -1) << resource << " 的抑制规则块里没写 image: none";
     }
 }
 
