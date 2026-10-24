@@ -45,6 +45,7 @@
 #include "Gui/Resources/IconProvider.h"
 #include "Gui/Theme/Language.h"
 #include "Gui/Theme/ThemeManager.h"
+#include "Gui/Controls/FocusRing.h"
 #include "Gui/Controls/Toast.h"
 
 #include <QApplication>
@@ -133,6 +134,13 @@ namespace GyanisScribe::Main
         QObject::connect(m_theme.get(), &GyanisScribe::Gui::ThemeManager::themeChanged, this, [this] { m_icons->setTintColor(m_theme->iconTint()); });
         // 第一次生效必然带一次通知（构造时解算位是「还没落过」的哨兵），描边色就在通知里落定
         m_theme->applyFromSettings();
+
+        // 焦点环覆盖层排在主题之后：析构顺序反过来，它先于主题消失，绘制时读到的色板始终有效
+        m_focusRing = std::make_unique<GyanisScribe::Gui::FocusRingController>([this] { return m_theme->palette(); });
+        m_focusRing->setThemeKind(m_theme->resolvedKind());
+        QObject::connect(m_theme.get(), &GyanisScribe::Gui::ThemeManager::themeChanged, m_focusRing.get(),
+                         [this] { m_focusRing->setThemeKind(m_theme->resolvedKind()); });
+        qApp->installEventFilter(m_focusRing.get());
 
         // 标注一套：引擎跨轮次复用（载入新帧自己会清空历史），窗口与工具栏也只建一次
         m_pins = std::make_unique<GyanisScribe::Gui::PinManager>(*m_settings, *m_integration);

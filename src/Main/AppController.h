@@ -115,6 +115,7 @@ namespace GyanisScribe::Core
 
 namespace GyanisScribe::Gui
 {
+    class FocusRingController;
     class IconProvider;
     class ThemeManager;
     class Toast;
@@ -287,6 +288,7 @@ namespace GyanisScribe::Main
         std::unique_ptr<GyanisScribe::Core::IScreenCaptureSource>     m_captureSource;  ///< 抓帧来源
         std::unique_ptr<GyanisScribe::Core::HotkeyManager>            m_hotkeys;        ///< 热键登记与触发
         std::unique_ptr<GyanisScribe::Gui::ThemeManager>              m_theme;          ///< 主题档位与样式表
+        std::unique_ptr<GyanisScribe::Gui::FocusRingController>       m_focusRing;      ///< 输入面双环焦点，进程级
         std::unique_ptr<GyanisScribe::Gui::IconProvider>              m_icons;          ///< 图标供给器，描边色跟主题
         std::unique_ptr<GyanisScribe::Gui::PinManager>                m_pins;           ///< 贴图管理器
         std::unique_ptr<GyanisScribe::App::RecordingCoordinator>      m_recording;      ///< 录屏这一族（配置、服务、控制条、倒计时）
