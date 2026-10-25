@@ -178,9 +178,10 @@ namespace GyanisScribe::Main
     /**
      * @brief 关于页正文
      * @param version 应用版本
-     * @return 一段可以直接显示的文本
+     * @return 一段可以直接显示的富文本（Qt Rich Text）
      * @details 版本号只从工程真源传进来，这里不写第二份字面量；
-     *          许可一句指向仓库里的第三方许可清单，避免在界面上抄一份会漂移的清单。
+     *          许可一句指向仓库里的第三方许可清单，避免在界面上抄一份会漂移的清单；
+     *          仓库链接由显示方接 linkActivated 打开，正文里只放地址。
      */
     [[nodiscard]] QString aboutText(const QString &version);
 

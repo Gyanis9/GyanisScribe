@@ -1800,12 +1800,12 @@
             <translation>Decrease</translation>
         </message>
         <message>
-            <source>提示</source>
-            <translation>Notice</translation>
-        </message>
-        <message>
             <source>提示图标</source>
             <translation>Notice icon</translation>
+        </message>
+        <message>
+            <source>提示</source>
+            <translation>Notice</translation>
         </message>
         <message>
             <source>今天 </source>
@@ -2692,8 +2692,8 @@
             <translation>GIF runs a two-pass palette and caps the frame rate at %1 frames per second, lower than MP4; MP4 suits longer clips. Changes apply from the next recording</translation>
         </message>
         <message>
-            <source>智录 GyanisScribe %1\n\n截图、标注、贴图、录屏与文字识别。\n全局热键：Ctrl+Alt+A 截图，Ctrl+Alt+R 录屏（再按一次停止并保存），Ctrl+Alt+O 识别。\n界面图标全部为本项目原创 SVG；第三方组件与其许可证见仓库 docs/ThirdPartyLicenses.md。\n</source>
-            <translation>GyanisScribe %1\n\nScreenshot, annotation, pin, screen recording and text recognition.\nGlobal hotkeys: Ctrl+Alt+A capture, Ctrl+Alt+R record (press again to stop and save), Ctrl+Alt+O recognize.\nAll UI icons are original SVG artwork made for this project; third-party components and their licenses are listed in docs/ThirdPartyLicenses.md in the repository.\n</translation>
+            <source>&lt;b style="font-size:15pt"&gt;智录 GyanisScribe&lt;/b&gt;&lt;br&gt;版本 %1&lt;br&gt;&lt;br&gt;截图、标注、贴图、取色、录屏与文字识别的桌面效率工具。&lt;br&gt;界面与图标全部为本项目原创；本软件免费供任何人使用。&lt;br&gt;&lt;br&gt;仓库：&lt;a href="https://github.com/Gyanis9/GyanisScribe"&gt;github.com/Gyanis9/GyanisScribe&lt;/a&gt;&lt;br&gt;第三方组件与其许可证见仓库 docs/ThirdPartyLicenses.md</source>
+            <translation>&lt;b style="font-size:15pt"&gt;GyanisScribe&lt;/b&gt;&lt;br&gt;Version %1&lt;br&gt;&lt;br&gt;A desktop productivity tool for screenshots, annotation, pinning, color picking, screen recording and text recognition.&lt;br&gt;The UI and icons are entirely original to this project; the software is free for anyone to use.&lt;br&gt;&lt;br&gt;Repository: &lt;a href="https://github.com/Gyanis9/GyanisScribe"&gt;github.com/Gyanis9/GyanisScribe&lt;/a&gt;&lt;br&gt;Third-party components and their licenses: see docs/ThirdPartyLicenses.md in the repository</translation>
         </message>
         <message>
             <source>智录 设置</source>

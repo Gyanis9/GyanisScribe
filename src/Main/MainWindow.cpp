@@ -1410,9 +1410,16 @@ namespace GyanisScribe::Main
     QString aboutText(const QString &version)
     {
         // 版本号由调用方从 QApplication::applicationVersion() 传进来：真源只有一处。
-        // 整段是一条字面量：翻译目录按整段查，拆成相邻字面量会让目录里只收到第一片
-        return GyanisScribe::Base::uiText("智录 GyanisScribe %1\n\n截图、标注、贴图、录屏与文字识别。\n全局热键：Ctrl+Alt+A 截图，Ctrl+Alt+R "
-                                          "录屏（再按一次停止并保存），Ctrl+Alt+O 识别。\n界面图标全部为本项目原创 SVG；第三方组件与其许可证见仓库 docs/ThirdPartyLicenses.md。\n")
+        // 整段是一条字面量：翻译目录按整段查，拆成相邻字面量会让目录里只收到第一片。
+        // 正文是富文本：产品名与版本各占一行，链接由显示它的标签接 linkActivated 打开
+        return GyanisScribe::Base::uiText("<b style=\"font-size:15pt\">智录 GyanisScribe</b><br>"
+                                          "版本 %1<br>"
+                                          "<br>"
+                                          "截图、标注、贴图、取色、录屏与文字识别的桌面效率工具。<br>"
+                                          "界面与图标全部为本项目原创；本软件免费供任何人使用。<br>"
+                                          "<br>"
+                                          "仓库：<a href=\"https://github.com/Gyanis9/GyanisScribe\">github.com/Gyanis9/GyanisScribe</a><br>"
+                                          "第三方组件与其许可证见仓库 docs/ThirdPartyLicenses.md")
                 .arg(version);
     }
 
@@ -2537,7 +2544,12 @@ namespace GyanisScribe::Main
         auto *text = new QLabel{aboutText(QApplication::applicationVersion()), page};
         text->setAccessibleName(GyanisScribe::Base::uiText("关于智录"));
         text->setWordWrap(true);
-        text->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        // 富文本里的仓库链接要可点也可选中复制：链接不直接开，交给 linkActivated 走系统浏览器。
+        // 焦点链不收这一格：键盘档链接导航会把 Tab 吞进文档里（焦点停在标签上不走），
+        // 而地址本身以明文摆着、选中复制与鼠标点击都不受影响
+        text->setTextInteractionFlags(Qt::TextBrowserInteraction);
+        text->setFocusPolicy(Qt::NoFocus);
+        QObject::connect(text, &QLabel::linkActivated, text, [](const QString &link) { QDesktopServices::openUrl(QUrl{link}); });
 
         // 检查更新：只查不换——下载与替换可执行体要先有签名与原子替换那一套，
         // 这里把「有没有新版」与发布页地址摆出来，下载交给用户自己在浏览器里点
