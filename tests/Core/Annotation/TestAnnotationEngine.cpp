@@ -218,6 +218,36 @@ TEST_F(EngineFixture, MovesOfDifferentShapesAreNotMerged)
 }
 
 /**
+ * @brief 钉住两趟独立拖动各占一步撤销
+ * @details 位移命令只按「同一组图形」合并时，两次独立拖动之间没有边界：
+ *          同一条图形先后拖两趟，按一次 Ctrl+Z 会退回两趟之前。
+ */
+TEST_F(EngineFixture, SeparateMoveGesturesUndoIndependently)
+{
+    drawRectangle(QPoint(20, 20), QPoint(100, 60));
+    const auto hit = m_engine.selectionAt(QPoint(20, 40));
+    ASSERT_TRUE(hit.has_value());
+    ASSERT_TRUE(m_engine.select(*hit).has_value());
+
+    m_engine.beginMoveGesture();
+    ASSERT_TRUE(m_engine.moveSelectionBy(QPoint(40, 0)).has_value());
+    m_engine.endMoveGesture();
+
+    m_engine.beginMoveGesture();
+    ASSERT_TRUE(m_engine.moveSelectionBy(QPoint(40, 0)).has_value());
+    m_engine.endMoveGesture();
+
+    ASSERT_TRUE(m_engine.undo().has_value());
+    // 一次撤销只退第二趟：图形应停在 +40，而不是回到起点
+    const auto bounds = m_engine.selectionBounds();
+    ASSERT_TRUE(bounds.has_value()) << "撤销位移之后选中项不该消失";
+    EXPECT_EQ(bounds->left(), 60) << "一次撤销把两趟独立拖动都退了";
+    EXPECT_EQ(bounds->top(), 20);
+    EXPECT_TRUE(m_engine.selectionAt(QPoint(60, 40)).has_value()) << "一次撤销把两趟独立拖动都退了";
+    EXPECT_FALSE(m_engine.selectionAt(QPoint(20, 40)).has_value()) << "第二趟没被撤掉或第一趟被连带撤掉";
+}
+
+/**
  * @brief 钉住换画布清空图形与历史
  */
 TEST_F(EngineFixture, LoadCanvasClearsShapesAndHistory)

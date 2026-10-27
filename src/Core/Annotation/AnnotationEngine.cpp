@@ -118,8 +118,8 @@ namespace GyanisScribe::Core
                 [[nodiscard]] bool operator==(const Target &) const = default;
             };
 
-            MoveShapesCommand(std::vector<Target> targets, const QPoint &delta, QUndoCommand *parent = nullptr) :
-                QUndoCommand(parent), m_targets(std::move(targets)), m_delta(delta)
+            MoveShapesCommand(std::vector<Target> targets, const QPoint &delta, const std::uint64_t gestureSerial, QUndoCommand *parent = nullptr) :
+                QUndoCommand(parent), m_targets(std::move(targets)), m_delta(delta), m_gestureSerial(gestureSerial)
             {
             }
 
@@ -151,6 +151,11 @@ namespace GyanisScribe::Core
                     return false;
                 }
                 const auto &next = *dynamic_cast<const MoveShapesCommand *>(other);
+                // 手势号不同就是两趟独立拖动：中间没有别的命令插队也不许并成一步
+                if (next.m_gestureSerial != m_gestureSerial)
+                {
+                    return false;
+                }
                 // 只并同一组图形的位移：换了工具或换了序号，那就是另一趟意图
                 if (next.m_targets != m_targets)
                 {
@@ -164,8 +169,9 @@ namespace GyanisScribe::Core
             }
 
         private:
-            std::vector<Target> m_targets; ///< 被平移的图形清单
-            QPoint              m_delta;   ///< 位移量
+            std::vector<Target> m_targets;       ///< 被平移的图形清单
+            QPoint              m_delta;         ///< 位移量
+            std::uint64_t       m_gestureSerial; ///< 手势号：只有同一趟拖动里的位移才合并
         };
 
         /**
@@ -247,8 +253,8 @@ namespace GyanisScribe::Core
         class ReplaceShapeCommand : public QUndoCommand
         {
         public:
-            ReplaceShapeCommand(const int typeId, AnnotationTool *tool, const int index, AnnotationShape before, AnnotationShape after) :
-                m_typeId(typeId), m_tool(tool), m_index(index), m_before(std::move(before)), m_after(std::move(after))
+            ReplaceShapeCommand(const int typeId, AnnotationTool *tool, const int index, AnnotationShape before, AnnotationShape after, const std::uint64_t gestureSerial) :
+                m_typeId(typeId), m_tool(tool), m_index(index), m_before(std::move(before)), m_after(std::move(after)), m_gestureSerial(gestureSerial)
             {
             }
 
@@ -274,6 +280,11 @@ namespace GyanisScribe::Core
                     return false;
                 }
                 const auto &next = *dynamic_cast<const ReplaceShapeCommand *>(other);
+                // 手势号不同就是两趟独立手势：同一图形的两次缩放或旋转也不许并成一步
+                if (next.m_gestureSerial != m_gestureSerial)
+                {
+                    return false;
+                }
                 if (next.m_tool != m_tool || next.m_index != m_index)
                 {
                     return false;
@@ -285,11 +296,12 @@ namespace GyanisScribe::Core
             }
 
         private:
-            int             m_typeId; ///< 合并标识：缩放与旋转各一个
-            AnnotationTool *m_tool;   ///< 目标工具，所有权在引擎
-            int             m_index;  ///< 图形索引
-            AnnotationShape m_before; ///< 改动之前的那一份图形
-            AnnotationShape m_after;  ///< 目标图形
+            int             m_typeId;        ///< 合并标识：缩放与旋转各一个
+            AnnotationTool *m_tool;          ///< 目标工具，所有权在引擎
+            int             m_index;         ///< 图形索引
+            AnnotationShape m_before;        ///< 改动之前的那一份图形
+            AnnotationShape m_after;         ///< 目标图形
+            std::uint64_t   m_gestureSerial; ///< 手势号：只有同一趟手势里的中间量才合并
         };
 
         /**
@@ -910,6 +922,18 @@ namespace GyanisScribe::Core
         return entries;
     }
 
+    void AnnotationEngine::beginMoveGesture()
+    {
+        // 换一个号就等于在撤销栈里划一道边界：下一批位移命令不会与上一趟的并成一步
+        ++m_gestureSerial;
+    }
+
+    void AnnotationEngine::endMoveGesture()
+    {
+        // 收场也换号：松手之后再来的位移（方向键微调）属于下一次意图
+        ++m_gestureSerial;
+    }
+
     Base::Expected<void> AnnotationEngine::moveSelectionBy(const QPoint &delta)
     {
         if (m_selection.empty())
@@ -929,7 +953,7 @@ namespace GyanisScribe::Core
             targets.push_back({tool, item.shapeIndex});
         }
 
-        m_undoStack.push(new MoveShapesCommand(std::move(targets), delta));
+        m_undoStack.push(new MoveShapesCommand(std::move(targets), delta, m_gestureSerial));
         return {};
     }
 
@@ -1081,7 +1105,9 @@ namespace GyanisScribe::Core
         drag.localBox   = QRectF{tool->localBoundingBoxOf(drag.before)};
         // 旋转的起点角取按下点相对中心的方向：之后每一点都跟这个方向比，抬手时图形正好转了多少一眼可算
         drag.startAngle = angleDegreesOf(QPointF{point}, drag.localBox.center());
-        m_handleDrag    = drag;
+        // 新一趟手柄拖动：先换手势号，中途的每个点才会并成这一趟的一步，而不与上一趟合并
+        ++m_gestureSerial;
+        m_handleDrag = drag;
         return {};
     }
 
@@ -1121,7 +1147,7 @@ namespace GyanisScribe::Core
 
         // 每一点都从 session.before 重算并覆盖命令的终点，中途的取整不会一格格攒成漂移；
         // 同一条图形的连续拖动并成一步撤销
-        m_undoStack.push(new ReplaceShapeCommand(typeId, tool, session.shapeIndex, session.before, target));
+        m_undoStack.push(new ReplaceShapeCommand(typeId, tool, session.shapeIndex, session.before, target, m_gestureSerial));
         return {};
     }
 

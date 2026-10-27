@@ -320,6 +320,8 @@ namespace GyanisScribe::Gui
                     return;
                 }
             }
+            // 这一按是一趟新拖动的起点：与上一趟之间要断开撤销合并
+            m_engine.beginMoveGesture();
             m_dragging = true;
             update();
             event->accept();
@@ -433,7 +435,12 @@ namespace GyanisScribe::Gui
             return;
         }
 
-        m_dragging = false;
+        if (m_dragging)
+        {
+            // 这一趟拖动到此为止：松手之后的微调与下一趟拖动各自另算一步撤销
+            m_engine.endMoveGesture();
+            m_dragging = false;
+        }
         if (m_ignoreNextRelease)
         {
             // 上一条事件是「双击收笔」：这一下松手不再走 endStroke（在途图形已经落定了）

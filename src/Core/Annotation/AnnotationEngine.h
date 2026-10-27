@@ -14,6 +14,7 @@
 #include <QRectF>
 #include <QUndoStack>
 
+#include <cstdint>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -270,6 +271,15 @@ namespace GyanisScribe::Core
         void paintShapes(QPainter &painter) const override;
 
         /**
+         * @brief 标一次新的位移手势开始
+         * @details 两次独立拖动之间要断开撤销合并；同一趟拖动里的几十次位移仍并成一步。
+         */
+        void beginMoveGesture() override;
+
+        /// 标一次位移手势结束；下一次 beginMoveGesture() 会换一个手势号
+        void endMoveGesture() override;
+
+        /**
          * @brief 移动选中项，见 IAnnotationEngine::moveSelectionBy()
          * @param delta 位移
          * @return 成功返回空载荷；没选中或索引失效返回 InvalidArgument
@@ -365,6 +375,7 @@ namespace GyanisScribe::Core
         std::vector<AnnotationSelection>                  m_selection;                     ///< 当前选中集：多选是常态，单条只是它的一格
         ToolKind                                          m_activeTool = ToolKind::Select; ///< 当前工具：默认是选择/指针，不落笔
         PenParameters                                     m_penParameters;                 ///< 画笔默认参数整套
+        std::uint64_t                                     m_gestureSerial = 0;             ///< 位移手势号：两次独立拖动之间换号，撤销栈据此断开合并
         int                                               m_topZ = 0;                      ///< 已发出的最大层叠号：新图形总领到更大的号，落在最上层
         std::optional<HandleDrag>                         m_handleDrag;                    ///< 进行中的手柄拖动现场
         std::vector<std::pair<ToolKind, AnnotationShape>> m_clipboard;                     ///< 引擎内剪贴板：复制下来的图形副本，与系统剪贴板无关

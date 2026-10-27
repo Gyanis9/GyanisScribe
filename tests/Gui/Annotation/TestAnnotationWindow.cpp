@@ -1294,6 +1294,45 @@ TEST_F(AnnotationWindowFixture, PrintShortcutEmitsTheBakedExportAndKeepsTheWindo
 }
 
 /**
+ * @brief 钉住视图按下与抬起之间是一趟拖动，两趟各占一步撤销
+ * @details 引擎按手势号分界，视图得在按下与抬起时各标一次；漏标的话两趟拖动共用
+ *          同一个手势号，位移命令按目标列表并成一步，用户按一次 Ctrl+Z 会退回两趟之前。
+ */
+TEST_F(AnnotationWindowFixture, TwoSeparateViewDragsUndoIndependently)
+{
+    GyanisScribe::Gui::AnnotationView view{engine()};
+    view.resize(400, 200);
+    // 画布逻辑 200x100 放进 400x200 的视图：控件坐标是逻辑坐标的两倍
+    engine().beginStroke({10, 10});
+    engine().moveStroke({60, 40});
+    const auto settled = engine().endStroke();
+    ASSERT_TRUE(settled.has_value()) << settled.error().message;
+    ASSERT_TRUE(engine().select(*settled).has_value());
+
+    const auto drag = [&view](const QPoint &from, const QPoint &to)
+    {
+        for (const auto &[type, position]: {std::pair{QEvent::MouseButtonPress, from}, std::pair{QEvent::MouseMove, to}, std::pair{QEvent::MouseButtonRelease, to}})
+        {
+            QMouseEvent event{type, QPointF{position}, QPointF{position}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+            QApplication::sendEvent(&view, &event);
+        }
+    };
+
+    // 两趟各挪逻辑 (10,10)：控件坐标是逻辑坐标的两倍
+    drag(QPoint{60, 60}, QPoint{80, 80});
+    drag(QPoint{100, 80}, QPoint{120, 100});
+
+    const auto moved = engine().selectionBounds();
+    ASSERT_TRUE(moved.has_value());
+    EXPECT_EQ(moved->topLeft(), QPoint(30, 30)) << "两趟拖动没各挪一格";
+
+    ASSERT_TRUE(engine().undo().has_value());
+    const auto afterOneUndo = engine().selectionBounds();
+    ASSERT_TRUE(afterOneUndo.has_value()) << "撤销拖动不该把选中项一起作废";
+    EXPECT_EQ(afterOneUndo->topLeft(), QPoint(20, 20)) << "一次撤销把两趟独立拖动都退了：视图没在按下/抬起时标手势边界";
+}
+
+/**
  * @brief 钉住工具栏最右那枚 X：一点就把窗口与工具栏一起收起，与 Esc 同一条路
  * @details 工具栏是独立顶层窗，只藏窗口会把它留在桌面上；这条判据两个 visible 都断。
  */

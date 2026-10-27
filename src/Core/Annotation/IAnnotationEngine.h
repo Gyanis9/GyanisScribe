@@ -363,6 +363,20 @@ namespace GyanisScribe::Core
         virtual void paintShapes(QPainter &painter) const = 0;
 
         /**
+         * @brief 标一次新的位移手势开始
+         * @details 两次独立拖动之间要断开撤销合并；同一趟拖动里的几十次位移仍并成一步。
+         *          界面在按住选中项、准备拖动的那一刻叫它。
+         */
+        virtual void beginMoveGesture() = 0;
+
+        /**
+         * @brief 标一次位移手势结束
+         * @details 下一次 beginMoveGesture() 会换一个手势号，于是这一趟与下一趟的位移
+         *          不会被撤销栈并成一步。界面在松手那一刻叫它。
+         */
+        virtual void endMoveGesture() = 0;
+
+        /**
          * @brief 移动选中项
          * @param delta 逻辑坐标位移
          * @return 成功返回空载荷；没有选中项或索引失效时返回 InvalidArgument
