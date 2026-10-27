@@ -199,12 +199,19 @@ namespace GyanisScribe::Core
                     Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("写入配置项失败：键名为空。请传「分组/大驼峰」形式的键，例如 Paths/Screenshot")});
         }
 
-        m_settings->setValue(toKey(key), value);
+        if (!value.isValid())
+        {
+            // 空 QVariant 是「删掉这一项」：QSettings 会把它写成 @Invalid() 留在 INI 里，
+            // 读取端虽按没值处理，allKeys 与导出却仍会列出这个已经失效的键，所以显式走 remove
+            m_settings->remove(toKey(key));
+        } else
+        {
+            m_settings->setValue(toKey(key), value);
+        }
         if (m_settings->status() == QSettings::AccessError)
         {
             return std::unexpected(Base::Error{Base::ErrorCode::FileWriteFailed, storageFailureReason(key).toStdString()});
         }
-
         // 通知发在状态检查之后：失败时不发，订阅者不会为一个没落地的值去重载
         emit valueChanged(toKey(key));
         return {};

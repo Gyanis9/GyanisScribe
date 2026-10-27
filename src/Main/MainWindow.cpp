@@ -57,6 +57,7 @@
 #include <QStackedWidget>
 #include <QToolButton>
 #include <QUrl>
+#include <QVariant>
 #include <QVBoxLayout>
 
 #include <array>
@@ -266,13 +267,14 @@ namespace
 
         // 失焦即写：设置页没有「保存」按钮，改完就看到效果是需求第五节的要求
         QObject::connect(editor, &QLineEdit::editingFinished, row,
-                         [&, editor, key, title]
+                         // fallback 按值抓：调用点给的多是临时 path，按引用抓会在这一句执行时读已销毁的路径
+                         [&, editor, key, title, fallback]
                          {
                              const auto text = editor->text().trimmed();
                              if (text.isEmpty())
                              {
-                                 // 清空表示回到默认：这里不写空串，而是把键删到回落状态，显示也一并回落到默认目录
-                                 if (auto written = settings.setValue(key, QString{}); !written)
+                                 // 清空表示回到默认：空 QVariant 是「把这一项删掉」，写空串会让读取端每次都按「填坏了」记一条警告
+                                 if (auto written = settings.setValue(key, QVariant{}); !written)
                                  {
                                      Logger::warning(std::format("{} 没能写入：{}", title.toStdString(), written.error().message));
                                  }

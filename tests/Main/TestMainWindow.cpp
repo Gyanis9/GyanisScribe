@@ -17,6 +17,7 @@
 #include "Core/Record/RecorderConfig.h"
 #include "Base/Logger.h"
 #include "Core/Image/OutputDecoration.h"
+#include "Base/Paths.h"
 #include "Base/Text.h"
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
@@ -1806,6 +1807,38 @@ TEST_F(MainWindowFixture, PathEditorsShareTheFormFieldLeftEdge)
         ASSERT_NE(reference, nullptr) << one.referenceAccessibleName;
         EXPECT_EQ(path->mapTo(card, QPoint(0, 0)).x(), reference->mapTo(card, QPoint(0, 0)).x()) << one.pathAccessibleName << " 没和上下字段列对齐";
     }
+}
+
+/**
+ * @brief 清空「截图与标注成品目录」后，显示回到默认目录，配置里那一项被删掉
+ * @details 清空是「用默认目录」的唯一写法：写一个空串进去，读取端每次都要把一条空文本
+ *          当坏值记一遍警告；而默认目录那一侧如果按引用抓了调用点的临时 path，
+ *          临时对象销毁之后读到的只是碰巧还对的字节。
+ */
+TEST_F(MainWindowFixture, ClearingPathRowShowsTheDefaultDirectory)
+{
+    const auto screenshotKey = toQString(GyanisScribe::Core::kPathScreenshot);
+    const auto customPath    = QStringLiteral("D:/临时成品目录");
+    const auto defaultText   = GyanisScribe::Base::Paths::toDisplayText(GyanisScribe::Base::Paths::defaultScreenshotDirectory());
+    ASSERT_TRUE(m_store->setValue(GyanisScribe::Core::kPathScreenshot, customPath).has_value());
+
+    makeWindow();
+    m_window->open(MainWindowPage::Capture);
+
+    auto *edit = qobject_cast<QLineEdit *>(controlInCurrentPage("截图目录"));
+    ASSERT_NE(edit, nullptr) << "截图页里没有截图目录这一格";
+    ASSERT_EQ(edit->text(), customPath) << "存过的目录没有显示出来，后面「清空后回到默认」就分不清是清空生效还是本来就没显示";
+
+    edit->clear();
+    emit edit->editingFinished();
+
+    EXPECT_EQ(edit->text(), defaultText) << "清空后没有回到默认目录：默认值可能读自已经销毁的临时 path";
+    // 先落盘再读键表：INI 后端会把待删除的键留到冲刷之后才从 allKeys 里消失
+    m_store->sync();
+    EXPECT_EQ(m_store->stringValue(GyanisScribe::Core::kPathScreenshot, QStringLiteral("missing")), QStringLiteral("missing"))
+            << "删键之后仍能读出原来的目录，清空没有真正落地";
+    EXPECT_FALSE(m_store->allKeys().contains(screenshotKey)) << "清空写成了空串而不是删键：读取端会把这条空文本当坏值记警告；现存键："
+                                                             << m_store->allKeys().join(QStringLiteral("、")).toStdString();
 }
 
 /**

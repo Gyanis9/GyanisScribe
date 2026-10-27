@@ -94,7 +94,7 @@ namespace GyanisScribe::Core
         /**
          * @brief 写一个取值并发出变更通知，见 ISettingsStore::setValue()
          * @param key 键名，空键直接拒绝
-         * @param value 载荷
+         * @param value 载荷；传空 QVariant 表示删掉这一项
          * @return 成功返回空载荷；失败返回原因
          */
         [[nodiscard]] Base::Expected<void> setValue(std::string_view key, const QVariant &value) override;

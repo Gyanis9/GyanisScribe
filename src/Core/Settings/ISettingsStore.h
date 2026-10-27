@@ -79,7 +79,7 @@ namespace GyanisScribe::Core
         /**
          * @brief 写一个取值
          * @param key 键名
-         * @param value 载荷，类型由调用方决定
+         * @param value 载荷，类型由调用方决定；传空 QVariant 表示把这一项删掉
          * @return 成功返回空载荷；失败返回原因（键名为空或存储不可写）
          * @note 成功之后会发 valueChanged(key)，订阅者据此即时生效，不需要重启
          */
