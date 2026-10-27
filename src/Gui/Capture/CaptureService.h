@@ -157,7 +157,21 @@ namespace GyanisScribe::Gui
          */
         void cancelLongCapture();
 
+        /**
+         * @brief 数一数取帧定时器的 timeout 上挂着几条连接（只给用例用）
+         * @return 连接条数；修复前每起一轮就多一条
+         * @details receivers 是 QObject 的 protected 成员，从派生类里露出来才能被外部用例读到：
+         *          每轮 connect 一次而收口只 stop 的缺陷，只能从这一处观察。
+         */
+        [[nodiscard]] int longTimerConsumerCountForTesting() const;
+
     private:
+        /// 把 QObject 的 protected receivers 露出来的定时器：只服务用例里那一条连接数判据
+        struct ReceiverCountingTimer final : QTimer
+        {
+            using QTimer::receivers;
+        };
+
         /**
          * @brief 把一次抓帧结果转成信号
          * @param result 抓帧或裁剪的结果
@@ -251,7 +265,7 @@ namespace GyanisScribe::Gui
         Core::ISettingsStore                 &m_settings;                       ///< 「上次区域」的读写处
         const Platform::IPlatformIntegration &m_integration;                    ///< 窗口候选与界面元素的来源，不拥有
         std::vector<QPointer<CaptureOverlay>> m_overlays;                       ///< 在屏的遮罩，每块屏一张；窗口自己析构后要认得空指针
-        QTimer                                m_longTimer;                      ///< 滚动拼接的取帧节拍，只在有选区之后跑
+        ReceiverCountingTimer                 m_longTimer;                      ///< 滚动拼接的取帧节拍，只在有选区之后跑
         QPointer<LongCaptureHud>              m_longHud;                        ///< 长截图控制条，一轮一个
         Base::CapturedImage                   m_longImage;                      ///< 已经接好的长图，第一帧就是它的开头
         QRect                                 m_longRegion;                     ///< 反复抓的那块区域，该屏内的逻辑坐标

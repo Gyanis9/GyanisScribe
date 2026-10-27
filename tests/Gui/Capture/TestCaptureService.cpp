@@ -550,6 +550,24 @@ TEST_F(CaptureServiceFixture, LongCaptureReportsAGrabThatNeverHappened)
 }
 
 /**
+ * @brief 钉住长截图每一轮只在 timeout 上留一条连接
+ * @details 每轮 connect 一次而收口只 stop 不断开：第二轮起每个节拍会把同一块抓好几遍再接上去，
+ *          接缝与耗时一起翻倍，而屏幕上看不出是哪一条多出来的。
+ */
+TEST_F(CaptureServiceFixture, SecondLongRoundKeepsOneTimerConnection)
+{
+    SettingsStore     settings(m_iniFile);
+    FakeCaptureSource source;
+    CaptureService    service(source, settings, *platform);
+
+    service.captureLongRegion(QRect{0, 0, 50, 25});
+    service.cancelLongCapture();
+    service.captureLongRegion(QRect{0, 0, 50, 25});
+    EXPECT_EQ(service.longTimerConsumerCountForTesting(), 1) << "第二轮又接了一次 timeout：每 tick 会抓多次";
+    service.cancelLongCapture();
+}
+
+/**
  * @brief 钉住「长截图还在接时再起一轮」被当场拒掉，而且不把手里那张一起丢掉
  * @details 第二层遮罩一铺，接了一半的那一轮既没交成品也没作废：用户取消遮罩之后会发现
  *          刚才滚的十几屏不见了。拒的那一句要给出路（先按完成或取消），并且这一轮仍然活着。

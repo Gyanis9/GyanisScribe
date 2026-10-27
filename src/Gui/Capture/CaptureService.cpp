@@ -42,6 +42,8 @@ namespace GyanisScribe::Gui
     CaptureService::CaptureService(const Core::IScreenCaptureSource &source, Core::ISettingsStore &settings, const Platform::IPlatformIntegration &integration, QObject *parent) :
         Core::ICaptureService(parent), m_source(source), m_settings(settings), m_integration(integration)
     {
+        // 取帧节拍只在这一处接一次：每轮 connect 而收口只 stop 会让第二轮起每个 tick 抓好几帧
+        QObject::connect(&m_longTimer, &QTimer::timeout, this, &CaptureService::grabNextLongFrame);
     }
 
     CaptureService::~CaptureService()
@@ -200,7 +202,9 @@ namespace GyanisScribe::Gui
                 return;
             }
 
-            auto *overlay = new CaptureOverlay(frame->image, screen->geometry(), screen->devicePixelRatio(), m_settings);
+            // 屏名按值留一份：回调可能在拔屏之后才跑，那时 screen 指向的 QScreen 已经没了
+            const QString screenName = screen->name();
+            auto         *overlay    = new CaptureOverlay(frame->image, screen->geometry(), screen->devicePixelRatio(), m_settings);
             // 只留与这块屏有交集的那几扇，并裁到屏内：跨屏的窗口截到的就是它在屏上看得见的那部分
             std::vector<QRect> onThisScreen;
             for (const auto &rect: candidates)
@@ -223,13 +227,13 @@ namespace GyanisScribe::Gui
             overlay->setCursorIncluded(longCapture ? std::nullopt : std::optional<bool>{cursorIncludedForThisRound()});
             QObject::connect(overlay, &CaptureOverlay::cursorIncludeChanged, this, [this](const bool included) { setCursorIncludedForRound(included); });
             QObject::connect(overlay, &CaptureOverlay::regionSelected, this,
-                             [this, screen, longCapture, frame](const QRect &region)
+                             [this, screenName, longCapture, frame](const QRect &region)
                              {
                                  closeOverlays();
                                  // 同一层遮罩两条去处：长截图先把这一块当成开头接住，普通截图当场交成品
                                  if (longCapture)
                                  {
-                                     captureLongRegion(region, screen->name());
+                                     captureLongRegion(region, screenName);
                                      return;
                                  }
                                  // 普通截图从遮罩那张冻帧里裁：再抓一次屏会把遮罩自己/刚切的桌面抓进去，
@@ -373,7 +377,7 @@ namespace GyanisScribe::Gui
         placeLongHud();
         hud->setReadout(longReadout(true));
 
-        QObject::connect(&m_longTimer, &QTimer::timeout, this, &CaptureService::grabNextLongFrame);
+        // timeout 的连接在构造时接好：这里只负责起表，收口只 stop
         m_longTimer.start(kLongCaptureIntervalMs);
     }
 
@@ -456,6 +460,11 @@ namespace GyanisScribe::Gui
         closeLongHud();
         // 三条出口（完成、取消、接不上）都收在这里：这一位不翻，之后的每一次调用还会去抓一帧
         m_longActive = false;
+    }
+
+    int CaptureService::longTimerConsumerCountForTesting() const
+    {
+        return m_longTimer.receivers(SIGNAL(timeout()));
     }
 
     void CaptureService::closeLongHud()
