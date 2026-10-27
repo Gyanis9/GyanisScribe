@@ -10,6 +10,7 @@
 #include <QApplication>
 #include <QElapsedTimer>
 #include <QEventLoop>
+#include <QFileInfo>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -20,6 +21,7 @@
 #include <QImage>
 #include <QPoint>
 #include <QSize>
+#include <QTimer>
 
 #include <cstdio>
 #include <algorithm>
@@ -90,31 +92,10 @@ namespace
     }
 
     /**
-     * @brief 处理事件直到列表里每一行的缩略图都显示成期望色
+     * @brief 处理事件直到视图解过 expected 张缩略图
      * @details 形状判据而不是计时判据：返回值只说明「解完了没有」，耗时由调用方另量。
-     *          旧实现解码是同步的，第一轮检查就已经成立；按需解码要等定时器一轮轮跑完。
+     *          解码计数只认真正的解码尝试，不会把占位图标的重绘算进去。
      */
-    [[nodiscard]] bool waitForThumbnails(const QListWidget &list, const QColor &expected, const qint64 timeoutMilliseconds)
-    {
-        QElapsedTimer watch;
-        watch.start();
-        while (watch.elapsed() < timeoutMilliseconds)
-        {
-            bool all = list.count() > 0;
-            for (int row = 0; row < list.count() && all; ++row)
-            {
-                all = iconCenterMatches(list.item(row)->icon(), expected);
-            }
-            if (all)
-            {
-                return true;
-            }
-            QApplication::processEvents(QEventLoop::AllEvents, 5);
-        }
-        return false;
-    }
-
-    /// 处理事件直到视图解过 expected 张缩略图
     [[nodiscard]] bool waitForDecodeCount(const HistoryView &view, const int expected, const qint64 timeoutMilliseconds)
     {
         QElapsedTimer watch;
@@ -464,6 +445,51 @@ TEST_F(HistoryViewFixture, ChangedFileInvalidatesItsThumbnail)
 }
 
 /**
+ * @brief 钉住文件大小变了、修改时间没变时也要重解
+ * @details 缓存键里两格各管一路：只换内容、保留时间戳的覆盖（同步盘与拷贝工具都会这么干）
+ *          只能靠大小看出来。这里覆盖后把修改时间原样恢复，只留大小这一格变化。
+ */
+TEST_F(HistoryViewFixture, ChangedFileSizeInvalidatesItsThumbnail)
+{
+    const QColor kOriginal{40, 120, 200};
+    const QColor kReplacement{220, 30, 30};
+
+    const auto changed     = writeImageArtifact(m_directory, "resized.png", {640, 480}, kOriginal);
+    const auto replacement = writeImageArtifact(m_directory, "resized-replacement.png", {640, 480}, kReplacement);
+    // 覆盖后大小差一截；修改时间在下面恢复成原值，缓存键里就只剩大小能变
+    padFileTo(replacement, std::filesystem::file_size(changed) + 4096);
+    ASSERT_NE(std::filesystem::file_size(changed), std::filesystem::file_size(replacement)) << "两份文件凑成了同样大小，判据会误读成修改时间变了";
+
+    addRecord(changed, HistoryKind::Screenshot, kNow);
+
+    auto view = makeView();
+    view->show();
+    ASSERT_TRUE(waitForDecodeCount(*view, 1, 10'000)) << "首显没把缩略图解出来，失效判据的前提不成立";
+
+    auto *list = view->findChild<QListWidget *>();
+    ASSERT_NE(list, nullptr) << "历史页里没有缩略图列表";
+    ASSERT_EQ(list->count(), 1);
+    ASSERT_TRUE(iconCenterMatches(list->item(0)->icon(), kOriginal)) << "首张缩略图不是原图的颜色，失效判据的前提不成立";
+
+    const auto      originalWriteTime = std::filesystem::last_write_time(changed);
+    const auto      originalMoment    = QFileInfo{QString::fromStdWString(changed.wstring())}.lastModified();
+    std::error_code copied;
+    std::filesystem::copy_file(replacement, changed, std::filesystem::copy_options::overwrite_existing, copied);
+    ASSERT_FALSE(copied) << "覆盖成品失败：" << copied.message();
+    std::error_code restored;
+    std::filesystem::last_write_time(changed, originalWriteTime, restored);
+    ASSERT_FALSE(restored) << "改不动修改时间，大小单变量的前提不成立：" << restored.message();
+    ASSERT_EQ(QFileInfo{QString::fromStdWString(changed.wstring())}.lastModified(), originalMoment) << "修改时间没恢复成原值，判据会误读成时间变了";
+    ASSERT_EQ(std::filesystem::file_size(changed), std::filesystem::file_size(replacement));
+
+    view->refresh();
+    ASSERT_TRUE(waitForDecodeCount(*view, 2, 10'000)) << "大小变了没有重解：缓存键里没有文件大小";
+    pumpEvents(100);
+    EXPECT_EQ(view->thumbnailDecodeCountForTesting(), 2) << "只该重解这一张";
+    EXPECT_TRUE(iconCenterMatches(list->item(0)->icon(), kReplacement)) << "列表项还是旧图：文件大小没有进缓存键";
+}
+
+/**
  * @brief 钉住换策略后重读就按新策略裁剪
  * @details 历史页此前拿的是构造时那份策略快照：通用页把条数改小之后，列表仍按旧上限列着。
  *          隐藏时刷新只摆行，不解缩略图——这一步也要一起钉住。
@@ -480,9 +506,76 @@ TEST_F(HistoryViewFixture, RetentionPolicyChangeRefreshesTheList)
     ASSERT_EQ(view->rowCount(), 2) << "初始策略不限条数，两条都该在";
     EXPECT_EQ(view->thumbnailDecodeCountForTesting(), 0) << "隐藏着刷新不该解缩略图";
 
+    // 只查刷新刚返回那一刻不够：定时器是 0ms 的，事件循环一转就会跑；这里给它 300ms 去犯错
+    pumpEvents(300);
+    EXPECT_EQ(view->thumbnailDecodeCountForTesting(), 0) << "隐藏着刷新，事件循环跑过之后还是解了缩略图";
+
     view->setPolicy(HistoryRetentionPolicy{.maximumEntries = 1, .retentionDays = 0});
     view->refresh();
     EXPECT_EQ(view->rowCount(), 1) << "策略改成只留一条后列表仍按旧策略列出：历史页拿的是构造时的快照";
+}
+
+/**
+ * @brief 钉住隐藏期间刷新、显示时补读期间新落的记录
+ * @details 隐藏时刷新只摆行；如果显示时不再补读一次，设置页改条数的那一瞬到翻回历史页之间
+ *          新保存的截图就漏在列表外——用户会以为刚截的那张没进历史。
+ */
+TEST_F(HistoryViewFixture, ShowAfterHiddenRefreshReadsWhatWasAddedMeanwhile)
+{
+    const auto first = writeImageArtifact(m_directory, "earlier.png", {320, 200});
+    addRecord(first, HistoryKind::Screenshot, kNow.addDays(-1));
+
+    auto view = makeView();
+    view->refresh();
+    ASSERT_EQ(view->rowCount(), 1);
+    EXPECT_EQ(view->thumbnailDecodeCountForTesting(), 0) << "隐藏着刷新不该解缩略图";
+
+    // 隐藏刷新的那一刻之后、显示之前又落了一条
+    const auto added = writeImageArtifact(m_directory, "added.png", {320, 200});
+    addRecord(added, HistoryKind::Screenshot, kNow);
+
+    view->show();
+    EXPECT_EQ(view->rowCount(), 2) << "隐藏刷新之后落的记录没在显示时补读，列表少了刚保存的那张";
+    EXPECT_TRUE(waitForDecodeCount(*view, 2, 10'000)) << "补读之后缩略图没有接着解";
+}
+
+/**
+ * @brief 钉住隐藏会停掉正在跑的缩略图解码，再次显示接着解完
+ * @details 每轮只解两张，四张以上的队列必然跨轮；隐藏发生在两轮之间时，定时器若不停，
+ *          看不见的列表会继续吃 GUI 线程。队列里的条目要留到下次显示，不能随隐藏丢掉。
+ *          用 4K 成品把单轮拉长到几十毫秒以上，才能稳定落在两轮之间观察。
+ */
+TEST_F(HistoryViewFixture, HideStopsPendingThumbnailsAndShowResumes)
+{
+    constexpr int kEntries = 8;
+
+    const auto seed = writeImageArtifact(m_directory, "busy-seed.png", {3840, 2160});
+    for (int index = 0; index < kEntries; ++index)
+    {
+        const auto      name   = std::format("busy-{:02}.png", index);
+        const auto      target = m_directory / name;
+        std::error_code copied;
+        std::filesystem::copy_file(seed, target, std::filesystem::copy_options::overwrite_existing, copied);
+        ASSERT_FALSE(copied) << "复制第 " << index << " 份成品失败：" << copied.message();
+        addRecord(target, HistoryKind::Screenshot, kNow.addSecs(-index));
+    }
+
+    auto  view  = makeView();
+    auto *timer = view->findChild<QTimer *>();
+    ASSERT_NE(timer, nullptr) << "历史页里没有缩略图解码定时器";
+
+    view->show();
+    ASSERT_TRUE(waitForDecodeCount(*view, 2, 60'000)) << "首显没开始解缩略图，隐藏判据的前提不成立";
+    ASSERT_LT(view->thumbnailDecodeCountForTesting(), kEntries) << "首轮就把队列解完了，落不到两轮之间";
+    view->hide();
+    EXPECT_FALSE(timer->isActive()) << "隐藏后解码定时器还活着，看不见的列表会继续占 GUI 线程";
+
+    const auto decodedAtHide = view->thumbnailDecodeCountForTesting();
+    pumpEvents(300);
+    EXPECT_EQ(view->thumbnailDecodeCountForTesting(), decodedAtHide) << "隐藏期间还在解码";
+
+    view->show();
+    ASSERT_TRUE(waitForDecodeCount(*view, kEntries, 60'000)) << "再次显示后没把剩下的缩略图接着解完";
 }
 
 /**
@@ -551,8 +644,10 @@ TEST_F(HistoryViewFixture, CategoryFallbackIconCarriesNinetySix)
     addRecord(video, HistoryKind::Recording, kNow);
 
     auto view = makeView();
-    view->refresh();
+    view->show();
     ASSERT_EQ(view->rowCount(), 1);
+    // 等解码真的跑过一轮：隐藏着刷新时兜底图标是直接摆上的，走不到读失败那条分支
+    ASSERT_TRUE(waitForDecodeCount(*view, 1, 10'000)) << "首显没走到解码，兜底分支的前提不成立";
 
     auto *list = view->findChild<QListWidget *>();
     ASSERT_NE(list, nullptr) << "历史页里没有缩略图列表";
@@ -578,16 +673,17 @@ TEST_F(HistoryViewFixture, ListUsesTabularFigures)
 }
 
 /**
- * @brief 读数用例：200 条 4K 成品时，构造加首次显示、以及第二次搜索刷新各要多久（不断言时间）
+ * @brief 读数用例：200 条 4K 成品时，构造加首次显示、第二次搜索刷新各要多久（不断言时间）
  * @details 一份 4K PNG 复制成 200 个名字，清单里记 200 条：旧实现构造期逐条同步解码，
- *          第二次搜索又把同一批全解一遍；新实现首次显示才读、按修改时间缓存，第二次应当只剩命中。
- *          这里只报「列表里每一行都换成真缩略图」所需的时间，跑在什么机器上就报什么数。
+ *          第二次搜索又把同一批全解一遍；新实现首次显示才读、按修改时间缓存，第二次只补解被容量挤掉的那一批。
+ *          「返回」量的是界面交还给调用方的时间；「抽干」等解码计数走完，不重画两百枚图标，
+ *          两段分开报，免得把占位图标的重绘算进解码里。数字随机器与运行波动，这里只报不断言时间。
  */
 TEST_F(HistoryViewFixture, ReportsTheCostOfRefreshingTwoHundredFourKHistoryEntries)
 {
-    constexpr int    kEntries = 200;
+    constexpr int    kEntries       = 200;
+    constexpr int    kCachedEntries = 128; ///< 与实现的缓存上限同值：第二轮补解的正是被挤掉的那一批
     const QSize      kSourceSize{3840, 2160};
-    const QColor     kSourceColor{40, 120, 200};
     constexpr qint64 kTimeoutMilliseconds = 60'000;
 
     const auto seed = writeImageArtifact(m_directory, "slide-seed.png", kSourceSize);
@@ -603,14 +699,13 @@ TEST_F(HistoryViewFixture, ReportsTheCostOfRefreshingTwoHundredFourKHistoryEntri
 
     QElapsedTimer firstShow;
     firstShow.start();
-    auto  view = makeView();
-    auto *list = view->findChild<QListWidget *>();
-    ASSERT_NE(list, nullptr) << "历史页里没有缩略图列表";
-
+    auto view = makeView();
     view->show();
     const auto windowReadyMilliseconds = firstShow.elapsed();
-    ASSERT_TRUE(waitForThumbnails(*list, kSourceColor, kTimeoutMilliseconds)) << "首屏缩略图没在时限内解完，这次的读数不成立";
-    const auto firstShowMilliseconds = firstShow.elapsed();
+
+    ASSERT_TRUE(waitForDecodeCount(*view, kEntries, kTimeoutMilliseconds)) << "首屏解码没在时限内走完，这次的读数不成立";
+    const auto firstDrainMilliseconds = firstShow.elapsed();
+    EXPECT_EQ(view->thumbnailDecodeCountForTesting(), kEntries);
 
     auto *search = view->findChild<QLineEdit *>();
     ASSERT_NE(search, nullptr) << "历史页里没有搜索框";
@@ -620,10 +715,14 @@ TEST_F(HistoryViewFixture, ReportsTheCostOfRefreshingTwoHundredFourKHistoryEntri
     searchRefresh.start();
     search->setText(QStringLiteral("slide"));
     const auto searchReturnMilliseconds = searchRefresh.elapsed();
-    ASSERT_TRUE(waitForThumbnails(*list, kSourceColor, kTimeoutMilliseconds)) << "搜索刷新后的缩略图没在时限内解完，这次的读数不成立";
-    const auto searchRefreshMilliseconds = searchRefresh.elapsed();
 
-    std::printf("[读数] 历史页 200 条 4K：构造+显示返回 %lldms；首屏缩略图全部就绪 %lldms；搜索刷新返回 %lldms；刷新后缩略图全部就绪 %lldms\n",
-                static_cast<long long>(windowReadyMilliseconds), static_cast<long long>(firstShowMilliseconds), static_cast<long long>(searchReturnMilliseconds),
-                static_cast<long long>(searchRefreshMilliseconds));
+    // 缓存只留 128 张，而列表按时间倒序装填，第一轮先把最新的一批挤掉；第二轮正好补解这 72 张
+    const auto expectedSecondDrain = kEntries + (kEntries - kCachedEntries);
+    ASSERT_TRUE(waitForDecodeCount(*view, expectedSecondDrain, kTimeoutMilliseconds)) << "搜索刷新的补解没在时限内走完，这次的读数不成立";
+    const auto searchDrainMilliseconds = searchRefresh.elapsed();
+    EXPECT_EQ(view->thumbnailDecodeCountForTesting(), expectedSecondDrain) << "第二轮补解的张数对不上：缓存容量或淘汰次序变了";
+
+    std::printf("[读数] 历史页 200 条 4K：构造+显示返回 %lldms；首轮解码 %d 张抽干 %lldms；搜索刷新返回 %lldms；第二轮补解 %d 张抽干 %lldms\n",
+                static_cast<long long>(windowReadyMilliseconds), kEntries, static_cast<long long>(firstDrainMilliseconds), static_cast<long long>(searchReturnMilliseconds),
+                expectedSecondDrain - kEntries, static_cast<long long>(searchDrainMilliseconds));
 }

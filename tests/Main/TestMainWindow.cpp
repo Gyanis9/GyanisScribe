@@ -25,6 +25,7 @@
 #include "Core/Settings/SettingsStore.h"
 #include "Gui/Controls/AppShortcuts.h"
 #include "Gui/Controls/CheckBox.h"
+#include "Gui/History/HistoryView.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Controls/HotkeyEdit.h"
 #include "Gui/Controls/SpinBox.h"
@@ -45,6 +46,7 @@ using GyanisScribe::App::UpdateVerdict;
 #include <QApplication>
 #include <QCheckBox>
 #include <QColor>
+#include <QDateTime>
 #include <QFile>
 #include <QFileInfo>
 #include <QFormLayout>
@@ -106,6 +108,14 @@ namespace
     QString toQString(const std::string_view text)
     {
         return QString::fromUtf8(text.data(), static_cast<qsizetype>(text.size()));
+    }
+
+    /// 造一张小 PNG：历史清单会丢掉成品不在的记录，路径上得先有真文件
+    bool writeShot(const std::filesystem::path &path)
+    {
+        QImage image{QSize{64, 64}, QImage::Format_ARGB32};
+        image.fill(QColor{40, 120, 200});
+        return image.save(QString::fromStdWString(path.wstring()));
     }
 
     /// 用例名给的独立 INI：ctest 逐用例起进程，但同一台机器上并行跑时共写一份配置会互相盖掉
@@ -943,6 +953,55 @@ namespace
 
         const auto reopened = makeStore();
         EXPECT_TRUE(reopened->boolValue(GyanisScribe::Core::kHistoryKeepUnsaved, false)) << "开关没写进 History/KeepUnsaved";
+    }
+
+    /**
+     * @brief 钉住通用页改历史保留条数后历史页当场按新策略重读
+     * @details 历史页构造时拿的是策略快照；主窗口不订阅这两个键的话，改完条数后列表仍按旧上限列着。
+     *          另改一个同样带历史字样的键作对照：它不该引起重读，否则每动一格都要重扫一遍清单。
+     */
+    TEST_F(MainWindowFixture, HistoryLimitChangeNarrowsTheHistoryList)
+    {
+        const auto older = m_directory / "older.png";
+        const auto newer = m_directory / "newer.png";
+        ASSERT_TRUE(writeShot(older));
+        ASSERT_TRUE(writeShot(newer));
+
+        const auto now = QDateTime::currentDateTime();
+        ASSERT_TRUE(static_cast<bool>(m_historyStore->append(
+                GyanisScribe::Core::HistoryEntry{.moment = now.addSecs(-60), .kind = GyanisScribe::Core::HistoryKind::Screenshot, .filePath = older, .size = QSize{64, 64}},
+                GyanisScribe::Core::HistoryRetentionPolicy{.maximumEntries = 0, .retentionDays = 0}, now)));
+        ASSERT_TRUE(static_cast<bool>(m_historyStore->append(
+                GyanisScribe::Core::HistoryEntry{.moment = now, .kind = GyanisScribe::Core::HistoryKind::Screenshot, .filePath = newer, .size = QSize{64, 64}},
+                GyanisScribe::Core::HistoryRetentionPolicy{.maximumEntries = 0, .retentionDays = 0}, now)));
+
+        makeWindow();
+        m_window->open(MainWindowPage::History);
+        auto *history = m_window->findChild<GyanisScribe::Gui::HistoryView *>();
+        ASSERT_NE(history, nullptr) << "主窗口里没有历史页";
+        ASSERT_EQ(history->rowCount(), 2) << "历史页首显没列出两条记录";
+
+        // 隐藏着又落了一条，再改一个不相关的键：历史页不该跟着重读，列表仍是两条
+        const auto added = m_directory / "added.png";
+        ASSERT_TRUE(writeShot(added));
+        ASSERT_TRUE(static_cast<bool>(m_historyStore->append(
+                GyanisScribe::Core::HistoryEntry{.moment = now.addSecs(60), .kind = GyanisScribe::Core::HistoryKind::Screenshot, .filePath = added, .size = QSize{64, 64}},
+                GyanisScribe::Core::HistoryRetentionPolicy{.maximumEntries = 0, .retentionDays = 0}, now)));
+
+        m_window->open(MainWindowPage::General);
+        auto *keepUnsaved = qobject_cast<QCheckBox *>(controlInCurrentPage("未保存的截图也进历史"));
+        ASSERT_NE(keepUnsaved, nullptr) << "通用页没有这一格";
+        keepUnsaved->setChecked(true);
+        m_window->open(MainWindowPage::History);
+        EXPECT_EQ(history->rowCount(), 2) << "不相关的键改动也刷新了历史页，每动一格都要重扫清单";
+
+        // 改条数：隐藏着就按新策略摆好行，翻回来应当只剩最新一条
+        m_window->open(MainWindowPage::General);
+        auto *limit = qobject_cast<QSpinBox *>(controlInCurrentPage("历史最多留多少条"));
+        ASSERT_NE(limit, nullptr) << "通用页没有这一格";
+        limit->setValue(1);
+        m_window->open(MainWindowPage::History);
+        EXPECT_EQ(history->rowCount(), 1) << "改完条数后历史页仍按旧策略列着：主窗口没把这两个键接到历史页";
     }
 
     /**

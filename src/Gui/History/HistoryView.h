@@ -180,7 +180,7 @@ namespace GyanisScribe::Gui
          * @brief 显示时补上首次读清单与隐藏期间的刷新请求
          * @param event 显示事件
          * @details 第一次显示才读清单；隐藏期间来过 refresh() 的，在这里补读一次——
-         *          那一次只摆了行，没解缩略图。
+         *          那一次只摆了行，没解缩略图。读清单失败也照样把上次没解完的队列重新排上。
          */
         void showEvent(QShowEvent *event) override;
 

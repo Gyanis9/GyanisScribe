@@ -41,10 +41,12 @@ namespace
     /// 列表项里存成品路径的那个角色
     constexpr int kPathRole = Qt::UserRole + 1;
 
-    /// 每轮定时器最多解几张：单轮只占几毫秒，两百张也不会拖到几秒之后才出现
-    constexpr int kThumbnailsPerTick = 3;
+    /// 每轮定时器最多解两张：4K 图在 Debug 下每张约 0.1 秒，两张一轮把单次停顿压在 0.2 秒上下，
+    /// 列表先摆出来，图随后一张张换上去
+    constexpr int kThumbnailsPerTick = 2;
 
-    /// 缩略图备到 3x 屏那一档：再高的缩放比按 3 档放大，1x/2x/3x 覆盖现有屏幕
+    /// 缩略图备到 3x 屏那一档：再高的缩放比按 3 档放大，1x/2x/3x 覆盖现有屏幕。
+    /// 三档一律生成、不做按屏裁剪，每张的位图合计约 0.5 MiB，这是缓存容量按张数计的代价来源
     constexpr int kLargestThumbnailDevicePixelRatio = 3;
 
     /**
@@ -52,6 +54,9 @@ namespace
      * @details 一张含 1x/2x/3x 三档，按 3x 计算约 0.5 MiB，128 张的上限约 64 MiB；
      *          默认保留上限是 200 条，128 覆盖一屏加几屏滚动。按张数算容量是为了淘汰次序可预期——
      *          三个 DPR 档的像素数差四倍，按字节算会让「同一张图在不同屏幕上占的额度」跟着屏幕走。
+     *          淘汰按最近使用次序：列表按时间倒序装填，一轮解码不查缓存，所以两百条时最先被挤掉的
+     *          是最新的 72 张；下一次刷新会先补解它们，正好是屏幕上最靠前的几张。这个次序是有意的
+     *          取舍，不是漏算：常在眼前滚动的几张重解一遍，换掉离屏的旧图占的额度。
      */
     constexpr int kThumbnailCacheCapacity = 128;
 
@@ -255,8 +260,8 @@ namespace GyanisScribe::Gui
         if (!m_loaded || m_refreshWhileHidden)
         {
             refresh();
-            return;
         }
+        // 读清单失败时上一次没解完的队列还留着：这里照样把它排上，不能跟着 refresh 一起提前返回
         scheduleThumbnails();
     }
 
@@ -340,11 +345,12 @@ namespace GyanisScribe::Gui
         m_list->clear();
         for (const auto &entry: visible)
         {
-            auto *item = new QListWidgetItem{fallbackIcon(entry), entryCaption(entry, QDateTime::currentDateTime())};
+            auto *item = new QListWidgetItem{entryCaption(entry, QDateTime::currentDateTime())};
             item->setData(kPathRole, GyanisScribe::Base::Paths::toDisplayText(entry.filePath));
             item->setToolTip(GyanisScribe::Base::Paths::toDisplayText(entry.filePath) + GyanisScribe::Base::uiText("（删除只从历史里去掉这条，成品文件留在原处）"));
             m_list->addItem(item);
 
+            // 先查缓存再谈占位图：命中时省下那一次图标查找，未命中才需要一枚先顶上
             const auto key = thumbnailCacheKey(entry);
             if (const auto *cached = m_thumbnailCache.object(key); cached != nullptr)
             {
@@ -353,6 +359,7 @@ namespace GyanisScribe::Gui
             }
 
             // 没命中先摆类别图标占位，真图等定时器那一批解出来再换
+            item->setIcon(fallbackIcon(entry));
             m_pendingThumbnails.append(PendingThumbnail{
                     .index = QPersistentModelIndex{m_list->model()->index(m_list->count() - 1, 0)},
                     .entry = entry,
@@ -390,6 +397,9 @@ namespace GyanisScribe::Gui
     {
         ++m_thumbnailDecodeCount;
 
+        // 键在读之前取：读一张大图要上百毫秒，期间文件被换掉时，这一份像素对应的仍是旧键
+        const auto key = thumbnailCacheKey(entry);
+
         QImageReader reader{GyanisScribe::Base::Paths::toDisplayText(entry.filePath)};
         reader.setAutoTransform(true);
 
@@ -405,7 +415,10 @@ namespace GyanisScribe::Gui
         const auto image = reader.read();
         if (image.isNull())
         {
-            return fallbackIcon(entry);
+            // 读不出也照样记在键下：视频与坏图每次刷新都重开一遍，等于每敲一个字就白读一批
+            const auto fallback = fallbackIcon(entry);
+            m_thumbnailCache.insert(key, new QIcon{fallback}, 1);
+            return fallback;
         }
 
         QIcon icon;
@@ -423,10 +436,13 @@ namespace GyanisScribe::Gui
         }
         if (icon.isNull())
         {
-            return fallbackIcon(entry);
+            const auto fallback = fallbackIcon(entry);
+            m_thumbnailCache.insert(key, new QIcon{fallback}, 1);
+            return fallback;
         }
 
-        m_thumbnailCache.insert(thumbnailCacheKey(entry), new QIcon{icon}, 1);
+        // 按读之前取的那把键放回去：读的这几百毫秒里文件换了名或换了内容，这次结果也不算到新键上
+        m_thumbnailCache.insert(key, new QIcon{icon}, 1);
         return icon;
     }
 
