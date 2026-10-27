@@ -450,12 +450,22 @@ namespace GyanisScribe::Plugins
         // 取声进程先收尸：留着一个还在写盘的 ffmpeg，刚删掉的 wav 会被它重新造出来。
         // 交回的 wav 路径这一轮用不上：中止的一轮不出成品
         static_cast<void>(finishAudioCapture());
-        std::error_code ignored;
         if (!m_audioWav.empty())
         {
-            std::filesystem::remove(m_audioWav, ignored);
+            std::error_code wavError;
+            std::filesystem::remove(m_audioWav, wavError);
+            if (wavError)
+            {
+                Base::Logger::warning(std::format("中止录屏时中间音频没删掉：{}（{}）", Base::Paths::toDisplayText(m_audioWav).toStdString(), wavError.message()));
+            }
         }
-        std::filesystem::remove_all(m_frameDirectory, ignored);
+
+        std::error_code frameError;
+        std::filesystem::remove_all(m_frameDirectory, frameError);
+        if (frameError)
+        {
+            Base::Logger::warning(std::format("中止录屏时临时帧目录没清干净：{}（{}）", Base::Paths::toDisplayText(m_frameDirectory).toStdString(), frameError.message()));
+        }
         m_frameDirectory.clear();
         m_audioWav.clear();
         m_frameSize = {};
@@ -554,7 +564,14 @@ namespace GyanisScribe::Plugins
 
     bool RecordingService::isEncoding() const
     {
-        // 列表里可能还留着已经返回的那几份（收尾时才顺手摘掉），所以按 isFinished 判而不是按空判
+        // 回接还排着的也算忙：编码可能已经返回，但 watcher 的 finished 还在事件队列里，
+        // 这时 state() 已到 Done，只按「还有没跑完的编码」判会让界面以为能开新一轮，
+        // 而旧的那次回接随后会收掉新控制条，并把取声结果读成新一轮的
+        if (!m_runningDeliveries.empty())
+        {
+            return true;
+        }
+        // 编码列表里可能还留着已经返回的那几份（收尾时才顺手摘掉），所以按 isFinished 判而不是按空判
         return std::ranges::any_of(m_runningEncodes, [](const QFuture<EncodeOutcome> &running) { return !running.isFinished(); });
     }
 

@@ -228,6 +228,13 @@ namespace GyanisScribe::App
 
     void RecordingCoordinator::showHud()
     {
+        // 上一轮的控制条与节拍若还开着，先收掉再换新的：直接覆盖指针会漏掉 close()，
+        // 旧控制条与旧 ticker 会一起留到进程结束
+        if (m_hud != nullptr || m_ticker != nullptr)
+        {
+            hideHud();
+        }
+
         auto *screen = QGuiApplication::primaryScreen();
         if (screen == nullptr)
         {

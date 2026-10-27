@@ -47,7 +47,7 @@ namespace GyanisScribe::App
     {
         bool    hasNewer = false; ///< 有没有比本机版本新的正式版
         QString message;          ///< 一行中文状态
-        QString link;             ///< 有新版时给发布页；其余情况为空
+        QString link;             ///< 要给用户点的时候给发布页：有新版本或检查失败；其余情况为空
     };
 
     /**
@@ -62,9 +62,9 @@ namespace GyanisScribe::App
      * @brief 把一次失败的检查翻成用户能照做的一句话
      * @param error Qt 报的网络错误
      * @param httpStatus HTTP 状态码，没走到响应时为 0
-     * @return 中文原因 + 替代做法；原始英文原因附在括号里
+     * @return 中文原因（大类名与 HTTP 状态码）+ 替代做法；不放 Qt 的英文原句
      * @details 分三档写：404（仓库没公开或还没发布）、403（限流或被拦）、连不上（网络/代理）。
-     *          其余归到一档通用文案里并把原始原因带上，不把 Qt 的英文原句直接摆给用户。
+     *          其余归到一档通用文案里并带上中文原因名，不把 Qt 的英文原句直接摆给用户。
      */
     [[nodiscard]] QString failureMessageFor(QNetworkReply::NetworkError error, int httpStatus);
 

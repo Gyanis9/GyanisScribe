@@ -21,6 +21,7 @@
 #include <QSize>
 #include <QString>
 #include <QStandardPaths>
+#include <QThreadPool>
 
 #include <gtest/gtest.h>
 
@@ -647,6 +648,39 @@ namespace
         EXPECT_EQ(finishedSize, QSize(8, 8)) << "成品没带上这一轮实际落帧的尺寸，整屏与窗口两种模式会把它记成 0×0";
         EXPECT_EQ(deliveryThread, std::this_thread::get_id()) << "成品不在界面线程上送，处置目录与发信号就都落在别的线程上了";
         EXPECT_FALSE(service.isEncoding()) << "成品已经交回，isEncoding 还说在编：下一轮会被无谓挡住";
+    }
+
+    /**
+     * @brief 钉住「编码已返回、成品还没交回」这一段也算在忙
+     * @details stop() 之后回接要等界面线程转起事件循环；这段窗口里 state() 已经到 Done。
+     *          如果 isEncoding 只看还没返回的编码，界面就会以为可以开新一轮，
+     *          而旧的那次回接随后会收掉新控制条，把取声结果也读成新一轮的。
+     */
+    TEST_F(RecordingServiceFixture, PendingDeliveryKeepsTheServiceBusy)
+    {
+        StubCaptureSource       source;
+        GatedRecordingEncoder   encoder;
+        StubPlatformIntegration platform;
+        RecordingService        service{source, encoder, platform};
+
+        ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
+        ASSERT_TRUE(spinFramesIn(service)) << "节拍一直没落下帧";
+        ASSERT_TRUE(static_cast<bool>(service.stop()));
+        ASSERT_TRUE(spinUntil([&] { return encoder.callCount() == 1; })) << "stop 之后一次编码都没开始";
+
+        QString product;
+        QObject::connect(&service, &RecordingService::finished, [&product](const QString &path, const QSize &) { product = path; });
+
+        encoder.release();
+        // 等编码线程真的跑完这一次，但不转界面循环：watcher 的 finished 还排在事件队列里，
+        // 停的正是「编码已返回、成品还没交回」那一格；转一次循环这一格就过去了
+        ASSERT_TRUE(QThreadPool::globalInstance()->waitForDone(static_cast<int>(kWaitPatience.count()))) << "门闩放开之后编码没收尾";
+        ASSERT_TRUE(encoder.isFinished()) << "编码线程已经空了，假编码器却说还在跑";
+        EXPECT_EQ(service.state(), RecordingState::Done) << "编码都跑完了，状态却没到 Done";
+        EXPECT_TRUE(service.isEncoding()) << "编码已返回但成品还在队列里，isEncoding 却说没有：这期间开新一轮会被旧的收尾收掉控制条";
+
+        ASSERT_TRUE(spinUntil([&] { return !product.isEmpty(); })) << "转起界面循环之后成品一直没送回来";
+        EXPECT_FALSE(service.isEncoding()) << "成品已经交回，isEncoding 还说在忙：下一轮会被无谓挡住";
     }
 
     /**

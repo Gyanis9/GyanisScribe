@@ -227,9 +227,9 @@ TEST_F(OcrResultWindowFixture, CopyAllWritesWholeResultAndSelectionNeedsASel)
 }
 
 /**
- * @brief 钉住复制选区时把段落分隔符换成换行
- * @details QTextCursor::selectedText() 用 U+2029 表示段落分隔，直接塞进剪贴板后
- *          粘到别的程序里会多出异常字符。复制全部走的是结果文本，本来就没有这一档。
+ * @brief 钉住复制选区时把段落分隔符与软换行都换成普通换行
+ * @details QTextCursor::selectedText() 用 U+2029 表示段落分隔、U+2028 表示段内软换行，
+ *          直接塞进剪贴板后粘到别的程序里会多出异常字符。复制全部走的是结果文本，本来就没有这两档。
  */
 TEST_F(OcrResultWindowFixture, CopySelectionTurnsSeparatorsIntoPlainNewlines)
 {
@@ -255,6 +255,15 @@ TEST_F(OcrResultWindowFixture, CopySelectionTurnsSeparatorsIntoPlainNewlines)
     EXPECT_EQ(selected, QString::fromUtf8("你好 世界\n第二行")) << "替换分隔符时把行内容弄丢了";
     EXPECT_EQ(QApplication::clipboard()->text(), selected);
     EXPECT_EQ(QApplication::clipboard()->text().indexOf(QChar::ParagraphSeparator), -1) << "剪贴板里仍留着 U+2029";
+
+    // 软换行落在一个块里，不经过段落分隔：只认 U+2029 的替换在这一档上不起作用
+    body->setPlainText(QStringLiteral("你好 世界") + QChar::LineSeparator + QStringLiteral("第二行"));
+    body->selectAll();
+    const auto withSoftBreak = window->copySelectionToClipboard();
+    ASSERT_FALSE(withSoftBreak.isEmpty()) << "带软换行的那一份全选之后复制选区却交回空串";
+    EXPECT_EQ(withSoftBreak.indexOf(QChar::LineSeparator), -1) << "复制出去的文本还带着 U+2028";
+    EXPECT_EQ(withSoftBreak, QString::fromUtf8("你好 世界\n第二行")) << "软换行没有换成普通换行";
+    EXPECT_EQ(QApplication::clipboard()->text().indexOf(QChar::LineSeparator), -1) << "剪贴板里仍留着 U+2028";
 }
 
 /**
