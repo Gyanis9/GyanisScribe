@@ -193,8 +193,11 @@ namespace GyanisScribe::Plugins
         auto       sealed     = m_session->finish(now);
         if (!sealed)
         {
-            emit failed(QString::fromUtf8(sealed.error().message.c_str()));
-            return std::unexpected(sealed.error());
+            // 封盘失败这一轮就不会有成品：临时帧与中间音频都要收掉，状态也要交回 Idle，否则下一轮开不了
+            const auto failure = sealed.error();
+            abortRound();
+            emit failed(QString::fromUtf8(failure.message.c_str()));
+            return std::unexpected(failure);
         }
 
         // 收尾这一串里只有编码要几秒到几十秒，所以只把那一段搬走：帧序列已经写完、取声进程也已经收尸，
@@ -401,7 +404,7 @@ namespace GyanisScribe::Plugins
             // 抓不到帧通常是屏幕没了：这种情况直接收，别录一份一直空转的成品
             const auto reason = frame.error().message;
             Base::Logger::error(std::format("录屏抓帧失败，这一轮中止：{}", reason));
-            m_timer.stop();
+            abortRound();
             emit failed(QString::fromUtf8(reason.c_str()));
             return;
         }
@@ -423,8 +426,10 @@ namespace GyanisScribe::Plugins
         }
         if (tick.state == Core::RecordingState::Failed)
         {
-            m_timer.stop();
-            emit failed(QString::fromUtf8(m_session->failure().message.c_str()));
+            // 会话判了失败：写盘那一路已经停了，帧目录与取声进程也要跟着收掉，状态交回 Idle
+            const auto reason = m_session->failure().message;
+            abortRound();
+            emit failed(QString::fromUtf8(reason.c_str()));
             return;
         }
         if (tick.durationReached)
@@ -437,6 +442,29 @@ namespace GyanisScribe::Plugins
                 emit failed(QString::fromUtf8(stopped.error().message.c_str()));
             }
         }
+    }
+
+    void RecordingService::abortRound()
+    {
+        m_timer.stop();
+        // 取声进程先收尸：留着一个还在写盘的 ffmpeg，刚删掉的 wav 会被它重新造出来。
+        // 交回的 wav 路径这一轮用不上：中止的一轮不出成品
+        static_cast<void>(finishAudioCapture());
+        std::error_code ignored;
+        if (!m_audioWav.empty())
+        {
+            std::filesystem::remove(m_audioWav, ignored);
+        }
+        std::filesystem::remove_all(m_frameDirectory, ignored);
+        m_frameDirectory.clear();
+        m_audioWav.clear();
+        m_frameSize = {};
+        // 会话先走、去处再走：会话拿着那一份的引用。两者都交回去之后 state() 回到 Idle，
+        // 控制条与托盘的读数才不会停在录制中，下一轮也不会被「上一轮还没收尾」拦住
+        m_session.reset();
+        m_sink.reset();
+        m_audioOutcome = AudioCaptureOutcome::NotRequested;
+        Base::Logger::info("录屏这一轮已中止：临时帧与中间音频都删掉了，这一轮不出成品");
     }
 
     Base::Expected<void> RecordingService::startAudioCapture()

@@ -307,6 +307,60 @@ namespace
         }
     };
 
+    /// 中途坏掉的抓屏来源：前几帧照常给，之后按选定的方式失败
+    enum class GrabFailureMode
+    {
+        Error,     ///< 抓屏直接返回错误（屏被拔掉那种）
+        NullFrame, ///< 抓屏成功但交回空图，写盘那一层会拒收
+    };
+
+    /**
+     * @brief 录到一半就坏掉的来源
+     * @details 两条失败路径要分开演：抓屏报错走服务自己的收口，空图走会话的写盘失败收口，
+     *          两条都该把这一轮完整收掉，而不是留下一个还在写的帧目录。
+     */
+    class FailingCaptureSource final : public IScreenCaptureSource
+    {
+    public:
+        /**
+         * @brief 建来源
+         * @param goodGrabs 前几次抓屏照常给帧
+         * @param mode 之后按哪种方式失败
+         */
+        FailingCaptureSource(const int goodGrabs, const GrabFailureMode mode) : m_goodGrabs(goodGrabs), m_mode(mode)
+        {
+        }
+
+        [[nodiscard]] Expected<CapturedImage> grabScreen(const QString &screenName) const override
+        {
+            if (m_grabs++ < m_goodGrabs)
+            {
+                return CapturedImage{QImage{QSize{8, 8}, QImage::Format_ARGB32_Premultiplied}, QSize{8, 8}, 1.0, screenName};
+            }
+            if (m_mode == GrabFailureMode::Error)
+            {
+                return std::unexpected(Error{ErrorCode::ScreenUnavailable, "这块屏没了"});
+            }
+            return CapturedImage{QImage{}, QSize{8, 8}, 1.0, screenName};
+        }
+
+        [[nodiscard]] Expected<CapturedImage> grabWindow(const quintptr) const override
+        {
+            return grabScreen(QStringLiteral("screen0"));
+        }
+
+        /// 之后的抓屏重新给帧：用来验一轮中止之后下一轮真的还能接着录
+        void heal()
+        {
+            m_goodGrabs = 1'000'000;
+        }
+
+    private:
+        int                  m_goodGrabs = 0; ///< 前几次照常给帧
+        GrabFailureMode      m_mode;          ///< 之后怎么坏
+        mutable int          m_grabs = 0;     ///< 已经抓了几次
+    };
+
     /// 一次编码调用的现场
     struct EncodeCall
     {
@@ -761,6 +815,100 @@ namespace
         QObject::connect(&service, &RecordingService::finished, [&product](const QString &path) { product = path; });
         encoder.release();
         EXPECT_TRUE(spinUntil([&] { return !product.isEmpty(); })) << "取消被拒之后这一轮该照常出成品";
+    }
+
+    /**
+     * @brief 钉住抓帧失败时把这一轮完整收掉
+     * @details 只停定时器的话，取声的 ffmpeg 还在写 wav、临时帧目录留着，state() 停在录制中，
+     *          下一轮会被「上一轮还没收尾」拦住。判据落在三处：状态回空闲、帧目录没了、下一轮能开。
+     */
+    TEST_F(RecordingServiceFixture, GrabFailureAbortsTheWholeRoundSoTheNextOneCanStart)
+    {
+        FailingCaptureSource    source{6, GrabFailureMode::Error};
+        GatedRecordingEncoder   encoder;
+        StubPlatformIntegration platform;
+        RecordingService        service{source, encoder, platform};
+
+        QString failure;
+        QObject::connect(&service, &RecordingService::failed, [&failure](const QString &reason) { failure = reason; });
+
+        ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
+        ASSERT_TRUE(spinFramesIn(service)) << "节拍一直没落下帧";
+        const auto frameDirectory = onlyFrameDirectory();
+        ASSERT_GT(countFilesIn(frameDirectory), 0U) << "这一轮一帧都没落，清理就没有可删的东西";
+
+        ASSERT_TRUE(spinUntil([&] { return !failure.isEmpty(); })) << "抓帧失败了却没报出来";
+        EXPECT_NE(failure.toStdString().find("这块屏没了"), std::string::npos) << failure.toStdString();
+        EXPECT_EQ(service.state(), RecordingState::Idle) << "中止之后状态没归位，下一轮会被「上一轮还没收尾」拦住";
+        EXPECT_FALSE(std::filesystem::exists(frameDirectory)) << "中止了这一轮却把临时帧留在盘上";
+        EXPECT_EQ(encoder.callCount(), 0) << "抓帧失败不该再去叫编码";
+
+        source.heal();
+        const auto restarted = service.start(serviceConfig(OutputFormat::Mp4, false), 0);
+        ASSERT_TRUE(static_cast<bool>(restarted)) << "上一轮失败之后开不了新一轮：" << restarted.error().message;
+        ASSERT_TRUE(spinFramesIn(service)) << "新一轮没落下帧";
+        ASSERT_TRUE(static_cast<bool>(service.cancel()));
+    }
+
+    /**
+     * @brief 钉住会话写盘失败时也走同一处收口
+     * @details 空图会被 PNG 序列拒收，会话随即进入 Failed。这一档原来只停定时器，
+     *          帧目录因此留着，而那一轮已经不会有成品。
+     */
+    TEST_F(RecordingServiceFixture, SessionWriteFailureAlsoDropsTheFrames)
+    {
+        FailingCaptureSource    source{6, GrabFailureMode::NullFrame};
+        GatedRecordingEncoder   encoder;
+        StubPlatformIntegration platform;
+        RecordingService        service{source, encoder, platform};
+
+        QString failure;
+        QObject::connect(&service, &RecordingService::failed, [&failure](const QString &reason) { failure = reason; });
+
+        ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
+        ASSERT_TRUE(spinFramesIn(service)) << "节拍一直没落下帧";
+        const auto frameDirectory = onlyFrameDirectory();
+        ASSERT_GT(countFilesIn(frameDirectory), 0U) << "这一轮一帧都没落，清理就没有可删的东西";
+
+        ASSERT_TRUE(spinUntil([&] { return !failure.isEmpty(); })) << "写盘失败了却没报出来";
+        EXPECT_NE(failure.toStdString().find("空图"), std::string::npos) << failure.toStdString();
+        EXPECT_EQ(service.state(), RecordingState::Idle) << "中止之后状态没归位，下一轮会被「上一轮还没收尾」拦住";
+        EXPECT_FALSE(std::filesystem::exists(frameDirectory)) << "写入失败的那一轮不会出成品，临时帧留着只是占盘";
+        EXPECT_EQ(encoder.callCount(), 0) << "写盘失败不该再去叫编码";
+
+        EXPECT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0))) << "上一轮失败之后开不了新一轮";
+        ASSERT_TRUE(static_cast<bool>(service.cancel()));
+    }
+
+    /**
+     * @brief 钉住收尾封盘失败时也把这一轮收干净
+     * @details 倒计时里就按停止：一帧都没有，seal 会失败。这一档原来只报错不收尾，
+     *          帧目录留着、state() 停在失败档，下一轮就被「上一轮还没收尾」挡住。
+     */
+    TEST_F(RecordingServiceFixture, StopBeforeAnyFrameAbortsTheRoundInsteadOfLeavingItHalfOpen)
+    {
+        StubCaptureSource       source;
+        GatedRecordingEncoder   encoder;
+        StubPlatformIntegration platform;
+        RecordingService        service{source, encoder, platform};
+
+        QString failure;
+        QObject::connect(&service, &RecordingService::failed, [&failure](const QString &reason) { failure = reason; });
+
+        ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 3)));
+        const auto frameDirectory = onlyFrameDirectory();
+        ASSERT_TRUE(std::filesystem::exists(frameDirectory));
+
+        const auto stopped = service.stop();
+        ASSERT_FALSE(static_cast<bool>(stopped)) << "一帧都没有却封盘成功";
+        EXPECT_EQ(stopped.error().code, ErrorCode::InternalError);
+        EXPECT_FALSE(failure.isEmpty()) << "封盘失败了却没报出来";
+        EXPECT_EQ(service.state(), RecordingState::Idle) << "中止之后状态没归位，下一轮会被「上一轮还没收尾」拦住";
+        EXPECT_FALSE(std::filesystem::exists(frameDirectory)) << "不会出成品的一轮把临时帧留在盘上";
+        EXPECT_EQ(encoder.callCount(), 0) << "封盘失败不该再去叫编码";
+
+        EXPECT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0))) << "上一轮失败之后开不了新一轮";
+        ASSERT_TRUE(static_cast<bool>(service.cancel()));
     }
 
     /**

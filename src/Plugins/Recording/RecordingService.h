@@ -152,6 +152,14 @@ namespace GyanisScribe::Plugins
         /// 定时器一跳：抓一帧并推进会话
         void onTick();
 
+        /**
+         * @brief 中止当前一轮：停定时器、结束取声、清临时帧，会话交回 Idle
+         * @details 抓帧失败与收尾封盘失败都走这里；不清理就会留下还在写盘的 ffmpeg 与
+         *          下一轮会覆盖的帧目录，而 state() 停在失败档会让界面以为这一轮还没结束、
+         *          下一轮 start() 也拿不到干净的状态。
+         */
+        void abortRound();
+
         /// 按模式抓到这一跳的画面
         [[nodiscard]] Base::Expected<Base::CapturedImage> grabFrame();
 
