@@ -38,6 +38,27 @@ namespace GyanisScribe::Base
         /// 模板长度上限：太长的名字在别的程序里也常常打不开
         constexpr qsizetype kMaximumNameTemplateLength = 120;
 
+        /// 撞名时依次尝试的编号上限：再往下只是把编号拉长，换时刻后缀更有用
+        constexpr int kMaximumUniqueAttempts = 999;
+
+        /// Windows 的保留设备名：带不带扩展名都会被当成设备，写盘直接失败
+        constexpr std::array<std::string_view, 22> kReservedDeviceNames{
+                "CON",  "PRN",  "AUX",  "NUL",  "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7",
+                "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+        };
+
+        /// 首个扩展名之前的那一段是不是保留设备名；比较不分大小写，也不看有没有扩展名
+        bool isReservedDeviceName(const QString &fileName)
+        {
+            const auto dot  = fileName.indexOf(QLatin1Char('.'));
+            const auto stem = (dot >= 0 ? fileName.left(dot) : fileName).trimmed();
+            return std::ranges::any_of(kReservedDeviceNames,
+                                       [&stem](const std::string_view reserved)
+                                       {
+                                           return stem.compare(QString::fromLatin1(reserved.data(), static_cast<qsizetype>(reserved.size())), Qt::CaseInsensitive) == 0;
+                                       });
+        }
+
         std::filesystem::path fromQt(const QString &location)
         {
             // Qt 的位置为空说明该用途在当前平台没有定义，回落到可写数据目录而不是抛出，
@@ -166,6 +187,13 @@ namespace GyanisScribe::Base
                                          GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("文件名模板太长（{} 个字，上限 {}）：太长的名字在别的程序里也常常打不开"),
                                                                       trimmed.size(), static_cast<int>(kMaximumNameTemplateLength))});
         }
+        // Windows 把 CON、AUX、COM1 这类名字当设备，带扩展名也写不出文件；模板这一层就拒掉，别等保存时才报系统错误
+        if (isReservedDeviceName(trimmed))
+        {
+            return std::unexpected(Error{ErrorCode::InvalidArgument,
+                                         GyanisScribe::Base::uiTextUtf8("文件名模板用到了 Windows 的保留设备名（CON、PRN、AUX、NUL、COM1 到 COM9、LPT1 到 LPT9）："
+                                                                        "这类名字写不出文件，请在名字里加几个字或换成别的写法")});
+        }
         for (const auto character: kForbiddenNameCharacters)
         {
             const auto forbidden = QChar::fromLatin1(character);
@@ -225,22 +253,38 @@ namespace GyanisScribe::Base
 
     std::filesystem::path Paths::uniqueFilePath(const std::filesystem::path &directory, const QString &fileName)
     {
-        // -2 加在扩展名之前：加在后面会得到 name.png-2，双击打不开
-        const auto dot    = fileName.lastIndexOf(QLatin1Char('.'));
-        const auto stem   = dot > 0 ? fileName.left(dot) : fileName;
-        const auto suffix = dot > 0 ? fileName.mid(dot) : QString{};
+        // 保留设备名先加一个下划线：CON.png 这类名字在 Windows 上写不出去，换一个能落盘的名字比失败有用
+        auto effectiveName = fileName;
+        if (isReservedDeviceName(effectiveName))
+        {
+            effectiveName.prepend(QLatin1Char('_'));
+        }
 
-        auto candidate = directory / fromDisplayText(fileName);
-        for (int attempt = 2; attempt <= 99; ++attempt)
+        // -2 加在扩展名之前：加在后面会得到 name.png-2，双击打不开
+        const auto dot    = effectiveName.lastIndexOf(QLatin1Char('.'));
+        const auto stem   = dot > 0 ? effectiveName.left(dot) : effectiveName;
+        const auto suffix = dot > 0 ? effectiveName.mid(dot) : QString{};
+
+        auto candidate = directory / fromDisplayText(effectiveName);
+        for (int attempt = 2; attempt <= kMaximumUniqueAttempts; ++attempt)
         {
             std::error_code ignored;
             if (!std::filesystem::exists(candidate, ignored))
             {
-                break;
+                return candidate;
             }
             candidate = directory / fromDisplayText(QStringLiteral("%1-%2%3").arg(stem).arg(attempt).arg(suffix));
         }
-        return candidate;
+
+        // 编号试到上限仍撞名：改用时刻后缀，名字长一点也好过交回一个已经存在的文件
+        const auto stamp    = QString::number(QDateTime::currentMSecsSinceEpoch(), 36);
+        auto       fallback = directory / fromDisplayText(QStringLiteral("%1-%2%3").arg(stem, stamp, suffix));
+        std::error_code ignored;
+        for (int attempt = 2; std::filesystem::exists(fallback, ignored); ++attempt)
+        {
+            fallback = directory / fromDisplayText(QStringLiteral("%1-%2-%3%4").arg(stem, stamp).arg(attempt).arg(suffix));
+        }
+        return fallback;
     }
 
 } // namespace GyanisScribe::Base

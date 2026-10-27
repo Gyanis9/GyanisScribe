@@ -144,8 +144,8 @@ namespace GyanisScribe::Base
          * @param text 用户填的模板
          * @return 成功返回可用的模板（已去掉首尾空白）；不合法时返回带中文原因的 InvalidArgument
          * @details 只认三格变量：%date%、%time%、%ms%，其余按字面量写进名字。
-         *          路径分隔符与 Windows 上的保留字符一律拒绝——放过去就是写到别的目录或写不出去；
-         *          形如 %xxx% 的未知变量也拒绝：打错一个字不该悄悄写进文件名。
+         *          路径分隔符、Windows 上的保留字符与保留设备名（CON、AUX、COM1 这类）一律拒绝——
+         *          放过去就是写到别的目录或写不出去；形如 %xxx% 的未知变量也拒绝：打错一个字不该悄悄写进文件名。
          */
         [[nodiscard]] static Expected<QString> parseNameTemplate(const QString &text);
 
@@ -163,7 +163,8 @@ namespace GyanisScribe::Base
          * @param fileName 想用的文件名（含扩展名）
          * @return 目录下的路径；同名文件已存在时在扩展名前加 -2、-3……
          * @details 模板里去掉 %ms% 之后同一秒连拍会撞名，直接写就是把前一张悄悄盖掉。
-         *          试到 -99 仍撞名就交回原路径：再往下试只是把名字拉长，不如让调用方按写失败处理。
+         *          名字是 Windows 保留设备名（CON、AUX、COM1 这类）时先在前面加一个下划线，
+         *          试到 -999 仍撞名时追加一个时刻后缀，保证交回的路径不是盘上已有的文件。
          */
         [[nodiscard]] static std::filesystem::path uniqueFilePath(const std::filesystem::path &directory, const QString &fileName);
     };

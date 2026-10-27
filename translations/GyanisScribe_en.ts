@@ -692,6 +692,10 @@
             <translation>Unknown variable "%{}%" in the file name template: the only ones are %date% (date), %time% (time) and %ms% (milliseconds)</translation>
         </message>
         <message>
+            <source>文件名模板用到了 Windows 的保留设备名（CON、PRN、AUX、NUL、COM1 到 COM9、LPT1 到 LPT9）：这类名字写不出文件，请在名字里加几个字或换成别的写法</source>
+            <translation>The file name template uses a Windows reserved device name (CON, PRN, AUX, NUL, COM1 to COM9, LPT1 to LPT9): such names cannot be written as files. Add a few characters or use another spelling.</translation>
+        </message>
+        <message>
             <source>…</source>
             <translation>…</translation>
         </message>

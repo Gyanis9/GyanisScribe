@@ -159,6 +159,9 @@ TEST(PathsNameTemplate, ParsesOnlyTheThreeDocumentedTokens)
     EXPECT_FALSE(Paths::parseNameTemplate(QStringLiteral("   ")).has_value()) << "空模板不该放行";
     EXPECT_FALSE(Paths::parseNameTemplate(QStringLiteral("a/b")).has_value()) << "路径分隔符会把文件写到别的目录";
     EXPECT_FALSE(Paths::parseNameTemplate(QStringLiteral("a:b")).has_value()) << "冒号在 Windows 上写不出去";
+    EXPECT_FALSE(Paths::parseNameTemplate(QStringLiteral("CON")).has_value()) << "Windows 保留设备名写不出文件，模板这一层就该拒";
+    EXPECT_FALSE(Paths::parseNameTemplate(QStringLiteral("con.png")).has_value()) << "带扩展名的保留设备名同样写不出去";
+    EXPECT_TRUE(Paths::parseNameTemplate(QStringLiteral("CONSOLE")).has_value()) << "只是以 CON 开头的普通名字不该被误伤";
 
     const auto typo = Paths::parseNameTemplate(QStringLiteral("shot_%dtae%"));
     ASSERT_FALSE(typo.has_value()) << "认不出的变量放过去，就是让打错的一个字悄悄写进文件名";
@@ -235,6 +238,62 @@ TEST_F(PathsFixture, UniqueFilePathStepsAsideBeforeTheExtension)
     }
     const auto third = Paths::uniqueFilePath(directory, QStringLiteral("shot-20261011.png"));
     EXPECT_EQ(third.filename().string(), "shot-20261011-3.png");
+
+    std::filesystem::remove_all(directory, ignored);
+}
+
+/**
+ * @brief 钉住 Windows 保留设备名不能原样当成品名
+ * @details CON、AUX、COM1 这类名字带不带扩展名都被系统当成设备，写盘直接失败；
+ *          原样交回让用户在保存时才看到一条系统错误。前缀一个下划线既保留可读性又写得出去。
+ */
+TEST_F(PathsFixture, UniqueFilePathAvoidsReservedDeviceNames)
+{
+    const auto      directory = probeDirectory("ReservedNames");
+    std::error_code ignored;
+    std::filesystem::remove_all(directory, ignored);
+    std::filesystem::create_directories(directory);
+
+    for (const auto *reserved: {"CON.png", "con.PNG", "AUX.png", "NUL.png", "COM1.jpg", "LPT9.png"})
+    {
+        const auto escaped = Paths::uniqueFilePath(directory, QString::fromUtf8(reserved));
+        EXPECT_NE(escaped.filename(), std::filesystem::path{QString::fromUtf8(reserved).toStdWString()}.filename()) << reserved << " 原样交回：Windows 会把它当设备，写不出文件";
+        EXPECT_EQ(escaped.parent_path(), directory) << "改名字时跑出了目标目录";
+        EXPECT_EQ(escaped.extension(), std::filesystem::path{QString::fromUtf8(reserved).toStdWString()}.extension()) << "改名字时把扩展名弄丢了，调用方会按错的格式写盘";
+    }
+
+    // 只是以 CON 开头的普通名字不该被误伤
+    EXPECT_EQ(Paths::uniqueFilePath(directory, QStringLiteral("console.png")).filename().string(), "console.png") << "CONSOLE 不是设备名，不该被加前缀";
+
+    std::filesystem::remove_all(directory, ignored);
+}
+
+/**
+ * @brief 钉住撞名试到上限之后仍交回一个盘上不存在的路径
+ * @details 原实现在 -99 那一档停下，第 99 次撞名之后原样交回一个已经存在的文件：
+ *          调用方一写就把上一张成品盖掉。上限之后改用时刻后缀，名字长一点也好过覆盖。
+ */
+TEST_F(PathsFixture, UniqueFilePathStaysUniquePastTheAttemptCeiling)
+{
+    const auto      directory = probeDirectory("NameCeiling");
+    std::error_code ignored;
+    std::filesystem::remove_all(directory, ignored);
+    std::filesystem::create_directories(directory);
+
+    // 原名与 -2 到 -999 全部占住：正好 999 个同名候选
+    {
+        std::ofstream original{directory / "shot.png"};
+        original << "x";
+    }
+    for (int attempt = 2; attempt <= 999; ++attempt)
+    {
+        std::ofstream sibling{directory / std::format("shot-{}.png", attempt)};
+        sibling << "x";
+    }
+
+    const auto candidate = Paths::uniqueFilePath(directory, QStringLiteral("shot.png"));
+    EXPECT_EQ(candidate.parent_path(), directory) << "退让时跑出了目标目录";
+    EXPECT_FALSE(std::filesystem::exists(candidate)) << "交回了一个已经存在的文件：调用方一写就覆盖上一张成品，实际是 " << candidate.filename().string();
 
     std::filesystem::remove_all(directory, ignored);
 }
