@@ -256,7 +256,8 @@ namespace
         layout->addWidget(browse);
 
         QObject::connect(browse, &QPushButton::clicked, row,
-                         [&, editor, title]
+                         // row 按值抓：它比这一行活得久，按引用抓会留下一个指回局部指针的引用
+                         [row, editor, title]
                          {
                              const auto picked = QFileDialog::getExistingDirectory(row, GyanisScribe::Base::uiText("选择%1").arg(title), editor->text());
                              if (!picked.isEmpty())
@@ -268,7 +269,7 @@ namespace
         // 失焦即写：设置页没有「保存」按钮，改完就看到效果是需求第五节的要求
         QObject::connect(editor, &QLineEdit::editingFinished, row,
                          // fallback 按值抓：调用点给的多是临时 path，按引用抓会在这一句执行时读已销毁的路径
-                         [&, editor, key, title, fallback]
+                         [&settings, editor, key, title, fallback]
                          {
                              const auto text = editor->text().trimmed();
                              if (text.isEmpty())
