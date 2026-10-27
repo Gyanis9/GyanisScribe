@@ -217,6 +217,39 @@ TEST_F(SettingsFixture, EachSuccessfulWriteNotifiesItsOwnKey)
 }
 
 /**
+ * @brief 钉住空 QVariant 是「删掉这一项」，删完仍发一次变更通知
+ * @details 设置页把路径框清空时走的就是这条：写空串会在 INI 里留一条空文本，
+ *          读取端每次都按「填坏了」记警告；写成 @Invalid() 又会让 allKeys 与导出
+ *          列出这个已经失效的键。订阅者也要收到这一次，界面才会回到默认值。
+ */
+TEST_F(SettingsFixture, InvalidVariantRemovesTheKeyAndStillNotifies)
+{
+    const auto caseName = "RemoveKey";
+    removeProbeFiles(caseName);
+    const auto iniFile = probePath(caseName);
+
+    SettingsStore store(iniFile);
+    ASSERT_TRUE(store.setValue("Paths/Screenshot", QVariant(QStringLiteral("D:/Shots"))).has_value());
+    store.sync();
+    ASSERT_TRUE(store.allKeys().contains("Paths/Screenshot"));
+
+    std::vector<QString> seen;
+    QObject::connect(&store, &SettingsStore::valueChanged, [&seen](const QString &key) { seen.push_back(key); });
+
+    ASSERT_TRUE(store.setValue("Paths/Screenshot", QVariant{}).has_value());
+    store.sync();
+
+    EXPECT_EQ(store.stringValue("Paths/Screenshot", QStringLiteral("默认")), QStringLiteral("默认")) << "删键之后仍读回旧值";
+    EXPECT_FALSE(store.allKeys().contains("Paths/Screenshot")) << "空 QVariant 没删掉这一项：allKeys 与导出仍会列出它";
+    ASSERT_EQ(seen.size(), 1U) << "删键没有发出通知，订阅者还停在旧值上";
+    EXPECT_EQ(seen[0], QStringLiteral("Paths/Screenshot"));
+    EXPECT_EQ(readFile(iniFile).find("Screenshot"), std::string::npos) << "INI 里还留着这一项的键名";
+
+    SettingsStore reopened(iniFile);
+    EXPECT_FALSE(reopened.allKeys().contains("Paths/Screenshot")) << "删键没有落盘，换一个实例又读到了";
+}
+
+/**
  * @brief 钉住导出→导入这条往返：列表与文本都要原样回到另一份存储里
  */
 TEST_F(SettingsFixture, ExportThenImportRestoresIntoAnotherStore)

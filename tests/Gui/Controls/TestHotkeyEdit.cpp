@@ -156,3 +156,44 @@ TEST_F(HotkeyEditFixture, FocusOutCancelsRecording)
     EXPECT_EQ(display->text(), bound) << "取消之后显示被按下的键改掉了";
 }
 
+/**
+ * @brief 钉住录制中按 Esc 还原现值、退出录制态，配置原样不动
+ * @details Esc 的意思是「我不改这一项」，不是「把这一项清空」；录制提示与写入失败的提示
+ *          都会改显示文本，取消时必须回到绑定值而不是回到空。
+ */
+TEST_F(HotkeyEditFixture, EscapeRestoresTheBoundValue)
+{
+    QWidget container;
+    auto *layout = new QVBoxLayout{&container};
+    auto *edit   = new HotkeyEdit{*m_store, &container};
+    layout->addWidget(edit);
+    container.show();
+    container.activateWindow();
+    QCoreApplication::processEvents();
+
+    const auto key     = GyanisScribe::Core::kHotkeyCapture;
+    const auto bound   = QStringLiteral("Ctrl+Alt+A");
+    const auto written = m_store->setValue(key, bound);
+    ASSERT_TRUE(written.has_value()) << written.error().message;
+    edit->bindTo(key, QStringLiteral("截图"), QStringLiteral("Ctrl+Alt+B"), HotkeyEditScope::Global);
+
+    auto *display = edit->findChild<QLabel *>(QStringLiteral("hotkeyDisplay"));
+    ASSERT_NE(display, nullptr) << "录制框里没有显示组合的那一格";
+
+    edit->setFocus(Qt::MouseFocusReason);
+    QCoreApplication::processEvents();
+    ASSERT_TRUE(edit->hasFocus()) << "焦点没落到录制框，按键判据没有落点";
+    QMouseEvent press{QEvent::MouseButtonPress, QPointF{5, 5}, QPointF{5, 5}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QCoreApplication::sendEvent(edit, &press);
+    ASSERT_TRUE(display->property("recording").toBool()) << "点一下没有进入录制态，判据没有落点";
+    ASSERT_NE(display->text(), bound) << "进入录制态后还显示旧组合，用户不知道程序在等按键";
+
+    QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier};
+    QCoreApplication::sendEvent(edit, &escape);
+    QCoreApplication::processEvents();
+
+    EXPECT_FALSE(display->property("recording").toBool()) << "按 Esc 之后仍留在录制态";
+    EXPECT_EQ(display->text(), bound) << "Esc 没有把显示还原成绑定值，录制提示停在框里";
+    EXPECT_EQ(m_store->stringValue(key, QStringLiteral("missing")), bound) << "Esc 改写了配置，本意是放弃这次录制";
+}
+

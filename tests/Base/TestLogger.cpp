@@ -34,9 +34,10 @@ namespace
 
 /**
  * @brief 钉住 Logger 从「未初始化」到「重复初始化不切走」的整条生命周期
- * @details 状态是进程级单例，所以本文件刻意只留这一条用例：拆成多条会让「先跑哪条」决定成败，
- *          而 ctest 逐用例起进程与直接跑整枚可执行体两种顺序并不相同。顺序排成「先在未关闭的句柄上
- *          验早退分支，再 shutdown 验冲刷」——中途一旦 shutdown，重复初始化就变成合法的新建。
+ * @details 状态是进程级单例，所以本文件刻意只留这两条用例：拆得更细会让「先跑哪条」决定成败，
+ *          而 ctest 逐用例起进程与直接跑整枚可执行体两种顺序并不相同。第一条的顺序排成「先在未关闭的
+ *          句柄上验早退分支，再 shutdown 验冲刷」——中途一旦 shutdown，重复初始化就变成合法的新建；
+ *          第二条自己先 shutdown，再验异常兜底，不依赖第一条留下什么。
  */
 TEST(Logger, LifecycleKeepsFirstSinkAcrossRepeatedInitialize)
 {
