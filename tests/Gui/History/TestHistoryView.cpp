@@ -241,7 +241,7 @@ TEST_F(HistoryViewFixture, EmptyListGuidesInsteadOfActing)
 }
 
 /**
- * @brief 钉住空列表与「筛不出记录」各有自己的引导句（界面审查 UI-64）
+ * @brief 钉住空列表与「筛不出记录」各有自己的引导句
  * @details 一片白卡读起来像记录丢了或窗体坏了；两种空又不该共用一句——筛选没命中时说
  *          「还没有记录」是在撒谎。判据读的是视口里那句提示的文字与显示态。
  */

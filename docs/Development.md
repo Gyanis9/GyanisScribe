@@ -12,8 +12,8 @@
 | 编译器 | MSVC（本机实测 14.51） | 需要 C++20/23 的 `std::expected` 与 `std::format` |
 | CMake | ≥ 3.28 | — |
 | Ninja | — | 生成器 |
-| Conan | 2 | 依赖：spdlog 1.17.0、GoogleTest 1.17.0，Release 档另领 Tesseract 5.5.2 |
-| Qt | 6.11，含 Core / Gui / Widgets / Concurrent / Svg / Network | 用 msvc2022_64 套件 |
+| Conan | 2 | 依赖：spdlog 1.17.0、GoogleTest 1.17.0、zxing-cpp 3.1.1（二维码/条形码识别后端），Release 档另领 Tesseract 5.5.2 |
+| Qt | 6.11，含 Core / Gui / Widgets / Concurrent / Svg / Network / PrintSupport | 用 msvc2022_64 套件；LinguistTools 组件可选，装了才用 `lrelease` 生成语言包，缺了整条跳过 |
 | Python | 3 | 两条静态门禁脚本 |
 | ffmpeg | 官方静态构建（gyan.dev） | 打包时需要：`scripts/FetchFfmpeg.ps1` 按钉好的 URL + SHA-256 取进 `vendor/Ffmpeg/`；开发期 PATH 上有一份也行 |
 | NSIS | — | 可选：只在打安装器时需要 |

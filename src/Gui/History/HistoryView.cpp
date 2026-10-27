@@ -234,7 +234,7 @@ namespace GyanisScribe::Gui
                              }
                          });
 
-        // 缩略图按小批解：0ms 单次定时器每响一次解两三张，列表先摆出来，图随后一张张换上去
+        // 缩略图按小批解：0ms 单次定时器每响一次解两张，列表先摆出来，图随后一张张换上去
         m_thumbnailTimer = new QTimer{this};
         m_thumbnailTimer->setSingleShot(true);
         m_thumbnailTimer->setInterval(0);

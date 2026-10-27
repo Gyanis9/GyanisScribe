@@ -61,7 +61,7 @@ namespace GyanisScribe::Plugins
      * @details 这层只做胶水：定时器跳一次就抓一帧交给会话，会话决定写不写；
      *          「什么时候写、暂停怎么算、时长上限」全在 Core::RecordingSession 里，那部分有用例。
      *          本类直测的是这几条：一份配置能不能开始、取声在该跳过的档位上真跳过了、编码交给工作线程
-     *          而回接落在界面线程、编码失败时帧目录留着好重编码、抓帧或封盘失败时整轮收掉、
+     *          而回接落在界面线程、编码失败时帧目录留着好重编码、抓帧、会话写盘或封盘失败时整轮收掉、
      *          取消时帧目录删掉而编码一次都不叫、析构会等手上的编码、
      *          窗口模式按平台给的客户区读数把光标高亮叠在正确的格子上（光标位置由 cursorGlobalPosition 钉住）；
      *          真抓屏像素与真编出文件需要一个真实桌面会话，那一段仍然留给验收。
@@ -209,7 +209,7 @@ namespace GyanisScribe::Plugins
          * @param recordedDurationMs 这一轮录了多久，毫秒（暂停不计）：与帧数一起决定成品按什么帧率铺开
          * @param audioWav 中间 wav，空表示本轮没取声
          * @param frameSize 这一轮落下的那一帧的物理尺寸，成品进历史时按它记
-         * @details 结果用 QFuture::then 送回界面线程（continuation 的 context 是本对象），
+         * @details 结果由 QFutureWatcher 的 finished 送回界面线程：watcher 以本对象为父，随它一起销毁，
          *          因此并发跑两轮编码也各有归处，不需要排队。
          */
         void startEncoding(const Core::RecorderConfig &config, const std::filesystem::path &frameDirectory, int frames, qint64 recordedDurationMs,
