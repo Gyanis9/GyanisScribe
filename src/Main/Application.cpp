@@ -102,7 +102,15 @@ Application::Application(int &argc, char **argv, const GyanisScribe::App::Comman
     {
         // 自检量的正是启动路上的热键登记：这一格照样登记一遍，结果进读数与退出码——
         // 一项没登记上就退 1。其余一次性动作（截一张、贴一张、取色）不碰全局热键，常驻实例的登记不被打断。
-        registerStartupHotkeys();
+        // 打包冒烟设了那个环境变量：量的是随包 DLL 齐不齐，键位被本机别的程序占着不该算成品失败
+        m_selftestHotkeyCheckSkipped = qEnvironmentVariableIsSet(GyanisScribe::App::kSelftestSkipHotkeysEnvVar);
+        if (m_selftestHotkeyCheckSkipped)
+        {
+            GyanisScribe::Base::Logger::info("自检：按环境变量跳过全局热键登记，退出码只看日志与装配是否就绪");
+        } else
+        {
+            registerStartupHotkeys();
+        }
     }
 
     // 就绪判据只看日志有没有接管成功：界面在日志坏掉时照样能用，但 CI 的自检要把这一格判红
@@ -224,8 +232,10 @@ int Application::executeCommandLine(const GyanisScribe::App::CommandLineRequest 
             GyanisScribe::Base::Logger::info(std::format("自检：热键登记 {} 项、固定未登记 {} 项、自定义未登记 {} 项，日志就绪 {}，热键登记走通 {}，可见顶层窗口 {} 个",
                                                           report.registered, report.failures.size(), report.customFailures.size(), isReady(), m_hotkeyReportReceived,
                                                           visibleTopLevels));
-            // 重登整体失败时没有可看的报告项：那一轮同样不能算通过，否则又是「一项没登记上却退 0」
-            return GyanisScribe::App::selftestPassed(isReady() && m_hotkeyReportReceived, report) ? 0 : 1;
+            // 重登整体失败时没有可看的报告项：那一轮同样不能算通过，否则又是「一项没登记上却退 0」。
+            // 跳过登记的那一轮没有报告可等，判据只剩日志与装配
+            const bool checkHotkeys = !m_selftestHotkeyCheckSkipped;
+            return GyanisScribe::App::selftestPassed(isReady() && (m_hotkeyReportReceived || !checkHotkeys), report, checkHotkeys) ? 0 : 1;
         }
         case GyanisScribe::App::CommandLineAction::CaptureFullScreen:
         case GyanisScribe::App::CommandLineAction::CaptureLastRegion:

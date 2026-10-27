@@ -94,8 +94,12 @@
 ```powershell
 GyanisScribe.exe            # 起托盘，按 Ctrl+Alt+A 截第一张图
 GyanisScribe.exe --help     # 启动参数
-GyanisScribe.exe --selftest # 把启动路径跑完就退，退出码 0 即自检通过
+GyanisScribe.exe --selftest # 把启动路径跑完就退：日志就绪且全局热键全部登记上才退 0
 ```
+
+严格自检要求那几颗全局热键在本机空闲；热键被别的程序（或常驻的另一份智录）占着时它会退 1。
+只想量「包装完起不起得来」时，先设环境变量 `GYANISSCRIBE_SELFTEST_SKIP_HOTKEYS=1`：自检照常建
+控制器、托盘与主窗口，只是跳过全局热键登记，退出码只看日志与装配是否就绪。打包脚本用的正是这一档。
 
 程序常驻托盘，主窗口随时从托盘菜单打开；全局热键撞了可在设置里改，改完立刻生效。
 

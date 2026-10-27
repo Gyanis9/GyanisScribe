@@ -261,6 +261,10 @@ TEST(CommandLineStartupShape, SelftestNeedsReadyLogAndEveryHotkey)
     report.customFailures.push_back(GyanisScribe::Core::CustomHotkeyFailure{QStringLiteral("screen-capture"), QStringLiteral("Ctrl+Alt+F"),
                                                                           GyanisScribe::Base::Error{GyanisScribe::Base::ErrorCode::Busy, "这个组合已被别的程序占用"}});
     EXPECT_FALSE(selftestPassed(true, report)) << "自定义绑定有未登记项不能算通过";
+
+    // 打包冒烟那一档：跳过热键登记时只看日志，未登记项不是这一轮的判据
+    EXPECT_TRUE(selftestPassed(true, report, false)) << "跳过热键那一档被未登记项判红了";
+    EXPECT_FALSE(selftestPassed(false, report, false)) << "日志没接管，跳过哪一档都不能算通过";
 }
 
 /**

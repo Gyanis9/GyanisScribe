@@ -22,6 +22,9 @@
 namespace GyanisScribe::App
 {
 
+    /// 打包自检用的环境变量名：设了它，--selftest 不登记全局热键，退出码只看日志与装配是否就绪
+    inline constexpr const char *kSelftestSkipHotkeysEnvVar = "GYANISSCRIBE_SELFTEST_SKIP_HOTKEYS";
+
     /**
      * @brief 命令行要求的启动动作
      * @details 帮助与版本也在表里：它们与别的动作共用同一条解析路，Main 按结果各自收场。
@@ -101,11 +104,13 @@ namespace GyanisScribe::App
      * @brief 自检这一格算不算通过
      * @param logReady 日志是否接管成功
      * @param report 启动那一轮的热键登记结果
-     * @return true 表示日志就绪，且固定动作与自定义绑定都没有未登记项
+     * @param checkHotkeys 这一轮要不要把热键登记结果算进判据；打包冒烟按「不登记」那一路调用时传 false
+     * @return true 表示日志就绪，且（要看热键时）固定动作与自定义绑定都没有未登记项
      * @details 只看日志就绪会把「热键一条都没登记上」判成通过：常驻实例占着那批键时，
-     *          自检拿到的正是这种读数，而打包门会把它当成成功放行。
+     *          自检拿到的正是这种读数，而打包门会把它当成成功放行。打包那一路绕开的是
+     *          「键被别人占着」这件与本机环境有关的事，不是绕开热键登记这条代码路。
      */
-    [[nodiscard]] bool selftestPassed(bool logReady, const GyanisScribe::Core::HotkeyReloadReport &report);
+    [[nodiscard]] bool selftestPassed(bool logReady, const GyanisScribe::Core::HotkeyReloadReport &report, bool checkHotkeys = true);
 
     /**
      * @brief 一次性截图之后是否还要进入事件循环

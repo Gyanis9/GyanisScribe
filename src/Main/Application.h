@@ -86,8 +86,8 @@ public:
     /**
      * @brief 执行命令行要的那一个动作，并收场
      * @param request 解析好的请求（不含 Help/Version，那两条在 Main 里就打发了）
-     * @return 进程退出码：自检只在日志就绪且固定与自定义热键全部登记上时给 0；截图落盘成功 0、失败 1；
-     *         贴图与取色是常驻动作，事件循环结束后按 0 交回
+     * @return 进程退出码：自检只在日志就绪且固定与自定义热键全部登记上时给 0（按环境变量跳过热键登记的那一轮只看日志与装配）；
+     *         截图落盘成功 0、失败 1；贴图与取色是常驻动作，事件循环结束后按 0 交回
      * @details 截图那条把落盘路径打到标准输出、失败原因打到标准错误：脚本按这两条接着干活
      */
     int executeCommandLine(const GyanisScribe::App::CommandLineRequest &request);
@@ -114,4 +114,5 @@ private:
     bool                                               m_isPrimaryInstance = false; ///< 构造里那一次探测的结果，tryBecomePrimaryInstance 只回报它
     bool                                               m_isReady           = false; ///< 日志是否接管成功
     bool                                               m_hotkeyReportReceived = false; ///< 启动那一轮热键登记是否真的交回了报告；重登整体失败时自检不能算通过
+    bool                                               m_selftestHotkeyCheckSkipped = false; ///< 自检这一轮按环境变量跳过了热键登记；退出码只看日志与装配
 };

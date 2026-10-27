@@ -128,9 +128,16 @@ try {
     $savedQtDir   = $env:QTDIR
     $savedPlugins = $env:QT_PLUGIN_PATH
     $savedQpa     = $env:QT_QPA_PLATFORM_PLUGIN_PATH
+    $savedSkipHotkeys = $env:GYANISSCRIBE_SELFTEST_SKIP_HOTKEYS
     try {
         $env:PATH = (Join-Path $env:SystemRoot 'System32')
         Remove-Item Env:QTDIR, Env:QT_PLUGIN_PATH, Env:QT_QPA_PLATFORM_PLUGIN_PATH -ErrorAction SilentlyContinue
+        # Strict --selftest exits 1 whenever a global hotkey is already taken, which on a build
+        # machine (a resident copy, or another program owning the same combination) says nothing
+        # about the package. This smoke only answers "does the staged folder still start with
+        # every DLL it needs", so skip hotkey registration for this one run and put the variable
+        # back afterwards.
+        $env:GYANISSCRIBE_SELFTEST_SKIP_HOTKEYS = '1'
         & .\GyanisScribe.exe --selftest
         if ($LASTEXITCODE -ne 0) { throw "staged package failed its selftest with PATH narrowed to System32 (exit $LASTEXITCODE)" }
         & .\ffmpeg.exe -hide_banner -version 2>&1 | Out-Null
@@ -140,6 +147,11 @@ try {
         if ($savedQtDir) { $env:QTDIR = $savedQtDir }
         if ($savedPlugins) { $env:QT_PLUGIN_PATH = $savedPlugins }
         if ($savedQpa) { $env:QT_QPA_PLATFORM_PLUGIN_PATH = $savedQpa }
+        if ($null -ne $savedSkipHotkeys) {
+            $env:GYANISSCRIBE_SELFTEST_SKIP_HOTKEYS = $savedSkipHotkeys
+        } else {
+            Remove-Item Env:GYANISSCRIBE_SELFTEST_SKIP_HOTKEYS -ErrorAction SilentlyContinue
+        }
     }
 } finally { Pop-Location }
 Write-Output '[ok] staged package and bundled ffmpeg run with PATH narrowed to the system directory'

@@ -53,6 +53,12 @@ Qt 运行时，然后在 staging 目录里把 `PATH` 收窄到只剩 `System32`�
 把 `Qt6Widgets.dll` 挪开，`--selftest` 的退出码变成 `-1073741515`（`0xc0000135` = 找不到 DLL），
 放回又回到 0。安装器带卸载段。
 
+严格模式的 `--selftest` 要求本机那几颗全局热键全部空闲：常驻的智录或别的程序占着任一颗，
+它就退 1。打包量的是「随包的 DLL 齐不齐」，与键位占没占着无关，所以脚本在这一段设
+`GYANISSCRIBE_SELFTEST_SKIP_HOTKEYS=1`：自检照常建控制器、托盘与主窗口，只是跳过全局热键
+登记，退出码只看日志与装配是否就绪——缺 DLL 一样起不来、退出码一样非 0。脚本在该段结束时
+把这个变量还原成原值。手动想量完整的启动路（含热键）时不要设它，那就是严格自检。
+
 VC++ 运行库也随包带：可执行体导入 `MSVCP140.dll` 与 `VCRUNTIME140.dll`（还有 `_1`、`_2` 两份），
 这几件不属于 Windows 自带的系统映像，新装机上要么先装 redist 要么程序起不来。打包脚本按编译器版本
 从工具链的 `VC\Redist\MSVC\<版本>\onecore\x64\Microsoft.VC145.CRT` 取那五份摆到可执行体旁边
@@ -62,7 +68,7 @@ VC++ 运行库也随包带：可执行体导入 `MSVCP140.dll` 与 `VCRUNTIME140
 「装完即用」这一条也真机量过：把 `dist/` 里的安装器静默装进一个空目录（`/S /D=<空目录>`），
 装出来的目录里 `GyanisScribe.exe`、`ffmpeg.exe`、`tessdata/` 两份语言包、`licenses/`、
 `translations/GyanisScribe_en.qm`、`platforms/qwindows.dll` 与 `Uninstaller.exe` 全在；
-就在那个目录里把 PATH 收窄到只剩 `System32` 跑 `--selftest`，退出码 0，
+就在那个目录里把 PATH 收窄到只剩 `System32` 跑 `--selftest`，退出码 0（当时是严格模式，热键空闲），
 `ffmpeg.exe -version` 也起得来（9.0.2-essentials_build）；随后 `Uninstaller.exe /S` 退出码 0，
 装出来的目录和 HKLM 里那条卸载登记键都不在了。
 
