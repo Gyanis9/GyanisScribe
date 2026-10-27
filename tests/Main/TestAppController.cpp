@@ -692,6 +692,33 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住「外部命令没起跑时命令行不报交付成功」
+     * @details 脚本拿到 delivered 就当这一轮成了；把开不起来的程序名记成一次成功，是最难查的那种假绿。
+     *          判据用的是一个不存在的程序名：不真的去起一个外部程序，也不碰这台机器上的工具。
+     */
+    TEST_F(AppControllerFixture, FailedExternalCommandIsNotReportedAsDelivered)
+    {
+        m_frameScreenName = m_realScreenName;
+        makeController();
+
+        QStringList delivered;
+        QStringList failures;
+        QObject::connect(m_controller.get(), &Main::AppController::commandLineCaptureDelivered, m_controller.get(),
+                         [&delivered](const QString &savedPath) { delivered << savedPath; });
+        QObject::connect(m_controller.get(), &Main::AppController::commandLineActionFailed, m_controller.get(), [&failures](const QString &reason) { failures << reason; });
+
+        App::CommandLineRequest request;
+        request.action      = App::CommandLineAction::CaptureFullScreen;
+        request.outputs     = App::CaptureOutputSet{App::CaptureOutput::File};
+        request.execCommand = QStringLiteral("GyanisScribeNoSuchProgram-3f9a.exe");
+        m_controller->startCommandLineCapture(request);
+
+        EXPECT_TRUE(delivered.isEmpty()) << "外部命令没起跑，命令行却报了交付成功";
+        ASSERT_EQ(failures.size(), 1) << "外部命令没起跑，命令行出口一个字都没说";
+        EXPECT_TRUE(failures.front().contains(QStringLiteral("GyanisScribeNoSuchProgram-3f9a.exe"))) << failures.front().toStdString();
+    }
+
+    /**
      * @brief 钉住「命令行 `--pin`」那条入口在拆族之后照走：桌上要多一张贴图
      * @details 这条链现在是「`Application` → `AppController::pinImageFile`（转发壳）→ `PinCoordinator::pinFile`
      *          → `PinManager` → 一扇贴图窗」。拆族时换过接收者，而件级用例测的是 `PinManager` 自己——
