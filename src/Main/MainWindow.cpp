@@ -1426,6 +1426,19 @@ namespace GyanisScribe::Main
                 .arg(version);
     }
 
+    QString updateStatusHtml(const GyanisScribe::App::UpdateVerdict &verdict)
+    {
+        const auto message = verdict.message.toHtmlEscaped();
+        const QUrl   link{verdict.link};
+        const auto   scheme = link.scheme();
+        if (!link.isValid() || link.host().isEmpty() || (scheme != QStringLiteral("http") && scheme != QStringLiteral("https")))
+        {
+            // 不是能交给系统浏览器的地址就当纯文本：硬套一个 <a> 只会多出一个点了没反应的链接
+            return message;
+        }
+        return QStringLiteral("<a href=\"%1\">%2</a>").arg(verdict.link.toHtmlEscaped(), message);
+    }
+
     MainWindow::~MainWindow()
     {
         // 退出前把几何存一份：下次开在同一块屏、同一尺寸上。
@@ -2571,7 +2584,7 @@ namespace GyanisScribe::Main
                          [checkButton, status](const GyanisScribe::App::UpdateVerdict &verdict)
                          {
                              checkButton->setEnabled(true);
-                             status->setText(verdict.link.isEmpty() ? verdict.message : QStringLiteral("<a href=\"%1\">%2</a>").arg(verdict.link, verdict.message));
+                             status->setText(updateStatusHtml(verdict));
                          });
         QObject::connect(checkButton, &QPushButton::clicked, page,
                          [this, checkButton, status]

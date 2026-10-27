@@ -35,6 +35,8 @@
 #include <gtest/gtest.h>
 
 using GyanisScribe::Main::screenCaptureLabels;
+using GyanisScribe::Main::updateStatusHtml;
+using GyanisScribe::App::UpdateVerdict;
 
 #include <QAbstractButton>
 #include <QAbstractItemView>
@@ -550,6 +552,34 @@ namespace
         ASSERT_NE(aboutLogo, nullptr) << "关于页没有正文控件，判据的前提没构造出来";
         const int aboutLeft = aboutLogo->mapTo(m_window.get(), QPoint{0, 0}).x();
         EXPECT_EQ(aboutLeft, formLeft) << "关于页正文左缘与表单页的网格对不上";
+    }
+
+    /**
+     * @brief 钉住检查更新的状态行把服务端文案当纯文本，只有 http/https 成为链接
+     * @details 版本标签与发布页地址都来自远端；不转义时一个带尖括号的标签会把整行吃成标记，
+     *          而 javascript: 之类的地址也不该被摆成可点项。
+     */
+    TEST(MainWindowUpdateStatus, EscapesRemoteTextAndLinksOnlyHttp)
+    {
+        EXPECT_EQ(updateStatusHtml(UpdateVerdict{false, QStringLiteral("已是最新（0.0.1）"), QString{}}), QStringLiteral("已是最新（0.0.1）"));
+
+        const auto markup = updateStatusHtml(UpdateVerdict{false, QStringLiteral("<b>新版</b> & <script>"), QString{}});
+        EXPECT_EQ(markup.indexOf(QStringLiteral("<b>")), -1) << "远端文案被当成标记：" << markup.toStdString();
+        EXPECT_NE(markup.indexOf(QStringLiteral("&lt;b&gt;")), -1) << markup.toStdString();
+        EXPECT_NE(markup.indexOf(QStringLiteral("&amp;")), -1) << "与号没转义，一行里的实体可能被拆开";
+
+        const auto linked = updateStatusHtml(UpdateVerdict{true, QStringLiteral("有新版本 <0.0.2>"), QStringLiteral("https://example.invalid/a?b=1&c=2")});
+        EXPECT_TRUE(linked.startsWith(QStringLiteral("<a href=\""))) << linked.toStdString();
+        EXPECT_TRUE(linked.endsWith(QStringLiteral("</a>"))) << linked.toStdString();
+        EXPECT_NE(linked.indexOf(QStringLiteral("&lt;0.0.2&gt;")), -1) << "链接正文没转义：" << linked.toStdString();
+        EXPECT_NE(linked.indexOf(QStringLiteral("&amp;c=2")), -1) << "地址里的与号没转义，属性会在那里断开";
+
+        for (const QString &bad: {QStringLiteral("javascript:alert(1)"), QStringLiteral("file:///C:/Windows/System32/calc.exe"), QStringLiteral("https://"), QString{}})
+        {
+            const auto verdict = updateStatusHtml(UpdateVerdict{true, QStringLiteral("点这一行"), bad});
+            EXPECT_EQ(verdict.indexOf(QStringLiteral("<a ")), -1) << "不是 http/https 的地址成了可点项：" << bad.toStdString();
+            EXPECT_EQ(verdict, QStringLiteral("点这一行"));
+        }
     }
 
     /**

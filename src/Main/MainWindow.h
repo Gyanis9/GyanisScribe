@@ -186,6 +186,15 @@ namespace GyanisScribe::Main
     [[nodiscard]] QString aboutText(const QString &version);
 
     /**
+     * @brief 检查更新的结果转成状态行富文本
+     * @param verdict 这一次检查的判定
+     * @return 只有地址是 http/https 时才给出可点的链接；正文与服务端文案一律按纯文本转义
+     * @details 版本标签与地址都来自远端：不转义时一个带尖括号的标签会把整行吃成标记，
+     *          而 javascript: 之类的地址也不该被摆成可点项交给系统浏览器。
+     */
+    [[nodiscard]] QString updateStatusHtml(const GyanisScribe::App::UpdateVerdict &verdict);
+
+    /**
      * @brief 主窗口
      * @details 这个工具平时住在托盘与热键上，主窗口只是配置与信息的入口：
      *          关掉它就回到托盘，不退出程序。
