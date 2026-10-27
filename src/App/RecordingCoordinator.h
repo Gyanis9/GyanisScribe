@@ -124,6 +124,7 @@ namespace GyanisScribe::App
         QPointer<GyanisScribe::Gui::RecordingHud>                      m_hud;                          ///< 录屏控制条，一轮一个、收起即销毁
         QTimer                                                        *m_ticker             = nullptr; ///< 每秒推一次读数；随控制条一起起停
         int                                                            m_countdownRemaining = 0;       ///< 倒计时剩余整秒，推给控制条的大字
+        bool                                                           m_autoStopNotified   = false;    ///< 到达上限的那句说明发过了：ticker 每秒一跳，重复说就成了刷屏
     };
 
 } // namespace GyanisScribe::App

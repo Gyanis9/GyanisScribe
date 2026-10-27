@@ -424,6 +424,14 @@
             <translation>Building the finished file - you will hear when it is ready</translation>
         </message>
         <message>
+            <source>已到最长时长，正在编成品</source>
+            <translation>Reached the maximum recording length; building the finished file now</translation>
+        </message>
+        <message>
+            <source>上一轮还在编成品，编好了再开新一轮</source>
+            <translation>The previous recording is still being built; start a new one once it is ready</translation>
+        </message>
+        <message>
             <source>取消录屏没成：{}</source>
             <translation>Couldn't cancel the recording: {}</translation>
         </message>

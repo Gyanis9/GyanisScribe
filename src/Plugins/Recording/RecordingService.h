@@ -130,6 +130,14 @@ namespace GyanisScribe::Plugins
         /// 本轮取声的结果，stop() 之后读才有终值
         [[nodiscard]] AudioCaptureOutcome audioOutcome() const noexcept;
 
+        /**
+         * @brief 后台还在编成品吗
+         * @return true 表示至少有一份编码还没返回
+         * @details state() 到 Done 时编码才刚起跑：界面据此决定要不要允许开下一轮，
+         *          否则两份成品会同时在编，完成通知也分不清是哪一轮的。
+         */
+        [[nodiscard]] bool isEncoding() const;
+
     signals:
         /// 倒计时剩余整秒数变了
         void countdownChanged(int remainingSeconds);

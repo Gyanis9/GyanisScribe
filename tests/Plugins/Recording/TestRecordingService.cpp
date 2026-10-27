@@ -617,6 +617,7 @@ namespace
 
         ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
         ASSERT_TRUE(spinFramesIn(service)) << "节拍一直没落下帧";
+        EXPECT_FALSE(service.isEncoding()) << "还没按停止就说后台在编码";
 
         QString         finishedPath;
         QSize           finishedSize;
@@ -632,6 +633,7 @@ namespace
         const auto stopped = service.stop();
         ASSERT_TRUE(static_cast<bool>(stopped)) << stopped.error().message;
         ASSERT_TRUE(spinUntil([&] { return encoder.callCount() == 1; })) << "stop 之后一次编码都没开始";
+        EXPECT_TRUE(service.isEncoding()) << "编码还堵在门闩上，isEncoding 却说没有：界面会以为可以立刻开下一轮";
         EXPECT_FALSE(encoder.isFinished()) << "stop() 返回时编码已经跑完：它还堵在界面线程上";
         EXPECT_NE(encoder.callAt(0).thread, std::this_thread::get_id()) << "encode() 跑在界面线程上";
         EXPECT_GT(encoder.callAt(0).frameCount, 0) << "交给编码的帧数是 0，说明这一轮根本没落帧";
@@ -644,6 +646,36 @@ namespace
         // 这里用 QSize(8, 8) 而不是 QSize{8, 8}：花括号不替宏挡逗号，EXPECT_EQ 会被拆成三个实参
         EXPECT_EQ(finishedSize, QSize(8, 8)) << "成品没带上这一轮实际落帧的尺寸，整屏与窗口两种模式会把它记成 0×0";
         EXPECT_EQ(deliveryThread, std::this_thread::get_id()) << "成品不在界面线程上送，处置目录与发信号就都落在别的线程上了";
+        EXPECT_FALSE(service.isEncoding()) << "成品已经交回，isEncoding 还说在编：下一轮会被无谓挡住";
+    }
+
+    /**
+     * @brief 钉住到达最长时长后服务自己收尾并进入 Done
+     * @details 定时器那一跳发现到上限就调 stop()，不需要用户按停止。界面靠 Done 与 isEncoding
+     *          决定收起控制条、说明正在编码；这里钉住状态与编码确实起步。
+     */
+    TEST_F(RecordingServiceFixture, DurationCapStopsAndStartsTheEncodeOnItsOwn)
+    {
+        StubCaptureSource       source;
+        GatedRecordingEncoder   encoder;
+        StubPlatformIntegration platform;
+        RecordingService        service{source, encoder, platform};
+
+        auto config                   = serviceConfig(OutputFormat::Mp4, false);
+        config.maximumDurationSeconds = 1;
+
+        QString product;
+        QObject::connect(&service, &RecordingService::finished, [&product](const QString &path, const QSize &) { product = path; });
+
+        ASSERT_TRUE(static_cast<bool>(service.start(config, 0)));
+        ASSERT_TRUE(spinFramesIn(service)) << "节拍一直没落下帧";
+        ASSERT_TRUE(spinUntil([&] { return service.state() == RecordingState::Done; })) << "到了最长时长还没自己收尾";
+        ASSERT_TRUE(spinUntil([&] { return encoder.callCount() == 1; })) << "自动收尾没有开始编码";
+        EXPECT_TRUE(service.isEncoding()) << "自动收尾之后编码没在跑";
+
+        encoder.release();
+        ASSERT_TRUE(spinUntil([&] { return !product.isEmpty(); })) << "放开门闩之后成品一直没送回来";
+        EXPECT_FALSE(service.isEncoding());
     }
 
     /**

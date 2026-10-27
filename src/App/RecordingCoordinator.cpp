@@ -160,6 +160,13 @@ namespace GyanisScribe::App
     void RecordingCoordinator::toggle()
     {
         const auto state = m_service->state();
+        // Done 之后编码还在跑：这时开新一轮会让两份成品同时在编，完成通知也分不清是哪一轮的
+        if (state == GyanisScribe::Core::RecordingState::Done && m_service->isEncoding())
+        {
+            emit messageForUser(GyanisScribe::Base::uiText("上一轮还在编成品，编好了再开新一轮"), GyanisScribe::Gui::ToastKind::Information);
+            return;
+        }
+
         if (state == GyanisScribe::Core::RecordingState::Idle || state == GyanisScribe::Core::RecordingState::Done || state == GyanisScribe::Core::RecordingState::Failed)
         {
             const auto config = makeConfig();
@@ -227,7 +234,9 @@ namespace GyanisScribe::App
             return;
         }
 
-        m_hud = new GyanisScribe::Gui::RecordingHud(m_icons, screen->availableGeometry());
+        // 新的一轮重新计：上一轮自动停止时发过的说明不该压住这一轮的
+        m_autoStopNotified = false;
+        m_hud              = new GyanisScribe::Gui::RecordingHud(m_icons, screen->availableGeometry());
         QObject::connect(m_hud, &GyanisScribe::Gui::RecordingHud::pauseRequested, this,
                          [this]
                          {
@@ -265,9 +274,25 @@ namespace GyanisScribe::App
         {
             return;
         }
-        m_hud->applyState(m_service->state(), m_countdownRemaining, m_service->recordedSeconds());
+
+        const auto state = m_service->state();
+        if (state == GyanisScribe::Core::RecordingState::Done || state == GyanisScribe::Core::RecordingState::Failed)
+        {
+            // 自动停止不经过 toggle：不收起控制条，它和托盘读数会一直停在「录制中」，
+            // 用户再按停止键又会被当成开始新一轮。说明只发一次，ticker 每秒一跳不能重复说
+            const auto announceEncoding = state == GyanisScribe::Core::RecordingState::Done && !m_autoStopNotified;
+            hideHud();
+            if (announceEncoding)
+            {
+                m_autoStopNotified = true;
+                emit messageForUser(GyanisScribe::Base::uiText("已到最长时长，正在编成品"), GyanisScribe::Gui::ToastKind::Information);
+            }
+            return;
+        }
+
+        m_hud->applyState(state, m_countdownRemaining, m_service->recordedSeconds());
         // 控制条收进托盘后，这一行读数就是用户唯一的出口：每秒推一次，暂停与在录分开显示
-        emit recordingStatusChanged(m_service->recordedSeconds(), m_service->state() == GyanisScribe::Core::RecordingState::Paused);
+        emit recordingStatusChanged(m_service->recordedSeconds(), state == GyanisScribe::Core::RecordingState::Paused);
     }
 
     void RecordingCoordinator::hideHud()

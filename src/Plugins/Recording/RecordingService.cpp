@@ -552,4 +552,10 @@ namespace GyanisScribe::Plugins
         return m_audioOutcome;
     }
 
+    bool RecordingService::isEncoding() const
+    {
+        // 列表里可能还留着已经返回的那几份（收尾时才顺手摘掉），所以按 isFinished 判而不是按空判
+        return std::ranges::any_of(m_runningEncodes, [](const QFuture<EncodeOutcome> &running) { return !running.isFinished(); });
+    }
+
 } // namespace GyanisScribe::Plugins
