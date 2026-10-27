@@ -1764,6 +1764,8 @@ namespace GyanisScribe::Gui
                 // 交出去的是显示色：开了灰度/反色之后，用户挑中的就是屏上那一个
                 emit colorPicked(displayImage().pixelColor(*pixel));
                 setColorPickMode(false);
+                // 这一击若来自双击，序列里还剩一次 doubleClick：吃掉它，免得取一次色顺手关掉这张图
+                m_suppressDoubleClick = true;
             }
             return;
         }
@@ -2156,6 +2158,13 @@ namespace GyanisScribe::Gui
 
     void PinWindow::mouseDoubleClickEvent(QMouseEvent *event)
     {
+        // 取色模式的首击已经取走颜色并退出模式：双击序列的第三段不该顺带关掉这张图
+        if (m_suppressDoubleClick)
+        {
+            m_suppressDoubleClick = false;
+            return;
+        }
+
         if (event->button() != Qt::LeftButton)
         {
             QWidget::mouseDoubleClickEvent(event);
@@ -2450,7 +2459,8 @@ namespace GyanisScribe::Gui
         throughAction->setCheckable(true);
         throughAction->setChecked(m_mouseThrough);
         throughAction->setVisible(capabilities.clickThrough);
-        throughAction->setToolTip(GyanisScribe::Base::uiText("滚轮缩放，Ctrl+滚轮旋转，Shift+滚轮调透明度，R 转正一挡（Shift+R 反向），0 或双击回到原始比例，Esc 关闭"));
+        throughAction->setToolTip(
+                GyanisScribe::Base::uiText("滚轮缩放，Ctrl+滚轮旋转，Shift+滚轮调透明度，R 转正一挡（Shift+R 反向），双击关闭这一张；`0` 回到原始比例，Esc 关闭"));
 
         // 窗口阴影：窗口比内容每边大一圈、投影画在带子里，内容坐标不动（见 setShadowEnabled）。
         // 缩略图态不铺：那枚小方块是临时让位用的

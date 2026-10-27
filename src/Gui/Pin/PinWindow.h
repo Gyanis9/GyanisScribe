@@ -773,9 +773,11 @@ namespace GyanisScribe::Gui
         void mouseReleaseEvent(QMouseEvent *event) override;
 
         /**
-         * @brief 左键双击：回到原始比例与角度
+         * @brief 左键双击：关掉这一张；取色刚取走一个像素时，紧跟着的这一击不关
          * @param event 鼠标事件，非左键时交回 Qt 继续分发
-         * @details 重写 QWidget 的空实现：这一击与按 `0` 走同一个出口，已经在 1:1 且没转角时是幂等。
+         * @details 重写 QWidget 的空实现：贴在桌上的图看完了，双击是让它消失的顺手动作。
+         *          一次双击在 Qt 里是「按下、松开、双击、松开」四段，取色模式的首段已经取走颜色并退出模式，
+         *          第三段若照常关闭，取一次色就会连带丢一张图——那一段由一次性的抑制标志吃掉。
          */
         void mouseDoubleClickEvent(QMouseEvent *event) override;
 
@@ -871,8 +873,7 @@ namespace GyanisScribe::Gui
 
         /**
          * @brief 回到原始比例（1:1）与角度（0°），透明度与位置不动
-         * @details 键盘 `0` 与左键双击共用这一个出口：两处各写一份复位就会在将来只改一处。
-         *          位置不跟着改中心：复位尺寸不该把人摆好的那一站挪走。
+         * @details 键盘 `0` 走这一个出口；位置不跟着改中心：复位尺寸不该把人摆好的那一站挪走。
          */
         void resetScaleAndRotation();
 
@@ -964,7 +965,8 @@ namespace GyanisScribe::Gui
         QMap<int, QString>                            m_groupNames;                                          ///< 各组名字（管理器推过来），菜单标签与改名输入框的预填都读它
         bool                                          m_colorPickMode = false;                               ///< 取色模式：鼠标读像素而不是拖动
         QPointF                                       m_pickPoint;                                           ///< 取色模式下光标在窗口里的位置，读数框跟它走
-        Core::ScreenEdge                              m_edgeDock = Core::ScreenEdge::None;                   ///< 贴的是哪条屏边；None 表示没贴
+        bool                                          m_suppressDoubleClick = false;                         ///< 取色刚取走一个像素：吃掉紧跟着的那次双击
+        Core::ScreenEdge                              m_edgeDock            = Core::ScreenEdge::None;        ///< 贴的是哪条屏边；None 表示没贴
         QRect                                         m_dockArea;                                            ///< 贴边那一刻那块屏的可用区，收起与展开都按它算
         bool                                          m_dockCollapsed = false;                               ///< 贴边后是不是收成了那一条
         std::unique_ptr<SpringValue>                  m_geometrySpring;                                      ///< 吸附与贴边收展的几何弹簧；没有动画时为空

@@ -743,6 +743,75 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住取色之后紧跟着的那次双击不关贴图，而之后真双击照旧关
+     * @details 双击在 Qt 里是「按下、松开、双击、松开」四段；第一下按下已经取走颜色并退出取色，
+     *          第三段落到关闭分支就把这张图顺手关掉了。判据既看这一串只取一个色、窗口没关，
+     *          也看抑制只生效一次——下一次双击要照常关闭。
+     */
+    TEST_F(PinWindowFixture, ColorPickDoubleClickDoesNotCloseThePin)
+    {
+        auto &window = makeWindow();
+        window.show();
+        QCoreApplication::processEvents();
+        ASSERT_TRUE(window.isVisible()) << "前提不对：这张该在桌上";
+
+        auto   picked = 0;
+        auto   closed = 0;
+        QColor pickedColor;
+        QObject::connect(&window, &Gui::PinWindow::colorPicked, &window,
+                         [&picked, &pickedColor](const QColor &color)
+                         {
+                             ++picked;
+                             pickedColor = color;
+                         });
+        QObject::connect(&window, &Gui::PinWindow::closedByUser, &window, [&closed] { ++closed; });
+
+        window.setColorPickMode(true);
+        const QPointF at{5.0, 5.0};
+        QMouseEvent   press{QEvent::MouseButtonPress, at, at, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &press);
+        QMouseEvent firstRelease{QEvent::MouseButtonRelease, at, at, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &firstRelease);
+        QMouseEvent doubleClick{QEvent::MouseButtonDblClick, at, at, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &doubleClick);
+        QMouseEvent secondRelease{QEvent::MouseButtonRelease, at, at, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &secondRelease);
+
+        ASSERT_EQ(picked, 1) << "双击序列只该取走一个像素";
+        EXPECT_EQ(pickedColor, QColor(200, 60, 60)) << "取到的是这张图之外的颜色";
+        EXPECT_FALSE(window.isColorPickMode()) << "取完一个色该退出取色";
+        EXPECT_EQ(closed, 0) << "取色后的双击把贴图关掉了：取色这一下不该带出一次关闭";
+        EXPECT_TRUE(window.isVisible()) << "取色后的双击把贴图从桌上收走了";
+
+        doubleClickLeft(window);
+        EXPECT_EQ(closed, 1) << "取色之后的抑制只该生效一次，下一次双击要照常关闭";
+    }
+
+    /**
+     * @brief 钉住穿透那一项的提示按真行为写：双击关闭这一张，`0` 才是回到原始比例
+     * @details 提示若还写着「双击回到原始比例」，用户双击之后贴图没了，只会以为丢了一张图。
+     */
+    TEST_F(PinWindowFixture, MouseThroughTooltipSaysDoubleClickCloses)
+    {
+        auto                        &window = makeWindow();
+        const std::unique_ptr<QMenu> menu{window.buildContextMenu()};
+
+        QAction *through = nullptr;
+        for (auto *action: menu->actions())
+        {
+            if (action->text() == QString::fromUtf8("鼠标穿透"))
+            {
+                through = action;
+            }
+        }
+        ASSERT_NE(through, nullptr) << "右键菜单里没有「鼠标穿透」这一项";
+
+        const auto hint = through->toolTip();
+        EXPECT_TRUE(hint.contains(QStringLiteral("双击关闭"))) << "提示没把双击说成关闭，实际：" << hint.toStdString();
+        EXPECT_TRUE(hint.contains(QStringLiteral("回到原始比例"))) << "提示里把 `0` 那一档丢了，实际：" << hint.toStdString();
+    }
+
+    /**
      * @brief 钉住右键菜单的「保存」真按设置里的目录与命名模板写下一个文件
      * @details 这一条同时是「在文件夹中查看」那一半的守护：两条菜单项共用同一处起名与写盘，
      *          保存坏了它们一起坏。文件落在用例自己的临时目录里，不碰用户真实的图片目录。
