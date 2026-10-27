@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <exception>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -79,3 +80,43 @@ TEST(Logger, LifecycleKeepsFirstSinkAcrossRepeatedInitialize)
     EXPECT_FALSE(Logger::isInitialized()) << "shutdown 之后仍报已接管，后续写入会走一条已关闭的通道";
     EXPECT_TRUE(fileContains(firstLogFile, "日志探针：区域截图已确认")) << "关闭时没冲刷，Info 级那条丢在缓冲区里";
 }
+
+/**
+ * @brief 钉住日志文件名按本地码页转不出来时返回原因，而不是把异常抛到启动路径上
+ * @details 用户名或日志目录里有本地码页装不下的字符时，path::string() 抛 std::system_error；
+ *          initialize 原来只接 spdlog 自己的异常，这条会一路冒到启动流程，在崩溃兜底安装之前终止进程。
+ *          判据取「返回错误且文案说明原因」，不取具体异常类型：不同标准库实现抛的派生类不一样。
+ */
+TEST(Logger, UnconvertibleLogFileNameReturnsAnErrorInsteadOfThrowing)
+{
+    // 会话与用例共用进程级单例：先关掉上一条用例可能留下的句柄，本用例自己收拾干净
+    Logger::shutdown();
+
+    const auto      directory = std::filesystem::temp_directory_path() / (std::wstring{L"GyanisScribe-Logger-"} + L"\U0001F600");
+    std::error_code cleanupError;
+    std::filesystem::remove_all(directory, cleanupError);
+
+    // 本地码页装得下这个字符的环境复现不了转换失败（例如系统开了 UTF-8 的 Beta 档），跳过而不是硬判
+    bool conversionFails = false;
+    try
+    {
+        static_cast<void>(directory.string());
+    } catch (const std::exception &)
+    {
+        conversionFails = true;
+    }
+    if (!conversionFails)
+    {
+        GTEST_SKIP() << "本机本地码页装得下 U+1F600，构造不出路径转换失败";
+    }
+
+    const auto result = Logger::initialize(directory);
+    ASSERT_FALSE(result.has_value()) << "文件名转不出来却报初始化成功，调用方会以为日志已经落地";
+    EXPECT_EQ(result.error().code, ErrorCode::FileWriteFailed) << "故障类别应当是落盘失败，而不是别的兜底档";
+    EXPECT_NE(result.error().message.find("本地码页"), std::string::npos) << "文案要说清是文件名按本地码页转不出来，实际是：" << result.error().message;
+    EXPECT_FALSE(Logger::isInitialized()) << "初始化失败之后仍标记为已接管，后续写入会进一条不存在的通道";
+
+    Logger::shutdown();
+    std::filesystem::remove_all(directory, cleanupError);
+}
+

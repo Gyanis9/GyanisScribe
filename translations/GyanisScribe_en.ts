@@ -664,6 +664,10 @@
             <translation>The log file can't be opened: {} (reason {}). Close the program holding it, or pick another log directory.</translation>
         </message>
         <message>
+            <source>日志文件名按本地码页转不出来：{}（原因 {}）。请把用户名或日志目录改成本地码页能表示的字符再重启</source>
+            <translation>The log file name can't be converted to the local code page: {} (reason {}). Change the user name or log directory to characters the local code page can represent, then restart.</translation>
+        </message>
+        <message>
             <source>目录创建失败：{}（原因 {}）。请检查该路径是否可写，或在设置里换一个目录</source>
             <translation>The directory can't be created: {} (reason {}). Check that this path is writable, or pick another directory in Settings.</translation>
         </message>

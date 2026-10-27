@@ -8,6 +8,7 @@
 #include <spdlog/spdlog.h>
 
 #include <cstdio>
+#include <exception>
 #include <filesystem>
 #include <format>
 #include <memory>
@@ -109,6 +110,13 @@ namespace GyanisScribe::Base
             // spdlog 只抛这一种；文件被别的进程独占时走到这里，交回调用方提示用户
             return std::unexpected(Error{ErrorCode::FileWriteFailed,
                                          GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("日志文件打不开：{}（原因 {}）。请关闭占用它的程序，或换一个日志目录"),
+                                                                      Paths::toDisplayText(logDirectory / std::string(kLogFileBaseName)).toStdString(), exception.what())});
+        } catch (const std::exception &exception)
+        {
+            // 路径里出现本地码页装不下的字符时 path::string() 抛 std::system_error：
+            // 这里必须兜住，否则启动在崩溃兜底安装之前就终止，用户连一条日志都拿不到
+            return std::unexpected(Error{ErrorCode::FileWriteFailed,
+                                         GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("日志文件名按本地码页转不出来：{}（原因 {}）。请把用户名或日志目录改成本地码页能表示的字符再重启"),
                                                                       Paths::toDisplayText(logDirectory / std::string(kLogFileBaseName)).toStdString(), exception.what())});
         }
 
