@@ -55,6 +55,7 @@
 #include <string>
 #include <system_error>
 #include <thread>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -445,6 +446,19 @@ namespace GyanisScribe
     } // namespace
 
     /**
+     * @brief 钉住「父对象不会悄悄变成 restorePins」
+     * @details 构造首参从 parent 换成 bool 之后，AppController(parent) 会把非空指针读成 true、
+     *          空指针读成 false；两个删除的重载让这种写法在编译期就报错，常驻装配仍走默认参数。
+     */
+    TEST(AppControllerConstruction, ParentPointerCannotLandInRestorePins)
+    {
+        EXPECT_FALSE((std::is_constructible_v<Main::AppController, QObject *>)) << "parent 指针还能落进 restorePins";
+        EXPECT_FALSE((std::is_constructible_v<Main::AppController, Main::AppControllerParts, QObject *>)) << "parts 档的 parent 还能落进 restorePins";
+        EXPECT_TRUE((std::is_constructible_v<Main::AppController, bool>)) << "按档位构造的那一条被删重载挡住了";
+        EXPECT_TRUE(std::is_default_constructible_v<Main::AppController>) << "默认的常驻装配被挡住了";
+    }
+
+    /**
      * @brief 钉住「0 秒就是不延时」：按下那一刻帧已经抓完，不等任何一次事件循环
      * @details 「0 秒」若走成「定时器 0 毫秒」也还是异步的，调用返回时这条就不成立了；
      *          把「就地开抓」与「排个定时器」分开，是这一档存在的全部意义。
@@ -708,7 +722,8 @@ namespace GyanisScribe
     /**
      * @brief 钉住「外部命令没起跑时命令行不报交付成功」
      * @details 脚本拿到 delivered 就当这一轮成了；把开不起来的程序名记成一次成功，是最难查的那种假绿。
-     *          判据用的是一个不存在的程序名：不真的去起一个外部程序，也不碰这台机器上的工具。
+     *          程序名用本用例临时目录下一个不存在的绝对路径：既不会碰这台机器上的工具，
+     *          也不会被 PATH 上恰好同名的程序接住。
      */
     TEST_F(AppControllerFixture, FailedExternalCommandIsNotReportedAsDelivered)
     {
@@ -721,15 +736,16 @@ namespace GyanisScribe
                          [&delivered](const QString &savedPath) { delivered << savedPath; });
         QObject::connect(m_controller.get(), &Main::AppController::commandLineActionFailed, m_controller.get(), [&failures](const QString &reason) { failures << reason; });
 
+        const auto missingProgram = Base::Paths::toDisplayText(m_root / "no-such-command-3f9a.exe");
         App::CommandLineRequest request;
         request.action      = App::CommandLineAction::CaptureFullScreen;
         request.outputs     = App::CaptureOutputSet{App::CaptureOutput::File};
-        request.execCommand = QStringLiteral("GyanisScribeNoSuchProgram-3f9a.exe");
+        request.execCommand = QStringLiteral("\"%1\"").arg(missingProgram);
         m_controller->startCommandLineCapture(request);
 
         EXPECT_TRUE(delivered.isEmpty()) << "外部命令没起跑，命令行却报了交付成功";
         ASSERT_EQ(failures.size(), 1) << "外部命令没起跑，命令行出口一个字都没说";
-        EXPECT_TRUE(failures.front().contains(QStringLiteral("GyanisScribeNoSuchProgram-3f9a.exe"))) << failures.front().toStdString();
+        EXPECT_TRUE(failures.front().contains(missingProgram)) << failures.front().toStdString();
     }
 
     /**
@@ -751,6 +767,8 @@ namespace GyanisScribe
         EXPECT_EQ(kept->size(), 1) << "一次性启动退出时把上次的贴图布局抹掉了";
 
         m_controller.reset();
+        // 第二次不再预置：这一份布局必须是上一轮默认档真从盘上摆回来的，否则最后那条判据是空转
+        m_seedPinLayout = false;
         makeController();
         EXPECT_EQ(m_controller->pinCountForTesting(), 1) << "预置的布局本来就摆不回来，上一条判据就成了空转";
     }

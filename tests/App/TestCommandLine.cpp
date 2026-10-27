@@ -16,6 +16,7 @@ using GyanisScribe::App::commandLineUsageText;
 using GyanisScribe::App::isTransientCommandLineAction;
 using GyanisScribe::App::kCommandLineCaptureChoices;
 using GyanisScribe::App::parseStartupArguments;
+using GyanisScribe::App::selftestPassed;
 using GyanisScribe::App::shouldRunEventLoopAfterOneShot;
 
 namespace
@@ -239,6 +240,27 @@ TEST(CommandLineStartupShape, TransientActionsAreTheOneShotOnes)
     {
         EXPECT_FALSE(isTransientCommandLineAction(action)) << static_cast<int>(action);
     }
+}
+
+/**
+ * @brief 自检的通过判据：日志就绪，固定动作与自定义绑定一条不缺
+ * @details 只看日志就绪时，常驻实例占着热键的那次自检会读成 0：控制器建了、热键一项没登记，
+ *          打包门却在一次什么都没登记上的进程上放行。两组未登记项各有自己的字段，任何一组非空都不能通过。
+ */
+TEST(CommandLineStartupShape, SelftestNeedsReadyLogAndEveryHotkey)
+{
+    GyanisScribe::Core::HotkeyReloadReport report;
+    EXPECT_TRUE(selftestPassed(true, report)) << "日志就绪且没有未登记项，这一轮才算通过";
+    EXPECT_FALSE(selftestPassed(false, report)) << "日志没接管不能算通过";
+
+    report.failures.push_back(GyanisScribe::Core::HotkeyFailure{GyanisScribe::Core::HotkeyAction::Capture, QStringLiteral("Ctrl+Alt+A"),
+                                                                GyanisScribe::Base::Error{GyanisScribe::Base::ErrorCode::Busy, "这个组合已被别的程序占用"}});
+    EXPECT_FALSE(selftestPassed(true, report)) << "固定动作有未登记项不能算通过";
+
+    report.failures.clear();
+    report.customFailures.push_back(GyanisScribe::Core::CustomHotkeyFailure{QStringLiteral("screen-capture"), QStringLiteral("Ctrl+Alt+F"),
+                                                                          GyanisScribe::Base::Error{GyanisScribe::Base::ErrorCode::Busy, "这个组合已被别的程序占用"}});
+    EXPECT_FALSE(selftestPassed(true, report)) << "自定义绑定有未登记项不能算通过";
 }
 
 /**

@@ -179,6 +179,12 @@ namespace GyanisScribe::Main
          */
         explicit AppController(AppControllerParts parts, bool restorePins = true, QObject *parent = nullptr);
 
+        /// 父对象不能隐式落到 restorePins 上：这个重载只为让 AppController(parent) 在编译期报错
+        AppController(QObject *parent) = delete;
+
+        /// 同上：AppController(parts, parent) 里的父对象不能落到 restorePins 上
+        AppController(AppControllerParts parts, QObject *parent) = delete;
+
         /**
          * @brief 析构控制器，按创建的反向顺序交还各模块
          */

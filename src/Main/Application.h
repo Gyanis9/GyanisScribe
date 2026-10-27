@@ -41,8 +41,8 @@ public:
      * @brief 构造应用并完成身份设置、日志初始化与控制器创建
      * @param argc 命令行参数个数，Qt 要求传引用
      * @param argv 命令行参数数组
-     * @param request 命令行解析出的启动请求；一次性的命令行动作（截图/贴图/取色）走「不锁单实例、
-     *        不登记热键」的装配：脚本在常驻实例开着时照样能用，也不去抢那八个全局热键
+     * @param request 命令行解析出的启动请求；一次性的命令行动作都不锁单实例，脚本在常驻实例开着时照样能用。
+     *        截图/贴图/取色不碰全局热键；自检另外登记一次热键，退出码只在日志就绪且固定与自定义热键全部登记上时为 0
      * @note 日志初始化失败不阻断启动：Logger 会退回 stderr，用户至少还能看见界面
      */
     Application(int &argc, char **argv, const GyanisScribe::App::CommandLineRequest &request = {});
@@ -86,7 +86,7 @@ public:
     /**
      * @brief 执行命令行要的那一个动作，并收场
      * @param request 解析好的请求（不含 Help/Version，那两条在 Main 里就打发了）
-     * @return 进程退出码：自检按启动路径给出 0/1；截图落盘成功 0、失败 1；
+     * @return 进程退出码：自检只在日志就绪且固定与自定义热键全部登记上时给 0；截图落盘成功 0、失败 1；
      *         贴图与取色是常驻动作，事件循环结束后按 0 交回
      * @details 截图那条把落盘路径打到标准输出、失败原因打到标准错误：脚本按这两条接着干活
      */
@@ -113,4 +113,5 @@ private:
     GyanisScribe::Core::HotkeyReloadReport             m_hotkeyReport;              ///< 启动那一轮的登记结果，界面随后要拿去提示
     bool                                               m_isPrimaryInstance = false; ///< 构造里那一次探测的结果，tryBecomePrimaryInstance 只回报它
     bool                                               m_isReady           = false; ///< 日志是否接管成功
+    bool                                               m_hotkeyReportReceived = false; ///< 启动那一轮热键登记是否真的交回了报告；重登整体失败时自检不能算通过
 };

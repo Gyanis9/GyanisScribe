@@ -237,6 +237,11 @@ namespace GyanisScribe::App
         return !finished || (keepRunning && exitCode == 0);
     }
 
+    bool selftestPassed(const bool logReady, const GyanisScribe::Core::HotkeyReloadReport &report)
+    {
+        return logReady && report.failures.empty() && report.customFailures.empty();
+    }
+
     QString commandLineUsageText()
     {
         QString captureLines;
@@ -251,7 +256,7 @@ namespace GyanisScribe::App
                             "用法：GyanisScribe [参数]\n"
                             "  -h, --help         打这份说明后退出\n"
                             "  -v, --version      打版本号后退出\n"
-                            "  --selftest         把启动路径跑完就退出：热键登记与日志就绪算通过（退出码 0），否则 1\n"
+                            "  --selftest         把启动路径跑完就退出：日志就绪且固定与自定义热键全部登记上才算通过（退出码 0），否则 1\n"
                             "  --capture=<范围>   截一张，默认存成文件并复制进剪贴板，把文件路径打到标准输出后退出：\n") +
                captureLines +
                Base::uiText("  --to=<去处>       只配 --capture：这一次落哪几处，逗号分隔，可取 file / clipboard / pin\n"

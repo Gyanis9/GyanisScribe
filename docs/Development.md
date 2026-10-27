@@ -347,7 +347,7 @@ clang-tidy 的报告每次运行都作 artifact（`clang-tidy-report`）上传�
 
 | 读数 | Release 实测 | 方法与 Debug 对照 |
 | --- | --- | --- |
-| 冷启动（进程起 → 自检报出就绪） | 中位 **391ms**（7 轮，min 388 / max 409） | `python scripts/measure-cold-start.py --exe build/release/bin/GyanisScribe.exe`——`--selftest` 走与用户双击同一条启动路（建控制器、装托盘、开窗口、登记热键）并自己退出；Debug 档同一脚本读到 939ms |
+| 冷启动（进程起 → 自检报出就绪） | 中位 **391ms**（7 轮，min 388 / max 409） | `python scripts/measure-cold-start.py --exe build/release/bin/GyanisScribe.exe`——`--selftest` 建控制器、装托盘、开窗口、登记一次热键，日志就绪且固定与自定义热键全部登记上才退 0；它不锁单实例、不恢复上次贴图，不是用户双击那条路的逐字复刻；Debug 档同一脚本读到 939ms |
 | 标注窗整幅重绘一次 | 中位 **3.7ms**（底图 2560×1440、30 个图形、10 轮，min 3.3 / max 5.9） | 读数用例 `AnnotationWindowFixture.ReportsTheCostOfRepaintingAWindowFullOfShapes`（整窗 `grab()` 十轮取中位）；Debug 档 9.0ms |
 | 贴 20 张 4K 贴图后工作集 | 基线 23 MiB → **659 MiB**（涨 636 MiB，每张约 31.8 MiB——正好一张 3840×2160 的像素，说明六处持有者共享同一份、没有各留副本） | 读数用例 `PinManagerFixture.ReportsTheWorkingSetAfterTwentyUltraHdPins`（真建 20 扇贴图窗，`K32GetProcessMemoryInfo` 走 kernel32 取工作集；报不出工作集的机器上跳过）；Debug 档 637 MiB / 每张 31.9 MiB |
 | 一帧真屏幕内容落 PNG | 中位 **77.5ms**（2560×1440、12 轮，min 76.8 / max 79.2；帧内像素 14.1 MiB，落盘 311 KiB） | 读数用例 `PngSinkReadoutFixture.ReportsTheCostOfWritingOnePngFrameOfRealScreenContent`（抓一帧真屏幕交给录屏真正用的那个 `PngSequenceSink`；合成图不算数——PNG 代价取决于内容熵）；Debug 档 201ms |

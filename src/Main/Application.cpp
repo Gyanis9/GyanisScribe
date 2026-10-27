@@ -27,8 +27,8 @@ namespace
 
 Application::Application(int &argc, char **argv, const GyanisScribe::App::CommandLineRequest &request) : QApplication(argc, argv)
 {
-    // 一次性的命令行动作（截图/贴图/取色/自检）：不锁单实例，也不跟常驻实例抢全局热键——
-    // 它是「跑一件事就走」的启动，脚本在托盘常驻时照样能用。
+    // 一次性的命令行动作（截图/贴图/取色/自检）：不锁单实例，脚本在托盘常驻时照样能用。
+    // 截图/贴图/取色不碰全局热键；自检要量启动路，会登记一次热键并据结果给出退出码。
     // 托盘与主窗口仍随控制器现一下身：那是控制器构造的一部分，单独剪掉等于再造一条装配路
     const bool transientAction = GyanisScribe::App::isTransientCommandLineAction(request.action);
 
@@ -100,8 +100,8 @@ Application::Application(int &argc, char **argv, const GyanisScribe::App::Comman
                          });
     } else if (request.action == CommandLineAction::SelfTest)
     {
-        // 自检量的正是启动路上的热键登记：这一格照样登记一遍，结果只进日志与自检输出，不据此判红。
-        // 其余一次性动作（截一张、贴一张、取色）不碰全局热键，常驻实例的登记不被打断。
+        // 自检量的正是启动路上的热键登记：这一格照样登记一遍，结果进读数与退出码——
+        // 一项没登记上就退 1。其余一次性动作（截一张、贴一张、取色）不碰全局热键，常驻实例的登记不被打断。
         registerStartupHotkeys();
     }
 
@@ -142,7 +142,8 @@ void Application::registerStartupHotkeys()
     }
     if (const auto report = m_controller->registerHotkeys(); report)
     {
-        m_hotkeyReport = *report;
+        m_hotkeyReport         = *report;
+        m_hotkeyReportReceived = true;
         for (const auto &failure: m_hotkeyReport.failures)
         {
             GyanisScribe::Base::Logger::warning(std::format("热键「{}」没能登记：{}", failure.combination.toStdString(), failure.error.message));
@@ -220,9 +221,11 @@ int Application::executeCommandLine(const GyanisScribe::App::CommandLineRequest 
                     ++visibleTopLevels;
                 }
             }
-            GyanisScribe::Base::Logger::info(
-                    std::format("自检：热键登记 {} 项、未登记 {} 项，日志就绪 {}，可见顶层窗口 {} 个", report.registered, report.failures.size(), isReady(), visibleTopLevels));
-            return isReady() ? 0 : 1;
+            GyanisScribe::Base::Logger::info(std::format("自检：热键登记 {} 项、固定未登记 {} 项、自定义未登记 {} 项，日志就绪 {}，热键登记走通 {}，可见顶层窗口 {} 个",
+                                                          report.registered, report.failures.size(), report.customFailures.size(), isReady(), m_hotkeyReportReceived,
+                                                          visibleTopLevels));
+            // 重登整体失败时没有可看的报告项：那一轮同样不能算通过，否则又是「一项没登记上却退 0」
+            return GyanisScribe::App::selftestPassed(isReady() && m_hotkeyReportReceived, report) ? 0 : 1;
         }
         case GyanisScribe::App::CommandLineAction::CaptureFullScreen:
         case GyanisScribe::App::CommandLineAction::CaptureLastRegion:

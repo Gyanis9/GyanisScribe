@@ -173,7 +173,8 @@ namespace GyanisScribe::Main
                          [this](const QImage &image, const QString &sourceFile) { m_pins->addPin(image, QCursor::pos(), sourceFile); });
         m_toast = std::make_unique<GyanisScribe::Gui::Toast>(*m_icons, *m_theme);
         QObject::connect(m_tray.get(), &GyanisScribe::App::TrayController::actionRequested, this, &AppController::handleTrayAction);
-        // 装没装上要留到接线全部完成之后再处置：现身的这一刻起用户就能点，每个入口都得已经接好
+        // 托盘在这一步装起：菜单动作那条线已经接好，逐屏截图那一条要等截图协调器建出来才接（见下）；
+        // 装没装上的读数先决定主窗口动作条收不收，没有托盘时还要让主窗口自己现身（见下）
         const bool trayInstalled = m_tray->install();
         // 托盘在场时顶部动作条就是第二份入口：整条收起，逐屏截图改走托盘子菜单
         m_mainWindow->setTrayMenuAvailable(trayInstalled);

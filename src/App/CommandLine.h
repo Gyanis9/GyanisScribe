@@ -11,6 +11,7 @@
 
 #include "App/CaptureDelivery.h"
 #include "Base/Types.h"
+#include "Core/Hotkey/IHotkeyManager.h"
 
 #include <QString>
 #include <QStringList>
@@ -30,7 +31,7 @@ namespace GyanisScribe::App
         None,              ///< 没带参数：正常启动，常驻
         Help,              ///< --help：打用法说明后退出
         Version,           ///< --version：打版本号后退出
-        SelfTest,          ///< --selftest：把启动路径跑完就退出，退出码 0 / 1
+        SelfTest,          ///< --selftest：把启动路径跑完就退出；日志就绪且全部热键登记上才退 0
         CaptureFullScreen, ///< --capture full：截整块屏，落盘后把路径打到标准输出并退出
         CaptureLastRegion, ///< --capture region：复用「上次选区」，其余同上
         CaptureWindow,     ///< --capture window：截当前前台窗口，其余同上
@@ -90,11 +91,21 @@ namespace GyanisScribe::App
      * @brief 这个动作是不是「跑一件事就走」的一次性启动
      * @param action 解析出的启动动作
      * @return 自检、截图、贴图与取色为 true；常驻、帮助与版本为 false
-     * @details 一次性启动不锁单实例、不去抢常驻实例的全局热键，脚本在托盘常驻时照样能用。
-     *          自检也归这一档：它在已有实例时同样要把控制器建起来跑一遍启动路径，
-     *          落在这一档之外时，非主实例那次启动不建任何东西，而退出码仍可能是 0。
+     * @details 一次性启动不锁单实例，脚本在托盘常驻时照样能用。截图、贴图与取色不碰全局热键；
+     *          自检另外登记一次热键、把启动路径真的跑一遍，退出码据此给出：不归这一档时它会在
+     *          非主实例那次启动里什么都不建，退出码也就无从判断。
      */
     [[nodiscard]] bool isTransientCommandLineAction(CommandLineAction action);
+
+    /**
+     * @brief 自检这一格算不算通过
+     * @param logReady 日志是否接管成功
+     * @param report 启动那一轮的热键登记结果
+     * @return true 表示日志就绪，且固定动作与自定义绑定都没有未登记项
+     * @details 只看日志就绪会把「热键一条都没登记上」判成通过：常驻实例占着那批键时，
+     *          自检拿到的正是这种读数，而打包门会把它当成成功放行。
+     */
+    [[nodiscard]] bool selftestPassed(bool logReady, const GyanisScribe::Core::HotkeyReloadReport &report);
 
     /**
      * @brief 一次性截图之后是否还要进入事件循环
