@@ -975,8 +975,8 @@ TEST_F(EngineFixture, TextPlateAndOutlineRestyleAndUndoBack)
     ASSERT_TRUE(m_engine.undo().has_value());
     EXPECT_EQ(brightIn(box), 0) << "撤销没把描边退回去";
 
-    // 开底板：白板叠灰出 227，也是亮格；撤销作废了选中项，先重新选中
-    ASSERT_TRUE(m_engine.select(text).has_value());
+    // 开底板：白板叠灰出 227，也是亮格；改样式撤销不动图形索引，选中项还指着这一条
+    ASSERT_EQ(m_engine.selections().size(), 1U) << "改样式撤销把选中项一起作废了";
     ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 4, .fontSize = 24, .fillStyle = 0, .textBackground = true}).has_value());
     EXPECT_GT(brightIn(box), 0) << "选中这条文字的底板没跟着开";
     ASSERT_TRUE(m_engine.undo().has_value());
@@ -1315,6 +1315,39 @@ TEST_F(EngineFixture, HandleDragResizesAndUndoesInOneStep)
     ASSERT_TRUE(undone.has_value());
     EXPECT_NEAR(undone->right(), 100, 1.5) << "一次撤销没回到开场之前（中间两次 update 占了两步？）";
     EXPECT_EQ(m_engine.exportImage().pixelColor(158, 50), QColor(255, 255, 255)) << "撤销后伸出去的那一段还留着";
+}
+
+/**
+ * @brief 钉住两趟独立的手柄拖动各占一步撤销
+ * @details 手柄拖动也按手势号合并：开场时若只顾着重算几何、不换手势号，同一图形先后拖两趟
+ *          会被撤销栈并成一步，按一次 Ctrl+Z 退回两趟之前。判据落在第二趟的终点与一次撤销后的右边界：
+ *          撤销只该退掉第二趟，图形应停在第一趟的 130 而不是回到开场的 101。
+ */
+TEST_F(EngineFixture, SeparateHandleDragsUndoIndependently)
+{
+    const auto rectangle = drawRectangle(QPoint(20, 30), QPoint(100, 70));
+    ASSERT_TRUE(m_engine.select(rectangle).has_value());
+
+    // 第一趟：右中手柄从 100 拖到 130
+    ASSERT_TRUE(m_engine.beginSelectionDrag(SelectionHandle::Right, QPoint(100, 50)).has_value());
+    ASSERT_TRUE(m_engine.updateSelectionDrag(QPoint(130, 50), {}).has_value());
+    m_engine.endSelectionDrag();
+    auto bounds = m_engine.selectionBounds();
+    ASSERT_TRUE(bounds.has_value());
+    EXPECT_NEAR(bounds->right(), 130, 2.5) << "第一趟手柄拖动没把右边带到 130";
+
+    // 第二趟：从 130 继续拖到 160
+    ASSERT_TRUE(m_engine.beginSelectionDrag(SelectionHandle::Right, QPoint(130, 50)).has_value());
+    ASSERT_TRUE(m_engine.updateSelectionDrag(QPoint(160, 50), {}).has_value());
+    m_engine.endSelectionDrag();
+    bounds = m_engine.selectionBounds();
+    ASSERT_TRUE(bounds.has_value());
+    EXPECT_NEAR(bounds->right(), 160, 2.5) << "第二趟手柄拖动没把右边带到 160";
+
+    ASSERT_TRUE(m_engine.undo().has_value());
+    const auto afterOneUndo = m_engine.selectionBounds();
+    ASSERT_TRUE(afterOneUndo.has_value()) << "撤销缩放不该把选中项一起作废";
+    EXPECT_NEAR(afterOneUndo->right(), 130, 2.5) << "一次撤销把两趟独立手柄拖动都退了：开场时没换手势号";
 }
 
 /**

@@ -745,7 +745,18 @@ TEST_F(AnnotationWindowFixture, SwitchingToolFromToolbarKeepsTheSelectedShapeSty
     EXPECT_EQ(engine().activeTool(), ToolKind::Arrow) << "工具没切过去，这条判据的前提没成立";
     EXPECT_EQ(engine().exportImage().pixelColor(40, 80), QColor(232, 62, 62)) << "切工具把选中矩形刷成了新工具的颜色";
 
-    // 撤销栈里只有「插入」这一步：一撤该把矩形整条收走，而不是先退颜色
+    // 切过来的工具得真按箭头那格参数落笔：按钮显示的是蓝，画出来也得是蓝。
+    // 画在矩形下方：逻辑 (20,80)-(180,80)，杆身中点在物理 (200,160)，不与矩形重叠
+    engine().beginStroke(QPoint(20, 80));
+    engine().moveStroke(QPoint(180, 80));
+    const auto arrow = engine().endStroke();
+    ASSERT_TRUE(arrow.has_value()) << arrow.error().message;
+    EXPECT_EQ(engine().exportImage().pixelColor(200, 160), GyanisScribe::Core::kAnnotationPaletteColors[4])
+            << "切工具只换了按钮显示，箭头仍按矩形那格红落笔：桥没把工具栏参数写回默认值";
+
+    // 先撤掉刚画的箭头，再撤一步把矩形整条收走：撤销栈里该只有两次插入，没有改样式那一步
+    ASSERT_TRUE(engine().undo().has_value());
+    EXPECT_EQ(engine().exportImage().pixelColor(200, 160), QColor(180, 180, 180)) << "这一撤没把刚画的箭头收走";
     ASSERT_TRUE(engine().undo().has_value());
     EXPECT_EQ(engine().exportImage().pixelColor(40, 80), QColor(180, 180, 180)) << "切工具多压了一步改样式，这一撤退的是颜色";
 }
@@ -1400,6 +1411,45 @@ TEST_F(AnnotationWindowFixture, TwoSeparateViewDragsUndoIndependently)
     const auto afterOneUndo = engine().selectionBounds();
     ASSERT_TRUE(afterOneUndo.has_value()) << "撤销拖动不该把选中项一起作废";
     EXPECT_EQ(afterOneUndo->topLeft(), QPoint(20, 20)) << "一次撤销把两趟独立拖动都退了：视图没在按下/抬起时标手势边界";
+}
+
+/**
+ * @brief 钉住松手之后的方向键微调另算一步撤销
+ * @details 视图在抬起时补一次手势边界，松手之后的 moveSelectionBy()（方向键微调）才会另起一步；
+ *          漏掉它时微调与刚结束的拖动同号，位移命令并成一步，一次撤销把拖动与微调都退回去。
+ */
+TEST_F(AnnotationWindowFixture, DragThenNudgeUndoIndependently)
+{
+    GyanisScribe::Gui::AnnotationView view{engine()};
+    view.resize(400, 200);
+    // 画布逻辑 200x100 放进 400x200 的视图：控件坐标是逻辑坐标的两倍
+    engine().beginStroke({10, 10});
+    engine().moveStroke({60, 40});
+    const auto settled = engine().endStroke();
+    ASSERT_TRUE(settled.has_value()) << settled.error().message;
+    ASSERT_TRUE(engine().select(*settled).has_value());
+
+    // 拖一趟：控件 (70,50) 按下、(90,70) 松手，逻辑位移 (10,10)
+    for (const auto &[type, position]: {std::pair{QEvent::MouseButtonPress, QPoint{70, 50}}, std::pair{QEvent::MouseMove, QPoint{90, 70}},
+                                       std::pair{QEvent::MouseButtonRelease, QPoint{90, 70}}})
+    {
+        QMouseEvent event{type, QPointF{position}, QPointF{position}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&view, &event);
+    }
+    const auto dragged = engine().selectionBounds();
+    ASSERT_TRUE(dragged.has_value());
+    EXPECT_EQ(dragged->topLeft(), QPoint(20, 20)) << "这一趟拖动没把图形挪到逻辑 (20,20)";
+
+    // 松手之后按方向键：直接走引擎的位移出口，逻辑再向右挪 5
+    ASSERT_TRUE(engine().moveSelectionBy(QPoint(5, 0)).has_value());
+    const auto nudged = engine().selectionBounds();
+    ASSERT_TRUE(nudged.has_value());
+    EXPECT_EQ(nudged->topLeft(), QPoint(25, 20)) << "微调没落到图形上";
+
+    ASSERT_TRUE(engine().undo().has_value());
+    const auto afterOneUndo = engine().selectionBounds();
+    ASSERT_TRUE(afterOneUndo.has_value()) << "撤销微调不该把选中项一起作废";
+    EXPECT_EQ(afterOneUndo->topLeft(), QPoint(20, 20)) << "一次撤销把拖动与微调都退了：松手时没标手势边界";
 }
 
 /**

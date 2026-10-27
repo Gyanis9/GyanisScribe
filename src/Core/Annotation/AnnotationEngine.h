@@ -292,8 +292,8 @@ namespace GyanisScribe::Core
          * @brief 移动选中项，见 IAnnotationEngine::moveSelectionBy()
          * @param delta 位移
          * @return 成功返回空载荷；没选中或索引失效返回 InvalidArgument
-         * @details 重写基类接口：压一条平移命令，并与栈顶同一条图形的上一次位移并成一步，
-         *          拖一趟与连按方向键都只算一步撤销。
+         * @details 重写基类接口：压一条平移命令，只与同一趟手势里栈顶同一条图形的上一次位移并成一步；
+         *          拖一趟与连按方向键各自只算一步撤销，两趟之间的边界由 beginMoveGesture()/endMoveGesture() 划开。
          */
         [[nodiscard]] Base::Expected<void> moveSelectionBy(const QPoint &delta) override;
 
@@ -376,12 +376,12 @@ namespace GyanisScribe::Core
         [[nodiscard]] std::vector<int> shapeCounts() const;
 
         /**
-         * @brief 按图形数的变化决定选中集去留
+         * @brief 按图形数的变化同步选中集
          * @param countsBefore 这一趟撤销/重做之前的图形数快照
          * @details 只有增删图形才会让索引整体错位，那时选中项可能指到邻居身上，必须清空；
          *          位移、改样式、缩放与换层都不动索引，撤销之后选中项还指着同一条图形，清掉只是白让用户再点一次。
          */
-        void keepSelectionAfterHistoryStep(const std::vector<int> &countsBefore);
+        void syncSelectionAfterHistoryStep(const std::vector<int> &countsBefore);
 
         /// 一条选中项的外接框（含旋转）；索引失效时为空
         [[nodiscard]] std::optional<QRect> boundsOf(const AnnotationSelection &selection) const;

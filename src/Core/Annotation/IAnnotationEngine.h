@@ -390,8 +390,9 @@ namespace GyanisScribe::Core
          * @brief 移动选中项
          * @param delta 逻辑坐标位移
          * @return 成功返回空载荷；没有选中项或索引失效时返回 InvalidArgument
-         * @details 多选时整组一起走。同一条图形的连续位移并成一步撤销：拖一趟要发几十次位移，
-         *          方向键也能连按好几格，并成一步之后撤销一次就回到这一趟开始之前。
+         * @details 多选时整组一起走。同一趟手势里的连续位移并成一步撤销：拖一趟要发几十次位移，
+         *          方向键也能连按好几格，并成一步之后撤销一次就回到这一趟开始之前；
+         *          两趟拖动之间由 beginMoveGesture()/endMoveGesture() 划开，不跨手势合并。
          */
         [[nodiscard]] virtual Base::Expected<void> moveSelectionBy(const QPoint &delta) = 0;
 
@@ -417,12 +418,14 @@ namespace GyanisScribe::Core
         /**
          * @brief 撤销一步
          * @return 成功返回空载荷；没得撤时返回 InvalidArgument，界面对此只需把按钮置灰
+         * @note 撤销若增删图形、让索引整体错位，选中集会随之清空；图形数没变时保留原选中项。
          */
         [[nodiscard]] virtual Base::Expected<void> undo() = 0;
 
         /**
          * @brief 重做一步
          * @return 成功返回空载荷；没得重做时返回 InvalidArgument
+         * @note 与撤销同一口径：重做若增删图形就清空选中集，图形数没变时保留。
          */
         [[nodiscard]] virtual Base::Expected<void> redo() = 0;
 

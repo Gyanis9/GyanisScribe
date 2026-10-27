@@ -103,8 +103,9 @@ namespace GyanisScribe::Core
         /**
          * @brief 平移一组图形（多选时整组一起走）
          * @details 撤销用等量反向位移：记下位移本身，而不是记下移动前后的两个位置。
-         *          同一组图形的连续平移并成一步：拖一趟会发几十次位移，方向键逐格也能连按好几次，
+         *          同一趟手势里的连续平移并成一步：拖一趟会发几十次位移，方向键逐格也能连按好几次，
          *          不并的话撤销一次只退一格，用户只能一直按着 Ctrl+Z 往回跑。
+         *          两趟拖动之间由手势号断开，合并不会跨过抬手那一刻。
          */
         class MoveShapesCommand : public QUndoCommand
         {
@@ -800,7 +801,7 @@ namespace GyanisScribe::Core
         return counts;
     }
 
-    void AnnotationEngine::keepSelectionAfterHistoryStep(const std::vector<int> &countsBefore)
+    void AnnotationEngine::syncSelectionAfterHistoryStep(const std::vector<int> &countsBefore)
     {
         // 图形数一样说明索引没动：位移、改样式、缩放与换层撤回去之后，选中的还是同一条
         if (shapeCounts() == countsBefore || m_selection.empty())
@@ -1108,7 +1109,7 @@ namespace GyanisScribe::Core
         const auto countsBefore = shapeCounts();
         m_undoStack.undo();
         m_handleDrag.reset();
-        keepSelectionAfterHistoryStep(countsBefore);
+        syncSelectionAfterHistoryStep(countsBefore);
         return {};
     }
 
@@ -1121,7 +1122,7 @@ namespace GyanisScribe::Core
         const auto countsBefore = shapeCounts();
         m_undoStack.redo();
         m_handleDrag.reset();
-        keepSelectionAfterHistoryStep(countsBefore);
+        syncSelectionAfterHistoryStep(countsBefore);
         return {};
     }
 
