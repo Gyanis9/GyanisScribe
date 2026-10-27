@@ -5,6 +5,7 @@
 #include "Base/Text.h"
 
 #include <QKeyEvent>
+#include <QFocusEvent>
 #include <QMouseEvent>
 #include <QLabel>
 #include <QStyle>
@@ -72,6 +73,7 @@ namespace GyanisScribe::Gui
                                                     : GyanisScribe::Base::uiText("%1 的界面按键。点击这一格后按下要用的那颗键，裸键也算，按 Esc 取消").arg(title));
 
         const auto stored = m_settings.stringValue(key, defaultText);
+        m_displayText     = stored;
         m_display->setText(stored);
     }
 
@@ -91,6 +93,7 @@ namespace GyanisScribe::Gui
             return;
         }
         m_display->clear();
+        m_displayText.clear();
     }
 
 
@@ -113,6 +116,7 @@ namespace GyanisScribe::Gui
             showPrompt(GyanisScribe::Base::uiText("写入失败"));
             return written;
         }
+        m_displayText = text;
         m_display->setText(text);
         return {};
     }
@@ -141,7 +145,7 @@ namespace GyanisScribe::Gui
         if (event->key() == Qt::Key_Escape)
         {
             // 取消回到现值：用户按 Esc 的意思是「我不改这一项」，把它写成空热键是曲解
-            setRecordingState(false);
+            cancelRecording();
             clearFocus();
             return;
         }
@@ -161,6 +165,17 @@ namespace GyanisScribe::Gui
         clearFocus();
     }
 
+    void HotkeyEdit::focusOutEvent(QFocusEvent *event)
+    {
+        QWidget::focusOutEvent(event);
+        if (!m_recording)
+        {
+            return;
+        }
+        // 点走别处等于放弃这次录制：录制态若留着，下一次 Tab 回来按的键会被当成这次录制的结果写进配置
+        cancelRecording();
+    }
+
     void HotkeyEdit::setRecordingState(const bool recording)
     {
         m_recording = recording;
@@ -169,8 +184,16 @@ namespace GyanisScribe::Gui
         m_display->style()->polish(m_display);
     }
 
+    void HotkeyEdit::cancelRecording()
+    {
+        setRecordingState(false);
+        // 现值单独留在 m_displayText 里：录制中的提示、写入失败的提示都不该把它冲掉
+        m_display->setText(m_displayText);
+    }
+
     void HotkeyEdit::showPrompt(const QString &text)
     {
+        // 只换提示文本，不动 m_displayText：取消时要靠它把配置里的现值还原到界面上
         m_display->setText(text);
     }
 

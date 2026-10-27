@@ -19,6 +19,7 @@
 #include <string_view>
 
 class QLabel;
+class QFocusEvent;
 
 namespace GyanisScribe::Gui
 {
@@ -104,8 +105,21 @@ namespace GyanisScribe::Gui
          */
         void mousePressEvent(QMouseEvent *event) override;
 
+        /**
+         * @brief 录制中失去焦点时取消这次录制，显示回到绑定值
+         * @param event 焦点事件
+         * @details 重写 QWidget::focusOutEvent()：点走别处等于用户放弃这次录制，
+         *          录制态若留着，下一次 Tab 回来随手按的键就会被当成这次录制的成果写进配置。
+         */
+        void focusOutEvent(QFocusEvent *event) override;
+
     private:
         void showPrompt(const QString &text);
+
+        /**
+         * @brief 放弃当前录制：退出录制态并把显示恢复成配置里的现值
+         */
+        void cancelRecording();
 
         /**
          * @brief 把「正在录制」这一档同步给样式表
@@ -118,8 +132,9 @@ namespace GyanisScribe::Gui
         Core::ISettingsStore &m_settings;                            ///< 配置存储，不拥有
         std::string           m_key;                                 ///< 绑定的配置键名
         HotkeyEditScope       m_scope     = HotkeyEditScope::Global; ///< 这一格录下来的键归哪一档
-        QLabel               *m_display   = nullptr;                 ///< 显示组合文本的标签，也是录制状态的提示位
-        bool                  m_recording = false;                   ///< 是否正在等一次按键
+        QLabel               *m_display     = nullptr;                 ///< 显示组合文本的标签，也是录制状态的提示位
+        QString               m_displayText;                           ///< 配置里的现值文本；录制中的提示不覆盖它
+        bool                  m_recording = false;                     ///< 是否正在等一次按键
     };
 
 } // namespace GyanisScribe::Gui
