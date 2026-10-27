@@ -192,9 +192,9 @@ int Application::runOneShotCapture(const GyanisScribe::App::CommandLineRequest &
                      });
 
     // 抓帧当下就是同步完成的（整屏那一路尤其如此）：结果可能在 exec() 之前就到，
-    // 而那时 quit() 是个空动作——不认这一格，事件循环一进去就再没人叫停
+    // 而那时 quit() 是个空动作。失败且不保活时没有可等的东西：进去就再没人叫停
     m_controller->startCommandLineCapture(request);
-    if (!finished || keepRunning)
+    if (GyanisScribe::App::shouldRunEventLoopAfterOneShot(finished, keepRunning, exitCode))
     {
         QApplication::exec();
     }

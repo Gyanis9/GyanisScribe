@@ -16,6 +16,7 @@ using GyanisScribe::App::commandLineUsageText;
 using GyanisScribe::App::isTransientCommandLineAction;
 using GyanisScribe::App::kCommandLineCaptureChoices;
 using GyanisScribe::App::parseStartupArguments;
+using GyanisScribe::App::shouldRunEventLoopAfterOneShot;
 
 namespace
 {
@@ -238,4 +239,19 @@ TEST(CommandLineStartupShape, TransientActionsAreTheOneShotOnes)
     {
         EXPECT_FALSE(isTransientCommandLineAction(action)) << static_cast<int>(action);
     }
+}
+
+/**
+ * @brief 一次性截图之后要不要进事件循环：同步失败时不许进去
+ * @details 抓帧当下就可能收口（整屏那一路尤其如此）。失败时 finished 与 keepRunning 同时为真，
+ *          而 quit() 在 exec() 之前是空动作——进了循环就再没人叫停，进程挂在那里。
+ *          只有「结果还没到」或「成功且要保活」这两种还有事可等。
+ */
+TEST(CommandLineStartupShape, EventLoopOnlyRunsWhenSomethingCanFinish)
+{
+    EXPECT_FALSE(shouldRunEventLoopAfterOneShot(true, true, 1)) << "同步失败却点了 pin：进去再没人叫停";
+    EXPECT_TRUE(shouldRunEventLoopAfterOneShot(true, true, 0)) << "交付成功且要保活：贴图活在这个进程里，得转着";
+    EXPECT_TRUE(shouldRunEventLoopAfterOneShot(false, false, 1)) << "结果还没到：得等它";
+    EXPECT_FALSE(shouldRunEventLoopAfterOneShot(true, false, 0)) << "交付完了又不保活：没什么可等";
+    EXPECT_FALSE(shouldRunEventLoopAfterOneShot(true, false, 1)) << "失败且不保活：同样没什么可等";
 }

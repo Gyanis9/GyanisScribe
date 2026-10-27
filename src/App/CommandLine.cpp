@@ -232,6 +232,11 @@ namespace GyanisScribe::App
         return false;
     }
 
+    bool shouldRunEventLoopAfterOneShot(const bool finished, const bool keepRunning, const int exitCode)
+    {
+        return !finished || (keepRunning && exitCode == 0);
+    }
+
     QString commandLineUsageText()
     {
         QString captureLines;

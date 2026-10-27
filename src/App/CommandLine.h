@@ -96,6 +96,17 @@ namespace GyanisScribe::App
      */
     [[nodiscard]] bool isTransientCommandLineAction(CommandLineAction action);
 
+    /**
+     * @brief 一次性截图之后是否还要进入事件循环
+     * @param finished 交付结果（成功或失败）是否已经在进入循环之前送到
+     * @param keepRunning 这一轮是否点了「贴到屏幕上」而需要留在桌面上
+     * @param exitCode 已经定下的退出码
+     * @return true 表示还有事要做：结果尚未送到，或交付成功且需要保活；false 表示可以直接返回退出码
+     * @details quit() 在 exec() 之前什么也不做。同步失败时 finished 与 keepRunning 同时为真，
+     *          只看这两个布尔就会进循环后一直等下去；失败且退出码非 0 时没有可等的东西，由调用方直接返回。
+     */
+    [[nodiscard]] bool shouldRunEventLoopAfterOneShot(bool finished, bool keepRunning, int exitCode);
+
     /// 用法说明全文（走文案目录），Main 在 --help 与解析报错时打印
     [[nodiscard]] QString commandLineUsageText();
 
