@@ -505,8 +505,13 @@ namespace GyanisScribe::Gui
     {
         m_pinned            = pinned;
         const auto unpinned = windowFlags() & ~Qt::WindowFlags(Qt::WindowStaysOnTopHint);
+        // 与穿透同一套写法：改标志要重新映射，但收着的窗口只改标志，别把它摆回桌面
+        const bool wasVisible = isVisible();
         setWindowFlags(pinned ? (unpinned | Qt::WindowStaysOnTopHint) : unpinned);
-        show(); // 同上：改标志要重新映射
+        if (wasVisible)
+        {
+            show();
+        }
     }
 
     bool PinWindow::isAlwaysOnTop() const noexcept
@@ -1729,6 +1734,9 @@ namespace GyanisScribe::Gui
             return;
         }
 
+        // 抑制只服务取色那一串双击：新的普通按下说明那一串已经过去，不能让它一直挂着
+        m_suppressDoubleClick = false;
+
         // 按下即停：这一下可能起拖或改大小，后续每一帧都由指针说了算，不能与几何弹簧抢窗口
         stopGeometryAnimation();
 
@@ -1781,9 +1789,11 @@ namespace GyanisScribe::Gui
             m_draggedHandle    = *handle;
             m_dragInitialScale = m_scale;
             m_dragInitialEdge  = m_thumbnailEdge;
-            // 整趟手势只认这一个中心：锚边重排之后窗口中心已经移位，每帧现读会让倍率跟着跳
-            m_dragInitialCenter   = QRectF(rect()).center();
-            m_dragInitialDistance = std::hypot(point.x() - m_dragInitialCenter.x(), point.y() - m_dragInitialCenter.y());
+            // 整趟手势只认这一个中心：锚边重排之后窗口中心已经移位，每帧现读会让倍率跟着跳。
+            // 中心记全屏坐标、距离也按事件的全屏位置量：左/上边被抓住时窗口原点在动，
+            // 同一个屏幕点每一帧换算出来的窗口内坐标都不一样
+            m_dragInitialCenter   = mapToGlobal(QRectF(rect()).center());
+            m_dragInitialDistance = std::hypot(event->globalPosition().x() - m_dragInitialCenter.x(), event->globalPosition().y() - m_dragInitialCenter.y());
             return;
         }
 
@@ -1818,8 +1828,7 @@ namespace GyanisScribe::Gui
 
         if (const auto handle = m_draggedHandle)
         {
-            const auto point    = event->position();
-            const auto distance = std::hypot(point.x() - m_dragInitialCenter.x(), point.y() - m_dragInitialCenter.y());
+            const auto distance = std::hypot(event->globalPosition().x() - m_dragInitialCenter.x(), event->globalPosition().y() - m_dragInitialCenter.y());
             const auto before   = QRect(pos(), size());
             // 缩着的那一枚改的是方块边长，摊开的那张改的是缩放：同一只手感（按到中心的距离给倍率），落到各自的量上
             if (m_thumbnail)
@@ -2162,6 +2171,12 @@ namespace GyanisScribe::Gui
         if (m_suppressDoubleClick)
         {
             m_suppressDoubleClick = false;
+            return;
+        }
+
+        // 取色模式还开着说明首击落在图像之外、什么都没取：这一下只是点偏，不该关掉这张图
+        if (m_colorPickMode)
+        {
             return;
         }
 

@@ -862,6 +862,8 @@ namespace GyanisScribe::Gui
         // 逐个关掉：每个窗口关的时候会回调 forget，这里不能边遍历边 erase，先整份挪出来再收尾
         auto pending = std::move(m_pins);
         m_pins.clear();
+        // 一张都不剩，Solo 主角也随 pending 一起没了：清掉指针，不留一个指向已删窗口的悬空引用
+        m_solo = nullptr;
         for (auto &pin: pending)
         {
             // 整桌关掉走的也是「关闭」那一档：这些像素还按得回来，与销毁不是一回事

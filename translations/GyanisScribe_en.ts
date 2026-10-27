@@ -2336,8 +2336,8 @@
             <translation>Click-through</translation>
         </message>
         <message>
-            <source>滚轮缩放，Ctrl+滚轮旋转，Shift+滚轮调透明度，R 转正一挡（Shift+R 反向），0 或双击回到原始比例，Esc 关闭</source>
-            <translation>Scroll to scale, Ctrl+scroll to rotate, Shift+scroll for opacity, R to turn a quarter step (Shift+R the other way), 0 or double-click to restore the original size and angle, Esc to close</translation>
+            <source>滚轮缩放，Ctrl+滚轮旋转，Shift+滚轮调透明度，R 转正一挡（Shift+R 反向），双击关闭这一张；`0` 回到原始比例，Esc 关闭</source>
+            <translation>Scroll to scale, Ctrl+scroll to rotate, Shift+scroll for opacity, R to turn a quarter step (Shift+R the other way), double-click to close this pin; `0` to restore the original size and angle, Esc to close</translation>
         </message>
         <message>
             <source>窗口阴影</source>

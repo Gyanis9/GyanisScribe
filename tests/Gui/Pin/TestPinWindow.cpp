@@ -788,8 +788,42 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住取色的双击抑制只活到下一次普通按下
+     * @details 取完色若只按一下、并不组成双击，抑制标志不能一直挂着——否则隔一段时间之后的真双击
+     *          会被它吃掉，贴图双击关不掉。这里先取一次色（只有按下与松开），再投一整串双击。
+     */
+    TEST_F(PinWindowFixture, ColorPickSuppressionEndsAtTheNextPress)
+    {
+        auto &window = makeWindow();
+        auto  picked = 0;
+        auto  closed = 0;
+        QObject::connect(&window, &Gui::PinWindow::colorPicked, &window, [&picked] { ++picked; });
+        QObject::connect(&window, &Gui::PinWindow::closedByUser, &window, [&closed] { ++closed; });
+
+        window.setColorPickMode(true);
+        const QPointF at{5.0, 5.0};
+        QMouseEvent   press{QEvent::MouseButtonPress, at, at, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &press);
+        QMouseEvent firstRelease{QEvent::MouseButtonRelease, at, at, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &firstRelease);
+        ASSERT_EQ(picked, 1) << "前提不对：这一下该取走一个像素";
+        ASSERT_FALSE(window.isColorPickMode()) << "前提不对：取完一个色该退出模式";
+
+        // 单独的一次普通按下（不属于任何双击）：抑制到此为止
+        QMouseEvent laterPress{QEvent::MouseButtonPress, QPointF{20.0, 20.0}, QPointF{20.0, 20.0}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &laterPress);
+        QMouseEvent laterRelease{QEvent::MouseButtonRelease, QPointF{20.0, 20.0}, QPointF{20.0, 20.0}, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &laterRelease);
+
+        doubleClickLeft(window);
+        EXPECT_EQ(closed, 1) << "隔了一次普通按下之后，取色的抑制还把真双击吃掉了";
+    }
+
+    /**
      * @brief 钉住穿透那一项的提示按真行为写：双击关闭这一张，`0` 才是回到原始比例
      * @details 提示若还写着「双击回到原始比例」，用户双击之后贴图没了，只会以为丢了一张图。
+     *          判据取整条文案并显式排除旧口诀：只查两个子串时，「双击关闭」与残留的
+     *          「双击回到原始比例」可以同时出现在一句自相矛盾的话里。
      */
     TEST_F(PinWindowFixture, MouseThroughTooltipSaysDoubleClickCloses)
     {
@@ -806,9 +840,39 @@ namespace GyanisScribe
         }
         ASSERT_NE(through, nullptr) << "右键菜单里没有「鼠标穿透」这一项";
 
-        const auto hint = through->toolTip();
-        EXPECT_TRUE(hint.contains(QStringLiteral("双击关闭"))) << "提示没把双击说成关闭，实际：" << hint.toStdString();
-        EXPECT_TRUE(hint.contains(QStringLiteral("回到原始比例"))) << "提示里把 `0` 那一档丢了，实际：" << hint.toStdString();
+        const auto hint     = through->toolTip();
+        const auto expected = QString::fromUtf8("滚轮缩放，Ctrl+滚轮旋转，Shift+滚轮调透明度，R 转正一挡（Shift+R 反向），双击关闭这一张；`0` 回到原始比例，Esc 关闭");
+        EXPECT_EQ(hint, expected) << "提示与真行为对不上，实际：" << hint.toStdString();
+        EXPECT_FALSE(hint.contains(QStringLiteral("双击回到原始比例"))) << "提示还写着旧口诀：双击会把这一张关掉，不是回到原始比例";
+        EXPECT_FALSE(hint.contains(QStringLiteral("0 或双击"))) << "提示仍把 `0` 与双击并列成同一档";
+    }
+
+    /**
+     * @brief 钉住取色模式下点在图像之外的双击不关贴图
+     * @details 取色只在点中图像内容时退出模式；点进阴影带子里那一下什么都没取，模式还开着，
+     *          紧跟着的双击若照常关闭，用户只是点偏了一次就丢了一张图。
+     */
+    TEST_F(PinWindowFixture, ColorPickDoubleClickOutsideTheImageKeepsThePin)
+    {
+        auto &window = makeWindow();
+        window.setShadowEnabled(true);
+        ASSERT_GT(window.width(), kImageEdge) << "前提不对：开着阴影时窗口该比图大一圈，边上才有图外的落点";
+
+        auto closed = 0;
+        auto picked = 0;
+        QObject::connect(&window, &Gui::PinWindow::closedByUser, &window, [&closed] { ++closed; });
+        QObject::connect(&window, &Gui::PinWindow::colorPicked, &window, [&picked] { ++picked; });
+
+        window.setColorPickMode(true);
+        const QPointF outside{1.0, 1.0};
+        QMouseEvent   press{QEvent::MouseButtonPress, outside, outside, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &press);
+        EXPECT_EQ(picked, 0) << "点在图像之外也取到了一个像素";
+        EXPECT_TRUE(window.isColorPickMode()) << "没点中图像就退出了取色模式";
+
+        doubleClickLeft(window);
+        EXPECT_EQ(closed, 0) << "取色模式下点在图外的双击把贴图关掉了";
+        EXPECT_TRUE(window.isColorPickMode()) << "双击把取色模式一起关掉了：用户只是点偏了一次";
     }
 
     /**
@@ -2379,6 +2443,30 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住改置顶标志不会把收着的贴图摆回桌面
+     * @details 改窗口标志要重新映射才生效，但只有原本在桌上的窗口才该重新 show；
+     *          收起的那一张（整桌收起或在别的组）只该换标志，显隐等下一次重算。
+     */
+    TEST_F(PinWindowFixture, AlwaysOnTopKeepsConcealedPinsConcealed)
+    {
+        auto &window = makeWindow();
+        window.setAttribute(Qt::WA_DontShowOnScreen);
+        window.show();
+        ASSERT_TRUE(window.isVisible()) << "前提不对：这张该在桌上";
+
+        window.setConcealed(true);
+        ASSERT_FALSE(window.isVisible()) << "前提不对：收起那一档该让它从桌上消失";
+
+        window.setAlwaysOnTop(false);
+        EXPECT_FALSE(window.isAlwaysOnTop()) << "置顶开关没落进状态";
+        EXPECT_FALSE(window.isVisible()) << "改置顶标志把收着的贴图摆回了桌面";
+
+        window.setAlwaysOnTop(true);
+        EXPECT_TRUE(window.isAlwaysOnTop()) << "再改回置顶时状态没落进去";
+        EXPECT_FALSE(window.isVisible()) << "再改回置顶又把收着的贴图摆了出来";
+    }
+
+    /**
      * @brief 钉住「在设置页换过一颗键」之后贴图窗跟着换，旧那颗当场让位
      * @details 默认那颗由「H/V/G/I/T/R 各管哪一档」那几条判据钉着，这一条钉的是分派读的是
      *          Gui/Controls/AppShortcuts.h 那份清册而不是写死的字母：灰度换成 K 之后按 G 不动、按 K 翻得动。
@@ -2514,6 +2602,40 @@ namespace GyanisScribe
         EXPECT_GE(window.width(), afterFirst) << "指针多走 1px，宽度却回跳：拖边用的是移动后的中心";
 
         QMouseEvent release{QEvent::MouseButtonRelease, edge + QPointF{101, 0}, global + QPoint{101, 0}, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &release);
+    }
+
+    /**
+     * @brief 钉住按左边手柄改大小时参照中心不随窗口原点移动
+     * @details 抓左边时右边界钉住，窗口原点跟着手势往左走；同一个屏幕点在下一帧换算出来的窗口内坐标
+     *          已经不同。参照中心若还记在窗口内坐标里，指针明明在远离中心，量出来的距离反而变小，
+     *          宽度会来回跳。判据用一颗固定在全屏坐标上的指针逐格往左，每帧按
+     *          「全屏指针 − 窗口原点」重算窗口内坐标，宽度只许一路变大。
+     */
+    TEST_F(PinWindowFixture, LeftEdgeResizeFollowsAFixedGlobalPointer)
+    {
+        auto &window = makeWindow();
+        window.move(300, 300);
+
+        const QPoint  origin = window.pos();
+        const QPointF edge{0.0, static_cast<qreal>(window.height() / 2.0)};
+        QPoint        cursor = origin + edge.toPoint();
+        QMouseEvent   press{QEvent::MouseButtonPress, edge, QPointF(cursor), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &press);
+
+        int previousWidth = window.width();
+        for (int step = 1; step <= 8; ++step)
+        {
+            cursor.setX(origin.x() - step * 12);
+            const QPointF local = QPointF(cursor) - QPointF(window.pos());
+            QMouseEvent   move{QEvent::MouseMove, local, QPointF(cursor), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+            QApplication::sendEvent(&window, &move);
+            EXPECT_GT(window.width(), previousWidth) << "指针往左多走 12px，宽度没有跟着变大：拖边量的是移动后的中心，实际宽度 " << window.width() << "，上一帧 " << previousWidth;
+            previousWidth = window.width();
+        }
+
+        const QPointF local = QPointF(cursor) - QPointF(window.pos());
+        QMouseEvent   release{QEvent::MouseButtonRelease, local, QPointF(cursor), Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
         QApplication::sendEvent(&window, &release);
     }
 

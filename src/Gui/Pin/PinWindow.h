@@ -477,6 +477,8 @@ namespace GyanisScribe::Gui
          * @return 成功返回空载荷；平台没有该能力时返回 PlatformUnsupported 并写明替代做法
          * @details 重写接口：走 Qt 的 WindowTransparentForInput 标志（平台原生能力），
          *          穿透时同时去掉焦点接受，避免贴图吃不到鼠标却又抢走焦点。
+         *          改标志要重新映射窗口才生效，但只对原本可见的窗口重新 show——收着的贴图只改标志，
+         *          等下一次显隐重算，否则取消穿透会把别组或收起态的贴图摆回桌面。
          */
         [[nodiscard]] Base::Expected<void> setMouseThrough(bool through) override;
 
@@ -778,6 +780,7 @@ namespace GyanisScribe::Gui
          * @details 重写 QWidget 的空实现：贴在桌上的图看完了，双击是让它消失的顺手动作。
          *          一次双击在 Qt 里是「按下、松开、双击、松开」四段，取色模式的首段已经取走颜色并退出模式，
          *          第三段若照常关闭，取一次色就会连带丢一张图——那一段由一次性的抑制标志吃掉。
+         *          首击落在图像之外时取色模式还开着，这一下什么都没取到，同样不该关掉这张图。
          */
         void mouseDoubleClickEvent(QMouseEvent *event) override;
 
@@ -965,7 +968,7 @@ namespace GyanisScribe::Gui
         QMap<int, QString>                            m_groupNames;                                          ///< 各组名字（管理器推过来），菜单标签与改名输入框的预填都读它
         bool                                          m_colorPickMode = false;                               ///< 取色模式：鼠标读像素而不是拖动
         QPointF                                       m_pickPoint;                                           ///< 取色模式下光标在窗口里的位置，读数框跟它走
-        bool                                          m_suppressDoubleClick = false;                         ///< 取色刚取走一个像素：吃掉紧跟着的那次双击
+        bool                                          m_suppressDoubleClick = false;                         ///< 取色刚取走一个像素：吃掉紧跟着的那次双击；下一次普通按下清掉
         Core::ScreenEdge                              m_edgeDock            = Core::ScreenEdge::None;        ///< 贴的是哪条屏边；None 表示没贴
         QRect                                         m_dockArea;                                            ///< 贴边那一刻那块屏的可用区，收起与展开都按它算
         bool                                          m_dockCollapsed = false;                               ///< 贴边后是不是收成了那一条
@@ -980,7 +983,7 @@ namespace GyanisScribe::Gui
         std::function<std::vector<QRect>()>           m_snapCandidates;                                      ///< 起笔时取参照矩形的口径，由管理器供给
         std::vector<QRect>                            m_dragCandidates;                                      ///< 这一趟拖动的参照快照，整趟都用它，不在每帧重新枚举
         std::optional<Core::HandleKind>               m_draggedHandle;                                       ///< 正在拖的手柄，没拖时为空
-        QPointF                                       m_dragInitialCenter;                                   ///< 起拖时的窗口中心：锚边重排会让中心移位，整趟手势都按它算距离
+        QPointF                                       m_dragInitialCenter;                                   ///< 起拖时的窗口中心（全屏坐标）：整趟手势按它算距离
         double                                        m_dragInitialScale                 = 1.0;              ///< 起拖时的缩放
         double                                        m_dragInitialEdge                  = Core::kDefaultThumbnailEdge; ///< 起拖时缩略图方块的边长
         double                                        m_dragInitialDistance              = 0.0;                         ///< 起拖时指针到中心的距离
