@@ -315,6 +315,9 @@ namespace GyanisScribe::Gui
         {
             return {};
         }
+        // selectedText() 用段落分隔符与行分隔符表示换行；原样塞进剪贴板，粘到别的程序会多出异常字符
+        selected.replace(QChar::ParagraphSeparator, QLatin1Char('\n'));
+        selected.replace(QChar::LineSeparator, QLatin1Char('\n'));
         QApplication::clipboard()->setText(selected);
         return selected;
     }

@@ -227,6 +227,37 @@ TEST_F(OcrResultWindowFixture, CopyAllWritesWholeResultAndSelectionNeedsASel)
 }
 
 /**
+ * @brief 钉住复制选区时把段落分隔符换成换行
+ * @details QTextCursor::selectedText() 用 U+2029 表示段落分隔，直接塞进剪贴板后
+ *          粘到别的程序里会多出异常字符。复制全部走的是结果文本，本来就没有这一档。
+ */
+TEST_F(OcrResultWindowFixture, CopySelectionTurnsSeparatorsIntoPlainNewlines)
+{
+    auto window = makeWindow(makeTwoLineResult());
+
+    QTextEdit *body = nullptr;
+    for (auto *edit: window->findChildren<QTextEdit *>())
+    {
+        if (edit->accessibleName() == QStringLiteral("识别文本"))
+        {
+            body = edit;
+            break;
+        }
+    }
+    ASSERT_NE(body, nullptr) << "结果窗里没有「识别文本」正文";
+    body->selectAll();
+
+    const auto selected = window->copySelectionToClipboard();
+    ASSERT_FALSE(selected.isEmpty()) << "全选之后复制选区却交回空串";
+    EXPECT_EQ(selected.indexOf(QChar::ParagraphSeparator), -1) << "复制出去的文本还带着 U+2029";
+    EXPECT_EQ(selected.indexOf(QChar::LineSeparator), -1) << "复制出去的文本还带着 U+2028";
+    EXPECT_NE(selected.indexOf(QLatin1Char('\n')), -1) << "两行之间没有换行";
+    EXPECT_EQ(selected, QString::fromUtf8("你好 世界\n第二行")) << "替换分隔符时把行内容弄丢了";
+    EXPECT_EQ(QApplication::clipboard()->text(), selected);
+    EXPECT_EQ(QApplication::clipboard()->text().indexOf(QChar::ParagraphSeparator), -1) << "剪贴板里仍留着 U+2029";
+}
+
+/**
  * @brief 钉住导出的两份文件内容来自导出器而不是界面拼的
  * @details 路径按用例名给独立文件；JSON 里必须带图片尺寸，否则方框坐标换一张图就对不上号。
  */
