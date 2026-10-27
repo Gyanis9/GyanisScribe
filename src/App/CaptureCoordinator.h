@@ -176,6 +176,16 @@ namespace GyanisScribe::App
         /// 标注窗请求刷新截图（F5）：重抓这块区域换底图，标注留着
         void refreshLastCapture(const QString &screenName, const QRect &region);
 
+        /**
+         * @brief 藏起标注窗与工具栏抓一块区域，抓完不管成败都摆回来
+         * @param screenName 目标屏幕名
+         * @param region 该屏内的逻辑区域
+         * @return 抓到的帧；抓帧失败时原因原样交回，画布与标注都不动
+         * @details 标注窗盖着的正是要抓的那一块：不藏就把它自己拍进底图。先记下两者的可见态与几何，
+         *          藏完让事件循环把这次隐藏落到屏上，抓完恢复——失败时也不许把窗留在屏外。
+         */
+        [[nodiscard]] GyanisScribe::Base::Expected<GyanisScribe::Base::CapturedImage> grabWithAnnotationHidden(const QString &screenName, const QRect &region);
+
         /// 选择档拖完标注窗边框：先藏窗再按新范围重抓，换一张画布
         void cropLastCapture(const QString &screenName, const QRect &globalSelection);
 

@@ -407,6 +407,35 @@ namespace GyanisScribe::App
         emit commandLineCaptureDelivered(m_dependencies.delivery.writtenFilePath());
     }
 
+    GyanisScribe::Base::Expected<GyanisScribe::Base::CapturedImage> CaptureCoordinator::grabWithAnnotationHidden(const QString &screenName, const QRect &region)
+    {
+        // 窗与工具栏都盖在要抓的那一块上：记下可见态与几何，抓完照原样摆回
+        const bool  windowWasVisible  = m_annotationWindow->isVisible();
+        const bool  toolbarWasVisible = m_annotationWindow->toolbar().isVisible();
+        const QRect windowGeometry    = m_annotationWindow->geometry();
+        const QRect toolbarGeometry   = m_annotationWindow->toolbar().geometry();
+
+        m_annotationWindow->hide();
+        m_annotationWindow->toolbar().hide();
+        // 隐藏要等合成器交出那一帧：不等的话这次抓到的仍是窗还在的那一版
+        QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+
+        const auto frame = m_capture->grabRegionNow(region, screenName);
+
+        // 成败都摆回：抓失败时画布与标注原样留着，但窗口不许因为这一眼抓屏留在屏外
+        m_annotationWindow->setGeometry(windowGeometry);
+        m_annotationWindow->toolbar().setGeometry(toolbarGeometry);
+        if (windowWasVisible)
+        {
+            m_annotationWindow->show();
+        }
+        if (toolbarWasVisible)
+        {
+            m_annotationWindow->toolbar().show();
+        }
+        return frame;
+    }
+
     void CaptureCoordinator::refreshLastCapture(const QString &screenName, const QRect &region)
     {
         // 区域未知（整屏抓来的那几路）就没法对着重抓：说一声，而不是抓一块错的盖上去
@@ -416,7 +445,7 @@ namespace GyanisScribe::App
             return;
         }
 
-        const auto frame = m_capture->grabRegionNow(region, screenName);
+        const auto frame = grabWithAnnotationHidden(screenName, region);
         if (!frame)
         {
             emit messageForUser(QString::fromStdString(frame.error().message), GyanisScribe::Gui::ToastKind::Danger);
@@ -460,11 +489,7 @@ namespace GyanisScribe::App
         }
 
         // 来源没带冻帧（整屏抓的那几路）：退回重新抓屏；先藏窗，DXGI 抓到的是整块桌面
-        m_annotationWindow->hide();
-        m_annotationWindow->toolbar().hide();
-        QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
-
-        const auto frame = m_capture->grabRegionNow(local, screenName);
+        const auto frame = grabWithAnnotationHidden(screenName, local);
         if (!frame)
         {
             // 抓新范围失败就退回原来那一轮：画布与标注都没动，只把窗口摆回旧几何

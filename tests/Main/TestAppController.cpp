@@ -37,6 +37,7 @@
 #include <QImage>
 #include <QLabel>
 #include <QPushButton>
+#include <QRect>
 #include <QScreen>
 #include <QSize>
 #include <QString>
@@ -86,6 +87,11 @@ namespace GyanisScribe
 
             [[nodiscard]] Base::Expected<Base::CapturedImage> grabScreen(const QString &screenName) const override
             {
+                if (onGrabScreen)
+                {
+                    // 抓的那一刻屏上摆着什么由用例自己看：F5 那条判据就落在「标注窗藏没藏」上
+                    onGrabScreen();
+                }
                 ++screenCalls;
                 requestedScreen = screenName;
                 return m_frame;
@@ -98,10 +104,11 @@ namespace GyanisScribe
                 return m_frame;
             }
 
-            mutable int      screenCalls = 0;     ///< 整屏这一路被叫了几次
-            mutable int      windowCalls = 0;     ///< 窗口这一路被叫了几次
-            mutable QString  requestedScreen;     ///< 最近一次叫的屏名
-            mutable quintptr requestedWindow = 0; ///< 最近一次叫的窗口句柄
+            mutable int           screenCalls = 0;     ///< 整屏这一路被叫了几次
+            mutable int           windowCalls = 0;     ///< 窗口这一路被叫了几次
+            mutable QString       requestedScreen;     ///< 最近一次叫的屏名
+            mutable quintptr      requestedWindow = 0; ///< 最近一次叫的窗口句柄
+            std::function<void()> onGrabScreen;        ///< 每次整屏抓帧前叫一声，让用例记录当时的状态
 
         private:
             Base::CapturedImage m_frame; ///< 与生产同形状的那一帧假屏
@@ -221,8 +228,8 @@ namespace GyanisScribe
                 std::filesystem::remove_all(Base::Paths::unsavedCaptureDirectory(), ignored);
             }
 
-            /// 造一帧与生产同形状的假屏：逻辑与物理尺寸一致（倍比 1.0），屏名由用例点名
-            [[nodiscard]] static Base::CapturedImage makeFrame(const QString &screenName)
+            /// 造一帧与生产同形状的假屏：逻辑与物理尺寸一致（倍比 1.0），屏名与选区由用例点名
+            [[nodiscard]] static Base::CapturedImage makeFrame(const QString &screenName, const QRect &logicalRegion = {})
             {
                 QImage image(kFrameWidth, kFrameHeight, QImage::Format_ARGB32_Premultiplied);
                 image.fill(QColor(36, 87, 166));
@@ -232,6 +239,7 @@ namespace GyanisScribe
                 frame.logicalSize      = QSize(kFrameWidth, kFrameHeight);
                 frame.devicePixelRatio = 1.0;
                 frame.screenName       = screenName;
+                frame.logicalRegion    = logicalRegion;
                 return frame;
             }
 
@@ -257,7 +265,7 @@ namespace GyanisScribe
                 }
                 m_settings = settings.get();
 
-                auto source      = std::make_unique<CountingScreenSource>(makeFrame(m_frameScreenName));
+                auto source      = std::make_unique<CountingScreenSource>(makeFrame(m_frameScreenName, m_frameRegion));
                 auto integration = std::make_unique<ForegroundWindowStub>(kForegroundWindowHandle);
                 m_source         = source.get();
                 m_integration    = integration.get();
@@ -398,6 +406,7 @@ namespace GyanisScribe
             QString                              m_realScreenName;                                          ///< 离屏平台那块真屏的名字
             int                                  m_delaySeconds    = 0;                                     ///< 延时截图那一格
             QString                              m_frameScreenName = QString::fromLatin1(kGhostScreenName); ///< 假帧带的屏名
+            QRect                                m_frameRegion;                                             ///< 假帧记的屏内选区，F5 重抓按它走
             std::optional<App::CaptureIntent>    m_afterAction;                                             ///< 「截完之后」那一格；空 = 不写
             bool                                 m_keepUnsaved = false;                                     ///< 「未保存也进历史」那一格
             bool                                 m_autoSave    = false;                                     ///< 「自动保存」那一格
@@ -439,6 +448,42 @@ namespace GyanisScribe
         EXPECT_EQ(m_source->requestedScreen, screen->name()) << "重抓跑到别的屏去了";
         EXPECT_TRUE(window.isVisible()) << "重抓之后标注窗没有重新出现";
         EXPECT_EQ(window.geometry(), region) << "标注窗没有按新范围摆好";
+    }
+
+    /**
+     * @brief 钉住 F5 重抓那一刻标注窗与工具栏都不在屏上，抓完两样都回来
+     * @details 窗盖着的正是要重抓的那一块：不藏就把它自己拍进新底图，按住 F5 会一层层叠进去。
+     *          判据在抓帧那一刻读可见态——抓完之后的恢复另占两条断言，两半缺一都算没做成。
+     */
+    TEST_F(AppControllerFixture, RefreshHidesAnnotationWindowWhileGrabbing)
+    {
+        m_frameScreenName = m_realScreenName;
+        m_frameRegion     = QRect{0, 0, kFrameWidth, kFrameHeight};
+        makeController();
+
+        auto *screen = QGuiApplication::primaryScreen();
+        ASSERT_NE(screen, nullptr);
+        auto &window = m_controller->capture().annotationWindow();
+        m_controller->capture().startFullScreen(App::CaptureIntent::Annotate);
+        ASSERT_TRUE(window.isVisible()) << "标注窗没开起来，后面的判据无从谈起";
+        ASSERT_TRUE(window.toolbar().isVisible()) << "工具栏没跟着摆出来，后面的判据无从谈起";
+
+        bool sawWindowHidden   = false;
+        bool sawToolbarHidden  = false;
+        m_source->onGrabScreen = [&]
+        {
+            sawWindowHidden  = !window.isVisible();
+            sawToolbarHidden = !window.toolbar().isVisible();
+        };
+
+        const auto callsBefore = m_source->screenCalls;
+        window.refreshRequested(screen->name(), m_frameRegion);
+
+        EXPECT_EQ(m_source->screenCalls, callsBefore + 1) << "F5 没有重抓这一块";
+        EXPECT_TRUE(sawWindowHidden) << "抓帧时标注窗还在屏上：新底图会把它自己拍进去";
+        EXPECT_TRUE(sawToolbarHidden) << "抓帧时工具栏还在屏上：新底图会把它自己拍进去";
+        EXPECT_TRUE(window.isVisible()) << "抓完没把标注窗放回来";
+        EXPECT_TRUE(window.toolbar().isVisible()) << "抓完没把工具栏放回来";
     }
 
     /**
