@@ -454,12 +454,18 @@ namespace GyanisScribe::Gui
                                                  m_integration.displayName().toStdString())});
         }
 
-        // 穿透同时去掉焦点接受：吃不到鼠标却又抢走焦点，会让用户的键盘操作莫名失灵
-        const auto opaque = windowFlags() & ~Qt::WindowFlags(Qt::WindowTransparentForInput) & ~Qt::WindowFlags(Qt::NoDropShadowWindowHint);
+        // 穿透同时去掉焦点接受：吃不到鼠标却又抢走焦点，会让用户的键盘操作莫名失灵。
+        // 改标志位后 Qt 要求重新映射窗口才生效，但只有原本在桌上的窗口才该重新 show：
+        // 收着的（整桌收起或在别的组）只改标志，否则取消穿透会把隐藏的贴图摆回桌面
+        const bool wasVisible = isVisible();
+        const auto opaque     = windowFlags() & ~Qt::WindowFlags(Qt::WindowTransparentForInput) & ~Qt::WindowFlags(Qt::NoDropShadowWindowHint);
         setWindowFlags(through ? (opaque | Qt::WindowTransparentForInput) : opaque);
         setFocusPolicy(through ? Qt::NoFocus : Qt::StrongFocus);
         m_mouseThrough = through;
-        show(); // 改标志位后 Qt 要求重新映射窗口才生效
+        if (wasVisible)
+        {
+            show();
+        }
         return {};
     }
 

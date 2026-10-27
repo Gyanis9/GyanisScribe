@@ -726,6 +726,33 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住取消鼠标穿透不会把收着的贴图摆回桌面
+     * @details 改窗口标志要重新映射才生效，但只有原本就在桌上的窗口才该重新 show；
+     *          托盘那一键遍历所有穿透中的贴图，顺手把别组或收起态的窗口摆出来，
+     *          用户看到的就是「取消一个开关，桌上多出一张图」。
+     */
+    TEST_F(PinManagerFixture, ClearingMouseThroughKeepsConcealedPinsHidden)
+    {
+        if (!integration().capabilities().clickThrough)
+        {
+            GTEST_SKIP() << "这台机器没有鼠标穿透能力，这一条判据造不出前提";
+        }
+
+        auto &pins = makeManager();
+        pins.addPin(makeImage(), QPoint(10, 10));
+        auto &hidden = static_cast<Gui::PinWindow &>(pins.addPin(makeImage(), QPoint(80, 80)));
+        ASSERT_TRUE(pins.movePinToGroup(1, 2).has_value()) << "把第二张移到别组没成功";
+        ASSERT_FALSE(isOnDesk(&hidden)) << "前提不对：别组的那张该是收着的";
+
+        ASSERT_TRUE(hidden.setMouseThrough(true).has_value()) << "这台机器不支持穿透，前提造不出来";
+        EXPECT_FALSE(isOnDesk(&hidden)) << "开穿透的那一刻把收着的贴图摆回了桌面";
+
+        EXPECT_EQ(pins.clearMouseThrough(), 1) << "在穿透里的那一张该被取消";
+        EXPECT_FALSE(hidden.isMouseThrough()) << "穿透没取消掉";
+        EXPECT_FALSE(isOnDesk(&hidden)) << "取消穿透把别组的贴图摆回了桌面";
+    }
+
+    /**
      * @brief 钉住替换内容只换像素：逻辑尺寸跟着新图走，倍率与摆的中心都不动
      * @details 按 `Ctrl+V` 要的是「这张图换了」，不是「这张贴图挪了位、又回到 1:1」——
      *          尺寸、倍率、中心三样里只有尺寸该动。
