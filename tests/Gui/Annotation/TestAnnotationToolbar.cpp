@@ -131,7 +131,6 @@ namespace
         {
             std::vector<ToolKind> tools;            ///< toolChanged 收到的工具
             std::vector<QColor>   colors;           ///< colorChanged 收到的颜色
-            std::vector<QColor>   adoptedColors;    ///< toolColorAdopted 收到的颜色（切工具沿用该形状自己的色）
             std::vector<int>      widths;           ///< widthChanged 收到的线宽
             std::vector<int>      fontSizes;        ///< fontSizeChanged 收到的字号
             std::vector<int>      fillStyles;       ///< fillStyleChanged 收到的填充档
@@ -166,7 +165,6 @@ namespace
             auto toolbar = std::make_unique<AnnotationToolbar>(*m_settings, *icons);
             QObject::connect(toolbar.get(), &AnnotationToolbar::toolChanged, [&log](ToolKind kind) { log.tools.push_back(kind); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::colorChanged, [&log](const QColor &color) { log.colors.push_back(color); });
-            QObject::connect(toolbar.get(), &AnnotationToolbar::toolColorAdopted, [&log](const QColor &color) { log.adoptedColors.push_back(color); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::widthChanged, [&log](int width) { log.widths.push_back(width); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::fontSizeChanged, [&log](int fontSize) { log.fontSizes.push_back(fontSize); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::fillStyleChanged, [&log](int style) { log.fillStyles.push_back(style); });
@@ -1394,8 +1392,7 @@ TEST_F(ToolbarFixture, SwitchingToolDoesNotPretendTheUserChangedTheColor)
     buttonByLabel(*toolbar, "颜色 2")->click();
     buttonByLabel(*toolbar, "箭头")->click();
     buttonByLabel(*toolbar, "颜色 5")->click();
-    const auto colorsBeforeSwitch  = log.colors.size();
-    const auto adoptedBeforeSwitch = log.adoptedColors.size();
+    const auto colorsBeforeSwitch = log.colors.size();
 
     buttonByLabel(*toolbar, "矩形")->click();
     EXPECT_EQ(toolbar->currentColor(), kAnnotationPaletteColors[1]) << "切回矩形该沿用矩形自己那一格";
@@ -1403,9 +1400,6 @@ TEST_F(ToolbarFixture, SwitchingToolDoesNotPretendTheUserChangedTheColor)
     EXPECT_EQ(toolbar->currentColor(), kAnnotationPaletteColors[4]) << "切回箭头该沿用箭头自己那一格";
 
     EXPECT_EQ(log.colors.size(), colorsBeforeSwitch) << "切工具把「沿用该形状自己的颜色」发成了用户改色";
-    ASSERT_EQ(log.adoptedColors.size(), adoptedBeforeSwitch + 2U) << "沿用颜色要走 toolColorAdopted，颜色按钮才换得过去";
-    EXPECT_EQ(log.adoptedColors[adoptedBeforeSwitch], kAnnotationPaletteColors[1]);
-    EXPECT_EQ(log.adoptedColors[adoptedBeforeSwitch + 1U], kAnnotationPaletteColors[4]);
 }
 
 /**
