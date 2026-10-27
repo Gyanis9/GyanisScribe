@@ -98,6 +98,11 @@ namespace GyanisScribe::Core
         const auto canvasSize = decoratedOutputSize(image.size(), border, shadow, style);
         const auto padding    = QPoint{(canvasSize.width() - image.width()) / 2, (canvasSize.height() - image.height()) / 2};
         QImage     canvas{canvasSize, QImage::Format_ARGB32_Premultiplied};
+        if (canvas.isNull())
+        {
+            // 尺寸算出天量时 Qt 分不出画布，交回的是一张空图：原样交回，别拿它去建 QPainter
+            return canvas;
+        }
         canvas.fill(fillBackground ? Qt::white : Qt::transparent);
         const auto imageRect = QRect{padding, image.size()};
 
@@ -107,6 +112,10 @@ namespace GyanisScribe::Core
         if (shadow)
         {
             shadowLayer = QImage{canvasSize, QImage::Format_ARGB32_Premultiplied};
+        }
+        if (!shadowLayer.isNull())
+        {
+            // 投影层没分出来时整段跳过：边框与成品照画，辅助图失败不该把这一张成品一起丢掉
             shadowLayer.fill(Qt::transparent);
             // 投影源头取「成品 + 边框」所占的那一块：渐隐从边框外沿起算，贴边那一圈最深。
             // 成品内部一格都不碰——图里本身有透明像素时，投影垫在底下会透出来
