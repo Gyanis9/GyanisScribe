@@ -161,19 +161,23 @@ namespace GyanisScribe::Main
     public:
         /**
          * @brief 构造控制器并创建各模块实例
+         * @param restorePins 启动时要不要把上次会话的贴图摆回桌面
          * @param parent QObject 父对象，默认无
          * @note 要在 QApplication 存在之后构造：配置、屏幕列表与热键后端都要靠应用对象
+         * @details 一次性命令行的装配传 false：这个进程没接管桌面上那批贴图，
+         *          既不该把它们摆出来（那一轮截图会把它们截进去），退出时也不该按自己手上的张数把布局写回去。
          */
-        explicit AppController(QObject *parent = nullptr);
+        explicit AppController(bool restorePins = true, QObject *parent = nullptr);
 
         /**
          * @brief 用换进来的底物构造控制器（测试注入口）
          * @param parts 要换掉的底物；留空的格子按生产那一份自建
+         * @param restorePins 启动时要不要把上次会话的贴图摆回桌面
          * @param parent QObject 父对象，默认无
          * @details 与不带参数的那个构造汇到同一处私有构造：装配逻辑只写一份，
          *          生产路径就相当于把四个格子全留空。
          */
-        explicit AppController(AppControllerParts parts, QObject *parent = nullptr);
+        explicit AppController(AppControllerParts parts, bool restorePins = true, QObject *parent = nullptr);
 
         /**
          * @brief 析构控制器，按创建的反向顺序交还各模块
@@ -244,6 +248,14 @@ namespace GyanisScribe::Main
          */
         [[nodiscard]] GyanisScribe::App::TrayController &trayControllerForTesting() const noexcept;
 
+        /**
+         * @brief 此刻桌面上的贴图张数，仅供用例
+         * @return 控制器持有的贴图管理器报出的张数
+         * @note 生产侧不需要这个读数：张数由管理器自己推给托盘提示。用例要判
+         *       「一次性启动没把上次的贴图摆回来」，而张数只有管理器知道。
+         */
+        [[nodiscard]] int pinCountForTesting() const noexcept;
+
     Q_SIGNALS:
         /**
          * @brief 命令行那一次截图交付完事
@@ -266,10 +278,11 @@ namespace GyanisScribe::Main
          * @param integration 平台集成，所有权交进来
          * @param captureSource 抓帧来源，所有权交进来
          * @param historyStoragePath 历史清单落点，非空
+         * @param restorePins 启动时要不要把上次会话的贴图摆回桌面，退出时要不要回写布局
          * @param parent QObject 父对象
          */
         AppController(std::unique_ptr<GyanisScribe::Core::SettingsStore> settings, std::unique_ptr<GyanisScribe::Platform::IPlatformIntegration> integration,
-                      std::unique_ptr<GyanisScribe::Core::IScreenCaptureSource> captureSource, std::filesystem::path historyStoragePath, QObject *parent);
+                      std::unique_ptr<GyanisScribe::Core::IScreenCaptureSource> captureSource, std::filesystem::path historyStoragePath, bool restorePins, QObject *parent);
 
         /**
          * @brief 读设置里那一档「截完之后做什么」

@@ -72,10 +72,11 @@ Application::Application(int &argc, char **argv, const GyanisScribe::App::Comman
     if (transientAction)
     {
         // 一次性启动不争单实例那把锁；控制器照建——自检量的正是这一条装配路，
-        // 控制器不在时它只是一次空跑，失败也看不出来
+        // 控制器不在时它只是一次空跑，失败也看不出来。
+        // 这一路不恢复也不回写上次的贴图：那一刻的桌面不属于这个进程，--capture 还会把旧贴图截进图里
         GyanisScribe::Base::Logger::info("命令行动作启动：不锁单实例");
         m_isPrimaryInstance = true;
-        m_controller        = std::make_unique<GyanisScribe::Main::AppController>();
+        m_controller        = std::make_unique<GyanisScribe::Main::AppController>(false);
     } else
     {
         m_singleInstance    = std::make_unique<GyanisScribe::App::SingleInstance>();

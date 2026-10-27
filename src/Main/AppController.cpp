@@ -94,20 +94,21 @@ namespace GyanisScribe::Main
     }
 
 
-    AppController::AppController(QObject *parent) : AppController(AppControllerParts{}, parent)
+    AppController::AppController(const bool restorePins, QObject *parent) : AppController(AppControllerParts{}, restorePins, parent)
     {
     }
 
-    AppController::AppController(AppControllerParts parts, QObject *parent) :
+    AppController::AppController(AppControllerParts parts, const bool restorePins, QObject *parent) :
         AppController(parts.settings ? std::move(parts.settings) : createSettingsStore(),
                       parts.integration ? std::move(parts.integration) : GyanisScribe::Platform::createPlatformIntegration(),
                       parts.captureSource ? std::move(parts.captureSource) : GyanisScribe::Plugins::createScreenCaptureSource(),
-                      parts.historyStoragePath.empty() ? GyanisScribe::Core::HistoryStore::defaultStoragePath() : std::move(parts.historyStoragePath), parent)
+                      parts.historyStoragePath.empty() ? GyanisScribe::Core::HistoryStore::defaultStoragePath() : std::move(parts.historyStoragePath), restorePins, parent)
     {
     }
 
     AppController::AppController(std::unique_ptr<GyanisScribe::Core::SettingsStore> settings, std::unique_ptr<GyanisScribe::Platform::IPlatformIntegration> integration,
-                                 std::unique_ptr<GyanisScribe::Core::IScreenCaptureSource> captureSource, std::filesystem::path historyStoragePath, QObject *parent) :
+                                 std::unique_ptr<GyanisScribe::Core::IScreenCaptureSource> captureSource, std::filesystem::path historyStoragePath, const bool restorePins,
+                                 QObject *parent) :
         QObject(parent), m_settings(std::move(settings)), m_integration(std::move(integration)), m_captureSource(std::move(captureSource))
     {
         // 语言要排在所有界面对象之前：translator 装晚了，已经建好的控件仍然拿源码文案
@@ -319,23 +320,27 @@ namespace GyanisScribe::Main
         QObject::connect(m_pins.get(), &GyanisScribe::Gui::PinManager::pinGroupRenamed, m_pinCoordinator.get(), &GyanisScribe::App::PinCoordinator::reportGroupRenamed);
         QObject::connect(m_pins.get(), &GyanisScribe::Gui::PinManager::pinGroupDeleted, m_pinCoordinator.get(), &GyanisScribe::App::PinCoordinator::reportGroupDeleted);
 
-        // 启动把上一次会话留下的那几张摆回来；退出前把在存的这批连像素一起记下
-        if (const auto restored = m_pins->restoreLayout(); !restored)
+        // 启动把上一次会话留下的那几张摆回来；退出前把在存的这批连像素一起记下。
+        // 一次性命令行的装配不接管桌面上那批贴图：既不摆回来，也不在手上一张都没有时把布局写成空的
+        if (restorePins)
         {
-            GyanisScribe::Base::Logger::warning(std::format("上次留下的贴图没摆回来：{}", restored.error().message));
-        } else if (*restored > 0)
-        {
-            GyanisScribe::Base::Logger::info(std::format("启动恢复了 {} 张贴图", *restored));
-        }
-        // 挂在 aboutToQuit 而不是托盘那一条上：主窗口关闭、命令行退出与崩溃守卫收尾走的是同一个出口
-        QObject::connect(qApp, &QCoreApplication::aboutToQuit, this,
-                         [this]
-                         {
-                             if (const auto saved = m_pins->saveLayout(); !saved)
+            if (const auto restored = m_pins->restoreLayout(); !restored)
+            {
+                GyanisScribe::Base::Logger::warning(std::format("上次留下的贴图没摆回来：{}", restored.error().message));
+            } else if (*restored > 0)
+            {
+                GyanisScribe::Base::Logger::info(std::format("启动恢复了 {} 张贴图", *restored));
+            }
+            // 挂在 aboutToQuit 而不是托盘那一条上：主窗口关闭、命令行退出与崩溃守卫收尾走的是同一个出口
+            QObject::connect(qApp, &QCoreApplication::aboutToQuit, this,
+                             [this]
                              {
-                                 GyanisScribe::Base::Logger::error(std::format("贴图布局没能存下：{}", saved.error().message));
-                             }
-                         });
+                                 if (const auto saved = m_pins->saveLayout(); !saved)
+                                 {
+                                     GyanisScribe::Base::Logger::error(std::format("贴图布局没能存下：{}", saved.error().message));
+                                 }
+                             });
+        }
 
         // 没有托盘就没有第二个入口，而全局热键在缺后端的平台上也不生效：主窗口得自己现身，
         // 并把「关掉窗子就退出」打开。Application 里那句 setQuitOnLastWindowClosed(false) 是为
@@ -505,6 +510,11 @@ namespace GyanisScribe::Main
     GyanisScribe::App::TrayController &AppController::trayControllerForTesting() const noexcept
     {
         return *m_tray;
+    }
+
+    int AppController::pinCountForTesting() const noexcept
+    {
+        return m_pins->count();
     }
 
     void AppController::refreshPinWithScreenUnder(const int index)

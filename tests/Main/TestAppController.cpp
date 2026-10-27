@@ -19,6 +19,8 @@
 #include "Core/History/HistoryRules.h"
 #include "Core/History/HistoryStore.h"
 #include "Core/History/HistoryTypes.h"
+#include "Core/Pin/PinLayout.h"
+#include "Gui/Pin/PinManager.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Platform/PlatformCapabilities.h"
 #include "Core/Settings/SettingsKeys.h"
@@ -259,7 +261,8 @@ namespace GyanisScribe
             }
 
             /// 用替身把控制器支起来：延时、去向与「未保存也进历史」都从上面那几格字段读
-            void makeController()
+            /// @param restorePins 这一档要不要把上次的贴图摆回来；默认与常驻启动一致
+            void makeController(const bool restorePins = true)
             {
                 auto settings = std::make_unique<Core::SettingsStore>(m_root / "settings.ini");
                 ASSERT_TRUE(settings->setValue(Core::kCaptureDelaySeconds, m_delaySeconds).has_value());
@@ -285,12 +288,22 @@ namespace GyanisScribe
                 m_source         = source.get();
                 m_integration    = integration.get();
 
+                // 预置一份摆得回来的布局：借管理器的公开保存路写，免得「没摆回来」的判据对着空配置空转
+                if (m_seedPinLayout)
+                {
+                    Gui::PinManager seeding(*m_settings, *m_integration);
+                    QImage          image(8, 8, QImage::Format_ARGB32);
+                    image.fill(Qt::green);
+                    seeding.addPin(image, QPoint(40, 40));
+                    ASSERT_TRUE(seeding.saveLayout().has_value()) << "布局没写下去，用例前提就没了";
+                }
+
                 Main::AppControllerParts parts;
                 parts.settings           = std::move(settings);
                 parts.integration        = std::move(integration);
                 parts.captureSource      = std::move(source);
                 parts.historyStoragePath = m_root / "history.json";
-                m_controller             = std::make_unique<Main::AppController>(std::move(parts));
+                m_controller             = std::make_unique<Main::AppController>(std::move(parts), restorePins);
             }
 
 
@@ -423,8 +436,9 @@ namespace GyanisScribe
             QString                              m_frameScreenName = QString::fromLatin1(kGhostScreenName); ///< 假帧带的屏名
             QRect                                m_frameRegion;                                             ///< 假帧记的屏内选区，F5 重抓按它走
             std::optional<App::CaptureIntent>    m_afterAction;                                             ///< 「截完之后」那一格；空 = 不写
-            bool                                 m_keepUnsaved = false;                                     ///< 「未保存也进历史」那一格
-            bool                                 m_autoSave    = false;                                     ///< 「自动保存」那一格
+            bool                                 m_keepUnsaved   = false;                                   ///< 「未保存也进历史」那一格
+            bool                                 m_autoSave      = false;                                   ///< 「自动保存」那一格
+            bool                                 m_seedPinLayout = false;                                   ///< 造控制器前先写一份贴图布局
             std::optional<std::filesystem::path> m_recordingDirectory;                                      ///< 录屏成品目录；非空就写 kPathRecording（只有录屏那一组设它）
             std::optional<int>                   m_recordingCountdown;                                      ///< 录屏倒计时秒数；不设就按生产默认（3 秒）走
         };
@@ -716,6 +730,29 @@ namespace GyanisScribe
         EXPECT_TRUE(delivered.isEmpty()) << "外部命令没起跑，命令行却报了交付成功";
         ASSERT_EQ(failures.size(), 1) << "外部命令没起跑，命令行出口一个字都没说";
         EXPECT_TRUE(failures.front().contains(QStringLiteral("GyanisScribeNoSuchProgram-3f9a.exe"))) << failures.front().toStdString();
+    }
+
+    /**
+     * @brief 钉住「一次性启动不把上次的贴图摆回桌面，也不把它写没」
+     * @details 一次性截图也建完整控制器：恢复旧布局等于让 --capture 把上次的贴图截进图里。
+     *          布局是借管理器的公开保存路预置的，不是伪造的读数；最后再用默认档建一次，
+     *          证明这份布局真的摆得回来，否则「没摆回来」那条判据就是空转。
+     */
+    TEST_F(AppControllerFixture, TransientStartupDoesNotRestoreTheLastPinLayout)
+    {
+        m_seedPinLayout = true;
+        makeController(false);
+        EXPECT_EQ(m_controller->pinCountForTesting(), 0) << "一次性启动把上次的贴图摆上了桌面";
+
+        // 这个进程没接管过桌面上那批贴图：退出时也不许把布局写成空的
+        ASSERT_TRUE(QMetaObject::invokeMethod(qApp, "aboutToQuit", Qt::DirectConnection)) << "用例没能触发退出信号";
+        const auto kept = Core::loadLayout(*m_settings);
+        ASSERT_TRUE(kept.has_value()) << kept.error().message;
+        EXPECT_EQ(kept->size(), 1) << "一次性启动退出时把上次的贴图布局抹掉了";
+
+        m_controller.reset();
+        makeController();
+        EXPECT_EQ(m_controller->pinCountForTesting(), 1) << "预置的布局本来就摆不回来，上一条判据就成了空转";
     }
 
     /**
