@@ -1770,10 +1770,12 @@ namespace GyanisScribe::Gui
         // 起笔点先认手柄与边带：碰上了就是改大小，没碰上才是整张平移
         if (const auto handle = resizeHandleAt(point); handle)
         {
-            m_draggedHandle       = *handle;
-            m_dragInitialScale    = m_scale;
-            m_dragInitialEdge     = m_thumbnailEdge;
-            m_dragInitialDistance = std::hypot(point.x() - rect().center().x(), point.y() - rect().center().y());
+            m_draggedHandle    = *handle;
+            m_dragInitialScale = m_scale;
+            m_dragInitialEdge  = m_thumbnailEdge;
+            // 整趟手势只认这一个中心：锚边重排之后窗口中心已经移位，每帧现读会让倍率跟着跳
+            m_dragInitialCenter   = QRectF(rect()).center();
+            m_dragInitialDistance = std::hypot(point.x() - m_dragInitialCenter.x(), point.y() - m_dragInitialCenter.y());
             return;
         }
 
@@ -1809,7 +1811,7 @@ namespace GyanisScribe::Gui
         if (const auto handle = m_draggedHandle)
         {
             const auto point    = event->position();
-            const auto distance = std::hypot(point.x() - rect().center().x(), point.y() - rect().center().y());
+            const auto distance = std::hypot(point.x() - m_dragInitialCenter.x(), point.y() - m_dragInitialCenter.y());
             const auto before   = QRect(pos(), size());
             // 缩着的那一枚改的是方块边长，摊开的那张改的是缩放：同一只手感（按到中心的距离给倍率），落到各自的量上
             if (m_thumbnail)

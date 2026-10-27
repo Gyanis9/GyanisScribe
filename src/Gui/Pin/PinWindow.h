@@ -978,6 +978,7 @@ namespace GyanisScribe::Gui
         std::function<std::vector<QRect>()>           m_snapCandidates;                                      ///< 起笔时取参照矩形的口径，由管理器供给
         std::vector<QRect>                            m_dragCandidates;                                      ///< 这一趟拖动的参照快照，整趟都用它，不在每帧重新枚举
         std::optional<Core::HandleKind>               m_draggedHandle;                                       ///< 正在拖的手柄，没拖时为空
+        QPointF                                       m_dragInitialCenter;                                   ///< 起拖时的窗口中心：锚边重排会让中心移位，整趟手势都按它算距离
         double                                        m_dragInitialScale                 = 1.0;              ///< 起拖时的缩放
         double                                        m_dragInitialEdge                  = Core::kDefaultThumbnailEdge; ///< 起拖时缩略图方块的边长
         double                                        m_dragInitialDistance              = 0.0;                         ///< 起拖时指针到中心的距离

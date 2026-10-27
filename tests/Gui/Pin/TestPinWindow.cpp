@@ -2420,6 +2420,35 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住拖边改大小的整趟手势用同一个参照中心
+     * @details 缩放倍率按「指针到中心的距离」算，而按锚边重排之后中心已经跟着挪了；
+     *          若每一帧都读当下的中心，指针只多走一格宽度就会回跳一截——手势像在原地打摆子。
+     *          判据取连续两次移动：第二次多走 1px，宽度不许小于第一次之后。
+     */
+    TEST_F(PinWindowFixture, FrameResizeFollowsThePointerWithoutJumping)
+    {
+        auto &window = makeWindow();
+        window.move(300, 300);
+
+        const QPointF edge{static_cast<qreal>(window.width() - 1), static_cast<qreal>(window.height() / 2)};
+        const QPoint  global{window.pos() + edge.toPoint()};
+        QMouseEvent   press{QEvent::MouseButtonPress, edge, global, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &press);
+
+        QMouseEvent first{QEvent::MouseMove, edge + QPointF{100, 0}, global + QPoint{100, 0}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &first);
+        const int afterFirst = window.width();
+        ASSERT_GT(afterFirst, kImageEdge) << "前提不对：往外拖一百格该先把这张拉宽";
+
+        QMouseEvent second{QEvent::MouseMove, edge + QPointF{101, 0}, global + QPoint{101, 0}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &second);
+        EXPECT_GE(window.width(), afterFirst) << "指针多走 1px，宽度却回跳：拖边用的是移动后的中心";
+
+        QMouseEvent release{QEvent::MouseButtonRelease, edge + QPointF{101, 0}, global + QPoint{101, 0}, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+        QApplication::sendEvent(&window, &release);
+    }
+
+    /**
      * @brief 钉住色卡身份、右键那一项与改色这一步
      * @details 三处各钉一次：不是色卡就不该出现「改这一张的颜色…」（点下去会把这张照片换成色卡）；
      *          是色卡时这一项要在菜单里；改完手上那张图的像素、记下的原色与布局记录三者一起走——
