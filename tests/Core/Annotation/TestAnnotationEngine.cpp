@@ -306,6 +306,40 @@ TEST_F(EngineFixture, UndoInvalidatesStaleSelection)
 }
 
 /**
+ * @brief 钉住撤销插入或删除之后，选中集不会落到相邻图形上
+ * @details 撤销删除会把图形按原索引插回去，其后的图形整体后移一格；
+ *          旧实现只剔掉越界的选中项，索引仍落在原位的选中项就变成了旁边那条。
+ */
+TEST_F(EngineFixture, SelectionDoesNotFollowTheWrongShapeAfterUndo)
+{
+    drawRectangle(QPoint(10, 10), QPoint(60, 40));
+    const auto second = drawRectangle(QPoint(80, 10), QPoint(130, 40));
+    drawRectangle(QPoint(150, 10), QPoint(200, 40));
+
+    ASSERT_TRUE(m_engine.select(second).has_value());
+    ASSERT_TRUE(m_engine.removeSelection().has_value());
+
+    // 删掉中间那条之后，第三条前移到索引 1：按命中重新选中它（创建时拿到的索引已经过期）
+    const auto thirdAfterRemoval = m_engine.selectionAt(QPoint(150, 20));
+    ASSERT_TRUE(thirdAfterRemoval.has_value()) << "第三条该还在原位";
+    ASSERT_TRUE(m_engine.select(*thirdAfterRemoval).has_value());
+
+    ASSERT_TRUE(m_engine.undo().has_value()); // 把 second 放回原位，第三条被挤回索引 2
+
+    // 选中集要么清空，要么仍指向第三条；绝不能变成被复活的第二条。
+    // 两种都成立时判据不许空转：先断「清了」与「落在第三条上」至少一头为真。
+    const auto bounds  = m_engine.selectionBounds();
+    const bool cleared = m_engine.selections().empty();
+    const bool onThird = bounds.has_value() && bounds->left() >= 150 && bounds->right() <= 200;
+    EXPECT_TRUE(cleared || onThird) << "撤销后选中框既没清掉、也没留在第三条上：它落到了被复活的相邻图形上";
+    if (!cleared)
+    {
+        ASSERT_TRUE(bounds.has_value()) << "还留着选中项却量不出外接框";
+        EXPECT_GE(bounds->left(), 150) << "撤销后选中框跳到了被复活的相邻图形上";
+    }
+}
+
+/**
  * @brief 钉住撤销/重做没得走时给出原因而不是崩
  */
 TEST_F(EngineFixture, UndoAndRedoWithoutHistoryFailWithReason)
@@ -866,7 +900,8 @@ TEST_F(EngineFixture, TextStyleRestyleLandsOnTheSelectedTextAndUndoesBack)
  * @details 两个字段与文字样式三件同属「后加的样式旋钮」：penParametersOf 与 restyleShapeAt
  *          都按字段逐个抄，漏一个就是「选中老样式的文字调效果不生效」。
  *          画布换成中灰 128：红字（深色）的描边与底板都取白——亮格（三通道 >200）在不开效果时
- *          一个都没有，开了就成片出现，两处各按这个口径比。撤销会作废选中项，第二处要重新选中。
+ *          一个都没有，开了就成片出现，两处各按这个口径比。改样式撤销不改图形索引，
+ *          第二处重新选中只是让判据不依赖撤销后的选中集。
  */
 TEST_F(EngineFixture, TextPlateAndOutlineRestyleAndUndoBack)
 {

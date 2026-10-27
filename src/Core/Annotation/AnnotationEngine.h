@@ -309,12 +309,14 @@ namespace GyanisScribe::Core
         /**
          * @brief 撤销一步，见 IAnnotationEngine::undo()
          * @return 成功返回空载荷；没得撤返回 InvalidArgument
+         * @details 撤销可能增删图形、让索引整体错位：图形数变了就清空选中，没变就留着。
          */
         [[nodiscard]] Base::Expected<void> undo() override;
 
         /**
          * @brief 重做一步，见 IAnnotationEngine::redo()
          * @return 成功返回空载荷；没得重做返回 InvalidArgument
+         * @details 与撤销同一口径：图形数变了就清空选中，没变就留着。
          */
         [[nodiscard]] Base::Expected<void> redo() override;
 
@@ -353,6 +355,17 @@ namespace GyanisScribe::Core
 
         /// 一条选中项到底在不在册
         [[nodiscard]] bool selectionIsValid(const AnnotationSelection &selection) const;
+
+        /// 每个工具当前的图形数：撤销/重做前后各取一次，用来判断索引会不会整体错位
+        [[nodiscard]] std::vector<int> shapeCounts() const;
+
+        /**
+         * @brief 按图形数的变化决定选中集去留
+         * @param countsBefore 这一趟撤销/重做之前的图形数快照
+         * @details 只有增删图形才会让索引整体错位，那时选中项可能指到邻居身上，必须清空；
+         *          位移、改样式、缩放与换层都不动索引，撤销之后选中项还指着同一条图形，清掉只是白让用户再点一次。
+         */
+        void keepSelectionAfterHistoryStep(const std::vector<int> &countsBefore);
 
         /// 一条选中项的外接框（含旋转）；索引失效时为空
         [[nodiscard]] std::optional<QRect> boundsOf(const AnnotationSelection &selection) const;

@@ -768,6 +768,29 @@ namespace GyanisScribe::Core
         return tool != nullptr && selection.shapeIndex >= 0 && selection.shapeIndex < tool->shapeCount();
     }
 
+    std::vector<int> AnnotationEngine::shapeCounts() const
+    {
+        std::vector<int> counts;
+        counts.reserve(m_tools.size());
+        for (const auto &tool: m_tools)
+        {
+            counts.push_back(tool->shapeCount());
+        }
+        return counts;
+    }
+
+    void AnnotationEngine::keepSelectionAfterHistoryStep(const std::vector<int> &countsBefore)
+    {
+        // 图形数一样说明索引没动：位移、改样式、缩放与换层撤回去之后，选中的还是同一条
+        if (shapeCounts() == countsBefore || m_selection.empty())
+        {
+            return;
+        }
+        // 增删会把后面每一条的索引都挪一格，原来的选中项就指到了邻居身上；宁可不选，也不许打错对象
+        m_selection.clear();
+        emit canvasChanged();
+    }
+
     Base::Expected<void> AnnotationEngine::select(const AnnotationSelection &selection)
     {
         if (!selectionIsValid(selection))
@@ -1061,10 +1084,10 @@ namespace GyanisScribe::Core
         {
             return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("没有可撤销的标注动作了")});
         }
+        const auto countsBefore = shapeCounts();
         m_undoStack.undo();
         m_handleDrag.reset();
-        // 撤销可能把选中的那条抹掉：索引失效的就从选中集里摘掉，别让后续操作打到别的图形上
-        std::erase_if(m_selection, [this](const AnnotationSelection &item) { return !selectionIsValid(item); });
+        keepSelectionAfterHistoryStep(countsBefore);
         return {};
     }
 
@@ -1074,8 +1097,10 @@ namespace GyanisScribe::Core
         {
             return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("没有可重做的标注动作了")});
         }
+        const auto countsBefore = shapeCounts();
         m_undoStack.redo();
         m_handleDrag.reset();
+        keepSelectionAfterHistoryStep(countsBefore);
         return {};
     }
 
