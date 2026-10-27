@@ -3,10 +3,15 @@
 #include "Core/Image/OutputDecoration.h"
 
 #include <QColor>
+#include <QElapsedTimer>
 #include <QImage>
 #include <QString>
 
 #include <gtest/gtest.h>
+
+#include <algorithm>
+#include <cstdio>
+#include <vector>
 
 using GyanisScribe::Core::decoratedOutputSize;
 using GyanisScribe::Core::decorateForOutput;
@@ -192,6 +197,35 @@ TEST(OutputDecoration, KeepsTransparencyInsideTheImage)
     const auto inside = output.pixelColor(kOutputShadowPixels, kOutputShadowPixels);
     EXPECT_EQ(inside.alpha(), 128) << "图内的半透明被抹平了";
     EXPECT_EQ(inside.green(), 255);
+}
+
+/**
+ * @brief 读数用例：一张 4K 成品加边框与 16 格投影要多少毫秒（不断言时间）
+ * @details 投影原先逐像素算距离再写回，成本随画布面积走；成品常见尺寸是 3840×2160，
+ *          这一格量的是整条装饰链路（建画布、画投影、边框与成品）。它不断言时间：
+ *          跑在什么机器上就报什么数，红了只说明装饰没交出成品。
+ */
+TEST(OutputDecoration, ReportsTheCostOfDecoratingA4kImageWithShadow)
+{
+    QImage image{3840, 2160, QImage::Format_ARGB32_Premultiplied};
+    image.fill(QColor{64, 96, 128});
+    const OutputDecorationStyle style{.borderPixels = kOutputBorderPixels, .borderColor = kDefaultOutputBorderColor, .shadowPixels = 16};
+
+    constexpr int       kRounds = 5;
+    std::vector<double> milliseconds;
+    milliseconds.reserve(kRounds);
+    for (int round = 0; round < kRounds; ++round)
+    {
+        QElapsedTimer watch;
+        watch.start();
+        const auto output = decorateForOutput(image, true, true, false, style);
+        milliseconds.push_back(static_cast<double>(watch.nsecsElapsed()) / 1'000'000.0);
+        ASSERT_EQ(output.size(), decoratedOutputSize(image.size(), true, true, style)) << "第 " << round << " 轮没交出装饰后的画布，读数不成立";
+    }
+
+    std::ranges::sort(milliseconds);
+    std::printf("[读数] 4K（3840×2160）成品加边框与 16 格投影一次：中位 %.1fms（%d 轮，min %.1f / max %.1f）\n", milliseconds[static_cast<std::size_t>(kRounds) / 2U], kRounds,
+                  milliseconds.front(), milliseconds.back());
 }
 
 /**
