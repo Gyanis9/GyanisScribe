@@ -987,7 +987,9 @@ namespace GyanisScribe::Gui
         m_currentColor = found.value();
         // 颜色按钮上的色块跟着换：它说的必须是现在这支色
         updateOpacityHint();
-        emit colorChanged(m_currentColor);
+        // 这是「沿用该形状自己记着的色」，不是用户挑色：发 colorChanged 会让宿主把它
+        // 当成对选中项的改样式，选中图形被顺手改色并压入一步撤销
+        emit toolColorAdopted(m_currentColor);
     }
 
     int AnnotationToolbar::currentColorOpacityPercent() const

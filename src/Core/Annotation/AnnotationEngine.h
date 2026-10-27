@@ -106,6 +106,15 @@ namespace GyanisScribe::Core
         [[nodiscard]] Base::Expected<void> setPenParameters(const PenParameters &parameters) override;
 
         /**
+         * @brief 只更新后续图形的默认画笔参数，见 IAnnotationEngine::setDefaultPenParameters()
+         * @param parameters 新默认参数
+         * @return 成功返回空载荷；线宽或字号不是正数时返回写明取值范围的中文原因
+         * @details 切工具时工具栏会沿用该工具自己记着的颜色：这是「下一笔用什么」，
+         *          不是用户对选中项的改样式，因此不重设选中项、也不压改样式命令。
+         */
+        [[nodiscard]] Base::Expected<void> setDefaultPenParameters(const PenParameters &parameters) override;
+
+        /**
          * @brief 起笔，见 IAnnotationEngine::beginStroke()
          * @param point 画布逻辑坐标
          */
@@ -349,6 +358,13 @@ namespace GyanisScribe::Core
 
         /// 把当前画笔参数下发给全部工具：构造与改参数两处共用一个口径
         void applyPenParametersToTools();
+
+        /**
+         * @brief 校验一整套画笔参数
+         * @param parameters 待校验的那一份
+         * @return 通过返回空载荷；线宽或字号不是正数时返回写明取值范围的中文原因
+         */
+        [[nodiscard]] Base::Expected<void> validatePenParameters(const PenParameters &parameters) const;
 
         /// 全部图形按层叠号升序排好（最底层的在前）
         [[nodiscard]] std::vector<ZEntry> zOrderedEntries() const;

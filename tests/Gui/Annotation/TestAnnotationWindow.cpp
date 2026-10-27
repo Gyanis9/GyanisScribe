@@ -24,6 +24,7 @@
 #include <QFontMetricsF>
 #include <QImage>
 #include <QKeyEvent>
+#include <QMenu>
 #include <QMouseEvent>
 #include <QRegularExpression>
 #include <QScreen>
@@ -678,6 +679,75 @@ TEST_F(AnnotationWindowFixture, DoubleArrowToggleFromToolbarReachesTheEngine)
     EXPECT_GT(countInkAtStartHead(), 0) << "按钮点下去了，选中的那条没有跟着变双向：窗口到引擎这条链没接上";
     ASSERT_TRUE(engine().undo().has_value());
     EXPECT_EQ(countInkAtStartHead(), 0) << "撤销没把双向退回单头，改开关没进撤销栈";
+}
+
+/**
+ * @brief 钉住切工具从窗口一路不改选中图形：工具栏换色只是下一笔用什么
+ * @details 箭头与矩形各记一格色，切到箭头时工具栏会沿用箭头那格；旧实现把它发成
+ *          colorChanged，桥按用户改样式把选中的矩形刷成新色并压一步撤销。
+ *          判据落在像素与撤销步两处：撤销一次该把矩形整条收走，而不是先退颜色。
+ */
+TEST_F(AnnotationWindowFixture, SwitchingToolFromToolbarKeepsTheSelectedShapeStyle)
+{
+    auto window = makeWindow();
+
+    const auto toolButton = [&window](const QString &label) -> QToolButton *
+    {
+        for (auto *candidate: window->toolbar().findChildren<QToolButton *>())
+        {
+            if (candidate->accessibleName() == label)
+            {
+                return candidate;
+            }
+        }
+        return nullptr;
+    };
+    const auto pickColor = [&window](const QString &label)
+    {
+        auto *menu = window->toolbar().findChild<QMenu *>(QStringLiteral("annotationColorMenu"));
+        EXPECT_NE(menu, nullptr) << "工具栏上没有颜色菜单";
+        if (menu == nullptr)
+        {
+            return;
+        }
+        QMetaObject::invokeMethod(menu, "aboutToShow", Qt::DirectConnection);
+        for (auto *swatch: menu->findChildren<QToolButton *>())
+        {
+            if (swatch->accessibleName() == label)
+            {
+                swatch->click();
+                return;
+            }
+        }
+        ADD_FAILURE() << "颜色菜单里没有「" << label.toStdString() << "」这一格";
+    };
+
+    // 箭头记蓝、矩形记红：此刻没有选中项，换色只改默认值
+    auto *arrowButton = toolButton(QString::fromUtf8("箭头"));
+    ASSERT_NE(arrowButton, nullptr) << "工具栏上找不到箭头按钮";
+    arrowButton->click();
+    pickColor(QString::fromUtf8("颜色 5"));
+    auto *rectangleButton = toolButton(QString::fromUtf8("矩形"));
+    ASSERT_NE(rectangleButton, nullptr) << "工具栏上找不到矩形按钮";
+    rectangleButton->click();
+    pickColor(QString::fromUtf8("颜色 1"));
+
+    engine().beginStroke(QPoint(20, 20));
+    engine().moveStroke(QPoint(80, 60));
+    const auto box = engine().endStroke();
+    ASSERT_TRUE(box.has_value()) << box.error().message;
+    ASSERT_TRUE(engine().select(*box).has_value());
+    // 画布倍比 2：逻辑 (20,40) 落在物理 (40,80)，与既有像素用例同一个探点
+    ASSERT_EQ(engine().exportImage().pixelColor(40, 80), QColor(232, 62, 62)) << "红矩形没画上，后面的对照没有基准";
+
+    // 切到箭头：工具栏沿用箭头那格蓝，但这不是用户对选中矩形的改色
+    arrowButton->click();
+    EXPECT_EQ(engine().activeTool(), ToolKind::Arrow) << "工具没切过去，这条判据的前提没成立";
+    EXPECT_EQ(engine().exportImage().pixelColor(40, 80), QColor(232, 62, 62)) << "切工具把选中矩形刷成了新工具的颜色";
+
+    // 撤销栈里只有「插入」这一步：一撤该把矩形整条收走，而不是先退颜色
+    ASSERT_TRUE(engine().undo().has_value());
+    EXPECT_EQ(engine().exportImage().pixelColor(40, 80), QColor(180, 180, 180)) << "切工具多压了一步改样式，这一撤退的是颜色";
 }
 
 /**

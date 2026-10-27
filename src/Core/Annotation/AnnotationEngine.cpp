@@ -539,17 +539,9 @@ namespace GyanisScribe::Core
 
     Base::Expected<void> AnnotationEngine::setPenParameters(const PenParameters &parameters)
     {
-        if (parameters.lineWidth <= 0)
+        if (auto valid = validatePenParameters(parameters); !valid)
         {
-            return std::unexpected(
-                    Base::Error{Base::ErrorCode::InvalidArgument,
-                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("线宽必须是正数，收到的是 {}。请取 1 到 50 之间的整数"), parameters.lineWidth)});
-        }
-        if (parameters.fontSize <= 0)
-        {
-            return std::unexpected(
-                    Base::Error{Base::ErrorCode::InvalidArgument,
-                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("字号必须是正数，收到的是 {}。请取 8 到 72 之间的整数"), parameters.fontSize)});
+            return valid;
         }
 
         m_penParameters = parameters;
@@ -575,6 +567,35 @@ namespace GyanisScribe::Core
         if (anyChanged)
         {
             m_undoStack.push(new RestyleShapesCommand(std::move(targets), parameters));
+        }
+        return {};
+    }
+
+    Base::Expected<void> AnnotationEngine::setDefaultPenParameters(const PenParameters &parameters)
+    {
+        if (auto valid = validatePenParameters(parameters); !valid)
+        {
+            return valid;
+        }
+
+        m_penParameters = parameters;
+        applyPenParametersToTools();
+        return {};
+    }
+
+    Base::Expected<void> AnnotationEngine::validatePenParameters(const PenParameters &parameters) const
+    {
+        if (parameters.lineWidth <= 0)
+        {
+            return std::unexpected(
+                    Base::Error{Base::ErrorCode::InvalidArgument,
+                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("线宽必须是正数，收到的是 {}。请取 1 到 50 之间的整数"), parameters.lineWidth)});
+        }
+        if (parameters.fontSize <= 0)
+        {
+            return std::unexpected(
+                    Base::Error{Base::ErrorCode::InvalidArgument,
+                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("字号必须是正数，收到的是 {}。请取 8 到 72 之间的整数"), parameters.fontSize)});
         }
         return {};
     }

@@ -275,6 +275,8 @@ namespace GyanisScribe::Gui
         void contextLayoutChanged();
         /// 用户切了颜色
         void colorChanged(const QColor &color);
+        /// 切工具时工具栏沿用了该工具自己记着的颜色：只用于工具栏自身的显示同步，不是用户改色
+        void toolColorAdopted(const QColor &color);
         /// 用户改了线宽
         void widthChanged(int width);
         /// 用户改了字号
@@ -389,6 +391,8 @@ namespace GyanisScribe::Gui
          * @param kind 切过去的形状
          * @details 没记过颜色的形状不动：突然把用户正在用的颜色换成色板第一格，比留着更让人莫名。
          *          换了色要把颜色按钮的色块跟着换过去，否则按钮上那一格说的不是当前色。
+         *          这里只发 toolColorAdopted 给工具栏自己同步显示，不发 colorChanged：
+         *          后者是用户挑色，宿主会把它当成对选中项的改样式。
          */
         void adoptColorForTool(Core::ToolKind kind);
 

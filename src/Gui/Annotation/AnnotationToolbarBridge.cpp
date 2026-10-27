@@ -12,28 +12,7 @@ namespace GyanisScribe::Gui
         QObject(parent), m_toolbar(toolbar), m_engine(engine)
     {
         // 起点参数整套照工具栏的初值抄一遍：每一档都必须与工具栏同解，否则第一笔的样式与按钮显示的不一致
-        m_penParameters = Core::PenParameters{.color                = toolbar.currentColor(),
-                                              .lineWidth            = toolbar.currentWidth(),
-                                              .fontSize             = toolbar.currentFontSize(),
-                                              .fillStyle            = toolbar.currentFillStyle(),
-                                              .lineStyle            = toolbar.currentLineStyle(),
-                                              .roundedRect          = toolbar.currentRoundedRect(),
-                                              .doubleHeaded         = toolbar.currentDoubleHeaded(),
-                                              .arrowReversed        = toolbar.currentArrowReversed(),
-                                              .elliptical           = toolbar.currentElliptical(),
-                                              .mosaicBlockSize      = toolbar.currentMosaicBlockSize(),
-                                              .highlightAlpha       = toolbar.currentHighlightAlpha(),
-                                              .highlightWidthFactor = toolbar.currentHighlightWidthFactor(),
-                                              .arrowHeadStyle       = toolbar.currentArrowHeadStyle(),
-                                              .arrowHeadScale       = toolbar.currentArrowHeadScale(),
-                                              .fontFamily           = toolbar.currentFontFamily(),
-                                              .textBold             = toolbar.currentTextBold(),
-                                              .textItalic           = toolbar.currentTextItalic(),
-                                              .textOutline          = toolbar.currentTextOutline(),
-                                              .textBackground       = toolbar.currentTextBackground(),
-                                              .textStrokeColorStep  = toolbar.currentTextStrokeColorStep(),
-                                              .textOutlineWidthStep = toolbar.currentTextOutlineWidthStep(),
-                                              .textPlateColorStep   = toolbar.currentTextPlateColorStep()};
+        readToolbarParameters();
 
         QObject::connect(&toolbar, &AnnotationToolbar::toolChanged, this,
                          [this](const Core::ToolKind kind)
@@ -41,6 +20,14 @@ namespace GyanisScribe::Gui
                              if (auto switched = m_engine.setActiveTool(kind); !switched)
                              {
                                  Base::Logger::warning(std::format("切工具没成：{}", switched.error().message));
+                             }
+                             // 切工具时工具栏会沿用这一档自己记着的颜色：这是「下一笔用什么」，
+                             // 不是用户改选中项的样式。重读整套参数后走只改默认值的出口，
+                             // 选中图形保持原样，也不多出一步可撤销
+                             readToolbarParameters();
+                             if (auto applied = m_engine.setDefaultPenParameters(m_penParameters); !applied)
+                             {
+                                 Base::Logger::warning(std::format("默认画笔参数没下发：{}", applied.error().message));
                              }
                          });
         QObject::connect(&toolbar, &AnnotationToolbar::colorChanged, this,
@@ -224,6 +211,32 @@ namespace GyanisScribe::Gui
     const Core::PenParameters &AnnotationToolbarBridge::penParameters() const noexcept
     {
         return m_penParameters;
+    }
+
+    void AnnotationToolbarBridge::readToolbarParameters()
+    {
+        m_penParameters = Core::PenParameters{.color                = m_toolbar.currentColor(),
+                                              .lineWidth            = m_toolbar.currentWidth(),
+                                              .fontSize             = m_toolbar.currentFontSize(),
+                                              .fillStyle            = m_toolbar.currentFillStyle(),
+                                              .lineStyle            = m_toolbar.currentLineStyle(),
+                                              .roundedRect          = m_toolbar.currentRoundedRect(),
+                                              .doubleHeaded         = m_toolbar.currentDoubleHeaded(),
+                                              .arrowReversed        = m_toolbar.currentArrowReversed(),
+                                              .elliptical           = m_toolbar.currentElliptical(),
+                                              .mosaicBlockSize      = m_toolbar.currentMosaicBlockSize(),
+                                              .highlightAlpha       = m_toolbar.currentHighlightAlpha(),
+                                              .highlightWidthFactor = m_toolbar.currentHighlightWidthFactor(),
+                                              .arrowHeadStyle       = m_toolbar.currentArrowHeadStyle(),
+                                              .arrowHeadScale       = m_toolbar.currentArrowHeadScale(),
+                                              .fontFamily           = m_toolbar.currentFontFamily(),
+                                              .textBold             = m_toolbar.currentTextBold(),
+                                              .textItalic           = m_toolbar.currentTextItalic(),
+                                              .textOutline          = m_toolbar.currentTextOutline(),
+                                              .textBackground       = m_toolbar.currentTextBackground(),
+                                              .textStrokeColorStep  = m_toolbar.currentTextStrokeColorStep(),
+                                              .textOutlineWidthStep = m_toolbar.currentTextOutlineWidthStep(),
+                                              .textPlateColorStep   = m_toolbar.currentTextPlateColorStep()};
     }
 
     void AnnotationToolbarBridge::applyPenParameters()

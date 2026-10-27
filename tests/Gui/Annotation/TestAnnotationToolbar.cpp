@@ -131,6 +131,7 @@ namespace
         {
             std::vector<ToolKind> tools;            ///< toolChanged 收到的工具
             std::vector<QColor>   colors;           ///< colorChanged 收到的颜色
+            std::vector<QColor>   adoptedColors;    ///< toolColorAdopted 收到的颜色（切工具沿用该形状自己的色）
             std::vector<int>      widths;           ///< widthChanged 收到的线宽
             std::vector<int>      fontSizes;        ///< fontSizeChanged 收到的字号
             std::vector<int>      fillStyles;       ///< fillStyleChanged 收到的填充档
@@ -165,6 +166,7 @@ namespace
             auto toolbar = std::make_unique<AnnotationToolbar>(*m_settings, *icons);
             QObject::connect(toolbar.get(), &AnnotationToolbar::toolChanged, [&log](ToolKind kind) { log.tools.push_back(kind); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::colorChanged, [&log](const QColor &color) { log.colors.push_back(color); });
+            QObject::connect(toolbar.get(), &AnnotationToolbar::toolColorAdopted, [&log](const QColor &color) { log.adoptedColors.push_back(color); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::widthChanged, [&log](int width) { log.widths.push_back(width); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::fontSizeChanged, [&log](int fontSize) { log.fontSizes.push_back(fontSize); });
             QObject::connect(toolbar.get(), &AnnotationToolbar::fillStyleChanged, [&log](int style) { log.fillStyles.push_back(style); });
@@ -1374,6 +1376,36 @@ TEST_F(ToolbarFixture, ShapeWithoutItsOwnColorKeepsTheOneInUse)
 
     EXPECT_EQ(toolbar->currentColor(), kAnnotationPaletteColors[2]) << "没挑过色的形状该沿用当前色";
     EXPECT_EQ(log.colors.size(), colorsBeforeSwitch) << "没换色也别发信号：宿主收到一次 colorChanged 就要重下一遍画笔参数";
+}
+
+/**
+ * @brief 钉住切工具时沿用该形状自己的颜色不算用户改色
+ * @details 工具栏切回记过颜色的形状会换色，但那是「下一笔用什么」，不是用户对选中项的改样式；
+ *          把它发成 colorChanged，桥会立刻重设选中图形的颜色并压入一步撤销。
+ */
+TEST_F(ToolbarFixture, SwitchingToolDoesNotPretendTheUserChangedTheColor)
+{
+    SignalLog log;
+    auto      toolbar = makeToolbarLogged(log);
+
+    // 矩形与箭头各记一格色：切回去时工具栏会沿用它，正是旧实现发 colorChanged 的那一步
+    ASSERT_NE(openColorMenu(*toolbar), nullptr);
+    buttonByLabel(*toolbar, "矩形")->click();
+    buttonByLabel(*toolbar, "颜色 2")->click();
+    buttonByLabel(*toolbar, "箭头")->click();
+    buttonByLabel(*toolbar, "颜色 5")->click();
+    const auto colorsBeforeSwitch  = log.colors.size();
+    const auto adoptedBeforeSwitch = log.adoptedColors.size();
+
+    buttonByLabel(*toolbar, "矩形")->click();
+    EXPECT_EQ(toolbar->currentColor(), kAnnotationPaletteColors[1]) << "切回矩形该沿用矩形自己那一格";
+    buttonByLabel(*toolbar, "箭头")->click();
+    EXPECT_EQ(toolbar->currentColor(), kAnnotationPaletteColors[4]) << "切回箭头该沿用箭头自己那一格";
+
+    EXPECT_EQ(log.colors.size(), colorsBeforeSwitch) << "切工具把「沿用该形状自己的颜色」发成了用户改色";
+    ASSERT_EQ(log.adoptedColors.size(), adoptedBeforeSwitch + 2U) << "沿用颜色要走 toolColorAdopted，颜色按钮才换得过去";
+    EXPECT_EQ(log.adoptedColors[adoptedBeforeSwitch], kAnnotationPaletteColors[1]);
+    EXPECT_EQ(log.adoptedColors[adoptedBeforeSwitch + 1U], kAnnotationPaletteColors[4]);
 }
 
 /**

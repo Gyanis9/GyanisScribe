@@ -67,6 +67,9 @@ namespace GyanisScribe::Gui
         /// 把整包参数下发给引擎，并把失败记进日志
         void applyPenParameters();
 
+        /// 从工具栏现读整套画笔参数：构造与切工具两处共用同一个读法
+        void readToolbarParameters();
+
         AnnotationToolbar       &m_toolbar;       ///< 工具栏，不拥有
         Core::IAnnotationEngine &m_engine;        ///< 标注引擎，不拥有
         Core::PenParameters      m_penParameters; ///< 画笔参数整套：工具栏下发的都先汇到这里再给引擎

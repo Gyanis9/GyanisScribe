@@ -150,6 +150,16 @@ namespace GyanisScribe::Core
         [[nodiscard]] virtual Base::Expected<void> setPenParameters(const PenParameters &parameters) = 0;
 
         /**
+         * @brief 只更新后续图形的默认画笔参数，不改选中图形
+         * @param parameters 一整套新的默认样式参数
+         * @return 成功返回空载荷；线宽或字号不是正数时返回 InvalidArgument，说明收哪些值
+         * @details 切工具时工具栏会沿用该工具自己记着的颜色：那是「下一笔用什么」，
+         *          不是用户对选中项的改样式，所以这里不重设选中图形、也不进撤销栈。
+         *          参数校验与 setPenParameters 同一口径。
+         */
+        [[nodiscard]] virtual Base::Expected<void> setDefaultPenParameters(const PenParameters &parameters) = 0;
+
+        /**
          * @brief 起笔
          * @param point 画布逻辑坐标
          */

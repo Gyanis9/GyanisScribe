@@ -450,6 +450,37 @@ TEST_F(EngineFixture, StyleChangeTouchesOnlyTheSelectedShape)
 }
 
 /**
+ * @brief 钉住「只改后续图形的默认画笔参数」不碰选中项、也不进撤销栈
+ * @details 切工具时工具栏会沿用该工具自己的颜色，那是下一笔用什么；若按用户改样式处理，
+ *          选中图形会被改色并压入一步撤销，Ctrl+Z 退的是颜色而不是画上去的那条。
+ */
+TEST_F(EngineFixture, DefaultPenParametersLeaveTheSelectionAlone)
+{
+    const auto rectangle = drawRectangle(QPoint(10, 10), QPoint(90, 60));
+    ASSERT_TRUE(m_engine.select(rectangle).has_value());
+    ASSERT_EQ(m_engine.exportImage().pixelColor(10, 35), QColor(255, 0, 0)) << "默认红没落在左边界上，后面的对照就没有基准";
+
+    ASSERT_TRUE(m_engine.setDefaultPenParameters(PenParameters{.color = QColor(0, 0, 255), .lineWidth = 3, .fontSize = 16, .fillStyle = 0}).has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(10, 35), QColor(255, 0, 0)) << "只改默认值却把选中图形刷成了新色";
+    EXPECT_EQ(m_engine.selections().size(), 1U) << "改默认值不该动选中集";
+
+    // 新默认值确实给了下一条：后画的这条是蓝的
+    const auto second = drawRectangle(QPoint(120, 10), QPoint(190, 60));
+    ASSERT_TRUE(m_engine.select(second).has_value());
+    EXPECT_EQ(m_engine.exportImage().pixelColor(120, 35), QColor(0, 0, 255)) << "默认值没换给后续图形";
+
+    // 撤一次收走第二条，而不是把第一条的颜色退回去
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_FALSE(m_engine.selectionAt(QPoint(150, 35)).has_value()) << "这一撤没把第二条收走：改默认值多占了一步";
+    EXPECT_EQ(m_engine.exportImage().pixelColor(10, 35), QColor(255, 0, 0)) << "第一条的颜色被一起退掉了";
+
+    // 拒绝面与 setPenParameters 同一口径
+    const auto badWidth = m_engine.setDefaultPenParameters(PenParameters{.color = QColor(0, 0, 255), .lineWidth = 0, .fontSize = 16, .fillStyle = 0});
+    ASSERT_FALSE(badWidth.has_value()) << "线宽 0 被默认值入口收下了";
+    EXPECT_NE(badWidth.error().message.find("正数"), std::string::npos);
+}
+
+/**
  * @brief 钉住「双向箭头」也走改样式命令：选中一条已画好的单头箭头，开双向要立刻落到它身上，撤销回单头
  * @details 样式开关记在图形自己身上：新开关加进来如果忘了进 RestyleShapeCommand，选中的那条不会变，
  *          或变了撤不回去。取样点与箭头几何用例手算的同一处：线宽 4 时头长 14，
