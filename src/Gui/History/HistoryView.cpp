@@ -8,9 +8,12 @@
 #include "Gui/Theme/DesignTokens.h"
 
 #include <QComboBox>
+#include <QAbstractItemModel>
 #include <QDateTime>
 #include <QEvent>
+#include <QFileInfo>
 #include <QHBoxLayout>
+#include <QHideEvent>
 #include <QIcon>
 #include <QImageReader>
 #include <QLabel>
@@ -20,13 +23,14 @@
 #include <QMessageBox>
 #include <QListWidgetItem>
 #include <QPushButton>
+#include <QShowEvent>
+#include <QTimer>
 #include <QVariant>
 #include <QVBoxLayout>
 
+#include <algorithm>
 #include <array>
-#include <utility>
-
-#include <array>
+#include <cmath>
 #include <utility>
 
 namespace
@@ -36,6 +40,20 @@ namespace
 
     /// 列表项里存成品路径的那个角色
     constexpr int kPathRole = Qt::UserRole + 1;
+
+    /// 每轮定时器最多解几张：单轮只占几毫秒，两百张也不会拖到几秒之后才出现
+    constexpr int kThumbnailsPerTick = 3;
+
+    /// 缩略图备到 3x 屏那一档：再高的缩放比按 3 档放大，1x/2x/3x 覆盖现有屏幕
+    constexpr int kLargestThumbnailDevicePixelRatio = 3;
+
+    /**
+     * @brief 缩略图缓存最多存多少张
+     * @details 一张含 1x/2x/3x 三档，按 3x 计算约 0.5 MiB，128 张的上限约 64 MiB；
+     *          默认保留上限是 200 条，128 覆盖一屏加几屏滚动。按张数算容量是为了淘汰次序可预期——
+     *          三个 DPR 档的像素数差四倍，按字节算会让「同一张图在不同屏幕上占的额度」跟着屏幕走。
+     */
+    constexpr int kThumbnailCacheCapacity = 128;
 
     // 路径与界面字符串的换算沿用 Base::Paths::toDisplayText / fromDisplayText，这里不再抄一份
 } // namespace
@@ -211,9 +229,42 @@ namespace GyanisScribe::Gui
                              }
                          });
 
-        // 建好就自读一次：程序重启后第一次打开这一页时盘上没有新增，靠外部触发要等到下一次保存才出得来，
-        // 而用户在那之前看到的是空列表——那读起来跟「记录丢了」一模一样
-        refresh();
+        // 缩略图按小批解：0ms 单次定时器每响一次解两三张，列表先摆出来，图随后一张张换上去
+        m_thumbnailTimer = new QTimer{this};
+        m_thumbnailTimer->setSingleShot(true);
+        m_thumbnailTimer->setInterval(0);
+        QObject::connect(m_thumbnailTimer, &QTimer::timeout, this, &HistoryView::drainThumbnails);
+        m_thumbnailCache.setMaxCost(kThumbnailCacheCapacity);
+    }
+
+    void HistoryView::setPolicy(const Core::HistoryRetentionPolicy &policy)
+    {
+        m_policy = policy;
+    }
+
+    int HistoryView::thumbnailDecodeCountForTesting() const
+    {
+        return m_thumbnailDecodeCount;
+    }
+
+    void HistoryView::showEvent(QShowEvent *event)
+    {
+        QWidget::showEvent(event);
+
+        // 第一次显示才读清单；隐藏期间来过刷新请求的，这一次补读并解缩略图
+        if (!m_loaded || m_refreshWhileHidden)
+        {
+            refresh();
+            return;
+        }
+        scheduleThumbnails();
+    }
+
+    void HistoryView::hideEvent(QHideEvent *event)
+    {
+        // 定时器停了队列还留着：下次显示接着解，已经解好的都在缓存里
+        m_thumbnailTimer->stop();
+        QWidget::hideEvent(event);
     }
 
     void HistoryView::refresh()
@@ -231,7 +282,11 @@ namespace GyanisScribe::Gui
         }
 
         m_entries = *loaded;
+        m_loaded  = true;
         refillList();
+
+        // 隐藏时只摆行，不解缩略图；标记下来让第一次显示补读一次清单
+        m_refreshWhileHidden = !isVisible();
     }
 
     bool HistoryView::eventFilter(QObject *watched, QEvent *event)
@@ -279,13 +334,29 @@ namespace GyanisScribe::Gui
     {
         const auto visible = visibleEntries(m_entries, m_search->text(), kindFilterAt(m_filter->currentIndex()));
 
+        // 整批重建：旧下标全部失效，未解的那批也一并作废
+        m_thumbnailTimer->stop();
+        m_pendingThumbnails.clear();
         m_list->clear();
         for (const auto &entry: visible)
         {
-            auto *item = new QListWidgetItem{iconFor(entry), entryCaption(entry, QDateTime::currentDateTime())};
+            auto *item = new QListWidgetItem{fallbackIcon(entry), entryCaption(entry, QDateTime::currentDateTime())};
             item->setData(kPathRole, GyanisScribe::Base::Paths::toDisplayText(entry.filePath));
             item->setToolTip(GyanisScribe::Base::Paths::toDisplayText(entry.filePath) + GyanisScribe::Base::uiText("（删除只从历史里去掉这条，成品文件留在原处）"));
             m_list->addItem(item);
+
+            const auto key = thumbnailCacheKey(entry);
+            if (const auto *cached = m_thumbnailCache.object(key); cached != nullptr)
+            {
+                item->setIcon(*cached);
+                continue;
+            }
+
+            // 没命中先摆类别图标占位，真图等定时器那一批解出来再换
+            m_pendingThumbnails.append(PendingThumbnail{
+                    .index = QPersistentModelIndex{m_list->model()->index(m_list->count() - 1, 0)},
+                    .entry = entry,
+            });
         }
 
         // 两种「列表是空的」分开说：真没有记录，与筛选后没有命中——后者说「还没有记录」就是撒谎
@@ -297,19 +368,106 @@ namespace GyanisScribe::Gui
             placeEmptyHint();
             m_emptyHint->raise();
         }
+
+        scheduleThumbnails();
     }
 
-    QIcon HistoryView::iconFor(const Core::HistoryEntry &entry) const
+    QIcon HistoryView::fallbackIcon(const Core::HistoryEntry &entry) const
     {
+        // 视频与读不了的图都给一枚类别图标：列表里出现一片空白方块比图标更难看
+        return m_icons.icon(entry.kind == Core::HistoryKind::Recording ? "Record" : "CaptureRegion");
+    }
+
+    QString HistoryView::thumbnailCacheKey(const Core::HistoryEntry &entry)
+    {
+        // 修改时间进毫秒：同一路径被新内容覆盖时，键跟着变，旧图自然被当成另一张
+        const QFileInfo info{GyanisScribe::Base::Paths::toDisplayText(entry.filePath)};
+        return GyanisScribe::Base::Paths::toDisplayText(entry.filePath) + QChar{u'|'} + QString::number(info.lastModified().toMSecsSinceEpoch()) + QChar{u'|'} +
+               QString::number(info.size());
+    }
+
+    QIcon HistoryView::decodeThumbnail(const Core::HistoryEntry &entry)
+    {
+        ++m_thumbnailDecodeCount;
+
         QImageReader reader{GyanisScribe::Base::Paths::toDisplayText(entry.filePath)};
         reader.setAutoTransform(true);
+
+        // 读一次就够：先按最大那档 DPR 的覆盖尺寸预缩，三档缩略图都从这一份像素上裁
+        if (const auto source = reader.size(); source.isValid() && !source.isEmpty())
+        {
+            const auto edge  = Core::kThumbnailEdge * kLargestThumbnailDevicePixelRatio;
+            const auto ratio = std::max(static_cast<double>(edge) / static_cast<double>(source.width()), static_cast<double>(edge) / static_cast<double>(source.height()));
+            reader.setScaledSize(
+                    QSize{static_cast<int>(std::ceil(static_cast<double>(source.width()) * ratio)), static_cast<int>(std::ceil(static_cast<double>(source.height()) * ratio))});
+        }
+
         const auto image = reader.read();
         if (image.isNull())
         {
-            // 视频与读不了的图都给一枚类别图标：列表里出现一片空白方块比图标更难看
-            return m_icons.icon(entry.kind == Core::HistoryKind::Recording ? "Record" : "CaptureRegion");
+            return fallbackIcon(entry);
         }
-        return QIcon{QPixmap::fromImage(Core::makeThumbnail(image, QSize{Core::kThumbnailEdge, Core::kThumbnailEdge}, Core::kThumbnailCornerRadius))};
+
+        QIcon icon;
+        for (int ratio = 1; ratio <= kLargestThumbnailDevicePixelRatio; ++ratio)
+        {
+            const auto thumbnail = Core::makeThumbnail(image, QSize{Core::kThumbnailEdge * ratio, Core::kThumbnailEdge * ratio}, Core::kThumbnailCornerRadius * ratio);
+            if (thumbnail.isNull())
+            {
+                continue;
+            }
+            auto bitmap = QPixmap::fromImage(thumbnail);
+            // 缩放比写在位图上：列表按 96 逻辑像素摆，取图时引擎才会挑到这一档
+            bitmap.setDevicePixelRatio(ratio);
+            icon.addPixmap(bitmap);
+        }
+        if (icon.isNull())
+        {
+            return fallbackIcon(entry);
+        }
+
+        m_thumbnailCache.insert(thumbnailCacheKey(entry), new QIcon{icon}, 1);
+        return icon;
+    }
+
+    void HistoryView::scheduleThumbnails()
+    {
+        if (!isVisible() || m_pendingThumbnails.isEmpty() || m_thumbnailTimer->isActive())
+        {
+            return;
+        }
+        m_thumbnailTimer->start();
+    }
+
+    void HistoryView::drainThumbnails()
+    {
+        if (!isVisible())
+        {
+            return;
+        }
+
+        int decoded = 0;
+        while (decoded < kThumbnailsPerTick && !m_pendingThumbnails.isEmpty())
+        {
+            const auto pending = m_pendingThumbnails.takeFirst();
+            if (!pending.index.isValid())
+            {
+                // 列表已经重建过：这个下标指向的项不在了，旧图也不必再解
+                continue;
+            }
+            auto *item = m_list->itemFromIndex(pending.index);
+            if (item == nullptr)
+            {
+                continue;
+            }
+            item->setIcon(decodeThumbnail(pending.entry));
+            ++decoded;
+        }
+
+        if (!m_pendingThumbnails.isEmpty())
+        {
+            m_thumbnailTimer->start();
+        }
     }
 
     void HistoryView::removeSelected()

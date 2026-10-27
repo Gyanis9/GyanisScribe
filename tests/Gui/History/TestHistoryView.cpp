@@ -8,21 +8,29 @@
 #include <gtest/gtest.h>
 
 #include <QApplication>
+#include <QElapsedTimer>
+#include <QEventLoop>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QPushButton>
 #include <QColor>
 #include <QDateTime>
+#include <QIcon>
 #include <QImage>
 #include <QPoint>
 #include <QSize>
 
+#include <cstdio>
+#include <algorithm>
+#include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <format>
 #include <fstream>
 #include <memory>
 #include <optional>
+#include <string>
 
 using GyanisScribe::Core::HistoryEntry;
 using GyanisScribe::Core::HistoryKind;
@@ -46,15 +54,93 @@ namespace
     const QDateTime kNow{QDate{2026, 10, 10}, QTime{12, 0}};
 
     /// 在临时目录里存一张真 PNG：PNG 的读写由 Qt Gui 自带，不靠镜像格式插件
-    std::filesystem::path writeImageArtifact(const std::filesystem::path &directory, const std::string &name, const QSize &size)
+    std::filesystem::path writeImageArtifact(const std::filesystem::path &directory, const std::string &name, const QSize &size, const QColor &fill = QColor{40, 120, 200})
     {
         QImage image{size, QImage::Format_ARGB32};
-        image.fill(QColor{40, 120, 200});
+        image.fill(fill);
         const auto path = directory / name;
         // 存不下就当场红：造不出前提的用例会把自己想测的东西读成「文件被删了」
         EXPECT_TRUE(image.save(QString::fromStdWString(path.wstring()))) << name;
         return path;
     }
+
+    /// 把文件补零到指定字节数：PNG 读完 IEND 就收尾，尾部的填充不会被当成像素
+    void padFileTo(const std::filesystem::path &path, const std::uintmax_t size)
+    {
+        const auto current = std::filesystem::file_size(path);
+        if (current >= size)
+        {
+            return;
+        }
+        std::ofstream stream{path, std::ios::binary | std::ios::app};
+        stream << std::string(static_cast<std::size_t>(size - current), '\0');
+    }
+
+    /// 列表项图标中心处的颜色与期望色是否一致（圆角只切四个角，中心一定是图本身）
+    [[nodiscard]] bool iconCenterMatches(const QIcon &icon, const QColor &expected)
+    {
+        const auto bitmap = icon.pixmap(QSize{kThumbnailEdge, kThumbnailEdge});
+        if (bitmap.isNull())
+        {
+            return false;
+        }
+        const auto image  = bitmap.toImage();
+        const auto center = image.pixelColor(image.width() / 2, image.height() / 2);
+        return center.alpha() > 0 && qAbs(center.red() - expected.red()) <= 2 && qAbs(center.green() - expected.green()) <= 2 && qAbs(center.blue() - expected.blue()) <= 2;
+    }
+
+    /**
+     * @brief 处理事件直到列表里每一行的缩略图都显示成期望色
+     * @details 形状判据而不是计时判据：返回值只说明「解完了没有」，耗时由调用方另量。
+     *          旧实现解码是同步的，第一轮检查就已经成立；按需解码要等定时器一轮轮跑完。
+     */
+    [[nodiscard]] bool waitForThumbnails(const QListWidget &list, const QColor &expected, const qint64 timeoutMilliseconds)
+    {
+        QElapsedTimer watch;
+        watch.start();
+        while (watch.elapsed() < timeoutMilliseconds)
+        {
+            bool all = list.count() > 0;
+            for (int row = 0; row < list.count() && all; ++row)
+            {
+                all = iconCenterMatches(list.item(row)->icon(), expected);
+            }
+            if (all)
+            {
+                return true;
+            }
+            QApplication::processEvents(QEventLoop::AllEvents, 5);
+        }
+        return false;
+    }
+
+    /// 处理事件直到视图解过 expected 张缩略图
+    [[nodiscard]] bool waitForDecodeCount(const HistoryView &view, const int expected, const qint64 timeoutMilliseconds)
+    {
+        QElapsedTimer watch;
+        watch.start();
+        while (watch.elapsed() < timeoutMilliseconds)
+        {
+            if (view.thumbnailDecodeCountForTesting() >= expected)
+            {
+                return true;
+            }
+            QApplication::processEvents(QEventLoop::AllEvents, 5);
+        }
+        return view.thumbnailDecodeCountForTesting() >= expected;
+    }
+
+    /// 空转一段时间：用来证明这段时间里没有新的解码发生
+    void pumpEvents(const qint64 milliseconds)
+    {
+        QElapsedTimer watch;
+        watch.start();
+        while (watch.elapsed() < milliseconds)
+        {
+            QApplication::processEvents(QEventLoop::AllEvents, 5);
+        }
+    }
+
 
     /// 录屏成品：写一段占位字节即可，视图读不出像素时会退回类别图标
     std::filesystem::path writeVideoArtifact(const std::filesystem::path &directory, const std::string &name)
@@ -277,11 +363,13 @@ TEST(HistoryThumbnail, SquaresAreUniformAndCornersAreCut)
 }
 
 /**
- * @brief 钉住视图建立就自读清单，初读不靠外部触发
- * @details 程序重启后第一次打开这一页时盘上没有新增：初读若交给调用方，列表就是空的，
- *          而空列表读起来与「记录丢了」一模一样。这一条只构造视图、不调 refresh()。
+ * @brief 钉住第一次显示才读清单，构造期不碰盘
+ * @details 程序重启后第一次打开这一页时盘上没有新增：初读若交给下一次保存，列表就是空的，
+ *          而空列表读起来与「记录丢了」一模一样。但这一页挂在设置窗里、通常还不是第一页，
+ *          构造期读清单会顺带解两百张缩略图，设置窗还没露面就先卡住。因此构造后行数为 0，
+ *          show() 之后才把记录列出来。
  */
-TEST_F(HistoryViewFixture, ConstructorReadsTheManifestOnItsOwn)
+TEST_F(HistoryViewFixture, FirstShowReadsTheManifestOnItsOwn)
 {
     const auto first  = writeImageArtifact(m_directory, "first.png", {640, 480});
     const auto second = writeImageArtifact(m_directory, "second.png", {640, 480});
@@ -289,7 +377,90 @@ TEST_F(HistoryViewFixture, ConstructorReadsTheManifestOnItsOwn)
     addRecord(second, HistoryKind::Screenshot, kNow);
 
     const auto view = makeView();
-    EXPECT_EQ(view->rowCount(), 2) << "构造没读清单：这一页要等下一次保存才把旧记录列出来";
+    EXPECT_EQ(view->rowCount(), 0) << "构造期就把清单读进来了：设置窗打开时整页都要为看不见的缩略图付解码钱";
+    EXPECT_EQ(view->thumbnailDecodeCountForTesting(), 0) << "构造期解了缩略图";
+
+    view->show();
+    QApplication::processEvents();
+    EXPECT_EQ(view->rowCount(), 2) << "第一次显示没读清单：这一页要等下一次保存才把旧记录列出来";
+}
+
+/**
+ * @brief 钉住同一批文件第二次刷新不再解码
+ * @details 搜索每次键入都会重建列表；旧实现逐条现读现裁，两百条历史每敲一个字就解两百张 4K 图。
+ *          计数只认真正的解码尝试：命中缓存时列表图标照换，但计数不动。
+ */
+TEST_F(HistoryViewFixture, ThumbnailsAreCachedAcrossSearch)
+{
+    const auto first  = writeImageArtifact(m_directory, "cached-one.png", {640, 480});
+    const auto second = writeImageArtifact(m_directory, "cached-two.png", {640, 480});
+    addRecord(first, HistoryKind::Screenshot, kNow.addDays(-1));
+    addRecord(second, HistoryKind::Screenshot, kNow);
+
+    auto view = makeView();
+    ASSERT_EQ(view->thumbnailDecodeCountForTesting(), 0) << "构造期就解了缩略图";
+
+    view->show();
+    ASSERT_TRUE(waitForDecodeCount(*view, 2, 10'000)) << "首显没把两张缩略图解出来，缓存用例的前提不成立";
+    ASSERT_EQ(view->rowCount(), 2);
+
+    auto *search = view->findChild<QLineEdit *>();
+    ASSERT_NE(search, nullptr) << "历史页里没有搜索框";
+    search->setText(QStringLiteral("cached"));
+    view->refresh();
+    ASSERT_EQ(view->rowCount(), 2) << "搜索词该同时命中两张";
+
+    // 给按需解码留出足够的轮次：缓存没命中时这里会多解两张
+    pumpEvents(300);
+    EXPECT_EQ(view->thumbnailDecodeCountForTesting(), 2) << "同一批文件第二次刷新又解了一遍：缓存没命中";
+}
+
+/**
+ * @brief 钉住成品内容变了要重解，没变的仍走缓存
+ * @details 缓存键含修改时间：同一路径被新图覆盖时旧缩略图必须换掉，否则列表一直显示上一版。
+ *          只该重解改了的那一张——两张都重解说明缓存键里没有修改时间。
+ */
+TEST_F(HistoryViewFixture, ChangedFileInvalidatesItsThumbnail)
+{
+    const QColor kOriginal{40, 120, 200};
+    const QColor kReplacement{220, 30, 30};
+
+    const auto changed     = writeImageArtifact(m_directory, "changed.png", {640, 480}, kOriginal);
+    const auto replacement = writeImageArtifact(m_directory, "replacement.png", {640, 480}, kReplacement);
+    const auto kept        = writeImageArtifact(m_directory, "kept.png", {640, 480}, kOriginal);
+
+    // 两份内容不同的 PNG 补到同一字节数：后面覆盖时文件大小不变，缓存键里只剩修改时间能变
+    const auto paddedSize = std::max(std::filesystem::file_size(changed), std::filesystem::file_size(replacement)) + 4096;
+    padFileTo(changed, paddedSize);
+    padFileTo(replacement, paddedSize);
+    ASSERT_EQ(std::filesystem::file_size(changed), std::filesystem::file_size(replacement)) << "两份文件没补成同样大小，失效判据会误读成大小变了";
+
+    addRecord(changed, HistoryKind::Screenshot, kNow.addDays(-1));
+    addRecord(kept, HistoryKind::Screenshot, kNow);
+
+    auto view = makeView();
+    view->show();
+    ASSERT_TRUE(waitForDecodeCount(*view, 2, 10'000)) << "首显没把两张缩略图解出来，失效判据的前提不成立";
+    ASSERT_EQ(view->thumbnailDecodeCountForTesting(), 2);
+
+    auto *list = view->findChild<QListWidget *>();
+    ASSERT_NE(list, nullptr) << "历史页里没有缩略图列表";
+    ASSERT_EQ(list->count(), 2);
+
+    // 同一路径换成新内容并推到将来的修改时间：大小不变，只有修改时间这一格变了
+    std::error_code copied;
+    std::filesystem::copy_file(replacement, changed, std::filesystem::copy_options::overwrite_existing, copied);
+    ASSERT_FALSE(copied) << "覆盖成品失败：" << copied.message();
+    std::error_code touched;
+    std::filesystem::last_write_time(changed, std::filesystem::file_time_type::clock::now() + std::chrono::seconds{10}, touched);
+    ASSERT_FALSE(touched) << "改不动修改时间，失效判据的前提不成立：" << touched.message();
+
+    view->refresh();
+    ASSERT_TRUE(waitForDecodeCount(*view, 3, 10'000)) << "换了内容的文件没有重解";
+    pumpEvents(100);
+    EXPECT_EQ(view->thumbnailDecodeCountForTesting(), 3) << "只该重解改了的那一张；两张都重解说明缓存键里没有修改时间";
+    // 列表按时间倒序：改了的那条较早，排在第二行
+    EXPECT_TRUE(iconCenterMatches(list->item(1)->icon(), kReplacement)) << "列表项还是旧图：修改时间没有进缓存键";
 }
 
 /**
@@ -382,4 +553,55 @@ TEST_F(HistoryViewFixture, ListUsesTabularFigures)
 #if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
     EXPECT_EQ(list->font().featureValue(QFont::Tag("tnum")), 1u) << "历史列表没锁等宽，卡片读数会左右跳";
 #endif
+}
+
+/**
+ * @brief 读数用例：200 条 4K 成品时，构造加首次显示、以及第二次搜索刷新各要多久（不断言时间）
+ * @details 一份 4K PNG 复制成 200 个名字，清单里记 200 条：旧实现构造期逐条同步解码，
+ *          第二次搜索又把同一批全解一遍；新实现首次显示才读、按修改时间缓存，第二次应当只剩命中。
+ *          这里只报「列表里每一行都换成真缩略图」所需的时间，跑在什么机器上就报什么数。
+ */
+TEST_F(HistoryViewFixture, ReportsTheCostOfRefreshingTwoHundredFourKHistoryEntries)
+{
+    constexpr int    kEntries = 200;
+    const QSize      kSourceSize{3840, 2160};
+    const QColor     kSourceColor{40, 120, 200};
+    constexpr qint64 kTimeoutMilliseconds = 60'000;
+
+    const auto seed = writeImageArtifact(m_directory, "slide-seed.png", kSourceSize);
+    for (int index = 0; index < kEntries; ++index)
+    {
+        const auto      name   = std::format("slide-{:03}.png", index);
+        const auto      target = m_directory / name;
+        std::error_code copied;
+        std::filesystem::copy_file(seed, target, std::filesystem::copy_options::overwrite_existing, copied);
+        ASSERT_FALSE(copied) << "复制第 " << index << " 份 4K 成品失败：" << copied.message();
+        addRecord(target, HistoryKind::Screenshot, kNow.addSecs(-index));
+    }
+
+    QElapsedTimer firstShow;
+    firstShow.start();
+    auto  view = makeView();
+    auto *list = view->findChild<QListWidget *>();
+    ASSERT_NE(list, nullptr) << "历史页里没有缩略图列表";
+
+    view->show();
+    const auto windowReadyMilliseconds = firstShow.elapsed();
+    ASSERT_TRUE(waitForThumbnails(*list, kSourceColor, kTimeoutMilliseconds)) << "首屏缩略图没在时限内解完，这次的读数不成立";
+    const auto firstShowMilliseconds = firstShow.elapsed();
+
+    auto *search = view->findChild<QLineEdit *>();
+    ASSERT_NE(search, nullptr) << "历史页里没有搜索框";
+
+    // 搜索词命中全部 200 条：列表整批重建，旧实现会在这里把同一批图全解第二遍
+    QElapsedTimer searchRefresh;
+    searchRefresh.start();
+    search->setText(QStringLiteral("slide"));
+    const auto searchReturnMilliseconds = searchRefresh.elapsed();
+    ASSERT_TRUE(waitForThumbnails(*list, kSourceColor, kTimeoutMilliseconds)) << "搜索刷新后的缩略图没在时限内解完，这次的读数不成立";
+    const auto searchRefreshMilliseconds = searchRefresh.elapsed();
+
+    std::printf("[读数] 历史页 200 条 4K：构造+显示返回 %lldms；首屏缩略图全部就绪 %lldms；搜索刷新返回 %lldms；刷新后缩略图全部就绪 %lldms\n",
+                static_cast<long long>(windowReadyMilliseconds), static_cast<long long>(firstShowMilliseconds), static_cast<long long>(searchReturnMilliseconds),
+                static_cast<long long>(searchRefreshMilliseconds));
 }

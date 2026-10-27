@@ -15,6 +15,9 @@
 
 #include "Gui/Controls/Toast.h"
 
+#include <QCache>
+#include <QIcon>
+#include <QPersistentModelIndex>
 #include <QStringList>
 #include <QVector>
 #include <QWidget>
@@ -23,10 +26,13 @@
 #include <optional>
 
 class QEvent;
+class QHideEvent;
 class QLabel;
 class QLineEdit;
 class QListWidget;
 class QComboBox;
+class QShowEvent;
+class QTimer;
 
 namespace GyanisScribe::Gui
 {
@@ -71,7 +77,7 @@ namespace GyanisScribe::Gui
     /**
      * @brief 历史页控件
      * @details 视图不认贴图也不认识识别：三个出口只发信号，路径交给持有各模块的控制器。
-     *          缩略图现读现裁，不另存一份缓存——多存一份就要管它什么时候过期。
+     *          缩略图按路径、修改时间与文件大小缓存，解码按小批排队，看不见的时候不解。
      */
     class HistoryView : public QWidget
     {
@@ -79,8 +85,9 @@ namespace GyanisScribe::Gui
 
     public:
         /**
-         * @brief 构造历史页
-         * @details 收尾读一次清单：这一页第一次摆出来就得是当前的记录，不能等下一次保存才有内容。
+         * @brief 构造历史页，只搭控件不读清单
+         * @details 这一页挂在设置窗里且通常不是第一页；构造期读清单会顺带解两百张缩略图，
+         *          设置窗还没露面就先卡住。清单交给第一次显示去读。
          * @param store 历史清单，刷新时从它读
          * @param policy 保留策略，读清单时裁剪
          * @param icons 图标供给器，读不到缩略图时的兜底图标由它给
@@ -90,8 +97,16 @@ namespace GyanisScribe::Gui
         HistoryView(Core::HistoryStore &store, const Core::HistoryRetentionPolicy &policy, Gui::IconProvider &icons, QWidget *parent = nullptr);
 
         /**
+         * @brief 换一份保留策略，下一次 refresh() 按它裁剪
+         * @param policy 新的条数与天数上限
+         * @details 只记策略不自己重读：设置页改完条数或天数后由主窗口紧接着调 refresh()，
+         *          两件事拆开才看得见「策略已换、清单还没重读」这个中间态。
+         */
+        void setPolicy(const Core::HistoryRetentionPolicy &policy);
+
+        /**
          * @brief 重读清单并按当前条件重填列表
-         * @details 视图建立时读过一次，之后每次截图或录屏由调用方触发；列表不会自己发现盘上多了文件。
+         * @details 显式调用时隐藏着也照常读出条目并摆好行；缩略图要等这一页显示出来才解。
          */
         void refresh();
 
@@ -112,6 +127,13 @@ namespace GyanisScribe::Gui
          * @return 路径；没有选中项时返回空
          */
         [[nodiscard]] std::optional<std::filesystem::path> selectedPath() const;
+
+        /**
+         * @brief 已经真正解码过多少张缩略图
+         * @return 解码尝试次数；缓存命中与直接摆上的占位图标不计
+         * @details 「刷新会不会又解一遍」只有这个计数看得见：图标换没换在列表上看不出新旧。
+         */
+        [[nodiscard]] int thumbnailDecodeCountForTesting() const;
 
     signals:
         /**
@@ -154,6 +176,21 @@ namespace GyanisScribe::Gui
         /// 列表视口改尺寸时把空态提示重新摆到中央
         bool eventFilter(QObject *watched, QEvent *event) override;
 
+        /**
+         * @brief 显示时补上首次读清单与隐藏期间的刷新请求
+         * @param event 显示事件
+         * @details 第一次显示才读清单；隐藏期间来过 refresh() 的，在这里补读一次——
+         *          那一次只摆了行，没解缩略图。
+         */
+        void showEvent(QShowEvent *event) override;
+
+        /**
+         * @brief 隐藏时停掉缩略图解码
+         * @param event 隐藏事件
+         * @details 看不见的卡片不值得继续解；队列留着，下次显示接着跑。
+         */
+        void hideEvent(QHideEvent *event) override;
+
     private:
         /// 按当前搜索词与类别重填列表，不动 m_entries
         void refillList();
@@ -161,20 +198,45 @@ namespace GyanisScribe::Gui
         /// 把空态提示铺满列表视口的内侧（居中由标签自己的对齐做）
         void placeEmptyHint();
 
-        /// 读缩略图；读不到就退回这一类的图标
-        [[nodiscard]] QIcon iconFor(const Core::HistoryEntry &entry) const;
+        /// 某条记录读不出缩略图时的类别图标
+        [[nodiscard]] QIcon fallbackIcon(const Core::HistoryEntry &entry) const;
+
+        /// 读一条成品并裁成 1x/2x/3x 三档缩略图；读不出时退回类别图标
+        [[nodiscard]] QIcon decodeThumbnail(const Core::HistoryEntry &entry);
+
+        /// 缓存键：成品路径、修改时间（毫秒）与文件大小
+        [[nodiscard]] static QString thumbnailCacheKey(const Core::HistoryEntry &entry);
+
+        /// 可见且队列非空时启动一次单次定时器
+        void scheduleThumbnails();
+
+        /// 每次定时器触发解一小批，解不完再排下一发
+        void drainThumbnails();
 
         /// 删除选中项：先去掉记录，再刷新列表
         void removeSelected();
 
-        Core::HistoryStore          &m_store;               ///< 历史清单
-        Core::HistoryRetentionPolicy m_policy;              ///< 读清单时用的保留策略
-        Gui::IconProvider           &m_icons;               ///< 图标供给器
-        QVector<Core::HistoryEntry>  m_entries;             ///< 本次读到的全量记录，时间倒序
-        QLineEdit                   *m_search    = nullptr; ///< 搜索框
-        QComboBox                   *m_filter    = nullptr; ///< 类别筛选下拉
-        QListWidget                 *m_list      = nullptr; ///< 缩略图列表
-        QLabel                      *m_emptyHint = nullptr; ///< 列表为空/筛不出时的引导句
+        /// 一条等着解码的列表项；列表重建后 QPersistentModelIndex 自己失效
+        struct PendingThumbnail
+        {
+            QPersistentModelIndex index; ///< 目标列表项
+            Core::HistoryEntry    entry; ///< 要解的那条成品
+        };
+
+        Core::HistoryStore          &m_store;                        ///< 历史清单
+        Core::HistoryRetentionPolicy m_policy;                       ///< 读清单时用的保留策略
+        Gui::IconProvider           &m_icons;                        ///< 图标供给器
+        QVector<Core::HistoryEntry>  m_entries;                      ///< 本次读到的全量记录，时间倒序
+        QLineEdit                   *m_search         = nullptr;     ///< 搜索框
+        QComboBox                   *m_filter         = nullptr;     ///< 类别筛选下拉
+        QListWidget                 *m_list           = nullptr;     ///< 缩略图列表
+        QLabel                      *m_emptyHint      = nullptr;     ///< 列表为空/筛不出时的引导句
+        QTimer                      *m_thumbnailTimer = nullptr;     ///< 0ms 单次定时器，按批解码缩略图
+        QCache<QString, QIcon>       m_thumbnailCache;               ///< 缩略图缓存，键见 thumbnailCacheKey
+        QVector<PendingThumbnail>    m_pendingThumbnails;            ///< 还没解的列表项
+        int                          m_thumbnailDecodeCount = 0;     ///< 实际解码尝试次数，供用例读数
+        bool                         m_loaded               = false; ///< 是否已经成功读过一次清单
+        bool                         m_refreshWhileHidden   = false; ///< 上次刷新发生在隐藏时，显示后要补读
     };
 
 } // namespace GyanisScribe::Gui
