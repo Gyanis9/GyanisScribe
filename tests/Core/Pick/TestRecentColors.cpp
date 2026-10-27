@@ -6,9 +6,11 @@
 #include <QColor>
 #include <QStringList>
 
+#include <format>
+#include <string>
 #include <vector>
 
-using GyanisScribe::Core::kAnnotationRecentColors;
+using GyanisScribe::Core::kAnnotationPalette;
 using GyanisScribe::Core::kPickRecentColors;
 using GyanisScribe::Core::kRecentColorCapacity;
 using GyanisScribe::Core::parseRecentColors;
@@ -21,6 +23,12 @@ namespace
     std::vector<QColor> colors(std::initializer_list<QColor> list)
     {
         return {list};
+    }
+
+    /// 取色器这一路给解析器的恢复办法：提示里点名的必须是它真正读的那一格
+    std::string pickRecoveryHint()
+    {
+        return std::format("删掉配置里的 {} 这一项可以恢复默认", kPickRecentColors);
     }
 } // namespace
 
@@ -47,7 +55,7 @@ TEST(RecentColorsToken, DropsAlphaToKeepSixDigits)
     const auto translucent = QColor(255, 0, 0, 128);
     EXPECT_EQ(recentColorToken(translucent), QStringLiteral("#FF0000"));
 
-    const auto readBack = parseRecentColors({recentColorToken(translucent)}, kPickRecentColors);
+    const auto readBack = parseRecentColors({recentColorToken(translucent)}, "最近使用颜色", pickRecoveryHint());
     ASSERT_TRUE(readBack.has_value()) << readBack.error().message;
     ASSERT_EQ(readBack->size(), 1U);
     EXPECT_EQ(readBack->at(0).red(), 255);
@@ -113,7 +121,7 @@ TEST(RecentColorsRoundTrip, SerializedListReadsBackEqual)
     ASSERT_EQ(tokens.size(), 3);
     EXPECT_EQ(tokens[2], QStringLiteral("#123456")) << "顺序变了，重启后色板上的位置就会和用户记忆里不一样";
 
-    const auto readBack = parseRecentColors(tokens, kPickRecentColors);
+    const auto readBack = parseRecentColors(tokens, "最近使用颜色", pickRecoveryHint());
     ASSERT_TRUE(readBack.has_value()) << readBack.error().message;
     EXPECT_EQ(readBack.value(), list);
 }
@@ -127,32 +135,34 @@ TEST(RecentColorsRoundTrip, RejectsAnyTokenThatIsNotSixHexDigits)
     // 每条都是非空文本：空串的 find(\"\") 恒为 0，那样的断言不带信息（这里刻意不放空串）
     for (const auto *bad: {"red", "#GGGGGG", "#FF00", "#FF00000", " FF0000"})
     {
-        const auto parsed = parseRecentColors({QStringLiteral("#123456"), QString::fromUtf8(bad)}, kPickRecentColors);
+        const auto parsed = parseRecentColors({QStringLiteral("#123456"), QString::fromUtf8(bad)}, "最近使用颜色", pickRecoveryHint());
         ASSERT_FALSE(parsed.has_value()) << bad;
         EXPECT_EQ(parsed.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument) << bad;
         // 原因要点出是哪一条词与怎么恢复，否则用户只能对着配置文件猜；
         // 恢复办法说的必须是这条读路径真正读的键，照着删错键等于没修
         EXPECT_NE(parsed.error().message.find(QString::fromUtf8(bad).toStdString()), std::string::npos) << bad;
         EXPECT_NE(parsed.error().message.find(kPickRecentColors), std::string::npos) << bad;
-        EXPECT_EQ(parsed.error().message.find(kAnnotationRecentColors), std::string::npos) << bad << " 提示指向了另一条读路径的键";
+        EXPECT_EQ(parsed.error().message.find(kAnnotationPalette), std::string::npos) << bad << " 提示指向了另一条读路径的键";
     }
 
     // 空清单是合法状态（用户还没用过自定义颜色），不能报成坏值
-    const auto empty = parseRecentColors({}, kPickRecentColors);
+    const auto empty = parseRecentColors({}, "最近使用颜色", pickRecoveryHint());
     ASSERT_TRUE(empty.has_value());
     EXPECT_TRUE(empty->empty());
 }
 
 /**
- * @brief 钉住标注色板这条读路径的提示指向 Annotation/RecentColors
- * @details 同一个解析函数被取色器与标注色板共用；提示里的键随调用方走，
- *          否则标注色板读坏时会叫用户去删取色器那一格，白删一场
+ * @brief 钉住清单名与恢复办法都由调用方决定，提示里不写死任何一份清单
+ * @details 同一个解析函数被取色器、标注最近色与自定义色板共用；提示里的清单名与键随调用方走，
+ *          否则色板读坏时会叫用户去删最近使用那一格，白删一场
  */
-TEST(RecentColorsRoundTrip, BadTokenUnderAnnotationKeyNamesTheAnnotationKey)
+TEST(RecentColorsRoundTrip, BadTokenUsesTheCallersListLabelAndRecoveryHint)
 {
-    const auto parsed = parseRecentColors({QStringLiteral("#123456"), QStringLiteral("#GGGGGG")}, kAnnotationRecentColors);
+    const auto recovery = std::format("删掉配置里的 {} 这一项可以恢复默认", kAnnotationPalette);
+    const auto parsed   = parseRecentColors({QStringLiteral("#123456"), QStringLiteral("#GGGGGG")}, "自定义色板", recovery);
     ASSERT_FALSE(parsed.has_value());
     EXPECT_EQ(parsed.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument);
-    EXPECT_NE(parsed.error().message.find(kAnnotationRecentColors), std::string::npos) << " 提示没点名标注色板读的那一格键";
-    EXPECT_EQ(parsed.error().message.find(kPickRecentColors), std::string::npos) << " 提示指向了取色器那一格键";
+    EXPECT_NE(parsed.error().message.find("自定义色板"), std::string::npos) << " 提示没带上调用方给的清单名";
+    EXPECT_NE(parsed.error().message.find(kAnnotationPalette), std::string::npos) << " 提示没点名调用方给的那一格键";
+    EXPECT_EQ(parsed.error().message.find("最近使用颜色"), std::string::npos) << " 提示沿用了另一条读路径的清单名";
 }

@@ -7,9 +7,45 @@
 #include "Base/Text.h"
 
 #include <algorithm>
+#include <format>
+#include <string_view>
 
 namespace GyanisScribe::Core
 {
+    namespace
+    {
+        /// 这份清单在提示里的名字：配置读入与文件导入共用
+        constexpr std::string_view kPaletteListLabel = "自定义色板";
+
+        /**
+         * @brief 色板解码的共用实现
+         * @param tokens 待解码的色块词
+         * @param recoveryHint 恢复默认的做法，由配置读入或文件导入那一侧给出
+         * @return 解码出的色板；为空、超上限或含坏词时返回原因
+         */
+        Base::Expected<std::vector<QColor>> paletteFromTokensWithHint(const QStringList &tokens, const std::string_view recoveryHint)
+        {
+            if (tokens.isEmpty())
+            {
+                return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
+                                                   GyanisScribe::Base::uiTextUtf8("色板是空的：至少要留一格。想回到内置那八格，请把设置里那一格清掉而不是填成空白")});
+            }
+            if (tokens.size() > static_cast<qsizetype>(kPaletteCapacity))
+            {
+                // 不截断：悄悄丢掉后面几格，用户看到的是「我存的八格少了两格」，而原因哪儿都没有
+                return std::unexpected(
+                        Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("色板有 {} 格，超出上限 {} 格：请删掉几格再存"),
+                                                                                                   tokens.size(), static_cast<int>(kPaletteCapacity))});
+            }
+            const auto parsed = Core::parseRecentColors(tokens, kPaletteListLabel, recoveryHint);
+            if (!parsed)
+            {
+                return std::unexpected(parsed.error());
+            }
+            return *parsed;
+        }
+    } // namespace
+
     std::vector<QColor> defaultAnnotationPalette()
     {
         // 值只住在本头那一处；这里按区间两端构造 vector，不用 ranges::to（编译器实现进度不一，写法要保守）
@@ -35,24 +71,8 @@ namespace GyanisScribe::Core
 
     Base::Expected<std::vector<QColor>> paletteFromTokens(const QStringList &tokens)
     {
-        if (tokens.isEmpty())
-        {
-            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Base::uiTextUtf8("色板是空的：至少要留一格。想回到内置那八格，请把设置里那一格清掉而不是填成空白")});
-        }
-        if (tokens.size() > static_cast<qsizetype>(kPaletteCapacity))
-        {
-            // 不截断：悄悄丢掉后面几格，用户看到的是「我存的八格少了两格」，而原因哪儿都没有
-            return std::unexpected(
-                    Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("色板有 {} 格，超出上限 {} 格：请删掉几格再存"),
-                                                                                               tokens.size(), static_cast<int>(kPaletteCapacity))});
-        }
-        const auto parsed = Core::parseRecentColors(tokens, Core::kAnnotationRecentColors);
-        if (!parsed)
-        {
-            return std::unexpected(parsed.error());
-        }
-        return *parsed;
+        const auto recovery = std::format("删掉配置里的 {} 这一项可以恢复默认", Core::kAnnotationPalette);
+        return paletteFromTokensWithHint(tokens, recovery);
     }
 
     std::vector<QColor> movePaletteColor(std::vector<QColor> palette, const std::size_t from, const std::size_t to)
@@ -121,7 +141,8 @@ namespace GyanisScribe::Core
                 }
             }
         }
-        return paletteFromTokens(tokens);
+        const auto recovery = std::format("检查导入文件里的色块写法，或删掉配置里的 {} 这一项可以恢复默认", Core::kAnnotationPalette);
+        return paletteFromTokensWithHint(tokens, recovery);
     }
 
 } // namespace GyanisScribe::Core

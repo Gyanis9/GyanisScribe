@@ -170,7 +170,8 @@ namespace GyanisScribe::Gui
             Base::Logger::warning(std::format("自定义色板读不出：{}，本次按内置那八格摆", resolved.error().message));
             m_palette = Core::defaultAnnotationPalette();
         }
-        if (const auto parsed = Core::parseRecentColors(m_settings.stringListValue(Core::kAnnotationRecentColors, {}), Core::kAnnotationRecentColors); parsed)
+        const auto recentRecovery = std::format("删掉配置里的 {} 这一项可以恢复默认", Core::kAnnotationRecentColors);
+        if (const auto parsed = Core::parseRecentColors(m_settings.stringListValue(Core::kAnnotationRecentColors, {}), "最近使用颜色", recentRecovery); parsed)
         {
             m_recentColors = *parsed;
             // 手改过的配置文件可能超出上限：按上限截断，菜单不会被撑到放不下

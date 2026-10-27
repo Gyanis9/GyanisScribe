@@ -136,6 +136,28 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住色板坏值提示点的是 Annotation/Palette，不是最近使用那一格
+     * @details 色板与最近使用共用同一个解析器；提示里的键跟错调用方，用户照删等于白删一场
+     */
+    TEST_F(AnnotationPaletteFixture, BadPaletteTokenNamesThePaletteKey)
+    {
+        const auto parsed = paletteFromTokens({QStringLiteral("#FF0000"), QStringLiteral("red")});
+        ASSERT_FALSE(parsed.has_value());
+        const auto &message = parsed.error().message;
+        EXPECT_NE(message.find(GyanisScribe::Core::kAnnotationPalette), std::string::npos) << "提示没点名色板读的那一格键：" << message;
+        EXPECT_NE(message.find("自定义色板"), std::string::npos) << "清单名沿用了最近使用那一路的说法：" << message;
+        EXPECT_EQ(message.find(GyanisScribe::Core::kAnnotationRecentColors), std::string::npos) << "提示指向了最近使用那一格键：" << message;
+
+        // 导入文件那一侧换了恢复办法：先看文件写法，再说配置那一格
+        const auto imported = parsePaletteFileText(QStringLiteral("#FF0000, red"));
+        ASSERT_FALSE(imported.has_value());
+        const auto &importMessage = imported.error().message;
+        EXPECT_NE(importMessage.find("导入文件"), std::string::npos) << "导入提示没有指向这份文件：" << importMessage;
+        EXPECT_NE(importMessage.find(GyanisScribe::Core::kAnnotationPalette), std::string::npos) << "导入提示没点名色板读的那一格键：" << importMessage;
+        EXPECT_EQ(importMessage.find(GyanisScribe::Core::kAnnotationRecentColors), std::string::npos) << "导入提示指向了最近使用那一格键：" << importMessage;
+    }
+
+    /**
      * @brief 钉住「拖一格到另一格那儿」是插入而不是互换
      * @details 互换在拖过半排时会把用户的意思反着算：他要把第 0 格放到第 3 格旁边，结果换来换去还在原地
      */

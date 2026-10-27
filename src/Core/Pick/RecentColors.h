@@ -53,15 +53,16 @@ namespace GyanisScribe::Core
     [[nodiscard]] QStringList serializeRecentColors(std::span<const QColor> colors);
 
     /**
-     * @brief 读回配置里的清单
-     * @param tokens 配置文本列表
-     * @param settingsKey 调用方实际读的那一格配置键；只用来在出错原因里告诉用户删哪一格
+     * @brief 读回一份颜色清单
+     * @param tokens 配置或导入文件里的文本列表
+     * @param listLabel 这条读路径上清单的名字，用于说出坏的是哪一份清单
+     * @param recoveryHint 恢复默认的做法，由调用方给出
      * @return 解析出的颜色清单；任一词不是 #RRGGBB 时返回带该词的原因
      * @details 整条一起拒绝而不是跳过坏词：跳过的话用户看到的就是「我明明存了八个只剩五个」，
      *          而原因落在日志里他看不见。
-     *          键由调用方给：取色器与标注色板各读各的一格，写死其中任何一个都会让另一条路径
-     *          提示用户去删一个它根本没读过的键。
+     *          清单名与恢复办法由调用方给：取色器、标注最近色与自定义色板各读各的一份，
+     *          写死其中任何一份都会让另一条路径提示用户去删一个它根本没读过的键。
      */
-    [[nodiscard]] Base::Expected<std::vector<QColor>> parseRecentColors(const QStringList &tokens, std::string_view settingsKey);
+    [[nodiscard]] Base::Expected<std::vector<QColor>> parseRecentColors(const QStringList &tokens, std::string_view listLabel, std::string_view recoveryHint);
 
 } // namespace GyanisScribe::Core

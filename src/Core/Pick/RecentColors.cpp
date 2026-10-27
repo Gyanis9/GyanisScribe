@@ -53,7 +53,7 @@ namespace GyanisScribe::Core
         return tokens;
     }
 
-    Base::Expected<std::vector<QColor>> parseRecentColors(const QStringList &tokens, const std::string_view settingsKey)
+    Base::Expected<std::vector<QColor>> parseRecentColors(const QStringList &tokens, const std::string_view listLabel, const std::string_view recoveryHint)
     {
         std::vector<QColor> colors;
         colors.reserve(static_cast<std::size_t>(tokens.size()));
@@ -64,7 +64,7 @@ namespace GyanisScribe::Core
             {
                 return Base::Expected<std::vector<QColor>>{std::unexpected{Base::Error{
                         .code    = Base::ErrorCode::InvalidArgument,
-                        .message = std::format("最近使用颜色里有一条不是 #RRGGBB 写法：\"{}\"。删掉配置里的 {} 这一项可以恢复默认", token.toStdString(), settingsKey),
+                        .message = std::format("{}里有一条不是 #RRGGBB 写法：\"{}\"。{}", listLabel, token.toStdString(), recoveryHint),
                 }}};
             }
 
@@ -75,7 +75,7 @@ namespace GyanisScribe::Core
             {
                 return Base::Expected<std::vector<QColor>>{std::unexpected{Base::Error{
                         .code    = Base::ErrorCode::InvalidArgument,
-                        .message = std::format("最近使用颜色里有一条不是十六进制：\"{}\"。删掉配置里的 {} 这一项可以恢复默认", token.toStdString(), settingsKey),
+                        .message = std::format("{}里有一条不是十六进制：\"{}\"。{}", listLabel, token.toStdString(), recoveryHint),
                 }}};
             }
 
