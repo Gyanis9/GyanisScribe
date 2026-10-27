@@ -10,11 +10,13 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <format>
 #include <memory>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 using GyanisScribe::Base::Error;
@@ -46,13 +48,18 @@ namespace
             Qt::Key               key;
         };
 
-        explicit FakeHotkeyBackend(std::set<int> identifiersToReject = {}) : m_identifiersToReject(std::move(identifiersToReject))
+        explicit FakeHotkeyBackend(std::set<int> identifiersToReject = {}, std::set<std::pair<Qt::KeyboardModifiers, Qt::Key>> rejectedCombinations = {}) :
+            m_identifiersToReject(std::move(identifiersToReject)), m_rejectedCombinations(std::move(rejectedCombinations))
         {
         }
 
         Expected<void> registerHotkey(int identifier, Qt::KeyboardModifiers modifiers, Qt::Key key) override
         {
             registrations.push_back(Registration{identifier, modifiers, key});
+            if (m_rejectedCombinations.find(std::pair{modifiers, key}) != m_rejectedCombinations.end())
+            {
+                return std::unexpected(Error{ErrorCode::Busy, "替身按组合拒绝登记：模拟这颗键已被别的程序占走"});
+            }
             if (m_identifiersToReject.find(identifier) != m_identifiersToReject.end())
             {
                 return std::unexpected(Error{ErrorCode::Busy, std::format("替身按编号 {} 拒绝登记：模拟组合键已被占用", identifier)});
@@ -89,7 +96,8 @@ namespace
         int                       unregisterAllCalls = 0;
 
     private:
-        std::set<int> m_identifiersToReject;
+        std::set<int>                                       m_identifiersToReject;  ///< 这些编号一登记就报被占用
+        std::set<std::pair<Qt::KeyboardModifiers, Qt::Key>> m_rejectedCombinations; ///< 这些组合一登记就报被占用
     };
 
     class FakePlatformIntegration : public IPlatformIntegration
@@ -177,14 +185,15 @@ namespace
                 m_backendMirror = nullptr;
                 return std::make_unique<UnsupportedHotkeyBackend>();
             }
-            auto created    = std::make_unique<FakeHotkeyBackend>(m_identifiersToReject);
+            auto created    = std::make_unique<FakeHotkeyBackend>(m_identifiersToReject, m_rejectedCombinations);
             m_backendMirror = created.get();
             return created;
         }
 
-        FakeHotkeyBackend *m_backendMirror = nullptr; ///< 最近创建的那份后端，用例经它检查登记与触发
-        std::set<int>      m_identifiersToReject;
-        bool               m_supportsHotkeys = true;
+        FakeHotkeyBackend                                  *m_backendMirror = nullptr; ///< 最近创建的那份后端，用例经它检查登记与触发
+        std::set<int>                                       m_identifiersToReject;
+        std::set<std::pair<Qt::KeyboardModifiers, Qt::Key>> m_rejectedCombinations; ///< 登记时要报被占用的组合，后端创建时带过去
+        bool                                                m_supportsHotkeys = true;
     };
 
     std::unique_ptr<QCoreApplication> application;
@@ -417,6 +426,71 @@ TEST_F(HotkeyManagerFixture, BindingTextFallsBackWhenStoredCombinationIsBroken)
     ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kHotkeyCapture, QVariant(QStringLiteral("Ctrl+?"))).has_value());
     EXPECT_EQ(manager.bindingText(HotkeyAction::Capture), QStringLiteral("Ctrl+Alt+A")) << "坏值要回落到默认组合的显示文本";
     EXPECT_EQ(manager.bindingText(HotkeyAction::Record), QStringLiteral("Ctrl+Alt+R")) << "没被改动的动作不受影响";
+}
+
+/**
+ * @brief 钉住设置改出的新组合被拒时，旧组合重新登记回去，并把失败交回界面
+ * @details 重登先把旧登记全摘掉：新组合被别的程序占走、旧组合又不恢复的话，
+ *          用户按新键没有反应，按回旧键也没有反应，而设置页仍显示新组合。
+ */
+TEST_F(HotkeyManagerFixture, FailedReloadKeepsThePreviousCombinationRegistered)
+{
+    SettingsStore settings(m_iniFile);
+    // 默认组合都不碰 F2，这一颗只在下面那次改动里出现
+    FakePlatformIntegration integration;
+    integration.m_rejectedCombinations = {{Qt::ControlModifier | Qt::ShiftModifier, Qt::Key_F2}};
+    HotkeyManager manager(settings, integration);
+    ASSERT_TRUE(manager.reload().has_value());
+
+    std::vector<HotkeyReloadReport> reports;
+    QObject::connect(&manager, &IHotkeyManager::reloadFailed, [&reports](const HotkeyReloadReport &report) { reports.push_back(report); });
+
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kHotkeyCapture, QVariant(QStringLiteral("Ctrl+Shift+F2"))).has_value());
+
+    ASSERT_EQ(reports.size(), 1U) << "设置变更触发的重登失败了，界面却什么也没收到：用户只会看到按了没反应";
+    ASSERT_EQ(reports[0].failures.size(), 1U);
+    EXPECT_EQ(reports[0].failures[0].action, HotkeyAction::Capture);
+    EXPECT_EQ(reports[0].failures[0].error.code, ErrorCode::Busy);
+    EXPECT_EQ(reports[0].failures[0].combination, QStringLiteral("Ctrl+Shift+F2")) << "失败项要说清用户刚设的那串文本";
+    const auto reason = QString::fromStdString(reports[0].failures[0].error.message);
+    EXPECT_TRUE(reason.contains(QStringLiteral("Ctrl+Alt+A"))) << "原因里没说旧组合是哪一个，用户不知道现在该按什么：" << reason.toStdString();
+    EXPECT_EQ(reports[0].registered, 7) << "恢复旧组合不算新登记，只数其余七项";
+
+    const auto &registrations = integration.m_backendMirror->registrations;
+    const auto  lastCapture =
+            std::find_if(registrations.rbegin(), registrations.rend(), [](const FakeHotkeyBackend::Registration &registration) { return registration.identifier == 1; });
+    ASSERT_NE(lastCapture, registrations.rend()) << "重登之后截图那颗键一次都没再登记，旧组合已经失效";
+    EXPECT_EQ(lastCapture->modifiers, Qt::ControlModifier | Qt::AltModifier) << "最后登记给截图编号的不是原来那颗键的修饰键";
+    EXPECT_EQ(lastCapture->key, Qt::Key_A) << "最后登记给截图编号的不是原来那颗键：新组合被拒后旧热键已经死了";
+    EXPECT_EQ(integration.m_backendMirror->liveRegistrations.count(1), 1U) << "截图编号不在册：按 Ctrl+Alt+A 不会再有反应";
+}
+
+/**
+ * @brief 钉住设置文本坏掉时同样恢复旧组合：一次手改坏配置不该让热键全灭
+ */
+TEST_F(HotkeyManagerFixture, InvalidCombinationTextRestoresThePreviousCombination)
+{
+    SettingsStore           settings(m_iniFile);
+    FakePlatformIntegration integration;
+    HotkeyManager           manager(settings, integration);
+    ASSERT_TRUE(manager.reload().has_value());
+
+    std::vector<HotkeyReloadReport> reports;
+    QObject::connect(&manager, &IHotkeyManager::reloadFailed, [&reports](const HotkeyReloadReport &report) { reports.push_back(report); });
+
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kHotkeyCapture, QVariant(QStringLiteral("Ctrl+?"))).has_value());
+
+    ASSERT_EQ(reports.size(), 1U) << "坏文本的重登失败也要交回界面，不能只写日志";
+    ASSERT_EQ(reports[0].failures.size(), 1U);
+    EXPECT_EQ(reports[0].failures[0].error.code, ErrorCode::InvalidArgument);
+
+    const auto &registrations = integration.m_backendMirror->registrations;
+    const auto  lastCapture =
+            std::find_if(registrations.rbegin(), registrations.rend(), [](const FakeHotkeyBackend::Registration &registration) { return registration.identifier == 1; });
+    ASSERT_NE(lastCapture, registrations.rend()) << "解析失败时旧组合没有被登记回去，热键直接没了";
+    EXPECT_EQ(lastCapture->modifiers, Qt::ControlModifier | Qt::AltModifier);
+    EXPECT_EQ(lastCapture->key, Qt::Key_A) << "解析失败后最后登记给截图的不是旧组合";
+    EXPECT_EQ(integration.m_backendMirror->liveRegistrations.count(1), 1U);
 }
 
 /**

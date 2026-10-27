@@ -129,6 +129,14 @@ namespace GyanisScribe::Core
          *          硬并成一个枚举就会让热键层去认识「贴图组管理」这类它不该知道的东西。
          */
         void customActionTriggered(const QString &token);
+
+        /**
+         * @brief 设置变更触发的重登有失败项
+         * @param report 本轮结果，failures 与 customFailures 至少有一组非空
+         * @details 只在设置页改组合键那一条路上发：启动与自定义键变更由调用方拿返回值自己提示，
+         *          两条路都发会让同一件事弹两遍；没有失败的本轮不发。
+         */
+        void reloadFailed(const GyanisScribe::Core::HotkeyReloadReport &report);
     };
 
 } // namespace GyanisScribe::Core

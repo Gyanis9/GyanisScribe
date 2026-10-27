@@ -230,6 +230,10 @@ namespace GyanisScribe::Main
                              }
                              handleTrayAction(*action);
                          });
+        // 设置页改固定组合时由热键层自己重登，那一路没人接返回值：失败项从这条信号回来。
+        // 启动与自定义键变更走 registerHotkeys()，它已经当面提示过，这里不会再弹第二遍
+        QObject::connect(m_hotkeys.get(), &GyanisScribe::Core::IHotkeyManager::reloadFailed, this,
+                         [this](const GyanisScribe::Core::HotkeyReloadReport &report) { reportHotkeyFailures(report); });
         // 自定义键不在热键层那八个的订阅里：改完这一族的任何一格，由这里重登一次，不必重启
         QObject::connect(m_settings.get(), &GyanisScribe::Core::ISettingsStore::valueChanged, this,
                          [this](const QString &key)
@@ -348,22 +352,31 @@ namespace GyanisScribe::Main
         // 先把手绑的那一批交给热键层再重登：登记要的是「这一批」，中间态不必单独登一次
         m_hotkeys->setCustomBindings(GyanisScribe::App::collectCustomBindings(*m_settings));
         auto report = m_hotkeys->reload();
-        if (report && !report->failures.empty())
+        if (report)
+        {
+            reportHotkeyFailures(*report);
+        }
+        return report;
+    }
+
+    void AppController::reportHotkeyFailures(const GyanisScribe::Core::HotkeyReloadReport &report)
+    {
+        if (!report.failures.empty())
         {
             // 登记结果只写进日志的话，用户看到的就只是「按了没反应」：要当场说出来，
             // 而且把每一条组合键与它各自的原因一起说——四条未必是同一个理由。
             QStringList lines;
-            for (const auto &failure: report->failures)
+            for (const auto &failure: report.failures)
             {
                 lines << QStringLiteral("%1（%2）").arg(failure.combination, QString::fromStdString(failure.error.message));
             }
             notifyUser(GyanisScribe::Base::uiText("这些全局热键没能登记上：") + lines.join(QStringLiteral("；")), GyanisScribe::Gui::ToastKind::Danger);
         }
-        if (report && !report->customFailures.empty())
+        if (!report.customFailures.empty())
         {
             // 自定义那一批单独报一句：这里要点的是功能名（「整屏截图」），只报组合键没人知道是哪件事没绑上
             QStringList lines;
-            for (const auto &failure: report->customFailures)
+            for (const auto &failure: report.customFailures)
             {
                 const auto bound = GyanisScribe::App::trayActionForToken(failure.token);
                 const auto label = bound ? GyanisScribe::App::bindableActionLabel(*bound) : failure.token;
@@ -371,7 +384,6 @@ namespace GyanisScribe::Main
             }
             notifyUser(GyanisScribe::Base::uiText("这些自定义热键没能登记上：") + lines.join(QStringLiteral("；")), GyanisScribe::Gui::ToastKind::Danger);
         }
-        return report;
     }
 
     void AppController::openMainWindow(const MainWindowPage page)

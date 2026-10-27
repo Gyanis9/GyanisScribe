@@ -9,9 +9,11 @@
 
 #pragma once
 
+#include "Core/Hotkey/HotkeyCombination.h"
 #include "Core/Hotkey/IHotkeyManager.h"
 
 #include <array>
+#include <map>
 #include <span>
 #include <memory>
 #include <optional>
@@ -117,6 +119,7 @@ namespace GyanisScribe::Core
         Platform::IPlatformIntegration           &m_integration;    ///< 后端工厂
         std::unique_ptr<Platform::IHotkeyBackend> m_backend;        ///< 当前后端，第一次 reload() 时建立
         std::vector<CustomHotkeyBinding>          m_customBindings; ///< 这一批自定义绑定，顺序就是登记顺序（编号按下标算）
+        std::map<int, HotkeyCombination>          m_activeBindings; ///< 当前真正登记在册的组合（编号 → 组合），重登失败时按它恢复旧键
     };
 
 } // namespace GyanisScribe::Core

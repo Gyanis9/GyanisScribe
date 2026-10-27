@@ -283,6 +283,14 @@ namespace GyanisScribe::Main
         /// 给用户看的一条提示：有气泡就用气泡，没有（例如起不来托盘的那类环境）就落日志
         void notifyUser(const QString &message, GyanisScribe::Gui::ToastKind kind);
 
+        /**
+         * @brief 把一轮热键登记里的失败项说给用户听
+         * @param report 本轮结果；固定动作与自定义绑定两组各拼一句，空的那组不弹
+         * @details 启动、自定义键变更与设置页改固定组合三条路都汇到这里：同一件事的两种说法
+         *          迟早会一边修好、一边继续报错。
+         */
+        void reportHotkeyFailures(const GyanisScribe::Core::HotkeyReloadReport &report);
+
         std::unique_ptr<GyanisScribe::Core::SettingsStore>            m_settings;       ///< 配置存储
         std::unique_ptr<GyanisScribe::Platform::IPlatformIntegration> m_integration;    ///< 平台集成
         std::unique_ptr<GyanisScribe::Core::IScreenCaptureSource>     m_captureSource;  ///< 抓帧来源

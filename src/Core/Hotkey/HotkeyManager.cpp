@@ -1,6 +1,7 @@
 #include "Core/Hotkey/HotkeyManager.h"
 
 #include "Base/Logger.h"
+#include "Base/Text.h"
 #include "Core/Hotkey/HotkeyCombination.h"
 #include "Platform/IHotkeyBackend.h"
 #include "Platform/IPlatformIntegration.h"
@@ -8,6 +9,7 @@
 #include "Core/Settings/SettingsKeys.h"
 
 #include <format>
+#include <optional>
 
 namespace GyanisScribe::Core
 {
@@ -30,6 +32,44 @@ namespace GyanisScribe::Core
 
         /// 快速保存的默认组合：S 取 save，与 A/R/O/P 同一套「动作首字母」记法
         constexpr std::string_view kDefaultQuickSave = "Ctrl+Alt+S";
+
+        /**
+         * @brief 新组合没能登记时，把同一编号上一轮生效的组合重新登记回去
+         * @param backend 本轮使用的后端
+         * @param identifier 要恢复的编号
+         * @param previous 上一轮真正在册的组合
+         * @param next 本轮在册的组合，恢复成功时写入
+         * @return 恢复成功返回旧组合的文本，供失败原因说明现在该按什么
+         * @return 上一轮没有这一条、或后端再次拒绝时返回空
+         * @details 重登先全注销：不恢复的话，改坏一格就让那颗键彻底失效。
+         *          恢复失败不写进在册表——表里的每一条都必须是后端此刻真收下的组合。
+         */
+        std::optional<QString> restorePreviousBinding(Platform::IHotkeyBackend &backend, const int identifier, const std::map<int, HotkeyCombination> &previous,
+                                                      std::map<int, HotkeyCombination> &next)
+        {
+            const auto old = previous.find(identifier);
+            if (old == previous.end())
+            {
+                return std::nullopt;
+            }
+            if (const auto restored = backend.registerHotkey(identifier, old->second.modifiers(), old->second.key()); !restored)
+            {
+                Base::Logger::warning(std::format("编号 {} 的旧组合没能恢复：{}", identifier, restored.error().message));
+                return std::nullopt;
+            }
+            next.insert_or_assign(identifier, old->second);
+            return old->second.toText();
+        }
+
+        /// 恢复成功时把「旧组合仍在使用」接在失败原因后面，用户才知道现在按哪颗键还有用
+        void appendRestoredNote(Base::Error &error, const std::optional<QString> &restoredText)
+        {
+            if (!restoredText)
+            {
+                return;
+            }
+            error.message += "；" + Base::uiFormat(Base::uiTextUtf8("旧的 {} 仍在使用，新的组合没有生效"), restoredText->toStdString());
+        }
     } // namespace
 
     HotkeyManager::HotkeyManager(Core::ISettingsStore &settings, Platform::IPlatformIntegration &integration, QObject *parent) :
@@ -43,10 +83,15 @@ namespace GyanisScribe::Core
                              {
                                  if (QString::fromUtf8(settingsKeyFor(action).data(), static_cast<qsizetype>(settingsKeyFor(action).size())) == key)
                                  {
-                                     if (const auto report = reload(); report && !report->failures.empty())
+                                     if (const auto report = reload(); report)
                                      {
-                                         // 重载里带了失败项也要出声，否则用户以为改成功了
-                                         Base::Logger::warning(std::format("快捷键改动后仍有 {} 项没能登记", report->failures.size()));
+                                         if (report->failures.empty() && report->customFailures.empty())
+                                         {
+                                             return;
+                                         }
+                                         // 设置页这一路没人接返回值：失败项要从信号交回界面，否则用户以为改成功了
+                                         Base::Logger::warning(std::format("快捷键改动后仍有 {} 项没能登记", report->failures.size() + report->customFailures.size()));
+                                         emit reloadFailed(*report);
                                      }
                                      return;
                                  }
@@ -178,47 +223,63 @@ namespace GyanisScribe::Core
         }
 
         HotkeyReloadReport report;
+        // 上一轮真正在册的组合要留一份：这一轮先清场，新值登记不上时靠它把旧键放回去
+        const auto                       previousBindings = m_activeBindings;
+        std::map<int, HotkeyCombination> nextBindings;
         // 先清场再重登：留着上一轮的登记，用户改掉的旧组合会一直占着，新组合也可能撞号
         m_backend->unregisterAll();
 
         for (const auto action: managedActions())
         {
+            const int  identifier = identifierFor(action);
             const auto storedText = m_settings.stringValue(settingsKeyFor(action), QString::fromUtf8(defaultCombinationTextFor(action)));
 
             const auto combination = HotkeyCombination::fromText(storedText.toStdString(), m_settings.boolValue(GyanisScribe::Core::kAllowSimpleGlobalHotkeys, false));
             if (!combination)
             {
                 // 设置里的值坏掉时按项记失败，不用默认组合顶上：顶上去用户按到的就不是他设的那个键
-                report.failures.push_back(HotkeyFailure{action, storedText, combination.error()});
+                Base::Error error = combination.error();
+                appendRestoredNote(error, restorePreviousBinding(*m_backend, identifier, previousBindings, nextBindings));
+                report.failures.push_back(HotkeyFailure{action, storedText, std::move(error)});
                 continue;
             }
 
-            if (const auto registered = m_backend->registerHotkey(identifierFor(action), combination->modifiers(), combination->key()); !registered)
+            if (const auto registered = m_backend->registerHotkey(identifier, combination->modifiers(), combination->key()); !registered)
             {
-                report.failures.push_back(HotkeyFailure{action, storedText, registered.error()});
+                Base::Error error = registered.error();
+                appendRestoredNote(error, restorePreviousBinding(*m_backend, identifier, previousBindings, nextBindings));
+                report.failures.push_back(HotkeyFailure{action, storedText, std::move(error)});
                 continue;
             }
+            nextBindings.insert_or_assign(identifier, *combination);
             ++report.registered;
         }
 
         // 自定义那一批：编号从 kCustomIdentifierBase 起按表序排，两项同一条组合撞上了就各自记一条失败（后端会拒第二个）
         for (std::size_t slot = 0; slot < m_customBindings.size(); ++slot)
         {
+            const auto  identifier  = kCustomIdentifierBase + static_cast<int>(slot);
             const auto &binding     = m_customBindings[slot];
             const auto  combination = HotkeyCombination::fromText(binding.combination.toStdString(), m_settings.boolValue(GyanisScribe::Core::kAllowSimpleGlobalHotkeys, false));
             if (!combination)
             {
-                report.customFailures.push_back(CustomHotkeyFailure{binding.token, binding.combination, combination.error()});
+                Base::Error error = combination.error();
+                appendRestoredNote(error, restorePreviousBinding(*m_backend, identifier, previousBindings, nextBindings));
+                report.customFailures.push_back(CustomHotkeyFailure{binding.token, binding.combination, std::move(error)});
                 continue;
             }
-            if (const auto registered = m_backend->registerHotkey(kCustomIdentifierBase + static_cast<int>(slot), combination->modifiers(), combination->key()); !registered)
+            if (const auto registered = m_backend->registerHotkey(identifier, combination->modifiers(), combination->key()); !registered)
             {
-                report.customFailures.push_back(CustomHotkeyFailure{binding.token, binding.combination, registered.error()});
+                Base::Error error = registered.error();
+                appendRestoredNote(error, restorePreviousBinding(*m_backend, identifier, previousBindings, nextBindings));
+                report.customFailures.push_back(CustomHotkeyFailure{binding.token, binding.combination, std::move(error)});
                 continue;
             }
+            nextBindings.insert_or_assign(identifier, *combination);
             ++report.registered;
         }
 
+        m_activeBindings = std::move(nextBindings);
         return report;
     }
 
