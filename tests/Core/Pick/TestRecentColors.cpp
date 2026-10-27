@@ -1,4 +1,5 @@
 #include "Core/Pick/RecentColors.h"
+#include "Core/Settings/SettingsKeys.h"
 
 #include <gtest/gtest.h>
 
@@ -7,6 +8,8 @@
 
 #include <vector>
 
+using GyanisScribe::Core::kAnnotationRecentColors;
+using GyanisScribe::Core::kPickRecentColors;
 using GyanisScribe::Core::kRecentColorCapacity;
 using GyanisScribe::Core::parseRecentColors;
 using GyanisScribe::Core::pushRecentColor;
@@ -44,7 +47,7 @@ TEST(RecentColorsToken, DropsAlphaToKeepSixDigits)
     const auto translucent = QColor(255, 0, 0, 128);
     EXPECT_EQ(recentColorToken(translucent), QStringLiteral("#FF0000"));
 
-    const auto readBack = parseRecentColors({recentColorToken(translucent)});
+    const auto readBack = parseRecentColors({recentColorToken(translucent)}, kPickRecentColors);
     ASSERT_TRUE(readBack.has_value()) << readBack.error().message;
     ASSERT_EQ(readBack->size(), 1U);
     EXPECT_EQ(readBack->at(0).red(), 255);
@@ -110,31 +113,46 @@ TEST(RecentColorsRoundTrip, SerializedListReadsBackEqual)
     ASSERT_EQ(tokens.size(), 3);
     EXPECT_EQ(tokens[2], QStringLiteral("#123456")) << "顺序变了，重启后色板上的位置就会和用户记忆里不一样";
 
-    const auto readBack = parseRecentColors(tokens);
+    const auto readBack = parseRecentColors(tokens, kPickRecentColors);
     ASSERT_TRUE(readBack.has_value()) << readBack.error().message;
     EXPECT_EQ(readBack.value(), list);
 }
 
 /**
  * @brief 钉住坏值的拒绝面：整条拒绝而不是跳过，且原因里带上那条词
+ * @details 提示里点名的是调用方读的那一格键，照着删才真能恢复默认
  */
 TEST(RecentColorsRoundTrip, RejectsAnyTokenThatIsNotSixHexDigits)
 {
     // 每条都是非空文本：空串的 find(\"\") 恒为 0，那样的断言不带信息（这里刻意不放空串）
     for (const auto *bad: {"red", "#GGGGGG", "#FF00", "#FF00000", " FF0000"})
     {
-        const auto parsed = parseRecentColors({QStringLiteral("#123456"), QString::fromUtf8(bad)});
+        const auto parsed = parseRecentColors({QStringLiteral("#123456"), QString::fromUtf8(bad)}, kPickRecentColors);
         ASSERT_FALSE(parsed.has_value()) << bad;
         EXPECT_EQ(parsed.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument) << bad;
         // 原因要点出是哪一条词与怎么恢复，否则用户只能对着配置文件猜；
         // 恢复办法说的必须是这条读路径真正读的键，照着删错键等于没修
         EXPECT_NE(parsed.error().message.find(QString::fromUtf8(bad).toStdString()), std::string::npos) << bad;
-        EXPECT_NE(parsed.error().message.find("Pick/RecentColors"), std::string::npos) << bad;
-        EXPECT_EQ(parsed.error().message.find("Annotation/RecentColors"), std::string::npos) << bad << " 提示指向了另一条读路径的键";
+        EXPECT_NE(parsed.error().message.find(kPickRecentColors), std::string::npos) << bad;
+        EXPECT_EQ(parsed.error().message.find(kAnnotationRecentColors), std::string::npos) << bad << " 提示指向了另一条读路径的键";
     }
 
     // 空清单是合法状态（用户还没用过自定义颜色），不能报成坏值
-    const auto empty = parseRecentColors({});
+    const auto empty = parseRecentColors({}, kPickRecentColors);
     ASSERT_TRUE(empty.has_value());
     EXPECT_TRUE(empty->empty());
+}
+
+/**
+ * @brief 钉住标注色板这条读路径的提示指向 Annotation/RecentColors
+ * @details 同一个解析函数被取色器与标注色板共用；提示里的键随调用方走，
+ *          否则标注色板读坏时会叫用户去删取色器那一格，白删一场
+ */
+TEST(RecentColorsRoundTrip, BadTokenUnderAnnotationKeyNamesTheAnnotationKey)
+{
+    const auto parsed = parseRecentColors({QStringLiteral("#123456"), QStringLiteral("#GGGGGG")}, kAnnotationRecentColors);
+    ASSERT_FALSE(parsed.has_value());
+    EXPECT_EQ(parsed.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument);
+    EXPECT_NE(parsed.error().message.find(kAnnotationRecentColors), std::string::npos) << " 提示没点名标注色板读的那一格键";
+    EXPECT_EQ(parsed.error().message.find(kPickRecentColors), std::string::npos) << " 提示指向了取色器那一格键";
 }

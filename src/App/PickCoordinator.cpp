@@ -29,7 +29,7 @@ namespace GyanisScribe::App
 
     std::vector<QColor> PickCoordinator::recentColors() const
     {
-        const auto parsed = GyanisScribe::Core::parseRecentColors(m_settings.stringListValue(GyanisScribe::Core::kPickRecentColors, {}));
+        const auto parsed = GyanisScribe::Core::parseRecentColors(m_settings.stringListValue(GyanisScribe::Core::kPickRecentColors, {}), GyanisScribe::Core::kPickRecentColors);
         if (!parsed)
         {
             GyanisScribe::Base::Logger::warning(std::format("最近取色清单读不出，按空清单继续：{}", parsed.error().message));

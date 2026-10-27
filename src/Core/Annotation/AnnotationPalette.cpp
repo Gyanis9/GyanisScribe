@@ -47,7 +47,7 @@ namespace GyanisScribe::Core
                     Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("色板有 {} 格，超出上限 {} 格：请删掉几格再存"),
                                                                                                tokens.size(), static_cast<int>(kPaletteCapacity))});
         }
-        const auto parsed = Core::parseRecentColors(tokens);
+        const auto parsed = Core::parseRecentColors(tokens, Core::kAnnotationRecentColors);
         if (!parsed)
         {
             return std::unexpected(parsed.error());
