@@ -472,6 +472,9 @@ namespace GyanisScribe::App
             emit messageForUser(QString::fromStdString(frame.error().message), GyanisScribe::Gui::ToastKind::Danger);
             return;
         }
+        // 这一轮抓到的就是最新那一帧：下一回拖边框重裁必须从它起算。只换画布不换记录的话，
+        // 冻帧还停在刷新之前，重裁会裁出 F5 之前那一张
+        m_lastCapture = *frame;
         m_annotationWindow->refreshCapture(*frame);
     }
 

@@ -200,10 +200,21 @@ namespace GyanisScribe::Gui
         return *m_toolbar;
     }
 
+    const Base::CapturedImage &AnnotationWindow::canvas() const noexcept
+    {
+        return m_engine.canvas();
+    }
+
     void AnnotationWindow::refreshCapture(const Base::CapturedImage &captured)
     {
         // 刷新的区域就是原来那块：尺寸该同形；真差了一点也不动窗口——用户的标注坐标还是老坐标系，
         // 挪窗口只会让画面与标注错开。引擎只换底图这一份，标注与撤销栈原地留着
+        // 刷新这一轮的记录一并换掉：之后拖边框重裁、拖动时那块预览都从新帧取，不能再回看旧帧
+        m_refreshScreenName   = captured.screenName;
+        m_refreshRegion       = captured.logicalRegion;
+        m_frozenImage         = captured.frozenImage;
+        m_frozenLogicalSize   = captured.frozenLogicalSize;
+        m_frozenLogicalRegion = captured.frozenLogicalRegion;
         m_engine.refreshCanvas(captured);
     }
 

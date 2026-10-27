@@ -122,6 +122,13 @@ namespace GyanisScribe::Gui
         [[nodiscard]] AnnotationToolbar &toolbar() const noexcept;
 
         /**
+         * @brief 引擎当前画布
+         * @return 画布那一份截图产物；窗口自己不改它
+         * @note 测试与调试用它核对换上来的底图，界面各处都经引擎读，不在窗口里另存一份
+         */
+        [[nodiscard]] const Base::CapturedImage &canvas() const noexcept;
+
+        /**
          * @brief 把重新抓到的一帧换上：底图换了，标注、选中与撤销历史都留着
          * @param captured 重抓的产物，应与开窗时那一帧同形（同一块区域再抓一帧）
          * @details 引擎的 refreshCanvas 就是这个语义；与 loadCanvas 分开正是为了不把标注清掉。

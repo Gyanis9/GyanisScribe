@@ -14,6 +14,7 @@
 #include "App/CaptureIntent.h"
 #include "Base/Text.h"
 #include "Core/Capture/IScreenCaptureSource.h"
+#include "Core/Capture/RegionHistory.h"
 #include "Base/Paths.h"
 #include "Base/Types.h"
 #include "Core/History/HistoryRules.h"
@@ -112,6 +113,12 @@ namespace GyanisScribe
             void failNextScreenGrab(Base::Error error) const
             {
                 m_nextScreenError = std::move(error);
+            }
+
+            /// 换掉之后每一路交回的那一帧：F5 那一格要在同一轮里把底图从红换成绿
+            void setFrame(Base::CapturedImage frame)
+            {
+                m_frame = std::move(frame);
             }
 
             [[nodiscard]] Base::Expected<Base::CapturedImage> grabWindow(const quintptr handle) const override
@@ -247,10 +254,11 @@ namespace GyanisScribe
             }
 
             /// 造一帧与生产同形状的假屏：逻辑与物理尺寸一致（倍比 1.0），屏名与选区由用例点名
-            [[nodiscard]] static Base::CapturedImage makeFrame(const QString &screenName, const QRect &logicalRegion = {})
+            [[nodiscard]] static Base::CapturedImage makeFrame(const QString &screenName, const QRect &logicalRegion = {},
+                                                               const QColor &fillColor = QColor(36, 87, 166))
             {
                 QImage image(kFrameWidth, kFrameHeight, QImage::Format_ARGB32_Premultiplied);
-                image.fill(QColor(36, 87, 166));
+                image.fill(fillColor);
 
                 Base::CapturedImage frame;
                 frame.image            = image;
@@ -284,7 +292,7 @@ namespace GyanisScribe
                 }
                 m_settings = settings.get();
 
-                auto source      = std::make_unique<CountingScreenSource>(makeFrame(m_frameScreenName, m_frameRegion));
+                auto source      = std::make_unique<CountingScreenSource>(makeFrame(m_frameScreenName, m_frameRegion, m_frameColor));
                 auto integration = std::make_unique<ForegroundWindowStub>(kForegroundWindowHandle);
                 m_source         = source.get();
                 m_integration    = integration.get();
@@ -435,6 +443,7 @@ namespace GyanisScribe
             QString                              m_realScreenName;                                          ///< 离屏平台那块真屏的名字
             int                                  m_delaySeconds    = 0;                                     ///< 延时截图那一格
             QString                              m_frameScreenName = QString::fromLatin1(kGhostScreenName); ///< 假帧带的屏名
+            QColor                               m_frameColor      = QColor(36, 87, 166);                  ///< 假帧铺的底色
             QRect                                m_frameRegion;                                             ///< 假帧记的屏内选区，F5 重抓按它走
             std::optional<App::CaptureIntent>    m_afterAction;                                             ///< 「截完之后」那一格；空 = 不写
             bool                                 m_keepUnsaved   = false;                                   ///< 「未保存也进历史」那一格
@@ -491,6 +500,45 @@ namespace GyanisScribe
         EXPECT_EQ(m_source->requestedScreen, screen->name()) << "重抓跑到别的屏去了";
         EXPECT_TRUE(window.isVisible()) << "重抓之后标注窗没有重新出现";
         EXPECT_EQ(window.geometry(), region) << "标注窗没有按新范围摆好";
+    }
+
+    /**
+     * @brief 钉住 F5 换上新帧之后，拖边框重裁裁的是新帧而不是刷新之前那一张
+     * @details 刷新只换画布不换记录时，冻帧还停在 F5 之前：下一回拖边框走冻帧那条重裁路，
+     *          裁出来的画面就是刷新之前那一张，用户按了 F5 却看到旧内容。
+     *          这一格先红后绿，重裁之后按新范围同时判颜色与几何。
+     */
+    TEST_F(AppControllerFixture, RefreshThenCropUsesTheRefreshedFrame)
+    {
+        m_frameScreenName = m_realScreenName;
+        m_frameColor      = QColor(220, 0, 0);
+        makeController();
+
+        auto *screen = QGuiApplication::primaryScreen();
+        ASSERT_NE(screen, nullptr);
+        const QPoint origin   = screen->geometry().topLeft();
+        const QRect  region   = QRect{0, 0, kFrameWidth, kFrameHeight};
+        const QColor red      = QColor(220, 0, 0);
+        const QColor green    = QColor(0, 200, 0);
+        Core::rememberRegion(*m_settings, Core::RegionHistoryEntry{region, screen->name()});
+
+        auto &window = m_controller->capture().annotationWindow();
+        m_controller->capture().startLastRegion(App::CaptureIntent::Annotate);
+        ASSERT_TRUE(window.isVisible()) << "标注窗没开起来，后面的判据无从谈起";
+        ASSERT_EQ(window.canvas().image.pixelColor(kFrameWidth / 2, kFrameHeight / 2), red) << "起始帧不是那一张红的";
+
+        m_source->setFrame(makeFrame(m_frameScreenName, region, green));
+        window.refreshRequested(screen->name(), region);
+        EXPECT_EQ(window.canvas().image.pixelColor(kFrameWidth / 2, kFrameHeight / 2), green) << "F5 之后画布没换成新帧";
+
+        const QRect newLocal    = QRect{4, 4, 20, 16};
+        const auto  callsBefore = m_source->screenCalls;
+        window.cropRequested(screen->name(), newLocal.translated(origin));
+
+        EXPECT_EQ(m_source->screenCalls, callsBefore) << "带冻帧的那一轮重裁不该再抓一次屏";
+        EXPECT_EQ(window.canvas().logicalSize, newLocal.size()) << "重裁之后画布不是新范围";
+        EXPECT_EQ(window.canvas().image.pixelColor(newLocal.width() / 2, newLocal.height() / 2), green) << "重裁裁出来的是 F5 之前那一张";
+        EXPECT_EQ(window.geometry(), newLocal.translated(origin)) << "标注窗没有按新范围摆好";
     }
 
     /**
