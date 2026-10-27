@@ -266,14 +266,16 @@ namespace GyanisScribe::Base
         const auto suffix = dot > 0 ? effectiveName.mid(dot) : QString{};
 
         auto candidate = directory / fromDisplayText(effectiveName);
-        for (int attempt = 2; attempt <= kMaximumUniqueAttempts; ++attempt)
+        // attempt 记的是「这一次看的是第几个候选」：1 是原名，之后每次撞名换下一个编号。
+        // 上限写进循环条件里，-999 这一格必须真的被试到，不能建出来就丢掉
+        for (int attempt = 1; attempt <= kMaximumUniqueAttempts; ++attempt)
         {
             std::error_code ignored;
             if (!std::filesystem::exists(candidate, ignored))
             {
                 return candidate;
             }
-            candidate = directory / fromDisplayText(QStringLiteral("%1-%2%3").arg(stem).arg(attempt).arg(suffix));
+            candidate = directory / fromDisplayText(QStringLiteral("%1-%2%3").arg(stem).arg(attempt + 1).arg(suffix));
         }
 
         // 编号试到上限仍撞名：改用时刻后缀，名字长一点也好过交回一个已经存在的文件

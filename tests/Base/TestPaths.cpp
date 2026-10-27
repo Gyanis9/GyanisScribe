@@ -299,6 +299,35 @@ TEST_F(PathsFixture, UniqueFilePathStaysUniquePastTheAttemptCeiling)
 }
 
 /**
+ * @brief 钉住文档里写的 -999 这一格真的被试过
+ * @details 循环若只试到 -998，最后一个编号永远空着，用户拿到的是一串时刻后缀；
+ *          上限写着 -999 就该按 -999 交回。
+ */
+TEST_F(PathsFixture, UniqueFilePathProbesTheLastNumberedSlot)
+{
+    const auto      directory = probeDirectory("NameLastSlot");
+    std::error_code ignored;
+    std::filesystem::remove_all(directory, ignored);
+    std::filesystem::create_directories(directory);
+
+    // 原名与 -2 到 -998 占住，只把 -999 留空
+    {
+        std::ofstream original{directory / "shot.png"};
+        original << "x";
+    }
+    for (int attempt = 2; attempt <= 998; ++attempt)
+    {
+        std::ofstream sibling{directory / std::format("shot-{}.png", attempt)};
+        sibling << "x";
+    }
+
+    const auto candidate = Paths::uniqueFilePath(directory, QStringLiteral("shot.png"));
+    EXPECT_EQ(candidate.filename().string(), "shot-999.png") << "最后一个编号没被试到，交回的是时刻后缀：" << candidate.filename().string();
+
+    std::filesystem::remove_all(directory, ignored);
+}
+
+/**
  * @brief 钉住界面文本与路径的往返闭合，取的是一条本地码页装不下的路径
  * @details toDisplayText 那一侧有八个用例文件命中，而它的孪生 fromDisplayText 一处都没有——
  *          可它有十六个生产调用点，包括用户在设置里填的目录、剪贴板 URL 的 toLocalFile()
