@@ -4,10 +4,21 @@
 
 #include <Windows.h>
 
+// 老 SDK 的 WinUser.h 没有这一位；Windows 7 起 RegisterHotKey 认它
+#ifndef MOD_NOREPEAT
+#define MOD_NOREPEAT 0x4000
+#endif
+
 #include <format>
 
 namespace GyanisScribe::Platform
 {
+
+    quint32 hotkeyRegistrationFlags(const quint32 modifierMask)
+    {
+        // 不重复位与修饰键位各占各的位，直接并起来；少了它按住热键会按系统重复率反复触发
+        return modifierMask | static_cast<quint32>(MOD_NOREPEAT);
+    }
 
     Base::Expected<quint32> toWin32ModifierMask(Qt::KeyboardModifiers modifiers)
     {

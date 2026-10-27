@@ -17,6 +17,7 @@
 #include "Platform/Windows/Win32HotkeyMapping.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <iostream>
 #include <thread>
@@ -24,6 +25,7 @@
 using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Platform::autostartCommandLine;
 using GyanisScribe::Platform::createPlatformIntegration;
+using GyanisScribe::Platform::hotkeyRegistrationFlags;
 using GyanisScribe::Platform::ScreenWindow;
 using GyanisScribe::Platform::UnsupportedHotkeyBackend;
 
@@ -387,6 +389,31 @@ TEST(Win32HotkeyMapping, ConvertsSupportedVocabulary)
     const auto unsupportedKey = GyanisScribe::Platform::toWin32VirtualKey(Qt::Key_Question);
     ASSERT_FALSE(unsupportedKey.has_value()) << "符号键随键盘布局变位，不能当全局热键";
     EXPECT_EQ(unsupportedKey.error().code, ErrorCode::InvalidArgument);
+}
+
+/**
+ * @brief 钉住登记全局热键时带上「不自动重复」这一位，同时不碰修饰键那几位
+ * @details 少了 MOD_NOREPEAT，按住热键不放会按系统的键盘重复率反复发 WM_HOTKEY：
+ *          框选遮罩被反复重建，正在拖的选区被丢。判据只认这一位与修饰键的并集，
+ *          不复用 toWin32ModifierMask 的现有取值，免得实现漏掉这一位时两边一起绿。
+ */
+TEST(Win32HotkeyMapping, HotkeyRegistrationFlagsRequestNoRepeat)
+{
+    // Windows 7 起可用的 MOD_NOREPEAT，值写在 WinUser.h 里
+    constexpr quint32 kNoRepeat = 0x4000U;
+    const std::array masks{
+            quint32{0U},
+            static_cast<quint32>(MOD_CONTROL),
+            static_cast<quint32>(MOD_CONTROL | MOD_ALT),
+            static_cast<quint32>(MOD_SHIFT | MOD_WIN),
+    };
+
+    for (const auto mask: masks)
+    {
+        const quint32 flags = hotkeyRegistrationFlags(mask);
+        EXPECT_EQ(flags & kNoRepeat, kNoRepeat) << "掩码 " << mask << " 的登记实参没带不重复位：按住热键会反复触发";
+        EXPECT_EQ(flags & ~kNoRepeat, mask) << "加不重复位时改动了修饰键那几位，登记出来的是另一个组合";
+    }
 }
 
 /**

@@ -63,7 +63,9 @@ namespace GyanisScribe::Platform
         }
 
         const auto windowHandle = reinterpret_cast<HWND>(m_sinkWindow->winId());
-        if (!RegisterHotKey(windowHandle, identifier, *modifierMask, *virtualKey))
+        // 登记实参统一由映射层组：不重复位漏掉时，按住热键会按系统重复率反复触发
+        const quint32 registrationFlags = hotkeyRegistrationFlags(*modifierMask);
+        if (!RegisterHotKey(windowHandle, identifier, registrationFlags, *virtualKey))
         {
             const DWORD lastError = GetLastError();
             // ERROR_HOTKEY_ALREADY_REGISTERED 是这一条最常走到的分支，直说「被占用」比报错误码有用

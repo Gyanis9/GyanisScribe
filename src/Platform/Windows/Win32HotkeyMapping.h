@@ -27,6 +27,15 @@ namespace GyanisScribe::Platform
     [[nodiscard]] Base::Expected<quint32> toWin32ModifierMask(Qt::KeyboardModifiers modifiers);
 
     /**
+     * @brief 组出 RegisterHotKey 的修饰键实参
+     * @param modifierMask toWin32ModifierMask() 给出的修饰键位
+     * @return 修饰键位并上 MOD_NOREPEAT
+     * @details 不带这一位时，按住热键不放会按系统的键盘重复率反复触发回调：
+     *          截图遮罩会被反复重建，正在拖的选区随之丢掉。
+     */
+    [[nodiscard]] quint32 hotkeyRegistrationFlags(quint32 modifierMask);
+
+    /**
      * @brief 把 Qt 按键换成 Win32 虚拟键码
      * @param key 单个按键，不含修饰键
      * @return 成功返回虚拟键码：字母与数字沿用其大写字母表点位，F1-F24 落在 0x70 起的那一段，空格 0x20
