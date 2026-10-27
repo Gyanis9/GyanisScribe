@@ -12,6 +12,7 @@
 #include <string>
 
 using GyanisScribe::App::failureMessageFor;
+using GyanisScribe::App::failureVerdictFor;
 using GyanisScribe::App::parseLatestRelease;
 using GyanisScribe::App::UpdateRelease;
 using GyanisScribe::App::verdictFor;
@@ -107,5 +108,30 @@ TEST(UpdateFailureText, NamesTheCommonCasesAndStaysChinese)
     for (const auto &message: {notFound, denied, offline})
     {
         EXPECT_EQ(message.indexOf(QStringLiteral("Error")), -1) << "把 Qt 的英文原句交出去：" << message.toStdString();
+    }
+}
+
+/**
+ * @brief 钉住网络失败这一路交回的是中文判定与发布页
+ * @details 产出路径原来直接用 Qt 的英文 errorString 拼给用户的话，failureMessageFor
+ *          只被用例叫过。这里钉住两者共用的那个纯函数：正文能照做，链接指向发布页，
+ *          状态码原样带进文案。
+ */
+TEST(UpdateFailureText, FailureVerdictUsesTheChineseMessageAndReleasePage)
+{
+    const auto offline = failureVerdictFor(QNetworkReply::HostNotFoundError, 0);
+    EXPECT_FALSE(offline.hasNewer);
+    EXPECT_NE(offline.message.indexOf(QStringLiteral("域名解析不了")), -1) << offline.message.toStdString();
+    EXPECT_FALSE(offline.link.isEmpty()) << "失败时也要给出发布页，用户才有替代做法";
+    EXPECT_TRUE(offline.link.startsWith(QStringLiteral("https://"))) << offline.link.toStdString();
+
+    const auto denied = failureVerdictFor(QNetworkReply::ContentAccessDenied, 403);
+    EXPECT_NE(denied.message.indexOf(QStringLiteral("403")), -1) << denied.message.toStdString();
+
+    for (const auto error: {QNetworkReply::TimeoutError, QNetworkReply::HostNotFoundError, QNetworkReply::ConnectionRefusedError, QNetworkReply::RemoteHostClosedError})
+    {
+        const auto verdict = failureVerdictFor(error, 0);
+        EXPECT_NE(verdict.message.indexOf(QStringLiteral("发布页")), -1) << "没说下一步去哪看：" << verdict.message.toStdString();
+        EXPECT_EQ(verdict.message.indexOf(QStringLiteral("Error")), -1) << "把 Qt 的英文原句交给用户：" << verdict.message.toStdString();
     }
 }

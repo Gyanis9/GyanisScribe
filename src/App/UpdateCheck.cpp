@@ -99,6 +99,11 @@ namespace GyanisScribe::App
         }
     }
 
+    UpdateVerdict failureVerdictFor(const QNetworkReply::NetworkError error, const int httpStatus)
+    {
+        return UpdateVerdict{false, failureMessageFor(error, httpStatus), QString::fromLatin1(kReleasePageUrl.data(), static_cast<qsizetype>(kReleasePageUrl.size()))};
+    }
+
     UpdateVerdict verdictFor(const QString &runningVersion, const UpdateRelease &release)
     {
         const auto running = QVersionNumber::fromString(versionTextOf(runningVersion));
@@ -169,12 +174,10 @@ namespace GyanisScribe::App
                          {
                              if (reply->error() != QNetworkReply::NoError)
                              {
-                                 const auto reason = reply->errorString();
-                                 Base::Logger::warning(std::format("检查更新失败：{}", reason.toStdString()));
-                                 emit finished(UpdateVerdict{
-                                         false,
-                                         QString::fromUtf8(Base::uiFormat(Base::uiTextUtf8("检查更新失败：{}。请稍后再试，或到发布页自己看一眼"), reason.toStdString()).c_str()),
-                                         QString::fromLatin1(kReleasePageUrl.data(), static_cast<qsizetype>(kReleasePageUrl.size()))});
+                                 // 英文原文只进日志：界面上那行要给中文原因与下一步做法
+                                 const auto status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+                                 Base::Logger::warning(std::format("检查更新失败：{}（HTTP {}）", reply->errorString().toStdString(), status));
+                                 emit finished(failureVerdictFor(reply->error(), status));
                                  reply->deleteLater();
                                  return;
                              }

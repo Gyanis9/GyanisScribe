@@ -69,6 +69,16 @@ namespace GyanisScribe::App
     [[nodiscard]] QString failureMessageFor(QNetworkReply::NetworkError error, int httpStatus);
 
     /**
+     * @brief 把一次失败的检查拼成交回界面的判定
+     * @param error Qt 报的网络错误
+     * @param httpStatus HTTP 状态码，没走到响应时为 0
+     * @return 没有新版、正文走 failureMessageFor、链接给发布页
+     * @details 产出路径与用例共用这一处：只让用例叫 failureMessageFor 的话，
+     *          真正给用户看的那句话仍会退回 Qt 的英文原句。
+     */
+    [[nodiscard]] UpdateVerdict failureVerdictFor(QNetworkReply::NetworkError error, int httpStatus);
+
+    /**
      * @brief 去 GitHub 问一次最新正式版
      * @details 只做「查」，不做「换」：下载与替换可执行体要先有签名与原子替换那一套，
      *          那是另一个量级的活；这里把发布页交给用户自己去点。

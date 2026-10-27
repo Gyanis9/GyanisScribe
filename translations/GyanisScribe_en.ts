@@ -640,10 +640,6 @@
             <translation>Up to date ({})</translation>
         </message>
         <message>
-            <source>检查更新失败：{}。请稍后再试，或到发布页自己看一眼</source>
-            <translation>Update check failed: {}. Try again later, or take a look at the releases page yourself</translation>
-        </message>
-        <message>
             <source>{}：取值 "{}" 不在可选值里，可取的只有 {}。请在设置的{}重选，或删掉 {} 这一项回到默认档</source>
             <translation>{}: the value "{}" is not among the allowed ones, which are only {}. Re-pick it on the {} page in Settings, or delete the {} entry to fall back to the default</translation>
         </message>
