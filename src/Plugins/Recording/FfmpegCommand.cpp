@@ -81,8 +81,9 @@ namespace GyanisScribe::Plugins
         {
             arguments << QStringLiteral("-i") << fromPath(audioWav) << QStringLiteral("-c:a") << QStringLiteral("aac") << QStringLiteral("-b:a")
                       << QStringLiteral("128k")
-                      // 视频与音频长度不一致时以短的为准：音频多出来的那一段会变成一段静音画面
-                      << QStringLiteral("-shortest");
+                      // apad 让短音频补静音；-shortest 因此停在视频那一条的长度上，而不是音频结束处。
+                      // 只留 -shortest 会以短流为准：取声设备中途拔出时后半段画面被静默截掉
+                      << QStringLiteral("-af") << QStringLiteral("apad") << QStringLiteral("-shortest");
         }
 
         arguments << fromPath(outputFile);

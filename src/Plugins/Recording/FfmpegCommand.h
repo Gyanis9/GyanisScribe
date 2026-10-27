@@ -42,7 +42,9 @@ namespace GyanisScribe::Plugins
      * @param videoEncoder 编码器名，取值来自 kPreferredVideoEncoders，由调用方探出来再交进来
      * @return 传给 ffmpeg 的参数序列（不含可执行文件名本身）
      * @details 不录声音时显式加 -an：让「没有声轨」成为一个说得出的决定，
-     *          而不是 ffmpeg 自己发现的意外。尺寸按 H.264 一类的硬要求凑成偶数
+     *          而不是 ffmpeg 自己发现的意外。录了声音时用 apad 把短音频补成静音：
+     *          -shortest 因此停在视频那一条的长度上，取声设备中途拔出不会截掉后半段画面。
+     *          尺寸按 H.264 一类的硬要求凑成偶数
      *          （奇数高度会直接报 requested width/height for inplane are not multiples of 2）。
      */
     [[nodiscard]] QStringList mp4Arguments(const Core::RecorderConfig &config, int frameCount, qint64 recordedDurationMs, const std::filesystem::path &frameDirectory,

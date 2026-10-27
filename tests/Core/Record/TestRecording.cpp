@@ -337,6 +337,14 @@ TEST(RecordingFfmpeg, ArgumentTablesMatchTheDocumentedCommands)
     EXPECT_NE(withAudio.indexOf(QStringLiteral("-shortest")), -1);
     EXPECT_NE(withAudio.indexOf(QStringLiteral("aac")), -1);
 
+    // 音频短于视频时要补静音：只留 -shortest 会以短的那条流为准，设备中途拔出时后半段画面被静默截掉
+    const auto audioFilter = withAudio.indexOf(QStringLiteral("-af"));
+    ASSERT_NE(audioFilter, -1) << withAudio.join(QLatin1Char(' ')).toStdString();
+    EXPECT_EQ(withAudio.value(audioFilter + 1), QStringLiteral("apad")) << "短音频没补静音，成品会在音频结束处截断";
+    EXPECT_LT(audioFilter, withAudio.indexOf(QStringLiteral("-shortest"))) << "apad 要落在 -shortest 之前";
+    EXPECT_EQ(silent.indexOf(QStringLiteral("-af")), -1) << "没声轨时不该出现音频滤镜";
+    EXPECT_EQ(silent.indexOf(QStringLiteral("apad")), -1) << "没声轨时补静音无处可补";
+
     // 没给码率时按质量优先，走 CRF
     EXPECT_NE(silent.indexOf(QStringLiteral("-crf")), -1) << "缺省档要留下 CRF，否则成品质量没人负责";
     EXPECT_EQ(silent.indexOf(QStringLiteral("-b:v")), -1) << "没给码率就不该出现码率控";
