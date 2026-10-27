@@ -2520,6 +2520,21 @@ namespace GyanisScribe::Main
         QObject::connect(m_history, &GyanisScribe::Gui::HistoryView::openFolderRequested, this, &MainWindow::historyOpenFolderRequested);
         QObject::connect(m_history, &GyanisScribe::Gui::HistoryView::clearAllRequested, this, &MainWindow::historyClearRequested);
         QObject::connect(m_history, &GyanisScribe::Gui::HistoryView::messageForUser, this, &MainWindow::messageForUser);
+
+        // 通用页改完条数或天数后，这一页此前只认构造时那份策略快照：改这两个键就当场换策略并按新策略重读。
+        // 隐藏着时这一步只读清单摆行，缩略图等翻到这一页再解
+        const auto maximumEntriesKey = QString::fromUtf8(GyanisScribe::Core::kHistoryMaximumEntries.data(), static_cast<int>(GyanisScribe::Core::kHistoryMaximumEntries.size()));
+        const auto retentionDaysKey  = QString::fromUtf8(GyanisScribe::Core::kHistoryRetentionDays.data(), static_cast<int>(GyanisScribe::Core::kHistoryRetentionDays.size()));
+        QObject::connect(&m_settings, &GyanisScribe::Core::ISettingsStore::valueChanged, this,
+                         [this, maximumEntriesKey, retentionDaysKey](const QString &key)
+                         {
+                             if (m_history == nullptr || (key != maximumEntriesKey && key != retentionDaysKey))
+                             {
+                                 return;
+                             }
+                             m_history->setPolicy(GyanisScribe::Core::policyFromSettings(m_settings));
+                             m_history->refresh();
+                         });
         return page;
     }
 
@@ -2527,6 +2542,8 @@ namespace GyanisScribe::Main
     {
         if (m_history != nullptr)
         {
+            // 策略可能刚在通用页改过：先换再读，否则列表还按旧的条数与天数裁剪
+            m_history->setPolicy(GyanisScribe::Core::policyFromSettings(m_settings));
             m_history->refresh();
         }
     }

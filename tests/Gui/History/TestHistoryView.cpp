@@ -464,6 +464,28 @@ TEST_F(HistoryViewFixture, ChangedFileInvalidatesItsThumbnail)
 }
 
 /**
+ * @brief 钉住换策略后重读就按新策略裁剪
+ * @details 历史页此前拿的是构造时那份策略快照：通用页把条数改小之后，列表仍按旧上限列着。
+ *          隐藏时刷新只摆行，不解缩略图——这一步也要一起钉住。
+ */
+TEST_F(HistoryViewFixture, RetentionPolicyChangeRefreshesTheList)
+{
+    const auto older = writeImageArtifact(m_directory, "older.png", {320, 200});
+    const auto newer = writeImageArtifact(m_directory, "newer.png", {320, 200});
+    addRecord(older, HistoryKind::Screenshot, kNow.addDays(-1));
+    addRecord(newer, HistoryKind::Screenshot, kNow);
+
+    auto view = makeView();
+    view->refresh();
+    ASSERT_EQ(view->rowCount(), 2) << "初始策略不限条数，两条都该在";
+    EXPECT_EQ(view->thumbnailDecodeCountForTesting(), 0) << "隐藏着刷新不该解缩略图";
+
+    view->setPolicy(HistoryRetentionPolicy{.maximumEntries = 1, .retentionDays = 0});
+    view->refresh();
+    EXPECT_EQ(view->rowCount(), 1) << "策略改成只留一条后列表仍按旧策略列出：历史页拿的是构造时的快照";
+}
+
+/**
  * @brief 钉住列表按时间倒序列出、搜索能收窄、选中项给回路径
  * @details 列表是历史页唯一的读数：少一行或次序反了，用户会以为成品丢了。
  */
