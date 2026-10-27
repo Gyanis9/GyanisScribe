@@ -120,4 +120,3 @@ TEST(Logger, UnconvertibleLogFileNameReturnsAnErrorInsteadOfThrowing)
     Logger::shutdown();
     std::filesystem::remove_all(directory, cleanupError);
 }
-

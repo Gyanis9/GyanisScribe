@@ -197,3 +197,43 @@ TEST_F(HotkeyEditFixture, EscapeRestoresTheBoundValue)
     EXPECT_EQ(m_store->stringValue(key, QStringLiteral("missing")), bound) << "Esc 改写了配置，本意是放弃这次录制";
 }
 
+/**
+ * @brief 钉住「不合格的组合被拒之后，显示回到绑定值」
+ * @details 把被拒的那颗组合留在框里，看起来像是已经改成了它；下一次别人看到这一格会以为
+ *          配置里就是那一颗。配置不许动，显示要回到现值。
+ */
+TEST_F(HotkeyEditFixture, RejectedCombinationRestoresTheBoundValue)
+{
+    QWidget container;
+    auto *layout = new QVBoxLayout{&container};
+    auto *edit   = new HotkeyEdit{*m_store, &container};
+    layout->addWidget(edit);
+    container.show();
+    container.activateWindow();
+    QCoreApplication::processEvents();
+
+    const auto key     = GyanisScribe::Core::kHotkeyCapture;
+    const auto bound   = QStringLiteral("Ctrl+Alt+A");
+    const auto written = m_store->setValue(key, bound);
+    ASSERT_TRUE(written.has_value()) << written.error().message;
+    edit->bindTo(key, QStringLiteral("截图"), QStringLiteral("Ctrl+Alt+B"), HotkeyEditScope::Global);
+
+    auto *display = edit->findChild<QLabel *>(QStringLiteral("hotkeyDisplay"));
+    ASSERT_NE(display, nullptr) << "录制框里没有显示组合的那一格";
+
+    edit->setFocus(Qt::MouseFocusReason);
+    QCoreApplication::processEvents();
+    ASSERT_TRUE(edit->hasFocus()) << "焦点没落到录制框，按键判据没有落点";
+    QMouseEvent press{QEvent::MouseButtonPress, QPointF{5, 5}, QPointF{5, 5}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QCoreApplication::sendEvent(edit, &press);
+    ASSERT_TRUE(display->property("recording").toBool()) << "点一下没有进入录制态，判据没有落点";
+
+    // 全局热键不收裸键：这一颗一定被拒
+    QKeyEvent bareKey{QEvent::KeyPress, Qt::Key_K, Qt::NoModifier};
+    QCoreApplication::sendEvent(edit, &bareKey);
+    QCoreApplication::processEvents();
+
+    EXPECT_FALSE(display->property("recording").toBool()) << "被拒之后仍留在录制态";
+    EXPECT_EQ(display->text(), bound) << "被拒的组合留在了框里，看起来像是改成功了";
+    EXPECT_EQ(m_store->stringValue(key, QStringLiteral("missing")), bound) << "被拒的组合写进了配置";
+}

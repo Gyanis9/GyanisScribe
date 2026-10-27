@@ -88,7 +88,7 @@ namespace GyanisScribe::Gui
         /**
          * @brief 校验并写入一个组合
          * @param combination 待写入的组合
-         * @return 成功返回空载荷；不合格时返回原因且不写配置，界面把原因显示出来
+         * @return 成功返回空载荷；不合格时返回原因且不写配置，显示回到绑定值（原因由调用点记日志）
          */
         [[nodiscard]] Base::Expected<void> applyCombination(const Core::HotkeyCombination &combination);
 

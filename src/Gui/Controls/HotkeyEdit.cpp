@@ -105,15 +105,17 @@ namespace GyanisScribe::Gui
         const auto usable        = m_scope == HotkeyEditScope::InWindow ? combination.checkUsableInWindow() : combination.checkUsableGlobally(allowBareKeys);
         if (!usable)
         {
-            // 不合格就什么都不写：半截组合落进配置，重启后热键直接登记不上，比现在改不动更难查
-            showPrompt(combination.toText());
+            // 不合格就什么都不写：半截组合落进配置，重启后热键直接登记不上，比现在改不动更难查。
+            // 显示也回到绑定值：把被拒的组合留在框里，看起来像是已经改成了那一颗
+            cancelRecording();
             return std::unexpected(usable.error());
         }
 
         const auto text = combination.toText();
         if (auto written = m_settings.setValue(m_key, text); !written)
         {
-            showPrompt(GyanisScribe::Base::uiText("写入失败"));
+            // 写不进去同样回到绑定值：框里留着「写入失败」或那颗新组合，都会让人以为这一项已经改了
+            cancelRecording();
             return written;
         }
         m_displayText = text;
