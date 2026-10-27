@@ -805,6 +805,14 @@ namespace GyanisScribe::Gui
         }
         m_pins = std::move(kept);
 
+        // 关掉的若是 Solo 的主角，这一档先落掉：主角马上不在册，留着它会让其余几张被判成「不该露脸」，
+        // 而那个指针在 pending 析构之后就悬空了，之后也没有哪条路会再来清它
+        if (m_solo != nullptr && std::ranges::any_of(pending, [this](const auto &pin) { return pin.get() == m_solo; }))
+        {
+            m_solo = nullptr;
+            publishSolo();
+        }
+
         for (auto &pin: pending)
         {
             // 走的也是「关闭」那一档：这些像素还按得回来，与销毁不是一回事
@@ -817,6 +825,8 @@ namespace GyanisScribe::Gui
         }
         normalizeActiveGroup();
         applyGroupVisibility();
+        // 选中集里被关掉的几张已经不在册：剩下那些手里的张数读数要跟着改
+        publishSelection();
         emit pinCountChanged(count());
         return static_cast<int>(pending.size());
     }

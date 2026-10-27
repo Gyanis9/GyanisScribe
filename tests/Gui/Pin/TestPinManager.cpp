@@ -700,6 +700,32 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住整组关闭会结束 Solo、摘掉选中，并把剩下的贴图摆回桌面
+     * @details closeGroup 先把成员移出在册表再关窗，forget 看不到这些窗口，Solo 的主角指针就留成了悬空的；
+     *          显隐判据仍按「有主角」算，剩下那一组会被一起收起，看上去像整桌贴图都被关了。
+     *          选中集里被关掉的那张也要从张数读数里摘掉，否则剩下那张还记着旧的张数。
+     */
+    TEST_F(PinManagerFixture, ClosingGroupEndsSoloAndBringsTheOthersBack)
+    {
+        auto &pins = makeManager();
+        auto &solo = static_cast<Gui::PinWindow &>(pins.addPin(makeImage(), QPoint(10, 10)));
+        pins.addPin(makeImage(), QPoint(80, 80));
+        ASSERT_TRUE(pins.movePinToGroup(1, 2).has_value()) << "把第二张移到别组没成功";
+
+        pins.setPinSolo(solo, true);
+        pins.togglePinSelection(solo);
+        ASSERT_EQ(pins.selectedPinCount(), 1) << "前提不对：选中集里该正好是会被关掉的那张";
+
+        ASSERT_EQ(pins.closeGroup(1), 1) << "第一组只有这一张，该关掉一张";
+        ASSERT_EQ(pins.count(), 1) << "关完只剩第二组那一张";
+
+        EXPECT_TRUE(isOnDesk(pins.pinAt(0))) << "Solo 主角被整组关掉后，其余贴图还被 Solo 挡着";
+        EXPECT_FALSE(pins.pinIsSolo(*static_cast<Gui::PinWindow *>(pins.pinAt(0)))) << "剩下的那张被当成了 Solo 主角";
+        EXPECT_EQ(pins.selectedPinCount(), 0) << "关掉的那张还留在选中集的账上";
+        EXPECT_EQ(static_cast<Gui::PinWindow *>(pins.pinAt(0))->selectionCount(), 0) << "剩下那张手里的选中张数没跟着改：它还以为自己在一组里";
+    }
+
+    /**
      * @brief 钉住替换内容只换像素：逻辑尺寸跟着新图走，倍率与摆的中心都不动
      * @details 按 `Ctrl+V` 要的是「这张图换了」，不是「这张贴图挪了位、又回到 1:1」——
      *          尺寸、倍率、中心三样里只有尺寸该动。
