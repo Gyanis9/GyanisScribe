@@ -1797,8 +1797,8 @@ namespace GyanisScribe::Main
             row->addWidget(button);
         }
 
-        // 多屏时给「整屏截图」补一份屏幕清单：托盘那一份菜单项是扁平的枚举（不带屏名），
-        // 点名另一块屏这条路从主窗口走——两处都能做的就是「光标所在那块」这一档
+        // 多屏时给「整屏截图」补一份屏幕清单：这一组服务的是没有托盘的机器（托盘在场时动作条整条收起，
+        // 逐屏截图改走托盘的子菜单）；托盘装不上时，它就是点名另一块屏的入口
         QStringList screenNames;
         for (const auto *screen: QGuiApplication::screens())
         {
