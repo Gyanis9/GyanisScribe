@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <format>
+#include <map>
 #include <memory>
 #include <set>
 #include <string>
@@ -68,13 +69,20 @@ namespace
             {
                 return std::unexpected(Error{ErrorCode::InvalidArgument, std::format("编号 {} 在本后端内已经登记过", identifier)});
             }
+            if (const auto existing = liveCombinations.find(std::pair{modifiers, key}); existing != liveCombinations.end() && existing->second != identifier)
+            {
+                // 与 RegisterHotKey 同解：同一颗组合在同一进程里只能挂在一个编号上，换个编号再登记也会被系统拒绝
+                return std::unexpected(Error{ErrorCode::Busy, std::format("组合已被编号 {} 占用，不能再登记给 {}", existing->second, identifier)});
+            }
             liveRegistrations.insert(identifier);
+            liveCombinations.insert_or_assign(std::pair{modifiers, key}, identifier);
             return {};
         }
 
         Expected<void> unregisterHotkey(int identifier) override
         {
             liveRegistrations.erase(identifier);
+            std::erase_if(liveCombinations, [identifier](const auto &entry) { return entry.second == identifier; });
             return {};
         }
 
@@ -82,7 +90,14 @@ namespace
         {
             ++unregisterAllCalls;
             liveRegistrations.clear();
+            liveCombinations.clear();
             registrations.clear();
+        }
+
+        /// 从下一次登记起按编号拒绝：模拟「先登记成功、之后被别的程序占走」
+        void rejectIdentifierFromNowOn(int identifier)
+        {
+            m_identifiersToReject.insert(identifier);
         }
 
         /// 模拟平台送来的触发事件
@@ -96,8 +111,9 @@ namespace
         int                       unregisterAllCalls = 0;
 
     private:
-        std::set<int>                                       m_identifiersToReject;  ///< 这些编号一登记就报被占用
-        std::set<std::pair<Qt::KeyboardModifiers, Qt::Key>> m_rejectedCombinations; ///< 这些组合一登记就报被占用
+        std::set<int>                                            m_identifiersToReject;  ///< 这些编号一登记就报被占用
+        std::set<std::pair<Qt::KeyboardModifiers, Qt::Key>>      m_rejectedCombinations; ///< 这些组合一登记就报被占用
+        std::map<std::pair<Qt::KeyboardModifiers, Qt::Key>, int> liveCombinations;       ///< 在册的组合 → 编号，用来拒绝跨编号撞键
     };
 
     class FakePlatformIntegration : public IPlatformIntegration
@@ -494,6 +510,35 @@ TEST_F(HotkeyManagerFixture, InvalidCombinationTextRestoresThePreviousCombinatio
 }
 
 /**
+ * @brief 钉住旧组合也恢复不了时，失败原因要说明这颗键现在按不了
+ * @details 只写日志的话，用户看到的只是「按了没反应」；设置页又仍显示新组合，
+ *          没有一个字告诉他旧键这次也没回来。
+ */
+TEST_F(HotkeyManagerFixture, FailedRestoreIsReportedToTheUser)
+{
+    SettingsStore           settings(m_iniFile);
+    FakePlatformIntegration integration;
+    HotkeyManager           manager(settings, integration);
+    ASSERT_TRUE(manager.reload().has_value());
+
+    std::vector<HotkeyReloadReport> reports;
+    QObject::connect(&manager, &IHotkeyManager::reloadFailed, [&reports](const HotkeyReloadReport &report) { reports.push_back(report); });
+
+    // 先让第一次登记成功，之后编号 1 被占走：新组合与要恢复的旧组合都会被后端拒绝
+    integration.m_backendMirror->rejectIdentifierFromNowOn(1);
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kHotkeyCapture, QVariant(QStringLiteral("Ctrl+Shift+F2"))).has_value());
+
+    ASSERT_EQ(reports.size(), 1U);
+    ASSERT_EQ(reports[0].failures.size(), 1U);
+    EXPECT_EQ(reports[0].failures[0].action, HotkeyAction::Capture);
+    EXPECT_EQ(reports[0].failures[0].error.code, ErrorCode::Busy);
+    const auto reason = QString::fromStdString(reports[0].failures[0].error.message);
+    EXPECT_TRUE(reason.contains(QStringLiteral("Ctrl+Alt+A"))) << "原因里没点出原本那颗键，用户无从判断现在还能按什么：" << reason.toStdString();
+    EXPECT_TRUE(reason.contains(QStringLiteral("没能恢复"))) << "旧组合也恢复不了时只写日志，界面会让人以为旧键还能按：" << reason.toStdString();
+    EXPECT_EQ(integration.m_backendMirror->liveRegistrations.count(1), 0U) << "两次登记都被拒，编号 1 不该留在册上";
+}
+
+/**
  * @brief 钉住平台没有该能力时不崩、且每条都记为不支持
  */
 TEST_F(HotkeyManagerFixture, ReportsEveryActionUnsupportedWhenPlatformLacksHotkeys)
@@ -608,6 +653,107 @@ TEST_F(HotkeyManagerFixture, CustomFailuresAreReportedSeparatelyWithTheToken)
     EXPECT_EQ(report->customFailures[0].combination, QStringLiteral("Ctrl+Alt+Q"));
     EXPECT_EQ(report->customFailures[1].token, QStringLiteral("RepinClosed"));
     EXPECT_EQ(report->customFailures[1].error.code, ErrorCode::InvalidArgument) << "「Alt」缺主键，属组合本身不合法";
+}
+
+/**
+ * @brief 钉住自定义编号位移后不按编号乱恢复：失败的那一格不能把别人的旧组合装回来
+ * @details 自定义编号按下标算，收批时又跳过没填的那些：前一项被清空或换掉，
+ *          后一项就挪到更小的编号。恢复只看编号的话，会把上一任功能的旧组合装到这个编号上，
+ *          真正占用这个编号的功能反而登记不上。
+ */
+TEST_F(HotkeyManagerFixture, ShiftedCustomSlotDoesNotRestoreAnotherActionsCombination)
+{
+    SettingsStore           settings(m_iniFile);
+    FakePlatformIntegration integration;
+    integration.m_rejectedCombinations = {{Qt::ControlModifier | Qt::AltModifier, Qt::Key_Z}};
+    HotkeyManager manager(settings, integration);
+
+    manager.setCustomBindings({
+            CustomHotkeyBinding{QStringLiteral("CloseAllPins"), QStringLiteral("Ctrl+Alt+Q")},
+            CustomHotkeyBinding{QStringLiteral("RepinClosed"), QStringLiteral("Ctrl+Alt+W")},
+    });
+    ASSERT_TRUE(manager.reload().has_value());
+    ASSERT_EQ(integration.m_backendMirror->liveRegistrations.count(1000), 1U);
+    ASSERT_EQ(integration.m_backendMirror->liveRegistrations.count(1001), 1U);
+
+    // 前面插进一个新功能：CloseAllPins 从 1000 挪到 1001，1000 上已经不是它了
+    manager.setCustomBindings({
+            CustomHotkeyBinding{QStringLiteral("BlankCanvas"), QStringLiteral("Ctrl+Alt+Z")},
+            CustomHotkeyBinding{QStringLiteral("CloseAllPins"), QStringLiteral("Ctrl+Alt+Q")},
+    });
+    const auto report = manager.reload();
+    ASSERT_TRUE(report.has_value());
+    ASSERT_EQ(report->customFailures.size(), 1U) << "CloseAllPins 挪到 1001 后该正常登记，失败项只该有新功能那一条";
+    EXPECT_EQ(report->customFailures[0].token, QStringLiteral("BlankCanvas"));
+
+    const auto reason = QString::fromStdString(report->customFailures[0].error.message);
+    EXPECT_FALSE(reason.contains(QStringLiteral("仍在使用"))) << "1000 号上换了功能，却对用户说「旧的仍在使用」：" << reason.toStdString();
+
+    // 1000 号上只该有新组合那一次被拒的登记，绝不能出现 CloseAllPins 的旧组合
+    const auto &registrations = integration.m_backendMirror->registrations;
+    for (const auto &registration: registrations)
+    {
+        if (registration.identifier == 1000)
+        {
+            EXPECT_NE(registration.key, Qt::Key_Q) << "失败的新功能没有旧组合可恢复，却把上一个功能的 Ctrl+Alt+Q 装回了 1000 号";
+        }
+    }
+
+    const auto registeredA =
+            std::find_if(registrations.rbegin(), registrations.rend(), [](const FakeHotkeyBackend::Registration &registration) { return registration.identifier == 1001; });
+    ASSERT_NE(registeredA, registrations.rend()) << "挪到 1001 号的 CloseAllPins 一次都没登记上";
+    EXPECT_EQ(registeredA->modifiers, Qt::ControlModifier | Qt::AltModifier);
+    EXPECT_EQ(registeredA->key, Qt::Key_Q) << "CloseAllPins 的组合没有落在它现在占的编号上";
+    EXPECT_EQ(integration.m_backendMirror->liveRegistrations.count(1001), 1U) << "CloseAllPins 的组合没有真正留在册上";
+    EXPECT_EQ(integration.m_backendMirror->liveRegistrations.count(1000), 0U) << "被拒的新功能不该留下任何登记";
+}
+
+/**
+ * @brief 钉住同一个自定义功能换了新组合被拒时，恢复的是它自己的旧组合
+ * @details 编号位移的防线不能把「功能没换、只是组合没登记上」也一起挡住：
+ *          这一条要求按编号与标识都对得上时确实把旧键装回去。
+ */
+TEST_F(HotkeyManagerFixture, CustomBindingFailureRestoresItsOwnPreviousCombination)
+{
+    SettingsStore           settings(m_iniFile);
+    FakePlatformIntegration integration;
+    integration.m_rejectedCombinations = {{Qt::ControlModifier | Qt::AltModifier, Qt::Key_Z}};
+    HotkeyManager manager(settings, integration);
+    manager.setCustomBindings({CustomHotkeyBinding{QStringLiteral("CloseAllPins"), QStringLiteral("Ctrl+Alt+Q")}});
+    ASSERT_TRUE(manager.reload().has_value());
+
+    manager.setCustomBindings({CustomHotkeyBinding{QStringLiteral("CloseAllPins"), QStringLiteral("Ctrl+Alt+Z")}});
+    const auto report = manager.reload();
+    ASSERT_TRUE(report.has_value());
+    ASSERT_EQ(report->customFailures.size(), 1U);
+    const auto reason = QString::fromStdString(report->customFailures[0].error.message);
+    EXPECT_TRUE(reason.contains(QStringLiteral("Ctrl+Alt+Q"))) << "同一个功能的新组合被拒，原因里该说明恢复的是它自己的旧组合：" << reason.toStdString();
+
+    const auto &registrations = integration.m_backendMirror->registrations;
+    const auto  restored =
+            std::find_if(registrations.rbegin(), registrations.rend(), [](const FakeHotkeyBackend::Registration &registration) { return registration.identifier == 1000; });
+    ASSERT_NE(restored, registrations.rend());
+    EXPECT_EQ(restored->modifiers, Qt::ControlModifier | Qt::AltModifier);
+    EXPECT_EQ(restored->key, Qt::Key_Q) << "功能没换、编号也没换，旧组合却没有登记回去";
+    EXPECT_EQ(integration.m_backendMirror->liveRegistrations.count(1000), 1U);
+}
+
+/**
+ * @brief 钉住替身与 RegisterHotKey 同解：同一颗组合不能同时挂在两个编号上
+ * @details 替身允许跨编号撞键的话，「恢复时把别人的组合装错编号」这类缺陷在测试里看不出来。
+ */
+TEST_F(HotkeyManagerFixture, FakeBackendRejectsCombinationLiveUnderAnotherIdentifier)
+{
+    FakeHotkeyBackend backend;
+    const auto        modifiers = Qt::ControlModifier | Qt::AltModifier;
+    ASSERT_TRUE(backend.registerHotkey(1, modifiers, Qt::Key_Q).has_value());
+
+    const auto duplicate = backend.registerHotkey(2, modifiers, Qt::Key_Q);
+    ASSERT_FALSE(duplicate.has_value()) << "同一颗组合在两个编号上同时登记，替身比系统松，跨编号撞键的回归就测不出来";
+    EXPECT_EQ(duplicate.error().code, ErrorCode::Busy);
+
+    ASSERT_TRUE(backend.unregisterHotkey(1).has_value());
+    EXPECT_TRUE(backend.registerHotkey(2, modifiers, Qt::Key_Q).has_value()) << "编号 1 注销后，这颗组合该腾出来";
 }
 
 /**

@@ -2484,6 +2484,10 @@
             <translation>The previous shortcut {} is still active; the new combination did not take effect</translation>
         </message>
         <message>
+            <source>旧的 {} 也没能恢复，这颗键暂时按不了</source>
+            <translation>The previous shortcut {} could not be restored either; this shortcut will not work for now</translation>
+        </message>
+        <message>
             <source>这块屏幕已经不在了，重抓不到画面。把贴图挪回还在的屏幕上再刷新</source>
             <translation>This screen is gone, so there is nothing to re-capture. Move the pin back onto a screen that is still there, then refresh it</translation>
         </message>

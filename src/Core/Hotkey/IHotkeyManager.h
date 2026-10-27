@@ -72,7 +72,7 @@ namespace GyanisScribe::Core
      */
     struct HotkeyReloadReport
     {
-        int                              registered = 0; ///< 成功登记的条数（固定的与自定义的一起算）
+        int                              registered = 0; ///< 本轮新登记成功的条数（固定的与自定义的一起算）；恢复上一轮组合的不计入
         std::vector<HotkeyFailure>       failures;       ///< 固定动作里没登记上的，一条不落全在这里
         std::vector<CustomHotkeyFailure> customFailures; ///< 自定义绑定里没登记上的；与上面那组分开记，界面按各自的名字报
     };

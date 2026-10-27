@@ -33,42 +33,16 @@ namespace GyanisScribe::Core
         /// 快速保存的默认组合：S 取 save，与 A/R/O/P 同一套「动作首字母」记法
         constexpr std::string_view kDefaultQuickSave = "Ctrl+Alt+S";
 
-        /**
-         * @brief 新组合没能登记时，把同一编号上一轮生效的组合重新登记回去
-         * @param backend 本轮使用的后端
-         * @param identifier 要恢复的编号
-         * @param previous 上一轮真正在册的组合
-         * @param next 本轮在册的组合，恢复成功时写入
-         * @return 恢复成功返回旧组合的文本，供失败原因说明现在该按什么
-         * @return 上一轮没有这一条、或后端再次拒绝时返回空
-         * @details 重登先全注销：不恢复的话，改坏一格就让那颗键彻底失效。
-         *          恢复失败不写进在册表——表里的每一条都必须是后端此刻真收下的组合。
-         */
-        std::optional<QString> restorePreviousBinding(Platform::IHotkeyBackend &backend, const int identifier, const std::map<int, HotkeyCombination> &previous,
-                                                      std::map<int, HotkeyCombination> &next)
+        /// 恢复成功时把「旧组合仍在使用」接在失败原因后面，用户才知道现在按哪颗键还有用
+        void appendRestoredNote(Base::Error &error, const QString &restoredText)
         {
-            const auto old = previous.find(identifier);
-            if (old == previous.end())
-            {
-                return std::nullopt;
-            }
-            if (const auto restored = backend.registerHotkey(identifier, old->second.modifiers(), old->second.key()); !restored)
-            {
-                Base::Logger::warning(std::format("编号 {} 的旧组合没能恢复：{}", identifier, restored.error().message));
-                return std::nullopt;
-            }
-            next.insert_or_assign(identifier, old->second);
-            return old->second.toText();
+            error.message += "；" + Base::uiFormat(Base::uiTextUtf8("旧的 {} 仍在使用，新的组合没有生效"), restoredText.toStdString());
         }
 
-        /// 恢复成功时把「旧组合仍在使用」接在失败原因后面，用户才知道现在按哪颗键还有用
-        void appendRestoredNote(Base::Error &error, const std::optional<QString> &restoredText)
+        /// 旧组合也恢复不了时，失败原因要说明这颗键现在按不了，而不是只留一行日志
+        void appendUnrestoredNote(Base::Error &error, const QString &previousText)
         {
-            if (!restoredText)
-            {
-                return;
-            }
-            error.message += "；" + Base::uiFormat(Base::uiTextUtf8("旧的 {} 仍在使用，新的组合没有生效"), restoredText->toStdString());
+            error.message += "；" + Base::uiFormat(Base::uiTextUtf8("旧的 {} 也没能恢复，这颗键暂时按不了"), previousText.toStdString());
         }
     } // namespace
 
@@ -223,9 +197,25 @@ namespace GyanisScribe::Core
         }
 
         HotkeyReloadReport report;
-        // 上一轮真正在册的组合要留一份：这一轮先清场，新值登记不上时靠它把旧键放回去
-        const auto                       previousBindings = m_activeBindings;
-        std::map<int, HotkeyCombination> nextBindings;
+        // 上一轮真正在册的记录要留一份：这一轮先清场，新值登记不上时靠它把旧键放回去
+        const auto                   previousBindings = m_activeBindings;
+        std::map<int, ActiveBinding> nextBindings;
+        // 恢复旧键时要先说清这个编号此刻该归哪个功能：固定动作传空，自定义传这一格的标识
+        const auto restoreAndNote = [&](Base::Error &error, const int identifier, const std::optional<QString> &token)
+        {
+            const auto restore = restorePreviousBinding(identifier, token, previousBindings, nextBindings);
+            switch (restore.outcome)
+            {
+                case RestoreOutcome::Restored:
+                    appendRestoredNote(error, restore.previous.toText());
+                    break;
+                case RestoreOutcome::Failed:
+                    appendUnrestoredNote(error, restore.previous.toText());
+                    break;
+                case RestoreOutcome::NoPrevious:
+                    break;
+            }
+        };
         // 先清场再重登：留着上一轮的登记，用户改掉的旧组合会一直占着，新组合也可能撞号
         m_backend->unregisterAll();
 
@@ -239,7 +229,7 @@ namespace GyanisScribe::Core
             {
                 // 设置里的值坏掉时按项记失败，不用默认组合顶上：顶上去用户按到的就不是他设的那个键
                 Base::Error error = combination.error();
-                appendRestoredNote(error, restorePreviousBinding(*m_backend, identifier, previousBindings, nextBindings));
+                restoreAndNote(error, identifier, std::nullopt);
                 report.failures.push_back(HotkeyFailure{action, storedText, std::move(error)});
                 continue;
             }
@@ -247,11 +237,11 @@ namespace GyanisScribe::Core
             if (const auto registered = m_backend->registerHotkey(identifier, combination->modifiers(), combination->key()); !registered)
             {
                 Base::Error error = registered.error();
-                appendRestoredNote(error, restorePreviousBinding(*m_backend, identifier, previousBindings, nextBindings));
+                restoreAndNote(error, identifier, std::nullopt);
                 report.failures.push_back(HotkeyFailure{action, storedText, std::move(error)});
                 continue;
             }
-            nextBindings.insert_or_assign(identifier, *combination);
+            nextBindings.insert_or_assign(identifier, ActiveBinding{std::nullopt, *combination});
             ++report.registered;
         }
 
@@ -264,23 +254,49 @@ namespace GyanisScribe::Core
             if (!combination)
             {
                 Base::Error error = combination.error();
-                appendRestoredNote(error, restorePreviousBinding(*m_backend, identifier, previousBindings, nextBindings));
+                restoreAndNote(error, identifier, binding.token);
                 report.customFailures.push_back(CustomHotkeyFailure{binding.token, binding.combination, std::move(error)});
                 continue;
             }
             if (const auto registered = m_backend->registerHotkey(identifier, combination->modifiers(), combination->key()); !registered)
             {
                 Base::Error error = registered.error();
-                appendRestoredNote(error, restorePreviousBinding(*m_backend, identifier, previousBindings, nextBindings));
+                restoreAndNote(error, identifier, binding.token);
                 report.customFailures.push_back(CustomHotkeyFailure{binding.token, binding.combination, std::move(error)});
                 continue;
             }
-            nextBindings.insert_or_assign(identifier, *combination);
+            nextBindings.insert_or_assign(identifier, ActiveBinding{binding.token, *combination});
             ++report.registered;
         }
 
         m_activeBindings = std::move(nextBindings);
         return report;
+    }
+
+    HotkeyManager::RestoreResult HotkeyManager::restorePreviousBinding(const int identifier, const std::optional<QString> &token, const std::map<int, ActiveBinding> &previous,
+                                                                       std::map<int, ActiveBinding> &next)
+    {
+        const auto old = previous.find(identifier);
+        if (old == previous.end())
+        {
+            return {};
+        }
+        if (old->second.token != token)
+        {
+            // 自定义编号按下标算，增删前一项会让后一项换号：编号下的功能已经换人，旧组合不是它的
+            return {};
+        }
+        RestoreResult result;
+        result.outcome  = RestoreOutcome::Failed;
+        result.previous = old->second.combination;
+        if (const auto restored = m_backend->registerHotkey(identifier, old->second.combination.modifiers(), old->second.combination.key()); !restored)
+        {
+            Base::Logger::warning(std::format("编号 {} 的旧组合没能恢复：{}", identifier, restored.error().message));
+            return result;
+        }
+        next.insert_or_assign(identifier, ActiveBinding{token, old->second.combination});
+        result.outcome = RestoreOutcome::Restored;
+        return result;
     }
 
     void HotkeyManager::setCustomBindings(std::vector<CustomHotkeyBinding> bindings)
