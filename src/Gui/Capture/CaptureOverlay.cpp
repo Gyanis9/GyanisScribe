@@ -66,6 +66,9 @@ namespace
 
     /// 尺寸输入框摆在光标右下时的偏移，逻辑像素
     constexpr int kSizeEditorCursorGap = 12;
+
+    /// 按下到松手之间位移不超过这一格（逻辑像素）时按「原地点击」处理：手抖不该把整窗选择变成碎片
+    constexpr int kHoverClickSlop = 4;
 } // namespace
 
 namespace GyanisScribe::Gui
@@ -524,6 +527,9 @@ namespace GyanisScribe::Gui
             closeSizeEditor();
         }
 
+        // 上一次按下的悬停候选到这里已经过期：这一次落在抓点上时松手不采纳它
+        m_pressedHoveredRegion.reset();
+
         const auto point  = event->position().toPoint();
         const auto region = selectedRegion();
         // 已经框好的一块先认抓点：认到了就改这一块，而不是重新框一遍。
@@ -545,6 +551,8 @@ namespace GyanisScribe::Gui
         m_currentPoint   = m_anchorPoint;
         m_cursorPoint    = m_anchorPoint;
         m_hasCursorPoint = true;
+        // 按下那一刻亮着的候选留一份：拖动会把它从预览里清掉，小位移松手时还要按它采纳
+        m_pressedHoveredRegion = m_hoveredRegion;
         // 重新框一块就不是「取自历史」了：下一次 R 该从最近一条重新起，而不是接着上一轮的位次
         m_historyIndex = -1;
         // 预览留着不熄：按下还没拖的那一瞬间，「点一下要哪扇」的答案就是它。
@@ -624,14 +632,18 @@ namespace GyanisScribe::Gui
                                                                             : Core::ratioLockedPoint(m_anchorPoint, releasePoint, m_aspectLocked ? m_aspectRatio : QSize{}, limit);
 
             // 按下又原地放开（没拖出任何一块）时，认此刻悬停亮着的那个候选：
-            // 「点一下就要这一扇窗口」是框选最常用的走法，而原地放开过去什么也不产出
-            if (m_hoveredRegion && selectedRegion().isNull())
+            // 「点一下就要这一扇窗口」是框选最常用的走法，而原地放开过去什么也不产出。
+            // 1-3 像素的手抖同样按原地点击算：阈值内任何一边都不该把一块碎片交出去
+            const auto drafted      = selectedRegion();
+            const bool inPlaceClick = drafted.width() <= kHoverClickSlop || drafted.height() <= kHoverClickSlop;
+            if (inPlaceClick && m_pressedHoveredRegion)
             {
-                m_anchorPoint  = m_hoveredRegion->topLeft();
-                m_currentPoint = m_hoveredRegion->bottomRight();
+                m_anchorPoint  = m_pressedHoveredRegion->topLeft();
+                m_currentPoint = m_pressedHoveredRegion->bottomRight();
                 m_hoveredRegion.reset();
                 m_historyIndex = -1; // 采纳的是悬停候选，不是历史里那一条
             }
+            m_pressedHoveredRegion.reset();
             update();
             // 松手即交出：选区范围在这一刻定下来，下一个界面就是标注窗；
             // 重裁边框在标注窗里用「选择」档拖四边完成
@@ -670,7 +682,13 @@ namespace GyanisScribe::Gui
 
         // 可换键的那几档排在按颗键判定的 switch 之前：它们认的是清册里现在那颗键，整颗组合相等才算命中。
         // 换上去的键与既有组合（如 Ctrl+A）撞上时这一层先赢——用户把它换上来就是要这颗键归这一档
-        switch (const auto action = rebindableActionFor(event); action)
+        const auto action = rebindableActionFor(event);
+        // 长按产生的自动重复不翻档：翻档是「按一下」的语义，键盘重复率会把它变成来回抽动
+        if (event->isAutoRepeat() && (action == RebindableKeyAction::ToggleAspectRatio || action == RebindableKeyAction::ToggleCursor))
+        {
+            return;
+        }
+        switch (action)
         {
             case RebindableKeyAction::None:
                 break;

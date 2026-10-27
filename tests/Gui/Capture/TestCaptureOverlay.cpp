@@ -171,6 +171,35 @@ TEST_F(CaptureOverlayFixture, ClickWithoutDragAdoptsTheHoveredWindow)
 }
 
 /**
+ * @brief 钉住按下后 1-3 像素的手抖仍按「原地点击」采纳悬停那一扇
+ * @details 点一下窗口是框选里最常用的一下；手一抖就交出一块 3×3 的碎片，用户还得重来一次。
+ *          阈值内部的位移判成原地点击，交出的要逐位等于悬停亮着的那一块。
+ */
+TEST_F(CaptureOverlayFixture, TinyJitterAfterPressStillAdoptsTheHoveredWindow)
+{
+    auto overlay = makeOverlay();
+    overlay->setWindowCandidates(kCandidates);
+
+    int   emitted = 0;
+    QRect confirmed;
+    QObject::connect(overlay.get(), &CaptureOverlay::regionSelected, overlay.get(),
+                     [&emitted, &confirmed](const QRect &region)
+                     {
+                         ++emitted;
+                         confirmed = region;
+                     });
+
+    moveOver(*overlay, QPoint{200, 160});
+    buttonAt(*overlay, QEvent::MouseButtonPress, QPoint{200, 160});
+    moveOver(*overlay, QPoint{202, 162});
+    buttonAt(*overlay, QEvent::MouseButtonRelease, QPoint{202, 162});
+
+    ASSERT_EQ(emitted, 1) << "松手没有交出选区";
+    EXPECT_EQ(confirmed, QRect(180, 150, 100, 80)) << "按下后 2px 的手抖把整窗选择变成了碎片";
+    EXPECT_FALSE(overlay->hoveredRegion().has_value()) << "已经落成的选区不该再留一个预览框";
+}
+
+/**
  * @brief 钉住手动框选没被这条新路抢走：拖出来的仍然是拖的那一块
  */
 TEST_F(CaptureOverlayFixture, DraggedRegionStillWinsOverHover)
@@ -357,6 +386,13 @@ TEST_F(CaptureOverlayFixture, MagnifierFlipsAsideAtTheScreenCorner)
 void pressKey(CaptureOverlay &overlay, const Qt::Key key, const Qt::KeyboardModifiers modifiers = Qt::KeyboardModifier{})
 {
     QKeyEvent event{QEvent::KeyPress, key, modifiers};
+    QApplication::sendEvent(&overlay, &event);
+}
+
+/// 投一条「按住不放」产生的自动重复按键：isAutoRepeat 为真，键值与修饰键与首按相同
+void pressKeyAutoRepeat(CaptureOverlay &overlay, const Qt::Key key, const Qt::KeyboardModifiers modifiers = Qt::KeyboardModifier{})
+{
+    QKeyEvent event{QEvent::KeyPress, key, modifiers, QString{}, true};
     QApplication::sendEvent(&overlay, &event);
 }
 
@@ -999,6 +1035,53 @@ TEST_F(CaptureOverlayFixture, PointerKeyTogglesCursorForThisRound)
     longRound->setCursorIncluded(std::nullopt);
     pressKey(*longRound, Qt::Key_P);
     EXPECT_FALSE(longRound->cursorIncluded().has_value()) << "这一轮没有这一档时，P 该交回 Qt";
+}
+
+/**
+ * @brief 钉住按住 A 不放时自动重复不反复翻比例锁
+ * @details 自动重复的速率由键盘设置决定，按住一秒能来几十下；每一下都翻一次，
+ *          锁就被按成「抽查」而不是「锁住」。
+ */
+TEST_F(CaptureOverlayFixture, HoldingTheAspectRatioKeyTogglesOnlyOnce)
+{
+    auto overlay = makeOverlay();
+    dragOut(*overlay, QPoint{100, 100}, QPoint{299, 199});
+    ASSERT_EQ(overlay->selectedRegion(), QRect(100, 100, 200, 100));
+
+    int reports = 0;
+    QObject::connect(overlay.get(), &CaptureOverlay::aspectRatioLockChanged, [&reports](const QSize &) { ++reports; });
+
+    pressKey(*overlay, Qt::Key_A);
+    ASSERT_EQ(overlay->lockedAspectRatio(), (QSize(2, 1))) << "第一下没锁上，后面的判据无从谈起";
+    ASSERT_EQ(reports, 1);
+
+    pressKeyAutoRepeat(*overlay, Qt::Key_A);
+    pressKeyAutoRepeat(*overlay, Qt::Key_A);
+    EXPECT_EQ(overlay->lockedAspectRatio(), (QSize(2, 1))) << "长按 A 的自动重复把比例锁反复翻了";
+    EXPECT_EQ(reports, 1) << "自动重复每来一次就翻一次档，按住一秒能翻几十遍";
+}
+
+/**
+ * @brief 钉住按住 P 不放时自动重复不反复翻指针档
+ * @details 除了翻档，每次重复还会往服务报一次意图：按住不放的这段时间里
+ *          宿主收到一串来回摇摆的档位，用户看到的与最后生效的未必是同一个。
+ */
+TEST_F(CaptureOverlayFixture, HoldingThePointerKeyTogglesOnlyOnce)
+{
+    auto overlay = makeOverlay();
+    overlay->setCursorIncluded(false);
+
+    int reports = 0;
+    QObject::connect(overlay.get(), &CaptureOverlay::cursorIncludeChanged, [&reports](const bool) { ++reports; });
+
+    pressKey(*overlay, Qt::Key_P);
+    ASSERT_TRUE(overlay->cursorIncluded().value_or(false)) << "第一下没翻成含指针，后面的判据无从谈起";
+    ASSERT_EQ(reports, 1);
+
+    pressKeyAutoRepeat(*overlay, Qt::Key_P);
+    pressKeyAutoRepeat(*overlay, Qt::Key_P);
+    EXPECT_TRUE(overlay->cursorIncluded().value_or(false)) << "长按 P 的自动重复把指针档又翻了回去";
+    EXPECT_EQ(reports, 1) << "自动重复每来一次就报一次意图";
 }
 
 /**

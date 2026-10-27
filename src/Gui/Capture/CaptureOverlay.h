@@ -428,6 +428,7 @@ namespace GyanisScribe::Gui
         std::vector<QRect>                 m_elementChain;          ///< 光标处的元素链，已换成局部逻辑坐标，由深到浅；相邻同矩形已并档
         std::size_t                        m_elementAscent = 0;     ///< 从这里往上数了几级（0 = 最深一级）；等于链长时看整扇窗口
         std::optional<QRect>               m_hoveredRegion;         ///< 光标压在上的那一个候选，没有则空
+        std::optional<QRect>               m_pressedHoveredRegion;  ///< 按下那一刻亮着的候选：小位移松手时按它采纳
         QSize                              m_aspectRatio;           ///< 上一次锁过的长宽比（已约分）；空 = 还没有过
         bool                               m_aspectLocked  = false; ///< 长宽比锁此刻是不是开着
         bool                               m_cursorTouched = false; ///< 指针档被 `P` 翻过没有：没翻过就不必多占读数那一格
