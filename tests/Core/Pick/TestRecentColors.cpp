@@ -126,9 +126,11 @@ TEST(RecentColorsRoundTrip, RejectsAnyTokenThatIsNotSixHexDigits)
         const auto parsed = parseRecentColors({QStringLiteral("#123456"), QString::fromUtf8(bad)});
         ASSERT_FALSE(parsed.has_value()) << bad;
         EXPECT_EQ(parsed.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument) << bad;
-        // 原因要点出是哪一条词与怎么恢复，否则用户只能对着配置文件猜
+        // 原因要点出是哪一条词与怎么恢复，否则用户只能对着配置文件猜；
+        // 恢复办法说的必须是这条读路径真正读的键，照着删错键等于没修
         EXPECT_NE(parsed.error().message.find(QString::fromUtf8(bad).toStdString()), std::string::npos) << bad;
-        EXPECT_NE(parsed.error().message.find("Annotation/RecentColors"), std::string::npos) << bad;
+        EXPECT_NE(parsed.error().message.find("Pick/RecentColors"), std::string::npos) << bad;
+        EXPECT_EQ(parsed.error().message.find("Annotation/RecentColors"), std::string::npos) << bad << " 提示指向了另一条读路径的键";
     }
 
     // 空清单是合法状态（用户还没用过自定义颜色），不能报成坏值
