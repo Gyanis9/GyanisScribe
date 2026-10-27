@@ -27,13 +27,10 @@ namespace
 
 Application::Application(int &argc, char **argv, const GyanisScribe::App::CommandLineRequest &request) : QApplication(argc, argv)
 {
-    // 一次性的命令行动作（截图/贴图/取色）：不锁单实例、不登记热键——它是「跑一件事就走」的启动，
-    // 该与常驻实例互不打扰（脚本在托盘常驻时照样能用，也不去抢那八个全局热键）。
+    // 一次性的命令行动作（截图/贴图/取色/自检）：不锁单实例，也不跟常驻实例抢全局热键——
+    // 它是「跑一件事就走」的启动，脚本在托盘常驻时照样能用。
     // 托盘与主窗口仍随控制器现一下身：那是控制器构造的一部分，单独剪掉等于再造一条装配路
-    const bool transientCommandLine = request.action == GyanisScribe::App::CommandLineAction::CaptureFullScreen ||
-                                      request.action == GyanisScribe::App::CommandLineAction::CaptureLastRegion ||
-                                      request.action == GyanisScribe::App::CommandLineAction::CaptureWindow || request.action == GyanisScribe::App::CommandLineAction::PinFile ||
-                                      request.action == GyanisScribe::App::CommandLineAction::ColorPick;
+    const bool transientAction = GyanisScribe::App::isTransientCommandLineAction(request.action);
 
     // 身份三件套必须排在任何 Paths/Settings 调用之前，否则 QStandardPaths 会给出无组织名的路径
     setOrganizationName(QLatin1String(kOrganizationName));
@@ -72,9 +69,11 @@ Application::Application(int &argc, char **argv, const GyanisScribe::App::Comman
     // 全局热键。实测（本机连开两次进程）：排在后面时第二份会把整棵树建完（设置页那四条 ffmpeg
     // 警告就是它建主窗口留下的）、把七个热键挨个抢一遍（全部回 1409「已被占用」）才退出——
     // 用户那一侧看到的是第二个托盘图标一闪，外加一次白启动
-    if (transientCommandLine)
+    if (transientAction)
     {
-        GyanisScribe::Base::Logger::info("命令行动作启动：不锁单实例、不登记热键");
+        // 一次性启动不争单实例那把锁；控制器照建——自检量的正是这一条装配路，
+        // 控制器不在时它只是一次空跑，失败也看不出来
+        GyanisScribe::Base::Logger::info("命令行动作启动：不锁单实例");
         m_isPrimaryInstance = true;
         m_controller        = std::make_unique<GyanisScribe::Main::AppController>();
     } else
@@ -86,22 +85,10 @@ Application::Application(int &argc, char **argv, const GyanisScribe::App::Comman
     {
         // 唤醒与退出的判断在 Main 里；界面这一侧只留一条日志，别的一概不建
         GyanisScribe::Base::Logger::info("本次启动不是主实例：不建界面、不登记热键，交给 Main 去唤前一份");
-    } else if (!transientCommandLine)
+    } else if (!transientAction)
     {
         m_controller = std::make_unique<GyanisScribe::Main::AppController>();
-
-        // 热键登记失败不阻断启动：组合键被别的程序占了也要能让用户从界面里操作
-        if (const auto report = m_controller->registerHotkeys(); report)
-        {
-            m_hotkeyReport = *report;
-            for (const auto &failure: m_hotkeyReport.failures)
-            {
-                GyanisScribe::Base::Logger::warning(std::format("热键「{}」没能登记：{}", failure.combination.toStdString(), failure.error.message));
-            }
-        } else
-        {
-            GyanisScribe::Base::Logger::error(std::format("热键登记没走通：{}", report.error().message));
-        }
+        registerStartupHotkeys();
 
         // 有人再来启动时唤前一份：唤的是控制器管着的那些窗口，因此这条接线只在主实例这一支上
         QObject::connect(m_singleInstance.get(), &GyanisScribe::App::SingleInstance::secondLaunchRequested, this,
@@ -110,6 +97,11 @@ Application::Application(int &argc, char **argv, const GyanisScribe::App::Comman
                              GyanisScribe::Base::Logger::info("又有人启动智录：把设置窗口唤到前台，不再开第二份");
                              m_controller->openMainWindow(GyanisScribe::Main::MainWindowPage::General);
                          });
+    } else if (request.action == CommandLineAction::SelfTest)
+    {
+        // 自检量的正是启动路上的热键登记：这一格照样登记一遍，结果只进日志与自检输出，不据此判红。
+        // 其余一次性动作（截一张、贴一张、取色）不碰全局热键，常驻实例的登记不被打断。
+        registerStartupHotkeys();
     }
 
     // 就绪判据只看日志有没有接管成功：界面在日志坏掉时照样能用，但 CI 的自检要把这一格判红
@@ -139,6 +131,25 @@ bool Application::wakePrimaryInstance()
 bool Application::isReady() const noexcept
 {
     return m_isReady;
+}
+
+void Application::registerStartupHotkeys()
+{
+    if (m_controller == nullptr)
+    {
+        return;
+    }
+    if (const auto report = m_controller->registerHotkeys(); report)
+    {
+        m_hotkeyReport = *report;
+        for (const auto &failure: m_hotkeyReport.failures)
+        {
+            GyanisScribe::Base::Logger::warning(std::format("热键「{}」没能登记：{}", failure.combination.toStdString(), failure.error.message));
+        }
+    } else
+    {
+        GyanisScribe::Base::Logger::error(std::format("热键登记没走通：{}", report.error().message));
+    }
 }
 
 const GyanisScribe::Core::HotkeyReloadReport &Application::hotkeyReport() const noexcept

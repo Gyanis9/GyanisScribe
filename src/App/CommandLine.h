@@ -86,6 +86,16 @@ namespace GyanisScribe::App
      */
     [[nodiscard]] CommandLineParseResult parseStartupArguments(const QStringList &arguments);
 
+    /**
+     * @brief 这个动作是不是「跑一件事就走」的一次性启动
+     * @param action 解析出的启动动作
+     * @return 自检、截图、贴图与取色为 true；常驻、帮助与版本为 false
+     * @details 一次性启动不锁单实例、不去抢常驻实例的全局热键，脚本在托盘常驻时照样能用。
+     *          自检也归这一档：它在已有实例时同样要把控制器建起来跑一遍启动路径，
+     *          落在这一档之外时，非主实例那次启动不建任何东西，而退出码仍可能是 0。
+     */
+    [[nodiscard]] bool isTransientCommandLineAction(CommandLineAction action);
+
     /// 用法说明全文（走文案目录），Main 在 --help 与解析报错时打印
     [[nodiscard]] QString commandLineUsageText();
 

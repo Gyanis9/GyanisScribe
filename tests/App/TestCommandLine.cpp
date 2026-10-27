@@ -13,6 +13,7 @@ using GyanisScribe::App::CaptureOutput;
 using GyanisScribe::App::CaptureOutputSet;
 using GyanisScribe::App::CommandLineAction;
 using GyanisScribe::App::commandLineUsageText;
+using GyanisScribe::App::isTransientCommandLineAction;
 using GyanisScribe::App::kCommandLineCaptureChoices;
 using GyanisScribe::App::parseStartupArguments;
 
@@ -219,4 +220,22 @@ TEST(CommandLineParsing, DeliveryFlagsNeedACaptureAction)
 
     // 单独给 --to（一个动作都没给）也算错：那条请求既不是截图也没有去处可落
     EXPECT_FALSE(parseStartupArguments({QStringLiteral("--to=file")}).errorText.isEmpty());
+}
+
+/**
+ * @brief 一次性动作的表：常驻、帮助与版本之外的启动都按「跑一件事就走」装配
+ * @details 自检也在这张表里。它此前被漏在表外，已有实例时那次启动不建控制器，
+ *          而退出码只看日志有没有接管，于是打包门在「什么都没建」的进程上读到 0。
+ */
+TEST(CommandLineStartupShape, TransientActionsAreTheOneShotOnes)
+{
+    for (const auto action: {CommandLineAction::SelfTest, CommandLineAction::CaptureFullScreen, CommandLineAction::CaptureLastRegion, CommandLineAction::CaptureWindow,
+                             CommandLineAction::PinFile, CommandLineAction::ColorPick})
+    {
+        EXPECT_TRUE(isTransientCommandLineAction(action)) << static_cast<int>(action);
+    }
+    for (const auto action: {CommandLineAction::None, CommandLineAction::Help, CommandLineAction::Version})
+    {
+        EXPECT_FALSE(isTransientCommandLineAction(action)) << static_cast<int>(action);
+    }
 }

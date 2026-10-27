@@ -213,6 +213,25 @@ namespace GyanisScribe::App
         return result;
     }
 
+    bool isTransientCommandLineAction(const CommandLineAction action)
+    {
+        switch (action)
+        {
+            case CommandLineAction::SelfTest:
+            case CommandLineAction::CaptureFullScreen:
+            case CommandLineAction::CaptureLastRegion:
+            case CommandLineAction::CaptureWindow:
+            case CommandLineAction::PinFile:
+            case CommandLineAction::ColorPick:
+                return true;
+            case CommandLineAction::None:
+            case CommandLineAction::Help:
+            case CommandLineAction::Version:
+                return false;
+        }
+        return false;
+    }
+
     QString commandLineUsageText()
     {
         QString captureLines;
