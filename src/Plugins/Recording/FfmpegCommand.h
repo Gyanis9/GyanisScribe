@@ -12,6 +12,7 @@
 #include "Base/Types.h"
 #include "Core/Record/RecorderConfig.h"
 
+#include <QByteArray>
 #include <QStringList>
 
 #include <filesystem>
@@ -103,5 +104,13 @@ namespace GyanisScribe::Plugins
      *          中间格式定 pcm_s16le：与编码那一步解耦，取声失败时画面那一半还能独立出片。
      */
     [[nodiscard]] Base::Expected<QStringList> audioCaptureArguments(const QString &microphoneDevice, const QString &systemSoundDevice, const std::filesystem::path &wavFile);
+
+    /**
+     * @brief 让取声的那条 ffmpeg 正常收尾的 stdin 命令
+     * @return q 加一个换行
+     * @details ffmpeg 从 stdin 读到 q 就关容器，自己把 wav 的长度头写好；写成 q 反斜杠 n
+     *          三个字符只会让它一直读到超时，被强杀后留下的 wav 读不出时长。
+     */
+    [[nodiscard]] QByteArray ffmpegStopCommand();
 
 } // namespace GyanisScribe::Plugins

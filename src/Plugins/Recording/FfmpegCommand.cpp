@@ -167,6 +167,11 @@ namespace GyanisScribe::Plugins
         return arguments;
     }
 
+    QByteArray ffmpegStopCommand()
+    {
+        return QByteArrayLiteral("q\n");
+    }
+
     QString bundledFfmpegPath(const QString &applicationDirectory)
     {
         if (applicationDirectory.isEmpty())

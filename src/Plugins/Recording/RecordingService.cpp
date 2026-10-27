@@ -524,7 +524,7 @@ namespace GyanisScribe::Plugins
         // 一个 q 走 stdin 就是 ffmpeg 自己的「收尾退出」：它会正常关掉 wav 的长度头，强杀留下的文件读不出时长
         if (m_audio->state() != QProcess::NotRunning)
         {
-            m_audio->write("q\\n");
+            m_audio->write(ffmpegStopCommand());
             m_audio->waitForBytesWritten(1000);
             if (!m_audio->waitForFinished(kAudioStopTimeoutMs))
             {

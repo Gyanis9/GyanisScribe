@@ -406,6 +406,17 @@ TEST(RecordingFfmpeg, AchievedFrameRateDrivesTheCommandLine)
 }
 
 /**
+ * @brief 钉住取声收尾命令是 q 加一个真正的换行
+ * @details 写进去的若是 q、反斜杠、n 三个字符，ffmpeg 只能在读到 EOF 或等到超时后才退出；
+ *          收尾那一步因此多等几秒，超时强杀还会留下一份长度头不对的 wav。
+ */
+TEST(RecordingFfmpeg, StopCommandIsTheRealQNewline)
+{
+    const auto command = GyanisScribe::Plugins::ffmpegStopCommand();
+    ASSERT_EQ(command, QByteArrayLiteral("q\n")) << "取声收尾命令不是 q 加一个换行，实际是 " << command.toHex().toStdString();
+}
+
+/**
  * @brief 钉住编码超时的算法
  * @details 短片不能被余量算得太小误杀，长片也不能无限等。
  */
