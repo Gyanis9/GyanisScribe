@@ -177,14 +177,19 @@ namespace GyanisScribe::App
         void refreshLastCapture(const QString &screenName, const QRect &region);
 
         /**
-         * @brief 藏起标注窗与工具栏抓一块区域，抓完不管成败都摆回来
+         * @brief 藏起标注窗与工具栏抓一块区域，抓完把几何摆回
          * @param screenName 目标屏幕名
          * @param region 该屏内的逻辑区域
+         * @param restoreVisibility 抓完是否由本函数把两者重新露出来
          * @return 抓到的帧；抓帧失败时原因原样交回，画布与标注都不动
          * @details 标注窗盖着的正是要抓的那一块：不藏就把它自己拍进底图。先记下两者的可见态与几何，
-         *          藏完让事件循环把这次隐藏落到屏上，抓完恢复——失败时也不许把窗留在屏外。
+         *          藏完让事件循环把这次隐藏落到屏上，抓完恢复几何——失败时也不许把窗留在屏外。
+         *          重露时把窗口抬到最前并重新激活：连按 F5 的下一颗键要落回这扇窗。
+         *          restoreVisibility 为假时只摆回几何，重露交给随后的 recropAnnotation 或
+         *          restoreAfterCrop——它们先换画布再显窗，不会闪一帧旧底图。
          */
-        [[nodiscard]] GyanisScribe::Base::Expected<GyanisScribe::Base::CapturedImage> grabWithAnnotationHidden(const QString &screenName, const QRect &region);
+        [[nodiscard]] GyanisScribe::Base::Expected<GyanisScribe::Base::CapturedImage> grabWithAnnotationHidden(const QString &screenName, const QRect &region,
+                                                                                                               bool restoreVisibility);
 
         /// 选择档拖完标注窗边框：先藏窗再按新范围重抓，换一张画布
         void cropLastCapture(const QString &screenName, const QRect &globalSelection);

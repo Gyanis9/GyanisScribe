@@ -200,6 +200,35 @@ TEST_F(CaptureOverlayFixture, TinyJitterAfterPressStillAdoptsTheHoveredWindow)
 }
 
 /**
+ * @brief 钉住宽 200、高 3 的细长条不算原地点击，不被悬停候选吞掉
+ * @details 只要有一边拉得够长就是用户有意框的一条；把细长条并进悬停候选，
+ *          等于想裁一条横幅却交出了整个窗口。
+ */
+TEST_F(CaptureOverlayFixture, ThinDragIsNotAnInPlaceClick)
+{
+    auto overlay = makeOverlay();
+    overlay->setWindowCandidates(kCandidates);
+
+    int   emitted = 0;
+    QRect confirmed;
+    QObject::connect(overlay.get(), &CaptureOverlay::regionSelected, overlay.get(),
+                     [&emitted, &confirmed](const QRect &region)
+                     {
+                         ++emitted;
+                         confirmed = region;
+                     });
+
+    moveOver(*overlay, QPoint{200, 160});
+    ASSERT_TRUE(overlay->hoveredRegion().has_value()) << "先得有悬停候选，后面的判据才验得到「被吞掉」";
+    buttonAt(*overlay, QEvent::MouseButtonPress, QPoint{200, 160});
+    moveOver(*overlay, QPoint{399, 162});
+    buttonAt(*overlay, QEvent::MouseButtonRelease, QPoint{399, 162});
+
+    ASSERT_EQ(emitted, 1) << "松手没有交出选区";
+    EXPECT_EQ(confirmed, QRect(200, 160, 200, 3)) << "细长条被当成原地点击，交出的成了整扇窗口";
+}
+
+/**
  * @brief 钉住手动框选没被这条新路抢走：拖出来的仍然是拖的那一块
  */
 TEST_F(CaptureOverlayFixture, DraggedRegionStillWinsOverHover)

@@ -53,6 +53,7 @@
 #include <string>
 #include <system_error>
 #include <thread>
+#include <utility>
 #include <vector>
 
 namespace GyanisScribe
@@ -94,7 +95,20 @@ namespace GyanisScribe
                 }
                 ++screenCalls;
                 requestedScreen = screenName;
+                if (m_nextScreenError)
+                {
+                    // 只失败这一次：失败路径的用例要在同一轮里看到窗被放回原处
+                    const auto error = std::move(*m_nextScreenError);
+                    m_nextScreenError.reset();
+                    return std::unexpected(error);
+                }
                 return m_frame;
+            }
+
+            /// 让下一次整屏抓帧带上这条原因失败一次：F5 的失败路径要看到窗与画布原样留着
+            void failNextScreenGrab(Base::Error error) const
+            {
+                m_nextScreenError = std::move(error);
             }
 
             [[nodiscard]] Base::Expected<Base::CapturedImage> grabWindow(const quintptr handle) const override
@@ -111,7 +125,8 @@ namespace GyanisScribe
             std::function<void()> onGrabScreen;        ///< 每次整屏抓帧前叫一声，让用例记录当时的状态
 
         private:
-            Base::CapturedImage m_frame; ///< 与生产同形状的那一帧假屏
+            Base::CapturedImage                m_frame;           ///< 与生产同形状的那一帧假屏
+            mutable std::optional<Base::Error> m_nextScreenError; ///< 下一次整屏抓帧要交回的原因；空即照常成功
         };
 
         /**
@@ -484,6 +499,44 @@ namespace GyanisScribe
         EXPECT_TRUE(sawToolbarHidden) << "抓帧时工具栏还在屏上：新底图会把它自己拍进去";
         EXPECT_TRUE(window.isVisible()) << "抓完没把标注窗放回来";
         EXPECT_TRUE(window.toolbar().isVisible()) << "抓完没把工具栏放回来";
+    }
+
+    /**
+     * @brief 钉住 F5 抓帧失败时标注窗与工具栏照原样留在原地，原因说给用户
+     * @details 抓帧失败时画布与标注都不许动，窗口也不许因为藏过一眼就消失或换位置；
+     *          原因要沿提示那条路交出去，而不是静默留在日志里。
+     */
+    TEST_F(AppControllerFixture, RefreshFailureRestoresTheAnnotationWindow)
+    {
+        m_frameScreenName = m_realScreenName;
+        m_frameRegion     = QRect{0, 0, kFrameWidth, kFrameHeight};
+        makeController();
+
+        auto *screen = QGuiApplication::primaryScreen();
+        ASSERT_NE(screen, nullptr);
+        auto &window = m_controller->capture().annotationWindow();
+        m_controller->capture().startFullScreen(App::CaptureIntent::Annotate);
+        ASSERT_TRUE(window.isVisible()) << "标注窗没开起来，后面的判据无从谈起";
+        ASSERT_TRUE(window.toolbar().isVisible()) << "工具栏没跟着摆出来，后面的判据无从谈起";
+        const auto geometry = window.geometry();
+
+        int     messages = 0;
+        QString said;
+        QObject::connect(&m_controller->capture(), &GyanisScribe::App::CaptureCoordinator::messageForUser, &m_controller->capture(),
+                         [&messages, &said](const QString &text, GyanisScribe::Gui::ToastKind)
+                         {
+                             ++messages;
+                             said = text;
+                         });
+
+        m_source->failNextScreenGrab(Base::Error{Base::ErrorCode::ScreenUnavailable, "替身：这一帧没抓到"});
+        window.refreshRequested(screen->name(), m_frameRegion);
+
+        EXPECT_TRUE(window.isVisible()) << "F5 抓失败后标注窗消失了";
+        EXPECT_TRUE(window.toolbar().isVisible()) << "F5 抓失败后工具栏没回来";
+        EXPECT_EQ(window.geometry(), geometry) << "F5 抓失败后标注窗换了位置";
+        EXPECT_EQ(messages, 1) << "F5 抓失败的原因没有说给用户";
+        EXPECT_TRUE(said.contains(QStringLiteral("这一帧没抓到"))) << said.toStdString();
     }
 
     /**

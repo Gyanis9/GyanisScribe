@@ -418,7 +418,8 @@ namespace GyanisScribe::App
         emit commandLineCaptureDelivered(m_dependencies.delivery.writtenFilePath());
     }
 
-    GyanisScribe::Base::Expected<GyanisScribe::Base::CapturedImage> CaptureCoordinator::grabWithAnnotationHidden(const QString &screenName, const QRect &region)
+    GyanisScribe::Base::Expected<GyanisScribe::Base::CapturedImage> CaptureCoordinator::grabWithAnnotationHidden(const QString &screenName, const QRect &region,
+                                                                                                                 const bool restoreVisibility)
     {
         // 窗与工具栏都盖在要抓的那一块上：记下可见态与几何，抓完照原样摆回
         const bool  windowWasVisible  = m_annotationWindow->isVisible();
@@ -433,16 +434,25 @@ namespace GyanisScribe::App
 
         const auto frame = m_capture->grabRegionNow(region, screenName);
 
-        // 成败都摆回：抓失败时画布与标注原样留着，但窗口不许因为这一眼抓屏留在屏外
+        // 成败都摆回几何：抓失败时画布与标注原样留着，但窗口不许因为这一眼抓屏留在屏外
         m_annotationWindow->setGeometry(windowGeometry);
         m_annotationWindow->toolbar().setGeometry(toolbarGeometry);
+        if (!restoreVisibility)
+        {
+            // 重裁路径随后先换画布再显窗；这里显出来会先闪一帧旧底图
+            return frame;
+        }
         if (windowWasVisible)
         {
             m_annotationWindow->show();
+            m_annotationWindow->raise();
+            // 连按 F5 时这一颗键要回到这扇窗：不激活的话焦点留在别处
+            m_annotationWindow->activateWindow();
         }
         if (toolbarWasVisible)
         {
             m_annotationWindow->toolbar().show();
+            m_annotationWindow->toolbar().raise();
         }
         return frame;
     }
@@ -456,7 +466,7 @@ namespace GyanisScribe::App
             return;
         }
 
-        const auto frame = grabWithAnnotationHidden(screenName, region);
+        const auto frame = grabWithAnnotationHidden(screenName, region, true);
         if (!frame)
         {
             emit messageForUser(QString::fromStdString(frame.error().message), GyanisScribe::Gui::ToastKind::Danger);
@@ -500,7 +510,8 @@ namespace GyanisScribe::App
         }
 
         // 来源没带冻帧（整屏抓的那几路）：退回重新抓屏；先藏窗，DXGI 抓到的是整块桌面
-        const auto frame = grabWithAnnotationHidden(screenName, local);
+        // 重露交给下面的 recropAnnotation 与失败时的 restoreAfterCrop：它们先换画布再显窗
+        const auto frame = grabWithAnnotationHidden(screenName, local, false);
         if (!frame)
         {
             // 抓新范围失败就退回原来那一轮：画布与标注都没动，只把窗口摆回旧几何

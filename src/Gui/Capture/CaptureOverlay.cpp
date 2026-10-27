@@ -67,7 +67,7 @@ namespace
     /// 尺寸输入框摆在光标右下时的偏移，逻辑像素
     constexpr int kSizeEditorCursorGap = 12;
 
-    /// 按下到松手之间位移不超过这一格（逻辑像素）时按「原地点击」处理：手抖不该把整窗选择变成碎片
+    /// 松手时框出的宽与高都不超过这一格（逻辑像素）时按「原地点击」处理：手抖不该把整窗选择变成碎片
     constexpr int kHoverClickSlop = 4;
 } // namespace
 
@@ -633,9 +633,9 @@ namespace GyanisScribe::Gui
 
             // 按下又原地放开（没拖出任何一块）时，认此刻悬停亮着的那个候选：
             // 「点一下就要这一扇窗口」是框选最常用的走法，而原地放开过去什么也不产出。
-            // 1-3 像素的手抖同样按原地点击算：阈值内任何一边都不该把一块碎片交出去
+            // 1-3 像素的手抖同样按原地点击算：宽高都在阈值内才是手抖，细长条是有意框的一条
             const auto drafted      = selectedRegion();
-            const bool inPlaceClick = drafted.width() <= kHoverClickSlop || drafted.height() <= kHoverClickSlop;
+            const bool inPlaceClick = drafted.width() <= kHoverClickSlop && drafted.height() <= kHoverClickSlop;
             if (inPlaceClick && m_pressedHoveredRegion)
             {
                 m_anchorPoint  = m_pressedHoveredRegion->topLeft();

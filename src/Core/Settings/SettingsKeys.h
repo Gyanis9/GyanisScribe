@@ -117,7 +117,7 @@ namespace GyanisScribe::Core
     /**
      * @brief 截图成功后起跑的一条外部命令，形如「上传工具 --path "%file%"」；留空即不跑
      * @details `%file%` 换成这一轮落盘的成品路径，没落盘时带它的命令会被拒并说明原因。
-     *          读端在 AppController::runAfterCaptureCommand，写端在设置的截图页；命令行的 --exec 压过这一格。
+     *          读端在 DeliveryCoordinator::runAfterCaptureCommand，写端在设置的截图页；命令行的 --exec 压过这一格。
      */
     inline constexpr std::string_view kCaptureExecCommand = "Capture/ExecCommand";
 
