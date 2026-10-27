@@ -236,6 +236,14 @@ namespace GyanisScribe::Main
          */
         [[nodiscard]] GyanisScribe::Gui::IconProvider &icons() const noexcept;
 
+        /**
+         * @brief 托盘控制器，仅供用例驱动托盘上的那几下
+         * @return 本控制器持有的那一份，所有权不在调用方
+         * @note 生产代码不从这条口子拿托盘：入口都在本类的方法上。用例要能让托盘真的发一次信号，
+         *       否则「接线接在空对象上」这种静默失败只能靠读代码发现。
+         */
+        [[nodiscard]] GyanisScribe::App::TrayController &trayControllerForTesting() const noexcept;
+
     Q_SIGNALS:
         /**
          * @brief 命令行那一次截图交付完事

@@ -176,7 +176,6 @@ namespace GyanisScribe::Main
         const bool trayInstalled = m_tray->install();
         // 托盘在场时顶部动作条就是第二份入口：整条收起，逐屏截图改走托盘子菜单
         m_mainWindow->setTrayMenuAvailable(trayInstalled);
-        QObject::connect(m_tray.get(), &GyanisScribe::App::TrayController::screenCaptureRequested, m_capture.get(), &GyanisScribe::App::CaptureCoordinator::captureScreen);
 
         // 热键 → 动作：唯一的接线处，界面加菜单项时也是发同一个信号而不是再走一条路径
         QObject::connect(m_hotkeys.get(), &GyanisScribe::Core::IHotkeyManager::actionTriggered, this,
@@ -257,6 +256,9 @@ namespace GyanisScribe::Main
         QObject::connect(m_capture.get(), &GyanisScribe::App::CaptureCoordinator::messageForUser, this, &AppController::notifyUser);
         QObject::connect(m_capture.get(), &GyanisScribe::App::CaptureCoordinator::commandLineActionFailed, this, &AppController::commandLineActionFailed);
         QObject::connect(m_capture.get(), &GyanisScribe::App::CaptureCoordinator::commandLineCaptureDelivered, this, &AppController::commandLineCaptureDelivered);
+        QObject::connect(m_tray.get(), &GyanisScribe::App::TrayController::screenCaptureRequested, m_capture.get(), &GyanisScribe::App::CaptureCoordinator::captureScreen);
+        // 托盘那一族的逐屏截图接在协调器建好之后：连在尚未构造的成员上时 QObject::connect 不报错，
+        // 托盘图标与菜单都照常现身，点下去却什么都不会发生
 
         // 录屏这一族整族搬进了 RecordingCoordinator：控制器只留三根线——
         // 要说给用户的话、托盘那一行读数、成品归档进历史
@@ -498,6 +500,11 @@ namespace GyanisScribe::Main
     GyanisScribe::Gui::IconProvider &AppController::icons() const noexcept
     {
         return *m_icons;
+    }
+
+    GyanisScribe::App::TrayController &AppController::trayControllerForTesting() const noexcept
+    {
+        return *m_tray;
     }
 
     void AppController::refreshPinWithScreenUnder(const int index)

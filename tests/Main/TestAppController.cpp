@@ -676,6 +676,22 @@ namespace GyanisScribe
 
 
     /**
+     * @brief 钉住托盘的「逐屏截图」真的落到抓帧服务上
+     * @details 托盘在场时顶部动作条整条收起，逐屏截图就只剩托盘子菜单这一个入口。
+     *          这条接线曾经连在一个还没构造的成员上，QObject::connect 对空接收者不报错：
+     *          图标在、菜单在，点下去什么都不会发生。
+     */
+    TEST_F(AppControllerFixture, TrayScreenCaptureReachesTheCaptureService)
+    {
+        makeController();
+
+        m_controller->trayControllerForTesting().screenCaptureRequested(QStringLiteral("FakeScreen-1"));
+
+        EXPECT_EQ(m_source->screenCalls, 1) << "托盘的逐屏截图没有走到抓帧服务：那条接线接在空对象上";
+        EXPECT_EQ(m_source->requestedScreen, QStringLiteral("FakeScreen-1")) << "抓的不是托盘点名的那块屏";
+    }
+
+    /**
      * @brief 钉住「命令行 `--pin`」那条入口在拆族之后照走：桌上要多一张贴图
      * @details 这条链现在是「`Application` → `AppController::pinImageFile`（转发壳）→ `PinCoordinator::pinFile`
      *          → `PinManager` → 一扇贴图窗」。拆族时换过接收者，而件级用例测的是 `PinManager` 自己——
