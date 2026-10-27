@@ -259,6 +259,7 @@ namespace GyanisScribe::App
 
     void CaptureCoordinator::handleCaptured(const GyanisScribe::Base::CapturedImage &image)
     {
+        m_dependencies.delivery.beginRound();
         m_lastCapture = image;
 
         // 音效与自动保存接在「截图完成」这一刻：不管之后去哪一步，先响一声、先在盘上留一份。
@@ -334,7 +335,11 @@ namespace GyanisScribe::App
 
         deliverFrame(image.image, *screen);
         // 外部命令接在「这一轮交付完」之后：命令里多半要拿盘上那份，交付没完就跑等于喂给它一个还不存在的文件
-        m_dependencies.delivery.runAfterCaptureCommand(m_commandLineExecGiven ? m_commandLineExec : QString{});
+        const auto ran = m_dependencies.delivery.runAfterCaptureCommand(m_commandLineExecGiven ? m_commandLineExec : QString{});
+        if (!ran)
+        {
+            emit messageForUser(QString::fromStdString(ran.error().message), GyanisScribe::Gui::ToastKind::Danger);
+        }
     }
 
     void CaptureCoordinator::deliverFrame(const QImage &image, QScreen &screen)
@@ -403,7 +408,13 @@ namespace GyanisScribe::App
                     break;
             }
         }
-        m_dependencies.delivery.runAfterCaptureCommand(m_commandLineExecGiven ? m_commandLineExec : QString{});
+        const auto ran = m_dependencies.delivery.runAfterCaptureCommand(m_commandLineExecGiven ? m_commandLineExec : QString{});
+        if (!ran)
+        {
+            // 脚本的事件循环等的是一个结果：命令没跑起来就说失败，别让退出码停在 0 上
+            emit commandLineActionFailed(QString::fromStdString(ran.error().message));
+            return;
+        }
         emit commandLineCaptureDelivered(m_dependencies.delivery.writtenFilePath());
     }
 

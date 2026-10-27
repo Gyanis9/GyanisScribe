@@ -70,11 +70,19 @@ namespace GyanisScribe::App
         [[nodiscard]] QImage decorate(const QImage &image, bool fillBackground) const;
 
         /**
+         * @brief 开一轮新的截图交付：清掉上一轮记下的成品路径
+         * @details `%file%` 与命令行打到标准输出的都是这一份路径；不清就会把上一张的成品当成这一轮的。
+         */
+        void beginRound();
+
+        /**
          * @brief 截图后跑设置里那条外部命令
          * @param commandLineOverride 非空即以它为准（命令行给了 `--exec` 就只跑那一条：
          *        与设置里那一格叠着跑会跑出两份副作用，而脚本要的是「这一次照我说的做」）
+         * @return 没错时成功；命令为空也算成功。`%file%` 存在而这一轮没落成文件时是 InvalidArgument，
+         *         拆解或起跑失败交回对应错误——是否说给用户由调用方决定（命令行那一路没有界面可看）
          */
-        void runAfterCaptureCommand(const QString &commandLineOverride);
+        [[nodiscard]] GyanisScribe::Base::Expected<void> runAfterCaptureCommand(const QString &commandLineOverride);
 
         /// 贴图批量保存的收尾一句话：全写成、成一半、一张都没成各一句（一张都没成时原因就是主角）
         void reportBatchSave(const GyanisScribe::Gui::PinBatchSaveReport &report);

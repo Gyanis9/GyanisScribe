@@ -3,6 +3,7 @@ add_executable(TestShell
         TestSingleInstance.cpp
         TestCaptureIntent.cpp
         TestCaptureDelivery.cpp
+        TestDeliveryCoordinator.cpp
         TestCommandLine.cpp
         TestCustomHotkeys.cpp
         TestTrayClick.cpp

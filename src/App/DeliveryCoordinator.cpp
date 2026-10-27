@@ -106,30 +106,35 @@ namespace GyanisScribe::App
         return GyanisScribe::Core::decorateForOutput(image, border, shadow, fillBackground, GyanisScribe::Core::readOutputDecorationStyle(m_settings));
     }
 
-    void DeliveryCoordinator::runAfterCaptureCommand(const QString &commandLineOverride)
+    void DeliveryCoordinator::beginRound()
+    {
+        // 本轮真落了盘再由 saveToDisk 写上；没落盘时留着上一张的路径，%file% 就会拿到过期文件
+        m_writtenFilePath.clear();
+    }
+
+    GyanisScribe::Base::Expected<void> DeliveryCoordinator::runAfterCaptureCommand(const QString &commandLineOverride)
     {
         // 命令行给了 --exec 就只跑那一条：与设置里那一格叠着跑会跑出两份副作用，而脚本要的是「这一次照我说的做」
         const auto commandLine = commandLineOverride.isEmpty() ? m_settings.stringValue(GyanisScribe::Core::kCaptureExecCommand, QString{}) : commandLineOverride;
         if (commandLine.trimmed().isEmpty())
         {
-            return;
+            return {};
         }
 
         const auto planned = GyanisScribe::Base::planExternalCommand(commandLine, m_writtenFilePath);
         if (!planned)
         {
             GyanisScribe::Base::Logger::error(std::format("截图后的外部命令没拆开：{}", planned.error().message));
-            emit messageForUser(QString::fromStdString(planned.error().message), GyanisScribe::Gui::ToastKind::Danger);
-            return;
+            return std::unexpected(planned.error());
         }
         const auto started = GyanisScribe::Base::startExternalCommand(*planned);
         if (!started)
         {
             GyanisScribe::Base::Logger::error(std::format("截图后的外部命令没起跑：{}", started.error().message));
-            emit messageForUser(QString::fromStdString(started.error().message), GyanisScribe::Gui::ToastKind::Danger);
-            return;
+            return std::unexpected(started.error());
         }
         GyanisScribe::Base::Logger::info(std::format("截图后已交外部程序起跑：{}", planned->program.toStdString()));
+        return {};
     }
 
     void DeliveryCoordinator::reportBatchSave(const GyanisScribe::Gui::PinBatchSaveReport &report)
