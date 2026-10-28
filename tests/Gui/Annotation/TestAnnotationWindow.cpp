@@ -26,6 +26,7 @@
 #include <QKeyEvent>
 #include <QMenu>
 #include <QMouseEvent>
+#include <QPainter>
 #include <QRegularExpression>
 #include <QScreen>
 #include <QTextCursor>
@@ -1622,6 +1623,62 @@ TEST_F(AnnotationWindowFixture, ReportsTheCostOfRepaintingAWindowFullOfShapes)
     std::ranges::sort(milliseconds);
     std::printf("[读数] 标注窗整幅重绘一次：中位 %.1fms（底图 2560×1440、%d 个图形、%d 轮，min %.1f / max %.1f）\n", milliseconds[static_cast<std::size_t>(kRounds) / 2U], kShapes,
                 kRounds, milliseconds.front(), milliseconds.back());
+}
+
+/**
+ * @brief 钉住屏显与导出的图形边缘走同一档抗锯齿
+ * @details 屏显走 AnnotationView 的普通分支、导出走 AnnotationEngine::exportImage()，两条路各自设渲染提示；
+ *          图形那层漏掉抗锯齿时，斜线与箭头的边缘会在屏上糊出一圈成品里没有的灰边。
+ *          判据是同一块区域逐像素相等：四边各留 4 像素，那里只有只上屏的提示线。
+ */
+TEST_F(AnnotationWindowFixture, ScreenAndExportUseTheSameAntialiasing)
+{
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Pen).has_value());
+    ASSERT_TRUE(engine().setPenParameters(PenParameters{.color = QColor{255, 0, 0}, .lineWidth = 3, .fontSize = 16, .fillStyle = 0}).has_value());
+
+    // 起笔与行进没有返回值，这一笔能不能落定由收笔那一下说了算
+    engine().beginStroke({20, 20});
+    engine().moveStroke({180, 80});
+    const auto settled = engine().endStroke();
+    ASSERT_TRUE(settled.has_value()) << settled.error().message;
+
+    GyanisScribe::Gui::AnnotationView view{engine()};
+    view.resize(400, 200);
+
+    // 用 render 而不是 grab：抓屏按控件自己的倍比出图，离屏屏的倍比不一定是 1，图就不是 400x200 了
+    QImage screen{400, 200, QImage::Format_ARGB32};
+    screen.fill(Qt::transparent);
+    {
+        QPainter painter{&screen};
+        view.render(&painter);
+    }
+
+    const auto exported = engine().exportImage();
+    ASSERT_EQ(screen.size(), QSize(400, 200)) << "屏显那一路的图不是 400x200，后面的坐标对不上";
+    ASSERT_EQ(exported.size(), QSize(400, 200)) << "导出图不是 400x200，后面的坐标对不上";
+
+    constexpr int kMargin = 4; // 提示线压在控件最外一圈，只上屏、不进成品
+    int           differences = 0;
+    std::string   firstDifference;
+    for (int y = kMargin; y < screen.height() - kMargin; ++y)
+    {
+        for (int x = kMargin; x < screen.width() - kMargin; ++x)
+        {
+            const QColor screenColor = screen.pixelColor(x, y);
+            const QColor exportColor = exported.pixelColor(x, y);
+            if (screenColor == exportColor)
+            {
+                continue;
+            }
+            if (differences == 0)
+            {
+                firstDifference = std::format("第一处差异在 ({}, {})：屏显 ({},{},{},{})、导出 ({},{},{},{})", x, y, screenColor.red(), screenColor.green(), screenColor.blue(),
+                                              screenColor.alpha(), exportColor.red(), exportColor.green(), exportColor.blue(), exportColor.alpha());
+            }
+            ++differences;
+        }
+    }
+    EXPECT_EQ(differences, 0) << firstDifference;
 }
 
 /**

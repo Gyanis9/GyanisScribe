@@ -120,6 +120,41 @@ TEST(ShapeTransformResize, KeepsTheAspectRatioWhenAsked)
 }
 
 /**
+ * @brief 钉住 Shift 档从边中点向内拖时按比例缩小，对面那条边不动
+ * @details 80×40（2:1）的框拖边中点向内：倍率取被拖的那一轴，另一轴绕自己的中线收进来。
+ *          左右边各拖到中线处剩一半（40×20），上下边各拖到离对面一条边 10 处剩四分之一（20×10）。
+ *          倍率要从 0 起算：从 1 起算时向内拖的比值被夹在 1 上，框顶在原地一点都不缩。
+ */
+TEST(ShapeTransformResize, ShrinksEdgeMidpointsProportionallyInward)
+{
+    const QRectF box{10.0, 20.0, 80.0, 40.0}; // left 10 top 20 right 90 bottom 60
+
+    const auto left = resizedBox(box, SelectionHandle::Left, QPointF{50.0, 40.0}, kMinimumResizedBoxSide, false, true);
+    EXPECT_DOUBLE_EQ(left.width(), 40.0) << "左边中点向内拖，宽没有缩到一半";
+    EXPECT_DOUBLE_EQ(left.height(), 20.0) << "左边中点向内拖，高没有跟着缩到一半";
+    EXPECT_DOUBLE_EQ(left.right(), 90.0) << "左边中点向内拖，右边跟着动了";
+    EXPECT_DOUBLE_EQ(left.width() / left.height(), 2.0) << "左边中点向内拖，长宽比没保住";
+
+    const auto right = resizedBox(box, SelectionHandle::Right, QPointF{50.0, 40.0}, kMinimumResizedBoxSide, false, true);
+    EXPECT_DOUBLE_EQ(right.width(), 40.0) << "右边中点向内拖，宽没有缩到一半";
+    EXPECT_DOUBLE_EQ(right.height(), 20.0) << "右边中点向内拖，高没有跟着缩到一半";
+    EXPECT_DOUBLE_EQ(right.left(), 10.0) << "右边中点向内拖，左边跟着动了";
+    EXPECT_DOUBLE_EQ(right.width() / right.height(), 2.0) << "右边中点向内拖，长宽比没保住";
+
+    const auto top = resizedBox(box, SelectionHandle::Top, QPointF{50.0, 50.0}, kMinimumResizedBoxSide, false, true);
+    EXPECT_DOUBLE_EQ(top.height(), 10.0) << "上边中点向内拖，高没有缩到四分之一";
+    EXPECT_DOUBLE_EQ(top.width(), 20.0) << "上边中点向内拖，宽没有跟着缩到四分之一";
+    EXPECT_DOUBLE_EQ(top.bottom(), 60.0) << "上边中点向内拖，下边跟着动了";
+    EXPECT_DOUBLE_EQ(top.width() / top.height(), 2.0) << "上边中点向内拖，长宽比没保住";
+
+    const auto bottom = resizedBox(box, SelectionHandle::Bottom, QPointF{50.0, 30.0}, kMinimumResizedBoxSide, false, true);
+    EXPECT_DOUBLE_EQ(bottom.height(), 10.0) << "下边中点向内拖，高没有缩到四分之一";
+    EXPECT_DOUBLE_EQ(bottom.width(), 20.0) << "下边中点向内拖，宽没有跟着缩到四分之一";
+    EXPECT_DOUBLE_EQ(bottom.top(), 20.0) << "下边中点向内拖，上边跟着动了";
+    EXPECT_DOUBLE_EQ(bottom.width() / bottom.height(), 2.0) << "下边中点向内拖，长宽比没保住";
+}
+
+/**
  * @brief 钉住两档同时按：以中心为不动点、保持长宽比
  */
 TEST(ShapeTransformResize, CombinesCenterAndProportional)

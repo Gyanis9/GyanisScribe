@@ -125,6 +125,8 @@ namespace GyanisScribe::Gui
             painter.drawImage(QRect{QPoint{0, 0}, size()}, m_cropPreviewImage, m_cropPreviewImage.rect());
             painter.save();
             painter.translate(m_cropPreviewShapeOffset);
+            // 重裁预览里的图形也要抗锯齿：预览与成品画出的边缘是同一档
+            painter.setRenderHint(QPainter::Antialiasing, true);
             m_engine.paintShapes(painter);
             painter.restore();
             paintCaptureFrame(painter);
@@ -140,6 +142,8 @@ namespace GyanisScribe::Gui
 
         QPainter painter{this};
         painter.setRenderHint(QPainter::SmoothPixmapTransform);
+        // 图形边缘与导出用同一档抗锯齿：斜线、箭头与椭圆的屏上样子要与成品逐像素对得上
+        painter.setRenderHint(QPainter::Antialiasing);
 
         // 透明底要有东西衬着才看得出来：先垫一层棋盘格。白底那一路完全不透明，垫在上面也看不见
         if (canvas.image.hasAlphaChannel())
@@ -157,6 +161,9 @@ namespace GyanisScribe::Gui
         painter.scale(shapeScale, shapeScale);
         m_engine.paintShapes(painter);
         painter.restore();
+
+        // 选框、手柄与提示线是界面辅助线，不要抗锯齿：虚线与小方块糊上一层灰边就看不清了
+        painter.setRenderHint(QPainter::Antialiasing, false);
 
         // 选框走控件坐标而不是逻辑坐标：线宽与虚线间隔不该随缩放变粗变细
         if (const auto frame = m_engine.selectionFrame(); frame)
