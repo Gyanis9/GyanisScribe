@@ -135,8 +135,11 @@ namespace GyanisScribe::Gui
             cancelRecording();
             return written;
         }
-        m_displayText = text;
-        m_display->setText(text);
+        // setValue 同步发 valueChanged：管理器登记失败会把旧组合写回配置，监听器已经先把显示改成它。
+        // 这里必须回读配置，不能直接拿刚提交的新文本覆盖：那会把被拒的组合重新写回界面
+        const auto stored = m_settings.stringValue(m_key, m_defaultText);
+        m_displayText     = stored;
+        m_display->setText(stored);
         return {};
     }
 

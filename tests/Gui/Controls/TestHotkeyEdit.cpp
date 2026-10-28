@@ -247,6 +247,100 @@ TEST_F(HotkeyEditFixture, FollowsTheStoredValueWhenItChangesElsewhere)
 }
 
 /**
+ * @brief 钉住「写入被管理器回滚后，这一格显示的是回读出来的旧组合」
+ * @details setValue 同步发 valueChanged：监听器把旧组合写回配置时，applyCombination 若照抄刚提交的
+ *          新文本，界面就停在被拒的组合上，配置里却是旧的。这一条让监听器模拟管理器回滚，
+ *          断言配置、显示与录制态都以回读结果为准。
+ */
+TEST_F(HotkeyEditFixture, RolledBackCombinationStaysOnScreen)
+{
+    QWidget container;
+    auto *layout = new QVBoxLayout{&container};
+    auto *edit   = new HotkeyEdit{*m_store, &container};
+    layout->addWidget(edit);
+    container.show();
+    container.activateWindow();
+    QCoreApplication::processEvents();
+
+    const auto key       = GyanisScribe::Core::kHotkeyCapture;
+    const auto keyText   = QString::fromUtf8(key.data(), static_cast<int>(key.size()));
+    const auto older     = QStringLiteral("Ctrl+Alt+A");
+    const auto attempted = QStringLiteral("Ctrl+Alt+D");
+    ASSERT_TRUE(m_store->setValue(key, older).has_value());
+    edit->bindTo(key, QStringLiteral("截图"), QStringLiteral("Ctrl+Alt+B"), HotkeyEditScope::Global);
+
+    auto *display = edit->findChild<QLabel *>(QStringLiteral("hotkeyDisplay"));
+    ASSERT_NE(display, nullptr) << "录制框里没有显示组合的那一格";
+    ASSERT_EQ(display->text(), older);
+
+    // 模拟管理器：新组合被别的程序占走时同步把旧组合写回。守卫只让第一次回滚生效，防止自己触发自己
+    bool rollingBack = false;
+    bool rolledBack  = false;
+    QObject::connect(m_store.get(), &GyanisScribe::Core::ISettingsStore::valueChanged, edit,
+                     [&](const QString &changedKey)
+                     {
+                         if (rollingBack || changedKey != keyText)
+                         {
+                             return;
+                         }
+                         if (m_store->stringValue(key, QStringLiteral("missing")) != attempted)
+                         {
+                             return;
+                         }
+                         rollingBack = true;
+                         rolledBack  = m_store->setValue(key, older).has_value();
+                         rollingBack = false;
+                     });
+
+    edit->setFocus(Qt::MouseFocusReason);
+    QCoreApplication::processEvents();
+    ASSERT_TRUE(edit->hasFocus()) << "焦点没落到录制框，按键判据没有落点";
+    QMouseEvent press{QEvent::MouseButtonPress, QPointF{5, 5}, QPointF{5, 5}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QCoreApplication::sendEvent(edit, &press);
+    ASSERT_TRUE(display->property("recording").toBool()) << "点一下没有进入录制态，判据没有落点";
+
+    QKeyEvent record{QEvent::KeyPress, Qt::Key_D, Qt::ControlModifier | Qt::AltModifier};
+    QCoreApplication::sendEvent(edit, &record);
+    QCoreApplication::processEvents();
+
+    ASSERT_TRUE(rolledBack) << "回滚监听没有被触发，这一条判据没有落点";
+    EXPECT_EQ(m_store->stringValue(key, QStringLiteral("missing")), older) << "配置里不是回滚后的旧组合，回滚模拟没有成立";
+    EXPECT_EQ(display->text(), older) << "写入被回滚后，这一格仍显示被拒的新组合：用户看到的热键不是实际生效的那颗";
+    EXPECT_FALSE(display->property("recording").toBool()) << "写完一次组合后仍留在录制态";
+}
+
+/**
+ * @brief 钉住「取消绑定后显示回落到默认文本，键从配置里删掉」
+ * @details 界面按键那一档每一格都有默认键：删掉绑定后若留一块空白，用户会以为这颗键不能用了。
+ */
+TEST_F(HotkeyEditFixture, ClearBindingFallsBackToTheDefaultText)
+{
+    QWidget container;
+    auto *layout = new QVBoxLayout{&container};
+    auto *edit   = new HotkeyEdit{*m_store, &container};
+    layout->addWidget(edit);
+    container.show();
+    container.activateWindow();
+    QCoreApplication::processEvents();
+
+    const auto key      = GyanisScribe::Core::kHotkeyCapture;
+    const auto bound    = QStringLiteral("Ctrl+Alt+Q");
+    const auto fallback = QStringLiteral("Ctrl+Alt+B");
+    ASSERT_TRUE(m_store->setValue(key, bound).has_value());
+    edit->bindTo(key, QStringLiteral("截图"), fallback, HotkeyEditScope::InWindow);
+
+    auto *display = edit->findChild<QLabel *>(QStringLiteral("hotkeyDisplay"));
+    ASSERT_NE(display, nullptr) << "录制框里没有显示组合的那一格";
+    ASSERT_EQ(display->text(), bound);
+
+    edit->clearBinding();
+    QCoreApplication::processEvents();
+
+    EXPECT_EQ(display->text(), fallback) << "删除绑定后没有回落到默认文本：界面按键那一格留在了空白";
+    EXPECT_EQ(m_store->stringValue(key, QStringLiteral("missing")), QStringLiteral("missing")) << "取消绑定没有把键从配置里删掉";
+}
+
+/**
  * @brief 钉住「不合格的组合被拒之后，显示回到绑定值」
  * @details 把被拒的那颗组合留在框里，看起来像是已经改成了它；下一次别人看到这一格会以为
  *          配置里就是那一颗。配置不许动，显示要回到现值。

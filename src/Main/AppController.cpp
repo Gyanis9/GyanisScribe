@@ -59,6 +59,7 @@
 #include <QPainter>
 #include <QPrintDialog>
 #include <QPrinter>
+#include <QScopeGuard>
 #include <QScreen>
 #include <QCoreApplication>
 #include <QDateTime>
@@ -379,8 +380,9 @@ namespace GyanisScribe::Main
         if (!report.restored.empty())
         {
             m_restoringHotkeySettings = true;
+            // 中途抛出也要把标志复位：永久留在 true 会吞掉之后所有自定义键变更的重登
+            const auto resetRestoring = qScopeGuard([this] { m_restoringHotkeySettings = false; });
             m_hotkeys->persistRestoredBindings(report);
-            m_restoringHotkeySettings = false;
         }
         if (!report.failures.empty())
         {

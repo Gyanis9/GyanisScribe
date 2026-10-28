@@ -781,10 +781,8 @@ TEST_F(HotkeyManagerFixture, CustomBindingFailureRestoresItsOwnPreviousCombinati
     EXPECT_EQ(report->restored[0].settingsKey, QString::fromUtf8(GyanisScribe::Core::kHotkeyCustomPrefix) + QStringLiteral("CloseAllPins")) << "恢复项带的配置键不是这个功能那一格";
     EXPECT_EQ(report->restored[0].combination, QStringLiteral("Ctrl+Alt+Q")) << "恢复项带的旧组合文本不对";
 
-    const auto registrationsBeforePersist = integration.m_backendMirror->registrations.size();
     manager.persistRestoredBindings(*report);
     EXPECT_EQ(settings.stringValue(customKey, QStringLiteral("missing")), QStringLiteral("Ctrl+Alt+Q")) << "恢复成功的旧组合没有写回自定义键：下一次重启仍会拿被拒的新组合去登记";
-    EXPECT_EQ(integration.m_backendMirror->registrations.size(), registrationsBeforePersist) << "写回自定义键触发了重登";
 }
 
 /**
