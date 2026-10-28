@@ -65,6 +65,8 @@ namespace GyanisScribe::Plugins
      *          取消时帧目录删掉而编码一次都不叫、析构会等手上的编码、
      *          窗口模式按平台给的客户区读数把光标高亮叠在正确的格子上（光标位置由 cursorGlobalPosition 钉住）；
      *          真抓屏像素与真编出文件需要一个真实桌面会话，那一段仍然留给验收。
+     *          临时帧的处置：抓帧失败、会话写盘失败与收尾封盘失败时这一轮不会出成品，帧目录与中间音频一起删掉；
+     *          编码失败时帧目录保留，留换参数重编码的余地。
      */
     class RecordingService : public QObject
     {
@@ -157,6 +159,8 @@ namespace GyanisScribe::Plugins
         void finished(const QString &outputPath, const QSize &frameSize);
         /// 本轮被取消：临时帧与中间 wav 都已删掉，没有成品也不会有 finished
         void aborted();
+        /// 到了最长时长且停止成功：编码已经起步，界面应当立刻收起控制条并说明
+        void autoStopStarted();
 
     private:
         /// 定时器一跳：抓一帧并推进会话
@@ -164,8 +168,9 @@ namespace GyanisScribe::Plugins
 
         /**
          * @brief 中止当前一轮：停定时器、结束取声、清临时帧，会话交回 Idle
-         * @details 抓帧失败、会话写盘失败与收尾封盘失败都走这里；不清理就会留下还在写盘的 ffmpeg 与
-         *          下一轮会覆盖的帧目录，而 state() 停在失败档会让界面以为这一轮还没结束、
+         * @details 抓帧失败、会话写盘失败与收尾封盘失败都走这里，三者的共同结果是这一轮不会出成品，
+         *          因此临时帧与中间音频一并删掉；编码失败不走这里，那一路保留帧目录以便换参数重编码。
+         *          不清理就会留下还在写盘的 ffmpeg 与下一轮会覆盖的帧目录，而 state() 停在失败档会让界面以为这一轮还没结束、
          *          下一轮 start() 也拿不到干净的状态。
          */
         void abortRound();

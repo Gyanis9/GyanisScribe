@@ -29,10 +29,29 @@ namespace GyanisScribe::App
     {
         m_encoder = std::make_unique<GyanisScribe::Plugins::FfmpegRecordingEncoder>();
         m_service = std::make_unique<GyanisScribe::Plugins::RecordingService>(m_captureSource, *m_encoder, m_integration);
+        connectService();
+    }
 
+    RecordingCoordinator::RecordingCoordinator(GyanisScribe::Core::IScreenCaptureSource &captureSource, GyanisScribe::Platform::IPlatformIntegration &integration,
+                                               GyanisScribe::Core::ISettingsStore &settings, GyanisScribe::Gui::IconProvider &icons,
+                                               std::unique_ptr<GyanisScribe::Plugins::RecordingService> service, QObject *parent) :
+        QObject(parent), m_captureSource(captureSource), m_integration(integration), m_settings(settings), m_icons(icons), m_service(std::move(service))
+    {
+        connectService();
+    }
+
+    void RecordingCoordinator::connectService()
+    {
         QObject::connect(m_service.get(), &GyanisScribe::Plugins::RecordingService::finished, this, &RecordingCoordinator::handleFinished);
         QObject::connect(m_service.get(), &GyanisScribe::Plugins::RecordingService::failed, this, &RecordingCoordinator::handleFailed);
         QObject::connect(m_service.get(), &GyanisScribe::Plugins::RecordingService::aborted, this, &RecordingCoordinator::handleAborted);
+        QObject::connect(m_service.get(), &GyanisScribe::Plugins::RecordingService::autoStopStarted, this,
+                         [this]
+                         {
+                             // 上限那一轮不经过 toggle：控制条与托盘读数要当场收掉，不能等下一次每秒节拍
+                             hideHud();
+                             emit messageForUser(GyanisScribe::Base::uiText("已到最长时长，正在编成品"), GyanisScribe::Gui::ToastKind::Information);
+                         });
         QObject::connect(m_service.get(), &GyanisScribe::Plugins::RecordingService::countdownChanged, this,
                          [this](const int remainingSeconds)
                          {
@@ -206,8 +225,6 @@ namespace GyanisScribe::App
         {
             hideHud();
             GyanisScribe::Base::Logger::error(std::format("录屏收尾失败：{}", stopped.error().message));
-            emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("录屏收尾失败：{}"), stopped.error().message).c_str()),
-                                GyanisScribe::Gui::ToastKind::Danger);
             return;
         }
         hideHud();
@@ -226,6 +243,12 @@ namespace GyanisScribe::App
         }
     }
 
+    bool RecordingCoordinator::isHudVisible() const noexcept
+    {
+        // 控制条收起即销毁：指针空了或窗口已经关上，两种都算不可见
+        return m_hud != nullptr && m_hud->isVisible();
+    }
+
     void RecordingCoordinator::showHud()
     {
         // 上一轮的控制条与节拍若还开着，先收掉再换新的：直接覆盖指针会漏掉 close()，
@@ -241,9 +264,7 @@ namespace GyanisScribe::App
             return;
         }
 
-        // 新的一轮重新计：上一轮自动停止时发过的说明不该压住这一轮的
-        m_autoStopNotified = false;
-        m_hud              = new GyanisScribe::Gui::RecordingHud(m_icons, screen->availableGeometry());
+        m_hud = new GyanisScribe::Gui::RecordingHud(m_icons, screen->availableGeometry());
         QObject::connect(m_hud, &GyanisScribe::Gui::RecordingHud::pauseRequested, this,
                          [this]
                          {
@@ -286,14 +307,8 @@ namespace GyanisScribe::App
         if (state == GyanisScribe::Core::RecordingState::Done || state == GyanisScribe::Core::RecordingState::Failed)
         {
             // 自动停止不经过 toggle：不收起控制条，它和托盘读数会一直停在「录制中」，
-            // 用户再按停止键又会被当成开始新一轮。说明只发一次，ticker 每秒一跳不能重复说
-            const auto announceEncoding = state == GyanisScribe::Core::RecordingState::Done && !m_autoStopNotified;
+            // 用户再按停止键又会被当成开始新一轮
             hideHud();
-            if (announceEncoding)
-            {
-                m_autoStopNotified = true;
-                emit messageForUser(GyanisScribe::Base::uiText("已到最长时长，正在编成品"), GyanisScribe::Gui::ToastKind::Information);
-            }
             return;
         }
 

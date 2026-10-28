@@ -26,3 +26,20 @@ add_dependencies(TestShell DeployQtRuntime)
 
 include(GoogleTest)
 gtest_discover_tests(TestShell)
+
+add_executable(TestRecordingCoordinator
+        TestRecordingCoordinator.cpp)
+
+target_link_libraries(TestRecordingCoordinator PRIVATE
+        App
+        GTest::gtest
+        GTest::gtest_main)
+
+if (MSVC)
+    target_compile_options(TestRecordingCoordinator PRIVATE /W4 /WX)
+endif ()
+
+add_dependencies(TestRecordingCoordinator DeployQtRuntime)
+
+include(GoogleTest)
+gtest_discover_tests(TestRecordingCoordinator)

@@ -436,11 +436,12 @@ namespace GyanisScribe::Plugins
         {
             // 触到上限自动收尾：用户可能根本没看着屏幕，继续录只是把磁盘写满
             m_timer.stop();
-            const auto stopped = stop();
-            if (!stopped)
+            if (const auto stopped = stop(); !stopped)
             {
-                emit failed(QString::fromUtf8(stopped.error().message.c_str()));
+                // stop() 自己已经发过 failed，这里不再补第二条
+                return;
             }
+            emit autoStopStarted();
         }
     }
 

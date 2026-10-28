@@ -70,6 +70,20 @@ namespace GyanisScribe::App
                              GyanisScribe::Core::ISettingsStore &settings, GyanisScribe::Gui::IconProvider &icons, QObject *parent = nullptr);
 
         /**
+         * @brief 构造：录屏服务由调用方交进来
+         * @param captureSource 抓帧来源，交给录屏服务
+         * @param integration 平台能力（前台窗口那一档录窗口要用）
+         * @param settings 录制参数与输出目录从这里读
+         * @param icons 控制条的图标出口
+         * @param service 录屏服务本体，所有权转给协调器
+         * @param parent Qt 父对象
+         * @note 这一支不建编码器：service 拿着的编码器与抓帧来源都要活过本对象。
+         */
+        RecordingCoordinator(GyanisScribe::Core::IScreenCaptureSource &captureSource, GyanisScribe::Platform::IPlatformIntegration &integration,
+                             GyanisScribe::Core::ISettingsStore &settings, GyanisScribe::Gui::IconProvider &icons, std::unique_ptr<GyanisScribe::Plugins::RecordingService> service,
+                             QObject *parent = nullptr);
+
+        /**
          * @brief 析构
          * @note 声明在头、定义在 .cpp：两个成员的唯一指针各指着一个只前向声明的类型
          *       （编码器与服务），析构要在类型完整的 TU 里实例化——否则别的 TU 里
@@ -87,6 +101,12 @@ namespace GyanisScribe::App
         /// 取消这一轮：临时帧与中间音频都删掉，不出成品（成功那一路由服务的 aborted 信号回到 handleAborted，收尾只有一处）
         void cancel();
 
+        /**
+         * @brief 控制条现在是不是摆在屏幕上
+         * @return true 表示控制条可见；收起或关闭之后返回 false
+         */
+        [[nodiscard]] bool isHudVisible() const noexcept;
+
     signals:
         /// 要说给用户的一句话（由控制器决定用气泡还是落日志）
         void messageForUser(const QString &message, GyanisScribe::Gui::ToastKind kind);
@@ -96,6 +116,9 @@ namespace GyanisScribe::App
         void finished(const QString &outputPath, const QSize &frameSize);
 
     private:
+        /// 把服务的信号接到本类的收尾口上：两个构造共用这一份连接
+        void connectService();
+
         /// 按设置与光标所在屏拼一份录制配置；读不出或做不出来的那几档一律交回原因，不替用户挑一档
         [[nodiscard]] GyanisScribe::Base::Expected<GyanisScribe::Core::RecorderConfig> makeConfig() const;
         void                                                                           showHud();
@@ -124,7 +147,6 @@ namespace GyanisScribe::App
         QPointer<GyanisScribe::Gui::RecordingHud>                      m_hud;                          ///< 录屏控制条，一轮一个、收起即销毁
         QTimer                                                        *m_ticker             = nullptr; ///< 每秒推一次读数；随控制条一起起停
         int                                                            m_countdownRemaining = 0;       ///< 倒计时剩余整秒，推给控制条的大字
-        bool                                                           m_autoStopNotified   = false;    ///< 到达上限的那句说明发过了：ticker 每秒一跳，重复说就成了刷屏
     };
 
 } // namespace GyanisScribe::App

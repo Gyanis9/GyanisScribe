@@ -693,7 +693,13 @@ namespace
         StubCaptureSource       source;
         GatedRecordingEncoder   encoder;
         StubPlatformIntegration platform;
-        RecordingService        service{source, encoder, platform};
+
+        int              autoStopCount = 0;
+        int              failedCount   = 0;
+        RecordingService service{source, encoder, platform};
+
+        QObject::connect(&service, &RecordingService::autoStopStarted, [&autoStopCount] { ++autoStopCount; });
+        QObject::connect(&service, &RecordingService::failed, [&failedCount](const QString &) { ++failedCount; });
 
         auto config                   = serviceConfig(OutputFormat::Mp4, false);
         config.maximumDurationSeconds = 1;
@@ -704,6 +710,9 @@ namespace
         ASSERT_TRUE(static_cast<bool>(service.start(config, 0)));
         ASSERT_TRUE(spinFramesIn(service)) << "节拍一直没落下帧";
         ASSERT_TRUE(spinUntil([&] { return service.state() == RecordingState::Done; })) << "到了最长时长还没自己收尾";
+        // 自动收尾成功要给界面一个当场可用的说明出口；失败那一路的信号也不该跟着来
+        EXPECT_EQ(autoStopCount, 1) << "自动收尾没有发出 autoStopStarted，界面只能等下一次每秒节拍";
+        EXPECT_EQ(failedCount, 0) << "自动收尾成功了却报了失败";
         ASSERT_TRUE(spinUntil([&] { return encoder.callCount() == 1; })) << "自动收尾没有开始编码";
         EXPECT_TRUE(service.isEncoding()) << "自动收尾之后编码没在跑";
 
