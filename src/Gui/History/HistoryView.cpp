@@ -406,10 +406,9 @@ namespace GyanisScribe::Gui
                QString::number(info.size());
     }
 
-    HistoryView::DecodedThumbnail HistoryView::decodeThumbnailPixels(const QString &displayPath, const QString &key, const int generation)
+    HistoryView::DecodedThumbnail HistoryView::decodeThumbnailPixels(const QString &displayPath, const int generation)
     {
         DecodedThumbnail decoded;
-        decoded.key                 = key;
         decoded.generation          = generation;
         decoded.decodedOffGuiThread = QThread::currentThread() != QCoreApplication::instance()->thread();
 
@@ -470,8 +469,7 @@ namespace GyanisScribe::Gui
             m_inFlightThumbnail = pending;
 
             const auto displayPath = GyanisScribe::Base::Paths::toDisplayText(pending.entry.filePath);
-            m_thumbnailWatcher->setFuture(
-                    QtConcurrent::run([displayPath, key = pending.cacheKey, generation = pending.generation] { return decodeThumbnailPixels(displayPath, key, generation); }));
+            m_thumbnailWatcher->setFuture(QtConcurrent::run([displayPath, generation = pending.generation] { return decodeThumbnailPixels(displayPath, generation); }));
             return;
         }
 
@@ -481,14 +479,15 @@ namespace GyanisScribe::Gui
 
     void HistoryView::applyDecodedThumbnail()
     {
-        const auto decoded = m_thumbnailWatcher->result();
-
-        PendingThumbnail pending;
-        if (m_inFlightThumbnail.has_value())
+        // 结果只由 finished 触发，正常顺序下一定有一条在飞条目；这里没有就无处可落，也无需再排一次
+        if (!m_inFlightThumbnail.has_value())
         {
-            pending = std::move(*m_inFlightThumbnail);
+            return;
         }
+        auto pending = std::move(*m_inFlightThumbnail);
         m_inFlightThumbnail.reset();
+
+        const auto decoded = m_thumbnailWatcher->result();
 
         // 列表在解码期间重建过：结果对应的已是另一批行，不计数也不写缓存
         if (pending.generation != m_thumbnailGeneration)
@@ -535,9 +534,9 @@ namespace GyanisScribe::Gui
         }
 
         item->setIcon(icon);
-        // 键取自解码前：读的这几百毫秒里文件换了名或换了内容，这次结果也不算到新键上。
+        // 键取自发起解码前的那份在飞记录：读的这几百毫秒里文件换了名或换了内容，这次结果也不算到新键上。
         // 兜底图标也记在键下：视频与坏图每次刷新都重开一遍，等于每敲一个字就白读一批
-        m_thumbnailCache.insert(decoded.key, new QIcon{icon}, 1);
+        m_thumbnailCache.insert(pending.cacheKey, new QIcon{icon}, 1);
         ++m_thumbnailDecodeCount;
         m_lastDecodeOffGuiThread = decoded.decodedOffGuiThread;
         scheduleThumbnails();

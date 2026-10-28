@@ -131,8 +131,10 @@ namespace GyanisScribe::Gui
         [[nodiscard]] std::optional<std::filesystem::path> selectedPath() const;
 
         /**
-         * @brief 已经真正解码过多少张缩略图
-         * @return 解码尝试次数；缓存命中与直接摆上的占位图标不计
+         * @brief 已经真正落到列表上的缩略图张数
+         * @return 结果换上列表才计数；缓存命中与直接摆上的占位图标不计，
+         *         隐藏前已发起的那次解码仍会在工作线程上跑完并退回队列，不计，
+         *         因代际过期或行已失效而被丢弃的结果也不计
          * @details 「刷新会不会又解一遍」只有这个计数看得见：图标换没换在列表上看不出新旧。
          */
         [[nodiscard]] int thumbnailDecodeCountForTesting() const;
@@ -204,13 +206,12 @@ namespace GyanisScribe::Gui
         /// 工作线程解好的一条缩略图；界面线程只拿它组装图标与写缓存
         struct DecodedThumbnail
         {
-            QString key;                         ///< 解码前取的缓存键
-            int     generation = 0;              ///< 解码发起时的代际号
-            QImage  oneX;                        ///< 96 见方
-            QImage  twoX;                        ///< 192 见方
-            QImage  threeX;                      ///< 288 见方
-            bool    readFailed          = false; ///< 像素没读出来，界面线程改摆类别图标
-            bool    decodedOffGuiThread = false; ///< 解码确实发生在界面线程之外
+            int    generation = 0;              ///< 解码发起时的代际号
+            QImage oneX;                        ///< 96 见方
+            QImage twoX;                        ///< 192 见方
+            QImage threeX;                      ///< 288 见方
+            bool   readFailed          = false; ///< 像素没读出来，界面线程改摆类别图标
+            bool   decodedOffGuiThread = false; ///< 解码确实发生在界面线程之外
         };
 
         /// 一条等着解码的列表项；列表重建后 QPersistentModelIndex 自己失效
@@ -231,8 +232,15 @@ namespace GyanisScribe::Gui
         /// 某条记录读不出缩略图时的类别图标
         [[nodiscard]] QIcon fallbackIcon(const Core::HistoryEntry &entry) const;
 
-        /// 在工作线程上读一条成品并裁成 1x/2x/3x 三档；不碰图标、缓存与列表
-        [[nodiscard]] static DecodedThumbnail decodeThumbnailPixels(const QString &displayPath, const QString &key, int generation);
+        /**
+         * @brief 在工作线程上读一条成品并裁成 1x/2x/3x 三档
+         * @param displayPath 成品路径的显示用文本
+         * @param generation 解码发起时的代际号，原样带回
+         * @return 三档像素，外加读失败与线程判断两枚读数；不碰图标、缓存与列表
+         * @details 交给工作线程的 lambda 只按值捕获路径与整数，不捕获 this：
+         *          视图在解码途中析构时任务照样跑完，不会碰到已经不在的对象。
+         */
+        [[nodiscard]] static DecodedThumbnail decodeThumbnailPixels(const QString &displayPath, int generation);
 
         /// 缓存键：成品路径、修改时间（毫秒）与文件大小
         [[nodiscard]] static QString thumbnailCacheKey(const Core::HistoryEntry &entry);

@@ -8,7 +8,9 @@
 #include <gtest/gtest.h>
 
 #include <QApplication>
+#include <QCoreApplication>
 #include <QElapsedTimer>
+#include <QEvent>
 #include <QEventLoop>
 #include <QFileInfo>
 #include <QLabel>
@@ -21,6 +23,7 @@
 #include <QImage>
 #include <QPoint>
 #include <QSize>
+#include <QThreadPool>
 #include <QTimer>
 
 #include <cstdio>
@@ -166,6 +169,12 @@ namespace
 
         void TearDown() override
         {
+            // 视图是测试体里的局部量，已先于这里析构；但它排下的延迟删除事件可能还留在队列里，
+            // 在飞解码也可能仍握着临时目录里某个图片文件的句柄。Windows 上带着打开的句柄删目录
+            // 不报错，只会静默留下残余；那份读盘还会渗进下一支对时序敏感的用例。先让延迟删除
+            // 落地，再限时等全局线程池排空，最后才删目录
+            QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+            ASSERT_TRUE(QThreadPool::globalInstance()->waitForDone(10'000)) << "全局线程池没在时限内排空：上一支用例的在飞解码还在读临时目录里的文件";
             std::error_code cleanup;
             std::filesystem::remove_all(m_directory, cleanup);
         }
