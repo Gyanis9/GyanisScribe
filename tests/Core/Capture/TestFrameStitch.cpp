@@ -14,7 +14,7 @@
 #include <vector>
 
 using GyanisScribe::Base::ErrorCode;
-using GyanisScribe::Core::appendFrame;
+using GyanisScribe::Core::FrameStitcher;
 using GyanisScribe::Core::overlapRowCount;
 
 namespace
@@ -71,10 +71,12 @@ TEST(FrameStitch, OverlapIsHowMuchWasScrolled)
 
     EXPECT_EQ(overlapRowCount(first, second), 40) << "重叠行数没认出滚掉的这一截";
 
-    const auto appended = appendFrame(first, second);
+    FrameStitcher stitcher{first};
+    const auto    appended = stitcher.append(second);
     ASSERT_TRUE(appended.has_value()) << appended.error().message;
-    EXPECT_EQ(appended->height(), 160) << "接完的高度该是「前一张 + 新的一段」";
-    EXPECT_TRUE(*appended == page.copy(0, 0, 20, 160)) << "接出来的长页与原始内容逐位不同";
+    const auto result = stitcher.snapshot();
+    EXPECT_EQ(result.height(), 160) << "接完的高度该是「前一张 + 新的一段」";
+    EXPECT_TRUE(result == page.copy(0, 0, 20, 160)) << "接出来的长页与原始内容逐位不同";
 }
 
 /**
@@ -87,9 +89,11 @@ TEST(FrameStitch, IdenticalFramesAddNothing)
 
     EXPECT_EQ(overlapRowCount(first, first), 100);
 
-    const auto appended = appendFrame(first, first);
+    FrameStitcher stitcher{first};
+    const auto    appended = stitcher.append(first);
     ASSERT_TRUE(appended.has_value()) << appended.error().message;
-    EXPECT_EQ(appended->height(), 100) << "一帧都没滚，成品却长高了";
+    const auto result = stitcher.snapshot();
+    EXPECT_EQ(result.height(), 100) << "一帧都没滚，成品却长高了";
 }
 
 /**
@@ -105,9 +109,10 @@ TEST(FrameStitch, RefusesASeamItCannotTrust)
     const auto barelyOverlapping = makeFrameOverlappingBy(first, 8);
     EXPECT_EQ(overlapRowCount(first, barelyOverlapping), 0);
 
-    const auto otherPage  = makeTallPage(30, 120);
-    const auto otherWidth = otherPage.copy(0, 0, 30, 100);
-    const auto rejected   = appendFrame(first, otherWidth);
+    const auto    otherPage  = makeTallPage(30, 120);
+    const auto    otherWidth = otherPage.copy(0, 0, 30, 100);
+    FrameStitcher stitcher{first};
+    const auto    rejected = stitcher.append(otherWidth);
     ASSERT_FALSE(rejected.has_value());
     EXPECT_EQ(rejected.error().code, ErrorCode::InvalidArgument) << "宽度对不上要当场拒绝，不许静默接歪";
     EXPECT_FALSE(rejected.error().message.empty()) << "拒绝得报出原因：用户看不出是哪一帧换的屏";
@@ -125,7 +130,61 @@ TEST(FrameStitch, LongestSeamWinsWhenThePageRepeats)
 
     EXPECT_EQ(overlapRowCount(previous, next), 60) << "接缝该取最长的那一段，不是第一个对得上的";
 
-    const auto appended = appendFrame(previous, next);
+    FrameStitcher stitcher{previous};
+    const auto    appended = stitcher.append(next);
     ASSERT_TRUE(appended.has_value()) << appended.error().message;
-    EXPECT_EQ(appended->height(), 120) << "整帧都重合还长出了一段";
+    const auto result = stitcher.snapshot();
+    EXPECT_EQ(result.height(), 120) << "整帧都重合还长出了一段";
+}
+
+/**
+ * @brief 钉住缓冲装得下时追加是原地写的
+ * @details 首帧 100 行先开 100 行缓冲，第一次追加就翻倍到 200 行；此后九帧都装得下，
+ *          地址必须一动不动——每帧都重分配并把已接的行搬一遍，等于把「只写新行」的成本还回去了。
+ */
+TEST(FrameStitch, InPlaceAppendKeepsTheBufferWhileItFits)
+{
+    const auto page  = makeTallPage(20, 300);
+    const auto first = page.copy(0, 0, 20, 100);
+
+    FrameStitcher stitcher{first};
+    ASSERT_EQ(stitcher.pixelHeight(), 100);
+
+    const uchar *address = nullptr;
+    for (auto index = 0; index < 10; ++index)
+    {
+        const auto appended = stitcher.append(page.copy(0, 100 + index, 20, 1));
+        ASSERT_TRUE(appended.has_value()) << appended.error().message;
+        // 第一次追加正好装不下，扩容就发生在这里；记的是扩容之后的地址
+        if (index == 0)
+        {
+            address = stitcher.bufferAddressForTesting();
+            continue;
+        }
+        EXPECT_EQ(stitcher.bufferAddressForTesting(), address) << "第 " << (index + 1) << " 条追加换了缓冲地址：装得下也在重分配";
+    }
+
+    EXPECT_EQ(stitcher.pixelHeight(), 110) << "十条一行高的帧没接成十行";
+}
+
+/**
+ * @brief 钉住容量按倍数长，而且扩容搬行之后内容不错位
+ * @details 首帧 100 行、再逐行追加 100 条，容量只该在装不下时翻倍；每帧都按精确行数重分配
+ *          虽然结果也对，但接整屏滚动就是每帧搬一遍整张长图。
+ */
+TEST(FrameStitch, CapacityGrowsByDoublingNotByEveryAppend)
+{
+    const auto page  = makeTallPage(20, 300);
+    const auto first = page.copy(0, 0, 20, 100);
+
+    FrameStitcher stitcher{first};
+    for (auto row = 100; row < 200; ++row)
+    {
+        const auto appended = stitcher.append(page.copy(0, row, 20, 1));
+        ASSERT_TRUE(appended.has_value()) << appended.error().message;
+    }
+
+    EXPECT_EQ(stitcher.pixelHeight(), 200);
+    EXPECT_LE(stitcher.allocatedPixelHeightForTesting(), 2 * stitcher.pixelHeight()) << "容量没有按倍数长，每帧都在重分配";
+    EXPECT_TRUE(stitcher.snapshot() == page.copy(0, 0, 20, 200)) << "扩容搬行之后内容错位了";
 }

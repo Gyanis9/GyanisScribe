@@ -361,10 +361,13 @@ namespace GyanisScribe::Gui
             return;
         }
 
-        m_longImage      = *first;
-        m_longRegion     = logicalRegion;
-        m_longScreenName = frame->screenName;
-        m_longActive     = true;
+        m_longStitcher.emplace(first->image);
+        m_longImage = *first;
+        // 像素交给累加器，这里只留读数和来源：留一份中途还会变的副本就得两处同步
+        m_longImage.image = {};
+        m_longRegion      = logicalRegion;
+        m_longScreenName  = frame->screenName;
+        m_longActive      = true;
 
         // 选区同样记进「上次区域」：长截图框出来的那条竖块往往正是下次要复用的那一块
         Core::rememberRegion(m_settings, Core::RegionHistoryEntry{logicalRegion, m_longScreenName});
@@ -383,7 +386,7 @@ namespace GyanisScribe::Gui
 
     void CaptureService::grabNextLongFrame()
     {
-        if (!m_longActive)
+        if (!m_longActive || !m_longStitcher)
         {
             return;
         }
@@ -404,7 +407,8 @@ namespace GyanisScribe::Gui
             return;
         }
 
-        const auto appended = Core::appendFrame(m_longImage.image, cropped->image);
+        const int  before   = m_longStitcher->pixelHeight();
+        const auto appended = m_longStitcher->append(cropped->image);
         if (!appended)
         {
             stopLongRound();
@@ -412,10 +416,9 @@ namespace GyanisScribe::Gui
             return;
         }
 
-        const auto grew   = appended->height() > m_longImage.image.height();
-        m_longImage.image = *appended;
+        const bool grew = m_longStitcher->pixelHeight() > before;
         // 逻辑高度按缩放因子反算：宽没变，高是像素除以比例；向下取整会让读数比实际少一格
-        m_longImage.logicalSize = QSize{m_longImage.logicalSize.width(), static_cast<int>(std::lround(m_longImage.image.height() / m_longImage.devicePixelRatio))};
+        m_longImage.logicalSize = QSize{m_longImage.logicalSize.width(), static_cast<int>(std::lround(m_longStitcher->pixelHeight() / m_longImage.devicePixelRatio))};
 
         if (m_longHud)
         {
@@ -430,11 +433,13 @@ namespace GyanisScribe::Gui
 
     void CaptureService::finishLongCapture()
     {
-        if (!m_longActive)
+        if (!m_longActive || !m_longStitcher)
         {
             return;
         }
-        m_longActive = false;
+        // 快照先取走：stopLongRound() 会把累加器连同它那块缓冲一起放掉
+        m_longImage.image = m_longStitcher->snapshot();
+        m_longActive      = false;
         stopLongRound();
 
         // 交出去的形状与一次普通截图完全一样：后续去向不需要知道这是接出来的
@@ -460,6 +465,8 @@ namespace GyanisScribe::Gui
         closeLongHud();
         // 三条出口（完成、取消、接不上）都收在这里：这一位不翻，之后的每一次调用还会去抓一帧
         m_longActive = false;
+        // 累加器与它那几兆缓冲一并放掉，下一轮从新的首帧重新长长
+        m_longStitcher.reset();
     }
 
     int CaptureService::longTimerConsumerCountForTesting() const

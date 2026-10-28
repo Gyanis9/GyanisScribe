@@ -2,7 +2,7 @@
  * @file FrameStitch.h
  * @brief 滚动长截图的接缝：认出两张相邻帧重叠了多少行，并把新的一段接上去
  * @author Gyanis
- * @date 2026-10-11
+ * @date 2026-10-28
  * @version 0.0.1
  * @copyright Copyright (c) . All rights reserved.
  */
@@ -35,12 +35,63 @@ namespace GyanisScribe::Core
     [[nodiscard]] int overlapRowCount(const QImage &previous, const QImage &next, int maximumOverlapRows = kMaximumOverlapRows);
 
     /**
-     * @brief 把新一帧接到成品下面
-     * @param stitched 已经接好的那一张
-     * @param next 刚抓到的新一帧
-     * @return 接好后的新图；两帧宽度不同时报错，内容全重合时接出来的就是原来那一段
-     * @details 不新画一份而是造一张更高的图把两段抄进去：调用方要的就是这一张长图本身。
+     * @brief 长图累加器：首帧定下宽度与缩放，之后每帧只把新露出的那几行写进缓冲
+     * @details 缓冲按倍数扩容，收尾由 snapshot() 深拷贝一次；接 n 帧的总成本与已接高度成正比，
+     *          而不是每帧都把整张长图重抄两遍。
+     * @note 像素归本类独占：构造与 append() 都不与入参共享，snapshot() 交出的也是独立图像。
      */
-    [[nodiscard]] Base::Expected<QImage> appendFrame(const QImage &stitched, const QImage &next);
+    class FrameStitcher
+    {
+    public:
+        /**
+         * @brief 用首帧开一个累加器
+         * @param first 第一帧；内部转成 ARGB32 抄进自有缓冲，此后与入参不再共享像素
+         */
+        explicit FrameStitcher(const QImage &first);
+
+        /**
+         * @brief 把新一帧接到缓冲末尾
+         * @param next 刚抓到的新一帧，宽度必须与首帧一致
+         * @return 接上了返回空；空图或宽度不同时返回中文原因
+         * @details 只写 next 里没与已接部分重合的那几行；装不下时按倍数扩容，旧内容逐行搬过去。
+         */
+        [[nodiscard]] Base::Expected<void> append(const QImage &next);
+
+        /**
+         * @brief 已接好的像素高度
+         * @return 行数；不含扩容后还没用上的那些空行
+         */
+        [[nodiscard]] int pixelHeight() const noexcept;
+
+        /**
+         * @brief 取一份独立的长图
+         * @return 深拷贝出来的图，缩放因子与构造时一致
+         */
+        [[nodiscard]] QImage snapshot() const;
+
+        /**
+         * @brief 缓冲当前分配了多少行（只给用例用）
+         * @return 容量行数，正常会大于 pixelHeight()
+         */
+        [[nodiscard]] int allocatedPixelHeightForTesting() const noexcept;
+
+        /**
+         * @brief 缓冲首地址（只给用例用）
+         * @return 同一轮里没扩容就保持不变；缓冲为空时是 nullptr
+         */
+        [[nodiscard]] const uchar *bufferAddressForTesting() const noexcept;
+
+    private:
+        /**
+         * @brief 保证缓冲装得下 rows 行
+         * @param rows 需要的总行数
+         * @details 装得下就原地不动；装不下按「所需行数」与「现有容量两倍」中较大的那个重分配，
+         *          连续追加 n 行只触发 O(log n) 次分配。
+         */
+        void ensureCapacity(int rows);
+
+        QImage m_buffer;       ///< 累加用的整块缓冲，容量可能大于已用行数
+        int    m_usedRows = 0; ///< 缓冲里已经写好的行数，就是成品高度
+    };
 
 } // namespace GyanisScribe::Core

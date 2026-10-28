@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "Core/Capture/FrameStitch.h"
 #include "Core/Capture/ICaptureService.h"
 #include "Base/Types.h"
 
@@ -267,7 +268,8 @@ namespace GyanisScribe::Gui
         std::vector<QPointer<CaptureOverlay>> m_overlays;                       ///< 在屏的遮罩，每块屏一张；窗口自己析构后要认得空指针
         ReceiverCountingTimer                 m_longTimer;                      ///< 滚动拼接的取帧节拍，只在有选区之后跑
         QPointer<LongCaptureHud>              m_longHud;                        ///< 长截图控制条，一轮一个
-        Base::CapturedImage                   m_longImage;                      ///< 已经接好的长图，第一帧就是它的开头
+        Base::CapturedImage                   m_longImage;                      ///< 这一轮的成品元数据；像素由 m_longStitcher 持有，收尾时才拷回来
+        std::optional<Core::FrameStitcher>    m_longStitcher;                   ///< 这一轮的累加器；与 m_longActive 一起立、一起清
         QRect                                 m_longRegion;                     ///< 反复抓的那块区域，该屏内的逻辑坐标
         QString                               m_longScreenName;                 ///< 这一轮所在的那块屏
         std::optional<QPoint>                 m_lastElementQuery;               ///< 上一格问过的悬停点，同一个点不重复问
