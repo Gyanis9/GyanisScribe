@@ -159,12 +159,14 @@ TEST(FrameStitch, InPlaceAppendKeepsTheBufferWhileItFits)
         if (index == 0)
         {
             address = stitcher.bufferAddressForTesting();
+            ASSERT_NE(address, nullptr) << "扩容之后缓冲该落在一片实存的内存上";
             continue;
         }
         EXPECT_EQ(stitcher.bufferAddressForTesting(), address) << "第 " << (index + 1) << " 条追加换了缓冲地址：装得下也在重分配";
     }
 
     EXPECT_EQ(stitcher.pixelHeight(), 110) << "十条一行高的帧没接成十行";
+    EXPECT_TRUE(stitcher.snapshot() == page.copy(0, 0, 20, 110)) << "原地追加十行之后内容与原始长页逐位不同";
 }
 
 /**
@@ -187,4 +189,29 @@ TEST(FrameStitch, CapacityGrowsByDoublingNotByEveryAppend)
     EXPECT_EQ(stitcher.pixelHeight(), 200);
     EXPECT_LE(stitcher.allocatedPixelHeightForTesting(), 2 * stitcher.pixelHeight()) << "容量没有按倍数长，每帧都在重分配";
     EXPECT_TRUE(stitcher.snapshot() == page.copy(0, 0, 20, 200)) << "扩容搬行之后内容错位了";
+}
+
+/**
+ * @brief 钉住接缝只在缓冲里「已经写好」的那些行中找，不拿扩容留的空行凑数
+ * @details 首帧 100 行、缓冲 100 行；接一帧 100 行（真实重叠 40）后已用 160 行、容量长到 200 行，
+ *          后 40 行是扩容留下的、从没写过的空行。再接 page 的 100..199 行时，真实重叠是 60 行、
+ *          只该新写 40 行、成品停在 200 行；把整块 200 行缓冲交给接缝判定，那 40 个空行会让重叠
+ *          落空，成品接成 260 行并多出一段重复的内容。
+ */
+TEST(FrameStitch, SeamIsSearchedOnlyInTheUsedRows)
+{
+    const auto page  = makeTallPage(20, 300);
+    const auto first = page.copy(0, 0, 20, 100);
+
+    FrameStitcher stitcher{first};
+    const auto    firstAppended = stitcher.append(page.copy(0, 60, 20, 100));
+    ASSERT_TRUE(firstAppended.has_value()) << firstAppended.error().message;
+    ASSERT_EQ(stitcher.pixelHeight(), 160) << "第一段接完该是 100 + 100 - 40";
+    // 没有这段空行，下面的断言在两个实现下都会绿，等于没钉住
+    ASSERT_EQ(stitcher.allocatedPixelHeightForTesting(), 200) << "这一条要靠扩容留下的空行才能证伪";
+
+    const auto appended = stitcher.append(page.copy(0, 100, 20, 100));
+    ASSERT_TRUE(appended.has_value()) << appended.error().message;
+    EXPECT_EQ(stitcher.pixelHeight(), 200) << "接缝该只在已写好的行里找：重叠是 60、新写 40 行；多出来的行说明把扩容的空行当成了内容";
+    EXPECT_TRUE(stitcher.snapshot() == page.copy(0, 0, 20, 200)) << "接缝没落在已用行上，成品里多接了一段";
 }

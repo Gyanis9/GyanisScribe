@@ -52,7 +52,7 @@ namespace GyanisScribe::Core
         /**
          * @brief 把新一帧接到缓冲末尾
          * @param next 刚抓到的新一帧，宽度必须与首帧一致
-         * @return 接上了返回空；空图或宽度不同时返回中文原因
+         * @return 接上了返回空；空图或宽度不同时返回中文原因；缓冲开不出来时返回内部故障
          * @details 只写 next 里没与已接部分重合的那几行；装不下时按倍数扩容，旧内容逐行搬过去。
          */
         [[nodiscard]] Base::Expected<void> append(const QImage &next);
@@ -80,6 +80,12 @@ namespace GyanisScribe::Core
          * @return 同一轮里没扩容就保持不变；缓冲为空时是 nullptr
          */
         [[nodiscard]] const uchar *bufferAddressForTesting() const noexcept;
+
+        // 像素归本类独占：拷贝与移动都等于把同一块缓冲交给第二个持有者，这里一并禁掉
+        FrameStitcher(const FrameStitcher &)            = delete;
+        FrameStitcher &operator=(const FrameStitcher &) = delete;
+        FrameStitcher(FrameStitcher &&)                 = delete;
+        FrameStitcher &operator=(FrameStitcher &&)      = delete;
 
     private:
         /**
