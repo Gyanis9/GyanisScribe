@@ -1,7 +1,8 @@
 #include "Core/Pick/RecentColors.h"
 
+#include "Base/Text.h"
+
 #include <algorithm>
-#include <format>
 
 namespace GyanisScribe::Core
 {
@@ -64,7 +65,7 @@ namespace GyanisScribe::Core
             {
                 return Base::Expected<std::vector<QColor>>{std::unexpected{Base::Error{
                         .code    = Base::ErrorCode::InvalidArgument,
-                        .message = std::format("{}里有一条不是 #RRGGBB 写法：\"{}\"。{}", listLabel, token.toStdString(), recoveryHint),
+                        .message = Base::uiFormat(Base::uiTextUtf8("{}里有一条不是 #RRGGBB 写法：\"{}\"。{}"), listLabel, token.toStdString(), recoveryHint),
                 }}};
             }
 
@@ -75,7 +76,7 @@ namespace GyanisScribe::Core
             {
                 return Base::Expected<std::vector<QColor>>{std::unexpected{Base::Error{
                         .code    = Base::ErrorCode::InvalidArgument,
-                        .message = std::format("{}里有一条不是十六进制：\"{}\"。{}", listLabel, token.toStdString(), recoveryHint),
+                        .message = Base::uiFormat(Base::uiTextUtf8("{}里有一条不是十六进制：\"{}\"。{}"), listLabel, token.toStdString(), recoveryHint),
                 }}};
             }
 

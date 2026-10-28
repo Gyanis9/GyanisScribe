@@ -896,6 +896,10 @@
             <translation>Scrolling capture cannot continue: this frame is a different width than the earlier ones (the screen or the scaling changed mid-way). Finish what you already have, then start over</translation>
         </message>
         <message>
+            <source>长截图接不上：内存不够再开一段缓冲。先把已有这一段收好再重来</source>
+            <translation>Scrolling capture cannot continue: not enough memory for another buffer. Finish what you already have, then start over</translation>
+        </message>
+        <message>
             <source>选区历史的记录格式不对：第 {} 段「{}」应为「x,y,width,height,屏名」。请删掉这一项，让程序重新记一次</source>
             <translation>The selection history entry is malformed: segment {} "{}" should look like "x,y,width,height,screen-name". Delete that entry so the app can record a fresh one</translation>
         </message>
@@ -3562,6 +3566,26 @@
         <message>
             <source>取声的 ffmpeg 起不来。设备可能正被别的程序占用，关掉占用者再录，或在设置里把取声关掉</source>
             <translation>The audio ffmpeg wouldn't start. The device may be held by another program - close it and try again, or turn audio capture off in Settings</translation>
+        </message>
+        <message>
+            <source>{}里有一条不是 #RRGGBB 写法："{}"。{}</source>
+            <translation>One entry in {} is not written as #RRGGBB: "{}". {}</translation>
+        </message>
+        <message>
+            <source>{}里有一条不是十六进制："{}"。{}</source>
+            <translation>One entry in {} is not hexadecimal: "{}". {}</translation>
+        </message>
+        <message>
+            <source>最近使用颜色</source>
+            <translation>Recent colors</translation>
+        </message>
+        <message>
+            <source>删掉配置里的 %1 这一项可以恢复默认</source>
+            <translation>Delete the %1 entry in settings to restore the defaults</translation>
+        </message>
+        <message>
+            <source>检查导入文件里的色块写法，或删掉配置里的 %1 这一项可以恢复默认</source>
+            <translation>Check the color entries in the imported file, or delete the %1 entry in settings to restore the defaults</translation>
         </message>
 </context>
 </TS>

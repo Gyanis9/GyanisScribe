@@ -14,9 +14,6 @@ namespace GyanisScribe::Core
 {
     namespace
     {
-        /// 这份清单在提示里的名字：配置读入与文件导入共用
-        constexpr std::string_view kPaletteListLabel = "自定义色板";
-
         /**
          * @brief 色板解码的共用实现
          * @param tokens 待解码的色块词
@@ -37,7 +34,7 @@ namespace GyanisScribe::Core
                         Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("色板有 {} 格，超出上限 {} 格：请删掉几格再存"),
                                                                                                    tokens.size(), static_cast<int>(kPaletteCapacity))});
             }
-            const auto parsed = Core::parseRecentColors(tokens, kPaletteListLabel, recoveryHint);
+            const auto parsed = Core::parseRecentColors(tokens, Base::uiText("自定义色板").toStdString(), recoveryHint);
             if (!parsed)
             {
                 return std::unexpected(parsed.error());
@@ -71,7 +68,7 @@ namespace GyanisScribe::Core
 
     Base::Expected<std::vector<QColor>> paletteFromTokens(const QStringList &tokens)
     {
-        const auto recovery = std::format("删掉配置里的 {} 这一项可以恢复默认", Core::kAnnotationPalette);
+        const auto recovery = Base::uiText("删掉配置里的 %1 这一项可以恢复默认").arg(QString::fromUtf8(Core::kAnnotationPalette)).toStdString();
         return paletteFromTokensWithHint(tokens, recovery);
     }
 
@@ -141,7 +138,7 @@ namespace GyanisScribe::Core
                 }
             }
         }
-        const auto recovery = std::format("检查导入文件里的色块写法，或删掉配置里的 {} 这一项可以恢复默认", Core::kAnnotationPalette);
+        const auto recovery = Base::uiText("检查导入文件里的色块写法，或删掉配置里的 %1 这一项可以恢复默认").arg(QString::fromUtf8(Core::kAnnotationPalette)).toStdString();
         return paletteFromTokensWithHint(tokens, recovery);
     }
 
