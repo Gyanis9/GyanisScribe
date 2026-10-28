@@ -9,9 +9,11 @@
 
 #include <QComboBox>
 #include <QAbstractItemModel>
+#include <QCoreApplication>
 #include <QDateTime>
 #include <QEvent>
 #include <QFileInfo>
+#include <QFutureWatcher>
 #include <QHBoxLayout>
 #include <QHideEvent>
 #include <QIcon>
@@ -24,9 +26,11 @@
 #include <QListWidgetItem>
 #include <QPushButton>
 #include <QShowEvent>
+#include <QThread>
 #include <QTimer>
 #include <QVariant>
 #include <QVBoxLayout>
+#include <QtConcurrent/QtConcurrentRun>
 
 #include <algorithm>
 #include <array>
@@ -40,10 +44,6 @@ namespace
 
     /// 列表项里存成品路径的那个角色
     constexpr int kPathRole = Qt::UserRole + 1;
-
-    /// 每轮定时器最多解两张：4K 图在 Debug 下每张约 0.1 秒，两张一轮把单次停顿压在 0.2 秒上下，
-    /// 列表先摆出来，图随后一张张换上去
-    constexpr int kThumbnailsPerTick = 2;
 
     /// 缩略图备到 3x 屏那一档：再高的缩放比按 3 档放大，1x/2x/3x 覆盖现有屏幕。
     /// 三档一律生成、不做按屏裁剪，每张的位图合计约 0.5 MiB，这是缓存容量按张数计的代价来源
@@ -234,11 +234,14 @@ namespace GyanisScribe::Gui
                              }
                          });
 
-        // 缩略图按小批解：0ms 单次定时器每响一次解两张，列表先摆出来，图随后一张张换上去
+        // 缩略图逐张解：0ms 单次定时器每响一次挑一条交给工作线程，列表先摆出来，图随后一张张换上去
+        m_thumbnailWatcher = new QFutureWatcher<DecodedThumbnail>{this};
+        QObject::connect(m_thumbnailWatcher, &QFutureWatcher<DecodedThumbnail>::finished, this, &HistoryView::applyDecodedThumbnail);
+
         m_thumbnailTimer = new QTimer{this};
         m_thumbnailTimer->setSingleShot(true);
         m_thumbnailTimer->setInterval(0);
-        QObject::connect(m_thumbnailTimer, &QTimer::timeout, this, &HistoryView::drainThumbnails);
+        QObject::connect(m_thumbnailTimer, &QTimer::timeout, this, &HistoryView::startNextThumbnail);
         m_thumbnailCache.setMaxCost(kThumbnailCacheCapacity);
     }
 
@@ -252,9 +255,16 @@ namespace GyanisScribe::Gui
         return m_thumbnailDecodeCount;
     }
 
+    bool HistoryView::lastDecodeRanOffGuiThreadForTesting() const noexcept
+    {
+        return m_lastDecodeOffGuiThread;
+    }
+
     void HistoryView::showEvent(QShowEvent *event)
     {
         QWidget::showEvent(event);
+
+        m_thumbnailSuspended = false;
 
         // 第一次显示才读清单；隐藏期间来过刷新请求的，这一次补读并解缩略图
         if (!m_loaded || m_refreshWhileHidden)
@@ -267,8 +277,9 @@ namespace GyanisScribe::Gui
 
     void HistoryView::hideEvent(QHideEvent *event)
     {
-        // 定时器停了队列还留着：下次显示接着解，已经解好的都在缓存里
+        // 定时器停了队列还留着：在飞的那张回来后会退回队首，下次显示接着解
         m_thumbnailTimer->stop();
+        m_thumbnailSuspended = true;
         QWidget::hideEvent(event);
     }
 
@@ -339,7 +350,9 @@ namespace GyanisScribe::Gui
     {
         const auto visible = visibleEntries(m_entries, m_search->text(), kindFilterAt(m_filter->currentIndex()));
 
-        // 整批重建：旧下标全部失效，未解的那批也一并作废
+        // 整批重建：旧下标全部失效，未解的那批也一并作废。代际号让在飞任务的结果落地时作废，
+        // 但不去打断它手里的读文件——那份像素已经读出来了，只是不再属于这一批行
+        ++m_thumbnailGeneration;
         m_thumbnailTimer->stop();
         m_pendingThumbnails.clear();
         m_list->clear();
@@ -393,14 +406,14 @@ namespace GyanisScribe::Gui
                QString::number(info.size());
     }
 
-    QIcon HistoryView::decodeThumbnail(const Core::HistoryEntry &entry)
+    HistoryView::DecodedThumbnail HistoryView::decodeThumbnailPixels(const QString &displayPath, const QString &key, const int generation)
     {
-        ++m_thumbnailDecodeCount;
+        DecodedThumbnail decoded;
+        decoded.key                 = key;
+        decoded.generation          = generation;
+        decoded.decodedOffGuiThread = QThread::currentThread() != QCoreApplication::instance()->thread();
 
-        // 键在读之前取：读一张大图要上百毫秒，期间文件被换掉时，这一份像素对应的仍是旧键
-        const auto key = thumbnailCacheKey(entry);
-
-        QImageReader reader{GyanisScribe::Base::Paths::toDisplayText(entry.filePath)};
+        QImageReader reader{displayPath};
         reader.setAutoTransform(true);
 
         // 读一次就够：先按最大那档 DPR 的覆盖尺寸预缩，三档缩略图都从这一份像素上裁
@@ -415,75 +428,119 @@ namespace GyanisScribe::Gui
         const auto image = reader.read();
         if (image.isNull())
         {
-            // 读不出也照样记在键下：视频与坏图每次刷新都重开一遍，等于每敲一个字就白读一批
-            const auto fallback = fallbackIcon(entry);
-            m_thumbnailCache.insert(key, new QIcon{fallback}, 1);
-            return fallback;
+            decoded.readFailed = true;
+            return decoded;
         }
 
-        QIcon icon;
-        for (int ratio = 1; ratio <= kLargestThumbnailDevicePixelRatio; ++ratio)
-        {
-            const auto thumbnail = Core::makeThumbnail(image, QSize{Core::kThumbnailEdge * ratio, Core::kThumbnailEdge * ratio}, Core::kThumbnailCornerRadius * ratio);
-            if (thumbnail.isNull())
-            {
-                continue;
-            }
-            auto bitmap = QPixmap::fromImage(thumbnail);
-            // 缩放比写在位图上：列表按 96 逻辑像素摆，取图时引擎才会挑到这一档
-            bitmap.setDevicePixelRatio(ratio);
-            icon.addPixmap(bitmap);
-        }
-        if (icon.isNull())
-        {
-            const auto fallback = fallbackIcon(entry);
-            m_thumbnailCache.insert(key, new QIcon{fallback}, 1);
-            return fallback;
-        }
-
-        // 按读之前取的那把键放回去：读的这几百毫秒里文件换了名或换了内容，这次结果也不算到新键上
-        m_thumbnailCache.insert(key, new QIcon{icon}, 1);
-        return icon;
+        decoded.oneX   = Core::makeThumbnail(image, QSize{Core::kThumbnailEdge, Core::kThumbnailEdge}, Core::kThumbnailCornerRadius);
+        decoded.twoX   = Core::makeThumbnail(image, QSize{Core::kThumbnailEdge * 2, Core::kThumbnailEdge * 2}, Core::kThumbnailCornerRadius * 2);
+        decoded.threeX = Core::makeThumbnail(image, QSize{Core::kThumbnailEdge * kLargestThumbnailDevicePixelRatio, Core::kThumbnailEdge * kLargestThumbnailDevicePixelRatio},
+                                             Core::kThumbnailCornerRadius * kLargestThumbnailDevicePixelRatio);
+        return decoded;
     }
 
     void HistoryView::scheduleThumbnails()
     {
-        if (!isVisible() || m_pendingThumbnails.isEmpty() || m_thumbnailTimer->isActive())
+        if (!isVisible() || m_thumbnailSuspended || m_pendingThumbnails.isEmpty() || m_inFlightThumbnail.has_value() || m_thumbnailTimer->isActive())
         {
             return;
         }
         m_thumbnailTimer->start();
     }
 
-    void HistoryView::drainThumbnails()
+    void HistoryView::startNextThumbnail()
     {
-        if (!isVisible())
+        if (m_inFlightThumbnail.has_value() || !isVisible() || m_thumbnailSuspended)
         {
             return;
         }
 
-        int decoded = 0;
-        while (decoded < kThumbnailsPerTick && !m_pendingThumbnails.isEmpty())
+        while (!m_pendingThumbnails.isEmpty())
         {
-            const auto pending = m_pendingThumbnails.takeFirst();
-            if (!pending.index.isValid())
+            auto pending = m_pendingThumbnails.takeFirst();
+            if (!pending.index.isValid() || m_list->itemFromIndex(pending.index) == nullptr)
             {
                 // 列表已经重建过：这个下标指向的项不在了，旧图也不必再解
                 continue;
             }
-            auto *item = m_list->itemFromIndex(pending.index);
-            if (item == nullptr)
-            {
-                continue;
-            }
-            item->setIcon(decodeThumbnail(pending.entry));
-            ++decoded;
+
+            // 键在读之前取：读一张大图要上百毫秒，期间文件被换掉时，这一份像素对应的仍是旧键
+            pending.cacheKey    = thumbnailCacheKey(pending.entry);
+            pending.generation  = m_thumbnailGeneration;
+            m_inFlightThumbnail = pending;
+
+            const auto displayPath = GyanisScribe::Base::Paths::toDisplayText(pending.entry.filePath);
+            m_thumbnailWatcher->setFuture(
+                    QtConcurrent::run([displayPath, key = pending.cacheKey, generation = pending.generation] { return decodeThumbnailPixels(displayPath, key, generation); }));
+            return;
         }
 
-        if (!m_pendingThumbnails.isEmpty())
+        // 队列里只剩失效条目：这里没活可干，交给调度收尾，不再空转定时器
+        scheduleThumbnails();
+    }
+
+    void HistoryView::applyDecodedThumbnail()
+    {
+        const auto decoded = m_thumbnailWatcher->result();
+
+        PendingThumbnail pending;
+        if (m_inFlightThumbnail.has_value())
         {
-            m_thumbnailTimer->start();
+            pending = std::move(*m_inFlightThumbnail);
         }
+        m_inFlightThumbnail.reset();
+
+        // 列表在解码期间重建过：结果对应的已是另一批行，不计数也不写缓存
+        if (pending.generation != m_thumbnailGeneration)
+        {
+            scheduleThumbnails();
+            return;
+        }
+
+        // 看不见的时候不解：这一条退回队首，下次显示接着来
+        if (!isVisible() || m_thumbnailSuspended)
+        {
+            m_pendingThumbnails.prepend(pending);
+            return;
+        }
+
+        auto *item = pending.index.isValid() ? m_list->itemFromIndex(pending.index) : nullptr;
+        if (item == nullptr)
+        {
+            scheduleThumbnails();
+            return;
+        }
+
+        QIcon icon;
+        if (!decoded.readFailed)
+        {
+            const auto addTier = [&icon](const QImage &image, const int ratio)
+            {
+                if (image.isNull())
+                {
+                    return;
+                }
+                auto bitmap = QPixmap::fromImage(image);
+                // 缩放比写在位图上：列表按 96 逻辑像素摆，取图时引擎才会挑到这一档
+                bitmap.setDevicePixelRatio(ratio);
+                icon.addPixmap(bitmap);
+            };
+            addTier(decoded.oneX, 1);
+            addTier(decoded.twoX, 2);
+            addTier(decoded.threeX, kLargestThumbnailDevicePixelRatio);
+        }
+        if (icon.isNull())
+        {
+            icon = fallbackIcon(pending.entry);
+        }
+
+        item->setIcon(icon);
+        // 键取自解码前：读的这几百毫秒里文件换了名或换了内容，这次结果也不算到新键上。
+        // 兜底图标也记在键下：视频与坏图每次刷新都重开一遍，等于每敲一个字就白读一批
+        m_thumbnailCache.insert(decoded.key, new QIcon{icon}, 1);
+        ++m_thumbnailDecodeCount;
+        m_lastDecodeOffGuiThread = decoded.decodedOffGuiThread;
+        scheduleThumbnails();
     }
 
     void HistoryView::removeSelected()

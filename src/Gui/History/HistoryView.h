@@ -16,7 +16,9 @@
 #include "Gui/Controls/Toast.h"
 
 #include <QCache>
+#include <QFutureWatcher>
 #include <QIcon>
+#include <QImage>
 #include <QPersistentModelIndex>
 #include <QStringList>
 #include <QVector>
@@ -77,7 +79,7 @@ namespace GyanisScribe::Gui
     /**
      * @brief 历史页控件
      * @details 视图不认贴图也不认识识别：三个出口只发信号，路径交给持有各模块的控制器。
-     *          缩略图按路径、修改时间与文件大小缓存，解码按小批排队，看不见的时候不解。
+     *          缩略图按路径、修改时间与文件大小缓存，解码逐张交给工作线程，看不见的时候不解。
      */
     class HistoryView : public QWidget
     {
@@ -134,6 +136,13 @@ namespace GyanisScribe::Gui
          * @details 「刷新会不会又解一遍」只有这个计数看得见：图标换没换在列表上看不出新旧。
          */
         [[nodiscard]] int thumbnailDecodeCountForTesting() const;
+
+        /**
+         * @brief 最近一次落地的缩略图是不是在界面线程之外解出的
+         * @return 解码函数运行线程的判断结果；还没有结果落地时为 false
+         * @details 读文件、缩放与圆角搬出界面线程这件事在列表上看不见，用例只能靠这枚读数确认。
+         */
+        [[nodiscard]] bool lastDecodeRanOffGuiThreadForTesting() const noexcept;
 
     signals:
         /**
@@ -192,6 +201,27 @@ namespace GyanisScribe::Gui
         void hideEvent(QHideEvent *event) override;
 
     private:
+        /// 工作线程解好的一条缩略图；界面线程只拿它组装图标与写缓存
+        struct DecodedThumbnail
+        {
+            QString key;                         ///< 解码前取的缓存键
+            int     generation = 0;              ///< 解码发起时的代际号
+            QImage  oneX;                        ///< 96 见方
+            QImage  twoX;                        ///< 192 见方
+            QImage  threeX;                      ///< 288 见方
+            bool    readFailed          = false; ///< 像素没读出来，界面线程改摆类别图标
+            bool    decodedOffGuiThread = false; ///< 解码确实发生在界面线程之外
+        };
+
+        /// 一条等着解码的列表项；列表重建后 QPersistentModelIndex 自己失效
+        struct PendingThumbnail
+        {
+            QPersistentModelIndex index;          ///< 目标列表项
+            Core::HistoryEntry    entry;          ///< 要解的那条成品
+            QString               cacheKey;       ///< 发起解码前取的缓存键
+            int                   generation = 0; ///< 发起解码时的代际号
+        };
+
         /// 按当前搜索词与类别重填列表，不动 m_entries
         void refillList();
 
@@ -201,42 +231,43 @@ namespace GyanisScribe::Gui
         /// 某条记录读不出缩略图时的类别图标
         [[nodiscard]] QIcon fallbackIcon(const Core::HistoryEntry &entry) const;
 
-        /// 读一条成品并裁成 1x/2x/3x 三档缩略图；读不出时退回类别图标
-        [[nodiscard]] QIcon decodeThumbnail(const Core::HistoryEntry &entry);
+        /// 在工作线程上读一条成品并裁成 1x/2x/3x 三档；不碰图标、缓存与列表
+        [[nodiscard]] static DecodedThumbnail decodeThumbnailPixels(const QString &displayPath, const QString &key, int generation);
 
         /// 缓存键：成品路径、修改时间（毫秒）与文件大小
         [[nodiscard]] static QString thumbnailCacheKey(const Core::HistoryEntry &entry);
 
-        /// 可见且队列非空时启动一次单次定时器
+        /// 可见、未挂起、队列非空且没有在飞任务时启动一次单次定时器
         void scheduleThumbnails();
 
-        /// 每次定时器触发解一小批，解不完再排下一发
-        void drainThumbnails();
+        /// 定时器触发后取一条有效条目交给工作线程，队列里没有活时不再空转
+        void startNextThumbnail();
+
+        /// 工作线程交回结果：代际与显示状态都合适时组装图标并写缓存
+        void applyDecodedThumbnail();
 
         /// 删除选中项：先去掉记录，再刷新列表
         void removeSelected();
 
-        /// 一条等着解码的列表项；列表重建后 QPersistentModelIndex 自己失效
-        struct PendingThumbnail
-        {
-            QPersistentModelIndex index; ///< 目标列表项
-            Core::HistoryEntry    entry; ///< 要解的那条成品
-        };
-
-        Core::HistoryStore          &m_store;                        ///< 历史清单
-        Core::HistoryRetentionPolicy m_policy;                       ///< 读清单时用的保留策略
-        Gui::IconProvider           &m_icons;                        ///< 图标供给器
-        QVector<Core::HistoryEntry>  m_entries;                      ///< 本次读到的全量记录，时间倒序
-        QLineEdit                   *m_search         = nullptr;     ///< 搜索框
-        QComboBox                   *m_filter         = nullptr;     ///< 类别筛选下拉
-        QListWidget                 *m_list           = nullptr;     ///< 缩略图列表
-        QLabel                      *m_emptyHint      = nullptr;     ///< 列表为空/筛不出时的引导句
-        QTimer                      *m_thumbnailTimer = nullptr;     ///< 0ms 单次定时器，按批解码缩略图
-        QCache<QString, QIcon>       m_thumbnailCache;               ///< 缩略图缓存，键见 thumbnailCacheKey
-        QVector<PendingThumbnail>    m_pendingThumbnails;            ///< 还没解的列表项
-        int                          m_thumbnailDecodeCount = 0;     ///< 实际解码尝试次数，供用例读数
-        bool                         m_loaded               = false; ///< 是否已经成功读过一次清单
-        bool                         m_refreshWhileHidden   = false; ///< 上次刷新发生在隐藏时，显示后要补读
+        Core::HistoryStore               &m_store;                          ///< 历史清单
+        Core::HistoryRetentionPolicy      m_policy;                         ///< 读清单时用的保留策略
+        Gui::IconProvider                &m_icons;                          ///< 图标供给器
+        QVector<Core::HistoryEntry>       m_entries;                        ///< 本次读到的全量记录，时间倒序
+        QLineEdit                        *m_search           = nullptr;     ///< 搜索框
+        QComboBox                        *m_filter           = nullptr;     ///< 类别筛选下拉
+        QListWidget                      *m_list             = nullptr;     ///< 缩略图列表
+        QLabel                           *m_emptyHint        = nullptr;     ///< 列表为空/筛不出时的引导句
+        QTimer                           *m_thumbnailTimer   = nullptr;     ///< 0ms 单次定时器，每响一次启动一张工作线程解码
+        QFutureWatcher<DecodedThumbnail> *m_thumbnailWatcher = nullptr;     ///< 工作线程结果的回接点
+        QCache<QString, QIcon>            m_thumbnailCache;                 ///< 缩略图缓存，键见 thumbnailCacheKey
+        QVector<PendingThumbnail>         m_pendingThumbnails;              ///< 还没解的列表项
+        std::optional<PendingThumbnail>   m_inFlightThumbnail;              ///< 正在工作线程上解的那条，结果落地才清
+        int                               m_thumbnailDecodeCount   = 0;     ///< 实际解码尝试次数（结果落地才算）
+        int                               m_thumbnailGeneration    = 0;     ///< 列表重建代际，旧代际的结果作废
+        bool                              m_thumbnailSuspended     = false; ///< 隐藏期间挂起，结果回来先退回队列
+        bool                              m_lastDecodeOffGuiThread = false; ///< 最近一次落地结果是否在工作线程上解出
+        bool                              m_loaded                 = false; ///< 是否已经成功读过一次清单
+        bool                              m_refreshWhileHidden     = false; ///< 上次刷新发生在隐藏时，显示后要补读
     };
 
 } // namespace GyanisScribe::Gui

@@ -79,9 +79,9 @@ namespace
     }
 
     /// 列表项图标中心处的颜色与期望色是否一致（圆角只切四个角，中心一定是图本身）
-    [[nodiscard]] bool iconCenterMatches(const QIcon &icon, const QColor &expected)
+    [[nodiscard]] bool iconCenterMatches(const QIcon &icon, const QColor &expected, const int ratio = 1)
     {
-        const auto bitmap = icon.pixmap(QSize{kThumbnailEdge, kThumbnailEdge});
+        const auto bitmap = icon.pixmap(QSize{kThumbnailEdge, kThumbnailEdge}, ratio);
         if (bitmap.isNull())
         {
             return false;
@@ -397,6 +397,52 @@ TEST_F(HistoryViewFixture, ThumbnailsAreCachedAcrossSearch)
 }
 
 /**
+ * @brief 钉住缩略图解码发生在界面线程之外
+ * @details 读文件、缩放与圆角搬到工作线程后，界面线程只组装图标与写缓存；
+ *          这枚读数由解码函数在它实际运行的线程上当场记录，列表上看不出来。
+ */
+TEST_F(HistoryViewFixture, DecodesThumbnailsOffTheGuiThread)
+{
+    const auto artifact = writeImageArtifact(m_directory, "off-thread.png", {640, 480});
+    addRecord(artifact, HistoryKind::Screenshot, kNow);
+
+    auto view = makeView();
+    view->show();
+    ASSERT_TRUE(waitForDecodeCount(*view, 1, 10'000)) << "缩略图没解出来，线程判据的前提不成立";
+    EXPECT_TRUE(view->lastDecodeRanOffGuiThreadForTesting()) << "解码跑在界面线程上";
+}
+
+/**
+ * @brief 钉住一次解码产出 1x/2x/3x 三档，取图时各挑各的档
+ * @details 三档都从同一份像素上裁：屏是 2x 或 3x 时若只有 96 那一档，
+ *          列表位图会被放大发糊。判据同时看像素尺寸、缩放比与中心颜色。
+ */
+TEST_F(HistoryViewFixture, ServesAllThreeDprTiersFromOneDecode)
+{
+    const QColor kOriginal{40, 120, 200};
+    const auto   artifact = writeImageArtifact(m_directory, "dpr-tiers.png", {640, 480}, kOriginal);
+    addRecord(artifact, HistoryKind::Screenshot, kNow);
+
+    auto view = makeView();
+    view->show();
+    ASSERT_TRUE(waitForDecodeCount(*view, 1, 10'000)) << "缩略图没解出来，档位判据的前提不成立";
+
+    auto *list = view->findChild<QListWidget *>();
+    ASSERT_NE(list, nullptr) << "历史页里没有缩略图列表";
+    ASSERT_EQ(list->count(), 1);
+    const auto icon = list->item(0)->icon();
+
+    for (const int ratio: {1, 2, 3})
+    {
+        const auto bitmap = icon.pixmap(QSize{kThumbnailEdge, kThumbnailEdge}, ratio);
+        EXPECT_EQ(bitmap.size(), QSize(kThumbnailEdge * ratio, kThumbnailEdge * ratio)) << "缺少 " << ratio << "x 档";
+        EXPECT_DOUBLE_EQ(bitmap.devicePixelRatio(), static_cast<qreal>(ratio)) << ratio << "x 档的缩放比不对";
+        EXPECT_TRUE(iconCenterMatches(icon, kOriginal, ratio)) << ratio << "x 档中心不是原图颜色";
+    }
+    EXPECT_EQ(view->thumbnailDecodeCountForTesting(), 1) << "三档应由一次解码产出";
+}
+
+/**
  * @brief 钉住成品内容变了要重解，没变的仍走缓存
  * @details 缓存键含修改时间：同一路径被新图覆盖时旧缩略图必须换掉，否则列表一直显示上一版。
  *          只该重解改了的那一张——两张都重解说明缓存键里没有修改时间。
@@ -541,9 +587,9 @@ TEST_F(HistoryViewFixture, ShowAfterHiddenRefreshReadsWhatWasAddedMeanwhile)
 
 /**
  * @brief 钉住隐藏会停掉正在跑的缩略图解码，再次显示接着解完
- * @details 每轮只解两张，四张以上的队列必然跨轮；隐藏发生在两轮之间时，定时器若不停，
- *          看不见的列表会继续吃 GUI 线程。队列里的条目要留到下次显示，不能随隐藏丢掉。
- *          用 4K 成品把单轮拉长到几十毫秒以上，才能稳定落在两轮之间观察。
+ * @details 队列一次只解一张，四张以上的队列必然跨轮；隐藏发生在两轮之间或一张还在飞时，
+ *          定时器若不停，看不见的列表会继续吃 GUI 线程。队列里的条目要留到下次显示，不能随隐藏丢掉。
+ *          用 4K 成品把单张拉长到几十毫秒以上，才能稳定落在两轮之间观察。
  */
 TEST_F(HistoryViewFixture, HideStopsPendingThumbnailsAndShowResumes)
 {

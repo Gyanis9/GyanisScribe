@@ -28,7 +28,9 @@ target_link_libraries(Gui PUBLIC
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets
-        Qt6::Svg)
+        Qt6::Svg
+        # 只取 QtConcurrent 的头文件：QtConcurrent::run 的执行体跑在 QtCore 的线程池，运行目录不必摆一份没人加载的 Qt6Concurrent
+        Qt6::Concurrent)
 
 if (MSVC)
     target_compile_options(Gui PRIVATE /W4 /WX)
