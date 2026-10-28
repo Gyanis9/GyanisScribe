@@ -239,6 +239,11 @@ namespace GyanisScribe::Main
         QObject::connect(m_settings.get(), &GyanisScribe::Core::ISettingsStore::valueChanged, this,
                          [this](const QString &key)
                          {
+                             if (m_restoringHotkeySettings)
+                             {
+                                 // 写回恢复的旧组合也会发自定义键的变更通知：再登一遍会把刚恢复的登记又翻掉
+                                 return;
+                             }
                              const auto prefix =
                                      QString::fromUtf8(GyanisScribe::Core::kHotkeyCustomPrefix.data(), static_cast<qsizetype>(GyanisScribe::Core::kHotkeyCustomPrefix.size()));
                              if (!key.startsWith(prefix))
@@ -369,6 +374,14 @@ namespace GyanisScribe::Main
 
     void AppController::reportHotkeyFailures(const GyanisScribe::Core::HotkeyReloadReport &report)
     {
+        // 先把恢复成功的旧组合写回配置：设置页与重启都只认配置，不写回就仍停在失败的新文本上。
+        // 写回期间压住自定义键那一路的重登，否则刚恢复的登记会被再翻一遍。
+        if (!report.restored.empty())
+        {
+            m_restoringHotkeySettings = true;
+            m_hotkeys->persistRestoredBindings(report);
+            m_restoringHotkeySettings = false;
+        }
         if (!report.failures.empty())
         {
             // 登记结果只写进日志的话，用户看到的就只是「按了没反应」：要当场说出来，

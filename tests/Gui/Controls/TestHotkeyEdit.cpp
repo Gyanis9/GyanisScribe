@@ -198,6 +198,55 @@ TEST_F(HotkeyEditFixture, EscapeRestoresTheBoundValue)
 }
 
 /**
+ * @brief 钉住「配置被别处改掉时，这一格跟着变」
+ * @details 热键管理器把恢复失败的新组合退回旧组合时只改配置：设置页上的录制框不跟，
+ *          用户看到的就是新组合，实际按得动的却是旧组合。录制中这一格显示的是提示，
+ *          外部改动只更新现值，不许把提示顶掉；取消后要显示最新的现值。
+ */
+TEST_F(HotkeyEditFixture, FollowsTheStoredValueWhenItChangesElsewhere)
+{
+    QWidget container;
+    auto *layout = new QVBoxLayout{&container};
+    auto *edit   = new HotkeyEdit{*m_store, &container};
+    layout->addWidget(edit);
+    container.show();
+    container.activateWindow();
+    QCoreApplication::processEvents();
+
+    const auto key = GyanisScribe::Core::kHotkeyCapture;
+    ASSERT_TRUE(m_store->setValue(key, QStringLiteral("Ctrl+Alt+A")).has_value());
+    edit->bindTo(key, QStringLiteral("截图"), QStringLiteral("Ctrl+Alt+B"), HotkeyEditScope::Global);
+
+    auto *display = edit->findChild<QLabel *>(QStringLiteral("hotkeyDisplay"));
+    ASSERT_NE(display, nullptr) << "录制框里没有显示组合的那一格";
+    ASSERT_EQ(display->text(), QStringLiteral("Ctrl+Alt+A"));
+
+    ASSERT_TRUE(m_store->setValue(key, QStringLiteral("Ctrl+Alt+D")).has_value());
+    EXPECT_EQ(display->text(), QStringLiteral("Ctrl+Alt+D")) << "配置在别处改了，这一格还显示旧值：用户看到的热键不是实际生效的那颗";
+
+    // 点一下进入录制态；外部再改配置只更新现值，不许把「按下快捷键」的提示顶掉
+    edit->setFocus(Qt::MouseFocusReason);
+    QCoreApplication::processEvents();
+    ASSERT_TRUE(edit->hasFocus()) << "焦点没落到录制框，录制判据没有落点";
+    QMouseEvent press{QEvent::MouseButtonPress, QPointF{5, 5}, QPointF{5, 5}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QCoreApplication::sendEvent(edit, &press);
+    ASSERT_TRUE(display->property("recording").toBool()) << "点一下没有进入录制态，判据没有落点";
+
+    ASSERT_TRUE(m_store->setValue(key, QStringLiteral("Ctrl+Alt+E")).has_value());
+    EXPECT_TRUE(display->property("recording").toBool()) << "外部改配置把录制态弄丢了";
+    EXPECT_NE(display->text(), QStringLiteral("Ctrl+Alt+E")) << "录制中的提示被外部改动顶掉了，用户不知道还在等按键";
+    EXPECT_TRUE(display->text().contains(QStringLiteral("按下快捷键"))) << "录制中的提示文本不对：" << display->text().toStdString();
+
+    QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier};
+    QCoreApplication::sendEvent(edit, &escape);
+    QCoreApplication::processEvents();
+
+    EXPECT_FALSE(display->property("recording").toBool()) << "按 Esc 之后仍留在录制态";
+    EXPECT_EQ(display->text(), QStringLiteral("Ctrl+Alt+E")) << "取消录制后没有显示外部改出的最新现值";
+    EXPECT_EQ(m_store->stringValue(key, QStringLiteral("missing")), QStringLiteral("Ctrl+Alt+E")) << "Esc 改写了配置，本意是放弃这次录制";
+}
+
+/**
  * @brief 钉住「不合格的组合被拒之后，显示回到绑定值」
  * @details 把被拒的那颗组合留在框里，看起来像是已经改成了它；下一次别人看到这一格会以为
  *          配置里就是那一颗。配置不许动，显示要回到现值。

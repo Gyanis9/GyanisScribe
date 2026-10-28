@@ -28,6 +28,7 @@ using GyanisScribe::Core::HotkeyAction;
 using GyanisScribe::Core::HotkeyManager;
 using GyanisScribe::Core::HotkeyReloadReport;
 using GyanisScribe::Core::IHotkeyManager;
+using GyanisScribe::Core::kHotkeyCapture;
 using GyanisScribe::Core::SettingsStore;
 using GyanisScribe::Platform::ForegroundWindow;
 using GyanisScribe::Platform::IHotkeyBackend;
@@ -479,6 +480,15 @@ TEST_F(HotkeyManagerFixture, FailedReloadKeepsThePreviousCombinationRegistered)
     EXPECT_EQ(lastCapture->modifiers, Qt::ControlModifier | Qt::AltModifier) << "最后登记给截图编号的不是原来那颗键的修饰键";
     EXPECT_EQ(lastCapture->key, Qt::Key_A) << "最后登记给截图编号的不是原来那颗键：新组合被拒后旧热键已经死了";
     EXPECT_EQ(integration.m_backendMirror->liveRegistrations.count(1), 1U) << "截图编号不在册：按 Ctrl+Alt+A 不会再有反应";
+
+    ASSERT_EQ(reports[0].restored.size(), 1U) << "旧组合恢复成功了，报告里却没有这一条：写回配置那一层不知道要改哪一格";
+    EXPECT_EQ(reports[0].restored[0].settingsKey, QString::fromUtf8(kHotkeyCapture)) << "恢复项带的配置键不是截图那一格";
+    EXPECT_EQ(reports[0].restored[0].combination, QStringLiteral("Ctrl+Alt+A")) << "恢复项带的旧组合文本不对";
+
+    const auto registrationsBeforePersist = integration.m_backendMirror->registrations.size();
+    manager.persistRestoredBindings(reports[0]);
+    EXPECT_EQ(settings.stringValue(kHotkeyCapture, QStringLiteral("missing")), QStringLiteral("Ctrl+Alt+A")) << "恢复成功的旧组合没有写回配置：重启后还会拿失败的新组合再登记一次";
+    EXPECT_EQ(integration.m_backendMirror->registrations.size(), registrationsBeforePersist) << "写回配置触发了重登：同一批登记被多翻了一遍";
 }
 
 /**
@@ -536,6 +546,35 @@ TEST_F(HotkeyManagerFixture, FailedRestoreIsReportedToTheUser)
     EXPECT_TRUE(reason.contains(QStringLiteral("Ctrl+Alt+A"))) << "原因里没点出原本那颗键，用户无从判断现在还能按什么：" << reason.toStdString();
     EXPECT_TRUE(reason.contains(QStringLiteral("没能恢复"))) << "旧组合也恢复不了时只写日志，界面会让人以为旧键还能按：" << reason.toStdString();
     EXPECT_EQ(integration.m_backendMirror->liveRegistrations.count(1), 0U) << "两次登记都被拒，编号 1 不该留在册上";
+}
+
+/**
+ * @brief 钉住「没恢复成功就不写回」：失败的新文本原样留在配置里
+ * @details 恢复失败时把配置改回旧组合，等于让用户以为自己设的键还在；改回默认或清空更糟——
+ *          用户下一次打开设置页已看不出自己刚设过什么。这一轮没有可写回的项，持久化必须什么都不做。
+ */
+TEST_F(HotkeyManagerFixture, RestoredBindingsAreNotWrittenWhenNothingWasRestored)
+{
+    SettingsStore           settings(m_iniFile);
+    FakePlatformIntegration integration;
+    HotkeyManager           manager(settings, integration);
+    ASSERT_TRUE(manager.reload().has_value());
+
+    std::vector<HotkeyReloadReport> reports;
+    QObject::connect(&manager, &IHotkeyManager::reloadFailed, [&reports](const HotkeyReloadReport &report) { reports.push_back(report); });
+
+    // 编号 1 从下一次登记起被占走：新组合与要恢复的旧组合都会被拒
+    integration.m_backendMirror->rejectIdentifierFromNowOn(1);
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kHotkeyCapture, QVariant(QStringLiteral("Ctrl+Shift+F2"))).has_value());
+
+    ASSERT_EQ(reports.size(), 1U);
+    EXPECT_TRUE(reports[0].restored.empty()) << "旧组合没恢复成功，却被记成可写回的项：配置会被改回一颗没登记上的键";
+
+    const auto registrationsBeforePersist = integration.m_backendMirror->registrations.size();
+    manager.persistRestoredBindings(reports[0]);
+    EXPECT_EQ(settings.stringValue(GyanisScribe::Core::kHotkeyCapture, QStringLiteral("missing")), QStringLiteral("Ctrl+Shift+F2"))
+            << "这一轮什么都没恢复，配置却被改掉了：失败的新文本该原样留着";
+    EXPECT_EQ(integration.m_backendMirror->registrations.size(), registrationsBeforePersist) << "没有可写回的项，持久化却触发了重登";
 }
 
 /**
@@ -736,6 +775,16 @@ TEST_F(HotkeyManagerFixture, CustomBindingFailureRestoresItsOwnPreviousCombinati
     EXPECT_EQ(restored->modifiers, Qt::ControlModifier | Qt::AltModifier);
     EXPECT_EQ(restored->key, Qt::Key_Q) << "功能没换、编号也没换，旧组合却没有登记回去";
     EXPECT_EQ(integration.m_backendMirror->liveRegistrations.count(1000), 1U);
+
+    const auto customKey = std::string{GyanisScribe::Core::kHotkeyCustomPrefix} + "CloseAllPins";
+    ASSERT_EQ(report->restored.size(), 1U) << "自定义绑定的旧组合恢复成功了，报告里却没有这一条";
+    EXPECT_EQ(report->restored[0].settingsKey, QString::fromUtf8(GyanisScribe::Core::kHotkeyCustomPrefix) + QStringLiteral("CloseAllPins")) << "恢复项带的配置键不是这个功能那一格";
+    EXPECT_EQ(report->restored[0].combination, QStringLiteral("Ctrl+Alt+Q")) << "恢复项带的旧组合文本不对";
+
+    const auto registrationsBeforePersist = integration.m_backendMirror->registrations.size();
+    manager.persistRestoredBindings(*report);
+    EXPECT_EQ(settings.stringValue(customKey, QStringLiteral("missing")), QStringLiteral("Ctrl+Alt+Q")) << "恢复成功的旧组合没有写回自定义键：下一次重启仍会拿被拒的新组合去登记";
+    EXPECT_EQ(integration.m_backendMirror->registrations.size(), registrationsBeforePersist) << "写回自定义键触发了重登";
 }
 
 /**

@@ -8,6 +8,8 @@
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
 
+#include <QScopeGuard>
+
 #include <format>
 #include <optional>
 
@@ -53,6 +55,11 @@ namespace GyanisScribe::Core
         QObject::connect(&m_settings, &Core::ISettingsStore::valueChanged, this,
                          [this](const QString &key)
                          {
+                             if (m_writingRestoredBindings)
+                             {
+                                 // 写回恢复的旧组合也会发同一条通知：那一批已经登记在册，再登一遍是白翻
+                                 return;
+                             }
                              for (const auto action: managedActions())
                              {
                                  if (QString::fromUtf8(settingsKeyFor(action).data(), static_cast<qsizetype>(settingsKeyFor(action).size())) == key)
@@ -201,13 +208,15 @@ namespace GyanisScribe::Core
         const auto                   previousBindings = m_activeBindings;
         std::map<int, ActiveBinding> nextBindings;
         // 恢复旧键时要先说清这个编号此刻该归哪个功能：固定动作传空，自定义传这一格的标识
-        const auto restoreAndNote = [&](Base::Error &error, const int identifier, const std::optional<QString> &token)
+        const auto restoreAndNote = [&](Base::Error &error, const int identifier, const std::optional<QString> &token, const QString &settingsKey)
         {
             const auto restore = restorePreviousBinding(identifier, token, previousBindings, nextBindings);
             switch (restore.outcome)
             {
                 case RestoreOutcome::Restored:
                     appendRestoredNote(error, restore.previous.toText());
+                    // 只记真正恢复成功的项：写回配置那一层拿这份名单把旧组合落回磁盘
+                    report.restored.push_back(RestoredHotkeyBinding{settingsKey, restore.previous.toText()});
                     break;
                 case RestoreOutcome::Failed:
                     appendUnrestoredNote(error, restore.previous.toText());
@@ -229,7 +238,7 @@ namespace GyanisScribe::Core
             {
                 // 设置里的值坏掉时按项记失败，不用默认组合顶上：顶上去用户按到的就不是他设的那个键
                 Base::Error error = combination.error();
-                restoreAndNote(error, identifier, std::nullopt);
+                restoreAndNote(error, identifier, std::nullopt, QString::fromUtf8(settingsKeyFor(action)));
                 report.failures.push_back(HotkeyFailure{action, storedText, std::move(error)});
                 continue;
             }
@@ -237,7 +246,7 @@ namespace GyanisScribe::Core
             if (const auto registered = m_backend->registerHotkey(identifier, combination->modifiers(), combination->key()); !registered)
             {
                 Base::Error error = registered.error();
-                restoreAndNote(error, identifier, std::nullopt);
+                restoreAndNote(error, identifier, std::nullopt, QString::fromUtf8(settingsKeyFor(action)));
                 report.failures.push_back(HotkeyFailure{action, storedText, std::move(error)});
                 continue;
             }
@@ -254,14 +263,14 @@ namespace GyanisScribe::Core
             if (!combination)
             {
                 Base::Error error = combination.error();
-                restoreAndNote(error, identifier, binding.token);
+                restoreAndNote(error, identifier, binding.token, QString::fromUtf8(GyanisScribe::Core::kHotkeyCustomPrefix) + binding.token);
                 report.customFailures.push_back(CustomHotkeyFailure{binding.token, binding.combination, std::move(error)});
                 continue;
             }
             if (const auto registered = m_backend->registerHotkey(identifier, combination->modifiers(), combination->key()); !registered)
             {
                 Base::Error error = registered.error();
-                restoreAndNote(error, identifier, binding.token);
+                restoreAndNote(error, identifier, binding.token, QString::fromUtf8(GyanisScribe::Core::kHotkeyCustomPrefix) + binding.token);
                 report.customFailures.push_back(CustomHotkeyFailure{binding.token, binding.combination, std::move(error)});
                 continue;
             }
@@ -302,6 +311,25 @@ namespace GyanisScribe::Core
     void HotkeyManager::setCustomBindings(std::vector<CustomHotkeyBinding> bindings)
     {
         m_customBindings = std::move(bindings);
+    }
+
+    void HotkeyManager::persistRestoredBindings(const HotkeyReloadReport &report)
+    {
+        if (report.restored.empty())
+        {
+            return;
+        }
+        // 每条写回都会发 valueChanged：不压住这一位，写几条就重登几轮
+        m_writingRestoredBindings = true;
+        // 中途抛出也要把标志复位：永久留在 true 会吞掉之后所有设置变更的重登
+        const auto resetWriting = qScopeGuard([this] { m_writingRestoredBindings = false; });
+        for (const auto &entry: report.restored)
+        {
+            if (const auto written = m_settings.setValue(entry.settingsKey.toStdString(), entry.combination); !written)
+            {
+                Base::Logger::warning(std::format("恢复的旧组合没能写回配置：{}（{}）", entry.settingsKey.toStdString(), written.error().message));
+            }
+        }
     }
 
     std::optional<std::size_t> HotkeyManager::customIndexForIdentifier(const int identifier) const

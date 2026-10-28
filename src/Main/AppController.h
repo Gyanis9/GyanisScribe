@@ -337,6 +337,8 @@ namespace GyanisScribe::Main
         std::unique_ptr<GyanisScribe::App::CaptureCoordinator>        m_capture;        ///< 截图这一族（枢纽：入口、延时、抓帧、按意图交付）
         std::unique_ptr<GyanisScribe::App::PinCoordinator>            m_pinCoordinator; ///< 贴图这一族的贴出动作（剪贴板/文件/回贴/组管理）
         std::unique_ptr<GyanisScribe::App::DeliveryCoordinator>       m_delivery;       ///< 交付这一族（装饰、落盘、外部命令、批量报告）
+
+        bool m_restoringHotkeySettings = false; ///< 正在把恢复的旧组合写回配置：期间自定义键的变更通知不再重登
     };
 
 } // namespace GyanisScribe::Main

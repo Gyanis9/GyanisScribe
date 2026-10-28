@@ -129,12 +129,13 @@ namespace GyanisScribe::Gui
          */
         void setRecordingState(bool recording);
 
-        Core::ISettingsStore &m_settings;                            ///< 配置存储，不拥有
-        std::string           m_key;                                 ///< 绑定的配置键名
-        HotkeyEditScope       m_scope     = HotkeyEditScope::Global; ///< 这一格录下来的键归哪一档
-        QLabel               *m_display     = nullptr;                 ///< 显示组合文本的标签，也是录制状态的提示位
-        QString               m_displayText;                           ///< 配置里的现值文本；录制中的提示不覆盖它
-        bool                  m_recording = false;                     ///< 是否正在等一次按键
+        Core::ISettingsStore &m_settings;                          ///< 配置存储，不拥有
+        std::string           m_key;                               ///< 绑定的配置键名
+        HotkeyEditScope       m_scope   = HotkeyEditScope::Global; ///< 这一格录下来的键归哪一档
+        QLabel               *m_display = nullptr;                 ///< 显示组合文本的标签，也是录制状态的提示位
+        QString               m_displayText;                       ///< 配置里的现值文本；录制中的提示不覆盖它
+        QString               m_defaultText;                       ///< 键不存在时的默认文本；清掉绑定后显示回落到它
+        bool                  m_recording = false;                 ///< 是否正在等一次按键
     };
 
 } // namespace GyanisScribe::Gui

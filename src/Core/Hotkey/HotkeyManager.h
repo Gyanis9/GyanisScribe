@@ -93,6 +93,14 @@ namespace GyanisScribe::Core
          */
         void setCustomBindings(std::vector<CustomHotkeyBinding> bindings) override;
 
+        /**
+         * @brief 把本轮成功恢复的旧组合写回配置，见 IHotkeyManager::persistRestoredBindings()
+         * @param report 同一轮 reload() 的结果
+         * @details 写回期间压住 valueChanged 触发的重登：写回的值就是此刻已经生效的组合，
+         *          再登一遍只会把同一批登记翻来覆去地重建。写不进去的那条只记日志，不弹提示。
+         */
+        void persistRestoredBindings(const HotkeyReloadReport &report) override;
+
     private:
         /// 全部受管动作，顺序与登记顺序一致，是「有几项」的唯一出处
         [[nodiscard]] static std::span<const HotkeyAction> managedActions();
@@ -157,6 +165,8 @@ namespace GyanisScribe::Core
         std::unique_ptr<Platform::IHotkeyBackend> m_backend;        ///< 当前后端，第一次 reload() 时建立
         std::vector<CustomHotkeyBinding>          m_customBindings; ///< 这一批自定义绑定，顺序就是登记顺序（编号按下标算）
         std::map<int, ActiveBinding>              m_activeBindings; ///< 当前真正登记在册的记录（编号 → 功能标识与组合），重登失败时按它恢复
+
+        bool m_writingRestoredBindings = false; ///< 正在把恢复的旧组合写回配置；此时 valueChanged 不再触发重登
     };
 
 } // namespace GyanisScribe::Core

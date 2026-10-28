@@ -62,8 +62,9 @@ namespace GyanisScribe::Gui
 
     void HotkeyEdit::bindTo(const std::string_view key, const QString &title, const QString &defaultText, const HotkeyEditScope scope)
     {
-        m_key   = std::string{key};
-        m_scope = scope;
+        m_key         = std::string{key};
+        m_scope       = scope;
+        m_defaultText = defaultText;
         // 无障碍名称与 tooltip 都写中文名：只有「Ctrl+Alt+A」这块文本时，读屏说不清它管哪个动作
         setAccessibleName(title);
         m_display->setAccessibleName(title);
@@ -71,6 +72,21 @@ namespace GyanisScribe::Gui
         // 界面按键里那颗裸键是合法值，用户在提示的误导下会以为「按了没反应」是控件坏了
         setToolTip(scope == HotkeyEditScope::Global ? GyanisScribe::Base::uiText("%1 的全局热键。点击这一格后按下组合键即可替换，按 Esc 取消").arg(title)
                                                     : GyanisScribe::Base::uiText("%1 的界面按键。点击这一格后按下要用的那颗键，裸键也算，按 Esc 取消").arg(title));
+
+        // 外部改了同一项（恢复的旧组合写回、导入配置）时跟着变：设置页开着的时候本来就该实时刷新
+        QObject::connect(&m_settings, &Core::ISettingsStore::valueChanged, this,
+                         [this](const QString &changedKey)
+                         {
+                             if (changedKey != QString::fromStdString(m_key))
+                             {
+                                 return;
+                             }
+                             m_displayText = m_settings.stringValue(m_key, m_defaultText);
+                             if (!m_recording)
+                             {
+                                 m_display->setText(m_displayText);
+                             }
+                         });
 
         const auto stored = m_settings.stringValue(key, defaultText);
         m_displayText     = stored;
@@ -92,8 +108,9 @@ namespace GyanisScribe::Gui
             showPrompt(GyanisScribe::Base::uiText("写入失败"));
             return;
         }
-        m_display->clear();
-        m_displayText.clear();
+        // 删键之后按同一口径回读：界面按键那一档要落回默认那颗键，不能留一块空白
+        m_displayText = m_settings.stringValue(m_key, m_defaultText);
+        m_display->setText(m_displayText);
     }
 
 

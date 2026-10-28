@@ -68,13 +68,23 @@ namespace GyanisScribe::Core
     };
 
     /**
+     * @brief 一次登记失败后成功恢复的旧绑定
+     */
+    struct RestoredHotkeyBinding
+    {
+        QString settingsKey; ///< 应写回的配置键
+        QString combination; ///< 恢复成功的旧组合文本
+    };
+
+    /**
      * @brief 一轮登记的结果
      */
     struct HotkeyReloadReport
     {
-        int                              registered = 0; ///< 本轮新登记成功的条数（固定的与自定义的一起算）；恢复上一轮组合的不计入
-        std::vector<HotkeyFailure>       failures;       ///< 固定动作里没登记上的，一条不落全在这里
-        std::vector<CustomHotkeyFailure> customFailures; ///< 自定义绑定里没登记上的；与上面那组分开记，界面按各自的名字报
+        int                                registered = 0; ///< 本轮新登记成功的条数（固定的与自定义的一起算）；恢复上一轮组合的不计入
+        std::vector<HotkeyFailure>         failures;       ///< 固定动作里没登记上的，一条不落全在这里
+        std::vector<CustomHotkeyFailure>   customFailures; ///< 自定义绑定里没登记上的；与上面那组分开记，界面按各自的名字报
+        std::vector<RestoredHotkeyBinding> restored;       ///< 本轮恢复成功的旧绑定，只装确实恢复成功的项，顺序按登记表
     };
 
     /**
@@ -114,6 +124,13 @@ namespace GyanisScribe::Core
          *          调用方存完再调 reload()（或 registerHotkeys()）那一条路。
          */
         virtual void setCustomBindings(std::vector<CustomHotkeyBinding> bindings) = 0;
+
+        /**
+         * @brief 把本轮成功恢复的旧组合写回配置
+         * @param report 同一轮 reload() 的结果
+         * @details 写回期间实现方必须抑制自己由 valueChanged 触发的重登；失败项逐条记日志，不弹提示。
+         */
+        virtual void persistRestoredBindings(const HotkeyReloadReport &report) = 0;
 
     signals:
         /**
