@@ -416,10 +416,6 @@
             <translation>Recording didn't start: {}</translation>
         </message>
         <message>
-            <source>录屏收尾失败：{}</source>
-            <translation>Finishing the recording failed: {}</translation>
-        </message>
-        <message>
             <source>正在编成品，好了会说一声</source>
             <translation>Building the finished file - you will hear when it is ready</translation>
         </message>
@@ -896,8 +892,8 @@
             <translation>Scrolling capture cannot continue: this frame is a different width than the earlier ones (the screen or the scaling changed mid-way). Finish what you already have, then start over</translation>
         </message>
         <message>
-            <source>长截图接不上：内存不够再开一段缓冲。先把已有这一段收好再重来</source>
-            <translation>Scrolling capture cannot continue: not enough memory for another buffer. Finish what you already have, then start over</translation>
+            <source>长截图接不上：内存不够继续拼接。请缩小选区或分段重截</source>
+            <translation>Scrolling capture cannot continue: not enough memory to keep stitching. Narrow the selection or capture it in shorter sections</translation>
         </message>
         <message>
             <source>选区历史的记录格式不对：第 {} 段「{}」应为「x,y,width,height,屏名」。请删掉这一项，让程序重新记一次</source>
@@ -2133,7 +2129,7 @@
         </message>
         <message>
             <source>要改名字的分组号不对：{}。分组从 {} 起，请在贴图右键菜单里操作</source>
-            <translation>Bad group number to rename: {}. Groups start at 1. Use the context menu on a pin</translation>
+            <translation>Bad group number to rename: {}. Groups start at {}. Use the context menu on a pin</translation>
         </message>
         <message>
             <source>第一组是删掉别的组时成员并回去的落点，这一组删不掉。要把这一张从第一组挪走请用「移动到分组」</source>

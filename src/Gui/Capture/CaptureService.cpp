@@ -438,8 +438,16 @@ namespace GyanisScribe::Gui
             return;
         }
         // 快照先取走：stopLongRound() 会把累加器连同它那块缓冲一起放掉
-        m_longImage.image = m_longStitcher->snapshot();
-        m_longActive      = false;
+        const auto snapshot = m_longStitcher->snapshot();
+        if (snapshot.isNull())
+        {
+            // 首帧非空却开不出缓冲时累加器一行都没有：收口也只能报内存不够，不能交一张空图
+            stopLongRound();
+            deliver(Base::Expected<Base::CapturedImage>(std::unexpected(Core::stitchOutOfMemoryError())));
+            m_longImage = {};
+            return;
+        }
+        m_longImage.image = snapshot;
         stopLongRound();
 
         // 交出去的形状与一次普通截图完全一样：后续去向不需要知道这是接出来的

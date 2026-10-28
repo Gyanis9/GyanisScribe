@@ -406,10 +406,9 @@ namespace GyanisScribe::Gui
                QString::number(info.size());
     }
 
-    HistoryView::DecodedThumbnail HistoryView::decodeThumbnailPixels(const QString &displayPath, const int generation)
+    HistoryView::DecodedThumbnail HistoryView::decodeThumbnailPixels(const QString &displayPath)
     {
         DecodedThumbnail decoded;
-        decoded.generation          = generation;
         decoded.decodedOffGuiThread = QThread::currentThread() != QCoreApplication::instance()->thread();
 
         QImageReader reader{displayPath};
@@ -469,7 +468,7 @@ namespace GyanisScribe::Gui
             m_inFlightThumbnail = pending;
 
             const auto displayPath = GyanisScribe::Base::Paths::toDisplayText(pending.entry.filePath);
-            m_thumbnailWatcher->setFuture(QtConcurrent::run([displayPath, generation = pending.generation] { return decodeThumbnailPixels(displayPath, generation); }));
+            m_thumbnailWatcher->setFuture(QtConcurrent::run([displayPath] { return decodeThumbnailPixels(displayPath); }));
             return;
         }
 

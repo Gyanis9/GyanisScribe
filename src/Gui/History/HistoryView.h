@@ -206,7 +206,6 @@ namespace GyanisScribe::Gui
         /// 工作线程解好的一条缩略图；界面线程只拿它组装图标与写缓存
         struct DecodedThumbnail
         {
-            int    generation = 0;              ///< 解码发起时的代际号
             QImage oneX;                        ///< 96 见方
             QImage twoX;                        ///< 192 见方
             QImage threeX;                      ///< 288 见方
@@ -235,12 +234,11 @@ namespace GyanisScribe::Gui
         /**
          * @brief 在工作线程上读一条成品并裁成 1x/2x/3x 三档
          * @param displayPath 成品路径的显示用文本
-         * @param generation 解码发起时的代际号，原样带回
          * @return 三档像素，外加读失败与线程判断两枚读数；不碰图标、缓存与列表
-         * @details 交给工作线程的 lambda 只按值捕获路径与整数，不捕获 this：
-         *          视图在解码途中析构时任务照样跑完，不会碰到已经不在的对象。
+         * @details 交给工作线程的 lambda 只按值捕获路径：视图在解码途中析构时任务照样跑完，
+         *          不会碰到已经不在的对象。代际号留在在飞条目上，结果落地时再比。
          */
-        [[nodiscard]] static DecodedThumbnail decodeThumbnailPixels(const QString &displayPath, int generation);
+        [[nodiscard]] static DecodedThumbnail decodeThumbnailPixels(const QString &displayPath);
 
         /// 缓存键：成品路径、修改时间（毫秒）与文件大小
         [[nodiscard]] static QString thumbnailCacheKey(const Core::HistoryEntry &entry);
@@ -270,7 +268,7 @@ namespace GyanisScribe::Gui
         QCache<QString, QIcon>            m_thumbnailCache;                 ///< 缩略图缓存，键见 thumbnailCacheKey
         QVector<PendingThumbnail>         m_pendingThumbnails;              ///< 还没解的列表项
         std::optional<PendingThumbnail>   m_inFlightThumbnail;              ///< 正在工作线程上解的那条，结果落地才清
-        int                               m_thumbnailDecodeCount   = 0;     ///< 实际解码尝试次数（结果落地才算）
+        int                               m_thumbnailDecodeCount   = 0;     ///< 真正落到列表上的张数（缓存命中、隐藏退回、代际/失效丢弃都不计）
         int                               m_thumbnailGeneration    = 0;     ///< 列表重建代际，旧代际的结果作废
         bool                              m_thumbnailSuspended     = false; ///< 隐藏期间挂起，结果回来先退回队列
         bool                              m_lastDecodeOffGuiThread = false; ///< 最近一次落地结果是否在工作线程上解出

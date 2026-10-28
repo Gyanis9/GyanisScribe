@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "Base/Text.h"
 #include "Base/Types.h"
 
 #include <QImage>
@@ -35,6 +36,16 @@ namespace GyanisScribe::Core
     [[nodiscard]] int overlapRowCount(const QImage &previous, const QImage &next, int maximumOverlapRows = kMaximumOverlapRows);
 
     /**
+     * @brief 长截图拼不下去时的统一说法：缓冲开不出来或扩不出去，都归到这一条
+     * @return 内部故障，正文告诉用户缩小选区或分段重截
+     * @details 累加器与收口两处共用这一条，改文案时只需改这里；收口时快照为空也报它。
+     */
+    [[nodiscard]] inline Base::Error stitchOutOfMemoryError()
+    {
+        return Base::Error{Base::ErrorCode::InternalError, Base::uiTextUtf8("长截图接不上：内存不够继续拼接。请缩小选区或分段重截")};
+    }
+
+    /**
      * @brief 长图累加器：首帧定下宽度与缩放，之后每帧只把新露出的那几行写进缓冲
      * @details 缓冲按倍数扩容，收尾由 snapshot() 深拷贝一次；接 n 帧的总成本与已接高度成正比，
      *          而不是每帧都把整张长图重抄两遍。
@@ -46,6 +57,8 @@ namespace GyanisScribe::Core
         /**
          * @brief 用首帧开一个累加器
          * @param first 第一帧；内部转成 ARGB32 抄进自有缓冲，此后与入参不再共享像素
+         * @details 首帧非空但缓冲开不出来时只记下这一笔：append() 会直接报内存不够，
+         *          而不是拿空缓冲去接缝或逐行抄。
          */
         explicit FrameStitcher(const QImage &first);
 
@@ -96,8 +109,9 @@ namespace GyanisScribe::Core
          */
         void ensureCapacity(int rows);
 
-        QImage m_buffer;       ///< 累加用的整块缓冲，容量可能大于已用行数
-        int    m_usedRows = 0; ///< 缓冲里已经写好的行数，就是成品高度
+        QImage m_buffer;                   ///< 累加用的整块缓冲，容量可能大于已用行数
+        int    m_usedRows         = 0;     ///< 缓冲里已经写好的行数，就是成品高度
+        bool   m_allocationFailed = false; ///< 构造时缓冲没开出来：append() 直接报内存不够，不碰空缓冲
     };
 
 } // namespace GyanisScribe::Core

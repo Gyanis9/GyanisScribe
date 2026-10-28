@@ -333,6 +333,7 @@ namespace
         int                                   m_announcements            = 0;     ///< 「已到最长时长」那条说明的条数
         bool                                  m_hudVisibleAtAnnouncement = false; ///< 说明发出那一刻控制条是否可见
         bool                                  m_finished                 = false; ///< 成品信号到过没有
+        bool                                  m_finishedAtAnnouncement   = false; ///< 说明发出那一刻成品是否已经回来
         std::filesystem::path                 m_root;                             ///< 这一格用例自己的临时目录
         StubCaptureSource                     m_source;                           ///< 抓帧来源
         InstantEncoder                        m_encoder;                          ///< 立即返回成品的编码器
@@ -358,6 +359,7 @@ TEST_F(RecordingCoordinatorFixture, AutoStopAnnouncesBeforeTheEncodeFinishes)
                          {
                              ++m_announcements;
                              m_hudVisibleAtAnnouncement = m_coordinator->isHudVisible();
+                             m_finishedAtAnnouncement   = m_finished;
                          }
                      });
     QObject::connect(m_coordinator.get(), &RecordingCoordinator::finished, [this](const QString &, const QSize &) { m_finished = true; });
@@ -369,6 +371,7 @@ TEST_F(RecordingCoordinatorFixture, AutoStopAnnouncesBeforeTheEncodeFinishes)
     ASSERT_TRUE(spinUntil([this] { return m_finished; })) << "十秒内没等到成品";
 
     EXPECT_EQ(m_announcements, 1) << "说明 " << m_announcements << " 条，应恰好 1 条";
+    EXPECT_FALSE(m_finishedAtAnnouncement) << "说明在成品之后才发，自动停止的时序判据没有成立";
     EXPECT_FALSE(m_hudVisibleAtAnnouncement) << "说明发出时控制条还挂着：用户会先看到一句与画面对不上的提示";
     EXPECT_FALSE(m_coordinator->isHudVisible()) << "成品回来之后控制条还挂着";
 }

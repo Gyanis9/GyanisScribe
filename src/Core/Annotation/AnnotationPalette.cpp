@@ -7,7 +7,6 @@
 #include "Base/Text.h"
 
 #include <algorithm>
-#include <format>
 #include <string_view>
 
 namespace GyanisScribe::Core

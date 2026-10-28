@@ -1629,7 +1629,7 @@ TEST_F(AnnotationWindowFixture, ReportsTheCostOfRepaintingAWindowFullOfShapes)
  * @brief 钉住屏显与导出的图形边缘走同一档抗锯齿
  * @details 屏显走 AnnotationView 的普通分支、导出走 AnnotationEngine::exportImage()，两条路各自设渲染提示；
  *          图形那层漏掉抗锯齿时，斜线与箭头的边缘会在屏上糊出一圈成品里没有的灰边。
- *          判据是同一块区域逐像素相等：四边各留 4 像素，那里只有只上屏的提示线。
+ *          判据是同一块区域逐像素相等：四边各留 4 像素，那里只有仅屏显才有的提示线。
  */
 TEST_F(AnnotationWindowFixture, ScreenAndExportUseTheSameAntialiasing)
 {
@@ -1644,8 +1644,9 @@ TEST_F(AnnotationWindowFixture, ScreenAndExportUseTheSameAntialiasing)
 
     GyanisScribe::Gui::AnnotationView view{engine()};
     view.resize(400, 200);
+    ASSERT_EQ(view.size(), QSize(400, 200)) << "控件没按 400x200 摆，下面的坐标对不上";
 
-    // 用 render 而不是 grab：抓屏按控件自己的倍比出图，离屏屏的倍比不一定是 1，图就不是 400x200 了
+    // 用 render 而不是 grab：抓屏按控件自己的倍比出图，离屏窗口的倍比不一定是 1，图就不是 400x200 了
     QImage screen{400, 200, QImage::Format_ARGB32};
     screen.fill(Qt::transparent);
     {
@@ -1656,6 +1657,22 @@ TEST_F(AnnotationWindowFixture, ScreenAndExportUseTheSameAntialiasing)
     const auto exported = engine().exportImage();
     ASSERT_EQ(screen.size(), QSize(400, 200)) << "屏显那一路的图不是 400x200，后面的坐标对不上";
     ASSERT_EQ(exported.size(), QSize(400, 200)) << "导出图不是 400x200，后面的坐标对不上";
+
+    // 阳性对照：屏显上真有一笔红色笔迹，逐像素对照才是在比「同一笔的两条渲染路径」，
+    // 两边都空白时差异恒为 0，抗锯齿去掉也照样绿
+    int penPixels = 0;
+    for (int y = 0; y < screen.height(); ++y)
+    {
+        for (int x = 0; x < screen.width(); ++x)
+        {
+            const QColor pixel = screen.pixelColor(x, y);
+            if (pixel.red() > 200 && pixel.green() < 80 && pixel.blue() < 80)
+            {
+                ++penPixels;
+            }
+        }
+    }
+    EXPECT_GT(penPixels, 0) << "屏显上找不到笔迹：两边都是空白，逐像素对照等于没比";
 
     constexpr int kMargin = 4; // 提示线压在控件最外一圈，只上屏、不进成品
     int           differences = 0;

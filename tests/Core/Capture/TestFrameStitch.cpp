@@ -184,6 +184,12 @@ TEST(FrameStitch, CapacityGrowsByDoublingNotByEveryAppend)
     {
         const auto appended = stitcher.append(page.copy(0, row, 20, 1));
         ASSERT_TRUE(appended.has_value()) << appended.error().message;
+        if (row == 100)
+        {
+            // 第一次追加就装不下：容量要从 100 翻到 200。按精确行数重分配时分配器可能复用地址，
+            // 只看地址与最终内容都发现不了，只能盯容量
+            EXPECT_EQ(stitcher.allocatedPixelHeightForTesting(), 200) << "第一次追加后的容量不是 200：扩容按精确行数在走，不是在翻倍";
+        }
     }
 
     EXPECT_EQ(stitcher.pixelHeight(), 200);

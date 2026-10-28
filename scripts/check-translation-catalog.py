@@ -46,6 +46,8 @@ AGGREGATE_ROW = re.compile(r"[A-Z][A-Za-z0-9_]*\{[^{}\n]*\}")
 INITIALIZER_LIST = re.compile(r"=\s*\{([^{}\n]*)\}")
 LITERAL = re.compile(r'"((?:\\.|[^"\\])*)"')
 CJK = re.compile(r"[\u4e00-\u9fff]")
+# Qt 风格的位置占位符：%1、%2……
+QT_PLACEHOLDER = re.compile(r"%\d+")
 
 SELF_PROBE = (
     'auto a = Base::uiTextUtf8("甲 \\"{}\\" 乙"\n     "丙");'
@@ -62,6 +64,15 @@ SELF_PROBE_ROWS = (
 def unescape_cpp(text: str) -> str:
     """把 C++ 字面量里的转义还原成运行期真正的那串字节。"""
     return text.replace('\\"', '"').replace("\\\\", "\\")
+
+
+def placeholder_signature(text: str) -> tuple[int, tuple[str, ...]]:
+    """译文与源码的占位符指纹：{} 的个数，加上 %N 出现的顺序与序号。
+
+    多一个 {} 会让 std::format 少填一格当场抛异常，少一个 %1 会让 QString::arg 叠错位置；
+    只看「有没有占位符」漏得掉这两种，所以逐项比。
+    """
+    return (text.count("{}"), tuple(QT_PLACEHOLDER.findall(text)))
 
 
 def collect_required(scan_root: pathlib.Path) -> list[str]:
@@ -118,6 +129,14 @@ def self_probe() -> None:
     if len(row_hits) != 4 or set(row_hits) != {"丁", "戊", "己", "庚"}:
         raise RuntimeError(f"自检失败：合成表行抓到 {row_hits}（应为 丁、戊、己、庚 四条，多抓说明两种表形重复计，少抓说明有一形没认）")
 
+    # 占位符探针：同一组占位符的译文要判成相同，少一个 {} 或少一个 %N 都要判成不同
+    if placeholder_signature("甲 {} 乙 {}") != placeholder_signature("A {} B {}"):
+        raise RuntimeError("自检失败：占位符相同的两条被判成不同，核对会误报")
+    if placeholder_signature("甲 {} 乙 {}") == placeholder_signature("A {} B"):
+        raise RuntimeError("自检失败：译文少一个 {} 没被认出，运行期 std::format 会抛异常")
+    if placeholder_signature("甲 %1 乙") == placeholder_signature("A %2 B"):
+        raise RuntimeError("自检失败：%N 序号变了没被认出，运行期 QString::arg 会填错位置")
+
 
 def generate(scan_root: pathlib.Path, catalog: pathlib.Path, required: list[str]) -> int:
     existing = read_catalog(catalog)
@@ -172,6 +191,15 @@ def verify(scan_root: pathlib.Path, catalog: pathlib.Path, required: list[str]) 
         for value in missing:
             print(f"  - {value}", file=sys.stderr)
         print("  补译文后重新构建（lrelease 会自动生成 .qm）", file=sys.stderr)
+        return 1
+
+    # 占位符对不上同样是运行期故障：译文少一个 {} 会让 std::format 抛，%N 序号变了会填错位置
+    mismatched = [(value, existing[value]) for value in required if placeholder_signature(value) != placeholder_signature(existing[value])]
+    if mismatched:
+        print(f"[失败] 译文与源码的占位符对不上 {len(mismatched)} 条。运行期会少填或多填一格：", file=sys.stderr)
+        for source, translation in mismatched:
+            print(f"  - 源码：{source}", file=sys.stderr)
+            print(f"    译文：{translation}", file=sys.stderr)
         return 1
     print(f"[通过] {scan_root} 下 {len(list(scan_root.rglob('*.cpp')))} 个 .cpp 的 {len(required)} 条文案全部有译文")
     return 0

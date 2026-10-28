@@ -82,7 +82,8 @@ namespace GyanisScribe::Core
         m_buffer.setDevicePixelRatio(first.devicePixelRatio());
         if (m_buffer.isNull())
         {
-            // 开不出缓冲就当一行都没接上：m_usedRows 留在 0，append() 会报「这一帧是空的」，好过拿空指针逐行抄
+            // 开不出缓冲就记下来：append() 直接报内存不够，好过拿空指针逐行抄
+            m_allocationFailed = true;
             return;
         }
         // 逐行抄而不是给入参挂一份引用：调用方交完这一帧就不再管它，缓冲得自己活下来
@@ -92,6 +93,11 @@ namespace GyanisScribe::Core
 
     Base::Expected<void> FrameStitcher::append(const QImage &next)
     {
+        // 首帧非空却没能开出缓冲：这一轮注定接不上，先把它报出去，别拿空缓冲去比接缝
+        if (m_allocationFailed)
+        {
+            return std::unexpected(stitchOutOfMemoryError());
+        }
         const auto added = asArgb(next);
         if (m_buffer.isNull() || added.isNull())
         {
@@ -117,7 +123,7 @@ namespace GyanisScribe::Core
         if (m_usedRows + fresh > m_buffer.height())
         {
             // 扩容没成功时缓冲还是原来那一张，往下写就越界了；让调用方把已有这一段收好
-            return std::unexpected(Base::Error{Base::ErrorCode::InternalError, GyanisScribe::Base::uiTextUtf8("长截图接不上：内存不够再开一段缓冲。先把已有这一段收好再重来")});
+            return std::unexpected(stitchOutOfMemoryError());
         }
         // 逐行抄而不是 QPainter：合成会把 alpha 再算一遍，抄过去才是原样
         copyRows(m_buffer, m_usedRows, added, overlap, fresh);
