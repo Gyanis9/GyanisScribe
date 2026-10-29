@@ -41,6 +41,17 @@ namespace GyanisScribe::Core
         return QRect(left, top, rightExclusive - left, bottomExclusive - top);
     }
 
+    QRect physicalScreenRect(const QRect &logicalGeometry, const qreal devicePixelRatio)
+    {
+        if (devicePixelRatio <= 0.0)
+        {
+            return logicalGeometry;
+        }
+
+        // 原点原样保留：逻辑几何只把尺寸除以缩放因子，桌面坐标里的起点本来就是物理像素
+        return {logicalGeometry.topLeft(), QSize{qRound(logicalGeometry.width() * devicePixelRatio), qRound(logicalGeometry.height() * devicePixelRatio)}};
+    }
+
     Base::Expected<Base::CapturedImage> cropToLogicalRect(const Base::CapturedImage &source, const QRect &logicalRegion)
     {
         const auto physical = toPhysicalRect(logicalRegion, source.devicePixelRatio);

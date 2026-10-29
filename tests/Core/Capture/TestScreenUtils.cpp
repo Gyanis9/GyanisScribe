@@ -31,6 +31,7 @@ using GyanisScribe::Core::kSelectionGripTolerance;
 using GyanisScribe::Core::nudgeRegion;
 using GyanisScribe::Core::parseCaptureCornerRadius;
 using GyanisScribe::Core::parseProcessExcludes;
+using GyanisScribe::Core::physicalScreenRect;
 using GyanisScribe::Core::ratioLockedPoint;
 using GyanisScribe::Core::rectFromUnit;
 using GyanisScribe::Core::rectInUnit;
@@ -88,6 +89,20 @@ TEST(ScreenUtils, ScalesLogicalRectToPhysicalPixels)
     const auto rejected = toPhysicalRect(QRect(0, 0, 10, 10), 0.0);
     ASSERT_FALSE(rejected.has_value()) << "缩放因子为 0 时按 1 处理会得到一张与屏幕上不等大的图";
     EXPECT_EQ(rejected.error().code, ErrorCode::InvalidArgument);
+}
+
+/**
+ * @brief 钉住物理屏矩形保留原生原点：只有尺寸按缩放因子放大
+ * @details 副屏逻辑原点 2560、DPR 2：尺寸翻倍到 3840×2160，原点仍是 2560。整条矩形一起乘
+ *          DPR 会把原点也放大到 5120，DXGI 按输出坐标认屏时就找不到这块屏。
+ */
+TEST(ScreenUtils, PhysicalScreenRectKeepsTheNativeOrigin)
+{
+    EXPECT_EQ(physicalScreenRect(QRect(2560, 0, 1920, 1080), 2.0), QRect(2560, 0, 3840, 2160));
+    // 主屏原点本来就是 0，放大与否看不出差别：这一档钉住尺寸的取整
+    EXPECT_EQ(physicalScreenRect(QRect(0, 0, 1280, 720), 1.5), QRect(0, 0, 1920, 1080));
+    // 缩放因子非正时原样交回：这一条只做搬运，不替调用方猜一个档
+    EXPECT_EQ(physicalScreenRect(QRect(100, 50, 800, 600), 0.0), QRect(100, 50, 800, 600));
 }
 
 /**

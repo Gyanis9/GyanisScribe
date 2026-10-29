@@ -100,6 +100,15 @@ namespace GyanisScribe::Plugins
          */
         Base::Expected<QImage> grab(const QRect &screenRect)
         {
+            // 分辨率或排布变了之后，旧屏幕的重复接口与暂存纹理都认不回新输出：先按当前各屏的
+            // 物理矩形清掉旧条目，失效的重复接口随状态一起释放，下一次按新尺寸重建
+            std::vector<QRect> currentRects;
+            for (auto *screen: QGuiApplication::screens())
+            {
+                currentRects.push_back(Core::physicalScreenRect(screen->geometry(), screen->devicePixelRatio()));
+            }
+            std::erase_if(m_outputs, [&currentRects](const OutputState &state) { return std::ranges::find(currentRects, state.screenRect) == currentRects.end(); });
+
             auto *state = stateFor(screenRect);
             if (state == nullptr)
             {
@@ -420,8 +429,8 @@ namespace GyanisScribe::Plugins
             return std::unexpected(Base::Error{Base::ErrorCode::ScreenUnavailable, Base::uiTextUtf8("Qt 没有报出任何屏幕：请在 QGuiApplication 建好之后再抓图")});
         }
 
-        // Qt 的逻辑几何乘缩放因子就是这块屏在 Windows 桌面坐标里的物理矩形；认屏按它来
-        const QRect physicalRect(target->geometry().topLeft() * target->devicePixelRatio(), target->geometry().size() * target->devicePixelRatio());
+        // 原点按 Qt 报的原生坐标原样保留、只放大尺寸：DXGI 的输出坐标与它同一套原点
+        const QRect physicalRect = Core::physicalScreenRect(target->geometry(), target->devicePixelRatio());
 
         const auto grabbed = m_duplicator->grab(physicalRect);
         if (!grabbed)

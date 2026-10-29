@@ -55,6 +55,16 @@ namespace GyanisScribe::Core
     [[nodiscard]] Base::Expected<QRect> toPhysicalRect(const QRect &logicalRect, qreal devicePixelRatio);
 
     /**
+     * @brief 把某块屏的逻辑几何换成桌面坐标里的物理矩形
+     * @param logicalGeometry QScreen::geometry() 交回的全局逻辑几何
+     * @param devicePixelRatio 该屏缩放因子
+     * @return 原点保持原生坐标、宽高按缩放因子取整的矩形；缩放因子非正时原样交回
+     * @details Qt 只把屏尺寸除以缩放因子，原点本来就是桌面坐标。整条矩形一起放大会把副屏的
+     *          起点也放大，DXGI 按输出坐标认屏时就会对不上这块屏。
+     */
+    [[nodiscard]] QRect physicalScreenRect(const QRect &logicalGeometry, qreal devicePixelRatio);
+
+    /**
      * @brief 从一帧抓屏结果里裁出选区
      * @param source 抓到的整帧（物理像素）
      * @param logicalRegion source 所属屏幕内的逻辑矩形
