@@ -93,7 +93,7 @@ namespace GyanisScribe::Plugins
 
         /**
          * @brief 抓一块屏的当前画面
-         * @param screenRect Qt 报的那块屏的物理矩形（逻辑几何乘缩放因子）
+         * @param screenRect Qt 报的那块屏的物理矩形：原点原样保留，宽高按缩放因子放大
          * @return 成功返回物理像素的图；这一台/这一块屏做不到时返回原因
          * @details 认屏按桌面坐标而不是屏名：Qt 在 Windows 上报的是显示器友好名（例如 H27T22S），
          *          与 DXGI 的设备名不是一回事，按名字找必然全部对不上。

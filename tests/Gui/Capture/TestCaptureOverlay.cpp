@@ -11,6 +11,7 @@
 
 #include <QApplication>
 #include <QClipboard>
+#include <QFont>
 #include <QGuiApplication>
 #include <QImage>
 #include <QKeyEvent>
@@ -414,8 +415,9 @@ TEST_F(CaptureOverlayFixture, MagnifierFlipsAsideAtTheScreenCorner)
 /**
  * @brief 钉住鼠标移动只重绘会变化的那一片，不再整窗重画
  * @details 遮罩铺满整屏，每次移动都整窗重绘会在 4K 屏上反复合成几十兆字节。这里在 200×150 的
- *          小遮罩上悬停一块窗口候选，把光标从一处移到另一处：记录下来的绘制区域不能等于整窗，
- *          并且要同时包住新旧两处光标邻域与读数条——少算旧位置会留下残影，少算新位置则读数不刷新。
+ *          小遮罩上悬停一块窗口候选，把光标从一处移到另一处：记录下来的绘制区域不能等于整窗、
+ *          面积要严格小于整窗，并且要同时包住新旧两处光标邻域与两端读数条——少算旧位置会留下残影，
+ *          少算新位置则读数不刷新。元素链换档（setElementChain）同样只刷新换链前后的两块悬停框。
  * @note 把放大镜视野设为「不显示」：180 格的放大镜在 150 格高的遮罩里必然翻到屏外并被裁掉，
  *       那样记录下来的包围盒又会碰到整窗的四条边，判不出「局部」这件事。
  */
@@ -445,14 +447,40 @@ TEST_F(CaptureOverlayFixture, MouseMoveRepaintsOnlyTheChangedRegion)
     const auto lastRegion = overlay.lastPaintRegionForTesting();
     const auto widgetRect = overlay.rect();
 
+    ASSERT_FALSE(newReadout.isEmpty()) << "第二次移动后没有读数条，判据够不着要验的那一块";
     EXPECT_NE(lastRegion.boundingRect(), widgetRect) << "鼠标移动仍然重画了整窗";
+
+    // 面积也要严格小：包围盒不等于整窗，但几个分散的矩形仍可能铺满整窗
+    qint64 dirtyArea = 0;
+    for (const auto &rect: lastRegion)
+    {
+        dirtyArea += static_cast<qint64>(rect.width()) * rect.height();
+    }
+    EXPECT_LT(dirtyArea, static_cast<qint64>(widgetRect.width()) * widgetRect.height()) << "重绘面积没有比整窗小";
+
     // 绘制事件里的区域会被 Qt 裁到控件内：读数条翻到屏外的那一截不参与比较
+    EXPECT_TRUE(lastRegion.intersects(oldReadout)) << "旧位置的读数条与重绘区域不相交，移动后会留下一块残影";
+    EXPECT_TRUE(lastRegion.intersects(newReadout)) << "新位置的读数条与重绘区域不相交，读数不会刷新";
     EXPECT_TRUE(lastRegion.contains(oldReadout.intersected(widgetRect))) << "旧位置的读数条没进重绘区域，移动后会留下一块残影";
     EXPECT_TRUE(lastRegion.contains(newReadout.intersected(widgetRect))) << "新位置的读数条没进重绘区域，读数不会刷新";
     for (const auto &point: {oldPoint, newPoint})
     {
         EXPECT_TRUE(lastRegion.contains(QRect{point - QPoint{2, 2}, QSize{5, 5}})) << "光标 (" << point.x() << ", " << point.y() << ") 附近没进重绘区域";
     }
+
+    // 元素链换档：旧悬停框与新悬停框的内部都要在这一次重绘里，漏掉旧的那块就留下一个框。
+    // 两个点各只落在其中一块里，任一块漏了都判得出
+    const QRect firstElement{1950, 20, 60, 40};  // 局部 (30,20,60,40)
+    const QRect secondElement{1970, 40, 60, 40}; // 局部 (50,40,60,40)
+    overlay.setElementChain({firstElement});
+    QApplication::processEvents();
+    overlay.setElementChain({secondElement});
+    QApplication::processEvents();
+
+    const auto chainRegion = overlay.lastPaintRegionForTesting();
+    EXPECT_TRUE(chainRegion.contains(QPoint{35, 25})) << "换链前的旧悬停框没进重绘区域，原地会留下一个框";
+    EXPECT_TRUE(chainRegion.contains(QPoint{100, 70})) << "换链后的新悬停框没进重绘区域，预览框不会刷新";
+    EXPECT_NE(chainRegion.boundingRect(), widgetRect) << "换链时重画了整窗";
 }
 
 /// 投一条键盘事件给遮罩
@@ -497,6 +525,51 @@ void dragOut(CaptureOverlay &overlay, const QPoint &anchor, const QPoint &curren
     buttonAt(overlay, QEvent::MouseButtonPress, anchor);
     moveOver(overlay, current);
     buttonAt(overlay, QEvent::MouseButtonRelease, current);
+}
+
+/**
+ * @brief 钉住提示区脏区按实测文字取，不被固定 420×150 估算块裁掉
+ * @details 提示的宽高随字号与文案变：控件字体调大（这里是 30pt）之后，读数、确认行与「已复制尺寸」
+ *          三段都比固定 420 宽、150 高的估算块更大。脏区若还按那块估，右侧与最末一行只有一部分
+ *          被刷新，其余停在上一帧。宽度从提示的起点（与选区左边同一条竖线）往右量，高度从提示顶端
+ *          量到底端——选区外扩的那几格不参与这两个数。判据同时钉住「小选区不把远处角落带进脏区」，
+ *          证明放大的是提示区，不是整窗。
+ * @note 放大镜视野设为「不显示」：那枚 180 格插图会把包围盒撑到控件边上，判不出局部。
+ *       松手与复制各刷新过一次整窗；换一次空元素链，让最后一次绘制走局部区域。
+ */
+TEST_F(CaptureOverlayFixture, LargeHintTextKeepsTheWholeRepaintRegion)
+{
+    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Core::kCaptureMagnifierView, QStringLiteral("off")))) << "写入放大镜视野档失败";
+
+    auto  overlay   = makeOverlay();
+    QFont largeFont = overlay->font();
+    largeFont.setPointSize(30);
+    overlay->setFont(largeFont);
+
+    // 一块贴屏中部的小选区：提示画在它上方，放大字号后三段文字比 420×150 的估算块更宽更高
+    dragOut(*overlay, QPoint{200, 300}, QPoint{260, 340});
+    ASSERT_EQ(overlay->selectedRegion(), QRect(200, 300, 61, 41));
+    // 把读数条挪到提示区上方：它落在 150 高的估算块以内，高度判据就只量得到提示区本身
+    moveOver(*overlay, QPoint{260, 150});
+    // 「已复制尺寸」那一行也算提示区：三层都画出来才验得到整块高度
+    pressKey(*overlay, Qt::Key_V);
+
+    overlay->show();
+    QApplication::processEvents();
+
+    overlay->setElementChain({});
+    QApplication::processEvents();
+
+    const auto region    = overlay->lastPaintRegionForTesting();
+    const auto selection = overlay->selectedRegion();
+
+    // 提示从选区左边起画：固定上限只到 +420，实际那几行一直画到控件右缘
+    const auto hintSide = region.intersected(QRect{selection.left(), 0, overlay->width() - selection.left(), overlay->height()}).boundingRect();
+    EXPECT_GT(hintSide.width(), 420) << "大字号下提示区仍按固定的 420 宽截断，右侧那截不会被刷新";
+    EXPECT_GT(region.boundingRect().height(), 150) << "大字号下提示区仍按固定的 150 高截断，最末一行不会被刷新";
+
+    // 选区与提示都在左上方那一片：右下角这块不该被带进脏区
+    EXPECT_FALSE(region.intersects(QRect{770, 570, 20, 20})) << "小选区把远处角落也带进了重绘区域";
 }
 
 /**

@@ -73,11 +73,8 @@ namespace
     /// 局部重绘时选区/悬停框外扩的格数，逻辑像素：盖住边框与抓点
     constexpr int kRepaintMargin = 4;
 
-    /// 提示区的宽度下限，逻辑像素：读数与确认行都比一块短选区宽
-    constexpr int kHintAreaMinimumWidth = 420;
-
-    /// 提示区的高度上限，逻辑像素：三行读数与提示都落在这一条带里
-    constexpr int kHintAreaHeight = 150;
+    /// 放大镜边框外让的格数，逻辑像素：边框线宽有一半压在矩形外，脏区少了这一格就留半条残影
+    constexpr int kMagnifierBorderOutset = 1;
 
     /// 选择中十字线的带宽，逻辑像素：虚线本身只有一格，两侧各留一格给抗锯齿
     constexpr int kCrosshairBandWidth = 3;
@@ -276,12 +273,16 @@ namespace GyanisScribe::Gui
             // 外扩几格把边框、抓点与三分线都盖住：它们都贴在选区边上
             region += QRegion{shown.adjusted(-kRepaintMargin, -kRepaintMargin, kRepaintMargin, kRepaintMargin)};
 
-            // 提示区按「读数可能占的最大宽度 + 三行文字」整块算：文字宽度随读数变，逐行量反而更容易漏
+            // 提示区按画上去的那三层文字逐块取：读数与确认行的宽高随字号、文案变，
+            // 按一块固定宽高估就会把长的那一行裁出脏区
             const auto widgetRect = QRect{QPoint{0, 0}, size()};
-            const auto hintRect   = QRect{hintPositionFor(shown), QSize{std::max(shown.width(), kHintAreaMinimumWidth), kHintAreaHeight}}.intersected(widgetRect);
-            if (!hintRect.isEmpty())
+            const auto hint       = hintLayoutFor(shown);
+            for (const auto &rect: {hint.hintRect, hint.confirmRect, hint.copiedRect})
             {
-                region += QRegion{hintRect};
+                if (const auto visible = rect.intersected(widgetRect); !visible.isEmpty())
+                {
+                    region += QRegion{visible};
+                }
             }
         }
 
@@ -295,7 +296,7 @@ namespace GyanisScribe::Gui
 
         if (const auto magnifier = magnifierRect(); !magnifier.isEmpty())
         {
-            region += QRegion{magnifier};
+            region += QRegion{magnifier.adjusted(-kMagnifierBorderOutset, -kMagnifierBorderOutset, kMagnifierBorderOutset, kMagnifierBorderOutset)};
         }
         if (const auto readout = readoutStripRect(); !readout.isEmpty())
         {
@@ -456,6 +457,51 @@ namespace GyanisScribe::Gui
         return {region.left(), region.bottom() + 4};
     }
 
+    CaptureOverlay::HintLayout CaptureOverlay::hintLayoutFor(const QRect &shown) const
+    {
+        HintLayout layout;
+
+        // 读数按这一轮那一档量：拖框时看到的宽高要与复制出去、敲回尺寸框的那一组数是同一个口径
+        layout.hint = Core::formatSelectionHint(measuredRect(shown));
+        if (m_aspectLocked)
+        {
+            // 锁着比例时在读数后面标出来：不标的话「拖不出想要的形状」会被当成手抖
+            layout.hint += GyanisScribe::Base::uiText("（锁定 %1）").arg(Core::aspectRatioToText(m_aspectRatio));
+        }
+        if (m_cursorTouched && m_cursorIncluded)
+        {
+            // 翻过指针档就把当下那一档写进读数：带不带指针看不出来，比一律不带更糟
+            layout.hint += *m_cursorIncluded ? GyanisScribe::Base::uiText("（含指针）") : GyanisScribe::Base::uiText("（不含指针）");
+        }
+
+        layout.font = font();
+        // 字号以 12pt 打底；控件字体调大时跟着放大，否则提示会比旁边的正文还小
+        layout.font.setPointSizeF(std::max<qreal>(GyanisScribe::Gui::kHintFontSize, font().pointSizeF()));
+        // 尺寸提示里中文与数字同处一行：只上 tnum，避免中文回退被降重推到 Bold
+        layout.font = tabularFont(layout.font, TextScript::Mixed);
+        const QFontMetrics metrics(layout.font);
+
+        const auto textSize    = metrics.size(Qt::TextSingleLine, layout.hint);
+        const auto hintTopLeft = hintPositionFor(shown);
+        layout.hintRect        = QRect{hintTopLeft, textSize + QSize(GyanisScribe::Gui::kHintPadding * 2, GyanisScribe::Gui::kHintPadding)};
+
+        // 确认/取消怎么写常驻读数下一行：新用户拖完框最容易停在「然后呢」上
+        layout.confirm     = m_isSelecting ? GyanisScribe::Base::uiText("松手即完成 · Esc 取消") : GyanisScribe::Base::uiText("拖四边调整 · Enter/双击确认 · Esc 取消");
+        const auto confirmSize = metrics.size(Qt::TextSingleLine, layout.confirm);
+        layout.confirmRect     = QRect{hintTopLeft + QPoint(0, textSize.height() + kCopiedHintGap), confirmSize + QSize(GyanisScribe::Gui::kHintPadding * 2, GyanisScribe::Gui::kHintPadding)};
+
+        // 「已复制尺寸 …」贴在确认行下面一格；指针一动就清（见 mouseMoveEvent），
+        // 不为它引一个定时器——那种反馈本来就不必跟秒表绑定
+        if (!m_copiedSizeHint.isEmpty())
+        {
+            layout.copied         = m_copiedSizeHint;
+            const auto copiedSize = metrics.size(Qt::TextSingleLine, m_copiedSizeHint);
+            layout.copiedRect     = QRect{hintTopLeft + QPoint(0, textSize.height() + confirmSize.height() + 2 * kCopiedHintGap),
+                                          copiedSize + QSize(GyanisScribe::Gui::kHintPadding * 2, GyanisScribe::Gui::kHintPadding)};
+        }
+        return layout;
+    }
+
     void CaptureOverlay::paintEvent(QPaintEvent *event)
     {
         m_lastPaintRegion = event->region();
@@ -506,57 +552,28 @@ namespace GyanisScribe::Gui
                 }
             }
 
-            // 读数按这一轮那一档量：拖框时看到的宽高要与复制出去、敲回尺寸框的那一组数是同一个口径
-            auto hint = Core::formatSelectionHint(measuredRect(shown));
-            if (m_aspectLocked)
-            {
-                // 锁着比例时在读数后面标出来：不标的话「拖不出想要的形状」会被当成手抖
-                hint += GyanisScribe::Base::uiText("（锁定 %1）").arg(Core::aspectRatioToText(m_aspectRatio));
-            }
-            if (m_cursorTouched && m_cursorIncluded)
-            {
-                // 翻过指针档就把当下那一档写进读数：带不带指针看不出来，比一律不带更糟
-                hint += *m_cursorIncluded ? GyanisScribe::Base::uiText("（含指针）") : GyanisScribe::Base::uiText("（不含指针）");
-            }
-            QFont hintFont = font();
-            hintFont.setPointSize(GyanisScribe::Gui::kHintFontSize);
-            // 尺寸提示里中文与数字同处一行：只上 tnum，避免中文回退被降重推到 Bold
-            hintFont = tabularFont(hintFont, TextScript::Mixed);
-            painter.setFont(hintFont);
-            const QFontMetrics metrics(hintFont);
-            const auto         textSize    = metrics.size(Qt::TextSingleLine, hint);
-            const auto         hintTopLeft = hintPositionFor(shown);
-            const QRect        hintRect(hintTopLeft, textSize + QSize(GyanisScribe::Gui::kHintPadding * 2, GyanisScribe::Gui::kHintPadding));
+            // 提示区三层文字与位置跟局部重绘共用一次测量：两边各量一遍，字号或文案一变就会有一边算错
+            const auto hint = hintLayoutFor(shown);
+            painter.setFont(hint.font);
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(GyanisScribe::Gui::kCaptureHintBackgroundColor);
+            painter.drawRect(hint.hintRect);
+            painter.setPen(GyanisScribe::Gui::kCaptureHintTextColor);
+            painter.drawText(hint.hintRect, Qt::AlignCenter, hint.hint);
 
             painter.setPen(Qt::NoPen);
             painter.setBrush(GyanisScribe::Gui::kCaptureHintBackgroundColor);
-            painter.drawRect(hintRect);
+            painter.drawRect(hint.confirmRect);
             painter.setPen(GyanisScribe::Gui::kCaptureHintTextColor);
-            painter.drawText(hintRect, Qt::AlignCenter, hint);
+            painter.drawText(hint.confirmRect, Qt::AlignCenter, hint.confirm);
 
-            // 确认/取消怎么写常驻读数下一行：新用户拖完框最容易停在「然后呢」上
-            const auto  confirmText = m_isSelecting ? GyanisScribe::Base::uiText("松手即完成 · Esc 取消") : GyanisScribe::Base::uiText("拖四边调整 · Enter/双击确认 · Esc 取消");
-            const auto  confirmSize = metrics.size(Qt::TextSingleLine, confirmText);
-            const QRect confirmRect(hintTopLeft + QPoint(0, textSize.height() + kCopiedHintGap),
-                                    confirmSize + QSize(GyanisScribe::Gui::kHintPadding * 2, GyanisScribe::Gui::kHintPadding));
-            painter.setPen(Qt::NoPen);
-            painter.setBrush(GyanisScribe::Gui::kCaptureHintBackgroundColor);
-            painter.drawRect(confirmRect);
-            painter.setPen(GyanisScribe::Gui::kCaptureHintTextColor);
-            painter.drawText(confirmRect, Qt::AlignCenter, confirmText);
-
-            // 「已复制尺寸 …」贴在确认行下面一格；指针一动就清（见 mouseMoveEvent），
-            // 不为它引一个定时器——那种反馈本来就不必跟秒表绑定
-            if (!m_copiedSizeHint.isEmpty())
+            if (!hint.copiedRect.isEmpty())
             {
-                const auto  copyTextSize = metrics.size(Qt::TextSingleLine, m_copiedSizeHint);
-                const QRect copyRect(hintTopLeft + QPoint(0, textSize.height() + confirmSize.height() + 2 * kCopiedHintGap),
-                                     copyTextSize + QSize(GyanisScribe::Gui::kHintPadding * 2, GyanisScribe::Gui::kHintPadding));
                 painter.setPen(Qt::NoPen);
                 painter.setBrush(GyanisScribe::Gui::kCaptureHintBackgroundColor);
-                painter.drawRect(copyRect);
+                painter.drawRect(hint.copiedRect);
                 painter.setPen(GyanisScribe::Gui::kCaptureHintTextColor);
-                painter.drawText(copyRect, Qt::AlignCenter, m_copiedSizeHint);
+                painter.drawText(hint.copiedRect, Qt::AlignCenter, hint.copied);
             }
         }
 
@@ -633,7 +650,8 @@ namespace GyanisScribe::Gui
 
         // 悬停点报给服务去问界面元素：只在「没在框选、也还没有选区」时报，
         // 这两种状态下悬停预览本来就不显示，问了也是白花一次跨进程的费用。
-        // 先报再重算：服务把新链送回来之后，下面的 refreshHoveredRegion 用的就是这一帧的链
+        // 服务把连续几个点合并进同一个 40ms 窗口，新链不会在这一帧就回来：本次仍按手上的链重算，
+        // 等 setElementChain 送到时再刷一次
         if (!m_isSelecting && !m_isAdjusting && selectedRegion().isNull())
         {
             emit hoverPointChanged(globalCursorPoint());

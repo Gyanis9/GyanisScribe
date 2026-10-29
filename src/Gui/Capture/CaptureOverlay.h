@@ -10,6 +10,7 @@
 #pragma once
 
 #include <QColor>
+#include <QFont>
 #include <QImage>
 #include <QPoint>
 #include <QRect>
@@ -329,10 +330,34 @@ namespace GyanisScribe::Gui
 
         /**
          * @brief 当前状态可能改动的所有区域
-         * @return 选区或悬停框外扩、提示区、选择中的十字带、放大镜与读数条的并集
+         * @return 选区或悬停框外扩、提示区三层文字的实测矩形、选择中的十字带、放大镜与读数条的并集
          * @details 局部重绘的边界：少算一块会留下一帧残影，多算只多画几像素、不会画错。
+         *          提示区按画上去的那三层文字逐块取，不按固定宽高估——估算宽高会把长的那一行裁掉。
          */
         [[nodiscard]] QRegion visualRegionForCurrentState() const;
+
+        /**
+         * @brief 提示区三层文字：字体、内容与画上去的矩形
+         * @details 绘制与局部重绘共用同一次测量。两边各量一遍时，字号或文案一变就有一边算错，
+         *          表现成提示被固定宽高裁掉一角。
+         */
+        struct HintLayout
+        {
+            QFont   font;        ///< 三层文字共用的字体
+            QString hint;        ///< 尺寸读数（含锁定比例与指针档）
+            QString confirm;     ///< 确认/取消那一行
+            QString copied;      ///< 「已复制尺寸 …」那一行；空表示不画
+            QRect   hintRect;    ///< 读数条的矩形
+            QRect   confirmRect; ///< 确认行的矩形
+            QRect   copiedRect;  ///< 「已复制尺寸」的矩形；不画时为空
+        };
+
+        /**
+         * @brief 按当前状态算出提示区的三层文字与矩形
+         * @param shown 画面上亮着的那一块（选区或悬停预览）
+         * @return 字体、文案与三个矩形；绘制与局部重绘都从这里取
+         */
+        [[nodiscard]] HintLayout hintLayoutFor(const QRect &shown) const;
 
         /**
          * @brief 读数应当画在哪
