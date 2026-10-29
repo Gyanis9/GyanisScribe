@@ -384,6 +384,8 @@ namespace GyanisScribe::Core
         /**
          * @brief 全部图形按层叠号升序排好（最底层的在前）
          * @return 缓存表的引用；图形集合变化后第一次调用时重建并重排
+         * @note 返回的是缓存内部的引用：引擎里任何图形集合或层叠号的改动（增删、撤销/重做、
+         *       换层、换画布、重裁）都会让它失效，调用方要么立即用完，要么自己拷贝一份。
          */
         [[nodiscard]] const std::vector<ZEntry> &zOrderedEntries() const;
 

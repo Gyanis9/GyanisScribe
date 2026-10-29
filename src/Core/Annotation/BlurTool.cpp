@@ -45,7 +45,8 @@ namespace GyanisScribe::Core
         const auto radius = qMax(1, static_cast<int>(std::lround(kBlurRadiusLogical * context.pixelScale)));
 
         // 整张底图只模糊一次：拖动大区域时每帧重算三趟全图方框模糊是这条绘制路径最贵的一步。
-        // 源图身份或半径变了才重建，缓存只留这一份整图
+        // 源图身份或半径变了才重建，缓存只留这一份整图；框沿附近的像素按整图采样，
+        // 取得到框外的邻居，贴出去的只是下面裁出来的那一块
         if (m_blurredCanvas.isNull() || source.cacheKey() != m_blurredSourceKey || radius != m_blurredRadius)
         {
             m_blurredCanvas    = boxBlurred(source, radius);

@@ -50,8 +50,10 @@ namespace GyanisScribe::Core
          * @brief 糊一块区域，见 AnnotationTool::paintShape()
          * @param painter 目标画家
          * @param shape 图形，取 rect
-         * @param context 绘制现场，用 source 取被盖那块的原像素、用 pixelScale 把逻辑半径换成物理半径
-         * @details 重写基类纯虚接口：把源图那一块抠出来做三趟方框模糊（三趟叠加近似高斯），再画回去。
+         * @param context 绘制现场，用 source 取整张底图、用 pixelScale 把逻辑框与逻辑半径换成物理量
+         * @details 重写基类纯虚接口：对整张底图做三趟方框模糊（三趟叠加近似高斯），再把框住的那一块
+         *          裁出来贴回去。模糊按整张底图采样，框沿一个半径以内的像素会取到框外的邻居，
+         *          与「先裁出框内那一块再糊」的边界值不同。
          *          缩放因子非正或源图为空时什么都不画——宁可看不见效果，也不往用户脸上盖东西。
          */
         void paintShape(QPainter &painter, const AnnotationShape &shape, const PaintContext &context) const override;

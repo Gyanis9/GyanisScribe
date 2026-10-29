@@ -23,6 +23,8 @@
 
 #include <gtest/gtest.h>
 
+#include <cmath>
+#include <cstring>
 #include <memory>
 #include <string>
 
@@ -33,7 +35,9 @@ using GyanisScribe::Core::AnnotationSelection;
 using GyanisScribe::Core::AnnotationShape;
 using GyanisScribe::Core::AnnotationTool;
 using GyanisScribe::Core::BlurTool;
+using GyanisScribe::Core::boxBlurred;
 using GyanisScribe::Core::EraserTool;
+using GyanisScribe::Core::kBlurRadiusLogical;
 using GyanisScribe::Core::kMagnifierGap;
 using GyanisScribe::Core::kNumberGroupCount;
 using GyanisScribe::Core::magnifierInsetRectFor;
@@ -94,17 +98,31 @@ namespace
     };
 
     /**
-     * @brief 把工具里的第一条图形画进一张新图，模拟一次重绘
+     * @brief 把工具里的第一条图形画进一张新图并交回成品
      * @param tool 被测工具
      * @param context 绘制现场
+     * @return 画好这一条图形的画布，用于逐像素比较不同绘制路径的结果
      * @details 每次重绘换一张干净画布：命中缓存时工具应直接复用上一笔成品，而不是重新算像素。
      */
-    void repaintFirstShape(const AnnotationTool &tool, const PaintContext &context)
+    QImage renderFirstShape(const AnnotationTool &tool, const PaintContext &context)
     {
         QImage target(context.source.size(), QImage::Format_ARGB32_Premultiplied);
         target.fill(Qt::transparent);
-        QPainter painter(&target);
-        tool.paintShapeAt(0, painter, context);
+        {
+            QPainter painter(&target);
+            tool.paintShapeAt(0, painter, context);
+        }
+        return target;
+    }
+
+    /**
+     * @brief 把工具里的第一条图形画进一张新图，模拟一次重绘
+     * @param tool 被测工具
+     * @param context 绘制现场
+     */
+    void repaintFirstShape(const AnnotationTool &tool, const PaintContext &context)
+    {
+        static_cast<void>(renderFirstShape(tool, context));
     }
 
     /**
@@ -370,6 +388,65 @@ TEST_F(AnnotationFixture, BlurReusesTheBlurredCanvasAcrossRepaints)
 }
 
 /**
+ * @brief 钉住模糊在图形边界采的是整张底图的邻居像素，而不是只糊框内那一块
+ * @details 底图左半黑、右半白，框整个落在白半区、左沿正贴分界线。整张底图先糊后裁时，
+ *          框沿那一列取得到框外的黑邻居，读数是灰；只把框内那一块抠出来糊时，边界按夹取
+ *          采样，框沿仍是纯白。判据两头都钉：读数必须等于整图模糊在同一个像素上的值，
+ *          又必须不等于「先裁框再糊」在框沿上的值。
+ */
+TEST_F(AnnotationFixture, BlurSamplesNeighbourPixelsAtTheShapeBoundary)
+{
+    QImage source(200, 100, QImage::Format_ARGB32_Premultiplied);
+    source.fill(QColor(255, 255, 255));
+    for (int y = 0; y < source.height(); ++y)
+    {
+        for (int x = 0; x < 100; ++x)
+        {
+            source.setPixelColor(x, y, QColor(0, 0, 0));
+        }
+    }
+
+    AnnotationShape shape;
+    shape.rect = QRect(100, 0, 50, 100); // 整个落在白半区，左沿就是黑白分界
+    BlurTool tool;
+    tool.insertShape(0, shape);
+
+    QImage rendered = source.copy();
+    {
+        QPainter painter(&rendered);
+        tool.paintShapeAt(0, painter, PaintContext{source, 1.0});
+    }
+
+    const int    radius   = qMax(1, static_cast<int>(std::lround(kBlurRadiusLogical * 1.0)));
+    const QImage expected = boxBlurred(source, radius);
+    const QColor edge     = rendered.pixelColor(100, 50);
+    EXPECT_LT(qGray(edge.rgb()), 250) << "框沿还是白的：模糊只采了框内的像素";
+    EXPECT_EQ(edge, expected.pixelColor(100, 50)) << "框沿读数不是整张底图模糊在该像素上的结果";
+    EXPECT_NE(edge, boxBlurred(source.copy(shape.rect), radius).pixelColor(0, 50)) << "框沿读数与只糊框内那一块的边界值相同，整图采样没有被钉住";
+}
+
+/**
+ * @brief 钉住模糊缓存键覆盖倍比：换倍比就是换半径，必须重建
+ * @details 同一支工具先用倍比 1 画到命中，再换倍比 2 重绘：半径从 6 变成 12，旧缓存不能复用。
+ */
+TEST_F(AnnotationFixture, BlurCacheKeyCoversPixelScale)
+{
+    const auto        &canvas  = m_engine.canvas();
+    const PaintContext context{canvas.image, 1.0};
+
+    AnnotationShape shape;
+    shape.rect = QRect(100, 70, 100, 60);
+    BlurTool tool;
+    tool.insertShape(0, shape);
+
+    repaintFirstShape(tool, context);
+    ASSERT_EQ(tool.cacheBuildCountForTesting(), 1) << "第一次绘制该建一次模糊缓存";
+    const PaintContext scaled{canvas.image, 2.0};
+    repaintFirstShape(tool, scaled);
+    EXPECT_EQ(tool.cacheBuildCountForTesting(), 2) << "换了倍比（半径）还命中缓存，贴的是旧半径的模糊";
+}
+
+/**
  * @brief 钉住马赛克的上一笔成品跨重绘复用，换底图后必须重算
  * @details 同一图形、同一倍比与粒度下重绘直接贴上一笔成品；源图身份是键的一部分。
  */
@@ -393,6 +470,40 @@ TEST_F(AnnotationFixture, MosaicReusesTheLastShapeAcrossRepaints)
     const PaintContext replacementContext{replacement, 1.0};
     repaintFirstShape(tool, replacementContext);
     EXPECT_EQ(tool.cacheBuildCountForTesting(), 2) << "源图换了缓存没失效，贴的是旧底图的马赛克";
+}
+
+/**
+ * @brief 钉住马赛克缓存键覆盖粒度与倍比：改粒度、换倍比都必须重算
+ * @details 两个场景各用一支新工具，计数从一个干净的 0 起：哪个维度没进键都藏不住。
+ */
+TEST_F(AnnotationFixture, MosaicCacheKeyCoversGranularityAndPixelScale)
+{
+    const auto        &canvas  = m_engine.canvas();
+    const PaintContext context{canvas.image, 1.0};
+
+    AnnotationShape shape;
+    shape.rect            = QRect(100, 60, 100, 60);
+    shape.mosaicBlockSize = 8;
+
+    // 粒度从 8 改成 16：方块网格变了，成品必须重算
+    MosaicTool granularityTool;
+    granularityTool.insertShape(0, shape);
+    repaintFirstShape(granularityTool, context);
+    ASSERT_EQ(granularityTool.cacheBuildCountForTesting(), 1) << "第一次绘制该算一次马赛克";
+    shape.mosaicBlockSize = 16;
+    ASSERT_TRUE(granularityTool.replaceShapeAt(0, shape));
+    repaintFirstShape(granularityTool, context);
+    EXPECT_EQ(granularityTool.cacheBuildCountForTesting(), 2) << "换了粒度还命中缓存，贴的是旧粒度的马赛克";
+
+    // 换倍比：物理框与方块边长都变了，成品必须重算
+    shape.mosaicBlockSize = 8;
+    MosaicTool scaleTool;
+    scaleTool.insertShape(0, shape);
+    repaintFirstShape(scaleTool, context);
+    ASSERT_EQ(scaleTool.cacheBuildCountForTesting(), 1) << "第一次绘制该算一次马赛克";
+    const PaintContext scaled{canvas.image, 2.0};
+    repaintFirstShape(scaleTool, scaled);
+    EXPECT_EQ(scaleTool.cacheBuildCountForTesting(), 2) << "换了倍比还命中缓存，贴的是旧倍比的马赛克";
 }
 
 /**
@@ -420,6 +531,104 @@ TEST_F(AnnotationFixture, EraserReusesTheLastPatchAcrossRepaints)
     const PaintContext replacementContext{replacement, 1.0};
     repaintFirstShape(tool, replacementContext);
     EXPECT_EQ(tool.cacheBuildCountForTesting(), 2) << "源图换了缓存没失效，擦出来的是旧底图";
+}
+
+/**
+ * @brief 钉住橡皮擦缓存键覆盖轨迹与倍比：轨迹多一个点、换倍比都必须重算
+ * @details 两个场景各用一支新工具，计数从一个干净的 0 起：哪个维度没进键都藏不住。
+ */
+TEST_F(AnnotationFixture, EraserCacheKeyCoversTrailAndPixelScale)
+{
+    const auto        &canvas  = m_engine.canvas();
+    const PaintContext context{canvas.image, 1.0};
+
+    AnnotationShape shape;
+    shape.points    = {QPoint(120, 40), QPoint(280, 40)};
+    shape.lineWidth = 8;
+
+    // 轨迹尾部多一个采样点：另一笔了，成品必须重算
+    EraserTool trailTool;
+    trailTool.insertShape(0, shape);
+    repaintFirstShape(trailTool, context);
+    ASSERT_EQ(trailTool.cacheBuildCountForTesting(), 1) << "第一次绘制该抠一次图";
+    shape.points.append(QPoint(280, 80));
+    ASSERT_TRUE(trailTool.replaceShapeAt(0, shape));
+    repaintFirstShape(trailTool, context);
+    EXPECT_EQ(trailTool.cacheBuildCountForTesting(), 2) << "轨迹多了一点还命中缓存，擦出来的是旧笔迹";
+
+    // 换倍比：笔迹粗细与物理框都变了，成品必须重算
+    shape.points = {QPoint(120, 40), QPoint(280, 40)};
+    EraserTool scaleTool;
+    scaleTool.insertShape(0, shape);
+    repaintFirstShape(scaleTool, context);
+    ASSERT_EQ(scaleTool.cacheBuildCountForTesting(), 1) << "第一次绘制该抠一次图";
+    const PaintContext scaled{canvas.image, 2.0};
+    repaintFirstShape(scaleTool, scaled);
+    EXPECT_EQ(scaleTool.cacheBuildCountForTesting(), 2) << "换了倍比还命中缓存，擦出来的是旧倍比的图";
+}
+
+/**
+ * @brief 钉住三个像素工具的缓存命中路径与全新工具重画逐字节相同
+ * @details 每支缓存工具先画一次建缓存、再画一次走命中；同一图形另建一支全新工具画一遍。
+ *          两张成品逐字节比较：缓存命中若省掉了什么该做的步骤，这里当场变红。
+ */
+TEST_F(AnnotationFixture, CachedRepaintIsPixelIdenticalToAFreshTool)
+{
+    const auto        &canvas  = m_engine.canvas();
+    const PaintContext context{canvas.image, 1.0};
+
+    const auto expectIdentical = [](const QImage &hit, const QImage &built, const char *what)
+    {
+        ASSERT_EQ(hit.size(), built.size()) << what << "：两次绘制的成品尺寸不一致";
+        ASSERT_EQ(hit.format(), built.format()) << what << "：两次绘制的成品像素格式不一致";
+        ASSERT_EQ(hit.sizeInBytes(), built.sizeInBytes()) << what << "：两次绘制的成品字节数不一致";
+        EXPECT_EQ(std::memcmp(hit.constBits(), built.constBits(), static_cast<std::size_t>(hit.sizeInBytes())), 0)
+            << what << "：命中缓存的成品与全新工具重画的结果不是逐字节相同";
+    };
+
+    AnnotationShape blurShape;
+    blurShape.rect = QRect(100, 70, 120, 70);
+    {
+        BlurTool cached;
+        cached.insertShape(0, blurShape);
+        static_cast<void>(renderFirstShape(cached, context));
+        const QImage hit = renderFirstShape(cached, context);
+        ASSERT_EQ(cached.cacheBuildCountForTesting(), 1) << "模糊第二次绘制没命中缓存";
+
+        BlurTool fresh;
+        fresh.insertShape(0, blurShape);
+        expectIdentical(hit, renderFirstShape(fresh, context), "模糊");
+    }
+
+    AnnotationShape mosaicShape;
+    mosaicShape.rect            = QRect(100, 60, 100, 60);
+    mosaicShape.mosaicBlockSize = 8;
+    {
+        MosaicTool cached;
+        cached.insertShape(0, mosaicShape);
+        static_cast<void>(renderFirstShape(cached, context));
+        const QImage hit = renderFirstShape(cached, context);
+        ASSERT_EQ(cached.cacheBuildCountForTesting(), 1) << "马赛克第二次绘制没命中缓存";
+
+        MosaicTool fresh;
+        fresh.insertShape(0, mosaicShape);
+        expectIdentical(hit, renderFirstShape(fresh, context), "马赛克");
+    }
+
+    AnnotationShape eraserShape;
+    eraserShape.points    = {QPoint(120, 40), QPoint(280, 40)};
+    eraserShape.lineWidth = 8;
+    {
+        EraserTool cached;
+        cached.insertShape(0, eraserShape);
+        static_cast<void>(renderFirstShape(cached, context));
+        const QImage hit = renderFirstShape(cached, context);
+        ASSERT_EQ(cached.cacheBuildCountForTesting(), 1) << "橡皮擦第二次绘制没命中缓存";
+
+        EraserTool fresh;
+        fresh.insertShape(0, eraserShape);
+        expectIdentical(hit, renderFirstShape(fresh, context), "橡皮擦");
+    }
 }
 
 /**
