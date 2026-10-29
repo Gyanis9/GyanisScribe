@@ -944,10 +944,6 @@
             <translation>The history list is malformed: {}. Delete this file and let the app rebuild it (the saved files are not touched), or fix it into the shape {{"entries": [...]}}.</translation>
         </message>
         <message>
-            <source>历史清单第 {} 条缺 path、kind 或 moment。请修好这一条，或删掉整个文件让软件重建：{}</source>
-            <translation>History entry {} lacks path, kind or moment: {}. Fix this entry, or delete the whole file and let the app rebuild it.</translation>
-        </message>
-        <message>
             <source>{}。清单：{}。请把这一条改对，或删掉这份清单让软件重建（成品文件不受影响）</source>
             <translation>{}. List: {}. Correct this entry, or delete this list and let the app rebuild it (the saved files are not affected)</translation>
         </message>
