@@ -70,6 +70,8 @@ Application::Application(int &argc, char **argv, const GyanisScribe::App::Comman
     {
         GyanisScribe::Base::Logger::info(
                 std::format("智录 {} 启动，日志目录 {}", applicationVersion().toStdString(), GyanisScribe::Base::Paths::toDisplayText(logDirectory).toStdString()));
+        // 崩溃兜底装得比日志早，它自己那行只到了 stderr；日志接管后补记一行，读日志时才知道转储会落在哪
+        GyanisScribe::Base::Logger::info(std::format("崩溃兜底已就位：崩溃转储会写到 {}", GyanisScribe::Base::Paths::toDisplayText(logDirectory).toStdString()));
     }
 
     // 单实例探测排在控制器与热键之前：落败的那一次启动不该装托盘、不该建主窗口、更不该去抢那七个
