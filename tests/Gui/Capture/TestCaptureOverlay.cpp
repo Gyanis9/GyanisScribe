@@ -529,11 +529,12 @@ void dragOut(CaptureOverlay &overlay, const QPoint &anchor, const QPoint &curren
 
 /**
  * @brief 钉住提示区脏区按实测文字取，不被固定 420×150 估算块裁掉
- * @details 提示的宽高随字号与文案变：控件字体调大（这里是 30pt）之后，读数、确认行与「已复制尺寸」
+ * @details 提示的宽高随字号与文案变：控件字体调大（这里是 40pt）之后，读数、确认行与「已复制尺寸」
  *          三段都比固定 420 宽、150 高的估算块更大。脏区若还按那块估，右侧与最末一行只有一部分
  *          被刷新，其余停在上一帧。宽度从提示的起点（与选区左边同一条竖线）往右量，高度从提示顶端
  *          量到底端——选区外扩的那几格不参与这两个数。判据同时钉住「小选区不把远处角落带进脏区」，
- *          证明放大的是提示区，不是整窗。
+ *          证明放大的是提示区，不是整窗。取 40pt：三行高度在 offscreen 与桌面两套字体度量下都超过
+ *          150；30pt 在 offscreen 上三行只有 132，判据会随平台字体变红。
  * @note 放大镜视野设为「不显示」：那枚 180 格插图会把包围盒撑到控件边上，判不出局部。
  *       松手与复制各刷新过一次整窗；换一次空元素链，让最后一次绘制走局部区域。
  */
@@ -543,7 +544,7 @@ TEST_F(CaptureOverlayFixture, LargeHintTextKeepsTheWholeRepaintRegion)
 
     auto  overlay   = makeOverlay();
     QFont largeFont = overlay->font();
-    largeFont.setPointSize(30);
+    largeFont.setPointSize(40);
     overlay->setFont(largeFont);
 
     // 一块贴屏中部的小选区：提示画在它上方，放大字号后三段文字比 420×150 的估算块更宽更高
