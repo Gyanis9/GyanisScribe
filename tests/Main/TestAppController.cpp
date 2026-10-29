@@ -4,6 +4,7 @@
 // 从 AppControllerParts 注进去，把「谁在什么时刻被叫到、成品记在哪一份清单上」钉住。
 
 #include "App/CaptureCoordinator.h"
+#include "App/CustomHotkeys.h"
 #include "Gui/Annotation/AnnotationWindow.h"
 #include "App/TrayController.h"
 #include "Gui/Pick/ColorPickerOverlay.h"
@@ -51,6 +52,7 @@
 #include <filesystem>
 #include <format>
 #include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -140,6 +142,85 @@ namespace GyanisScribe
         };
 
         /**
+         * @brief 假热键后端：记录登记与整轮清场次数，并可按组合拒绝一次登记
+         * @details 拒绝按 Qt 的修饰键与键值比对，与设置文本解析出来的组合一一对应；
+         *          让某一组被拒即可把重登推到「恢复旧组合」那条路上。
+         */
+        class HotkeyBackendStub final : public Platform::IHotkeyBackend
+        {
+        public:
+            /**
+             * @brief 登记一个热键，落在预先点名的拒绝组合上就交回失败
+             * @param identifier 本后端内的编号
+             * @param modifiers Qt 修饰键集合
+             * @param key 按键本体
+             * @return 成功返回空载荷；拒绝组合返回「已被占用」的中文原因
+             */
+            [[nodiscard]] Base::Expected<void> registerHotkey(const int identifier, const Qt::KeyboardModifiers modifiers, const Qt::Key key) override
+            {
+                ++registerCalls;
+                if (m_hasRejectedCombination && modifiers == m_rejectedModifiers && key == m_rejectedKey)
+                {
+                    return std::unexpected(Base::Error{Base::ErrorCode::Busy, "替身：这一组已被别的程序占用"});
+                }
+                m_registered.insert_or_assign(identifier, std::pair{modifiers, key});
+                return {};
+            }
+
+            /**
+             * @brief 注销一个热键
+             * @param identifier 登记时用过的编号
+             * @return 总是成功；没登记过的编号视作已不在册
+             */
+            [[nodiscard]] Base::Expected<void> unregisterHotkey(const int identifier) override
+            {
+                m_registered.erase(identifier);
+                return {};
+            }
+
+            /// 整轮清场：次数是「重登了几轮」的落脚点
+            void unregisterAll() override
+            {
+                ++unregisterAllCalls;
+                m_registered.clear();
+            }
+
+            /// 点名下一批登记里要拒绝的组合
+            void rejectCombination(const Qt::KeyboardModifiers modifiers, const Qt::Key key)
+            {
+                m_hasRejectedCombination = true;
+                m_rejectedModifiers      = modifiers;
+                m_rejectedKey            = key;
+            }
+
+            /// 在册登记的条数
+            [[nodiscard]] int registeredCount() const
+            {
+                return static_cast<int>(m_registered.size());
+            }
+
+            /**
+             * @brief 某一组组合此刻是否在册
+             * @param modifiers Qt 修饰键集合
+             * @param key 按键本体
+             * @return 在册为 true
+             */
+            [[nodiscard]] bool isRegistered(const Qt::KeyboardModifiers modifiers, const Qt::Key key) const
+            {
+                return std::ranges::any_of(m_registered, [modifiers, key](const auto &entry) { return entry.second.first == modifiers && entry.second.second == key; });
+            }
+
+            int registerCalls      = 0; ///< 登记调用总次数（含被拒的）
+            int unregisterAllCalls = 0; ///< 整轮清场次数
+
+        private:
+            std::map<int, std::pair<Qt::KeyboardModifiers, Qt::Key>> m_registered;                               ///< 编号 → 在册组合
+            bool                                                     m_hasRejectedCombination = false;           ///< 是否点名了要拒绝的组合
+            Qt::KeyboardModifiers                                    m_rejectedModifiers      = Qt::NoModifier;  ///< 被拒组合的修饰键
+            Qt::Key                                                  m_rejectedKey            = Qt::Key_unknown; ///< 被拒组合的按键
+        };
+
+        /**
          * @brief 只演「前台窗口就是这一扇」的平台集成替身
          * @details 能力位全假：界面按「本平台给不出」筛菜单，与本组判据无关；
          *          前台窗口查询次数是「到点才取」那条判据的落脚点。
@@ -161,9 +242,15 @@ namespace GyanisScribe
                 return QStringLiteral("直测替身");
             }
 
+            /**
+             * @brief 交出一枚可观察的假热键后端
+             * @return 新后端；同一替身只建一次，调用方经 hotkeyBackend 读它的计数
+             */
             [[nodiscard]] std::unique_ptr<Platform::IHotkeyBackend> createHotkeyBackend() override
             {
-                return nullptr;
+                auto backend  = std::make_unique<HotkeyBackendStub>();
+                hotkeyBackend = backend.get();
+                return backend;
             }
 
             [[nodiscard]] Base::Expected<Platform::ForegroundWindow> foregroundWindow() const override
@@ -195,7 +282,8 @@ namespace GyanisScribe
                 return std::unexpected(Base::Error{Base::ErrorCode::PlatformUnsupported, "替身不演界面元素这一项"});
             }
 
-            mutable int foregroundQueries = 0; ///< 前台窗口被问了几次
+            mutable int        foregroundQueries = 0;       ///< 前台窗口被问了几次
+            HotkeyBackendStub *hotkeyBackend     = nullptr; ///< 建出来的假热键后端；第一次重登之前为空
 
         private:
             quintptr m_handle; ///< 每次交回同一枚句柄
@@ -289,6 +377,11 @@ namespace GyanisScribe
                 if (m_recordingCountdown != std::nullopt)
                 {
                     ASSERT_TRUE(settings->setValue(Core::kRecordCountdownSeconds, *m_recordingCountdown).has_value());
+                }
+                if (!m_customHotkeyText.isEmpty())
+                {
+                    // 预置一条自定义绑定：启动登记收进去之后，下一轮改动才有「旧组合」可恢复
+                    ASSERT_TRUE(settings->setValue(App::customHotkeyKey("CaptureFullScreen").toStdString(), m_customHotkeyText).has_value());
                 }
                 m_settings = settings.get();
 
@@ -456,6 +549,7 @@ namespace GyanisScribe
             bool                                 m_seedPinLayout = false;                                   ///< 造控制器前先写一份贴图布局
             std::optional<std::filesystem::path> m_recordingDirectory;                                      ///< 录屏成品目录；非空就写 kPathRecording（只有录屏那一组设它）
             std::optional<int>                   m_recordingCountdown;                                      ///< 录屏倒计时秒数；不设就按生产默认（3 秒）走
+            QString                              m_customHotkeyText;                                        ///< 预置的自定义绑定；空 = 不写这一格
         };
     } // namespace
 
@@ -883,6 +977,38 @@ namespace GyanisScribe
             return !text.isEmpty() && (text.contains(QStringLiteral("识别")) || text.contains(QStringLiteral("语言包")));
         };
         EXPECT_TRUE(waitUntil(said)) << "识别意图截完图后识别那一族一句话都没说：截图协调器到识别协调器那条缝断了";
+    }
+
+    /**
+     * @brief 钉住恢复旧组合写回配置时不会再触发一整轮重登
+     * @details 自定义键改动触发重登：新组合被占用后热键层恢复旧组合，控制器把旧组合写回配置；
+     *          写回同样会发 valueChanged，若没人压住这一位，就会再重登一轮。
+     *          后端整轮清场次数就是「重登了几轮」：一次改动只该多清一次场。
+     *          旧组合必须真的回到设置与在册表里，否则「没多登」可能只是新组合根本没失败。
+     */
+    TEST_F(AppControllerFixture, RestoredCustomBindingDoesNotRestartTheReload)
+    {
+        const auto customKey = App::customHotkeyKey("CaptureFullScreen");
+        m_customHotkeyText   = QStringLiteral("Ctrl+Alt+9");
+        makeController();
+
+        const auto initial = m_controller->registerHotkeys();
+        ASSERT_TRUE(initial.has_value()) << initial.error().message;
+        ASSERT_NE(m_integration->hotkeyBackend, nullptr) << "替身平台没有交出热键后端，这一格无从判起";
+        auto &backend = *m_integration->hotkeyBackend;
+        ASSERT_EQ(backend.unregisterAllCalls, 1) << "启动登记该只清一次场";
+        ASSERT_EQ(backend.registeredCount(), 9) << "八个固定动作加一条自定义键没有全部登记上";
+
+        // 新组合被占用：写入设置即触发整轮重登，热键层恢复旧组合后控制器把它写回配置
+        backend.rejectCombination(Qt::ControlModifier | Qt::AltModifier, Qt::Key_8);
+        const auto unregisterBefore = backend.unregisterAllCalls;
+        ASSERT_TRUE(m_settings->setValue(customKey.toStdString(), QStringLiteral("Ctrl+Alt+8")).has_value());
+
+        EXPECT_EQ(backend.unregisterAllCalls, unregisterBefore + 1) << "改一次自定义键却重登了不止一轮：恢复旧组合的写回又触发了一整轮";
+        EXPECT_LE(backend.unregisterAllCalls, 2) << "整轮清场次数越界：重登没有被压住";
+        EXPECT_EQ(m_settings->stringValue(customKey.toStdString(), QString{}), QStringLiteral("Ctrl+Alt+9")) << "恢复的旧组合没有写回配置";
+        EXPECT_TRUE(backend.isRegistered(Qt::ControlModifier | Qt::AltModifier, Qt::Key_9)) << "旧组合没有重新登记在册";
+        EXPECT_FALSE(backend.isRegistered(Qt::ControlModifier | Qt::AltModifier, Qt::Key_8)) << "被占用的新组合不该留在册表里";
     }
 
     /**
