@@ -85,6 +85,8 @@ namespace GyanisScribe::Plugins
                                        QObject *parent, const int encodeShutdownWaitMs) :
         QObject(parent), m_source(source), m_encoder(std::move(encoder)), m_integration(integration)
     {
+        // 编码那一步是这一轮录屏的唯一出口：没接上时后续每一处都只是空转，当场在开发档点出来
+        Q_ASSERT(m_encoder != nullptr);
         m_encodeShutdownWaitMs = encodeShutdownWaitMs;
         m_timer.setTimerType(Qt::PreciseTimer);
         QObject::connect(&m_timer, &QTimer::timeout, this, &RecordingService::onTick);

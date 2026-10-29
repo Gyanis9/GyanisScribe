@@ -119,7 +119,7 @@ namespace GyanisScribe::App
         /// 把服务的信号接到本类的收尾口上：两个构造共用这一份连接
         void connectService();
 
-        /// 按设置与主屏拼一份录制配置；读不出或做不出来的那几档一律交回原因，不替用户挑一档
+        /// 按设置与当前那一块屏拼一份录制配置；读不出或做不出来的那几档一律交回原因，不替用户挑一档
         [[nodiscard]] GyanisScribe::Base::Expected<GyanisScribe::Core::RecorderConfig> makeConfig() const;
         void                                                                           showHud();
         void                                                                           hideHud();
@@ -128,8 +128,9 @@ namespace GyanisScribe::App
     protected:
         /**
          * @brief 这一轮录哪块屏
-         * @return 生产实现返回主屏名；没有屏时返回空串
-         * @details 留成可覆写的只为用例：离屏平台没有屏名，而录屏参数必须带屏名。
+         * @return 先按光标位置取屏，光标不在任何一块屏上时退回主屏；一块屏都没有时返回空串
+         * @details 生产实现跟着光标走，多屏机器上人在副屏干活时录的才是眼前那块。
+         *          留成可覆写只为用例：离屏平台给不出屏名，而录屏参数必须带屏名。
          */
         [[nodiscard]] virtual QString recordingScreenName() const;
 
