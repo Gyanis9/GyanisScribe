@@ -139,6 +139,47 @@ namespace
         return path;
     }
 
+    /// 清单里写的是通用分隔符的 UTF-8：提示里点名的也是这一串，断言按同一套换算
+    QString manifestPathText(const std::filesystem::path &path)
+    {
+        const auto utf8 = path.generic_u8string();
+        return QString::fromUtf8(reinterpret_cast<const char *>(utf8.data()), static_cast<qsizetype>(utf8.size()));
+    }
+
+    /**
+     * @brief 写一份「一条好记录 + badCount 条坏记录」的清单
+     * @param manifestPath 清单路径
+     * @param artifact 好记录的成品文件
+     * @param badCount 坏记录条数，类别统一写成不认识的值
+     * @details 坏记录固定成「类别不认识」：它走逐条跳过那条路，与「整份清单读不出」是两种失败，
+     *          提示条数是否随之变化正靠这两种形状对照。
+     */
+    void writeManifestWithBadRecords(const std::filesystem::path &manifestPath, const std::filesystem::path &artifact, const int badCount)
+    {
+        QJsonObject good;
+        good.insert(QStringLiteral("path"), QString::fromStdWString(artifact.wstring()));
+        good.insert(QStringLiteral("kind"), QStringLiteral("Screenshot"));
+        good.insert(QStringLiteral("moment"), QStringLiteral("2026-10-10T12:00:00.000"));
+        good.insert(QStringLiteral("width"), 320);
+        good.insert(QStringLiteral("height"), 200);
+
+        QJsonArray entries{good};
+        for (int index = 0; index < badCount; ++index)
+        {
+            QJsonObject bad;
+            bad.insert(QStringLiteral("path"), QStringLiteral("broken-%1.png").arg(index));
+            bad.insert(QStringLiteral("kind"), QStringLiteral("picture"));
+            bad.insert(QStringLiteral("moment"), QStringLiteral("2026-10-10T12:00:00.000"));
+            entries.append(bad);
+        }
+
+        QJsonObject root;
+        root.insert(QStringLiteral("entries"), entries);
+        QFile manifest{QString::fromStdWString(manifestPath.wstring())};
+        ASSERT_TRUE(manifest.open(QIODevice::WriteOnly)) << "造不出用例前提：清单写不进去";
+        manifest.write(QJsonDocument{root}.toJson());
+    }
+
     class HistoryViewFixture : public ::testing::Test
     {
     protected:
@@ -666,25 +707,7 @@ TEST_F(HistoryViewFixture, ListShowsNewestFirstAndNarrowsBySearch)
 TEST_F(HistoryViewFixture, SkippedRecordsWarnOncePerCount)
 {
     const auto artifact = writeImageArtifact(m_directory, "kept.png", {320, 200});
-
-    QJsonObject good;
-    good.insert(QStringLiteral("path"), QString::fromStdWString(artifact.wstring()));
-    good.insert(QStringLiteral("kind"), QStringLiteral("Screenshot"));
-    good.insert(QStringLiteral("moment"), QStringLiteral("2026-10-10T12:00:00.000"));
-    good.insert(QStringLiteral("width"), 320);
-    good.insert(QStringLiteral("height"), 200);
-
-    QJsonObject bad;
-    bad.insert(QStringLiteral("path"), QStringLiteral("broken.png"));
-    bad.insert(QStringLiteral("kind"), QStringLiteral("picture"));
-    bad.insert(QStringLiteral("moment"), QStringLiteral("2026-10-10T12:00:00.000"));
-
-    QJsonObject root;
-    root.insert(QStringLiteral("entries"), QJsonArray{good, bad});
-    QFile manifest{QString::fromStdWString(m_storePath.wstring())};
-    ASSERT_TRUE(manifest.open(QIODevice::WriteOnly)) << "造不出用例前提：清单写不进去";
-    manifest.write(QJsonDocument{root}.toJson());
-    manifest.close();
+    writeManifestWithBadRecords(m_storePath, artifact, 1);
 
     auto    view         = makeView();
     int     dangerToasts = 0;
@@ -703,10 +726,68 @@ TEST_F(HistoryViewFixture, SkippedRecordsWarnOncePerCount)
     EXPECT_EQ(view->rowCount(), 1) << "坏记录把好记录一起挡在列表外了";
     EXPECT_EQ(dangerToasts, 1) << "读到坏记录却没有提示";
     EXPECT_NE(lastMessage.indexOf(QStringLiteral("1 条")), -1) << "提示里没带跳过的条数：" << lastMessage.toStdString();
+    EXPECT_NE(lastMessage.indexOf(manifestPathText(m_storePath)), -1) << "提示里没有清单路径，用户不知道去改哪一份：" << lastMessage.toStdString();
 
     view->refresh();
     EXPECT_EQ(view->rowCount(), 1);
     EXPECT_EQ(dangerToasts, 1) << "跳过数量没变，两次刷新却弹了两次提示";
+
+    // 数量变了要再提示一次，且带的是最新数量
+    writeManifestWithBadRecords(m_storePath, artifact, 2);
+    view->refresh();
+    EXPECT_EQ(dangerToasts, 2) << "坏记录数量从 1 变成 2 却没有再提示";
+    EXPECT_NE(lastMessage.indexOf(QStringLiteral("2 条")), -1) << "数量变了，提示里还是旧数量：" << lastMessage.toStdString();
+
+    view->refresh();
+    EXPECT_EQ(dangerToasts, 2) << "数量没变，再刷新一次又弹了一遍";
+}
+
+/**
+ * @brief 钉住整份清单读失败后把「上次提示过的数量」归零，修回同一个数量还能提示
+ * @details 1 条坏记录提示过一次（记下 1），随后清单被整份写坏（这次读不出，另报一条失败提示），
+ *          再把清单修回同样 1 条坏记录：失败那次若没有归零，数量与上次相同，修复后的提示就被吞掉，
+ *          用户永远等不到「还剩几条坏记录」。
+ */
+TEST_F(HistoryViewFixture, RepairingAfterABrokenManifestWarnsAgain)
+{
+    const auto artifact = writeImageArtifact(m_directory, "kept.png", {320, 200});
+    writeManifestWithBadRecords(m_storePath, artifact, 1);
+
+    auto view          = makeView();
+    int  skippedToasts = 0;
+    int  failureToasts = 0;
+    QObject::connect(view.get(), &HistoryView::messageForUser, view.get(),
+                     [&skippedToasts, &failureToasts](const QString &text, const ToastKind kind)
+                     {
+                         if (kind != ToastKind::Danger)
+                         {
+                             return;
+                         }
+                         if (text.contains(QStringLiteral("读不懂")))
+                         {
+                             ++skippedToasts;
+                         } else if (text.contains(QStringLiteral("没能读出来")))
+                         {
+                             ++failureToasts;
+                         }
+                     });
+
+    view->refresh();
+    EXPECT_EQ(skippedToasts, 1) << "读到坏记录却没有提示";
+    EXPECT_EQ(view->rowCount(), 1);
+
+    {
+        std::ofstream broken{m_storePath};
+        broken << "{ broken";
+    }
+    view->refresh();
+    EXPECT_EQ(failureToasts, 1) << "整份清单读不出却没有报一声";
+    EXPECT_EQ(skippedToasts, 1) << "整份清单读不出不该被当成一条坏记录提示";
+
+    writeManifestWithBadRecords(m_storePath, artifact, 1);
+    view->refresh();
+    EXPECT_EQ(skippedToasts, 2) << "修回同样的坏记录数量后不再提示：整份读失败时没有把上次提示过的数量归零";
+    EXPECT_EQ(view->rowCount(), 1) << "修好之后好记录没有回到列表";
 }
 
 /**

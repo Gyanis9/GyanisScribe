@@ -18,12 +18,14 @@
 #include <QVariant>
 
 #include <algorithm>
+#include <array>
 #include <filesystem>
 #include <format>
 #include <fstream>
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 
 using GyanisScribe::Core::HistoryEntry;
 using GyanisScribe::Core::HistoryKind;
@@ -48,16 +50,61 @@ namespace
     /// 「两个上限都放开」的策略写法，避免用默认值当不限（默认值是 200 条 / 30 天）
     const HistoryRetentionPolicy kNoLimits{.maximumEntries = 0, .retentionDays = 0};
 
-    /// 读回清单里的 entries 数组：用例据此检查写回后坏记录还在不在
-    QJsonArray manifestEntries(const std::filesystem::path &manifestPath)
+    /**
+     * @brief 路径在清单与提示里的写法：通用分隔符 + UTF-8
+     * @param path 要换算的路径
+     * @return 与 HistoryStore 落盘那一套相同的字符串
+     * @details 用 u8string 而不是 generic_string()：Windows 上临时目录一旦落在装不下的码页里，
+     *          narrow 版本会换成另一串字节，路径断言就白比了。
+     */
+    std::string pathTextOf(const std::filesystem::path &path)
+    {
+        const auto utf8 = path.generic_u8string();
+        return std::string{reinterpret_cast<const char *>(utf8.data()), utf8.size()};
+    }
+
+    /**
+     * @brief 读回清单里的 entries 数组
+     * @param manifestPath 清单路径
+     * @return 读到的数组；文件不在、打不开或根不是对象时返回空
+     * @details 用 optional 而不是空数组：清单消失或写成坏 JSON 时，空数组会让「清空后没有记录」
+     *          这类断言假绿——要测的恰恰是文件还在且形状对。
+     */
+    std::optional<QJsonArray> manifestEntries(const std::filesystem::path &manifestPath)
     {
         QFile file{QString::fromStdWString(manifestPath.wstring())};
         if (!file.open(QIODevice::ReadOnly))
         {
-            return {};
+            return std::nullopt;
         }
         const auto document = QJsonDocument::fromJson(file.readAll());
-        return document.isObject() ? document.object().value(QStringLiteral("entries")).toArray() : QJsonArray{};
+        if (!document.isObject())
+        {
+            return std::nullopt;
+        }
+        return document.object().value(QStringLiteral("entries")).toArray();
+    }
+
+    /// 把 entries 数组写成一份清单：用例造前提共用这一处，省得每处各抄一遍落盘
+    void writeManifest(const std::filesystem::path &manifestPath, const QJsonArray &entries)
+    {
+        QJsonObject root;
+        root.insert(QStringLiteral("entries"), entries);
+        QFile file{QString::fromStdWString(manifestPath.wstring())};
+        ASSERT_TRUE(file.open(QIODevice::WriteOnly)) << "造不出用例前提：清单写不进去";
+        file.write(QJsonDocument{root}.toJson());
+    }
+
+    /// 一条字段齐全、读得懂的记录
+    QJsonObject goodRecord(const std::filesystem::path &artifact)
+    {
+        QJsonObject record;
+        record.insert(QStringLiteral("path"), QString::fromStdString(pathTextOf(artifact)));
+        record.insert(QStringLiteral("kind"), QStringLiteral("Screenshot"));
+        record.insert(QStringLiteral("moment"), QStringLiteral("2026-10-10T12:00:00.000"));
+        record.insert(QStringLiteral("width"), 10);
+        record.insert(QStringLiteral("height"), 10);
+        return record;
     }
 
     /// 造一条记录；路径由调用方给，是否真的存在由用例决定
@@ -360,7 +407,7 @@ TEST_F(HistoryFixture, CorruptManifestFailsWithPlaceToFix)
     const auto   unparsable = store.load(kNoLimits, kNow);
     ASSERT_FALSE(static_cast<bool>(unparsable));
     EXPECT_NE(unparsable.error().message.find("格式不对"), std::string::npos);
-    EXPECT_NE(unparsable.error().message.find(storePath().generic_string()), std::string::npos) << "报错里没有清单路径，用户不知道去修哪一份";
+    EXPECT_NE(unparsable.error().message.find(pathTextOf(storePath())), std::string::npos) << "报错里没有清单路径，用户不知道去修哪一份";
 }
 
 /**
@@ -371,26 +418,12 @@ TEST_F(HistoryFixture, CorruptManifestFailsWithPlaceToFix)
 TEST_F(HistoryFixture, OneBadRecordIsSkippedAndPreserved)
 {
     const auto artifact = makeArtifact("kept.png");
-    {
-        QJsonObject good;
-        good.insert(QStringLiteral("path"), QString::fromStdWString(artifact.wstring()));
-        good.insert(QStringLiteral("kind"), QStringLiteral("Screenshot"));
-        good.insert(QStringLiteral("moment"), QStringLiteral("2026-10-10T12:00:00.000"));
-        good.insert(QStringLiteral("width"), 10);
-        good.insert(QStringLiteral("height"), 10);
 
-        QJsonObject bad;
-        bad.insert(QStringLiteral("path"), QStringLiteral("broken.png"));
-        bad.insert(QStringLiteral("kind"), QStringLiteral("picture"));
-        bad.insert(QStringLiteral("moment"), QStringLiteral("2026-10-10T12:00:00.000"));
-
-        QJsonObject root;
-        root.insert(QStringLiteral("entries"), QJsonArray{good, bad});
-
-        QFile manifest{QString::fromStdWString(storePath().wstring())};
-        ASSERT_TRUE(manifest.open(QIODevice::WriteOnly)) << "造不出用例前提：清单写不进去";
-        manifest.write(QJsonDocument{root}.toJson());
-    }
+    QJsonObject bad;
+    bad.insert(QStringLiteral("path"), QStringLiteral("broken.png"));
+    bad.insert(QStringLiteral("kind"), QStringLiteral("picture"));
+    bad.insert(QStringLiteral("moment"), QStringLiteral("2026-10-10T12:00:00.000"));
+    writeManifest(storePath(), QJsonArray{goodRecord(artifact), bad});
 
     HistoryStore store{storePath()};
     const auto   loaded = store.load(kNoLimits, kNow);
@@ -398,22 +431,18 @@ TEST_F(HistoryFixture, OneBadRecordIsSkippedAndPreserved)
     ASSERT_EQ(loaded->entries.size(), 1);
     EXPECT_EQ(loaded->entries[0].filePath, artifact) << "好记录没有留下";
     EXPECT_EQ(loaded->skippedRecords, 1);
-    EXPECT_FALSE(loaded->firstProblem.empty()) << "跳过了一条却没有留下原因，界面无从提示";
+    ASSERT_FALSE(loaded->firstProblem.empty()) << "跳过了一条却没有留下原因，界面无从提示";
+    EXPECT_NE(loaded->firstProblem.find(pathTextOf(storePath())), std::string::npos) << "跳过原因里没有清单路径，用户不知道去改哪一份：" << loaded->firstProblem;
+    EXPECT_NE(loaded->firstProblem.find("改对"), std::string::npos) << "跳过原因里没有修法，用户只能看着记录被跳过：" << loaded->firstProblem;
+    EXPECT_NE(loaded->firstProblem.find("重建"), std::string::npos) << "跳过原因里没有「删掉清单重建」这一条路：" << loaded->firstProblem;
 
     const auto added = makeArtifact("added.png");
     ASSERT_TRUE(static_cast<bool>(store.append(HistoryEntry{.moment = kNow, .kind = HistoryKind::Screenshot, .filePath = added, .size = QSize{10, 10}}, kNoLimits, kNow)));
 
-    const auto addedText   = QString::fromStdString(added.generic_string());
-    const auto containsBad = [](const QJsonArray &entries)
-    {
-        return std::any_of(entries.begin(), entries.end(),
-                           [](const QJsonValue &value)
-                           {
-                               const auto item = value.toObject();
-                               return item.value(QStringLiteral("path")).toString() == QStringLiteral("broken.png") &&
-                                      item.value(QStringLiteral("kind")).toString() == QStringLiteral("picture");
-                           });
-    };
+    const auto addedText = QString::fromStdString(pathTextOf(added));
+    // 整对象比对：只比 path+kind 时，写回时被截断或改写别的字段（比如 moment）也照样绿
+    const auto containsBad = [&bad](const QJsonArray &entries)
+    { return std::any_of(entries.begin(), entries.end(), [&bad](const QJsonValue &value) { return value.toObject() == bad; }); };
     const auto containsAdded = [&addedText](const QJsonArray &entries)
     {
         return std::any_of(entries.begin(), entries.end(),
@@ -421,22 +450,65 @@ TEST_F(HistoryFixture, OneBadRecordIsSkippedAndPreserved)
     };
 
     const auto afterAppend = manifestEntries(storePath());
-    ASSERT_EQ(afterAppend.size(), 3) << "append 后清单条目数不对";
-    EXPECT_TRUE(containsBad(afterAppend)) << "append 之后坏记录被吞掉了，用户再也没有机会修好它";
-    EXPECT_TRUE(containsAdded(afterAppend)) << "append 的新记录没有写进清单";
+    ASSERT_TRUE(afterAppend.has_value()) << "append 后清单读不回来：文件不在、打不开或根 JSON 坏了";
+    ASSERT_EQ(afterAppend->size(), 3) << "append 后清单条目数不对";
+    EXPECT_TRUE(containsBad(*afterAppend)) << "append 之后坏记录被改写或吞掉了，用户再也没有机会修好它";
+    EXPECT_TRUE(containsAdded(*afterAppend)) << "append 的新记录没有写进清单";
 
     ASSERT_TRUE(static_cast<bool>(store.remove(added)));
     const auto afterRemove = manifestEntries(storePath());
-    ASSERT_EQ(afterRemove.size(), 2) << "remove 后清单条目数不对";
-    EXPECT_TRUE(containsBad(afterRemove)) << "remove 之后坏记录被吞掉了";
-    EXPECT_FALSE(containsAdded(afterRemove)) << "remove 没有去掉那条记录";
+    ASSERT_TRUE(afterRemove.has_value()) << "remove 后清单读不回来：文件不在、打不开或根 JSON 坏了";
+    ASSERT_EQ(afterRemove->size(), 2) << "remove 后清单条目数不对";
+    EXPECT_TRUE(containsBad(*afterRemove)) << "remove 之后坏记录被改写或吞掉了";
+    EXPECT_FALSE(containsAdded(*afterRemove)) << "remove 没有去掉那条记录";
 
     ASSERT_TRUE(static_cast<bool>(store.clear()));
-    EXPECT_TRUE(manifestEntries(storePath()).isEmpty()) << "clear() 之后清单里还留着记录";
+    const auto afterClearFile = manifestEntries(storePath());
+    ASSERT_TRUE(afterClearFile.has_value()) << "clear() 之后清单不见了或根 JSON 坏了";
+    EXPECT_TRUE(afterClearFile->isEmpty()) << "clear() 之后清单里还留着记录";
     const auto afterClear = store.load(kNoLimits, kNow);
     ASSERT_TRUE(static_cast<bool>(afterClear));
     EXPECT_TRUE(afterClear->entries.isEmpty());
     EXPECT_EQ(afterClear->skippedRecords, 0);
+}
+
+/**
+ * @brief 钉住三种跳过原因各自说得清，且都带清单位置与修法
+ * @details 缺字段、类别不认识、时间读不出是三种不同的坏法：只报「有记录读不懂」，
+ *          用户不知道改哪一格；三种原因都要点名清单文件，并给出改记录、删清单两条路。
+ */
+TEST_F(HistoryFixture, SkipReasonsNameTheProblemAndHowToFixIt)
+{
+    HistoryStore store{storePath()};
+
+    QJsonObject missingField;
+    missingField.insert(QStringLiteral("path"), QStringLiteral("missing-moment.png"));
+    missingField.insert(QStringLiteral("kind"), QStringLiteral("Screenshot"));
+
+    QJsonObject unknownKind = goodRecord(m_directory / "unknown-kind.png");
+    unknownKind.insert(QStringLiteral("kind"), QStringLiteral("picture"));
+
+    QJsonObject badMoment = goodRecord(m_directory / "bad-moment.png");
+    badMoment.insert(QStringLiteral("moment"), QStringLiteral("昨天下午"));
+
+    const std::array cases = {
+            std::pair{missingField, std::string{"缺 path、kind 或 moment"}},
+            std::pair{unknownKind, std::string{"picture"}},
+            std::pair{badMoment, std::string{"昨天下午"}},
+    };
+    for (const auto &[record, fragment]: cases)
+    {
+        SCOPED_TRACE(fragment);
+        writeManifest(storePath(), QJsonArray{record});
+        const auto loaded = store.load(kNoLimits, kNow);
+        ASSERT_TRUE(static_cast<bool>(loaded)) << "一条坏记录把整份历史都判成了读不出";
+        ASSERT_EQ(loaded->skippedRecords, 1);
+        EXPECT_TRUE(loaded->entries.isEmpty()) << "坏记录不该混进好记录里";
+        EXPECT_NE(loaded->firstProblem.find(fragment), std::string::npos) << "跳过原因没有说清坏在哪：" << loaded->firstProblem;
+        EXPECT_NE(loaded->firstProblem.find(pathTextOf(storePath())), std::string::npos) << "跳过原因里没有清单路径：" << loaded->firstProblem;
+        EXPECT_NE(loaded->firstProblem.find("改对"), std::string::npos) << "跳过原因里没有改记录这条修法：" << loaded->firstProblem;
+        EXPECT_NE(loaded->firstProblem.find("重建"), std::string::npos) << "跳过原因里没有删掉清单重建这条修法：" << loaded->firstProblem;
+    }
 }
 
 /**

@@ -288,6 +288,9 @@ namespace GyanisScribe::Gui
         auto loaded = m_store.load(m_policy, QDateTime::currentDateTime());
         if (!loaded)
         {
+            // 整份清单这次没读出来：把上次提示过的数量归零，否则用户修回同一个坏记录数时，
+            // 修复后的那一次会被当成「数量没变」而不再提示
+            m_lastSkippedRecords = 0;
             // 清单坏了不能把列表清空了事：留着上一次的行，用户还能找到那批文件
             Base::Logger::warning(std::format("历史清单没能读出来：{}", loaded.error().message));
             emit messageForUser(

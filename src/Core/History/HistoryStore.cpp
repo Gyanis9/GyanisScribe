@@ -61,6 +61,20 @@ namespace
         const auto utf8 = text.toUtf8();
         return std::filesystem::path{std::u8string{reinterpret_cast<const char8_t *>(utf8.constData()), static_cast<std::size_t>(utf8.size())}};
     }
+
+    /**
+     * @brief 给一条坏记录的原因补上清单位置与修复办法
+     * @param problem 逐条解析时记下的原因
+     * @param manifestPath 清单文件位置
+     * @return 可直接进日志与气泡的一句话
+     * @details 只说「第几条」时用户不知道去改哪份文件；点名路径并给出改记录、删清单两条路，
+     *          日志与界面共用这一份文案，不必各自再拼。
+     */
+    std::string withPlaceToFix(std::string problem, const std::filesystem::path &manifestPath)
+    {
+        return GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("{}。清单：{}。请把这一条改对，或删掉这份清单让软件重建（成品文件不受影响）"), problem,
+                                            pathToText(manifestPath));
+    }
 } // namespace
 
 namespace GyanisScribe::Core
@@ -215,6 +229,10 @@ namespace GyanisScribe::Core
                     .filePath = pathFromText(pathText),
                     .size     = QSize{item.value(QLatin1String{kKeyWidth}).toInt(), item.value(QLatin1String{kKeyHeight}).toInt()},
             });
+        }
+        if (!raw.firstProblem.empty())
+        {
+            raw.firstProblem = withPlaceToFix(std::move(raw.firstProblem), m_storagePath);
         }
 
         return Expected<RawHistory>{std::move(raw)};
