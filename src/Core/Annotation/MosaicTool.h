@@ -11,6 +11,10 @@
 
 #include "Core/Annotation/AnnotationTool.h"
 
+#include <QImage>
+
+#include <cstdint>
+
 namespace GyanisScribe::Core
 {
 
@@ -33,6 +37,12 @@ namespace GyanisScribe::Core
          */
         [[nodiscard]] QString displayName() const override;
 
+        /**
+         * @brief 上一笔成品重算了几次
+         * @return 重算次数，用于确认静止重绘命中缓存
+         */
+        [[nodiscard]] int cacheBuildCountForTesting() const noexcept;
+
     protected:
         /**
          * @brief 打一块马赛克，见 AnnotationTool::paintShape()
@@ -44,6 +54,12 @@ namespace GyanisScribe::Core
          *          宁可看不见效果，也不把一片随机像素盖到用户脸上。
          */
         void paintShape(QPainter &painter, const AnnotationShape &shape, const PaintContext &context) const override;
+
+    private:
+        mutable QImage        m_lastImage;       ///< 上一笔的成品：命中缓存时直接贴它
+        mutable QRect         m_lastTarget;      ///< 上一笔成品的逻辑目标矩形
+        mutable std::uint64_t m_lastKey     = 0; ///< 上一笔的缓存键：源图、倍比与几何一起混出来
+        mutable int           m_cacheBuilds = 0; ///< 重算次数，缓存键不匹配时才递增
     };
 
 } // namespace GyanisScribe::Core

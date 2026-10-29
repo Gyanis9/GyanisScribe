@@ -11,6 +11,11 @@
 
 #include "Core/Annotation/PenTool.h"
 
+#include <QImage>
+#include <QRectF>
+
+#include <cstdint>
+
 namespace GyanisScribe::Core
 {
 
@@ -37,6 +42,12 @@ namespace GyanisScribe::Core
          */
         [[nodiscard]] QString displayName() const override;
 
+        /**
+         * @brief 上一块擦除成品重算了几次
+         * @return 重算次数，用于确认静止重绘命中缓存
+         */
+        [[nodiscard]] int cacheBuildCountForTesting() const noexcept;
+
     protected:
         /**
          * @brief 把笔迹扫过的那一块底图画回画布，见 AnnotationTool::paintShape()
@@ -59,6 +70,12 @@ namespace GyanisScribe::Core
          *          否则视觉上一条宽笔迹却只有中间一线点得中。
          */
         [[nodiscard]] bool hitTestShape(const AnnotationShape &shape, const QPoint &point, int tolerance) const override;
+
+    private:
+        mutable QImage        m_lastPatch;       ///< 上一笔的成品：命中缓存时直接贴它，不再抠一次图
+        mutable QRectF        m_lastTarget;      ///< 上一笔成品的逻辑目标矩形
+        mutable std::uint64_t m_lastKey     = 0; ///< 上一笔的缓存键：源图、倍比、线宽与轨迹一起混出来
+        mutable int           m_cacheBuilds = 0; ///< 重算次数，缓存键不匹配时才递增
     };
 
 } // namespace GyanisScribe::Core

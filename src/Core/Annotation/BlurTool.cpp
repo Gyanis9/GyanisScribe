@@ -19,6 +19,11 @@ namespace GyanisScribe::Core
         return GyanisScribe::Base::uiText("高斯模糊");
     }
 
+    int BlurTool::cacheBuildCountForTesting() const noexcept
+    {
+        return m_cacheBuilds;
+    }
+
     void BlurTool::paintShape(QPainter &painter, const AnnotationShape &shape, const PaintContext &context) const
     {
         const auto &source = context.source;
@@ -37,8 +42,18 @@ namespace GyanisScribe::Core
         }
 
         // 半径也按同一倍比换算：否则高 DPI 屏上糊得比用户框的浅一倍
-        const auto radius  = qMax(1, static_cast<int>(std::lround(kBlurRadiusLogical * context.pixelScale)));
-        const auto blurred = boxBlurred(source.copy(physical), radius);
+        const auto radius = qMax(1, static_cast<int>(std::lround(kBlurRadiusLogical * context.pixelScale)));
+
+        // 整张底图只模糊一次：拖动大区域时每帧重算三趟全图方框模糊是这条绘制路径最贵的一步。
+        // 源图身份或半径变了才重建，缓存只留这一份整图
+        if (m_blurredCanvas.isNull() || source.cacheKey() != m_blurredSourceKey || radius != m_blurredRadius)
+        {
+            m_blurredCanvas    = boxBlurred(source, radius);
+            m_blurredSourceKey = source.cacheKey();
+            m_blurredRadius    = radius;
+            ++m_cacheBuilds;
+        }
+        const QImage blurred = m_blurredCanvas.copy(physical);
 
         if (!shape.elliptical)
         {

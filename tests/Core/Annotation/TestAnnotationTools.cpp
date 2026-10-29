@@ -1,6 +1,9 @@
 #include "Core/Annotation/AnnotationEngine.h"
 #include "Core/Annotation/PenParameters.h"
 
+#include "Core/Annotation/AnnotationTool.h"
+#include "Core/Annotation/BlurTool.h"
+#include "Core/Annotation/EraserTool.h"
 #include "Core/Annotation/HighlightTool.h"
 #include "Core/Annotation/ImageBlur.h"
 #include "Core/Annotation/MagnifierLayout.h"
@@ -15,6 +18,7 @@
 #include <QFontDatabase>
 #include <QFontMetricsF>
 #include <QImage>
+#include <QPainter>
 #include <QString>
 
 #include <gtest/gtest.h>
@@ -26,10 +30,16 @@ using GyanisScribe::Base::CapturedImage;
 using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Core::AnnotationEngine;
 using GyanisScribe::Core::AnnotationSelection;
+using GyanisScribe::Core::AnnotationShape;
+using GyanisScribe::Core::AnnotationTool;
+using GyanisScribe::Core::BlurTool;
+using GyanisScribe::Core::EraserTool;
 using GyanisScribe::Core::kMagnifierGap;
 using GyanisScribe::Core::kNumberGroupCount;
 using GyanisScribe::Core::magnifierInsetRectFor;
+using GyanisScribe::Core::MosaicTool;
 using GyanisScribe::Core::NumberTool;
+using GyanisScribe::Core::PaintContext;
 using GyanisScribe::Core::PenParameters;
 using GyanisScribe::Core::PenTool;
 using GyanisScribe::Core::ToolKind;
@@ -82,6 +92,20 @@ namespace
         AnnotationEngine m_engine;
         QImage           m_original; ///< 未经标注的底图，用于数「改了哪些像素」
     };
+
+    /**
+     * @brief 把工具里的第一条图形画进一张新图，模拟一次重绘
+     * @param tool 被测工具
+     * @param context 绘制现场
+     * @details 每次重绘换一张干净画布：命中缓存时工具应直接复用上一笔成品，而不是重新算像素。
+     */
+    void repaintFirstShape(const AnnotationTool &tool, const PaintContext &context)
+    {
+        QImage target(context.source.size(), QImage::Format_ARGB32_Premultiplied);
+        target.fill(Qt::transparent);
+        QPainter painter(&target);
+        tool.paintShapeAt(0, painter, context);
+    }
 
     /**
      * @brief 钉住高斯模糊把跨边界的对比糊掉，且只动框住的那一块
@@ -317,6 +341,116 @@ namespace
     }
 
 } // namespace
+
+/**
+ * @brief 钉住模糊的整张底图结果跨重绘复用，换底图后必须重建
+ * @details 拖动改动的是图形几何，底图与半径不变，重绘不该再跑三趟全图方框模糊；
+ *          源图身份变了还复用就会把旧底图的模糊贴到新画面上。
+ */
+TEST_F(AnnotationFixture, BlurReusesTheBlurredCanvasAcrossRepaints)
+{
+    BlurTool        tool;
+    AnnotationShape shape;
+    shape.rect = QRect(100, 70, 100, 60);
+    tool.insertShape(0, shape);
+
+    const auto        &canvas = m_engine.canvas();
+    const PaintContext context{canvas.image, 1.0};
+
+    repaintFirstShape(tool, context);
+    EXPECT_EQ(tool.cacheBuildCountForTesting(), 1) << "第一次绘制该建一次模糊缓存";
+    repaintFirstShape(tool, context);
+    EXPECT_EQ(tool.cacheBuildCountForTesting(), 1) << "同一块底图重绘又重算了整张图";
+
+    QImage replacement = canvas.image.copy();
+    replacement.setPixelColor(0, 0, QColor(0, 0, 0));
+    const PaintContext replacementContext{replacement, 1.0};
+    repaintFirstShape(tool, replacementContext);
+    EXPECT_EQ(tool.cacheBuildCountForTesting(), 2) << "源图换了缓存没失效，画上去的是旧底图的模糊";
+}
+
+/**
+ * @brief 钉住马赛克的上一笔成品跨重绘复用，换底图后必须重算
+ * @details 同一图形、同一倍比与粒度下重绘直接贴上一笔成品；源图身份是键的一部分。
+ */
+TEST_F(AnnotationFixture, MosaicReusesTheLastShapeAcrossRepaints)
+{
+    MosaicTool      tool;
+    AnnotationShape shape;
+    shape.rect = QRect(100, 60, 100, 60);
+    tool.insertShape(0, shape);
+
+    const auto        &canvas = m_engine.canvas();
+    const PaintContext context{canvas.image, 1.0};
+
+    repaintFirstShape(tool, context);
+    EXPECT_EQ(tool.cacheBuildCountForTesting(), 1) << "第一次绘制该算一次马赛克";
+    repaintFirstShape(tool, context);
+    EXPECT_EQ(tool.cacheBuildCountForTesting(), 1) << "同一笔重绘又重算了一遍马赛克";
+
+    QImage replacement = canvas.image.copy();
+    replacement.setPixelColor(0, 0, QColor(0, 0, 0));
+    const PaintContext replacementContext{replacement, 1.0};
+    repaintFirstShape(tool, replacementContext);
+    EXPECT_EQ(tool.cacheBuildCountForTesting(), 2) << "源图换了缓存没失效，贴的是旧底图的马赛克";
+}
+
+/**
+ * @brief 钉住橡皮擦的上一块成品跨重绘复用，换底图后必须重算
+ * @details 键包含轨迹与线宽：轨迹一变就是另一笔，静止重绘才允许直接复用。
+ */
+TEST_F(AnnotationFixture, EraserReusesTheLastPatchAcrossRepaints)
+{
+    EraserTool      tool;
+    AnnotationShape shape;
+    shape.points    = {QPoint(120, 40), QPoint(280, 40)};
+    shape.lineWidth = 8;
+    tool.insertShape(0, shape);
+
+    const auto        &canvas = m_engine.canvas();
+    const PaintContext context{canvas.image, 1.0};
+
+    repaintFirstShape(tool, context);
+    EXPECT_EQ(tool.cacheBuildCountForTesting(), 1) << "第一次绘制该抠一次图";
+    repaintFirstShape(tool, context);
+    EXPECT_EQ(tool.cacheBuildCountForTesting(), 1) << "同一笔重绘又抠了一遍图";
+
+    QImage replacement = canvas.image.copy();
+    replacement.setPixelColor(0, 0, QColor(0, 0, 0));
+    const PaintContext replacementContext{replacement, 1.0};
+    repaintFirstShape(tool, replacementContext);
+    EXPECT_EQ(tool.cacheBuildCountForTesting(), 2) << "源图换了缓存没失效，擦出来的是旧底图";
+}
+
+/**
+ * @brief 钉住层序表只在图形集合变化后重建
+ * @details 连续导出同一画面不该反复重建并排序；插入与撤销都会改索引，各该重建一次。
+ */
+TEST_F(AnnotationFixture, ZOrderTableIsRebuiltOnlyWhenShapesChange)
+{
+    ASSERT_TRUE(m_engine.setActiveTool(ToolKind::Rectangle).has_value());
+    m_engine.beginStroke(QPoint(10, 10));
+    m_engine.moveStroke(QPoint(60, 60));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+
+    const int baseline = m_engine.zOrderRebuildCountForTesting();
+    static_cast<void>(m_engine.exportImage());
+    const int afterFirstExport = m_engine.zOrderRebuildCountForTesting();
+    EXPECT_EQ(afterFirstExport, baseline + 1) << "第一次导出该建一次层序表";
+
+    static_cast<void>(m_engine.exportImage());
+    EXPECT_EQ(m_engine.zOrderRebuildCountForTesting(), afterFirstExport) << "没有变图形时重复导出不该重建层序表";
+
+    m_engine.beginStroke(QPoint(100, 10));
+    m_engine.moveStroke(QPoint(150, 60));
+    ASSERT_TRUE(m_engine.endStroke().has_value());
+    static_cast<void>(m_engine.exportImage());
+    EXPECT_EQ(m_engine.zOrderRebuildCountForTesting(), afterFirstExport + 1) << "插入一条后层序表没有重建";
+
+    ASSERT_TRUE(m_engine.undo().has_value());
+    static_cast<void>(m_engine.exportImage());
+    EXPECT_EQ(m_engine.zOrderRebuildCountForTesting(), afterFirstExport + 2) << "撤销后层序表没有重建";
+}
 
 /**
  * @brief 钉住画笔的采样：一路走过的点都要留下，重复采样点丢掉

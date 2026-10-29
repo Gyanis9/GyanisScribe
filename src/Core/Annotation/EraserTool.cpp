@@ -8,7 +8,9 @@
 #include <QPainterPath>
 #include <QRectF>
 
+#include <bit>
 #include <cmath>
+#include <cstdint>
 
 namespace GyanisScribe::Core
 {
@@ -16,6 +18,53 @@ namespace GyanisScribe::Core
     {
         // 橡皮相对线宽的加宽倍数：与高亮同口径，滑块调线宽就是调橡皮的大小
         constexpr int kEraserWidthFactor = 6;
+
+        /// FNV-1a 的 64 位基值与质数：把源图身份与几何混成一个缓存键
+        constexpr std::uint64_t kFnvOffsetBasis = 14695981039346656037ULL;
+        constexpr std::uint64_t kFnvPrime       = 1099511628211ULL;
+
+        /**
+         * @brief 把一个 64 位量逐字节混进 FNV-1a 哈希
+         * @param hash 当前哈希值
+         * @param value 待混入的量
+         * @return 混入后的哈希值
+         */
+        [[nodiscard]] std::uint64_t mixCacheKey(std::uint64_t hash, const std::uint64_t value) noexcept
+        {
+            for (int shift = 0; shift < 64; shift += 8)
+            {
+                hash ^= (value >> shift) & 0xFFULL;
+                hash *= kFnvPrime;
+            }
+            return hash;
+        }
+
+        /**
+         * @brief 算上一笔擦除成品的缓存键
+         * @param shape 图形
+         * @param context 绘制现场
+         * @return 源图身份、倍比、线宽、椭圆档与整条轨迹一起混出的键
+         * @details 轨迹逐点混入：采样点一变就是另一笔，绝不把旧笔迹的成品贴到新笔迹上。
+         */
+        [[nodiscard]] std::uint64_t eraserCacheKey(const AnnotationShape &shape, const PaintContext &context) noexcept
+        {
+            std::uint64_t key = kFnvOffsetBasis;
+            key               = mixCacheKey(key, static_cast<std::uint64_t>(context.source.cacheKey()));
+            key               = mixCacheKey(key, std::bit_cast<std::uint64_t>(static_cast<double>(context.pixelScale)));
+            key               = mixCacheKey(key, static_cast<std::uint64_t>(shape.lineWidth));
+            key               = mixCacheKey(key, static_cast<std::uint64_t>(shape.rect.x()));
+            key               = mixCacheKey(key, static_cast<std::uint64_t>(shape.rect.y()));
+            key               = mixCacheKey(key, static_cast<std::uint64_t>(shape.rect.width()));
+            key               = mixCacheKey(key, static_cast<std::uint64_t>(shape.rect.height()));
+            key               = mixCacheKey(key, shape.elliptical ? 1ULL : 0ULL);
+            key               = mixCacheKey(key, static_cast<std::uint64_t>(shape.points.size()));
+            for (const auto &point: shape.points)
+            {
+                key = mixCacheKey(key, static_cast<std::uint64_t>(point.x()));
+                key = mixCacheKey(key, static_cast<std::uint64_t>(point.y()));
+            }
+            return key;
+        }
     } // namespace
 
     EraserTool::EraserTool() : PenTool(ToolKind::Eraser)
@@ -25,6 +74,11 @@ namespace GyanisScribe::Core
     QString EraserTool::displayName() const
     {
         return GyanisScribe::Base::uiText("橡皮擦");
+    }
+
+    int EraserTool::cacheBuildCountForTesting() const noexcept
+    {
+        return m_cacheBuilds;
     }
 
     void EraserTool::paintShape(QPainter &painter, const AnnotationShape &shape, const PaintContext &context) const
@@ -50,6 +104,18 @@ namespace GyanisScribe::Core
         physical = physical.adjusted(-margin, -margin, margin, margin).intersected(source.rect());
         if (physical.isEmpty())
         {
+            return;
+        }
+
+        // 物理框按同一倍比换回逻辑坐标贴回画布：屏显与导出各有一套画家变换，两处都落到同一块像素上
+        const QRectF target(QPointF(physical.left() / context.pixelScale, physical.top() / context.pixelScale),
+                            QSizeF(physical.width() / context.pixelScale, physical.height() / context.pixelScale));
+
+        // 静止重绘轨迹没变：上一块成品原样贴回去，不必再画一遍掩膜、再抠一次图
+        const std::uint64_t cacheKey = eraserCacheKey(shape, context);
+        if (!m_lastPatch.isNull() && cacheKey == m_lastKey)
+        {
+            painter.drawImage(m_lastTarget, m_lastPatch);
             return;
         }
 
@@ -106,10 +172,11 @@ namespace GyanisScribe::Core
             patchPainter.drawImage(0, 0, mask);
         }
 
-        // 物理框按同一倍比换回逻辑坐标贴回画布：屏显与导出各有一套画家变换，两处都落到同一块像素上
-        const QRectF target(QPointF(physical.left() / context.pixelScale, physical.top() / context.pixelScale),
-                            QSizeF(physical.width() / context.pixelScale, physical.height() / context.pixelScale));
-        painter.drawImage(target, patch);
+        m_lastPatch  = patch;
+        m_lastTarget = target;
+        m_lastKey    = cacheKey;
+        ++m_cacheBuilds;
+        painter.drawImage(m_lastTarget, m_lastPatch);
     }
 
     bool EraserTool::hitTestShape(const AnnotationShape &shape, const QPoint &point, int tolerance) const

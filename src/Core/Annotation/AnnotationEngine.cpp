@@ -417,7 +417,13 @@ namespace GyanisScribe::Core
         Q_ASSERT(defaultActivated.has_value());
         Q_UNUSED(defaultActivated);
 
-        QObject::connect(&m_undoStack, &QUndoStack::indexChanged, this, [this] { emit canvasChanged(); });
+        QObject::connect(&m_undoStack, &QUndoStack::indexChanged, this,
+                         [this]
+                         {
+                             // 增删、撤销与重做都会改图形集合：层序表下一次用时重建
+                             m_zCacheDirty = true;
+                             emit canvasChanged();
+                         });
     }
 
     AnnotationEngine::~AnnotationEngine() = default;
@@ -432,6 +438,8 @@ namespace GyanisScribe::Core
         m_handleDrag.reset();
         m_topZ        = 0;
         m_pasteSeries = 0;
+        // 图形被直接清空，撤销栈此刻多半已是空的：层序表必须自己置脏，不能只靠索引变更信号
+        m_zCacheDirty = true;
         // 剪贴板不清：复制的是一条标注的副本，粘到下一张图上接着用正是它存在的意义
         for (const auto &tool: m_tools)
         {
@@ -466,6 +474,8 @@ namespace GyanisScribe::Core
         m_handleDrag.reset();
         // 撤销命令记的是旧坐标：留着重做会把图形插回裁切前的位置
         m_undoStack.clear();
+        // 图形被整体平移而层叠号不变：这里仍统一标脏，让下一次绘制从当前图形集合重取一份
+        m_zCacheDirty = true;
         emit canvasChanged();
     }
 
@@ -788,7 +798,7 @@ namespace GyanisScribe::Core
     std::optional<AnnotationSelection> AnnotationEngine::selectionAt(const QPoint &point) const
     {
         // 按层叠号的倒序问：最上层的那条先答，用户点的就是看得见的那一条
-        const auto entries = zOrderedEntries();
+        const auto &entries = zOrderedEntries();
         for (auto it = entries.rbegin(); it != entries.rend(); ++it)
         {
             if (it->tool->hitTestShapeAt(it->index, point))
@@ -967,19 +977,27 @@ namespace GyanisScribe::Core
         }
     }
 
-    std::vector<AnnotationEngine::ZEntry> AnnotationEngine::zOrderedEntries() const
+    const std::vector<AnnotationEngine::ZEntry> &AnnotationEngine::zOrderedEntries() const
     {
-        std::vector<ZEntry> entries;
+        // 图形集合没变就直接交回上一份：屏显每帧都会问它一次，重建与排序比一次命中贵得多
+        if (!m_zCacheDirty)
+        {
+            return m_zCache;
+        }
+
+        m_zCache.clear();
         for (const auto &tool: m_tools)
         {
             for (int index = 0; index < tool->shapeCount(); ++index)
             {
-                entries.push_back({tool.get(), index, tool->shapeAt(index).zOrder});
+                m_zCache.push_back({tool.get(), index, tool->shapeAt(index).zOrder});
             }
         }
         // 稳定排序：层叠号本该互不相同；真撞上了（老数据、手工构造）也保持工具登记顺序，不随机打乱
-        std::stable_sort(entries.begin(), entries.end(), [](const ZEntry &left, const ZEntry &right) { return left.zOrder < right.zOrder; });
-        return entries;
+        std::stable_sort(m_zCache.begin(), m_zCache.end(), [](const ZEntry &left, const ZEntry &right) { return left.zOrder < right.zOrder; });
+        m_zCacheDirty = false;
+        ++m_zRebuilds;
+        return m_zCache;
     }
 
     void AnnotationEngine::beginMoveGesture()
@@ -1427,6 +1445,11 @@ namespace GyanisScribe::Core
         m_selection = std::move(pasted);
         emit canvasChanged();
         return {};
+    }
+
+    int AnnotationEngine::zOrderRebuildCountForTesting() const noexcept
+    {
+        return m_zRebuilds;
     }
 
     AnnotationTool *AnnotationEngine::toolFor(ToolKind kind) const noexcept

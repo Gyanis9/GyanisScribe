@@ -338,6 +338,12 @@ namespace GyanisScribe::Core
          */
         [[nodiscard]] Base::Expected<void> redo() override;
 
+        /**
+         * @brief 层序表重建了几次
+         * @return 重建次数，用于确认重复绘制命中缓存
+         */
+        [[nodiscard]] int zOrderRebuildCountForTesting() const noexcept;
+
     private:
         /// 全局层叠表里的一条：哪个工具的哪一条图形、压在第几层
         struct ZEntry
@@ -375,8 +381,11 @@ namespace GyanisScribe::Core
          */
         [[nodiscard]] Base::Expected<void> validatePenParameters(const PenParameters &parameters) const;
 
-        /// 全部图形按层叠号升序排好（最底层的在前）
-        [[nodiscard]] std::vector<ZEntry> zOrderedEntries() const;
+        /**
+         * @brief 全部图形按层叠号升序排好（最底层的在前）
+         * @return 缓存表的引用；图形集合变化后第一次调用时重建并重排
+         */
+        [[nodiscard]] const std::vector<ZEntry> &zOrderedEntries() const;
 
         /// 一条选中项到底在不在册
         [[nodiscard]] bool selectionIsValid(const AnnotationSelection &selection) const;
@@ -414,10 +423,13 @@ namespace GyanisScribe::Core
         ToolKind                                          m_activeTool = ToolKind::Select; ///< 当前工具：默认是选择/指针，不落笔
         PenParameters                                     m_penParameters;                 ///< 画笔默认参数整套
         std::uint64_t                                     m_gestureSerial = 0;             ///< 位移手势号：两次独立拖动之间换号，撤销栈据此断开合并
-        int                                               m_topZ = 0;                      ///< 已发出的最大层叠号：新图形总领到更大的号，落在最上层
+        int                                               m_topZ          = 0;             ///< 已发出的最大层叠号：新图形总领到更大的号，落在最上层
         std::optional<HandleDrag>                         m_handleDrag;                    ///< 进行中的手柄拖动现场
         std::vector<std::pair<ToolKind, AnnotationShape>> m_clipboard;                     ///< 引擎内剪贴板：复制下来的图形副本，与系统剪贴板无关
         int                                               m_pasteSeries = 0;               ///< 连续粘贴的轮次：每粘一次多偏一格，两次粘贴不会完全叠在一起
+        mutable std::vector<ZEntry>                       m_zCache;                        ///< 层序表缓存：图形集合不变时重复绘制不再重建并排序
+        mutable bool                                      m_zCacheDirty = true;            ///< 缓存是否过期：撤销栈索引变化、换画布与重裁时置位
+        mutable int                                       m_zRebuilds   = 0;               ///< 缓存重建次数，用例据此确认重复绘制命中缓存
     };
 
 } // namespace GyanisScribe::Core
