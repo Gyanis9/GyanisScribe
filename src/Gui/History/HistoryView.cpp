@@ -306,10 +306,11 @@ namespace GyanisScribe::Gui
 
         if (loaded->skippedRecords > 0)
         {
-            Base::Logger::warning(std::format("历史清单里有 {} 条记录读不懂，已跳过：{}", loaded->skippedRecords, loaded->firstProblem));
-            // 同一个数量连续刷新只提示一次：用户没修好之前，每次重读都弹一遍只是打扰
+            // 同一个数量连续刷新只提示一次：用户没修好之前，每次重读都弹一遍只是打扰。
+            // 日志跟着提示走同一条分支：没有新提示的刷新不该再往日志里刷同一行
             if (loaded->skippedRecords != m_lastSkippedRecords)
             {
+                Base::Logger::warning(std::format("历史清单里有 {} 条记录读不懂，已跳过：{}", loaded->skippedRecords, loaded->firstProblem));
                 const auto message =
                         GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("历史清单里有 {} 条记录读不懂，已跳过：{}"), loaded->skippedRecords, loaded->firstProblem);
                 emit messageForUser(QString::fromUtf8(message.c_str()), Gui::ToastKind::Danger);
