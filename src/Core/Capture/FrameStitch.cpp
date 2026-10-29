@@ -105,8 +105,10 @@ namespace GyanisScribe::Core
         }
         if (m_buffer.width() != added.width())
         {
-            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Base::uiTextUtf8("长截图接不上：这一帧的宽度和前面不一致（多半是中途换了屏或改了缩放）。先把已有这一段收好再重来")});
+            return std::unexpected(
+                    Base::Error{Base::ErrorCode::InvalidArgument,
+                                GyanisScribe::Base::uiTextUtf8(
+                                        "长截图接不上：这一帧的宽度和前面不一致（多半是中途换了屏或改了缩放）。这一段已中止，临时画面不会保留；请在同一屏幕与缩放下重截")});
         }
 
         // 只把已写好的那几行交给接缝判定：扩容留出的空行还没写过，混进来比就是拿未初始化的字节碰运气。
