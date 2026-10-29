@@ -404,6 +404,52 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住动画每一步都复用同一份缩放位图：只有源图、内容尺寸、平滑档或窗口倍比变了才重建
+     * @details 贴边收展只挪窗口几何、不动内容尺寸，整段动画应当零重建；改缩放才让内容尺寸换档。
+     *          指针若绕过缓存直接画原图，这份计数停在 0，第一条断言就会红。
+     */
+    TEST_F(PinWindowFixture, ScaledPixmapIsReusedDuringAnimation)
+    {
+        QScreen *screen = QGuiApplication::primaryScreen();
+        if (screen == nullptr)
+        {
+            GTEST_SKIP() << "这个环境没有屏幕可枚举，贴边的几何无从谈起";
+        }
+        const auto available = screen->availableGeometry();
+
+        auto &window = makeWindow();
+        window.setScale(2.0);
+        window.setAttribute(Qt::WA_DontShowOnScreen);
+        window.show();
+        QCoreApplication::processEvents();
+        window.grab();
+        ASSERT_EQ(window.scaledCacheBuildCountForTesting(), 1) << "首帧没有建出缩放位图：绘制没有走这条缓存";
+
+        // 贴边收起后悬停展开：几何在弹簧里走，内容尺寸整段不变
+        window.move(available.left() + 5, available.top() + 120);
+        window.setEdgeDocked(true);
+        ASSERT_EQ(window.edgeDock(), Core::ScreenEdge::Left) << "前提没造出来：这张没有贴到左边";
+        window.grab();
+        ASSERT_EQ(window.scaledCacheBuildCountForTesting(), 1) << "收起只挪位置，不该重建缩放位图";
+
+        QEnterEvent enter{QPointF{1.0, 1.0}, QPointF{1.0, 1.0}, QPointF{1.0, 1.0}};
+        QApplication::sendEvent(&window, &enter);
+        ASSERT_TRUE(window.isGeometryAnimationRunning()) << "前提没造出来：悬停展开没有起几何弹簧";
+        for (int step = 0; step < 5; ++step)
+        {
+            window.advanceGeometryAnimationForTesting(20);
+            window.grab();
+        }
+        EXPECT_EQ(window.scaledCacheBuildCountForTesting(), 1) << "动画推进时重建了缩放位图：每一帧都在把整张图重新采样一遍";
+        EXPECT_TRUE(window.isGeometryAnimationRunning()) << "动画在五步内就走完了，这一条判不到「动画期间」";
+
+        window.advanceGeometryAnimationForTesting(1000);
+        window.setScale(3.0);
+        window.grab();
+        EXPECT_EQ(window.scaledCacheBuildCountForTesting(), 2) << "改缩放后内容尺寸换了档，缩放位图必须重建";
+    }
+
+    /**
      * @brief 钉住 `Ctrl+A` 只报「把桌上看得见的贴图一起选上」的意图，裸按 A 不抢
      * @details 谁在屏上是管理器的账（收着的、别组的都不算），窗口这一层只报意图，
      *          判据因此落在「报了几次」而不是「选中了几张」。

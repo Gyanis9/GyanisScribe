@@ -148,6 +148,15 @@ namespace GyanisScribe::Core
         [[nodiscard]] virtual Base::Expected<QString> saveToFile(const std::filesystem::path &directory, const QString &fileName, int quality) = 0;
 
         /**
+         * @brief 按布局记录恢复贴边收起态
+         * @param edge 贴的是哪条屏边；None 表示这张没贴边
+         * @param collapsed true 表示恢复后收成留在屏上的那一条
+         * @details 恢复时按保存的左上角与边反推露出时的矩形，再用它的中心找屏；找不到屏幕时退回主屏。
+         *          恢复走瞬时落位，不从屏外弹一段动画回来。
+         */
+        virtual void restoreDockState(Core::ScreenEdge edge, bool collapsed) = 0;
+
+        /**
          * @brief 贴图当前在全屏坐标里的位置
          * @return 逻辑坐标下的矩形
          */

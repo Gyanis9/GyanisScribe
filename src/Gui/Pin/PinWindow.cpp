@@ -541,6 +541,57 @@ namespace GyanisScribe::Gui
         return m_edgeDock;
     }
 
+    void PinWindow::restoreDockState(const Core::ScreenEdge edge, const bool collapsed)
+    {
+        if (edge == Core::ScreenEdge::None)
+        {
+            m_edgeDock      = Core::ScreenEdge::None;
+            m_dockCollapsed = false;
+            return;
+        }
+
+        // 收起态的左上角在屏外，按保存时留下的那条边把露出矩形反推回来：
+        // 四条边的换算与 Core::dockedRect 正好相反，条宽必须用同一个常量
+        auto revealed = QRect(pos(), size());
+        if (collapsed)
+        {
+            switch (edge)
+            {
+                case Core::ScreenEdge::Left:
+                    revealed.moveLeft(revealed.left() + revealed.width() - Core::kEdgeStripWidth);
+                    break;
+                case Core::ScreenEdge::Right:
+                    revealed.moveLeft(revealed.left() - revealed.width() + Core::kEdgeStripWidth);
+                    break;
+                case Core::ScreenEdge::Top:
+                    revealed.moveTop(revealed.top() + revealed.height() - Core::kEdgeStripWidth);
+                    break;
+                case Core::ScreenEdge::Bottom:
+                    revealed.moveTop(revealed.top() - revealed.height() + Core::kEdgeStripWidth);
+                    break;
+                case Core::ScreenEdge::None:
+                    break;
+            }
+        }
+
+        // 用露出矩形的中心找屏：收起之后窗口中心也落在屏外，拿它找不到那台显示器
+        const QScreen *screen = QGuiApplication::screenAt(revealed.center());
+        if (screen == nullptr)
+        {
+            screen = QGuiApplication::primaryScreen();
+        }
+        if (screen == nullptr)
+        {
+            return;
+        }
+
+        m_dockArea      = screen->availableGeometry();
+        m_edgeDock      = edge;
+        m_dockCollapsed = collapsed;
+        // 恢复是启动时那一下：不摆一段从屏外滑回来的动画
+        applyDockGeometry(false);
+    }
+
     void PinWindow::setEdgeDocked(const bool docked)
     {
         if (!docked)
@@ -726,6 +777,8 @@ namespace GyanisScribe::Gui
         state.transparentBackdrop = m_transparentBackdrop;
         state.sourceFile          = m_sourceFile;
         state.colorCardHex        = m_colorCardHex;
+        state.edgeDock            = m_edgeDock;
+        state.dockCollapsed       = m_dockCollapsed;
         return state;
     }
 
@@ -1575,6 +1628,11 @@ namespace GyanisScribe::Gui
         }
     }
 
+    int PinWindow::scaledCacheBuildCountForTesting() const noexcept
+    {
+        return m_scaledBuilds;
+    }
+
     QRectF PinWindow::contentRect() const
     {
         const auto   scaled = m_thumbnail ? QSizeF{m_thumbnailEdge, m_thumbnailEdge} : Core::windowSizeFor(m_logicalSize, m_scale);
@@ -1628,7 +1686,26 @@ namespace GyanisScribe::Gui
         {
             painter.fillRect(content, QBrush{Core::checkerboardTile(checker->first, checker->second, Core::kCheckerCellPixels)});
         }
-        painter.drawImage(content, displayImage(), QRectF(QPointF(0.0, 0.0), QSizeF(m_image.width(), m_image.height())));
+        // 显示图按内容尺寸先缩好一份挂住：动画只改窗口几何、不动内容尺寸，整段收展都复用它。
+        // 键取显示图的 cacheKey、内容逻辑尺寸、平滑档与窗口倍比，任一换挡就重建
+        const QImage &source      = displayImage();
+        const qreal   deviceRatio = devicePixelRatioF();
+        const QSize   logicalSize = content.size().toSize();
+        if (m_scaledContent.isNull() || m_scaledSourceKey != source.cacheKey() || m_scaledLogicalSize != logicalSize || m_scaledSmooth != m_smoothScaleEnabled ||
+            m_scaledDpr != deviceRatio)
+        {
+            // 目标按窗口倍比放大到物理像素，绘制的 1:1 落点才与旧画法逐像素对齐
+            const auto targetPixels = QSize{std::max(1, qRound(content.width() * deviceRatio)), std::max(1, qRound(content.height() * deviceRatio))};
+            m_scaledContent         = source.scaled(targetPixels, Qt::IgnoreAspectRatio, m_smoothScaleEnabled ? Qt::SmoothTransformation : Qt::FastTransformation);
+            m_scaledContent.setDevicePixelRatio(deviceRatio);
+            m_scaledSourceKey   = source.cacheKey();
+            m_scaledLogicalSize = logicalSize;
+            m_scaledSmooth      = m_smoothScaleEnabled;
+            m_scaledDpr         = deviceRatio;
+            ++m_scaledBuilds;
+        }
+        // 缓存已按逻辑尺寸与倍比铺好，这里不再让画家重采样
+        painter.drawImage(content.topLeft(), m_scaledContent);
         painter.resetTransform();
 
         // 悬停、拖手柄或选进多选集才画边框，平时一张干净的图压在屏幕上不该有装饰；

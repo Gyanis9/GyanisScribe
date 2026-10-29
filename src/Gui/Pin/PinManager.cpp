@@ -358,6 +358,11 @@ namespace GyanisScribe::Gui
             // 位置排在几何参数之后：缩放与旋转都绕着图片中心重排，窗口左上会跟着挪，
             // 先摆位置再改尺寸就等于把记下来的那个点当成了「参数生效前」的位置
             m_pins.back()->move(state.position);
+            // 贴边那两张的左上角在屏外：位置落定之后按边与收起档把窗口重新摆回条带上
+            if (state.edgeDock != Core::ScreenEdge::None)
+            {
+                pin.restoreDockState(state.edgeDock, state.dockCollapsed);
+            }
             ++restored;
         }
 

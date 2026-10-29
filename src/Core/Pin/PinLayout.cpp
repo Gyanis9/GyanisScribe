@@ -17,20 +17,22 @@ namespace GyanisScribe::Core
     namespace
     {
         // 单个对象的字段名集中在这里，序列化与解析读同一组常量，才不会一个写成 scale 另一个写成 Scale
-        constexpr std::string_view kKeyPositionX = "x";
-        constexpr std::string_view kKeyPositionY = "y";
-        constexpr std::string_view kKeyWidth     = "width";
-        constexpr std::string_view kKeyHeight    = "height";
-        constexpr std::string_view kKeyScale     = "scale";
-        constexpr std::string_view kKeyRotation  = "rotation";
-        constexpr std::string_view kKeyOpacity   = "opacity";
-        constexpr std::string_view kKeyImageFile = "imageFile";
-        constexpr std::string_view kKeyGroup     = "group";
-        constexpr std::string_view kKeyOnTop     = "alwaysOnTop";
-        constexpr std::string_view kKeyThrough   = "mouseThrough";
-        constexpr std::string_view kKeySource    = "sourceFile";
-        constexpr std::string_view kKeyBackdrop  = "transparentBackdrop";
-        constexpr std::string_view kKeyColorCard = "colorCardHex";
+        constexpr std::string_view kKeyPositionX     = "x";
+        constexpr std::string_view kKeyPositionY     = "y";
+        constexpr std::string_view kKeyWidth         = "width";
+        constexpr std::string_view kKeyHeight        = "height";
+        constexpr std::string_view kKeyScale         = "scale";
+        constexpr std::string_view kKeyRotation      = "rotation";
+        constexpr std::string_view kKeyOpacity       = "opacity";
+        constexpr std::string_view kKeyImageFile     = "imageFile";
+        constexpr std::string_view kKeyGroup         = "group";
+        constexpr std::string_view kKeyOnTop         = "alwaysOnTop";
+        constexpr std::string_view kKeyThrough       = "mouseThrough";
+        constexpr std::string_view kKeySource        = "sourceFile";
+        constexpr std::string_view kKeyBackdrop      = "transparentBackdrop";
+        constexpr std::string_view kKeyColorCard     = "colorCardHex";
+        constexpr std::string_view kKeyEdgeDock      = "edgeDock";
+        constexpr std::string_view kKeyDockCollapsed = "dockCollapsed";
 
         /// 键名是有长度的视图，转 QLatin1String 时按 (指针, 长度) 收：不假设它过 0 结尾
         /// （QLatin1String 的 const char* 那一档就会去读结尾之外的字节，表项改成切片就静默越界）
@@ -71,6 +73,8 @@ namespace GyanisScribe::Core
             entry.insert(keyText(kKeySource), state.sourceFile);
             entry.insert(keyText(kKeyBackdrop), static_cast<int>(state.transparentBackdrop));
             entry.insert(keyText(kKeyColorCard), state.colorCardHex);
+            entry.insert(keyText(kKeyEdgeDock), static_cast<int>(state.edgeDock));
+            entry.insert(keyText(kKeyDockCollapsed), state.dockCollapsed);
             entries.append(entry);
         }
         return QString::fromUtf8(QJsonDocument(entries).toJson(QJsonDocument::Compact));
@@ -200,6 +204,35 @@ namespace GyanisScribe::Core
                                                                  index + 1, kTransparentBackdropCount - 1, raw));
                 }
                 state.transparentBackdrop = static_cast<TransparentBackdrop>(raw);
+            }
+
+            // 贴边方向同样是后加的字段，缺省落「没贴边」（旧布局里的贴图本来都在屏内）；
+            // 写了非整数或超出那五档才是坏记录——悄悄折成「没贴边」会把收在屏外的那张摆回桌面上
+            if (entry.contains(keyText(kKeyEdgeDock)))
+            {
+                const auto stored = entry[keyText(kKeyEdgeDock)];
+                if (!stored.isDouble() || static_cast<double>(stored.toInt()) != stored.toDouble())
+                {
+                    return failWith(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图布局第 {} 项的贴边方向不是整数。请清除这一项后让程序重新记一次"), index + 1));
+                }
+                const auto raw = stored.toInt();
+                if (raw < static_cast<int>(ScreenEdge::None) || raw > static_cast<int>(ScreenEdge::Bottom))
+                {
+                    return failWith(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图布局第 {} 项的贴边方向不在 0 到 {} 里：{}。请清除这一项后让程序重新记一次"),
+                                                                 index + 1, static_cast<int>(ScreenEdge::Bottom), raw));
+                }
+                state.edgeDock = static_cast<ScreenEdge>(raw);
+            }
+
+            // 收起档只在贴边时才有意义，但缺省与写歪要分开处理：缺省按「未收起」，
+            // 写了不是布尔值才是坏记录——toBool() 会把任意内容折成 false，静默把收起态读反
+            if (entry.contains(keyText(kKeyDockCollapsed)))
+            {
+                if (!entry[keyText(kKeyDockCollapsed)].isBool())
+                {
+                    return failWith(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图布局第 {} 项的收起档不是布尔值。请清除这一项后让程序重新记一次"), index + 1));
+                }
+                state.dockCollapsed = entry[keyText(kKeyDockCollapsed)].toBool();
             }
 
             states.push_back(state);

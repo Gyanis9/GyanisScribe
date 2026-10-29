@@ -48,6 +48,8 @@ namespace GyanisScribe::Core
         QString             sourceFile;                                           ///< 动图的来源文件；空表示这张是静图（剪贴板与标注贴出来的都在内存里）
         QString             colorCardHex;                                         ///< 这张是色卡时它原本那个色（`#AARRGGBB`）；空表示不是色卡，右键「改这一张的颜色…」据此出现
         TransparentBackdrop transparentBackdrop = TransparentBackdrop::ThemeBase; ///< 透明像素底下画哪一档，与右键「透明区」同解
+        ScreenEdge          edgeDock            = ScreenEdge::None;               ///< 贴的是哪条屏边；None 表示没贴
+        bool                dockCollapsed       = false;                          ///< 贴边后是不是收成了那一条
     };
 
     /// 分组号的起点：布局里缺 group 字段（上一版存下的）与新建的贴图都落这一组

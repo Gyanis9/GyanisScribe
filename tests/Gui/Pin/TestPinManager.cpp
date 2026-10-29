@@ -20,11 +20,15 @@
 #include <QColor>
 #include <QDragEnterEvent>
 #include <QDropEvent>
+#include <QEnterEvent>
+#include <QEvent>
+#include <QGuiApplication>
 #include <QImage>
 #include <QAction>
 #include <QKeyEvent>
 #include <QMenu>
 #include <QMouseEvent>
+#include <QScreen>
 #include <QWheelEvent>
 #include <QMimeData>
 #include <QPoint>
@@ -331,6 +335,60 @@ namespace GyanisScribe
         ASSERT_NE(pin, nullptr) << "管理器里的贴图不是 PinWindow，这一条判据接不上";
         EXPECT_TRUE(pin->isAnimated()) << "动图过夜回来变成了静图：布局里那条来源路径没用上";
         EXPECT_EQ(pin->state().sourceFile, gifPath) << "恢复之后来源路径又丢了";
+    }
+
+    /**
+     * @brief 钉住贴边收起态过夜：换了管理器恢复后仍贴着左边、只剩一条，悬停再露出来
+     * @details 收起后窗口左上角落在屏外，位置那一格本身指不回那块屏；恢复时必须按边与条宽反推露出矩形，
+     *          再用露出矩形的中心找屏。位置按主屏可用区摆，离屏几何下也有确定读数。
+     */
+    TEST_F(PinManagerFixture, DockStateSurvivesRestartAndHoverReveals)
+    {
+        QScreen *screen = QGuiApplication::primaryScreen();
+        if (screen == nullptr)
+        {
+            GTEST_SKIP() << "这个环境没有屏幕可枚举，贴边的几何无从谈起";
+        }
+        const auto available = screen->availableGeometry();
+
+        int revealedWidth = 0;
+        {
+            auto &pins = makeManager();
+            pins.addPin(makeImage(), QPoint(available.left() + 5, available.top() + 150));
+            auto *window = dynamic_cast<Gui::PinWindow *>(pins.pinAt(0));
+            ASSERT_NE(window, nullptr) << "管理器里的贴图不是 PinWindow，这一条判据接不上";
+            revealedWidth = window->width();
+
+            window->setEdgeDocked(true);
+            ASSERT_EQ(window->edgeDock(), Core::ScreenEdge::Left) << "前提没造出来：菜单那一档该贴到近处的左边";
+            ASSERT_EQ(window->geometry().right() - available.left() + 1, Core::kEdgeStripWidth) << "前提没造出来：收起后该只剩一条";
+            ASSERT_TRUE(pins.saveLayout().has_value()) << "布局没写下去";
+        }
+
+        // 布局文本是贴边态的唯一凭据：先从这里读一眼，免得把「写丢了」误判成「恢复丢了」
+        const auto states = Core::parseLayout(settings().stringValue(Core::kPinLayout, QString()).toStdString());
+        ASSERT_TRUE(states.has_value()) << "写下的布局读不回来：" << states.error().message;
+        ASSERT_EQ(states->size(), 1);
+        EXPECT_EQ(states->front().edgeDock, Core::ScreenEdge::Left) << "贴的是哪条边没写进布局";
+        EXPECT_TRUE(states->front().dockCollapsed) << "收起那一档没写进布局";
+
+        auto      &reopened = makeManager();
+        const auto restored = reopened.restoreLayout();
+        ASSERT_TRUE(restored.has_value()) << restored.error().message;
+        ASSERT_EQ(*restored, 1);
+        auto *window = dynamic_cast<Gui::PinWindow *>(reopened.pinAt(0));
+        ASSERT_NE(window, nullptr) << "管理器里的贴图不是 PinWindow，这一条判据接不上";
+
+        EXPECT_EQ(window->edgeDock(), Core::ScreenEdge::Left) << "贴边那一档没跟着布局回来：重启后这张会摆在屏中间";
+        EXPECT_EQ(window->width(), revealedWidth) << "恢复时把窗口尺寸改了，收起条带就找不到原来的位置";
+        EXPECT_EQ(window->geometry().right() - available.left() + 1, Core::kEdgeStripWidth) << "恢复后没有收成那一条：整张图还压在桌面上";
+
+        // 悬停露回来：收起态下指针一进来就该展开，不然那条窄边点都点不到内容
+        QEnterEvent enter{QPointF{1.0, 1.0}, QPointF{1.0, 1.0}, QPointF{1.0, 1.0}};
+        QApplication::sendEvent(window, &enter);
+        window->advanceGeometryAnimationForTesting(1000);
+        EXPECT_EQ(window->geometry().left(), available.left()) << "悬停没有露回来：恢复出来的贴图永远收在屏外";
+        EXPECT_EQ(window->geometry().right() - available.left() + 1, revealedWidth) << "展开后露出的宽度与收起前不一致";
     }
 
     /**

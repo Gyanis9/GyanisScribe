@@ -247,6 +247,65 @@ TEST_F(PinLayoutFixture, TransparentBackdropRoundTripsAndRejectsUnknownSteps)
 }
 
 /**
+ * @brief 钉住贴边收起态进得了布局：换一个实例读回来还是同一条边、同一个收起档
+ * @details 位置那一格在收起时落在屏外，只有边与收起档一起记住，恢复时才能判断该往哪边反推。
+ */
+TEST_F(PinLayoutFixture, LayoutRoundTripsDockState)
+{
+    auto docked          = sample(10, 20, 1.0, 0.0, 1.0);
+    docked.edgeDock      = ScreenEdge::Left;
+    docked.dockCollapsed = true;
+
+    auto expanded          = sample(60, 80, 1.0, 0.0, 1.0);
+    expanded.edgeDock      = ScreenEdge::Bottom;
+    expanded.dockCollapsed = false;
+
+    const auto parsed = parseLayout(serializeLayout(QVector<PinState>{docked, expanded}).toStdString());
+    ASSERT_TRUE(parsed.has_value()) << "自己写出的布局读不回来：" << parsed.error().message;
+    ASSERT_EQ(parsed->size(), 2);
+    EXPECT_EQ((*parsed)[0].edgeDock, ScreenEdge::Left) << "贴的是哪条边没进布局文本";
+    EXPECT_TRUE((*parsed)[0].dockCollapsed) << "收起那一档没进布局文本，重启后收起的图会变成露着";
+    EXPECT_EQ((*parsed)[1].edgeDock, ScreenEdge::Bottom) << "另一条边没进布局文本";
+    EXPECT_FALSE((*parsed)[1].dockCollapsed) << "没收起的那张被写成了收起";
+}
+
+/**
+ * @brief 钉住旧布局缺这两个字段时的缺省：没贴边、未收起
+ * @details 这两个字段与 group 同一条规矩：上一版存下的记录没有它们，升级后第一次启动必须照样摆得回来。
+ */
+TEST_F(PinLayoutFixture, LegacyLayoutWithoutDockStateMeansNoDock)
+{
+    const auto legacy = parseLayout(R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png"}])");
+    ASSERT_TRUE(legacy.has_value()) << "旧布局读不出来，升级后贴图会一张都摆不回：" << legacy.error().message;
+    EXPECT_EQ(legacy->front().edgeDock, ScreenEdge::None) << "缺字段时该按没贴边处理";
+    EXPECT_FALSE(legacy->front().dockCollapsed) << "缺字段时该按未收起处理";
+}
+
+/**
+ * @brief 钉住越界或写歪的贴边记录被当成坏记录拒掉
+ * @details 不存在的边静默折成「没贴边」等于把用户收起来的那张摆回屏中间，写反收起档会让图整个藏进屏外。
+ */
+TEST_F(PinLayoutFixture, IllegalDockEdgeIsRejected)
+{
+    constexpr std::array<const char *, 4> badEdge = {
+            R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png","edgeDock":5}])",
+            R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png","edgeDock":-1}])",
+            R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png","edgeDock":"left"}])",
+            R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png","edgeDock":1.5}])",
+    };
+    for (const char *record: badEdge)
+    {
+        const auto rejected = parseLayout(record);
+        ASSERT_FALSE(rejected.has_value()) << "这一条坏贴边记录被当成了合法值：" << record;
+        EXPECT_NE(rejected.error().message.find("贴边"), std::string::npos) << "要写出坏的是哪一个字段：" << rejected.error().message;
+    }
+
+    const auto notBool = parseLayout(R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png","dockCollapsed":1}])");
+    ASSERT_FALSE(notBool.has_value()) << "非布尔值被 toBool 折成 false，等于静默把收起档读反";
+    EXPECT_NE(notBool.error().message.find("收起"), std::string::npos) << "要写出坏的是哪一个字段：" << notBool.error().message;
+}
+
+/**
  * @brief 钉住配置读写这一对：写下去的布局换实例也读得回来
  */
 TEST_F(PinLayoutFixture, SaveAndLoadThroughSettingsStore)
