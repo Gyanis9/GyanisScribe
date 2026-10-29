@@ -125,7 +125,7 @@ TEST_F(ClipboardFileFixture, PutsTheLocalFileUrlOnTheClipboard)
 
 /**
  * @brief 钉住中转目录只留最新的一批 PNG，刚写的那份永不删
- * @details 预置 70 份旧图并把修改时间逐份推后，复制一张之后只该剩 64 份；
+ * @details 预置 70 份旧图并把修改时间逐份推后，按缓存档（第三个实参为 true）复制一张之后只该剩 64 份；
  *          最旧的那批被清掉，最新的一份旧图与刚写入的文件都还在。
  */
 TEST_F(ClipboardFileFixture, ClipboardCacheKeepsOnlyTheNewestFiles)
@@ -143,7 +143,7 @@ TEST_F(ClipboardFileFixture, ClipboardCacheKeepsOnlyTheNewestFiles)
         ASSERT_FALSE(touched) << "改不动预置文件的修改时间，清理判据的前提不成立：" << touched.message();
     }
 
-    const auto written = copyImageAsFile(makeImage(), directory());
+    const auto written = copyImageAsFile(makeImage(), directory(), true);
     ASSERT_TRUE(written.has_value()) << written.error().message;
     EXPECT_TRUE(std::filesystem::exists(*written)) << "刚写入的文件被清理掉了";
 
@@ -164,7 +164,7 @@ TEST_F(ClipboardFileFixture, ClipboardCacheKeepsOnlyTheNewestFiles)
  * @brief 钉住清理给刚写入的那份留一格：64 份时间戳在未来的旧图也挤不掉它
  * @details 刚写入的文件可能带着比谁都旧的时间戳（从别处拷来、保留源时间的文件就是），
  *          按时间排序它会落到队尾；清理若只按时间取前 64，剪贴板里正指着的这一份就被删了。
- *          预置 64 份时间戳在一天后的旧图，复制一张之后总数必须仍是 64：
+ *          预置 64 份时间戳在一天后的旧图，按缓存档（第三个实参为 true）复制一张之后总数必须仍是 64：
  *          刚写入的那份在，旧的只删掉时间戳最靠前的一份。
  */
 TEST_F(ClipboardFileFixture, ClipboardPruneReservesASlotForTheJustWrittenFile)
@@ -182,7 +182,7 @@ TEST_F(ClipboardFileFixture, ClipboardPruneReservesASlotForTheJustWrittenFile)
         ASSERT_FALSE(touched) << "改不动预置文件的修改时间，留一格判据的前提不成立：" << touched.message();
     }
 
-    const auto written = copyImageAsFile(makeImage(), directory());
+    const auto written = copyImageAsFile(makeImage(), directory(), true);
     ASSERT_TRUE(written.has_value()) << written.error().message;
     EXPECT_TRUE(std::filesystem::exists(*written)) << "时间戳更旧的那份被清理掉了：刚写入的文件没有单独占一格";
 
@@ -206,15 +206,15 @@ TEST_F(ClipboardFileFixture, ClipboardPruneReservesASlotForTheJustWrittenFile)
 }
 
 /**
- * @brief 钉住同一张图复制两次复用同一个文件，且清理不会把刚写的那份删掉
+ * @brief 钉住同一张图复制两次复用同一个文件，且缓存档的清理不会把刚写的那份删掉
  * @details 文件名按内容寻址；第二次写盘后的清理必须把刚写的文件排除在删除之外，
  *          否则剪贴板里交出去的路径在下一次复制时就指向一个不存在的文件。
  */
 TEST_F(ClipboardFileFixture, CopyingTheSameImageReusesTheFile)
 {
-    const auto first = copyImageAsFile(makeImage(), directory());
+    const auto first = copyImageAsFile(makeImage(), directory(), true);
     ASSERT_TRUE(first.has_value()) << first.error().message;
-    const auto second = copyImageAsFile(makeImage(), directory());
+    const auto second = copyImageAsFile(makeImage(), directory(), true);
     ASSERT_TRUE(second.has_value()) << second.error().message;
 
     EXPECT_EQ(*second, *first) << "同一张图复制两次落在了两个文件上";

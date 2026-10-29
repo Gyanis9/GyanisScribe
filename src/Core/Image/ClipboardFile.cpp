@@ -110,7 +110,7 @@ namespace GyanisScribe::Core
         }
     } // namespace
 
-    Base::Expected<std::filesystem::path> copyImageAsFile(const QImage &image, const std::filesystem::path &directory)
+    Base::Expected<std::filesystem::path> copyImageAsFile(const QImage &image, const std::filesystem::path &directory, const bool pruneOldFiles)
     {
         if (image.isNull())
         {
@@ -130,8 +130,11 @@ namespace GyanisScribe::Core
                                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("复制为文件失败：{} 写不下去。请检查这个目录是否可写"),
                                                                             Base::Paths::toDisplayText(filePath).toStdString())});
         }
-        // 写盘成功后才清理：旧图留在中转目录只增不减，会把应用数据目录撑大
-        pruneClipboardDirectory(directory, filePath);
+        // 写盘成功后才清理：开了缓存那一档时，旧图留在中转目录只增不减，会把应用数据目录撑大
+        if (pruneOldFiles)
+        {
+            pruneClipboardDirectory(directory, filePath);
+        }
 
         auto *mime = new QMimeData;
         mime->setUrls({QUrl::fromLocalFile(Base::Paths::toDisplayText(filePath))});

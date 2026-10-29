@@ -687,8 +687,9 @@ namespace GyanisScribe::Gui
 
     void PinWindow::copyAsFileToClipboard()
     {
-        // 落在缓存目录下一个专用子目录：这是给剪贴板用的中转文件，不往用户的图片目录里塞
-        if (const auto written = Core::copyImageAsFile(m_image, Base::Paths::cacheDirectory() / "Clipboard"); !written)
+        // 落在缓存目录下一个专用子目录：这是给剪贴板用的中转文件，不往用户的图片目录里塞；
+        // 正因为它只是一份缓存，才显式打开清理，只留最近一批
+        if (const auto written = Core::copyImageAsFile(m_image, Base::Paths::cacheDirectory() / "Clipboard", true); !written)
         {
             Base::Logger::warning(std::format("复制为文件没成：{}", written.error().message));
         }
