@@ -888,8 +888,8 @@
             <translation>Scrolling capture cannot continue: this frame is empty. Capture it again</translation>
         </message>
         <message>
-            <source>长截图接不上：这一帧的宽度和前面不一致（多半是中途换了屏或改了缩放）。先把已有这一段收好再重来</source>
-            <translation>Scrolling capture cannot continue: this frame is a different width than the earlier ones (the screen or the scaling changed mid-way). Finish what you already have, then start over</translation>
+            <source>长截图接不上：这一帧的宽度和前面不一致（多半是中途换了屏或改了缩放）。这一段已中止，临时画面不会保留；请在同一屏幕与缩放下重截</source>
+            <translation>Scrolling capture cannot continue: this frame is a different width than the earlier ones (the screen or the scaling probably changed mid-way). This section was stopped and the temporary image will not be kept; capture it again on the same screen and at the same scaling</translation>
         </message>
         <message>
             <source>长截图接不上：内存不够继续拼接。请缩小选区或分段重截</source>
@@ -946,6 +946,14 @@
         <message>
             <source>历史清单第 {} 条缺 path、kind 或 moment。请修好这一条，或删掉整个文件让软件重建：{}</source>
             <translation>History entry {} lacks path, kind or moment: {}. Fix this entry, or delete the whole file and let the app rebuild it.</translation>
+        </message>
+        <message>
+            <source>{}。清单：{}。请把这一条改对，或删掉这份清单让软件重建（成品文件不受影响）</source>
+            <translation>{}. List: {}. Correct this entry, or delete this list and let the app rebuild it (the saved files are not affected)</translation>
+        </message>
+        <message>
+            <source>历史清单第 {} 条缺 path、kind 或 moment</source>
+            <translation>History entry {} lacks path, kind or moment</translation>
         </message>
         <message>
             <source>历史清单第 {} 条：{}</source>
@@ -1126,6 +1134,18 @@
         <message>
             <source>贴图布局第 {} 项的透明区档位不在 0 到 {} 里：{}。请清除这一项后让程序重新记一次</source>
             <translation>Pin layout entry {} has a transparent-area step outside 0 to {} (read {}). Clear the entry so the app can record the layout again</translation>
+        </message>
+        <message>
+            <source>贴图布局第 {} 项的贴边方向不是整数。请清除这一项后让程序重新记一次</source>
+            <translation>Pin layout entry {} has a docked edge direction that is not an integer. Clear this entry and let the program record it again</translation>
+        </message>
+        <message>
+            <source>贴图布局第 {} 项的贴边方向不在 0 到 {} 里：{}。请清除这一项后让程序重新记一次</source>
+            <translation>Pin layout entry {} has a docked edge direction outside 0 to {} (read {}). Clear this entry and let the program record it again</translation>
+        </message>
+        <message>
+            <source>贴图布局第 {} 项的收起档不是布尔值。请清除这一项后让程序重新记一次</source>
+            <translation>Pin layout entry {} has a collapsed flag that is not a boolean. Clear this entry and let the program record it again</translation>
         </message>
         <message>
             <source>贴图分组名字不是一段 JSON 对象：{}。请在设置里清除 Pin/GroupNames 这一项，让程序重新记一次</source>
@@ -1890,6 +1910,10 @@
         <message>
             <source>历史清单没能读出来：{}。列表先显示上一次的记录</source>
             <translation>The history list couldn't be read: {}. The list keeps showing the previous records.</translation>
+        </message>
+        <message>
+            <source>历史清单里有 {} 条记录读不懂，已跳过：{}</source>
+            <translation>{} records in the history list could not be read and were skipped: {}</translation>
         </message>
         <message>
             <source>（删除只从历史里去掉这条，成品文件留在原处）</source>
