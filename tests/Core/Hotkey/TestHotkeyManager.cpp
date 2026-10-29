@@ -331,6 +331,43 @@ TEST_F(HotkeyManagerFixture, SimpleHotkeySettingDecidesWhetherStoredBareKeysRegi
     EXPECT_EQ(integration.m_backendMirror->registrations[0].modifiers, Qt::NoModifier);
     EXPECT_EQ(manager.bindingText(HotkeyAction::Capture), QStringLiteral("R"));
 }
+/**
+ * @brief 钉住关闭「允许单键」后重登会撤掉裸键，并把该动作记为失败
+ * @details 开关本身的变化也要触发重登；恢复旧组合前必须按当前档重新解析，
+ *          否则清场之后又把旧裸键装回去，用户关掉开关也拦不住它继续吞键。
+ */
+TEST_F(HotkeyManagerFixture, DisablingBareKeysReRegistersAndDropsTheBareBinding)
+{
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kAllowSimpleGlobalHotkeys, true).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kHotkeyCapture, QVariant(QStringLiteral("F1"))).has_value());
+
+    FakePlatformIntegration integration;
+    HotkeyManager           manager(settings, integration);
+    ASSERT_TRUE(manager.reload().has_value());
+    ASSERT_NE(integration.m_backendMirror, nullptr);
+    ASSERT_EQ(integration.m_backendMirror->liveRegistrations.count(1), 1U) << "允许单键时截图那颗裸键没有登记上，用例前提不成立";
+    const auto captureRegistration = std::find_if(integration.m_backendMirror->registrations.rbegin(), integration.m_backendMirror->registrations.rend(),
+                                                  [](const FakeHotkeyBackend::Registration &registration) { return registration.identifier == 1; });
+    ASSERT_NE(captureRegistration, integration.m_backendMirror->registrations.rend());
+    ASSERT_EQ(captureRegistration->key, Qt::Key_F1);
+
+    std::vector<HotkeyReloadReport> reports;
+    QObject::connect(&manager, &IHotkeyManager::reloadFailed, [&reports](const HotkeyReloadReport &report) { reports.push_back(report); });
+
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kAllowSimpleGlobalHotkeys, false).has_value());
+
+    ASSERT_EQ(reports.size(), 1U) << "关闭单键开关没有触发重登，裸键还留在册上";
+    ASSERT_EQ(reports[0].failures.size(), 1U) << "被新档拒掉的裸键该按项记失败，而不是静默消失";
+    EXPECT_EQ(reports[0].failures[0].action, HotkeyAction::Capture);
+    EXPECT_EQ(reports[0].failures[0].error.code, ErrorCode::InvalidArgument);
+    EXPECT_EQ(integration.m_backendMirror->liveRegistrations.count(1), 0U) << "关掉开关后截图编号仍在册：用户按 F1 还会触发截图";
+    for (const auto &registration: integration.m_backendMirror->registrations)
+    {
+        EXPECT_NE(registration.key, Qt::Key_F1) << "关闭单键开关后旧裸键又被恢复登记了";
+    }
+}
+
 TEST_F(HotkeyManagerFixture, OneFailureDoesNotStopTheOthers)
 {
     SettingsStore settings(m_iniFile);

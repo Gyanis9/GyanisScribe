@@ -60,22 +60,31 @@ namespace GyanisScribe::Core
                                  // 写回恢复的旧组合也会发同一条通知：那一批已经登记在册，再登一遍是白翻
                                  return;
                              }
+                             // 「允许单键」这一格同样决定旧组合还能不能用：它一变也要重登
+                             const auto allowSimpleKey = QString::fromUtf8(kAllowSimpleGlobalHotkeys.data(), static_cast<qsizetype>(kAllowSimpleGlobalHotkeys.size()));
+                             bool       isWatched      = key == allowSimpleKey;
                              for (const auto action: managedActions())
                              {
-                                 if (QString::fromUtf8(settingsKeyFor(action).data(), static_cast<qsizetype>(settingsKeyFor(action).size())) == key)
+                                 const auto actionKey = settingsKeyFor(action);
+                                 if (QString::fromUtf8(actionKey.data(), static_cast<qsizetype>(actionKey.size())) == key)
                                  {
-                                     if (const auto report = reload(); report)
-                                     {
-                                         if (report->failures.empty() && report->customFailures.empty())
-                                         {
-                                             return;
-                                         }
-                                         // 设置页这一路没人接返回值：失败项要从信号交回界面，否则用户以为改成功了
-                                         Base::Logger::warning(std::format("快捷键改动后仍有 {} 项没能登记", report->failures.size() + report->customFailures.size()));
-                                         emit reloadFailed(*report);
-                                     }
+                                     isWatched = true;
+                                     break;
+                                 }
+                             }
+                             if (!isWatched)
+                             {
+                                 return;
+                             }
+                             if (const auto report = reload(); report)
+                             {
+                                 if (report->failures.empty() && report->customFailures.empty())
+                                 {
                                      return;
                                  }
+                                 // 设置页这一路没人接返回值：失败项要从信号交回界面，否则用户以为改成功了
+                                 Base::Logger::warning(std::format("快捷键改动后仍有 {} 项没能登记", report->failures.size() + report->customFailures.size()));
+                                 emit reloadFailed(*report);
                              }
                          });
     }
@@ -295,15 +304,21 @@ namespace GyanisScribe::Core
             // 自定义编号按下标算，增删前一项会让后一项换号：编号下的功能已经换人，旧组合不是它的
             return {};
         }
+        // 恢复也要过当前这一档：关掉「允许单键」后旧裸键不再合法，不能借恢复通道绕开开关
+        const auto current = HotkeyCombination::fromText(old->second.combination.toText().toStdString(), m_settings.boolValue(kAllowSimpleGlobalHotkeys, false));
+        if (!current)
+        {
+            return {};
+        }
         RestoreResult result;
         result.outcome  = RestoreOutcome::Failed;
         result.previous = old->second.combination;
-        if (const auto restored = m_backend->registerHotkey(identifier, old->second.combination.modifiers(), old->second.combination.key()); !restored)
+        if (const auto restored = m_backend->registerHotkey(identifier, current->modifiers(), current->key()); !restored)
         {
             Base::Logger::warning(std::format("编号 {} 的旧组合没能恢复：{}", identifier, restored.error().message));
             return result;
         }
-        next.insert_or_assign(identifier, ActiveBinding{token, old->second.combination});
+        next.insert_or_assign(identifier, ActiveBinding{token, *current});
         result.outcome = RestoreOutcome::Restored;
         return result;
     }
