@@ -8,6 +8,7 @@
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Theme/Motion.h"
 #include "Platform/AnimationSettings.h"
+#include "Platform/CrashGuard.h"
 
 #include <QFileInfo>
 
@@ -38,6 +39,12 @@ Application::Application(int &argc, char **argv, const GyanisScribe::App::Comman
     // 品牌名不进翻译目录：切英文后用户仍然要能在任务栏与窗口标题里认出「智录」这个产品
     setApplicationDisplayName(QStringLiteral("智录"));
     setApplicationVersion(QStringLiteral(PROJECT_VERSION));
+
+    // 兜底要在日志、控制器与任何装配之前装好：这些步骤里崩一下也得留下转储，
+    // 而且一次性命令行动作同样走本构造，装在这里它们才在保护范围内
+    GyanisScribe::Platform::installCrashDumpWriter(GyanisScribe::Base::Paths::logDirectory(), QStringLiteral(PROJECT_VERSION).toStdWString());
+    GyanisScribe::Platform::installTerminateHandler();
+
     // 正文档字号在这一处给一次：各窗口不再各自设字体，点值随系统 DPI 与字体缩放走
     auto bodyFont = font();
     bodyFont.setPointSize(static_cast<int>(GyanisScribe::Gui::kTextRolePointSizeBody));

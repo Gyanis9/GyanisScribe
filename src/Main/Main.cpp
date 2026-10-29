@@ -8,7 +8,6 @@
 #include "Base/Text.h"
 
 #include <QApplication>
-#include <QCoreApplication>
 #include <QStringList>
 
 #include <cstdio>
@@ -34,7 +33,7 @@ namespace
  * @brief 进程入口
  * @details 启动顺序是刻意的：参数先解析（命令行动作决定装配方式：一次性动作都不锁单实例；
  *          截图/贴图/取色登记热键的那一步不做，自检另外登记一次以量启动路径），应用对象再建，
- *          命令行动作在崩溃兜底与单实例之前就走掉——它们要量的或做的只有那一件事。
+ *          命令行动作在崩溃兜底之后、单实例之前就走掉——它们要量的或做的只有那一件事。
  * @param argc 命令行参数个数
  * @param argv 命令行参数数组
  * @return 事件循环退出码；自检只在日志就绪且全部热键登记上时给 0，截图按落盘成败给出 0/1，参数写错给出 2
@@ -65,10 +64,6 @@ int main(int argc, char *argv[])
     {
         return application.executeCommandLine(parsed.request);
     }
-
-    // 兜底要在任何可能崩的步骤之前装好：装晚了那条崩就只是「程序没了」
-    GyanisScribe::Platform::installCrashDumpWriter(GyanisScribe::Base::Paths::logDirectory(), QCoreApplication::applicationVersion().toStdWString());
-    GyanisScribe::Platform::installTerminateHandler();
 
     // 单实例：第二次启动把前一份唤出来然后自己退出，而不是两个实例抢同一批全局热键
     if (!application.tryBecomePrimaryInstance())
