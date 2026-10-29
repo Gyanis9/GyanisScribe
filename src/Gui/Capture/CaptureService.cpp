@@ -23,6 +23,9 @@ namespace
     /// 滚动长截图的取帧节拍，毫秒：比人手滚一格快，又不至于每帧都在同一位置上
     constexpr int kLongCaptureIntervalMs = 250;
 
+    /// 悬停查询的合并窗口，毫秒：比连续两下鼠标移动的间隔长，又不至于让悬停框明显滞后
+    constexpr int kHoverQueryCoalesceMs = 40;
+
     /// 比例锁落盘的那一处：空尺寸＝解开，把配置里这一档清掉（下一次开遮罩就是自由的）
     void rememberAspectRatio(GyanisScribe::Core::ISettingsStore &settings, const QSize &ratio)
     {
@@ -44,6 +47,11 @@ namespace GyanisScribe::Gui
     {
         // 取帧节拍只在这一处接一次：每轮 connect 而收口只 stop 会让第二轮起每个 tick 抓好几帧
         QObject::connect(&m_longTimer, &QTimer::timeout, this, &CaptureService::grabNextLongFrame);
+
+        // 悬停查询走一条合并窗口：鼠标划动时连发的点只查最后一次，不必每个点都跨进程枚举窗口与 UIA
+        m_hoverQueryTimer.setSingleShot(true);
+        m_hoverQueryTimer.setInterval(kHoverQueryCoalesceMs);
+        QObject::connect(&m_hoverQueryTimer, &QTimer::timeout, this, &CaptureService::flushPendingHoverQuery);
     }
 
     CaptureService::~CaptureService()
@@ -259,7 +267,17 @@ namespace GyanisScribe::Gui
             // 悬停细分到界面元素：平台没这能力就不接这条线，遮罩照旧只认窗口候选
             if (m_integration.capabilities().uiElements)
             {
-                QObject::connect(overlay, &CaptureOverlay::hoverPointChanged, this, [this, overlay](const QPoint &globalPoint) { queryElementChain(overlay, globalPoint); });
+                QObject::connect(overlay, &CaptureOverlay::hoverPointChanged, this,
+                                 [this, overlay](const QPoint &globalPoint)
+                                 {
+                                     // 只记最新一点：窗口内前几个点已被后一个覆盖，查它们只是白花跨进程开销
+                                     m_pendingHoverOverlay = overlay;
+                                     m_pendingHoverPoint   = globalPoint;
+                                     if (!m_hoverQueryTimer.isActive())
+                                     {
+                                         m_hoverQueryTimer.start();
+                                     }
+                                 });
             }
             m_overlays.emplace_back(overlay);
             overlay->show();
@@ -327,6 +345,11 @@ namespace GyanisScribe::Gui
 
     void CaptureService::closeOverlays()
     {
+        // 还压着的那一次悬停查询跟着这一轮作废：遮罩都要收了，查出来也没处送
+        m_hoverQueryTimer.stop();
+        m_pendingHoverOverlay = nullptr;
+        m_pendingHoverPoint.reset();
+
         // 逐张收掉并清向量：遮罩是顶层窗口，留着不关就会一直压住屏幕
         for (auto &overlay: m_overlays)
         {
@@ -558,6 +581,24 @@ namespace GyanisScribe::Gui
             rects.push_back(window.logicalGlobal);
         }
         return rects;
+    }
+
+    void CaptureService::flushPendingHoverQuery()
+    {
+        const auto overlay    = m_pendingHoverOverlay;
+        const auto point      = m_pendingHoverPoint;
+        m_pendingHoverOverlay = nullptr;
+        m_pendingHoverPoint.reset();
+        if (!point)
+        {
+            return;
+        }
+        if (overlay == nullptr)
+        {
+            // 遮罩在窗口内被销毁了：这一批没有收件人，丢掉而不是往已经没了的窗口上写结果
+            return;
+        }
+        queryElementChain(overlay, *point);
     }
 
     void CaptureService::queryElementChain(CaptureOverlay *overlay, const QPoint &globalLogicalPoint)

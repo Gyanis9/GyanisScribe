@@ -13,6 +13,7 @@
 #include <QImage>
 #include <QPoint>
 #include <QRect>
+#include <QRegion>
 #include <QWidget>
 
 #include "Core/Capture/ScreenUtils.h"
@@ -79,6 +80,14 @@ namespace GyanisScribe::Gui
          * @return 该屏内的逻辑矩形，宽高已被归一为非负；还没框时为 QRect()
          */
         [[nodiscard]] QRect selectedRegion() const;
+
+        /**
+         * @brief 最后一次绘制事件实际重绘的区域（只给用例用）
+         * @return paintEvent 收到的 QRegion；还没有画过时为空
+         * @details 局部重绘只能从绘制事件本身核对：抓像素去比会撞上窗口暴露与合成时序，
+         *          而 event->region() 正是 Qt 这一帧交给遮罩的矩形。
+         */
+        [[nodiscard]] QRegion lastPaintRegionForTesting() const noexcept;
 
         /**
          * @brief 确认当前选区并发出 regionSelected
@@ -319,6 +328,13 @@ namespace GyanisScribe::Gui
         [[nodiscard]] static QRect normalizeRect(const QPoint &anchor, const QPoint &current);
 
         /**
+         * @brief 当前状态可能改动的所有区域
+         * @return 选区或悬停框外扩、提示区、选择中的十字带、放大镜与读数条的并集
+         * @details 局部重绘的边界：少算一块会留下一帧残影，多算只多画几像素、不会画错。
+         */
+        [[nodiscard]] QRegion visualRegionForCurrentState() const;
+
+        /**
          * @brief 读数应当画在哪
          * @param region 选区
          * @return 选区上方的位置；贴到屏顶时改画在选区下方
@@ -408,6 +424,7 @@ namespace GyanisScribe::Gui
         QImage                m_background;                              ///< 该屏的物理像素图，按缩放因子画成逻辑大小
         Core::ISettingsStore &m_settings;                                ///< 裸键那几档的读端（Gui/Controls/AppShortcuts.h 那份清册），不拥有
         QRect                 m_screenGeometry;                          ///< 该屏的全局逻辑几何
+        QRegion               m_lastPaintRegion;                         ///< 最后一次绘制事件收到的区域，供用例读
         qreal                 m_devicePixelRatio = 1.0;                  ///< 该屏缩放因子
         QPoint                m_anchorPoint;                             ///< 本次框选的按下点，局部逻辑坐标
         QPoint                m_currentPoint;                            ///< 框选过程中的当前点

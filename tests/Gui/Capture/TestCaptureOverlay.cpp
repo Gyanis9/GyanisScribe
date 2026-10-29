@@ -411,6 +411,50 @@ TEST_F(CaptureOverlayFixture, MagnifierFlipsAsideAtTheScreenCorner)
     EXPECT_TRUE(widgetRect.contains(flipped)) << "放大镜整枚该留在这块屏内";
 }
 
+/**
+ * @brief 钉住鼠标移动只重绘会变化的那一片，不再整窗重画
+ * @details 遮罩铺满整屏，每次移动都整窗重绘会在 4K 屏上反复合成几十兆字节。这里在 200×150 的
+ *          小遮罩上悬停一块窗口候选，把光标从一处移到另一处：记录下来的绘制区域不能等于整窗，
+ *          并且要同时包住新旧两处光标邻域与读数条——少算旧位置会留下残影，少算新位置则读数不刷新。
+ * @note 把放大镜视野设为「不显示」：180 格的放大镜在 150 格高的遮罩里必然翻到屏外并被裁掉，
+ *       那样记录下来的包围盒又会碰到整窗的四条边，判不出「局部」这件事。
+ */
+TEST_F(CaptureOverlayFixture, MouseMoveRepaintsOnlyTheChangedRegion)
+{
+    ASSERT_TRUE(static_cast<bool>(settings().setValue(GyanisScribe::Core::kCaptureMagnifierView, QStringLiteral("off")))) << "写入放大镜视野档失败";
+
+    QImage background(QSize{200, 150}, QImage::Format_ARGB32_Premultiplied);
+    background.fill(Qt::white);
+    CaptureOverlay overlay(background, QRect{1920, 0, 200, 150}, 1.0, settings());
+    // 一块盖住新旧两个光标的悬停候选：预览框与提示区都该落在重绘区域里
+    overlay.setWindowCandidates(std::vector<QRect>{QRect{1940, 10, 160, 120}});
+    overlay.show();
+    QApplication::processEvents();
+
+    // 先停在候选上的旧位置，记下这一处的读数条；再移到候选上的新位置
+    const QPoint oldPoint{60, 40};
+    const QPoint newPoint{80, 50};
+    moveOver(overlay, oldPoint);
+    QApplication::processEvents();
+    const auto oldReadout = overlay.readoutStripRect();
+    ASSERT_FALSE(oldReadout.isEmpty()) << "第一次移动后没有读数条，判据够不着要验的那一块";
+
+    moveOver(overlay, newPoint);
+    QApplication::processEvents();
+    const auto newReadout = overlay.readoutStripRect();
+    const auto lastRegion = overlay.lastPaintRegionForTesting();
+    const auto widgetRect = overlay.rect();
+
+    EXPECT_NE(lastRegion.boundingRect(), widgetRect) << "鼠标移动仍然重画了整窗";
+    // 绘制事件里的区域会被 Qt 裁到控件内：读数条翻到屏外的那一截不参与比较
+    EXPECT_TRUE(lastRegion.contains(oldReadout.intersected(widgetRect))) << "旧位置的读数条没进重绘区域，移动后会留下一块残影";
+    EXPECT_TRUE(lastRegion.contains(newReadout.intersected(widgetRect))) << "新位置的读数条没进重绘区域，读数不会刷新";
+    for (const auto &point: {oldPoint, newPoint})
+    {
+        EXPECT_TRUE(lastRegion.contains(QRect{point - QPoint{2, 2}, QSize{5, 5}})) << "光标 (" << point.x() << ", " << point.y() << ") 附近没进重绘区域";
+    }
+}
+
 /// 投一条键盘事件给遮罩
 void pressKey(CaptureOverlay &overlay, const Qt::Key key, const Qt::KeyboardModifiers modifiers = Qt::KeyboardModifier{})
 {

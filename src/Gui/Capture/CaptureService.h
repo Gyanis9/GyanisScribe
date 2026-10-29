@@ -227,6 +227,12 @@ namespace GyanisScribe::Gui
         void queryElementChain(CaptureOverlay *overlay, const QPoint &globalLogicalPoint);
 
         /**
+         * @brief 合并窗口到点：只查最后一次悬停点
+         * @details 遮罩已经销毁就丢掉这一批：QPointer 为空说明那个窗口不在了，结果也没处送。
+         */
+        void flushPendingHoverQuery();
+
+        /**
          * @brief 在屏遮罩的窗口句柄，交给平台当元素命中的排除名单
          * @return 每张还在的遮罩一份句柄；还没建出原生窗口的那些跳过
          */
@@ -267,6 +273,9 @@ namespace GyanisScribe::Gui
         const Platform::IPlatformIntegration &m_integration;                    ///< 窗口候选与界面元素的来源，不拥有
         std::vector<QPointer<CaptureOverlay>> m_overlays;                       ///< 在屏的遮罩，每块屏一张；窗口自己析构后要认得空指针
         ReceiverCountingTimer                 m_longTimer;                      ///< 滚动拼接的取帧节拍，只在有选区之后跑
+        QTimer                                m_hoverQueryTimer;                ///< 悬停查询的合并窗口：连发移动只查最后一次
+        QPointer<CaptureOverlay>              m_pendingHoverOverlay;            ///< 等着查询的那张遮罩，销毁后为空
+        std::optional<QPoint>                 m_pendingHoverPoint;              ///< 窗口内最后一次悬停点，空即没有待查
         QPointer<LongCaptureHud>              m_longHud;                        ///< 长截图控制条，一轮一个
         Base::CapturedImage                   m_longImage;                      ///< 这一轮的成品元数据；像素由 m_longStitcher 持有，收尾时才拷回来
         std::optional<Core::FrameStitcher>    m_longStitcher;                   ///< 这一轮的累加器；与 m_longActive 一起立、一起清

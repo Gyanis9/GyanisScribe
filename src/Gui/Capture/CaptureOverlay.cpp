@@ -69,6 +69,18 @@ namespace
 
     /// 松手时框出的宽与高都不超过这一格（逻辑像素）时按「原地点击」处理：手抖不该把整窗选择变成碎片
     constexpr int kHoverClickSlop = 4;
+
+    /// 局部重绘时选区/悬停框外扩的格数，逻辑像素：盖住边框与抓点
+    constexpr int kRepaintMargin = 4;
+
+    /// 提示区的宽度下限，逻辑像素：读数与确认行都比一块短选区宽
+    constexpr int kHintAreaMinimumWidth = 420;
+
+    /// 提示区的高度上限，逻辑像素：三行读数与提示都落在这一条带里
+    constexpr int kHintAreaHeight = 150;
+
+    /// 选择中十字线的带宽，逻辑像素：虚线本身只有一格，两侧各留一格给抗锯齿
+    constexpr int kCrosshairBandWidth = 3;
 } // namespace
 
 namespace GyanisScribe::Gui
@@ -119,6 +131,11 @@ namespace GyanisScribe::Gui
         return normalizeRect(m_anchorPoint, m_currentPoint);
     }
 
+    QRegion CaptureOverlay::lastPaintRegionForTesting() const noexcept
+    {
+        return m_lastPaintRegion;
+    }
+
     void CaptureOverlay::confirmSelection()
     {
         const auto region = selectedRegion();
@@ -145,6 +162,9 @@ namespace GyanisScribe::Gui
 
     void CaptureOverlay::setElementChain(const std::vector<QRect> &globalRects)
     {
+        // 先记改动前的那一片：悬停框换位置时要连旧位置一起刷，否则原地留下一个框
+        const auto before = visualRegionForCurrentState();
+
         // 同窗口候选：换算到这块屏的局部坐标再用
         const auto origin = m_screenGeometry.topLeft();
         m_elementChain.clear();
@@ -161,7 +181,7 @@ namespace GyanisScribe::Gui
             m_elementChain.push_back(local);
         }
         refreshHoveredRegion();
-        update();
+        update(before | visualRegionForCurrentState());
     }
 
     void CaptureOverlay::setRegionHistory(const std::vector<QRect> &localRects)
@@ -242,6 +262,46 @@ namespace GyanisScribe::Gui
         }
         const auto viewRect = magnifierLayout().viewRect.translated(-m_screenGeometry.topLeft());
         return QRect{viewRect.left(), viewRect.bottom() + kMagnifierPenWidth, viewRect.width(), kMagnifierStripHeight};
+    }
+
+    QRegion CaptureOverlay::visualRegionForCurrentState() const
+    {
+        const auto selection = selectedRegion();
+        // 与绘制同一处取舍：还没框出选区时，悬停认出的那一块就是画面上亮着的那一块
+        const auto shown = selection.isNull() ? m_hoveredRegion.value_or(QRect{}) : selection;
+
+        QRegion region;
+        if (!shown.isNull())
+        {
+            // 外扩几格把边框、抓点与三分线都盖住：它们都贴在选区边上
+            region += QRegion{shown.adjusted(-kRepaintMargin, -kRepaintMargin, kRepaintMargin, kRepaintMargin)};
+
+            // 提示区按「读数可能占的最大宽度 + 三行文字」整块算：文字宽度随读数变，逐行量反而更容易漏
+            const auto widgetRect = QRect{QPoint{0, 0}, size()};
+            const auto hintRect   = QRect{hintPositionFor(shown), QSize{std::max(shown.width(), kHintAreaMinimumWidth), kHintAreaHeight}}.intersected(widgetRect);
+            if (!hintRect.isEmpty())
+            {
+                region += QRegion{hintRect};
+            }
+        }
+
+        if (m_isSelecting && !shown.isNull())
+        {
+            // 十字虚线横贯整块遮罩，两条各按线宽取一条窄带
+            const auto halfBand = kCrosshairBandWidth / 2;
+            region += QRegion{QRect{0, m_currentPoint.y() - halfBand, size().width(), kCrosshairBandWidth}};
+            region += QRegion{QRect{m_currentPoint.x() - halfBand, 0, kCrosshairBandWidth, size().height()}};
+        }
+
+        if (const auto magnifier = magnifierRect(); !magnifier.isEmpty())
+        {
+            region += QRegion{magnifier};
+        }
+        if (const auto readout = readoutStripRect(); !readout.isEmpty())
+        {
+            region += QRegion{readout};
+        }
+        return region;
     }
 
     Core::ColorFormat CaptureOverlay::readoutFormat() const noexcept
@@ -398,7 +458,7 @@ namespace GyanisScribe::Gui
 
     void CaptureOverlay::paintEvent(QPaintEvent *event)
     {
-        Q_UNUSED(event);
+        m_lastPaintRegion = event->region();
 
         QPainter   painter(this);
         const auto widgetRect = QRect(QPoint(0, 0), size());
@@ -562,6 +622,9 @@ namespace GyanisScribe::Gui
 
     void CaptureOverlay::mouseMoveEvent(QMouseEvent *event)
     {
+        // 先取改动前会变的那一片：移动会挪走放大镜与读数条，旧位置也必须一起刷
+        const auto before = visualRegionForCurrentState();
+
         // 光标位置与选区端点分开记：没按下时也要重画（辅助线与悬停跟着光标走），
         // 但把它写进 m_currentPoint 会让 selectedRegion() 从原点编出一块根本没框过的选区
         m_cursorPoint    = event->position().toPoint();
@@ -584,7 +647,7 @@ namespace GyanisScribe::Gui
             const auto moved = Core::dragRegionByGrip(selectedRegion(), *m_draggedGrip, delta, QRect{QPoint{0, 0}, size()});
             m_anchorPoint    = moved.topLeft();
             m_currentPoint   = moved.bottomRight();
-            update();
+            update(before | visualRegionForCurrentState());
             return;
         }
 
@@ -601,7 +664,7 @@ namespace GyanisScribe::Gui
             setCursor(Core::cursorForGrip(Core::gripAt(selectedRegion(), m_cursorPoint)));
         }
         refreshHoveredRegion();
-        update();
+        update(before | visualRegionForCurrentState());
     }
 
     void CaptureOverlay::mouseReleaseEvent(QMouseEvent *event)

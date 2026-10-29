@@ -14,6 +14,7 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QString>
+#include <QThread>
 #include <QVariant>
 
 #include <gtest/gtest.h>
@@ -824,16 +825,37 @@ namespace
     };
 
     /// 找这一轮铺出来的遮罩：它是一张顶层控件，按类型认出来
+    /// @details 先认可见的那一张：上一轮收掉的遮罩还在等 deleteLater，留在顶层表里但已经隐藏，
+    ///          拿错它会让「把事件发给这一轮的遮罩」变成发给一个没有接线的旧窗口。
     [[nodiscard]] CaptureOverlay *findOverlay()
     {
+        CaptureOverlay *hidden = nullptr;
         for (auto *widget: QApplication::topLevelWidgets())
         {
-            if (auto *overlay = qobject_cast<CaptureOverlay *>(widget))
+            auto *overlay = qobject_cast<CaptureOverlay *>(widget);
+            if (overlay == nullptr)
+            {
+                continue;
+            }
+            if (overlay->isVisible())
             {
                 return overlay;
             }
+            hidden = overlay;
         }
-        return nullptr;
+        return hidden;
+    }
+
+    /// 转指定时长的事件循环：悬停查询落在合并窗口到点，定时器与绘制都只在这段里发生
+    void pumpEventsFor(const int milliseconds)
+    {
+        QElapsedTimer clock;
+        clock.start();
+        while (clock.elapsed() < milliseconds)
+        {
+            QApplication::processEvents(QEventLoop::AllEvents, 10);
+            QThread::msleep(5);
+        }
     }
 } // namespace
 
@@ -868,6 +890,8 @@ TEST_F(CaptureServiceFixture, HoverAsksThePlatformAndFeedsTheChainBackToTheOverl
 
     QMouseEvent move{QEvent::MouseMove, QPointF{localPoint}, QPointF{globalPoint}, Qt::NoButton, Qt::NoButton, Qt::KeyboardModifiers{}};
     QApplication::sendEvent(overlay, &move);
+    // 查询挂在合并窗口的定时器上：转够一个窗口再判，别把「还没到点」当成「没接线」
+    pumpEventsFor(150);
 
     ASSERT_EQ(fake.queriedPoints.size(), 1U) << "悬停没有去问平台要界面元素";
     EXPECT_EQ(fake.queriedPoints[0], globalPoint) << "问的不是全局坐标，问到的是别的屏上的元素";
@@ -878,7 +902,49 @@ TEST_F(CaptureServiceFixture, HoverAsksThePlatformAndFeedsTheChainBackToTheOverl
 
     // 同一点再报一次：不重复问
     QApplication::sendEvent(overlay, &move);
+    pumpEventsFor(120);
     EXPECT_EQ(fake.queriedPoints.size(), 1U) << "同一个点被问了两次，每次都是一串跨进程调用";
+}
+
+/**
+ * @brief 钉住连续悬停点合并成一次查询，且查的是最后一点
+ * @details 鼠标划过一片界面时每秒会报几十个点，每个点都同步枚举窗口与 UIA 会卡住界面线程。
+ *          这里连发 10 个不转事件循环的点，再转 150ms：平台必须只被问一次，
+ *          参数是最后一个点——查中间某个点会让悬停框落在光标已经离开的地方。
+ */
+TEST_F(CaptureServiceFixture, HoverQueriesAreCoalesced)
+{
+    if (QGuiApplication::screens().isEmpty())
+    {
+        GTEST_SKIP() << "这个环境没有屏幕可枚举，铺不出遮罩";
+    }
+
+    SettingsStore           settings(m_iniFile);
+    FakeCaptureSource       source;
+    FakePlatformIntegration fake;
+    fake.capabilitiesValue.uiElements = true;
+    CaptureService service(source, settings, fake);
+
+    service.startInteractive();
+    auto *overlay = findOverlay();
+    ASSERT_NE(overlay, nullptr) << "开始框选之后没铺出遮罩";
+
+    const auto origin = overlay->geometry().topLeft();
+    const auto center = QRect(QPoint{0, 0}, overlay->size()).center();
+    QPoint     lastPoint;
+    for (int step = 0; step < 10; ++step)
+    {
+        const auto local = center + QPoint{step, step};
+        lastPoint        = origin + local;
+        QMouseEvent move{QEvent::MouseMove, QPointF{local}, QPointF{lastPoint}, Qt::NoButton, Qt::NoButton, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &move);
+    }
+    EXPECT_TRUE(fake.queriedPoints.empty()) << "合并窗口还没到就当场查了平台，连发的点会逐次跨进程";
+
+    pumpEventsFor(150);
+
+    ASSERT_EQ(fake.queriedPoints.size(), 1U) << "连发 10 个悬停点，平台被问了 " << fake.queriedPoints.size() << " 次";
+    EXPECT_EQ(fake.queriedPoints.front(), lastPoint) << "查到的是中间某个点，悬停框会落在光标已经离开的地方";
 }
 
 /**
