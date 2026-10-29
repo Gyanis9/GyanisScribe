@@ -75,12 +75,11 @@ Write-Output '[ok] OCR language packs staged'
 # not under the build root -- pointing at build\release\translations would silently ship a
 # package that can never switch language.
 $translations = Join-Path 'build' 'release\bin\translations'
-if (Test-Path $translations) {
-    Copy-Item -Recurse -Force $translations (Join-Path $stage 'translations')
-    Write-Output '[ok] language packs staged'
-} else {
-    Write-Output '[info] no language packs in this tree (lrelease missing?) -- packaged app stays Chinese-only'
+if (-not (Test-Path $translations)) {
+    throw 'language packs missing under build/release/bin/translations (lrelease did not run)'
 }
+Copy-Item -Recurse -Force $translations (Join-Path $stage 'translations')
+Write-Output '[ok] language packs staged'
 
 $winDeployQt = Join-Path $QtDir 'bin\windeployqt.exe'
 if (-not (Test-Path $winDeployQt)) { throw "windeployqt not found under $QtDir (set QTDIR)" }
