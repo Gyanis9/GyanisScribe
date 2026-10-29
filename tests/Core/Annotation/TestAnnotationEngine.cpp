@@ -8,8 +8,6 @@
 
 #include <gtest/gtest.h>
 
-
-#include <cstdlib>
 #include <memory>
 #include <string>
 
@@ -17,6 +15,7 @@ using GyanisScribe::Base::CapturedImage;
 using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Core::AnnotationEngine;
 using GyanisScribe::Core::AnnotationSelection;
+using GyanisScribe::Core::kAnnotationUndoLimit;
 using GyanisScribe::Core::PenParameters;
 using GyanisScribe::Core::SelectionDragModifiers;
 using GyanisScribe::Core::SelectionHandle;
@@ -1511,18 +1510,18 @@ TEST_F(EngineFixture, TextInputFontFollowsPenParameters)
  */
 TEST_F(EngineFixture, UndoHistoryKeepsTheLatestHundredSteps)
 {
-    for (int index = 0; index < 105; ++index)
+    for (int index = 0; index < kAnnotationUndoLimit + 5; ++index)
     {
         const QPoint from{2 + (index % 15) * 13, 2 + (index / 15) * 13};
         drawRectangle(from, from + QPoint(8, 8));
     }
 
-    for (int step = 0; step < 100; ++step)
+    for (int step = 0; step < kAnnotationUndoLimit; ++step)
     {
-        ASSERT_TRUE(m_engine.undo().has_value()) << "第 " << step + 1 << " 次撤销失败：栈里没有一百步";
+        ASSERT_TRUE(m_engine.undo().has_value()) << "第 " << step + 1 << " 次撤销失败：栈里没有 " << kAnnotationUndoLimit << " 步";
     }
-    EXPECT_FALSE(m_engine.canUndo()) << "撤满一百次之后还能继续撤，撤销栈没有上限";
-    EXPECT_TRUE(m_engine.canRedo()) << "撤满一百次之后没有可重做的步骤";
+    EXPECT_FALSE(m_engine.canUndo()) << "撤满 " << kAnnotationUndoLimit << " 次之后还能继续撤，撤销栈没有上限";
+    EXPECT_TRUE(m_engine.canRedo()) << "撤满 " << kAnnotationUndoLimit << " 次之后没有可重做的步骤";
 
     EXPECT_TRUE(m_engine.selectionAt(QPoint(6, 6)).has_value()) << "最早那一条被撤销栈的上限一起丢掉了";
     const QPoint lastCenter{2 + 14 * 13 + 4, 2 + 6 * 13 + 4};

@@ -2008,7 +2008,10 @@ TEST_F(AnnotationWindowFixture, EdgeHandleBeatsWindowGrip)
 
     const auto frameAfter = engine().selectionFrame();
     ASSERT_TRUE(frameAfter.has_value());
-    EXPECT_NE(*frameBefore, *frameAfter) << "拖上边中点手柄没有改变图形：这一按被当成了重裁窗口";
+    // 上边手柄只动上沿：上沿往上走，下沿与左右两边留在原处
+    EXPECT_LT((*frameAfter)[0].y(), (*frameBefore)[0].y() - 5.0) << "拖上边中点手柄没把上沿拉上去：这一按被当成了重裁窗口";
+    EXPECT_DOUBLE_EQ((*frameAfter)[4].y(), (*frameBefore)[4].y()) << "拉上沿把下沿也带走了：拖的不是上边手柄";
+    EXPECT_DOUBLE_EQ((*frameAfter)[0].x(), (*frameBefore)[0].x()) << "拉上沿改了左边：拖的不是上边手柄";
     EXPECT_EQ(window->geometry(), windowBefore) << "按下图形手柄却挪走了窗口";
 }
 
@@ -2063,20 +2066,43 @@ TEST_F(AnnotationWindowFixture, CropPreviewMapsShapesByClippedOriginAndScale)
     QApplication::processEvents();
     ASSERT_EQ(view->size(), QSize(210, 100)) << "拖左边框没有把视图扩到 210 宽，后面的映射判据不成立";
 
-    const QImage shot         = view->grab().toImage();
-    const auto   primaryColor = [](const QColor &pixel) { return pixel.red() > 180 && pixel.green() < 100 && pixel.blue() < 100; };
-
-    int rightMostInk = -1;
-    for (int x = 0; x < shot.width(); ++x)
+    const QImage shot = view->grab().toImage();
+    // grab 出的是物理像素：探点都按抓屏倍比折回控件逻辑坐标，100% 与 150% 缩放共用同一套判据
+    const auto primaryColor = [](const QColor &pixel) { return pixel.red() > 180 && pixel.green() < 100 && pixel.blue() < 100; };
+    const auto shotScaleOf  = [](const QImage &frame) { return frame.devicePixelRatio() > 0.0 ? frame.devicePixelRatio() : 1.0; };
+    const auto rightMostInkOn = [&primaryColor, &shotScaleOf](const QImage &frame, const qreal logicalY)
     {
-        if (primaryColor(shot.pixelColor(x, 40)))
+        const qreal scale     = shotScaleOf(frame);
+        const int   row       = static_cast<int>(std::lround(logicalY * scale));
+        int         rightMost = -1;
+        for (int x = 0; x < frame.width(); ++x)
         {
-            rightMostInk = x;
+            if (primaryColor(frame.pixelColor(x, row)))
+            {
+                rightMost = x;
+            }
         }
-    }
-    ASSERT_GE(rightMostInk, 0) << "预览里找不到矩形的右边，后面两处判据都没有基准";
+        return rightMost < 0 ? -1.0 : static_cast<qreal>(rightMost) / scale;
+    };
+    const auto inkAt = [&primaryColor, &shotScaleOf](const QImage &frame, const qreal logicalX, const qreal logicalY)
+    {
+        const qreal scale = shotScaleOf(frame);
+        return primaryColor(frame.pixelColor(static_cast<int>(std::lround(logicalX * scale)), static_cast<int>(std::lround(logicalY * scale))));
+    };
+
+    const qreal rightMostInk = rightMostInkOn(shot, 40.0);
+    ASSERT_GE(rightMostInk, 0.0) << "预览里找不到矩形的右边，后面两处判据都没有基准";
     EXPECT_NEAR(rightMostInk, (80.0 + 10.0) * 210.0 / 200.0, 2.0) << "矩形右边没按预览的裁切原点与缩放映射";
-    EXPECT_FALSE(primaryColor(shot.pixelColor(90, 40))) << "图形的旧位置还留着主色：这一趟只做了平移，没有按预览比例缩放";
+    EXPECT_FALSE(inkAt(shot, 90.0, 40.0)) << "图形的旧位置还留着主色：这一趟只做了平移，没有按预览比例缩放";
+
+    // 预览逻辑尺寸为空时只平移不缩放：跳过 scale 分支，不会拿空宽去做除法
+    view->setCropPreview(frozen, QPointF{5.0, 5.0}, QSizeF{});
+    QApplication::processEvents();
+    const QImage fallback              = view->grab().toImage();
+    const qreal  rightMostWithoutScale = rightMostInkOn(fallback, 40.0);
+    ASSERT_GE(rightMostWithoutScale, 0.0) << "空预览尺寸那一档找不到矩形的右边";
+    EXPECT_NEAR(rightMostWithoutScale, 80.0 + 5.0, 2.0) << "空预览尺寸时图形没有按原点平移（或按别的比例缩放了）";
+    EXPECT_FALSE(inkAt(fallback, 20.0, 40.0)) << "空预览尺寸时矩形还停在原位：平移没生效";
 }
 
 /**
