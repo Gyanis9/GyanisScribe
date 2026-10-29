@@ -261,6 +261,9 @@ namespace GyanisScribe::Gui
          * @param collapsed true 表示恢复后收成留在屏上的那一条
          * @details 重写 Core::IPinWindow::restoreDockState()：按保存的左上角与边反推露出时的矩形，
          *          用露出矩形的中心找屏；收起态的窗口中心本身就在屏外，不能拿它找屏。
+         *          露出矩形在自由轴（左右贴边看纵坐标，上下贴边看横坐标）上夹进那块屏的可用区：
+         *          保存的坐标来自一块已经不在的屏时，收成一条的贴图也不会整张落在屏外。
+         *          找到的屏没有可用区时什么都不改，窗口留在保存的位置，贴边档也不记上。
          */
         void restoreDockState(Core::ScreenEdge edge, bool collapsed) override;
 
@@ -971,7 +974,7 @@ namespace GyanisScribe::Gui
         mutable qint64                                m_viewFilteredSourceKey = 0;                                  ///< 上面那份缓存对的是哪一版像素（cacheKey）
         mutable QImage                                m_scaledContent;                                              ///< 按窗口内容尺寸缩好的位图，绘制时原样铺上
         mutable qint64                                m_scaledSourceKey = 0;                                        ///< 上面那份缩放位图对的是哪一版显示图（cacheKey）
-        mutable QSize                                 m_scaledLogicalSize;                                          ///< 缩放位图对应的内容逻辑尺寸
+        mutable QSize                                 m_scaledLogicalSize;                                          ///< 缩放位图的目标像素尺寸（内容逻辑尺寸乘窗口倍比）
         mutable bool                                  m_scaledSmooth        = false;                                ///< 缩放位图用的是平滑档还是最近邻档
         mutable qreal                                 m_scaledDpr           = 0.0;                                  ///< 缩放位图按哪个窗口倍比铺的像素
         mutable int                                   m_scaledBuilds        = 0;                                    ///< 缩放位图重建过几次，供用例核对复用情况

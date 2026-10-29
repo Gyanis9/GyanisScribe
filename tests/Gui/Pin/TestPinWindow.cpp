@@ -404,8 +404,10 @@ namespace GyanisScribe
     }
 
     /**
-     * @brief 钉住动画每一步都复用同一份缩放位图：只有源图、内容尺寸、平滑档或窗口倍比变了才重建
-     * @details 贴边收展只挪窗口几何、不动内容尺寸，整段动画应当零重建；改缩放才让内容尺寸换档。
+     * @brief 钉住动画每一步都复用同一份缩放位图：只有源图、目标像素尺寸、平滑档或窗口倍比变了才重建
+     * @details 贴边收展只挪窗口几何、不动内容尺寸，整段动画应当零重建；改缩放才让目标像素尺寸换档。
+     *          缓存键与交给 scaled 的是同一个目标像素尺寸表达式。窗口倍比为 1 时逻辑尺寸与目标像素尺寸
+     *          逐格相同，用例造不出「逻辑尺寸不变而像素尺寸变」的输入，这一档由那一处共用表达式保证。
      *          指针若绕过缓存直接画原图，这份计数停在 0，第一条断言就会红。
      */
     TEST_F(PinWindowFixture, ScaledPixmapIsReusedDuringAnimation)
@@ -416,6 +418,9 @@ namespace GyanisScribe
             GTEST_SKIP() << "这个环境没有屏幕可枚举，贴边的几何无从谈起";
         }
         const auto available = screen->availableGeometry();
+
+        // 几何弹簧要跑起来才判得到「动画期间零重建」：写死这一档，不吃外面残留的设置
+        GyanisScribe::Gui::setAnimationsEnabledForTesting(true);
 
         auto &window = makeWindow();
         window.setScale(2.0);
@@ -1074,6 +1079,39 @@ namespace GyanisScribe
         QApplication::sendEvent(&window, &dragRelease);
         EXPECT_EQ(window.edgeDock(), Core::ScreenEdge::None) << "拖到屏中间松手还贴着边";
         EXPECT_GT(window.x(), available.left()) << "松手之后没停在拖到的位置";
+    }
+
+    /**
+     * @brief 钉住按布局恢复一个「没贴边」的档会把贴边字段清干净
+     * @details 恢复入口也可能带着 None 被调用（布局里没贴边那一档）：只清边不清收起档的话，
+     *          悬停仍会把一张没贴边的贴图往旧屏边挪。清档不该顺手搬窗口。
+     */
+    TEST_F(PinWindowFixture, RestoreDockStateNoneClearsTheDock)
+    {
+        QScreen *screen = QGuiApplication::primaryScreen();
+        if (screen == nullptr)
+        {
+            GTEST_SKIP() << "这个环境没有屏幕可枚举，贴边的几何无从谈起";
+        }
+        GyanisScribe::Gui::setAnimationsEnabledForTesting(true);
+        const auto available = screen->availableGeometry();
+
+        auto &window = makeWindow();
+        window.move(available.left() + 5, available.top() + 150);
+        window.setEdgeDocked(true);
+        ASSERT_EQ(window.edgeDock(), Core::ScreenEdge::Left) << "前提没造出来：这一张没有贴到左边";
+        ASSERT_TRUE(window.state().dockCollapsed) << "前提没造出来：菜单贴边该当场收起";
+        const auto dockedGeometry = window.geometry();
+
+        window.restoreDockState(Core::ScreenEdge::None, false);
+        EXPECT_EQ(window.edgeDock(), Core::ScreenEdge::None) << "恢复 None 之后还挂着贴边档";
+        EXPECT_FALSE(window.state().dockCollapsed) << "恢复 None 之后收起档还留着";
+        EXPECT_EQ(window.geometry(), dockedGeometry) << "清贴边档不该顺手把窗口搬走";
+
+        QEnterEvent enter{QPointF{1.0, 1.0}, QPointF{1.0, 1.0}, QPointF{1.0, 1.0}};
+        QApplication::sendEvent(&window, &enter);
+        EXPECT_FALSE(window.isGeometryAnimationRunning()) << "贴边档已清，悬停仍起了收展弹簧";
+        EXPECT_EQ(window.geometry(), dockedGeometry) << "贴边档已清，悬停仍把窗口挪回旧屏边";
     }
 
     /**

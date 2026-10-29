@@ -287,11 +287,13 @@ TEST_F(PinLayoutFixture, LegacyLayoutWithoutDockStateMeansNoDock)
  */
 TEST_F(PinLayoutFixture, IllegalDockEdgeIsRejected)
 {
-    constexpr std::array<const char *, 4> badEdge = {
+    constexpr std::array<const char *, 6> badEdge = {
             R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png","edgeDock":5}])",
             R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png","edgeDock":-1}])",
             R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png","edgeDock":"left"}])",
             R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png","edgeDock":1.5}])",
+            R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png","edgeDock":true}])",
+            R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png","edgeDock":null}])",
     };
     for (const char *record: badEdge)
     {
@@ -300,9 +302,16 @@ TEST_F(PinLayoutFixture, IllegalDockEdgeIsRejected)
         EXPECT_NE(rejected.error().message.find("贴边"), std::string::npos) << "要写出坏的是哪一个字段：" << rejected.error().message;
     }
 
-    const auto notBool = parseLayout(R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png","dockCollapsed":1}])");
-    ASSERT_FALSE(notBool.has_value()) << "非布尔值被 toBool 折成 false，等于静默把收起档读反";
-    EXPECT_NE(notBool.error().message.find("收起"), std::string::npos) << "要写出坏的是哪一个字段：" << notBool.error().message;
+    constexpr std::array<const char *, 2> badCollapsed = {
+            R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png","dockCollapsed":1}])",
+            R"([{"x":1,"y":2,"width":10,"height":10,"scale":1,"rotation":0,"opacity":1,"imageFile":"a.png","dockCollapsed":"yes"}])",
+    };
+    for (const char *record: badCollapsed)
+    {
+        const auto rejected = parseLayout(record);
+        ASSERT_FALSE(rejected.has_value()) << "非布尔值被 toBool 折成 false，等于静默把收起档读反：" << record;
+        EXPECT_NE(rejected.error().message.find("收起"), std::string::npos) << "要写出坏的是哪一个字段：" << rejected.error().message;
+    }
 }
 
 /**

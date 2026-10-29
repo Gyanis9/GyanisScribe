@@ -54,6 +54,7 @@
 #include <QScreen>
 #include <QUrl>
 
+#include <algorithm>
 #include <cmath>
 #include <format>
 
@@ -545,8 +546,10 @@ namespace GyanisScribe::Gui
     {
         if (edge == Core::ScreenEdge::None)
         {
+            // 不贴边就是没有贴边档：三个字段一起清干净，别留下一块旧屏的可用区
             m_edgeDock      = Core::ScreenEdge::None;
             m_dockCollapsed = false;
+            m_dockArea      = {};
             return;
         }
 
@@ -584,11 +587,36 @@ namespace GyanisScribe::Gui
         {
             return;
         }
+        const QRect area = screen->availableGeometry();
+        if (area.isEmpty())
+        {
+            // 没有可用区就算不出该往哪贴：位置与贴边档都不动，调用方保留保存的几何
+            return;
+        }
 
-        m_dockArea      = screen->availableGeometry();
+        // 保存的坐标可能来自一块已经不在的屏：自由轴夹回可用区，留下的那条边才点得到。
+        // 窗口比可用区还大时上下界会反过来，此时取上界与左界，至少让起点落在屏内
+        const int highestTop    = std::max(area.top(), area.bottom() - revealed.height() + 1);
+        const int rightmostLeft = std::max(area.left(), area.right() - revealed.width() + 1);
+        switch (edge)
+        {
+            case Core::ScreenEdge::Left:
+            case Core::ScreenEdge::Right:
+                revealed.moveTop(std::clamp(revealed.top(), area.top(), highestTop));
+                break;
+            case Core::ScreenEdge::Top:
+            case Core::ScreenEdge::Bottom:
+                revealed.moveLeft(std::clamp(revealed.left(), area.left(), rightmostLeft));
+                break;
+            case Core::ScreenEdge::None:
+                return;
+        }
+
+        m_dockArea      = area;
         m_edgeDock      = edge;
         m_dockCollapsed = collapsed;
         // 恢复是启动时那一下：不摆一段从屏外滑回来的动画
+        move(revealed.topLeft());
         applyDockGeometry(false);
     }
 
@@ -1686,25 +1714,24 @@ namespace GyanisScribe::Gui
         {
             painter.fillRect(content, QBrush{Core::checkerboardTile(checker->first, checker->second, Core::kCheckerCellPixels)});
         }
-        // 显示图按内容尺寸先缩好一份挂住：动画只改窗口几何、不动内容尺寸，整段收展都复用它。
-        // 键取显示图的 cacheKey、内容逻辑尺寸、平滑档与窗口倍比，任一换挡就重建
-        const QImage &source      = displayImage();
-        const qreal   deviceRatio = devicePixelRatioF();
-        const QSize   logicalSize = content.size().toSize();
-        if (m_scaledContent.isNull() || m_scaledSourceKey != source.cacheKey() || m_scaledLogicalSize != logicalSize || m_scaledSmooth != m_smoothScaleEnabled ||
+        // 显示图按目标像素尺寸先缩好一份挂住：动画只改窗口几何、不动内容尺寸，整段收展都复用它。
+        // 键里的尺寸就是交给 scaled 的那一份尺寸，不用另一套逻辑尺寸：两处换算一旦分家，
+        // 目标像素变了而键没变，缓存会把上一档的位图继续铺上去
+        const QImage &source       = displayImage();
+        const qreal   deviceRatio  = devicePixelRatioF();
+        const QSize   targetPixels = (content.size() * deviceRatio).toSize();
+        if (m_scaledContent.isNull() || m_scaledSourceKey != source.cacheKey() || m_scaledLogicalSize != targetPixels || m_scaledSmooth != m_smoothScaleEnabled ||
             m_scaledDpr != deviceRatio)
         {
-            // 目标按窗口倍比放大到物理像素，绘制的 1:1 落点才与旧画法逐像素对齐
-            const auto targetPixels = QSize{std::max(1, qRound(content.width() * deviceRatio)), std::max(1, qRound(content.height() * deviceRatio))};
-            m_scaledContent         = source.scaled(targetPixels, Qt::IgnoreAspectRatio, m_smoothScaleEnabled ? Qt::SmoothTransformation : Qt::FastTransformation);
+            m_scaledContent = source.scaled(targetPixels, Qt::IgnoreAspectRatio, m_smoothScaleEnabled ? Qt::SmoothTransformation : Qt::FastTransformation);
             m_scaledContent.setDevicePixelRatio(deviceRatio);
             m_scaledSourceKey   = source.cacheKey();
-            m_scaledLogicalSize = logicalSize;
+            m_scaledLogicalSize = targetPixels;
             m_scaledSmooth      = m_smoothScaleEnabled;
             m_scaledDpr         = deviceRatio;
             ++m_scaledBuilds;
         }
-        // 缓存已按逻辑尺寸与倍比铺好，这里不再让画家重采样
+        // 缓存已按目标像素尺寸与倍比铺好，这里不再让画家重采样
         painter.drawImage(content.topLeft(), m_scaledContent);
         painter.resetTransform();
 

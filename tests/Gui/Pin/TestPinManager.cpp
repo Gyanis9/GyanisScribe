@@ -392,6 +392,193 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住保存的坐标落在屏外时恢复会把自由轴夹回可用区
+     * @details 屏幕换过之后，上一次留下的纵坐标可能远在当前屏下方：只按边反推露出矩形的话，
+     *          收成一条的窗口会整张停在屏外，留在屏上的那一条也就接不到指针。
+     */
+    TEST_F(PinManagerFixture, OffscreenDockRestoreClampsTheFreeAxisBackOntoTheScreen)
+    {
+        QScreen *screen = QGuiApplication::primaryScreen();
+        if (screen == nullptr)
+        {
+            GTEST_SKIP() << "这个环境没有屏幕可枚举，贴边的几何无从谈起";
+        }
+        const auto available     = screen->availableGeometry();
+        const int  offscreenY    = available.bottom() + 500;
+        int        revealedWidth = 0;
+
+        {
+            auto &pins = makeManager();
+            pins.addPin(makeImage(), QPoint(available.left() + 5, available.top() + 150));
+            auto *window = dynamic_cast<Gui::PinWindow *>(pins.pinAt(0));
+            ASSERT_NE(window, nullptr) << "管理器里的贴图不是 PinWindow，这一条判据接不上";
+            revealedWidth = window->width();
+
+            window->setEdgeDocked(true);
+            ASSERT_EQ(window->edgeDock(), Core::ScreenEdge::Left) << "前提没造出来：菜单那一档该贴到近处的左边";
+
+            // 只挪纵坐标：x 仍是收起那条的位置，模拟「保存下来的坐标属于一块已经不在的屏」
+            window->move(window->x(), offscreenY);
+            ASSERT_EQ(window->state().position.y(), offscreenY) << "前提没造出来：保存的纵坐标没落到屏外";
+            ASSERT_TRUE(pins.saveLayout().has_value()) << "布局没写下去";
+        }
+
+        auto      &reopened = makeManager();
+        const auto restored = reopened.restoreLayout();
+        ASSERT_TRUE(restored.has_value()) << restored.error().message;
+        ASSERT_EQ(*restored, 1);
+
+        auto *window = dynamic_cast<Gui::PinWindow *>(reopened.pinAt(0));
+        ASSERT_NE(window, nullptr) << "管理器里的贴图不是 PinWindow，这一条判据接不上";
+        EXPECT_EQ(window->edgeDock(), Core::ScreenEdge::Left) << "贴边那一档没跟着布局回来";
+        EXPECT_EQ(window->width(), revealedWidth) << "恢复时把窗口尺寸改了";
+        EXPECT_NE(window->geometry().top(), offscreenY) << "恢复还停在保存时的屏外坐标";
+        EXPECT_TRUE(window->geometry().intersects(available)) << "恢复后的贴图整张落在可用区外：悬停也接不到";
+        EXPECT_GE(window->geometry().top(), available.top());
+        EXPECT_LE(window->geometry().bottom(), available.bottom()) << "自由轴没有夹回可用区";
+    }
+
+    /**
+     * @brief 钉住右侧收起态过夜：恢复后仍贴右缘、只剩留在屏上的那一条，且不起弹簧
+     */
+    TEST_F(PinManagerFixture, CollapsedRightDockRestoresOntoTheScreenEdge)
+    {
+        QScreen *screen = QGuiApplication::primaryScreen();
+        if (screen == nullptr)
+        {
+            GTEST_SKIP() << "这个环境没有屏幕可枚举，贴边的几何无从谈起";
+        }
+        const auto available = screen->availableGeometry();
+
+        int revealedWidth  = 0;
+        int revealedHeight = 0;
+        int savedTop       = 0;
+        {
+            auto &pins = makeManager();
+            pins.addPin(makeImage(), QPoint(available.right() - kImageWidth - 5, available.top() + 120));
+            auto *window = dynamic_cast<Gui::PinWindow *>(pins.pinAt(0));
+            ASSERT_NE(window, nullptr) << "管理器里的贴图不是 PinWindow，这一条判据接不上";
+            revealedWidth  = window->width();
+            revealedHeight = window->height();
+
+            window->setEdgeDocked(true);
+            ASSERT_EQ(window->edgeDock(), Core::ScreenEdge::Right) << "前提没造出来：这一张该贴到近处的右边";
+            ASSERT_EQ(available.right() - window->geometry().left() + 1, Core::kEdgeStripWidth) << "前提没造出来：收起后该只剩一条";
+            savedTop = window->geometry().top();
+            ASSERT_TRUE(pins.saveLayout().has_value()) << "布局没写下去";
+        }
+
+        auto      &reopened = makeManager();
+        const auto restored = reopened.restoreLayout();
+        ASSERT_TRUE(restored.has_value()) << restored.error().message;
+        ASSERT_EQ(*restored, 1);
+
+        auto *window = dynamic_cast<Gui::PinWindow *>(reopened.pinAt(0));
+        ASSERT_NE(window, nullptr) << "管理器里的贴图不是 PinWindow，这一条判据接不上";
+        EXPECT_EQ(window->edgeDock(), Core::ScreenEdge::Right) << "贴边那一档没跟着布局回来";
+        EXPECT_EQ(window->size(), QSize(revealedWidth, revealedHeight)) << "恢复时把窗口尺寸改了";
+        EXPECT_EQ(available.right() - window->geometry().left() + 1, Core::kEdgeStripWidth) << "恢复后没有收成那一条";
+        EXPECT_EQ(window->geometry().top(), savedTop) << "自由轴（上下）该留在保存的位置";
+        EXPECT_FALSE(window->isGeometryAnimationRunning()) << "恢复是瞬时落位，不该起几何弹簧";
+    }
+
+    /**
+     * @brief 钉住底部收起态过夜：恢复后仍贴下缘、只剩留在屏上的那一条，且不起弹簧
+     */
+    TEST_F(PinManagerFixture, CollapsedBottomDockRestoresOntoTheScreenEdge)
+    {
+        QScreen *screen = QGuiApplication::primaryScreen();
+        if (screen == nullptr)
+        {
+            GTEST_SKIP() << "这个环境没有屏幕可枚举，贴边的几何无从谈起";
+        }
+        const auto available = screen->availableGeometry();
+
+        int revealedWidth  = 0;
+        int revealedHeight = 0;
+        int savedLeft      = 0;
+        {
+            auto &pins = makeManager();
+            pins.addPin(makeImage(), QPoint(available.left() + 120, available.bottom() - kImageHeight - 5));
+            auto *window = dynamic_cast<Gui::PinWindow *>(pins.pinAt(0));
+            ASSERT_NE(window, nullptr) << "管理器里的贴图不是 PinWindow，这一条判据接不上";
+            revealedWidth  = window->width();
+            revealedHeight = window->height();
+
+            window->setEdgeDocked(true);
+            ASSERT_EQ(window->edgeDock(), Core::ScreenEdge::Bottom) << "前提没造出来：这一张该贴到近处的下边";
+            ASSERT_EQ(available.bottom() - window->geometry().top() + 1, Core::kEdgeStripWidth) << "前提没造出来：收起后该只剩一条";
+            savedLeft = window->geometry().left();
+            ASSERT_TRUE(pins.saveLayout().has_value()) << "布局没写下去";
+        }
+
+        auto      &reopened = makeManager();
+        const auto restored = reopened.restoreLayout();
+        ASSERT_TRUE(restored.has_value()) << restored.error().message;
+        ASSERT_EQ(*restored, 1);
+
+        auto *window = dynamic_cast<Gui::PinWindow *>(reopened.pinAt(0));
+        ASSERT_NE(window, nullptr) << "管理器里的贴图不是 PinWindow，这一条判据接不上";
+        EXPECT_EQ(window->edgeDock(), Core::ScreenEdge::Bottom) << "贴边那一档没跟着布局回来";
+        EXPECT_EQ(window->size(), QSize(revealedWidth, revealedHeight)) << "恢复时把窗口尺寸改了";
+        EXPECT_EQ(available.bottom() - window->geometry().top() + 1, Core::kEdgeStripWidth) << "恢复后没有收成那一条";
+        EXPECT_EQ(window->geometry().left(), savedLeft) << "自由轴（左右）该留在保存的位置";
+        EXPECT_FALSE(window->isGeometryAnimationRunning()) << "恢复是瞬时落位，不该起几何弹簧";
+    }
+
+    /**
+     * @brief 钉住露着那一档的贴边恢复：贴齐左缘、整张展开，位置不再退回收起的条带
+     * @details 收起档是 false 时反推那一步不该发生：露出矩形的左上角就是保存的位置，
+     *          按收起反推会把一张本来露着的贴图推到屏外。
+     */
+    TEST_F(PinManagerFixture, ExpandedDockRestoreRevealsTheWholePin)
+    {
+        QScreen *screen = QGuiApplication::primaryScreen();
+        if (screen == nullptr)
+        {
+            GTEST_SKIP() << "这个环境没有屏幕可枚举，贴边的几何无从谈起";
+        }
+        const auto available = screen->availableGeometry();
+
+        int revealedWidth  = 0;
+        int revealedHeight = 0;
+        int savedTop       = 0;
+        {
+            auto &pins = makeManager();
+            pins.addPin(makeImage(), QPoint(available.left() + 5, available.top() + 150));
+            auto *window = dynamic_cast<Gui::PinWindow *>(pins.pinAt(0));
+            ASSERT_NE(window, nullptr) << "管理器里的贴图不是 PinWindow，这一条判据接不上";
+
+            window->setEdgeDocked(true);
+            ASSERT_EQ(window->edgeDock(), Core::ScreenEdge::Left) << "前提没造出来：菜单那一档该贴到近处的左边";
+            QEnterEvent enter{QPointF{1.0, 1.0}, QPointF{1.0, 1.0}, QPointF{1.0, 1.0}};
+            QApplication::sendEvent(window, &enter);
+            window->advanceGeometryAnimationForTesting(1000);
+            ASSERT_FALSE(window->isGeometryAnimationRunning()) << "前提没造出来：展开弹簧没走完";
+            ASSERT_FALSE(window->state().dockCollapsed) << "前提没造出来：悬停没有把收起档翻过来";
+            ASSERT_EQ(window->geometry().left(), available.left()) << "前提没造出来：没有整张露在屏上";
+
+            revealedWidth  = window->width();
+            revealedHeight = window->height();
+            savedTop       = window->geometry().top();
+            ASSERT_TRUE(pins.saveLayout().has_value()) << "布局没写下去";
+        }
+
+        auto      &reopened = makeManager();
+        const auto restored = reopened.restoreLayout();
+        ASSERT_TRUE(restored.has_value()) << restored.error().message;
+        ASSERT_EQ(*restored, 1);
+
+        auto *window = dynamic_cast<Gui::PinWindow *>(reopened.pinAt(0));
+        ASSERT_NE(window, nullptr) << "管理器里的贴图不是 PinWindow，这一条判据接不上";
+        EXPECT_EQ(window->edgeDock(), Core::ScreenEdge::Left) << "贴边那一档没跟着布局回来";
+        EXPECT_EQ(window->geometry().left(), available.left()) << "露出的那一档没贴齐左缘";
+        EXPECT_EQ(window->size(), QSize(revealedWidth, revealedHeight)) << "恢复时把窗口尺寸改了";
+        EXPECT_EQ(window->geometry().top(), savedTop) << "自由轴（上下）该留在保存的位置";
+        EXPECT_FALSE(window->isGeometryAnimationRunning()) << "恢复是瞬时落位，不该起几何弹簧";
+    }
+
+    /**
      * @brief 钉住活动组指向一个不存在的分组时回落到第一组
      * @details 那个组号是上一次会话留下的（那一组的图被删了、布局被清过）：不回落的后果是
      *          桌上一张都看不见，而用户手上没有任何线索说明为什么。
