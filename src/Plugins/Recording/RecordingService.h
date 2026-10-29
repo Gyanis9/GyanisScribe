@@ -45,6 +45,15 @@ namespace GyanisScribe::Plugins
     [[nodiscard]] std::optional<QPoint> windowFrameOrigin(const std::vector<Platform::ScreenWindow> &windows, quintptr handle);
 
     /**
+     * @brief 抓帧定时器的间隔
+     * @param frameRate 目标帧率，每秒帧数；小于 1 时按 1 算
+     * @return 间隔毫秒数，至少 1
+     * @details 按理论节拍排，落帧仍由会话的理论时刻闸门控制，多出来的跳只抓不算：
+     *          再额外加余量会把 60 帧压到五十帧以下。
+     */
+    [[nodiscard]] int recordingTimerIntervalMs(int frameRate) noexcept;
+
+    /**
      * @brief 本轮取声的结果
      * @details 界面据此决定出片通知要不要带「没声」那句：
      *          只记日志等于让用户拿到一个安静的成品，再自己发现没录上。
@@ -76,16 +85,18 @@ namespace GyanisScribe::Plugins
         /**
          * @brief 建服务
          * @param source 抓帧来源，所有权在宿主
-         * @param encoder 编码器，所有权在宿主
+         * @param encoder 编码器，与本服务共享所有权：编码线程按值拿着它，服务析构后那一份仍然有效
          * @param integration 平台集成，用来问「录的这扇窗在屏幕上的哪儿」，所有权在宿主
          * @param parent Qt 父对象
+         * @param encodeShutdownWaitMs 析构时等手上编码的总预算，毫秒；到点记 warning 并返回
          */
-        RecordingService(Core::IScreenCaptureSource &source, Core::IRecordingEncoder &encoder, Platform::IPlatformIntegration &integration, QObject *parent = nullptr);
+        RecordingService(Core::IScreenCaptureSource &source, std::shared_ptr<Core::IRecordingEncoder> encoder, Platform::IPlatformIntegration &integration,
+                         QObject *parent = nullptr, int encodeShutdownWaitMs = 5000);
 
         /**
-         * @brief 析构：收掉还在跑的取声进程，并等手上的编码跑完
-         * @details 等编码是因为那份 ffmpeg 由本服务起，而帧目录的处置跟着它走；
-         *          不等就是让工作线程拿着已析构的编码器与配置继续编。
+         * @brief 析构：收掉还在跑的取声进程，并在预算内等手上的编码
+         * @details 等编码是因为帧目录的处置跟着它走；预算到点后工作线程仍拿着 shared_ptr 自行收尾，
+         *          不会留下悬空引用，也不会把程序退出无限拖住。
          */
         ~RecordingService() override;
 
@@ -239,23 +250,24 @@ namespace GyanisScribe::Plugins
         [[nodiscard]] virtual QPoint cursorGlobalPosition() const;
 
     private:
-        Core::IScreenCaptureSource             &m_source;                                           ///< 抓帧来源，不拥有
-        Core::IRecordingEncoder                &m_encoder;                                          ///< 编码器，不拥有
-        Platform::IPlatformIntegration         &m_integration;                                      ///< 平台集成，问窗口位置用，不拥有
-        QTimer                                  m_timer;                                            ///< 抓帧定时器
-        QElapsedTimer                           m_clock;                                            ///< 单调时钟，会话的时间轴都从它取
-        std::unique_ptr<Core::RecordingSession> m_session;                                          ///< 当前会话
-        std::unique_ptr<Core::IRecordingSink>   m_sink;                                             ///< 当前帧去处（PNG 序列）
-        std::unique_ptr<QProcess>               m_audio;                                            ///< 取声进程，空表示本轮不取声
-        Core::RecorderConfig                    m_config;                                           ///< 本轮参数
-        std::filesystem::path                   m_frameDirectory;                                   ///< 本轮临时帧目录
-        std::filesystem::path                   m_audioWav;                                         ///< 本轮取声落在哪份 wav 上
-        QSize                                   m_frameSize;                                        ///< 本轮第一张落下的帧的物理尺寸，成品进历史按它记，start 时清空
-        AudioCaptureOutcome                     m_audioOutcome = AudioCaptureOutcome::NotRequested; ///< 取声结果，stop 之后读
-        std::vector<QFuture<EncodeOutcome>>     m_runningEncodes;                                   ///< 还在编码的那几份，析构前要等完
+        Core::IScreenCaptureSource              &m_source;                                           ///< 抓帧来源，不拥有
+        std::shared_ptr<Core::IRecordingEncoder> m_encoder;                                          ///< 编码器，与编码线程共享所有权
+        Platform::IPlatformIntegration          &m_integration;                                      ///< 平台集成，问窗口位置用，不拥有
+        QTimer                                   m_timer;                                            ///< 抓帧定时器
+        QElapsedTimer                            m_clock;                                            ///< 单调时钟，会话的时间轴都从它取
+        std::unique_ptr<Core::RecordingSession>  m_session;                                          ///< 当前会话
+        std::unique_ptr<Core::IRecordingSink>    m_sink;                                             ///< 当前帧去处（PNG 序列）
+        std::unique_ptr<QProcess>                m_audio;                                            ///< 取声进程，空表示本轮不取声
+        Core::RecorderConfig                     m_config;                                           ///< 本轮参数
+        std::filesystem::path                    m_frameDirectory;                                   ///< 本轮临时帧目录
+        std::filesystem::path                    m_audioWav;                                         ///< 本轮取声落在哪份 wav 上
+        QSize                                    m_frameSize;                                        ///< 本轮第一张落下的帧的物理尺寸，成品进历史按它记，start 时清空
+        AudioCaptureOutcome                      m_audioOutcome = AudioCaptureOutcome::NotRequested; ///< 取声结果，stop 之后读
+        std::vector<QFuture<EncodeOutcome>>      m_runningEncodes;                                   ///< 还在编码的那几份，析构前要等完
         /// 还在回接的那几份：watcher 挂在本对象下随它一起析构，析构前要先拆线再等编码（与 RecognitionRunner 同一条理由）
         std::vector<QFutureWatcher<EncodeOutcome> *> m_runningDeliveries;
         bool                                         m_cursorHighlightWarned = false; ///< 光标高亮已经报过一次原因，本轮不再重复
+        int                                          m_encodeShutdownWaitMs  = 5000;  ///< 析构等编码的总预算，毫秒
     };
 
 } // namespace GyanisScribe::Plugins

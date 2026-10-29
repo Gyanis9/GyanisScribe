@@ -6,6 +6,7 @@
 #include "Base/Types.h"
 #include "Plugins/Recording/FfmpegCommand.h"
 #include "Plugins/Recording/FfmpegRecordingEncoder.h"
+#include "Plugins/Recording/FfmpegVideoEncoderEnumerator.h"
 #include "Plugins/Recording/FfmpegVideoEncoders.h"
 #include "Core/Record/RecorderConfig.h"
 #include "Core/Record/RecordingSinks.h"
@@ -13,6 +14,7 @@
 #include <QColor>
 #include <QCoreApplication>
 #include <QDir>
+#include <QEventLoop>
 #include <QFile>
 #include <QFileInfo>
 #include <QImage>
@@ -23,6 +25,8 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -71,6 +75,27 @@ namespace
     auto makeProbe(ProbeRecorder &recorder)
     {
         return [&recorder](const QStringList &arguments) { return recorder(arguments); };
+    }
+
+    /**
+     * @brief 有界轮询等条件成立，其间把事件循环转起来
+     * @param predicate 要等的条件
+     * @param patience 等待上限
+     * @return 成立返回 true；到上限仍不成立返回 false（用例据此判红而不是挂住）
+     */
+    template<typename Predicate>
+    bool spinUntil(const Predicate &predicate, const std::chrono::milliseconds patience)
+    {
+        const auto deadline = std::chrono::steady_clock::now() + patience;
+        while (std::chrono::steady_clock::now() < deadline)
+        {
+            if (predicate())
+            {
+                return true;
+            }
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+        }
+        return predicate();
     }
 
     TEST(VideoEncoderShapes, EachFamilyGetsItsOwnQualityFlags)
@@ -192,6 +217,38 @@ namespace
         EXPECT_EQ(withNvenc.value(withNvenc.indexOf(QStringLiteral("-c:v")) + 1), QStringLiteral("h264_nvenc"));
         EXPECT_FALSE(withNvenc.contains(QStringLiteral("-crf"))) << "选型换了编码器还留着 x264 的参数，整条命令开不起来";
         EXPECT_TRUE(withNvenc.contains(QStringLiteral("+faststart")));
+    }
+
+    /**
+     * @brief 钉住探测缓存的命中、未命中、键维度与容量上限
+     * @details 键里少了帧率就会把 30 帧的探测结果拿去给 15 帧用；上限不生效则长时间会话里缓存只增不减。
+     *          这一条直测缓存本身，不依赖本机装没装 ffmpeg。
+     */
+    TEST(VideoEncoderProbeCache, HitsOnlyTheExactKeyAndKeepsEightEntries)
+    {
+        using GyanisScribe::Plugins::VideoEncoderProbeCache;
+
+        VideoEncoderProbeCache            cache;
+        const VideoEncoderProbeCache::Key key{1920, 1080, 30, 4000};
+        EXPECT_FALSE(cache.find(key).has_value()) << "还没存过就命中了";
+
+        cache.store(key, "libx264");
+        const auto hit = cache.find(key);
+        ASSERT_TRUE(hit.has_value());
+        EXPECT_EQ(*hit, "libx264");
+
+        EXPECT_FALSE(cache.find(VideoEncoderProbeCache::Key{1280, 1080, 30, 4000}).has_value()) << "宽度不同却命中了同一格";
+        EXPECT_FALSE(cache.find(VideoEncoderProbeCache::Key{1920, 720, 30, 4000}).has_value()) << "高度不同却命中了同一格";
+        EXPECT_FALSE(cache.find(VideoEncoderProbeCache::Key{1920, 1080, 60, 4000}).has_value()) << "帧率不同却命中了同一格";
+        EXPECT_FALSE(cache.find(VideoEncoderProbeCache::Key{1920, 1080, 30, 2000}).has_value()) << "码率不同却命中了同一格";
+
+        for (int index = 0; index < 8; ++index)
+        {
+            cache.store(VideoEncoderProbeCache::Key{100 + index, 100, 15, 0}, "mpeg4");
+        }
+        EXPECT_EQ(cache.sizeForTesting(), 8U) << "缓存没有跟着上限收住";
+        EXPECT_FALSE(cache.find(VideoEncoderProbeCache::Key{100, 100, 15, 0}).has_value()) << "超过上限没有把按键排序最靠前的那一项挤出去";
+        EXPECT_TRUE(cache.find(VideoEncoderProbeCache::Key{107, 100, 15, 0}).has_value());
     }
 
     // 端到端那一条要起进程：QProcess 靠应用对象的 socket 通知器收 ffmpeg 的输出，
@@ -334,5 +391,41 @@ namespace
         EXPECT_GT(std::filesystem::file_size(*encoded, ignored), 1024u) << "调色板两遍法只出一个 KB 以下的 GIF，说明画面没进去";
 
         std::filesystem::remove_all(scratchDirectory, ignored);
+    }
+
+    /**
+     * @brief 钉住单次探测超时会强杀进程、跳过这一档并在清单探完后报失败
+     * @details 注入一条不会自己结束的命令与 50 毫秒超时：候选表有五个，超时机制不在就该一直挂到命令自己返回。
+     *          判据是两秒内收到 failed，并且 busy 复位（再发起一轮还能再收到一次）。
+     */
+    TEST_F(VideoEncoderEndToEndFixture, ProbeTimeoutReportsFailureQuickly)
+    {
+        std::atomic<int> probes{0};
+        auto             builder = [&probes](const QString &) -> GyanisScribe::Base::Expected<GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator::ProbeCommand>
+        {
+            probes.fetch_add(1, std::memory_order_relaxed);
+            return GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator::ProbeCommand{
+                    QStringLiteral("cmd"), {QStringLiteral("/c"), QStringLiteral("ping"), QStringLiteral("-n"), QStringLiteral("10"), QStringLiteral("127.0.0.1")}};
+        };
+        GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator enumerator{builder, 50};
+
+        int     failedCount = 0;
+        QString lastReason;
+        QObject::connect(&enumerator, &GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator::failed,
+                         [&failedCount, &lastReason](const GyanisScribe::Base::Error &error)
+                         {
+                             ++failedCount;
+                             lastReason = QString::fromUtf8(error.message.c_str());
+                         });
+
+        enumerator.refresh();
+        ASSERT_TRUE(spinUntil([&] { return failedCount == 1; }, std::chrono::milliseconds{2000})) << "两秒内没收到探测失败";
+        EXPECT_EQ(probes.load(std::memory_order_relaxed), static_cast<int>(GyanisScribe::Plugins::kPreferredVideoEncoders.size())) << "超时那一档没有跳过并继续探下一个";
+        EXPECT_FALSE(lastReason.isEmpty());
+
+        // busy 复位：同一个对象再发起一轮，仍应走完整份清单并再报一次失败
+        enumerator.refresh();
+        ASSERT_TRUE(spinUntil([&] { return failedCount == 2; }, std::chrono::milliseconds{2000})) << "busy 没复位：第二次 refresh 被忽略了";
+        EXPECT_EQ(probes.load(std::memory_order_relaxed), 2 * static_cast<int>(GyanisScribe::Plugins::kPreferredVideoEncoders.size()));
     }
 } // namespace

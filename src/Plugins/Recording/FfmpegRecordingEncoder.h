@@ -12,6 +12,7 @@
 #include "Base/Types.h"
 #include "Core/Record/RecorderConfig.h"
 #include "Core/Record/IRecordingEncoder.h"
+#include "Plugins/Recording/FfmpegVideoEncoders.h"
 
 #include <QSize>
 #include <QStringList>
@@ -80,8 +81,12 @@ namespace GyanisScribe::Plugins
          * @param config 录屏参数，帧率与画面码率从这儿取
          * @param frameSize 首帧尺寸，像素
          * @return 成功返回编码器名；候选全开不起来返回原因
+         * @details 自动档探通的结果按帧尺寸、帧率与码率记进缓存，同一档参数再录一轮直接复用；
+         *          钉住编码器时不查也不写缓存，每次照旧真探。
          */
-        [[nodiscard]] static Base::Expected<std::string> selectEncoder(const Core::RecorderConfig &config, const QSize &frameSize);
+        [[nodiscard]] Base::Expected<std::string> selectEncoder(const Core::RecorderConfig &config, const QSize &frameSize);
+
+        VideoEncoderProbeCache m_probeCache; ///< 自动档探测结果，按帧尺寸、帧率与码率分格
     };
 
 } // namespace GyanisScribe::Plugins

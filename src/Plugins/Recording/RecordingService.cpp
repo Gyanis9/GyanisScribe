@@ -18,12 +18,11 @@
 #include <chrono>
 #include <format>
 #include <optional>
+#include <thread>
+#include <utility>
 
 namespace
 {
-    /// 定时器比目标帧率多要一点余量：正好按 1000/帧率 排会让偶发的一次迟到的抓帧直接跳过一整格
-    constexpr int kTimerSlackMs = 4;
-
     /// 等 ffmpeg 起来的最长时间：设备被占用时它几乎立刻就退，等满只为防机器卡住
     constexpr int kAudioStartTimeoutMs = 3000;
 
@@ -76,9 +75,17 @@ namespace GyanisScribe::Plugins
         return std::nullopt;
     }
 
-    RecordingService::RecordingService(Core::IScreenCaptureSource &source, Core::IRecordingEncoder &encoder, Platform::IPlatformIntegration &integration, QObject *parent) :
-        QObject(parent), m_source(source), m_encoder(encoder), m_integration(integration)
+    int recordingTimerIntervalMs(const int frameRate) noexcept
     {
+        // 帧率读成 0 或负数时按 1 算：间隔至少 1 毫秒，既不除零也不会把定时器排成 0
+        return std::max(1, 1000 / std::max(1, frameRate));
+    }
+
+    RecordingService::RecordingService(Core::IScreenCaptureSource &source, std::shared_ptr<Core::IRecordingEncoder> encoder, Platform::IPlatformIntegration &integration,
+                                       QObject *parent, const int encodeShutdownWaitMs) :
+        QObject(parent), m_source(source), m_encoder(std::move(encoder)), m_integration(integration)
+    {
+        m_encodeShutdownWaitMs = encodeShutdownWaitMs;
         m_timer.setTimerType(Qt::PreciseTimer);
         QObject::connect(&m_timer, &QTimer::timeout, this, &RecordingService::onTick);
     }
@@ -100,11 +107,19 @@ namespace GyanisScribe::Plugins
         }
         m_runningDeliveries.clear();
 
-        // 还在编的那几份要等：那条线程用的是 m_encoder 的引用与带过来的快照，
-        // 不等就是让它对着已经析构的服务继续编
+        // 还在编的那几份要等：那条线程拿着本对象交出去的 shared_ptr，帧目录的处置也由它回接。
+        // 但等待必须有上限：编码卡住时无限等等于让程序退不出去。QFuture 没有带时限的等待口，按截止时刻轮询它
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(m_encodeShutdownWaitMs);
         for (auto &running: m_runningEncodes)
         {
-            running.waitForFinished();
+            while (!running.isFinished() && std::chrono::steady_clock::now() < deadline)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds{2});
+            }
+            if (!running.isFinished())
+            {
+                Base::Logger::warning("还有编码没在退出等待预算内结束，工作线程会自行收尾");
+            }
         }
         m_runningEncodes.clear();
     }
@@ -154,9 +169,8 @@ namespace GyanisScribe::Plugins
         m_clock.start();
         m_session = std::make_unique<Core::RecordingSession>(config, *m_sink, m_clock.elapsed(), countdownSeconds);
 
-        // 间隔取 1000/帧率 再加几毫秒余量：抓屏本身就有抖动，排太紧只会让帧率抖动被放大成丢帧
-        const auto interval = static_cast<int>(1000 / std::max(1, config.frameRate)) + kTimerSlackMs;
-        m_timer.start(interval);
+        // 间隔按理论节拍排：多出来的跳由会话的闸门控制，只抓不算
+        m_timer.start(recordingTimerIntervalMs(config.frameRate));
         Base::Logger::info(
                 std::format("录屏开始：帧率 {}，上限 {} 秒，临时帧目录 {}", config.frameRate, config.maximumDurationSeconds, Base::Paths::toDisplayText(directory).toStdString()));
         return {};
@@ -164,17 +178,29 @@ namespace GyanisScribe::Plugins
 
     void RecordingService::pause()
     {
-        if (m_session != nullptr)
+        if (m_session == nullptr)
         {
-            m_session->pause(m_clock.elapsed());
+            return;
+        }
+        m_session->pause(m_clock.elapsed());
+        // 会话真进了暂停档才停表：倒计时里按暂停是空操作，停了表倒计时就永远走不完
+        if (m_session->state() == Core::RecordingState::Paused)
+        {
+            m_timer.stop();
         }
     }
 
     void RecordingService::resume()
     {
-        if (m_session != nullptr)
+        if (m_session == nullptr)
         {
-            m_session->resume(m_clock.elapsed());
+            return;
+        }
+        m_session->resume(m_clock.elapsed());
+        // 只认会话真回到录制档：暂停还不满一毫秒时 resume 是空操作，这时起表会白白照抓整屏
+        if (m_session->state() == Core::RecordingState::Recording)
+        {
+            m_timer.start(recordingTimerIntervalMs(m_config.frameRate));
         }
     }
 
@@ -242,10 +268,11 @@ namespace GyanisScribe::Plugins
     void RecordingService::startEncoding(const Core::RecorderConfig &config, const std::filesystem::path &frameDirectory, const int frames, const qint64 recordedDurationMs,
                                          const std::filesystem::path &audioWav, const QSize &frameSize)
     {
-        auto &encoder = m_encoder;
+        // 编码线程按值拿住 shared_ptr：服务先析构时那一份仍然有效
+        const auto encoder = m_encoder;
         // 参数与目录都按快照带过去：期间用户重新开一轮会覆盖成员那两份，而这一次编码认的是叫它出来的那一轮
-        auto future = QtConcurrent::run([&encoder, config, frameDirectory, frames, recordedDurationMs, audioWav]
-                                        { return encoder.encode(config, frameDirectory, frames, recordedDurationMs, audioWav); });
+        auto future = QtConcurrent::run([encoder, config, frameDirectory, frames, recordedDurationMs, audioWav]
+                                        { return encoder->encode(config, frameDirectory, frames, recordedDurationMs, audioWav); });
 
         // 回接走 QFutureWatcher：它随本对象一起析构，接收者没了连接由 Qt 自己断。
         // 这里原来是 future.then(this, ...)——那条续接在跑到时才检查 context 还在不在，

@@ -14,16 +14,90 @@
 #include <QString>
 #include <QStringList>
 
-#include <functional>
 #include <array>
+#include <compare>
+#include <cstddef>
+#include <functional>
+#include <map>
+#include <mutex>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace GyanisScribe::Plugins
 {
     /// 候选编码器的偏好顺序：软的排最前（不需要显卡也能跑），硬件编码器在后，最后一个是各构建都自带的 mpeg4
     inline constexpr std::array<std::string_view, 5> kPreferredVideoEncoders{
             "libx264", "h264_nvenc", "h264_qsv", "h264_amf", "mpeg4",
+    };
+
+    /// 探测缓存的上限：按参数档各留一格，再多的档位就轮换掉按键排序最靠前的那一项
+    inline constexpr std::size_t kVideoEncoderProbeCacheEntries = 8;
+
+    /**
+     * @brief 自动档探测结果的缓存
+     * @details 键是帧尺寸、帧率与码率：同一档参数再录一轮不必把候选逐个真探一遍。
+     *          只给自动档用，钉住编码器时每次都要真探。
+     * @note 可从任意线程调用：内部那张表由互斥锁保护。
+     */
+    class VideoEncoderProbeCache
+    {
+    public:
+        /// 缓存的键：任何一项不同都不算命中
+        struct Key
+        {
+            int  width                          = 0;       ///< 帧宽，像素
+            int  height                         = 0;       ///< 帧高，像素
+            int  frameRate                      = 0;       ///< 帧率
+            int  bitrateKbps                    = 0;       ///< 画面码率，0 表示按质量优先
+            auto operator<=>(const Key &) const = default; ///< 四项逐项比较
+        };
+
+        /**
+         * @brief 查一格
+         * @param key 参数档
+         * @return 命中时返回上次探通的编码器名；没有这一格返回空
+         */
+        [[nodiscard]] std::optional<std::string> find(const Key &key) const
+        {
+            const std::lock_guard guard{m_mutex};
+            const auto            found = m_entries.find(key);
+            if (found == m_entries.end())
+            {
+                return std::nullopt;
+            }
+            return found->second;
+        }
+
+        /**
+         * @brief 记下一格
+         * @param key 参数档
+         * @param encoder 探通的编码器名
+         * @details 超过上限时删掉按键排序最靠前的那一项，让缓存不随会话增长。
+         */
+        void store(const Key &key, std::string encoder)
+        {
+            const std::lock_guard guard{m_mutex};
+            const auto [position, inserted] = m_entries.insert_or_assign(key, std::move(encoder));
+            static_cast<void>(position);
+            // 只在真的多出一格时收一次：改写已有键不会让表变大
+            if (inserted && m_entries.size() > kVideoEncoderProbeCacheEntries)
+            {
+                m_entries.erase(m_entries.begin());
+            }
+        }
+
+        /// 当前缓存了几格，用例用
+        [[nodiscard]] std::size_t sizeForTesting() const
+        {
+            const std::lock_guard guard{m_mutex};
+            return m_entries.size();
+        }
+
+    private:
+        mutable std::mutex         m_mutex;   ///< 保护 m_entries
+        std::map<Key, std::string> m_entries; ///< 参数档 → 编码器名
     };
 
     /**

@@ -14,7 +14,6 @@
 #include "Plugins/Recording/FfmpegRecordingEncoder.h"
 #include "Plugins/Recording/RecordingService.h"
 
-#include <QCursor>
 #include <QGuiApplication>
 #include <QScreen>
 #include <QTimer>
@@ -27,8 +26,8 @@ namespace GyanisScribe::App
                                                GyanisScribe::Core::ISettingsStore &settings, GyanisScribe::Gui::IconProvider &icons, QObject *parent) :
         QObject(parent), m_captureSource(captureSource), m_integration(integration), m_settings(settings), m_icons(icons)
     {
-        m_encoder = std::make_unique<GyanisScribe::Plugins::FfmpegRecordingEncoder>();
-        m_service = std::make_unique<GyanisScribe::Plugins::RecordingService>(m_captureSource, *m_encoder, m_integration);
+        m_encoder = std::make_shared<GyanisScribe::Plugins::FfmpegRecordingEncoder>();
+        m_service = std::make_unique<GyanisScribe::Plugins::RecordingService>(m_captureSource, m_encoder, m_integration);
         connectService();
     }
 
@@ -63,23 +62,21 @@ namespace GyanisScribe::App
 
     RecordingCoordinator::~RecordingCoordinator() = default;
 
+    QString RecordingCoordinator::recordingScreenName() const
+    {
+        const auto *screen = QGuiApplication::primaryScreen();
+        if (screen == nullptr)
+        {
+            return {};
+        }
+        return screen->name();
+    }
+
     GyanisScribe::Base::Expected<GyanisScribe::Core::RecorderConfig> RecordingCoordinator::makeConfig() const
     {
-        // 录哪块屏跟着光标走：多屏机器上人在副屏干活，只盯着主屏就是把用户要的画面录丢了；
-        // 抓帧那一侧（QScreenCaptureSource）本来就是按光标选屏的，两处口径要一致。
-        auto *screen = QGuiApplication::screenAt(QCursor::pos());
-        if (screen == nullptr)
-        {
-            screen = QGuiApplication::primaryScreen();
-        }
-        if (screen == nullptr)
-        {
-            return std::unexpected(GyanisScribe::Base::Error{GyanisScribe::Base::ErrorCode::ScreenUnavailable,
-                                                             GyanisScribe::Base::uiTextUtf8("当前没有可用屏幕，录屏没法开始。请接回显示器后重试")});
-        }
-
         GyanisScribe::Core::RecorderConfig config;
-        config.screenName      = screen->name();
+        // 屏名留空时交给 validateRecorderConfig 拒收：控制条与失败提示的时序仍由 toggle() 那一条统一
+        config.screenName      = recordingScreenName();
         const auto configured  = m_settings.stringValue(GyanisScribe::Core::kPathRecording, QString());
         config.outputDirectory = configured.isEmpty() ? GyanisScribe::Base::Paths::defaultRecordingDirectory() : GyanisScribe::Base::Paths::fromDisplayText(configured);
 

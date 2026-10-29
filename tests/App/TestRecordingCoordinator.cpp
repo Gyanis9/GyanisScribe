@@ -32,6 +32,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 using GyanisScribe::App::RecordingCoordinator;
@@ -270,6 +271,41 @@ namespace
     }
 
     /**
+     * @brief 把录屏屏名钉成固定值的协调器
+     * @details 离屏平台给不出屏名，而录屏参数必须带屏名；覆写这一格让 makeConfig 的其余部分照常跑，
+     *          用例因此不必占一张交互桌面。
+     */
+    class TestRecordingCoordinator final : public RecordingCoordinator
+    {
+    public:
+        /**
+         * @brief 构造：录屏服务由用例交进来
+         * @param captureSource 抓帧来源，交给录屏服务
+         * @param integration 平台能力
+         * @param settings 录制参数来源
+         * @param icons 控制条图标出口
+         * @param service 录屏服务本体，所有权转给协调器
+         * @param parent Qt 父对象
+         */
+        TestRecordingCoordinator(GyanisScribe::Core::IScreenCaptureSource &captureSource, GyanisScribe::Platform::IPlatformIntegration &integration,
+                                 GyanisScribe::Core::ISettingsStore &settings, GyanisScribe::Gui::IconProvider &icons, std::unique_ptr<RecordingService> service,
+                                 QObject *parent = nullptr) : RecordingCoordinator(captureSource, integration, settings, icons, std::move(service), parent)
+        {
+        }
+
+    protected:
+        /**
+         * @brief 录哪块屏
+         * @return 固定的替身屏名
+         * @details 重写 RecordingCoordinator::recordingScreenName()：离屏平台没有屏名，返回固定值让参数校验通过。
+         */
+        [[nodiscard]] QString recordingScreenName() const override
+        {
+            return QStringLiteral("FakeScreen");
+        }
+    };
+
+    /**
      * @brief 直测装置：设置、抓帧、编码与平台全部换成用例自己的那一份
      * @details 协调器由注入构造接上替身编码器的真服务；控制条的显示与收起因此是可观测的。
      */
@@ -277,13 +313,12 @@ namespace
     {
     protected:
         /**
-         * @brief 起应用：协调器拼配置要一块有名字的屏，控制条是 Tool 窗、不抢焦点
-         * @details 离屏平台的 QScreen::name() 是空串，而 validateRecorderConfig 拒收空屏名，
-         *          协调器在那一档永远开不了录，两条用例的前置条件立不起来。
+         * @brief 起应用：协调器拼配置与摆控制条各要一块屏
+         * @details 离屏平台给不出屏名，拼配置那一格由 TestRecordingCoordinator 覆写的 recordingScreenName() 补上。
          */
         static void SetUpTestSuite()
         {
-            qputenv("QT_QPA_PLATFORM", "windows");
+            qputenv("QT_QPA_PLATFORM", "offscreen");
             // 帧目录按应用名分开：并行跑别的测试进程时不共用缓存里那棵 Recording 树
             QCoreApplication::setApplicationName(QStringLiteral("TestRecordingCoordinator-%1").arg(QCoreApplication::applicationPid()));
             int argumentCount = 1;
@@ -312,7 +347,7 @@ namespace
 
             m_icons       = std::make_unique<IconProvider>();
             auto service  = std::make_unique<RecordingService>(m_source, m_encoder, m_platform);
-            m_coordinator = std::make_unique<RecordingCoordinator>(m_source, m_platform, *m_settings, *m_icons, std::move(service));
+            m_coordinator = std::make_unique<TestRecordingCoordinator>(m_source, m_platform, *m_settings, *m_icons, std::move(service));
         }
 
         void TearDown() override
@@ -328,19 +363,19 @@ namespace
             std::filesystem::remove_all(GyanisScribe::Base::Paths::cacheDirectory() / "Recording", ignored);
         }
 
-        std::vector<QString>                  m_messages;                         ///< 收到的全部提示正文，按发出顺序
-        std::vector<QString>                  m_dangerMessages;                   ///< 收到的那几条危险提示
-        int                                   m_announcements            = 0;     ///< 「已到最长时长」那条说明的条数
-        bool                                  m_hudVisibleAtAnnouncement = false; ///< 说明发出那一刻控制条是否可见
-        bool                                  m_finished                 = false; ///< 成品信号到过没有
-        bool                                  m_finishedAtAnnouncement   = false; ///< 说明发出那一刻成品是否已经回来
-        std::filesystem::path                 m_root;                             ///< 这一格用例自己的临时目录
-        StubCaptureSource                     m_source;                           ///< 抓帧来源
-        InstantEncoder                        m_encoder;                          ///< 立即返回成品的编码器
-        StubPlatformIntegration               m_platform;                         ///< 平台集成
-        std::unique_ptr<SettingsStore>        m_settings;                         ///< 参数来源
-        std::unique_ptr<IconProvider>         m_icons;                            ///< 控制条图标出口
-        std::unique_ptr<RecordingCoordinator> m_coordinator;                      ///< 被测对象
+        std::vector<QString>                      m_messages;                                     ///< 收到的全部提示正文，按发出顺序
+        std::vector<QString>                      m_dangerMessages;                               ///< 收到的那几条危险提示
+        int                                       m_announcements            = 0;                 ///< 「已到最长时长」那条说明的条数
+        bool                                      m_hudVisibleAtAnnouncement = false;             ///< 说明发出那一刻控制条是否可见
+        bool                                      m_finished                 = false;             ///< 成品信号到过没有
+        bool                                      m_finishedAtAnnouncement   = false;             ///< 说明发出那一刻成品是否已经回来
+        std::filesystem::path                     m_root;                                         ///< 这一格用例自己的临时目录
+        StubCaptureSource                         m_source;                                       ///< 抓帧来源
+        std::shared_ptr<InstantEncoder>           m_encoder = std::make_shared<InstantEncoder>(); ///< 立即返回成品的编码器
+        StubPlatformIntegration                   m_platform;                                     ///< 平台集成
+        std::unique_ptr<SettingsStore>            m_settings;                                     ///< 参数来源
+        std::unique_ptr<IconProvider>             m_icons;                                        ///< 控制条图标出口
+        std::unique_ptr<TestRecordingCoordinator> m_coordinator;                                  ///< 被测对象
     };
 } // namespace
 

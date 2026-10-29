@@ -1,6 +1,7 @@
-// RecordingService 的直测。抓屏与真编码留给桌面会话，这里钉的是这一层自己的三个决定：
+// RecordingService 的直测。抓屏与真编码留给桌面会话，这里钉的是这一层自己的几个决定：
 // 哪种输出该跳过取声（音频档位）、stop() 之后编码是不是真的不在界面线程上等（线程交接）、
-// 以及临时帧的处置（编码失败留着好重编码，取消则整棵删掉且一次编码都不叫）。
+// 临时帧的处置（编码失败留着好重编码，取消则整棵删掉且一次编码都不叫）、
+// 暂停之后还抓不抓整屏、排帧间隔是不是理论节拍，以及析构等编码的预算。
 // 假编码器把 encode() 停在门闩上，「调用已返回而活还没干完」因此成了可断言的事。
 
 #include "Core/Capture/IScreenCaptureSource.h"
@@ -37,6 +38,7 @@
 #include <algorithm>
 #include <ranges>
 #include <thread>
+#include <utility>
 #include <vector>
 
 using GyanisScribe::Base::CapturedImage;
@@ -278,8 +280,8 @@ namespace
     class FixedCursorRecordingService final : public RecordingService
     {
     public:
-        FixedCursorRecordingService(IScreenCaptureSource &source, IRecordingEncoder &encoder, GyanisScribe::Platform::IPlatformIntegration &integration, const QPoint &cursor) :
-            RecordingService(source, encoder, integration), m_cursor(cursor)
+        FixedCursorRecordingService(IScreenCaptureSource &source, std::shared_ptr<IRecordingEncoder> encoder, GyanisScribe::Platform::IPlatformIntegration &integration,
+                                    const QPoint &cursor) : RecordingService(source, std::move(encoder), integration), m_cursor(cursor)
         {
         }
 
@@ -306,6 +308,36 @@ namespace
         {
             return CapturedImage{QImage{QSize{8, 8}, QImage::Format_ARGB32_Premultiplied}, QSize{8, 8}, 1.0, QStringLiteral("screen0")};
         }
+    };
+
+    /**
+     * @brief 数得清被抓了几次屏的来源
+     * @details 暂停那条判据是「来源的调用数不再增长」而不是「帧没落」：会话在暂停档本来就不收帧，
+     *          但整屏抓取与叠高亮仍然每次照做，用户按下暂停要停的正是这一段。
+     */
+    class CountingCaptureSource final : public IScreenCaptureSource
+    {
+    public:
+        [[nodiscard]] Expected<CapturedImage> grabScreen(const QString &screenName) const override
+        {
+            m_grabs.fetch_add(1, std::memory_order_relaxed);
+            return CapturedImage{QImage{QSize{8, 8}, QImage::Format_ARGB32_Premultiplied}, QSize{8, 8}, 1.0, screenName};
+        }
+
+        [[nodiscard]] Expected<CapturedImage> grabWindow(const quintptr) const override
+        {
+            m_grabs.fetch_add(1, std::memory_order_relaxed);
+            return CapturedImage{QImage{QSize{8, 8}, QImage::Format_ARGB32_Premultiplied}, QSize{8, 8}, 1.0, QStringLiteral("screen0")};
+        }
+
+        /// 已经抓了几次屏
+        [[nodiscard]] int grabCount() const
+        {
+            return m_grabs.load(std::memory_order_relaxed);
+        }
+
+    private:
+        mutable std::atomic<int> m_grabs{0}; ///< 抓屏调用次数
     };
 
     /// 中途坏掉的抓屏来源：前几帧照常给，之后按选定的方式失败
@@ -357,9 +389,9 @@ namespace
         }
 
     private:
-        int                  m_goodGrabs = 0; ///< 前几次照常给帧
-        GrabFailureMode      m_mode;          ///< 之后怎么坏
-        mutable int          m_grabs = 0;     ///< 已经抓了几次
+        int             m_goodGrabs = 0; ///< 前几次照常给帧
+        GrabFailureMode m_mode;          ///< 之后怎么坏
+        mutable int     m_grabs = 0;     ///< 已经抓了几次
     };
 
     /// 一次编码调用的现场
@@ -459,6 +491,20 @@ namespace
             std::this_thread::sleep_for(std::chrono::milliseconds{1});
         }
         return predicate();
+    }
+
+    /**
+     * @brief 把界面循环转够一段观察窗口
+     * @param milliseconds 要转的毫秒数
+     */
+    void spinFor(const qint64 milliseconds)
+    {
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds{milliseconds};
+        while (std::chrono::steady_clock::now() < deadline)
+        {
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 1);
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
+        }
     }
 
     /**
@@ -572,7 +618,7 @@ namespace
     TEST_F(RecordingServiceFixture, GifWithAudioRequestedStartsWithoutTakingSound)
     {
         StubCaptureSource       source;
-        GatedRecordingEncoder   encoder;
+        const auto              encoder = std::make_shared<GatedRecordingEncoder>();
         StubPlatformIntegration platform;
         RecordingService        service{source, encoder, platform};
 
@@ -596,7 +642,7 @@ namespace
         }
 
         StubCaptureSource       source;
-        GatedRecordingEncoder   encoder;
+        const auto              encoder = std::make_shared<GatedRecordingEncoder>();
         StubPlatformIntegration platform;
         RecordingService        service{source, encoder, platform};
 
@@ -612,7 +658,7 @@ namespace
     TEST_F(RecordingServiceFixture, StopReturnsWhileTheEncodeIsStillRunning)
     {
         StubCaptureSource       source;
-        GatedRecordingEncoder   encoder;
+        const auto              encoder = std::make_shared<GatedRecordingEncoder>();
         StubPlatformIntegration platform;
         RecordingService        service{source, encoder, platform};
 
@@ -633,14 +679,14 @@ namespace
 
         const auto stopped = service.stop();
         ASSERT_TRUE(static_cast<bool>(stopped)) << stopped.error().message;
-        ASSERT_TRUE(spinUntil([&] { return encoder.callCount() == 1; })) << "stop 之后一次编码都没开始";
+        ASSERT_TRUE(spinUntil([&] { return encoder->callCount() == 1; })) << "stop 之后一次编码都没开始";
         EXPECT_TRUE(service.isEncoding()) << "编码还堵在门闩上，isEncoding 却说没有：界面会以为可以立刻开下一轮";
-        EXPECT_FALSE(encoder.isFinished()) << "stop() 返回时编码已经跑完：它还堵在界面线程上";
-        EXPECT_NE(encoder.callAt(0).thread, std::this_thread::get_id()) << "encode() 跑在界面线程上";
-        EXPECT_GT(encoder.callAt(0).frameCount, 0) << "交给编码的帧数是 0，说明这一轮根本没落帧";
+        EXPECT_FALSE(encoder->isFinished()) << "stop() 返回时编码已经跑完：它还堵在界面线程上";
+        EXPECT_NE(encoder->callAt(0).thread, std::this_thread::get_id()) << "encode() 跑在界面线程上";
+        EXPECT_GT(encoder->callAt(0).frameCount, 0) << "交给编码的帧数是 0，说明这一轮根本没落帧";
         EXPECT_TRUE(finishedPath.isEmpty()) << "成品信号在编码跑完之前就发了";
 
-        encoder.release();
+        encoder->release();
         ASSERT_TRUE(spinUntil([&] { return !finishedPath.isEmpty(); })) << "放开门闩之后成品一直没送回来";
         EXPECT_TRUE(finishedPath.contains(QStringLiteral("product.mp4"))) << finishedPath.toStdString();
         // 尺寸随这一轮一起交回来：假来源每帧 8×8，成品读数就得是它，而不是从配置里的录屏区反推的那份。
@@ -648,6 +694,46 @@ namespace
         EXPECT_EQ(finishedSize, QSize(8, 8)) << "成品没带上这一轮实际落帧的尺寸，整屏与窗口两种模式会把它记成 0×0";
         EXPECT_EQ(deliveryThread, std::this_thread::get_id()) << "成品不在界面线程上送，处置目录与发信号就都落在别的线程上了";
         EXPECT_FALSE(service.isEncoding()) << "成品已经交回，isEncoding 还说在编：下一轮会被无谓挡住";
+    }
+
+    /**
+     * @brief 钉住暂停之后不再按帧率抓整屏
+     * @details 会话在暂停档不乱写帧，但定时器还在跳就会继续抓整屏、叠高亮：用户按下暂停要停的正是这一段。
+     *          这里数来源的调用次数而不是数写下的帧，后者在暂停档本来就该是零。
+     */
+    TEST_F(RecordingServiceFixture, PauseStopsGrabbingFrames)
+    {
+        CountingCaptureSource   source;
+        const auto              encoder = std::make_shared<GatedRecordingEncoder>();
+        StubPlatformIntegration platform;
+        RecordingService        service{source, encoder, platform};
+
+        ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
+        ASSERT_TRUE(spinFramesIn(service)) << "节拍一直没落下帧";
+
+        service.pause();
+        EXPECT_EQ(service.state(), RecordingState::Paused);
+        // 暂停前已经排进事件队列的那一跳还会抓一次；先把它放掉再清点，否则那一次会把判据打红
+        spinFor(100);
+        const auto grabsWhilePaused = source.grabCount();
+        spinFor(200);
+        EXPECT_EQ(source.grabCount(), grabsWhilePaused) << "暂停了还在按帧率抓整屏";
+
+        service.resume();
+        ASSERT_TRUE(spinUntil([&] { return service.state() == RecordingState::Recording; })) << "恢复没有生效";
+        ASSERT_TRUE(spinFramesIn(service)) << "恢复之后节拍没接着落帧";
+    }
+
+    /**
+     * @brief 钉住排帧间隔就是理论节拍
+     * @details 定时器多要 4 毫秒余量会把 60 帧压到五十帧以下（1000/(16+4)）；15/30/60 三档的整数结果同时钉住取整方向。
+     */
+    TEST(RecordingTimerInterval, MatchesTheTheoreticalFrameRate)
+    {
+        EXPECT_EQ(GyanisScribe::Plugins::recordingTimerIntervalMs(15), 66);
+        EXPECT_EQ(GyanisScribe::Plugins::recordingTimerIntervalMs(30), 33);
+        EXPECT_EQ(GyanisScribe::Plugins::recordingTimerIntervalMs(60), 16);
+        EXPECT_EQ(GyanisScribe::Plugins::recordingTimerIntervalMs(0), 1000) << "帧率读成 0 时按 1 算，间隔就是 1000";
     }
 
     /**
@@ -659,23 +745,23 @@ namespace
     TEST_F(RecordingServiceFixture, PendingDeliveryKeepsTheServiceBusy)
     {
         StubCaptureSource       source;
-        GatedRecordingEncoder   encoder;
+        const auto              encoder = std::make_shared<GatedRecordingEncoder>();
         StubPlatformIntegration platform;
         RecordingService        service{source, encoder, platform};
 
         ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
         ASSERT_TRUE(spinFramesIn(service)) << "节拍一直没落下帧";
         ASSERT_TRUE(static_cast<bool>(service.stop()));
-        ASSERT_TRUE(spinUntil([&] { return encoder.callCount() == 1; })) << "stop 之后一次编码都没开始";
+        ASSERT_TRUE(spinUntil([&] { return encoder->callCount() == 1; })) << "stop 之后一次编码都没开始";
 
         QString product;
         QObject::connect(&service, &RecordingService::finished, [&product](const QString &path, const QSize &) { product = path; });
 
-        encoder.release();
+        encoder->release();
         // 等编码线程真的跑完这一次，但不转界面循环：watcher 的 finished 还排在事件队列里，
         // 停的正是「编码已返回、成品还没交回」那一格；转一次循环这一格就过去了
         ASSERT_TRUE(QThreadPool::globalInstance()->waitForDone(static_cast<int>(kWaitPatience.count()))) << "门闩放开之后编码没收尾";
-        ASSERT_TRUE(encoder.isFinished()) << "编码线程已经空了，假编码器却说还在跑";
+        ASSERT_TRUE(encoder->isFinished()) << "编码线程已经空了，假编码器却说还在跑";
         EXPECT_EQ(service.state(), RecordingState::Done) << "编码都跑完了，状态却没到 Done";
         EXPECT_TRUE(service.isEncoding()) << "编码已返回但成品还在队列里，isEncoding 却说没有：这期间开新一轮会被旧的收尾收掉控制条";
 
@@ -691,7 +777,7 @@ namespace
     TEST_F(RecordingServiceFixture, DurationCapStopsAndStartsTheEncodeOnItsOwn)
     {
         StubCaptureSource       source;
-        GatedRecordingEncoder   encoder;
+        const auto              encoder = std::make_shared<GatedRecordingEncoder>();
         StubPlatformIntegration platform;
 
         int              autoStopCount = 0;
@@ -713,10 +799,10 @@ namespace
         // 自动收尾成功要给界面一个当场可用的说明出口；失败那一路的信号也不该跟着来
         EXPECT_EQ(autoStopCount, 1) << "自动收尾没有发出 autoStopStarted，界面只能等下一次每秒节拍";
         EXPECT_EQ(failedCount, 0) << "自动收尾成功了却报了失败";
-        ASSERT_TRUE(spinUntil([&] { return encoder.callCount() == 1; })) << "自动收尾没有开始编码";
+        ASSERT_TRUE(spinUntil([&] { return encoder->callCount() == 1; })) << "自动收尾没有开始编码";
         EXPECT_TRUE(service.isEncoding()) << "自动收尾之后编码没在跑";
 
-        encoder.release();
+        encoder->release();
         ASSERT_TRUE(spinUntil([&] { return !product.isEmpty(); })) << "放开门闩之后成品一直没送回来";
         EXPECT_FALSE(service.isEncoding());
     }
@@ -728,9 +814,9 @@ namespace
     TEST_F(RecordingServiceFixture, EncodeFailureKeepsTheFramesAndReports)
     {
         StubCaptureSource       source;
-        GatedRecordingEncoder   encoder;
+        const auto              encoder = std::make_shared<GatedRecordingEncoder>();
         StubPlatformIntegration platform;
-        encoder.failNext();
+        encoder->failNext();
         RecordingService service{source, encoder, platform};
 
         ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
@@ -740,11 +826,11 @@ namespace
         QObject::connect(&service, &RecordingService::failed, [&failure](const QString &reason) { failure = reason; });
 
         ASSERT_TRUE(static_cast<bool>(service.stop()));
-        ASSERT_TRUE(spinUntil([&] { return encoder.callCount() == 1; }));
-        const auto frameDirectory = encoder.callAt(0).frameDirectory;
+        ASSERT_TRUE(spinUntil([&] { return encoder->callCount() == 1; }));
+        const auto frameDirectory = encoder->callAt(0).frameDirectory;
         ASSERT_TRUE(std::filesystem::exists(frameDirectory));
 
-        encoder.release();
+        encoder->release();
         ASSERT_TRUE(spinUntil([&] { return !failure.isEmpty(); })) << "编码失败了却没报出来";
         EXPECT_NE(failure.toStdString().find("编不动"), std::string::npos) << failure.toStdString();
         EXPECT_TRUE(std::filesystem::exists(frameDirectory)) << "编码失败却把临时帧删了，用户连重编码的余地都没有";
@@ -758,52 +844,89 @@ namespace
     TEST_F(RecordingServiceFixture, SecondRecordingGetsItsOwnFrameDirectoryWhileTheFirstEncodes)
     {
         StubCaptureSource       source;
-        GatedRecordingEncoder   encoder;
+        const auto              encoder = std::make_shared<GatedRecordingEncoder>();
         StubPlatformIntegration platform;
         RecordingService        service{source, encoder, platform};
 
         ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
         ASSERT_TRUE(spinFramesIn(service)) << "节拍一直没落下帧";
         ASSERT_TRUE(static_cast<bool>(service.stop()));
-        ASSERT_TRUE(spinUntil([&] { return encoder.callCount() == 1; }));
-        const auto firstDirectory = encoder.callAt(0).frameDirectory;
+        ASSERT_TRUE(spinUntil([&] { return encoder->callCount() == 1; }));
+        const auto firstDirectory = encoder->callAt(0).frameDirectory;
         EXPECT_TRUE(std::filesystem::exists(firstDirectory)) << "第一轮还在编，它的目录就已经被人删了";
 
         ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
         ASSERT_TRUE(spinFramesIn(service)) << "节拍一直没落下帧";
         ASSERT_TRUE(static_cast<bool>(service.stop()));
-        ASSERT_TRUE(spinUntil([&] { return encoder.callCount() == 2; })) << "上一轮还在编时开不了新一轮";
-        const auto secondDirectory = encoder.callAt(1).frameDirectory;
+        ASSERT_TRUE(spinUntil([&] { return encoder->callCount() == 2; })) << "上一轮还在编时开不了新一轮";
+        const auto secondDirectory = encoder->callAt(1).frameDirectory;
         EXPECT_NE(firstDirectory, secondDirectory) << "两轮录屏写进了同一个帧目录";
 
         int finishedCount = 0;
         QObject::connect(&service, &RecordingService::finished, [&finishedCount](const QString &, const QSize &) { ++finishedCount; });
 
-        encoder.release();
-        encoder.release();
+        encoder->release();
+        encoder->release();
         ASSERT_TRUE(spinUntil([&] { return finishedCount == 2; })) << "两轮编码没收齐成品";
         EXPECT_FALSE(std::filesystem::exists(firstDirectory)) << "第一轮编完该删的是它自己那一份目录";
         EXPECT_FALSE(std::filesystem::exists(secondDirectory)) << "第二轮编完该删的是它自己那一份目录";
     }
 
     /**
-     * @brief 钉住析构会等手上的编码跑完
-     * @details 编码器是服务持有的引用，那条线程还在用它；不等就是让工作线程拿着已析构的对象继续编。
+     * @brief 钉住析构会在预算内等到手上的编码收尾
+     * @details 编码器在 50 毫秒后自行返回：析构若不等，它返回时 isFinished 还是假。
      */
-    TEST_F(RecordingServiceFixture, DestructionWaitsForTheEncodeInFlight)
+    TEST_F(RecordingServiceFixture, DestructionWaitsWithinBudget)
     {
         StubCaptureSource       source;
-        GatedRecordingEncoder   encoder;
+        const auto              encoder = std::make_shared<GatedRecordingEncoder>();
         StubPlatformIntegration platform;
-        auto                    service = std::make_unique<RecordingService>(source, encoder, platform);
+        auto                    service = std::make_unique<RecordingService>(source, encoder, platform, nullptr, 5000);
 
         ASSERT_TRUE(static_cast<bool>(service->start(serviceConfig(OutputFormat::Mp4, false), 0)));
         ASSERT_TRUE(spinFramesIn(*service)) << "节拍一直没落下帧";
         ASSERT_TRUE(static_cast<bool>(service->stop()));
-        ASSERT_TRUE(spinUntil([&] { return encoder.callCount() == 1; }));
+        ASSERT_TRUE(spinUntil([&] { return encoder->callCount() == 1; }));
+        ASSERT_FALSE(encoder->isFinished()) << "前提没造出来：这次编码在析构之前就返回了";
 
+        // 50 毫秒后放行：析构要在这段等待里把编码等到收尾，而不是拿到一个还在跑的线程
+        std::thread releaser(
+                [&encoder]
+                {
+                    std::this_thread::sleep_for(std::chrono::milliseconds{50});
+                    encoder->release();
+                });
         service.reset();
-        EXPECT_TRUE(encoder.isFinished()) << "析构直接返回了：编码还在跑，编码器却已经没人管了";
+        EXPECT_TRUE(encoder->isFinished()) << "析构没等这一次编码收尾";
+        releaser.join();
+    }
+
+    /**
+     * @brief 钉住编码一直不回时析构也不会无限等
+     * @details 预算 100 毫秒；编码堵在门闩上。析构返回之后放行门闩，让工作线程自己收尾，不把线程留到进程退出。
+     */
+    TEST_F(RecordingServiceFixture, DestructionReturnsAfterTheShutdownBudget)
+    {
+        StubCaptureSource       source;
+        const auto              encoder = std::make_shared<GatedRecordingEncoder>();
+        StubPlatformIntegration platform;
+        auto                    service = std::make_unique<RecordingService>(source, encoder, platform, nullptr, 100);
+
+        ASSERT_TRUE(static_cast<bool>(service->start(serviceConfig(OutputFormat::Mp4, false), 0)));
+        ASSERT_TRUE(spinFramesIn(*service)) << "节拍一直没落下帧";
+        ASSERT_TRUE(static_cast<bool>(service->stop()));
+        ASSERT_TRUE(spinUntil([&] { return encoder->callCount() == 1; }));
+        ASSERT_FALSE(encoder->isFinished()) << "前提没造出来：编码在析构之前就返回了";
+
+        const auto started = std::chrono::steady_clock::now();
+        service.reset();
+        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started);
+        EXPECT_LT(elapsed, std::chrono::milliseconds{1000}) << "析构等了 " << elapsed.count() << " 毫秒：编码挂住时预算没生效";
+
+        // 放开替身门闩并等它收尾：预算到点后编码线程仍拿着服务交出去的 shared_ptr，不能把它留到进程退出
+        encoder->release();
+        ASSERT_TRUE(spinUntil([&] { return encoder->isFinished(); })) << "放开门闩之后编码没收尾";
+        ASSERT_TRUE(QThreadPool::globalInstance()->waitForDone(static_cast<int>(kWaitPatience.count()))) << "编码线程没收尾";
     }
 
     /**
@@ -814,7 +937,7 @@ namespace
     TEST_F(RecordingServiceFixture, CancelDropsTheFramesAndNeverAsksTheEncoder)
     {
         StubCaptureSource       source;
-        GatedRecordingEncoder   encoder;
+        const auto              encoder = std::make_shared<GatedRecordingEncoder>();
         StubPlatformIntegration platform;
         RecordingService        service{source, encoder, platform};
 
@@ -832,7 +955,7 @@ namespace
         ASSERT_TRUE(static_cast<bool>(cancelled)) << cancelled.error().message;
         EXPECT_EQ(abortedCount, 1) << "没发 aborted：控制条与托盘会停在「正在录制」那句假话上";
         EXPECT_FALSE(gotFinished) << "取消还送出了成品";
-        EXPECT_EQ(encoder.callCount(), 0) << "取消还去叫了编码器：扔掉的一段不该再花一次 CPU";
+        EXPECT_EQ(encoder->callCount(), 0) << "取消还去叫了编码器：扔掉的一段不该再花一次 CPU";
         EXPECT_FALSE(std::filesystem::exists(frameDirectory)) << "帧目录还留着，取消与停止并保存在磁盘上就没分别了";
         EXPECT_EQ(service.state(), RecordingState::Idle) << "状态没归位，下一轮会被「上一轮还没收尾」拦住";
 
@@ -846,7 +969,7 @@ namespace
     TEST_F(RecordingServiceFixture, CancelWithoutAnActiveRoundIsRefused)
     {
         StubCaptureSource       source;
-        GatedRecordingEncoder   encoder;
+        const auto              encoder = std::make_shared<GatedRecordingEncoder>();
         StubPlatformIntegration platform;
         RecordingService        service{source, encoder, platform};
 
@@ -866,15 +989,15 @@ namespace
     TEST_F(RecordingServiceFixture, CancelAfterStopIsRefusedAndLeavesTheEncodeInputAlone)
     {
         StubCaptureSource       source;
-        GatedRecordingEncoder   encoder;
+        const auto              encoder = std::make_shared<GatedRecordingEncoder>();
         StubPlatformIntegration platform;
         RecordingService        service{source, encoder, platform};
 
         ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
         ASSERT_TRUE(spinFramesIn(service)) << "节拍一直没落下帧";
         ASSERT_TRUE(static_cast<bool>(service.stop()));
-        ASSERT_TRUE(spinUntil([&] { return encoder.callCount() == 1; }));
-        const auto frameDirectory = encoder.callAt(0).frameDirectory;
+        ASSERT_TRUE(spinUntil([&] { return encoder->callCount() == 1; }));
+        const auto frameDirectory = encoder->callAt(0).frameDirectory;
         ASSERT_TRUE(std::filesystem::exists(frameDirectory));
 
         int abortedCount = 0;
@@ -888,7 +1011,7 @@ namespace
 
         QString product;
         QObject::connect(&service, &RecordingService::finished, [&product](const QString &path) { product = path; });
-        encoder.release();
+        encoder->release();
         EXPECT_TRUE(spinUntil([&] { return !product.isEmpty(); })) << "取消被拒之后这一轮该照常出成品";
     }
 
@@ -900,7 +1023,7 @@ namespace
     TEST_F(RecordingServiceFixture, GrabFailureAbortsTheWholeRoundSoTheNextOneCanStart)
     {
         FailingCaptureSource    source{6, GrabFailureMode::Error};
-        GatedRecordingEncoder   encoder;
+        const auto              encoder = std::make_shared<GatedRecordingEncoder>();
         StubPlatformIntegration platform;
         RecordingService        service{source, encoder, platform};
 
@@ -916,7 +1039,7 @@ namespace
         EXPECT_NE(failure.toStdString().find("这块屏没了"), std::string::npos) << failure.toStdString();
         EXPECT_EQ(service.state(), RecordingState::Idle) << "中止之后状态没归位，下一轮会被「上一轮还没收尾」拦住";
         EXPECT_FALSE(std::filesystem::exists(frameDirectory)) << "中止了这一轮却把临时帧留在盘上";
-        EXPECT_EQ(encoder.callCount(), 0) << "抓帧失败不该再去叫编码";
+        EXPECT_EQ(encoder->callCount(), 0) << "抓帧失败不该再去叫编码";
 
         source.heal();
         const auto restarted = service.start(serviceConfig(OutputFormat::Mp4, false), 0);
@@ -933,7 +1056,7 @@ namespace
     TEST_F(RecordingServiceFixture, SessionWriteFailureAlsoDropsTheFrames)
     {
         FailingCaptureSource    source{6, GrabFailureMode::NullFrame};
-        GatedRecordingEncoder   encoder;
+        const auto              encoder = std::make_shared<GatedRecordingEncoder>();
         StubPlatformIntegration platform;
         RecordingService        service{source, encoder, platform};
 
@@ -949,7 +1072,7 @@ namespace
         EXPECT_NE(failure.toStdString().find("空图"), std::string::npos) << failure.toStdString();
         EXPECT_EQ(service.state(), RecordingState::Idle) << "中止之后状态没归位，下一轮会被「上一轮还没收尾」拦住";
         EXPECT_FALSE(std::filesystem::exists(frameDirectory)) << "写入失败的那一轮不会出成品，临时帧留着只是占盘";
-        EXPECT_EQ(encoder.callCount(), 0) << "写盘失败不该再去叫编码";
+        EXPECT_EQ(encoder->callCount(), 0) << "写盘失败不该再去叫编码";
 
         EXPECT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0))) << "上一轮失败之后开不了新一轮";
         ASSERT_TRUE(static_cast<bool>(service.cancel()));
@@ -963,7 +1086,7 @@ namespace
     TEST_F(RecordingServiceFixture, StopBeforeAnyFrameAbortsTheRoundInsteadOfLeavingItHalfOpen)
     {
         StubCaptureSource       source;
-        GatedRecordingEncoder   encoder;
+        const auto              encoder = std::make_shared<GatedRecordingEncoder>();
         StubPlatformIntegration platform;
         RecordingService        service{source, encoder, platform};
 
@@ -980,7 +1103,7 @@ namespace
         EXPECT_FALSE(failure.isEmpty()) << "封盘失败了却没报出来";
         EXPECT_EQ(service.state(), RecordingState::Idle) << "中止之后状态没归位，下一轮会被「上一轮还没收尾」拦住";
         EXPECT_FALSE(std::filesystem::exists(frameDirectory)) << "不会出成品的一轮把临时帧留在盘上";
-        EXPECT_EQ(encoder.callCount(), 0) << "封盘失败不该再去叫编码";
+        EXPECT_EQ(encoder->callCount(), 0) << "封盘失败不该再去叫编码";
 
         EXPECT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0))) << "上一轮失败之后开不了新一轮";
         ASSERT_TRUE(static_cast<bool>(service.cancel()));
@@ -1022,7 +1145,7 @@ namespace
     TEST_F(RecordingServiceFixture, WindowModePaintsHighlightWhereTheClientRectSays)
     {
         BlankFrameSource                     source;
-        GatedRecordingEncoder                encoder;
+        const auto                           encoder = std::make_shared<GatedRecordingEncoder>();
         GyanisScribe::Platform::ScreenWindow target;
         target.handle              = 7;
         target.logicalGlobal       = QRect{90, 20, 90, 80};
@@ -1054,7 +1177,7 @@ namespace
     TEST_F(RecordingServiceFixture, WindowModeLeavesFrameCleanWhenThePlatformGivesNoClientRect)
     {
         BlankFrameSource                     source;
-        GatedRecordingEncoder                encoder;
+        const auto                           encoder = std::make_shared<GatedRecordingEncoder>();
         GyanisScribe::Platform::ScreenWindow target;
         target.handle = 7;
         // 整窗那份刻意摆在「光标会落在帧内 (40,20)」的位置：实现一旦退去用它，那一圈就会凭空出现
@@ -1082,7 +1205,7 @@ namespace
     TEST_F(RecordingServiceFixture, StartCreatesTheOutputDirectorySoTheEncodeHasSomewhereToWrite)
     {
         StubCaptureSource       source;
-        GatedRecordingEncoder   encoder;
+        const auto              encoder = std::make_shared<GatedRecordingEncoder>();
         StubPlatformIntegration platform;
         RecordingService        service{source, encoder, platform};
 
@@ -1110,7 +1233,7 @@ namespace
     TEST_F(RecordingServiceFixture, StartRefusesWhenTheOutputPathIsNotADirectory)
     {
         StubCaptureSource       source;
-        GatedRecordingEncoder   encoder;
+        const auto              encoder = std::make_shared<GatedRecordingEncoder>();
         StubPlatformIntegration platform;
         RecordingService        service{source, encoder, platform};
 
@@ -1141,7 +1264,7 @@ namespace
     TEST_F(RecordingServiceFixture, StopHandsTheEncoderThisRoundsFramesAndDuration)
     {
         StubCaptureSource       source;
-        GatedRecordingEncoder   encoder;
+        const auto              encoder = std::make_shared<GatedRecordingEncoder>();
         StubPlatformIntegration platform;
         RecordingService        service{source, encoder, platform};
 
@@ -1151,14 +1274,14 @@ namespace
         ASSERT_TRUE(spinFramesIn(service)) << "节拍一直没落下帧";
 
         ASSERT_TRUE(static_cast<bool>(service.stop()));
-        ASSERT_TRUE(spinUntil([&] { return encoder.callCount() == 1; }));
+        ASSERT_TRUE(spinUntil([&] { return encoder->callCount() == 1; }));
 
-        const auto call = encoder.callAt(0);
+        const auto call = encoder->callAt(0);
         EXPECT_GT(call.frameCount, 0) << "一帧都没交出去，成品时长也就没有可对齐的分子";
         EXPECT_GT(call.recordedDurationMs, 0) << "时长没交出去：编码只能按目标帧率铺，短了的帧序列会被编成快放";
         // 这两条一起排掉了两种错接：拿配置里的时长上限（60 秒）或拿墙钟整段（含倒计时）当这一轮时长
         EXPECT_LE(call.recordedDurationMs, wall.elapsed()) << "交出去的时长比这一轮从开始到停止还长";
 
-        encoder.release();
+        encoder->release();
     }
 } // namespace

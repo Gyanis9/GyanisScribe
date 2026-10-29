@@ -59,12 +59,28 @@ namespace GyanisScribe::Plugins
 
     Base::Expected<std::string> FfmpegRecordingEncoder::selectEncoder(const Core::RecorderConfig &config, const QSize &frameSize)
     {
+        const auto                        autoMode = config.videoEncoder.empty();
+        const VideoEncoderProbeCache::Key cacheKey{frameSize.width(), frameSize.height(), config.frameRate, config.videoBitrateKbps};
+        // 只缓存自动档：钉住编码器时用户要的就是每次真探，命中旧结果会把「钉子这次为什么没生效」埋掉
+        if (autoMode)
+        {
+            if (const auto cached = m_probeCache.find(cacheKey); cached)
+            {
+                Base::Logger::info(std::format("复用上次探测的编码器：{}（{}x{}，{} 帧/秒）", *cached, frameSize.width(), frameSize.height(), config.frameRate));
+                return *cached;
+            }
+        }
+
         // 每个候选都真跑三帧：名单里有不等于开得起来（缺 Intel/AMD 运行库的那些照样在名单上）
         const auto probe = [](const QStringList &arguments) { return run(arguments, kEncoderProbeTimeoutMs, GyanisScribe::Base::uiTextUtf8("编码器探测")).has_value(); };
 
         const auto selected = selectVideoEncoder(probe, frameSize.width(), frameSize.height(), config.frameRate, config.videoBitrateKbps, config.videoEncoder);
         if (selected)
         {
+            if (autoMode)
+            {
+                m_probeCache.store(cacheKey, *selected);
+            }
             if (!config.videoEncoder.empty() && *selected != config.videoEncoder)
             {
                 // 帧已经录完了，这里不中途失败：钉的那一档这次开不起来（驱动或运行库变了）按自动档编出来，原因写清楚

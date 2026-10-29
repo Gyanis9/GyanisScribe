@@ -13,7 +13,9 @@
 
 #include <QObject>
 #include <QStringList>
+#include <QTimer>
 
+#include <functional>
 #include <memory>
 
 class QProcess;
@@ -40,10 +42,32 @@ namespace GyanisScribe::Plugins
 
     public:
         /**
-         * @brief 建枚举器
+         * @brief 一条探测命令
+         * @details 拆成程序与实参两段：生产实现用 locateFfmpeg 找程序，用例可以换成任何一条会卡住的命令。
+         */
+        struct ProbeCommand
+        {
+            QString     program;   ///< 可执行文件名或路径
+            QStringList arguments; ///< 传给它的实参，不含程序名本身
+        };
+
+        /// 按候选编码器名拼一条探测命令；拼不出来时返回原因（生产实现里就是 ffmpeg 不在场）
+        using ProbeCommandBuilder = std::function<Base::Expected<ProbeCommand>(const QString &encoderName)>;
+
+        /**
+         * @brief 建枚举器：探测命令走生产实现，单个候选超时 15 秒
          * @param parent QObject 父对象，默认无
          */
         explicit FfmpegVideoEncoderEnumerator(QObject *parent = nullptr);
+
+        /**
+         * @brief 建枚举器：探测命令与单人超时由调用方给
+         * @param builder 按候选编码器名拼命令
+         * @param probeTimeoutMs 单个候选的探测上限，毫秒；到点强杀进程并跳过这一档
+         * @param parent QObject 父对象，默认无
+         * @note 这一支只给用例：生产构造固定走 locateFfmpeg 与 videoEncoderProbeArguments。
+         */
+        FfmpegVideoEncoderEnumerator(ProbeCommandBuilder builder, int probeTimeoutMs, QObject *parent = nullptr);
 
         /**
          * @brief 析构：收掉还在跑的 ffmpeg
@@ -79,10 +103,16 @@ namespace GyanisScribe::Plugins
         /// 当前候选的进程收尾：退出码 0 记为可用，继续下一个
         void handleFinished();
 
-        std::unique_ptr<QProcess> m_process;      ///< 正在跑的探测进程；空表示没在探
-        QStringList               m_remaining;    ///< 还没探的候选，按偏好顺序
-        QStringList               m_usable;       ///< 已经探通的候选
-        bool                      m_busy = false; ///< 是否已有一轮探测在飞
+        /// 当前候选超时：强杀进程、记日志、跳过这一档，接着探下一个
+        void handleProbeTimeout();
+
+        ProbeCommandBuilder       m_probeCommandBuilder; ///< 按候选编码器名拼探测命令
+        int                       m_probeTimeoutMs = 0;  ///< 单个候选的探测上限，毫秒
+        QTimer                    m_probeTimeout;        ///< 当前候选的超时表，单次
+        std::unique_ptr<QProcess> m_process;             ///< 正在跑的探测进程；空表示没在探
+        QStringList               m_remaining;           ///< 还没探的候选，按偏好顺序
+        QStringList               m_usable;              ///< 已经探通的候选
+        bool                      m_busy = false;        ///< 是否已有一轮探测在飞
     };
 
 } // namespace GyanisScribe::Plugins

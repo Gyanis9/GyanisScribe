@@ -119,12 +119,21 @@ namespace GyanisScribe::App
         /// 把服务的信号接到本类的收尾口上：两个构造共用这一份连接
         void connectService();
 
-        /// 按设置与光标所在屏拼一份录制配置；读不出或做不出来的那几档一律交回原因，不替用户挑一档
+        /// 按设置与主屏拼一份录制配置；读不出或做不出来的那几档一律交回原因，不替用户挑一档
         [[nodiscard]] GyanisScribe::Base::Expected<GyanisScribe::Core::RecorderConfig> makeConfig() const;
         void                                                                           showHud();
         void                                                                           hideHud();
         void                                                                           updateHud();
 
+    protected:
+        /**
+         * @brief 这一轮录哪块屏
+         * @return 生产实现返回主屏名；没有屏时返回空串
+         * @details 留成可覆写的只为用例：离屏平台没有屏名，而录屏参数必须带屏名。
+         */
+        [[nodiscard]] virtual QString recordingScreenName() const;
+
+    private:
         /**
          * @brief 编码完成：收起控制条、按需报一句没带上声音、把成品交回控制器归档
          * @param outputPath 成品路径（显示文本）
@@ -142,7 +151,7 @@ namespace GyanisScribe::App
         GyanisScribe::Platform::IPlatformIntegration                  &m_integration;                  ///< 平台能力，不拥有
         GyanisScribe::Core::ISettingsStore                            &m_settings;                     ///< 录制参数来源，不拥有
         GyanisScribe::Gui::IconProvider                               &m_icons;                        ///< 控制条图标出口，不拥有
-        std::unique_ptr<GyanisScribe::Plugins::FfmpegRecordingEncoder> m_encoder;                      ///< 编码那一步（ffmpeg 子进程）
+        std::shared_ptr<GyanisScribe::Plugins::FfmpegRecordingEncoder> m_encoder;                      ///< 编码那一步（ffmpeg 子进程），与服务共享所有权
         std::unique_ptr<GyanisScribe::Plugins::RecordingService>       m_service;                      ///< 录屏服务，一轮一个会话
         QPointer<GyanisScribe::Gui::RecordingHud>                      m_hud;                          ///< 录屏控制条，一轮一个、收起即销毁
         QTimer                                                        *m_ticker             = nullptr; ///< 每秒推一次读数；随控制条一起起停
