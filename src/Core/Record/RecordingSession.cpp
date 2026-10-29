@@ -97,9 +97,10 @@ namespace GyanisScribe::Core
 
     void RecordingSession::resume(const qint64 nowMs)
     {
-        if (m_state != RecordingState::Paused || nowMs <= m_pausedFromMs)
+        if (m_state != RecordingState::Paused || nowMs < m_pausedFromMs)
         {
-            // 时间倒着走不认：单调时钟不该倒退，认了只会让累计暂停时长变成负数，节拍随即乱掉
+            // 时间倒着走不认：单调时钟不该倒退，认了只会让累计暂停时长变成负数，节拍随即乱掉。
+            // 同一毫秒里按下暂停又恢复是合法的：累计暂停加 0，会话照常回到录制档。
             return;
         }
         m_pausedTotalMs += nowMs - m_pausedFromMs;

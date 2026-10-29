@@ -7,6 +7,40 @@
 
 namespace GyanisScribe::Plugins
 {
+    std::optional<std::string> VideoEncoderProbeCache::find(const Key &key) const
+    {
+        const std::lock_guard guard{m_mutex};
+        const auto            found = m_entries.find(key);
+        if (found == m_entries.end())
+        {
+            return std::nullopt;
+        }
+        return found->second;
+    }
+
+    void VideoEncoderProbeCache::store(const Key &key, std::string encoder)
+    {
+        const std::lock_guard guard{m_mutex};
+        // 先挤再写：新键若恰好排在表头，写后删 begin() 会把刚存进来的这一项自己删掉
+        if (!m_entries.contains(key) && m_entries.size() >= kVideoEncoderProbeCacheEntries)
+        {
+            m_entries.erase(m_entries.begin());
+        }
+        m_entries.insert_or_assign(key, std::move(encoder));
+    }
+
+    void VideoEncoderProbeCache::erase(const Key &key)
+    {
+        const std::lock_guard guard{m_mutex};
+        m_entries.erase(key);
+    }
+
+    std::size_t VideoEncoderProbeCache::sizeForTesting() const
+    {
+        const std::lock_guard guard{m_mutex};
+        return m_entries.size();
+    }
+
     QStringList videoEncoderQualityArguments(const std::string_view encoder, const int videoBitrateKbps)
     {
         // 码率给了就走按码率控，没给才走各家的质量档

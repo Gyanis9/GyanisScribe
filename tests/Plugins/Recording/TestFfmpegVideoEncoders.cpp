@@ -19,6 +19,7 @@
 #include <QFileInfo>
 #include <QImage>
 #include <QProcess>
+#include <QScopeGuard>
 #include <QString>
 #include <QStringList>
 
@@ -249,6 +250,84 @@ namespace
         EXPECT_EQ(cache.sizeForTesting(), 8U) << "缓存没有跟着上限收住";
         EXPECT_FALSE(cache.find(VideoEncoderProbeCache::Key{100, 100, 15, 0}).has_value()) << "超过上限没有把按键排序最靠前的那一项挤出去";
         EXPECT_TRUE(cache.find(VideoEncoderProbeCache::Key{107, 100, 15, 0}).has_value());
+
+        // 新写进来的键排在表头时，挤掉的是旧的表头而不是它自己
+        cache.store(VideoEncoderProbeCache::Key{1, 1, 15, 0}, "libx264");
+        EXPECT_EQ(cache.sizeForTesting(), 8U) << "上限在换掉一项之后没守住";
+        EXPECT_TRUE(cache.find(VideoEncoderProbeCache::Key{1, 1, 15, 0}).has_value()) << "刚存进来的这一项被上限挤掉了";
+        EXPECT_FALSE(cache.find(VideoEncoderProbeCache::Key{101, 100, 15, 0}).has_value()) << "该挤掉的是换进来之前排在表头的那一项";
+
+        // 失效一格之后不再命中，其余格不受影响
+        cache.erase(VideoEncoderProbeCache::Key{1, 1, 15, 0});
+        EXPECT_FALSE(cache.find(VideoEncoderProbeCache::Key{1, 1, 15, 0}).has_value());
+        EXPECT_EQ(cache.sizeForTesting(), 7U);
+        EXPECT_TRUE(cache.find(VideoEncoderProbeCache::Key{107, 100, 15, 0}).has_value()) << "失效一格把别的格也带走了";
+    }
+
+    /**
+     * @brief 钉住自动档的缓存接线：同一档参数只真探一次，换一档或手工失效就重新探
+     * @details 探测由构造注入的替身回答，判据是探了几次；不依赖本机装没装 ffmpeg。
+     */
+    TEST(VideoEncoderCacheWiring, AutoModeReusesTheSameKeyUntilItIsForgotten)
+    {
+        int                                          probes = 0;
+        GyanisScribe::Plugins::FfmpegRecordingEncoder encoder{[&probes](const QStringList &)
+                                                              {
+                                                                  ++probes;
+                                                                  return true;
+                                                              }};
+
+        GyanisScribe::Core::RecorderConfig config;
+        config.frameRate        = 30;
+        config.videoBitrateKbps = 4000;
+        const QSize frameSize{1920, 1080};
+
+        const auto first = encoder.selectEncoderForTesting(config, frameSize);
+        ASSERT_TRUE(static_cast<bool>(first)) << first.error().message;
+        EXPECT_EQ(*first, "libx264");
+        EXPECT_EQ(probes, 1);
+
+        const auto second = encoder.selectEncoderForTesting(config, frameSize);
+        ASSERT_TRUE(static_cast<bool>(second)) << second.error().message;
+        EXPECT_EQ(*second, "libx264");
+        EXPECT_EQ(probes, 1) << "同一档参数第二次仍然真探了，探测缓存没有接上";
+
+        // 换了帧率就是另一档：缓存键里少了它会把 30 帧的结论拿去给别的帧率用
+        config.frameRate = 60;
+        ASSERT_TRUE(static_cast<bool>(encoder.selectEncoderForTesting(config, frameSize)));
+        EXPECT_EQ(probes, 2) << "帧率不同却命中了同一格";
+
+        // 手工失效之后必须重新真探：自动档编码失败会走同一格
+        encoder.probeCacheForTesting().erase(GyanisScribe::Plugins::VideoEncoderProbeCache::Key{1920, 1080, 60, 4000});
+        ASSERT_TRUE(static_cast<bool>(encoder.selectEncoderForTesting(config, frameSize)));
+        EXPECT_EQ(probes, 3) << "缓存失效之后仍然命中了旧结果";
+    }
+
+    /**
+     * @brief 钉住钉住编码器那一档从不查缓存
+     * @details 用户钉了某一档要的就是每次按当前驱动与运行库真探；命中旧结果会把「钉子为什么没生效」埋掉。
+     */
+    TEST(VideoEncoderCacheWiring, PinnedEncoderIsProbedOnEveryCall)
+    {
+        int                                          probes = 0;
+        GyanisScribe::Plugins::FfmpegRecordingEncoder encoder{[&probes](const QStringList &)
+                                                              {
+                                                                  ++probes;
+                                                                  return true;
+                                                              }};
+
+        GyanisScribe::Core::RecorderConfig config;
+        config.frameRate    = 30;
+        config.videoEncoder = "h264_nvenc";
+        const QSize frameSize{1920, 1080};
+
+        for (int round = 1; round <= 2; ++round)
+        {
+            const auto selected = encoder.selectEncoderForTesting(config, frameSize);
+            ASSERT_TRUE(static_cast<bool>(selected)) << selected.error().message;
+            EXPECT_EQ(*selected, "h264_nvenc");
+            EXPECT_EQ(probes, round) << "钉住编码器时第 " << round << " 次没有真探";
+        }
     }
 
     // 端到端那一条要起进程：QProcess 靠应用对象的 socket 通知器收 ffmpeg 的输出，
@@ -404,8 +483,9 @@ namespace
         auto             builder = [&probes](const QString &) -> GyanisScribe::Base::Expected<GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator::ProbeCommand>
         {
             probes.fetch_add(1, std::memory_order_relaxed);
+            // 直接起 ping，不套 cmd /c：Windows 上杀父进程不会带走子进程，套一层就会留下孤儿 ping 跑满十秒
             return GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator::ProbeCommand{
-                    QStringLiteral("cmd"), {QStringLiteral("/c"), QStringLiteral("ping"), QStringLiteral("-n"), QStringLiteral("10"), QStringLiteral("127.0.0.1")}};
+                    QStringLiteral("ping"), {QStringLiteral("-n"), QStringLiteral("10"), QStringLiteral("127.0.0.1")}};
         };
         GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator enumerator{builder, 50};
 
@@ -427,5 +507,74 @@ namespace
         enumerator.refresh();
         ASSERT_TRUE(spinUntil([&] { return failedCount == 2; }, std::chrono::milliseconds{2000})) << "busy 没复位：第二次 refresh 被忽略了";
         EXPECT_EQ(probes.load(std::memory_order_relaxed), 2 * static_cast<int>(GyanisScribe::Plugins::kPreferredVideoEncoders.size()));
+    }
+
+    /**
+     * @brief 钉住「复用的探测结果在真编码失败后失效」
+     * @details 自动档第二轮命中缓存直接开编；这一档若编不出来（驱动或运行库刚变），
+     *          缓存不清就会让同一参数的每一轮都撞同一堵墙，直到重启。
+     *          这里用一个收到 ffmpeg 参数就失败的替身程序顶在 PATH 最前面，不依赖本机真 ffmpeg：
+     *          选型由注入的探针回答，MP4 那一步交给替身程序走失败出口。
+     */
+    TEST_F(VideoEncoderEndToEndFixture, ReusedProbeResultIsForgottenWhenTheMp4RunFails)
+    {
+#ifdef Q_OS_WIN
+        const QFileInfo fakeSource{QStringLiteral("C:/Windows/System32/where.exe")};
+        if (!fakeSource.exists())
+        {
+            GTEST_SKIP() << "找不到可借用的系统程序，这一条没法造出会失败的 ffmpeg 替身";
+        }
+
+        std::error_code ignored;
+        const auto      scratchDirectory = processScratchRoot("GyanisScribe-probe-cache-failure");
+        const auto      fakeBin          = scratchDirectory / "fake-bin";
+        const auto      frameDirectory   = scratchDirectory / "frames";
+        const auto      outputDirectory  = scratchDirectory / "out";
+        std::filesystem::remove_all(scratchDirectory, ignored);
+        std::filesystem::create_directories(fakeBin, ignored);
+        std::filesystem::create_directories(frameDirectory, ignored);
+        std::filesystem::create_directories(outputDirectory, ignored);
+        ASSERT_FALSE(ignored) << "工作目录建不出来：" << scratchDirectory.string();
+        std::filesystem::copy_file(std::filesystem::path{fakeSource.absoluteFilePath().toStdWString()}, fakeBin / "ffmpeg.exe", ignored);
+        ASSERT_FALSE(ignored) << "ffmpeg 替身没复制出来";
+
+        // PATH 只在本进程内改，用例结束就还原：同进程里别的用例仍按真实环境找 ffmpeg
+        const auto oldPath = qEnvironmentVariable("PATH");
+        const auto restore = qScopeGuard([oldPath] { qputenv("PATH", oldPath.toLocal8Bit()); });
+        const auto fakeBinText = QString::fromStdWString(fakeBin.wstring());
+        qputenv("PATH", (fakeBinText + QDir::listSeparator() + oldPath).toLocal8Bit());
+
+        GyanisScribe::Core::PngSequenceSink sink{frameDirectory};
+        for (int index = 0; index < 3; ++index)
+        {
+            QImage frame{QSize{32, 24}, QImage::Format_ARGB32};
+            frame.fill(QColor{40, 90, 140});
+            ASSERT_TRUE(static_cast<bool>(sink.write(frame, index)));
+        }
+        ASSERT_TRUE(static_cast<bool>(sink.seal()));
+
+        GyanisScribe::Core::RecorderConfig config;
+        config.frameRate       = 15;
+        config.outputDirectory = outputDirectory;
+
+        int                                          probes = 0;
+        GyanisScribe::Plugins::FfmpegRecordingEncoder encoder{[&probes](const QStringList &)
+                                                              {
+                                                                  ++probes;
+                                                                  return true;
+                                                              }};
+        const QSize frameSize{32, 24};
+        ASSERT_TRUE(static_cast<bool>(encoder.selectEncoderForTesting(config, frameSize))) << "第一轮选型没成功";
+
+        const auto encoded = encoder.encode(config, frameDirectory, sink.writtenFrames(), 2000, {});
+        EXPECT_FALSE(static_cast<bool>(encoded)) << "替身程序收下 ffmpeg 参数就失败，encode 却报成功";
+
+        ASSERT_TRUE(static_cast<bool>(encoder.selectEncoderForTesting(config, frameSize)));
+        EXPECT_EQ(probes, 2) << "复用的探测结果在 MP4 失败后没有失效：下一轮会继续撞同一堵墙";
+        static_cast<void>(restore);
+        std::filesystem::remove_all(scratchDirectory, ignored);
+#else
+        GTEST_SKIP() << "这一条用 Windows 的系统程序造 ffmpeg 替身";
+#endif
     }
 } // namespace

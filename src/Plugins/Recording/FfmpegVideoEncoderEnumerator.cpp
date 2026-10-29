@@ -148,6 +148,14 @@ namespace GyanisScribe::Plugins
             return;
         }
 
+        // 边界上进程可能刚好退了，finished 还排在事件队列里没轮到：这一档是真探通的，按正常收尾走，
+        // 别把成功候选当成超时丢掉
+        if (m_process->state() == QProcess::NotRunning)
+        {
+            handleFinished();
+            return;
+        }
+
         const auto candidate = m_remaining.constFirst();
         Base::Logger::warning(std::format("探测编码器 {} 超过 {} 毫秒没返回，已强杀并跳过这一档", candidate.toStdString(), m_probeTimeoutMs));
 

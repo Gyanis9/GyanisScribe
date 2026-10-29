@@ -725,6 +725,61 @@ namespace
     }
 
     /**
+     * @brief 钉住倒计时里按暂停是空操作：表不能停，倒计时得自己走完
+     * @details 会话在 Countdown 档本来就不收 pause()，服务若照着「按过暂停」把表停了，
+     *          这一轮就永远到不了录制档，用户看到的是卡在倒计时上的控制条。
+     */
+    TEST_F(RecordingServiceFixture, PauseDuringCountdownKeepsTheCountdownRunning)
+    {
+        StubCaptureSource       source;
+        const auto              encoder = std::make_shared<GatedRecordingEncoder>();
+        StubPlatformIntegration platform;
+        RecordingService        service{source, encoder, platform};
+
+        ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 1)));
+        ASSERT_EQ(service.state(), RecordingState::Countdown);
+
+        service.pause();
+        EXPECT_EQ(service.state(), RecordingState::Countdown) << "倒计时里按暂停被当成了真暂停";
+
+        // 表若被停掉，这一段会等到 spinFramesIn 的上限才判红
+        ASSERT_TRUE(spinFramesIn(service)) << "倒计时没有走完：暂停把抓帧表停死了";
+        EXPECT_EQ(service.state(), RecordingState::Recording);
+
+        ASSERT_TRUE(static_cast<bool>(service.cancel()));
+    }
+
+    /**
+     * @brief 钉住连按两次暂停、再连按两次恢复之后仍在录制，而且表是转着的
+     * @details 第二次 pause 是空操作，第二次 resume 也只该把表重新排一次；两次恢复之后
+     *          表若没起来，用户看到的是「已恢复」而画面不再更新。
+     */
+    TEST_F(RecordingServiceFixture, DoublePauseAndResumeStayInRecordingWithTheTimerRunning)
+    {
+        CountingCaptureSource   source;
+        const auto              encoder = std::make_shared<GatedRecordingEncoder>();
+        StubPlatformIntegration platform;
+        RecordingService        service{source, encoder, platform};
+
+        ASSERT_TRUE(static_cast<bool>(service.start(serviceConfig(OutputFormat::Mp4, false), 0)));
+        ASSERT_TRUE(spinFramesIn(service)) << "节拍一直没落下帧";
+
+        service.pause();
+        service.pause();
+        EXPECT_EQ(service.state(), RecordingState::Paused);
+
+        service.resume();
+        service.resume();
+        ASSERT_EQ(service.state(), RecordingState::Recording) << "两次恢复之后没回到录制档";
+
+        const auto grabsBefore = source.grabCount();
+        spinFor(200);
+        EXPECT_GT(source.grabCount(), grabsBefore) << "两次恢复之后抓帧表没转起来：录屏停在恢复那一刻";
+
+        ASSERT_TRUE(static_cast<bool>(service.cancel()));
+    }
+
+    /**
      * @brief 钉住排帧间隔就是理论节拍
      * @details 定时器多要 4 毫秒余量会把 60 帧压到五十帧以下（1000/(16+4)）；15/30/60 三档的整数结果同时钉住取整方向。
      */
@@ -926,6 +981,37 @@ namespace
         // 放开替身门闩并等它收尾：预算到点后编码线程仍拿着服务交出去的 shared_ptr，不能把它留到进程退出
         encoder->release();
         ASSERT_TRUE(spinUntil([&] { return encoder->isFinished(); })) << "放开门闩之后编码没收尾";
+        ASSERT_TRUE(QThreadPool::globalInstance()->waitForDone(static_cast<int>(kWaitPatience.count()))) << "编码线程没收尾";
+    }
+
+    /**
+     * @brief 钉住服务析构后编码线程仍按值拿着编码器
+     * @details 析构预算到点时编码还堵在门闩上；这时用例自己那一份 shared_ptr 也丢掉，
+     *          只剩工作线程按值捕获的那一份。它若没被按值拿住，编码线程会摸到已销毁的对象；
+     *          拿住了，弱引用就还能锁上，直到编码真的收尾才失效。
+     */
+    TEST_F(RecordingServiceFixture, WorkerKeepsTheEncoderAliveAfterTheServiceIsGone)
+    {
+        StubCaptureSource source;
+        auto              encoder = std::make_shared<GatedRecordingEncoder>();
+        const std::weak_ptr<GatedRecordingEncoder> witness = encoder;
+        StubPlatformIntegration                    platform;
+        auto                                       service = std::make_unique<RecordingService>(source, encoder, platform, nullptr, 100);
+
+        ASSERT_TRUE(static_cast<bool>(service->start(serviceConfig(OutputFormat::Mp4, false), 0)));
+        ASSERT_TRUE(spinFramesIn(*service)) << "节拍一直没落下帧";
+        ASSERT_TRUE(static_cast<bool>(service->stop()));
+        ASSERT_TRUE(spinUntil([&] { return encoder->callCount() == 1; }));
+        ASSERT_FALSE(encoder->isFinished()) << "前提没造出来：编码在析构之前就返回了";
+
+        service.reset();
+        auto *const gate = encoder.get();
+        encoder.reset();
+        // 用例这一份也丢了：还能锁上就说明工作线程手里确实有一份
+        EXPECT_NE(witness.lock(), nullptr) << "服务析构后工作线程没按值拿着编码器";
+
+        gate->release();
+        ASSERT_TRUE(spinUntil([&] { return witness.expired(); })) << "编码收尾之后仍有人拿着编码器";
         ASSERT_TRUE(QThreadPool::globalInstance()->waitForDone(static_cast<int>(kWaitPatience.count()))) << "编码线程没收尾";
     }
 

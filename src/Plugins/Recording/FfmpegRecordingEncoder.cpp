@@ -35,6 +35,10 @@ namespace
 
 namespace GyanisScribe::Plugins
 {
+    FfmpegRecordingEncoder::FfmpegRecordingEncoder(EncoderProbe probe) : m_probe(std::move(probe))
+    {
+    }
+
     int FfmpegRecordingEncoder::encodeTimeoutMs(const int frameRate, const int frameCount)
     {
         // 按「实际时长 × 4」给余量，再垫 30 秒：几秒钟的短片不能因为余量算出来太小而被误杀
@@ -57,22 +61,31 @@ namespace GyanisScribe::Plugins
         return size;
     }
 
-    Base::Expected<std::string> FfmpegRecordingEncoder::selectEncoder(const Core::RecorderConfig &config, const QSize &frameSize)
+    Base::Expected<std::string> FfmpegRecordingEncoder::selectEncoder(const Core::RecorderConfig &config, const QSize &frameSize, bool &servedFromCache)
     {
-        const auto                        autoMode = config.videoEncoder.empty();
+        servedFromCache                   = false;
+        const auto                        autoMode   = config.videoEncoder.empty();
         const VideoEncoderProbeCache::Key cacheKey{frameSize.width(), frameSize.height(), config.frameRate, config.videoBitrateKbps};
         // 只缓存自动档：钉住编码器时用户要的就是每次真探，命中旧结果会把「钉子这次为什么没生效」埋掉
         if (autoMode)
         {
             if (const auto cached = m_probeCache.find(cacheKey); cached)
             {
+                servedFromCache = true;
                 Base::Logger::info(std::format("复用上次探测的编码器：{}（{}x{}，{} 帧/秒）", *cached, frameSize.width(), frameSize.height(), config.frameRate));
                 return *cached;
             }
         }
 
         // 每个候选都真跑三帧：名单里有不等于开得起来（缺 Intel/AMD 运行库的那些照样在名单上）
-        const auto probe = [](const QStringList &arguments) { return run(arguments, kEncoderProbeTimeoutMs, GyanisScribe::Base::uiTextUtf8("编码器探测")).has_value(); };
+        const auto probe = [this](const QStringList &arguments)
+        {
+            if (m_probe)
+            {
+                return m_probe(arguments);
+            }
+            return run(arguments, kEncoderProbeTimeoutMs, GyanisScribe::Base::uiTextUtf8("编码器探测")).has_value();
+        };
 
         const auto selected = selectVideoEncoder(probe, frameSize.width(), frameSize.height(), config.frameRate, config.videoBitrateKbps, config.videoEncoder);
         if (selected)
@@ -89,6 +102,17 @@ namespace GyanisScribe::Plugins
             Base::Logger::info(std::format("录屏编码器：{}（{}x{}，{} 帧/秒）", *selected, frameSize.width(), frameSize.height(), config.frameRate));
         }
         return selected;
+    }
+
+    Base::Expected<std::string> FfmpegRecordingEncoder::selectEncoderForTesting(const Core::RecorderConfig &config, const QSize &frameSize)
+    {
+        bool servedFromCache = false;
+        return selectEncoder(config, frameSize, servedFromCache);
+    }
+
+    VideoEncoderProbeCache &FfmpegRecordingEncoder::probeCacheForTesting() noexcept
+    {
+        return m_probeCache;
     }
 
     Base::Expected<std::filesystem::path> FfmpegRecordingEncoder::encode(const Core::RecorderConfig &config, const std::filesystem::path &frameDirectory, const int frameCount,
@@ -114,7 +138,8 @@ namespace GyanisScribe::Plugins
                 return std::unexpected(frameSize.error());
             }
 
-            const auto selected = selectEncoder(config, *frameSize);
+            bool       servedFromCache = false;
+            const auto selected        = selectEncoder(config, *frameSize, servedFromCache);
             if (!selected)
             {
                 return std::unexpected(selected.error());
@@ -124,6 +149,12 @@ namespace GyanisScribe::Plugins
             const auto arguments = mp4Arguments(config, frameCount, recordedDurationMs, frameDirectory, outputFile, audioWav, *selected);
             if (auto ran = run(arguments, timeout, GyanisScribe::Base::uiTextUtf8("MP4 编码")); !ran)
             {
+                if (servedFromCache)
+                {
+                    // 复用的那一档这次真编不出来：留在缓存里会让同一参数的下一轮继续撞同一堵墙，直到重启
+                    m_probeCache.erase(VideoEncoderProbeCache::Key{frameSize->width(), frameSize->height(), config.frameRate, config.videoBitrateKbps});
+                    Base::Logger::info(std::format("复用的编码器 {} 这次没编出来，已丢掉这一档的探测结果，下一轮重新探测", *selected));
+                }
                 return std::unexpected(ran.error());
             }
         } else

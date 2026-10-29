@@ -197,7 +197,7 @@ namespace GyanisScribe::Plugins
             return;
         }
         m_session->resume(m_clock.elapsed());
-        // 只认会话真回到录制档：暂停还不满一毫秒时 resume 是空操作，这时起表会白白照抓整屏
+        // 只认会话真回到录制档：不在暂停里的那次 resume 是空操作，这时起表会白白照抓整屏
         if (m_session->state() == Core::RecordingState::Recording)
         {
             m_timer.start(recordingTimerIntervalMs(m_config.frameRate));

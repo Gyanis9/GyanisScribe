@@ -18,6 +18,7 @@
 #include <QStringList>
 
 #include <filesystem>
+#include <functional>
 #include <string>
 #include <string_view>
 
@@ -35,6 +36,16 @@ namespace GyanisScribe::Plugins
     class FfmpegRecordingEncoder final : public Core::IRecordingEncoder
     {
     public:
+        /// 跑一条探测命令，成功返回 true；空函数表示生产实现真跑 ffmpeg
+        using EncoderProbe = std::function<bool(const QStringList &)>;
+
+        /**
+         * @brief 建编码器
+         * @param probe 探测命令的替身，空表示真跑 ffmpeg
+         * @note 注入只给用例：自动档的探测缓存不依赖本机装没装 ffmpeg 就能验。
+         */
+        explicit FfmpegRecordingEncoder(EncoderProbe probe = {});
+
         /**
          * @brief 编码一帧的预算时长，毫秒
          * @param frameRate 目标帧率
@@ -59,6 +70,18 @@ namespace GyanisScribe::Plugins
         [[nodiscard]] Base::Expected<std::filesystem::path> encode(const Core::RecorderConfig &config, const std::filesystem::path &frameDirectory, int frameCount,
                                                                    qint64 recordedDurationMs, const std::filesystem::path &audioWav) override;
 
+        /**
+         * @brief 走一遍选型，不做真编码
+         * @param config 录屏参数，帧率、码率与编码器钉子从这儿取
+         * @param frameSize 帧尺寸，像素
+         * @return 成功返回选中的编码器名；候选全开不起来返回原因
+         * @details 用例用：判的是缓存命中与失效，探测本身由构造注入的 EncoderProbe 回答。
+         */
+        [[nodiscard]] Base::Expected<std::string> selectEncoderForTesting(const Core::RecorderConfig &config, const QSize &frameSize);
+
+        /// 用例用：直接拿到自动档探测缓存，验命中与失效
+        [[nodiscard]] VideoEncoderProbeCache &probeCacheForTesting() noexcept;
+
     private:
         /**
          * @brief 跑一次 ffmpeg 并等它结束
@@ -80,13 +103,15 @@ namespace GyanisScribe::Plugins
          * @brief 按真录屏的尺寸探出这台机器上开得起来的编码器
          * @param config 录屏参数，帧率与画面码率从这儿取
          * @param frameSize 首帧尺寸，像素
+         * @param servedFromCache 交回这次结果是否来自缓存（只有自动档可能为 true）
          * @return 成功返回编码器名；候选全开不起来返回原因
          * @details 自动档探通的结果按帧尺寸、帧率与码率记进缓存，同一档参数再录一轮直接复用；
          *          钉住编码器时不查也不写缓存，每次照旧真探。
          */
-        [[nodiscard]] Base::Expected<std::string> selectEncoder(const Core::RecorderConfig &config, const QSize &frameSize);
+        [[nodiscard]] Base::Expected<std::string> selectEncoder(const Core::RecorderConfig &config, const QSize &frameSize, bool &servedFromCache);
 
         VideoEncoderProbeCache m_probeCache; ///< 自动档探测结果，按帧尺寸、帧率与码率分格
+        EncoderProbe           m_probe;      ///< 探测命令的替身；空表示真跑 ffmpeg
     };
 
 } // namespace GyanisScribe::Plugins

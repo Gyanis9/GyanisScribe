@@ -59,41 +59,25 @@ namespace GyanisScribe::Plugins
          * @param key 参数档
          * @return 命中时返回上次探通的编码器名；没有这一格返回空
          */
-        [[nodiscard]] std::optional<std::string> find(const Key &key) const
-        {
-            const std::lock_guard guard{m_mutex};
-            const auto            found = m_entries.find(key);
-            if (found == m_entries.end())
-            {
-                return std::nullopt;
-            }
-            return found->second;
-        }
+        [[nodiscard]] std::optional<std::string> find(const Key &key) const;
 
         /**
          * @brief 记下一格
          * @param key 参数档
          * @param encoder 探通的编码器名
-         * @details 超过上限时删掉按键排序最靠前的那一项，让缓存不随会话增长。
+         * @details 超过上限时先挤掉按键排序最靠前的那一项再写入：新写进来的这一格不会被自己挤掉。
          */
-        void store(const Key &key, std::string encoder)
-        {
-            const std::lock_guard guard{m_mutex};
-            const auto [position, inserted] = m_entries.insert_or_assign(key, std::move(encoder));
-            static_cast<void>(position);
-            // 只在真的多出一格时收一次：改写已有键不会让表变大
-            if (inserted && m_entries.size() > kVideoEncoderProbeCacheEntries)
-            {
-                m_entries.erase(m_entries.begin());
-            }
-        }
+        void store(const Key &key, std::string encoder);
+
+        /**
+         * @brief 忘掉一格
+         * @param key 参数档
+         * @details 这一档的探测结论作废，下一轮重新真探：缓存里的名字可能在真编码那一刻开不起来。
+         */
+        void erase(const Key &key);
 
         /// 当前缓存了几格，用例用
-        [[nodiscard]] std::size_t sizeForTesting() const
-        {
-            const std::lock_guard guard{m_mutex};
-            return m_entries.size();
-        }
+        [[nodiscard]] std::size_t sizeForTesting() const;
 
     private:
         mutable std::mutex         m_mutex;   ///< 保护 m_entries

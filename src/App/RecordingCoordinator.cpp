@@ -14,6 +14,7 @@
 #include "Plugins/Recording/FfmpegRecordingEncoder.h"
 #include "Plugins/Recording/RecordingService.h"
 
+#include <QCursor>
 #include <QGuiApplication>
 #include <QScreen>
 #include <QTimer>
@@ -64,7 +65,13 @@ namespace GyanisScribe::App
 
     QString RecordingCoordinator::recordingScreenName() const
     {
-        const auto *screen = QGuiApplication::primaryScreen();
+        // 录哪块屏跟着光标走：多屏机器上人在副屏干活，只盯着主屏就是把用户要的画面录丢了；
+        // 抓帧那一侧（QScreenCaptureSource）本来就是按光标选屏的，两处口径要一致。
+        const auto *screen = QGuiApplication::screenAt(QCursor::pos());
+        if (screen == nullptr)
+        {
+            screen = QGuiApplication::primaryScreen();
+        }
         if (screen == nullptr)
         {
             return {};
@@ -74,9 +81,17 @@ namespace GyanisScribe::App
 
     GyanisScribe::Base::Expected<GyanisScribe::Core::RecorderConfig> RecordingCoordinator::makeConfig() const
     {
+        const auto screenName = recordingScreenName();
+        // 一块屏都没有时按「屏不可用」拒收，用原来那句能操作的文案。离屏平台会给出一个没有名字的
+        // 替身屏，那一路仍交给 validateRecorderConfig：控制条一闪与失败提示的既有顺序因此不变。
+        if (screenName.isEmpty() && QGuiApplication::screens().isEmpty())
+        {
+            return std::unexpected(GyanisScribe::Base::Error{GyanisScribe::Base::ErrorCode::ScreenUnavailable,
+                                                             GyanisScribe::Base::uiTextUtf8("当前没有可用屏幕，录屏没法开始。请接回显示器后重试")});
+        }
+
         GyanisScribe::Core::RecorderConfig config;
-        // 屏名留空时交给 validateRecorderConfig 拒收：控制条与失败提示的时序仍由 toggle() 那一条统一
-        config.screenName      = recordingScreenName();
+        config.screenName      = screenName;
         const auto configured  = m_settings.stringValue(GyanisScribe::Core::kPathRecording, QString());
         config.outputDirectory = configured.isEmpty() ? GyanisScribe::Base::Paths::defaultRecordingDirectory() : GyanisScribe::Base::Paths::fromDisplayText(configured);
 

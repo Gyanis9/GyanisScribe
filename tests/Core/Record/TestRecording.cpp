@@ -500,6 +500,27 @@ TEST(RecordingSessionCase, PauseSkipsFramesAndDoesNotConsumeDuration)
 }
 
 /**
+ * @brief 钉住同一毫秒里按下暂停又恢复：会话要回到录制档，累计暂停加 0
+ * @details 把「不大于」当成时间倒走会把这次恢复吞掉：控制条显示暂停、定时器也不再起，
+ *          用户看到的是一段永远恢复不了的录屏。只拒绝真的倒退（nowMs < 暂停起点）。
+ */
+TEST(RecordingSessionCase, ResumeAtTheSameInstantReturnsToRecording)
+{
+    RecordingSink    sink;
+    auto             config = baselineConfig();
+    RecordingSession session{config, sink, 0, 0};
+
+    EXPECT_TRUE(session.tick(0, frameOf()).frameStored);
+    session.pause(100);
+    ASSERT_EQ(session.state(), RecordingState::Paused);
+
+    session.resume(100);
+    EXPECT_EQ(session.state(), RecordingState::Recording) << "同一毫秒的恢复被当成时间倒走吞掉了";
+    EXPECT_EQ(session.recordedDurationMs(100), 100) << "累计暂停不该因为这次恢复变成负数或别的值";
+    EXPECT_TRUE(session.tick(100, frameOf()).frameStored) << "回到录制档后节拍没接上";
+}
+
+/**
  * @brief 钉住时长上限与收尾
  * @details 触到上限时报给调用方 durationReached，由它收尾；finish 只封盘一次，
  *          收尾时一帧都没有要报错而不是把空目录交给编码器。
