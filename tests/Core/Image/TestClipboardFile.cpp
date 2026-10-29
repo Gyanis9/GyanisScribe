@@ -155,9 +155,54 @@ TEST_F(ClipboardFileFixture, ClipboardCacheKeepsOnlyTheNewestFiles)
             ++pngCount;
         }
     }
-    EXPECT_LE(pngCount, 64) << "中转目录的文件数超过了上限";
+    EXPECT_EQ(pngCount, 64) << "中转目录的文件数不是上限那一档：刚写入的那份与最新 63 份旧图应当都在";
     EXPECT_TRUE(std::filesystem::exists(directory() / "seed-69.png")) << "最新的一份旧图被删了，留下的是更旧的那批";
     EXPECT_FALSE(std::filesystem::exists(directory() / "seed-00.png")) << "最旧的一份没有被清理";
+}
+
+/**
+ * @brief 钉住清理给刚写入的那份留一格：64 份时间戳在未来的旧图也挤不掉它
+ * @details 刚写入的文件可能带着比谁都旧的时间戳（从别处拷来、保留源时间的文件就是），
+ *          按时间排序它会落到队尾；清理若只按时间取前 64，剪贴板里正指着的这一份就被删了。
+ *          预置 64 份时间戳在一天后的旧图，复制一张之后总数必须仍是 64：
+ *          刚写入的那份在，旧的只删掉时间戳最靠前的一份。
+ */
+TEST_F(ClipboardFileFixture, ClipboardPruneReservesASlotForTheJustWrittenFile)
+{
+    constexpr int kSeedCount = 64;
+
+    ASSERT_TRUE(std::filesystem::create_directories(directory()));
+    const auto futureTime = std::filesystem::file_time_type::clock::now() + std::chrono::hours{24};
+    for (int index = 0; index < kSeedCount; ++index)
+    {
+        const auto path = directory() / std::format("future-{:02}.png", index);
+        std::ofstream{path, std::ios::binary} << "old";
+        std::error_code touched;
+        std::filesystem::last_write_time(path, futureTime + std::chrono::seconds{index}, touched);
+        ASSERT_FALSE(touched) << "改不动预置文件的修改时间，留一格判据的前提不成立：" << touched.message();
+    }
+
+    const auto written = copyImageAsFile(makeImage(), directory());
+    ASSERT_TRUE(written.has_value()) << written.error().message;
+    EXPECT_TRUE(std::filesystem::exists(*written)) << "时间戳更旧的那份被清理掉了：刚写入的文件没有单独占一格";
+
+    int pngCount    = 0;
+    int futureCount = 0;
+    for (const auto &entry: std::filesystem::directory_iterator{directory()})
+    {
+        if (entry.path().extension() != ".png")
+        {
+            continue;
+        }
+        ++pngCount;
+        if (entry.path().filename() != written->filename())
+        {
+            ++futureCount;
+        }
+    }
+    EXPECT_EQ(pngCount, 64) << "留一格之后总数应当仍是上限，实际" << pngCount << "份";
+    EXPECT_EQ(futureCount, 63) << "预置的旧图应当恰好删掉一份，实际剩下" << futureCount << "份";
+    EXPECT_FALSE(std::filesystem::exists(directory() / "future-00.png")) << "多出来的应当是最早的那一份旧图";
 }
 
 /**

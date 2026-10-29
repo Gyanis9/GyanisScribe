@@ -27,8 +27,11 @@ namespace GyanisScribe::Core
         /**
          * @brief 清掉中转目录里超量的旧 PNG
          * @param directory 中转目录
-         * @param keepPath 刚写入的那一份，永远不删
-         * @details 按最后写入时间保留最新的一批；删除失败只记 warning，已经交出的文件不受影响。
+         * @param keepPath 刚写入的那一份：先给它占住一格，其余按时间只留最新的 63 份
+         * @details 上限按「刚写入 1 份 + 其余 63 份」切分：刚写入那份的时间戳可能比谁都旧
+         *          （从别处拷来的文件会保留源时间），若让它按时间参与排序，清理恰好会删掉
+         *          剪贴板里正指着的那一份。读不出类型或时间的文件不参与删除，只记 warning：
+         *          宁可多留一份，也不误删。
          */
         void pruneClipboardDirectory(const std::filesystem::path &directory, const std::filesystem::path &keepPath)
         {
@@ -41,18 +44,33 @@ namespace GyanisScribe::Core
             std::error_code             iterationError;
             std::vector<Candidate>      candidates;
             const std::filesystem::path keepName = keepPath.filename();
+            bool                        keepSeen = false;
             for (std::filesystem::directory_iterator iterator{directory, iterationError}, end; !iterationError && iterator != end; iterator.increment(iterationError))
             {
                 std::error_code typeError;
-                if (!iterator->is_regular_file(typeError) || typeError || iterator->path().extension() != ".png")
+                const bool      isRegular = iterator->is_regular_file(typeError);
+                if (typeError)
                 {
+                    Base::Logger::warning(
+                            std::format("剪贴板中转文件读不出类型，这次先留着：{}（{}）", Base::Paths::toDisplayText(iterator->path()).toStdString(), typeError.message()));
+                    continue;
+                }
+                if (!isRegular || iterator->path().extension() != ".png")
+                {
+                    continue;
+                }
+                if (iterator->path().filename() == keepName)
+                {
+                    // 刚写的那份单独占一格：既不参与时间排序，也不进删除名单
+                    keepSeen = true;
                     continue;
                 }
                 std::error_code timeError;
                 const auto      writeTime = std::filesystem::last_write_time(iterator->path(), timeError);
                 if (timeError)
                 {
-                    // 读不出时间就无法判断新旧：留着不动，宁可多一份也不误删
+                    Base::Logger::warning(
+                            std::format("剪贴板中转文件读不出修改时间，这次先留着：{}（{}）", Base::Paths::toDisplayText(iterator->path()).toStdString(), timeError.message()));
                     continue;
                 }
                 candidates.push_back(Candidate{iterator->path(), writeTime});
@@ -64,12 +82,11 @@ namespace GyanisScribe::Core
             }
 
             std::ranges::sort(candidates, std::greater{}, &Candidate::writeTime);
-            std::size_t kept = 0;
+            // 刚写入的那份已经占去一格，其余只留最新的 63 份，总数仍不超过上限
+            std::size_t kept = keepSeen ? 1 : 0;
             for (const auto &candidate: candidates)
             {
-                // 刚写的那份单独放行：即使时间戳异常落到队尾，也不能把它从剪贴板路径下删掉
-                const bool isJustWritten = candidate.path.filename() == keepName;
-                if (isJustWritten || kept < kClipboardCacheLimit)
+                if (kept < kClipboardCacheLimit)
                 {
                     ++kept;
                     continue;
