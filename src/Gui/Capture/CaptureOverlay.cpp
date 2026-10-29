@@ -553,8 +553,11 @@ namespace GyanisScribe::Gui
             }
 
             // 提示区三层文字与位置跟局部重绘共用一次测量：两边各量一遍，字号或文案一变就会有一边算错
-            const auto hint = hintLayoutFor(shown);
-            painter.setFont(hint.font);
+            const auto hint     = hintLayoutFor(shown);
+            // 量尺寸时已锁过表格数字，绘制前再显式锁一次：同一属性重复应用不改变字体，绘制处也不依赖量尺寸那一侧
+            QFont hintFont = hint.font;
+            hintFont       = GyanisScribe::Gui::tabularFont(hintFont, TextScript::Mixed);
+            painter.setFont(hintFont);
             painter.setPen(Qt::NoPen);
             painter.setBrush(GyanisScribe::Gui::kCaptureHintBackgroundColor);
             painter.drawRect(hint.hintRect);
