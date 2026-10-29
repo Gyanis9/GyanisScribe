@@ -75,8 +75,11 @@ Write-Output '[ok] OCR language packs staged'
 # not under the build root -- pointing at build\release\translations would silently ship a
 # package that can never switch language.
 $translations = Join-Path 'build' 'release\bin\translations'
-if (-not (Test-Path $translations)) {
-    throw 'language packs missing under build/release/bin/translations (lrelease did not run)'
+# The catalog has to be a real, non-empty file: an empty or missing .qm passes a directory-only
+# check just as quietly, and the packaged app then falls back to Chinese for every string.
+$englishCatalog = Join-Path $translations 'GyanisScribe_en.qm'
+if (-not (Test-Path $englishCatalog) -or (Get-Item $englishCatalog).Length -le 0) {
+    throw 'language pack GyanisScribe_en.qm missing or empty under build/release/bin/translations (lrelease did not run)'
 }
 Copy-Item -Recurse -Force $translations (Join-Path $stage 'translations')
 Write-Output '[ok] language packs staged'
