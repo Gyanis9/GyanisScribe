@@ -12,6 +12,7 @@
 #include "Core/Settings/SettingsStore.h"
 #include "Gui/Controls/AppShortcuts.h"
 #include "Gui/Resources/IconProvider.h"
+#include "Gui/Theme/DesignTokens.h"
 #include "Gui/Theme/ThemeKind.h"
 #include "Gui/Theme/ThemeManager.h"
 
@@ -2103,6 +2104,69 @@ TEST_F(AnnotationWindowFixture, CropPreviewMapsShapesByClippedOriginAndScale)
     ASSERT_GE(rightMostWithoutScale, 0.0) << "空预览尺寸那一档找不到矩形的右边";
     EXPECT_NEAR(rightMostWithoutScale, 80.0 + 5.0, 2.0) << "空预览尺寸时图形没有按原点平移（或按别的比例缩放了）";
     EXPECT_FALSE(inkAt(fallback, 20.0, 40.0)) << "空预览尺寸时矩形还停在原位：平移没生效";
+}
+
+/**
+ * @brief 钉住重裁预览里的图形抗锯齿、选框与抓点边缘保持纯色
+ * @details 预览分支与普通分支各设一次渲染提示：斜放的矩形边要在预览里落出中间色，
+ *          否则预览与成品的边缘不是同一档；选框与抓点是界面辅助线，边缘必须仍是纯色。
+ *          用 render 按 1:1 出图，抓屏会按设备倍比放大，1px 辅助线的纯色判据会被缩放糊掉。
+ */
+TEST_F(AnnotationWindowFixture, CropPreviewAntialiasesShapeEdges)
+{
+    // 矩形转 45°，四条边都成为斜线：抗锯齿与否在像素上分得开
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Rectangle).has_value());
+    ASSERT_TRUE(engine().setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 3, .fontSize = 16, .fillStyle = 0}).has_value());
+    engine().beginStroke(QPoint(60, 35));
+    engine().moveStroke(QPoint(140, 65));
+    const auto settled = engine().endStroke();
+    ASSERT_TRUE(settled.has_value()) << settled.error().message;
+    ASSERT_TRUE(engine().select(*settled).has_value());
+    ASSERT_TRUE(engine().beginSelectionDrag(GyanisScribe::Core::SelectionHandle::Rotate, QPoint(100, 0)).has_value()) << "没抓住旋转手柄，矩形转不到斜放";
+    ASSERT_TRUE(engine().updateSelectionDrag(QPoint(150, 0), GyanisScribe::Core::SelectionDragModifiers{}).has_value()) << "旋转拖不动，矩形仍是横平竖直";
+    engine().endSelectionDrag();
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Select).has_value());
+
+    GyanisScribe::Gui::AnnotationView view{engine()};
+    view.resize(200, 100);
+    QImage preview{200, 100, QImage::Format_ARGB32};
+    preview.fill(QColor(0, 180, 0));
+    view.setCropPreview(preview, QPointF{0.0, 0.0}, QSizeF{200.0, 100.0});
+    QApplication::processEvents();
+
+    QImage shot{200, 100, QImage::Format_ARGB32};
+    shot.fill(Qt::transparent);
+    {
+        QPainter painter{&shot};
+        view.render(&painter);
+    }
+
+    const QColor background{0, 180, 0};
+    const QColor ink{255, 0, 0};
+    int          intermediatePixels = 0;
+    for (int y = 8; y < 92; ++y)
+    {
+        for (int x = 8; x < 192; ++x)
+        {
+            const QColor pixel = shot.pixelColor(x, y);
+            // 红绿相混的像素既不是底色也不是笔色：只有开了抗锯齿的斜边会落在这一档
+            if (pixel != background && pixel != ink && pixel.red() > 0 && pixel.green() > 0)
+            {
+                ++intermediatePixels;
+            }
+        }
+    }
+    EXPECT_GT(intermediatePixels, 0) << "预览里的斜边没有中间色：图形那一层没开抗锯齿";
+
+    // 反向对照：顶边选框线与右侧中点抓点的左边缘都不该被抗锯齿糊开
+    for (const int x: {20, 40, 70, 120, 150, 180})
+    {
+        EXPECT_EQ(shot.pixelColor(x, 1), GyanisScribe::Gui::kAccentColor) << "预览顶边的选框线在 x=" << x << " 不是纯色";
+    }
+    for (const int y: {47, 49, 51})
+    {
+        EXPECT_EQ(shot.pixelColor(195, y), GyanisScribe::Gui::kAccentColor) << "右侧中点抓点的左边缘在 y=" << y << " 不是纯色";
+    }
 }
 
 /**
