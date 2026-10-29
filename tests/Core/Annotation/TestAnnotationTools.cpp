@@ -507,6 +507,37 @@ TEST_F(AnnotationFixture, MosaicCacheKeyCoversGranularityAndPixelScale)
 }
 
 /**
+ * @brief 钉住马赛克缓存键覆盖矩形：同一支工具换掉位置与大小后，必须重算并画到新矩形上
+ * @details 新旧矩形不重叠，判据同时看两处：新矩形里该有像素，旧矩形的位置该空出来。
+ *          只看计数的话，把旧成品贴回旧位置也能让计数以外的检查蒙混过去；这里读的是渲染结果。
+ */
+TEST_F(AnnotationFixture, MosaicCacheKeyCoversGeometry)
+{
+    const auto        &canvas  = m_engine.canvas();
+    const PaintContext context{canvas.image, 1.0};
+
+    AnnotationShape before;
+    before.rect            = QRect(40, 60, 80, 60);
+    before.mosaicBlockSize = 8;
+
+    MosaicTool tool;
+    tool.insertShape(0, before);
+    const QImage beforeRender = renderFirstShape(tool, context);
+    ASSERT_EQ(tool.cacheBuildCountForTesting(), 1) << "第一次绘制该算一次马赛克";
+    ASSERT_EQ(beforeRender.pixelColor(80, 90).alpha(), 255) << "旧矩形里没画出马赛克，后面的对照没有基准";
+    ASSERT_EQ(beforeRender.pixelColor(240, 130).alpha(), 0) << "新矩形的位置在第一次绘制时就已有像素，探点不干净";
+
+    AnnotationShape moved = before;
+    moved.rect            = QRect(220, 70, 120, 80); // 平移到右边并放大，与旧矩形不重叠
+    ASSERT_TRUE(tool.replaceShapeAt(0, moved));
+    const QImage movedRender = renderFirstShape(tool, context);
+    EXPECT_EQ(tool.cacheBuildCountForTesting(), 2) << "矩形换了还命中缓存，贴的是旧矩形上的马赛克";
+
+    EXPECT_EQ(movedRender.pixelColor(240, 130).alpha(), 255) << "新矩形里没有马赛克";
+    EXPECT_EQ(movedRender.pixelColor(80, 90).alpha(), 0) << "旧矩形的位置还留着马赛克：成品贴到了旧目标上";
+}
+
+/**
  * @brief 钉住橡皮擦的上一块成品跨重绘复用，换底图后必须重算
  * @details 键包含轨迹与线宽：轨迹一变就是另一笔，静止重绘才允许直接复用。
  */
@@ -565,6 +596,35 @@ TEST_F(AnnotationFixture, EraserCacheKeyCoversTrailAndPixelScale)
     const PaintContext scaled{canvas.image, 2.0};
     repaintFirstShape(scaleTool, scaled);
     EXPECT_EQ(scaleTool.cacheBuildCountForTesting(), 2) << "换了倍比还命中缓存，擦出来的是旧倍比的图";
+}
+
+/**
+ * @brief 钉住橡皮擦缓存键覆盖线宽：同一组采样点换粗线宽，擦出的笔迹必须跟着变宽
+ * @details 线宽 4 的橡皮是 24 宽（半宽 12），线宽 10 是 60 宽（半宽 30）。探点取在距笔迹中线
+ *          20 像素处：细笔够不着、粗笔盖得住。只盯计数的话，旧笔迹被贴回来，这个探点仍是空的。
+ */
+TEST_F(AnnotationFixture, EraserCacheKeyCoversLineWidth)
+{
+    const auto        &canvas  = m_engine.canvas();
+    const PaintContext context{canvas.image, 1.0};
+
+    AnnotationShape shape;
+    shape.points    = {QPoint(60, 150), QPoint(340, 150)};
+    shape.lineWidth = 4;
+
+    EraserTool tool;
+    tool.insertShape(0, shape);
+    const QImage thin = renderFirstShape(tool, context);
+    ASSERT_EQ(tool.cacheBuildCountForTesting(), 1) << "第一次绘制该抠一次图";
+    ASSERT_EQ(thin.pixelColor(200, 150), QColor(0, 0, 0)) << "细笔在笔迹中线上都没擦出底图，后面的对照没有基准";
+    ASSERT_EQ(thin.pixelColor(200, 170).alpha(), 0) << "细笔在距中线 20 像素处已有像素，探点不干净";
+
+    shape.lineWidth = 10;
+    ASSERT_TRUE(tool.replaceShapeAt(0, shape));
+    const QImage wide = renderFirstShape(tool, context);
+    EXPECT_EQ(tool.cacheBuildCountForTesting(), 2) << "线宽换了还命中缓存，擦出来的是旧线宽";
+
+    EXPECT_EQ(wide.pixelColor(200, 170), QColor(0, 0, 0)) << "粗笔没有变宽：距中线 20 像素的探点仍在笔迹之外";
 }
 
 /**
