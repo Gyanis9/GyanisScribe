@@ -539,10 +539,20 @@ namespace
         ASSERT_FALSE(ignored) << "ffmpeg 替身没复制出来";
 
         // PATH 只在本进程内改，用例结束就还原：同进程里别的用例仍按真实环境找 ffmpeg
-        const auto oldPath = qEnvironmentVariable("PATH");
-        const auto restore = qScopeGuard([oldPath] { qputenv("PATH", oldPath.toLocal8Bit()); });
+        const auto oldPath     = qEnvironmentVariable("PATH");
+        const auto restore     = qScopeGuard([oldPath] { qputenv("PATH", oldPath.toLocal8Bit()); });
         const auto fakeBinText = QString::fromStdWString(fakeBin.wstring());
         qputenv("PATH", (fakeBinText + QDir::listSeparator() + oldPath).toLocal8Bit());
+
+        // 产品找 ffmpeg 时随包那份排在 PATH 前面：装过包或被拷到带 ffmpeg 的目录下时，
+        // 这一条跑到的是真 ffmpeg 而不是替身，encode 未必失败，判据就不成立了
+        const auto located       = GyanisScribe::Plugins::locateFfmpeg();
+        const auto fakeFfmpeg    = QFileInfo{fakeBinText + QStringLiteral("/ffmpeg.exe")};
+        const auto locatedFfmpeg = located ? QFileInfo{*located} : QFileInfo{};
+        if (!located || locatedFfmpeg.canonicalFilePath() != fakeFfmpeg.canonicalFilePath())
+        {
+            GTEST_SKIP() << "locateFfmpeg 解析到的不是替身目录里的那一份，这一条要能确定跑到替身程序上";
+        }
 
         GyanisScribe::Core::PngSequenceSink sink{frameDirectory};
         for (int index = 0; index < 3; ++index)
