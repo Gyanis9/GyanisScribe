@@ -297,9 +297,26 @@ namespace GyanisScribe::Gui
             return;
         }
 
-        m_entries = *loaded;
+        m_entries = loaded->entries;
         m_loaded  = true;
         refillList();
+
+        if (loaded->skippedRecords > 0)
+        {
+            Base::Logger::warning(std::format("历史清单里有 {} 条记录读不懂，已跳过：{}", loaded->skippedRecords, loaded->firstProblem));
+            // 同一个数量连续刷新只提示一次：用户没修好之前，每次重读都弹一遍只是打扰
+            if (loaded->skippedRecords != m_lastSkippedRecords)
+            {
+                const auto message =
+                        GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("历史清单里有 {} 条记录读不懂，已跳过：{}"), loaded->skippedRecords, loaded->firstProblem);
+                emit messageForUser(QString::fromUtf8(message.c_str()), Gui::ToastKind::Danger);
+                m_lastSkippedRecords = loaded->skippedRecords;
+            }
+        } else
+        {
+            // 坏记录修好或清单被清空后归零，下一次再出现坏记录仍会提示
+            m_lastSkippedRecords = 0;
+        }
 
         // 隐藏时只摆行，不解缩略图；标记下来让第一次显示补读一次清单
         m_refreshWhileHidden = !isVisible();

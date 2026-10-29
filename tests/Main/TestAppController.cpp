@@ -397,7 +397,12 @@ namespace GyanisScribe
             [[nodiscard]] Base::Expected<QVector<Core::HistoryEntry>> readHistory() const
             {
                 const Core::HistoryStore store(m_root / "history.json");
-                return store.load(Core::policyFromSettings(*m_settings), QDateTime::currentDateTime());
+                const auto               loaded = store.load(Core::policyFromSettings(*m_settings), QDateTime::currentDateTime());
+                if (!loaded)
+                {
+                    return Base::Expected<QVector<Core::HistoryEntry>>{std::unexpected{loaded.error()}};
+                }
+                return loaded->entries;
             }
 
             /// 钉住成品落在哪个目录：拿两边的等价文件系统状态判，不抄字符串比前缀

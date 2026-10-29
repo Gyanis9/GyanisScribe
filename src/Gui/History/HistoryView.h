@@ -109,6 +109,7 @@ namespace GyanisScribe::Gui
         /**
          * @brief 重读清单并按当前条件重填列表
          * @details 显式调用时隐藏着也照常读出条目并摆好行；缩略图要等这一页显示出来才解。
+         *          有坏记录时列表照常列出好记录，跳过数量变化才弹一次危险提示。
          */
         void refresh();
 
@@ -274,6 +275,7 @@ namespace GyanisScribe::Gui
         bool                              m_lastDecodeOffGuiThread = false; ///< 最近一次落地结果是否在工作线程上解出
         bool                              m_loaded                 = false; ///< 是否已经成功读过一次清单
         bool                              m_refreshWhileHidden     = false; ///< 上次刷新发生在隐藏时，显示后要补读
+        int                               m_lastSkippedRecords     = 0;     ///< 上次提示过的坏记录条数，相同数量不再重复弹
     };
 
 } // namespace GyanisScribe::Gui

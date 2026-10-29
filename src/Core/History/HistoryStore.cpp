@@ -74,24 +74,29 @@ namespace GyanisScribe::Core
         return Base::Paths::applicationDataDirectory() / "history.json";
     }
 
-    Expected<QVector<HistoryEntry>> HistoryStore::load(const HistoryRetentionPolicy &policy, const QDateTime &now) const
+    Expected<HistoryLoadResult> HistoryStore::load(const HistoryRetentionPolicy &policy, const QDateTime &now) const
     {
         auto raw = readRaw();
         if (!raw)
         {
-            return Expected<QVector<HistoryEntry>>{std::unexpected{raw.error()}};
+            return Expected<HistoryLoadResult>{std::unexpected{raw.error()}};
         }
 
         // 成品已经不在了的记录先丢掉：列表里点一张不存在的图，比列表少一条更难解释
-        const auto before = raw->size();
+        const auto before = raw->entries.size();
         // QVector 没有 std::erase_if 的重载，用 erase + remove_if 这一对
-        raw->erase(std::remove_if(raw->begin(), raw->end(), [](const HistoryEntry &entry) { return !std::filesystem::exists(entry.filePath); }), raw->end());
-        if (const auto dropped = before - raw->size(); dropped > 0)
+        raw->entries.erase(std::remove_if(raw->entries.begin(), raw->entries.end(), [](const HistoryEntry &entry) { return !std::filesystem::exists(entry.filePath); }),
+                           raw->entries.end());
+        if (const auto dropped = before - raw->entries.size(); dropped > 0)
         {
             Base::Logger::info(std::format("历史清单里有 {} 条的成品文件已经不在了，这次不再列出", dropped));
         }
 
-        return Expected<QVector<HistoryEntry>>{pruneForPolicy(*raw, policy, now)};
+        return Expected<HistoryLoadResult>{HistoryLoadResult{
+                .entries        = pruneForPolicy(raw->entries, policy, now),
+                .skippedRecords = raw->skipped,
+                .firstProblem   = std::move(raw->firstProblem),
+        }};
     }
 
     Expected<void> HistoryStore::append(const HistoryEntry &entry, const HistoryRetentionPolicy &policy, const QDateTime &now)
@@ -103,10 +108,11 @@ namespace GyanisScribe::Core
         }
 
         // 同一路径只留一条：同一张图被记进两次时，后写的这条覆盖前一条，而不是并列两行
-        raw->erase(std::remove_if(raw->begin(), raw->end(), [&entry](const HistoryEntry &existing) { return existing.filePath == entry.filePath; }), raw->end());
-        raw->push_back(entry);
+        raw->entries.erase(std::remove_if(raw->entries.begin(), raw->entries.end(), [&entry](const HistoryEntry &existing) { return existing.filePath == entry.filePath; }),
+                           raw->entries.end());
+        raw->entries.push_back(entry);
 
-        return writeRaw(pruneForPolicy(*raw, policy, now));
+        return writeRaw(pruneForPolicy(raw->entries, policy, now), raw->badRecords);
     }
 
     Expected<void> HistoryStore::remove(const std::filesystem::path &filePath)
@@ -117,36 +123,37 @@ namespace GyanisScribe::Core
             return Expected<void>{std::unexpected{raw.error()}};
         }
 
-        const auto found = std::ranges::find(*raw, filePath, &HistoryEntry::filePath);
-        if (found == raw->end())
+        const auto found = std::ranges::find(raw->entries, filePath, &HistoryEntry::filePath);
+        if (found == raw->entries.end())
         {
             return Expected<void>{std::unexpected{
                     makeError(ErrorCode::InvalidArgument,
                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("历史清单里没有这条记录：{}。请刷新列表后再试一次"), pathToText(filePath)))}};
         }
 
-        raw->erase(found);
-        return writeRaw(*raw);
+        raw->entries.erase(found);
+        return writeRaw(raw->entries, raw->badRecords);
     }
 
     Expected<void> HistoryStore::clear()
     {
-        // 原子替换那条路已经由 writeRaw 兜着：空清单也走同一次替换，不留「先清空再写」的中间窗口
-        return writeRaw({});
+        // 原子替换那条路已经由 writeRaw 兜着：空清单也走同一次替换，不留「先清空再写」的中间窗口。
+        // 坏记录也在这里一并丢掉：用户点的是清空整份清单，不是只清读得懂的那一半
+        return writeRaw({}, {});
     }
 
-    Expected<QVector<HistoryEntry>> HistoryStore::readRaw() const
+    Expected<HistoryStore::RawHistory> HistoryStore::readRaw() const
     {
         std::error_code existsError;
         if (!std::filesystem::exists(m_storagePath, existsError))
         {
-            return Expected<QVector<HistoryEntry>>{QVector<HistoryEntry>{}};
+            return Expected<RawHistory>{RawHistory{}};
         }
 
         QFile file{QString::fromStdWString(m_storagePath.wstring())};
         if (!file.open(QIODevice::ReadOnly))
         {
-            return Expected<QVector<HistoryEntry>>{std::unexpected{
+            return Expected<RawHistory>{std::unexpected{
                     makeError(ErrorCode::FileWriteFailed,
                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("历史清单打不开：{}。请检查这个文件是否被别的程序占着，或把它删掉让软件重建"),
                                                            pathToText(m_storagePath)))}};
@@ -156,16 +163,26 @@ namespace GyanisScribe::Core
         const auto document = QJsonDocument::fromJson(bytes);
         if (document.isNull() || !document.isObject())
         {
-            return Expected<QVector<HistoryEntry>>{std::unexpected{makeError(
+            return Expected<RawHistory>{std::unexpected{makeError(
                     ErrorCode::InvalidArgument,
                     GyanisScribe::Base::uiFormat(
                             GyanisScribe::Base::uiTextUtf8("历史清单格式不对：{}。可以把这个文件删掉让软件重建（成品文件不受影响），或按 {{\"entries\": [...]}} 的形状修好"),
                             pathToText(m_storagePath)))}};
         }
 
-        const auto            array = document.object().value(QLatin1String{kRootKeyEntries}).toArray();
-        QVector<HistoryEntry> entries;
-        entries.reserve(static_cast<int>(array.size()));
+        const auto array = document.object().value(QLatin1String{kRootKeyEntries}).toArray();
+        RawHistory raw;
+        raw.entries.reserve(static_cast<int>(array.size()));
+        // 单条读不懂只跳过这一条：原始 JSON 一并留下，下一次写回时原样接上，用户还有机会修好它
+        const auto skipRecord = [&raw, &array](const int index, std::string problem)
+        {
+            raw.badRecords.append(array.at(index));
+            ++raw.skipped;
+            if (raw.firstProblem.empty())
+            {
+                raw.firstProblem = std::move(problem);
+            }
+        };
         for (auto index = 0; index < array.size(); ++index)
         {
             const auto item       = array.at(index).toObject();
@@ -174,29 +191,25 @@ namespace GyanisScribe::Core
             const auto momentText = item.value(QLatin1String{kKeyMoment}).toString();
             if (pathText.isEmpty() || kindText.isEmpty() || momentText.isEmpty())
             {
-                // 缺字段的条目报出来而不是跳过：跳过等于替用户决定哪条历史不算历史
-                return Expected<QVector<HistoryEntry>>{std::unexpected{makeError(
-                        ErrorCode::InvalidArgument,
-                        GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("历史清单第 {} 条缺 path、kind 或 moment。请修好这一条，或删掉整个文件让软件重建：{}"),
-                                                     index + 1, pathToText(m_storagePath)))}};
+                skipRecord(index, GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("历史清单第 {} 条缺 path、kind 或 moment"), index + 1));
+                continue;
             }
 
             auto kind = parseHistoryKind(kindText.toStdString());
             if (!kind)
             {
-                return Expected<QVector<HistoryEntry>>{std::unexpected{
-                        makeError(kind.error().code, GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("历史清单第 {} 条：{}"), index + 1, kind.error().message))}};
+                skipRecord(index, GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("历史清单第 {} 条：{}"), index + 1, kind.error().message));
+                continue;
             }
             const auto moment = QDateTime::fromString(momentText, Qt::ISODateWithMs);
             if (!moment.isValid())
             {
-                return Expected<QVector<HistoryEntry>>{std::unexpected{
-                        makeError(ErrorCode::InvalidArgument,
-                                  GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("历史清单第 {} 条的时间 \"{}\" 读不出来。请用 2026-10-10T08:30:00.000 这种写法"),
-                                                               index + 1, momentText.toStdString()))}};
+                skipRecord(index, GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("历史清单第 {} 条的时间 \"{}\" 读不出来。请用 2026-10-10T08:30:00.000 这种写法"),
+                                                               index + 1, momentText.toStdString()));
+                continue;
             }
 
-            entries.push_back(HistoryEntry{
+            raw.entries.push_back(HistoryEntry{
                     .moment   = moment,
                     .kind     = *kind,
                     .filePath = pathFromText(pathText),
@@ -204,10 +217,10 @@ namespace GyanisScribe::Core
             });
         }
 
-        return Expected<QVector<HistoryEntry>>{std::move(entries)};
+        return Expected<RawHistory>{std::move(raw)};
     }
 
-    Expected<void> HistoryStore::writeRaw(const QVector<HistoryEntry> &entries) const
+    Expected<void> HistoryStore::writeRaw(const QVector<HistoryEntry> &entries, const QJsonArray &badRecords) const
     {
         QJsonArray array;
         for (const auto &entry: entries)
@@ -219,6 +232,11 @@ namespace GyanisScribe::Core
             item.insert(QLatin1String{kKeyWidth}, entry.size.width());
             item.insert(QLatin1String{kKeyHeight}, entry.size.height());
             array.append(item);
+        }
+        // 坏记录原样接在好记录后面：它们仍是用户文件的一部分，只有 clear() 才整份丢弃
+        for (const auto &record: badRecords)
+        {
+            array.append(record);
         }
 
         QJsonObject root;

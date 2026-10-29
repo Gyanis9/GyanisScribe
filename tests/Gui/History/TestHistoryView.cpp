@@ -13,6 +13,10 @@
 #include <QEvent>
 #include <QEventLoop>
 #include <QFileInfo>
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -50,6 +54,7 @@ using GyanisScribe::Gui::historyFilterLabels;
 using GyanisScribe::Gui::HistoryView;
 using GyanisScribe::Gui::IconProvider;
 using GyanisScribe::Gui::kindFilterAt;
+using GyanisScribe::Gui::ToastKind;
 
 namespace
 {
@@ -651,6 +656,57 @@ TEST_F(HistoryViewFixture, ListShowsNewestFirstAndNarrowsBySearch)
 
     const auto selected = view->selectedPath();
     EXPECT_FALSE(selected.has_value()) << "没有选中项时不该给出一个路径";
+}
+
+/**
+ * @brief 钉住坏记录只提示一次：相同的跳过数量连续刷新不再重复弹危险提示
+ * @details 清单里一条好一条坏时列表仍要列出好记录；跳过数量没变就不重复打扰，
+ *          数量变了才再提示一次。
+ */
+TEST_F(HistoryViewFixture, SkippedRecordsWarnOncePerCount)
+{
+    const auto artifact = writeImageArtifact(m_directory, "kept.png", {320, 200});
+
+    QJsonObject good;
+    good.insert(QStringLiteral("path"), QString::fromStdWString(artifact.wstring()));
+    good.insert(QStringLiteral("kind"), QStringLiteral("Screenshot"));
+    good.insert(QStringLiteral("moment"), QStringLiteral("2026-10-10T12:00:00.000"));
+    good.insert(QStringLiteral("width"), 320);
+    good.insert(QStringLiteral("height"), 200);
+
+    QJsonObject bad;
+    bad.insert(QStringLiteral("path"), QStringLiteral("broken.png"));
+    bad.insert(QStringLiteral("kind"), QStringLiteral("picture"));
+    bad.insert(QStringLiteral("moment"), QStringLiteral("2026-10-10T12:00:00.000"));
+
+    QJsonObject root;
+    root.insert(QStringLiteral("entries"), QJsonArray{good, bad});
+    QFile manifest{QString::fromStdWString(m_storePath.wstring())};
+    ASSERT_TRUE(manifest.open(QIODevice::WriteOnly)) << "造不出用例前提：清单写不进去";
+    manifest.write(QJsonDocument{root}.toJson());
+    manifest.close();
+
+    auto    view         = makeView();
+    int     dangerToasts = 0;
+    QString lastMessage;
+    QObject::connect(view.get(), &HistoryView::messageForUser, view.get(),
+                     [&dangerToasts, &lastMessage](const QString &text, const ToastKind kind)
+                     {
+                         if (kind == ToastKind::Danger)
+                         {
+                             ++dangerToasts;
+                             lastMessage = text;
+                         }
+                     });
+
+    view->refresh();
+    EXPECT_EQ(view->rowCount(), 1) << "坏记录把好记录一起挡在列表外了";
+    EXPECT_EQ(dangerToasts, 1) << "读到坏记录却没有提示";
+    EXPECT_NE(lastMessage.indexOf(QStringLiteral("1 条")), -1) << "提示里没带跳过的条数：" << lastMessage.toStdString();
+
+    view->refresh();
+    EXPECT_EQ(view->rowCount(), 1);
+    EXPECT_EQ(dangerToasts, 1) << "跳过数量没变，两次刷新却弹了两次提示";
 }
 
 /**

@@ -9,10 +9,15 @@
 
 #include <QDate>
 #include <QDateTime>
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QString>
 #include <QTime>
 #include <QVariant>
 
+#include <algorithm>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -42,6 +47,18 @@ namespace
 
     /// 「两个上限都放开」的策略写法，避免用默认值当不限（默认值是 200 条 / 30 天）
     const HistoryRetentionPolicy kNoLimits{.maximumEntries = 0, .retentionDays = 0};
+
+    /// 读回清单里的 entries 数组：用例据此检查写回后坏记录还在不在
+    QJsonArray manifestEntries(const std::filesystem::path &manifestPath)
+    {
+        QFile file{QString::fromStdWString(manifestPath.wstring())};
+        if (!file.open(QIODevice::ReadOnly))
+        {
+            return {};
+        }
+        const auto document = QJsonDocument::fromJson(file.readAll());
+        return document.isObject() ? document.object().value(QStringLiteral("entries")).toArray() : QJsonArray{};
+    }
 
     /// 造一条记录；路径由调用方给，是否真的存在由用例决定
     HistoryEntry makeEntry(const std::string &name, const int daysAgo, const HistoryKind kind)
@@ -222,11 +239,12 @@ TEST_F(HistoryFixture, StoreRoundTripsEveryField)
 
     const auto loaded = store.load(kNoLimits, kNow);
     ASSERT_TRUE(static_cast<bool>(loaded));
-    ASSERT_EQ(loaded->size(), 1);
-    EXPECT_EQ((*loaded)[0].moment, kNow);
-    EXPECT_EQ((*loaded)[0].kind, HistoryKind::Recording);
-    EXPECT_EQ((*loaded)[0].filePath, artifact);
-    EXPECT_EQ((*loaded)[0].size, QSize(1280, 720));
+    ASSERT_EQ(loaded->entries.size(), 1);
+    EXPECT_EQ(loaded->entries[0].moment, kNow);
+    EXPECT_EQ(loaded->entries[0].kind, HistoryKind::Recording);
+    EXPECT_EQ(loaded->entries[0].filePath, artifact);
+    EXPECT_EQ(loaded->entries[0].size, QSize(1280, 720));
+    EXPECT_EQ(loaded->skippedRecords, 0);
 }
 
 /**
@@ -244,8 +262,8 @@ TEST_F(HistoryFixture, StoreDropsRecordsWhoseFileIsGone)
 
     const auto loaded = store.load(kNoLimits, kNow);
     ASSERT_TRUE(static_cast<bool>(loaded));
-    EXPECT_EQ(loaded->size(), 1) << "文件不在的那条不该出现在列表里";
-    EXPECT_EQ((*loaded)[0].filePath, kept);
+    EXPECT_EQ(loaded->entries.size(), 1) << "文件不在的那条不该出现在列表里";
+    EXPECT_EQ(loaded->entries[0].filePath, kept);
 }
 
 /**
@@ -267,18 +285,18 @@ TEST_F(HistoryFixture, StoreReplacesSamePathAndPrunesOnAppend)
 
     const auto loaded = store.load(policy, kNow);
     ASSERT_TRUE(static_cast<bool>(loaded));
-    ASSERT_EQ(loaded->size(), 2);
-    EXPECT_EQ((*loaded)[0].filePath, third);
-    EXPECT_EQ((*loaded)[1].filePath, second) << "最旧的一条已被条数上限裁掉";
+    ASSERT_EQ(loaded->entries.size(), 2);
+    EXPECT_EQ(loaded->entries[0].filePath, third);
+    EXPECT_EQ(loaded->entries[1].filePath, second) << "最旧的一条已被条数上限裁掉";
 
     // 同一张图再记一次：换成新的时间，而不是并列两条
     ASSERT_TRUE(static_cast<bool>(store.append(HistoryEntry{.moment = kNow.addSecs(60), .kind = HistoryKind::Screenshot, .filePath = third, .size = QSize{20, 20}}, policy, kNow)));
     const auto again = store.load(policy, kNow);
     ASSERT_TRUE(static_cast<bool>(again));
-    ASSERT_EQ(again->size(), 2);
-    EXPECT_EQ((*again)[0].filePath, third) << "同一路径只能有一条，第二条不该是同一张图的旧记录";
-    EXPECT_EQ((*again)[1].filePath, second);
-    EXPECT_EQ((*again)[0].size, QSize(20, 20));
+    ASSERT_EQ(again->entries.size(), 2);
+    EXPECT_EQ(again->entries[0].filePath, third) << "同一路径只能有一条，第二条不该是同一张图的旧记录";
+    EXPECT_EQ(again->entries[1].filePath, second);
+    EXPECT_EQ(again->entries[0].size, QSize(20, 20));
 }
 
 /**
@@ -296,7 +314,7 @@ TEST_F(HistoryFixture, RemoveClearsRecordOnlyAndRejectsUnknownPath)
 
     const auto loaded = store.load(kNoLimits, kNow);
     ASSERT_TRUE(static_cast<bool>(loaded));
-    EXPECT_TRUE(loaded->isEmpty());
+    EXPECT_TRUE(loaded->entries.isEmpty());
 
     const auto missing = store.remove(m_directory / "never-was.png");
     ASSERT_FALSE(static_cast<bool>(missing));
@@ -324,12 +342,13 @@ TEST_F(HistoryFixture, ClearEmptiesTheManifestAndKeepsTheArtifacts)
 
     const auto loaded = store.load(kNoLimits, kNow);
     ASSERT_TRUE(static_cast<bool>(loaded)) << "清空后清单读不出来了";
-    EXPECT_TRUE(loaded->isEmpty());
+    EXPECT_TRUE(loaded->entries.isEmpty());
 }
 
 /**
- * @brief 钉住读不懂的清单整体报错而不是读出半份
- * @details 静默跳过某一条等于替用户决定哪段历史不算历史；报错里必须给出第几条与文件位置。
+ * @brief 钉住整份读不懂的清单仍整体报错并指出文件位置
+ * @details 单条坏记录改为跳过，但根 JSON 都读不出来时没有任何可用的记录表，
+ *          报错里必须给出文件位置让用户能删掉重建。
  */
 TEST_F(HistoryFixture, CorruptManifestFailsWithPlaceToFix)
 {
@@ -341,22 +360,83 @@ TEST_F(HistoryFixture, CorruptManifestFailsWithPlaceToFix)
     const auto   unparsable = store.load(kNoLimits, kNow);
     ASSERT_FALSE(static_cast<bool>(unparsable));
     EXPECT_NE(unparsable.error().message.find("格式不对"), std::string::npos);
+    EXPECT_NE(unparsable.error().message.find(storePath().generic_string()), std::string::npos) << "报错里没有清单路径，用户不知道去修哪一份";
+}
 
+/**
+ * @brief 钉住一条坏记录只被跳过、原因留下，且写回时原样保留
+ * @details 一条手改坏的记录不该让整份历史都读不出；坏条目也不能在下次 append 时被吞掉，
+ *          否则用户修好那一格的机会也一起没了。只有 clear() 才整份清空。
+ */
+TEST_F(HistoryFixture, OneBadRecordIsSkippedAndPreserved)
+{
+    const auto artifact = makeArtifact("kept.png");
     {
-        std::ofstream broken{storePath()};
-        broken << R"({"entries":[{"path":"a.png","kind":"picture","moment":"2026-10-10T12:00:00.000","width":1,"height":1}]})";
-    }
-    const auto badKind = store.load(kNoLimits, kNow);
-    ASSERT_FALSE(static_cast<bool>(badKind));
-    EXPECT_NE(badKind.error().message.find("第 1 条"), std::string::npos) << "要指出是哪一条读不懂";
+        QJsonObject good;
+        good.insert(QStringLiteral("path"), QString::fromStdWString(artifact.wstring()));
+        good.insert(QStringLiteral("kind"), QStringLiteral("Screenshot"));
+        good.insert(QStringLiteral("moment"), QStringLiteral("2026-10-10T12:00:00.000"));
+        good.insert(QStringLiteral("width"), 10);
+        good.insert(QStringLiteral("height"), 10);
 
-    {
-        std::ofstream broken{storePath()};
-        broken << R"({"entries":[{"path":"a.png","moment":"2026-10-10T12:00:00.000","width":1,"height":1}]})";
+        QJsonObject bad;
+        bad.insert(QStringLiteral("path"), QStringLiteral("broken.png"));
+        bad.insert(QStringLiteral("kind"), QStringLiteral("picture"));
+        bad.insert(QStringLiteral("moment"), QStringLiteral("2026-10-10T12:00:00.000"));
+
+        QJsonObject root;
+        root.insert(QStringLiteral("entries"), QJsonArray{good, bad});
+
+        QFile manifest{QString::fromStdWString(storePath().wstring())};
+        ASSERT_TRUE(manifest.open(QIODevice::WriteOnly)) << "造不出用例前提：清单写不进去";
+        manifest.write(QJsonDocument{root}.toJson());
     }
-    const auto missingField = store.load(kNoLimits, kNow);
-    ASSERT_FALSE(static_cast<bool>(missingField));
-    EXPECT_NE(missingField.error().message.find("缺 path"), std::string::npos);
+
+    HistoryStore store{storePath()};
+    const auto   loaded = store.load(kNoLimits, kNow);
+    ASSERT_TRUE(static_cast<bool>(loaded)) << "一条坏记录把整份历史都判成了读不出";
+    ASSERT_EQ(loaded->entries.size(), 1);
+    EXPECT_EQ(loaded->entries[0].filePath, artifact) << "好记录没有留下";
+    EXPECT_EQ(loaded->skippedRecords, 1);
+    EXPECT_FALSE(loaded->firstProblem.empty()) << "跳过了一条却没有留下原因，界面无从提示";
+
+    const auto added = makeArtifact("added.png");
+    ASSERT_TRUE(static_cast<bool>(store.append(HistoryEntry{.moment = kNow, .kind = HistoryKind::Screenshot, .filePath = added, .size = QSize{10, 10}}, kNoLimits, kNow)));
+
+    const auto addedText   = QString::fromStdString(added.generic_string());
+    const auto containsBad = [](const QJsonArray &entries)
+    {
+        return std::any_of(entries.begin(), entries.end(),
+                           [](const QJsonValue &value)
+                           {
+                               const auto item = value.toObject();
+                               return item.value(QStringLiteral("path")).toString() == QStringLiteral("broken.png") &&
+                                      item.value(QStringLiteral("kind")).toString() == QStringLiteral("picture");
+                           });
+    };
+    const auto containsAdded = [&addedText](const QJsonArray &entries)
+    {
+        return std::any_of(entries.begin(), entries.end(),
+                           [&addedText](const QJsonValue &value) { return value.toObject().value(QStringLiteral("path")).toString() == addedText; });
+    };
+
+    const auto afterAppend = manifestEntries(storePath());
+    ASSERT_EQ(afterAppend.size(), 3) << "append 后清单条目数不对";
+    EXPECT_TRUE(containsBad(afterAppend)) << "append 之后坏记录被吞掉了，用户再也没有机会修好它";
+    EXPECT_TRUE(containsAdded(afterAppend)) << "append 的新记录没有写进清单";
+
+    ASSERT_TRUE(static_cast<bool>(store.remove(added)));
+    const auto afterRemove = manifestEntries(storePath());
+    ASSERT_EQ(afterRemove.size(), 2) << "remove 后清单条目数不对";
+    EXPECT_TRUE(containsBad(afterRemove)) << "remove 之后坏记录被吞掉了";
+    EXPECT_FALSE(containsAdded(afterRemove)) << "remove 没有去掉那条记录";
+
+    ASSERT_TRUE(static_cast<bool>(store.clear()));
+    EXPECT_TRUE(manifestEntries(storePath()).isEmpty()) << "clear() 之后清单里还留着记录";
+    const auto afterClear = store.load(kNoLimits, kNow);
+    ASSERT_TRUE(static_cast<bool>(afterClear));
+    EXPECT_TRUE(afterClear->entries.isEmpty());
+    EXPECT_EQ(afterClear->skippedRecords, 0);
 }
 
 /**
@@ -368,5 +448,5 @@ TEST_F(HistoryFixture, AbsentManifestLoadsAsEmptyHistory)
     HistoryStore store{m_directory / "does-not-exist.json"};
     const auto   loaded = store.load(kNoLimits, kNow);
     ASSERT_TRUE(static_cast<bool>(loaded));
-    EXPECT_TRUE(loaded->isEmpty());
+    EXPECT_TRUE(loaded->entries.isEmpty());
 }
