@@ -53,6 +53,7 @@
 #include <QGuiApplication>
 #include <QScreen>
 #include <QUrl>
+#include <QtMath>
 
 #include <algorithm>
 #include <cmath>
@@ -1718,9 +1719,11 @@ namespace GyanisScribe::Gui
         // 显示图按目标像素尺寸先缩好一份挂住：动画只改窗口几何、不动内容尺寸，整段收展都复用它。
         // 键里的尺寸就是交给 scaled 的那一份尺寸，不用另一套逻辑尺寸：两处换算一旦分家，
         // 目标像素变了而键没变，缓存会把上一档的位图继续铺上去
-        const QImage &source       = displayImage();
-        const qreal   deviceRatio  = devicePixelRatioF();
-        const QSize   targetPixels = (content.size() * deviceRatio).toSize();
+        const QImage &source      = displayImage();
+        const qreal   deviceRatio = devicePixelRatioF();
+        // 逐维向上取整：内容尺寸带小数时，直接截断会少铺出不到一像素的一条边，
+        // 画在整数对齐的 content.topLeft() 上就露出细缝
+        const QSize targetPixels{qCeil(content.width() * deviceRatio), qCeil(content.height() * deviceRatio)};
         if (m_scaledContent.isNull() || m_scaledSourceKey != source.cacheKey() || m_scaledLogicalSize != targetPixels || m_scaledSmooth != m_smoothScaleEnabled ||
             m_scaledDpr != deviceRatio)
         {
