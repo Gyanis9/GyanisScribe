@@ -13,6 +13,7 @@
 #include "Core/Annotation/MagnifierTool.h"
 #include "Core/Annotation/RectangleTool.h"
 #include "Core/Annotation/ShapeTransform.h"
+#include "Core/Annotation/TextFont.h"
 #include "Core/Annotation/TextTool.h"
 #include "Base/Text.h"
 
@@ -387,6 +388,9 @@ namespace GyanisScribe::Core
 
     AnnotationEngine::AnnotationEngine(QObject *parent) : IAnnotationEngine(parent)
     {
+        // 标注历史只留最近一百步：更早的插入被栈丢掉，长时间标注不会只增不减
+        m_undoStack.setUndoLimit(kAnnotationUndoLimit);
+
         m_tools.push_back(std::make_unique<RectangleTool>());
         m_tools.push_back(std::make_unique<EllipseTool>());
         m_tools.push_back(std::make_unique<ArrowTool>());
@@ -582,6 +586,17 @@ namespace GyanisScribe::Core
         m_penParameters = parameters;
         applyPenParametersToTools();
         return {};
+    }
+
+    QFont AnnotationEngine::textInputFont() const
+    {
+        // 用一条匿名图形把四格文字样式交给 textFontFor：行内输入框与成品必须同一处拼字体
+        AnnotationShape textStyle;
+        textStyle.fontFamily = m_penParameters.fontFamily;
+        textStyle.fontSize   = m_penParameters.fontSize;
+        textStyle.textBold   = m_penParameters.textBold;
+        textStyle.textItalic = m_penParameters.textItalic;
+        return textFontFor(textStyle);
     }
 
     Base::Expected<void> AnnotationEngine::validatePenParameters(const PenParameters &parameters) const

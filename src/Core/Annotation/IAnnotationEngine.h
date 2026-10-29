@@ -13,6 +13,7 @@
 #include "Core/Annotation/PenParameters.h"
 #include "Base/Types.h"
 
+#include <QFont>
 #include <QObject>
 #include <QPoint>
 #include <QPointF>
@@ -158,6 +159,14 @@ namespace GyanisScribe::Core
          *          参数校验与 setPenParameters 同一口径。
          */
         [[nodiscard]] virtual Base::Expected<void> setDefaultPenParameters(const PenParameters &parameters) = 0;
+
+        /**
+         * @brief 当前文字画笔参数拼出的字体
+         * @return 与成品画字、量字同一个函数拼出的字体
+         * @details 行内输入框拿它设字体：输入时的行宽与行高才会与提交后的成品对得上。
+         *          字体族为空串时跟随应用默认字体，与文字工具落笔的口径一致。
+         */
+        [[nodiscard]] virtual QFont textInputFont() const = 0;
 
         /**
          * @brief 起笔

@@ -3,11 +3,13 @@
 
 #include <QApplication>
 #include <QColor>
+#include <QFont>
 #include <QImage>
 
 #include <gtest/gtest.h>
 
 
+#include <cstdlib>
 #include <memory>
 #include <string>
 
@@ -1477,4 +1479,52 @@ TEST_F(EngineFixture, HandleDragRefusesWithoutASingleSelection)
     const auto other = drawRectangle(QPoint(120, 30), QPoint(160, 70));
     ASSERT_TRUE(m_engine.addToSelection(other).has_value());
     EXPECT_FALSE(m_engine.beginSelectionDrag(SelectionHandle::Right, QPoint(100, 50)).has_value()) << "多选时还能开拖手柄";
+}
+
+/**
+ * @brief 钉住输入框字体取自画笔参数
+ * @details 输入框与成品必须是同一个字体：只认字号、漏掉字体族与粗斜体时，
+ *          输入时看到的行宽与提交后的字形对不上。
+ */
+TEST_F(EngineFixture, TextInputFontFollowsPenParameters)
+{
+    ASSERT_TRUE(m_engine.setPenParameters(PenParameters{.color      = QColor(255, 0, 0),
+                                                        .lineWidth  = 4,
+                                                        .fontSize   = 20,
+                                                        .fillStyle  = 0,
+                                                        .fontFamily = QStringLiteral("Consolas"),
+                                                        .textBold   = true,
+                                                        .textItalic = true})
+                        .has_value());
+
+    const QFont font = m_engine.textInputFont();
+    EXPECT_EQ(font.family(), QStringLiteral("Consolas")) << "字体族没进输入框字体";
+    EXPECT_EQ(font.pointSize(), 20) << "字号没进输入框字体";
+    EXPECT_TRUE(font.bold()) << "粗体没进输入框字体";
+    EXPECT_TRUE(font.italic()) << "斜体没进输入框字体";
+}
+
+/**
+ * @brief 钉住撤销栈只留最近一百步
+ * @details 长时间标注若让栈无上限增长，内存只增不减；取一百步覆盖一轮标注，
+ *          更早的插入被栈丢掉之后撤到第一百次就到底，最早画下的那几条仍留在画布上。
+ */
+TEST_F(EngineFixture, UndoHistoryKeepsTheLatestHundredSteps)
+{
+    for (int index = 0; index < 105; ++index)
+    {
+        const QPoint from{2 + (index % 15) * 13, 2 + (index / 15) * 13};
+        drawRectangle(from, from + QPoint(8, 8));
+    }
+
+    for (int step = 0; step < 100; ++step)
+    {
+        ASSERT_TRUE(m_engine.undo().has_value()) << "第 " << step + 1 << " 次撤销失败：栈里没有一百步";
+    }
+    EXPECT_FALSE(m_engine.canUndo()) << "撤满一百次之后还能继续撤，撤销栈没有上限";
+    EXPECT_TRUE(m_engine.canRedo()) << "撤满一百次之后没有可重做的步骤";
+
+    EXPECT_TRUE(m_engine.selectionAt(QPoint(6, 6)).has_value()) << "最早那一条被撤销栈的上限一起丢掉了";
+    const QPoint lastCenter{2 + 14 * 13 + 4, 2 + 6 * 13 + 4};
+    EXPECT_FALSE(m_engine.selectionAt(lastCenter).has_value()) << "最后画的那些没被撤销掉";
 }

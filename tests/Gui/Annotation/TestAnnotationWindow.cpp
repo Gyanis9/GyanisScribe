@@ -47,6 +47,7 @@
 #include <memory>
 #include <numbers>
 #include <optional>
+#include <tuple>
 #include <utility>
 
 using GyanisScribe::Base::CapturedImage;
@@ -1965,4 +1966,202 @@ TEST_F(AnnotationWindowFixture, BorderlessInlineEditorResizesToItsContent)
         // 文本没被裁：视口装得下整份文档（含上下文档边距），不靠截图目测
         EXPECT_GE(editor->viewport()->height(), editor->document()->size().toSize().height()) << lineCount << " 行时文本被输入框裁掉了一截";
     }
+}
+
+/**
+ * @brief 钉住贴着窗口边缘的图形手柄优先于窗口抓点
+ * @details 上边中点手柄落在窗口上边八格抓点带里：按下这一点时用户要拉的是图形。
+ *          先问窗口抓点会把这一趟变成重裁截图范围，图形一动不动而窗口整体挪走。
+ *          按下点取两者命中区的交集（手柄圆心在 y=10，窗口上边带在 y<=8），
+ *          拖动方向朝窗口左上，两条路的产物一眼分得开。
+ */
+TEST_F(AnnotationWindowFixture, EdgeHandleBeatsWindowGrip)
+{
+    auto window         = makeWindow();
+    auto captured       = makeCanvas(QSize(200, 100));
+    captured.screenName = QStringLiteral("FakeScreen-9");
+    window->startAnnotation(captured, QRect(0, 0, 1920, 1080), QRect(100, 100, 200, 100));
+    QApplication::processEvents();
+
+    ASSERT_TRUE(drawAndSelect({10, 10}, {190, 90}).has_value()) << "选中的矩形没画出来，后面的手柄判定没有对象";
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Select).has_value());
+
+    auto *view = window->findChild<GyanisScribe::Gui::AnnotationView *>();
+    ASSERT_NE(view, nullptr);
+    ASSERT_EQ(view->size(), QSize(200, 100)) << "视图没铺满窗口，控件坐标与画布坐标对不上";
+
+    const auto frameBefore  = engine().selectionFrame();
+    const auto windowBefore = window->geometry();
+    ASSERT_TRUE(frameBefore.has_value()) << "选中一条图形之后没有手柄框";
+    ASSERT_EQ(windowBefore.size(), QSize(200, 100)) << "窗口没按开窗时的画布尺寸摆好";
+
+    const QPoint  pressLocal{100, 8};
+    const QPoint  moveLocal{80, -12};
+    const QPointF pressGlobal{view->mapToGlobal(pressLocal)};
+    const QPointF moveGlobal{view->mapToGlobal(moveLocal)};
+    for (const auto &[type, local, global]: {std::tuple{QEvent::MouseButtonPress, pressLocal, pressGlobal}, std::tuple{QEvent::MouseMove, moveLocal, moveGlobal},
+                                             std::tuple{QEvent::MouseButtonRelease, moveLocal, moveGlobal}})
+    {
+        QMouseEvent event{type, QPointF{local}, global, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(view, &event);
+    }
+
+    const auto frameAfter = engine().selectionFrame();
+    ASSERT_TRUE(frameAfter.has_value());
+    EXPECT_NE(*frameBefore, *frameAfter) << "拖上边中点手柄没有改变图形：这一按被当成了重裁窗口";
+    EXPECT_EQ(window->geometry(), windowBefore) << "按下图形手柄却挪走了窗口";
+}
+
+/**
+ * @brief 钉住重裁预览按裁切片的原点与逻辑尺寸映射图形
+ * @details 冻帧只盖住新窗口的一部分：预览图被裁掉右侧一截后拉伸到整个窗口宽度，
+ *          图形必须按同一份「被裁原点 + 预览逻辑尺寸」缩放，而不是按老坐标平移。
+ *          冻帧 400×300 物理像素、缩放因子 2，即 200×150 逻辑像素；
+ *          初始画布 200×100，向左扩 10 后窗口 210×100，预览取到的是 200×100 的逻辑片。
+ *          矩形右边逻辑 80，映射后应落在 (80 + 10) × 210 / 200 一带；老写法停在 90。
+ */
+TEST_F(AnnotationWindowFixture, CropPreviewMapsShapesByClippedOriginAndScale)
+{
+    auto *screen = QGuiApplication::primaryScreen();
+    ASSERT_NE(screen, nullptr);
+
+    QImage frozen{QSize{400, 300}, QImage::Format_ARGB32};
+    frozen.fill(QColor(0, 255, 0));
+
+    auto initial = makeCanvas(QSize(200, 100));
+    initial.image.fill(QColor(0, 0, 255));
+    initial.logicalRegion       = QRect(100, 100, 200, 100);
+    initial.screenName          = screen->name();
+    initial.frozenImage         = frozen;
+    initial.frozenLogicalSize   = QSize(200, 150);
+    initial.frozenLogicalRegion = QRect(90, 100, 200, 150);
+
+    auto window = makeWindow();
+    window->startAnnotation(initial, screen->availableGeometry(), QRect{screen->geometry().topLeft() + QPoint(100, 100), QSize{200, 100}});
+    QApplication::processEvents();
+
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Rectangle).has_value());
+    ASSERT_TRUE(engine().setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 2, .fontSize = 16, .fillStyle = 0}).has_value());
+    engine().beginStroke(QPoint(20, 20));
+    engine().moveStroke(QPoint(80, 60));
+    ASSERT_TRUE(engine().endStroke().has_value()) << "参照矩形没画上";
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Select).has_value());
+
+    auto *view = window->findChild<GyanisScribe::Gui::AnnotationView *>();
+    ASSERT_NE(view, nullptr);
+    ASSERT_EQ(view->size(), QSize(200, 100)) << "开窗时视图不是 200×100，拖动前的坐标对不上";
+
+    const QPoint  pressLocal{0, 50};
+    const QPoint  moveLocal{-10, 50};
+    const QPointF pressGlobal{view->mapToGlobal(pressLocal)};
+    const QPointF moveGlobal{view->mapToGlobal(moveLocal)};
+    for (const auto &[type, local, global]: {std::tuple{QEvent::MouseButtonPress, pressLocal, pressGlobal}, std::tuple{QEvent::MouseMove, moveLocal, moveGlobal}})
+    {
+        QMouseEvent event{type, QPointF{local}, global, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(view, &event);
+    }
+    QApplication::processEvents();
+    ASSERT_EQ(view->size(), QSize(210, 100)) << "拖左边框没有把视图扩到 210 宽，后面的映射判据不成立";
+
+    const QImage shot         = view->grab().toImage();
+    const auto   primaryColor = [](const QColor &pixel) { return pixel.red() > 180 && pixel.green() < 100 && pixel.blue() < 100; };
+
+    int rightMostInk = -1;
+    for (int x = 0; x < shot.width(); ++x)
+    {
+        if (primaryColor(shot.pixelColor(x, 40)))
+        {
+            rightMostInk = x;
+        }
+    }
+    ASSERT_GE(rightMostInk, 0) << "预览里找不到矩形的右边，后面两处判据都没有基准";
+    EXPECT_NEAR(rightMostInk, (80.0 + 10.0) * 210.0 / 200.0, 2.0) << "矩形右边没按预览的裁切原点与缩放映射";
+    EXPECT_FALSE(primaryColor(shot.pixelColor(90, 40))) << "图形的旧位置还留着主色：这一趟只做了平移，没有按预览比例缩放";
+}
+
+/**
+ * @brief 钉住文字输入框跟着成品字体与基线摆
+ * @details 成品把 position 当首行基线画字，输入框若把基线点当左上角，
+ *          提交瞬间文字会向上跳一个 ascent；输入框还必须是画笔参数拼出的那个字体。
+ */
+TEST_F(AnnotationWindowFixture, TextEditorUsesTheProductFontAndBaseline)
+{
+    GyanisScribe::Gui::AnnotationView view{engine()};
+    view.resize(200, 100);
+    ASSERT_EQ(view.size(), QSize(200, 100)) << "视图没按画布逻辑尺寸摆，按下点与基线对不上";
+
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Text).has_value());
+    ASSERT_TRUE(engine().setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 2, .fontSize = 20, .fillStyle = 0}).has_value());
+
+    const QPoint pressPoint{50, 50};
+    QMouseEvent  press{QEvent::MouseButtonPress, QPointF{pressPoint}, QPointF{pressPoint}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QApplication::sendEvent(&view, &press);
+
+    auto *editor = view.findChild<QTextEdit *>(QStringLiteral("annotationTextEditor"));
+    ASSERT_NE(editor, nullptr) << "文字工具下按下画布没有打开输入框";
+    EXPECT_EQ(editor->font().pointSize(), 20) << "输入框用的不是画笔参数里的字号";
+
+    const QFontMetricsF metrics{editor->font()};
+    const auto expectedTop = pressPoint.y() - static_cast<int>(std::ceil(metrics.ascent() + editor->document()->documentMargin() + static_cast<qreal>(editor->frameWidth())));
+    EXPECT_EQ(editor->geometry().top(), expectedTop) << "输入框上沿还停在基线上，没有退一个 ascent 与文档边距";
+    EXPECT_EQ(editor->geometry().left(), pressPoint.x()) << "输入框左沿不该跟着基线调整一起挪";
+}
+
+/**
+ * @brief 钉住提交前后首行字形顶不跳
+ * @details 输入框与成品走两条渲染路：判据取两边各自首行第一个墨点的行号。
+ *          输入框把基线当左上角时，提交后成品字会整体上移一个 ascent，两边的墨点顶差出一行多。
+ *          输入框与画布同为 200×100，控件坐标与画布逻辑坐标一一对应，导出图按倍比 2 折算物理行号。
+ */
+TEST_F(AnnotationWindowFixture, TextEditorCommitKeepsItsTopEdge)
+{
+    GyanisScribe::Gui::AnnotationView view{engine()};
+    view.resize(200, 100);
+    ASSERT_EQ(view.size(), QSize(200, 100)) << "视图没按画布逻辑尺寸摆，两边的行号不能直接比";
+
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Text).has_value());
+    ASSERT_TRUE(engine().setPenParameters(PenParameters{.color = QColor(255, 0, 0), .lineWidth = 2, .fontSize = 20, .fillStyle = 0}).has_value());
+
+    const QPoint pressPoint{50, 50};
+    QMouseEvent  press{QEvent::MouseButtonPress, QPointF{pressPoint}, QPointF{pressPoint}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QApplication::sendEvent(&view, &press);
+
+    auto *editor = view.findChild<QTextEdit *>(QStringLiteral("annotationTextEditor"));
+    ASSERT_NE(editor, nullptr) << "文字工具下按下画布没有打开输入框";
+    editor->setPlainText(QStringLiteral("H"));
+    editor->selectAll();
+    editor->setTextColor(QColor(255, 0, 0));
+    editor->moveCursor(QTextCursor::End);
+
+    const auto firstInkRow = [](const QImage &image)
+    {
+        for (int y = 0; y < image.height(); ++y)
+        {
+            for (int x = 0; x < image.width(); ++x)
+            {
+                const QColor pixel = image.pixelColor(x, y);
+                if (pixel.red() > 180 && pixel.green() < 100 && pixel.blue() < 100)
+                {
+                    return y;
+                }
+            }
+        }
+        return -1;
+    };
+
+    QImage editorShot{editor->size(), QImage::Format_ARGB32};
+    editorShot.fill(Qt::white);
+    {
+        QPainter painter{&editorShot};
+        editor->render(&painter);
+    }
+    const int editorInkTop = firstInkRow(editorShot);
+    ASSERT_GE(editorInkTop, 0) << "输入框里找不到红字，后面的对照没有基准";
+    const int editorInkTopInView = editor->geometry().top() + editorInkTop;
+
+    pressKeyOn(*editor, Qt::Key_Return, Qt::ControlModifier);
+    const int exportedInkTop = firstInkRow(engine().exportImage());
+    ASSERT_GE(exportedInkTop, 0) << "导出图里找不到红字，提交没落到画布上";
+    EXPECT_LE(std::abs(exportedInkTop - editorInkTopInView * 2), 1)
+            << "提交后首行字形顶跳了：输入框在视图第 " << editorInkTopInView << " 行，成品在第 " << exportedInkTop << " 行（物理）";
 }

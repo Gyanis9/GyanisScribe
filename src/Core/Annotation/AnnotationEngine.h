@@ -22,6 +22,9 @@
 namespace GyanisScribe::Core
 {
 
+    /// 撤销栈保留的步数上限：足够覆盖一轮标注，又不会让长时间标注的历史只增不减
+    inline constexpr int kAnnotationUndoLimit = 100;
+
     /**
      * @brief IAnnotationEngine 的实现
      * @details 工具集在构造时按 ToolKind 建齐，切换只是改「谁接收事件」——
@@ -113,6 +116,12 @@ namespace GyanisScribe::Core
          *          不是用户对选中项的改样式，因此不重设选中项、也不压改样式命令。
          */
         [[nodiscard]] Base::Expected<void> setDefaultPenParameters(const PenParameters &parameters) override;
+
+        /**
+         * @brief 当前文字画笔参数拼出的字体，见 IAnnotationEngine::textInputFont()
+         * @return 与成品画字、量字同一处拼出的字体
+         */
+        [[nodiscard]] QFont textInputFont() const override;
 
         /**
          * @brief 起笔，见 IAnnotationEngine::beginStroke()

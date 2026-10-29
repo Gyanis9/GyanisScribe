@@ -287,7 +287,12 @@ namespace GyanisScribe::Gui
 
         QImage preview = m_frozenImage.copy(clipped);
         preview.setDevicePixelRatio(dpr);
-        m_view->setCropPreview(preview, oldLocal.topLeft() - newLocal.topLeft());
+        // 预览图被裁过之后可能盖不满新窗口：把裁切片的逻辑原点与逻辑尺寸一起交给视图，
+        // 图形才会跟着预览图同一份比例缩放，而不是按老坐标平移
+        const QPointF clippedOrigin = QPointF{clipped.topLeft()} / dpr + QPointF{static_cast<qreal>(m_frozenLogicalRegion.left()), static_cast<qreal>(m_frozenLogicalRegion.top())};
+        const QPointF shapeOrigin   = QPointF{oldLocal.topLeft()} - clippedOrigin;
+        const QSizeF  previewLogicalSize = QSizeF{clipped.size()} / dpr;
+        m_view->setCropPreview(preview, shapeOrigin, previewLogicalSize);
     }
 
     void AnnotationWindow::keyPressEvent(QKeyEvent *event)

@@ -124,7 +124,12 @@ namespace GyanisScribe::Gui
             QPainter painter{this};
             painter.drawImage(QRect{QPoint{0, 0}, size()}, m_cropPreviewImage, m_cropPreviewImage.rect());
             painter.save();
-            painter.translate(m_cropPreviewShapeOffset);
+            // 预览图先按控件铺满，图形跟着同一份逻辑尺寸缩放：裁掉一截的预览与图形才不会各按各的比例落
+            if (!m_cropPreviewLogicalSize.isEmpty())
+            {
+                painter.scale(size().width() / m_cropPreviewLogicalSize.width(), size().height() / m_cropPreviewLogicalSize.height());
+            }
+            painter.translate(m_cropPreviewShapeOrigin);
             // 重裁预览里的图形也要抗锯齿：预览与成品画出的边缘是同一档
             painter.setRenderHint(QPainter::Antialiasing, true);
             m_engine.paintShapes(painter);
@@ -240,10 +245,11 @@ namespace GyanisScribe::Gui
         }
     }
 
-    void AnnotationView::setCropPreview(const QImage &image, const QPoint &shapeOffset)
+    void AnnotationView::setCropPreview(const QImage &image, const QPointF &shapeOrigin, const QSizeF &previewLogicalSize)
     {
         m_cropPreviewImage       = image;
-        m_cropPreviewShapeOffset = shapeOffset;
+        m_cropPreviewShapeOrigin = shapeOrigin;
+        m_cropPreviewLogicalSize = previewLogicalSize;
         m_hasCropPreview         = !image.isNull();
         update();
     }
@@ -267,7 +273,25 @@ namespace GyanisScribe::Gui
             return;
         }
 
-        // 选择档下贴着窗口四边/四角按下＝重裁截图范围；重抓后图形会随裁切平移
+        const auto rect   = currentDisplayRect();
+        const auto point  = toCanvasPoint(event->pos(), rect, m_engine.canvas().logicalSize);
+        m_lastCanvasPoint = point;
+
+        // 手柄先于窗口抓点：图形手柄可能正落在窗口边缘的抓点带里，那一点用户要拉的是图形
+        if (const auto handle = handleAt(event->pos()); handle != Core::SelectionHandle::None)
+        {
+            if (auto begun = m_engine.beginSelectionDrag(handle, point); begun)
+            {
+                m_handleDragging = true;
+            } else
+            {
+                Base::Logger::warning(std::format("手柄拖动没开场：{}", begun.error().message));
+            }
+            event->accept();
+            return;
+        }
+
+        // 没抓住手柄才轮到窗口边缘：选择档下贴着窗口四边/四角按下＝重裁截图范围；重抓后图形会随裁切平移
         if (m_engine.activeTool() == Core::ToolKind::Select)
         {
             const auto grip = Core::gripAt(QRect{QPoint{0, 0}, size()}, event->pos(), Core::kSelectionGripTolerance);
@@ -280,24 +304,6 @@ namespace GyanisScribe::Gui
                 event->accept();
                 return;
             }
-        }
-
-        const auto rect   = currentDisplayRect();
-        const auto point  = toCanvasPoint(event->pos(), rect, m_engine.canvas().logicalSize);
-        m_lastCanvasPoint = point;
-
-        // 手柄压在最前面问：它们坐在选中框的角与边中点上，那些点往往正落在图形自己的命中区里
-        if (const auto handle = handleAt(event->pos()); handle != Core::SelectionHandle::None)
-        {
-            if (auto begun = m_engine.beginSelectionDrag(handle, point); begun)
-            {
-                m_handleDragging = true;
-            } else
-            {
-                Base::Logger::warning(std::format("手柄拖动没开场：{}", begun.error().message));
-            }
-            event->accept();
-            return;
         }
 
         // 再问命中：点中已有图形就选中并准备拖动，点空白才起笔画新的
@@ -503,14 +509,20 @@ namespace GyanisScribe::Gui
         // Tab 交回界面（与单行时代同解）：在标注里插个制表符没有意义
         m_textEditor->setTabChangesFocus(true);
         m_textEditor->setPlaceholderText(GyanisScribe::Base::uiText("输入文字，回车换行，Ctrl+回车提交"));
-        m_textEditor->setFont(font());
+        // 字体与成品同一处拼出：字号、字体族、粗斜体在输入时与提交后才会一致
+        const QFont editorFont = m_engine.textInputFont();
+        m_textEditor->setFont(editorFont);
         m_textEditor->setPlainText(initial);
         // 重编时光标落到文末，不摆全选：全选之下按个回车就把原文整段替成一个换行，
         // 而多行编辑里「接着往下写一行」才是重开这一格的正事；要整段换掉按 Ctrl+A 自选
         m_textEditor->moveCursor(QTextCursor::End);
         // 宽度夹在显示区内：贴着右边缘点下的文字框不该跑到画布外面去
         const auto width = std::min(kTextEditorWidth, std::max(40, rect.right() - widget.x()));
-        m_textEditor->setGeometry(widget.x(), widget.y(), width, kTextEditorMinimumHeight);
+        // 按下点是首行基线；输入框上沿要退一个 ascent 再加文档边距与边框，提交时文字才不会往上跳
+        const QFontMetricsF editorMetrics{editorFont};
+        const auto          editorTop =
+                widget.y() - static_cast<int>(std::ceil(editorMetrics.ascent() + m_textEditor->document()->documentMargin() + static_cast<qreal>(m_textEditor->frameWidth())));
+        m_textEditor->setGeometry(widget.x(), editorTop, width, kTextEditorMinimumHeight);
         m_textEditor->show();
         m_textEditor->setFocus();
         resizeTextEditorToContent();

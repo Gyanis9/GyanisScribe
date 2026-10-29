@@ -16,6 +16,7 @@
 #include <QPointF>
 #include <QRect>
 #include <QSize>
+#include <QSizeF>
 #include <QWidget>
 
 #include <array>
@@ -145,17 +146,18 @@ namespace GyanisScribe::Gui
         /**
          * @brief 拖边框途中用冻帧裁出来的预览顶替旧画布
          * @param image 按新范围裁好的冻帧
-         * @param shapeOffset 旧画布原点在新预览里的位置
+         * @param shapeOrigin 旧画布原点在预览里的位置，预览逻辑坐标
+         * @param previewLogicalSize 预览图对应的逻辑尺寸；空尺寸表示不缩放，图形按逻辑坐标直接落
          */
-        void setCropPreview(const QImage &image, const QPoint &shapeOffset);
+        void setCropPreview(const QImage &image, const QPointF &shapeOrigin, const QSizeF &previewLogicalSize);
 
         /// 收起重裁预览，回到引擎画布
         void clearCropPreview();
 
     private:
         /**
-         * @brief 文字的行内输入框：在按下处摆一个多行的
-         * @param canvasPoint 画布逻辑坐标，输入框左上角落在这一点
+         * @brief 文字的行内输入框：按下处在首行基线上摆一个多行的
+         * @param canvasPoint 画布逻辑坐标，文字首行基线落在这条线上；输入框上沿按 ascent 往上退
          * @param initial 输入框的初始内容；新画的那条传空串
          * @param reEditing true 表示改的是已放下的那一条（提交走 setTextOfSelection），false 是新画一条
          * @note 框只在 \n 处断行（不软换行）：屏上看到的断行就是成品里的断行
@@ -216,9 +218,10 @@ namespace GyanisScribe::Gui
         QPoint     m_lastCanvasPoint;           ///< 上一次事件换算到的画布坐标
         QTextEdit *m_textEditor = nullptr;      ///< 行内输入框（多行），用完即销毁
 
-        QImage m_cropPreviewImage;       ///< 重裁途中的冻帧预览
-        QPoint m_cropPreviewShapeOffset; ///< 旧画布原点在新预览里的位置
-        bool   m_hasCropPreview = false; ///< 是否正在显示预览
+        QImage  m_cropPreviewImage;       ///< 重裁途中的冻帧预览
+        QPointF m_cropPreviewShapeOrigin; ///< 旧画布原点在预览里的位置，预览逻辑坐标
+        QSizeF  m_cropPreviewLogicalSize; ///< 预览图对应的逻辑尺寸
+        bool    m_hasCropPreview = false; ///< 是否正在显示预览
 
         /// 画屏幕边框与选择档抓点：正常出图与重裁预览共用同一笔
         void paintCaptureFrame(QPainter &painter);
