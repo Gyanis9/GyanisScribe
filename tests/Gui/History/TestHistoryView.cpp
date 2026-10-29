@@ -870,8 +870,10 @@ TEST_F(HistoryViewFixture, ListUsesTabularFigures)
  *          第二次搜索又把同一批全解一遍；新实现首次显示才读、按修改时间缓存，第二次只补解被容量挤掉的那一批。
  *          「返回」量的是界面交还给调用方的时间；「抽干」等解码计数走完，不重画两百枚图标，
  *          两段分开报，免得把占位图标的重绘算进解码里。数字随机器与运行波动，这里只报不断言时间。
- *          抽干期间另挂 10ms 定时器量最大间隔：解码若回到界面线程，单张 4K 就要百毫秒上下，
- *          10ms 节拍会被整段饿死；阈值取 100ms，实测工作线程抽干时最大间隔约 16ms。
+ *          计时窗从构造之前开、到第二轮补解结束关：构造与首显里若同步解码，第一跳就会把整段记成一次空档；
+ *          搜索刷新与两轮抽干同在这一扇窗里，第二轮不再落在计时之外。
+ *          窗内另挂 10ms 定时器量最大间隔，阈值取规格的 250ms（工作线程路径实测约 15ms）。
+ *          解码跑在哪个线程由 DecodesThumbnailsOffTheGuiThread 直接钉住；本用例只管界面线程不被单次任务占住。
  *          机器负载把抽干拖过时限时跳过本用例并报出已完成张数，不让慢机器把整支套件判红。
  */
 TEST_F(HistoryViewFixture, ReportsTheCostOfRefreshingTwoHundredFourKHistoryEntries)
@@ -880,7 +882,7 @@ TEST_F(HistoryViewFixture, ReportsTheCostOfRefreshingTwoHundredFourKHistoryEntri
     constexpr int    kCachedEntries = 128; ///< 与实现的缓存上限同值：第二轮补解的正是被挤掉的那一批
     const QSize      kSourceSize{3840, 2160};
     constexpr qint64 kTimeoutMilliseconds       = 60'000;
-    constexpr qint64 kMaximumGuiGapMilliseconds = 100;
+    constexpr qint64 kMaximumGuiGapMilliseconds = 250;
 
     const auto seed = writeImageArtifact(m_directory, "slide-seed.png", kSourceSize);
     for (int index = 0; index < kEntries; ++index)
@@ -893,13 +895,8 @@ TEST_F(HistoryViewFixture, ReportsTheCostOfRefreshingTwoHundredFourKHistoryEntri
         addRecord(target, HistoryKind::Screenshot, kNow.addSecs(-index));
     }
 
-    QElapsedTimer firstShow;
-    firstShow.start();
-    auto view = makeView();
-    view->show();
-    const auto windowReadyMilliseconds = firstShow.elapsed();
-
-    // 抽干期间每 10ms 记一笔：相邻两跳的间隔就是界面线程被单次任务占住的最长时间
+    // 每 10ms 记一笔：相邻两跳的间隔就是界面线程被单次任务占住的最长时间。
+    // 表在构造之前起：构造与首显本身也进窗口，同步解码在里面停多久都会被第一跳量到
     QTimer        gapTimer;
     QElapsedTimer gapClock;
     qint64        lastTick   = 0;
@@ -916,16 +913,18 @@ TEST_F(HistoryViewFixture, ReportsTheCostOfRefreshingTwoHundredFourKHistoryEntri
     gapClock.start();
     gapTimer.start();
 
+    QElapsedTimer firstShow;
+    firstShow.start();
+    auto view = makeView();
+    view->show();
+    const auto windowReadyMilliseconds = firstShow.elapsed();
+
     if (!waitForDecodeCount(*view, kEntries, kTimeoutMilliseconds))
     {
         GTEST_SKIP() << std::format("首屏解码在 {} 秒内只完成 {}/{} 张：机器负载过重，读数用例跳过", kTimeoutMilliseconds / 1000, view->thumbnailDecodeCountForTesting(), kEntries);
     }
-    gapTimer.stop();
-    // 结束这一跳也算间隔：长任务把定时器整段饿死时一跳都不会发生，只看已触发的 tick 会读成零
-    maximumGap = std::max(maximumGap, gapClock.elapsed() - lastTick);
     const auto firstDrainMilliseconds = firstShow.elapsed();
     EXPECT_EQ(view->thumbnailDecodeCountForTesting(), kEntries);
-    EXPECT_LT(maximumGap, kMaximumGuiGapMilliseconds) << "抽干期间界面线程被单次任务占住 " << maximumGap << "ms：缩略图又在界面线程上解码";
 
     auto *search = view->findChild<QLineEdit *>();
     ASSERT_NE(search, nullptr) << "历史页里没有搜索框";
@@ -944,9 +943,15 @@ TEST_F(HistoryViewFixture, ReportsTheCostOfRefreshingTwoHundredFourKHistoryEntri
                                     expectedSecondDrain);
     }
     const auto searchDrainMilliseconds = searchRefresh.elapsed();
-    EXPECT_EQ(view->thumbnailDecodeCountForTesting(), expectedSecondDrain) << "第二轮补解的张数对不上：缓存容量或淘汰次序变了";
 
-    std::printf("[读数] 历史页 200 条 4K：构造+显示返回 %lldms；首轮解码 %d 张抽干 %lldms（最大界面间隔 %lldms）；搜索刷新返回 %lldms；第二轮补解 %d 张抽干 %lldms\n",
-                static_cast<long long>(windowReadyMilliseconds), kEntries, static_cast<long long>(firstDrainMilliseconds), static_cast<long long>(maximumGap),
-                static_cast<long long>(searchReturnMilliseconds), expectedSecondDrain - kEntries, static_cast<long long>(searchDrainMilliseconds));
+    // 第二轮抽干是这扇窗的最后一格：到这里才停表，把搜索刷新与补解也算进最大间隔
+    gapTimer.stop();
+    // 结束这一跳也算间隔：长任务把定时器整段饿死时一跳都不会发生，只看已触发的 tick 会读成零
+    maximumGap = std::max(maximumGap, gapClock.elapsed() - lastTick);
+    EXPECT_EQ(view->thumbnailDecodeCountForTesting(), expectedSecondDrain) << "第二轮补解的张数对不上：缓存容量或淘汰次序变了";
+    EXPECT_LT(maximumGap, kMaximumGuiGapMilliseconds) << "构造、两轮抽干与搜索刷新之间界面线程被单次任务占住 " << maximumGap << "ms：缩略图又在界面线程上解码";
+
+    std::printf("[读数] 历史页 200 条 4K：构造+显示返回 %lldms；首轮解码 %d 张抽干 %lldms；搜索刷新返回 %lldms；第二轮补解 %d 张抽干 %lldms；整窗最大界面间隔 %lldms\n",
+                static_cast<long long>(windowReadyMilliseconds), kEntries, static_cast<long long>(firstDrainMilliseconds), static_cast<long long>(searchReturnMilliseconds),
+                expectedSecondDrain - kEntries, static_cast<long long>(searchDrainMilliseconds), static_cast<long long>(maximumGap));
 }
