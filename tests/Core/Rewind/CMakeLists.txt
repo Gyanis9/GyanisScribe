@@ -1,5 +1,6 @@
 add_executable(TestCoreRewind
         TestFrameChangeDetector.cpp
+        TestFrameRingBuffer.cpp
         TestRewindConfig.cpp
         TestRewindFrameCodec.cpp)
 
