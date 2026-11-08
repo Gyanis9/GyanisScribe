@@ -34,8 +34,10 @@ namespace GyanisScribe::Gui
 
     void ComboBox::paintEvent(QPaintEvent *event)
     {
-        QPainter painter{this};
-        paintComboChrome(*this, painter);
+        {
+            QPainter painter{this};
+            paintComboChrome(*this, painter);
+        }
         QComboBox::paintEvent(event);
     }
 
@@ -46,8 +48,10 @@ namespace GyanisScribe::Gui
 
     void FontComboBox::paintEvent(QPaintEvent *event)
     {
-        QPainter painter{this};
-        paintComboChrome(*this, painter);
+        {
+            QPainter painter{this};
+            paintComboChrome(*this, painter);
+        }
         QFontComboBox::paintEvent(event);
     }
 } // namespace GyanisScribe::Gui

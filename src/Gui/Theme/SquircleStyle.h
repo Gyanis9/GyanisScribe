@@ -59,8 +59,10 @@ namespace GyanisScribe::Gui
         /**
          * @brief 自绘输入类不交给原生风格画下拉框与微调框主体
          * @details 重写 QProxyStyle::drawComplexControl()：带 squircle 属性的控件画 CC_ComboBox
-         *          与 CC_SpinBox 时直接返回，当前项文字与下拉箭头仍由基类的 CE_ComboBoxLabel
-         *          与样式表的 ::down-arrow 规则负责
+         *          与 CC_SpinBox 时整支返回；当前项文字由 QComboBox::paintEvent 随后单独发起的
+         *          CE_ComboBoxLabel 绘制，不受影响。原生下拉箭头属于 CC_ComboBox 这一支，
+         *          随主体一起跳过；应用里的箭头由三份主题 QSS 的 QComboBox::down-arrow 提供，
+         *          不套样式表的 QComboBox 不会自带箭头
          * @param control 待绘制的复杂控件
          * @param option 绘制参数
          * @param painter 目标画家

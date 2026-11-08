@@ -145,7 +145,7 @@ namespace GyanisScribe::Gui
          * @param recording 进入/退出录制态
          * @details 显示框的铺底与描边由 SurfaceLabel 自绘：录制态铺 accentSoft 并换成主色边，
          *          退出后按启用状态回到 controlFill 或 mutedFill；recording 属性同时留在显示框上，
-         *          供用例与后续样式规则观察当前状态
+         *          作为可观察的录制状态
          */
         void setRecordingState(bool recording);
 

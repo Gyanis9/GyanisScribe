@@ -853,7 +853,7 @@ TEST_F(ThemeManagerFixture, CheckboxAndSliderShowAKeyboardFocusRing)
  *          QPushButton:focus、QLineEdit:focus 一类规则，会在自绘边之外再压一圈。
  *          判据按选择器分支看，不能只搜全文。
  */
-TEST_F(ThemeManagerFixture, LightAndDarkSheetsDropTheControlLevelFocusOutlines)
+TEST_F(ThemeManagerFixture, AllSheetsDropTheControlLevelFocusOutlines)
 {
     const auto cases = {std::tuple{std::string_view{":/styles/Light.qss"}, false}, std::tuple{std::string_view{":/styles/Dark.qss"}, false},
                         std::tuple{std::string_view{":/styles/HighContrast.qss"}, true}};
@@ -885,7 +885,7 @@ TEST_F(ThemeManagerFixture, LightAndDarkSheetsDropTheControlLevelFocusOutlines)
             EXPECT_TRUE(matched.isEmpty()) << resource << " 还留着控件级焦点描边：" << matched.join(QStringLiteral("; ")).toStdString();
         }
 
-        // 复选框指示器与滑块手柄是子控件，焦点仍由 QSS 表达，留到后续切片迁移；
+        // 复选框指示器与滑块手柄是子控件，焦点仍由 QSS 表达；
         // 高对比度档的复选框指示器是这一档唯一合法的 :focus 分支
         EXPECT_EQ(branches(QStringLiteral("QCheckBox::indicator:focus")).size(), highContrast ? 1 : 0) << resource << " 复选框指示器的 :focus 分支条数不对";
         EXPECT_EQ(branches(QStringLiteral("QSlider::handle:horizontal:focus")).size(), 1) << resource << " 滑块的手柄反转焦点没了";

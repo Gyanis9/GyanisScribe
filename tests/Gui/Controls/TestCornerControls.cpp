@@ -70,6 +70,9 @@ namespace
     protected:
         static void SetUpTestSuite()
         {
+            // 像素判据按逻辑像素取样：真机 125%/150% 缩放下 grab() 给出的是更大的图，同一个采样点会落到别处。
+            // 这个二进制里的像素用例共用同一份 QApplication，强制倍比为 1；真缩放屏的观感留给实机核对
+            qputenv("QT_SCALE_FACTOR", "1");
             static int   argumentCount  = 1;
             static char  argumentZero[] = "TestCornerControls";
             static char *arguments[]    = {argumentZero, nullptr};

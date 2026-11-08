@@ -92,8 +92,10 @@ namespace GyanisScribe::Gui
 
     void SquircleStyle::drawComplexControl(const ComplexControl control, const QStyleOptionComplex *option, QPainter *painter, const QWidget *widget) const
     {
-        // 下拉框与微调框的主体是原生底加边框；自绘类已经铺好连续曲率底，这里只跳过主体。
-        // 样式表路径不会走到本方法：QStyleSheetStyle 自己画边框与 ::down-arrow
+        // 下拉框与微调框的主体是原生底加边框；自绘类已经铺好连续曲率底，这里整支跳过这两个复杂控件。
+        // 样式表路径不会走到本方法：QStyleSheetStyle 自己画边框与 ::down-arrow。
+        // CC_ComboBox 这一支里还带着原生下拉箭头，随主体一起跳过之后，不自绘箭头的下拉框就没有箭头；
+        // 应用里的下拉框依赖三份主题 QSS 的 QComboBox::down-arrow 提供箭头，不套样式表的 QComboBox 不会自带箭头。
         if (paintsItsOwnChrome(widget) && (control == CC_ComboBox || control == CC_SpinBox))
         {
             return;
