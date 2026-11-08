@@ -13,10 +13,15 @@
 using GyanisScribe::Core::isExcludedProcessName;
 using GyanisScribe::Core::kDefaultRewindBufferSeconds;
 using GyanisScribe::Core::kDefaultRewindFrameRate;
+using GyanisScribe::Core::kMaximumRewindBufferSeconds;
+using GyanisScribe::Core::kMaximumRewindFrameRate;
+using GyanisScribe::Core::kMinimumRewindBufferSeconds;
+using GyanisScribe::Core::kMinimumRewindFrameRate;
 using GyanisScribe::Core::kRewindBufferSeconds;
 using GyanisScribe::Core::kRewindEnabled;
 using GyanisScribe::Core::kRewindExcludeProcesses;
 using GyanisScribe::Core::kRewindFrameRate;
+using GyanisScribe::Core::kRewindMemoryBudgetMb;
 using GyanisScribe::Core::parseRewindExclusions;
 using GyanisScribe::Core::readRewindConfig;
 using GyanisScribe::Core::SettingsStore;
@@ -93,6 +98,48 @@ TEST_F(RewindConfigFixture, BadNumbersFallBackToDefaults)
 }
 
 /**
+ * @brief 钉住区间内的时长与帧率原样读回，字节预算保持固定档
+ */
+TEST_F(RewindConfigFixture, InRangeValuesRoundTrip)
+{
+    SettingsStore store(m_iniFile);
+    ASSERT_TRUE(store.setValue(kRewindBufferSeconds, QStringLiteral("20")).has_value());
+    ASSERT_TRUE(store.setValue(kRewindFrameRate, QStringLiteral("8")).has_value());
+    store.sync();
+
+    SettingsStore reopened(m_iniFile);
+    const auto    config = readRewindConfig(reopened);
+    ASSERT_TRUE(config.has_value());
+    EXPECT_EQ(config->bufferSeconds, 20);
+    EXPECT_EQ(config->frameRate, 8);
+    EXPECT_EQ(config->memoryBudgetMb, kRewindMemoryBudgetMb);
+}
+
+/**
+ * @brief 钉住时长与帧率的上下边界本身合法，不会被当成越界回落到默认档
+ */
+TEST_F(RewindConfigFixture, InclusiveBoundsAreAccepted)
+{
+    for (const int seconds: {kMinimumRewindBufferSeconds, kMaximumRewindBufferSeconds})
+    {
+        SettingsStore store(m_iniFile);
+        ASSERT_TRUE(store.setValue(kRewindBufferSeconds, QString::number(seconds)).has_value());
+        const auto config = readRewindConfig(store);
+        ASSERT_TRUE(config.has_value());
+        EXPECT_EQ(config->bufferSeconds, seconds);
+    }
+
+    for (const int frameRate: {kMinimumRewindFrameRate, kMaximumRewindFrameRate})
+    {
+        SettingsStore store(m_iniFile);
+        ASSERT_TRUE(store.setValue(kRewindFrameRate, QString::number(frameRate)).has_value());
+        const auto config = readRewindConfig(store);
+        ASSERT_TRUE(config.has_value());
+        EXPECT_EQ(config->frameRate, frameRate);
+    }
+}
+
+/**
  * @brief 钉住排除名单去空白、转小写、去重并保留先出现的顺序，比对时不区分大小写
  */
 TEST_F(RewindConfigFixture, ParsesAndNormalizesExclusions)
@@ -106,6 +153,23 @@ TEST_F(RewindConfigFixture, ParsesAndNormalizesExclusions)
     EXPECT_TRUE(isExcludedProcessName(QStringLiteral("KEEPASS.EXE"), config->excludedProcesses));
     EXPECT_TRUE(isExcludedProcessName(QStringLiteral("keepass.exe"), config->excludedProcesses));
     EXPECT_FALSE(isExcludedProcessName(QStringLiteral("chrome.exe"), config->excludedProcesses));
+}
+
+/**
+ * @brief 钉住名单项与进程名的 .exe 后缀两侧都可比，空进程名一律不命中
+ */
+TEST_F(RewindConfigFixture, MatchesProcessNamesWithOrWithoutExeSuffix)
+{
+    const QStringList withoutSuffix = parseRewindExclusions(QStringLiteral("keepass")).value();
+    EXPECT_TRUE(isExcludedProcessName(QStringLiteral("keepass.exe"), withoutSuffix));
+    EXPECT_TRUE(isExcludedProcessName(QStringLiteral("KEEPASS.EXE"), withoutSuffix));
+    EXPECT_TRUE(isExcludedProcessName(QStringLiteral("keepass"), withoutSuffix));
+    EXPECT_FALSE(isExcludedProcessName(QString(), withoutSuffix));
+    EXPECT_FALSE(isExcludedProcessName(QStringLiteral("   "), withoutSuffix));
+
+    const QStringList withSuffix = parseRewindExclusions(QStringLiteral("keepass.exe")).value();
+    EXPECT_TRUE(isExcludedProcessName(QStringLiteral("keepass"), withSuffix));
+    EXPECT_TRUE(isExcludedProcessName(QStringLiteral("keepass.exe"), withSuffix));
 }
 
 /**
@@ -124,6 +188,20 @@ TEST_F(RewindConfigFixture, RejectsPathsWildcardsAndOversize)
     const auto oversize = parseRewindExclusions(QString(3000, QChar('a')));
     ASSERT_FALSE(oversize.has_value());
     EXPECT_NE(oversize.error().message.find("2048"), std::string::npos);
+}
+
+/**
+ * @brief 钉住 Windows 文件名里不允许出现的字符被拒，报错仍指向文件名写法
+ */
+TEST_F(RewindConfigFixture, RejectsInvalidFileNameCharacters)
+{
+    for (const auto &text: {QStringLiteral("C:keepass.exe"), QStringLiteral("keep|ass.exe"), QStringLiteral("keep<ass>.exe"), QStringLiteral("keep\"ass.exe")})
+    {
+        const auto rejected = parseRewindExclusions(text);
+        ASSERT_FALSE(rejected.has_value()) << text.toStdString();
+        EXPECT_NE(rejected.error().message.find("文件名"), std::string::npos) << text.toStdString();
+        EXPECT_NE(rejected.error().message.find("不能有"), std::string::npos) << text.toStdString();
+    }
 }
 
 /**

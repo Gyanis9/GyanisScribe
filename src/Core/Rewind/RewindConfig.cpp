@@ -22,6 +22,16 @@ namespace GyanisScribe::Core
             }
             return value;
         }
+
+        QString normalizedExecutableStem(const QString &name)
+        {
+            auto normalized = name.trimmed().toLower();
+            if (normalized.endsWith(QStringLiteral(".exe")))
+            {
+                normalized.chop(4);
+            }
+            return normalized;
+        }
     } // namespace
 
     Base::Expected<RewindConfig> readRewindConfig(const ISettingsStore &settings)
@@ -58,11 +68,14 @@ namespace GyanisScribe::Core
             {
                 continue;
             }
-            if (name.contains(QLatin1Char('/')) || name.contains(QLatin1Char('\\')) || name.contains(QLatin1Char('*')) || name.contains(QLatin1Char('?')))
+            if (name.contains(QLatin1Char('/')) || name.contains(QLatin1Char('\\')) || name.contains(QLatin1Char(':')) || name.contains(QLatin1Char('*')) ||
+                name.contains(QLatin1Char('?')) || name.contains(QLatin1Char('"')) || name.contains(QLatin1Char('<')) || name.contains(QLatin1Char('>')) ||
+                name.contains(QLatin1Char('|')))
             {
-                return std::unexpected(
-                        Base::Error{Base::ErrorCode::InvalidArgument,
-                                    Base::uiFormat(Base::uiTextUtf8("排除名单里的「{}」不是可执行文件名：只填文件名（如 keepass.exe），不要带路径或通配符"), name.toStdString())});
+                return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
+                                                   Base::uiFormat(Base::uiTextUtf8("排除名单里的「{}」不是可执行文件名：只填文件名（如 keepass.exe），不要带路径或盘符，"
+                                                                                   "不要用 * ? 通配符，文件名里也不能有 : < > | \" 这几个字符"),
+                                                                  name.toStdString())});
             }
             if (!result.contains(name))
             {
@@ -74,14 +87,14 @@ namespace GyanisScribe::Core
 
     bool isExcludedProcessName(const QString &processName, const QStringList &excludedProcesses) noexcept
     {
-        const auto normalized = processName.trimmed().toLower();
-        if (normalized.isEmpty())
+        const auto processStem = normalizedExecutableStem(processName);
+        if (processStem.isEmpty())
         {
             return false;
         }
         for (const auto &entry: excludedProcesses)
         {
-            if (normalized == entry || normalized == entry + QStringLiteral(".exe"))
+            if (normalizedExecutableStem(entry) == processStem)
             {
                 return true;
             }
