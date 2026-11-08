@@ -390,12 +390,19 @@ namespace GyanisScribe
                     // 预置一条自定义绑定：启动登记收进去之后，下一轮改动才有「旧组合」可恢复
                     ASSERT_TRUE(settings->setValue(App::customHotkeyKey("CaptureFullScreen").toStdString(), m_customHotkeyText).has_value());
                 }
+                if (m_rewindEnabled)
+                {
+                    // 控制器构造里就会按这一格启动回溯协调器：写晚了 start() 只会读到关闭
+                    ASSERT_TRUE(settings->setValue(Core::kRewindEnabled, true).has_value());
+                }
                 m_settings = settings.get();
 
                 auto source      = std::make_unique<CountingScreenSource>(makeFrame(m_frameScreenName, m_frameRegion, m_frameColor));
                 auto integration = std::make_unique<ForegroundWindowStub>(kForegroundWindowHandle);
-                m_source         = source.get();
-                m_integration    = integration.get();
+                // 回溯协调器在控制器构造里就 start()：能力位与开关必须先落在这份替身上，构造之后再补已经晚了
+                integration->sessionNotifications = m_sessionNotifications;
+                m_source                          = source.get();
+                m_integration                     = integration.get();
 
                 // 预置一份摆得回来的布局：借管理器的公开保存路写，免得「没摆回来」的判据对着空配置空转
                 if (m_seedPinLayout)
@@ -570,6 +577,8 @@ namespace GyanisScribe
             std::optional<std::filesystem::path> m_recordingDirectory;                                      ///< 录屏成品目录；非空就写 kPathRecording（只有录屏那一组设它）
             std::optional<int>                   m_recordingCountdown;                                      ///< 录屏倒计时秒数；不设就按生产默认（3 秒）走
             QString                              m_customHotkeyText;                                        ///< 预置的自定义绑定；空 = 不写这一格
+            bool                                 m_rewindEnabled        = false;                            ///< 回溯开关；真就在造控制器前写进设置
+            bool                                 m_sessionNotifications = false;                            ///< 平台是否承诺锁屏通知；回溯协调器只在它为真时启用
         };
     } // namespace
 
@@ -646,11 +655,52 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住回溯协调器由控制器持有并启动，且热键分支的门禁读的是截图流程标志
+     * @details 热键那一跳的触发口在控制器内部，本装置发不出一次 HotkeyAction::Rewind：
+     *          这一格钉的是它能碰到的三段——协调器确实由控制器构造（访问器拿得到、默认关闭时
+     *          停在 Disabled 并按关闭档回话）、开关与锁屏能力在构造前摆好后 start() 能把缓冲带起来、
+     *          以及热键分支用来挡人的 capture().isCaptureFlowActive() 在框选起落之间翻转。
+     *          剩下的「热键真的调到 showPicker」由编译期接线保证，触发口留给热键层。
+     */
+    TEST_F(AppControllerFixture, RewindHotkeyPathIsWiredAndGated)
+    {
+        makeController();
+        auto &rewind = m_controller->rewindCoordinatorForTesting();
+        EXPECT_EQ(rewind.statusForTesting(), Core::RewindStatus::Disabled) << "默认关闭时回溯协调器不该抓帧：start() 没认设置";
+
+        // 关闭档按回溯：协调器把「去设置开启」说给用户，而不是开一个空选择器
+        const auto before = visibleToastBubbles();
+        rewind.showPicker();
+        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("回溯截图未开启")); }))
+                << "关闭档的 showPicker 没把开启路径说给用户：控制器拿到的不是真协调器";
+
+        // 热键分支的门禁：框选起头时读过为真，取消收场后复位
+        auto &capture = m_controller->capture();
+        EXPECT_FALSE(capture.isCaptureFlowActive()) << "还没起截图，流程标志就不是清的";
+        capture.startInteractive(App::CaptureIntent::Annotate);
+        auto *overlay = visibleCaptureOverlay();
+        ASSERT_NE(overlay, nullptr) << "框选没铺出遮罩，流程门禁无从判起";
+        EXPECT_TRUE(capture.isCaptureFlowActive()) << "框选在跑时流程标志是假的：回溯热键会叠一层遮罩";
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &escape);
+        EXPECT_FALSE(capture.isCaptureFlowActive()) << "取消之后流程标志没复位：热键会一直挡人";
+
+        // 开关与能力位在构造前摆好：控制器里的 start() 该把缓冲带起来
+        m_controller.reset();
+        m_rewindEnabled        = true;
+        m_sessionNotifications = true;
+        makeController();
+        EXPECT_EQ(m_controller->rewindCoordinatorForTesting().statusForTesting(), Core::RewindStatus::Buffering) << "开启档下控制器没把回溯缓冲启动起来：start() 没接进构造";
+        EXPECT_TRUE(m_controller->rewindCoordinatorForTesting().configForTesting().enabled) << "协调器读到的配置没跟着设置走";
+    }
+
+    /**
      * @brief 钉住回车复制这一交付出口也结束回溯流程：收场一次，缓冲从暂停回到抓帧
      * @details 标注窗的四个交付出口会收起窗口但不走 closeAnnotation；少发 closed() 时
      *          captureFlowFinished 就永远不来，回溯缓冲停在 CaptureFlow，之后的热键都被
-     *          「先完成当前截图」挡回。这里把真回溯协调器接在收场信号上，从选帧一路走到
-     *          标注窗里的回车复制；正式接线由控制器那一层完成，本用例只手工接这两根线。
+     *          「先完成当前截图」挡回。这一格用的是控制器亲手建的那份回溯协调器：
+     *          开关与锁屏能力都在构造前摆好，构造函数里的 start() 就该把缓冲带起来；
+     *          四根线也全由控制器接，用例只保留观测。
      */
     TEST_F(AppControllerFixture, EnterCopyDeliveryEndsTheRewindCaptureFlow)
     {
@@ -660,9 +710,10 @@ namespace GyanisScribe
         m_frameScreenName = screen->name();
         m_frameRegion     = screen->geometry();
         m_afterAction     = App::CaptureIntent::Annotate;
+        // 回溯协调器只在平台承诺锁屏通知且设置为开启时启用：两位都要在构造控制器之前摆好
+        m_rewindEnabled        = true;
+        m_sessionNotifications = true;
         makeController();
-        // 回溯协调器只在平台承诺锁屏通知时启用；这一位默认是假，本格点名打开
-        m_integration->sessionNotifications = true;
 
         // 回溯抓整屏：选帧后的布局校验要求帧区域与当前屏几何一致，物理尺寸也要自洽
         Base::CapturedImage full = makeFrame(screen->name(), screen->geometry());
@@ -673,8 +724,9 @@ namespace GyanisScribe
         full.image.fill(m_frameColor);
         m_source->setFrame(full);
 
-        ASSERT_TRUE(m_settings->setValue(Core::kRewindEnabled, true).has_value()) << "回溯开关没写进设置";
-        App::RewindCoordinator rewind({*m_source, *m_integration, *m_settings});
+        auto &rewind = m_controller->rewindCoordinatorForTesting();
+        // 控制器构造里调过 start()：这一句同时判「调了」与「认了开启那一档」
+        ASSERT_EQ(rewind.statusForTesting(), Core::RewindStatus::Buffering) << "控制器没按开启设置启动回溯缓冲，后面的流程无从判起";
 
         bool lastPaused = false;
         QObject::connect(&rewind, &App::RewindCoordinator::bufferStatusChanged, &rewind,
@@ -683,12 +735,7 @@ namespace GyanisScribe
         auto &capture  = m_controller->capture();
         int   finished = 0;
         QObject::connect(&capture, &App::CaptureCoordinator::captureFlowFinished, &capture, [&finished] { ++finished; });
-        QObject::connect(&capture, &App::CaptureCoordinator::captureFlowFinished, &rewind, &App::RewindCoordinator::handleCaptureFlowFinished);
-        QObject::connect(&rewind, &App::RewindCoordinator::frameChosen, &capture,
-                         [&capture](const Base::CapturedImage &frame) { capture.startInteractiveWithFrame(frame); });
 
-        rewind.start();
-        ASSERT_EQ(rewind.statusForTesting(), Core::RewindStatus::Buffering) << "回溯缓冲没起来，后面的流程无从判起";
         rewind.captureTickForTesting();
         ASSERT_TRUE(waitUntil([&rewind] { return rewind.bufferStatsForTesting().sampleCount > 0; }, 5000)) << "回溯缓冲没抓到帧";
 

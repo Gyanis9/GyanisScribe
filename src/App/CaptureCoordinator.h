@@ -108,6 +108,14 @@ namespace GyanisScribe::App
          */
         [[nodiscard]] GyanisScribe::Gui::AnnotationWindow &annotationWindow() const noexcept;
 
+        /**
+         * @brief 这一刻有没有一轮从框选或长截图起头的流程在跑
+         * @return 流程在跑为 true；整屏、命令行那几路不算
+         * @details 回溯选择器与普通截图共用遮罩与标注窗：上一轮还没收场就再铺一层，
+         *          遮罩会把用户正在标注的那一窗拍进去。热键据此先把用户挡回当前流程。
+         */
+        [[nodiscard]] bool isCaptureFlowActive() const noexcept;
+
         /// 框选截图（热键、托盘、标注窗的「重新截」都从这里进）
         void startInteractive(std::optional<GyanisScribe::App::CaptureIntent> intent = std::nullopt);
 

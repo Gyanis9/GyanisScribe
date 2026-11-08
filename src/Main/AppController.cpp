@@ -9,6 +9,7 @@
 #include "App/HistoryCoordinator.h"
 #include "App/DeliveryCoordinator.h"
 #include "App/CaptureCoordinator.h"
+#include "App/RewindCoordinator.h"
 #include "App/PinCoordinator.h"
 #include "App/PickCoordinator.h"
 #include "App/OcrCoordinator.h"
@@ -216,6 +217,16 @@ namespace GyanisScribe::Main
                                      // 不另写一条截图→存盘的捷径，两条各写一遍就会两边行为漂移
                                      m_capture->startInteractive(GyanisScribe::App::CaptureIntent::QuickSave);
                                      return;
+                                 case GyanisScribe::Core::HotkeyAction::Rewind:
+                                     // 回溯选择器会再铺一层遮罩：当前截图或标注还没收场就打开，
+                                     // 遮罩会把用户正在标注的那一窗拍进去，所以先挡住并说清出路
+                                     if (m_capture->isCaptureFlowActive())
+                                     {
+                                         notifyUser(GyanisScribe::Base::uiText("先完成当前截图或标注，再打开回溯。"), GyanisScribe::Gui::ToastKind::Information);
+                                         return;
+                                     }
+                                     m_rewind->showPicker();
+                                     return;
                              }
                          });
 
@@ -267,6 +278,17 @@ namespace GyanisScribe::Main
         QObject::connect(m_tray.get(), &GyanisScribe::App::TrayController::screenCaptureRequested, m_capture.get(), &GyanisScribe::App::CaptureCoordinator::captureScreen);
         // 托盘那一族的逐屏截图接在协调器建好之后：连在尚未构造的成员上时 QObject::connect 不报错，
         // 托盘图标与菜单都照常现身，点下去却什么都不会发生
+
+        // 回溯这一族排在截图协调器之后：缓冲与选择器都由它自己管，控制器只接四条线——
+        // 选中的帧进同一条截图链路、要说的话回到提示、缓冲状态推给托盘、流程收场恢复抓帧。
+        // start() 自己读设置与平台能力位：默认关闭，未开启时停在 Disabled，不抓帧也不占托盘那一段
+        m_rewind = std::make_unique<GyanisScribe::App::RewindCoordinator>(GyanisScribe::App::RewindCoordinator::Dependencies{*m_captureSource, *m_integration, *m_settings});
+        QObject::connect(m_rewind.get(), &GyanisScribe::App::RewindCoordinator::frameChosen, m_capture.get(), &GyanisScribe::App::CaptureCoordinator::startInteractiveWithFrame);
+        QObject::connect(m_rewind.get(), &GyanisScribe::App::RewindCoordinator::messageForUser, this, &AppController::notifyUser);
+        QObject::connect(m_rewind.get(), &GyanisScribe::App::RewindCoordinator::bufferStatusChanged, m_tray.get(), &GyanisScribe::App::TrayController::setRewindStatus);
+        QObject::connect(m_capture.get(), &GyanisScribe::App::CaptureCoordinator::captureFlowFinished, m_rewind.get(),
+                         &GyanisScribe::App::RewindCoordinator::handleCaptureFlowFinished);
+        m_rewind->start();
 
         // 录屏这一族整族搬进了 RecordingCoordinator：控制器只留三根线——
         // 要说给用户的话、托盘那一行读数、成品归档进历史
@@ -526,6 +548,11 @@ namespace GyanisScribe::Main
     GyanisScribe::App::TrayController &AppController::trayControllerForTesting() const noexcept
     {
         return *m_tray;
+    }
+
+    GyanisScribe::App::RewindCoordinator &AppController::rewindCoordinatorForTesting() const noexcept
+    {
+        return *m_rewind;
     }
 
     int AppController::pinCountForTesting() const noexcept

@@ -62,6 +62,7 @@ namespace GyanisScribe::App
     class PickCoordinator;
     class PinCoordinator;
     class RecordingCoordinator;
+    class RewindCoordinator;
 } // namespace GyanisScribe::App
 
 namespace GyanisScribe::Core
@@ -255,6 +256,14 @@ namespace GyanisScribe::Main
         [[nodiscard]] GyanisScribe::App::TrayController &trayControllerForTesting() const noexcept;
 
         /**
+         * @brief 回溯这一族的协调器，仅供用例驱动选帧与判状态
+         * @return 本控制器持有的那一份，所有权不在调用方
+         * @note 生产侧只经热键那一条线进来：用例要判「控制器亲手接的那份协调器真的起来了、
+         *       选帧与收场四条线接在它身上」，只有这一条口子拿得到同一个对象。
+         */
+        [[nodiscard]] GyanisScribe::App::RewindCoordinator &rewindCoordinatorForTesting() const noexcept;
+
+        /**
          * @brief 此刻桌面上的贴图张数，仅供用例
          * @return 控制器持有的贴图管理器报出的张数
          * @note 生产侧不需要这个读数：张数由管理器自己推给托盘提示。用例要判
@@ -335,6 +344,7 @@ namespace GyanisScribe::Main
         std::unique_ptr<GyanisScribe::App::HistoryCoordinator>        m_history;        ///< 历史这一族（增删清空与「这条去哪了」）
         std::unique_ptr<GyanisScribe::App::PickCoordinator>           m_picker;         ///< 取色这一族（遮罩、写法与字母档、最近取色）
         std::unique_ptr<GyanisScribe::App::CaptureCoordinator>        m_capture;        ///< 截图这一族（枢纽：入口、延时、抓帧、按意图交付）
+        std::unique_ptr<GyanisScribe::App::RewindCoordinator>         m_rewind;         ///< 回溯这一族（缓冲、选择器、暂停与恢复）
         std::unique_ptr<GyanisScribe::App::PinCoordinator>            m_pinCoordinator; ///< 贴图这一族的贴出动作（剪贴板/文件/回贴/组管理）
         std::unique_ptr<GyanisScribe::App::DeliveryCoordinator>       m_delivery;       ///< 交付这一族（装饰、落盘、外部命令、批量报告）
 

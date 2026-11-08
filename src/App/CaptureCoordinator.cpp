@@ -114,6 +114,11 @@ namespace GyanisScribe::App
         return *m_annotationWindow;
     }
 
+    bool CaptureCoordinator::isCaptureFlowActive() const noexcept
+    {
+        return m_captureFlowActive;
+    }
+
     void CaptureCoordinator::startInteractive(const std::optional<GyanisScribe::App::CaptureIntent> intent)
     {
         m_intent            = intent.value_or(settingsCaptureIntent());
@@ -180,6 +185,9 @@ namespace GyanisScribe::App
     void CaptureCoordinator::startLong()
     {
         m_intent = settingsCaptureIntent();
+        // 长截图也从框选起头：流程标志要跟着一起立，否则用户框完区域进入滚动采集时，
+        // 回溯热键会以为没有流程在跑，再叠一层遮罩
+        m_captureFlowActive = true;
         schedule([this] { m_capture->startLongCapture(); });
     }
 
