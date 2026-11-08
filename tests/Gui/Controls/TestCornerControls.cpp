@@ -16,6 +16,7 @@
 #include <QAction>
 #include <QApplication>
 #include <QCoreApplication>
+#include <QHoverEvent>
 #include <QImage>
 #include <QMenu>
 #include <QPainter>
@@ -366,6 +367,110 @@ TEST_F(CornerControlsFixture, ListWidgetPaintsItemHighlightAndContainer)
     const QImage image = list.grab().toImage();
     EXPECT_EQ(image.pixelColor(0, 0).alpha(), 0) << "列表容器左上角应透明";
     EXPECT_EQ(image.pixelColor(100, 100), GyanisScribe::Gui::activePalette().surface) << "列表容器底没铺 surface";
+}
+
+/**
+ * @brief 钉住列表项的悬停反馈与选中优先
+ * @details 悬停底与选中底都由 ItemDelegate 按项的 State_MouseOver 与 State_Selected 画，
+ *          而这两个状态只在视口收到悬停事件后才更新。样式表撤掉 item:hover 之后，
+ *          WA_Hover 与鼠标跟踪不会再被 QStyleSheetStyle 打开，所以先钉住视口的这两个属性，
+ *          再手工把 HoverEnter 送到视口：QAbstractItemView 在 HoverEnter 上就会落下悬停项，
+ *          一条事件即是最短可靠序列，不必先 Enter 再 Move。
+ *          取样取项内靠右的一格：文字靠左，那里不会落到笔画上。
+ *          最后把悬停移到选中行：选中底必须压过悬停底。
+ */
+TEST_F(CornerControlsFixture, ListWidgetItemShowsHoverAndSelectionWins)
+{
+    GyanisScribe::Gui::ListWidget list;
+    list.resize(200, 120);
+    list.addItem(QStringLiteral("第一项"));
+    list.addItem(QStringLiteral("第二项"));
+    list.setCurrentRow(0);
+    list.show();
+    QCoreApplication::processEvents();
+
+    ASSERT_TRUE(list.viewport()->testAttribute(Qt::WA_Hover)) << "视口没开 WA_Hover，真实鼠标移动不会产生悬停事件";
+    EXPECT_TRUE(list.viewport()->hasMouseTracking()) << "视口没开鼠标跟踪";
+
+    const QRect hoveredItem = list.visualItemRect(list.item(1));
+    ASSERT_FALSE(hoveredItem.isEmpty());
+    const QPoint hoverProbe{hoveredItem.right() - 10, hoveredItem.center().y()};
+    QHoverEvent  hoverEnter{QEvent::HoverEnter, QPointF{hoverProbe}, list.viewport()->mapToGlobal(hoverProbe), QPointF{hoverProbe}};
+    QCoreApplication::sendEvent(list.viewport(), &hoverEnter);
+    QCoreApplication::processEvents();
+
+    QImage viewportImage = list.viewport()->grab().toImage();
+    EXPECT_EQ(viewportImage.pixelColor(hoverProbe), GyanisScribe::Gui::activePalette().hover) << "悬停项没铺 hover 底";
+
+    const QRect selectedItem = list.visualItemRect(list.item(0));
+    ASSERT_FALSE(selectedItem.isEmpty());
+    const QPoint selectedProbe{selectedItem.right() - 10, selectedItem.center().y()};
+    QHoverEvent  hoverMove{QEvent::HoverMove, QPointF{selectedProbe}, list.viewport()->mapToGlobal(selectedProbe), QPointF{hoverProbe}};
+    QCoreApplication::sendEvent(list.viewport(), &hoverMove);
+    QCoreApplication::processEvents();
+
+    viewportImage = list.viewport()->grab().toImage();
+    EXPECT_EQ(viewportImage.pixelColor(selectedProbe), GyanisScribe::Gui::activePalette().accentSoft) << "悬停压过了选中底";
+}
+
+/**
+ * @brief 钉住关掉容器底的列表完全透明
+ * @details 导航压在别的面板上，setSurfaceVisible(false) 之后列表自己不铺 surface；
+ *          宿主铺红底，列表中心与左上角都必须露出宿主色，说明容器底真的没画。
+ *          列表里只放两项且不选中，项底与文字都落不进这两个取样点。
+ */
+TEST_F(CornerControlsFixture, ListWidgetWithoutSurfaceLeavesTheHostVisible)
+{
+    QWidget host;
+    host.resize(220, 140);
+    host.setAutoFillBackground(true);
+    host.setPalette(QPalette{QColor{255, 0, 0}});
+
+    auto *list = new GyanisScribe::Gui::ListWidget{&host};
+    list->resize(200, 120);
+    list->move(10, 10);
+    list->addItem(QStringLiteral("第一项"));
+    list->addItem(QStringLiteral("第二项"));
+    list->setSurfaceVisible(false);
+    host.show();
+    QCoreApplication::processEvents();
+
+    const QImage image = host.grab().toImage();
+    EXPECT_EQ(image.pixelColor(110, 100), QColor(255, 0, 0)) << "关掉容器底后列表中心应露出宿主底色";
+    EXPECT_EQ(image.pixelColor(10, 10), QColor(255, 0, 0)) << "关掉容器底后列表左上角应露出宿主底色";
+}
+
+/**
+ * @brief 钉住高对比度档选中项的主色描边
+ * @details 这一档不靠底色分层：选中项在 accentSoft 底上再描一圈 2px 主色边。
+ *          边取项内左沿第二列，底取项内靠右一格避开文字；切回浅色档后同一格必须是 accentSoft，
+ *          说明描边只出现在高对比度档，其余档只铺底。
+ */
+TEST_F(CornerControlsFixture, HighContrastSelectedItemKeepsTheAccentOutline)
+{
+    GyanisScribe::Gui::setTextThemeKind(GyanisScribe::Gui::ThemeKind::HighContrast);
+    const auto &palette = GyanisScribe::Gui::activePalette();
+
+    GyanisScribe::Gui::ListWidget list;
+    list.resize(200, 120);
+    list.addItem(QStringLiteral("第一项"));
+    list.addItem(QStringLiteral("第二项"));
+    list.setCurrentRow(0);
+    list.show();
+    QCoreApplication::processEvents();
+
+    const QRect item = list.visualItemRect(list.item(0));
+    ASSERT_FALSE(item.isEmpty());
+    const int edgeY = item.center().y();
+    QImage    image = list.viewport()->grab().toImage();
+    EXPECT_EQ(image.pixelColor(item.left() + 1, edgeY), palette.accent) << "高对比度档的选中项没有 2px 主色边";
+    EXPECT_EQ(image.pixelColor(item.right() - 10, edgeY), palette.accentSoft) << "选中底没铺 accentSoft";
+
+    GyanisScribe::Gui::setTextThemeKind(GyanisScribe::Gui::ThemeKind::Light);
+    list.viewport()->update();
+    QCoreApplication::processEvents();
+    image = list.viewport()->grab().toImage();
+    EXPECT_EQ(image.pixelColor(item.left() + 1, edgeY), GyanisScribe::Gui::activePalette().accentSoft) << "浅色档的选中项不该有描边";
 }
 
 /**

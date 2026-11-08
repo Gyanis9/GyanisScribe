@@ -21,6 +21,10 @@ namespace GyanisScribe::Gui
         setAttribute(Qt::WA_TranslucentBackground);
         setAutoFillBackground(false);
         viewport()->setAutoFillBackground(false);
+        // 项悬停由视口事件驱动：样式表里 QListWidget::item:hover 撤掉之后，这层属性与鼠标跟踪
+        // 不会再被 QStyleSheetStyle 打开，委托的 State_MouseOver 分支也就永远不跑，必须在这里打开
+        viewport()->setAttribute(Qt::WA_Hover);
+        viewport()->setMouseTracking(true);
     }
 
     void ListWidget::setSurfaceVisible(const bool visible)

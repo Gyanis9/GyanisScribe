@@ -16,6 +16,7 @@ namespace GyanisScribe::Gui
     /**
      * @brief 自绘连续曲率容器底的列表
      * @details 容器底与描边由本类按 Panel 档画，项底与高亮由 ItemDelegate 画；
+     *          视口的悬停属性与鼠标跟踪也在构造里打开，项悬停态不依赖样式表的 :hover 规则；
      *          滚动、选择模式与模型接口都留在 QListWidget 上。
      */
     class ListWidget : public QListWidget
