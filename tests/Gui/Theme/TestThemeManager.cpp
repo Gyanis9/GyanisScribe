@@ -4,6 +4,7 @@
 #include "Gui/Theme/ThemeManager.h"
 #include "Gui/Controls/Button.h"
 #include "Gui/Controls/SurfaceWidget.h"
+#include "Gui/Theme/ControlPalette.h"
 #include "Core/Geometry/ContinuousCorner.h"
 
 #include "Base/Logger.h"
@@ -412,7 +413,9 @@ TEST_F(ThemeManagerFixture, GarbageStoredValueFallsBackToSystemAndLogsWarning)
 /**
  * @brief 钉住样式表与色板同解，双向都查
  * @details 正向逐主题：QSS 里出现的每个十六进制色都必须是该主题色板里的一个（禁「代码外再有一套色」）；
- *          反向全局：每个进 QSS 的色板角色至少要有一份样式表用着，icon、success、danger 由绘制代码取用，不计入——
+ *          反向全局：每个进 QSS 的色板角色至少要有一份样式表用着，icon、success、danger 由绘制代码取用，
+ *          pressed 的按下态填充也改由 Gui::Button / Gui::ToolButton 按 ControlPalette 自绘，
+ *          这几项不计入 QSS 反向名单，pressed 另按按钮填充的返回值钉住它仍有消费方——
  *          这一条抓的是「加了没人用的色板字段」这种死配置。色板是三档共用的一张角色表，判据是角色在整个
  *          样式层有没有消费方；逐主题会把判据改成「每份 QSS 都得用全自己色板的十五个角色」，
  *          某档刻意少用一个角色就报红，而那不是死配置。
@@ -459,16 +462,21 @@ TEST_F(ThemeManagerFixture, StyleSheetsAndPalettesAgreeInBothDirections)
         }
     }
 
-    // 反向全局：每个该进 QSS 的角色至少被一份样式表用着
+    // 反向全局：每个该进 QSS 的角色至少被一份样式表用着；按下态填充已改由自绘类消费，
+    // 这里换成对 buttonColors / toolButtonColors 的断言，避免把「没有消费方」的字段放过去
     for (const auto kind: {ThemeKind::Light, ThemeKind::Dark, ThemeKind::HighContrast})
     {
         const auto &palette = paletteFor(kind);
         for (const auto &color:
              {palette.windowBackground, palette.surface, palette.text, palette.secondaryText, palette.border, palette.accent, palette.onAccent, palette.selection,
-              palette.mutedFill, palette.controlFill, palette.hover, palette.pressed, palette.accentHover, palette.accentSoft, palette.borderStrong})
+              palette.mutedFill, palette.controlFill, palette.hover, palette.accentHover, palette.accentSoft, palette.borderStrong})
         {
             EXPECT_TRUE(usedColors.contains(hexOf(color))) << "色板里的 " << hexOf(color).toStdString() << " 一份 QSS 都没用过";
         }
+        EXPECT_EQ(GyanisScribe::Gui::buttonColors(palette, kind, false, true, false, true, false, false).fill, palette.pressed)
+                << "按下态的按钮填充没取 pressed 角色";
+        EXPECT_EQ(GyanisScribe::Gui::toolButtonColors(palette, kind, false, true, false, true, false, false).fill, palette.pressed)
+                << "按下态的工具按钮填充没取 pressed 角色";
     }
 }
 
@@ -632,10 +640,10 @@ TEST_F(ThemeManagerFixture, ControlHeightsStayPinnedPerTheme)
     for (const auto kind: {ThemeKind::Light, ThemeKind::Dark, ThemeKind::HighContrast})
     {
         application->setStyleSheet(ThemeManager::styleSheetFor(kind));
-        QLineEdit   edit;
-        QPushButton button(QStringLiteral("确定"));
-        QSpinBox    spin;
-        QComboBox   combo;
+        QLineEdit                 edit;
+        GyanisScribe::Gui::Button button{QStringLiteral("确定")};
+        QSpinBox                  spin;
+        QComboBox                 combo;
         for (QWidget *widget: std::initializer_list<QWidget *>{&edit, &button, &spin, &combo})
         {
             widget->ensurePolished();
@@ -836,10 +844,11 @@ TEST_F(ThemeManagerFixture, CheckboxAndSliderShowAKeyboardFocusRing)
 }
 
 /**
- * @brief 钉住 Light/Dark 不再有控件级焦点描边，只留标注工具栏的紧凑焦点与滑块手柄反转
- * @details 双环由 FocusRingController 的覆盖层画；样式表里若还留着 QPushButton:focus 一类规则，
- *          会在覆盖层之外再压一圈描边，切主题后同一控件出现两种焦点形态。判据按选择器分支看，
- *          不能只搜全文——工具栏那五条同样以 QPushButton:focus 收尾。
+ * @brief 钉住 Light/Dark 的按钮焦点已交给自绘类，输入类只留标注工具栏的紧凑焦点
+ * @details 按钮的焦点边由 Gui::Button / Gui::ToolButton 按 ControlPalette 自绘，
+ *          样式表里若还留着 QPushButton:focus 一类规则，会在自绘边之外再压一圈。
+ *          输入类的 focus 规则留到输入控件迁移时再收，这里先钉住它们仍只在工具栏那一条。
+ *          判据按选择器分支看，不能只搜全文。
  */
 TEST_F(ThemeManagerFixture, LightAndDarkSheetsDropTheControlLevelFocusOutlines)
 {
@@ -863,8 +872,15 @@ TEST_F(ThemeManagerFixture, LightAndDarkSheetsDropTheControlLevelFocusOutlines)
             return matched;
         };
 
-        // 标注工具栏是唯一允许控件级焦点的落点：每条命中都必须带 #AnnotationToolbar 前缀
-        for (const auto *token: {"QPushButton:focus", "QToolButton:focus", "QLineEdit:focus", "QComboBox:focus", "QSpinBox:focus"})
+        // 按钮的焦点边改由控件自绘：浅深两档都不该再有按钮的 :focus 分支
+        for (const auto *token: {"QPushButton:focus", "QToolButton:focus"})
+        {
+            const auto matched = branches(QString::fromLatin1(token));
+            EXPECT_TRUE(matched.isEmpty()) << resource << " 按钮还留着 QSS 焦点描边：" << matched.join(QStringLiteral("; ")).toStdString();
+        }
+
+        // 输入类与标注工具栏的紧凑焦点留到输入控件迁移：现有且只有工具栏那一条
+        for (const auto *token: {"QLineEdit:focus", "QComboBox:focus", "QSpinBox:focus"})
         {
             const auto matched = branches(QString::fromLatin1(token));
             EXPECT_EQ(matched.size(), 1) << resource << " 里 " << token << " 的条数不对：应有且只有工具栏那一条";

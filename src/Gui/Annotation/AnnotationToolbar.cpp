@@ -11,6 +11,7 @@
 #include "Gui/Controls/AppShortcuts.h"
 #include "Gui/Theme/CornerStyle.h"
 #include "Gui/Theme/DesignTokens.h"
+#include "Gui/Controls/Button.h"
 
 #include <QApplication>
 #include <QAction>
@@ -894,7 +895,7 @@ namespace GyanisScribe::Gui
 
     QToolButton *AnnotationToolbar::makeButton(const std::string_view iconName, const QString &label, const bool checkable)
     {
-        auto *button = new QToolButton{this};
+        auto *button = new Gui::ToolButton{this};
         button->setIcon(m_icons.icon(iconName));
         button->setIconSize(QSize{static_cast<int>(IconSize::Medium), static_cast<int>(IconSize::Medium)});
         // tooltip 与无障碍名称同名：需求要求每个图标按钮两者都有，只有 tooltip 时读屏拿不到名字
@@ -939,7 +940,7 @@ namespace GyanisScribe::Gui
         int  slot      = 0;
         auto addSwatch = [&](const QColor &color, const QString &label)
         {
-            auto *button = new QToolButton{panel};
+            auto *button = new Gui::ToolButton{panel};
             button->setAutoRaise(true);
             button->setIcon(QIcon{colorSwatchPixmap(color, m_icons.tintColor())});
             button->setIconSize(QSize{static_cast<int>(IconSize::Medium), static_cast<int>(IconSize::Medium)});

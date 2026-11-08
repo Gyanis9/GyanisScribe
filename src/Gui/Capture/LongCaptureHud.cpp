@@ -2,6 +2,7 @@
 
 #include "Core/Geometry/ContinuousCorner.h"
 #include "Base/Text.h"
+#include "Gui/Controls/Button.h"
 #include "Gui/Theme/CornerStyle.h"
 #include "Gui/Theme/DesignTokens.h"
 
@@ -78,10 +79,10 @@ namespace GyanisScribe::Gui
         line->setSpacing(GyanisScribe::Gui::kSpacingSmall);
         root->addLayout(line);
 
-        auto *cancelButton = new QPushButton{GyanisScribe::Base::uiText("取消"), this};
+        auto *cancelButton = new Gui::Button{GyanisScribe::Base::uiText("取消"), this};
         cancelButton->setToolTip(GyanisScribe::Base::uiText("扔掉这一段，不产出长图"));
         cancelButton->setAccessibleName(GyanisScribe::Base::uiText("取消长截图"));
-        auto *finishButton = new QPushButton{GyanisScribe::Base::uiText("完成"), this};
+        auto *finishButton = new Gui::Button{GyanisScribe::Base::uiText("完成"), this};
         finishButton->setToolTip(GyanisScribe::Base::uiText("结束拼接，把这张长图交给下一步"));
         finishButton->setAccessibleName(GyanisScribe::Base::uiText("完成长截图"));
 

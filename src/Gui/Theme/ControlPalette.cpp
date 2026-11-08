@@ -47,8 +47,8 @@ namespace GyanisScribe::Gui
          * @param kind 当前主题档
          * @param enabled 是否启用
          * @param checked 是否选中
-         * @note 对齐 HighContrast.qss 的 QToolButton:checked（2px 主色边）：只有启用且选中的工具按钮才补；
-         *       同一档的 :disabled 把边压成透明，焦点边已在调用前算好，因此只补 borderWidth 仍为 0 的那一档
+         * @note 对齐这一档工具按钮选中态的约定：只有启用且选中的工具按钮才带 2px 主色边；
+         *       同一档的禁用态把边压成透明，焦点边已在调用前算好，因此只补 borderWidth 仍为 0 的那一档
          */
         void applyHighContrastCheckedBorder(ControlColors &colors, const ThemePalette &palette, const ThemeKind kind, const bool enabled, const bool checked)
         {

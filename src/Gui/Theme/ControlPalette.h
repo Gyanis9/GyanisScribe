@@ -61,7 +61,7 @@ namespace GyanisScribe::Gui
      * @param focused 是否持有焦点
      * @param inlineFocus 是否由控件自绘焦点边
      * @return 填充与描边；未选中且无状态时填充透明；高对比度档选中时补 accent 描边，
-     *         对齐这一档 QSS 的 QToolButton:checked
+     *         对齐这一档工具按钮选中态的 2px 主色边
      */
     [[nodiscard]] ControlColors toolButtonColors(const ThemePalette &palette, ThemeKind kind, bool checked, bool enabled, bool hover,
                                                  bool down, bool focused, bool inlineFocus);

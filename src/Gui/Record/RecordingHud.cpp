@@ -5,6 +5,7 @@
 #include "Gui/Theme/DesignTokens.h"
 
 #include "Base/Text.h"
+#include "Gui/Controls/Button.h"
 #include "Gui/Resources/IconProvider.h"
 
 #include <QFont>
@@ -157,18 +158,18 @@ namespace GyanisScribe::Gui
         line->addWidget(m_elapsed);
 
         // 取消排在最左：它与「停止并保存」之间隔着暂停键，误点一格不会把录好的那段丢掉
-        auto *cancelButton = new QPushButton{GyanisScribe::Base::uiText("取消"), this};
+        auto *cancelButton = new Gui::Button{GyanisScribe::Base::uiText("取消"), this};
         cancelButton->setIcon(m_icons.icon("Close"));
         cancelButton->setToolTip(GyanisScribe::Base::uiText("放弃这一段，不保存成品"));
         cancelButton->setAccessibleName(GyanisScribe::Base::uiText("取消录屏"));
-        m_pauseButton = new QPushButton{GyanisScribe::Base::uiText("暂停"), this};
+        m_pauseButton = new Gui::Button{GyanisScribe::Base::uiText("暂停"), this};
         m_pauseButton->setIcon(m_icons.icon("RecordPause"));
         m_pauseButton->setAccessibleName(GyanisScribe::Base::uiText("暂停"));
-        auto *stopButton = new QPushButton{GyanisScribe::Base::uiText("停止"), this};
+        auto *stopButton = new Gui::Button{GyanisScribe::Base::uiText("停止"), this};
         stopButton->setIcon(m_icons.icon("RecordStop"));
         stopButton->setToolTip(GyanisScribe::Base::uiText("停止并保存成品"));
         stopButton->setAccessibleName(GyanisScribe::Base::uiText("停止并保存"));
-        auto *minimizeButton = new QPushButton{this};
+        auto *minimizeButton = new Gui::Button{this};
         minimizeButton->setIcon(m_icons.icon("Tray"));
         minimizeButton->setToolTip(GyanisScribe::Base::uiText("最小化到托盘"));
         minimizeButton->setAccessibleName(GyanisScribe::Base::uiText("最小化到托盘"));

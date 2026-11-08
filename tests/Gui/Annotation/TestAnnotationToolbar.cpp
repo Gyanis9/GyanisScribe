@@ -6,6 +6,7 @@
 #include "Core/Settings/SettingsStore.h"
 #include "Gui/Controls/AppShortcuts.h"
 #include "Core/Annotation/AnnotationPalette.h"
+#include "Gui/Theme/ControlPalette.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Theme/SquircleStyle.h"
 #include "Gui/Theme/ThemeKind.h"
@@ -1627,4 +1628,22 @@ TEST_F(ToolbarFixture, PanelIsPaintedWithSquircleCorners)
     const QImage image = toolbar->grab().toImage();
     EXPECT_EQ(image.pixelColor(0, 0).alpha(), 0) << "工具栏左上角不透明：方形底露出来了";
     EXPECT_EQ(image.pixelColor(toolbar->width() / 2, 2), GyanisScribe::Gui::activePalette().surface);
+}
+
+/**
+ * @brief 钉住工具栏内的按钮走自绘的紧凑焦点边
+ * @details 工具栏不装 6px 外扩焦点环，按钮的焦点边只能由 Gui::ToolButton 自己画；
+ *          判定入口必须认得出工具栏里的按钮，也要把工具栏外的按钮排除在外。
+ */
+TEST_F(ToolbarFixture, ToolButtonsUseTheInlineFocusBorder)
+{
+    SignalLog log;
+    auto      toolbar = makeToolbarLogged(log);
+
+    auto *button = toolbar->toolButtonAt(0);
+    ASSERT_NE(button, nullptr) << "工具栏上找不到按钮，判据没有落点";
+    EXPECT_TRUE(GyanisScribe::Gui::usesInlineFocusBorder(*button)) << "工具栏内的按钮没被认成自绘焦点边";
+
+    QToolButton outside;
+    EXPECT_FALSE(GyanisScribe::Gui::usesInlineFocusBorder(outside)) << "工具栏外的按钮不该走紧凑焦点边";
 }

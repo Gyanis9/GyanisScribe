@@ -6,6 +6,7 @@
 #include "Base/Text.h"
 #include "Plugins/OcrEngines/OcrEngineFactory.h"
 #include "Core/Ocr/OcrTextExporter.h"
+#include "Gui/Controls/Button.h"
 #include "Gui/Resources/IconProvider.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Theme/ThemeManager.h"
@@ -116,7 +117,7 @@ namespace
      */
     QToolButton *makeToolButton(GyanisScribe::Gui::IconProvider &icons, std::string_view iconName, const QString &label)
     {
-        auto *button = new QToolButton;
+        auto *button = new GyanisScribe::Gui::ToolButton;
         button->setIcon(icons.icon(iconName));
         button->setToolTip(label);
         button->setAccessibleName(label);

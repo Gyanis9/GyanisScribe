@@ -4,6 +4,7 @@
 #include "Base/Paths.h"
 #include "Base/Text.h"
 #include "Core/History/HistoryThumbnail.h"
+#include "Gui/Controls/Button.h"
 #include "Gui/Resources/IconProvider.h"
 #include "Gui/Theme/DesignTokens.h"
 
@@ -143,11 +144,11 @@ namespace GyanisScribe::Gui
         m_filter->setAccessibleName(GyanisScribe::Base::uiText("历史类别"));
         tools->addWidget(m_filter);
 
-        auto                                                           *pinButton    = new QPushButton{GyanisScribe::Base::uiText("重新贴图"), this};
-        auto                                                           *ocrButton    = new QPushButton{GyanisScribe::Base::uiText("重新识别"), this};
-        auto                                                           *folderButton = new QPushButton{GyanisScribe::Base::uiText("打开所在目录"), this};
-        auto                                                           *deleteButton = new QPushButton{GyanisScribe::Base::uiText("删除"), this};
-        auto                                                           *clearButton  = new QPushButton{GyanisScribe::Base::uiText("清空列表"), this};
+        auto                                                           *pinButton    = new Gui::Button{GyanisScribe::Base::uiText("重新贴图"), this};
+        auto                                                           *ocrButton    = new Gui::Button{GyanisScribe::Base::uiText("重新识别"), this};
+        auto                                                           *folderButton = new Gui::Button{GyanisScribe::Base::uiText("打开所在目录"), this};
+        auto                                                           *deleteButton = new Gui::Button{GyanisScribe::Base::uiText("删除"), this};
+        auto                                                           *clearButton  = new Gui::Button{GyanisScribe::Base::uiText("清空列表"), this};
         const std::array<std::pair<QPushButton *, std::string_view>, 5> buttons      = {
                 std::pair{pinButton, "Pin"}, std::pair{ocrButton, "Ocr"}, std::pair{folderButton, "Folder"}, std::pair{deleteButton, "Delete"}, std::pair{clearButton, "Delete"},
         };

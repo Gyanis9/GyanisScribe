@@ -16,8 +16,8 @@ namespace GyanisScribe::Gui
 {
     /**
      * @brief 自绘连续曲率底与状态的按钮
-     * @details 填充与描边由 ControlPalette 按状态映射；QSS 只留透明占位，
-     *          未迁移的 QPushButton 仍走原生样式表规则。
+     * @details 填充与描边由 ControlPalette 按状态映射；QSS 只留透明边框与内边距占位，
+     *          文字色仍由样式表给出。
      */
     class Button : public QPushButton
     {

@@ -85,6 +85,116 @@ TEST_F(CornerControlsFixture, ButtonPaintsControlFillAndAccentDefault)
     EXPECT_EQ(image.pixelColor(70, 25), GyanisScribe::Gui::activePalette().accent);
 }
 
+/**
+ * @brief 钉住工具按钮的选中底与禁用透明底
+ * @details 选中态整块铺 accentSoft；禁用态不铺底，宿主底色原样露出来。
+ *          「透明」用宿主的红底判：宿主是不透明窗口，抓图里那里的 alpha 本来就是 255，
+ *          能区分铺底与否的是颜色本身。
+ */
+TEST_F(CornerControlsFixture, ToolButtonShowsCheckedAndDisabledStates)
+{
+    QWidget host;
+    host.resize(80, 60);
+    host.setAutoFillBackground(true);
+    host.setPalette(QPalette{QColor{255, 0, 0}});
+
+    auto *button = new GyanisScribe::Gui::ToolButton{&host};
+    button->setCheckable(true);
+    button->setChecked(true);
+    button->setGeometry(10, 10, 40, 40);
+    host.show();
+    QCoreApplication::processEvents();
+
+    auto image = host.grab().toImage();
+    EXPECT_EQ(image.pixelColor(30, 30), GyanisScribe::Gui::activePalette().accentSoft);
+
+    button->setEnabled(false);
+    button->update();
+    QCoreApplication::processEvents();
+    image = host.grab().toImage();
+    EXPECT_EQ(image.pixelColor(30, 30), QColor(255, 0, 0)) << "禁用工具按钮应保持透明底，露出宿主色";
+}
+
+/**
+ * @brief 钉住按钮的焦点边由自绘类画出
+ * @details 高对比度档静息是 2px borderStrong 边、聚焦换成同宽主色边；
+ *          这两档都只在 paintEvent 里落笔，QSS 已无按钮描边规则。
+ */
+TEST_F(CornerControlsFixture, ButtonSelfPaintsHighContrastBorderAndFocusEdge)
+{
+    GyanisScribe::Gui::setTextThemeKind(GyanisScribe::Gui::ThemeKind::HighContrast);
+    const auto &palette = GyanisScribe::Gui::activePalette();
+
+    QWidget host;
+    host.resize(160, 60);
+    host.setAutoFillBackground(true);
+    host.setPalette(QPalette{QColor{255, 0, 0}});
+
+    auto *button = new GyanisScribe::Gui::Button{&host};
+    button->setGeometry(10, 10, 120, 32);
+    host.show();
+    QCoreApplication::processEvents();
+    // show 之后第一个可聚焦控件会自动拿到焦点：先清掉，量的才是静息边
+    button->clearFocus();
+    button->update();
+    QCoreApplication::processEvents();
+
+    QImage image = host.grab().toImage();
+    EXPECT_EQ(image.pixelColor(70, 26), palette.controlFill) << "高对比度档的按钮底没铺 controlFill";
+    EXPECT_EQ(image.pixelColor(11, 26), palette.borderStrong) << "无焦点时没有 2px 静息边";
+
+    button->setFocus(Qt::OtherFocusReason);
+    QCoreApplication::processEvents();
+    ASSERT_TRUE(button->hasFocus()) << "判据的前提没构造出来：按钮没拿到焦点";
+    button->update();
+    QCoreApplication::processEvents();
+    image = host.grab().toImage();
+    EXPECT_EQ(image.pixelColor(11, 26), palette.accent) << "聚焦后没有换成主色焦点边";
+}
+
+/**
+ * @brief 钉住标注工具栏内的按钮自绘紧凑焦点边
+ * @details 工具栏内的按钮靠 usesInlineFocusBorder 认出来，焦点边由 paintEvent 画；
+ *          未选中时按钮不铺底，中心露出宿主色，只有一圈 1px 主色边。
+ */
+TEST_F(CornerControlsFixture, ToolButtonInsideTheAnnotationToolbarPaintsTheInlineFocusEdge)
+{
+    QWidget host;
+    host.resize(120, 80);
+    host.setAutoFillBackground(true);
+    host.setPalette(QPalette{QColor{255, 0, 0}});
+    QWidget toolbar{&host};
+    toolbar.setObjectName(QStringLiteral("AnnotationToolbar"));
+    toolbar.setGeometry(0, 0, 120, 80);
+
+    auto *button = new GyanisScribe::Gui::ToolButton{&toolbar};
+    button->setGeometry(20, 20, 32, 32);
+    host.show();
+    button->setFocus(Qt::OtherFocusReason);
+    QCoreApplication::processEvents();
+    ASSERT_TRUE(button->hasFocus()) << "判据的前提没构造出来：按钮没拿到焦点";
+
+    const QImage image = toolbar.grab().toImage();
+    EXPECT_EQ(image.pixelColor(20, 36), GyanisScribe::Gui::activePalette().accent) << "工具栏内的按钮没画 1px 主色焦点边";
+    EXPECT_EQ(image.pixelColor(36, 36), QColor(255, 0, 0)) << "未选中、悬停与按下的工具按钮不该铺底，宿主色应露出来";
+}
+
+/**
+ * @brief 钉住工具栏祖先链的判定
+ * @details 焦点边是否走紧凑档只看祖先里有没有 AnnotationToolbar；
+ *          工具栏内的按钮认成自绘，工具栏外的按钮不认。
+ */
+TEST_F(CornerControlsFixture, InlineFocusBorderIsDetectedInsideTheAnnotationToolbar)
+{
+    QWidget host;
+    QWidget toolbar{&host};
+    toolbar.setObjectName(QStringLiteral("AnnotationToolbar"));
+    GyanisScribe::Gui::ToolButton button{&toolbar};
+    EXPECT_TRUE(GyanisScribe::Gui::usesInlineFocusBorder(button));
+    GyanisScribe::Gui::ToolButton outside{&host};
+    EXPECT_FALSE(GyanisScribe::Gui::usesInlineFocusBorder(outside));
+}
+
 TEST_F(CornerControlsFixture, MenuPaintsSquirclePanelAndActiveItem)
 {
     GyanisScribe::Gui::Menu menu;

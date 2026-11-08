@@ -2,6 +2,8 @@
    骨架与另两档同源，但这一档保留自己的契约：控件一律 2px 描边、焦点走控件级 2px 主色描边
    （滑块例外：焦点画在手柄上，是 2px 纯黑圈），不靠底色分层次；这些规则与 Light/Dark 的
    1px 透明占位不同，是有意的差异。
+   按钮与工具按钮的 2px 边和焦点边由 Gui::Button / Gui::ToolButton 按同一口径自绘，
+   QSS 只留同宽透明占位。
    色值取自 src/Gui/Theme/DesignTokens.h 的 kHighContrastPalette，用例双向核对同解。
    这一档的可辨识特征是「描边加粗到 2px + 纯黑纯白 + 纯黄选区」。 */
 
@@ -35,101 +37,37 @@ QLabel:disabled {
     color: #000000;
 }
 
-/* ---- 按钮：这一档按钮一律白底 + 2px 纯黑描边（不透明是它的可辨识特征）；
-   悬停与按下只换底，主按钮（default）走主色填充 ---- */
+/* ---- 按钮：这一档按钮的 2px 边与白底由 Gui::Button 自绘（不透明是它的可辨识特征）；
+        这里只留同宽透明边框、内边距与文字色，控件总高不变 ---- */
 QPushButton {
-    background-color: #FFFFFF;
     color: #000000;
-    border: 2px solid #000000;
-    border-radius: 12px;
+    border: 2px solid transparent;
     padding: 0 15px;
     min-height: 28px;
 }
 
-QPushButton:hover {
-    background-color: #E0E0E0;
-}
-
-QPushButton:pressed {
-    background-color: #C8C8C8;
-}
-
-QPushButton:focus {
-    border-color: #0B57D0;
-}
-
 QPushButton:disabled {
-    background-color: #FFFFFF;
     color: #000000;
-    border-color: #000000;
 }
 
+/* 主按钮的底与边同样由 buttonColors 给出；QSS 只保文字色与边框占位 */
 QPushButton:default {
-    background-color: #0B57D0;
     color: #FFFFFF;
-    border-color: #0B57D0;
-}
-
-QPushButton:default:hover {
-    background-color: #08449E;
-    border-color: #08449E;
-}
-
-QPushButton:default:pressed {
-    background-color: #0B57D0;
+    border: 2px solid transparent;
 }
 
 QPushButton:default:disabled {
-    background-color: #FFFFFF;
     color: #000000;
-    border-color: #000000;
 }
 
-/* 已迁移的按钮由 Gui::Button 自绘填充与描边；这里只把原生样式表的底与边压成透明，
-   保留上面的 padding、min-height 与 2px 透明边框占位，控件总高不变 */
-QPushButton[squircle="true"],
-QPushButton[squircle="true"]:hover,
-QPushButton[squircle="true"]:pressed,
-QPushButton[squircle="true"]:disabled,
-QPushButton[squircle="true"]:default,
-QPushButton[squircle="true"]:default:hover,
-QPushButton[squircle="true"]:default:pressed,
-QPushButton[squircle="true"]:default:disabled {
-    background-color: transparent;
-    border-color: transparent;
-}
-
-/* ---- 工具按钮：平时透明，只在悬停/选中时给出底 ---- */
+/* ---- 工具按钮：2px 边与焦点边由 Gui::ToolButton 自绘；
+        这里只留透明边框、内边距与最小尺寸占位 ---- */
 QToolButton {
-    background-color: transparent;
     color: #000000;
     border: 2px solid transparent;
-    border-radius: 8px;
     padding: 2px;
     min-width: 26px;
     min-height: 26px;
-}
-
-QToolButton:hover {
-    background-color: #E0E0E0;
-}
-
-QToolButton:pressed {
-    background-color: #C8C8C8;
-}
-
-QToolButton:focus {
-    border-color: #0B57D0;
-}
-
-QToolButton:checked {
-    background-color: #D6E4FB;
-    border-color: #0B57D0;
-}
-
-QToolButton:disabled {
-    background-color: transparent;
-    border-color: transparent;
 }
 
 /* ---- 标注工具栏的按钮：这一档描边 2px（比浅色档重一档），内容尺寸相应各让 1px，

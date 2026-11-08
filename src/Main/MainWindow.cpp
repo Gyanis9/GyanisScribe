@@ -251,7 +251,7 @@ namespace
         editor->setAccessibleName(title);
         editor->setToolTip(GyanisScribe::Base::uiText("%1。留空表示用默认目录").arg(title));
 
-        auto *browse = new QPushButton{GyanisScribe::Base::uiText("浏览…"), row};
+        auto *browse = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("浏览…"), row};
         icons.applyIcon(*browse, "Save");
         browse->setAccessibleName(GyanisScribe::Base::uiText("选择%1的目录").arg(title));
 
@@ -1673,12 +1673,12 @@ namespace GyanisScribe::Main
         auto *layout = new QHBoxLayout{row};
         layout->setContentsMargins(0, 0, 0, 0);
 
-        auto *exportButton = new QPushButton{GyanisScribe::Base::uiText("导出配置…"), row};
+        auto *exportButton = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("导出配置…"), row};
         m_icons.applyIcon(*exportButton, "Export");
         exportButton->setAccessibleName(GyanisScribe::Base::uiText("导出配置"));
         exportButton->setToolTip(GyanisScribe::Base::uiText("把当前全部设置写成一个 JSON 文件，换机器或备份时用"));
 
-        auto *importButton = new QPushButton{GyanisScribe::Base::uiText("导入配置…"), row};
+        auto *importButton = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("导入配置…"), row};
         m_icons.applyIcon(*importButton, "Import");
         importButton->setAccessibleName(GyanisScribe::Base::uiText("导入配置"));
         importButton->setToolTip(GyanisScribe::Base::uiText("从本程序导出的 JSON 文件读回设置；订阅配置的热键与主题立刻跟上新值"));
@@ -1819,7 +1819,7 @@ namespace GyanisScribe::Main
             }
         }
 
-        auto *more = new QToolButton{bar};
+        auto *more = new GyanisScribe::Gui::ToolButton{bar};
         more->setText(GyanisScribe::Base::uiText("更多"));
         more->setAccessibleName(GyanisScribe::Base::uiText("更多"));
         more->setPopupMode(QToolButton::InstantPopup);
@@ -2263,12 +2263,12 @@ namespace GyanisScribe::Main
         auto *layout = new QHBoxLayout{row};
         layout->setContentsMargins(0, 0, 0, 0);
 
-        auto *exportButton = new QPushButton{GyanisScribe::Base::uiText("导出色板…"), row};
+        auto *exportButton = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("导出色板…"), row};
         m_icons.applyIcon(*exportButton, "Export");
         exportButton->setAccessibleName(GyanisScribe::Base::uiText("导出色板"));
         exportButton->setToolTip(GyanisScribe::Base::uiText("把现在用的那排颜色写成一个文本文件（一行一格 #RRGGBB），发给同事或换机器时用"));
 
-        auto *importButton = new QPushButton{GyanisScribe::Base::uiText("导入色板…"), row};
+        auto *importButton = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("导入色板…"), row};
         m_icons.applyIcon(*importButton, "Import");
         importButton->setAccessibleName(GyanisScribe::Base::uiText("导入色板"));
         importButton->setToolTip(GyanisScribe::Base::uiText("从一份色板文件整份替换当前这一排；下一次打开标注窗就是这一份"));
@@ -2439,7 +2439,7 @@ namespace GyanisScribe::Main
             edit->bindTo(GyanisScribe::App::customHotkeyKey(entry.token).toStdString(), label, QString{}, GyanisScribe::Gui::HotkeyEditScope::Global);
             edit->setEnabled(m_capabilities.globalHotkeys);
 
-            auto *clear = new QPushButton{GyanisScribe::Base::uiText("取消绑定"), row};
+            auto *clear = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("取消绑定"), row};
             // 名字带上功能：十行都叫「取消绑定」时，读屏与判据都分不清按下的是哪一行
             clear->setAccessibleName(GyanisScribe::Base::uiText("取消 %1 的绑定").arg(label));
             clear->setToolTip(GyanisScribe::Base::uiText("清掉这一项，那个组合键就不再归这个功能管"));
@@ -2502,7 +2502,7 @@ namespace GyanisScribe::Main
             auto *edit = new GyanisScribe::Gui::HotkeyEdit{m_settings, row};
             edit->bindTo(GyanisScribe::Gui::appShortcutKey(entry.token).toStdString(), label, defaultKey, GyanisScribe::Gui::HotkeyEditScope::InWindow);
 
-            auto *reset = new QPushButton{GyanisScribe::Base::uiText("恢复默认"), row};
+            auto *reset = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("恢复默认"), row};
             // 名字带上那一档：二十五行都叫「恢复默认」时，读屏与判据都分不清按下的是哪一行
             reset->setAccessibleName(GyanisScribe::Base::uiText("把「%1」的按键恢复成默认那颗").arg(label));
             reset->setToolTip(GyanisScribe::Base::uiText("清掉这一项：那颗键回到默认的 %1，配置里不留一个读起来算坏值的空串").arg(defaultKey));
@@ -2610,7 +2610,7 @@ namespace GyanisScribe::Main
 
         // 检查更新：只查不换——下载与替换可执行体要先有签名与原子替换那一套，
         // 这里把「有没有新版」与发布页地址摆出来，下载交给用户自己在浏览器里点
-        auto *checkButton = new QPushButton{GyanisScribe::Base::uiText("检查更新"), page};
+        auto *checkButton = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("检查更新"), page};
         checkButton->setAccessibleName(GyanisScribe::Base::uiText("检查更新"));
         auto *status = new QLabel{page};
         status->setObjectName(QStringLiteral("pageHint"));
