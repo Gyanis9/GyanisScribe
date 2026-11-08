@@ -95,6 +95,25 @@ TEST(PiiDetector, DetectsMobilePhoneWithCountryCodeAndSeparators)
 }
 
 /**
+ * @brief 钉住 +86 连续号码同时通过 Luhn 时仍归手机号，不被银行卡抢走
+ * @details +8613800138002 归一化后是 13 位 8613800138002，恰好通过 Luhn；它是 +86 手机号去掉加号后的形状。
+ */
+TEST(PiiDetector, PrefersCountryCodePhoneOverLuhnBankCard)
+{
+    const OcrResult ocr = makeResult({
+            makeLine({OcrWord{QStringLiteral("+8613800138002"), QRect(20, 20, 200, 24)}}),
+    });
+
+    const std::vector<PiiItem> items = detectPii(ocr, {}, kFrameSize);
+
+    ASSERT_EQ(items.size(), 1U) << "同一个词只能产出一条命中";
+    EXPECT_EQ(items.at(0).kind, PiiKind::Phone);
+    EXPECT_EQ(items.at(0).physicalBox, QRect(20, 20, 200, 24));
+    EXPECT_EQ(items.at(0).maskedSample, QStringLiteral("138****8002"));
+    EXPECT_EQ(countKind(items, PiiKind::BankCard), 0) << "8613800138002 只是 86 区号加手机号，不能列成银行卡";
+}
+
+/**
  * @brief 钉住座机区号前导 0 的拒绝面，并保留短横线脱敏形状
  */
 TEST(PiiDetector, DetectsLandlineAndRejectsAreaWithoutLeadingZero)
@@ -172,6 +191,22 @@ TEST(PiiDetector, DetectsEmailAndRejectsMalformedAddresses)
 }
 
 /**
+ * @brief 钉住邮箱在原文上匹配：数字归一化会改写 .com 与 local 里的 l，不能拿副本做邮箱规则
+ */
+TEST(PiiDetector, MatchesEmailOnOriginalTextBeforeDigitNormalization)
+{
+    const OcrResult ocr = makeResult({
+            makeLine({OcrWord{QStringLiteral("Alice@Example.COM"), QRect(20, 20, 220, 24)}}),
+    });
+
+    const std::vector<PiiItem> items = detectPii(ocr, {}, kFrameSize);
+
+    ASSERT_EQ(items.size(), 1U);
+    EXPECT_EQ(items.at(0).kind, PiiKind::Email);
+    EXPECT_EQ(items.at(0).maskedSample, QStringLiteral("A***@Example.COM")) << "归一化副本里 o/l 会变成 0/1，邮箱按副本匹配就找不到这条";
+}
+
+/**
  * @brief 钉住 IPv4 逐段范围校验与带数字的 IPv6 基本格式
  */
 TEST(PiiDetector, ValidatesIpv4OctetsAndBasicIpv6)
@@ -193,6 +228,25 @@ TEST(PiiDetector, ValidatesIpv4OctetsAndBasicIpv6)
     EXPECT_EQ(ipv4->physicalBox, QRect(20, 20, 180, 24));
     EXPECT_EQ(ipv4->maskedSample, QStringLiteral("192.168.***.***"));
     EXPECT_EQ(items.at(1).maskedSample, QStringLiteral("2001:db8:****")) << "v1.2.3.4 是版本号、std::vector 是代码片段，都不能算 IP";
+}
+
+/**
+ * @brief 钉住 IPv6 的接受范围：全字母地址是已记录的漏检，紧贴标签的地址不得切出残段
+ */
+TEST(PiiDetector, DocumentsIpv6ScopeForAllLetterAndLabelPrefixedAddresses)
+{
+    const OcrResult ocr = makeResult({
+            makeLine({OcrWord{QStringLiteral("face:beef:cafe:dead:babe:feed:face:beef"), QRect(20, 20, 260, 24)}}),
+            makeLine({OcrWord{QStringLiteral("IPv6:2001:db8::1"), QRect(20, 60, 200, 24)}}),
+            makeLine({OcrWord{QStringLiteral("IPv6 2001:db8::1"), QRect(20, 100, 200, 24)}}),
+    });
+
+    const std::vector<PiiItem> items = detectPii(ocr, {}, kFrameSize);
+
+    ASSERT_EQ(items.size(), 1U) << "全字母地址不识别；标签与地址之间没有空格时不能从标签尾部切出残段";
+    EXPECT_EQ(items.at(0).kind, PiiKind::Ip);
+    EXPECT_EQ(items.at(0).physicalBox, QRect(20, 100, 200, 24));
+    EXPECT_EQ(items.at(0).maskedSample, QStringLiteral("2001:db8:****"));
 }
 
 /**
@@ -231,6 +285,22 @@ TEST(PiiDetector, UnionsWordBoxesAndFallsBackToLineBox)
     ASSERT_EQ(items.size(), 2U);
     EXPECT_EQ(items.at(0).physicalBox, QRect(10, 10, 130, 20)) << "三个词框的并集应覆盖整段号码";
     EXPECT_EQ(items.at(1).physicalBox, QRect(10, 60, 200, 20)) << "词框无效时必须回退整行框";
+}
+
+/**
+ * @brief 钉住缺一个词框时的整体回退：不能用首尾有效词框拼出短一截的并集
+ */
+TEST(PiiDetector, FallsBackToLineBoxWhenAnyTouchedWordBoxIsInvalid)
+{
+    OcrLine line;
+    line.words       = {OcrWord{QStringLiteral("138"), QRect(10, 10, 30, 20)}, OcrWord{QStringLiteral("0013"), QRect()}, OcrWord{QStringLiteral("8000"), QRect(100, 10, 40, 20)}};
+    line.boundingBox = QRect(10, 10, 200, 20);
+
+    const std::vector<PiiItem> items = detectPii(makeResult({line}), {}, kFrameSize);
+
+    ASSERT_EQ(items.size(), 1U);
+    EXPECT_EQ(items.at(0).kind, PiiKind::Phone);
+    EXPECT_EQ(items.at(0).physicalBox, QRect(10, 10, 200, 20)) << "中间词框缺失时只并首尾两个词框会短一截，必须退回整行框";
 }
 
 /**
@@ -284,19 +354,21 @@ TEST(PiiDetector, ClipsWordAndBarcodeBoxesToImageSize)
 }
 
 /**
- * @brief 钉住身份证内嵌的手机号形态被更大框吸收，不重复列出
+ * @brief 钉住同一行内被二维码框整体包住的手机号不再单列
  */
-TEST(PiiDetector, DropsPhoneCandidateContainedInIdCard)
+TEST(PiiDetector, DropsPhoneCandidateContainedInBarcodeBox)
 {
-    const OcrResult ocr = makeResult({
-            makeLine({OcrWord{QStringLiteral("11010519491231002X"), QRect(20, 20, 300, 24)}}),
+    const OcrResult          ocr = makeResult({
+            makeLine({OcrWord{QStringLiteral("13800138000"), QRect(60, 60, 160, 24)}}),
     });
+    const std::vector<QRect> barcodeBoxes{QRect(40, 40, 300, 200)};
 
-    const std::vector<PiiItem> items = detectPii(ocr, {}, kFrameSize);
+    const std::vector<PiiItem> items = detectPii(ocr, barcodeBoxes, kFrameSize);
 
-    ASSERT_EQ(items.size(), 1U);
-    EXPECT_EQ(items.at(0).kind, PiiKind::IdCard);
-    EXPECT_EQ(countKind(items, PiiKind::Phone), 0) << "身份证中间的 19491231002 是子串，不能单独列成手机号";
+    ASSERT_EQ(items.size(), 1U) << "手机号已被更大的二维码框覆盖，不能重复列入";
+    EXPECT_EQ(items.at(0).kind, PiiKind::Barcode);
+    EXPECT_EQ(items.at(0).physicalBox, QRect(40, 40, 300, 200));
+    EXPECT_EQ(countKind(items, PiiKind::Phone), 0) << "手机号框完全落在二维码框内，必须按包含关系丢弃";
 }
 
 /**

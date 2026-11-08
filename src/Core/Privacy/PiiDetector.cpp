@@ -21,15 +21,15 @@ namespace GyanisScribe::Core::Privacy
         const QRegularExpression kLandlinePattern{QStringLiteral(R"((?<!\d)0\d{2,3}-?\d{7,8}(?!\d))")};
         // 身份证 18 位，末位允许 X；前后不能贴字母数字，防止从更长串里截取
         const QRegularExpression kIdCardPattern{QStringLiteral(R"((?<![0-9A-Za-z_])\d{17}[\dXx](?![0-9A-Za-z_]))")};
-        // 银行卡只认连续的 13-19 位数字，Luhn 校验放到匹配之后
+        // 银行卡只认连续的 13-19 位数字，Luhn 校验与 86 区号手机形状的剔除放到匹配之后
         const QRegularExpression kBankCardPattern{QStringLiteral(R"((?<!\d)\d{13,19}(?!\d))")};
         // 邮箱要求至少一个域名点与 2 位以上字母 TLD；连续点等残形交给校验函数拒绝
         const QRegularExpression kEmailPattern{
                 QStringLiteral(R"((?<![A-Za-z0-9._%+\-])[A-Za-z0-9._%+\-]+@(?:[A-Za-z0-9](?:[A-Za-z0-9\-]*[A-Za-z0-9])?\.)+[A-Za-z]{2,}(?![A-Za-z0-9\-]))")};
         // IPv4 候选只负责切出四段；每段 0-255 的判定在 isValidIpv4 里
         const QRegularExpression kIpv4Pattern{QStringLiteral(R"((?<![A-Za-z0-9_.\-])\d{1,3}(?:\.\d{1,3}){3}(?![A-Za-z0-9_.\-]))")};
-        // IPv6 候选至少两段冒号；纯十六进制字母片段（如代码里的 std::）由数字要求挡掉
-        const QRegularExpression kIpv6Pattern{QStringLiteral(R"((?<![0-9A-Fa-f:])[0-9A-Fa-f]{0,4}(?::[0-9A-Fa-f]{0,4}){2,7}(?![0-9A-Fa-f:]))")};
+        // IPv6 候选至少两段冒号；前后不得贴字母、数字或冒号，避免从 IPv6:2001:db8::1 这类标签尾部切出残段
+        const QRegularExpression kIpv6Pattern{QStringLiteral(R"((?<![0-9A-Za-z:])[0-9A-Fa-f]{0,4}(?::[0-9A-Fa-f]{0,4}){2,7}(?![0-9A-Fa-f:]))")};
 
         // GB 11643 的加权因子与校验码表；权重按身份证前 17 位的从左到右顺序
         constexpr std::array<int, 17> kIdCardWeights{7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2};
@@ -289,6 +289,17 @@ namespace GyanisScribe::Core::Privacy
         }
 
         /**
+         * @brief 判断 13 位数字是否为 +86 手机号去掉加号后的形状
+         * @param digits 13 位数字候选
+         * @return true 表示 86 之后是 1[3-9] 起头的 11 位号码
+         */
+        bool isCountryCodeMobileDigits(const QString &digits)
+        {
+            return digits.size() == 13 && digits.startsWith(QStringLiteral("86")) && digits.at(2) == QLatin1Char('1') && digits.at(3) >= QLatin1Char('3') &&
+                   digits.at(3) <= QLatin1Char('9');
+        }
+
+        /**
          * @brief 校验手机号归一化后的数字形状
          * @param value 归一化副本里的命中原文
          * @return true 表示 11 位且以 1 开头，或 +86 后的 13 位形态
@@ -300,11 +311,7 @@ namespace GyanisScribe::Core::Privacy
             {
                 return digits.startsWith(QLatin1Char('1'));
             }
-            if (digits.size() == 13 && digits.startsWith(QStringLiteral("86")))
-            {
-                return digits.at(2) == QLatin1Char('1');
-            }
-            return false;
+            return isCountryCodeMobileDigits(digits);
         }
 
         /**
@@ -396,9 +403,15 @@ namespace GyanisScribe::Core::Privacy
          * @brief 校验银行卡候选
          * @param value 连续数字候选
          * @return true 表示长度 13-19 且通过 Luhn
+         * @note 以 86 开头的 13 位号码正是 +86 手机号去掉加号后的形状；86 是中国区号而不是已发行的卡 IIN，
+         *       这类候选即使 Luhn 通过也不按银行卡收，避免同一段文字被银行卡抢走
          */
         bool isValidBankCard(const QString &value)
         {
+            if (isCountryCodeMobileDigits(value))
+            {
+                return false;
+            }
             return value.size() >= 13 && value.size() <= 19 && passesLuhn(value);
         }
 
@@ -478,7 +491,8 @@ namespace GyanisScribe::Core::Privacy
          * @brief 校验压缩或完整的 IPv6 基本格式
          * @param value 冒号分段候选
          * @return true 表示无压缩时正好 8 组、有 :: 时不足 8 组且只有一个 ::
-         * @note 要求候选里至少含一位数字：代码里的 std:: 这类作用域符号常被误切成年限近似形状
+         * @note 要求候选里至少含一位数字：代码里的 std:: 这类作用域符号常被误切成年限近似形状。
+         *       代价是 face:beef:cafe:dead:babe:feed:face:beef 这类全字母的合法地址不识别，属于已记录的漏检范围。
          */
         bool isValidIpv6(const QString &value)
         {
@@ -538,13 +552,14 @@ namespace GyanisScribe::Core::Privacy
          * @param wordIndexByCharacter 逐字符的词归属
          * @param start 命中起点
          * @param length 命中长度
-         * @return 覆盖命中的有效词框并集；一个可用词框都没有时退回整行框
+         * @return 覆盖命中的词框并集；任一被命中的词框不可用时退回整行框
          */
         QRect boxForMatch(const OcrLine &line, const QVector<qsizetype> &wordIndexByCharacter, qsizetype start, qsizetype length)
         {
             QRect           unionBox;
-            bool            hasWordBox = false;
-            const qsizetype end        = std::min(start + length, wordIndexByCharacter.size());
+            bool            hasWordBox        = false;
+            bool            hasInvalidWordBox = false;
+            const qsizetype end               = std::min(start + length, wordIndexByCharacter.size());
             for (qsizetype characterIndex = std::max<qsizetype>(start, 0); characterIndex < end; ++characterIndex)
             {
                 const qsizetype wordIndex = wordIndexByCharacter.at(characterIndex);
@@ -555,13 +570,15 @@ namespace GyanisScribe::Core::Privacy
                 const QRect &wordBox = line.words.at(wordIndex).boundingBox;
                 if (!wordBox.isValid())
                 {
+                    hasInvalidWordBox = true;
                     continue;
                 }
                 unionBox   = hasWordBox ? unionBox.united(wordBox) : wordBox;
                 hasWordBox = true;
             }
-            // 词框不可用时退回整行框：后端没给出可定位的词框，整行仍能圈出大致范围
-            return hasWordBox ? unionBox : line.boundingBox;
+            // 命中只要沾到一个没有可用词框的词，并集就会缺一段，必须整体退回整行框；
+            // 一个词框都不可用时同样退回整行框
+            return hasInvalidWordBox || !hasWordBox ? line.boundingBox : unionBox;
         }
 
         /**
@@ -628,6 +645,7 @@ namespace GyanisScribe::Core::Privacy
             collectMatches(digitText, lineText.text, kIdCardPattern, PiiKind::IdCard, isValidIdCard, maskIdCard, line, lineText.wordIndexByCharacter, imageSize, candidates);
             collectMatches(digitText, lineText.text, kBankCardPattern, PiiKind::BankCard, isValidBankCard, maskBankCard, line, lineText.wordIndexByCharacter, imageSize,
                            candidates);
+            // 邮箱用原文匹配：数字归一化会把 .com 里的 o 换成 0、把 local 部分的 l 换成 1，副本上再也匹配不到
             collectMatches(lineText.text, lineText.text, kEmailPattern, PiiKind::Email, isValidEmail, maskEmail, line, lineText.wordIndexByCharacter, imageSize, candidates);
             collectMatches(digitText, lineText.text, kIpv4Pattern, PiiKind::Ip, isValidIpv4, maskIpv4, line, lineText.wordIndexByCharacter, imageSize, candidates);
             collectMatches(digitText, lineText.text, kIpv6Pattern, PiiKind::Ip, isValidIpv6, maskIpv6, line, lineText.wordIndexByCharacter, imageSize, candidates);
