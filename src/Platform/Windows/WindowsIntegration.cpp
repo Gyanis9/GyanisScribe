@@ -10,6 +10,7 @@
 #include <windows.h>
 
 #include <dwmapi.h>
+#include <wtsapi32.h>
 
 #include <UIAutomation.h>
 
@@ -270,13 +271,51 @@ namespace
     }
 } // namespace
 
+namespace
+{
+    /**
+     * @brief 会话通知窗口的窗口过程：只处理 WM_WTSSESSION_CHANGE，其余交回系统
+     * @details 实例指针在 WM_NCCREATE 时经 lpCreateParams 存进 GWLP_USERDATA，之后每条消息从那里取回。
+     *          账号注销与登录分别按锁屏与解锁处理：两者都会换掉坐在屏幕前的人，
+     *          留在内存里的整屏画面同样不该跨过这道边界。
+     */
+    LRESULT CALLBACK sessionWindowProcedure(const HWND window, const UINT message, const WPARAM wParam, const LPARAM lParam)
+    {
+        if (message == WM_NCCREATE)
+        {
+            auto *const create = reinterpret_cast<CREATESTRUCTW *>(lParam);
+            SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(create->lpCreateParams));
+        }
+
+        auto *const integration = reinterpret_cast<GyanisScribe::Platform::WindowsIntegration *>(GetWindowLongPtrW(window, GWLP_USERDATA));
+        if (message == WM_WTSSESSION_CHANGE && integration != nullptr)
+        {
+            if (wParam == WTS_SESSION_LOCK || wParam == WTS_SESSION_LOGOFF)
+            {
+                emit integration->sessionLocked();
+            } else if (wParam == WTS_SESSION_UNLOCK || wParam == WTS_SESSION_LOGON)
+            {
+                emit integration->sessionUnlocked();
+            }
+        }
+        return DefWindowProcW(window, message, wParam, lParam);
+    }
+} // namespace
+
 namespace GyanisScribe::Platform
 {
 
-    WindowsIntegration::WindowsIntegration() = default;
+    WindowsIntegration::WindowsIntegration()
+    {
+        // 建不出来也不拦构造：能力位留在假那一档，回溯缓冲据此不启用
+        createSessionWindow();
+    }
 
     WindowsIntegration::~WindowsIntegration()
     {
+        // 先拆会话窗口：它之后不再需要任何回调，先断掉通知再放 UIA
+        destroySessionWindow();
+
         // 缓存的那一个入口对象自己放掉：COM 对象没人替它管引用计数
         if (m_uia != nullptr)
         {
@@ -284,19 +323,75 @@ namespace GyanisScribe::Platform
         }
     }
 
+    quintptr WindowsIntegration::sessionWindowHandleForTesting() const noexcept
+    {
+        return m_sessionWindow;
+    }
+
+    bool WindowsIntegration::createSessionWindow()
+    {
+        const HINSTANCE instance = GetModuleHandleW(nullptr);
+        constexpr wchar_t kClassName[] = L"GyanisScribeSessionNotificationWindow";
+
+        // 同进程里再建一份集成对象时 RegisterClassW 报「类已存在」，复用同一个类名与窗口过程正是想要的；
+        // 其它原因登不上会由 CreateWindowExW 当场失败，不在这里分两处报
+        WNDCLASSW windowClass{};
+        windowClass.lpfnWndProc   = &sessionWindowProcedure;
+        windowClass.hInstance     = instance;
+        windowClass.lpszClassName = kClassName;
+        RegisterClassW(&windowClass);
+
+        const HWND window = CreateWindowExW(0, kClassName, L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, instance, this);
+        if (window == nullptr)
+        {
+            Base::Logger::warning("会话通知窗口建不出来：回溯缓冲不会启用");
+            return false;
+        }
+
+        m_sessionWindow                 = reinterpret_cast<quintptr>(window);
+        m_sessionNotificationRegistered = WTSRegisterSessionNotification(window, NOTIFY_FOR_THIS_SESSION) != FALSE;
+        if (!m_sessionNotificationRegistered)
+        {
+            Base::Logger::warning("会话通知登记失败：回溯缓冲不会启用");
+            // 收不到会话消息的窗口没有用处，也不该让测试句柄看起来像建成了
+            destroySessionWindow();
+            return false;
+        }
+        return true;
+    }
+
+    void WindowsIntegration::destroySessionWindow()
+    {
+        if (m_sessionWindow == 0)
+        {
+            return;
+        }
+
+        auto *const window = reinterpret_cast<HWND>(m_sessionWindow);
+        if (m_sessionNotificationRegistered)
+        {
+            WTSUnRegisterSessionNotification(window);
+            m_sessionNotificationRegistered = false;
+        }
+        DestroyWindow(window);
+        m_sessionWindow = 0;
+    }
+
     PlatformCapabilities WindowsIntegration::capabilities() const noexcept
     {
-        // 五项都按操作系统给得出的能力填：RegisterHotKey、WS_EX_TRANSPARENT、GetForegroundWindow、
-        // EnumWindows、UI Automation。录屏采集、系统声音与系统 OCR 不在这张表里占位：
+        // 前五项都按操作系统给得出的能力填：RegisterHotKey、WS_EX_TRANSPARENT、GetForegroundWindow、
+        // EnumWindows、UI Automation。会话通知不写死真：WTS 登记会因会话服务被裁掉或窗口建不出来而失败，
+        // 这一位按构造时的实测结果填。录屏采集、系统声音与系统 OCR 不在这张表里占位：
         // 那三步的可用性由各自模块在调用点现探（采集探屏幕、编码看 ffmpeg 在不在、识别问系统装了哪几支语言包），
         // 静态位只会说假话
         return PlatformCapabilities{
-                .globalHotkeys     = true,
-                .clickThrough      = true,
-                .windowDiscovery   = true,
-                .windowEnumeration = true,
-                .uiElements        = true,
-                .autostart         = true,
+                .globalHotkeys        = true,
+                .clickThrough         = true,
+                .windowDiscovery      = true,
+                .windowEnumeration    = true,
+                .uiElements           = true,
+                .autostart            = true,
+                .sessionNotifications = m_sessionNotificationRegistered,
         };
     }
 

@@ -51,4 +51,7 @@ if (WIN32)
     # 那一条分支是空操作，所以这两行才敢只在 Windows 上写）
     target_link_libraries(Platform PRIVATE dbghelp)
 
+    # 锁屏/解锁通知走 WTSRegisterSessionNotification 与 WTSUnRegisterSessionNotification，两者都在 wtsapi32 里
+    target_link_libraries(Platform PRIVATE Wtsapi32)
+
 endif ()

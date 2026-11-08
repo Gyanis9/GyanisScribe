@@ -115,6 +115,19 @@ namespace GyanisScribe::Platform
          *          UIA 的命中测试穿不过置顶窗（本机探针实测，工具窗也不例外），所以不能直接问「点下的元素」。
          */
         [[nodiscard]] virtual Base::Expected<std::vector<QRect>> elementChainAtPoint(const QPoint &globalLogicalPoint, const std::vector<quintptr> &excludeWindowHandles) const = 0;
+
+    signals:
+        /**
+         * @brief 会话已锁屏或切换用户
+         * @details 消费方收到后要清空敏感的内存缓冲：锁屏之后再留着整屏画面等于把内容摆给下一个用这台机器的人
+         */
+        void sessionLocked();
+
+        /**
+         * @brief 会话已解锁
+         * @details 消费方按自己的开关恢复采集；本接口不替调用方决定恢复成什么状态
+         */
+        void sessionUnlocked();
     };
 
     /**

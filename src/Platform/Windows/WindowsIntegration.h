@@ -38,7 +38,8 @@ namespace GyanisScribe::Platform
 
         /**
          * @brief 取 Windows 能力表，见 IPlatformIntegration::capabilities()
-         * @return 全局热键、鼠标穿透、取前台窗口、枚举可见窗口与界面元素检测五项均为真
+         * @return 全局热键、鼠标穿透、取前台窗口、枚举可见窗口与界面元素检测五项均为真；
+         *         会话通知按构造时 WTS 登记的实际结果填
          */
         [[nodiscard]] PlatformCapabilities capabilities() const noexcept override;
 
@@ -99,7 +100,26 @@ namespace GyanisScribe::Platform
          */
         [[nodiscard]] Base::Expected<void> setAutostart(bool enabled) override;
 
+        /**
+         * @brief 会话通知窗口句柄，仅供用例发送 WM_WTSSESSION_CHANGE
+         * @return 消息专用窗口的句柄；窗口没建出来或 WTS 登记失败时是 0
+         */
+        [[nodiscard]] quintptr sessionWindowHandleForTesting() const noexcept;
+
     private:
+        /**
+         * @brief 建会话通知用的消息专用窗口并向 WTS 登记
+         * @return 登记成功返回 true；窗口建不出来或登记失败返回 false，并写一条中文日志
+         * @details 消息专用窗口不占任务栏，也不会出现在窗口候选里；WM_WTSSESSION_CHANGE 由系统
+         *          直接投递到这个句柄。登记失败时把窗口拆掉、句柄留 0——收不到会话消息的窗口没有用处
+         */
+        bool createSessionWindow();
+
+        /**
+         * @brief 注销会话通知并销毁消息专用窗口
+         */
+        void destroySessionWindow();
+
         /**
          * @brief 惰性取 UI Automation 入口对象
          * @return 拿到返回该对象（本类持有，生命周期随对象）；起不来返回空指针
@@ -108,6 +128,8 @@ namespace GyanisScribe::Platform
          */
         [[nodiscard]] IUIAutomation *uiAutomation() const;
 
+        quintptr m_sessionWindow                 = 0;     ///< 消息专用窗口句柄；没建出来时是 0
+        bool     m_sessionNotificationRegistered = false; ///< WTS 登记是否成功：能力位直接读它
         mutable IUIAutomation *m_uia = nullptr; ///< UI Automation 入口，按需创建、析构时放掉
     };
 
