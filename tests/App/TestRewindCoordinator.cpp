@@ -674,6 +674,33 @@ TEST_F(RewindCoordinatorFixture, PickerWaitTimeoutOpensWithExistingFrames)
     EXPECT_GE(coordinator.bufferStatsForTesting().sampleCount, 1);
 }
 
+TEST_F(RewindCoordinatorFixture, TickWhileEncodePendingIsDropped)
+{
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(kRewindEnabled, QVariant(true)).has_value());
+
+    FakeSource        source;
+    FakePlatform      platform;
+    RewindCoordinator coordinator({source, platform, settings});
+    // 2560×1440 的 PNG 编码耗时不短，第二拍一定落在编码还没回接的窗口里；
+    // 再大的帧只会拖慢用例，更小的帧则要靠 finished 事件尚未投递这一点，不如大帧直白
+    source.frameSize = QSize(2560, 1440);
+    coordinator.start();
+    ASSERT_EQ(coordinator.statusForTesting(), RewindStatus::Buffering);
+
+    coordinator.captureTickForTesting();
+    ASSERT_EQ(source.calls, 1);
+    ASSERT_TRUE(coordinator.encodePendingForTesting());
+
+    // 两拍之间不跑事件循环：编码的 finished 事件不可能回接，第二拍必须被在途守卫挡在抓帧之前
+    coordinator.captureTickForTesting();
+    EXPECT_EQ(source.calls, 1);
+    EXPECT_TRUE(coordinator.encodePendingForTesting());
+
+    // 收尾：把这一帧等进缓冲，不把在途 future 留给下一条用例
+    QTRY_VERIFY_WITH_TIMEOUT(coordinator.bufferStatsForTesting().sampleCount >= 1, 3000);
+}
+
 TEST_F(RewindCoordinatorFixture, HotkeyWhileDecodingExplainsInsteadOfRaisingHiddenPicker)
 {
     SettingsStore settings(m_iniFile);
