@@ -35,7 +35,9 @@ add_library(App STATIC
         CaptureCoordinator.h
         CaptureCoordinator.cpp
         PickCoordinator.h
-        PickCoordinator.cpp)
+        PickCoordinator.cpp
+        RewindCoordinator.h
+        RewindCoordinator.cpp)
 
 target_include_directories(App PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(App PUBLIC
