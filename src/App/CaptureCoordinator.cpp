@@ -63,6 +63,11 @@ namespace
 
 namespace GyanisScribe::App
 {
+    QString rewindBusyMessage()
+    {
+        return GyanisScribe::Base::uiText("先完成当前截图或标注，再打开回溯。");
+    }
+
     CaptureCoordinator::CaptureCoordinator(Dependencies dependencies, QObject *parent) : QObject(parent), m_dependencies(dependencies)
     {
         m_annotation = std::make_unique<GyanisScribe::Core::AnnotationEngine>();
@@ -121,9 +126,15 @@ namespace GyanisScribe::App
 
     void CaptureCoordinator::startInteractive(const std::optional<GyanisScribe::App::CaptureIntent> intent)
     {
-        m_intent            = intent.value_or(settingsCaptureIntent());
-        m_captureFlowActive = true;
-        schedule([this] { m_capture->startInteractive(); });
+        m_intent = intent.value_or(settingsCaptureIntent());
+        // 流程标志跟着到点那一步立：schedule 被上一次延时挡回时，这一轮根本没开始，
+        // 先把标志立起来会让回溯热键一直挡人
+        schedule(
+                [this]
+                {
+                    m_captureFlowActive = true;
+                    m_capture->startInteractive();
+                });
     }
 
     void CaptureCoordinator::startInteractiveWithFrame(const GyanisScribe::Base::CapturedImage &frame)
@@ -186,9 +197,14 @@ namespace GyanisScribe::App
     {
         m_intent = settingsCaptureIntent();
         // 长截图也从框选起头：流程标志要跟着一起立，否则用户框完区域进入滚动采集时，
-        // 回溯热键会以为没有流程在跑，再叠一层遮罩
-        m_captureFlowActive = true;
-        schedule([this] { m_capture->startLongCapture(); });
+        // 回溯热键会以为没有流程在跑，再叠一层遮罩。与框选同一口径，标志放到到点那一步再立，
+        // 被延时回绝的那一次不能把它留在 true
+        schedule(
+                [this]
+                {
+                    m_captureFlowActive = true;
+                    m_capture->startLongCapture();
+                });
     }
 
     void CaptureCoordinator::startBlankCanvas()

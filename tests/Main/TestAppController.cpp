@@ -12,6 +12,7 @@
 #include "Gui/Pick/ColorPickerOverlay.h"
 #include "Gui/Pin/PinWindow.h"
 #include "Gui/Record/RecordingHud.h"
+#include "Gui/Rewind/RewindPickerWindow.h"
 #include "Main/AppController.h"
 
 #include "App/CaptureIntent.h"
@@ -692,6 +693,76 @@ namespace GyanisScribe
         makeController();
         EXPECT_EQ(m_controller->rewindCoordinatorForTesting().statusForTesting(), Core::RewindStatus::Buffering) << "开启档下控制器没把回溯缓冲启动起来：start() 没接进构造";
         EXPECT_TRUE(m_controller->rewindCoordinatorForTesting().configForTesting().enabled) << "协调器读到的配置没跟着设置走";
+    }
+
+    /**
+     * @brief 钉住整屏截图留下的标注窗也挡住回溯热键
+     * @details 整屏、上次选区这些入口不开 captureFlowActive，默认动作却是打开标注窗：
+     *          只看流程标志的门禁会把选择器叠到用户正在标注的那一窗上，缓冲随后把选择器自己抓进下一帧。
+     *          这一格走热键分派的同一个出口：先开整屏标注再按 Rewind，选择器不许出现、提示要是那一句；
+     *          关窗后再按一次，选择器该正常打开，证明上面那条不是被「选择器根本打不开」兜住的假绿。
+     */
+    TEST_F(AppControllerFixture, RewindHotkeyIsBlockedByAVisibleAnnotationWindow)
+    {
+        m_frameScreenName      = m_realScreenName;
+        m_rewindEnabled        = true;
+        m_sessionNotifications = true;
+        makeController();
+
+        auto &capture = m_controller->capture();
+        auto &window  = capture.annotationWindow();
+        capture.startFullScreen(App::CaptureIntent::Annotate);
+        ASSERT_TRUE(window.isVisible()) << "整屏截图该把标注窗开起来";
+        ASSERT_FALSE(capture.isCaptureFlowActive()) << "整屏这一路本来就不立流程标志：本用例钉的正是标志之外的那一半";
+
+        // 缓冲里先有帧：门禁若漏了，选择器当场就有东西可选，不会因为空缓冲躲过去
+        auto &rewind = m_controller->rewindCoordinatorForTesting();
+        rewind.captureTickForTesting();
+        ASSERT_TRUE(waitUntil([&rewind] { return rewind.bufferStatsForTesting().sampleCount > 0; }, 5000))
+                << "回溯缓冲没抓到帧：后面的判据分不清是被门禁挡下还是没帧可开";
+
+        const auto before = visibleToastBubbles();
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Rewind);
+        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("先完成当前截图或标注")); }))
+                << "标注窗开着时回溯热键没被挡回，也没说清出路";
+        pumpFor(400); // 编码在途时选择器会等一小会儿再开：给漏掉的门禁留出这一段
+        EXPECT_EQ(countTopLevelWindows<Gui::RewindPickerWindow>(), 0) << "标注窗还开着就叠上了回溯选择器";
+
+        // 关窗之后再按：同一个出口该把选择器打开，本用例的前提与接线都还活着
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(&window, &escape);
+        ASSERT_FALSE(window.isVisible()) << "标注窗没关掉，后一条判据无从判起";
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Rewind);
+        EXPECT_TRUE(waitUntil([] { return countTopLevelWindows<Gui::RewindPickerWindow>() > 0; }, 3000))
+                << "标注窗关掉之后回溯热键仍打不开选择器：这条出口本身没接到协调器";
+    }
+
+    /**
+     * @brief 钉住延时排不进去的那一次不会把截图流程标志留在 true
+     * @details 标志若在 schedule 之前就立起来，第二次按键被「上一次延时截图还在等」回绝时，
+     *          这一轮根本没有流程，却会一直把回溯热键挡回去。标志跟着到点那一步立，
+     *          本格按两次、等到点、再取消，把「被回绝」与「真跑起来」两头都判住。
+     */
+    TEST_F(AppControllerFixture, ScheduleBailDoesNotLeaveTheCaptureFlowFlagRaised)
+    {
+        m_frameScreenName = m_realScreenName;
+        m_frameRegion     = QRect{0, 0, kFrameWidth, kFrameHeight};
+        m_delaySeconds    = 1;
+        makeController();
+
+        auto &capture = m_controller->capture();
+        capture.startInteractive(App::CaptureIntent::Annotate);
+        EXPECT_FALSE(capture.isCaptureFlowActive()) << "延时还没到就立了流程标志：被回绝的第二次按键会把它永久留在 true";
+
+        capture.startLong(); // 上一枚定时器还在等：这一次该被回绝
+        EXPECT_FALSE(capture.isCaptureFlowActive()) << "被回绝的那一次把流程标志留在了 true：回溯热键会一直被挡";
+
+        ASSERT_TRUE(waitUntil([] { return visibleCaptureOverlay() != nullptr; }, 5000)) << "延时到点了也没开始框选";
+        EXPECT_TRUE(capture.isCaptureFlowActive()) << "到点真开始框选时流程标志没立起来";
+
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(visibleCaptureOverlay(), &escape);
+        EXPECT_FALSE(capture.isCaptureFlowActive()) << "取消之后流程标志没复位";
     }
 
     /**

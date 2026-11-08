@@ -60,6 +60,14 @@ namespace GyanisScribe::App
 {
 
     /**
+     * @brief 回溯热键被进行中的截图或标注挡回时说的那一句
+     * @return 中文提示
+     * @details 控制器在热键门禁处、回溯协调器在自己的 CaptureFlow 状态里都说这一句；
+     *          两处各写一份字面量，改文案迟早会只改一处。
+     */
+    [[nodiscard]] QString rewindBusyMessage();
+
+    /**
      * @brief 截图这一族：入口 → 延时 → 抓帧 → 按意图交付
      * @details 它是枢纽——交付那一跳要往识别、贴图、标注、落盘四处去，所以依赖在构造时一次给全
      *          （`Dependencies` 是本仓既有形状，AppControllerParts 同款），不各自去摸全局。

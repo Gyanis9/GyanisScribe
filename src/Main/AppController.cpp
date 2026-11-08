@@ -183,52 +183,7 @@ namespace GyanisScribe::Main
 
         // 热键 → 动作：唯一的接线处，界面加菜单项时也是发同一个信号而不是再走一条路径
         QObject::connect(m_hotkeys.get(), &GyanisScribe::Core::IHotkeyManager::actionTriggered, this,
-                         [this](GyanisScribe::Core::HotkeyAction action)
-                         {
-                             switch (action)
-                             {
-                                 case GyanisScribe::Core::HotkeyAction::Capture:
-                                     m_capture->startInteractive();
-                                     return;
-                                 case GyanisScribe::Core::HotkeyAction::Record:
-                                     m_recording->toggle();
-                                     return;
-                                 case GyanisScribe::Core::HotkeyAction::CaptureLong:
-                                     // 与托盘那一行同一条路：热键不该有一条自己的截图逻辑
-                                     m_capture->startLong();
-                                     return;
-                                 case GyanisScribe::Core::HotkeyAction::Pick:
-                                     m_picker->start();
-                                     return;
-                                 case GyanisScribe::Core::HotkeyAction::Ocr:
-                                     // 识别热键：截完直接进结果窗口，中间不弹标注窗
-                                     m_capture->startInteractive(GyanisScribe::App::CaptureIntent::Recognize);
-                                     return;
-                                 case GyanisScribe::Core::HotkeyAction::TogglePins:
-                                     // 走托盘那一条：开关的方向与提示文案都只有一份
-                                     handleTrayAction(GyanisScribe::App::TrayAction::TogglePinsVisible);
-                                     return;
-                                 case GyanisScribe::Core::HotkeyAction::NextPinGroup:
-                                     // 同上：切组只有一条实现，热键与托盘那一行不发散
-                                     handleTrayAction(GyanisScribe::App::TrayAction::NextPinGroup);
-                                     return;
-                                 case GyanisScribe::Core::HotkeyAction::QuickSave:
-                                     // 快速保存走的就是「截完之后」那一档的实体：热键只是替用户把这一档定死，
-                                     // 不另写一条截图→存盘的捷径，两条各写一遍就会两边行为漂移
-                                     m_capture->startInteractive(GyanisScribe::App::CaptureIntent::QuickSave);
-                                     return;
-                                 case GyanisScribe::Core::HotkeyAction::Rewind:
-                                     // 回溯选择器会再铺一层遮罩：当前截图或标注还没收场就打开，
-                                     // 遮罩会把用户正在标注的那一窗拍进去，所以先挡住并说清出路
-                                     if (m_capture->isCaptureFlowActive())
-                                     {
-                                         notifyUser(GyanisScribe::Base::uiText("先完成当前截图或标注，再打开回溯。"), GyanisScribe::Gui::ToastKind::Information);
-                                         return;
-                                     }
-                                     m_rewind->showPicker();
-                                     return;
-                             }
-                         });
+                         [this](const GyanisScribe::Core::HotkeyAction action) { handleHotkeyAction(action); });
 
         // 自定义绑定的那一路：热键层只报回一个标识，功能名到动作的映射住在这一层（词表在 App/CustomHotkeys.h）
         QObject::connect(m_hotkeys.get(), &GyanisScribe::Core::IHotkeyManager::customActionTriggered, this,
@@ -382,6 +337,54 @@ namespace GyanisScribe::Main
     }
 
     AppController::~AppController() = default;
+
+    void AppController::handleHotkeyAction(const GyanisScribe::Core::HotkeyAction action)
+    {
+        switch (action)
+        {
+            case GyanisScribe::Core::HotkeyAction::Capture:
+                m_capture->startInteractive();
+                return;
+            case GyanisScribe::Core::HotkeyAction::Record:
+                m_recording->toggle();
+                return;
+            case GyanisScribe::Core::HotkeyAction::CaptureLong:
+                // 与托盘那一行同一条路：热键不该有一条自己的截图逻辑
+                m_capture->startLong();
+                return;
+            case GyanisScribe::Core::HotkeyAction::Pick:
+                m_picker->start();
+                return;
+            case GyanisScribe::Core::HotkeyAction::Ocr:
+                // 识别热键：截完直接进结果窗口，中间不弹标注窗
+                m_capture->startInteractive(GyanisScribe::App::CaptureIntent::Recognize);
+                return;
+            case GyanisScribe::Core::HotkeyAction::TogglePins:
+                // 走托盘那一条：开关的方向与提示文案都只有一份
+                handleTrayAction(GyanisScribe::App::TrayAction::TogglePinsVisible);
+                return;
+            case GyanisScribe::Core::HotkeyAction::NextPinGroup:
+                // 同上：切组只有一条实现，热键与托盘那一行不发散
+                handleTrayAction(GyanisScribe::App::TrayAction::NextPinGroup);
+                return;
+            case GyanisScribe::Core::HotkeyAction::QuickSave:
+                // 快速保存走的就是「截完之后」那一档的实体：热键只是替用户把这一档定死，
+                // 不另写一条截图→存盘的捷径，两条各写一遍就会两边行为漂移
+                m_capture->startInteractive(GyanisScribe::App::CaptureIntent::QuickSave);
+                return;
+            case GyanisScribe::Core::HotkeyAction::Rewind:
+                // 回溯选择器会再铺一层遮罩：当前截图或标注还没收场就打开，
+                // 遮罩会把用户正在标注的那一窗拍进去，所以先挡住并说清出路。
+                // 整屏、上次选区与空白画布这几路不开流程标志，标注窗已经立起来时同样算没收场
+                if (m_capture->isCaptureFlowActive() || m_capture->annotationWindow().isVisible())
+                {
+                    notifyUser(GyanisScribe::App::rewindBusyMessage(), GyanisScribe::Gui::ToastKind::Information);
+                    return;
+                }
+                m_rewind->showPicker();
+                return;
+        }
+    }
 
     GyanisScribe::Base::Expected<GyanisScribe::Core::HotkeyReloadReport> AppController::registerHotkeys()
     {
@@ -553,6 +556,12 @@ namespace GyanisScribe::Main
     GyanisScribe::App::RewindCoordinator &AppController::rewindCoordinatorForTesting() const noexcept
     {
         return *m_rewind;
+    }
+
+    void AppController::handleHotkeyActionForTesting(const GyanisScribe::Core::HotkeyAction action)
+    {
+        // 与热键层那条信号走同一段分派：门禁分支只在这一处判，用例不另抄一份
+        handleHotkeyAction(action);
     }
 
     int AppController::pinCountForTesting() const noexcept

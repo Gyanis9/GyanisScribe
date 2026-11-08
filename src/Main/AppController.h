@@ -264,6 +264,14 @@ namespace GyanisScribe::Main
         [[nodiscard]] GyanisScribe::App::RewindCoordinator &rewindCoordinatorForTesting() const noexcept;
 
         /**
+         * @brief 从用例驱动一次热键分派
+         * @param action 要驱动的动作
+         * @note 生产侧唯一的入口是热键层的 actionTriggered；用例没有键盘可发，
+         *       而门禁分支要判的正是「这一次分派有没有把选择器打开」。
+         */
+        void handleHotkeyActionForTesting(GyanisScribe::Core::HotkeyAction action);
+
+        /**
          * @brief 此刻桌面上的贴图张数，仅供用例
          * @return 控制器持有的贴图管理器报出的张数
          * @note 生产侧不需要这个读数：张数由管理器自己推给托盘提示。用例要判
@@ -307,6 +315,14 @@ namespace GyanisScribe::Main
 
         /// 托盘菜单的一项被点了
         void handleTrayAction(GyanisScribe::App::TrayAction action);
+
+        /**
+         * @brief 热键层报回的一个动作
+         * @param action 动作
+         * @details 生产侧只有 actionTriggered 一条来路；用例经 handleHotkeyActionForTesting
+         *          走同一条分派，门禁与转发不会各长一份。
+         */
+        void handleHotkeyAction(GyanisScribe::Core::HotkeyAction action);
 
         /**
          * @brief 把某张贴图此刻盖住的那块屏幕重抓一次，换掉它的画面（`F5` 与右键那一项的落点）

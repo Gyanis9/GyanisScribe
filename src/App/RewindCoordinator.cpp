@@ -1,5 +1,6 @@
 #include "App/RewindCoordinator.h"
 
+#include "App/CaptureCoordinator.h"
 #include "Base/Logger.h"
 #include "Base/Text.h"
 #include "Core/Capture/IScreenCaptureSource.h"
@@ -147,7 +148,7 @@ namespace GyanisScribe::App
         }
         if (m_state == State::CaptureFlow)
         {
-            emit messageForUser(Base::uiText("先完成当前截图或标注，再打开回溯。"), Gui::ToastKind::Information);
+            emit messageForUser(rewindBusyMessage(), Gui::ToastKind::Information);
             return;
         }
         if (m_buffer.stats().sampleCount == 0)
