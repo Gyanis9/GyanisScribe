@@ -1,5 +1,7 @@
 add_executable(TestCoreRewind
-        TestRewindConfig.cpp)
+        TestFrameChangeDetector.cpp
+        TestRewindConfig.cpp
+        TestRewindFrameCodec.cpp)
 
 target_link_libraries(TestCoreRewind PRIVATE
         Core
