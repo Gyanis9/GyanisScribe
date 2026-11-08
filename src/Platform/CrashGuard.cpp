@@ -109,8 +109,11 @@ namespace
             stream.ThreadId          = GetCurrentThreadId();
             stream.ExceptionPointers = pointers;
             stream.ClientPointers    = FALSE;
-            // 间接引用的内存那一档：栈与线程上下文都在，够定位崩在哪一行，体积又不至于吃掉盘
-            MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), file, MiniDumpWithIndirectlyReferencedMemory, &stream, nullptr, nullptr);
+            // 只取线程栈与异常现场，不取间接引用的堆页：回溯缓冲把屏幕像素放在堆上，
+            // MiniDumpWithIndirectlyReferencedMemory 会把栈上指针指向的那几页一并写进 .dmp，
+            // 等于把画面落到盘上，违背「只存内存」。MiniDumpNormal 带各线程调用栈与异常上下文，
+            // 定位崩在哪一行够用；MiniDumpWithThreadInfo 只补线程时序，同样不碰堆。
+            MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), file, static_cast<MINIDUMP_TYPE>(MiniDumpNormal | MiniDumpWithThreadInfo), &stream, nullptr, nullptr);
             CloseHandle(file);
         }
 

@@ -124,6 +124,14 @@ namespace GyanisScribe::App
          */
         [[nodiscard]] bool isCaptureFlowActive() const noexcept;
 
+        /**
+         * @brief 这一刻有没有一轮延时截图在等定时器到点
+         * @return 延时还没到点为 true；没有延时或已到点开始抓帧为 false
+         * @details 延时期间框选流程标志还没立起来，只看它会让回溯选择器叠到即将抓取的画面上；
+         *          热键门禁据此把用户挡回当前流程。
+         */
+        [[nodiscard]] bool isDelayPending() const noexcept;
+
         /// 框选截图（热键、托盘、标注窗的「重新截」都从这里进）
         void startInteractive(std::optional<GyanisScribe::App::CaptureIntent> intent = std::nullopt);
 

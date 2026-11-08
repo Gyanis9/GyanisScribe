@@ -82,6 +82,12 @@ namespace GyanisScribe::App
 
     void RewindCoordinator::start()
     {
+        // 开关先读原始值：名单坏掉时读整份配置会失败，关闭档不该因此报一个「配置读不出」的错
+        if (!m_dependencies.settings.boolValue(Core::kRewindEnabled, false))
+        {
+            setState(State::Disabled);
+            return;
+        }
         const auto config = Core::readRewindConfig(m_dependencies.settings);
         if (!config)
         {
@@ -217,7 +223,14 @@ namespace GyanisScribe::App
     void RewindCoordinator::reloadFromSettings()
     {
         const bool wasDisabled = m_state == State::Disabled;
-        const auto config      = Core::readRewindConfig(m_dependencies.settings);
+        // 开关先读原始值，解析名单放在后面：名单坏掉时读整份配置会失败，
+        // 若先解析就会在关开关时提前返回，缓冲继续抓帧。关闭是隐私上的硬要求，必须先生效
+        if (!m_dependencies.settings.boolValue(Core::kRewindEnabled, false))
+        {
+            stop();
+            return;
+        }
+        const auto config = Core::readRewindConfig(m_dependencies.settings);
         if (!config)
         {
             // 名单非法时不能悄悄沿用旧配置重开：先让用户改对，再启动
@@ -751,7 +764,9 @@ namespace GyanisScribe::App
         {
             return;
         }
-        if (!m_config.enabled)
+        // 解锁按当前开关决定要不要续抓：m_config 可能停在锁屏前那一份，
+        // 期间用户已把开关关掉时不能再把它带回 Buffering
+        if (!m_dependencies.settings.boolValue(Core::kRewindEnabled, false) || !m_config.enabled)
         {
             setState(State::Disabled);
             return;

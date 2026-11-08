@@ -124,6 +124,12 @@ namespace GyanisScribe::App
         return m_captureFlowActive;
     }
 
+    bool CaptureCoordinator::isDelayPending() const noexcept
+    {
+        // 到点回调先把指针清掉再开始抓帧：那一刻之后由流程标志或标注窗接手挡人
+        return m_delayTimer != nullptr;
+    }
+
     void CaptureCoordinator::startInteractive(const std::optional<GyanisScribe::App::CaptureIntent> intent)
     {
         m_intent = intent.value_or(settingsCaptureIntent());

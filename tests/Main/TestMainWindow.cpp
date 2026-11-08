@@ -61,6 +61,7 @@ using GyanisScribe::App::UpdateVerdict;
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMenu>
+#include <QMessageBox>
 #include <QPixmap>
 #include <QPoint>
 #include <QPushButton>
@@ -70,6 +71,7 @@ using GyanisScribe::App::UpdateVerdict;
 #include <QSize>
 #include <QString>
 #include <QStringList>
+#include <QTimer>
 #include <QToolButton>
 #include <QWidget>
 
@@ -274,7 +276,7 @@ namespace
                             {"录屏目录", "录制范围", "输出格式", "默认帧率", "录屏倒计时", "最长录多久", "画面码率", "视频编码器", "光标高亮", "麦克风设备", "系统声音设备"},
                             true},
                 Expectation{MainWindowPage::Ocr, {"识别语言", "语言包目录"}, true},
-                Expectation{MainWindowPage::Hotkey, {"截图", "录屏", "文字识别", "屏幕取色", "快速保存", "允许单键当全局热键"}, true},
+                Expectation{MainWindowPage::Hotkey, {"截图", "录屏", "文字识别", "屏幕取色", "快速保存", "回溯截图", "允许单键当全局热键"}, true},
                 Expectation{MainWindowPage::Theme, {"主题"}, true},
                 Expectation{MainWindowPage::About, {"智录图标"}, false},
                 Expectation{MainWindowPage::History, {"历史列表"}, false},
@@ -1206,6 +1208,82 @@ namespace
     }
 
     /**
+     * @brief 钉住回溯开关的隐私确认：否与 Esc 都不写配置，只有「是」才写入 true
+     * @details 静默用 setChecked 触发会卡在模态框的嵌套事件循环里，所以先起一枚短定时器，
+     *          等 QMessageBox 真成为活动模态窗时再替用户按键。三档各走一遍：
+     *          否、Esc 之后配置仍是 false，是之后才变 true。
+     */
+    TEST_F(MainWindowFixture, RewindEnableConfirmationOnlyWritesAfterYes)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::Capture);
+
+        auto *enabled = m_window->findChild<QCheckBox *>(QStringLiteral("rewindEnabled"));
+        ASSERT_NE(enabled, nullptr);
+        ASSERT_FALSE(enabled->isChecked());
+        ASSERT_FALSE(m_store->boolValue(GyanisScribe::Core::kRewindEnabled, false)) << "前置：配置本来是关的";
+
+        const auto toggleWithAnswer = [&](const auto &answer)
+        {
+            int    driven = 0;
+            QTimer driver;
+            driver.setInterval(1);
+            QObject::connect(&driver, &QTimer::timeout, &driver,
+                             [&]
+                             {
+                                 auto *box = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
+                                 if (box == nullptr)
+                                 {
+                                     return;
+                                 }
+                                 answer(*box);
+                                 ++driven;
+                                 driver.stop();
+                             });
+            driver.start();
+            enabled->setChecked(true);
+            driver.stop();
+            EXPECT_EQ(driven, 1) << "隐私确认框没被驱动到：开关可能绕过了确认直接生效";
+        };
+
+        // 否：勾收回，配置一个字都不动
+        toggleWithAnswer(
+                [](QMessageBox &box)
+                {
+                    auto *button = box.button(QMessageBox::No);
+                    ASSERT_NE(button, nullptr);
+                    button->click();
+                });
+        EXPECT_FALSE(enabled->isChecked()) << "点否之后勾没收回去";
+        EXPECT_FALSE(m_store->boolValue(GyanisScribe::Core::kRewindEnabled, false)) << "点否之后开关被写成了 true";
+
+        // Esc 等同拒绝：同样不许写 true
+        toggleWithAnswer(
+                [](QMessageBox &box)
+                {
+                    QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+                    QApplication::sendEvent(&box, &escape);
+                });
+        EXPECT_FALSE(enabled->isChecked()) << "Esc 之后勾没收回去";
+        EXPECT_FALSE(m_store->boolValue(GyanisScribe::Core::kRewindEnabled, false)) << "Esc 之后开关被写成了 true";
+
+        // 是：这一档才写 true，复选框保持勾上
+        toggleWithAnswer(
+                [](QMessageBox &box)
+                {
+                    auto *button = box.button(QMessageBox::Yes);
+                    ASSERT_NE(button, nullptr);
+                    button->click();
+                });
+        EXPECT_TRUE(enabled->isChecked()) << "点是之后勾被收回了";
+        EXPECT_TRUE(m_store->boolValue(GyanisScribe::Core::kRewindEnabled, false)) << "点是之后开关没写进配置";
+
+        closeWindowAndFlush();
+        const auto reopened = makeStore();
+        EXPECT_TRUE(reopened->boolValue(GyanisScribe::Core::kRewindEnabled, false)) << "确认开启没落盘";
+    }
+
+    /**
      * @brief 钉住「允许单键当全局热键」这一格真的换了录入框的松紧
      * @details 只断设置写没写是空转：这一格的价值全在「录入框认不认裸键」上。
      *          两档各来一次：默认拒、开了收，且收下的就是那颗键本身。
@@ -2110,13 +2188,13 @@ TEST_F(MainWindowFixture, ActionBarLandsEveryVisibleTrayEntrySomewhere)
  * @brief 钉住热键页的登记入口跟着平台能力位走：没有登记口的平台上不许装作改了会生效
  * @details 两格都判：能力位为真时每一行都能编辑（少了这一格，把 setEnabled 摘掉也不会红），
  *          为假时所有行都灰掉但仍在——行消失了用户就看不见自己配过什么。
- *          行数由「固定八个动作 + 可绑词表每一项」算出，自定义那一排也归同一道能力位管：
+ *          行数由「固定九个动作 + 可绑词表每一项」算出，自定义那一排也归同一道能力位管：
  *          填了不生效的组合比不填更坑人，两排必须一起灰。界面按键那一栏不吃这道能力位，
  *          因此按配置键前缀只数全局那一排，混在一起判就看不出哪一批被灰掉了。
  */
 TEST_F(MainWindowFixture, HotkeyEntriesFollowTheGlobalHotkeyCapability)
 {
-    const int expectedRows = 8 + static_cast<int>(GyanisScribe::App::bindableActions().size());
+    const int expectedRows = 9 + static_cast<int>(GyanisScribe::App::bindableActions().size());
 
     const auto globalRows = [this]
     {
@@ -2134,7 +2212,8 @@ TEST_F(MainWindowFixture, HotkeyEntriesFollowTheGlobalHotkeyCapability)
     makeWindow(true);
     m_window->open(MainWindowPage::Hotkey);
     auto rows = globalRows();
-    ASSERT_EQ(rows.size(), expectedRows) << "热键页该有固定八行，再给每个可绑功能一行";
+    ASSERT_EQ(rows.size(), expectedRows) << "热键页该有固定九行，再给每个可绑功能一行";
+    EXPECT_TRUE(introInCurrentPage().contains(QStringLiteral("上面 9 个是固定动作"))) << "说明里的固定动作数没跟着行表走：" << introInCurrentPage().toStdString();
     for (auto *edit: rows)
     {
         EXPECT_TRUE(edit->isEnabled()) << "有登记口的平台上这些行要能改";

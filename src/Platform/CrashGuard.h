@@ -71,7 +71,8 @@ namespace GyanisScribe::Platform
      * @param applicationVersion 版本号，进文件名
      * @details Windows 用 SetUnhandledExceptionFilter + MiniDumpWriteDump；处理器里只做三件事：
      *          开文件、写转储、按 kCrashExitCode 结束进程——不写日志（日志的锁可能正被崩掉的那条线程
-     *          持有），也不走 Qt 类型。
+     *          持有），也不走 Qt 类型。转储档位取线程栈与异常现场，不取间接引用的堆页：
+     *          回溯缓冲的画面在堆上，带堆页的转储会把屏幕像素写到盘上。
      *          非 Windows 上这一档是空操作：目录照建、日志照记，但不装过滤器——那边的崩溃现场
      *          由系统按自己的转储策略落地，进程内没有要对齐的东西。
      * @note 会覆盖先前装好的异常过滤器：本程序只有这一处装，链到上游过滤器留给系统自己处理崩溃。

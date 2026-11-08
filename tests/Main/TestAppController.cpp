@@ -475,6 +475,22 @@ namespace GyanisScribe
                 return {};
             }
 
+            /// 此刻可见气泡里那一条提示的正文：气泡会复用同一扇窗，只能读当前文本
+            [[nodiscard]] static QString visibleToastText()
+            {
+                for (auto *bubble: visibleToastBubbles())
+                {
+                    for (auto *label: bubble->findChildren<QLabel *>())
+                    {
+                        if (label->accessibleName() != GyanisScribe::Base::uiText("提示图标"))
+                        {
+                            return label->text();
+                        }
+                    }
+                }
+                return {};
+            }
+
             /// 控制器建出来的那扇主窗口：没有托盘的环境里它会自己现身（离屏平台上托盘装不上）
             [[nodiscard]] static GyanisScribe::Main::MainWindow *mainWindowOnDesk()
             {
@@ -758,6 +774,49 @@ namespace GyanisScribe
         EXPECT_FALSE(capture.isCaptureFlowActive()) << "被回绝的那一次把流程标志留在了 true：回溯热键会一直被挡";
 
         ASSERT_TRUE(waitUntil([] { return visibleCaptureOverlay() != nullptr; }, 5000)) << "延时到点了也没开始框选";
+        EXPECT_TRUE(capture.isCaptureFlowActive()) << "到点真开始框选时流程标志没立起来";
+
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(visibleCaptureOverlay(), &escape);
+        EXPECT_FALSE(capture.isCaptureFlowActive()) << "取消之后流程标志没复位";
+    }
+
+    /**
+     * @brief 钉住延时截图倒计时期间回溯热键也被挡回
+     * @details 延时还没到点时框选流程标志仍是 false，只看流程标志的门禁会把选择器叠到
+     *          几秒后铺出来的遮罩上。这一格先让缓冲里有帧（门禁若漏了，选择器当场打得开），
+     *          再起一轮延时截图并按回溯热键：提示要是那一句、选择器不许出现；
+     *          到点铺出遮罩后流程标志接手，取消收场，证明延时谓词不是永久为真。
+     */
+    TEST_F(AppControllerFixture, RewindHotkeyIsBlockedWhileCaptureDelayPending)
+    {
+        m_frameScreenName      = m_realScreenName;
+        m_frameRegion          = QRect{0, 0, kFrameWidth, kFrameHeight};
+        m_delaySeconds         = 1;
+        m_rewindEnabled        = true;
+        m_sessionNotifications = true;
+        makeController();
+
+        auto &capture = m_controller->capture();
+        EXPECT_FALSE(capture.isDelayPending()) << "还没起延时截图，延时谓词就不是清的";
+
+        auto &rewind = m_controller->rewindCoordinatorForTesting();
+        rewind.captureTickForTesting();
+        ASSERT_TRUE(waitUntil([&rewind] { return rewind.bufferStatsForTesting().sampleCount > 0; }, 5000))
+                << "回溯缓冲没抓到帧：后面的判据分不清是被门禁挡下还是没帧可开";
+
+        capture.startInteractive(App::CaptureIntent::Annotate);
+        EXPECT_TRUE(capture.isDelayPending()) << "延时已经排上，谓词却没立起来";
+        EXPECT_FALSE(capture.isCaptureFlowActive()) << "本用例钉的正是流程标志之外的那一段";
+
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Rewind);
+        EXPECT_TRUE(waitUntil([&] { return visibleToastText().contains(QStringLiteral("先完成当前截图或标注")); }))
+                << "延时倒计时里按回溯热键没被挡回，也没说清出路";
+        pumpFor(200); // 编码在途时选择器会等一小会儿再开：给漏掉的门禁留出这一段
+        EXPECT_EQ(countTopLevelWindows<Gui::RewindPickerWindow>(), 0) << "延时截图还没到点就叠上了回溯选择器";
+
+        ASSERT_TRUE(waitUntil([] { return visibleCaptureOverlay() != nullptr; }, 5000)) << "延时到点了也没开始框选";
+        EXPECT_FALSE(capture.isDelayPending()) << "到点开始抓帧后延时谓词还挂着：热键会被一直挡住";
         EXPECT_TRUE(capture.isCaptureFlowActive()) << "到点真开始框选时流程标志没立起来";
 
         QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};

@@ -530,6 +530,32 @@ TEST_F(RewindCoordinatorFixture, SettingsDisableStopsAndInvalidReloadDoesNotStar
     EXPECT_EQ(source.calls, callsAfterDisable);
 }
 
+TEST_F(RewindCoordinatorFixture, DisableStopsEvenWhenExclusionListIsInvalid)
+{
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(kRewindEnabled, QVariant(true)).has_value());
+
+    FakeSource        source;
+    FakePlatform      platform;
+    RewindCoordinator coordinator({source, platform, settings});
+    coordinator.start();
+    coordinator.captureTickForTesting();
+    QTRY_VERIFY_WITH_TIMEOUT(coordinator.bufferStatsForTesting().sampleCount > 0, 3000);
+
+    // 名单先坏掉：重载会报错但不该停掉已在跑的缓冲
+    ASSERT_TRUE(settings.setValue(kRewindExcludeProcesses, QStringLiteral("C:\\Tools\\keepass.exe")).has_value());
+    EXPECT_EQ(coordinator.statusForTesting(), RewindStatus::Buffering);
+    EXPECT_GT(coordinator.bufferStatsForTesting().sampleCount, 0);
+
+    // 关开关必须压过解析失败：先读原始开关，缓冲清空、定时器停下
+    const int callsBeforeDisable = source.calls;
+    ASSERT_TRUE(settings.setValue(kRewindEnabled, QVariant(false)).has_value());
+    EXPECT_EQ(coordinator.statusForTesting(), RewindStatus::Disabled) << "名单坏掉时关开关没生效：缓冲还在抓";
+    EXPECT_EQ(coordinator.bufferStatsForTesting().sampleCount, 0) << "关掉之后旧画面还留在缓冲里";
+    coordinator.captureTickForTesting();
+    EXPECT_EQ(source.calls, callsBeforeDisable) << "已关闭却仍抓到新帧";
+}
+
 TEST_F(RewindCoordinatorFixture, EncodeFailurePausesAndResetsPendingFrame)
 {
     SettingsStore settings(m_iniFile);

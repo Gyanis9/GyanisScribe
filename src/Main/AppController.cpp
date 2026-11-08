@@ -375,8 +375,9 @@ namespace GyanisScribe::Main
             case GyanisScribe::Core::HotkeyAction::Rewind:
                 // 回溯选择器会再铺一层遮罩：当前截图或标注还没收场就打开，
                 // 遮罩会把用户正在标注的那一窗拍进去，所以先挡住并说清出路。
-                // 整屏、上次选区与空白画布这几路不开流程标志，标注窗已经立起来时同样算没收场
-                if (m_capture->isCaptureFlowActive() || m_capture->annotationWindow().isVisible())
+                // 整屏、上次选区与空白画布这几路不开流程标志，标注窗已经立起来时同样算没收场；
+                // 延时截图还在倒计时时流程标志也还没立，但再过几秒遮罩就会铺满屏，同样要挡
+                if (m_capture->isCaptureFlowActive() || m_capture->isDelayPending() || m_capture->annotationWindow().isVisible())
                 {
                     notifyUser(GyanisScribe::App::rewindBusyMessage(), GyanisScribe::Gui::ToastKind::Information);
                     return;

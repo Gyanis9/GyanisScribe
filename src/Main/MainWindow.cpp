@@ -2538,7 +2538,8 @@ namespace GyanisScribe::Main
                                      std::tuple{GyanisScribe::Core::kHotkeyCaptureLong, GyanisScribe::Base::uiText("滚动长截图"), QStringLiteral("Ctrl+Alt+L")},
                                      std::tuple{GyanisScribe::Core::kHotkeyQuickSave, GyanisScribe::Base::uiText("快速保存"), QStringLiteral("Ctrl+Alt+S")},
                                      std::tuple{GyanisScribe::Core::kHotkeyTogglePins, GyanisScribe::Base::uiText("收起 / 摆回贴图"), QStringLiteral("Ctrl+Alt+H")},
-                                     std::tuple{GyanisScribe::Core::kHotkeyNextPinGroup, GyanisScribe::Base::uiText("切换贴图分组"), QStringLiteral("Ctrl+Alt+G")}};
+                                     std::tuple{GyanisScribe::Core::kHotkeyNextPinGroup, GyanisScribe::Base::uiText("切换贴图分组"), QStringLiteral("Ctrl+Alt+G")},
+                                     std::tuple{GyanisScribe::Core::kHotkeyRewind, GyanisScribe::Base::uiText("回溯截图"), QStringLiteral("Ctrl+Alt+Z")}};
 
         const auto intro =
                 m_capabilities.globalHotkeys
@@ -2558,7 +2559,7 @@ namespace GyanisScribe::Main
             form->addRow(GyanisScribe::Base::uiText("%1 的全局热键").arg(title), edit);
         }
 
-        // 固定八个之外的功能：一格一签，可绑可不绑，「取消绑定」把那一项从配置里删掉
+        // 固定这几行之外的功能：一格一签，可绑可不绑，「取消绑定」把那一项从配置里删掉
         for (const auto &entry: GyanisScribe::App::bindableActions())
         {
             const auto label  = GyanisScribe::App::bindableActionLabel(entry.action);
