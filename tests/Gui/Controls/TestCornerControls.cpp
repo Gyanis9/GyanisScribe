@@ -1,7 +1,9 @@
 #include "Core/Geometry/ContinuousCorner.h"
 #include "Gui/Controls/Button.h"
 #include "Gui/Controls/ComboBox.h"
+#include "Gui/Controls/ItemDelegate.h"
 #include "Gui/Controls/LineEdit.h"
+#include "Gui/Controls/ListView.h"
 #include "Gui/Controls/ListWidget.h"
 #include "Gui/Controls/Menu.h"
 #include "Gui/Controls/SpinBox.h"
@@ -21,6 +23,8 @@
 #include <QMenu>
 #include <QPainter>
 #include <QPalette>
+#include <QStringListModel>
+#include <QStyledItemDelegate>
 #include <QWidget>
 
 #include <memory>
@@ -507,6 +511,78 @@ TEST_F(CornerControlsFixture, ComboBoxPaintsControlFill)
     const QImage image = host.grab().toImage();
     EXPECT_EQ(image.pixelColor(120, 26), GyanisScribe::Gui::activePalette().controlFill);
     EXPECT_EQ(image.pixelColor(10, 10), (QColor{255, 0, 0}));
+}
+
+/**
+ * @brief 钉住下拉弹层用的是连续曲率视图
+ * @details 收起态由 paintEvent 自绘，弹层却由 QComboBox 在内部容器里显示；
+ *          setView 之后弹层视图必须是 Gui::ListView，视口的悬停属性与鼠标跟踪也要打开，
+ *          否则 ItemDelegate 的 State_MouseOver 分支永远不跑。
+ */
+TEST_F(CornerControlsFixture, ComboBoxPopupsUseTheSquircleListView)
+{
+    GyanisScribe::Gui::ComboBox combo;
+    combo.addItem(QStringLiteral("一"));
+    auto *comboView = dynamic_cast<GyanisScribe::Gui::ListView *>(combo.view());
+    ASSERT_NE(comboView, nullptr) << "下拉框的弹层没用 Gui::ListView";
+    EXPECT_TRUE(comboView->viewport()->testAttribute(Qt::WA_Hover)) << "弹层视口没开 WA_Hover";
+    EXPECT_TRUE(comboView->viewport()->hasMouseTracking()) << "弹层视口没开鼠标跟踪";
+    EXPECT_TRUE(comboView->window()->testAttribute(Qt::WA_TranslucentBackground)) << "弹层窗口没开透明背景，圆角外会露出方底";
+    EXPECT_FALSE(comboView->window()->autoFillBackground()) << "弹层窗口仍在自动填底";
+
+    GyanisScribe::Gui::FontComboBox fontCombo;
+    auto *fontView = dynamic_cast<GyanisScribe::Gui::ListView *>(fontCombo.view());
+    ASSERT_NE(fontView, nullptr) << "字体下拉框的弹层没用 Gui::ListView";
+    EXPECT_TRUE(fontView->viewport()->testAttribute(Qt::WA_Hover)) << "字体弹层视口没开 WA_Hover";
+    EXPECT_TRUE(fontView->window()->testAttribute(Qt::WA_TranslucentBackground)) << "字体弹层窗口没开透明背景";
+}
+
+/**
+ * @brief 钉住弹层视图自己铺容器底并让出圆角
+ * @details 样式表已删掉 QComboBox QAbstractItemView 的 background 与 border-radius，
+ *          容器底只能由 ListView 在 event() 里画；中心取两行之下的一格必须是 surface，
+ *          左上角取自身抓图必须透明，方角没有把整块矩形填满。
+ */
+TEST_F(CornerControlsFixture, ListViewPaintsSurfaceAndLeavesCornersToThePopup)
+{
+    QStringListModel model{QStringList{QStringLiteral("第一项"), QStringLiteral("第二项")}};
+    GyanisScribe::Gui::ListView view;
+    view.resize(200, 120);
+    view.setModel(&model);
+    view.show();
+    QCoreApplication::processEvents();
+
+    const QImage image = view.grab().toImage();
+    EXPECT_EQ(image.pixelColor(100, 100), GyanisScribe::Gui::activePalette().surface) << "弹层视图没铺 surface";
+    EXPECT_EQ(image.pixelColor(0, 0).alpha(), 0) << "弹层视图左上角应透明";
+}
+
+/**
+ * @brief 钉住 showPopup 之后的弹层委托仍是 ItemDelegate
+ * @details QComboBox 在弹层容器创建时会装自己的私有委托；这里先在视图上放一个普通委托当替身，
+ *          再走一次 showPopup()，返回后必须换回 ItemDelegate。
+ *          弹层在无交互桌面的测试进程里不会真的显示，所以委托判据只核类型、不核窗口可见性；
+ *          容器左上角取自身渲染结果的 alpha，确认顶层窗口没在圆角外铺一块方底。
+ */
+TEST_F(CornerControlsFixture, ComboBoxReplacesThePopupDelegateAfterShowPopup)
+{
+    GyanisScribe::Gui::ComboBox combo;
+    combo.addItem(QStringLiteral("第一项"));
+    combo.addItem(QStringLiteral("第二项"));
+    combo.resize(200, 32);
+    combo.show();
+    QCoreApplication::processEvents();
+
+    auto *standIn = new QStyledItemDelegate{combo.view()};
+    combo.view()->setItemDelegate(standIn);
+    ASSERT_EQ(combo.view()->itemDelegate(), standIn);
+
+    combo.showPopup();
+    EXPECT_NE(dynamic_cast<GyanisScribe::Gui::ItemDelegate *>(combo.view()->itemDelegate()), nullptr) << "弹层委托没有在 showPopup 之后换回 ItemDelegate";
+
+    const QImage popupImage = combo.view()->window()->grab().toImage();
+    EXPECT_EQ(popupImage.pixelColor(0, 0).alpha(), 0) << "弹层容器左上角应透明，不能露出方形窗口底";
+    combo.hidePopup();
 }
 
 TEST_F(CornerControlsFixture, TextEditPaintsControlFill)

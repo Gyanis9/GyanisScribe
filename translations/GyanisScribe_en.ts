@@ -3603,5 +3603,9 @@
             <source>检查导入文件里的色块写法，或删掉配置里的 %1 这一项可以恢复默认</source>
             <translation>Check the color entries in the imported file, or delete the %1 entry in settings to restore the defaults</translation>
         </message>
+        <message>
+            <source>下拉列表</source>
+            <translation>Drop-down list</translation>
+        </message>
 </context>
 </TS>

@@ -1,6 +1,8 @@
 #include "Gui/Controls/ComboBox.h"
 
 #include "Core/Geometry/ContinuousCorner.h"
+#include "Gui/Controls/ItemDelegate.h"
+#include "Gui/Controls/ListView.h"
 #include "Gui/Theme/ControlPalette.h"
 #include "Gui/Theme/DesignTokens.h"
 
@@ -23,6 +25,23 @@ namespace
         GyanisScribe::Core::paintContinuousCorner(painter, QRectF{combo.rect()}, GyanisScribe::Core::cornerShapeFor(GyanisScribe::Core::CornerRole::Control),
                                                   colors.fill, pen);
     }
+
+    /**
+     * @brief 让弹层窗口不铺系统底色，视图的圆角外才能真的透明
+     * @param combo 目标下拉框
+     * @details 弹层容器是独立的顶层窗口；面板与项高亮都由 Gui::ListView 与 ItemDelegate 画，
+     *          容器自己不再填底。不打开透明背景时，视图的透明圆角会落在容器的方底上
+     */
+    void preparePopupWindow(QComboBox &combo)
+    {
+        QWidget *popupWindow = combo.view() != nullptr ? combo.view()->window() : nullptr;
+        if (popupWindow == nullptr || popupWindow == &combo)
+        {
+            return;
+        }
+        popupWindow->setAttribute(Qt::WA_TranslucentBackground);
+        popupWindow->setAutoFillBackground(false);
+    }
 } // namespace
 
 namespace GyanisScribe::Gui
@@ -30,6 +49,19 @@ namespace GyanisScribe::Gui
     ComboBox::ComboBox(QWidget *parent) : QComboBox(parent)
     {
         setProperty("squircle", true);
+        setView(new ListView{this});
+        preparePopupWindow(*this);
+    }
+
+    void ComboBox::showPopup()
+    {
+        QComboBox::showPopup();
+        preparePopupWindow(*this);
+        // 弹层创建时 QComboBox 会装回自己的私有委托，基类返回后重设一次
+        if (auto *popupView = view(); popupView != nullptr)
+        {
+            popupView->setItemDelegate(new ItemDelegate{popupView});
+        }
     }
 
     void ComboBox::paintEvent(QPaintEvent *event)
@@ -44,6 +76,19 @@ namespace GyanisScribe::Gui
     FontComboBox::FontComboBox(QWidget *parent) : QFontComboBox(parent)
     {
         setProperty("squircle", true);
+        setView(new ListView{this});
+        preparePopupWindow(*this);
+    }
+
+    void FontComboBox::showPopup()
+    {
+        QFontComboBox::showPopup();
+        preparePopupWindow(*this);
+        // 弹层创建时基类会装回自己的私有委托，基类返回后重设一次
+        if (auto *popupView = view(); popupView != nullptr)
+        {
+            popupView->setItemDelegate(new ItemDelegate{popupView});
+        }
     }
 
     void FontComboBox::paintEvent(QPaintEvent *event)

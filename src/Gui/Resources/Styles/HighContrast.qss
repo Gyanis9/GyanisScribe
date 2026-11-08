@@ -147,11 +147,11 @@ QComboBox::down-arrow {
     height: 10px;
 }
 
+/* ---- 下拉弹层：底、2px 边与项高亮由 Gui::ListView 与 ItemDelegate 按连续曲率自绘，
+        这里只留内边距、文字色、选区色与同宽透明边框占位 ---- */
 QComboBox QAbstractItemView {
-    background-color: #FFFFFF;
     color: #000000;
-    border: 2px solid #000000;
-    border-radius: 12px;
+    border: 2px solid transparent;
     padding: 6px;
     outline: none;
     selection-background-color: #D6E4FB;
@@ -160,12 +160,7 @@ QComboBox QAbstractItemView {
 
 QComboBox QAbstractItemView::item {
     min-height: 30px;
-    border-radius: 8px;
     padding: 0 8px;
-}
-
-QComboBox QAbstractItemView::item:hover {
-    background-color: #E0E0E0;
 }
 
 /* 微调框的上下箭头由 Gui::SpinBox 自绘；下拉箭头用 styles 下的 chevron（见上面 QComboBox::down-arrow），

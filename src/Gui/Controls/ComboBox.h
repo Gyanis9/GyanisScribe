@@ -17,7 +17,7 @@ namespace GyanisScribe::Gui
     /**
      * @brief 自绘连续曲率底的下拉框
      * @details 填充与描边由 ControlPalette::inputColors 按启用与焦点状态映射；
-     *          QSS 只留透明边框占位、内边距与箭头图，弹层仍走样式表。
+     *          QSS 只留透明边框占位、内边距与箭头图，弹层改由 Gui::ListView 与 ItemDelegate 自绘。
      */
     class ComboBox : public QComboBox
     {
@@ -27,6 +27,13 @@ namespace GyanisScribe::Gui
          * @param parent Qt 父对象
          */
         explicit ComboBox(QWidget *parent = nullptr);
+
+        /**
+         * @brief 弹出下拉列表，并把弹层的私有委托换成 ItemDelegate
+         * @details 重写 QComboBox::showPopup()：弹层创建时基类会装上自己的私有委托，
+         *          这里在基类返回后重设，弹层的项底与高亮才按连续曲率画
+         */
+        void showPopup() override;
 
     protected:
         /**
@@ -40,7 +47,8 @@ namespace GyanisScribe::Gui
 
     /**
      * @brief 自绘连续曲率底的字体下拉框
-     * @details 与 ComboBox 共用同一套底色与描边，字体列表与预览字符仍由基类提供。
+     * @details 与 ComboBox 共用同一套底色与描边，字体列表与预览字符仍由基类提供，
+     *          弹层改由 Gui::ListView 与 ItemDelegate 自绘。
      */
     class FontComboBox : public QFontComboBox
     {
@@ -50,6 +58,13 @@ namespace GyanisScribe::Gui
          * @param parent Qt 父对象
          */
         explicit FontComboBox(QWidget *parent = nullptr);
+
+        /**
+         * @brief 弹出字体列表，并把弹层的私有委托换成 ItemDelegate
+         * @details 重写 QFontComboBox::showPopup()：弹层创建时基类会装上自己的私有委托，
+         *          这里在基类返回后重设，弹层的项底与高亮才按连续曲率画
+         */
+        void showPopup() override;
 
     protected:
         /**
