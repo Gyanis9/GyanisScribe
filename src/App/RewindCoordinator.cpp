@@ -28,9 +28,6 @@ namespace
     /// 连续失败几次后暂停：一两次抖动不该打扰用户
     constexpr int kConsecutiveFailureLimit = 3;
 
-    /// 热键等编码完成的上限；超过就先用现有帧打开，别让按键看起来没反应
-    constexpr int kPickerWaitMs = 300;
-
     /// 设置键的分组前缀：这一组改动才需要重载回溯配置
     constexpr const char *kRewindSettingsPrefix = "Rewind/";
 } // namespace
@@ -132,17 +129,20 @@ namespace GyanisScribe::App
         }
         if (m_state == State::PickerOpen)
         {
-            if (m_picker != nullptr)
+            if (m_decoderWatcher.isRunning())
             {
-                if (!m_picker->isVisible() && !m_decoderWatcher.isRunning())
-                {
-                    m_picker->showFrames(m_buffer.views(), m_screenRect, m_screenName, false, {});
-                } else
-                {
-                    m_picker->raise();
-                    m_picker->activateWindow();
-                }
+                // 解码期间选择器是收起的：抬窗只会对着一个看不见的窗口使劲，改为说明当前进度
+                emit messageForUser(Base::uiText("正在解码选中的帧，稍候。"), Gui::ToastKind::Information);
+                return;
             }
+            if (m_picker != nullptr && m_picker->isVisible())
+            {
+                m_picker->raise();
+                m_picker->activateWindow();
+                return;
+            }
+            // 选择器被收起过（例如没有可选帧）：按打开流程重摆，空缓冲会在里面被挡下
+            openPicker();
             return;
         }
         if (m_state == State::CaptureFlow)
@@ -155,12 +155,12 @@ namespace GyanisScribe::App
             emit messageForUser(Base::uiText("回溯缓冲里还没有画面：刚开启时等一秒再按；若提示已暂停，先看暂停原因。"), Gui::ToastKind::Information);
             return;
         }
-        if (m_encoderWatcher.isRunning())
+        if (m_encoderWatcher.isRunning() || m_pendingFrame.has_value())
         {
             // 编码马上结束：让它把最新一帧追加进来再开，选择器里就能看到刚发生的事；
             // 最多等一小会儿，编码太慢就先拿现有帧打开
             m_openPickerWhenEncoded = true;
-            QTimer::singleShot(kPickerWaitMs, this,
+            QTimer::singleShot(m_pickerWaitMs, this,
                                [this]
                                {
                                    if (!m_openPickerWhenEncoded)
@@ -286,6 +286,47 @@ namespace GyanisScribe::App
         chooseFrame(id);
     }
 
+    void RewindCoordinator::setPickerWaitForTesting(const int milliseconds)
+    {
+        m_pickerWaitMs = std::max(0, milliseconds);
+    }
+
+    Core::RewindConfig RewindCoordinator::configForTesting() const
+    {
+        return m_config;
+    }
+
+    int RewindCoordinator::consecutiveEncodeFailuresForTesting() const noexcept
+    {
+        return m_consecutiveEncodeFailures;
+    }
+
+    bool RewindCoordinator::encodePendingForTesting() const noexcept
+    {
+        return m_pendingFrame.has_value();
+    }
+
+    quint64 RewindCoordinator::injectCorruptFrameForTesting()
+    {
+        Core::RewindFrameSample sample;
+        sample.id          = m_nextSampleId;
+        sample.monotonicMs = m_clock.elapsed();
+        sample.capturedAt  = QDateTime::currentDateTime();
+        // 不是任何图片格式的字节：解码器会直接报错，缓冲本身只检查字节非空
+        sample.encodedPixels     = QByteArrayLiteral("truncated-by-test");
+        sample.logicalSize       = m_screenRect.size();
+        sample.devicePixelRatio  = 1.0;
+        sample.screenName        = m_screenName;
+        sample.screenLogicalRect = m_screenRect;
+        if (auto appended = m_buffer.append(sample); !appended)
+        {
+            Base::Logger::warning(std::format("用例注入的损坏样本没进缓冲：{}", appended.error().message));
+            return 0;
+        }
+        ++m_nextSampleId;
+        return sample.id;
+    }
+
     void RewindCoordinator::applyConfig(const Core::RewindConfig &config)
     {
         m_config = config;
@@ -319,7 +360,8 @@ namespace GyanisScribe::App
                     m_picker->hide();
                 }
                 resetFrameState();
-                m_screenResolved = false;
+                m_screenResolved      = false;
+                m_screenAvailableRect = QRect{};
                 break;
             case State::PickerOpen:
             case State::CaptureFlow:
@@ -340,7 +382,17 @@ namespace GyanisScribe::App
         emit bufferStatusChanged(enabled, paused, m_stateReason);
         if (state == State::PausedByError)
         {
-            emit messageForUser(Base::uiText("回溯缓冲已暂停：") + reason + Base::uiText(" 调整后重新开启回溯缓冲即可恢复。"), Gui::ToastKind::Danger);
+            // 同一条原因只弹一次：从选择器取消回到错误暂停只是刷新托盘读数，
+            // 用户不需要为同一个错误看第二遍同样的话
+            if (reason != m_announcedErrorReason)
+            {
+                m_announcedErrorReason = reason;
+                emit messageForUser(Base::uiText("回溯缓冲已暂停：") + reason + Base::uiText(" 调整后重新开启回溯缓冲即可恢复。"), Gui::ToastKind::Danger);
+            }
+        } else if (state == State::Buffering || state == State::Disabled)
+        {
+            // 回到正常或关闭之后，同样的错误再出现就是新一次故障，值得再说一次
+            m_announcedErrorReason.clear();
         }
     }
 
@@ -373,19 +425,29 @@ namespace GyanisScribe::App
         // 离屏平台的屏名可能为空，所以首次解析不能只靠名字比较
         if (!m_screenResolved || screen->name() != m_screenName)
         {
-            m_screenName     = screen->name();
-            m_screenRect     = screen->geometry();
-            m_screenResolved = true;
+            const bool switched   = m_screenResolved;
+            m_screenName          = screen->name();
+            m_screenRect          = screen->geometry();
+            m_screenAvailableRect = screen->availableGeometry();
+            m_screenResolved      = true;
             m_buffer.clear();
             resetFrameState();
             Base::Logger::info(std::format("回溯改为抓屏 {}（{}×{}）", m_screenName.toStdString(), m_screenRect.width(), m_screenRect.height()));
+            if (switched)
+            {
+                // 换屏清空了旧缓冲，托盘那行读数要跟着重发一次；屏名不在托盘读数的三个参数里，
+                // 只能说给用户听，否则「换到哪块屏」这条信息只剩日志里能看到
+                emit bufferStatusChanged(true, false, QString{});
+                emit messageForUser(Base::uiText("回溯改为抓屏幕「") + m_screenName + Base::uiText("」，旧缓冲已清空。"), Gui::ToastKind::Information);
+            }
         }
         if (exclusionVisible(m_screenRect))
         {
             setState(State::PausedByExclusion, Base::uiText("排除的程序在前台"));
             return;
         }
-        if (m_encoderWatcher.isRunning() || m_decoderWatcher.isRunning())
+        // 在途帧的结果还没回接时也不能开新编码：换掉 future 会让那一份结果落到新帧头上
+        if (m_encoderWatcher.isRunning() || m_pendingFrame.has_value() || m_decoderWatcher.isRunning())
         {
             return;
         }
@@ -441,6 +503,8 @@ namespace GyanisScribe::App
                 return;
             }
             m_lastFingerprint = fingerprint;
+            // 心跳说明状态机还在正常出样本：两次失败之间隔着一段静止画面就不该累计到暂停
+            m_consecutiveEncodeFailures = 0;
             return;
         }
 
@@ -449,6 +513,11 @@ namespace GyanisScribe::App
 
     void RewindCoordinator::startEncode(const Base::CapturedImage &frame, const Core::FrameFingerprint &fingerprint)
     {
+        if (m_pendingFrame.has_value() || m_encoderWatcher.isRunning())
+        {
+            // 上一帧还在等结果：再提交一次会把它覆盖掉，那一份结果回接时就没有对应的帧可拼
+            return;
+        }
         m_pendingFrame       = frame;
         m_pendingFingerprint = fingerprint;
         m_pendingMonotonicMs = m_clock.elapsed();
@@ -495,6 +564,20 @@ namespace GyanisScribe::App
 
     void RewindCoordinator::openPicker()
     {
+        const auto views = m_buffer.views();
+        if (views.empty())
+        {
+            // 一条可展示的样本都没有：收起选择器并回到打开前的状态，
+            // 不能把窗口藏起来却仍停在 PickerOpen，热键会以为选择器还开着
+            if (m_picker != nullptr)
+            {
+                m_picker->hide();
+            }
+            setState(stateAfterPickerClosed(), m_reasonBeforePicker);
+            emit messageForUser(Base::uiText("回溯缓冲里已经没有画面，选择器收起了。"), Gui::ToastKind::Information);
+            return;
+        }
+
         if (m_state != State::PickerOpen)
         {
             m_stateBeforePicker  = m_state;
@@ -507,7 +590,8 @@ namespace GyanisScribe::App
             QObject::connect(m_picker.get(), &Gui::RewindPickerWindow::frameChosen, this, &RewindCoordinator::chooseFrame);
             QObject::connect(m_picker.get(), &Gui::RewindPickerWindow::dismissed, this, &RewindCoordinator::handlePickerDismissed);
         }
-        m_picker->showFrames(m_buffer.views(), m_screenRect, m_screenName, false, {});
+        // 摆放按可用区（避开任务栏），抓帧与样本上的屏矩形仍是整屏
+        m_picker->showFrames(views, m_screenAvailableRect.isEmpty() ? m_screenRect : m_screenAvailableRect, m_screenName, false, {});
     }
 
     void RewindCoordinator::chooseFrame(const quint64 id)
@@ -540,12 +624,19 @@ namespace GyanisScribe::App
         {
             return;
         }
-        State resume = m_stateBeforePicker;
+        // 取消只是收起选择器：排除程序还在前台、或错误还没排除时，暂停本来就该继续，
+        // 回到暂停态而不是借取消把暂停一并解除
+        setState(stateAfterPickerClosed(), m_reasonBeforePicker);
+    }
+
+    RewindCoordinator::State RewindCoordinator::stateAfterPickerClosed() const noexcept
+    {
+        State resume = m_state == State::PickerOpen ? m_stateBeforePicker : m_state;
         if (resume == State::Disabled || resume == State::PickerOpen || resume == State::CaptureFlow)
         {
             resume = State::Buffering;
         }
-        setState(resume, m_reasonBeforePicker);
+        return resume;
     }
 
     void RewindCoordinator::handleEncoded()
@@ -671,8 +762,9 @@ namespace GyanisScribe::App
         Base::Logger::info(std::format("显示器布局变化：回溯缓冲清空并重新开始（已抓 {} 帧）", m_capturedFrames));
         m_buffer.clear();
         resetFrameState();
-        m_screenResolved = false;
-        m_screenRect     = QRect{};
+        m_screenResolved      = false;
+        m_screenRect          = QRect{};
+        m_screenAvailableRect = QRect{};
         m_screenName.clear();
         if (m_state == State::PickerOpen)
         {

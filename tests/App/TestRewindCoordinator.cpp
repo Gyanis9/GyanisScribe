@@ -1,5 +1,6 @@
 #include "App/RewindCoordinator.h"
 
+#include "Base/Logger.h"
 #include "Core/Capture/IScreenCaptureSource.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Settings/SettingsStore.h"
@@ -32,8 +33,10 @@ using GyanisScribe::Base::Error;
 using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Base::Expected;
 using GyanisScribe::Core::IScreenCaptureSource;
+using GyanisScribe::Core::kRewindBufferSeconds;
 using GyanisScribe::Core::kRewindEnabled;
 using GyanisScribe::Core::kRewindExcludeProcesses;
+using GyanisScribe::Core::kRewindFrameRate;
 using GyanisScribe::Core::RewindStatus;
 using GyanisScribe::Core::SettingsStore;
 using GyanisScribe::Gui::ToastKind;
@@ -44,12 +47,12 @@ using GyanisScribe::Platform::ScreenWindow;
 
 namespace
 {
-    CapturedImage makeFrame(const QColor &color)
+    CapturedImage makeFrame(const QColor &color, const QSize &size = QSize(64, 36))
     {
         CapturedImage frame;
-        frame.image = QImage(64, 36, QImage::Format_ARGB32_Premultiplied);
+        frame.image = QImage(size, QImage::Format_ARGB32_Premultiplied);
         frame.image.fill(color);
-        frame.logicalSize      = QSize(64, 36);
+        frame.logicalSize      = size;
         frame.devicePixelRatio = 1.0;
         const auto *screen     = QGuiApplication::primaryScreen();
         frame.screenName       = screen != nullptr ? screen->name() : QStringLiteral("TestScreen");
@@ -62,7 +65,7 @@ namespace
     public:
         [[nodiscard]] Expected<CapturedImage> grabScreen(const QString &) const override
         {
-            return makeFrame(Qt::white);
+            return makeFrame(Qt::white, frameSize);
         }
 
         [[nodiscard]] Expected<CapturedImage> tryGrabScreen(const QString &) const override
@@ -72,16 +75,30 @@ namespace
             {
                 return std::unexpected(Error{ErrorCode::ScreenUnavailable, "测试替身：抓帧失败"});
             }
-            return makeFrame(calls % 2 == 0 ? Qt::white : Qt::black);
+            if (nullImage)
+            {
+                // 抓帧成功但图是空的：专供编码失败那条路
+                auto frame  = makeFrame(Qt::white, frameSize);
+                frame.image = QImage{};
+                return frame;
+            }
+            if (constantFrame)
+            {
+                return makeFrame(Qt::white, frameSize);
+            }
+            return makeFrame(calls % 2 == 0 ? Qt::white : Qt::black, frameSize);
         }
 
         [[nodiscard]] Expected<CapturedImage> grabWindow(quintptr) const override
         {
-            return makeFrame(Qt::white);
+            return makeFrame(Qt::white, frameSize);
         }
 
-        mutable int  calls   = 0;
-        mutable bool failing = false;
+        mutable int   calls         = 0;
+        mutable bool  failing       = false;
+        mutable bool  nullImage     = false;
+        mutable bool  constantFrame = false;
+        mutable QSize frameSize{64, 36};
     };
 
     class FakePlatform final : public IPlatformIntegration
@@ -176,10 +193,14 @@ namespace
             QCoreApplication::setOrganizationName(QStringLiteral("Gyanis"));
             QCoreApplication::setApplicationName(QStringLiteral("GyanisScribe-Tests"));
             qRegisterMetaType<GyanisScribe::Base::CapturedImage>("GyanisScribe::Base::CapturedImage");
+            // 日志只留错误级并落到临时目录：用例判的是状态与信号，控制台上一行行 info 会把结果冲散
+            const auto logDirectory = std::filesystem::temp_directory_path() / "GyanisScribe-RewindCoordinator-logs";
+            static_cast<void>(GyanisScribe::Base::Logger::initialize(logDirectory, GyanisScribe::Base::Severity::Error));
         }
 
         static void TearDownTestSuite()
         {
+            GyanisScribe::Base::Logger::shutdown();
             application.reset();
         }
 
@@ -503,4 +524,311 @@ TEST_F(RewindCoordinatorFixture, SettingsDisableStopsAndInvalidReloadDoesNotStar
     EXPECT_TRUE(messages.back().contains(QStringLiteral("排除名单")));
     coordinator.captureTickForTesting();
     EXPECT_EQ(source.calls, callsAfterDisable);
+}
+
+TEST_F(RewindCoordinatorFixture, EncodeFailurePausesAndResetsPendingFrame)
+{
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(kRewindEnabled, QVariant(true)).has_value());
+
+    FakeSource        source;
+    FakePlatform      platform;
+    QStringList       messages;
+    RewindCoordinator coordinator({source, platform, settings});
+    QObject::connect(&coordinator, &RewindCoordinator::messageForUser, &coordinator, [&messages](const QString &message, ToastKind) { messages.append(message); });
+    coordinator.start();
+    // 抓帧成功但图是空的：编码器拒收空图，正好稳定复现编码失败
+    source.nullImage = true;
+
+    coordinator.captureTickForTesting();
+    QTRY_VERIFY_WITH_TIMEOUT(coordinator.consecutiveEncodeFailuresForTesting() == 1, 3000);
+    // 失败回接后必须丢掉在途帧，否则后面两次 tick 都提交不了新编码，也就到不了三连败
+    EXPECT_FALSE(coordinator.encodePendingForTesting());
+    EXPECT_EQ(coordinator.statusForTesting(), RewindStatus::Buffering);
+
+    coordinator.captureTickForTesting();
+    QTRY_VERIFY_WITH_TIMEOUT(coordinator.consecutiveEncodeFailuresForTesting() == 2, 3000);
+    EXPECT_FALSE(coordinator.encodePendingForTesting());
+
+    coordinator.captureTickForTesting();
+    QTRY_VERIFY_WITH_TIMEOUT(coordinator.statusForTesting() == RewindStatus::PausedByError, 3000);
+    EXPECT_FALSE(coordinator.encodePendingForTesting());
+    EXPECT_EQ(coordinator.bufferStatsForTesting().sampleCount, 0);
+    ASSERT_EQ(messages.size(), 1);
+    EXPECT_TRUE(messages.front().contains(QStringLiteral("编码失败")));
+
+    // 错误暂停后不再抓帧，直到用户重新开启
+    const int callsWhenPaused = source.calls;
+    coordinator.captureTickForTesting();
+    EXPECT_EQ(source.calls, callsWhenPaused);
+}
+
+TEST_F(RewindCoordinatorFixture, RunningExclusionReloadPausesAndResumes)
+{
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(kRewindEnabled, QVariant(true)).has_value());
+
+    FakeSource        source;
+    FakePlatform      platform;
+    RewindCoordinator coordinator({source, platform, settings});
+    coordinator.start();
+    coordinator.captureTickForTesting();
+    QTRY_VERIFY_WITH_TIMEOUT(coordinator.bufferStatsForTesting().sampleCount > 0, 3000);
+
+    // 名单是运行中才写进设置的：重载后下一次 tick 就要按它暂停
+    ASSERT_TRUE(settings.setValue(kRewindExcludeProcesses, QStringLiteral("keepass.exe")).has_value());
+    platform.windows.push_back(ScreenWindow{1, QStringLiteral("Vault"), QStringLiteral("keepass.exe"), QRect(0, 0, 100, 100), QRect(0, 0, 100, 100)});
+    coordinator.captureTickForTesting();
+    EXPECT_EQ(coordinator.statusForTesting(), RewindStatus::PausedByExclusion);
+
+    const int callsWhilePaused = source.calls;
+    coordinator.captureTickForTesting();
+    EXPECT_EQ(source.calls, callsWhilePaused);
+
+    // 程序消失、名单也清空之后，下一次 tick 自己恢复抓帧
+    platform.windows.clear();
+    ASSERT_TRUE(settings.setValue(kRewindExcludeProcesses, QVariant{}).has_value());
+    coordinator.captureTickForTesting();
+    EXPECT_EQ(coordinator.statusForTesting(), RewindStatus::Buffering);
+    EXPECT_GT(source.calls, callsWhilePaused);
+}
+
+TEST_F(RewindCoordinatorFixture, HeartbeatReusesEncodedBytesAndResetsEncodeFailures)
+{
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(kRewindEnabled, QVariant(true)).has_value());
+
+    FakeSource        source;
+    FakePlatform      platform;
+    RewindCoordinator coordinator({source, platform, settings});
+    coordinator.start();
+    // 画面一直不变：第二拍只该追加心跳样本
+    source.constantFrame = true;
+    coordinator.captureTickForTesting();
+    QTRY_VERIFY_WITH_TIMEOUT(coordinator.bufferStatsForTesting().sampleCount == 1, 3000);
+    const auto afterFirst = coordinator.bufferStatsForTesting();
+    ASSERT_GT(afterFirst.uniquePixelBytes, 0);
+
+    // 中间夹一次编码失败，用来验证心跳会把失败计数清零
+    source.nullImage = true;
+    coordinator.captureTickForTesting();
+    QTRY_VERIFY_WITH_TIMEOUT(coordinator.consecutiveEncodeFailuresForTesting() == 1, 3000);
+
+    source.nullImage = false;
+    coordinator.captureTickForTesting();
+    QTRY_VERIFY_WITH_TIMEOUT(coordinator.bufferStatsForTesting().sampleCount == 2, 3000);
+    const auto afterSecond = coordinator.bufferStatsForTesting();
+    EXPECT_EQ(afterSecond.uniquePixelBytes, afterFirst.uniquePixelBytes);
+    // 两次失败之间隔着一段静止画面，不该凑成连续失败
+    EXPECT_EQ(coordinator.consecutiveEncodeFailuresForTesting(), 0);
+    EXPECT_EQ(coordinator.statusForTesting(), RewindStatus::Buffering);
+}
+
+TEST_F(RewindCoordinatorFixture, PickerWaitsForEncoderThenShowsNewestFrame)
+{
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(kRewindEnabled, QVariant(true)).has_value());
+
+    FakeSource        source;
+    FakePlatform      platform;
+    RewindCoordinator coordinator({source, platform, settings});
+    coordinator.start();
+    // 大帧让第二帧的编码确实还在跑
+    source.frameSize = QSize(1920, 1080);
+    coordinator.captureTickForTesting();
+    QTRY_VERIFY_WITH_TIMEOUT(coordinator.bufferStatsForTesting().sampleCount == 1, 3000);
+
+    coordinator.captureTickForTesting();
+    ASSERT_TRUE(coordinator.encodePendingForTesting());
+
+    // 编码在飞时热键要等它追加完再开（上限 300ms），这样选择器里能看到刚发生的一帧
+    coordinator.showPicker();
+    QTRY_VERIFY_WITH_TIMEOUT(findPickerWindow() != nullptr && findPickerWindow()->isVisible(), 3000);
+    EXPECT_FALSE(coordinator.encodePendingForTesting());
+    EXPECT_EQ(coordinator.bufferStatsForTesting().sampleCount, 2);
+}
+
+TEST_F(RewindCoordinatorFixture, PickerWaitTimeoutOpensWithExistingFrames)
+{
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(kRewindEnabled, QVariant(true)).has_value());
+
+    FakeSource        source;
+    FakePlatform      platform;
+    RewindCoordinator coordinator({source, platform, settings});
+    // 把 300ms 上限压到 0：不必真的等一次慢编码也能走到超时分支
+    coordinator.setPickerWaitForTesting(0);
+    coordinator.start();
+    // 大帧让第二帧的编码确实还在跑
+    source.frameSize = QSize(1920, 1080);
+    coordinator.captureTickForTesting();
+    QTRY_VERIFY_WITH_TIMEOUT(coordinator.bufferStatsForTesting().sampleCount == 1, 3000);
+
+    coordinator.captureTickForTesting();
+    ASSERT_TRUE(coordinator.encodePendingForTesting());
+
+    coordinator.showPicker();
+    QTRY_VERIFY_WITH_TIMEOUT(findPickerWindow() != nullptr && findPickerWindow()->isVisible(), 3000);
+    // 超时先开：窗口出现时那一帧还在编码，选择器用的是已有样本
+    EXPECT_TRUE(coordinator.encodePendingForTesting());
+    EXPECT_GE(coordinator.bufferStatsForTesting().sampleCount, 1);
+}
+
+TEST_F(RewindCoordinatorFixture, HotkeyWhileDecodingExplainsInsteadOfRaisingHiddenPicker)
+{
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(kRewindEnabled, QVariant(true)).has_value());
+
+    FakeSource        source;
+    FakePlatform      platform;
+    RewindCoordinator coordinator({source, platform, settings});
+    coordinator.start();
+    // 大帧让解码确实要花几毫秒，热键才落在解码进行中
+    source.frameSize = QSize(1920, 1080);
+    coordinator.captureTickForTesting();
+    QTRY_VERIFY_WITH_TIMEOUT(coordinator.bufferStatsForTesting().sampleCount == 1, 3000);
+
+    coordinator.showPicker();
+    QTRY_VERIFY_WITH_TIMEOUT(findPickerWindow() != nullptr && findPickerWindow()->isVisible(), 3000);
+
+    QStringList messages;
+    QObject::connect(&coordinator, &RewindCoordinator::messageForUser, &coordinator, [&messages](const QString &message, ToastKind) { messages.append(message); });
+    QSignalSpy chosen(&coordinator, &RewindCoordinator::frameChosen);
+    const auto id = coordinator.firstFrameIdForTesting();
+    ASSERT_TRUE(id.has_value());
+    coordinator.chooseFrameForTesting(*id);
+
+    // 解码期间选择器是收起的：此时热键不能去抬一个看不见的窗口
+    coordinator.showPicker();
+    ASSERT_EQ(messages.size(), 1);
+    EXPECT_TRUE(messages.front().contains(QStringLiteral("正在解码")));
+
+    QTRY_VERIFY_WITH_TIMEOUT(chosen.count() == 1, 3000);
+    EXPECT_EQ(coordinator.statusForTesting(), RewindStatus::Buffering);
+}
+
+TEST_F(RewindCoordinatorFixture, DecodeFailureReopensPickerAndExplains)
+{
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(kRewindEnabled, QVariant(true)).has_value());
+
+    FakeSource        source;
+    FakePlatform      platform;
+    RewindCoordinator coordinator({source, platform, settings});
+    coordinator.start();
+    coordinator.captureTickForTesting();
+    QTRY_VERIFY_WITH_TIMEOUT(coordinator.bufferStatsForTesting().sampleCount == 1, 3000);
+
+    const auto corruptId = coordinator.injectCorruptFrameForTesting();
+    ASSERT_NE(corruptId, 0U);
+
+    coordinator.showPicker();
+    QTRY_VERIFY_WITH_TIMEOUT(findPickerWindow() != nullptr && findPickerWindow()->isVisible(), 3000);
+
+    const QSignalSpy statusSpy(&coordinator, &RewindCoordinator::bufferStatusChanged);
+    QStringList      messages;
+    QObject::connect(&coordinator, &RewindCoordinator::messageForUser, &coordinator, [&messages](const QString &message, ToastKind) { messages.append(message); });
+    coordinator.chooseFrameForTesting(corruptId);
+
+    QTRY_VERIFY_WITH_TIMEOUT(messages.size() == 1, 3000);
+    EXPECT_TRUE(messages.front().contains(QStringLiteral("解码失败")));
+    // 失败不能静默收起：选择器要摆回来，缓冲仍是暂停态
+    auto *picker = findPickerWindow();
+    ASSERT_NE(picker, nullptr);
+    QTRY_VERIFY_WITH_TIMEOUT(picker->isVisible(), 3000);
+    const auto reopened = lastStatus(statusSpy);
+    ASSERT_TRUE(reopened.has_value());
+    EXPECT_TRUE(reopened->enabled);
+    EXPECT_TRUE(reopened->paused);
+    EXPECT_EQ(coordinator.statusForTesting(), RewindStatus::Buffering);
+}
+
+TEST_F(RewindCoordinatorFixture, TopologyChangeDropsBufferedAndInFlightFrames)
+{
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(kRewindEnabled, QVariant(true)).has_value());
+
+    FakeSource        source;
+    FakePlatform      platform;
+    RewindCoordinator coordinator({source, platform, settings});
+    coordinator.start();
+    coordinator.captureTickForTesting();
+    QTRY_VERIFY_WITH_TIMEOUT(coordinator.bufferStatsForTesting().sampleCount == 1, 3000);
+
+    // 布局变化时还有一帧在编码：它属于旧屏，必须跟着旧缓冲一起作废
+    source.frameSize = QSize(1920, 1080);
+    coordinator.captureTickForTesting();
+    ASSERT_TRUE(coordinator.encodePendingForTesting());
+
+    emit qGuiApp->screenAdded(QGuiApplication::primaryScreen());
+    EXPECT_EQ(coordinator.bufferStatsForTesting().sampleCount, 0);
+    EXPECT_FALSE(coordinator.encodePendingForTesting());
+    EXPECT_EQ(coordinator.statusForTesting(), RewindStatus::Buffering);
+
+    // 锁屏把定时器停掉，之后只看那一帧的结果会不会把样本带回来
+    emit platform.sessionLocked();
+    QTest::qWait(400);
+    EXPECT_EQ(coordinator.bufferStatsForTesting().sampleCount, 0);
+    EXPECT_EQ(coordinator.statusForTesting(), RewindStatus::PausedByLock);
+}
+
+TEST_F(RewindCoordinatorFixture, LiveDurationAndFrameRateReload)
+{
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(kRewindEnabled, QVariant(true)).has_value());
+
+    FakeSource        source;
+    FakePlatform      platform;
+    RewindCoordinator coordinator({source, platform, settings});
+    coordinator.start();
+    EXPECT_EQ(coordinator.configForTesting().bufferSeconds, 10);
+    EXPECT_EQ(coordinator.configForTesting().frameRate, 5);
+    EXPECT_TRUE(coordinator.configForTesting().enabled);
+
+    const QSignalSpy statusSpy(&coordinator, &RewindCoordinator::bufferStatusChanged);
+    ASSERT_TRUE(settings.setValue(kRewindBufferSeconds, QVariant(20)).has_value());
+    EXPECT_EQ(coordinator.configForTesting().bufferSeconds, 20);
+    EXPECT_EQ(coordinator.configForTesting().frameRate, 5);
+
+    ASSERT_TRUE(settings.setValue(kRewindFrameRate, QVariant(8)).has_value());
+    EXPECT_EQ(coordinator.configForTesting().frameRate, 8);
+    EXPECT_EQ(coordinator.configForTesting().bufferSeconds, 20);
+
+    // 运行中重载只换容量与节拍，不该顺手暂停或重启
+    EXPECT_EQ(coordinator.statusForTesting(), RewindStatus::Buffering);
+    const auto reloaded = lastStatus(statusSpy);
+    ASSERT_TRUE(reloaded.has_value());
+    EXPECT_TRUE(reloaded->enabled);
+    EXPECT_FALSE(reloaded->paused);
+}
+
+TEST_F(RewindCoordinatorFixture, DismissFromErrorPauseKeepsPauseWithoutRepeatingMessage)
+{
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(kRewindEnabled, QVariant(true)).has_value());
+
+    FakeSource        source;
+    FakePlatform      platform;
+    QStringList       messages;
+    RewindCoordinator coordinator({source, platform, settings});
+    QObject::connect(&coordinator, &RewindCoordinator::messageForUser, &coordinator, [&messages](const QString &message, ToastKind) { messages.append(message); });
+    coordinator.start();
+    coordinator.captureTickForTesting();
+    QTRY_VERIFY_WITH_TIMEOUT(coordinator.bufferStatsForTesting().sampleCount == 1, 3000);
+
+    // 连续抓帧失败进错误暂停，缓冲里还留着一帧，热键仍能打开选择器
+    source.failing = true;
+    coordinator.captureTickForTesting();
+    coordinator.captureTickForTesting();
+    coordinator.captureTickForTesting();
+    ASSERT_EQ(coordinator.statusForTesting(), RewindStatus::PausedByError);
+    ASSERT_EQ(messages.size(), 1);
+
+    coordinator.showPicker();
+    QTRY_VERIFY_WITH_TIMEOUT(findPickerWindow() != nullptr && findPickerWindow()->isVisible(), 3000);
+    findPickerWindow()->close();
+
+    // 取消选择器不该顺手解除错误暂停，也不该把同一条原因再弹一遍
+    QTRY_VERIFY_WITH_TIMEOUT(coordinator.statusForTesting() == RewindStatus::PausedByError, 3000);
+    EXPECT_EQ(messages.size(), 1);
 }

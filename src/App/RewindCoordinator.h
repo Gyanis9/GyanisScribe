@@ -124,6 +124,29 @@ namespace GyanisScribe::App
         /// 用例按样本号走一遍选帧解码，与选择器确认同一条路
         void chooseFrameForTesting(quint64 id);
 
+        /**
+         * @brief 改热键等编码的上限
+         * @param milliseconds 等待毫秒数
+         * @details 用例把它改成 0，就能稳定走到「编码还没完，先用现有帧打开」那条超时分支。
+         */
+        void setPickerWaitForTesting(int milliseconds);
+
+        /// 当前生效的配置，供用例判时长与帧率是否跟着设置变了
+        [[nodiscard]] Core::RewindConfig configForTesting() const;
+
+        /// 连续编码失败次数，供用例判心跳与成功编码是否把它清零
+        [[nodiscard]] int consecutiveEncodeFailuresForTesting() const noexcept;
+
+        /// 是否有一帧已提交编码、结果还没回接
+        [[nodiscard]] bool encodePendingForTesting() const noexcept;
+
+        /**
+         * @brief 往缓冲里塞一段不是编码器产出的字节
+         * @return 样本号；缓冲拒绝追加时返回 0
+         * @details 正常路径只收编码器自己的产出，选帧解码失败的用例没有别的入口造出坏数据。
+         */
+        quint64 injectCorruptFrameForTesting();
+
     signals:
         /// 选中的历史帧已解码：控制器据此进入回溯框选
         void frameChosen(const Base::CapturedImage &frame);
@@ -165,6 +188,8 @@ namespace GyanisScribe::App
         void chooseFrame(quint64 id);
         /// 选择器被取消：回到打开前的状态
         void handlePickerDismissed();
+        /// 收起选择器后该回哪个状态：暂停原因仍在就留在暂停，界面流程一律回抓帧
+        [[nodiscard]] State stateAfterPickerClosed() const noexcept;
         /// 编码完成：成功追加，连续失败暂停，结果过期则丢弃
         void handleEncoded();
         /// 解码完成：成功进框选并发 frameChosen，失败把选择器摆回来
@@ -199,14 +224,17 @@ namespace GyanisScribe::App
         quint64                                                  m_nextSampleId       = 1;                 ///< 下一条样本号，只增不减
         QString                                                  m_screenName;                             ///< 当前抓的屏名，可能为空（离屏平台）
         QRect                                                    m_screenRect;                             ///< 当前屏的逻辑全局矩形
+        QRect                                                    m_screenAvailableRect;                    ///< 当前屏的可用区，选择器按它摆放；抓帧仍按整屏
         State                                                    m_state             = State::Disabled;    ///< 当前状态
         State                                                    m_stateBeforePicker = State::Buffering;   ///< 打开选择器前的状态，取消时回这里
         QString                                                  m_stateReason;                            ///< 当前暂停原因，重发状态时沿用
+        QString                                                  m_announcedErrorReason;                   ///< 已经弹过的错误原因，从选择器回到同一暂停时不重复弹
         QString                                                  m_reasonBeforePicker;                     ///< 打开选择器前的暂停原因
         int                                                      m_consecutiveFailures            = 0;     ///< 连续抓帧失败次数
         int                                                      m_consecutiveSlowGrabs           = 0;     ///< 连续慢抓次数
         int                                                      m_consecutiveEncodeFailures      = 0;     ///< 连续编码失败次数
         int                                                      m_capturedFrames                 = 0;     ///< 抓帧尝试总数，诊断用
+        int                                                      m_pickerWaitMs                   = 300;   ///< 热键等编码完成的上限，用例可改短
         bool                                                     m_openPickerWhenEncoded          = false; ///< 热键等编码完成后再开选择器
         bool                                                     m_screenResolved                 = false; ///< 是否已解析过光标屏；离屏平台屏名为空也要能判首次
         mutable bool                                             m_windowEnumerationFailureLogged = false; ///< 窗口枚举失败只记一次日志
