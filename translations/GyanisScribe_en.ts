@@ -3603,5 +3603,221 @@
             <source>检查导入文件里的色块写法，或删掉配置里的 %1 这一项可以恢复默认</source>
             <translation>Check the color entries in the imported file, or delete the %1 entry in settings to restore the defaults</translation>
         </message>
+        <message>
+            <source>先完成当前截图或标注，再打开回溯。</source>
+            <translation>Finish the current capture or annotation before opening Rewind.</translation>
+        </message>
+        <message>
+            <source>本平台给不出锁屏通知，出于隐私不开启回溯缓冲</source>
+            <translation>This platform cannot report screen locking, so rewind buffering stays off for privacy</translation>
+        </message>
+        <message>
+            <source>回溯截图未开启。到设置 → 截图 → 回溯截图里开启（只存内存，不上传）。</source>
+            <translation>Rewind is off. Turn it on in Settings → Capture → Rewind (memory only, never uploaded).</translation>
+        </message>
+        <message>
+            <source>正在解码选中的帧，稍候。</source>
+            <translation>Decoding the selected frame, please wait.</translation>
+        </message>
+        <message>
+            <source>回溯缓冲里还没有画面：刚开启时等一秒再按；若提示已暂停，先看暂停原因。</source>
+            <translation>The rewind buffer has no frames yet: after just turning it on, wait a second and press again; if it says paused, check the pause reason first.</translation>
+        </message>
+        <message>
+            <source>回溯缓冲已暂停：</source>
+            <translation>Rewind buffer paused: </translation>
+        </message>
+        <message>
+            <source> 调整后重新开启回溯缓冲即可恢复。</source>
+            <translation> Fix the cause and re-enable the rewind buffer to resume.</translation>
+        </message>
+        <message>
+            <source>找不到光标所在的屏幕</source>
+            <translation>Cannot find the screen the cursor is on</translation>
+        </message>
+        <message>
+            <source>回溯改为抓屏幕「</source>
+            <translation>Rewind now captures screen "</translation>
+        </message>
+        <message>
+            <source>」，旧缓冲已清空。</source>
+            <translation>"; the old buffer was cleared.</translation>
+        </message>
+        <message>
+            <source>排除的程序在前台</source>
+            <translation>An excluded program is in the foreground</translation>
+        </message>
+        <message>
+            <source>抓帧太慢，回溯缓冲已暂停</source>
+            <translation>Frame grabbing is too slow; rewind buffer paused</translation>
+        </message>
+        <message>
+            <source>回溯缓冲里已经没有画面，选择器收起了。</source>
+            <translation>The rewind buffer has no frames left, so the picker was closed.</translation>
+        </message>
+        <message>
+            <source>回溯选择器已打开</source>
+            <translation>Rewind picker opened</translation>
+        </message>
+        <message>
+            <source>这一帧已经从回溯缓冲里淘汰了，请在胶片条里另选一帧。</source>
+            <translation>This frame has already been evicted from the rewind buffer; pick another frame in the filmstrip.</translation>
+        </message>
+        <message>
+            <source>这一帧解码失败，请在胶片条里重选一帧：</source>
+            <translation>Failed to decode this frame; pick another frame in the filmstrip: </translation>
+        </message>
+        <message>
+            <source>回溯框选进行中</source>
+            <translation>Rewind region selection in progress</translation>
+        </message>
+        <message>
+            <source>已锁屏，回溯缓冲已清空</source>
+            <translation>Screen locked; the rewind buffer was cleared</translation>
+        </message>
+        <message>
+            <source>录制已暂停 %1</source>
+            <translation>Recording paused at %1</translation>
+        </message>
+        <message>
+            <source>正在录制 %1</source>
+            <translation>Recording %1</translation>
+        </message>
+        <message>
+            <source>贴图 %1 张</source>
+            <translation>%1 pin(s)</translation>
+        </message>
+        <message>
+            <source>智录 · %1</source>
+            <translation>GyanisScribe · %1</translation>
+        </message>
+        <message>
+            <source>回溯缓冲已暂停：%1</source>
+            <translation>Rewind buffer paused: %1</translation>
+        </message>
+        <message>
+            <source>回溯缓冲已开启</source>
+            <translation>Rewind buffer is on</translation>
+        </message>
+        <message>
+            <source>回溯帧缓冲拒绝空样本：编码结果是空的</source>
+            <translation>Rewind frame buffer rejected an empty sample: the encoded result is empty</translation>
+        </message>
+        <message>
+            <source>回溯帧本身超过内存预算（{} 字节）：请降低时长或帧率</source>
+            <translation>A single rewind frame exceeds the memory budget ({} bytes): lower the duration or frame rate</translation>
+        </message>
+        <message>
+            <source>回溯缓冲超过内存预算（{} 字节）：请降低时长或帧率</source>
+            <translation>The rewind buffer exceeds the memory budget ({} bytes): lower the duration or frame rate</translation>
+        </message>
+        <message>
+            <source>排除名单太长（{} 字符）：上限 {} 字符，请删掉不用的项</source>
+            <translation>The exclusion list is too long ({} characters): the limit is {} characters; remove entries you do not need</translation>
+        </message>
+        <message>
+            <source>排除名单里的「{}」不是可执行文件名：只填文件名（如 keepass.exe），不要带路径或盘符，不要用 * ? 通配符，文件名里也不能有 : &lt; &gt; | " 这几个字符</source>
+            <translation>「{}」 in the exclusion list is not an executable file name: enter only the file name (for example keepass.exe), without a path or drive letter and without * ? wildcards; the file name also cannot contain : &lt; &gt; | "</translation>
+        </message>
+        <message>
+            <source>回溯帧编码失败：源图是空的</source>
+            <translation>Rewind frame encoding failed: the source image is empty</translation>
+        </message>
+        <message>
+            <source>回溯帧编码失败：内存缓冲打不开</source>
+            <translation>Rewind frame encoding failed: the memory buffer cannot be opened</translation>
+        </message>
+        <message>
+            <source>回溯帧编码失败：PNG 写不进去</source>
+            <translation>Rewind frame encoding failed: PNG cannot be written</translation>
+        </message>
+        <message>
+            <source>回溯帧解码失败：数据损坏或格式不支持。请重新选一帧</source>
+            <translation>Rewind frame decoding failed: the data is corrupt or the format is unsupported. Pick another frame.</translation>
+        </message>
+        <message>
+            <source>这块屏的布局已经变了，回溯到的画面不能再用；请重新开启回溯缓冲</source>
+            <translation>This screen's layout has changed, so the rewind frame can no longer be used; turn rewind buffering on again</translation>
+        </message>
+        <message>
+            <source>回溯画面</source>
+            <translation>Rewind frame</translation>
+        </message>
+        <message>
+            <source>← → 选择，Enter 确认，Esc 取消。下一步可拖框选区域，Ctrl+A 选整屏。</source>
+            <translation>← → to choose, Enter to confirm, Esc to cancel. Next, drag to select a region, or press Ctrl+A for the whole screen.</translation>
+        </message>
+        <message>
+            <source>候选帧：画面或前台窗口发生变化</source>
+            <translation>Candidate frame: the screen or foreground window changed</translation>
+        </message>
+        <message>
+            <source>回溯缓冲已暂停</source>
+            <translation>Rewind buffer paused</translation>
+        </message>
+        <message>
+            <source>回溯截图 · %1</source>
+            <translation>Rewind · %1</translation>
+        </message>
+        <message>
+            <source>开启回溯缓冲（仅内存）</source>
+            <translation>Enable rewind buffer (memory only)</translation>
+        </message>
+        <message>
+            <source>开启回溯缓冲</source>
+            <translation>Enable rewind buffer</translation>
+        </message>
+        <message>
+            <source>只存内存，不写盘、不上传；锁屏或退出清空。</source>
+            <translation>Memory only: nothing is written to disk or uploaded; locking the screen or exiting clears it.</translation>
+        </message>
+        <message>
+            <source>会把最近 10 秒的屏幕画面保存在内存里。</source>
+            <translation>The last 10 seconds of screen content is kept in memory.</translation>
+        </message>
+        <message>
+            <source>不写盘、不上传、不录声音。</source>
+            <translation>Nothing is written to disk, uploaded, or recorded as audio.</translation>
+        </message>
+        <message>
+            <source>锁屏或退出程序会清空。</source>
+            <translation>Locking the screen or exiting the app clears it.</translation>
+        </message>
+        <message>
+            <source>可以排除密码管理器等程序。</source>
+            <translation>You can exclude programs such as password managers.</translation>
+        </message>
+        <message>
+            <source>确定开启吗？</source>
+            <translation>Turn it on?</translation>
+        </message>
+        <message>
+            <source>保留时长</source>
+            <translation>Buffer duration</translation>
+        </message>
+        <message>
+            <source>帧率</source>
+            <translation>Frame rate</translation>
+        </message>
+        <message>
+            <source>keepass.exe, 1password.exe</source>
+            <translation>keepass.exe, 1password.exe</translation>
+        </message>
+        <message>
+            <source>排除程序</source>
+            <translation>Excluded programs</translation>
+        </message>
+        <message>
+            <source>逗号分隔的可执行文件名；名单里的程序有可见窗口时暂停抓帧</source>
+            <translation>Comma-separated executable file names; frame grabbing pauses while a listed program has a visible window</translation>
+        </message>
+        <message>
+            <source>排除名单不合法</source>
+            <translation>Invalid exclusion list</translation>
+        </message>
+        <message>
+            <source>回溯截图</source>
+            <translation>Rewind</translation>
+        </message>
 </context>
 </TS>

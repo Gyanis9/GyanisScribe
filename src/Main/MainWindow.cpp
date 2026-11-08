@@ -21,6 +21,7 @@
 #include "Plugins/Recording/FfmpegAudioDevices.h"
 #include "Plugins/Recording/FfmpegVideoEncoderEnumerator.h"
 #include "Core/Record/RecorderConfig.h"
+#include "Core/Rewind/RewindConfig.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
@@ -49,6 +50,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMenu>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QSpinBox>
@@ -84,6 +86,8 @@ namespace
     using GyanisScribe::Main::PageChoice;
     using GyanisScribe::Main::ThemeChoice;
     using GyanisScribe::Main::themeKindAt;
+
+    namespace Core = GyanisScribe::Core;
 
     /// 主窗口的全部页：序号、目标页、导航行标签与图标绑在同一张表上，表的顺序就是导航的顺序
     constexpr std::array<PageChoice, 10> kPages = {
@@ -1341,6 +1345,141 @@ namespace
                          });
         return combo;
     }
+
+    /**
+     * @brief 回溯缓冲的开启开关，带一次隐私确认
+     * @param settings 配置存储
+     * @return 归调用方所有的复选框
+     * @details 打开与关闭不是对称的两步：打开后屏幕画面会留在内存里，所以先把边界摆给用户看，
+     *          只有点「是」才写 true；点「否」把勾收回去，配置一个字都不动。关闭正相反，立刻写 false，
+     *          协调器收到变更后清空缓冲并停止抓帧。
+     */
+    QCheckBox *makeRewindEnabledCheck(Core::ISettingsStore &settings)
+    {
+        auto *check = new GyanisScribe::Gui::CheckBox;
+        check->setObjectName(QStringLiteral("rewindEnabled"));
+        check->setText(GyanisScribe::Base::uiText("开启回溯缓冲（仅内存）"));
+        check->setAccessibleName(GyanisScribe::Base::uiText("开启回溯缓冲"));
+        check->setToolTip(GyanisScribe::Base::uiText("只存内存，不写盘、不上传；锁屏或退出清空。"));
+        check->setChecked(settings.boolValue(Core::kRewindEnabled, false));
+
+        QObject::connect(check, &QCheckBox::toggled, check,
+                         [&settings, check](const bool checked)
+                         {
+                             if (checked)
+                             {
+                                 // 分段查表再用换行拼起来：把 \n 写进 uiText 的字面量时，目录里存的是转义文本，运行期查不中
+                                 const QString privacy = GyanisScribe::Base::uiText("会把最近 10 秒的屏幕画面保存在内存里。") + QLatin1Char('\n') +
+                                                         GyanisScribe::Base::uiText("不写盘、不上传、不录声音。") + QLatin1Char('\n') +
+                                                         GyanisScribe::Base::uiText("锁屏或退出程序会清空。") + QLatin1Char('\n') +
+                                                         GyanisScribe::Base::uiText("可以排除密码管理器等程序。") + QStringLiteral("\n\n") +
+                                                         GyanisScribe::Base::uiText("确定开启吗？");
+                                 const auto    answer =
+                                         QMessageBox::question(check, GyanisScribe::Base::uiText("开启回溯缓冲"), privacy, QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+                                 if (answer != QMessageBox::Yes)
+                                 {
+                                     const QSignalBlocker blocker(check);
+                                     check->setChecked(false);
+                                     return;
+                                 }
+                             }
+                             if (auto written = settings.setValue(Core::kRewindEnabled, checked); !written)
+                             {
+                                 Logger::warning(std::format("回溯开关没能写入：{}", written.error().message));
+                             }
+                         });
+        return check;
+    }
+
+    /**
+     * @brief 回溯缓冲保留多久（秒）
+     * @param settings 配置存储
+     * @return 归调用方所有的数字框
+     * @details 范围取 Core 里与读端共用的那两个常量：界面能给出的值，协调器都必须收得下。
+     */
+    QSpinBox *makeRewindBufferSecondsSpin(Core::ISettingsStore &settings)
+    {
+        auto *spin = new GyanisScribe::Gui::SpinBox;
+        spin->setObjectName(QStringLiteral("rewindBufferSeconds"));
+        spin->setRange(Core::kMinimumRewindBufferSeconds, Core::kMaximumRewindBufferSeconds);
+        spin->setSuffix(GyanisScribe::Base::uiText(" 秒"));
+        spin->setAccessibleName(GyanisScribe::Base::uiText("保留时长"));
+        spin->setValue(settings.intValue(Core::kRewindBufferSeconds, Core::kDefaultRewindBufferSeconds));
+
+        QObject::connect(spin, &QSpinBox::valueChanged, spin,
+                         [&settings](const int value)
+                         {
+                             if (auto written = settings.setValue(Core::kRewindBufferSeconds, value); !written)
+                             {
+                                 Logger::warning(std::format("回溯时长没能写入：{}", written.error().message));
+                             }
+                         });
+        return spin;
+    }
+
+    /**
+     * @brief 回溯缓冲的目标帧率
+     * @param settings 配置存储
+     * @return 归调用方所有的下拉框
+     * @details 只摆三档：回溯是回看，过密的帧只会更快吃满固定的内存预算。
+     */
+    QComboBox *makeRewindFrameRateCombo(Core::ISettingsStore &settings)
+    {
+        auto *combo = new QComboBox;
+        combo->setObjectName(QStringLiteral("rewindFrameRate"));
+        combo->setAccessibleName(GyanisScribe::Base::uiText("帧率"));
+        for (const int rate: {Core::kMinimumRewindFrameRate, Core::kDefaultRewindFrameRate, Core::kMaximumRewindFrameRate})
+        {
+            combo->addItem(QString::number(rate), rate);
+        }
+
+        const int stored = settings.intValue(Core::kRewindFrameRate, Core::kDefaultRewindFrameRate);
+        const int index  = combo->findData(stored);
+        combo->setCurrentIndex(index >= 0 ? index : combo->findData(Core::kDefaultRewindFrameRate));
+
+        QObject::connect(combo, &QComboBox::currentIndexChanged, combo,
+                         [&settings, combo]
+                         {
+                             if (auto written = settings.setValue(Core::kRewindFrameRate, combo->currentData()); !written)
+                             {
+                                 Logger::warning(std::format("回溯帧率没能写入：{}", written.error().message));
+                             }
+                         });
+        return combo;
+    }
+
+    /**
+     * @brief 回溯缓冲的排除程序名单
+     * @param settings 配置存储
+     * @return 归调用方所有的输入框
+     * @details 写入前先按协调器读配置用的同一个解析函数校验：非法项不落盘并当场说明正确写法，
+     *          否则协调器下一次启动会因这份名单拒绝启动，而用户只在日志里看得到原因。
+     */
+    QLineEdit *makeRewindExclusionEdit(Core::ISettingsStore &settings)
+    {
+        auto *edit = new QLineEdit;
+        edit->setObjectName(QStringLiteral("rewindExcludeProcesses"));
+        edit->setPlaceholderText(GyanisScribe::Base::uiText("keepass.exe, 1password.exe"));
+        edit->setAccessibleName(GyanisScribe::Base::uiText("排除程序"));
+        edit->setToolTip(GyanisScribe::Base::uiText("逗号分隔的可执行文件名；名单里的程序有可见窗口时暂停抓帧"));
+        edit->setText(settings.stringValue(Core::kRewindExcludeProcesses, QString{}));
+
+        QObject::connect(edit, &QLineEdit::editingFinished, edit,
+                         [&settings, edit]
+                         {
+                             const auto parsed = Core::parseRewindExclusions(edit->text());
+                             if (!parsed)
+                             {
+                                 QMessageBox::warning(edit, GyanisScribe::Base::uiText("排除名单不合法"), QString::fromStdString(parsed.error().message));
+                                 return;
+                             }
+                             if (auto written = settings.setValue(Core::kRewindExcludeProcesses, edit->text()); !written)
+                             {
+                                 Logger::warning(std::format("回溯排除名单没能写入：{}", written.error().message));
+                             }
+                         });
+        return edit;
+    }
 } // namespace
 
 namespace GyanisScribe::Main
@@ -2188,6 +2327,15 @@ namespace GyanisScribe::Main
                      makeSettingCheck(m_settings, GyanisScribe::Core::kPickHexUppercase, true, GyanisScribe::Base::uiText("十六进制用大写"),
                                       GyanisScribe::Base::uiText("十六进制用大写"),
                                       GyanisScribe::Base::uiText("关掉后复制出来的是 #3c78c8 这一形。只影响 HEX 那一档写法，其余五档不动")));
+        form->addRow(GyanisScribe::Base::uiText("回溯截图"), makeRewindEnabledCheck(m_settings));
+        form->addRow(GyanisScribe::Base::uiText("保留时长"), makeRewindBufferSecondsSpin(m_settings));
+        form->addRow(GyanisScribe::Base::uiText("帧率"), makeRewindFrameRateCombo(m_settings));
+        form->addRow(GyanisScribe::Base::uiText("排除程序"), makeRewindExclusionEdit(m_settings));
+
+        auto *rewindNote = new QLabel{GyanisScribe::Base::uiText("只存内存，不写盘、不上传；锁屏或退出清空。"), page};
+        rewindNote->setObjectName(QStringLiteral("rewindPrivacyNote"));
+        rewindNote->setWordWrap(true);
+        form->addRow(rewindNote);
         return page;
     }
 

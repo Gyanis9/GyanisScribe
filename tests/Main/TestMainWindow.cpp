@@ -15,6 +15,7 @@
 #include "Core/Pick/PickGeometry.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Core/Record/RecorderConfig.h"
+#include "Core/Rewind/RewindConfig.h"
 #include "Base/Logger.h"
 #include "Core/Image/OutputDecoration.h"
 #include "Base/Paths.h"
@@ -1142,6 +1143,69 @@ namespace
     }
 
     /**
+     * @brief 钉住截图页的回溯分组：四个控件按对象名找得到，且未存配置时摆的是默认档
+     * @details 对象名是设置页之外的接线点，协调器与用例都靠它取控件；只断存在不断默认值时，
+     *          把时长默认写成 30 或帧率默认写成 2 都照样绿。
+     */
+    TEST_F(MainWindowFixture, CapturePageExposesRewindSettingsWithDefaults)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::Capture);
+
+        auto *enabled = m_window->findChild<QCheckBox *>(QStringLiteral("rewindEnabled"));
+        auto *seconds = m_window->findChild<QSpinBox *>(QStringLiteral("rewindBufferSeconds"));
+        auto *rate    = m_window->findChild<QComboBox *>(QStringLiteral("rewindFrameRate"));
+        auto *exclude = m_window->findChild<QLineEdit *>(QStringLiteral("rewindExcludeProcesses"));
+        ASSERT_NE(enabled, nullptr) << "截图页没有开启回溯缓冲这一格";
+        ASSERT_NE(seconds, nullptr) << "截图页没有保留时长这一格";
+        ASSERT_NE(rate, nullptr) << "截图页没有帧率这一格";
+        ASSERT_NE(exclude, nullptr) << "截图页没有排除程序这一格";
+
+        EXPECT_FALSE(enabled->isChecked()) << "回溯默认必须关闭";
+        EXPECT_EQ(enabled->text(), GyanisScribe::Base::uiText("开启回溯缓冲（仅内存）"));
+        EXPECT_EQ(seconds->minimum(), GyanisScribe::Core::kMinimumRewindBufferSeconds);
+        EXPECT_EQ(seconds->maximum(), GyanisScribe::Core::kMaximumRewindBufferSeconds);
+        EXPECT_EQ(seconds->value(), GyanisScribe::Core::kDefaultRewindBufferSeconds);
+        EXPECT_EQ(seconds->suffix(), GyanisScribe::Base::uiText(" 秒"));
+
+        ASSERT_EQ(rate->count(), 3);
+        EXPECT_EQ(rate->itemData(0).toInt(), GyanisScribe::Core::kMinimumRewindFrameRate);
+        EXPECT_EQ(rate->itemData(1).toInt(), GyanisScribe::Core::kDefaultRewindFrameRate);
+        EXPECT_EQ(rate->itemData(2).toInt(), GyanisScribe::Core::kMaximumRewindFrameRate);
+        EXPECT_EQ(rate->currentData().toInt(), GyanisScribe::Core::kDefaultRewindFrameRate);
+
+        EXPECT_TRUE(exclude->text().isEmpty());
+        EXPECT_EQ(exclude->placeholderText(), GyanisScribe::Base::uiText("keepass.exe, 1password.exe"));
+
+        auto *note = m_window->findChild<QLabel *>(QStringLiteral("rewindPrivacyNote"));
+        ASSERT_NE(note, nullptr) << "回溯分组没有一行说明";
+        EXPECT_EQ(note->text(), GyanisScribe::Base::uiText("只存内存，不写盘、不上传；锁屏或退出清空。"));
+    }
+
+    /**
+     * @brief 钉住关闭回溯开关立刻写 false（协调器据此清空缓冲）
+     * @details 开启那一向要弹隐私确认，测试里不点模态框；这里只走关闭这一向：
+     *          构造时存成已开启，取消勾选后配置必须当场变 false，而不是等关窗才落盘。
+     */
+    TEST_F(MainWindowFixture, RewindEnableSwitchWritesOffImmediately)
+    {
+        ASSERT_TRUE(m_store->setValue(GyanisScribe::Core::kRewindEnabled, true).has_value());
+        makeWindow();
+        m_window->open(MainWindowPage::Capture);
+
+        auto *enabled = m_window->findChild<QCheckBox *>(QStringLiteral("rewindEnabled"));
+        ASSERT_NE(enabled, nullptr);
+        ASSERT_TRUE(enabled->isChecked()) << "存着开启时这一格该显示已开";
+
+        enabled->setChecked(false);
+        EXPECT_FALSE(m_store->boolValue(GyanisScribe::Core::kRewindEnabled, true)) << "关闭没有立刻写回配置，协调器不会清空缓冲";
+
+        closeWindowAndFlush();
+        const auto reopened = makeStore();
+        EXPECT_FALSE(reopened->boolValue(GyanisScribe::Core::kRewindEnabled, true)) << "关闭没落盘";
+    }
+
+    /**
      * @brief 钉住「允许单键当全局热键」这一格真的换了录入框的松紧
      * @details 只断设置写没写是空转：这一格的价值全在「录入框认不认裸键」上。
      *          两档各来一次：默认拒、开了收，且收下的就是那颗键本身。
@@ -1800,7 +1864,7 @@ TEST_F(MainWindowFixture, EveryNumericFieldUsesTheCustomStepper)
         inventory << QStringLiteral("%1/%2").arg(QString::fromLatin1(spin->metaObject()->className()), spin->accessibleName());
         EXPECT_NE(dynamic_cast<GyanisScribe::Gui::SpinBox *>(spin), nullptr) << "设置页还留着一个原生 QSpinBox：" << spin->metaObject()->className();
     }
-    EXPECT_EQ(spins.size(), 13) << "设置页数字框数量变了，先确认新加的那一格有没有用 SpinBox：" << inventory.join(QStringLiteral(", ")).toStdString();
+    EXPECT_EQ(spins.size(), 14) << "设置页数字框数量变了，先确认新加的那一格有没有用 SpinBox：" << inventory.join(QStringLiteral(", ")).toStdString();
 }
 
 /**
