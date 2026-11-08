@@ -1,3 +1,12 @@
+/**
+ * @file SurfaceWidget.h
+ * @brief 按连续曲率铺语义色底的容器与标签
+ * @author Gyanis
+ * @date 2026-11-08
+ * @version 0.0.1
+ * @copyright Copyright (c) . All rights reserved.
+ */
+
 #pragma once
 
 #include "Core/Geometry/ContinuousCorner.h"
@@ -52,6 +61,8 @@ namespace GyanisScribe::Gui
     protected:
         /**
          * @brief 按当前角色与铺底色画连续曲率底
+         * @details 重写 QWidget::paintEvent()：基类只画背景，这里改由本类按连续曲率画底与描边；
+         *          开了 setHighContrastBorder 时高对比度档换用 borderStrong 2px 边
          * @param event 绘制事件
          */
         void paintEvent(QPaintEvent *event) override;
@@ -101,6 +112,8 @@ namespace GyanisScribe::Gui
     protected:
         /**
          * @brief 先画连续曲率底，再让 QLabel 画内容
+         * @details 重写 QLabel::paintEvent()：底画在基类之前，文字、对齐与省略仍由基类处理；
+         *          开了 setHighContrastBorder 时高对比度档换用 borderStrong 2px 边
          * @param event 绘制事件
          */
         void paintEvent(QPaintEvent *event) override;

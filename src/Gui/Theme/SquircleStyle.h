@@ -31,6 +31,8 @@ namespace GyanisScribe::Gui
     protected:
         /**
          * @brief 置空菜单面板与菜单框，其余交回代理的桌面风格
+         * @details 重写 QProxyStyle::drawPrimitive()：PE_PanelMenu 与 PE_FrameMenu 直接返回，
+         *          其余图元原样交给基类
          * @param element 待绘制的图元
          * @param option 绘制参数
          * @param painter 目标画家
@@ -40,6 +42,8 @@ namespace GyanisScribe::Gui
 
         /**
          * @brief 菜单项只画内容，不画原生底与空区底
+         * @details 重写 QProxyStyle::drawControl()：CE_MenuEmptyArea 直接返回；CE_MenuItem 清掉
+         *          选中态与 Button、Highlight 两种画刷后再交基类
          * @param element 待绘制的控件元素
          * @param option 绘制参数
          * @param painter 目标画家

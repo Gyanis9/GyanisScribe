@@ -1,3 +1,12 @@
+/**
+ * @file Button.h
+ * @brief 自绘连续曲率底与状态的按钮与工具按钮
+ * @author Gyanis
+ * @date 2026-11-08
+ * @version 0.0.1
+ * @copyright Copyright (c) . All rights reserved.
+ */
+
 #pragma once
 
 #include <QPushButton>
@@ -29,9 +38,9 @@ namespace GyanisScribe::Gui
     protected:
         /**
          * @brief 先画连续曲率底，再只画标签
+         * @details 重写 QPushButton::paintEvent()：不调基类，只让样式引擎画 CE_PushButtonLabel；
+         *          没有样式表时原生风格会整块补一层不透明底，把自绘填充盖掉
          * @param event 绘制事件
-         * @note 不调 QPushButton::paintEvent：没有样式表时原生风格会整块补一层不透明底，
-         *       把自绘填充盖掉；标签仍由样式引擎画，QSS 的文字色与图标不受影响
          */
         void paintEvent(QPaintEvent *event) override;
     };
@@ -52,6 +61,8 @@ namespace GyanisScribe::Gui
     protected:
         /**
          * @brief 先画连续曲率底，再只画标签
+         * @details 重写 QToolButton::paintEvent()：不调基类，只让样式引擎画 CE_ToolButtonLabel；
+         *          填充与描边由 toolButtonColors 按选中、悬停、按下与焦点状态给出
          * @param event 绘制事件
          */
         void paintEvent(QPaintEvent *event) override;

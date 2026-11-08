@@ -39,10 +39,29 @@ namespace GyanisScribe::Gui
                 colors.borderWidth = themeBorderWidth(kind);
             }
         }
+
+        /**
+         * @brief 补上高对比度档工具按钮选中态的主色边
+         * @param colors 已按状态算好的颜色，就地补边
+         * @param palette 当前主题的语义色
+         * @param kind 当前主题档
+         * @param enabled 是否启用
+         * @param checked 是否选中
+         * @note 对齐 HighContrast.qss 的 QToolButton:checked（2px 主色边）：只有启用且选中的工具按钮才补；
+         *       同一档的 :disabled 把边压成透明，焦点边已在调用前算好，因此只补 borderWidth 仍为 0 的那一档
+         */
+        void applyHighContrastCheckedBorder(ControlColors &colors, const ThemePalette &palette, const ThemeKind kind, const bool enabled, const bool checked)
+        {
+            if (colors.borderWidth == 0 && kind == ThemeKind::HighContrast && enabled && checked)
+            {
+                colors.border      = palette.accent;
+                colors.borderWidth = themeBorderWidth(kind);
+            }
+        }
     } // namespace
 
-    ControlColors buttonColors(const ThemePalette &palette, const ThemeKind kind, const bool isDefault, const bool enabled, const bool hover,
-                               const bool down, const bool focused, const bool inlineFocus)
+    ControlColors buttonColors(const ThemePalette &palette, const ThemeKind kind, const bool isDefault, const bool enabled, const bool hover, const bool down, const bool focused,
+                               const bool inlineFocus)
     {
         ControlColors colors;
         if (!enabled)
@@ -62,8 +81,8 @@ namespace GyanisScribe::Gui
         return colors;
     }
 
-    ControlColors toolButtonColors(const ThemePalette &palette, const ThemeKind kind, const bool checked, const bool enabled, const bool hover,
-                                   const bool down, const bool focused, const bool inlineFocus)
+    ControlColors toolButtonColors(const ThemePalette &palette, const ThemeKind kind, const bool checked, const bool enabled, const bool hover, const bool down, const bool focused,
+                                   const bool inlineFocus)
     {
         ControlColors colors;
         if (enabled)
@@ -82,11 +101,11 @@ namespace GyanisScribe::Gui
         const auto border  = focusedBorder(palette, kind, focused, inlineFocus);
         colors.border      = border.border;
         colors.borderWidth = border.borderWidth;
+        applyHighContrastCheckedBorder(colors, palette, kind, enabled, checked);
         return colors;
     }
 
-    ControlColors inputColors(const ThemePalette &palette, const ThemeKind kind, const bool enabled, const bool readOnly, const bool focused,
-                              const bool inlineFocus)
+    ControlColors inputColors(const ThemePalette &palette, const ThemeKind kind, const bool enabled, const bool readOnly, const bool focused, const bool inlineFocus)
     {
         ControlColors colors;
         colors.fill        = (!enabled || readOnly) ? palette.mutedFill : palette.controlFill;

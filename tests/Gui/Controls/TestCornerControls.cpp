@@ -125,4 +125,15 @@ TEST_F(CornerControlsFixture, ControlPaletteMapsStatesToThemeRoles)
     EXPECT_EQ(resting.borderWidth, 2);
     const auto focused = GyanisScribe::Gui::buttonColors(contrast, GyanisScribe::Gui::ThemeKind::HighContrast, false, true, false, false, true, false);
     EXPECT_EQ(focused.border, contrast.accent) << "聚焦的主色边被静息黑边盖住了";
+
+    // 工具按钮在这一档选中时同样保留主色边，对齐 QSS 的 QToolButton:checked；
+    // 禁用态的 :disabled 把边压成透明，输入控件无焦点也有一圈 borderStrong 2px 边
+    const auto checkedTool = GyanisScribe::Gui::toolButtonColors(contrast, GyanisScribe::Gui::ThemeKind::HighContrast, true, true, false, false, false, false);
+    EXPECT_EQ(checkedTool.border, contrast.accent);
+    EXPECT_EQ(checkedTool.borderWidth, 2);
+    const auto checkedDisabled = GyanisScribe::Gui::toolButtonColors(contrast, GyanisScribe::Gui::ThemeKind::HighContrast, true, false, false, false, false, false);
+    EXPECT_EQ(checkedDisabled.borderWidth, 0) << "禁用态的工具按钮不该有可见边";
+    const auto restingInput = GyanisScribe::Gui::inputColors(contrast, GyanisScribe::Gui::ThemeKind::HighContrast, true, false, false, false);
+    EXPECT_EQ(restingInput.border, contrast.borderStrong);
+    EXPECT_EQ(restingInput.borderWidth, 2);
 }

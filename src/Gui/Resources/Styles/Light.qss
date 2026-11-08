@@ -14,7 +14,7 @@ QWidget#appRoot {
 }
 
 /* 阅读面（设置页卡片）：底与圆角由 Gui::SurfaceWidget 按 ContinuousCorner 自绘，
-   样式表不再铺底；未迁移的页面容器仍是普通 QWidget，不受这条影响 */
+   样式表里不再有 #pageCard 的铺底与圆角规则 */
 
 /* 关于页品牌底板：品牌砖的砖底是固定色，深色卡片与它同值时砖形会消失；
    底板取窗口底那一档，让黑砖在每一套主题里都有一层可分的边。底与圆角由 Gui::SurfaceLabel 自绘 */

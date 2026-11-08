@@ -1,3 +1,12 @@
+/**
+ * @file Menu.h
+ * @brief 自绘连续曲率面板与当前项高亮的菜单
+ * @author Gyanis
+ * @date 2026-11-08
+ * @version 0.0.1
+ * @copyright Copyright (c) . All rights reserved.
+ */
+
 #pragma once
 
 #include <QMenu>
@@ -28,6 +37,8 @@ namespace GyanisScribe::Gui
     protected:
         /**
          * @brief 先画面板与当前项高亮，再让 QMenu 画菜单项内容
+         * @details 重写 QMenu::paintEvent()：面板、边框与当前项高亮由本类画，
+         *          菜单项文字、图标、勾与子菜单箭头仍交回基类
          * @param event 绘制事件
          */
         void paintEvent(QPaintEvent *event) override;

@@ -24,7 +24,7 @@ namespace GyanisScribe::Gui
     void SquircleStyle::drawPrimitive(const PrimitiveElement element, const QStyleOption *option, QPainter *painter, const QWidget *widget) const
     {
         // 菜单的面板与边框都由 Gui::Menu 按连续曲率自绘；原生风格照常落笔就会盖住高亮、
-        // 并在圆角外补一块方底。提示面板在后续切片里另由本样式接管，这里只有菜单这两档
+        // 并在圆角外补一块方底
         if (element == PE_PanelMenu || element == PE_FrameMenu)
         {
             return;
