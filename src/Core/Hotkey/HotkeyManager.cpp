@@ -35,6 +35,9 @@ namespace GyanisScribe::Core
         /// 快速保存的默认组合：S 取 save，与 A/R/O/P 同一套「动作首字母」记法
         constexpr std::string_view kDefaultQuickSave = "Ctrl+Alt+S";
 
+        /// 回溯截图的默认组合：与前面八颗默认键都不重复，用户不必先改掉别的动作才能用
+        constexpr std::string_view kDefaultRewind = "Ctrl+Alt+Z";
+
         /// 恢复成功时把「旧组合仍在使用」接在失败原因后面，用户才知道现在按哪颗键还有用
         void appendRestoredNote(Base::Error &error, const QString &restoredText)
         {
@@ -100,8 +103,8 @@ namespace GyanisScribe::Core
     std::span<const HotkeyAction> HotkeyManager::managedActions()
     {
         // 表长度由这份初始化列表自己算：每加一个动作就改三处的日子结束了
-        static constexpr std::array kActions = {HotkeyAction::Capture,     HotkeyAction::Record,     HotkeyAction::Ocr,          HotkeyAction::Pick,
-                                                HotkeyAction::CaptureLong, HotkeyAction::TogglePins, HotkeyAction::NextPinGroup, HotkeyAction::QuickSave};
+        static constexpr std::array kActions = {HotkeyAction::Capture,    HotkeyAction::Record,       HotkeyAction::Ocr,       HotkeyAction::Pick,  HotkeyAction::CaptureLong,
+                                                HotkeyAction::TogglePins, HotkeyAction::NextPinGroup, HotkeyAction::QuickSave, HotkeyAction::Rewind};
         return kActions;
     }
 
@@ -125,6 +128,8 @@ namespace GyanisScribe::Core
                 return Core::kHotkeyNextPinGroup;
             case HotkeyAction::QuickSave:
                 return Core::kHotkeyQuickSave;
+            case HotkeyAction::Rewind:
+                return Core::kHotkeyRewind;
         }
         // 上面穷举过；走到这里说明新增了动作而这里没跟上，交回兜底键名并在日志里点名
         Base::Logger::error(std::format("动作枚举 {} 没有对应的设置键，请把 settingsKeyFor 补全", static_cast<int>(action)));
@@ -163,6 +168,8 @@ namespace GyanisScribe::Core
                 return kDefaultNextPinGroup;
             case HotkeyAction::QuickSave:
                 return kDefaultQuickSave;
+            case HotkeyAction::Rewind:
+                return kDefaultRewind;
         }
         Base::Logger::error(std::format("动作枚举 {} 没有对应的默认组合，请把 defaultCombinationTextFor 补全", static_cast<int>(action)));
         return kDefaultCapture;

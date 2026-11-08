@@ -34,6 +34,7 @@ namespace GyanisScribe::Core
         TogglePins,   ///< 收起或摆回全部贴图；追加在末尾，编号排到 6
         NextPinGroup, ///< 切到下一组贴图；追加在末尾，编号排到 7
         QuickSave,    ///< 快速保存：截图后直接存文件并复制；追加在末尾，编号排到 8
+        Rewind,       ///< 回溯截图；追加在末尾，编号排到 9
     };
 
     /**

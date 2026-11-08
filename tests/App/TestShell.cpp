@@ -149,10 +149,10 @@ TEST(TrayMenuCapabilities, DropsThroughEscapeOnlyWhenThePlatformCannotGoThrough)
  */
 TEST(TrayTooltip, ShowsThePinCountOnlyWhenPinsExist)
 {
-    EXPECT_EQ(GyanisScribe::App::trayTooltip(0, -1, false), QStringLiteral("智录"));
-    EXPECT_EQ(GyanisScribe::App::trayTooltip(-1, -1, false), QStringLiteral("智录")) << "负数不该写成「贴图 -1 张」";
+    EXPECT_EQ(GyanisScribe::App::trayTooltip(0, -1, false, QString{}), QStringLiteral("智录"));
+    EXPECT_EQ(GyanisScribe::App::trayTooltip(-1, -1, false, QString{}), QStringLiteral("智录")) << "负数不该写成「贴图 -1 张」";
 
-    const auto three = GyanisScribe::App::trayTooltip(3, -1, false);
+    const auto three = GyanisScribe::App::trayTooltip(3, -1, false, QString{});
     EXPECT_NE(three.indexOf(QStringLiteral("智录")), -1) << three.toStdString();
     EXPECT_NE(three.indexOf(QStringLiteral("3")), -1) << three.toStdString();
     EXPECT_NE(three.indexOf(QStringLiteral("贴图")), -1) << three.toStdString();
@@ -165,16 +165,31 @@ TEST(TrayTooltip, ShowsThePinCountOnlyWhenPinsExist)
  */
 TEST(TrayTooltip, ShowsRecordingProgressAndSeparatesPaused)
 {
-    const auto recording = GyanisScribe::App::trayTooltip(2, 75, false);
+    const auto recording = GyanisScribe::App::trayTooltip(2, 75, false, QString{});
     EXPECT_NE(recording.indexOf(QStringLiteral("录制")), -1) << recording.toStdString();
     EXPECT_NE(recording.indexOf(QStringLiteral("01:15")), -1) << "时长要按时钟文本给：75 直接写出来看不出比 90 短";
 
-    const auto paused = GyanisScribe::App::trayTooltip(2, 75, true);
+    const auto paused = GyanisScribe::App::trayTooltip(2, 75, true, QString{});
     EXPECT_NE(paused.indexOf(QStringLiteral("暂停")), -1) << paused.toStdString();
     EXPECT_NE(recording, paused) << "暂停与在录在托盘上是同一句读数";
 
-    EXPECT_EQ(GyanisScribe::App::trayTooltip(2, -1, false), GyanisScribe::App::trayTooltip(2, -5, false)) << "负数一律按「没在录」处理，不该随数值变";
-    EXPECT_EQ(GyanisScribe::App::trayTooltip(0, -1, true), QStringLiteral("智录")) << "没在录时暂停位不该改读数";
+    EXPECT_EQ(GyanisScribe::App::trayTooltip(2, -1, false, QString{}), GyanisScribe::App::trayTooltip(2, -5, false, QString{})) << "负数一律按「没在录」处理，不该随数值变";
+    EXPECT_EQ(GyanisScribe::App::trayTooltip(0, -1, true, QString{}), QStringLiteral("智录")) << "没在录时暂停位不该改读数";
+}
+
+/**
+ * @brief 钉住回溯状态是托盘提示上多出来的一段，传空即恢复原文案
+ * @details 关闭回溯或平台不支持时调用方传空串：提示必须与没有这一档时逐字一样，
+ *          否则「回溯已经关掉」在托盘上看起来仍像在抓。
+ */
+TEST(TrayTooltip, RewindStatusAppearsAndDisappears)
+{
+    using GyanisScribe::App::trayTooltip;
+    const auto enabled = trayTooltip(0, -1, false, QStringLiteral("回溯缓冲已开启"));
+    EXPECT_TRUE(enabled.contains(QStringLiteral("回溯缓冲"))) << enabled.toStdString();
+    const auto paused = trayTooltip(0, -1, false, QStringLiteral("回溯缓冲已暂停：排除的程序在前台"));
+    EXPECT_TRUE(paused.contains(QStringLiteral("已暂停"))) << paused.toStdString();
+    EXPECT_EQ(trayTooltip(0, -1, false, QString{}), QStringLiteral("智录"));
 }
 
 /**

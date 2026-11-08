@@ -82,11 +82,13 @@ namespace GyanisScribe::App
      * @param pinCount 现在挂着的贴图张数，0 表示没有
      * @param recordedSeconds 已录秒数；负数表示这一轮没在录
      * @param paused 是否停在暂停那一档，只有真在录的时候作数
+     * @param rewindStatus 回溯缓冲状态那一段；空串表示不显示
      * @return 一行提示文本
      * @details 控制条可以收进托盘，收起后托盘就是唯一还能看出「还在录、录了多久」的地方；
-     *          没在录时这一行留给贴图张数。做成纯函数是为了逐格点名，不依赖这台机器真有托盘。
+     *          没在录时这一行留给贴图张数。回溯状态非空时再接一段，关闭后传空串即恢复原文案。
+     *          做成纯函数是为了逐格点名，不依赖这台机器真有托盘。
      */
-    [[nodiscard]] QString trayTooltip(int pinCount, int recordedSeconds, bool paused);
+    [[nodiscard]] QString trayTooltip(int pinCount, int recordedSeconds, bool paused, const QString &rewindStatus);
 
     /**
      * @brief 托盘控制器
@@ -157,6 +159,16 @@ namespace GyanisScribe::App
         void setRecordingStatus(int recordedSeconds, bool paused);
 
         /**
+         * @brief 把回溯缓冲状态推给托盘悬停提示
+         * @param enabled 缓冲是否开启；关闭时提示里不再有回溯那一段
+         * @param paused 是否暂停抓帧
+         * @param reason 暂停原因，只在暂停时显示
+         * @details 装托盘之前调用也不丢：install() 用的是这份存下来的状态。
+         *          关闭后提示恢复到没有这一档时的原文案，不会留着上一轮的「已暂停」。
+         */
+        void setRewindStatus(bool enabled, bool paused, const QString &reason);
+
+        /**
          * @brief 托盘图标上的一下鼠标按配置该做成什么
          * @param role 左键单击还是中键单击
          * @details 这是那两下的公开出口：真的托盘在这台机器上不一定建得出来，而「这一格配的是什么、
@@ -180,6 +192,12 @@ namespace GyanisScribe::App
          */
         void onActivated(QSystemTrayIcon::ActivationReason reason);
 
+        /**
+         * @brief 当前回溯状态在悬停提示里占的那一段
+         * @return 关闭时为空串；暂停时为「回溯缓冲已暂停：原因」；其余为「回溯缓冲已开启」
+         */
+        [[nodiscard]] QString rewindStatusText() const;
+
         GyanisScribe::Gui::IconProvider &m_icons;                   ///< 图标供给器，不拥有
         GyanisScribe::Gui::ThemeManager &m_theme;                   ///< 主题管理器，不拥有
         Core::ISettingsStore            &m_settings;                ///< 配置存储，不拥有
@@ -189,6 +207,9 @@ namespace GyanisScribe::App
         int                              m_pinCount        = 0;     ///< 现在挂着的贴图张数，只用于悬停提示
         int                              m_recordedSeconds = -1;    ///< 已录秒数，负数表示没在录
         bool                             m_recordingPaused = false; ///< 录制是否停在暂停那一档
+        bool                             m_rewindEnabled   = false; ///< 回溯缓冲是否开启
+        bool                             m_rewindPaused    = false; ///< 回溯缓冲是否暂停
+        QString                          m_rewindReason;            ///< 暂停原因，只在暂停时显示
     };
 
 } // namespace GyanisScribe::App

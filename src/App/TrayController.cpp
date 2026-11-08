@@ -30,19 +30,27 @@ namespace
 
 namespace GyanisScribe::App
 {
-    QString trayTooltip(const int pinCount, const int recordedSeconds, const bool paused)
+    QString trayTooltip(const int pinCount, const int recordedSeconds, const bool paused, const QString &rewindStatus)
     {
+        QStringList parts;
         if (recordedSeconds >= 0)
         {
             // 控制条收起后这就是唯一的读数处：暂停与在录要分得开，否则用户不知道帧还在不在走
-            const auto label = paused ? GyanisScribe::Base::uiText("智录 · 录制已暂停 %1") : GyanisScribe::Base::uiText("智录 · 正在录制 %1");
-            return label.arg(GyanisScribe::Gui::formatDuration(recordedSeconds));
+            const auto label = paused ? GyanisScribe::Base::uiText("录制已暂停 %1") : GyanisScribe::Base::uiText("正在录制 %1");
+            parts.append(label.arg(GyanisScribe::Gui::formatDuration(recordedSeconds)));
+        } else if (pinCount > 0)
+        {
+            parts.append(GyanisScribe::Base::uiText("贴图 %1 张").arg(pinCount));
         }
-        if (pinCount <= 0)
+        if (!rewindStatus.isEmpty())
+        {
+            parts.append(rewindStatus);
+        }
+        if (parts.isEmpty())
         {
             return GyanisScribe::Base::uiText("智录");
         }
-        return GyanisScribe::Base::uiText("智录 · 贴图 %1 张").arg(pinCount);
+        return GyanisScribe::Base::uiText("智录 · %1").arg(parts.join(QStringLiteral(" · ")));
     }
 
     QString trayHotkeyHint(const Core::ISettingsStore &settings, const std::string_view hotkeyKey)
@@ -152,7 +160,7 @@ namespace GyanisScribe::App
         buildMenu(*m_menu, screenNames);
 
         m_icon->setIcon(trayIcon());
-        m_icon->setToolTip(trayTooltip(m_pinCount, m_recordedSeconds, m_recordingPaused));
+        m_icon->setToolTip(trayTooltip(m_pinCount, m_recordedSeconds, m_recordingPaused, rewindStatusText()));
 
         m_icon->setContextMenu(m_menu.get());
         m_icon->show();
@@ -260,7 +268,7 @@ namespace GyanisScribe::App
         m_pinCount = pinCount;
         if (m_icon != nullptr)
         {
-            m_icon->setToolTip(trayTooltip(m_pinCount, m_recordedSeconds, m_recordingPaused));
+            m_icon->setToolTip(trayTooltip(m_pinCount, m_recordedSeconds, m_recordingPaused, rewindStatusText()));
         }
     }
 
@@ -270,8 +278,32 @@ namespace GyanisScribe::App
         m_recordingPaused = paused;
         if (m_icon != nullptr)
         {
-            m_icon->setToolTip(trayTooltip(m_pinCount, m_recordedSeconds, m_recordingPaused));
+            m_icon->setToolTip(trayTooltip(m_pinCount, m_recordedSeconds, m_recordingPaused, rewindStatusText()));
         }
+    }
+
+    void TrayController::setRewindStatus(const bool enabled, const bool paused, const QString &reason)
+    {
+        m_rewindEnabled = enabled;
+        m_rewindPaused  = paused;
+        m_rewindReason  = reason;
+        if (m_icon != nullptr)
+        {
+            m_icon->setToolTip(trayTooltip(m_pinCount, m_recordedSeconds, m_recordingPaused, rewindStatusText()));
+        }
+    }
+
+    QString TrayController::rewindStatusText() const
+    {
+        if (!m_rewindEnabled)
+        {
+            return {};
+        }
+        if (m_rewindPaused)
+        {
+            return GyanisScribe::Base::uiText("回溯缓冲已暂停：%1").arg(m_rewindReason);
+        }
+        return GyanisScribe::Base::uiText("回溯缓冲已开启");
     }
 
 
