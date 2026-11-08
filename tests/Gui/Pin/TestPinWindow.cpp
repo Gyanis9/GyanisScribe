@@ -1376,7 +1376,7 @@ namespace GyanisScribe
         QMimeData mime;
         mime.setText(QStringLiteral("hello"));
 
-        QDragEnterEvent enter{QPoint{10, 12}, Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier};
+        QDragEnterEvent enter{QPointF{10.0, 12.0}, Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier};
         QApplication::sendEvent(&window, &enter);
         ASSERT_TRUE(enter.isAccepted()) << "拖动进入没收下，后面的落下无从谈起";
 
@@ -1409,13 +1409,13 @@ namespace GyanisScribe
         auto &window = makeWindow();
 
         QMimeData       empty;
-        QDragEnterEvent refused{QPoint{5, 5}, Qt::CopyAction, &empty, Qt::LeftButton, Qt::NoModifier};
+        QDragEnterEvent refused{QPointF{5.0, 5.0}, Qt::CopyAction, &empty, Qt::LeftButton, Qt::NoModifier};
         QApplication::sendEvent(&window, &refused);
         EXPECT_FALSE(refused.isAccepted()) << "空载荷也收下了";
 
         QMimeData text;
         text.setText(QStringLiteral("x"));
-        QDragEnterEvent accepted{QPoint{5, 5}, Qt::CopyAction, &text, Qt::LeftButton, Qt::NoModifier};
+        QDragEnterEvent accepted{QPointF{5.0, 5.0}, Qt::CopyAction, &text, Qt::LeftButton, Qt::NoModifier};
         QApplication::sendEvent(&window, &accepted);
         EXPECT_TRUE(accepted.isAccepted()) << "带文本的拖动没收下";
 
@@ -1423,7 +1423,7 @@ namespace GyanisScribe
         QObject::connect(&window, &Gui::PinWindow::dropRequested, [&dropped](const QMimeData *, const QPoint &) { dropped = true; });
 
         window.startAnnotation();
-        QDragEnterEvent during{QPoint{5, 5}, Qt::CopyAction, &text, Qt::LeftButton, Qt::NoModifier};
+        QDragEnterEvent during{QPointF{5.0, 5.0}, Qt::CopyAction, &text, Qt::LeftButton, Qt::NoModifier};
         QApplication::sendEvent(&window, &during);
         EXPECT_FALSE(during.isAccepted()) << "标注中把拖动也收下了";
 

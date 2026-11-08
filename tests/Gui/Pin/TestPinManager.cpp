@@ -648,7 +648,7 @@ namespace GyanisScribe
                          });
 
         // 先收下 DragEnter：QApplication::notify 只把 Drop 投给收下过 DragEnter 的窗口
-        QDragEnterEvent enter{QPoint{4, 6}, Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier};
+        QDragEnterEvent enter{QPointF{4.0, 6.0}, Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier};
         QApplication::sendEvent(window, &enter);
         ASSERT_TRUE(enter.isAccepted()) << "拖动进入没收下，后面的落下无从谈起";
 
