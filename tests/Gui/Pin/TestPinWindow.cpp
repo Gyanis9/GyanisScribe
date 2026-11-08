@@ -71,6 +71,23 @@ namespace GyanisScribe
             return image;
         }
 
+        /**
+         * @brief 造一条拖入事件，落点构造按 Qt 版本选
+         * @param pos 窗口内落点
+         * @param data 拖放载荷，只在事件存活期间使用
+         * @return 拖入事件
+         * @details Qt 6.12 构建里 QPoint 构造会报弃用警告（/WX 下是 C4996），而 6.11 还没有 QPointF 构造，
+         *          所以按版本分岔；两种构造给出同一个落点。
+         */
+        QDragEnterEvent makeDragEnterEvent(const QPoint &pos, const QMimeData *data)
+        {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 12, 0)
+            return QDragEnterEvent{QPointF{pos}, Qt::CopyAction, data, Qt::LeftButton, Qt::NoModifier};
+#else
+            return QDragEnterEvent{pos, Qt::CopyAction, data, Qt::LeftButton, Qt::NoModifier};
+#endif
+        }
+
         /// 投一条按键事件：判据不依赖「窗口恰好是当前焦点」
         void pressKey(QWidget &target, const Qt::Key key, const Qt::KeyboardModifiers modifiers = Qt::NoModifier)
         {
@@ -1376,7 +1393,7 @@ namespace GyanisScribe
         QMimeData mime;
         mime.setText(QStringLiteral("hello"));
 
-        QDragEnterEvent enter{QPoint{10, 12}, Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier};
+        QDragEnterEvent enter = makeDragEnterEvent(QPoint{10, 12}, &mime);
         QApplication::sendEvent(&window, &enter);
         ASSERT_TRUE(enter.isAccepted()) << "拖动进入没收下，后面的落下无从谈起";
 
@@ -1409,13 +1426,13 @@ namespace GyanisScribe
         auto &window = makeWindow();
 
         QMimeData       empty;
-        QDragEnterEvent refused{QPoint{5, 5}, Qt::CopyAction, &empty, Qt::LeftButton, Qt::NoModifier};
+        QDragEnterEvent refused = makeDragEnterEvent(QPoint{5, 5}, &empty);
         QApplication::sendEvent(&window, &refused);
         EXPECT_FALSE(refused.isAccepted()) << "空载荷也收下了";
 
         QMimeData text;
         text.setText(QStringLiteral("x"));
-        QDragEnterEvent accepted{QPoint{5, 5}, Qt::CopyAction, &text, Qt::LeftButton, Qt::NoModifier};
+        QDragEnterEvent accepted = makeDragEnterEvent(QPoint{5, 5}, &text);
         QApplication::sendEvent(&window, &accepted);
         EXPECT_TRUE(accepted.isAccepted()) << "带文本的拖动没收下";
 
@@ -1423,7 +1440,7 @@ namespace GyanisScribe
         QObject::connect(&window, &Gui::PinWindow::dropRequested, [&dropped](const QMimeData *, const QPoint &) { dropped = true; });
 
         window.startAnnotation();
-        QDragEnterEvent during{QPoint{5, 5}, Qt::CopyAction, &text, Qt::LeftButton, Qt::NoModifier};
+        QDragEnterEvent during = makeDragEnterEvent(QPoint{5, 5}, &text);
         QApplication::sendEvent(&window, &during);
         EXPECT_FALSE(during.isAccepted()) << "标注中把拖动也收下了";
 

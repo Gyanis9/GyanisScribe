@@ -68,6 +68,23 @@ namespace GyanisScribe
             return 0;
         }
 
+        /**
+         * @brief 造一条拖入事件，落点构造按 Qt 版本选
+         * @param pos 窗口内落点
+         * @param data 拖放载荷，只在事件存活期间使用
+         * @return 拖入事件
+         * @details Qt 6.12 构建里 QPoint 构造会报弃用警告（/WX 下是 C4996），而 6.11 还没有 QPointF 构造，
+         *          所以按版本分岔；两种构造给出同一个落点。
+         */
+        QDragEnterEvent makeDragEnterEvent(const QPoint &pos, const QMimeData *data)
+        {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 12, 0)
+            return QDragEnterEvent{QPointF{pos}, Qt::CopyAction, data, Qt::LeftButton, Qt::NoModifier};
+#else
+            return QDragEnterEvent{pos, Qt::CopyAction, data, Qt::LeftButton, Qt::NoModifier};
+#endif
+        }
+
         /// 小图一张：分组判据不看内容，只看谁在桌上
         QImage makeImage()
         {
@@ -648,7 +665,7 @@ namespace GyanisScribe
                          });
 
         // 先收下 DragEnter：QApplication::notify 只把 Drop 投给收下过 DragEnter 的窗口
-        QDragEnterEvent enter{QPoint{4, 6}, Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier};
+        QDragEnterEvent enter = makeDragEnterEvent(QPoint{4, 6}, &mime);
         QApplication::sendEvent(window, &enter);
         ASSERT_TRUE(enter.isAccepted()) << "拖动进入没收下，后面的落下无从谈起";
 
