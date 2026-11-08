@@ -1,6 +1,7 @@
 #include "Core/Geometry/ContinuousCorner.h"
 #include "Gui/Controls/Button.h"
 #include "Gui/Controls/ComboBox.h"
+#include "Gui/Controls/FontItemDelegate.h"
 #include "Gui/Controls/ItemDelegate.h"
 #include "Gui/Controls/LineEdit.h"
 #include "Gui/Controls/ListView.h"
@@ -18,6 +19,7 @@
 #include <QAction>
 #include <QApplication>
 #include <QCoreApplication>
+#include <QFont>
 #include <QHoverEvent>
 #include <QImage>
 #include <QMenu>
@@ -70,6 +72,32 @@ namespace
         constexpr int probeExtent = 20;
         return QRect{button.width() - probeExtent, button.height() - probeExtent, probeExtent, probeExtent};
     }
+
+    /**
+     * @brief 记录委托准备绘制参数时换上的字体族
+     * @details FontItemDelegate::prepareOption() 是保护成员，用例通过子类在调用基类之后
+     *          抄下 option.font 的族名，从而在离屏绘制里核对字体预览。
+     */
+    class RecordingFontItemDelegate : public GyanisScribe::Gui::FontItemDelegate
+    {
+    public:
+        using GyanisScribe::Gui::FontItemDelegate::FontItemDelegate;
+
+        mutable QString preparedFamily; ///< 最近一次绘制准备出的字体族
+
+    protected:
+        /**
+         * @brief 抄下基类换好的字体族
+         * @details 重写 FontItemDelegate::prepareOption()：先让基类换字体，再记录结果。
+         * @param option 绘制参数
+         * @param index 项下标
+         */
+        void prepareOption(QStyleOptionViewItem &option, const QModelIndex &index) const override
+        {
+            GyanisScribe::Gui::FontItemDelegate::prepareOption(option, index);
+            preparedFamily = option.font.family();
+        }
+    };
 
     class CornerControlsFixture : public ::testing::Test
     {
@@ -583,6 +611,43 @@ TEST_F(CornerControlsFixture, ComboBoxReplacesThePopupDelegateAfterShowPopup)
     const QImage popupImage = combo.view()->window()->grab().toImage();
     EXPECT_EQ(popupImage.pixelColor(0, 0).alpha(), 0) << "弹层容器左上角应透明，不能露出方形窗口底";
     combo.hidePopup();
+}
+
+/**
+ * @brief 钉住字体下拉弹层保留按族名预览的委托
+ * @details 字体下拉框的视图在构造与 showPopup 之后都必须装 FontItemDelegate，
+ *          普通下拉框仍用 ItemDelegate。离屏绘制一条族名项，委托准备出的字体族
+ *          必须等于该项文本，否则弹层里的字体名会全部退回界面字体。
+ */
+TEST_F(CornerControlsFixture, FontComboPopupKeepsTheFamilyPreviewDelegate)
+{
+    GyanisScribe::Gui::FontComboBox fontCombo;
+    EXPECT_NE(qobject_cast<GyanisScribe::Gui::FontItemDelegate *>(fontCombo.view()->itemDelegate()), nullptr) << "字体下拉框构造后没有装 FontItemDelegate";
+
+    fontCombo.showPopup();
+    EXPECT_NE(qobject_cast<GyanisScribe::Gui::FontItemDelegate *>(fontCombo.view()->itemDelegate()), nullptr) << "showPopup 之后字体预览委托被换掉了";
+    fontCombo.hidePopup();
+
+    GyanisScribe::Gui::ComboBox combo;
+    combo.addItem(QStringLiteral("一"));
+    EXPECT_EQ(qobject_cast<GyanisScribe::Gui::FontItemDelegate *>(combo.view()->itemDelegate()), nullptr) << "普通下拉框不该用字体预览委托";
+    EXPECT_NE(dynamic_cast<GyanisScribe::Gui::ItemDelegate *>(combo.view()->itemDelegate()), nullptr) << "普通下拉框的弹层委托没走 ItemDelegate";
+
+    const QString family = QStringLiteral("Courier New");
+    ASSERT_NE(QFont{family}.family(), QApplication::font().family()) << "判据前提没构造出来：项族名与界面字体相同";
+
+    QStringListModel          model{QStringList{family}};
+    RecordingFontItemDelegate delegate;
+    QImage                    image{120, 28, QImage::Format_ARGB32_Premultiplied};
+    image.fill(Qt::transparent);
+    QStyleOptionViewItem option;
+    option.rect  = QRect{0, 0, 120, 28};
+    option.state = QStyle::State_Enabled;
+    {
+        QPainter painter{&image};
+        delegate.paint(&painter, option, model.index(0, 0));
+    }
+    EXPECT_EQ(delegate.preparedFamily, family) << "委托准备出的绘制字体还是界面字体，没有换成项自己的族名";
 }
 
 TEST_F(CornerControlsFixture, TextEditPaintsControlFill)

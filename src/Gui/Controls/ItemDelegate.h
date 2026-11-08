@@ -40,5 +40,15 @@ namespace GyanisScribe::Gui
          * @param index 项在模型里的下标
          */
         void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override;
+
+    protected:
+        /**
+         * @brief 在画高亮与文字之前调整绘制参数
+         * @details paint() 在 initStyleOption 之后调用本钩子；派生类据此换字体等，
+         *          不必复制高亮与选中逻辑
+         * @param option 已由 initStyleOption 填好的绘制参数
+         * @param index 项在模型里的下标
+         */
+        virtual void prepareOption(QStyleOptionViewItem &option, const QModelIndex &index) const;
     };
 } // namespace GyanisScribe::Gui

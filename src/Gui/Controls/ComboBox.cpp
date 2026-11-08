@@ -1,6 +1,7 @@
 #include "Gui/Controls/ComboBox.h"
 
 #include "Core/Geometry/ContinuousCorner.h"
+#include "Gui/Controls/FontItemDelegate.h"
 #include "Gui/Controls/ItemDelegate.h"
 #include "Gui/Controls/ListView.h"
 #include "Gui/Theme/ControlPalette.h"
@@ -77,6 +78,8 @@ namespace GyanisScribe::Gui
     {
         setProperty("squircle", true);
         setView(new ListView{this});
+        // 视图构造时装的是通用委托；字体弹层要按族名预览，构造时就换成字体委托
+        setItemDelegate(new FontItemDelegate{this});
         preparePopupWindow(*this);
     }
 
@@ -84,10 +87,10 @@ namespace GyanisScribe::Gui
     {
         QFontComboBox::showPopup();
         preparePopupWindow(*this);
-        // 弹层创建时基类会装回自己的私有委托，基类返回后重设一次
+        // 弹层创建时基类会装回自己的私有委托，基类返回后重设一次，字体预览才不会丢
         if (auto *popupView = view(); popupView != nullptr)
         {
-            popupView->setItemDelegate(new ItemDelegate{popupView});
+            popupView->setItemDelegate(new FontItemDelegate{popupView});
         }
     }
 

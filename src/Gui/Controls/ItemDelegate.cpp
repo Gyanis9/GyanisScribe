@@ -17,6 +17,8 @@ namespace GyanisScribe::Gui
     {
         QStyleOptionViewItem opt{option};
         initStyleOption(&opt, index);
+        // 字体预览一类派生行为在这里换参数，高亮与文字仍走下面的统一路径
+        prepareOption(opt, index);
         const bool selected = opt.state.testFlag(QStyle::State_Selected);
         const bool hover    = opt.state.testFlag(QStyle::State_MouseOver);
         if (selected || hover)
@@ -36,5 +38,12 @@ namespace GyanisScribe::Gui
         // 选中底已经画过：把 Highlight 画刷清空，基类才不会在圆角底上再补一块方角
         opt.palette.setBrush(QPalette::Highlight, Qt::NoBrush);
         QStyledItemDelegate::paint(painter, opt, index);
+    }
+
+    void ItemDelegate::prepareOption(QStyleOptionViewItem &option, const QModelIndex &index) const
+    {
+        // 默认不改绘制参数；派生类覆盖后按需换字体等
+        Q_UNUSED(option);
+        Q_UNUSED(index);
     }
 } // namespace GyanisScribe::Gui

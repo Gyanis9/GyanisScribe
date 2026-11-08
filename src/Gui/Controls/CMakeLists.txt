@@ -14,6 +14,8 @@ set_property(GLOBAL APPEND PROPERTY GyanisScribeGuiSources
         ${CMAKE_CURRENT_LIST_DIR}/Menu.cpp
         ${CMAKE_CURRENT_LIST_DIR}/ItemDelegate.h
         ${CMAKE_CURRENT_LIST_DIR}/ItemDelegate.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/FontItemDelegate.h
+        ${CMAKE_CURRENT_LIST_DIR}/FontItemDelegate.cpp
         ${CMAKE_CURRENT_LIST_DIR}/ListWidget.h
         ${CMAKE_CURRENT_LIST_DIR}/ListWidget.cpp
         ${CMAKE_CURRENT_LIST_DIR}/ListView.h
