@@ -3,6 +3,7 @@
 #ifdef Q_OS_WIN
 
 #include "Core/Capture/BgraFrame.h"
+#include "Plugins/CaptureSources/DxgiAcquirePolicy.h"
 #include "Plugins/CaptureSources/QScreenCaptureSource.h"
 #include "Core/Capture/ScreenUtils.h"
 #include "Base/Logger.h"
@@ -30,12 +31,34 @@ namespace GyanisScribe::Plugins
         /// 等一帧的时间：到点说明桌面这一格没变过，交回上一张——录屏要的是「每一格都有一帧可写」
         constexpr UINT kAcquireTimeoutMs = 100;
 
+        /// 回溯抓帧只取这一刻已就绪的帧：0 表示不等，静态画面直接走缓存
+        constexpr unsigned int kTryGrabTimeoutMs = 0;
+
         /// 一帧的等待与重建最多试两轮：中途切分辨率/锁屏会让重复接口失效，重建一次能救回来
         constexpr int kMaximumAttempts = 2;
 
         QString fromDeviceName(const wchar_t *deviceName)
         {
             return QString::fromWCharArray(deviceName);
+        }
+
+        /// 认出这次抓哪块屏；认不出时交回与 grabScreen 同一套原因
+        Base::Expected<QScreen *> resolveTargetScreen(const QString &screenName)
+        {
+            QScreen *target = screenName.isEmpty() ? Core::screenAtGlobalPoint(QCursor::pos()) : Core::screenByName(screenName);
+            if (target != nullptr)
+            {
+                return target;
+            }
+            if (!screenName.isEmpty())
+            {
+                // 屏名对不上多半是多显示器被拔掉：让调用方按光标所在屏重抓，别按名字猜
+                return std::unexpected(Base::Error{Base::ErrorCode::ScreenUnavailable,
+                                                   Base::uiFormat(Base::uiTextUtf8("找不到名为「{}」的屏幕：多半已经被拔掉。请在不填屏幕名的情况下重抓一次（那样按光标所在屏走）"),
+                                                                  screenName.toStdString())});
+            }
+            // 空屏名走光标所在屏；这里为空说明光标点不在任何屏上，通常是 Qt 还没报出屏幕
+            return std::unexpected(Base::Error{Base::ErrorCode::ScreenUnavailable, Base::uiTextUtf8("Qt 没有报出任何屏幕：请在 QGuiApplication 建好之后再抓图")});
         }
     } // namespace
 
@@ -112,6 +135,21 @@ namespace GyanisScribe::Plugins
         Base::Expected<QImage> tryGrab(const QRect &screenRect, const UINT timeoutMs)
         {
             return grab(screenRect, timeoutMs);
+        }
+
+        /**
+         * @brief 把刚交付出去的一帧种回缓存
+         * @param screenRect Qt 报的那块屏的物理矩形
+         * @param frame 这一格要交回的帧
+         * @details 缓存必须始终是「最近一次交付出去的那一格」：全黑帧被换成 Qt 帧之后，
+         *          留黑帧在这里会让下一次 0 超时取帧原样交回黑图，又触发一次阻塞的 Qt 抓帧。
+         */
+        void rememberFrame(const QRect &screenRect, const QImage &frame)
+        {
+            if (OutputState *state = stateFor(screenRect); state != nullptr)
+            {
+                state->lastFrame = frame;
+            }
         }
 
     private:
@@ -315,24 +353,22 @@ namespace GyanisScribe::Plugins
             auto                    resource = winrt::com_ptr<IDXGIResource>{};
             const HRESULT           acquired = state.duplication->AcquireNextFrame(timeoutMs, &info, resource.put());
 
-            if (acquired == DXGI_ERROR_WAIT_TIMEOUT)
+            // 超时、首帧未就绪、失效与其余失败都在纯决策层分档，这里只把每一档翻成错误对象
+            switch (Dxgi::resolveAcquireOutcome(acquired, !state.lastFrame.isNull()))
             {
-                if (state.lastFrame.isNull())
-                {
+                case Dxgi::AcquireOutcome::CachedFrame:
+                    // 桌面这一格没变过：交回上一张，录屏的每一格才有帧可写
+                    return state.lastFrame;
+                case Dxgi::AcquireOutcome::FirstFrameMissing:
                     return std::unexpected(
                             Base::Error{Base::ErrorCode::ScreenUnavailable, Base::uiTextUtf8("DXGI 桌面重复开了之后一直没等到第一帧：画面可能刚被锁屏或切走。请重试一次")});
-                }
-                // 桌面这一格没变过：交回上一张，录屏的每一格才有帧可写
-                return state.lastFrame;
-            }
-            if (acquired == DXGI_ERROR_ACCESS_LOST)
-            {
-                return std::unexpected(Base::Error{Base::ErrorCode::Busy, Base::uiTextUtf8("DXGI 桌面重复已失效（切分辨率或会话切换）：接口要重开一轮")});
-            }
-            if (FAILED(acquired))
-            {
-                return std::unexpected(
-                        Base::Error{Base::ErrorCode::ScreenUnavailable, Base::uiFormat(Base::uiTextUtf8("DXGI 取帧失败（HRESULT 0x{:08X}）"), static_cast<unsigned>(acquired))});
+                case Dxgi::AcquireOutcome::ReopenDuplication:
+                    return std::unexpected(Base::Error{Base::ErrorCode::Busy, Base::uiTextUtf8("DXGI 桌面重复已失效（切分辨率或会话切换）：接口要重开一轮")});
+                case Dxgi::AcquireOutcome::Failed:
+                    return std::unexpected(Base::Error{Base::ErrorCode::ScreenUnavailable,
+                                                       Base::uiFormat(Base::uiTextUtf8("DXGI 取帧失败（HRESULT 0x{:08X}）"), static_cast<unsigned>(acquired))});
+                case Dxgi::AcquireOutcome::NewFrame:
+                    break;
             }
 
             // 拿到帧之后不管走哪条路都要 ReleaseFrame：漏一次这块屏的重复接口就再也取不到帧
@@ -434,61 +470,65 @@ namespace GyanisScribe::Plugins
 
     Base::Expected<Base::CapturedImage> DxgiCaptureSource::grabScreen(const QString &screenName) const
     {
-        QScreen *target = screenName.isEmpty() ? Core::screenAtGlobalPoint(QCursor::pos()) : Core::screenByName(screenName);
-        if (target == nullptr)
-        {
-            if (!screenName.isEmpty())
-            {
-                return std::unexpected(Base::Error{Base::ErrorCode::ScreenUnavailable,
-                                                   Base::uiFormat(Base::uiTextUtf8("找不到名为「{}」的屏幕：多半已经被拔掉。请在不填屏幕名的情况下重抓一次（那样按光标所在屏走）"),
-                                                                  screenName.toStdString())});
-            }
-            return std::unexpected(Base::Error{Base::ErrorCode::ScreenUnavailable, Base::uiTextUtf8("Qt 没有报出任何屏幕：请在 QGuiApplication 建好之后再抓图")});
-        }
-
-        // 原点按 Qt 报的原生坐标原样保留、只放大尺寸：DXGI 的输出坐标与它同一套原点
-        const QRect physicalRect = Core::physicalScreenRect(target->geometry(), target->devicePixelRatio());
-
-        const auto grabbed = m_duplicator->grab(physicalRect);
-        if (!grabbed)
-        {
-            // 降级不是错误：这台机器/这一刻这套原语用不了，Qt 那一份能抓就给用户抓到，
-            // 原因照旧从上一句 Error 里落进日志（下一次抓帧还会先试 DXGI，不留「错一次就换原语」的状态）
-            Base::Logger::warning(std::format("DXGI 抓帧回落到 Qt：{}", grabbed.error().message));
-            return m_qtFallback->grabScreen(target->name());
-        }
-        if (Core::imageLooksAllBlack(*grabbed))
-        {
-            // 托盘菜单/桌面合成切换的瞬间，DXGI 偶尔交回一整帧黑：它不是「用户桌面是黑的」，
-            // 落进遮罩就会先看到全黑再截出黑图。改用 Qt 的原语再抓一次，真黑屏也会原样交回。
-            Base::Logger::warning("DXGI 抓帧拿到全黑帧，改用 Qt 抓帧一次");
-            return m_qtFallback->grabScreen(target->name());
-        }
-
-        return Core::frameFromGrabbedImage(*grabbed, target, target->geometry().size());
+        return grabScreenImpl(screenName, kAcquireTimeoutMs, "DXGI 抓帧", FallbackLogMode::EveryOccurrence);
     }
 
     Base::Expected<Base::CapturedImage> DxgiCaptureSource::tryGrabScreen(const QString &screenName) const
     {
-        QScreen *target = screenName.isEmpty() ? Core::screenAtGlobalPoint(QCursor::pos()) : Core::screenByName(screenName);
-        if (target == nullptr)
-        {
-            return std::unexpected(Base::Error{Base::ErrorCode::ScreenUnavailable,
-                                               Base::uiFormat(Base::uiTextUtf8("回溯抓帧找不到屏幕「{}」：请重新开启回溯缓冲"), screenName.toStdString())});
-        }
+        return grabScreenImpl(screenName, kTryGrabTimeoutMs, "回溯抓帧", FallbackLogMode::OnTransition);
+    }
 
+    Base::Expected<Base::CapturedImage> DxgiCaptureSource::grabScreenImpl(const QString &screenName, const unsigned int timeoutMs, const std::string_view logTag,
+                                                                          const FallbackLogMode logMode) const
+    {
+        const auto resolved = resolveTargetScreen(screenName);
+        if (!resolved)
+        {
+            return std::unexpected(resolved.error());
+        }
+        QScreen *target = *resolved;
+
+        // 回落日志按入口定密度：一次性抓帧每次记；5Hz 的回溯路径只在进入回落状态时记一条
+        const auto reportFallback = [this, logMode, logTag](const std::string_view message)
+        {
+            if (logMode == FallbackLogMode::EveryOccurrence)
+            {
+                Base::Logger::warning(message);
+                return;
+            }
+            if (!m_fallbackWarningLogged)
+            {
+                m_fallbackWarningLogged = true;
+                Base::Logger::warning(message);
+            }
+        };
+
+        // 原点按 Qt 报的原生坐标原样保留、只放大尺寸：DXGI 的输出坐标与它同一套原点
         const QRect physicalRect = Core::physicalScreenRect(target->geometry(), target->devicePixelRatio());
-        const auto  grabbed      = m_duplicator->tryGrab(physicalRect, 0);
+
+        const auto grabbed = m_duplicator->tryGrab(physicalRect, timeoutMs);
         if (!grabbed)
         {
-            Base::Logger::warning(std::format("回溯抓帧回落到 Qt：{}", grabbed.error().message));
+            // 降级不是错误：这台机器/这一刻这套原语用不了，Qt 那一份能抓就给用户抓到
+            reportFallback(std::format("{}回落到 Qt：{}", logTag, grabbed.error().message));
             return m_qtFallback->grabScreen(target->name());
         }
-        if (Core::imageLooksAllBlack(*grabbed))
+
+        if (Dxgi::resolveFrameDisposition(Core::imageLooksAllBlack(*grabbed)) == Dxgi::FrameDisposition::FallbackToQt)
         {
-            Base::Logger::warning("回溯抓帧拿到全黑帧，改用 Qt 抓帧一次");
-            return m_qtFallback->grabScreen(target->name());
+            reportFallback(std::format("{}拿到全黑帧，改用 Qt 抓帧一次", logTag));
+            const auto fallback = m_qtFallback->grabScreen(target->name());
+            if (fallback)
+            {
+                // 缓存必须跟着交付走：留黑帧在缓存里，下一次 0 超时取帧会原样交回它，
+                // 又触发一次阻塞的 Qt 抓帧；把 Qt 帧种回去，静态桌面下一格直接交缓存
+                m_duplicator->rememberFrame(physicalRect, fallback->image);
+            }
+            return fallback;
         }
+
+        // 这一格没有回落：DXGI 已经恢复，下一次再回落要重新记一条
+        m_fallbackWarningLogged = false;
         return Core::frameFromGrabbedImage(*grabbed, target, target->geometry().size());
     }
 

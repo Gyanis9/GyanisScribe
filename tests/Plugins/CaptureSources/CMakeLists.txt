@@ -1,4 +1,5 @@
 add_executable(TestPluginsCaptureSources
+        TestDxgiAcquirePolicy.cpp
         TestDxgiCaptureSource.cpp
         TestQScreenCaptureSource.cpp)
 

@@ -4,5 +4,7 @@ set_property(GLOBAL APPEND PROPERTY GyanisScribePluginsSources
         ${CMAKE_CURRENT_LIST_DIR}/QScreenCaptureSource.cpp
         ${CMAKE_CURRENT_LIST_DIR}/ScreenCaptureSourceFactory.h
         ${CMAKE_CURRENT_LIST_DIR}/ScreenCaptureSourceFactory.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/DxgiAcquirePolicy.h
+        ${CMAKE_CURRENT_LIST_DIR}/DxgiAcquirePolicy.cpp
         ${CMAKE_CURRENT_LIST_DIR}/DxgiCaptureSource.h
         ${CMAKE_CURRENT_LIST_DIR}/DxgiCaptureSource.cpp)

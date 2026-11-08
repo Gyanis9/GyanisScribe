@@ -12,6 +12,7 @@
 #include "Core/Capture/IScreenCaptureSource.h"
 
 #include <memory>
+#include <string_view>
 
 namespace GyanisScribe::Plugins
 {
@@ -69,9 +70,11 @@ namespace GyanisScribe::Plugins
         [[nodiscard]] Base::Expected<Base::CapturedImage> grabScreen(const QString &screenName) const override;
 
         /**
-         * @brief 抓一帧，不等待画面变化，见 Core::IScreenCaptureSource::tryGrabScreen()
+         * @brief 抓一帧，不等新的画面变化，见 Core::IScreenCaptureSource::tryGrabScreen()
          * @param screenName 目标屏幕名；空串表示光标所在那块
          * @return 成功返回当前或最近一帧；首帧未就绪或抓不到时返回原因
+         * @details 以 0 超时取帧，静态画面直接交回缓存帧；DXGI 不可用时回落 Qt，那一次仍会阻塞。
+         *          回落日志只在进入回落状态时写一条，DXGI 恢复后重新计数。
          */
         [[nodiscard]] Base::Expected<Base::CapturedImage> tryGrabScreen(const QString &screenName) const override;
 
@@ -90,8 +93,26 @@ namespace GyanisScribe::Plugins
         [[nodiscard]] std::optional<Core::CursorSprite> grabCursor(const QString &screenName) const override;
 
     private:
-        std::unique_ptr<DxgiScreenDuplicator> m_duplicator; ///< 设备与每块屏的重复接口
-        std::unique_ptr<QScreenCaptureSource> m_qtFallback; ///< 窗口抓取、指针与降级都走它
+        /// 回落日志的密度
+        enum class FallbackLogMode
+        {
+            EveryOccurrence, ///< 一次性抓帧：每次回落都写一条
+            OnTransition,    ///< 0 超时路径：只在进入回落状态时写一条
+        };
+
+        /**
+         * @brief 抓一块屏的公共实现
+         * @param screenName 目标屏幕名；空串表示光标所在那块
+         * @param timeoutMs 等新帧的上限，毫秒；0 表示只取已就绪的帧
+         * @param logTag 日志前缀，点名是哪条抓帧路径
+         * @param logMode 回落日志的密度
+         * @return 成功返回整帧；DXGI 抓不到时回落 Qt，两者都失败时交回 Qt 的原因
+         */
+        [[nodiscard]] Base::Expected<Base::CapturedImage> grabScreenImpl(const QString &screenName, unsigned int timeoutMs, std::string_view logTag, FallbackLogMode logMode) const;
+
+        std::unique_ptr<DxgiScreenDuplicator> m_duplicator;                    ///< 设备与每块屏的重复接口
+        std::unique_ptr<QScreenCaptureSource> m_qtFallback;                    ///< 窗口抓取、指针与降级都走它
+        mutable bool                          m_fallbackWarningLogged = false; ///< 0 超时路径是否已报过回落；DXGI 恢复后清掉
     };
 #endif
 
