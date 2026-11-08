@@ -4,6 +4,7 @@
 #include "Gui/Controls/SurfaceWidget.h"
 #include "Gui/Theme/ControlPalette.h"
 #include "Gui/Theme/SquircleStyle.h"
+#include "Gui/Theme/ThemeManager.h"
 
 #include <gtest/gtest.h>
 
@@ -20,6 +21,44 @@
 namespace
 {
     std::unique_ptr<QApplication> application;
+
+    /**
+     * @brief 数一块区域里的深色笔画
+     * @details 菜单指示器用文字色落笔，浅底上只有箭头笔画会同时压暗三个通道；
+     *          宿主铺白底就是为了让这个判据分得清箭头与底色。
+     * @param image 抓到的图
+     * @param area 取样区域
+     * @return 三个通道都低于 128 且不透明的像素数
+     */
+    int countInkPixels(const QImage &image, const QRect &area)
+    {
+        int count = 0;
+        for (int y = area.top(); y <= area.bottom(); ++y)
+        {
+            for (int x = area.left(); x <= area.right(); ++x)
+            {
+                const QColor color = image.pixelColor(x, y);
+                if (color.alpha() == 255 && color.red() < 128 && color.green() < 128 && color.blue() < 128)
+                {
+                    ++count;
+                }
+            }
+        }
+        return count;
+    }
+
+    /**
+     * @brief 菜单指示器的取样窗口
+     * @details Qt 把工具按钮的菜单指示器放在按钮右下角：原生风格用 PM_MenuButtonIndicator 见方的一小格，
+     *          套上样式表后是 13px 见方的 ::menu-indicator 块，两档都落在右下角 20px 见方里
+     * @param button 目标按钮
+     * @return 相对按钮左上角的取样矩形
+     */
+    QRect menuIndicatorProbe(const QWidget &button)
+    {
+        constexpr int probeExtent = 20;
+        return QRect{button.width() - probeExtent, button.height() - probeExtent, probeExtent, probeExtent};
+    }
 
     class CornerControlsFixture : public ::testing::Test
     {
@@ -177,6 +216,85 @@ TEST_F(CornerControlsFixture, ToolButtonInsideTheAnnotationToolbarPaintsTheInlin
     const QImage image = toolbar.grab().toImage();
     EXPECT_EQ(image.pixelColor(20, 36), GyanisScribe::Gui::activePalette().accent) << "工具栏内的按钮没画 1px 主色焦点边";
     EXPECT_EQ(image.pixelColor(36, 36), QColor(255, 0, 0)) << "未选中、悬停与按下的工具按钮不该铺底，宿主色应露出来";
+}
+
+/**
+ * @brief 钉住工具按钮的菜单指示箭头
+ * @details 带菜单的 InstantPopup 按钮本该在右下角落下指示器；没有菜单的同尺寸按钮那里必须是空的。
+ *          判据用宿主白底上的深色笔画，带菜单的那枚要数得出箭头，另一枚要一粒都没有。
+ */
+TEST_F(CornerControlsFixture, ToolButtonPaintsTheMenuIndicatorOnlyWhenItHasAMenu)
+{
+    QWidget host;
+    host.resize(120, 80);
+    host.setAutoFillBackground(true);
+    host.setPalette(QPalette{QColor{Qt::white}});
+
+    auto *plain = new GyanisScribe::Gui::ToolButton{&host};
+    plain->setGeometry(10, 10, 40, 40);
+
+    auto *menu = new QMenu{&host};
+    menu->addAction(QStringLiteral("一项"));
+    auto *withMenu = new GyanisScribe::Gui::ToolButton{&host};
+    withMenu->setGeometry(60, 10, 40, 40);
+    withMenu->setPopupMode(QToolButton::InstantPopup);
+    withMenu->setMenu(menu);
+
+    host.show();
+    QCoreApplication::processEvents();
+
+    const QImage image = host.grab().toImage();
+    const int    plainInk = countInkPixels(image, menuIndicatorProbe(*plain).translated(plain->pos()));
+    const int    menuInk  = countInkPixels(image, menuIndicatorProbe(*withMenu).translated(withMenu->pos()));
+    EXPECT_EQ(plainInk, 0) << "没有菜单的工具按钮不该出现指示器";
+    EXPECT_GT(menuInk, 0) << "带菜单的 InstantPopup 工具按钮丢了菜单指示箭头";
+}
+
+/**
+ * @brief 钉住色块按钮收掉菜单指示器
+ * @details 色块自己就是入口提示，样式表用 QToolButton#annotationColorButton::menu-indicator 的 image: none
+ *          把箭头收掉；同一档样式表下，把对象名换掉就该重新出现箭头，否则规则没有消费方。
+ */
+TEST_F(CornerControlsFixture, AnnotationColorButtonSuppressesTheMenuIndicator)
+{
+    struct StyleSheetGuard
+    {
+        QString previous = qApp->styleSheet();
+
+        ~StyleSheetGuard()
+        {
+            qApp->setStyleSheet(previous);
+        }
+    } guard;
+    qApp->setStyleSheet(GyanisScribe::Gui::ThemeManager::styleSheetFor(GyanisScribe::Gui::ThemeKind::Light));
+
+    QWidget host;
+    host.resize(140, 80);
+    host.setAutoFillBackground(true);
+    host.setPalette(QPalette{QColor{Qt::white}});
+
+    auto *menu = new QMenu{&host};
+    menu->addAction(QStringLiteral("一项"));
+
+    auto *colorButton = new GyanisScribe::Gui::ToolButton{&host};
+    colorButton->setObjectName(QStringLiteral("annotationColorButton"));
+    colorButton->setPopupMode(QToolButton::InstantPopup);
+    colorButton->setMenu(menu);
+    colorButton->setGeometry(10, 10, 40, 40);
+
+    auto *twin = new GyanisScribe::Gui::ToolButton{&host};
+    twin->setPopupMode(QToolButton::InstantPopup);
+    twin->setMenu(menu);
+    twin->setGeometry(70, 10, 40, 40);
+
+    host.show();
+    QCoreApplication::processEvents();
+
+    const QImage image = host.grab().toImage();
+    const int    namedInk = countInkPixels(image, menuIndicatorProbe(*colorButton).translated(colorButton->pos()));
+    const int    twinInk  = countInkPixels(image, menuIndicatorProbe(*twin).translated(twin->pos()));
+    EXPECT_GT(twinInk, 0) << "同一档样式表下，没有这个对象名的按钮该有菜单指示箭头";
+    EXPECT_EQ(namedInk, 0) << "色块按钮的菜单指示器没被样式表收掉";
 }
 
 /**

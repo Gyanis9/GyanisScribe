@@ -60,9 +60,11 @@ namespace GyanisScribe::Gui
 
     protected:
         /**
-         * @brief 先画连续曲率底，再只画标签
-         * @details 重写 QToolButton::paintEvent()：不调基类，只让样式引擎画 CE_ToolButtonLabel；
-         *          填充与描边由 toolButtonColors 按选中、悬停、按下与焦点状态给出
+         * @brief 先画连续曲率底，再画标签与菜单指示器
+         * @details 重写 QToolButton::paintEvent()：不调基类，填充与描边由 toolButtonColors 按选中、悬停、
+         *          按下与焦点状态给出，标签只让样式引擎画 CE_ToolButtonLabel；带菜单时再把面板、焦点边、
+         *          文字与图标关掉，借 CC_ToolButton 补右下角的指示箭头——指示器由样式引擎按 ::menu-indicator
+         *          规则决定画不画，样式表里的 image: none 才管得住它
          * @param event 绘制事件
          */
         void paintEvent(QPaintEvent *event) override;

@@ -5,6 +5,7 @@
 #include "Gui/Theme/DesignTokens.h"
 
 #include <QBrush>
+#include <QIcon>
 #include <QPainter>
 #include <QPen>
 #include <QStyle>
@@ -63,5 +64,17 @@ namespace GyanisScribe::Gui
         QStyleOptionToolButton option;
         initStyleOption(&option);
         style()->drawControl(QStyle::CE_ToolButtonLabel, &option, &painter, this);
+
+        if (!option.features.testFlag(QStyleOptionToolButton::HasMenu))
+        {
+            return;
+        }
+        // 菜单指示器只有 CC_ToolButton 会画：把面板、焦点边、文字与图标都关掉，只留右下角那枚箭头；
+        // 走样式引擎而不是自己画 PE_IndicatorArrowDown，样式表的 ::menu-indicator（image: none）才管得住它
+        option.subControls = QStyle::SC_None;
+        option.state &= ~QStyle::State_HasFocus;
+        option.text.clear();
+        option.icon = QIcon{};
+        style()->drawComplexControl(QStyle::CC_ToolButton, &option, &painter, this);
     }
 } // namespace GyanisScribe::Gui
