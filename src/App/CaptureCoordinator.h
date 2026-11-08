@@ -111,6 +111,14 @@ namespace GyanisScribe::App
         /// 框选截图（热键、托盘、标注窗的「重新截」都从这里进）
         void startInteractive(std::optional<GyanisScribe::App::CaptureIntent> intent = std::nullopt);
 
+        /**
+         * @brief 用回溯缓冲里的一帧进入框选
+         * @param frame 回溯帧；屏名与屏内几何仍须对应当前屏幕
+         * @details 与 startInteractive 同一条交付链，只是不抓当前屏；去向仍从「截完之后」那一档现读。
+         *          不走延时通道：帧已经冻住了，再等几秒只会让画面更旧。
+         */
+        void startInteractiveWithFrame(const GyanisScribe::Base::CapturedImage &frame);
+
         /// 整屏截图
         void startFullScreen(std::optional<GyanisScribe::App::CaptureIntent> intent = std::nullopt);
 
@@ -150,10 +158,23 @@ namespace GyanisScribe::App
         void commandLineActionFailed(const QString &reason);
         /// 命令行那一次交付完了：成品路径交回控制器（它才知道要不要打到标准输出）
         void commandLineCaptureDelivered(const QString &filePath);
+        /**
+         * @brief 一轮从框选起头的截图走完了
+         * @details 收场口只此一声：取消、失败、非标注交付完、标注窗关闭、屏不可用的剪贴板兜底都在这里汇合。
+         *          每个流程最多发一次（流程标志防重）；回溯协调器靠它恢复抓帧。
+         */
+        void captureFlowFinished();
 
     private:
         /// 「截完之后」那一档从设置现读：读不出按默认档走并把原因落进日志
         [[nodiscard]] GyanisScribe::App::CaptureIntent settingsCaptureIntent() const;
+
+        /**
+         * @brief 结束这一轮从框选起头的截图
+         * @details 没起过这一轮（整屏、命令行那几路）时不发信号：收场只说给真正起过流程的人听。
+         *          先复位再发：接收方在槽里再起一轮时，不会被这一次的复位误伤。
+         */
+        void finishCaptureFlow();
 
         /// 抓帧回来：记下这一轮，再按意图交付
         void handleCaptured(const GyanisScribe::Base::CapturedImage &image);
@@ -203,6 +224,7 @@ namespace GyanisScribe::App
         QString                                               m_commandLineExec;                ///< --exec 写的那一条命令；只在 m_commandLineExecGiven 为真时压过设置里那一格
         bool                                                  m_commandLineExecGiven = false;   ///< 命令行到底给没给 --exec：给了就只跑那一条
         bool                                                  m_commandLineActive    = false;   ///< 正在跑命令行那次截图：失败路径要往 commandLineActionFailed 也交一份
+        bool                                                  m_captureFlowActive    = false;   ///< 有一轮框选起的流程在跑：收场信号只发一次
         QTimer                                               *m_delayTimer           = nullptr; ///< 延时截图那一枚，一次只允许有一个在等
         std::function<void()>                                 m_pendingCapture;                 ///< 延时到点要走的那一步，随定时器一起活到触发
         GyanisScribe::Base::CapturedImage                     m_lastCapture;                    ///< 本轮抓到的帧，贴图与识别要用它定位

@@ -201,6 +201,12 @@ namespace GyanisScribe::Gui
          * @note 与其它出口不同：打印不关窗，用户取消打印或在打印之后接着改，现场都不丢
          */
         void printRequested(const QImage &image);
+        /**
+         * @brief 标注窗收起了
+         * @details Esc 与工具栏最右那枚 X 都汇到 closeAnnotation，收完就在这里报一声。
+         *          宿主靠它知道「这一轮标注到此为止」，比如回溯缓冲要从这里恢复抓帧。
+         */
+        void closed();
 
     protected:
         /**

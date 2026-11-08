@@ -710,6 +710,7 @@ namespace GyanisScribe::App
         frame.devicePixelRatio = sample->devicePixelRatio;
         frame.screenName       = sample->screenName;
         frame.logicalRegion    = sample->screenLogicalRect;
+        frame.capturedAt       = sample->capturedAt;
 
         if (m_picker != nullptr)
         {

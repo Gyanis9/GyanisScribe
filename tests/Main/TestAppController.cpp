@@ -6,6 +6,7 @@
 #include "App/CaptureCoordinator.h"
 #include "App/CustomHotkeys.h"
 #include "Gui/Annotation/AnnotationWindow.h"
+#include "Gui/Capture/CaptureOverlay.h"
 #include "App/TrayController.h"
 #include "Gui/Pick/ColorPickerOverlay.h"
 #include "Gui/Pin/PinWindow.h"
@@ -39,7 +40,9 @@
 #include <QEventLoop>
 #include <QGuiApplication>
 #include <QImage>
+#include <QKeyEvent>
 #include <QLabel>
+#include <QMouseEvent>
 #include <QPushButton>
 #include <QRect>
 #include <QScreen>
@@ -473,6 +476,19 @@ namespace GyanisScribe
                 return nullptr;
             }
 
+            /// 这一轮铺出来的框选遮罩：顶层窗里按类型认可见的那一张（收掉的旧遮罩还在等 deleteLater）
+            [[nodiscard]] static GyanisScribe::Gui::CaptureOverlay *visibleCaptureOverlay()
+            {
+                for (auto *widget: QApplication::topLevelWidgets())
+                {
+                    if (auto *overlay = qobject_cast<GyanisScribe::Gui::CaptureOverlay *>(widget); overlay != nullptr && overlay->isVisible())
+                    {
+                        return overlay;
+                    }
+                }
+                return nullptr;
+            }
+
             /// 动作条上文案是这一句的那个按钮：那些按钮与托盘菜单同一张表，文案从表里取
             [[nodiscard]] static QPushButton *actionBarButton(QWidget &window, const QString &label)
             {
@@ -578,6 +594,51 @@ namespace GyanisScribe
 
         EXPECT_EQ(m_source->screenCalls, 1) << "0 秒档该在按下那一刻抓完";
         EXPECT_EQ(m_source->windowCalls, 0);
+    }
+
+    /**
+     * @brief 钉住截图流程收场：取消报一次，标注窗关报一次，重复关闭不再报
+     * @details 回溯协调器靠 captureFlowFinished 恢复抓帧：标注窗还开着就报收场，缓冲会在用户标注时又抓起来；
+     *          同一轮报两次，恢复动作会重复执行。判据走真遮罩、真标注窗与真信号，不碰内部标志。
+     */
+    TEST_F(AppControllerFixture, CaptureFlowFinishedIsReportedOncePerFlow)
+    {
+        m_frameScreenName = m_realScreenName;
+        m_frameRegion     = QRect{0, 0, kFrameWidth, kFrameHeight};
+        makeController();
+
+        int   finished = 0;
+        auto &capture  = m_controller->capture();
+        QObject::connect(&capture, &App::CaptureCoordinator::captureFlowFinished, &capture, [&finished] { ++finished; });
+
+        // 第一轮：取消框选，收场一次
+        capture.startInteractive(App::CaptureIntent::Annotate);
+        auto *overlay = visibleCaptureOverlay();
+        ASSERT_NE(overlay, nullptr) << "开始框选之后没铺出遮罩";
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &escape);
+        EXPECT_EQ(finished, 1) << "取消框选没报收场，回溯会停在 CaptureFlow";
+
+        // 第二轮：框一块进标注窗；关窗前不报，关窗报一次，再关不再报
+        capture.startInteractive(App::CaptureIntent::Annotate);
+        overlay = visibleCaptureOverlay();
+        ASSERT_NE(overlay, nullptr) << "第二轮没铺出遮罩";
+        const auto global = overlay->geometry().topLeft();
+        QMouseEvent press{QEvent::MouseButtonPress, QPointF{5, 5}, QPointF{global + QPoint{5, 5}}, Qt::LeftButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &press);
+        QMouseEvent move{QEvent::MouseMove, QPointF{14, 14}, QPointF{global + QPoint{14, 14}}, Qt::NoButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &move);
+        QMouseEvent release{QEvent::MouseButtonRelease, QPointF{14, 14}, QPointF{global + QPoint{14, 14}}, Qt::LeftButton, Qt::NoButton, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &release);
+
+        auto &window = capture.annotationWindow();
+        ASSERT_TRUE(window.isVisible()) << "标注那一档没把窗开起来";
+        EXPECT_EQ(finished, 1) << "标注窗还开着就报了收场，回溯会在用户标注时恢复抓帧";
+
+        QApplication::sendEvent(&window, &escape);
+        EXPECT_EQ(finished, 2) << "标注窗关了却没报收场，回溯会一直停在 CaptureFlow";
+        QApplication::sendEvent(&window, &escape);
+        EXPECT_EQ(finished, 2) << "同一轮流程报了两次收场，恢复动作会重复执行";
     }
 
     /**

@@ -78,6 +78,15 @@ namespace
 
     /// 选择中十字线的带宽，逻辑像素：虚线本身只有一格，两侧各留一格给抗锯齿
     constexpr int kCrosshairBandWidth = 3;
+
+    /// 模式横幅距遮罩左上角的边距，逻辑像素
+    constexpr int kModeBannerMargin = 12;
+
+    /// 模式横幅底板在文字两侧各让的留白，逻辑像素
+    constexpr int kModeBannerPaddingX = 8;
+
+    /// 模式横幅底板在文字上下各让的留白，逻辑像素
+    constexpr int kModeBannerPaddingY = 4;
 } // namespace
 
 namespace GyanisScribe::Gui
@@ -268,6 +277,11 @@ namespace GyanisScribe::Gui
         const auto shown = selection.isNull() ? m_hoveredRegion.value_or(QRect{}) : selection;
 
         QRegion region;
+        // 模式横幅与选区无关，任何状态下都得算进来
+        if (!m_modeBannerRect.isEmpty())
+        {
+            region += QRegion{m_modeBannerRect};
+        }
         if (!shown.isNull())
         {
             // 外扩几格把边框、抓点与三分线都盖住：它们都贴在选区边上
@@ -591,6 +605,20 @@ namespace GyanisScribe::Gui
         if (isReadoutVisible())
         {
             paintMagnifier(painter);
+        }
+
+        // 模式横幅压在所有东西上面：它要说明「这块画面不是此刻的」，被选区或放大镜盖住就失去了用处
+        if (!m_modeBannerRect.isEmpty() && !m_modeBanner.isEmpty())
+        {
+            QFont bannerFont = font();
+            bannerFont.setPointSizeF(std::max<qreal>(GyanisScribe::Gui::kHintFontSize, font().pointSizeF()));
+            bannerFont = GyanisScribe::Gui::tabularFont(bannerFont, TextScript::Mixed);
+            painter.setFont(bannerFont);
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(GyanisScribe::Gui::kCaptureHintBackgroundColor);
+            painter.drawRect(m_modeBannerRect);
+            painter.setPen(GyanisScribe::Gui::kCaptureHintTextColor);
+            painter.drawText(m_modeBannerRect, Qt::AlignCenter, m_modeBanner);
         }
     }
 
@@ -930,6 +958,36 @@ namespace GyanisScribe::Gui
     std::optional<bool> CaptureOverlay::cursorIncluded() const noexcept
     {
         return m_cursorIncluded;
+    }
+
+    void CaptureOverlay::setModeBanner(const QString &text)
+    {
+        // 横幅上下一块也要重绘：换文案时旧底板不复用，只刷一次并集
+        const auto before = visualRegionForCurrentState();
+        m_modeBanner      = text;
+        m_modeBannerRect  = modeBannerRectFor(text);
+        update(before | visualRegionForCurrentState());
+    }
+
+    QString CaptureOverlay::modeBannerForTesting() const
+    {
+        return m_modeBanner;
+    }
+
+    QRect CaptureOverlay::modeBannerRectFor(const QString &text) const
+    {
+        if (text.isEmpty())
+        {
+            return {};
+        }
+
+        QFont bannerFont = font();
+        // 与读数条同一档字号：横幅是给同一双眼睛看的，不该比旁边的数还小
+        bannerFont.setPointSizeF(std::max<qreal>(GyanisScribe::Gui::kHintFontSize, font().pointSizeF()));
+        bannerFont = tabularFont(bannerFont, TextScript::Mixed);
+        const QFontMetrics metrics(bannerFont);
+        const auto         textSize = metrics.size(Qt::TextSingleLine, text);
+        return QRect{QPoint{kModeBannerMargin, kModeBannerMargin}, textSize + QSize(kModeBannerPaddingX * 2, kModeBannerPaddingY * 2)};
     }
 
     QSize CaptureOverlay::lockedAspectRatio() const

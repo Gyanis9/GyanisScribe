@@ -175,6 +175,8 @@ namespace GyanisScribe::Gui
         // 工具栏是独立顶层窗：藏这一边不会把它一起带走
         m_toolbar->hide();
         hide();
+        // 收完再报：接收方查可见态时看到的就是「已经收起」
+        emit closed();
     }
 
     void AnnotationWindow::placeToolbarForSelection()

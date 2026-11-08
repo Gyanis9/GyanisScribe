@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include <QDateTime>
 #include <QImage>
 #include <QString>
 
@@ -83,6 +84,8 @@ namespace GyanisScribe::Base
         QImage frozenImage;         ///< 可选：整屏冻帧，标注窗重裁时从这里取新范围（空表示没有）
         QSize  frozenLogicalSize;   ///< 冻帧的逻辑尺寸
         QRect  frozenLogicalRegion; ///< 冻帧在这块屏内的逻辑区域（通常从 (0,0) 起的整屏）
+
+        QDateTime capturedAt; ///< 这一帧拍下的本地时刻；无效表示来源没给时间（回溯横幅据此省略时刻）
     };
 
 } // namespace GyanisScribe::Base

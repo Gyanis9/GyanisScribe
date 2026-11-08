@@ -235,6 +235,16 @@ namespace GyanisScribe::Gui
         /// 这一轮要不要把指针画进成品；这一档不存在时返回空
         [[nodiscard]] std::optional<bool> cursorIncluded() const noexcept;
 
+        /**
+         * @brief 在遮罩左上角显示一条模式横幅
+         * @param text 横幅文本；空表示不画
+         * @details 回溯框选用这一条说明画面来自什么时候；普通截图不设它，遮罩上不会多出任何东西。
+         */
+        void setModeBanner(const QString &text);
+
+        /// 当前模式横幅的文本（只给用例用）
+        [[nodiscard]] QString modeBannerForTesting() const;
+
     signals:
         /**
          * @brief 选区已确认
@@ -446,6 +456,14 @@ namespace GyanisScribe::Gui
          */
         [[nodiscard]] QString formatCursorReadout() const;
 
+        /**
+         * @brief 按一条横幅文字算出要画的底板
+         * @param text 横幅文本
+         * @return 遮罩内的逻辑矩形；空文本返回空矩形
+         * @details 绘制与局部重绘共用这一处测量：两边各算一遍，字号或文案一变就会有一边算错。
+         */
+        [[nodiscard]] QRect modeBannerRectFor(const QString &text) const;
+
         QImage                m_background;                              ///< 该屏的物理像素图，按缩放因子画成逻辑大小
         Core::ISettingsStore &m_settings;                                ///< 裸键那几档的读端（Gui/Controls/AppShortcuts.h 那份清册），不拥有
         QRect                 m_screenGeometry;                          ///< 该屏的全局逻辑几何
@@ -476,5 +494,7 @@ namespace GyanisScribe::Gui
         bool                               m_cursorTouched = false; ///< 指针档被 `P` 翻过没有：没翻过就不必多占读数那一格
         std::optional<bool>                m_cursorIncluded;        ///< 这一轮成品要不要含指针；空 = 这一轮没有这一档
         QLineEdit                         *m_sizeEditor = nullptr;  ///< 尺寸输入框，开着时才有
+        QString                            m_modeBanner;            ///< 左上角的模式横幅文本；空表示不画
+        QRect                              m_modeBannerRect;        ///< 横幅底板的逻辑矩形，随文本一起算好
     };
 } // namespace GyanisScribe::Gui

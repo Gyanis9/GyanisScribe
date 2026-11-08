@@ -153,6 +153,65 @@ namespace GyanisScribe::Gui
         beginInteractive(false);
     }
 
+    void CaptureService::startInteractiveWithFrame(const Base::CapturedImage &frame)
+    {
+        closeOverlays();
+
+        // 回溯帧记的是抓帧那一刻的屏名与几何：布局改过之后这块画面已经对不上现在的屏幕，
+        // 照旧铺遮罩会让用户以为框到的是眼前这块
+        auto *screen = Core::screenByName(frame.screenName);
+        if (screen == nullptr || frame.logicalRegion != screen->geometry())
+        {
+            deliver(Base::Expected<Base::CapturedImage>(std::unexpected(Base::Error{
+                    Base::ErrorCode::ScreenUnavailable,
+                    Base::uiTextUtf8("这块屏的布局已经变了，回溯到的画面不能再用；请重新开启回溯缓冲")})));
+            return;
+        }
+
+        auto *overlay = new CaptureOverlay(frame.image, frame.logicalRegion, frame.devicePixelRatio, m_settings);
+        // 横幅写明这是回看：带得上时刻就一起给，用户才分得清自己看的是历史还是实时
+        auto banner = Base::uiText("回溯画面");
+        if (frame.capturedAt.isValid())
+        {
+            banner += QStringLiteral(" · ") + frame.capturedAt.toString(QStringLiteral("HH:mm:ss"));
+        }
+        overlay->setModeBanner(banner);
+        // 不提供窗口候选/元素链、不接悬停查询：当前窗口布局可能已经变了，吸附过去会框错
+        overlay->setWindowCandidates({});
+        // 缓冲帧本身不含指针，这一轮也没有「含指针」这一档可翻
+        overlay->setCursorIncluded(std::nullopt);
+        if (const auto ratio = Core::aspectRatioFromText(m_settings.stringValue(Core::kCaptureAspectRatio, QString())); ratio)
+        {
+            overlay->setLockedAspectRatio(*ratio);
+        }
+        if (const auto history = Core::loadRegionHistory(m_settings); history)
+        {
+            overlay->setRegionHistory(Core::regionsOnScreen(*history, screen->name()));
+        }
+
+        QObject::connect(overlay, &CaptureOverlay::regionSelected, this,
+                         [this, frame](const QRect &region)
+                         {
+                             closeOverlays();
+                             // 从回溯帧裁：再抓一次屏就把「现在」交出去了，与用户选中的那一帧不是同一张
+                             auto cropped = Core::cropToLogicalRect(frame, region);
+                             if (!cropped)
+                             {
+                                 deliver(cropped);
+                                 return;
+                             }
+                             cropped->frozenImage         = frame.image;
+                             cropped->frozenLogicalSize   = frame.logicalSize;
+                             cropped->frozenLogicalRegion = QRect{QPoint{0, 0}, frame.logicalSize};
+                             finishRegion(std::move(cropped), region);
+                         });
+        QObject::connect(overlay, &CaptureOverlay::dismissed, this, &CaptureService::cancelInteractive);
+
+        m_overlays.emplace_back(overlay);
+        overlay->show();
+        overlay->activateWindow();
+    }
+
     void CaptureService::startLongCapture()
     {
         beginInteractive(true);

@@ -121,6 +121,15 @@ namespace GyanisScribe::Gui
         void startInteractive() override;
 
         /**
+         * @brief 用回溯缓冲里的一帧进入框选
+         * @param frame 回溯帧；screenName 与 logicalRegion 必须仍对应当前屏幕
+         * @details 不抓帧、不提供窗口候选/元素链、不合成指针；框选后走 finishRegion 同一条交付链。
+         *          屏幕布局变了（拔屏、换分辨率、改名）就拒绝并说明出路：照旧铺一张遮罩会把
+         *          一块对不上的历史画面当成可截的当前画面。
+         */
+        void startInteractiveWithFrame(const Base::CapturedImage &frame);
+
+        /**
          * @brief 收掉遮罩并发 captureCancelled，见 Core::ICaptureService::cancelInteractive()
          */
         void cancelInteractive() override;

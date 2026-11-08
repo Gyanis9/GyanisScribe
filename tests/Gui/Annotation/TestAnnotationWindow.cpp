@@ -30,6 +30,7 @@
 #include <QPainter>
 #include <QRegularExpression>
 #include <QScreen>
+#include <QSignalSpy>
 #include <QTextCursor>
 #include <QTextDocument>
 #include <QTextEdit>
@@ -1479,6 +1480,28 @@ TEST_F(AnnotationWindowFixture, ToolbarCloseButtonHidesBothWindows)
 
     EXPECT_FALSE(window->isVisible()) << "点了 X 标注窗还留在屏上";
     EXPECT_FALSE(window->toolbar().isVisible()) << "点了 X 工具栏还浮在桌面上";
+}
+
+/**
+ * @brief 钉住关闭信号：Esc 收起这一轮标注时，宿主能收到「标注窗已关」
+ * @details 回溯流程靠这一声恢复抓帧；少发一次，回溯缓冲就永远停在 CaptureFlow。
+ *          判据只认一次按下的结果，窗口与工具栏的可见态一起断。
+ */
+TEST_F(AnnotationWindowFixture, EscapeEmitsClosedOnce)
+{
+    auto window = makeWindow();
+    window->startAnnotation(makeCanvas({200, 100}), QRect{0, 0, 1920, 1080}, QRect{0, 0, 200, 100});
+    ASSERT_TRUE(window->isVisible());
+    ASSERT_TRUE(window->toolbar().isVisible());
+
+    QSignalSpy closedSpy(window.get(), &AnnotationWindow::closed);
+    ASSERT_TRUE(closedSpy.isValid());
+
+    pressKeyOn(*window, Qt::Key_Escape);
+
+    EXPECT_FALSE(window->isVisible()) << "按了 Esc 标注窗还留在屏上";
+    EXPECT_FALSE(window->toolbar().isVisible()) << "按了 Esc 工具栏还浮在桌面上";
+    EXPECT_EQ(closedSpy.count(), 1) << "一次关闭发了 " << closedSpy.count() << " 次 closed()";
 }
 
 /**

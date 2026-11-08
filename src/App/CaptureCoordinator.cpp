@@ -72,7 +72,12 @@ namespace GyanisScribe::App
                 *m_annotation, m_dependencies.settings, std::make_unique<GyanisScribe::Gui::AnnotationToolbar>(m_dependencies.settings, m_dependencies.icons));
 
         QObject::connect(m_capture.get(), &GyanisScribe::Core::ICaptureService::captured, this, &CaptureCoordinator::handleCaptured);
-        QObject::connect(m_capture.get(), &GyanisScribe::Core::ICaptureService::captureCancelled, this, [] { GyanisScribe::Base::Logger::info("截图已取消"); });
+        QObject::connect(m_capture.get(), &GyanisScribe::Core::ICaptureService::captureCancelled, this,
+                         [this]
+                         {
+                             GyanisScribe::Base::Logger::info("截图已取消");
+                             finishCaptureFlow();
+                         });
         QObject::connect(m_capture.get(), &GyanisScribe::Core::ICaptureService::captureFailed, this,
                          [this](const GyanisScribe::Base::Error &error)
                          {
@@ -84,6 +89,7 @@ namespace GyanisScribe::App
                              {
                                  emit commandLineActionFailed(QString::fromStdString(error.message));
                              }
+                             finishCaptureFlow();
                          });
 
         // 标注窗的六个出口：动作只有一个入口，界面不需要知道用户是点了按钮还是按了键盘
@@ -97,6 +103,8 @@ namespace GyanisScribe::App
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::printRequested, this, &CaptureCoordinator::printImage);
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::refreshRequested, this, &CaptureCoordinator::refreshLastCapture);
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::cropRequested, this, &CaptureCoordinator::cropLastCapture);
+        // 标注窗一关就是这一轮流程的终点：回溯协调器要在这里恢复抓帧
+        QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::closed, this, &CaptureCoordinator::finishCaptureFlow);
     }
 
     CaptureCoordinator::~CaptureCoordinator() = default;
@@ -108,8 +116,17 @@ namespace GyanisScribe::App
 
     void CaptureCoordinator::startInteractive(const std::optional<GyanisScribe::App::CaptureIntent> intent)
     {
-        m_intent = intent.value_or(settingsCaptureIntent());
+        m_intent            = intent.value_or(settingsCaptureIntent());
+        m_captureFlowActive = true;
         schedule([this] { m_capture->startInteractive(); });
+    }
+
+    void CaptureCoordinator::startInteractiveWithFrame(const GyanisScribe::Base::CapturedImage &frame)
+    {
+        // 去向照设置现读：回溯只是换了一张底图，之后的标注/复制/保存仍是用户点的那一档
+        m_intent            = settingsCaptureIntent();
+        m_captureFlowActive = true;
+        m_capture->startInteractiveWithFrame(frame);
     }
 
     void CaptureCoordinator::startCommandLine(const GyanisScribe::App::CommandLineRequest &request)
@@ -314,6 +331,8 @@ namespace GyanisScribe::App
             {
                 emit commandLineCaptureDelivered(m_dependencies.delivery.writtenFilePath());
             }
+            // 屏不可用这一路没有标注窗可等：成品已经直接进了剪贴板，这一轮就此收场
+            finishCaptureFlow();
             return;
         }
 
@@ -340,6 +359,21 @@ namespace GyanisScribe::App
         {
             emit messageForUser(QString::fromStdString(ran.error().message), GyanisScribe::Gui::ToastKind::Danger);
         }
+        // 标注那一档还要等窗关：其余去向当场交完，这一轮流程到这里就结束了
+        if (m_intent != GyanisScribe::App::CaptureIntent::Annotate)
+        {
+            finishCaptureFlow();
+        }
+    }
+
+    void CaptureCoordinator::finishCaptureFlow()
+    {
+        if (!m_captureFlowActive)
+        {
+            return;
+        }
+        m_captureFlowActive = false;
+        emit captureFlowFinished();
     }
 
     void CaptureCoordinator::deliverFrame(const QImage &image, QScreen &screen)

@@ -9,6 +9,7 @@
 
 #include <QApplication>
 #include <QColor>
+#include <QDateTime>
 #include <QElapsedTimer>
 #include <QImage>
 #include <QKeyEvent>
@@ -1303,6 +1304,83 @@ TEST_F(CaptureServiceFixture, LongCaptureRoutesTheOverlaySelectionIntoTheLongRou
     service.startInteractive();
     ASSERT_TRUE(outcome.error.has_value()) << "长截图那一轮没在接：选区没进长截图这条路";
     EXPECT_NE(outcome.error->message.find("滚动长截图还在接"), std::string::npos) << "拒绝的理由不是「长截图还在接」，那就证明不了这一轮活着：" << outcome.error->message;
+}
+
+/**
+ * @brief 钉住回溯帧直接进入框选：不再抓屏、横幅带时刻、框完仍裁同一帧
+ * @details 回溯选中的是一帧历史画面：再抓一次屏会把「现在」交出去，横幅不写时刻则用户分不清
+ *          这是回看还是实时。取消那一条另起一轮再验，因为「没框到东西」与「用户取消」在服务里
+ *          是两条不同的收场信号。
+ */
+TEST_F(CaptureServiceFixture, StartInteractiveWithFrameUsesProvidedFrameAndSkipsGrab)
+{
+    auto *screen = QGuiApplication::primaryScreen();
+    if (screen == nullptr)
+    {
+        GTEST_SKIP() << "这个环境没有屏幕";
+    }
+
+    SettingsStore     settings(m_iniFile);
+    FakeCaptureSource source;
+    CaptureService    service(source, settings, *platform);
+
+    CapturedImage frame = makeFrame();
+    frame.screenName       = screen->name();
+    frame.logicalSize      = screen->geometry().size();
+    frame.devicePixelRatio = screen->devicePixelRatio();
+    frame.logicalRegion    = screen->geometry();
+    frame.capturedAt       = QDateTime::currentDateTime();
+    const QSize physicalSize(qRound(frame.logicalSize.width() * frame.devicePixelRatio), qRound(frame.logicalSize.height() * frame.devicePixelRatio));
+    frame.image = QImage(physicalSize, QImage::Format_ARGB32_Premultiplied);
+    frame.image.fill(QColor(0, 128, 255));
+
+    Outcome outcome;
+    wire(service, outcome);
+    service.startInteractiveWithFrame(frame);
+
+    EXPECT_TRUE(source.requestedScreens.empty()) << "回溯帧不应再抓一次屏";
+    EXPECT_TRUE(source.requestedCursorScreens.empty()) << "回溯帧不该合成当前指针：缓冲帧本来就不含指针";
+    auto *overlay = findOverlay();
+    ASSERT_NE(overlay, nullptr) << "回溯帧没铺出遮罩";
+    EXPECT_TRUE(overlay->isVisible()) << "回溯帧的遮罩没有露出来";
+    ASSERT_TRUE(overlay->modeBannerForTesting().startsWith(QStringLiteral("回溯画面"))) << overlay->modeBannerForTesting().toStdString();
+    EXPECT_TRUE(overlay->modeBannerForTesting().contains(frame.capturedAt.toString(QStringLiteral("HH:mm:ss"))))
+            << "横幅没带抓帧时刻，用户分不清这是回看还是实时画面：" << overlay->modeBannerForTesting().toStdString();
+
+    const auto global = overlay->geometry().topLeft();
+    // 选区端点含尾：从 (10,10) 拖到 (59,39) 才是 50×30；RECT 的右下一格本身也在框里
+    QMouseEvent press{QEvent::MouseButtonPress, QPointF{10, 10}, QPointF{global + QPoint{10, 10}}, Qt::LeftButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+    QApplication::sendEvent(overlay, &press);
+    QMouseEvent move{QEvent::MouseMove, QPointF{59, 39}, QPointF{global + QPoint{59, 39}}, Qt::NoButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+    QApplication::sendEvent(overlay, &move);
+    QMouseEvent release{QEvent::MouseButtonRelease, QPointF{59, 39}, QPointF{global + QPoint{59, 39}}, Qt::LeftButton, Qt::NoButton, Qt::KeyboardModifiers{}};
+    QApplication::sendEvent(overlay, &release);
+
+    ASSERT_TRUE(outcome.image.has_value()) << "回溯帧框完没交出成品，错误：" << (outcome.error ? outcome.error->message : std::string{});
+    EXPECT_EQ(outcome.image->logicalSize.width(), 50);
+    EXPECT_EQ(outcome.image->logicalSize.height(), 30);
+    EXPECT_EQ(outcome.image->image.width(), qRound(50 * frame.devicePixelRatio));
+    EXPECT_EQ(outcome.image->image.height(), qRound(30 * frame.devicePixelRatio));
+    EXPECT_EQ(outcome.image->frozenImage.size(), frame.image.size()) << "冻帧没留住整屏：标注窗重裁时看到的会是另一帧";
+
+    // 取消：再起一轮，Esc 收场必须发 captureCancelled，否则回溯协调器一直等在 CaptureFlow
+    service.startInteractiveWithFrame(frame);
+    overlay = findOverlay();
+    ASSERT_NE(overlay, nullptr);
+    ASSERT_TRUE(overlay->isVisible());
+    QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+    QApplication::sendEvent(overlay, &escape);
+    EXPECT_EQ(outcome.cancellations, 1) << "取消回溯框选没发 captureCancelled";
+
+    // 布局对不上：拒绝并给中文出路，不再铺一张半有效的遮罩
+    CapturedImage stale = frame;
+    stale.logicalRegion  = frame.logicalRegion.adjusted(0, 0, -10, 0);
+    service.startInteractiveWithFrame(stale);
+    ASSERT_TRUE(outcome.error.has_value()) << "布局变了照样铺了遮罩";
+    EXPECT_EQ(outcome.error->code, ErrorCode::ScreenUnavailable);
+    EXPECT_NE(outcome.error->message.find("布局已经变了"), std::string::npos) << "文案没说明布局变了：" << outcome.error->message;
+    const auto *rejectedOverlay = findOverlay();
+    EXPECT_TRUE(rejectedOverlay == nullptr || !rejectedOverlay->isVisible()) << "拒绝之后还留着一张可见的遮罩";
 }
 
 /**
