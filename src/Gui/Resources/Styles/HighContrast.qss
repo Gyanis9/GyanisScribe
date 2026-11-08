@@ -299,11 +299,10 @@ QToolTip {
     padding: 4px 8px;
 }
 
-/* ---- 列表：导航侧栏与历史列表共用一套项形状 ---- */
+/* ---- 列表：容器底与项高亮由 Gui::ListWidget 与 ItemDelegate 按连续曲率自绘，
+        这里只留透明边框占位、内边距与文字色 ---- */
 QListWidget {
-    background-color: #FFFFFF;
-    border: 2px solid #000000;
-    border-radius: 16px;
+    border: 2px solid transparent;
     padding: 6px;
     outline: none;
 }
@@ -313,17 +312,6 @@ QListWidget::item {
     padding: 4px 8px;
     margin: 1px 2px;
     border: 1px solid transparent;
-    border-radius: 8px;
-    color: #000000;
-}
-
-QListWidget::item:hover {
-    background-color: #E0E0E0;
-}
-
-QListWidget::item:selected {
-    background-color: #D6E4FB;
-    border-color: #0B57D0;
     color: #000000;
 }
 

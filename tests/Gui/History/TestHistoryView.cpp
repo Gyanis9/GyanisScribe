@@ -1,4 +1,5 @@
 #include "Core/History/HistoryThumbnail.h"
+#include "Gui/Controls/ListWidget.h"
 #include "Gui/History/HistoryView.h"
 
 #include "Core/History/HistoryStore.h"
@@ -858,6 +859,7 @@ TEST_F(HistoryViewFixture, ListUsesTabularFigures)
     auto  view = makeView();
     auto *list = view->findChild<QListWidget *>();
     ASSERT_NE(list, nullptr) << "历史页里没有缩略图列表";
+    EXPECT_NE(dynamic_cast<GyanisScribe::Gui::ListWidget *>(list), nullptr) << "历史列表没用自绘连续曲率的列表类";
     EXPECT_EQ(list->accessibleName(), QStringLiteral("历史列表"));
 #if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
     EXPECT_EQ(list->font().featureValue(QFont::Tag("tnum")), 1u) << "历史列表没锁等宽，卡片读数会左右跳";

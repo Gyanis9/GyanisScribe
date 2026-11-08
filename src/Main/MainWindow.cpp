@@ -30,6 +30,7 @@
 #include "Gui/Controls/CheckBox.h"
 #include "Gui/Controls/ComboBox.h"
 #include "Gui/Controls/LineEdit.h"
+#include "Gui/Controls/ListWidget.h"
 #include "Gui/Controls/Menu.h"
 #include "Gui/Controls/SpinBox.h"
 #include "Gui/Controls/SurfaceWidget.h"
@@ -1483,7 +1484,10 @@ namespace GyanisScribe::Main
 
         auto *layout = new QHBoxLayout;
         layout->setSpacing(GyanisScribe::Gui::kSpacingMedium);
-        m_nav   = new QListWidget{this};
+        auto *nav = new Gui::ListWidget{this};
+        // 导航压在设置页的面板上，容器底不铺：铺了就是多一层与卡片同色的方块
+        nav->setSurfaceVisible(false);
+        m_nav   = nav;
         m_stack = new QStackedWidget{this};
         m_nav->setObjectName(QStringLiteral("settingsNav"));
         m_nav->setIconSize(QSize(20, 20));

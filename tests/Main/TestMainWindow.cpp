@@ -28,6 +28,7 @@
 #include "Gui/History/HistoryView.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Controls/HotkeyEdit.h"
+#include "Gui/Controls/ListWidget.h"
 #include "Gui/Controls/SpinBox.h"
 #include "Gui/Resources/IconProvider.h"
 #include "Gui/Theme/Language.h"
@@ -2494,6 +2495,7 @@ TEST_F(MainWindowFixture, BrandIconAndNavMetricsAreWired)
     EXPECT_TRUE(m_window->windowIcon().availableSizes().contains(QSize(512, 512))) << "窗口图标没走品牌入口：界面图标阶梯止于 128";
 
     ASSERT_NE(nav(), nullptr);
+    EXPECT_NE(dynamic_cast<GyanisScribe::Gui::ListWidget *>(nav()), nullptr) << "导航没用自绘连续曲率的列表类";
     EXPECT_EQ(nav()->iconSize(), QSize(20, 20));
 
     m_window->open(MainWindowPage::About);

@@ -2,6 +2,7 @@
 #include "Gui/Controls/Button.h"
 #include "Gui/Controls/ComboBox.h"
 #include "Gui/Controls/LineEdit.h"
+#include "Gui/Controls/ListWidget.h"
 #include "Gui/Controls/Menu.h"
 #include "Gui/Controls/SpinBox.h"
 #include "Gui/Controls/SurfaceWidget.h"
@@ -339,6 +340,32 @@ TEST_F(CornerControlsFixture, MenuPaintsSquirclePanelAndActiveItem)
     EXPECT_EQ(image.pixelColor(itemBackground), GyanisScribe::Gui::activePalette().hover);
     EXPECT_EQ(image.pixelColor(0, 0).alpha(), 0) << "菜单左上角必须透明，不能露出方形面板";
     EXPECT_EQ(image.pixelColor(menu.width() / 2, menu.height() - 8), GyanisScribe::Gui::activePalette().surface);
+}
+
+/**
+ * @brief 钉住列表的项高亮与容器底都由连续曲率自绘
+ * @details 高亮取当前行矩形中心：那里必须是 accentSoft，样式表已经不画选中底了。
+ *          容器底取两行之下的一格：那里必须铺 surface，样式表删掉 background 之后
+ *          这块底只能由列表自己画；角部取自身抓图的左上角，那里必须透明，
+ *          方角没有把整块矩形填满。
+ */
+TEST_F(CornerControlsFixture, ListWidgetPaintsItemHighlightAndContainer)
+{
+    GyanisScribe::Gui::ListWidget list;
+    list.resize(200, 120);
+    list.addItem(QStringLiteral("第一项"));
+    list.addItem(QStringLiteral("第二项"));
+    list.setCurrentRow(0);
+    list.show();
+    QCoreApplication::processEvents();
+
+    const QImage viewportImage = list.viewport()->grab().toImage();
+    const QRect  item          = list.visualItemRect(list.item(0));
+    ASSERT_FALSE(item.isEmpty());
+    EXPECT_EQ(viewportImage.pixelColor(item.center()), GyanisScribe::Gui::activePalette().accentSoft);
+    const QImage image = list.grab().toImage();
+    EXPECT_EQ(image.pixelColor(0, 0).alpha(), 0) << "列表容器左上角应透明";
+    EXPECT_EQ(image.pixelColor(100, 100), GyanisScribe::Gui::activePalette().surface) << "列表容器底没铺 surface";
 }
 
 /**
