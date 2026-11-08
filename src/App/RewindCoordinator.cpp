@@ -259,6 +259,12 @@ namespace GyanisScribe::App
         return views.front().id;
     }
 
+    QDateTime RewindCoordinator::sampleCapturedAtForTesting(const quint64 id) const
+    {
+        const auto sample = m_buffer.sampleById(id);
+        return sample ? sample->capturedAt : QDateTime{};
+    }
+
     Core::RewindStatus RewindCoordinator::statusForTesting() const noexcept
     {
         // 选择器与框选是界面流程自己的暂停，对外状态枚举没有这两档；

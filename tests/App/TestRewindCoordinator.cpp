@@ -305,9 +305,13 @@ TEST_F(RewindCoordinatorFixture, ChooseFrameEmitsCapturedImage)
     QSignalSpy       chosen(&coordinator, &RewindCoordinator::frameChosen);
     const auto       id = coordinator.firstFrameIdForTesting();
     ASSERT_TRUE(id.has_value());
+    const auto sampleCapturedAt = coordinator.sampleCapturedAtForTesting(*id);
+    ASSERT_TRUE(sampleCapturedAt.isValid()) << "样本自己没有抓帧时刻，后面的对照没有基准";
     coordinator.chooseFrameForTesting(*id);
     QTRY_VERIFY_WITH_TIMEOUT(chosen.count() == 1, 3000);
-    EXPECT_FALSE(chosen.first().at(0).value<CapturedImage>().image.isNull());
+    const auto chosenFrame = chosen.first().at(0).value<CapturedImage>();
+    EXPECT_FALSE(chosenFrame.image.isNull());
+    EXPECT_EQ(chosenFrame.capturedAt, sampleCapturedAt) << "选帧交回的 capturedAt 不是样本那一格：横幅会显示解码时刻而不是抓帧时刻";
 
     const auto captureFlow = lastStatus(statusSpy);
     ASSERT_TRUE(captureFlow.has_value());

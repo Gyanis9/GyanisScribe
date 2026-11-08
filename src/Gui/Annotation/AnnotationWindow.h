@@ -203,8 +203,8 @@ namespace GyanisScribe::Gui
         void printRequested(const QImage &image);
         /**
          * @brief 标注窗收起了
-         * @details Esc 与工具栏最右那枚 X 都汇到 closeAnnotation，收完就在这里报一声。
-         *          宿主靠它知道「这一轮标注到此为止」，比如回溯缓冲要从这里恢复抓帧。
+         * @details Esc、工具栏最右那枚 X，以及回车复制、保存、贴图、识别这四个交付出口都汇到这一声；
+         *          每轮开窗只报一次。宿主靠它知道「这一轮标注到此为止」，比如回溯缓冲要从这里恢复抓帧。
          */
         void closed();
 
@@ -216,11 +216,14 @@ namespace GyanisScribe::Gui
         void keyPressEvent(QKeyEvent *event) override;
 
     private:
-        /// 把标注结果交出去：先收窗口与工具栏，再发对应信号，避免成品图里带上界面
+        /// 把标注结果交出去：先收窗口与工具栏，再发对应信号，避免成品图里带上界面；交付完也报 closed()
         void deliver(ShortcutAction action);
 
         /// 收起这一轮标注：Esc 与工具栏最右那枚 X 共用同一条收场路
         void closeAnnotation();
+
+        /// 报「标注窗收起了」：交付出口与 Esc/X 都走这里，一轮只报一次
+        void reportClosedOnce();
 
         /// 按记下的选区与屏幕可用区把工具栏摆一次；可见段收放（contextLayoutChanged）后也走这一处
         void placeToolbarForSelection();
@@ -239,6 +242,7 @@ namespace GyanisScribe::Gui
         void  updateCropPreview(const QRect &globalSelection);
         QRect m_placedScreenAvailable; ///< 本轮摆放用的屏幕可用区：可见段变化后重摆要同一份
         QRect m_placedSelection;       ///< 本轮摆放参照的选区：可见段变化后重摆要同一份
+        bool  m_closedReported = false; ///< 这一轮开窗已经报过 closed：交付出口与 Esc/X 共用一个收场
     };
 
 } // namespace GyanisScribe::Gui

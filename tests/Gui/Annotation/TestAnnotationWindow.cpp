@@ -1505,6 +1505,47 @@ TEST_F(AnnotationWindowFixture, EscapeEmitsClosedOnce)
 }
 
 /**
+ * @brief 钉住四个交付出口也报「标注窗已关」，且与 Esc 不会重复报
+ * @details 回车复制、Ctrl+S、Ctrl+D、Ctrl+O 在 deliver 里收窗口交成品，与 Esc/X 是同一个终点；
+ *          少发这一声，回溯缓冲会停在 CaptureFlow。每档各开一轮新窗口，判交付一次、窗口收起、
+ *          closed 一次；交付之后再按 Esc，计数不许再涨。
+ */
+TEST_F(AnnotationWindowFixture, DeliveryExitsEmitClosedOnce)
+{
+    using DeliverySignal = void (AnnotationWindow::*)(const QImage &);
+    const std::vector<std::tuple<Qt::Key, Qt::KeyboardModifiers, DeliverySignal>> cases{
+        {Qt::Key_Return, Qt::NoModifier, &AnnotationWindow::copyRequested},
+        {Qt::Key_S, Qt::ControlModifier, &AnnotationWindow::saveRequested},
+        {Qt::Key_D, Qt::ControlModifier, &AnnotationWindow::pinRequested},
+        {Qt::Key_O, Qt::ControlModifier, &AnnotationWindow::ocrRequested},
+    };
+
+    for (const auto &[key, modifiers, signal]: cases)
+    {
+        auto window = makeWindow();
+        window->startAnnotation(makeCanvas({200, 100}), QRect{0, 0, 1920, 1080}, QRect{0, 0, 200, 100});
+        ASSERT_TRUE(window->isVisible());
+        ASSERT_TRUE(window->toolbar().isVisible());
+
+        int deliveries = 0;
+        QObject::connect(window.get(), signal, window.get(), [&deliveries](const QImage &) { ++deliveries; });
+        QSignalSpy closedSpy(window.get(), &AnnotationWindow::closed);
+        ASSERT_TRUE(closedSpy.isValid());
+
+        pressKeyOn(*window, key, modifiers);
+
+        EXPECT_EQ(deliveries, 1) << "按键 " << static_cast<int>(key) << " 没走到交付出口";
+        EXPECT_FALSE(window->isVisible()) << "交付之后标注窗还留在屏上";
+        EXPECT_FALSE(window->toolbar().isVisible()) << "交付之后工具栏还浮在桌面上";
+        EXPECT_EQ(closedSpy.count(), 1) << "交付出口发了 " << closedSpy.count() << " 次 closed()";
+
+        // 窗口虽已藏起，事件仍能送达：Esc 走同一条收场路时必须被防重挡下
+        pressKeyOn(*window, Qt::Key_Escape);
+        EXPECT_EQ(closedSpy.count(), 1) << "交付之后再关一次又发了一回 closed()";
+    }
+}
+
+/**
  * @brief 钉住「识别二维码」按钮：交出去的是烘好的成品，而且窗口不收场（与打印同一口径）
  * @details 与识别文字不同：扫码不另开结果窗，认没认出来都该留在标注窗里——多半只是想知道
  *          「这里头是什么」，顺手关掉现场是最烦的一种收场。

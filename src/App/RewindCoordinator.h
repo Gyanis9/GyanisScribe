@@ -16,6 +16,7 @@
 #include "Core/Rewind/RewindTypes.h"
 #include "Gui/Controls/Toast.h"
 
+#include <QDateTime>
 #include <QElapsedTimer>
 #include <QFutureWatcher>
 #include <QObject>
@@ -113,6 +114,14 @@ namespace GyanisScribe::App
 
         /// 缓冲里最旧一帧的样本号；空缓冲返回空
         [[nodiscard]] std::optional<quint64> firstFrameIdForTesting() const;
+
+        /**
+         * @brief 某一帧样本的抓帧时刻
+         * @param id 样本号
+         * @return 样本还在缓冲里时返回它的时刻；已被淘汰时返回无效值
+         * @details 用例拿它核对选帧交回的帧带的是样本那一格时间，而不是解码那一刻的现时。
+         */
+        [[nodiscard]] QDateTime sampleCapturedAtForTesting(quint64 id) const;
 
         /**
          * @brief 当前状态按对外状态枚举折算，供用例判暂停与恢复

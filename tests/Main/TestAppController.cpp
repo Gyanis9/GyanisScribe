@@ -5,6 +5,7 @@
 
 #include "App/CaptureCoordinator.h"
 #include "App/CustomHotkeys.h"
+#include "App/RewindCoordinator.h"
 #include "Gui/Annotation/AnnotationWindow.h"
 #include "Gui/Capture/CaptureOverlay.h"
 #include "App/TrayController.h"
@@ -237,7 +238,9 @@ namespace GyanisScribe
 
             [[nodiscard]] Platform::PlatformCapabilities capabilities() const noexcept override
             {
-                return Platform::PlatformCapabilities{};
+                Platform::PlatformCapabilities caps;
+                caps.sessionNotifications = sessionNotifications;
+                return caps;
             }
 
             [[nodiscard]] QString displayName() const override
@@ -287,6 +290,7 @@ namespace GyanisScribe
 
             mutable int        foregroundQueries = 0;       ///< 前台窗口被问了几次
             HotkeyBackendStub *hotkeyBackend     = nullptr; ///< 建出来的假热键后端；第一次重登之前为空
+            bool               sessionNotifications = false; ///< 锁屏通知这一位；回溯协调器只在它为真时启用
 
         private:
             quintptr m_handle; ///< 每次交回同一枚句柄
@@ -639,6 +643,84 @@ namespace GyanisScribe
         EXPECT_EQ(finished, 2) << "标注窗关了却没报收场，回溯会一直停在 CaptureFlow";
         QApplication::sendEvent(&window, &escape);
         EXPECT_EQ(finished, 2) << "同一轮流程报了两次收场，恢复动作会重复执行";
+    }
+
+    /**
+     * @brief 钉住回车复制这一交付出口也结束回溯流程：收场一次，缓冲从暂停回到抓帧
+     * @details 标注窗的四个交付出口会收起窗口但不走 closeAnnotation；少发 closed() 时
+     *          captureFlowFinished 就永远不来，回溯缓冲停在 CaptureFlow，之后的热键都被
+     *          「先完成当前截图」挡回。这里把真回溯协调器接在收场信号上，从选帧一路走到
+     *          标注窗里的回车复制；正式接线由控制器那一层完成，本用例只手工接这两根线。
+     */
+    TEST_F(AppControllerFixture, EnterCopyDeliveryEndsTheRewindCaptureFlow)
+    {
+        auto *screen = QGuiApplication::primaryScreen();
+        ASSERT_NE(screen, nullptr) << "离屏平台该有一块屏";
+
+        m_frameScreenName = screen->name();
+        m_frameRegion     = screen->geometry();
+        m_afterAction     = App::CaptureIntent::Annotate;
+        makeController();
+        // 回溯协调器只在平台承诺锁屏通知时启用；这一位默认是假，本格点名打开
+        m_integration->sessionNotifications = true;
+
+        // 回溯抓整屏：选帧后的布局校验要求帧区域与当前屏几何一致，物理尺寸也要自洽
+        Base::CapturedImage full = makeFrame(screen->name(), screen->geometry());
+        full.logicalSize         = screen->geometry().size();
+        full.devicePixelRatio    = screen->devicePixelRatio();
+        full.image               = QImage(QSize(qRound(full.logicalSize.width() * full.devicePixelRatio), qRound(full.logicalSize.height() * full.devicePixelRatio)),
+                                          QImage::Format_ARGB32_Premultiplied);
+        full.image.fill(m_frameColor);
+        m_source->setFrame(full);
+
+        ASSERT_TRUE(m_settings->setValue(Core::kRewindEnabled, true).has_value()) << "回溯开关没写进设置";
+        App::RewindCoordinator rewind({*m_source, *m_integration, *m_settings});
+
+        bool lastPaused = false;
+        QObject::connect(&rewind, &App::RewindCoordinator::bufferStatusChanged, &rewind,
+                         [&lastPaused](bool enabled, bool paused, const QString &) { lastPaused = enabled && paused; });
+
+        auto &capture  = m_controller->capture();
+        int   finished = 0;
+        QObject::connect(&capture, &App::CaptureCoordinator::captureFlowFinished, &capture, [&finished] { ++finished; });
+        QObject::connect(&capture, &App::CaptureCoordinator::captureFlowFinished, &rewind, &App::RewindCoordinator::handleCaptureFlowFinished);
+        QObject::connect(&rewind, &App::RewindCoordinator::frameChosen, &capture,
+                         [&capture](const Base::CapturedImage &frame) { capture.startInteractiveWithFrame(frame); });
+
+        rewind.start();
+        ASSERT_EQ(rewind.statusForTesting(), Core::RewindStatus::Buffering) << "回溯缓冲没起来，后面的流程无从判起";
+        rewind.captureTickForTesting();
+        ASSERT_TRUE(waitUntil([&rewind] { return rewind.bufferStatsForTesting().sampleCount > 0; }, 5000)) << "回溯缓冲没抓到帧";
+
+        const auto id = rewind.firstFrameIdForTesting();
+        ASSERT_TRUE(id.has_value());
+        rewind.chooseFrameForTesting(*id);
+        ASSERT_TRUE(waitUntil([] { return visibleCaptureOverlay() != nullptr; }, 3000)) << "选帧之后没铺出框选遮罩";
+
+        auto *overlay = visibleCaptureOverlay();
+        ASSERT_NE(overlay, nullptr);
+        const auto global = overlay->geometry().topLeft();
+        QMouseEvent press{QEvent::MouseButtonPress, QPointF{10, 10}, QPointF{global + QPoint{10, 10}}, Qt::LeftButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &press);
+        QMouseEvent move{QEvent::MouseMove, QPointF{109, 89}, QPointF{global + QPoint{109, 89}}, Qt::NoButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &move);
+        QMouseEvent release{QEvent::MouseButtonRelease, QPointF{109, 89}, QPointF{global + QPoint{109, 89}}, Qt::LeftButton, Qt::NoButton, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &release);
+
+        ASSERT_TRUE(waitUntil([this] { return m_controller->capture().annotationWindow().isVisible(); }, 3000)) << "框选之后标注窗没开起来";
+        EXPECT_TRUE(lastPaused) << "标注窗开着时回溯缓冲该是暂停的，后面的恢复判据才有对照";
+
+        auto &window = capture.annotationWindow();
+        QKeyEvent enter{QEvent::KeyPress, Qt::Key_Return, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(&window, &enter);
+
+        EXPECT_EQ(finished, 1) << "回车复制没报收场：回溯协调器会一直停在 CaptureFlow";
+        EXPECT_FALSE(window.isVisible()) << "回车复制之后标注窗还留在屏上";
+        EXPECT_FALSE(lastPaused) << "收场之后回溯缓冲没恢复抓帧";
+
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(&window, &escape);
+        EXPECT_EQ(finished, 1) << "同一轮流程报了两次收场，恢复动作会重复执行";
     }
 
     /**

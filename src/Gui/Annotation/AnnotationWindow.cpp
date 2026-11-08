@@ -144,6 +144,8 @@ namespace GyanisScribe::Gui
 
     void AnnotationWindow::startAnnotation(const Base::CapturedImage &captured, const QRect &screenAvailable, const QRect &selection)
     {
+        // 新一轮开窗重新计收场：上一轮报过的 closed 不该压住这一轮
+        m_closedReported = false;
         // 记下这一轮抓的是哪块屏、哪块区域：刷新截图（F5）要对着同一块地方重抓
         m_refreshScreenName   = captured.screenName;
         m_refreshRegion       = captured.logicalRegion;
@@ -176,6 +178,17 @@ namespace GyanisScribe::Gui
         m_toolbar->hide();
         hide();
         // 收完再报：接收方查可见态时看到的就是「已经收起」
+        reportClosedOnce();
+    }
+
+    void AnnotationWindow::reportClosedOnce()
+    {
+        // 交付出口也会收窗：与 Esc/X 共用这一声，一轮只报一次，免得宿主重复恢复抓帧
+        if (m_closedReported)
+        {
+            return;
+        }
+        m_closedReported = true;
         emit closed();
     }
 
@@ -465,8 +478,10 @@ namespace GyanisScribe::Gui
                 emit ocrRequested(image);
                 break;
             default:
-                return;
+                break;
         }
+        // 交付完再报收场：复制、保存、贴图、识别与 Esc/X 是同一个终点，宿主据此恢复抓帧
+        reportClosedOnce();
     }
 
 } // namespace GyanisScribe::Gui

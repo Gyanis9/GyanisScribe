@@ -1343,8 +1343,8 @@ TEST_F(CaptureServiceFixture, StartInteractiveWithFrameUsesProvidedFrameAndSkips
     auto *overlay = findOverlay();
     ASSERT_NE(overlay, nullptr) << "回溯帧没铺出遮罩";
     EXPECT_TRUE(overlay->isVisible()) << "回溯帧的遮罩没有露出来";
-    ASSERT_TRUE(overlay->modeBannerForTesting().startsWith(QStringLiteral("回溯画面"))) << overlay->modeBannerForTesting().toStdString();
-    EXPECT_TRUE(overlay->modeBannerForTesting().contains(frame.capturedAt.toString(QStringLiteral("HH:mm:ss"))))
+    const auto expectedBanner = QStringLiteral("回溯画面 · ") + frame.capturedAt.toString(QStringLiteral("HH:mm:ss"));
+    EXPECT_EQ(overlay->modeBannerForTesting(), expectedBanner)
             << "横幅没带抓帧时刻，用户分不清这是回看还是实时画面：" << overlay->modeBannerForTesting().toStdString();
 
     const auto global = overlay->geometry().topLeft();
@@ -1381,6 +1381,40 @@ TEST_F(CaptureServiceFixture, StartInteractiveWithFrameUsesProvidedFrameAndSkips
     EXPECT_NE(outcome.error->message.find("布局已经变了"), std::string::npos) << "文案没说明布局变了：" << outcome.error->message;
     const auto *rejectedOverlay = findOverlay();
     EXPECT_TRUE(rejectedOverlay == nullptr || !rejectedOverlay->isVisible()) << "拒绝之后还留着一张可见的遮罩";
+}
+
+/**
+ * @brief 钉住没有抓帧时刻时横幅只写「回溯画面」：不拼一个空分隔符或假时刻
+ * @details 时间有效才接 HH:mm:ss；无效时多一个「·」会让用户以为时刻丢了，
+ *          而补一个现时又会把回看画面说成刚抓的。
+ */
+TEST_F(CaptureServiceFixture, StartInteractiveWithFrameWithoutTimestampShowsPlainBanner)
+{
+    auto *screen = QGuiApplication::primaryScreen();
+    if (screen == nullptr)
+    {
+        GTEST_SKIP() << "这个环境没有屏幕";
+    }
+
+    SettingsStore     settings(m_iniFile);
+    FakeCaptureSource source;
+    CaptureService    service(source, settings, *platform);
+
+    CapturedImage frame = makeFrame();
+    frame.screenName       = screen->name();
+    frame.logicalSize      = screen->geometry().size();
+    frame.devicePixelRatio = screen->devicePixelRatio();
+    frame.logicalRegion    = screen->geometry();
+    frame.capturedAt       = QDateTime{};
+    const QSize physicalSize(qRound(frame.logicalSize.width() * frame.devicePixelRatio), qRound(frame.logicalSize.height() * frame.devicePixelRatio));
+    frame.image = QImage(physicalSize, QImage::Format_ARGB32_Premultiplied);
+    frame.image.fill(QColor(0, 128, 255));
+
+    service.startInteractiveWithFrame(frame);
+
+    auto *overlay = findOverlay();
+    ASSERT_NE(overlay, nullptr) << "回溯帧没铺出遮罩";
+    EXPECT_EQ(overlay->modeBannerForTesting(), QStringLiteral("回溯画面")) << "没有抓帧时刻时横幅不该带分隔符或假时刻：" << overlay->modeBannerForTesting().toStdString();
 }
 
 /**
