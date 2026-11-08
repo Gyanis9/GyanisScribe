@@ -653,8 +653,8 @@ TEST_F(HotkeyManagerFixture, ReportsEveryActionUnsupportedWhenPlatformLacksHotke
 
 /**
  * @brief 钉住长截图那条键真的走它自己的设置项
- * @details 七个动作共用一套登记代码，键名接错一格就是「改了长截图的键，截图的键跟着变」——
- *          两项都用同一条后端通道登记，界面上完全看不出来。这里改一项，另六项必须一动不动。
+ * @details 九个动作共用一套登记代码，键名接错一格就是「改了长截图的键，截图的键跟着变」——
+ *          两项都用同一条后端通道登记，界面上完全看不出来。这里改一项，另八项必须一动不动。
  */
 TEST_F(HotkeyManagerFixture, LongCaptureHotkeyUsesItsOwnSetting)
 {

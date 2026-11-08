@@ -997,7 +997,7 @@ namespace GyanisScribe
         ASSERT_NE(m_integration->hotkeyBackend, nullptr) << "替身平台没有交出热键后端，这一格无从判起";
         auto &backend = *m_integration->hotkeyBackend;
         ASSERT_EQ(backend.unregisterAllCalls, 1) << "启动登记该只清一次场";
-        ASSERT_EQ(backend.registeredCount(), 9) << "八个固定动作加一条自定义键没有全部登记上";
+        ASSERT_EQ(backend.registeredCount(), 10) << "九个固定动作加一条自定义键没有全部登记上";
 
         // 新组合被占用：写入设置即触发整轮重登，热键层恢复旧组合后控制器把它写回配置
         backend.rejectCombination(Qt::ControlModifier | Qt::AltModifier, Qt::Key_8);

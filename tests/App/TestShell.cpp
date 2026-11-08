@@ -193,6 +193,38 @@ TEST(TrayTooltip, RewindStatusAppearsAndDisappears)
 }
 
 /**
+ * @brief 钉住回溯状态那一段自己算得对，不靠托盘也能逐格核对
+ * @details 离屏环境装不出托盘，控制器刷新提示那段路走不到，所以判据必须落在纯函数上：
+ *          关闭时不留任何一段，暂停时带上原因，开启时是一句固定文案。
+ */
+TEST(TrayTooltip, RewindStatusTextCoversAllThreeStates)
+{
+    using GyanisScribe::App::rewindStatusText;
+    EXPECT_EQ(rewindStatusText(false, false, QString{}), QString{}) << "关闭时不能留任何一段，否则托盘还像在抓";
+    EXPECT_EQ(rewindStatusText(false, true, QStringLiteral("排除的程序在前台")), QString{}) << "关闭优先于暂停位，不能冒出「已暂停」";
+    EXPECT_EQ(rewindStatusText(true, true, QStringLiteral("排除的程序在前台")), QStringLiteral("回溯缓冲已暂停：排除的程序在前台")) << "暂停时要把原因一并说给用户";
+    EXPECT_EQ(rewindStatusText(true, false, QString{}), QStringLiteral("回溯缓冲已开启"));
+}
+
+/**
+ * @brief 钉住录制读数或贴图张数与回溯状态在提示里接成两段
+ * @details 控制条收起后用户同时要知道「还在录、录了多久」和「缓冲还开着」：
+ *          两段都要在，各占一段，后一段不能把前一段挤掉。
+ */
+TEST(TrayTooltip, JoinsStatusWithRecordingOrPinCount)
+{
+    using GyanisScribe::App::rewindStatusText;
+    using GyanisScribe::App::trayTooltip;
+
+    const auto status    = rewindStatusText(true, false, QString{});
+    const auto recording = trayTooltip(2, 75, false, status);
+    EXPECT_EQ(recording, QStringLiteral("智录 · 正在录制 01:15 · 回溯缓冲已开启")) << recording.toStdString();
+
+    const auto pinned = trayTooltip(3, -1, false, status);
+    EXPECT_EQ(pinned, QStringLiteral("智录 · 贴图 3 张 · 回溯缓冲已开启")) << pinned.toStdString();
+}
+
+/**
  * @brief 钉住「快捷键提示只挂在真实存在的配置键上」
  * @details 提示文字要从配置现读，挂在一个没人写的键上就会永远显示默认值，
  *          用户改了设置也看不到变化。

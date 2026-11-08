@@ -91,6 +91,17 @@ namespace GyanisScribe::App
     [[nodiscard]] QString trayTooltip(int pinCount, int recordedSeconds, bool paused, const QString &rewindStatus);
 
     /**
+     * @brief 回溯缓冲状态在悬停提示里占的那一段
+     * @param enabled 缓冲是否开启
+     * @param paused 是否暂停抓帧，只在开启时作数
+     * @param reason 暂停原因，只在暂停时显示
+     * @return 关闭时为空串；暂停时为「回溯缓冲已暂停：原因」；其余为「回溯缓冲已开启」
+     * @details 与 trayTooltip 一样做成纯函数：离屏环境装不出托盘，这一段仍要能逐格核对；
+     *          控制器刷新提示与用例断言走同一条实现，不会一边改了一边还在核旧文案。
+     */
+    [[nodiscard]] QString rewindStatusText(bool enabled, bool paused, const QString &reason);
+
+    /**
      * @brief 托盘控制器
      * @details 只负责「图标 + 菜单 + 通知」，动作一律发成信号：
      *          截图、录屏、识别的编排都在 AppController 里，托盘不认识它们。
@@ -191,12 +202,6 @@ namespace GyanisScribe::App
          * @details 右键、双击与未知原因在这条路上不做事（换成空档），平台自己那一套不去抢。
          */
         void onActivated(QSystemTrayIcon::ActivationReason reason);
-
-        /**
-         * @brief 当前回溯状态在悬停提示里占的那一段
-         * @return 关闭时为空串；暂停时为「回溯缓冲已暂停：原因」；其余为「回溯缓冲已开启」
-         */
-        [[nodiscard]] QString rewindStatusText() const;
 
         GyanisScribe::Gui::IconProvider &m_icons;                   ///< 图标供给器，不拥有
         GyanisScribe::Gui::ThemeManager &m_theme;                   ///< 主题管理器，不拥有
