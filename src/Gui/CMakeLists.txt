@@ -10,6 +10,7 @@ add_subdirectory(Capture)
 add_subdirectory(Ocr)
 add_subdirectory(Record)
 add_subdirectory(Annotation)
+add_subdirectory(Rewind)
 
 get_property(GuiSources GLOBAL PROPERTY GyanisScribeGuiSources)
 add_library(Gui STATIC ${GuiSources})
