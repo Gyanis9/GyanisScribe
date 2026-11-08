@@ -45,6 +45,18 @@ namespace GyanisScribe::Core
         [[nodiscard]] virtual Base::Expected<Base::CapturedImage> grabScreen(const QString &screenName) const = 0;
 
         /**
+         * @brief 抓一帧，不等待画面变化
+         * @param screenName 目标屏幕名；空串表示光标所在那块
+         * @return 成功返回当前或最近一帧；首帧未就绪或抓不到时返回原因
+         * @details 默认实现转调 grabScreen()，保证既有来源与测试替身不用改；
+         *          DXGI 来源重写为 0 超时，静态画面直接返回缓存帧，不阻塞 GUI 线程。
+         */
+        [[nodiscard]] virtual Base::Expected<Base::CapturedImage> tryGrabScreen(const QString &screenName) const
+        {
+            return grabScreen(screenName);
+        }
+
+        /**
          * @brief 抓一个窗口
          * @param windowHandle 平台窗口句柄（Qt 的 WId）
          * @return 成功返回该窗口的帧，逻辑尺寸按所在屏的缩放因子算

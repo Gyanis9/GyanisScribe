@@ -69,6 +69,13 @@ namespace GyanisScribe::Plugins
         [[nodiscard]] Base::Expected<Base::CapturedImage> grabScreen(const QString &screenName) const override;
 
         /**
+         * @brief 抓一帧，不等待画面变化，见 Core::IScreenCaptureSource::tryGrabScreen()
+         * @param screenName 目标屏幕名；空串表示光标所在那块
+         * @return 成功返回当前或最近一帧；首帧未就绪或抓不到时返回原因
+         */
+        [[nodiscard]] Base::Expected<Base::CapturedImage> tryGrabScreen(const QString &screenName) const override;
+
+        /**
          * @brief 抓一个窗口，见 Core::IScreenCaptureSource::grabWindow()
          * @param windowHandle 平台窗口句柄
          * @return 转发给 Qt 那一份的结果

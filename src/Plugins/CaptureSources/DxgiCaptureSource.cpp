@@ -100,6 +100,24 @@ namespace GyanisScribe::Plugins
          */
         Base::Expected<QImage> grab(const QRect &screenRect)
         {
+            return grab(screenRect, kAcquireTimeoutMs);
+        }
+
+        /**
+         * @brief 抓一块屏的当前画面，最多等 timeoutMs 毫秒
+         * @param screenRect Qt 报的那块屏的物理矩形
+         * @param timeoutMs 等新帧的上限；0 表示只取这一刻已就绪的帧，静态画面走缓存
+         * @return 成功返回物理像素的图；这一台/这一块屏做不到时返回原因
+         */
+        Base::Expected<QImage> tryGrab(const QRect &screenRect, const UINT timeoutMs)
+        {
+            return grab(screenRect, timeoutMs);
+        }
+
+    private:
+        /// 抓帧的公共路径：认屏、建设备、取帧，两步之间按 Busy 重开一轮
+        Base::Expected<QImage> grab(const QRect &screenRect, const UINT timeoutMs)
+        {
             // 分辨率或排布变了之后，旧屏幕的重复接口与暂存纹理都认不回新输出：先按当前各屏的
             // 物理矩形清掉旧条目，失效的重复接口随状态一起释放，下一次按新尺寸重建
             std::vector<QRect> currentRects;
@@ -137,7 +155,7 @@ namespace GyanisScribe::Plugins
                                                        deviceName.toStdString())});
                 }
 
-                const auto frame = acquireFrame(*state, adapter);
+                const auto frame = acquireFrame(*state, adapter, timeoutMs);
                 if (frame)
                 {
                     ++m_dxgiFrames;
@@ -155,7 +173,6 @@ namespace GyanisScribe::Plugins
                                                Base::uiFormat(Base::uiTextUtf8("DXGI 抓帧连续两轮失效（{}）：画面刚切过分辨率或会话被锁。请重试一次"), deviceName.toStdString())});
         }
 
-    private:
         /// 一块适配器与它按需建起来的设备
         struct AdapterContext
         {
@@ -291,12 +308,12 @@ namespace GyanisScribe::Plugins
             }
         }
 
-        /// 取一帧：等待超时交回上一帧，重复接口失效交回 Busy（调用方据此重开）
-        Base::Expected<QImage> acquireFrame(OutputState &state, AdapterContext &adapter)
+        /// 取一帧：最多等 timeoutMs 毫秒，等待超时交回上一帧，重复接口失效交回 Busy（调用方据此重开）
+        Base::Expected<QImage> acquireFrame(OutputState &state, AdapterContext &adapter, const UINT timeoutMs)
         {
             DXGI_OUTDUPL_FRAME_INFO info{};
             auto                    resource = winrt::com_ptr<IDXGIResource>{};
-            const HRESULT           acquired = state.duplication->AcquireNextFrame(kAcquireTimeoutMs, &info, resource.put());
+            const HRESULT           acquired = state.duplication->AcquireNextFrame(timeoutMs, &info, resource.put());
 
             if (acquired == DXGI_ERROR_WAIT_TIMEOUT)
             {
@@ -448,6 +465,30 @@ namespace GyanisScribe::Plugins
             return m_qtFallback->grabScreen(target->name());
         }
 
+        return Core::frameFromGrabbedImage(*grabbed, target, target->geometry().size());
+    }
+
+    Base::Expected<Base::CapturedImage> DxgiCaptureSource::tryGrabScreen(const QString &screenName) const
+    {
+        QScreen *target = screenName.isEmpty() ? Core::screenAtGlobalPoint(QCursor::pos()) : Core::screenByName(screenName);
+        if (target == nullptr)
+        {
+            return std::unexpected(Base::Error{Base::ErrorCode::ScreenUnavailable,
+                                               Base::uiFormat(Base::uiTextUtf8("回溯抓帧找不到屏幕「{}」：请重新开启回溯缓冲"), screenName.toStdString())});
+        }
+
+        const QRect physicalRect = Core::physicalScreenRect(target->geometry(), target->devicePixelRatio());
+        const auto  grabbed      = m_duplicator->tryGrab(physicalRect, 0);
+        if (!grabbed)
+        {
+            Base::Logger::warning(std::format("回溯抓帧回落到 Qt：{}", grabbed.error().message));
+            return m_qtFallback->grabScreen(target->name());
+        }
+        if (Core::imageLooksAllBlack(*grabbed))
+        {
+            Base::Logger::warning("回溯抓帧拿到全黑帧，改用 Qt 抓帧一次");
+            return m_qtFallback->grabScreen(target->name());
+        }
         return Core::frameFromGrabbedImage(*grabbed, target, target->geometry().size());
     }
 

@@ -1,4 +1,5 @@
 add_executable(TestPluginsCaptureSources
+        TestDxgiCaptureSource.cpp
         TestQScreenCaptureSource.cpp)
 
 target_link_libraries(TestPluginsCaptureSources PRIVATE

@@ -3,6 +3,7 @@ add_executable(TestCoreCapture
         TestCursorPixels.cpp
         TestFrameStitch.cpp
         TestRegionHistory.cpp
+        TestScreenCaptureSource.cpp
         TestScreenUtils.cpp)
 
 target_link_libraries(TestCoreCapture PRIVATE
