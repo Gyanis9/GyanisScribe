@@ -365,6 +365,21 @@ clang-tidy 的报告每次运行都作 artifact（`clang-tidy-report`）上传�
 | 历史页 200 条 4K 首屏 | 构造+显示返回 **160ms**；首轮后台解码 200 张 **5.90s**；搜索刷新返回 **8ms**；第二轮补解 72 张 **2.06s** | `HistoryViewFixture.ReportsTheCostOfRefreshingTwoHundredFourKHistoryEntries`；改造前 Debug 档构造/刷新同步解码 18.9s，界面在此期间不可操作 |
 | 4K 成品加边框与 16 格投影 | 中位 **15.7ms**（5 轮，min 15.4 / max 16.3） | `OutputDecoration.ReportsTheCostOfDecoratingA4kImageWithShadow`；改造前 Debug 档中位 138.4ms |
 
+2026-11 回溯截图 Phase 1 读数（Windows、2560×1440 单屏、dpr 1.0；门禁 `GYANISSCRIBE_REWIND_GATE=1`、`GYANISSCRIBE_REWIND_GATE_SECONDS=60`；
+预热一帧丢弃，读数只报数，门禁用例自己断言 p99 ≤ 16ms）：
+
+| 读数 | Debug | Release | 方法 |
+| --- | --- | --- | --- |
+| 0 超时抓帧 p50 / p95 / p99 | **10.6 / 12.1 / 14.6ms**（5073 帧） | **6.0 / 6.4 / 7.1ms**（9352 帧） | `TestPluginsCaptureSources.exe --gtest_filter=RewindCaptureGate.P99Under16Ms` |
+| 200 帧读数 p50 / p95 / p99 | — | **6.0 / 6.3 / 6.5ms** | `DxgiCaptureSourceFixture.TryGrabScreenReadout` |
+| 抓一帧中位（Qt / 当前原语） | — | **29.1 / 9.6ms**（各 12 轮，每轮搅动桌面） | `QScreenCaptureSourceFixture.ReportsMedianGrabCostOfBothPrimitives` |
+| 一次框选全链中位 | — | **13.3ms**（5 轮，min 10.6 / max 47.3） | `CaptureServiceFixture.ReportsTheCostOfOneWholeInteractiveCapture` |
+| 回溯缓冲内存与空闲 CPU | — | 私有内存 **99.7 → 130.0 MiB**（+30.3 MiB）；CPU **3.2s / 60s**（约 5.3% 单核、0.27% 整机 20 逻辑核） | 便携配置在 `build/release/bin` 起真程序，关闭/开启回溯各空闲 60 秒，`Get-Process` 取 `PrivateMemorySize64` 与 `TotalProcessorTime`；含整进程基线，不是缓冲单独一份 |
+
+这一批只覆盖 1440p / 10 秒档 / 60 秒采样：**4K 与 30 分钟长跑没有测**，不拿外推当读数。
+首帧冷启动（开桌面重复、建暂存纹理、首帧全黑回落）不计入上表，门禁与读数都预热丢弃；
+真黑屏时 Qt 回落帧本身全黑，缓存里没有非黑帧可复用，那一档会每格走一次阻塞回落（见[路线图](Roadmap.md#回溯截图phase-1已实现)）。
+
 ## 参与贡献
 
 
