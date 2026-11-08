@@ -24,6 +24,10 @@ namespace
                 return palette.surface;
             case GyanisScribe::Gui::SurfaceFillRole::ControlFill:
                 return palette.controlFill;
+            case GyanisScribe::Gui::SurfaceFillRole::MutedFill:
+                return palette.mutedFill;
+            case GyanisScribe::Gui::SurfaceFillRole::AccentSoft:
+                return palette.accentSoft;
             case GyanisScribe::Gui::SurfaceFillRole::None:
                 break;
         }

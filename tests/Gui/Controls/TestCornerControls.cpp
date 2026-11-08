@@ -1,7 +1,11 @@
 #include "Core/Geometry/ContinuousCorner.h"
 #include "Gui/Controls/Button.h"
+#include "Gui/Controls/ComboBox.h"
+#include "Gui/Controls/LineEdit.h"
 #include "Gui/Controls/Menu.h"
+#include "Gui/Controls/SpinBox.h"
 #include "Gui/Controls/SurfaceWidget.h"
+#include "Gui/Controls/TextEdit.h"
 #include "Gui/Theme/ControlPalette.h"
 #include "Gui/Theme/SquircleStyle.h"
 #include "Gui/Theme/ThemeManager.h"
@@ -14,6 +18,7 @@
 #include <QImage>
 #include <QMenu>
 #include <QPainter>
+#include <QPalette>
 #include <QWidget>
 
 #include <memory>
@@ -331,6 +336,88 @@ TEST_F(CornerControlsFixture, MenuPaintsSquirclePanelAndActiveItem)
     EXPECT_EQ(image.pixelColor(itemBackground), GyanisScribe::Gui::activePalette().hover);
     EXPECT_EQ(image.pixelColor(0, 0).alpha(), 0) << "菜单左上角必须透明，不能露出方形面板";
     EXPECT_EQ(image.pixelColor(menu.width() / 2, menu.height() - 8), GyanisScribe::Gui::activePalette().surface);
+}
+
+/**
+ * @brief 钉住输入类控件的连续曲率填充
+ * @details 宿主铺红底：控件中心必须是 controlFill，左上角必须露出宿主色，
+ *          后者说明方角没有填满——圆角路径画在控件自己的矩形里。
+ */
+TEST_F(CornerControlsFixture, LineEditPaintsControlFill)
+{
+    QWidget host;
+    host.resize(220, 60);
+    host.setAutoFillBackground(true);
+    host.setPalette(QPalette{QColor{255, 0, 0}});
+    auto *edit = new GyanisScribe::Gui::LineEdit{&host};
+    edit->setGeometry(10, 10, 200, 32);
+    host.show();
+    QCoreApplication::processEvents();
+    const QImage image = host.grab().toImage();
+    EXPECT_EQ(image.pixelColor(120, 26), GyanisScribe::Gui::activePalette().controlFill);
+    EXPECT_EQ(image.pixelColor(10, 10), (QColor{255, 0, 0}));
+}
+
+TEST_F(CornerControlsFixture, ComboBoxPaintsControlFill)
+{
+    QWidget host;
+    host.resize(220, 60);
+    host.setAutoFillBackground(true);
+    host.setPalette(QPalette{QColor{255, 0, 0}});
+    auto *combo = new GyanisScribe::Gui::ComboBox{&host};
+    combo->addItem(QStringLiteral("一"));
+    combo->setGeometry(10, 10, 200, 32);
+    host.show();
+    QCoreApplication::processEvents();
+    const QImage image = host.grab().toImage();
+    EXPECT_EQ(image.pixelColor(120, 26), GyanisScribe::Gui::activePalette().controlFill);
+    EXPECT_EQ(image.pixelColor(10, 10), (QColor{255, 0, 0}));
+}
+
+TEST_F(CornerControlsFixture, TextEditPaintsControlFill)
+{
+    QWidget host;
+    host.resize(220, 120);
+    host.setAutoFillBackground(true);
+    host.setPalette(QPalette{QColor{255, 0, 0}});
+    auto *edit = new GyanisScribe::Gui::TextEdit{&host};
+    edit->setGeometry(10, 10, 200, 100);
+    host.show();
+    QCoreApplication::processEvents();
+    const QImage image = host.grab().toImage();
+    EXPECT_EQ(image.pixelColor(120, 60), GyanisScribe::Gui::activePalette().controlFill);
+    EXPECT_EQ(image.pixelColor(10, 10), (QColor{255, 0, 0}));
+}
+
+TEST_F(CornerControlsFixture, SpinBoxPaintsControlFill)
+{
+    QWidget host;
+    host.resize(220, 60);
+    host.setAutoFillBackground(true);
+    host.setPalette(QPalette{QColor{255, 0, 0}});
+    auto *spin = new GyanisScribe::Gui::SpinBox{&host};
+    spin->setGeometry(10, 10, 200, 32);
+    host.show();
+    QCoreApplication::processEvents();
+    const QImage image = host.grab().toImage();
+    EXPECT_EQ(image.pixelColor(60, 26), GyanisScribe::Gui::activePalette().controlFill);
+}
+
+TEST_F(CornerControlsFixture, HighContrastInputFocusDrawsAccentBorder)
+{
+    GyanisScribe::Gui::setTextThemeKind(GyanisScribe::Gui::ThemeKind::HighContrast);
+    QWidget host;
+    host.resize(220, 60);
+    host.setAutoFillBackground(true);
+    host.setPalette(QPalette{QColor{255, 0, 0}});
+    auto *edit = new GyanisScribe::Gui::LineEdit{&host};
+    edit->setGeometry(10, 10, 200, 34);
+    host.show();
+    edit->setFocus(Qt::TabFocusReason);
+    QCoreApplication::processEvents();
+    const QImage image = host.grab().toImage();
+    EXPECT_EQ(image.pixelColor(110, 10), GyanisScribe::Gui::activePalette().accent);
+    GyanisScribe::Gui::setTextThemeKind(GyanisScribe::Gui::ThemeKind::Light);
 }
 
 TEST_F(CornerControlsFixture, ControlPaletteMapsStatesToThemeRoles)

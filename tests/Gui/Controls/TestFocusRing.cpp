@@ -3,6 +3,7 @@
 // 只读控件跳过、主题切换重装，以及勾选的工具按钮仍要拿到单环。
 // 与 TestControlsChrome 同进程，共用它那份 QApplication。
 #include "Gui/Controls/FocusRing.h"
+#include "Gui/Controls/LineEdit.h"
 
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Theme/ThemeManager.h"
@@ -112,9 +113,10 @@ TEST_F(FocusRingFixture, BlurHidesTheRingAndHighContrastNeverInstallsOne)
 }
 
 /**
- * @brief 钉住标注工具栏内的控件不装双环，只把 1px 透明边框换成主色
+ * @brief 钉住标注工具栏内的控件不装双环，只由控件自绘 1px 主色边
  * @details 工具栏是 26px 紧凑档、行距只有 2px，6px 外扩的环会压到相邻按钮上；
- *          聚焦只换边色不换尺寸，输入框不应被挤动。
+ *          聚焦只换边色不换尺寸，输入框不应被挤动。可见焦点边由 ControlPalette::inputColors
+ *          按 usesInlineFocusBorder 自绘，QSS 里已没有工具栏的 :focus 规则。
  */
 TEST_F(FocusRingFixture, CompactToolbarKeepsItsOwnFocusEdge)
 {
@@ -123,7 +125,7 @@ TEST_F(FocusRingFixture, CompactToolbarKeepsItsOwnFocusEdge)
     QWidget host;
     host.setObjectName(QStringLiteral("AnnotationToolbar"));
     host.resize(240, 80);
-    auto *edit = new QLineEdit{&host};
+    auto *edit = new GyanisScribe::Gui::LineEdit{&host};
     edit->setGeometry(30, 24, 180, 32);
     host.show();
     QCoreApplication::processEvents();
@@ -136,8 +138,10 @@ TEST_F(FocusRingFixture, CompactToolbarKeepsItsOwnFocusEdge)
     EXPECT_EQ(edit->size(), sizeBeforeFocus) << "聚焦换边色把输入框尺寸改了";
     EXPECT_EQ(edit->size(), QSize(180, 32)) << "输入框没落在设定的尺寸上";
 
-    const auto   shot = host.grab().toImage();
-    const QColor edge = shot.pixelColor(edit->geometry().left(), edit->geometry().center().y());
+    const auto shot = host.grab().toImage();
+    // 取样上边而不是左边：同一笔 1px 描边在纵向边缘会与底色混出几个百分点的抗锯齿，
+    // 横向边缘落在整像素上，取到的就是主色本身
+    const QColor edge = shot.pixelColor(edit->geometry().center().x(), edit->geometry().top());
     EXPECT_EQ(edge, kLightPalette.accent) << "紧凑工具栏的焦点边缘不是主色，实际是 " << edge.name().toStdString();
 }
 

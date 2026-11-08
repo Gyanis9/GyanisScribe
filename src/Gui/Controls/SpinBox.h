@@ -34,6 +34,14 @@ namespace GyanisScribe::Gui
 
     protected:
         /**
+         * @brief 先画连续曲率底，再交给基类画数字与光标
+         * @details 重写 QSpinBox::paintEvent()：填充与描边由 inputColors 给出，
+         *          数字、光标与选区仍由基类处理
+         * @param event 绘制事件
+         */
+        void paintEvent(QPaintEvent *event) override;
+
+        /**
          * @brief 窗口尺寸变化时把两枚按钮重新贴到右缘
          * @param event 尺寸事件
          */

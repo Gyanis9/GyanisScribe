@@ -3,6 +3,9 @@
 #include "Gui/Theme/ThemeKind.h"
 #include "Gui/Theme/ThemeManager.h"
 #include "Gui/Controls/Button.h"
+#include "Gui/Controls/ComboBox.h"
+#include "Gui/Controls/LineEdit.h"
+#include "Gui/Controls/SpinBox.h"
 #include "Gui/Controls/SurfaceWidget.h"
 #include "Gui/Theme/ControlPalette.h"
 #include "Core/Geometry/ContinuousCorner.h"
@@ -640,10 +643,10 @@ TEST_F(ThemeManagerFixture, ControlHeightsStayPinnedPerTheme)
     for (const auto kind: {ThemeKind::Light, ThemeKind::Dark, ThemeKind::HighContrast})
     {
         application->setStyleSheet(ThemeManager::styleSheetFor(kind));
-        QLineEdit                 edit;
-        GyanisScribe::Gui::Button button{QStringLiteral("确定")};
-        QSpinBox                  spin;
-        QComboBox                 combo;
+        GyanisScribe::Gui::LineEdit edit;
+        GyanisScribe::Gui::Button   button{QStringLiteral("确定")};
+        GyanisScribe::Gui::SpinBox  spin;
+        GyanisScribe::Gui::ComboBox combo;
         for (QWidget *widget: std::initializer_list<QWidget *>{&edit, &button, &spin, &combo})
         {
             widget->ensurePolished();
@@ -844,15 +847,17 @@ TEST_F(ThemeManagerFixture, CheckboxAndSliderShowAKeyboardFocusRing)
 }
 
 /**
- * @brief 钉住 Light/Dark 的按钮焦点已交给自绘类，输入类只留标注工具栏的紧凑焦点
- * @details 按钮的焦点边由 Gui::Button / Gui::ToolButton 按 ControlPalette 自绘，
- *          样式表里若还留着 QPushButton:focus 一类规则，会在自绘边之外再压一圈。
- *          输入类的 focus 规则留到输入控件迁移时再收，这里先钉住它们仍只在工具栏那一条。
+ * @brief 钉住三份样式的按钮与输入类焦点都已交给自绘代码
+ * @details 按钮与输入类的可见焦点边由 Gui::Button / Gui::ToolButton / Gui::LineEdit 等按
+ *          ControlPalette 自绘，浅深档另有 FocusRingController 的覆盖层；样式表里若还留着
+ *          QPushButton:focus、QLineEdit:focus 一类规则，会在自绘边之外再压一圈。
  *          判据按选择器分支看，不能只搜全文。
  */
 TEST_F(ThemeManagerFixture, LightAndDarkSheetsDropTheControlLevelFocusOutlines)
 {
-    for (const auto resource: {std::string_view{":/styles/Light.qss"}, std::string_view{":/styles/Dark.qss"}})
+    const auto cases = {std::tuple{std::string_view{":/styles/Light.qss"}, false}, std::tuple{std::string_view{":/styles/Dark.qss"}, false},
+                        std::tuple{std::string_view{":/styles/HighContrast.qss"}, true}};
+    for (const auto &[resource, highContrast]: cases)
     {
         const auto sheet     = readStyleSheet(resource);
         const auto selectors = focusSelectorsIn(sheet);
@@ -872,31 +877,19 @@ TEST_F(ThemeManagerFixture, LightAndDarkSheetsDropTheControlLevelFocusOutlines)
             return matched;
         };
 
-        // 按钮的焦点边改由控件自绘：浅深两档都不该再有按钮的 :focus 分支
-        for (const auto *token: {"QPushButton:focus", "QToolButton:focus"})
+        // 按钮与输入类的焦点边都改由控件自绘：任何一份样式表都不该再有这些分支
+        for (const auto *token: {"QPushButton:focus", "QToolButton:focus", "QLineEdit:focus", "QComboBox:focus", "QSpinBox:focus",
+                                 "QTextEdit#annotationTextEditor:focus"})
         {
             const auto matched = branches(QString::fromLatin1(token));
-            EXPECT_TRUE(matched.isEmpty()) << resource << " 按钮还留着 QSS 焦点描边：" << matched.join(QStringLiteral("; ")).toStdString();
+            EXPECT_TRUE(matched.isEmpty()) << resource << " 还留着控件级焦点描边：" << matched.join(QStringLiteral("; ")).toStdString();
         }
 
-        // 输入类与标注工具栏的紧凑焦点留到输入控件迁移：现有且只有工具栏那一条
-        for (const auto *token: {"QLineEdit:focus", "QComboBox:focus", "QSpinBox:focus"})
-        {
-            const auto matched = branches(QString::fromLatin1(token));
-            EXPECT_EQ(matched.size(), 1) << resource << " 里 " << token << " 的条数不对：应有且只有工具栏那一条";
-            for (const auto &selector: matched)
-            {
-                EXPECT_TRUE(selector.contains(QStringLiteral("#AnnotationToolbar"))) << resource << " 留下了控件级焦点描边：" << selector.toStdString();
-            }
-        }
-
-        // 这两类在浅色与深色档里没有任何合法落点：覆盖层负责，QSS 不该再画
-        EXPECT_TRUE(branches(QStringLiteral("QTextEdit#annotationTextEditor:focus")).isEmpty()) << resource << " 行内编辑器还留着 :focus 描边";
-        EXPECT_TRUE(branches(QStringLiteral("QCheckBox::indicator:focus")).isEmpty()) << resource << " 复选框指示器还留着 :focus 描边";
-
-        // 滑块没有覆盖层：手柄反转是浅深两档唯一的 QSS 焦点形态
+        // 复选框指示器与滑块手柄是子控件，焦点仍由 QSS 表达，留到后续切片迁移；
+        // 高对比度档的复选框指示器是这一档唯一合法的 :focus 分支
+        EXPECT_EQ(branches(QStringLiteral("QCheckBox::indicator:focus")).size(), highContrast ? 1 : 0) << resource << " 复选框指示器的 :focus 分支条数不对";
         EXPECT_EQ(branches(QStringLiteral("QSlider::handle:horizontal:focus")).size(), 1) << resource << " 滑块的手柄反转焦点没了";
-        // 高对比度档仍保留控件级 2px 描边，由 SemanticColorPairsMeetWcagContrast 的 2PX SOLID 判据钉住
+        // 高对比度档仍保留控件级 2px 描边占位，由 SemanticColorPairsMeetWcagContrast 的 2PX SOLID 判据钉住
     }
 }
 

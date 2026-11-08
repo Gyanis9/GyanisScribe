@@ -12,6 +12,7 @@
 #include "Gui/Theme/CornerStyle.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Controls/Button.h"
+#include "Gui/Controls/ComboBox.h"
 
 #include <QApplication>
 #include <QAction>
@@ -219,7 +220,7 @@ namespace GyanisScribe::Gui
         layout->addWidget(m_widthSlider);
 
         // 字号：需求给的是离散阶梯（12/13/14/16/20/24），用下拉而不是滑块，避免出现 15 这种没定义的值
-        m_fontSizeCombo = new QComboBox{this};
+        m_fontSizeCombo = new Gui::ComboBox{this};
         for (const auto size: kFontSizes)
         {
             m_fontSizeCombo->addItem(QString::number(size), size);
@@ -284,7 +285,7 @@ namespace GyanisScribe::Gui
         QObject::connect(m_arrowHeadScaleButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleArrowHeadScale);
         layout->addWidget(m_arrowHeadScaleButton);
         // 文字字体族：文字工具用得上，列系统字体。宽度封顶——字体名长的很，放任 sizeHint 会撑出去
-        m_fontCombo = new QFontComboBox{this};
+        m_fontCombo = new Gui::FontComboBox{this};
         m_fontCombo->setMaximumWidth(Gui::kToolbarFontComboWidth);
         m_fontCombo->setAccessibleName(GyanisScribe::Base::uiText("字体"));
         m_fontCombo->setToolTip(GyanisScribe::Base::uiText("字体（文字）"));

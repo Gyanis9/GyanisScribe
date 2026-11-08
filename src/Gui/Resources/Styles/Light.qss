@@ -82,20 +82,14 @@ QToolButton#annotationColorButton::menu-indicator {
     image: none;
 }
 
-/* 标注工具栏的紧凑焦点：26px 档不装 6px 双环，只把 1px 透明边框换成主色，尺寸不跳；
-   按钮的焦点边由 Gui::Button / Gui::ToolButton 自绘，这里只剩输入类 */
-QWidget#AnnotationToolbar QLineEdit:focus,
-QWidget#AnnotationToolbar QComboBox:focus,
-QWidget#AnnotationToolbar QSpinBox:focus {
-    border-color: #236DE9;
-}
-
-/* ---- 输入类：静息 controlFill 填充、无可见描边；1px 透明边框占位，总高 32 ---- */
+/* ---- 输入类：填充、描边与圆角由 Gui::LineEdit / Gui::ComboBox / Gui::SpinBox 按启用、
+        只读与焦点状态自绘；这里只留 1px 透明边框、透明底占位、内边距、最小高度与文字色，
+        控件总高仍是 32。透明底不能省：样式表一旦写了 border，QStyleSheetStyle 就会按
+        QPalette::Base 先铺一层方底，自绘的连续曲率底会被盖掉 ---- */
 QLineEdit, QComboBox, QSpinBox {
-    background-color: #F2F2EE;
     color: #141412;
+    background: transparent;
     border: 1px solid transparent;
-    border-radius: 12px;
     padding: 0 12px;
     min-height: 30px;
     selection-background-color: #D8E5F9;
@@ -109,45 +103,32 @@ QSpinBox {
 }
 
 QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled {
-    background-color: #EDEDE9;
     color: #53534D;
-    border-color: transparent;
 }
 
 QLineEdit:read-only {
-    background-color: #EDEDE9;
     color: #53534D;
 }
 
-/* ---- 快捷键录制框：与输入框同一套外观，静息走 controlFill；录制态把底与描边换成主色 ---- */
+/* ---- 快捷键录制框：显示框是 Gui::SurfaceLabel，静息 controlFill、录制态 accentSoft 加主色边、
+        禁用态 mutedFill 都由它自绘；这里只留文字色、透明边框、内边距与最小高度 ---- */
 QLabel#hotkeyDisplay {
-    background-color: #F2F2EE;
     color: #141412;
     border: 1px solid transparent;
-    border-radius: 12px;
     padding: 0 12px;
     min-height: 30px;
 }
 
-QLabel#hotkeyDisplay[recording="true"] {
-    background-color: #E5EEFA;
-    border-color: #236DE9;
-}
-
 QLabel#hotkeyDisplay:disabled {
-    background-color: #EDEDE9;
     color: #53534D;
-    border-color: transparent;
 }
 
 /* ---- 标注窗的行内文字输入框：与上面几档输入框同形，别把识别结果区的宽内边距带进去 ----
    上下内边距为零是标注输入框高度算式的前提（AnnotationView::resizeTextEditorToContent 只补边框与余量），
    改这里的 padding 要同步改那边 */
 QTextEdit#annotationTextEditor {
-    background-color: #F2F2EE;
     color: #141412;
     border: 1px solid transparent;
-    border-radius: 12px;
     padding: 0 8px;
     selection-background-color: #D8E5F9;
     selection-color: #141412;
@@ -374,12 +355,11 @@ QScrollArea#settingsScroll > QWidget {
     background-color: transparent;
 }
 
-/* ---- 文本区（识别结果） ---- */
+/* ---- 文本区（识别结果）：底与圆角由 Gui::TextEdit 按 Panel 档自绘，
+        这里只留文字色、透明边框、内边距与选区颜色 ---- */
 QTextEdit {
-    background-color: #F2F2EE;
     color: #141412;
-    border: none;
-    border-radius: 16px;
+    border: 1px solid transparent;
     padding: 8px;
     selection-background-color: #D8E5F9;
     selection-color: #141412;
@@ -434,7 +414,8 @@ QScrollBar::add-page, QScrollBar::sub-page {
     background-color: transparent;
 }
 
-/* ---- 键盘焦点：勾选框与输入类的焦点由 Gui::FocusRingController 的覆盖层画；
+/* ---- 键盘焦点：勾选框的焦点由 Gui::FocusRingController 的覆盖层画，输入类的可见焦点边
+        由 ControlPalette::inputColors 自绘（浅深档只在标注工具栏内落笔）；
         滑块因控件级边框在 CC_Slider 的自绘路径里不落笔，焦点改挂在手柄上反转：
         底色芯 + 正文色圈 ---- */
 QSlider::handle:horizontal:focus {

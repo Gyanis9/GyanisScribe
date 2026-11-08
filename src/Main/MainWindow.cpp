@@ -28,6 +28,8 @@
 #include "Gui/Controls/AppShortcuts.h"
 #include "Gui/Controls/Button.h"
 #include "Gui/Controls/CheckBox.h"
+#include "Gui/Controls/ComboBox.h"
+#include "Gui/Controls/LineEdit.h"
 #include "Gui/Controls/Menu.h"
 #include "Gui/Controls/SpinBox.h"
 #include "Gui/Controls/SurfaceWidget.h"
@@ -243,7 +245,7 @@ namespace
         // 否则输入框左缘比字段列右移一截，三处路径行看起来各偏各的
         layout->setContentsMargins(0, 0, 0, 0);
         layout->setSpacing(GyanisScribe::Gui::kSpacingSmall);
-        auto      *editor  = new QLineEdit{row};
+        auto      *editor  = new GyanisScribe::Gui::LineEdit{row};
         const auto stored  = settings.stringValue(key, QString{});
         const auto display = stored.isEmpty() ? GyanisScribe::Base::Paths::toDisplayText(fallback) : stored;
         editor->setText(display);
@@ -340,7 +342,7 @@ namespace
     template<std::size_t Size>
     QComboBox *makeStepCombo(GyanisScribe::Core::ISettingsStore &settings, const std::string_view key, const std::array<int, Size> &steps, const int fallback, const QString &title)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         for (const auto stepValue: steps)
         {
             combo->addItem(QString::number(stepValue), stepValue);
@@ -484,7 +486,7 @@ namespace
      */
     QComboBox *makeUiLanguageCombo(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         for (const auto &choice: kLanguageChoices)
         {
             combo->addItem(GyanisScribe::Base::uiText(choice.label));
@@ -527,7 +529,7 @@ namespace
      */
     QComboBox *makeThemeCombo(GyanisScribe::Gui::ThemeManager &theme)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         for (const auto &choice: kThemeChoices)
         {
             combo->addItem(GyanisScribe::Base::uiText(choice.label));
@@ -555,7 +557,7 @@ namespace
      */
     QComboBox *makeOcrLanguageCombo(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         combo->addItems(GyanisScribe::Core::supportedOcrLanguageTags());
         combo->setAccessibleName(GyanisScribe::Base::uiText("识别语言"));
         const auto stored = settings.stringValue(GyanisScribe::Core::kOcrLanguage, QString::fromUtf8(GyanisScribe::Core::kDefaultOcrLanguage));
@@ -581,7 +583,7 @@ namespace
      */
     QComboBox *makeColorFormatCombo(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         combo->addItems(GyanisScribe::Core::colorFormatLabels());
         combo->setAccessibleName(GyanisScribe::Base::uiText("颜色写法"));
         const auto stored = GyanisScribe::Core::parseColorFormat(settings.stringValue(GyanisScribe::Core::kPickFormat, QStringLiteral("Hex")).toStdString());
@@ -613,7 +615,7 @@ namespace
      */
     QComboBox *makeMagnifierViewCombo(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         for (const auto view: GyanisScribe::Core::magnifierViews())
         {
             combo->addItem(GyanisScribe::Core::magnifierViewLabel(view));
@@ -657,7 +659,7 @@ namespace
      */
     QComboBox *makeSizeUnitCombo(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto                                              combo = new QComboBox;
+        auto                                              combo = new GyanisScribe::Gui::ComboBox;
         const std::array<GyanisScribe::Core::SizeUnit, 2> units{GyanisScribe::Core::SizeUnit::Logical, GyanisScribe::Core::SizeUnit::Physical};
         for (const auto unit: units)
         {
@@ -702,7 +704,7 @@ namespace
     QComboBox *makeTrayClickCombo(GyanisScribe::Core::ISettingsStore &settings, const GyanisScribe::App::TrayClickRole role,
                                   const GyanisScribe::Platform::PlatformCapabilities &capabilities)
     {
-        auto        combo   = new QComboBox;
+        auto        combo   = new GyanisScribe::Gui::ComboBox;
         const auto &info    = GyanisScribe::App::trayClickRoleInfo(role);
         const auto  choices = GyanisScribe::App::trayClickChoices(capabilities);
         std::string complaint;
@@ -1001,7 +1003,7 @@ namespace
      */
     QComboBox *makeRecordScopeCombo(GyanisScribe::Core::ISettingsStore &settings, const GyanisScribe::Gui::IconProvider &icons)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         for (const auto &choice: GyanisScribe::Core::kRecordScopeChoices)
         {
             // 图标名与标签同在词表里：三档录法的字形不一样，扫一眼就分得出，不必逐条读字
@@ -1043,7 +1045,7 @@ namespace
      */
     QComboBox *makeCaptureIntentCombo(GyanisScribe::Core::ISettingsStore &settings, const GyanisScribe::Gui::IconProvider &icons)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         for (const auto &choice: GyanisScribe::App::kCaptureIntentChoices)
         {
             // 与录制范围那格同一条形状：图标名跟着词表走，界面只负责取
@@ -1081,7 +1083,7 @@ namespace
      */
     QComboBox *makeImageFormatCombo(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         // 只摆这台机器真写得出来的那几档：Qt 的图像编码器是插件，摆一档写不出的就是让用户白失败一次
         for (const auto format: GyanisScribe::Core::writableImageFormats())
         {
@@ -1167,7 +1169,7 @@ namespace
     QComboBox *makeAudioDeviceCombo(GyanisScribe::Core::ISettingsStore &settings, const std::string_view key, const QString &title,
                                     GyanisScribe::Plugins::FfmpegAudioDeviceEnumerator &enumerator)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         combo->addItem(GyanisScribe::Base::uiText("不取这一路"), QString());
         combo->setAccessibleName(title);
 
@@ -1219,7 +1221,7 @@ namespace
      */
     QComboBox *makeVideoEncoderCombo(GyanisScribe::Core::ISettingsStore &settings, GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator &enumerator)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         combo->addItem(GyanisScribe::Base::uiText("自动（逐个探测）"), QString::fromUtf8(std::string{GyanisScribe::Core::kRecordVideoEncoderAutoToken}));
         combo->setAccessibleName(GyanisScribe::Base::uiText("视频编码器"));
         combo->setToolTip(GyanisScribe::Base::uiText("列出的是这台机器上前不久真探通的编码器；自动档会在每次编码前按偏好顺序探一遍"));
@@ -1313,7 +1315,7 @@ namespace
      */
     QComboBox *makeRecordFormatCombo(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         for (const auto &choice: GyanisScribe::Core::kRecordFormatChoices)
         {
             combo->addItem(GyanisScribe::Base::uiText(choice.label), tokenText(choice.token));
@@ -1881,7 +1883,7 @@ namespace GyanisScribe::Main
      */
     QLineEdit *makeDetectionExcludesEdit(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *edit = new QLineEdit;
+        auto *edit = new GyanisScribe::Gui::LineEdit;
         edit->setText(settings.stringValue(GyanisScribe::Core::kCaptureDetectionExcludes, QString{}));
         edit->setPlaceholderText(GyanisScribe::Base::uiText("留空即谁都不排除，例如 chrome.exe, cmd.exe"));
         edit->setClearButtonEnabled(true);
@@ -1901,7 +1903,7 @@ namespace GyanisScribe::Main
 
     QLineEdit *makeGroupRotationEdit(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *edit = new QLineEdit;
+        auto *edit = new GyanisScribe::Gui::LineEdit;
         edit->setText(settings.stringListValue(GyanisScribe::Core::kPinGroupRotationOrder, {}).join(QStringLiteral(", ")));
         edit->setPlaceholderText(GyanisScribe::Base::uiText("留空即按组号升序，例如 2, 1, 3"));
         edit->setClearButtonEnabled(true);
@@ -1979,7 +1981,7 @@ namespace GyanisScribe::Main
      */
     QLineEdit *makeNameTemplateEdit(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *edit = new QLineEdit;
+        auto *edit = new GyanisScribe::Gui::LineEdit;
         edit->setText(settings.stringValue(GyanisScribe::Core::kSaveNameTemplate, QString{}));
         edit->setPlaceholderText(GyanisScribe::Base::Paths::defaultNameTemplate());
         edit->setClearButtonEnabled(true);
@@ -2090,7 +2092,7 @@ namespace GyanisScribe::Main
      */
     QLineEdit *makeBorderColorEdit(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *edit = new QLineEdit;
+        auto *edit = new GyanisScribe::Gui::LineEdit;
         edit->setText(settings.stringValue(GyanisScribe::Core::kOutputBorderColor, QString{}));
         edit->setPlaceholderText(GyanisScribe::Base::uiText("#808080（中灰，留空即这一档）"));
         edit->setClearButtonEnabled(true);
@@ -2130,7 +2132,7 @@ namespace GyanisScribe::Main
      */
     QLineEdit *makeExecCommandEdit(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *edit = new QLineEdit;
+        auto *edit = new GyanisScribe::Gui::LineEdit;
         edit->setText(settings.stringValue(GyanisScribe::Core::kCaptureExecCommand, QString{}));
         edit->setPlaceholderText(GyanisScribe::Base::uiText("留空即不跑；形如 上传工具 --path \"%file%\""));
         edit->setClearButtonEnabled(true);
@@ -2207,7 +2209,7 @@ namespace GyanisScribe::Main
      */
     QLineEdit *makePaletteEdit(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *edit = new QLineEdit;
+        auto *edit = new GyanisScribe::Gui::LineEdit;
         edit->setText(settings.stringListValue(GyanisScribe::Core::kAnnotationPalette, {}).join(QStringLiteral(", ")));
         edit->setPlaceholderText(GyanisScribe::Base::uiText("留空即内置那八格；形如 #FF0000, #00FF00"));
         edit->setClearButtonEnabled(true);

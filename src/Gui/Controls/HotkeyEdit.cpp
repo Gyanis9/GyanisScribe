@@ -3,12 +3,13 @@
 #include "Base/Logger.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Base/Text.h"
+#include "Gui/Controls/SurfaceWidget.h"
+#include "Gui/Theme/DesignTokens.h"
 
+#include <QEvent>
 #include <QKeyEvent>
 #include <QFocusEvent>
 #include <QMouseEvent>
-#include <QLabel>
-#include <QStyle>
 #include <QVBoxLayout>
 
 #include <string>
@@ -48,14 +49,16 @@ namespace GyanisScribe::Gui
         auto *layout = new QVBoxLayout{this};
         layout->setContentsMargins(0, 0, 0, 0);
 
-        m_display = new QLabel{this};
+        m_display = new GyanisScribe::Gui::SurfaceLabel{GyanisScribe::Gui::SurfaceFillRole::ControlFill, GyanisScribe::Core::CornerRole::Control, this};
         m_display->setObjectName(QStringLiteral("hotkeyDisplay"));
         m_display->setFrameShape(QFrame::NoFrame);
         m_display->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
         m_display->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
         m_display->setMinimumWidth(0);
+        m_display->setHighContrastBorder(true);
         m_display->setText(GyanisScribe::Base::uiText("点击后按下快捷键"));
         layout->addWidget(m_display);
+        refreshDisplayFill();
 
         setFocusPolicy(Qt::ClickFocus);
     }
@@ -198,12 +201,28 @@ namespace GyanisScribe::Gui
         cancelRecording();
     }
 
+    void HotkeyEdit::changeEvent(QEvent *event)
+    {
+        QWidget::changeEvent(event);
+        if (event->type() == QEvent::EnabledChange && m_display != nullptr)
+        {
+            refreshDisplayFill();
+        }
+    }
+
+    void HotkeyEdit::refreshDisplayFill()
+    {
+        m_display->setFillRole(m_recording ? SurfaceFillRole::AccentSoft
+                                           : (isEnabled() ? SurfaceFillRole::ControlFill : SurfaceFillRole::MutedFill));
+        m_display->setBorderColor(m_recording ? activePalette().accent : QColor{});
+    }
+
     void HotkeyEdit::setRecordingState(const bool recording)
     {
         m_recording = recording;
+        // 样式表不再按录制态换形，属性只留作可观察的状态；可见的底与边由 SurfaceLabel 自绘
         m_display->setProperty("recording", recording);
-        m_display->style()->unpolish(m_display);
-        m_display->style()->polish(m_display);
+        refreshDisplayFill();
     }
 
     void HotkeyEdit::cancelRecording()

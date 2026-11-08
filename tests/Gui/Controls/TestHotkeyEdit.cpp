@@ -2,6 +2,8 @@
 
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Settings/SettingsStore.h"
+#include "Gui/Controls/SurfaceWidget.h"
+#include "Gui/Theme/ControlPalette.h"
 
 #include <gtest/gtest.h>
 
@@ -9,6 +11,7 @@
 
 #include <QApplication>
 #include <QCoreApplication>
+#include <QImage>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMouseEvent>
@@ -338,6 +341,53 @@ TEST_F(HotkeyEditFixture, ClearBindingFallsBackToTheDefaultText)
 
     EXPECT_EQ(display->text(), fallback) << "删除绑定后没有回落到默认文本：界面按键那一格留在了空白";
     EXPECT_EQ(m_store->stringValue(key, QStringLiteral("missing")), QStringLiteral("missing")) << "取消绑定没有把键从配置里删掉";
+}
+
+/**
+ * @brief 钉住显示框是自绘连续曲率底的 SurfaceLabel，并按录制/禁用换铺底角色
+ * @details 录制态铺 accentSoft、禁用态铺 mutedFill、恢复后回到 controlFill；
+ *          这三个颜色只存在于 SurfaceLabel 的 fillRole 里，QSS 已不再给 hotkeyDisplay 铺底。
+ *          取样点留在右侧内边距：文字左对齐，那里只有底色。
+ */
+TEST_F(HotkeyEditFixture, DisplayPaintsRecordingAndDisabledFillRoles)
+{
+    QWidget container;
+    auto   *edit = new HotkeyEdit{*m_store, &container};
+    edit->setGeometry(0, 0, 320, 60);
+    container.resize(320, 60);
+    container.show();
+    container.activateWindow();
+    QCoreApplication::processEvents();
+
+    auto *display = edit->findChild<QLabel *>(QStringLiteral("hotkeyDisplay"));
+    ASSERT_NE(display, nullptr) << "录制框里没有显示组合的那一格";
+    ASSERT_NE(dynamic_cast<GyanisScribe::Gui::SurfaceLabel *>(display), nullptr) << "显示框没有改用 SurfaceLabel，连续曲率底没有落笔处";
+
+    const auto fillAt = [display]
+    {
+        const QImage image = display->grab().toImage();
+        return image.pixelColor(display->width() - 8, display->height() / 2);
+    };
+    const auto &palette = GyanisScribe::Gui::activePalette();
+    EXPECT_EQ(fillAt(), palette.controlFill) << "静息态没有铺 controlFill";
+
+    QMouseEvent press{QEvent::MouseButtonPress, QPointF{5, 5}, QPointF{5, 5}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QCoreApplication::sendEvent(edit, &press);
+    QCoreApplication::processEvents();
+    EXPECT_EQ(fillAt(), palette.accentSoft) << "录制态没有铺 accentSoft";
+
+    QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier};
+    QCoreApplication::sendEvent(edit, &escape);
+    QCoreApplication::processEvents();
+    EXPECT_EQ(fillAt(), palette.controlFill) << "退出录制后没有回到 controlFill";
+
+    edit->setEnabled(false);
+    QCoreApplication::processEvents();
+    EXPECT_EQ(fillAt(), palette.mutedFill) << "禁用态没有铺 mutedFill";
+
+    edit->setEnabled(true);
+    QCoreApplication::processEvents();
+    EXPECT_EQ(fillAt(), palette.controlFill) << "恢复启用后没有回到 controlFill";
 }
 
 /**

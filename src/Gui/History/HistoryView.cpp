@@ -5,6 +5,8 @@
 #include "Base/Text.h"
 #include "Core/History/HistoryThumbnail.h"
 #include "Gui/Controls/Button.h"
+#include "Gui/Controls/ComboBox.h"
+#include "Gui/Controls/LineEdit.h"
 #include "Gui/Resources/IconProvider.h"
 #include "Gui/Theme/DesignTokens.h"
 
@@ -133,13 +135,13 @@ namespace GyanisScribe::Gui
         auto *tools = new QHBoxLayout;
         root->addLayout(tools);
 
-        m_search = new QLineEdit{this};
+        m_search = new Gui::LineEdit{this};
         m_search->setPlaceholderText(GyanisScribe::Base::uiText("按文件名、类别或日期搜索"));
         m_search->setClearButtonEnabled(true);
         m_search->setAccessibleName(GyanisScribe::Base::uiText("历史搜索"));
         tools->addWidget(m_search, 1);
 
-        m_filter = new QComboBox{this};
+        m_filter = new Gui::ComboBox{this};
         m_filter->addItems(historyFilterLabels());
         m_filter->setAccessibleName(GyanisScribe::Base::uiText("历史类别"));
         tools->addWidget(m_filter);

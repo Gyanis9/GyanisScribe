@@ -23,7 +23,9 @@ namespace GyanisScribe::Gui
         None,             ///< 不铺底
         WindowBackground, ///< 窗口底
         Surface,          ///< 卡片与浮层
-        ControlFill       ///< 按钮与输入
+        ControlFill,      ///< 按钮与输入
+        MutedFill,        ///< 静默底：禁用与只读的输入
+        AccentSoft        ///< 选中底：快捷键录制态
     };
 
     /// 一次控件绘制的填充、描边与描边宽度

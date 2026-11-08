@@ -2,6 +2,12 @@
 set_property(GLOBAL APPEND PROPERTY GyanisScribeGuiSources
         ${CMAKE_CURRENT_LIST_DIR}/SurfaceWidget.h
         ${CMAKE_CURRENT_LIST_DIR}/SurfaceWidget.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/LineEdit.h
+        ${CMAKE_CURRENT_LIST_DIR}/LineEdit.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/ComboBox.h
+        ${CMAKE_CURRENT_LIST_DIR}/ComboBox.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/TextEdit.h
+        ${CMAKE_CURRENT_LIST_DIR}/TextEdit.cpp
         ${CMAKE_CURRENT_LIST_DIR}/Button.h
         ${CMAKE_CURRENT_LIST_DIR}/Button.cpp
         ${CMAKE_CURRENT_LIST_DIR}/Menu.h
