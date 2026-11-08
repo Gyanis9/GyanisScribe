@@ -30,6 +30,9 @@ namespace GyanisScribe::Core
     /// 快速保存的全局热键：截图后直接存成文件并复制，不走「截完之后」那一档
     inline constexpr std::string_view kHotkeyQuickSave = "Hotkey/QuickSave";
 
+    /// 回溯截图的全局热键
+    inline constexpr std::string_view kHotkeyRewind = "Hotkey/Rewind";
+
     /**
      * @brief 自定义全局热键那一族（`Hotkey/Custom/<功能标识>`），键名不在这里逐个登记
      * @details 一份词表住在 App/CustomHotkeys.h 的 bindableActions()：可绑的功能、标识与配置键都在那一处算，
@@ -120,6 +123,18 @@ namespace GyanisScribe::Core
      *          读端在 DeliveryCoordinator::runAfterCaptureCommand，写端在设置的截图页；命令行的 --exec 压过这一格。
      */
     inline constexpr std::string_view kCaptureExecCommand = "Capture/ExecCommand";
+
+    /// 回溯缓冲：开启后只把最近一段屏幕画面保存在内存里
+    inline constexpr std::string_view kRewindEnabled = "Rewind/Enabled";
+
+    /// 回溯缓冲保留多少秒（5–30）
+    inline constexpr std::string_view kRewindBufferSeconds = "Rewind/BufferSeconds";
+
+    /// 回溯缓冲的目标帧率（2–10）
+    inline constexpr std::string_view kRewindFrameRate = "Rewind/FrameRate";
+
+    /// 回溯缓冲的排除名单：逗号分隔的可执行文件名，大小写不敏感
+    inline constexpr std::string_view kRewindExcludeProcesses = "Rewind/ExcludeProcesses";
 
     /// 成品出程序（存文件或交剪贴板）时加的装饰，两格独立；默认都关，装饰是「要的时候才有」的东西
     inline constexpr std::string_view kOutputBorder = "Save/OutputBorder";
