@@ -1,3 +1,4 @@
+#include "Gui/Theme/CornerStyle.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Theme/ThemeKind.h"
 #include "Gui/Theme/ThemeManager.h"
@@ -907,6 +908,17 @@ TEST_F(ThemeManagerFixture, ThemeSwitchReplaysAsciiMetricRoleForExistingWidgets)
     ASSERT_TRUE(manager().setTheme(ThemeKind::Light).has_value());
     EXPECT_EQ(static_cast<int>(label.font().weight()), 600) << "切回浅色档没有把字重还原成 600";
     EXPECT_EQ(label.font().family(), baseFamily) << "切回浅色档还挂着深色档的可变字族";
+}
+
+/**
+ * @brief 钉住可见描边宽度按主题分档
+ * @details 只有高对比度档加粗到 2px；其余两档是 1px，可见描边由自绘代码按这个值画。
+ */
+TEST_F(ThemeManagerFixture, HighContrastBorderWidthIsTwo)
+{
+    EXPECT_EQ(GyanisScribe::Gui::themeBorderWidth(ThemeKind::Light), 1);
+    EXPECT_EQ(GyanisScribe::Gui::themeBorderWidth(ThemeKind::Dark), 1);
+    EXPECT_EQ(GyanisScribe::Gui::themeBorderWidth(ThemeKind::HighContrast), 2);
 }
 
 /**
