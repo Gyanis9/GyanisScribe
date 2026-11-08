@@ -6,6 +6,7 @@
 #include "App/UpdateCheck.h"
 #include "Core/Annotation/AnnotationPalette.h"
 #include "Core/Capture/ScreenUtils.h"
+#include "Core/Geometry/ContinuousCorner.h"
 #include "Core/Image/ImageFormat.h"
 #include "Base/Logger.h"
 #include "Core/Image/OutputDecoration.h"
@@ -25,8 +26,12 @@
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Gui/Controls/AppShortcuts.h"
+#include "Gui/Controls/Button.h"
 #include "Gui/Controls/CheckBox.h"
+#include "Gui/Controls/Menu.h"
 #include "Gui/Controls/SpinBox.h"
+#include "Gui/Controls/SurfaceWidget.h"
+#include "Gui/Theme/CornerStyle.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Controls/HotkeyEdit.h"
 #include "Gui/Resources/IconProvider.h"
@@ -48,7 +53,6 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
-#include <QMenu>
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QSpinBox>
@@ -189,7 +193,6 @@ namespace
     void decoratePage(QWidget &page, const QString &title)
     {
         page.setObjectName(QStringLiteral("pageCard"));
-        page.setAttribute(Qt::WA_StyledBackground, true);
 
         auto *layout = page.layout();
         if (auto *box = qobject_cast<QVBoxLayout *>(layout); box != nullptr)
@@ -1765,7 +1768,7 @@ namespace GyanisScribe::Main
         row->setContentsMargins(0, 0, 0, 0);
         row->setSpacing(GyanisScribe::Gui::kSpacingSmall);
 
-        auto *moreMenu = new QMenu{bar};
+        auto *moreMenu = new GyanisScribe::Gui::Menu{bar};
         auto  menuFont = moreMenu->font();
         menuFont.setPointSize(GyanisScribe::Gui::kMenuTextPointSize);
         moreMenu->setFont(menuFont);
@@ -1789,7 +1792,7 @@ namespace GyanisScribe::Main
                 QObject::connect(item, &QAction::triggered, this, [this, action] { emit actionRequested(*action); });
                 continue;
             }
-            auto *button = new QPushButton{entry.label, bar};
+            auto *button = new GyanisScribe::Gui::Button{entry.label, bar};
             m_icons.applyIcon(*button, entry.iconName);
             button->setAccessibleName(entry.label);
             button->setToolTip(GyanisScribe::Base::uiText("与托盘菜单、全局热键走同一个出口"));
@@ -1936,7 +1939,9 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildGeneralPage()
     {
-        auto *page = new QWidget{this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
+                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        page->setHighContrastBorder(true);
         auto *form =
                 makePageForm(page, GyanisScribe::Base::uiText("界面语言决定菜单、托盘提示与这些设置页的措辞，切换后要重启智录才生效。下面两格管历史留多少，填到 0 就是不限。"));
         form->addRow(GyanisScribe::Base::uiText("界面语言"), makeUiLanguageCombo(m_settings));
@@ -2147,7 +2152,9 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildCapturePage()
     {
-        auto *page = new QWidget{this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
+                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        page->setHighContrastBorder(true);
         auto *form = makePageForm(page, GyanisScribe::Base::uiText("截图与标注成品落在这个目录里。取色复制出来的文本按下面的写法格式化。"));
         form->addRow(GyanisScribe::Base::uiText("截完之后"), makeCaptureIntentCombo(m_settings, m_icons));
         form->addRow(GyanisScribe::Base::uiText("延时截图"), makeCaptureDelaySpin(m_settings));
@@ -2298,7 +2305,9 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildAnnotationPage()
     {
-        auto *page = new QWidget{this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
+                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        page->setHighContrastBorder(true);
         auto *form = makePageForm(page, GyanisScribe::Base::uiText("新打开的标注窗按这两档起步，画过之后的改动会被工具栏记下来，下次仍以最近用的那一档开始。"
                                                                    "色板那一排也可以换成自己的一套：留空就是内置那八格，下面两个按钮负责把一份配色发给同事或收回来。"));
         form->addRow(GyanisScribe::Base::uiText("默认线宽"),
@@ -2318,7 +2327,9 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildPinPage()
     {
-        auto *page = new QWidget{this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
+                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        page->setHighContrastBorder(true);
         auto *form = makePageForm(page, GyanisScribe::Base::uiText("新贴到屏幕上的图按这个不透明度开始。滚轮调透明度只影响那一张贴图，不改这里。"));
         form->addRow(GyanisScribe::Base::uiText("新建贴图的默认不透明度"), makeOpacitySpin(m_settings));
         form->addRow(GyanisScribe::Base::uiText("吸附距离"), makeEdgeSnapDistanceSpin(m_settings));
@@ -2330,7 +2341,9 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildRecordPage()
     {
-        auto *page = new QWidget{this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
+                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        page->setHighContrastBorder(true);
         auto *form =
                 makePageForm(page, GyanisScribe::Base::uiText("录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。存成 GIF "
                                                               "时帧率上限比 MP4 低（选了 GIF 那一格只到 24）。画面码率填 0 就交给编码器的质量档，给了具体数值就按那个码率控，GIF "
@@ -2369,7 +2382,9 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildOcrPage()
     {
-        auto *page = new QWidget{this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
+                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        page->setHighContrastBorder(true);
         auto *form = makePageForm(page, GyanisScribe::Base::uiText("认得出哪种文字取决于语言包。目录留空时按环境变量与程序数据目录找。"));
         form->addRow(GyanisScribe::Base::uiText("识别语言"), makeOcrLanguageCombo(m_settings));
         form->addRow(GyanisScribe::Base::uiText("识别语言包目录"), makePathRow(m_settings, GyanisScribe::Core::kOcrTessDataDirectory, GyanisScribe::Base::uiText("语言包目录"),
@@ -2379,7 +2394,9 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildHotkeyPage()
     {
-        auto *page = new QWidget{this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
+                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        page->setHighContrastBorder(true);
         // 没有登记接口的那一种平台上，改组合键不会有任何效果：入口灰掉并当场说明，
         // 比让人反复改完再按一次、把「没反应」当成程序坏了要好
         // 一行一个动作；条数由这份表自己数出来：文案里那个数字与热键登记表必须是同一个源
@@ -2500,7 +2517,9 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildThemePage()
     {
-        auto *page = new QWidget{this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
+                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        page->setHighContrastBorder(true);
         auto *form = makePageForm(page, GyanisScribe::Base::uiText("配色方案即时生效。高对比度档是纯黑正文、纯白底与加粗边框。"));
         form->addRow(GyanisScribe::Base::uiText("配色方案"), makeThemeCombo(m_theme));
         return page;
@@ -2508,7 +2527,9 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildHistoryPage()
     {
-        auto *page  = new QWidget{this};
+        auto *page  = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
+                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        page->setHighContrastBorder(true);
         auto *inner = new QVBoxLayout{page};
         m_history   = new GyanisScribe::Gui::HistoryView{m_historyStore, GyanisScribe::Core::policyFromSettings(m_settings), m_icons, page};
         inner->addWidget(m_history);
@@ -2550,7 +2571,9 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildAboutPage()
     {
-        auto *page   = new QWidget{this};
+        auto *page   = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
+                                                           GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        page->setHighContrastBorder(true);
         auto *layout = new QVBoxLayout{page};
         // 与表单页同一条内容网格：默认边距比表单页小一圈，翻到这一页正文会左跳 7px
         layout->setContentsMargins(GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium);
@@ -2566,7 +2589,8 @@ namespace GyanisScribe::Main
                 highestRatio = screen->devicePixelRatio();
             }
         }
-        auto *logo = new QLabel{page};
+        auto *logo = new GyanisScribe::Gui::SurfaceLabel{GyanisScribe::Gui::SurfaceFillRole::WindowBackground,
+                                                         GyanisScribe::Core::CornerRole::Card, page};
         logo->setObjectName(QStringLiteral("brandPlate"));
         logo->setFixedSize(80, 80);
         logo->setContentsMargins(8, 8, 8, 8);

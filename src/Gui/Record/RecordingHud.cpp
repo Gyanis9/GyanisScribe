@@ -1,5 +1,7 @@
 #include "Gui/Record/RecordingHud.h"
 
+#include "Core/Geometry/ContinuousCorner.h"
+#include "Gui/Theme/CornerStyle.h"
 #include "Gui/Theme/DesignTokens.h"
 
 #include "Base/Text.h"
@@ -9,6 +11,8 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMouseEvent>
+#include <QPainter>
+#include <QPen>
 #include <QPushButton>
 #include <QVBoxLayout>
 
@@ -116,9 +120,11 @@ namespace GyanisScribe::Gui
         setWindowTitle(GyanisScribe::Base::uiText("录屏控制条"));
         setAccessibleName(GyanisScribe::Base::uiText("录屏控制条"));
         setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
-        // 这一圈卡片底由样式表的 QWidget#hudRoot 给：无边框悬浮窗不铺底，字就直接压在桌面上
+        // 工具窗没有系统标题栏，圆角外不能落系统底色：面板由 paintEvent 画，
+        // 窗口本身透明，桌面上看到的才是连续曲率的四角
         setObjectName(QStringLiteral("hudRoot"));
-        setAttribute(Qt::WA_StyledBackground, true);
+        setAttribute(Qt::WA_TranslucentBackground);
+        setAutoFillBackground(false);
         // 收起即销毁（控制器那一头写的是「一轮一个」）：控制器拿的是 QPointer，收起后它当场变空；
         // 少了这一档，每一轮录屏都会在桌上留一个藏着不用的控制条
         setAttribute(Qt::WA_DeleteOnClose);
@@ -286,6 +292,13 @@ namespace GyanisScribe::Gui
             setGeometry(snapHudRect(geometry(), m_available));
         }
         QWidget::mouseReleaseEvent(event);
+    }
+
+    void RecordingHud::paintEvent(QPaintEvent *)
+    {
+        QPainter painter{this};
+        Core::paintContinuousCorner(painter, QRectF{rect()}, Core::cornerShapeFor(Core::CornerRole::Panel), activePalette().surface,
+                                    QPen{activePalette().borderStrong, static_cast<qreal>(themeBorderWidth(activeThemeKind()))});
     }
 
 } // namespace GyanisScribe::Gui

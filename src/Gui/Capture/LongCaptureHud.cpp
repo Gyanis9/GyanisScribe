@@ -1,10 +1,14 @@
 #include "Gui/Capture/LongCaptureHud.h"
 
+#include "Core/Geometry/ContinuousCorner.h"
 #include "Base/Text.h"
+#include "Gui/Theme/CornerStyle.h"
 #include "Gui/Theme/DesignTokens.h"
 
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QPainter>
+#include <QPen>
 #include <QPushButton>
 #include <QVBoxLayout>
 
@@ -50,7 +54,9 @@ namespace GyanisScribe::Gui
         setAccessibleName(GyanisScribe::Base::uiText("长截图控制条"));
         setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
         setObjectName(QStringLiteral("hudRoot"));
-        setAttribute(Qt::WA_StyledBackground, true);
+        // 圆角外不能落系统底色：面板由 paintEvent 画，窗口本身透明
+        setAttribute(Qt::WA_TranslucentBackground);
+        setAutoFillBackground(false);
 
         auto *root = new QVBoxLayout{this};
         root->setContentsMargins(GyanisScribe::Gui::kSpacingSmall, GyanisScribe::Gui::kSpacingTiny, GyanisScribe::Gui::kSpacingSmall, GyanisScribe::Gui::kSpacingTiny);
@@ -87,6 +93,13 @@ namespace GyanisScribe::Gui
     }
 
     LongCaptureHud::~LongCaptureHud() = default;
+
+    void LongCaptureHud::paintEvent(QPaintEvent *)
+    {
+        QPainter painter{this};
+        Core::paintContinuousCorner(painter, QRectF{rect()}, Core::cornerShapeFor(Core::CornerRole::Panel), activePalette().surface,
+                                    QPen{activePalette().borderStrong, static_cast<qreal>(themeBorderWidth(activeThemeKind()))});
+    }
 
     void LongCaptureHud::setReadout(const QString &readout)
     {

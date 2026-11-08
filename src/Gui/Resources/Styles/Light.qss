@@ -13,26 +13,16 @@ QWidget#appRoot {
     background-color: #F5F5F3;
 }
 
-/* 阅读面（设置页卡片）：无描边，靠 surface 与窗口底的微明度差分层；圆角按设计的阅读面档 */
-QWidget#pageCard {
-    background-color: #FCFCFB;
-    border: none;
-    border-radius: 20px;
-}
+/* 阅读面（设置页卡片）：底与圆角由 Gui::SurfaceWidget 按 ContinuousCorner 自绘，
+   样式表不再铺底；未迁移的页面容器仍是普通 QWidget，不受这条影响 */
 
 /* 关于页品牌底板：品牌砖的砖底是固定色，深色卡片与它同值时砖形会消失；
-   底板取窗口底那一档，让黑砖在每一套主题里都有一层可分的边 */
-QLabel#brandPlate {
-    background-color: #F5F5F3;
-    border-radius: 20px;
-}
+   底板取窗口底那一档，让黑砖在每一套主题里都有一层可分的边。底与圆角由 Gui::SurfaceLabel 自绘 */
 
-/* 悬浮条（录屏控制条、标注工具栏）：浮层压在任意内容上，保留一条 borderStrong 微边缘；
-   Qt 的样式表没有投影，浮层靠这条边缘与底色分出来 */
+/* 悬浮条（录屏控制条、标注工具栏）：面板与圆角由控件自绘，这里只留一条透明边框占位，
+   保住原 1px 边占掉的那一格尺寸 */
 QWidget#hudRoot, QWidget#AnnotationToolbar {
-    background-color: #FCFCFB;
-    border: 1px solid #E2E2DD;
-    border-radius: 16px;
+    border: 1px solid transparent;
 }
 
 /* ---- 文字颜色层级（字号见 applyTextRole） ---- */
@@ -93,6 +83,20 @@ QPushButton:default:pressed {
 QPushButton:default:disabled {
     background-color: #EDEDE9;
     color: #53534D;
+    border-color: transparent;
+}
+
+/* 已迁移的按钮由 Gui::Button 自绘填充与描边；这里只把原生样式表的底与边压成透明，
+   保留上面的 padding、min-height 与 1px 透明边框占位，控件总高不变 */
+QPushButton[squircle="true"],
+QPushButton[squircle="true"]:hover,
+QPushButton[squircle="true"]:pressed,
+QPushButton[squircle="true"]:disabled,
+QPushButton[squircle="true"]:default,
+QPushButton[squircle="true"]:default:hover,
+QPushButton[squircle="true"]:default:pressed,
+QPushButton[squircle="true"]:default:disabled {
+    background-color: transparent;
     border-color: transparent;
 }
 
@@ -358,6 +362,19 @@ QMenu::separator {
     height: 1px;
     background-color: #E7E7E2;
     margin: 2px 6px;
+}
+
+/* 已迁移的菜单由 Gui::Menu 自绘面板与当前项高亮；这里只压掉原生底与项底，
+   保留上面的 padding 与颜色规则，未迁移的菜单仍走原样式 */
+QMenu[squircle="true"] {
+    background-color: transparent;
+    border-color: transparent;
+}
+
+QMenu[squircle="true"]::item,
+QMenu[squircle="true"]::item:selected {
+    background-color: transparent;
+    border-radius: 0;
 }
 
 QToolTip {

@@ -1,0 +1,132 @@
+#include "Gui/Controls/SurfaceWidget.h"
+
+#include "Gui/Theme/CornerStyle.h"
+#include "Gui/Theme/DesignTokens.h"
+
+#include <QPainter>
+#include <QPen>
+
+namespace
+{
+    /**
+     * @brief 把铺底角色解成当前主题的语义色
+     * @param role 铺底角色
+     * @return 对应颜色；不铺底时返回透明
+     */
+    QColor fillColorFor(const GyanisScribe::Gui::SurfaceFillRole role)
+    {
+        const auto &palette = GyanisScribe::Gui::activePalette();
+        switch (role)
+        {
+            case GyanisScribe::Gui::SurfaceFillRole::WindowBackground:
+                return palette.windowBackground;
+            case GyanisScribe::Gui::SurfaceFillRole::Surface:
+                return palette.surface;
+            case GyanisScribe::Gui::SurfaceFillRole::ControlFill:
+                return palette.controlFill;
+            case GyanisScribe::Gui::SurfaceFillRole::None:
+                break;
+        }
+        return Qt::transparent;
+    }
+
+    /**
+     * @brief 画一块连续曲率的填充与描边
+     * @param painter 目标画家
+     * @param rect 目标矩形
+     * @param shape 圆角形状
+     * @param fill 填充色
+     * @param border 描边色
+     * @param borderWidth 描边宽度；0 表示不画
+     */
+    void paintSurface(QPainter &painter, const QRectF &rect, const GyanisScribe::Core::CornerShape &shape, const QColor &fill,
+                      const QColor &border, const int borderWidth)
+    {
+        const QPen pen = borderWidth > 0 ? QPen{border, static_cast<qreal>(borderWidth)} : QPen{Qt::NoPen};
+        GyanisScribe::Core::paintContinuousCorner(painter, rect, shape, fill, pen);
+    }
+} // namespace
+
+namespace GyanisScribe::Gui
+{
+    SurfaceWidget::SurfaceWidget(const Core::CornerRole role, const SurfaceFillRole fillRole, QWidget *parent) :
+        QWidget(parent), m_role(role), m_fillRole(fillRole)
+    {
+        setAutoFillBackground(false);
+    }
+
+    void SurfaceWidget::paintEvent(QPaintEvent *)
+    {
+        QPainter painter{this};
+        QColor   border = m_borderColor;
+        int      width  = m_borderWidth;
+        if (m_highContrastBorder && activeThemeKind() == ThemeKind::HighContrast)
+        {
+            border = activePalette().borderStrong;
+            width  = themeBorderWidth(ThemeKind::HighContrast);
+        }
+        paintSurface(painter, QRectF{rect()}, Core::cornerShapeFor(m_role, QSizeF{size()}), fillColorFor(m_fillRole), border, width);
+    }
+
+    void SurfaceWidget::setFillRole(const SurfaceFillRole role)
+    {
+        m_fillRole = role;
+        update();
+    }
+
+    void SurfaceWidget::setBorderColor(const QColor &color)
+    {
+        m_borderColor = color;
+        update();
+    }
+
+    void SurfaceWidget::setBorderWidth(const int width)
+    {
+        m_borderWidth = width;
+        update();
+    }
+
+    void SurfaceWidget::setHighContrastBorder(const bool enabled)
+    {
+        m_highContrastBorder = enabled;
+        update();
+    }
+
+    SurfaceLabel::SurfaceLabel(const SurfaceFillRole fillRole, const Core::CornerRole role, QWidget *parent) :
+        QLabel(parent), m_fillRole(fillRole), m_role(role)
+    {
+        setAutoFillBackground(false);
+    }
+
+    void SurfaceLabel::paintEvent(QPaintEvent *event)
+    {
+        QPainter painter{this};
+        QColor   border = m_borderColor;
+        int      width  = m_borderColor.isValid() ? themeBorderWidth(activeThemeKind()) : 0;
+        if (m_highContrastBorder && activeThemeKind() == ThemeKind::HighContrast)
+        {
+            border = activePalette().borderStrong;
+            width  = themeBorderWidth(ThemeKind::HighContrast);
+        }
+        paintSurface(painter, QRectF{rect()}, Core::cornerShapeFor(m_role), fillColorFor(m_fillRole), border, width);
+        QLabel::paintEvent(event);
+    }
+
+    void SurfaceLabel::setFillRole(const SurfaceFillRole role)
+    {
+        m_fillRole = role;
+        update();
+    }
+
+    void SurfaceLabel::setBorderColor(const QColor &color)
+    {
+        m_borderColor = color;
+        update();
+    }
+
+    void SurfaceLabel::setHighContrastBorder(const bool enabled)
+    {
+        m_highContrastBorder = enabled;
+        update();
+    }
+} // namespace GyanisScribe::Gui

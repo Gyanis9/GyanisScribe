@@ -8,6 +8,7 @@
 
 #include <QApplication>
 #include <QEvent>
+#include <QImage>
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPushButton>
@@ -344,4 +345,22 @@ TEST_F(RecordingHudFixture, ElapsedAndCountdownUseTabularFigures)
     EXPECT_EQ(elapsed->font().featureValue(QFont::Tag("tnum")), 1u) << "录屏时长没锁等宽，秒数一跳整条就抖";
     EXPECT_EQ(countdown->font().featureValue(QFont::Tag("tnum")), 1u) << "倒计时大字没锁等宽，数字宽度逐秒变";
 #endif
+}
+
+/**
+ * @brief 钉住控制条的面板由自绘的连续曲率铺底
+ * @details 样式表只剩透明边框占位：面板若退回方形底，左上角会是不透明像素。
+ *          面板取样点落在上沿中部——布局内容从上边距起，这一格只有面板底。
+ */
+TEST_F(RecordingHudFixture, PanelIsPaintedWithSquircleCorners)
+{
+    setTextThemeKind(ThemeKind::Light);
+    auto hud = makeHud();
+    hud->setAttribute(Qt::WA_DontShowOnScreen);
+    hud->show();
+    QCoreApplication::processEvents();
+
+    const QImage image = hud->grab().toImage();
+    EXPECT_EQ(image.pixelColor(0, 0).alpha(), 0) << "控制条左上角不透明：方形底露出来了";
+    EXPECT_EQ(image.pixelColor(hud->width() / 2, 2), GyanisScribe::Gui::activePalette().surface);
 }

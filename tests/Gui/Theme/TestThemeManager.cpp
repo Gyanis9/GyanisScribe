@@ -2,6 +2,9 @@
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Theme/ThemeKind.h"
 #include "Gui/Theme/ThemeManager.h"
+#include "Gui/Controls/Button.h"
+#include "Gui/Controls/SurfaceWidget.h"
+#include "Core/Geometry/ContinuousCorner.h"
 
 #include "Base/Logger.h"
 #include "Core/Settings/ISettingsStore.h"
@@ -556,13 +559,17 @@ TEST_F(ThemeManagerFixture, WidgetsRenderThePaletteSurfacePerTheme)
     {
         // setStyleSheet 是 QWidget 的成员而不是静态函数，这里挂在套件持有的应用对象上
         application->setStyleSheet(ThemeManager::styleSheetFor(kind));
+        // 卡片的底色改由 SurfaceWidget 按 activePalette 取：先把这个进程级档位对齐，
+        // 量到的才是这一档的 surface；取完还原，别把档位留给后面的用例
+        const auto previous = GyanisScribe::Gui::activeThemeKind();
+        GyanisScribe::Gui::setTextThemeKind(kind);
         // 探针挑阅读面卡片而不是空按钮：按钮平时是 controlFill 填充，拿按钮取中部像素
         // 测的是另一档角色；#pageCard 的底色就是 surface 角色本身
-        QWidget card;
+        GyanisScribe::Gui::SurfaceWidget card{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface};
         card.setObjectName(QStringLiteral("pageCard"));
-        card.setAttribute(Qt::WA_StyledBackground, true);
         card.resize(120, 32);
         const QPixmap pixmap = card.grab();
+        GyanisScribe::Gui::setTextThemeKind(previous);
         EXPECT_FALSE(pixmap.isNull()) << "这一档没画出任何像素：" << static_cast<int>(kind);
         return pixmap.toImage().pixelColor(20, 16);
     };
@@ -589,17 +596,21 @@ TEST_F(ThemeManagerFixture, SecondaryButtonsStayDistinguishableAtRest)
     const auto probe = [](const ThemeKind kind)
     {
         application->setStyleSheet(ThemeManager::styleSheetFor(kind));
-        QWidget host;
+        // 宿主与按钮都改由自绘类取色：档位先对齐，取完还原
+        const auto previous = GyanisScribe::Gui::activeThemeKind();
+        GyanisScribe::Gui::setTextThemeKind(kind);
+        GyanisScribe::Gui::SurfaceWidget host{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface};
         host.setObjectName(QStringLiteral("pageCard"));
-        host.setAttribute(Qt::WA_StyledBackground, true);
         host.resize(200, 80);
-        QPushButton button(QStringLiteral("导出配置…"), &host);
+        GyanisScribe::Gui::Button button(QStringLiteral("导出配置…"), &host);
         button.setGeometry(30, 20, 140, 30);
         host.show();
         QCoreApplication::processEvents();
         const auto image = host.grab().toImage();
+        GyanisScribe::Gui::setTextThemeKind(previous);
         application->setStyleSheet(QString{});
-        return std::pair{image.pixelColor(40, 35), image.pixelColor(5, 5)};
+        // 卡片取样点留在左缘中部：Card 档 20px 圆角把 (5,5) 切在形状外，那里已经不是 surface
+        return std::pair{image.pixelColor(40, 35), image.pixelColor(5, 40)};
     };
 
     for (const auto kind: {ThemeKind::Light, ThemeKind::Dark})

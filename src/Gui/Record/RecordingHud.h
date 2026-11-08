@@ -157,6 +157,14 @@ namespace GyanisScribe::Gui
          */
         void mouseReleaseEvent(QMouseEvent *event) override;
 
+        /**
+         * @brief 画控制条的连续曲率面板与边框
+         * @details 无边框工具窗的圆角来自这里：样式表只留透明边框占位，
+         *          面板底的 surface 与 borderStrong 微边缘都由本控件自绘
+         * @param event 绘制事件
+         */
+        void paintEvent(QPaintEvent *event) override;
+
     private:
         /// 按当前状态决定暂停键是「暂停」还是「继续」，并只在这两态让它可按
         void reflectPauseAction();

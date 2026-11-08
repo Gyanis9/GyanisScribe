@@ -1,5 +1,11 @@
 # Gui/Controls：通用控件（Toast、快捷键输入框、按键步骤、界面快捷键清册）
 set_property(GLOBAL APPEND PROPERTY GyanisScribeGuiSources
+        ${CMAKE_CURRENT_LIST_DIR}/SurfaceWidget.h
+        ${CMAKE_CURRENT_LIST_DIR}/SurfaceWidget.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/Button.h
+        ${CMAKE_CURRENT_LIST_DIR}/Button.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/Menu.h
+        ${CMAKE_CURRENT_LIST_DIR}/Menu.cpp
         ${CMAKE_CURRENT_LIST_DIR}/Toast.h
         ${CMAKE_CURRENT_LIST_DIR}/Toast.cpp
         ${CMAKE_CURRENT_LIST_DIR}/StreamingText.h

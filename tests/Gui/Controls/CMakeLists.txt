@@ -41,3 +41,21 @@ add_dependencies(TestControlsChrome DeployQtRuntime)
 
 include(GoogleTest)
 gtest_discover_tests(TestControlsChrome)
+
+# 连续曲率圆角的切片判据：SurfaceWidget、Button、Menu 的像素与色板映射各自要一份 QApplication，
+# 因此单独一个可执行体，不并入上面两组
+add_executable(TestControlsCorners TestCornerControls.cpp)
+target_link_libraries(TestControlsCorners PRIVATE
+        Gui
+        Core
+        GTest::gtest
+        GTest::gtest_main
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Widgets)
+if (MSVC)
+    target_compile_options(TestControlsCorners PRIVATE /W4 /WX)
+endif ()
+add_dependencies(TestControlsCorners DeployQtRuntime)
+include(GoogleTest)
+gtest_discover_tests(TestControlsCorners)

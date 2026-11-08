@@ -2,12 +2,14 @@
 
 #include "Core/Annotation/AnnotationPalette.h"
 #include "Core/Annotation/AnnotationTool.h"
+#include "Core/Geometry/ContinuousCorner.h"
 #include "Core/Pick/RecentColors.h"
 #include "Base/Logger.h"
 #include "Base/Text.h"
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Gui/Controls/AppShortcuts.h"
+#include "Gui/Theme/CornerStyle.h"
 #include "Gui/Theme/DesignTokens.h"
 
 #include <QApplication>
@@ -104,8 +106,9 @@ namespace GyanisScribe::Gui
         QWidget(parent), m_settings(settings), m_icons(icons), m_activeTool(Core::ToolKind::Select)
     {
         setObjectName(QStringLiteral("AnnotationToolbar"));
-        // 样式表给这个对象名画了一圈卡片底；QWidget 子类不打开这个开关就不会吃样式表的背景
-        setAttribute(Qt::WA_StyledBackground, true);
+        // 面板与圆角由 paintEvent 自绘；圆角外要让宿主底色透出来，不再由样式表铺底
+        setAttribute(Qt::WA_TranslucentBackground);
+        setAutoFillBackground(false);
 
         auto *layout = new QHBoxLayout{this};
         layout->setContentsMargins(Gui::kSpacingTiny, Gui::kSpacingTiny, Gui::kSpacingTiny, Gui::kSpacingTiny);
@@ -1051,6 +1054,13 @@ namespace GyanisScribe::Gui
         applyColorToActiveTool(dimmed);
         updateOpacityHint();
         event->accept();
+    }
+
+    void AnnotationToolbar::paintEvent(QPaintEvent *)
+    {
+        QPainter painter{this};
+        Core::paintContinuousCorner(painter, QRectF{rect()}, Core::cornerShapeFor(Core::CornerRole::Panel), activePalette().surface,
+                                    QPen{activePalette().borderStrong, static_cast<qreal>(themeBorderWidth(activeThemeKind()))});
     }
 
 } // namespace GyanisScribe::Gui

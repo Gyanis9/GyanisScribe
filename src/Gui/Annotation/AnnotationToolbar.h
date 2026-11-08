@@ -348,6 +348,14 @@ namespace GyanisScribe::Gui
          */
         void wheelEvent(QWheelEvent *event) override;
 
+        /**
+         * @brief 画工具栏的连续曲率面板与边框
+         * @details 嵌入标注窗时工具栏不再走样式表铺底：面板由本控件自绘，
+         *          宿主提供的那一层底色只从圆角外露出
+         * @param event 绘制事件
+         */
+        void paintEvent(QPaintEvent *event) override;
+
     private:
         /**
          * @brief 建一个带图标、tooltip 与无障碍名称的按钮

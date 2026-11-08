@@ -31,6 +31,7 @@
 #include "Gui/Controls/SpinBox.h"
 #include "Gui/Resources/IconProvider.h"
 #include "Gui/Theme/Language.h"
+#include "Gui/Theme/SquircleStyle.h"
 #include "Gui/Theme/ThemeManager.h"
 
 #include <gtest/gtest.h>
@@ -125,6 +126,8 @@ namespace
         static void SetUpTestSuite()
         {
             application = std::make_unique<QApplication>(kArgumentCount, kArguments);
+            // 「更多」菜单是 Gui::Menu：原生菜单面板不装这一档代理就会盖住自绘高亮
+            GyanisScribe::Gui::SquircleStyle::install();
         }
 
         static void TearDownTestSuite()
@@ -143,6 +146,9 @@ namespace
             m_historyStore = std::make_unique<HistoryStore>(m_directory / "history.json");
             m_store        = makeStore();
             m_theme        = std::make_unique<ThemeManager>(*m_store);
+            // 生产里 AppController 先落主题再建窗口，QPalette 与 activePalette 同源于 ThemePalette；
+            // 这一份装置也照这个次序起，否则自绘面按 Light 铺底、标签却还拿系统原生档的文字色
+            m_theme->applyFromSettings();
         }
 
         void TearDown() override

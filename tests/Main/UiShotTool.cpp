@@ -20,6 +20,7 @@
 #include "Gui/Pin/PinWindow.h"
 #include "Gui/Resources/IconProvider.h"
 #include "Gui/Theme/ThemeManager.h"
+#include "Gui/Theme/SquircleStyle.h"
 
 #include <QApplication>
 #include <QCoreApplication>
@@ -295,6 +296,9 @@ int main(int argc, char *argv[])
     QCoreApplication::setApplicationName(QStringLiteral("GyanisScribe-Shots"));
     // 关于页正文的版本号读 applicationVersion：与真程序同一条真源（工程版本宏），不写第二份字面量
     QCoreApplication::setApplicationVersion(QStringLiteral(PROJECT_VERSION));
+
+    // 与真程序同一条装配顺序：代理样式先就位，主题样式表与窗口随后才建
+    GyanisScribe::Gui::SquircleStyle::install();
 
     // 离屏平台上 Qt 找不到系统字体，字形会全渲染成方框：把系统里那份中文字体显式装进来，
     // 并把全局字体指向它。装不上就当场失败，不出一摞方框图冒充界面图。

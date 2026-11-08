@@ -7,6 +7,7 @@
 #include "Gui/Controls/AppShortcuts.h"
 #include "Core/Annotation/AnnotationPalette.h"
 #include "Gui/Theme/DesignTokens.h"
+#include "Gui/Theme/SquircleStyle.h"
 #include "Gui/Theme/ThemeKind.h"
 #include "Gui/Theme/ThemeManager.h"
 #include "Gui/Resources/IconProvider.h"
@@ -91,6 +92,8 @@ namespace
             static char  argumentZero[] = "TestAnnotationToolbar";
             static char *arguments[]    = {argumentZero, nullptr};
             application                 = std::make_unique<QApplication>(argumentCount, arguments);
+            // 颜色菜单是 Gui::Menu：本进程的第二套夹具不再新建应用，因此这里装一次就够
+            GyanisScribe::Gui::SquircleStyle::install();
             icons                       = std::make_unique<IconProvider>();
             // 描边色钉死成深色，不让它跟着本机深浅色走：本机是深色主题时默认描边就是白，
             // 「白色色块有没有画边框」就变成拿白对白判，永远成立
@@ -1604,4 +1607,24 @@ TEST_F(ToolbarFixture, BrokenPaletteFallsBackToTheBuiltinRow)
 
     EXPECT_EQ(toolbar->colorButtonCount(), static_cast<int>(kAnnotationPaletteColors.size()) + 1) << "坏名单把整排色板带走了";
     EXPECT_EQ(toolbar->currentColor(), kAnnotationPaletteColors[0]) << "回落的那一排第一格该是内置的第一格";
+}
+
+/**
+ * @brief 钉住标注工具栏的面板由自绘的连续曲率铺底
+ * @details 工具栏嵌在标注窗里，样式表不再铺底：左上角要透出宿主底色，
+ *          上沿中部只该有面板的 surface
+ */
+TEST_F(ToolbarFixture, PanelIsPaintedWithSquircleCorners)
+{
+    GyanisScribe::Gui::setTextThemeKind(GyanisScribe::Gui::ThemeKind::Light);
+    SignalLog log;
+    auto      toolbar = makeToolbarLogged(log);
+    toolbar->setAttribute(Qt::WA_DontShowOnScreen);
+    toolbar->resize(toolbar->sizeHint());
+    toolbar->show();
+    QCoreApplication::processEvents();
+
+    const QImage image = toolbar->grab().toImage();
+    EXPECT_EQ(image.pixelColor(0, 0).alpha(), 0) << "工具栏左上角不透明：方形底露出来了";
+    EXPECT_EQ(image.pixelColor(toolbar->width() / 2, 2), GyanisScribe::Gui::activePalette().surface);
 }
