@@ -24,6 +24,8 @@ add_library(App STATIC
         SingleInstance.cpp
         OcrCoordinator.h
         OcrCoordinator.cpp
+        PrivacyCoordinator.h
+        PrivacyCoordinator.cpp
         HistoryCoordinator.h
         HistoryCoordinator.cpp
         RecordingCoordinator.h
