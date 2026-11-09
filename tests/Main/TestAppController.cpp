@@ -6,6 +6,7 @@
 #include "App/CaptureCoordinator.h"
 #include "App/CustomHotkeys.h"
 #include "App/HistoryCoordinator.h"
+#include "App/MemoryCoordinator.h"
 #include "App/PrivacyCoordinator.h"
 #include "App/RewindCoordinator.h"
 #include "Core/Ocr/OcrTypes.h"
@@ -28,6 +29,7 @@
 #include "Core/History/HistoryRules.h"
 #include "Core/History/HistoryStore.h"
 #include "Core/History/HistoryTypes.h"
+#include "Core/Memory/MemoryIndex.h"
 #include "Core/Pin/PinLayout.h"
 #include "Gui/Pin/PinManager.h"
 #include "Platform/IPlatformIntegration.h"
@@ -40,6 +42,7 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QColor>
+#include <QCheckBox>
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QDialog>
@@ -49,6 +52,7 @@
 #include <QImage>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QMessageBox>
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QRect>
@@ -73,6 +77,8 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+
+#include <QAbstractButton>
 
 namespace GyanisScribe
 {
@@ -296,9 +302,9 @@ namespace GyanisScribe
                 return std::unexpected(Base::Error{Base::ErrorCode::PlatformUnsupported, "替身不演界面元素这一项"});
             }
 
-            mutable int        foregroundQueries = 0;       ///< 前台窗口被问了几次
-            HotkeyBackendStub *hotkeyBackend     = nullptr; ///< 建出来的假热键后端；第一次重登之前为空
-            bool               sessionNotifications = false; ///< 锁屏通知这一位；回溯协调器只在它为真时启用
+            mutable int        foregroundQueries    = 0;       ///< 前台窗口被问了几次
+            HotkeyBackendStub *hotkeyBackend        = nullptr; ///< 建出来的假热键后端；第一次重登之前为空
+            bool               sessionNotifications = false;   ///< 锁屏通知这一位；回溯协调器只在它为真时启用
 
         private:
             quintptr m_handle; ///< 每次交回同一枚句柄
@@ -357,8 +363,7 @@ namespace GyanisScribe
             }
 
             /// 造一帧与生产同形状的假屏：逻辑与物理尺寸一致（倍比 1.0），屏名与选区由用例点名
-            [[nodiscard]] static Base::CapturedImage makeFrame(const QString &screenName, const QRect &logicalRegion = {},
-                                                               const QColor &fillColor = QColor(36, 87, 166))
+            [[nodiscard]] static Base::CapturedImage makeFrame(const QString &screenName, const QRect &logicalRegion = {}, const QColor &fillColor = QColor(36, 87, 166))
             {
                 QImage image(kFrameWidth, kFrameHeight, QImage::Format_ARGB32_Premultiplied);
                 image.fill(fillColor);
@@ -403,6 +408,11 @@ namespace GyanisScribe
                     // 控制器构造里就会按这一格启动回溯协调器：写晚了 start() 只会读到关闭
                     ASSERT_TRUE(settings->setValue(Core::kRewindEnabled, true).has_value());
                 }
+                // 记忆库落点必须在造控制器之前定下：start() 在构造末尾就开库。
+                // 默认按「已经问过、暂不开启」摆：存量用例截图时不该弹出授权框；
+                // 只有授权那条用例自己把它翻回未询问
+                ASSERT_TRUE(settings->setValue(Core::kMemoryEnabled, m_memoryEnabled).has_value());
+                ASSERT_TRUE(settings->setValue(Core::kMemoryConsentAsked, m_memoryConsentAsked).has_value());
                 m_settings = settings.get();
 
                 auto source      = std::make_unique<CountingScreenSource>(makeFrame(m_frameScreenName, m_frameRegion, m_frameColor));
@@ -427,6 +437,7 @@ namespace GyanisScribe
                 parts.integration        = std::move(integration);
                 parts.captureSource      = std::move(source);
                 parts.historyStoragePath = m_root / "history.json";
+                parts.memoryStoragePath  = m_root / "memory.sqlite";
                 m_controller             = std::make_unique<Main::AppController>(std::move(parts), restorePins);
             }
 
@@ -559,6 +570,78 @@ namespace GyanisScribe
                 EXPECT_TRUE(equivalent) << "成品没落在判据点名的目录里：" << file.string();
             }
 
+            /// 造一张小 PNG：记忆索引与历史清单都会检查原图在不在盘上
+            static void writeShotFile(const std::filesystem::path &path)
+            {
+                std::error_code ignored;
+                std::filesystem::create_directories(path.parent_path(), ignored);
+                QImage image{QSize{32, 24}, QImage::Format_ARGB32};
+                image.fill(QColor{30, 90, 160});
+                ASSERT_TRUE(image.save(QString::fromStdWString(path.wstring()))) << "判据的素材没写出来：" << path.string();
+            }
+
+            /// 记忆索引里的全部行；查询失败直接判红，避免把「库没开」读成「本来就是空的」
+            [[nodiscard]] std::vector<Core::MemoryResult> memoryRows() const
+            {
+                auto results = m_controller->memoryCoordinatorForTesting().index().search(Core::MemoryQuery{});
+                EXPECT_TRUE(results.has_value()) << "记忆索引查不出结果";
+                return results ? *results : std::vector<Core::MemoryResult>{};
+            }
+
+            /**
+             * @brief 起一枚短定时器，等记忆授权弹窗成为活动模态框后按下「暂不」
+             * @param answered 收到并回答过的弹窗次数，调用方据此判「问了几次」
+             * @return 还活着的定时器；用例跑完那一轮再停它
+             * @details 弹窗在截图交付里 exec，会卡住调用方的栈：只能用定时器在嵌套事件循环里替用户按。
+             */
+            [[nodiscard]] static std::unique_ptr<QTimer> declineMemoryConsentDialogs(int &answered)
+            {
+                auto driver = std::make_unique<QTimer>();
+                driver->setInterval(1);
+                QObject::connect(driver.get(), &QTimer::timeout, driver.get(),
+                                 [&answered]
+                                 {
+                                     auto *box = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
+                                     if (box == nullptr)
+                                     {
+                                         return;
+                                     }
+                                     QAbstractButton *decline = nullptr;
+                                     for (auto *button: box->findChildren<QAbstractButton *>())
+                                     {
+                                         if (button->text() == Base::uiText("暂不"))
+                                         {
+                                             decline = button;
+                                             break;
+                                         }
+                                     }
+                                     EXPECT_NE(decline, nullptr) << "记忆授权弹窗里没有「暂不」";
+                                     if (decline == nullptr)
+                                     {
+                                         box->reject();
+                                     } else
+                                     {
+                                         decline->click();
+                                     }
+                                     ++answered;
+                                 });
+                driver->start();
+                return driver;
+            }
+
+            /// 主窗里指定无障碍名的控件；找不到是空指针，调用方据此报「这一处入口没了」
+            [[nodiscard]] static QWidget *windowControl(QWidget &window, const QString &accessibleName)
+            {
+                for (auto *child: window.findChildren<QWidget *>())
+                {
+                    if (child->accessibleName() == accessibleName)
+                    {
+                        return child;
+                    }
+                }
+                return nullptr;
+            }
+
             /// 等一个条件成立，最长等 budgetMs：延时那一档用的是真定时器，只能转着事件循环真等
             [[nodiscard]] static bool waitUntil(const std::function<bool()> &condition, const int budgetMs = 5000)
             {
@@ -592,7 +675,7 @@ namespace GyanisScribe
             QString                              m_realScreenName;                                          ///< 离屏平台那块真屏的名字
             int                                  m_delaySeconds    = 0;                                     ///< 延时截图那一格
             QString                              m_frameScreenName = QString::fromLatin1(kGhostScreenName); ///< 假帧带的屏名
-            QColor                               m_frameColor      = QColor(36, 87, 166);                  ///< 假帧铺的底色
+            QColor                               m_frameColor      = QColor(36, 87, 166);                   ///< 假帧铺的底色
             QRect                                m_frameRegion;                                             ///< 假帧记的屏内选区，F5 重抓按它走
             std::optional<App::CaptureIntent>    m_afterAction;                                             ///< 「截完之后」那一格；空 = 不写
             bool                                 m_keepUnsaved   = false;                                   ///< 「未保存也进历史」那一格
@@ -603,6 +686,8 @@ namespace GyanisScribe
             QString                              m_customHotkeyText;                                        ///< 预置的自定义绑定；空 = 不写这一格
             bool                                 m_rewindEnabled        = false;                            ///< 回溯开关；真就在造控制器前写进设置
             bool                                 m_sessionNotifications = false;                            ///< 平台是否承诺锁屏通知；回溯协调器只在它为真时启用
+            bool                                 m_memoryEnabled        = false;                            ///< 记忆库开关；造控制器前写进设置
+            bool                                 m_memoryConsentAsked   = true;                             ///< 记忆库是否已问过授权；默认问过，只有授权那条用例翻回未询问
         };
     } // namespace
 
@@ -613,9 +698,9 @@ namespace GyanisScribe
      */
     TEST(AppControllerConstruction, ParentPointerCannotLandInRestorePins)
     {
-        EXPECT_FALSE((std::is_constructible_v<Main::AppController, QObject *>)) << "parent 指针还能落进 restorePins";
-        EXPECT_FALSE((std::is_constructible_v<Main::AppController, Main::AppControllerParts, QObject *>)) << "parts 档的 parent 还能落进 restorePins";
-        EXPECT_TRUE((std::is_constructible_v<Main::AppController, bool>)) << "按档位构造的那一条被删重载挡住了";
+        EXPECT_FALSE((std::is_constructible_v<Main::AppController, QObject *>) ) << "parent 指针还能落进 restorePins";
+        EXPECT_FALSE((std::is_constructible_v<Main::AppController, Main::AppControllerParts, QObject *>) ) << "parts 档的 parent 还能落进 restorePins";
+        EXPECT_TRUE((std::is_constructible_v<Main::AppController, bool>) ) << "按档位构造的那一条被删重载挡住了";
         EXPECT_TRUE(std::is_default_constructible_v<Main::AppController>) << "默认的常驻装配被挡住了";
     }
 
@@ -660,7 +745,7 @@ namespace GyanisScribe
         capture.startInteractive(App::CaptureIntent::Annotate);
         overlay = visibleCaptureOverlay();
         ASSERT_NE(overlay, nullptr) << "第二轮没铺出遮罩";
-        const auto global = overlay->geometry().topLeft();
+        const auto  global = overlay->geometry().topLeft();
         QMouseEvent press{QEvent::MouseButtonPress, QPointF{5, 5}, QPointF{global + QPoint{5, 5}}, Qt::LeftButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
         QApplication::sendEvent(overlay, &press);
         QMouseEvent move{QEvent::MouseMove, QPointF{14, 14}, QPointF{global + QPoint{14, 14}}, Qt::NoButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
@@ -741,13 +826,11 @@ namespace GyanisScribe
         // 缓冲里先有帧：门禁若漏了，选择器当场就有东西可选，不会因为空缓冲躲过去
         auto &rewind = m_controller->rewindCoordinatorForTesting();
         rewind.captureTickForTesting();
-        ASSERT_TRUE(waitUntil([&rewind] { return rewind.bufferStatsForTesting().sampleCount > 0; }, 5000))
-                << "回溯缓冲没抓到帧：后面的判据分不清是被门禁挡下还是没帧可开";
+        ASSERT_TRUE(waitUntil([&rewind] { return rewind.bufferStatsForTesting().sampleCount > 0; }, 5000)) << "回溯缓冲没抓到帧：后面的判据分不清是被门禁挡下还是没帧可开";
 
         const auto before = visibleToastBubbles();
         m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Rewind);
-        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("先完成当前截图或标注")); }))
-                << "标注窗开着时回溯热键没被挡回，也没说清出路";
+        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("先完成当前截图或标注")); })) << "标注窗开着时回溯热键没被挡回，也没说清出路";
         pumpFor(400); // 编码在途时选择器会等一小会儿再开：给漏掉的门禁留出这一段
         EXPECT_EQ(countTopLevelWindows<Gui::RewindPickerWindow>(), 0) << "标注窗还开着就叠上了回溯选择器";
 
@@ -756,8 +839,7 @@ namespace GyanisScribe
         QApplication::sendEvent(&window, &escape);
         ASSERT_FALSE(window.isVisible()) << "标注窗没关掉，后一条判据无从判起";
         m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Rewind);
-        EXPECT_TRUE(waitUntil([] { return countTopLevelWindows<Gui::RewindPickerWindow>() > 0; }, 3000))
-                << "标注窗关掉之后回溯热键仍打不开选择器：这条出口本身没接到协调器";
+        EXPECT_TRUE(waitUntil([] { return countTopLevelWindows<Gui::RewindPickerWindow>() > 0; }, 3000)) << "标注窗关掉之后回溯热键仍打不开选择器：这条出口本身没接到协调器";
     }
 
     /**
@@ -809,16 +891,14 @@ namespace GyanisScribe
 
         auto &rewind = m_controller->rewindCoordinatorForTesting();
         rewind.captureTickForTesting();
-        ASSERT_TRUE(waitUntil([&rewind] { return rewind.bufferStatsForTesting().sampleCount > 0; }, 5000))
-                << "回溯缓冲没抓到帧：后面的判据分不清是被门禁挡下还是没帧可开";
+        ASSERT_TRUE(waitUntil([&rewind] { return rewind.bufferStatsForTesting().sampleCount > 0; }, 5000)) << "回溯缓冲没抓到帧：后面的判据分不清是被门禁挡下还是没帧可开";
 
         capture.startInteractive(App::CaptureIntent::Annotate);
         EXPECT_TRUE(capture.isDelayPending()) << "延时已经排上，谓词却没立起来";
         EXPECT_FALSE(capture.isCaptureFlowActive()) << "本用例钉的正是流程标志之外的那一段";
 
         m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Rewind);
-        EXPECT_TRUE(waitUntil([&] { return visibleToastText().contains(QStringLiteral("先完成当前截图或标注")); }))
-                << "延时倒计时里按回溯热键没被挡回，也没说清出路";
+        EXPECT_TRUE(waitUntil([&] { return visibleToastText().contains(QStringLiteral("先完成当前截图或标注")); })) << "延时倒计时里按回溯热键没被挡回，也没说清出路";
         pumpFor(200); // 编码在途时选择器会等一小会儿再开：给漏掉的门禁留出这一段
         EXPECT_EQ(countTopLevelWindows<Gui::RewindPickerWindow>(), 0) << "延时截图还没到点就叠上了回溯选择器";
 
@@ -883,7 +963,7 @@ namespace GyanisScribe
 
         auto *overlay = visibleCaptureOverlay();
         ASSERT_NE(overlay, nullptr);
-        const auto global = overlay->geometry().topLeft();
+        const auto  global = overlay->geometry().topLeft();
         QMouseEvent press{QEvent::MouseButtonPress, QPointF{10, 10}, QPointF{global + QPoint{10, 10}}, Qt::LeftButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
         QApplication::sendEvent(overlay, &press);
         QMouseEvent move{QEvent::MouseMove, QPointF{109, 89}, QPointF{global + QPoint{109, 89}}, Qt::NoButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
@@ -894,7 +974,7 @@ namespace GyanisScribe
         ASSERT_TRUE(waitUntil([this] { return m_controller->capture().annotationWindow().isVisible(); }, 3000)) << "框选之后标注窗没开起来";
         EXPECT_TRUE(lastPaused) << "标注窗开着时回溯缓冲该是暂停的，后面的恢复判据才有对照";
 
-        auto &window = capture.annotationWindow();
+        auto     &window = capture.annotationWindow();
         QKeyEvent enter{QEvent::KeyPress, Qt::Key_Return, Qt::KeyboardModifiers{}};
         QApplication::sendEvent(&window, &enter);
 
@@ -942,10 +1022,10 @@ namespace GyanisScribe
 
         auto *screen = QGuiApplication::primaryScreen();
         ASSERT_NE(screen, nullptr);
-        const QPoint origin   = screen->geometry().topLeft();
-        const QRect  region   = QRect{0, 0, kFrameWidth, kFrameHeight};
-        const QColor red      = QColor(220, 0, 0);
-        const QColor green    = QColor(0, 200, 0);
+        const QPoint origin = screen->geometry().topLeft();
+        const QRect  region = QRect{0, 0, kFrameWidth, kFrameHeight};
+        const QColor red    = QColor(220, 0, 0);
+        const QColor green  = QColor(0, 200, 0);
         Core::rememberRegion(*m_settings, Core::RegionHistoryEntry{region, screen->name()});
 
         auto &window = m_controller->capture().annotationWindow();
@@ -1247,7 +1327,7 @@ namespace GyanisScribe
                          [&delivered](const QString &savedPath) { delivered << savedPath; });
         QObject::connect(m_controller.get(), &Main::AppController::commandLineActionFailed, m_controller.get(), [&failures](const QString &reason) { failures << reason; });
 
-        const auto missingProgram = Base::Paths::toDisplayText(m_root / "no-such-command-3f9a.exe");
+        const auto              missingProgram = Base::Paths::toDisplayText(m_root / "no-such-command-3f9a.exe");
         App::CommandLineRequest request;
         request.action      = App::CommandLineAction::CaptureFullScreen;
         request.outputs     = App::CaptureOutputSet{App::CaptureOutput::File};
@@ -1734,6 +1814,278 @@ namespace GyanisScribe
         privacy.scanSucceeded(window.canvas().image, Core::OcrResult{});
         EXPECT_EQ(canvasMessages, 1) << "协调器的结果没有落到画布那一层";
         EXPECT_EQ(said, Base::uiText("没有发现可打码的敏感信息。请仍自行检查后再分享。")) << said.toStdString();
+    }
+
+    /**
+     * @brief 钉住首次截图问一次授权、点「暂不」后不再问也不建索引
+     * @details 授权弹窗在截图交付的同步路径里 exec：只有定时器能在嵌套事件循环里替用户按。
+     *          第一张之后 settings 必须留下「问过了」，第二张再弹一次就是每次截图都拦人；
+     *          索引一条都不能有，否则「暂不」只关掉了提示。
+     */
+    TEST_F(AppControllerFixture, FirstCaptureAsksForMemoryConsentOnceAndDecliningKeepsItOff)
+    {
+        m_frameScreenName    = m_realScreenName;
+        m_memoryConsentAsked = false;
+        makeController();
+        ASSERT_TRUE(m_controller->memoryCoordinatorForTesting().index().isOpen()) << "记忆索引没在临时目录里打开";
+
+        int  answered = 0;
+        auto driver   = declineMemoryConsentDialogs(answered);
+        m_controller->capture().startFullScreen(App::CaptureIntent::QuickSave);
+        driver->stop();
+
+        EXPECT_EQ(answered, 1) << "第一张可索引截图没有弹一次授权";
+        EXPECT_FALSE(m_controller->settings().boolValue(Core::kMemoryEnabled, true)) << "点「暂不」却把功能打开了";
+        EXPECT_TRUE(m_controller->settings().boolValue(Core::kMemoryConsentAsked, false)) << "暂不之后没记住已经问过";
+        EXPECT_TRUE(memoryRows().empty()) << "暂不之后仍然索引了那张截图";
+
+        // 再截一张：同一进程里不该再弹第二次
+        auto again = declineMemoryConsentDialogs(answered);
+        m_controller->capture().startFullScreen(App::CaptureIntent::QuickSave);
+        again->stop();
+        EXPECT_EQ(answered, 1) << "暂不之后又来问了一次";
+        EXPECT_TRUE(memoryRows().empty()) << "关着功能也建了索引";
+    }
+
+    /**
+     * @brief 钉住历史里删一条，记忆索引里那一行跟着消失，原图不动
+     * @details 历史页删记录只动清单不动文件；记忆库按同一条口径删行。读的是控制器注进去的
+     *          临时索引，判据不碰真实应用数据目录。
+     */
+    TEST_F(AppControllerFixture, HistoryRemoveDropsTheMemoryRow)
+    {
+        m_frameScreenName = m_realScreenName;
+        m_memoryEnabled   = true;
+        makeController();
+        ASSERT_TRUE(m_controller->memoryCoordinatorForTesting().isEnabled());
+
+        m_controller->capture().startFullScreen(App::CaptureIntent::QuickSave);
+        const auto entries = readHistory();
+        ASSERT_TRUE(entries.has_value()) << entries.error().message;
+        ASSERT_EQ(entries->size(), 1);
+        const auto shotPath = entries->front().filePath;
+
+        const auto before = memoryRows();
+        ASSERT_EQ(before.size(), 1) << "截图没有进记忆索引";
+        EXPECT_EQ(before.front().filePath, shotPath);
+
+        m_controller->historyCoordinatorForTesting().remove(shotPath);
+        EXPECT_TRUE(memoryRows().empty()) << "从历史删掉之后记忆索引还留着这一行";
+        EXPECT_TRUE(std::filesystem::exists(shotPath)) << "删历史记录不该动原图";
+    }
+
+    /**
+     * @brief 钉住历史清空只删截图来源的行，导入行保留
+     * @details 历史里只有截图，导入的旧图从来不在那份清单里；清空历史时把它一起删掉，
+     *          用户手动导进来的那批就凭空消失，而原文件还在盘上却再也搜不到。
+     */
+    TEST_F(AppControllerFixture, HistoryClearDropsCaptureRowsAndKeepsImportedOnes)
+    {
+        m_frameScreenName = m_realScreenName;
+        m_memoryEnabled   = true;
+        makeController();
+        auto &memory = m_controller->memoryCoordinatorForTesting();
+
+        const auto importPath = m_root / "imports" / "old-shot.png";
+        writeShotFile(importPath);
+        Core::MemoryUpsert imported;
+        imported.filePath   = importPath;
+        imported.source     = Core::MemorySource::Import;
+        imported.capturedAt = QDateTime::currentDateTime();
+        imported.size       = QSize{32, 24};
+        ASSERT_TRUE(memory.index().upsertPending(imported).has_value());
+
+        m_controller->capture().startFullScreen(App::CaptureIntent::QuickSave);
+        ASSERT_EQ(memoryRows().size(), 2) << "截图与导入行该各一条";
+
+        m_controller->historyCoordinatorForTesting().clear();
+
+        const auto rows = memoryRows();
+        ASSERT_EQ(rows.size(), 1) << "清空历史只该删掉截图来源的行";
+        EXPECT_EQ(rows.front().source, Core::MemorySource::Import);
+        EXPECT_EQ(rows.front().filePath, importPath);
+    }
+
+    /**
+     * @brief 钉住记忆页的贴图入口走历史那一条贴图路线
+     * @details 贴图要有光标位置、要进管理器的册表：记忆页另写一条就与历史页的贴图行为漂移。
+     *          这里按真信号发一次，数桌面上的贴图张数。
+     */
+    TEST_F(AppControllerFixture, MemoryPinOpensAPinThroughTheSharedRoute)
+    {
+        m_frameScreenName = m_realScreenName;
+        m_memoryEnabled   = true;
+        makeController();
+        m_controller->capture().startFullScreen(App::CaptureIntent::QuickSave);
+
+        const auto entries = readHistory();
+        ASSERT_TRUE(entries.has_value()) << entries.error().message;
+        ASSERT_EQ(entries->size(), 1);
+
+        auto *window = mainWindowOnDesk();
+        ASSERT_NE(window, nullptr);
+        emit window->memoryPinRequested(entries->front().filePath);
+        EXPECT_EQ(m_controller->pinCountForTesting(), 1) << "记忆页的贴图没有落到贴图管理器上";
+    }
+
+    /**
+     * @brief 钉住记忆页的重新识别请求落到协调器
+     * @details 视图只发主键；找不到这一条时协调器只说一句、不重排。这里预置一条不在队列里的行，
+     *          以 changed 信号为落点：协调器收到它才会重置状态并重新入队。
+     */
+    TEST_F(AppControllerFixture, MemoryRetryReachesTheCoordinator)
+    {
+        m_memoryEnabled = true;
+        makeController();
+        auto &memory = m_controller->memoryCoordinatorForTesting();
+
+        const auto retryPath = m_root / "retry-shot.png";
+        writeShotFile(retryPath);
+        Core::MemoryUpsert entry;
+        entry.filePath        = retryPath;
+        entry.capturedAt      = QDateTime::currentDateTime();
+        entry.size            = QSize{32, 24};
+        const auto identifier = memory.index().upsertPending(entry);
+        ASSERT_TRUE(identifier.has_value()) << identifier.error().message;
+
+        int changes = 0;
+        QObject::connect(&memory, &App::MemoryCoordinator::changed, &memory, [&changes] { ++changes; });
+
+        auto *window = mainWindowOnDesk();
+        ASSERT_NE(window, nullptr);
+        emit window->memoryRetryOcrRequested(*identifier);
+        EXPECT_GE(changes, 1) << "重新识别请求没有落到协调器";
+    }
+
+    /**
+     * @brief 钉住记忆页的导入入口把选好的目录交到协调器的导入任务上
+     * @details 文件对话框要人点，用例驱动的是「选好目录以后发生的事」那一段：
+     *          导入是分块异步跑的，等索引里出现这张导入图就算接通。
+     */
+    TEST_F(AppControllerFixture, ImportFolderFromTheMemoryEntryReachesTheIndex)
+    {
+        m_memoryEnabled = true;
+        makeController();
+
+        const auto folder       = m_root / "imports";
+        const auto importedPath = folder / "a.png";
+        writeShotFile(importedPath);
+
+        m_controller->importMemoryFolder(folder);
+        EXPECT_TRUE(waitUntil(
+                [this, &importedPath]
+                {
+                    auto rows = m_controller->memoryCoordinatorForTesting().index().search(Core::MemoryQuery{});
+                    return rows && std::ranges::any_of(*rows, [&importedPath](const Core::MemoryResult &row) { return row.filePath == importedPath; });
+                }))
+                << "导入目录没有写进记忆索引";
+    }
+
+    /**
+     * @brief 钉住记忆页的清空请求把索引清空（确认框在视图那一侧已经点过）
+     * @details 这里直接发主窗信号：视图的确认框另有用例钉，这一条判的是收到请求之后的落点。
+     */
+    TEST_F(AppControllerFixture, WindowClearRequestEmptiesTheIndex)
+    {
+        m_memoryEnabled = true;
+        makeController();
+        auto &memory = m_controller->memoryCoordinatorForTesting();
+
+        const auto importPath = m_root / "imports" / "kept-until-clear.png";
+        writeShotFile(importPath);
+        Core::MemoryUpsert imported;
+        imported.filePath   = importPath;
+        imported.source     = Core::MemorySource::Import;
+        imported.capturedAt = QDateTime::currentDateTime();
+        imported.size       = QSize{32, 24};
+        ASSERT_TRUE(memory.index().upsertPending(imported).has_value());
+        m_controller->capture().startFullScreen(App::CaptureIntent::QuickSave);
+        ASSERT_FALSE(memoryRows().empty());
+
+        auto *window = mainWindowOnDesk();
+        ASSERT_NE(window, nullptr);
+        emit window->memoryClearRequested();
+        EXPECT_TRUE(memoryRows().empty()) << "清空请求没有落到协调器";
+    }
+
+    /**
+     * @brief 钉住记忆页的排除请求改了名单并删掉已索引的对应行
+     * @details 名单要按协调器的归一口径写进配置（去 .exe、小写），否则下一次启动读出来是另一个形状；
+     *          已有行当场删除，之后同一进程的新截图才不进库。
+     */
+    TEST_F(AppControllerFixture, WindowExcludeRequestDropsMatchingRows)
+    {
+        m_memoryEnabled = true;
+        makeController();
+        auto &memory = m_controller->memoryCoordinatorForTesting();
+
+        const auto secretPath = m_root / "secret-shot.png";
+        writeShotFile(secretPath);
+        Core::MemoryUpsert entry;
+        entry.filePath    = secretPath;
+        entry.capturedAt  = QDateTime::currentDateTime();
+        entry.size        = QSize{32, 24};
+        entry.processName = QStringLiteral("secret-app");
+        ASSERT_TRUE(memory.index().upsertPending(entry).has_value());
+        ASSERT_EQ(memoryRows().size(), 1);
+
+        auto *window = mainWindowOnDesk();
+        ASSERT_NE(window, nullptr);
+        emit window->memoryExcludeRequested(QStringList{QStringLiteral("Secret-App.exe")});
+
+        EXPECT_TRUE(memoryRows().empty()) << "排除应用没有删掉已索引的那一行";
+        EXPECT_EQ(m_controller->settings().stringListValue(Core::kMemoryExcludeProcesses, QStringList{}), QStringList{QStringLiteral("secret-app")})
+                << "排除名单没有按归一后的形状写进配置";
+    }
+
+    /**
+     * @brief 钉住横幅上的开启与设置页的勾选都落到协调器的开关上
+     * @details 手动开启视为已同意（不再弹授权框）；两个入口的落点必须是同一个 setEnabled，
+     *          勾选还要跟着协调器的状态回摆。
+     */
+    TEST_F(AppControllerFixture, EnablingFromTheBannerAndTheToggleBothReachTheCoordinator)
+    {
+        m_memoryEnabled      = false;
+        m_memoryConsentAsked = true;
+        makeController();
+        auto &memory = m_controller->memoryCoordinatorForTesting();
+        ASSERT_FALSE(memory.isEnabled());
+
+        auto *window = mainWindowOnDesk();
+        ASSERT_NE(window, nullptr);
+        emit window->memoryEnableRequested();
+        EXPECT_TRUE(memory.isEnabled()) << "横幅上的开启没有落到协调器";
+        EXPECT_TRUE(m_controller->settings().boolValue(Core::kMemoryEnabled, false));
+
+        auto *toggle = qobject_cast<QCheckBox *>(windowControl(*window, Base::uiText("截图记忆")));
+        ASSERT_NE(toggle, nullptr) << "主窗通用页没有「截图记忆」勾选";
+        EXPECT_TRUE(toggle->isChecked()) << "协调器已开启，勾选没跟上";
+
+        toggle->setChecked(false);
+        EXPECT_FALSE(memory.isEnabled()) << "取消勾选没有关掉功能";
+        EXPECT_FALSE(m_controller->settings().boolValue(Core::kMemoryEnabled, true));
+    }
+
+    /**
+     * @brief 钉住打开记忆页之前先清掉原图已不在的行
+     * @details 导入的旧图被移动或删除之后，库里那一行只剩一张空卡；打开这一页那一下就该清掉，
+     *          不必等用户再点一次刷新。
+     */
+    TEST_F(AppControllerFixture, OpeningTheMemoryPagePrunesRowsWhoseFileIsGone)
+    {
+        m_memoryEnabled = true;
+        makeController();
+        auto &memory = m_controller->memoryCoordinatorForTesting();
+
+        Core::MemoryUpsert gone;
+        gone.filePath   = m_root / "gone" / "missing.png";
+        gone.capturedAt = QDateTime::currentDateTime();
+        gone.size       = QSize{32, 24};
+        ASSERT_TRUE(memory.index().upsertPending(gone).has_value());
+        ASSERT_EQ(memoryRows().size(), 1);
+
+        m_controller->openMainWindow(Main::MainWindowPage::Memory);
+        EXPECT_TRUE(memoryRows().empty()) << "打开记忆页没有先清理原图缺失的行";
     }
 
 } // namespace GyanisScribe

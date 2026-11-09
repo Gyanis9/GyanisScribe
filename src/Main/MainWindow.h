@@ -16,6 +16,7 @@
 #include "Gui/Controls/Toast.h"
 
 #include <QString>
+#include <QStringList>
 #include <QWidget>
 
 #include <filesystem>
@@ -23,6 +24,7 @@
 #include <span>
 #include <string_view>
 
+class QCheckBox;
 class QListWidget;
 class QStackedWidget;
 class QCloseEvent;
@@ -41,11 +43,18 @@ namespace GyanisScribe::Gui
 namespace GyanisScribe::Core
 {
     class HistoryStore;
+    class MemoryIndex;
+    struct MemoryImportProgress;
 } // namespace GyanisScribe::Core
 
 namespace GyanisScribe::Gui
 {
     class HistoryView;
+} // namespace GyanisScribe::Gui
+
+namespace GyanisScribe::Gui
+{
+    class MemoryView;
 } // namespace GyanisScribe::Gui
 
 namespace GyanisScribe::Plugins
@@ -83,6 +92,7 @@ namespace GyanisScribe::Main
         Theme,      ///< 主题
         About,      ///< 关于
         History,    ///< 历史
+        Memory,     ///< 记忆库
     };
 
     /**
@@ -211,6 +221,7 @@ namespace GyanisScribe::Main
          * @param theme 主题管理器，主题下拉即时生效走它
          * @param icons 图标供给器
          * @param historyStore 历史清单，历史页从它读列表、往它删记录
+         * @param memoryIndex 记忆库索引，记忆页从这里搜索与统计；引用须比本窗口活得久
          * @param capabilities 平台能力表：热键页按它决定给不给登记入口，
          *        没有全局热键后端的平台上改组合键不会生效，界面不许装作会生效
          * @param parent Qt 父对象
@@ -218,7 +229,7 @@ namespace GyanisScribe::Main
          *       设置页不需要为了「生效」去拖一个控制器进来。历史页的三个出口同样只发信号。
          */
         explicit MainWindow(GyanisScribe::Core::ISettingsStore &settings, GyanisScribe::Gui::ThemeManager &theme, GyanisScribe::Gui::IconProvider &icons,
-                            GyanisScribe::Core::HistoryStore &historyStore, GyanisScribe::Platform::PlatformCapabilities capabilities,
+                            GyanisScribe::Core::HistoryStore &historyStore, GyanisScribe::Core::MemoryIndex &memoryIndex, GyanisScribe::Platform::PlatformCapabilities capabilities,
                             GyanisScribe::Platform::IPlatformIntegration &integration, QWidget *parent = nullptr);
 
         /**
@@ -249,6 +260,48 @@ namespace GyanisScribe::Main
          * @details 截图与录屏落盘之后由控制器调用：列表不会自己发现盘上多了文件。
          */
         void refreshHistory();
+
+        /**
+         * @brief 重读记忆索引并刷新记忆库页
+         * @details 索引变化与统计更新时由控制器调用；页隐藏着时照常摆行，缩略图等翻到这一页再解。
+         */
+        void refreshMemory();
+
+        /**
+         * @brief 把记忆功能的开关状态摆进设置页勾选与记忆页横幅
+         * @param enabled 记忆功能是否已开启
+         * @note 这是功能开关，与 QWidget::setEnabled 的整页禁用不是一回事
+         */
+        void setMemoryEnabled(bool enabled);
+
+        /**
+         * @brief 更新记忆页识别后端可用性横幅
+         * @param available 后端是否可用
+         * @param reason 不可用时的中文原因与替代做法
+         */
+        void setMemoryOcrAvailability(bool available, const QString &reason);
+
+        /**
+         * @brief 更新记忆页数据库错误横幅
+         * @param reason 中文原因；空串表示错误已恢复
+         */
+        void setMemoryDatabaseError(const QString &reason);
+
+        /**
+         * @brief 更新记忆页的导入进度
+         * @param progress 已扫描、已入库、跳过、失败与取消状态
+         * @details 进度对话框归记忆视图自己持有，主窗口只转发。
+         */
+        void setMemoryImportProgress(const Core::MemoryImportProgress &progress);
+
+        /// 收起记忆页的导入进度对话框；还没创建过时是空操作
+        void hideMemoryImportProgress();
+
+        /**
+         * @brief 把设置里的排除应用名单交给记忆页
+         * @param processes 完整名单；排除对话框按它决定初始勾选
+         */
+        void setMemoryExcludedProcesses(QStringList processes);
 
         /**
          * @brief 把当前全部设置导出成一个文件，并把结果落成一条气泡提示
@@ -328,6 +381,64 @@ namespace GyanisScribe::Main
         void historyClearRequested();
 
         /**
+         * @brief 记忆页要求把这条截图重新贴回屏幕
+         * @param filePath 原图路径
+         */
+        void memoryPinRequested(const std::filesystem::path &filePath);
+
+        /**
+         * @brief 记忆页要求用系统默认程序打开这条原图
+         * @param filePath 原图路径
+         */
+        void memoryOpenFileRequested(const std::filesystem::path &filePath);
+
+        /**
+         * @brief 记忆页请求打开这条原图所在的目录
+         * @param filePath 选中的那条记录
+         */
+        void memoryOpenFolderRequested(const std::filesystem::path &filePath);
+
+        /**
+         * @brief 记忆页要求重新识别一条
+         * @param id 条目主键
+         */
+        void memoryRetryOcrRequested(qint64 id);
+
+        /**
+         * @brief 记忆页要求从索引里删掉一条（原文件保留）
+         * @param id 条目主键
+         */
+        void memoryRemoveRequested(qint64 id);
+
+        /// 记忆页请求选择文件夹并导入旧截图
+        void memoryImportRequested();
+
+        /// 记忆页请求清空整个索引（原文件保留）
+        void memoryClearRequested();
+
+        /**
+         * @brief 记忆页的排除名单已由用户在对话框里确认
+         * @param processes 完整名单，未排除的应用不在其中
+         */
+        void memoryExcludeRequested(QStringList processes);
+
+        /// 记忆页的启用引导被点了
+        void memoryEnableRequested();
+
+        /// 记忆页的数据库错误横幅上点了重建索引
+        void memoryRebuildRequested();
+
+        /// 导入进度对话框里点了取消
+        void memoryImportCancelRequested();
+
+        /**
+         * @brief 通用页的「截图记忆」勾选被用户改了
+         * @param enabled 用户想打开还是关掉
+         * @details 只报用户的动作；控制器处理完状态之后经 setMemoryEnabled 回写勾选与横幅。
+         */
+        void memoryEnabledToggled(bool enabled);
+
+        /**
          * @brief 主窗口要落进气泡的一条提示
          * @param message 界面语言的正文（历史页与导入导出共用这一条通道）
          * @param kind 语义种类
@@ -390,6 +501,8 @@ namespace GyanisScribe::Main
         QWidget *buildAboutPage();
         /// 历史页：缩略图列表与三个出口
         QWidget *buildHistoryPage();
+        /// 记忆库页：搜索、筛选、结果卡片与页脚统计
+        QWidget *buildMemoryPage();
 
         GyanisScribe::Core::ISettingsStore                                  &m_settings;            ///< 配置存储，不拥有
         GyanisScribe::Gui::ThemeManager                                     &m_theme;               ///< 主题管理器，不拥有
@@ -402,9 +515,13 @@ namespace GyanisScribe::Main
         std::unique_ptr<GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator> m_videoEncoders;       ///< 录屏页编码器清单的来源：逐个候选真探一遍
         GyanisScribe::Platform::IPlatformIntegration                        &m_integration;         ///< 平台动作（当前只有开机启动那一格）：能力位可以造假，动作要有真对象
         GyanisScribe::Core::HistoryStore                                    &m_historyStore;        ///< 历史清单，历史页从它读
+        GyanisScribe::Core::MemoryIndex                                     &m_memoryIndex;         ///< 记忆索引，记忆页从它查
         // 排在历史后面只为照声明次序初始化（它默认是空的，构造列表里没写它；夹在中间会让后两项的初始化次序与声明不符）
-        std::unique_ptr<GyanisScribe::App::UpdateChecker> m_updateChecker;     ///< 检查更新那一条：关于页按一下才发请求，不是启动就联网
-        GyanisScribe::Gui::HistoryView                   *m_history = nullptr; ///< 历史页控件，重读清单时刷新它
+        std::unique_ptr<GyanisScribe::App::UpdateChecker> m_updateChecker;           ///< 检查更新那一条：关于页按一下才发请求，不是启动就联网
+        GyanisScribe::Gui::HistoryView                   *m_history       = nullptr; ///< 历史页控件，重读清单时刷新它
+        GyanisScribe::Gui::MemoryView                    *m_memory        = nullptr; ///< 记忆库页控件，重读索引与各条横幅都在它身上
+        QCheckBox                                        *m_memoryToggle  = nullptr; ///< 通用页的「截图记忆」勾选
+        bool                                              m_memoryEnabled = false;   ///< 记忆功能开关的当前状态，勾选与横幅都以它为准
     };
 
 } // namespace GyanisScribe::Main

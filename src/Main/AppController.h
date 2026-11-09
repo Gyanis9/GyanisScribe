@@ -56,6 +56,7 @@ namespace GyanisScribe::Gui
 namespace GyanisScribe::App
 {
     class HistoryCoordinator;
+    class MemoryCoordinator;
     class OcrCoordinator;
     class PrivacyCoordinator;
     class CaptureCoordinator;
@@ -148,6 +149,7 @@ namespace GyanisScribe::Main
         std::unique_ptr<GyanisScribe::Platform::IPlatformIntegration> integration;        ///< 平台集成；空 = 本机那一份
         std::unique_ptr<GyanisScribe::Core::IScreenCaptureSource>     captureSource;      ///< 抓帧来源；空 = 本机抓屏
         std::filesystem::path                                         historyStoragePath; ///< 历史清单落点；空 = 默认位置
+        std::filesystem::path                                         memoryStoragePath;  ///< 记忆索引落点；空 = 默认位置；测试必须给临时路径
     };
 
 
@@ -221,6 +223,14 @@ namespace GyanisScribe::Main
         /// 命令行 `--pick` 的入口：取色这一族在 `PickCoordinator` 里，这里只转发
         void startColorPick();
 
+        /**
+         * @brief 从记忆库的导入入口选定目录之后走的同一条路
+         * @param directory 要扫描的文件夹
+         * @details 公开是为了让用例能直接驱动「选好目录以后发生的事」——文件对话框要人点，
+         *          判据钉不到它身上。
+         */
+        void importMemoryFolder(const std::filesystem::path &directory);
+
         /// 命令行 `--pin` 的入口：识图与贴出那一族在 `PinCoordinator` 里，这里只转发
         [[nodiscard]] GyanisScribe::Base::Expected<void> pinImageFile(const QString &filePath);
 
@@ -281,6 +291,14 @@ namespace GyanisScribe::Main
         [[nodiscard]] GyanisScribe::App::HistoryCoordinator &historyCoordinatorForTesting() const noexcept;
 
         /**
+         * @brief 截图记忆这一族，仅供用例判授权、历史联动与索引落点
+         * @return 本控制器持有的那一份，所有权不在调用方
+         * @note 用例要判「第一次截图真的弹了授权、历史删一条真的删了索引行」，
+         *       只有这一条口子拿得到控制器亲手接线的那个对象与它的索引。
+         */
+        [[nodiscard]] GyanisScribe::App::MemoryCoordinator &memoryCoordinatorForTesting() const noexcept;
+
+        /**
          * @brief 从用例驱动一次热键分派
          * @param action 要驱动的动作
          * @note 生产侧唯一的入口是热键层的 actionTriggered；用例没有键盘可发，
@@ -318,11 +336,13 @@ namespace GyanisScribe::Main
          * @param integration 平台集成，所有权交进来
          * @param captureSource 抓帧来源，所有权交进来
          * @param historyStoragePath 历史清单落点，非空
+         * @param memoryStoragePath 记忆索引落点，非空
          * @param restorePins 启动时要不要把上次会话的贴图摆回桌面，退出时要不要回写布局
          * @param parent QObject 父对象
          */
         AppController(std::unique_ptr<GyanisScribe::Core::SettingsStore> settings, std::unique_ptr<GyanisScribe::Platform::IPlatformIntegration> integration,
-                      std::unique_ptr<GyanisScribe::Core::IScreenCaptureSource> captureSource, std::filesystem::path historyStoragePath, bool restorePins, QObject *parent);
+                      std::unique_ptr<GyanisScribe::Core::IScreenCaptureSource> captureSource, std::filesystem::path historyStoragePath, std::filesystem::path memoryStoragePath,
+                      bool restorePins, QObject *parent);
 
         /**
          * @brief 读设置里那一档「截完之后做什么」
@@ -360,27 +380,36 @@ namespace GyanisScribe::Main
          */
         void reportHotkeyFailures(const GyanisScribe::Core::HotkeyReloadReport &report);
 
-        std::unique_ptr<GyanisScribe::Core::SettingsStore>            m_settings;       ///< 配置存储
-        std::unique_ptr<GyanisScribe::Platform::IPlatformIntegration> m_integration;    ///< 平台集成
-        std::unique_ptr<GyanisScribe::Core::IScreenCaptureSource>     m_captureSource;  ///< 抓帧来源
-        std::unique_ptr<GyanisScribe::Core::HotkeyManager>            m_hotkeys;        ///< 热键登记与触发
-        std::unique_ptr<GyanisScribe::Gui::ThemeManager>              m_theme;          ///< 主题档位与样式表
-        std::unique_ptr<GyanisScribe::Gui::FocusRingController>       m_focusRing;      ///< 输入面双环焦点，进程级
-        std::unique_ptr<GyanisScribe::Gui::IconProvider>              m_icons;          ///< 图标供给器，描边色跟主题
-        std::unique_ptr<GyanisScribe::Gui::PinManager>                m_pins;           ///< 贴图管理器
-        std::unique_ptr<GyanisScribe::App::RecordingCoordinator>      m_recording;      ///< 录屏这一族（配置、服务、控制条、倒计时）
-        std::unique_ptr<GyanisScribe::App::OcrCoordinator>            m_ocr;            ///< 识别这一族（后端选型、搬运工、结果窗）
-        std::unique_ptr<GyanisScribe::App::PrivacyCoordinator>        m_privacy;        ///< 隐私扫描这一族（后端选型、单飞、结果交回截图协调器）
-        std::unique_ptr<GyanisScribe::App::TrayController>            m_tray;           ///< 托盘图标与菜单
-        std::unique_ptr<MainWindow>                                   m_mainWindow;     ///< 设置与关于的入口
-        std::unique_ptr<GyanisScribe::Gui::Toast>                     m_toast;          ///< 右下角提示气泡，操作结果的落地处
-        std::unique_ptr<GyanisScribe::Core::HistoryStore>             m_historyStore;   ///< 历史清单本体：与主窗口共享同一份，删记录不删文件
-        std::unique_ptr<GyanisScribe::App::HistoryCoordinator>        m_history;        ///< 历史这一族（增删清空与「这条去哪了」）
-        std::unique_ptr<GyanisScribe::App::PickCoordinator>           m_picker;         ///< 取色这一族（遮罩、写法与字母档、最近取色）
-        std::unique_ptr<GyanisScribe::App::CaptureCoordinator>        m_capture;        ///< 截图这一族（枢纽：入口、延时、抓帧、按意图交付）
-        std::unique_ptr<GyanisScribe::App::RewindCoordinator>         m_rewind;         ///< 回溯这一族（缓冲、选择器、暂停与恢复）
-        std::unique_ptr<GyanisScribe::App::PinCoordinator>            m_pinCoordinator; ///< 贴图这一族的贴出动作（剪贴板/文件/回贴/组管理）
-        std::unique_ptr<GyanisScribe::App::DeliveryCoordinator>       m_delivery;       ///< 交付这一族（装饰、落盘、外部命令、批量报告）
+        /**
+         * @brief 首次授权的说明弹窗
+         * @details 标题、四条说明与「开启记忆 / 暂不」两个按钮按设计走；默认钮是「暂不」，Esc 同解。
+         *          回答交给协调器的 resolveConsent，并把开关与横幅摆回主窗口。
+         */
+        void showMemoryConsent();
+
+        std::unique_ptr<GyanisScribe::Core::SettingsStore>            m_settings;      ///< 配置存储
+        std::unique_ptr<GyanisScribe::Platform::IPlatformIntegration> m_integration;   ///< 平台集成
+        std::unique_ptr<GyanisScribe::Core::IScreenCaptureSource>     m_captureSource; ///< 抓帧来源
+        std::unique_ptr<GyanisScribe::Core::HotkeyManager>            m_hotkeys;       ///< 热键登记与触发
+        std::unique_ptr<GyanisScribe::Gui::ThemeManager>              m_theme;         ///< 主题档位与样式表
+        std::unique_ptr<GyanisScribe::Gui::FocusRingController>       m_focusRing;     ///< 输入面双环焦点，进程级
+        std::unique_ptr<GyanisScribe::Gui::IconProvider>              m_icons;         ///< 图标供给器，描边色跟主题
+        std::unique_ptr<GyanisScribe::Gui::PinManager>                m_pins;          ///< 贴图管理器
+        std::unique_ptr<GyanisScribe::App::RecordingCoordinator>      m_recording;     ///< 录屏这一族（配置、服务、控制条、倒计时）
+        std::unique_ptr<GyanisScribe::App::OcrCoordinator>            m_ocr;           ///< 识别这一族（后端选型、搬运工、结果窗）
+        std::unique_ptr<GyanisScribe::App::PrivacyCoordinator>        m_privacy;       ///< 隐私扫描这一族（后端选型、单飞、结果交回截图协调器）
+        std::unique_ptr<GyanisScribe::App::TrayController>            m_tray;          ///< 托盘图标与菜单
+        // 排在主窗口之前：窗口构造要拿它的索引，析构顺序反过来，窗口先没、库最后关
+        std::unique_ptr<GyanisScribe::App::MemoryCoordinator>   m_memory;         ///< 截图记忆这一族（授权、OCR 队列、导入与索引维护）
+        std::unique_ptr<MainWindow>                             m_mainWindow;     ///< 设置与关于的入口
+        std::unique_ptr<GyanisScribe::Gui::Toast>               m_toast;          ///< 右下角提示气泡，操作结果的落地处
+        std::unique_ptr<GyanisScribe::Core::HistoryStore>       m_historyStore;   ///< 历史清单本体：与主窗口共享同一份，删记录不删文件
+        std::unique_ptr<GyanisScribe::App::HistoryCoordinator>  m_history;        ///< 历史这一族（增删清空与「这条去哪了」）
+        std::unique_ptr<GyanisScribe::App::PickCoordinator>     m_picker;         ///< 取色这一族（遮罩、写法与字母档、最近取色）
+        std::unique_ptr<GyanisScribe::App::CaptureCoordinator>  m_capture;        ///< 截图这一族（枢纽：入口、延时、抓帧、按意图交付）
+        std::unique_ptr<GyanisScribe::App::RewindCoordinator>   m_rewind;         ///< 回溯这一族（缓冲、选择器、暂停与恢复）
+        std::unique_ptr<GyanisScribe::App::PinCoordinator>      m_pinCoordinator; ///< 贴图这一族的贴出动作（剪贴板/文件/回贴/组管理）
+        std::unique_ptr<GyanisScribe::App::DeliveryCoordinator> m_delivery;       ///< 交付这一族（装饰、落盘、外部命令、批量报告）
 
         bool m_restoringHotkeySettings = false; ///< 正在把恢复的旧组合写回配置：期间自定义键的变更通知不再重登
     };

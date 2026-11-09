@@ -14,6 +14,7 @@
 #include "Core/History/HistoryRules.h"
 #include "Core/History/HistoryStore.h"
 #include "Core/History/HistoryTypes.h"
+#include "Core/Memory/MemoryIndex.h"
 #include "Core/Ocr/OcrTypes.h"
 #include "Core/Pick/RecentColors.h"
 #include "Core/Record/RecordingSession.h"
@@ -404,8 +405,11 @@ int main(int argc, char *argv[])
     // 面 3：主窗口初始尺寸档（MainWindow 构造里 resize(680, 560)，实际被最小宽顶住，读数行会报真实值）
     {
         GyanisScribe::Core::HistoryStore history(dataDirectory / "history.json");
-        const auto                       integration = GyanisScribe::Platform::createPlatformIntegration();
-        GyanisScribe::Main::MainWindow   window(settings, theme, icons, history, integration->capabilities(), *integration);
+        // 记忆库页要一份索引：审查出图只读，落在这个临时目录里，不碰真实应用数据
+        GyanisScribe::Core::MemoryIndex memory(dataDirectory / "memory.sqlite");
+        static_cast<void>(memory.open());
+        const auto                     integration = GyanisScribe::Platform::createPlatformIntegration();
+        GyanisScribe::Main::MainWindow window(settings, theme, icons, history, memory, integration->capabilities(), *integration);
         // 这台机器有托盘：生产里动作条会被收起，审查图也要按用户实际看到的形状出
         window.setTrayMenuAvailable(true);
         window.resize(680, 560);

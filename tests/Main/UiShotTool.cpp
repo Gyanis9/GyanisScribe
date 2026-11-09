@@ -11,6 +11,7 @@
 #include "Core/Annotation/IAnnotationEngine.h"
 #include "Core/Annotation/PenParameters.h"
 #include "Core/History/HistoryStore.h"
+#include "Core/Memory/MemoryIndex.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Settings/SettingsStore.h"
@@ -79,7 +80,7 @@ namespace
      */
     QImage makeMockupDesktop()
     {
-        QImage frame{kDesktopSize, QImage::Format_ARGB32_Premultiplied};
+        QImage   frame{kDesktopSize, QImage::Format_ARGB32_Premultiplied};
         QPainter painter{&frame};
         painter.setRenderHint(QPainter::Antialiasing);
         painter.setRenderHint(QPainter::TextAntialiasing);
@@ -203,8 +204,8 @@ namespace
         const std::array<int, 6> barHeights{96, 140, 72, 168, 120, 88};
         for (std::size_t index = 0; index < barHeights.size(); ++index)
         {
-            const int barLeft  = 480 + static_cast<int>(index) * 92;
-            const int barTop   = 524 - barHeights[index];
+            const int  barLeft = 480 + static_cast<int>(index) * 92;
+            const int  barTop  = 524 - barHeights[index];
             const bool accent  = barHeights[index] == 168;
             painter.setBrush(accent ? QColor{0x46, 0x78, 0x4f} : QColor{0xc9, 0xc3, 0xb8});
             painter.drawRoundedRect(barLeft, barTop, 44, barHeights[index], 4, 4);
@@ -235,7 +236,7 @@ namespace
         using GyanisScribe::Core::ToolKind;
 
         const PenParameters red{.color = QColor{222, 56, 46}, .lineWidth = 3, .fontSize = 18};
-        const auto drawStroke = [&engine](const ToolKind tool, const PenParameters &pen, const QPoint &from, const QPoint &to)
+        const auto          drawStroke = [&engine](const ToolKind tool, const PenParameters &pen, const QPoint &from, const QPoint &to)
         {
             if (!engine.setActiveTool(tool).has_value() || !engine.setPenParameters(pen).has_value())
             {
@@ -333,11 +334,14 @@ int main(int argc, char *argv[])
     GyanisScribe::Gui::IconProvider  icons;
     GyanisScribe::Gui::ThemeManager  theme(settings);
     GyanisScribe::Core::HistoryStore history(dataDirectory / "history.json");
-    const auto                       integration = GyanisScribe::Platform::createPlatformIntegration();
+    // 记忆库页要一份索引：出图只读，落在这个临时目录里，不碰真实应用数据
+    GyanisScribe::Core::MemoryIndex memory(dataDirectory / "memory.sqlite");
+    static_cast<void>(memory.open());
+    const auto integration = GyanisScribe::Platform::createPlatformIntegration();
     // 样式表要落一次：真实程序里这一步在 AppController 构造里做，这里没有控制器
     theme.applyFromSettings();
 
-    GyanisScribe::Main::MainWindow window(settings, theme, icons, history, integration->capabilities(), *integration);
+    GyanisScribe::Main::MainWindow window(settings, theme, icons, history, memory, integration->capabilities(), *integration);
     window.resize(1000, 680);
 
     for (const auto &shot: kShots)
@@ -373,7 +377,7 @@ int main(int argc, char *argv[])
     // 截图遮罩：拖到一半的现场（选区、三分网格与放大镜读数都在），事件直接投给控件，不碰真鼠标
     {
         GyanisScribe::Gui::CaptureOverlay overlay{mockup, QRect{QPoint{0, 0}, kDesktopSize}, 1.0, settings};
-        const auto sendMouse = [&overlay](const QEvent::Type type, const QPoint &local, const Qt::MouseButton button, const Qt::MouseButtons buttons)
+        const auto                        sendMouse = [&overlay](const QEvent::Type type, const QPoint &local, const Qt::MouseButton button, const Qt::MouseButtons buttons)
         {
             QMouseEvent event{type, QPointF{local}, QPointF{local}, button, buttons, Qt::KeyboardModifiers{}};
             QApplication::sendEvent(&overlay, &event);
@@ -390,14 +394,14 @@ int main(int argc, char *argv[])
 
     // 标注窗：走一遍真开局（startAnnotation），再落示例标注；工具栏是独立浮窗，与窗口分别 render 进桌面底图
     {
-        GyanisScribe::Core::AnnotationEngine    engine;
-        GyanisScribe::Gui::AnnotationWindow     annotationWindow{engine, settings, std::make_unique<GyanisScribe::Gui::AnnotationToolbar>(settings, icons)};
-        GyanisScribe::Base::CapturedImage       captured;
-        captured.image                          = mockup.copy(kMockupWindow);
-        captured.logicalSize                    = kMockupWindow.size();
-        captured.devicePixelRatio               = 1.0;
-        captured.screenName                     = QStringLiteral("UiShot");
-        captured.logicalRegion                  = kMockupWindow;
+        GyanisScribe::Core::AnnotationEngine engine;
+        GyanisScribe::Gui::AnnotationWindow  annotationWindow{engine, settings, std::make_unique<GyanisScribe::Gui::AnnotationToolbar>(settings, icons)};
+        GyanisScribe::Base::CapturedImage    captured;
+        captured.image            = mockup.copy(kMockupWindow);
+        captured.logicalSize      = kMockupWindow.size();
+        captured.devicePixelRatio = 1.0;
+        captured.screenName       = QStringLiteral("UiShot");
+        captured.logicalRegion    = kMockupWindow;
         annotationWindow.startAnnotation(captured, QRect{0, 0, kDesktopSize.width(), 760}, kMockupWindow);
         if (!drawSampleAnnotations(engine))
         {
@@ -405,7 +409,7 @@ int main(int argc, char *argv[])
             return 1;
         }
         QCoreApplication::processEvents();
-        QPixmap shot = QPixmap::fromImage(mockup);
+        QPixmap  shot = QPixmap::fromImage(mockup);
         QPainter painter{&shot};
         annotationWindow.render(&painter, annotationWindow.pos());
         annotationWindow.toolbar().render(&painter, annotationWindow.toolbar().pos());
@@ -423,7 +427,7 @@ int main(int argc, char *argv[])
         cardPin.move(120, 520);
         chartPin.move(742, 430);
         QCoreApplication::processEvents();
-        QPixmap shot = QPixmap::fromImage(mockup);
+        QPixmap  shot = QPixmap::fromImage(mockup);
         QPainter painter{&shot};
         cardPin.render(&painter, cardPin.pos());
         chartPin.render(&painter, chartPin.pos());

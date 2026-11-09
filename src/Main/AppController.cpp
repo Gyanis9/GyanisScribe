@@ -7,6 +7,7 @@
 #include "App/ClipboardPin.h"
 #include "App/CustomHotkeys.h"
 #include "App/HistoryCoordinator.h"
+#include "App/MemoryCoordinator.h"
 #include "App/DeliveryCoordinator.h"
 #include "App/CaptureCoordinator.h"
 #include "App/RewindCoordinator.h"
@@ -30,6 +31,7 @@
 #include "Core/History/HistoryStore.h"
 #include "Core/History/HistoryTypes.h"
 #include "Core/History/UnsavedArchive.h"
+#include "Core/Memory/MemoryIndex.h"
 #include "Core/Hotkey/HotkeyManager.h"
 #include "Core/Hotkey/IHotkeyManager.h"
 #include "Core/Pick/ColorFormat.h"
@@ -52,15 +54,20 @@
 
 #include <QApplication>
 #include <QClipboard>
+#include <QDesktopServices>
 #include <QDialog>
+#include <QDir>
+#include <QFileDialog>
 #include <QFileInfo>
 #include <QCursor>
 #include <QGuiApplication>
+#include <QMessageBox>
 #include <QMimeData>
 #include <QPageLayout>
 #include <QPainter>
 #include <QPrintDialog>
 #include <QPrinter>
+#include <QPushButton>
 #include <QScopeGuard>
 #include <QScreen>
 #include <QCoreApplication>
@@ -105,13 +112,14 @@ namespace GyanisScribe::Main
         AppController(parts.settings ? std::move(parts.settings) : createSettingsStore(),
                       parts.integration ? std::move(parts.integration) : GyanisScribe::Platform::createPlatformIntegration(),
                       parts.captureSource ? std::move(parts.captureSource) : GyanisScribe::Plugins::createScreenCaptureSource(),
-                      parts.historyStoragePath.empty() ? GyanisScribe::Core::HistoryStore::defaultStoragePath() : std::move(parts.historyStoragePath), restorePins, parent)
+                      parts.historyStoragePath.empty() ? GyanisScribe::Core::HistoryStore::defaultStoragePath() : std::move(parts.historyStoragePath),
+                      parts.memoryStoragePath.empty() ? GyanisScribe::Core::MemoryIndex::defaultStoragePath() : std::move(parts.memoryStoragePath), restorePins, parent)
     {
     }
 
     AppController::AppController(std::unique_ptr<GyanisScribe::Core::SettingsStore> settings, std::unique_ptr<GyanisScribe::Platform::IPlatformIntegration> integration,
-                                 std::unique_ptr<GyanisScribe::Core::IScreenCaptureSource> captureSource, std::filesystem::path historyStoragePath, const bool restorePins,
-                                 QObject *parent) :
+                                 std::unique_ptr<GyanisScribe::Core::IScreenCaptureSource> captureSource, std::filesystem::path historyStoragePath,
+                                 std::filesystem::path memoryStoragePath, const bool restorePins, QObject *parent) :
         QObject(parent), m_settings(std::move(settings)), m_integration(std::move(integration)), m_captureSource(std::move(captureSource))
     {
         // 语言要排在所有界面对象之前：translator 装晚了，已经建好的控件仍然拿源码文案
@@ -142,8 +150,7 @@ namespace GyanisScribe::Main
         // 焦点环覆盖层排在主题之后：析构顺序反过来，它先于主题消失，绘制时读到的色板始终有效
         m_focusRing = std::make_unique<GyanisScribe::Gui::FocusRingController>([this] { return m_theme->palette(); });
         m_focusRing->setThemeKind(m_theme->resolvedKind());
-        QObject::connect(m_theme.get(), &GyanisScribe::Gui::ThemeManager::themeChanged, m_focusRing.get(),
-                         [this] { m_focusRing->setThemeKind(m_theme->resolvedKind()); });
+        QObject::connect(m_theme.get(), &GyanisScribe::Gui::ThemeManager::themeChanged, m_focusRing.get(), [this] { m_focusRing->setThemeKind(m_theme->resolvedKind()); });
         qApp->installEventFilter(m_focusRing.get());
 
         // 标注一套：引擎跨轮次复用（载入新帧自己会清空历史），窗口与工具栏也只建一次
@@ -167,13 +174,105 @@ namespace GyanisScribe::Main
                          [](const GyanisScribe::Base::Error &error) { GyanisScribe::Base::Logger::error(std::format("隐私扫描失败：{}", error.message)); });
         m_tray         = std::make_unique<GyanisScribe::App::TrayController>(*m_icons, *m_theme, *m_settings, *m_integration);
         m_historyStore = std::make_unique<GyanisScribe::Core::HistoryStore>(std::move(historyStoragePath));
-        m_mainWindow   = std::make_unique<MainWindow>(*m_settings, *m_theme, *m_icons, *m_historyStore, m_integration->capabilities(), *m_integration);
+        // 记忆协调器要排在主窗口之前：窗口的「记忆库」页拿索引的引用。这时还不 start()，
+        // 等窗口与信号都接好再开库，免得启动期的通知打在还没接线的页上
+        m_memory     = std::make_unique<GyanisScribe::App::MemoryCoordinator>(*m_settings, *m_integration, std::move(memoryStoragePath));
+        m_mainWindow = std::make_unique<MainWindow>(*m_settings, *m_theme, *m_icons, *m_historyStore, m_memory->index(), m_integration->capabilities(), *m_integration);
         // 历史这一族整族搬进了 HistoryCoordinator：清单本体仍由这里持有并与主窗口共享，
         // 协调器只拿引用；「清单变了要刷新窗口」由 changed() 回到这一层接——它不能自己去叫 Main，
         // 那会让 App 层反向依赖 Main，而 Main 本来就依赖 App
         m_history = std::make_unique<GyanisScribe::App::HistoryCoordinator>(*m_historyStore, *m_settings);
         QObject::connect(m_history.get(), &GyanisScribe::App::HistoryCoordinator::messageForUser, this, &AppController::notifyUser);
         QObject::connect(m_history.get(), &GyanisScribe::App::HistoryCoordinator::changed, this, [this] { m_mainWindow->refreshHistory(); });
+        // 历史是记忆库的来路：一条截图进了历史才建索引；删一条或清空按同一条口径删索引行。
+        // 只认截图：录屏成品不是「主动截的图」，不进记忆库
+        QObject::connect(
+                m_history.get(), &GyanisScribe::App::HistoryCoordinator::recorded, this,
+                [this](const std::filesystem::path &filePath, const GyanisScribe::Core::HistoryKind kind, const QSize &size, const GyanisScribe::Core::CaptureSourceInfo &source)
+                {
+                    if (kind != GyanisScribe::Core::HistoryKind::Screenshot)
+                    {
+                        return;
+                    }
+                    m_memory->noteScreenshot(filePath, size, source);
+                });
+        QObject::connect(m_history.get(), &GyanisScribe::App::HistoryCoordinator::removed, m_memory.get(), &GyanisScribe::App::MemoryCoordinator::removePath);
+        QObject::connect(m_history.get(), &GyanisScribe::App::HistoryCoordinator::cleared, m_memory.get(), &GyanisScribe::App::MemoryCoordinator::clearCaptureEntries);
+
+        // 记忆库的状态与动作：状态从协调器推到窗口，动作从窗口交回协调器；两边都不认识对方的内部
+        QObject::connect(m_memory.get(), &GyanisScribe::App::MemoryCoordinator::messageForUser, this, &AppController::notifyUser);
+        QObject::connect(m_memory.get(), &GyanisScribe::App::MemoryCoordinator::changed, m_mainWindow.get(), &MainWindow::refreshMemory);
+        // 统计与列表同一次刷新：页脚读数不能比列表晚一拍，否则删完最后一条时阅读区是空的、页脚还写着 1
+        QObject::connect(m_memory.get(), &GyanisScribe::App::MemoryCoordinator::statsChanged, m_mainWindow.get(), &MainWindow::refreshMemory);
+        QObject::connect(m_memory.get(), &GyanisScribe::App::MemoryCoordinator::databaseError, m_mainWindow.get(), &MainWindow::setMemoryDatabaseError);
+        QObject::connect(m_memory.get(), &GyanisScribe::App::MemoryCoordinator::ocrAvailabilityChanged, m_mainWindow.get(), &MainWindow::setMemoryOcrAvailability);
+        QObject::connect(m_memory.get(), &GyanisScribe::App::MemoryCoordinator::importProgress, m_mainWindow.get(), &MainWindow::setMemoryImportProgress);
+        QObject::connect(m_memory.get(), &GyanisScribe::App::MemoryCoordinator::importFinished, m_mainWindow.get(), &MainWindow::hideMemoryImportProgress);
+        QObject::connect(m_memory.get(), &GyanisScribe::App::MemoryCoordinator::consentRequested, this, &AppController::showMemoryConsent);
+        QObject::connect(m_mainWindow.get(), &MainWindow::memoryPinRequested, m_history.get(), &GyanisScribe::App::HistoryCoordinator::requestPin);
+        QObject::connect(m_mainWindow.get(), &MainWindow::memoryOpenFolderRequested, m_history.get(), &GyanisScribe::App::HistoryCoordinator::openContainingFolder);
+        QObject::connect(m_mainWindow.get(), &MainWindow::memoryOpenFileRequested, this,
+                         [this](const std::filesystem::path &filePath)
+                         {
+                             if (!QDesktopServices::openUrl(QUrl::fromLocalFile(QString::fromStdWString(filePath.wstring()))))
+                             {
+                                 notifyUser(GyanisScribe::Base::uiText("打不开这个文件：它可能已被移动或删除。请刷新记忆库后再试"), GyanisScribe::Gui::ToastKind::Danger);
+                             }
+                         });
+        QObject::connect(m_mainWindow.get(), &MainWindow::memoryRetryOcrRequested, m_memory.get(), &GyanisScribe::App::MemoryCoordinator::retryOcr);
+        // 视图只发主键：按主键找回路径再删，删除口径与历史那一路同为「按路径删行」
+        QObject::connect(m_mainWindow.get(), &MainWindow::memoryRemoveRequested, this,
+                         [this](const qint64 id)
+                         {
+                             const auto found = m_memory->index().findById(id);
+                             if (!found || !found->has_value())
+                             {
+                                 return;
+                             }
+                             m_memory->removePath((**found).filePath);
+                         });
+        // 文件对话框要人点：选好目录以后的那一段在 importMemoryFolder 里，用例直接驱动那里
+        QObject::connect(m_mainWindow.get(), &MainWindow::memoryImportRequested, this,
+                         [this]
+                         {
+                             const auto picked = QFileDialog::getExistingDirectory(m_mainWindow.get(), GyanisScribe::Base::uiText("导入旧截图"), QDir::homePath());
+                             if (picked.isEmpty())
+                             {
+                                 return;
+                             }
+                             importMemoryFolder(GyanisScribe::Base::Paths::fromDisplayText(picked));
+                         });
+        // 清空的确认框在记忆视图那一侧已经点过：这里收到的是确认之后的请求
+        QObject::connect(m_mainWindow.get(), &MainWindow::memoryClearRequested, m_memory.get(), &GyanisScribe::App::MemoryCoordinator::clearAll);
+        QObject::connect(m_mainWindow.get(), &MainWindow::memoryExcludeRequested, this,
+                         [this](QStringList processes)
+                         {
+                             m_memory->setExcludedProcesses(processes);
+                             // 协调器保存前会归一（去 .exe、小写、去重），回给视图的是归一后的那一份
+                             m_mainWindow->setMemoryExcludedProcesses(m_memory->excludedProcesses());
+                         });
+        QObject::connect(m_mainWindow.get(), &MainWindow::memoryEnableRequested, this,
+                         [this]
+                         {
+                             m_memory->setEnabled(true);
+                             m_mainWindow->setMemoryEnabled(true);
+                         });
+        QObject::connect(m_mainWindow.get(), &MainWindow::memoryRebuildRequested, m_memory.get(), &GyanisScribe::App::MemoryCoordinator::rebuildIndex);
+        QObject::connect(m_mainWindow.get(), &MainWindow::memoryImportCancelRequested, m_memory.get(), &GyanisScribe::App::MemoryCoordinator::cancelImport);
+        QObject::connect(m_mainWindow.get(), &MainWindow::memoryEnabledToggled, this,
+                         [this](const bool enabled)
+                         {
+                             m_memory->setEnabled(enabled);
+                             // 协调器落账后把勾选与横幅摆回同一状态：写失败时界面不能比配置更乐观
+                             m_mainWindow->setMemoryEnabled(m_memory->isEnabled());
+                         });
+
+        // 启动状态先摆一次：勾选、横幅与排除名单都不从协调器的私有字段里猜
+        m_mainWindow->setMemoryEnabled(m_memory->isEnabled());
+        m_mainWindow->setMemoryExcludedProcesses(m_memory->excludedProcesses());
+        m_mainWindow->setMemoryOcrAvailability(true, QString{});
+        // 窗口与信号都接完再开库：start() 里的 pruneMissing、统计与待识别恢复都会发信号
+        m_memory->start();
         // 交付这一族也搬进了协调器：控制器只留提示与「命令行那条会话状态」的接线
         m_delivery = std::make_unique<GyanisScribe::App::DeliveryCoordinator>(*m_settings, *m_history);
         QObject::connect(m_delivery.get(), &GyanisScribe::App::DeliveryCoordinator::messageForUser, this, &AppController::notifyUser);
@@ -449,6 +548,11 @@ namespace GyanisScribe::Main
 
     void AppController::openMainWindow(const MainWindowPage page)
     {
+        if (page == MainWindowPage::Memory)
+        {
+            // 打开这一页那一下顺手清掉原图已不在的行：导入的文件被移动或删除之后只剩一张空卡
+            m_memory->pruneMissing();
+        }
         m_mainWindow->open(page);
     }
 
@@ -456,6 +560,12 @@ namespace GyanisScribe::Main
     {
         // 取色这一族在 PickCoordinator 里，这里只转发：Application 那条命令行 --pick 入口认的是控制器
         m_picker->start();
+    }
+
+    void AppController::importMemoryFolder(const std::filesystem::path &directory)
+    {
+        // 导入这一族在 MemoryCoordinator 里，这里只转发：文件对话框选好目录之后走的也是这一条
+        m_memory->importFolder(directory);
     }
 
     void AppController::startCommandLineCapture(const GyanisScribe::App::CommandLineRequest &request)
@@ -581,6 +691,11 @@ namespace GyanisScribe::Main
         return *m_history;
     }
 
+    GyanisScribe::App::MemoryCoordinator &AppController::memoryCoordinatorForTesting() const noexcept
+    {
+        return *m_memory;
+    }
+
     void AppController::handleHotkeyActionForTesting(const GyanisScribe::Core::HotkeyAction action)
     {
         // 与热键层那条信号走同一段分派：门禁分支只在这一处判，用例不另抄一份
@@ -643,6 +758,31 @@ namespace GyanisScribe::Main
         }
         // 气泡还没建起来的那一段（构造早期）不该把话吞掉：日志是兜底出口
         GyanisScribe::Base::Logger::info(std::format("提示：{}", message.toStdString()));
+    }
+
+    void AppController::showMemoryConsent()
+    {
+        QMessageBox box{m_mainWindow.get()};
+        box.setWindowTitle(GyanisScribe::Base::uiText("开启截图记忆？"));
+        box.setIcon(QMessageBox::Question);
+        // 四条分行的承诺：挤成一段长句时，读的人只会扫到第一行
+        QStringList lines;
+        lines << GyanisScribe::Base::uiText("只索引你主动截的图");
+        lines << GyanisScribe::Base::uiText("只在本机");
+        lines << GyanisScribe::Base::uiText("不上传、不录屏");
+        lines << GyanisScribe::Base::uiText("可随时关闭并清空");
+        box.setText(lines.join(QChar{u'\n'}));
+
+        auto *enableButton  = box.addButton(GyanisScribe::Base::uiText("开启记忆"), QMessageBox::AcceptRole);
+        auto *declineButton = box.addButton(GyanisScribe::Base::uiText("暂不"), QMessageBox::RejectRole);
+        // 默认与 Esc 都落在「暂不」：顺手回车或按 Esc 不该替用户打开一个索引本机屏幕内容的库
+        box.setDefaultButton(declineButton);
+        box.setEscapeButton(declineButton);
+        box.exec();
+
+        const bool enabled = box.clickedButton() == enableButton;
+        m_memory->resolveConsent(enabled);
+        m_mainWindow->setMemoryEnabled(enabled);
     }
 
 } // namespace GyanisScribe::Main

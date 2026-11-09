@@ -10,6 +10,8 @@
 #include "Core/Capture/ScreenUtils.h"
 #include "Core/History/HistoryRules.h"
 #include "Core/History/HistoryStore.h"
+#include "Core/Memory/MemoryIndex.h"
+#include "Gui/Memory/MemoryView.h"
 #include "Core/Pin/PinLayout.h"
 #include "Core/Pin/PinTransform.h"
 #include "Core/Pick/PickGeometry.h"
@@ -39,9 +41,9 @@
 
 #include <gtest/gtest.h>
 
+using GyanisScribe::App::UpdateVerdict;
 using GyanisScribe::Main::screenCaptureLabels;
 using GyanisScribe::Main::updateStatusHtml;
-using GyanisScribe::App::UpdateVerdict;
 
 #include <QAbstractButton>
 #include <QAbstractItemView>
@@ -150,8 +152,10 @@ namespace
 
             m_icons        = std::make_unique<IconProvider>();
             m_historyStore = std::make_unique<HistoryStore>(m_directory / "history.json");
-            m_store        = makeStore();
-            m_theme        = std::make_unique<ThemeManager>(*m_store);
+            m_memoryIndex  = std::make_unique<GyanisScribe::Core::MemoryIndex>(m_directory / "memory.sqlite");
+            ASSERT_TRUE(m_memoryIndex->open().has_value()) << "记忆索引没在临时目录里打开：这一组用例不许碰真实应用数据目录";
+            m_store = makeStore();
+            m_theme = std::make_unique<ThemeManager>(*m_store);
             // 生产里 AppController 先落主题再建窗口，QPalette 与 activePalette 同源于 ThemePalette；
             // 这一份装置也照这个次序起，否则自绘面按 Light 铺底、标签却还拿系统原生档的文字色
             m_theme->applyFromSettings();
@@ -165,6 +169,8 @@ namespace
             m_store.reset();
             m_historyStore.reset();
             m_icons.reset();
+            // 索引排最后：窗口与记忆页只借它的引用，反过来会让连接落在已析构的库上
+            m_memoryIndex.reset();
             std::filesystem::remove_all(m_directory);
         }
 
@@ -181,7 +187,7 @@ namespace
             m_integration                = GyanisScribe::Platform::createPlatformIntegration();
             m_capabilities               = GyanisScribe::Platform::PlatformCapabilities{};
             m_capabilities.globalHotkeys = globalHotkeys;
-            m_window                     = std::make_unique<MainWindow>(*m_store, *m_theme, *m_icons, *m_historyStore, m_capabilities, *m_integration);
+            m_window                     = std::make_unique<MainWindow>(*m_store, *m_theme, *m_icons, *m_historyStore, *m_memoryIndex, m_capabilities, *m_integration);
             m_window->setAttribute(Qt::WA_DontShowOnScreen);
         }
 
@@ -232,12 +238,13 @@ namespace
             return {};
         }
 
-        std::filesystem::path          m_directory;
-        std::unique_ptr<IconProvider>  m_icons;
-        std::unique_ptr<HistoryStore>  m_historyStore;
-        std::unique_ptr<SettingsStore> m_store;
-        std::unique_ptr<ThemeManager>  m_theme;
-        std::unique_ptr<MainWindow>    m_window;
+        std::filesystem::path                            m_directory;
+        std::unique_ptr<IconProvider>                    m_icons;
+        std::unique_ptr<HistoryStore>                    m_historyStore;
+        std::unique_ptr<GyanisScribe::Core::MemoryIndex> m_memoryIndex; ///< 记忆库页的索引，落在本用例的临时目录里
+        std::unique_ptr<SettingsStore>                   m_store;
+        std::unique_ptr<ThemeManager>                    m_theme;
+        std::unique_ptr<MainWindow>                      m_window;
         /// 建窗口时那份能力表，动作条的用例按它算出预期条目
         GyanisScribe::Platform::PlatformCapabilities                  m_capabilities;
         std::unique_ptr<GyanisScribe::Platform::IPlatformIntegration> m_integration; ///< 平台动作（开机启动那一格要真对象）
@@ -275,7 +282,7 @@ namespace
 
         // 「这一类有什么」的用词取自界面里的无障碍名，不是从配置键推的：读的人要能对着窗口核对
         const std::vector<Expectation> expectations = {
-                Expectation{MainWindowPage::General, {"界面语言", "历史最多留多少条", "历史最久留多少天", "左键单击", "中键单击", "导出配置", "导入配置"}, true},
+                Expectation{MainWindowPage::General, {"界面语言", "历史最多留多少条", "历史最久留多少天", "截图记忆", "左键单击", "中键单击", "导出配置", "导入配置"}, true},
                 Expectation{MainWindowPage::Capture,
                             {"截完之后", "延时截图", "截图目录", "颜色写法", "不参与窗口检测的程序", "自动保存所有截图", "截图音效", "成品加边框", "成品加投影"},
                             true},
@@ -289,6 +296,7 @@ namespace
                 Expectation{MainWindowPage::Theme, {"主题"}, true},
                 Expectation{MainWindowPage::About, {"智录图标"}, false},
                 Expectation{MainWindowPage::History, {"历史列表"}, false},
+                Expectation{MainWindowPage::Memory, {"记忆库搜索", "按应用筛选", "按时间筛选", "合并重复图", "导入旧截图", "记忆结果", "记忆库统计"}, false},
         };
         ASSERT_EQ(expectations.size(), table.size()) << "新增一页要在这里也登记它该有什么";
 
@@ -307,6 +315,74 @@ namespace
                 EXPECT_NE(controlInCurrentPage(controlName), nullptr) << "第 " << index << " 页里没有「" << std::string{controlName} << "」";
             }
         }
+    }
+
+    /**
+     * @brief 钉住记忆库是历史之后的新一页，且关闭功能时页面上留着「开启记忆」的入口
+     * @details 导航表的顺序就是堆叠页的顺序：记忆库插在历史前面会让「点历史、看记忆」。
+     *          关闭状态还要看得到启用按钮，否则用户从设置页关掉之后就再也找不到开回来的地方。
+     */
+    TEST_F(MainWindowFixture, MemoryPageFollowsHistoryAndShowsTheEnableEntryWhenOff)
+    {
+        makeWindow();
+        const auto table = pageChoices();
+        ASSERT_EQ(table.size(), 11u) << "记忆库要作为第 11 页出现在导航表里";
+
+        const auto memoryAt  = GyanisScribe::Main::indexOfMainWindowPage(MainWindowPage::Memory);
+        const auto historyAt = GyanisScribe::Main::indexOfMainWindowPage(MainWindowPage::History);
+        ASSERT_GE(memoryAt, 0) << "导航表里没有记忆库";
+        ASSERT_GE(historyAt, 0) << "导航表里没有历史";
+        EXPECT_EQ(memoryAt, historyAt + 1) << "记忆库没有紧跟历史";
+        EXPECT_EQ(toQString(table[static_cast<std::size_t>(memoryAt)].label), QStringLiteral("记忆库"));
+        EXPECT_EQ(toQString(table[static_cast<std::size_t>(memoryAt)].icon), QStringLiteral("History")) << "复用已有图标，不另造资源";
+
+        ASSERT_NE(nav(), nullptr);
+        ASSERT_NE(stack(), nullptr);
+        ASSERT_EQ(nav()->count(), 11);
+        EXPECT_EQ(nav()->item(memoryAt)->text(), QStringLiteral("记忆库"));
+
+        m_window->open(MainWindowPage::Memory);
+        EXPECT_EQ(stack()->currentIndex(), memoryAt);
+        EXPECT_TRUE(stack()->currentWidget()->isVisible()) << "打开记忆库页后它没有显示";
+        EXPECT_NE(stack()->currentWidget()->findChild<GyanisScribe::Gui::MemoryView *>(), nullptr) << "记忆库页里没有记忆视图";
+
+        m_window->setMemoryEnabled(false);
+        auto *enable = m_window->findChild<QPushButton *>(QStringLiteral("memoryEnable"));
+        ASSERT_NE(enable, nullptr) << "记忆视图里没有开启按钮";
+        EXPECT_TRUE(enable->isVisible()) << "关闭功能后启用入口应当露出来";
+        m_window->setMemoryEnabled(true);
+        EXPECT_FALSE(enable->isVisible()) << "开启后横幅上的启用按钮应当收起";
+    }
+
+    /**
+     * @brief 钉住通用页的「截图记忆」勾选与功能状态双向同步，并且不动 QWidget::setEnabled
+     * @details 勾选是给用户看的开关，不是禁用整页：用 setEnabled 改名前的名字会把这一页整片灰掉。
+     *          设置器回写勾选时不许再发 memoryEnabledToggled，否则控制器会收到一个自己造成的回声。
+     */
+    TEST_F(MainWindowFixture, MemoryToggleFollowsTheFeatureStateWithoutEcho)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::General);
+        auto *toggle = qobject_cast<QCheckBox *>(controlInCurrentPage("截图记忆"));
+        ASSERT_NE(toggle, nullptr) << "通用页没有「截图记忆」勾选";
+        EXPECT_FALSE(toggle->isChecked()) << "默认档是关";
+        EXPECT_TRUE(toggle->isEnabled()) << "功能开关不该把整页禁用";
+
+        int  toggles   = 0;
+        bool lastValue = true;
+        QObject::connect(m_window.get(), &MainWindow::memoryEnabledToggled, m_window.get(),
+                         [&toggles, &lastValue](const bool enabled)
+                         {
+                             ++toggles;
+                             lastValue = enabled;
+                         });
+        m_window->setMemoryEnabled(true);
+        EXPECT_TRUE(toggle->isChecked()) << "设置器没把勾选摆到位";
+        EXPECT_EQ(toggles, 0) << "设置器回写勾选时不该再发用户改动";
+
+        toggle->setChecked(false);
+        ASSERT_EQ(toggles, 1) << "用户取消勾选时没有发 memoryEnabledToggled";
+        EXPECT_FALSE(lastValue);
     }
 
     /**
@@ -2075,8 +2151,7 @@ TEST_F(MainWindowFixture, ClearingPathRowShowsTheDefaultDirectory)
     EXPECT_EQ(edit->text(), defaultText) << "清空后没有回到默认目录：默认值可能读自已经销毁的临时 path";
     // 先落盘再读键表：INI 后端会把待删除的键留到冲刷之后才从 allKeys 里消失
     m_store->sync();
-    EXPECT_EQ(m_store->stringValue(GyanisScribe::Core::kPathScreenshot, QStringLiteral("missing")), QStringLiteral("missing"))
-            << "删键之后仍能读出原来的目录，清空没有真正落地";
+    EXPECT_EQ(m_store->stringValue(GyanisScribe::Core::kPathScreenshot, QStringLiteral("missing")), QStringLiteral("missing")) << "删键之后仍能读出原来的目录，清空没有真正落地";
     EXPECT_FALSE(m_store->allKeys().contains(screenshotKey)) << "清空写成了空串而不是删键：读取端会把这条空文本当坏值记警告；现存键："
                                                              << m_store->allKeys().join(QStringLiteral("、")).toStdString();
 }

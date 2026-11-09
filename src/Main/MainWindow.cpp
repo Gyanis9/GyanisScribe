@@ -14,6 +14,7 @@
 #include "Base/Text.h"
 #include "Core/History/HistoryRules.h"
 #include "Gui/History/HistoryView.h"
+#include "Gui/Memory/MemoryView.h"
 #include "Core/History/UnsavedArchive.h"
 #include "Plugins/OcrEngines/OcrEngineFactory.h"
 #include "Core/Pick/ColorFormat.h"
@@ -75,6 +76,7 @@
 #include <filesystem>
 #include <format>
 #include <string>
+#include <utility>
 namespace
 {
     using GyanisScribe::Base::Expected;
@@ -98,12 +100,19 @@ namespace
     namespace Core = GyanisScribe::Core;
 
     /// 主窗口的全部页：序号、目标页、导航行标签与图标绑在同一张表上，表的顺序就是导航的顺序
-    constexpr std::array<PageChoice, 10> kPages = {
-            PageChoice{MainWindowPage::General, "通用", "Settings"},      PageChoice{MainWindowPage::Capture, "截图", "Capture"},
-            PageChoice{MainWindowPage::Annotation, "标注", "Annotation"}, PageChoice{MainWindowPage::Pin, "贴图", "Pin"},
-            PageChoice{MainWindowPage::Record, "录屏", "Record"},         PageChoice{MainWindowPage::Ocr, "文字识别", "Ocr"},
-            PageChoice{MainWindowPage::Hotkey, "快捷键", "Hotkey"},       PageChoice{MainWindowPage::Theme, "主题", "Theme"},
-            PageChoice{MainWindowPage::About, "关于", "About"},           PageChoice{MainWindowPage::History, "历史", "History"},
+    constexpr std::array<PageChoice, 11> kPages = {
+            PageChoice{MainWindowPage::General, "通用", "Settings"},
+            PageChoice{MainWindowPage::Capture, "截图", "Capture"},
+            PageChoice{MainWindowPage::Annotation, "标注", "Annotation"},
+            PageChoice{MainWindowPage::Pin, "贴图", "Pin"},
+            PageChoice{MainWindowPage::Record, "录屏", "Record"},
+            PageChoice{MainWindowPage::Ocr, "文字识别", "Ocr"},
+            PageChoice{MainWindowPage::Hotkey, "快捷键", "Hotkey"},
+            PageChoice{MainWindowPage::Theme, "主题", "Theme"},
+            PageChoice{MainWindowPage::About, "关于", "About"},
+            PageChoice{MainWindowPage::History, "历史", "History"},
+            // 记忆库紧跟历史：两者都是「截过什么」的去处，复用历史那枚图标，不为此新增资源
+            PageChoice{MainWindowPage::Memory, "记忆库", "History"},
     };
 
     /// 下拉框的全部行：序号、档位、可见标签三者绑在这一张表上
@@ -1578,8 +1587,8 @@ namespace GyanisScribe::Main
     QString updateStatusHtml(const GyanisScribe::App::UpdateVerdict &verdict)
     {
         const auto message = verdict.message.toHtmlEscaped();
-        const QUrl   link{verdict.link};
-        const auto   scheme = link.scheme();
+        const QUrl link{verdict.link};
+        const auto scheme = link.scheme();
         if (!link.isValid() || link.host().isEmpty() || (scheme != QStringLiteral("http") && scheme != QStringLiteral("https")))
         {
             // 不是能交给系统浏览器的地址就当纯文本：硬套一个 <a> 只会多出一个点了没反应的链接
@@ -1606,11 +1615,12 @@ namespace GyanisScribe::Main
     }
 
     MainWindow::MainWindow(GyanisScribe::Core::ISettingsStore &settings, GyanisScribe::Gui::ThemeManager &theme, GyanisScribe::Gui::IconProvider &icons,
-                           GyanisScribe::Core::HistoryStore &historyStore, GyanisScribe::Platform::PlatformCapabilities capabilities,
+                           GyanisScribe::Core::HistoryStore &historyStore, GyanisScribe::Core::MemoryIndex &memoryIndex, GyanisScribe::Platform::PlatformCapabilities capabilities,
                            GyanisScribe::Platform::IPlatformIntegration &integration, QWidget *parent) :
         QWidget(parent), m_settings(settings), m_theme(theme), m_icons(icons), m_capabilities(capabilities),
         m_audioDevices(std::make_unique<GyanisScribe::Plugins::FfmpegAudioDeviceEnumerator>()),
-        m_videoEncoders(std::make_unique<GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator>()), m_integration(integration), m_historyStore(historyStore)
+        m_videoEncoders(std::make_unique<GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator>()), m_integration(integration), m_historyStore(historyStore),
+        m_memoryIndex(memoryIndex)
     {
         setWindowTitle(GyanisScribe::Base::uiText("智录 设置"));
         setWindowIcon(icons.brandIcon());
@@ -1889,6 +1899,8 @@ namespace GyanisScribe::Main
                 return buildAboutPage();
             case MainWindowPage::History:
                 return buildHistoryPage();
+            case MainWindowPage::Memory:
+                return buildMemoryPage();
         }
         return nullptr;
     }
@@ -2088,8 +2100,7 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildGeneralPage()
     {
-        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
-                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
         auto *form =
                 makePageForm(page, GyanisScribe::Base::uiText("界面语言决定菜单、托盘提示与这些设置页的措辞，切换后要重启智录才生效。下面两格管历史留多少，填到 0 就是不限。"));
@@ -2110,6 +2121,15 @@ namespace GyanisScribe::Main
                                                                                    "勾上后每张截图都在程序数据目录里留一份像素，误触 Esc 丢掉的那一张也还在历史里（最多留 {} 张）"),
                                                                            static_cast<int>(GyanisScribe::Core::kUnsavedArchiveCapacity))
                                                       .c_str())));
+        // 记忆库的功能开关摆在历史那几格旁边：两者都是「截过的图去哪了」。
+        // 它只是功能开关，不是整页禁用——用 QWidget::setEnabled 会把开回来的入口一起灰掉
+        m_memoryToggle = new GyanisScribe::Gui::CheckBox;
+        m_memoryToggle->setText(GyanisScribe::Base::uiText("截图记忆：只索引我主动截的图"));
+        m_memoryToggle->setAccessibleName(GyanisScribe::Base::uiText("截图记忆"));
+        m_memoryToggle->setToolTip(GyanisScribe::Base::uiText("开启后只把你主动截的图里的文字与来源记进本机索引，不上传；可随时关掉，已有索引仍可搜索，也可以清空"));
+        m_memoryToggle->setChecked(m_memoryEnabled);
+        QObject::connect(m_memoryToggle, &QCheckBox::toggled, this, &MainWindow::memoryEnabledToggled);
+        form->addRow(GyanisScribe::Base::uiText("截图记忆"), m_memoryToggle);
         form->addRow(GyanisScribe::Base::uiText("分组轮换顺序"), makeGroupRotationEdit(m_settings));
         // 托盘那两下：这一族动作在菜单、热键与鼠标点击三处都走同一个出口，这里只多两个入口而不多一份实现
         for (const auto &role: GyanisScribe::App::trayClickRoles())
@@ -2301,8 +2321,7 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildCapturePage()
     {
-        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
-                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
         auto *form = makePageForm(page, GyanisScribe::Base::uiText("截图与标注成品落在这个目录里。取色复制出来的文本按下面的写法格式化。"));
         form->addRow(GyanisScribe::Base::uiText("截完之后"), makeCaptureIntentCombo(m_settings, m_icons));
@@ -2463,8 +2482,7 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildAnnotationPage()
     {
-        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
-                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
         auto *form = makePageForm(page, GyanisScribe::Base::uiText("新打开的标注窗按这两档起步，画过之后的改动会被工具栏记下来，下次仍以最近用的那一档开始。"
                                                                    "色板那一排也可以换成自己的一套：留空就是内置那八格，下面两个按钮负责把一份配色发给同事或收回来。"));
@@ -2485,8 +2503,7 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildPinPage()
     {
-        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
-                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
         auto *form = makePageForm(page, GyanisScribe::Base::uiText("新贴到屏幕上的图按这个不透明度开始。滚轮调透明度只影响那一张贴图，不改这里。"));
         form->addRow(GyanisScribe::Base::uiText("新建贴图的默认不透明度"), makeOpacitySpin(m_settings));
@@ -2499,8 +2516,7 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildRecordPage()
     {
-        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
-                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
         auto *form =
                 makePageForm(page, GyanisScribe::Base::uiText("录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。存成 GIF "
@@ -2540,8 +2556,7 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildOcrPage()
     {
-        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
-                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
         auto *form = makePageForm(page, GyanisScribe::Base::uiText("认得出哪种文字取决于语言包。目录留空时按环境变量与程序数据目录找。"));
         form->addRow(GyanisScribe::Base::uiText("识别语言"), makeOcrLanguageCombo(m_settings));
@@ -2552,8 +2567,7 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildHotkeyPage()
     {
-        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
-                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
         // 没有登记接口的那一种平台上，改组合键不会有任何效果：入口灰掉并当场说明，
         // 比让人反复改完再按一次、把「没反应」当成程序坏了要好
@@ -2676,8 +2690,7 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildThemePage()
     {
-        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
-                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
         auto *form = makePageForm(page, GyanisScribe::Base::uiText("配色方案即时生效。高对比度档是纯黑正文、纯白底与加粗边框。"));
         form->addRow(GyanisScribe::Base::uiText("配色方案"), makeThemeCombo(m_theme));
@@ -2686,8 +2699,7 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildHistoryPage()
     {
-        auto *page  = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
-                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
         auto *inner = new QVBoxLayout{page};
         m_history   = new GyanisScribe::Gui::HistoryView{m_historyStore, GyanisScribe::Core::policyFromSettings(m_settings), m_icons, page};
@@ -2718,6 +2730,93 @@ namespace GyanisScribe::Main
         return page;
     }
 
+    QWidget *MainWindow::buildMemoryPage()
+    {
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        page->setHighContrastBorder(true);
+        auto *inner = new QVBoxLayout{page};
+        m_memory    = new GyanisScribe::Gui::MemoryView{m_memoryIndex, m_icons, page};
+        inner->addWidget(m_memory);
+
+        // 这一页的出口原样转给控制器：贴图、识别、导入与索引维护各自怎么做，主窗口不知道也不该知道
+        QObject::connect(m_memory, &GyanisScribe::Gui::MemoryView::pinRequested, this, &MainWindow::memoryPinRequested);
+        QObject::connect(m_memory, &GyanisScribe::Gui::MemoryView::openFileRequested, this, &MainWindow::memoryOpenFileRequested);
+        QObject::connect(m_memory, &GyanisScribe::Gui::MemoryView::openFolderRequested, this, &MainWindow::memoryOpenFolderRequested);
+        QObject::connect(m_memory, &GyanisScribe::Gui::MemoryView::retryOcrRequested, this, &MainWindow::memoryRetryOcrRequested);
+        QObject::connect(m_memory, &GyanisScribe::Gui::MemoryView::removeIndexRequested, this, &MainWindow::memoryRemoveRequested);
+        QObject::connect(m_memory, &GyanisScribe::Gui::MemoryView::importRequested, this, &MainWindow::memoryImportRequested);
+        QObject::connect(m_memory, &GyanisScribe::Gui::MemoryView::clearIndexRequested, this, &MainWindow::memoryClearRequested);
+        QObject::connect(m_memory, &GyanisScribe::Gui::MemoryView::excludeProcessesChanged, this, &MainWindow::memoryExcludeRequested);
+        QObject::connect(m_memory, &GyanisScribe::Gui::MemoryView::enableRequested, this, &MainWindow::memoryEnableRequested);
+        QObject::connect(m_memory, &GyanisScribe::Gui::MemoryView::rebuildRequested, this, &MainWindow::memoryRebuildRequested);
+        QObject::connect(m_memory, &GyanisScribe::Gui::MemoryView::importCancelRequested, this, &MainWindow::memoryImportCancelRequested);
+        QObject::connect(m_memory, &GyanisScribe::Gui::MemoryView::messageForUser, this, &MainWindow::messageForUser);
+        return page;
+    }
+
+    void MainWindow::refreshMemory()
+    {
+        if (m_memory != nullptr)
+        {
+            m_memory->refresh();
+        }
+    }
+
+    void MainWindow::setMemoryEnabled(const bool enabled)
+    {
+        m_memoryEnabled = enabled;
+        if (m_memoryToggle != nullptr)
+        {
+            // 回写勾选不是用户动作：不压住信号会让控制器收到自己造成的回声
+            const QSignalBlocker blocker{m_memoryToggle};
+            m_memoryToggle->setChecked(enabled);
+        }
+        if (m_memory != nullptr)
+        {
+            m_memory->setMemoryEnabled(enabled);
+        }
+    }
+
+    void MainWindow::setMemoryOcrAvailability(const bool available, const QString &reason)
+    {
+        if (m_memory != nullptr)
+        {
+            m_memory->setOcrAvailability(available, reason);
+        }
+    }
+
+    void MainWindow::setMemoryDatabaseError(const QString &reason)
+    {
+        if (m_memory != nullptr)
+        {
+            m_memory->setDatabaseError(reason);
+        }
+    }
+
+    void MainWindow::setMemoryImportProgress(const Core::MemoryImportProgress &progress)
+    {
+        if (m_memory != nullptr)
+        {
+            m_memory->setImportProgress(progress);
+        }
+    }
+
+    void MainWindow::hideMemoryImportProgress()
+    {
+        if (m_memory != nullptr)
+        {
+            m_memory->hideImportProgress();
+        }
+    }
+
+    void MainWindow::setMemoryExcludedProcesses(QStringList processes)
+    {
+        if (m_memory != nullptr)
+        {
+            m_memory->setExcludedProcesses(std::move(processes));
+        }
+    }
+
     void MainWindow::refreshHistory()
     {
         if (m_history != nullptr)
@@ -2730,8 +2829,7 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildAboutPage()
     {
-        auto *page   = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
-                                                           GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
         auto *layout = new QVBoxLayout{page};
         // 与表单页同一条内容网格：默认边距比表单页小一圈，翻到这一页正文会左跳 7px
@@ -2748,8 +2846,7 @@ namespace GyanisScribe::Main
                 highestRatio = screen->devicePixelRatio();
             }
         }
-        auto *logo = new GyanisScribe::Gui::SurfaceLabel{GyanisScribe::Gui::SurfaceFillRole::WindowBackground,
-                                                         GyanisScribe::Core::CornerRole::Card, page};
+        auto *logo = new GyanisScribe::Gui::SurfaceLabel{GyanisScribe::Gui::SurfaceFillRole::WindowBackground, GyanisScribe::Core::CornerRole::Card, page};
         logo->setObjectName(QStringLiteral("brandPlate"));
         logo->setFixedSize(80, 80);
         logo->setContentsMargins(8, 8, 8, 8);
