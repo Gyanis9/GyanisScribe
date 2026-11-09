@@ -10,6 +10,7 @@
 #include "Core/Annotation/MosaicTool.h"
 #include "Core/Annotation/NumberTool.h"
 #include "Core/Annotation/PenTool.h"
+#include "Core/Annotation/RectangleTool.h"
 #include "Core/Annotation/TextTool.h"
 
 #include <QApplication>
@@ -46,6 +47,7 @@ using GyanisScribe::Core::NumberTool;
 using GyanisScribe::Core::PaintContext;
 using GyanisScribe::Core::PenParameters;
 using GyanisScribe::Core::PenTool;
+using GyanisScribe::Core::RectangleTool;
 using GyanisScribe::Core::ToolKind;
 
 namespace
@@ -1779,6 +1781,37 @@ TEST_F(AnnotationFixture, RoundedRectCutsTheCornersButKeepsTheSides)
     EXPECT_GT(drawn.pixelColor(141, 21).lightness(), 200) << "圆角档的角没被切掉";
     EXPECT_LT(drawn.pixelColor(50, 21).lightness(), 100) << "直角档的上边中段没画出来";
     EXPECT_LT(drawn.pixelColor(170, 21).lightness(), 100) << "圆角档的上边中段没画出来";
+}
+
+/**
+ * @brief 钉住大半径下圆角矩形的转角按连续曲率提前收平，而不是圆弧一路下探
+ * @details 60px 的小方块上两条路径的轮廓只差不到半像素，采不出差别；400px 时平滑度进到 0.85，
+ *          过渡段沿上边拉长，离角 60px 的截面上描边中心比圆弧低一格半。
+ *          (80,24) 在连续曲率的描边上，圆弧路径那里已经收进上边内侧，是空白。
+ */
+TEST_F(AnnotationFixture, RoundedRectCornerJoinsTheEdgeWithContinuousCurvature)
+{
+    constexpr int kSide = 400;
+    QImage        canvas(kSide + 40, kSide + 40, QImage::Format_ARGB32_Premultiplied);
+    canvas.fill(Qt::white);
+
+    AnnotationShape shape;
+    shape.rect        = QRect(20, 20, kSide, kSide);
+    shape.roundedRect = true;
+    shape.color       = QColor(0, 0, 0);
+    shape.lineWidth   = 4;
+
+    RectangleTool tool;
+    tool.insertShape(0, shape);
+    {
+        QPainter painter(&canvas);
+        tool.paintShapeAt(0, painter, PaintContext{canvas, 1.0});
+    }
+
+    // 角被切掉、上边中段有墨：与 60px 用例同一条语义，这里只补大半径下的转角走向
+    EXPECT_GT(canvas.pixelColor(21, 21).lightness(), 200) << "圆角档的角没被切掉";
+    EXPECT_LT(canvas.pixelColor(220, 21).lightness(), 100) << "圆角档的上边中段没画出来";
+    EXPECT_LT(canvas.pixelColor(80, 24).lightness(), 100) << "转角还是圆弧，连续曲率的描边没落到画上";
 }
 
 /**

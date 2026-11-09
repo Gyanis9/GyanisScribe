@@ -1,6 +1,7 @@
 #include "Gui/Pin/PinWindow.h"
 
 #include "Core/Annotation/AnnotationEngine.h"
+#include "Core/Geometry/ContinuousCorner.h"
 #include "Gui/Annotation/AnnotationToolbar.h"
 #include "Gui/Annotation/AnnotationToolbarBridge.h"
 #include "Gui/Annotation/AnnotationToolbarGeometry.h"
@@ -1824,7 +1825,8 @@ namespace GyanisScribe::Gui
 
         painter.setPen(Qt::NoPen);
         painter.setBrush(QColor(0, 0, 0, 200));
-        painter.drawRoundedRect(box, 3.0, 3.0);
+        // 读数框与色块同档：3px 名义半径、0.20 平滑度
+        painter.drawPath(Core::continuousCornerPath(box, Core::cornerShapeFor(Core::CornerRole::ContentTiny)));
 
         const QRectF swatchRect(box.left() + kColorReadoutPadding, box.center().y() - swatchEdge / 2.0, swatchEdge, swatchEdge);
         painter.setBrush(swatch);

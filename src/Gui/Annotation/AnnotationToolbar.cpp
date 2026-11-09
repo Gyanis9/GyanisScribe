@@ -88,7 +88,9 @@ namespace
         painter.setRenderHint(QPainter::Antialiasing);
         painter.setPen(QPen{outline, 1.0});
         painter.setBrush(color);
-        painter.drawRoundedRect(QRectF{1.0, 1.0, static_cast<qreal>(side) - 2.0, static_cast<qreal>(side) - 2.0}, 3.0, 3.0);
+        // 色块四角与读数框同档：3px 名义半径、0.20 平滑度，白块与彩块在别的浮层里也长同一副角
+        painter.drawPath(GyanisScribe::Core::continuousCornerPath(QRectF{1.0, 1.0, static_cast<qreal>(side) - 2.0, static_cast<qreal>(side) - 2.0},
+                                                                  GyanisScribe::Core::cornerShapeFor(GyanisScribe::Core::CornerRole::ContentTiny)));
         return bitmap;
     }
 

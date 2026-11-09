@@ -2,8 +2,10 @@
 
 #include "Base/Logger.h"
 #include "Base/Text.h"
+#include "Core/Geometry/ContinuousCorner.h"
 #include "Gui/Controls/StreamingText.h"
 #include "Gui/Resources/IconProvider.h"
+#include "Gui/Theme/CornerStyle.h"
 #include "Gui/Theme/Motion.h"
 #include "Gui/Theme/ThemeManager.h"
 
@@ -14,6 +16,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPainter>
+#include <QPen>
 #include <QPixmap>
 #include <QPointer>
 #include <QScreen>
@@ -178,6 +181,9 @@ namespace GyanisScribe::Gui
         explicit Bubble(IconProvider &icons) : QWidget(nullptr, Qt::ToolTip | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::WindowDoesNotAcceptFocus), m_icons(icons)
         {
             setAttribute(Qt::WA_ShowWithoutActivating);
+            // 胶囊只画在路径内：窗口不铺系统底色，四角才能真的透出底下的内容
+            setAttribute(Qt::WA_TranslucentBackground);
+            setAutoFillBackground(false);
             // 名称是给读屏与自动化测试的：一个没有名字的顶层窗在辅助技术里就是一块空白
             setAccessibleName(GyanisScribe::Base::uiText("提示"));
 
@@ -237,10 +243,8 @@ namespace GyanisScribe::Gui
         void setPalette(const ThemePalette &palette)
         {
             m_currentPalette = palette;
-            // 背景走面板色、边框走浮层微边缘那一档（borderStrong）：气泡是浮层，不铺投影，
-            // 靠这一圈细边与底下的内容分开；圆角取胶囊档——半高以上的大圆角由 Qt 按高度收敛
-            setStyleSheet(QStringLiteral("background-color: %1; border: 1px solid %2; border-radius: 999px;")
-                                  .arg(m_currentPalette.surface.name(QColor::HexRgb), m_currentPalette.borderStrong.name(QColor::HexRgb)));
+            // 底色与描边由 paintEvent 现画：这里只记色板并重绘，不写样式表
+            update();
         }
 
         /**
@@ -316,6 +320,19 @@ namespace GyanisScribe::Gui
 
     protected:
         /**
+         * @brief 按当前色板画胶囊底与描边
+         * @details 底色走面板色、描边走浮层微边缘那一档：气泡是浮层，不铺投影，
+         *          靠这一圈细边与底下的内容分开。形状取 Handle 档的胶囊，
+         *          圆角半径由窗口短边决定，四角之外保持透明。
+         */
+        void paintEvent(QPaintEvent *) override
+        {
+            QPainter painter{this};
+            Core::paintContinuousCorner(painter, QRectF{rect()}, Core::cornerShapeFor(Core::CornerRole::Handle, QSizeF{size()}), m_currentPalette.surface,
+                                        QPen{m_currentPalette.borderStrong, static_cast<qreal>(themeBorderWidth(activeThemeKind()))});
+        }
+
+        /**
          * @brief 气泡隐藏时收掉流式覆盖层
          * @details 重写 QWidget::hideEvent()：覆盖层的帧定时器不随气泡隐藏停下，
          *          留着会继续推进并在下一次显示时盖住新文字。
@@ -388,7 +405,6 @@ namespace GyanisScribe::Gui
         }
 
         // 每次显示都现取主题色：主题刚换过就冒出来的提示不能还穿着旧衣
-        m_bubble->setStyleSheet({});
         m_bubble->setPalette(m_theme.palette());
         // 图标按目标屏幕的倍比取图：气泡这时还没显示，devicePixelRatioF() 只会给主屏的比例，
         // 混合 DPI 的副屏上图标会被按逻辑像素放大糊掉

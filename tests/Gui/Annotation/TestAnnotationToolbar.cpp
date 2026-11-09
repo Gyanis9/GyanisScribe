@@ -1089,6 +1089,9 @@ TEST_F(ToolbarFixture, WhiteSwatchKeepsAVisibleOutline)
     }
     EXPECT_GT(outlinePixels, 0) << "白底上一格没有描边的白色色块等于看不见，用户会以为那一格是禁用的";
     EXPECT_GT(fillPixels, 0) << "色块没填上色板里的颜色";
+    // 3px 连续曲率路径把四角切掉：角上必须透明，白块在浅色底上才不会摊成一块方砖
+    EXPECT_EQ(bitmap.pixelColor(0, 0).alpha(), 0) << "色块左上角没有被路径切掉";
+    EXPECT_EQ(bitmap.pixelColor(bitmap.width() - 1, bitmap.height() - 1).alpha(), 0) << "色块右下角没有被路径切掉";
 }
 
 /**

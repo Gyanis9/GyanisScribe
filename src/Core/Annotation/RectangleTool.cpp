@@ -2,6 +2,7 @@
 #include "Core/Annotation/StrokePen.h"
 
 #include "Core/Annotation/FillBrush.h"
+#include "Core/Geometry/ContinuousCorner.h"
 #include "Base/Text.h"
 
 #include <QPainter>
@@ -42,7 +43,8 @@ namespace GyanisScribe::Core
 
         // 圆角按短边算：长条上按长边给半径会把两端收成一粒胶囊
         const double radius = std::min(shape.rect.width(), shape.rect.height()) * kRoundedRectRadiusRatio;
-        painter.drawRoundedRect(shape.rect, radius, radius);
+        // 半径只决定形状大小，平滑度按半径分档：统一交给连续曲率路径，圆弧与过渡段一起算
+        painter.drawPath(continuousCornerPath(QRectF{shape.rect}, cornerShapeForRadius(radius)));
     }
 
 } // namespace GyanisScribe::Core

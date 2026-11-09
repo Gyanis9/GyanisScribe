@@ -17,6 +17,7 @@
 #include <QEventLoop>
 #include <QFontInfo>
 #include <QFontMetrics>
+#include <QImage>
 #include <QLabel>
 #include <QPoint>
 #include <QRect>
@@ -213,6 +214,28 @@ TEST_F(ToastFixture, ToastFollowsThemeSwitch)
 
     EXPECT_EQ(toast().currentText(), QStringLiteral("深色主题下的提示"));
     EXPECT_EQ(toastColorFor(ToastKind::Information, theme().palette()), kDarkPalette.secondaryText);
+}
+
+/**
+ * @brief 钉住气泡按胶囊形状自绘：四角透明、中心不透明、底色取当前主题 surface
+ * @details 气泡是浮层，四角若铺满方底会在浅色内容上露出一圈硬边；中心透明则说明只剩描边。
+ *          底色断言直接读主题色板，换主题后写死的灰会在这里露出来。
+ */
+TEST_F(ToastFixture, BubblePaintsATransparentCornerOutsideTheCapsule)
+{
+    toast().show(QStringLiteral("提示"), ToastKind::Information);
+    QWidget *bubble = visibleToastBubble();
+    ASSERT_NE(bubble, nullptr) << "没有找到可见的 Toast 气泡";
+
+    const QImage image = bubble->grab().toImage();
+    ASSERT_FALSE(image.isNull());
+    ASSERT_GT(image.width(), 2);
+    ASSERT_GT(image.height(), 2);
+
+    EXPECT_EQ(image.pixelColor(0, 0).alpha(), 0) << "气泡左上角没有透明，胶囊被画成了方底";
+    EXPECT_EQ(image.pixelColor(image.width() - 1, image.height() - 1).alpha(), 0) << "气泡右下角没有透明";
+    EXPECT_GT(image.pixelColor(image.width() / 2, image.height() / 2).alpha(), 0) << "胶囊中心透明，气泡只剩描边";
+    EXPECT_EQ(image.pixelColor(image.width() - 8, image.height() / 2), theme().palette().surface) << "胶囊底色不是当前主题的 surface";
 }
 
 /**
