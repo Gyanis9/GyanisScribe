@@ -109,7 +109,8 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
   `continuousCornerPath` 生成。
 - `Gui/Theme/ControlPalette` 的 `buttonColors` / `toolButtonColors` / `inputColors` 把状态映射成填充与描边；
   `Gui::themeBorderWidth` 给 1px（浅色、深色）或 2px（高对比度）；`Gui::SquircleStyle` 作为代理样式置空
-  菜单与提示弹层的原生面板、置空自绘输入类的原生输入面板与边框，避免方底盖住连续曲率。
+  自绘菜单与提示弹层的原生面板、置空自绘输入类的原生输入面板与边框，避免方底盖住连续曲率；
+  系统文本控件的标准右键菜单是原生 `QMenu`，面板与悬停高亮仍交给原生风格。
 
 QSS 只留颜色、排版与透明边框占位：
 
@@ -121,25 +122,31 @@ QSS 只留颜色、排版与透明边框占位：
 - 数字框不带边框占位：Qt 6.12 的 `QStyleSheetStyle` 在关掉原生按钮后会按微调框自身的边框与内边距裁内部
   行编辑，把行编辑收成 1px 宽，数值文本还在却画不出来。它的内容最小高因此补到 28（高对比度档 34），
   叠上微调框上下各 2px 的自有框，总高仍落在 32 与 38；内部行编辑的规则只给文字色、透明底与左右 12px 缩进。
-- 输入类的透明底与透明边只落在带 `squircle` 属性的自绘类上，微调框的内部行编辑只继承透明底；原生对话框里的
-  `QLineEdit`/`QComboBox`/`QSpinBox` 保持系统外观。`QToolTip` 规则不能写任何 `border` 声明，
-  否则样式引擎会自己画完提示面板，`SquircleStyle` 收不到 `PE_PanelTipLabel`。
+- 按钮与输入类的透明底、透明边与内边距只落在带 `squircle` 属性的自绘类上，微调框的内部行编辑只继承透明底；
+  `QMessageBox`、`QInputDialog`、`QColorDialog` 里的原生按钮与 `QLineEdit`/`QComboBox`/`QSpinBox`
+  保持系统外观。`QToolTip` 规则不能写任何 `border` 声明，否则样式引擎会自己画完提示面板，
+  `SquircleStyle` 收不到 `PE_PanelTipLabel`。
 - 菜单与下拉弹层的顶层窗关闭自动填底并开透明背景；菜单面板由 `Gui::Menu` 自绘，`SquircleStyle`
-  置空原生面板，提示弹层由 `SquircleStyle` 在 `PE_PanelTipLabel` 上重画面板。提示弹层的实机合成
-  没有进截图工具，像素判据走离屏路径。
+  只置空自绘菜单的原生面板，标准右键菜单（原生 `QMenu`）保留原生面板与悬停高亮。
+  下拉弹层由 `Gui::ListView` 在容器底上描一圈 `borderStrong` 微边缘（浅深 1px、高对比度 2px）。
+  提示弹层由 `SquircleStyle` 在 `PE_PanelTipLabel` 上重画面板；`polish` 时给提示窗打开透明底并关自动填底，
+  `SH_ToolTip_Mask` 返回 0，原生方形窗口底与掩膜不会切掉连续曲率的角。
 - 不变量由 `StyleSheetsHaveNoBorderRadius`、`SourceHasNoRawShapeWidgetConstruction`、
-  `SourceHasNoRoundedRectDrawingOrInlineRadii`、`TooltipRuleKeepsNoBorderDeclaration` 与
-  `InputTransparencyStaysScopedToTheSquircleClasses` 钉住。
+  `SourceHasNoRoundedRectDrawingOrInlineRadii`、`TooltipRuleKeepsNoBorderDeclaration`、
+  `InputTransparencyStaysScopedToTheSquircleClasses`、`ButtonRulesStayScopedToTheSquircleClasses` 与
+  `MenuRulesStayScopedToTheSquircleMenus` 钉住。
 
 ## 2. 每个窗口的样式与状态
 
 状态命名仍按 Qt 的伪状态语义：`:hover`、`:pressed`、`:focus`、`:disabled`、`:checked`；
 迁移后样式表不再给这些状态写形状规则，填充与描边由自绘类按同一套语义取，子控件只剩尺寸与透明边框占位。
-浅色与深色两份 QSS 逐条同构，覆盖同一批选择器（`QPushButton`、`QToolButton`、带 `squircle` 属性的
-`QLineEdit`/`QComboBox`/`QSpinBox`、`QCheckBox`、`QMenu`、`QToolTip`、`QListWidget`、`QTextEdit`，
+浅色与深色两份 QSS 逐条同构，覆盖同一批选择器（`QPushButton[squircle="true"]`/`QToolButton[squircle="true"]`、
+`QLineEdit[squircle="true"]`/`QComboBox[squircle="true"]`/`QSpinBox[squircle="true"]`、
+`QMenu[squircle="true"]`、`QCheckBox`、`QToolTip`、`QListWidget`、`QTextEdit`，
 以及具名容器 `#appRoot`/`#hudRoot`/`#AnnotationToolbar`/`#toolbarSeparator`/`#annotationTextEditor`/
 `#settingsScroll`/`#settingsNav`/`#hotkeyDisplay`/`#annotationColorButton` 与文字角色
-`#pageHint`/`#metricValue`），差异只在色值与占位宽。滑块与滚动条完全自绘，样式表里没有它们的选择器；
+`#pageHint`/`#metricValue`），差异只在色值与占位宽。不带 `squircle` 属性的原生
+`QPushButton`/`QToolButton`/`QMenu` 匹配不到按钮与菜单规则，系统对话框与标准右键菜单按原生外观绘制。滑块与滚动条完全自绘，样式表里没有它们的选择器；
 `#pageCard` 也不再由样式表铺底。
 下表的悬停、选中与焦点描述默认指浅色与深色两档。高对比度档的样式表覆盖同一批选择器，但只保留颜色、
 2px 透明占位与文字色；选中与焦点由自绘代码用 2px 主色边表达：导航与列表的选中项、标注工具栏与工具按钮的
@@ -165,7 +172,7 @@ QSS 只留颜色、排版与透明边框占位：
 | Toast 通知 | `src/Gui/Controls/Toast.cpp`、`StreamingText.cpp` | 文字色与图标描边仍从色板角色现算（`palette.success`/`danger`/`secondaryText`；`success` 与 `danger` 不进 QSS，用例按消费方名单核对）；气泡由 `Toast::Bubble::paintEvent` 用 `CornerRole::Handle` 自绘胶囊（半径取短边一半、平滑度 0），填充 `surface`、描边 `borderStrong`、宽度取 `themeBorderWidth`（浅深 1px、高对比度 2px），顶层窗透明背景、四角外不铺系统底；图标与文字同一行，图标底边落在首行基线下方 0.125em | 三类：Information / Success / Danger，3 秒后自收。成功与信息提示逐字显现（第 i 字在 i×30ms 起步、单字 90ms 从模糊到清晰，缓动 `cubic-bezier(.215,.61,.355,1)`），错误提示整句即时出现；成功图标从 0.6 弹到 1.0；图标描边取该条提示的语义色；新提示顶掉旧提示时覆盖层一并销毁重启，不叠影 |
 | 复选框（设置页全部勾选项） | `src/Gui/Controls/CheckBox.cpp` + QSS `QCheckBox::indicator` | 指示器由 `Gui::CheckBox::paintEvent` 按 `CornerRole::Indicator`（5px/0.25）自绘：静息 `controlFill`、悬停 `hover` + 1px `borderStrong` 边、勾选 `accent` 填充、禁用 `mutedFill`；高对比度档一律 2px 边（焦点/勾选/悬停取 `accent`，静息与禁用取 `borderStrong`）。勾由同一处自绘：启用时取 `onAccent`，勾选且禁用时取 `secondaryText`（禁用指示器底已落 `mutedFill`，白勾会看不见）；QSS 只留 18px 的 `::indicator` 尺寸与同宽透明边框占位 | 启用且勾选时从 0.55 弹性到 1.0（`kPopSpring`，约 450ms、过冲约 19.5%），取消勾选不弹；三档启用档的勾都取 `onAccent`（高对比度档是蓝底白勾，与另两档同一套取色）；勾选且禁用时勾取 `secondaryText`，不播弹簧（控件本来就没有可操作的确认）；减少动效时直接到 1.0 |
 | 焦点态（所有可聚焦控件） | `src/Gui/Controls/FocusRing.cpp` | `FocusRingController` 作为应用事件过滤器，首次聚焦时创建覆盖层；宿主是能装下目标矩形外扩 6px 的最近祖先，几何按宿主坐标系算；内外两环都由 `continuousCornerPath` 生成，形状按目标控件取 `Indicator`（复选框）、`Compact`（工具按钮）或 `Control`（其余） | 输入框（`QLineEdit`、`QComboBox`、`QSpinBox`、标注行内 `QTextEdit`、`HotkeyEdit`）双环；按钮、工具按钮、复选框单环（复选框套在 indicator 上）；可编辑下拉框/微调框内部的行编辑映射回外层；只读、禁用与标注工具栏内的控件不装；滑块走手柄反转（见 §5）；高对比度档不装覆盖层，焦点边由控件自绘 2px 主色；切到高对比度档立即撤环、切回时给当前焦点补环 |
-| 快捷键输入框 | `src/Gui/Controls/HotkeyEdit.cpp` | 显示框是 `Gui::SurfaceLabel`，按 `CornerRole::Control` 自绘底与边：静息 `controlFill`、录制态 `accentSoft` + 主色边（宽度取 `themeBorderWidth`）、禁用 `mutedFill`；高对比度档另按该档契约补 2px `borderStrong` 边。QSS 只留文字色、内边距、最小高度与同宽透明边框占位 | 闲置态显示已存的组合，悬浮说明写清「点击这一格后按下组合键即可替换，按 Esc 取消」；进入录制态换成「请按下快捷键（Esc 取消）」的提示 |
+| 快捷键输入框 | `src/Gui/Controls/HotkeyEdit.cpp` | 显示框是 `Gui::SurfaceLabel`，按 `CornerRole::Control` 自绘底与边：静息 `controlFill`、录制态 `accentSoft` + 主色边（宽度取 `themeBorderWidth`）、禁用 `mutedFill`；高对比度档静息态按该档契约补 2px `borderStrong` 边，录制态的主色边是显式描边、三档都保持主色。QSS 只留文字色、内边距、最小高度与同宽透明边框占位 | 闲置态显示已存的组合，悬浮说明写清「点击这一格后按下组合键即可替换，按 Esc 取消」；进入录制态换成「请按下快捷键（Esc 取消）」的提示 |
 | 数字输入框 | `src/Gui/Controls/SpinBox.cpp` | 继承 `QSpinBox`，面板按 `CornerRole::Control` 自绘；关掉原生上下按钮，右缘叠两枚自绘 chevron，悬停底取 `QPalette::AlternateBase`（即 `mutedFill`）并按 `CornerRole::Thumbnail`（6px/0.30）自绘 | 点击加/减，范围、后缀、`不限` 等语义仍由 `QSpinBox` 负责；键盘上下键照常；数值上 tabular figures |
 | 历史列表 | `src/Gui/History/HistoryView.cpp` | 缩略图边长 `kThumbnailEdge`（96），圆角 `kThumbnailCornerRadius`（6）由 `Core::makeThumbnail` 按 `CornerRole::Thumbnail`（6px/0.30）掩膜；列表容器是 `Gui::ListWidget`，按 `CornerRole::Panel` 自绘底与边；列表项与导航共用 `ItemDelegate` 的 `Compact` 档高亮 | 顶部一枚搜索框（按文件名、类别或日期）加一个类别筛选下拉，次序固定时间倒序；保留策略本身在「通用」页那两格，这一页不重复摆读数。缩略图读不出来时给一枚类别图标（`Record`/`CaptureRegion`），不留空白方块；时间与尺寸读数上 tabular figures |
 
@@ -266,7 +273,7 @@ QSS 只留颜色、排版与透明边框占位：
 ## 5. 键盘与可访问性
 
 - 每个动作都有键盘路径：全局热键见 README 的热键表，界面内 `Enter`/`Esc`/`Tab` 顺序由焦点可见性
-  与控件顺序体现，`QPushButton:default` 给主操作单独配色。
+  与控件顺序体现，`QPushButton[squircle="true"]:default` 给主操作单独配色。
 - 焦点可见性是硬要求，分三档落地：
   - 浅色与深色：输入面（行编辑、下拉框、微调框、标注行内编辑器、快捷键框）用双环——贴控件边缘的
     2px 主色内环、2px 空隙、落在 4–6px 处、32% 透明度的 2px 外环；按钮、工具按钮与复选框用单环，

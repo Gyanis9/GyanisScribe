@@ -35,7 +35,7 @@ namespace GyanisScribe::Gui
          * @brief 在控件自己的绘制事件里铺容器底
          * @details 重写 QListView::event()：滚动区的 Paint 事件被 QAbstractScrollArea 换成
          *          QFrame::paintEvent，只画原生框，虚函数 paintEvent 收到的是视口事件、画不到整块容器；
-         *          容器底因此在这里落笔，位置在视口与滚动条之前。高对比度档补 borderStrong 2px 边
+         *          容器底因此在这里落笔，位置在视口与滚动条之前。弹层三档都描一圈 borderStrong 微边缘，宽度 1px 或 2px
          * @param event 事件
          * @return 与基类同解，其余事件原样交回 QListView
          */
