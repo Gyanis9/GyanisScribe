@@ -10,6 +10,7 @@
 #include "Gui/Controls/KeyStep.h"
 #include "Base/Types.h"
 
+#include <QCloseEvent>
 #include <QKeyEvent>
 #include <QVBoxLayout>
 
@@ -184,6 +185,15 @@ namespace GyanisScribe::Gui
         hide();
         // 收完再报：接收方查可见态时看到的就是「已经收起」
         reportClosedOnce();
+    }
+
+    void AnnotationWindow::closeEvent(QCloseEvent *event)
+    {
+        // 系统关闭（Alt+F4、任务栏）与 Esc/X 走同一条收场路：工具栏是独立顶层窗，必须先收；
+        // 轮次守卫也要跟着落地，否则迟到的隐私结果会往一扇看不见的画布上落笔
+        closeAnnotation();
+        QWidget::closeEvent(event);
+        event->accept();
     }
 
     void AnnotationWindow::reportClosedOnce()

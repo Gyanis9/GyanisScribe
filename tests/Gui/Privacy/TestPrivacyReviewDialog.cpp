@@ -187,6 +187,30 @@ TEST_F(PrivacyReviewDialogFixture, SelectNoneThenAllTogglesEveryRow)
 }
 
 /**
+ * @brief 钉住一项都不勾时「应用打码」灰掉，重新勾上才恢复
+ * @details 应用按钮默认是对话框的默认按钮：灰掉之后回车也不会接受一份空批次。
+ */
+TEST_F(PrivacyReviewDialogFixture, ApplyIsDisabledWhenNothingIsChecked)
+{
+    PrivacyReviewDialog dialog{makeItems()};
+
+    auto *apply      = dialog.findChild<QPushButton *>(QStringLiteral("privacyApply"));
+    auto *selectNone = dialog.findChild<QPushButton *>(QStringLiteral("privacySelectNone"));
+    auto *selectAll  = dialog.findChild<QPushButton *>(QStringLiteral("privacySelectAll"));
+    ASSERT_NE(apply, nullptr);
+    ASSERT_NE(selectNone, nullptr);
+    ASSERT_NE(selectAll, nullptr);
+    EXPECT_TRUE(apply->isEnabled()) << "默认全选时应用按钮该是可点的";
+
+    selectNone->click();
+    EXPECT_FALSE(apply->isEnabled()) << "一项都没勾时应用按钮还亮着，点下去会关掉对话框却不改画布";
+    EXPECT_TRUE(apply->isDefault()) << "灰掉的默认按钮仍会在回车时被触发";
+
+    selectAll->click();
+    EXPECT_TRUE(apply->isEnabled()) << "重新全选之后应用按钮没恢复";
+}
+
+/**
  * @brief 钉住风格下拉只有马赛克与高斯模糊，并各自映射到对应的 ToolKind
  */
 TEST_F(PrivacyReviewDialogFixture, StyleComboMapsToToolKind)

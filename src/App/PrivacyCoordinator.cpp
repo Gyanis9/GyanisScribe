@@ -1,6 +1,5 @@
 #include "App/PrivacyCoordinator.h"
 
-#include "Base/Logger.h"
 #include "Base/Text.h"
 #include "Core/Ocr/IOcrEngine.h"
 #include "Core/Ocr/OcrLanguage.h"
@@ -9,8 +8,6 @@
 #include "Core/Settings/SettingsKeys.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Plugins/OcrEngines/OcrEngineFactory.h"
-
-#include <format>
 
 namespace GyanisScribe::App
 {
@@ -68,7 +65,6 @@ namespace GyanisScribe::App
         {
             const auto reason  = m_engine != nullptr ? m_engine->unavailableReason() : QString{};
             const auto message = reason.isEmpty() ? fallbackUnavailableReason() : reason;
-            GyanisScribe::Base::Logger::error(std::format("敏感信息检查没能开始：{}", message.toStdString()));
             emit scanFailed(GyanisScribe::Base::Error{GyanisScribe::Base::ErrorCode::PlatformUnsupported, message.toStdString()});
             emit messageForUser(message, GyanisScribe::Gui::ToastKind::Danger);
             return;
@@ -106,7 +102,6 @@ namespace GyanisScribe::App
         m_scanning = false;
         const auto message =
                 QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("敏感信息检查失败：{}。请重试一次，或换一种语言再试"), error.message).c_str());
-        GyanisScribe::Base::Logger::error(message.toStdString());
         emit scanFailed(error);
         emit messageForUser(message, GyanisScribe::Gui::ToastKind::Danger);
     }

@@ -41,7 +41,8 @@ namespace GyanisScribe::Plugins
         {
             if (result.isValid())
             {
-                // 四个定位点是码角在输入图上的像素坐标；外接框取最外沿，再夹回图像以免把码外的空白算进去
+                // 四个定位点是码角在输入图上的像素坐标；外接框取最外沿，再夹回图像范围。
+                // 一维码的定位点往往只覆盖解码行附近的一条窄带，夹取不会给它补出条码高度
                 const ZXing::Position &position = result.position();
                 int                    left     = position.topLeft().x;
                 int                    top      = position.topLeft().y;

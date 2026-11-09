@@ -1655,6 +1655,29 @@ TEST_F(AnnotationWindowFixture, RoundStaysActiveUntilTheWindowCloses)
 }
 
 /**
+ * @brief 钉住系统关窗（Alt+F4、任务栏关闭）也走收场：closed 只发一次，轮次守卫落下
+ * @details 只 hide 不报收场时，迟到的隐私识别结果仍以为这一轮在编辑，会开审核并往看不见的画布上落笔。
+ */
+TEST_F(AnnotationWindowFixture, CloseEventEndsTheRoundOnce)
+{
+    auto window = makeWindow();
+    QSignalSpy closed{window.get(), &AnnotationWindow::closed};
+    ASSERT_TRUE(closed.isValid());
+
+    window->startAnnotation(makeCanvas({200, 100}), QRect{0, 0, 1920, 1080}, QRect{0, 0, 200, 100});
+    ASSERT_TRUE(window->isVisible());
+    ASSERT_TRUE(window->isRoundActive());
+
+    window->close();
+    EXPECT_FALSE(window->isVisible()) << "系统关窗之后窗口还留着";
+    EXPECT_FALSE(window->isRoundActive()) << "系统关窗之后这一轮还报「在编辑」";
+    EXPECT_EQ(closed.count(), 1) << "系统关窗没有走 closed() 收场，或一轮报了几次";
+
+    window->close();
+    EXPECT_EQ(closed.count(), 1) << "重复关窗又报了一次 closed()";
+}
+
+/**
  * @brief 钉住 Ctrl+Shift+↑/↓ 与 Home/End 从窗口接到引擎
  * @details 两条实心矩形盖同一块地，中心像素就是层叠读数；四条键各按一次核对读数。
  */

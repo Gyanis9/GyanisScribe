@@ -3856,6 +3856,10 @@
             <translation>Batch redaction only supports Mosaic or Gaussian blur, but received tool 0x{:X}. Switch the redaction style to one of these two and try again</translation>
         </message>
         <message>
+            <source>马赛克方块边长必须在 {} 到 {} 逻辑像素之间，收到的是 {}。请改用工具条上的细、中、粗一档再试</source>
+            <translation>The mosaic block size must be between {} and {} logical pixels, but received {}. Use one of the Fine, Medium, or Coarse steps on the toolbar and try again</translation>
+        </message>
+        <message>
             <source>没有可打码的区域：这次没有给出可用的框。请重新检测，或手动框选画布内的区域</source>
             <translation>There is nothing to redact: no usable boxes were given this time. Run the check again, or draw boxes on the canvas manually</translation>
         </message>

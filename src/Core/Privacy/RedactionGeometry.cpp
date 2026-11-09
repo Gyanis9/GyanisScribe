@@ -2,24 +2,28 @@
 
 #include <QPoint>
 
+#include <algorithm>
 #include <cmath>
 
 namespace GyanisScribe::Core::Privacy
 {
     QRect expandBarcodeScanline(const QRect &scanline, const QSize imageSize, const QSize logicalSize)
     {
-        if (imageSize.isEmpty())
+        if (imageSize.isEmpty() || scanline.isEmpty())
         {
             return {};
         }
 
-        // 一维码的定位框是一条接近零高度的扫描线：额外纵向像素上下各扩一半，
-        // 再按两维比例把逻辑像素折成物理高度
-        const qreal verticalScale = logicalSize.height() > 0 ? static_cast<qreal>(imageSize.height()) / static_cast<qreal>(logicalSize.height()) : 1.0;
-        const int   expansion     = static_cast<int>(std::lround(static_cast<qreal>(kBarcodeVerticalExpansionPixels) / 2.0 * verticalScale));
-        QRect       box           = scanline.normalized();
-        box.adjust(0, -expansion, 0, expansion);
-        return box.intersected(QRect{QPoint{0, 0}, imageSize});
+        // 一维码的定位框往往只覆盖解码行附近：先按纵向倍比把逻辑像素折成物理像素，
+        // 目标高度取「原框高度 + 额外高度」与最小高度中的较大者，再以定位框中心为轴上下均分
+        const qreal verticalScale        = logicalSize.height() > 0 ? static_cast<qreal>(imageSize.height()) / static_cast<qreal>(logicalSize.height()) : 1.0;
+        const QRect line                 = scanline.normalized();
+        const qreal currentLogicalHeight = static_cast<qreal>(line.height()) / verticalScale;
+        const qreal targetLogicalHeight  = std::max(static_cast<qreal>(kBarcodeMinLogicalHeight), currentLogicalHeight + static_cast<qreal>(kBarcodeVerticalExpansionPixels));
+        const int   targetHeight         = std::max(1, static_cast<int>(std::lround(targetLogicalHeight * verticalScale)));
+        const int   centerY              = line.top() + line.height() / 2;
+        const QRect expanded{line.left(), centerY - targetHeight / 2, line.width(), targetHeight};
+        return expanded.intersected(QRect{QPoint{0, 0}, imageSize});
     }
 
     std::optional<QRect> logicalRedactionRect(const QRect &physicalBox, const QSize imageSize, const QSize logicalSize)

@@ -1624,6 +1624,35 @@ TEST_F(EngineFixture, AddRedactionsRejectsBadBatchesAndClipsToTheCanvas)
 }
 
 /**
+ * @brief 钉住马赛克粒度越界被拒：0、负数与超过 64 都不许以「成功」落一个近乎无遮挡的块
+ * @details 粒度 0 会让 MosaicTool 把取样块折到 1 像素，画出来与底图几乎一样，
+ *          却仍报「已打码 N 处」。拒绝必须发生在动撤销栈之前；1 与 64 两端仍接受。
+ */
+TEST_F(EngineFixture, AddRedactionsRejectsMosaicBlockSizesOutsideOneToSixtyFour)
+{
+    loadColorfulCanvas();
+
+    for (const int badSize: {0, -3, 65, 1000})
+    {
+        const std::array<RedactionRequest, 1> requests{RedactionRequest{.logicalRect = QRect(20, 20, 40, 30), .mosaicBlockSize = badSize}};
+        const auto                            rejected = m_engine.addRedactions(requests, ToolKind::Mosaic);
+        ASSERT_FALSE(rejected.has_value()) << "粒度 " << badSize << " 也被当成成功";
+        EXPECT_EQ(rejected.error().code, ErrorCode::InvalidArgument);
+        EXPECT_NE(rejected.error().message.find("马赛克"), std::string::npos) << "拒绝理由没说是哪一档参数越界";
+        EXPECT_NE(rejected.error().message.find(std::to_string(badSize)), std::string::npos) << "拒绝理由没带上收到的值";
+        EXPECT_FALSE(m_engine.canUndo()) << "粒度 " << badSize << " 的批次在撤销栈里留了一步";
+        EXPECT_TRUE(m_engine.selections().empty());
+    }
+
+    for (const int goodSize: {1, 64})
+    {
+        const std::array<RedactionRequest, 1> requests{RedactionRequest{.logicalRect = QRect(20, 20, 40, 30), .mosaicBlockSize = goodSize}};
+        EXPECT_TRUE(m_engine.addRedactions(requests, ToolKind::Mosaic).has_value()) << "边界粒度 " << goodSize << " 被误拒";
+        ASSERT_TRUE(m_engine.undo().has_value());
+    }
+}
+
+/**
  * @brief 钉住手柄拖动的拒绝面：没抓住、没选中、多选、没开场
  */
 TEST_F(EngineFixture, HandleDragRefusesWithoutASingleSelection)

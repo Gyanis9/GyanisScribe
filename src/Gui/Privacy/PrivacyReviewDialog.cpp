@@ -100,17 +100,20 @@ namespace GyanisScribe::Gui
 
         auto *cancel = new QPushButton{Base::uiText("取消"), this};
         cancel->setObjectName(QStringLiteral("privacyCancel"));
-        auto *apply = new QPushButton{Base::uiText("应用打码"), this};
-        apply->setObjectName(QStringLiteral("privacyApply"));
+        m_apply = new QPushButton{Base::uiText("应用打码"), this};
+        m_apply->setObjectName(QStringLiteral("privacyApply"));
         // 回车等同应用：用户逐项确认后最常见的动作是直接落笔，默认按钮让键盘路径一致
-        apply->setDefault(true);
+        m_apply->setDefault(true);
         buttons->addWidget(cancel);
-        buttons->addWidget(apply);
+        buttons->addWidget(m_apply);
 
         QObject::connect(selectAll, &QPushButton::clicked, this, [this] { setAllCheckStates(Qt::Checked); });
         QObject::connect(selectNone, &QPushButton::clicked, this, [this] { setAllCheckStates(Qt::Unchecked); });
+        // 逐项取消到一项不剩时「应用打码」也该灰掉：空批次没有可落的笔
+        QObject::connect(m_list, &QListWidget::itemChanged, this, [this](QListWidgetItem *) { updateApplyEnabled(); });
         QObject::connect(cancel, &QPushButton::clicked, this, &QDialog::reject);
-        QObject::connect(apply, &QPushButton::clicked, this, &QDialog::accept);
+        QObject::connect(m_apply, &QPushButton::clicked, this, &QDialog::accept);
+        updateApplyEnabled();
     }
 
     std::vector<Core::Privacy::PiiItem> PrivacyReviewDialog::selectedItems() const
@@ -140,6 +143,11 @@ namespace GyanisScribe::Gui
         {
             m_list->item(row)->setCheckState(checkState);
         }
+    }
+
+    void PrivacyReviewDialog::updateApplyEnabled()
+    {
+        m_apply->setEnabled(!selectedItems().empty());
     }
 
 } // namespace GyanisScribe::Gui

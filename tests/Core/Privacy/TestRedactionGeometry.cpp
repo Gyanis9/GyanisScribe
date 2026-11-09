@@ -5,6 +5,9 @@
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <vector>
+
 namespace
 {
     using GyanisScribe::Core::Privacy::expandBarcodeScanline;
@@ -63,22 +66,56 @@ TEST(RedactionGeometry, DropsDegenerateSizes)
 }
 
 /**
- * @brief 钉住一维码纵向只额外扩 8 逻辑像素（上下各 4）
- * @details 原图是画布的两倍：上下各 4 逻辑像素折成 8 物理像素；扫描线本身高 1 像素，
- *          扩完从 y=92 到 y=108，共 17 行。加宽到 16 逻辑像素（上下各 8）会打成 33 行。
+ * @brief 钉住一维码扫描线被撑到至少 32 逻辑像素高，且仍以扫描线为中心
+ * @details 原图是画布的两倍：32 逻辑像素折成 64 物理像素。扫描线 y=100、高 1，
+ *          目标框从 y=68 到 y=131，扫描线中心落在里面；换算回逻辑坐标再加留边后高 36。
  */
-TEST(RedactionGeometry, BarcodeScanlineExpandsByEightLogicalPixelsTotal)
+TEST(RedactionGeometry, BarcodeScanlineExpandsToAtLeastThirtyTwoLogicalPixels)
 {
     const auto expanded = expandBarcodeScanline(QRect{50, 100, 100, 1}, QSize{800, 600}, QSize{400, 300});
-    EXPECT_EQ(expanded, QRect(50, 92, 100, 17)) << "一维码纵向扩的不是上下各 4 逻辑像素";
+    EXPECT_EQ(expanded, QRect(50, 68, 100, 64)) << "一维码没有撑到 32 逻辑像素高，或没有以扫描线为中心";
+    EXPECT_TRUE(expanded.contains(QRect{50, 100, 100, 1}.center())) << "扫描线中心跑出了打码框";
+
+    const auto mapped = logicalRedactionRect(expanded, QSize{800, 600}, QSize{400, 300});
+    ASSERT_TRUE(mapped.has_value());
+    EXPECT_EQ(*mapped, QRect(23, 32, 54, 36)) << "换算回逻辑坐标并留边之后的框对不上";
+    EXPECT_GE(mapped->height(), 32) << "留边后的成品框仍不足 32 逻辑像素高";
 }
 
 /// 扩框在图像边上夹住：上沿不许出负坐标，下沿不许越过图像最后一行
 TEST(RedactionGeometry, BarcodeScanlineExpansionClampsToTheImage)
 {
     const auto top = expandBarcodeScanline(QRect{50, 2, 100, 1}, QSize{800, 600}, QSize{400, 300});
-    EXPECT_EQ(top, QRect(50, 0, 100, 11)) << "上沿扩出图像后没夹回";
+    EXPECT_EQ(top, QRect(50, 0, 100, 34)) << "上沿扩出图像后没夹回";
 
     const auto bottom = expandBarcodeScanline(QRect{50, 596, 100, 1}, QSize{800, 600}, QSize{400, 300});
-    EXPECT_EQ(bottom, QRect(50, 588, 100, 12)) << "下沿扩出图像后没夹回";
+    EXPECT_EQ(bottom, QRect(50, 564, 100, 36)) << "下沿扩出图像后没夹回";
+}
+
+/**
+ * @brief 钉住非等倍比的画布：横纵两向各按自己的倍比换算
+ * @details 原图 800×600、画布 400×150：横向 0.5、纵向 0.25。
+ *          物理 (100,50,200,100) 换成逻辑 (50,12.5,100,25)，四边留 2 后取整外扩为 (48,10,104,30)。
+ */
+TEST(RedactionGeometry, UsesIndependentScalesForNonUniformCanvases)
+{
+    const auto mapped = logicalRedactionRect(QRect{100, 50, 200, 100}, QSize{800, 600}, QSize{400, 150});
+    ASSERT_TRUE(mapped.has_value());
+    EXPECT_EQ(*mapped, QRect(48, 10, 104, 30)) << "横纵没有各按自己的倍比换算，或留边取整口径变了";
+}
+
+/// 一批框里只数换算成功的那些：空框与完全越界的框被剔掉，其余照常产出
+TEST(RedactionGeometry, CountsOnlyBoxesThatMapIntoTheCanvas)
+{
+    const std::vector<QRect> boxes{QRect{100, 50, 200, 100}, QRect{500, 300, 20, 10}, QRect{}, QRect{380, 190, 20, 10}};
+
+    std::size_t mappedCount = 0;
+    for (const QRect &box: boxes)
+    {
+        if (logicalRedactionRect(box, kImageSize, kLogicalSize).has_value())
+        {
+            ++mappedCount;
+        }
+    }
+    EXPECT_EQ(mappedCount, 2U) << "被剔掉的应当是空框与完全越界的框，实测数量对不上";
 }

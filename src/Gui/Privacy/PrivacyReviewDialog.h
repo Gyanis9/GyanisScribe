@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "Core/Annotation/AnnotationTool.h"
 #include "Core/Privacy/PiiTypes.h"
 
 #include <QDialog>
@@ -17,13 +18,7 @@
 
 class QComboBox;
 class QListWidget;
-
-namespace GyanisScribe::Core
-{
-    // 本类只按值传出工具种类，不持有工具对象；前向声明就够，不必把整个标注工具头带进界面层。
-    // 限定作用域枚举不带底层类型时默认 int，与 AnnotationTool.h 里的定义相容。
-    enum class ToolKind;
-} // namespace GyanisScribe::Core
+class QPushButton;
 
 namespace GyanisScribe::Gui
 {
@@ -64,11 +59,15 @@ namespace GyanisScribe::Gui
          */
         void setAllCheckStates(Qt::CheckState checkState);
 
+        /// 一项都没勾时把「应用打码」灰掉：空批次落笔只会白白关一次对话框
+        void updateApplyEnabled();
+
         Q_DISABLE_COPY(PrivacyReviewDialog)
 
         std::vector<Core::Privacy::PiiItem> m_items;           ///< 命中项，下标与清单行一一对应
         QListWidget                        *m_list  = nullptr; ///< 逐项勾选清单
         QComboBox                          *m_style = nullptr; ///< 打码方式下拉
+        QPushButton                        *m_apply = nullptr; ///< 应用打码按钮，随勾选数启用或灰掉
     };
 
 } // namespace GyanisScribe::Gui

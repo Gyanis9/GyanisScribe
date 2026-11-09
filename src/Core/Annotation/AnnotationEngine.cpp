@@ -44,6 +44,10 @@ namespace GyanisScribe::Core
         /// 粘贴时副本相对原件每轮的偏移量，逻辑像素：叠得死死的会让人以为没粘上
         constexpr int kPasteOffsetStride = 8;
 
+        /// 马赛克方块边长的允许范围：与 AnnotationTool 对粒度参数的钳制口径一致，0 或负数会画出近乎无遮挡的马赛克
+        constexpr int kMinMosaicBlockSize = 1;
+        constexpr int kMaxMosaicBlockSize = 64;
+
         /**
          * @brief 插入一条图形
          * @details 撤销栈里的命令都只碰工具的存储接口，不碰交互态：
@@ -1468,8 +1472,8 @@ namespace GyanisScribe::Core
             return std::unexpected(Base::Error{Base::ErrorCode::InternalError, GyanisScribe::Base::uiTextUtf8("打码工具不在册：请检查工具登记表")});
         }
 
-        // 先把整批框夹回画布并剔掉退化框，全部校验通过才动撤销栈：有一条打不成就整批不落，
-        // 不留「插了一半」的批次，也不给撤销栈留空宏
+        // 先把整批框夹回画布并剔掉退化框，再到撤销栈上落笔：框被跳过不算失败，
+        // 只有整批都剔光才不落笔，也不给撤销栈留空宏
         const QRect bounds(QPoint(0, 0), m_canvas.logicalSize);
         struct ClippedRequest
         {
@@ -1481,6 +1485,14 @@ namespace GyanisScribe::Core
         clippedRequests.reserve(boxes.size());
         for (const auto &request: boxes)
         {
+            // 马赛克的粒度越界会画出近乎无遮挡的块：这与「已打码」的成功提示相矛盾，整批拒绝
+            if (tool == ToolKind::Mosaic && (request.mosaicBlockSize < kMinMosaicBlockSize || request.mosaicBlockSize > kMaxMosaicBlockSize))
+            {
+                return std::unexpected(Base::Error{
+                        Base::ErrorCode::InvalidArgument,
+                        GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("马赛克方块边长必须在 {} 到 {} 逻辑像素之间，收到的是 {}。请改用工具条上的细、中、粗一档再试"),
+                                                     kMinMosaicBlockSize, kMaxMosaicBlockSize, request.mosaicBlockSize)});
+            }
             const QRect clamped = request.logicalRect.normalized().intersected(bounds);
             if (clamped.isEmpty())
             {

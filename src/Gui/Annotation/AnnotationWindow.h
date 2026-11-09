@@ -18,6 +18,8 @@
 #include <memory>
 #include <optional>
 
+class QCloseEvent;
+
 namespace GyanisScribe::Base
 {
     struct CapturedImage;
@@ -229,6 +231,14 @@ namespace GyanisScribe::Gui
          * @param event 按键事件
          */
         void keyPressEvent(QKeyEvent *event) override;
+
+        /**
+         * @brief 系统关窗（Alt+F4、任务栏关闭）也走与 Esc/X 同一条收场路
+         * @param event 关闭事件
+         * @details 只 hide 的话轮次守卫还立着，迟到的隐私识别结果仍可能开审核并往看不见的画布上落笔；
+         *          这里先收工具栏与窗口、报一次 closed()，再把事件交给基类接受。
+         */
+        void closeEvent(QCloseEvent *event) override;
 
     private:
         /// 把标注结果交出去：先收窗口与工具栏，再发对应信号，避免成品图里带上界面；交付完也报 closed()

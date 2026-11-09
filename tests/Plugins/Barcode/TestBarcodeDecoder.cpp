@@ -1,6 +1,7 @@
 // 二维码/条形码识别的直测：自造一张码再认回来、噪声与空图都该是「一个都没认出」而不是错误。
 // 后端是可选的（见 src/Plugins/CMakeLists.txt）：宏按档给，没编后端时这一支只断言桩的行为——
 // 两种形状各有用例看住，不留「没编过」的分支。
+#include "Core/Privacy/RedactionGeometry.h"
 #include "Plugins/Barcode/BarcodeDecoder.h"
 
 #include <QColor>
@@ -61,17 +62,45 @@ TEST(BarcodeDecoder, PreferredReadingFavorsMatrixCodes)
 namespace
 {
     /**
-     * @brief 自造一张带静区的二维码灰度图
+     * @brief 自造一张带静区的码灰度图
      * @param payload 码里承载的文本
+     * @param format 码制
      * @param scale 每个模块放大到的像素数
      * @return 自带像素副本的图；后端写出的缓冲随 ZXing::Image 析构，不能直接借给 QImage
      */
-    QImage renderQrCode(const std::string &payload, int scale)
+    QImage renderCode(const std::string &payload, const ZXing::BarcodeFormat format, int scale)
     {
-        const auto         barcode  = ZXing::CreateBarcodeFromText(payload, ZXing::CreatorOptions{ZXing::BarcodeFormat::QRCode});
+        const auto         barcode  = ZXing::CreateBarcodeFromText(payload, ZXing::CreatorOptions{format});
         const ZXing::Image rendered = ZXing::WriteBarcodeToImage(barcode, ZXing::WriterOptions{}.scale(scale).addQuietZones(true));
 
         return QImage{rendered.data(), rendered.width(), rendered.height(), rendered.rowStride(), QImage::Format_Grayscale8}.copy();
+    }
+
+    /// 自造一张二维码：既有用例的入口，内部与条形码共用一份渲染
+    QImage renderQrCode(const std::string &payload, int scale)
+    {
+        return renderCode(payload, ZXing::BarcodeFormat::QRCode, scale);
+    }
+
+    /**
+     * @brief 码在画布上的实际墨迹范围
+     * @param image 灰度画布，静区为白
+     * @return 非白像素的外接框；整张全白时为空
+     */
+    QRect inkBounds(const QImage &image)
+    {
+        QRect bounds;
+        for (int y = 0; y < image.height(); ++y)
+        {
+            for (int x = 0; x < image.width(); ++x)
+            {
+                if (image.pixelColor(x, y).value() < 250)
+                {
+                    bounds = bounds.isNull() ? QRect{x, y, 1, 1} : bounds.united(QRect{x, y, 1, 1});
+                }
+            }
+        }
+        return bounds;
     }
 } // namespace
 
@@ -110,6 +139,43 @@ TEST(BarcodeDecoder, ReadingCarriesGeometryBoxInsideTheImage)
     EXPECT_TRUE(box.contains(canvas.rect().center())) << "几何框没盖住码中心";
     EXPECT_LT(box.width(), canvas.width()) << "几何框占满整幅图，说明不是从定位点收出来的";
     EXPECT_LT(box.height(), canvas.height()) << "几何框占满整幅图，说明不是从定位点收出来的";
+}
+
+/**
+ * @brief 钉住一维 Code128：认得出、码制与二维标记正确，几何框对条码本体有意义
+ * @details zxing 给一维码的定位点可能只覆盖解码行附近；本用例要求框横着盖住条码、
+ *          纵向落在条码行内。纵向高度由 Core 的打码几何负责：按 1 倍屏撑到至少
+ *          32 逻辑像素高，换算成物理像素后必须把整条码上下都盖住。
+ */
+TEST(BarcodeDecoder, ReadsBackASelfMadeCode128WithMeaningfulGeometryBox)
+{
+    const std::string payload  = "GYANIS-2026-1109";
+    const QImage      canvas   = renderCode(payload, ZXing::BarcodeFormat::Code128, 1);
+    const auto        readings = readBarcodes(canvas);
+    ASSERT_TRUE(readings.has_value());
+    const auto preferred = preferredReading(*readings);
+    ASSERT_TRUE(preferred.has_value()) << "自造的 Code128 没认出来";
+    EXPECT_EQ(preferred->text, QString::fromStdString(payload)) << "挑出来的文本对不上";
+    EXPECT_EQ(preferred->format, QStringLiteral("Code 128")) << "码制没报对";
+    EXPECT_FALSE(preferred->matrix) << "Code128 被标成了二维码";
+
+    const QRect ink = inkBounds(canvas);
+    ASSERT_FALSE(ink.isEmpty()) << "自造的条码整张全白，判据的靶子不干净";
+    const QRect &box = preferred->box;
+    EXPECT_FALSE(box.isEmpty()) << "认出了条码却没给出几何框";
+    EXPECT_TRUE(canvas.rect().contains(box)) << "几何框越出了输入图";
+    EXPECT_GE(box.width(), ink.width() * 9 / 10) << "几何框没横着盖住条码本体";
+    EXPECT_TRUE(ink.contains(box.center())) << "几何框的纵向中心落在条码行之外";
+
+    // 按 1 倍屏算：32 逻辑像素就是 32 物理像素；2 倍屏上物理高度会跟着翻倍
+    const QSize logicalSize = canvas.size();
+    const QRect expanded = GyanisScribe::Core::Privacy::expandBarcodeScanline(box, canvas.size(), logicalSize);
+    EXPECT_LE(expanded.top(), ink.top()) << "撑高后的打码框没盖住条码上沿";
+    EXPECT_GE(expanded.bottom(), ink.bottom()) << "撑高后的打码框没盖住条码下沿";
+
+    const auto mapped = GyanisScribe::Core::Privacy::logicalRedactionRect(expanded, canvas.size(), logicalSize);
+    ASSERT_TRUE(mapped.has_value());
+    EXPECT_GE(mapped->height(), 32) << "打码框落到画布后不足 32 逻辑像素高";
 }
 
 /**

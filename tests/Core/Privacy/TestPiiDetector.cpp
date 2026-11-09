@@ -114,6 +114,45 @@ TEST(PiiDetector, PrefersCountryCodePhoneOverLuhnBankCard)
 }
 
 /**
+ * @brief 钉住银行卡常见的分组写法：数字之间夹空格或短横线也要认
+ * @details 归一化之后再算长度与 Luhn，不能拿带分隔符的原串直接校验；
+ *          脱敏样例同样按数字归一化，分隔符不进样例。
+ */
+TEST(PiiDetector, DetectsBankCardsWithSpacesAndDashes)
+{
+    const OcrResult ocr = makeResult({
+            makeLine({OcrWord{QStringLiteral("4111 1111 1111 1111"), QRect(20, 20, 260, 24)}}),
+            makeLine({OcrWord{QStringLiteral("4111-1111-1111-1111"), QRect(20, 60, 260, 24)}}),
+    });
+
+    const std::vector<PiiItem> items = detectPii(ocr, {}, kFrameSize);
+
+    ASSERT_EQ(items.size(), 2U) << "分组写法的银行卡被漏掉了";
+    EXPECT_EQ(countKind(items, PiiKind::BankCard), 2);
+    EXPECT_EQ(items.at(0).maskedSample, QStringLiteral("4111********1111"));
+    EXPECT_EQ(items.at(1).maskedSample, QStringLiteral("4111********1111")) << "样例应去掉分隔符再遮";
+}
+
+/**
+ * @brief 钉住不带加号的 86 前缀手机号：既是常见写法，也不能被银行卡抢走
+ * @details 8613800138000 归一化后是 13 位数字，恰好落在银行卡的长度档；
+ *          它先按手机号认，银行卡候选由 86 区号形状的守卫剔掉。
+ */
+TEST(PiiDetector, AcceptsCountryCodePhoneWithoutPlus)
+{
+    const OcrResult ocr = makeResult({
+            makeLine({OcrWord{QStringLiteral("8613800138000"), QRect(20, 20, 200, 24)}}),
+    });
+
+    const std::vector<PiiItem> items = detectPii(ocr, {}, kFrameSize);
+
+    ASSERT_EQ(items.size(), 1U);
+    EXPECT_EQ(items.at(0).kind, PiiKind::Phone);
+    EXPECT_EQ(items.at(0).maskedSample, QStringLiteral("138****8000"));
+    EXPECT_EQ(countKind(items, PiiKind::BankCard), 0) << "86 区号加手机号不能同时列成银行卡";
+}
+
+/**
  * @brief 钉住座机区号前导 0 的拒绝面，并保留短横线脱敏形状
  */
 TEST(PiiDetector, DetectsLandlineAndRejectsAreaWithoutLeadingZero)

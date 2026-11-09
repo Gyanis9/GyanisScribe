@@ -159,7 +159,7 @@ namespace GyanisScribe::Main
         // 它要说的那句提示（后端没编进来、没有可认的图、认失败了）走 messageForUser 回到这一层出气泡
         m_ocr = std::make_unique<GyanisScribe::App::OcrCoordinator>(*m_settings, *m_integration, *m_icons, *m_theme);
         QObject::connect(m_ocr.get(), &GyanisScribe::App::OcrCoordinator::messageForUser, this, &AppController::notifyUser);
-        // 隐私扫描这一族只做「一张图的敏感信息检查」：提示回到这一层出气泡，失败另记一条日志。
+        // 隐私扫描这一族只做「一张图的敏感信息检查」：提示回到这一层出气泡，失败只在接 scanFailed 的这一处记一条日志。
         // 结果要落到画布上，所以接下来那两根线接在截图协调器那边（它才拿得到标注窗与引擎）
         m_privacy = std::make_unique<GyanisScribe::App::PrivacyCoordinator>(*m_settings, *m_integration);
         QObject::connect(m_privacy.get(), &GyanisScribe::App::PrivacyCoordinator::messageForUser, this, &AppController::notifyUser);

@@ -15,14 +15,14 @@ namespace GyanisScribe::Core::Privacy
 
     namespace
     {
-        // 手机号允许 +86 前缀与空格/短横线；前后不得再贴数字，避免把更长的编号切一段出来
-        const QRegularExpression kPhonePattern{QStringLiteral(R"((?<!\d)(?:\+86[\s-]?)?1[3-9](?:[\s-]?\d){9}(?!\d))")};
+        // 手机号允许 +86 或裸 86 前缀，以及空格/短横线；前后不得再贴数字，避免把更长的编号切一段出来
+        const QRegularExpression kPhonePattern{QStringLiteral(R"((?<!\d)(?:\+?86[\s-]?)?1[3-9](?:[\s-]?\d){9}(?!\d))")};
         // 座机必须带区号前导 0；短横线可选，区号 2-3 位、号码 7-8 位
         const QRegularExpression kLandlinePattern{QStringLiteral(R"((?<!\d)0\d{2,3}-?\d{7,8}(?!\d))")};
         // 身份证 18 位，末位允许 X；前后不能贴字母数字，防止从更长串里截取
         const QRegularExpression kIdCardPattern{QStringLiteral(R"((?<![0-9A-Za-z_])\d{17}[\dXx](?![0-9A-Za-z_]))")};
-        // 银行卡只认连续的 13-19 位数字，Luhn 校验与 86 区号手机形状的剔除放到匹配之后
-        const QRegularExpression kBankCardPattern{QStringLiteral(R"((?<!\d)\d{13,19}(?!\d))")};
+        // 银行卡允许 13-19 位数字之间夹空格/短横线（卡片与文档常按四位分组）；长度、Luhn 与 86 区号形状的剔除放到匹配之后
+        const QRegularExpression kBankCardPattern{QStringLiteral(R"((?<!\d)\d(?:[\s-]?\d){12,18}(?!\d))")};
         // 邮箱要求至少一个域名点与 2 位以上字母 TLD；连续点等残形交给校验函数拒绝
         const QRegularExpression kEmailPattern{
                 QStringLiteral(R"((?<![A-Za-z0-9._%+\-])[A-Za-z0-9._%+\-]+@(?:[A-Za-z0-9](?:[A-Za-z0-9\-]*[A-Za-z0-9])?\.)+[A-Za-z]{2,}(?![A-Za-z0-9\-]))")};
@@ -401,18 +401,19 @@ namespace GyanisScribe::Core::Privacy
 
         /**
          * @brief 校验银行卡候选
-         * @param value 连续数字候选
-         * @return true 表示长度 13-19 且通过 Luhn
+         * @param value 正则命中的候选，数字之间可能夹着空格或短横线
+         * @return true 表示归一化后长度 13-19 且通过 Luhn
          * @note 以 86 开头的 13 位号码正是 +86 手机号去掉加号后的形状；86 是中国区号而不是已发行的卡 IIN，
          *       这类候选即使 Luhn 通过也不按银行卡收，避免同一段文字被银行卡抢走
          */
         bool isValidBankCard(const QString &value)
         {
-            if (isCountryCodeMobileDigits(value))
+            const QString digits = digitsOnly(value);
+            if (isCountryCodeMobileDigits(digits))
             {
                 return false;
             }
-            return value.size() >= 13 && value.size() <= 19 && passesLuhn(value);
+            return digits.size() >= 13 && digits.size() <= 19 && passesLuhn(digits);
         }
 
         /**

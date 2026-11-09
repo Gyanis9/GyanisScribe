@@ -708,7 +708,7 @@ namespace GyanisScribe::App
         std::vector<QRect> barcodeBoxes;
         if (const auto readings = GyanisScribe::Plugins::readBarcodes(image); readings)
         {
-            // 一维码的定位框是一条近零高度的扫描线：额外纵向 8 逻辑像素的扩框算法在 Core 里单测，
+            // 一维码的定位框是一条近零高度的扫描线：撑到至少 32 逻辑像素高的算法在 Core 里单测，
             // 这里只管按它把物理框并进清单；二维码的定位框本来就框住整个码，原样并入
             barcodeBoxes.reserve(readings->size());
             for (const auto &reading: *readings)

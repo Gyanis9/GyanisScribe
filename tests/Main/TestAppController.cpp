@@ -1498,6 +1498,45 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住系统关窗（Alt+F4、任务栏关闭）之后迟到的隐私结果也被轮次守卫挡下
+     * @details 这条关窗路径不经过工具栏 X，只靠 closeEvent 才能把 closed() 与轮次守卫一起落地；
+     *          引擎与画布在关窗后仍留着上一轮，cacheKey 完全对得上，只有轮次守卫能分辨用户已经收工。
+     */
+    TEST_F(AppControllerFixture, PrivacyScanAfterSystemCloseIsRejected)
+    {
+        m_frameScreenName = m_realScreenName;
+        makeController();
+
+        auto &window = m_controller->capture().annotationWindow();
+        m_controller->capture().startFullScreen(App::CaptureIntent::Annotate);
+        ASSERT_TRUE(window.isVisible());
+        ASSERT_TRUE(window.isRoundActive());
+        const QImage scanned = window.canvas().image;
+
+        int closedCount = 0;
+        QObject::connect(&window, &Gui::AnnotationWindow::closed, &window, [&closedCount] { ++closedCount; });
+        window.close();
+        EXPECT_FALSE(window.isVisible()) << "系统关窗之后标注窗还留在屏上";
+        EXPECT_EQ(closedCount, 1) << "系统关窗没有报 closed()，或一轮报了几次";
+        ASSERT_FALSE(window.isRoundActive()) << "系统关窗之后这一轮还报「在编辑」";
+
+        int     messages = 0;
+        QString said;
+        QObject::connect(&m_controller->capture(), &App::CaptureCoordinator::messageForUser, &m_controller->capture(),
+                         [&messages, &said](const QString &message, Gui::ToastKind)
+                         {
+                             ++messages;
+                             said = message;
+                         });
+
+        m_controller->capture().handlePrivacyScan(scanned, Core::OcrResult{});
+
+        EXPECT_EQ(messages, 1) << "系统关窗之后回来的结果既没落笔也没把原因说给用户";
+        EXPECT_EQ(said, Base::uiText("当前没有正在编辑的标注，请重新截图后再试")) << said.toStdString();
+        EXPECT_FALSE(window.isVisible()) << "一扇已经关掉的窗被迟到的结果重新摆出来了";
+    }
+
+    /**
      * @brief 钉住有命中那一整条：审核确认后按实际交给引擎的框数报成功
      * @details 对话框是模态的，用例在进入 exec 的嵌套事件循环后用定时器按下「应用打码」。
      *          两个手机号各落一个框，成功提示必须是 2；窗口与这一轮都留着。

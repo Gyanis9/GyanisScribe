@@ -21,9 +21,17 @@ namespace GyanisScribe::Core::Privacy
     inline constexpr int kRedactionPaddingPixels = 2;
 
     /**
-     * @brief 一维条形码纵向要盖住的额外逻辑像素（上下合计）
-     * @details zxing 给一维码的定位框是一条接近零高度的扫描线，直接拿来打码只盖住一行像素；
-     *          上下各扩一半，条码本体才整个落在遮挡里。二维码的定位框本来框住整个码，不走这一档。
+     * @brief 一维条形码打码框的最小逻辑高度
+     * @details zxing 给一维码的定位框往往只覆盖解码行附近，可能不带条码高度；
+     *          只按它上下扩几个像素，小尺寸条码仍可能露出上下两截被扫出来。
+     *          这里统一撑到 32 逻辑像素高，以定位框中心为轴；距离画布上下边太近时按夹取后的高度算。
+     */
+    inline constexpr int kBarcodeMinLogicalHeight = 32;
+
+    /**
+     * @brief 一维条形码在原框高度之外再补的逻辑像素（上下合计）
+     * @details 定位框偶尔带一点高度；在原高度上再补 8，最终高度取它与最小高度中的较大者。
+     *          二维码的定位框本来框住整个码，不走这一档。
      */
     inline constexpr int kBarcodeVerticalExpansionPixels = 8;
 
@@ -31,8 +39,9 @@ namespace GyanisScribe::Core::Privacy
      * @brief 把一维条形码的扫描线定位框扩成能盖住条码本体的物理框
      * @param scanline zxing 返回的定位框，原图物理像素
      * @param imageSize 原图物理尺寸，扩完夹回这块矩形
-     * @param logicalSize 画布逻辑尺寸；纵向的额外逻辑像素按两维比例折成物理高度
-     * @return 扩好并夹回图像的框；尺寸退化时返回空矩形
+     * @param logicalSize 画布逻辑尺寸；最小高度与额外高度按纵向倍比折成物理像素
+     * @return 以扫描线为中心、至少 kBarcodeMinLogicalHeight 逻辑像素高、夹回图像的框；
+     *         尺寸退化或定位框为空时返回空矩形
      */
     [[nodiscard]] QRect expandBarcodeScanline(const QRect &scanline, QSize imageSize, QSize logicalSize);
 
