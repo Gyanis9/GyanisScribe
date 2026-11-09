@@ -1089,9 +1089,12 @@ TEST_F(ToolbarFixture, WhiteSwatchKeepsAVisibleOutline)
     }
     EXPECT_GT(outlinePixels, 0) << "白底上一格没有描边的白色色块等于看不见，用户会以为那一格是禁用的";
     EXPECT_GT(fillPixels, 0) << "色块没填上色板里的颜色";
-    // 3px 连续曲率路径把四角切掉：角上必须透明，白块在浅色底上才不会摊成一块方砖
-    EXPECT_EQ(bitmap.pixelColor(0, 0).alpha(), 0) << "色块左上角没有被路径切掉";
-    EXPECT_EQ(bitmap.pixelColor(bitmap.width() - 1, bitmap.height() - 1).alpha(), 0) << "色块右下角没有被路径切掉";
+    // 路径从 1 逻辑像素处起笔，最外圈对直角与圆角都是透明的，钉不住形状；
+    // 取往里第一个像素的角（按位图的物理倍比换算）：3px 连续曲率在那里只压住一部分，
+    // 路径退化成直角时这个像素会被填满，alpha 到 255
+    const int cornerInset = std::max(1, qRound(static_cast<qreal>(bitmap.width()) / static_cast<qreal>(kSwatchEdge)));
+    EXPECT_LT(bitmap.pixelColor(cornerInset, cornerInset).alpha(), 255) << "色块左上角没有圆角，路径还是方的";
+    EXPECT_LT(bitmap.pixelColor(bitmap.width() - 1 - cornerInset, bitmap.height() - 1 - cornerInset).alpha(), 255) << "色块右下角没有圆角，路径还是方的";
 }
 
 /**

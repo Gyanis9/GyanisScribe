@@ -12,6 +12,7 @@
 #include "Core/Annotation/PenTool.h"
 #include "Core/Annotation/RectangleTool.h"
 #include "Core/Annotation/TextTool.h"
+#include "Core/Geometry/ContinuousCorner.h"
 
 #include <QApplication>
 #include <QColor>
@@ -20,6 +21,7 @@
 #include <QFontMetricsF>
 #include <QImage>
 #include <QPainter>
+#include <QPen>
 #include <QString>
 
 #include <gtest/gtest.h>
@@ -1786,13 +1788,16 @@ TEST_F(AnnotationFixture, RoundedRectCutsTheCornersButKeepsTheSides)
 /**
  * @brief 钉住大半径下圆角矩形的转角按连续曲率提前收平，而不是圆弧一路下探
  * @details 60px 的小方块上两条路径的轮廓只差不到半像素，采不出差别；400px 时平滑度进到 0.85，
- *          过渡段沿上边拉长，离角 60px 的截面上描边中心比圆弧低一格半。
- *          (80,24) 在连续曲率的描边上，圆弧路径那里已经收进上边内侧，是空白。
+ *          过渡段沿上边拉长，离角 60px 的截面上描边中心比圆弧低约 1.75px。
+ *          (80,23) 在连续曲率的描边上（线宽 4，整行压在笔画里）；圆弧路径的描边外沿只到
+ *          y≈23.01，同一行几乎全白。旁边并排画一条平滑度 0 的圆弧对照，两处读数必须分开：
+ *          差别来自平滑度，而不是采样点的漂移。
  */
 TEST_F(AnnotationFixture, RoundedRectCornerJoinsTheEdgeWithContinuousCurvature)
 {
     constexpr int kSide = 400;
-    QImage        canvas(kSide + 40, kSide + 40, QImage::Format_ARGB32_Premultiplied);
+
+    QImage canvas(kSide + 40, kSide + 40, QImage::Format_ARGB32_Premultiplied);
     canvas.fill(Qt::white);
 
     AnnotationShape shape;
@@ -1805,13 +1810,27 @@ TEST_F(AnnotationFixture, RoundedRectCornerJoinsTheEdgeWithContinuousCurvature)
     tool.insertShape(0, shape);
     {
         QPainter painter(&canvas);
+        // 与 AnnotationEngine::exportImage 同一渲染档：生产路径开着抗锯齿，用例关着就采不到真实覆盖
+        painter.setRenderHint(QPainter::Antialiasing, true);
         tool.paintShapeAt(0, painter, PaintContext{canvas, 1.0});
+    }
+
+    // 对照：同样的矩形与画笔，只把平滑度归零，就是旧的圆弧圆角
+    QImage circular(kSide + 40, kSide + 40, QImage::Format_ARGB32_Premultiplied);
+    circular.fill(Qt::white);
+    {
+        QPainter painter(&circular);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setPen(QPen{QColor(0, 0, 0), 4.0, Qt::SolidLine, Qt::RoundCap});
+        painter.setBrush(Qt::NoBrush);
+        painter.drawPath(GyanisScribe::Core::continuousCornerPath(QRectF{shape.rect}, GyanisScribe::Core::CornerShape{72.0, 0.0}));
     }
 
     // 角被切掉、上边中段有墨：与 60px 用例同一条语义，这里只补大半径下的转角走向
     EXPECT_GT(canvas.pixelColor(21, 21).lightness(), 200) << "圆角档的角没被切掉";
     EXPECT_LT(canvas.pixelColor(220, 21).lightness(), 100) << "圆角档的上边中段没画出来";
-    EXPECT_LT(canvas.pixelColor(80, 24).lightness(), 100) << "转角还是圆弧，连续曲率的描边没落到画上";
+    EXPECT_LT(canvas.pixelColor(80, 23).lightness(), 100) << "转角还是圆弧，连续曲率的描边没落到画上";
+    EXPECT_GT(circular.pixelColor(80, 23).lightness(), 200) << "对照圆弧在同一像素上也压着墨，这个采样点分不出两种曲率";
 }
 
 /**
