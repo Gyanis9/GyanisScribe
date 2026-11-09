@@ -1,6 +1,6 @@
 /**
  * @file SquircleStyle.h
- * @brief 应用级代理样式：让原生风格不画菜单面板与菜单框
+ * @brief 应用级代理样式：接管菜单与提示弹层的原生面板，置空自绘输入类的原生边框
  * @author Gyanis
  * @date 2026-11-08
  * @version 0.0.1
@@ -16,7 +16,8 @@ namespace GyanisScribe::Gui
     /**
      * @brief 连续曲率控件共用的代理样式
      * @details 菜单面板与菜单框由 Gui::Menu 自绘：原生风格若照常画一层方形面板，
-     *          自绘的连续曲率高亮会被它盖住，角上的透明区也会露出方底。
+     *          自绘的连续曲率高亮会被它盖住，角上的透明区也会露出方底。提示弹层没有自绘类，
+     *          原生面板整层改成连续曲率面板。
      *          输入类的自绘底同理：带 squircle 属性的控件（及其内部的子行编辑）不再让原生风格
      *          画输入面板、边框与下拉/微调框主体，否则自绘的连续曲率底会被一层方底盖掉。
      */
@@ -32,14 +33,17 @@ namespace GyanisScribe::Gui
 
     protected:
         /**
-         * @brief 置空菜单面板与菜单框，以及自绘输入类的原生输入面板与边框
+         * @brief 接管菜单与提示弹层的原生面板，置空自绘输入类的原生输入面板与边框
          * @details 重写 QProxyStyle::drawPrimitive()：PE_PanelMenu 与 PE_FrameMenu 直接返回；
-         *          带 squircle 属性的控件（或其子控件）的 PE_PanelLineEdit、PE_FrameLineEdit 与
-         *          QAbstractScrollArea 的 PE_Frame 也直接返回，其余图元原样交给基类
+         *          PE_PanelTipLabel 按紧凑档画出连续曲率面板与描边；带 squircle 属性的控件
+         *          （或其子控件）的 PE_PanelLineEdit、PE_FrameLineEdit 与 QAbstractScrollArea 的
+         *          PE_Frame 也直接返回，其余图元原样交给基类
          * @param element 待绘制的图元
          * @param option 绘制参数
          * @param painter 目标画家
          * @param widget 目标控件
+         * @note 提示弹层的面板走样式表引擎的回落路径：QToolTip 的规则里必须没有边框声明，
+         *       否则 QStyleSheetStyle 会自己画完 PE_PanelTipLabel，这里不会被执行
          */
         void drawPrimitive(PrimitiveElement element, const QStyleOption *option, QPainter *painter, const QWidget *widget) const override;
 

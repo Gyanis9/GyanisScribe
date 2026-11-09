@@ -13,6 +13,7 @@
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Controls/Button.h"
 #include "Gui/Controls/ComboBox.h"
+#include "Gui/Controls/Menu.h"
 
 #include <QApplication>
 #include <QAction>
@@ -192,7 +193,7 @@ namespace GyanisScribe::Gui
         m_colorButton = makeButton("ColorPicker", GyanisScribe::Base::uiText("颜色"), false);
         m_colorButton->setObjectName(QStringLiteral("annotationColorButton"));
         m_colorButton->setPopupMode(QToolButton::InstantPopup);
-        m_colorMenu = new QMenu{this};
+        m_colorMenu = new Gui::Menu{this};
         m_colorMenu->setObjectName(QStringLiteral("annotationColorMenu"));
         m_colorButton->setMenu(m_colorMenu);
         // 每次弹出前重建：色板与最近使用只在面板里出现，选过一格之后不必另外通知界面

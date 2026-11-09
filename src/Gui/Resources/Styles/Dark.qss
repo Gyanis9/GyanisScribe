@@ -246,22 +246,17 @@ QSlider:disabled::handle:horizontal {
     border-color: #151515;
 }
 
-/* ---- 菜单与工具提示：弹层比卡片再圆一点，靠描边而不是阴影分层 ---- */
+/* ---- 菜单与工具提示：面板、描边与当前项高亮由 Gui::Menu 与 SquircleStyle 按连续曲率自绘，
+        这里只留抑制原生框的透明边框占位、内边距与文字色。
+        工具提示不能有任何 border 声明：样式表引擎只要判得出可画内容就会自己画完这一层，
+        代理风格收不到 PE_PanelTipLabel；内边距各加一像素，补上不再由边框占掉的宽度 ---- */
 QMenu {
-    background-color: #151515;
-    border: 1px solid #2A2A28;
-    border-radius: 16px;
+    border: 1px solid transparent;
     padding: 4px;
 }
 
 QMenu::item {
     padding: 4px 18px 4px 8px;
-    border-radius: 8px;
-    color: #E8E8E3;
-}
-
-QMenu::item:selected {
-    background-color: #20201E;
     color: #E8E8E3;
 }
 
@@ -275,25 +270,9 @@ QMenu::separator {
     margin: 2px 6px;
 }
 
-/* 已迁移的菜单由 Gui::Menu 自绘面板与当前项高亮；这里只压掉原生底与项底，
-   保留上面的 padding 与颜色规则，未迁移的菜单仍走原样式 */
-QMenu[squircle="true"] {
-    background-color: transparent;
-    border-color: transparent;
-}
-
-QMenu[squircle="true"]::item,
-QMenu[squircle="true"]::item:selected {
-    background-color: transparent;
-    border-radius: 0;
-}
-
 QToolTip {
-    background-color: #151515;
     color: #E8E8E3;
-    border: 1px solid #2A2A28;
-    border-radius: 8px;
-    padding: 4px 8px;
+    padding: 5px 9px;
 }
 
 /* ---- 列表：容器底与项高亮由 Gui::ListWidget 与 ItemDelegate 按连续曲率自绘，

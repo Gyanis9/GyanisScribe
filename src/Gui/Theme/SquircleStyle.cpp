@@ -1,8 +1,15 @@
 #include "Gui/Theme/SquircleStyle.h"
 
+#include "Core/Geometry/ContinuousCorner.h"
+#include "Gui/Theme/CornerStyle.h"
+#include "Gui/Theme/DesignTokens.h"
+
 #include <QAbstractScrollArea>
 #include <QApplication>
+#include <QPainter>
 #include <QPalette>
+#include <QPen>
+#include <QRectF>
 #include <QStyleOptionMenuItem>
 #include <QWidget>
 
@@ -50,6 +57,18 @@ namespace GyanisScribe::Gui
         // 并在圆角外补一块方底
         if (element == PE_PanelMenu || element == PE_FrameMenu)
         {
+            return;
+        }
+        // 提示弹层没有自绘类：面板与描边就在这里按紧凑档画出。QSS 的 QToolTip 规则只留文字色
+        // 与内边距，不能有任何边框声明——样式表引擎只要判得出可画内容，就会自己画完这一层，
+        // 本方法收不到这次调用
+        if (element == PE_PanelTipLabel)
+        {
+            painter->save();
+            painter->setRenderHint(QPainter::Antialiasing, true);
+            Core::paintContinuousCorner(*painter, QRectF{option->rect}.adjusted(0.5, 0.5, -0.5, -0.5), Core::cornerShapeFor(Core::CornerRole::Compact),
+                                        activePalette().surface, QPen{activePalette().borderStrong, static_cast<qreal>(themeBorderWidth(activeThemeKind()))});
+            painter->restore();
             return;
         }
         // 输入类的连续曲率底同样不能被原生输入面板、输入边框与滚动区边框盖掉

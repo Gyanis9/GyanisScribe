@@ -26,6 +26,7 @@
 #include <QPainter>
 #include <QPalette>
 #include <QStringListModel>
+#include <QStyleOption>
 #include <QStyledItemDelegate>
 #include <QWidget>
 
@@ -373,6 +374,47 @@ TEST_F(CornerControlsFixture, MenuPaintsSquirclePanelAndActiveItem)
     EXPECT_EQ(image.pixelColor(itemBackground), GyanisScribe::Gui::activePalette().hover);
     EXPECT_EQ(image.pixelColor(0, 0).alpha(), 0) << "菜单左上角必须透明，不能露出方形面板";
     EXPECT_EQ(image.pixelColor(menu.width() / 2, menu.height() - 8), GyanisScribe::Gui::activePalette().surface);
+}
+
+/**
+ * @brief 钉住菜单当前项高亮用的是紧凑档形状
+ * @details 高亮由 Gui::Menu 按 CornerRole::Compact 自绘，样式表不再给 QMenu::item:selected 铺底。
+ *          取样取当前项矩形的左上角：方角填充会把这格整块涂成悬停色，连续曲率把角切掉之后
+ *          这一格只剩菜单面板自身抗锯齿留下的极浅覆盖（本机实测 alpha 2）。先在同一行的右侧
+ *          断言悬停底确实在场，判据才不会被「根本没画高亮」蒙混过去。
+ */
+TEST_F(CornerControlsFixture, MenuHighlightUsesCompactShape)
+{
+    GyanisScribe::Gui::Menu menu;
+    auto *action = menu.addAction(QStringLiteral("项"));
+    menu.setActiveAction(action);
+    menu.show();
+    QCoreApplication::processEvents();
+    const QRect  item  = menu.actionGeometry(action);
+    const QImage image = menu.grab().toImage();
+    ASSERT_FALSE(item.isEmpty());
+    EXPECT_EQ(image.pixelColor(item.right() - 12, item.top() + 2), GyanisScribe::Gui::activePalette().hover) << "当前项没铺悬停底，判据的前提不成立";
+    EXPECT_LT(image.pixelColor(item.left(), item.top()).alpha(), 16) << "高亮左上角不应是方形";
+}
+
+/**
+ * @brief 钉住提示面板由代理风格按连续曲率画出
+ * @details QToolTip 的样式表只留文字色与内边距：任何边框声明（哪怕是透明的）都会让
+ *          QStyleSheetStyle 抢先把这一层画完，代理收不到 PE_PanelTipLabel。
+ *          判据直接调 drawPrimitive：左上角必须保持透明（角被切掉），中心必须是本档 surface。
+ */
+TEST_F(CornerControlsFixture, TooltipPanelIsDrawnByTheProxyStyle)
+{
+    QImage image{QSize{120, 40}, QImage::Format_ARGB32_Premultiplied};
+    image.fill(Qt::transparent);
+    QStyleOptionFrame option;
+    option.rect = QRect{0, 0, 120, 40};
+    {
+        QPainter painter{&image};
+        qApp->style()->drawPrimitive(QStyle::PE_PanelTipLabel, &option, &painter, nullptr);
+    }
+    EXPECT_EQ(image.pixelColor(0, 0).alpha(), 0);
+    EXPECT_EQ(image.pixelColor(60, 20), GyanisScribe::Gui::activePalette().surface);
 }
 
 /**

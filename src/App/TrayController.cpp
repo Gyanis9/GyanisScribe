@@ -5,6 +5,7 @@
 #include "Platform/IPlatformIntegration.h"
 #include "Platform/PlatformCapabilities.h"
 #include "Gui/Record/RecordingHud.h"
+#include "Gui/Controls/Menu.h"
 #include "Core/Hotkey/HotkeyManager.h"
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
@@ -135,7 +136,7 @@ namespace GyanisScribe::App
         if (m_icon == nullptr)
         {
             m_icon = new QSystemTrayIcon{this};
-            m_menu = std::make_unique<QMenu>();
+            m_menu = std::make_unique<Gui::Menu>();
             // 左键与中键各按设置里那一格走；这条连接只在这里挂一次——install() 会随主题重跑，
             // 挂在外面每次重跑就多接一条，一次点击会发出好几个动作
             QObject::connect(m_icon, &QSystemTrayIcon::activated, this, &TrayController::onActivated);
@@ -181,7 +182,8 @@ namespace GyanisScribe::App
             // 多屏：把「整屏截图」整条换成子菜单，第一项接管原来那一档
             if (*entry.action == TrayAction::CaptureFullScreen && screenNames.size() > 1)
             {
-                auto *submenu = menu.addMenu(entry.label);
+                auto *submenu = new Gui::Menu{entry.label, &menu};
+                menu.addMenu(submenu);
                 if (!entry.iconName.empty())
                 {
                     submenu->setIcon(m_icons.icon(entry.iconName));

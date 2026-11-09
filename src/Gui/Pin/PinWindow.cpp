@@ -21,6 +21,7 @@
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Resources/IconProvider.h"
 #include "Gui/Controls/KeyStep.h"
+#include "Gui/Controls/Menu.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/NamingRules.h"
@@ -2321,7 +2322,7 @@ namespace GyanisScribe::Gui
 
     QMenu *PinWindow::buildContextMenu()
     {
-        auto *menu     = new QMenu(this);
+        auto *menu     = new GyanisScribe::Gui::Menu(this);
         auto  menuFont = menu->font();
         menuFont.setPointSize(GyanisScribe::Gui::kMenuTextPointSize);
         menu->setFont(menuFont);
@@ -2457,7 +2458,7 @@ namespace GyanisScribe::Gui
 
         // 背景色（白板）：垫在图的后面，透明像素处露出来的就是它；「无背景」回到透出桌面那一档。
         // 四项预设各一项，外加一个开取色对话框的自定义
-        auto      *backgroundMenu      = menu->addMenu(GyanisScribe::Base::uiText("背景色"));
+        auto      *backgroundMenu      = new GyanisScribe::Gui::Menu{GyanisScribe::Base::uiText("背景色"), menu};
         const auto addBackgroundChoice = [this, backgroundMenu](const QString &label, const QColor &color)
         {
             auto *item = backgroundMenu->addAction(label);
@@ -2486,9 +2487,10 @@ namespace GyanisScribe::Gui
                                  setBackgroundColor(picked);
                              }
                          });
+        menu->addMenu(backgroundMenu);
 
         // 透明区：带透明通道的图，那些像素底下画什么。四档各管一件事，所以把「露底色」与「让桌面透出来」摆在前面
-        auto      *backdropMenu      = menu->addMenu(GyanisScribe::Base::uiText("透明区"));
+        auto      *backdropMenu      = new GyanisScribe::Gui::Menu{GyanisScribe::Base::uiText("透明区"), menu};
         const auto addBackdropChoice = [this, backdropMenu](const QString &label, const Core::TransparentBackdrop mode, const QString &hint)
         {
             auto *item = backdropMenu->addAction(label);
@@ -2505,6 +2507,7 @@ namespace GyanisScribe::Gui
                           GyanisScribe::Base::uiText("按深色棋盘画出透明区，摆在白文档上看得出边界"));
         addBackdropChoice(GyanisScribe::Base::uiText("亮色棋盘"), Core::TransparentBackdrop::LightChecker,
                           GyanisScribe::Base::uiText("按亮色棋盘画出透明区，摆在深色桌面上看得出边界"));
+        menu->addMenu(backdropMenu);
 
         // 只显示这一张：其余的收起来，屏幕腾给这一张；再点一下恢复按组的那套规则。
         // 与「标注」那两档不同，它对谁用都成立（动图也一样）
@@ -2520,7 +2523,7 @@ namespace GyanisScribe::Gui
         // 移动到分组：列出管理器推过来的现有分组号，当前那一项带勾且灰掉（「现在就在这儿」），
         // 末尾一项按现有最大组号 +1 现建新组。移过去等于把它从当前这组暂时收起来，
         // 与实际改动都由管理器一处落账
-        auto *groupMenu = menu->addMenu(GyanisScribe::Base::uiText("移动到分组"));
+        auto *groupMenu = new GyanisScribe::Gui::Menu{GyanisScribe::Base::uiText("移动到分组"), menu};
         for (const int group: m_groupChoices)
         {
             // 起过名字的组带出名字，没起过的还是「分组 N」：加一档命名不该把老账改写成另一种样子
@@ -2558,6 +2561,7 @@ namespace GyanisScribe::Gui
         {
             deleteGroupAction->setToolTip(GyanisScribe::Base::uiText("第一组是删掉别的组时成员并回去的落点，删不掉；想把这一张挪走请用上面的分组"));
         }
+        menu->addMenu(groupMenu);
 
         menu->addSeparator();
 
