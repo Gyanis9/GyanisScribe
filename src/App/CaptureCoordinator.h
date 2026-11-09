@@ -33,6 +33,7 @@ namespace GyanisScribe::Core
     class AnnotationEngine;
     class IScreenCaptureSource;
     class ISettingsStore;
+    struct OcrResult;
 } // namespace GyanisScribe::Core
 
 namespace GyanisScribe::Gui
@@ -115,6 +116,15 @@ namespace GyanisScribe::App
          * @details 窗、采集服务与选区三者只有这里能同时看到；用例据此驱动「拖边框→重抓」这一整条。
          */
         [[nodiscard]] GyanisScribe::Gui::AnnotationWindow &annotationWindow() const noexcept;
+
+        /**
+         * @brief 隐私扫描回来了：认码、检测敏感信息、审核，再在画布上批量打码
+         * @param image 发起扫描时那一张画布原图，物理像素
+         * @param result 识别结果，词框与行框都和 image 同一坐标系
+         * @details 画布在识别期间被刷新或重裁时丢弃过期结果并提示重新发起；没有命中只给一句提示，
+         *          不弹空清单。用户确认后才落笔，选中项按画布逻辑坐标换算并四周留边，整批可一次撤销。
+         */
+        void handlePrivacyScan(const QImage &image, const GyanisScribe::Core::OcrResult &result);
 
         /**
          * @brief 这一刻有没有一轮从框选或长截图起头的流程在跑

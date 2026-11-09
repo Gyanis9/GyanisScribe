@@ -14,6 +14,8 @@
 #include "Core/Capture/ScreenUtils.h"
 #include "Core/History/HistoryTypes.h"
 #include "Core/History/UnsavedArchive.h"
+#include "Core/Ocr/OcrTypes.h"
+#include "Core/Privacy/PiiDetector.h"
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Image/ImageFit.h"
 #include "Core/Settings/NamingRules.h"
@@ -21,6 +23,7 @@
 #include "Gui/Annotation/AnnotationToolbar.h"
 #include "Gui/Annotation/AnnotationWindow.h"
 #include "Gui/Capture/CaptureService.h"
+#include "Gui/Privacy/PrivacyReviewDialog.h"
 #include "Gui/Resources/IconProvider.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Gui/Theme/ThemeManager.h"
@@ -39,7 +42,9 @@
 #include <QScreen>
 #include <QTimer>
 
+#include <cmath>
 #include <format>
+#include <vector>
 
 namespace
 {
@@ -668,6 +673,97 @@ namespace GyanisScribe::App
         {
             emit messageForUser(GyanisScribe::Base::uiText("认出 %1 个码，已复制最上面那条").arg(static_cast<int>(readings->size())), GyanisScribe::Gui::ToastKind::Success);
         }
+    }
+
+    void CaptureCoordinator::handlePrivacyScan(const QImage &image, const GyanisScribe::Core::OcrResult &result)
+    {
+        // 识别是异步的：回来时画布可能已经刷新或重裁（F5、拖边框），旧框的坐标属于另一张图。
+        // 同一份图像素的 cacheKey 不变，换了底图就变——比尺寸更严，同尺寸重裁也能挡住
+        const auto &canvas = m_annotation->canvas();
+        if (image.isNull() || canvas.image.isNull() || image.cacheKey() != canvas.image.cacheKey())
+        {
+            emit messageForUser(GyanisScribe::Base::uiText("画布已经变了，请重新点隐私打码"), GyanisScribe::Gui::ToastKind::Information);
+            return;
+        }
+
+        std::vector<QRect> barcodeBoxes;
+        if (const auto readings = GyanisScribe::Plugins::readBarcodes(image); readings)
+        {
+            // 一维码的定位框是一条近零高度的扫描线：按 8 个逻辑像素折成物理高度再上下各扩一半，
+            // 换算到画布上才真是纵向 8 逻辑像素；二维码的定位框本来就框住整个码，原样并入
+            const qreal verticalScale = canvas.logicalSize.height() > 0 ? static_cast<qreal>(canvas.image.height()) / static_cast<qreal>(canvas.logicalSize.height()) : 1.0;
+            const int   expansion     = static_cast<int>(std::lround(8.0 * verticalScale));
+            barcodeBoxes.reserve(readings->size());
+            for (const auto &reading: *readings)
+            {
+                QRect box = reading.box.normalized();
+                if (!reading.matrix)
+                {
+                    box.adjust(0, -expansion, 0, expansion);
+                }
+                box = box.intersected(image.rect());
+                if (!box.isEmpty())
+                {
+                    barcodeBoxes.push_back(box);
+                }
+            }
+        } else
+        {
+            // 码识别后端不在场不该拖住文本检测：记下原因，清单里不出现二维码项
+            GyanisScribe::Base::Logger::warning(std::format("隐私扫描里的二维码识别已跳过：{}", readings.error().message));
+        }
+
+        const auto items = GyanisScribe::Core::Privacy::detectPii(result, barcodeBoxes, image.size());
+        if (items.empty())
+        {
+            emit messageForUser(GyanisScribe::Base::uiText("没有发现可打码的敏感信息。请仍自行检查后再分享。"), GyanisScribe::Gui::ToastKind::Information);
+            return;
+        }
+
+        // 审核是用户确认这一步：默认全选也要按下「应用打码」才落笔，取消或一项不选都什么都不改
+        GyanisScribe::Gui::PrivacyReviewDialog dialog{items, m_annotationWindow.get()};
+        if (dialog.exec() != QDialog::Accepted)
+        {
+            return;
+        }
+        const auto selected = dialog.selectedItems();
+        if (selected.empty())
+        {
+            return;
+        }
+
+        // 物理框换到画布逻辑坐标：按两个方向的倍比各算一次，四边再留 2 逻辑像素；
+        // 一维码的纵向扩展已经在检测前并进物理框，这里不再重复
+        const qreal scaleX = canvas.image.width() > 0 ? static_cast<qreal>(canvas.logicalSize.width()) / static_cast<qreal>(canvas.image.width()) : 1.0;
+        const qreal scaleY = canvas.image.height() > 0 ? static_cast<qreal>(canvas.logicalSize.height()) / static_cast<qreal>(canvas.image.height()) : 1.0;
+        const QRect bounds{QPoint{0, 0}, canvas.logicalSize};
+        std::vector<GyanisScribe::Core::RedactionRequest> requests;
+        requests.reserve(selected.size());
+        for (const auto &item: selected)
+        {
+            const QRectF physical{item.physicalBox.normalized()};
+            QRectF       logical{physical.left() * scaleX, physical.top() * scaleY, physical.width() * scaleX, physical.height() * scaleY};
+            logical.adjust(-2.0, -2.0, 2.0, 2.0);
+            const QRect clamped = logical.toAlignedRect().intersected(bounds);
+            if (clamped.isEmpty())
+            {
+                continue;
+            }
+            requests.push_back(GyanisScribe::Core::RedactionRequest{.logicalRect = clamped});
+        }
+        if (requests.empty())
+        {
+            emit messageForUser(GyanisScribe::Base::uiText("这些打码框都落在画布之外或小到看不见：请重新检测，或手动框选后再打码"), GyanisScribe::Gui::ToastKind::Information);
+            return;
+        }
+
+        if (auto added = m_annotation->addRedactions(requests, dialog.redactionTool()); !added)
+        {
+            emit messageForUser(QString::fromStdString(added.error().message), GyanisScribe::Gui::ToastKind::Danger);
+            return;
+        }
+        // 数的是用户勾选的条数：勾了但换算后落在画布外的框引擎会剔掉，这里仍按用户确认的数量报
+        emit messageForUser(GyanisScribe::Base::uiText("已打码 %1 处；请自行检查后再分享。").arg(static_cast<int>(selected.size())), GyanisScribe::Gui::ToastKind::Success);
     }
 
     GyanisScribe::App::CaptureIntent CaptureCoordinator::settingsCaptureIntent() const

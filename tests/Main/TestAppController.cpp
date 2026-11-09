@@ -5,7 +5,9 @@
 
 #include "App/CaptureCoordinator.h"
 #include "App/CustomHotkeys.h"
+#include "App/PrivacyCoordinator.h"
 #include "App/RewindCoordinator.h"
+#include "Core/Ocr/OcrTypes.h"
 #include "Gui/Annotation/AnnotationWindow.h"
 #include "Gui/Capture/CaptureOverlay.h"
 #include "App/TrayController.h"
@@ -50,6 +52,7 @@
 #include <QScreen>
 #include <QSize>
 #include <QString>
+#include <QToolButton>
 #include <QVector>
 
 #include <algorithm>
@@ -1376,6 +1379,122 @@ namespace GyanisScribe
         const auto entries = readHistory();
         ASSERT_TRUE(entries.has_value());
         EXPECT_TRUE(entries->empty()) << "录屏没开始，历史里却多出了记录";
+    }
+
+    /**
+     * @brief 钉住隐私扫描无命中：只说一句结果，不弹空的审核对话框，画布与窗口都留着
+     * @details 隐私打码的入口在标注窗，结果却落在画布上：无命中这条最短的路把
+     *          「结果图与画布对齐 → 认码 → 检测 → 提示」整条串起来，且不能把标注窗收掉。
+     */
+    TEST_F(AppControllerFixture, PrivacyScanWithoutHitsOnlyReportsTheOutcome)
+    {
+        m_frameScreenName = m_realScreenName;
+        makeController();
+
+        auto &window = m_controller->capture().annotationWindow();
+        m_controller->capture().startFullScreen(App::CaptureIntent::Annotate);
+        ASSERT_TRUE(window.isVisible()) << "标注窗没开起来，后面的判据无从谈起";
+
+        int     messages = 0;
+        QString said;
+        QObject::connect(&m_controller->capture(), &App::CaptureCoordinator::messageForUser, &m_controller->capture(),
+                         [&messages, &said](const QString &message, Gui::ToastKind)
+                         {
+                             ++messages;
+                             said = message;
+                         });
+
+        // 纯色替身帧里没有文字也没有码：检测器给空清单
+        m_controller->capture().handlePrivacyScan(window.canvas().image, Core::OcrResult{});
+
+        EXPECT_EQ(messages, 1) << "无命中该只说一句结果";
+        EXPECT_EQ(said, Base::uiText("没有发现可打码的敏感信息。请仍自行检查后再分享。")) << said.toStdString();
+        EXPECT_TRUE(window.isVisible()) << "无命中提示之后标注窗被收掉了";
+        EXPECT_TRUE(window.toolbar().isVisible());
+    }
+
+    /**
+     * @brief 钉住过期结果被丢弃：画布在识别期间换过，就不许把旧框落到新画布上
+     * @details 隐私扫描是异步的；等待期间用户按了 F5 或重裁，框的坐标已经不属于当前画布。
+     *          这一格拿一张 cacheKey 不同的同尺寸图冒充过期结果，判的是提示而不是静默落笔。
+     */
+    TEST_F(AppControllerFixture, PrivacyScanRejectsAStaleImage)
+    {
+        m_frameScreenName = m_realScreenName;
+        makeController();
+
+        auto &window = m_controller->capture().annotationWindow();
+        m_controller->capture().startFullScreen(App::CaptureIntent::Annotate);
+        ASSERT_TRUE(window.isVisible());
+
+        int     messages = 0;
+        QString said;
+        QObject::connect(&m_controller->capture(), &App::CaptureCoordinator::messageForUser, &m_controller->capture(),
+                         [&messages, &said](const QString &message, Gui::ToastKind)
+                         {
+                             ++messages;
+                             said = message;
+                         });
+
+        QImage stale(kFrameWidth, kFrameHeight, QImage::Format_ARGB32);
+        stale.fill(Qt::black);
+        ASSERT_NE(stale.cacheKey(), window.canvas().image.cacheKey());
+
+        m_controller->capture().handlePrivacyScan(stale, Core::OcrResult{});
+
+        EXPECT_EQ(messages, 1) << "过期结果该被挡下并说清出路";
+        EXPECT_EQ(said, Base::uiText("画布已经变了，请重新点隐私打码")) << said.toStdString();
+        EXPECT_TRUE(window.isVisible());
+    }
+
+    /**
+     * @brief 钉住隐私协调器确实接在窗口入口与画布那一层之间
+     * @details 控制器里没有别的口子能拿到这份协调器，接线少一根都只能靠读代码发现：
+     *          窗口的 privacyRequested 要叫到 requestScan（协调器当场回一句「正在检查」或后端原因），
+     *          协调器的 scanSucceeded 要落到 CaptureCoordinator::handlePrivacyScan（无命中那句提示）。
+     *          真识别一轮由 TestPrivacyCoordinator 的假引擎覆盖，这里只判接线。
+     */
+    TEST_F(AppControllerFixture, PrivacyCoordinatorIsWiredToWindowAndCanvas)
+    {
+        m_frameScreenName = m_realScreenName;
+        makeController();
+
+        auto &privacy = m_controller->privacyCoordinatorForTesting();
+        auto &capture = m_controller->capture();
+        auto &window  = capture.annotationWindow();
+        capture.startFullScreen(App::CaptureIntent::Annotate);
+        ASSERT_TRUE(window.isVisible());
+
+        int privacyMessages = 0;
+        QObject::connect(&privacy, &App::PrivacyCoordinator::messageForUser, &privacy, [&privacyMessages](const QString &, Gui::ToastKind) { ++privacyMessages; });
+
+        QToolButton *privacyButton = nullptr;
+        for (auto *candidate: window.toolbar().findChildren<QToolButton *>())
+        {
+            if (candidate->accessibleName() == Base::uiText("隐私打码"))
+            {
+                privacyButton = candidate;
+                break;
+            }
+        }
+        ASSERT_NE(privacyButton, nullptr) << "标注窗工具栏上找不到隐私打码入口";
+        privacyButton->click();
+        EXPECT_EQ(privacyMessages, 1) << "窗口的隐私打码入口没有叫到协调器（既没开始检查也没报后端原因）";
+        EXPECT_TRUE(window.isVisible()) << "发起检查就把标注窗收了";
+
+        int     canvasMessages = 0;
+        QString said;
+        QObject::connect(&capture, &App::CaptureCoordinator::messageForUser, &capture,
+                         [&canvasMessages, &said](const QString &message, Gui::ToastKind)
+                         {
+                             ++canvasMessages;
+                             said = message;
+                         });
+
+        // 直接发一条成功结果：真识别由 TestPrivacyCoordinator 的假引擎驱动，这里判的是这根线
+        privacy.scanSucceeded(window.canvas().image, Core::OcrResult{});
+        EXPECT_EQ(canvasMessages, 1) << "协调器的结果没有落到画布那一层";
+        EXPECT_EQ(said, Base::uiText("没有发现可打码的敏感信息。请仍自行检查后再分享。")) << said.toStdString();
     }
 
 } // namespace GyanisScribe

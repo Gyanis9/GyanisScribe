@@ -13,6 +13,7 @@
 #include "App/PinCoordinator.h"
 #include "App/PickCoordinator.h"
 #include "App/OcrCoordinator.h"
+#include "App/PrivacyCoordinator.h"
 #include "App/RecordingCoordinator.h"
 #include "Gui/Capture/CaptureService.h"
 #include "Core/Capture/IScreenCaptureSource.h"
@@ -158,6 +159,12 @@ namespace GyanisScribe::Main
         // 它要说的那句提示（后端没编进来、没有可认的图、认失败了）走 messageForUser 回到这一层出气泡
         m_ocr = std::make_unique<GyanisScribe::App::OcrCoordinator>(*m_settings, *m_integration, *m_icons, *m_theme);
         QObject::connect(m_ocr.get(), &GyanisScribe::App::OcrCoordinator::messageForUser, this, &AppController::notifyUser);
+        // 隐私扫描这一族只做「一张图的敏感信息检查」：提示回到这一层出气泡，失败另记一条日志。
+        // 结果要落到画布上，所以接下来那两根线接在截图协调器那边（它才拿得到标注窗与引擎）
+        m_privacy = std::make_unique<GyanisScribe::App::PrivacyCoordinator>(*m_settings, *m_integration);
+        QObject::connect(m_privacy.get(), &GyanisScribe::App::PrivacyCoordinator::messageForUser, this, &AppController::notifyUser);
+        QObject::connect(m_privacy.get(), &GyanisScribe::App::PrivacyCoordinator::scanFailed, this,
+                         [](const GyanisScribe::Base::Error &error) { GyanisScribe::Base::Logger::error(std::format("隐私扫描失败：{}", error.message)); });
         m_tray         = std::make_unique<GyanisScribe::App::TrayController>(*m_icons, *m_theme, *m_settings, *m_integration);
         m_historyStore = std::make_unique<GyanisScribe::Core::HistoryStore>(std::move(historyStoragePath));
         m_mainWindow   = std::make_unique<MainWindow>(*m_settings, *m_theme, *m_icons, *m_historyStore, m_integration->capabilities(), *m_integration);
@@ -231,6 +238,11 @@ namespace GyanisScribe::Main
         QObject::connect(m_capture.get(), &GyanisScribe::App::CaptureCoordinator::commandLineActionFailed, this, &AppController::commandLineActionFailed);
         QObject::connect(m_capture.get(), &GyanisScribe::App::CaptureCoordinator::commandLineCaptureDelivered, this, &AppController::commandLineCaptureDelivered);
         QObject::connect(m_tray.get(), &GyanisScribe::App::TrayController::screenCaptureRequested, m_capture.get(), &GyanisScribe::App::CaptureCoordinator::captureScreen);
+        // 隐私打码的两根线：标注窗的入口发起扫描，扫描成功交回截图协调器认码、审核、落笔。
+        // 标注窗不关，结果回来之前用户还能接着改；过期画布由 handlePrivacyScan 自己挡
+        QObject::connect(&m_capture->annotationWindow(), &GyanisScribe::Gui::AnnotationWindow::privacyRequested, m_privacy.get(),
+                         &GyanisScribe::App::PrivacyCoordinator::requestScan);
+        QObject::connect(m_privacy.get(), &GyanisScribe::App::PrivacyCoordinator::scanSucceeded, m_capture.get(), &GyanisScribe::App::CaptureCoordinator::handlePrivacyScan);
         // 托盘那一族的逐屏截图接在协调器建好之后：连在尚未构造的成员上时 QObject::connect 不报错，
         // 托盘图标与菜单都照常现身，点下去却什么都不会发生
 
@@ -557,6 +569,11 @@ namespace GyanisScribe::Main
     GyanisScribe::App::RewindCoordinator &AppController::rewindCoordinatorForTesting() const noexcept
     {
         return *m_rewind;
+    }
+
+    GyanisScribe::App::PrivacyCoordinator &AppController::privacyCoordinatorForTesting() const noexcept
+    {
+        return *m_privacy;
     }
 
     void AppController::handleHotkeyActionForTesting(const GyanisScribe::Core::HotkeyAction action)

@@ -1589,6 +1589,49 @@ TEST_F(AnnotationWindowFixture, ScanButtonEmitsTheBakedExportAndKeepsTheWindow)
 }
 
 /**
+ * @brief 钉住「隐私打码」按钮：交出去的是画布原图，而且窗口不收场
+ * @details 隐私扫描认的是底图上的文字与码框，不是烘上图形的成品；入口与扫码同一口径——
+ *          检查结果回到宿主再弹审核，编辑现场必须留着。
+ */
+TEST_F(AnnotationWindowFixture, PrivacyButtonEmitsTheCanvasImageAndKeepsTheWindow)
+{
+    auto window = makeWindow();
+    window->startAnnotation(makeCanvas({200, 100}), QRect{0, 0, 1920, 1080}, QRect{0, 0, 200, 100});
+    ASSERT_TRUE(window->isVisible());
+
+    auto   privacyCalls = 0;
+    QImage requested;
+    QObject::connect(window.get(), &AnnotationWindow::privacyRequested,
+                     [&](const QImage &image)
+                     {
+                         ++privacyCalls;
+                         requested = image;
+                     });
+
+    ASSERT_TRUE(drawAndSelect({10, 10}, {60, 40}).has_value());
+    ASSERT_TRUE(window->toolbar().isVisible());
+
+    QToolButton *privacyButton = nullptr;
+    for (auto *candidate: window->toolbar().findChildren<QToolButton *>())
+    {
+        if (candidate->accessibleName() == QString::fromUtf8("隐私打码"))
+        {
+            privacyButton = candidate;
+            break;
+        }
+    }
+    ASSERT_NE(privacyButton, nullptr) << "工具栏上找不到「隐私打码」按钮";
+    privacyButton->click();
+
+    EXPECT_EQ(privacyCalls, 1) << "点了按钮没走到隐私打码那一路";
+    ASSERT_FALSE(requested.isNull());
+    EXPECT_EQ(requested.size(), QSize(400, 200)) << "交出去的不是画布的物理尺寸";
+    EXPECT_EQ(requested.cacheKey(), window->canvas().image.cacheKey()) << "交出去的应当是画布原图，而不是烘上图形的成品";
+    EXPECT_TRUE(window->isVisible()) << "隐私打码把窗口收了：检查结果还没回来，编辑现场得留着";
+    EXPECT_TRUE(window->toolbar().isVisible());
+}
+
+/**
  * @brief 钉住 Ctrl+Shift+↑/↓ 与 Home/End 从窗口接到引擎
  * @details 两条实心矩形盖同一块地，中心像素就是层叠读数；四条键各按一次核对读数。
  */

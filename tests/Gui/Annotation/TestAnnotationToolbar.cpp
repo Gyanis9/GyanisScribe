@@ -66,7 +66,7 @@ namespace
     constexpr std::array<std::string_view, 14> kToolShortcuts = {"V", "R", "E", "A", "P", "H", "M", "T", "N", "L", "B", "X", "G", "F"};
 
     /// 动作按钮的中文名，同样按需求第六节的排列顺序抄一份
-    constexpr std::array<std::string_view, 5> kActionLabels = {"复制到剪贴板", "保存为文件", "贴到屏幕上", "识别文字", "识别二维码"};
+    constexpr std::array<std::string_view, 6> kActionLabels = {"复制到剪贴板", "保存为文件", "贴到屏幕上", "识别文字", "识别二维码", "隐私打码"};
 
     /// 全 1920x1080、原点的可用区，几何用例的默认舞台
     constexpr QRect kScreen{0, 0, 1920, 1080};
@@ -153,7 +153,7 @@ namespace
             std::vector<int>      textItalics;      ///< textItalicChanged 收到的开关（1 开 0 关）
             std::vector<int>      textOutlines;     ///< textOutlineChanged 收到的开关（1 开 0 关）
             std::vector<int>      textBackgrounds;  ///< textBackgroundChanged 收到的开关（1 开 0 关）
-            int                   actions{};        ///< 四个动作按钮的合计触发次数
+            int                   actions{};        ///< 六个动作按钮的合计触发次数
             int                   undo{};           ///< undoClicked 次数
             int                   redo{};           ///< redoClicked 次数
             int                   closes{};         ///< closeClicked 次数
@@ -191,7 +191,7 @@ namespace
             QObject::connect(toolbar.get(), &AnnotationToolbar::redoClicked, [&log] { ++log.redo; });
             QObject::connect(toolbar.get(), &AnnotationToolbar::closeClicked, [&log] { ++log.closes; });
             for (auto signal: {&AnnotationToolbar::copyClicked, &AnnotationToolbar::saveClicked, &AnnotationToolbar::pinClicked, &AnnotationToolbar::ocrClicked,
-                               &AnnotationToolbar::scanClicked})
+                               &AnnotationToolbar::scanClicked, &AnnotationToolbar::privacyClicked})
             {
                 QObject::connect(toolbar.get(), signal, [&log] { ++log.actions; });
             }
@@ -1199,7 +1199,7 @@ TEST_F(ToolbarFixture, SliderStepsMapToLadderWidths)
 
 /**
  * @brief 钉住颜色菜单里的色块与动作按钮各归各位
- * @details 点色块发 colorChanged；点五个动作各发一次对应信号，混在一起的话「复制」就会去存文件。
+ * @details 点色块发 colorChanged；点六个动作各发一次对应信号，混在一起的话「复制」就会去存文件。
  *          最右那枚 X 只发 closeClicked，不能顺手把图交出去。
  */
 TEST_F(ToolbarFixture, ColorSwatchesAndActionButtonsEmitTheirOwnSignals)
@@ -1222,7 +1222,7 @@ TEST_F(ToolbarFixture, ColorSwatchesAndActionButtonsEmitTheirOwnSignals)
         ASSERT_NE(button, nullptr) << label;
         button->click();
     }
-    EXPECT_EQ(log.actions, 5) << "五个动作按钮的信号没各自分开落地";
+    EXPECT_EQ(log.actions, 6) << "六个动作按钮的信号没各自分开落地";
     EXPECT_EQ(log.undo, 0);
     EXPECT_EQ(log.redo, 0);
 
@@ -1236,7 +1236,30 @@ TEST_F(ToolbarFixture, ColorSwatchesAndActionButtonsEmitTheirOwnSignals)
     ASSERT_NE(closeButton, nullptr) << "工具栏缺一枚显式的关闭入口";
     closeButton->click();
     EXPECT_EQ(log.closes, 1);
-    EXPECT_EQ(log.actions, 5) << "点关闭不该把图交出去";
+    EXPECT_EQ(log.actions, 6) << "点关闭不该把图交出去";
+}
+
+/**
+ * @brief 钉住隐私打码入口：按钮在场，点一下只发 privacyClicked
+ * @details 隐私打码与扫码同属动作按钮，不切工具、也不改画笔参数；单独钉一条是为了让
+ *          「入口漏接」在工具栏这一层就现形，而不是等到画布上什么都不发生。
+ */
+TEST_F(ToolbarFixture, PrivacyActionExistsAndEmitsItsOwnSignal)
+{
+    SignalLog log;
+    auto      toolbar = makeToolbarLogged(log);
+
+    auto *button = buttonByLabel(*toolbar, "隐私打码");
+    ASSERT_NE(button, nullptr) << "工具栏缺少隐私打码入口";
+    EXPECT_EQ(button->toolTip(), QString::fromUtf8("隐私打码"));
+
+    int privacyCalls = 0;
+    QObject::connect(toolbar.get(), &AnnotationToolbar::privacyClicked, [&privacyCalls] { ++privacyCalls; });
+    button->click();
+
+    EXPECT_EQ(privacyCalls, 1) << "点了隐私打码却没发 privacyClicked";
+    EXPECT_EQ(log.actions, 1) << "隐私打码的信号没有单独落地";
+    EXPECT_TRUE(log.tools.empty()) << "隐私打码不该顺手切工具";
 }
 
 /**

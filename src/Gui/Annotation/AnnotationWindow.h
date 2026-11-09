@@ -196,6 +196,12 @@ namespace GyanisScribe::Gui
          */
         void scanRequested(const QImage &image);
         /**
+         * @brief 请求检查并打码画面里的敏感信息
+         * @param image 当前画布原图，物理像素；隐私扫描认的是底图上的文字与码框，不是烘上图形的成品
+         * @note 与扫码、打印同一条口径：请求只报出去，标注窗不关，检查与审核由宿主接手
+         */
+        void privacyRequested(const QImage &image);
+        /**
          * @brief 请求打印标注结果
          * @param image 烘焙好的图
          * @note 与其它出口不同：打印不关窗，用户取消打印或在打印之后接着改，现场都不丢

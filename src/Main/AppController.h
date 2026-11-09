@@ -57,6 +57,7 @@ namespace GyanisScribe::App
 {
     class HistoryCoordinator;
     class OcrCoordinator;
+    class PrivacyCoordinator;
     class CaptureCoordinator;
     class DeliveryCoordinator;
     class PickCoordinator;
@@ -264,6 +265,14 @@ namespace GyanisScribe::Main
         [[nodiscard]] GyanisScribe::App::RewindCoordinator &rewindCoordinatorForTesting() const noexcept;
 
         /**
+         * @brief 隐私扫描这一族的协调器，仅供用例判入口与画布那一层的接线
+         * @return 本控制器持有的那一份，所有权不在调用方
+         * @note 生产侧只经标注窗的隐私打码入口进来：用例要判「窗口的信号真的叫到了它、
+         *       它的结果真的落进截图协调器」，只有这一条口子拿得到同一个对象。
+         */
+        [[nodiscard]] GyanisScribe::App::PrivacyCoordinator &privacyCoordinatorForTesting() const noexcept;
+
+        /**
          * @brief 从用例驱动一次热键分派
          * @param action 要驱动的动作
          * @note 生产侧唯一的入口是热键层的 actionTriggered；用例没有键盘可发，
@@ -353,6 +362,7 @@ namespace GyanisScribe::Main
         std::unique_ptr<GyanisScribe::Gui::PinManager>                m_pins;           ///< 贴图管理器
         std::unique_ptr<GyanisScribe::App::RecordingCoordinator>      m_recording;      ///< 录屏这一族（配置、服务、控制条、倒计时）
         std::unique_ptr<GyanisScribe::App::OcrCoordinator>            m_ocr;            ///< 识别这一族（后端选型、搬运工、结果窗）
+        std::unique_ptr<GyanisScribe::App::PrivacyCoordinator>        m_privacy;        ///< 隐私扫描这一族（后端选型、单飞、结果交回截图协调器）
         std::unique_ptr<GyanisScribe::App::TrayController>            m_tray;           ///< 托盘图标与菜单
         std::unique_ptr<MainWindow>                                   m_mainWindow;     ///< 设置与关于的入口
         std::unique_ptr<GyanisScribe::Gui::Toast>                     m_toast;          ///< 右下角提示气泡，操作结果的落地处

@@ -343,6 +343,8 @@ namespace GyanisScribe::Gui
                 ActionSpec{"Pin", GyanisScribe::Base::uiText("贴到屏幕上"), &AnnotationToolbar::pinClicked},
                 ActionSpec{"Ocr", GyanisScribe::Base::uiText("识别文字"), &AnnotationToolbar::ocrClicked},
                 ActionSpec{"QrCode", GyanisScribe::Base::uiText("识别二维码"), &AnnotationToolbar::scanClicked},
+                // 隐私打码复用马赛克图标：它是「按规则批量打码」，与工具组里手画马赛克是同一件事的两种入口
+                ActionSpec{"Mosaic", GyanisScribe::Base::uiText("隐私打码"), &AnnotationToolbar::privacyClicked},
         };
         for (const auto &action: actions)
         {

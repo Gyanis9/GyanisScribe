@@ -140,6 +140,9 @@ namespace GyanisScribe::Gui
         QObject::connect(m_toolbarBridge.get(), &AnnotationToolbarBridge::ocrRequested, this, [this] { deliver(ShortcutAction::Ocr); });
         // 扫码不关窗：与打印同一条口径，识别结果由宿主提示，编辑现场留着
         QObject::connect(m_toolbarBridge.get(), &AnnotationToolbarBridge::scanRequested, this, [this] { emit scanRequested(m_engine.exportImage()); });
+        // 隐私打码也不关窗：检查要等识别回来，结果由宿主审核后才落到画布上。
+        // 交出去的是画布原图：检测框与它同坐标系，烘上图形的成品会让文字与框对不上
+        QObject::connect(m_toolbarBridge.get(), &AnnotationToolbarBridge::privacyRequested, this, [this] { emit privacyRequested(m_engine.canvas().image); });
     }
 
     void AnnotationWindow::startAnnotation(const Base::CapturedImage &captured, const QRect &screenAvailable, const QRect &selection)

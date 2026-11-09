@@ -27,7 +27,7 @@ namespace GyanisScribe::Gui
      * @details 标注窗与「贴图上直接标注」两处宿主共用同一份接线：工具栏上十三项样式信号、
      *          工具切换、撤销重做与按钮态回灌都收在这里。两处各接一份的话，将来加第十四项
      *          参数时必有一处漏接——那种漏接不会编译报错，只表现为「这个开关在那边不生效」。
-     * @note 桥只管引擎这一侧；复制/保存/贴图/识别四个动作按钮只把意图重新发出来，
+     * @note 桥只管引擎这一侧；复制、保存、贴图、识别、扫码与隐私打码这些动作按钮只把意图重新发出来，
      *       按钮按下去要做什么（复制哪张图、收不收工）由宿主决定。
      */
     class AnnotationToolbarBridge : public QObject
@@ -62,6 +62,9 @@ namespace GyanisScribe::Gui
 
         /// 识别二维码/条形码
         void scanRequested();
+
+        /// 工具栏上的「隐私打码」被点了
+        void privacyRequested();
 
     private:
         /// 把整包参数下发给引擎，并把失败记进日志

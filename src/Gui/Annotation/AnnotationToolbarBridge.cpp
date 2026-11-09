@@ -189,12 +189,13 @@ namespace GyanisScribe::Gui
                              }
                          });
 
-        // 四个动作按钮只把意图转出来：按下去做什么由宿主决定，桥不替它挑默认
+        // 动作按钮只把意图转出来：按下去做什么由宿主决定，桥不替它挑默认
         QObject::connect(&toolbar, &AnnotationToolbar::copyClicked, this, &AnnotationToolbarBridge::copyRequested);
         QObject::connect(&toolbar, &AnnotationToolbar::saveClicked, this, &AnnotationToolbarBridge::saveRequested);
         QObject::connect(&toolbar, &AnnotationToolbar::pinClicked, this, &AnnotationToolbarBridge::pinRequested);
         QObject::connect(&toolbar, &AnnotationToolbar::ocrClicked, this, &AnnotationToolbarBridge::ocrRequested);
         QObject::connect(&toolbar, &AnnotationToolbar::scanClicked, this, &AnnotationToolbarBridge::scanRequested);
+        QObject::connect(&toolbar, &AnnotationToolbar::privacyClicked, this, &AnnotationToolbarBridge::privacyRequested);
 
         // 引擎的栈深或工具变了就刷按钮：让用户看见「还能不能撤」而不是点了才知道没得撤；
         // 快捷键切的工具也从这里回灌到按钮上，两处永远同解
