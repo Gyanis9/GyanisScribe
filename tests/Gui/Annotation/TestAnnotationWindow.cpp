@@ -1632,6 +1632,29 @@ TEST_F(AnnotationWindowFixture, PrivacyButtonEmitsTheCanvasImageAndKeepsTheWindo
 }
 
 /**
+ * @brief 钉住轮次守卫：开窗置真，刷新底图仍在同一轮，收场之后才置假
+ * @details 关窗后引擎与画布还留着上一轮内容，异步结果回来时只能靠这一句分辨
+ *          「用户还在看这一轮」还是「窗已经关了」。重抓只是换底图，不算收场。
+ */
+TEST_F(AnnotationWindowFixture, RoundStaysActiveUntilTheWindowCloses)
+{
+    auto window = makeWindow();
+    EXPECT_FALSE(window->isRoundActive()) << "还没开窗就报这一轮在编辑";
+
+    window->startAnnotation(makeCanvas({200, 100}), QRect{0, 0, 1920, 1080}, QRect{0, 0, 200, 100});
+    EXPECT_TRUE(window->isRoundActive()) << "开窗之后没报这一轮在编辑";
+
+    window->refreshCapture(makeCanvas({200, 100}));
+    EXPECT_TRUE(window->isRoundActive()) << "刷新底图把这一轮当成收场了";
+
+    pressKeyOn(*window, Qt::Key_Escape);
+    EXPECT_FALSE(window->isRoundActive()) << "Esc 收起之后还报这一轮在编辑";
+
+    window->startAnnotation(makeCanvas({200, 100}), QRect{0, 0, 1920, 1080}, QRect{0, 0, 200, 100});
+    EXPECT_TRUE(window->isRoundActive()) << "新一轮开窗没有把轮次守卫重新立起来";
+}
+
+/**
  * @brief 钉住 Ctrl+Shift+↑/↓ 与 Home/End 从窗口接到引擎
  * @details 两条实心矩形盖同一块地，中心像素就是层叠读数；四条键各按一次核对读数。
  */

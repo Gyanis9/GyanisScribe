@@ -102,6 +102,14 @@ namespace GyanisScribe::Gui
          */
         void setUndoRedoAvailable(bool canUndo, bool canRedo);
 
+        /**
+         * @brief 开/关「隐私打码」动作按钮
+         * @param available true 表示宿主接了隐私扫描与审核；false 时这枚按钮整枚收起
+         * @details 贴图上的直接标注复用同一把工具栏，但那一处没有审核对话框与批量落笔的宿主：
+         *          按钮留在那里就是一枚点了没反应的死控件，收起来比灰着更像「这里本来没有这一项」。
+         */
+        void setPrivacyAvailable(bool available);
+
         /// 工具按钮数量，由登记表算出：布局与用例据此核对「每一档工具都有一枚按钮」
         [[nodiscard]] static int toolButtonCount();
 
@@ -425,6 +433,7 @@ namespace GyanisScribe::Gui
         QToolButton                                 *m_colorButton          = nullptr;                                          ///< 颜色入口：按钮上是当前色，弹出菜单里才是色板
         QMenu                                       *m_colorMenu            = nullptr;                                          ///< 颜色弹出菜单，每次弹出前按色板与最近使用重建
         QToolButton                                 *m_closeButton          = nullptr;                                          ///< 关闭标注窗，与 Esc 同一条收场路
+        QToolButton                                 *m_privacyButton        = nullptr;                                       ///< 隐私打码按钮；无宿主时由 setPrivacyAvailable 收起
         QToolButton                                 *m_undoButton           = nullptr;                                          ///< 撤销按钮
         QToolButton                                 *m_redoButton           = nullptr;                                          ///< 重做按钮
         QSlider                                     *m_widthSlider          = nullptr;                                          ///< 线宽滑块，档位对齐 kAnnotationWidths

@@ -149,6 +149,8 @@ namespace GyanisScribe::Gui
     {
         // 新一轮开窗重新计收场：上一轮报过的 closed 不该压住这一轮
         m_closedReported = false;
+        // 轮次守卫跟着开窗重新立起来：上一轮关窗后留下的画布还在引擎里，不能拿它当「还在编辑」
+        m_roundActive = true;
         // 记下这一轮抓的是哪块屏、哪块区域：刷新截图（F5）要对着同一块地方重抓
         m_refreshScreenName   = captured.screenName;
         m_refreshRegion       = captured.logicalRegion;
@@ -192,6 +194,8 @@ namespace GyanisScribe::Gui
             return;
         }
         m_closedReported = true;
+        // 收场之后这一轮不再可编辑：迟到的异步结果靠它认出窗已经关了
+        m_roundActive = false;
         emit closed();
     }
 
@@ -221,6 +225,11 @@ namespace GyanisScribe::Gui
     const Base::CapturedImage &AnnotationWindow::canvas() const noexcept
     {
         return m_engine.canvas();
+    }
+
+    bool AnnotationWindow::isRoundActive() const noexcept
+    {
+        return m_roundActive;
     }
 
     void AnnotationWindow::refreshCapture(const Base::CapturedImage &captured)

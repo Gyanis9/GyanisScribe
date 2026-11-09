@@ -1263,6 +1263,30 @@ TEST_F(ToolbarFixture, PrivacyActionExistsAndEmitsItsOwnSignal)
 }
 
 /**
+ * @brief 钉住「没有隐私流程的宿主可以把这枚按钮收起来」
+ * @details 贴图上的直接标注复用同一把工具栏，但那里没有审核对话框与批量落笔的宿主：
+ *          按钮留在栏上就是一枚点了没反应的死控件。收起之后重开也要能回来，
+ *          否则将来别处复用这把工具栏就少了一档。
+ */
+TEST_F(ToolbarFixture, PrivacyActionCanBeHiddenByAHostWithoutAPrivacyFlow)
+{
+    SignalLog log;
+    auto      toolbar = makeToolbarLogged(log);
+
+    auto *button = buttonByLabel(*toolbar, "隐私打码");
+    ASSERT_NE(button, nullptr);
+    EXPECT_FALSE(button->isHidden()) << "默认该露着：标注窗接了这一路";
+
+    toolbar->setPrivacyAvailable(false);
+    EXPECT_TRUE(button->isHidden()) << "宿主没有隐私流程时按钮还占着一格，那是一枚死控件";
+    EXPECT_FALSE(button->isEnabled()) << "收起的按钮仍然可点，键盘焦点还能落上去";
+
+    toolbar->setPrivacyAvailable(true);
+    EXPECT_FALSE(button->isHidden()) << "重新接线后按钮该回到工具栏上";
+    EXPECT_TRUE(button->isEnabled());
+}
+
+/**
  * @brief 钉住「最近使用颜色」从配置回到色板，点了就发那条颜色
  * @details 清单本身的算法在 TestRecentColors 里钉；这条端到端验的是接线——
  *          存好配置后重开一份 store，等价于用户重启程序再回来。

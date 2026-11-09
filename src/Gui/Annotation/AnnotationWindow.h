@@ -129,6 +129,15 @@ namespace GyanisScribe::Gui
         [[nodiscard]] const Base::CapturedImage &canvas() const noexcept;
 
         /**
+         * @brief 这一刻有没有一轮标注处于编辑中
+         * @return 从 startAnnotation 起为 true，收场（reportClosedOnce）之后为 false
+         * @details 关窗后引擎与画布还留着上一轮的内容，异步结果回来时外形上看不出区别；
+         *          宿主靠这一句分辨「用户还在看这一轮」还是「窗已经关了」，不把审核弹到
+         *          一扇看不见的父窗背后，也不往看不见的画布上落笔。
+         */
+        [[nodiscard]] bool isRoundActive() const noexcept;
+
+        /**
          * @brief 把重新抓到的一帧换上：底图换了，标注、选中与撤销历史都留着
          * @param captured 重抓的产物，应与开窗时那一帧同形（同一块区域再抓一帧）
          * @details 引擎的 refreshCanvas 就是这个语义；与 loadCanvas 分开正是为了不把标注清掉。
@@ -249,6 +258,7 @@ namespace GyanisScribe::Gui
         QRect m_placedScreenAvailable; ///< 本轮摆放用的屏幕可用区：可见段变化后重摆要同一份
         QRect m_placedSelection;       ///< 本轮摆放参照的选区：可见段变化后重摆要同一份
         bool  m_closedReported = false; ///< 这一轮开窗已经报过 closed：交付出口与 Esc/X 共用一个收场
+        bool  m_roundActive    = false; ///< 这一轮标注是否还在编辑：startAnnotation 置真，收场置假
     };
 
 } // namespace GyanisScribe::Gui

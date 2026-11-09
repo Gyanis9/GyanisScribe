@@ -36,6 +36,7 @@
 #include <QMovie>
 #include <QScreen>
 #include <QMouseEvent>
+#include <QToolButton>
 #include <algorithm>
 #include <QPoint>
 #include <QSize>
@@ -1211,6 +1212,37 @@ namespace GyanisScribe
         auto *view = window.findChild<Gui::AnnotationView *>();
         ASSERT_NE(view, nullptr) << "标注视图没挂到贴图窗上";
         EXPECT_EQ(view->geometry(), window.rect()) << "标注视图该铺满整窗";
+    }
+
+    /**
+     * @brief 钉住贴图直接标注不摆「隐私打码」：那一处没有审核与批量落笔的宿主
+     * @details 两处共用同一把工具栏；如果把这枚按钮原样留在贴图的标注栏上，
+     *          用户点到的是一枚永远没反应的控件。收起只动这一枚，复制等既有动作照旧在场。
+     */
+    TEST_F(PinWindowFixture, DirectAnnotationHidesThePrivacyActionWithoutAHost)
+    {
+        auto &window = makeWindow();
+        window.startAnnotation();
+        ASSERT_TRUE(window.isAnnotating());
+
+        QToolButton *privacyButton = nullptr;
+        QToolButton *copyButton    = nullptr;
+        for (auto *candidate: window.findChildren<QToolButton *>())
+        {
+            if (candidate->accessibleName() == QString::fromUtf8("隐私打码"))
+            {
+                privacyButton = candidate;
+            } else if (candidate->accessibleName() == QString::fromUtf8("复制到剪贴板"))
+            {
+                copyButton = candidate;
+            }
+        }
+        ASSERT_NE(privacyButton, nullptr) << "贴图的标注工具栏上找不到隐私打码按钮";
+        EXPECT_TRUE(privacyButton->isHidden()) << "贴图直接标注没有隐私审核的宿主，这枚按钮留着就是死控件";
+        EXPECT_FALSE(privacyButton->isEnabled()) << "收起的隐私打码仍然可点";
+
+        ASSERT_NE(copyButton, nullptr) << "贴图的标注工具栏上找不到复制按钮";
+        EXPECT_FALSE(copyButton->isHidden()) << "收起隐私打码顺手把别的动作也收起来了";
     }
 
     /**

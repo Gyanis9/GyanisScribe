@@ -351,6 +351,11 @@ namespace GyanisScribe::Gui
             auto *button = makeButton(action.iconName, action.label, false);
             QObject::connect(button, &QToolButton::clicked, this, [this, signal = action.signal] { (this->*signal)(); });
             layout->addWidget(button);
+            // 隐私打码留着指针：贴图上的直接标注没有审核宿主，要把这一枚单独收起来
+            if (action.signal == &AnnotationToolbar::privacyClicked)
+            {
+                m_privacyButton = button;
+            }
         }
 
         // 最右那枚 X 与 Esc 同一条收场路：免得用户以为只能去托盘退出或再截一张
@@ -852,6 +857,17 @@ namespace GyanisScribe::Gui
         {
             emit contextLayoutChanged();
         }
+    }
+
+    void AnnotationToolbar::setPrivacyAvailable(const bool available)
+    {
+        if (m_privacyButton == nullptr)
+        {
+            return;
+        }
+        // 收起而不是只置灰：灰着的按钮仍占着动作格，用户还会反复点它试
+        m_privacyButton->setVisible(available);
+        m_privacyButton->setEnabled(available);
     }
 
     void AnnotationToolbar::setUndoRedoAvailable(const bool canUndo, const bool canRedo)

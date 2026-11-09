@@ -40,6 +40,7 @@
 #include <QColor>
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QDialog>
 #include <QElapsedTimer>
 #include <QEventLoop>
 #include <QGuiApplication>
@@ -52,6 +53,7 @@
 #include <QScreen>
 #include <QSize>
 #include <QString>
+#include <QTimer>
 #include <QToolButton>
 #include <QVector>
 
@@ -1445,6 +1447,165 @@ namespace GyanisScribe
         EXPECT_EQ(messages, 1) << "过期结果该被挡下并说清出路";
         EXPECT_EQ(said, Base::uiText("画布已经变了，请重新点隐私打码")) << said.toStdString();
         EXPECT_TRUE(window.isVisible());
+    }
+
+    /**
+     * @brief 钉住「关窗之后迟到的结果」被轮次守卫挡下
+     * @details 引擎与画布在关窗后仍留着上一轮，cacheKey 完全对得上；只有轮次守卫能分辨
+     *          用户已经收工。这一格用同一张画布冒充迟到结果，判的是提示与窗口不被重新摆出来。
+     */
+    TEST_F(AppControllerFixture, PrivacyScanAfterCloseIsRejected)
+    {
+        m_frameScreenName = m_realScreenName;
+        makeController();
+
+        auto &window = m_controller->capture().annotationWindow();
+        m_controller->capture().startFullScreen(App::CaptureIntent::Annotate);
+        ASSERT_TRUE(window.isVisible());
+        ASSERT_TRUE(window.isRoundActive());
+
+        // 记下关窗前的画布：迟到结果拿的就是这一张，cacheKey 对得上，走的只能是轮次守卫
+        const QImage scanned = window.canvas().image;
+
+        QToolButton *closeButton = nullptr;
+        for (auto *candidate: window.toolbar().findChildren<QToolButton *>())
+        {
+            if (candidate->accessibleName() == Base::uiText("关闭标注"))
+            {
+                closeButton = candidate;
+                break;
+            }
+        }
+        ASSERT_NE(closeButton, nullptr) << "标注窗工具栏上找不到关闭按钮";
+        closeButton->click();
+        ASSERT_FALSE(window.isVisible()) << "点了关闭按钮，标注窗还留在屏上";
+        ASSERT_FALSE(window.isRoundActive()) << "关窗之后这一轮标注还报「在编辑」";
+
+        int     messages = 0;
+        QString said;
+        QObject::connect(&m_controller->capture(), &App::CaptureCoordinator::messageForUser, &m_controller->capture(),
+                         [&messages, &said](const QString &message, Gui::ToastKind)
+                         {
+                             ++messages;
+                             said = message;
+                         });
+
+        m_controller->capture().handlePrivacyScan(scanned, Core::OcrResult{});
+
+        EXPECT_EQ(messages, 1) << "关窗之后回来的结果既没落笔也没把原因说给用户";
+        EXPECT_EQ(said, Base::uiText("当前没有正在编辑的标注，请重新截图后再试")) << said.toStdString();
+        EXPECT_FALSE(window.isVisible()) << "一扇已经关掉的窗被迟到的结果重新摆出来了";
+    }
+
+    /**
+     * @brief 钉住有命中那一整条：审核确认后按实际交给引擎的框数报成功
+     * @details 对话框是模态的，用例在进入 exec 的嵌套事件循环后用定时器按下「应用打码」。
+     *          两个手机号各落一个框，成功提示必须是 2；窗口与这一轮都留着。
+     */
+    TEST_F(AppControllerFixture, PrivacyScanAppliesReviewedBoxesAndReportsTheCount)
+    {
+        m_frameScreenName = m_realScreenName;
+        makeController();
+
+        auto &window = m_controller->capture().annotationWindow();
+        m_controller->capture().startFullScreen(App::CaptureIntent::Annotate);
+        ASSERT_TRUE(window.isVisible());
+        const QImage scanned = window.canvas().image;
+        ASSERT_EQ(scanned.size(), QSize(kFrameWidth, kFrameHeight));
+
+        Core::OcrResult result;
+        for (const auto &[phone, box]: {std::pair{QStringLiteral("13800138000"), QRect{4, 4, 40, 12}}, std::pair{QStringLiteral("13900139000"), QRect{4, 28, 40, 12}}})
+        {
+            Core::OcrLine line;
+            line.words.append(Core::OcrWord{phone, box});
+            line.boundingBox = box;
+            result.lines.append(line);
+        }
+
+        int     messages = 0;
+        QString said;
+        QObject::connect(&m_controller->capture(), &App::CaptureCoordinator::messageForUser, &m_controller->capture(),
+                         [&messages, &said](const QString &message, Gui::ToastKind)
+                         {
+                             ++messages;
+                             said = message;
+                         });
+
+        // 进入 handlePrivacyScan 之后对话框才 exec：定时器在嵌套事件循环里按下「应用打码」
+        QTimer::singleShot(0,
+                           []
+                           {
+                               if (auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget()))
+                               {
+                                   dialog->accept();
+                               }
+                           });
+
+        m_controller->capture().handlePrivacyScan(scanned, result);
+
+        EXPECT_EQ(messages, 1) << "有命中时既没落笔也没给成功提示";
+        EXPECT_EQ(said, Base::uiText("已打码 2 处；请自行检查后再分享。")) << said.toStdString();
+        EXPECT_TRUE(window.isVisible()) << "应用打码把标注窗收了";
+        EXPECT_TRUE(window.isRoundActive());
+    }
+
+    /**
+     * @brief 钉住对话框合上之后的复核：审核期间这一轮收场了就不再落笔
+     * @details 模态框挡得住用户点窗，挡不住宿主或键盘路径收场；exec 返回后必须重认轮次，
+     *          否则一批框会落到一扇已经关掉的窗口背后的画布上。
+     */
+    TEST_F(AppControllerFixture, PrivacyScanRechecksTheRoundAfterTheReviewDialog)
+    {
+        m_frameScreenName = m_realScreenName;
+        makeController();
+
+        auto &window = m_controller->capture().annotationWindow();
+        m_controller->capture().startFullScreen(App::CaptureIntent::Annotate);
+        ASSERT_TRUE(window.isVisible());
+        const QImage scanned = window.canvas().image;
+
+        QToolButton *closeButton = nullptr;
+        for (auto *candidate: window.toolbar().findChildren<QToolButton *>())
+        {
+            if (candidate->accessibleName() == Base::uiText("关闭标注"))
+            {
+                closeButton = candidate;
+                break;
+            }
+        }
+        ASSERT_NE(closeButton, nullptr) << "标注窗工具栏上找不到关闭按钮";
+
+        Core::OcrResult result;
+        Core::OcrLine   line;
+        line.words.append(Core::OcrWord{QStringLiteral("13800138000"), QRect{4, 4, 40, 12}});
+        line.boundingBox = QRect{4, 4, 40, 12};
+        result.lines.append(line);
+
+        int     messages = 0;
+        QString said;
+        QObject::connect(&m_controller->capture(), &App::CaptureCoordinator::messageForUser, &m_controller->capture(),
+                         [&messages, &said](const QString &message, Gui::ToastKind)
+                         {
+                             ++messages;
+                             said = message;
+                         });
+
+        // 审核框还开着时收场，再按下「应用打码」：这一步只有落笔前的复核能挡住
+        QTimer::singleShot(0,
+                           [closeButton]
+                           {
+                               closeButton->click();
+                               if (auto *dialog = qobject_cast<QDialog *>(QApplication::activeModalWidget()))
+                               {
+                                   dialog->accept();
+                               }
+                           });
+
+        m_controller->capture().handlePrivacyScan(scanned, result);
+
+        EXPECT_EQ(messages, 1) << "审核期间收场后既没落笔也没说清原因";
+        EXPECT_EQ(said, Base::uiText("当前没有正在编辑的标注，请重新截图后再试")) << said.toStdString();
+        EXPECT_FALSE(window.isVisible()) << "一扇已经关掉的窗被重新摆出来了";
     }
 
     /**

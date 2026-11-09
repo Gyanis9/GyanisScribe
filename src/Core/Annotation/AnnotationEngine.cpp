@@ -1459,7 +1459,7 @@ namespace GyanisScribe::Core
         if (boxes.empty())
         {
             return std::unexpected(
-                    Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("没有要打码的区域：这次没有给出任何框。请先重新检测，或手动框选后再打码")});
+                    Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("没有可打码的区域：这次没有给出可用的框。请重新检测，或手动框选画布内的区域")});
         }
 
         auto *target = toolFor(tool);
