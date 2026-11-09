@@ -218,6 +218,7 @@ TEST(PiiDetector, MergesOverlappingBankCardWindowsOverTheCardTail)
 
     ASSERT_EQ(items.size(), 1U) << "重叠窗口没有合并成一段";
     EXPECT_TRUE(items.at(0).physicalBox.contains(tail)) << "真卡的尾号词框落在打码框外";
+    EXPECT_EQ(items.at(0).maskedSample.size(), 20) << "脱敏样例没有覆盖到合并后的整段数字";
     EXPECT_TRUE(items.at(0).maskedSample.endsWith(QStringLiteral("0004"))) << "脱敏样例没有覆盖到真卡尾号";
 }
 
@@ -234,6 +235,7 @@ TEST(PiiDetector, MergesDatePrefixWindowWithTheCard)
 
     ASSERT_EQ(items.size(), 1U) << "日期前缀与卡号的重叠窗口没有合并";
     EXPECT_TRUE(items.at(0).physicalBox.contains(tail)) << "真卡的尾号词框落在打码框外";
+    EXPECT_EQ(items.at(0).maskedSample.size(), 24) << "脱敏样例没有覆盖到合并后的整段数字";
     EXPECT_TRUE(items.at(0).maskedSample.endsWith(QStringLiteral("1111"))) << "脱敏样例没有覆盖到真卡尾号";
 }
 
