@@ -1,5 +1,8 @@
 #include "Gui/Ocr/OcrResultWindow.h"
 
+#include "Core/Content/CsvWriter.h"
+#include "Core/Content/MarkdownBuilder.h"
+#include "Core/Content/TableDetector.h"
 #include "Core/Image/ImageFit.h"
 #include "Base/Logger.h"
 #include "Base/Paths.h"
@@ -18,6 +21,7 @@
 #include <QComboBox>
 #include <QDateTime>
 #include <QFileDialog>
+#include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPainter>
@@ -213,6 +217,20 @@ namespace GyanisScribe::Gui
         applyTabularFigures(*m_status, TextScript::Mixed);
         right->addWidget(m_status);
 
+        // 内容动作单独成行：与底部的复制/导出/语言同排会挤成一团，读不出哪些动作跟当前内容走
+        m_contentActions = new QWidget{this};
+        m_contentActions->setObjectName(QStringLiteral("ocrContentActions"));
+        auto *contentActions = new QHBoxLayout{m_contentActions};
+        contentActions->setContentsMargins(0, 0, 0, 0);
+        m_copyMarkdown = makeToolButton(m_icons, "OcrExport", GyanisScribe::Base::uiText("复制 Markdown"));
+        m_copyMarkdown->setObjectName(QStringLiteral("ocrCopyMarkdown"));
+        m_exportCsv = makeToolButton(m_icons, "OcrExport", GyanisScribe::Base::uiText("导出表格 CSV"));
+        m_exportCsv->setObjectName(QStringLiteral("ocrExportCsv"));
+        contentActions->addWidget(m_copyMarkdown);
+        contentActions->addWidget(m_exportCsv);
+        contentActions->addStretch(1);
+        right->addWidget(m_contentActions);
+
         auto *buttons = new QHBoxLayout;
         right->addLayout(buttons);
 
@@ -274,6 +292,17 @@ namespace GyanisScribe::Gui
                          });
         QObject::connect(exportTxt, &QToolButton::clicked, this, [this] { chooseAndExportTxt(); });
         QObject::connect(exportJson, &QToolButton::clicked, this, [this] { chooseAndExportJson(); });
+        QObject::connect(m_copyMarkdown, &QToolButton::clicked, this,
+                         [this]
+                         {
+                             if (copyMarkdownToClipboard().isEmpty())
+                             {
+                                 emit messageForUser(GyanisScribe::Base::uiText("这一张图没有认出可复制的文字"), Gui::ToastKind::Information);
+                                 return;
+                             }
+                             emit messageForUser(GyanisScribe::Base::uiText("已复制 Markdown"), Gui::ToastKind::Success);
+                         });
+        QObject::connect(m_exportCsv, &QToolButton::clicked, this, [this] { chooseAndExportCsv(); });
         QObject::connect(closeButton, &QToolButton::clicked, this, &QWidget::close);
     }
 
@@ -283,10 +312,21 @@ namespace GyanisScribe::Gui
         m_result    = result;
         m_lineIndex = -1;
         m_highlight = {};
+        m_table     = Core::detectTable(m_result);
         m_text->setPlainText(result.text());
 
         // 摘要与语言下拉都要跟着结果走：换语言重认之后旧摘要留在屏上比报错更难查
-        m_status->setText(statusLineFor(m_result, m_image.size()));
+        QString status = statusLineFor(m_result, m_image.size());
+        if (m_table.found)
+        {
+            // 复杂表没有导出出口，但检测本身值得说一句；不写原因，用户只会以为表格没认出来
+            status += QLatin1Char(' ') + (m_table.complex ? GyanisScribe::Base::uiText("· 检测到复杂表格，暂不支持 CSV") : GyanisScribe::Base::uiText("· 检测到表格，可导出 CSV"));
+        }
+        m_status->setText(status);
+        // 动作行只按结果收放，不读控件当前是否可见：窗口还没显示时 isVisible 一律为假
+        m_copyMarkdown->setVisible(hasMarkdownAction());
+        m_exportCsv->setVisible(hasCsvAction());
+        m_contentActions->setVisible(hasMarkdownAction() || hasCsvAction());
         if (const int index = m_language->findText(m_result.language); index >= 0)
         {
             const QSignalBlocker blocker{m_language};
@@ -325,6 +365,17 @@ namespace GyanisScribe::Gui
         return selected;
     }
 
+    QString OcrResultWindow::copyMarkdownToClipboard()
+    {
+        const auto markdown = Core::buildMarkdown(m_result, m_table);
+        if (markdown.isEmpty())
+        {
+            return {};
+        }
+        QGuiApplication::clipboard()->setText(markdown);
+        return markdown;
+    }
+
     Base::Expected<void> OcrResultWindow::exportTxt(const std::filesystem::path &filePath)
     {
         return Core::writeTextFile(filePath, Core::toTxt(m_result));
@@ -333,6 +384,21 @@ namespace GyanisScribe::Gui
     Base::Expected<void> OcrResultWindow::exportJson(const std::filesystem::path &filePath)
     {
         return Core::writeTextFile(filePath, Core::toJson(m_result, m_image.size()));
+    }
+
+    Base::Expected<void> OcrResultWindow::exportCsv(const std::filesystem::path &filePath)
+    {
+        return Core::writeCsvFile(filePath, m_table);
+    }
+
+    bool OcrResultWindow::hasMarkdownAction() const
+    {
+        return !m_result.text().isEmpty();
+    }
+
+    bool OcrResultWindow::hasCsvAction() const
+    {
+        return m_table.found && !m_table.complex;
     }
 
     QString OcrResultWindow::statusText() const
@@ -396,6 +462,27 @@ namespace GyanisScribe::Gui
             return;
         }
         emit messageForUser(GyanisScribe::Base::uiText("已导出 JSON：") + chosen, Gui::ToastKind::Success);
+    }
+
+    void OcrResultWindow::chooseAndExportCsv()
+    {
+        const auto suggested = suggestedExportPath(QStringLiteral("csv"), m_nameTemplate);
+        const auto chosen    = QFileDialog::getSaveFileName(this, GyanisScribe::Base::uiText("导出表格 CSV"), QString::fromStdWString(suggested.wstring()),
+                                                            GyanisScribe::Base::uiText("CSV 文件 (*.csv)"));
+        if (chosen.isEmpty())
+        {
+            return;
+        }
+        const auto path = chosen.toStdWString();
+        if (auto exported = exportCsv(path); !exported)
+        {
+            const auto message = QString::fromUtf8(
+                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("导出表格 CSV 失败：{}。请换一个目录再试一次"), exported.error().message).c_str());
+            Base::Logger::warning(message.toStdString());
+            emit messageForUser(message, Gui::ToastKind::Danger);
+            return;
+        }
+        emit messageForUser(GyanisScribe::Base::uiText("已导出表格 CSV：") + chosen, Gui::ToastKind::Success);
     }
 
 } // namespace GyanisScribe::Gui

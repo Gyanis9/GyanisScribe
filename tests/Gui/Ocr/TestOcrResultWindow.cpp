@@ -10,10 +10,13 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QComboBox>
+#include <QFile>
 #include <QIcon>
 #include <QImage>
 #include <QLabel>
+#include <QTemporaryDir>
 #include <QTextEdit>
+#include <QToolButton>
 
 #include <filesystem>
 #include <format>
@@ -75,6 +78,57 @@ namespace
         QImage image{size, QImage::Format_ARGB32};
         image.fill(QColor{200, 200, 200});
         return image;
+    }
+
+    /// 造一行两词的表格行：词框宽 60、间距 40，与表格检测用例同一口径
+    OcrLine makeCellsLine(const int y, const QVector<QString> &texts)
+    {
+        OcrLine line;
+        int     x = 10;
+        for (const QString &text: texts)
+        {
+            const OcrWord word{text, QRect{x, y, 60, 20}};
+            line.words.push_back(word);
+            line.boundingBox = line.boundingBox.isNull() ? word.boundingBox : line.boundingBox.united(word.boundingBox);
+            x += 100;
+        }
+        return line;
+    }
+
+    /// 一行两词“测试文本”：有文字、无表格
+    OcrResult makeTextResult()
+    {
+        OcrResult result;
+        result.language          = QStringLiteral("zh-Hans");
+        result.averageConfidence = 0.9;
+        OcrLine line;
+        line.words       = {OcrWord{QStringLiteral("测试"), QRect{100, 20, 40, 16}}, OcrWord{QStringLiteral("文本"), QRect{150, 20, 40, 16}}};
+        line.boundingBox = QRect{100, 20, 90, 16};
+        result.lines     = {line};
+        return result;
+    }
+
+    /// 2×2 简单表：A/B 与 1/2 两行
+    OcrResult makeTableResult()
+    {
+        OcrResult result;
+        result.language          = QStringLiteral("zh-Hans");
+        result.averageConfidence = 0.9;
+        result.lines             = {makeCellsLine(10, {QStringLiteral("A"), QStringLiteral("B")}), makeCellsLine(40, {QStringLiteral("1"), QStringLiteral("2")})};
+        return result;
+    }
+
+    /// 复杂表：首行一个宽 140 的合并表头，下面两行各两词，结构无法按列还原
+    OcrResult makeComplexTableResult()
+    {
+        OcrResult result;
+        result.language          = QStringLiteral("zh-Hans");
+        result.averageConfidence = 0.9;
+        OcrLine header;
+        header.words       = {OcrWord{QStringLiteral("合并表头"), QRect{10, 10, 140, 28}}};
+        header.boundingBox = QRect{10, 10, 140, 28};
+        result.lines       = {header, makeCellsLine(50, {QStringLiteral("A"), QStringLiteral("B")}), makeCellsLine(80, {QStringLiteral("1"), QStringLiteral("2")})};
+        return result;
     }
 
     class OcrResultWindowFixture : public ::testing::Test
@@ -352,6 +406,109 @@ TEST_F(OcrResultWindowFixture, StatusUsesTabularFiguresButTheBodyDoesNot)
     EXPECT_EQ(status->font().featureValue(QFont::Tag("tnum")), 1u) << "OCR 摘要没锁等宽，计数与尺寸会跳";
     EXPECT_EQ(body->font().featureValue(QFont::Tag("tnum")), 0u) << "正文被误加了等宽数字，阅读字形变了";
 #endif
+}
+
+/**
+ * @brief 钉住空结果不给任何内容动作
+ * @details 没字就没 Markdown、没表就没 CSV；整行也不该占着位置，否则空结果窗里会多出一排点了没反应的按钮。
+ */
+TEST_F(OcrResultWindowFixture, HidesContentActionsForEmptyResult)
+{
+    auto window = makeWindow(OcrResult{});
+    EXPECT_FALSE(window->hasMarkdownAction());
+    EXPECT_FALSE(window->hasCsvAction());
+
+    auto *contentActions = window->findChild<QWidget *>(QStringLiteral("ocrContentActions"));
+    ASSERT_NE(contentActions, nullptr) << "结果窗里没有内容动作行";
+    EXPECT_TRUE(contentActions->isHidden()) << "两个动作都不可用时整行应当隐藏";
+    auto *copyMarkdown = window->findChild<QToolButton *>(QStringLiteral("ocrCopyMarkdown"));
+    ASSERT_NE(copyMarkdown, nullptr) << "结果窗里没有「复制 Markdown」按钮";
+    EXPECT_TRUE(copyMarkdown->isHidden());
+    auto *exportCsv = window->findChild<QToolButton *>(QStringLiteral("ocrExportCsv"));
+    ASSERT_NE(exportCsv, nullptr) << "结果窗里没有「导出表格 CSV」按钮";
+    EXPECT_TRUE(exportCsv->isHidden());
+}
+
+/**
+ * @brief 钉住有文字时给出 Markdown 动作并把同一份内容写进剪贴板
+ * @details 复制出口自己生成 Markdown，界面不另拼一份；否则复制到的内容与导出/预览会各说各话。
+ */
+TEST_F(OcrResultWindowFixture, ShowsMarkdownAndCopiesItForTextResult)
+{
+    const OcrResult result = makeTextResult();
+    auto            window = makeWindow(result);
+    EXPECT_TRUE(window->hasMarkdownAction());
+    EXPECT_FALSE(window->hasCsvAction());
+
+    auto *copyMarkdown = window->findChild<QToolButton *>(QStringLiteral("ocrCopyMarkdown"));
+    ASSERT_NE(copyMarkdown, nullptr) << "结果窗里没有「复制 Markdown」按钮";
+    EXPECT_FALSE(copyMarkdown->isHidden()) << "有文字时「复制 Markdown」应当可见";
+    auto *exportCsv = window->findChild<QToolButton *>(QStringLiteral("ocrExportCsv"));
+    ASSERT_NE(exportCsv, nullptr) << "结果窗里没有「导出表格 CSV」按钮";
+    EXPECT_TRUE(exportCsv->isHidden()) << "没有表格时不该出现 CSV 按钮";
+
+    // 用例进程没有事件循环：先前写剪贴板留下的 OLE 消息没人处理，不先泵一次队列，
+    // setText 会被外部进程占着的剪贴板卡到超时，读完仍是空的
+    QCoreApplication::processEvents();
+    const QString markdown = window->copyMarkdownToClipboard();
+    EXPECT_FALSE(markdown.isEmpty());
+    EXPECT_EQ(QGuiApplication::clipboard()->text(), markdown);
+}
+
+/**
+ * @brief 钉住简单表才出现 CSV 动作，导出文件带 BOM
+ * @details Excel 认 BOM 才按 UTF-8 打开；没有这三个字节时中文表头会整列乱码。
+ */
+TEST_F(OcrResultWindowFixture, ShowsCsvOnlyForSimpleTableAndExportsBomFile)
+{
+    auto window = makeWindow(makeTableResult());
+    EXPECT_TRUE(window->hasMarkdownAction());
+    EXPECT_TRUE(window->hasCsvAction());
+
+    auto *exportCsv = window->findChild<QToolButton *>(QStringLiteral("ocrExportCsv"));
+    ASSERT_NE(exportCsv, nullptr) << "结果窗里没有「导出表格 CSV」按钮";
+    EXPECT_FALSE(exportCsv->isHidden()) << "检测到简单表时 CSV 按钮应当可见";
+    auto *contentActions = window->findChild<QWidget *>(QStringLiteral("ocrContentActions"));
+    ASSERT_NE(contentActions, nullptr) << "结果窗里没有内容动作行";
+    EXPECT_FALSE(contentActions->isHidden());
+    EXPECT_TRUE(window->statusText().contains(QStringLiteral("可导出 CSV"))) << "简单表要在状态行说明可以导出 CSV";
+
+    QTemporaryDir temp;
+    ASSERT_TRUE(temp.isValid());
+    const auto path = std::filesystem::path(temp.path().toStdString()) / "table.csv";
+    ASSERT_TRUE(window->exportCsv(path).has_value());
+    QFile file{QString::fromStdWString(path.wstring())};
+    ASSERT_TRUE(file.open(QIODevice::ReadOnly));
+    const QByteArray bytes = file.readAll();
+    EXPECT_TRUE(bytes.startsWith("\xEF\xBB\xBF"));
+    EXPECT_TRUE(bytes.contains("A"));
+}
+
+/**
+ * @brief 钉住复杂表不给 CSV 动作，并在状态行说明原因
+ * @details 复杂表按列还原会丢内容，宁可不导出；不写一句说明，用户只会以为功能没做。
+ */
+TEST_F(OcrResultWindowFixture, HidesCsvAndExplainsComplexTable)
+{
+    auto window = makeWindow(makeComplexTableResult());
+    EXPECT_TRUE(window->hasMarkdownAction());
+    EXPECT_FALSE(window->hasCsvAction());
+    EXPECT_TRUE(window->statusText().contains(QStringLiteral("复杂表格")));
+    auto *contentActions = window->findChild<QWidget *>(QStringLiteral("ocrContentActions"));
+    ASSERT_NE(contentActions, nullptr) << "结果窗里没有内容动作行";
+    EXPECT_FALSE(contentActions->isHidden()) << "Markdown 动作仍在，内容行不该整行隐藏";
+}
+
+/**
+ * @brief 钉住换结果时内容动作跟着刷新
+ * @details 重识别与换语言都走 setResult；只刷文本不刷按钮，用户会对着上一张图才有的动作。
+ */
+TEST_F(OcrResultWindowFixture, SetResultUpdatesContentActions)
+{
+    auto window = makeWindow(OcrResult{});
+    EXPECT_FALSE(window->hasMarkdownAction());
+    window->setResult(makeImage({800, 200}), makeTextResult());
+    EXPECT_TRUE(window->hasMarkdownAction());
 }
 
 /**

@@ -10,6 +10,7 @@
 #pragma once
 
 #include "Base/Types.h"
+#include "Core/Content/ContentTypes.h"
 #include "Core/Ocr/OcrTypes.h"
 #include "Gui/Controls/Toast.h"
 
@@ -26,6 +27,7 @@ class QLabel;
 class QComboBox;
 class QResizeEvent;
 class QTextEdit;
+class QToolButton;
 
 namespace GyanisScribe::Gui
 {
@@ -115,6 +117,33 @@ namespace GyanisScribe::Gui
         QString copySelectionToClipboard();
 
         /**
+         * @brief 复制按版面重排的 Markdown 到剪贴板
+         * @return 写进剪贴板的 Markdown；结果为空时返回空串
+         * @details 简单表格按 Markdown 表输出，复杂表退回普通文本行。
+         */
+        QString copyMarkdownToClipboard();
+
+        /**
+         * @brief 导出检测到的表格为 CSV
+         * @param filePath 目标文件，已存在则覆盖
+         * @return 成功返回空载荷；没有可导出的简单表或写盘失败时返回带原因的 Error
+         */
+        [[nodiscard]] Base::Expected<void> exportCsv(const std::filesystem::path &filePath);
+
+        /**
+         * @brief 结果里是否有可复制的 Markdown
+         * @return 结果文本非空时为 true
+         * @details 只看结果本身，不看窗口是否已显示：按钮是否摆出来由这份判断决定。
+         */
+        [[nodiscard]] bool hasMarkdownAction() const;
+
+        /**
+         * @brief 结果里是否有可导出的简单表格
+         * @return 检测到简单表时为 true
+         */
+        [[nodiscard]] bool hasCsvAction() const;
+
+        /**
          * @brief 导出 TXT
          * @param filePath 目标文件，已存在则覆盖
          * @return 成功返回空载荷；失败返回带路径与原因的 Error
@@ -164,19 +193,26 @@ namespace GyanisScribe::Gui
         /// 问用户要路径并导出 JSON；取消对话框不提示
         void chooseAndExportJson();
 
+        /// 问用户要路径并导出表格 CSV；取消对话框不提示
+        void chooseAndExportCsv();
+
         Q_DISABLE_COPY(OcrResultWindow)
 
-        QImage                   m_image;               ///< 原图，预览按它算方框
-        Core::OcrResult          m_result;              ///< 当前结果，窗口只展示不改写
-        Gui::IconProvider       &m_icons;               ///< 图标供给器
-        const Gui::ThemeManager &m_theme;               ///< 主题管理器，取主色画高亮框
-        QString                  m_nameTemplate;        ///< 导出用文件名模板，构造时给；空串表示默认档
-        QWidget                 *m_preview   = nullptr; ///< 左侧预览控件，重绘由 refreshPreview 驱动
-        QTextEdit               *m_text      = nullptr; ///< 右侧文本，只读、可选中
-        QLabel                  *m_status    = nullptr; ///< 摘要那一行，随结果刷新
-        QComboBox               *m_language  = nullptr; ///< 语言下拉，取值来自后端词表
-        int                      m_lineIndex = -1;      ///< 当前定位的行下标，-1 表示不圈任何行
-        std::optional<QRect>     m_highlight;           ///< 当前行在预览里的方框
+        QImage                   m_image;                    ///< 原图，预览按它算方框
+        Core::OcrResult          m_result;                   ///< 当前结果，窗口只展示不改写
+        Core::TableDetection     m_table;                    ///< 当前结果里检测到的表，随结果刷新
+        Gui::IconProvider       &m_icons;                    ///< 图标供给器
+        const Gui::ThemeManager &m_theme;                    ///< 主题管理器，取主色画高亮框
+        QString                  m_nameTemplate;             ///< 导出用文件名模板，构造时给；空串表示默认档
+        QWidget                 *m_preview        = nullptr; ///< 左侧预览控件，重绘由 refreshPreview 驱动
+        QTextEdit               *m_text           = nullptr; ///< 右侧文本，只读、可选中
+        QLabel                  *m_status         = nullptr; ///< 摘要那一行，随结果刷新
+        QWidget                 *m_contentActions = nullptr; ///< 内容动作行，两个动作都不可用时整行隐藏
+        QToolButton             *m_copyMarkdown   = nullptr; ///< 复制 Markdown
+        QToolButton             *m_exportCsv      = nullptr; ///< 导出表格 CSV
+        QComboBox               *m_language       = nullptr; ///< 语言下拉，取值来自后端词表
+        int                      m_lineIndex      = -1;      ///< 当前定位的行下标，-1 表示不圈任何行
+        std::optional<QRect>     m_highlight;                ///< 当前行在预览里的方框
     };
 
 } // namespace GyanisScribe::Gui
