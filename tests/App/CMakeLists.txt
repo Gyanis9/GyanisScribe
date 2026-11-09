@@ -100,3 +100,27 @@ add_dependencies(TestPrivacyCoordinator DeployQtRuntime)
 
 include(GoogleTest)
 gtest_discover_tests(TestPrivacyCoordinator)
+
+add_executable(TestAppMemoryCoordinator
+        TestMemoryCoordinator.cpp)
+
+target_link_libraries(TestAppMemoryCoordinator PRIVATE
+        App
+        Core
+        GTest::gtest
+        GTest::gtest_main
+        Qt6::Test)
+
+add_custom_command(TARGET TestAppMemoryCoordinator POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_FILE:Qt6::Test>"
+        "$<TARGET_FILE_DIR:TestAppMemoryCoordinator>/")
+
+if (MSVC)
+    target_compile_options(TestAppMemoryCoordinator PRIVATE /W4 /WX)
+endif ()
+
+add_dependencies(TestAppMemoryCoordinator DeployQtRuntime)
+
+include(GoogleTest)
+gtest_discover_tests(TestAppMemoryCoordinator)

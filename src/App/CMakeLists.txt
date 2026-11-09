@@ -28,6 +28,8 @@ add_library(App STATIC
         PrivacyCoordinator.cpp
         HistoryCoordinator.h
         HistoryCoordinator.cpp
+        MemoryCoordinator.h
+        MemoryCoordinator.cpp
         RecordingCoordinator.h
         RecordingCoordinator.cpp
         PinCoordinator.h

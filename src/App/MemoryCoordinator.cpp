@@ -1,0 +1,922 @@
+#include "App/MemoryCoordinator.h"
+
+#include "Base/Text.h"
+#include "Core/Memory/DuplicateHash.h"
+#include "Core/Memory/MemoryIndex.h"
+#include "Core/Ocr/IOcrEngine.h"
+#include "Core/Ocr/OcrLanguage.h"
+#include "Core/Ocr/RecognitionRunner.h"
+#include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/SettingsKeys.h"
+#include "Platform/IPlatformIntegration.h"
+#include "Plugins/OcrEngines/OcrEngineFactory.h"
+
+#include <QDateTime>
+#include <QFileInfo>
+#include <QStringList>
+#include <QtConcurrent/QtConcurrentRun>
+
+#include <algorithm>
+#include <system_error>
+#include <utility>
+
+namespace GyanisScribe::App
+{
+    namespace
+    {
+        /// 路径转界面文本：只走宽字符，避免本地码页装不下的字
+        QString displayPath(const std::filesystem::path &path)
+        {
+            return QString::fromStdWString(path.wstring());
+        }
+
+        /// 进程名归一：取文件名、转小写、去掉结尾的 .exe；空串保持空
+        QString normalizedProcessName(const QString &name)
+        {
+            QString normalized = QFileInfo(name).fileName().toLower();
+            if (normalized.endsWith(QStringLiteral(".exe")))
+            {
+                normalized.chop(4);
+            }
+            return normalized;
+        }
+
+        /// 按 UTF-8 字节上限截断，回退到字符边界，避免留下半个多字节序列
+        QString truncateOcrText(const QString &text, bool &truncated)
+        {
+            const QByteArray bytes = text.toUtf8();
+            if (bytes.size() <= Core::kMaxOcrTextBytes)
+            {
+                truncated = false;
+                return text;
+            }
+
+            qsizetype cut = Core::kMaxOcrTextBytes;
+            while (cut > 0 && (static_cast<unsigned char>(bytes.at(cut)) & 0xC0U) == 0x80U)
+            {
+                --cut;
+            }
+            truncated = true;
+            return QString::fromUtf8(bytes.constData(), cut);
+        }
+
+        /// 没有后端对象时的兜底原因
+        QString fallbackUnavailableReason()
+        {
+            return Base::uiText("本机没有可用的文字识别后端：请安装系统语言包，或换用 Tesseract 语言包后再试");
+        }
+
+        /// 数据库文件的侧车路径：-wal 与 -shm 跟着主文件换名
+        std::filesystem::path sidecarPath(const std::filesystem::path &base, const wchar_t *suffix)
+        {
+            std::filesystem::path path = base;
+            path += suffix;
+            return path;
+        }
+
+        /// 选一个尚不存在的旧库留档名，避免同一秒内两次重建撞名
+        std::filesystem::path uniqueCorruptPath(const std::filesystem::path &databasePath, const QString &timestamp)
+        {
+            const std::filesystem::path directory = databasePath.parent_path();
+            const QString               stem      = QStringLiteral("memory-index.corrupt-%1").arg(timestamp);
+            for (int index = 0;; ++index)
+            {
+                const QString   name      = index == 0 ? stem + QStringLiteral(".sqlite") : QStringLiteral("%1-%2.sqlite").arg(stem).arg(index);
+                const auto      candidate = directory / std::filesystem::path{name.toStdWString()};
+                std::error_code existsError;
+                if (!std::filesystem::exists(candidate, existsError))
+                {
+                    return candidate;
+                }
+            }
+        }
+
+        /// 文件存在时改名；不存在按成功处理，失败把系统原因带回来
+        bool moveFileIfExists(const std::filesystem::path &source, const std::filesystem::path &target, std::string &failure)
+        {
+            std::error_code existsError;
+            const bool      exists = std::filesystem::exists(source, existsError);
+            if (existsError)
+            {
+                failure = existsError.message();
+                return false;
+            }
+            if (!exists)
+            {
+                return true;
+            }
+
+            std::error_code renameError;
+            std::filesystem::rename(source, target, renameError);
+            if (renameError)
+            {
+                failure = renameError.message();
+                return false;
+            }
+            return true;
+        }
+    } // namespace
+
+    MemoryCoordinator::MemoryCoordinator(GyanisScribe::Core::ISettingsStore &settings, GyanisScribe::Platform::IPlatformIntegration &integration,
+                                         std::filesystem::path databasePath, QObject *parent) :
+        QObject(parent), m_settings(settings), m_databasePath(std::move(databasePath)), m_index(std::make_unique<GyanisScribe::Core::MemoryIndex>(m_databasePath))
+    {
+        m_engine = GyanisScribe::Plugins::createOcrEngine(m_settings, integration);
+        initialize();
+    }
+
+    MemoryCoordinator::MemoryCoordinator(GyanisScribe::Core::ISettingsStore &settings, std::filesystem::path databasePath, std::unique_ptr<GyanisScribe::Core::IOcrEngine> engine,
+                                         QObject *parent) :
+        QObject(parent), m_settings(settings), m_databasePath(std::move(databasePath)), m_index(std::make_unique<GyanisScribe::Core::MemoryIndex>(m_databasePath)),
+        m_engine(std::move(engine))
+    {
+        initialize();
+    }
+
+    MemoryCoordinator::~MemoryCoordinator()
+    {
+        // 先断开读图结果的回接再等：等待期间结果落地的话，finished 会打在正在析构的对象上
+        QObject::disconnect(&m_prepareWatcher, nullptr, this, nullptr);
+        if (m_runner != nullptr)
+        {
+            QObject::disconnect(m_runner.get(), nullptr, this, nullptr);
+        }
+        m_prepareWatcher.waitForFinished();
+    }
+
+    void MemoryCoordinator::initialize()
+    {
+        QObject::connect(&m_prepareWatcher, &QFutureWatcher<PreparedImage>::finished, this, &MemoryCoordinator::handlePrepared);
+        if (m_engine == nullptr)
+        {
+            return;
+        }
+
+        // 搬运工拿着后端的引用，成员析构按声明反序：m_runner 必须先于 m_engine 回收
+        m_runner = std::make_unique<GyanisScribe::Core::RecognitionRunner>(*m_engine);
+        QObject::connect(m_runner.get(), &GyanisScribe::Core::RecognitionRunner::succeeded, this,
+                         [this](const QImage &, const QString &, const GyanisScribe::Core::OcrResult &result) { handleOcrSucceeded(result); });
+        QObject::connect(m_runner.get(), &GyanisScribe::Core::RecognitionRunner::failed, this, &MemoryCoordinator::handleOcrFailed);
+    }
+
+    void MemoryCoordinator::start()
+    {
+        if (m_started)
+        {
+            return;
+        }
+        m_started = true;
+
+        if (!ensureIndexOpen())
+        {
+            return;
+        }
+
+        pruneMissing();
+        if (isEnabled())
+        {
+            retryPending();
+        } else
+        {
+            emitStats();
+        }
+    }
+
+    GyanisScribe::Core::MemoryIndex &MemoryCoordinator::index()
+    {
+        return *m_index;
+    }
+
+    bool MemoryCoordinator::isEnabled() const
+    {
+        return m_settings.boolValue(GyanisScribe::Core::kMemoryEnabled, false);
+    }
+
+    bool MemoryCoordinator::needsConsent() const
+    {
+        return !isEnabled() && !m_settings.boolValue(GyanisScribe::Core::kMemoryConsentAsked, false);
+    }
+
+    void MemoryCoordinator::resolveConsent(const bool enabled)
+    {
+        const auto enabledWrite = m_settings.setValue(GyanisScribe::Core::kMemoryEnabled, enabled);
+        if (!enabledWrite)
+        {
+            emit messageForUser(QString::fromStdString(enabledWrite.error().message), Gui::ToastKind::Danger);
+        }
+        const auto askedWrite = m_settings.setValue(GyanisScribe::Core::kMemoryConsentAsked, true);
+        if (!askedWrite)
+        {
+            emit messageForUser(QString::fromStdString(askedWrite.error().message), Gui::ToastKind::Danger);
+        }
+
+        if (enabled)
+        {
+            if (!ensureIndexOpen())
+            {
+                emit changed();
+                emitStats();
+                return;
+            }
+
+            if (m_pendingConsent)
+            {
+                const Core::MemoryUpsert pending = *std::move(m_pendingConsent);
+                m_pendingConsent.reset();
+                storeEntry(pending);
+            }
+            retryPending();
+        } else
+        {
+            m_pendingConsent.reset();
+        }
+
+        emit changed();
+        emitStats();
+        startNextOcr();
+    }
+
+    void MemoryCoordinator::setEnabled(const bool enabled)
+    {
+        const auto enabledWrite = m_settings.setValue(GyanisScribe::Core::kMemoryEnabled, enabled);
+        if (!enabledWrite)
+        {
+            emit messageForUser(QString::fromStdString(enabledWrite.error().message), Gui::ToastKind::Danger);
+        }
+
+        if (!enabled)
+        {
+            stopQueue();
+            m_pendingConsent.reset();
+            emit changed();
+            emitStats();
+            return;
+        }
+
+        const auto askedWrite = m_settings.setValue(GyanisScribe::Core::kMemoryConsentAsked, true);
+        if (!askedWrite)
+        {
+            emit messageForUser(QString::fromStdString(askedWrite.error().message), Gui::ToastKind::Danger);
+        }
+
+        if (!ensureIndexOpen())
+        {
+            emit changed();
+            emitStats();
+            return;
+        }
+
+        if (m_pendingConsent)
+        {
+            const Core::MemoryUpsert pending = *std::move(m_pendingConsent);
+            m_pendingConsent.reset();
+            storeEntry(pending);
+        }
+        retryPending();
+        emit changed();
+        emitStats();
+    }
+
+    void MemoryCoordinator::noteScreenshot(const std::filesystem::path &filePath, const QSize &size, const GyanisScribe::Core::CaptureSourceInfo &source)
+    {
+        const QString processName = normalizedProcessName(source.processName);
+
+        if (!isEnabled())
+        {
+            // 授权前只攒一条：等待回答期间再来的截图没有意义，用户回答后只索引第一张
+            if (!m_settings.boolValue(GyanisScribe::Core::kMemoryConsentAsked, false) && !m_pendingConsent)
+            {
+                Core::MemoryUpsert entry;
+                entry.filePath    = filePath;
+                entry.source      = Core::MemorySource::Capture;
+                entry.capturedAt  = QDateTime::currentDateTime();
+                entry.size        = size;
+                entry.processName = processName;
+                entry.windowTitle = source.windowTitle;
+                m_pendingConsent  = std::move(entry);
+                emit consentRequested();
+            }
+            return;
+        }
+
+        if (!m_index->isOpen())
+        {
+            if (!m_databaseFailureReported && !m_indexNoticeShown)
+            {
+                m_indexNoticeShown = true;
+                emit messageForUser(Base::uiText("记忆库暂不可用：索引还没有打开，请稍后重试；若问题持续，请在记忆库页重建索引。"), Gui::ToastKind::Danger);
+            }
+            return;
+        }
+
+        if (isExcludedProcess(processName))
+        {
+            if (!m_excludedNoticeShown)
+            {
+                m_excludedNoticeShown = true;
+                emit messageForUser(Base::uiText("记忆库：这个程序在排除名单里，这次截图没有建立索引。"), Gui::ToastKind::Information);
+            }
+            return;
+        }
+
+        Core::MemoryUpsert entry;
+        entry.filePath    = filePath;
+        entry.source      = Core::MemorySource::Capture;
+        entry.capturedAt  = QDateTime::currentDateTime();
+        entry.size        = size;
+        entry.processName = processName;
+        entry.windowTitle = source.windowTitle;
+        storeEntry(entry);
+    }
+
+    void MemoryCoordinator::retryOcr(const qint64 id)
+    {
+        if (!ensureIndexOpen())
+        {
+            return;
+        }
+        if (m_running && m_running->id == id)
+        {
+            return;
+        }
+
+        const auto known = findQueueItem(id);
+        if (!known)
+        {
+            emit messageForUser(Base::uiText("记忆库：找不到要重新识别的条目，请刷新列表后再试。"), Gui::ToastKind::Information);
+            return;
+        }
+
+        const auto reset = m_index->resetOcr(id);
+        if (!reset)
+        {
+            emit messageForUser(QString::fromStdString(reset.error().message), Gui::ToastKind::Danger);
+            return;
+        }
+
+        removeQueuedById(id);
+        m_knownItems[id] = *known;
+        if (known->source == Core::MemorySource::Import)
+        {
+            m_importQueue.push_front(*known);
+        } else
+        {
+            m_captureQueue.push_front(*known);
+        }
+        emit changed();
+        emitStats();
+        startNextOcr();
+    }
+
+    void MemoryCoordinator::retryPending()
+    {
+        if (!ensureIndexOpen())
+        {
+            return;
+        }
+        refreshOcrAvailability();
+        if (!isEnabled())
+        {
+            return;
+        }
+
+        const auto pending = m_index->pendingItems(Core::kMaxMemoryEntries);
+        if (!pending)
+        {
+            emit messageForUser(QString::fromStdString(pending.error().message), Gui::ToastKind::Danger);
+            return;
+        }
+
+        std::deque<QueueItem> captureQueue;
+        std::deque<QueueItem> importQueue;
+        for (const Core::MemoryResult &result: *pending)
+        {
+            // 正在识别的那一条不重复入队；它的结果回来后自己收尾
+            if (m_running && result.id == m_running->id)
+            {
+                continue;
+            }
+
+            QueueItem item;
+            item.id                 = result.id;
+            item.filePath           = result.filePath;
+            item.size               = result.size;
+            item.source             = result.source;
+            m_knownItems[result.id] = item;
+            if (result.source == Core::MemorySource::Import)
+            {
+                importQueue.push_back(item);
+            } else
+            {
+                captureQueue.push_back(item);
+            }
+        }
+
+        m_captureQueue = std::move(captureQueue);
+        m_importQueue  = std::move(importQueue);
+        emitStats();
+        startNextOcr();
+    }
+
+    void MemoryCoordinator::removePath(const std::filesystem::path &filePath)
+    {
+        if (!ensureIndexOpen())
+        {
+            return;
+        }
+
+        const auto removed = m_index->removeByPath(filePath);
+        if (!removed)
+        {
+            emit messageForUser(QString::fromStdString(removed.error().message), Gui::ToastKind::Danger);
+            return;
+        }
+
+        const QString pathKey = Core::MemoryIndex::pathKey(filePath);
+        if (m_pendingConsent && Core::MemoryIndex::pathKey(m_pendingConsent->filePath) == pathKey)
+        {
+            m_pendingConsent.reset();
+        }
+        removeQueuedByPath(pathKey);
+        for (auto entry = m_knownItems.begin(); entry != m_knownItems.end();)
+        {
+            if (Core::MemoryIndex::pathKey(entry->second.filePath) == pathKey)
+            {
+                entry = m_knownItems.erase(entry);
+            } else
+            {
+                ++entry;
+            }
+        }
+
+        emit changed();
+        emitStats();
+    }
+
+    void MemoryCoordinator::clearCaptureEntries()
+    {
+        if (!ensureIndexOpen())
+        {
+            return;
+        }
+
+        const auto removed = m_index->removeCaptureEntries();
+        if (!removed)
+        {
+            emit messageForUser(QString::fromStdString(removed.error().message), Gui::ToastKind::Danger);
+        }
+
+        m_pendingConsent.reset();
+        m_captureQueue.clear();
+        if (m_running && m_running->source == Core::MemorySource::Capture)
+        {
+            m_running.reset();
+            m_runningDhash.clear();
+        }
+        for (auto entry = m_knownItems.begin(); entry != m_knownItems.end();)
+        {
+            if (entry->second.source == Core::MemorySource::Capture)
+            {
+                entry = m_knownItems.erase(entry);
+            } else
+            {
+                ++entry;
+            }
+        }
+
+        emit changed();
+        emitStats();
+    }
+
+    void MemoryCoordinator::clearAll()
+    {
+        if (!ensureIndexOpen())
+        {
+            return;
+        }
+
+        const auto cleared = m_index->clear();
+        if (!cleared)
+        {
+            emit messageForUser(QString::fromStdString(cleared.error().message), Gui::ToastKind::Danger);
+        }
+
+        m_pendingConsent.reset();
+        stopQueue();
+        m_knownItems.clear();
+        emit changed();
+        emitStats();
+    }
+
+    void MemoryCoordinator::pruneMissing()
+    {
+        if (!ensureIndexOpen())
+        {
+            return;
+        }
+
+        const auto removed = m_index->pruneMissing();
+        if (!removed)
+        {
+            emit messageForUser(QString::fromStdString(removed.error().message), Gui::ToastKind::Danger);
+            emitStats();
+            return;
+        }
+
+        if (*removed > 0)
+        {
+            emit changed();
+            emit messageForUser(Base::uiText("记忆库：已清理 %1 条原图不在磁盘上的索引；导入的文件请保持原路径。").arg(*removed), Gui::ToastKind::Information);
+        }
+        emitStats();
+    }
+
+    void MemoryCoordinator::rebuildIndex()
+    {
+        const std::filesystem::path databasePath = m_databasePath;
+        m_index.reset();
+        m_pendingConsent.reset();
+        stopQueue();
+        m_knownItems.clear();
+        m_databaseFailureReported = false;
+        m_indexNoticeShown        = false;
+
+        const QString               timestamp   = QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss"));
+        const std::filesystem::path corruptPath = uniqueCorruptPath(databasePath, timestamp);
+
+        std::string failure;
+        if (!moveFileIfExists(databasePath, corruptPath, failure))
+        {
+            m_index = std::make_unique<GyanisScribe::Core::MemoryIndex>(databasePath);
+            static_cast<void>(ensureIndexOpen());
+            const QString message = Base::uiText("记忆库：重建索引时无法移动旧库文件 %1（%2）。旧文件仍可找回，请关闭占用数据库的程序后重试。")
+                                            .arg(displayPath(corruptPath), QString::fromStdString(failure));
+            reportDatabaseFailure(Base::Error{Base::ErrorCode::FileWriteFailed, message.toStdString()});
+            return;
+        }
+
+        for (const wchar_t *suffix: {L"-wal", L"-shm"})
+        {
+            const std::filesystem::path source = sidecarPath(databasePath, suffix);
+            const std::filesystem::path target = sidecarPath(corruptPath, suffix);
+            if (!moveFileIfExists(source, target, failure))
+            {
+                m_index               = std::make_unique<GyanisScribe::Core::MemoryIndex>(databasePath);
+                const QString message = Base::uiText("记忆库：重建索引时无法移动旧库文件 %1（%2）。旧文件仍可找回，请关闭占用数据库的程序后重试。")
+                                                .arg(displayPath(target), QString::fromStdString(failure));
+                reportDatabaseFailure(Base::Error{Base::ErrorCode::FileWriteFailed, message.toStdString()});
+                return;
+            }
+        }
+
+        m_index = std::make_unique<GyanisScribe::Core::MemoryIndex>(databasePath);
+        if (!ensureIndexOpen())
+        {
+            return;
+        }
+        emit changed();
+        emitStats();
+    }
+
+    bool MemoryCoordinator::ensureIndexOpen()
+    {
+        if (m_index->isOpen())
+        {
+            return true;
+        }
+
+        const auto opened = m_index->open();
+        if (!opened)
+        {
+            reportDatabaseFailure(opened.error());
+            return false;
+        }
+
+        m_databaseFailureReported = false;
+        m_indexNoticeShown        = false;
+        return true;
+    }
+
+    void MemoryCoordinator::reportDatabaseFailure(const Base::Error &error)
+    {
+        if (m_databaseFailureReported)
+        {
+            return;
+        }
+        m_databaseFailureReported = true;
+
+        QString message = QString::fromStdString(error.message);
+        if (message.isEmpty())
+        {
+            message = Base::uiText("记忆库数据库操作失败，请稍后重试；若问题持续，请在记忆库页重建索引。");
+        }
+        emit databaseError(message);
+        emit messageForUser(message, Gui::ToastKind::Danger);
+    }
+
+    void MemoryCoordinator::storeEntry(const Core::MemoryUpsert &entry)
+    {
+        if (!ensureIndexOpen())
+        {
+            return;
+        }
+
+        const auto identifier = m_index->upsertPending(entry);
+        if (!identifier)
+        {
+            emit messageForUser(QString::fromStdString(identifier.error().message), Gui::ToastKind::Danger);
+            return;
+        }
+
+        QueueItem item;
+        item.id       = *identifier;
+        item.filePath = entry.filePath;
+        item.size     = entry.size;
+        item.source   = entry.source;
+
+        removeQueuedById(item.id);
+        m_knownItems[item.id] = item;
+        if (item.source == Core::MemorySource::Import)
+        {
+            m_importQueue.push_back(item);
+        } else
+        {
+            m_captureQueue.push_back(item);
+        }
+
+        emit changed();
+        emitStats();
+        startNextOcr();
+    }
+
+    void MemoryCoordinator::startNextOcr()
+    {
+        if (m_running || m_runnerBusy || m_prepareWatcher.isRunning())
+        {
+            return;
+        }
+        if (!isEnabled() || !m_index->isOpen())
+        {
+            return;
+        }
+
+        refreshOcrAvailability();
+        if (!m_ocrAvailable || m_runner == nullptr)
+        {
+            return;
+        }
+
+        QueueItem item;
+        if (!m_captureQueue.empty())
+        {
+            item = m_captureQueue.front();
+            m_captureQueue.pop_front();
+        } else if (!m_importQueue.empty())
+        {
+            item = m_importQueue.front();
+            m_importQueue.pop_front();
+        } else
+        {
+            return;
+        }
+
+        m_running = item;
+        m_runningDhash.clear();
+
+        const std::filesystem::path filePath = item.filePath;
+        m_prepareWatcher.setFuture(QtConcurrent::run(
+                [filePath]
+                {
+                    PreparedImage prepared;
+                    QImage        image;
+                    if (image.load(displayPath(filePath)) && !image.isNull())
+                    {
+                        prepared.image    = image;
+                        prepared.dhash    = Core::computeDHash(image);
+                        prepared.readable = true;
+                    }
+                    return prepared;
+                }));
+    }
+
+    void MemoryCoordinator::handlePrepared()
+    {
+        if (!m_running)
+        {
+            startNextOcr();
+            return;
+        }
+
+        const QueueItem     item     = *m_running;
+        const PreparedImage prepared = m_prepareWatcher.result();
+        if (!prepared.readable)
+        {
+            writeOcr(item.id, QString{}, QString{}, QStringLiteral("failed"), Base::uiText("记忆库：读取截图失败，原文件可能已被移动或删除；可稍后在记忆库页重新识别。"), false);
+            finishTask();
+            return;
+        }
+
+        refreshOcrAvailability();
+        if (!m_ocrAvailable || m_runner == nullptr)
+        {
+            // 保持待识别，等后端恢复后由重试待处理重新入队
+            m_running.reset();
+            m_runningDhash.clear();
+            emitStats();
+            return;
+        }
+
+        m_runningDhash = prepared.dhash;
+        m_runnerBusy   = true;
+        m_runner->request(prepared.image, ocrLanguage());
+    }
+
+    void MemoryCoordinator::handleOcrSucceeded(const GyanisScribe::Core::OcrResult &result)
+    {
+        m_runnerBusy = false;
+        if (!m_running)
+        {
+            startNextOcr();
+            return;
+        }
+
+        const QueueItem item      = *m_running;
+        bool            truncated = false;
+        const QString   text      = truncateOcrText(result.text(), truncated);
+        writeOcr(item.id, text, m_runningDhash, QStringLiteral("done"), QString{}, truncated);
+        finishTask();
+    }
+
+    void MemoryCoordinator::handleOcrFailed(const Base::Error &error)
+    {
+        m_runnerBusy = false;
+        if (!m_running)
+        {
+            startNextOcr();
+            return;
+        }
+
+        const QueueItem item = *m_running;
+        writeOcr(item.id, QString{}, m_runningDhash, QStringLiteral("failed"), QString::fromStdString(error.message), false);
+        refreshOcrAvailability();
+        finishTask();
+    }
+
+    void MemoryCoordinator::writeOcr(const qint64 id, QString text, QString dhash, QString status, QString error, const bool truncated)
+    {
+        if (!m_index->isOpen())
+        {
+            return;
+        }
+
+        const auto updated = m_index->updateOcr(id, std::move(text), std::move(dhash), std::move(status), std::move(error), truncated);
+        if (!updated)
+        {
+            emit messageForUser(QString::fromStdString(updated.error().message), Gui::ToastKind::Danger);
+        }
+    }
+
+    void MemoryCoordinator::finishTask()
+    {
+        m_running.reset();
+        m_runningDhash.clear();
+        emit changed();
+        emitStats();
+        startNextOcr();
+    }
+
+    void MemoryCoordinator::stopQueue()
+    {
+        m_captureQueue.clear();
+        m_importQueue.clear();
+        m_running.reset();
+        m_runningDhash.clear();
+    }
+
+    void MemoryCoordinator::removeQueuedByPath(const QString &pathKey)
+    {
+        const auto matches = [&pathKey](const QueueItem &item) { return Core::MemoryIndex::pathKey(item.filePath) == pathKey; };
+        m_captureQueue.erase(std::remove_if(m_captureQueue.begin(), m_captureQueue.end(), matches), m_captureQueue.end());
+        m_importQueue.erase(std::remove_if(m_importQueue.begin(), m_importQueue.end(), matches), m_importQueue.end());
+        if (m_running && matches(*m_running))
+        {
+            m_running.reset();
+            m_runningDhash.clear();
+        }
+    }
+
+    void MemoryCoordinator::removeQueuedById(const qint64 id)
+    {
+        const auto matches = [id](const QueueItem &item) { return item.id == id; };
+        m_captureQueue.erase(std::remove_if(m_captureQueue.begin(), m_captureQueue.end(), matches), m_captureQueue.end());
+        m_importQueue.erase(std::remove_if(m_importQueue.begin(), m_importQueue.end(), matches), m_importQueue.end());
+        if (m_running && m_running->id == id)
+        {
+            m_running.reset();
+            m_runningDhash.clear();
+        }
+    }
+
+    std::optional<MemoryCoordinator::QueueItem> MemoryCoordinator::findQueueItem(const qint64 id) const
+    {
+        const auto known = m_knownItems.find(id);
+        if (known != m_knownItems.end())
+        {
+            return known->second;
+        }
+        for (const QueueItem &item: m_captureQueue)
+        {
+            if (item.id == id)
+            {
+                return item;
+            }
+        }
+        for (const QueueItem &item: m_importQueue)
+        {
+            if (item.id == id)
+            {
+                return item;
+            }
+        }
+
+        // 界面传来的主键可能来自更早的搜索结果：回查最近一页，查不到再报给用户
+        const auto results = m_index->search(Core::MemoryQuery{});
+        if (results)
+        {
+            for (const Core::MemoryResult &result: *results)
+            {
+                if (result.id == id)
+                {
+                    QueueItem item;
+                    item.id       = result.id;
+                    item.filePath = result.filePath;
+                    item.size     = result.size;
+                    item.source   = result.source;
+                    return item;
+                }
+            }
+        }
+        return std::nullopt;
+    }
+
+    void MemoryCoordinator::refreshOcrAvailability()
+    {
+        const bool available = m_engine != nullptr && m_runner != nullptr && m_engine->isAvailable();
+        if (available == m_ocrAvailable)
+        {
+            return;
+        }
+
+        QString reason;
+        if (!available)
+        {
+            reason = m_engine != nullptr ? m_engine->unavailableReason() : QString{};
+            if (reason.isEmpty())
+            {
+                reason = fallbackUnavailableReason();
+            }
+        }
+        m_ocrAvailable = available;
+        emit ocrAvailabilityChanged(available, available ? QString{} : reason);
+    }
+
+    void MemoryCoordinator::emitStats()
+    {
+        if (!m_index->isOpen())
+        {
+            return;
+        }
+
+        const int  excluded = static_cast<int>(m_settings.stringListValue(GyanisScribe::Core::kMemoryExcludeProcesses, QStringList{}).size());
+        const auto stats    = m_index->stats(excluded);
+        if (stats)
+        {
+            emit statsChanged(*stats);
+        }
+    }
+
+    bool MemoryCoordinator::isExcludedProcess(const QString &processName) const
+    {
+        if (processName.isEmpty())
+        {
+            // 空进程名是导入条目的标记，不受排除名单影响
+            return false;
+        }
+
+        const QStringList excluded = m_settings.stringListValue(GyanisScribe::Core::kMemoryExcludeProcesses, QStringList{});
+        for (const QString &entry: excluded)
+        {
+            if (normalizedProcessName(entry) == processName)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    QString MemoryCoordinator::ocrLanguage() const
+    {
+        return m_settings.stringValue(GyanisScribe::Core::kOcrLanguage, QString::fromUtf8(GyanisScribe::Core::kDefaultOcrLanguage));
+    }
+
+} // namespace GyanisScribe::App

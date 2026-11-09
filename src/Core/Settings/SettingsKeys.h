@@ -203,6 +203,15 @@ namespace GyanisScribe::Core
     /// 没存过文件的截图也进历史：像素另存一份到应用数据目录下的 Unsaved（读端在 AppController::handleCaptured，写端在 Core::archiveUnsavedCapture）
     inline constexpr std::string_view kHistoryKeepUnsaved = "History/KeepUnsaved";
 
+    /// 截图记忆是否为新截图建立索引；默认关，手动打开时视为已完成首次授权
+    inline constexpr std::string_view kMemoryEnabled = "Memory/Enabled";
+
+    /// 是否已经问过首次授权；不论用户开启还是暂不，问过之后就为 true
+    inline constexpr std::string_view kMemoryConsentAsked = "Memory/ConsentAsked";
+
+    /// 不建立索引的进程名列表，保存时归一为小写并去掉 .exe；空列表表示不排除任何程序
+    inline constexpr std::string_view kMemoryExcludeProcesses = "Memory/ExcludeProcesses";
+
     /// 标注色板的最近使用颜色（#RRGGBB 列表，最新的在前），读写都在 Gui::AnnotationToolbar
     inline constexpr std::string_view kAnnotationRecentColors = "Annotation/RecentColors";
 
