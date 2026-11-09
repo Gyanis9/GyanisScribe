@@ -85,6 +85,16 @@ namespace GyanisScribe::App
         {
             return;
         }
+        if (m_cancelled)
+        {
+            finish();
+            return;
+        }
+
+        // 每块一个事务：这一块的写入要么一起落库，要么一起回滚
+        const bool          transactional = m_index.beginTransaction().has_value();
+        std::vector<qint64> insertedIds;
+        insertedIds.reserve(kChunkSize);
 
         int processed = 0;
         while (!m_cancelled && processed < kChunkSize && m_iterator != nullptr && m_iterator->hasNext())
@@ -99,13 +109,31 @@ namespace GyanisScribe::App
 
             ++m_progress.scanned;
             ++m_sinceProgress;
-            processFile(filePath);
+            processFile(filePath, transactional, insertedIds);
+        }
 
-            if (m_sinceProgress >= kProgressInterval)
+        if (transactional)
+        {
+            const auto committed = m_index.commitTransaction();
+            if (committed)
             {
-                m_sinceProgress = 0;
-                emit progress(m_progress);
+                m_progress.inserted += static_cast<int>(insertedIds.size());
+                for (const qint64 id: insertedIds)
+                {
+                    emit inserted(id);
+                }
+            } else
+            {
+                // 整块回滚：块内已写的行都不算入库，计入失败后继续下一块
+                static_cast<void>(m_index.rollbackTransaction());
+                m_progress.failed += static_cast<int>(insertedIds.size());
             }
+        }
+
+        if (m_sinceProgress >= kProgressInterval)
+        {
+            m_sinceProgress = 0;
+            emit progress(m_progress);
         }
 
         if (m_cancelled || m_iterator == nullptr || !m_iterator->hasNext())
@@ -116,7 +144,7 @@ namespace GyanisScribe::App
         QTimer::singleShot(0, this, &MemoryImportJob::processChunk);
     }
 
-    void MemoryImportJob::processFile(const QString &filePath)
+    void MemoryImportJob::processFile(const QString &filePath, const bool canInsert, std::vector<qint64> &insertedIds)
     {
         const QFileInfo info{filePath};
         if (!info.isFile() || info.size() < 0 || info.size() > kMaxImportFileBytes)
@@ -149,6 +177,13 @@ namespace GyanisScribe::App
             return;
         }
 
+        if (!canInsert)
+        {
+            // 本块事务没开起来：这条本该入库的候选记为失败，下一块仍会继续尝试
+            ++m_progress.failed;
+            return;
+        }
+
         Core::MemoryUpsert entry;
         entry.filePath   = path;
         entry.source     = Core::MemorySource::Import;
@@ -166,8 +201,8 @@ namespace GyanisScribe::App
             return;
         }
 
-        ++m_progress.inserted;
-        emit inserted(*identifier);
+        // 提交之前只记下主键；commit 成功后才计入 inserted 并逐条发信号
+        insertedIds.push_back(*identifier);
     }
 
     void MemoryImportJob::finish()

@@ -1,4 +1,4 @@
-// 记忆库导入的直测：文件夹扫描、已在库跳过、大小写重复、超限与坏图、取消、排除应用与容量淘汰。
+// 记忆库导入的直测：文件夹扫描、已在库跳过、大小写重复、超限与坏图、取消、排除应用、分块事务与容量淘汰。
 // 假引擎统一返回「本周报价表」，让五百张导入后能只靠 OCR 文本检索；数据库与设置都落在临时目录。
 
 #include "App/MemoryCoordinator.h"
@@ -610,9 +610,8 @@ TEST_F(MemoryImport, CapacityEvictsAndNotifies)
     ASSERT_TRUE(settings.setValue(kMemoryConsentAsked, true).has_value());
 
     auto        engine = std::make_unique<ConstantOcrEngine>(QStringLiteral("本周报价表"));
-    Coordinator coordinator{settings, databasePath(), std::move(engine)};
+    Coordinator coordinator{settings, databasePath(), std::move(engine), 2};
     coordinator.start();
-    coordinator.setCapacityLimitForTesting(2);
 
     const auto                         moment = QDateTime::currentDateTime();
     std::vector<std::filesystem::path> importPaths;
@@ -646,4 +645,94 @@ TEST_F(MemoryImport, CapacityEvictsAndNotifies)
 
     ASSERT_GE(stats.count(), 1);
     EXPECT_EQ(stats.last().at(0).value<MemoryStats>().totalItems, 2);
+}
+
+/**
+ * @brief 导入超过容量时只合并提示一次，被淘汰的行不再排队读图识别
+ */
+TEST_F(MemoryImport, CapacityEvictionDuringImportNotifiesOnce)
+{
+    SettingsStore settings{settingsPath()};
+    ASSERT_TRUE(settings.setValue(kMemoryEnabled, true).has_value());
+    ASSERT_TRUE(settings.setValue(kMemoryConsentAsked, true).has_value());
+
+    auto        engine = std::make_unique<ConstantOcrEngine>(QStringLiteral("本周报价表"));
+    auto       *fake   = engine.get();
+    Coordinator coordinator{settings, databasePath(), std::move(engine), 3};
+    coordinator.start();
+
+    const auto folder = importFolder();
+    for (int index = 0; index < 10; ++index)
+    {
+        static_cast<void>(makePng(QStringLiteral("imports/capacity-%1.png").arg(index), QSize{8, 8}, Qt::cyan));
+    }
+
+    QSignalSpy messages(&coordinator, &Coordinator::messageForUser);
+    QSignalSpy finished(&coordinator, &Coordinator::importFinished);
+    coordinator.importFolder(folder);
+    ASSERT_TRUE(waitUntil([&] { return finished.count() > 0; }, kImportPatienceMs)) << "导入没有结束";
+
+    const auto report = finished.last().at(0).value<MemoryImportReport>();
+    EXPECT_EQ(report.scanned, 10);
+    EXPECT_EQ(report.inserted, 10);
+    EXPECT_EQ(report.failed, 0);
+    EXPECT_EQ(report.skipped, 0);
+
+    const auto finalStats = coordinator.index().stats(0);
+    ASSERT_TRUE(finalStats.has_value());
+    EXPECT_EQ(finalStats->totalItems, 3) << "导入结束后总数应落在容量上限";
+
+    ASSERT_EQ(messages.count(), 1) << "整个导入只该给一条容量提示，而不是每行一条";
+    EXPECT_EQ(messages.at(0).at(1).value<ToastKind>(), ToastKind::Information);
+    EXPECT_TRUE(messages.at(0).at(0).toString().contains(QStringLiteral("已达上限")));
+
+    ASSERT_TRUE(waitUntil(
+            [&]
+            {
+                const auto stats = coordinator.index().stats(0);
+                return stats.has_value() && stats->pendingOcr == 0;
+            },
+            kImportPatienceMs))
+            << "后台识别没有收口";
+    EXPECT_EQ(fake->calls(), 3) << "被容量淘汰的行不该再进入识别";
+}
+
+/**
+ * @brief 每块事务开不起来时整块按失败计数，不写入任何行，也不给容量提示
+ */
+TEST_F(MemoryImport, ChunkFailureCountsRowsFailedWithoutWriting)
+{
+    SettingsStore settings{settingsPath()};
+    ASSERT_TRUE(settings.setValue(kMemoryEnabled, true).has_value());
+    ASSERT_TRUE(settings.setValue(kMemoryConsentAsked, true).has_value());
+
+    auto        engine = std::make_unique<ConstantOcrEngine>(QStringLiteral("本周报价表"));
+    auto       *fake   = engine.get();
+    Coordinator coordinator{settings, databasePath(), std::move(engine)};
+    coordinator.start();
+
+    const auto folder = importFolder();
+    for (int index = 0; index < 3; ++index)
+    {
+        static_cast<void>(makePng(QStringLiteral("imports/blocked-%1.png").arg(index), QSize{8, 8}, Qt::darkCyan));
+    }
+
+    // 占住连接上的事务，让导入块的 begin 失败，模拟整块开不起来
+    ASSERT_TRUE(coordinator.index().beginTransaction().has_value());
+
+    QSignalSpy messages(&coordinator, &Coordinator::messageForUser);
+    QSignalSpy finished(&coordinator, &Coordinator::importFinished);
+    coordinator.importFolder(folder);
+    ASSERT_TRUE(waitUntil([&] { return finished.count() > 0; }, kImportPatienceMs)) << "导入没有结束";
+
+    const auto report = finished.last().at(0).value<MemoryImportReport>();
+    EXPECT_EQ(report.scanned, 3);
+    EXPECT_EQ(report.inserted, 0);
+    EXPECT_EQ(report.failed, 3) << "事务开不起来时块内候选应计入失败";
+    EXPECT_EQ(report.skipped, 0);
+    EXPECT_EQ(fake->calls(), 0) << "没有入库的行不该进入识别";
+    EXPECT_EQ(messages.count(), 0) << "没有淘汰就不该有容量提示";
+
+    ASSERT_TRUE(coordinator.index().rollbackTransaction().has_value());
+    EXPECT_EQ(resultCount(coordinator.index()), 0) << "回滚后不该留下导入行";
 }

@@ -1,4 +1,4 @@
-// 钉住记忆索引的建表、增删改查、FTS5 中文检索、应用与时间筛选、容量淘汰、统计与 1 万条性能预算
+// 钉住记忆索引的建表、增删改查、FTS5 中文检索、应用与时间筛选、事务、容量淘汰、统计与 1 万条性能预算
 
 #include "Core/Memory/MemoryIndex.h"
 #include "Core/Memory/MemoryToken.h"
@@ -386,7 +386,7 @@ TEST_F(MemoryIndex, RemovesByPathAndProcessIdempotently)
     EXPECT_EQ(afterProcessRemoval->front().source, Core::MemorySource::Import);
 }
 
-// 钉住容量淘汰顺序：先删除最新一行外最旧的导入，导入删完后才轮到最旧的截图
+// 钉住容量淘汰顺序：先删刚写入一条之外最旧的导入，导入删完后才轮到最旧的截图，并带回被删主键
 TEST_F(MemoryIndex, CapacityEvictsOldestImportFirst)
 {
     const auto oldestImport  = tempFile("oldest-import.png");
@@ -394,13 +394,17 @@ TEST_F(MemoryIndex, CapacityEvictsOldestImportFirst)
     const auto newestCapture = tempFile("newest-capture.png");
     const auto moment        = QDateTime::fromSecsSinceEpoch(1767225600);
 
-    ASSERT_TRUE(m_index->upsertPending(entryFor(oldestImport, Core::MemorySource::Import, moment, QSize(10, 10))).has_value());
-    ASSERT_TRUE(m_index->upsertPending(entryFor(newerImport, Core::MemorySource::Import, moment.addSecs(60), QSize(10, 10))).has_value());
-    ASSERT_TRUE(m_index->upsertPending(entryFor(newestCapture, Core::MemorySource::Capture, moment.addSecs(120), QSize(10, 10))).has_value());
+    const auto oldestImportId  = m_index->upsertPending(entryFor(oldestImport, Core::MemorySource::Import, moment, QSize(10, 10)));
+    const auto newerImportId   = m_index->upsertPending(entryFor(newerImport, Core::MemorySource::Import, moment.addSecs(60), QSize(10, 10)));
+    const auto newestCaptureId = m_index->upsertPending(entryFor(newestCapture, Core::MemorySource::Capture, moment.addSecs(120), QSize(10, 10)));
+    ASSERT_TRUE(oldestImportId.has_value());
+    ASSERT_TRUE(newerImportId.has_value());
+    ASSERT_TRUE(newestCaptureId.has_value());
 
-    const auto firstEviction = m_index->enforceCapacity(2);
+    const auto firstEviction = m_index->enforceCapacity(2, *newestCaptureId);
     ASSERT_TRUE(firstEviction.has_value());
-    EXPECT_EQ(*firstEviction, 1);
+    ASSERT_EQ(firstEviction->size(), 1U);
+    EXPECT_EQ(firstEviction->front(), *oldestImportId);
 
     const auto afterFirst = m_index->search(Core::MemoryQuery{});
     ASSERT_TRUE(afterFirst.has_value());
@@ -409,14 +413,47 @@ TEST_F(MemoryIndex, CapacityEvictsOldestImportFirst)
     EXPECT_TRUE(containsPath(*afterFirst, newerImport));
     EXPECT_TRUE(containsPath(*afterFirst, newestCapture));
 
-    const auto secondEviction = m_index->enforceCapacity(1);
+    const auto secondEviction = m_index->enforceCapacity(1, *newestCaptureId);
     ASSERT_TRUE(secondEviction.has_value());
-    EXPECT_EQ(*secondEviction, 1);
+    ASSERT_EQ(secondEviction->size(), 1U);
+    EXPECT_EQ(secondEviction->front(), *newerImportId);
 
     const auto afterSecond = m_index->search(Core::MemoryQuery{});
     ASSERT_TRUE(afterSecond.has_value());
     ASSERT_EQ(afterSecond->size(), 1U);
     EXPECT_EQ(afterSecond->front().filePath, newestCapture);
+}
+
+// 钉住刚写入的一行活过本次淘汰：同路径走更新分支时加入时间仍是旧值，也要靠调用方给的主键保住
+TEST_F(MemoryIndex, CapacityKeepsJustInsertedRow)
+{
+    const auto updatedPath = tempFile("updated-import.png");
+    const auto otherPath   = tempFile("other-import.png");
+    const auto capturePath = tempFile("capture.png");
+    const auto moment      = QDateTime::fromSecsSinceEpoch(1767225600);
+
+    const auto updatedId = m_index->upsertPending(entryFor(updatedPath, Core::MemorySource::Import, moment, QSize(10, 10)));
+    const auto otherId   = m_index->upsertPending(entryFor(otherPath, Core::MemorySource::Import, moment.addSecs(60), QSize(10, 10)));
+    const auto captureId = m_index->upsertPending(entryFor(capturePath, Core::MemorySource::Capture, moment.addSecs(120), QSize(10, 10)));
+    ASSERT_TRUE(updatedId.has_value());
+    ASSERT_TRUE(otherId.has_value());
+    ASSERT_TRUE(captureId.has_value());
+
+    // 同一路径再写一次走更新分支，加入时间保持最早；没有主键保护时它会被当成最旧一条删掉
+    const auto rewrittenId = m_index->upsertPending(entryFor(updatedPath, Core::MemorySource::Import, moment.addSecs(180), QSize(20, 20)));
+    ASSERT_TRUE(rewrittenId.has_value());
+    EXPECT_EQ(*rewrittenId, *updatedId);
+
+    const auto evicted = m_index->enforceCapacity(2, *rewrittenId);
+    ASSERT_TRUE(evicted.has_value());
+    ASSERT_EQ(evicted->size(), 1U);
+    EXPECT_EQ(evicted->front(), *otherId);
+
+    const auto survivors = m_index->search(Core::MemoryQuery{});
+    ASSERT_TRUE(survivors.has_value());
+    ASSERT_EQ(survivors->size(), 2U);
+    EXPECT_TRUE(containsPath(*survivors, updatedPath)) << "刚写入的一行不该被本次淘汰删掉";
+    EXPECT_TRUE(containsPath(*survivors, capturePath));
 }
 
 // 钉住 OCR 文本按 UTF-8 字节截到 64 KiB 并置 truncated，ASCII 与多字节字符都不越界
@@ -515,6 +552,40 @@ TEST_F(MemoryIndex, CloseAllowsReopenInPlace)
     ASSERT_TRUE(results.has_value());
     ASSERT_EQ(results->size(), 1U);
     EXPECT_EQ(results->front().id, *id);
+}
+
+// 钉住事务：回滚丢弃块内全部写入，提交后整块可见
+TEST_F(MemoryIndex, TransactionsCommitAndRollBack)
+{
+    const auto moment = QDateTime::fromSecsSinceEpoch(1767225600);
+
+    ASSERT_TRUE(m_index->beginTransaction().has_value());
+    ASSERT_TRUE(m_index->upsertPending(entryFor(tempFile("rolled-back-a.png"), Core::MemorySource::Import, moment, QSize(10, 10))).has_value());
+    ASSERT_TRUE(m_index->upsertPending(entryFor(tempFile("rolled-back-b.png"), Core::MemorySource::Import, moment.addSecs(1), QSize(10, 10))).has_value());
+    ASSERT_TRUE(m_index->rollbackTransaction().has_value());
+
+    const auto afterRollback = m_index->search(Core::MemoryQuery{});
+    ASSERT_TRUE(afterRollback.has_value());
+    EXPECT_TRUE(afterRollback->empty()) << "回滚后块内写入不该留下";
+
+    ASSERT_TRUE(m_index->beginTransaction().has_value());
+    const auto committedId = m_index->upsertPending(entryFor(tempFile("committed.png"), Core::MemorySource::Import, moment, QSize(10, 10)));
+    ASSERT_TRUE(committedId.has_value());
+    ASSERT_TRUE(m_index->commitTransaction().has_value());
+
+    const auto afterCommit = m_index->search(Core::MemoryQuery{});
+    ASSERT_TRUE(afterCommit.has_value());
+    ASSERT_EQ(afterCommit->size(), 1U);
+    EXPECT_EQ(afterCommit->front().id, *committedId);
+}
+
+// 钉住事务接口在关库后返回错误，而不是静默成功
+TEST_F(MemoryIndex, TransactionsRequireOpenDatabase)
+{
+    m_index->close();
+    EXPECT_FALSE(m_index->beginTransaction().has_value());
+    EXPECT_FALSE(m_index->commitTransaction().has_value());
+    EXPECT_FALSE(m_index->rollbackTransaction().has_value());
 }
 
 // 钉住失败写回只改状态与原因：旧文本、可检索文本与指纹都保留

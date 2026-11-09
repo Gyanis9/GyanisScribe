@@ -401,6 +401,51 @@ namespace GyanisScribe::Core
         return m_open;
     }
 
+    Base::Expected<void> MemoryIndex::beginTransaction()
+    {
+        if (!m_open)
+        {
+            return std::unexpected(notOpenError());
+        }
+
+        QSqlDatabase database = databaseFor(m_connectionName);
+        if (!database.transaction())
+        {
+            return std::unexpected(queryError(QStringLiteral("开启事务失败"), database.lastError()));
+        }
+        return {};
+    }
+
+    Base::Expected<void> MemoryIndex::commitTransaction()
+    {
+        if (!m_open)
+        {
+            return std::unexpected(notOpenError());
+        }
+
+        QSqlDatabase database = databaseFor(m_connectionName);
+        if (!database.commit())
+        {
+            return std::unexpected(queryError(QStringLiteral("提交事务失败"), database.lastError()));
+        }
+        return {};
+    }
+
+    Base::Expected<void> MemoryIndex::rollbackTransaction()
+    {
+        if (!m_open)
+        {
+            return std::unexpected(notOpenError());
+        }
+
+        QSqlDatabase database = databaseFor(m_connectionName);
+        if (!database.rollback())
+        {
+            return std::unexpected(queryError(QStringLiteral("回滚事务失败"), database.lastError()));
+        }
+        return {};
+    }
+
     Base::Expected<bool> MemoryIndex::containsPath(const std::filesystem::path &path) const
     {
         if (!m_open)
@@ -904,7 +949,7 @@ namespace GyanisScribe::Core
         return static_cast<int>(missing.size());
     }
 
-    Base::Expected<int> MemoryIndex::enforceCapacity(const int maxEntries)
+    Base::Expected<std::vector<qint64>> MemoryIndex::enforceCapacity(const int maxEntries, const qint64 keepId)
     {
         if (!m_open)
         {
@@ -922,21 +967,24 @@ namespace GyanisScribe::Core
             total = countQuery.value(0).toInt();
         }
 
-        const int maximum = std::max(maxEntries, 0);
-        const int excess  = total - maximum;
+        std::vector<qint64> evicted;
+        const int           maximum = std::max(maxEntries, 0);
+        const int           excess  = total - maximum;
         if (excess <= 0)
         {
-            return 0;
+            return evicted;
         }
 
-        qint64 newestId = -1;
+        // 本次刚写入的一行必须活过这次淘汰；调用方没给主键时退回保护最新一行
+        qint64 protectedId = keepId;
+        if (protectedId <= 0)
         {
             QSqlQuery newestQuery{database};
             if (!newestQuery.exec(QStringLiteral("SELECT id FROM items ORDER BY added_at DESC, id DESC LIMIT 1")) || !newestQuery.next())
             {
                 return std::unexpected(queryError(QStringLiteral("确定最新条目失败"), newestQuery.lastError()));
             }
-            newestId = newestQuery.value(0).toLongLong();
+            protectedId = newestQuery.value(0).toLongLong();
         }
 
         if (!database.transaction())
@@ -944,36 +992,50 @@ namespace GyanisScribe::Core
             return std::unexpected(queryError(QStringLiteral("开启容量淘汰事务失败"), database.lastError()));
         }
 
-        QSqlQuery removeOldest{database};
-        if (!removeOldest.prepare(QStringLiteral("DELETE FROM items WHERE id = ("
-                                                 "SELECT id FROM items WHERE source = ? AND id <> ? "
-                                                 "ORDER BY added_at ASC, id ASC LIMIT 1)")))
+        QSqlQuery nextVictim{database};
+        if (!nextVictim.prepare(QStringLiteral("SELECT id FROM items WHERE source = ? AND id <> ? ORDER BY added_at ASC, id ASC LIMIT 1")))
         {
             database.rollback();
-            return std::unexpected(queryError(QStringLiteral("准备容量淘汰失败"), removeOldest.lastError()));
+            return std::unexpected(queryError(QStringLiteral("准备查找待淘汰条目失败"), nextVictim.lastError()));
+        }
+        QSqlQuery removal{database};
+        if (!removal.prepare(QStringLiteral("DELETE FROM items WHERE id = ?")))
+        {
+            database.rollback();
+            return std::unexpected(queryError(QStringLiteral("准备容量淘汰失败"), removal.lastError()));
         }
 
-        // 每次淘汰一条：先导入后截图，并且始终跳过最新那一行
-        int removed = 0;
-        while (removed < excess)
+        // 每次淘汰一条：先导入后截图，并始终跳过 protectedId
+        while (static_cast<int>(evicted.size()) < excess)
         {
             bool deletedOne = false;
             for (const QString &source: {QStringLiteral("import"), QStringLiteral("capture")})
             {
-                removeOldest.bindValue(0, source);
-                removeOldest.bindValue(1, newestId);
-                if (!removeOldest.exec())
+                nextVictim.bindValue(0, source);
+                nextVictim.bindValue(1, protectedId);
+                if (!nextVictim.exec())
                 {
-                    const QSqlError deleteError = removeOldest.lastError();
+                    const QSqlError findError = nextVictim.lastError();
+                    database.rollback();
+                    return std::unexpected(queryError(QStringLiteral("查找待淘汰条目失败"), findError));
+                }
+                if (!nextVictim.next())
+                {
+                    continue;
+                }
+
+                const qint64 victimId = nextVictim.value(0).toLongLong();
+                nextVictim.finish();
+                removal.bindValue(0, victimId);
+                if (!removal.exec())
+                {
+                    const QSqlError deleteError = removal.lastError();
                     database.rollback();
                     return std::unexpected(queryError(QStringLiteral("容量淘汰失败"), deleteError));
                 }
-                if (removeOldest.numRowsAffected() > 0)
-                {
-                    deletedOne = true;
-                    ++removed;
-                    break;
-                }
+                evicted.push_back(victimId);
+                deletedOne = true;
+                break;
             }
             if (!deletedOne)
             {
@@ -987,6 +1049,6 @@ namespace GyanisScribe::Core
             database.rollback();
             return std::unexpected(queryError(QStringLiteral("提交容量淘汰失败"), commitError));
         }
-        return removed;
+        return evicted;
     }
 } // namespace GyanisScribe::Core

@@ -16,6 +16,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <vector>
 
 class QDirIterator;
 
@@ -29,8 +30,10 @@ namespace GyanisScribe::App
     /**
      * @brief 一次旧图导入任务
      * @details 递归扫描文件夹里的图片，逐条写进索引；扫描与入库在界面线程上分块跑，
-     *          每块之间让出事件循环，进度对话框才能画面。不复制文件，也不改历史清单。
-     *          同一时间只跑一个任务；取消后不再调度新文件，已入库的行保留。
+     *          每块之间让出事件循环，进度对话框才能画面。每块写入放在同一个事务里，
+     *          整块提交成功后才报告插入；提交失败则整块回滚并计入失败。
+     *          不复制文件，也不改历史清单。同一时间只跑一个任务；取消后不再调度新文件，
+     *          已提交的块保留。
      */
     class MemoryImportJob : public QObject
     {
@@ -71,7 +74,7 @@ namespace GyanisScribe::App
         /**
          * @brief 一条旧图已写进索引
          * @param id 该条目在索引里的主键
-         * @details 协调器据此把它排进导入 OCR 队列。
+         * @details 只有在所属块的事务提交成功后才逐条发出；协调器据此把它排进导入 OCR 队列。
          */
         void inserted(qint64 id);
 
@@ -82,14 +85,14 @@ namespace GyanisScribe::App
         void finished(const GyanisScribe::Core::MemoryImportReport &report);
 
     private:
-        /// 处理一块文件；处理后让出事件循环再排下一块
+        /// 处理一块文件；块内写入在同一个事务里，提交成功后才对外报告插入
         void processChunk();
 
         /// 收尾：发最终进度与结束报告，之后不再处理文件
         void finish();
 
         /// 处理一个候选文件；不合格的只计数，不进库
-        void processFile(const QString &filePath);
+        void processFile(const QString &filePath, bool canInsert, std::vector<qint64> &insertedIds);
 
         Core::MemoryIndex            &m_index;                 ///< 目标索引，不拥有
         std::unique_ptr<QDirIterator> m_iterator;              ///< 递归扫描器

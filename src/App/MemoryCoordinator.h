@@ -27,6 +27,7 @@
 #include <memory>
 #include <optional>
 #include <unordered_map>
+#include <vector>
 
 namespace GyanisScribe::Core
 {
@@ -61,20 +62,22 @@ namespace GyanisScribe::App
          * @param settings 配置来源，读开关、授权与 OCR 语言
          * @param integration 平台能力来源，后端选型用
          * @param databasePath 数据库文件路径；第一次 start() 时打开
+         * @param maxEntries 条目容量上限，生产用默认值；用例可改小
          * @param parent Qt 父对象
          */
         MemoryCoordinator(GyanisScribe::Core::ISettingsStore &settings, GyanisScribe::Platform::IPlatformIntegration &integration, std::filesystem::path databasePath,
-                          QObject *parent = nullptr);
+                          int maxEntries = Core::kMaxMemoryEntries, QObject *parent = nullptr);
 
         /**
          * @brief 测试注入构造：跳过后端工厂，直接接管一个引擎
          * @param settings 配置来源
          * @param databasePath 数据库文件路径
          * @param engine 识别后端，所有权移入本对象；为空时队列按「后端不可用」停住
+         * @param maxEntries 条目容量上限，生产用默认值；用例可改小
          * @param parent Qt 父对象
          */
         MemoryCoordinator(GyanisScribe::Core::ISettingsStore &settings, std::filesystem::path databasePath, std::unique_ptr<GyanisScribe::Core::IOcrEngine> engine,
-                          QObject *parent = nullptr);
+                          int maxEntries = Core::kMaxMemoryEntries, QObject *parent = nullptr);
 
         /**
          * @brief 析构：先断开读图结果的回接，再等读图与识别收口
@@ -145,12 +148,6 @@ namespace GyanisScribe::App
 
         /// 当前排除的应用名单，已归一化
         [[nodiscard]] QStringList excludedProcesses() const;
-
-        /**
-         * @brief 用例把容量改小，稳定走到淘汰分支
-         * @param maxEntries 允许保留的最大条数
-         */
-        void setCapacityLimitForTesting(int maxEntries);
 
         /**
          * @brief 重新识别一条
@@ -260,8 +257,8 @@ namespace GyanisScribe::App
         /// 导入任务入库一条后把它排进导入队列
         void enqueueImported(qint64 id);
 
-        /// 超出容量时淘汰旧条目；有淘汰时发一次提示与统计
-        void enforceCapacity();
+        /// 超出容量时淘汰旧条目；导入期间只累计，截图路径立即提示
+        void enforceCapacity(qint64 insertedId, bool duringImport);
 
         /// 把已排除进程的排队任务与等待授权的截图清掉
         void dropExcludedWork(const QStringList &excluded);
@@ -293,7 +290,7 @@ namespace GyanisScribe::App
         /// 从两条队列与运行位里去掉同一路径的任务
         void removeQueuedByPath(const QString &pathKey);
 
-        /// 从两条队列与运行位里去掉同一条任务
+        /// 从两条队列、运行位与主键映射里去掉同一条任务
         void removeQueuedById(qint64 id);
 
         /// 找一个任务的内存元数据；队列里没有时按最近搜索结果回查
@@ -330,8 +327,9 @@ namespace GyanisScribe::App
         bool                                                   m_indexNoticeShown        = false; ///< 索引未打开提示是否已经说过
         bool                                                   m_excludedNoticeShown     = false; ///< 排除提示是否已经说过
 
-        std::unique_ptr<MemoryImportJob> m_importJob;                               ///< 当前导入任务，同一时间只有一个
-        int                              m_capacityLimit = Core::kMaxMemoryEntries; ///< 条目上限，用例可改小
+        std::unique_ptr<MemoryImportJob> m_importJob;                                    ///< 当前导入任务，同一时间只有一个
+        int                              m_capacityLimit      = Core::kMaxMemoryEntries; ///< 条目上限，用例可在构造时改小
+        int                              m_importEvictedCount = 0;                       ///< 本次导入累计淘汰的条数，结束时合并提示
     };
 
 } // namespace GyanisScribe::App

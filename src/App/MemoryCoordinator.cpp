@@ -119,16 +119,17 @@ namespace GyanisScribe::App
     } // namespace
 
     MemoryCoordinator::MemoryCoordinator(GyanisScribe::Core::ISettingsStore &settings, GyanisScribe::Platform::IPlatformIntegration &integration,
-                                         std::filesystem::path databasePath, QObject *parent) :
-        QObject(parent), m_settings(settings), m_databasePath(std::move(databasePath)), m_index(m_databasePath)
+                                         std::filesystem::path databasePath, const int maxEntries, QObject *parent) :
+        QObject(parent), m_settings(settings), m_databasePath(std::move(databasePath)), m_index(m_databasePath), m_capacityLimit(std::max(maxEntries, 0))
     {
         m_engine = GyanisScribe::Plugins::createOcrEngine(m_settings, integration);
         initialize();
     }
 
     MemoryCoordinator::MemoryCoordinator(GyanisScribe::Core::ISettingsStore &settings, std::filesystem::path databasePath, std::unique_ptr<GyanisScribe::Core::IOcrEngine> engine,
-                                         QObject *parent) :
-        QObject(parent), m_settings(settings), m_databasePath(std::move(databasePath)), m_index(m_databasePath), m_engine(std::move(engine))
+                                         const int maxEntries, QObject *parent) :
+        QObject(parent), m_settings(settings), m_databasePath(std::move(databasePath)), m_index(m_databasePath), m_engine(std::move(engine)),
+        m_capacityLimit(std::max(maxEntries, 0))
     {
         initialize();
     }
@@ -361,6 +362,7 @@ namespace GyanisScribe::App
             return;
         }
 
+        m_importEvictedCount = 0;
         m_importJob          = std::make_unique<MemoryImportJob>(m_index);
         MemoryImportJob *job = m_importJob.get();
 
@@ -379,9 +381,17 @@ namespace GyanisScribe::App
                              MemoryImportJob *finishedJob = m_importJob.release();
                              finishedJob->deleteLater();
 
+                             const int evicted = std::exchange(m_importEvictedCount, 0);
+
                              emit importFinished(report);
                              emit changed();
                              emitStats();
+                             if (evicted > 0)
+                             {
+                                 // 整个导入合并成一条，逐条提示会把界面刷屏
+                                 emit messageForUser(Base::uiText("记忆库已达上限 %1 条：本次导入已淘汰最早的 %2 条；原图文件不受影响。").arg(m_capacityLimit).arg(evicted),
+                                                     Gui::ToastKind::Information);
+                             }
                          });
 
         job->start(directory);
@@ -457,11 +467,6 @@ namespace GyanisScribe::App
             }
         }
         return normalized;
-    }
-
-    void MemoryCoordinator::setCapacityLimitForTesting(const int maxEntries)
-    {
-        m_capacityLimit = std::max(maxEntries, 0);
     }
 
     void MemoryCoordinator::retryOcr(const qint64 id)
@@ -770,8 +775,8 @@ namespace GyanisScribe::App
             return;
         }
 
-        // 每次写入后都收一次容量：刚插入的这一行是最新的，淘汰不会把它删掉
-        enforceCapacity();
+        // 每次写入后都收一次容量：刚插入的这一行不会被淘汰
+        enforceCapacity(*identifier, false);
 
         QueueItem item;
         item.id          = *identifier;
@@ -797,13 +802,13 @@ namespace GyanisScribe::App
 
     void MemoryCoordinator::enqueueImported(const qint64 id)
     {
-        // 导入任务写完一行就算一次 upsert；先收容量，刚插入的这行不会被淘汰
-        enforceCapacity();
+        // 导入任务写完一行就算一次 upsert；淘汰计数留到导入结束合并提示
+        enforceCapacity(id, true);
 
         const auto found = m_index.findById(id);
         if (!found || !found->has_value())
         {
-            emitStats();
+            // 本批里已被容量淘汰或导入期间被删除：不再排队，也不该为它读图识别
             return;
         }
 
@@ -820,27 +825,40 @@ namespace GyanisScribe::App
         startNextOcr();
     }
 
-    void MemoryCoordinator::enforceCapacity()
+    void MemoryCoordinator::enforceCapacity(const qint64 insertedId, const bool duringImport)
     {
         if (!m_index.isOpen())
         {
             return;
         }
 
-        const auto evicted = m_index.enforceCapacity(m_capacityLimit);
+        const auto evicted = m_index.enforceCapacity(m_capacityLimit, insertedId);
         if (!evicted)
         {
             emit messageForUser(QString::fromStdString(evicted.error().message), Gui::ToastKind::Danger);
             return;
         }
-        if (*evicted <= 0)
+        if (evicted->empty())
         {
+            return;
+        }
+
+        // 被淘汰的行不能再读图识别：从两条队列、运行位与主键映射里一并清掉
+        for (const qint64 id: *evicted)
+        {
+            removeQueuedById(id);
+        }
+
+        if (duringImport)
+        {
+            m_importEvictedCount += static_cast<int>(evicted->size());
             return;
         }
 
         emit changed();
         emitStats();
-        emit messageForUser(Base::uiText("记忆库：条目已达上限 %1 条，已淘汰最早的 %2 条；原图文件不受影响。").arg(m_capacityLimit).arg(*evicted), Gui::ToastKind::Information);
+        emit messageForUser(Base::uiText("记忆库：条目已达上限 %1 条，已淘汰最早的 %2 条；原图文件不受影响。").arg(m_capacityLimit).arg(static_cast<int>(evicted->size())),
+                            Gui::ToastKind::Information);
     }
 
     void MemoryCoordinator::dropExcludedWork(const QStringList &excluded)
@@ -1056,6 +1074,7 @@ namespace GyanisScribe::App
             m_running.reset();
             m_runningDhash.clear();
         }
+        m_knownItems.erase(id);
     }
 
     std::optional<MemoryCoordinator::QueueItem> MemoryCoordinator::findQueueItem(const qint64 id) const

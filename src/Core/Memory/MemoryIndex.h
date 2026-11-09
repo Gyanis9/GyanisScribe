@@ -76,6 +76,25 @@ namespace GyanisScribe::Core
         [[nodiscard]] bool isOpen() const noexcept;
 
         /**
+         * @brief 开启一个事务
+         * @return 成功返回空载荷；数据库未打开或驱动拒绝开启时返回中文 Error
+         * @details 事务期间本连接上的写入要么一起提交，要么一起回滚；不支持嵌套。
+         */
+        [[nodiscard]] Base::Expected<void> beginTransaction();
+
+        /**
+         * @brief 提交当前事务
+         * @return 成功返回空载荷；没有活动事务或提交失败时返回中文 Error
+         */
+        [[nodiscard]] Base::Expected<void> commitTransaction();
+
+        /**
+         * @brief 回滚当前事务，丢弃自开启以来的写入
+         * @return 成功返回空载荷；回滚失败时返回中文 Error
+         */
+        [[nodiscard]] Base::Expected<void> rollbackTransaction();
+
+        /**
          * @brief 判断一条路径是否已经在索引里
          * @param path 原始文件路径，按 pathKey 比较
          * @return 已存在返回 true，不存在返回 false；查询失败返回中文 Error
@@ -196,10 +215,11 @@ namespace GyanisScribe::Core
         /**
          * @brief 超出容量时淘汰旧条目
          * @param maxEntries 允许保留的最大条数
-         * @return 删除的条目数
-         * @details 先删最新一行之外最旧的导入条目，导入删完后才删最旧的截图条目。
+         * @param keepId 本次刚写入的条目主键，淘汰时始终跳过；非正数时改为跳过最新一行
+         * @return 被淘汰条目的主键，按删除先后排列；未超限时为空
+         * @details 先删最旧的导入条目，导入删完后才删最旧的截图条目。
          */
-        [[nodiscard]] Base::Expected<int> enforceCapacity(int maxEntries);
+        [[nodiscard]] Base::Expected<std::vector<qint64>> enforceCapacity(int maxEntries, qint64 keepId);
 
     private:
         std::filesystem::path m_databasePath;   ///< 数据库文件位置
