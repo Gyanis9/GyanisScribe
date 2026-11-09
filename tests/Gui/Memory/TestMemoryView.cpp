@@ -22,10 +22,12 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QThreadPool>
+#include <QTimer>
 #include <QVariant>
 
 #include <algorithm>
@@ -210,7 +212,8 @@ namespace
 
 /**
  * @brief 钉住重复图合并默认开启、关闭后列出全部结果
- * @details 两条 dHash 距离 0 的截图折成一个组头加最新一条，关掉开关后三条全部列出。
+ * @details 两条 dHash 距离 0 的截图折成组头加最新一条，连同另一组的一张共三行；
+ *          折叠时组内旧的不出现，关掉开关后三条卡片全部列出、不再有组头。
  */
 TEST_F(MemoryViewFixture, MergesDuplicateResultsOnlyWhenEnabled)
 {
@@ -218,16 +221,37 @@ TEST_F(MemoryViewFixture, MergesDuplicateResultsOnlyWhenEnabled)
     auto view = makeView();
     view.refresh();
 
-    ASSERT_EQ(view.rowCount(), 2) << "两条相同 dHash 应折成组头加最新一条";
+    auto *list = view.findChild<QListWidget *>(QStringLiteral("memoryList"));
+    ASSERT_NE(list, nullptr) << "没有结果列表";
+    const auto hasText = [list](const QString &needle)
+    {
+        for (int row = 0; row < list->count(); ++row)
+        {
+            if (list->item(row)->text().contains(needle))
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    ASSERT_EQ(view.rowCount(), 3) << "折叠时应是另一组一张、重复组头与组内最新一条";
+    EXPECT_TRUE(hasText(QStringLiteral("张重复/相似"))) << "折叠时没有组头";
+    EXPECT_FALSE(hasText(QStringLiteral("旧的一版"))) << "折叠时露出了组内旧的一条";
+
     auto *merge = view.findChild<QCheckBox *>(QStringLiteral("memoryMergeToggle"));
     ASSERT_NE(merge, nullptr) << "没有合并重复图开关";
     EXPECT_TRUE(merge->isChecked()) << "合并重复图默认应开启";
 
     merge->setChecked(false);
-    EXPECT_EQ(view.rowCount(), 3) << "关闭合并后应列出全部三条";
+    EXPECT_EQ(view.rowCount(), 3) << "关闭合并后应列出全部三条卡片";
+    EXPECT_FALSE(hasText(QStringLiteral("张重复/相似"))) << "关闭合并后还留着组头";
+    EXPECT_TRUE(hasText(QStringLiteral("旧的一版"))) << "关闭合并后旧的一条没有列出";
 
     merge->setChecked(true);
-    EXPECT_EQ(view.rowCount(), 2) << "重新开启后应再次折成两组";
+    EXPECT_EQ(view.rowCount(), 3) << "重新开启后应再次折成三行";
+    EXPECT_TRUE(hasText(QStringLiteral("张重复/相似"))) << "重新合并后没有组头";
+    EXPECT_FALSE(hasText(QStringLiteral("旧的一版"))) << "重新合并后旧的一条还露着";
 }
 
 /**
@@ -256,14 +280,14 @@ TEST_F(MemoryViewFixture, SearchDebouncesThenShowsNoMatchHint)
     static_cast<void>(seedDuplicateGroup());
     auto view = makeView();
     view.refresh();
-    ASSERT_EQ(view.rowCount(), 2);
+    ASSERT_EQ(view.rowCount(), 3);
 
     auto *search = view.findChild<QLineEdit *>(QStringLiteral("memorySearch"));
     ASSERT_NE(search, nullptr) << "没有搜索框";
     EXPECT_EQ(search->placeholderText(), QString::fromUtf8("搜索截图里的文字…"));
 
     search->setText(QStringLiteral("完全不存在的关键词"));
-    EXPECT_EQ(view.rowCount(), 2) << "防抖期内不该立刻查库";
+    EXPECT_EQ(view.rowCount(), 3) << "防抖期内不该立刻查库";
 
     ASSERT_TRUE(waitUntil([&view] { return view.rowCount() == 0; }, 2'000)) << "防抖结束后没有按关键词刷新";
 
@@ -281,7 +305,7 @@ TEST_F(MemoryViewFixture, SearchDebouncesThenShowsNoMatchHint)
 TEST_F(MemoryViewFixture, BannersExposeEnableAndRebuildActions)
 {
     auto view = makeView();
-    view.setEnabled(false);
+    view.setMemoryEnabled(false);
 
     auto *enable = buttonOf(view, QStringLiteral("memoryEnable"));
     auto *banner = view.findChild<QLabel *>(QStringLiteral("memoryBanner"));
@@ -298,7 +322,7 @@ TEST_F(MemoryViewFixture, BannersExposeEnableAndRebuildActions)
     enable->click();
     EXPECT_EQ(enables, 1);
 
-    view.setEnabled(true);
+    view.setMemoryEnabled(true);
     EXPECT_TRUE(enable->isHidden()) << "已开启时还亮着开启按钮";
     EXPECT_TRUE(frame->isHidden()) << "没有理由时横幅还占着地方";
 
@@ -569,7 +593,8 @@ TEST_F(MemoryViewFixture, EmptyIndexExposesImportAndClearExits)
 
 /**
  * @brief 钉住重复组头可点击展开与收起
- * @details 组头不可选中；点一下列出组内两条，再点一下收回组头。
+ * @details 组头不可选中；折叠时组头下已露出最新一条，点一下补出组内旧的一条，
+ *          再点一下收回旧的一条。
  */
 TEST_F(MemoryViewFixture, GroupHeaderTogglesExpansion)
 {
@@ -579,7 +604,7 @@ TEST_F(MemoryViewFixture, GroupHeaderTogglesExpansion)
 
     auto *list = view.findChild<QListWidget *>(QStringLiteral("memoryList"));
     ASSERT_NE(list, nullptr);
-    ASSERT_EQ(list->count(), 2);
+    ASSERT_EQ(list->count(), 3) << "折叠时应是另一组一张、组头与组内最新一条";
     ASSERT_NE(list->item(1)->text().indexOf(QStringLiteral("张重复/相似")), -1) << list->item(1)->text().toStdString();
 
     view.show();
@@ -590,14 +615,14 @@ TEST_F(MemoryViewFixture, GroupHeaderTogglesExpansion)
     ASSERT_FALSE(headerRect.isEmpty()) << "组头没有可见矩形，点击展开的前提不成立";
     QTest::mouseClick(list->viewport(), Qt::LeftButton, Qt::NoModifier, headerRect.center());
     QApplication::processEvents();
-    EXPECT_EQ(view.rowCount(), 4) << "点组头没有展开组内两条";
+    EXPECT_EQ(view.rowCount(), 4) << "点组头没有补出组内旧的一条";
 
     header                    = list->item(1);
     const QRect collapsedRect = list->visualItemRect(header);
     ASSERT_FALSE(collapsedRect.isEmpty());
     QTest::mouseClick(list->viewport(), Qt::LeftButton, Qt::NoModifier, collapsedRect.center());
     QApplication::processEvents();
-    EXPECT_EQ(view.rowCount(), 2) << "再点组头没有收起";
+    EXPECT_EQ(view.rowCount(), 3) << "再点组头没有收回旧的一条";
 }
 
 /**
@@ -654,8 +679,9 @@ TEST_F(MemoryViewFixture, ViewOwnsImportDialog)
 }
 
 /**
- * @brief 钉住排除应用对话框列出应用与已排除项并返回完整勾选
- * @details 进程名为空的导入条目不可排除；已排除但当前没有条目的进程也要能显示与取消勾选。
+ * @brief 钉住排除应用对话框列出应用与已排除项、保存前按条数确认并返回完整勾选
+ * @details 进程名为空的导入条目不可排除；已排除但当前没有条目的进程也要能显示与取消勾选；
+ *          新勾选的应用有索引行时，确认框要写明将删除的条数。
  */
 TEST_F(MemoryViewFixture, ExcludeDialogReturnsCheckedProcesses)
 {
@@ -721,13 +747,58 @@ TEST_F(MemoryViewFixture, ExcludeDialogReturnsCheckedProcesses)
     browserRow->setCheckState(Qt::Checked);
     auto *save = dialog.findChild<QPushButton *>(QStringLiteral("excludeSave"));
     ASSERT_NE(save, nullptr);
+
+    // 保存会删掉新排除的 browser 已有的 2 条：先起一枚短定时器，等确认框成为活动模态窗时点「是」
+    QString confirmText;
+    int     confirms = 0;
+    QTimer  driver;
+    driver.setInterval(1);
+    QObject::connect(&driver, &QTimer::timeout, &driver,
+                     [&]
+                     {
+                         auto *box = qobject_cast<QMessageBox *>(QApplication::activeModalWidget());
+                         if (box == nullptr)
+                         {
+                             return;
+                         }
+                         confirmText = box->text();
+                         auto *yes   = box->button(QMessageBox::Yes);
+                         ASSERT_NE(yes, nullptr);
+                         yes->click();
+                         ++confirms;
+                         driver.stop();
+                     });
+    driver.start();
     save->click();
+    driver.stop();
+    EXPECT_EQ(confirms, 1) << "保存时没有弹出写明删除条数的确认框";
+    EXPECT_NE(confirmText.indexOf(QStringLiteral("2 条")), -1) << confirmText.toStdString();
 
     const QStringList selected = dialog.selectedProcesses();
     EXPECT_FALSE(selected.contains(QStringLiteral("code"))) << "取消勾选的 code 还在名单里";
     EXPECT_TRUE(selected.contains(QStringLiteral("browser")));
     EXPECT_TRUE(selected.contains(QStringLiteral("legacy")));
     EXPECT_TRUE(selected.contains(QStringLiteral("newapp"))) << "输入的新进程没有进最终名单";
+}
+
+/**
+ * @brief 钉住排除保存的删除条数只数新勾选的应用
+ * @details 已排除的应用在当初保存时已经删过行，重复计入会把确认框的数字说大；
+ *          没在索引里出现过的进程没有行可删，也不计入。
+ */
+TEST_F(MemoryViewFixture, ExcludeDeletionCountCoversNewlyCheckedApps)
+{
+    const std::vector<Core::MemoryAppCount> apps{
+            {.processName = QStringLiteral("code"), .count = 3},
+            {.processName = QStringLiteral("browser"), .count = 2},
+            {.processName = QString{}, .count = 1},
+    };
+
+    EXPECT_EQ(MemoryExcludeDialog::pendingDeletionCount(apps, QStringList{QStringLiteral("legacy")}, QStringList{QStringLiteral("code"), QStringLiteral("browser")}), 5)
+            << "新勾选的 code 与 browser 应合计 5 条";
+    EXPECT_EQ(MemoryExcludeDialog::pendingDeletionCount(apps, QStringList{QStringLiteral("code")}, QStringList{QStringLiteral("CODE"), QStringLiteral("newapp")}), 0)
+            << "大小写不敏感地认出已排除的 code，没出现过的 newapp 没有行可删";
+    EXPECT_EQ(MemoryExcludeDialog::pendingDeletionCount(apps, QStringList{}, QStringList{QStringLiteral("browser")}), 2) << "空名单时只数 browser 的 2 条";
 }
 
 /**

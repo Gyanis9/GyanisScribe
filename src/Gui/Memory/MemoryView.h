@@ -78,8 +78,9 @@ namespace GyanisScribe::Gui
          * @brief 记录功能开关并更新顶部横幅
          * @param enabled 记忆库是否已开启
          * @note 关闭只停新条目的建立；已有索引仍可搜索，列表不清空
+         * @note 这是功能开关，和 QWidget::setEnabled 的整页禁用不是一回事
          */
-        void setEnabled(bool enabled);
+        void setMemoryEnabled(bool enabled);
 
         /**
          * @brief 记录识别后端可用性并更新横幅
@@ -223,7 +224,7 @@ namespace GyanisScribe::Gui
         /// 按当前选中行启用或灰掉五枚动作按钮
         void updateActionState();
 
-        /// 把 m_groups 铺进列表，重复组按展开状态决定列不列组内条目
+        /// 把 m_groups 铺进列表：重复组收着时只列组头与最新一条，展开后列出全部成员
         void refillList();
 
         /// 往列表追加一条结果卡片

@@ -407,7 +407,7 @@ namespace GyanisScribe::Gui
         refreshStats();
     }
 
-    void MemoryView::setEnabled(const bool enabled)
+    void MemoryView::setMemoryEnabled(const bool enabled)
     {
         m_enabled = enabled;
         updateBanner();
@@ -614,21 +614,22 @@ namespace GyanisScribe::Gui
         for (std::size_t groupIndex = 0; groupIndex < m_groups.size(); ++groupIndex)
         {
             const auto &group = m_groups[groupIndex];
-            if (group.size() > 1)
-            {
-                appendGroupHeader(static_cast<int>(groupIndex), group);
-            }
             if (group.size() == 1)
             {
                 appendCard(group.front());
                 continue;
             }
-            if (m_groupExpanded[groupIndex])
+
+            appendGroupHeader(static_cast<int>(groupIndex), group);
+            if (!m_groupExpanded[groupIndex])
             {
-                for (const auto &result: group)
-                {
-                    appendCard(result);
-                }
+                // 收着的组也要露出最新一条：组头只说明还有几张，贴图与打开的动作都长在卡片上
+                appendCard(group.front());
+                continue;
+            }
+            for (const auto &result: group)
+            {
+                appendCard(result);
             }
         }
 

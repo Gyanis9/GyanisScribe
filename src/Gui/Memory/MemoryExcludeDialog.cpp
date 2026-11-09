@@ -11,6 +11,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QListWidgetItem>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QVBoxLayout>
 
@@ -152,6 +153,20 @@ namespace GyanisScribe::Gui
         return m_selected;
     }
 
+    int MemoryExcludeDialog::pendingDeletionCount(const std::vector<Core::MemoryAppCount> &apps, const QStringList &previouslyExcluded, const QStringList &selected)
+    {
+        int count = 0;
+        for (const auto &app: apps)
+        {
+            if (app.processName.isEmpty() || containsProcess(previouslyExcluded, app.processName) || !containsProcess(selected, app.processName))
+            {
+                continue;
+            }
+            count += app.count;
+        }
+        return count;
+    }
+
     void MemoryExcludeDialog::confirmSelection()
     {
         m_selected.clear();
@@ -160,6 +175,19 @@ namespace GyanisScribe::Gui
             if (m_list->item(row)->checkState() == Qt::Checked)
             {
                 m_selected.append(m_list->item(row)->data(kProcessRole).toString());
+            }
+        }
+
+        // 保存会删掉新排除应用已有的索引：先把条数摆出来，别让一次勾选变成意外删库
+        const int deletionCount = pendingDeletionCount(m_apps, m_excluded, m_selected);
+        if (deletionCount > 0)
+        {
+            const auto answer = QMessageBox::question(this, Base::uiText("排除应用"),
+                                                      Base::uiText("保存后会从记忆库删除新排除应用已有的 %1 条索引，原图与历史记录不会被删除。要继续吗？").arg(deletionCount),
+                                                      QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+            if (answer != QMessageBox::Yes)
+            {
+                return;
             }
         }
         accept();
