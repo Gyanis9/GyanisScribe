@@ -34,31 +34,34 @@ QLabel:disabled {
 }
 
 /* ---- 按钮：填充、描边与圆角由 Gui::Button 按状态自绘；
-        这里只留 1px 透明边框、内边距与最小高度，控件总高仍是 30 ---- */
-QPushButton {
+        这里只留 1px 透明边框、内边距与最小高度，控件总高仍是 30。
+        选择器限定到带 squircle 属性的自绘类：QMessageBox、QInputDialog、QColorDialog
+        里的原生 QPushButton 保留系统外观，不能落成只剩文字与图标的透明按钮 ---- */
+QPushButton[squircle="true"] {
     color: #E8E8E3;
     border: 1px solid transparent;
     padding: 0 15px;
     min-height: 28px;
 }
 
-QPushButton:disabled {
+QPushButton[squircle="true"]:disabled {
     color: #B0B0AA;
 }
 
 /* 主按钮的底由 buttonColors 换成主色；QSS 只保文字色与边框占位 */
-QPushButton:default {
+QPushButton[squircle="true"]:default {
     color: #0B0B0A;
     border: 1px solid transparent;
 }
 
-QPushButton:default:disabled {
+QPushButton[squircle="true"]:default:disabled {
     color: #B0B0AA;
 }
 
 /* ---- 工具按钮：填充、描边与圆角由 Gui::ToolButton 按选中、悬停、按下与焦点自绘；
-        这里只留透明边框、内边距与最小尺寸占位 ---- */
-QToolButton {
+        这里只留透明边框、内边距与最小尺寸占位。同样限定到 squircle 属性，
+        原生对话窗里的 QToolButton 保留系统外观 ---- */
+QToolButton[squircle="true"] {
     color: #E8E8E3;
     border: 1px solid transparent;
     padding: 2px;
@@ -68,12 +71,12 @@ QToolButton {
 
 /* ---- 标注工具栏的按钮：一排最多五十几件控件，最小尺寸比全局那档各收 2px，宽度省上百像素。
         颜色入口一枚按钮带菜单，原生小箭头在 20px 图标旁显得脏，收掉——按钮上的色块自己就是入口提示 ---- */
-QWidget#AnnotationToolbar QToolButton {
+QWidget#AnnotationToolbar QToolButton[squircle="true"] {
     min-width: 26px;
     min-height: 26px;
 }
 
-QToolButton#annotationColorButton::menu-indicator {
+QToolButton#annotationColorButton[squircle="true"]::menu-indicator {
     image: none;
 }
 
@@ -204,23 +207,25 @@ QCheckBox:disabled {
 
 /* ---- 菜单与工具提示：面板、描边与当前项高亮由 Gui::Menu 与 SquircleStyle 按连续曲率自绘，
         这里只留抑制原生框的透明边框占位、内边距与文字色。
+        选择器限定到带 squircle 属性的自绘菜单：QLineEdit 等文本控件用
+        createStandardContextMenu() 建的标准右键菜单保留原生面板与悬停高亮。
         工具提示不能有任何 border 声明：样式表引擎只要判得出可画内容就会自己画完这一层，
         代理风格收不到 PE_PanelTipLabel；内边距各加一像素，补上不再由边框占掉的宽度 ---- */
-QMenu {
+QMenu[squircle="true"] {
     border: 1px solid transparent;
     padding: 4px;
 }
 
-QMenu::item {
+QMenu[squircle="true"]::item {
     padding: 4px 18px 4px 8px;
     color: #E8E8E3;
 }
 
-QMenu::item:disabled {
+QMenu[squircle="true"]::item:disabled {
     color: #B0B0AA;
 }
 
-QMenu::separator {
+QMenu[squircle="true"]::separator {
     height: 1px;
     background-color: #242422;
     margin: 2px 6px;

@@ -1,6 +1,7 @@
 #include "Gui/Theme/SquircleStyle.h"
 
 #include "Core/Geometry/ContinuousCorner.h"
+#include "Gui/Controls/Menu.h"
 #include "Gui/Controls/ScrollBar.h"
 #include "Gui/Theme/CornerStyle.h"
 #include "Gui/Theme/DesignTokens.h"
@@ -19,6 +20,31 @@ namespace
 {
     /// 进程内只装一次：重复包装会把上一次的代理套进新代理里
     bool s_installed = false;
+
+    /**
+     * @brief 控件是否是由本应用自绘的菜单
+     * @param widget 待判定控件
+     * @return 控件是 Gui::Menu 时为真
+     * @details Gui::Menu 没有 Q_OBJECT，不能用 qobject_cast；菜单与代理样式同在 Gui 模块内，
+     *          RTTI 判定足够。
+     */
+    bool isSquircleMenu(const QWidget *widget)
+    {
+        return dynamic_cast<const GyanisScribe::Gui::Menu *>(widget) != nullptr;
+    }
+
+    /**
+     * @brief 是否压掉原生菜单面板与空区底
+     * @param widget 目标控件
+     * @return 目标不是 Qt 原生 QMenu 时为真
+     * @details Gui::Menu 自绘菜单面板；QComboBox 的弹层容器也借 PE_PanelMenu 与 CE_MenuEmptyArea
+     *          铺底，而它的面板由 Gui::ListView 自绘，同样要压掉。要放行的只有 Qt 自己造的
+     *          原生 QMenu：系统文本控件的标准右键菜单属于这一类，面板与高亮必须落回原生风格。
+     */
+    bool suppressesNativeMenuChrome(const QWidget *widget)
+    {
+        return qobject_cast<const QMenu *>(widget) == nullptr || isSquircleMenu(widget);
+    }
 
     /**
      * @brief 控件是否由自己铺底并画边界
@@ -55,9 +81,9 @@ namespace GyanisScribe::Gui
 
     void SquircleStyle::drawPrimitive(const PrimitiveElement element, const QStyleOption *option, QPainter *painter, const QWidget *widget) const
     {
-        // 菜单的面板与边框都由 Gui::Menu 按连续曲率自绘；原生风格照常落笔就会盖住高亮、
-        // 并在圆角外补一块方底
-        if (element == PE_PanelMenu || element == PE_FrameMenu)
+        // 自绘菜单的面板与边框都由 Gui::Menu 按连续曲率画；原生风格照常落笔就会盖住高亮、
+        // 并在圆角外补一块方底。系统文本控件里的原生 QMenu 不是自绘菜单，必须交给原生风格画
+        if ((element == PE_PanelMenu || element == PE_FrameMenu) && suppressesNativeMenuChrome(widget))
         {
             return;
         }
@@ -90,11 +116,13 @@ namespace GyanisScribe::Gui
 
     void SquircleStyle::drawControl(const ControlElement element, const QStyleOption *option, QPainter *painter, const QWidget *widget) const
     {
-        if (element == CE_MenuEmptyArea)
+        // 空区底只对自绘菜单与同样自绘面板的下拉弹层跳过；原生 QMenu 的空区照常交给原生风格
+        if (element == CE_MenuEmptyArea && suppressesNativeMenuChrome(widget))
         {
             return;
         }
-        if (element == CE_MenuItem)
+        // 菜单项的内容清理只对自绘菜单生效：原生菜单的选中高亮必须留住
+        if (element == CE_MenuItem && isSquircleMenu(widget))
         {
             if (const auto *item = qstyleoption_cast<const QStyleOptionMenuItem *>(option); item != nullptr)
             {

@@ -30,10 +30,12 @@ namespace GyanisScribe::Gui
 
     Button::Button(QWidget *parent) : QPushButton(parent)
     {
+        setProperty("squircle", true);
     }
 
     Button::Button(const QString &text, QWidget *parent) : QPushButton(text, parent)
     {
+        setProperty("squircle", true);
     }
 
     void Button::paintEvent(QPaintEvent *)
@@ -51,6 +53,7 @@ namespace GyanisScribe::Gui
 
     ToolButton::ToolButton(QWidget *parent) : QToolButton(parent)
     {
+        setProperty("squircle", true);
     }
 
     void ToolButton::paintEvent(QPaintEvent *)

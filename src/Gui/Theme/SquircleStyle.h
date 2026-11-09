@@ -16,7 +16,9 @@ namespace GyanisScribe::Gui
     /**
      * @brief 连续曲率控件共用的代理样式
      * @details 菜单面板与菜单框由 Gui::Menu 自绘：原生风格若照常画一层方形面板，
-     *          自绘的连续曲率高亮会被它盖住，角上的透明区也会露出方底。提示弹层没有自绘类，
+     *          自绘的连续曲率高亮会被它盖住，角上的透明区也会露出方底。菜单拦截只对
+     *          Gui::Menu 与不基于 QMenu 的自绘弹层生效，系统对话框与文本控件的标准右键菜单
+     *          仍由原生风格画。提示弹层没有自绘类，
      *          原生面板整层改成连续曲率面板。
      *          输入类的自绘底同理：带 squircle 属性的控件（及其内部的子行编辑）不再让原生风格
      *          画输入面板、边框与下拉/微调框主体，否则自绘的连续曲率底会被一层方底盖掉。
@@ -36,10 +38,11 @@ namespace GyanisScribe::Gui
     protected:
         /**
          * @brief 接管菜单与提示弹层的原生面板，置空自绘输入类的原生输入面板与边框
-         * @details 重写 QProxyStyle::drawPrimitive()：PE_PanelMenu 与 PE_FrameMenu 直接返回；
-         *          PE_PanelTipLabel 按紧凑档画出连续曲率面板与描边；带 squircle 属性的控件
-         *          （或其子控件）的 PE_PanelLineEdit、PE_FrameLineEdit 与 QAbstractScrollArea 的
-         *          PE_Frame 也直接返回，其余图元原样交给基类
+         * @details 重写 QProxyStyle::drawPrimitive()：非原生 QMenu 的 PE_PanelMenu 与
+         *          PE_FrameMenu 直接返回（Gui::Menu 与同样自绘面板的下拉弹层容器都在此列），
+         *          Qt 原生 QMenu 落回原生风格；PE_PanelTipLabel 按紧凑档画出连续曲率面板与描边；
+         *          带 squircle 属性的控件（或其子控件）的 PE_PanelLineEdit、PE_FrameLineEdit
+         *          与 QAbstractScrollArea 的 PE_Frame 也直接返回，其余图元原样交给基类
          * @param element 待绘制的图元
          * @param option 绘制参数
          * @param painter 目标画家
@@ -50,9 +53,10 @@ namespace GyanisScribe::Gui
         void drawPrimitive(PrimitiveElement element, const QStyleOption *option, QPainter *painter, const QWidget *widget) const override;
 
         /**
-         * @brief 菜单项只画内容，不画原生底与空区底
-         * @details 重写 QProxyStyle::drawControl()：CE_MenuEmptyArea 直接返回；CE_MenuItem 清掉
-         *          选中态与 Button、Highlight 两种画刷后再交基类
+         * @brief 自绘菜单的项只画内容，不画原生底与空区底
+         * @details 重写 QProxyStyle::drawControl()：非原生 QMenu 的 CE_MenuEmptyArea 直接返回；
+         *          Gui::Menu 的 CE_MenuItem 清掉选中态与 Button、Highlight 两种画刷后再交基类。
+         *          Qt 原生 QMenu 两类都交给原生风格，选中高亮与面板照常画出
          * @param element 待绘制的控件元素
          * @param option 绘制参数
          * @param painter 目标画家

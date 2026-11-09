@@ -191,6 +191,53 @@ namespace
         }
         return sheets;
     }
+
+    /**
+     * @brief 拆开一条规则的选择器
+     * @param selector 选择器全文
+     * @return 去掉首尾空白的逗号分支
+     */
+    std::vector<std::string> selectorBranches(const std::string &selector)
+    {
+        std::vector<std::string> branches;
+        std::size_t              start = 0;
+        while (true)
+        {
+            const auto comma = selector.find(',', start);
+            branches.push_back(trim(selector.substr(start, comma == std::string::npos ? std::string::npos : comma - start)));
+            if (comma == std::string::npos)
+            {
+                break;
+            }
+            start = comma + 1;
+        }
+        return branches;
+    }
+
+    /**
+     * @brief 选择器分支是否点名某个控件类型
+     * @param branch 选择器分支
+     * @param type 控件类型名
+     * @return 类型名以完整标识符出现时为真
+     * @details QMenuBar 这类名字里也含 QMenu 字样，判定按标识符边界收口。
+     */
+    bool mentionsWidgetType(const std::string &branch, const std::string_view type)
+    {
+        for (auto at = branch.find(type); at != std::string::npos; at = branch.find(type, at + 1))
+        {
+            const auto after = at + type.size();
+            if (after >= branch.size())
+            {
+                return true;
+            }
+            const auto next = static_cast<unsigned char>(branch[after]);
+            if (!std::isalnum(next) && next != '_')
+            {
+                return true;
+            }
+        }
+        return false;
+    }
 } // namespace
 
 TEST(CornerInvariants, StyleSheetsHaveNoBorderRadius)
@@ -285,5 +332,66 @@ TEST(CornerInvariants, InputTransparencyStaysScopedToTheSquircleClasses)
                 EXPECT_NE(rule.selector.find("squircle"), std::string::npos) << "输入类的透明底规则没限定到自绘控件：" << rule.selector;
             }
         }
+    }
+}
+
+/**
+ * @brief 钉住按钮的样式规则只落在自绘类上
+ * @details 系统对话框（消息框、输入框、取色器）里是原生 QPushButton / QToolButton：
+ *          规则一旦退回类型选择器，它们会拿到透明边框与内边距，却没有自绘填充，
+ *          界面上只剩文字与图标。三份样式表里每个点名按钮的规则分支都必须带
+ *          [squircle="true"]；每份至少还要有一条这样的规则，避免整块被删空也全绿。
+ */
+TEST(CornerInvariants, ButtonRulesStayScopedToTheSquircleClasses)
+{
+    for (const auto &text: styleSheetTexts())
+    {
+        ASSERT_FALSE(text.empty());
+        int scopedRules = 0;
+        for (const auto &rule: rulesIn(withoutComments(text)))
+        {
+            for (const auto &branch: selectorBranches(rule.selector))
+            {
+                for (const auto *type: {"QPushButton", "QToolButton"})
+                {
+                    if (!mentionsWidgetType(branch, type))
+                    {
+                        continue;
+                    }
+                    EXPECT_NE(branch.find("[squircle=\"true\"]"), std::string::npos) << "按钮规则没限定到自绘类：" << branch;
+                    ++scopedRules;
+                }
+            }
+        }
+        EXPECT_GT(scopedRules, 0) << "样式表里没有按钮规则，限定判据没有落点";
+    }
+}
+
+/**
+ * @brief 钉住菜单的样式规则只落在自绘类上
+ * @details QLineEdit::createStandardContextMenu() 与其它文本控件交出的是原生 QMenu：
+ *          规则一旦退回类型选择器，标准右键菜单会套上自绘菜单的透明边框与内边距，
+ *          面板与悬停高亮却没有自绘类接手。三份样式表里每个点名 QMenu 的规则分支
+ *          都必须带 [squircle="true"]，每份至少还要有一条这样的规则。
+ */
+TEST(CornerInvariants, MenuRulesStayScopedToTheSquircleMenus)
+{
+    for (const auto &text: styleSheetTexts())
+    {
+        ASSERT_FALSE(text.empty());
+        int scopedRules = 0;
+        for (const auto &rule: rulesIn(withoutComments(text)))
+        {
+            for (const auto &branch: selectorBranches(rule.selector))
+            {
+                if (!mentionsWidgetType(branch, "QMenu"))
+                {
+                    continue;
+                }
+                EXPECT_NE(branch.find("[squircle=\"true\"]"), std::string::npos) << "菜单规则没限定到自绘类：" << branch;
+                ++scopedRules;
+            }
+        }
+        EXPECT_GT(scopedRules, 0) << "样式表里没有菜单规则，限定判据没有落点";
     }
 }

@@ -33,7 +33,9 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPalette>
+#include <QPushButton>
 #include <QStringListModel>
+#include <QStyle>
 #include <QStyleOption>
 #include <QStyleOptionSlider>
 #include <QStyledItemDelegate>
@@ -469,6 +471,101 @@ TEST_F(CornerControlsFixture, MenuHighlightUsesCompactShape)
     ASSERT_FALSE(panel.contains(sample)) << "取样点落在面板档形状内，分辨不出 Compact 与 Panel";
     EXPECT_EQ(image.pixelColor(item.left() + 3, item.top() + 2), GyanisScribe::Gui::activePalette().hover) << "当前项高亮的角部不是紧凑档形状";
     EXPECT_LT(image.pixelColor(item.left(), item.top()).alpha(), 16) << "高亮左上角不应是方形";
+}
+
+/**
+ * @brief 钉住自绘按钮与菜单在构造时就带上 squircle 属性
+ * @details 属性是样式表与代理样式识别自绘类的唯一标记：漏掉时按钮会丢内边距与最小高度，
+ *          菜单会退成原生面板；反过来，系统对话框与文本控件的原生控件绝不该带这个标记。
+ */
+TEST_F(CornerControlsFixture, SquircleClassesCarryTheScopingProperty)
+{
+    GyanisScribe::Gui::Button     button{QStringLiteral("确定")};
+    GyanisScribe::Gui::ToolButton toolButton;
+    GyanisScribe::Gui::Menu       menu;
+    EXPECT_TRUE(button.property("squircle").toBool()) << "Gui::Button 没打 squircle 属性";
+    EXPECT_TRUE(toolButton.property("squircle").toBool()) << "Gui::ToolButton 没打 squircle 属性";
+    EXPECT_TRUE(menu.property("squircle").toBool()) << "Gui::Menu 没打 squircle 属性";
+
+    QPushButton stockButton;
+    QToolButton stockToolButton;
+    QMenu       stockMenu;
+    EXPECT_FALSE(stockButton.property("squircle").toBool()) << "原生按钮不该带自绘标记";
+    EXPECT_FALSE(stockToolButton.property("squircle").toBool()) << "原生工具按钮不该带自绘标记";
+    EXPECT_FALSE(stockMenu.property("squircle").toBool()) << "原生菜单不该带自绘标记";
+}
+
+/**
+ * @brief 钉住文本控件的标准右键菜单保留原生面板与悬停高亮
+ * @details QLineEdit::createStandardContextMenu() 交给 Qt 一个原生 QMenu，不是 Gui::Menu。
+ *          样式表与代理样式的菜单拦截若不分类型，这个菜单只剩一圈透明边框：
+ *          面板被置空、当前项高亮被清掉，弹出后是一块没有底的方区。
+ *          判据分两半：菜单抓图的上下沿必须有不透明面板底；设上当前项后，
+ *          项内像素必须相对无高亮时发生变化。
+ */
+TEST_F(CornerControlsFixture, StockContextMenusKeepNativePanelAndHighlight)
+{
+    struct StyleSheetGuard
+    {
+        QString previous = qApp->styleSheet();
+
+        ~StyleSheetGuard()
+        {
+            qApp->setStyleSheet(previous);
+        }
+    } guard;
+    qApp->setStyleSheet(GyanisScribe::Gui::ThemeManager::styleSheetFor(GyanisScribe::Gui::ThemeKind::Light));
+
+    QLineEdit edit;
+    edit.setText(QStringLiteral("选中文字"));
+    edit.selectAll();
+    edit.resize(240, 32);
+    edit.show();
+    QCoreApplication::processEvents();
+
+    std::unique_ptr<QMenu> menu{edit.createStandardContextMenu()};
+    ASSERT_NE(menu, nullptr);
+    ASSERT_FALSE(menu->property("squircle").toBool()) << "标准右键菜单不该被当成自绘菜单";
+
+    QAction *selected = nullptr;
+    for (auto *action: menu->actions())
+    {
+        if (!action->isSeparator() && action->isEnabled())
+        {
+            selected = action;
+            break;
+        }
+    }
+    ASSERT_NE(selected, nullptr) << "标准右键菜单里没有可用项，判据没有落点";
+    menu->setActiveAction(nullptr);
+    menu->show();
+    QCoreApplication::processEvents();
+
+    // 面板：菜单上下沿都要有不透明底，文本与分隔线不会铺到这两个位置
+    const QImage menuImage = menu->grab().toImage();
+    EXPECT_EQ(menuImage.pixelColor(1, 1).alpha(), 255) << "标准右键菜单左上角没有面板底，露出透明窗口";
+    EXPECT_EQ(menuImage.pixelColor(menu->width() / 2, menu->height() - 3).alpha(), 255) << "标准右键菜单底部没有面板底，只剩一串文本";
+
+    const QRect item = menu->actionGeometry(selected);
+    ASSERT_FALSE(item.isEmpty()) << "取不到菜单项矩形，判据没有落点";
+    const QImage withoutHighlight = menu->grab().toImage();
+
+    menu->setActiveAction(selected);
+    QCoreApplication::processEvents();
+    const QImage withHighlight = menu->grab().toImage();
+
+    int changed = 0;
+    for (int y = item.top(); y <= item.bottom(); ++y)
+    {
+        for (int x = item.left(); x <= item.right(); ++x)
+        {
+            if (withoutHighlight.pixelColor(x, y) != withHighlight.pixelColor(x, y))
+            {
+                ++changed;
+            }
+        }
+    }
+    EXPECT_GT(changed, 20) << "当前项没有原生高亮，标准右键菜单只剩一块没有底的方区";
 }
 
 /**

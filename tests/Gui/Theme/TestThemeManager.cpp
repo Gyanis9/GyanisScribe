@@ -756,6 +756,42 @@ TEST_F(ThemeManagerFixture, StockQtInputsKeepTheirNativeFill)
 }
 
 /**
+ * @brief 钉住系统对话框的原生按钮保留完整外观
+ * @details 消息框、输入框与取色器里的按钮是 Qt 自己造的 QPushButton，没有 squircle 属性；
+ *          按钮规则若退回类型选择器，它们会套上透明边框与内边距，却没有 Gui::Button 的自绘填充，
+ *          界面上只剩文字与图标。三份样式表下都放一个原生按钮：左右内侧必须是不透明填充，
+ *          且不能露出宿主红底。
+ */
+TEST_F(ThemeManagerFixture, StockQtDialogButtonsKeepTheirNativeChrome)
+{
+    for (const auto kind: {ThemeKind::Light, ThemeKind::Dark, ThemeKind::HighContrast})
+    {
+        application->setStyleSheet(ThemeManager::styleSheetFor(kind));
+        QWidget host;
+        host.resize(200, 60);
+        host.setAutoFillBackground(true);
+        host.setPalette(QPalette{QColor{255, 0, 0}});
+        auto *button = new QPushButton{QStringLiteral("确定"), &host};
+        button->setGeometry(20, 15, 160, 30);
+        host.show();
+        QCoreApplication::processEvents();
+        button->clearFocus();
+        button->update();
+        QCoreApplication::processEvents();
+
+        const QImage image = host.grab().toImage();
+        const QRect  area{button->geometry()};
+        for (const QPoint probe: {QPoint{area.left() + 10, area.center().y()}, QPoint{area.right() - 10, area.center().y()}})
+        {
+            const QColor color = image.pixelColor(probe);
+            EXPECT_EQ(color.alpha(), 255) << static_cast<int>(kind) << " 档下原生按钮的填充被抹掉了";
+            EXPECT_NE(color, QColor(255, 0, 0)) << static_cast<int>(kind) << " 档下原生按钮露出了宿主底色，只剩文字与图标";
+        }
+        application->setStyleSheet(QString{});
+    }
+}
+
+/**
  * @brief 钉住换主题时应用调色板跟着换
  * @details 样式表覆盖不到勾选的勾、微调框箭头、占位文字与禁用文字——这些走调色板。
  *          只落样式表时文本比对全绿而界面是浅色原生件，所以这里按角色逐个核到令牌上，

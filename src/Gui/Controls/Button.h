@@ -17,7 +17,8 @@ namespace GyanisScribe::Gui
     /**
      * @brief 自绘连续曲率底与状态的按钮
      * @details 填充与描边由 ControlPalette 按状态映射；QSS 只留透明边框与内边距占位，
-     *          文字色仍由样式表给出。
+     *          文字色仍由样式表给出。构造时打的 squircle 属性把样式表规则限定到本类，
+     *          系统对话框里的原生 QPushButton 因此保留原生外观。
      */
     class Button : public QPushButton
     {
@@ -48,6 +49,8 @@ namespace GyanisScribe::Gui
     /**
      * @brief 自绘连续曲率底与状态的工具按钮
      * @details 未选中且无状态时填充透明，给标注工具栏这类密集排布保留可视留白。
+     *          构造时打的 squircle 属性把样式表规则限定到本类，原生对话窗里的 QToolButton
+     *          因此保留原生外观。
      */
     class ToolButton : public QToolButton
     {
