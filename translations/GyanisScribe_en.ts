@@ -3819,5 +3819,117 @@
             <source>回溯截图</source>
             <translation>Rewind</translation>
         </message>
+        <message>
+            <source>当前没有正在编辑的标注，请重新截图后再试</source>
+            <translation>No annotation is being edited right now. Capture again and retry</translation>
+        </message>
+        <message>
+            <source>画布已经变了，请重新点隐私打码</source>
+            <translation>The canvas has changed. Click Privacy redaction again</translation>
+        </message>
+        <message>
+            <source>没有发现可打码的敏感信息。请仍自行检查后再分享。</source>
+            <translation>No sensitive information was found to redact. Still check the image yourself before sharing.</translation>
+        </message>
+        <message>
+            <source>已打码 %1 处；请自行检查后再分享。</source>
+            <translation>%1 areas redacted; still check the image yourself before sharing.</translation>
+        </message>
+        <message>
+            <source>本机没有可用的文字识别后端：请安装系统语言包，或换用 Tesseract 语言包后再试</source>
+            <translation>No text recognition backend is available on this machine: install the system language pack, or switch to a Tesseract language pack and try again</translation>
+        </message>
+        <message>
+            <source>还没有可检查的图：先截一张图或打开一张图片，再发起隐私打码</source>
+            <translation>No image to check yet: capture a screenshot or open an image first, then start privacy redaction</translation>
+        </message>
+        <message>
+            <source>正在检查敏感信息…</source>
+            <translation>Checking for sensitive information…</translation>
+        </message>
+        <message>
+            <source>敏感信息检查失败：{}。请重试一次，或换一种语言再试</source>
+            <translation>Sensitive information check failed: {}. Try again, or switch to another language.</translation>
+        </message>
+        <message>
+            <source>批量打码只支持马赛克或高斯模糊，收到的是工具 0x{:X}。请把打码方式换成这两种之一再试</source>
+            <translation>Batch redaction only supports Mosaic or Gaussian blur, but received tool 0x{:X}. Switch the redaction style to one of these two and try again</translation>
+        </message>
+        <message>
+            <source>没有可打码的区域：这次没有给出可用的框。请重新检测，或手动框选画布内的区域</source>
+            <translation>There is nothing to redact: no usable boxes were given this time. Run the check again, or draw boxes on the canvas manually</translation>
+        </message>
+        <message>
+            <source>打码工具不在册：请检查工具登记表</source>
+            <translation>The redaction tool is not registered: check the tool registry</translation>
+        </message>
+        <message>
+            <source>这些打码框都落在画布之外或小到看不见：没有可打码的区域。请重新检测，或手动框选画布内的区域</source>
+            <translation>All of these redaction boxes fall outside the canvas or are too small to see: there is nothing to redact. Run the check again, or draw boxes on the canvas manually</translation>
+        </message>
+        <message>
+            <source>二维码/条形码</source>
+            <translation>QR code/barcode</translation>
+        </message>
+        <message>
+            <source>隐私打码</source>
+            <translation>Privacy redaction</translation>
+        </message>
+        <message>
+            <source>手机号</source>
+            <translation>Mobile number</translation>
+        </message>
+        <message>
+            <source>固定电话</source>
+            <translation>Landline</translation>
+        </message>
+        <message>
+            <source>身份证</source>
+            <translation>ID card</translation>
+        </message>
+        <message>
+            <source>银行卡</source>
+            <translation>Bank card</translation>
+        </message>
+        <message>
+            <source>邮箱</source>
+            <translation>Email</translation>
+        </message>
+        <message>
+            <source>IP 地址</source>
+            <translation>IP address</translation>
+        </message>
+        <message>
+            <source>隐私打码审核</source>
+            <translation>Privacy redaction review</translation>
+        </message>
+        <message>
+            <source>只在本机检测，未上传；请逐项确认，打码后可撤销。</source>
+            <translation>Detection runs on this machine only; nothing is uploaded. Review each item; the redactions can be undone.</translation>
+        </message>
+        <message>
+            <source>敏感信息清单</source>
+            <translation>Sensitive information list</translation>
+        </message>
+        <message>
+            <source>%1：%2</source>
+            <translation>%1: %2</translation>
+        </message>
+        <message>
+            <source>全选</source>
+            <translation>Select all</translation>
+        </message>
+        <message>
+            <source>全不选</source>
+            <translation>Select none</translation>
+        </message>
+        <message>
+            <source>打码方式</source>
+            <translation>Redaction style</translation>
+        </message>
+        <message>
+            <source>应用打码</source>
+            <translation>Apply redactions</translation>
+        </message>
 </context>
 </TS>
