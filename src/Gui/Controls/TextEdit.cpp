@@ -1,5 +1,6 @@
 #include "Gui/Controls/TextEdit.h"
 
+#include "Gui/Controls/ScrollBar.h"
 #include "Gui/Theme/ControlPalette.h"
 #include "Gui/Theme/DesignTokens.h"
 
@@ -18,6 +19,9 @@ namespace GyanisScribe::Gui
     {
         setProperty("squircle", true);
         viewport()->setAutoFillBackground(false);
+        // 样式表不再给 QScrollBar 尺寸与颜色：两条滚动条在构造时就换成自绘件
+        setVerticalScrollBar(new ScrollBar{Qt::Vertical, this});
+        setHorizontalScrollBar(new ScrollBar{Qt::Horizontal, this});
     }
 
     bool TextEdit::event(QEvent *event)

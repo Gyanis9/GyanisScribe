@@ -5,6 +5,7 @@
 #include "Gui/Controls/Button.h"
 #include "Gui/Controls/ComboBox.h"
 #include "Gui/Controls/LineEdit.h"
+#include "Gui/Controls/Slider.h"
 #include "Gui/Controls/SpinBox.h"
 #include "Gui/Controls/SurfaceWidget.h"
 #include "Gui/Theme/ControlPalette.h"
@@ -465,14 +466,14 @@ TEST_F(ThemeManagerFixture, StyleSheetsAndPalettesAgreeInBothDirections)
         }
     }
 
-    // 反向全局：每个该进 QSS 的角色至少被一份样式表用着；按下态填充已改由自绘类消费，
-    // 这里换成对 buttonColors / toolButtonColors 的断言，避免把「没有消费方」的字段放过去
+    // 反向全局：每个既定的 QSS 角色至少被一份样式表用着；按下态填充、中性悬停底、主色悬停底与禁用的静默底
+    // 已改由自绘类消费，这里换成对 buttonColors / inputColors 的断言；面板底 surface 由
+    // SurfaceWidget / ListWidget / TextEdit / Gui::Menu 的像素用例钉住，不再计入 QSS 名单
     for (const auto kind: {ThemeKind::Light, ThemeKind::Dark, ThemeKind::HighContrast})
     {
         const auto &palette = paletteFor(kind);
-        for (const auto &color:
-             {palette.windowBackground, palette.surface, palette.text, palette.secondaryText, palette.border, palette.accent, palette.onAccent, palette.selection,
-              palette.mutedFill, palette.controlFill, palette.hover, palette.accentHover, palette.accentSoft, palette.borderStrong})
+        for (const auto &color: {palette.windowBackground, palette.text, palette.secondaryText, palette.border, palette.accent, palette.onAccent, palette.selection,
+                                 palette.controlFill, palette.accentSoft, palette.borderStrong})
         {
             EXPECT_TRUE(usedColors.contains(hexOf(color))) << "色板里的 " << hexOf(color).toStdString() << " 一份 QSS 都没用过";
         }
@@ -480,6 +481,11 @@ TEST_F(ThemeManagerFixture, StyleSheetsAndPalettesAgreeInBothDirections)
                 << "按下态的按钮填充没取 pressed 角色";
         EXPECT_EQ(GyanisScribe::Gui::toolButtonColors(palette, kind, false, true, false, true, false, false).fill, palette.pressed)
                 << "按下态的工具按钮填充没取 pressed 角色";
+        EXPECT_EQ(GyanisScribe::Gui::buttonColors(palette, kind, false, true, true, false, false, false).fill, palette.hover) << "悬停的按钮填充没取 hover 角色";
+        EXPECT_EQ(GyanisScribe::Gui::buttonColors(palette, kind, true, true, true, false, false, false).fill, palette.accentHover)
+                << "主按钮悬停底没取 accentHover 角色";
+        EXPECT_EQ(GyanisScribe::Gui::inputColors(palette, kind, false, false, false, false).fill, palette.mutedFill) << "禁用输入的静默底没取 mutedFill 角色";
+        EXPECT_EQ(GyanisScribe::Gui::inputColors(palette, kind, true, true, false, false).fill, palette.mutedFill) << "只读输入的静默底没取 mutedFill 角色";
     }
 }
 
@@ -762,9 +768,10 @@ TEST_F(ThemeManagerFixture, ExistingWidgetsRepaintWithTheNewThemeText)
 
 /**
  * @brief 钉住勾选框与线宽滑块的键盘焦点看得见
- * @details 高对比度档不装焦点环覆盖层，这两类控件的焦点只能由 QSS 描边表达。两处判据不赌具体坐标：
- *          勾选框在聚焦前后各抓一次图，数主色像素，聚焦后必须多出来（指示器换主色描边）；
- *          滑块数的是手柄矩形里的主色，聚焦时必须掉下去（实心手柄翻成底色芯 + 正文色圈）。
+ * @details 高对比度档不装焦点环覆盖层：勾选框的焦点由样式表的指示器描边表达，
+ *          滑块的焦点由 Gui::Slider 自绘反转（手柄换底色芯 + 正文色圈）。两处判据不赌具体坐标：
+ *          勾选框在聚焦前后各抓一次图，数主色像素，聚焦后必须多出来；
+ *          滑块数的是手柄矩形里的主色，聚焦时必须掉下去。
  */
 TEST_F(ThemeManagerFixture, CheckboxAndSliderShowAKeyboardFocusRing)
 {
@@ -791,9 +798,9 @@ TEST_F(ThemeManagerFixture, CheckboxAndSliderShowAKeyboardFocusRing)
 
     QWidget host;
     auto   *check  = new QCheckBox{QStringLiteral("check"), &host};
-    auto   *slider = new QSlider{Qt::Horizontal, &host};
+    auto   *slider = new GyanisScribe::Gui::Slider{Qt::Horizontal, &host};
     slider->setRange(0, 100);
-    slider->setValue(100); // 手柄推到右端，groove 左段整条露出来
+    slider->setValue(100); // 手柄推到右端，槽的左段整条露出来
     check->move(0, 0);
     slider->move(0, 30);
     slider->resize(200, 30);
@@ -805,21 +812,21 @@ TEST_F(ThemeManagerFixture, CheckboxAndSliderShowAKeyboardFocusRing)
     slider->clearFocus();
     QCoreApplication::processEvents();
 
-    // QSS 的控件级边框在 CC_Slider 的自绘路径里不落笔（实测三份样式表都没画），
-    // 焦点形态只能挂在手柄上：聚焦时手柄从「主色实心」翻成「底色芯 + 正文色圈」。
+    // 手柄几何按 Gui::Slider 的绘制口径取：边长 18，位置由 style()->sliderPositionFromValue 在
+    // 控件宽减手柄边长的区间上算。焦点反转是「主色实心」翻成「底色芯 + 正文色圈」，
     // 判据落在手柄自己的矩形里数主色：实心时上百，翻过来之后归零。
-    const auto handleAccentPixels = [&accent](QSlider &widget)
+    constexpr int kHandleEdge = 18;
+    const auto    handleRect  = [](GyanisScribe::Gui::Slider &widget)
     {
-        QStyleOptionSlider option;
-        option.initFrom(&widget);
-        option.orientation    = widget.orientation();
-        option.minimum        = widget.minimum();
-        option.maximum        = widget.maximum();
-        option.sliderPosition = widget.sliderPosition();
-        option.sliderValue    = widget.value();
-        const QRect handle    = widget.style()->subControlRect(QStyle::CC_Slider, &option, QStyle::SC_SliderHandle, &widget);
-        const auto  shot      = widget.grab().toImage();
-        int         count     = 0;
+        const int span     = std::max(0, widget.width() - kHandleEdge);
+        const int position = widget.style()->sliderPositionFromValue(widget.minimum(), widget.maximum(), widget.value(), span, false);
+        return QRect{position, widget.height() / 2 - kHandleEdge / 2, kHandleEdge, kHandleEdge};
+    };
+    const auto handleAccentPixels = [&accent, &handleRect](GyanisScribe::Gui::Slider &widget)
+    {
+        const QRect handle = handleRect(widget);
+        const auto  shot   = widget.grab().toImage();
+        int         count  = 0;
         for (int y = handle.top(); y <= handle.bottom(); ++y)
         {
             for (int x = handle.left(); x <= handle.right(); ++x)
@@ -862,7 +869,15 @@ TEST_F(ThemeManagerFixture, AllSheetsDropTheControlLevelFocusOutlines)
         const auto sheet     = readStyleSheet(resource);
         const auto selectors = focusSelectorsIn(sheet);
         ASSERT_FALSE(sheet.isEmpty()) << resource;
-        ASSERT_FALSE(selectors.isEmpty()) << resource << " 一条 :focus 规则都没有，判据没有落点";
+        // 滑块的焦点反转已由 Gui::Slider 自绘，浅深两档不再保留任何 :focus 规则；
+        // 高对比度档只剩勾选框指示器那一条
+        if (highContrast)
+        {
+            ASSERT_FALSE(selectors.isEmpty()) << resource << " 高对比度档的复选框指示器 :focus 规则不见了";
+        } else
+        {
+            EXPECT_TRUE(selectors.isEmpty()) << resource << " 浅深两档还留着 :focus 规则：" << selectors.join(QStringLiteral("; ")).toStdString();
+        }
 
         const auto branches = [&selectors](const QString &token)
         {
@@ -885,10 +900,10 @@ TEST_F(ThemeManagerFixture, AllSheetsDropTheControlLevelFocusOutlines)
             EXPECT_TRUE(matched.isEmpty()) << resource << " 还留着控件级焦点描边：" << matched.join(QStringLiteral("; ")).toStdString();
         }
 
-        // 复选框指示器与滑块手柄是子控件，焦点仍由 QSS 表达；
-        // 高对比度档的复选框指示器是这一档唯一合法的 :focus 分支
+        // 复选框指示器是子控件，焦点仍由 QSS 表达；高对比度档的复选框指示器是这一档唯一合法的 :focus 分支。
+        // 滑块手柄的焦点同样已改由 Gui::Slider 自绘，样式表不该再有反转分支
         EXPECT_EQ(branches(QStringLiteral("QCheckBox::indicator:focus")).size(), highContrast ? 1 : 0) << resource << " 复选框指示器的 :focus 分支条数不对";
-        EXPECT_EQ(branches(QStringLiteral("QSlider::handle:horizontal:focus")).size(), 1) << resource << " 滑块的手柄反转焦点没了";
+        EXPECT_EQ(branches(QStringLiteral("QSlider::handle:horizontal:focus")).size(), 0) << resource << " 滑块焦点改由 Gui::Slider 自绘，样式表不该再有手柄反转分支";
         // 高对比度档仍保留控件级 2px 描边占位，由 SemanticColorPairsMeetWcagContrast 的 2PX SOLID 判据钉住
     }
 }

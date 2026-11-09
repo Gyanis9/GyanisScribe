@@ -25,7 +25,6 @@
 class QComboBox;
 class QFontComboBox;
 class QMenu;
-class QSlider;
 class QToolButton;
 
 namespace GyanisScribe::Core
@@ -35,6 +34,7 @@ namespace GyanisScribe::Core
 
 namespace GyanisScribe::Gui
 {
+    class Slider;
 
     /**
      * @brief 工具按钮的登记表：顺序、图标名、中文名与界面按键标识一处对齐
@@ -432,7 +432,7 @@ namespace GyanisScribe::Gui
         QToolButton                                 *m_closeButton          = nullptr;                                          ///< 关闭标注窗，与 Esc 同一条收场路
         QToolButton                                 *m_undoButton           = nullptr;                                          ///< 撤销按钮
         QToolButton                                 *m_redoButton           = nullptr;                                          ///< 重做按钮
-        QSlider                                     *m_widthSlider          = nullptr;                                          ///< 线宽滑块，档位对齐 kAnnotationWidths
+        Slider                                      *m_widthSlider          = nullptr;                                          ///< 线宽滑块，档位对齐 kAnnotationWidths
         QComboBox                                   *m_fontSizeCombo        = nullptr;                                          ///< 字号下拉，取值对齐 kFontSizes
         QToolButton                                 *m_fillButton           = nullptr;                                          ///< 填充档按钮，点一下走一档
         QToolButton                                 *m_roundedRectButton    = nullptr;                                          ///< 圆角矩形开关，按下表示切圆角

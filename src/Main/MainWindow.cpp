@@ -32,6 +32,7 @@
 #include "Gui/Controls/LineEdit.h"
 #include "Gui/Controls/ListWidget.h"
 #include "Gui/Controls/Menu.h"
+#include "Gui/Controls/ScrollBar.h"
 #include "Gui/Controls/SpinBox.h"
 #include "Gui/Controls/SurfaceWidget.h"
 #include "Gui/Theme/CornerStyle.h"
@@ -144,6 +145,9 @@ namespace
         scroll->setFrameShape(QFrame::NoFrame);
         // 横向不出杠：表单的宽度跟着窗口走，出杠说明是排版坏了而不是内容太长
         scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        // 样式表不再给 QScrollBar 尺寸与颜色：两条滚动条在滚动区建好时就换成自绘件
+        scroll->setVerticalScrollBar(new GyanisScribe::Gui::ScrollBar{Qt::Vertical, scroll});
+        scroll->setHorizontalScrollBar(new GyanisScribe::Gui::ScrollBar{Qt::Horizontal, scroll});
         scroll->setWidget(&page);
         return scroll;
     }

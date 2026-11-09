@@ -204,46 +204,6 @@ QCheckBox[animatedIndicator="true"]::indicator:checked {
     image: none;
 }
 
-/* ---- 滑块：槽给一档描边（这一档靠它才看得见轨道），已走过的部分用主色 ---- */
-QSlider::groove:horizontal {
-    height: 6px;
-    background-color: #FFFFFF;
-    border: 2px solid #000000;
-    border-radius: 4px;
-}
-
-QSlider::sub-page:horizontal {
-    background-color: #0B57D0;
-    border: 2px solid #0B57D0;
-    border-radius: 4px;
-}
-
-QSlider::handle:horizontal {
-    width: 14px;
-    height: 14px;
-    margin: -6px -2px;
-    background-color: #0B57D0;
-    border: 2px solid #FFFFFF;
-    border-radius: 9px;
-}
-
-QSlider::handle:horizontal:hover {
-    background-color: #08449E;
-}
-
-QSlider:disabled::groove:horizontal {
-    background-color: #E0E0E0;
-}
-
-QSlider:disabled::sub-page:horizontal {
-    background-color: #C8C8C8;
-}
-
-QSlider:disabled::handle:horizontal {
-    background-color: #C8C8C8;
-    border-color: #FFFFFF;
-}
-
 /* ---- 菜单与工具提示：面板、描边与当前项高亮由 Gui::Menu 与 SquircleStyle 按连续曲率自绘，
         这里只留抑制原生框的透明边框占位、内边距与文字色。
         工具提示不能有任何 border 声明：样式表引擎只要判得出可画内容就会自己画完这一层，
@@ -327,56 +287,9 @@ QFrame#toolbarSeparator {
     min-width: 1px;
 }
 
-/* ---- 滚动条：细、无箭头、纯黑滑块（这一档不靠淡化分层次） ---- */
-QScrollBar:vertical {
-    background-color: transparent;
-    width: 10px;
-    margin: 2px;
-}
-
-QScrollBar::handle:vertical {
-    background-color: #000000;
-    border-radius: 4px;
-    min-height: 24px;
-}
-
-QScrollBar::handle:vertical:hover {
-    background-color: #000000;
-}
-
-QScrollBar:horizontal {
-    background-color: transparent;
-    height: 10px;
-    margin: 2px;
-}
-
-QScrollBar::handle:horizontal {
-    background-color: #000000;
-    border-radius: 4px;
-    min-width: 24px;
-}
-
-QScrollBar::handle:horizontal:hover {
-    background-color: #000000;
-}
-
-QScrollBar::add-line, QScrollBar::sub-line {
-    height: 0;
-    width: 0;
-}
-
-QScrollBar::add-page, QScrollBar::sub-page {
-    background-color: transparent;
-}
-
 /* ---- 键盘焦点：这一档不装焦点环覆盖层，输入类的 2px 主色焦点边由
         ControlPalette::inputColors 自绘；勾选框给指示器换主色描边；
-        滑块因控件级边框在 CC_Slider 的自绘路径里不落笔，焦点改挂在手柄上反转：底色芯 + 正文色圈 ---- */
+        滑块的焦点反转由 Gui::Slider 自绘，样式表不再有滑块规则 ---- */
 QCheckBox::indicator:focus {
     border: 2px solid #0B57D0;
-}
-
-QSlider::handle:horizontal:focus {
-    background-color: #FFFFFF;
-    border: 2px solid #000000;
 }

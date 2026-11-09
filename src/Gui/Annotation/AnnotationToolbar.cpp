@@ -14,6 +14,7 @@
 #include "Gui/Controls/Button.h"
 #include "Gui/Controls/ComboBox.h"
 #include "Gui/Controls/Menu.h"
+#include "Gui/Controls/Slider.h"
 
 #include <QApplication>
 #include <QAction>
@@ -202,7 +203,7 @@ namespace GyanisScribe::Gui
         layout->addWidget(makeSeparator());
 
         // 线宽：滑块只走阶梯，取值表与 Gui::kAnnotationWidths 同解，不会出现 3.5 这种没定义过的宽度
-        m_widthSlider = new QSlider{Qt::Horizontal, this};
+        m_widthSlider = new Gui::Slider{Qt::Horizontal, this};
         m_widthSlider->setRange(0, static_cast<int>(kAnnotationWidths.size()) - 1);
         m_widthSlider->setPageStep(1);
         m_widthSlider->setFixedWidth(Gui::kToolbarSliderWidth);

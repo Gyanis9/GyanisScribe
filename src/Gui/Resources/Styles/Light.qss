@@ -212,46 +212,6 @@ QCheckBox[animatedIndicator="true"]::indicator:checked {
     image: none;
 }
 
-/* ---- 滑块：槽给一档描边（高对比度档靠这一档才看得见轨道），已走过的部分用主色 ---- */
-QSlider::groove:horizontal {
-    height: 6px;
-    background-color: #EDEDE9;
-    border: 1px solid #E7E7E2;
-    border-radius: 4px;
-}
-
-QSlider::sub-page:horizontal {
-    background-color: #236DE9;
-    border: 1px solid #236DE9;
-    border-radius: 4px;
-}
-
-QSlider::handle:horizontal {
-    width: 14px;
-    height: 14px;
-    margin: -6px -2px;
-    background-color: #236DE9;
-    border: 2px solid #FCFCFB;
-    border-radius: 9px;
-}
-
-QSlider::handle:horizontal:hover {
-    background-color: #1D61D5;
-}
-
-QSlider:disabled::groove:horizontal {
-    background-color: #E7E7E2;
-}
-
-QSlider:disabled::sub-page:horizontal {
-    background-color: #E2E2DD;
-}
-
-QSlider:disabled::handle:horizontal {
-    background-color: #E2E2DD;
-    border-color: #FCFCFB;
-}
-
 /* ---- 菜单与工具提示：面板、描边与当前项高亮由 Gui::Menu 与 SquircleStyle 按连续曲率自绘，
         这里只留抑制原生框的透明边框占位、内边距与文字色。
         工具提示不能有任何 border 声明：样式表引擎只要判得出可画内容就会自己画完这一层，
@@ -335,53 +295,6 @@ QFrame#toolbarSeparator {
     min-width: 1px;
 }
 
-/* ---- 滚动条：细、无箭头、平时淡一档 ---- */
-QScrollBar:vertical {
-    background-color: transparent;
-    width: 10px;
-    margin: 2px;
-}
-
-QScrollBar::handle:vertical {
-    background-color: rgba(20, 20, 18, 0.16);
-    border-radius: 4px;
-    min-height: 24px;
-}
-
-QScrollBar::handle:vertical:hover {
-    background-color: rgba(20, 20, 18, 0.32);
-}
-
-QScrollBar:horizontal {
-    background-color: transparent;
-    height: 10px;
-    margin: 2px;
-}
-
-QScrollBar::handle:horizontal {
-    background-color: rgba(20, 20, 18, 0.16);
-    border-radius: 4px;
-    min-width: 24px;
-}
-
-QScrollBar::handle:horizontal:hover {
-    background-color: rgba(20, 20, 18, 0.32);
-}
-
-QScrollBar::add-line, QScrollBar::sub-line {
-    height: 0;
-    width: 0;
-}
-
-QScrollBar::add-page, QScrollBar::sub-page {
-    background-color: transparent;
-}
-
 /* ---- 键盘焦点：勾选框的焦点由 Gui::FocusRingController 的覆盖层画，输入类的可见焦点边
         由 ControlPalette::inputColors 自绘（浅深档只在标注工具栏内落笔）；
-        滑块因控件级边框在 CC_Slider 的自绘路径里不落笔，焦点改挂在手柄上反转：
-        底色芯 + 正文色圈 ---- */
-QSlider::handle:horizontal:focus {
-    background-color: #FCFCFB;
-    border: 2px solid #141412;
-}
+        滑块的焦点反转由 Gui::Slider 自绘，样式表不再有滑块规则 ---- */

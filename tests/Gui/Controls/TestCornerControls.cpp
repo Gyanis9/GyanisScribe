@@ -7,6 +7,8 @@
 #include "Gui/Controls/ListView.h"
 #include "Gui/Controls/ListWidget.h"
 #include "Gui/Controls/Menu.h"
+#include "Gui/Controls/ScrollBar.h"
+#include "Gui/Controls/Slider.h"
 #include "Gui/Controls/SpinBox.h"
 #include "Gui/Controls/SurfaceWidget.h"
 #include "Gui/Controls/TextEdit.h"
@@ -17,6 +19,7 @@
 #include <gtest/gtest.h>
 
 #include <QAction>
+#include <QAbstractScrollArea>
 #include <QApplication>
 #include <QCoreApplication>
 #include <QFont>
@@ -778,6 +781,78 @@ TEST_F(CornerControlsFixture, SpinBoxPaintsControlFill)
     QCoreApplication::processEvents();
     const QImage image = host.grab().toImage();
     EXPECT_EQ(image.pixelColor(60, 26), GyanisScribe::Gui::activePalette().controlFill);
+}
+
+/**
+ * @brief 钉住滑块自绘槽与手柄
+ * @details 样式表已没有 QSlider 规则，槽、已走过的子页与手柄都由 Gui::Slider 画。
+ *          值 50 落在「控件宽减手柄边长」区间的中点，取样两处：手柄中心必须是主色，
+ *          手柄右侧必须只剩槽的静默底。只断言「不是全透明」不行——控件底会把整块铺满，
+ *          那样不画任何笔也能过。滑块放在宿主里并把焦点留在宿主上，手柄才不会落成
+ *          聚焦反转档（底色芯加正文色圈）。
+ */
+TEST_F(CornerControlsFixture, SliderPaintsGrooveAndHandle)
+{
+    QWidget host;
+    auto   *slider = new GyanisScribe::Gui::Slider{Qt::Horizontal, &host};
+    slider->setRange(0, 100);
+    slider->setValue(50);
+    slider->setGeometry(0, 0, 160, 20);
+    host.resize(160, 20);
+    host.setFocusPolicy(Qt::StrongFocus);
+    host.show();
+    host.setFocus();
+    QCoreApplication::processEvents();
+    ASSERT_FALSE(slider->hasFocus()) << "焦点没留在宿主上，手柄会落成聚焦反转档";
+    const QImage image = slider->grab().toImage();
+    EXPECT_EQ(image.pixelColor(80, 10), GyanisScribe::Gui::activePalette().accent) << "手柄中心没画成主色";
+    EXPECT_EQ(image.pixelColor(150, 10), GyanisScribe::Gui::activePalette().mutedFill) << "手柄右侧的槽没铺静默底";
+}
+
+/**
+ * @brief 钉住滚动条自绘圆角手柄且轨道透明
+ * @details 样式表已没有 QScrollBar 规则，手柄由 Gui::ScrollBar 按细槽档画；
+ *          轨道本身不铺底，手柄上端之外的一格必须是透明的。
+ */
+TEST_F(CornerControlsFixture, ScrollBarPaintsRoundedHandle)
+{
+    GyanisScribe::Gui::ScrollBar bar{Qt::Vertical};
+    bar.setRange(0, 100);
+    bar.setPageStep(20);
+    bar.resize(10, 120);
+    bar.show();
+    QCoreApplication::processEvents();
+    const QImage image = bar.grab().toImage();
+    int          opaque = 0;
+    for (int y = 0; y < image.height(); ++y)
+    {
+        for (int x = 0; x < image.width(); ++x)
+        {
+            if (image.pixelColor(x, y).alpha() > 0)
+            {
+                ++opaque;
+            }
+        }
+    }
+    EXPECT_GT(opaque, 0);
+    EXPECT_EQ(image.pixelColor(5, 0).alpha(), 0) << "轨道上端应透明；实际取色 " << image.pixelColor(5, 0).name(QColor::HexArgb).toStdString();
+}
+
+/**
+ * @brief 钉住三个自绘滚动区挂的是本类的滚动条
+ * @details 样式表不再给 QScrollBar 尺寸与颜色，挂回原生滚动条就没有圆角手柄；
+ *          文本区、列表与弹层视图在构造时就要换掉两条滚动条。
+ */
+TEST_F(CornerControlsFixture, GuiScrollAreasUseTheSquircleScrollBars)
+{
+    GyanisScribe::Gui::TextEdit   text;
+    GyanisScribe::Gui::ListWidget list;
+    GyanisScribe::Gui::ListView   view;
+    for (auto *area: {static_cast<QAbstractScrollArea *>(&text), static_cast<QAbstractScrollArea *>(&list), static_cast<QAbstractScrollArea *>(&view)})
+    {
+        EXPECT_NE(qobject_cast<GyanisScribe::Gui::ScrollBar *>(area->verticalScrollBar()), nullptr) << "垂直滚动条还是原生件";
+        EXPECT_NE(qobject_cast<GyanisScribe::Gui::ScrollBar *>(area->horizontalScrollBar()), nullptr) << "水平滚动条还是原生件";
+    }
 }
 
 TEST_F(CornerControlsFixture, HighContrastInputFocusDrawsAccentBorder)

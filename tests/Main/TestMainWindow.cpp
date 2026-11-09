@@ -67,6 +67,7 @@ using GyanisScribe::App::UpdateVerdict;
 #include <QPushButton>
 #include <QSpinBox>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QStackedWidget>
 #include <QSize>
 #include <QString>
@@ -318,8 +319,9 @@ namespace
             for (auto *widget: root->findChildren<QWidget *>())
             {
                 const QLatin1StringView className{widget->metaObject()->className()};
-                // Qt 自绘件的内部子件（滚动条、下拉弹出表、清除按钮、数字框内编辑）不是用户可操作项
-                if (className == "QScrollBar" || className == "QComboBoxListView" || className == "QLineEditIconButton" ||
+                // Qt 自绘件的内部子件（滚动条、下拉弹出表、清除按钮、数字框内编辑）不是用户可操作项；
+                // 滚动条按类型认，自绘的 Gui::ScrollBar 子类同样不算
+                if (qobject_cast<QScrollBar *>(widget) != nullptr || className == "QComboBoxListView" || className == "QLineEditIconButton" ||
                     widget->objectName() == QStringLiteral("qt_spinbox_lineedit"))
                 {
                     continue;

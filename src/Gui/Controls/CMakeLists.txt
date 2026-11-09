@@ -28,6 +28,10 @@ set_property(GLOBAL APPEND PROPERTY GyanisScribeGuiSources
         ${CMAKE_CURRENT_LIST_DIR}/HotkeyEdit.cpp
         ${CMAKE_CURRENT_LIST_DIR}/SpinBox.h
         ${CMAKE_CURRENT_LIST_DIR}/SpinBox.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/Slider.h
+        ${CMAKE_CURRENT_LIST_DIR}/Slider.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/ScrollBar.h
+        ${CMAKE_CURRENT_LIST_DIR}/ScrollBar.cpp
         ${CMAKE_CURRENT_LIST_DIR}/KeyStep.h
         ${CMAKE_CURRENT_LIST_DIR}/KeyStep.cpp
         ${CMAKE_CURRENT_LIST_DIR}/AppShortcuts.h

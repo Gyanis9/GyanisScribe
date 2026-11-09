@@ -2,6 +2,7 @@
 
 #include "Core/Geometry/ContinuousCorner.h"
 #include "Gui/Controls/ItemDelegate.h"
+#include "Gui/Controls/ScrollBar.h"
 #include "Gui/Theme/CornerStyle.h"
 #include "Gui/Theme/DesignTokens.h"
 
@@ -25,6 +26,9 @@ namespace GyanisScribe::Gui
         // 不会再被 QStyleSheetStyle 打开，委托的 State_MouseOver 分支也就永远不跑，必须在这里打开
         viewport()->setAttribute(Qt::WA_Hover);
         viewport()->setMouseTracking(true);
+        // 样式表不再给 QScrollBar 尺寸与颜色：两条滚动条在构造时就换成自绘件
+        setVerticalScrollBar(new ScrollBar{Qt::Vertical, this});
+        setHorizontalScrollBar(new ScrollBar{Qt::Horizontal, this});
     }
 
     void ListWidget::setSurfaceVisible(const bool visible)
