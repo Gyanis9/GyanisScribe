@@ -545,7 +545,7 @@ TEST_F(CornerControlsFixture, ComboBoxPaintsControlFill)
  * @brief 钉住下拉弹层用的是连续曲率视图
  * @details 收起态由 paintEvent 自绘，弹层却由 QComboBox 在内部容器里显示；
  *          setView 之后弹层视图必须是 Gui::ListView，视口的悬停属性与鼠标跟踪也要打开，
- *          否则 ItemDelegate 的 State_MouseOver 分支永远不跑。
+ *          否则 ItemDelegate 的 State_MouseOver 分支永远不跑；省略模式保持 Qt 默认弹层的中间省略。
  */
 TEST_F(CornerControlsFixture, ComboBoxPopupsUseTheSquircleListView)
 {
@@ -556,7 +556,8 @@ TEST_F(CornerControlsFixture, ComboBoxPopupsUseTheSquircleListView)
     EXPECT_TRUE(comboView->viewport()->testAttribute(Qt::WA_Hover)) << "弹层视口没开 WA_Hover";
     EXPECT_TRUE(comboView->viewport()->hasMouseTracking()) << "弹层视口没开鼠标跟踪";
     EXPECT_TRUE(comboView->window()->testAttribute(Qt::WA_TranslucentBackground)) << "弹层窗口没开透明背景，圆角外会露出方底";
-    EXPECT_FALSE(comboView->window()->autoFillBackground()) << "弹层窗口仍在自动填底";
+    EXPECT_TRUE(comboView->window()->testAttribute(Qt::WA_NoSystemBackground)) << "弹层窗口还在铺系统底色";
+    EXPECT_EQ(comboView->textElideMode(), Qt::ElideMiddle) << "弹层视图的省略模式偏离了 Qt 默认弹层的中间省略";
 
     GyanisScribe::Gui::FontComboBox fontCombo;
     auto *fontView = dynamic_cast<GyanisScribe::Gui::ListView *>(fontCombo.view());
@@ -586,9 +587,62 @@ TEST_F(CornerControlsFixture, ListViewPaintsSurfaceAndLeavesCornersToThePopup)
 }
 
 /**
- * @brief 钉住 showPopup 之后的弹层委托仍是 ItemDelegate
- * @details QComboBox 在弹层容器创建时会装自己的私有委托；这里先在视图上放一个普通委托当替身，
- *          再走一次 showPopup()，返回后必须换回 ItemDelegate。
+ * @brief 钉住三档样式表下的弹层视图仍是自绘底
+ * @details 其余弹层用例都没有挂应用样式表；三份 QSS 的 QComboBox QAbstractItemView 规则一旦补回
+ *          background 或 border-radius，方底会压在自绘圆角上而用例仍全绿。
+ *          弹层不打开时视图不可见、抓不到像素，这里在组合框下挂一个同源的 ListView 探针，
+ *          让它走同一条 QComboBox QAbstractItemView 规则：中心必须是这一档的 surface，
+ *          左上角必须透明；收尾把样式表与档位还原，别把状态留给后面的用例。
+ */
+TEST_F(CornerControlsFixture, ThemedPopupViewsKeepTheSquircleSurface)
+{
+    struct StyleSheetGuard
+    {
+        QString previous = qApp->styleSheet();
+
+        ~StyleSheetGuard()
+        {
+            qApp->setStyleSheet(previous);
+        }
+    } styleSheetGuard;
+    struct ThemeKindGuard
+    {
+        GyanisScribe::Gui::ThemeKind previous = GyanisScribe::Gui::activeThemeKind();
+
+        ~ThemeKindGuard()
+        {
+            GyanisScribe::Gui::setTextThemeKind(previous);
+        }
+    } themeKindGuard;
+
+    for (const auto kind: {GyanisScribe::Gui::ThemeKind::Light, GyanisScribe::Gui::ThemeKind::Dark, GyanisScribe::Gui::ThemeKind::HighContrast})
+    {
+        qApp->setStyleSheet(GyanisScribe::Gui::ThemeManager::styleSheetFor(kind));
+        GyanisScribe::Gui::setTextThemeKind(kind);
+
+        GyanisScribe::Gui::ComboBox combo;
+        combo.resize(240, 160);
+        combo.show();
+        // 弹层要等打开才可见，抓不到离屏像素；这里用同源的 ListView 挂在组合框下，
+        // 走同一条 QComboBox QAbstractItemView 规则，再按普通控件抓图
+        auto *view = new GyanisScribe::Gui::ListView{&combo};
+        view->setGeometry(20, 20, 200, 120);
+        view->show();
+        QCoreApplication::processEvents();
+        const QImage image = view->grab().toImage();
+        ASSERT_FALSE(image.isNull());
+        EXPECT_EQ(image.pixelColor(100, 100), GyanisScribe::Gui::paletteFor(kind).surface)
+                << static_cast<int>(kind) << " 档下弹层视图没铺该档 surface；中心取色 " << image.pixelColor(100, 100).name(QColor::HexArgb).toStdString();
+        EXPECT_EQ(image.pixelColor(0, 0).alpha(), 0) << static_cast<int>(kind) << " 档下弹层视图左上角不透明，方角底又回来了；左上角取色 "
+                                                     << image.pixelColor(0, 0).name(QColor::HexArgb).toStdString();
+    }
+}
+
+/**
+ * @brief 钉住 showPopup 只兜底核对弹层委托
+ * @details Qt 不在 showPopup 里重装委托，ListView 构造时装的 ItemDelegate 会一直留着；
+ *          这里先在视图上放一个普通委托当替身，模拟委托被换掉的情形，走一次 showPopup() 后必须补回 ItemDelegate。
+ *          第二次打开只能做类型核对，不得再新建委托，否则每次打开都会多出一个。
  *          弹层在无交互桌面的测试进程里不会真的显示，所以委托判据只核类型、不核窗口可见性；
  *          容器左上角取自身渲染结果的 alpha，确认顶层窗口没在圆角外铺一块方底。
  */
@@ -606,10 +660,15 @@ TEST_F(CornerControlsFixture, ComboBoxReplacesThePopupDelegateAfterShowPopup)
     ASSERT_EQ(combo.view()->itemDelegate(), standIn);
 
     combo.showPopup();
-    EXPECT_NE(dynamic_cast<GyanisScribe::Gui::ItemDelegate *>(combo.view()->itemDelegate()), nullptr) << "弹层委托没有在 showPopup 之后换回 ItemDelegate";
+    auto *installed = combo.view()->itemDelegate();
+    ASSERT_NE(qobject_cast<GyanisScribe::Gui::ItemDelegate *>(installed), nullptr) << "弹层委托没有在 showPopup 之后补回 ItemDelegate";
 
     const QImage popupImage = combo.view()->window()->grab().toImage();
     EXPECT_EQ(popupImage.pixelColor(0, 0).alpha(), 0) << "弹层容器左上角应透明，不能露出方形窗口底";
+
+    combo.hidePopup();
+    combo.showPopup();
+    EXPECT_EQ(combo.view()->itemDelegate(), installed) << "第二次打开又分配了一个委托";
     combo.hidePopup();
 }
 

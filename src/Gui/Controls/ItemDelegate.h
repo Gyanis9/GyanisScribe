@@ -21,6 +21,8 @@ namespace GyanisScribe::Gui
      */
     class ItemDelegate : public QStyledItemDelegate
     {
+        Q_OBJECT
+
     public:
         /**
          * @brief 构造委托

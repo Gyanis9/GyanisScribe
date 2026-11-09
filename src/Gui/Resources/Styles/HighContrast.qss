@@ -148,7 +148,7 @@ QComboBox::down-arrow {
 }
 
 /* ---- 下拉弹层：底、2px 边与项高亮由 Gui::ListView 与 ItemDelegate 按连续曲率自绘，
-        这里只留内边距、文字色、选区色与同宽透明边框占位 ---- */
+        这里只留内边距、文字色与同宽透明边框占位 ---- */
 QComboBox QAbstractItemView {
     color: #000000;
     border: 2px solid transparent;

@@ -18,6 +18,8 @@ namespace GyanisScribe::Gui
         // 具体是哪个字段由组合框自己的无障碍名说明，这里只给列表一条通用名
         setAccessibleName(Base::uiText("下拉列表"));
         setItemDelegate(new ItemDelegate{this});
+        // 与 Qt 默认弹层一致取中间省略：右侧省略会把长族名的差异截掉
+        setTextElideMode(Qt::ElideMiddle);
         // 容器底与描边都由本类画：原生面板框会在圆角外补一圈方角线
         setFrameShape(QFrame::NoFrame);
         // 控件与视口都不许再铺系统底色，否则圆角外的四个角会露成方块；

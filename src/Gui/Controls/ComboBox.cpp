@@ -58,8 +58,10 @@ namespace GyanisScribe::Gui
     {
         QComboBox::showPopup();
         preparePopupWindow(*this);
-        // 弹层创建时 QComboBox 会装回自己的私有委托，基类返回后重设一次
-        if (auto *popupView = view(); popupView != nullptr)
+        // 委托在视图构造时就已装好，Qt 打开弹层时不会改回来；这里只做类型核对，
+        // 弹层被换成别的委托才补装，正常打开不再新建
+        auto *popupView = view();
+        if (popupView != nullptr && qobject_cast<ItemDelegate *>(popupView->itemDelegate()) == nullptr)
         {
             popupView->setItemDelegate(new ItemDelegate{popupView});
         }
@@ -87,8 +89,9 @@ namespace GyanisScribe::Gui
     {
         QFontComboBox::showPopup();
         preparePopupWindow(*this);
-        // 弹层创建时基类会装回自己的私有委托，基类返回后重设一次，字体预览才不会丢
-        if (auto *popupView = view(); popupView != nullptr)
+        // 同 ComboBox：字体委托在构造时就已装好，只在被换掉时兜底补装，字体预览不会丢
+        auto *popupView = view();
+        if (popupView != nullptr && qobject_cast<FontItemDelegate *>(popupView->itemDelegate()) == nullptr)
         {
             popupView->setItemDelegate(new FontItemDelegate{popupView});
         }

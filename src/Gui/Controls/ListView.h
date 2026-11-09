@@ -17,6 +17,8 @@ namespace GyanisScribe::Gui
      * @brief 自绘连续曲率容器底的下拉弹层视图
      * @details 容器底与描边由本类按 Control 档画，项底与高亮由 ItemDelegate 画；
      *          视口的悬停属性与鼠标跟踪也在构造里打开，项悬停态不依赖样式表的 :hover 规则；
+     *          省略模式与 Qt 默认弹层一致取中间省略。
+     *          弹层不是独立字段，无障碍名只取通用的「下拉列表」，具体字段由所属组合框的名字说明；
      *          滚动、选择模式与模型接口都留在 QListView 上。
      */
     class ListView : public QListView

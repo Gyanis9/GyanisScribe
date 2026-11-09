@@ -16,7 +16,7 @@ namespace GyanisScribe::Gui
         const QVariant fontData = index.data(Qt::FontRole);
         if (fontData.canConvert<QFont>())
         {
-            // 模型给了完整字体时沿用它的族名与字形，其余属性仍取界面字体
+            // 模型给了完整字体时以它为准：已设置的属性优先，未设置的才从界面字体补齐
             option.font = fontData.value<QFont>().resolve(option.font);
         } else
         {
