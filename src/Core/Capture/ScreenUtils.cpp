@@ -2,6 +2,7 @@
 
 #include "Base/SizeText.h"
 #include "Base/Text.h"
+#include "Core/Geometry/ContinuousCorner.h"
 
 #include <QGuiApplication>
 #include <QPainter>
@@ -341,39 +342,18 @@ namespace GyanisScribe::Core
         }}};
     }
 
-    QImage roundedCornerImage(const QImage &image, const int radiusPhysical)
+    QImage roundedCornerImage(const QImage &image, const int radiusPhysical, const qreal smoothing)
     {
         if (image.isNull() || radiusPhysical <= 0)
         {
             return image;
         }
 
-        // 半径夹到短边的一半：再大就没有「直边」可留，整张会被切成一枚椭圆甚至什么都不剩——
-        // 用户把半径调到 60 而截的是一枚小图标时，要的绝不是把内容切光
-        const auto capped = std::min(radiusPhysical, std::min(image.width(), image.height()) / 2);
-        if (capped <= 0)
-        {
-            return image;
-        }
-
         QImage rounded = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
 
-        // 掩膜整幅画好再合成：DestinationIn 只作用于「画到的像素」，直接 fillPath 的话圆角之外
-        // 的像素根本没人碰、四角会原样留着。整幅掩膜与马赛克、橡皮擦同一套口径
-        QImage mask(rounded.size(), QImage::Format_ARGB32_Premultiplied);
-        mask.fill(Qt::transparent);
-        {
-            QPainter maskPainter(&mask);
-            maskPainter.setRenderHint(QPainter::Antialiasing, true);
-            maskPainter.setPen(Qt::NoPen);
-            maskPainter.setBrush(Qt::black);
-            maskPainter.drawRoundedRect(QRectF{mask.rect()}, capped, capped);
-        }
-        {
-            QPainter painter(&rounded);
-            painter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
-            painter.drawImage(0, 0, mask);
-        }
+        // 半径夹到短边的一半、平滑度压到角占位不越过半张，都在路径层按整张的尺寸算；
+        // 截图与界面共用那一处，夹取规则就只有一份
+        applyCornerMask(rounded, CornerShape{static_cast<qreal>(radiusPhysical), smoothing});
         return rounded;
     }
 

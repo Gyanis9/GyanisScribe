@@ -228,11 +228,13 @@ namespace GyanisScribe::Core
      * @brief 把一张图按给定半径切圆四角
      * @param image 源图
      * @param radiusPhysical 圆角半径，物理像素；非正时原样交回
+     * @param smoothing 0–1 的平滑度，0 等价于普通圆角
      * @return 四角切圆后的 ARGB 图：圆角之外是透明像素，边与内里一个像素不动
-     * @details 「圆角矩形截图」的成品加工：走掩膜而不是裁剪边，圆弧上才不会有台阶。
-     *          半径由调用方按缩放因子换好再送进来，这里不做 dpr 换算。
+     * @details 「圆角矩形截图」的成品加工：走整幅掩膜而不是裁剪边，圆弧上才不会有台阶，
+     *          与界面里其余圆角共用同一份连续曲率路径。半径由调用方按缩放因子换好再送进来，
+     *          这里不做 dpr 换算；平滑度由调用方按逻辑半径取档，两边分开才让 100% 与 200% 屏上形状一致。
      */
-    [[nodiscard]] QImage roundedCornerImage(const QImage &image, int radiusPhysical);
+    [[nodiscard]] QImage roundedCornerImage(const QImage &image, int radiusPhysical, qreal smoothing);
 
     /**
      * @brief 三分网格的两竖两横，摆在选区里当构图参考线

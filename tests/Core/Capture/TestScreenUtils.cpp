@@ -556,9 +556,9 @@ TEST(ScreenUtilsSelection, SizeAndAspectTextRoundTrip)
 
 /**
  * @brief 钉住圆角切图：四角变透明、边与内里一个像素不动、半径非正原样交回
- * @details 40×30 的实心红图切半径 8：角尖 (0,0) 一定在圆角之外；(0,15) 是左边中点、必在；
- *
- * 圆心附近 (8,8) 恰在弧上，不取——抗锯齿会给出半透明的答案，判据不拿它当靶子。
+ * @details 40×30 的实心红图切半径 8、平滑度 0.5：角尖 (0,0) 一定在圆角之外；
+ *          (0,15) 是左边中点，角的占位是半径的 1.5 倍、只到 12 像素，中点仍在直边段里。
+ *          弧上的点不取——抗锯齿会给出半透明的答案，判据不拿它当靶子。
  */
 TEST(ScreenUtils, RoundedCornersBecomeTransparentAndKeepTheMiddle)
 {
@@ -567,14 +567,33 @@ TEST(ScreenUtils, RoundedCornersBecomeTransparentAndKeepTheMiddle)
     QImage square{40, 30, QImage::Format_ARGB32_Premultiplied};
     square.fill(QColor(255, 0, 0));
 
-    const auto rounded = roundedCornerImage(square, 8);
+    const auto rounded = roundedCornerImage(square, 8, 0.5);
     ASSERT_EQ(rounded.size(), square.size());
     EXPECT_EQ(rounded.pixelColor(0, 0).alpha(), 0) << "角尖没被切掉";
     EXPECT_EQ(rounded.pixelColor(20, 15), QColor(255, 0, 0)) << "内里被动过了";
     EXPECT_EQ(rounded.pixelColor(0, 15), QColor(255, 0, 0)) << "左边中点不该被切到";
     EXPECT_EQ(rounded.pixelColor(39, 15), QColor(255, 0, 0)) << "右边中点不该被切到";
 
-    EXPECT_EQ(roundedCornerImage(square, 0), square) << "半径为 0 时该原样交回";
+    // 只数全透明的格子在这张 40×30 的图上分不开：两边都切掉 32 个，差别落在边上那圈半透明像素。
+    // 数 alpha 不到 255 的格子才看得出弧往边里多带了一段：两边一样说明平滑度根本没进路径
+    const auto softPixels = [](const QImage &image)
+    {
+        auto soft = 0;
+        for (auto y = 0; y < image.height(); ++y)
+        {
+            for (auto x = 0; x < image.width(); ++x)
+            {
+                if (image.pixelColor(x, y).alpha() < 255)
+                {
+                    ++soft;
+                }
+            }
+        }
+        return soft;
+    };
+    EXPECT_GT(softPixels(rounded), softPixels(roundedCornerImage(square, 8, 0.0))) << "平滑度没参与路径：0 与 0.5 切出了同样的边界";
+
+    EXPECT_EQ(roundedCornerImage(square, 0, 0.5), square) << "半径为 0 时该原样交回";
 }
 
 /**
@@ -589,7 +608,7 @@ TEST(ScreenUtils, RoundedCornersClampTheRadiusToHalfTheShortEdge)
     QImage wide{60, 20, QImage::Format_ARGB32_Premultiplied};
     wide.fill(QColor(255, 0, 0));
 
-    const auto rounded = roundedCornerImage(wide, 500);
+    const auto rounded = roundedCornerImage(wide, 500, 0.5);
     EXPECT_EQ(rounded.pixelColor(0, 0).alpha(), 0) << "角上仍该被切掉：夹半径不是不切";
     EXPECT_EQ(rounded.pixelColor(30, 10), QColor(255, 0, 0)) << "中心被切光了：半径该收在短边一半，而不是盖过整张";
     EXPECT_EQ(rounded.pixelColor(30, 0), QColor(255, 0, 0)) << "上边中点在夹过的弧外一格都不得碰";

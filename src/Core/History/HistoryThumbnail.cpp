@@ -1,7 +1,8 @@
 #include "Core/History/HistoryThumbnail.h"
 
+#include "Core/Geometry/ContinuousCorner.h"
+
 #include <QPainter>
-#include <QPainterPath>
 
 #include <algorithm>
 
@@ -18,15 +19,17 @@ namespace GyanisScribe::Core
         const auto scaled = source.scaled(target, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
         const auto crop   = QPoint{std::max(0, (scaled.width() - target.width()) / 2), std::max(0, (scaled.height() - target.height()) / 2)};
 
-        QImage canvas{target, QImage::Format_ARGB32};
+        // 画布用预乘格式：与掩膜同一套像素口径，DestinationIn 合成不必在绘制时临时转换
+        QImage canvas{target, QImage::Format_ARGB32_Premultiplied};
         canvas.fill(Qt::transparent);
         {
-            QPainter     painter{&canvas};
-            QPainterPath rounded;
-            rounded.addRoundedRect(QRectF{QPointF{0.0, 0.0}, QSizeF{target}}, cornerRadius, cornerRadius);
-            painter.setClipPath(rounded);
+            QPainter painter{&canvas};
             painter.drawImage(-crop, scaled);
         }
+
+        // 平滑度取缩略图这一档、半径取调用方换好的物理像素：1x/2x/3x 三张图在列表里是同一个逻辑形状
+        const auto shape = cornerShapeFor(CornerRole::Thumbnail);
+        applyCornerMask(canvas, CornerShape{static_cast<qreal>(cornerRadius), shape.smoothing});
         return canvas;
     }
 

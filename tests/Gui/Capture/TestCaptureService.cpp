@@ -1090,7 +1090,7 @@ TEST_F(CaptureServiceFixture, CornerRadiusSettingShapesTheRoundedProduct)
     wideService.captureRegion(QRect(0, 0, 40, 40), QStringLiteral("FakeScreen-1"));
     ASSERT_TRUE(atWide.image.has_value());
     const auto wideCut = cutPixels(*atWide.image);
-    EXPECT_GT(wideCut, defaultCut + 200) << "半径从 12 调到 20 该多切出一大片角：这一格没被吃进几何";
+    EXPECT_GT(wideCut, defaultCut + 600) << "半径从 12 调到 20 该多切出一大片角：这一格没被吃进几何";
 
     // 坏值（0）不该让截图失败，也不该悄悄按 0 切：记一条原因之后按默认档继续
     ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kCaptureCornerRadius, QVariant(0)).has_value());

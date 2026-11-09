@@ -400,6 +400,28 @@ TEST(HistoryThumbnail, SquaresAreUniformAndCornersAreCut)
 }
 
 /**
+ * @brief 钉住同一张缩略图在 1 倍与 2 倍下切出同一个逻辑形状
+ * @details 列表按 96 逻辑像素摆，2 倍图是 192 像素；半径若只按角色里的 6 像素走，
+ *          2 倍图上那个角看上去只剩一半。判据取 (2,2)：按 12 像素半径一定在形状之外，
+ *          按 6 像素就落进角里，两种实现在这里分得开。
+ */
+TEST(HistoryThumbnail, DevicePixelRatioKeepsTheSameLogicalCorner)
+{
+    QImage source{QSize{240, 120}, QImage::Format_ARGB32};
+    source.fill(QColor{200, 30, 30});
+
+    const auto oneX = makeThumbnail(source, {kThumbnailEdge, kThumbnailEdge}, kThumbnailCornerRadius);
+    const auto twoX = makeThumbnail(source, {kThumbnailEdge * 2, kThumbnailEdge * 2}, kThumbnailCornerRadius * 2);
+    ASSERT_EQ(oneX.size(), QSize(kThumbnailEdge, kThumbnailEdge));
+    ASSERT_EQ(twoX.size(), QSize(kThumbnailEdge * 2, kThumbnailEdge * 2));
+
+    EXPECT_EQ(oneX.pixelColor(0, 0).alpha(), 0) << "左上角在圆角之外";
+    EXPECT_EQ(twoX.pixelColor(0, 0).alpha(), 0) << "左上角在圆角之外";
+    EXPECT_EQ(twoX.pixelColor(2, 2).alpha(), 0) << "2 倍图的角按 6 像素切：物理半径没跟着缩放，同一个逻辑角只剩一半";
+    EXPECT_GT(twoX.pixelColor(kThumbnailEdge, kThumbnailEdge).alpha(), 0) << "中心必须还是图本身";
+}
+
+/**
  * @brief 钉住第一次显示才读清单，构造期不碰盘
  * @details 程序重启后第一次打开这一页时盘上没有新增：初读若交给下一次保存，列表就是空的，
  *          而空列表读起来与「记录丢了」一模一样。但这一页挂在设置窗里、通常还不是第一页，
