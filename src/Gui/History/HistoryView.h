@@ -14,6 +14,7 @@
 #include "Core/History/HistoryTypes.h"
 
 #include "Gui/Controls/Toast.h"
+#include "Gui/History/ThumbnailPixels.h"
 
 #include <QCache>
 #include <QFutureWatcher>
@@ -204,16 +205,6 @@ namespace GyanisScribe::Gui
         void hideEvent(QHideEvent *event) override;
 
     private:
-        /// 工作线程解好的一条缩略图；界面线程只拿它组装图标与写缓存
-        struct DecodedThumbnail
-        {
-            QImage oneX;                        ///< 96 见方
-            QImage twoX;                        ///< 192 见方
-            QImage threeX;                      ///< 288 见方
-            bool   readFailed          = false; ///< 像素没读出来，界面线程改摆类别图标
-            bool   decodedOffGuiThread = false; ///< 解码确实发生在界面线程之外
-        };
-
         /// 一条等着解码的列表项；列表重建后 QPersistentModelIndex 自己失效
         struct PendingThumbnail
         {
@@ -231,18 +222,6 @@ namespace GyanisScribe::Gui
 
         /// 某条记录读不出缩略图时的类别图标
         [[nodiscard]] QIcon fallbackIcon(const Core::HistoryEntry &entry) const;
-
-        /**
-         * @brief 在工作线程上读一条成品并裁成 1x/2x/3x 三档
-         * @param displayPath 成品路径的显示用文本
-         * @return 三档像素，外加读失败与线程判断两枚读数；不碰图标、缓存与列表
-         * @details 交给工作线程的 lambda 只按值捕获路径：视图在解码途中析构时任务照样跑完，
-         *          不会碰到已经不在的对象。代际号留在在飞条目上，结果落地时再比。
-         */
-        [[nodiscard]] static DecodedThumbnail decodeThumbnailPixels(const QString &displayPath);
-
-        /// 缓存键：成品路径、修改时间（毫秒）与文件大小
-        [[nodiscard]] static QString thumbnailCacheKey(const Core::HistoryEntry &entry);
 
         /// 可见、未挂起、队列非空且没有在飞任务时启动一次单次定时器
         void scheduleThumbnails();

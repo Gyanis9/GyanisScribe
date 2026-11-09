@@ -13,15 +13,12 @@
 
 #include <QComboBox>
 #include <QAbstractItemModel>
-#include <QCoreApplication>
 #include <QDateTime>
 #include <QEvent>
-#include <QFileInfo>
 #include <QFutureWatcher>
 #include <QHBoxLayout>
 #include <QHideEvent>
 #include <QIcon>
-#include <QImageReader>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPixmap>
@@ -30,15 +27,12 @@
 #include <QListWidgetItem>
 #include <QPushButton>
 #include <QShowEvent>
-#include <QThread>
 #include <QTimer>
 #include <QVariant>
 #include <QVBoxLayout>
 #include <QtConcurrent/QtConcurrentRun>
 
-#include <algorithm>
 #include <array>
-#include <cmath>
 #include <utility>
 
 namespace
@@ -48,10 +42,6 @@ namespace
 
     /// 列表项里存成品路径的那个角色
     constexpr int kPathRole = Qt::UserRole + 1;
-
-    /// 缩略图备到 3x 屏那一档：再高的缩放比按 3 档放大，1x/2x/3x 覆盖现有屏幕。
-    /// 三档一律生成、不做按屏裁剪，每张的位图合计约 0.5 MiB，这是缓存容量按张数计的代价来源
-    constexpr int kLargestThumbnailDevicePixelRatio = 3;
 
     /**
      * @brief 缩略图缓存最多存多少张
@@ -383,13 +373,14 @@ namespace GyanisScribe::Gui
         m_list->clear();
         for (const auto &entry: visible)
         {
-            auto *item = new QListWidgetItem{entryCaption(entry, QDateTime::currentDateTime())};
-            item->setData(kPathRole, GyanisScribe::Base::Paths::toDisplayText(entry.filePath));
-            item->setToolTip(GyanisScribe::Base::Paths::toDisplayText(entry.filePath) + GyanisScribe::Base::uiText("（删除只从历史里去掉这条，成品文件留在原处）"));
+            const auto displayPath = GyanisScribe::Base::Paths::toDisplayText(entry.filePath);
+            auto      *item        = new QListWidgetItem{entryCaption(entry, QDateTime::currentDateTime())};
+            item->setData(kPathRole, displayPath);
+            item->setToolTip(displayPath + GyanisScribe::Base::uiText("（删除只从历史里去掉这条，成品文件留在原处）"));
             m_list->addItem(item);
 
             // 先查缓存再谈占位图：命中时省下那一次图标查找，未命中才需要一枚先顶上
-            const auto key = thumbnailCacheKey(entry);
+            const auto key = thumbnailCacheKey(displayPath);
             if (const auto *cached = m_thumbnailCache.object(key); cached != nullptr)
             {
                 item->setIcon(*cached);
@@ -423,45 +414,6 @@ namespace GyanisScribe::Gui
         return m_icons.icon(entry.kind == Core::HistoryKind::Recording ? "Record" : "CaptureRegion");
     }
 
-    QString HistoryView::thumbnailCacheKey(const Core::HistoryEntry &entry)
-    {
-        // 修改时间进毫秒：同一路径被新内容覆盖时，键跟着变，旧图自然被当成另一张
-        const QFileInfo info{GyanisScribe::Base::Paths::toDisplayText(entry.filePath)};
-        return GyanisScribe::Base::Paths::toDisplayText(entry.filePath) + QChar{u'|'} + QString::number(info.lastModified().toMSecsSinceEpoch()) + QChar{u'|'} +
-               QString::number(info.size());
-    }
-
-    HistoryView::DecodedThumbnail HistoryView::decodeThumbnailPixels(const QString &displayPath)
-    {
-        DecodedThumbnail decoded;
-        decoded.decodedOffGuiThread = QThread::currentThread() != QCoreApplication::instance()->thread();
-
-        QImageReader reader{displayPath};
-        reader.setAutoTransform(true);
-
-        // 读一次就够：先按最大那档 DPR 的覆盖尺寸预缩，三档缩略图都从这一份像素上裁
-        if (const auto source = reader.size(); source.isValid() && !source.isEmpty())
-        {
-            const auto edge  = Core::kThumbnailEdge * kLargestThumbnailDevicePixelRatio;
-            const auto ratio = std::max(static_cast<double>(edge) / static_cast<double>(source.width()), static_cast<double>(edge) / static_cast<double>(source.height()));
-            reader.setScaledSize(
-                    QSize{static_cast<int>(std::ceil(static_cast<double>(source.width()) * ratio)), static_cast<int>(std::ceil(static_cast<double>(source.height()) * ratio))});
-        }
-
-        const auto image = reader.read();
-        if (image.isNull())
-        {
-            decoded.readFailed = true;
-            return decoded;
-        }
-
-        decoded.oneX   = Core::makeThumbnail(image, QSize{Core::kThumbnailEdge, Core::kThumbnailEdge}, Core::kThumbnailCornerRadius);
-        decoded.twoX   = Core::makeThumbnail(image, QSize{Core::kThumbnailEdge * 2, Core::kThumbnailEdge * 2}, Core::kThumbnailCornerRadius * 2);
-        decoded.threeX = Core::makeThumbnail(image, QSize{Core::kThumbnailEdge * kLargestThumbnailDevicePixelRatio, Core::kThumbnailEdge * kLargestThumbnailDevicePixelRatio},
-                                             Core::kThumbnailCornerRadius * kLargestThumbnailDevicePixelRatio);
-        return decoded;
-    }
-
     void HistoryView::scheduleThumbnails()
     {
         if (!isVisible() || m_thumbnailSuspended || m_pendingThumbnails.isEmpty() || m_inFlightThumbnail.has_value() || m_thumbnailTimer->isActive())
@@ -488,7 +440,7 @@ namespace GyanisScribe::Gui
             }
 
             // 键在读之前取：读一张大图要上百毫秒，期间文件被换掉时，这一份像素对应的仍是旧键
-            pending.cacheKey    = thumbnailCacheKey(pending.entry);
+            pending.cacheKey    = thumbnailCacheKey(GyanisScribe::Base::Paths::toDisplayText(pending.entry.filePath));
             pending.generation  = m_thumbnailGeneration;
             m_inFlightThumbnail = pending;
 
