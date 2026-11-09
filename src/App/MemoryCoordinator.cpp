@@ -1,5 +1,6 @@
 #include "App/MemoryCoordinator.h"
 
+#include "App/MemoryImportJob.h"
 #include "Base/Text.h"
 #include "Core/Memory/DuplicateHash.h"
 #include "Core/Memory/MemoryIndex.h"
@@ -134,6 +135,8 @@ namespace GyanisScribe::App
 
     MemoryCoordinator::~MemoryCoordinator()
     {
+        m_importJob.reset();
+
         // 先断开读图结果的回接再等：等待期间结果落地的话，finished 会打在正在析构的对象上
         QObject::disconnect(&m_prepareWatcher, nullptr, this, nullptr);
         if (m_runner != nullptr)
@@ -245,6 +248,8 @@ namespace GyanisScribe::App
 
         if (!enabled)
         {
+            // 关掉记忆功能就不再接受任何新索引，正在跑的导入也停在下一块之前
+            cancelImport();
             stopQueue();
             m_pendingConsent.reset();
             emit changed();
@@ -280,6 +285,17 @@ namespace GyanisScribe::App
     {
         const QString processName = normalizedProcessName(source.processName);
 
+        // 排除判断先于授权：被排除的程序既不该触发首次询问，也不该入库
+        if (isExcludedProcess(processName))
+        {
+            if (isEnabled() && !m_excludedNoticeShown)
+            {
+                m_excludedNoticeShown = true;
+                emit messageForUser(Base::uiText("记忆库：这个程序在排除名单里，这次截图没有建立索引。"), Gui::ToastKind::Information);
+            }
+            return;
+        }
+
         if (!isEnabled())
         {
             // 授权前只攒一条：等待回答期间再来的截图没有意义，用户回答后只索引第一张
@@ -308,16 +324,6 @@ namespace GyanisScribe::App
             return;
         }
 
-        if (isExcludedProcess(processName))
-        {
-            if (!m_excludedNoticeShown)
-            {
-                m_excludedNoticeShown = true;
-                emit messageForUser(Base::uiText("记忆库：这个程序在排除名单里，这次截图没有建立索引。"), Gui::ToastKind::Information);
-            }
-            return;
-        }
-
         Core::MemoryUpsert entry;
         entry.filePath    = filePath;
         entry.source      = Core::MemorySource::Capture;
@@ -326,6 +332,136 @@ namespace GyanisScribe::App
         entry.processName = processName;
         entry.windowTitle = source.windowTitle;
         storeEntry(entry);
+    }
+
+    void MemoryCoordinator::importFolder(const std::filesystem::path &directory)
+    {
+        if (!isEnabled())
+        {
+            // 用户可能从记忆库页点导入：先走首次授权，回答后再点一次
+            emit consentRequested();
+            return;
+        }
+
+        if (m_importJob)
+        {
+            emit messageForUser(Base::uiText("记忆库：已经有一个导入任务在进行，请等它结束或先取消。"), Gui::ToastKind::Information);
+            return;
+        }
+
+        if (!ensureIndexOpen())
+        {
+            return;
+        }
+
+        const QFileInfo directoryInfo{displayPath(directory)};
+        if (!directoryInfo.exists() || !directoryInfo.isDir())
+        {
+            emit messageForUser(Base::uiText("记忆库：导入目录 %1 不存在或不可读，请选择一个存在的文件夹。").arg(displayPath(directory)), Gui::ToastKind::Danger);
+            return;
+        }
+
+        m_importJob          = std::make_unique<MemoryImportJob>(m_index);
+        MemoryImportJob *job = m_importJob.get();
+
+        QObject::connect(job, &MemoryImportJob::inserted, this, &MemoryCoordinator::enqueueImported);
+        QObject::connect(job, &MemoryImportJob::progress, this,
+                         [this](const Core::MemoryImportProgress &progress)
+                         {
+                             emit importProgress(progress);
+                             emit changed();
+                             emitStats();
+                         });
+        QObject::connect(job, &MemoryImportJob::finished, this,
+                         [this](const Core::MemoryImportReport &report)
+                         {
+                             // 结束信号是任务的最后一条：排到下一轮事件循环再删，避免在它的成员函数里销毁它
+                             MemoryImportJob *finishedJob = m_importJob.release();
+                             finishedJob->deleteLater();
+
+                             emit importFinished(report);
+                             emit changed();
+                             emitStats();
+                         });
+
+        job->start(directory);
+    }
+
+    void MemoryCoordinator::cancelImport()
+    {
+        if (m_importJob)
+        {
+            m_importJob->cancel();
+        }
+    }
+
+    void MemoryCoordinator::setExcludedProcesses(QStringList processes)
+    {
+        QStringList normalized;
+        for (const QString &process: processes)
+        {
+            const QString name = normalizedProcessName(process);
+            if (!name.isEmpty() && !normalized.contains(name))
+            {
+                normalized.append(name);
+            }
+        }
+
+        QStringList previous;
+        for (const QString &process: m_settings.stringListValue(GyanisScribe::Core::kMemoryExcludeProcesses, QStringList{}))
+        {
+            const QString name = normalizedProcessName(process);
+            if (!name.isEmpty() && !previous.contains(name))
+            {
+                previous.append(name);
+            }
+        }
+
+        const auto written = m_settings.setValue(GyanisScribe::Core::kMemoryExcludeProcesses, normalized);
+        if (!written)
+        {
+            emit messageForUser(QString::fromStdString(written.error().message), Gui::ToastKind::Danger);
+        }
+
+        if (m_index.isOpen())
+        {
+            for (const QString &name: normalized)
+            {
+                if (previous.contains(name))
+                {
+                    continue;
+                }
+
+                const auto removed = m_index.removeProcess(name);
+                if (!removed)
+                {
+                    emit messageForUser(QString::fromStdString(removed.error().message), Gui::ToastKind::Danger);
+                }
+            }
+        }
+
+        dropExcludedWork(normalized);
+        emit changed();
+        emitStats();
+    }
+
+    QStringList MemoryCoordinator::excludedProcesses() const
+    {
+        QStringList normalized;
+        for (const QString &process: m_settings.stringListValue(GyanisScribe::Core::kMemoryExcludeProcesses, QStringList{}))
+        {
+            const QString name = normalizedProcessName(process);
+            if (!name.isEmpty() && !normalized.contains(name))
+            {
+                normalized.append(name);
+            }
+        }
+        return normalized;
+    }
+
+    void MemoryCoordinator::setCapacityLimitForTesting(const int maxEntries)
+    {
+        m_capacityLimit = std::max(maxEntries, 0);
     }
 
     void MemoryCoordinator::retryOcr(const qint64 id)
@@ -401,6 +537,7 @@ namespace GyanisScribe::App
             item.filePath           = result.filePath;
             item.size               = result.size;
             item.source             = result.source;
+            item.processName        = result.processName;
             m_knownItems[result.id] = item;
             if (result.source == Core::MemorySource::Import)
             {
@@ -494,6 +631,9 @@ namespace GyanisScribe::App
             return;
         }
 
+        // 清空之后不该再有导入把行写回来
+        cancelImport();
+
         const auto cleared = m_index.clear();
         if (!cleared)
         {
@@ -533,6 +673,9 @@ namespace GyanisScribe::App
     void MemoryCoordinator::rebuildIndex()
     {
         const std::filesystem::path databasePath = m_databasePath;
+
+        // 重建期间不该有导入把行写进旧库
+        cancelImport();
 
         // 先关连接再改名：占用中的主库无法改名，-wal/-shm 也会随关闭合并或删除
         m_index.close();
@@ -627,11 +770,15 @@ namespace GyanisScribe::App
             return;
         }
 
+        // 每次写入后都收一次容量：刚插入的这一行是最新的，淘汰不会把它删掉
+        enforceCapacity();
+
         QueueItem item;
-        item.id       = *identifier;
-        item.filePath = entry.filePath;
-        item.size     = entry.size;
-        item.source   = entry.source;
+        item.id          = *identifier;
+        item.filePath    = entry.filePath;
+        item.size        = entry.size;
+        item.source      = entry.source;
+        item.processName = entry.processName;
 
         removeQueuedById(item.id);
         m_knownItems[item.id] = item;
@@ -646,6 +793,87 @@ namespace GyanisScribe::App
         emit changed();
         emitStats();
         startNextOcr();
+    }
+
+    void MemoryCoordinator::enqueueImported(const qint64 id)
+    {
+        // 导入任务写完一行就算一次 upsert；先收容量，刚插入的这行不会被淘汰
+        enforceCapacity();
+
+        const auto found = m_index.findById(id);
+        if (!found || !found->has_value())
+        {
+            emitStats();
+            return;
+        }
+
+        const Core::MemoryResult &result = **found;
+        QueueItem                 item;
+        item.id          = result.id;
+        item.filePath    = result.filePath;
+        item.size        = result.size;
+        item.source      = result.source;
+        item.processName = result.processName;
+
+        m_knownItems[item.id] = item;
+        m_importQueue.push_back(item);
+        startNextOcr();
+    }
+
+    void MemoryCoordinator::enforceCapacity()
+    {
+        if (!m_index.isOpen())
+        {
+            return;
+        }
+
+        const auto evicted = m_index.enforceCapacity(m_capacityLimit);
+        if (!evicted)
+        {
+            emit messageForUser(QString::fromStdString(evicted.error().message), Gui::ToastKind::Danger);
+            return;
+        }
+        if (*evicted <= 0)
+        {
+            return;
+        }
+
+        emit changed();
+        emitStats();
+        emit messageForUser(Base::uiText("记忆库：条目已达上限 %1 条，已淘汰最早的 %2 条；原图文件不受影响。").arg(m_capacityLimit).arg(*evicted), Gui::ToastKind::Information);
+    }
+
+    void MemoryCoordinator::dropExcludedWork(const QStringList &excluded)
+    {
+        if (excluded.isEmpty())
+        {
+            return;
+        }
+
+        const auto matches = [&excluded](const QueueItem &item) { return !item.processName.isEmpty() && excluded.contains(item.processName); };
+        m_captureQueue.erase(std::remove_if(m_captureQueue.begin(), m_captureQueue.end(), matches), m_captureQueue.end());
+        m_importQueue.erase(std::remove_if(m_importQueue.begin(), m_importQueue.end(), matches), m_importQueue.end());
+        if (m_running && matches(*m_running))
+        {
+            m_running.reset();
+            m_runningDhash.clear();
+        }
+
+        for (auto entry = m_knownItems.begin(); entry != m_knownItems.end();)
+        {
+            if (matches(entry->second))
+            {
+                entry = m_knownItems.erase(entry);
+            } else
+            {
+                ++entry;
+            }
+        }
+
+        if (m_pendingConsent && !m_pendingConsent->processName.isEmpty() && excluded.contains(m_pendingConsent->processName))
+        {
+            m_pendingConsent.reset();
+        }
     }
 
     void MemoryCoordinator::startNextOcr()
@@ -858,10 +1086,11 @@ namespace GyanisScribe::App
         {
             const Core::MemoryResult &result = **found;
             QueueItem                 item;
-            item.id       = result.id;
-            item.filePath = result.filePath;
-            item.size     = result.size;
-            item.source   = result.source;
+            item.id          = result.id;
+            item.filePath    = result.filePath;
+            item.size        = result.size;
+            item.source      = result.source;
+            item.processName = result.processName;
             return item;
         }
         return std::nullopt;

@@ -102,7 +102,8 @@ include(GoogleTest)
 gtest_discover_tests(TestPrivacyCoordinator)
 
 add_executable(TestAppMemoryCoordinator
-        TestMemoryCoordinator.cpp)
+        TestMemoryCoordinator.cpp
+        TestMemoryImport.cpp)
 
 target_link_libraries(TestAppMemoryCoordinator PRIVATE
         App

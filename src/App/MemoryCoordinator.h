@@ -20,6 +20,7 @@
 #include <QObject>
 #include <QSize>
 #include <QString>
+#include <QStringList>
 
 #include <deque>
 #include <filesystem>
@@ -42,6 +43,8 @@ namespace GyanisScribe::Platform
 
 namespace GyanisScribe::App
 {
+
+    class MemoryImportJob;
 
     /**
      * @brief 截图记忆这一条链的协作对象
@@ -122,6 +125,34 @@ namespace GyanisScribe::App
         void noteScreenshot(const std::filesystem::path &filePath, const QSize &size, const Core::CaptureSourceInfo &source);
 
         /**
+         * @brief 把一个文件夹里的旧截图导入记忆库
+         * @param directory 要扫描的文件夹
+         * @details 未开启时只请求首次授权并返回，用户回答后可从记忆库页再次发起；
+         *          同一时间只允许一个导入任务。扫描与入库分块进行，OCR 仍走本类的队列。
+         */
+        void importFolder(const std::filesystem::path &directory);
+
+        /// 取消正在跑的导入；没有导入时是空操作
+        void cancelImport();
+
+        /**
+         * @brief 改排除的应用名单
+         * @param processes 进程名列表；保存前归一为小写、去掉 .exe 并去重
+         * @details 新加入的进程会删掉已有索引行，之后同一进程的新截图不再入库；
+         *          空进程名的导入行不受影响。之后不再排除的进程只影响新截图，旧行不回填。
+         */
+        void setExcludedProcesses(QStringList processes);
+
+        /// 当前排除的应用名单，已归一化
+        [[nodiscard]] QStringList excludedProcesses() const;
+
+        /**
+         * @brief 用例把容量改小，稳定走到淘汰分支
+         * @param maxEntries 允许保留的最大条数
+         */
+        void setCapacityLimitForTesting(int maxEntries);
+
+        /**
          * @brief 重新识别一条
          * @param id 条目主键
          * @details 状态重置为待识别并排到同类队列的队首；当前正在识别的同一条不重复排。
@@ -168,6 +199,18 @@ namespace GyanisScribe::App
         void statsChanged(const GyanisScribe::Core::MemoryStats &stats);
 
         /**
+         * @brief 导入进度
+         * @param progress 已扫描、已入库、跳过、失败与取消状态
+         */
+        void importProgress(const GyanisScribe::Core::MemoryImportProgress &progress);
+
+        /**
+         * @brief 导入结束
+         * @param report 本次导入的合计读数
+         */
+        void importFinished(const GyanisScribe::Core::MemoryImportReport &report);
+
+        /**
          * @brief 识别后端可用性变了
          * @param available 是否可用
          * @param reason 不可用时的中文原因与替代做法；可用时为空
@@ -191,6 +234,7 @@ namespace GyanisScribe::App
             std::filesystem::path filePath;                             ///< 原图路径
             QSize                 size;                                 ///< 像素尺寸
             Core::MemorySource    source = Core::MemorySource::Capture; ///< 截图还是导入
+            QString               processName;                          ///< 归一后的进程名，导入为空
         };
 
         /// 工作线程读图与算指纹后的产物
@@ -212,6 +256,15 @@ namespace GyanisScribe::App
 
         /// 把一条元数据写入待识别行并排进截图队列
         void storeEntry(const Core::MemoryUpsert &entry);
+
+        /// 导入任务入库一条后把它排进导入队列
+        void enqueueImported(qint64 id);
+
+        /// 超出容量时淘汰旧条目；有淘汰时发一次提示与统计
+        void enforceCapacity();
+
+        /// 把已排除进程的排队任务与等待授权的截图清掉
+        void dropExcludedWork(const QStringList &excluded);
 
         /// 取下一个任务；截图队列优先，同类先进先出
         void startNextOcr();
@@ -276,6 +329,9 @@ namespace GyanisScribe::App
         bool                                                   m_databaseFailureReported = false; ///< 本次失败是否已经报过
         bool                                                   m_indexNoticeShown        = false; ///< 索引未打开提示是否已经说过
         bool                                                   m_excludedNoticeShown     = false; ///< 排除提示是否已经说过
+
+        std::unique_ptr<MemoryImportJob> m_importJob;                               ///< 当前导入任务，同一时间只有一个
+        int                              m_capacityLimit = Core::kMaxMemoryEntries; ///< 条目上限，用例可改小
     };
 
 } // namespace GyanisScribe::App

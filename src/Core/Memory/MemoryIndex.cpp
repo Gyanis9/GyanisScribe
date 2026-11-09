@@ -401,6 +401,26 @@ namespace GyanisScribe::Core
         return m_open;
     }
 
+    Base::Expected<bool> MemoryIndex::containsPath(const std::filesystem::path &path) const
+    {
+        if (!m_open)
+        {
+            return std::unexpected(notOpenError());
+        }
+
+        QSqlQuery statement{databaseFor(m_connectionName)};
+        if (!statement.prepare(QStringLiteral("SELECT 1 FROM items WHERE path_key = ? LIMIT 1")))
+        {
+            return std::unexpected(queryError(QStringLiteral("准备按路径查在库失败"), statement.lastError()));
+        }
+        statement.addBindValue(pathKey(path));
+        if (!statement.exec())
+        {
+            return std::unexpected(queryError(QStringLiteral("按路径查在库失败"), statement.lastError()));
+        }
+        return statement.next();
+    }
+
     Base::Expected<qint64> MemoryIndex::upsertPending(const MemoryUpsert &entry)
     {
         if (!m_open)

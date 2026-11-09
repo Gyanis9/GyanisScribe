@@ -428,6 +428,29 @@ TEST_F(MemoryCoordinator, DisabledCoordinatorDoesNotIndex)
 }
 
 /**
+ * @brief 排除列表先于授权判断：被排除的程序既不询问授权也不入库
+ */
+TEST_F(MemoryCoordinator, ExcludedProcessSkipsConsent)
+{
+    SettingsStore settings{settingsPath()};
+
+    auto        engine = std::make_unique<FakeOcrEngine>(std::deque<Expected<OcrResult>>{});
+    Coordinator coordinator{settings, databasePath(), std::move(engine)};
+    QSignalSpy  consent(&coordinator, &Coordinator::consentRequested);
+
+    coordinator.start();
+    coordinator.setExcludedProcesses({QStringLiteral("Notepad.EXE")});
+    coordinator.noteScreenshot(makeShot(QStringLiteral("excluded.png"), Qt::red), QSize{32, 24}, CaptureSourceInfo{QStringLiteral("notepad.exe"), QStringLiteral("标题")});
+
+    EXPECT_EQ(consent.count(), 0) << "排除名单里的程序不该触发首次授权";
+    EXPECT_TRUE(coordinator.needsConsent()) << "排除的判断不该顺手把授权问题用过";
+    EXPECT_EQ(resultCount(coordinator.index()), 0);
+
+    coordinator.noteScreenshot(makeShot(QStringLiteral("allowed.png"), Qt::blue), QSize{32, 24}, CaptureSourceInfo{QStringLiteral("chrome.exe"), QStringLiteral("网页")});
+    EXPECT_EQ(consent.count(), 1) << "不在排除名单里的第一张截图仍应询问授权";
+}
+
+/**
  * @brief 截图任务按入队顺序识别，不因后一张到来而乱序
  */
 TEST_F(MemoryCoordinator, CaptureQueueKeepsFifoOrder)

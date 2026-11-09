@@ -76,6 +76,14 @@ namespace GyanisScribe::Core
         [[nodiscard]] bool isOpen() const noexcept;
 
         /**
+         * @brief 判断一条路径是否已经在索引里
+         * @param path 原始文件路径，按 pathKey 比较
+         * @return 已存在返回 true，不存在返回 false；查询失败返回中文 Error
+         * @details 只读判断，不重置识别状态；导入据此跳过已在库的路径而不重新排队。
+         */
+        [[nodiscard]] Base::Expected<bool> containsPath(const std::filesystem::path &path) const;
+
+        /**
          * @brief 插入或刷新一条待识别条目
          * @param entry 路径、来源、时间、尺寸与窗口元数据
          * @return 该条目在 items 表里的主键；失败返回中文 Error

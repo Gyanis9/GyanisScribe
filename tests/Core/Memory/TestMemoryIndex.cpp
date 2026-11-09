@@ -261,6 +261,24 @@ TEST_F(MemoryIndex, PathKeyTreatsWindowsCaseAndSeparatorsAsSame)
 #endif
 }
 
+// 钉住按路径身份查在库：同一条路径命中，未入库路径不命中，关库后返回错误
+TEST_F(MemoryIndex, ContainsPathMatchesPathKey)
+{
+    const auto path = tempFile("imported.png");
+    ASSERT_TRUE(m_index->upsertPending(entryFor(path, Core::MemorySource::Import, QDateTime::fromSecsSinceEpoch(1767225600), QSize(10, 10))).has_value());
+
+    const auto hit = m_index->containsPath(path);
+    ASSERT_TRUE(hit.has_value());
+    EXPECT_TRUE(*hit);
+
+    const auto miss = m_index->containsPath(tempFile("other.png"));
+    ASSERT_TRUE(miss.has_value());
+    EXPECT_FALSE(*miss);
+
+    m_index->close();
+    EXPECT_FALSE(m_index->containsPath(path).has_value()) << "关库后没有可查的连接，应返回错误";
+}
+
 // 钉住历史清空只删截图来源，导入行保留；清空索引后一条不剩
 TEST_F(MemoryIndex, RemoveCaptureEntriesKeepsImports)
 {

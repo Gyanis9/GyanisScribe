@@ -30,6 +30,8 @@ add_library(App STATIC
         HistoryCoordinator.cpp
         MemoryCoordinator.h
         MemoryCoordinator.cpp
+        MemoryImportJob.h
+        MemoryImportJob.cpp
         RecordingCoordinator.h
         RecordingCoordinator.cpp
         PinCoordinator.h
