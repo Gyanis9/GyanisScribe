@@ -2528,6 +2528,62 @@
             <translation>Exported JSON: </translation>
         </message>
         <message>
+            <source>复制 Markdown</source>
+            <translation>Copy Markdown</translation>
+        </message>
+        <message>
+            <source>导出表格 CSV</source>
+            <translation>Export table CSV</translation>
+        </message>
+        <message>
+            <source>已复制 Markdown</source>
+            <translation>Copied Markdown</translation>
+        </message>
+        <message>
+            <source>· 检测到表格，可导出 CSV</source>
+            <translation>· Table detected; CSV export available</translation>
+        </message>
+        <message>
+            <source>· 检测到复杂表格，暂不支持 CSV</source>
+            <translation>· Complex table detected; CSV is not supported yet</translation>
+        </message>
+        <message>
+            <source>CSV 文件 (*.csv)</source>
+            <translation>CSV files (*.csv)</translation>
+        </message>
+        <message>
+            <source>导出表格 CSV 失败：{}。请换一个目录再试一次</source>
+            <translation>Exporting the table CSV failed: {}. Pick another directory and try again.</translation>
+        </message>
+        <message>
+            <source>已导出表格 CSV：</source>
+            <translation>Exported table CSV: </translation>
+        </message>
+        <message>
+            <source>检测到复杂表格，暂不支持导出 CSV；请改用 Markdown 或 TXT 复制表格内容</source>
+            <translation>A complex table was detected, and CSV export is not supported yet; copy the table content as Markdown or TXT instead</translation>
+        </message>
+        <message>
+            <source>没有检测到可导出的表格，请先确认截图里有对齐的表格</source>
+            <translation>No exportable table was detected. Check that the screenshot contains an aligned table</translation>
+        </message>
+        <message>
+            <source>表格结构不完整，暂不支持导出 CSV；请改用 Markdown 或 TXT 复制表格内容</source>
+            <translation>The table structure is incomplete, and CSV export is not supported yet; copy the table content as Markdown or TXT instead</translation>
+        </message>
+        <message>
+            <source>CSV 写不出去：{}（{}）。请换一个可写的目录后重试</source>
+            <translation>Cannot write the CSV: {} ({}). Pick a writable directory and try again</translation>
+        </message>
+        <message>
+            <source>CSV 没能写入：{}（{}）。请检查磁盘空间后重试</source>
+            <translation>The CSV could not be written: {} ({}). Check the free disk space and try again</translation>
+        </message>
+        <message>
+            <source>CSV 没能落盘：{}（{}）。请检查磁盘空间后重试</source>
+            <translation>The CSV could not be flushed to disk: {} ({}). Check the free disk space and try again</translation>
+        </message>
+        <message>
             <source>取色器</source>
             <translation>Color picker</translation>
         </message>
