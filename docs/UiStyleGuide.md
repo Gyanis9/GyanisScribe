@@ -41,7 +41,7 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
   滑块槽与微调框上下按钮的悬停底也取它。
   卡片的圆角按 `Card` 档（20px、平滑度 0.80，见 §1.6）、内边距 `kSpacingMedium`，底色差已经足够分出「这是一块阅读面」。
 - 无容器边框：`#pageCard`、按钮、工具按钮、输入框（含快捷键框与标注行内编辑器）、列表、文本区一律没有可见描边。
-  浅色与深色给按钮与输入类保留一条 1px 透明边框占位，让控件总高固定为按钮 30、输入类 32；
+  浅色与深色给按钮与输入类保留一条 1px 透明边框占位（数字框不带占位，改为抬高内容最小高），让控件总高固定为按钮 30、输入类 32；
   换色只换底，不换尺寸。高对比度档的 2px 描边是契约，不按这一条归一化：
   按钮 32、输入类 34、数字框 38，由 `ThemeManagerFixture.ControlHeightsStayPinnedPerTheme` 按档钉住。
 - 浮层微边缘：压在其它内容上的面板在自绘时保留一圈 `borderStrong` 边缘（浅深 1px、高对比度 2px），
@@ -115,10 +115,13 @@ QSS 只留颜色、排版与透明边框占位：
 
 - 三份样式表都没有 `border-radius`，也不给形状类控件写可见的 `background-color`/`border-color`；
   文字色、选区色、下拉箭头资源、内边距、`min-width`/`min-height`/`margin`/`spacing` 仍留在样式表。
-- 浅色与深色的按钮与输入类保留 `1px solid transparent`、高对比度档保留 `2px solid transparent` 的边框占位，
-  控件总高按档不变（按钮 30、输入 32、高对比度档按钮 32 / 输入 34、数字框 38，由
+- 浅色与深色的按钮、行编辑与下拉框保留 `1px solid transparent`、高对比度档保留 `2px solid transparent` 的
+  边框占位，控件总高按档不变（按钮 30、输入 32、高对比度档按钮 32 / 输入 34，由
   `ThemeManagerFixture.ControlHeightsStayPinnedPerTheme` 钉住）。
-- 输入类的透明底与透明边只落在带 `squircle` 属性的自绘类及其内部行编辑上；原生对话框里的
+- 数字框不带边框占位：Qt 6.12 的 `QStyleSheetStyle` 在关掉原生按钮后会按微调框自身的边框与内边距裁内部
+  行编辑，把行编辑收成 1px 宽，数值文本还在却画不出来。它的内容最小高因此补到 28（高对比度档 34），
+  叠上微调框上下各 2px 的自有框，总高仍落在 32 与 38；内部行编辑的规则只给文字色、透明底与左右 12px 缩进。
+- 输入类的透明底与透明边只落在带 `squircle` 属性的自绘类上，微调框的内部行编辑只继承透明底；原生对话框里的
   `QLineEdit`/`QComboBox`/`QSpinBox` 保持系统外观。`QToolTip` 规则不能写任何 `border` 声明，
   否则样式引擎会自己画完提示面板，`SquircleStyle` 收不到 `PE_PanelTipLabel`。
 - 菜单与下拉弹层的顶层窗关闭自动填底并开透明背景；菜单面板由 `Gui::Menu` 自绘，`SquircleStyle`
