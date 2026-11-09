@@ -2726,19 +2726,21 @@ TEST_F(MainWindowFixture, UnbindRemovesTheCustomHotkeyEntry)
 }
 
 /**
- * @brief 钉住「关掉主窗口就是退出程序」
- * @details 常驻托盘不该变成「关掉窗口后还得再去托盘点一次退出」：closeEvent 要发 quitRequested，
- *          宿主拿它接 QCoreApplication::quit。这里只钉窗口这一端，接没接上由 AppController 的装配保证。
+ * @brief 钉住「关掉主窗口只是缩回托盘」
+ * @details 常驻工具关掉设置窗只藏窗：对象留在进程里，托盘菜单能把同一扇窗再摆出来；
+ *          退出只走托盘菜单那一条路。这里钉窗口这一端：close() 之后不可见，open() 能重新显示。
  */
-TEST_F(MainWindowFixture, ClosingTheWindowAsksTheApplicationToQuit)
+TEST_F(MainWindowFixture, ClosingTheWindowHidesItForLaterReopen)
 {
     makeWindow();
-    bool quitRequested = false;
-    QObject::connect(m_window.get(), &MainWindow::quitRequested, [&quitRequested] { quitRequested = true; });
+    m_window->open(MainWindowPage::General);
+    ASSERT_TRUE(m_window->isVisible()) << "用例前提不成立：主窗口没显示出来";
 
-    m_window->close();
+    EXPECT_TRUE(m_window->close()) << "关窗事件被拒了，窗口还留在屏上";
+    EXPECT_FALSE(m_window->isVisible()) << "关掉主窗口之后它还留在屏上";
 
-    EXPECT_TRUE(quitRequested) << "关掉主窗口没发退出请求，进程会继续挂在托盘里";
+    m_window->open(MainWindowPage::General);
+    EXPECT_TRUE(m_window->isVisible()) << "从托盘再打开时同一扇窗没有重新显示";
 }
 
 /**
