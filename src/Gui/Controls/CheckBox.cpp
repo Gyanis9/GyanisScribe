@@ -4,6 +4,8 @@
 #include "Gui/Theme/CornerStyle.h"
 #include "Gui/Theme/DesignTokens.h"
 
+#include <QEnterEvent>
+#include <QEvent>
 #include <QPainter>
 #include <QPainterPath>
 #include <QStyle>
@@ -105,11 +107,13 @@ namespace GyanisScribe::Gui
             int    borderWidth = 0;
             if (kind == ThemeKind::HighContrast)
             {
-                // 这一档不装焦点环覆盖层：焦点、勾选与悬停都靠 2px 主色边表达，静息是 2px borderStrong
-                border      = (hasFocus() || isChecked() || underMouse()) ? palette.accent : palette.borderStrong;
+                // 这一档不装焦点环覆盖层：可用时焦点、勾选与悬停靠 2px 主色边表达；
+                // 静息与禁用是 2px borderStrong，禁用的黑边与旧样式表一致
+                border      = (isEnabled() && (hasFocus() || isChecked() || underMouse())) ? palette.accent : palette.borderStrong;
                 borderWidth = 2;
-            } else if (underMouse() && !isChecked())
+            } else if (isEnabled() && underMouse() && !isChecked())
             {
+                // 悬停边只在可用时出现：控件在悬停中途被禁用后，旧样式表的 :disabled 也会压掉悬停边
                 border      = palette.borderStrong;
                 borderWidth = themeBorderWidth(kind);
             }
@@ -149,5 +153,17 @@ namespace GyanisScribe::Gui
         const auto checkColor = isEnabled() ? activePalette().onAccent : activePalette().secondaryText;
         painter.setPen(QPen{checkColor, 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin});
         painter.drawPath(path);
+    }
+
+    void CheckBox::enterEvent(QEnterEvent *event)
+    {
+        QCheckBox::enterEvent(event);
+        update();
+    }
+
+    void CheckBox::leaveEvent(QEvent *event)
+    {
+        QCheckBox::leaveEvent(event);
+        update();
     }
 } // namespace GyanisScribe::Gui

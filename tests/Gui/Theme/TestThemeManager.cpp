@@ -915,6 +915,32 @@ TEST_F(ThemeManagerFixture, FocusRingUsesThePerControlContinuousCornerShape)
 }
 
 /**
+ * @brief 钉住勾选框指示器走连续曲率自绘
+ * @details 指示器的底与描边由 Gui::CheckBox 在 paintEvent 里自绘，形状取 Indicator 档，
+ *          样式表只留尺寸占位。角部差异只有一两个像素，像素用例分辨不出普通圆角与连续曲率，
+ *          这一条按源码级接线守住绘制入口与形状来源。
+ */
+TEST_F(ThemeManagerFixture, CheckBoxPaintsTheIndicatorWithTheContinuousCornerPath)
+{
+    const auto source = readSourceFile("src/Gui/Controls/CheckBox.cpp");
+    ASSERT_FALSE(source.empty()) << "读不到勾选框源文件";
+    EXPECT_EQ(source.find("drawRoundedRect"), std::string::npos) << "勾选框还在用普通圆角";
+
+    const auto paintStart = source.find("void CheckBox::paintEvent");
+    ASSERT_NE(paintStart, std::string::npos) << "勾选框源文件里找不到 paintEvent";
+    const auto paintEnd = enclosingFunctionEnd(source, paintStart);
+    ASSERT_NE(paintEnd, std::string::npos) << "paintEvent 的括号没有配对";
+
+    const auto paintCall = source.find("paintContinuousCorner", paintStart);
+    ASSERT_NE(paintCall, std::string::npos) << "指示器没有走连续曲率绘制";
+    EXPECT_LT(paintCall, paintEnd) << "连续曲率绘制不在 paintEvent 体内";
+
+    const auto role = source.find("CornerRole::Indicator", paintStart);
+    ASSERT_NE(role, std::string::npos) << "指示器没按 Indicator 档取形状";
+    EXPECT_LT(role, paintEnd) << "Indicator 档不在 paintEvent 体内";
+}
+
+/**
  * @brief 钉住换主题时 ThemeManager 会重放已存在控件的文字角色
  * @details 只测 applyTextRole 本身漏掉的是 allWidgets 这条接线：控件在浅色档建好、换到深色档后
  *          若不再重算，暗色纯 ASCII 读数会停在默认字族与 600，可变字族的降重永远不生效。

@@ -7,6 +7,8 @@
 
 #include <QApplication>
 #include <QCheckBox>
+#include <QEnterEvent>
+#include <QEvent>
 #include <QImage>
 #include <QPainter>
 #include <QSet>
@@ -154,10 +156,12 @@ TEST_F(CheckBoxFixture, AnimatesTheCheckFromTheCompressedStart)
 }
 
 /**
- * @brief 钉住指示器按状态自绘填充
+ * @brief 钉住指示器按状态自绘填充与描边
  * @details 方框填色不再来自样式表：静息取 controlFill，悬停取 hover，勾选取 accent，
  *          禁用取 mutedFill。宿主铺红底，指示器中心必须是该状态对应的底；
  *          悬停用 WA_UnderMouse 构造，与样式表判悬停读的是同一个属性。
+ *          左缘中点另核对边色：浅深档的悬停边是 1px borderStrong，高对比度档的静息、
+ *          悬停与禁用边都是 2px（静息与禁用取 borderStrong，悬停取主色）。
  */
 TEST_F(CheckBoxFixture, IndicatorFillFollowsTheState)
 {
@@ -175,19 +179,37 @@ TEST_F(CheckBoxFixture, IndicatorFillFollowsTheState)
         box.setGeometry(24, 24, 180, 24);
         host.show();
         QCoreApplication::processEvents();
+        // show 之后第一个可聚焦控件（勾选框）会自动拿到焦点：先清掉，量的才是静息边
+        box.clearFocus();
+        box.update();
+        QCoreApplication::processEvents();
 
         const QRect indicator = indicatorOnHost(box, host);
         ASSERT_FALSE(indicator.isEmpty()) << "取不到指示器矩形，判据没有落点";
         const auto centerOf = [&indicator](const QImage &image) { return image.pixelColor(indicator.center()); };
+        // 左缘中点：描边按半个笔宽内缩，这一列像素被笔盖满，取到的就是纯边色
+        const auto leftEdgeOf = [&indicator](const QImage &image) { return image.pixelColor(indicator.left(), indicator.center().y()); };
+        // 高对比度档的边是 2px：第二列也必须还是边色，1px 边会在这一列露出填色
+        const auto secondEdgeOf = [&indicator](const QImage &image) { return image.pixelColor(indicator.left() + 1, indicator.center().y()); };
 
         auto shot = host.grab().toImage();
         EXPECT_EQ(centerOf(shot), paletteFor(kind).controlFill) << static_cast<int>(kind) << " 静息指示器底不是 controlFill";
+        if (kind == ThemeKind::HighContrast)
+        {
+            EXPECT_EQ(leftEdgeOf(shot), paletteFor(kind).borderStrong) << "高对比度静息指示器的左缘不是 borderStrong";
+            EXPECT_EQ(secondEdgeOf(shot), paletteFor(kind).borderStrong) << "高对比度静息指示器的边只有 1px";
+        }
 
         box.setAttribute(Qt::WA_UnderMouse, true);
         box.update();
         QCoreApplication::processEvents();
         shot = host.grab().toImage();
         EXPECT_EQ(centerOf(shot), paletteFor(kind).hover) << static_cast<int>(kind) << " 悬停指示器底不是 hover";
+        EXPECT_EQ(leftEdgeOf(shot), kind == ThemeKind::HighContrast ? paletteFor(kind).accent : paletteFor(kind).borderStrong) << static_cast<int>(kind) << " 悬停指示器的边色不对";
+        if (kind == ThemeKind::HighContrast)
+        {
+            EXPECT_EQ(secondEdgeOf(shot), paletteFor(kind).accent) << "高对比度悬停指示器的边只有 1px";
+        }
         box.setAttribute(Qt::WA_UnderMouse, false);
 
         box.setChecked(true);
@@ -201,9 +223,63 @@ TEST_F(CheckBoxFixture, IndicatorFillFollowsTheState)
         QCoreApplication::processEvents();
         shot = host.grab().toImage();
         EXPECT_EQ(centerOf(shot), paletteFor(kind).mutedFill) << static_cast<int>(kind) << " 禁用指示器底不是 mutedFill";
+        if (kind == ThemeKind::HighContrast)
+        {
+            EXPECT_EQ(leftEdgeOf(shot), paletteFor(kind).borderStrong) << "禁用且勾选的高对比度指示器不该再用主色边";
+            EXPECT_EQ(secondEdgeOf(shot), paletteFor(kind).borderStrong) << "禁用且勾选的高对比度指示器的边只有 1px";
+        }
 
         host.hide();
     }
+}
+
+/**
+ * @brief 钉住悬停态靠进入与离开事件自己请求重绘
+ * @details 样式表撤掉 QCheckBox::indicator 的 :hover 规则后，悬停底与描边只由自绘代码按
+ *          underMouse() 决定，而 Qt 的进入与离开事件不会顺带重绘控件。这里各发一次 Enter
+ *          与 Leave，只转事件循环、不手动 update()：两回合都必须出现绘制事件，
+ *          否则悬停色要等下一次别的重绘才出现，或因缺少刷新留在屏上。
+ */
+TEST_F(CheckBoxFixture, EnterAndLeaveScheduleTheirOwnRepaints)
+{
+    qApp->setStyleSheet(ThemeManager::styleSheetFor(ThemeKind::Light));
+    setTextThemeKind(ThemeKind::Light);
+
+    QWidget host;
+    host.resize(240, 80);
+    CheckBox box{&host};
+    box.setText(QStringLiteral("勾选项"));
+    box.setGeometry(24, 24, 180, 24);
+    host.show();
+    QCoreApplication::processEvents();
+
+    struct PaintCounter final : QObject
+    {
+        int paints = 0;
+
+        bool eventFilter(QObject *, QEvent *event) override
+        {
+            if (event->type() == QEvent::Paint)
+            {
+                ++paints;
+            }
+            return false;
+        }
+    } counter;
+    box.installEventFilter(&counter);
+    QCoreApplication::processEvents();
+    counter.paints = 0;
+
+    QEnterEvent enter{QPointF{1.0, 1.0}, box.mapToGlobal(QPoint{1, 1}), QPointF{1.0, 1.0}};
+    QApplication::sendEvent(&box, &enter);
+    QCoreApplication::processEvents();
+    EXPECT_GT(counter.paints, 0) << "进入只改了悬停态没请求重绘：悬停底与描边要等下一次别的重绘才出现";
+
+    counter.paints = 0;
+    QEvent leave{QEvent::Leave};
+    QApplication::sendEvent(&box, &leave);
+    QCoreApplication::processEvents();
+    EXPECT_GT(counter.paints, 0) << "离开没请求重绘：悬停底与描边会留在屏上";
 }
 
 /**

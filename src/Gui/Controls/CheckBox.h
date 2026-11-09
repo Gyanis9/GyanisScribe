@@ -13,13 +13,16 @@
 
 #include <QCheckBox>
 
+class QEnterEvent;
+
 namespace GyanisScribe::Gui
 {
     /**
      * @brief 弹性对勾复选框
      * @details 指示器的填充、描边与连续曲率圆角都由本类自绘：静息取 controlFill，悬停取 hover，
      *          勾选取 accent，禁用取 mutedFill；高对比度档另给 2px 边，焦点、勾选与悬停用主色，
-     *          静息用 borderStrong。样式表的 ::indicator 只保留尺寸与透明边框占位。
+     *          静息与禁用用 borderStrong。样式表的 ::indicator 只保留尺寸与透明边框占位。
+     *          样式表已没有 :hover 规则，悬停态由进入与离开事件主动请求重绘。
      *          勾选时勾按 kPopSpring 从 0.55 弹到 1.0，并按 onAccent 自绘；取消勾选不播动画，直接恢复满幅。
      */
     class CheckBox final : public QCheckBox
@@ -75,6 +78,21 @@ namespace GyanisScribe::Gui
          * @param event 重绘事件
          */
         void paintEvent(QPaintEvent *event) override;
+
+        /**
+         * @brief 鼠标进入时重画悬停档的指示器
+         * @details 重写 QWidget::enterEvent()：样式表撤掉 :hover 规则后，悬停态不再自动触发重绘，
+         *          这里手动刷新一次，paintEvent 里的 underMouse() 才会落到 hover 底与悬停边
+         * @param event 进入事件
+         */
+        void enterEvent(QEnterEvent *event) override;
+
+        /**
+         * @brief 鼠标离开时退回静息档的指示器
+         * @details 重写 QWidget::leaveEvent()：与进入时的刷新配对，悬停底与描边不会留到鼠标移开之后
+         * @param event 离开事件
+         */
+        void leaveEvent(QEvent *event) override;
 
     private:
         /**
