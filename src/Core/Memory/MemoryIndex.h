@@ -15,6 +15,7 @@
 #include <QString>
 
 #include <filesystem>
+#include <optional>
 #include <vector>
 
 namespace GyanisScribe::Core
@@ -40,6 +41,13 @@ namespace GyanisScribe::Core
 
         MemoryIndex(const MemoryIndex &)            = delete;
         MemoryIndex &operator=(const MemoryIndex &) = delete;
+
+        /**
+         * @brief 关闭并移除数据库连接，之后可再次 open()
+         * @details 文件改名之前必须先关闭：Windows 上占用中的数据库与 -wal、-shm 不能改名。
+         *          关闭后对象仍然有效，open() 会重新建立连接并迁移 schema。
+         */
+        void close();
 
         /**
          * @brief 默认数据库位置
@@ -90,12 +98,30 @@ namespace GyanisScribe::Core
         [[nodiscard]] Base::Expected<void> updateOcr(qint64 id, QString text, QString dhash, QString status, QString error, bool truncated);
 
         /**
+         * @brief 只写失败状态与失败原因，不动既有识别结果
+         * @param id 条目主键
+         * @param error 失败原因，按 UTF-8 字节截到 2 KiB
+         * @return 成功返回空载荷；失败返回中文 Error
+         * @details 供曾经识别成功、重新识别又失败的行使用：ocr_text、search_text、truncated 与 dhash 原样保留，
+         *          旧文本在下次成功识别覆盖之前仍然可搜。条目已被删除时按幂等成功处理。
+         */
+        [[nodiscard]] Base::Expected<void> markOcrFailed(qint64 id, QString error);
+
+        /**
          * @brief 把条目重置为待识别
          * @param id 条目主键
          * @return 成功返回空载荷；失败返回中文 Error
          * @note 旧识别文本保留到新结果覆盖，期间搜索仍能命中它
          */
         [[nodiscard]] Base::Expected<void> resetOcr(qint64 id);
+
+        /**
+         * @brief 按主键读一条索引
+         * @param id 条目主键
+         * @return 命中返回该条结果；未命中返回空的 optional；SQL 失败返回中文 Error
+         * @details 只查一行，不受搜索结果单页条数上限影响。
+         */
+        [[nodiscard]] Base::Expected<std::optional<MemoryResult>> findById(qint64 id) const;
 
         /**
          * @brief 按关键词、应用与时间检索

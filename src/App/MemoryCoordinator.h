@@ -11,6 +11,7 @@
 
 #include "Base/Types.h"
 #include "Core/Capture/SourceInfo.h"
+#include "Core/Memory/MemoryIndex.h"
 #include "Core/Memory/MemoryTypes.h"
 #include "Gui/Controls/Toast.h"
 
@@ -30,7 +31,6 @@ namespace GyanisScribe::Core
 {
     class IOcrEngine;
     class ISettingsStore;
-    class MemoryIndex;
     class RecognitionRunner;
     struct OcrResult;
 } // namespace GyanisScribe::Core
@@ -87,7 +87,7 @@ namespace GyanisScribe::App
 
         /**
          * @brief 本对象使用的索引
-         * @return 数据库索引；重建索引后指向新库
+         * @return 数据库索引；重建索引后仍是同一个对象，引用一直有效
          */
         [[nodiscard]] Core::MemoryIndex &index();
 
@@ -148,7 +148,8 @@ namespace GyanisScribe::App
 
         /**
          * @brief 重建索引：把旧库改名留档后新建空库
-         * @details 旧库及其 -wal、-shm 改名为 memory-index.corrupt-<时间戳>.sqlite 及其侧车，
+         * @details 索引对象本身不替换，只在原地关闭再打开，重建前后拿到的引用始终有效。
+         *          旧库及其 -wal、-shm 改名为 memory-index.corrupt-<时间戳>.sqlite 及其侧车，
          *          不静默删除；改名或新建失败时发 databaseError，旧文件保持可找回。
          */
         void rebuildIndex();
@@ -224,8 +225,11 @@ namespace GyanisScribe::App
         /// 识别失败：写回失败状态与原因
         void handleOcrFailed(const Base::Error &error);
 
-        /// 写回一次识别结果
+        /// 写回一次成功的识别结果
         void writeOcr(qint64 id, QString text, QString dhash, QString status, QString error, bool truncated);
+
+        /// 只写失败状态与原因，保留上一次成功的文本与指纹
+        void writeOcrFailure(qint64 id, QString error);
 
         /// 收尾一条任务：清运行位、发变更与统计、继续下一条
         void finishTask();
@@ -256,7 +260,7 @@ namespace GyanisScribe::App
 
         GyanisScribe::Core::ISettingsStore                    &m_settings;                        ///< 配置来源，不拥有
         std::filesystem::path                                  m_databasePath;                    ///< 数据库文件位置
-        std::unique_ptr<GyanisScribe::Core::MemoryIndex>       m_index;                           ///< 索引本体；重建时整体替换
+        GyanisScribe::Core::MemoryIndex                        m_index;                           ///< 索引本体；重建时原地关闭再打开，地址不变
         std::unique_ptr<GyanisScribe::Core::IOcrEngine>        m_engine;                          ///< 识别后端；排在搬运工之后析构
         std::unique_ptr<GyanisScribe::Core::RecognitionRunner> m_runner;                          ///< 线程搬运工，拿着后端的引用
         QFutureWatcher<PreparedImage>                          m_prepareWatcher;                  ///< 读图与指纹结果的回接点

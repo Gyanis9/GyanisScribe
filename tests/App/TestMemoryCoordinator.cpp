@@ -490,6 +490,45 @@ TEST_F(MemoryCoordinator, OcrFailureKeepsRowAndRetryRecovers)
 }
 
 /**
+ * @brief 重新识别失败保留上一次的文本与指纹，旧文本仍可被搜到
+ */
+TEST_F(MemoryCoordinator, FailedRetryKeepsPreviousTextSearchable)
+{
+    SettingsStore settings{settingsPath()};
+    ASSERT_TRUE(settings.setValue(kMemoryEnabled, true).has_value());
+
+    auto        engine = std::make_unique<FakeOcrEngine>(std::deque<Expected<OcrResult>>{makeResult(QStringLiteral("旧文本 报价单")), failedResult()});
+    auto       *fake   = engine.get();
+    Coordinator coordinator{settings, databasePath(), std::move(engine)};
+
+    coordinator.start();
+    const auto shot = makeShot(QStringLiteral("failed-retry-text.png"), Qt::darkYellow);
+    coordinator.noteScreenshot(shot, QSize{32, 24}, CaptureSourceInfo{});
+    ASSERT_TRUE(waitUntil([&] { return hasStatus(coordinator.index(), shot, QStringLiteral("done")); }));
+
+    const auto succeeded = findResult(coordinator.index(), shot);
+    ASSERT_TRUE(succeeded.has_value());
+    ASSERT_EQ(succeeded->ocrSnippet, QStringLiteral("旧文本 报价单"));
+
+    coordinator.retryOcr(succeeded->id);
+
+    ASSERT_TRUE(waitUntil([&] { return hasStatus(coordinator.index(), shot, QStringLiteral("failed")); }));
+    const auto failed = findResult(coordinator.index(), shot);
+    ASSERT_TRUE(failed.has_value());
+    EXPECT_EQ(failed->ocrStatus, QStringLiteral("failed"));
+    EXPECT_EQ(failed->ocrSnippet, QStringLiteral("旧文本 报价单")) << "重新识别失败不该清掉上一次的文本";
+    EXPECT_EQ(failed->dhash, succeeded->dhash) << "重新识别失败不该清掉指纹";
+    EXPECT_EQ(fake->calls(), 2);
+
+    MemoryQuery query;
+    query.text      = QStringLiteral("报价");
+    const auto hits = coordinator.index().search(query);
+    ASSERT_TRUE(hits.has_value());
+    ASSERT_EQ(hits->size(), 1U) << "旧文本应当仍留在全文索引里";
+    EXPECT_EQ(hits->front().id, succeeded->id);
+}
+
+/**
  * @brief 启动时把库中的待识别行重新入队并写回文本
  */
 TEST_F(MemoryCoordinator, PendingRowsAreRecoveredOnStart)
@@ -624,6 +663,93 @@ TEST_F(MemoryCoordinator, RebuildIndexMovesOldDatabaseAndReopens)
     EXPECT_TRUE(foundCorrupt) << "旧库应改名为 memory-index.corrupt-<时间戳>.sqlite 留档";
     EXPECT_GT(changed.count(), 0);
     EXPECT_GT(stats.count(), 0);
+}
+
+/**
+ * @brief 重建索引复用同一个索引对象，重建前拿到的引用仍能写入与搜索
+ */
+TEST_F(MemoryCoordinator, RebuildKeepsSameIndexObject)
+{
+    SettingsStore settings{settingsPath()};
+    ASSERT_TRUE(settings.setValue(kMemoryEnabled, true).has_value());
+
+    auto        engine = std::make_unique<FakeOcrEngine>(std::deque<Expected<OcrResult>>{});
+    Coordinator coordinator{settings, databasePath(), std::move(engine)};
+    coordinator.start();
+    ASSERT_TRUE(coordinator.index().isOpen());
+
+    const MemoryIndex *before = &coordinator.index();
+    coordinator.rebuildIndex();
+
+    ASSERT_TRUE(coordinator.index().isOpen());
+    ASSERT_EQ(before, &coordinator.index()) << "重建索引应复用同一个索引对象，不能让旧引用悬空";
+
+    const auto   shot = makeShot(QStringLiteral("after-rebuild.png"), Qt::darkCyan);
+    MemoryUpsert entry;
+    entry.filePath   = shot;
+    entry.source     = MemorySource::Capture;
+    entry.capturedAt = QDateTime::currentDateTime();
+    entry.size       = QSize{32, 24};
+    ASSERT_TRUE(coordinator.index().upsertPending(entry).has_value());
+
+    const auto results = before->search(MemoryQuery{});
+    ASSERT_TRUE(results.has_value());
+    ASSERT_EQ(results->size(), 1U) << "重建后的新库应能通过重建前的引用查到新行";
+    EXPECT_EQ(results->front().filePath, shot);
+}
+
+/**
+ * @brief 主键不在最近一页搜索结果里时，重试仍能按主键找到旧行
+ */
+TEST_F(MemoryCoordinator, RetryFindsRowOutsideRecentSearch)
+{
+    SettingsStore settings{settingsPath()};
+    ASSERT_TRUE(settings.setValue(kMemoryEnabled, true).has_value());
+    ASSERT_TRUE(settings.setValue(kMemoryConsentAsked, true).has_value());
+
+    auto        engine = std::make_unique<FakeOcrEngine>(std::deque<Expected<OcrResult>>{makeResult(QStringLiteral("很久以前"))});
+    auto       *fake   = engine.get();
+    Coordinator coordinator{settings, databasePath(), std::move(engine)};
+    ASSERT_TRUE(coordinator.index().open().has_value());
+
+    // 最旧一行先入库并标记失败，随后 249 行完成；按时间倒序它不在最近 200 条里
+    const auto moment     = QDateTime::currentDateTime();
+    const auto oldestShot = makeShot(QStringLiteral("oldest.png"), Qt::darkMagenta);
+    qint64     oldestId   = 0;
+    for (int index = 0; index < 250; ++index)
+    {
+        MemoryUpsert entry;
+        entry.filePath   = index == 0 ? oldestShot : root() / std::filesystem::path{QStringLiteral("synthetic-%1.png").arg(index).toStdWString()};
+        entry.source     = MemorySource::Capture;
+        entry.capturedAt = moment.addSecs(index);
+        entry.size       = QSize{32, 24};
+
+        const auto id = coordinator.index().upsertPending(entry);
+        ASSERT_TRUE(id.has_value());
+        if (index == 0)
+        {
+            oldestId = *id;
+        } else
+        {
+            ASSERT_TRUE(coordinator.index().updateOcr(*id, QStringLiteral("第 %1 条").arg(index), QString{}, QStringLiteral("done"), QString{}, false).has_value());
+        }
+    }
+    ASSERT_TRUE(coordinator.index().updateOcr(oldestId, QStringLiteral("旧文本"), QString{}, QStringLiteral("failed"), QStringLiteral("旧失败"), false).has_value());
+
+    coordinator.retryOcr(oldestId);
+
+    ASSERT_TRUE(waitUntil(
+            [&]
+            {
+                const auto row = coordinator.index().findById(oldestId);
+                return row.has_value() && row->has_value() && (*row)->ocrStatus == QStringLiteral("done");
+            }))
+            << "超过 200 行的旧主键应当仍能按主键重新入队";
+    const auto retried = coordinator.index().findById(oldestId);
+    ASSERT_TRUE(retried.has_value());
+    ASSERT_TRUE(retried->has_value());
+    EXPECT_EQ((*retried)->ocrSnippet, QStringLiteral("很久以前"));
+    EXPECT_EQ(fake->calls(), 1);
 }
 
 /**

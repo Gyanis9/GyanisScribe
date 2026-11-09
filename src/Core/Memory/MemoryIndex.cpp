@@ -315,7 +315,13 @@ namespace GyanisScribe::Core
 
     MemoryIndex::~MemoryIndex()
     {
+        close();
+    }
+
+    void MemoryIndex::close()
+    {
         closeConnection(m_connectionName);
+        m_open = false;
     }
 
     std::filesystem::path MemoryIndex::defaultStoragePath()
@@ -335,6 +341,9 @@ namespace GyanisScribe::Core
         {
             return {};
         }
+
+        // 上一次打开失败可能留下同名连接的残留，重新建立前先清理，避免 Qt 报重复连接名
+        closeConnection(m_connectionName);
 
         // 数据目录可能还没建：先把父目录建出来，失败时给出可操作的路径与原因
         const std::filesystem::path parent = m_databasePath.parent_path();
@@ -379,7 +388,7 @@ namespace GyanisScribe::Core
 
         if (failure)
         {
-            closeConnection(m_connectionName);
+            close();
             return std::unexpected(*failure);
         }
 
@@ -511,6 +520,30 @@ namespace GyanisScribe::Core
         return {};
     }
 
+    Base::Expected<void> MemoryIndex::markOcrFailed(const qint64 id, QString error)
+    {
+        if (!m_open)
+        {
+            return std::unexpected(notOpenError());
+        }
+
+        bool          errorTruncated = false;
+        const QString storedError    = truncateUtf8(error, kMaximumOcrErrorBytes, errorTruncated);
+
+        QSqlQuery statement{databaseFor(m_connectionName)};
+        if (!statement.prepare(QStringLiteral("UPDATE items SET ocr_status = 'failed', ocr_error = ? WHERE id = ?")))
+        {
+            return std::unexpected(queryError(QStringLiteral("准备写入识别失败状态失败"), statement.lastError()));
+        }
+        statement.addBindValue(nonNull(storedError));
+        statement.addBindValue(id);
+        if (!statement.exec())
+        {
+            return std::unexpected(queryError(QStringLiteral("写入识别失败状态失败"), statement.lastError()));
+        }
+        return {};
+    }
+
     Base::Expected<void> MemoryIndex::resetOcr(const qint64 id)
     {
         if (!m_open)
@@ -526,6 +559,30 @@ namespace GyanisScribe::Core
             return std::unexpected(queryError(QStringLiteral("重置识别状态失败"), statement.lastError()));
         }
         return {};
+    }
+
+    Base::Expected<std::optional<MemoryResult>> MemoryIndex::findById(const qint64 id) const
+    {
+        if (!m_open)
+        {
+            return std::unexpected(notOpenError());
+        }
+
+        QSqlQuery statement{databaseFor(m_connectionName)};
+        if (!statement.prepare(QStringLiteral("SELECT %1 FROM items WHERE items.id = ?").arg(resultColumns())))
+        {
+            return std::unexpected(queryError(QStringLiteral("准备按主键读取条目失败"), statement.lastError()));
+        }
+        statement.addBindValue(id);
+        if (!statement.exec())
+        {
+            return std::unexpected(queryError(QStringLiteral("按主键读取条目失败"), statement.lastError()));
+        }
+        if (!statement.next())
+        {
+            return std::optional<MemoryResult>{};
+        }
+        return std::optional<MemoryResult>{readResult(statement)};
     }
 
     Base::Expected<std::vector<MemoryResult>> MemoryIndex::search(const MemoryQuery &query) const

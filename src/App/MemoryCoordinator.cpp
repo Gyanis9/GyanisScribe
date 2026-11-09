@@ -119,7 +119,7 @@ namespace GyanisScribe::App
 
     MemoryCoordinator::MemoryCoordinator(GyanisScribe::Core::ISettingsStore &settings, GyanisScribe::Platform::IPlatformIntegration &integration,
                                          std::filesystem::path databasePath, QObject *parent) :
-        QObject(parent), m_settings(settings), m_databasePath(std::move(databasePath)), m_index(std::make_unique<GyanisScribe::Core::MemoryIndex>(m_databasePath))
+        QObject(parent), m_settings(settings), m_databasePath(std::move(databasePath)), m_index(m_databasePath)
     {
         m_engine = GyanisScribe::Plugins::createOcrEngine(m_settings, integration);
         initialize();
@@ -127,8 +127,7 @@ namespace GyanisScribe::App
 
     MemoryCoordinator::MemoryCoordinator(GyanisScribe::Core::ISettingsStore &settings, std::filesystem::path databasePath, std::unique_ptr<GyanisScribe::Core::IOcrEngine> engine,
                                          QObject *parent) :
-        QObject(parent), m_settings(settings), m_databasePath(std::move(databasePath)), m_index(std::make_unique<GyanisScribe::Core::MemoryIndex>(m_databasePath)),
-        m_engine(std::move(engine))
+        QObject(parent), m_settings(settings), m_databasePath(std::move(databasePath)), m_index(m_databasePath), m_engine(std::move(engine))
     {
         initialize();
     }
@@ -184,7 +183,7 @@ namespace GyanisScribe::App
 
     GyanisScribe::Core::MemoryIndex &MemoryCoordinator::index()
     {
-        return *m_index;
+        return m_index;
     }
 
     bool MemoryCoordinator::isEnabled() const
@@ -299,7 +298,7 @@ namespace GyanisScribe::App
             return;
         }
 
-        if (!m_index->isOpen())
+        if (!m_index.isOpen())
         {
             if (!m_databaseFailureReported && !m_indexNoticeShown)
             {
@@ -347,7 +346,7 @@ namespace GyanisScribe::App
             return;
         }
 
-        const auto reset = m_index->resetOcr(id);
+        const auto reset = m_index.resetOcr(id);
         if (!reset)
         {
             emit messageForUser(QString::fromStdString(reset.error().message), Gui::ToastKind::Danger);
@@ -380,7 +379,7 @@ namespace GyanisScribe::App
             return;
         }
 
-        const auto pending = m_index->pendingItems(Core::kMaxMemoryEntries);
+        const auto pending = m_index.pendingItems(Core::kMaxMemoryEntries);
         if (!pending)
         {
             emit messageForUser(QString::fromStdString(pending.error().message), Gui::ToastKind::Danger);
@@ -425,7 +424,7 @@ namespace GyanisScribe::App
             return;
         }
 
-        const auto removed = m_index->removeByPath(filePath);
+        const auto removed = m_index.removeByPath(filePath);
         if (!removed)
         {
             emit messageForUser(QString::fromStdString(removed.error().message), Gui::ToastKind::Danger);
@@ -460,7 +459,7 @@ namespace GyanisScribe::App
             return;
         }
 
-        const auto removed = m_index->removeCaptureEntries();
+        const auto removed = m_index.removeCaptureEntries();
         if (!removed)
         {
             emit messageForUser(QString::fromStdString(removed.error().message), Gui::ToastKind::Danger);
@@ -495,7 +494,7 @@ namespace GyanisScribe::App
             return;
         }
 
-        const auto cleared = m_index->clear();
+        const auto cleared = m_index.clear();
         if (!cleared)
         {
             emit messageForUser(QString::fromStdString(cleared.error().message), Gui::ToastKind::Danger);
@@ -515,7 +514,7 @@ namespace GyanisScribe::App
             return;
         }
 
-        const auto removed = m_index->pruneMissing();
+        const auto removed = m_index.pruneMissing();
         if (!removed)
         {
             emit messageForUser(QString::fromStdString(removed.error().message), Gui::ToastKind::Danger);
@@ -534,7 +533,9 @@ namespace GyanisScribe::App
     void MemoryCoordinator::rebuildIndex()
     {
         const std::filesystem::path databasePath = m_databasePath;
-        m_index.reset();
+
+        // 先关连接再改名：占用中的主库无法改名，-wal/-shm 也会随关闭合并或删除
+        m_index.close();
         m_pendingConsent.reset();
         stopQueue();
         m_knownItems.clear();
@@ -547,7 +548,7 @@ namespace GyanisScribe::App
         std::string failure;
         if (!moveFileIfExists(databasePath, corruptPath, failure))
         {
-            m_index = std::make_unique<GyanisScribe::Core::MemoryIndex>(databasePath);
+            // 旧库还在原位，重新打开后用户仍能搜索
             static_cast<void>(ensureIndexOpen());
             const QString message = Base::uiText("记忆库：重建索引时无法移动旧库文件 %1（%2）。旧文件仍可找回，请关闭占用数据库的程序后重试。")
                                             .arg(displayPath(corruptPath), QString::fromStdString(failure));
@@ -561,7 +562,6 @@ namespace GyanisScribe::App
             const std::filesystem::path target = sidecarPath(corruptPath, suffix);
             if (!moveFileIfExists(source, target, failure))
             {
-                m_index               = std::make_unique<GyanisScribe::Core::MemoryIndex>(databasePath);
                 const QString message = Base::uiText("记忆库：重建索引时无法移动旧库文件 %1（%2）。旧文件仍可找回，请关闭占用数据库的程序后重试。")
                                                 .arg(displayPath(target), QString::fromStdString(failure));
                 reportDatabaseFailure(Base::Error{Base::ErrorCode::FileWriteFailed, message.toStdString()});
@@ -569,7 +569,6 @@ namespace GyanisScribe::App
             }
         }
 
-        m_index = std::make_unique<GyanisScribe::Core::MemoryIndex>(databasePath);
         if (!ensureIndexOpen())
         {
             return;
@@ -580,12 +579,12 @@ namespace GyanisScribe::App
 
     bool MemoryCoordinator::ensureIndexOpen()
     {
-        if (m_index->isOpen())
+        if (m_index.isOpen())
         {
             return true;
         }
 
-        const auto opened = m_index->open();
+        const auto opened = m_index.open();
         if (!opened)
         {
             reportDatabaseFailure(opened.error());
@@ -621,7 +620,7 @@ namespace GyanisScribe::App
             return;
         }
 
-        const auto identifier = m_index->upsertPending(entry);
+        const auto identifier = m_index.upsertPending(entry);
         if (!identifier)
         {
             emit messageForUser(QString::fromStdString(identifier.error().message), Gui::ToastKind::Danger);
@@ -655,7 +654,7 @@ namespace GyanisScribe::App
         {
             return;
         }
-        if (!isEnabled() || !m_index->isOpen())
+        if (!isEnabled() || !m_index.isOpen())
         {
             return;
         }
@@ -711,7 +710,7 @@ namespace GyanisScribe::App
         const PreparedImage prepared = m_prepareWatcher.result();
         if (!prepared.readable)
         {
-            writeOcr(item.id, QString{}, QString{}, QStringLiteral("failed"), Base::uiText("记忆库：读取截图失败，原文件可能已被移动或删除；可稍后在记忆库页重新识别。"), false);
+            writeOcrFailure(item.id, Base::uiText("记忆库：读取截图失败，原文件可能已被移动或删除；可稍后在记忆库页重新识别。"));
             finishTask();
             return;
         }
@@ -757,19 +756,33 @@ namespace GyanisScribe::App
         }
 
         const QueueItem item = *m_running;
-        writeOcr(item.id, QString{}, m_runningDhash, QStringLiteral("failed"), QString::fromStdString(error.message), false);
+        writeOcrFailure(item.id, QString::fromStdString(error.message));
         refreshOcrAvailability();
         finishTask();
     }
 
     void MemoryCoordinator::writeOcr(const qint64 id, QString text, QString dhash, QString status, QString error, const bool truncated)
     {
-        if (!m_index->isOpen())
+        if (!m_index.isOpen())
         {
             return;
         }
 
-        const auto updated = m_index->updateOcr(id, std::move(text), std::move(dhash), std::move(status), std::move(error), truncated);
+        const auto updated = m_index.updateOcr(id, std::move(text), std::move(dhash), std::move(status), std::move(error), truncated);
+        if (!updated)
+        {
+            emit messageForUser(QString::fromStdString(updated.error().message), Gui::ToastKind::Danger);
+        }
+    }
+
+    void MemoryCoordinator::writeOcrFailure(const qint64 id, QString error)
+    {
+        if (!m_index.isOpen())
+        {
+            return;
+        }
+
+        const auto updated = m_index.markOcrFailed(id, std::move(error));
         if (!updated)
         {
             emit messageForUser(QString::fromStdString(updated.error().message), Gui::ToastKind::Danger);
@@ -839,22 +852,17 @@ namespace GyanisScribe::App
             }
         }
 
-        // 界面传来的主键可能来自更早的搜索结果：回查最近一页，查不到再报给用户
-        const auto results = m_index->search(Core::MemoryQuery{});
-        if (results)
+        // 界面传来的主键可能来自更早的搜索结果：按主键回查，不受单页搜索条数限制
+        const auto found = m_index.findById(id);
+        if (found && found->has_value())
         {
-            for (const Core::MemoryResult &result: *results)
-            {
-                if (result.id == id)
-                {
-                    QueueItem item;
-                    item.id       = result.id;
-                    item.filePath = result.filePath;
-                    item.size     = result.size;
-                    item.source   = result.source;
-                    return item;
-                }
-            }
+            const Core::MemoryResult &result = **found;
+            QueueItem                 item;
+            item.id       = result.id;
+            item.filePath = result.filePath;
+            item.size     = result.size;
+            item.source   = result.source;
+            return item;
         }
         return std::nullopt;
     }
@@ -882,13 +890,13 @@ namespace GyanisScribe::App
 
     void MemoryCoordinator::emitStats()
     {
-        if (!m_index->isOpen())
+        if (!m_index.isOpen())
         {
             return;
         }
 
         const int  excluded = static_cast<int>(m_settings.stringListValue(GyanisScribe::Core::kMemoryExcludeProcesses, QStringList{}).size());
-        const auto stats    = m_index->stats(excluded);
+        const auto stats    = m_index.stats(excluded);
         if (stats)
         {
             emit statsChanged(*stats);

@@ -23,6 +23,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace Core = GyanisScribe::Core;
@@ -478,6 +479,87 @@ TEST_F(MemoryIndex, RejectsNewerSchemaVersion)
     EXPECT_EQ(opened.error().code, ErrorCode::PlatformUnsupported);
     EXPECT_FALSE(opened.error().message.empty());
     EXPECT_FALSE(newerIndex.isOpen());
+}
+
+// 钉住关闭后可原地重开：close 断开连接，open 复用同一对象恢复读写
+TEST_F(MemoryIndex, CloseAllowsReopenInPlace)
+{
+    const auto id = m_index->upsertPending(entryFor(tempFile("reopen.png"), Core::MemorySource::Capture, QDateTime::fromSecsSinceEpoch(1767225600), QSize(10, 10)));
+    ASSERT_TRUE(id.has_value());
+
+    m_index->close();
+    EXPECT_FALSE(m_index->isOpen());
+    EXPECT_FALSE(m_index->search(Core::MemoryQuery{}).has_value()) << "关闭之后查询应报告数据库未打开";
+
+    ASSERT_TRUE(m_index->open().has_value());
+    EXPECT_TRUE(m_index->isOpen());
+    const auto results = m_index->search(Core::MemoryQuery{});
+    ASSERT_TRUE(results.has_value());
+    ASSERT_EQ(results->size(), 1U);
+    EXPECT_EQ(results->front().id, *id);
+}
+
+// 钉住失败写回只改状态与原因：旧文本、可检索文本与指纹都保留
+TEST_F(MemoryIndex, MarkOcrFailedKeepsPreviousText)
+{
+    const auto path = tempFile("failed-retry.png");
+    const auto id   = m_index->upsertPending(entryFor(path, Core::MemorySource::Capture, QDateTime::fromSecsSinceEpoch(1767225600), QSize(20, 10)));
+    ASSERT_TRUE(id.has_value());
+    ASSERT_TRUE(m_index->updateOcr(*id, QStringLiteral("本周报价表"), QStringLiteral("0123456789abcdef"), QStringLiteral("done"), QString{}, false).has_value());
+
+    ASSERT_TRUE(m_index->markOcrFailed(*id, QStringLiteral("再次识别失败")).has_value());
+
+    const auto results = m_index->search(Core::MemoryQuery{});
+    ASSERT_TRUE(results.has_value());
+    ASSERT_EQ(results->size(), 1U);
+    EXPECT_EQ(results->front().ocrStatus, QStringLiteral("failed"));
+    EXPECT_EQ(results->front().ocrSnippet, QStringLiteral("本周报价表")) << "失败写回不该清掉旧文本";
+    EXPECT_EQ(results->front().dhash, QStringLiteral("0123456789abcdef")) << "失败写回不该清掉指纹";
+
+    Core::MemoryQuery query;
+    query.text      = QStringLiteral("报价");
+    const auto hits = m_index->search(query);
+    ASSERT_TRUE(hits.has_value());
+    EXPECT_EQ(hits->size(), 1U) << "旧文本应当仍在全文索引里";
+
+    RawDatabase raw{tempFile("index.sqlite")};
+    QSqlQuery   errorQuery{raw.database()};
+    ASSERT_TRUE(errorQuery.prepare(QStringLiteral("SELECT ocr_error FROM items WHERE id = ?")));
+    errorQuery.addBindValue(*id);
+    ASSERT_TRUE(errorQuery.exec());
+    ASSERT_TRUE(errorQuery.next());
+    EXPECT_EQ(errorQuery.value(0).toString(), QStringLiteral("再次识别失败"));
+}
+
+// 钉住按主键回查：不受单页 200 条搜索上限影响，缺失主键返回空而不是错误
+TEST_F(MemoryIndex, FindByIdReturnsRowOrEmpty)
+{
+    const auto moment = QDateTime::fromSecsSinceEpoch(1767225600);
+    qint64     oldest = 0;
+    for (int index = 0; index < 250; ++index)
+    {
+        const auto id = m_index->upsertPending(entryFor(tempFile(QStringLiteral("page-%1.png").arg(index)), Core::MemorySource::Capture, moment.addSecs(index), QSize(10, 10)));
+        ASSERT_TRUE(id.has_value());
+        if (index == 0)
+        {
+            oldest = *id;
+        } else
+        {
+            ASSERT_TRUE(m_index->updateOcr(*id, QStringLiteral("第 %1 条").arg(index), QString{}, QStringLiteral("done"), QString{}, false).has_value());
+        }
+    }
+    ASSERT_TRUE(m_index->updateOcr(oldest, QStringLiteral("最旧一条"), QString{}, QStringLiteral("failed"), QString{}, false).has_value());
+
+    const auto found = m_index->findById(oldest);
+    ASSERT_TRUE(found.has_value());
+    ASSERT_TRUE(found->has_value());
+    EXPECT_EQ((*found)->id, oldest);
+    EXPECT_EQ((*found)->ocrSnippet, QStringLiteral("最旧一条"));
+    EXPECT_EQ((*found)->ocrStatus, QStringLiteral("failed"));
+
+    const auto missing = m_index->findById(999999);
+    ASSERT_TRUE(missing.has_value());
+    EXPECT_FALSE(missing->has_value());
 }
 
 // 钉住超过 256 字符的查询在绑定前被截断，FTS5 收到合法短语而不是超长语法错误
