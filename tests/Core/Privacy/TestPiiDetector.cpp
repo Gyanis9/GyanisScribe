@@ -153,6 +153,67 @@ TEST(PiiDetector, AcceptsCountryCodePhoneWithoutPlus)
 }
 
 /**
+ * @brief 钉住卡号后面紧跟有效期时仍按卡号收：尾随短组不能被硬拼进候选
+ * @details 归一化后 18 位候选过不了 Luhn；必须在分组边界退回 16 位卡号，而不是整段丢掉。
+ */
+TEST(PiiDetector, DetectsBankCardBeforeTrailingExpiry)
+{
+    const OcrResult ocr = makeResult({
+            makeLine({OcrWord{QStringLiteral("4111111111111111 12/25"), QRect(20, 20, 320, 24)}}),
+    });
+
+    const std::vector<PiiItem> items = detectPii(ocr, {}, kFrameSize);
+
+    ASSERT_EQ(items.size(), 1U) << "卡号加有效期整行被漏掉";
+    EXPECT_EQ(items.at(0).kind, PiiKind::BankCard);
+    EXPECT_EQ(items.at(0).maskedSample, QStringLiteral("4111********1111"));
+}
+
+/**
+ * @brief 钉住卡号前面隔着年份等数字组时仍能认出：子段从分组边界上重新起步
+ * @details 整段 20 位超出银行卡长度档；前 16 位过不了 Luhn，后 16 位才是卡号。
+ */
+TEST(PiiDetector, FindsGroupedBankCardAfterLeadingDigits)
+{
+    const OcrResult ocr = makeResult({
+            makeLine({OcrWord{QStringLiteral("2026 4111 1111 1111 1111"), QRect(20, 20, 360, 24)}}),
+    });
+
+    const std::vector<PiiItem> items = detectPii(ocr, {}, kFrameSize);
+
+    ASSERT_EQ(items.size(), 1U) << "年份加卡号整行被漏掉";
+    EXPECT_EQ(items.at(0).kind, PiiKind::BankCard);
+    EXPECT_EQ(items.at(0).maskedSample, QStringLiteral("4111********1111"));
+}
+
+/// 一行两张卡时都要列出来：合法子段互不重叠时不能只留位数最多的那一段
+TEST(PiiDetector, KeepsBothCardsInOneGroupedRun)
+{
+    const OcrResult ocr = makeResult({
+            makeLine({OcrWord{QStringLiteral("4111 1111 1111 1111"), QRect(20, 20, 260, 24)}, OcrWord{QStringLiteral("5500 0000 0000 0004"), QRect(300, 20, 260, 24)}}),
+    });
+
+    const std::vector<PiiItem> items = detectPii(ocr, {}, kFrameSize);
+
+    ASSERT_EQ(items.size(), 2U) << "一行里的两张卡只报了一张";
+    EXPECT_EQ(countKind(items, PiiKind::BankCard), 2);
+    EXPECT_TRUE(items.at(0).physicalBox.contains(QRect(20, 20, 260, 24)));
+    EXPECT_TRUE(items.at(1).physicalBox.contains(QRect(300, 20, 260, 24)));
+}
+
+/// 一整串超长数字不从中间截卡号：20 位连续数字即使内部有合法 Luhn 子串也不按银行卡收
+TEST(PiiDetector, DoesNotCarveBankCardOutOfOverlongContiguousDigits)
+{
+    const OcrResult ocr = makeResult({
+            makeLine({OcrWord{QStringLiteral("41111111111111119999"), QRect(20, 20, 240, 24)}}),
+    });
+
+    const std::vector<PiiItem> items = detectPii(ocr, {}, kFrameSize);
+
+    EXPECT_TRUE(items.empty()) << "超长连续数字被截成了银行卡";
+}
+
+/**
  * @brief 钉住座机区号前导 0 的拒绝面，并保留短横线脱敏形状
  */
 TEST(PiiDetector, DetectsLandlineAndRejectsAreaWithoutLeadingZero)

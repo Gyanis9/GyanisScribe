@@ -9,6 +9,7 @@
 #include <QApplication>
 #include <QComboBox>
 #include <QDialog>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QListWidget>
 #include <QListWidgetItem>
@@ -193,6 +194,9 @@ TEST_F(PrivacyReviewDialogFixture, SelectNoneThenAllTogglesEveryRow)
 TEST_F(PrivacyReviewDialogFixture, ApplyIsDisabledWhenNothingIsChecked)
 {
     PrivacyReviewDialog dialog{makeItems()};
+    // 默认按钮的回车判定要求按钮可见；不 show 时 QDialog 会直接跳过默认按钮
+    dialog.show();
+    QApplication::processEvents();
 
     auto *apply      = dialog.findChild<QPushButton *>(QStringLiteral("privacyApply"));
     auto *selectNone = dialog.findChild<QPushButton *>(QStringLiteral("privacySelectNone"));
@@ -204,10 +208,20 @@ TEST_F(PrivacyReviewDialogFixture, ApplyIsDisabledWhenNothingIsChecked)
 
     selectNone->click();
     EXPECT_FALSE(apply->isEnabled()) << "一项都没勾时应用按钮还亮着，点下去会关掉对话框却不改画布";
-    EXPECT_TRUE(apply->isDefault()) << "灰掉的默认按钮仍会在回车时被触发";
+    EXPECT_TRUE(apply->isDefault()) << "应用按钮丢了默认按钮标记，回车路径与既有约定不一致";
+
+    // 回车就是走默认按钮：灰掉时 QDialog 会跳过它，勾回来之后才恢复接受
+    QSignalSpy accepted{&dialog, &QDialog::accepted};
+    ASSERT_TRUE(accepted.isValid());
+    QKeyEvent emptyReturn{QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier};
+    QApplication::sendEvent(&dialog, &emptyReturn);
+    EXPECT_EQ(accepted.count(), 0) << "一项都没勾时回车仍接受了空批次";
 
     selectAll->click();
     EXPECT_TRUE(apply->isEnabled()) << "重新全选之后应用按钮没恢复";
+    QKeyEvent filledReturn{QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier};
+    QApplication::sendEvent(&dialog, &filledReturn);
+    EXPECT_EQ(accepted.count(), 1) << "勾选之后回车没有走应用";
 }
 
 /**

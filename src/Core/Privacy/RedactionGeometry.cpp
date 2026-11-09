@@ -9,7 +9,7 @@ namespace GyanisScribe::Core::Privacy
 {
     QRect expandBarcodeScanline(const QRect &scanline, const QSize imageSize, const QSize logicalSize)
     {
-        if (imageSize.isEmpty() || scanline.isEmpty())
+        if (imageSize.isEmpty() || logicalSize.isEmpty() || scanline.isEmpty())
         {
             return {};
         }

@@ -21,8 +21,10 @@ namespace GyanisScribe::Core::Privacy
         const QRegularExpression kLandlinePattern{QStringLiteral(R"((?<!\d)0\d{2,3}-?\d{7,8}(?!\d))")};
         // 身份证 18 位，末位允许 X；前后不能贴字母数字，防止从更长串里截取
         const QRegularExpression kIdCardPattern{QStringLiteral(R"((?<![0-9A-Za-z_])\d{17}[\dXx](?![0-9A-Za-z_]))")};
-        // 银行卡允许 13-19 位数字之间夹空格/短横线（卡片与文档常按四位分组）；长度、Luhn 与 86 区号形状的剔除放到匹配之后
-        const QRegularExpression kBankCardPattern{QStringLiteral(R"((?<!\d)\d(?:[\s-]?\d){12,18}(?!\d))")};
+        // 银行卡先切出以空格/短横线相连的整段数字分组；具体取哪 13-19 位由 bankCardRanges 在分组边界上再挑
+        const QRegularExpression kBankCardRunPattern{QStringLiteral(R"((?<!\d)\d+(?:[\s-]+\d+)*)")};
+        // 分组串里的单个数字组；卡号与有效期/CVV 之间恰好也只隔空格或短横线
+        const QRegularExpression kDigitGroupPattern{QStringLiteral(R"(\d+)")};
         // 邮箱要求至少一个域名点与 2 位以上字母 TLD；连续点等残形交给校验函数拒绝
         const QRegularExpression kEmailPattern{
                 QStringLiteral(R"((?<![A-Za-z0-9._%+\-])[A-Za-z0-9._%+\-]+@(?:[A-Za-z0-9](?:[A-Za-z0-9\-]*[A-Za-z0-9])?\.)+[A-Za-z]{2,}(?![A-Za-z0-9\-]))")};
@@ -52,6 +54,16 @@ namespace GyanisScribe::Core::Privacy
             PiiKind kind = PiiKind::Phone; ///< 命中类型
             QRect   box;                   ///< 已夹回图像范围的框
             QString maskedSample;          ///< 脱敏样例
+        };
+
+        /**
+         * @brief 数字分组串里的一段银行卡候选
+         */
+        struct BankCardRange
+        {
+            qsizetype start  = 0; ///< 相对分组串起点的字符偏移
+            qsizetype length = 0; ///< 字符长度，含组间分隔符
+            int       digits = 0; ///< 这一段里的数字位数
         };
 
         /**
@@ -417,6 +429,86 @@ namespace GyanisScribe::Core::Privacy
         }
 
         /**
+         * @brief 在一段以空格/短横线相连的数字分组里挑出银行卡子段
+         * @param value 连续数字分组串，例如 `4111 1111 1111 1111 12`
+         * @return 相对串首的字符区间，按从左到右排列；没有合法子段时为空
+         * @details 只在分组边界上取 13-19 位，卡号后面紧跟的有效期/CVV 或前面的年份
+         *          不会被硬拼进候选后拖垮整段校验；单组连续数字仍整体判定，不从长编号中间截卡号。
+         *          多个互不重叠的合法子段都保留，一行两张卡时不会少报；重叠时先取位数多的。
+         */
+        std::vector<BankCardRange> bankCardRanges(const QString &value)
+        {
+            std::vector<BankCardRange>      groups;
+            QRegularExpressionMatchIterator groupIterator = kDigitGroupPattern.globalMatch(value);
+            while (groupIterator.hasNext())
+            {
+                const QRegularExpressionMatch group = groupIterator.next();
+                groups.push_back(BankCardRange{group.capturedStart(), group.capturedLength(), static_cast<int>(group.capturedLength())});
+            }
+            if (groups.empty())
+            {
+                return {};
+            }
+
+            // 一整串连续数字只按原样判：20 位以上的长编号即使后 16 位碰巧过了 Luhn，也不从中间切一段出来
+            if (groups.size() == 1)
+            {
+                if (groups.front().digits >= 13 && groups.front().digits <= 19 && isValidBankCard(value))
+                {
+                    return {BankCardRange{0, value.size(), groups.front().digits}};
+                }
+                return {};
+            }
+
+            std::vector<BankCardRange> validRanges;
+            for (std::size_t first = 0; first < groups.size(); ++first)
+            {
+                int digits = 0;
+                for (std::size_t last = first; last < groups.size(); ++last)
+                {
+                    digits += groups.at(last).digits;
+                    if (digits > 19)
+                    {
+                        break;
+                    }
+                    if (digits < 13)
+                    {
+                        continue;
+                    }
+                    const qsizetype start = groups.at(first).start;
+                    const qsizetype end   = groups.at(last).start + groups.at(last).length;
+                    if (isValidBankCard(value.mid(start, end - start)))
+                    {
+                        validRanges.push_back(BankCardRange{start, end - start, digits});
+                    }
+                }
+            }
+
+            // 位数多的优先，位数相同取靠左的；再排除与已选区间重叠的候选
+            std::stable_sort(validRanges.begin(), validRanges.end(),
+                             [](const BankCardRange &left, const BankCardRange &right)
+                             {
+                                 if (left.digits != right.digits)
+                                 {
+                                     return left.digits > right.digits;
+                                 }
+                                 return left.start < right.start;
+                             });
+            std::vector<BankCardRange> selected;
+            for (const BankCardRange &range: validRanges)
+            {
+                const bool overlaps = std::any_of(selected.begin(), selected.end(), [&range](const BankCardRange &kept)
+                                                  { return range.start < kept.start + kept.length && kept.start < range.start + range.length; });
+                if (!overlaps)
+                {
+                    selected.push_back(range);
+                }
+            }
+            std::sort(selected.begin(), selected.end(), [](const BankCardRange &left, const BankCardRange &right) { return left.start < right.start; });
+            return selected;
+        }
+
+        /**
          * @brief 拒绝邮箱形状里的残形
          * @param value 正则命中的邮箱候选
          * @return true 表示只有一个 @、没有连续点、首尾不是点
@@ -626,6 +718,39 @@ namespace GyanisScribe::Core::Privacy
         }
 
         /**
+         * @brief 收集一行里能按银行卡收下的那一部分
+         * @param searchText 数字型归一化副本
+         * @param originalText 原文，脱敏样例从这里取
+         * @param line 命中所在行
+         * @param wordIndexByCharacter 逐字符的词归属
+         * @param imageSize 图像尺寸
+         * @param candidates 输出候选
+         */
+        void collectBankCardMatches(const QString &searchText, const QString &originalText, const OcrLine &line, const QVector<qsizetype> &wordIndexByCharacter, QSize imageSize,
+                                    std::vector<Candidate> &candidates)
+        {
+            QRegularExpressionMatchIterator iterator = kBankCardRunPattern.globalMatch(searchText);
+            while (iterator.hasNext())
+            {
+                const QRegularExpressionMatch run = iterator.next();
+                if (!run.hasMatch() || run.capturedLength() <= 0)
+                {
+                    continue;
+                }
+                for (const BankCardRange &range: bankCardRanges(run.captured(0)))
+                {
+                    const qsizetype start = run.capturedStart() + range.start;
+                    const QRect     box   = clipToImage(boxForMatch(line, wordIndexByCharacter, start, range.length), imageSize);
+                    if (box.isEmpty())
+                    {
+                        continue;
+                    }
+                    candidates.push_back(Candidate{PiiKind::BankCard, box, maskBankCard(originalText.mid(start, range.length))});
+                }
+            }
+        }
+
+        /**
          * @brief 收集一行里的全部命中的类型
          * @param line 一行识别结果
          * @param imageSize 图像尺寸
@@ -644,8 +769,7 @@ namespace GyanisScribe::Core::Privacy
             collectMatches(digitText, lineText.text, kLandlinePattern, PiiKind::Landline, isValidLandline, maskLandline, line, lineText.wordIndexByCharacter, imageSize,
                            candidates);
             collectMatches(digitText, lineText.text, kIdCardPattern, PiiKind::IdCard, isValidIdCard, maskIdCard, line, lineText.wordIndexByCharacter, imageSize, candidates);
-            collectMatches(digitText, lineText.text, kBankCardPattern, PiiKind::BankCard, isValidBankCard, maskBankCard, line, lineText.wordIndexByCharacter, imageSize,
-                           candidates);
+            collectBankCardMatches(digitText, lineText.text, line, lineText.wordIndexByCharacter, imageSize, candidates);
             // 邮箱用原文匹配：数字归一化会把 .com 里的 o 换成 0、把 local 部分的 l 换成 1，副本上再也匹配不到
             collectMatches(lineText.text, lineText.text, kEmailPattern, PiiKind::Email, isValidEmail, maskEmail, line, lineText.wordIndexByCharacter, imageSize, candidates);
             collectMatches(digitText, lineText.text, kIpv4Pattern, PiiKind::Ip, isValidIpv4, maskIpv4, line, lineText.wordIndexByCharacter, imageSize, candidates);

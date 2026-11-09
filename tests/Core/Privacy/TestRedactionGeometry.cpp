@@ -63,6 +63,35 @@ TEST(RedactionGeometry, DropsDegenerateSizes)
 {
     EXPECT_FALSE(logicalRedactionRect(QRect{10, 10, 20, 10}, QSize{}, kLogicalSize).has_value());
     EXPECT_FALSE(logicalRedactionRect(QRect{10, 10, 20, 10}, kImageSize, QSize{}).has_value());
+
+    EXPECT_TRUE(expandBarcodeScanline(QRect{10, 10, 20, 1}, QSize{}, kLogicalSize).isEmpty()) << "原图尺寸为空时还扩出了框";
+    EXPECT_TRUE(expandBarcodeScanline(QRect{10, 10, 20, 1}, kImageSize, QSize{}).isEmpty()) << "画布逻辑尺寸为空时还扩出了框";
+    EXPECT_TRUE(expandBarcodeScanline(QRect{}, kImageSize, kLogicalSize).isEmpty()) << "空定位框还扩出了框";
+}
+
+/**
+ * @brief 钉住原框已经高于最小高度时仍再补 8 逻辑像素，而不是把框压回 32
+ * @details 原图是画布的两倍：物理高 50 折成 25 逻辑像素，目标高度 25+8=33，
+ *          折回物理 66，中心取原框中心 y=125，扩完从 y=92 到 y=157。
+ */
+TEST(RedactionGeometry, BarcodeScanlineAddsEightToTallerBoxes)
+{
+    const auto expanded = expandBarcodeScanline(QRect{50, 100, 100, 50}, QSize{800, 600}, QSize{400, 300});
+    EXPECT_EQ(expanded, QRect(50, 92, 100, 66)) << "高于最小高度的条码没有被再补 8 逻辑像素";
+}
+
+/// 奇数高度取整不把中心挪出框：原框高 3、中心 y=101，目标高 64，从 y=69 起
+TEST(RedactionGeometry, BarcodeScanlineKeepsOddHeightCentered)
+{
+    const auto expanded = expandBarcodeScanline(QRect{50, 100, 100, 3}, QSize{800, 600}, QSize{400, 300});
+    EXPECT_EQ(expanded, QRect(50, 69, 100, 64)) << "奇数高度的中心或取整口径变了";
+}
+
+/// 画布比原图大（纵向倍比 0.5）时，32 逻辑像素折成 16 物理像素，仍以扫描线为中心
+TEST(RedactionGeometry, BarcodeScanlineHandlesSubUnitVerticalScale)
+{
+    const auto expanded = expandBarcodeScanline(QRect{50, 100, 100, 10}, QSize{400, 300}, QSize{800, 600});
+    EXPECT_EQ(expanded, QRect(50, 97, 100, 16)) << "倍比小于 1 时没有按比例折算";
 }
 
 /**
