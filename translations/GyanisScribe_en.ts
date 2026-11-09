@@ -4,6 +4,14 @@
 <context>
     <name>GyanisScribe</name>
         <message>
+            <source>当前没有正在编辑的标注，请重新截图后再试</source>
+            <translation>No annotation is being edited right now. Capture again and retry</translation>
+        </message>
+        <message>
+            <source>先完成当前截图或标注，再打开回溯。</source>
+            <translation>Finish the current capture or annotation before opening Rewind.</translation>
+        </message>
+        <message>
             <source>截图未完成：%1。请重试一次</source>
             <translation>Capture did not complete: %1. Try again</translation>
         </message>
@@ -66,6 +74,18 @@
         <message>
             <source>认出 %1 个码，已复制最上面那条</source>
             <translation>%1 codes found; the topmost one was copied</translation>
+        </message>
+        <message>
+            <source>画布已经变了，请重新点隐私打码</source>
+            <translation>The canvas has changed. Click Privacy redaction again</translation>
+        </message>
+        <message>
+            <source>没有发现可打码的敏感信息。请仍自行检查后再分享。</source>
+            <translation>No sensitive information was found to redact. Still check the image yourself before sharing.</translation>
+        </message>
+        <message>
+            <source>已打码 %1 处；请自行检查后再分享。</source>
+            <translation>%1 areas redacted; still check the image yourself before sharing.</translation>
         </message>
         <message>
             <source>至少要写一处目的地：可取的只有 {}</source>
@@ -288,6 +308,54 @@
             <translation>The fetched data has no readable pixels (it may not be an image, or this machine cannot decode the format): try another image address</translation>
         </message>
         <message>
+            <source>本机没有可用的文字识别后端：请安装系统语言包，或换用 Tesseract 语言包后再试</source>
+            <translation>No text recognition backend is available on this machine: install the system language pack, or switch to a Tesseract language pack and try again</translation>
+        </message>
+        <message>
+            <source>记忆库：这个程序在排除名单里，这次截图没有建立索引。</source>
+            <translation>Memory: this app is on the exclusion list, so this screenshot was not indexed.</translation>
+        </message>
+        <message>
+            <source>记忆库暂不可用：索引还没有打开，请稍后重试；若问题持续，请在记忆库页重建索引。</source>
+            <translation>Memory is unavailable: the index is not open yet. Try again shortly; if the problem persists, rebuild the index on the Memory page.</translation>
+        </message>
+        <message>
+            <source>记忆库：已经有一个导入任务在进行，请等它结束或先取消。</source>
+            <translation>Memory: an import is already running. Wait for it to finish or cancel it first.</translation>
+        </message>
+        <message>
+            <source>记忆库：导入目录 %1 不存在或不可读，请选择一个存在的文件夹。</source>
+            <translation>Memory: the import folder %1 does not exist or cannot be read. Choose an existing folder.</translation>
+        </message>
+        <message>
+            <source>记忆库已达上限 %1 条：本次导入已淘汰最早的 %2 条；原图文件不受影响。</source>
+            <translation>The memory index reached its limit of %1 entries: the oldest %2 entries were evicted during this import; the original files are unaffected.</translation>
+        </message>
+        <message>
+            <source>记忆库：找不到要重新识别的条目，请刷新列表后再试。</source>
+            <translation>Memory: the entry to re-recognize could not be found. Refresh the list and try again.</translation>
+        </message>
+        <message>
+            <source>记忆库：已清理 %1 条原图不在磁盘上的索引；导入的文件请保持原路径。</source>
+            <translation>Memory: removed %1 index entries whose original files are no longer on disk; keep imported files at their original paths.</translation>
+        </message>
+        <message>
+            <source>记忆库：重建索引时无法移动旧库文件 %1（%2）。旧文件仍可找回，请关闭占用数据库的程序后重试。</source>
+            <translation>Memory: could not move the old database file %1 (%2) while rebuilding the index. The old file can still be recovered; close programs that hold the database and try again.</translation>
+        </message>
+        <message>
+            <source>记忆库数据库操作失败，请稍后重试；若问题持续，请在记忆库页重建索引。</source>
+            <translation>The memory database operation failed. Try again shortly; if the problem persists, rebuild the index on the Memory page.</translation>
+        </message>
+        <message>
+            <source>记忆库：条目已达上限 %1 条，已淘汰最早的 %2 条；原图文件不受影响。</source>
+            <translation>Memory: the index reached its limit of %1 entries; the oldest %2 entries were evicted; the original files are unaffected.</translation>
+        </message>
+        <message>
+            <source>记忆库：读取截图失败，原文件可能已被移动或删除；可稍后在记忆库页重新识别。</source>
+            <translation>Memory: the screenshot could not be read; the original file may have been moved or deleted. Try re-recognizing it later on the Memory page.</translation>
+        </message>
+        <message>
             <source>识别图片文件</source>
             <translation>Recognize an image file</translation>
         </message>
@@ -306,6 +374,14 @@
         <message>
             <source>文字识别失败：{}。请重试一次，或换一种语言再试</source>
             <translation>Text recognition failed: {}. Try again, or switch to another language.</translation>
+        </message>
+        <message>
+            <source>最近使用颜色</source>
+            <translation>Recent colors</translation>
+        </message>
+        <message>
+            <source>删掉配置里的 %1 这一项可以恢复默认</source>
+            <translation>Delete the %1 entry in settings to restore the defaults</translation>
         </message>
         <message>
             <source>已复制颜色 </source>
@@ -404,6 +480,22 @@
             <translation>Switched to {}; the desk now shows that group</translation>
         </message>
         <message>
+            <source>还没有可检查的图：先截一张图或打开一张图片，再发起隐私打码</source>
+            <translation>No image to check yet: capture a screenshot or open an image first, then start privacy redaction</translation>
+        </message>
+        <message>
+            <source>正在检查敏感信息…</source>
+            <translation>Checking for sensitive information…</translation>
+        </message>
+        <message>
+            <source>敏感信息检查失败：{}。请重试一次，或换一种语言再试</source>
+            <translation>Sensitive information check failed: {}. Try again, or switch to another language.</translation>
+        </message>
+        <message>
+            <source>已到最长时长，正在编成品</source>
+            <translation>Reached the maximum recording length; building the finished file now</translation>
+        </message>
+        <message>
             <source>当前没有可用屏幕，录屏没法开始。请接回显示器后重试</source>
             <translation>No screen is available, so recording cannot start. Reconnect a display and try again.</translation>
         </message>
@@ -412,20 +504,16 @@
             <translation>No selection to record yet: frame one with the capture hotkey first, then start recording; you can also set the recording scope back to full screen</translation>
         </message>
         <message>
+            <source>上一轮还在编成品，编好了再开新一轮</source>
+            <translation>The previous recording is still being built; start a new one once it is ready</translation>
+        </message>
+        <message>
             <source>录屏没能开始：{}</source>
             <translation>Recording didn't start: {}</translation>
         </message>
         <message>
             <source>正在编成品，好了会说一声</source>
             <translation>Building the finished file - you will hear when it is ready</translation>
-        </message>
-        <message>
-            <source>已到最长时长，正在编成品</source>
-            <translation>Reached the maximum recording length; building the finished file now</translation>
-        </message>
-        <message>
-            <source>上一轮还在编成品，编好了再开新一轮</source>
-            <translation>The previous recording is still being built; start a new one once it is ready</translation>
         </message>
         <message>
             <source>取消录屏没成：{}</source>
@@ -448,6 +536,74 @@
             <translation>Recording cancelled: this take wasn't saved and its temporary frames are gone.</translation>
         </message>
         <message>
+            <source>本平台给不出锁屏通知，出于隐私不开启回溯缓冲</source>
+            <translation>This platform cannot report screen locking, so rewind buffering stays off for privacy</translation>
+        </message>
+        <message>
+            <source>回溯截图未开启。到设置 → 截图 → 回溯截图里开启（只存内存，不上传）。</source>
+            <translation>Rewind is off. Turn it on in Settings → Capture → Rewind (memory only, never uploaded).</translation>
+        </message>
+        <message>
+            <source>正在解码选中的帧，稍候。</source>
+            <translation>Decoding the selected frame, please wait.</translation>
+        </message>
+        <message>
+            <source>回溯缓冲里还没有画面：刚开启时等一秒再按；若提示已暂停，先看暂停原因。</source>
+            <translation>The rewind buffer has no frames yet: after just turning it on, wait a second and press again; if it says paused, check the pause reason first.</translation>
+        </message>
+        <message>
+            <source>回溯缓冲已暂停：</source>
+            <translation>Rewind buffer paused: </translation>
+        </message>
+        <message>
+            <source> 调整后重新开启回溯缓冲即可恢复。</source>
+            <translation> Fix the cause and re-enable the rewind buffer to resume.</translation>
+        </message>
+        <message>
+            <source>找不到光标所在的屏幕</source>
+            <translation>Cannot find the screen the cursor is on</translation>
+        </message>
+        <message>
+            <source>回溯改为抓屏幕「</source>
+            <translation>Rewind now captures screen "</translation>
+        </message>
+        <message>
+            <source>」，旧缓冲已清空。</source>
+            <translation>"; the old buffer was cleared.</translation>
+        </message>
+        <message>
+            <source>排除的程序在前台</source>
+            <translation>An excluded program is in the foreground</translation>
+        </message>
+        <message>
+            <source>抓帧太慢，回溯缓冲已暂停</source>
+            <translation>Frame grabbing is too slow; rewind buffer paused</translation>
+        </message>
+        <message>
+            <source>回溯缓冲里已经没有画面，选择器收起了。</source>
+            <translation>The rewind buffer has no frames left, so the picker was closed.</translation>
+        </message>
+        <message>
+            <source>回溯选择器已打开</source>
+            <translation>Rewind picker opened</translation>
+        </message>
+        <message>
+            <source>这一帧已经从回溯缓冲里淘汰了，请在胶片条里另选一帧。</source>
+            <translation>This frame has already been evicted from the rewind buffer; pick another frame in the filmstrip.</translation>
+        </message>
+        <message>
+            <source>这一帧解码失败，请在胶片条里重选一帧：</source>
+            <translation>Failed to decode this frame; pick another frame in the filmstrip: </translation>
+        </message>
+        <message>
+            <source>回溯框选进行中</source>
+            <translation>Rewind region selection in progress</translation>
+        </message>
+        <message>
+            <source>已锁屏，回溯缓冲已清空</source>
+            <translation>Screen locked; the rewind buffer was cleared</translation>
+        </message>
+        <message>
             <source>什么都不做</source>
             <translation>Do nothing</translation>
         </message>
@@ -464,20 +620,32 @@
             <translation>Middle click</translation>
         </message>
         <message>
-            <source>智录 · 录制已暂停 %1</source>
-            <translation>GyanisScribe · recording paused at %1</translation>
+            <source>录制已暂停 %1</source>
+            <translation>Recording paused at %1</translation>
         </message>
         <message>
-            <source>智录 · 正在录制 %1</source>
-            <translation>GyanisScribe · recording %1</translation>
+            <source>正在录制 %1</source>
+            <translation>Recording %1</translation>
+        </message>
+        <message>
+            <source>贴图 %1 张</source>
+            <translation>%1 pin(s)</translation>
         </message>
         <message>
             <source>智录</source>
             <translation>GyanisScribe</translation>
         </message>
         <message>
-            <source>智录 · 贴图 %1 张</source>
-            <translation>GyanisScribe · %1 pin(s)</translation>
+            <source>智录 · %1</source>
+            <translation>GyanisScribe · %1</translation>
+        </message>
+        <message>
+            <source>回溯缓冲已暂停：%1</source>
+            <translation>Rewind buffer paused: %1</translation>
+        </message>
+        <message>
+            <source>回溯缓冲已开启</source>
+            <translation>Rewind buffer is on</translation>
         </message>
         <message>
             <source>框选截图</source>
@@ -684,16 +852,16 @@
             <translation>The file name template is too long ({} characters, limit {}): names that long often fail to open in other programs</translation>
         </message>
         <message>
+            <source>文件名模板用到了 Windows 的保留设备名（CON、PRN、AUX、NUL、COM1 到 COM9、LPT1 到 LPT9）：这类名字写不出文件，请在名字里加几个字或换成别的写法</source>
+            <translation>The file name template uses a Windows reserved device name (CON, PRN, AUX, NUL, COM1 to COM9, LPT1 to LPT9): such names cannot be written as files. Add a few characters or use another spelling.</translation>
+        </message>
+        <message>
             <source>文件名模板里不能有「{}」：它会把文件写到别的目录，或让系统直接拒绝写盘</source>
             <translation>The file name template cannot contain "{}": it would put the file in another folder, or make the system refuse the write</translation>
         </message>
         <message>
             <source>文件名模板里的变量「%{}%」不认得：可用的只有 %date%（日期）、%time%（时刻）、%ms%（毫秒）</source>
             <translation>Unknown variable "%{}%" in the file name template: the only ones are %date% (date), %time% (time) and %ms% (milliseconds)</translation>
-        </message>
-        <message>
-            <source>文件名模板用到了 Windows 的保留设备名（CON、PRN、AUX、NUL、COM1 到 COM9、LPT1 到 LPT9）：这类名字写不出文件，请在名字里加几个字或换成别的写法</source>
-            <translation>The file name template uses a Windows reserved device name (CON, PRN, AUX, NUL, COM1 to COM9, LPT1 to LPT9): such names cannot be written as files. Add a few characters or use another spelling.</translation>
         </message>
         <message>
             <source>…</source>
@@ -824,12 +992,40 @@
             <translation>None of the tools in the clipboard are registered, so there is nowhere to paste</translation>
         </message>
         <message>
+            <source>批量打码只支持马赛克或高斯模糊，收到的是工具 0x{:X}。请把打码方式换成这两种之一再试</source>
+            <translation>Batch redaction only supports Mosaic or Gaussian blur, but received tool 0x{:X}. Switch the redaction style to one of these two and try again</translation>
+        </message>
+        <message>
+            <source>没有可打码的区域：这次没有给出可用的框。请重新检测，或手动框选画布内的区域</source>
+            <translation>There is nothing to redact: no usable boxes were given this time. Run the check again, or draw boxes on the canvas manually</translation>
+        </message>
+        <message>
+            <source>打码工具不在册：请检查工具登记表</source>
+            <translation>The redaction tool is not registered: check the tool registry</translation>
+        </message>
+        <message>
+            <source>马赛克方块边长必须在 {} 到 {} 逻辑像素之间，收到的是 {}。请改用工具条上的细、中、粗一档再试</source>
+            <translation>The mosaic block size must be between {} and {} logical pixels, but received {}. Use one of the Fine, Medium, or Coarse steps on the toolbar and try again</translation>
+        </message>
+        <message>
+            <source>这些打码框都落在画布之外或小到看不见：没有可打码的区域。请重新检测，或手动框选画布内的区域</source>
+            <translation>All of these redaction boxes fall outside the canvas or are too small to see: there is nothing to redact. Run the check again, or draw boxes on the canvas manually</translation>
+        </message>
+        <message>
             <source>色板是空的：至少要留一格。想回到内置那八格，请把设置里那一格清掉而不是填成空白</source>
             <translation>The palette is empty: keep at least one swatch. To go back to the built-in eight, clear that field rather than leaving it blank</translation>
         </message>
         <message>
             <source>色板有 {} 格，超出上限 {} 格：请删掉几格再存</source>
             <translation>The palette has {} swatches, above the limit of {}: remove a few before saving</translation>
+        </message>
+        <message>
+            <source>自定义色板</source>
+            <translation>Custom palette</translation>
+        </message>
+        <message>
+            <source>检查导入文件里的色块写法，或删掉配置里的 %1 这一项可以恢复默认</source>
+            <translation>Check the color entries in the imported file, or delete the %1 entry in settings to restore the defaults</translation>
         </message>
         <message>
             <source>箭头</source>
@@ -932,6 +1128,10 @@
             <translation>Corner radius "{}" is outside {} to {}. Pick a new value on the Shot page of Settings, or delete Capture/CornerRadius to fall back to the default {} pixels</translation>
         </message>
         <message>
+            <source>{}。清单：{}。请把这一条改对，或删掉这份清单让软件重建（成品文件不受影响）</source>
+            <translation>{}. List: {}. Correct this entry, or delete this list and let the app rebuild it (the saved files are not affected)</translation>
+        </message>
+        <message>
             <source>历史清单里没有这条记录：{}。请刷新列表后再试一次</source>
             <translation>The history list has no such record: {}. Refresh the list and try again.</translation>
         </message>
@@ -942,10 +1142,6 @@
         <message>
             <source>历史清单格式不对：{}。可以把这个文件删掉让软件重建（成品文件不受影响），或按 {{"entries": [...]}} 的形状修好</source>
             <translation>The history list is malformed: {}. Delete this file and let the app rebuild it (the saved files are not touched), or fix it into the shape {{"entries": [...]}}.</translation>
-        </message>
-        <message>
-            <source>{}。清单：{}。请把这一条改对，或删掉这份清单让软件重建（成品文件不受影响）</source>
-            <translation>{}. List: {}. Correct this entry, or delete this list and let the app rebuild it (the saved files are not affected)</translation>
         </message>
         <message>
             <source>历史清单第 {} 条缺 path、kind 或 moment</source>
@@ -1020,6 +1216,14 @@
             <translation>Key 0x{:X} can't be used as an in-window key. Use a letter, a digit, Space or one of F1-F24.</translation>
         </message>
         <message>
+            <source>旧的 {} 仍在使用，新的组合没有生效</source>
+            <translation>The previous shortcut {} is still active; the new combination did not take effect</translation>
+        </message>
+        <message>
+            <source>旧的 {} 也没能恢复，这颗键暂时按不了</source>
+            <translation>The previous shortcut {} could not be restored either; this shortcut will not work for now</translation>
+        </message>
+        <message>
             <source>这张图是空的，没有可复制成文件的内容</source>
             <translation>This image is empty; there is nothing to copy as a file</translation>
         </message>
@@ -1056,6 +1260,18 @@
             <translation>Border colour "{}" is not a colour this program can read (try #RRGGBB). Refill it on the Shot page of Settings, or leave it empty for the default neutral grey</translation>
         </message>
         <message>
+            <source>记忆索引：%1 请稍后重试；若问题持续，请检查应用数据目录的写入权限，或在记忆库页重建索引。</source>
+            <translation>Memory index: %1. Try again shortly; if the problem persists, check write permissions on the application data folder, or rebuild the index on the Memory page.</translation>
+        </message>
+        <message>
+            <source>记忆索引：数据库尚未打开，请先打开记忆库再重试。</source>
+            <translation>Memory index: the database is not open yet. Open the Memory page and try again.</translation>
+        </message>
+        <message>
+            <source>记忆索引：条目路径为空，请传入截图落盘后的文件路径再重试。</source>
+            <translation>Memory index: the entry path is empty. Pass the file path of the saved screenshot and try again.</translation>
+        </message>
+        <message>
             <source>识别结果写不出去：{}（{}）。请换一个可写的目录，或直接复制到剪贴板</source>
             <translation>The recognition result can't be written: {} ({}). Pick a writable directory, or copy it to the clipboard instead.</translation>
         </message>
@@ -1086,6 +1302,14 @@
         <message>
             <source>宽（21×21）</source>
             <translation>Wide (21×21)</translation>
+        </message>
+        <message>
+            <source>{}里有一条不是 #RRGGBB 写法："{}"。{}</source>
+            <translation>One entry in {} is not written as #RRGGBB: "{}". {}</translation>
+        </message>
+        <message>
+            <source>{}里有一条不是十六进制："{}"。{}</source>
+            <translation>One entry in {} is not hexadecimal: "{}". {}</translation>
         </message>
         <message>
             <source>贴图布局不是一段 JSON 数组：{}。请在设置里清除这一项，让程序重新记一次</source>
@@ -1166,6 +1390,10 @@
         <message>
             <source>吸附距离 "{}" 不在 {} 到 {} 之间：请在设置的贴图页重填这一格，或删掉 Pin/EdgeSnapDistance 这一项回到默认的 {} 格</source>
             <translation>Snap distance "{}" is outside {} to {}: refill this field on the Pin settings page, or delete the Pin/EdgeSnapDistance entry to go back to the default {} pixels</translation>
+        </message>
+        <message>
+            <source>二维码/条形码</source>
+            <translation>QR code/barcode</translation>
         </message>
         <message>
             <source>光标高亮的缩放因子必须是正数，收到的是 {}。请传这一块屏幕的 devicePixelRatio</source>
@@ -1266,6 +1494,42 @@
         <message>
             <source>这一轮一帧都没有存下来，可能是刚开始就按了停止</source>
             <translation>Not one frame was saved for this recording; you probably pressed stop right after the start.</translation>
+        </message>
+        <message>
+            <source>回溯帧缓冲拒绝空样本：编码结果是空的</source>
+            <translation>Rewind frame buffer rejected an empty sample: the encoded result is empty</translation>
+        </message>
+        <message>
+            <source>回溯帧本身超过内存预算（{} 字节）：请降低时长或帧率</source>
+            <translation>A single rewind frame exceeds the memory budget ({} bytes): lower the duration or frame rate</translation>
+        </message>
+        <message>
+            <source>回溯缓冲超过内存预算（{} 字节）：请降低时长或帧率</source>
+            <translation>The rewind buffer exceeds the memory budget ({} bytes): lower the duration or frame rate</translation>
+        </message>
+        <message>
+            <source>排除名单太长（{} 字符）：上限 {} 字符，请删掉不用的项</source>
+            <translation>The exclusion list is too long ({} characters): the limit is {} characters; remove entries you do not need</translation>
+        </message>
+        <message>
+            <source>排除名单里的「{}」不是可执行文件名：只填文件名（如 keepass.exe），不要带路径或盘符，不要用 * ? 通配符，文件名里也不能有 : &lt; &gt; | " 这几个字符</source>
+            <translation>「{}」 in the exclusion list is not an executable file name: enter only the file name (for example keepass.exe), without a path or drive letter and without * ? wildcards; the file name also cannot contain : &lt; &gt; | "</translation>
+        </message>
+        <message>
+            <source>回溯帧编码失败：源图是空的</source>
+            <translation>Rewind frame encoding failed: the source image is empty</translation>
+        </message>
+        <message>
+            <source>回溯帧编码失败：内存缓冲打不开</source>
+            <translation>Rewind frame encoding failed: the memory buffer cannot be opened</translation>
+        </message>
+        <message>
+            <source>回溯帧编码失败：PNG 写不进去</source>
+            <translation>Rewind frame encoding failed: PNG cannot be written</translation>
+        </message>
+        <message>
+            <source>回溯帧解码失败：数据损坏或格式不支持。请重新选一帧</source>
+            <translation>Rewind frame decoding failed: the data is corrupt or the format is unsupported. Pick another frame.</translation>
         </message>
         <message>
             <source>配置项 {} 存不进去：后端返回了错误状态，请检查应用配置目录是否可写</source>
@@ -1406,6 +1670,10 @@
         <message>
             <source>识别二维码</source>
             <translation>Scan QR/barcode</translation>
+        </message>
+        <message>
+            <source>隐私打码</source>
+            <translation>Privacy redaction</translation>
         </message>
         <message>
             <source>关闭标注</source>
@@ -1688,6 +1956,14 @@
             <translation>No previous region to reuse yet: drag out one capture first, or use region capture.</translation>
         </message>
         <message>
+            <source>这块屏的布局已经变了，回溯到的画面不能再用；请重新开启回溯缓冲</source>
+            <translation>This screen's layout has changed, so the rewind frame can no longer be used; turn rewind buffering on again</translation>
+        </message>
+        <message>
+            <source>回溯画面</source>
+            <translation>Rewind frame</translation>
+        </message>
+        <message>
             <source>滚动长截图还在接：先在控制条上按完成或取消，再开始下一次截图</source>
             <translation>A scrolling capture is still running: press Done or Cancel on its control bar before starting another one.</translation>
         </message>
@@ -1820,6 +2096,10 @@
             <translation>Press the shortcut (Esc cancels)</translation>
         </message>
         <message>
+            <source>下拉列表</source>
+            <translation>Drop-down list</translation>
+        </message>
+        <message>
             <source>增加</source>
             <translation>Increase</translation>
         </message>
@@ -1922,6 +2202,238 @@
         <message>
             <source>没有符合条件的记录，换个关键词或类别试试。</source>
             <translation>No records match. Try another keyword or category.</translation>
+        </message>
+        <message>
+            <source>导入旧截图</source>
+            <translation>Import old screenshots</translation>
+        </message>
+        <message>
+            <source>取消导入</source>
+            <translation>Cancel import</translation>
+        </message>
+        <message>
+            <source>正在扫描并导入旧截图…</source>
+            <translation>Scanning and importing old screenshots…</translation>
+        </message>
+        <message>
+            <source>已扫描 {} 张 · 入库 {} 张 · 跳过 {} 张 · 失败 {} 张</source>
+            <translation>Scanned {} · Imported {} · Skipped {} · Failed {}</translation>
+        </message>
+        <message>
+            <source>待识别 {} 条，导入后会在后台继续识别</source>
+            <translation>{} entries pending recognition; they will continue in the background after the import</translation>
+        </message>
+        <message>
+            <source>正在取消；已入库的条目与已完成的识别会保留。</source>
+            <translation>Cancelling; imported entries and completed recognition are kept.</translation>
+        </message>
+        <message>
+            <source>排除应用</source>
+            <translation>Excluded apps</translation>
+        </message>
+        <message>
+            <source>勾选的应用之后不再加入记忆库；保存时会删掉这些应用已有的索引。导入的旧截图不受影响。</source>
+            <translation>Checked apps will no longer be added to memory; saving also deletes their existing index entries. Imported old screenshots are unaffected.</translation>
+        </message>
+        <message>
+            <source>排除应用清单</source>
+            <translation>Excluded app list</translation>
+        </message>
+        <message>
+            <source>%1（%2 张）</source>
+            <translation>%1 (%2 items)</translation>
+        </message>
+        <message>
+            <source>输入尚未出现过的进程名…</source>
+            <translation>Type a process name not seen yet…</translation>
+        </message>
+        <message>
+            <source>新增排除进程</source>
+            <translation>Add excluded process</translation>
+        </message>
+        <message>
+            <source>添加</source>
+            <translation>Add</translation>
+        </message>
+        <message>
+            <source>保存</source>
+            <translation>Save</translation>
+        </message>
+        <message>
+            <source>保存后会从记忆库删除新排除应用已有的 %1 条索引，原图与历史记录不会被删除。要继续吗？</source>
+            <translation>Saving will delete %1 existing index entries for the newly excluded apps from memory; original files and history are not deleted. Continue?</translation>
+        </message>
+        <message>
+            <source>未知应用</source>
+            <translation>Unknown app</translation>
+        </message>
+        <message>
+            <source>没有识别到文字</source>
+            <translation>No text recognized</translation>
+        </message>
+        <message>
+            <source>文件已不在</source>
+            <translation>File is gone</translation>
+        </message>
+        <message>
+            <source>待识别</source>
+            <translation>Pending</translation>
+        </message>
+        <message>
+            <source>识别失败</source>
+            <translation>Recognition failed</translation>
+        </message>
+        <message>
+            <source>%1 张重复/相似 · 最新 %2</source>
+            <translation>%1 duplicate/similar · latest %2</translation>
+        </message>
+        <message>
+            <source>记忆库</source>
+            <translation>Memory</translation>
+        </message>
+        <message>
+            <source>记忆库状态提示</source>
+            <translation>Memory status message</translation>
+        </message>
+        <message>
+            <source>开启记忆</source>
+            <translation>Enable memory</translation>
+        </message>
+        <message>
+            <source>重建索引</source>
+            <translation>Rebuild index</translation>
+        </message>
+        <message>
+            <source>搜索截图里的文字…</source>
+            <translation>Search text in screenshots…</translation>
+        </message>
+        <message>
+            <source>记忆库搜索</source>
+            <translation>Memory search</translation>
+        </message>
+        <message>
+            <source>按应用筛选</source>
+            <translation>Filter by app</translation>
+        </message>
+        <message>
+            <source>全部应用</source>
+            <translation>All apps</translation>
+        </message>
+        <message>
+            <source>按时间筛选</source>
+            <translation>Filter by time</translation>
+        </message>
+        <message>
+            <source>今天</source>
+            <translation>Today</translation>
+        </message>
+        <message>
+            <source>7 天</source>
+            <translation>7 days</translation>
+        </message>
+        <message>
+            <source>30 天</source>
+            <translation>30 days</translation>
+        </message>
+        <message>
+            <source>合并重复图</source>
+            <translation>Merge duplicates</translation>
+        </message>
+        <message>
+            <source>贴图</source>
+            <translation>Pin</translation>
+        </message>
+        <message>
+            <source>打开文件</source>
+            <translation>Open file</translation>
+        </message>
+        <message>
+            <source>从记忆库移除</source>
+            <translation>Remove from memory</translation>
+        </message>
+        <message>
+            <source>记忆结果</source>
+            <translation>Memory results</translation>
+        </message>
+        <message>
+            <source>记忆库空态提示</source>
+            <translation>Memory empty-state hint</translation>
+        </message>
+        <message>
+            <source>记忆库统计</source>
+            <translation>Memory statistics</translation>
+        </message>
+        <message>
+            <source>排除应用…</source>
+            <translation>Excluded apps…</translation>
+        </message>
+        <message>
+            <source>清空索引</source>
+            <translation>Clear index</translation>
+        </message>
+        <message>
+            <source>统计暂时读不出来</source>
+            <translation>Statistics are temporarily unavailable</translation>
+        </message>
+        <message>
+            <source>共 %1 条 · 待识别 %2 · 失败 %3 · 数据库 %4 · 排除应用 %5 个</source>
+            <translation>%1 entries · %2 pending · %3 failed · database %4 · %5 apps excluded</translation>
+        </message>
+        <message>
+            <source> · 只显示前 %1 条，收窄关键词可看到更早的结果</source>
+            <translation> · Showing the first %1; narrow the keywords to see older results</translation>
+        </message>
+        <message>
+            <source>记忆库暂时不可用：</source>
+            <translation>Memory is unavailable: </translation>
+        </message>
+        <message>
+            <source>记忆库还没开启。开启后只索引你主动截的截图，只保存在本机，可随时关闭并清空。</source>
+            <translation>Memory is not enabled yet. When enabled, only screenshots you take are indexed, everything stays on this machine, and you can turn it off and clear it at any time.</translation>
+        </message>
+        <message>
+            <source>文字识别后端不可用</source>
+            <translation>The text recognition backend is unavailable</translation>
+        </message>
+        <message>
+            <source>文字识别暂不可用：</source>
+            <translation>Text recognition is unavailable: </translation>
+        </message>
+        <message>
+            <source>。截图仍会入库，可稍后重新识别。</source>
+            <translation>. Screenshots are still indexed and can be recognized again later.</translation>
+        </message>
+        <message>
+            <source>点击展开或收起这一组重复/相似截图</source>
+            <translation>Click to expand or collapse this group of duplicate/similar screenshots</translation>
+        </message>
+        <message>
+            <source>记忆库暂时读不出来。可以点上面的「重建索引」，原图不会被删除。</source>
+            <translation>Memory cannot be read right now. Click Rebuild index above; original files will not be deleted.</translation>
+        </message>
+        <message>
+            <source>开启记忆后，这里会列出你主动截的图。</source>
+            <translation>Once memory is enabled, screenshots you take will be listed here.</translation>
+        </message>
+        <message>
+            <source>没有搜到匹配的截图。换个关键词，或放宽应用与时间范围。</source>
+            <translation>No matching screenshots. Try another keyword, or widen the app and time filters.</translation>
+        </message>
+        <message>
+            <source>还没有索引。第一次截图后会自动建立索引，也可以导入旧截图。</source>
+            <translation>Nothing is indexed yet. The first screenshot builds the index automatically; you can also import old screenshots.</translation>
+        </message>
+        <message>
+            <source>记忆库本来就是空的</source>
+            <translation>Memory is already empty</translation>
+        </message>
+        <message>
+            <source>清空记忆索引</source>
+            <translation>Clear memory index</translation>
+        </message>
+        <message>
+            <source>要删除全部 %1 条索引吗？原图与历史记录不会被删除。</source>
+            <translation>Delete all %1 index entries? Original files and history will not be deleted.</translation>
         </message>
         <message>
             <source>这一张图里没认出文字。可以换一种语言再认一次，或重新截一张更清晰的图</source>
@@ -2216,10 +2728,6 @@
             <translation>Change this card's colour…</translation>
         </message>
         <message>
-            <source>保存</source>
-            <translation>Save</translation>
-        </message>
-        <message>
             <source>在文件夹中查看</source>
             <translation>Show in folder</translation>
         </message>
@@ -2404,6 +2912,62 @@
             <translation>Close this image for good: it will not stay in the five recoverable closed images. Use Close if you only need the space back.</translation>
         </message>
         <message>
+            <source>手机号</source>
+            <translation>Mobile number</translation>
+        </message>
+        <message>
+            <source>固定电话</source>
+            <translation>Landline</translation>
+        </message>
+        <message>
+            <source>身份证</source>
+            <translation>ID card</translation>
+        </message>
+        <message>
+            <source>银行卡</source>
+            <translation>Bank card</translation>
+        </message>
+        <message>
+            <source>邮箱</source>
+            <translation>Email</translation>
+        </message>
+        <message>
+            <source>IP 地址</source>
+            <translation>IP address</translation>
+        </message>
+        <message>
+            <source>隐私打码审核</source>
+            <translation>Privacy redaction review</translation>
+        </message>
+        <message>
+            <source>只在本机检测，未上传；请逐项确认，打码后可撤销。</source>
+            <translation>Detection runs on this machine only; nothing is uploaded. Review each item; the redactions can be undone.</translation>
+        </message>
+        <message>
+            <source>敏感信息清单</source>
+            <translation>Sensitive information list</translation>
+        </message>
+        <message>
+            <source>%1：%2</source>
+            <translation>%1: %2</translation>
+        </message>
+        <message>
+            <source>全选</source>
+            <translation>Select all</translation>
+        </message>
+        <message>
+            <source>全不选</source>
+            <translation>Select none</translation>
+        </message>
+        <message>
+            <source>打码方式</source>
+            <translation>Redaction style</translation>
+        </message>
+        <message>
+            <source>应用打码</source>
+            <translation>Apply redactions</translation>
+        </message>
+        <message>
             <source>未在录制</source>
             <translation>Not recording</translation>
         </message>
@@ -2484,8 +3048,28 @@
             <translation>Resume</translation>
         </message>
         <message>
+            <source>← → 选择，Enter 确认，Esc 取消。下一步可拖框选区域，Ctrl+A 选整屏。</source>
+            <translation>← → to choose, Enter to confirm, Esc to cancel. Next, drag to select a region, or press Ctrl+A for the whole screen.</translation>
+        </message>
+        <message>
+            <source>候选帧：画面或前台窗口发生变化</source>
+            <translation>Candidate frame: the screen or foreground window changed</translation>
+        </message>
+        <message>
+            <source>回溯缓冲已暂停</source>
+            <translation>Rewind buffer paused</translation>
+        </message>
+        <message>
+            <source>回溯截图 · %1</source>
+            <translation>Rewind · %1</translation>
+        </message>
+        <message>
             <source>主题取值 "{}" 不在可用档位里：请在设置的主题页从 Light、Dark、System、HighContrast 四项里选一项，手写配置文件时只能是这四个词（区分大小写）</source>
             <translation>Theme value "{}" is not one of the available options: pick Light, Dark, System, or HighContrast on the Theme page in Settings, or write exactly one of those four words (case-sensitive) when editing the config file by hand</translation>
+        </message>
+        <message>
+            <source>打不开这个文件：它可能已被移动或删除。请刷新记忆库后再试</source>
+            <translation>Cannot open this file: it may have been moved or deleted. Refresh memory and try again</translation>
         </message>
         <message>
             <source>这张贴图已移到当前分组，就摆在原处</source>
@@ -2504,16 +3088,32 @@
             <translation>These custom hotkeys were not registered:</translation>
         </message>
         <message>
-            <source>旧的 {} 仍在使用，新的组合没有生效</source>
-            <translation>The previous shortcut {} is still active; the new combination did not take effect</translation>
-        </message>
-        <message>
-            <source>旧的 {} 也没能恢复，这颗键暂时按不了</source>
-            <translation>The previous shortcut {} could not be restored either; this shortcut will not work for now</translation>
-        </message>
-        <message>
             <source>这块屏幕已经不在了，重抓不到画面。把贴图挪回还在的屏幕上再刷新</source>
             <translation>This screen is gone, so there is nothing to re-capture. Move the pin back onto a screen that is still there, then refresh it</translation>
+        </message>
+        <message>
+            <source>开启截图记忆？</source>
+            <translation>Enable screenshot memory?</translation>
+        </message>
+        <message>
+            <source>只索引你主动截的图</source>
+            <translation>Only screenshots you take are indexed</translation>
+        </message>
+        <message>
+            <source>只在本机</source>
+            <translation>On this machine only</translation>
+        </message>
+        <message>
+            <source>不上传、不录屏</source>
+            <translation>No upload, no screen recording</translation>
+        </message>
+        <message>
+            <source>可随时关闭并清空</source>
+            <translation>Turn off and clear at any time</translation>
+        </message>
+        <message>
+            <source>暂不</source>
+            <translation>Not now</translation>
         </message>
         <message>
             <source>这一类的说明</source>
@@ -2732,6 +3332,62 @@
             <translation>GIF runs a two-pass palette and caps the frame rate at %1 frames per second, lower than MP4; MP4 suits longer clips. Changes apply from the next recording</translation>
         </message>
         <message>
+            <source>开启回溯缓冲（仅内存）</source>
+            <translation>Enable rewind buffer (memory only)</translation>
+        </message>
+        <message>
+            <source>开启回溯缓冲</source>
+            <translation>Enable rewind buffer</translation>
+        </message>
+        <message>
+            <source>只存内存，不写盘、不上传；锁屏或退出清空。</source>
+            <translation>Memory only: nothing is written to disk or uploaded; locking the screen or exiting clears it.</translation>
+        </message>
+        <message>
+            <source>会把最近 10 秒的屏幕画面保存在内存里。</source>
+            <translation>The last 10 seconds of screen content is kept in memory.</translation>
+        </message>
+        <message>
+            <source>不写盘、不上传、不录声音。</source>
+            <translation>Nothing is written to disk, uploaded, or recorded as audio.</translation>
+        </message>
+        <message>
+            <source>锁屏或退出程序会清空。</source>
+            <translation>Locking the screen or exiting the app clears it.</translation>
+        </message>
+        <message>
+            <source>可以排除密码管理器等程序。</source>
+            <translation>You can exclude programs such as password managers.</translation>
+        </message>
+        <message>
+            <source>确定开启吗？</source>
+            <translation>Turn it on?</translation>
+        </message>
+        <message>
+            <source>保留时长</source>
+            <translation>Buffer duration</translation>
+        </message>
+        <message>
+            <source>帧率</source>
+            <translation>Frame rate</translation>
+        </message>
+        <message>
+            <source>keepass.exe, 1password.exe</source>
+            <translation>keepass.exe, 1password.exe</translation>
+        </message>
+        <message>
+            <source>排除程序</source>
+            <translation>Excluded programs</translation>
+        </message>
+        <message>
+            <source>逗号分隔的可执行文件名；名单里的程序有可见窗口时暂停抓帧</source>
+            <translation>Comma-separated executable file names; frame grabbing pauses while a listed program has a visible window</translation>
+        </message>
+        <message>
+            <source>排除名单不合法</source>
+            <translation>Invalid exclusion list</translation>
+        </message>
+        <message>
             <source>&lt;b style="font-size:15pt"&gt;智录 GyanisScribe&lt;/b&gt;&lt;br&gt;版本 %1&lt;br&gt;&lt;br&gt;截图、标注、贴图、取色、录屏与文字识别的桌面效率工具。&lt;br&gt;界面与图标全部为本项目原创；本软件免费供任何人使用。&lt;br&gt;&lt;br&gt;仓库：&lt;a href="https://github.com/Gyanis9/GyanisScribe"&gt;github.com/Gyanis9/GyanisScribe&lt;/a&gt;&lt;br&gt;第三方组件与其许可证见仓库 docs/ThirdPartyLicenses.md</source>
             <translation>&lt;b style="font-size:15pt"&gt;GyanisScribe&lt;/b&gt;&lt;br&gt;Version %1&lt;br&gt;&lt;br&gt;A desktop productivity tool for screenshots, annotation, pinning, color picking, screen recording and text recognition.&lt;br&gt;The UI and icons are entirely original to this project; the software is free for anyone to use.&lt;br&gt;&lt;br&gt;Repository: &lt;a href="https://github.com/Gyanis9/GyanisScribe"&gt;github.com/Gyanis9/GyanisScribe&lt;/a&gt;&lt;br&gt;Third-party components and their licenses: see docs/ThirdPartyLicenses.md in the repository</translation>
         </message>
@@ -2862,6 +3518,18 @@
         <message>
             <source>勾上后每张截图都在程序数据目录里留一份像素，误触 Esc 丢掉的那一张也还在历史里（最多留 {} 张）</source>
             <translation>When on, every capture keeps a pixel copy in the app data folder, so one lost to Esc is still in history (up to {} kept)</translation>
+        </message>
+        <message>
+            <source>截图记忆：只索引我主动截的图</source>
+            <translation>Screenshot memory: index only screenshots I take</translation>
+        </message>
+        <message>
+            <source>截图记忆</source>
+            <translation>Screenshot memory</translation>
+        </message>
+        <message>
+            <source>开启后只把你主动截的图里的文字与来源记进本机索引，不上传；可随时关掉，已有索引仍可搜索，也可以清空</source>
+            <translation>When enabled, text and source metadata from screenshots you take are stored in a local index and never uploaded. You can turn it off at any time; existing entries remain searchable and can be cleared.</translation>
         </message>
         <message>
             <source>开机自启动</source>
@@ -3016,12 +3684,12 @@
             <translation>With this off, copied text looks like #3c78c8. It only affects the HEX notation; the other five are untouched.</translation>
         </message>
         <message>
-            <source>留空即内置那八格；形如 #FF0000, #00FF00</source>
-            <translation>Leave empty for the built-in eight; written as #FF0000, #00FF00</translation>
+            <source>回溯截图</source>
+            <translation>Rewind</translation>
         </message>
         <message>
-            <source>自定义色板</source>
-            <translation>Custom palette</translation>
+            <source>留空即内置那八格；形如 #FF0000, #00FF00</source>
+            <translation>Leave empty for the built-in eight; written as #FF0000, #00FF00</translation>
         </message>
         <message>
             <source>色板上摆的那几格，这里的顺序就是从左到右</source>
@@ -3256,10 +3924,6 @@
             <translation>General</translation>
         </message>
         <message>
-            <source>贴图</source>
-            <translation>Pin</translation>
-        </message>
-        <message>
             <source>快捷键</source>
             <translation>Keyboard shortcuts</translation>
         </message>
@@ -3364,6 +4028,14 @@
             <translation>This build has no QR/barcode backend. Use the packaged installer, or add zxing-cpp to the build dependencies</translation>
         </message>
         <message>
+            <source>找不到名为「{}」的屏幕：多半已经被拔掉。请在不填屏幕名的情况下重抓一次（那样按光标所在屏走）</source>
+            <translation>Cannot find a screen named "{}": it was probably unplugged. Capture again with no screen name, which follows the screen under the cursor.</translation>
+        </message>
+        <message>
+            <source>Qt 没有报出任何屏幕：请在 QGuiApplication 建好之后再抓图</source>
+            <translation>Qt reported no screens: capture only after QGuiApplication has been created.</translation>
+        </message>
+        <message>
             <source>DXGI 桌面重复认不出屏幕（{}×{}，原点 {}）：Qt 报的几何与适配器的输出坐标对不上。请重试一次，或改用 Qt 的抓帧原语</source>
             <translation>DXGI desktop duplication cannot match a screen ({}x{}, origin {}): the geometry Qt reports does not match any adapter output. Try again, or switch to the Qt capture primitive</translation>
         </message>
@@ -3410,14 +4082,6 @@
         <message>
             <source>DXGI 抓帧：读出来的是空图。请重试一次</source>
             <translation>DXGI capture: the read came back as an empty image. Try again</translation>
-        </message>
-        <message>
-            <source>找不到名为「{}」的屏幕：多半已经被拔掉。请在不填屏幕名的情况下重抓一次（那样按光标所在屏走）</source>
-            <translation>Cannot find a screen named "{}": it was probably unplugged. Capture again with no screen name, which follows the screen under the cursor.</translation>
-        </message>
-        <message>
-            <source>Qt 没有报出任何屏幕：请在 QGuiApplication 建好之后再抓图</source>
-            <translation>Qt reported no screens: capture only after QGuiApplication has been created.</translation>
         </message>
         <message>
             <source>抓「{}」这块屏拿到了空图：本平台可能不允许直接抓取屏幕。请检查会话类型（远程会话、Wayland 沙箱）后重试</source>
@@ -3582,362 +4246,6 @@
         <message>
             <source>取声的 ffmpeg 起不来。设备可能正被别的程序占用，关掉占用者再录，或在设置里把取声关掉</source>
             <translation>The audio ffmpeg wouldn't start. The device may be held by another program - close it and try again, or turn audio capture off in Settings</translation>
-        </message>
-        <message>
-            <source>{}里有一条不是 #RRGGBB 写法："{}"。{}</source>
-            <translation>One entry in {} is not written as #RRGGBB: "{}". {}</translation>
-        </message>
-        <message>
-            <source>{}里有一条不是十六进制："{}"。{}</source>
-            <translation>One entry in {} is not hexadecimal: "{}". {}</translation>
-        </message>
-        <message>
-            <source>最近使用颜色</source>
-            <translation>Recent colors</translation>
-        </message>
-        <message>
-            <source>删掉配置里的 %1 这一项可以恢复默认</source>
-            <translation>Delete the %1 entry in settings to restore the defaults</translation>
-        </message>
-        <message>
-            <source>检查导入文件里的色块写法，或删掉配置里的 %1 这一项可以恢复默认</source>
-            <translation>Check the color entries in the imported file, or delete the %1 entry in settings to restore the defaults</translation>
-        </message>
-        <message>
-            <source>先完成当前截图或标注，再打开回溯。</source>
-            <translation>Finish the current capture or annotation before opening Rewind.</translation>
-        </message>
-        <message>
-            <source>本平台给不出锁屏通知，出于隐私不开启回溯缓冲</source>
-            <translation>This platform cannot report screen locking, so rewind buffering stays off for privacy</translation>
-        </message>
-        <message>
-            <source>回溯截图未开启。到设置 → 截图 → 回溯截图里开启（只存内存，不上传）。</source>
-            <translation>Rewind is off. Turn it on in Settings → Capture → Rewind (memory only, never uploaded).</translation>
-        </message>
-        <message>
-            <source>正在解码选中的帧，稍候。</source>
-            <translation>Decoding the selected frame, please wait.</translation>
-        </message>
-        <message>
-            <source>回溯缓冲里还没有画面：刚开启时等一秒再按；若提示已暂停，先看暂停原因。</source>
-            <translation>The rewind buffer has no frames yet: after just turning it on, wait a second and press again; if it says paused, check the pause reason first.</translation>
-        </message>
-        <message>
-            <source>回溯缓冲已暂停：</source>
-            <translation>Rewind buffer paused: </translation>
-        </message>
-        <message>
-            <source> 调整后重新开启回溯缓冲即可恢复。</source>
-            <translation> Fix the cause and re-enable the rewind buffer to resume.</translation>
-        </message>
-        <message>
-            <source>找不到光标所在的屏幕</source>
-            <translation>Cannot find the screen the cursor is on</translation>
-        </message>
-        <message>
-            <source>回溯改为抓屏幕「</source>
-            <translation>Rewind now captures screen "</translation>
-        </message>
-        <message>
-            <source>」，旧缓冲已清空。</source>
-            <translation>"; the old buffer was cleared.</translation>
-        </message>
-        <message>
-            <source>排除的程序在前台</source>
-            <translation>An excluded program is in the foreground</translation>
-        </message>
-        <message>
-            <source>抓帧太慢，回溯缓冲已暂停</source>
-            <translation>Frame grabbing is too slow; rewind buffer paused</translation>
-        </message>
-        <message>
-            <source>回溯缓冲里已经没有画面，选择器收起了。</source>
-            <translation>The rewind buffer has no frames left, so the picker was closed.</translation>
-        </message>
-        <message>
-            <source>回溯选择器已打开</source>
-            <translation>Rewind picker opened</translation>
-        </message>
-        <message>
-            <source>这一帧已经从回溯缓冲里淘汰了，请在胶片条里另选一帧。</source>
-            <translation>This frame has already been evicted from the rewind buffer; pick another frame in the filmstrip.</translation>
-        </message>
-        <message>
-            <source>这一帧解码失败，请在胶片条里重选一帧：</source>
-            <translation>Failed to decode this frame; pick another frame in the filmstrip: </translation>
-        </message>
-        <message>
-            <source>回溯框选进行中</source>
-            <translation>Rewind region selection in progress</translation>
-        </message>
-        <message>
-            <source>已锁屏，回溯缓冲已清空</source>
-            <translation>Screen locked; the rewind buffer was cleared</translation>
-        </message>
-        <message>
-            <source>录制已暂停 %1</source>
-            <translation>Recording paused at %1</translation>
-        </message>
-        <message>
-            <source>正在录制 %1</source>
-            <translation>Recording %1</translation>
-        </message>
-        <message>
-            <source>贴图 %1 张</source>
-            <translation>%1 pin(s)</translation>
-        </message>
-        <message>
-            <source>智录 · %1</source>
-            <translation>GyanisScribe · %1</translation>
-        </message>
-        <message>
-            <source>回溯缓冲已暂停：%1</source>
-            <translation>Rewind buffer paused: %1</translation>
-        </message>
-        <message>
-            <source>回溯缓冲已开启</source>
-            <translation>Rewind buffer is on</translation>
-        </message>
-        <message>
-            <source>回溯帧缓冲拒绝空样本：编码结果是空的</source>
-            <translation>Rewind frame buffer rejected an empty sample: the encoded result is empty</translation>
-        </message>
-        <message>
-            <source>回溯帧本身超过内存预算（{} 字节）：请降低时长或帧率</source>
-            <translation>A single rewind frame exceeds the memory budget ({} bytes): lower the duration or frame rate</translation>
-        </message>
-        <message>
-            <source>回溯缓冲超过内存预算（{} 字节）：请降低时长或帧率</source>
-            <translation>The rewind buffer exceeds the memory budget ({} bytes): lower the duration or frame rate</translation>
-        </message>
-        <message>
-            <source>排除名单太长（{} 字符）：上限 {} 字符，请删掉不用的项</source>
-            <translation>The exclusion list is too long ({} characters): the limit is {} characters; remove entries you do not need</translation>
-        </message>
-        <message>
-            <source>排除名单里的「{}」不是可执行文件名：只填文件名（如 keepass.exe），不要带路径或盘符，不要用 * ? 通配符，文件名里也不能有 : &lt; &gt; | " 这几个字符</source>
-            <translation>「{}」 in the exclusion list is not an executable file name: enter only the file name (for example keepass.exe), without a path or drive letter and without * ? wildcards; the file name also cannot contain : &lt; &gt; | "</translation>
-        </message>
-        <message>
-            <source>回溯帧编码失败：源图是空的</source>
-            <translation>Rewind frame encoding failed: the source image is empty</translation>
-        </message>
-        <message>
-            <source>回溯帧编码失败：内存缓冲打不开</source>
-            <translation>Rewind frame encoding failed: the memory buffer cannot be opened</translation>
-        </message>
-        <message>
-            <source>回溯帧编码失败：PNG 写不进去</source>
-            <translation>Rewind frame encoding failed: PNG cannot be written</translation>
-        </message>
-        <message>
-            <source>回溯帧解码失败：数据损坏或格式不支持。请重新选一帧</source>
-            <translation>Rewind frame decoding failed: the data is corrupt or the format is unsupported. Pick another frame.</translation>
-        </message>
-        <message>
-            <source>这块屏的布局已经变了，回溯到的画面不能再用；请重新开启回溯缓冲</source>
-            <translation>This screen's layout has changed, so the rewind frame can no longer be used; turn rewind buffering on again</translation>
-        </message>
-        <message>
-            <source>回溯画面</source>
-            <translation>Rewind frame</translation>
-        </message>
-        <message>
-            <source>← → 选择，Enter 确认，Esc 取消。下一步可拖框选区域，Ctrl+A 选整屏。</source>
-            <translation>← → to choose, Enter to confirm, Esc to cancel. Next, drag to select a region, or press Ctrl+A for the whole screen.</translation>
-        </message>
-        <message>
-            <source>候选帧：画面或前台窗口发生变化</source>
-            <translation>Candidate frame: the screen or foreground window changed</translation>
-        </message>
-        <message>
-            <source>回溯缓冲已暂停</source>
-            <translation>Rewind buffer paused</translation>
-        </message>
-        <message>
-            <source>回溯截图 · %1</source>
-            <translation>Rewind · %1</translation>
-        </message>
-        <message>
-            <source>开启回溯缓冲（仅内存）</source>
-            <translation>Enable rewind buffer (memory only)</translation>
-        </message>
-        <message>
-            <source>开启回溯缓冲</source>
-            <translation>Enable rewind buffer</translation>
-        </message>
-        <message>
-            <source>只存内存，不写盘、不上传；锁屏或退出清空。</source>
-            <translation>Memory only: nothing is written to disk or uploaded; locking the screen or exiting clears it.</translation>
-        </message>
-        <message>
-            <source>会把最近 10 秒的屏幕画面保存在内存里。</source>
-            <translation>The last 10 seconds of screen content is kept in memory.</translation>
-        </message>
-        <message>
-            <source>不写盘、不上传、不录声音。</source>
-            <translation>Nothing is written to disk, uploaded, or recorded as audio.</translation>
-        </message>
-        <message>
-            <source>锁屏或退出程序会清空。</source>
-            <translation>Locking the screen or exiting the app clears it.</translation>
-        </message>
-        <message>
-            <source>可以排除密码管理器等程序。</source>
-            <translation>You can exclude programs such as password managers.</translation>
-        </message>
-        <message>
-            <source>确定开启吗？</source>
-            <translation>Turn it on?</translation>
-        </message>
-        <message>
-            <source>保留时长</source>
-            <translation>Buffer duration</translation>
-        </message>
-        <message>
-            <source>帧率</source>
-            <translation>Frame rate</translation>
-        </message>
-        <message>
-            <source>keepass.exe, 1password.exe</source>
-            <translation>keepass.exe, 1password.exe</translation>
-        </message>
-        <message>
-            <source>排除程序</source>
-            <translation>Excluded programs</translation>
-        </message>
-        <message>
-            <source>逗号分隔的可执行文件名；名单里的程序有可见窗口时暂停抓帧</source>
-            <translation>Comma-separated executable file names; frame grabbing pauses while a listed program has a visible window</translation>
-        </message>
-        <message>
-            <source>排除名单不合法</source>
-            <translation>Invalid exclusion list</translation>
-        </message>
-        <message>
-            <source>回溯截图</source>
-            <translation>Rewind</translation>
-        </message>
-        <message>
-            <source>当前没有正在编辑的标注，请重新截图后再试</source>
-            <translation>No annotation is being edited right now. Capture again and retry</translation>
-        </message>
-        <message>
-            <source>画布已经变了，请重新点隐私打码</source>
-            <translation>The canvas has changed. Click Privacy redaction again</translation>
-        </message>
-        <message>
-            <source>没有发现可打码的敏感信息。请仍自行检查后再分享。</source>
-            <translation>No sensitive information was found to redact. Still check the image yourself before sharing.</translation>
-        </message>
-        <message>
-            <source>已打码 %1 处；请自行检查后再分享。</source>
-            <translation>%1 areas redacted; still check the image yourself before sharing.</translation>
-        </message>
-        <message>
-            <source>本机没有可用的文字识别后端：请安装系统语言包，或换用 Tesseract 语言包后再试</source>
-            <translation>No text recognition backend is available on this machine: install the system language pack, or switch to a Tesseract language pack and try again</translation>
-        </message>
-        <message>
-            <source>还没有可检查的图：先截一张图或打开一张图片，再发起隐私打码</source>
-            <translation>No image to check yet: capture a screenshot or open an image first, then start privacy redaction</translation>
-        </message>
-        <message>
-            <source>正在检查敏感信息…</source>
-            <translation>Checking for sensitive information…</translation>
-        </message>
-        <message>
-            <source>敏感信息检查失败：{}。请重试一次，或换一种语言再试</source>
-            <translation>Sensitive information check failed: {}. Try again, or switch to another language.</translation>
-        </message>
-        <message>
-            <source>批量打码只支持马赛克或高斯模糊，收到的是工具 0x{:X}。请把打码方式换成这两种之一再试</source>
-            <translation>Batch redaction only supports Mosaic or Gaussian blur, but received tool 0x{:X}. Switch the redaction style to one of these two and try again</translation>
-        </message>
-        <message>
-            <source>马赛克方块边长必须在 {} 到 {} 逻辑像素之间，收到的是 {}。请改用工具条上的细、中、粗一档再试</source>
-            <translation>The mosaic block size must be between {} and {} logical pixels, but received {}. Use one of the Fine, Medium, or Coarse steps on the toolbar and try again</translation>
-        </message>
-        <message>
-            <source>没有可打码的区域：这次没有给出可用的框。请重新检测，或手动框选画布内的区域</source>
-            <translation>There is nothing to redact: no usable boxes were given this time. Run the check again, or draw boxes on the canvas manually</translation>
-        </message>
-        <message>
-            <source>打码工具不在册：请检查工具登记表</source>
-            <translation>The redaction tool is not registered: check the tool registry</translation>
-        </message>
-        <message>
-            <source>这些打码框都落在画布之外或小到看不见：没有可打码的区域。请重新检测，或手动框选画布内的区域</source>
-            <translation>All of these redaction boxes fall outside the canvas or are too small to see: there is nothing to redact. Run the check again, or draw boxes on the canvas manually</translation>
-        </message>
-        <message>
-            <source>二维码/条形码</source>
-            <translation>QR code/barcode</translation>
-        </message>
-        <message>
-            <source>隐私打码</source>
-            <translation>Privacy redaction</translation>
-        </message>
-        <message>
-            <source>手机号</source>
-            <translation>Mobile number</translation>
-        </message>
-        <message>
-            <source>固定电话</source>
-            <translation>Landline</translation>
-        </message>
-        <message>
-            <source>身份证</source>
-            <translation>ID card</translation>
-        </message>
-        <message>
-            <source>银行卡</source>
-            <translation>Bank card</translation>
-        </message>
-        <message>
-            <source>邮箱</source>
-            <translation>Email</translation>
-        </message>
-        <message>
-            <source>IP 地址</source>
-            <translation>IP address</translation>
-        </message>
-        <message>
-            <source>隐私打码审核</source>
-            <translation>Privacy redaction review</translation>
-        </message>
-        <message>
-            <source>只在本机检测，未上传；请逐项确认，打码后可撤销。</source>
-            <translation>Detection runs on this machine only; nothing is uploaded. Review each item; the redactions can be undone.</translation>
-        </message>
-        <message>
-            <source>敏感信息清单</source>
-            <translation>Sensitive information list</translation>
-        </message>
-        <message>
-            <source>%1：%2</source>
-            <translation>%1: %2</translation>
-        </message>
-        <message>
-            <source>全选</source>
-            <translation>Select all</translation>
-        </message>
-        <message>
-            <source>全不选</source>
-            <translation>Select none</translation>
-        </message>
-        <message>
-            <source>打码方式</source>
-            <translation>Redaction style</translation>
-        </message>
-        <message>
-            <source>应用打码</source>
-            <translation>Apply redactions</translation>
-        </message>
-        <message>
-            <source>下拉列表</source>
-            <translation>Drop-down list</translation>
         </message>
 </context>
 </TS>
