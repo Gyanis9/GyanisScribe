@@ -8,7 +8,6 @@
 #include <QApplication>
 #include <QCheckBox>
 #include <QImage>
-#include <QImageReader>
 #include <QPainter>
 #include <QSet>
 #include <QStyle>
@@ -111,8 +110,8 @@ namespace
         return kind == ThemeKind::HighContrast ? 2 : 1;
     }
 
-    /// 按静态勾图资源自己画一张参照图：内容区与自绘勾取同一个矩形，判据不依赖 QSS 能否装载 SVG
-    QImage staticCheckReference(const ThemeKind kind, const QSize indicatorSize)
+    /// 按勾形资源自己画一张参照图：内容区与自绘勾取同一个矩形，判据不依赖样式表能否装载图片
+    QImage checkPathReference(const ThemeKind kind, const QSize indicatorSize)
     {
         const int inset = indicatorInset(kind);
         QImage    image{indicatorSize, QImage::Format_ARGB32_Premultiplied};
@@ -131,11 +130,11 @@ namespace
 } // namespace
 
 /**
- * @brief 钉住自绘复选框：QSS 静态勾图被抑制，勾选从缩小档弹回满幅
- * @details 关动画时勾选直接满幅；开动画后取消再勾选，缩放先落在 0.55，
- *          推进到弹簧稳定时长之后精确收在 1.0。
+ * @brief 钉住自绘复选框的勾选动画：勾从缩小档弹回满幅
+ * @details 指示器底与勾都由 Gui::CheckBox 自绘。关动画时勾选直接满幅；
+ *          开动画后取消再勾选，缩放先落在 0.55，推进到弹簧稳定时长之后精确收在 1.0。
  */
-TEST_F(CheckBoxFixture, SuppressesTheStaticQssCheckAndAnimatesTheCheck)
+TEST_F(CheckBoxFixture, AnimatesTheCheckFromTheCompressedStart)
 {
     qApp->setStyleSheet(ThemeManager::styleSheetFor(ThemeKind::Light));
     setTextThemeKind(ThemeKind::Light);
@@ -155,20 +154,70 @@ TEST_F(CheckBoxFixture, SuppressesTheStaticQssCheckAndAnimatesTheCheck)
 }
 
 /**
- * @brief 钉住渲染结果：动画中段与收尾都看得见勾，静态勾图不会在弹起首帧叠上来
- * @details 抓图数的是指示器内的 onAccent 像素；静态勾图的判据用同一份 SVG 自建的参照图，
- *          不要求 QSS 的 image 资源在当前运行目录里真能装载。
- *          弹簧在 100ms 时已经走到约 0.93，自绘勾与静态勾的落点几乎重合，
- *          所以静态图是否被抑制只能在弹起首帧（0.55）判断：那一刻参照图上的每个实心像素
+ * @brief 钉住指示器按状态自绘填充
+ * @details 方框填色不再来自样式表：静息取 controlFill，悬停取 hover，勾选取 accent，
+ *          禁用取 mutedFill。宿主铺红底，指示器中心必须是该状态对应的底；
+ *          悬停用 WA_UnderMouse 构造，与样式表判悬停读的是同一个属性。
+ */
+TEST_F(CheckBoxFixture, IndicatorFillFollowsTheState)
+{
+    for (const auto kind: {ThemeKind::Light, ThemeKind::Dark, ThemeKind::HighContrast})
+    {
+        qApp->setStyleSheet(ThemeManager::styleSheetFor(kind));
+        setTextThemeKind(kind);
+
+        QWidget host;
+        host.resize(240, 80);
+        host.setAutoFillBackground(true);
+        host.setPalette(QPalette{QColor{255, 0, 0}});
+        CheckBox box{&host};
+        box.setText(QStringLiteral("勾选项"));
+        box.setGeometry(24, 24, 180, 24);
+        host.show();
+        QCoreApplication::processEvents();
+
+        const QRect indicator = indicatorOnHost(box, host);
+        ASSERT_FALSE(indicator.isEmpty()) << "取不到指示器矩形，判据没有落点";
+        const auto centerOf = [&indicator](const QImage &image) { return image.pixelColor(indicator.center()); };
+
+        auto shot = host.grab().toImage();
+        EXPECT_EQ(centerOf(shot), paletteFor(kind).controlFill) << static_cast<int>(kind) << " 静息指示器底不是 controlFill";
+
+        box.setAttribute(Qt::WA_UnderMouse, true);
+        box.update();
+        QCoreApplication::processEvents();
+        shot = host.grab().toImage();
+        EXPECT_EQ(centerOf(shot), paletteFor(kind).hover) << static_cast<int>(kind) << " 悬停指示器底不是 hover";
+        box.setAttribute(Qt::WA_UnderMouse, false);
+
+        box.setChecked(true);
+        box.update();
+        QCoreApplication::processEvents();
+        shot = host.grab().toImage();
+        EXPECT_EQ(centerOf(shot), paletteFor(kind).accent) << static_cast<int>(kind) << " 勾选指示器底不是主色";
+
+        box.setEnabled(false);
+        box.update();
+        QCoreApplication::processEvents();
+        shot = host.grab().toImage();
+        EXPECT_EQ(centerOf(shot), paletteFor(kind).mutedFill) << static_cast<int>(kind) << " 禁用指示器底不是 mutedFill";
+
+        host.hide();
+    }
+}
+
+/**
+ * @brief 钉住勾的绘制：动画中段与收尾都看得见勾，收尾与勾形资源逐点同集
+ * @details 抓图数的是指示器内的 onAccent 像素；勾形参照图用同一份 SVG 自建，
+ *          样式表不再引用这张图，参照图只作为勾形的判据。
+ *          弹簧在 100ms 时已经走到约 0.93，自绘勾与满幅勾的落点几乎重合，
+ *          所以「弹起首帧仍收在缩小档」只能在缩放为 0.55 时判断：那一刻满幅勾的每个实心像素
  *          都该是主色底，而不是勾色。
- *          收尾帧的自绘勾必须与参照图逐点同集：高对比度档的指示器描边是 2px，
+ *          收尾帧的自绘勾必须与参照图逐点同集：高对比度档的指示器是 2px 边，
  *          内缩也必须是 2px，勾才会落在 18px 内容区里；少缩一像素时勾会压出这一集合。
  */
-TEST_F(CheckBoxFixture, PaintsTheCheckWhileAnimatedAndMatchesTheStaticPathAtRest)
+TEST_F(CheckBoxFixture, PaintsTheCheckWhileAnimatedAndMatchesTheReferencePathAtRest)
 {
-    // 缺 qsvg 时 QSS 的 image: url 不报错，只是静默不画，抑制判据会因此空转；这是部署缺陷，不能跳过
-    ASSERT_TRUE(QImageReader::supportedImageFormats().contains("svg")) << "qsvg image plugin missing; the static-check suppression test would be vacuous";
-
     for (const auto kind: {ThemeKind::Light, ThemeKind::HighContrast})
     {
         qApp->setStyleSheet(ThemeManager::styleSheetFor(kind));
@@ -187,8 +236,8 @@ TEST_F(CheckBoxFixture, PaintsTheCheckWhileAnimatedAndMatchesTheStaticPathAtRest
         const QRect indicator = indicatorOnHost(box, host);
         ASSERT_FALSE(indicator.isEmpty()) << "取不到指示器矩形，判据没有落点";
 
-        const QImage reference = staticCheckReference(kind, indicator.size());
-        ASSERT_FALSE(reference.isNull()) << "静态勾图参照图画不出来";
+        const QImage reference = checkPathReference(kind, indicator.size());
+        ASSERT_FALSE(reference.isNull()) << "勾形参照图画不出来";
         const QSet<QPoint> referencePixels = onAccentPixels(reference, QRect{QPoint{0, 0}, reference.size()});
         ASSERT_FALSE(referencePixels.isEmpty()) << "参照图上没有勾，判据没有可比的形状";
 
@@ -197,16 +246,16 @@ TEST_F(CheckBoxFixture, PaintsTheCheckWhileAnimatedAndMatchesTheStaticPathAtRest
         box.setChecked(true);
         EXPECT_DOUBLE_EQ(box.checkScale(), 0.55) << "勾选没有从缩小档起步";
 
-        // 弹起首帧：静态勾图若还在，它那些实心像素会出现在参照图的位置上
+        // 弹起首帧：勾仍收在缩小档，满幅勾的像素位置此刻应还是主色底
         const QImage       startShot   = host.grab().toImage();
         const QSet<QPoint> startPixels = onAccentPixels(startShot, indicator);
         for (const QPoint &point: referencePixels)
         {
-            EXPECT_FALSE(startPixels.contains(point)) << "弹起首帧里还画着静态勾图的像素 (" << point.x() << ", " << point.y() << ")";
+            EXPECT_FALSE(startPixels.contains(point)) << "弹起首帧里已经画着满幅勾的像素 (" << point.x() << ", " << point.y() << ")";
         }
-        // 静态勾图长笔画的远端：按 18px 内容区算，落在指示器内 (14, 5) 附近
+        // 满幅勾长笔画的远端：按 18px 内容区算，落在指示器内 (14, 5) 附近
         const QPoint farEnd = indicator.topLeft() + QPoint(indicatorInset(kind) + 13, indicatorInset(kind) + 5);
-        EXPECT_FALSE(isOnAccent(startShot.pixelColor(farEnd))) << "弹起首帧的勾已经伸到静态勾图的远端";
+        EXPECT_FALSE(isOnAccent(startShot.pixelColor(farEnd))) << "弹起首帧的勾已经伸到满幅勾的远端";
 
         box.advanceCheckAnimationForTesting(100);
         EXPECT_GT(box.checkScale(), 0.55);
@@ -221,9 +270,11 @@ TEST_F(CheckBoxFixture, PaintsTheCheckWhileAnimatedAndMatchesTheStaticPathAtRest
         box.setChecked(true);
         box.advanceCheckAnimationForTesting(600);
         EXPECT_DOUBLE_EQ(box.checkScale(), 1.0) << "弹簧没有收在 1.0";
-        const QSet<QPoint> endPixels = onAccentPixels(host.grab().toImage(), indicator);
+        const QImage       endShot   = host.grab().toImage();
+        const QSet<QPoint> endPixels = onAccentPixels(endShot, indicator);
         EXPECT_FALSE(endPixels.isEmpty()) << "收尾帧的指示器里没有勾色像素";
-        EXPECT_EQ(endPixels, referencePixels) << "收尾的勾没有落在静态勾图的同一批像素上";
+        EXPECT_EQ(endPixels, referencePixels) << "收尾的勾没有落在参照勾图的同一批像素上";
+        EXPECT_EQ(endShot.pixelColor(indicator.center()), paletteFor(kind).accent) << "勾选指示器的底不是自绘的主色";
 
         host.hide();
     }
@@ -231,9 +282,8 @@ TEST_F(CheckBoxFixture, PaintsTheCheckWhileAnimatedAndMatchesTheStaticPathAtRest
 
 /**
  * @brief 钉住勾选且禁用时勾仍看得见
- * @details 禁用档的指示器底落在 mutedFill（高对比度档是纯白），而 QSS 的 :disabled 规则排在
- *          :checked 之后，勾选底的主色会被压掉。勾若还按 onAccent 画，浅色档就是浅底白勾、
- *          高对比度档是白底白勾，等于没有勾。这三档都按次要文本色画。
+ * @details 禁用档的指示器底由自绘代码落在 mutedFill（高对比度档是纯白），勾若还按 onAccent 画，
+ *          浅色档就是浅底白勾、高对比度档是白底白勾，等于没有勾。这三档都按次要文本色画。
  */
 TEST_F(CheckBoxFixture, DisabledCheckedBoxStillPaintsAVisibleCheck)
 {

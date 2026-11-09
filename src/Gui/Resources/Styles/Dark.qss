@@ -166,7 +166,8 @@ QComboBox QAbstractItemView::item {
 
 /* 微调框的上下箭头由 Gui::SpinBox 自绘；下拉箭头用 styles 下的 chevron（见上面 QComboBox::down-arrow），
    两处都不再让原生风格画箭头。 */
-/* 勾选框自己画：勾的形状是 Resources/Styles 下的两份 SVG，深色档压的是深色对勾 */
+/* 勾选框自己画：指示器的填充、勾与连续曲率圆角由 Gui::CheckBox 自绘，
+   这里只留 18px 的内容尺寸与 1px 透明边框，占住 20px 的指示器与 22px 的行高。 */
 QCheckBox {
     spacing: 8px;
     color: #E8E8E3;
@@ -176,34 +177,11 @@ QCheckBox {
 QCheckBox::indicator {
     width: 18px;
     height: 18px;
-    background-color: #1A1A19;
     border: 1px solid transparent;
-    border-radius: 5px;
-}
-
-QCheckBox::indicator:hover {
-    background-color: #20201E;
-    border-color: #2A2A28;
-}
-
-QCheckBox::indicator:checked {
-    background-color: #4C8DFF;
-    border-color: transparent;
-    image: url(:/styles/CheckmarkOnAccentDark.svg);
-}
-
-QCheckBox::indicator:disabled {
-    background-color: #111110;
-    border-color: transparent;
 }
 
 QCheckBox:disabled {
     color: #B0B0AA;
-}
-
-/* 自绘复选框把静态勾图关掉：勾由 Gui::CheckBox 按 onAccent 画，方框仍走上面的底色与圆角 */
-QCheckBox[animatedIndicator="true"]::indicator:checked {
-    image: none;
 }
 
 /* ---- 菜单与工具提示：面板、描边与当前项高亮由 Gui::Menu 与 SquircleStyle 按连续曲率自绘，

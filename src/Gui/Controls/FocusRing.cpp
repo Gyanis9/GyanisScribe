@@ -1,5 +1,6 @@
 #include "Gui/Controls/FocusRing.h"
 
+#include "Core/Geometry/ContinuousCorner.h"
 #include "Gui/Controls/HotkeyEdit.h"
 
 #include <QAbstractButton>
@@ -115,18 +116,18 @@ namespace
         return widget;
     }
 
-    /// 按控件类型取圆角，与 QSS 里对应控件的 border-radius 对齐
-    int radiusFor(const QWidget &widget)
+    /// 按控件类型取连续曲率形状：勾选框指示器 5/0.25、工具按钮 8/0.35、其余控件 12/0.5
+    GyanisScribe::Core::CornerShape shapeFor(const QWidget &widget)
     {
         if (qobject_cast<const QCheckBox *>(&widget) != nullptr)
         {
-            return 5;
+            return GyanisScribe::Core::cornerShapeFor(GyanisScribe::Core::CornerRole::Indicator);
         }
         if (qobject_cast<const QToolButton *>(&widget) != nullptr)
         {
-            return 8;
+            return GyanisScribe::Core::cornerShapeFor(GyanisScribe::Core::CornerRole::Compact);
         }
-        return 12;
+        return GyanisScribe::Core::cornerShapeFor(GyanisScribe::Core::CornerRole::Control);
     }
 } // namespace
 
@@ -193,11 +194,11 @@ namespace GyanisScribe::Gui
         QPainter painter{this};
         painter.setRenderHint(QPainter::Antialiasing);
         painter.setBrush(Qt::NoBrush);
-        const int radius = radiusFor(*m_target);
+        const auto shape = shapeFor(*m_target);
 
         // 内环贴着控件边缘：rect 外扩 1px 后以 2px 笔宽描边，笔画落在外侧两像素上
         painter.setPen(QPen{m_palette.accent, kRingWidth});
-        painter.drawRoundedRect(QRectF(target).adjusted(-1.0, -1.0, 1.0, 1.0), radius + 1.0, radius + 1.0);
+        painter.drawPath(GyanisScribe::Core::continuousCornerPath(QRectF{target}.adjusted(-1.0, -1.0, 1.0, 1.0), shape));
 
         if (m_style == FocusRingStyle::Single)
         {
@@ -208,7 +209,7 @@ namespace GyanisScribe::Gui
         QColor outer = m_palette.accent;
         outer.setAlphaF(kOuterRingOpacity);
         painter.setPen(QPen{outer, kRingWidth});
-        painter.drawRoundedRect(QRectF(target).adjusted(-5.0, -5.0, 5.0, 5.0), radius + 5.0, radius + 5.0);
+        painter.drawPath(GyanisScribe::Core::continuousCornerPath(QRectF{target}.adjusted(-5.0, -5.0, 5.0, 5.0), shape));
     }
 
     FocusRingController::FocusRingController(PaletteProvider palette, QObject *parent) : QObject(parent), m_palette(std::move(palette))

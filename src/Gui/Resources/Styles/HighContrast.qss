@@ -165,7 +165,8 @@ QComboBox QAbstractItemView::item {
 
 /* 微调框的上下箭头由 Gui::SpinBox 自绘；下拉箭头用 styles 下的 chevron（见上面 QComboBox::down-arrow），
    两处都不再让原生风格画箭头。 */
-/* 勾选框自己画：勾的形状是 Resources/Styles 下的两份 SVG */
+/* 勾选框自己画：指示器的填充、2px 边与勾由 Gui::CheckBox 自绘，焦点也换成主色 2px 边；
+   这里只留 18px 的内容尺寸与 2px 透明边框，占住 22px 的指示器与 22px 的行高。 */
 QCheckBox {
     spacing: 8px;
     color: #000000;
@@ -175,33 +176,11 @@ QCheckBox {
 QCheckBox::indicator {
     width: 18px;
     height: 18px;
-    background-color: #FFFFFF;
-    border: 2px solid #000000;
-    border-radius: 5px;
-}
-
-QCheckBox::indicator:hover {
-    border-color: #0B57D0;
-}
-
-QCheckBox::indicator:checked {
-    background-color: #0B57D0;
-    border-color: #0B57D0;
-    image: url(:/styles/CheckmarkOnAccent.svg);
-}
-
-QCheckBox::indicator:disabled {
-    background-color: #FFFFFF;
-    border-color: #000000;
+    border: 2px solid transparent;
 }
 
 QCheckBox:disabled {
     color: #000000;
-}
-
-/* 自绘复选框把静态勾图关掉：勾由 Gui::CheckBox 按 onAccent 画，方框仍走上面的底色与圆角 */
-QCheckBox[animatedIndicator="true"]::indicator:checked {
-    image: none;
 }
 
 /* ---- 菜单与工具提示：面板、描边与当前项高亮由 Gui::Menu 与 SquircleStyle 按连续曲率自绘，
@@ -287,9 +266,6 @@ QFrame#toolbarSeparator {
     min-width: 1px;
 }
 
-/* ---- 键盘焦点：这一档不装焦点环覆盖层，输入类的 2px 主色焦点边由
-        ControlPalette::inputColors 自绘；勾选框给指示器换主色描边；
-        滑块的焦点反转由 Gui::Slider 自绘，样式表不再有滑块规则 ---- */
-QCheckBox::indicator:focus {
-    border: 2px solid #0B57D0;
-}
+/* ---- 键盘焦点：这一档不装焦点环覆盖层，输入类与按钮的 2px 主色焦点边由各自的自绘类
+        按 ControlPalette 画，勾选框更新指示器描边，滑块的焦点反转由 Gui::Slider 自绘；
+        样式表里不再有 :focus 规则 ---- */

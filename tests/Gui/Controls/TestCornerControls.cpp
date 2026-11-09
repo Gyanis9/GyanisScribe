@@ -1,5 +1,6 @@
 #include "Core/Geometry/ContinuousCorner.h"
 #include "Gui/Controls/Button.h"
+#include "Gui/Controls/CheckBox.h"
 #include "Gui/Controls/ComboBox.h"
 #include "Gui/Controls/FontItemDelegate.h"
 #include "Gui/Controls/ItemDelegate.h"
@@ -258,6 +259,44 @@ TEST_F(CornerControlsFixture, ButtonSelfPaintsHighContrastBorderAndFocusEdge)
     QCoreApplication::processEvents();
     image = host.grab().toImage();
     EXPECT_EQ(image.pixelColor(11, 26), palette.accent) << "聚焦后没有换成主色焦点边";
+}
+
+/**
+ * @brief 钉住勾选指示器是连续曲率的自绘方框
+ * @details 勾选底由 Gui::CheckBox 按 Indicator 档自绘：中心必须是主色；
+ *          宿主铺红底，指示器左上角必须露出宿主色，方角没有把整块矩形填满。
+ *          样式表只留尺寸占位。
+ */
+TEST_F(CornerControlsFixture, CheckedIndicatorIsAContinuousCorner)
+{
+    struct StyleSheetGuard
+    {
+        QString previous = qApp->styleSheet();
+
+        ~StyleSheetGuard()
+        {
+            qApp->setStyleSheet(previous);
+        }
+    } guard;
+    qApp->setStyleSheet(GyanisScribe::Gui::ThemeManager::styleSheetFor(GyanisScribe::Gui::ThemeKind::Light));
+
+    QWidget host;
+    host.resize(160, 60);
+    host.setAutoFillBackground(true);
+    host.setPalette(QPalette{QColor{255, 0, 0}});
+    auto *check = new GyanisScribe::Gui::CheckBox{&host};
+    check->setText(QStringLiteral("勾选"));
+    check->setChecked(true);
+    check->setGeometry(20, 15, 120, 30);
+    host.show();
+    QCoreApplication::processEvents();
+
+    const QImage image     = host.grab().toImage();
+    const QRect  indicator = GyanisScribe::Gui::CheckBox::indicatorRectForTesting(*check);
+    ASSERT_FALSE(indicator.isEmpty()) << "取不到指示器矩形，判据没有落点";
+    const QRect onHost{check->mapTo(&host, indicator.topLeft()), indicator.size()};
+    EXPECT_EQ(image.pixelColor(onHost.center()), GyanisScribe::Gui::activePalette().accent) << "勾选指示器没有铺主色底";
+    EXPECT_EQ(image.pixelColor(onHost.left(), onHost.top()), QColor(255, 0, 0)) << "指示器左上角不该被填满";
 }
 
 /**

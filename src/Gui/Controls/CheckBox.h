@@ -1,6 +1,6 @@
 /**
  * @file CheckBox.h
- * @brief 带弹性对勾的复选框：方框仍由样式表绘制，勾由本类自绘
+ * @brief 自绘指示器与弹性对勾的复选框
  * @author Gyanis
  * @date 2026-10-24
  * @version 0.0.1
@@ -17,9 +17,10 @@ namespace GyanisScribe::Gui
 {
     /**
      * @brief 弹性对勾复选框
-     * @details 方框的填充、描边与圆角仍由 QSS 的 ::indicator 规则绘制；本类通过 animatedIndicator
-     *          动态属性让 QSS 关掉静态勾图，勾选时用 kPopSpring 从 0.55 弹到 1.0，并按 onAccent 自绘勾。
-     *          取消勾选不播动画，直接恢复满幅。
+     * @details 指示器的填充、描边与连续曲率圆角都由本类自绘：静息取 controlFill，悬停取 hover，
+     *          勾选取 accent，禁用取 mutedFill；高对比度档另给 2px 边，焦点、勾选与悬停用主色，
+     *          静息用 borderStrong。样式表的 ::indicator 只保留尺寸与透明边框占位。
+     *          勾选时勾按 kPopSpring 从 0.55 弹到 1.0，并按 onAccent 自绘；取消勾选不播动画，直接恢复满幅。
      */
     class CheckBox final : public QCheckBox
     {
@@ -59,11 +60,18 @@ namespace GyanisScribe::Gui
          */
         void advanceCheckAnimationForTesting(int milliseconds);
 
+        /**
+         * @brief 取指示器矩形，供用例核对自绘落点
+         * @param box 目标复选框
+         * @return 与 paintEvent 自绘时相同的指示器矩形
+         */
+        [[nodiscard]] static QRect indicatorRectForTesting(const CheckBox &box);
+
     protected:
         /**
          * @brief 绘制复选框
-         * @details 重写 QCheckBox::paintEvent()：先让基类画方框、文字与图标，
-         *          勾选时再按 checkScale 围绕方框中心缩放，用 QPainterPath 画勾。
+         * @details 重写 QCheckBox::paintEvent()：先按状态在指示器矩形里铺连续曲率底与描边，
+         *          再让基类画文字与图标；勾选时最后按 checkScale 围绕方框中心缩放，用 QPainterPath 画勾。
          * @param event 重绘事件
          */
         void paintEvent(QPaintEvent *event) override;
@@ -71,7 +79,7 @@ namespace GyanisScribe::Gui
     private:
         /**
          * @brief 取勾选框指示器的矩形
-         * @return 与 QSS 的 ::indicator 同源的矩形，按当前布局与样式算
+         * @return 与样式表 ::indicator 同源的矩形，按当前布局与样式算
          */
         [[nodiscard]] QRect indicatorRect() const;
 

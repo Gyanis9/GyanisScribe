@@ -66,7 +66,7 @@ namespace GyanisScribe::Gui
         /**
          * @brief 画焦点环
          * @param event 绘制事件，未使用
-         * @details 重写 QWidget::paintEvent()：不铺底，只按当前形状描环；
+         * @details 重写 QWidget::paintEvent()：不铺底，只按连续曲率路径描环，形状随目标控件取档；
          *          双环由贴边内环与 32% 透明度的外环组成，单环只画贴边那一圈。
          */
         void paintEvent(QPaintEvent *event) override;

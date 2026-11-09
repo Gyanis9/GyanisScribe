@@ -3,8 +3,8 @@
    设计里带透明度的线（滚动条滑块）在色板里没有角色，按 rgba 字面量写——
    那道同解门禁只扫 #RRGGBB，这个位置是仅有的例外，改它要连同本注释一起看。
    字号与字重不在这里：排版走 Gui::applyTextRole，点值随系统 DPI 缩放，而样式表的 px 不缩。
-   勾与下拉箭头走 Resources/Styles 下的 SVG，微调框上下按钮由 Gui::SpinBox 自绘，
-   都不再由原生风格画；QPalette（Gui::buildApplicationPalette）补原生文字、占位与禁用几档颜色，
+   勾选框指示器与勾由 Gui::CheckBox 自绘，下拉箭头走 Resources/Styles 下的 SVG，
+   微调框上下按钮由 Gui::SpinBox 自绘，都不再由原生风格画；QPalette（Gui::buildApplicationPalette）补原生文字、占位与禁用几档颜色，
    另把 AlternateBase 设成 mutedFill，自绘微调框的上下按钮悬停时取它当底。 */
 
 /* ---- 面：只有具名的根与卡片铺底。裸 QWidget 一律不铺——铺了就是每个子控件各画一块底，
@@ -171,8 +171,8 @@ QComboBox QAbstractItemView::item {
 
 /* 微调框的上下箭头由 Gui::SpinBox 自绘；下拉箭头用 styles 下的 chevron（见上面 QComboBox::down-arrow），
    两处都不再让原生风格画箭头。 */
-/* 勾选框自己画：不覆盖 ::indicator 时，原生风格按系统深浅色画那枚方框，
-   应用切成深色而系统留在浅色就会带进一块白底。勾的形状是 Resources/Styles 下的两份 SVG。 */
+/* 勾选框自己画：指示器的填充、勾与连续曲率圆角由 Gui::CheckBox 自绘，
+   这里只留 18px 的内容尺寸与 1px 透明边框，占住 20px 的指示器与 22px 的行高。 */
 QCheckBox {
     spacing: 8px;
     color: #141412;
@@ -182,34 +182,11 @@ QCheckBox {
 QCheckBox::indicator {
     width: 18px;
     height: 18px;
-    background-color: #F2F2EE;
     border: 1px solid transparent;
-    border-radius: 5px;
-}
-
-QCheckBox::indicator:hover {
-    background-color: #E9E9E4;
-    border-color: #E2E2DD;
-}
-
-QCheckBox::indicator:checked {
-    background-color: #236DE9;
-    border-color: transparent;
-    image: url(:/styles/CheckmarkOnAccent.svg);
-}
-
-QCheckBox::indicator:disabled {
-    background-color: #EDEDE9;
-    border-color: transparent;
 }
 
 QCheckBox:disabled {
     color: #53534D;
-}
-
-/* 自绘复选框把静态勾图关掉：勾由 Gui::CheckBox 按 onAccent 画，方框仍走上面的底色与圆角 */
-QCheckBox[animatedIndicator="true"]::indicator:checked {
-    image: none;
 }
 
 /* ---- 菜单与工具提示：面板、描边与当前项高亮由 Gui::Menu 与 SquircleStyle 按连续曲率自绘，

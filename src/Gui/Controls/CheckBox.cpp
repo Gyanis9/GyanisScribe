@@ -1,5 +1,7 @@
 #include "Gui/Controls/CheckBox.h"
 
+#include "Core/Geometry/ContinuousCorner.h"
+#include "Gui/Theme/CornerStyle.h"
 #include "Gui/Theme/DesignTokens.h"
 
 #include <QPainter>
@@ -11,7 +13,7 @@ namespace GyanisScribe::Gui
 {
     CheckBox::CheckBox(QWidget *parent) : QCheckBox(parent), m_spring(this)
     {
-        // 动态属性让 QSS 关掉 ::indicator:checked 的静态勾图，方框的底色与圆角仍走样式表
+        // 标记指示器由本类自绘：样式表只留尺寸占位，底与勾都不再从 QSS 取
         setProperty("animatedIndicator", true);
         m_spring.setSpec(kPopSpring);
         m_spring.setImmediate(1.0);
@@ -47,6 +49,11 @@ namespace GyanisScribe::Gui
         m_spring.advanceBy(milliseconds);
     }
 
+    QRect CheckBox::indicatorRectForTesting(const CheckBox &box)
+    {
+        return box.indicatorRect();
+    }
+
     void CheckBox::onToggled(const bool checked)
     {
         if (!checked)
@@ -72,6 +79,45 @@ namespace GyanisScribe::Gui
 
     void CheckBox::paintEvent(QPaintEvent *event)
     {
+        // 指示器底与描边按状态自绘；样式表的 ::indicator 只保留 18px 尺寸与透明边框占位。
+        // 画笔先收在作用域里：基类 paintEvent 会在同一个控件上另开一支 QPainter
+        {
+            QPainter painter{this};
+            painter.setRenderHint(QPainter::Antialiasing, true);
+            const auto     &palette = activePalette();
+            const ThemeKind kind    = activeThemeKind();
+            const QRectF    box{indicatorRect()};
+
+            // 状态次序与样式表的覆盖次序一致：禁用压过勾选，勾选压过悬停
+            QColor fill = palette.controlFill;
+            if (!isEnabled())
+            {
+                fill = palette.mutedFill;
+            } else if (isChecked())
+            {
+                fill = palette.accent;
+            } else if (underMouse())
+            {
+                fill = palette.hover;
+            }
+
+            QColor border;
+            int    borderWidth = 0;
+            if (kind == ThemeKind::HighContrast)
+            {
+                // 这一档不装焦点环覆盖层：焦点、勾选与悬停都靠 2px 主色边表达，静息是 2px borderStrong
+                border      = (hasFocus() || isChecked() || underMouse()) ? palette.accent : palette.borderStrong;
+                borderWidth = 2;
+            } else if (underMouse() && !isChecked())
+            {
+                border      = palette.borderStrong;
+                borderWidth = themeBorderWidth(kind);
+            }
+
+            Core::paintContinuousCorner(painter, box, Core::cornerShapeFor(Core::CornerRole::Indicator), fill,
+                                        borderWidth > 0 ? QPen{border, static_cast<qreal>(borderWidth)} : QPen{Qt::NoPen});
+        }
+
         QCheckBox::paintEvent(event);
         if (!isChecked())
         {

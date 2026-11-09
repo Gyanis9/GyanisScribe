@@ -2,6 +2,7 @@
 // 零边距行与滚动区的宿主选择、下拉框/微调框的内部行编辑映射、移动缩放跟随、
 // 只读控件跳过、主题切换重装，以及勾选的工具按钮仍要拿到单环。
 // 与 TestControlsChrome 同进程，共用它那份 QApplication。
+#include "Gui/Controls/CheckBox.h"
 #include "Gui/Controls/FocusRing.h"
 #include "Gui/Controls/LineEdit.h"
 
@@ -22,6 +23,7 @@
 #include <QToolButton>
 #include <QWidget>
 
+#include <cmath>
 #include <memory>
 
 using GyanisScribe::Gui::FocusRingController;
@@ -86,6 +88,40 @@ TEST_F(FocusRingFixture, LineEditFocusDrawsTwoRingsOutsideTheField)
     EXPECT_TRUE(isBluish(shot.pixelColor(left - 1, y))) << "内环没贴住输入框边缘";
     EXPECT_FALSE(isBluish(shot.pixelColor(left - 3, y))) << "双环之间没有露出父底色的空隙";
     EXPECT_TRUE(isBluish(shot.pixelColor(left - 5, y))) << "外环没画出来";
+}
+
+/**
+ * @brief 钉住焦点环的角部按连续曲率切掉，外环保持 32% 透明度
+ * @details 内环与外环都由 Core::continuousCornerPath 生成：环矩形左上角落在曲线外，
+ *          方角环本会描到那里；同一环的左侧中点必须仍贴着主色。
+ *          外环是 32% 透明度的主色压在白底上，中点取色的每个通道都要与这档混合值一致。
+ */
+TEST_F(FocusRingFixture, FocusRingCornersFollowTheContinuousPath)
+{
+    QWidget host;
+    host.setStyleSheet(QStringLiteral("background-color: #FFFFFF;"));
+    host.resize(260, 90);
+    auto *edit = new QLineEdit{&host};
+    edit->setGeometry(40, 30, 180, 32);
+    host.show();
+    edit->setFocus();
+    QCoreApplication::processEvents();
+
+    const auto shot = host.grab().toImage();
+    const int  y    = edit->geometry().center().y();
+    const int  left = edit->geometry().left();
+    const int  top  = edit->geometry().top();
+
+    EXPECT_TRUE(isBluish(shot.pixelColor(left - 1, y))) << "内环左侧中点不是主色";
+    EXPECT_TRUE(isBluish(shot.pixelColor(left - 5, y))) << "外环左侧中点没画出来";
+    EXPECT_FALSE(isBluish(shot.pixelColor(left - 5, top - 5))) << "外环左上角没被连续曲率切掉";
+
+    // 外环色 = 主色按 32% 透明度压在白底上：82 是 QColor::setAlphaF(0.32) 的整数字节
+    const auto blended = [](const int accent) { return (accent * 82 + 255 * (255 - 82)) / 255; };
+    const auto outer   = shot.pixelColor(left - 5, y);
+    EXPECT_LE(std::abs(outer.red() - blended(kLightPalette.accent.red())), 4) << "外环红色分量不是 32% 主色";
+    EXPECT_LE(std::abs(outer.green() - blended(kLightPalette.accent.green())), 4) << "外环绿色分量不是 32% 主色";
+    EXPECT_LE(std::abs(outer.blue() - blended(kLightPalette.accent.blue())), 4) << "外环蓝色分量不是 32% 主色";
 }
 
 /**
@@ -154,7 +190,8 @@ TEST_F(FocusRingFixture, CheckBoxGetsASingleRingAroundTheIndicator)
     QWidget host;
     host.setStyleSheet(QStringLiteral("background-color: #FCFCFB;"));
     host.resize(220, 70);
-    auto *check = new QCheckBox{QStringLiteral("勾选项"), &host};
+    auto *check = new GyanisScribe::Gui::CheckBox{&host};
+    check->setText(QStringLiteral("勾选项"));
     check->setGeometry(20, 20, 160, 24);
     host.show();
     check->setFocus();
