@@ -52,6 +52,7 @@
 #include <QImage>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QListWidget>
 #include <QMessageBox>
 #include <QMouseEvent>
 #include <QPushButton>
@@ -2086,6 +2087,33 @@ namespace GyanisScribe
 
         m_controller->openMainWindow(Main::MainWindowPage::Memory);
         EXPECT_TRUE(memoryRows().empty()) << "打开记忆页没有先清理原图缺失的行";
+    }
+
+    /**
+     * @brief 钉住从左侧导航行进记忆库页也会清掉原图缺失的行
+     * @details 用户点导航行不经过控制器：清理与重读只能挂在窗口的「进入这一页」上，
+     *          否则原图被删的那些行要等到下一次从托盘打开才消失，用户当下看到的全是空卡。
+     */
+    TEST_F(AppControllerFixture, EnteringTheMemoryPageFromTheNavRowPrunesRowsWhoseFileIsGone)
+    {
+        m_memoryEnabled = true;
+        makeController();
+        auto &memory = m_controller->memoryCoordinatorForTesting();
+
+        Core::MemoryUpsert gone;
+        gone.filePath   = m_root / "gone-nav" / "missing.png";
+        gone.capturedAt = QDateTime::currentDateTime();
+        gone.size       = QSize{32, 24};
+        ASSERT_TRUE(memory.index().upsertPending(gone).has_value());
+        ASSERT_EQ(memoryRows().size(), 1);
+
+        auto *window = mainWindowOnDesk();
+        ASSERT_NE(window, nullptr);
+        auto *navRows = window->findChild<QListWidget *>(QStringLiteral("settingsNav"));
+        ASSERT_NE(navRows, nullptr) << "主窗口没有导航行";
+
+        navRows->setCurrentRow(Main::indexOfMainWindowPage(Main::MainWindowPage::Memory));
+        EXPECT_TRUE(memoryRows().empty()) << "从导航行进记忆库页没有清掉原图缺失的行";
     }
 
 } // namespace GyanisScribe

@@ -1687,6 +1687,16 @@ namespace GyanisScribe::Main
                          });
 
         QObject::connect(m_nav, &QListWidget::currentRowChanged, m_stack, &QStackedWidget::setCurrentIndex);
+        // 导航行停到记忆库也算「进了这一页」：托盘、导航与 open() 三条路都要走到清理与重读，
+        // 不能只有托盘那条经过控制器；行号与页的对应关系仍只认 pageChoices()
+        QObject::connect(m_nav, &QListWidget::currentRowChanged, this,
+                         [this](const int row)
+                         {
+                             if (row == indexOfMainWindowPage(MainWindowPage::Memory))
+                             {
+                                 emit memoryPageShown();
+                             }
+                         });
         m_nav->setCurrentRow(0);
 
         layout->addWidget(m_nav);
@@ -1714,8 +1724,15 @@ namespace GyanisScribe::Main
             return;
         }
         // 两边都摆到位：导航已经停在这一行时 currentRowChanged 不再发信号，只设导航会让页容器留在原处
+        const bool rowChanged = m_nav->currentRow() != index;
         m_nav->setCurrentRow(index);
         m_stack->setCurrentIndex(index);
+        // 切行那一次已经由导航行报过进入这一页；停在原地再打开同一页时那一路不发信号，这里补上，
+        // 于是一次打开只报一次
+        if (!rowChanged && page == MainWindowPage::Memory)
+        {
+            emit memoryPageShown();
+        }
         show();
         raise();
         activateWindow();

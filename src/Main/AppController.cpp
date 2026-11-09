@@ -209,6 +209,15 @@ namespace GyanisScribe::Main
         QObject::connect(m_memory.get(), &GyanisScribe::App::MemoryCoordinator::importProgress, m_mainWindow.get(), &MainWindow::setMemoryImportProgress);
         QObject::connect(m_memory.get(), &GyanisScribe::App::MemoryCoordinator::importFinished, m_mainWindow.get(), &MainWindow::hideMemoryImportProgress);
         QObject::connect(m_memory.get(), &GyanisScribe::App::MemoryCoordinator::consentRequested, this, &AppController::showMemoryConsent);
+        // 进到记忆库页那一下先清掉原图已不在的行再重读列表：导航行、托盘与 open() 都经过窗口的那一条信号，
+        // 因此不必每个入口各写一遍
+        QObject::connect(m_mainWindow.get(), &MainWindow::memoryPageShown, this,
+                         [this]
+                         {
+                             m_memory->pruneMissing();
+                             // 一条都没删时 pruneMissing 不发 changed，列表仍按当前索引重读一次
+                             m_mainWindow->refreshMemory();
+                         });
         QObject::connect(m_mainWindow.get(), &MainWindow::memoryPinRequested, m_history.get(), &GyanisScribe::App::HistoryCoordinator::requestPin);
         QObject::connect(m_mainWindow.get(), &MainWindow::memoryOpenFolderRequested, m_history.get(), &GyanisScribe::App::HistoryCoordinator::openContainingFolder);
         QObject::connect(m_mainWindow.get(), &MainWindow::memoryOpenFileRequested, this,
@@ -548,11 +557,7 @@ namespace GyanisScribe::Main
 
     void AppController::openMainWindow(const MainWindowPage page)
     {
-        if (page == MainWindowPage::Memory)
-        {
-            // 打开这一页那一下顺手清掉原图已不在的行：导入的文件被移动或删除之后只剩一张空卡
-            m_memory->pruneMissing();
-        }
+        // 记忆库页的清理与重读挂在 MainWindow::memoryPageShown 上：导航行直接切页也走同一处
         m_mainWindow->open(page);
     }
 

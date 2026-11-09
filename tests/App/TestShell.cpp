@@ -287,7 +287,7 @@ TEST(MainWindowMapping, ThemeChoicesAndIndicesPointAtEachOther)
  */
 TEST(MainWindowMapping, PageChoicesBindIndexPageLabelAndIcon)
 {
-    constexpr std::array<std::tuple<MainWindowPage, std::string_view, std::string_view>, 10> expectedPages = {
+    constexpr std::array<std::tuple<MainWindowPage, std::string_view, std::string_view>, 11> expectedPages = {
             std::tuple{MainWindowPage::General, std::string_view{"通用"}, std::string_view{"Settings"}},
             std::tuple{MainWindowPage::Capture, std::string_view{"截图"}, std::string_view{"Capture"}},
             std::tuple{MainWindowPage::Annotation, std::string_view{"标注"}, std::string_view{"Annotation"}},
@@ -298,6 +298,7 @@ TEST(MainWindowMapping, PageChoicesBindIndexPageLabelAndIcon)
             std::tuple{MainWindowPage::Theme, std::string_view{"主题"}, std::string_view{"Theme"}},
             std::tuple{MainWindowPage::About, std::string_view{"关于"}, std::string_view{"About"}},
             std::tuple{MainWindowPage::History, std::string_view{"历史"}, std::string_view{"History"}},
+            std::tuple{MainWindowPage::Memory, std::string_view{"记忆库"}, std::string_view{"History"}},
     };
 
     const auto pages = pageChoices();

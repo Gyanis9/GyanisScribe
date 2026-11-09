@@ -381,6 +381,13 @@ namespace GyanisScribe::Main
         void historyClearRequested();
 
         /**
+         * @brief 真正进到记忆库页的那一下
+         * @details 导航行、托盘菜单与 open() 三条路都从这一条报出，控制器据此清掉原图已不在的行再重读列表；
+         *          一次进入只报一次，停在原地不报，离开这一页也不报。
+         */
+        void memoryPageShown();
+
+        /**
          * @brief 记忆页要求把这条截图重新贴回屏幕
          * @param filePath 原图路径
          */

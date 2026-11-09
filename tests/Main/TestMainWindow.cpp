@@ -355,6 +355,42 @@ namespace
     }
 
     /**
+     * @brief 钉住「进到记忆库页」的信号把导航行与 open() 两条路都算进来，且一次进入只报一次
+     * @details 控制器靠这一条做清理与重读；只在 open() 里报的话，用户点导航行那一趟就没有人清理，
+     *          已删的文件会一直挂在列表上。反过来两条路各报一次，就会清理两遍、提示两遍。
+     */
+    TEST_F(MainWindowFixture, MemoryPageShownFiresOncePerEntry)
+    {
+        makeWindow();
+        const auto memoryAt = GyanisScribe::Main::indexOfMainWindowPage(MainWindowPage::Memory);
+        ASSERT_GE(memoryAt, 0) << "导航表里没有记忆库";
+        auto *navRows = nav();
+        ASSERT_NE(navRows, nullptr);
+
+        int shown = 0;
+        QObject::connect(m_window.get(), &MainWindow::memoryPageShown, m_window.get(), [&shown] { ++shown; });
+
+        m_window->open(MainWindowPage::Memory);
+        EXPECT_EQ(shown, 1) << "open(Memory) 没有报出进入记忆库页";
+
+        m_window->open(MainWindowPage::History);
+        EXPECT_EQ(shown, 1) << "离开记忆库页也报了进入";
+
+        m_window->open(MainWindowPage::Memory);
+        EXPECT_EQ(shown, 2) << "从别的页再打开记忆库没有报出";
+        EXPECT_EQ(navRows->currentRow(), memoryAt);
+
+        navRows->setCurrentRow(0);
+        EXPECT_EQ(shown, 2) << "导航行切到别的页也报了进入";
+        navRows->setCurrentRow(memoryAt);
+        EXPECT_EQ(shown, 3) << "导航行切到记忆库没有报出";
+        EXPECT_EQ(stack()->currentIndex(), memoryAt) << "导航行切到记忆库时页容器没有跟上";
+
+        m_window->open(MainWindowPage::Memory);
+        EXPECT_EQ(shown, 4) << "已经停在记忆库页时再打开没有报出";
+    }
+
+    /**
      * @brief 钉住通用页的「截图记忆」勾选与功能状态双向同步，并且不动 QWidget::setEnabled
      * @details 勾选是给用户看的开关，不是禁用整页：用 setEnabled 改名前的名字会把这一页整片灰掉。
      *          设置器回写勾选时不许再发 memoryEnabledToggled，否则控制器会收到一个自己造成的回声。
