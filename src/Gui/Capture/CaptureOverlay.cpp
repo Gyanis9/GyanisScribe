@@ -12,6 +12,7 @@
 #include "Gui/Controls/AppShortcuts.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Controls/KeyStep.h"
+#include "Gui/Controls/LineEdit.h"
 
 #include <QFont>
 #include <QFontMetrics>
@@ -1027,7 +1028,7 @@ namespace GyanisScribe::Gui
     {
         if (m_sizeEditor == nullptr)
         {
-            m_sizeEditor = new QLineEdit{this};
+            m_sizeEditor = new Gui::LineEdit{this};
             m_sizeEditor->setObjectName(QStringLiteral("overlaySizeEditor"));
             m_sizeEditor->setAlignment(Qt::AlignCenter);
             m_sizeEditor->setFixedWidth(kSizeEditorWidth);

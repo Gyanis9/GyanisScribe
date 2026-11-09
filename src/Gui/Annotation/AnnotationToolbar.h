@@ -25,7 +25,6 @@
 class QComboBox;
 class QFontComboBox;
 class QMenu;
-class QSlider;
 class QToolButton;
 
 namespace GyanisScribe::Core
@@ -35,6 +34,7 @@ namespace GyanisScribe::Core
 
 namespace GyanisScribe::Gui
 {
+    class Slider;
 
     /**
      * @brief 工具按钮的登记表：顺序、图标名、中文名与界面按键标识一处对齐
@@ -359,6 +359,14 @@ namespace GyanisScribe::Gui
          */
         void wheelEvent(QWheelEvent *event) override;
 
+        /**
+         * @brief 画工具栏的连续曲率面板与边框
+         * @details 重写 QWidget::paintEvent()：嵌入标注窗时工具栏不再走样式表铺底，
+         *          面板由本控件自绘，宿主提供的那一层底色只从圆角外露出
+         * @param event 绘制事件
+         */
+        void paintEvent(QPaintEvent *event) override;
+
     private:
         /**
          * @brief 建一个带图标、tooltip 与无障碍名称的按钮
@@ -436,7 +444,7 @@ namespace GyanisScribe::Gui
         QToolButton                                 *m_privacyButton        = nullptr;                                       ///< 隐私打码按钮；无宿主时由 setPrivacyAvailable 收起
         QToolButton                                 *m_undoButton           = nullptr;                                          ///< 撤销按钮
         QToolButton                                 *m_redoButton           = nullptr;                                          ///< 重做按钮
-        QSlider                                     *m_widthSlider          = nullptr;                                          ///< 线宽滑块，档位对齐 kAnnotationWidths
+        Slider                                      *m_widthSlider          = nullptr;                                          ///< 线宽滑块，档位对齐 kAnnotationWidths
         QComboBox                                   *m_fontSizeCombo        = nullptr;                                          ///< 字号下拉，取值对齐 kFontSizes
         QToolButton                                 *m_fillButton           = nullptr;                                          ///< 填充档按钮，点一下走一档
         QToolButton                                 *m_roundedRectButton    = nullptr;                                          ///< 圆角矩形开关，按下表示切圆角

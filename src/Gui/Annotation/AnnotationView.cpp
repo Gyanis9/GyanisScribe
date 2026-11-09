@@ -13,6 +13,8 @@
 #include <QRectF>
 #include <QTextCursor>
 #include <QTextDocument>
+#include "Gui/Controls/TextEdit.h"
+
 #include <QTextEdit>
 
 #include <algorithm>
@@ -498,7 +500,7 @@ namespace GyanisScribe::Gui
         }
 
         m_reEditingText = reEditing;
-        m_textEditor    = new QTextEdit{this};
+        m_textEditor    = new Gui::TextEdit{Core::CornerRole::Control, this};
         // 样式表按这个名字给它输入类那一档的样子：不挂名字就会落到识别结果区那条宽内边距的规则上
         m_textEditor->setObjectName(QStringLiteral("annotationTextEditor"));
         m_textEditor->setAcceptRichText(false);

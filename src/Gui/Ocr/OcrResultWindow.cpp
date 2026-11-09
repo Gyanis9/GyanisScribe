@@ -6,6 +6,9 @@
 #include "Base/Text.h"
 #include "Plugins/OcrEngines/OcrEngineFactory.h"
 #include "Core/Ocr/OcrTextExporter.h"
+#include "Gui/Controls/Button.h"
+#include "Gui/Controls/ComboBox.h"
+#include "Gui/Controls/TextEdit.h"
 #include "Gui/Resources/IconProvider.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Theme/ThemeManager.h"
@@ -116,7 +119,7 @@ namespace
      */
     QToolButton *makeToolButton(GyanisScribe::Gui::IconProvider &icons, std::string_view iconName, const QString &label)
     {
-        auto *button = new QToolButton;
+        auto *button = new GyanisScribe::Gui::ToolButton;
         button->setIcon(icons.icon(iconName));
         button->setToolTip(label);
         button->setAccessibleName(label);
@@ -199,7 +202,7 @@ namespace GyanisScribe::Gui
         auto *right = new QVBoxLayout;
         root->addLayout(right, 2);
 
-        m_text = new QTextEdit;
+        m_text = new Gui::TextEdit;
         m_text->setReadOnly(true);
         m_text->setAccessibleName(GyanisScribe::Base::uiText("识别文本"));
         right->addWidget(m_text);
@@ -219,7 +222,7 @@ namespace GyanisScribe::Gui
         auto *exportJson  = makeToolButton(m_icons, "Save", GyanisScribe::Base::uiText("导出 JSON"));
         auto *rerun       = makeToolButton(m_icons, "Refresh", GyanisScribe::Base::uiText("重新识别"));
         auto *closeButton = makeToolButton(m_icons, "Close", GyanisScribe::Base::uiText("关闭"));
-        m_language        = new QComboBox;
+        m_language        = new Gui::ComboBox;
         m_language->addItems(Core::supportedOcrLanguageTags());
         m_language->setAccessibleName(GyanisScribe::Base::uiText("识别语言"));
 

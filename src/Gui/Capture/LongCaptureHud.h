@@ -78,6 +78,15 @@ namespace GyanisScribe::Gui
          */
         void cancelled();
 
+    protected:
+        /**
+         * @brief 画控制条的连续曲率面板与边框
+         * @details 重写 QWidget::paintEvent()：工具窗透明，圆角外不落系统底色；
+         *          面板底的 surface 与 borderStrong 微边缘由本控件自绘
+         * @param event 绘制事件
+         */
+        void paintEvent(QPaintEvent *event) override;
+
     private:
         QLabel *m_readout = nullptr; ///< 读数那一行，setReadout 写在这里
     };

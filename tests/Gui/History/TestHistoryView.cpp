@@ -1,4 +1,5 @@
 #include "Core/History/HistoryThumbnail.h"
+#include "Gui/Controls/ListWidget.h"
 #include "Gui/History/HistoryView.h"
 
 #include "Core/History/HistoryStore.h"
@@ -396,6 +397,28 @@ TEST(HistoryThumbnail, SquaresAreUniformAndCornersAreCut)
 
     EXPECT_TRUE(makeThumbnail(QImage{}, {kThumbnailEdge, kThumbnailEdge}, kThumbnailCornerRadius).isNull());
     EXPECT_TRUE(makeThumbnail(source, {0, 0}, kThumbnailCornerRadius).isNull());
+}
+
+/**
+ * @brief 钉住同一张缩略图在 1 倍与 2 倍下切出同一个逻辑形状
+ * @details 列表按 96 逻辑像素摆，2 倍图是 192 像素；半径若只按角色里的 6 像素走，
+ *          2 倍图上那个角看上去只剩一半。判据取 (2,2)：按 12 像素半径一定在形状之外，
+ *          按 6 像素就落进角里，两种实现在这里分得开。
+ */
+TEST(HistoryThumbnail, DevicePixelRatioKeepsTheSameLogicalCorner)
+{
+    QImage source{QSize{240, 120}, QImage::Format_ARGB32};
+    source.fill(QColor{200, 30, 30});
+
+    const auto oneX = makeThumbnail(source, {kThumbnailEdge, kThumbnailEdge}, kThumbnailCornerRadius);
+    const auto twoX = makeThumbnail(source, {kThumbnailEdge * 2, kThumbnailEdge * 2}, kThumbnailCornerRadius * 2);
+    ASSERT_EQ(oneX.size(), QSize(kThumbnailEdge, kThumbnailEdge));
+    ASSERT_EQ(twoX.size(), QSize(kThumbnailEdge * 2, kThumbnailEdge * 2));
+
+    EXPECT_EQ(oneX.pixelColor(0, 0).alpha(), 0) << "左上角在圆角之外";
+    EXPECT_EQ(twoX.pixelColor(0, 0).alpha(), 0) << "左上角在圆角之外";
+    EXPECT_EQ(twoX.pixelColor(2, 2).alpha(), 0) << "2 倍图的角按 6 像素切：物理半径没跟着缩放，同一个逻辑角只剩一半";
+    EXPECT_GT(twoX.pixelColor(kThumbnailEdge, kThumbnailEdge).alpha(), 0) << "中心必须还是图本身";
 }
 
 /**
@@ -858,6 +881,7 @@ TEST_F(HistoryViewFixture, ListUsesTabularFigures)
     auto  view = makeView();
     auto *list = view->findChild<QListWidget *>();
     ASSERT_NE(list, nullptr) << "历史页里没有缩略图列表";
+    EXPECT_NE(dynamic_cast<GyanisScribe::Gui::ListWidget *>(list), nullptr) << "历史列表没用自绘连续曲率的列表类";
     EXPECT_EQ(list->accessibleName(), QStringLiteral("历史列表"));
 #if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
     EXPECT_EQ(list->font().featureValue(QFont::Tag("tnum")), 1u) << "历史列表没锁等宽，卡片读数会左右跳";

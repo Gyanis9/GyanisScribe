@@ -2,13 +2,19 @@
 
 #include "Core/Annotation/AnnotationPalette.h"
 #include "Core/Annotation/AnnotationTool.h"
+#include "Core/Geometry/ContinuousCorner.h"
 #include "Core/Pick/RecentColors.h"
 #include "Base/Logger.h"
 #include "Base/Text.h"
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Gui/Controls/AppShortcuts.h"
+#include "Gui/Theme/CornerStyle.h"
 #include "Gui/Theme/DesignTokens.h"
+#include "Gui/Controls/Button.h"
+#include "Gui/Controls/ComboBox.h"
+#include "Gui/Controls/Menu.h"
+#include "Gui/Controls/Slider.h"
 
 #include <QApplication>
 #include <QAction>
@@ -82,7 +88,9 @@ namespace
         painter.setRenderHint(QPainter::Antialiasing);
         painter.setPen(QPen{outline, 1.0});
         painter.setBrush(color);
-        painter.drawRoundedRect(QRectF{1.0, 1.0, static_cast<qreal>(side) - 2.0, static_cast<qreal>(side) - 2.0}, 3.0, 3.0);
+        // 色块四角与读数框同档：3px 名义半径、0.20 平滑度，白块与彩块在别的浮层里也长同一副角
+        painter.drawPath(GyanisScribe::Core::continuousCornerPath(QRectF{1.0, 1.0, static_cast<qreal>(side) - 2.0, static_cast<qreal>(side) - 2.0},
+                                                                  GyanisScribe::Core::cornerShapeFor(GyanisScribe::Core::CornerRole::ContentTiny)));
         return bitmap;
     }
 
@@ -104,8 +112,9 @@ namespace GyanisScribe::Gui
         QWidget(parent), m_settings(settings), m_icons(icons), m_activeTool(Core::ToolKind::Select)
     {
         setObjectName(QStringLiteral("AnnotationToolbar"));
-        // 样式表给这个对象名画了一圈卡片底；QWidget 子类不打开这个开关就不会吃样式表的背景
-        setAttribute(Qt::WA_StyledBackground, true);
+        // 面板与圆角由 paintEvent 自绘；圆角外要让宿主底色透出来，不再由样式表铺底
+        setAttribute(Qt::WA_TranslucentBackground);
+        setAutoFillBackground(false);
 
         auto *layout = new QHBoxLayout{this};
         layout->setContentsMargins(Gui::kSpacingTiny, Gui::kSpacingTiny, Gui::kSpacingTiny, Gui::kSpacingTiny);
@@ -187,7 +196,7 @@ namespace GyanisScribe::Gui
         m_colorButton = makeButton("ColorPicker", GyanisScribe::Base::uiText("颜色"), false);
         m_colorButton->setObjectName(QStringLiteral("annotationColorButton"));
         m_colorButton->setPopupMode(QToolButton::InstantPopup);
-        m_colorMenu = new QMenu{this};
+        m_colorMenu = new Gui::Menu{this};
         m_colorMenu->setObjectName(QStringLiteral("annotationColorMenu"));
         m_colorButton->setMenu(m_colorMenu);
         // 每次弹出前重建：色板与最近使用只在面板里出现，选过一格之后不必另外通知界面
@@ -196,7 +205,7 @@ namespace GyanisScribe::Gui
         layout->addWidget(makeSeparator());
 
         // 线宽：滑块只走阶梯，取值表与 Gui::kAnnotationWidths 同解，不会出现 3.5 这种没定义过的宽度
-        m_widthSlider = new QSlider{Qt::Horizontal, this};
+        m_widthSlider = new Gui::Slider{Qt::Horizontal, this};
         m_widthSlider->setRange(0, static_cast<int>(kAnnotationWidths.size()) - 1);
         m_widthSlider->setPageStep(1);
         m_widthSlider->setFixedWidth(Gui::kToolbarSliderWidth);
@@ -215,7 +224,7 @@ namespace GyanisScribe::Gui
         layout->addWidget(m_widthSlider);
 
         // 字号：需求给的是离散阶梯（12/13/14/16/20/24），用下拉而不是滑块，避免出现 15 这种没定义的值
-        m_fontSizeCombo = new QComboBox{this};
+        m_fontSizeCombo = new Gui::ComboBox{this};
         for (const auto size: kFontSizes)
         {
             m_fontSizeCombo->addItem(QString::number(size), size);
@@ -280,7 +289,7 @@ namespace GyanisScribe::Gui
         QObject::connect(m_arrowHeadScaleButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleArrowHeadScale);
         layout->addWidget(m_arrowHeadScaleButton);
         // 文字字体族：文字工具用得上，列系统字体。宽度封顶——字体名长的很，放任 sizeHint 会撑出去
-        m_fontCombo = new QFontComboBox{this};
+        m_fontCombo = new Gui::FontComboBox{this};
         m_fontCombo->setMaximumWidth(Gui::kToolbarFontComboWidth);
         m_fontCombo->setAccessibleName(GyanisScribe::Base::uiText("字体"));
         m_fontCombo->setToolTip(GyanisScribe::Base::uiText("字体（文字）"));
@@ -909,7 +918,7 @@ namespace GyanisScribe::Gui
 
     QToolButton *AnnotationToolbar::makeButton(const std::string_view iconName, const QString &label, const bool checkable)
     {
-        auto *button = new QToolButton{this};
+        auto *button = new Gui::ToolButton{this};
         button->setIcon(m_icons.icon(iconName));
         button->setIconSize(QSize{static_cast<int>(IconSize::Medium), static_cast<int>(IconSize::Medium)});
         // tooltip 与无障碍名称同名：需求要求每个图标按钮两者都有，只有 tooltip 时读屏拿不到名字
@@ -954,7 +963,7 @@ namespace GyanisScribe::Gui
         int  slot      = 0;
         auto addSwatch = [&](const QColor &color, const QString &label)
         {
-            auto *button = new QToolButton{panel};
+            auto *button = new Gui::ToolButton{panel};
             button->setAutoRaise(true);
             button->setIcon(QIcon{colorSwatchPixmap(color, m_icons.tintColor())});
             button->setIconSize(QSize{static_cast<int>(IconSize::Medium), static_cast<int>(IconSize::Medium)});
@@ -1069,6 +1078,13 @@ namespace GyanisScribe::Gui
         applyColorToActiveTool(dimmed);
         updateOpacityHint();
         event->accept();
+    }
+
+    void AnnotationToolbar::paintEvent(QPaintEvent *)
+    {
+        QPainter painter{this};
+        Core::paintContinuousCorner(painter, QRectF{rect()}, Core::cornerShapeFor(Core::CornerRole::Panel), activePalette().surface,
+                                    QPen{activePalette().borderStrong, static_cast<qreal>(themeBorderWidth(activeThemeKind()))});
     }
 
 } // namespace GyanisScribe::Gui

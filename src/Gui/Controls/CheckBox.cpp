@@ -1,7 +1,11 @@
 #include "Gui/Controls/CheckBox.h"
 
+#include "Core/Geometry/ContinuousCorner.h"
+#include "Gui/Theme/CornerStyle.h"
 #include "Gui/Theme/DesignTokens.h"
 
+#include <QEnterEvent>
+#include <QEvent>
 #include <QPainter>
 #include <QPainterPath>
 #include <QStyle>
@@ -11,8 +15,6 @@ namespace GyanisScribe::Gui
 {
     CheckBox::CheckBox(QWidget *parent) : QCheckBox(parent), m_spring(this)
     {
-        // 动态属性让 QSS 关掉 ::indicator:checked 的静态勾图，方框的底色与圆角仍走样式表
-        setProperty("animatedIndicator", true);
         m_spring.setSpec(kPopSpring);
         m_spring.setImmediate(1.0);
         // 弹簧只驱动绘制缩放：重绘范围收在指示器那一块，不带着整行文字一起重画
@@ -47,6 +49,11 @@ namespace GyanisScribe::Gui
         m_spring.advanceBy(milliseconds);
     }
 
+    QRect CheckBox::indicatorRectForTesting(const CheckBox &box)
+    {
+        return box.indicatorRect();
+    }
+
     void CheckBox::onToggled(const bool checked)
     {
         if (!checked)
@@ -72,6 +79,47 @@ namespace GyanisScribe::Gui
 
     void CheckBox::paintEvent(QPaintEvent *event)
     {
+        // 指示器底与描边按状态自绘；样式表的 ::indicator 只保留 18px 尺寸与透明边框占位。
+        // 画笔先收在作用域里：基类 paintEvent 会在同一个控件上另开一支 QPainter
+        {
+            QPainter painter{this};
+            painter.setRenderHint(QPainter::Antialiasing, true);
+            const auto     &palette = activePalette();
+            const ThemeKind kind    = activeThemeKind();
+            const QRectF    box{indicatorRect()};
+
+            // 状态次序与样式表的覆盖次序一致：禁用压过勾选，勾选压过悬停
+            QColor fill = palette.controlFill;
+            if (!isEnabled())
+            {
+                fill = palette.mutedFill;
+            } else if (isChecked())
+            {
+                fill = palette.accent;
+            } else if (underMouse())
+            {
+                fill = palette.hover;
+            }
+
+            QColor border;
+            int    borderWidth = 0;
+            if (kind == ThemeKind::HighContrast)
+            {
+                // 这一档不装焦点环覆盖层：可用时焦点、勾选与悬停靠 2px 主色边表达；
+                // 静息与禁用是 2px borderStrong，禁用的黑边与旧样式表一致
+                border      = (isEnabled() && (hasFocus() || isChecked() || underMouse())) ? palette.accent : palette.borderStrong;
+                borderWidth = 2;
+            } else if (isEnabled() && underMouse() && !isChecked())
+            {
+                // 悬停边只在可用时出现：控件在悬停中途被禁用后，旧样式表的 :disabled 也会压掉悬停边
+                border      = palette.borderStrong;
+                borderWidth = themeBorderWidth(kind);
+            }
+
+            Core::paintContinuousCorner(painter, box, Core::cornerShapeFor(Core::CornerRole::Indicator), fill,
+                                        borderWidth > 0 ? QPen{border, static_cast<qreal>(borderWidth)} : QPen{Qt::NoPen});
+        }
+
         QCheckBox::paintEvent(event);
         if (!isChecked())
         {
@@ -103,5 +151,17 @@ namespace GyanisScribe::Gui
         const auto checkColor = isEnabled() ? activePalette().onAccent : activePalette().secondaryText;
         painter.setPen(QPen{checkColor, 1.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin});
         painter.drawPath(path);
+    }
+
+    void CheckBox::enterEvent(QEnterEvent *event)
+    {
+        QCheckBox::enterEvent(event);
+        update();
+    }
+
+    void CheckBox::leaveEvent(QEvent *event)
+    {
+        QCheckBox::leaveEvent(event);
+        update();
     }
 } // namespace GyanisScribe::Gui

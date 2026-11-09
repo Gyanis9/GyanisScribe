@@ -1,6 +1,8 @@
 #include "Gui/Rewind/RewindPickerWindow.h"
 
 #include "Base/Text.h"
+#include "Gui/Controls/Button.h"
+#include "Gui/Controls/ListWidget.h"
 
 #include <QCloseEvent>
 #include <QColor>
@@ -113,11 +115,11 @@ namespace GyanisScribe::Gui
         header->addWidget(m_status);
         header->addStretch(1);
 
-        auto *cancel = new QPushButton{GyanisScribe::Base::uiText("取消"), this};
+        auto *cancel = new Button{GyanisScribe::Base::uiText("取消"), this};
         cancel->setObjectName(QStringLiteral("rewindCancel"));
         header->addWidget(cancel);
 
-        m_list = new QListWidget{this};
+        m_list = new ListWidget{this};
         m_list->setObjectName(QStringLiteral("rewindFilmstrip"));
         m_list->setViewMode(QListView::IconMode);
         m_list->setFlow(QListView::LeftToRight);

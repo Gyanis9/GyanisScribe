@@ -2,6 +2,8 @@
    骨架与另两档同源，但这一档保留自己的契约：控件一律 2px 描边、焦点走控件级 2px 主色描边
    （滑块例外：焦点画在手柄上，是 2px 纯黑圈），不靠底色分层次；这些规则与 Light/Dark 的
    1px 透明占位不同，是有意的差异。
+   按钮与工具按钮的 2px 边和焦点边由 Gui::Button / Gui::ToolButton 按同一口径自绘，
+   QSS 只留同宽透明占位。
    色值取自 src/Gui/Theme/DesignTokens.h 的 kHighContrastPalette，用例双向核对同解。
    这一档的可辨识特征是「描边加粗到 2px + 纯黑纯白 + 纯黄选区」。 */
 
@@ -10,26 +12,16 @@ QWidget#appRoot {
     background-color: #FFFFFF;
 }
 
-/* 阅读面（设置页卡片）：纯白底 + 2px 纯黑描边 */
-QWidget#pageCard {
-    background-color: #FFFFFF;
-    border: 2px solid #000000;
-    border-radius: 20px;
-}
+/* 阅读面（设置页卡片）：纯白底 + 2px 纯黑描边的形状由 Gui::SurfaceWidget 自绘，
+   高对比度档的 2px 边由 setHighContrastBorder(true) 补上；样式表不再铺底 */
 
 /* 关于页品牌底板：这一档卡片本来就是纯白，底板同色即可，
-   黑砖与白框靠自身的高对比分开，不需要额外一层 */
-QLabel#brandPlate {
-    background-color: #FFFFFF;
-    border-radius: 20px;
-}
+   黑砖与白框靠自身的高对比分开，不需要额外一层。底与圆角由 Gui::SurfaceLabel 自绘 */
 
-/* 悬浮条（录屏控制条、标注工具栏）：浮层档，圆角比阅读面收一档；
-   Qt 的样式表没有投影，浮层靠描边与底色分出来 */
+/* 悬浮条（录屏控制条、标注工具栏）：面板、圆角与 2px 边都由控件自绘，
+   这里只留一条同宽透明边框占位，控件尺寸不跳 */
 QWidget#hudRoot, QWidget#AnnotationToolbar {
-    background-color: #FFFFFF;
-    border: 2px solid #000000;
-    border-radius: 16px;
+    border: 2px solid transparent;
 }
 
 /* ---- 文字颜色层级（字号见 applyTextRole） ---- */
@@ -45,171 +37,130 @@ QLabel:disabled {
     color: #000000;
 }
 
-/* ---- 按钮：这一档按钮一律白底 + 2px 纯黑描边（不透明是它的可辨识特征）；
-   悬停与按下只换底，主按钮（default）走主色填充 ---- */
-QPushButton {
-    background-color: #FFFFFF;
+/* ---- 按钮：这一档按钮的 2px 边与白底由 Gui::Button 自绘（不透明是它的可辨识特征）；
+        这里只留同宽透明边框、内边距与文字色，控件总高不变。
+        选择器限定到带 squircle 属性的自绘类：QMessageBox、QInputDialog、QColorDialog
+        里的原生 QPushButton 保留系统外观，不能落成只剩文字与图标的透明按钮 ---- */
+QPushButton[squircle="true"] {
     color: #000000;
-    border: 2px solid #000000;
-    border-radius: 12px;
+    border: 2px solid transparent;
     padding: 0 15px;
     min-height: 28px;
 }
 
-QPushButton:hover {
-    background-color: #E0E0E0;
-}
-
-QPushButton:pressed {
-    background-color: #C8C8C8;
-}
-
-QPushButton:focus {
-    border-color: #0B57D0;
-}
-
-QPushButton:disabled {
-    background-color: #FFFFFF;
+QPushButton[squircle="true"]:disabled {
     color: #000000;
-    border-color: #000000;
 }
 
-QPushButton:default {
-    background-color: #0B57D0;
+/* 主按钮的底与边同样由 buttonColors 给出；QSS 只保文字色与边框占位 */
+QPushButton[squircle="true"]:default {
     color: #FFFFFF;
-    border-color: #0B57D0;
+    border: 2px solid transparent;
 }
 
-QPushButton:default:hover {
-    background-color: #08449E;
-    border-color: #08449E;
-}
-
-QPushButton:default:pressed {
-    background-color: #0B57D0;
-}
-
-QPushButton:default:disabled {
-    background-color: #FFFFFF;
+QPushButton[squircle="true"]:default:disabled {
     color: #000000;
-    border-color: #000000;
 }
 
-/* ---- 工具按钮：平时透明，只在悬停/选中时给出底 ---- */
-QToolButton {
-    background-color: transparent;
+/* ---- 工具按钮：2px 边与焦点边由 Gui::ToolButton 自绘；
+        这里只留透明边框、内边距与最小尺寸占位。同样限定到 squircle 属性，
+        原生对话窗里的 QToolButton 保留系统外观 ---- */
+QToolButton[squircle="true"] {
     color: #000000;
     border: 2px solid transparent;
-    border-radius: 8px;
     padding: 2px;
     min-width: 26px;
     min-height: 26px;
 }
 
-QToolButton:hover {
-    background-color: #E0E0E0;
-}
-
-QToolButton:pressed {
-    background-color: #C8C8C8;
-}
-
-QToolButton:focus {
-    border-color: #0B57D0;
-}
-
-QToolButton:checked {
-    background-color: #D6E4FB;
-    border-color: #0B57D0;
-}
-
-QToolButton:disabled {
-    background-color: transparent;
-    border-color: transparent;
-}
-
 /* ---- 标注工具栏的按钮：这一档描边 2px（比浅色档重一档），内容尺寸相应各让 1px，
         节距与另两档同宽——否则一排五十几件控件会把宽度顶出 1536 契约。
         颜色入口一枚按钮带菜单，原生小箭头在 20px 图标旁显得脏，收掉——按钮上的色块自己就是入口提示 ---- */
-QWidget#AnnotationToolbar QToolButton {
+QWidget#AnnotationToolbar QToolButton[squircle="true"] {
     min-width: 26px;
     min-height: 26px;
 }
 
-QToolButton#annotationColorButton::menu-indicator {
+QToolButton#annotationColorButton[squircle="true"]::menu-indicator {
     image: none;
 }
 
-/* ---- 输入类：描边比分隔线重一档，好让「能填的」一眼分得出 ---- */
-QLineEdit, QComboBox, QSpinBox {
-    background-color: #FFFFFF;
+/* ---- 输入类：这一档的 2px 静息边与主色焦点边由 Gui::LineEdit / Gui::ComboBox /
+        Gui::SpinBox 按 ControlPalette::inputColors 自绘；这里只留同宽透明边框、透明底占位、
+        内边距、最小高度与文字色，控件总高不变。透明底不能省：样式表一旦写了 border，
+        QStyleSheetStyle 就会按 QPalette::Base 先铺一层方底。
+        选择器限定到带 squircle 属性的自绘类：原生对话窗（取色、文本输入、文件对话框）里的
+        QLineEdit / QComboBox / QSpinBox 也匹配类型选择器，透明底加透明边落在它们身上就是
+        没有底的输入框。微调框不在这一条里：Qt 6.12 的 QStyleSheetStyle 在关掉原生按钮后，
+        会按微调框自己的边框与内边距裁内部行编辑，把行编辑收成 1px 宽，数值文本还在却画不出来。
+        它的文字色与最小高度另起一条，内部行编辑走下面的后代规则。 */
+QLineEdit[squircle="true"], QComboBox[squircle="true"] {
     color: #000000;
-    border: 2px solid #000000;
-    border-radius: 12px;
+    background: transparent;
+    border: 2px solid transparent;
     padding: 0 12px;
     min-height: 30px;
     selection-background-color: #FFE500;
     selection-color: #000000;
 }
 
-QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
-    border: 2px solid #0B57D0;
-}
-
-QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled {
-    background-color: #FFFFFF;
+/* 微调框的数值由内部行编辑排：盒模型退回原生子控件算法后，行编辑落在微调框的内容区；
+   这里只留文字色、透明底和与单行输入一致的左右缩进，不再带边框与最小高度 */
+QSpinBox[squircle="true"] QLineEdit {
     color: #000000;
-    border-color: #000000;
+    background: transparent;
+    border: none;
+    padding: 0 12px;
+    selection-background-color: #FFE500;
+    selection-color: #000000;
 }
 
-QLineEdit:read-only {
-    background-color: #FFFFFF;
+/* 数字框的 sizeHint 另带上下各 2px 的自有框：原来占位用的 2px 透明边框去掉后空出 4px，
+   内容高补到 34 才能让数字框仍落在总高 38 */
+QSpinBox[squircle="true"] {
+    color: #000000;
+    min-height: 34px;
+}
+
+QLineEdit[squircle="true"]:disabled, QComboBox[squircle="true"]:disabled, QSpinBox[squircle="true"]:disabled,
+QSpinBox[squircle="true"] QLineEdit:disabled, QComboBox[squircle="true"] QLineEdit:disabled {
     color: #000000;
 }
 
-/* ---- 快捷键录制框：与输入框同一套外观；录制态把描边换成主色 ---- */
+QLineEdit[squircle="true"]:read-only, QSpinBox[squircle="true"] QLineEdit:read-only, QComboBox[squircle="true"] QLineEdit:read-only {
+    color: #000000;
+}
+
+/* ---- 快捷键录制框：显示框是 Gui::SurfaceLabel，静息 2px 纯黑边、录制态主色边、
+        禁用态 mutedFill 都由它自绘；这里只留文字色、同宽透明边框、内边距与最小高度 ---- */
 QLabel#hotkeyDisplay {
-    background-color: #FFFFFF;
     color: #000000;
-    border: 2px solid #000000;
-    border-radius: 12px;
+    border: 2px solid transparent;
     padding: 0 12px;
     min-height: 30px;
 }
 
-QLabel#hotkeyDisplay[recording="true"] {
-    border: 2px solid #0B57D0;
-}
-
 QLabel#hotkeyDisplay:disabled {
-    background-color: #FFFFFF;
     color: #000000;
-    border-color: #000000;
 }
 
 /* ---- 标注窗的行内文字输入框：与上面几档输入框同形，别把识别结果区的宽内边距带进去 ----
    上下内边距为零是标注输入框高度算式的前提（AnnotationView::resizeTextEditorToContent 只补边框与余量），
    改这里的 padding 要同步改那边 */
 QTextEdit#annotationTextEditor {
-    background-color: #FFFFFF;
     color: #000000;
-    border: 2px solid #000000;
-    border-radius: 12px;
+    border: 2px solid transparent;
     padding: 0 8px;
     selection-background-color: #FFE500;
     selection-color: #000000;
 }
 
-QTextEdit#annotationTextEditor:focus {
-    border: 2px solid #0B57D0;
-}
-
 /* 下拉箭头走 styles 下的 chevron：与自绘微调框同一笔画，不再让原生风格画方角箭头 */
-QComboBox {
+QComboBox[squircle="true"] {
     padding-right: 26px;
 }
 
-QComboBox::drop-down {
+QComboBox[squircle="true"]::drop-down {
     subcontrol-origin: padding;
     subcontrol-position: center right;
     width: 26px;
@@ -217,17 +168,17 @@ QComboBox::drop-down {
     background: transparent;
 }
 
-QComboBox::down-arrow {
+QComboBox[squircle="true"]::down-arrow {
     image: url(:/styles/ComboChevronHighContrast.svg);
     width: 10px;
     height: 10px;
 }
 
+/* ---- 下拉弹层：底、2px 边与项高亮由 Gui::ListView 与 ItemDelegate 按连续曲率自绘，
+        这里只留内边距、文字色与同宽透明边框占位 ---- */
 QComboBox QAbstractItemView {
-    background-color: #FFFFFF;
     color: #000000;
-    border: 2px solid #000000;
-    border-radius: 12px;
+    border: 2px solid transparent;
     padding: 6px;
     outline: none;
     selection-background-color: #D6E4FB;
@@ -236,17 +187,13 @@ QComboBox QAbstractItemView {
 
 QComboBox QAbstractItemView::item {
     min-height: 30px;
-    border-radius: 8px;
     padding: 0 8px;
-}
-
-QComboBox QAbstractItemView::item:hover {
-    background-color: #E0E0E0;
 }
 
 /* 微调框的上下箭头由 Gui::SpinBox 自绘；下拉箭头用 styles 下的 chevron（见上面 QComboBox::down-arrow），
    两处都不再让原生风格画箭头。 */
-/* 勾选框自己画：勾的形状是 Resources/Styles 下的两份 SVG */
+/* 勾选框自己画：指示器的填充、2px 边与勾由 Gui::CheckBox 自绘，焦点也换成主色 2px 边；
+   这里只留 18px 的内容尺寸与 2px 透明边框，占住 22px 的指示器与 22px 的行高。 */
 QCheckBox {
     spacing: 8px;
     color: #000000;
@@ -256,117 +203,48 @@ QCheckBox {
 QCheckBox::indicator {
     width: 18px;
     height: 18px;
-    background-color: #FFFFFF;
-    border: 2px solid #000000;
-    border-radius: 5px;
-}
-
-QCheckBox::indicator:hover {
-    border-color: #0B57D0;
-}
-
-QCheckBox::indicator:checked {
-    background-color: #0B57D0;
-    border-color: #0B57D0;
-    image: url(:/styles/CheckmarkOnAccent.svg);
-}
-
-QCheckBox::indicator:disabled {
-    background-color: #FFFFFF;
-    border-color: #000000;
+    border: 2px solid transparent;
 }
 
 QCheckBox:disabled {
     color: #000000;
 }
 
-/* 自绘复选框把静态勾图关掉：勾由 Gui::CheckBox 按 onAccent 画，方框仍走上面的底色与圆角 */
-QCheckBox[animatedIndicator="true"]::indicator:checked {
-    image: none;
-}
-
-/* ---- 滑块：槽给一档描边（这一档靠它才看得见轨道），已走过的部分用主色 ---- */
-QSlider::groove:horizontal {
-    height: 6px;
-    background-color: #FFFFFF;
-    border: 2px solid #000000;
-    border-radius: 4px;
-}
-
-QSlider::sub-page:horizontal {
-    background-color: #0B57D0;
-    border: 2px solid #0B57D0;
-    border-radius: 4px;
-}
-
-QSlider::handle:horizontal {
-    width: 14px;
-    height: 14px;
-    margin: -6px -2px;
-    background-color: #0B57D0;
-    border: 2px solid #FFFFFF;
-    border-radius: 9px;
-}
-
-QSlider::handle:horizontal:hover {
-    background-color: #08449E;
-}
-
-QSlider:disabled::groove:horizontal {
-    background-color: #E0E0E0;
-}
-
-QSlider:disabled::sub-page:horizontal {
-    background-color: #C8C8C8;
-}
-
-QSlider:disabled::handle:horizontal {
-    background-color: #C8C8C8;
-    border-color: #FFFFFF;
-}
-
-/* ---- 菜单与工具提示：弹层比卡片再圆一点，靠描边而不是阴影分层 ---- */
-QMenu {
-    background-color: #FFFFFF;
-    border: 2px solid #000000;
-    border-radius: 16px;
+/* ---- 菜单与工具提示：面板、描边与当前项高亮由 Gui::Menu 与 SquircleStyle 按连续曲率自绘，
+        这里只留抑制原生框的透明边框占位、内边距与文字色。
+        选择器限定到带 squircle 属性的自绘菜单：QLineEdit 等文本控件用
+        createStandardContextMenu() 建的标准右键菜单保留原生面板与悬停高亮。
+        工具提示不能有任何 border 声明：样式表引擎只要判得出可画内容就会自己画完这一层，
+        代理风格收不到 PE_PanelTipLabel；内边距各加两像素，补上不再由边框占掉的宽度 ---- */
+QMenu[squircle="true"] {
+    border: 2px solid transparent;
     padding: 4px;
 }
 
-QMenu::item {
+QMenu[squircle="true"]::item {
     padding: 4px 18px 4px 8px;
-    border-radius: 8px;
     color: #000000;
 }
 
-QMenu::item:selected {
-    background-color: #E0E0E0;
+QMenu[squircle="true"]::item:disabled {
     color: #000000;
 }
 
-QMenu::item:disabled {
-    color: #000000;
-}
-
-QMenu::separator {
+QMenu[squircle="true"]::separator {
     height: 1px;
     background-color: #000000;
     margin: 2px 6px;
 }
 
 QToolTip {
-    background-color: #FFFFFF;
     color: #000000;
-    border: 2px solid #000000;
-    border-radius: 8px;
-    padding: 4px 8px;
+    padding: 6px 10px;
 }
 
-/* ---- 列表：导航侧栏与历史列表共用一套项形状 ---- */
+/* ---- 列表：容器底与项高亮由 Gui::ListWidget 与 ItemDelegate 按连续曲率自绘，
+        这里只留透明边框占位、内边距与文字色 ---- */
 QListWidget {
-    background-color: #FFFFFF;
-    border: 2px solid #000000;
-    border-radius: 16px;
+    border: 2px solid transparent;
     padding: 6px;
     outline: none;
 }
@@ -376,17 +254,6 @@ QListWidget::item {
     padding: 4px 8px;
     margin: 1px 2px;
     border: 1px solid transparent;
-    border-radius: 8px;
-    color: #000000;
-}
-
-QListWidget::item:hover {
-    background-color: #E0E0E0;
-}
-
-QListWidget::item:selected {
-    background-color: #D6E4FB;
-    border-color: #0B57D0;
     color: #000000;
 }
 
@@ -411,12 +278,11 @@ QScrollArea#settingsScroll > QWidget {
     background-color: transparent;
 }
 
-/* ---- 文本区（识别结果） ---- */
+/* ---- 文本区（识别结果）：底、2px 边与圆角由 Gui::TextEdit 按 Panel 档自绘，
+        这里只留文字色、同宽透明边框、内边距与选区颜色 ---- */
 QTextEdit {
-    background-color: #FFFFFF;
     color: #000000;
-    border: 2px solid #000000;
-    border-radius: 16px;
+    border: 2px solid transparent;
     padding: 8px;
     selection-background-color: #FFE500;
     selection-color: #000000;
@@ -429,55 +295,6 @@ QFrame#toolbarSeparator {
     min-width: 1px;
 }
 
-/* ---- 滚动条：细、无箭头、纯黑滑块（这一档不靠淡化分层次） ---- */
-QScrollBar:vertical {
-    background-color: transparent;
-    width: 10px;
-    margin: 2px;
-}
-
-QScrollBar::handle:vertical {
-    background-color: #000000;
-    border-radius: 4px;
-    min-height: 24px;
-}
-
-QScrollBar::handle:vertical:hover {
-    background-color: #000000;
-}
-
-QScrollBar:horizontal {
-    background-color: transparent;
-    height: 10px;
-    margin: 2px;
-}
-
-QScrollBar::handle:horizontal {
-    background-color: #000000;
-    border-radius: 4px;
-    min-width: 24px;
-}
-
-QScrollBar::handle:horizontal:hover {
-    background-color: #000000;
-}
-
-QScrollBar::add-line, QScrollBar::sub-line {
-    height: 0;
-    width: 0;
-}
-
-QScrollBar::add-page, QScrollBar::sub-page {
-    background-color: transparent;
-}
-
-/* ---- 键盘焦点：高对比度档不装焦点环覆盖层，由 QSS 描边承担。勾选框给指示器换主色描边；
-        滑块因控件级边框在 CC_Slider 的自绘路径里不落笔，焦点改挂在手柄上反转：底色芯 + 正文色圈 ---- */
-QCheckBox::indicator:focus {
-    border: 2px solid #0B57D0;
-}
-
-QSlider::handle:horizontal:focus {
-    background-color: #FFFFFF;
-    border: 2px solid #000000;
-}
+/* ---- 键盘焦点：这一档不装焦点环覆盖层，输入类与按钮的 2px 主色焦点边由各自的自绘类
+        按 ControlPalette 画，勾选框更新指示器描边，滑块的焦点反转由 Gui::Slider 自绘；
+        样式表里不再有 :focus 规则 ---- */

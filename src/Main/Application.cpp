@@ -7,6 +7,7 @@
 #include "Core/Hotkey/IHotkeyManager.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Theme/Motion.h"
+#include "Gui/Theme/SquircleStyle.h"
 #include "Platform/AnimationSettings.h"
 #include "Platform/CrashGuard.h"
 
@@ -56,6 +57,10 @@ Application::Application(int &argc, char **argv, const GyanisScribe::App::Comman
     // 会发 quitRequested，与托盘菜单的「退出」走同一个收场。不设这一行时，关掉任何一枚贴图都会
     // 把整个程序带走，托盘图标与挂在屏幕上的其它贴图一起消失
     setQuitOnLastWindowClosed(false);
+
+    // 菜单面板与控件形状改由 Gui 侧自绘：代理样式要在第一次装样式表、建第一扇窗口之前就位，
+    // 否则原生菜单面板会先画一层方底。排在控制器之前，所有浮层都从第一帧起走同一条路径
+    GyanisScribe::Gui::SquircleStyle::install();
 
     const auto logDirectory = GyanisScribe::Base::Paths::logDirectory();
     if (const auto ensured = GyanisScribe::Base::Paths::ensureDirectory(logDirectory); !ensured)

@@ -6,6 +6,7 @@
 #include "Gui/Capture/LongCaptureHud.h"
 #include "Core/Capture/RegionHistory.h"
 #include "Core/Capture/ScreenUtils.h"
+#include "Core/Geometry/ContinuousCorner.h"
 #include "Base/Logger.h"
 #include "Base/Text.h"
 #include "Platform/IPlatformIntegration.h"
@@ -93,7 +94,10 @@ namespace GyanisScribe::Gui
                 Base::Logger::warning(parsed.error().message);
             }
             const auto logical = parsed.value_or(Core::kCaptureCornerRadiusDefault);
-            frame->image       = Core::roundedCornerImage(frame->image, qRound(logical * frame->devicePixelRatio));
+            // 平滑度按逻辑半径取档、掩膜半径按物理像素走：一块 100% 屏与一块 200% 屏上截同样大的一块，
+            // 形状不该因为缩放出两个样
+            const auto shape = Core::cornerShapeForRadius(static_cast<qreal>(logical));
+            frame->image     = Core::roundedCornerImage(frame->image, qRound(logical * frame->devicePixelRatio), shape.smoothing);
         }
 
         // 选区记账排在成功之后：失败也写就会把用户上次的好选区顶掉

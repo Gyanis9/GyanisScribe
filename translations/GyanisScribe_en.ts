@@ -3935,5 +3935,9 @@
             <source>应用打码</source>
             <translation>Apply redactions</translation>
         </message>
+        <message>
+            <source>下拉列表</source>
+            <translation>Drop-down list</translation>
+        </message>
 </context>
 </TS>

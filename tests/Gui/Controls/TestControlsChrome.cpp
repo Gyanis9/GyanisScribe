@@ -4,6 +4,7 @@
 #include "Gui/Controls/HotkeyEdit.h"
 #include "Gui/Controls/SpinBox.h"
 #include "Gui/Theme/DesignTokens.h"
+#include "Gui/Theme/SquircleStyle.h"
 
 #include "Core/Settings/SettingsStore.h"
 
@@ -39,6 +40,9 @@ namespace
             static char  argumentZero[] = "TestControlsChrome";
             static char *arguments[]    = {argumentZero, nullptr};
             application                 = std::make_unique<QApplication>(argumentCount, arguments);
+            // 与 Main::Application 同序：先装代理样式，再让用例按需挂样式表。
+            // 输入控件靠这个代理压掉原生输入面板，否则自绘的连续曲率底会被系统底盖住
+            GyanisScribe::Gui::SquircleStyle::install();
         }
 
         void TearDown() override
@@ -88,9 +92,11 @@ TEST_F(HotkeyEditChromeFixture, DisplayUsesTheInputFieldChrome)
 }
 
 /**
- * @brief 钉住录制态会翻出主色描边属性
+ * @brief 钉住录制态会在显示框上留一个可观察的状态属性
+ * @details 可见形状已由 SurfaceLabel 自绘，样式表不再按这个属性换形；
+ *          属性本身仍是判断「这一格正在等按键」的落点
  */
-TEST_F(HotkeyEditChromeFixture, RecordingStateIsExposedToTheStyleSheet)
+TEST_F(HotkeyEditChromeFixture, RecordingStateIsExposedAsAProperty)
 {
     GyanisScribe::Gui::HotkeyEdit edit{*m_store};
     auto                         *display = edit.findChild<QLabel *>(QStringLiteral("hotkeyDisplay"));
@@ -99,7 +105,7 @@ TEST_F(HotkeyEditChromeFixture, RecordingStateIsExposedToTheStyleSheet)
 
     QMouseEvent press{QEvent::MouseButtonPress, QPointF{5, 5}, QPointF{5, 5}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
     QApplication::sendEvent(&edit, &press);
-    EXPECT_TRUE(display->property("recording").toBool()) << "点进录制态，样式表拿不到状态";
+    EXPECT_TRUE(display->property("recording").toBool()) << "点进录制态，显示框没有留下录制状态";
 
     QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier};
     QApplication::sendEvent(&edit, &escape);

@@ -4,6 +4,10 @@
 #include "Base/Paths.h"
 #include "Base/Text.h"
 #include "Core/History/HistoryThumbnail.h"
+#include "Gui/Controls/Button.h"
+#include "Gui/Controls/ComboBox.h"
+#include "Gui/Controls/LineEdit.h"
+#include "Gui/Controls/ListWidget.h"
 #include "Gui/Resources/IconProvider.h"
 #include "Gui/Theme/DesignTokens.h"
 
@@ -132,22 +136,22 @@ namespace GyanisScribe::Gui
         auto *tools = new QHBoxLayout;
         root->addLayout(tools);
 
-        m_search = new QLineEdit{this};
+        m_search = new Gui::LineEdit{this};
         m_search->setPlaceholderText(GyanisScribe::Base::uiText("按文件名、类别或日期搜索"));
         m_search->setClearButtonEnabled(true);
         m_search->setAccessibleName(GyanisScribe::Base::uiText("历史搜索"));
         tools->addWidget(m_search, 1);
 
-        m_filter = new QComboBox{this};
+        m_filter = new Gui::ComboBox{this};
         m_filter->addItems(historyFilterLabels());
         m_filter->setAccessibleName(GyanisScribe::Base::uiText("历史类别"));
         tools->addWidget(m_filter);
 
-        auto                                                           *pinButton    = new QPushButton{GyanisScribe::Base::uiText("重新贴图"), this};
-        auto                                                           *ocrButton    = new QPushButton{GyanisScribe::Base::uiText("重新识别"), this};
-        auto                                                           *folderButton = new QPushButton{GyanisScribe::Base::uiText("打开所在目录"), this};
-        auto                                                           *deleteButton = new QPushButton{GyanisScribe::Base::uiText("删除"), this};
-        auto                                                           *clearButton  = new QPushButton{GyanisScribe::Base::uiText("清空列表"), this};
+        auto                                                           *pinButton    = new Gui::Button{GyanisScribe::Base::uiText("重新贴图"), this};
+        auto                                                           *ocrButton    = new Gui::Button{GyanisScribe::Base::uiText("重新识别"), this};
+        auto                                                           *folderButton = new Gui::Button{GyanisScribe::Base::uiText("打开所在目录"), this};
+        auto                                                           *deleteButton = new Gui::Button{GyanisScribe::Base::uiText("删除"), this};
+        auto                                                           *clearButton  = new Gui::Button{GyanisScribe::Base::uiText("清空列表"), this};
         const std::array<std::pair<QPushButton *, std::string_view>, 5> buttons      = {
                 std::pair{pinButton, "Pin"}, std::pair{ocrButton, "Ocr"}, std::pair{folderButton, "Folder"}, std::pair{deleteButton, "Delete"}, std::pair{clearButton, "Delete"},
         };
@@ -160,7 +164,7 @@ namespace GyanisScribe::Gui
             tools->addWidget(button);
         }
 
-        m_list = new QListWidget{this};
+        m_list = new Gui::ListWidget{this};
         m_list->setViewMode(QListView::IconMode);
         m_list->setIconSize(QSize{Core::kThumbnailEdge, Core::kThumbnailEdge});
         m_list->setUniformItemSizes(true);
@@ -173,7 +177,7 @@ namespace GyanisScribe::Gui
         root->addWidget(m_list, 1);
 
         // 空列表给一句引导：一片白卡读起来像记录丢了或窗体坏了。
-        // 提示挂在视口上并居中、不吃鼠标：列表的卡片底与圆角仍由 QSS 画
+        // 提示挂在视口上并居中、不吃鼠标：列表的卡片底与圆角由 Gui::ListWidget 自绘，提示只是压在视口上的一层字
         m_emptyHint = new QLabel{m_list->viewport()};
         m_emptyHint->setObjectName(QStringLiteral("pageHint"));
         m_emptyHint->setAccessibleName(GyanisScribe::Base::uiText("历史空态提示"));

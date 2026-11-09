@@ -2,14 +2,15 @@
 
 #include "Base/Text.h"
 #include "Core/Annotation/AnnotationTool.h"
+#include "Gui/Controls/Button.h"
+#include "Gui/Controls/ComboBox.h"
+#include "Gui/Controls/ListWidget.h"
 #include "Gui/Theme/DesignTokens.h"
 
-#include <QComboBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QListWidget>
 #include <QListWidgetItem>
-#include <QPushButton>
 #include <QVBoxLayout>
 
 #include <cstddef>
@@ -65,7 +66,7 @@ namespace GyanisScribe::Gui
         note->setWordWrap(true);
         root->addWidget(note);
 
-        m_list = new QListWidget{this};
+        m_list = new ListWidget{this};
         m_list->setObjectName(QStringLiteral("privacyList"));
         m_list->setAccessibleName(Base::uiText("敏感信息清单"));
         // 清单只做勾选：行文本来自脱敏样例，不给编辑入口
@@ -82,8 +83,8 @@ namespace GyanisScribe::Gui
         buttons->setSpacing(kSpacingSmall);
         root->addLayout(buttons);
 
-        auto *selectAll  = new QPushButton{Base::uiText("全选"), this};
-        auto *selectNone = new QPushButton{Base::uiText("全不选"), this};
+        auto *selectAll  = new Button{Base::uiText("全选"), this};
+        auto *selectNone = new Button{Base::uiText("全不选"), this};
         selectAll->setObjectName(QStringLiteral("privacySelectAll"));
         selectNone->setObjectName(QStringLiteral("privacySelectNone"));
         buttons->addWidget(selectAll);
@@ -91,16 +92,16 @@ namespace GyanisScribe::Gui
         buttons->addStretch(1);
 
         buttons->addWidget(new QLabel{Base::uiText("打码方式"), this});
-        m_style = new QComboBox{this};
+        m_style = new ComboBox{this};
         m_style->setObjectName(QStringLiteral("privacyStyle"));
         m_style->setAccessibleName(Base::uiText("打码方式"));
         m_style->addItem(Base::uiText("马赛克"));
         m_style->addItem(Base::uiText("高斯模糊"));
         buttons->addWidget(m_style);
 
-        auto *cancel = new QPushButton{Base::uiText("取消"), this};
+        auto *cancel = new Button{Base::uiText("取消"), this};
         cancel->setObjectName(QStringLiteral("privacyCancel"));
-        m_apply = new QPushButton{Base::uiText("应用打码"), this};
+        m_apply = new Button{Base::uiText("应用打码"), this};
         m_apply->setObjectName(QStringLiteral("privacyApply"));
         // 回车等同应用：用户逐项确认后最常见的动作是直接落笔，默认按钮让键盘路径一致
         m_apply->setDefault(true);

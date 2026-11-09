@@ -6,7 +6,9 @@
 #include "Core/Settings/SettingsStore.h"
 #include "Gui/Controls/AppShortcuts.h"
 #include "Core/Annotation/AnnotationPalette.h"
+#include "Gui/Theme/ControlPalette.h"
 #include "Gui/Theme/DesignTokens.h"
+#include "Gui/Theme/SquircleStyle.h"
 #include "Gui/Theme/ThemeKind.h"
 #include "Gui/Theme/ThemeManager.h"
 #include "Gui/Resources/IconProvider.h"
@@ -91,6 +93,8 @@ namespace
             static char  argumentZero[] = "TestAnnotationToolbar";
             static char *arguments[]    = {argumentZero, nullptr};
             application                 = std::make_unique<QApplication>(argumentCount, arguments);
+            // 颜色菜单是 Gui::Menu：本进程的第二套夹具不再新建应用，因此这里装一次就够
+            GyanisScribe::Gui::SquircleStyle::install();
             icons                       = std::make_unique<IconProvider>();
             // 描边色钉死成深色，不让它跟着本机深浅色走：本机是深色主题时默认描边就是白，
             // 「白色色块有没有画边框」就变成拿白对白判，永远成立
@@ -1085,6 +1089,12 @@ TEST_F(ToolbarFixture, WhiteSwatchKeepsAVisibleOutline)
     }
     EXPECT_GT(outlinePixels, 0) << "白底上一格没有描边的白色色块等于看不见，用户会以为那一格是禁用的";
     EXPECT_GT(fillPixels, 0) << "色块没填上色板里的颜色";
+    // 路径从 1 逻辑像素处起笔，最外圈对直角与圆角都是透明的，钉不住形状；
+    // 取往里第一个像素的角（按位图的物理倍比换算）：3px 连续曲率在那里只压住一部分，
+    // 路径退化成直角时这个像素会被填满，alpha 到 255
+    const int cornerInset = std::max(1, qRound(static_cast<qreal>(bitmap.width()) / static_cast<qreal>(kSwatchEdge)));
+    EXPECT_LT(bitmap.pixelColor(cornerInset, cornerInset).alpha(), 255) << "色块左上角没有圆角，路径还是方的";
+    EXPECT_LT(bitmap.pixelColor(bitmap.width() - 1 - cornerInset, bitmap.height() - 1 - cornerInset).alpha(), 255) << "色块右下角没有圆角，路径还是方的";
 }
 
 /**
@@ -1651,4 +1661,42 @@ TEST_F(ToolbarFixture, BrokenPaletteFallsBackToTheBuiltinRow)
 
     EXPECT_EQ(toolbar->colorButtonCount(), static_cast<int>(kAnnotationPaletteColors.size()) + 1) << "坏名单把整排色板带走了";
     EXPECT_EQ(toolbar->currentColor(), kAnnotationPaletteColors[0]) << "回落的那一排第一格该是内置的第一格";
+}
+
+/**
+ * @brief 钉住标注工具栏的面板由自绘的连续曲率铺底
+ * @details 工具栏嵌在标注窗里，样式表不再铺底：左上角要透出宿主底色，
+ *          上沿中部只该有面板的 surface
+ */
+TEST_F(ToolbarFixture, PanelIsPaintedWithSquircleCorners)
+{
+    GyanisScribe::Gui::setTextThemeKind(GyanisScribe::Gui::ThemeKind::Light);
+    SignalLog log;
+    auto      toolbar = makeToolbarLogged(log);
+    toolbar->setAttribute(Qt::WA_DontShowOnScreen);
+    toolbar->resize(toolbar->sizeHint());
+    toolbar->show();
+    QCoreApplication::processEvents();
+
+    const QImage image = toolbar->grab().toImage();
+    EXPECT_EQ(image.pixelColor(0, 0).alpha(), 0) << "工具栏左上角不透明：方形底露出来了";
+    EXPECT_EQ(image.pixelColor(toolbar->width() / 2, 2), GyanisScribe::Gui::activePalette().surface);
+}
+
+/**
+ * @brief 钉住工具栏内的按钮走自绘的紧凑焦点边
+ * @details 工具栏不装 6px 外扩焦点环，按钮的焦点边只能由 Gui::ToolButton 自己画；
+ *          判定入口必须认得出工具栏里的按钮，也要把工具栏外的按钮排除在外。
+ */
+TEST_F(ToolbarFixture, ToolButtonsUseTheInlineFocusBorder)
+{
+    SignalLog log;
+    auto      toolbar = makeToolbarLogged(log);
+
+    auto *button = toolbar->toolButtonAt(0);
+    ASSERT_NE(button, nullptr) << "工具栏上找不到按钮，判据没有落点";
+    EXPECT_TRUE(GyanisScribe::Gui::usesInlineFocusBorder(*button)) << "工具栏内的按钮没被认成自绘焦点边";
+
+    QToolButton outside;
+    EXPECT_FALSE(GyanisScribe::Gui::usesInlineFocusBorder(outside)) << "工具栏外的按钮不该走紧凑焦点边";
 }

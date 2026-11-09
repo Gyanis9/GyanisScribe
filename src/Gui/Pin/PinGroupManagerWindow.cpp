@@ -1,6 +1,8 @@
 #include "Gui/Pin/PinGroupManagerWindow.h"
 
 #include "Base/Text.h"
+#include "Gui/Controls/Button.h"
+#include "Gui/Controls/ScrollBar.h"
 #include "Gui/Pin/PinManager.h"
 
 #include <QAbstractItemView>
@@ -51,12 +53,15 @@ namespace GyanisScribe::Gui
         m_table->setColumnWidth(kCountColumn, 80);
         m_table->setColumnWidth(kActiveColumn, 90);
         m_table->horizontalHeader()->setStretchLastSection(true);
+        // 样式表不再给 QScrollBar 尺寸与颜色：表格的两条滚动条在构造后立刻换成自绘件
+        m_table->setVerticalScrollBar(new ScrollBar{Qt::Vertical, m_table});
+        m_table->setHorizontalScrollBar(new ScrollBar{Qt::Horizontal, m_table});
 
-        m_showButton   = new QPushButton(GyanisScribe::Base::uiText("摆出这一组"), this);
-        m_renameButton = new QPushButton(GyanisScribe::Base::uiText("重命名…"), this);
-        m_voidButton   = new QPushButton(GyanisScribe::Base::uiText("腾空这一组"), this);
-        m_deleteButton = new QPushButton(GyanisScribe::Base::uiText("删掉这一组"), this);
-        m_closeButton  = new QPushButton(GyanisScribe::Base::uiText("关闭"), this);
+        m_showButton   = new Gui::Button(GyanisScribe::Base::uiText("摆出这一组"), this);
+        m_renameButton = new Gui::Button(GyanisScribe::Base::uiText("重命名…"), this);
+        m_voidButton   = new Gui::Button(GyanisScribe::Base::uiText("腾空这一组"), this);
+        m_deleteButton = new Gui::Button(GyanisScribe::Base::uiText("删掉这一组"), this);
+        m_closeButton  = new Gui::Button(GyanisScribe::Base::uiText("关闭"), this);
         m_showButton->setAccessibleName(GyanisScribe::Base::uiText("摆出这一组"));
         m_renameButton->setAccessibleName(GyanisScribe::Base::uiText("重命名这一组"));
         m_voidButton->setAccessibleName(GyanisScribe::Base::uiText("腾空这一组"));

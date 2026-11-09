@@ -17,6 +17,7 @@
 #include <QEventLoop>
 #include <QFontInfo>
 #include <QFontMetrics>
+#include <QImage>
 #include <QLabel>
 #include <QPoint>
 #include <QRect>
@@ -25,6 +26,7 @@
 #include <QThread>
 #include <QWidget>
 
+#include <cstdlib>
 #include <filesystem>
 #include <format>
 #include <memory>
@@ -74,8 +76,12 @@ namespace
             const auto iniPath = std::filesystem::temp_directory_path() / std::format("GyanisScribe-Toast-{}.ini", ::testing::UnitTest::GetInstance()->current_test_info()->name());
             std::error_code cleanup;
             std::filesystem::remove(iniPath, cleanup);
-            m_store   = std::make_unique<SettingsStore>(iniPath);
-            m_theme   = std::make_unique<ThemeManager>(*m_store);
+            m_store = std::make_unique<SettingsStore>(iniPath);
+            m_theme = std::make_unique<ThemeManager>(*m_store);
+            // 起点档固定成浅色：每个用例各建一份 ThemeManager，不先落一档时它停在 System，
+            // 而抓图断言要拿具体色板比对，跟着本机深浅色走就会在两台机器上得到两种结果。
+            // setTheme 同时把全局生效档写下去，气泡描边宽度也不再跟着上一条用例的余档走
+            ASSERT_TRUE(m_theme->setTheme(ThemeKind::Light).has_value()) << "起始主题没落成浅色档";
             m_icons   = std::make_unique<GyanisScribe::Gui::IconProvider>();
             m_toast   = std::make_unique<Toast>(*m_icons, *m_theme);
             m_iniPath = iniPath;
@@ -213,6 +219,52 @@ TEST_F(ToastFixture, ToastFollowsThemeSwitch)
 
     EXPECT_EQ(toast().currentText(), QStringLiteral("深色主题下的提示"));
     EXPECT_EQ(toastColorFor(ToastKind::Information, theme().palette()), kDarkPalette.secondaryText);
+}
+
+/**
+ * @brief 钉住气泡按胶囊形状自绘：四角透明、中心不透明，底色与描边跟着主题换
+ * @details 气泡是浮层，四角若铺满方底会在浅色内容上露出一圈硬边；中心透明则说明只剩描边。
+ *          同一个气泡先按浅色档抓一次、落深色档再显示后再抓一次，底色与左沿描边都必须
+ *          换成新档的 surface / borderStrong：任何写死的灰都会在第二次抓图里露出来。
+ *          描边取左沿中高的第一列：胶囊在那里是竖直边，一像素内缩就该是 borderStrong，
+ *          画笔换成 NoPen 时这一条会红。
+ */
+TEST_F(ToastFixture, BubblePaintsATransparentCornerOutsideTheCapsule)
+{
+    // 抗锯齿让边缘可能差一两个色阶，判「接近」而不是判相等
+    const auto differenceTo = [](const QColor &pixel, const QColor &expected)
+    { return std::abs(pixel.red() - expected.red()) + std::abs(pixel.green() - expected.green()) + std::abs(pixel.blue() - expected.blue()); };
+
+    toast().show(QStringLiteral("提示"), ToastKind::Information);
+    QWidget *bubble = visibleToastBubble();
+    ASSERT_NE(bubble, nullptr) << "没有找到可见的 Toast 气泡";
+
+    const QImage lightImage = bubble->grab().toImage();
+    ASSERT_FALSE(lightImage.isNull());
+    ASSERT_GT(lightImage.width(), 2);
+    ASSERT_GT(lightImage.height(), 2);
+
+    EXPECT_EQ(lightImage.pixelColor(0, 0).alpha(), 0) << "气泡左上角没有透明，胶囊被画成了方底";
+    EXPECT_EQ(lightImage.pixelColor(lightImage.width() - 1, lightImage.height() - 1).alpha(), 0) << "气泡右下角没有透明";
+    EXPECT_GT(lightImage.pixelColor(lightImage.width() / 2, lightImage.height() / 2).alpha(), 0) << "胶囊中心透明，气泡只剩描边";
+    EXPECT_EQ(lightImage.pixelColor(lightImage.width() - 8, lightImage.height() / 2), kLightPalette.surface) << "浅色档的胶囊底色不是 surface";
+    EXPECT_LE(differenceTo(lightImage.pixelColor(0, lightImage.height() / 2), kLightPalette.borderStrong), 8) << "浅色档的胶囊左沿没有 borderStrong 描边";
+
+    // 换档后重新显示：气泡复用同一个顶层窗，show 会按新色板重新灌色并重绘
+    ASSERT_TRUE(theme().setTheme(ThemeKind::Dark).has_value());
+    toast().show(QStringLiteral("深色主题下的提示"), ToastKind::Information);
+    QWidget *darkBubble = visibleToastBubble();
+    ASSERT_NE(darkBubble, nullptr) << "换档后没有找到可见的 Toast 气泡";
+
+    const QImage darkImage = darkBubble->grab().toImage();
+    ASSERT_FALSE(darkImage.isNull());
+    ASSERT_GT(darkImage.width(), 2);
+    ASSERT_GT(darkImage.height(), 2);
+
+    EXPECT_EQ(darkImage.pixelColor(0, 0).alpha(), 0) << "深色档的气泡左上角没有透明";
+    EXPECT_GT(darkImage.pixelColor(darkImage.width() / 2, darkImage.height() / 2).alpha(), 0) << "深色档的胶囊中心透明";
+    EXPECT_EQ(darkImage.pixelColor(darkImage.width() - 8, darkImage.height() / 2), kDarkPalette.surface) << "换到深色档后胶囊底色还是浅色 surface";
+    EXPECT_LE(differenceTo(darkImage.pixelColor(0, darkImage.height() / 2), kDarkPalette.borderStrong), 8) << "换到深色档后胶囊左沿描边没跟着换";
 }
 
 /**

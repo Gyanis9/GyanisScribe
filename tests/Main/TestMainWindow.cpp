@@ -26,12 +26,15 @@
 #include "Core/Settings/SettingsStore.h"
 #include "Gui/Controls/AppShortcuts.h"
 #include "Gui/Controls/CheckBox.h"
+#include "Gui/Controls/ScrollBar.h"
 #include "Gui/History/HistoryView.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Controls/HotkeyEdit.h"
+#include "Gui/Controls/ListWidget.h"
 #include "Gui/Controls/SpinBox.h"
 #include "Gui/Resources/IconProvider.h"
 #include "Gui/Theme/Language.h"
+#include "Gui/Theme/SquircleStyle.h"
 #include "Gui/Theme/ThemeManager.h"
 
 #include <gtest/gtest.h>
@@ -67,6 +70,7 @@ using GyanisScribe::App::UpdateVerdict;
 #include <QPushButton>
 #include <QSpinBox>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QStackedWidget>
 #include <QSize>
 #include <QString>
@@ -128,6 +132,8 @@ namespace
         static void SetUpTestSuite()
         {
             application = std::make_unique<QApplication>(kArgumentCount, kArguments);
+            // 「更多」菜单是 Gui::Menu：原生菜单面板不装这一档代理就会盖住自绘高亮
+            GyanisScribe::Gui::SquircleStyle::install();
         }
 
         static void TearDownTestSuite()
@@ -146,6 +152,9 @@ namespace
             m_historyStore = std::make_unique<HistoryStore>(m_directory / "history.json");
             m_store        = makeStore();
             m_theme        = std::make_unique<ThemeManager>(*m_store);
+            // 生产里 AppController 先落主题再建窗口，QPalette 与 activePalette 同源于 ThemePalette；
+            // 这一份装置也照这个次序起，否则自绘面按 Light 铺底、标签却还拿系统原生档的文字色
+            m_theme->applyFromSettings();
         }
 
         void TearDown() override
@@ -314,8 +323,9 @@ namespace
             for (auto *widget: root->findChildren<QWidget *>())
             {
                 const QLatin1StringView className{widget->metaObject()->className()};
-                // Qt 自绘件的内部子件（滚动条、下拉弹出表、清除按钮、数字框内编辑）不是用户可操作项
-                if (className == "QScrollBar" || className == "QComboBoxListView" || className == "QLineEditIconButton" ||
+                // Qt 自绘件的内部子件（滚动条、下拉弹出表、清除按钮、数字框内编辑）不是用户可操作项；
+                // 滚动条按类型认，自绘的 Gui::ScrollBar 子类同样不算
+                if (qobject_cast<QScrollBar *>(widget) != nullptr || className == "QComboBoxListView" || className == "QLineEditIconButton" ||
                     widget->objectName() == QStringLiteral("qt_spinbox_lineedit"))
                 {
                     continue;
@@ -1957,7 +1967,6 @@ TEST_F(MainWindowFixture, EveryCheckBoxUsesTheElasticIndicator)
     for (auto *check: checks)
     {
         EXPECT_NE(dynamic_cast<GyanisScribe::Gui::CheckBox *>(check), nullptr) << "设置页还留着一个原生 QCheckBox：" << check->metaObject()->className();
-        EXPECT_TRUE(check->property("animatedIndicator").toBool()) << "复选框没带抑制静态勾图的属性：" << check->metaObject()->className();
     }
 }
 
@@ -2294,6 +2303,8 @@ TEST_F(MainWindowFixture, EverySettingsPageIsWrappedInAScrollArea)
         EXPECT_EQ(scroll->objectName(), QStringLiteral("settingsScroll")) << "样式表按这个名字把这层设成透明，名字改了就会多出一圈底色";
         EXPECT_TRUE(scroll->widgetResizable()) << "第 " << index << " 页没让内容跟着宽度走：长句会被挤成竖条";
         EXPECT_NE(scroll->widget(), nullptr) << "第 " << index << " 页的滚动区里没装东西";
+        EXPECT_NE(qobject_cast<GyanisScribe::Gui::ScrollBar *>(scroll->verticalScrollBar()), nullptr) << "第 " << index << " 页的竖直滚动条还是原生件，细滑块与圆角手柄都不会出现";
+        EXPECT_NE(qobject_cast<GyanisScribe::Gui::ScrollBar *>(scroll->horizontalScrollBar()), nullptr) << "第 " << index << " 页的水平滚动条还是原生件";
     }
 }
 
@@ -2631,6 +2642,7 @@ TEST_F(MainWindowFixture, BrandIconAndNavMetricsAreWired)
     EXPECT_TRUE(m_window->windowIcon().availableSizes().contains(QSize(512, 512))) << "窗口图标没走品牌入口：界面图标阶梯止于 128";
 
     ASSERT_NE(nav(), nullptr);
+    EXPECT_NE(dynamic_cast<GyanisScribe::Gui::ListWidget *>(nav()), nullptr) << "导航没用自绘连续曲率的列表类";
     EXPECT_EQ(nav()->iconSize(), QSize(20, 20));
 
     m_window->open(MainWindowPage::About);

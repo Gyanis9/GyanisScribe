@@ -2,6 +2,8 @@
 
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Settings/SettingsStore.h"
+#include "Gui/Controls/SurfaceWidget.h"
+#include "Gui/Theme/ControlPalette.h"
 
 #include <gtest/gtest.h>
 
@@ -9,6 +11,7 @@
 
 #include <QApplication>
 #include <QCoreApplication>
+#include <QImage>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMouseEvent>
@@ -338,6 +341,98 @@ TEST_F(HotkeyEditFixture, ClearBindingFallsBackToTheDefaultText)
 
     EXPECT_EQ(display->text(), fallback) << "删除绑定后没有回落到默认文本：界面按键那一格留在了空白";
     EXPECT_EQ(m_store->stringValue(key, QStringLiteral("missing")), QStringLiteral("missing")) << "取消绑定没有把键从配置里删掉";
+}
+
+/**
+ * @brief 钉住显示框是自绘连续曲率底的 SurfaceLabel，并按录制/禁用换铺底角色
+ * @details 录制态铺 accentSoft、禁用态铺 mutedFill、恢复后回到 controlFill；
+ *          这三个颜色只存在于 SurfaceLabel 的 fillRole 里，QSS 已不再给 hotkeyDisplay 铺底。
+ *          取样点留在右侧内边距：文字左对齐，那里只有底色。
+ */
+TEST_F(HotkeyEditFixture, DisplayPaintsRecordingAndDisabledFillRoles)
+{
+    QWidget container;
+    auto   *edit = new HotkeyEdit{*m_store, &container};
+    edit->setGeometry(0, 0, 320, 60);
+    container.resize(320, 60);
+    container.show();
+    container.activateWindow();
+    QCoreApplication::processEvents();
+
+    auto *display = edit->findChild<QLabel *>(QStringLiteral("hotkeyDisplay"));
+    ASSERT_NE(display, nullptr) << "录制框里没有显示组合的那一格";
+    ASSERT_NE(dynamic_cast<GyanisScribe::Gui::SurfaceLabel *>(display), nullptr) << "显示框没有改用 SurfaceLabel，连续曲率底没有落笔处";
+
+    const auto fillAt = [display]
+    {
+        const QImage image = display->grab().toImage();
+        return image.pixelColor(display->width() - 8, display->height() / 2);
+    };
+    const auto &palette = GyanisScribe::Gui::activePalette();
+    EXPECT_EQ(fillAt(), palette.controlFill) << "静息态没有铺 controlFill";
+
+    QMouseEvent press{QEvent::MouseButtonPress, QPointF{5, 5}, QPointF{5, 5}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QCoreApplication::sendEvent(edit, &press);
+    QCoreApplication::processEvents();
+    EXPECT_EQ(fillAt(), palette.accentSoft) << "录制态没有铺 accentSoft";
+
+    QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier};
+    QCoreApplication::sendEvent(edit, &escape);
+    QCoreApplication::processEvents();
+    EXPECT_EQ(fillAt(), palette.controlFill) << "退出录制后没有回到 controlFill";
+
+    edit->setEnabled(false);
+    QCoreApplication::processEvents();
+    EXPECT_EQ(fillAt(), palette.mutedFill) << "禁用态没有铺 mutedFill";
+
+    edit->setEnabled(true);
+    QCoreApplication::processEvents();
+    EXPECT_EQ(fillAt(), palette.controlFill) << "恢复启用后没有回到 controlFill";
+}
+
+/**
+ * @brief 钉住高对比度档的录制主色边不被自动静息边盖掉
+ * @details 高对比度档会给没有显式描边的 SurfaceLabel 自动补 2px borderStrong 边；
+ *          录制态显式把边设成主色，这一档若仍无条件套自动边，用户就看不到「正在等按键」。
+ *          判据取显示框顶边中点：静息必须是 borderStrong，按下后必须是 accent，Esc 后回到 borderStrong。
+ */
+TEST_F(HotkeyEditFixture, HighContrastKeepsTheRecordingAccentEdge)
+{
+    struct ThemeKindGuard
+    {
+        GyanisScribe::Gui::ThemeKind previous = GyanisScribe::Gui::activeThemeKind();
+
+        ~ThemeKindGuard()
+        {
+            GyanisScribe::Gui::setTextThemeKind(previous);
+        }
+    } themeKindGuard;
+    GyanisScribe::Gui::setTextThemeKind(GyanisScribe::Gui::ThemeKind::HighContrast);
+    const auto &palette = GyanisScribe::Gui::activePalette();
+
+    QWidget container;
+    auto   *edit = new HotkeyEdit{*m_store, &container};
+    edit->setGeometry(0, 0, 320, 60);
+    container.resize(320, 60);
+    container.show();
+    container.activateWindow();
+    QCoreApplication::processEvents();
+
+    auto *display = edit->findChild<QLabel *>(QStringLiteral("hotkeyDisplay"));
+    ASSERT_NE(display, nullptr) << "录制框里没有显示组合的那一格";
+    const auto topEdge = [display] { return display->grab().toImage().pixelColor(display->width() / 2, 0); };
+    EXPECT_EQ(topEdge(), palette.borderStrong) << "高对比度档的静息态没有自动补出 borderStrong 边";
+
+    QMouseEvent press{QEvent::MouseButtonPress, QPointF{5, 5}, QPointF{5, 5}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QCoreApplication::sendEvent(edit, &press);
+    QCoreApplication::processEvents();
+    EXPECT_TRUE(display->property("recording").toBool()) << "点一下没有进入录制态，判据没有落点";
+    EXPECT_EQ(topEdge(), palette.accent) << "录制态的主色边被高对比度档的静息黑边盖掉了";
+
+    QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier};
+    QCoreApplication::sendEvent(edit, &escape);
+    QCoreApplication::processEvents();
+    EXPECT_EQ(topEdge(), palette.borderStrong) << "退出录制后没有回到高对比度档的自动静息边";
 }
 
 /**

@@ -18,11 +18,13 @@
 #include <optional>
 #include <string_view>
 
-class QLabel;
 class QFocusEvent;
+class QEvent;
 
 namespace GyanisScribe::Gui
 {
+
+    class SurfaceLabel;
 
     /**
      * @brief 判断一次按键能不能当热键的「按键本体」
@@ -115,8 +117,23 @@ namespace GyanisScribe::Gui
          */
         void focusOutEvent(QFocusEvent *event) override;
 
+        /**
+         * @brief 启用状态变化时重算显示框的铺底角色
+         * @param event 状态变化事件
+         * @details 重写 QWidget::changeEvent()：禁用态铺 mutedFill，重新启用回到 controlFill；
+         *          其余事件原样交给基类
+         */
+        void changeEvent(QEvent *event) override;
+
     private:
         void showPrompt(const QString &text);
+
+        /**
+         * @brief 按录制态与启用态重算显示框的铺底与描边
+         * @details 录制态铺 accentSoft 并加主色边，禁用态铺 mutedFill，其余铺 controlFill；
+         *          高对比度档的 2px 静息边由 SurfaceLabel 的 setHighContrastBorder 补上
+         */
+        void refreshDisplayFill();
 
         /**
          * @brief 放弃当前录制：退出录制态并把显示恢复成配置里的现值
@@ -124,17 +141,18 @@ namespace GyanisScribe::Gui
         void cancelRecording();
 
         /**
-         * @brief 把「正在录制」这一档同步给样式表
+         * @brief 切换录制态
          * @param recording 进入/退出录制态
-         * @details 样式表按 hotkeyDisplay[recording="true"] 换主色描边；属性改了要手动重抛光，
-         *          否则动态属性选择器停在上一次的值。
+         * @details 显示框的铺底与描边由 SurfaceLabel 自绘：录制态铺 accentSoft 并换成主色边，
+         *          退出后按启用状态回到 controlFill 或 mutedFill；recording 属性同时留在显示框上，
+         *          作为可观察的录制状态
          */
         void setRecordingState(bool recording);
 
         Core::ISettingsStore &m_settings;                          ///< 配置存储，不拥有
         std::string           m_key;                               ///< 绑定的配置键名
         HotkeyEditScope       m_scope   = HotkeyEditScope::Global; ///< 这一格录下来的键归哪一档
-        QLabel               *m_display = nullptr;                 ///< 显示组合文本的标签，也是录制状态的提示位
+        SurfaceLabel         *m_display = nullptr;                 ///< 显示组合文本的标签，也是录制状态的提示位
         QString               m_displayText;                       ///< 配置里的现值文本；录制中的提示不覆盖它
         QString               m_defaultText;                       ///< 键不存在时的默认文本；清掉绑定后显示回落到它
         bool                  m_recording = false;                 ///< 是否正在等一次按键

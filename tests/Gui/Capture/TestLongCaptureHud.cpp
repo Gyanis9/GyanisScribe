@@ -1,7 +1,10 @@
 // 长截图控制条的两件事：摆在选区之外（否则会被自己拍进下一帧），以及两枚按钮各有可观察的结果。
 #include "Gui/Capture/LongCaptureHud.h"
 
+#include "Gui/Theme/DesignTokens.h"
+
 #include <QApplication>
+#include <QImage>
 #include <QLabel>
 #include <QPushButton>
 
@@ -144,4 +147,23 @@ TEST_F(LongCaptureHudFixture, ReadoutUsesTabularFigures)
 #if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
     EXPECT_EQ(readout->font().featureValue(QFont::Tag("tnum")), 1u) << "长截图读数没锁等宽，接一帧就左右抖";
 #endif
+}
+
+/**
+ * @brief 钉住长截图控制条的面板由自绘的连续曲率铺底
+ * @details 工具窗透明：左上角必须是透明像素，面板上沿必须是 surface；
+ *          取样点在内容边距之上，那里只可能有面板底
+ */
+TEST_F(LongCaptureHudFixture, PanelIsPaintedWithSquircleCorners)
+{
+    GyanisScribe::Gui::setTextThemeKind(GyanisScribe::Gui::ThemeKind::Light);
+    LongCaptureHud hud;
+    hud.resize(hud.preferredHudSize());
+    hud.setAttribute(Qt::WA_DontShowOnScreen);
+    hud.show();
+    QCoreApplication::processEvents();
+
+    const QImage image = hud.grab().toImage();
+    EXPECT_EQ(image.pixelColor(0, 0).alpha(), 0) << "控制条左上角不透明：方形底露出来了";
+    EXPECT_EQ(image.pixelColor(hud.width() / 2, 2), GyanisScribe::Gui::activePalette().surface);
 }

@@ -6,6 +6,7 @@
 #include "App/UpdateCheck.h"
 #include "Core/Annotation/AnnotationPalette.h"
 #include "Core/Capture/ScreenUtils.h"
+#include "Core/Geometry/ContinuousCorner.h"
 #include "Core/Image/ImageFormat.h"
 #include "Base/Logger.h"
 #include "Core/Image/OutputDecoration.h"
@@ -26,8 +27,16 @@
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Gui/Controls/AppShortcuts.h"
+#include "Gui/Controls/Button.h"
 #include "Gui/Controls/CheckBox.h"
+#include "Gui/Controls/ComboBox.h"
+#include "Gui/Controls/LineEdit.h"
+#include "Gui/Controls/ListWidget.h"
+#include "Gui/Controls/Menu.h"
+#include "Gui/Controls/ScrollBar.h"
 #include "Gui/Controls/SpinBox.h"
+#include "Gui/Controls/SurfaceWidget.h"
+#include "Gui/Theme/CornerStyle.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Controls/HotkeyEdit.h"
 #include "Gui/Resources/IconProvider.h"
@@ -49,7 +58,6 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
-#include <QMenu>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSignalBlocker>
@@ -141,6 +149,9 @@ namespace
         scroll->setFrameShape(QFrame::NoFrame);
         // 横向不出杠：表单的宽度跟着窗口走，出杠说明是排版坏了而不是内容太长
         scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        // 样式表不再给 QScrollBar 尺寸与颜色：两条滚动条在滚动区建好时就换成自绘件
+        scroll->setVerticalScrollBar(new GyanisScribe::Gui::ScrollBar{Qt::Vertical, scroll});
+        scroll->setHorizontalScrollBar(new GyanisScribe::Gui::ScrollBar{Qt::Horizontal, scroll});
         scroll->setWidget(&page);
         return scroll;
     }
@@ -193,7 +204,6 @@ namespace
     void decoratePage(QWidget &page, const QString &title)
     {
         page.setObjectName(QStringLiteral("pageCard"));
-        page.setAttribute(Qt::WA_StyledBackground, true);
 
         auto *layout = page.layout();
         if (auto *box = qobject_cast<QVBoxLayout *>(layout); box != nullptr)
@@ -244,7 +254,7 @@ namespace
         // 否则输入框左缘比字段列右移一截，三处路径行看起来各偏各的
         layout->setContentsMargins(0, 0, 0, 0);
         layout->setSpacing(GyanisScribe::Gui::kSpacingSmall);
-        auto      *editor  = new QLineEdit{row};
+        auto      *editor  = new GyanisScribe::Gui::LineEdit{row};
         const auto stored  = settings.stringValue(key, QString{});
         const auto display = stored.isEmpty() ? GyanisScribe::Base::Paths::toDisplayText(fallback) : stored;
         editor->setText(display);
@@ -252,7 +262,7 @@ namespace
         editor->setAccessibleName(title);
         editor->setToolTip(GyanisScribe::Base::uiText("%1。留空表示用默认目录").arg(title));
 
-        auto *browse = new QPushButton{GyanisScribe::Base::uiText("浏览…"), row};
+        auto *browse = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("浏览…"), row};
         icons.applyIcon(*browse, "Save");
         browse->setAccessibleName(GyanisScribe::Base::uiText("选择%1的目录").arg(title));
 
@@ -341,7 +351,7 @@ namespace
     template<std::size_t Size>
     QComboBox *makeStepCombo(GyanisScribe::Core::ISettingsStore &settings, const std::string_view key, const std::array<int, Size> &steps, const int fallback, const QString &title)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         for (const auto stepValue: steps)
         {
             combo->addItem(QString::number(stepValue), stepValue);
@@ -485,7 +495,7 @@ namespace
      */
     QComboBox *makeUiLanguageCombo(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         for (const auto &choice: kLanguageChoices)
         {
             combo->addItem(GyanisScribe::Base::uiText(choice.label));
@@ -528,7 +538,7 @@ namespace
      */
     QComboBox *makeThemeCombo(GyanisScribe::Gui::ThemeManager &theme)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         for (const auto &choice: kThemeChoices)
         {
             combo->addItem(GyanisScribe::Base::uiText(choice.label));
@@ -556,7 +566,7 @@ namespace
      */
     QComboBox *makeOcrLanguageCombo(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         combo->addItems(GyanisScribe::Core::supportedOcrLanguageTags());
         combo->setAccessibleName(GyanisScribe::Base::uiText("识别语言"));
         const auto stored = settings.stringValue(GyanisScribe::Core::kOcrLanguage, QString::fromUtf8(GyanisScribe::Core::kDefaultOcrLanguage));
@@ -582,7 +592,7 @@ namespace
      */
     QComboBox *makeColorFormatCombo(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         combo->addItems(GyanisScribe::Core::colorFormatLabels());
         combo->setAccessibleName(GyanisScribe::Base::uiText("颜色写法"));
         const auto stored = GyanisScribe::Core::parseColorFormat(settings.stringValue(GyanisScribe::Core::kPickFormat, QStringLiteral("Hex")).toStdString());
@@ -614,7 +624,7 @@ namespace
      */
     QComboBox *makeMagnifierViewCombo(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         for (const auto view: GyanisScribe::Core::magnifierViews())
         {
             combo->addItem(GyanisScribe::Core::magnifierViewLabel(view));
@@ -658,7 +668,7 @@ namespace
      */
     QComboBox *makeSizeUnitCombo(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto                                              combo = new QComboBox;
+        auto                                              combo = new GyanisScribe::Gui::ComboBox;
         const std::array<GyanisScribe::Core::SizeUnit, 2> units{GyanisScribe::Core::SizeUnit::Logical, GyanisScribe::Core::SizeUnit::Physical};
         for (const auto unit: units)
         {
@@ -703,7 +713,7 @@ namespace
     QComboBox *makeTrayClickCombo(GyanisScribe::Core::ISettingsStore &settings, const GyanisScribe::App::TrayClickRole role,
                                   const GyanisScribe::Platform::PlatformCapabilities &capabilities)
     {
-        auto        combo   = new QComboBox;
+        auto        combo   = new GyanisScribe::Gui::ComboBox;
         const auto &info    = GyanisScribe::App::trayClickRoleInfo(role);
         const auto  choices = GyanisScribe::App::trayClickChoices(capabilities);
         std::string complaint;
@@ -1002,7 +1012,7 @@ namespace
      */
     QComboBox *makeRecordScopeCombo(GyanisScribe::Core::ISettingsStore &settings, const GyanisScribe::Gui::IconProvider &icons)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         for (const auto &choice: GyanisScribe::Core::kRecordScopeChoices)
         {
             // 图标名与标签同在词表里：三档录法的字形不一样，扫一眼就分得出，不必逐条读字
@@ -1044,7 +1054,7 @@ namespace
      */
     QComboBox *makeCaptureIntentCombo(GyanisScribe::Core::ISettingsStore &settings, const GyanisScribe::Gui::IconProvider &icons)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         for (const auto &choice: GyanisScribe::App::kCaptureIntentChoices)
         {
             // 与录制范围那格同一条形状：图标名跟着词表走，界面只负责取
@@ -1082,7 +1092,7 @@ namespace
      */
     QComboBox *makeImageFormatCombo(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         // 只摆这台机器真写得出来的那几档：Qt 的图像编码器是插件，摆一档写不出的就是让用户白失败一次
         for (const auto format: GyanisScribe::Core::writableImageFormats())
         {
@@ -1168,7 +1178,7 @@ namespace
     QComboBox *makeAudioDeviceCombo(GyanisScribe::Core::ISettingsStore &settings, const std::string_view key, const QString &title,
                                     GyanisScribe::Plugins::FfmpegAudioDeviceEnumerator &enumerator)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         combo->addItem(GyanisScribe::Base::uiText("不取这一路"), QString());
         combo->setAccessibleName(title);
 
@@ -1220,7 +1230,7 @@ namespace
      */
     QComboBox *makeVideoEncoderCombo(GyanisScribe::Core::ISettingsStore &settings, GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator &enumerator)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         combo->addItem(GyanisScribe::Base::uiText("自动（逐个探测）"), QString::fromUtf8(std::string{GyanisScribe::Core::kRecordVideoEncoderAutoToken}));
         combo->setAccessibleName(GyanisScribe::Base::uiText("视频编码器"));
         combo->setToolTip(GyanisScribe::Base::uiText("列出的是这台机器上前不久真探通的编码器；自动档会在每次编码前按偏好顺序探一遍"));
@@ -1314,7 +1324,7 @@ namespace
      */
     QComboBox *makeRecordFormatCombo(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         for (const auto &choice: GyanisScribe::Core::kRecordFormatChoices)
         {
             combo->addItem(GyanisScribe::Base::uiText(choice.label), tokenText(choice.token));
@@ -1425,7 +1435,7 @@ namespace
      */
     QComboBox *makeRewindFrameRateCombo(Core::ISettingsStore &settings)
     {
-        auto *combo = new QComboBox;
+        auto *combo = new GyanisScribe::Gui::ComboBox;
         combo->setObjectName(QStringLiteral("rewindFrameRate"));
         combo->setAccessibleName(GyanisScribe::Base::uiText("帧率"));
         for (const int rate: {Core::kMinimumRewindFrameRate, Core::kDefaultRewindFrameRate, Core::kMaximumRewindFrameRate})
@@ -1457,7 +1467,7 @@ namespace
      */
     QLineEdit *makeRewindExclusionEdit(Core::ISettingsStore &settings)
     {
-        auto *edit = new QLineEdit;
+        auto *edit = new GyanisScribe::Gui::LineEdit;
         edit->setObjectName(QStringLiteral("rewindExcludeProcesses"));
         edit->setPlaceholderText(GyanisScribe::Base::uiText("keepass.exe, 1password.exe"));
         edit->setAccessibleName(GyanisScribe::Base::uiText("排除程序"));
@@ -1617,7 +1627,10 @@ namespace GyanisScribe::Main
 
         auto *layout = new QHBoxLayout;
         layout->setSpacing(GyanisScribe::Gui::kSpacingMedium);
-        m_nav   = new QListWidget{this};
+        auto *nav = new Gui::ListWidget{this};
+        // 导航压在设置页的面板上，容器底不铺：铺了就是多一层与卡片同色的方块
+        nav->setSurfaceVisible(false);
+        m_nav   = nav;
         m_stack = new QStackedWidget{this};
         m_nav->setObjectName(QStringLiteral("settingsNav"));
         m_nav->setIconSize(QSize(20, 20));
@@ -1809,12 +1822,12 @@ namespace GyanisScribe::Main
         auto *layout = new QHBoxLayout{row};
         layout->setContentsMargins(0, 0, 0, 0);
 
-        auto *exportButton = new QPushButton{GyanisScribe::Base::uiText("导出配置…"), row};
+        auto *exportButton = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("导出配置…"), row};
         m_icons.applyIcon(*exportButton, "Export");
         exportButton->setAccessibleName(GyanisScribe::Base::uiText("导出配置"));
         exportButton->setToolTip(GyanisScribe::Base::uiText("把当前全部设置写成一个 JSON 文件，换机器或备份时用"));
 
-        auto *importButton = new QPushButton{GyanisScribe::Base::uiText("导入配置…"), row};
+        auto *importButton = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("导入配置…"), row};
         m_icons.applyIcon(*importButton, "Import");
         importButton->setAccessibleName(GyanisScribe::Base::uiText("导入配置"));
         importButton->setToolTip(GyanisScribe::Base::uiText("从本程序导出的 JSON 文件读回设置；订阅配置的热键与主题立刻跟上新值"));
@@ -1904,7 +1917,7 @@ namespace GyanisScribe::Main
         row->setContentsMargins(0, 0, 0, 0);
         row->setSpacing(GyanisScribe::Gui::kSpacingSmall);
 
-        auto *moreMenu = new QMenu{bar};
+        auto *moreMenu = new GyanisScribe::Gui::Menu{bar};
         auto  menuFont = moreMenu->font();
         menuFont.setPointSize(GyanisScribe::Gui::kMenuTextPointSize);
         moreMenu->setFont(menuFont);
@@ -1928,7 +1941,7 @@ namespace GyanisScribe::Main
                 QObject::connect(item, &QAction::triggered, this, [this, action] { emit actionRequested(*action); });
                 continue;
             }
-            auto *button = new QPushButton{entry.label, bar};
+            auto *button = new GyanisScribe::Gui::Button{entry.label, bar};
             m_icons.applyIcon(*button, entry.iconName);
             button->setAccessibleName(entry.label);
             button->setToolTip(GyanisScribe::Base::uiText("与托盘菜单、全局热键走同一个出口"));
@@ -1955,7 +1968,7 @@ namespace GyanisScribe::Main
             }
         }
 
-        auto *more = new QToolButton{bar};
+        auto *more = new GyanisScribe::Gui::ToolButton{bar};
         more->setText(GyanisScribe::Base::uiText("更多"));
         more->setAccessibleName(GyanisScribe::Base::uiText("更多"));
         more->setPopupMode(QToolButton::InstantPopup);
@@ -2017,7 +2030,7 @@ namespace GyanisScribe::Main
      */
     QLineEdit *makeDetectionExcludesEdit(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *edit = new QLineEdit;
+        auto *edit = new GyanisScribe::Gui::LineEdit;
         edit->setText(settings.stringValue(GyanisScribe::Core::kCaptureDetectionExcludes, QString{}));
         edit->setPlaceholderText(GyanisScribe::Base::uiText("留空即谁都不排除，例如 chrome.exe, cmd.exe"));
         edit->setClearButtonEnabled(true);
@@ -2037,7 +2050,7 @@ namespace GyanisScribe::Main
 
     QLineEdit *makeGroupRotationEdit(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *edit = new QLineEdit;
+        auto *edit = new GyanisScribe::Gui::LineEdit;
         edit->setText(settings.stringListValue(GyanisScribe::Core::kPinGroupRotationOrder, {}).join(QStringLiteral(", ")));
         edit->setPlaceholderText(GyanisScribe::Base::uiText("留空即按组号升序，例如 2, 1, 3"));
         edit->setClearButtonEnabled(true);
@@ -2075,7 +2088,9 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildGeneralPage()
     {
-        auto *page = new QWidget{this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
+                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        page->setHighContrastBorder(true);
         auto *form =
                 makePageForm(page, GyanisScribe::Base::uiText("界面语言决定菜单、托盘提示与这些设置页的措辞，切换后要重启智录才生效。下面两格管历史留多少，填到 0 就是不限。"));
         form->addRow(GyanisScribe::Base::uiText("界面语言"), makeUiLanguageCombo(m_settings));
@@ -2113,7 +2128,7 @@ namespace GyanisScribe::Main
      */
     QLineEdit *makeNameTemplateEdit(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *edit = new QLineEdit;
+        auto *edit = new GyanisScribe::Gui::LineEdit;
         edit->setText(settings.stringValue(GyanisScribe::Core::kSaveNameTemplate, QString{}));
         edit->setPlaceholderText(GyanisScribe::Base::Paths::defaultNameTemplate());
         edit->setClearButtonEnabled(true);
@@ -2224,7 +2239,7 @@ namespace GyanisScribe::Main
      */
     QLineEdit *makeBorderColorEdit(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *edit = new QLineEdit;
+        auto *edit = new GyanisScribe::Gui::LineEdit;
         edit->setText(settings.stringValue(GyanisScribe::Core::kOutputBorderColor, QString{}));
         edit->setPlaceholderText(GyanisScribe::Base::uiText("#808080（中灰，留空即这一档）"));
         edit->setClearButtonEnabled(true);
@@ -2264,7 +2279,7 @@ namespace GyanisScribe::Main
      */
     QLineEdit *makeExecCommandEdit(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *edit = new QLineEdit;
+        auto *edit = new GyanisScribe::Gui::LineEdit;
         edit->setText(settings.stringValue(GyanisScribe::Core::kCaptureExecCommand, QString{}));
         edit->setPlaceholderText(GyanisScribe::Base::uiText("留空即不跑；形如 上传工具 --path \"%file%\""));
         edit->setClearButtonEnabled(true);
@@ -2286,7 +2301,9 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildCapturePage()
     {
-        auto *page = new QWidget{this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
+                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        page->setHighContrastBorder(true);
         auto *form = makePageForm(page, GyanisScribe::Base::uiText("截图与标注成品落在这个目录里。取色复制出来的文本按下面的写法格式化。"));
         form->addRow(GyanisScribe::Base::uiText("截完之后"), makeCaptureIntentCombo(m_settings, m_icons));
         form->addRow(GyanisScribe::Base::uiText("延时截图"), makeCaptureDelaySpin(m_settings));
@@ -2348,7 +2365,7 @@ namespace GyanisScribe::Main
      */
     QLineEdit *makePaletteEdit(GyanisScribe::Core::ISettingsStore &settings)
     {
-        auto *edit = new QLineEdit;
+        auto *edit = new GyanisScribe::Gui::LineEdit;
         edit->setText(settings.stringListValue(GyanisScribe::Core::kAnnotationPalette, {}).join(QStringLiteral(", ")));
         edit->setPlaceholderText(GyanisScribe::Base::uiText("留空即内置那八格；形如 #FF0000, #00FF00"));
         edit->setClearButtonEnabled(true);
@@ -2404,12 +2421,12 @@ namespace GyanisScribe::Main
         auto *layout = new QHBoxLayout{row};
         layout->setContentsMargins(0, 0, 0, 0);
 
-        auto *exportButton = new QPushButton{GyanisScribe::Base::uiText("导出色板…"), row};
+        auto *exportButton = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("导出色板…"), row};
         m_icons.applyIcon(*exportButton, "Export");
         exportButton->setAccessibleName(GyanisScribe::Base::uiText("导出色板"));
         exportButton->setToolTip(GyanisScribe::Base::uiText("把现在用的那排颜色写成一个文本文件（一行一格 #RRGGBB），发给同事或换机器时用"));
 
-        auto *importButton = new QPushButton{GyanisScribe::Base::uiText("导入色板…"), row};
+        auto *importButton = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("导入色板…"), row};
         m_icons.applyIcon(*importButton, "Import");
         importButton->setAccessibleName(GyanisScribe::Base::uiText("导入色板"));
         importButton->setToolTip(GyanisScribe::Base::uiText("从一份色板文件整份替换当前这一排；下一次打开标注窗就是这一份"));
@@ -2446,7 +2463,9 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildAnnotationPage()
     {
-        auto *page = new QWidget{this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
+                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        page->setHighContrastBorder(true);
         auto *form = makePageForm(page, GyanisScribe::Base::uiText("新打开的标注窗按这两档起步，画过之后的改动会被工具栏记下来，下次仍以最近用的那一档开始。"
                                                                    "色板那一排也可以换成自己的一套：留空就是内置那八格，下面两个按钮负责把一份配色发给同事或收回来。"));
         form->addRow(GyanisScribe::Base::uiText("默认线宽"),
@@ -2466,7 +2485,9 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildPinPage()
     {
-        auto *page = new QWidget{this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
+                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        page->setHighContrastBorder(true);
         auto *form = makePageForm(page, GyanisScribe::Base::uiText("新贴到屏幕上的图按这个不透明度开始。滚轮调透明度只影响那一张贴图，不改这里。"));
         form->addRow(GyanisScribe::Base::uiText("新建贴图的默认不透明度"), makeOpacitySpin(m_settings));
         form->addRow(GyanisScribe::Base::uiText("吸附距离"), makeEdgeSnapDistanceSpin(m_settings));
@@ -2478,7 +2499,9 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildRecordPage()
     {
-        auto *page = new QWidget{this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
+                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        page->setHighContrastBorder(true);
         auto *form =
                 makePageForm(page, GyanisScribe::Base::uiText("录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。存成 GIF "
                                                               "时帧率上限比 MP4 低（选了 GIF 那一格只到 24）。画面码率填 0 就交给编码器的质量档，给了具体数值就按那个码率控，GIF "
@@ -2517,7 +2540,9 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildOcrPage()
     {
-        auto *page = new QWidget{this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
+                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        page->setHighContrastBorder(true);
         auto *form = makePageForm(page, GyanisScribe::Base::uiText("认得出哪种文字取决于语言包。目录留空时按环境变量与程序数据目录找。"));
         form->addRow(GyanisScribe::Base::uiText("识别语言"), makeOcrLanguageCombo(m_settings));
         form->addRow(GyanisScribe::Base::uiText("识别语言包目录"), makePathRow(m_settings, GyanisScribe::Core::kOcrTessDataDirectory, GyanisScribe::Base::uiText("语言包目录"),
@@ -2527,7 +2552,9 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildHotkeyPage()
     {
-        auto *page = new QWidget{this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
+                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        page->setHighContrastBorder(true);
         // 没有登记接口的那一种平台上，改组合键不会有任何效果：入口灰掉并当场说明，
         // 比让人反复改完再按一次、把「没反应」当成程序坏了要好
         // 一行一个动作；条数由这份表自己数出来：文案里那个数字与热键登记表必须是同一个源
@@ -2571,7 +2598,7 @@ namespace GyanisScribe::Main
             edit->bindTo(GyanisScribe::App::customHotkeyKey(entry.token).toStdString(), label, QString{}, GyanisScribe::Gui::HotkeyEditScope::Global);
             edit->setEnabled(m_capabilities.globalHotkeys);
 
-            auto *clear = new QPushButton{GyanisScribe::Base::uiText("取消绑定"), row};
+            auto *clear = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("取消绑定"), row};
             // 名字带上功能：十行都叫「取消绑定」时，读屏与判据都分不清按下的是哪一行
             clear->setAccessibleName(GyanisScribe::Base::uiText("取消 %1 的绑定").arg(label));
             clear->setToolTip(GyanisScribe::Base::uiText("清掉这一项，那个组合键就不再归这个功能管"));
@@ -2634,7 +2661,7 @@ namespace GyanisScribe::Main
             auto *edit = new GyanisScribe::Gui::HotkeyEdit{m_settings, row};
             edit->bindTo(GyanisScribe::Gui::appShortcutKey(entry.token).toStdString(), label, defaultKey, GyanisScribe::Gui::HotkeyEditScope::InWindow);
 
-            auto *reset = new QPushButton{GyanisScribe::Base::uiText("恢复默认"), row};
+            auto *reset = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("恢复默认"), row};
             // 名字带上那一档：二十五行都叫「恢复默认」时，读屏与判据都分不清按下的是哪一行
             reset->setAccessibleName(GyanisScribe::Base::uiText("把「%1」的按键恢复成默认那颗").arg(label));
             reset->setToolTip(GyanisScribe::Base::uiText("清掉这一项：那颗键回到默认的 %1，配置里不留一个读起来算坏值的空串").arg(defaultKey));
@@ -2649,7 +2676,9 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildThemePage()
     {
-        auto *page = new QWidget{this};
+        auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
+                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        page->setHighContrastBorder(true);
         auto *form = makePageForm(page, GyanisScribe::Base::uiText("配色方案即时生效。高对比度档是纯黑正文、纯白底与加粗边框。"));
         form->addRow(GyanisScribe::Base::uiText("配色方案"), makeThemeCombo(m_theme));
         return page;
@@ -2657,7 +2686,9 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildHistoryPage()
     {
-        auto *page  = new QWidget{this};
+        auto *page  = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
+                                                          GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        page->setHighContrastBorder(true);
         auto *inner = new QVBoxLayout{page};
         m_history   = new GyanisScribe::Gui::HistoryView{m_historyStore, GyanisScribe::Core::policyFromSettings(m_settings), m_icons, page};
         inner->addWidget(m_history);
@@ -2699,7 +2730,9 @@ namespace GyanisScribe::Main
 
     QWidget *MainWindow::buildAboutPage()
     {
-        auto *page   = new QWidget{this};
+        auto *page   = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card,
+                                                           GyanisScribe::Gui::SurfaceFillRole::Surface, this};
+        page->setHighContrastBorder(true);
         auto *layout = new QVBoxLayout{page};
         // 与表单页同一条内容网格：默认边距比表单页小一圈，翻到这一页正文会左跳 7px
         layout->setContentsMargins(GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium);
@@ -2715,7 +2748,8 @@ namespace GyanisScribe::Main
                 highestRatio = screen->devicePixelRatio();
             }
         }
-        auto *logo = new QLabel{page};
+        auto *logo = new GyanisScribe::Gui::SurfaceLabel{GyanisScribe::Gui::SurfaceFillRole::WindowBackground,
+                                                         GyanisScribe::Core::CornerRole::Card, page};
         logo->setObjectName(QStringLiteral("brandPlate"));
         logo->setFixedSize(80, 80);
         logo->setContentsMargins(8, 8, 8, 8);
@@ -2735,7 +2769,7 @@ namespace GyanisScribe::Main
 
         // 检查更新：只查不换——下载与替换可执行体要先有签名与原子替换那一套，
         // 这里把「有没有新版」与发布页地址摆出来，下载交给用户自己在浏览器里点
-        auto *checkButton = new QPushButton{GyanisScribe::Base::uiText("检查更新"), page};
+        auto *checkButton = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("检查更新"), page};
         checkButton->setAccessibleName(GyanisScribe::Base::uiText("检查更新"));
         auto *status = new QLabel{page};
         status->setObjectName(QStringLiteral("pageHint"));

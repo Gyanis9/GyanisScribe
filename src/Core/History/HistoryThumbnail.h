@@ -24,8 +24,8 @@ namespace GyanisScribe::Core
     /**
      * @brief 把一张图裁成统一尺寸的圆角缩略图
      * @param source 原图
-     * @param target 目标尺寸，正方形
-     * @param cornerRadius 圆角半径
+     * @param target 目标尺寸，正方形，物理像素
+     * @param cornerRadius 圆角半径，物理像素：调用方按目标图的设备倍率换算，1x/2x/3x 三张图才是同一个逻辑形状
      * @return 目标尺寸的缩略图；原图为空或目标尺寸不成立时返回空图
      * @details 按「填满再裁」而不是「装进去留白」：留白的缩略图在网格里大小不一，
      *          用户扫一眼看不出哪张是同一批截图。

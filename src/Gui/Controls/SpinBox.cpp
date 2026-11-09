@@ -1,6 +1,8 @@
 #include "Gui/Controls/SpinBox.h"
 
 #include "Base/Text.h"
+#include "Core/Geometry/ContinuousCorner.h"
+#include "Gui/Theme/ControlPalette.h"
 #include "Gui/Theme/DesignTokens.h"
 
 #include <QAbstractButton>
@@ -8,6 +10,7 @@
 #include <QLineEdit>
 #include <QPainter>
 #include <QPainterPath>
+#include <QPen>
 #include <QResizeEvent>
 
 namespace
@@ -39,9 +42,9 @@ namespace
             painter.setRenderHint(QPainter::Antialiasing);
             if (underMouse() && isEnabled())
             {
-                painter.setPen(Qt::NoPen);
-                painter.setBrush(palette().color(QPalette::AlternateBase));
-                painter.drawRoundedRect(rect().adjusted(1, 1, -1, -1), 6, 6);
+                GyanisScribe::Core::paintContinuousCorner(painter, QRectF{rect().adjusted(1, 1, -1, -1)},
+                                                          GyanisScribe::Core::cornerShapeFor(GyanisScribe::Core::CornerRole::Thumbnail),
+                                                          palette().color(QPalette::AlternateBase), QPen{Qt::NoPen});
             }
 
             const auto    color       = isEnabled() ? palette().color(QPalette::Text) : palette().color(QPalette::Disabled, QPalette::Text);
@@ -76,6 +79,7 @@ namespace GyanisScribe::Gui
     SpinBox::SpinBox(QWidget *parent) : QSpinBox(parent)
     {
         setObjectName(QStringLiteral("numericSpin"));
+        setProperty("squircle", true);
         setButtonSymbols(QAbstractSpinBox::NoButtons);
         // 数字读数锁等宽：微调时位数变化，后几位不能左右抖
         applyTabularFigures(*this, TextScript::Mixed);
@@ -93,6 +97,17 @@ namespace GyanisScribe::Gui
         m_down->setAccessibleName(GyanisScribe::Base::uiText("减少"));
         QObject::connect(m_up, &QAbstractButton::clicked, this, [this] { stepUp(); });
         QObject::connect(m_down, &QAbstractButton::clicked, this, [this] { stepDown(); });
+    }
+
+    void SpinBox::paintEvent(QPaintEvent *event)
+    {
+        {
+            QPainter   painter{this};
+            const auto colors = inputColors(activePalette(), activeThemeKind(), isEnabled(), isReadOnly(), hasFocus(), usesInlineFocusBorder(*this));
+            const QPen pen    = colors.borderWidth > 0 ? QPen{colors.border, static_cast<qreal>(colors.borderWidth)} : QPen{Qt::NoPen};
+            Core::paintContinuousCorner(painter, QRectF{rect()}, Core::cornerShapeFor(Core::CornerRole::Control), colors.fill, pen);
+        }
+        QSpinBox::paintEvent(event);
     }
 
     void SpinBox::resizeEvent(QResizeEvent *event)

@@ -10,6 +10,7 @@ add_subdirectory(Ocr)
 add_subdirectory(Privacy)
 add_subdirectory(Record)
 add_subdirectory(Annotation)
+add_subdirectory(Geometry)
 add_subdirectory(Rewind)
 
 get_property(CoreSources GLOBAL PROPERTY GyanisScribeCoreSources)

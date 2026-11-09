@@ -1,5 +1,25 @@
 # Gui/Controls：通用控件（Toast、快捷键输入框、按键步骤、界面快捷键清册）
 set_property(GLOBAL APPEND PROPERTY GyanisScribeGuiSources
+        ${CMAKE_CURRENT_LIST_DIR}/SurfaceWidget.h
+        ${CMAKE_CURRENT_LIST_DIR}/SurfaceWidget.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/LineEdit.h
+        ${CMAKE_CURRENT_LIST_DIR}/LineEdit.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/ComboBox.h
+        ${CMAKE_CURRENT_LIST_DIR}/ComboBox.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/TextEdit.h
+        ${CMAKE_CURRENT_LIST_DIR}/TextEdit.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/Button.h
+        ${CMAKE_CURRENT_LIST_DIR}/Button.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/Menu.h
+        ${CMAKE_CURRENT_LIST_DIR}/Menu.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/ItemDelegate.h
+        ${CMAKE_CURRENT_LIST_DIR}/ItemDelegate.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/FontItemDelegate.h
+        ${CMAKE_CURRENT_LIST_DIR}/FontItemDelegate.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/ListWidget.h
+        ${CMAKE_CURRENT_LIST_DIR}/ListWidget.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/ListView.h
+        ${CMAKE_CURRENT_LIST_DIR}/ListView.cpp
         ${CMAKE_CURRENT_LIST_DIR}/Toast.h
         ${CMAKE_CURRENT_LIST_DIR}/Toast.cpp
         ${CMAKE_CURRENT_LIST_DIR}/StreamingText.h
@@ -8,6 +28,10 @@ set_property(GLOBAL APPEND PROPERTY GyanisScribeGuiSources
         ${CMAKE_CURRENT_LIST_DIR}/HotkeyEdit.cpp
         ${CMAKE_CURRENT_LIST_DIR}/SpinBox.h
         ${CMAKE_CURRENT_LIST_DIR}/SpinBox.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/Slider.h
+        ${CMAKE_CURRENT_LIST_DIR}/Slider.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/ScrollBar.h
+        ${CMAKE_CURRENT_LIST_DIR}/ScrollBar.cpp
         ${CMAKE_CURRENT_LIST_DIR}/KeyStep.h
         ${CMAKE_CURRENT_LIST_DIR}/KeyStep.cpp
         ${CMAKE_CURRENT_LIST_DIR}/AppShortcuts.h

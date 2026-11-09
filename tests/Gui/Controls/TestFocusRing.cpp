@@ -2,7 +2,9 @@
 // 零边距行与滚动区的宿主选择、下拉框/微调框的内部行编辑映射、移动缩放跟随、
 // 只读控件跳过、主题切换重装，以及勾选的工具按钮仍要拿到单环。
 // 与 TestControlsChrome 同进程，共用它那份 QApplication。
+#include "Gui/Controls/CheckBox.h"
 #include "Gui/Controls/FocusRing.h"
+#include "Gui/Controls/LineEdit.h"
 
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Theme/ThemeManager.h"
@@ -21,6 +23,7 @@
 #include <QToolButton>
 #include <QWidget>
 
+#include <cmath>
 #include <memory>
 
 using GyanisScribe::Gui::FocusRingController;
@@ -88,6 +91,40 @@ TEST_F(FocusRingFixture, LineEditFocusDrawsTwoRingsOutsideTheField)
 }
 
 /**
+ * @brief 钉住焦点环的角部按连续曲率切掉，外环保持 32% 透明度
+ * @details 内环与外环都由 Core::continuousCornerPath 生成：环矩形左上角落在曲线外，
+ *          方角环本会描到那里；同一环的左侧中点必须仍贴着主色。
+ *          外环是 32% 透明度的主色压在白底上，中点取色的每个通道都要与这档混合值一致。
+ */
+TEST_F(FocusRingFixture, FocusRingCornersFollowTheContinuousPath)
+{
+    QWidget host;
+    host.setStyleSheet(QStringLiteral("background-color: #FFFFFF;"));
+    host.resize(260, 90);
+    auto *edit = new QLineEdit{&host};
+    edit->setGeometry(40, 30, 180, 32);
+    host.show();
+    edit->setFocus();
+    QCoreApplication::processEvents();
+
+    const auto shot = host.grab().toImage();
+    const int  y    = edit->geometry().center().y();
+    const int  left = edit->geometry().left();
+    const int  top  = edit->geometry().top();
+
+    EXPECT_TRUE(isBluish(shot.pixelColor(left - 1, y))) << "内环左侧中点不是主色";
+    EXPECT_TRUE(isBluish(shot.pixelColor(left - 5, y))) << "外环左侧中点没画出来";
+    EXPECT_FALSE(isBluish(shot.pixelColor(left - 5, top - 5))) << "外环左上角没被连续曲率切掉";
+
+    // 外环色 = 主色按 32% 透明度压在白底上：82 是 QColor::setAlphaF(0.32) 的整数字节
+    const auto blended = [](const int accent) { return (accent * 82 + 255 * (255 - 82)) / 255; };
+    const auto outer   = shot.pixelColor(left - 5, y);
+    EXPECT_LE(std::abs(outer.red() - blended(kLightPalette.accent.red())), 4) << "外环红色分量不是 32% 主色";
+    EXPECT_LE(std::abs(outer.green() - blended(kLightPalette.accent.green())), 4) << "外环绿色分量不是 32% 主色";
+    EXPECT_LE(std::abs(outer.blue() - blended(kLightPalette.accent.blue())), 4) << "外环蓝色分量不是 32% 主色";
+}
+
+/**
  * @brief 钉住失焦回收覆盖层，且高对比度档从不安装覆盖层
  * @details 高对比度靠 QSS 的 2px 描边表达焦点，多一层自绘环会破坏这一档的视觉契约。
  */
@@ -112,9 +149,10 @@ TEST_F(FocusRingFixture, BlurHidesTheRingAndHighContrastNeverInstallsOne)
 }
 
 /**
- * @brief 钉住标注工具栏内的控件不装双环，只把 1px 透明边框换成主色
+ * @brief 钉住标注工具栏内的控件不装双环，只由控件自绘 1px 主色边
  * @details 工具栏是 26px 紧凑档、行距只有 2px，6px 外扩的环会压到相邻按钮上；
- *          聚焦只换边色不换尺寸，输入框不应被挤动。
+ *          聚焦只换边色不换尺寸，输入框不应被挤动。可见焦点边由 ControlPalette::inputColors
+ *          按 usesInlineFocusBorder 自绘，QSS 里已没有工具栏的 :focus 规则。
  */
 TEST_F(FocusRingFixture, CompactToolbarKeepsItsOwnFocusEdge)
 {
@@ -123,7 +161,7 @@ TEST_F(FocusRingFixture, CompactToolbarKeepsItsOwnFocusEdge)
     QWidget host;
     host.setObjectName(QStringLiteral("AnnotationToolbar"));
     host.resize(240, 80);
-    auto *edit = new QLineEdit{&host};
+    auto *edit = new GyanisScribe::Gui::LineEdit{&host};
     edit->setGeometry(30, 24, 180, 32);
     host.show();
     QCoreApplication::processEvents();
@@ -136,8 +174,10 @@ TEST_F(FocusRingFixture, CompactToolbarKeepsItsOwnFocusEdge)
     EXPECT_EQ(edit->size(), sizeBeforeFocus) << "聚焦换边色把输入框尺寸改了";
     EXPECT_EQ(edit->size(), QSize(180, 32)) << "输入框没落在设定的尺寸上";
 
-    const auto   shot = host.grab().toImage();
-    const QColor edge = shot.pixelColor(edit->geometry().left(), edit->geometry().center().y());
+    const auto shot = host.grab().toImage();
+    // 取样上边而不是左边：同一笔 1px 描边在纵向边缘会与底色混出几个百分点的抗锯齿，
+    // 横向边缘落在整像素上，取到的就是主色本身
+    const QColor edge = shot.pixelColor(edit->geometry().center().x(), edit->geometry().top());
     EXPECT_EQ(edge, kLightPalette.accent) << "紧凑工具栏的焦点边缘不是主色，实际是 " << edge.name().toStdString();
 }
 
@@ -150,7 +190,8 @@ TEST_F(FocusRingFixture, CheckBoxGetsASingleRingAroundTheIndicator)
     QWidget host;
     host.setStyleSheet(QStringLiteral("background-color: #FCFCFB;"));
     host.resize(220, 70);
-    auto *check = new QCheckBox{QStringLiteral("勾选项"), &host};
+    auto *check = new GyanisScribe::Gui::CheckBox{&host};
+    check->setText(QStringLiteral("勾选项"));
     check->setGeometry(20, 20, 160, 24);
     host.show();
     check->setFocus();

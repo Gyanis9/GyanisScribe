@@ -2,6 +2,7 @@
 
 #include "Core/Annotation/TextFont.h"
 #include "Core/Annotation/TextLayout.h"
+#include "Core/Geometry/ContinuousCorner.h"
 #include "Base/Text.h"
 
 #include <QFontMetricsF>
@@ -128,7 +129,8 @@ namespace GyanisScribe::Core
             plate.setAlpha(kTextPlateAlpha);
             painter.setPen(Qt::NoPen);
             painter.setBrush(plate);
-            painter.drawRoundedRect(textBox.adjusted(-padding, -padding, padding, padding), shape.fontSize / 5.0, shape.fontSize / 5.0);
+            // 底板四角与其它内容圆角同走连续曲率路径；半径仍按字号取，小字上不会缩成尖角
+            painter.drawPath(continuousCornerPath(QRectF{textBox.adjusted(-padding, -padding, padding, padding)}, cornerShapeForRadius(shape.fontSize / 5.0)));
         }
 
         if (shape.textOutline)
