@@ -1,16 +1,20 @@
 // 审核对话框的用例：清单勾选、全选/全不选、打码方式与取消语义。
 // 用例不调用 exec()，只直接点按钮或改勾选状态，避免在自动化里阻塞事件循环。
 
+#include "Core/Annotation/AnnotationTool.h"
 #include "Gui/Privacy/PrivacyReviewDialog.h"
 
 #include <gtest/gtest.h>
 
 #include <QApplication>
 #include <QComboBox>
+#include <QDialog>
+#include <QLabel>
 #include <QListWidget>
 #include <QListWidgetItem>
 #include <QPushButton>
 #include <QRect>
+#include <QSignalSpy>
 #include <QString>
 
 #include <cstddef>
@@ -96,6 +100,46 @@ TEST_F(PrivacyReviewDialogFixture, DefaultsSelectEverythingAndMosaic)
     EXPECT_TRUE(list->item(0)->text().contains(QStringLiteral("手机号"))) << "每行要带中文类型标签";
     EXPECT_TRUE(list->item(0)->text().contains(items[0].maskedSample)) << "每行要带脱敏样例";
     EXPECT_TRUE(list->item(1)->text().contains(QStringLiteral("邮箱"))) << "邮箱行要带邮箱类型标签";
+
+    auto *note = dialog.findChild<QLabel *>(QStringLiteral("privacyNote"));
+    ASSERT_NE(note, nullptr) << "说明文字要以 privacyNote 命名供用例核对";
+    EXPECT_TRUE(note->text().contains(QStringLiteral("未上传"))) << "说明要写明内容未上传";
+}
+
+/**
+ * @brief 钉住每一种命中类型都有自己的中文标签
+ * @details 类型分派漏掉一支时，那一行只会剩下冒号和脱敏样例，审核人看不出这是什么。
+ */
+TEST_F(PrivacyReviewDialogFixture, EveryKindHasChineseTypeLabel)
+{
+    struct KindLabel
+    {
+        PiiKind kind;
+        QString label;
+    };
+
+    const std::vector<KindLabel> cases{{PiiKind::Phone, QStringLiteral("手机号")},         {PiiKind::Landline, QStringLiteral("固定电话")},
+                                       {PiiKind::IdCard, QStringLiteral("身份证")},        {PiiKind::BankCard, QStringLiteral("银行卡")},
+                                       {PiiKind::Email, QStringLiteral("邮箱")},           {PiiKind::Ip, QStringLiteral("IP 地址")},
+                                       {PiiKind::Barcode, QStringLiteral("二维码/条形码")}};
+
+    std::vector<PiiItem> items;
+    items.reserve(cases.size());
+    for (const auto &one: cases)
+    {
+        items.push_back(makeItem(one.kind, QStringLiteral("masked")));
+    }
+
+    PrivacyReviewDialog dialog{items};
+    auto               *list = dialog.findChild<QListWidget *>(QStringLiteral("privacyList"));
+    ASSERT_NE(list, nullptr);
+    ASSERT_EQ(list->count(), static_cast<int>(cases.size()));
+
+    for (int row = 0; row < list->count(); ++row)
+    {
+        const QString &label = cases[static_cast<std::size_t>(row)].label;
+        EXPECT_TRUE(list->item(row)->text().contains(label)) << "第 " << row << " 行缺少类型标签 " << label.toStdString();
+    }
 }
 
 /**
@@ -163,17 +207,25 @@ TEST_F(PrivacyReviewDialogFixture, StyleComboMapsToToolKind)
 }
 
 /**
- * @brief 钉住取消不返回已接受结果，应用按钮才把对话框置为 Accepted
+ * @brief 钉住取消把已接受的结果改回 Rejected，应用按钮才把对话框置为 Accepted
+ * @details 先手动置成 Accepted 再点取消：QDialog 的初始 result() 本来就是 Rejected，
+ *          不先改掉的话，删掉取消按钮到 reject() 的连线这条用例照样是绿的。
  */
 TEST_F(PrivacyReviewDialogFixture, CancelRejectsAndApplyAccepts)
 {
     PrivacyReviewDialog dialog{makeItems()};
     auto               *cancel = dialog.findChild<QPushButton *>(QStringLiteral("privacyCancel"));
     ASSERT_NE(cancel, nullptr);
-    cancel->click();
 
+    dialog.done(static_cast<int>(QDialog::Accepted));
+    ASSERT_EQ(dialog.result(), static_cast<int>(QDialog::Accepted)) << "前提：先让对话框带上已接受的结果";
+
+    QSignalSpy rejected{&dialog, &QDialog::rejected};
+    ASSERT_TRUE(rejected.isValid()) << "要能监听 rejected 才能数清取消发了几次";
+
+    cancel->click();
     EXPECT_EQ(dialog.result(), static_cast<int>(QDialog::Rejected)) << "取消后结果应是 Rejected";
-    EXPECT_NE(dialog.result(), static_cast<int>(QDialog::Accepted)) << "取消不能留下已接受的结果";
+    EXPECT_EQ(rejected.count(), 1) << "取消按钮只该发一次 rejected";
 
     PrivacyReviewDialog applied{makeItems()};
     auto               *apply = applied.findChild<QPushButton *>(QStringLiteral("privacyApply"));

@@ -1,6 +1,7 @@
 #include "Gui/Privacy/PrivacyReviewDialog.h"
 
 #include "Base/Text.h"
+#include "Core/Annotation/AnnotationTool.h"
 #include "Gui/Theme/DesignTokens.h"
 
 #include <QComboBox>
@@ -60,6 +61,7 @@ namespace GyanisScribe::Gui
         root->setSpacing(kSpacingMedium);
 
         auto *note = new QLabel{Base::uiText("只在本机检测，未上传；请逐项确认，打码后可撤销。"), this};
+        note->setObjectName(QStringLiteral("privacyNote"));
         note->setWordWrap(true);
         root->addWidget(note);
 
@@ -80,12 +82,12 @@ namespace GyanisScribe::Gui
         buttons->setSpacing(kSpacingSmall);
         root->addLayout(buttons);
 
-        m_selectAll  = new QPushButton{Base::uiText("全选"), this};
-        m_selectNone = new QPushButton{Base::uiText("全不选"), this};
-        m_selectAll->setObjectName(QStringLiteral("privacySelectAll"));
-        m_selectNone->setObjectName(QStringLiteral("privacySelectNone"));
-        buttons->addWidget(m_selectAll);
-        buttons->addWidget(m_selectNone);
+        auto *selectAll  = new QPushButton{Base::uiText("全选"), this};
+        auto *selectNone = new QPushButton{Base::uiText("全不选"), this};
+        selectAll->setObjectName(QStringLiteral("privacySelectAll"));
+        selectNone->setObjectName(QStringLiteral("privacySelectNone"));
+        buttons->addWidget(selectAll);
+        buttons->addWidget(selectNone);
         buttons->addStretch(1);
 
         buttons->addWidget(new QLabel{Base::uiText("打码方式"), this});
@@ -105,8 +107,8 @@ namespace GyanisScribe::Gui
         buttons->addWidget(cancel);
         buttons->addWidget(apply);
 
-        QObject::connect(m_selectAll, &QPushButton::clicked, this, [this] { setAllCheckStates(Qt::Checked); });
-        QObject::connect(m_selectNone, &QPushButton::clicked, this, [this] { setAllCheckStates(Qt::Unchecked); });
+        QObject::connect(selectAll, &QPushButton::clicked, this, [this] { setAllCheckStates(Qt::Checked); });
+        QObject::connect(selectNone, &QPushButton::clicked, this, [this] { setAllCheckStates(Qt::Unchecked); });
         QObject::connect(cancel, &QPushButton::clicked, this, &QDialog::reject);
         QObject::connect(apply, &QPushButton::clicked, this, &QDialog::accept);
     }
