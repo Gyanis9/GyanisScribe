@@ -1,6 +1,5 @@
 #include "Core/Memory/MemoryToken.h"
 
-#include <QRegularExpression>
 #include <QStringList>
 
 #include <algorithm>
@@ -87,7 +86,27 @@ namespace GyanisScribe::Core
 
     QString buildFtsQuery(const QString &userText)
     {
-        const auto segments = userText.split(QRegularExpression(QStringLiteral("\\s+")), Qt::SkipEmptyParts);
+        // 按 Unicode 空白切段：全角空格 U+3000 等与 ASCII 空白同为中文输入法的词边界，
+        // 只认 ASCII \s 会把两个独立词粘成一段连续短语
+        QStringList segments;
+        QString     currentSegment;
+        for (const QChar character: userText)
+        {
+            if (character.isSpace())
+            {
+                if (!currentSegment.isEmpty())
+                {
+                    segments.append(currentSegment);
+                    currentSegment.clear();
+                }
+                continue;
+            }
+            currentSegment.append(character);
+        }
+        if (!currentSegment.isEmpty())
+        {
+            segments.append(currentSegment);
+        }
 
         QStringList parts;
         parts.reserve(segments.size());

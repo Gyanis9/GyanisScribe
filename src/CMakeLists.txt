@@ -33,7 +33,7 @@ add_custom_command(TARGET DeployQtRuntime POST_BUILD
 # QFutureWatcher 也在 QtCore 里——实测 Release 成品与测试二进制都不 import Qt6Concurrent / libQt6Concurrent
 # （打包那一步的 windeployqt 同样没拷它）。链 Qt6::Concurrent 只是为了拿到头文件，摆一份没人加载的 DLL 进运行目录是死重量。
 # PrintSupport 在清单里：打印对话框（标注窗 Ctrl+P）真加载它，缺一个 DLL 的表现是构建期枚举整个 .exe 报 0xc0000135
-foreach (QtModule Core Gui Widgets Svg Network PrintSupport)
+foreach (QtModule Core Gui Widgets Svg Network PrintSupport Sql)
     add_custom_command(TARGET DeployQtRuntime POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "$<TARGET_FILE_DIR:Qt6::${QtModule}>/Qt6${QtModule}${QT_DEBUG_SUFFIX}.dll"
@@ -44,6 +44,14 @@ add_custom_command(TARGET DeployQtRuntime POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "$<TARGET_FILE_DIR:Qt6::Gui>/../plugins/platforms/qwindows${QT_DEBUG_SUFFIX}.dll"
         "$<TARGET_FILE_DIR:GyanisScribe>/plugins/platforms/")
+
+# SQLite 驱动是插件：记忆索引靠 QSQLITE 打开数据库，缺 qsqlite.dll 时 QSqlDatabase 报驱动未加载
+add_custom_command(TARGET DeployQtRuntime POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+        "$<TARGET_FILE_DIR:GyanisScribe>/sqldrivers"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_FILE_DIR:Qt6::Sql>/../plugins/sqldrivers/qsqlite${QT_DEBUG_SUFFIX}.dll"
+        "$<TARGET_FILE_DIR:GyanisScribe>/sqldrivers/")
 
 # 图像格式插件：PNG 编在 Qt6Gui 里，JPG、WebP、GIF 与 SVG 是插件。设置页摆出来的档必须真写得出来，
 # 否则用户选了那一档就得到一次失败（实测开发树里 imageformats 没摆时 jpg 就是写不出）。

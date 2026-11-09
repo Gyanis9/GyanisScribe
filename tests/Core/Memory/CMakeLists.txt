@@ -1,6 +1,7 @@
 add_executable(TestCoreMemory
         TestMemoryToken.cpp
-        TestDuplicateHash.cpp)
+        TestDuplicateHash.cpp
+        TestMemoryIndex.cpp)
 
 target_link_libraries(TestCoreMemory PRIVATE
         Core

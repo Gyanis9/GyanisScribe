@@ -23,7 +23,8 @@ target_link_libraries(Core PUBLIC
         Base
         Qt6::Core
         Qt6::Gui
-        Qt6::Concurrent)
+        Qt6::Concurrent
+        Qt6::Sql)
 
 target_compile_features(Core PUBLIC cxx_std_23)
 

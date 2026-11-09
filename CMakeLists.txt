@@ -25,6 +25,7 @@ find_package(Qt6 COMPONENTS
         Svg
         Network
         PrintSupport
+        Sql
         REQUIRED)
 
 enable_testing()
