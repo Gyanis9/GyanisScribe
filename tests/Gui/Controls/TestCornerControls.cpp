@@ -28,6 +28,7 @@
 #include <QFont>
 #include <QHoverEvent>
 #include <QImage>
+#include <QLineEdit>
 #include <QMenu>
 #include <QMouseEvent>
 #include <QPainter>
@@ -851,6 +852,53 @@ TEST_F(CornerControlsFixture, SpinBoxPaintsControlFill)
     QCoreApplication::processEvents();
     const QImage image = host.grab().toImage();
     EXPECT_EQ(image.pixelColor(60, 26), GyanisScribe::Gui::activePalette().controlFill);
+}
+
+/**
+ * @brief 钉住数字框在主题样式表下仍画得出取值
+ * @details Qt 6.12 的 QStyleSheetStyle 在微调框关掉原生按钮（NoButtons）、且自身命中带边框
+ *          或内边距的样式表规则时，会把内部行编辑的矩形收成 1px 宽。取值文本还在，
+ *          界面上却只剩一片空白。这里套上真实的浅色样式表，要求行编辑占住微调框的内容区，
+ *          并在避开右侧自绘上下按钮的区域里数出取值文本的深色笔画。
+ */
+TEST_F(CornerControlsFixture, SpinBoxKeepsItsValueVisibleUnderTheThemeStyleSheet)
+{
+    struct StyleSheetGuard
+    {
+        QString previous = qApp->styleSheet();
+
+        ~StyleSheetGuard()
+        {
+            qApp->setStyleSheet(previous);
+        }
+    } guard;
+    qApp->setStyleSheet(GyanisScribe::Gui::ThemeManager::styleSheetFor(GyanisScribe::Gui::ThemeKind::Light));
+
+    QWidget host;
+    host.resize(240, 60);
+    host.setAutoFillBackground(true);
+    host.setPalette(QPalette{QColor{255, 0, 0}});
+    auto *spin = new GyanisScribe::Gui::SpinBox{&host};
+    spin->setRange(0, 1000);
+    spin->setSuffix(QStringLiteral(" 条"));
+    spin->setValue(200);
+    spin->setGeometry(10, 10, 200, 32);
+    host.show();
+    QCoreApplication::processEvents();
+    // 焦点会带出一条闪烁光标，光标笔画不能被当成取值文本
+    spin->clearFocus();
+    spin->update();
+    QCoreApplication::processEvents();
+
+    auto *edit = spin->findChild<QLineEdit *>();
+    ASSERT_NE(edit, nullptr) << "微调框没有内部行编辑，判据没有落点";
+    EXPECT_GT(edit->width(), 1) << "内部行编辑被样式表收成一条线，取值画不出来";
+    EXPECT_GT(edit->height(), 1) << "内部行编辑没有高度，取值画不出来";
+
+    const QImage image = spin->grab().toImage();
+    // 右侧留给自绘的上下按钮，箭头笔画不能算成取值文本
+    const int ink = countInkPixels(image, QRect{0, 0, spin->width() - 26, spin->height()});
+    EXPECT_GT(ink, 20) << "数字框的内容区里没有成形的深色笔画，取值不可见";
 }
 
 /**

@@ -88,9 +88,10 @@ QToolButton#annotationColorButton::menu-indicator {
         QStyleSheetStyle 就会按 QPalette::Base 先铺一层方底。
         选择器限定到带 squircle 属性的自绘类：原生对话窗（取色、文本输入、文件对话框）里的
         QLineEdit / QComboBox / QSpinBox 也匹配类型选择器，透明底加透明边落在它们身上就是
-        没有底的输入框。微调框与可编辑下拉框内部的行编辑没有这个属性，用祖先选择器带到同一套占位。 */
-QLineEdit[squircle="true"], QComboBox[squircle="true"], QSpinBox[squircle="true"],
-QSpinBox[squircle="true"] QLineEdit, QComboBox[squircle="true"] QLineEdit {
+        没有底的输入框。微调框不在这一条里：Qt 6.12 的 QStyleSheetStyle 在关掉原生按钮后，
+        会按微调框自己的边框与内边距裁内部行编辑，把行编辑收成 1px 宽，数值文本还在却画不出来。
+        它的文字色与最小高度另起一条，内部行编辑走下面的后代规则。 */
+QLineEdit[squircle="true"], QComboBox[squircle="true"] {
     color: #000000;
     background: transparent;
     border: 2px solid transparent;
@@ -98,6 +99,24 @@ QSpinBox[squircle="true"] QLineEdit, QComboBox[squircle="true"] QLineEdit {
     min-height: 30px;
     selection-background-color: #FFE500;
     selection-color: #000000;
+}
+
+/* 微调框的数值由内部行编辑排：盒模型退回原生子控件算法后，行编辑落在微调框的内容区；
+   这里只留文字色、透明底和与单行输入一致的左右缩进，不再带边框与最小高度 */
+QSpinBox[squircle="true"] QLineEdit {
+    color: #000000;
+    background: transparent;
+    border: none;
+    padding: 0 12px;
+    selection-background-color: #FFE500;
+    selection-color: #000000;
+}
+
+/* 数字框的 sizeHint 另带上下各 2px 的自有框：原来占位用的 2px 透明边框去掉后空出 4px，
+   内容高补到 34 才能让数字框仍落在总高 38 */
+QSpinBox[squircle="true"] {
+    color: #000000;
+    min-height: 34px;
 }
 
 QLineEdit[squircle="true"]:disabled, QComboBox[squircle="true"]:disabled, QSpinBox[squircle="true"]:disabled,
