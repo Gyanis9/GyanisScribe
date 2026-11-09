@@ -19,6 +19,21 @@ namespace
         line.boundingBox = line.words.front().boundingBox;
         return line;
     }
+
+    /// 造一行由多个词框组成的文本：词文本本身不带前导空格，缩进只体现在框的位置上
+    OcrLine wordBoxesLine(const int top, const int left, const QVector<QString> &texts)
+    {
+        OcrLine line;
+        int     x = left;
+        for (const QString &text: texts)
+        {
+            const OcrWord word{text, QRect{x, top, static_cast<int>(text.size()) * 10, 20}};
+            line.words.push_back(word);
+            line.boundingBox = line.boundingBox.isNull() ? word.boundingBox : line.boundingBox.united(word.boundingBox);
+            x += static_cast<int>(text.size()) * 10 + 10;
+        }
+        return line;
+    }
 } // namespace
 
 TEST(MarkdownBuilder, LevelsHeadingsByLineHeight)
@@ -48,18 +63,28 @@ TEST(MarkdownBuilder, SeparatesListFromFollowingParagraph)
 TEST(MarkdownBuilder, WrapsTwoIndentedCodeLinesInFence)
 {
     OcrResult result;
-    result.lines           = {line(QStringLiteral("正文"), 10), line(QStringLiteral("if (x) {"), 40, 20, 80), line(QStringLiteral("  return 1;"), 65, 20, 80)};
+    result.lines           = {line(QStringLiteral("正文"), 10), line(QStringLiteral("if (x) {"), 40, 20, 80), line(QStringLiteral("return 1;"), 65, 20, 80)};
     const QString markdown = buildMarkdown(result);
-    EXPECT_TRUE(markdown.contains(QStringLiteral("```\nif (x) {\n  return 1;\n```")));
+    EXPECT_TRUE(markdown.contains(QStringLiteral("```\nif (x) {\nreturn 1;\n```")));
     EXPECT_TRUE(markdown.contains(QStringLiteral("正文")));
 }
 
 TEST(MarkdownBuilder, WrapsCodeLinesInFenceExactly)
 {
     OcrResult result;
-    result.lines = {line(QStringLiteral("正文"), 10), line(QStringLiteral("if (x) {"), 40, 20, 80), line(QStringLiteral("  return 1;"), 65, 20, 80),
+    result.lines = {line(QStringLiteral("正文"), 10), line(QStringLiteral("if (x) {"), 40, 20, 80), line(QStringLiteral("return 1;"), 65, 20, 80),
                     line(QStringLiteral("}"), 90, 20, 80), line(QStringLiteral("if (y) {"), 115, 20, 80)};
-    EXPECT_EQ(buildMarkdown(result), QStringLiteral("正文\n```\nif (x) {\n  return 1;\n}\nif (y) {\n```\n"));
+    EXPECT_EQ(buildMarkdown(result), QStringLiteral("正文\n```\nif (x) {\nreturn 1;\n}\nif (y) {\n```\n"));
+}
+
+TEST(MarkdownBuilder, FencesFlatCodeRunFromWordBoxesWithoutTextIndent)
+{
+    // 真实 OCR 的词文本不带前导空格，缩进只体现在词框位置：平铺缩进的连续行照样成块
+    OcrResult result;
+    result.lines           = {line(QStringLiteral("正文"), 10), wordBoxesLine(40, 80, {QStringLiteral("if"), QStringLiteral("(x)"), QStringLiteral("{")}),
+                              wordBoxesLine(65, 80, {QStringLiteral("return"), QStringLiteral("1;")})};
+    const QString markdown = buildMarkdown(result);
+    EXPECT_TRUE(markdown.contains(QStringLiteral("```\nif (x) {\nreturn 1;\n```"))) << markdown.toStdString();
 }
 
 TEST(MarkdownBuilder, DoesNotFenceSingleIndentedLine)
@@ -148,6 +173,25 @@ TEST(MarkdownBuilder, ComplexTableFallsBackToText)
     const QString markdown = buildMarkdown(result, table);
     EXPECT_FALSE(markdown.contains(QStringLiteral("| --- |")));
     EXPECT_TRUE(markdown.contains(QStringLiteral("A")));
+}
+
+TEST(MarkdownBuilder, KeepsUnrelatedParagraphInsideTableIndexRange)
+{
+    // OCR 行序抖动时，无关段落可能落在表格首末下标之间；按外接框判定才不会把它一起替换掉
+    OcrResult result;
+    result.lines = {line(QStringLiteral("A"), 100), line(QStringLiteral("说明文字"), 500), line(QStringLiteral("1"), 130)};
+    TableDetection table;
+    table.found       = true;
+    table.rows        = 2;
+    table.columns     = 2;
+    table.cells       = {{QStringLiteral("A"), QStringLiteral("B")}, {QStringLiteral("1"), QStringLiteral("2")}};
+    table.firstLine   = 0;
+    table.lastLine    = 2;
+    table.boundingBox = QRect{10, 100, 100, 50};
+
+    const QString markdown = buildMarkdown(result, table);
+    EXPECT_TRUE(markdown.contains(QStringLiteral("| 1 | 2 |"))) << markdown.toStdString();
+    EXPECT_TRUE(markdown.contains(QStringLiteral("说明文字"))) << markdown.toStdString();
 }
 
 TEST(MarkdownBuilder, EscapesParagraphLineStartsAndEndsWithOneNewline)

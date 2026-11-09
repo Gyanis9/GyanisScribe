@@ -132,8 +132,9 @@ namespace GyanisScribe::Gui
 
         /**
          * @brief 结果里是否有可复制的 Markdown
-         * @return 结果文本非空时为 true
+         * @return 去掉首尾空白后仍有文字时为 true
          * @details 只看结果本身，不看窗口是否已显示：按钮是否摆出来由这份判断决定。
+         *          只有空白的词拼不出 Markdown，按钮摆出来也只会提示「没有认出可复制的文字」。
          */
         [[nodiscard]] bool hasMarkdownAction() const;
 

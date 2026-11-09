@@ -21,7 +21,7 @@ namespace GyanisScribe::Core
     inline constexpr double kTableVerticalGapFactor = 1.5; ///< 相邻行纵向间隙上限，按行高中位数折算
     inline constexpr double kTableCellGapFactor     = 0.8; ///< 单元格间隙下限，按词高中位数折算
     inline constexpr double kTableBoundaryTolerance = 0.5; ///< 列边界聚类容差，按词高中位数折算
-    inline constexpr double kTableBoundarySupport   = 0.6; ///< 列边界至少被多少比例的可分界行支持
+    inline constexpr double kTableBoundarySupport   = 0.6; ///< 列边界至少被多少比例的段内行支持；单格行也计入分母
     inline constexpr double kTableSimpleConfidence  = 0.8; ///< 简单表的最低行完整度
 
     /**

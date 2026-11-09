@@ -66,8 +66,6 @@ namespace GyanisScribe::Core
         {
             double medianLineHeight = 1.0;
             double medianWordHeight = 1.0;
-            double medianCharWidth  = 1.0;
-            int    bodyLeft         = 0;
         };
 
         [[nodiscard]] bool isUsableWord(const OcrWord &word)
@@ -111,29 +109,12 @@ namespace GyanisScribe::Core
             return (values.at(middle - 1) + values.at(middle)) / 2;
         }
 
-        [[nodiscard]] double medianOf(QVector<double> values)
-        {
-            if (values.isEmpty())
-            {
-                return 0.0;
-            }
-            std::sort(values.begin(), values.end());
-            const qsizetype middle = values.size() / 2;
-            if (values.size() % 2 != 0)
-            {
-                return values.at(middle);
-            }
-            return (values.at(middle - 1) + values.at(middle)) / 2.0;
-        }
-
-        /// 过滤空行与空词，按阅读顺序返回行，并顺带算出四个版面基准值
+        /// 过滤空行与空词，按阅读顺序返回行，并顺带算出行高基准值
         [[nodiscard]] QVector<TableRow> collectRows(const OcrResult &result, BodyMetrics &metrics)
         {
             QVector<TableRow> rows;
             QVector<int>      lineHeights;
             QVector<int>      wordHeights;
-            QVector<int>      bodyLefts;
-            QVector<double>   characterWidths;
 
             for (qsizetype lineIndex = 0; lineIndex < result.lines.size(); ++lineIndex)
             {
@@ -171,13 +152,9 @@ namespace GyanisScribe::Core
                 row.words     = std::move(words);
                 row.bounds    = unionOfWords(row.words);
                 lineHeights.push_back(row.bounds.height());
-                bodyLefts.push_back(row.bounds.left());
                 for (const OcrWord &word: row.words)
                 {
                     wordHeights.push_back(word.boundingBox.height());
-                    // 单字符宽度用词宽除以字符数估算；文本长度已保证至少为 1
-                    const int characterCount = std::max(1, static_cast<int>(word.text.size()));
-                    characterWidths.push_back(static_cast<double>(word.boundingBox.width()) / static_cast<double>(characterCount));
                 }
                 rows.push_back(std::move(row));
             }
@@ -196,8 +173,6 @@ namespace GyanisScribe::Core
             // 中位数可能因退化输入为 0，统一抬到 1，后续阈值与除法不至于失效
             metrics.medianLineHeight = static_cast<double>(std::max(1, medianOf(lineHeights)));
             metrics.medianWordHeight = static_cast<double>(std::max(1, medianOf(wordHeights)));
-            metrics.medianCharWidth  = std::max(1.0, medianOf(characterWidths));
-            metrics.bodyLeft         = medianOf(bodyLefts);
             return rows;
         }
 
@@ -341,7 +316,7 @@ namespace GyanisScribe::Core
         /// 按选定的列分界把词落格，并判定复杂条件与置信度
         [[nodiscard]] std::optional<TableCandidate> buildCandidate(const QVector<TableRow> &rows, const BodyMetrics &metrics)
         {
-            // 段内至少要有两行各含两个以上的词，否则只是少量文字碰巧对齐，不足以构成表格
+            // 段内至少要有两行各含至少两个词，否则只是少量文字碰巧对齐，不足以构成表格
             int multiWordRowCount = 0;
             for (const TableRow &row: rows)
             {

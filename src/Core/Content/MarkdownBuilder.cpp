@@ -412,6 +412,18 @@ namespace GyanisScribe::Core
             return markdownRows.join(QStringLiteral("\n"));
         }
 
+        /// 判断一行是否属于要被表格替换的区间：识别结果的行序可能和几何顺序不一致，
+        /// 原下标落在首末行之间并不等于这一行就在表里，还要看行框与表格外接框是否相交；
+        /// 手工构造的表没有外接框，只能退回按行下标判定
+        [[nodiscard]] bool belongsToTable(const TextLine &line, const TableDetection &table)
+        {
+            if (line.index < table.firstLine || line.index > table.lastLine)
+            {
+                return false;
+            }
+            return table.boundingBox.isEmpty() || table.boundingBox.intersects(line.bounds);
+        }
+
         [[nodiscard]] QVector<LineInfo> classifyLines(const QVector<TextLine> &lines, const BodyMetrics &metrics, const TableDetection *table)
         {
             QVector<LineInfo> infos;
@@ -420,7 +432,7 @@ namespace GyanisScribe::Core
             {
                 LineInfo info;
                 info.line    = line;
-                info.inTable = table != nullptr && line.index >= table->firstLine && line.index <= table->lastLine;
+                info.inTable = table != nullptr && belongsToTable(line, *table);
                 if (!info.inTable)
                 {
                     const QString text = line.text.trimmed();

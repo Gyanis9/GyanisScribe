@@ -393,7 +393,7 @@ namespace GyanisScribe::Gui
 
     bool OcrResultWindow::hasMarkdownAction() const
     {
-        return !m_result.text().isEmpty();
+        return !m_result.text().trimmed().isEmpty();
     }
 
     bool OcrResultWindow::hasCsvAction() const

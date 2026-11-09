@@ -497,6 +497,12 @@ TEST_F(OcrResultWindowFixture, HidesCsvAndExplainsComplexTable)
     auto *contentActions = window->findChild<QWidget *>(QStringLiteral("ocrContentActions"));
     ASSERT_NE(contentActions, nullptr) << "结果窗里没有内容动作行";
     EXPECT_FALSE(contentActions->isHidden()) << "Markdown 动作仍在，内容行不该整行隐藏";
+    auto *copyMarkdown = window->findChild<QToolButton *>(QStringLiteral("ocrCopyMarkdown"));
+    ASSERT_NE(copyMarkdown, nullptr) << "结果窗里没有「复制 Markdown」按钮";
+    EXPECT_FALSE(copyMarkdown->isHidden()) << "复杂表仍有文字可复制成 Markdown";
+    auto *exportCsv = window->findChild<QToolButton *>(QStringLiteral("ocrExportCsv"));
+    ASSERT_NE(exportCsv, nullptr) << "结果窗里没有「导出表格 CSV」按钮";
+    EXPECT_TRUE(exportCsv->isHidden()) << "复杂表不能露出 CSV 按钮";
 }
 
 /**
@@ -505,10 +511,58 @@ TEST_F(OcrResultWindowFixture, HidesCsvAndExplainsComplexTable)
  */
 TEST_F(OcrResultWindowFixture, SetResultUpdatesContentActions)
 {
-    auto window = makeWindow(OcrResult{});
-    EXPECT_FALSE(window->hasMarkdownAction());
-    window->setResult(makeImage({800, 200}), makeTextResult());
+    auto  window         = makeWindow(OcrResult{});
+    auto *contentActions = window->findChild<QWidget *>(QStringLiteral("ocrContentActions"));
+    auto *copyMarkdown   = window->findChild<QToolButton *>(QStringLiteral("ocrCopyMarkdown"));
+    auto *exportCsv      = window->findChild<QToolButton *>(QStringLiteral("ocrExportCsv"));
+    ASSERT_NE(contentActions, nullptr) << "结果窗里没有内容动作行";
+    ASSERT_NE(copyMarkdown, nullptr) << "结果窗里没有「复制 Markdown」按钮";
+    ASSERT_NE(exportCsv, nullptr) << "结果窗里没有「导出表格 CSV」按钮";
+    EXPECT_TRUE(contentActions->isHidden()) << "空结果不该留下内容动作行";
+    EXPECT_TRUE(copyMarkdown->isHidden());
+    EXPECT_TRUE(exportCsv->isHidden());
+
+    const OcrResult text = makeTextResult();
+    window->setResult(makeImage({800, 200}), text);
     EXPECT_TRUE(window->hasMarkdownAction());
+    EXPECT_FALSE(window->hasCsvAction());
+    EXPECT_FALSE(contentActions->isHidden()) << "有文字时内容动作行应当出现";
+    EXPECT_FALSE(copyMarkdown->isHidden()) << "换成有文字的结果后 Markdown 按钮应当出现";
+    EXPECT_TRUE(exportCsv->isHidden()) << "没有表格时不该出现 CSV 按钮";
+    EXPECT_EQ(window->statusText(), statusLineFor(text, {800, 200})) << "状态行不该留着上一份结果的表格提示";
+
+    window->setResult(makeImage({800, 200}), makeTableResult());
+    EXPECT_TRUE(window->hasMarkdownAction());
+    EXPECT_TRUE(window->hasCsvAction());
+    EXPECT_FALSE(contentActions->isHidden());
+    EXPECT_FALSE(copyMarkdown->isHidden());
+    EXPECT_FALSE(exportCsv->isHidden()) << "换成简单表后 CSV 按钮应当出现";
+    EXPECT_TRUE(window->statusText().contains(QStringLiteral("可导出 CSV"))) << "状态行没跟着新结果刷新";
+}
+
+/**
+ * @brief 钉住只有空白的识别结果不算有字
+ * @details 空白词拼不出 Markdown；按钮若露出来，点下去只会得到「没有认出可复制的文字」。
+ */
+TEST_F(OcrResultWindowFixture, TreatsWhitespaceOnlyResultAsNoText)
+{
+    OcrResult blank;
+    blank.language = QStringLiteral("zh-Hans");
+    OcrLine line;
+    line.words       = {OcrWord{QStringLiteral("   "), QRect{100, 20, 30, 16}}};
+    line.boundingBox = line.words.front().boundingBox;
+    blank.lines      = {line};
+
+    auto window = makeWindow(blank);
+    EXPECT_TRUE(blank.text().trimmed().isEmpty()) << "样本本身得是纯空白";
+    EXPECT_FALSE(window->hasMarkdownAction());
+    EXPECT_TRUE(window->copyMarkdownToClipboard().isEmpty());
+    auto *copyMarkdown = window->findChild<QToolButton *>(QStringLiteral("ocrCopyMarkdown"));
+    ASSERT_NE(copyMarkdown, nullptr) << "结果窗里没有「复制 Markdown」按钮";
+    EXPECT_TRUE(copyMarkdown->isHidden()) << "只有空白时不该露出 Markdown 按钮";
+    auto *contentActions = window->findChild<QWidget *>(QStringLiteral("ocrContentActions"));
+    ASSERT_NE(contentActions, nullptr) << "结果窗里没有内容动作行";
+    EXPECT_TRUE(contentActions->isHidden()) << "没有可用的内容动作时整行应当隐藏";
 }
 
 /**
