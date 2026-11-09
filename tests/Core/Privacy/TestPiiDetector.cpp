@@ -201,6 +201,42 @@ TEST(PiiDetector, KeepsBothCardsInOneGroupedRun)
     EXPECT_TRUE(items.at(1).physicalBox.contains(QRect(300, 20, 260, 24)));
 }
 
+/**
+ * @brief 钉住两个位数相同的合法窗口重叠时合并成一段：不能只留靠左那段而把卡尾露在外面
+ * @details 年份 2026 与卡号各取 16 位都可能通过 Luhn；只留靠左窗口时，真卡的最后一个词框
+ *          不在打码框里，画面上仍能看到卡尾。合并后最后一个词框必须被盖住。
+ */
+TEST(PiiDetector, MergesOverlappingBankCardWindowsOverTheCardTail)
+{
+    const QRect     tail{340, 20, 60, 24};
+    const OcrResult ocr = makeResult({
+            makeLine({OcrWord{QStringLiteral("2026"), QRect(20, 20, 60, 24)}, OcrWord{QStringLiteral("5500"), QRect(100, 20, 60, 24)},
+                      OcrWord{QStringLiteral("0000"), QRect(180, 20, 60, 24)}, OcrWord{QStringLiteral("0000"), QRect(260, 20, 60, 24)}, OcrWord{QStringLiteral("0004"), tail}}),
+    });
+
+    const std::vector<PiiItem> items = detectPii(ocr, {}, kFrameSize);
+
+    ASSERT_EQ(items.size(), 1U) << "重叠窗口没有合并成一段";
+    EXPECT_TRUE(items.at(0).physicalBox.contains(tail)) << "真卡的尾号词框落在打码框外";
+    EXPECT_TRUE(items.at(0).maskedSample.endsWith(QStringLiteral("0004"))) << "脱敏样例没有覆盖到真卡尾号";
+}
+
+/// 日期前缀与卡号的两个 16 位窗口重叠时同样合并，日期后整张卡都必须落在框里
+TEST(PiiDetector, MergesDatePrefixWindowWithTheCard)
+{
+    const QRect     tail{440, 20, 60, 24};
+    const OcrResult ocr = makeResult({
+            makeLine({OcrWord{QStringLiteral("2026-01-15"), QRect(20, 20, 140, 24)}, OcrWord{QStringLiteral("4111"), QRect(180, 20, 60, 24)},
+                      OcrWord{QStringLiteral("1111"), QRect(260, 20, 60, 24)}, OcrWord{QStringLiteral("1111"), QRect(340, 20, 60, 24)}, OcrWord{QStringLiteral("1111"), tail}}),
+    });
+
+    const std::vector<PiiItem> items = detectPii(ocr, {}, kFrameSize);
+
+    ASSERT_EQ(items.size(), 1U) << "日期前缀与卡号的重叠窗口没有合并";
+    EXPECT_TRUE(items.at(0).physicalBox.contains(tail)) << "真卡的尾号词框落在打码框外";
+    EXPECT_TRUE(items.at(0).maskedSample.endsWith(QStringLiteral("1111"))) << "脱敏样例没有覆盖到真卡尾号";
+}
+
 /// 一整串超长数字不从中间截卡号：20 位连续数字即使内部有合法 Luhn 子串也不按银行卡收
 TEST(PiiDetector, DoesNotCarveBankCardOutOfOverlongContiguousDigits)
 {

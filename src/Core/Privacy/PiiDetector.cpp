@@ -63,7 +63,6 @@ namespace GyanisScribe::Core::Privacy
         {
             qsizetype start  = 0; ///< 相对分组串起点的字符偏移
             qsizetype length = 0; ///< 字符长度，含组间分隔符
-            int       digits = 0; ///< 这一段里的数字位数
         };
 
         /**
@@ -434,7 +433,8 @@ namespace GyanisScribe::Core::Privacy
          * @return 相对串首的字符区间，按从左到右排列；没有合法子段时为空
          * @details 只在分组边界上取 13-19 位，卡号后面紧跟的有效期/CVV 或前面的年份
          *          不会被硬拼进候选后拖垮整段校验；单组连续数字仍整体判定，不从长编号中间截卡号。
-         *          多个互不重叠的合法子段都保留，一行两张卡时不会少报；重叠时先取位数多的。
+         *          互不重叠的合法子段各自保留，一行两张卡时不会少报；有重叠时合并成一段，
+         *          因为无法从两段都通过校验的窗口判断哪一段才是真卡，宁可多盖也不把卡尾留在外面。
          */
         std::vector<BankCardRange> bankCardRanges(const QString &value)
         {
@@ -443,7 +443,7 @@ namespace GyanisScribe::Core::Privacy
             while (groupIterator.hasNext())
             {
                 const QRegularExpressionMatch group = groupIterator.next();
-                groups.push_back(BankCardRange{group.capturedStart(), group.capturedLength(), static_cast<int>(group.capturedLength())});
+                groups.push_back(BankCardRange{group.capturedStart(), group.capturedLength()});
             }
             if (groups.empty())
             {
@@ -453,9 +453,9 @@ namespace GyanisScribe::Core::Privacy
             // 一整串连续数字只按原样判：20 位以上的长编号即使后 16 位碰巧过了 Luhn，也不从中间切一段出来
             if (groups.size() == 1)
             {
-                if (groups.front().digits >= 13 && groups.front().digits <= 19 && isValidBankCard(value))
+                if (groups.front().length >= 13 && groups.front().length <= 19 && isValidBankCard(value))
                 {
-                    return {BankCardRange{0, value.size(), groups.front().digits}};
+                    return {BankCardRange{0, value.size()}};
                 }
                 return {};
             }
@@ -466,7 +466,7 @@ namespace GyanisScribe::Core::Privacy
                 int digits = 0;
                 for (std::size_t last = first; last < groups.size(); ++last)
                 {
-                    digits += groups.at(last).digits;
+                    digits += static_cast<int>(groups.at(last).length);
                     if (digits > 19)
                     {
                         break;
@@ -479,33 +479,26 @@ namespace GyanisScribe::Core::Privacy
                     const qsizetype end   = groups.at(last).start + groups.at(last).length;
                     if (isValidBankCard(value.mid(start, end - start)))
                     {
-                        validRanges.push_back(BankCardRange{start, end - start, digits});
+                        validRanges.push_back(BankCardRange{start, end - start});
                     }
                 }
             }
 
-            // 位数多的优先，位数相同取靠左的；再排除与已选区间重叠的候选
-            std::stable_sort(validRanges.begin(), validRanges.end(),
-                             [](const BankCardRange &left, const BankCardRange &right)
-                             {
-                                 if (left.digits != right.digits)
-                                 {
-                                     return left.digits > right.digits;
-                                 }
-                                 return left.start < right.start;
-                             });
-            std::vector<BankCardRange> selected;
+            // 按起点排序后把重叠的合法窗口并成一段：只留靠左的一段会在画面上留下真卡的尾号
+            std::sort(validRanges.begin(), validRanges.end(), [](const BankCardRange &left, const BankCardRange &right) { return left.start < right.start; });
+            std::vector<BankCardRange> merged;
             for (const BankCardRange &range: validRanges)
             {
-                const bool overlaps = std::any_of(selected.begin(), selected.end(), [&range](const BankCardRange &kept)
-                                                  { return range.start < kept.start + kept.length && kept.start < range.start + range.length; });
-                if (!overlaps)
+                if (!merged.empty() && range.start < merged.back().start + merged.back().length)
                 {
-                    selected.push_back(range);
+                    const qsizetype end  = std::max(merged.back().start + merged.back().length, range.start + range.length);
+                    merged.back().length = end - merged.back().start;
+                } else
+                {
+                    merged.push_back(range);
                 }
             }
-            std::sort(selected.begin(), selected.end(), [](const BankCardRange &left, const BankCardRange &right) { return left.start < right.start; });
-            return selected;
+            return merged;
         }
 
         /**
