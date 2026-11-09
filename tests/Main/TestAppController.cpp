@@ -5,6 +5,7 @@
 
 #include "App/CaptureCoordinator.h"
 #include "App/CustomHotkeys.h"
+#include "App/HistoryCoordinator.h"
 #include "App/PrivacyCoordinator.h"
 #include "App/RewindCoordinator.h"
 #include "Core/Ocr/OcrTypes.h"
@@ -23,6 +24,7 @@
 #include "Core/Capture/RegionHistory.h"
 #include "Base/Paths.h"
 #include "Base/Types.h"
+#include "Core/Capture/SourceInfo.h"
 #include "Core/History/HistoryRules.h"
 #include "Core/History/HistoryStore.h"
 #include "Core/History/HistoryTypes.h"
@@ -1153,6 +1155,42 @@ namespace GyanisScribe
         ASSERT_TRUE(entries.has_value()) << "历史清单读不回：" << entries.error().message;
         ASSERT_EQ(entries->size(), 1) << "自动保存已经落盘，归档不该再记第二条";
         expectUnderDirectory(entries->front().filePath, m_root / "shots");
+    }
+
+    /**
+     * @brief 钉住空白画布保存时不会继承上一轮截图的前台来源
+     * @details 空白画布与截图共用同一扇标注窗和同一个交付协调器：开画布时不换轮，
+     *          保存白板就会把上一轮截图的应用与标题记到这张图上，按应用筛查记忆库时
+     *          这张图会被归到无关的程序名下。第一轮截图先证明来源确实记下来了，
+     *          空白画布那一轮的记录才有可对照的「上一轮」。
+     */
+    TEST_F(AppControllerFixture, BlankCanvasSaveDoesNotInheritThePreviousCaptureSource)
+    {
+        m_frameScreenName = m_realScreenName;
+        m_keepUnsaved     = true;
+        makeController();
+
+        std::vector<Core::CaptureSourceInfo> recordedSources;
+        auto                                &history = m_controller->historyCoordinatorForTesting();
+        QObject::connect(&history, &App::HistoryCoordinator::recorded, &history,
+                         [&recordedSources](const std::filesystem::path &, const Core::HistoryKind, const QSize &, const Core::CaptureSourceInfo &source)
+                         { recordedSources.push_back(source); });
+
+        // 先走一轮真截图：替身平台把前台窗口报成「替身窗口」，这一轮来源非空
+        m_controller->capture().startFullScreen(App::CaptureIntent::Annotate);
+        ASSERT_EQ(recordedSources.size(), 1) << "这一轮截图没有进历史，空白画布的对照就没有前提";
+        ASSERT_EQ(recordedSources.front().windowTitle, QStringLiteral("替身窗口")) << "来源没有在截图那一刻记下来";
+
+        // 空白画布不是从屏上抓来的图：保存它不许把上一轮的来源带进历史
+        m_controller->capture().startBlankCanvas();
+        auto &window = m_controller->capture().annotationWindow();
+        ASSERT_TRUE(window.isRoundActive()) << "空白画布没有开成标注窗";
+
+        window.saveRequested(window.canvas().image);
+
+        ASSERT_EQ(recordedSources.size(), 2) << "空白画布的保存没有进历史";
+        EXPECT_TRUE(recordedSources.back().processName.isEmpty()) << "空白画布继承了上一轮的进程名";
+        EXPECT_TRUE(recordedSources.back().windowTitle.isEmpty()) << "空白画布继承了上一轮的窗口标题";
     }
 
     /**

@@ -273,6 +273,14 @@ namespace GyanisScribe::Main
         [[nodiscard]] GyanisScribe::App::PrivacyCoordinator &privacyCoordinatorForTesting() const noexcept;
 
         /**
+         * @brief 历史这一族，仅供用例接记录信号
+         * @return 本控制器持有的那一份，所有权不在调用方
+         * @note 每条记录带的是哪一份来源只有 recorded 说得清：用例要判「空白画布没有继承上一轮的来源」，
+         *       只有这一条口子拿得到发出该信号的那个对象。
+         */
+        [[nodiscard]] GyanisScribe::App::HistoryCoordinator &historyCoordinatorForTesting() const noexcept;
+
+        /**
          * @brief 从用例驱动一次热键分派
          * @param action 要驱动的动作
          * @note 生产侧唯一的入口是热键层的 actionTriggered；用例没有键盘可发，

@@ -576,6 +576,11 @@ namespace GyanisScribe::Main
         return *m_privacy;
     }
 
+    GyanisScribe::App::HistoryCoordinator &AppController::historyCoordinatorForTesting() const noexcept
+    {
+        return *m_history;
+    }
+
     void AppController::handleHotkeyActionForTesting(const GyanisScribe::Core::HotkeyAction action)
     {
         // 与热键层那条信号走同一段分派：门禁分支只在这一处判，用例不另抄一份

@@ -251,7 +251,11 @@ namespace GyanisScribe::App
         const auto transparentCanvas = m_dependencies.settings.boolValue(GyanisScribe::Core::kAnnotationBlankCanvasTransparent, false);
         const auto canvas            = GyanisScribe::Core::makeBlankCanvas(GyanisScribe::Core::kBlankCanvasSize, screen->devicePixelRatio(), screen->name(), transparentCanvas);
         const auto available         = screen->availableGeometry();
-        // 不碰截图那条链：没有帧、不记「上次选区」、也不触发音效/自动保存/历史——那一串都挂在「抓到了屏上的一块」上
+        // 空白画布不是从屏上抓来的图：这一轮没有来源，交付那一族也要换到这一轮，
+        // 否则保存白板会把上一轮截图的前台应用与标题记进历史
+        m_sourceInfo = {};
+        m_dependencies.delivery.beginRound();
+        // 不碰抓帧那条链：没有帧、不记「上次选区」、也不触发音效/自动保存/历史——那一串都挂在「抓到了屏上的一块」上
         m_annotationWindow->startAnnotation(canvas, available, GyanisScribe::Core::blankCanvasRegion(available, canvas.logicalSize));
         GyanisScribe::Base::Logger::info(std::format("空白画布已开：逻辑 {}×{}，物理 {}×{}，屏 {}，底{}", canvas.logicalSize.width(), canvas.logicalSize.height(),
                                                      canvas.image.width(), canvas.image.height(), canvas.screenName.toStdString(), transparentCanvas ? "透明" : "白"));
