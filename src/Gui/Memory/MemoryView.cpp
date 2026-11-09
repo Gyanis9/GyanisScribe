@@ -275,6 +275,15 @@ namespace GyanisScribe::Gui
         m_stats->setAccessibleName(Base::uiText("记忆库统计"));
         footer->addWidget(m_stats, 1);
 
+        // 后端恢复后要有出口：只有「重新识别」一条一条点，积压的待识别行就永远清不完
+        m_retryPendingButton = new Button{Base::uiText("重试待处理"), this};
+        m_retryPendingButton->setObjectName(QStringLiteral("memoryRetryPending"));
+        m_retryPendingButton->setToolTip(m_retryPendingButton->text());
+        m_retryPendingButton->setAccessibleName(m_retryPendingButton->text());
+        m_icons.applyIcon(*m_retryPendingButton, "Ocr");
+        m_retryPendingButton->setVisible(false);
+        footer->addWidget(m_retryPendingButton);
+
         m_excludeButton = new Button{Base::uiText("排除应用…"), this};
         m_excludeButton->setObjectName(QStringLiteral("memoryExclude"));
         m_excludeButton->setToolTip(m_excludeButton->text());
@@ -301,6 +310,7 @@ namespace GyanisScribe::Gui
         QObject::connect(m_importButton, &QPushButton::clicked, this, &MemoryView::importRequested);
         QObject::connect(m_enableButton, &QPushButton::clicked, this, &MemoryView::enableRequested);
         QObject::connect(m_rebuildButton, &QPushButton::clicked, this, &MemoryView::rebuildRequested);
+        QObject::connect(m_retryPendingButton, &QPushButton::clicked, this, &MemoryView::retryPendingRequested);
         QObject::connect(m_excludeButton, &QPushButton::clicked, this, &MemoryView::openExcludeDialog);
         QObject::connect(m_clearButton, &QPushButton::clicked, this, &MemoryView::requestClearIndex);
 
@@ -368,6 +378,7 @@ namespace GyanisScribe::Gui
 
         updateActionState();
         updateBanner();
+        updateRetryPendingState();
         updateEmptyHint();
     }
 
@@ -378,11 +389,16 @@ namespace GyanisScribe::Gui
 
         if (!results)
         {
-            // 库这次没读出来不能把列表清空了事：留着上一次的行，用户还能顺着路径找文件
+            // 库这次没读出来不能把列表清空了事：留着上一次的行，用户还能顺着路径找文件。
+            // 错误也进数据库横幅：只弹气泡的话，库打不开时用户找不到重建入口
             emit messageForUser(QString::fromUtf8(results.error().message.c_str()), Gui::ToastKind::Danger);
             refreshStats();
+            setRuntimeDatabaseError(QString::fromUtf8(results.error().message.c_str()));
             return;
         }
+
+        // 这次读得出来，之前记下的查询错误就已经过期：横幅与重建入口随之收起
+        setRuntimeDatabaseError(QString{});
 
         m_groups.clear();
         if (m_mergeToggle->isChecked())
@@ -411,6 +427,7 @@ namespace GyanisScribe::Gui
     {
         m_enabled = enabled;
         updateBanner();
+        updateRetryPendingState();
         updateEmptyHint();
     }
 
@@ -419,13 +436,36 @@ namespace GyanisScribe::Gui
         m_ocrAvailable = available;
         m_ocrReason    = reason;
         updateBanner();
+        updateRetryPendingState();
     }
 
     void MemoryView::setDatabaseError(const QString &reason)
     {
-        m_databaseError = reason;
+        m_externalDatabaseError = reason;
+        if (reason.isEmpty())
+        {
+            // 协调器说库恢复了：本页此前记下的查询失败也已过期，不能留着旧原因继续亮重建按钮
+            m_runtimeDatabaseError.clear();
+        }
         updateBanner();
         updateEmptyHint();
+    }
+
+    void MemoryView::setRuntimeDatabaseError(const QString &reason)
+    {
+        if (m_runtimeDatabaseError == reason)
+        {
+            return;
+        }
+
+        m_runtimeDatabaseError = reason;
+        updateBanner();
+        updateEmptyHint();
+    }
+
+    QString MemoryView::databaseErrorText() const
+    {
+        return m_externalDatabaseError.isEmpty() ? m_runtimeDatabaseError : m_externalDatabaseError;
     }
 
     void MemoryView::setImportProgress(const Core::MemoryImportProgress &progress)
@@ -549,10 +589,12 @@ namespace GyanisScribe::Gui
         if (!stats)
         {
             m_stats->setText(Base::uiText("统计暂时读不出来"));
+            setRuntimeDatabaseError(QString::fromUtf8(stats.error().message.c_str()));
             return;
         }
 
         m_totalItems      = stats->totalItems;
+        m_pendingOcr      = stats->pendingOcr;
         QString statsText = Base::uiText("共 %1 条 · 待识别 %2 · 失败 %3 · 数据库 %4 · 排除应用 %5 个")
                                     .arg(stats->totalItems)
                                     .arg(stats->pendingOcr)
@@ -565,14 +607,16 @@ namespace GyanisScribe::Gui
             statsText += Base::uiText(" · 只显示前 %1 条，收窄关键词可看到更早的结果").arg(Core::kMemorySearchLimit);
         }
         m_stats->setText(statsText);
+        updateRetryPendingState();
     }
 
     void MemoryView::updateBanner()
     {
-        QStringList reasons;
-        if (!m_databaseError.isEmpty())
+        QStringList   reasons;
+        const QString databaseError = databaseErrorText();
+        if (!databaseError.isEmpty())
         {
-            reasons.append(Base::uiText("记忆库暂时不可用：") + m_databaseError);
+            reasons.append(Base::uiText("记忆库暂时不可用：") + databaseError);
         }
         if (!m_enabled)
         {
@@ -586,8 +630,16 @@ namespace GyanisScribe::Gui
 
         m_banner->setText(reasons.join(QChar{u'\n'}));
         m_enableButton->setVisible(!m_enabled);
-        m_rebuildButton->setVisible(!m_databaseError.isEmpty());
+        m_rebuildButton->setVisible(!databaseError.isEmpty());
         m_bannerFrame->setVisible(!reasons.isEmpty());
+    }
+
+    void MemoryView::updateRetryPendingState()
+    {
+        // 后端不可用时给恢复入口，有积压时给批量重试；功能关着时重试不会执行，入口一并收起
+        const bool needed = m_enabled && (!m_ocrAvailable || m_pendingOcr > 0);
+        m_retryPendingButton->setVisible(needed);
+        m_retryPendingButton->setEnabled(needed);
     }
 
     void MemoryView::updateActionState()
@@ -691,8 +743,9 @@ namespace GyanisScribe::Gui
 
     void MemoryView::updateEmptyHint()
     {
-        QString text;
-        if (!m_databaseError.isEmpty())
+        QString       text;
+        const QString databaseError = databaseErrorText();
+        if (!databaseError.isEmpty())
         {
             text = Base::uiText("记忆库暂时读不出来。可以点上面的「重建索引」，原图不会被删除。");
         } else if (!m_enabled)

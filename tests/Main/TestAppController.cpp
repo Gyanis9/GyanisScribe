@@ -48,6 +48,7 @@
 #include <QDialog>
 #include <QElapsedTimer>
 #include <QEventLoop>
+#include <QFile>
 #include <QGuiApplication>
 #include <QImage>
 #include <QKeyEvent>
@@ -438,7 +439,7 @@ namespace GyanisScribe
                 parts.integration        = std::move(integration);
                 parts.captureSource      = std::move(source);
                 parts.historyStoragePath = m_root / "history.json";
-                parts.memoryStoragePath  = m_root / "memory.sqlite";
+                parts.memoryStoragePath  = m_memoryStoragePath.empty() ? m_root / "memory.sqlite" : m_memoryStoragePath;
                 m_controller             = std::make_unique<Main::AppController>(std::move(parts), restorePins);
             }
 
@@ -689,6 +690,7 @@ namespace GyanisScribe
             bool                                 m_sessionNotifications = false;                            ///< 平台是否承诺锁屏通知；回溯协调器只在它为真时启用
             bool                                 m_memoryEnabled        = false;                            ///< 记忆库开关；造控制器前写进设置
             bool                                 m_memoryConsentAsked   = true;                             ///< 记忆库是否已问过授权；默认问过，只有授权那条用例翻回未询问
+            std::filesystem::path                m_memoryStoragePath;                                       ///< 记忆索引落点；空 = 临时目录下的 memory.sqlite
         };
     } // namespace
 
@@ -1956,6 +1958,77 @@ namespace GyanisScribe
         ASSERT_NE(window, nullptr);
         emit window->memoryRetryOcrRequested(*identifier);
         EXPECT_GE(changes, 1) << "重新识别请求没有落到协调器";
+    }
+
+    /**
+     * @brief 钉住数据库打不开时重建成功会把错误横幅与重建按钮一起收起
+     * @details 记忆索引的位置先是「库文件所在目录被一个同名文件占着」，启动开库失败并在记忆页挂出错误；
+     *          清掉阻挡后点「重建索引」，库能打开，恢复信号要沿着协调器—主窗口—视图一路把横幅收掉。
+     *          横幅还在的话，用户再点一次就会把刚修好的库改名留档，索引行白丢。
+     */
+    TEST_F(AppControllerFixture, RebuildingAfterDatabaseErrorClearsTheBannerAndButton)
+    {
+        m_memoryEnabled             = true;
+        const auto blockedDirectory = m_root / "blocked-memory";
+        QFile      blocker{QString::fromStdWString(blockedDirectory.wstring())};
+        ASSERT_TRUE(blocker.open(QIODevice::WriteOnly));
+        blocker.close();
+        m_memoryStoragePath = blockedDirectory / "memory.sqlite";
+
+        makeController(false);
+        auto *window = mainWindowOnDesk();
+        ASSERT_NE(window, nullptr);
+        auto *rebuild = window->findChild<QPushButton *>(QStringLiteral("memoryRebuild"));
+        auto *frame   = window->findChild<QWidget *>(QStringLiteral("memoryBannerFrame"));
+        ASSERT_NE(rebuild, nullptr) << "记忆页没有重建索引按钮";
+        ASSERT_NE(frame, nullptr) << "记忆页没有错误横幅容器";
+        EXPECT_FALSE(m_controller->memoryCoordinatorForTesting().index().isOpen()) << "阻挡还在时库不该能打开";
+        EXPECT_FALSE(rebuild->isHidden()) << "库打不开时没有重建入口";
+        EXPECT_FALSE(frame->isHidden()) << "库打不开时错误横幅没露出来";
+
+        ASSERT_TRUE(std::filesystem::remove(blockedDirectory));
+        ASSERT_TRUE(std::filesystem::create_directory(blockedDirectory));
+
+        rebuild->click();
+
+        EXPECT_TRUE(m_controller->memoryCoordinatorForTesting().index().isOpen()) << "重建后索引没打开";
+        EXPECT_TRUE(rebuild->isHidden()) << "重建成功后重建按钮还亮着";
+        EXPECT_TRUE(frame->isHidden()) << "重建成功后错误横幅还占着地方";
+    }
+
+    /**
+     * @brief 钉住记忆页的「重试待处理」从按钮一路落到协调器
+     * @details 后端恢复后积压仍在库里，单条「重新识别」清不完一批；按钮在后端不可用或有积压时露出，
+     *          点下去要让协调器重新入队（这里以统计更新为落点）。
+     */
+    TEST_F(AppControllerFixture, RetryPendingButtonReachesTheCoordinator)
+    {
+        m_memoryEnabled = true;
+        makeController(false);
+        auto &memory = m_controller->memoryCoordinatorForTesting();
+
+        const auto pendingPath = m_root / "pending-shot.png";
+        writeShotFile(pendingPath);
+        Core::MemoryUpsert entry;
+        entry.filePath   = pendingPath;
+        entry.capturedAt = QDateTime::currentDateTime();
+        entry.size       = QSize{32, 24};
+        ASSERT_TRUE(memory.index().upsertPending(entry).has_value());
+
+        auto *window = mainWindowOnDesk();
+        ASSERT_NE(window, nullptr);
+        auto *retryPending = window->findChild<QPushButton *>(QStringLiteral("memoryRetryPending"));
+        ASSERT_NE(retryPending, nullptr) << "记忆页没有重试待处理按钮";
+
+        window->setMemoryOcrAvailability(false, QStringLiteral("测试：识别后端不可用"));
+        window->refreshMemory();
+        EXPECT_FALSE(retryPending->isHidden()) << "后端不可用且有积压时没有重试入口";
+        window->setMemoryOcrAvailability(true, QString{});
+
+        int stats = 0;
+        QObject::connect(&memory, &App::MemoryCoordinator::statsChanged, &memory, [&stats](const Core::MemoryStats &) { ++stats; });
+        retryPending->click();
+        EXPECT_GE(stats, 1) << "重试待处理的点击没有落到协调器";
     }
 
     /**

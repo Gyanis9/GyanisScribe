@@ -721,6 +721,8 @@ namespace GyanisScribe::App
         {
             return;
         }
+        // 重建成功：上次留下的数据库错误已被新库取代，清掉横幅与重建入口
+        emit databaseError(QString{});
         emit changed();
         emitStats();
     }
@@ -739,8 +741,14 @@ namespace GyanisScribe::App
             return false;
         }
 
+        // 打开成功即代表这一路恢复了：之前报过的错误在这里清掉，界面才不会一直留着重建入口
+        const bool recovered      = m_databaseFailureReported;
         m_databaseFailureReported = false;
         m_indexNoticeShown        = false;
+        if (recovered)
+        {
+            emit databaseError(QString{});
+        }
         return true;
     }
 

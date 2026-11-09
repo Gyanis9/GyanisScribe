@@ -2148,6 +2148,10 @@
             <translation>Recognize again</translation>
         </message>
         <message>
+            <source>重试待处理</source>
+            <translation>Retry pending</translation>
+        </message>
+        <message>
             <source>打开所在目录</source>
             <translation>Open containing folder</translation>
         </message>

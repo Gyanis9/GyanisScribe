@@ -267,6 +267,7 @@ namespace GyanisScribe::Main
                              m_mainWindow->setMemoryEnabled(true);
                          });
         QObject::connect(m_mainWindow.get(), &MainWindow::memoryRebuildRequested, m_memory.get(), &GyanisScribe::App::MemoryCoordinator::rebuildIndex);
+        QObject::connect(m_mainWindow.get(), &MainWindow::memoryRetryPendingRequested, m_memory.get(), &GyanisScribe::App::MemoryCoordinator::retryPending);
         QObject::connect(m_mainWindow.get(), &MainWindow::memoryImportCancelRequested, m_memory.get(), &GyanisScribe::App::MemoryCoordinator::cancelImport);
         QObject::connect(m_mainWindow.get(), &MainWindow::memoryEnabledToggled, this,
                          [this](const bool enabled)

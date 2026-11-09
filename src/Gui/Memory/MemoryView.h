@@ -166,6 +166,9 @@ namespace GyanisScribe::Gui
         /// 用户点了数据库错误横幅上的「重建索引」
         void rebuildRequested();
 
+        /// 用户点了「重试待处理」，要求把积压的待识别条目重新入队
+        void retryPendingRequested();
+
         /// 用户在导入进度对话框里点了取消
         void importCancelRequested();
 
@@ -218,8 +221,17 @@ namespace GyanisScribe::Gui
         /// 按当前排除名单读页脚统计
         void refreshStats();
 
+        /// 记下搜索或统计查询的失败原因；空串表示这一路又读得出来了
+        void setRuntimeDatabaseError(const QString &reason);
+
+        /// 当前要展示的数据库错误原因：协调器报的错误优先，其次才是本页查询失败
+        [[nodiscard]] QString databaseErrorText() const;
+
         /// 按启用、识别可用与数据库错误三路状态重写顶部横幅
         void updateBanner();
+
+        /// 按识别后端可用性与待识别条数显示或收起「重试待处理」
+        void updateRetryPendingState();
 
         /// 按当前选中行启用或灰掉五枚动作按钮
         void updateActionState();
@@ -269,17 +281,19 @@ namespace GyanisScribe::Gui
         /// 确认后请求清空索引，确认框里写明总条数
         void requestClearIndex();
 
-        Core::MemoryIndex                           &m_index;               ///< 记忆索引
-        Gui::IconProvider                           &m_icons;               ///< 图标供给器
-        QStringList                                  m_excludedProcesses;   ///< 设置里的排除应用名单
-        std::vector<std::vector<Core::MemoryResult>> m_groups;              ///< 本次结果按重复图分好的组
-        std::vector<bool>                            m_groupExpanded;       ///< 每个重复组是否展开
-        bool                                         m_enabled      = true; ///< 功能是否已开启
-        bool                                         m_ocrAvailable = true; ///< 识别后端是否可用
-        QString                                      m_ocrReason;           ///< 识别不可用的中文原因
-        QString                                      m_databaseError;       ///< 数据库错误的中文原因，空表示正常
-        int                                          m_totalItems  = 0;     ///< 最近一次统计的总条数，清空确认框用
-        int                                          m_resultCount = 0;     ///< 最近一次搜索返回的结果条数，判 200 条上限用
+        Core::MemoryIndex                           &m_index;                 ///< 记忆索引
+        Gui::IconProvider                           &m_icons;                 ///< 图标供给器
+        QStringList                                  m_excludedProcesses;     ///< 设置里的排除应用名单
+        std::vector<std::vector<Core::MemoryResult>> m_groups;                ///< 本次结果按重复图分好的组
+        std::vector<bool>                            m_groupExpanded;         ///< 每个重复组是否展开
+        bool                                         m_enabled      = true;   ///< 功能是否已开启
+        bool                                         m_ocrAvailable = true;   ///< 识别后端是否可用
+        QString                                      m_ocrReason;             ///< 识别不可用的中文原因
+        QString                                      m_externalDatabaseError; ///< 协调器报来的数据库错误，空表示已恢复
+        QString                                      m_runtimeDatabaseError;  ///< 本页搜索或统计查询失败的原因，空表示这一路正常
+        int                                          m_totalItems  = 0;       ///< 最近一次统计的总条数，清空确认框用
+        int                                          m_pendingOcr  = 0;       ///< 最近一次统计的待识别条数，重试入口用
+        int                                          m_resultCount = 0;       ///< 最近一次搜索返回的结果条数，判 200 条上限用
 
         QWidget     *m_bannerFrame      = nullptr; ///< 顶部横幅容器
         QLabel      *m_banner           = nullptr; ///< 横幅正文
@@ -298,9 +312,12 @@ namespace GyanisScribe::Gui
         QListWidget *m_list             = nullptr; ///< 结果列表
         QLabel      *m_emptyHint        = nullptr; ///< 列表为空或筛不出时的引导句
         QLabel      *m_stats            = nullptr; ///< 页脚统计
-        QPushButton *m_excludeButton    = nullptr; ///< 排除应用
-        QPushButton *m_clearButton      = nullptr; ///< 清空索引
-        QTimer      *m_searchTimer      = nullptr; ///< 搜索防抖定时器
+
+        QPushButton *m_retryPendingButton = nullptr; ///< 重试待处理
+
+        QPushButton *m_excludeButton = nullptr; ///< 排除应用
+        QPushButton *m_clearButton   = nullptr; ///< 清空索引
+        QTimer      *m_searchTimer   = nullptr; ///< 搜索防抖定时器
 
         ImportProgressDialog *m_importDialog = nullptr; ///< 导入进度对话框，首次显示时创建
 

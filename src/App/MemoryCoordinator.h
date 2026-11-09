@@ -88,6 +88,7 @@ namespace GyanisScribe::App
         /**
          * @brief 打开数据库、清理失效行并恢复待识别条目
          * @details 只生效一次；库打不开时发 databaseError 与一条中文提示，后续截图不再建索引。
+         *          之后若重新打开成功，会再发一次空串的 databaseError 表示恢复。
          */
         void start();
 
@@ -179,6 +180,7 @@ namespace GyanisScribe::App
          * @details 索引对象本身不替换，只在原地关闭再打开，重建前后拿到的引用始终有效。
          *          旧库及其 -wal、-shm 改名为 memory-index.corrupt-<时间戳>.sqlite 及其侧车，
          *          不静默删除；改名或新建失败时发 databaseError，旧文件保持可找回。
+         *          重建成功时发一次空串的 databaseError，界面据此收起错误横幅与重建入口。
          */
         void rebuildIndex();
 
@@ -215,8 +217,8 @@ namespace GyanisScribe::App
         void ocrAvailabilityChanged(bool available, const QString &reason);
 
         /**
-         * @brief 数据库打不开或维护失败
-         * @param message 中文原因与下一步
+         * @brief 数据库打不开、维护失败或从失败中恢复
+         * @param message 中文原因与下一步；空串表示数据库已恢复，界面据此收起错误横幅与重建入口
          */
         void databaseError(const QString &message);
 
@@ -245,7 +247,7 @@ namespace GyanisScribe::App
         /// 建后端搬运工并接上读图与识别的结果信号
         void initialize();
 
-        /// 确保数据库已打开；失败时只报一次
+        /// 确保数据库已打开；失败时只报一次，成功且上次报过失败时发一次空串表示恢复
         [[nodiscard]] bool ensureIndexOpen();
 
         /// 发数据库错误与一条中文提示；同一次失败只报一次

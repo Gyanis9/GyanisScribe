@@ -649,6 +649,41 @@ TEST_F(MemoryCoordinator, DatabaseErrorSurfacesMessage)
 }
 
 /**
+ * @brief 重建索引修好打不开的库后发一次空串错误，表示界面可以收起横幅与重建入口
+ * @details 数据库位置先被一个同名文件挡住，start() 打开失败并报错；清掉阻挡后重建索引应当成功，
+ *          并且再发一条空串的 databaseError。界面只认这条恢复信号，否则错误横幅与重建按钮会一直留着。
+ */
+TEST_F(MemoryCoordinator, RebuildAfterOpenFailureEmitsRecovery)
+{
+    SettingsStore settings{settingsPath()};
+    ASSERT_TRUE(settings.setValue(kMemoryEnabled, true).has_value());
+
+    const auto blockedDirectory = root() / "blocked-directory";
+    QFile      blocker{displayPath(blockedDirectory)};
+    ASSERT_TRUE(blocker.open(QIODevice::WriteOnly));
+    blocker.close();
+
+    auto        engine = std::make_unique<FakeOcrEngine>(std::deque<Expected<OcrResult>>{});
+    Coordinator coordinator{settings, blockedDirectory / "memory-index.sqlite", std::move(engine)};
+    QSignalSpy  databaseErrors(&coordinator, &Coordinator::databaseError);
+
+    coordinator.start();
+
+    ASSERT_EQ(databaseErrors.count(), 1) << "库打不开应报一次错误";
+    EXPECT_FALSE(databaseErrors.at(0).at(0).toString().isEmpty());
+    EXPECT_FALSE(coordinator.index().isOpen());
+
+    ASSERT_TRUE(std::filesystem::remove(blockedDirectory));
+    ASSERT_TRUE(std::filesystem::create_directory(blockedDirectory));
+
+    coordinator.rebuildIndex();
+
+    ASSERT_TRUE(coordinator.index().isOpen()) << "清掉阻挡后重建出来的库应当能打开";
+    ASSERT_EQ(databaseErrors.count(), 2) << "重建成功应再发一次信号表示恢复";
+    EXPECT_TRUE(databaseErrors.at(1).at(0).toString().isEmpty()) << "恢复信号应带空串，界面据此收起横幅与重建按钮";
+}
+
+/**
  * @brief 重建索引把旧库改名留档，新库可打开且为空
  */
 TEST_F(MemoryCoordinator, RebuildIndexMovesOldDatabaseAndReopens)

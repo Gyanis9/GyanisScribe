@@ -340,6 +340,78 @@ TEST_F(MemoryViewFixture, BannersExposeEnableAndRebuildActions)
 
     view.setDatabaseError(QString{});
     EXPECT_TRUE(rebuild->isHidden()) << "错误清掉后重建按钮还亮着";
+    EXPECT_TRUE(frame->isHidden()) << "错误清掉后错误横幅还占着地方";
+}
+
+/**
+ * @brief 钉住搜索失败会把数据库错误摆进横幅，恢复后横幅与重建入口一起收起
+ * @details 库连不上时只弹气泡，用户找不到「重建索引」；查询成功之后旧错误必须过期，
+ *          否则修好的库前面会一直挂着错误横幅与重建按钮。
+ */
+TEST_F(MemoryViewFixture, SearchFailureShowsDatabaseErrorUntilRecovery)
+{
+    auto view = makeView();
+    m_index->close();
+    view.refresh();
+
+    auto *banner  = view.findChild<QLabel *>(QStringLiteral("memoryBanner"));
+    auto *frame   = view.findChild<QWidget *>(QStringLiteral("memoryBannerFrame"));
+    auto *rebuild = buttonOf(view, QStringLiteral("memoryRebuild"));
+    ASSERT_NE(banner, nullptr) << "没有顶部横幅";
+    ASSERT_NE(frame, nullptr) << "没有顶部横幅容器";
+    ASSERT_NE(rebuild, nullptr) << "数据库错误时没有重建按钮";
+    EXPECT_FALSE(frame->isHidden()) << "搜索失败时错误横幅没露出来";
+    EXPECT_FALSE(rebuild->isHidden()) << "搜索失败时没给重建入口";
+    EXPECT_NE(banner->text().indexOf(QStringLiteral("数据库尚未打开")), -1) << banner->text().toStdString();
+
+    ASSERT_TRUE(m_index->open().has_value()) << "临时索引重开失败，恢复这一半就无从判起";
+    view.refresh();
+    EXPECT_TRUE(rebuild->isHidden()) << "库恢复后重建按钮还亮着";
+    EXPECT_TRUE(frame->isHidden()) << "库恢复后错误横幅还占着地方";
+}
+
+/**
+ * @brief 钉住「重试待处理」只在后端不可用或有积压时出现，点击发一次重试请求
+ * @details 后端恢复后积压仍可能留在库里；只有单条「重新识别」入口时，用户清不完一批待识别行。
+ */
+TEST_F(MemoryViewFixture, RetryPendingButtonFollowsBackendAndPendingRows)
+{
+    auto  view         = makeView();
+    auto *retryPending = buttonOf(view, QStringLiteral("memoryRetryPending"));
+    ASSERT_NE(retryPending, nullptr) << "页脚没有重试待处理按钮";
+    EXPECT_EQ(retryPending->text(), QStringLiteral("重试待处理"));
+    EXPECT_TRUE(retryPending->isHidden()) << "没有理由时重试入口不该占着页脚";
+
+    int requests = 0;
+    QObject::connect(&view, &MemoryView::retryPendingRequested, &view, [&requests] { ++requests; });
+
+    view.setOcrAvailability(false, QStringLiteral("缺少识别引擎"));
+    EXPECT_FALSE(retryPending->isHidden()) << "后端不可用时没给重试入口";
+    EXPECT_TRUE(retryPending->isEnabled());
+    retryPending->click();
+    EXPECT_EQ(requests, 1) << "点了重试待处理却没发请求";
+
+    view.setOcrAvailability(true, QString{});
+    EXPECT_TRUE(retryPending->isHidden()) << "后端恢复且没有积压时重试入口还亮着";
+
+    const auto               pendingPath = std::filesystem::path(m_temp.path().toStdString()) / "pending-shot.png";
+    const Core::MemoryUpsert entry{
+            .filePath   = pendingPath,
+            .source     = Core::MemorySource::Capture,
+            .capturedAt = QDateTime::currentDateTime(),
+            .size       = QSize{32, 24},
+    };
+    const auto identifier = m_index->upsertPending(entry);
+    ASSERT_TRUE(identifier.has_value()) << identifier.error().message;
+
+    view.refresh();
+    EXPECT_FALSE(retryPending->isHidden()) << "有待识别行时没有重试入口";
+    retryPending->click();
+    EXPECT_EQ(requests, 2) << "有积压时点重试待处理却没发请求";
+
+    ASSERT_TRUE(m_index->updateOcr(*identifier, QStringLiteral("补上的文本"), QString{}, QStringLiteral("done"), QString{}, false).has_value());
+    view.refresh();
+    EXPECT_TRUE(retryPending->isHidden()) << "积压清完后重试入口还亮着";
 }
 
 /**

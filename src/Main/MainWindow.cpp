@@ -2766,6 +2766,7 @@ namespace GyanisScribe::Main
         QObject::connect(m_memory, &GyanisScribe::Gui::MemoryView::excludeProcessesChanged, this, &MainWindow::memoryExcludeRequested);
         QObject::connect(m_memory, &GyanisScribe::Gui::MemoryView::enableRequested, this, &MainWindow::memoryEnableRequested);
         QObject::connect(m_memory, &GyanisScribe::Gui::MemoryView::rebuildRequested, this, &MainWindow::memoryRebuildRequested);
+        QObject::connect(m_memory, &GyanisScribe::Gui::MemoryView::retryPendingRequested, this, &MainWindow::memoryRetryPendingRequested);
         QObject::connect(m_memory, &GyanisScribe::Gui::MemoryView::importCancelRequested, this, &MainWindow::memoryImportCancelRequested);
         QObject::connect(m_memory, &GyanisScribe::Gui::MemoryView::messageForUser, this, &MainWindow::messageForUser);
         return page;

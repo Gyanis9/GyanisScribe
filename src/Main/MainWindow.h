@@ -435,6 +435,9 @@ namespace GyanisScribe::Main
         /// 记忆页的数据库错误横幅上点了重建索引
         void memoryRebuildRequested();
 
+        /// 记忆页请求重试所有待识别条目
+        void memoryRetryPendingRequested();
+
         /// 导入进度对话框里点了取消
         void memoryImportCancelRequested();
 
