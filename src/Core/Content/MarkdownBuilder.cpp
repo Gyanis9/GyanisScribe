@@ -44,7 +44,6 @@ namespace GyanisScribe::Core
         {
             double bodyHeight      = 1.0;
             int    bodyLeft        = 0;
-            int    codeBaseLeft    = 0;
             double medianCharWidth = 1.0;
         };
 
@@ -105,21 +104,6 @@ namespace GyanisScribe::Core
                 parts.append(word.text);
             }
             return parts.join(QLatin1Char(' '));
-        }
-
-        [[nodiscard]] int medianOf(QVector<int> values)
-        {
-            if (values.isEmpty())
-            {
-                return 0;
-            }
-            std::sort(values.begin(), values.end());
-            const qsizetype middle = values.size() / 2;
-            if (values.size() % 2 != 0)
-            {
-                return values.at(middle);
-            }
-            return (values.at(middle - 1) + values.at(middle)) / 2;
         }
 
         [[nodiscard]] double medianOf(QVector<double> values)
@@ -215,11 +199,10 @@ namespace GyanisScribe::Core
             }
 
             // 正文行高取排序后的下四分位数，避免标题把正文基准抬高。
-            // 正文左边界仍取中位数，与表格检测同口径；代码缩进另以左界下四分位数为基准：
-            // 连续代码行可能占多数，中位数会被推到代码缩进上，按它判代码就永远不够缩进。
+            // 正文左边界取非空行左界的最小值：最左侧的正文行给出整页的排版起点，
+            // 列表层级与代码缩进都以它为基准。代码行可能占多数，用中位数会被推到代码缩进上。
             metrics.bodyHeight      = static_cast<double>(std::max(1, lowerQuartileOf(lineHeights)));
-            metrics.bodyLeft        = medianOf(lineLefts);
-            metrics.codeBaseLeft    = lowerQuartileOf(lineLefts);
+            metrics.bodyLeft        = *std::min_element(lineLefts.begin(), lineLefts.end());
             metrics.medianCharWidth = std::max(1.0, medianOf(characterWidths));
             return lines;
         }
@@ -329,7 +312,7 @@ namespace GyanisScribe::Core
             {
                 return false;
             }
-            const double requiredIndent = static_cast<double>(metrics.codeBaseLeft) + kCodeIndentFactor * metrics.medianCharWidth;
+            const double requiredIndent = static_cast<double>(metrics.bodyLeft) + kCodeIndentFactor * metrics.medianCharWidth;
             if (static_cast<double>(line.bounds.left()) < requiredIndent)
             {
                 return false;
@@ -353,7 +336,9 @@ namespace GyanisScribe::Core
             {
                 return {};
             }
-            if (QStringLiteral("#>-+*\\").contains(trimmed.at(0)))
+            // 行首这几个字符会被 Markdown 当成标题、引用、列表、强调、setext 下划线或代码围栏，
+            // 段落里一律转义掉
+            if (QStringLiteral("#>-+*\\=~").contains(trimmed.at(0)))
             {
                 return QStringLiteral("\\") + trimmed;
             }
@@ -364,8 +349,9 @@ namespace GyanisScribe::Core
             {
                 return trimmed;
             }
+            // 只转义数字后的点本身：插入空格会把 3.14 改写成 3. 14
             const QString digits = match.captured(1);
-            return digits + QStringLiteral("\\. ") + trimmed.mid(match.capturedEnd(0)).trimmed();
+            return digits + QStringLiteral("\\.") + trimmed.mid(match.capturedEnd(0));
         }
 
         [[nodiscard]] QString escapeTableCell(const QString &value)
@@ -575,8 +561,10 @@ namespace GyanisScribe::Core
             {
                 const Block &previous = blocks.at(blockIndex - 1);
                 const Block &current  = blocks.at(blockIndex);
-                const bool   needsBlankLine =
-                        (previous.kind == BlockKind::Paragraph && current.kind == BlockKind::Paragraph) || previous.kind == BlockKind::Table || current.kind == BlockKind::Table;
+                // 列表块后接非列表块也必须空行：紧密跟随的段落会被 CommonMark 并入最后一个列表项
+                const bool needsBlankLine = (previous.kind == BlockKind::Paragraph && current.kind == BlockKind::Paragraph) ||
+                                            (previous.kind == BlockKind::List && current.kind != BlockKind::List) || previous.kind == BlockKind::Table ||
+                                            current.kind == BlockKind::Table;
                 markdown.append(needsBlankLine ? QStringLiteral("\n\n") : QStringLiteral("\n"));
             }
             markdown.append(blocks.at(blockIndex).text);

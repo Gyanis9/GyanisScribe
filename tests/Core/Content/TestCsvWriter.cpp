@@ -29,7 +29,13 @@ namespace
 TEST(CsvWriter, QuotesCommasQuotesAndEmptyCells)
 {
     const auto table = tableWith({{QStringLiteral("a,b"), QStringLiteral("say \"hi\"")}, {QStringLiteral(""), QStringLiteral("2")}});
-    EXPECT_EQ(toCsv(table), QStringLiteral("\"a,b\",\"say \"\"hi\"\"\"\r\n,\"2\"\r\n"));
+    EXPECT_EQ(toCsv(table), QStringLiteral("\"a,b\",\"say \"\"hi\"\"\"\r\n,2\r\n"));
+}
+
+TEST(CsvWriter, LeavesPlainFieldsUnquoted)
+{
+    const auto table = tableWith({{QStringLiteral("A"), QStringLiteral("2026")}});
+    EXPECT_EQ(toCsv(table), QStringLiteral("A,2026\r\n"));
 }
 
 TEST(CsvWriter, KeepsNewlineInsideQuotedField)
@@ -92,11 +98,25 @@ TEST(CsvWriter, RejectsComplexWriteWithoutCreatingFile)
     EXPECT_FALSE(std::filesystem::exists(path));
 }
 
-TEST(CsvWriter, OpenFailureLeavesNoFile)
+TEST(CsvWriter, CreatesMissingParentDirectory)
 {
     QTemporaryDir temp;
     ASSERT_TRUE(temp.isValid());
     const auto path = std::filesystem::path(temp.path().toStdString()) / "missing" / "table.csv";
+
+    ASSERT_TRUE(writeCsvFile(path, tableWith({{QStringLiteral("A")}})).has_value());
+    EXPECT_TRUE(std::filesystem::is_regular_file(path));
+}
+
+TEST(CsvWriter, FailsWhenParentPathIsAFile)
+{
+    QTemporaryDir temp;
+    ASSERT_TRUE(temp.isValid());
+    const auto parent = std::filesystem::path(temp.path().toStdString()) / "blocker";
+    QFile      blocker{QString::fromStdWString(parent.wstring())};
+    ASSERT_TRUE(blocker.open(QIODevice::WriteOnly));
+    blocker.close();
+    const auto path = parent / "table.csv";
 
     const auto result = writeCsvFile(path, tableWith({{QStringLiteral("A")}}));
 

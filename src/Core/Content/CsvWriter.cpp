@@ -34,10 +34,12 @@ namespace GyanisScribe::Core
 
         [[nodiscard]] QString quotedField(const QString &value)
         {
-            // 非空字段统一加引号：OCR 单元格常是纯数字或含逗号、引号，统一引用后 Excel 不会把编号当数值改写
-            if (value.isEmpty())
+            // 只在字段含分隔符、双引号或换行时加引号：这是 RFC 4180 的最小引用，
+            // 纯数字与普通文本保持原样，避免把 `2026` 这类内容写成带引号的字符串
+            const bool needsQuotes = value.contains(QLatin1Char(',')) || value.contains(QLatin1Char('"')) || value.contains(QLatin1Char('\r')) || value.contains(QLatin1Char('\n'));
+            if (!needsQuotes)
             {
-                return {};
+                return value;
             }
             QString escaped = value;
             escaped.replace(QLatin1Char('"'), QStringLiteral("\"\""));
@@ -86,7 +88,15 @@ namespace GyanisScribe::Core
 
         const QString     csv         = toCsv(table);
         const std::string displayPath = Base::Paths::toDisplayText(filePath).toStdString();
-        QSaveFile         output(Base::Paths::toDisplayText(filePath));
+        // 与 writeTextFile 同口径：父目录不存在时先建出来，导出到新目录不必让调用方再跑一趟
+        if (const auto parent = filePath.parent_path(); !parent.empty())
+        {
+            if (const auto ensured = Base::Paths::ensureDirectory(parent); !ensured)
+            {
+                return std::unexpected(ensured.error());
+            }
+        }
+        QSaveFile output(Base::Paths::toDisplayText(filePath));
         if (!output.open(QIODevice::WriteOnly))
         {
             return std::unexpected(Base::Error{Base::ErrorCode::FileWriteFailed, Base::uiFormat(Base::uiTextUtf8("CSV 写不出去：{}（{}）。请换一个可写的目录后重试"), displayPath,

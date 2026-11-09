@@ -38,6 +38,13 @@ TEST(MarkdownBuilder, BuildsNestedBulletAndOrderedLists)
     EXPECT_TRUE(markdown.contains(QStringLiteral("1. 第一步")));
 }
 
+TEST(MarkdownBuilder, SeparatesListFromFollowingParagraph)
+{
+    OcrResult result;
+    result.lines = {line(QStringLiteral("- 第一项"), 10), line(QStringLiteral("说明文字"), 35)};
+    EXPECT_EQ(buildMarkdown(result), QStringLiteral("- 第一项\n\n说明文字\n"));
+}
+
 TEST(MarkdownBuilder, WrapsTwoIndentedCodeLinesInFence)
 {
     OcrResult result;
@@ -45,6 +52,14 @@ TEST(MarkdownBuilder, WrapsTwoIndentedCodeLinesInFence)
     const QString markdown = buildMarkdown(result);
     EXPECT_TRUE(markdown.contains(QStringLiteral("```\nif (x) {\n  return 1;\n```")));
     EXPECT_TRUE(markdown.contains(QStringLiteral("正文")));
+}
+
+TEST(MarkdownBuilder, WrapsCodeLinesInFenceExactly)
+{
+    OcrResult result;
+    result.lines = {line(QStringLiteral("正文"), 10), line(QStringLiteral("if (x) {"), 40, 20, 80), line(QStringLiteral("  return 1;"), 65, 20, 80),
+                    line(QStringLiteral("}"), 90, 20, 80), line(QStringLiteral("if (y) {"), 115, 20, 80)};
+    EXPECT_EQ(buildMarkdown(result), QStringLiteral("正文\n```\nif (x) {\n  return 1;\n}\nif (y) {\n```\n"));
 }
 
 TEST(MarkdownBuilder, DoesNotFenceSingleIndentedLine)
@@ -72,6 +87,21 @@ TEST(MarkdownBuilder, ReplacesSimpleTableWithMarkdownTable)
     EXPECT_TRUE(markdown.contains(QStringLiteral("| A | B |")));
     EXPECT_TRUE(markdown.contains(QStringLiteral("| --- | --- |")));
     EXPECT_TRUE(markdown.contains(QStringLiteral("| 1 | 2 |")));
+}
+
+TEST(MarkdownBuilder, BuildsSimpleTableExactly)
+{
+    OcrResult result;
+    result.lines = {line(QStringLiteral("A"), 10), line(QStringLiteral("1"), 40)};
+    TableDetection table;
+    table.found     = true;
+    table.rows      = 2;
+    table.columns   = 2;
+    table.cells     = {{QStringLiteral("A"), QStringLiteral("B")}, {QStringLiteral("1"), QStringLiteral("2")}};
+    table.firstLine = 0;
+    table.lastLine  = 1;
+
+    EXPECT_EQ(buildMarkdown(result, table), QStringLiteral("| A | B |\n| --- | --- |\n| 1 | 2 |\n"));
 }
 
 TEST(MarkdownBuilder, EscapesPipeInsideTableCells)
@@ -129,6 +159,20 @@ TEST(MarkdownBuilder, EscapesParagraphLineStartsAndEndsWithOneNewline)
     EXPECT_TRUE(markdown.contains(QStringLiteral("\\> 引用样式")));
     EXPECT_TRUE(markdown.endsWith(QLatin1Char('\n')));
     EXPECT_FALSE(markdown.endsWith(QStringLiteral("\n\n")));
+}
+
+TEST(MarkdownBuilder, EscapesOnlyTheDotAfterLeadingDigits)
+{
+    OcrResult result;
+    result.lines = {line(QStringLiteral("3.14 是圆周率"), 10)};
+    EXPECT_EQ(buildMarkdown(result), QStringLiteral("3\\.14 是圆周率\n"));
+}
+
+TEST(MarkdownBuilder, EscapesLeadingEqualsAndTilde)
+{
+    OcrResult result;
+    result.lines = {line(QStringLiteral("= 不是下划线"), 10), line(QStringLiteral("~~~ 不是围栏"), 35)};
+    EXPECT_EQ(buildMarkdown(result), QStringLiteral("\\= 不是下划线\n\\~~~ 不是围栏\n"));
 }
 
 TEST(MarkdownBuilder, EmptyResultIsEmpty)
