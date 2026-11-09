@@ -3,6 +3,7 @@
 #include "Core/Geometry/ContinuousCorner.h"
 #include "Gui/Controls/Menu.h"
 #include "Gui/Controls/ScrollBar.h"
+#include "Gui/Controls/Slider.h"
 #include "Gui/Theme/CornerStyle.h"
 #include "Gui/Theme/DesignTokens.h"
 
@@ -66,6 +67,18 @@ namespace
         const auto *parent = widget->parentWidget();
         return parent != nullptr && parent->property("squircle").toBool();
     }
+
+    /**
+     * @brief 控件是否是 Qt 内部的提示弹层窗口
+     * @param widget 待判定控件
+     * @return 类名链里带 QTipLabel 时为真
+     * @details QToolTip 的窗口类型 QTipLabel 只在 Qt 私有头里声明，这里按类名认；
+     *          提示窗是顶层原生窗口，透明底与掩膜开关都要在它身上单独落下。
+     */
+    bool isTipLabel(const QWidget *widget)
+    {
+        return widget != nullptr && widget->inherits("QTipLabel");
+    }
 } // namespace
 
 namespace GyanisScribe::Gui
@@ -77,6 +90,30 @@ namespace GyanisScribe::Gui
             QApplication::setStyle(new SquircleStyle);
             s_installed = true;
         }
+    }
+
+    void SquircleStyle::polish(QWidget *widget)
+    {
+        QProxyStyle::polish(widget);
+        if (!isTipLabel(widget))
+        {
+            return;
+        }
+        // 提示窗是不透明顶层窗口：不放开透明底时，8px 面板的四个角外会铺一层窗口色，圆角与描边都看不出来。
+        // 透明底同时关掉系统底，可见像素只剩 PE_PanelTipLabel 画出的面板
+        widget->setAttribute(Qt::WA_TranslucentBackground);
+        widget->setAutoFillBackground(false);
+    }
+
+    int SquircleStyle::styleHint(const StyleHint hint, const QStyleOption *option, const QWidget *widget, QStyleHintReturn *returnData) const
+    {
+        // QTipLabel::resizeEvent 按这个提示装一圈原生掩膜：掩膜按矩形或原生圆角裁角，
+        // 会把自绘的连续曲率角切掉。返回 0 之后窗口只按透明底合成
+        if (hint == SH_ToolTip_Mask && isTipLabel(widget))
+        {
+            return 0;
+        }
+        return QProxyStyle::styleHint(hint, option, widget, returnData);
     }
 
     void SquircleStyle::drawPrimitive(const PrimitiveElement element, const QStyleOption *option, QPainter *painter, const QWidget *widget) const
@@ -194,9 +231,17 @@ namespace GyanisScribe::Gui
         switch (metric)
         {
             case PM_ScrollBarExtent:
-                return 10;
+                return kScrollBarThickness;
             case PM_ScrollBarSliderMin:
-                return 24;
+                return kScrollBarMinimumHandle;
+            case PM_SliderLength:
+                // QSlider 的按下命中、拖动换算都用这个长度解手柄矩形；自绘手柄按同一档边长画，
+                // 度量的仍由原生风格给出时，按在手柄可见边缘上会被判成点槽
+                if (qobject_cast<const Slider *>(widget) != nullptr)
+                {
+                    return kSliderHandleEdge;
+                }
+                break;
             default:
                 break;
         }

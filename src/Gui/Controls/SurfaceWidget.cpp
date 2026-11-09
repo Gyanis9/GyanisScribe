@@ -64,7 +64,10 @@ namespace GyanisScribe::Gui
         QPainter painter{this};
         QColor   border = m_borderColor;
         int      width  = m_borderWidth;
-        if (m_highContrastBorder && activeThemeKind() == ThemeKind::HighContrast)
+        // 高对比度档的自动边只补「调用方没要边」的那一档：显式描边的控件换的是颜色与状态，
+        // 不能被一层静息黑边盖回去
+        const bool hasExplicitBorder = m_borderColor.isValid() && m_borderWidth > 0;
+        if (m_highContrastBorder && !hasExplicitBorder && activeThemeKind() == ThemeKind::HighContrast)
         {
             border = activePalette().borderStrong;
             width  = themeBorderWidth(ThemeKind::HighContrast);
@@ -107,7 +110,8 @@ namespace GyanisScribe::Gui
         QPainter painter{this};
         QColor   border = m_borderColor;
         int      width  = m_borderColor.isValid() ? themeBorderWidth(activeThemeKind()) : 0;
-        if (m_highContrastBorder && activeThemeKind() == ThemeKind::HighContrast)
+        // 显式描边优先：录制态的主色边要压过高对比度档的静息黑边，自动边只补没有显式边的那一档
+        if (m_highContrastBorder && !m_borderColor.isValid() && activeThemeKind() == ThemeKind::HighContrast)
         {
             border = activePalette().borderStrong;
             width  = themeBorderWidth(ThemeKind::HighContrast);

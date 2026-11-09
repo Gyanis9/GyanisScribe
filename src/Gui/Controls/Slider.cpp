@@ -17,9 +17,6 @@ namespace
     /// 槽的高度，逻辑像素
     constexpr int kGrooveHeight = 6;
 
-    /// 手柄的边长，逻辑像素：正方形，按正圆档画成圆
-    constexpr int kHandleEdge = 18;
-
     /// 手柄描边宽度：聚焦与静息同宽，反转只换颜色
     constexpr qreal kHandleBorderWidth = 2.0;
 } // namespace
@@ -45,10 +42,10 @@ namespace GyanisScribe::Gui
         const auto  &palette  = activePalette();
         const bool   enabled  = isEnabled();
         const qreal  centerY  = height() / 2.0;
-        const int    span     = std::max(0, width() - kHandleEdge);
+        const int    span     = std::max(0, width() - kSliderHandleEdge);
         const int    position = style()->sliderPositionFromValue(minimum(), maximum(), value(), span, false);
         const QRectF groove{0.0, centerY - kGrooveHeight / 2.0, static_cast<qreal>(width()), static_cast<qreal>(kGrooveHeight)};
-        const QRectF handle{static_cast<qreal>(position), centerY - kHandleEdge / 2.0, static_cast<qreal>(kHandleEdge), static_cast<qreal>(kHandleEdge)};
+        const QRectF handle{static_cast<qreal>(position), centerY - kSliderHandleEdge / 2.0, static_cast<qreal>(kSliderHandleEdge), static_cast<qreal>(kSliderHandleEdge)};
 
         const QColor grooveFill        = enabled ? palette.mutedFill : palette.border;
         const QColor grooveBorder      = enabled ? palette.border : palette.borderStrong;

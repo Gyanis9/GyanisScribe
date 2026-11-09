@@ -13,14 +13,8 @@
 
 namespace
 {
-    /// 滚动条的粗细，逻辑像素
-    constexpr int kThickness = 10;
-
     /// 轨道四周留白，手柄不贴边
     constexpr int kMargin = 2;
-
-    /// 手柄的最短长度，逻辑像素
-    constexpr int kMinimumHandle = 24;
 
     /**
      * @brief 手柄颜色
@@ -66,7 +60,7 @@ namespace GyanisScribe::Gui
         const int  trackLength   = qRound(vertical ? track.height() : track.width());
         const int  range         = option.maximum - option.minimum;
         const int  page          = std::max(1, option.pageStep);
-        const int  minimumHandle = std::min(kMinimumHandle, trackLength);
+        const int  minimumHandle = std::min(kScrollBarMinimumHandle, trackLength);
         const int  handleLength  = std::clamp(qRound(static_cast<qreal>(trackLength) * page / (qint64{range} + page)), minimumHandle, trackLength);
         const int  position =
                 range > 0 ? qRound(static_cast<qreal>(trackLength - handleLength) * (static_cast<qreal>(option.sliderPosition) - static_cast<qreal>(option.minimum)) / range) : 0;
@@ -83,16 +77,16 @@ namespace GyanisScribe::Gui
         setAutoFillBackground(false);
         if (orientation == Qt::Vertical)
         {
-            setFixedWidth(kThickness);
+            setFixedWidth(kScrollBarThickness);
         } else
         {
-            setFixedHeight(kThickness);
+            setFixedHeight(kScrollBarThickness);
         }
     }
 
     QSize ScrollBar::sizeHint() const
     {
-        return orientation() == Qt::Vertical ? QSize{kThickness, 120} : QSize{120, kThickness};
+        return orientation() == Qt::Vertical ? QSize{kScrollBarThickness, 120} : QSize{120, kScrollBarThickness};
     }
 
     void ScrollBar::paintEvent(QPaintEvent *)

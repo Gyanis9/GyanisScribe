@@ -15,6 +15,9 @@ class QEnterEvent;
 
 namespace GyanisScribe::Gui
 {
+    /// 手柄的边长，逻辑像素：绘制、样式度量与命中测试共用这一档
+    inline constexpr int kSliderHandleEdge = 18;
+
     /**
      * @brief 自绘连续曲率槽与手柄的水平滑块
      * @details 槽、已走过的子页与手柄都由本类绘制，尺寸与颜色不再落在样式表里：

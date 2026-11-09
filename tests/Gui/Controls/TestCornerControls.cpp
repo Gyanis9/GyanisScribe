@@ -23,8 +23,10 @@
 #include <QAbstractScrollArea>
 #include <QApplication>
 #include <QCoreApplication>
+#include <QElapsedTimer>
 #include <QEnterEvent>
 #include <QEvent>
+#include <QEventLoop>
 #include <QFont>
 #include <QHoverEvent>
 #include <QImage>
@@ -39,6 +41,7 @@
 #include <QStyleOption>
 #include <QStyleOptionSlider>
 #include <QStyledItemDelegate>
+#include <QToolTip>
 #include <QWidget>
 
 #include <cstdlib>
@@ -589,6 +592,90 @@ TEST_F(CornerControlsFixture, TooltipPanelIsDrawnByTheProxyStyle)
 }
 
 /**
+ * @brief 钉住真实提示窗的透明底与关掉的原生掩膜
+ * @details TooltipPanelIsDrawnByTheProxyStyle 只直接调了 drawPrimitive，widget 传的是空指针，
+ *          窗口本身是不是不透明、有没有被原生掩膜裁角都不在判据里。这里经 QToolTip::showText
+ *          造出真实的 QTipLabel：它必须带 WA_TranslucentBackground、关掉自动填底，
+ *          SH_ToolTip_Mask 必须返回 0，否则四个角外会露出窗口色或被原生圆角掩膜切掉；
+ *          抓图左上角必须是透明的。
+ *          测试进程里提示窗不一定能真的建出来（无交互桌面、离屏平台），那种情况下退化为跳过，
+ *          留下一条明确的限制说明，不把「没建窗」当成通过。
+ */
+TEST_F(CornerControlsFixture, RealTooltipWindowUsesTheTranslucentSquirclePanel)
+{
+    struct StyleSheetGuard
+    {
+        QString previous = qApp->styleSheet();
+
+        ~StyleSheetGuard()
+        {
+            qApp->setStyleSheet(previous);
+        }
+    } styleSheetGuard;
+    struct EffectGuard
+    {
+        bool fade    = QApplication::isEffectEnabled(Qt::UI_FadeTooltip);
+        bool animate = QApplication::isEffectEnabled(Qt::UI_AnimateTooltip);
+
+        ~EffectGuard()
+        {
+            QApplication::setEffectEnabled(Qt::UI_FadeTooltip, fade);
+            QApplication::setEffectEnabled(Qt::UI_AnimateTooltip, animate);
+        }
+    } effectGuard;
+    // 动画会推迟窗口的第一次显示：判据要抓的是一块已经存在的画面
+    QApplication::setEffectEnabled(Qt::UI_FadeTooltip, false);
+    QApplication::setEffectEnabled(Qt::UI_AnimateTooltip, false);
+    qApp->setStyleSheet(GyanisScribe::Gui::ThemeManager::styleSheetFor(GyanisScribe::Gui::ThemeKind::Light));
+
+    QWidget anchor;
+    anchor.resize(120, 60);
+    anchor.show();
+    QCoreApplication::processEvents();
+
+    const QPoint tipPosition = anchor.mapToGlobal(QPoint{10, 10});
+    QToolTip::showText(tipPosition, QStringLiteral("提示"), &anchor);
+    QCoreApplication::processEvents();
+
+    QWidget *tip = nullptr;
+    for (auto *candidate: QApplication::topLevelWidgets())
+    {
+        if (candidate->inherits("QTipLabel") && candidate->isVisible())
+        {
+            tip = candidate;
+            break;
+        }
+    }
+    if (tip == nullptr)
+    {
+        QToolTip::hideText();
+        GTEST_SKIP() << "测试环境里 QToolTip 没有建出可见的 QTipLabel，提示窗的透明底与掩膜路径无法按像素核对";
+    }
+
+    EXPECT_TRUE(tip->testAttribute(Qt::WA_TranslucentBackground)) << "提示窗没开透明底，面板圆角外会露出窗口色";
+    EXPECT_FALSE(tip->autoFillBackground()) << "提示窗还在自动填底，方底会盖住连续曲率面板";
+    QStyleOption option;
+    option.initFrom(tip);
+    EXPECT_EQ(tip->style()->styleHint(QStyle::SH_ToolTip_Mask, &option, tip), 0) << "提示窗仍会装原生掩膜，连续曲率的角会被切掉";
+
+    const QImage image = tip->grab().toImage();
+    ASSERT_FALSE(image.isNull());
+    EXPECT_EQ(image.pixelColor(0, 0).alpha(), 0) << "提示窗左上角不透明，" << tip->width() << "x" << tip->height() << " 的窗口在面板外铺了方底";
+    EXPECT_EQ(image.pixelColor(tip->width() - 4, tip->height() / 2), GyanisScribe::Gui::activePalette().surface) << "提示窗的边距区没有铺出这一档的面板底";
+
+    QToolTip::hideText();
+    // hideText 先启动 300ms 的隐藏计时器，再把窗口 deleteLater；不等到它走完，
+    // 提示窗会留在后面的用例顶上，抓图判据就会抓到别的窗口
+    QElapsedTimer elapsed;
+    elapsed.start();
+    while (QToolTip::isVisible() && elapsed.elapsed() < 2000)
+    {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+    }
+    EXPECT_FALSE(QToolTip::isVisible()) << "提示窗没有被收回，后续用例的顶层窗口判据会被它干扰";
+}
+
+/**
  * @brief 钉住列表的项高亮与容器底都由连续曲率自绘
  * @details 高亮取当前行矩形中心：那里必须是 accentSoft，样式表已经不画选中底了。
  *          容器底取两行之下的一格：那里必须铺 surface，样式表删掉 background 之后
@@ -846,6 +933,11 @@ TEST_F(CornerControlsFixture, ThemedPopupViewsKeepTheSquircleSurface)
         ASSERT_FALSE(image.isNull());
         EXPECT_EQ(image.pixelColor(100, 100), GyanisScribe::Gui::paletteFor(kind).surface)
                 << static_cast<int>(kind) << " 档下弹层视图没铺该档 surface；中心取色 " << image.pixelColor(100, 100).name(QColor::HexArgb).toStdString();
+        // 弹层是压在别的内容上的浮层：三档都要一圈 borderStrong 微边缘，浅深档 1px、高对比度档 2px。
+        // 顶边中点在文字与项高亮之外，那里没有这一档的 borderStrong 就说明描边只落在高对比度档
+        EXPECT_EQ(image.pixelColor(image.width() / 2, 0), GyanisScribe::Gui::paletteFor(kind).borderStrong)
+                << static_cast<int>(kind) << " 档下弹层视图的顶边没有 borderStrong 微边缘；顶边取色 "
+                << image.pixelColor(image.width() / 2, 0).name(QColor::HexArgb).toStdString();
         EXPECT_EQ(image.pixelColor(0, 0).alpha(), 0) << static_cast<int>(kind) << " 档下弹层视图左上角不透明，方角底又回来了；左上角取色 "
                                                      << image.pixelColor(0, 0).name(QColor::HexArgb).toStdString();
     }
@@ -1022,6 +1114,33 @@ TEST_F(CornerControlsFixture, SliderPaintsGrooveAndHandle)
     const QImage image = slider->grab().toImage();
     EXPECT_EQ(image.pixelColor(80, 10), GyanisScribe::Gui::activePalette().accent) << "手柄中心没画成主色";
     EXPECT_EQ(image.pixelColor(150, 10), GyanisScribe::Gui::activePalette().mutedFill) << "手柄右侧的槽没铺静默底";
+}
+
+/**
+ * @brief 钉住滑块的按下命中与画出来的手柄同宽
+ * @details QSlider 的按下命中与拖动换算都问 PM_SliderLength；样式仍按原生长度给值时，
+ *          按在手柄可见边缘上会被判成点槽，滑块会直接跳一档。判据先核对样式给出的长度，
+ *          再按自绘手柄的同一个位置按下，滑块必须进入拖动态。
+ */
+TEST_F(CornerControlsFixture, SliderHandleHitTestingMatchesThePaintedHandle)
+{
+    GyanisScribe::Gui::Slider slider{Qt::Horizontal};
+    slider.setRange(0, 100);
+    slider.setValue(50);
+    slider.resize(160, 20);
+    slider.show();
+    QCoreApplication::processEvents();
+
+    EXPECT_EQ(slider.style()->pixelMetric(QStyle::PM_SliderLength, nullptr, &slider), GyanisScribe::Gui::kSliderHandleEdge)
+            << "样式给出的手柄长度与自绘手柄不同宽";
+    const int position = slider.style()->sliderPositionFromValue(slider.minimum(), slider.maximum(), slider.value(), slider.width() - GyanisScribe::Gui::kSliderHandleEdge, false);
+    const QPoint pressPoint{position + 1, slider.height() / 2};
+    QMouseEvent press{QEvent::MouseButtonPress, QPointF{pressPoint}, QPointF{pressPoint}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QCoreApplication::sendEvent(&slider, &press);
+    EXPECT_TRUE(slider.isSliderDown()) << "按在手柄左沿内侧没有开始拖动：命中几何与自绘手柄不同宽";
+
+    QMouseEvent release{QEvent::MouseButtonRelease, QPointF{pressPoint}, QPointF{pressPoint}, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+    QCoreApplication::sendEvent(&slider, &release);
 }
 
 /**

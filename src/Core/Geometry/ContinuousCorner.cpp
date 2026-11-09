@@ -1,7 +1,5 @@
 #include "Core/Geometry/ContinuousCorner.h"
 
-#include <QLineF>
-
 #include <algorithm>
 #include <cmath>
 
@@ -28,7 +26,8 @@ namespace
 
     LocalCornerParameters makeLocalParameters(const QSizeF &size, const GyanisScribe::Core::CornerShape &shape)
     {
-        const qreal budget = std::min(size.width(), size.height()) / 2.0;
+        // 夹取上界先收到非负：尺寸为负时 std::clamp 的下界会大于上界，属于未定义行为
+        const qreal budget = std::max(0.0, std::min(size.width(), size.height()) / 2.0);
         const qreal radius = std::clamp(shape.radius, 0.0, budget);
         if (radius <= 0.0)
         {

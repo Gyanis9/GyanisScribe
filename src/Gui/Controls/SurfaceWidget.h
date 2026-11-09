@@ -54,7 +54,7 @@ namespace GyanisScribe::Gui
 
         /**
          * @brief 让高对比度档自动补 borderStrong 2px 边
-         * @param enabled true 表示这一档由本控件补边
+         * @param enabled true 表示没有显式描边时由本控件补边
          */
         void setHighContrastBorder(bool enabled);
 
@@ -62,7 +62,8 @@ namespace GyanisScribe::Gui
         /**
          * @brief 按当前角色与铺底色画连续曲率底
          * @details 重写 QWidget::paintEvent()：基类只画背景，这里改由本类按连续曲率画底与描边；
-         *          开了 setHighContrastBorder 时高对比度档换用 borderStrong 2px 边
+         *          开了 setHighContrastBorder 时高对比度档换用 borderStrong 2px 边，
+         *          已经有显式描边的控件保持自己的颜色与宽度
          * @param event 绘制事件
          */
         void paintEvent(QPaintEvent *event) override;
@@ -105,7 +106,7 @@ namespace GyanisScribe::Gui
 
         /**
          * @brief 让高对比度档自动补 borderStrong 2px 边
-         * @param enabled true 表示这一档由本控件补边
+         * @param enabled true 表示没有显式描边时由本控件补边
          */
         void setHighContrastBorder(bool enabled);
 
@@ -113,7 +114,8 @@ namespace GyanisScribe::Gui
         /**
          * @brief 先画连续曲率底，再让 QLabel 画内容
          * @details 重写 QLabel::paintEvent()：底画在基类之前，文字、对齐与省略仍由基类处理；
-         *          开了 setHighContrastBorder 时高对比度档换用 borderStrong 2px 边
+         *          开了 setHighContrastBorder 时高对比度档换用 borderStrong 2px 边，
+         *          已经有显式描边的控件保持自己的颜色与宽度
          * @param event 绘制事件
          */
         void paintEvent(QPaintEvent *event) override;

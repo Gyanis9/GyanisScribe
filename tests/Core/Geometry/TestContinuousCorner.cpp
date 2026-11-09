@@ -71,6 +71,18 @@ TEST(ContinuousCorner, ClampsRadiusAndSmoothingToBudget)
     EXPECT_NEAR(params.arcMeasure, 67.5, 1e-9);
 }
 
+/**
+ * @brief 钉住负尺寸不再落进上下界颠倒的夹取
+ * @details 半径的上界取短边一半；尺寸为负时上界也是负的，std::clamp 要求下界不大于上界。
+ *          夹取后的半径与占位都必须回落成 0，路径按无圆角处理。
+ */
+TEST(ContinuousCorner, NegativeSizeYieldsNoCurvature)
+{
+    const auto params = cornerPathParameters(QSizeF{-20.0, 10.0}, CornerShape{8.0, 0.35});
+    EXPECT_EQ(params.radius, 0.0);
+    EXPECT_EQ(params.p, 0.0);
+}
+
 TEST(ContinuousCorner, PathStaysInsideRect)
 {
     const QRectF rect{5.0, 7.0, 180.0, 100.0};

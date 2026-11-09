@@ -391,6 +391,51 @@ TEST_F(HotkeyEditFixture, DisplayPaintsRecordingAndDisabledFillRoles)
 }
 
 /**
+ * @brief 钉住高对比度档的录制主色边不被自动静息边盖掉
+ * @details 高对比度档会给没有显式描边的 SurfaceLabel 自动补 2px borderStrong 边；
+ *          录制态显式把边设成主色，这一档若仍无条件套自动边，用户就看不到「正在等按键」。
+ *          判据取显示框顶边中点：静息必须是 borderStrong，按下后必须是 accent，Esc 后回到 borderStrong。
+ */
+TEST_F(HotkeyEditFixture, HighContrastKeepsTheRecordingAccentEdge)
+{
+    struct ThemeKindGuard
+    {
+        GyanisScribe::Gui::ThemeKind previous = GyanisScribe::Gui::activeThemeKind();
+
+        ~ThemeKindGuard()
+        {
+            GyanisScribe::Gui::setTextThemeKind(previous);
+        }
+    } themeKindGuard;
+    GyanisScribe::Gui::setTextThemeKind(GyanisScribe::Gui::ThemeKind::HighContrast);
+    const auto &palette = GyanisScribe::Gui::activePalette();
+
+    QWidget container;
+    auto   *edit = new HotkeyEdit{*m_store, &container};
+    edit->setGeometry(0, 0, 320, 60);
+    container.resize(320, 60);
+    container.show();
+    container.activateWindow();
+    QCoreApplication::processEvents();
+
+    auto *display = edit->findChild<QLabel *>(QStringLiteral("hotkeyDisplay"));
+    ASSERT_NE(display, nullptr) << "录制框里没有显示组合的那一格";
+    const auto topEdge = [display] { return display->grab().toImage().pixelColor(display->width() / 2, 0); };
+    EXPECT_EQ(topEdge(), palette.borderStrong) << "高对比度档的静息态没有自动补出 borderStrong 边";
+
+    QMouseEvent press{QEvent::MouseButtonPress, QPointF{5, 5}, QPointF{5, 5}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QCoreApplication::sendEvent(edit, &press);
+    QCoreApplication::processEvents();
+    EXPECT_TRUE(display->property("recording").toBool()) << "点一下没有进入录制态，判据没有落点";
+    EXPECT_EQ(topEdge(), palette.accent) << "录制态的主色边被高对比度档的静息黑边盖掉了";
+
+    QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier};
+    QCoreApplication::sendEvent(edit, &escape);
+    QCoreApplication::processEvents();
+    EXPECT_EQ(topEdge(), palette.borderStrong) << "退出录制后没有回到高对比度档的自动静息边";
+}
+
+/**
  * @brief 钉住「不合格的组合被拒之后，显示回到绑定值」
  * @details 把被拒的那颗组合留在框里，看起来像是已经改成了它；下一次别人看到这一格会以为
  *          配置里就是那一颗。配置不许动，显示要回到现值。

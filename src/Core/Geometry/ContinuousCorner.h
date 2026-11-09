@@ -49,8 +49,8 @@ namespace GyanisScribe::Core
     {
         qreal a                = 0.0; ///< 第一段贝塞尔的控制点步长
         qreal b                = 0.0; ///< a 的一半
-        qreal c                = 0.0; ///< 圆弧后第一段控制点的横向分量
-        qreal d                = 0.0; ///< 圆弧后第一段控制点的纵向分量
+        qreal c                = 0.0; ///< 第一段贝塞尔终点沿出边方向的附加步长
+        qreal d                = 0.0; ///< 第一段贝塞尔终点沿入边方向的附加步长
         qreal p                = 0.0; ///< 圆角在边上的总占位
         qreal radius           = 0.0; ///< 夹取后的半径
         qreal arcSectionLength = 0.0; ///< 圆弧在横纵轴上的投影长度

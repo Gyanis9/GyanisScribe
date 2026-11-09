@@ -17,6 +17,12 @@ class QStyleOptionSlider;
 
 namespace GyanisScribe::Gui
 {
+    /// 滚动条的粗细，逻辑像素：自绘轨道、样式度量与命中几何共用这一档
+    inline constexpr int kScrollBarThickness = 10;
+
+    /// 手柄的最短长度，逻辑像素：自绘手柄与命中测试共用这一档
+    inline constexpr int kScrollBarMinimumHandle = 24;
+
     /**
      * @brief 滚动条内轨道的矩形
      * @param option 滚动条的样式参数，只取方向

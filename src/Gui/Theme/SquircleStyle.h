@@ -19,10 +19,10 @@ namespace GyanisScribe::Gui
      *          自绘的连续曲率高亮会被它盖住，角上的透明区也会露出方底。菜单拦截只对
      *          Gui::Menu 与不基于 QMenu 的自绘弹层生效，系统对话框与文本控件的标准右键菜单
      *          仍由原生风格画。提示弹层没有自绘类，
-     *          原生面板整层改成连续曲率面板。
+     *          原生面板整层改成连续曲率面板，窗口本身也让出透明底并关掉原生掩膜。
      *          输入类的自绘底同理：带 squircle 属性的控件（及其内部的子行编辑）不再让原生风格
      *          画输入面板、边框与下拉/微调框主体，否则自绘的连续曲率底会被一层方底盖掉。
-     *          滚动条的几何也在这里接管：滑块、轨道与翻页区都按自绘用的同一组常量给出，
+     *          滚动条与滑块的几何也在这里接管：滑块、轨道与翻页区都按自绘用的同一组常量给出，
      *          命中测试与拖动换算因此和画出来的手柄重合。
      */
     class SquircleStyle : public QProxyStyle
@@ -35,7 +35,31 @@ namespace GyanisScribe::Gui
          */
         static void install();
 
+        /**
+         * @brief 提示弹层窗口接入透明底
+         * @details 重写 QProxyStyle::polish()：Qt 内部的 QTipLabel 按类名认出来，
+         *          打开 WA_TranslucentBackground、清掉自动填底，窗口的可见像素只来自
+         *          PE_PanelTipLabel 画出的连续曲率面板；其余控件原样交给基类
+         * @param widget 待打磨的控件
+         * @note 必须在窗口创建与首次显示之前落下：不透明窗口会在 8px 面板的角外
+         *       铺一层方底，圆角就白画了
+         */
+        void polish(QWidget *widget) override;
+
     protected:
+        /**
+         * @brief 提示弹层不装原生掩膜
+         * @details 重写 QProxyStyle::styleHint()：QTipLabel::resizeEvent 会按 SH_ToolTip_Mask
+         *          装一圈原生掩膜，掩膜按矩形或原生圆角裁角，会把连续曲率面板的角切掉；
+         *          对提示弹层返回 0，其余提示原样交给基类
+         * @param hint 待查询的样式提示
+         * @param option 绘制参数
+         * @param widget 目标控件
+         * @param returnData 提示的附加返回值
+         * @return 提示弹层为 0，其余由基类给出
+         */
+        int styleHint(StyleHint hint, const QStyleOption *option, const QWidget *widget, QStyleHintReturn *returnData) const override;
+
         /**
          * @brief 接管菜单与提示弹层的原生面板，置空自绘输入类的原生输入面板与边框
          * @details 重写 QProxyStyle::drawPrimitive()：非原生 QMenu 的 PE_PanelMenu 与
@@ -97,13 +121,15 @@ namespace GyanisScribe::Gui
         QRect subControlRect(ComplexControl control, const QStyleOptionComplex *option, SubControl subControl, const QWidget *widget) const override;
 
         /**
-         * @brief 滚动条粗细与最短手柄对齐自绘数值
-         * @details 重写 QProxyStyle::pixelMetric()：PM_ScrollBarExtent 返回 10、PM_ScrollBarSliderMin 返回 24，
-         *          滚动条的建议尺寸与原生风格里的其它换算都落在同一档；其余度量原样交给基类
+         * @brief 滚动条与滑块的度量对齐自绘数值
+         * @details 重写 QProxyStyle::pixelMetric()：PM_ScrollBarExtent 返回滚动条粗细、
+         *          PM_ScrollBarSliderMin 返回手柄最短长度，滚动条的建议尺寸与原生风格里的其它换算
+         *          都落在自绘用的同一档；Gui::Slider 的 PM_SliderLength 返回手柄边长，
+         *          拖动换算与命中测试才会和画出来的手柄重合；其余度量原样交给基类
          * @param metric 待取的度量
          * @param option 绘制参数
          * @param widget 目标控件
-         * @return 滚动条度量为 10/24，其余由基类给出
+         * @return 滚动条与滑块度量为自绘常量，其余由基类给出
          */
         int pixelMetric(PixelMetric metric, const QStyleOption *option, const QWidget *widget) const override;
     };

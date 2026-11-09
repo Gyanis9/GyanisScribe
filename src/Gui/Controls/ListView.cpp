@@ -49,8 +49,9 @@ namespace GyanisScribe::Gui
     void ListView::paintSurface()
     {
         QPainter   painter{this};
-        const QPen border =
-                activeThemeKind() == ThemeKind::HighContrast ? QPen{activePalette().borderStrong, static_cast<qreal>(themeBorderWidth(ThemeKind::HighContrast))} : QPen{Qt::NoPen};
+        // 弹层是压在别的内容上的浮层，三档都要一圈 borderStrong 微边缘：只在高对比度档描边时，
+        // 浅深档的弹层边界与背后的界面糊成一片；宽度随档走 1px/2px
+        const QPen border{activePalette().borderStrong, static_cast<qreal>(themeBorderWidth(activeThemeKind()))};
         Core::paintContinuousCorner(painter, QRectF{rect()}, Core::cornerShapeFor(Core::CornerRole::Control), activePalette().surface, border);
     }
 } // namespace GyanisScribe::Gui
