@@ -18,7 +18,8 @@ namespace GyanisScribe::Core
      * @brief 在识别结果里找一张表格
      * @param result 一次识别的完整结果，词框坐标系与结果图一致
      * @return 唯一一张最可信的表；没有候选时 found 为 false，复杂表的 complex 为 true 且带中文原因
-     * @note 只按词框对齐推断，不读取表格线；存在多张表时优先简单表，其次取 rows × columns 最大者
+     * @note 只按词框对齐推断，不读取表格线。存在多张表时，先在所有简单表里取 rows × columns 最大的一张；
+     *       一张简单表都没有时，再在复杂表里取 rows × columns 最大的一张。简单表与复杂表不放在一起比较面积。
      */
     [[nodiscard]] TableDetection detectTable(const OcrResult &result);
 } // namespace GyanisScribe::Core

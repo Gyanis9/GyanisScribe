@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 using GyanisScribe::Core::detectTable;
+using GyanisScribe::Core::kMaxTableColumns;
 using GyanisScribe::Core::OcrLine;
 using GyanisScribe::Core::OcrResult;
 using GyanisScribe::Core::OcrWord;
@@ -22,6 +23,22 @@ namespace
             line.words.push_back(word);
             line.boundingBox = line.boundingBox.isNull() ? word.boundingBox : line.boundingBox.united(word.boundingBox);
             x += cellWidth + gap;
+        }
+        return line;
+    }
+
+    OcrWord makeWord(const QString &text, const int x, const int y, const int width, const int height = 20)
+    {
+        return OcrWord{text, QRect{x, y, width, height}};
+    }
+
+    OcrLine makeWordsLine(const QVector<OcrWord> &words)
+    {
+        OcrLine line;
+        line.words = words;
+        for (const OcrWord &word: words)
+        {
+            line.boundingBox = line.boundingBox.isNull() ? word.boundingBox : line.boundingBox.united(word.boundingBox);
         }
         return line;
     }
@@ -85,6 +102,35 @@ TEST(TableDetector, GroupsWordsInsideOneCell)
     EXPECT_EQ(table.cells.at(0).at(1), QStringLiteral("B"));
 }
 
+TEST(TableDetector, KeepsNarrowFirstColumnBoundary)
+{
+    const auto first  = makeWordsLine({makeWord(QStringLiteral("1"), 10, 10, 10), makeWord(QStringLiteral("12"), 36, 10, 40), makeWord(QStringLiteral("5"), 96, 10, 20)});
+    const auto second = makeWordsLine({makeWord(QStringLiteral("2"), 10, 40, 10), makeWord(QStringLiteral("34"), 36, 40, 40), makeWord(QStringLiteral("6"), 96, 40, 20)});
+    const auto table  = detectTable(makeResult({first, second}));
+
+    ASSERT_TRUE(table.found);
+    EXPECT_FALSE(table.complex);
+    EXPECT_EQ(table.rows, 2);
+    ASSERT_EQ(table.columns, 3);
+    ASSERT_EQ(table.cells.size(), 2);
+    EXPECT_EQ(table.cells.at(0).at(0), QStringLiteral("1"));
+    EXPECT_EQ(table.cells.at(0).at(1), QStringLiteral("12"));
+    EXPECT_EQ(table.cells.at(0).at(2), QStringLiteral("5"));
+}
+
+TEST(TableDetector, RejectsHeadingWithSingleMultiWordLine)
+{
+    const auto result = makeResult({makeLine(10, {QStringLiteral("Title")}), makeLine(40, {QStringLiteral("A"), QStringLiteral("B")})});
+    EXPECT_FALSE(detectTable(result).found);
+}
+
+TEST(TableDetector, RejectsMisalignedGaps)
+{
+    const auto first  = makeWordsLine({makeWord(QStringLiteral("Hi"), 10, 10, 40), makeWord(QStringLiteral("there"), 80, 10, 50)});
+    const auto second = makeWordsLine({makeWord(QStringLiteral("Welcome"), 10, 40, 100), makeWord(QStringLiteral("home"), 140, 40, 40)});
+    EXPECT_FALSE(detectTable(makeResult({first, second})).found);
+}
+
 TEST(TableDetector, RejectsSingleRowOrSingleColumn)
 {
     EXPECT_FALSE(detectTable(makeResult({makeLine(10, {QStringLiteral("A"), QStringLiteral("B")})})).found);
@@ -93,23 +139,45 @@ TEST(TableDetector, RejectsSingleRowOrSingleColumn)
 
 TEST(TableDetector, MarksCrossColumnTextComplex)
 {
-    OcrLine first     = makeLine(10, {});
-    OcrLine second    = makeLine(40, {QStringLiteral("1"), QStringLiteral("2")});
-    first.words       = {OcrWord{QStringLiteral("Wide"), QRect{10, 10, 140, 20}}, OcrWord{QStringLiteral("B"), QRect{180, 10, 60, 20}}};
-    first.boundingBox = QRect{10, 10, 230, 20};
+    const auto first  = makeWordsLine({makeWord(QStringLiteral("A"), 10, 10, 30), makeWord(QStringLiteral("Wide"), 44, 10, 86), makeWord(QStringLiteral("C"), 160, 10, 30)});
+    const auto second = makeWordsLine({makeWord(QStringLiteral("A"), 10, 40, 30), makeWord(QStringLiteral("B"), 70, 40, 60), makeWord(QStringLiteral("C"), 160, 40, 30)});
+    const auto third  = makeWordsLine({makeWord(QStringLiteral("A"), 10, 70, 30), makeWord(QStringLiteral("B"), 70, 70, 60), makeWord(QStringLiteral("C"), 160, 70, 30)});
+    const auto table  = detectTable(makeResult({first, second, third}));
 
-    const auto table = detectTable(makeResult({first, second}));
-    EXPECT_TRUE(table.found);
+    ASSERT_TRUE(table.found);
     EXPECT_TRUE(table.complex);
-    EXPECT_FALSE(table.complexReason.isEmpty());
+    ASSERT_EQ(table.columns, 3);
+    EXPECT_EQ(table.cells.at(0).at(1), QStringLiteral("Wide"));
+    EXPECT_TRUE(table.complexReason.contains(QStringLiteral("跨过列边界"))) << table.complexReason.toStdString();
+    EXPECT_FALSE(table.complexReason.contains(QStringLiteral("中间列缺少文字"))) << table.complexReason.toStdString();
+    EXPECT_FALSE(table.complexReason.contains(QStringLiteral("非空单元格数不一致"))) << table.complexReason.toStdString();
+    EXPECT_FALSE(table.complexReason.contains(QStringLiteral("边界与表格列不一致"))) << table.complexReason.toStdString();
 }
 
 TEST(TableDetector, MarksInconsistentRowsComplex)
 {
-    const auto result = makeResult({makeLine(10, {QStringLiteral("A"), QStringLiteral("B")}), makeLine(40, {QStringLiteral("1")})});
-    const auto table  = detectTable(result);
-    EXPECT_TRUE(table.found);
+    const auto result =
+            makeResult({makeLine(10, {QStringLiteral("A"), QStringLiteral("B")}), makeLine(40, {QStringLiteral("1"), QStringLiteral("2")}), makeLine(70, {QStringLiteral("3")})});
+    const auto table = detectTable(result);
+    ASSERT_TRUE(table.found);
     EXPECT_TRUE(table.complex);
+    EXPECT_TRUE(table.complexReason.contains(QStringLiteral("非空单元格数不一致"))) << table.complexReason.toStdString();
+}
+
+TEST(TableDetector, MarksMiddleEmptyCellComplex)
+{
+    const auto first  = makeWordsLine({makeWord(QStringLiteral("A"), 40, 10, 40), makeWord(QStringLiteral("B"), 120, 10, 40), makeWord(QStringLiteral("C"), 200, 10, 40)});
+    const auto second = makeWordsLine({makeWord(QStringLiteral("A"), 40, 40, 40), makeWord(QStringLiteral("Wide"), 140, 40, 100)});
+    const auto third  = makeWordsLine({makeWord(QStringLiteral("A"), 40, 70, 40), makeWord(QStringLiteral("B"), 120, 70, 40), makeWord(QStringLiteral("C"), 200, 70, 40)});
+    const auto fourth = makeWordsLine({makeWord(QStringLiteral("A"), 40, 100, 40), makeWord(QStringLiteral("B"), 120, 100, 40), makeWord(QStringLiteral("C"), 200, 100, 40)});
+    const auto table  = detectTable(makeResult({first, second, third, fourth}));
+
+    ASSERT_TRUE(table.found);
+    EXPECT_TRUE(table.complex);
+    ASSERT_EQ(table.columns, 3);
+    EXPECT_TRUE(table.cells.at(1).at(1).isEmpty());
+    EXPECT_EQ(table.cells.at(1).at(2), QStringLiteral("Wide"));
+    EXPECT_TRUE(table.complexReason.contains(QStringLiteral("中间列缺少文字"))) << table.complexReason.toStdString();
 }
 
 TEST(TableDetector, MarksMultiLevelHeaderComplex)
@@ -121,16 +189,52 @@ TEST(TableDetector, MarksMultiLevelHeaderComplex)
     const auto table   = detectTable(result);
     EXPECT_TRUE(table.found);
     EXPECT_TRUE(table.complex);
+    EXPECT_TRUE(table.complexReason.contains(QStringLiteral("多级表头"))) << table.complexReason.toStdString();
 }
 
 TEST(TableDetector, PrefersSimpleOverComplex)
 {
-    const auto result = makeResult({makeLine(10, {QStringLiteral("A"), QStringLiteral("B")}), makeLine(40, {QStringLiteral("1")}),
-                                    makeLine(120, {QStringLiteral("X"), QStringLiteral("Y")}), makeLine(150, {QStringLiteral("3"), QStringLiteral("4")})});
+    const auto header = makeWordsLine({makeWord(QStringLiteral("Merged"), 10, 10, 200, 28)});
+    const auto result = makeResult({header, makeLine(50, {QStringLiteral("A"), QStringLiteral("B")}), makeLine(80, {QStringLiteral("1"), QStringLiteral("2")}),
+                                    makeLine(160, {QStringLiteral("X"), QStringLiteral("Y")}), makeLine(190, {QStringLiteral("3"), QStringLiteral("4")})});
     const auto table  = detectTable(result);
     ASSERT_TRUE(table.found);
     EXPECT_FALSE(table.complex);
+    EXPECT_EQ(table.rows, 2);
+    EXPECT_EQ(table.columns, 2);
     EXPECT_EQ(table.cells.at(0).at(0), QStringLiteral("X"));
+}
+
+TEST(TableDetector, EnforcesColumnLimit)
+{
+    const auto makeTexts = [](const int count)
+    {
+        QVector<QString> texts;
+        texts.reserve(count);
+        for (int index = 0; index < count; ++index)
+        {
+            texts.push_back(QString::number(index + 1));
+        }
+        return texts;
+    };
+
+    const auto accepted = detectTable(makeResult({makeLine(10, makeTexts(kMaxTableColumns)), makeLine(40, makeTexts(kMaxTableColumns))}));
+    ASSERT_TRUE(accepted.found);
+    EXPECT_FALSE(accepted.complex);
+    EXPECT_EQ(accepted.columns, kMaxTableColumns);
+
+    EXPECT_FALSE(detectTable(makeResult({makeLine(10, makeTexts(kMaxTableColumns + 1)), makeLine(40, makeTexts(kMaxTableColumns + 1))})).found);
+}
+
+TEST(TableDetector, KeepsOriginalLineIndicesWhenBoxesAreOutOfOrder)
+{
+    const auto result = makeResult(
+            {makeLine(40, {QStringLiteral("1"), QStringLiteral("2")}), makeLine(10, {QStringLiteral("A"), QStringLiteral("B")}), makeLine(200, {QStringLiteral("End")})});
+    const auto table = detectTable(result);
+    ASSERT_TRUE(table.found);
+    EXPECT_EQ(table.rows, 2);
+    EXPECT_EQ(table.firstLine, 0);
+    EXPECT_EQ(table.lastLine, 1);
 }
 
 TEST(TableDetector, EmptyAndDegenerateInputIsSafe)

@@ -27,19 +27,20 @@ namespace GyanisScribe::Core
     /**
      * @brief 一次表格检测的结果
      * @details cells 按 rows × columns 排；空串表示该格没有文字。
-     *          complex 为真时 found 仍为真，界面据此说明“检测到复杂表格，暂不支持 CSV”。
+     *          复杂表同样 found 为真，complex 表示结构无法按列还原，complexReason 给出中文原因，
+     *          界面据此说明“检测到复杂表格，暂不支持 CSV”。
      */
     struct TableDetection
     {
         bool                      found   = false;  ///< 是否找到候选表（可能为复杂表）
-        bool                      complex = false;  ///< 是否含合并单元格、跨列文字或行列不一致
+        bool                      complex = false;  ///< 是否无法按列还原：合并单元格、跨列文字或行列不一致
         int                       rows    = 0;      ///< 表格行数
         int                       columns = 0;      ///< 表格列数
         QVector<QVector<QString>> cells;            ///< rows × columns 的单元格文本
         QRect                     boundingBox;      ///< 表格在原图坐标系里的外接框
-        int                       firstLine  = 0;   ///< 表在 OcrResult::lines 里的首行下标
-        int                       lastLine   = -1;  ///< 表在 OcrResult::lines 里的末行下标（含）
+        int                       firstLine  = 0;   ///< 表在 OcrResult::lines 里的最小行下标
+        int                       lastLine   = -1;  ///< 表在 OcrResult::lines 里的最大行下标（含）
         double                    confidence = 0.0; ///< 非空单元格数恰好等于列数的行占比
-        QString                   complexReason;    ///< 复杂表原因；简单表为空
+        QString                   complexReason;    ///< 复杂表的中文原因拼接；简单表为空
     };
 } // namespace GyanisScribe::Core

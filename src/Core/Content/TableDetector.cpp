@@ -234,7 +234,7 @@ namespace GyanisScribe::Core
         }
 
         /// 收集每行单元格之间的留白；单格行不产生分界，但保留在行段里参与复杂表判定
-        [[nodiscard]] QVector<BoundaryCandidate> collectBoundaryCandidates(const QVector<TableRow> &rows, const double cellGap, const double boundaryFloor)
+        [[nodiscard]] QVector<BoundaryCandidate> collectBoundaryCandidates(const QVector<TableRow> &rows, const double cellGap)
         {
             QVector<BoundaryCandidate> candidates;
             for (qsizetype rowIndex = 0; rowIndex < rows.size(); ++rowIndex)
@@ -258,11 +258,7 @@ namespace GyanisScribe::Core
                     }
 
                     const double position = (static_cast<double>(cellRight) + static_cast<double>(wordBounds.left())) / 2.0;
-                    // 正文左边界以左或紧贴左边界的分界是行首缩进噪声，不作为列分界
-                    if (position > boundaryFloor)
-                    {
-                        candidates.push_back(BoundaryCandidate{position, cellRight, wordBounds.left(), static_cast<int>(rowIndex)});
-                    }
+                    candidates.push_back(BoundaryCandidate{position, cellRight, wordBounds.left(), static_cast<int>(rowIndex)});
                     cellRight = horizontalRight(wordBounds);
                 }
             }
@@ -270,6 +266,9 @@ namespace GyanisScribe::Core
         }
 
         /// 把各行的留白中点聚成列分界，聚类结果记录有多少行支持它
+        /// @note 中点距离不超过容差，或两行的留白区间重叠，都视为同一处列分界。
+        ///       区间重叠合并是可传递的：一行里缺掉中间单元格时留下的长留白，
+        ///       可能把它覆盖到的相邻分界连成一个簇，簇中点取所有成员中点的平均。
         [[nodiscard]] QVector<BoundaryCluster> clusterBoundaries(const QVector<BoundaryCandidate> &candidates, const double tolerance)
         {
             const qsizetype count = candidates.size();
@@ -339,15 +338,38 @@ namespace GyanisScribe::Core
             return clusters;
         }
 
-        /// 过滤支持行数不足的分界；全都不足时退回支持最多的那些并标记复杂
-        [[nodiscard]] QVector<BoundaryCluster> selectSupportedClusters(const QVector<BoundaryCluster> &clusters, const int requiredSupport, bool &usedFallback)
+        /// 按选定的列分界把词落格，并判定复杂条件与置信度
+        [[nodiscard]] std::optional<TableCandidate> buildCandidate(const QVector<TableRow> &rows, const BodyMetrics &metrics)
         {
-            QVector<BoundaryCluster> supported;
-            int                      maximumSupport = 0;
-            for (const BoundaryCluster &cluster: clusters)
+            // 段内至少要有两行各含两个以上的词，否则只是少量文字碰巧对齐，不足以构成表格
+            int multiWordRowCount = 0;
+            for (const TableRow &row: rows)
             {
-                maximumSupport = std::max(maximumSupport, static_cast<int>(cluster.rows.size()));
+                if (row.words.size() >= 2)
+                {
+                    ++multiWordRowCount;
+                }
             }
+            if (multiWordRowCount < kMinTableRows)
+            {
+                return std::nullopt;
+            }
+
+            const double cellGap   = std::max(2.0, kTableCellGapFactor * metrics.medianWordHeight);
+            const double tolerance = kTableBoundaryTolerance * metrics.medianWordHeight;
+
+            const QVector<BoundaryCandidate> candidates = collectBoundaryCandidates(rows, cellGap);
+            if (candidates.isEmpty())
+            {
+                return std::nullopt;
+            }
+
+            const QVector<BoundaryCluster> clusters = clusterBoundaries(candidates, tolerance);
+
+            // 支持率的分母是段内总行数；单格表头或合并单元格的行没有分界，但仍计入分母
+            const int requiredSupport = std::max(1, static_cast<int>(std::ceil(kTableBoundarySupport * static_cast<double>(rows.size()))));
+
+            QVector<BoundaryCluster> supported;
             for (const BoundaryCluster &cluster: clusters)
             {
                 if (static_cast<int>(cluster.rows.size()) >= requiredSupport)
@@ -355,49 +377,6 @@ namespace GyanisScribe::Core
                     supported.push_back(cluster);
                 }
             }
-
-            usedFallback = supported.isEmpty() && maximumSupport > 0;
-            if (usedFallback)
-            {
-                for (const BoundaryCluster &cluster: clusters)
-                {
-                    if (static_cast<int>(cluster.rows.size()) == maximumSupport)
-                    {
-                        supported.push_back(cluster);
-                    }
-                }
-            }
-            return supported;
-        }
-
-        /// 按选定的列分界把词落格，并判定复杂条件与置信度
-        [[nodiscard]] std::optional<TableCandidate> buildCandidate(const QVector<TableRow> &rows, const BodyMetrics &metrics)
-        {
-            const double cellGap       = std::max(2.0, kTableCellGapFactor * metrics.medianWordHeight);
-            const double boundaryFloor = static_cast<double>(metrics.bodyLeft) + std::max(cellGap, metrics.medianCharWidth);
-            const double tolerance     = kTableBoundaryTolerance * metrics.medianWordHeight;
-
-            const QVector<BoundaryCandidate> candidates = collectBoundaryCandidates(rows, cellGap, boundaryFloor);
-            if (candidates.isEmpty())
-            {
-                return std::nullopt;
-            }
-
-            QVector<BoundaryCluster> clusters = clusterBoundaries(candidates, tolerance);
-
-            // 单格行（合并表头或合并单元格）不能产生分界，因此不参与支持率的分母
-            int boundaryRowCount = 0;
-            for (const TableRow &row: rows)
-            {
-                if (row.words.size() >= 2)
-                {
-                    ++boundaryRowCount;
-                }
-            }
-            const int requiredSupport = std::max(1, static_cast<int>(std::ceil(kTableBoundarySupport * static_cast<double>(boundaryRowCount))));
-
-            bool                     usedFallback = false;
-            QVector<BoundaryCluster> supported    = selectSupportedClusters(clusters, requiredSupport, usedFallback);
             if (supported.isEmpty())
             {
                 return std::nullopt;
@@ -452,12 +431,7 @@ namespace GyanisScribe::Core
             }
 
             QStringList reasons;
-            if (usedFallback)
-            {
-                reasons.append(QStringLiteral("列边界的支持行数不足"));
-            }
-
-            bool crossesColumnBoundary = false;
+            bool        crossesColumnBoundary = false;
             for (const TableRow &row: rows)
             {
                 for (const OcrWord &word: row.words)
@@ -588,11 +562,14 @@ namespace GyanisScribe::Core
             candidate.columns       = columns;
             candidate.cells         = std::move(cells);
             candidate.firstLine     = rows.first().lineIndex;
-            candidate.lastLine      = rows.last().lineIndex;
+            candidate.lastLine      = rows.first().lineIndex;
             candidate.confidence    = confidence;
             candidate.complexReason = reasons.join(QStringLiteral("；"));
             for (const TableRow &row: rows)
             {
+                // 行段按坐标排序，原结果里的行下标可能倒序；首末行取下标的最小值与最大值
+                candidate.firstLine   = std::min(candidate.firstLine, row.lineIndex);
+                candidate.lastLine    = std::max(candidate.lastLine, row.lineIndex);
                 candidate.boundingBox = candidate.boundingBox.isNull() ? row.bounds : candidate.boundingBox.united(row.bounds);
             }
             return candidate;
