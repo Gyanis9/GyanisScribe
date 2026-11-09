@@ -444,9 +444,10 @@ TEST_F(CornerControlsFixture, MenuPaintsSquirclePanelAndActiveItem)
 /**
  * @brief 钉住菜单当前项高亮用的是紧凑档形状
  * @details 高亮由 Gui::Menu 按 CornerRole::Compact 自绘，样式表不再给 QMenu::item:selected 铺底。
- *          取样取当前项矩形的左上角：方角填充会把这格整块涂成悬停色，连续曲率把角切掉之后
- *          这一格只剩菜单面板自身抗锯齿留下的极浅覆盖（本机实测 alpha 2）。先在同一行的右侧
- *          断言悬停底确实在场，判据才不会被「根本没画高亮」蒙混过去。
+ *          取样点取当前项左上角 (3, 2) 那格：当前项只有 43x21，Panel 档的 16px 半径会被短边
+ *          夹到 10.5px，但仍比紧凑档的 8px 角切得深；这一格落在 Compact 形状内、Panel 形状外，
+ *          圆角一旦退回 Panel，这里会露回面板底而不是悬停底。
+ *          判据先用 continuousCornerPath 自证取样点的分辨力，再看像素。
  */
 TEST_F(CornerControlsFixture, MenuHighlightUsesCompactShape)
 {
@@ -459,6 +460,13 @@ TEST_F(CornerControlsFixture, MenuHighlightUsesCompactShape)
     const QImage image = menu.grab().toImage();
     ASSERT_FALSE(item.isEmpty());
     EXPECT_EQ(image.pixelColor(item.right() - 12, item.top() + 2), GyanisScribe::Gui::activePalette().hover) << "当前项没铺悬停底，判据的前提不成立";
+
+    const QPointF sample{item.left() + 3.5, item.top() + 2.5};
+    const auto compact = GyanisScribe::Core::continuousCornerPath(QRectF{item}, GyanisScribe::Core::cornerShapeFor(GyanisScribe::Core::CornerRole::Compact));
+    const auto panel   = GyanisScribe::Core::continuousCornerPath(QRectF{item}, GyanisScribe::Core::cornerShapeFor(GyanisScribe::Core::CornerRole::Panel));
+    ASSERT_TRUE(compact.contains(sample)) << "取样点不在紧凑档形状内，判据的前提不成立";
+    ASSERT_FALSE(panel.contains(sample)) << "取样点落在面板档形状内，分辨不出 Compact 与 Panel";
+    EXPECT_EQ(image.pixelColor(item.left() + 3, item.top() + 2), GyanisScribe::Gui::activePalette().hover) << "当前项高亮的角部不是紧凑档形状";
     EXPECT_LT(image.pixelColor(item.left(), item.top()).alpha(), 16) << "高亮左上角不应是方形";
 }
 

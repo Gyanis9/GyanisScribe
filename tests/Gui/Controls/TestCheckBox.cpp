@@ -144,7 +144,6 @@ TEST_F(CheckBoxFixture, AnimatesTheCheckFromTheCompressedStart)
     CheckBox box;
     box.setAnimationsEnabled(false);
     box.setChecked(true);
-    EXPECT_TRUE(box.property("animatedIndicator").toBool());
     EXPECT_DOUBLE_EQ(box.checkScale(), 1.0);
 
     box.setAnimationsEnabled(true);

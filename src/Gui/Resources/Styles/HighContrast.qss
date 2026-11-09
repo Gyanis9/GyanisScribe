@@ -85,8 +85,12 @@ QToolButton#annotationColorButton::menu-indicator {
 /* ---- 输入类：这一档的 2px 静息边与主色焦点边由 Gui::LineEdit / Gui::ComboBox /
         Gui::SpinBox 按 ControlPalette::inputColors 自绘；这里只留同宽透明边框、透明底占位、
         内边距、最小高度与文字色，控件总高不变。透明底不能省：样式表一旦写了 border，
-        QStyleSheetStyle 就会按 QPalette::Base 先铺一层方底 ---- */
-QLineEdit, QComboBox, QSpinBox {
+        QStyleSheetStyle 就会按 QPalette::Base 先铺一层方底。
+        选择器限定到带 squircle 属性的自绘类：原生对话窗（取色、文本输入、文件对话框）里的
+        QLineEdit / QComboBox / QSpinBox 也匹配类型选择器，透明底加透明边落在它们身上就是
+        没有底的输入框。微调框与可编辑下拉框内部的行编辑没有这个属性，用祖先选择器带到同一套占位。 */
+QLineEdit[squircle="true"], QComboBox[squircle="true"], QSpinBox[squircle="true"],
+QSpinBox[squircle="true"] QLineEdit, QComboBox[squircle="true"] QLineEdit {
     color: #000000;
     background: transparent;
     border: 2px solid transparent;
@@ -96,11 +100,12 @@ QLineEdit, QComboBox, QSpinBox {
     selection-color: #000000;
 }
 
-QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled {
+QLineEdit[squircle="true"]:disabled, QComboBox[squircle="true"]:disabled, QSpinBox[squircle="true"]:disabled,
+QSpinBox[squircle="true"] QLineEdit:disabled, QComboBox[squircle="true"] QLineEdit:disabled {
     color: #000000;
 }
 
-QLineEdit:read-only {
+QLineEdit[squircle="true"]:read-only, QSpinBox[squircle="true"] QLineEdit:read-only, QComboBox[squircle="true"] QLineEdit:read-only {
     color: #000000;
 }
 
@@ -129,11 +134,11 @@ QTextEdit#annotationTextEditor {
 }
 
 /* 下拉箭头走 styles 下的 chevron：与自绘微调框同一笔画，不再让原生风格画方角箭头 */
-QComboBox {
+QComboBox[squircle="true"] {
     padding-right: 26px;
 }
 
-QComboBox::drop-down {
+QComboBox[squircle="true"]::drop-down {
     subcontrol-origin: padding;
     subcontrol-position: center right;
     width: 26px;
@@ -141,7 +146,7 @@ QComboBox::drop-down {
     background: transparent;
 }
 
-QComboBox::down-arrow {
+QComboBox[squircle="true"]::down-arrow {
     image: url(:/styles/ComboChevronHighContrast.svg);
     width: 10px;
     height: 10px;

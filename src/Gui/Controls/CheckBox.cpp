@@ -15,8 +15,6 @@ namespace GyanisScribe::Gui
 {
     CheckBox::CheckBox(QWidget *parent) : QCheckBox(parent), m_spring(this)
     {
-        // 标记指示器由本类自绘：样式表只留尺寸占位，底与勾都不再从 QSS 取
-        setProperty("animatedIndicator", true);
         m_spring.setSpec(kPopSpring);
         m_spring.setImmediate(1.0);
         // 弹簧只驱动绘制缩放：重绘范围收在指示器那一块，不带着整行文字一起重画

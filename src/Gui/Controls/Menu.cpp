@@ -14,10 +14,11 @@ namespace
     /**
      * @brief 让菜单窗口不铺系统底色，圆角外才能真的透明
      * @param menu 目标菜单
+     * @note 菜单面板与边框由 SquircleStyle 按 PE_PanelMenu/PE_FrameMenu 无条件跳过，
+     *       不靠 squircle 属性识别，因此这里不再打这个属性
      */
     void applyTranslucentWindow(GyanisScribe::Gui::Menu &menu)
     {
-        menu.setProperty("squircle", true);
         menu.setAttribute(Qt::WA_TranslucentBackground);
         menu.setAutoFillBackground(false);
     }

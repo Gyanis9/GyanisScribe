@@ -1,4 +1,5 @@
 add_executable(TestGuiTheme
+        TestCornerInvariants.cpp
         TestDesignTokens.cpp
         TestLanguage.cpp
         TestMotion.cpp

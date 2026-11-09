@@ -1825,7 +1825,6 @@ TEST_F(MainWindowFixture, EveryCheckBoxUsesTheElasticIndicator)
     for (auto *check: checks)
     {
         EXPECT_NE(dynamic_cast<GyanisScribe::Gui::CheckBox *>(check), nullptr) << "设置页还留着一个原生 QCheckBox：" << check->metaObject()->className();
-        EXPECT_TRUE(check->property("animatedIndicator").toBool()) << "复选框没带抑制静态勾图的属性：" << check->metaObject()->className();
     }
 }
 

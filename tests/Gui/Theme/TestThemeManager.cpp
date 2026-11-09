@@ -415,12 +415,15 @@ TEST_F(ThemeManagerFixture, GarbageStoredValueFallsBackToSystemAndLogsWarning)
 
 /**
  * @brief 钉住样式表与色板同解，双向都查
- * @details 正向逐主题：QSS 里出现的每个十六进制色都必须是该主题色板里的一个（禁「代码外再有一套色」）；
- *          反向全局：每个进 QSS 的色板角色至少要有一份样式表用着，icon、success、danger 由绘制代码取用；
- *          勾选框指示器改为自绘后，accent、controlFill、hover、mutedFill 与 borderStrong 在三份样式表里
- *          都不再有消费方，这几项不计入 QSS 反向名单，另按 ControlPalette 的取色断言钉住它们仍有消费方——
- *          这一条抓的是「加了没人用的色板字段」这种死配置。色板是三档共用的一张角色表，判据是角色在整个
- *          样式层有没有消费方；逐主题会把判据改成「每份 QSS 都得用全自己色板的十五个角色」，
+ * @details 正向逐主题：QSS 里出现的每个十六进制色都必须是该主题色板里的一个（禁「代码外再有一套色」）。
+ *          反向全局：每个角色至少要有一个真实消费方，QSS 或 C++ 绘制代码都算。输入类、按钮、
+ *          勾选框与浮层迁移到自绘之后，surface、controlFill、hover、pressed、mutedFill、accent、
+ *          accentHover、borderStrong 不再进样式表，由 ControlPalette 的按钮/输入取色、
+ *          Gui::SurfaceWidget / Gui::Menu / 提示代理 / Gui::ScrollBar / Toast 等 C++ 绘制代码取用；
+ *          这些角色在下面逐个断言真实取色函数返回它自己，避免「名单里有、没人用」的死配置。
+ *          icon、success、danger 只给绘制代码用（图标描边、Toast 语义色），出现在 QSS 里反而是问题，
+ *          消费方另由 TestIconProvider 与 TestToast 钉住。色板是三档共用的一张角色表，判据是角色
+ *          在整个样式层有没有消费方；逐主题会把判据改成「每份 QSS 都得用全自己色板的十五个角色」，
  *          某档刻意少用一个角色就报红，而那不是死配置。
  */
 TEST_F(ThemeManagerFixture, StyleSheetsAndPalettesAgreeInBothDirections)
@@ -465,9 +468,9 @@ TEST_F(ThemeManagerFixture, StyleSheetsAndPalettesAgreeInBothDirections)
         }
     }
 
-    // 反向全局：每个进样式表的角色至少被一份 QSS 用着。勾选框指示器改为自绘后，accent、controlFill、
-    // hover、mutedFill 与 borderStrong 不再进样式表，这几项换成对 buttonColors / inputColors 的断言；
-    // 面板底 surface 由 SurfaceWidget / ListWidget / TextEdit / Gui::Menu 的像素用例钉住，不计入 QSS 名单
+    // 反向全局（QSS 侧）：没有自绘消费方的角色必须至少被一份样式表用着，从样式表里消失就是断色。
+    // 判据先跑 QSS 这一侧，再把 C++ 消费方名单并进集合——顺序反过来，accentSoft 这类两边都算的角色
+    // 会让「QSS 里没了」被名单掩盖。
     for (const auto kind: {ThemeKind::Light, ThemeKind::Dark, ThemeKind::HighContrast})
     {
         const auto &palette = paletteFor(kind);
@@ -475,15 +478,29 @@ TEST_F(ThemeManagerFixture, StyleSheetsAndPalettesAgreeInBothDirections)
         {
             EXPECT_TRUE(usedColors.contains(hexOf(color))) << "色板里的 " << hexOf(color).toStdString() << " 一份 QSS 都没用过";
         }
-        EXPECT_EQ(GyanisScribe::Gui::buttonColors(palette, kind, true, true, false, false, false, false).fill, palette.accent) << "主按钮的静息填充没取 accent 角色";
+    }
+
+    // 反向全局（C++ 侧）：自绘迁移之后 surface、controlFill、hover、pressed、mutedFill、accent、
+    // accentHover、accentSoft、borderStrong 不再进 QSS，由 ControlPalette 的按钮/输入取色、
+    // Gui::SurfaceWidget / Gui::Menu / 提示代理 / Gui::ScrollBar / Toast 等绘制代码取用。
+    // 这里逐角色断言真实取色函数返回它自己；把名单直接并进 usedColors 会让 accentSoft 这类
+    // 两边都算的角色掩盖掉「QSS 里已经没了」，所以 QSS 与 C++ 两侧分开判。
+    for (const auto kind: {ThemeKind::Light, ThemeKind::Dark, ThemeKind::HighContrast})
+    {
+        const auto &palette = paletteFor(kind);
+        EXPECT_EQ(GyanisScribe::Gui::buildApplicationPalette(palette).color(QPalette::Base), palette.surface) << "surface 没有原生绘制消费方：QPalette::Base 没跟着色板走";
         EXPECT_EQ(GyanisScribe::Gui::buttonColors(palette, kind, false, true, false, false, false, false).fill, palette.controlFill) << "普通按钮的静息填充没取 controlFill 角色";
         EXPECT_EQ(GyanisScribe::Gui::buttonColors(palette, kind, false, true, true, false, false, false).fill, palette.hover) << "悬停的按钮填充没取 hover 角色";
         EXPECT_EQ(GyanisScribe::Gui::buttonColors(palette, kind, false, true, false, true, false, false).fill, palette.pressed) << "按下态的按钮填充没取 pressed 角色";
-        EXPECT_EQ(GyanisScribe::Gui::toolButtonColors(palette, kind, false, true, false, true, false, false).fill, palette.pressed) << "按下态的工具按钮填充没取 pressed 角色";
+        EXPECT_EQ(GyanisScribe::Gui::buttonColors(palette, kind, false, false, false, false, false, false).fill, palette.mutedFill) << "禁用按钮的填充没取 mutedFill 角色";
+        EXPECT_EQ(GyanisScribe::Gui::buttonColors(palette, kind, true, true, false, false, false, false).fill, palette.accent) << "主按钮的静息填充没取 accent 角色";
         EXPECT_EQ(GyanisScribe::Gui::buttonColors(palette, kind, true, true, true, false, false, false).fill, palette.accentHover) << "主按钮悬停底没取 accentHover 角色";
+        EXPECT_EQ(GyanisScribe::Gui::toolButtonColors(palette, kind, true, true, false, false, false, false).fill, palette.accentSoft) << "选中的工具按钮没取 accentSoft 角色";
+        EXPECT_EQ(GyanisScribe::Gui::toolButtonColors(palette, kind, false, true, false, true, false, false).fill, palette.pressed) << "按下态的工具按钮填充没取 pressed 角色";
         EXPECT_EQ(GyanisScribe::Gui::inputColors(palette, kind, true, false, false, false).fill, palette.controlFill) << "启用输入框的静息底没取 controlFill 角色";
         EXPECT_EQ(GyanisScribe::Gui::inputColors(palette, kind, false, false, false, false).fill, palette.mutedFill) << "禁用输入的静默底没取 mutedFill 角色";
         EXPECT_EQ(GyanisScribe::Gui::inputColors(palette, kind, true, true, false, false).fill, palette.mutedFill) << "只读输入的静默底没取 mutedFill 角色";
+        EXPECT_EQ(GyanisScribe::Gui::inputColors(palette, kind, true, false, true, true).border, palette.accent) << "标注工具栏内输入框的焦点边没取 accent 角色";
         EXPECT_EQ(GyanisScribe::Gui::inputColors(palette, kind, true, false, false, false).border, kind == ThemeKind::HighContrast ? palette.borderStrong : QColor{})
                 << "高对比度档输入框的静息描边没取 borderStrong 角色";
     }
@@ -716,7 +733,30 @@ TEST_F(ThemeManagerFixture, EveryThemeDropsTheStaticCheckImage)
 }
 
 /**
- * @brief 钉住「切主题时应用调色板跟着换」：原生绘制的那部分只认 QPalette
+ * @brief 钉住原生对话窗里的输入框仍有自己的底
+ * @details 输入类的透明底规则只限定到带 squircle 属性的自绘类；取色、文本输入与文件对话框
+ *          里的 QLineEdit 仍匹配类型选择器时，会变成透明底加透明边、没有任何填充。
+ *          这里在宿主红底上放一个原生 QLineEdit：中心必须是 QPalette::Base 对应的 surface，
+ *          宿主红底露出来就说明透明规则又落回了全局。
+ */
+TEST_F(ThemeManagerFixture, StockQtInputsKeepTheirNativeFill)
+{
+    ASSERT_TRUE(manager().setTheme(ThemeKind::Light).has_value());
+    QWidget host;
+    host.resize(200, 60);
+    host.setAutoFillBackground(true);
+    host.setPalette(QPalette{QColor{255, 0, 0}});
+    auto *edit = new QLineEdit{&host};
+    edit->setGeometry(20, 15, 160, 30);
+    host.show();
+    QCoreApplication::processEvents();
+
+    const auto image = host.grab().toImage();
+    EXPECT_EQ(image.pixelColor(edit->geometry().center()), GyanisScribe::Gui::kLightPalette.surface) << "原生输入框丢了 QPalette::Base 填充，露出了宿主底色";
+}
+
+/**
+ * @brief 钉住换主题时应用调色板跟着换
  * @details 样式表覆盖不到勾选的勾、微调框箭头、占位文字与禁用文字——这些走调色板。
  *          只落样式表时文本比对全绿而界面是浅色原生件，所以这里按角色逐个核到令牌上，
  *          并反向确认换档之后另一套的底色不在了。
@@ -851,11 +891,11 @@ TEST_F(ThemeManagerFixture, CheckboxAndSliderShowAKeyboardFocusRing)
 }
 
 /**
- * @brief 钉住三份样式的控件级焦点都已交给自绘代码
+ * @brief 钉住三份样式表的控件级焦点都不再由 QSS 承担
  * @details 按钮、输入类与勾选框的可见焦点边由 Gui::Button / Gui::ToolButton / Gui::LineEdit /
  *          Gui::CheckBox 等按 ControlPalette 及主题色自绘，浅深档另有 FocusRingController 的覆盖层；
  *          样式表里若还留着 QPushButton:focus、QLineEdit:focus 一类规则，会在自绘边之外再压一圈。
- *          判据按选择器分支看，不能只搜全文。
+ *          判据按选择器分支看，不能只搜全文；三份样式表都必须一条 :focus 规则都不剩。
  */
 TEST_F(ThemeManagerFixture, AllSheetsDropTheControlLevelFocusOutlines)
 {
@@ -881,16 +921,14 @@ TEST_F(ThemeManagerFixture, AllSheetsDropTheControlLevelFocusOutlines)
             return matched;
         };
 
-        // 按钮与输入类的焦点边都改由控件自绘：任何一份样式表都不该再有这些分支
-        for (const auto *token: {"QPushButton:focus", "QToolButton:focus", "QLineEdit:focus", "QComboBox:focus", "QSpinBox:focus", "QTextEdit#annotationTextEditor:focus"})
+        // 按钮、输入类与勾选框的焦点边都改由控件自绘：任何一份样式表都不该再有这些分支
+        for (const auto *token: {"QPushButton:focus", "QToolButton:focus", "QLineEdit:focus", "QComboBox:focus", "QSpinBox:focus", "QTextEdit#annotationTextEditor:focus",
+                                 "QCheckBox::indicator:focus", "QSlider::handle:horizontal:focus"})
         {
             const auto matched = branches(QString::fromLatin1(token));
             EXPECT_TRUE(matched.isEmpty()) << resource << " 还留着控件级焦点描边：" << matched.join(QStringLiteral("; ")).toStdString();
         }
 
-        // 勾选框指示器与滑块手柄的焦点同样已改由自绘代码表达，样式表不该再有这两条分支
-        EXPECT_EQ(branches(QStringLiteral("QCheckBox::indicator:focus")).size(), 0) << resource << " 勾选框指示器的焦点边改由 Gui::CheckBox 自绘";
-        EXPECT_EQ(branches(QStringLiteral("QSlider::handle:horizontal:focus")).size(), 0) << resource << " 滑块焦点改由 Gui::Slider 自绘，样式表不该再有手柄反转分支";
         // 高对比度档仍保留控件级 2px 描边占位，由 SemanticColorPairsMeetWcagContrast 的 2PX SOLID 判据钉住
     }
 }

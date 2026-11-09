@@ -85,8 +85,12 @@ QToolButton#annotationColorButton::menu-indicator {
 /* ---- 输入类：填充、描边与圆角由 Gui::LineEdit / Gui::ComboBox / Gui::SpinBox 按启用、
         只读与焦点状态自绘；这里只留 1px 透明边框、透明底占位、内边距、最小高度与文字色，
         控件总高仍是 32。透明底不能省：样式表一旦写了 border，QStyleSheetStyle 就会按
-        QPalette::Base 先铺一层方底，自绘的连续曲率底会被盖掉 ---- */
-QLineEdit, QComboBox, QSpinBox {
+        QPalette::Base 先铺一层方底，自绘的连续曲率底会被盖掉。
+        选择器限定到带 squircle 属性的自绘类：原生对话窗（取色、文本输入、文件对话框）里的
+        QLineEdit / QComboBox / QSpinBox 也匹配类型选择器，透明底加透明边落在它们身上就是
+        没有底的输入框。微调框与可编辑下拉框内部的行编辑没有这个属性，用祖先选择器带到同一套占位。 */
+QLineEdit[squircle="true"], QComboBox[squircle="true"], QSpinBox[squircle="true"],
+QSpinBox[squircle="true"] QLineEdit, QComboBox[squircle="true"] QLineEdit {
     color: #141412;
     background: transparent;
     border: 1px solid transparent;
@@ -98,15 +102,16 @@ QLineEdit, QComboBox, QSpinBox {
 
 /* 数字框的 sizeHint 另带上下各 2px 的自有框：共用 30px 内容高会顶到 36，
    内容高收到 26 才能与单行输入一样落在总高 32 */
-QSpinBox {
+QSpinBox[squircle="true"] {
     min-height: 26px;
 }
 
-QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled {
+QLineEdit[squircle="true"]:disabled, QComboBox[squircle="true"]:disabled, QSpinBox[squircle="true"]:disabled,
+QSpinBox[squircle="true"] QLineEdit:disabled, QComboBox[squircle="true"] QLineEdit:disabled {
     color: #53534D;
 }
 
-QLineEdit:read-only {
+QLineEdit[squircle="true"]:read-only, QSpinBox[squircle="true"] QLineEdit:read-only, QComboBox[squircle="true"] QLineEdit:read-only {
     color: #53534D;
 }
 
@@ -135,11 +140,11 @@ QTextEdit#annotationTextEditor {
 }
 
 /* 下拉箭头走 styles 下的 chevron：与自绘微调框同一笔画，不再让原生风格画方角箭头 */
-QComboBox {
+QComboBox[squircle="true"] {
     padding-right: 26px;
 }
 
-QComboBox::drop-down {
+QComboBox[squircle="true"]::drop-down {
     subcontrol-origin: padding;
     subcontrol-position: center right;
     width: 26px;
@@ -147,7 +152,7 @@ QComboBox::drop-down {
     background: transparent;
 }
 
-QComboBox::down-arrow {
+QComboBox[squircle="true"]::down-arrow {
     image: url(:/styles/ComboChevronLight.svg);
     width: 10px;
     height: 10px;
