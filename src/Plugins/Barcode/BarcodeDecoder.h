@@ -12,6 +12,7 @@
 #include "Base/Types.h"
 
 #include <QImage>
+#include <QRect>
 #include <QString>
 
 #include <optional>
@@ -28,6 +29,7 @@ namespace GyanisScribe::Plugins
         QString text;           ///< 码里承载的文本（按 HRI 口径还原，中文等内容原样）
         QString format;         ///< 码制名，如「QR Code」「Code128」；认不出码制时为空
         bool    matrix = false; ///< 是不是二维码（二维码/Data Matrix 一类）；挑选时优先二维
+        QRect   box;            ///< 码在输入图上的外接框，物理像素、已夹回图像范围
     };
 
     /**

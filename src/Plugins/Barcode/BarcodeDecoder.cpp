@@ -2,6 +2,8 @@
 
 #include "Base/Text.h"
 
+#include <algorithm>
+
 #if defined(GYANISSCRIBE_HAS_ZXING)
 #include <ZXing/BarcodeFormat.h>
 #include <ZXing/ReadBarcode.h>
@@ -39,8 +41,22 @@ namespace GyanisScribe::Plugins
         {
             if (result.isValid())
             {
+                // 四个定位点是码角在输入图上的像素坐标；外接框取最外沿，再夹回图像以免把码外的空白算进去
+                const ZXing::Position &position = result.position();
+                int                    left     = position.topLeft().x;
+                int                    top      = position.topLeft().y;
+                int                    right    = left;
+                int                    bottom   = top;
+                for (const ZXing::PointI &corner: position)
+                {
+                    left   = std::min(left, corner.x);
+                    top    = std::min(top, corner.y);
+                    right  = std::max(right, corner.x);
+                    bottom = std::max(bottom, corner.y);
+                }
+
                 readings.push_back(BarcodeReading{QString::fromStdString(result.text()), QString::fromStdString(ZXing::ToString(result.format())),
-                                                  result.format() & ZXing::BarcodeFormat::AllMatrix});
+                                                  result.format() & ZXing::BarcodeFormat::AllMatrix, QRect{QPoint{left, top}, QPoint{right, bottom}}.intersected(image.rect())});
             }
         }
         return readings;

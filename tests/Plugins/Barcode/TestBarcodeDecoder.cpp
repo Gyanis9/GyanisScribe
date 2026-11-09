@@ -58,24 +58,58 @@ TEST(BarcodeDecoder, PreferredReadingFavorsMatrixCodes)
 
 #if defined(GYANISSCRIBE_HAS_ZXING)
 
+namespace
+{
+    /**
+     * @brief 自造一张带静区的二维码灰度图
+     * @param payload 码里承载的文本
+     * @param scale 每个模块放大到的像素数
+     * @return 自带像素副本的图；后端写出的缓冲随 ZXing::Image 析构，不能直接借给 QImage
+     */
+    QImage renderQrCode(const std::string &payload, int scale)
+    {
+        const auto         barcode  = ZXing::CreateBarcodeFromText(payload, ZXing::CreatorOptions{ZXing::BarcodeFormat::QRCode});
+        const ZXing::Image rendered = ZXing::WriteBarcodeToImage(barcode, ZXing::WriterOptions{}.scale(scale).addQuietZones(true));
+
+        return QImage{rendered.data(), rendered.width(), rendered.height(), rendered.rowStride(), QImage::Format_Grayscale8}.copy();
+    }
+} // namespace
+
 /**
  * @brief 钉住认得出自造的二维码：文本一字不差、码制报的是 QRCode
  * @details 用同一份后端自造样例（不是钉死的图片文件）：样例与判据同源，升级后端时一起走
  */
 TEST(BarcodeDecoder, ReadsBackASelfMadeQrCode)
 {
-    const std::string  payload  = "https://example.com/gyanisscribe?q=1";
-    const auto         barcode  = ZXing::CreateBarcodeFromText(payload, ZXing::CreatorOptions{ZXing::BarcodeFormat::QRCode});
-    const ZXing::Image rendered = ZXing::WriteBarcodeToImage(barcode, ZXing::WriterOptions{}.scale(4).addQuietZones(true));
-
-    const QImage canvas{rendered.data(), rendered.width(), rendered.height(), rendered.rowStride(), QImage::Format_Grayscale8};
-    const auto   readings = readBarcodes(canvas);
+    const std::string payload  = "https://example.com/gyanisscribe?q=1";
+    const QImage      canvas   = renderQrCode(payload, 4);
+    const auto        readings = readBarcodes(canvas);
     ASSERT_TRUE(readings.has_value());
     EXPECT_TRUE(std::ranges::any_of(*readings, [](const BarcodeReading &reading) { return reading.matrix; })) << "二维码那条没被标成二维";
     const auto preferred = preferredReading(*readings);
     ASSERT_TRUE(preferred.has_value()) << "自造的二维码没认出来";
     EXPECT_EQ(preferred->text, QString::fromStdString(payload)) << "挑出来的文本对不上";
     EXPECT_EQ(preferred->format, QStringLiteral("QR Code")) << "码制没报对";
+}
+
+/**
+ * @brief 钉住几何框：认出的码要带上输入图物理像素的外接框，非空、落在图内、盖住码中心
+ * @details 框由后端的四个定位点收出来；它比整幅图小，正好排掉「直接回整张图」这种不认定位点的实现
+ */
+TEST(BarcodeDecoder, ReadingCarriesGeometryBoxInsideTheImage)
+{
+    const QImage canvas   = renderQrCode("https://example.com/gyanisscribe?q=1", 4);
+    const auto   readings = readBarcodes(canvas);
+    ASSERT_TRUE(readings.has_value());
+    const auto preferred = preferredReading(*readings);
+    ASSERT_TRUE(preferred.has_value()) << "自造的二维码没认出来";
+
+    const QRect &box = preferred->box;
+    EXPECT_FALSE(box.isEmpty()) << "认出了码却没给出几何框";
+    EXPECT_TRUE(canvas.rect().contains(box)) << "几何框越出了输入图";
+    EXPECT_TRUE(box.contains(canvas.rect().center())) << "几何框没盖住码中心";
+    EXPECT_LT(box.width(), canvas.width()) << "几何框占满整幅图，说明不是从定位点收出来的";
+    EXPECT_LT(box.height(), canvas.height()) << "几何框占满整幅图，说明不是从定位点收出来的";
 }
 
 /**
