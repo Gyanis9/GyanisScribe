@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "Core/Annotation/AnnotationShape.h"
 #include "Core/Annotation/AnnotationTool.h"
 #include "Core/Annotation/PenParameters.h"
 #include "Base/Types.h"
@@ -22,6 +23,7 @@
 
 #include <array>
 #include <optional>
+#include <span>
 #include <vector>
 
 class QImage;
@@ -37,6 +39,18 @@ namespace GyanisScribe::Core
     {
         ToolKind tool       = ToolKind::Rectangle; ///< 所属工具
         int      shapeIndex = -1;                  ///< 该工具内的索引，-1 表示没有选中
+    };
+
+    /**
+     * @brief 一条批量打码请求
+     * @details 检测结果到画布的映射由调用方完成：这里只收画布逻辑坐标下的框，
+     *          越出画布的部分由引擎夹回，夹完为空或退化的框跳过。
+     */
+    struct RedactionRequest
+    {
+        QRect logicalRect;                                                  ///< 画布逻辑坐标下的打码框
+        bool  elliptical      = false;                                      ///< 是否内切椭圆
+        int   mosaicBlockSize = kMosaicBlockSizes[kDefaultMosaicBlockStep]; ///< 马赛克方块边长，逻辑像素（仅马赛克使用）
     };
 
     /**
@@ -372,6 +386,16 @@ namespace GyanisScribe::Core
          *          一次粘贴是一步撤销，Ctrl+Z 一下收走整批。
          */
         [[nodiscard]] virtual Base::Expected<void> pasteClipboard() = 0;
+
+        /**
+         * @brief 批量插入打码图形（隐私扫描的落笔口）
+         * @param boxes 打码框，画布逻辑坐标；越出画布的部分被夹回，夹完为空或退化的框跳过
+         * @param tool 打码方式，只接受 Mosaic 或 Blur
+         * @return 成功返回空载荷；工具不是马赛克/模糊、集合为空、或夹取后没有可打码的区域时返回 InvalidArgument
+         * @details 整批是一条撤销：一次 Ctrl+Z 收走这一批。插入的图形成为当前选中集，
+         *          当前工具不变——打码是替用户落笔，不是切换用户手里的笔。
+         */
+        [[nodiscard]] virtual Base::Expected<void> addRedactions(std::span<const RedactionRequest> boxes, ToolKind tool) = 0;
 
         /**
          * @brief 把全部图形画给界面

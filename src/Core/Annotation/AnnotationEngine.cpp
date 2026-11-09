@@ -1447,6 +1447,75 @@ namespace GyanisScribe::Core
         return {};
     }
 
+    Base::Expected<void> AnnotationEngine::addRedactions(const std::span<const RedactionRequest> boxes, const ToolKind tool)
+    {
+        if (tool != ToolKind::Mosaic && tool != ToolKind::Blur)
+        {
+            return std::unexpected(
+                    Base::Error{Base::ErrorCode::InvalidArgument,
+                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("批量打码只支持马赛克或高斯模糊，收到的是工具 0x{:X}。请把打码方式换成这两种之一再试"),
+                                                             static_cast<int>(tool))});
+        }
+        if (boxes.empty())
+        {
+            return std::unexpected(
+                    Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("没有要打码的区域：这次没有给出任何框。请先重新检测，或手动框选后再打码")});
+        }
+
+        auto *target = toolFor(tool);
+        if (target == nullptr)
+        {
+            return std::unexpected(Base::Error{Base::ErrorCode::InternalError, GyanisScribe::Base::uiTextUtf8("打码工具不在册：请检查工具登记表")});
+        }
+
+        // 先把整批框夹回画布并剔掉退化框，全部校验通过才动撤销栈：有一条打不成就整批不落，
+        // 不留「插了一半」的批次，也不给撤销栈留空宏
+        const QRect bounds(QPoint(0, 0), m_canvas.logicalSize);
+        struct ClippedRequest
+        {
+            QRect rect;            ///< 夹回画布后的框
+            bool  elliptical;      ///< 是否内切椭圆
+            int   mosaicBlockSize; ///< 马赛克方块边长
+        };
+        std::vector<ClippedRequest> clippedRequests;
+        clippedRequests.reserve(boxes.size());
+        for (const auto &request: boxes)
+        {
+            const QRect clamped = request.logicalRect.normalized().intersected(bounds);
+            if (clamped.isEmpty())
+            {
+                continue;
+            }
+            clippedRequests.push_back({clamped, request.elliptical, request.mosaicBlockSize});
+        }
+        if (clippedRequests.empty())
+        {
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
+                                               GyanisScribe::Base::uiTextUtf8("这些打码框都落在画布之外或小到看不见：没有可打码的区域。请重新检测，或手动框选画布内的区域")});
+        }
+
+        std::vector<AnnotationSelection> inserted;
+        inserted.reserve(clippedRequests.size());
+        m_undoStack.beginMacro(QStringLiteral("隐私打码"));
+        for (const auto &request: clippedRequests)
+        {
+            AnnotationShape shape;
+            shape.rect            = request.rect;
+            shape.elliptical      = request.elliptical;
+            shape.mosaicBlockSize = request.mosaicBlockSize;
+            shape.zOrder          = ++m_topZ; // 打码盖在现有图形之上：它是用户刚确认过的一批落笔
+            const int placed      = target->shapeCount();
+            m_undoStack.push(new InsertShapeCommand(target, placed, shape));
+            inserted.push_back({tool, placed});
+        }
+        m_undoStack.endMacro();
+
+        // 打码后这批成为新的选中集：用户可以立刻拖动或删除其中一块
+        m_selection = std::move(inserted);
+        emit canvasChanged();
+        return {};
+    }
+
     int AnnotationEngine::zOrderRebuildCountForTesting() const noexcept
     {
         return m_zRebuilds;

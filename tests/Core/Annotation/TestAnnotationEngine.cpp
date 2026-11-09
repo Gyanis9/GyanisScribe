@@ -8,8 +8,10 @@
 
 #include <gtest/gtest.h>
 
+#include <array>
 #include <memory>
 #include <string>
+#include <vector>
 
 using GyanisScribe::Base::CapturedImage;
 using GyanisScribe::Base::ErrorCode;
@@ -17,6 +19,7 @@ using GyanisScribe::Core::AnnotationEngine;
 using GyanisScribe::Core::AnnotationSelection;
 using GyanisScribe::Core::kAnnotationUndoLimit;
 using GyanisScribe::Core::PenParameters;
+using GyanisScribe::Core::RedactionRequest;
 using GyanisScribe::Core::SelectionDragModifiers;
 using GyanisScribe::Core::SelectionHandle;
 using GyanisScribe::Core::ToolKind;
@@ -66,9 +69,56 @@ namespace
             return committed.value_or(AnnotationSelection{});
         }
 
+        /**
+         * @brief 换成逐像素渐变的彩色底图
+         * @details 纯色底图上马赛克与模糊都可能「看着没变」，框内的像素断言就失去意义；
+         *          这里让三个通道各按坐标混出伪随机色，相邻像素的颜色差得开。
+         */
+        void loadColorfulCanvas()
+        {
+            CapturedImage canvas;
+            canvas.image = QImage(200, 100, QImage::Format_ARGB32_Premultiplied);
+            for (int y = 0; y < canvas.image.height(); ++y)
+            {
+                for (int x = 0; x < canvas.image.width(); ++x)
+                {
+                    canvas.image.setPixelColor(x, y, QColor((x * 5 + y * 11) % 256, (x * 7 + y * 3) % 256, (x * 13 + y * 17) % 256));
+                }
+            }
+            canvas.devicePixelRatio = 1.0;
+            canvas.logicalSize      = QSize(200, 100);
+            canvas.screenName       = QStringLiteral("FakeScreen-1");
+            m_canvasImage           = canvas.image.copy();
+            m_engine.loadCanvas(canvas);
+        }
+
         AnnotationEngine m_engine;
         QImage           m_canvasImage;
     };
+
+    /**
+     * @brief 两张图在框内有没有任何一格像素不同
+     * @param before 对照图
+     * @param after 打码后的图
+     * @param box 打码框
+     * @return 框内至少一格变了返回 true
+     * @details 马赛克每块只采一个源像素，盯死单个坐标容易碰上「正好采到原色」的巧合；
+     *          隔三格扫一遍，问的是「这块确实被动过」。
+     */
+    bool anyPixelInsideChanged(const QImage &before, const QImage &after, const QRect &box)
+    {
+        for (int y = box.top(); y <= box.bottom(); y += 3)
+        {
+            for (int x = box.left(); x <= box.right(); x += 3)
+            {
+                if (before.pixelColor(x, y) != after.pixelColor(x, y))
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 } // namespace
 
 /**
@@ -1460,6 +1510,117 @@ TEST_F(EngineFixture, CopyPasteDuplicatesWithGrowingOffsetAndOneStepUndo)
     ASSERT_TRUE(m_engine.undo().has_value());
     EXPECT_EQ(m_engine.exportImage().pixelColor(68, 75), QColor(255, 255, 255)) << "一次撤销没收走整批：粘贴没包成一步";
     EXPECT_EQ(m_engine.exportImage().pixelColor(128, 75), QColor(255, 255, 255)) << "一次撤销只收走了其中一份副本";
+}
+
+/**
+ * @brief 钉住批量打码：两条马赛克一次插入、框内像素确实变了、框外不动，一次撤销全退
+ * @details 底图铺成逐像素渐变的彩色格：马赛克的取样块与原像素才会差得开。
+ *          第二条框带椭圆档，方角必须留着原像素；第二条框也成为选中集的一格。
+ */
+TEST_F(EngineFixture, AddRedactionsInsertsMosaicBoxesAsOneUndoableBatch)
+{
+    loadColorfulCanvas();
+    const QImage original = m_engine.exportImage();
+
+    const QRect                           firstBox(20, 20, 60, 40);
+    const QRect                           secondBox(120, 30, 50, 50);
+    const std::array<RedactionRequest, 2> requests{RedactionRequest{.logicalRect = firstBox}, RedactionRequest{.logicalRect = secondBox, .elliptical = true}};
+
+    const auto added = m_engine.addRedactions(requests, ToolKind::Mosaic);
+    ASSERT_TRUE(added.has_value()) << added.error().message;
+
+    EXPECT_EQ(m_engine.activeTool(), ToolKind::Select) << "批量打码不该顺手把当前工具切成马赛克";
+    ASSERT_EQ(m_engine.selections().size(), 2U) << "打码后插入的这批图形该成为当前选中集";
+    EXPECT_EQ(m_engine.selections().front().tool, ToolKind::Mosaic);
+    EXPECT_EQ(m_engine.selections().front().shapeIndex, 0);
+    EXPECT_EQ(m_engine.selections().back().tool, ToolKind::Mosaic);
+    EXPECT_EQ(m_engine.selections().back().shapeIndex, 1) << "两条框该按请求顺序各占一个索引";
+
+    const QImage drawn = m_engine.exportImage();
+    EXPECT_TRUE(anyPixelInsideChanged(original, drawn, firstBox)) << "第一条框内一个像素都没变：马赛克没落到画布上";
+    EXPECT_TRUE(anyPixelInsideChanged(original, drawn, secondBox)) << "第二条框内一个像素都没变：第二条请求被漏掉了";
+    EXPECT_EQ(drawn.pixelColor(secondBox.topLeft()), original.pixelColor(secondBox.topLeft())) << "椭圆档把方角也打上了，elliptical 没带进图形";
+    EXPECT_EQ(drawn.pixelColor(100, 90), original.pixelColor(100, 90)) << "两条框之外还有像素被改：打码溢出了框";
+
+    EXPECT_TRUE(m_engine.canUndo());
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_FALSE(m_engine.canUndo()) << "一次撤销之后还有得撤：整批没被包成一步";
+    EXPECT_TRUE(m_engine.selections().empty()) << "撤销增删图形后选中集该清空，不该指着已经不存在的索引";
+    EXPECT_TRUE(m_engine.exportImage() == original) << "一次撤销没把两条框的像素都退回去";
+
+    EXPECT_TRUE(m_engine.canRedo());
+    ASSERT_TRUE(m_engine.redo().has_value());
+    EXPECT_TRUE(m_engine.exportImage() == drawn) << "重做没把整批打码按原样画回来";
+}
+
+/**
+ * @brief 钉住模糊档也被接受：批量打码不是马赛克的专属通道
+ */
+TEST_F(EngineFixture, AddRedactionsAcceptsBlurTool)
+{
+    loadColorfulCanvas();
+    const QImage original = m_engine.exportImage();
+
+    const QRect                           box(40, 30, 60, 40);
+    const std::array<RedactionRequest, 1> requests{RedactionRequest{.logicalRect = box}};
+    const auto                            added = m_engine.addRedactions(requests, ToolKind::Blur);
+    ASSERT_TRUE(added.has_value()) << added.error().message;
+    ASSERT_EQ(m_engine.selections().size(), 1U);
+    EXPECT_EQ(m_engine.selections().front().tool, ToolKind::Blur) << "模糊档被打成了马赛克或别的工具";
+
+    const QImage drawn = m_engine.exportImage();
+    EXPECT_TRUE(anyPixelInsideChanged(original, drawn, box)) << "框内一个像素都没变：模糊没落到画布上";
+    EXPECT_EQ(drawn.pixelColor(10, 10), original.pixelColor(10, 10)) << "框外的像素被糊到了";
+
+    ASSERT_TRUE(m_engine.undo().has_value());
+    EXPECT_TRUE(m_engine.exportImage() == original) << "撤销没把模糊退回去";
+    EXPECT_FALSE(m_engine.canUndo()) << "一条框的批量打码也该算一步";
+}
+
+/**
+ * @brief 钉住批量打码的拒绝面与越界夹取：工具不对、空集合、全越界都不落笔，部分越界夹回画布
+ */
+TEST_F(EngineFixture, AddRedactionsRejectsBadBatchesAndClipsToTheCanvas)
+{
+    loadColorfulCanvas();
+    const QImage original = m_engine.exportImage();
+
+    const std::array<RedactionRequest, 1> request{RedactionRequest{.logicalRect = QRect(20, 20, 40, 30)}};
+
+    const auto wrongTool = m_engine.addRedactions(request, ToolKind::Rectangle);
+    ASSERT_FALSE(wrongTool.has_value()) << "矩形工具也接受批量打码，打出来的是看得见的红框，不是隐私遮罩";
+    EXPECT_EQ(wrongTool.error().code, ErrorCode::InvalidArgument);
+    EXPECT_NE(wrongTool.error().message.find("马赛克"), std::string::npos) << "拒绝理由没给出可选的一种打码方式";
+    EXPECT_NE(wrongTool.error().message.find("模糊"), std::string::npos) << "拒绝理由没给出另一种可选方式";
+    EXPECT_FALSE(m_engine.canUndo()) << "被拒绝的批次在撤销栈里留了一步";
+    EXPECT_TRUE(m_engine.selections().empty());
+
+    const auto emptyBatch = m_engine.addRedactions(std::span<const RedactionRequest>{}, ToolKind::Mosaic);
+    ASSERT_FALSE(emptyBatch.has_value()) << "空集合也当成成功，界面会提示「已打码 0 处」";
+    EXPECT_EQ(emptyBatch.error().code, ErrorCode::InvalidArgument);
+    EXPECT_FALSE(emptyBatch.error().message.empty()) << "空集合的拒绝没有中文原因";
+
+    const std::vector<RedactionRequest> outOfCanvas{RedactionRequest{.logicalRect = QRect(-60, -40, 40, 30)}, RedactionRequest{.logicalRect = QRect(220, 120, 30, 20)},
+                                                    RedactionRequest{.logicalRect = QRect(50, 50, 0, 0)}};
+    const auto                          allOutside = m_engine.addRedactions(outOfCanvas, ToolKind::Mosaic);
+    ASSERT_FALSE(allOutside.has_value()) << "全部越界的批次也当成成功，宏里会落一个空步骤";
+    EXPECT_EQ(allOutside.error().code, ErrorCode::InvalidArgument);
+    EXPECT_FALSE(allOutside.error().message.empty()) << "全部越界的拒绝没有中文原因";
+    EXPECT_FALSE(m_engine.canUndo()) << "被拒绝的批次不该留下可撤销的步骤";
+    EXPECT_TRUE(m_engine.selections().empty());
+
+    // 部分越界：右下角伸出去一半，夹回 (180,80,20,20)，框外紧邻的像素不许被打到
+    const std::array<RedactionRequest, 1> straddling{RedactionRequest{.logicalRect = QRect(180, 80, 40, 40)}};
+    const auto                            clipped = m_engine.addRedactions(straddling, ToolKind::Mosaic);
+    ASSERT_TRUE(clipped.has_value()) << clipped.error().message;
+    ASSERT_EQ(m_engine.selections().size(), 1U);
+    const auto clippedBounds = m_engine.selectionBounds();
+    ASSERT_TRUE(clippedBounds.has_value());
+    EXPECT_EQ(*clippedBounds, QRect(180, 80, 20, 20)) << "越界的框没有夹回画布";
+
+    const QImage drawn = m_engine.exportImage();
+    EXPECT_TRUE(anyPixelInsideChanged(original, drawn, QRect(180, 80, 20, 20))) << "夹取后的区域没被打码";
+    EXPECT_EQ(drawn.pixelColor(175, 75), original.pixelColor(175, 75)) << "夹取把框外的像素也打上了";
 }
 
 /**

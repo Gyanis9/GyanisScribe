@@ -281,6 +281,15 @@ namespace GyanisScribe::Core
         [[nodiscard]] Base::Expected<void> pasteClipboard() override;
 
         /**
+         * @brief 批量插入打码图形，见 IAnnotationEngine::addRedactions()
+         * @param boxes 打码框，画布逻辑坐标
+         * @param tool 打码方式，只接受 Mosaic 或 Blur
+         * @return 成功返回空载荷；工具不对、集合为空或夹取后没有可打码区域时返回 InvalidArgument
+         * @details 重写基类接口：先整批校验并夹回画布，再一个宏逐条插入；任一条没落成就不落半批。
+         */
+        [[nodiscard]] Base::Expected<void> addRedactions(std::span<const RedactionRequest> boxes, ToolKind tool) override;
+
+        /**
          * @brief 画全部图形给界面，见 IAnnotationEngine::paintShapes()
          * @param painter 目标画家，坐标系为画布逻辑坐标
          * @details 重写基类接口：底图的物理/逻辑倍比按画布现算，让马赛克这类要取源像素的工具
