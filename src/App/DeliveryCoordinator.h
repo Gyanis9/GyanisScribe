@@ -10,6 +10,7 @@
 #pragma once
 
 #include "Base/Types.h"
+#include "Core/Capture/SourceInfo.h"
 #include "Gui/Controls/Toast.h"
 
 #include <QImage>
@@ -70,10 +71,12 @@ namespace GyanisScribe::App
         [[nodiscard]] QImage decorate(const QImage &image, bool fillBackground) const;
 
         /**
-         * @brief 开一轮新的截图交付：清掉上一轮记下的成品路径
+         * @brief 开一轮新的截图交付：清掉上一轮记下的成品路径，并换成本轮的来源
+         * @param source 这一轮截图的前台来源；录屏或取不到时为空来源
          * @details `%file%` 与命令行打到标准输出的都是这一份路径；不清就会把上一张的成品当成这一轮的。
+         *          来源随本轮落盘一起进历史，下一轮开场时一并换掉。
          */
-        void beginRound();
+        void beginRound(const GyanisScribe::Core::CaptureSourceInfo &source = {});
 
         /**
          * @brief 截图后跑设置里那条外部命令
@@ -98,6 +101,7 @@ namespace GyanisScribe::App
         GyanisScribe::Core::ISettingsStore    &m_settings;        ///< 输出档位来源，不拥有
         GyanisScribe::App::HistoryCoordinator &m_history;         ///< 落盘后记账，不拥有
         QString                                m_writtenFilePath; ///< 最近落盘那份的显示路径
+        GyanisScribe::Core::CaptureSourceInfo  m_sourceInfo;      ///< 本轮截图的前台来源，随落盘一起进历史
     };
 
 } // namespace GyanisScribe::App

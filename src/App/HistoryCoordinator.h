@@ -10,6 +10,7 @@
 #pragma once
 
 #include "Base/Types.h"
+#include "Core/Capture/SourceInfo.h"
 #include "Core/History/HistoryTypes.h"
 #include "Gui/Controls/Toast.h"
 
@@ -54,10 +55,11 @@ namespace GyanisScribe::App
          * @param filePath 成品路径
          * @param kind 归到哪一类（截图/录屏）
          * @param size 像素尺寸
+         * @param source 截图时的前台来源；录屏或取不到时为空来源
          * @details 清单写不进去不该让「保存成功」变成假话：成品已经在盘上，只是下次打开找不到它——
          *          所以这里报一声而不是静默。
          */
-        void record(const std::filesystem::path &filePath, GyanisScribe::Core::HistoryKind kind, const QSize &size);
+        void record(const std::filesystem::path &filePath, GyanisScribe::Core::HistoryKind kind, const QSize &size, const GyanisScribe::Core::CaptureSourceInfo &source = {});
 
         /// 去掉一条记录（磁盘上的成品保留）
         void remove(const std::filesystem::path &filePath);
@@ -79,6 +81,19 @@ namespace GyanisScribe::App
     signals:
         /// 要说给用户的一句话（由控制器决定用气泡还是落日志）
         void messageForUser(const QString &message, GyanisScribe::Gui::ToastKind kind);
+        /**
+         * @brief 一条成品已经记进清单
+         * @param filePath 成品路径
+         * @param kind 类别
+         * @param size 像素尺寸
+         * @param source 截图时的前台来源；录屏为空来源
+         * @details 只报事实，不在这里索引：记忆库收到后自己决定收不收
+         */
+        void recorded(const std::filesystem::path &filePath, GyanisScribe::Core::HistoryKind kind, const QSize &size, const GyanisScribe::Core::CaptureSourceInfo &source);
+        /// 一条记录已经从清单里去掉（磁盘上的成品保留）
+        void removed(const std::filesystem::path &filePath);
+        /// 清单已整体清空（磁盘上的成品保留）
+        void cleared();
         /// 清单变了：控制器据此让窗口重读
         void changed();
         /// 有人要求把这张图贴到屏上：带上盘上的来源文件，动图贴上去要接着播

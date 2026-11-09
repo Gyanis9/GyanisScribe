@@ -1059,7 +1059,8 @@ namespace GyanisScribe
      * @brief 钉住「截取当前窗口走同一条延时通道，且到点那一刻才取前台窗口」
      * @details 这一格漏过一次：前台窗口在按下那一刻就取走、截图也立刻开抓，延时被绕开；
      *          等的那几秒本是用来把菜单摆出来的，取早了取到的就是错的窗口。
-     *          两条判据分开钉：句柄查询与抓帧，各自「按下为零、到点为一」。
+     *          两条判据分开钉：前台窗口查询与抓帧，各自「按下为零、到点才发生」；
+     *          到点这一跳问两次前台：先记截图来源，再取要截的句柄。
      */
     TEST_F(AppControllerFixture, ForegroundWindowIsFetchedOnlyWhenTheTimerFires)
     {
@@ -1071,7 +1072,7 @@ namespace GyanisScribe
         EXPECT_EQ(m_source->windowCalls, 0) << "延时没到就开抓窗口";
 
         ASSERT_TRUE(waitUntil([this] { return m_source->windowCalls >= 1; })) << "到点了还没抓窗口";
-        EXPECT_EQ(m_integration->foregroundQueries, 1) << "到点该取一次前台窗口";
+        EXPECT_EQ(m_integration->foregroundQueries, 2) << "到点该取两次前台窗口：一次记来源，一次取句柄";
         EXPECT_EQ(m_source->windowCalls, 1) << "一次按下只该抓一帧";
         EXPECT_EQ(m_source->requestedWindow, kForegroundWindowHandle) << "抓的该是那一刻取到的那枚句柄";
     }
@@ -1092,7 +1093,7 @@ namespace GyanisScribe
         pumpFor(700); // 若第二下真排了枚定时器，这一档够它到点
         EXPECT_EQ(m_source->screenCalls, 1) << "先按的那一次该照常跑";
         EXPECT_EQ(m_source->windowCalls, 0) << "后按的那一次既不该排进去、也不该把在等的顶掉";
-        EXPECT_EQ(m_integration->foregroundQueries, 0);
+        EXPECT_EQ(m_integration->foregroundQueries, 1) << "这 1 次来自先按那次到点时的来源读取；被回绝的第二下不该再问前台";
     }
 
     /**

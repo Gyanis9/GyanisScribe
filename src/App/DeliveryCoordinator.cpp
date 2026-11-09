@@ -79,7 +79,7 @@ namespace GyanisScribe::App
         }
         GyanisScribe::Base::Logger::info(std::format("成品已保存：{}", GyanisScribe::Base::Paths::toDisplayText(filePath).toStdString()));
         // 历史记的是盘上那份的尺寸：开着装饰时成品比原图大一围，记小了缩略图会裁边
-        m_history.record(filePath, GyanisScribe::Core::HistoryKind::Screenshot, decorated.size());
+        m_history.record(filePath, GyanisScribe::Core::HistoryKind::Screenshot, decorated.size(), m_sourceInfo);
         // 路径留在成员上，三条落盘路（存文件/快速保存/自动保存）与命令行的交付共用这一处读数：
         // 外部命令的 %file% 与命令行打到标准输出的都是它，两处各算一次就会在装饰开关上分家
         m_writtenFilePath = GyanisScribe::Base::Paths::toDisplayText(filePath);
@@ -106,10 +106,12 @@ namespace GyanisScribe::App
         return GyanisScribe::Core::decorateForOutput(image, border, shadow, fillBackground, GyanisScribe::Core::readOutputDecorationStyle(m_settings));
     }
 
-    void DeliveryCoordinator::beginRound()
+    void DeliveryCoordinator::beginRound(const GyanisScribe::Core::CaptureSourceInfo &source)
     {
         // 本轮真落了盘再由 saveToDisk 写上；没落盘时留着上一张的路径，%file% 就会拿到过期文件
         m_writtenFilePath.clear();
+        // 来源同理：这一轮没落盘时它也用不上，但绝不能把上一轮的来源留给下一张成品
+        m_sourceInfo = source;
     }
 
     GyanisScribe::Base::Expected<void> DeliveryCoordinator::runAfterCaptureCommand(const QString &commandLineOverride)

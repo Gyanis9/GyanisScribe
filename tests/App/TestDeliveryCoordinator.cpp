@@ -4,6 +4,7 @@
 
 #include "App/HistoryCoordinator.h"
 #include "Base/Paths.h"
+#include "Core/Capture/SourceInfo.h"
 #include "Core/History/HistoryStore.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Settings/SettingsStore.h"
@@ -21,6 +22,8 @@
 
 using GyanisScribe::App::DeliveryCoordinator;
 using GyanisScribe::App::HistoryCoordinator;
+using GyanisScribe::Core::CaptureSourceInfo;
+using GyanisScribe::Core::HistoryKind;
 using GyanisScribe::Core::HistoryStore;
 using GyanisScribe::Core::SettingsStore;
 
@@ -115,4 +118,51 @@ TEST_F(DeliveryCoordinatorFixture, EmptyCommandSucceeds)
     m_delivery->beginRound();
 
     EXPECT_TRUE(m_delivery->runAfterCaptureCommand(QString{}).has_value()) << "没填命令却报了一次失败";
+}
+
+/**
+ * @brief 钉住落盘时把本轮的截图来源带进历史
+ * @details 记忆库只从 HistoryCoordinator::recorded 收条目；来源在这一跳丢了，
+ *          索引里就只剩路径与尺寸，按应用筛查的入口全部失效。
+ */
+TEST_F(DeliveryCoordinatorFixture, SaveCarriesTheRoundsSourceIntoHistory)
+{
+    const CaptureSourceInfo source{QStringLiteral("notepad.exe"), QStringLiteral("未命名 - 记事本")};
+    int                     recordedCount = 0;
+    HistoryKind             recordedKind{};
+    CaptureSourceInfo       recordedSource;
+    QObject::connect(m_historyOwner.get(), &HistoryCoordinator::recorded, m_historyOwner.get(),
+                     [&](const std::filesystem::path &, const HistoryKind kind, const QSize &, const CaptureSourceInfo &captured)
+                     {
+                         ++recordedCount;
+                         recordedKind   = kind;
+                         recordedSource = captured;
+                     });
+
+    m_delivery->beginRound(source);
+    ASSERT_TRUE(saveOneFrame());
+
+    EXPECT_EQ(recordedCount, 1) << "落盘后没有报 recorded";
+    EXPECT_EQ(recordedKind, HistoryKind::Screenshot);
+    EXPECT_EQ(recordedSource.processName, source.processName) << "落盘时把本轮的进程名丢了";
+    EXPECT_EQ(recordedSource.windowTitle, source.windowTitle) << "落盘时把本轮的窗口标题丢了";
+}
+
+/**
+ * @brief 钉住不带来源开新一轮会把上一轮的来源清掉
+ * @details 录屏与回溯走默认空来源；不清就会把上一轮的进程名记到这一轮的成品上。
+ */
+TEST_F(DeliveryCoordinatorFixture, BeginRoundWithoutSourceClearsThePreviousRoundsSource)
+{
+    CaptureSourceInfo recordedSource;
+    QObject::connect(m_historyOwner.get(), &HistoryCoordinator::recorded, m_historyOwner.get(),
+                     [&](const std::filesystem::path &, const HistoryKind, const QSize &, const CaptureSourceInfo &captured) { recordedSource = captured; });
+
+    m_delivery->beginRound(CaptureSourceInfo{QStringLiteral("notepad.exe"), QStringLiteral("未命名 - 记事本")});
+    ASSERT_TRUE(saveOneFrame());
+    m_delivery->beginRound();
+    ASSERT_TRUE(saveOneFrame());
+
+    EXPECT_TRUE(recordedSource.processName.isEmpty()) << "上一轮的进程名被带进了这一轮";
+    EXPECT_TRUE(recordedSource.windowTitle.isEmpty()) << "上一轮的窗口标题被带进了这一轮";
 }

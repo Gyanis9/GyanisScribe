@@ -164,6 +164,8 @@ namespace GyanisScribe::App
         // 去向照设置现读：回溯只是换了一张底图，之后的标注/复制/保存仍是用户点的那一档
         m_intent            = settingsCaptureIntent();
         m_captureFlowActive = true;
+        // 回溯帧不是当前前台窗口：不额外取进程，本轮来源留空，免得把当下正在前台的应用记到旧帧上
+        m_sourceInfo = {};
         m_capture->startInteractiveWithFrame(frame);
     }
 
@@ -177,6 +179,8 @@ namespace GyanisScribe::App
         m_commandLineOutputs   = request.outputs.empty() ? GyanisScribe::App::defaultCaptureOutputs() : request.outputs;
         m_commandLineExec      = request.execCommand;
         m_commandLineExecGiven = !request.execCommand.trimmed().isEmpty();
+        // 这条路绕过 schedule：来源要在抓帧前就地取一次
+        noteForegroundSource();
         switch (request.action)
         {
             case GyanisScribe::App::CommandLineAction::CaptureFullScreen:
@@ -293,6 +297,8 @@ namespace GyanisScribe::App
         const auto seconds = delay ? *delay : 0;
         if (seconds <= 0)
         {
+            // 来源在 begin() 之前现取：抓帧那一刻前台是谁，就记谁
+            noteForegroundSource();
             begin();
             return;
         }
@@ -310,6 +316,8 @@ namespace GyanisScribe::App
                          {
                              m_delayTimer->deleteLater();
                              m_delayTimer = nullptr;
+                             // 延时这几秒里用户会把目标摆到前台：来源必须到点现取，而不是按下热键时那份
+                             noteForegroundSource();
                              m_pendingCapture();
                          });
         // 成员里存的是这一轮要做的动作：定时器响时用户可能已经切走了窗口，走的是同一条开始截图的路
@@ -320,9 +328,23 @@ namespace GyanisScribe::App
                 GyanisScribe::Gui::ToastKind::Information);
     }
 
+    void CaptureCoordinator::noteForegroundSource()
+    {
+        // 每一轮先清空：上一轮的来源不能跟到这一轮
+        m_sourceInfo      = {};
+        const auto window = m_dependencies.integration.foregroundWindow();
+        if (!window)
+        {
+            // 来源只是元数据：锁屏或焦点在桌面上时会取不到，不弹提示、不挡这次截图
+            return;
+        }
+        m_sourceInfo.processName = window->processName;
+        m_sourceInfo.windowTitle = window->title;
+    }
+
     void CaptureCoordinator::handleCaptured(const GyanisScribe::Base::CapturedImage &image)
     {
-        m_dependencies.delivery.beginRound();
+        m_dependencies.delivery.beginRound(m_sourceInfo);
         m_lastCapture = image;
 
         // 音效与自动保存接在「截图完成」这一刻：不管之后去哪一步，先响一声、先在盘上留一份。
@@ -357,7 +379,7 @@ namespace GyanisScribe::App
                 archived)
             {
                 // 记的是像素尺寸而不是逻辑尺寸：历史缩略图与「重新贴图」都按这份文件读回来
-                m_dependencies.history.record(*archived, GyanisScribe::Core::HistoryKind::Screenshot, image.image.size());
+                m_dependencies.history.record(*archived, GyanisScribe::Core::HistoryKind::Screenshot, image.image.size(), m_sourceInfo);
             } else
             {
                 // 开着这一档就是指望这一张还在，静默失败等于骗人

@@ -12,6 +12,7 @@
 #include "App/CaptureIntent.h"
 #include "App/CommandLine.h"
 #include "Base/Types.h"
+#include "Core/Capture/SourceInfo.h"
 #include "Gui/Controls/Toast.h"
 
 #include <QObject>
@@ -213,6 +214,12 @@ namespace GyanisScribe::App
         /// 抓帧回来：记下这一轮，再按意图交付
         void handleCaptured(const GyanisScribe::Base::CapturedImage &image);
 
+        /**
+         * @brief 记下这一轮截图的前台来源
+         * @details 只在用户真的发起截图时调用；取不到时留空且不弹提示——元数据拿不到不挡截图
+         */
+        void noteForegroundSource();
+
         /// 按这一轮点名的意图把成品交出去（识别/剪贴板/存文件/快速保存/贴到屏幕/标注）
         void deliverFrame(const QImage &image, QScreen &screen);
 
@@ -254,6 +261,7 @@ namespace GyanisScribe::App
         std::unique_ptr<GyanisScribe::Core::AnnotationEngine> m_annotation;                                          ///< 标注引擎，跨轮次保留（载入新帧会清空）
         std::unique_ptr<GyanisScribe::Gui::AnnotationWindow>  m_annotationWindow;                                    ///< 标注窗口，复用同一把工具栏
         GyanisScribe::App::CaptureIntent                      m_intent = GyanisScribe::App::CaptureIntent::Annotate; ///< 这一帧截完要去做的事
+        GyanisScribe::Core::CaptureSourceInfo                 m_sourceInfo;                                          ///< 本轮截图的前台来源，随历史记账一起交出去
         GyanisScribe::App::CaptureOutputSet                   m_commandLineOutputs;                                  ///< 命令行那一次点名的去处，已按交付顺序排好
         QString                                               m_commandLineExec;                ///< --exec 写的那一条命令；只在 m_commandLineExecGiven 为真时压过设置里那一格
         bool                                                  m_commandLineExecGiven = false;   ///< 命令行到底给没给 --exec：给了就只跑那一条

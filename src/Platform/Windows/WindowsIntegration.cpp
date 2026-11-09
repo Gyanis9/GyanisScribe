@@ -424,6 +424,8 @@ namespace GyanisScribe::Platform
         wchar_t       titleBuffer[kWindowTitleBufferLength] = {};
         const int     written                               = GetWindowTextW(window, titleBuffer, kWindowTitleBufferLength);
         info.title                                          = written > 0 ? QString::fromWCharArray(titleBuffer, written) : QString();
+        // 进程名与标题同一条口径：权限不够或进程已退出时留空，截图本身不因此失败
+        info.processName = processFileName(window);
         return info;
     }
 

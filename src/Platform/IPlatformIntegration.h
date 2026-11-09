@@ -28,8 +28,9 @@ namespace GyanisScribe::Platform
      */
     struct ForegroundWindow
     {
-        quintptr handle = 0; ///< 平台窗口句柄，与 Qt 的 WId 同一口径，可直接交给抓帧那一步
-        QString  title;      ///< 标题栏文字；有些窗口不给标题，空串是正常的
+        quintptr handle = 0;  ///< 平台窗口句柄，与 Qt 的 WId 同一口径，可直接交给抓帧那一步
+        QString  title;       ///< 标题栏文字；有些窗口不给标题，空串是正常的
+        QString  processName; ///< 进程可执行文件名（不含路径）；取不到时为空串
     };
 
     /**
@@ -72,7 +73,7 @@ namespace GyanisScribe::Platform
 
         /**
          * @brief 取当前前台窗口
-         * @return 成功返回句柄与标题；本平台给不出时返回 PlatformUnsupported，并在文案里指一条替代做法
+         * @return 成功返回句柄、标题与进程名；本平台给不出时返回 PlatformUnsupported，并在文案里指一条替代做法
          * @note 只给句柄不给几何：抓哪一块由抓帧那一步按句柄去问，这里再读一次系统就是两处读数，
          *       窗口正在动的时候两边会不一致
          */

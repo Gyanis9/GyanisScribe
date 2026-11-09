@@ -114,6 +114,14 @@ TEST(PlatformIntegration, WindowDiscoveryCapabilityMatchesTheOutcome)
     } else
     {
         EXPECT_NE(window->handle, static_cast<quintptr>(0)) << "报成功却交了个空句柄";
+
+        // 进程名取不到（锁屏、权限不足、焦点在桌面）时留空是正常收场；取到了就必须是
+        // 可执行文件名而不是全路径：记忆库按它做来源筛选与排除清单
+        const auto processName = window->processName;
+        const bool emptyName   = processName.isEmpty();
+        const bool bareExeName =
+                processName.endsWith(QStringLiteral(".exe"), Qt::CaseInsensitive) && !processName.contains(QLatin1Char('\\')) && !processName.contains(QLatin1Char('/'));
+        EXPECT_TRUE(emptyName || bareExeName) << "进程名要么为空，要么是不含路径的可执行文件名：实际是 " << processName.toStdString();
     }
 }
 

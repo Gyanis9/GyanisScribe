@@ -21,7 +21,8 @@ namespace GyanisScribe::App
     {
     }
 
-    void HistoryCoordinator::record(const std::filesystem::path &filePath, const GyanisScribe::Core::HistoryKind kind, const QSize &size)
+    void HistoryCoordinator::record(const std::filesystem::path &filePath, const GyanisScribe::Core::HistoryKind kind, const QSize &size,
+                                    const GyanisScribe::Core::CaptureSourceInfo &source)
     {
         const auto entry = GyanisScribe::Core::HistoryEntry{
                 .moment   = QDateTime::currentDateTime(),
@@ -37,6 +38,8 @@ namespace GyanisScribe::App
                                 GyanisScribe::Gui::ToastKind::Danger);
             return;
         }
+        // 只有真的写进清单才报：记忆库按这一声收条目，失败路径报了就会索引一条不存在的成品
+        emit recorded(filePath, kind, size, source);
         emit changed();
     }
 
@@ -51,6 +54,8 @@ namespace GyanisScribe::App
         // 删记录不删文件：这句要让用户看见，否则他会以为图也被清掉了
         emit messageForUser(GyanisScribe::Base::uiText("已从历史里去掉，成品文件仍在 ") + GyanisScribe::Base::Paths::toDisplayText(filePath),
                             GyanisScribe::Gui::ToastKind::Success);
+        // 只在这一条真的从清单里消失之后报：记忆库按路径删行，失败路径不许删
+        emit removed(filePath);
         emit changed();
     }
 
@@ -64,6 +69,8 @@ namespace GyanisScribe::App
         }
         // 与单条删除同一条口径：动的是清单，不是用户磁盘上的成品
         emit messageForUser(GyanisScribe::Base::uiText("历史列表已清空，成品文件仍在各自目录里"), GyanisScribe::Gui::ToastKind::Success);
+        // 记忆库据此清掉全部截图来源的行；成品文件同样不在这里碰
+        emit cleared();
         emit changed();
     }
 
