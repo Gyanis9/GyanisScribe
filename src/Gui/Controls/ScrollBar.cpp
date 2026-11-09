@@ -7,6 +7,7 @@
 #include <QEvent>
 #include <QPainter>
 #include <QPen>
+#include <QStyleOptionSlider>
 
 #include <algorithm>
 
@@ -41,6 +42,38 @@ namespace
 
 namespace GyanisScribe::Gui
 {
+    QRectF scrollBarTrackRect(const QStyleOptionSlider &option, const QWidget &widget)
+    {
+        const bool vertical = option.orientation == Qt::Vertical;
+        const int  length   = vertical ? widget.height() : widget.width();
+        const int  extent   = vertical ? widget.width() : widget.height();
+        if (length <= 2 * kMargin || extent <= 2 * kMargin)
+        {
+            return {};
+        }
+        return vertical ? QRectF{kMargin, kMargin, static_cast<qreal>(extent - 2 * kMargin), static_cast<qreal>(length - 2 * kMargin)}
+                        : QRectF{kMargin, kMargin, static_cast<qreal>(length - 2 * kMargin), static_cast<qreal>(extent - 2 * kMargin)};
+    }
+
+    QRectF scrollBarSliderRect(const QStyleOptionSlider &option, const QWidget &widget)
+    {
+        const QRectF track = scrollBarTrackRect(option, widget);
+        if (track.isEmpty())
+        {
+            return {};
+        }
+        const bool vertical      = option.orientation == Qt::Vertical;
+        const int  trackLength   = qRound(vertical ? track.height() : track.width());
+        const int  range         = option.maximum - option.minimum;
+        const int  page          = std::max(1, option.pageStep);
+        const int  minimumHandle = std::min(kMinimumHandle, trackLength);
+        const int  handleLength  = std::clamp(qRound(static_cast<qreal>(trackLength) * page / (qint64{range} + page)), minimumHandle, trackLength);
+        const int  position =
+                range > 0 ? qRound(static_cast<qreal>(trackLength - handleLength) * (static_cast<qreal>(option.sliderPosition) - static_cast<qreal>(option.minimum)) / range) : 0;
+        return vertical ? QRectF{track.left(), track.top() + position, track.width(), static_cast<qreal>(handleLength)}
+                        : QRectF{track.left() + position, track.top(), static_cast<qreal>(handleLength), track.height()};
+    }
+
     ScrollBar::ScrollBar(const Qt::Orientation orientation, QWidget *parent) : QScrollBar(orientation, parent)
     {
         // 轨道要真的透明：QScrollBar 默认带着不透明绘制标记，宿主窗口底也会铺到轨道上，
@@ -64,21 +97,15 @@ namespace GyanisScribe::Gui
 
     void ScrollBar::paintEvent(QPaintEvent *)
     {
-        QPainter painter{this};
-        painter.setRenderHint(QPainter::Antialiasing, true);
-        const int trackLength = (orientation() == Qt::Vertical ? height() : width()) - 2 * kMargin;
-        if (trackLength <= 0)
+        QStyleOptionSlider option;
+        initStyleOption(&option);
+        const QRectF handle = scrollBarSliderRect(option, *this);
+        if (handle.isEmpty())
         {
             return;
         }
-        const int    range         = maximum() - minimum();
-        const int    page          = std::max(1, pageStep());
-        const int    minimumHandle = std::min(kMinimumHandle, trackLength);
-        const int    handleLength  = std::clamp(qRound(static_cast<qreal>(trackLength) * page / (range + page)), minimumHandle, trackLength);
-        const int    position      = range > 0 ? qRound(static_cast<qreal>(trackLength - handleLength) * (value() - minimum()) / range) : 0;
-        const QRectF handle = orientation() == Qt::Vertical
-                                      ? QRectF{kMargin, static_cast<qreal>(kMargin + position), static_cast<qreal>(width() - 2 * kMargin), static_cast<qreal>(handleLength)}
-                                      : QRectF{static_cast<qreal>(kMargin + position), kMargin, static_cast<qreal>(handleLength), static_cast<qreal>(height() - 2 * kMargin)};
+        QPainter painter{this};
+        painter.setRenderHint(QPainter::Antialiasing, true);
         Core::paintContinuousCorner(painter, handle, Core::cornerShapeFor(Core::CornerRole::Hairline), handleColor(activeThemeKind(), underMouse()), QPen{Qt::NoPen});
     }
 

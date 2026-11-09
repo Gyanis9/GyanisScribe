@@ -28,6 +28,8 @@ namespace GyanisScribe::Gui
 {
     Slider::Slider(const Qt::Orientation orientation, QWidget *parent) : QSlider(orientation, parent)
     {
+        // 绘制只按水平方向实现，竖向会把槽与手柄画成一条横杠；构造时直接拦下
+        Q_ASSERT(orientation == Qt::Horizontal);
         setFixedHeight(20);
     }
 

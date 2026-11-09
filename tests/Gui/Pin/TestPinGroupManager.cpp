@@ -3,6 +3,7 @@
 // 窗上的 tableReadout()/hintText() 钉「界面真摆出来了什么」；按钮一律发 clicked() 走的是用户那一条路。
 
 #include "Core/Pin/IPinWindow.h"
+#include "Gui/Controls/ScrollBar.h"
 #include "Gui/Pin/PinGroupManagerWindow.h"
 #include "Gui/Pin/PinManager.h"
 
@@ -15,6 +16,7 @@
 #include <QColor>
 #include <QImage>
 #include <QPushButton>
+#include <QScrollBar>
 #include <QTableWidget>
 #include <QWidget>
 
@@ -229,6 +231,8 @@ namespace GyanisScribe
     /**
      * @brief 钉住窗上表里真摆出来的那三列：组号、显示名、张数与当前标记
      * @details 没起名字的组显示「分组 N」——只验管理器那份清单，就看不出界面把空名字摆成了什么。
+     *          表的两条滚动条也要在这里认出来：样式表不再给 QScrollBar 尺寸与颜色，
+     *          挂回原生件就没有细滑块与圆角手柄。
      */
     TEST_F(PinGroupManagerFixture, WindowTableListsEachGroupWithItsDisplayName)
     {
@@ -237,6 +241,11 @@ namespace GyanisScribe
 
         const QStringList expected{QStringLiteral("1|分组 1|2 张|是"), QStringLiteral("2|分组 2|1 张|")};
         EXPECT_EQ(window.tableReadout(), expected) << "表里摆的不是全桌那份账";
+
+        auto *table = window.findChild<QTableWidget *>();
+        ASSERT_NE(table, nullptr) << "表找不到，滚动条判据就是空跑";
+        EXPECT_NE(qobject_cast<Gui::ScrollBar *>(table->verticalScrollBar()), nullptr) << "表格的竖直滚动条还是原生件";
+        EXPECT_NE(qobject_cast<Gui::ScrollBar *>(table->horizontalScrollBar()), nullptr) << "表格的水平滚动条还是原生件";
     }
 
     /**

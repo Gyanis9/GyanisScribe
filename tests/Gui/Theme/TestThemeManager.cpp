@@ -50,10 +50,8 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QPushButton>
-#include <QSlider>
 #include <QSpinBox>
 #include <QStyle>
-#include <QStyleOptionSlider>
 
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -466,15 +464,21 @@ TEST_F(ThemeManagerFixture, StyleSheetsAndPalettesAgreeInBothDirections)
         }
     }
 
-    // 反向全局：每个既定的 QSS 角色至少被一份样式表用着；按下态填充、中性悬停底、主色悬停底与禁用的静默底
-    // 已改由自绘类消费，这里换成对 buttonColors / inputColors 的断言；面板底 surface 由
-    // SurfaceWidget / ListWidget / TextEdit / Gui::Menu 的像素用例钉住，不再计入 QSS 名单
+    // 反向全局：每个既定的 QSS 角色至少被一份样式表用着；按下态填充与主色悬停底已改由自绘类消费，
+    // 这里换成对 buttonColors / inputColors 的断言；面板底 surface 由 SurfaceWidget / ListWidget /
+    // TextEdit / Gui::Menu 的像素用例钉住，不再计入 QSS 名单。mutedFill 与 hover 在浅深两档仍被
+    // 复选框指示器的禁用底与悬停底用着；高对比度档的 hover 只由按钮族的悬停填充消费，
+    // 样式表里原来那一格随禁用滑块的槽规则一起消失，所以这一档不列入 QSS 名单，悬停填充由下面的断言钉住
     for (const auto kind: {ThemeKind::Light, ThemeKind::Dark, ThemeKind::HighContrast})
     {
         const auto &palette = paletteFor(kind);
         for (const auto &color: {palette.windowBackground, palette.text, palette.secondaryText, palette.border, palette.accent, palette.onAccent, palette.selection,
-                                 palette.controlFill, palette.accentSoft, palette.borderStrong})
+                                 palette.mutedFill, palette.controlFill, palette.hover, palette.accentSoft, palette.borderStrong})
         {
+            if (kind == ThemeKind::HighContrast && color == palette.hover)
+            {
+                continue;
+            }
             EXPECT_TRUE(usedColors.contains(hexOf(color))) << "色板里的 " << hexOf(color).toStdString() << " 一份 QSS 都没用过";
         }
         EXPECT_EQ(GyanisScribe::Gui::buttonColors(palette, kind, false, true, false, true, false, false).fill, palette.pressed)

@@ -1,6 +1,7 @@
 #include "Gui/Theme/SquircleStyle.h"
 
 #include "Core/Geometry/ContinuousCorner.h"
+#include "Gui/Controls/ScrollBar.h"
 #include "Gui/Theme/CornerStyle.h"
 #include "Gui/Theme/DesignTokens.h"
 
@@ -11,6 +12,7 @@
 #include <QPen>
 #include <QRectF>
 #include <QStyleOptionMenuItem>
+#include <QStyleOptionSlider>
 #include <QWidget>
 
 namespace
@@ -66,8 +68,8 @@ namespace GyanisScribe::Gui
         {
             painter->save();
             painter->setRenderHint(QPainter::Antialiasing, true);
-            Core::paintContinuousCorner(*painter, QRectF{option->rect}.adjusted(0.5, 0.5, -0.5, -0.5), Core::cornerShapeFor(Core::CornerRole::Compact),
-                                        activePalette().surface, QPen{activePalette().borderStrong, static_cast<qreal>(themeBorderWidth(activeThemeKind()))});
+            Core::paintContinuousCorner(*painter, QRectF{option->rect}.adjusted(0.5, 0.5, -0.5, -0.5), Core::cornerShapeFor(Core::CornerRole::Compact), activePalette().surface,
+                                        QPen{activePalette().borderStrong, static_cast<qreal>(themeBorderWidth(activeThemeKind()))});
             painter->restore();
             return;
         }
@@ -120,5 +122,56 @@ namespace GyanisScribe::Gui
             return;
         }
         QProxyStyle::drawComplexControl(control, option, painter, widget);
+    }
+
+    QRect SquircleStyle::subControlRect(const ComplexControl control, const QStyleOptionComplex *option, const SubControl subControl, const QWidget *widget) const
+    {
+        if (control == CC_ScrollBar && widget != nullptr)
+        {
+            const auto *scrollBar = qstyleoption_cast<const QStyleOptionSlider *>(option);
+            if (scrollBar != nullptr)
+            {
+                const QRect track    = scrollBarTrackRect(*scrollBar, *widget).toRect();
+                const QRect slider   = scrollBarSliderRect(*scrollBar, *widget).toRect();
+                const bool  vertical = scrollBar->orientation == Qt::Vertical;
+                if (!track.isEmpty() && !slider.isEmpty())
+                {
+                    switch (subControl)
+                    {
+                        case SC_ScrollBarSlider:
+                            return slider;
+                        case SC_ScrollBarGroove:
+                            return track;
+                        case SC_ScrollBarSubLine:
+                        case SC_ScrollBarAddLine:
+                            // 自绘滚动条没有两端的步进按钮，命中也不该落在那两条上
+                            return {};
+                        case SC_ScrollBarSubPage:
+                            return vertical ? QRect{track.left(), track.top(), track.width(), slider.top() - track.top()}
+                                            : QRect{track.left(), track.top(), slider.left() - track.left(), track.height()};
+                        case SC_ScrollBarAddPage:
+                            return vertical ? QRect{track.left(), slider.top() + slider.height(), track.width(), track.top() + track.height() - slider.top() - slider.height()}
+                                            : QRect{slider.left() + slider.width(), track.top(), track.left() + track.width() - slider.left() - slider.width(), track.height()};
+                        default:
+                            break;
+                    }
+                }
+            }
+        }
+        return QProxyStyle::subControlRect(control, option, subControl, widget);
+    }
+
+    int SquircleStyle::pixelMetric(const PixelMetric metric, const QStyleOption *option, const QWidget *widget) const
+    {
+        switch (metric)
+        {
+            case PM_ScrollBarExtent:
+                return 10;
+            case PM_ScrollBarSliderMin:
+                return 24;
+            default:
+                break;
+        }
+        return QProxyStyle::pixelMetric(metric, option, widget);
     }
 } // namespace GyanisScribe::Gui

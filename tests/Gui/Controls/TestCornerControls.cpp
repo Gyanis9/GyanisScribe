@@ -22,17 +22,23 @@
 #include <QAbstractScrollArea>
 #include <QApplication>
 #include <QCoreApplication>
+#include <QEnterEvent>
+#include <QEvent>
 #include <QFont>
 #include <QHoverEvent>
 #include <QImage>
 #include <QMenu>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QPalette>
 #include <QStringListModel>
 #include <QStyleOption>
+#include <QStyleOptionSlider>
 #include <QStyledItemDelegate>
 #include <QWidget>
 
+#include <cstdlib>
+#include <format>
 #include <memory>
 
 namespace
@@ -62,6 +68,23 @@ namespace
             }
         }
         return count;
+    }
+
+    /**
+     * @brief 比对半透明手柄的取样色
+     * @details grab() 给出的是预乘格式，半透明色经预乘与反预乘会有取整误差：
+     *          透明度必须完全一致，RGB 每通道允许 ±2 的误差。
+     * @param actual 实际取到的颜色
+     * @param expected 期望的手柄色
+     */
+    void expectHandleColor(const QColor &actual, const QColor &expected)
+    {
+        const auto describe = [&actual, &expected]()
+        { return std::format("实际 {}，期望 {}", actual.name(QColor::HexArgb).toStdString(), expected.name(QColor::HexArgb).toStdString()); };
+        EXPECT_EQ(actual.alpha(), expected.alpha()) << describe();
+        EXPECT_LE(std::abs(actual.red() - expected.red()), 2) << describe();
+        EXPECT_LE(std::abs(actual.green() - expected.green()), 2) << describe();
+        EXPECT_LE(std::abs(actual.blue() - expected.blue()), 2) << describe();
     }
 
     /**
@@ -810,32 +833,106 @@ TEST_F(CornerControlsFixture, SliderPaintsGrooveAndHandle)
 }
 
 /**
- * @brief 钉住滚动条自绘圆角手柄且轨道透明
- * @details 样式表已没有 QScrollBar 规则，手柄由 Gui::ScrollBar 按细槽档画；
- *          轨道本身不铺底，手柄上端之外的一格必须是透明的。
+ * @brief 钉住滚动条自绘圆角手柄、轨道透明与悬停加深
+ * @details 样式表已没有 QScrollBar 规则，手柄由 Gui::ScrollBar 按细槽档画。值 0 时手柄贴着内轨道
+ *          上端、最短 24px：手柄中心的颜色与透明度必须等于该档的静息值，整块铺满、换了颜色或
+ *          画错一档透明度都会红；轨道其余位置必须透明。悬停档单独发一次进入事件，
+ *          同一个取样点要加深一档。
  */
 TEST_F(CornerControlsFixture, ScrollBarPaintsRoundedHandle)
 {
     GyanisScribe::Gui::ScrollBar bar{Qt::Vertical};
     bar.setRange(0, 100);
     bar.setPageStep(20);
+    bar.setValue(0);
     bar.resize(10, 120);
     bar.show();
     QCoreApplication::processEvents();
-    const QImage image = bar.grab().toImage();
-    int          opaque = 0;
-    for (int y = 0; y < image.height(); ++y)
-    {
-        for (int x = 0; x < image.width(); ++x)
-        {
-            if (image.pixelColor(x, y).alpha() > 0)
-            {
-                ++opaque;
-            }
-        }
-    }
-    EXPECT_GT(opaque, 0);
+
+    const QPoint handleCenter{5, 2 + 12};
+    const QColor lightRest{20, 20, 18, 41};
+    const QColor lightHover{20, 20, 18, 82};
+    const QColor darkRest{232, 232, 227, 36};
+
+    QImage image = bar.grab().toImage();
+    expectHandleColor(image.pixelColor(handleCenter), lightRest);
     EXPECT_EQ(image.pixelColor(5, 0).alpha(), 0) << "轨道上端应透明；实际取色 " << image.pixelColor(5, 0).name(QColor::HexArgb).toStdString();
+    EXPECT_EQ(image.pixelColor(5, 60).alpha(), 0) << "手柄下沿以外应透明；实际取色 " << image.pixelColor(5, 60).name(QColor::HexArgb).toStdString();
+
+    QEnterEvent enter{QPointF{handleCenter}, bar.mapToGlobal(handleCenter), QPointF{handleCenter}};
+    QCoreApplication::sendEvent(&bar, &enter);
+    ASSERT_TRUE(bar.underMouse()) << "前提没构造出来：进入事件没让滚动条进入悬停态";
+    bar.update();
+    QCoreApplication::processEvents();
+    image = bar.grab().toImage();
+    expectHandleColor(image.pixelColor(handleCenter), lightHover);
+
+    QEvent leave{QEvent::Leave};
+    QCoreApplication::sendEvent(&bar, &leave);
+    ASSERT_FALSE(bar.underMouse());
+
+    GyanisScribe::Gui::setTextThemeKind(GyanisScribe::Gui::ThemeKind::Dark);
+    bar.update();
+    QCoreApplication::processEvents();
+    image = bar.grab().toImage();
+    expectHandleColor(image.pixelColor(handleCenter), darkRest);
+    GyanisScribe::Gui::setTextThemeKind(GyanisScribe::Gui::ThemeKind::Light);
+}
+
+/**
+ * @brief 钉住滚动条命中几何与自绘手柄同源
+ * @details 样式表删掉 QScrollBar 规则后，命中测试会退回原生风格的尺寸，与自绘的 10px 粗细、
+ *          2px 留白、24px 最短手柄对不上：手柄两端会落进翻页区，拖动也换算到另一条轨道上。
+ *          这里按 QScrollBar 的状态组一份 QStyleOptionSlider：样式给出的滑块矩形必须与
+ *          Gui::scrollBarSliderRect() 完全相同，命中测试在手柄中心与下沿内侧都必须返回滑块；
+ *          手柄以外一格必须是透明的。最后按下手柄中心再往下拖，值要跟着变。
+ */
+TEST_F(CornerControlsFixture, ScrollBarHitTestingFollowsThePaintedHandle)
+{
+    GyanisScribe::Gui::ScrollBar bar{Qt::Vertical};
+    bar.setRange(0, 100);
+    bar.setPageStep(20);
+    bar.setValue(0);
+    bar.resize(10, 120);
+    bar.show();
+    QCoreApplication::processEvents();
+
+    QStyleOptionSlider option;
+    option.initFrom(&bar);
+    option.orientation       = bar.orientation();
+    option.minimum           = bar.minimum();
+    option.maximum           = bar.maximum();
+    option.pageStep          = bar.pageStep();
+    option.sliderPosition    = bar.sliderPosition();
+    option.sliderValue       = bar.value();
+    option.rect              = bar.rect();
+    option.subControls       = QStyle::SC_All;
+    option.activeSubControls = QStyle::SC_None;
+
+    const QRect slider = bar.style()->subControlRect(QStyle::CC_ScrollBar, &option, QStyle::SC_ScrollBarSlider, &bar);
+    ASSERT_FALSE(slider.isEmpty()) << "样式没给出滑块矩形，命中和拖动都会退成无控件";
+    EXPECT_EQ(slider, GyanisScribe::Gui::scrollBarSliderRect(option, bar).toRect()) << "样式给出的滑块矩形与自绘手柄不同源";
+    // 值 0 时手柄贴内轨道上端，粗细 10 减去两侧 2px 留白，最短 24px
+    EXPECT_EQ(slider, (QRect{2, 2, 6, 24}));
+
+    const QPoint center = slider.center();
+    EXPECT_EQ(bar.style()->hitTestComplexControl(QStyle::CC_ScrollBar, &option, center, &bar), QStyle::SC_ScrollBarSlider) << "手柄中心被判成了别的子控件";
+    const QPoint lowerHandle{center.x(), slider.top() + slider.height() - 1};
+    EXPECT_EQ(bar.style()->hitTestComplexControl(QStyle::CC_ScrollBar, &option, lowerHandle, &bar), QStyle::SC_ScrollBarSlider) << "手柄下沿内侧落进了翻页区";
+
+    const QImage image = bar.grab().toImage();
+    EXPECT_GT(image.pixelColor(center).alpha(), 0) << "命中矩形中心没有画出手柄";
+    EXPECT_EQ(image.pixelColor(5, slider.top() + slider.height()).alpha(), 0) << "手柄下沿以外应透明";
+
+    QMouseEvent press{QEvent::MouseButtonPress, QPointF{center}, QPointF{center}, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QCoreApplication::sendEvent(&bar, &press);
+    ASSERT_TRUE(bar.isSliderDown()) << "按在手柄中心没有开始拖动";
+    const QPointF dragPoint{static_cast<qreal>(center.x()), static_cast<qreal>(center.y() + 50)};
+    QMouseEvent   drag{QEvent::MouseMove, dragPoint, dragPoint, Qt::NoButton, Qt::LeftButton, Qt::NoModifier};
+    QCoreApplication::sendEvent(&bar, &drag);
+    EXPECT_GT(bar.value(), 0) << "拖动之后值没变，拖动换算没走同一份几何";
+    QMouseEvent release{QEvent::MouseButtonRelease, dragPoint, dragPoint, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+    QCoreApplication::sendEvent(&bar, &release);
 }
 
 /**

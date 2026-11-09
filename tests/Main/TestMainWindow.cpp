@@ -25,6 +25,7 @@
 #include "Core/Settings/SettingsStore.h"
 #include "Gui/Controls/AppShortcuts.h"
 #include "Gui/Controls/CheckBox.h"
+#include "Gui/Controls/ScrollBar.h"
 #include "Gui/History/HistoryView.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Controls/HotkeyEdit.h"
@@ -2160,6 +2161,8 @@ TEST_F(MainWindowFixture, EverySettingsPageIsWrappedInAScrollArea)
         EXPECT_EQ(scroll->objectName(), QStringLiteral("settingsScroll")) << "样式表按这个名字把这层设成透明，名字改了就会多出一圈底色";
         EXPECT_TRUE(scroll->widgetResizable()) << "第 " << index << " 页没让内容跟着宽度走：长句会被挤成竖条";
         EXPECT_NE(scroll->widget(), nullptr) << "第 " << index << " 页的滚动区里没装东西";
+        EXPECT_NE(qobject_cast<GyanisScribe::Gui::ScrollBar *>(scroll->verticalScrollBar()), nullptr) << "第 " << index << " 页的竖直滚动条还是原生件，细滑块与圆角手柄都不会出现";
+        EXPECT_NE(qobject_cast<GyanisScribe::Gui::ScrollBar *>(scroll->horizontalScrollBar()), nullptr) << "第 " << index << " 页的水平滚动条还是原生件";
     }
 }
 

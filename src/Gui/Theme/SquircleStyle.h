@@ -20,6 +20,8 @@ namespace GyanisScribe::Gui
      *          原生面板整层改成连续曲率面板。
      *          输入类的自绘底同理：带 squircle 属性的控件（及其内部的子行编辑）不再让原生风格
      *          画输入面板、边框与下拉/微调框主体，否则自绘的连续曲率底会被一层方底盖掉。
+     *          滚动条的几何也在这里接管：滑块、轨道与翻页区都按自绘用的同一组常量给出，
+     *          命中测试与拖动换算因此和画出来的手柄重合。
      */
     class SquircleStyle : public QProxyStyle
     {
@@ -73,5 +75,32 @@ namespace GyanisScribe::Gui
          * @param widget 目标控件
          */
         void drawComplexControl(ComplexControl control, const QStyleOptionComplex *option, QPainter *painter, const QWidget *widget) const override;
+
+        /**
+         * @brief 滚动条各子控件按自绘几何给出
+         * @details 重写 QProxyStyle::subControlRect()：滚动条的滑块与轨道取自
+         *          Gui::scrollBarSliderRect()、Gui::scrollBarTrackRect()，翻页区是轨道去掉手柄后的两段，
+         *          两端步进按钮返回空矩形（本应用的滚动条不画按钮，命中也不该落在那两条上）。
+         *          其余复杂控件原样交给基类
+         * @param control 待解的复杂控件
+         * @param option 绘制参数
+         * @param subControl 待解的子控件
+         * @param widget 目标控件
+         * @return 子控件矩形；不是滚动条滑块几何时由基类计算
+         * @note 命中测试与 QScrollBar 的拖动换算都会问到这里：滑块矩形必须与
+         *       Gui::ScrollBar::paintEvent() 画出来的一致，轨道必须与自绘的内轨道一致
+         */
+        QRect subControlRect(ComplexControl control, const QStyleOptionComplex *option, SubControl subControl, const QWidget *widget) const override;
+
+        /**
+         * @brief 滚动条粗细与最短手柄对齐自绘数值
+         * @details 重写 QProxyStyle::pixelMetric()：PM_ScrollBarExtent 返回 10、PM_ScrollBarSliderMin 返回 24，
+         *          滚动条的建议尺寸与原生风格里的其它换算都落在同一档；其余度量原样交给基类
+         * @param metric 待取的度量
+         * @param option 绘制参数
+         * @param widget 目标控件
+         * @return 滚动条度量为 10/24，其余由基类给出
+         */
+        int pixelMetric(PixelMetric metric, const QStyleOption *option, const QWidget *widget) const override;
     };
 } // namespace GyanisScribe::Gui
