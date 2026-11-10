@@ -104,7 +104,7 @@ namespace GyanisScribe::App
         if (!m_dependencies.integration.capabilities().sessionNotifications)
         {
             Base::Logger::warning("平台给不出锁屏通知，回溯缓冲不启用");
-            emit messageForUser(Base::uiText("本平台给不出锁屏通知，出于隐私不开启回溯缓冲"), Gui::ToastKind::Information);
+            emit messageForUser(Base::uiText("当前平台不支持锁屏通知，出于隐私保护考虑，不启用回溯缓冲"), Gui::ToastKind::Information);
             setState(State::Disabled);
             return;
         }
@@ -131,7 +131,7 @@ namespace GyanisScribe::App
     {
         if (m_state == State::Disabled)
         {
-            emit messageForUser(Base::uiText("回溯截图未开启。到设置 → 截图 → 回溯截图里开启（只存内存，不上传）。"), Gui::ToastKind::Information);
+            emit messageForUser(Base::uiText("回溯截图未开启。请在「设置 → 截图 → 回溯截图」中启用（仅存于内存，不上传）。"), Gui::ToastKind::Information);
             return;
         }
         if (m_state == State::PickerOpen)
@@ -139,7 +139,7 @@ namespace GyanisScribe::App
             if (m_decoderWatcher.isRunning())
             {
                 // 解码期间选择器是收起的：抬窗只会对着一个看不见的窗口使劲，改为说明当前进度
-                emit messageForUser(Base::uiText("正在解码选中的帧，稍候。"), Gui::ToastKind::Information);
+                emit messageForUser(Base::uiText("正在解码选中的帧，请稍候。"), Gui::ToastKind::Information);
                 return;
             }
             if (m_picker != nullptr && m_picker->isVisible())
@@ -159,7 +159,7 @@ namespace GyanisScribe::App
         }
         if (m_buffer.stats().sampleCount == 0)
         {
-            emit messageForUser(Base::uiText("回溯缓冲里还没有画面：刚开启时等一秒再按；若提示已暂停，先看暂停原因。"), Gui::ToastKind::Information);
+            emit messageForUser(Base::uiText("回溯缓冲中暂无画面：刚开启时请等待一秒后重试；若提示已暂停，请先查看暂停原因。"), Gui::ToastKind::Information);
             return;
         }
         if (m_encoderWatcher.isRunning() || m_pendingFrame.has_value())
@@ -407,7 +407,7 @@ namespace GyanisScribe::App
             if (reason != m_announcedErrorReason)
             {
                 m_announcedErrorReason = reason;
-                emit messageForUser(Base::uiText("回溯缓冲已暂停：") + reason + Base::uiText(" 调整后重新开启回溯缓冲即可恢复。"), Gui::ToastKind::Danger);
+                emit messageForUser(Base::uiText("回溯缓冲已暂停：") + reason + Base::uiText("。请调整后重新启用回溯缓冲以恢复。"), Gui::ToastKind::Danger);
             }
         } else if (state == State::Buffering || state == State::Disabled)
         {
@@ -439,7 +439,7 @@ namespace GyanisScribe::App
         auto *screen = QGuiApplication::screenAt(QCursor::pos());
         if (screen == nullptr)
         {
-            setState(State::PausedByError, Base::uiText("找不到光标所在的屏幕"));
+            setState(State::PausedByError, Base::uiText("无法找到光标所在的屏幕"));
             return;
         }
         // 离屏平台的屏名可能为空，所以首次解析不能只靠名字比较
@@ -458,7 +458,7 @@ namespace GyanisScribe::App
                 // 换屏清空了旧缓冲，托盘那行读数要跟着重发一次；屏名不在托盘读数的三个参数里，
                 // 只能说给用户听，否则「换到哪块屏」这条信息只剩日志里能看到
                 emit bufferStatusChanged(true, false, QString{});
-                emit messageForUser(Base::uiText("回溯改为抓屏幕「") + m_screenName + Base::uiText("」，旧缓冲已清空。"), Gui::ToastKind::Information);
+                emit messageForUser(Base::uiText("回溯已改为抓取屏幕「") + m_screenName + Base::uiText("」，旧缓冲已清空。"), Gui::ToastKind::Information);
             }
         }
         if (exclusionVisible(m_screenRect))
@@ -489,7 +489,7 @@ namespace GyanisScribe::App
         {
             if (++m_consecutiveSlowGrabs >= kConsecutiveFailureLimit)
             {
-                setState(State::PausedByError, Base::uiText("抓帧太慢，回溯缓冲已暂停"));
+                setState(State::PausedByError, Base::uiText("屏幕捕获过慢，回溯缓冲已暂停"));
             }
             return;
         }
@@ -594,7 +594,7 @@ namespace GyanisScribe::App
                 m_picker->hide();
             }
             setState(stateAfterPickerClosed(), m_reasonBeforePicker);
-            emit messageForUser(Base::uiText("回溯缓冲里已经没有画面，选择器收起了。"), Gui::ToastKind::Information);
+            emit messageForUser(Base::uiText("回溯缓冲中已无画面，选择器已收起。"), Gui::ToastKind::Information);
             return;
         }
 
@@ -623,7 +623,7 @@ namespace GyanisScribe::App
         const auto sample = m_buffer.sampleById(id);
         if (!sample)
         {
-            emit messageForUser(Base::uiText("这一帧已经从回溯缓冲里淘汰了，请在胶片条里另选一帧。"), Gui::ToastKind::Information);
+            emit messageForUser(Base::uiText("该帧已从回溯缓冲中移除，请在胶片条中另选一帧。"), Gui::ToastKind::Information);
             return;
         }
 
@@ -705,7 +705,7 @@ namespace GyanisScribe::App
         if (!decoded)
         {
             Base::Logger::warning(std::format("回溯帧解码失败：{}", decoded.error().message));
-            emit messageForUser(Base::uiText("这一帧解码失败，请在胶片条里重选一帧：") + QString::fromStdString(decoded.error().message), Gui::ToastKind::Danger);
+            emit messageForUser(Base::uiText("该帧解码失败，请在胶片条中重新选择一帧：") + QString::fromStdString(decoded.error().message), Gui::ToastKind::Danger);
             if (m_state == State::PickerOpen)
             {
                 openPicker();
@@ -716,7 +716,7 @@ namespace GyanisScribe::App
         const auto sample = m_buffer.sampleById(*id);
         if (!sample)
         {
-            emit messageForUser(Base::uiText("这一帧已经从回溯缓冲里淘汰了，请在胶片条里另选一帧。"), Gui::ToastKind::Information);
+            emit messageForUser(Base::uiText("该帧已从回溯缓冲中移除，请在胶片条中另选一帧。"), Gui::ToastKind::Information);
             if (m_state == State::PickerOpen)
             {
                 openPicker();

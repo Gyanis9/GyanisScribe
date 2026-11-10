@@ -215,12 +215,12 @@ namespace GyanisScribe::Gui
                          {
                              if (m_entries.isEmpty())
                              {
-                                 emit messageForUser(GyanisScribe::Base::uiText("历史列表本来就是空的"), Gui::ToastKind::Information);
+                                 emit messageForUser(GyanisScribe::Base::uiText("历史列表当前为空"), Gui::ToastKind::Information);
                                  return;
                              }
                              // 清空是一下去掉一整批：先问一句，别让人一次点击丢掉整个清单
                              const auto answer = QMessageBox::question(this, GyanisScribe::Base::uiText("清空历史列表"),
-                                                                       GyanisScribe::Base::uiText("要把历史列表里的记录全部去掉吗？成品文件本身不会被删除，仍在各自目录里。"),
+                                                                       GyanisScribe::Base::uiText("确定清空历史列表中的全部记录吗？输出文件不会被删除，仍保留在原目录中。"),
                                                                        QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
                              if (answer == QMessageBox::Yes)
                              {
@@ -289,7 +289,7 @@ namespace GyanisScribe::Gui
             Base::Logger::warning(std::format("历史清单没能读出来：{}", loaded.error().message));
             emit messageForUser(
                     QString::fromUtf8(
-                            GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("历史清单没能读出来：{}。列表先显示上一次的记录"), loaded.error().message).c_str()),
+                            GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("历史清单读取失败：{}。列表将保留上一次的记录"), loaded.error().message).c_str()),
                     Gui::ToastKind::Danger);
             return;
         }
@@ -304,9 +304,9 @@ namespace GyanisScribe::Gui
             // 日志跟着提示走同一条分支：没有新提示的刷新不该再往日志里刷同一行
             if (loaded->skippedRecords != m_lastSkippedRecords)
             {
-                Base::Logger::warning(std::format("历史清单里有 {} 条记录读不懂，已跳过：{}", loaded->skippedRecords, loaded->firstProblem));
+                Base::Logger::warning(std::format("历史清单中有 {} 条记录无法解析，已跳过：{}", loaded->skippedRecords, loaded->firstProblem));
                 const auto message =
-                        GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("历史清单里有 {} 条记录读不懂，已跳过：{}"), loaded->skippedRecords, loaded->firstProblem);
+                        GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("历史清单中有 {} 条记录无法解析，已跳过：{}"), loaded->skippedRecords, loaded->firstProblem);
                 emit messageForUser(QString::fromUtf8(message.c_str()), Gui::ToastKind::Danger);
                 m_lastSkippedRecords = loaded->skippedRecords;
             }
@@ -376,7 +376,7 @@ namespace GyanisScribe::Gui
             const auto displayPath = GyanisScribe::Base::Paths::toDisplayText(entry.filePath);
             auto      *item        = new QListWidgetItem{entryCaption(entry, QDateTime::currentDateTime())};
             item->setData(kPathRole, displayPath);
-            item->setToolTip(displayPath + GyanisScribe::Base::uiText("（删除只从历史里去掉这条，成品文件留在原处）"));
+            item->setToolTip(displayPath + GyanisScribe::Base::uiText("（删除仅移除该条历史记录，输出文件保留在原处）"));
             m_list->addItem(item);
 
             // 先查缓存再谈占位图：命中时省下那一次图标查找，未命中才需要一枚先顶上
@@ -396,8 +396,8 @@ namespace GyanisScribe::Gui
         }
 
         // 两种「列表是空的」分开说：真没有记录，与筛选后没有命中——后者说「还没有记录」就是撒谎
-        m_emptyHint->setText(m_entries.isEmpty() ? GyanisScribe::Base::uiText("还没有记录。截一张图或录一段屏，成品会出现在这里。")
-                                                 : GyanisScribe::Base::uiText("没有符合条件的记录，换个关键词或类别试试。"));
+        m_emptyHint->setText(m_entries.isEmpty() ? GyanisScribe::Base::uiText("还没有记录。完成一次截图或录屏后，输出文件会显示在这里。")
+                                                 : GyanisScribe::Base::uiText("没有符合条件的记录。请更换关键词或类别后重试。"));
         m_emptyHint->setVisible(m_list->count() == 0);
         if (m_list->count() == 0)
         {

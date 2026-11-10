@@ -197,7 +197,7 @@ namespace GyanisScribe::Gui
         const auto rendered = Core::renderShareImage(m_image, m_style, 0);
         if (!rendered)
         {
-            setStatus(uiText("没能复制到剪贴板：") + QString::fromStdString(rendered.error().message), true);
+            setStatus(uiText("无法复制到剪贴板：") + QString::fromStdString(rendered.error().message), true);
             return std::unexpected(rendered.error());
         }
         QApplication::clipboard()->setImage(*rendered);
@@ -209,7 +209,7 @@ namespace GyanisScribe::Gui
     {
         const auto fail = [this](const Base::Error &reason)
         {
-            const auto error = Base::Error{reason.code, uiFormat(uiTextUtf8("没能保存美化图片：{}"), reason.message)};
+            const auto error = Base::Error{reason.code, uiFormat(uiTextUtf8("无法保存美化图片：{}"), reason.message)};
             Base::Logger::error(error.message);
             setStatus(QString::fromStdString(error.message), true);
             return std::unexpected(error);
@@ -234,7 +234,7 @@ namespace GyanisScribe::Gui
         }
 
         const auto pathText     = Base::Paths::toDisplayText(filePath);
-        const auto writeFailure = Base::Error{Base::ErrorCode::FileWriteFailed, uiFormat(uiTextUtf8("「{}」写不进去。请检查这个目录能不能写"), pathText.toStdString())};
+        const auto writeFailure = Base::Error{Base::ErrorCode::FileWriteFailed, uiFormat(uiTextUtf8("「{}」写不进去。请检查该目录是否可写。"), pathText.toStdString())};
 
         QSaveFile file{pathText};
         if (!file.open(QIODevice::WriteOnly))
@@ -251,7 +251,7 @@ namespace GyanisScribe::Gui
         {
             buffer.close();
             file.cancelWriting();
-            return fail(Base::Error{Base::ErrorCode::FileWriteFailed, uiFormat(uiTextUtf8("「{}」没能编码成目标格式"), pathText.toStdString())});
+            return fail(Base::Error{Base::ErrorCode::FileWriteFailed, uiFormat(uiTextUtf8("「{}」无法编码为目标格式"), pathText.toStdString())});
         }
         buffer.close();
 
@@ -319,7 +319,7 @@ namespace GyanisScribe::Gui
         const auto id = selectedTemplateId();
         if (Core::isBuiltInShareTemplateId(id))
         {
-            const auto error = Base::Error{Base::ErrorCode::InvalidArgument, uiTextUtf8("内置模板不能删除")};
+            const auto error = Base::Error{Base::ErrorCode::InvalidArgument, uiTextUtf8("内置模板不可删除")};
             setStatus(QString::fromStdString(error.message), true);
             return std::unexpected(error);
         }
@@ -390,7 +390,7 @@ namespace GyanisScribe::Gui
         // 缩放后的图会反过来影响标签的建议尺寸：忽略它，版面大小只由左栏剩余的宽度决定
         m_preview->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
         m_preview->setAccessibleName(uiText("美化预览"));
-        m_preview->setToolTip(uiText("这里显示套上当前样式之后的样子；复制与保存出去的仍是原尺寸"));
+        m_preview->setToolTip(uiText("此处显示应用当前样式后的效果；复制或保存的图片仍为原尺寸。"));
         m_preview->installEventFilter(this);
         root->addWidget(m_preview, 1);
 
@@ -413,7 +413,7 @@ namespace GyanisScribe::Gui
         form->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
         form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
 
-        auto *intro = new QLabel{uiText("左侧是实时预览；下面的改动只影响这张美化成品，原图与标注现场保持不变。"), formWidget};
+        auto *intro = new QLabel{uiText("左侧为实时预览；下方的修改仅影响本次美化结果，原图与标注内容保持不变。"), formWidget};
         intro->setObjectName(QStringLiteral("pageHint"));
         intro->setWordWrap(true);
         intro->setAccessibleName(uiText("美化分享说明"));
@@ -424,21 +424,21 @@ namespace GyanisScribe::Gui
         m_templateCombo = new ComboBox{formWidget};
         m_templateCombo->setObjectName(QStringLiteral("shareTemplateCombo"));
         m_templateCombo->setAccessibleName(uiText("模板"));
-        m_templateCombo->setToolTip(uiText("选一套内置模板或保存过的自定义模板；换模板会把这套样式加载到下面的控件里"));
+        m_templateCombo->setToolTip(uiText("选择内置模板或已保存的自定义模板；更换模板会将这套样式载入下方的控件。"));
         form->addRow(uiText("当前模板"), m_templateCombo);
 
         form->addRow(makeSectionLabel(formWidget, uiText("背景")));
         m_backgroundButton = new Button{formWidget};
         m_backgroundButton->setObjectName(QStringLiteral("shareBackgroundColor"));
         m_backgroundButton->setAccessibleName(uiText("背景色"));
-        m_backgroundButton->setToolTip(uiText("卡片背后的底色；点一下打开取色器"));
+        m_backgroundButton->setToolTip(uiText("卡片背后的底色；点击可打开取色器。"));
         m_backgroundButton->setMinimumHeight(28);
         form->addRow(uiText("背景色"), m_backgroundButton);
 
         m_secondColorButton = new Button{formWidget};
         m_secondColorButton->setObjectName(QStringLiteral("shareBackgroundSecondColor"));
         m_secondColorButton->setAccessibleName(uiText("渐变终点"));
-        m_secondColorButton->setToolTip(uiText("渐变终点的底色；打开「从上到下渐变」后才用得上"));
+        m_secondColorButton->setToolTip(uiText("渐变终点的底色；启用「从上到下渐变」后生效。"));
         m_secondColorButton->setMinimumHeight(28);
         form->addRow(uiText("渐变终点"), m_secondColorButton);
 
@@ -446,23 +446,23 @@ namespace GyanisScribe::Gui
         m_gradient->setObjectName(QStringLiteral("shareGradient"));
         m_gradient->setText(uiText("从上到下渐变"));
         m_gradient->setAccessibleName(uiText("渐变背景"));
-        m_gradient->setToolTip(uiText("打开后背景从背景色渐变到渐变终点；关着时只用背景色"));
+        m_gradient->setToolTip(uiText("启用后背景由背景色渐变至渐变终点；关闭时仅使用背景色。"));
         form->addRow(m_gradient);
 
         form->addRow(makeSectionLabel(formWidget, uiText("尺寸")));
-        m_padding = makeStyleSlider(formWidget, QStringLiteral("sharePadding"), uiText("内边距"), uiText("卡片四周留出多少像素的空白；越大画布越宽，成品四周越透气"),
+        m_padding = makeStyleSlider(formWidget, QStringLiteral("sharePadding"), uiText("内边距"), uiText("卡片四周留出的空白宽度，单位为像素；数值越大画布越宽，输出图片四周的留白越多。"),
                                     Core::kMinimumSharePadding, Core::kMaximumSharePadding, Core::ShareStyle{}.paddingPixels);
         form->addRow(uiText("内边距"), m_padding);
 
-        m_radius = makeStyleSlider(formWidget, QStringLiteral("shareRadius"), uiText("圆角半径"), uiText("卡片四角的圆角半径，像素；特别大时会按卡片短边自动收小"),
+        m_radius = makeStyleSlider(formWidget, QStringLiteral("shareRadius"), uiText("圆角半径"), uiText("卡片四角的圆角半径，单位为像素；数值过大时会按卡片短边自动收小。"),
                                    Core::kMinimumShareCornerRadius, Core::kMaximumShareCornerRadius, Core::ShareStyle{}.cornerRadiusPixels);
         form->addRow(uiText("圆角半径"), m_radius);
 
-        m_borderWidth = makeStyleSlider(formWidget, QStringLiteral("shareBorderWidth"), uiText("描边宽度"), uiText("卡片外圈描边的宽度，像素；0 表示不画描边"),
+        m_borderWidth = makeStyleSlider(formWidget, QStringLiteral("shareBorderWidth"), uiText("描边宽度"), uiText("卡片外圈描边的宽度，单位为像素；0 表示不绘制描边。"),
                                         Core::kMinimumShareBorderPixels, Core::kMaximumShareBorderPixels, Core::ShareStyle{}.borderPixels);
         form->addRow(uiText("描边宽度"), m_borderWidth);
 
-        m_shadowRadius = makeStyleSlider(formWidget, QStringLiteral("shareShadowRadius"), uiText("投影宽度"), uiText("卡片外圈投影向外铺开的宽度，像素；0 表示不画投影"),
+        m_shadowRadius = makeStyleSlider(formWidget, QStringLiteral("shareShadowRadius"), uiText("投影宽度"), uiText("卡片外圈投影向外扩展的宽度，单位为像素；0 表示不绘制投影。"),
                                          Core::kMinimumShareShadowPixels, Core::kMaximumShareShadowPixels, Core::ShareStyle{}.shadowPixels);
         form->addRow(uiText("投影宽度"), m_shadowRadius);
 
@@ -471,14 +471,14 @@ namespace GyanisScribe::Gui
         m_editorChrome->setObjectName(QStringLiteral("shareEditorChrome"));
         m_editorChrome->setText(uiText("在卡片顶部显示标题栏"));
         m_editorChrome->setAccessibleName(uiText("代码窗口标题栏"));
-        m_editorChrome->setToolTip(uiText("打开后在卡片顶部画一条编辑器标题栏：三个圆点加标题文字"));
+        m_editorChrome->setToolTip(uiText("启用后在卡片顶部绘制一条编辑器标题栏，包含三个圆点与标题文字。"));
         form->addRow(m_editorChrome);
 
         m_editorTitle = new LineEdit{formWidget};
         m_editorTitle->setObjectName(QStringLiteral("shareEditorTitle"));
         m_editorTitle->setAccessibleName(uiText("标题栏文字"));
-        m_editorTitle->setToolTip(uiText("标题栏里的文字；留空只画三个圆点"));
-        m_editorTitle->setPlaceholderText(uiText("留空只画三个圆点"));
+        m_editorTitle->setToolTip(uiText("标题栏中的文字；留空时仅绘制三个圆点。"));
+        m_editorTitle->setPlaceholderText(uiText("留空时仅绘制三个圆点"));
         m_editorTitle->setMaxLength(Core::kMaximumShareEditorTitleLength);
         form->addRow(uiText("标题文字"), m_editorTitle);
 
@@ -486,19 +486,19 @@ namespace GyanisScribe::Gui
         m_watermarkText = new LineEdit{formWidget};
         m_watermarkText->setObjectName(QStringLiteral("shareWatermarkText"));
         m_watermarkText->setAccessibleName(uiText("水印文字"));
-        m_watermarkText->setToolTip(uiText("贴在卡片下角的文字；留空不画水印"));
-        m_watermarkText->setPlaceholderText(uiText("留空不加水印"));
+        m_watermarkText->setToolTip(uiText("显示在卡片下角的文字；留空时不绘制水印。"));
+        m_watermarkText->setPlaceholderText(uiText("留空时不添加水印"));
         m_watermarkText->setMaxLength(Core::kMaximumShareWatermarkLength);
         form->addRow(uiText("水印文字"), m_watermarkText);
 
-        m_watermarkOpacity = makeStyleSlider(formWidget, QStringLiteral("shareWatermarkOpacity"), uiText("水印不透明度"), uiText("水印的不透明度：0 完全透明，255 完全不透明"),
+        m_watermarkOpacity = makeStyleSlider(formWidget, QStringLiteral("shareWatermarkOpacity"), uiText("水印不透明度"), uiText("水印的不透明度：0 为完全透明，255 为完全不透明"),
                                              Core::kMinimumShareWatermarkOpacity, Core::kMaximumShareWatermarkOpacity, Core::ShareStyle{}.watermarkOpacity);
         form->addRow(uiText("不透明度"), m_watermarkOpacity);
 
         m_watermarkCorner = new ComboBox{formWidget};
         m_watermarkCorner->setObjectName(QStringLiteral("shareWatermarkCorner"));
         m_watermarkCorner->setAccessibleName(uiText("水印位置"));
-        m_watermarkCorner->setToolTip(uiText("水印贴在卡片的右下角还是左下角"));
+        m_watermarkCorner->setToolTip(uiText("水印显示在卡片的右下角或左下角。"));
         m_watermarkCorner->addItem(uiText("右下角"));
         m_watermarkCorner->addItem(uiText("左下角"));
         form->addRow(uiText("水印位置"), m_watermarkCorner);
@@ -511,11 +511,11 @@ namespace GyanisScribe::Gui
         m_saveTemplate = new Button{uiText("另存为模板"), templateRow};
         m_saveTemplate->setObjectName(QStringLiteral("shareSaveTemplate"));
         m_saveTemplate->setAccessibleName(uiText("另存为模板"));
-        m_saveTemplate->setToolTip(uiText("把当前样式存成一套自定义模板，以后在同一台机器上还能选回来"));
+        m_saveTemplate->setToolTip(uiText("将当前样式保存为自定义模板，之后可在本机再次选用。"));
         m_deleteTemplate = new Button{uiText("删除模板"), templateRow};
         m_deleteTemplate->setObjectName(QStringLiteral("shareDeleteTemplate"));
         m_deleteTemplate->setAccessibleName(uiText("删除模板"));
-        m_deleteTemplate->setToolTip(uiText("删除当前选中的自定义模板；内置模板不能删"));
+        m_deleteTemplate->setToolTip(uiText("删除当前选中的自定义模板；内置模板不可删除。"));
         templateLayout->addWidget(m_saveTemplate);
         templateLayout->addWidget(m_deleteTemplate);
         templateLayout->addStretch(1);
@@ -528,15 +528,15 @@ namespace GyanisScribe::Gui
         m_copyButton = new Button{uiText("复制到剪贴板"), exportRow};
         m_copyButton->setObjectName(QStringLiteral("shareCopy"));
         m_copyButton->setAccessibleName(uiText("复制到剪贴板"));
-        m_copyButton->setToolTip(uiText("按原尺寸把美化成品放进剪贴板；原图与标注保持不动"));
+        m_copyButton->setToolTip(uiText("按原尺寸将美化后的图片复制到剪贴板；原图与标注保持不变。"));
         m_saveFileButton = new Button{uiText("保存图片…"), exportRow};
         m_saveFileButton->setObjectName(QStringLiteral("shareSaveFile"));
         m_saveFileButton->setAccessibleName(uiText("保存图片"));
-        m_saveFileButton->setToolTip(uiText("按原尺寸把美化成品另存成 PNG、JPG 或 WebP；原图与标注保持不动"));
+        m_saveFileButton->setToolTip(uiText("按原尺寸将美化后的图片另存为 PNG、JPG 或 WebP；原图与标注保持不变。"));
         m_closeButton = new Button{uiText("关闭"), exportRow};
         m_closeButton->setObjectName(QStringLiteral("shareClose"));
         m_closeButton->setAccessibleName(uiText("关闭美化分享"));
-        m_closeButton->setToolTip(uiText("关掉美化对话框回到标注现场；已经复制或保存的成品不受影响"));
+        m_closeButton->setToolTip(uiText("关闭美化对话框并返回标注界面；已复制或保存的输出文件不受影响。"));
         exportLayout->addWidget(m_copyButton);
         exportLayout->addWidget(m_saveFileButton);
         exportLayout->addWidget(m_closeButton);
@@ -548,7 +548,7 @@ namespace GyanisScribe::Gui
         m_statusLabel->setWordWrap(true);
         m_statusLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
         m_statusLabel->setAccessibleName(uiText("操作状态"));
-        m_statusLabel->setToolTip(uiText("这里显示复制、保存与模板操作的结果和失败原因"));
+        m_statusLabel->setToolTip(uiText("此处显示复制、保存与模板操作的结果及失败原因。"));
         form->addRow(m_statusLabel);
 
         scroll->setWidget(formWidget);
@@ -661,7 +661,7 @@ namespace GyanisScribe::Gui
         QObject::connect(m_deleteTemplate, &QPushButton::clicked, this,
                          [this]
                          {
-                             const auto answer = QMessageBox::question(this, uiText("删除模板"), uiText("确定删除当前选中的自定义模板吗？删除后不能恢复。"));
+                             const auto answer = QMessageBox::question(this, uiText("删除模板"), uiText("确定删除当前选中的自定义模板吗？删除后无法恢复。"));
                              if (answer != QMessageBox::Yes)
                              {
                                  return;
@@ -838,8 +838,8 @@ namespace GyanisScribe::Gui
 
         if (const auto written = m_settings.setValue(Core::kShareLastTemplate, selected->id); !written)
         {
-            Base::Logger::warning(uiFormat(uiTextUtf8("上次使用的美化模板没能写入：{}"), written.error().message));
-            setStatus(QString::fromStdString(uiFormat(uiTextUtf8("模板选择没能记住：{}"), written.error().message)), true);
+            Base::Logger::warning(uiFormat(uiTextUtf8("上次使用的美化模板无法写入：{}"), written.error().message));
+            setStatus(QString::fromStdString(uiFormat(uiTextUtf8("无法记住模板选择：{}"), written.error().message)), true);
         }
         renderPreview();
     }

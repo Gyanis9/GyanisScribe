@@ -226,7 +226,7 @@ TEST(OcrResultStatus, SummaryCarriesLinesConfidenceAndLanguage)
     EXPECT_EQ(summary, QString::fromUtf8("2 行 · 平均置信度 80% · 图像 800×200 · 语言 zh-Hans"));
 
     const QString emptySummary = statusLineFor(OcrResult{}, {800, 200});
-    EXPECT_NE(emptySummary.indexOf(QString::fromUtf8("没认出文字")), -1) << "空结果要说「没字」，不能报 0 行让用户以为识别失败";
+    EXPECT_NE(emptySummary.indexOf(QString::fromUtf8("未识别到文字")), -1) << "空结果要说「没字」，不能报 0 行让用户以为识别失败";
 }
 
 /**

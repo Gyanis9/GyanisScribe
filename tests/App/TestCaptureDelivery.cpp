@@ -98,7 +98,7 @@ TEST(CaptureDelivery, RejectsDuplicatedDestination)
     const auto duplicated = parseCaptureOutputs(QStringLiteral("clipboard,clipboard"));
     ASSERT_FALSE(duplicated.has_value());
     EXPECT_NE(duplicated.error().message.find("clipboard"), std::string::npos) << duplicated.error().message;
-    EXPECT_NE(duplicated.error().message.find("两次"), std::string::npos) << duplicated.error().message;
+    EXPECT_NE(duplicated.error().message.find("重复出现"), std::string::npos) << duplicated.error().message;
 }
 
 /**

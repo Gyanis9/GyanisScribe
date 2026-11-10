@@ -79,13 +79,13 @@ namespace GyanisScribe::App
 
         if (m_image.isNull())
         {
-            emit messageForUser(GyanisScribe::Base::uiText("还没有可识别的图：先按 Ctrl+Alt+A 框选一块屏幕"), GyanisScribe::Gui::ToastKind::Information);
+            emit messageForUser(GyanisScribe::Base::uiText("没有可识别的图像：请先按 Ctrl+Alt+A 框选屏幕区域。"), GyanisScribe::Gui::ToastKind::Information);
             return;
         }
 
         // 一次识别要跑几十到上千毫秒，放在这条线程上整个程序就停在那儿：交出去之前先说一句，
         // 否则结果回来之前界面看着像「点了没反应」
-        emit messageForUser(GyanisScribe::Base::uiText("正在识别这一张…"), GyanisScribe::Gui::ToastKind::Information);
+        emit messageForUser(GyanisScribe::Base::uiText("正在识别该图片…"), GyanisScribe::Gui::ToastKind::Information);
         m_runner->request(m_image, language);
     }
 
@@ -119,7 +119,7 @@ namespace GyanisScribe::App
     void OcrCoordinator::handleFailed(const GyanisScribe::Base::Error &error)
     {
         const auto message =
-                QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("文字识别失败：{}。请重试一次，或换一种语言再试"), error.message).c_str());
+                QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("文字识别失败：{}。请重试，或更换识别语言。"), error.message).c_str());
         GyanisScribe::Base::Logger::error(message.toStdString());
         emit messageForUser(message, GyanisScribe::Gui::ToastKind::Danger);
     }

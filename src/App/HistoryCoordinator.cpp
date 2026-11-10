@@ -34,7 +34,7 @@ namespace GyanisScribe::App
         {
             // 清单写不进去不该让「保存成功」变成假话：成品已经在盘上，只是下次打开找不到它
             GyanisScribe::Base::Logger::warning(std::format("成品没进历史清单：{}", stored.error().message));
-            emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("成品已保存，但没进历史清单：{}"), stored.error().message).c_str()),
+            emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("输出文件已保存，但未写入历史记录：{}"), stored.error().message).c_str()),
                                 GyanisScribe::Gui::ToastKind::Danger);
             return;
         }
@@ -47,12 +47,12 @@ namespace GyanisScribe::App
     {
         if (auto removed = m_history.remove(filePath); !removed)
         {
-            emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("这条历史没删掉：{}"), removed.error().message).c_str()),
+            emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("无法删除该条历史记录：{}"), removed.error().message).c_str()),
                                 GyanisScribe::Gui::ToastKind::Danger);
             return;
         }
         // 删记录不删文件：这句要让用户看见，否则他会以为图也被清掉了
-        emit messageForUser(GyanisScribe::Base::uiText("已从历史里去掉，成品文件仍在 ") + GyanisScribe::Base::Paths::toDisplayText(filePath),
+        emit messageForUser(GyanisScribe::Base::uiText("已从历史记录中移除，输出文件仍保留在 ") + GyanisScribe::Base::Paths::toDisplayText(filePath),
                             GyanisScribe::Gui::ToastKind::Success);
         // 只在这一条真的从清单里消失之后报：记忆库按路径删行，失败路径不许删
         emit removed(filePath);
@@ -63,12 +63,12 @@ namespace GyanisScribe::App
     {
         if (auto cleared = m_history.clear(); !cleared)
         {
-            emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("历史清单没清空：{}"), cleared.error().message).c_str()),
+            emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("无法清空历史记录：{}"), cleared.error().message).c_str()),
                                 GyanisScribe::Gui::ToastKind::Danger);
             return;
         }
         // 与单条删除同一条口径：动的是清单，不是用户磁盘上的成品
-        emit messageForUser(GyanisScribe::Base::uiText("历史列表已清空，成品文件仍在各自目录里"), GyanisScribe::Gui::ToastKind::Success);
+        emit messageForUser(GyanisScribe::Base::uiText("历史记录已清空，输出文件仍保留在原目录中"), GyanisScribe::Gui::ToastKind::Success);
         // 记忆库据此清掉全部截图来源的行；成品文件同样不在这里碰
         emit cleared();
         emit changed();
@@ -80,7 +80,7 @@ namespace GyanisScribe::App
         const auto      directory = filePath.parent_path();
         if (directory.empty() || !std::filesystem::exists(directory, ignored))
         {
-            emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("打不开所在目录：{} 已经不在了。成品可能已被移动或删除"),
+            emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("无法打开所在目录：{} 已不存在，输出文件可能已被移动或删除"),
                                                                                GyanisScribe::Base::Paths::toDisplayText(directory).toStdString())
                                                           .c_str()),
                                 GyanisScribe::Gui::ToastKind::Danger);
@@ -88,7 +88,7 @@ namespace GyanisScribe::App
         }
         if (!QDesktopServices::openUrl(QUrl::fromLocalFile(QString::fromStdWString(directory.wstring()))))
         {
-            emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("打不开目录 {}。请自己到设置里那个截图目录去找"),
+            emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("无法打开目录 {}。请前往设置中的截图输出目录查找"),
                                                                                GyanisScribe::Base::Paths::toDisplayText(directory).toStdString())
                                                           .c_str()),
                                 GyanisScribe::Gui::ToastKind::Danger);

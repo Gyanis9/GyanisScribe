@@ -30,7 +30,7 @@ namespace GyanisScribe::App
         // 失败一律带上「没能存下图片」这句头：三条调用路共用一处出口，用户看到的措辞才不会三处各说各的
         const auto fail = [](const GyanisScribe::Base::Error &reason)
         {
-            const auto message = GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("没能存下图片：{}"), reason.message);
+            const auto message = GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("无法存下图片：{}"), reason.message);
             GyanisScribe::Base::Logger::error(message);
             return std::unexpected(GyanisScribe::Base::Error{reason.code, message});
         };
@@ -60,7 +60,7 @@ namespace GyanisScribe::App
             // 这一档的编码器没装：说清是格式的问题，别让用户去查目录权限
             return fail(GyanisScribe::Base::Error{
                     GyanisScribe::Base::ErrorCode::PlatformUnsupported,
-                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("这台机器的 Qt 写不出「{}」这一档。请在设置的截图页改选一档"), storedFormat.toStdString())});
+                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("当前环境无法写入「{}」格式。请在设置的「截图」页中选择其他格式。"), storedFormat.toStdString())});
         }
 
         // 装饰按目标端要不要透明通道来定：JPG 垫白，PNG/WebP 保持透明（写出去不丢那一层）
@@ -81,7 +81,7 @@ namespace GyanisScribe::App
         if (!decorated.save(GyanisScribe::Base::Paths::toDisplayText(filePath), nullptr, quality))
         {
             return fail(GyanisScribe::Base::Error{GyanisScribe::Base::ErrorCode::FileWriteFailed,
-                                                  GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("「{}」写不进去。请检查这个目录能不能写"),
+                                                  GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("无法写入「{}」。请检查输出目录是否可写。"),
                                                                                GyanisScribe::Base::Paths::toDisplayText(filePath).toStdString())});
         }
         GyanisScribe::Base::Logger::info(std::format("成品已保存：{}", GyanisScribe::Base::Paths::toDisplayText(filePath).toStdString()));
@@ -101,7 +101,7 @@ namespace GyanisScribe::App
             emit messageForUser(QString::fromStdString(saved.error().message), GyanisScribe::Gui::ToastKind::Danger);
             return;
         }
-        emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已存成 {}"), saved->toStdString()).c_str()),
+        emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已保存为 {}"), saved->toStdString()).c_str()),
                             GyanisScribe::Gui::ToastKind::Success);
     }
 
@@ -151,20 +151,20 @@ namespace GyanisScribe::App
         // 三档收尾各一句：全写成要说「去哪儿看」，成了一半要点名还有几张没成，一张都没成时原因就是主角
         if (report.saved == 0)
         {
-            const auto reason = report.reason.isEmpty() ? QString::fromUtf8(GyanisScribe::Base::uiTextUtf8("原因见日志")) : report.reason;
-            emit       messageForUser(QString::fromUtf8(GyanisScribe::Base::uiTextUtf8("贴图一张都没写成：")) + reason, GyanisScribe::Gui::ToastKind::Danger);
+            const auto reason = report.reason.isEmpty() ? QString::fromUtf8(GyanisScribe::Base::uiTextUtf8("原因详见日志")) : report.reason;
+            emit       messageForUser(QString::fromUtf8(GyanisScribe::Base::uiTextUtf8("未能保存任何贴图：")) + reason, GyanisScribe::Gui::ToastKind::Danger);
             return;
         }
         if (report.failed == 0)
         {
             emit messageForUser(
-                    QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已把 {} 张贴图存成文件，就在设置里的截图目录"), report.saved).c_str()),
+                    QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已将 {} 张贴图保存为文件，位置为设置中的截图输出目录"), report.saved).c_str()),
                     GyanisScribe::Gui::ToastKind::Success);
             return;
         }
-        const auto reason = report.reason.isEmpty() ? QString::fromUtf8(GyanisScribe::Base::uiTextUtf8("原因见日志")) : report.reason;
+        const auto reason = report.reason.isEmpty() ? QString::fromUtf8(GyanisScribe::Base::uiTextUtf8("原因详见日志")) : report.reason;
         emit       messageForUser(
-                QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已存好 {} 张贴图，另有 {} 张没写成："), report.saved, report.failed).c_str()) +
+                QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已保存 {} 张贴图，另有 {} 张保存失败："), report.saved, report.failed).c_str()) +
                         reason,
                 GyanisScribe::Gui::ToastKind::Danger);
     }

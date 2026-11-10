@@ -1721,7 +1721,7 @@ namespace GyanisScribe
         // 协调器起步前先把控制条摆出来，随后校验不过（离屏没有屏名）又把它收起——收起的是「藏」，
         // 销毁要等事件循环，所以这一刻它还数得到；这条同时挡掉「叫到了别的族」：别处不会摆这扇控制条
         EXPECT_EQ(countTopLevelWindows<GyanisScribe::Gui::RecordingHud>(), 1) << "按了录屏，控制条那一闪都没出现：动作条到录屏协调器那条线断了";
-        const auto said = [&] { return newToastText(before).contains(QStringLiteral("录屏没能开始")); };
+        const auto said = [&] { return newToastText(before).contains(QStringLiteral("无法开始录屏")); };
         EXPECT_TRUE(waitUntil(said)) << "录屏没开成，也没把原因说给用户听：接线断在协调器前面";
 
         // 「没能开始」不许在历史里留下东西：没开始就没成品
@@ -1758,7 +1758,7 @@ namespace GyanisScribe
         m_controller->capture().handlePrivacyScan(window.canvas().image, Core::OcrResult{});
 
         EXPECT_EQ(messages, 1) << "无命中该只说一句结果";
-        EXPECT_EQ(said, Base::uiText("没有发现可打码的敏感信息。请仍自行检查后再分享。")) << said.toStdString();
+        EXPECT_EQ(said, Base::uiText("未发现可打码的敏感信息。分享前请自行检查。")) << said.toStdString();
         EXPECT_TRUE(window.isVisible()) << "无命中提示之后标注窗被收掉了";
         EXPECT_TRUE(window.toolbar().isVisible());
     }
@@ -1793,7 +1793,7 @@ namespace GyanisScribe
         m_controller->capture().handlePrivacyScan(stale, Core::OcrResult{});
 
         EXPECT_EQ(messages, 1) << "过期结果该被挡下并说清出路";
-        EXPECT_EQ(said, Base::uiText("画布已经变了，请重新点隐私打码")) << said.toStdString();
+        EXPECT_EQ(said, Base::uiText("画布已更新，请重新执行隐私打码")) << said.toStdString();
         EXPECT_TRUE(window.isVisible());
     }
 
@@ -2042,7 +2042,7 @@ namespace GyanisScribe
         // 直接发一条成功结果：真识别由 TestPrivacyCoordinator 的假引擎驱动，这里判的是这根线
         privacy.scanSucceeded(window.canvas().image, Core::OcrResult{});
         EXPECT_EQ(canvasMessages, 1) << "协调器的结果没有落到画布那一层";
-        EXPECT_EQ(said, Base::uiText("没有发现可打码的敏感信息。请仍自行检查后再分享。")) << said.toStdString();
+        EXPECT_EQ(said, Base::uiText("未发现可打码的敏感信息。分享前请自行检查。")) << said.toStdString();
     }
 
     /**

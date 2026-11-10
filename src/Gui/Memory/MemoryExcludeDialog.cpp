@@ -48,7 +48,7 @@ namespace GyanisScribe::Gui
         root->setContentsMargins(kSpacingLarge, kSpacingLarge, kSpacingLarge, kSpacingLarge);
         root->setSpacing(kSpacingMedium);
 
-        auto *note = new QLabel{Base::uiText("勾选的应用之后不再加入记忆库；保存时会删掉这些应用已有的索引。导入的旧截图不受影响。"), this};
+        auto *note = new QLabel{Base::uiText("勾选的应用将不再加入记忆库；保存时会删除这些应用已有的索引。导入的旧截图不受影响。"), this};
         note->setWordWrap(true);
         root->addWidget(note);
 
@@ -98,7 +98,7 @@ namespace GyanisScribe::Gui
         root->addLayout(addRow);
         auto *input = new LineEdit{this};
         input->setObjectName(QStringLiteral("excludeProcessInput"));
-        input->setPlaceholderText(Base::uiText("输入尚未出现过的进程名…"));
+        input->setPlaceholderText(Base::uiText("输入要排除的进程名…"));
         input->setAccessibleName(Base::uiText("新增排除进程"));
         addRow->addWidget(input, 1);
         auto *add = new Button{Base::uiText("添加"), this};
@@ -183,7 +183,7 @@ namespace GyanisScribe::Gui
         if (deletionCount > 0)
         {
             const auto answer = QMessageBox::question(this, Base::uiText("排除应用"),
-                                                      Base::uiText("保存后会从记忆库删除新排除应用已有的 %1 条索引，原图与历史记录不会被删除。要继续吗？").arg(deletionCount),
+                                                      Base::uiText("保存后会从记忆库删除新排除应用已有的 %1 条索引，原图与历史记录不会被删除。是否继续？").arg(deletionCount),
                                                       QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
             if (answer != QMessageBox::Yes)
             {

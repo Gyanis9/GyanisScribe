@@ -78,11 +78,11 @@ TEST(UpdateVerdict, UnreadableVersionsSaySoInsteadOfGuessing)
 {
     const auto badRunning = verdictFor(QStringLiteral("dev-build"), UpdateRelease{.tagName = QStringLiteral("v1.0.0"), .pageUrl = QStringLiteral("https://example.invalid")});
     EXPECT_FALSE(badRunning.hasNewer);
-    EXPECT_NE(badRunning.message.indexOf(QStringLiteral("读不出来")), -1);
+    EXPECT_NE(badRunning.message.indexOf(QStringLiteral("无法读取")), -1);
 
     const auto badTag = verdictFor(QStringLiteral("0.0.1"), UpdateRelease{.tagName = QStringLiteral("发布二号"), .pageUrl = QStringLiteral("https://example.invalid")});
     EXPECT_FALSE(badTag.hasNewer);
-    EXPECT_NE(badTag.message.indexOf(QStringLiteral("读不出来")), -1);
+    EXPECT_NE(badTag.message.indexOf(QStringLiteral("无法读取")), -1);
 
     const auto tolerant = verdictFor(QStringLiteral("0.0.1"), UpdateRelease{.tagName = QStringLiteral(" V0.0.2 "), .pageUrl = QStringLiteral("https://example.invalid")});
     EXPECT_TRUE(tolerant.hasNewer) << "大写 V 与首尾空白都是常见写法，该认";
@@ -103,7 +103,7 @@ TEST(UpdateFailureText, NamesTheCommonCasesAndStaysChinese)
     EXPECT_NE(denied.indexOf(QStringLiteral("403")), -1) << "限流那一档要带上状态码，便于用户自己和 GitHub 的记录对上";
 
     const auto offline = failureMessageFor(QNetworkReply::HostNotFoundError, 0);
-    EXPECT_NE(offline.indexOf(QStringLiteral("域名解析不了")), -1) << "网络类要给可读的原因名，而不是一个枚举数字";
+    EXPECT_NE(offline.indexOf(QStringLiteral("域名解析失败")), -1) << "网络类要给可读的原因名，而不是一个枚举数字";
 
     for (const auto &message: {notFound, denied, offline})
     {
@@ -121,7 +121,7 @@ TEST(UpdateFailureText, FailureVerdictUsesTheChineseMessageAndReleasePage)
 {
     const auto offline = failureVerdictFor(QNetworkReply::HostNotFoundError, 0);
     EXPECT_FALSE(offline.hasNewer);
-    EXPECT_NE(offline.message.indexOf(QStringLiteral("域名解析不了")), -1) << offline.message.toStdString();
+    EXPECT_NE(offline.message.indexOf(QStringLiteral("域名解析失败")), -1) << offline.message.toStdString();
     EXPECT_FALSE(offline.link.isEmpty()) << "失败时也要给出发布页，用户才有替代做法";
     EXPECT_TRUE(offline.link.startsWith(QStringLiteral("https://"))) << offline.link.toStdString();
 

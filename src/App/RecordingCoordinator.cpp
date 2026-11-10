@@ -50,7 +50,7 @@ namespace GyanisScribe::App
                          {
                              // 上限那一轮不经过 toggle：控制条与托盘读数要当场收掉，不能等下一次每秒节拍
                              hideHud();
-                             emit messageForUser(GyanisScribe::Base::uiText("已到最长时长，正在编成品"), GyanisScribe::Gui::ToastKind::Information);
+                             emit messageForUser(GyanisScribe::Base::uiText("已达到最长录制时长，正在生成输出文件"), GyanisScribe::Gui::ToastKind::Information);
                          });
         QObject::connect(m_service.get(), &GyanisScribe::Plugins::RecordingService::countdownChanged, this,
                          [this](const int remainingSeconds)
@@ -87,7 +87,7 @@ namespace GyanisScribe::App
         if (screenName.isEmpty() && QGuiApplication::screens().isEmpty())
         {
             return std::unexpected(GyanisScribe::Base::Error{GyanisScribe::Base::ErrorCode::ScreenUnavailable,
-                                                             GyanisScribe::Base::uiTextUtf8("当前没有可用屏幕，录屏没法开始。请接回显示器后重试")});
+                                                             GyanisScribe::Base::uiTextUtf8("当前没有可用屏幕，无法开始录屏。请连接显示器后重试")});
         }
 
         GyanisScribe::Core::RecorderConfig config;
@@ -173,7 +173,7 @@ namespace GyanisScribe::App
             if (history->empty())
             {
                 return std::unexpected(GyanisScribe::Base::Error{GyanisScribe::Base::ErrorCode::InvalidArgument,
-                                                                 GyanisScribe::Base::uiTextUtf8("还没有可录的选区：先按截图热键框一次选区，再开始录屏；也可以把录制范围改回整屏")});
+                                                                 GyanisScribe::Base::uiTextUtf8("当前没有可录制的选区：请先按下截图快捷键框选一次，再开始录屏；也可将录制范围改为整屏")});
             }
             config.region = history->front().region;
         } else if (config.mode == GyanisScribe::Core::RecordMode::Window)
@@ -194,7 +194,7 @@ namespace GyanisScribe::App
         // Done 之后编码还在跑：这时开新一轮会让两份成品同时在编，完成通知也分不清是哪一轮的
         if (state == GyanisScribe::Core::RecordingState::Done && m_service->isEncoding())
         {
-            emit messageForUser(GyanisScribe::Base::uiText("上一轮还在编成品，编好了再开新一轮"), GyanisScribe::Gui::ToastKind::Information);
+            emit messageForUser(GyanisScribe::Base::uiText("上一轮仍在生成输出文件，请等待完成后再开始新一轮"), GyanisScribe::Gui::ToastKind::Information);
             return;
         }
 
@@ -222,7 +222,7 @@ namespace GyanisScribe::App
             {
                 hideHud();
                 GyanisScribe::Base::Logger::error(std::format("录屏没能开始：{}", started.error().message));
-                emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("录屏没能开始：{}"), started.error().message).c_str()),
+                emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("无法开始录屏：{}"), started.error().message).c_str()),
                                     GyanisScribe::Gui::ToastKind::Danger);
                 return;
             }
@@ -240,7 +240,7 @@ namespace GyanisScribe::App
             return;
         }
         hideHud();
-        emit messageForUser(GyanisScribe::Base::uiText("正在编成品，好了会说一声"), GyanisScribe::Gui::ToastKind::Information);
+        emit messageForUser(GyanisScribe::Base::uiText("正在生成输出文件，完成后将另行通知"), GyanisScribe::Gui::ToastKind::Information);
     }
 
     void RecordingCoordinator::cancel()
@@ -250,7 +250,7 @@ namespace GyanisScribe::App
         if (!cancelled)
         {
             GyanisScribe::Base::Logger::warning(std::format("录屏取消没成：{}", cancelled.error().message));
-            emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("取消录屏没成：{}"), cancelled.error().message).c_str()),
+            emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("无法取消录屏：{}"), cancelled.error().message).c_str()),
                                 GyanisScribe::Gui::ToastKind::Danger);
         }
     }
@@ -295,7 +295,7 @@ namespace GyanisScribe::App
                          [this]
                          {
                              // 最小化只是收起这一层：托盘菜单的录屏项还在，用户照样能停
-                             emit messageForUser(GyanisScribe::Base::uiText("控制条已收起；按 Ctrl+Alt+R 或托盘里的录屏项可停止并保存"), GyanisScribe::Gui::ToastKind::Information);
+                             emit messageForUser(GyanisScribe::Base::uiText("控制条已收起；按 Ctrl+Alt+R 或使用托盘菜单中的录屏项可停止并保存"), GyanisScribe::Gui::ToastKind::Information);
                          });
 
         // 时长与状态每秒推一次：服务只在帧落地时发信号，而控制条要的是「现在过了多久」
@@ -353,7 +353,7 @@ namespace GyanisScribe::App
         // 中途丢了声音要当面说一句：只写日志等于让用户拿到一个安静的成品，再自己发现没录上
         if (m_service->audioOutcome() == GyanisScribe::Plugins::AudioCaptureOutcome::Failed)
         {
-            emit messageForUser(GyanisScribe::Base::uiText("成品已出，但没带上声音：取声那一步中途失败了，原因写在日志里"), GyanisScribe::Gui::ToastKind::Information);
+            emit messageForUser(GyanisScribe::Base::uiText("输出文件已生成，但未包含声音：音频采集失败，原因详见日志"), GyanisScribe::Gui::ToastKind::Information);
         }
         // 尺寸取信号里这一轮自己那份：编码在后台跑的时候用户可以再开一轮，回读成员拿到的会是后一轮的
         emit finished(outputPath, frameSize);
@@ -363,7 +363,7 @@ namespace GyanisScribe::App
     {
         hideHud();
         GyanisScribe::Base::Logger::error(std::format("录屏中止：{}", reason.toStdString()));
-        emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("录屏中止：{}。请重试一次"), reason.toStdString()).c_str()),
+        emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("录屏中止：{}。请重试"), reason.toStdString()).c_str()),
                             GyanisScribe::Gui::ToastKind::Danger);
     }
 
@@ -371,7 +371,7 @@ namespace GyanisScribe::App
     {
         hideHud();
         GyanisScribe::Base::Logger::info("录屏已取消：这一段没有成品");
-        emit messageForUser(GyanisScribe::Base::uiText("已取消录屏：这一段没有保存，临时帧也删了"), GyanisScribe::Gui::ToastKind::Information);
+        emit messageForUser(GyanisScribe::Base::uiText("已取消录屏：本次内容未保存，临时帧已删除"), GyanisScribe::Gui::ToastKind::Information);
     }
 
 } // namespace GyanisScribe::App

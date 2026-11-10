@@ -172,8 +172,8 @@ TEST_F(ClipboardPinFixture, RejectsWithoutContentAndSaysWhatToDo)
     huge.setText(QString(kMaximumTextCardCharacters + 1, QLatin1Char('x')));
     const auto tooLong = pinContentFrom(&huge, cardFont());
     ASSERT_FALSE(tooLong.has_value()) << "超长文本该拒，而不是渲染一张几千像素高的卡片";
-    EXPECT_NE(tooLong.error().message.find("太长"), std::string::npos);
-    EXPECT_NE(tooLong.error().message.find("截短"), std::string::npos) << "要给出替代做法";
+    EXPECT_NE(tooLong.error().message.find("过长"), std::string::npos);
+    EXPECT_NE(tooLong.error().message.find("缩短"), std::string::npos) << "要给出替代做法";
 
     QMimeData shell;
     shell.setImageData(QVariant{});

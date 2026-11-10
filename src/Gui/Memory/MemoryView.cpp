@@ -588,7 +588,7 @@ namespace GyanisScribe::Gui
         const auto stats = m_index.stats(static_cast<int>(m_excludedProcesses.size()));
         if (!stats)
         {
-            m_stats->setText(Base::uiText("统计暂时读不出来"));
+            m_stats->setText(Base::uiText("统计信息暂时无法读取"));
             setRuntimeDatabaseError(QString::fromUtf8(stats.error().message.c_str()));
             return;
         }
@@ -604,7 +604,7 @@ namespace GyanisScribe::Gui
         // 搜索固定只回一页；顶到上限时明说，用户才知道更早的结果要靠收窄条件翻出来
         if (m_resultCount >= Core::kMemorySearchLimit)
         {
-            statsText += Base::uiText(" · 只显示前 %1 条，收窄关键词可看到更早的结果").arg(Core::kMemorySearchLimit);
+            statsText += Base::uiText(" · 只显示前 %1 条，收窄关键词可查看更早的结果").arg(Core::kMemorySearchLimit);
         }
         m_stats->setText(statsText);
         updateRetryPendingState();
@@ -620,12 +620,12 @@ namespace GyanisScribe::Gui
         }
         if (!m_enabled)
         {
-            reasons.append(Base::uiText("记忆库还没开启。开启后只索引你主动截的截图，只保存在本机，可随时关闭并清空。"));
+            reasons.append(Base::uiText("记忆库尚未开启。开启后仅索引手动截图，数据仅保存在本机，可随时关闭并清空。"));
         }
         if (!m_ocrAvailable && m_enabled)
         {
-            const QString reason = m_ocrReason.isEmpty() ? Base::uiText("文字识别后端不可用") : m_ocrReason;
-            reasons.append(Base::uiText("文字识别暂不可用：") + reason + Base::uiText("。截图仍会入库，可稍后重新识别。"));
+            const QString reason = m_ocrReason.isEmpty() ? Base::uiText("未检测到可用的识别引擎") : m_ocrReason;
+            reasons.append(Base::uiText("文字识别暂不可用：") + reason + Base::uiText("。截图仍会存入记忆库，可稍后重新识别。"));
         }
 
         m_banner->setText(reasons.join(QChar{u'\n'}));
@@ -728,7 +728,7 @@ namespace GyanisScribe::Gui
         item->setData(kGroupRole, groupIndex);
         // 组头只承接点击展开，不参与选中：选中态留给真正能贴图的结果行
         item->setFlags(Qt::ItemIsEnabled);
-        item->setToolTip(Base::uiText("点击展开或收起这一组重复/相似截图"));
+        item->setToolTip(Base::uiText("点击展开或收起该组重复或相似截图。"));
         auto font = item->font();
         font.setBold(true);
         item->setFont(font);
@@ -747,14 +747,14 @@ namespace GyanisScribe::Gui
         const QString databaseError = databaseErrorText();
         if (!databaseError.isEmpty())
         {
-            text = Base::uiText("记忆库暂时读不出来。可以点上面的「重建索引」，原图不会被删除。");
+            text = Base::uiText("记忆库暂时无法读取。请点击上方的「重建索引」，原图不会被删除。");
         } else if (!m_enabled)
         {
-            text = Base::uiText("开启记忆后，这里会列出你主动截的图。");
+            text = Base::uiText("开启记忆后，此处会列出手动截图。");
         } else if (m_groups.empty())
         {
             const bool filtered = !m_search->text().trimmed().isEmpty() || !m_appFilter->currentData().toString().isEmpty() || m_timeFilter->currentData().toInt() > 0;
-            text = filtered ? Base::uiText("没有搜到匹配的截图。换个关键词，或放宽应用与时间范围。") : Base::uiText("还没有索引。第一次截图后会自动建立索引，也可以导入旧截图。");
+            text = filtered ? Base::uiText("没有搜到匹配的截图。请更换关键词，或放宽应用与时间范围。") : Base::uiText("还没有索引。首次截图后会自动建立索引，也可以导入旧截图。");
         }
 
         m_emptyHint->setText(text);
@@ -923,12 +923,12 @@ namespace GyanisScribe::Gui
     {
         if (m_totalItems <= 0)
         {
-            emit messageForUser(Base::uiText("记忆库本来就是空的"), Gui::ToastKind::Information);
+            emit messageForUser(Base::uiText("记忆库当前为空"), Gui::ToastKind::Information);
             return;
         }
 
         // 清空是一下去掉整批：确认框写明条数，原图与历史记录不在删除范围内
-        const auto answer = QMessageBox::question(this, Base::uiText("清空记忆索引"), Base::uiText("要删除全部 %1 条索引吗？原图与历史记录不会被删除。").arg(m_totalItems),
+        const auto answer = QMessageBox::question(this, Base::uiText("清空记忆索引"), Base::uiText("确定删除全部 %1 条索引吗？原图与历史记录不会被删除。").arg(m_totalItems),
                                                   QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
         if (answer == QMessageBox::Yes)
         {

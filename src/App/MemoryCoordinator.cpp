@@ -64,7 +64,7 @@ namespace GyanisScribe::App
         /// 没有后端对象时的兜底原因
         QString fallbackUnavailableReason()
         {
-            return Base::uiText("本机没有可用的文字识别后端：请安装系统语言包，或换用 Tesseract 语言包后再试");
+            return Base::uiText("本机没有可用的文字识别后端：请安装系统语言包，或改用 Tesseract 语言包后重试");
         }
 
         /// 数据库文件的侧车路径：-wal 与 -shm 跟着主文件换名
@@ -292,7 +292,7 @@ namespace GyanisScribe::App
             if (isEnabled() && !m_excludedNoticeShown)
             {
                 m_excludedNoticeShown = true;
-                emit messageForUser(Base::uiText("记忆库：这个程序在排除名单里，这次截图没有建立索引。"), Gui::ToastKind::Information);
+                emit messageForUser(Base::uiText("记忆库：该程序在排除名单中，本次截图未建立索引。"), Gui::ToastKind::Information);
             }
             return;
         }
@@ -320,7 +320,7 @@ namespace GyanisScribe::App
             if (!m_databaseFailureReported && !m_indexNoticeShown)
             {
                 m_indexNoticeShown = true;
-                emit messageForUser(Base::uiText("记忆库暂不可用：索引还没有打开，请稍后重试；若问题持续，请在记忆库页重建索引。"), Gui::ToastKind::Danger);
+                emit messageForUser(Base::uiText("记忆库暂不可用：索引尚未打开，请稍后重试；若问题持续，请在记忆库页重建索引。"), Gui::ToastKind::Danger);
             }
             return;
         }
@@ -346,7 +346,7 @@ namespace GyanisScribe::App
 
         if (m_importJob)
         {
-            emit messageForUser(Base::uiText("记忆库：已经有一个导入任务在进行，请等它结束或先取消。"), Gui::ToastKind::Information);
+            emit messageForUser(Base::uiText("记忆库：已有导入任务正在进行，请等待其结束或先取消。"), Gui::ToastKind::Information);
             return;
         }
 
@@ -358,7 +358,7 @@ namespace GyanisScribe::App
         const QFileInfo directoryInfo{displayPath(directory)};
         if (!directoryInfo.exists() || !directoryInfo.isDir())
         {
-            emit messageForUser(Base::uiText("记忆库：导入目录 %1 不存在或不可读，请选择一个存在的文件夹。").arg(displayPath(directory)), Gui::ToastKind::Danger);
+            emit messageForUser(Base::uiText("记忆库：导入目录 %1 不存在或无法读取，请选择有效的文件夹。").arg(displayPath(directory)), Gui::ToastKind::Danger);
             return;
         }
 
@@ -389,7 +389,7 @@ namespace GyanisScribe::App
                              if (evicted > 0)
                              {
                                  // 整个导入合并成一条，逐条提示会把界面刷屏
-                                 emit messageForUser(Base::uiText("记忆库已达上限 %1 条：本次导入已淘汰最早的 %2 条；原图文件不受影响。").arg(m_capacityLimit).arg(evicted),
+                                 emit messageForUser(Base::uiText("记忆库已达上限 %1 条：本次导入已移除最早的 %2 条；原图文件不受影响。").arg(m_capacityLimit).arg(evicted),
                                                      Gui::ToastKind::Information);
                              }
                          });
@@ -483,7 +483,7 @@ namespace GyanisScribe::App
         const auto known = findQueueItem(id);
         if (!known)
         {
-            emit messageForUser(Base::uiText("记忆库：找不到要重新识别的条目，请刷新列表后再试。"), Gui::ToastKind::Information);
+            emit messageForUser(Base::uiText("记忆库：未找到要重新识别的条目，请刷新列表后重试。"), Gui::ToastKind::Information);
             return;
         }
 
@@ -670,7 +670,7 @@ namespace GyanisScribe::App
         if (*removed > 0)
         {
             emit changed();
-            emit messageForUser(Base::uiText("记忆库：已清理 %1 条原图不在磁盘上的索引；导入的文件请保持原路径。").arg(*removed), Gui::ToastKind::Information);
+            emit messageForUser(Base::uiText("记忆库：已清理 %1 条原图已不存在的索引记录；导入的文件请保持原路径。").arg(*removed), Gui::ToastKind::Information);
         }
         emitStats();
     }
@@ -698,7 +698,7 @@ namespace GyanisScribe::App
         {
             // 旧库还在原位，重新打开后用户仍能搜索
             static_cast<void>(ensureIndexOpen());
-            const QString message = Base::uiText("记忆库：重建索引时无法移动旧库文件 %1（%2）。旧文件仍可找回，请关闭占用数据库的程序后重试。")
+            const QString message = Base::uiText("记忆库：重建索引时无法移动旧数据库文件 %1（%2）。旧文件仍可找回，请关闭占用该文件的程序后重试。")
                                             .arg(displayPath(corruptPath), QString::fromStdString(failure));
             reportDatabaseFailure(Base::Error{Base::ErrorCode::FileWriteFailed, message.toStdString()});
             return;
@@ -710,7 +710,7 @@ namespace GyanisScribe::App
             const std::filesystem::path target = sidecarPath(corruptPath, suffix);
             if (!moveFileIfExists(source, target, failure))
             {
-                const QString message = Base::uiText("记忆库：重建索引时无法移动旧库文件 %1（%2）。旧文件仍可找回，请关闭占用数据库的程序后重试。")
+                const QString message = Base::uiText("记忆库：重建索引时无法移动旧数据库文件 %1（%2）。旧文件仍可找回，请关闭占用该文件的程序后重试。")
                                                 .arg(displayPath(target), QString::fromStdString(failure));
                 reportDatabaseFailure(Base::Error{Base::ErrorCode::FileWriteFailed, message.toStdString()});
                 return;
@@ -763,7 +763,7 @@ namespace GyanisScribe::App
         QString message = QString::fromStdString(error.message);
         if (message.isEmpty())
         {
-            message = Base::uiText("记忆库数据库操作失败，请稍后重试；若问题持续，请在记忆库页重建索引。");
+            message = Base::uiText("记忆库的数据库操作失败，请稍后重试；若问题持续，请在记忆库页重建索引。");
         }
         emit databaseError(message);
         emit messageForUser(message, Gui::ToastKind::Danger);
@@ -865,7 +865,7 @@ namespace GyanisScribe::App
 
         emit changed();
         emitStats();
-        emit messageForUser(Base::uiText("记忆库：条目已达上限 %1 条，已淘汰最早的 %2 条；原图文件不受影响。").arg(m_capacityLimit).arg(static_cast<int>(evicted->size())),
+        emit messageForUser(Base::uiText("记忆库：条目已达上限 %1 条，已移除最早的 %2 条；原图文件不受影响。").arg(m_capacityLimit).arg(static_cast<int>(evicted->size())),
                             Gui::ToastKind::Information);
     }
 

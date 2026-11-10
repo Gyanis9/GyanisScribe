@@ -108,7 +108,7 @@ TEST_F(DeliveryCoordinatorFixture, PercentFileIsRejectedWhenThisRoundSavedNothin
     const auto result = m_delivery->runAfterCaptureCommand(QStringLiteral("GyanisScribe-This-Program-Does-Not-Exist %file%"));
     ASSERT_FALSE(result.has_value()) << "本轮没有文件却把 %file% 喂给了外部命令";
     EXPECT_EQ(result.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument) << "报的是「程序起不来」而不是「这一轮没有文件」：" << result.error().message;
-    EXPECT_NE(result.error().message.find("没有落成文件"), std::string::npos) << result.error().message;
+    EXPECT_NE(result.error().message.find("未生成文件"), std::string::npos) << result.error().message;
 }
 
 /**

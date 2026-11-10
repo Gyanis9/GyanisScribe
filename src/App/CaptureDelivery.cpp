@@ -43,7 +43,7 @@ namespace GyanisScribe::App
             if (piece.isEmpty())
             {
                 return std::unexpected(
-                        Base::Error{.code = Base::ErrorCode::InvalidArgument, .message = Base::uiTextUtf8("逗号两边都要有内容：把多余的逗号去掉（比如结尾那一个）")});
+                        Base::Error{.code = Base::ErrorCode::InvalidArgument, .message = Base::uiTextUtf8("逗号两侧都必须有内容；请删除多余的逗号（例如结尾处的逗号）。")});
             }
 
             const auto found = std::ranges::find_if(kCaptureOutputChoices, [&](const CaptureOutputChoice &choice) { return piece == tokenText(choice.token); });
@@ -57,7 +57,7 @@ namespace GyanisScribe::App
             if (std::ranges::find(outputs, found->output) != outputs.end())
             {
                 return std::unexpected(Base::Error{.code    = Base::ErrorCode::InvalidArgument,
-                                                   .message = Base::uiFormat(Base::uiTextUtf8("目的地「{}」写了两次：一处写一次就够"), piece.toStdString())});
+                                                   .message = Base::uiFormat(Base::uiTextUtf8("目的地「{}」重复出现；每个目的地只需填写一次。"), piece.toStdString())});
             }
             outputs.push_back(found->output);
         }

@@ -420,7 +420,7 @@ TEST_F(RewindCoordinatorFixture, ShowPickerExplainsDisabledAndEmptyBuffer)
     ASSERT_TRUE(settings.setValue(kRewindEnabled, QVariant(true)).has_value());
     coordinator.showPicker();
     ASSERT_EQ(messages.size(), 2);
-    EXPECT_TRUE(messages.back().contains(QStringLiteral("还没有画面")));
+    EXPECT_TRUE(messages.back().contains(QStringLiteral("暂无画面")));
     EXPECT_EQ(findPickerWindow(), nullptr);
 }
 

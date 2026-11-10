@@ -151,7 +151,7 @@ namespace GyanisScribe::Gui
         m_elapsed = new QLabel{formatDuration(0), this};
         m_elapsed->setObjectName(QStringLiteral("metricValue"));
         m_elapsed->setAccessibleName(GyanisScribe::Base::uiText("已录时长"));
-        m_elapsed->setToolTip(GyanisScribe::Base::uiText("已录了多久。录到设置里「最长录多久」那一格就自动收尾并保存（默认 10 分钟）"));
+        m_elapsed->setToolTip(GyanisScribe::Base::uiText("已录制时长。达到设置中的「最长录制时长」后会自动停止并保存（默认 10 分钟）。"));
         // 等宽数字：一秒一跳时这一列的宽度不能变，否则整条控制条每秒钟抖一次。
         // 时长是纯 ASCII 读数，暗色档可换可变字族并降 40
         GyanisScribe::Gui::applyTextRole(*m_elapsed, GyanisScribe::Gui::TextRole::Metric, GyanisScribe::Gui::TextScript::AsciiOnly);
@@ -160,14 +160,14 @@ namespace GyanisScribe::Gui
         // 取消排在最左：它与「停止并保存」之间隔着暂停键，误点一格不会把录好的那段丢掉
         auto *cancelButton = new Gui::Button{GyanisScribe::Base::uiText("取消"), this};
         cancelButton->setIcon(m_icons.icon("Close"));
-        cancelButton->setToolTip(GyanisScribe::Base::uiText("放弃这一段，不保存成品"));
+        cancelButton->setToolTip(GyanisScribe::Base::uiText("放弃本次录制，不保存输出文件"));
         cancelButton->setAccessibleName(GyanisScribe::Base::uiText("取消录屏"));
         m_pauseButton = new Gui::Button{GyanisScribe::Base::uiText("暂停"), this};
         m_pauseButton->setIcon(m_icons.icon("RecordPause"));
         m_pauseButton->setAccessibleName(GyanisScribe::Base::uiText("暂停"));
         auto *stopButton = new Gui::Button{GyanisScribe::Base::uiText("停止"), this};
         stopButton->setIcon(m_icons.icon("RecordStop"));
-        stopButton->setToolTip(GyanisScribe::Base::uiText("停止并保存成品"));
+        stopButton->setToolTip(GyanisScribe::Base::uiText("停止并保存输出文件"));
         stopButton->setAccessibleName(GyanisScribe::Base::uiText("停止并保存"));
         auto *minimizeButton = new Gui::Button{this};
         minimizeButton->setIcon(m_icons.icon("Tray"));

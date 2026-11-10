@@ -390,7 +390,7 @@ TEST_F(RecordingCoordinatorFixture, AutoStopAnnouncesBeforeTheEncodeFinishes)
                      [this](const QString &message, const ToastKind)
                      {
                          m_messages.push_back(message);
-                         if (message.contains(QStringLiteral("已到最长时长，正在编成品")))
+                         if (message.contains(QStringLiteral("已达到最长录制时长，正在生成输出文件")))
                          {
                              ++m_announcements;
                              m_hudVisibleAtAnnouncement = m_coordinator->isHudVisible();

@@ -65,11 +65,11 @@ namespace GyanisScribe::Gui
         // 统计读不出时宁可不写这一行，也不把不知道报成 0 条
         if (m_pendingOcr >= 0)
         {
-            lines.append(QString::fromUtf8(Base::uiFormat(Base::uiTextUtf8("待识别 {} 条，导入后会在后台继续识别"), m_pendingOcr).c_str()));
+            lines.append(QString::fromUtf8(Base::uiFormat(Base::uiTextUtf8("待识别 {} 条，导入后将在后台继续识别"), m_pendingOcr).c_str()));
         }
         if (m_progress.cancelled)
         {
-            lines.append(Base::uiText("正在取消；已入库的条目与已完成的识别会保留。"));
+            lines.append(Base::uiText("正在取消；已入库的条目与已完成的识别结果将保留。"));
         }
         m_text->setText(lines.join(QChar{u'\n'}));
         // 取消只该点一次：重复点击没有额外作用，灰掉也让「正在取消」这句更可信

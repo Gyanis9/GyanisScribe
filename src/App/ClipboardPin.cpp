@@ -128,7 +128,7 @@ namespace GyanisScribe::App
     {
         if (data == nullptr)
         {
-            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("剪贴板里没有可以贴的内容：图像、纯文本或颜色都行。先复制一个再来贴")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("剪贴板中没有可粘贴的内容：支持图像、纯文本或颜色。请先复制内容后重试。")});
         }
 
         if (data->hasImage())
@@ -138,7 +138,7 @@ namespace GyanisScribe::App
             if (image.isNull())
             {
                 return std::unexpected(
-                        Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("剪贴板里的图像读不出来（来源可能只挂了名目、没给像素）：换一张图复制，或先截图再来贴")});
+                        Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("无法读取剪贴板中的图像（来源可能未提供像素数据）。请复制其他图像，或先截图再粘贴。")});
             }
             return image;
         }
@@ -146,7 +146,7 @@ namespace GyanisScribe::App
         if (!data->hasText())
         {
             return std::unexpected(
-                    Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("剪贴板里没有可以贴的内容：图像、纯文本或颜色都行。链接与文件这一类还没有转贴图的做法")});
+                    Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("剪贴板中没有可粘贴的内容：支持图像、纯文本或颜色；链接与文件暂不支持转换为贴图。")});
         }
 
         const auto text = data->text();
@@ -158,12 +158,12 @@ namespace GyanisScribe::App
         const auto trimmed = text.trimmed();
         if (trimmed.isEmpty())
         {
-            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("剪贴板里的文本是空的（只有空白）：先复制一段文字再来贴")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("剪贴板中的文本为空（仅含空白字符）。请先复制文字内容。")});
         }
         if (trimmed.size() > kMaximumTextCardCharacters)
         {
             return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
-                                               Base::uiFormat(Base::uiTextUtf8("剪贴板里的文本太长（{} 个字，上限 {}）：整张卡片会长到没法看，先把要贴的那一段截短再试"),
+                                               Base::uiFormat(Base::uiTextUtf8("剪贴板文本过长（{} 个字符，上限 {}）：请缩短要粘贴的文本后重试。"),
                                                               trimmed.size(), static_cast<int>(kMaximumTextCardCharacters))});
         }
         return renderTextCard(trimmed, font);
@@ -173,7 +173,7 @@ namespace GyanisScribe::App
     {
         if (data == nullptr)
         {
-            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("拖进来的东西没有可读的内容，贴不出来")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("拖入的内容没有可读取的数据，无法生成贴图。")});
         }
 
         // 有文件就按文件走：拖一叠图片进来该贴出一叠，不是只看第一件
@@ -215,7 +215,7 @@ namespace GyanisScribe::App
                 return content;
             }
             return std::unexpected(
-                    Base::Error{Base::ErrorCode::InvalidArgument, Base::uiFormat(Base::uiTextUtf8("拖进来的文件不是图片或读不出来：{}。图片文件、链接与文本都可以贴"),
+                    Base::Error{Base::ErrorCode::InvalidArgument, Base::uiFormat(Base::uiTextUtf8("拖入的文件不是图片或无法读取：{}。支持图片文件、链接与文本。"),
                                                                                  content.rejectedNames.join(QStringLiteral("、")).toStdString())});
         }
 

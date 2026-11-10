@@ -813,10 +813,10 @@ TEST_F(HistoryViewFixture, RepairingAfterABrokenManifestWarnsAgain)
                          {
                              return;
                          }
-                         if (text.contains(QStringLiteral("读不懂")))
+                         if (text.contains(QStringLiteral("无法解析")))
                          {
                              ++skippedToasts;
-                         } else if (text.contains(QStringLiteral("没能读出来")))
+                         } else if (text.contains(QStringLiteral("读取失败")))
                          {
                              ++failureToasts;
                          }
@@ -870,7 +870,7 @@ TEST_F(HistoryViewFixture, BrokenKeepsPreviousRowsAndTellsTheUser)
     view->refresh();
 
     EXPECT_EQ(emitted, 1) << "读不出清单必须说一声，不能安静地把列表刷成空";
-    EXPECT_NE(message.toStdString().find("历史清单没能读出来"), std::string::npos);
+    EXPECT_NE(message.toStdString().find("历史清单读取失败"), std::string::npos);
     EXPECT_EQ(view->rowCount(), 1) << "上一次的记录要留着，让用户还能顺着路径找文件";
 }
 

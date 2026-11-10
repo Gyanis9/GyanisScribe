@@ -177,7 +177,7 @@ namespace GyanisScribe::Gui
         if (result.isEmpty())
         {
             // 空结果不是失败：把「这一张里没字」与「认不出」分开说，用户才知道下一步该换图还是换语言
-            return QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("这一张图里没认出文字。可以换一种语言再认一次，或重新截一张更清晰的图")).c_str());
+            return QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("未识别到文字。可更换识别语言后重试，或重新截取更清晰的图像。")).c_str());
         }
 
         // 置信度按后端给不给得出分两种写法：给不出这一路读数就写「未提供」，
@@ -268,7 +268,7 @@ namespace GyanisScribe::Gui
                          {
                              if (copyAllToClipboard().isEmpty())
                              {
-                                 emit messageForUser(GyanisScribe::Base::uiText("这一张图没有认出可复制的文字"), Gui::ToastKind::Information);
+                                 emit messageForUser(GyanisScribe::Base::uiText("未识别到可复制的文字"), Gui::ToastKind::Information);
                                  return;
                              }
                              emit messageForUser(GyanisScribe::Base::uiText("已复制全部文字"), Gui::ToastKind::Success);
@@ -278,7 +278,7 @@ namespace GyanisScribe::Gui
                          {
                              if (copySelectionToClipboard().isEmpty())
                              {
-                                 emit messageForUser(GyanisScribe::Base::uiText("先在右边选中要复制的文字"), Gui::ToastKind::Information);
+                                 emit messageForUser(GyanisScribe::Base::uiText("请先在右侧选中要复制的文字"), Gui::ToastKind::Information);
                                  return;
                              }
                              emit messageForUser(GyanisScribe::Base::uiText("已复制选中文字"), Gui::ToastKind::Success);
@@ -297,7 +297,7 @@ namespace GyanisScribe::Gui
                          {
                              if (copyMarkdownToClipboard().isEmpty())
                              {
-                                 emit messageForUser(GyanisScribe::Base::uiText("这一张图没有认出可复制的文字"), Gui::ToastKind::Information);
+                                 emit messageForUser(GyanisScribe::Base::uiText("未识别到可复制的文字"), Gui::ToastKind::Information);
                                  return;
                              }
                              emit messageForUser(GyanisScribe::Base::uiText("已复制 Markdown"), Gui::ToastKind::Success);
@@ -320,7 +320,7 @@ namespace GyanisScribe::Gui
         if (m_table.found)
         {
             // 复杂表没有导出出口，但检测本身值得说一句；不写原因，用户只会以为表格没认出来
-            status += QLatin1Char(' ') + (m_table.complex ? GyanisScribe::Base::uiText("· 检测到复杂表格，暂不支持 CSV") : GyanisScribe::Base::uiText("· 检测到表格，可导出 CSV"));
+            status += QLatin1Char(' ') + (m_table.complex ? GyanisScribe::Base::uiText("· 检测到复杂表格，暂不支持导出 CSV") : GyanisScribe::Base::uiText("· 检测到表格，可导出 CSV"));
         }
         m_status->setText(status);
         // 动作行只按结果收放，不读控件当前是否可见：窗口还没显示时 isVisible 一律为假
@@ -435,7 +435,7 @@ namespace GyanisScribe::Gui
         if (auto exported = exportTxt(path); !exported)
         {
             const auto message =
-                    QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("导出 TXT 失败：{}。请换一个目录再试一次"), exported.error().message).c_str());
+                    QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("导出 TXT 失败：{}。请更换输出目录后重试。"), exported.error().message).c_str());
             Base::Logger::warning(message.toStdString());
             emit messageForUser(message, Gui::ToastKind::Danger);
             return;
@@ -456,7 +456,7 @@ namespace GyanisScribe::Gui
         if (auto exported = exportJson(path); !exported)
         {
             const auto message =
-                    QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("导出 JSON 失败：{}。请换一个目录再试一次"), exported.error().message).c_str());
+                    QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("导出 JSON 失败：{}。请更换输出目录后重试。"), exported.error().message).c_str());
             Base::Logger::warning(message.toStdString());
             emit messageForUser(message, Gui::ToastKind::Danger);
             return;
@@ -477,7 +477,7 @@ namespace GyanisScribe::Gui
         if (auto exported = exportCsv(path); !exported)
         {
             const auto message = QString::fromUtf8(
-                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("导出表格 CSV 失败：{}。请换一个目录再试一次"), exported.error().message).c_str());
+                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("导出表格 CSV 失败：{}。请更换输出目录后重试。"), exported.error().message).c_str());
             Base::Logger::warning(message.toStdString());
             emit messageForUser(message, Gui::ToastKind::Danger);
             return;

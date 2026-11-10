@@ -38,7 +38,7 @@ namespace GyanisScribe::App
         // 上一条还在飞：先给它一个明确收场再换新的。截图工具不是下载器，同时跟两条只会让提示分不清哪一句属于谁
         if (m_reply != nullptr)
         {
-            concludeWithFailure(GyanisScribe::Base::uiText("上一条取图还没回来就被新的地址换掉了：这一张没有取到，要它请再贴一次"));
+            concludeWithFailure(GyanisScribe::Base::uiText("上一个图片请求尚未完成就被新地址替换，该图片未获取。如需此图片，请重新粘贴。"));
         }
 
         m_payload.clear();
@@ -101,7 +101,7 @@ namespace GyanisScribe::App
                              {
                                  cleanup();
                                  emit failed(QString::fromUtf8(
-                                         GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("这张图超过 {} MB 上限，没有取回来；换一张小一点的，或先把它存到盘上再拖进来"),
+                                         GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("图片超过 {} MB 上限，未获取。请更换较小的图片，或先保存到本地再拖入。"),
                                                                       kMaximumFetchedImageBytes / (1024LL * 1024))
                                                  .c_str()));
                                  return;
@@ -119,7 +119,7 @@ namespace GyanisScribe::App
                                                                            .c_str()));
                                      return;
                                  }
-                                 emit failed(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("这张图没取回来：{}。检查地址能不能在浏览器里打开"),
+                                 emit failed(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("未能获取图片：{}。请检查该地址能否在浏览器中打开。"),
                                                                                             reply->errorString().toStdString())
                                                                        .c_str()));
                                  return;
@@ -131,7 +131,7 @@ namespace GyanisScribe::App
                              {
                                  cleanup();
                                  emit failed(QString::fromUtf8(
-                                         GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("这条地址给回来的不是图片（{}）：要贴网页上的图，请对着图点右键复制图片地址"),
+                                         GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("该地址返回的内容不是图片（{}）。如需粘贴网页图片，请右键单击图片并复制图片地址。"),
                                                                       contentType.toStdString())
                                                  .c_str()));
                                  return;
@@ -141,7 +141,7 @@ namespace GyanisScribe::App
                              if (!image.loadFromData(m_payload))
                              {
                                  cleanup();
-                                 emit failed(GyanisScribe::Base::uiText("取回来的数据读不出像素（可能不是图片，或格式这台机器认不出）：换一条图片地址再试"));
+                                 emit failed(GyanisScribe::Base::uiText("无法读取返回数据的像素（可能不是图片，或当前环境不支持该格式）。请更换图片地址后重试。"));
                                  return;
                              }
 

@@ -30,7 +30,7 @@ namespace GyanisScribe::App
     std::vector<QColor> PickCoordinator::recentColors() const
     {
         const auto label    = GyanisScribe::Base::uiText("最近使用颜色").toStdString();
-        const auto recovery = GyanisScribe::Base::uiText("删掉配置里的 %1 这一项可以恢复默认").arg(QString::fromUtf8(GyanisScribe::Core::kPickRecentColors)).toStdString();
+        const auto recovery = GyanisScribe::Base::uiText("删除配置中的 %1 可恢复默认设置").arg(QString::fromUtf8(GyanisScribe::Core::kPickRecentColors)).toStdString();
         const auto parsed   = GyanisScribe::Core::parseRecentColors(m_settings.stringListValue(GyanisScribe::Core::kPickRecentColors, {}), label, recovery);
         if (!parsed)
         {

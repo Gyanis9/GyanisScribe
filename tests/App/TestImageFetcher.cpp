@@ -281,5 +281,5 @@ TEST_F(ImageFetcherFixture, UnreachableAddressGivesAnActionableReason)
     const auto   outcome = fetchAndWait(fetcher, QUrl{QStringLiteral("http://127.0.0.1:%1/pic.png").arg(deadPort)}, 8000);
     ASSERT_FALSE(outcome.timedOut) << "连接失败没有收场";
     ASSERT_FALSE(outcome.succeeded);
-    EXPECT_TRUE(outcome.reason.contains(QStringLiteral("检查地址"))) << "失败文案里要有出路：" << outcome.reason.toStdString();
+    EXPECT_TRUE(outcome.reason.contains(QStringLiteral("检查该地址"))) << "失败文案里要有出路：" << outcome.reason.toStdString();
 }
