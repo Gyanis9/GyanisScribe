@@ -344,3 +344,102 @@ TEST_F(PathsFixture, DisplayTextRoundTripsAPathTheLocalCodePageCannotHold)
     EXPECT_EQ(Paths::toDisplayText(path), text) << "换过去再换回来不是同一串：中文目录会被读成另一条不存在的路";
     EXPECT_EQ(Paths::fromDisplayText(Paths::toDisplayText(path)), path) << "往返不闭合";
 }
+
+/**
+ * @brief 钉住模板解析放行三格截图上下文变量
+ * @details 应用名、窗口标题与屏幕名都是运行时才知道的值，模板里必须能先写出来。
+ */
+TEST(Paths, NameTemplateAcceptsContextTokens)
+{
+    const auto parsed = Paths::parseNameTemplate(QStringLiteral("%app%_%title%_%monitor%_%date%_%time%_%ms%"));
+    ASSERT_TRUE(parsed.has_value());
+    EXPECT_EQ(*parsed, QStringLiteral("%app%_%title%_%monitor%_%date%_%time%_%ms%"));
+}
+
+/**
+ * @brief 钉住未知变量的错误文案列全六格可用变量
+ * @details 只说「不认得」而不给可选项，用户只能靠猜；打错一个变量名时尤其需要看到完整清单。
+ */
+TEST(Paths, NameTemplateUnknownVariableListsAllSixTokens)
+{
+    const auto parsed = Paths::parseNameTemplate(QStringLiteral("shot_%appx%"));
+    ASSERT_FALSE(parsed.has_value());
+    const auto &message = parsed.error().message;
+    EXPECT_NE(message.find("%date%"), std::string::npos);
+    EXPECT_NE(message.find("%app%"), std::string::npos);
+    EXPECT_NE(message.find("%title%"), std::string::npos);
+    EXPECT_NE(message.find("%monitor%"), std::string::npos);
+}
+
+/**
+ * @brief 钉住上下文值进入名字前的清洗：保留字面部分，只把路径字符与空白折成单个下划线
+ * @details 屏幕名常见形如 \\.\DISPLAY1，原样写进文件名会带出两个反斜杠、一个点与一个反斜杠；
+ *          清洗后只剩 DISPLAY1，首尾的空下划线、空格与点也必须一起去掉。
+ */
+TEST(Paths, FormatsAndSanitizesContextValues)
+{
+    const QDateTime moment{QDate{2026, 11, 9}, QTime{14, 3, 0, 123}};
+    const GyanisScribe::Base::NameTemplateContext context{
+            QStringLiteral("Chrome: 设置 / 隐私"),
+            QStringLiteral("Tabs - 项目"),
+            QStringLiteral("\\\\.\\DISPLAY1"),
+    };
+    EXPECT_EQ(Paths::formatProductName(moment, QStringLiteral("%app%_%title%_%monitor%_%date%"), context),
+              QStringLiteral("Chrome_设置_隐私_Tabs_-_项目_DISPLAY1_20261109"));
+}
+
+/**
+ * @brief 钉住上下文缺值时的回落与超长截断
+ * @details 窗口标题抓不到、屏幕名拿不到时不能留下空档；过长的标题要截到 40 个 QChar，
+ *          否则一段长标题会把整个文件名撑到别的程序打不开。
+ */
+TEST(Paths, ContextValuesFallbackWhenEmptyOrTooLong)
+{
+    const QDateTime moment{QDate{2026, 11, 9}, QTime{14, 3, 0, 123}};
+    EXPECT_EQ(Paths::formatProductName(moment, QStringLiteral("%app%_%title%_%monitor%"), {}), QStringLiteral("app_window_screen"));
+    EXPECT_EQ(Paths::formatProductName(moment, QStringLiteral("%app%"), GyanisScribe::Base::NameTemplateContext{QString(41, QLatin1Char('a')), {}, {}}).size(), 40);
+}
+
+/**
+ * @brief 钉住预览返回不带扩展名的主名，且空模板按默认档、非法模板交回原因
+ * @details 设置页拿到的是一段可直接显示的预览文本；空模板若判错，用户清空输入框时就会看到红字。
+ */
+TEST(Paths, PreviewReturnsStemAndRejectsInvalidTemplate)
+{
+    const QDateTime moment{QDate{2026, 11, 9}, QTime{14, 3, 0, 123}};
+    const auto preview = Paths::previewProductName(QStringLiteral("shot-%app%"), moment, GyanisScribe::Base::NameTemplateContext{QStringLiteral("Code"), {}, {}});
+    ASSERT_TRUE(preview.has_value());
+    EXPECT_EQ(*preview, QStringLiteral("shot-Code"));
+
+    EXPECT_FALSE(Paths::previewProductName(QStringLiteral("shot-%nope%"), moment, {}).has_value());
+    const auto empty = Paths::previewProductName(QString{}, moment, {});
+    ASSERT_TRUE(empty.has_value()) << "空模板应按默认档预览";
+    EXPECT_EQ(*empty, QStringLiteral("GyanisScribe_20261109_140300_123"));
+}
+
+/**
+ * @brief 钉住预览同样给 Windows 保留设备名加下划线前缀
+ * @details 预览与实际保存必须同解：预览显示 CON 而保存出来是 _CON，用户会以为名字没生效。
+ */
+TEST(Paths, PreviewEscapesReservedDeviceNames)
+{
+    const QDateTime moment{QDate{2026, 11, 9}, QTime{14, 3, 0, 123}};
+    const auto preview = Paths::previewProductName(QStringLiteral("%app%"), moment,
+                                                   GyanisScribe::Base::NameTemplateContext{QStringLiteral("CON"), {}, {}});
+    ASSERT_TRUE(preview.has_value());
+    EXPECT_EQ(*preview, QStringLiteral("_CON"));
+}
+
+/**
+ * @brief 钉住带上下文与不带上下文两条命名入口
+ * @details 带上下文时替换出的名字要清洗；不带上下文时三格变量回落成 app/window/screen；
+ *          上下文值恰好是保留设备名时，成品名要加下划线前缀，避免写盘失败。
+ */
+TEST(Paths, ImageFileNameUsesContextAndDefaults)
+{
+    const QDateTime moment{QDate{2026, 11, 9}, QTime{14, 3, 0, 123}};
+    const GyanisScribe::Base::NameTemplateContext context{QStringLiteral("Code"), QStringLiteral("main.cpp"), QStringLiteral("Screen1")};
+    EXPECT_EQ(Paths::imageFileName(moment, "png", QStringLiteral("%app%_%monitor%"), context), QStringLiteral("Code_Screen1.png"));
+    EXPECT_EQ(Paths::imageFileName(moment, "png", QStringLiteral("%app%_%title%")), QStringLiteral("app_window.png"));
+    EXPECT_EQ(Paths::imageFileName(moment, "png", QStringLiteral("%app%"), GyanisScribe::Base::NameTemplateContext{QStringLiteral("CON"), {}, {}}), QStringLiteral("_CON.png"));
+}

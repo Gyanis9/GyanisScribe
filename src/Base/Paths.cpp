@@ -4,6 +4,7 @@
 #include "Base/Text.h"
 
 #include <QCoreApplication>
+#include <QChar>
 #include <QDir>
 #include <QFileInfo>
 #include <QDateTime>
@@ -25,12 +26,29 @@ namespace GyanisScribe::Base
         /// 落在用户目录下时统一套这一层，避免与别的应用混在同一个 Pictures 里
         constexpr std::string_view kApplicationFolder = "GyanisScribe";
 
-        /// 文件名模板的变量表：变量名 → 时刻格式。表里没有的 %xxx% 一律拒
+        /// 文件名模板的时刻变量表：变量名 → 时刻格式
         constexpr std::array<std::pair<std::string_view, std::string_view>, 3> kNameTemplateTokens{
                 std::pair{"date", "yyyyMMdd"},
                 std::pair{"time", "HHmmss"},
                 std::pair{"ms", "zzz"},
         };
+
+        /// 文件名模板的截图上下文变量：变量名与取值为空时的回落
+        struct NameTemplateContextToken
+        {
+            std::string_view name;     ///< 模板里的变量名
+            std::string_view fallback; ///< 上下文值为空时的回落
+        };
+
+        /// 上下文变量表：每项的回落写在第二列，避免解析与拼名两处各抄一份
+        constexpr std::array<NameTemplateContextToken, 3> kNameTemplateContextTokens{
+                NameTemplateContextToken{"app", "app"},
+                NameTemplateContextToken{"title", "window"},
+                NameTemplateContextToken{"monitor", "screen"},
+        };
+
+        /// 单个上下文值进入文件名后的长度上限：太长的窗口标题会把整个文件名撑到别的程序打不开
+        constexpr qsizetype kMaximumNamePartLength = 40;
 
         /// 名字里不许出现的字符：前两个会把文件写到别的目录，其余是 Windows 的保留字符
         constexpr std::string_view kForbiddenNameCharacters = "/\\:*?\"<>|";
@@ -57,6 +75,70 @@ namespace GyanisScribe::Base
                                        {
                                            return stem.compare(QString::fromLatin1(reserved.data(), static_cast<qsizetype>(reserved.size())), Qt::CaseInsensitive) == 0;
                                        });
+        }
+
+        /// 取上下文变量对应的原始值；只对 kNameTemplateContextTokens 里的三个名字调用
+        QString contextValueFor(const std::string_view token, const NameTemplateContext &context)
+        {
+            if (token == "app")
+            {
+                return context.application;
+            }
+            if (token == "title")
+            {
+                return context.windowTitle;
+            }
+            return context.monitor;
+        }
+
+        /// 把上下文值清洗成文件名可用的片段：控制字符、保留字符与空白折成下划线，首尾的 _、空格与点去掉
+        QString sanitizeNamePart(const QString &value, const std::string_view fallback)
+        {
+            QString    sanitized;
+            const auto appendCharacter = [&sanitized](const QChar character)
+            {
+                // 连续下划线压成一个：用户写下的 _ 与替换产生的 _ 按同一条规则合并
+                if (character == QLatin1Char('_') && sanitized.endsWith(QLatin1Char('_')))
+                {
+                    return;
+                }
+                sanitized.append(character);
+            };
+            sanitized.reserve(value.size());
+
+            for (const QChar character: value)
+            {
+                const auto isControl   = character.category() == QChar::Other_Control;
+                const auto isForbidden = character.unicode() < 0x80 &&
+                                         kForbiddenNameCharacters.find(static_cast<char>(character.unicode())) != std::string_view::npos;
+                if (isControl || isForbidden || character.isSpace())
+                {
+                    // 三类字符都落成同一个分隔符，连写的保留字符与空白串因此不会留下连续下划线
+                    appendCharacter(QLatin1Char('_'));
+                    continue;
+                }
+                appendCharacter(character);
+            }
+
+            // 首尾的 _、空格与点都不能留在名字里：末尾的点会被 Windows 当成扩展名分隔，下划线只是难看
+            const auto isTrimmable = [](const QChar character)
+            {
+                return character == QLatin1Char('_') || character == QLatin1Char(' ') || character == QLatin1Char('.');
+            };
+            while (!sanitized.isEmpty() && isTrimmable(sanitized.front()))
+            {
+                sanitized.remove(0, 1);
+            }
+            while (!sanitized.isEmpty() && isTrimmable(sanitized.back()))
+            {
+                sanitized.chop(1);
+            }
+
+            if (sanitized.isEmpty())
+            {
+                return QString::fromLatin1(fallback.data(), static_cast<qsizetype>(fallback.size()));
+            }
+            return sanitized.left(kMaximumNamePartLength);
         }
 
         std::filesystem::path fromQt(const QString &location)
@@ -161,6 +243,11 @@ namespace GyanisScribe::Base
 
     QString Paths::imageFileName(const QDateTime &moment, const std::string_view extension, const QString &pattern)
     {
+        return imageFileName(moment, extension, pattern, NameTemplateContext{});
+    }
+
+    QString Paths::imageFileName(const QDateTime &moment, const std::string_view extension, const QString &pattern, const NameTemplateContext &context)
+    {
         // 模板留空表示默认档：与「目录留空表示默认目录」同一约定，调用方不必各抄一份默认值
         auto effective = pattern.isEmpty() ? defaultNameTemplate() : pattern;
         if (const auto checked = parseNameTemplate(effective); !checked)
@@ -171,7 +258,14 @@ namespace GyanisScribe::Base
             effective = defaultNameTemplate();
         }
 
-        return formatProductName(moment, effective) + QStringLiteral(".") + QString::fromUtf8(extension.data(), static_cast<qsizetype>(extension.size()));
+        // 上下文值洗出来的名字可能正好是 CON 这类设备名；先补下划线，别等写盘时才报系统错误
+        auto productName = formatProductName(moment, effective, context);
+        if (isReservedDeviceName(productName))
+        {
+            productName.prepend(QLatin1Char('_'));
+        }
+
+        return productName + QStringLiteral(".") + QString::fromUtf8(extension.data(), static_cast<qsizetype>(extension.size()));
     }
 
     Expected<QString> Paths::parseNameTemplate(const QString &text)
@@ -223,13 +317,17 @@ namespace GyanisScribe::Base
             const auto looksLikeToken = !token.isEmpty() && std::ranges::all_of(token, [](const QChar character) { return character.isLower(); });
             if (looksLikeToken)
             {
-                const auto known = std::ranges::any_of(kNameTemplateTokens, [&token](const auto &entry)
-                                                       { return token == QString::fromLatin1(entry.first.data(), static_cast<qsizetype>(entry.first.size())); });
-                if (!known)
+                const auto matchesToken = [&token](const std::string_view name)
+                { return token == QString::fromLatin1(name.data(), static_cast<qsizetype>(name.size())); };
+                const auto knownTimeToken = std::ranges::any_of(kNameTemplateTokens, [&matchesToken](const auto &entry) { return matchesToken(entry.first); });
+                const auto knownContextToken =
+                        std::ranges::any_of(kNameTemplateContextTokens, [&matchesToken](const auto &entry) { return matchesToken(entry.name); });
+                if (!knownTimeToken && !knownContextToken)
                 {
                     return std::unexpected(Error{ErrorCode::InvalidArgument,
                                                  GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8(
-                                                                                      "文件名模板里的变量「%{}%」不认得：可用的只有 %date%（日期）、%time%（时刻）、%ms%（毫秒）"),
+                                                                                      "文件名模板里的变量「%{}%」不认得：可用的只有 %date%（日期）、%time%（时刻）、%ms%（毫秒）、"
+                                                                                      "%app%（应用名）、%title%（窗口标题）、%monitor%（屏幕名）"),
                                                                               token.toStdString())});
                 }
             }
@@ -240,6 +338,11 @@ namespace GyanisScribe::Base
 
     QString Paths::formatProductName(const QDateTime &moment, const QString &pattern)
     {
+        return formatProductName(moment, pattern, NameTemplateContext{});
+    }
+
+    QString Paths::formatProductName(const QDateTime &moment, const QString &pattern, const NameTemplateContext &context)
+    {
         // 逐格替换而不是把整条模板喂给 QDateTime::toString：模板里的字面量（含中文与下划线）
         // 不必再按时刻格式的记号去转义，用户写什么就写什么
         auto name = pattern;
@@ -248,7 +351,33 @@ namespace GyanisScribe::Base
             const auto placeholder = QStringLiteral("%") + QString::fromLatin1(token.data(), static_cast<qsizetype>(token.size())) + QStringLiteral("%");
             name.replace(placeholder, moment.toString(QString::fromLatin1(timeFormat.data(), static_cast<qsizetype>(timeFormat.size()))));
         }
+
+        // 上下文变量在时刻变量之后替换：清洗后的窗口标题里若出现 %date% 字样，也不会被当成模板变量再展开一次
+        for (const auto &[token, fallback]: kNameTemplateContextTokens)
+        {
+            const auto placeholder = QStringLiteral("%") + QString::fromLatin1(token.data(), static_cast<qsizetype>(token.size())) + QStringLiteral("%");
+            name.replace(placeholder, sanitizeNamePart(contextValueFor(token, context), fallback));
+        }
         return name;
+    }
+
+    Expected<QString> Paths::previewProductName(const QString &pattern, const QDateTime &moment, const NameTemplateContext &context)
+    {
+        // 空模板按默认档预览：设置页清空输入框时显示的应与实际保存出来的名字一致
+        const auto effective = pattern.isEmpty() ? defaultNameTemplate() : pattern;
+        const auto checked   = parseNameTemplate(effective);
+        if (!checked)
+        {
+            return std::unexpected(checked.error());
+        }
+
+        // 预览与实际保存同解：保留设备名同样补下划线，用户看到的就是将要落盘的主名
+        auto productName = formatProductName(moment, *checked, context);
+        if (isReservedDeviceName(productName))
+        {
+            productName.prepend(QLatin1Char('_'));
+        }
+        return productName;
     }
 
     std::filesystem::path Paths::uniqueFilePath(const std::filesystem::path &directory, const QString &fileName)

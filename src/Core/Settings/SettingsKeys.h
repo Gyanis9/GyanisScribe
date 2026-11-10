@@ -153,7 +153,7 @@ namespace GyanisScribe::Core
     /// PNG 是无损的，这一格对它没有作用，读端与「保存格式」那两格同处
     inline constexpr std::string_view kSaveImageQuality = "Save/ImageQuality";
 
-    /// 成品文件名的模板，变量只有 %date%、%time%、%ms%（Base::Paths::parseNameTemplate 校验）；
+    /// 成品文件名的模板，变量为 %date%、%time%、%ms%、%app%、%title%、%monitor%（Base::Paths::parseNameTemplate 校验）；
     /// 留空表示默认档，读端见 Core::nameTemplateOrDefault
     inline constexpr std::string_view kSaveNameTemplate = "Save/NameTemplate";
 

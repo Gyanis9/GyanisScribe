@@ -22,6 +22,17 @@ namespace GyanisScribe::Base
 {
 
     /**
+     * @brief 文件名模板可用的截图上下文取值
+     * @details 三个字段都来自抓屏那一刻的来源信息；空值在拼名时回落到 app、window、screen。
+     */
+    struct NameTemplateContext
+    {
+        QString application;  ///< 应用名，例如 Chrome
+        QString windowTitle;  ///< 窗口标题，例如 Tabs - 项目
+        QString monitor;      ///< 屏幕设备名，例如 DISPLAY1（可能带设备前缀）
+    };
+
+    /**
      * @brief 目录提供者
      * @details 只给默认值，不读设置：用户改过的截图/录屏目录由 Settings 提供，由调用方（App 层）在这里之外
      *          做替换。这样 Core 不依赖 Settings，容器内无 GUI 也能跑用例。
@@ -114,6 +125,18 @@ namespace GyanisScribe::Base
          */
         [[nodiscard]] static QString imageFileName(const QDateTime &moment, std::string_view extension, const QString &pattern = {});
 
+        /**
+         * @brief 带截图上下文生成导出图像的文件名
+         * @param moment 导出时刻
+         * @param extension 扩展名，不带点，例如 png、mp4
+         * @param pattern 文件名模板；留空表示用 kDefaultNameTemplate
+         * @param context 应用名、窗口标题与屏幕名，拼进名字前逐项清洗
+         * @return 形如 Chrome_DISPLAY1.png 的文件名
+         * @details 与三参版本共用同一套校验与默认档回落；上下文值清洗后仍可能撞上 Windows 保留设备名，
+         *          主名前会补一个下划线，避免写盘时才报系统错误。
+         */
+        [[nodiscard]] static QString imageFileName(const QDateTime &moment, std::string_view extension, const QString &pattern, const NameTemplateContext &context);
+
         /// 成品文件名的默认模板：三格变量是日期、时刻与毫秒；毫秒那一格让同一秒里连拍不互相覆盖
         static constexpr std::string_view kDefaultNameTemplate = "GyanisScribe_%date%_%time%_%ms%";
 
@@ -143,9 +166,10 @@ namespace GyanisScribe::Base
          * @brief 校验一份文件名模板
          * @param text 用户填的模板
          * @return 成功返回可用的模板（已去掉首尾空白）；不合法时返回带中文原因的 InvalidArgument
-         * @details 只认三格变量：%date%、%time%、%ms%，其余按字面量写进名字。
-         *          路径分隔符、Windows 上的保留字符与保留设备名（CON、AUX、COM1 这类）一律拒绝——
-         *          放过去就是写到别的目录或写不出去；形如 %xxx% 的未知变量也拒绝：打错一个字不该悄悄写进文件名。
+         * @details 只认六格变量：%date%、%time%、%ms%，以及截图上下文的 %app%、%title%、%monitor%，
+         *          其余按字面量写进名字。路径分隔符、Windows 上的保留字符与保留设备名（CON、AUX、COM1 这类）
+         *          一律拒绝——放过去就是写到别的目录或写不出去；形如 %xxx% 的未知变量也拒绝：
+         *          打错一个字不该悄悄写进文件名。
          */
         [[nodiscard]] static Expected<QString> parseNameTemplate(const QString &text);
 
@@ -156,6 +180,26 @@ namespace GyanisScribe::Base
          * @return 不含扩展名的名字
          */
         [[nodiscard]] static QString formatProductName(const QDateTime &moment, const QString &pattern);
+
+        /**
+         * @brief 带截图上下文按模板拼出成品名
+         * @param moment 产出时刻
+         * @param pattern 已校验过的模板
+         * @param context 应用名、窗口标题与屏幕名，空值回落到 app、window、screen
+         * @return 不含扩展名的名字
+         * @details 时刻变量先展开，再替换三个上下文变量；上下文值只保留文件名可用的部分，超长截到 40 个 QChar。
+         */
+        [[nodiscard]] static QString formatProductName(const QDateTime &moment, const QString &pattern, const NameTemplateContext &context);
+
+        /**
+         * @brief 按模板与上下文预览成品主名
+         * @param pattern 文件名模板；空串表示按默认档预览
+         * @param moment 用于展开时刻变量的时刻
+         * @param context 应用名、窗口标题与屏幕名
+         * @return 成功返回不含扩展名的主名；模板不合法时返回带中文原因的 InvalidArgument
+         * @details 设置页要显示与实际保存一致的名字：清洗、空值回落与保留设备名前缀都与 imageFileName 同解。
+         */
+        [[nodiscard]] static Expected<QString> previewProductName(const QString &pattern, const QDateTime &moment, const NameTemplateContext &context);
 
         /**
          * @brief 取一个不与已有文件相撞的路径
