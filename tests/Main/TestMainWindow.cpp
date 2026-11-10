@@ -1061,6 +1061,77 @@ namespace
     }
 
     /**
+     * @brief 钉住「标注时显示截图信息」这一格读写的是标注窗现读的那个键，且默认关
+     * @details 这个键只在标注窗开一轮时读一次：写错一格不会报错，只会表现成「勾了面板不出来」。
+     *          默认必须关——面板会把当前窗口标题摆到屏幕上，隐私优先；读端也要从盘上装回来一次，
+     *          只看写入的话，每次重开设置页都显示默认档也能全绿。
+     */
+    TEST_F(MainWindowFixture, CaptureInfoPanelRowWritesTheKeyAnnotationWindowReads)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::Capture);
+
+        auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage("标注时显示截图信息"));
+        ASSERT_NE(check, nullptr) << "截图页没有这一格";
+        EXPECT_FALSE(check->isChecked()) << "默认档该是关：面板会把窗口标题摆到屏幕上";
+        check->setChecked(true);
+        closeWindowAndFlush();
+
+        const auto written = makeStore();
+        EXPECT_TRUE(written->boolValue(GyanisScribe::Core::kCaptureShowInfoPanel, false)) << "开关没写进 Capture/ShowInfoPanel";
+
+        // 读端：把盘上那份重新装进一扇新窗口，勾选框该是勾上的
+        m_store = makeStore();
+        m_theme = std::make_unique<ThemeManager>(*m_store);
+        m_theme->applyFromSettings();
+        makeWindow();
+        m_window->open(MainWindowPage::Capture);
+        auto *restored = qobject_cast<QCheckBox *>(controlInCurrentPage("标注时显示截图信息"));
+        ASSERT_NE(restored, nullptr) << "重开的截图页没有这一格";
+        EXPECT_TRUE(restored->isChecked()) << "盘上存着开，重开设置页却显示关";
+        restored->setChecked(false);
+        closeWindowAndFlush();
+
+        const auto cleared = makeStore();
+        EXPECT_FALSE(cleared->boolValue(GyanisScribe::Core::kCaptureShowInfoPanel, true)) << "关掉没写回 Capture/ShowInfoPanel";
+    }
+
+    /**
+     * @brief 钉住文件名模板预览：空模板按默认档、变量按固定示例展开、非法模板说不可用
+     * @details 预览是用户确认模板写对的唯一反馈；空模板若显示报错，清空输入框（回到默认档）会被当成写错。
+     *          示例时刻写死，所以默认档的预演是一个定值；预览只读输入框文本，不写配置，
+     *          真正落盘仍要等 editingFinished 的校验。
+     */
+    TEST_F(MainWindowFixture, NameTemplatePreviewFollowsInputWithoutWritingSettings)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::Capture);
+
+        auto *edit = qobject_cast<QLineEdit *>(controlInCurrentPage("文件名模板"));
+        ASSERT_NE(edit, nullptr) << "截图页没有文件名模板这一格";
+        auto *preview = m_window->findChild<QLabel *>(QStringLiteral("nameTemplatePreview"));
+        ASSERT_NE(preview, nullptr) << "文件名模板输入框下面没有预览标签";
+        EXPECT_EQ(preview->accessibleName(), GyanisScribe::Base::uiText("文件名模板预览"));
+
+        EXPECT_EQ(preview->text(), QStringLiteral("预演：GyanisScribe_20261109_140300_123.png")) << "空模板没有按默认档预演";
+
+        edit->setText(QStringLiteral("%app%_%title%"));
+        EXPECT_EQ(preview->text(), QStringLiteral("预演：示例应用_示例窗口.png")) << "输入变化后预览没跟上";
+
+        edit->setText(QStringLiteral("%monitor%"));
+        EXPECT_EQ(preview->text(), QStringLiteral("预演：屏幕_1.png")) << "屏幕名里的空格该在预览里折成下划线";
+
+        edit->setText(QStringLiteral("shot-%nope%"));
+        EXPECT_EQ(preview->text(), GyanisScribe::Base::uiText("预演：模板不可用")) << "非法模板没有说明不可用";
+
+        // 预览只是预演，不落配置：从 textChanged 到现在这一格应当仍是空的，真正写盘要等 editingFinished 的校验
+        EXPECT_TRUE(m_store->stringValue(GyanisScribe::Core::kSaveNameTemplate, QString{}).isEmpty()) << "预览把未校验的文本写进了配置";
+        closeWindowAndFlush();
+        const auto reopened = makeStore();
+        EXPECT_TRUE(reopened->stringValue(GyanisScribe::Core::kSaveNameTemplate, QString{}).isEmpty()) << "预览把未校验的文本写进了配置";
+    }
+
+    /**
      * @brief 钉住「未保存的截图也进历史」这一格写的是截图那条路现读的键，默认档是关
      * @details 这个键只在「截图完成」那一刻被读一次：写错一格不会报错，只会表现成
      *          「开关拨了却没多留一份」，而用户以为误触 Esc 也丢不掉的那一张其实从没进过历史。

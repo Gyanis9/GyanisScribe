@@ -49,6 +49,7 @@
 #include <QByteArray>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDateTime>
 #include <QDesktopServices>
 #include <QDir>
 #include <QFileDialog>
@@ -2203,6 +2204,52 @@ namespace GyanisScribe::Main
     }
 
     /**
+     * @brief 文件名模板那一格：输入框下面跟一行按固定示例预演的成品名
+     * @param settings 配置存储
+     * @return 归调用方所有的行控件
+     * @details 预演只读输入框当前文本，不写配置；留空按默认档预演（与实际保存同一档），
+     *          模板写歪时预览标签说「不可用」，具体原因仍挂在输入框的 tooltip 上。
+     *          示例值固定写死，不取当前前台窗口或时钟，用例与截图里的预演才是同一个结果。
+     */
+    QWidget *makeNameTemplateRow(GyanisScribe::Core::ISettingsStore &settings)
+    {
+        auto *row    = new QWidget;
+        auto *layout = new QVBoxLayout{row};
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->setSpacing(GyanisScribe::Gui::kSpacingTiny);
+
+        auto *edit = makeNameTemplateEdit(settings);
+        layout->addWidget(edit);
+
+        auto *preview = new QLabel{row};
+        preview->setObjectName(QStringLiteral("nameTemplatePreview"));
+        preview->setAccessibleName(GyanisScribe::Base::uiText("文件名模板预览"));
+        preview->setWordWrap(true);
+        layout->addWidget(preview);
+
+        const GyanisScribe::Base::NameTemplateContext context{
+                GyanisScribe::Base::uiText("示例应用"),
+                GyanisScribe::Base::uiText("示例窗口"),
+                GyanisScribe::Base::uiText("屏幕 1"),
+        };
+        const QDateTime moment{QDate{2026, 11, 9}, QTime{14, 3, 0, 123}};
+        const auto      refreshPreview = [preview, context, moment](const QString &text)
+        {
+            const auto productName = GyanisScribe::Base::Paths::previewProductName(text, moment, context);
+            if (!productName)
+            {
+                preview->setText(GyanisScribe::Base::uiText("预演：模板不可用"));
+                return;
+            }
+            const auto formatted = GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("预演：{}.png"), productName->toStdString());
+            preview->setText(QString::fromUtf8(formatted.c_str()));
+        };
+        QObject::connect(edit, &QLineEdit::textChanged, preview, refreshPreview);
+        refreshPreview(edit->text());
+        return row;
+    }
+
+    /**
      * @brief 成品边框的宽度，物理像素
      * @param settings 配置存储
      * @return 归调用方所有的数字框
@@ -2335,6 +2382,12 @@ namespace GyanisScribe::Main
         page->setHighContrastBorder(true);
         auto *form = makePageForm(page, GyanisScribe::Base::uiText("截图与标注成品落在这个目录里。取色复制出来的文本按下面的写法格式化。"));
         form->addRow(GyanisScribe::Base::uiText("截完之后"), makeCaptureIntentCombo(m_settings, m_icons));
+        form->addRow(GyanisScribe::Base::uiText("标注时显示截图信息"),
+                     makeSettingCheck(m_settings, GyanisScribe::Core::kCaptureShowInfoPanel, false,
+                                      GyanisScribe::Base::uiText("在标注窗旁浮一块截图信息面板"),
+                                      GyanisScribe::Base::uiText("标注时显示截图信息"),
+                                      GyanisScribe::Base::uiText("开上后每次进标注窗都在工具栏旁浮着一块，写明应用、窗口标题、屏幕与捕获时刻；"
+                                                                 "默认关，关着时标注窗与以前一样。面板只在本机显示，不写历史、不写日志。")));
         form->addRow(GyanisScribe::Base::uiText("延时截图"), makeCaptureDelaySpin(m_settings));
         form->addRow(GyanisScribe::Base::uiText("鼠标指针"), makeIncludeCursorCheck(m_settings));
         form->addRow(GyanisScribe::Base::uiText("圆角截图"),
@@ -2364,7 +2417,7 @@ namespace GyanisScribe::Main
                                                                                    GyanisScribe::Base::Paths::defaultScreenshotDirectory(), m_icons));
         form->addRow(GyanisScribe::Base::uiText("保存格式"), makeImageFormatCombo(m_settings));
         form->addRow(GyanisScribe::Base::uiText("保存质量"), makeImageQualitySpin(m_settings));
-        form->addRow(GyanisScribe::Base::uiText("文件名模板"), makeNameTemplateEdit(m_settings));
+        form->addRow(GyanisScribe::Base::uiText("文件名模板"), makeNameTemplateRow(m_settings));
         form->addRow(GyanisScribe::Base::uiText("复制用的写法"), makeColorFormatCombo(m_settings));
         form->addRow(GyanisScribe::Base::uiText("放大镜视野"), makeMagnifierViewCombo(m_settings));
         form->addRow(GyanisScribe::Base::uiText("尺寸单位"), makeSizeUnitCombo(m_settings));

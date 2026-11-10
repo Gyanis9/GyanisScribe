@@ -860,8 +860,8 @@
             <translation>The file name template cannot contain "{}": it would put the file in another folder, or make the system refuse the write</translation>
         </message>
         <message>
-            <source>文件名模板里的变量「%{}%」不认得：可用的只有 %date%（日期）、%time%（时刻）、%ms%（毫秒）</source>
-            <translation>Unknown variable "%{}%" in the file name template: the only ones are %date% (date), %time% (time) and %ms% (milliseconds)</translation>
+            <source>文件名模板里的变量「%{}%」不认得：可用的只有 %date%（日期）、%time%（时刻）、%ms%（毫秒）、%app%（应用名）、%title%（窗口标题）、%monitor%（屏幕名）</source>
+            <translation>Unknown variable "%{}%" in the file name template. Available variables are %date% (date), %time% (time), %ms% (milliseconds), %app% (application name), %title% (window title) and %monitor% (screen name)</translation>
         </message>
         <message>
             <source>…</source>
@@ -4306,6 +4306,78 @@
         <message>
             <source>取声的 ffmpeg 起不来。设备可能正被别的程序占用，关掉占用者再录，或在设置里把取声关掉</source>
             <translation>The audio ffmpeg wouldn't start. The device may be held by another program - close it and try again, or turn audio capture off in Settings</translation>
+        </message>
+        <message>
+            <source>截图信息</source>
+            <translation>Capture info</translation>
+        </message>
+        <message>
+            <source>关闭信息面板</source>
+            <translation>Close info panel</translation>
+        </message>
+        <message>
+            <source>应用</source>
+            <translation>App</translation>
+        </message>
+        <message>
+            <source>窗口</source>
+            <translation>Window</translation>
+        </message>
+        <message>
+            <source>屏幕</source>
+            <translation>Screen</translation>
+        </message>
+        <message>
+            <source>时间</source>
+            <translation>Time</translation>
+        </message>
+        <message>
+            <source>未知窗口</source>
+            <translation>Unknown window</translation>
+        </message>
+        <message>
+            <source>未知屏幕</source>
+            <translation>Unknown screen</translation>
+        </message>
+        <message>
+            <source>未知时间</source>
+            <translation>Unknown time</translation>
+        </message>
+        <message>
+            <source>文件名模板预览</source>
+            <translation>Filename template preview</translation>
+        </message>
+        <message>
+            <source>示例应用</source>
+            <translation>Sample app</translation>
+        </message>
+        <message>
+            <source>示例窗口</source>
+            <translation>Sample window</translation>
+        </message>
+        <message>
+            <source>屏幕 1</source>
+            <translation>Screen 1</translation>
+        </message>
+        <message>
+            <source>预演：模板不可用</source>
+            <translation>Preview: template unavailable</translation>
+        </message>
+        <message>
+            <source>预演：{}.png</source>
+            <translation>Preview: {}.png</translation>
+        </message>
+        <message>
+            <source>标注时显示截图信息</source>
+            <translation>Show capture info while annotating</translation>
+        </message>
+        <message>
+            <source>在标注窗旁浮一块截图信息面板</source>
+            <translation>Float a capture info panel beside the annotation window</translation>
+        </message>
+        <message>
+            <source>开上后每次进标注窗都在工具栏旁浮着一块，写明应用、窗口标题、屏幕与捕获时刻；默认关，关着时标注窗与以前一样。面板只在本机显示，不写历史、不写日志。</source>
+            <translation>When on, every annotation window shows a panel beside the toolbar with the application, window title, screen and capture time. Off by default; the annotation window behaves as before while off. The panel is shown locally only and is not written to history or logs.</translation>
         </message>
 </context>
 </TS>
