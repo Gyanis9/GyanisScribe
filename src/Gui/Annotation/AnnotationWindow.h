@@ -267,6 +267,12 @@ namespace GyanisScribe::Gui
          */
         void privacyRequested(const QImage &image);
         /**
+         * @brief 请求美化分享
+         * @param image 烘焙好的成品，物理像素
+         * @note 与打印/扫码同口径：只报出去，标注窗不关，由宿主开对话框
+         */
+        void shareRequested(const QImage &image);
+        /**
          * @brief 请求打印标注结果
          * @param image 烘焙好的图
          * @note 与其它出口不同：打印不关窗，用户取消打印或在打印之后接着改，现场都不丢

@@ -349,6 +349,7 @@ namespace GyanisScribe::Gui
         const std::array actions = {
                 ActionSpec{"Copy", GyanisScribe::Base::uiText("复制到剪贴板"), &AnnotationToolbar::copyClicked},
                 ActionSpec{"Save", GyanisScribe::Base::uiText("保存为文件"), &AnnotationToolbar::saveClicked},
+                ActionSpec{"Export", GyanisScribe::Base::uiText("美化分享"), &AnnotationToolbar::shareClicked},
                 ActionSpec{"Pin", GyanisScribe::Base::uiText("贴到屏幕上"), &AnnotationToolbar::pinClicked},
                 ActionSpec{"Ocr", GyanisScribe::Base::uiText("识别文字"), &AnnotationToolbar::ocrClicked},
                 ActionSpec{"QrCode", GyanisScribe::Base::uiText("识别二维码"), &AnnotationToolbar::scanClicked},
@@ -364,6 +365,12 @@ namespace GyanisScribe::Gui
             if (action.signal == &AnnotationToolbar::privacyClicked)
             {
                 m_privacyButton = button;
+            }
+            // 美化分享留着对象名与展开提示：用例按对象名找它，提示把这一档能调的四样写全
+            if (action.signal == &AnnotationToolbar::shareClicked)
+            {
+                button->setObjectName(QStringLiteral("shareButton"));
+                button->setToolTip(GyanisScribe::Base::uiText("美化分享（背景、圆角、投影、水印）"));
             }
         }
 

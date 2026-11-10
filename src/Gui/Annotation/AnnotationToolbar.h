@@ -66,7 +66,7 @@ namespace GyanisScribe::Gui
 
     /**
      * @brief 标注工具栏控件
-     * @details 按钮顺序按需求第六节：工具组 → 颜色 → 线宽/字号 → 撤销/重做 → 复制/保存/贴图/识别/扫码/隐私打码。
+     * @details 按钮顺序按需求第六节：工具组 → 颜色 → 线宽/字号 → 撤销/重做 → 复制/保存/美化分享/贴图/识别/扫码/隐私打码。
      *          本控件不直接改画布，只把用户意图发成信号，由宿主窗口转给引擎——
      *          这样工具栏不必拖着引擎一起走，将来别处要复用同一排按钮也不必改这里。
      * @note 每个图标按钮都带 tooltip 与无障碍名称，这是需求的可访问性硬要求，不是装饰。
@@ -336,6 +336,8 @@ namespace GyanisScribe::Gui
         void copyClicked();
         /// 存成文件
         void saveClicked();
+        /// 美化分享：把成品交给对话框，不关窗
+        void shareClicked();
         /// 贴到屏幕上
         void pinClicked();
         /// 送去做文字识别

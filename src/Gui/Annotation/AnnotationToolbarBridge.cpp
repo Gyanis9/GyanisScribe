@@ -192,6 +192,7 @@ namespace GyanisScribe::Gui
         // 动作按钮只把意图转出来：按下去做什么由宿主决定，桥不替它挑默认
         QObject::connect(&toolbar, &AnnotationToolbar::copyClicked, this, &AnnotationToolbarBridge::copyRequested);
         QObject::connect(&toolbar, &AnnotationToolbar::saveClicked, this, &AnnotationToolbarBridge::saveRequested);
+        QObject::connect(&toolbar, &AnnotationToolbar::shareClicked, this, &AnnotationToolbarBridge::shareRequested);
         QObject::connect(&toolbar, &AnnotationToolbar::pinClicked, this, &AnnotationToolbarBridge::pinRequested);
         QObject::connect(&toolbar, &AnnotationToolbar::ocrClicked, this, &AnnotationToolbarBridge::ocrRequested);
         QObject::connect(&toolbar, &AnnotationToolbar::scanClicked, this, &AnnotationToolbarBridge::scanRequested);

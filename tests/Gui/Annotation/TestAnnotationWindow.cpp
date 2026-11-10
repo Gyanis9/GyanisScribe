@@ -2737,3 +2737,38 @@ TEST_F(AnnotationWindowFixture, InfoPanelKeepsPartialSourceWithUnknownFields)
     EXPECT_EQ(panelLabelText(*panel, "captureInfoMonitor"), GyanisScribe::Base::uiText("未知屏幕"));
     EXPECT_EQ(panelLabelText(*panel, "captureInfoTime"), GyanisScribe::Base::uiText("未知时间"));
 }
+
+/**
+ * @brief 钉住「美化分享」入口：发出成品、标注窗不收场
+ * @details 美化是继续编辑之前的出口，不是交付终点；与复制/保存不同，
+ *          点完按钮窗还开着、轮次还活着，也不能发 closed。
+ */
+TEST_F(AnnotationWindowFixture, ShareButtonEmitsTheBakedImageAndKeepsTheRoundOpen)
+{
+    auto window = makeWindow();
+    window->startAnnotation(makeCanvas({200, 100}), QRect{0, 0, 1920, 1080}, QRect{0, 0, 200, 100});
+
+    QToolButton *share = nullptr;
+    for (auto *candidate: window->toolbar().findChildren<QToolButton *>())
+    {
+        if (candidate->objectName() == QStringLiteral("shareButton"))
+        {
+            share = candidate;
+            break;
+        }
+    }
+    ASSERT_NE(share, nullptr) << "工具栏上找不到美化分享按钮";
+    EXPECT_TRUE(share->toolTip().contains(QStringLiteral("美化分享")));
+
+    QSignalSpy shared{window.get(), &AnnotationWindow::shareRequested};
+    QSignalSpy closed{window.get(), &AnnotationWindow::closed};
+    share->click();
+
+    ASSERT_EQ(shared.count(), 1) << "按钮点了没把成品发出来";
+    const auto image = shared.at(0).at(0).value<QImage>();
+    EXPECT_FALSE(image.isNull());
+    EXPECT_EQ(image.size(), QSize(400, 200)) << "交出去的不是画布的物理尺寸";
+    EXPECT_TRUE(window->isVisible()) << "美化分享把标注窗关了";
+    EXPECT_TRUE(window->isRoundActive()) << "美化分享把这一轮画上了句号";
+    EXPECT_EQ(closed.count(), 0) << "美化分享不该发 closed";
+}
