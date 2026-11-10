@@ -1087,6 +1087,45 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住 F5 与拖边框重抓那一刻信息面板也不在屏上
+     * @details 信息面板是独立顶层窗，只藏标注窗与工具栏会把它留在抓帧里；选区铺满屏幕时，
+     *          它就会被永久烘进底图。两次抓帧都要在抓的那一刻读可见态，抓完再判它回到原位。
+     */
+    TEST_F(AppControllerFixture, RefreshAndRecropHideTheInfoPanelWhileGrabbing)
+    {
+        m_frameScreenName = m_realScreenName;
+        m_frameRegion     = QRect{0, 0, kFrameWidth, kFrameHeight};
+        makeController();
+        ASSERT_TRUE(m_settings->setValue(Core::kCaptureShowInfoPanel, true).has_value()) << "写入信息面板开关失败";
+
+        auto *screen = QGuiApplication::primaryScreen();
+        ASSERT_NE(screen, nullptr);
+        auto &window = m_controller->capture().annotationWindow();
+        m_controller->capture().startFullScreen(App::CaptureIntent::Annotate);
+        ASSERT_TRUE(window.isVisible()) << "标注窗没开起来，后面的判据无从谈起";
+        ASSERT_TRUE(window.isInfoPanelVisible()) << "开关开着、来源齐备，信息面板没露出来，判据没有基准";
+
+        int  grabs             = 0;
+        bool sawPanelHidden    = true;
+        m_source->onGrabScreen = [&]
+        {
+            ++grabs;
+            sawPanelHidden = sawPanelHidden && !window.isInfoPanelVisible();
+        };
+
+        const QRect region{5, 5, 40, 30};
+        window.cropRequested(screen->name(), region);
+        EXPECT_EQ(grabs, 1) << "拖边框没有按新范围重抓";
+        EXPECT_TRUE(sawPanelHidden) << "重裁抓帧时信息面板还在屏上";
+        EXPECT_TRUE(window.isInfoPanelVisible()) << "重裁抓完没把信息面板放回来";
+
+        window.refreshRequested(screen->name(), m_frameRegion);
+        EXPECT_EQ(grabs, 2) << "F5 没有重抓这一块";
+        EXPECT_TRUE(sawPanelHidden) << "F5 抓帧时信息面板还在屏上：选区铺满时会把它烘进底图";
+        EXPECT_TRUE(window.isInfoPanelVisible()) << "F5 抓完没把信息面板放回来";
+    }
+
+    /**
      * @brief 钉住 F5 抓帧失败时标注窗与工具栏照原样留在原地，原因说给用户
      * @details 抓帧失败时画布与标注都不许动，窗口也不许因为藏过一眼就消失或换位置；
      *          原因要沿提示那条路交出去，而不是静默留在日志里。

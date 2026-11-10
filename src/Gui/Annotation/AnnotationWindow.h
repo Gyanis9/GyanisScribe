@@ -178,6 +178,22 @@ namespace GyanisScribe::Gui
         [[nodiscard]] QWidget *infoPanelForTesting() const noexcept;
 
         /**
+         * @brief 抓屏前收起这一轮的浮层
+         * @details 标注窗、工具栏与信息面板都盖在要抓的那块屏上，只藏窗口会把另外两块拍进底图。
+         *          记下窗口与工具栏这一刻是否露着，与 restoreOverlaysAfterCapture 成对使用；
+         *          信息面板不记当时的可见态，恢复时按本轮策略重算，用户亲手收起的那一块不会复活。
+         */
+        void hideOverlaysForCapture();
+
+        /**
+         * @brief 抓完把刚收起的浮层恢复原样
+         * @details 只恢复抓屏前露着的窗口与工具栏；窗口重新抬起并激活，连按 F5 的下一颗键仍落回这里。
+         *          信息面板按本轮开关、来源与用户收起的记录重新判定，缺失的那一项不会凭空补上。
+         *          窗口与工具栏的几何要由调用方在两次调用之间摆回。
+         */
+        void restoreOverlaysAfterCapture();
+
+        /**
          * @brief 把重新抓到的一帧换上：底图换了，标注、选中与撤销历史都留着
          * @param captured 重抓的产物，应与开窗时那一帧同形（同一块区域再抓一帧）
          * @details 引擎的 refreshCanvas 就是这个语义；与 loadCanvas 分开正是为了不把标注清掉。
@@ -307,6 +323,9 @@ namespace GyanisScribe::Gui
         /// 收起信息面板：收场、交付与开关关掉都走这一处，面板对象留着下一轮再用
         void hideInfoPanel() noexcept;
 
+        /// 用户亲手收起了信息面板：记下本轮不再自动复活，抓屏恢复与重裁都照这一条办
+        void handleInfoPanelClosed();
+
         Core::IAnnotationEngine                 &m_engine;              ///< 标注引擎，不拥有
         Core::ISettingsStore                    &m_settings;            ///< 配置读端：字母键位清册与信息面板开关，不拥有
         std::unique_ptr<AnnotationToolbar>       m_toolbar;             ///< 浮层工具栏，本窗口拥有
@@ -320,11 +339,14 @@ namespace GyanisScribe::Gui
         QRect                                    m_frozenLogicalRegion; ///< 冻帧在这块屏内的逻辑区域
         /// 把冻帧按新选区裁成预览交给视图：拖边框时新露出的区域不是拉伸的旧画布
         void                    updateCropPreview(const QRect &globalSelection);
-        QRect                   m_placedScreenAvailable;  ///< 本轮摆放用的屏幕可用区：可见段变化后重摆要同一份
-        QRect                   m_placedSelection;        ///< 本轮摆放参照的选区：可见段变化后重摆要同一份
-        Core::CaptureSourceInfo m_sourceInfo;             ///< 本轮截图的来源：应用、窗口标题、屏幕与捕获时刻；没有来源的轮次留空
-        bool                    m_closedReported = false; ///< 这一轮开窗已经报过 closed：交付出口与 Esc/X 共用一个收场
-        bool                    m_roundActive    = false; ///< 这一轮标注是否还在编辑：startAnnotation 置真，收场置假
+        QRect                   m_placedScreenAvailable;            ///< 本轮摆放用的屏幕可用区：可见段变化后重摆要同一份
+        QRect                   m_placedSelection;                  ///< 本轮摆放参照的选区：可见段变化后重摆要同一份
+        Core::CaptureSourceInfo m_sourceInfo;                       ///< 本轮截图的来源：应用、窗口标题、屏幕与捕获时刻；没有来源的轮次留空
+        bool                    m_closedReported           = false; ///< 这一轮开窗已经报过 closed：交付出口与 Esc/X 共用一个收场
+        bool                    m_roundActive              = false; ///< 这一轮标注是否还在编辑：startAnnotation 置真，收场置假
+        bool                    m_infoPanelClosedByUser    = false; ///< 本轮用户亲手收起了信息面板：抓屏恢复与重裁都不把它带回来
+        bool                    m_captureWindowWasVisible  = false; ///< 抓屏前标注窗是否露着：恢复时照这一份还回去
+        bool                    m_captureToolbarWasVisible = false; ///< 抓屏前工具栏是否露着：恢复时照这一份还回去
     };
 
 } // namespace GyanisScribe::Gui

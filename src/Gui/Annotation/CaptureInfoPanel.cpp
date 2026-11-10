@@ -69,7 +69,7 @@ namespace
      * @brief 把一段文本写进值标签，过长时右侧收省略号
      * @param label 目标值标签
      * @param text 完整文本
-     * @details 居中的值标签按面板宽度定宽，过长只收显示；完整文本留在悬停提示里，
+     * @details 值标签按固定可用宽度左侧对齐，过长只收显示；完整文本留在悬停提示里，
      *          标题被截断时用户仍能看清全部。
      */
     void applyValueText(QLabel &label, const QString &text)

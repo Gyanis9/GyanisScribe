@@ -183,6 +183,8 @@ namespace GyanisScribe::Gui
     {
         // 新一轮开窗重新计收场：上一轮报过的 closed 不该压住这一轮
         m_closedReported = false;
+        // 面板也重新评估：上一轮用户亲手收起的那一块不该继续压着这一轮
+        m_infoPanelClosedByUser = false;
         // 轮次守卫跟着开窗重新立起来：上一轮关窗后留下的画布还在引擎里，不能拿它当「还在编辑」
         m_roundActive = true;
         // 来源随这一轮留在窗口上：空白画布与回溯换帧那几轮传的是空来源，不继承上一轮的
@@ -276,8 +278,9 @@ namespace GyanisScribe::Gui
 
     void AnnotationWindow::updateInfoPanel()
     {
-        // 开关默认关；来源全空的轮次（空白画布、回溯换帧）也不摆一块只写「未知」的面板
-        if (!m_settings.boolValue(Core::kCaptureShowInfoPanel, false) || isSourceInfoEmpty(m_sourceInfo))
+        // 开关默认关；来源全空的轮次（空白画布、回溯换帧）也不摆一块只写「未知」的面板；
+        // 用户在这一轮亲手收起过，就不再替用户打开
+        if (!m_settings.boolValue(Core::kCaptureShowInfoPanel, false) || isSourceInfoEmpty(m_sourceInfo) || m_infoPanelClosedByUser)
         {
             hideInfoPanel();
             return;
@@ -287,8 +290,9 @@ namespace GyanisScribe::Gui
         {
             // 不带父控件：面板要摆在标注窗外面，进了子控件树就会被裁切，也说不清有没有被导出
             m_infoPanel = std::make_unique<CaptureInfoPanel>();
-            // 面板自己收起时由窗口再收一次可见态：可见性只归标注窗管，面板只报一声
-            QObject::connect(m_infoPanel.get(), &CaptureInfoPanel::closed, this, &AnnotationWindow::hideInfoPanel);
+            // 面板自己收起时由窗口再收一次可见态，并记下这一轮用户不要它了：
+            // 可见性只归标注窗管，面板只报一声
+            QObject::connect(m_infoPanel.get(), &CaptureInfoPanel::closed, this, &AnnotationWindow::handleInfoPanelClosed);
         }
         m_infoPanel->setSource(m_sourceInfo);
         m_infoPanel->adjustSize();
@@ -369,6 +373,46 @@ namespace GyanisScribe::Gui
         if (m_infoPanel)
         {
             m_infoPanel->hide();
+        }
+    }
+
+    void AnnotationWindow::handleInfoPanelClosed()
+    {
+        // 用户亲手收起只作用于这一轮：之后抓屏前后的隐藏与恢复不许擅自把它带回来
+        m_infoPanelClosedByUser = true;
+        hideInfoPanel();
+    }
+
+    void AnnotationWindow::hideOverlaysForCapture()
+    {
+        // 抓屏看到的是桌面：标注窗、工具栏与信息面板三块都盖在选区上，要收就一起收；
+        // 先记下窗口与工具栏是否露着，抓完只把原来有的还回去
+        m_captureWindowWasVisible  = isVisible();
+        m_captureToolbarWasVisible = m_toolbar->isVisible();
+        m_toolbar->hide();
+        hideInfoPanel();
+        hide();
+    }
+
+    void AnnotationWindow::restoreOverlaysAfterCapture()
+    {
+        if (m_captureWindowWasVisible)
+        {
+            show();
+            raise();
+            // 连按 F5 时下一颗键要回到这扇窗：不激活的话焦点留在别处
+            activateWindow();
+        }
+        if (m_captureToolbarWasVisible)
+        {
+            m_toolbar->show();
+            m_toolbar->raise();
+        }
+        if (m_captureWindowWasVisible)
+        {
+            // 面板按本轮策略重算：开关关、来源空或用户亲手收起过都不重新露出来；
+            // 窗口没恢复时 updateInfoPanel 也会把面板留在隐藏态
+            updateInfoPanel();
         }
     }
 
@@ -462,8 +506,9 @@ namespace GyanisScribe::Gui
         placeToolbarForSelection();
         m_toolbar->show();
         m_toolbar->raise();
-        // 重裁换了窗口与工具栏的位置，已露出的信息面板跟着重摆；用户关掉的那块不在这里复活
-        placeInfoPanel();
+        // 重裁换了窗口与工具栏的位置：抓屏前收起的面板在这里按本轮策略恢复并重摆，
+        // 用户关掉的那一块由本轮记录挡住，不会被重新打开
+        updateInfoPanel();
     }
 
     void AnnotationWindow::restoreAfterCrop(const QRect &selection, const QRect &screenAvailable)
@@ -480,8 +525,8 @@ namespace GyanisScribe::Gui
         placeToolbarForSelection();
         m_toolbar->show();
         m_toolbar->raise();
-        // 窗口摆回旧几何之后面板也要回到工具栏旁边
-        placeInfoPanel();
+        // 窗口摆回旧几何之后面板也要按本轮策略恢复并回到工具栏旁边
+        updateInfoPanel();
     }
 
     void AnnotationWindow::updateCropPreview(const QRect &globalSelection)

@@ -542,14 +542,11 @@ namespace GyanisScribe::App
     GyanisScribe::Base::Expected<GyanisScribe::Base::CapturedImage> CaptureCoordinator::grabWithAnnotationHidden(const QString &screenName, const QRect &region,
                                                                                                                  const bool restoreVisibility)
     {
-        // 窗与工具栏都盖在要抓的那一块上：记下可见态与几何，抓完照原样摆回
-        const bool  windowWasVisible  = m_annotationWindow->isVisible();
-        const bool  toolbarWasVisible = m_annotationWindow->toolbar().isVisible();
-        const QRect windowGeometry    = m_annotationWindow->geometry();
-        const QRect toolbarGeometry   = m_annotationWindow->toolbar().geometry();
+        // 窗、工具栏与信息面板都盖在要抓的那一块上：记下几何，三块一起收，抓完照原样摆回
+        const QRect windowGeometry  = m_annotationWindow->geometry();
+        const QRect toolbarGeometry = m_annotationWindow->toolbar().geometry();
 
-        m_annotationWindow->hide();
-        m_annotationWindow->toolbar().hide();
+        m_annotationWindow->hideOverlaysForCapture();
         // 隐藏要等合成器交出那一帧：不等的话这次抓到的仍是窗还在的那一版
         QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
 
@@ -560,21 +557,12 @@ namespace GyanisScribe::App
         m_annotationWindow->toolbar().setGeometry(toolbarGeometry);
         if (!restoreVisibility)
         {
-            // 重裁路径随后先换画布再显窗；这里显出来会先闪一帧旧底图
+            // 重裁路径随后先换画布再显窗；这里显出来会先闪一帧旧底图。
+            // 信息面板也由随后的 recropAnnotation 或 restoreAfterCrop 按本轮策略恢复
             return frame;
         }
-        if (windowWasVisible)
-        {
-            m_annotationWindow->show();
-            m_annotationWindow->raise();
-            // 连按 F5 时这一颗键要回到这扇窗：不激活的话焦点留在别处
-            m_annotationWindow->activateWindow();
-        }
-        if (toolbarWasVisible)
-        {
-            m_annotationWindow->toolbar().show();
-            m_annotationWindow->toolbar().raise();
-        }
+        // 恢复抓屏前露着的窗口、工具栏与信息面板；用户亲手收起的面板不会在这里复活
+        m_annotationWindow->restoreOverlaysAfterCapture();
         return frame;
     }
 

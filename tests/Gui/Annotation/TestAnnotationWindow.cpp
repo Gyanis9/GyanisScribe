@@ -2471,6 +2471,7 @@ TEST_F(AnnotationWindowFixture, InfoPanelShowsTheSourceFieldsWhenEnabled)
     EXPECT_TRUE(summary.contains(QStringLiteral("2026-11-09 13:14:15")));
 
     EXPECT_TRUE(available.contains(panel->geometry())) << "面板摆到了屏幕可用区外面：" << panel->geometry().x() << "," << panel->geometry().y();
+    EXPECT_FALSE(panel->geometry().intersects(QRect{800, 400, 200, 100})) << "有地方摆时面板不该压住截下来的选区：" << panel->geometry().x() << "," << panel->geometry().y();
 }
 
 /**
@@ -2536,6 +2537,85 @@ TEST_F(AnnotationWindowFixture, InfoPanelCloseButtonHidesOnlyThisRound)
 
     window->startAnnotation(makeCanvas({200, 100}), available, selection, source);
     EXPECT_TRUE(window->isInfoPanelVisible()) << "下一轮开窗没有把面板重新摆出来";
+}
+
+/**
+ * @brief 钉住抓屏前的浮层收起：面板随窗口与工具栏一起消失，抓完只按本轮策略恢复
+ * @details F5 与拖边框重抓都走这条路。面板是独立顶层窗，只藏窗口与工具栏会把它留在抓帧里；
+ *          用户在这一轮亲手收起过面板时，恢复不许替用户打开，下一轮开窗仍按开关与来源重新判定。
+ */
+TEST_F(AnnotationWindowFixture, CaptureHidingTakesTheInfoPanelAndRestoresOnlyAllowedOnes)
+{
+    ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kCaptureShowInfoPanel, true).has_value()) << "写入信息面板开关失败";
+    auto window = makeWindow();
+
+    CaptureSourceInfo source;
+    source.processName = QStringLiteral("notepad.exe");
+    source.windowTitle = QStringLiteral("无标题 - 记事本");
+    source.screenName  = QStringLiteral("TestScreen");
+    source.capturedAt  = QDateTime{QDate{2026, 11, 9}, QTime{13, 14, 15}};
+    const QRect available{0, 0, 1920, 1080};
+    const QRect selection{800, 400, 200, 100};
+
+    window->startAnnotation(makeCanvas({200, 100}), available, selection, source);
+    ASSERT_TRUE(window->isInfoPanelVisible());
+    const QWidget *panel = window->infoPanelForTesting();
+    ASSERT_NE(panel, nullptr);
+
+    window->hideOverlaysForCapture();
+    EXPECT_FALSE(window->isVisible()) << "抓屏前标注窗还露着，会把自己拍进底图";
+    EXPECT_FALSE(window->toolbar().isVisible()) << "抓屏前工具栏还露着，会把自己拍进底图";
+    EXPECT_FALSE(window->isInfoPanelVisible()) << "抓屏前信息面板还露着，会把自己拍进底图";
+
+    window->restoreOverlaysAfterCapture();
+    EXPECT_TRUE(window->isVisible()) << "抓完没把标注窗放回来";
+    EXPECT_TRUE(window->toolbar().isVisible()) << "抓完没把工具栏放回来";
+    EXPECT_TRUE(window->isInfoPanelVisible()) << "抓完没把本轮该露的信息面板放回来";
+
+    // 用户点了面板右上角的关闭，再走一轮抓屏：恢复只还窗口与工具栏，面板不复活
+    auto *closeButton = panel->findChild<QAbstractButton *>(QStringLiteral("captureInfoClose"));
+    ASSERT_NE(closeButton, nullptr);
+    closeButton->click();
+    ASSERT_FALSE(window->isInfoPanelVisible());
+
+    window->hideOverlaysForCapture();
+    window->restoreOverlaysAfterCapture();
+    EXPECT_TRUE(window->isVisible());
+    EXPECT_TRUE(window->toolbar().isVisible());
+    EXPECT_FALSE(window->isInfoPanelVisible()) << "用户亲手收起的面板被抓屏恢复重新打开了";
+
+    // 新一轮开窗重置「本轮收起」：开关与来源仍成立时面板要重新露出来
+    window->startAnnotation(makeCanvas({200, 100}), available, selection, source);
+    EXPECT_TRUE(window->isInfoPanelVisible()) << "新一轮没有按开关与来源重新评估面板";
+}
+
+/**
+ * @brief 钉住窄屏兜底：工具栏两侧都放不下时面板落到可用区左上角内缩一格
+ * @details 摆放下限是「不出屏」：兜底位仍要整块落在可用区内，也不压住截下来的选区；
+ *          位置钉死是为了让后续改摆放顺序时，这一档不会悄悄漂走。
+ */
+TEST_F(AnnotationWindowFixture, InfoPanelFallsBackToTheAvailableCornerOnANarrowScreen)
+{
+    ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kCaptureShowInfoPanel, true).has_value()) << "写入信息面板开关失败";
+    auto window = makeWindow();
+
+    CaptureSourceInfo source;
+    source.processName = QStringLiteral("notepad.exe");
+    source.windowTitle = QStringLiteral("无标题 - 记事本");
+    source.screenName  = QStringLiteral("TestScreen");
+    source.capturedAt  = QDateTime{QDate{2026, 11, 9}, QTime{13, 14, 15}};
+    const QRect available{0, 0, 360, 720};
+    const QRect selection{80, 300, 200, 100};
+
+    window->startAnnotation(makeCanvas({200, 100}), available, selection, source);
+
+    ASSERT_TRUE(window->isInfoPanelVisible());
+    const QWidget *panel = window->infoPanelForTesting();
+    ASSERT_NE(panel, nullptr);
+    const QPoint expectedFallback = available.topLeft() + QPoint(12, 12);
+    EXPECT_EQ(panel->geometry().topLeft(), expectedFallback) << "窄屏兜底位不是可用区左上角内缩 12px";
+    EXPECT_TRUE(available.contains(panel->geometry())) << "兜底位把面板摆出了屏幕可用区";
+    EXPECT_FALSE(panel->geometry().intersects(selection)) << "兜底位压住了截下来的选区";
 }
 
 /**
