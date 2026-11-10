@@ -1199,6 +1199,7 @@ namespace GyanisScribe
         QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
         EXPECT_EQ(window.findChild<GyanisScribe::Gui::ShareDialog *>(), nullptr) << "对话框关掉后没释放";
         EXPECT_TRUE(window.isVisible());
+        EXPECT_TRUE(window.isRoundActive()) << "关掉美化对话框之后这一轮标注不再报「在编辑」";
 
         // 关掉之后再点一次：协调器手里那份必须已随对话框销毁置空，否则这里不是叠窗就是碰已释放的内存
         window.shareRequested(window.canvas().image);

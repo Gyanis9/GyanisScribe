@@ -396,6 +396,7 @@ namespace GyanisScribe::Gui
 
         auto *scroll = new QScrollArea{this};
         scroll->setObjectName(QStringLiteral("shareScroll"));
+        scroll->setAccessibleName(uiText("美化设置"));
         scroll->setWidgetResizable(true);
         scroll->setFrameShape(QFrame::NoFrame);
         scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -650,10 +651,11 @@ namespace GyanisScribe::Gui
                          {
                              bool       accepted = false;
                              const auto name     = QInputDialog::getText(this, uiText("另存为模板"), uiText("模板名称"), QLineEdit::Normal, QString{}, &accepted);
-                             if (!accepted || name.trimmed().isEmpty())
+                             if (!accepted)
                              {
                                  return;
                              }
+                             // 空名交给 saveTemplateAs 就地报「模板名不能为空」：按钮这一路也要给用户一个原因
                              (void) saveTemplateAs(name);
                          });
         QObject::connect(m_deleteTemplate, &QPushButton::clicked, this,

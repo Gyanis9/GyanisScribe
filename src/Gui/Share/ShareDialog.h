@@ -150,7 +150,7 @@ namespace GyanisScribe::Gui
          * @brief 预览标签尺寸落位后按保存的预览图重新缩放
          * @param watched 事件接收者
          * @param event 事件
-         * @return 已处理返回 true，其余交回基类
+         * @return 基类 eventFilter 的结果，不是「已处理」标志：重缩放过也一样原样交回基类
          * @details 顶层窗口的 resizeEvent 早于布局把新尺寸交给子控件，标签自己的 resize 才是缩放的准点
          */
         bool eventFilter(QObject *watched, QEvent *event) override;

@@ -26,17 +26,23 @@ TEST(SoftShadow, AlphaMatchesTheOldDecorationFalloff)
 /**
  * @brief 钉住圆角投影跟着圆角走
  * @details 圆角切掉的那块仍在卡片外接矩形内，必须有投影；卡片中心一格都不写。
+ *          角格 (52, 52) 到半径 20 的圆弧是 |18, 18| 的斜边再减半径，即 18√2 - 20 ≈ 5.456 格；
+ *          距离平方衰减给出 96 * (1 - 5.456 / 16)^2 ≈ 41.69，四舍五入是 42。
  */
 TEST(SoftShadow, RoundedCornerIsCoveredOutsideTheCurve)
 {
     const auto layer = makeSoftShadowLayer(QSize{260, 260}, QRect{50, 50, 100, 100}, 20, 16, 96);
     ASSERT_FALSE(layer.isNull());
     EXPECT_GT(qAlpha(layer.pixel(52, 52)), 0) << "圆角外、外接矩形内的角格应有投影";
+    EXPECT_EQ(qAlpha(layer.pixel(52, 52)), 42) << "角格与旧衰减不同解：18√2 - 20 格处应为 42";
     EXPECT_EQ(qAlpha(layer.pixel(100, 100)), 0) << "卡片内部不写投影";
 }
 
 /**
  * @brief 钉住圆角夹到卡片短边的一半，不因超大半径越界
+ * @details 半径 999 必须夹到 50（100 见方卡片的一半）。左沿外一格 (49, 100) 处：
+ *          横向距圆心 51 格、纵向距 1 格，到圆弧 51.0098 - 50 ≈ 1.0098 格，
+ *          96 * (1 - 1.0098 / 16)^2 ≈ 84.27，四舍五入是 84。半径不夹或夹错时这一格会掉到 0 附近。
  */
 TEST(SoftShadow, HugeCornerRadiusIsClamped)
 {
@@ -44,6 +50,7 @@ TEST(SoftShadow, HugeCornerRadiusIsClamped)
     ASSERT_FALSE(layer.isNull());
     EXPECT_EQ(qAlpha(layer.pixel(100, 100)), 0);
     EXPECT_GT(qAlpha(layer.pixel(49, 100)), 0) << "圆片外一格应有投影";
+    EXPECT_EQ(qAlpha(layer.pixel(49, 100)), 84) << "半径没有夹到卡片短边的一半：紧贴圆片那一圈应为 84";
 }
 
 /// 投影宽度非正、画布为空或卡片为空时返回空图，不返回一张透明画布让调用方误以为画过了

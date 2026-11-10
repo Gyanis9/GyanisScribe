@@ -293,6 +293,48 @@ TEST_F(CornerControlsFixture, ButtonSelfPaintsHighContrastBorderAndFocusEdge)
 }
 
 /**
+ * @brief 钉住色板按钮不吞掉主题的焦点边
+ * @details 色板只换底：高对比度档无焦点时是一圈 1px 强描边，聚焦后换成 2px 主色边，
+ *          底色始终是那支颜色。描边若被色板无条件写成 1px 强描边，聚焦后这里只会读到静息边。
+ */
+TEST_F(CornerControlsFixture, ButtonSwatchKeepsTheHighContrastFocusBorder)
+{
+    GyanisScribe::Gui::setTextThemeKind(GyanisScribe::Gui::ThemeKind::HighContrast);
+    const auto &palette = GyanisScribe::Gui::activePalette();
+    const auto  swatch  = QColor{0x2A, 0x2A, 0x2A};
+
+    QWidget host;
+    host.resize(160, 60);
+    host.setAutoFillBackground(true);
+    host.setPalette(QPalette{QColor{255, 0, 0}});
+
+    auto *button = new GyanisScribe::Gui::Button{&host};
+    button->setSwatchColor(swatch);
+    button->setGeometry(10, 10, 120, 32);
+    host.show();
+    QCoreApplication::processEvents();
+    // show 之后第一个可聚焦控件会自动拿到焦点：先清掉，量的才是静息边
+    button->clearFocus();
+    button->update();
+    QCoreApplication::processEvents();
+
+    const auto buttonArea = button->geometry();
+    QImage     image      = host.grab().toImage();
+    EXPECT_EQ(image.pixelColor(70, 26), swatch) << "色板底被描边色换掉了";
+    EXPECT_LE(image.pixelColor(10, 26).lightness(), 8) << "无焦点时没有强描边";
+    EXPECT_EQ(countPixelsWhere(image, buttonArea, [&palette](const QColor &color) { return color == palette.accent; }), 0) << "无焦点却画了主色边";
+
+    button->setFocus(Qt::OtherFocusReason);
+    QCoreApplication::processEvents();
+    ASSERT_TRUE(button->hasFocus()) << "判据的前提没构造出来：色板按钮没拿到焦点";
+    button->update();
+    QCoreApplication::processEvents();
+    image = host.grab().toImage();
+    EXPECT_EQ(image.pixelColor(11, 26), palette.accent) << "聚焦后色板按钮没有换成主色焦点边";
+    EXPECT_EQ(image.pixelColor(70, 26), swatch) << "聚焦把色板底也换掉了";
+}
+
+/**
  * @brief 钉住色板按钮的反差文字色不被样式表盖掉
  * @details 色板按钮的标签必须由自绘层直接落笔：交给 CE_PushButtonLabel 时，
  *          QStyleSheetStyle 按样式表的 color 规则上色，option.palette 里塞的反差色到不了画笔上。

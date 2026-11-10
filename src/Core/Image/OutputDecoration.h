@@ -10,6 +10,7 @@
 #pragma once
 
 #include "Base/Types.h"
+#include "Core/Image/SoftShadow.h"
 
 #include <QColor>
 #include <QImage>
@@ -38,7 +39,8 @@ namespace GyanisScribe::Core
     inline constexpr int kMaximumOutputShadowPixels = 48;
 
     /// 投影紧贴成品那一圈的不透明度（0-255）：轻量档，只把成品从底上「抬」起来一点
-    inline constexpr int kOutputShadowMaximumAlpha = 96;
+    /// 与美化卡片共用同一档：两处投影出自同一份 SoftShadow，浓淡不该各记一个数
+    inline constexpr int kOutputShadowMaximumAlpha = kSoftShadowMaximumAlpha;
 
     /// 边框的默认颜色：中灰，深浅底上都看得出边界，又不像纯黑那样把成品框死
     inline const QColor kDefaultOutputBorderColor{0x80, 0x80, 0x80};

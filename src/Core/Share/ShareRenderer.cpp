@@ -106,14 +106,15 @@ namespace GyanisScribe::Core
         {
             return std::unexpected(validated.error());
         }
-        if (static_cast<qint64>(image.width()) * static_cast<qint64>(image.height()) > kMaximumShareCanvasPixels)
-        {
-            return std::unexpected(canvasPixelLimitError());
-        }
+        // 两道上限都量整张画布：内边距与投影会把画布撑得比原图大，按原图像素放行会先分配一张过大的画布
         const auto full = shareCanvasSize(image.size(), style);
         if (full.width() > kMaximumShareCanvasEdge || full.height() > kMaximumShareCanvasEdge)
         {
             return std::unexpected(canvasEdgeTooLargeError());
+        }
+        if (static_cast<qint64>(full.width()) * static_cast<qint64>(full.height()) > kMaximumShareCanvasPixels)
+        {
+            return std::unexpected(canvasPixelLimitError());
         }
 
         const auto outputWidth = maximumDimension > 0 ? std::min(maximumDimension, full.width()) : full.width();

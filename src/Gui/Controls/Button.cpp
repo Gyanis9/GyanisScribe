@@ -71,7 +71,12 @@ namespace GyanisScribe::Gui
         if (swatchActive)
         {
             fill = QBrush{m_swatchColor};
-            pen  = QPen{activePalette().borderStrong, 1.0};
+            // 只有没焦点时才换成本档的静息描边：聚焦边是主题给的可达性提示（高对比度档是一圈主色），
+            // 色板只管换底，不能把它一起涂掉
+            if (!hasFocus())
+            {
+                pen = QPen{activePalette().borderStrong, 1.0};
+            }
         }
         Core::paintContinuousCorner(painter, QRectF{rect()}, Core::cornerShapeFor(Core::CornerRole::Control), fill, pen);
 

@@ -17,8 +17,12 @@
 #include <QFileInfo>
 #include <QImage>
 #include <QImageWriter>
+#include <QInputDialog>
+#include <QLineEdit>
+#include <QPushButton>
 #include <QSlider>
 #include <QTemporaryDir>
+#include <QTimer>
 #include <QWidget>
 
 #include <gtest/gtest.h>
@@ -167,6 +171,41 @@ TEST_F(ShareDialogFixture, RejectsBadTemplateNamesAndBuiltInDeletion)
     ASSERT_NE(combo, nullptr);
     combo->setCurrentIndex(combo->findData(QStringLiteral("light")));
     EXPECT_FALSE(dialog->deleteSelectedTemplate().has_value());
+}
+
+/// 「另存为模板」的空名在按钮这一路也要就地报错，不静默吞掉
+TEST_F(ShareDialogFixture, SaveTemplateButtonReportsAnEmptyName)
+{
+    const auto  dialog = makeDialog();
+    auto *const save   = dialog->findChild<QPushButton *>(QStringLiteral("shareSaveTemplate"));
+    ASSERT_NE(save, nullptr);
+
+    // 按钮槽里同步弹命名窗并 exec：先排一个零延时定时器，它会在命名窗自己的事件循环里跑，
+    // 清空输入再按确定，等价于用户什么都没填就点了一下
+    bool promptHandled = false;
+    QTimer::singleShot(0, dialog.get(),
+                       [owner = dialog.get(), &promptHandled]
+                       {
+                           auto *prompt = owner->findChild<QInputDialog *>();
+                           if (prompt == nullptr)
+                           {
+                               return;
+                           }
+                           promptHandled = true;
+                           if (auto *edit = prompt->findChild<QLineEdit *>())
+                           {
+                               edit->clear();
+                           }
+                           prompt->accept();
+                       });
+    save->click();
+
+    ASSERT_TRUE(promptHandled) << "点「另存为模板」没弹出命名窗：判据没有落点";
+    EXPECT_NE(dialog->statusText().indexOf(QStringLiteral("模板名不能为空")), -1) << dialog->statusText().toStdString();
+    EXPECT_TRUE(m_settings->stringValue(Core::kShareTemplates, QString{}).isEmpty()) << "空模板名被写进了设置";
+    auto *const combo = dialog->findChild<QComboBox *>(QStringLiteral("shareTemplateCombo"));
+    ASSERT_NE(combo, nullptr);
+    EXPECT_EQ(combo->count(), 4) << "空模板名也往模板下拉里加了一项";
 }
 
 /// 关对话框不影响父窗口

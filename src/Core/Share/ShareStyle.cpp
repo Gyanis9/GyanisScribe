@@ -488,7 +488,9 @@ namespace GyanisScribe::Core
         {
             if (templates.size() >= static_cast<std::size_t>(kMaximumCustomShareTemplates))
             {
-                break;
+                // 超出的条目静默丢掉会让用户以为模板还在：每丢一条都点名，数量与上限一起写进日志
+                Base::Logger::warning(Base::uiFormat(Base::uiTextUtf8("美化模板第 {} 项超出 {} 套上限，已丢弃"), index + 1, kMaximumCustomShareTemplates));
+                continue;
             }
 
             const auto entryValue = array.at(index);

@@ -4468,6 +4468,10 @@
             <translation>Entry {} in the share template has no name and was skipped</translation>
         </message>
         <message>
+            <source>美化模板第 {} 项超出 {} 套上限，已丢弃</source>
+            <translation>Entry {} in the share template exceeds the limit of {} templates and was dropped</translation>
+        </message>
+        <message>
             <source>美化模板「{}」用了内置 id，已跳过</source>
             <translation>The share template “{}” uses a built-in id and was skipped</translation>
         </message>
@@ -4578,6 +4582,10 @@
         <message>
             <source>美化分享说明</source>
             <translation>About beautify and share</translation>
+        </message>
+        <message>
+            <source>美化设置</source>
+            <translation>Beautify settings</translation>
         </message>
         <message>
             <source>模板</source>
