@@ -363,7 +363,7 @@ clang-tidy 的报告每次运行都作 artifact（`clang-tidy-report`）上传�
 | 读数 | Release 实测 | 方法与改造前对照 |
 | --- | --- | --- |
 | 历史页 200 条 4K 首屏 | 构造+显示返回 **160ms**；首轮后台解码 200 张 **5.90s**；搜索刷新返回 **8ms**；第二轮补解 72 张 **2.06s** | `HistoryViewFixture.ReportsTheCostOfRefreshingTwoHundredFourKHistoryEntries`；改造前 Debug 档构造/刷新同步解码 18.9s，界面在此期间不可操作 |
-| 4K 成品加边框与 16 格投影 | 中位 **15.7ms**（5 轮，min 15.4 / max 16.3） | `OutputDecoration.ReportsTheCostOfDecoratingA4kImageWithShadow`；改造前 Debug 档中位 138.4ms |
+| 4K 成品加边框与 16 格投影 | 同进程交替 9 轮（4K、边框 2、投影 16，Release 档）：旧装饰中位 **20.3ms**，改走共用 `SoftShadow` 后中位 **22.3ms**——多出的约 2ms 是逐像素 SDF 算术换掉旧查表、换来圆角支持的代价。绝对值跟着机器与当时负载走：当初记的 15.7ms 在新一轮里连旧实现自己也复现不出来，跨轮次只能比同一进程里的两档 | 读数用例 `OutputDecoration.ReportsTheCostOfDecoratingA4kImageWithShadow`；同进程 A/B 把旧实现逐字拷进探针，9 轮交替。更早的改造前 Debug 档中位 138.4ms |
 
 2026-11 回溯截图 Phase 1 读数（Windows、2560×1440 单屏、dpr 1.0；门禁 `GYANISSCRIBE_REWIND_GATE=1`、`GYANISSCRIBE_REWIND_GATE_SECONDS=60`；
 预热一帧丢弃，读数只报数，门禁用例自己断言 p99 ≤ 16ms）：

@@ -4383,5 +4383,425 @@
             <source>开上后每次进标注窗都在工具栏旁浮着一块，写明应用、窗口标题、屏幕与捕获时刻；默认关，关着时标注窗与以前一样。面板只在本机显示，不写历史、不写日志。</source>
             <translation>When on, every annotation window shows a panel beside the toolbar with the application, window title, screen and capture time. Off by default; the annotation window behaves as before while off. The panel is shown locally only and is not written to history or logs.</translation>
         </message>
+        <message>
+            <source>这张图是空的，没有可美化的内容：请先截一张图再分享</source>
+            <translation>This image is empty, so there is nothing to beautify; capture a screenshot before sharing</translation>
+        </message>
+        <message>
+            <source>美化画布超过了 {} 像素的边长上限：请缩小截图或减少内边距与投影</source>
+            <translation>The beautified canvas exceeds the {} pixel edge limit; use a smaller capture or reduce padding and shadow</translation>
+        </message>
+        <message>
+            <source>美化画布太大，内存放不下：请缩小截图或减少内边距与投影</source>
+            <translation>The beautified canvas is too large to fit in memory; use a smaller capture or reduce padding and shadow</translation>
+        </message>
+        <message>
+            <source>美化图片没能缩放：内存不够，请缩小截图或减少内边距与投影</source>
+            <translation>The beautified image could not be scaled: not enough memory; use a smaller capture or reduce padding and shadow</translation>
+        </message>
+        <message>
+            <source>美化渲染需要图形界面环境：请从应用内的分享入口重试</source>
+            <translation>Beautifying needs a graphical environment; retry from the share entry inside the app</translation>
+        </message>
+        <message>
+            <source>美化样式的 {} 不在 {} 到 {} 之间：请重选一个值，或回到默认模板</source>
+            <translation>The beautify style {} is outside {} to {}; pick another value or return to the default template</translation>
+        </message>
+        <message>
+            <source>美化样式的 {} 不是可用的取值：请重选一个值，或回到默认模板</source>
+            <translation>The beautify style {} is not a usable value; pick another value or return to the default template</translation>
+        </message>
+        <message>
+            <source>美化样式的颜色 {} 认不出来（如 #RRGGBB）：请重选一个值，或回到默认模板</source>
+            <translation>The beautify style color {} is not recognized (for example #RRGGBB); pick another value or return to the default template</translation>
+        </message>
+        <message>
+            <source>聚焦</source>
+            <translation>Focus</translation>
+        </message>
+        <message>
+            <source>渐变</source>
+            <translation>Gradient</translation>
+        </message>
+        <message>
+            <source>代码窗口</source>
+            <translation>Code window</translation>
+        </message>
+        <message>
+            <source>留白</source>
+            <translation>Whitespace</translation>
+        </message>
+        <message>
+            <source>美化样式的标题最多 {} 个字符</source>
+            <translation>The beautify style title can be at most {} characters</translation>
+        </message>
+        <message>
+            <source>美化样式的水印最多 {} 个字符</source>
+            <translation>The beautify style watermark can be at most {} characters</translation>
+        </message>
+        <message>
+            <source>美化模板不是一段合法的 JSON（{}），这一格按空处理</source>
+            <translation>The share template is not valid JSON ({}), so this field is treated as empty</translation>
+        </message>
+        <message>
+            <source>美化模板的根不是对象，这一格按空处理</source>
+            <translation>The share template root is not an object, so this field is treated as empty</translation>
+        </message>
+        <message>
+            <source>美化模板的版本不是 1（{}），这一格按空处理</source>
+            <translation>The share template version is not 1 ({}), so this field is treated as empty</translation>
+        </message>
+        <message>
+            <source>美化模板缺少 templates 数组，这一格按空处理</source>
+            <translation>The share template has no templates array, so this field is treated as empty</translation>
+        </message>
+        <message>
+            <source>美化模板第 {} 项不是对象，已跳过</source>
+            <translation>Entry {} in the share template is not an object and was skipped</translation>
+        </message>
+        <message>
+            <source>美化模板第 {} 项没有 id，已跳过</source>
+            <translation>Entry {} in the share template has no id and was skipped</translation>
+        </message>
+        <message>
+            <source>美化模板第 {} 项没有名字，已跳过</source>
+            <translation>Entry {} in the share template has no name and was skipped</translation>
+        </message>
+        <message>
+            <source>美化模板「{}」用了内置 id，已跳过</source>
+            <translation>The share template “{}” uses a built-in id and was skipped</translation>
+        </message>
+        <message>
+            <source>美化模板「{}」与内置模板同名，已跳过</source>
+            <translation>The share template “{}” has the same name as a built-in template and was skipped</translation>
+        </message>
+        <message>
+            <source>美化模板「{}」的风格不是对象，已跳过</source>
+            <translation>The share template “{}” style is not an object and was skipped</translation>
+        </message>
+        <message>
+            <source>美化模板「{}」的风格读不出来（{}），已跳过</source>
+            <translation>The share template “{}” style could not be read ({}) and was skipped</translation>
+        </message>
+        <message>
+            <source>模板名不能为空</source>
+            <translation>The template name cannot be empty</translation>
+        </message>
+        <message>
+            <source>模板名最多 40 个字符</source>
+            <translation>Template names can be at most 40 characters</translation>
+        </message>
+        <message>
+            <source>已有同名模板「{}」</source>
+            <translation>A template named “{}” already exists</translation>
+        </message>
+        <message>
+            <source>自定义模板最多 30 套，请先删掉几套</source>
+            <translation>You can keep at most 30 custom templates; delete a few first</translation>
+        </message>
+        <message>
+            <source>模板太多，设置里存不下：请先删掉几套</source>
+            <translation>There are too many templates to store in the settings; delete a few first</translation>
+        </message>
+        <message>
+            <source>内置模板不能删除</source>
+            <translation>Built-in templates cannot be deleted</translation>
+        </message>
+        <message>
+            <source>找不到这套模板，可能已经删掉了</source>
+            <translation>That template could not be found; it may have been deleted</translation>
+        </message>
+        <message>
+            <source>美化分享</source>
+            <translation>Beautify &amp; share</translation>
+        </message>
+        <message>
+            <source>美化分享（背景、圆角、投影、水印）</source>
+            <translation>Beautify and share (background, rounded corners, shadow, watermark)</translation>
+        </message>
+        <message>
+            <source>没能复制到剪贴板：</source>
+            <translation>Could not copy to the clipboard: </translation>
+        </message>
+        <message>
+            <source>没能保存美化图片：{}</source>
+            <translation>Could not save the beautified image: {}</translation>
+        </message>
+        <message>
+            <source>没有可保存的图片</source>
+            <translation>There is no image to save</translation>
+        </message>
+        <message>
+            <source>不支持的图片格式：{}</source>
+            <translation>Unsupported image format: {}</translation>
+        </message>
+        <message>
+            <source>（无后缀）</source>
+            <translation>(no suffix)</translation>
+        </message>
+        <message>
+            <source>「{}」没能编码成目标格式</source>
+            <translation>“{}” could not be encoded into the target format</translation>
+        </message>
+        <message>
+            <source>已保存到 {}</source>
+            <translation>Saved to {}</translation>
+        </message>
+        <message>
+            <source>模板保存失败：{}</source>
+            <translation>Could not save the template: {}</translation>
+        </message>
+        <message>
+            <source>已保存模板「{}」</source>
+            <translation>Saved template “{}”</translation>
+        </message>
+        <message>
+            <source>模板删除失败：{}</source>
+            <translation>Could not delete the template: {}</translation>
+        </message>
+        <message>
+            <source>已删除模板「{}」</source>
+            <translation>Deleted template “{}”</translation>
+        </message>
+        <message>
+            <source>美化预览</source>
+            <translation>Beautify preview</translation>
+        </message>
+        <message>
+            <source>这里显示套上当前样式之后的样子；复制与保存出去的仍是原尺寸</source>
+            <translation>Shows the result with the current style; copy and save still export at full size</translation>
+        </message>
+        <message>
+            <source>左侧是实时预览；下面的改动只影响这张美化成品，原图与标注现场保持不变。</source>
+            <translation>The left side is a live preview; the changes below only affect this beautified image, while the original capture and annotations stay untouched.</translation>
+        </message>
+        <message>
+            <source>美化分享说明</source>
+            <translation>About beautify and share</translation>
+        </message>
+        <message>
+            <source>模板</source>
+            <translation>Template</translation>
+        </message>
+        <message>
+            <source>选一套内置模板或保存过的自定义模板；换模板会把这套样式加载到下面的控件里</source>
+            <translation>Pick a built-in template or a saved custom template; switching loads that style into the controls below</translation>
+        </message>
+        <message>
+            <source>当前模板</source>
+            <translation>Current template</translation>
+        </message>
+        <message>
+            <source>卡片背后的底色；点一下打开取色器</source>
+            <translation>The color behind the card; click to open the color picker</translation>
+        </message>
+        <message>
+            <source>渐变终点</source>
+            <translation>Gradient end</translation>
+        </message>
+        <message>
+            <source>渐变终点的底色；打开「从上到下渐变」后才用得上</source>
+            <translation>The end color of the gradient; only used when “Top-to-bottom gradient” is on</translation>
+        </message>
+        <message>
+            <source>从上到下渐变</source>
+            <translation>Top-to-bottom gradient</translation>
+        </message>
+        <message>
+            <source>渐变背景</source>
+            <translation>Gradient background</translation>
+        </message>
+        <message>
+            <source>打开后背景从背景色渐变到渐变终点；关着时只用背景色</source>
+            <translation>When on, the background blends from the background color to the gradient end; when off, only the background color is used</translation>
+        </message>
+        <message>
+            <source>尺寸</source>
+            <translation>Size</translation>
+        </message>
+        <message>
+            <source>内边距</source>
+            <translation>Padding</translation>
+        </message>
+        <message>
+            <source>卡片四周留出多少像素的空白；越大画布越宽，成品四周越透气</source>
+            <translation>How many pixels of blank space surround the card; larger values widen the canvas and give the image more breathing room</translation>
+        </message>
+        <message>
+            <source>卡片四角的圆角半径，像素；特别大时会按卡片短边自动收小</source>
+            <translation>Corner radius of the card in pixels; very large values shrink automatically to fit the card's shorter side</translation>
+        </message>
+        <message>
+            <source>描边宽度</source>
+            <translation>Border width</translation>
+        </message>
+        <message>
+            <source>卡片外圈描边的宽度，像素；0 表示不画描边</source>
+            <translation>Width of the border around the card in pixels; 0 draws no border</translation>
+        </message>
+        <message>
+            <source>卡片外圈投影向外铺开的宽度，像素；0 表示不画投影</source>
+            <translation>How far the shadow spreads outward from the card in pixels; 0 draws no shadow</translation>
+        </message>
+        <message>
+            <source>在卡片顶部显示标题栏</source>
+            <translation>Show a title bar on top of the card</translation>
+        </message>
+        <message>
+            <source>代码窗口标题栏</source>
+            <translation>Code window title bar</translation>
+        </message>
+        <message>
+            <source>打开后在卡片顶部画一条编辑器标题栏：三个圆点加标题文字</source>
+            <translation>When on, draws an editor title bar across the top of the card: three dots plus the title text</translation>
+        </message>
+        <message>
+            <source>标题栏文字</source>
+            <translation>Title bar text</translation>
+        </message>
+        <message>
+            <source>标题栏里的文字；留空只画三个圆点</source>
+            <translation>The text in the title bar; leave it empty to draw only the three dots</translation>
+        </message>
+        <message>
+            <source>留空只画三个圆点</source>
+            <translation>Leave empty to draw only the three dots</translation>
+        </message>
+        <message>
+            <source>标题文字</source>
+            <translation>Title text</translation>
+        </message>
+        <message>
+            <source>水印</source>
+            <translation>Watermark</translation>
+        </message>
+        <message>
+            <source>水印文字</source>
+            <translation>Watermark text</translation>
+        </message>
+        <message>
+            <source>贴在卡片下角的文字；留空不画水印</source>
+            <translation>Text placed in the card's bottom corner; leave it empty to draw no watermark</translation>
+        </message>
+        <message>
+            <source>留空不加水印</source>
+            <translation>Leave empty for no watermark</translation>
+        </message>
+        <message>
+            <source>水印不透明度</source>
+            <translation>Watermark opacity</translation>
+        </message>
+        <message>
+            <source>水印的不透明度：0 完全透明，255 完全不透明</source>
+            <translation>Watermark opacity: 0 is fully transparent, 255 is fully opaque</translation>
+        </message>
+        <message>
+            <source>不透明度</source>
+            <translation>Opacity</translation>
+        </message>
+        <message>
+            <source>水印位置</source>
+            <translation>Watermark position</translation>
+        </message>
+        <message>
+            <source>水印贴在卡片的右下角还是左下角</source>
+            <translation>Whether the watermark sits in the card's bottom right or bottom left corner</translation>
+        </message>
+        <message>
+            <source>右下角</source>
+            <translation>Bottom right</translation>
+        </message>
+        <message>
+            <source>左下角</source>
+            <translation>Bottom left</translation>
+        </message>
+        <message>
+            <source>模板操作</source>
+            <translation>Template actions</translation>
+        </message>
+        <message>
+            <source>另存为模板</source>
+            <translation>Save as template</translation>
+        </message>
+        <message>
+            <source>把当前样式存成一套自定义模板，以后在同一台机器上还能选回来</source>
+            <translation>Save the current style as a custom template so you can pick it again on this machine</translation>
+        </message>
+        <message>
+            <source>删除模板</source>
+            <translation>Delete template</translation>
+        </message>
+        <message>
+            <source>删除当前选中的自定义模板；内置模板不能删</source>
+            <translation>Delete the selected custom template; built-in templates cannot be deleted</translation>
+        </message>
+        <message>
+            <source>按原尺寸把美化成品放进剪贴板；原图与标注保持不动</source>
+            <translation>Put the beautified image on the clipboard at full size; the original capture and annotations stay untouched</translation>
+        </message>
+        <message>
+            <source>保存图片…</source>
+            <translation>Save image…</translation>
+        </message>
+        <message>
+            <source>保存图片</source>
+            <translation>Save image</translation>
+        </message>
+        <message>
+            <source>按原尺寸把美化成品另存成 PNG、JPG 或 WebP；原图与标注保持不动</source>
+            <translation>Save the beautified image as PNG, JPG or WebP at full size; the original capture and annotations stay untouched</translation>
+        </message>
+        <message>
+            <source>关闭美化分享</source>
+            <translation>Close beautify and share</translation>
+        </message>
+        <message>
+            <source>关掉美化对话框回到标注现场；已经复制或保存的成品不受影响</source>
+            <translation>Close the beautify dialog and return to the annotation; anything already copied or saved is unaffected</translation>
+        </message>
+        <message>
+            <source>操作状态</source>
+            <translation>Status</translation>
+        </message>
+        <message>
+            <source>这里显示复制、保存与模板操作的结果和失败原因</source>
+            <translation>Shows the results and failure reasons for copy, save and template actions</translation>
+        </message>
+        <message>
+            <source>选择背景色</source>
+            <translation>Choose the background color</translation>
+        </message>
+        <message>
+            <source>选择渐变终点色</source>
+            <translation>Choose the gradient end color</translation>
+        </message>
+        <message>
+            <source>模板名称</source>
+            <translation>Template name</translation>
+        </message>
+        <message>
+            <source>确定删除当前选中的自定义模板吗？删除后不能恢复。</source>
+            <translation>Delete the selected custom template? This cannot be undone.</translation>
+        </message>
+        <message>
+            <source>PNG 图片 (*.png);;JPEG 图片 (*.jpg *.jpeg);;WebP 图片 (*.webp)</source>
+            <translation>PNG image (*.png);;JPEG image (*.jpg *.jpeg);;WebP image (*.webp)</translation>
+        </message>
+        <message>
+            <source>美化模板「{}」不在目录里，回到 light</source>
+            <translation>The share template “{}” is not in the catalog; falling back to light</translation>
+        </message>
+        <message>
+            <source>上次使用的美化模板没能写入：{}</source>
+            <translation>Could not write the last-used share template: {}</translation>
+        </message>
+        <message>
+            <source>模板选择没能记住：{}</source>
+            <translation>Could not remember the template choice: {}</translation>
+        </message>
+        <message>
+            <source>操作失败原因</source>
+            <translation>Failure reason</translation>
+        </message>
 </context>
 </TS>

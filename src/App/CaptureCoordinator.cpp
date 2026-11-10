@@ -114,7 +114,7 @@ namespace GyanisScribe::App
                              finishCaptureFlow();
                          });
 
-        // 标注窗的六个出口：动作只有一个入口，界面不需要知道用户是点了按钮还是按了键盘
+        // 标注窗的各出口：动作只有一个入口，界面不需要知道用户是点了按钮还是按了键盘
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::copyRequested, this, &CaptureCoordinator::copyToClipboard);
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::saveRequested, &m_dependencies.delivery,
                          &GyanisScribe::App::DeliveryCoordinator::saveAndReport);
