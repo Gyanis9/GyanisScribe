@@ -491,6 +491,13 @@ namespace GyanisScribe::Main
          * @details 条目直接取自托盘那张表：表里有的这里就有，表里没有的这里也不许多造一份。
          */
         QWidget *buildActionBar();
+
+        /**
+         * @brief 按设置内容与动作条当前可见状态重算窗口最小宽度
+         * @details 动作条可见时它自己也要装得下；隐藏时只按设置页内容收，窗口才能缩到内容那一档。
+         */
+        void updateMinimumWindowWidth();
+
         /// 关于页
         QWidget *buildAboutPage();
         /// 历史页：缩略图列表与三个出口
@@ -505,6 +512,7 @@ namespace GyanisScribe::Main
         QListWidget                                                         *m_nav       = nullptr; ///< 左侧导航，一行一页
         QStackedWidget                                                      *m_stack     = nullptr; ///< 右侧页容器，序号与导航行同解
         QWidget                                                             *m_actionBar = nullptr; ///< 顶部动作条；托盘可用时隐藏，无托盘时是唯一入口
+        int                                                                  m_settingsMinimumWidth = 0; ///< 设置内容的实测最小宽，动作条显隐时在这个底线上取大
         std::unique_ptr<GyanisScribe::Plugins::FfmpegAudioDeviceEnumerator>  m_audioDevices;        ///< 录屏页那两路设备清单的来源，一次查询两格共用
         std::unique_ptr<GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator> m_videoEncoders;       ///< 录屏页编码器清单的来源：逐个候选真探一遍
         GyanisScribe::Platform::IPlatformIntegration                        &m_integration;         ///< 平台动作（当前只有开机启动那一格）：能力位可以造假，动作要有真对象

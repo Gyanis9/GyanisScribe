@@ -529,13 +529,16 @@ namespace GyanisScribe::Gui
     inline constexpr int kSpacingHairline = 2;
 
     /// 一行设置项里字段的最大宽度：路径与下拉拉到整窗宽时，「这一格填什么」就看不出来了
-    inline constexpr int kFieldMaximumWidth = 380;
+    inline constexpr int kFieldMaximumWidth = 340;
 
-    /// 设置页标签列的最小宽度：全族统一（取最长标签一页），翻页时字段列不再左右跳
-    inline constexpr int kSettingsLabelColumnWidth = 240;
+    /// 设置窗的默认尺寸与最小尺寸：最小宽度按内容实测后可能再抬高
+    inline constexpr int kSettingsWindowDefaultWidth  = 840;
+    inline constexpr int kSettingsWindowDefaultHeight = 620;
+    inline constexpr int kSettingsWindowMinimumWidth  = 760;
+    inline constexpr int kSettingsWindowMinimumHeight = 480;
 
     /// 页顶说明行的最大宽度：整窗宽的一行长句读起来要回头数，收到这一档就按行折
-    inline constexpr int kIntroMaximumWidth = 420;
+    inline constexpr int kIntroMaximumWidth = 528;
 
     // 标注默认色板住在 Core/Annotation/AnnotationPalette.h（kAnnotationPaletteColors）；
     // 其中「蓝」与主色同值这条关系由 Gui 的用例钉住（TestDesignTokens.AnnotationPaletteBlueFollowsTheAccent）

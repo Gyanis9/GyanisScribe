@@ -282,17 +282,17 @@ namespace
 
         // 「这一类有什么」的用词取自界面里的无障碍名，不是从配置键推的：读的人要能对着窗口核对
         const std::vector<Expectation> expectations = {
-                Expectation{MainWindowPage::General, {"界面语言", "历史最多留多少条", "历史最久留多少天", "截图记忆", "左键单击", "中键单击", "导出配置", "导入配置"}, true},
+                Expectation{MainWindowPage::General, {"界面语言", "历史记录条数上限", "历史记录保留天数", "截图记忆", "左键单击", "中键单击", "导出配置", "导入配置"}, true},
                 Expectation{MainWindowPage::Capture,
-                            {"截完之后", "延时截图", "截图目录", "颜色写法", "不参与窗口检测的程序", "自动保存所有截图", "截图音效", "成品加边框", "成品加投影"},
+                            {"截图完成后", "截图延时", "截图输出目录", "颜色复制格式", "窗口检测排除程序", "自动保存所有截图", "截图音效", "输出边框", "输出投影"},
                             true},
-                Expectation{MainWindowPage::Annotation, {"默认线宽", "默认字号", "空白画布用透明底"}, true},
-                Expectation{MainWindowPage::Pin, {"默认不透明度", "吸附距离", "不许拖边改大小"}, true},
+                Expectation{MainWindowPage::Annotation, {"默认线宽", "默认字号", "空白画布背景"}, true},
+                Expectation{MainWindowPage::Pin, {"默认不透明度", "吸附距离", "禁止拖边调整大小"}, true},
                 Expectation{MainWindowPage::Record,
-                            {"录屏目录", "录制范围", "输出格式", "默认帧率", "录屏倒计时", "最长录多久", "画面码率", "视频编码器", "光标高亮", "麦克风设备", "系统声音设备"},
+                            {"录屏输出目录", "录制范围", "输出格式", "默认帧率", "录屏倒计时", "最长录制时长", "画面码率", "视频编码器", "光标高亮", "麦克风设备", "系统声音设备"},
                             true},
                 Expectation{MainWindowPage::Ocr, {"识别语言", "语言包目录"}, true},
-                Expectation{MainWindowPage::Hotkey, {"截图", "录屏", "文字识别", "屏幕取色", "快速保存", "回溯截图", "允许单键当全局热键"}, true},
+                Expectation{MainWindowPage::Hotkey, {"截图", "录屏", "文字识别", "屏幕取色", "快速保存", "回溯缓冲", "允许单键作为全局热键"}, true},
                 Expectation{MainWindowPage::Theme, {"主题"}, true},
                 Expectation{MainWindowPage::About, {"智录图标"}, false},
                 Expectation{MainWindowPage::History, {"历史列表"}, false},
@@ -555,17 +555,16 @@ namespace
     {
         ASSERT_TRUE(static_cast<bool>(m_store->setValue(GyanisScribe::Core::kMainWindowGeometry, QStringLiteral("AAAA"))));
         makeWindow();
-        EXPECT_EQ(m_window->size(), QSize(680, 560)) << "坏几何没回落默认尺寸";
+        EXPECT_EQ(m_window->size(), QSize(840, 620)) << "坏几何没回落默认尺寸";
     }
 
     /**
-     * @brief 设置页的标签与字段对得上：每一行的「标签文字右缘 → 字段左缘」的缝要恒定
-     * @details 这条钉的是标签右对齐那一处：左对齐时这条缝随标签长短忽宽忽窄（实测 4 字 81px、
-     *          10 字只剩 9px，同一页里两种都见得到）。只断 labelAlignment 属性的话，将来 Qt
-     *          换了绘制行为这条不会红，所以量的是画出来的像素——做法与 UiStyleGuide §3 那条
-     *          渲染判据同路。跨列行（分组标题一类）没有字段，不参与这条。
+     * @brief 设置页的标签靠左写，字段列以最长标签的右缘为起点
+     * @details 标签文字左对齐，标签控件统一到最长的 sizeHint；字段左缘因此全页同线，
+     *          最长那条标签与字段之间只隔一个行距。只断几何的话，标签内部怎么画仍可能跑偏，
+     *          所以左侧墨迹与最长标签的右缘另按像素核一遍。
      */
-    TEST_F(MainWindowFixture, SettingsFormKeepsAUniformLabelToFieldGap)
+    TEST_F(MainWindowFixture, SettingsLabelsAlignLeftAndFieldsFollowTheLongestLabel)
     {
         makeWindow();
         m_window->open(MainWindowPage::General);
@@ -573,13 +572,15 @@ namespace
         ASSERT_NE(page, nullptr);
         auto *form = page->findChild<QFormLayout *>();
         ASSERT_NE(form, nullptr) << "通用页没有表单骨架，判据的前提就没构造出来";
-        EXPECT_TRUE(form->labelAlignment().testFlag(Qt::AlignRight)) << "标签右对齐是「缝恒定」的来历，一并钉住";
+        EXPECT_TRUE(form->labelAlignment().testFlag(Qt::AlignLeft)) << "标签左对齐是这一版的排版前提";
 
-        const QImage pixmap    = page->grab().toImage();
-        const auto   scale     = pixmap.devicePixelRatio();
-        int          rows      = 0;
-        int          narrowest = std::numeric_limits<int>::max();
-        int          widest    = 0;
+        const QImage pixmap = page->grab().toImage();
+        const auto   scale  = pixmap.devicePixelRatio();
+
+        int    rows        = 0;
+        int    fieldLeft   = -1;
+        int    widestText  = 0;
+        QRect  widestRect;
         for (int row = 0; row < form->rowCount(); ++row)
         {
             const auto *labelItem = form->itemAt(row, QFormLayout::LabelRole);
@@ -590,72 +591,118 @@ namespace
             }
             auto *label = labelItem->widget();
             auto *field = fieldItem->widget();
+            auto *text  = qobject_cast<QLabel *>(label);
+            ASSERT_NE(text, nullptr) << "第 " << row << " 行的标签不是文字控件，前提没构造出来";
+            EXPECT_TRUE(text->alignment().testFlag(Qt::AlignLeft)) << "第 " << row << " 行的标签文字没有左对齐";
 
             const QRect labelRect{label->mapTo(page, QPoint{0, 0}), label->size()};
-            const int   fieldLeft = field->mapTo(page, QPoint{0, 0}).x();
-
-            // 标签文字右缘：在标签控件自己的矩形里从右往左找最右的墨迹像素
-            int textRight = -1;
-            for (int x = labelRect.right(); x >= labelRect.left() && textRight < 0; --x)
+            const int   left = field->mapTo(page, QPoint{0, 0}).x();
+            if (fieldLeft < 0)
             {
-                for (int y = labelRect.top(); y <= labelRect.bottom(); ++y)
+                fieldLeft = left;
+            }
+            EXPECT_EQ(left, fieldLeft) << "第 " << row << " 行的字段没有落在同一条左缘上";
+
+            // 左侧墨迹：最外 4px 不扫，避开标签自身边缘的抗锯齿
+            constexpr int kEdgeInset = 4;
+            int           leftInk    = -1;
+            for (int x = labelRect.left() + kEdgeInset; x <= labelRect.right() - kEdgeInset && leftInk < 0; ++x)
+            {
+                for (int y = labelRect.top() + 2; y <= labelRect.bottom() - 2; ++y)
                 {
                     const auto pixel = pixmap.pixelColor(qRound(x * scale), qRound(y * scale));
                     if (pixel.red() + pixel.green() + pixel.blue() < 3 * 200)
                     {
-                        textRight = x;
+                        leftInk = x;
                         break;
                     }
                 }
             }
-            ASSERT_GE(textRight, 0) << "第 " << row << " 行的标签一个字都没画出来";
-            const int gap = fieldLeft - textRight;
-            narrowest     = std::min(narrowest, gap);
-            widest        = std::max(widest, gap);
+            ASSERT_GE(leftInk, 0) << "第 " << row << " 行的标签一个字都没画出来";
+            EXPECT_LE(leftInk - labelRect.left(), 8) << "第 " << row << " 行的标签没有从左边开始写";
+
+            const int textWidth = QFontMetrics{text->font()}.horizontalAdvance(text->text());
+            if (textWidth > widestText)
+            {
+                widestText = textWidth;
+                widestRect = labelRect;
+            }
             ++rows;
         }
 
         ASSERT_GE(rows, 5) << "通用页参与判据的行太少，前提没构造出来";
-        EXPECT_LE(widest - narrowest, 3) << "缝忽宽忽窄又回来了：最窄 " << narrowest << "px、最宽 " << widest << "px";
-        EXPECT_GE(narrowest, 4) << "缝比行距还窄，标签已经贴上字段";
-        EXPECT_LE(widest, 16) << "缝最宽 " << widest << "px，标签与字段已经不成对";
+        ASSERT_FALSE(widestRect.isNull()) << "没有找到最长标签";
+        constexpr int kEdgeInset = 4;
+        int           rightInk   = -1;
+        for (int x = widestRect.right() - kEdgeInset; x >= widestRect.left() && rightInk < 0; --x)
+        {
+            for (int y = widestRect.top() + 2; y <= widestRect.bottom() - 2; ++y)
+            {
+                const auto pixel = pixmap.pixelColor(qRound(x * scale), qRound(y * scale));
+                if (pixel.red() + pixel.green() + pixel.blue() < 3 * 200)
+                {
+                    rightInk = x + kEdgeInset;
+                    break;
+                }
+            }
+        }
+        ASSERT_GE(rightInk, 0) << "最长标签一个字都没画出来";
+        const int gap = fieldLeft - rightInk;
+        EXPECT_GE(gap, 4) << "字段贴着最长标签，连行距都没有";
+        EXPECT_LE(gap, 16) << "字段列离最长标签的右缘 " << gap << "px，已经超过一个行距";
     }
 
     /**
-     * @brief 钉住「标签列宽全族统一」：翻页时字段列不许左右跳
-     * @details 改之前字段列在各页从 280 跳到 472——统一的标签列宽（kSettingsLabelColumnWidth）
-     *          把八页收到同一列；这条逐页开过去量第一行的字段左缘，任两页差 1px 都算红。
+     * @brief 钉住每一页的字段列都紧挨本页最长标签的右缘
+     * @details 列宽按页实测：短页不替长页背留白，同一页内所有字段仍然同线。
+     *          跨页不要求同一个 x——各页标签长度本来就不同，强行统一会把短页的字段推远。
      */
-    TEST_F(MainWindowFixture, SettingsColumnsShareOneWidthAcrossPages)
+    TEST_F(MainWindowFixture, SettingsFieldsFollowEachPagesLongestLabel)
     {
         makeWindow();
-        std::optional<int> sharedLeft;
-        const auto         pages = {MainWindowPage::General, MainWindowPage::Capture, MainWindowPage::Annotation, MainWindowPage::Pin,
-                                    MainWindowPage::Record,  MainWindowPage::Ocr,     MainWindowPage::Hotkey,     MainWindowPage::Theme};
+        const auto pages = {MainWindowPage::General, MainWindowPage::Capture, MainWindowPage::Annotation, MainWindowPage::Pin,
+                            MainWindowPage::Record,  MainWindowPage::Ocr,     MainWindowPage::Hotkey,     MainWindowPage::Theme};
         for (const auto page: pages)
         {
             m_window->open(page);
             QCoreApplication::processEvents();
-            auto *current = stack()->currentWidget();
-            ASSERT_NE(current, nullptr);
-            auto *form = current->findChild<QFormLayout *>();
+            auto *scroll = qobject_cast<QScrollArea *>(stack()->currentWidget());
+            ASSERT_NE(scroll, nullptr);
+            auto *card = scroll->widget();
+            ASSERT_NE(card, nullptr);
+            auto *form = card->findChild<QFormLayout *>();
             ASSERT_NE(form, nullptr);
-            int fieldLeft = -1;
-            for (int row = 0; row < form->rowCount() && fieldLeft < 0; ++row)
+
+            int pageLabelWidth = 0;
+            for (int row = 0; row < form->rowCount(); ++row)
             {
-                const auto *fieldItem = form->itemAt(row, QFormLayout::FieldRole);
-                if (fieldItem != nullptr && fieldItem->widget() != nullptr)
+                const auto *labelItem = form->itemAt(row, QFormLayout::LabelRole);
+                if (labelItem != nullptr && labelItem->widget() != nullptr)
                 {
-                    fieldLeft = fieldItem->widget()->mapTo(m_window.get(), QPoint{0, 0}).x();
+                    pageLabelWidth = std::max(pageLabelWidth, labelItem->widget()->sizeHint().width());
                 }
             }
-            ASSERT_GE(fieldLeft, 0) << "有一页没量到字段列";
-            if (!sharedLeft.has_value())
+            ASSERT_GT(pageLabelWidth, 0) << "这一页没有标签列";
+
+            int firstFieldLeft = -1;
+            for (int row = 0; row < form->rowCount(); ++row)
             {
-                sharedLeft = fieldLeft;
-            } else
-            {
-                EXPECT_EQ(fieldLeft, *sharedLeft) << "翻页时字段列跳了";
+                const auto *labelItem = form->itemAt(row, QFormLayout::LabelRole);
+                const auto *fieldItem = form->itemAt(row, QFormLayout::FieldRole);
+                if (labelItem == nullptr || labelItem->widget() == nullptr || fieldItem == nullptr || fieldItem->widget() == nullptr)
+                {
+                    continue;
+                }
+                const auto *label = labelItem->widget();
+                EXPECT_EQ(label->width(), pageLabelWidth) << "第 " << row << " 行的标签没有收到本页最长一档";
+                const int labelLeft = label->mapTo(card, QPoint{0, 0}).x();
+                const int fieldLeft = fieldItem->widget()->mapTo(card, QPoint{0, 0}).x();
+                EXPECT_EQ(fieldLeft, labelLeft + pageLabelWidth + form->horizontalSpacing()) << "第 " << row << " 行的字段没有紧接标签列右缘";
+                if (firstFieldLeft < 0)
+                {
+                    firstFieldLeft = fieldLeft;
+                }
+                EXPECT_EQ(fieldLeft, firstFieldLeft) << "同一页里字段列左右跳了";
             }
         }
     }
@@ -733,7 +780,7 @@ namespace
         QCheckBox *simpleCheck = nullptr;
         for (auto *check: page->findChildren<QCheckBox *>())
         {
-            if (check->text() == GyanisScribe::Base::uiText("允许单键当全局热键"))
+            if (check->text() == GyanisScribe::Base::uiText("允许单键作为全局热键"))
             {
                 simpleCheck = check;
                 break;
@@ -744,7 +791,7 @@ namespace
         QLabel *hint = nullptr;
         for (auto *label: page->findChildren<QLabel *>())
         {
-            if (label->text().contains(GyanisScribe::Base::uiText("允许单键（字母")))
+            if (label->text().contains(GyanisScribe::Base::uiText("允许将字母")))
             {
                 hint = label;
                 break;
@@ -827,7 +874,7 @@ namespace
 
         edit->setText(QStringLiteral("#334455"));
         emit edit->editingFinished();
-        EXPECT_EQ(edit->toolTip(), GyanisScribe::Base::uiText("成品那圈边框的颜色，写 #RRGGBB；留空回到默认的中灰")) << "认得的写法不该挂着一条报错";
+        EXPECT_EQ(edit->toolTip(), GyanisScribe::Base::uiText("输出图片边框的颜色，格式为 #RRGGBB；留空使用默认中灰色。")) << "认得的写法不该挂着一条报错";
 
         edit->setText(QStringLiteral("#1a2b"));
         emit edit->editingFinished();
@@ -950,7 +997,7 @@ namespace
         makeWindow();
         m_window->open(MainWindowPage::Record);
 
-        auto *spin = qobject_cast<QSpinBox *>(controlInCurrentPage("最长录多久"));
+        auto *spin = qobject_cast<QSpinBox *>(controlInCurrentPage("最长录制时长"));
         ASSERT_NE(spin, nullptr) << "录屏页没有这一格：录满上限自动停这件事用户看不到也说不了";
         EXPECT_EQ(spin->value(), GyanisScribe::Core::kDefaultMaximumDurationSeconds) << "默认该是十分钟";
         EXPECT_EQ(spin->maximum(), GyanisScribe::Core::kMaximumDurationSeconds) << "上限要与校验那一处的常量同解，否则界面能给出运行期不收的值";
@@ -1043,7 +1090,7 @@ namespace
         m_window->open(MainWindowPage::Capture);
 
         const auto rows = std::array{std::pair{"自动保存所有截图", GyanisScribe::Core::kCaptureAutoSave}, std::pair{"截图音效", GyanisScribe::Core::kCaptureSound},
-                                     std::pair{"成品加边框", GyanisScribe::Core::kOutputBorder}, std::pair{"成品加投影", GyanisScribe::Core::kOutputShadow}};
+                                     std::pair{"输出边框", GyanisScribe::Core::kOutputBorder}, std::pair{"输出投影", GyanisScribe::Core::kOutputShadow}};
         for (const auto &[name, key]: rows)
         {
             auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage(name));
@@ -1071,7 +1118,7 @@ namespace
         makeWindow();
         m_window->open(MainWindowPage::Capture);
 
-        auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage("标注时显示截图信息"));
+        auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage("显示截图信息面板"));
         ASSERT_NE(check, nullptr) << "截图页没有这一格";
         EXPECT_FALSE(check->isChecked()) << "默认档该是关：面板会把窗口标题摆到屏幕上";
         check->setChecked(true);
@@ -1086,7 +1133,7 @@ namespace
         m_theme->applyFromSettings();
         makeWindow();
         m_window->open(MainWindowPage::Capture);
-        auto *restored = qobject_cast<QCheckBox *>(controlInCurrentPage("标注时显示截图信息"));
+        auto *restored = qobject_cast<QCheckBox *>(controlInCurrentPage("显示截图信息面板"));
         ASSERT_NE(restored, nullptr) << "重开的截图页没有这一格";
         EXPECT_TRUE(restored->isChecked()) << "盘上存着开，重开设置页却显示关";
         restored->setChecked(false);
@@ -1122,16 +1169,16 @@ namespace
         }
         EXPECT_TRUE(hint.contains(QStringLiteral("留空"))) << "默认提示没说留空等于默认档：" << hint.toStdString();
 
-        EXPECT_EQ(preview->text(), QStringLiteral("预演：GyanisScribe_20261109_140300_123.png")) << "空模板没有按默认档预演";
+        EXPECT_EQ(preview->text(), QStringLiteral("预览：GyanisScribe_20261109_140300_123.png")) << "空模板没有按默认档预演";
 
         edit->setText(QStringLiteral("%app%_%title%"));
-        EXPECT_EQ(preview->text(), QStringLiteral("预演：示例应用_示例窗口.png")) << "输入变化后预览没跟上";
+        EXPECT_EQ(preview->text(), QStringLiteral("预览：示例应用_示例窗口.png")) << "输入变化后预览没跟上";
 
         edit->setText(QStringLiteral("%monitor%"));
-        EXPECT_EQ(preview->text(), QStringLiteral("预演：屏幕_1.png")) << "屏幕名里的空格该在预览里折成下划线";
+        EXPECT_EQ(preview->text(), QStringLiteral("预览：屏幕_1.png")) << "屏幕名里的空格该在预览里折成下划线";
 
         edit->setText(QStringLiteral("shot-%nope%"));
-        EXPECT_EQ(preview->text(), GyanisScribe::Base::uiText("预演：模板不可用")) << "非法模板没有说明不可用";
+        EXPECT_EQ(preview->text(), GyanisScribe::Base::uiText("预览：模板不可用")) << "非法模板没有说明不可用";
 
         // 预览只是预演，不落配置：从 textChanged 到现在这一格应当仍是空的，真正写盘要等 editingFinished 的校验
         EXPECT_TRUE(m_store->stringValue(GyanisScribe::Core::kSaveNameTemplate, QString{}).isEmpty()) << "预览把未校验的文本写进了配置";
@@ -1157,7 +1204,7 @@ namespace
 
         auto *preview = m_window->findChild<QLabel *>(QStringLiteral("nameTemplatePreview"));
         ASSERT_NE(preview, nullptr) << "文件名模板输入框下面没有预览标签";
-        EXPECT_EQ(preview->text(), QStringLiteral("预演：示例应用_示例窗口_屏幕_1.png")) << "建页预演没按盘上那份模板算";
+        EXPECT_EQ(preview->text(), QStringLiteral("预览：示例应用_示例窗口_屏幕_1.png")) << "建页预演没按盘上那份模板算";
 
         // 非默认模板下默认提示仍在：留空仍是回到默认档，不是一条报错
         EXPECT_TRUE(edit->toolTip().contains(QStringLiteral("留空"))) << "非默认模板下默认提示丢了：" << edit->toolTip().toStdString();
@@ -1173,7 +1220,7 @@ namespace
         makeWindow();
         m_window->open(MainWindowPage::General);
 
-        auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage("未保存的截图也进历史"));
+        auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage("保留未保存的截图"));
         ASSERT_NE(check, nullptr) << "通用页没有这一格";
         EXPECT_FALSE(check->isChecked()) << "默认档该是关：一开就每张截图往数据目录里落一份像素";
         check->setChecked(true);
@@ -1217,7 +1264,7 @@ namespace
                 GyanisScribe::Core::HistoryRetentionPolicy{.maximumEntries = 0, .retentionDays = 0}, now)));
 
         m_window->open(MainWindowPage::General);
-        auto *keepUnsaved = qobject_cast<QCheckBox *>(controlInCurrentPage("未保存的截图也进历史"));
+        auto *keepUnsaved = qobject_cast<QCheckBox *>(controlInCurrentPage("保留未保存的截图"));
         ASSERT_NE(keepUnsaved, nullptr) << "通用页没有这一格";
         keepUnsaved->setChecked(true);
         m_window->open(MainWindowPage::History);
@@ -1225,7 +1272,7 @@ namespace
 
         // 改条数：隐藏着就按新策略摆好行，翻回来应当只剩最新一条
         m_window->open(MainWindowPage::General);
-        auto *limit = qobject_cast<QSpinBox *>(controlInCurrentPage("历史最多留多少条"));
+        auto *limit = qobject_cast<QSpinBox *>(controlInCurrentPage("历史记录条数上限"));
         ASSERT_NE(limit, nullptr) << "通用页没有这一格";
         limit->setValue(1);
         m_window->open(MainWindowPage::History);
@@ -1243,7 +1290,7 @@ namespace
         makeWindow();
         m_window->open(MainWindowPage::Capture);
 
-        auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage("十六进制用大写"));
+        auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage("十六进制字母大小写"));
         ASSERT_NE(check, nullptr) << "截图页没有这一格";
         EXPECT_TRUE(check->isChecked()) << "默认档该是开：关掉会把所有老用户复制出去的形状换掉";
         check->setChecked(false);
@@ -1315,7 +1362,7 @@ namespace
         EXPECT_EQ(spin->maximum(), GyanisScribe::Core::kEdgeSnapDistanceMaximum) << "数字框的上限与校验函数不同解，界面就能填出一个读端拒掉的值";
         spin->setValue(24);
 
-        auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage("不许拖边改大小"));
+        auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage("禁止拖边调整大小"));
         ASSERT_NE(check, nullptr) << "贴图页没有「不许拖边改大小」这一格";
         EXPECT_FALSE(check->isChecked()) << "默认不该把拖边改大小关掉：那是本仓此前的形状";
         check->setChecked(true);
@@ -1337,7 +1384,7 @@ namespace
         makeWindow();
         m_window->open(MainWindowPage::Annotation);
 
-        auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage("空白画布用透明底"));
+        auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage("空白画布背景"));
         ASSERT_NE(check, nullptr) << "标注页没有这一格";
         EXPECT_FALSE(check->isChecked()) << "默认该是白底，与本仓此前的形状同值";
 
@@ -1358,7 +1405,7 @@ namespace
         makeWindow();
         m_window->open(MainWindowPage::Capture);
 
-        auto *edit = qobject_cast<QLineEdit *>(controlInCurrentPage("不参与窗口检测的程序"));
+        auto *edit = qobject_cast<QLineEdit *>(controlInCurrentPage("窗口检测排除程序"));
         ASSERT_NE(edit, nullptr) << "截图页没有这一格";
         edit->setText(QStringLiteral(" chrome.exe , cmd.exe "));
         emit edit->editingFinished();
@@ -1389,7 +1436,7 @@ namespace
         ASSERT_NE(exclude, nullptr) << "截图页没有排除程序这一格";
 
         EXPECT_FALSE(enabled->isChecked()) << "回溯默认必须关闭";
-        EXPECT_EQ(enabled->text(), GyanisScribe::Base::uiText("开启回溯缓冲（仅内存）"));
+        EXPECT_EQ(enabled->text(), GyanisScribe::Base::uiText("启用（仅使用内存）"));
         EXPECT_EQ(seconds->minimum(), GyanisScribe::Core::kMinimumRewindBufferSeconds);
         EXPECT_EQ(seconds->maximum(), GyanisScribe::Core::kMaximumRewindBufferSeconds);
         EXPECT_EQ(seconds->value(), GyanisScribe::Core::kDefaultRewindBufferSeconds);
@@ -1406,7 +1453,7 @@ namespace
 
         auto *note = m_window->findChild<QLabel *>(QStringLiteral("rewindPrivacyNote"));
         ASSERT_NE(note, nullptr) << "回溯分组没有一行说明";
-        EXPECT_EQ(note->text(), GyanisScribe::Base::uiText("只存内存，不写盘、不上传；锁屏或退出清空。"));
+        EXPECT_EQ(note->text(), GyanisScribe::Base::uiText("仅保存在内存中，不写入磁盘、不上传；锁屏或退出程序时清空。"));
     }
 
     /**
@@ -1531,7 +1578,7 @@ namespace
         const GyanisScribe::Core::HotkeyCombination bare{Qt::NoModifier, Qt::Key_R};
         EXPECT_FALSE(static_cast<bool>(captureEdit->applyCombination(bare))) << "默认那一档要拒裸键：单键会把别的程序的打字吞掉";
 
-        auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage("允许单键当全局热键"));
+        auto *check = qobject_cast<QCheckBox *>(controlInCurrentPage("允许单键作为全局热键"));
         ASSERT_NE(check, nullptr) << "快捷键页没有这一格";
         EXPECT_FALSE(check->isChecked()) << "默认该是关（与对方那一格的默认同值）";
         check->setChecked(true);
@@ -1581,7 +1628,7 @@ namespace
     {
         makeWindow();
         m_window->open(MainWindowPage::Capture);
-        auto *combo = qobject_cast<QComboBox *>(controlInCurrentPage("截完之后"));
+        auto *combo = qobject_cast<QComboBox *>(controlInCurrentPage("截图完成后"));
         ASSERT_NE(combo, nullptr);
         EXPECT_EQ(combo->count(), static_cast<int>(GyanisScribe::App::kCaptureIntentChoices.size())) << "下拉框的行数与词表不同解";
         EXPECT_EQ(combo->currentData().toString(), QString::fromUtf8(std::string{GyanisScribe::App::captureIntentText(GyanisScribe::App::defaultCaptureIntent())}))
@@ -1797,8 +1844,8 @@ namespace
     {
         makeWindow();
         m_window->open(MainWindowPage::General);
-        auto *entries = qobject_cast<QSpinBox *>(controlInCurrentPage("历史最多留多少条"));
-        auto *days    = qobject_cast<QSpinBox *>(controlInCurrentPage("历史最久留多少天"));
+        auto *entries = qobject_cast<QSpinBox *>(controlInCurrentPage("历史记录条数上限"));
+        auto *days    = qobject_cast<QSpinBox *>(controlInCurrentPage("历史记录保留天数"));
         ASSERT_NE(entries, nullptr);
         ASSERT_NE(days, nullptr);
 
@@ -1833,7 +1880,7 @@ namespace
 
         makeWindow();
         m_window->open(MainWindowPage::General);
-        const auto *entries = qobject_cast<QSpinBox *>(controlInCurrentPage("历史最多留多少条"));
+        const auto *entries = qobject_cast<QSpinBox *>(controlInCurrentPage("历史记录条数上限"));
         ASSERT_NE(entries, nullptr);
         EXPECT_EQ(entries->value(), 0);
         EXPECT_EQ(entries->text().trimmed(), QStringLiteral("不限"));
@@ -1963,7 +2010,7 @@ namespace
     {
         makeWindow();
 
-        for (const auto &name: {QStringLiteral("录制范围"), QStringLiteral("截完之后")})
+        for (const auto &name: {QStringLiteral("录制范围"), QStringLiteral("截图完成后")})
         {
             QComboBox *combo = nullptr;
             for (auto *candidate: m_window->findChildren<QComboBox *>())
@@ -2186,6 +2233,58 @@ TEST_F(MainWindowFixture, EveryCheckBoxUsesTheElasticIndicator)
 }
 
 /**
+ * @brief 钉住复选框不把表单标签原样再写一遍
+ * @details 标签列已经写了这一项的短名，框内文字再抄一遍只会挤占横向空间，
+ *          窄窗下还会贴着滚动条。框内文字应当是动作句或补充条件，而不是标签的复读。
+ */
+TEST_F(MainWindowFixture, SettingsCheckBoxCopiesAreNotTheRowLabels)
+{
+    makeWindow();
+    const auto pages = {MainWindowPage::General, MainWindowPage::Capture, MainWindowPage::Annotation, MainWindowPage::Pin,
+                        MainWindowPage::Record,  MainWindowPage::Ocr,     MainWindowPage::Hotkey,     MainWindowPage::Theme};
+    for (const auto page: pages)
+    {
+        m_window->open(page);
+        QCoreApplication::processEvents();
+        auto *scroll = qobject_cast<QScrollArea *>(m_window->findChild<QStackedWidget *>()->currentWidget());
+        ASSERT_NE(scroll, nullptr);
+        auto *card = scroll->widget();
+        ASSERT_NE(card, nullptr);
+        for (auto *form: card->findChildren<QFormLayout *>())
+        {
+            for (int row = 0; row < form->rowCount(); ++row)
+            {
+                const auto *labelItem = form->itemAt(row, QFormLayout::LabelRole);
+                const auto *fieldItem = form->itemAt(row, QFormLayout::FieldRole);
+                if (labelItem == nullptr || labelItem->widget() == nullptr || fieldItem == nullptr || fieldItem->widget() == nullptr)
+                {
+                    continue;
+                }
+                const auto *label = qobject_cast<QLabel *>(labelItem->widget());
+                if (label == nullptr)
+                {
+                    continue;
+                }
+                QList<QCheckBox *> checks;
+                if (auto *self = qobject_cast<QCheckBox *>(fieldItem->widget()); self != nullptr)
+                {
+                    checks.append(self);
+                }
+                checks.append(fieldItem->widget()->findChildren<QCheckBox *>());
+                for (const auto *check: checks)
+                {
+                    EXPECT_NE(check->text(), label->text()) << "第 " << row << " 行复选框把标签原样复读了一遍";
+                    if (label->text().size() >= 4)
+                    {
+                        EXPECT_FALSE(check->text().contains(label->text())) << "第 " << row << " 行复选框文字包含了整条标签：" << check->text().toStdString();
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
  * @brief 钉住设置窗压缩后的版面读数
  * @details 980 宽的旧最小宽来自顶部动作条；隐藏之后窗可以收到 860 以下。
  *          页边距与表单行距也按新档钉住，避免「只藏了动作条、页面还是松的」。
@@ -2212,6 +2311,54 @@ TEST_F(MainWindowFixture, CompactSettingsLayoutHasANarrowerFloor)
 }
 
 /**
+ * @brief 钉住设置窗不会被缩到内容宽以下
+ * @details 横向滚动条是关着的：窗口一旦窄于表单内容，右侧字段会被直接裁掉且没有任何提示。
+ *          这条先把窗口压到 320×240，确认几何被最小尺寸钳住；再逐页量每个字段的右缘，
+ *          要求它落在视口内，而不是靠「看起来差不多」。
+ */
+TEST_F(MainWindowFixture, SettingsWindowRefusesToShrinkBelowItsContent)
+{
+    makeWindow();
+    m_window->setTrayMenuAvailable(true);
+    m_window->open(MainWindowPage::General);
+    QCoreApplication::processEvents();
+
+    EXPECT_GE(m_window->minimumWidth(), GyanisScribe::Gui::kSettingsWindowMinimumWidth) << "窗口最小宽没守住设置页的下限";
+    EXPECT_GE(m_window->minimumHeight(), GyanisScribe::Gui::kSettingsWindowMinimumHeight) << "窗口最小高没守住设置页的下限";
+
+    m_window->resize(320, 240);
+    QCoreApplication::processEvents();
+    EXPECT_EQ(m_window->width(), m_window->minimumWidth()) << "窗口被缩到了内容宽以下";
+    EXPECT_EQ(m_window->height(), m_window->minimumHeight()) << "窗口被缩到了内容高以下";
+
+    const auto pages = {MainWindowPage::General, MainWindowPage::Capture, MainWindowPage::Annotation, MainWindowPage::Pin,
+                        MainWindowPage::Record,  MainWindowPage::Ocr,     MainWindowPage::Hotkey,     MainWindowPage::Theme};
+    for (const auto page: pages)
+    {
+        m_window->open(page);
+        QCoreApplication::processEvents();
+        auto *scroll = qobject_cast<QScrollArea *>(m_window->findChild<QStackedWidget *>()->currentWidget());
+        ASSERT_NE(scroll, nullptr) << "这一页没有滚动区";
+        auto *card = scroll->widget();
+        ASSERT_NE(card, nullptr) << "这一页没有卡片";
+        const QWidget *viewport = scroll->viewport();
+        for (auto *form: card->findChildren<QFormLayout *>())
+        {
+            for (int row = 0; row < form->rowCount(); ++row)
+            {
+                const auto *field = form->itemAt(row, QFormLayout::FieldRole);
+                if (field == nullptr || field->widget() == nullptr)
+                {
+                    continue;
+                }
+                const int right = field->widget()->mapTo(viewport, QPoint{field->widget()->width(), 0}).x();
+                EXPECT_LE(right, viewport->width()) << "第 " << row << " 行字段右缘 " << right << " 超出视口 " << viewport->width();
+            }
+        }
+    }
+}
+
+/**
  * @brief 钉住三处路径行的输入框左缘与表单字段列同线
  * @details 路径行是「QLineEdit + 浏览…」的横向组合，过去漏了 setContentsMargins(0,0,0,0)，
  *          输入框被布局默认边距向内推了约 9px。判据逐页量：路径输入框左缘 = 同行参照字段左缘。
@@ -2226,8 +2373,8 @@ TEST_F(MainWindowFixture, PathEditorsShareTheFormFieldLeftEdge)
         const char    *referenceAccessibleName;
     };
     const std::array cases{
-            Case{MainWindowPage::Capture, "截图目录", "截完之后"},
-            Case{MainWindowPage::Record, "录屏目录", "录制范围"},
+            Case{MainWindowPage::Capture, "截图输出目录", "截图完成后"},
+            Case{MainWindowPage::Record, "录屏输出目录", "录制范围"},
             Case{MainWindowPage::Ocr, "语言包目录", "识别语言"},
     };
 
@@ -2280,7 +2427,7 @@ TEST_F(MainWindowFixture, ClearingPathRowShowsTheDefaultDirectory)
     makeWindow();
     m_window->open(MainWindowPage::Capture);
 
-    auto *edit = qobject_cast<QLineEdit *>(controlInCurrentPage("截图目录"));
+    auto *edit = qobject_cast<QLineEdit *>(controlInCurrentPage("截图输出目录"));
     ASSERT_NE(edit, nullptr) << "截图页里没有截图目录这一格";
     ASSERT_EQ(edit->text(), customPath) << "存过的目录没有显示出来，后面「清空后回到默认」就分不清是清空生效还是本来就没显示";
 
@@ -2436,7 +2583,7 @@ TEST_F(MainWindowFixture, HotkeyEntriesFollowTheGlobalHotkeyCapability)
     m_window->open(MainWindowPage::Hotkey);
     auto rows = globalRows();
     ASSERT_EQ(rows.size(), expectedRows) << "热键页该有固定九行，再给每个可绑功能一行";
-    EXPECT_TRUE(introInCurrentPage().contains(QStringLiteral("上面 9 个是固定动作"))) << "说明里的固定动作数没跟着行表走：" << introInCurrentPage().toStdString();
+    EXPECT_TRUE(introInCurrentPage().contains(QStringLiteral("上方 9 项为固定动作"))) << "说明里的固定动作数没跟着行表走：" << introInCurrentPage().toStdString();
     for (auto *edit: rows)
     {
         EXPECT_TRUE(edit->isEnabled()) << "有登记口的平台上这些行要能改";
@@ -2544,7 +2691,7 @@ TEST_F(MainWindowFixture, InWindowShortcutRowsAreGroupedUnderFamilyHeadings)
     int headings = 0;
     for (auto *label: m_window->findChildren<QLabel *>())
     {
-        if (label->accessibleName() == GyanisScribe::Base::uiText("界面按键的分组标题"))
+        if (label->accessibleName() == GyanisScribe::Base::uiText("应用内快捷键的分组标题"))
         {
             ++headings;
             EXPECT_TRUE(families.contains(label->text())) << "多出一个没在清册里的分组标题：" << label->text().toStdString();
@@ -2569,7 +2716,7 @@ TEST_F(MainWindowFixture, GroupRotationRowStoresCleanTokensAndKeepsBadOnes)
 
     edit->setText(QStringLiteral("3, 1, 2"));
     emit edit->editingFinished();
-    EXPECT_EQ(edit->toolTip(), GyanisScribe::Base::uiText("切组按键走的那一圈按这里的顺序排，没写到的组补在末尾")) << "认得的名单不该挂着一条报错";
+    EXPECT_EQ(edit->toolTip(), GyanisScribe::Base::uiText("切换分组时按此顺序轮换；未列出的分组排在末尾。")) << "认得的名单不该挂着一条报错";
 
     edit->setText(QStringLiteral("2, 2"));
     emit edit->editingFinished();
@@ -2590,7 +2737,7 @@ TEST_F(MainWindowFixture, ExecCommandRowStoresRawLineOnCaptureKey)
     makeWindow();
     m_window->open(MainWindowPage::Capture);
 
-    auto *edit = qobject_cast<QLineEdit *>(controlInCurrentPage("截图后运行命令"));
+    auto *edit = qobject_cast<QLineEdit *>(controlInCurrentPage("截图后执行的命令"));
     ASSERT_NE(edit, nullptr) << "截图页没有这一格";
     EXPECT_TRUE(edit->text().isEmpty()) << "没填过时要显示空，空就是「截完不跑外部命令」";
 
@@ -2611,7 +2758,7 @@ TEST_F(MainWindowFixture, ExecCommandRowClearsWhenEmptied)
     makeWindow();
     m_window->open(MainWindowPage::Capture);
 
-    auto *edit = qobject_cast<QLineEdit *>(controlInCurrentPage("截图后运行命令"));
+    auto *edit = qobject_cast<QLineEdit *>(controlInCurrentPage("截图后执行的命令"));
     ASSERT_NE(edit, nullptr);
     edit->setText(QStringLiteral("旧命令.exe"));
     emit edit->editingFinished();

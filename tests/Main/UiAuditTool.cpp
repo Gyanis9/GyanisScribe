@@ -29,6 +29,7 @@
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Settings/SettingsStore.h"
 #include "Gui/Resources/IconProvider.h"
+#include "Gui/Theme/DesignTokens.h"
 #include "Gui/Theme/ThemeManager.h"
 
 #include <QApplication>
@@ -402,7 +403,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    // 面 3：主窗口初始尺寸档（MainWindow 构造里 resize(680, 560)，实际被最小宽顶住，读数行会报真实值）
+    // 面 3：主窗口默认档与最小档（实际几何会被最小尺寸钳住，读数行会报真实值）
     {
         GyanisScribe::Core::HistoryStore history(dataDirectory / "history.json");
         // 记忆库页要一份索引：审查出图只读，落在这个临时目录里，不碰真实应用数据
@@ -412,11 +413,18 @@ int main(int argc, char *argv[])
         GyanisScribe::Main::MainWindow window(settings, theme, icons, history, memory, integration->capabilities(), *integration);
         // 这台机器有托盘：生产里动作条会被收起，审查图也要按用户实际看到的形状出
         window.setTrayMenuAvailable(true);
-        window.resize(680, 560);
+        window.resize(GyanisScribe::Gui::kSettingsWindowDefaultWidth, GyanisScribe::Gui::kSettingsWindowDefaultHeight);
         for (const auto page: {GyanisScribe::Main::MainWindowPage::General, GyanisScribe::Main::MainWindowPage::Capture})
         {
             window.open(page);
             shoot(window, outputDirectory, page == GyanisScribe::Main::MainWindowPage::General ? "main-general-default" : "main-capture-default");
+        }
+        // 最小档：横向滚动条是关着的，这一档是「再缩就裁内容」的边界
+        window.resize(window.minimumWidth(), window.minimumHeight());
+        for (const auto page: {GyanisScribe::Main::MainWindowPage::General, GyanisScribe::Main::MainWindowPage::Capture})
+        {
+            window.open(page);
+            shoot(window, outputDirectory, page == GyanisScribe::Main::MainWindowPage::General ? "main-general-min" : "main-capture-min");
         }
         // 快捷键页整页：那一页比窗口高，分组标题行在折叠之下——抓滚动区里那张卡片（内容全高）才看得到
         window.open(GyanisScribe::Main::MainWindowPage::Hotkey);

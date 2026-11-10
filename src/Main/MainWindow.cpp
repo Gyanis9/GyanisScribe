@@ -71,6 +71,7 @@
 #include <QVariant>
 #include <QVBoxLayout>
 
+#include <algorithm>
 #include <array>
 
 #include <filesystem>
@@ -191,10 +192,9 @@ namespace
         // 双环要在输入框外占 6px：行距从 2px 提到 8px，环不会压在相邻行上
         form->setVerticalSpacing(GyanisScribe::Gui::kSpacingSmall);
         form->setHorizontalSpacing(GyanisScribe::Gui::kSpacingSmall);
-        // 标签右对齐并与字段同一水平线：这一列的右端要与字段左缘只隔一个行距，左对齐时那条缝会随
-        // 标签长短忽宽忽窄（实测 4 字 81px、10 字只剩 9px，同一页里两种都见得到）；
+        // 标签左对齐并与字段同一水平线：整列宽由最长标签实测，字段从这一列右缘起排；
         // 顶对齐会让单行字段看着下沉，竖直方向取居中
-        form->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        form->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
         form->setFormAlignment(Qt::AlignLeft | Qt::AlignTop);
         layout->addLayout(form);
         layout->addStretch();
@@ -228,11 +228,14 @@ namespace
         {
             for (int row = 0; row < form->rowCount(); ++row)
             {
-                // 标签列宽也收到统一一档：QFormLayout 没有列宽接口，
-                // 给每个标签控件一个最小宽即把整列撑到同一档，翻页时字段列不再左右跳
+                // 标签文字左对齐：字段列由最长的一条标签定起点，短标签自然留白，
+                // 不再靠右对齐把每个词都推到同一右缘
                 if (auto *label = form->itemAt(row, QFormLayout::LabelRole); label != nullptr && label->widget() != nullptr)
                 {
-                    label->widget()->setMinimumWidth(GyanisScribe::Gui::kSettingsLabelColumnWidth);
+                    if (auto *text = qobject_cast<QLabel *>(label->widget()); text != nullptr)
+                    {
+                        text->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+                    }
                 }
                 if (auto *field = form->itemAt(row, QFormLayout::FieldRole); field != nullptr)
                 {
@@ -243,6 +246,75 @@ namespace
                 }
             }
         }
+    }
+
+    /**
+     * @brief 每页按本页最长的标签收标签列，并给字段列落上限
+     * @param stack 页容器，每一页是包着卡片的滚动区
+     * @return 收好之后最宽一页的内容宽度
+     * @details 短页不替长页背留白：字段列紧挨本页最长标签的右缘，翻页时各页字段可以不在同一 x，
+     *          但同一页内必须同线。字段先设上限再量页宽，最宽的那一页决定窗口最小宽。
+     */
+    int applySettingsFormMetrics(QStackedWidget &stack)
+    {
+        int contentWidth = 0;
+        for (int index = 0; index < stack.count(); ++index)
+        {
+            auto *scroll = qobject_cast<QScrollArea *>(stack.widget(index));
+            auto *page   = scroll != nullptr ? scroll->widget() : stack.widget(index);
+            if (page == nullptr)
+            {
+                continue;
+            }
+            const auto forms = page->findChildren<QFormLayout *>();
+            if (forms.isEmpty())
+            {
+                // 历史与记忆库是视图页，没有表单列：它们的 sizeHint 不该反过来把设置窗撑宽
+                continue;
+            }
+
+            // 每页各按本页最长的一条标签收列：短页不替长页背那块留白，字段紧挨标签列的右缘
+            int pageLabelWidth = 0;
+            for (auto *form: forms)
+            {
+                for (int row = 0; row < form->rowCount(); ++row)
+                {
+                    const auto *label = form->itemAt(row, QFormLayout::LabelRole);
+                    if (label != nullptr && label->widget() != nullptr)
+                    {
+                        pageLabelWidth = std::max(pageLabelWidth, label->widget()->sizeHint().width());
+                    }
+                }
+            }
+            for (auto *form: forms)
+            {
+                for (int row = 0; row < form->rowCount(); ++row)
+                {
+                    if (auto *label = form->itemAt(row, QFormLayout::LabelRole); label != nullptr && label->widget() != nullptr)
+                    {
+                        label->widget()->setFixedWidth(pageLabelWidth);
+                    }
+                    if (auto *field = form->itemAt(row, QFormLayout::FieldRole); field != nullptr && field->widget() != nullptr)
+                    {
+                        field->widget()->setMaximumWidth(GyanisScribe::Gui::kFieldMaximumWidth);
+                    }
+                }
+            }
+            // 说明行跟着本页表单内容宽走：固定一档会在宽窗里过早换行，在窄窗里又压到字段列
+            for (auto *hint: page->findChildren<QLabel *>())
+            {
+                if (hint->objectName() == QStringLiteral("pageHint"))
+                {
+                    hint->setMaximumWidth(pageLabelWidth + GyanisScribe::Gui::kSpacingSmall + GyanisScribe::Gui::kFieldMaximumWidth);
+                }
+            }
+            // sizeHint 用的是字段当前的 sizeHint，不认 maxWidth：按字段上限算一遍，
+            // 再把实际页宽取大，免得最小宽刚好把字段右缘裁掉
+            const int formWidth = pageLabelWidth + GyanisScribe::Gui::kSpacingSmall + GyanisScribe::Gui::kFieldMaximumWidth +
+                                  2 * GyanisScribe::Gui::kSpacingMedium;
+            contentWidth = std::max({contentWidth, formWidth, page->sizeHint().width()});
+        }
+        return contentWidth;
     }
 
     /**
@@ -267,9 +339,11 @@ namespace
         const auto stored  = settings.stringValue(key, QString{});
         const auto display = stored.isEmpty() ? GyanisScribe::Base::Paths::toDisplayText(fallback) : stored;
         editor->setText(display);
+        // setText 会把光标放到末尾，长路径因此只露出最后半截；路径要从盘符/根目录读起
+        editor->setCursorPosition(0);
         editor->setClearButtonEnabled(false);
         editor->setAccessibleName(title);
-        editor->setToolTip(GyanisScribe::Base::uiText("%1。留空表示用默认目录").arg(title));
+        editor->setToolTip(GyanisScribe::Base::uiText("%1。留空表示使用默认目录。").arg(title));
 
         auto *browse = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("浏览…"), row};
         icons.applyIcon(*browse, "Save");
@@ -421,9 +495,9 @@ namespace
     {
         auto *check = new GyanisScribe::Gui::CheckBox;
         check->setIcon(icons.icon("CursorHighlight"));
-        check->setText(GyanisScribe::Base::uiText("把光标位置圈在画面里"));
+        check->setText(GyanisScribe::Base::uiText("在录制画面中标记光标位置"));
         check->setAccessibleName(GyanisScribe::Base::uiText("光标高亮"));
-        check->setToolTip(GyanisScribe::Base::uiText("整屏、选区与窗口录屏都生效；录窗口时按平台报出的客户区左上角落位，那份读数拿不到时这一帧就不画圈"));
+        check->setToolTip(GyanisScribe::Base::uiText("整屏、区域与窗口录屏均生效；录制窗口时按平台提供的客户区左上角定位，无法获取该位置时不绘制标记。"));
         check->setChecked(settings.boolValue(GyanisScribe::Core::kRecordCursorHighlight, false));
 
         // 接线排在设初值之后：摆到位不等于用户改过，否则一开设置页就把默认值写进配置
@@ -448,10 +522,10 @@ namespace
     QCheckBox *makeIncludeCursorCheck(GyanisScribe::Core::ISettingsStore &settings)
     {
         auto *check = new GyanisScribe::Gui::CheckBox;
-        check->setText(GyanisScribe::Base::uiText("把鼠标指针画进成品"));
+        check->setText(GyanisScribe::Base::uiText("在截图中绘制"));
         check->setAccessibleName(GyanisScribe::Base::uiText("含鼠标指针"));
         check->setToolTip(
-                GyanisScribe::Base::uiText("整屏与区域截图生效；滚动长截图按帧接图，画进去会留下一串指针，那一趟不带。非 Windows 平台取不到系统指针的形状，开了也不会出现"));
+                GyanisScribe::Base::uiText("整屏与区域截图生效；滚动长截图按帧拼接，绘制指针会留下重复影像，因此不应用。非 Windows 平台无法获取系统指针形状，启用后也不会显示。"));
         check->setChecked(settings.boolValue(GyanisScribe::Core::kCaptureIncludeCursor, GyanisScribe::Core::kDefaultCaptureIncludeCursor));
 
         // 接线排在设初值之后：摆到位不等于用户改过，否则一开设置页就把默认值写进配置
@@ -510,7 +584,7 @@ namespace
             combo->addItem(GyanisScribe::Base::uiText(choice.label));
         }
         combo->setAccessibleName(GyanisScribe::Base::uiText("界面语言"));
-        combo->setToolTip(GyanisScribe::Base::uiText("切换语言要重启智录才生效"));
+        combo->setToolTip(GyanisScribe::Base::uiText("切换语言需重启智录后生效。"));
 
         const auto stored = settings.stringValue(GyanisScribe::Core::kUiLanguage, QString::fromUtf8(std::string{GyanisScribe::Gui::appLanguageText(AppLanguage::Chinese)}));
         if (const auto parsed = GyanisScribe::Gui::parseAppLanguage(stored.toStdString()); parsed)
@@ -603,7 +677,7 @@ namespace
     {
         auto *combo = new GyanisScribe::Gui::ComboBox;
         combo->addItems(GyanisScribe::Core::colorFormatLabels());
-        combo->setAccessibleName(GyanisScribe::Base::uiText("颜色写法"));
+        combo->setAccessibleName(GyanisScribe::Base::uiText("颜色复制格式"));
         const auto stored = GyanisScribe::Core::parseColorFormat(settings.stringValue(GyanisScribe::Core::kPickFormat, QStringLiteral("Hex")).toStdString());
         combo->setCurrentIndex(GyanisScribe::Core::indexOfColorFormat(stored ? *stored : GyanisScribe::Core::ColorFormat::Hex));
         QObject::connect(combo, &QComboBox::currentIndexChanged, combo,
@@ -639,7 +713,7 @@ namespace
             combo->addItem(GyanisScribe::Core::magnifierViewLabel(view));
         }
         combo->setAccessibleName(GyanisScribe::Base::uiText("放大镜视野"));
-        combo->setToolTip(GyanisScribe::Base::uiText("选「不显示」只收掉那枚像素插图，光标处的坐标与颜色读数条留在原位"));
+        combo->setToolTip(GyanisScribe::Base::uiText("选择“不显示”仅隐藏像素放大图，光标处的坐标与颜色读数仍会保留。"));
         std::string complaint;
         const auto  stored =
                 GyanisScribe::Core::magnifierViewOrDefault(settings.stringValue(GyanisScribe::Core::kCaptureMagnifierView, QStringLiteral("narrow")).toStdString(), complaint);
@@ -684,7 +758,7 @@ namespace
             combo->addItem(GyanisScribe::Core::sizeUnitLabel(unit));
         }
         combo->setAccessibleName(GyanisScribe::Base::uiText("尺寸单位"));
-        combo->setToolTip(GyanisScribe::Base::uiText("高 DPI 屏上这两组数差着一个缩放倍率；这一档管遮罩读数、复制尺寸与尺寸输入框三处"));
+        combo->setToolTip(GyanisScribe::Base::uiText("高 DPI 屏幕上两种单位相差一个缩放倍率；此设置同时影响遮罩读数、复制尺寸与尺寸输入框。"));
         std::string complaint;
         const auto  stored = GyanisScribe::Core::sizeUnitOrDefault(settings.stringValue(GyanisScribe::Core::kCaptureSizeUnit, QStringLiteral("dip")).toStdString(), complaint);
         if (!complaint.empty())
@@ -732,7 +806,7 @@ namespace
             combo->addItem(choice.label);
         }
         combo->setAccessibleName(GyanisScribe::Base::uiText(info.label));
-        combo->setToolTip(GyanisScribe::Base::uiText("右键那一下归系统自己弹菜单，双击在第一下松开时就算过一次单击——这两档只管这两下"));
+        combo->setToolTip(GyanisScribe::Base::uiText("右键单击由系统弹出菜单；双击会在第一次松开时计为一次单击。本项仅控制左键或中键单击。"));
         if (!complaint.empty())
         {
             Logger::warning(std::format("托盘点击读不出：{}，下拉框按默认那一档摆", complaint));
@@ -772,7 +846,7 @@ namespace
         spin->setRange(GyanisScribe::Core::kEdgeSnapDistanceMinimum, GyanisScribe::Core::kEdgeSnapDistanceMaximum);
         spin->setSuffix(GyanisScribe::Base::uiText(" 像素"));
         spin->setAccessibleName(GyanisScribe::Base::uiText("吸附距离"));
-        spin->setToolTip(GyanisScribe::Base::uiText("按住 Shift 拖动对齐、贴到屏边收起这两处共用的距离：填 0 就是完全不吸"));
+        spin->setToolTip(GyanisScribe::Base::uiText("按住 Shift 拖动对齐与贴近屏幕边缘时共用的距离；0 表示不吸附。"));
 
         const auto title  = GyanisScribe::Base::uiText("吸附距离");
         const auto stored = settings.intValue(GyanisScribe::Core::kPinEdgeSnapDistance, GyanisScribe::Core::kEdgeSnapTolerance);
@@ -836,10 +910,10 @@ namespace
         spin->setRange(1, GyanisScribe::Core::kMaximumDurationSeconds);
         spin->setSingleStep(60);
         spin->setSuffix(GyanisScribe::Base::uiText(" 秒"));
-        spin->setAccessibleName(GyanisScribe::Base::uiText("最长录多久"));
-        spin->setToolTip(GyanisScribe::Base::uiText("录到这个时长就自动收尾并保存：默认 600 秒（10 分钟），上限 7200 秒（2 小时）"));
+        spin->setAccessibleName(GyanisScribe::Base::uiText("最长录制时长"));
+        spin->setToolTip(GyanisScribe::Base::uiText("录制达到此时长后自动结束并保存；默认 600 秒（10 分钟），上限 7200 秒（2 小时）。"));
 
-        const auto title  = GyanisScribe::Base::uiText("最长录多久");
+        const auto title  = GyanisScribe::Base::uiText("最长录制时长");
         const auto stored = settings.intValue(GyanisScribe::Core::kRecordMaximumDuration, GyanisScribe::Core::kDefaultMaximumDurationSeconds);
         spin->setValue(shownValueForSetting(title, stored, GyanisScribe::Core::parseMaximumDurationSetting(stored), GyanisScribe::Core::kDefaultMaximumDurationSeconds));
 
@@ -889,10 +963,10 @@ namespace
         auto *spin = new GyanisScribe::Gui::SpinBox;
         spin->setRange(0, GyanisScribe::App::kMaximumCaptureDelaySeconds);
         spin->setSuffix(GyanisScribe::Base::uiText(" 秒"));
-        spin->setAccessibleName(GyanisScribe::Base::uiText("延时截图"));
-        spin->setToolTip(GyanisScribe::Base::uiText("按下截图后等这么久再开始，用来截菜单、悬停提示这类一碰就没的画面；0 表示不延时"));
+        spin->setAccessibleName(GyanisScribe::Base::uiText("截图延时"));
+        spin->setToolTip(GyanisScribe::Base::uiText("按下截图后等待此时间再开始，用于捕获菜单、悬停提示等短暂画面；0 表示不延时。"));
 
-        const auto title  = GyanisScribe::Base::uiText("延时截图");
+        const auto title  = GyanisScribe::Base::uiText("截图延时");
         const auto stored = settings.intValue(GyanisScribe::Core::kCaptureDelaySeconds, 0);
         const auto parsed = GyanisScribe::App::parseCaptureDelay(stored);
         spin->setValue(shownValueForSetting(title, stored, parsed, 0));
@@ -921,7 +995,7 @@ namespace
         spin->setRange(GyanisScribe::Core::kCaptureCornerRadiusMinimum, GyanisScribe::Core::kCaptureCornerRadiusMaximum);
         spin->setSuffix(GyanisScribe::Base::uiText(" 像素"));
         spin->setAccessibleName(GyanisScribe::Base::uiText("圆角半径"));
-        spin->setToolTip(GyanisScribe::Base::uiText("开着「圆角截图」时把四角切多圆：只对区域截图生效，整屏、窗口与滚动长截图不带"));
+        spin->setToolTip(GyanisScribe::Base::uiText("启用“圆角处理”时四角的半径；仅对区域截图生效，整屏、窗口与滚动长截图不应用。"));
 
         const auto title  = GyanisScribe::Base::uiText("圆角半径");
         const auto stored = settings.intValue(GyanisScribe::Core::kCaptureCornerRadius, GyanisScribe::Core::kCaptureCornerRadiusDefault);
@@ -951,7 +1025,7 @@ namespace
         spin->setRange(0, GyanisScribe::Core::kMaximumCountdownSeconds);
         spin->setSuffix(GyanisScribe::Base::uiText(" 秒"));
         spin->setAccessibleName(GyanisScribe::Base::uiText("录屏倒计时"));
-        spin->setToolTip(GyanisScribe::Base::uiText("按下录屏键后先数这么几秒再开始录，用来把要录的画面摆好；0 表示立即开始"));
+        spin->setToolTip(GyanisScribe::Base::uiText("按下录屏快捷键后倒计时此时长再开始录制，便于准备画面；0 表示立即开始。"));
 
         const auto title  = GyanisScribe::Base::uiText("录屏倒计时");
         const auto stored = settings.intValue(GyanisScribe::Core::kRecordCountdownSeconds, GyanisScribe::Core::kDefaultCountdownSeconds);
@@ -1028,7 +1102,7 @@ namespace
             combo->addItem(icons.icon(choice.iconName), GyanisScribe::Base::uiText(choice.label), tokenText(choice.token));
         }
         combo->setAccessibleName(GyanisScribe::Base::uiText("录制范围"));
-        combo->setToolTip(GyanisScribe::Base::uiText("「上次选区」用最近一次截图框出的那块矩形；「当前窗口」录按下开始时最靠前的那个窗口。改完从下一次录屏开始生效"));
+        combo->setToolTip(GyanisScribe::Base::uiText("“上次选区”使用最近一次截图的选区；“当前窗口”录制开始时最前面的窗口。修改后从下次录屏起生效。"));
 
         const auto defaultScope = GyanisScribe::Core::RecorderConfig{}.mode;
         const auto stored       = settings.stringValue(GyanisScribe::Core::kRecordScope, tokenText(GyanisScribe::Core::recordScopeText(defaultScope)));
@@ -1069,8 +1143,8 @@ namespace
             // 与录制范围那格同一条形状：图标名跟着词表走，界面只负责取
             combo->addItem(icons.icon(choice.iconName), GyanisScribe::Base::uiText(choice.label), tokenText(choice.token));
         }
-        combo->setAccessibleName(GyanisScribe::Base::uiText("截完之后"));
-        combo->setToolTip(GyanisScribe::Base::uiText("选「复制到剪贴板」「直接存成文件」「直接贴到屏幕上」时都不再弹标注窗；改完从下一次截图开始生效"));
+        combo->setAccessibleName(GyanisScribe::Base::uiText("截图完成后"));
+        combo->setToolTip(GyanisScribe::Base::uiText("选择“复制到剪贴板”“保存到文件”“贴到屏幕”时不会打开标注窗口；修改后从下次截图起生效。"));
 
         const auto stored =
                 settings.stringValue(GyanisScribe::Core::kCaptureAfterAction, tokenText(GyanisScribe::App::captureIntentText(GyanisScribe::App::defaultCaptureIntent())));
@@ -1109,7 +1183,7 @@ namespace
             combo->addItem(GyanisScribe::Base::uiText(choice.label), tokenText(choice.token));
         }
         combo->setAccessibleName(GyanisScribe::Base::uiText("保存格式"));
-        combo->setToolTip(GyanisScribe::Base::uiText("「直接存成文件」与贴图右键的「保存」按这一档写文件；PNG 无损，JPG 与 WebP 用来把照片类的截图压小"));
+        combo->setToolTip(GyanisScribe::Base::uiText("“保存到文件”与贴图右键“保存”按此格式写入文件；PNG 为无损格式，JPG 与 WebP 适合压缩照片类截图。"));
 
         const auto stored = settings.stringValue(GyanisScribe::Core::kSaveImageFormat, tokenText(GyanisScribe::Core::imageFormatToken(GyanisScribe::Core::ImageFormat::Png)));
         const auto parsed = GyanisScribe::Core::parseImageFormat(stored);
@@ -1151,7 +1225,7 @@ namespace
         auto *spin = new GyanisScribe::Gui::SpinBox;
         spin->setRange(GyanisScribe::Core::kMinimumImageQuality, GyanisScribe::Core::kMaximumImageQuality);
         spin->setAccessibleName(GyanisScribe::Base::uiText("保存质量"));
-        spin->setToolTip(GyanisScribe::Base::uiText("只有 JPG 与 WebP 吃这一格，PNG 是无损的；数字越大越清晰，文件也越大"));
+        spin->setToolTip(GyanisScribe::Base::uiText("仅 JPG 与 WebP 使用此设置，PNG 为无损格式；数值越大越清晰，文件也越大。"));
 
         const auto stored = settings.intValue(GyanisScribe::Core::kSaveImageQuality, GyanisScribe::Core::kDefaultImageQuality);
         const auto parsed = GyanisScribe::Core::parseImageQuality(stored);
@@ -1188,7 +1262,7 @@ namespace
                                     GyanisScribe::Plugins::FfmpegAudioDeviceEnumerator &enumerator)
     {
         auto *combo = new GyanisScribe::Gui::ComboBox;
-        combo->addItem(GyanisScribe::Base::uiText("不取这一路"), QString());
+        combo->addItem(GyanisScribe::Base::uiText("不录制"), QString());
         combo->setAccessibleName(title);
 
         const auto stored = settings.stringValue(key, QString());
@@ -1240,9 +1314,9 @@ namespace
     QComboBox *makeVideoEncoderCombo(GyanisScribe::Core::ISettingsStore &settings, GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator &enumerator)
     {
         auto *combo = new GyanisScribe::Gui::ComboBox;
-        combo->addItem(GyanisScribe::Base::uiText("自动（逐个探测）"), QString::fromUtf8(std::string{GyanisScribe::Core::kRecordVideoEncoderAutoToken}));
+        combo->addItem(GyanisScribe::Base::uiText("自动（逐项检测）"), QString::fromUtf8(std::string{GyanisScribe::Core::kRecordVideoEncoderAutoToken}));
         combo->setAccessibleName(GyanisScribe::Base::uiText("视频编码器"));
-        combo->setToolTip(GyanisScribe::Base::uiText("列出的是这台机器上前不久真探通的编码器；自动档会在每次编码前按偏好顺序探一遍"));
+        combo->setToolTip(GyanisScribe::Base::uiText("列出本机最近检测可用的编码器；自动模式会在每次编码前按偏好顺序逐项检测。"));
 
         const auto stored = settings.stringValue(GyanisScribe::Core::kRecordVideoEncoder, QString::fromUtf8(std::string{GyanisScribe::Core::kRecordVideoEncoderAutoToken}));
         QObject::connect(&enumerator, &GyanisScribe::Plugins::FfmpegVideoEncoderEnumerator::updated, combo,
@@ -1302,8 +1376,8 @@ namespace
 
         const QSignalBlocker blocker{frameRateSpin};
         frameRateSpin.setMaximum(maximum);
-        frameRateSpin.setToolTip(gif ? GyanisScribe::Base::uiText("GIF 最高 24 帧/秒：再高肉眼看不出来，两遍调色板还按帧数翻倍涨。切回 MP4 会恢复你原来那一档")
-                                     : GyanisScribe::Base::uiText("录屏的目标帧率；GIF 档的上限比 MP4 低（24 帧/秒）"));
+        frameRateSpin.setToolTip(gif ? GyanisScribe::Base::uiText("GIF 最高 24 帧/秒；更高帧率肉眼难以分辨，且会显著增加调色板处理量。切回 MP4 后恢复原有帧率。")
+                                     : GyanisScribe::Base::uiText("录屏的目标帧率；GIF 格式上限低于 MP4（24 帧/秒）。"));
         frameRateSpin.setValue(gif ? std::min(stored, maximum) : stored);
     }
 
@@ -1340,7 +1414,7 @@ namespace
         }
         combo->setAccessibleName(GyanisScribe::Base::uiText("输出格式"));
         // 上限那一个数取自 kMaximumGifFrameRate：写死了就会在阈值调那天变成一句假话
-        combo->setToolTip(GyanisScribe::Base::uiText("GIF 走两遍调色板，帧率上限只有 %1 帧/秒，比 MP4 低；MP4 适合长片段。改完从下一次录屏开始生效")
+        combo->setToolTip(GyanisScribe::Base::uiText("GIF 使用两遍调色板，帧率上限为 %1 帧/秒，低于 MP4；MP4 适合较长片段。修改后从下次录屏起生效。")
                                   .arg(GyanisScribe::Core::kMaximumGifFrameRate));
 
         const auto defaultFormat = GyanisScribe::Core::RecorderConfig{}.format;
@@ -1377,9 +1451,9 @@ namespace
     {
         auto *check = new GyanisScribe::Gui::CheckBox;
         check->setObjectName(QStringLiteral("rewindEnabled"));
-        check->setText(GyanisScribe::Base::uiText("开启回溯缓冲（仅内存）"));
-        check->setAccessibleName(GyanisScribe::Base::uiText("开启回溯缓冲"));
-        check->setToolTip(GyanisScribe::Base::uiText("只存内存，不写盘、不上传；锁屏或退出清空。"));
+        check->setText(GyanisScribe::Base::uiText("启用（仅使用内存）"));
+        check->setAccessibleName(GyanisScribe::Base::uiText("启用回溯缓冲"));
+        check->setToolTip(GyanisScribe::Base::uiText("仅保存在内存中，不写入磁盘、不上传；锁屏或退出程序时清空。"));
         check->setChecked(settings.boolValue(Core::kRewindEnabled, false));
 
         QObject::connect(check, &QCheckBox::toggled, check,
@@ -1388,13 +1462,13 @@ namespace
                              if (checked)
                              {
                                  // 分段查表再用换行拼起来：把 \n 写进 uiText 的字面量时，目录里存的是转义文本，运行期查不中
-                                 const QString privacy = GyanisScribe::Base::uiText("会把最近 10 秒的屏幕画面保存在内存里。") + QLatin1Char('\n') +
-                                                         GyanisScribe::Base::uiText("不写盘、不上传、不录声音。") + QLatin1Char('\n') +
-                                                         GyanisScribe::Base::uiText("锁屏或退出程序会清空。") + QLatin1Char('\n') +
-                                                         GyanisScribe::Base::uiText("可以排除密码管理器等程序。") + QStringLiteral("\n\n") +
-                                                         GyanisScribe::Base::uiText("确定开启吗？");
+                                 const QString privacy = GyanisScribe::Base::uiText("将最近 10 秒的屏幕画面保存在内存中。") + QLatin1Char('\n') +
+                                                         GyanisScribe::Base::uiText("不写入磁盘、不上传、不录制声音。") + QLatin1Char('\n') +
+                                                         GyanisScribe::Base::uiText("锁屏或退出程序时清空。") + QLatin1Char('\n') +
+                                                         GyanisScribe::Base::uiText("可排除密码管理器等程序。") + QStringLiteral("\n\n") +
+                                                         GyanisScribe::Base::uiText("确定启用吗？");
                                  const auto    answer =
-                                         QMessageBox::question(check, GyanisScribe::Base::uiText("开启回溯缓冲"), privacy, QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+                                         QMessageBox::question(check, GyanisScribe::Base::uiText("启用回溯缓冲"), privacy, QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
                                  if (answer != QMessageBox::Yes)
                                  {
                                      const QSignalBlocker blocker(check);
@@ -1422,7 +1496,7 @@ namespace
         spin->setObjectName(QStringLiteral("rewindBufferSeconds"));
         spin->setRange(Core::kMinimumRewindBufferSeconds, Core::kMaximumRewindBufferSeconds);
         spin->setSuffix(GyanisScribe::Base::uiText(" 秒"));
-        spin->setAccessibleName(GyanisScribe::Base::uiText("保留时长"));
+        spin->setAccessibleName(GyanisScribe::Base::uiText("缓冲保留时长"));
         spin->setValue(settings.intValue(Core::kRewindBufferSeconds, Core::kDefaultRewindBufferSeconds));
 
         QObject::connect(spin, &QSpinBox::valueChanged, spin,
@@ -1446,7 +1520,7 @@ namespace
     {
         auto *combo = new GyanisScribe::Gui::ComboBox;
         combo->setObjectName(QStringLiteral("rewindFrameRate"));
-        combo->setAccessibleName(GyanisScribe::Base::uiText("帧率"));
+        combo->setAccessibleName(GyanisScribe::Base::uiText("缓冲帧率"));
         for (const int rate: {Core::kMinimumRewindFrameRate, Core::kDefaultRewindFrameRate, Core::kMaximumRewindFrameRate})
         {
             combo->addItem(QString::number(rate), rate);
@@ -1479,8 +1553,8 @@ namespace
         auto *edit = new GyanisScribe::Gui::LineEdit;
         edit->setObjectName(QStringLiteral("rewindExcludeProcesses"));
         edit->setPlaceholderText(GyanisScribe::Base::uiText("keepass.exe, 1password.exe"));
-        edit->setAccessibleName(GyanisScribe::Base::uiText("排除程序"));
-        edit->setToolTip(GyanisScribe::Base::uiText("逗号分隔的可执行文件名；名单里的程序有可见窗口时暂停抓帧"));
+        edit->setAccessibleName(GyanisScribe::Base::uiText("排除的程序"));
+        edit->setToolTip(GyanisScribe::Base::uiText("以逗号分隔的可执行文件名；名单中的程序有可见窗口时暂停抓取画面。"));
         edit->setText(settings.stringValue(Core::kRewindExcludeProcesses, QString{}));
 
         QObject::connect(edit, &QLineEdit::editingFinished, edit,
@@ -1489,7 +1563,7 @@ namespace
                              const auto parsed = Core::parseRewindExclusions(edit->text());
                              if (!parsed)
                              {
-                                 QMessageBox::warning(edit, GyanisScribe::Base::uiText("排除名单不合法"), QString::fromStdString(parsed.error().message));
+                                 QMessageBox::warning(edit, GyanisScribe::Base::uiText("排除名单无效"), QString::fromStdString(parsed.error().message));
                                  return;
                              }
                              if (auto written = settings.setValue(Core::kRewindExcludeProcesses, edit->text()); !written)
@@ -1693,12 +1767,19 @@ namespace GyanisScribe::Main
                          });
         m_nav->setCurrentRow(0);
 
+        // 标签列宽与字段上限先落到位，再量最宽一页：窗口最小宽必须装得下那一页，
+        // 否则横向滚动条关着，右侧控件会被直接裁掉而且没有任何提示
+        const int contentWidth = applySettingsFormMetrics(*m_stack);
+        const int chromeWidth  = kNavColumnWidth + GyanisScribe::Gui::kSpacingMedium + 2 * GyanisScribe::Gui::kSpacingMedium + GyanisScribe::Gui::kSpacingLarge;
+        m_settingsMinimumWidth = std::max(GyanisScribe::Gui::kSettingsWindowMinimumWidth, contentWidth + chromeWidth);
+
         layout->addWidget(m_nav);
         layout->addWidget(m_stack, 1);
         m_actionBar = buildActionBar();
         root->addWidget(m_actionBar);
         root->addLayout(layout);
-        resize(680, 560);
+        setMinimumSize(m_settingsMinimumWidth, GyanisScribe::Gui::kSettingsWindowMinimumHeight);
+        resize(std::max(GyanisScribe::Gui::kSettingsWindowDefaultWidth, minimumWidth()), GyanisScribe::Gui::kSettingsWindowDefaultHeight);
 
         // 上次退出时的几何：没存过或存坏了就停在上面这档默认尺寸。
         // restoreGeometry 自己会把越界窗口挪回某块屏的可见区，换了屏也不会开在看不见的地方
@@ -1737,6 +1818,22 @@ namespace GyanisScribe::Main
         if (m_actionBar != nullptr)
         {
             m_actionBar->setVisible(!available);
+            updateMinimumWindowWidth();
+        }
+    }
+
+    void MainWindow::updateMinimumWindowWidth()
+    {
+        int requiredWidth = m_settingsMinimumWidth;
+        if (m_actionBar != nullptr && !m_actionBar->isHidden())
+        {
+            requiredWidth = std::max(requiredWidth, m_actionBar->sizeHint().width() + 2 * GyanisScribe::Gui::kSpacingMedium);
+        }
+        requiredWidth = std::max(requiredWidth, GyanisScribe::Gui::kSettingsWindowMinimumWidth);
+        setMinimumWidth(requiredWidth);
+        if (width() < requiredWidth)
+        {
+            resize(requiredWidth, height());
         }
     }
 
@@ -1773,7 +1870,7 @@ namespace GyanisScribe::Main
         // 逐项走的仍是 setValue，订阅配置的模块（热键、主题）已经收到通知；这里只把改动刷到盘上
         m_settings.sync();
         Logger::info(std::format("配置导入完成：{} 项来自 {}", *imported, GyanisScribe::Base::Paths::toDisplayText(source).toStdString()));
-        emit messageForUser(GyanisScribe::Base::uiText("已导入 %1 项设置。这一页显示的还是导入前的值，请关掉设置窗口再重新打开；界面语言要重启智录才生效。").arg(*imported),
+        emit messageForUser(GyanisScribe::Base::uiText("已导入 %1 项设置。当前页面仍显示导入前的值，请关闭并重新打开设置窗口；界面语言需重启智录后生效。").arg(*imported),
                             GyanisScribe::Gui::ToastKind::Success);
     }
 
@@ -1791,7 +1888,7 @@ namespace GyanisScribe::Main
         QFile file{filePath};
         if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
         {
-            const auto reason = GyanisScribe::Base::uiText("色板没写进去：这个路径开不了。换一个能写的目录再试一次");
+            const auto reason = GyanisScribe::Base::uiText("无法写入色板文件：目标路径不可写。请选择可写目录后重试。");
             Logger::warning(std::format("色板写不下去：{}（{}）", reason.toStdString(), filePath.toStdString()));
             emit messageForUser(reason, GyanisScribe::Gui::ToastKind::Danger);
             return;
@@ -1801,7 +1898,7 @@ namespace GyanisScribe::Main
         file.close();
 
         Logger::info(std::format("色板已导出：{} 格写到 {}", palette->size(), filePath.toStdString()));
-        emit messageForUser(GyanisScribe::Base::uiText("色板已导出：%1 格").arg(static_cast<int>(palette->size())), GyanisScribe::Gui::ToastKind::Success);
+        emit messageForUser(GyanisScribe::Base::uiText("已导出色板：%1 种颜色").arg(static_cast<int>(palette->size())), GyanisScribe::Gui::ToastKind::Success);
     }
 
     void MainWindow::importPaletteFromFile(const QString &filePath)
@@ -1809,7 +1906,7 @@ namespace GyanisScribe::Main
         QFile file{filePath};
         if (!file.open(QIODevice::ReadOnly))
         {
-            const auto reason = GyanisScribe::Base::uiText("读不到这份色板文件：「%1」不存在或打不开。请确认路径，或重新导出一份").arg(filePath);
+            const auto reason = GyanisScribe::Base::uiText("无法读取色板文件：路径“%1”不存在或无法打开。请确认路径，或重新导出。").arg(filePath);
             Logger::warning(std::format("色板读不到：{}", filePath.toStdString()));
             emit messageForUser(reason, GyanisScribe::Gui::ToastKind::Danger);
             return;
@@ -1833,7 +1930,7 @@ namespace GyanisScribe::Main
         }
         m_settings.sync();
         Logger::info(std::format("色板已导入：{} 格来自 {}", parsed->size(), filePath.toStdString()));
-        emit messageForUser(GyanisScribe::Base::uiText("色板已导入：%1 格。工具栏那一排在下一次打开标注窗时换成这一份。").arg(static_cast<int>(parsed->size())),
+        emit messageForUser(GyanisScribe::Base::uiText("已导入色板：%1 种颜色。工具栏将在下次打开标注窗口时使用新色板。").arg(static_cast<int>(parsed->size())),
                             GyanisScribe::Gui::ToastKind::Success);
     }
 
@@ -1846,12 +1943,12 @@ namespace GyanisScribe::Main
         auto *exportButton = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("导出配置…"), row};
         m_icons.applyIcon(*exportButton, "Export");
         exportButton->setAccessibleName(GyanisScribe::Base::uiText("导出配置"));
-        exportButton->setToolTip(GyanisScribe::Base::uiText("把当前全部设置写成一个 JSON 文件，换机器或备份时用"));
+        exportButton->setToolTip(GyanisScribe::Base::uiText("将当前全部设置写入一个 JSON 文件，用于迁移或备份。"));
 
         auto *importButton = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("导入配置…"), row};
         m_icons.applyIcon(*importButton, "Import");
         importButton->setAccessibleName(GyanisScribe::Base::uiText("导入配置"));
-        importButton->setToolTip(GyanisScribe::Base::uiText("从本程序导出的 JSON 文件读回设置；订阅配置的热键与主题立刻跟上新值"));
+        importButton->setToolTip(GyanisScribe::Base::uiText("从本程序导出的 JSON 文件恢复设置；热键与主题等订阅配置的模块会立即应用新值。"));
 
         // 对话框取消时 picked 是空串：那不是失败，一句话都不多说
         QObject::connect(exportButton, &QPushButton::clicked, row,
@@ -1967,7 +2064,7 @@ namespace GyanisScribe::Main
             auto *button = new GyanisScribe::Gui::Button{entry.label, bar};
             m_icons.applyIcon(*button, entry.iconName);
             button->setAccessibleName(entry.label);
-            button->setToolTip(GyanisScribe::Base::uiText("与托盘菜单、全局热键走同一个出口"));
+            button->setToolTip(GyanisScribe::Base::uiText("与托盘菜单及全局快捷键执行相同操作。"));
             QObject::connect(button, &QPushButton::clicked, this, [this, action] { emit actionRequested(*action); });
             row->addWidget(button);
         }
@@ -2009,7 +2106,7 @@ namespace GyanisScribe::Main
     QCheckBox *makeAutostartCheck(GyanisScribe::Platform::IPlatformIntegration &integration)
     {
         auto *check = new GyanisScribe::Gui::CheckBox;
-        check->setText(GyanisScribe::Base::uiText("开机时自动启动"));
+        check->setText(GyanisScribe::Base::uiText("登录系统后自动启动本程序"));
         check->setAccessibleName(GyanisScribe::Base::uiText("开机时自动启动"));
 
         const auto state = integration.autostartEnabled();
@@ -2021,7 +2118,7 @@ namespace GyanisScribe::Main
         }
 
         check->setChecked(*state);
-        check->setToolTip(GyanisScribe::Base::uiText("开机时自动起这一份程序；状态读的是系统里的启动项，改完立即生效"));
+        check->setToolTip(GyanisScribe::Base::uiText("登录系统后自动启动本程序；状态读取系统启动项，修改后立即生效。"));
 
         // 接线排在设初值之后：摆到位不等于用户改过，否则一开设置页就把状态写回一次
         QObject::connect(check, &QCheckBox::toggled, check,
@@ -2055,10 +2152,10 @@ namespace GyanisScribe::Main
     {
         auto *edit = new GyanisScribe::Gui::LineEdit;
         edit->setText(settings.stringValue(GyanisScribe::Core::kCaptureDetectionExcludes, QString{}));
-        edit->setPlaceholderText(GyanisScribe::Base::uiText("留空即谁都不排除，例如 chrome.exe, cmd.exe"));
+        edit->setPlaceholderText(GyanisScribe::Base::uiText("留空表示不排除任何程序，例如 chrome.exe, cmd.exe"));
         edit->setClearButtonEnabled(true);
-        edit->setAccessibleName(GyanisScribe::Base::uiText("不参与窗口检测的程序"));
-        edit->setToolTip(GyanisScribe::Base::uiText("写在这里的程序，悬停识别整扇窗口时会跳过它：适合那些常年压在桌面上的工具栏、笔记窗口"));
+        edit->setAccessibleName(GyanisScribe::Base::uiText("窗口检测排除程序"));
+        edit->setToolTip(GyanisScribe::Base::uiText("列出的程序在悬停识别窗口时会被跳过，适用于常驻桌面的工具栏或笔记窗口。"));
 
         QObject::connect(edit, &QLineEdit::editingFinished, edit,
                          [&settings, edit]
@@ -2075,12 +2172,12 @@ namespace GyanisScribe::Main
     {
         auto *edit = new GyanisScribe::Gui::LineEdit;
         edit->setText(settings.stringListValue(GyanisScribe::Core::kPinGroupRotationOrder, {}).join(QStringLiteral(", ")));
-        edit->setPlaceholderText(GyanisScribe::Base::uiText("留空即按组号升序，例如 2, 1, 3"));
+        edit->setPlaceholderText(GyanisScribe::Base::uiText("留空表示按组号升序，例如 2, 1, 3"));
         edit->setClearButtonEnabled(true);
         edit->setAccessibleName(GyanisScribe::Base::uiText("分组轮换顺序"));
 
         const auto explainHint = [edit](const QString &reason)
-        { edit->setToolTip(reason.isEmpty() ? GyanisScribe::Base::uiText("切组按键走的那一圈按这里的顺序排，没写到的组补在末尾") : reason); };
+        { edit->setToolTip(reason.isEmpty() ? GyanisScribe::Base::uiText("切换分组时按此顺序轮换；未列出的分组排在末尾。") : reason); };
         explainHint(QString{});
 
         QObject::connect(edit, &QLineEdit::editingFinished, edit,
@@ -2114,30 +2211,30 @@ namespace GyanisScribe::Main
         auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
         auto *form =
-                makePageForm(page, GyanisScribe::Base::uiText("界面语言决定菜单、托盘提示与这些设置页的措辞，切换后要重启智录才生效。下面两格管历史留多少，填到 0 就是不限。"));
+                makePageForm(page, GyanisScribe::Base::uiText("界面语言决定菜单、托盘提示与设置页文案，切换后需重启智录生效。历史记录条数上限与保留天数设为 0 时表示不限制。"));
         form->addRow(GyanisScribe::Base::uiText("界面语言"), makeUiLanguageCombo(m_settings));
         // 保留策略的读端在 GyanisScribe::Core::policyFromSettings，而那条负数提示写着「请在设置的通用页改回来」——
         // 这一页没有这两格时，那句提示就是把用户指到一个不存在的地方
-        form->addRow(GyanisScribe::Base::uiText("历史最多留多少条"),
-                     makeOptionalLimitSpin(m_settings, GyanisScribe::Core::kHistoryMaximumEntries, GyanisScribe::Base::uiText("历史最多留多少条"),
+        form->addRow(GyanisScribe::Base::uiText("历史记录条数上限"),
+                     makeOptionalLimitSpin(m_settings, GyanisScribe::Core::kHistoryMaximumEntries, GyanisScribe::Base::uiText("历史记录条数上限"),
                                            GyanisScribe::Base::uiText(" 条"), kMaximumEntriesLimit, GyanisScribe::Core::kDefaultMaximumEntries));
-        form->addRow(GyanisScribe::Base::uiText("历史最久留多少天"),
-                     makeOptionalLimitSpin(m_settings, GyanisScribe::Core::kHistoryRetentionDays, GyanisScribe::Base::uiText("历史最久留多少天"), GyanisScribe::Base::uiText(" 天"),
+        form->addRow(GyanisScribe::Base::uiText("历史记录保留天数"),
+                     makeOptionalLimitSpin(m_settings, GyanisScribe::Core::kHistoryRetentionDays, GyanisScribe::Base::uiText("历史记录保留天数"), GyanisScribe::Base::uiText(" 天"),
                                            kRetentionDaysLimit, GyanisScribe::Core::kDefaultRetentionDays));
-        form->addRow(GyanisScribe::Base::uiText("未保存的截图也进历史"),
-                     makeSettingCheck(m_settings, GyanisScribe::Core::kHistoryKeepUnsaved, false, GyanisScribe::Base::uiText("未保存的截图也进历史"),
-                                      GyanisScribe::Base::uiText("未保存的截图也进历史"),
+        form->addRow(GyanisScribe::Base::uiText("保留未保存的截图"),
+                     makeSettingCheck(m_settings, GyanisScribe::Core::kHistoryKeepUnsaved, false, GyanisScribe::Base::uiText("存入历史记录"),
+                                      GyanisScribe::Base::uiText("保留未保存的截图"),
                                       QString::fromUtf8(
                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8(
-                                                                                   "勾上后每张截图都在程序数据目录里留一份像素，误触 Esc 丢掉的那一张也还在历史里（最多留 {} 张）"),
+                                                                                   "启用后，每张截图都会在程序数据目录保留一份像素副本；因按 Esc 取消而丢弃的截图也会进入历史记录（最多保留 {} 张）"),
                                                                            static_cast<int>(GyanisScribe::Core::kUnsavedArchiveCapacity))
                                                       .c_str())));
         // 记忆库的功能开关摆在历史那几格旁边：两者都是「截过的图去哪了」。
         // 它只是功能开关，不是整页禁用——用 QWidget::setEnabled 会把开回来的入口一起灰掉
         m_memoryToggle = new GyanisScribe::Gui::CheckBox;
-        m_memoryToggle->setText(GyanisScribe::Base::uiText("截图记忆：只索引我主动截的图"));
+        m_memoryToggle->setText(GyanisScribe::Base::uiText("仅为手动截图建立索引"));
         m_memoryToggle->setAccessibleName(GyanisScribe::Base::uiText("截图记忆"));
-        m_memoryToggle->setToolTip(GyanisScribe::Base::uiText("开启后只把你主动截的图里的文字与来源记进本机索引，不上传；可随时关掉，已有索引仍可搜索，也可以清空"));
+        m_memoryToggle->setToolTip(GyanisScribe::Base::uiText("启用后，仅将手动截图的文字与来源写入本机索引，不会上传。可随时关闭；已有索引仍可搜索，也可清空。"));
         m_memoryToggle->setChecked(m_memoryEnabled);
         QObject::connect(m_memoryToggle, &QCheckBox::toggled, this, &MainWindow::memoryEnabledToggled);
         form->addRow(GyanisScribe::Base::uiText("截图记忆"), m_memoryToggle);
@@ -2167,7 +2264,7 @@ namespace GyanisScribe::Main
 
         const auto explainHint = [edit](const QString &reason)
         {
-            edit->setToolTip(reason.isEmpty() ? GyanisScribe::Base::uiText("可用变量：%date%（日期）、%time%（时刻）、%ms%（毫秒）、%app%（应用名）、%title%（窗口标题）、%monitor%（屏幕名）；留空表示用默认档。改动后从下一次保存起生效")
+            edit->setToolTip(reason.isEmpty() ? GyanisScribe::Base::uiText("可用变量：%date%（日期）、%time%（时刻）、%ms%（毫秒）、%app%（应用名）、%title%（窗口标题）、%monitor%（屏幕名）。留空表示使用默认模板；修改后从下次保存起生效。")
                                               : reason);
         };
         explainHint(QString{});
@@ -2238,10 +2335,10 @@ namespace GyanisScribe::Main
             const auto productName = GyanisScribe::Base::Paths::previewProductName(text, moment, context);
             if (!productName)
             {
-                preview->setText(GyanisScribe::Base::uiText("预演：模板不可用"));
+                preview->setText(GyanisScribe::Base::uiText("预览：模板不可用"));
                 return;
             }
-            const auto formatted = GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("预演：{}.png"), productName->toStdString());
+            const auto formatted = GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("预览：{}.png"), productName->toStdString());
             preview->setText(QString::fromUtf8(formatted.c_str()));
         };
         QObject::connect(edit, &QLineEdit::textChanged, preview, refreshPreview);
@@ -2260,7 +2357,7 @@ namespace GyanisScribe::Main
         spin->setRange(GyanisScribe::Core::kMinimumOutputBorderPixels, GyanisScribe::Core::kMaximumOutputBorderPixels);
         spin->setSuffix(GyanisScribe::Base::uiText(" 像素"));
         spin->setAccessibleName(GyanisScribe::Base::uiText("边框宽度"));
-        spin->setToolTip(GyanisScribe::Base::uiText("开着「成品加边框」时那圈框的宽度（物理像素）：只对离开程序的成品生效，贴到屏幕上那一张不加"));
+        spin->setToolTip(GyanisScribe::Base::uiText("启用“输出边框”时边框的宽度（物理像素）；仅对输出文件生效，贴到屏幕的贴图不添加。"));
 
         const auto title  = GyanisScribe::Base::uiText("边框宽度");
         const auto stored = settings.intValue(GyanisScribe::Core::kOutputBorderWidth, GyanisScribe::Core::kOutputBorderPixels);
@@ -2289,7 +2386,7 @@ namespace GyanisScribe::Main
         spin->setRange(GyanisScribe::Core::kMinimumOutputShadowPixels, GyanisScribe::Core::kMaximumOutputShadowPixels);
         spin->setSuffix(GyanisScribe::Base::uiText(" 像素"));
         spin->setAccessibleName(GyanisScribe::Base::uiText("投影宽度"));
-        spin->setToolTip(GyanisScribe::Base::uiText("开着「成品加投影」时投影向外铺多宽（物理像素）：宽度越大越柔，也越占地方"));
+        spin->setToolTip(GyanisScribe::Base::uiText("启用“输出投影”时投影向外扩展的宽度（物理像素）；宽度越大越柔和，占用空间也越大。"));
 
         const auto title  = GyanisScribe::Base::uiText("投影宽度");
         const auto stored = settings.intValue(GyanisScribe::Core::kOutputShadowWidth, GyanisScribe::Core::kOutputShadowPixels);
@@ -2318,12 +2415,12 @@ namespace GyanisScribe::Main
     {
         auto *edit = new GyanisScribe::Gui::LineEdit;
         edit->setText(settings.stringValue(GyanisScribe::Core::kOutputBorderColor, QString{}));
-        edit->setPlaceholderText(GyanisScribe::Base::uiText("#808080（中灰，留空即这一档）"));
+        edit->setPlaceholderText(GyanisScribe::Base::uiText("#808080（中灰色，留空即为默认）"));
         edit->setClearButtonEnabled(true);
         edit->setAccessibleName(GyanisScribe::Base::uiText("边框颜色"));
 
         const auto explainHint = [edit](const QString &reason)
-        { edit->setToolTip(reason.isEmpty() ? GyanisScribe::Base::uiText("成品那圈边框的颜色，写 #RRGGBB；留空回到默认的中灰") : reason); };
+        { edit->setToolTip(reason.isEmpty() ? GyanisScribe::Base::uiText("输出图片边框的颜色，格式为 #RRGGBB；留空使用默认中灰色。") : reason); };
         explainHint(QString{});
 
         QObject::connect(edit, &QLineEdit::editingFinished, edit,
@@ -2358,12 +2455,12 @@ namespace GyanisScribe::Main
     {
         auto *edit = new GyanisScribe::Gui::LineEdit;
         edit->setText(settings.stringValue(GyanisScribe::Core::kCaptureExecCommand, QString{}));
-        edit->setPlaceholderText(GyanisScribe::Base::uiText("留空即不跑；形如 上传工具 --path \"%file%\""));
+        edit->setPlaceholderText(GyanisScribe::Base::uiText("留空表示不执行；例如：上传工具 --path \"%file%\""));
         edit->setClearButtonEnabled(true);
-        edit->setAccessibleName(GyanisScribe::Base::uiText("截图后运行命令"));
-        edit->setToolTip(GyanisScribe::Base::uiText("每次截图交付完之后起跑这一串，参数里的 %file% 换成这一轮落盘的成品路径。"
-                                                    "这一轮没落成文件时（「截完之后」选了进标注窗等）带 %file% 的命令会被拒并说明原因；"
-                                                    "命令行给了 --exec 时以那一条为准，这一格不参与那一次。"));
+        edit->setAccessibleName(GyanisScribe::Base::uiText("截图后执行的命令"));
+        edit->setToolTip(GyanisScribe::Base::uiText("每次截图交付后执行此命令，参数中的 %file% 会替换为本轮输出文件路径。"
+                                                    "本轮未生成文件时（例如“截图完成后”选择在标注窗口中打开），带 %file% 的命令会被拒绝并说明原因；"
+                                                    "命令行提供 --exec 时以该命令为准。"));
 
         QObject::connect(edit, &QLineEdit::editingFinished, edit,
                          [&settings, edit]
@@ -2380,58 +2477,58 @@ namespace GyanisScribe::Main
     {
         auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
-        auto *form = makePageForm(page, GyanisScribe::Base::uiText("截图与标注成品落在这个目录里。取色复制出来的文本按下面的写法格式化。"));
-        form->addRow(GyanisScribe::Base::uiText("截完之后"), makeCaptureIntentCombo(m_settings, m_icons));
-        form->addRow(GyanisScribe::Base::uiText("标注时显示截图信息"),
+        auto *form = makePageForm(page, GyanisScribe::Base::uiText("截图与标注输出文件保存在指定目录。取色复制的文本按下方格式生成。"));
+        form->addRow(GyanisScribe::Base::uiText("截图完成后"), makeCaptureIntentCombo(m_settings, m_icons));
+        form->addRow(GyanisScribe::Base::uiText("显示截图信息面板"),
                      makeSettingCheck(m_settings, GyanisScribe::Core::kCaptureShowInfoPanel, false,
-                                      GyanisScribe::Base::uiText("在标注窗旁浮一块截图信息面板"),
-                                      GyanisScribe::Base::uiText("标注时显示截图信息"),
-                                      GyanisScribe::Base::uiText("开上后每次进标注窗都在工具栏旁浮着一块，写明应用、窗口标题、屏幕与捕获时刻；"
-                                                                 "默认关，关着时标注窗与以前一样。面板只在本机显示，不写历史、不写日志。")));
-        form->addRow(GyanisScribe::Base::uiText("延时截图"), makeCaptureDelaySpin(m_settings));
+                                      GyanisScribe::Base::uiText("在标注窗口旁显示"),
+                                      GyanisScribe::Base::uiText("显示截图信息面板"),
+                                      GyanisScribe::Base::uiText("启用后，每次打开标注窗口都会在工具栏旁显示信息面板，包含应用、窗口标题、屏幕与捕获时间。"
+                                                                 "默认关闭；面板仅在本机显示，不写入历史或日志。")));
+        form->addRow(GyanisScribe::Base::uiText("截图延时"), makeCaptureDelaySpin(m_settings));
         form->addRow(GyanisScribe::Base::uiText("鼠标指针"), makeIncludeCursorCheck(m_settings));
-        form->addRow(GyanisScribe::Base::uiText("圆角截图"),
+        form->addRow(GyanisScribe::Base::uiText("圆角处理"),
                      makeSettingCheck(m_settings, GyanisScribe::Core::kCaptureRoundCorners, GyanisScribe::Core::kDefaultCaptureRoundCorners,
-                                      GyanisScribe::Base::uiText("成品四角切圆"), GyanisScribe::Base::uiText("圆角截图"),
-                                      GyanisScribe::Base::uiText("区域截图生效：把成品四角切圆，角上是透明像素；切多圆由下面那一格定；整屏、窗口与滚动长截图不带")));
+                                      GyanisScribe::Base::uiText("将输出图片四角裁剪为圆角"), GyanisScribe::Base::uiText("圆角处理"),
+                                      GyanisScribe::Base::uiText("仅对区域截图生效：输出图片四角为透明像素，半径由下方设置决定；整屏、窗口与滚动长截图不应用圆角。")));
         form->addRow(GyanisScribe::Base::uiText("圆角半径"), makeCornerRadiusSpin(m_settings));
         form->addRow(GyanisScribe::Base::uiText("自动保存"),
-                     makeSettingCheck(m_settings, GyanisScribe::Core::kCaptureAutoSave, false, GyanisScribe::Base::uiText("每张截图都先存一份进上面的目录"),
+                     makeSettingCheck(m_settings, GyanisScribe::Core::kCaptureAutoSave, false, GyanisScribe::Base::uiText("每张截图均保存到输出目录"),
                                       GyanisScribe::Base::uiText("自动保存所有截图"),
-                                      GyanisScribe::Base::uiText("截图完成时立即按上面的格式与目录存一份，不弹提示；「截完之后」已经选了「存成文件」或「快速保存」时不重复存")));
+                                      GyanisScribe::Base::uiText("截图完成后立即按上方格式与目录保存一份，不显示提示；若“截图完成后”已选择“保存到文件”或“保存并复制”，则不会重复保存。")));
         form->addRow(GyanisScribe::Base::uiText("截图音效"),
-                     makeSettingCheck(m_settings, GyanisScribe::Core::kCaptureSound, false, GyanisScribe::Base::uiText("截图完成时响一声系统提示音"),
-                                      GyanisScribe::Base::uiText("截图音效"), GyanisScribe::Base::uiText("用系统的提示音，不需要放音频文件")));
-        form->addRow(GyanisScribe::Base::uiText("截图后运行命令"), makeExecCommandEdit(m_settings));
-        form->addRow(GyanisScribe::Base::uiText("成品加边框"),
-                     makeSettingCheck(m_settings, GyanisScribe::Core::kOutputBorder, false, GyanisScribe::Base::uiText("出程序时围一圈中灰边框"),
-                                      GyanisScribe::Base::uiText("成品加边框"),
-                                      GyanisScribe::Base::uiText("存文件、交剪贴板与打印都加上；贴到屏幕上那一张不加——那是显示，不是输出")));
+                     makeSettingCheck(m_settings, GyanisScribe::Core::kCaptureSound, false, GyanisScribe::Base::uiText("截图完成时播放系统提示音"),
+                                      GyanisScribe::Base::uiText("截图音效"), GyanisScribe::Base::uiText("使用系统提示音，无需提供音频文件。")));
+        form->addRow(GyanisScribe::Base::uiText("截图后执行的命令"), makeExecCommandEdit(m_settings));
+        form->addRow(GyanisScribe::Base::uiText("输出边框"),
+                     makeSettingCheck(m_settings, GyanisScribe::Core::kOutputBorder, false, GyanisScribe::Base::uiText("为输出图片添加中灰色边框"),
+                                      GyanisScribe::Base::uiText("输出边框"),
+                                      GyanisScribe::Base::uiText("保存文件、复制到剪贴板与打印时均添加边框；贴到屏幕的贴图不添加，因为那是显示而非输出。")));
         form->addRow(GyanisScribe::Base::uiText("边框宽度"), makeBorderWidthSpin(m_settings));
         form->addRow(GyanisScribe::Base::uiText("边框颜色"), makeBorderColorEdit(m_settings));
-        form->addRow(GyanisScribe::Base::uiText("成品加投影"),
-                     makeSettingCheck(m_settings, GyanisScribe::Core::kOutputShadow, false, GyanisScribe::Base::uiText("出程序时带一圈轻投影"),
-                                      GyanisScribe::Base::uiText("成品加投影"), GyanisScribe::Base::uiText("与边框同一组：存文件、交剪贴板与打印都加上；存 JPG 时投影底下垫白")));
+        form->addRow(GyanisScribe::Base::uiText("输出投影"),
+                     makeSettingCheck(m_settings, GyanisScribe::Core::kOutputShadow, false, GyanisScribe::Base::uiText("为输出图片添加轻投影"),
+                                      GyanisScribe::Base::uiText("输出投影"), GyanisScribe::Base::uiText("与边框同组生效：保存文件、复制到剪贴板与打印时均添加；保存为 JPG 时会在投影下方垫白色背景。")));
         form->addRow(GyanisScribe::Base::uiText("投影宽度"), makeShadowWidthSpin(m_settings));
-        form->addRow(GyanisScribe::Base::uiText("截图与标注成品目录"), makePathRow(m_settings, GyanisScribe::Core::kPathScreenshot, GyanisScribe::Base::uiText("截图目录"),
+        form->addRow(GyanisScribe::Base::uiText("截图与标注输出目录"), makePathRow(m_settings, GyanisScribe::Core::kPathScreenshot, GyanisScribe::Base::uiText("截图输出目录"),
                                                                                    GyanisScribe::Base::Paths::defaultScreenshotDirectory(), m_icons));
         form->addRow(GyanisScribe::Base::uiText("保存格式"), makeImageFormatCombo(m_settings));
         form->addRow(GyanisScribe::Base::uiText("保存质量"), makeImageQualitySpin(m_settings));
         form->addRow(GyanisScribe::Base::uiText("文件名模板"), makeNameTemplateRow(m_settings));
-        form->addRow(GyanisScribe::Base::uiText("复制用的写法"), makeColorFormatCombo(m_settings));
+        form->addRow(GyanisScribe::Base::uiText("颜色复制格式"), makeColorFormatCombo(m_settings));
         form->addRow(GyanisScribe::Base::uiText("放大镜视野"), makeMagnifierViewCombo(m_settings));
         form->addRow(GyanisScribe::Base::uiText("尺寸单位"), makeSizeUnitCombo(m_settings));
-        form->addRow(GyanisScribe::Base::uiText("不参与窗口检测的程序"), makeDetectionExcludesEdit(m_settings));
-        form->addRow(GyanisScribe::Base::uiText("HEX 字母"),
-                     makeSettingCheck(m_settings, GyanisScribe::Core::kPickHexUppercase, true, GyanisScribe::Base::uiText("十六进制用大写"),
-                                      GyanisScribe::Base::uiText("十六进制用大写"),
-                                      GyanisScribe::Base::uiText("关掉后复制出来的是 #3c78c8 这一形。只影响 HEX 那一档写法，其余五档不动")));
-        form->addRow(GyanisScribe::Base::uiText("回溯截图"), makeRewindEnabledCheck(m_settings));
-        form->addRow(GyanisScribe::Base::uiText("保留时长"), makeRewindBufferSecondsSpin(m_settings));
-        form->addRow(GyanisScribe::Base::uiText("帧率"), makeRewindFrameRateCombo(m_settings));
-        form->addRow(GyanisScribe::Base::uiText("排除程序"), makeRewindExclusionEdit(m_settings));
+        form->addRow(GyanisScribe::Base::uiText("窗口检测排除程序"), makeDetectionExcludesEdit(m_settings));
+        form->addRow(GyanisScribe::Base::uiText("十六进制字母大小写"),
+                     makeSettingCheck(m_settings, GyanisScribe::Core::kPickHexUppercase, true, GyanisScribe::Base::uiText("使用大写字母"),
+                                      GyanisScribe::Base::uiText("十六进制字母大小写"),
+                                      GyanisScribe::Base::uiText("关闭后输出为 #3c78c8 形式；仅影响十六进制写法，其它格式不受影响。")));
+        form->addRow(GyanisScribe::Base::uiText("回溯缓冲"), makeRewindEnabledCheck(m_settings));
+        form->addRow(GyanisScribe::Base::uiText("缓冲保留时长"), makeRewindBufferSecondsSpin(m_settings));
+        form->addRow(GyanisScribe::Base::uiText("缓冲帧率"), makeRewindFrameRateCombo(m_settings));
+        form->addRow(GyanisScribe::Base::uiText("排除的程序"), makeRewindExclusionEdit(m_settings));
 
-        auto *rewindNote = new QLabel{GyanisScribe::Base::uiText("只存内存，不写盘、不上传；锁屏或退出清空。"), page};
+        auto *rewindNote = new QLabel{GyanisScribe::Base::uiText("仅保存在内存中，不写入磁盘、不上传；锁屏或退出程序时清空。"), page};
         rewindNote->setObjectName(QStringLiteral("rewindPrivacyNote"));
         rewindNote->setWordWrap(true);
         form->addRow(rewindNote);
@@ -2449,12 +2546,12 @@ namespace GyanisScribe::Main
     {
         auto *edit = new GyanisScribe::Gui::LineEdit;
         edit->setText(settings.stringListValue(GyanisScribe::Core::kAnnotationPalette, {}).join(QStringLiteral(", ")));
-        edit->setPlaceholderText(GyanisScribe::Base::uiText("留空即内置那八格；形如 #FF0000, #00FF00"));
+        edit->setPlaceholderText(GyanisScribe::Base::uiText("留空表示使用内置八色；例如 #FF0000, #00FF00"));
         edit->setClearButtonEnabled(true);
         edit->setAccessibleName(GyanisScribe::Base::uiText("自定义色板"));
 
         const auto explainHint = [edit](const QString &reason)
-        { edit->setToolTip(reason.isEmpty() ? GyanisScribe::Base::uiText("色板上摆的那几格，这里的顺序就是从左到右") : reason); };
+        { edit->setToolTip(reason.isEmpty() ? GyanisScribe::Base::uiText("色板显示的色块；此处顺序即从左到右的排列顺序。") : reason); };
         explainHint(QString{});
 
         QObject::connect(edit, &QLineEdit::editingFinished, edit,
@@ -2506,12 +2603,12 @@ namespace GyanisScribe::Main
         auto *exportButton = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("导出色板…"), row};
         m_icons.applyIcon(*exportButton, "Export");
         exportButton->setAccessibleName(GyanisScribe::Base::uiText("导出色板"));
-        exportButton->setToolTip(GyanisScribe::Base::uiText("把现在用的那排颜色写成一个文本文件（一行一格 #RRGGBB），发给同事或换机器时用"));
+        exportButton->setToolTip(GyanisScribe::Base::uiText("将当前色板写入一个文本文件（每行一个 #RRGGBB），用于分享或迁移。"));
 
         auto *importButton = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("导入色板…"), row};
         m_icons.applyIcon(*importButton, "Import");
         importButton->setAccessibleName(GyanisScribe::Base::uiText("导入色板"));
-        importButton->setToolTip(GyanisScribe::Base::uiText("从一份色板文件整份替换当前这一排；下一次打开标注窗就是这一份"));
+        importButton->setToolTip(GyanisScribe::Base::uiText("从色板文件替换当前色板；下次打开标注窗口时使用新色板。"));
 
         // 对话框取消时 picked 是空串：那不是失败，一句话都不多说
         QObject::connect(exportButton, &QPushButton::clicked, row,
@@ -2547,8 +2644,8 @@ namespace GyanisScribe::Main
     {
         auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
-        auto *form = makePageForm(page, GyanisScribe::Base::uiText("新打开的标注窗按这两档起步，画过之后的改动会被工具栏记下来，下次仍以最近用的那一档开始。"
-                                                                   "色板那一排也可以换成自己的一套：留空就是内置那八格，下面两个按钮负责把一份配色发给同事或收回来。"));
+        auto *form = makePageForm(page, GyanisScribe::Base::uiText("新建标注窗口使用以下默认线宽与字号；之后的修改会由工具栏记录，下次以最近使用的档位打开。"
+                                                                   "自定义色板留空时使用内置八色；下方按钮可导出或导入整套配色。"));
         form->addRow(GyanisScribe::Base::uiText("默认线宽"),
                      makeStepCombo(m_settings, GyanisScribe::Core::kAnnotationDefaultWidth, GyanisScribe::Gui::kAnnotationWidths,
                                    GyanisScribe::Gui::kAnnotationWidths[GyanisScribe::Gui::kDefaultAnnotationWidthStep], GyanisScribe::Base::uiText("默认线宽")));
@@ -2556,11 +2653,11 @@ namespace GyanisScribe::Main
                      makeStepCombo(m_settings, GyanisScribe::Core::kAnnotationDefaultFontSize, GyanisScribe::Gui::kFontSizes,
                                    GyanisScribe::Gui::kFontSizes[GyanisScribe::Gui::kDefaultAnnotationFontSizeIndex], GyanisScribe::Base::uiText("默认字号")));
         form->addRow(GyanisScribe::Base::uiText("自定义色板"), makePaletteEdit(m_settings));
-        form->addRow(GyanisScribe::Base::uiText("分享色板"), buildPaletteTransferRow());
-        form->addRow(GyanisScribe::Base::uiText("空白画布用透明底"),
-                     makeSettingCheck(m_settings, GyanisScribe::Core::kAnnotationBlankCanvasTransparent, false, GyanisScribe::Base::uiText("新建的空白画布不带白底"),
-                                      GyanisScribe::Base::uiText("空白画布用透明底"),
-                                      GyanisScribe::Base::uiText("透明区在画布上垫一层棋盘格显示；存 PNG/WebP 留得住透明，存 JPG 前会先垫白")));
+        form->addRow(GyanisScribe::Base::uiText("色板导入与导出"), buildPaletteTransferRow());
+        form->addRow(GyanisScribe::Base::uiText("空白画布背景"),
+                     makeSettingCheck(m_settings, GyanisScribe::Core::kAnnotationBlankCanvasTransparent, false, GyanisScribe::Base::uiText("使用透明背景"),
+                                      GyanisScribe::Base::uiText("空白画布背景"),
+                                      GyanisScribe::Base::uiText("透明区域在画布上以棋盘格显示；保存为 PNG/WebP 时保留透明，保存为 JPG 时会先垫白色背景。")));
         return page;
     }
 
@@ -2568,12 +2665,12 @@ namespace GyanisScribe::Main
     {
         auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
-        auto *form = makePageForm(page, GyanisScribe::Base::uiText("新贴到屏幕上的图按这个不透明度开始。滚轮调透明度只影响那一张贴图，不改这里。"));
-        form->addRow(GyanisScribe::Base::uiText("新建贴图的默认不透明度"), makeOpacitySpin(m_settings));
+        auto *form = makePageForm(page, GyanisScribe::Base::uiText("新建贴图使用此默认不透明度。滚轮调整仅影响当前贴图，不修改此设置。"));
+        form->addRow(GyanisScribe::Base::uiText("新贴图默认不透明度"), makeOpacitySpin(m_settings));
         form->addRow(GyanisScribe::Base::uiText("吸附距离"), makeEdgeSnapDistanceSpin(m_settings));
-        form->addRow(GyanisScribe::Base::uiText("不许拖边改大小"),
-                     makeSettingCheck(m_settings, GyanisScribe::Core::kPinDisableFrameResize, false, GyanisScribe::Base::uiText("这一张不许拖边或拖手柄改大小"),
-                                      GyanisScribe::Base::uiText("不许拖边改大小"), GyanisScribe::Base::uiText("只关掉改尺寸的落点：整张平移、滚轮缩放与右键那几档都不受影响")));
+        form->addRow(GyanisScribe::Base::uiText("禁止拖边调整大小"),
+                     makeSettingCheck(m_settings, GyanisScribe::Core::kPinDisableFrameResize, false, GyanisScribe::Base::uiText("禁止拖动边缘或手柄"),
+                                      GyanisScribe::Base::uiText("禁止拖边调整大小"), GyanisScribe::Base::uiText("仅关闭调整尺寸的交互点；整张移动、滚轮缩放与右键菜单不受影响。")));
         return page;
     }
 
@@ -2582,27 +2679,27 @@ namespace GyanisScribe::Main
         auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
         auto *form =
-                makePageForm(page, GyanisScribe::Base::uiText("录屏成品落在这个目录里。录制范围选「上次选区」或「当前窗口」时，画面里就只有那一片。存成 GIF "
-                                                              "时帧率上限比 MP4 低（选了 GIF 那一格只到 24）。画面码率填 0 就交给编码器的质量档，给了具体数值就按那个码率控，GIF "
-                                                              "用不上这一项。编码器可以钉住某一家，默认自动就是编码前逐个真探、挑第一个开得起来的。倒计时 0 表示立即开始。"
-                                                              "取声那两格列不出设备时只剩「不取这一路」，把鼠标停在框上能看到原因；存成 GIF "
-                                                              "时这两格会灰掉，那种文件带不了声音。这几项都从下一次开始录屏时生效。"));
-        form->addRow(GyanisScribe::Base::uiText("录屏成品目录"), makePathRow(m_settings, GyanisScribe::Core::kPathRecording, GyanisScribe::Base::uiText("录屏目录"),
+                makePageForm(page, GyanisScribe::Base::uiText("录屏输出文件保存在指定目录。录制范围选择“上次选区”或“当前窗口”时，仅录制对应区域。"
+                                                              "保存为 GIF 时帧率上限低于 MP4（GIF 最高 24 帧/秒）。画面码率设为 0 时由编码器按质量优先处理；"
+                                                              "填写具体数值时按该码率控制，GIF 不使用此项。编码器可固定为某个可用项；自动模式会在编码前逐项检测并选择第一个可用项。"
+                                                              "录制倒计时为 0 时立即开始。音频设备无法列出时下拉框仅保留“不录制”，悬停可查看原因；"
+                                                              "保存为 GIF 时音频选项会禁用，因为该格式不支持声音。以上设置均从下次录屏开始生效。"));
+        form->addRow(GyanisScribe::Base::uiText("录屏输出目录"), makePathRow(m_settings, GyanisScribe::Core::kPathRecording, GyanisScribe::Base::uiText("录屏输出目录"),
                                                                              GyanisScribe::Base::Paths::defaultRecordingDirectory(), m_icons));
         form->addRow(GyanisScribe::Base::uiText("录制范围"), makeRecordScopeCombo(m_settings, m_icons));
         auto *formatCombo = makeRecordFormatCombo(m_settings);
         form->addRow(GyanisScribe::Base::uiText("输出格式"), formatCombo);
         auto *frameRateSpin = makeFrameRateSpin(m_settings);
         form->addRow(GyanisScribe::Base::uiText("默认帧率"), frameRateSpin);
-        form->addRow(GyanisScribe::Base::uiText("倒计时"), makeCountdownSpin(m_settings));
-        form->addRow(GyanisScribe::Base::uiText("最长录多久"), makeMaximumDurationSpin(m_settings));
+        form->addRow(GyanisScribe::Base::uiText("录制倒计时"), makeCountdownSpin(m_settings));
+        form->addRow(GyanisScribe::Base::uiText("最长录制时长"), makeMaximumDurationSpin(m_settings));
         form->addRow(GyanisScribe::Base::uiText("画面码率"), makeVideoBitrateSpin(m_settings));
         form->addRow(GyanisScribe::Base::uiText("视频编码器"), makeVideoEncoderCombo(m_settings, *m_videoEncoders));
         form->addRow(GyanisScribe::Base::uiText("光标高亮"), makeCursorHighlightCheck(m_settings, m_icons));
         auto *microphoneCombo  = makeAudioDeviceCombo(m_settings, GyanisScribe::Core::kRecordAudioMicrophone, GyanisScribe::Base::uiText("麦克风设备"), *m_audioDevices);
         auto *systemSoundCombo = makeAudioDeviceCombo(m_settings, GyanisScribe::Core::kRecordAudioSystemSound, GyanisScribe::Base::uiText("系统声音设备"), *m_audioDevices);
-        form->addRow(GyanisScribe::Base::uiText("麦克风这一路"), microphoneCombo);
-        form->addRow(GyanisScribe::Base::uiText("系统声音这一路"), systemSoundCombo);
+        form->addRow(GyanisScribe::Base::uiText("麦克风"), microphoneCombo);
+        form->addRow(GyanisScribe::Base::uiText("系统声音"), systemSoundCombo);
 
         // 选到 GIF 就把取声那两格关掉、把帧率那一格的天花板收到 24：判据与 RecordingService 跳过取声
         // 用的是同一句，帧率上限与 validateRecorderConfig 同源（kMaximumGifFrameRate 一处真源）
@@ -2621,9 +2718,9 @@ namespace GyanisScribe::Main
     {
         auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
-        auto *form = makePageForm(page, GyanisScribe::Base::uiText("认得出哪种文字取决于语言包。目录留空时按环境变量与程序数据目录找。"));
+        auto *form = makePageForm(page, GyanisScribe::Base::uiText("可识别的文字取决于语言包。目录留空时按环境变量与程序数据目录查找。"));
         form->addRow(GyanisScribe::Base::uiText("识别语言"), makeOcrLanguageCombo(m_settings));
-        form->addRow(GyanisScribe::Base::uiText("识别语言包目录"), makePathRow(m_settings, GyanisScribe::Core::kOcrTessDataDirectory, GyanisScribe::Base::uiText("语言包目录"),
+        form->addRow(GyanisScribe::Base::uiText("语言包目录"), makePathRow(m_settings, GyanisScribe::Core::kOcrTessDataDirectory, GyanisScribe::Base::uiText("语言包目录"),
                                                                                GyanisScribe::Base::Paths::applicationDataDirectory() / "tessdata", m_icons));
         return page;
     }
@@ -2641,18 +2738,18 @@ namespace GyanisScribe::Main
                                      std::tuple{GyanisScribe::Core::kHotkeyPick, GyanisScribe::Base::uiText("屏幕取色"), QStringLiteral("Ctrl+Alt+P")},
                                      std::tuple{GyanisScribe::Core::kHotkeyCaptureLong, GyanisScribe::Base::uiText("滚动长截图"), QStringLiteral("Ctrl+Alt+L")},
                                      std::tuple{GyanisScribe::Core::kHotkeyQuickSave, GyanisScribe::Base::uiText("快速保存"), QStringLiteral("Ctrl+Alt+S")},
-                                     std::tuple{GyanisScribe::Core::kHotkeyTogglePins, GyanisScribe::Base::uiText("收起 / 摆回贴图"), QStringLiteral("Ctrl+Alt+H")},
-                                     std::tuple{GyanisScribe::Core::kHotkeyNextPinGroup, GyanisScribe::Base::uiText("切换贴图分组"), QStringLiteral("Ctrl+Alt+G")},
-                                     std::tuple{GyanisScribe::Core::kHotkeyRewind, GyanisScribe::Base::uiText("回溯截图"), QStringLiteral("Ctrl+Alt+Z")}};
+                                     std::tuple{GyanisScribe::Core::kHotkeyTogglePins, GyanisScribe::Base::uiText("收起 / 显示全部贴图"), QStringLiteral("Ctrl+Alt+H")},
+                                     std::tuple{GyanisScribe::Core::kHotkeyNextPinGroup, GyanisScribe::Base::uiText("切换到下一组贴图"), QStringLiteral("Ctrl+Alt+G")},
+                                     std::tuple{GyanisScribe::Core::kHotkeyRewind, GyanisScribe::Base::uiText("回溯缓冲"), QStringLiteral("Ctrl+Alt+Z")}};
 
         const auto intro =
                 m_capabilities.globalHotkeys
-                        ? GyanisScribe::Base::uiText("上面 %1 个是固定动作，它们各有一条默认组合；接着 %2 个功能可以再各绑一条，留空就是不绑。改完立即重新登记，不需要重启。"
-                                                     "最下面那一栏是界面里的按键，只在本程序的窗口里认，任何平台上都生效。")
+                        ? GyanisScribe::Base::uiText("上方 %1 项为固定动作，各有一个默认快捷键；随后 %2 项功能可另行绑定，留空表示不绑定。修改后立即重新注册，无需重启。"
+                                                     "底部一栏为应用内快捷键，仅在智录窗口内生效。")
                                   .arg(static_cast<int>(rows.size()))
                                   .arg(static_cast<int>(GyanisScribe::App::bindableActions().size()))
-                        : GyanisScribe::Base::uiText("这个平台没有登记全局热键的接口，上面 %1 项改了也不会生效。"
-                                                     "最下面那一栏是界面里的按键，不吃这项能力，照常生效。")
+                        : GyanisScribe::Base::uiText("当前平台不提供全局快捷键注册接口，上方 %1 项修改后不会生效。"
+                                                     "底部一栏为应用内快捷键，不受此能力限制，照常生效。")
                                   .arg(static_cast<int>(rows.size() + GyanisScribe::App::bindableActions().size()));
         auto *form = makePageForm(page, intro);
         for (const auto &[key, title, defaultText]: rows)
@@ -2678,13 +2775,13 @@ namespace GyanisScribe::Main
             auto *clear = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("取消绑定"), row};
             // 名字带上功能：十行都叫「取消绑定」时，读屏与判据都分不清按下的是哪一行
             clear->setAccessibleName(GyanisScribe::Base::uiText("取消 %1 的绑定").arg(label));
-            clear->setToolTip(GyanisScribe::Base::uiText("清掉这一项，那个组合键就不再归这个功能管"));
+            clear->setToolTip(GyanisScribe::Base::uiText("清除此绑定后，该快捷键不再用于此功能。"));
             clear->setEnabled(m_capabilities.globalHotkeys);
             QObject::connect(clear, &QPushButton::clicked, clear, [edit] { edit->clearBinding(); });
 
             layout->addWidget(edit, 1);
             layout->addWidget(clear);
-            form->addRow(GyanisScribe::Base::uiText("给「%1」绑全局热键").arg(label), row);
+            form->addRow(GyanisScribe::Base::uiText("「%1」的全局快捷键").arg(label), row);
         }
 
         // 单键那一档单独一行，摆在全局热键段的末尾：它放开的是上面那些行的校验，
@@ -2695,25 +2792,25 @@ namespace GyanisScribe::Main
         auto *simpleLayout = new QVBoxLayout{simpleRow};
         simpleLayout->setContentsMargins(0, 0, 0, 0);
         simpleLayout->setSpacing(GyanisScribe::Gui::kSpacingTiny);
-        const auto simpleLabel = GyanisScribe::Base::uiText("允许单键当全局热键");
+        const auto simpleLabel = GyanisScribe::Base::uiText("允许单键作为全局热键");
         auto      *simple      = makeSettingCheck(m_settings, GyanisScribe::Core::kAllowSimpleGlobalHotkeys, false, simpleLabel, simpleLabel,
-                                                  GyanisScribe::Base::uiText("默认关。开了之后，比如把 `R` 绑成截图：在别的程序里敲 r 也会触发截图，"
-                                                                             "而那个程序收不到这个字母。只在你确实想让某颗键专属于它时才开"));
+                                                  GyanisScribe::Base::uiText("默认关闭。启用后，例如将 `R` 绑定为截图：在其他程序中按下 R 也会触发截图，"
+                                                                             "而该程序无法接收此按键。仅在确需将某个按键专用于智录时启用。"));
         simple->setEnabled(m_capabilities.globalHotkeys);
         simpleLayout->addWidget(simple);
-        auto *simpleHint = new QLabel{GyanisScribe::Base::uiText("允许单键（字母、数字、标点、方向键与 Esc、Enter 那一类）当全局热键"), simpleRow};
+        auto *simpleHint = new QLabel{GyanisScribe::Base::uiText("允许将字母、数字、标点、方向键以及 Esc、Enter 等单键用作全局快捷键"), simpleRow};
         simpleHint->setObjectName(QStringLiteral("pageHint"));
         simpleHint->setWordWrap(true);
         simpleHint->setMaximumWidth(GyanisScribe::Gui::kIntroMaximumWidth);
         // 表单行高按 sizeHint 给：不带这一档时窄窗下只分到一行，折行后的第二行被裁掉
         simpleHint->setMinimumHeight(simpleHint->fontMetrics().lineSpacing() * 2);
         simpleLayout->addWidget(simpleHint);
-        form->addRow(GyanisScribe::Base::uiText("单键也能当全局热键"), simpleRow);
+        form->addRow(GyanisScribe::Base::uiText("单键全局快捷键"), simpleRow);
         // 界面里的按键：这一批不吃平台能力位——没有全局登记口也照样在自己的窗口里认，
         // 所以它们既不灰也不进上面那句「改了也不会生效」的计数里
-        auto *inAppTitle = new QLabel{GyanisScribe::Base::uiText("界面里的按键"), page};
+        auto *inAppTitle = new QLabel{GyanisScribe::Base::uiText("应用内快捷键"), page};
         inAppTitle->setObjectName(QStringLiteral("pageHint"));
-        inAppTitle->setAccessibleName(GyanisScribe::Base::uiText("界面按键这一段的标题"));
+        inAppTitle->setAccessibleName(GyanisScribe::Base::uiText("应用内快捷键分组的标题"));
         form->addRow(inAppTitle);
         std::string_view lastFamily;
         for (const auto &entry: GyanisScribe::Gui::appShortcutEntries())
@@ -2724,7 +2821,7 @@ namespace GyanisScribe::Main
             {
                 lastFamily    = family;
                 auto *heading = new QLabel{GyanisScribe::Base::uiText(family), page};
-                heading->setAccessibleName(GyanisScribe::Base::uiText("界面按键的分组标题"));
+                heading->setAccessibleName(GyanisScribe::Base::uiText("应用内快捷键的分组标题"));
                 form->addRow(heading);
             }
 
@@ -2740,13 +2837,13 @@ namespace GyanisScribe::Main
 
             auto *reset = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("恢复默认"), row};
             // 名字带上那一档：二十五行都叫「恢复默认」时，读屏与判据都分不清按下的是哪一行
-            reset->setAccessibleName(GyanisScribe::Base::uiText("把「%1」的按键恢复成默认那颗").arg(label));
-            reset->setToolTip(GyanisScribe::Base::uiText("清掉这一项：那颗键回到默认的 %1，配置里不留一个读起来算坏值的空串").arg(defaultKey));
+            reset->setAccessibleName(GyanisScribe::Base::uiText("将「%1」的快捷键恢复为默认值").arg(label));
+            reset->setToolTip(GyanisScribe::Base::uiText("清除此设置后，该快捷键恢复为默认的 %1。").arg(defaultKey));
             QObject::connect(reset, &QPushButton::clicked, reset, [edit] { edit->clearBinding(); });
 
             layout->addWidget(edit, 1);
             layout->addWidget(reset);
-            form->addRow(GyanisScribe::Base::uiText("「%1」用的键").arg(label), row);
+            form->addRow(GyanisScribe::Base::uiText("「%1」的应用内快捷键").arg(label), row);
         }
         return page;
     }
@@ -2755,7 +2852,7 @@ namespace GyanisScribe::Main
     {
         auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
-        auto *form = makePageForm(page, GyanisScribe::Base::uiText("配色方案即时生效。高对比度档是纯黑正文、纯白底与加粗边框。"));
+        auto *form = makePageForm(page, GyanisScribe::Base::uiText("配色方案立即生效。高对比度模式使用纯黑文字、纯白背景与加粗边框。"));
         form->addRow(GyanisScribe::Base::uiText("配色方案"), makeThemeCombo(m_theme));
         return page;
     }

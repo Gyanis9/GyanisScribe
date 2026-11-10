@@ -4811,5 +4811,1997 @@
             <source>操作失败原因</source>
             <translation>Failure reason</translation>
         </message>
+        <message>
+            <source>截图未完成：%1。请重试</source>
+            <translation>Capture did not complete: %1. Try again</translation>
+        </message>
+        <message>
+            <source>该命令行操作不经过截图流程</source>
+            <translation>This command-line action does not use the capture flow</translation>
+        </message>
+        <message>
+            <source>无法创建空白画布：未检测到可用的屏幕。请在图形会话中重试</source>
+            <translation>The blank canvas did not open: Qt reported no usable screen. Retry inside a graphical session.</translation>
+        </message>
+        <message>
+            <source>上一次延时截图尚未完成，请等待完成后再操作</source>
+            <translation>The previous delayed capture has not finished. Wait for it to complete before trying again.</translation>
+        </message>
+        <message>
+            <source>{} 秒后开始截图：请先准备好要截取的菜单或悬停状态，期间请勿操作</source>
+            <translation>Capture starts in {} seconds: get the menu or hover state ready and hold still for a moment</translation>
+        </message>
+        <message>
+            <source>本次截图未记录选区，无法刷新截图</source>
+            <translation>No region was recorded for this capture, so the screenshot cannot be refreshed</translation>
+        </message>
+        <message>
+            <source>本次截图未记录屏幕或选区，无法调整截图范围</source>
+            <translation>No screen or selection was recorded for this round, so the capture range cannot be changed</translation>
+        </message>
+        <message>
+            <source>暂无可打印的画面</source>
+            <translation>Nothing to print yet</translation>
+        </message>
+        <message>
+            <source>无法开始打印：系统打印设备未就绪。可先保存为文件，再从其他应用打印</source>
+            <translation>Printing could not start: the system print device is not ready. Save the image to a file and print it from elsewhere</translation>
+        </message>
+        <message>
+            <source>未在图像中识别到二维码或条形码</source>
+            <translation>No QR code or barcode was detected in the image.</translation>
+        </message>
+        <message>
+            <source>识别到 %1 个条码，已复制第一条结果</source>
+            <translation>%1 codes found; the topmost one was copied</translation>
+        </message>
+        <message>
+            <source>画布已更新，请重新执行隐私打码</source>
+            <translation>The canvas has changed. Click Privacy redaction again</translation>
+        </message>
+        <message>
+            <source>未发现可打码的敏感信息。分享前请自行检查。</source>
+            <translation>No sensitive information was found to redact. Still check the image yourself before sharing.</translation>
+        </message>
+        <message>
+            <source>逗号两侧都必须有内容；请删除多余的逗号（例如结尾处的逗号）。</source>
+            <translation>Both sides of a comma need a value: drop the extra comma (the trailing one, for example)</translation>
+        </message>
+        <message>
+            <source>目的地「{}」重复出现；每个目的地只需填写一次。</source>
+            <translation>Destination "{}" appears more than once; each destination only needs to be specified once.</translation>
+        </message>
+        <message>
+            <source>延时截图的秒数 "{}" 不在可用范围（0 到 {} 秒，0 表示不延时）里：请在设置的截图页重选，或删掉 Capture/DelaySeconds 此项回到默认档</source>
+            <translation>The capture delay "{}" is outside the usable range (0 to {} seconds, 0 means no delay): pick a value again on the Capture page in Settings, or delete the Capture/DelaySeconds entry to fall back to the default</translation>
+        </message>
+        <message>
+            <source>在标注窗口中打开</source>
+            <translation>Open in annotation window</translation>
+        </message>
+        <message>
+            <source>保存到文件</source>
+            <translation>Save as file</translation>
+        </message>
+        <message>
+            <source>保存并复制</source>
+            <translation>Quick save (file + clipboard)</translation>
+        </message>
+        <message>
+            <source>贴到屏幕</source>
+            <translation>Pin to screen</translation>
+        </message>
+        <message>
+            <source>剪贴板中没有可粘贴的内容：支持图像、纯文本或颜色。请先复制内容后重试。</source>
+            <translation>There is nothing on the clipboard to pin: an image, plain text, or a color all work. Copy something first</translation>
+        </message>
+        <message>
+            <source>无法读取剪贴板中的图像（来源可能未提供像素数据）。请复制其他图像，或先截图再粘贴。</source>
+            <translation>The image on the clipboard cannot be read (the source may have offered only a label, not pixels): copy another image, or capture one and then paste</translation>
+        </message>
+        <message>
+            <source>剪贴板中没有可粘贴的内容：支持图像、纯文本或颜色；链接与文件暂不支持转换为贴图。</source>
+            <translation>There is nothing on the clipboard to pin: an image, plain text, or a color all work. Links and files have no pinning path yet</translation>
+        </message>
+        <message>
+            <source>剪贴板中的文本为空（仅含空白字符）。请先复制文字内容。</source>
+            <translation>The clipboard text is empty (whitespace only): copy some text first</translation>
+        </message>
+        <message>
+            <source>剪贴板文本过长（{} 个字符，上限 {}）：请缩短要粘贴的文本后重试。</source>
+            <translation>The clipboard text is too long ({} characters, limit {}): the card would be unreadably tall. Shorten the passage you want to pin and try again</translation>
+        </message>
+        <message>
+            <source>拖入的内容没有可读取的数据，无法生成贴图。</source>
+            <translation>The dropped content has no readable data and cannot be turned into a pin.</translation>
+        </message>
+        <message>
+            <source>拖入的文件不是图片或无法读取：{}。支持图片文件、链接与文本。</source>
+            <translation>The dropped files are not images or cannot be read: {}. Image files, links and text can all be pinned</translation>
+        </message>
+        <message>
+            <source>--to 只给一次：请将多个去处写入同一参数，以逗号分隔</source>
+            <translation>--to may be given only once: write every destination in one list, separated by commas</translation>
+        </message>
+        <message>
+            <source>--to 至少需要一个目的地：可取值为 %1</source>
+            <translation>--to needs at least one destination: the only choices are %1</translation>
+        </message>
+        <message>
+            <source>--exec 只给一次：请用引号包裹整条命令，参数照常写在其中</source>
+            <translation>--exec may be given only once: wrap the whole command line in quotes and keep its arguments inside</translation>
+        </message>
+        <message>
+            <source>--exec 需要一条命令：格式如 --exec="上传工具 --path %file%"，参数中的 %file% 将替换为输出文件路径</source>
+            <translation>--exec needs one command, written as --exec="uploader --path %file%"; %file% in the arguments becomes the saved file path</translation>
+        </message>
+        <message>
+            <source>--capture 需要一个范围取值：full、region 或 window</source>
+            <translation>--capture needs a scope value: full, region or window</translation>
+        </message>
+        <message>
+            <source>--capture 的取值「%1」无效：只能为 full、region 或 window（区分大小写）</source>
+            <translation>Unrecognised value “%1” for --capture: only full, region or window are accepted (case-sensitive)</translation>
+        </message>
+        <message>
+            <source>--pin 需要一个图片文件路径</source>
+            <translation>--pin needs a path to an image file</translation>
+        </message>
+        <message>
+            <source>无法识别的参数：%1。可用参数请见 --help</source>
+            <translation>Unrecognised argument: %1. Run --help for the available ones</translation>
+        </message>
+        <message>
+            <source>一次只能指定一个动作：%1 与 %2 只能选其一</source>
+            <translation>Only one action can be given at a time: %1 and %2 are mutually exclusive</translation>
+        </message>
+        <message>
+            <source>--to 与 --exec 仅适用于 --capture：--pin 与 --pick 没有「截取后的交付」这一步</source>
+            <translation>--to and --exec only apply to --capture: --pin and --pick have no step that decides where a capture goes</translation>
+        </message>
+        <message>
+            <source>智录：截图、标注、贴图、取色、录屏与文字识别。不带参数启动即常驻（托盘 + 全局快捷键）。\n\n用法：GyanisScribe [参数]\n  -h, --help         显示此说明后退出\n  -v, --version      显示版本号后退出\n  --selftest         执行完启动流程后退出：日志就绪且固定快捷键与自定义快捷键全部注册成功时通过（退出码 0），否则为 1\n                    打包冒烟测试可设置 GYANISSCRIBE_SELFTEST_SKIP_HOTKEYS 跳过快捷键注册，退出码仅取决于日志与装配是否就绪\n  --capture=&lt;范围&gt;   截取一张截图，默认保存为文件并复制到剪贴板，将文件路径输出到标准输出后退出：\n</source>
+            <translation>ZhiLu: screenshots, annotation, pins, colour picking, recording and text recognition. Starting without arguments keeps it resident (tray + global hotkeys).\n\nUsage: GyanisScribe [arguments]\n  -h, --help         print this help and exit\n  -v, --version      print the version and exit\n  --selftest         run the whole startup path and exit: passes (exit code 0) only when the log is ready and every fixed and custom hotkey is registered, otherwise 1\n                    packaging smoke sets GYANISSCRIBE_SELFTEST_SKIP_HOTKEYS to skip hotkey registration; the exit code then depends only on the log and assembly being ready\n  --capture=&lt;scope&gt;  take one shot, by default saving it to a file and copying it to the clipboard, then print the file path to standard output and exit:\n</translation>
+        </message>
+        <message>
+            <source>  --to=&lt;去处&gt;       仅用于 --capture：指定本次交付位置，逗号分隔，可取 file / clipboard / pin\n                    交付顺序固定为 file → clipboard → pin；指定 pin 时贴图保留在桌面上且不退出（同 --pin）\n  --exec=&lt;命令&gt;      仅用于 --capture：截取完成后执行一条外部命令，参数中的 %file% 替换为输出文件路径\n                    请用引号包裹整条命令；未指定 file 时本次没有输出文件，包含 %file% 的命令将被拒绝\n  --pin &lt;文件&gt;       将磁盘上的图片贴到屏幕上（保持运行）\n  --pick             进入屏幕取色（保持运行）\n</source>
+            <translation>  --to=&lt;destinations&gt;  only with --capture: where this shot goes, comma-separated, the choices being file / clipboard / pin\n                    delivery order is always file -&gt; clipboard -&gt; pin; naming pin leaves the process on the desk (like --pin)\n  --exec=&lt;command&gt;      only with --capture: start one external command after the capture, with %file% in its arguments replaced by the saved file path\n                    wrap the whole line in quotes; without file named this round has no output file, so a command carrying %file% is rejected\n  --pin &lt;file&gt;        pin an image file from the disk (stays running)\n  --pick             enter screen colour picking (stays running)\n</translation>
+        </message>
+        <message>
+            <source>无法存下图片：{}</source>
+            <translation>Couldn't save the image: {}</translation>
+        </message>
+        <message>
+            <source>当前环境无法写入「{}」格式。请在设置的「截图」页中选择其他格式。</source>
+            <translation>The current environment cannot write the "{}" format. Select another format in the Screenshot page of Settings.</translation>
+        </message>
+        <message>
+            <source>无法写入「{}」。请检查输出目录是否可写。</source>
+            <translation>Writing the recording frame failed: {}. Check that the directory is writable and the disk isn't full.</translation>
+        </message>
+        <message>
+            <source>已保存为 {}</source>
+            <translation>Saved to {}</translation>
+        </message>
+        <message>
+            <source>原因详见日志</source>
+            <translation>See the log for the reason.</translation>
+        </message>
+        <message>
+            <source>未能保存任何贴图：</source>
+            <translation>Failed to save any pins:</translation>
+        </message>
+        <message>
+            <source>已将 {} 张贴图保存为文件，位置为设置中的截图输出目录</source>
+            <translation>Saved {} pins as files, in the screenshot folder from Settings.</translation>
+        </message>
+        <message>
+            <source>已保存 {} 张贴图，另有 {} 张保存失败：</source>
+            <translation>Saved {} pins, {} more failed: </translation>
+        </message>
+        <message>
+            <source>输出文件已保存，但未写入历史记录：{}</source>
+            <translation>The file was saved but never reached the history list: {}</translation>
+        </message>
+        <message>
+            <source>无法删除该条历史记录：{}</source>
+            <translation>Cannot delete this history entry: {}</translation>
+        </message>
+        <message>
+            <source>已从历史记录中移除，输出文件仍保留在 </source>
+            <translation>Removed from history; the file is still at </translation>
+        </message>
+        <message>
+            <source>无法清空历史记录：{}</source>
+            <translation>Cannot clear history: {}</translation>
+        </message>
+        <message>
+            <source>历史记录已清空，输出文件仍保留在原目录中</source>
+            <translation>History list cleared; the artifact files are still in their own folders</translation>
+        </message>
+        <message>
+            <source>无法打开所在目录：{} 已不存在，输出文件可能已被移动或删除</source>
+            <translation>Can't open the folder: {} is gone. The artifact may have been moved or deleted</translation>
+        </message>
+        <message>
+            <source>无法打开目录 {}。请前往设置中的截图输出目录查找</source>
+            <translation>Can't open {}. Look in the screenshot directory from Settings yourself</translation>
+        </message>
+        <message>
+            <source>上一个图片请求尚未完成就被新地址替换，该图片未获取。如需此图片，请重新粘贴。</source>
+            <translation>The previous image request was replaced by a new address before it finished; the image was not fetched. Paste it again if needed.</translation>
+        </message>
+        <message>
+            <source>图片超过 {} MB 上限，未获取。请更换较小的图片，或先保存到本地再拖入。</source>
+            <translation>This image is over the {} MB limit and was not fetched; try a smaller one, or save it to disk and drag it in</translation>
+        </message>
+        <message>
+            <source>未能获取图片：{}。请检查该地址能否在浏览器中打开。</source>
+            <translation>This image could not be fetched: {}. Check that the address opens in a browser</translation>
+        </message>
+        <message>
+            <source>该地址返回的内容不是图片（{}）。如需粘贴网页图片，请右键单击图片并复制图片地址。</source>
+            <translation>This address did not return an image ({}): to pin an image from the web, right-click the image and copy its address</translation>
+        </message>
+        <message>
+            <source>无法读取返回数据的像素（可能不是图片，或当前环境不支持该格式）。请更换图片地址后重试。</source>
+            <translation>The fetched data has no readable pixels (it may not be an image, or this machine cannot decode the format): try another image address</translation>
+        </message>
+        <message>
+            <source>本机没有可用的文字识别后端：请安装系统语言包，或改用 Tesseract 语言包后重试</source>
+            <translation>No text recognition backend is available on this machine: install the system language pack, or switch to a Tesseract language pack and try again</translation>
+        </message>
+        <message>
+            <source>记忆库：该程序在排除名单中，本次截图未建立索引。</source>
+            <translation>Memory: this app is on the exclusion list, so this screenshot was not indexed.</translation>
+        </message>
+        <message>
+            <source>记忆库暂不可用：索引尚未打开，请稍后重试；若问题持续，请在记忆库页重建索引。</source>
+            <translation>Memory is unavailable: the index is not open yet. Try again shortly; if the problem persists, rebuild the index on the Memory page.</translation>
+        </message>
+        <message>
+            <source>记忆库：已有导入任务正在进行，请等待其结束或先取消。</source>
+            <translation>Memory: an import is already running. Wait for it to finish or cancel it first.</translation>
+        </message>
+        <message>
+            <source>记忆库：导入目录 %1 不存在或无法读取，请选择有效的文件夹。</source>
+            <translation>Memory: the import folder %1 does not exist or cannot be read. Choose an existing folder.</translation>
+        </message>
+        <message>
+            <source>记忆库已达上限 %1 条：本次导入已移除最早的 %2 条；原图文件不受影响。</source>
+            <translation>The memory index reached its limit of %1 entries: the oldest %2 entries were evicted during this import; the original files are unaffected.</translation>
+        </message>
+        <message>
+            <source>记忆库：未找到要重新识别的条目，请刷新列表后重试。</source>
+            <translation>Memory: the entry to re-recognize could not be found. Refresh the list and try again.</translation>
+        </message>
+        <message>
+            <source>记忆库：已清理 %1 条原图已不存在的索引记录；导入的文件请保持原路径。</source>
+            <translation>Memory: removed %1 index entries whose original files are no longer on disk; keep imported files at their original paths.</translation>
+        </message>
+        <message>
+            <source>记忆库：重建索引时无法移动旧数据库文件 %1（%2）。旧文件仍可找回，请关闭占用该文件的程序后重试。</source>
+            <translation>Memory: could not move the old database file %1 (%2) while rebuilding the index. The old file can still be recovered; close programs that hold the database and try again.</translation>
+        </message>
+        <message>
+            <source>记忆库的数据库操作失败，请稍后重试；若问题持续，请在记忆库页重建索引。</source>
+            <translation>The memory database operation failed. Try again shortly; if the problem persists, rebuild the index on the Memory page.</translation>
+        </message>
+        <message>
+            <source>记忆库：条目已达上限 %1 条，已移除最早的 %2 条；原图文件不受影响。</source>
+            <translation>Memory: the index reached its limit of %1 entries; the oldest %2 entries were evicted; the original files are unaffected.</translation>
+        </message>
+        <message>
+            <source>没有可识别的图像：请先按 Ctrl+Alt+A 框选屏幕区域。</source>
+            <translation>No image to recognize yet: press Ctrl+Alt+A and drag out a screen region first</translation>
+        </message>
+        <message>
+            <source>正在识别该图片…</source>
+            <translation>Recognize an image file…</translation>
+        </message>
+        <message>
+            <source>文字识别失败：{}。请重试，或更换识别语言。</source>
+            <translation>Text recognition failed: {}. Try again, or switch to another language.</translation>
+        </message>
+        <message>
+            <source>删除配置中的 %1 可恢复默认设置</source>
+            <translation>Delete the %1 entry in settings to restore the defaults</translation>
+        </message>
+        <message>
+            <source>已从网页获取图片（{}×{}）并贴到屏幕上</source>
+            <translation>Fetched this image from the web ({}×{}) and pinned it to the screen</translation>
+        </message>
+        <message>
+            <source>正在从网页获取图片：{}</source>
+            <translation>Fetching this image from the web: {}</translation>
+        </message>
+        <message>
+            <source>未找到文件：{}</source>
+            <translation>File not found: {}</translation>
+        </message>
+        <message>
+            <source>「{}」不是可贴出的图片：支持 PNG、JPG、WebP、GIF 等格式</source>
+            <translation>“{}” is not an image that can be pinned: PNG / JPG / WebP / GIF are supported</translation>
+        </message>
+        <message>
+            <source>复制的文件中没有可贴出的图片：请复制图片文件本身或图片内容</source>
+            <translation>None of the copied files can be pinned as an image: copy the image file itself, or copy the image content</translation>
+        </message>
+        <message>
+            <source>无可重新贴出的贴图：已关闭的贴图最多保留 5 张，已销毁的不计入</source>
+            <translation>There is nothing to pin back: only the last 5 closed pins are kept, and destroyed ones never come back.</translation>
+        </message>
+        <message>
+            <source>已重新贴出最近关闭的贴图，剩余 {} 张可重新贴出</source>
+            <translation>The closed pin is back on the desk; {} more can still be pinned back.</translation>
+        </message>
+        <message>
+            <source>已贴出 {} 张；{} 不是图片，未贴出</source>
+            <translation>Pinned {} image(s); {} is not an image and was skipped</translation>
+        </message>
+        <message>
+            <source>已清除分组 %1 的名称，切组与菜单中将按序号显示</source>
+            <translation>Cleared the name of group %1; the menu and the switcher call it by its number again</translation>
+        </message>
+        <message>
+            <source>已删除分组 %1，%2 张贴图已并入第一组</source>
+            <translation>Deleted group %1 and folded %2 pins back into group 1</translation>
+        </message>
+        <message>
+            <source>分组 %1 中没有贴图，名称已一并清除</source>
+            <translation>Group %1 had no pins on it; its name was cleared too</translation>
+        </message>
+        <message>
+            <source>已恢复 {} 张贴图的鼠标交互</source>
+            <translation>Restored mouse input on {} pinned image(s)</translation>
+        </message>
+        <message>
+            <source>没有贴图处于鼠标穿透状态</source>
+            <translation>No pinned image is click-through right now</translation>
+        </message>
+        <message>
+            <source>已显示 {} 张贴图</source>
+            <translation>Pinned {} image(s) back on the desk</translation>
+        </message>
+        <message>
+            <source>当前没有贴图</source>
+            <translation>No pinned images on the desk</translation>
+        </message>
+        <message>
+            <source>已切换到{}，当前显示该分组</source>
+            <translation>Switched to {}. Currently showing that group.</translation>
+        </message>
+        <message>
+            <source>已达到最长录制时长，正在生成输出文件</source>
+            <translation>Reached the maximum recording length; building the finished file now</translation>
+        </message>
+        <message>
+            <source>当前没有可用屏幕，无法开始录屏。请连接显示器后重试</source>
+            <translation>No screen is available, so recording cannot start. Reconnect a display and try again.</translation>
+        </message>
+        <message>
+            <source>当前没有可录制的选区：请先按下截图快捷键框选一次，再开始录屏；也可将录制范围改为整屏</source>
+            <translation>No selection to record yet: frame one with the capture hotkey first, then start recording; you can also set the recording scope back to full screen</translation>
+        </message>
+        <message>
+            <source>上一轮仍在生成输出文件，请等待完成后再开始新一轮</source>
+            <translation>The previous output file is still being generated. Wait for it to finish before starting a new one.</translation>
+        </message>
+        <message>
+            <source>无法开始录屏：{}</source>
+            <translation>Recording didn't start: {}</translation>
+        </message>
+        <message>
+            <source>正在生成输出文件，完成后将另行通知</source>
+            <translation>Generating the output file. You will be notified when it is complete.</translation>
+        </message>
+        <message>
+            <source>无法取消录屏：{}</source>
+            <translation>Couldn't cancel the recording: {}</translation>
+        </message>
+        <message>
+            <source>控制条已收起；按 Ctrl+Alt+R 或使用托盘菜单中的录屏项可停止并保存</source>
+            <translation>The control bar is collapsed; press Ctrl+Alt+R or use the recording entry in the tray to stop and save</translation>
+        </message>
+        <message>
+            <source>输出文件已生成，但未包含声音：音频采集失败，原因详见日志</source>
+            <translation>The output file was created without audio: audio capture failed. See the log for details.</translation>
+        </message>
+        <message>
+            <source>录屏中止：{}。请重试</source>
+            <translation>Recording aborted: {}. Try again.</translation>
+        </message>
+        <message>
+            <source>已取消录屏：本次内容未保存，临时帧已删除</source>
+            <translation>Recording cancelled: this take wasn't saved and its temporary frames are gone.</translation>
+        </message>
+        <message>
+            <source>当前平台不支持锁屏通知，出于隐私保护考虑，不启用回溯缓冲</source>
+            <translation>This platform cannot report screen locking, so rewind buffering stays off for privacy</translation>
+        </message>
+        <message>
+            <source>回溯截图未开启。请在「设置 → 截图 → 回溯截图」中启用（仅存于内存，不上传）。</source>
+            <translation>Rewind is off. Turn it on in Settings → Capture → Rewind (memory only, never uploaded).</translation>
+        </message>
+        <message>
+            <source>正在解码选中的帧，请稍候。</source>
+            <translation>Decoding the selected frame, please wait.</translation>
+        </message>
+        <message>
+            <source>回溯缓冲中暂无画面：刚开启时请等待一秒后重试；若提示已暂停，请先查看暂停原因。</source>
+            <translation>The rewind buffer has no frames yet: after just turning it on, wait a second and press again; if it says paused, check the pause reason first.</translation>
+        </message>
+        <message>
+            <source>。请调整后重新启用回溯缓冲以恢复。</source>
+            <translation> Fix the cause and re-enable the rewind buffer to resume.</translation>
+        </message>
+        <message>
+            <source>无法找到光标所在的屏幕</source>
+            <translation>Cannot find the screen the cursor is on</translation>
+        </message>
+        <message>
+            <source>回溯已改为抓取屏幕「</source>
+            <translation>Rewind now captures screen "</translation>
+        </message>
+        <message>
+            <source>屏幕捕获过慢，回溯缓冲已暂停</source>
+            <translation>Frame grabbing is too slow; rewind buffer paused</translation>
+        </message>
+        <message>
+            <source>回溯缓冲中已无画面，选择器已收起。</source>
+            <translation>The rewind buffer has no frames left, so the picker was closed.</translation>
+        </message>
+        <message>
+            <source>该帧已从回溯缓冲中移除，请在胶片条中另选一帧。</source>
+            <translation>This frame has already been evicted from the rewind buffer; pick another frame in the filmstrip.</translation>
+        </message>
+        <message>
+            <source>该帧解码失败，请在胶片条中重新选择一帧：</source>
+            <translation>Failed to decode this frame; pick another frame in the filmstrip: </translation>
+        </message>
+        <message>
+            <source>收起 / 显示全部贴图</source>
+            <translation>Conceal / restore all pinned images</translation>
+        </message>
+        <message>
+            <source>将剪贴板内容贴到屏幕上</source>
+            <translation>Paste the clipboard image onto the screen</translation>
+        </message>
+        <message>
+            <source>重新贴出最近关闭的贴图</source>
+            <translation>Pin back the most recently closed image</translation>
+        </message>
+        <message>
+            <source>切换到下一组贴图</source>
+            <translation>Switch to the next pin group</translation>
+        </message>
+        <message>
+            <source>快捷键：%1，可在设置页修改</source>
+            <translation>Shortcut: %1. Change it on the Settings page</translation>
+        </message>
+        <message>
+            <source>域名解析失败</source>
+            <translation>the host name cannot be resolved</translation>
+        </message>
+        <message>
+            <source>检查更新的响应不是有效的发布信息（不是 JSON 对象）：可能是网络请求被拦截，请稍后重试</source>
+            <translation>The update response is not a release description (not a JSON object): something in the middle of the network probably intercepted it, please try again later</translation>
+        </message>
+        <message>
+            <source>发布信息中缺少版本标签：请前往发布页查看是否有新版本</source>
+            <translation>The release has no version tag: check the releases page for a new version</translation>
+        </message>
+        <message>
+            <source>发布信息中缺少发布页地址：请前往发布页查看是否有新版本</source>
+            <translation>The release has no page address: check the releases page for a new version</translation>
+        </message>
+        <message>
+            <source>无法获取发布信息（404）：仓库尚未公开，或尚未发布正式版。请前往发布页查看</source>
+            <translation>No release information found (404): this repository is not public yet, or has no published release yet. Take a look at the releases page yourself</translation>
+        </message>
+        <message>
+            <source>GitHub 拒绝了本次请求（HTTP {}）：可能是请求过于频繁，或网络请求被拦截。请稍后重试，或直接访问发布页</source>
+            <translation>GitHub rejected this request (HTTP {}): probably too many requests, or something in the middle of the network intercepted it. Try again in a while, or go straight to the releases page</translation>
+        </message>
+        <message>
+            <source>无法连接 GitHub（{}）：请检查网络或代理后重试，或直接访问发布页</source>
+            <translation>Cannot reach GitHub ({}): check your network or proxy and retry, or go straight to the releases page</translation>
+        </message>
+        <message>
+            <source>检查更新失败（{}）：请稍后重试，或直接访问发布页</source>
+            <translation>Update check failed ({}): try again later, or go straight to the releases page</translation>
+        </message>
+        <message>
+            <source>无法读取本机版本号「{}」，无法与最新版本比较。请前往发布页查看</source>
+            <translation>The local version "{}" cannot be parsed, so it cannot be compared with the latest one. Take a look at the releases page yourself</translation>
+        </message>
+        <message>
+            <source>无法读取发布页上的版本标签「{}」，无法与本机版本比较</source>
+            <translation>The version tag "{}" on the releases page cannot be parsed, so it cannot be compared with the local version</translation>
+        </message>
+        <message>
+            <source>有新版本 {}（本机 {}）：点击该行打开下载页</source>
+            <translation>A new version {} is available (you have {}): click this line to open the download page</translation>
+        </message>
+        <message>
+            <source>{}：取值 "{}" 不在可选值里，可取的只有 {}。请在设置的{}重选，或删掉 {} 此项回到默认档</source>
+            <translation>{}: the value "{}" is not among the allowed ones, which are only {}. Re-pick it on the {} page in Settings, or delete the {} entry to fall back to the default</translation>
+        </message>
+        <message>
+            <source>外部命令的第一个词「{}」里带着 %file%：%file% 是输出文件路径，只能出现在参数里。程序名要写在最前面</source>
+            <translation>The first word of the external command, "{}", carries %file%: %file% is the saved file path and can only appear among the arguments. Write the program name first.</translation>
+        </message>
+        <message>
+            <source>该外部命令需要 %file%，但本次截图未生成文件。请将设置中的「截图完成后」改为「保存到文件」或「保存并复制」，或删除命令中的 %file%。</source>
+            <translation>This external command needs %file%, but this capture wrote no file. Set "After a capture" to "Save straight to a file" or "Quick save (file + clipboard)", or remove %file% from the command.</translation>
+        </message>
+        <message>
+            <source>无法执行外部命令：「{}」启动失败。请检查程序名与路径是否存在；路径包含空格时，请用引号包裹完整命令。</source>
+            <translation>The external command could not start: "{}" would not launch. Check that the program name and path still exist; quote the whole path when it contains spaces.</translation>
+        </message>
+        <message>
+            <source>修改文字内容需恰好选中一条文字图形；多选或其他图形不支持修改。仅文字工具创建的文字可双击重新编辑。</source>
+            <translation>Changing content needs exactly one text shape selected: multiple selections or other shapes will not work. Only text shapes drawn with the text tool can be double-clicked to re-edit</translation>
+        </message>
+        <message>
+            <source>文字内容不能为空。如不需要此条，请按 Delete 删除，或按 Ctrl+Z 撤销本次修改。</source>
+            <translation>Text cannot be empty: press Delete to drop this shape, or Ctrl+Z to undo this change</translation>
+        </message>
+        <message>
+            <source>当前未在拖动手柄。请先按住选中框上的手柄再拖动。</source>
+            <translation>No handle drag is in progress. Press a handle on the selection frame first, then drag</translation>
+        </message>
+        <message>
+            <source>色板不能为空，至少保留一格。如需使用内置八色，请清空该设置，不要填入空白值。</source>
+            <translation>The palette cannot be empty; keep at least one color. To use the built-in eight colors, clear this setting instead of entering a blank value.</translation>
+        </message>
+        <message>
+            <source>删掉配置里的 %1 此项可以恢复默认</source>
+            <translation>Delete the %1 entry in settings to restore the defaults</translation>
+        </message>
+        <message>
+            <source>检查导入文件里的色块写法，或删掉配置里的 %1 此项可以恢复默认</source>
+            <translation>Check the color entries in the imported file, or delete the %1 entry in settings to restore the defaults</translation>
+        </message>
+        <message>
+            <source>选区历史的记录格式不对：第 {} 段「{}」应为「x,y,width,height,屏名」。请删掉此项，让程序重新记一次</source>
+            <translation>The selection history entry is malformed: segment {} "{}" should look like "x,y,width,height,screen-name". Delete that entry so the app can record a fresh one</translation>
+        </message>
+        <message>
+            <source>上次选区的记录格式不对：收到「{}」，应为「x,y,width,height」四个整数。请删掉此项，让程序重新记一次</source>
+            <translation>The last-selection record has the wrong format: got "{}", expected four integers "x,y,width,height". Delete this entry and let the program record it again.</translation>
+        </message>
+        <message>
+            <source>上次选区的记录第 {} 段「{}」不是整数。请删掉此项，让程序重新记一次</source>
+            <translation>Part {} of the last-selection record, "{}", is not a whole number. Delete this entry and let the program record it again.</translation>
+        </message>
+        <message>
+            <source>上次选区的宽高必须是正数，收到的是 {}×{}。请删掉此项，让程序重新记一次</source>
+            <translation>The last selection's width and height must be positive; got {}x{}. Delete this entry and let the program record it again.</translation>
+        </message>
+        <message>
+            <source>圆角半径 "{}" 不在 {} 到 {} 之间：请在设置的截图页重选一个值，或删掉 Capture/CornerRadius 此项回到默认的 {} 格</source>
+            <translation>Corner radius "{}" is outside {} to {}. Pick a new value on the Shot page of Settings, or delete Capture/CornerRadius to fall back to the default {} pixels</translation>
+        </message>
+        <message>
+            <source>CSV 无法写入：{}（{}）。请检查磁盘空间后重试</source>
+            <translation>The CSV could not be written: {} ({}). Check the free disk space and try again</translation>
+        </message>
+        <message>
+            <source>CSV 无法保存：{}（{}）。请检查磁盘空间后重试</source>
+            <translation>The CSV could not be flushed to disk: {} ({}). Check the free disk space and try again</translation>
+        </message>
+        <message>
+            <source>{}。清单：{}。请修正该条记录，或删除该清单文件让软件重建（输出文件不受影响）</source>
+            <translation>{}. List: {}. Correct this entry, or delete this list and let the app rebuild it (the saved files are not affected)</translation>
+        </message>
+        <message>
+            <source>无法打开历史清单：{}。请检查该文件是否被其他程序占用，或删除该文件让软件重建。</source>
+            <translation>The history list can't be opened: {}. Check whether another program holds this file, or delete it and let the app rebuild it.</translation>
+        </message>
+        <message>
+            <source>历史清单格式无效：{}。可删除该文件让软件重建（输出文件不受影响），或按 {{"entries": [...]}} 的结构修复</source>
+            <translation>The history list is malformed: {}. Delete this file and let the app rebuild it (the saved files are not touched), or fix it into the shape {{"entries": [...]}}.</translation>
+        </message>
+        <message>
+            <source>历史清单第 {} 条的时间 "{}" 无法读取。请用 2026-10-10T08:30:00.000 这种写法</source>
+            <translation>The time of history entry {} reads as "{}", which can't be parsed. Use a form like 2026-10-10T08:30:00.000.</translation>
+        </message>
+        <message>
+            <source>历史清单无法保存：{}。请重试一次，或换一个可写的目录</source>
+            <translation>The history list wasn't saved to disk: {}. Try again, or pick a writable directory.</translation>
+        </message>
+        <message>
+            <source>无法写入「{}」。请检查该目录是否可写，或关闭「保留未保存的截图」选项。</source>
+            <translation>"{}" could not be written. Check that the folder is writable, or turn off "Keep unsaved screenshots in history"</translation>
+        </message>
+        <message>
+            <source>全局热键至少要带一个修饰键：单键 {} 会拦截其他程序的普通按键。请加上 Ctrl 或 Alt</source>
+            <translation>A global hotkey needs at least one modifier: the single key {} would swallow other programs' ordinary keystrokes. Add Ctrl or Alt.</translation>
+        </message>
+        <message>
+            <source>旧的 {} 也无法恢复，该按键暂时不可用</source>
+            <translation>The previous shortcut {} could not be restored either; this shortcut will not work for now</translation>
+        </message>
+        <message>
+            <source>保存质量：取值 {} 不在可取区间里，只能是 {} 到 {}。请在设置的截图页重选，或删掉 Save/ImageQuality 此项回到默认档</source>
+            <translation>Save quality: value {} is out of range, only {} to {} are accepted. Choose again on the Shot page of Settings, or delete the Save/ImageQuality entry to fall back to the default</translation>
+        </message>
+        <message>
+            <source>无法读取这张图：{}。文件可能已被移动或删掉，或这个构建里没有对应的图片解码插件</source>
+            <translation>This image can't be read: {}. The file may have been moved or deleted, or this build has no image decoder plugin for it.</translation>
+        </message>
+        <message>
+            <source>{} "{}" 不在 {} 到 {} 之间：请在设置的截图页重选一个值，或删掉此项回到默认档</source>
+            <translation>{} "{}" is outside {} to {}: pick a new value on the Shot page of Settings, or delete this entry to fall back to the default</translation>
+        </message>
+        <message>
+            <source>识别结果未保存：{}（{}）。请检查磁盘空间后重试</source>
+            <translation>The recognition result wasn't saved to disk: {} ({}). Check the free disk space and retry.</translation>
+        </message>
+        <message>
+            <source>贴图布局不是一段 JSON 数组：{}。请在设置里清除此项，让程序重新记一次</source>
+            <translation>The pin layout isn't a JSON array: {}. Clear this entry in Settings and let the program record it again.</translation>
+        </message>
+        <message>
+            <source>贴图布局第 {} 项不是对象。请清除此项后让程序重新记一次</source>
+            <translation>Pin layout entry {} is not an object. Clear this entry and let the program record it again.</translation>
+        </message>
+        <message>
+            <source>贴图布局第 {} 项缺少字段 {}。请清除此项后让程序重新记一次</source>
+            <translation>Pin layout entry {} is missing the field {}. Clear this entry and let the program record it again.</translation>
+        </message>
+        <message>
+            <source>贴图布局第 {} 项没有图片位置。请清除此项后让程序重新记一次</source>
+            <translation>Pin layout entry {} has no image location. Clear this entry and let the program record it again.</translation>
+        </message>
+        <message>
+            <source>贴图布局第 {} 项的尺寸不是正数（{}×{}）。请清除此项后让程序重新记一次</source>
+            <translation>Pin layout entry {} has no positive size ({}x{}). Clear this entry and let the program record it again.</translation>
+        </message>
+        <message>
+            <source>贴图布局第 {} 项的不透明度不在 (0,1] 里：{}。请清除此项后让程序重新记一次</source>
+            <translation>Pin layout entry {} has an opacity outside (0,1]: {}. Clear this entry and let the program record it again.</translation>
+        </message>
+        <message>
+            <source>贴图布局第 {} 项的分组号不是正整数：{}。请清除此项后让程序重新记一次</source>
+            <translation>Entry {} of the pin layout has a group number that is not a positive integer: {}. Clear that entry and let the app record it again</translation>
+        </message>
+        <message>
+            <source>贴图布局第 {} 项的置顶字段不是布尔值。请清除此项后让程序重新记一次</source>
+            <translation>Entry {} of the pin layout has a non-boolean always-on-top field. Clear that entry and let the app record it again</translation>
+        </message>
+        <message>
+            <source>贴图布局第 {} 项的穿透字段不是布尔值。请清除此项后让程序重新记一次</source>
+            <translation>Entry {} of the pin layout has a non-boolean mouse-through field. Clear that entry and let the app record it again</translation>
+        </message>
+        <message>
+            <source>贴图布局第 {} 项的透明区档位不是整数。请清除此项后让程序重新记一次</source>
+            <translation>Pin layout entry {} has a transparent-area step that is not an integer. Clear the entry so the app can record the layout again</translation>
+        </message>
+        <message>
+            <source>贴图布局第 {} 项的透明区档位不在 0 到 {} 里：{}。请清除此项后让程序重新记一次</source>
+            <translation>Pin layout entry {} has a transparent-area step outside 0 to {} (read {}). Clear the entry so the app can record the layout again</translation>
+        </message>
+        <message>
+            <source>贴图布局第 {} 项的贴边方向不是整数。请清除此项后让程序重新记一次</source>
+            <translation>Pin layout entry {} has a docked edge direction that is not an integer. Clear this entry and let the program record it again</translation>
+        </message>
+        <message>
+            <source>贴图布局第 {} 项的贴边方向不在 0 到 {} 里：{}。请清除此项后让程序重新记一次</source>
+            <translation>Pin layout entry {} has a docked edge direction outside 0 to {} (read {}). Clear this entry and let the program record it again</translation>
+        </message>
+        <message>
+            <source>贴图布局第 {} 项的收起档不是布尔值。请清除此项后让程序重新记一次</source>
+            <translation>Pin layout entry {} has a collapsed flag that is not a boolean. Clear this entry and let the program record it again</translation>
+        </message>
+        <message>
+            <source>贴图分组名字不是一段 JSON 对象：{}。请在设置里清除 Pin/GroupNames 此项，让程序重新记一次</source>
+            <translation>Pin group names are not a JSON object: {}. Clear Pin/GroupNames in Settings and let the program record them again</translation>
+        </message>
+        <message>
+            <source>贴图分组名字里有一条的键不是正整数：{}。请在设置里清除 Pin/GroupNames 此项，让程序重新记一次</source>
+            <translation>A pin group name entry has a key that is not a positive integer: {}. Clear Pin/GroupNames in Settings and let the program record them again</translation>
+        </message>
+        <message>
+            <source>贴图分组名字第 {} 组的值不是一段文本。请在设置里清除 Pin/GroupNames 此项，让程序重新记一次</source>
+            <translation>The stored name for pin group {} is not a string. Clear Pin/GroupNames in Settings and let the program record them again</translation>
+        </message>
+        <message>
+            <source>分组轮换顺序里 "{}" {}。请在设置的通用页改此项，或整格清空回到按组号升序</source>
+            <translation>Group rotation order has "{}" {}. Fix this field on the General page of Settings, or clear it to fall back to ascending order</translation>
+        </message>
+        <message>
+            <source>贴图默认不透明度 "{}" 不在 1 到 100 之间：请在设置的贴图页重选一个值，或删掉 Pin/DefaultOpacity 此项回到完全不透明</source>
+            <translation>Pin default opacity "{}" is not between 1 and 100: pick a value again on the Pin page of Settings, or remove the Pin/DefaultOpacity entry to go back to fully opaque</translation>
+        </message>
+        <message>
+            <source>吸附距离 "{}" 不在 {} 到 {} 之间：请在设置的贴图页重填此项，或删掉 Pin/EdgeSnapDistance 此项回到默认的 {} 格</source>
+            <translation>Snap distance "{}" is outside {} to {}: refill this field on the Pin settings page, or delete the Pin/EdgeSnapDistance entry to go back to the default {} pixels</translation>
+        </message>
+        <message>
+            <source>默认帧率 "{}" 不在可用范围（1 到 {}）里：请在设置的录屏页重选一个值，或删掉 Record/DefaultFrameRate 此项回到默认档</source>
+            <translation>Default frame rate "{}" is outside the usable range (1 to {}): pick a value again on the Recording page of Settings, or remove the Record/DefaultFrameRate entry to go back to the default</translation>
+        </message>
+        <message>
+            <source>画面码率 "{}" 不在可用范围（0 到 {} kbps，0 表示按质量优先）里：请在设置的录屏页重选，或删掉 Record/VideoBitrateKbps 此项回到默认档</source>
+            <translation>Video bitrate "{}" is not in the available range (0 to {} kbps, where 0 means quality first): pick a value again on the recording page of Settings, or delete the Record/VideoBitrateKbps entry to fall back to the default</translation>
+        </message>
+        <message>
+            <source>最长录制时长「{}」不在可用范围（1 到 {} 秒，即最多 {} 分钟）里：请在设置的录屏页重选，或删掉 Record/MaximumDurationSeconds 此项回到默认的 {} 秒</source>
+            <translation>Maximum recording length "{}" is outside the usable range (1 to {} seconds, i.e. up to {} minutes): pick another value on the Record settings page, or delete the Record/MaximumDurationSeconds entry to go back to the default {} seconds</translation>
+        </message>
+        <message>
+            <source>倒计时「{}」不在可用范围（0 到 {} 秒，0 表示立即开始）里：请在设置的录屏页重选，或删掉 Record/CountdownSeconds 此项回到默认档</source>
+            <translation>Countdown “{}” is outside the range (0 to {} seconds; 0 starts immediately): reselect it on the Record page of Settings, or remove Record/CountdownSeconds to fall back to the default</translation>
+        </message>
+        <message>
+            <source>本次一帧都没有存下来，可能是刚开始就按了停止</source>
+            <translation>Not one frame was saved for this recording; you probably pressed stop right after the start.</translation>
+        </message>
+        <message>
+            <source>配置导出未保存：{}（{}）。请检查磁盘空间与目录权限</source>
+            <translation>The settings export wasn't saved to disk: {} ({}). Check the free disk space and the directory permissions.</translation>
+        </message>
+        <message>
+            <source>美化图片无法缩放：内存不够，请缩小截图或减少内边距与投影</source>
+            <translation>The beautified image could not be scaled: not enough memory; use a smaller capture or reduce padding and shadow</translation>
+        </message>
+        <message>
+            <source>美化模板不是一段合法的 JSON（{}），此项按空处理</source>
+            <translation>The share template is not valid JSON ({}), so this field is treated as empty</translation>
+        </message>
+        <message>
+            <source>美化模板的根不是对象，此项按空处理</source>
+            <translation>The share template root is not an object, so this field is treated as empty</translation>
+        </message>
+        <message>
+            <source>美化模板的版本不是 1（{}），此项按空处理</source>
+            <translation>The share template version is not 1 ({}), so this field is treated as empty</translation>
+        </message>
+        <message>
+            <source>美化模板缺少 templates 数组，此项按空处理</source>
+            <translation>The share template has no templates array, so this field is treated as empty</translation>
+        </message>
+        <message>
+            <source>美化模板「{}」的风格无法读取（{}），已跳过</source>
+            <translation>The share template “{}” style could not be read ({}) and was skipped</translation>
+        </message>
+        <message>
+            <source>自定义模板最多 30 套，请先删除部分模板</source>
+            <translation>You can keep at most 30 custom templates; delete a few first</translation>
+        </message>
+        <message>
+            <source>模板太多，设置里存不下：请先删除部分模板</source>
+            <translation>There are too many templates to store in the settings; delete a few first</translation>
+        </message>
+        <message>
+            <source>未找到该模板，可能已被删除。</source>
+            <translation>That template could not be found; it may have been deleted</translation>
+        </message>
+        <message>
+            <source>固定到屏幕</source>
+            <translation>Screen</translation>
+        </message>
+        <message>
+            <source>底板色：跟随标注色</source>
+            <translation>Plate color: use the annotation color</translation>
+        </message>
+        <message>
+            <source>最近使用颜色 %1</source>
+            <translation>Recent color %1</translation>
+        </message>
+        <message>
+            <source>颜色（当前不透明度 %1%；在按钮上滚动滚轮可调节）</source>
+            <translation>Color (current opacity %1%; scroll on this button to adjust)</translation>
+        </message>
+        <message>
+            <source>输入文字，按回车键换行，按 Ctrl+回车提交</source>
+            <translation>Type the text. Enter starts a new line; Ctrl+Enter commits.</translation>
+        </message>
+        <message>
+            <source>松开鼠标即完成 · Esc 取消</source>
+            <translation>Release to finish · Esc to cancel</translation>
+        </message>
+        <message>
+            <source>拖动边缘调整 · Enter/双击确认 · Esc 取消</source>
+            <translation>Drag the edges to adjust · Enter/double-click to confirm · Esc to cancel</translation>
+        </message>
+        <message>
+            <source>按{}填写；单位跟随设置中的「尺寸单位」。</source>
+            <translation>Fill in {}; this follows the "Size unit" setting</translation>
+        </message>
+        <message>
+            <source>没有可复用的上次选区，请先完成一次框选截图或改用区域截图</source>
+            <translation>No previous region to reuse yet: drag out one capture first, or use region capture.</translation>
+        </message>
+        <message>
+            <source>屏幕布局已经变了，回溯画面无法继续使用；请重新开启回溯缓冲</source>
+            <translation>This screen's layout has changed, so the rewind frame can no longer be used; turn rewind buffering on again</translation>
+        </message>
+        <message>
+            <source>滚动长截图还在接：请先在控制条上点击「完成」或「取消」，再开始下一次截图</source>
+            <translation>A scrolling capture is still running: press Done or Cancel on its control bar before starting another one.</translation>
+        </message>
+        <message>
+            <source>进入框选失败：Qt 未报告任何屏幕。请在图形会话中重试</source>
+            <translation>Cannot start region capture: Qt reported no screens. Try again inside a GUI session.</translation>
+        </message>
+        <message>
+            <source>已接 {} 像素高：本段与上一段相同，请向下滚动少许后继续拼接</source>
+            <translation>Stitched to {} px: this stretch matches the previous one, scroll a bit further</translation>
+        </message>
+        <message>
+            <source>滚动需要截取的页面，拼接完成后点击「完成」。</source>
+            <translation>Scroll the page you are capturing, then press Done</translation>
+        </message>
+        <message>
+            <source>尚未拼接任何片段</source>
+            <translation>No segments have been stitched yet.</translation>
+        </message>
+        <message>
+            <source>放弃本次长截图，不生成输出图片。</source>
+            <translation>Discard this long capture without generating an output image.</translation>
+        </message>
+        <message>
+            <source>结束拼接并进入后续处理。</source>
+            <translation>Finish stitching and continue to the next step.</translation>
+        </message>
+        <message>
+            <source>打开尺寸输入框</source>
+            <translation>Open the size box</translation>
+        </message>
+        <message>
+            <source>选择最近的选区</source>
+            <translation>Pick a recently framed region</translation>
+        </message>
+        <message>
+            <source>切换颜色格式</source>
+            <translation>Switch color format</translation>
+        </message>
+        <message>
+            <source>切换是否包含鼠标指针</source>
+            <translation>Include mouse pointer</translation>
+        </message>
+        <message>
+            <source>正向旋转一档</source>
+            <translation>Rotate clockwise by one step</translation>
+        </message>
+        <message>
+            <source>切换缩略图模式</source>
+            <translation>Toggle thumbnail mode</translation>
+        </message>
+        <message>
+            <source>%1 的全局快捷键。点击此输入框后按下组合键即可替换，按 Esc 取消。</source>
+            <translation>Global hotkey for %1. Click this cell and press the combination to replace it; press Esc to cancel.</translation>
+        </message>
+        <message>
+            <source>%1 的应用内快捷键。点击此输入框后按下所需按键；允许使用单键；按 Esc 取消。</source>
+            <translation>In-app shortcut for %1. Click this field and press the desired key; single keys are allowed; press Esc to cancel.</translation>
+        </message>
+        <message>
+            <source>历史列表当前为空</source>
+            <translation>History list</translation>
+        </message>
+        <message>
+            <source>确定清空历史列表中的全部记录吗？输出文件不会被删除，仍保留在原目录中。</source>
+            <translation>Remove every entry from the history list? The artifact files themselves are not deleted and stay in their folders.</translation>
+        </message>
+        <message>
+            <source>历史清单读取失败：{}。列表将保留上一次的记录</source>
+            <translation>The history list couldn't be read: {}. The list keeps showing the previous records.</translation>
+        </message>
+        <message>
+            <source>历史清单中有 {} 条记录无法解析，已跳过：{}</source>
+            <translation>{} records in the history list could not be read and were skipped: {}</translation>
+        </message>
+        <message>
+            <source>（删除仅移除该条历史记录，输出文件保留在原处）</source>
+            <translation>(Delete only removes this entry from the history; the file itself stays where it is)</translation>
+        </message>
+        <message>
+            <source>还没有记录。完成一次截图或录屏后，输出文件会显示在这里。</source>
+            <translation>No history yet. Capture a screenshot or record your screen, and the results will show up here.</translation>
+        </message>
+        <message>
+            <source>没有符合条件的记录。请更换关键词或类别后重试。</source>
+            <translation>No records match. Try another keyword or category.</translation>
+        </message>
+        <message>
+            <source>待识别 {} 条，导入后将在后台继续识别</source>
+            <translation>{} entries pending recognition; they will continue in the background after the import</translation>
+        </message>
+        <message>
+            <source>正在取消；已入库的条目与已完成的识别结果将保留。</source>
+            <translation>Cancelling; imported entries and completed recognition are kept.</translation>
+        </message>
+        <message>
+            <source>勾选的应用将不再加入记忆库；保存时会删除这些应用已有的索引。导入的旧截图不受影响。</source>
+            <translation>Checked apps will no longer be added to memory; saving also deletes their existing index entries. Imported old screenshots are unaffected.</translation>
+        </message>
+        <message>
+            <source>输入要排除的进程名…</source>
+            <translation>Type a process name not seen yet…</translation>
+        </message>
+        <message>
+            <source>保存后会从记忆库删除新排除应用已有的 %1 条索引，原图与历史记录不会被删除。是否继续？</source>
+            <translation>Saving will delete %1 existing index entries for the newly excluded apps from memory; original files and history are not deleted. Continue?</translation>
+        </message>
+        <message>
+            <source>统计信息暂时无法读取</source>
+            <translation>Statistics are temporarily unavailable</translation>
+        </message>
+        <message>
+            <source> · 只显示前 %1 条，收窄关键词可查看更早的结果</source>
+            <translation> · Showing the first %1; narrow the keywords to see older results</translation>
+        </message>
+        <message>
+            <source>记忆库尚未开启。开启后仅索引手动截图，数据仅保存在本机，可随时关闭并清空。</source>
+            <translation>Memory is not enabled yet. When enabled, only screenshots you take are indexed, everything stays on this machine, and you can turn it off and clear it at any time.</translation>
+        </message>
+        <message>
+            <source>未检测到可用的识别引擎</source>
+            <translation>No available recognition engine was detected.</translation>
+        </message>
+        <message>
+            <source>。截图仍会存入记忆库，可稍后重新识别。</source>
+            <translation>. Screenshots are still indexed and can be recognized again later.</translation>
+        </message>
+        <message>
+            <source>点击展开或收起该组重复或相似截图。</source>
+            <translation>Click to expand or collapse this group of duplicate/similar screenshots</translation>
+        </message>
+        <message>
+            <source>记忆库暂时无法读取。请点击上方的「重建索引」，原图不会被删除。</source>
+            <translation>Memory cannot be read right now. Click Rebuild index above; original files will not be deleted.</translation>
+        </message>
+        <message>
+            <source>开启记忆后，此处会列出手动截图。</source>
+            <translation>Once memory is enabled, screenshots you take will be listed here.</translation>
+        </message>
+        <message>
+            <source>没有搜到匹配的截图。请更换关键词，或放宽应用与时间范围。</source>
+            <translation>No matching screenshots. Try another keyword, or widen the app and time filters.</translation>
+        </message>
+        <message>
+            <source>还没有索引。首次截图后会自动建立索引，也可以导入旧截图。</source>
+            <translation>Nothing is indexed yet. The first screenshot builds the index automatically; you can also import old screenshots.</translation>
+        </message>
+        <message>
+            <source>记忆库当前为空</source>
+            <translation>Memory</translation>
+        </message>
+        <message>
+            <source>确定删除全部 %1 条索引吗？原图与历史记录不会被删除。</source>
+            <translation>Delete all %1 index entries? Original files and history will not be deleted.</translation>
+        </message>
+        <message>
+            <source>未识别到文字。可更换识别语言后重试，或重新截取更清晰的图像。</source>
+            <translation>No text was recognized. Try another recognition language or capture a clearer image.</translation>
+        </message>
+        <message>
+            <source>未识别到可复制的文字</source>
+            <translation>No text recognized</translation>
+        </message>
+        <message>
+            <source>请先在右侧选中要复制的文字</source>
+            <translation>Select the text to copy on the right first</translation>
+        </message>
+        <message>
+            <source>· 检测到复杂表格，暂不支持导出 CSV</source>
+            <translation>· Complex table detected; CSV is not supported yet</translation>
+        </message>
+        <message>
+            <source>导出 TXT 失败：{}。请更换输出目录后重试。</source>
+            <translation>Exporting TXT failed: {}. Pick another directory and try again.</translation>
+        </message>
+        <message>
+            <source>导出 JSON 失败：{}。请更换输出目录后重试。</source>
+            <translation>Exporting JSON failed: {}. Pick another directory and try again.</translation>
+        </message>
+        <message>
+            <source>导出表格 CSV 失败：{}。请更换输出目录后重试。</source>
+            <translation>Exporting the table CSV failed: {}. Pick another directory and try again.</translation>
+        </message>
+        <message>
+            <source>当前显示</source>
+            <translation>Don't show</translation>
+        </message>
+        <message>
+            <source>显示该组</source>
+            <translation>Show this group</translation>
+        </message>
+        <message>
+            <source>关闭该组贴图</source>
+            <translation>Close all pins</translation>
+        </message>
+        <message>
+            <source>删除该组</source>
+            <translation>Delete</translation>
+        </message>
+        <message>
+            <source>重命名该组</source>
+            <translation>Rename this group</translation>
+        </message>
+        <message>
+            <source>仅删除分组本身，组内贴图会并入第一组，不会丢失。第一组用于接收其他分组删除后并入的贴图，无法删除。</source>
+            <translation>Only the group is deleted; its pins are merged into the first group and are not lost. The first group receives pins from deleted groups and cannot be deleted.</translation>
+        </message>
+        <message>
+            <source>当前没有贴图，因此没有分组。先贴出一张贴图，再将另一张贴图通过「移动到分组 → 新建分组」移入新分组，此处才会出现第二行。</source>
+            <translation>There is not a single pin on the desk, so there are no groups either. Put one image up, then move another one with "Move to group -&gt; New group" and a second row shows up here.</translation>
+        </message>
+        <message>
+            <source>当前显示第 {} 组。</source>
+            <translation>Group {} is on the desk.</translation>
+        </message>
+        <message>
+            <source>重命名分组</source>
+            <translation>Rename…</translation>
+        </message>
+        <message>
+            <source>分组名称（留空则取消命名）</source>
+            <translation>Name (leaving it empty cancels the naming)</translation>
+        </message>
+        <message>
+            <source>已取消命名，该分组恢复为「分组 N」的默认名称。</source>
+            <translation>Naming cancelled; this group is called "Group N" again.</translation>
+        </message>
+        <message>
+            <source>第 {} 组已重命名为「{}」。</source>
+            <translation>Group {} is now called "{}".</translation>
+        </message>
+        <message>
+            <source>该分组没有贴图。</source>
+            <translation>This group had no pins to begin with.</translation>
+        </message>
+        <message>
+            <source>已关闭该分组的 {} 张贴图。可通过托盘的「重新贴出最近关掉的贴图」恢复最近 {} 张，更早的贴图无法恢复。</source>
+            <translation>Closed the {} pins of this group. The tray's "Re-pin the most recently closed pins" brings back only the newest {}; older ones do not come back.</translation>
+        </message>
+        <message>
+            <source>第 {} 组已删除，{} 张贴图已并回第一组。</source>
+            <translation>Group {} is gone; {} pins moved back to group 1.</translation>
+        </message>
+        <message>
+            <source>当前只有 1 个贴图分组，没有可切换的下一组。请在贴图的右键菜单中选择「移动到分组 → 新建分组」以增加分组。</source>
+            <translation>There is only one pin group right now, so there is no next group. Choose "Move to group &gt; New group" in a pin's context menu to create one</translation>
+        </message>
+        <message>
+            <source>未找到要移动的贴图（索引 {}）。请重新在贴图上打开右键菜单。</source>
+            <translation>The pin to move is not registered: index {}. Open the menu on that pin again</translation>
+        </message>
+        <message>
+            <source>未找到要替换内容的贴图（索引 {}）。请在仍显示的贴图上按 Ctrl+V。</source>
+            <translation>The pin whose content should be replaced is not in the list (index {}). Press Ctrl+V on a pin that is still on the desk.</translation>
+        </message>
+        <message>
+            <source>动图不支持替换内容：替换后的内容会被下一帧覆盖。请先保存为静态图片，再贴出该图片进行替换。</source>
+            <translation>An animated pin cannot be replaced: the next frame would cover the new content. Save it as a still image first, then pin that image and replace it.</translation>
+        </message>
+        <message>
+            <source>未找到要刷新的贴图（索引 {}）。请在仍显示的贴图上按 F5。</source>
+            <translation>The pin to refresh is not in the register: index {}. Press F5 on a pin that is still on the desk</translation>
+        </message>
+        <message>
+            <source>缩略图模式下不支持刷新：缩略图方块覆盖的屏幕区域与该贴图不对应。请按 T 恢复原始大小后再刷新。</source>
+            <translation>Refresh is not supported in thumbnail mode: the thumbnail covers a screen area that does not correspond to this pin. Press T to restore the original size, then refresh.</translation>
+        </message>
+        <message>
+            <source>动图不支持刷新：替换后的画面会被下一帧覆盖。如需观察实时画面，请先保存为静态图片后再贴出。</source>
+            <translation>Animated pins do not refresh: the frame captured here would be covered by the next one. To watch a live area, save a still image first and pin that one out</translation>
+        </message>
+        <message>
+            <source>未找到需要临时隐藏后截取屏幕的贴图（索引 {}）。</source>
+            <translation>No pin was found that needs to be hidden before capturing the screen (index {}).</translation>
+        </message>
+        <message>
+            <source>分组编号无效：{}。分组编号从 {} 开始，请在贴图的右键菜单中操作。</source>
+            <translation>Bad group number to rename: {}. Groups start at {}. Use the context menu on a pin</translation>
+        </message>
+        <message>
+            <source>第一组用于接收其他分组删除后并入的贴图，无法删除。如需将贴图移出第一组，请使用「移动到分组」。</source>
+            <translation>The first group receives pins from deleted groups and cannot be deleted. To move a pin out of the first group, use "Move to group".</translation>
+        </message>
+        <message>
+            <source>第 {} 组当前没有贴图，无法显示该分组。如需移入贴图，请在贴图的右键菜单中选择「移动到分组」。</source>
+            <translation>Group {} has no pins, so it cannot be shown. To move pins over, use "Move to group" in a pin's context menu</translation>
+        </message>
+        <message>
+            <source>当前环境无法写入「{}」格式。请在设置的「截图」页中改选其他格式。</source>
+            <translation>The current environment cannot write the "{}" format. Select another format in the Screenshot page of Settings.</translation>
+        </message>
+        <message>
+            <source>{} 不支持鼠标穿透：该功能在当前平台尚未实现。请将贴图移至不影响操作的位置，或降低透明度后从其他位置点击。</source>
+            <translation>{} doesn't support click-through: this isn't implemented on this platform. Move the pinned image where it doesn't block your clicks, or lower its opacity and click from somewhere else.</translation>
+        </message>
+        <message>
+            <source>贴图保存失败：{}。请检查输出目录是否可写，或先将该贴图复制到剪贴板。</source>
+            <translation>Saving the pinned image failed: {}. Check that the directory is writable, or copy this image to the clipboard first.</translation>
+        </message>
+        <message>
+            <source>修改颜色</source>
+            <translation>Color</translation>
+        </message>
+        <message>
+            <source>输入「宽x高」（例如 640x360）或倍率（例如 2x、50%）。</source>
+            <translation>Enter "width x height" (e.g. 640x360) or a ratio (e.g. 2x, 50%)</translation>
+        </message>
+        <message>
+            <source>无法读取该尺寸：请按「宽x高」格式输入（例如 640x360），或输入倍率（例如 2x、50%）。</source>
+            <translation>Could not read this size: write "width x height" (e.g. 640x360), or give a ratio (e.g. 2x, 50%)</translation>
+        </message>
+        <message>
+            <source>修改颜色…</source>
+            <translation>Change this card's colour…</translation>
+        </message>
+        <message>
+            <source>动图不支持直接标注：标注内容会被下一帧覆盖。请先保存为静态图片，再贴出该图片进行标注。</source>
+            <translation>An animated pin cannot be annotated directly: the next frame would cover the edits. Save it as a static image first, then pin that and annotate it</translation>
+        </message>
+        <message>
+            <source>动图不支持裁剪：裁剪结果会被下一帧覆盖，画面将恢复为原始尺寸。请先保存为静态图片，再贴出该图片进行裁剪。</source>
+            <translation>An animated pin cannot be cropped: the next frame would restore the original size. Save it as a still image and pin that one to crop it.</translation>
+        </message>
+        <message>
+            <source>刷新该贴图</source>
+            <translation>Re-pin</translation>
+        </message>
+        <message>
+            <source>重新截取该区域的屏幕画面并替换当前内容，除标注外的设置保持不变；按住 `F5` 可连续刷新，松开后停留在最后截取的画面。</source>
+            <translation>Re-captures this patch of screen and swaps in the new picture; every setting but the annotation stays put. Holding `F5` keeps refreshing, and releasing keeps the frame grabbed last</translation>
+        </message>
+        <message>
+            <source>动图不支持刷新：替换后的静态画面会被下一帧覆盖。如需观察实时画面，请先保存为静态图片后再贴出。</source>
+            <translation>Animated pins do not refresh: the still pixels put here would be covered by the next frame. To watch a live area, save a still image first and pin that one out</translation>
+        </message>
+        <message>
+            <source>缩略图模式下不支持刷新：缩略图方块覆盖的屏幕区域与该贴图不对应。请按 `T` 恢复原始大小后再刷新。</source>
+            <translation>Refresh is not supported in thumbnail mode: the thumbnail covers a screen area that does not correspond to this pin. Press `T` to restore the original size, then refresh.</translation>
+        </message>
+        <message>
+            <source>缩略图模式</source>
+            <translation>Thumbnail mode</translation>
+        </message>
+        <message>
+            <source>将贴图缩为屏幕上的缩略图方块以让出空间；拖动方块的四边与四角可调整大小，缩放与旋转设置保持不变；再次点击可恢复原始大小。</source>
+            <translation>Shrink the pin to a thumbnail on screen to free space; drag its edges or corners to resize, with zoom and rotation preserved; click again to restore the original size.</translation>
+        </message>
+        <message>
+            <source>透明像素显示窗口底色（默认）。</source>
+            <translation>Transparent pixels show the window background (the previous behaviour)</translation>
+        </message>
+        <message>
+            <source>整个窗口按逐像素合成，透明区域可透出下方桌面。</source>
+            <translation>The entire window uses per-pixel composition, so transparent areas reveal the desktop below.</translation>
+        </message>
+        <message>
+            <source>以深色棋盘格绘制透明区域，在白色文档上可清晰分辨边界。</source>
+            <translation>Paint the transparent area as a dark checkerboard, so its border shows on a white document</translation>
+        </message>
+        <message>
+            <source>以亮色棋盘格绘制透明区域，在深色桌面上可清晰分辨边界。</source>
+            <translation>Paint the transparent area as a light checkerboard, so its border shows on a dark desktop</translation>
+        </message>
+        <message>
+            <source>仅显示该贴图</source>
+            <translation>Show only this pin</translation>
+        </message>
+        <message>
+            <source>重命名分组…</source>
+            <translation>Rename This Group…</translation>
+        </message>
+        <message>
+            <source>分组名称（留空则恢复为「分组 %1」）</source>
+            <translation>Name for this group; leave it empty to fall back to Group %1</translation>
+        </message>
+        <message>
+            <source>删除分组</source>
+            <translation>Group</translation>
+        </message>
+        <message>
+            <source>第一组用于接收其他分组删除后并入的贴图，无法删除；如需移走该贴图，请使用上方的分组项。</source>
+            <translation>The first group receives pins from deleted groups and cannot be deleted; to move this pin, use the group above.</translation>
+        </message>
+        <message>
+            <source>滚轮缩放，Ctrl+滚轮旋转，Shift+滚轮调整透明度，R 每次旋转一档直至回正（Shift+R 反向），双击关闭该贴图；`0` 恢复原始比例，Esc 关闭。</source>
+            <translation>Scroll to scale, Ctrl+scroll to rotate, Shift+scroll for opacity, R to turn a quarter step (Shift+R the other way), double-click to close this pin; `0` to restore the original size and angle, Esc to close</translation>
+        </message>
+        <message>
+            <source>为贴图添加投影：窗口比内容大出一圈，内容坐标与吸附位置保持不变；缩略图模式（T）下不显示投影。</source>
+            <translation>Draw a shadow around this pin: the window grows one ring larger than the content while content coordinates and snap positions stay unchanged; not applied in thumbnail mode (T)</translation>
+        </message>
+        <message>
+            <source>放大时对像素做平滑处理；关闭该选项后，每个源像素显示为一块硬边方格，小字更清晰（仅影响显示，不影响输出图片）。</source>
+            <translation>Smooth pixels when magnified; when disabled, each source pixel is shown as a hard-edged square, making small text clearer (display only, does not affect output images).</translation>
+        </message>
+        <message>
+            <source>销毁该贴图</source>
+            <translation>Pin</translation>
+        </message>
+        <message>
+            <source>彻底关闭该贴图：它将不再出现在「重新贴出最近关掉的贴图」的最近五张中。如需暂时关闭，请使用「关闭」。</source>
+            <translation>Close this image for good: it will not stay in the five recoverable closed images. Use Close if you only need the space back.</translation>
+        </message>
+        <message>
+            <source>仅在本机检测，不会上传；请逐项确认，打码后可撤销。</source>
+            <translation>Detection runs on this machine only; nothing is uploaded. Review each item; the redactions can be undone.</translation>
+        </message>
+        <message>
+            <source>取消全选</source>
+            <translation>Cancel</translation>
+        </message>
+        <message>
+            <source>已录制时长。达到设置中的「最长录制时长」后会自动停止并保存（默认 10 分钟）。</source>
+            <translation>How long this recording has been running. It stops and saves itself at the "maximum recording length" set in the settings (10 minutes by default)</translation>
+        </message>
+        <message>
+            <source>放弃本次录制，不保存输出文件</source>
+            <translation>Discard this recording without saving an output file</translation>
+        </message>
+        <message>
+            <source>停止并保存输出文件</source>
+            <translation>Stop and save</translation>
+        </message>
+        <message>
+            <source>无法复制到剪贴板：</source>
+            <translation>Copy to clipboard</translation>
+        </message>
+        <message>
+            <source>无法保存美化图片：{}</source>
+            <translation>Could not save the beautified image: {}</translation>
+        </message>
+        <message>
+            <source>「{}」写不进去。请检查该目录是否可写。</source>
+            <translation>"{}" cannot be written. Check whether this directory is writable</translation>
+        </message>
+        <message>
+            <source>「{}」无法编码为目标格式</source>
+            <translation>“{}” could not be encoded into the target format</translation>
+        </message>
+        <message>
+            <source>内置模板不可删除</source>
+            <translation>Built-in templates cannot be deleted</translation>
+        </message>
+        <message>
+            <source>此处显示应用当前样式后的效果；复制或保存的图片仍为原尺寸。</source>
+            <translation>Shows the result with the current style; copy and save still export at full size</translation>
+        </message>
+        <message>
+            <source>左侧为实时预览；下方的修改仅影响本次美化结果，原图与标注内容保持不变。</source>
+            <translation>The left side is a live preview; the changes below only affect this beautified image, while the original capture and annotations stay untouched.</translation>
+        </message>
+        <message>
+            <source>选择内置模板或已保存的自定义模板；更换模板会将这套样式载入下方的控件。</source>
+            <translation>Pick a built-in template or a saved custom template; switching loads that style into the controls below</translation>
+        </message>
+        <message>
+            <source>卡片背后的底色；点击可打开取色器。</source>
+            <translation>The color behind the card; click to open the color picker</translation>
+        </message>
+        <message>
+            <source>渐变终点的底色；启用「从上到下渐变」后生效。</source>
+            <translation>The end color of the gradient; only used when “Top-to-bottom gradient” is on</translation>
+        </message>
+        <message>
+            <source>启用后背景由背景色渐变至渐变终点；关闭时仅使用背景色。</source>
+            <translation>When on, the background blends from the background color to the gradient end; when off, only the background color is used</translation>
+        </message>
+        <message>
+            <source>卡片四周留出的空白宽度，单位为像素；数值越大画布越宽，输出图片四周的留白越多。</source>
+            <translation>How many pixels of blank space surround the card; larger values widen the canvas and give the image more breathing room</translation>
+        </message>
+        <message>
+            <source>卡片四角的圆角半径，单位为像素；数值过大时会按卡片短边自动收小。</source>
+            <translation>Corner radius of the card in pixels; very large values shrink automatically to fit the card's shorter side</translation>
+        </message>
+        <message>
+            <source>卡片外圈描边的宽度，单位为像素；0 表示不绘制描边。</source>
+            <translation>Width of the border around the card in pixels; 0 draws no border</translation>
+        </message>
+        <message>
+            <source>卡片外圈投影向外扩展的宽度，单位为像素；0 表示不绘制投影。</source>
+            <translation>How far the shadow spreads outward from the card in pixels; 0 draws no shadow</translation>
+        </message>
+        <message>
+            <source>启用后在卡片顶部绘制一条编辑器标题栏，包含三个圆点与标题文字。</source>
+            <translation>When on, draws an editor title bar across the top of the card: three dots plus the title text</translation>
+        </message>
+        <message>
+            <source>标题栏中的文字；留空时仅绘制三个圆点。</source>
+            <translation>The text in the title bar; leave it empty to draw only the three dots</translation>
+        </message>
+        <message>
+            <source>留空时仅绘制三个圆点</source>
+            <translation>Leave empty to draw only the three dots</translation>
+        </message>
+        <message>
+            <source>显示在卡片下角的文字；留空时不绘制水印。</source>
+            <translation>Text placed in the card's bottom corner; leave it empty to draw no watermark</translation>
+        </message>
+        <message>
+            <source>留空时不添加水印</source>
+            <translation>Leave empty for no watermark</translation>
+        </message>
+        <message>
+            <source>水印的不透明度：0 为完全透明，255 为完全不透明</source>
+            <translation>Watermark opacity: 0 is fully transparent, 255 is fully opaque</translation>
+        </message>
+        <message>
+            <source>水印显示在卡片的右下角或左下角。</source>
+            <translation>Whether the watermark sits in the card's bottom right or bottom left corner</translation>
+        </message>
+        <message>
+            <source>将当前样式保存为自定义模板，之后可在本机再次选用。</source>
+            <translation>Save the current style as a custom template so you can pick it again on this machine</translation>
+        </message>
+        <message>
+            <source>删除当前选中的自定义模板；内置模板不可删除。</source>
+            <translation>Delete the selected custom template; built-in templates cannot be deleted</translation>
+        </message>
+        <message>
+            <source>按原尺寸将美化后的图片复制到剪贴板；原图与标注保持不变。</source>
+            <translation>Put the beautified image on the clipboard at full size; the original capture and annotations stay untouched</translation>
+        </message>
+        <message>
+            <source>按原尺寸将美化后的图片另存为 PNG、JPG 或 WebP；原图与标注保持不变。</source>
+            <translation>Save the beautified image as PNG, JPG or WebP at full size; the original capture and annotations stay untouched</translation>
+        </message>
+        <message>
+            <source>关闭美化对话框并返回标注界面；已复制或保存的输出文件不受影响。</source>
+            <translation>Close the beautify dialog and return to the annotation; anything already copied or saved is unaffected</translation>
+        </message>
+        <message>
+            <source>此处显示复制、保存与模板操作的结果及失败原因。</source>
+            <translation>Shows the results and failure reasons for copy, save and template actions</translation>
+        </message>
+        <message>
+            <source>确定删除当前选中的自定义模板吗？删除后无法恢复。</source>
+            <translation>Delete the selected custom template? This cannot be undone.</translation>
+        </message>
+        <message>
+            <source>上次使用的美化模板无法写入：{}</source>
+            <translation>Could not write the last-used share template: {}</translation>
+        </message>
+        <message>
+            <source>无法记住模板选择：{}</source>
+            <translation>Could not remember the template choice: {}</translation>
+        </message>
+        <message>
+            <source>无法打开该文件：文件可能已被移动或删除。请刷新记忆库后重试</source>
+            <translation>Cannot open this file: it may have been moved or deleted. Refresh memory and try again</translation>
+        </message>
+        <message>
+            <source>该贴图已移至当前分组，位置保持不变</source>
+            <translation>The pin was moved to the current group; its position is unchanged.</translation>
+        </message>
+        <message>
+            <source>贴图已移至{}，已暂时收起；按 {} 或从托盘切换到该分组即可显示</source>
+            <translation>Moved this pin to {}; it is tucked away for now. Press {} (or use the tray) to switch to that group</translation>
+        </message>
+        <message>
+            <source>以下全局快捷键注册失败：</source>
+            <translation>The following global shortcuts failed to register:</translation>
+        </message>
+        <message>
+            <source>以下自定义快捷键注册失败：</source>
+            <translation>The following custom shortcuts failed to register:</translation>
+        </message>
+        <message>
+            <source>该屏幕已不存在，无法重新截取画面。请将贴图移至仍连接的屏幕后再刷新</source>
+            <translation>This screen is gone, so there is nothing to re-capture. Move the pin back onto a screen that is still there, then refresh it</translation>
+        </message>
+        <message>
+            <source>仅索引主动截取的图像</source>
+            <translation>Only screenshots you take are indexed</translation>
+        </message>
+        <message>
+            <source>%1。留空表示使用默认目录。</source>
+            <translation>%1. Leave empty to use the default folder</translation>
+        </message>
+        <message>
+            <source>在录制画面中标记光标位置</source>
+            <translation>Mark the cursor position in the recording</translation>
+        </message>
+        <message>
+            <source>整屏、区域与窗口录屏均生效；录制窗口时按平台提供的客户区左上角定位，无法获取该位置时不绘制标记。</source>
+            <translation>Applies to full-screen, region, and window recording; when recording a window the ring is placed using the client-area top-left the platform reports, and a frame is left uncircled when that reading is unavailable</translation>
+        </message>
+        <message>
+            <source>在截图中绘制</source>
+            <translation>Draw in the capture</translation>
+        </message>
+        <message>
+            <source>整屏与区域截图生效；滚动长截图按帧拼接，绘制指针会留下重复影像，因此不应用。非 Windows 平台无法获取系统指针形状，启用后也不会显示。</source>
+            <translation>Applies to full-screen and region shots. Scrolling capture stitches frames, so a pointer would repeat down the long image and is left out there. Non-Windows platforms cannot read the system pointer shape, so turning this on changes nothing</translation>
+        </message>
+        <message>
+            <source>切换语言需重启智录后生效。</source>
+            <translation>Restart GyanisScribe for the language change to take effect</translation>
+        </message>
+        <message>
+            <source>颜色复制格式</source>
+            <translation>Color copy format</translation>
+        </message>
+        <message>
+            <source>选择“不显示”仅隐藏像素放大图，光标处的坐标与颜色读数仍会保留。</source>
+            <translation>Picking "don't show" only drops the pixel illustration; the coordinate and colour strip stays where it was</translation>
+        </message>
+        <message>
+            <source>高 DPI 屏幕上两种单位相差一个缩放倍率；此设置同时影响遮罩读数、复制尺寸与尺寸输入框。</source>
+            <translation>On a HiDPI screen these two numbers differ by the scale factor; this slot covers the mask readout, the copied size and the size editor</translation>
+        </message>
+        <message>
+            <source>右键单击由系统弹出菜单；双击会在第一次松开时计为一次单击。本项仅控制左键或中键单击。</source>
+            <translation>Right-click opens the system menu; a double-click counts as one click on the first release. This setting controls only left- or middle-click.</translation>
+        </message>
+        <message>
+            <source>按住 Shift 拖动对齐与贴近屏幕边缘时共用的距离；0 表示不吸附。</source>
+            <translation>The distance shared by Shift-held alignment and edge docking: 0 means nothing snaps at all</translation>
+        </message>
+        <message>
+            <source>最长录制时长</source>
+            <translation>Time recorded</translation>
+        </message>
+        <message>
+            <source>录制达到此时长后自动结束并保存；默认 600 秒（10 分钟），上限 7200 秒（2 小时）。</source>
+            <translation>Recording stops and saves itself at this length: 600 seconds (10 minutes) by default, up to 7200 seconds (2 hours)</translation>
+        </message>
+        <message>
+            <source>截图延时</source>
+            <translation>Screenshot</translation>
+        </message>
+        <message>
+            <source>按下截图后等待此时间再开始，用于捕获菜单、悬停提示等短暂画面；0 表示不延时。</source>
+            <translation>Wait this long after the key before capturing, for menus and hover hints that vanish as soon as you touch them; 0 means no delay</translation>
+        </message>
+        <message>
+            <source>启用“圆角处理”时四角的半径；仅对区域截图生效，整屏、窗口与滚动长截图不应用。</source>
+            <translation>How round the corners are while Round Corners is on. Region captures only; full-screen, window and scrolling captures keep square corners</translation>
+        </message>
+        <message>
+            <source>按下录屏快捷键后倒计时此时长再开始录制，便于准备画面；0 表示立即开始。</source>
+            <translation>Counts down before recording starts so you can arrange what is about to be recorded; 0 starts immediately</translation>
+        </message>
+        <message>
+            <source>“上次选区”使用最近一次截图的选区；“当前窗口”录制开始时最前面的窗口。修改后从下次录屏起生效。</source>
+            <translation>Last selection records the rectangle framed by the most recent capture; Current window records whichever window is in front when recording starts. Changes apply from the next recording</translation>
+        </message>
+        <message>
+            <source>截图完成后</source>
+            <translation>After a capture</translation>
+        </message>
+        <message>
+            <source>选择“复制到剪贴板”“保存到文件”“贴到屏幕”时不会打开标注窗口；修改后从下次截图起生效。</source>
+            <translation>Choosing "Copied to the clipboard", "Save straight to a file" or "Pin straight onto the screen" skips the annotation window; it takes effect from the next capture</translation>
+        </message>
+        <message>
+            <source>“保存到文件”与贴图右键“保存”按此格式写入文件；PNG 为无损格式，JPG 与 WebP 适合压缩照片类截图。</source>
+            <translation>"Save directly to a file" and the pin context-menu "Save" write with this format. PNG is lossless; JPG and WebP shrink photo-like shots</translation>
+        </message>
+        <message>
+            <source>仅 JPG 与 WebP 使用此设置，PNG 为无损格式；数值越大越清晰，文件也越大。</source>
+            <translation>Only JPG and WebP use this value; PNG is lossless. Higher means clearer and bigger</translation>
+        </message>
+        <message>
+            <source>不录制</source>
+            <translation>Recording</translation>
+        </message>
+        <message>
+            <source>自动（逐项检测）</source>
+            <translation>Automatic (probe each in turn)</translation>
+        </message>
+        <message>
+            <source>列出本机最近检测可用的编码器；自动模式会在每次编码前按偏好顺序逐项检测。</source>
+            <translation>Lists the encoders actually probed working on this machine; the automatic option probes them in preference order before every encode</translation>
+        </message>
+        <message>
+            <source>GIF 最高 24 帧/秒；更高帧率肉眼难以分辨，且会显著增加调色板处理量。切回 MP4 后恢复原有帧率。</source>
+            <translation>GIF tops out at 24 fps: beyond that the eye cannot tell while the two-pass palette scales with the frame count. Switching back to MP4 restores your own value</translation>
+        </message>
+        <message>
+            <source>录屏的目标帧率；GIF 格式上限低于 MP4（24 帧/秒）。</source>
+            <translation>Target frame rate for recording; the GIF format tops out lower than MP4 (24 fps)</translation>
+        </message>
+        <message>
+            <source>GIF 使用两遍调色板，帧率上限为 %1 帧/秒，低于 MP4；MP4 适合较长片段。修改后从下次录屏起生效。</source>
+            <translation>GIF runs a two-pass palette and caps the frame rate at %1 frames per second, lower than MP4; MP4 suits longer clips. Changes apply from the next recording</translation>
+        </message>
+        <message>
+            <source>启用（仅使用内存）</source>
+            <translation>Enable rewind buffer (memory only)</translation>
+        </message>
+        <message>
+            <source>启用回溯缓冲</source>
+            <translation>Enable rewind buffer</translation>
+        </message>
+        <message>
+            <source>仅保存在内存中，不写入磁盘、不上传；锁屏或退出程序时清空。</source>
+            <translation>Memory only: nothing is written to disk or uploaded; locking the screen or exiting clears it.</translation>
+        </message>
+        <message>
+            <source>将最近 10 秒的屏幕画面保存在内存中。</source>
+            <translation>The last 10 seconds of screen content is kept in memory.</translation>
+        </message>
+        <message>
+            <source>不写入磁盘、不上传、不录制声音。</source>
+            <translation>Nothing is written to disk, uploaded, or recorded as audio.</translation>
+        </message>
+        <message>
+            <source>锁屏或退出程序时清空。</source>
+            <translation>Locking the screen or exiting the app clears it.</translation>
+        </message>
+        <message>
+            <source>可排除密码管理器等程序。</source>
+            <translation>You can exclude programs such as password managers.</translation>
+        </message>
+        <message>
+            <source>确定启用吗？</source>
+            <translation>Turn it on?</translation>
+        </message>
+        <message>
+            <source>缓冲保留时长</source>
+            <translation>Buffer duration</translation>
+        </message>
+        <message>
+            <source>缓冲帧率</source>
+            <translation>Frame rate</translation>
+        </message>
+        <message>
+            <source>排除的程序</source>
+            <translation>Excluded programs</translation>
+        </message>
+        <message>
+            <source>以逗号分隔的可执行文件名；名单中的程序有可见窗口时暂停抓取画面。</source>
+            <translation>Comma-separated executable file names; frame grabbing pauses while a listed program has a visible window</translation>
+        </message>
+        <message>
+            <source>排除名单无效</source>
+            <translation>Invalid exclusion list</translation>
+        </message>
+        <message>
+            <source>已导入 %1 项设置。当前页面仍显示导入前的值，请关闭并重新打开设置窗口；界面语言需重启智录后生效。</source>
+            <translation>Imported %1 settings. This page still shows the values from before the import: close the settings window and open it again. The interface language takes effect only after restarting GyanisScribe.</translation>
+        </message>
+        <message>
+            <source>无法写入色板文件：目标路径不可写。请选择可写目录后重试。</source>
+            <translation>Cannot write the palette file: the target path is not writable. Choose a writable folder and try again.</translation>
+        </message>
+        <message>
+            <source>已导出色板：%1 种颜色</source>
+            <translation>Palette exported: %1 swatches</translation>
+        </message>
+        <message>
+            <source>无法读取色板文件：路径“%1”不存在或无法打开。请确认路径，或重新导出。</source>
+            <translation>This palette file could not be read: "%1" does not exist or cannot be opened. Check the path, or export a new one</translation>
+        </message>
+        <message>
+            <source>已导入色板：%1 种颜色。工具栏将在下次打开标注窗口时使用新色板。</source>
+            <translation>Palette imported: %1 swatches. The toolbar row switches to them the next time an annotation window opens.</translation>
+        </message>
+        <message>
+            <source>将当前全部设置写入一个 JSON 文件，用于迁移或备份。</source>
+            <translation>Writes all current settings into one JSON file, for a backup or another machine</translation>
+        </message>
+        <message>
+            <source>从本程序导出的 JSON 文件恢复设置；热键与主题等订阅配置的模块会立即应用新值。</source>
+            <translation>Reads settings back from a file this program exported; hotkeys and theme, which watch the configuration, follow the new values right away</translation>
+        </message>
+        <message>
+            <source>与托盘菜单及全局快捷键执行相同操作。</source>
+            <translation>Performs the same action as the tray menu and global shortcut.</translation>
+        </message>
+        <message>
+            <source>登录系统后自动启动本程序</source>
+            <translation>Start this app automatically after signing in</translation>
+        </message>
+        <message>
+            <source>登录系统后自动启动本程序；状态读取系统启动项，修改后立即生效。</source>
+            <translation>Start this copy of the program at sign-in; the state is read from the system's startup items and takes effect immediately</translation>
+        </message>
+        <message>
+            <source>留空表示不排除任何程序，例如 chrome.exe, cmd.exe</source>
+            <translation>Leave empty to exclude nothing, e.g. chrome.exe, cmd.exe</translation>
+        </message>
+        <message>
+            <source>窗口检测排除程序</source>
+            <translation>Programs skipped by window detection</translation>
+        </message>
+        <message>
+            <source>列出的程序在悬停识别窗口时会被跳过，适用于常驻桌面的工具栏或笔记窗口。</source>
+            <translation>Programs listed here are skipped when hovering to detect a whole window: handy for toolbars and note windows that always sit on top of the desktop</translation>
+        </message>
+        <message>
+            <source>留空表示按组号升序，例如 2, 1, 3</source>
+            <translation>Leave empty for ascending group numbers, e.g. 2, 1, 3</translation>
+        </message>
+        <message>
+            <source>切换分组时按此顺序轮换；未列出的分组排在末尾。</source>
+            <translation>Groups rotate in this order; unlisted groups are placed at the end.</translation>
+        </message>
+        <message>
+            <source>界面语言决定菜单、托盘提示与设置页文案，切换后需重启智录生效。历史记录条数上限与保留天数设为 0 时表示不限制。</source>
+            <translation>The interface language sets the wording of the menus, the tray hints and these settings pages; a change takes effect after restarting GyanisScribe. The two rows below decide how much history is kept; 0 means no limit.</translation>
+        </message>
+        <message>
+            <source>历史记录条数上限</source>
+            <translation>Maximum history entries</translation>
+        </message>
+        <message>
+            <source>历史记录保留天数</source>
+            <translation>History retention (days)</translation>
+        </message>
+        <message>
+            <source>保留未保存的截图</source>
+            <translation>Keep unsaved screenshots in history</translation>
+        </message>
+        <message>
+            <source>存入历史记录</source>
+            <translation>Save to history</translation>
+        </message>
+        <message>
+            <source>启用后，每张截图都会在程序数据目录保留一份像素副本；因按 Esc 取消而丢弃的截图也会进入历史记录（最多保留 {} 张）</source>
+            <translation>When on, every capture keeps a pixel copy in the app data folder, so one lost to Esc is still in history (up to {} kept)</translation>
+        </message>
+        <message>
+            <source>仅为手动截图建立索引</source>
+            <translation>Index manual captures only</translation>
+        </message>
+        <message>
+            <source>启用后，仅将手动截图的文字与来源写入本机索引，不会上传。可随时关闭；已有索引仍可搜索，也可清空。</source>
+            <translation>When enabled, text and source metadata from screenshots you take are stored in a local index and never uploaded. You can turn it off at any time; existing entries remain searchable and can be cleared.</translation>
+        </message>
+        <message>
+            <source>可用变量：%date%（日期）、%time%（时刻）、%ms%（毫秒）、%app%（应用名）、%title%（窗口标题）、%monitor%（屏幕名）。留空表示使用默认模板；修改后从下次保存起生效。</source>
+            <translation>Available variables: %date% (date), %time% (time), %ms% (milliseconds), %app% (application), %title% (window title), %monitor% (screen); leave blank to use the default. Changes take effect from the next save</translation>
+        </message>
+        <message>
+            <source>预览：模板不可用</source>
+            <translation>Preview: template unavailable</translation>
+        </message>
+        <message>
+            <source>预览：{}.png</source>
+            <translation>Preview: {}.png</translation>
+        </message>
+        <message>
+            <source>启用“输出边框”时边框的宽度（物理像素）；仅对输出文件生效，贴到屏幕的贴图不添加。</source>
+            <translation>Border width when "Output border" is enabled (physical pixels); applies only to output files, not to pins on screen.</translation>
+        </message>
+        <message>
+            <source>启用“输出投影”时投影向外扩展的宽度（物理像素）；宽度越大越柔和，占用空间也越大。</source>
+            <translation>How far the shadow spreads outward while Add Shadow is on, in physical pixels. Wider is softer, and takes more room</translation>
+        </message>
+        <message>
+            <source>#808080（中灰色，留空即为默认）</source>
+            <translation>#808080 (neutral grey; empty means this default)</translation>
+        </message>
+        <message>
+            <source>输出图片边框的颜色，格式为 #RRGGBB；留空使用默认中灰色。</source>
+            <translation>The colour of that ring, written as #RRGGBB. Leave it empty for the default neutral grey</translation>
+        </message>
+        <message>
+            <source>留空表示不执行；例如：上传工具 --path "%file%"</source>
+            <translation>Leave empty to skip it; written as, for example, uploader --path "%file%"</translation>
+        </message>
+        <message>
+            <source>截图后执行的命令</source>
+            <translation>Run a command after a capture</translation>
+        </message>
+        <message>
+            <source>每次截图交付后执行此命令，参数中的 %file% 会替换为本轮输出文件路径。本轮未生成文件时（例如“截图完成后”选择在标注窗口中打开），带 %file% 的命令会被拒绝并说明原因；命令行提供 --exec 时以该命令为准。</source>
+            <translation>Starts this command once every destination of this capture has been delivered. In its arguments %file% becomes the file written this round; when this round wrote no file ("After a capture" set to the annotation window, for example) a command carrying %file% is rejected with the reason shown. A command line that passed --exec runs that one instead, and this field does not take part in that run.</translation>
+        </message>
+        <message>
+            <source>截图与标注输出文件保存在指定目录。取色复制的文本按下方格式生成。</source>
+            <translation>Screenshots and finished annotations land in this folder. Copied colors are formatted with the format chosen below.</translation>
+        </message>
+        <message>
+            <source>显示截图信息面板</source>
+            <translation>Show capture info while annotating</translation>
+        </message>
+        <message>
+            <source>在标注窗口旁显示</source>
+            <translation>Show next to the annotation window</translation>
+        </message>
+        <message>
+            <source>启用后，每次打开标注窗口都会在工具栏旁显示信息面板，包含应用、窗口标题、屏幕与捕获时间。默认关闭；面板仅在本机显示，不写入历史或日志。</source>
+            <translation>When on, every annotation window shows a panel beside the toolbar with the application, window title, screen and capture time. Off by default; the annotation window behaves as before while off. The panel is shown locally only and is not written to history or logs.</translation>
+        </message>
+        <message>
+            <source>圆角处理</source>
+            <translation>Rounded</translation>
+        </message>
+        <message>
+            <source>将输出图片四角裁剪为圆角</source>
+            <translation>Round the corners of output images</translation>
+        </message>
+        <message>
+            <source>仅对区域截图生效：输出图片四角为透明像素，半径由下方设置决定；整屏、窗口与滚动长截图不应用圆角。</source>
+            <translation>Region captures only: the four corners of the product are rounded with transparent pixels there. The row below sets how round; full-screen, window and scrolling captures keep square corners</translation>
+        </message>
+        <message>
+            <source>每张截图均保存到输出目录</source>
+            <translation>Save every capture to the output folder</translation>
+        </message>
+        <message>
+            <source>截图完成后立即按上方格式与目录保存一份，不显示提示；若“截图完成后”已选择“保存到文件”或“保存并复制”，则不会重复保存。</source>
+            <translation>Save a copy immediately after capture using the format and folder above, without a notification; if "After capture" is set to "Save to file" or "Save and copy", no duplicate is saved.</translation>
+        </message>
+        <message>
+            <source>截图完成时播放系统提示音</source>
+            <translation>Play a system alert when a capture completes</translation>
+        </message>
+        <message>
+            <source>使用系统提示音，无需提供音频文件。</source>
+            <translation>Uses the system alert sound; no audio file needed</translation>
+        </message>
+        <message>
+            <source>输出边框</source>
+            <translation>Output border</translation>
+        </message>
+        <message>
+            <source>为输出图片添加中灰色边框</source>
+            <translation>Add a medium gray border to output images</translation>
+        </message>
+        <message>
+            <source>保存文件、复制到剪贴板与打印时均添加边框；贴到屏幕的贴图不添加，因为那是显示而非输出。</source>
+            <translation>Applied to file saves, clipboard copies and printing; not to pins on screen — that is display, not output</translation>
+        </message>
+        <message>
+            <source>输出投影</source>
+            <translation>Output shadow</translation>
+        </message>
+        <message>
+            <source>为输出图片添加轻投影</source>
+            <translation>Add a light shadow to output images</translation>
+        </message>
+        <message>
+            <source>与边框同组生效：保存文件、复制到剪贴板与打印时均添加；保存为 JPG 时会在投影下方垫白色背景。</source>
+            <translation>Same group as the border: applied to file saves, clipboard copies and printing; flattened onto white for JPG</translation>
+        </message>
+        <message>
+            <source>截图与标注输出目录</source>
+            <translation>Folder for screenshots and annotations</translation>
+        </message>
+        <message>
+            <source>截图输出目录</source>
+            <translation>Screenshots</translation>
+        </message>
+        <message>
+            <source>十六进制字母大小写</source>
+            <translation>Uppercase hex digits</translation>
+        </message>
+        <message>
+            <source>使用大写字母</source>
+            <translation>Use uppercase letters</translation>
+        </message>
+        <message>
+            <source>关闭后输出为 #3c78c8 形式；仅影响十六进制写法，其它格式不受影响。</source>
+            <translation>When disabled, output uses the #3c78c8 form; only the hexadecimal format is affected.</translation>
+        </message>
+        <message>
+            <source>回溯缓冲</source>
+            <translation>Rewind buffer is on</translation>
+        </message>
+        <message>
+            <source>留空表示使用内置八色；例如 #FF0000, #00FF00</source>
+            <translation>Leave empty for the built-in eight; written as #FF0000, #00FF00</translation>
+        </message>
+        <message>
+            <source>色板显示的色块；此处顺序即从左到右的排列顺序。</source>
+            <translation>Color swatches shown on the palette; this order is the left-to-right display order.</translation>
+        </message>
+        <message>
+            <source>将当前色板写入一个文本文件（每行一个 #RRGGBB），用于分享或迁移。</source>
+            <translation>Writes the swatches in use to a text file (one #RRGGBB per line) to hand to a colleague or move to another machine</translation>
+        </message>
+        <message>
+            <source>从色板文件替换当前色板；下次打开标注窗口时使用新色板。</source>
+            <translation>Replaces the whole row from a palette file; the next annotation window uses that one</translation>
+        </message>
+        <message>
+            <source>新建标注窗口使用以下默认线宽与字号；之后的修改会由工具栏记录，下次以最近使用的档位打开。自定义色板留空时使用内置八色；下方按钮可导出或导入整套配色。</source>
+            <translation>New annotation windows use the default line width and font size below; later changes are recorded by the toolbar and used next time. Leave the custom palette empty to use the built-in eight colors; the buttons below export or import the whole palette.</translation>
+        </message>
+        <message>
+            <source>色板导入与导出</source>
+            <translation>Palette import and export</translation>
+        </message>
+        <message>
+            <source>空白画布背景</source>
+            <translation>New blank canvas</translation>
+        </message>
+        <message>
+            <source>使用透明背景</source>
+            <translation>Use a transparent background</translation>
+        </message>
+        <message>
+            <source>透明区域在画布上以棋盘格显示；保存为 PNG/WebP 时保留透明，保存为 JPG 时会先垫白色背景。</source>
+            <translation>Transparent areas show as a checkerboard on the canvas; PNG/WebP keep the alpha, JPG gets a white fill first</translation>
+        </message>
+        <message>
+            <source>新建贴图使用此默认不透明度。滚轮调整仅影响当前贴图，不修改此设置。</source>
+            <translation>New pins use this default opacity. Scroll-wheel adjustments affect only the current pin and do not change this setting.</translation>
+        </message>
+        <message>
+            <source>新贴图默认不透明度</source>
+            <translation>Pin default opacity</translation>
+        </message>
+        <message>
+            <source>禁止拖边调整大小</source>
+            <translation>Disable edge resizing</translation>
+        </message>
+        <message>
+            <source>禁止拖动边缘或手柄</source>
+            <translation>Disable dragging edges or handles</translation>
+        </message>
+        <message>
+            <source>仅关闭调整尺寸的交互点；整张移动、滚轮缩放与右键菜单不受影响。</source>
+            <translation>Only the resize grips are turned off: moving the pin, wheel scaling and the right-click items all keep working</translation>
+        </message>
+        <message>
+            <source>录屏输出文件保存在指定目录。录制范围选择“上次选区”或“当前窗口”时，仅录制对应区域。保存为 GIF 时帧率上限低于 MP4（GIF 最高 24 帧/秒）。画面码率设为 0 时由编码器按质量优先处理；填写具体数值时按该码率控制，GIF 不使用此项。编码器可固定为某个可用项；自动模式会在编码前逐项检测并选择第一个可用项。录制倒计时为 0 时立即开始。音频设备无法列出时下拉框仅保留“不录制”，悬停可查看原因；保存为 GIF 时音频选项会禁用，因为该格式不支持声音。以上设置均从下次录屏开始生效。</source>
+            <translation>Recording output files are saved to the specified folder. When Recording area is set to "Last region" or "Current window", only that area is recorded. GIF has a lower frame-rate limit than MP4 (up to 24 fps). A video bitrate of 0 lets the encoder prioritize quality; a specific value enforces that bitrate, and GIF ignores this setting. The encoder can be fixed to an available option; Auto checks each option before encoding and uses the first available one. A countdown of 0 starts immediately. If audio devices cannot be listed, the dropdown keeps only "Do not record" and the reason appears on hover; audio options are disabled for GIF because the format does not support sound. All settings take effect on the next recording.</translation>
+        </message>
+        <message>
+            <source>录屏输出目录</source>
+            <translation>Recordings</translation>
+        </message>
+        <message>
+            <source>录制倒计时</source>
+            <translation>Recording countdown</translation>
+        </message>
+        <message>
+            <source>麦克风</source>
+            <translation>Microphone device</translation>
+        </message>
+        <message>
+            <source>系统声音</source>
+            <translation>System sound device</translation>
+        </message>
+        <message>
+            <source>可识别的文字取决于语言包。目录留空时按环境变量与程序数据目录查找。</source>
+            <translation>Which scripts can be recognized depends on the language packs. Leave the folder empty to fall back to the environment variable and the program data folder.</translation>
+        </message>
+        <message>
+            <source>上方 %1 项为固定动作，各有一个默认快捷键；随后 %2 项功能可另行绑定，留空表示不绑定。修改后立即重新注册，无需重启。底部一栏为应用内快捷键，仅在智录窗口内生效。</source>
+            <translation>The %1 boxes above are fixed actions, each with a default combination; the next %2 features can each bind one more, and leaving a box empty means not binding it. Changes are re-registered right away, no restart needed. The last section lists the in-window keys, which only count inside this program's own windows and work on every platform.</translation>
+        </message>
+        <message>
+            <source>当前平台不提供全局快捷键注册接口，上方 %1 项修改后不会生效。底部一栏为应用内快捷键，不受此能力限制，照常生效。</source>
+            <translation>This platform has no way to register global hotkeys, so changing the %1 boxes above has no effect. The last section lists the in-window keys, which ignore that capability and keep working.</translation>
+        </message>
+        <message>
+            <source>清除此绑定后，该快捷键不再用于此功能。</source>
+            <translation>After clearing this binding, the shortcut is no longer used for this action.</translation>
+        </message>
+        <message>
+            <source>「%1」的全局快捷键</source>
+            <translation>Key for %1</translation>
+        </message>
+        <message>
+            <source>允许单键作为全局热键</source>
+            <translation>Allow single-key global hotkeys</translation>
+        </message>
+        <message>
+            <source>默认关闭。启用后，例如将 `R` 绑定为截图：在其他程序中按下 R 也会触发截图，而该程序无法接收此按键。仅在确需将某个按键专用于智录时启用。</source>
+            <translation>Off by default. Once on, say with `R` bound to capture: typing r in another program triggers a capture and that program never sees the letter. Turn it on only when you really want a key to belong to this app alone</translation>
+        </message>
+        <message>
+            <source>允许将字母、数字、标点、方向键以及 Esc、Enter 等单键用作全局快捷键</source>
+            <translation>Allow single keys (letters, digits, punctuation, arrow keys, and keys like Esc or Enter) as global hotkeys</translation>
+        </message>
+        <message>
+            <source>单键全局快捷键</source>
+            <translation>Single keys can be global hotkeys</translation>
+        </message>
+        <message>
+            <source>应用内快捷键</source>
+            <translation>Keyboard shortcuts</translation>
+        </message>
+        <message>
+            <source>应用内快捷键分组的标题</source>
+            <translation>In-app shortcut group heading</translation>
+        </message>
+        <message>
+            <source>应用内快捷键的分组标题</source>
+            <translation>Heading of an in-window key group</translation>
+        </message>
+        <message>
+            <source>将「%1」的快捷键恢复为默认值</source>
+            <translation>Restore the default key for %1</translation>
+        </message>
+        <message>
+            <source>清除此设置后，该快捷键恢复为默认的 %1。</source>
+            <translation>After clearing this setting, the shortcut returns to the default %1.</translation>
+        </message>
+        <message>
+            <source>「%1」的应用内快捷键</source>
+            <translation>In-app shortcut for "%1"</translation>
+        </message>
+        <message>
+            <source>配色方案立即生效。高对比度模式使用纯黑文字、纯白背景与加粗边框。</source>
+            <translation>Color schemes apply immediately. High contrast uses pure black text on pure white with bold borders.</translation>
+        </message>
+        <message>
+            <source>本平台没有全局热键能力：登记不会生效。请在程序窗口内使用普通快捷键，或等平台适配后再开启此项</source>
+            <translation>This platform has no global hotkey support: registering won't take effect. Use ordinary shortcuts inside the program window, or enable this once the platform is adapted.</translation>
+        </message>
+        <message>
+            <source>当前没有可截取的前台窗口（可能已锁屏，或焦点位于桌面）。请先激活要截取的窗口，再使用此功能。</source>
+            <translation>No foreground window is available to capture (the screen may be locked or focus may be on the desktop). Activate the target window and try again.</translation>
+        </message>
+        <message>
+            <source>无法识别桌面上的窗口：平台的屏幕清单与界面的屏幕清单不一致。请先使用整屏或框选截图，并重新启动智录后重试。</source>
+            <translation>Can't tell which windows are on the desktop: the platform's screen list and the interface's screen list didn't pair up. Use full-screen or region capture for now, then restart GyanisScribe</translation>
+        </message>
+        <message>
+            <source>系统的 UI Automation 无法启动，不能识别界面元素。可继续使用悬停识别整个窗口，或直接框选目标区域。</source>
+            <translation>The system's UI Automation failed to start, so UI elements can't be detected. Hovering can still recognise whole windows, or frame the part you want directly</translation>
+        </message>
+        <message>
+            <source>无法获取本程序的完整路径，不能写入开机启动项。请从安装目录启动本程序后重试。</source>
+            <translation>The program's full path is unavailable, so the startup item cannot be written. Start the program from its install folder and try again</translation>
+        </message>
+        <message>
+            <source>开机启动项无法{}：写系统设置失败（可能是权限或安全软件拦截）。可以在系统的「启动」设置里把本程序手动添加进去</source>
+            <translation>Could not {} the startup item: writing the system setting failed (permissions or security software may be blocking it). You can add the program to the system's Startup settings yourself</translation>
+        </message>
+        <message>
+            <source>找不到名为「{}」的屏幕：该屏幕可能已被移除。请在不指定屏幕名的情况下重新截取（此时按光标所在屏幕处理）。</source>
+            <translation>Cannot find a screen named "{}": it was probably unplugged. Capture again with no screen name, which follows the screen under the cursor.</translation>
+        </message>
+        <message>
+            <source>桌面的像素格式是 0x{:X}，该通道只认 B8G8R8A8：请改用 Qt 的抓帧原语</source>
+            <translation>The desktop pixel format is 0x{:X}; this path only handles B8G8R8A8. Switch to the Qt capture primitive</translation>
+        </message>
+        <message>
+            <source>DXGI 抓帧：暂存纹理无法读取。请重试一次</source>
+            <translation>DXGI capture: the staging texture cannot be read. Try again</translation>
+        </message>
+        <message>
+            <source>Tesseract 识别该图片图失败（语言 {}）。请重试一次，或换一种语言再试</source>
+            <translation>Tesseract failed on this image (language {}). Try again, or switch to another language.</translation>
+        </message>
+        <message>
+            <source>该图片图无法编成 PNG。请重试一次，或先在标注窗里另存一份 PNG 再识别</source>
+            <translation>This image could not be encoded as PNG. Try again, or save a PNG copy from the annotation window and recognise that file</translation>
+        </message>
+        <message>
+            <source>系统识别该图片图失败（{}，错误码 0x{}）。请重试一次，或改用 Tesseract 后端</source>
+            <translation>System recognition failed for this image ({} , error code 0x{}). Try again, or switch to the Tesseract backend</translation>
+        </message>
+        <message>
+            <source>无法读取第一帧尺寸（{}）。请确认录屏期间磁盘空间充足，或先将帧序列交付到剪贴板。</source>
+            <translation>The first frame's size can't be read ({}). Check that the disk wasn't full during the recording, or deliver this frame sequence to the clipboard first</translation>
+        </message>
+        <message>
+            <source>ffmpeg 报告成功，但输出文件不可用：{}。请检查磁盘空间后重新编码，或先将帧序列交付到剪贴板。</source>
+            <translation>ffmpeg reported success, but the output is unusable: {}. Check the free disk space and re-encode, or deliver this frame sequence through the clipboard.</translation>
+        </message>
+        <message>
+            <source>{} 超时（{} 毫秒内未完成）。可缩短录屏时长，或先将输出文件交付到剪贴板。</source>
+            <translation>{} timed out (still unfinished after {} ms). Shorten the recording, or hand the output to the clipboard first.</translation>
+        </message>
+        <message>
+            <source>{} 失败（退出码 {}）：{}。完整输出在日志里，也可以手动执行一遍同样的命令看细节</source>
+            <translation>{} failed (exit code {}): {}. The full output is in the log, and you can also run the same command yourself to see the details.</translation>
+        </message>
+        <message>
+            <source>当前 ffmpeg 构建中没有可用的候选编码器（已逐项检测）。请安装包含 libx264 的完整 ffmpeg 构建；录屏仍可进行——编码时会再试一遍，全不行才报错</source>
+            <translation>None of the candidate encoders starts with your ffmpeg build (each was probed for real). Install a full ffmpeg build with libx264; recording still works — the encoder is probed again before encoding and only fails when every candidate does</translation>
+        </message>
+        <message>
+            <source>当前 ffmpeg 构建中没有可用的视频编码器（已尝试 {}）。请安装包含 libx264 的完整 ffmpeg 构建，或先用 ffmpeg 手动编码该帧序列以查看错误。</source>
+            <translation>None of the video encoders in your ffmpeg build could start (tried {}). Install a full ffmpeg build that carries libx264, or encode this frame sequence by hand with ffmpeg to read what it reports</translation>
+        </message>
+        <message>
+            <source>本轮录制已停止并正在编码：取消仅对正在录制的片段有效；如不需要输出文件，请等待编码完成后再删除。</source>
+            <translation>This recording has stopped and is being encoded. Cancel only affects the currently recording segment; if you do not need the output file, wait for encoding to finish and then delete it.</translation>
+        </message>
+        <message>
+            <source>音频采集进程无法启动。设备可能正被其他程序占用；请关闭占用程序后重试，或在设置中关闭音频采集。</source>
+            <translation>The audio capture process could not start. The device may be in use by another program; close it and retry, or disable audio capture in Settings.</translation>
+        </message>
 </context>
 </TS>
