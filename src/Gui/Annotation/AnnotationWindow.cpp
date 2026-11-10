@@ -146,12 +146,14 @@ namespace GyanisScribe::Gui
         QObject::connect(m_toolbarBridge.get(), &AnnotationToolbarBridge::privacyRequested, this, [this] { emit privacyRequested(m_engine.canvas().image); });
     }
 
-    void AnnotationWindow::startAnnotation(const Base::CapturedImage &captured, const QRect &screenAvailable, const QRect &selection)
+    void AnnotationWindow::startAnnotation(const Base::CapturedImage &captured, const QRect &screenAvailable, const QRect &selection, const Core::CaptureSourceInfo &source)
     {
         // 新一轮开窗重新计收场：上一轮报过的 closed 不该压住这一轮
         m_closedReported = false;
         // 轮次守卫跟着开窗重新立起来：上一轮关窗后留下的画布还在引擎里，不能拿它当「还在编辑」
         m_roundActive = true;
+        // 来源随这一轮留在窗口上：空白画布那一轮传的是空来源，不继承上一轮的
+        m_sourceInfo = source;
         // 记下这一轮抓的是哪块屏、哪块区域：刷新截图（F5）要对着同一块地方重抓
         m_refreshScreenName   = captured.screenName;
         m_refreshRegion       = captured.logicalRegion;

@@ -10,6 +10,7 @@
 #include "Core/Settings/SettingsStore.h"
 
 #include <QColor>
+#include <QDateTime>
 #include <QImage>
 #include <QString>
 
@@ -165,4 +166,40 @@ TEST_F(DeliveryCoordinatorFixture, BeginRoundWithoutSourceClearsThePreviousRound
 
     EXPECT_TRUE(recordedSource.processName.isEmpty()) << "上一轮的进程名被带进了这一轮";
     EXPECT_TRUE(recordedSource.windowTitle.isEmpty()) << "上一轮的窗口标题被带进了这一轮";
+}
+
+/**
+ * @brief 钉住落盘文件名从本轮来源取应用、标题与屏幕
+ * @details 模板里的三格上下文变量只有从本轮来源带进来才有值；进程名按去掉扩展名后的主名进名字，
+ *          标题与屏幕名各自清洗后原样拼上。名字读错了，用户按文件名再找图就找不回来。
+ */
+TEST_F(DeliveryCoordinatorFixture, SaveUsesTheRoundsContextInTheFileName)
+{
+    ASSERT_TRUE(m_settings->setValue(GyanisScribe::Core::kSaveNameTemplate, QStringLiteral("%app%_%title%_%monitor%")).has_value());
+    QImage frame{32, 24, QImage::Format_ARGB32_Premultiplied};
+    frame.fill(QColor(36, 87, 166));
+    m_delivery->beginRound(CaptureSourceInfo{QStringLiteral("Code.exe"), QStringLiteral("main.cpp"), QStringLiteral("Screen1"), QDateTime{QDate{2026, 11, 9}, QTime{8, 30, 15}}});
+
+    const auto saved = m_delivery->saveToDisk(frame);
+
+    ASSERT_TRUE(saved.has_value()) << saved.error().message;
+    EXPECT_EQ(*saved, QStringLiteral("Code_main.cpp_Screen1.png")) << "落盘名字没带上本轮的应用、标题与屏幕";
+}
+
+/**
+ * @brief 钉住来源为空时文件名回落到占位词
+ * @details 录屏、回溯与取不到来源的截图都走空来源；三格变量要有稳定回落，
+ *          保存不能因为拿不到应用名就失败或留下空段。
+ */
+TEST_F(DeliveryCoordinatorFixture, SaveWithoutSourceFallsBackToPlaceholderNames)
+{
+    ASSERT_TRUE(m_settings->setValue(GyanisScribe::Core::kSaveNameTemplate, QStringLiteral("%app%_%title%_%monitor%")).has_value());
+    QImage frame{32, 24, QImage::Format_ARGB32_Premultiplied};
+    frame.fill(QColor(36, 87, 166));
+    m_delivery->beginRound();
+
+    const auto saved = m_delivery->saveToDisk(frame);
+
+    ASSERT_TRUE(saved.has_value()) << saved.error().message;
+    EXPECT_EQ(*saved, QStringLiteral("app_window_screen.png")) << "空来源没有回落到占位词";
 }

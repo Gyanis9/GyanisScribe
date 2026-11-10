@@ -14,6 +14,7 @@
 #include "Gui/Pin/PinManager.h"
 
 #include <QDateTime>
+#include <QFileInfo>
 
 #include <format>
 
@@ -66,9 +67,15 @@ namespace GyanisScribe::App
         const auto decorated = decorate(image, !GyanisScribe::Core::imageFormatHasAlpha(*format));
 
         // 名字规则来自设置里那一格（留空即默认档）；起好名再让一次位：模板里去掉 %ms% 之后
-        // 同一秒连拍会撞名，直接写就是把前一张悄悄盖掉
+        // 同一秒连拍会撞名，直接写就是把前一张悄悄盖掉。上下文三格取自本轮来源：
+        // 应用名按去扩展名后的主名进名字，标题与屏幕名按模板拼上
+        const GyanisScribe::Base::NameTemplateContext context{
+                QFileInfo{m_sourceInfo.processName}.completeBaseName(),
+                m_sourceInfo.windowTitle,
+                m_sourceInfo.screenName,
+        };
         auto       fileName = GyanisScribe::Base::Paths::imageFileName(QDateTime::currentDateTime(), GyanisScribe::Core::imageFormatExtension(*format),
-                                                                       GyanisScribe::Core::nameTemplateOrDefault(m_settings));
+                                                                       GyanisScribe::Core::nameTemplateOrDefault(m_settings), context);
         const auto filePath = GyanisScribe::Base::Paths::uniqueFilePath(directory, fileName);
         // 格式不单独传给 Qt：它按后缀挑编码器，再传一次格式名就是第二个出处
         if (!decorated.save(GyanisScribe::Base::Paths::toDisplayText(filePath), nullptr, quality))

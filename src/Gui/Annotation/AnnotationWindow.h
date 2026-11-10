@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "Core/Capture/SourceInfo.h"
 #include "Gui/Annotation/AnnotationToolbarBridge.h"
 #include "Gui/Annotation/AnnotationToolbar.h"
 #include "Gui/Annotation/AnnotationView.h"
@@ -116,9 +117,10 @@ namespace GyanisScribe::Gui
          * @param captured 截图产物，窗口尺寸取它的逻辑尺寸
          * @param screenAvailable 目标屏幕的可用区，工具栏摆放用它
          * @param selection 选区，逻辑坐标；工具栏贴着它摆
+         * @param source 这一帧的来源：应用、窗口标题、屏幕与捕获时刻；空白画布等没有来源的调用留空
          * @details 会载入画布、清掉上一轮的图形，并按 placeToolbar 重新摆工具栏。
          */
-        void startAnnotation(const Base::CapturedImage &captured, const QRect &screenAvailable, const QRect &selection);
+        void startAnnotation(const Base::CapturedImage &captured, const QRect &screenAvailable, const QRect &selection, const Core::CaptureSourceInfo &source = {});
 
         /// 浮着的工具栏，测试与调试用它核对摆放
         [[nodiscard]] AnnotationToolbar &toolbar() const noexcept;
@@ -264,11 +266,12 @@ namespace GyanisScribe::Gui
         QSize                                    m_frozenLogicalSize;   ///< 冻帧逻辑尺寸
         QRect                                    m_frozenLogicalRegion; ///< 冻帧在这块屏内的逻辑区域
         /// 把冻帧按新选区裁成预览交给视图：拖边框时新露出的区域不是拉伸的旧画布
-        void  updateCropPreview(const QRect &globalSelection);
-        QRect m_placedScreenAvailable; ///< 本轮摆放用的屏幕可用区：可见段变化后重摆要同一份
-        QRect m_placedSelection;       ///< 本轮摆放参照的选区：可见段变化后重摆要同一份
-        bool  m_closedReported = false; ///< 这一轮开窗已经报过 closed：交付出口与 Esc/X 共用一个收场
-        bool  m_roundActive    = false; ///< 这一轮标注是否还在编辑：startAnnotation 置真，收场置假
+        void                    updateCropPreview(const QRect &globalSelection);
+        QRect                   m_placedScreenAvailable;  ///< 本轮摆放用的屏幕可用区：可见段变化后重摆要同一份
+        QRect                   m_placedSelection;        ///< 本轮摆放参照的选区：可见段变化后重摆要同一份
+        Core::CaptureSourceInfo m_sourceInfo;             ///< 本轮截图的来源：应用、窗口标题、屏幕与捕获时刻；没有来源的轮次留空
+        bool                    m_closedReported = false; ///< 这一轮开窗已经报过 closed：交付出口与 Esc/X 共用一个收场
+        bool                    m_roundActive    = false; ///< 这一轮标注是否还在编辑：startAnnotation 置真，收场置假
     };
 
 } // namespace GyanisScribe::Gui

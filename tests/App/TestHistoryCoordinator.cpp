@@ -7,6 +7,7 @@
 #include "Core/History/HistoryStore.h"
 #include "Core/Settings/SettingsStore.h"
 
+#include <QDateTime>
 #include <QSize>
 #include <QString>
 
@@ -101,6 +102,23 @@ TEST_F(HistoryCoordinatorFixture, RecordEmitsTheGivenSource)
     EXPECT_EQ(m_recordedSize, size);
     EXPECT_EQ(m_recordedSource.processName, source.processName) << "进程名在传递中改了值";
     EXPECT_EQ(m_recordedSource.windowTitle, source.windowTitle) << "窗口标题在传递中改了值";
+}
+
+/**
+ * @brief 钉住屏幕名与捕获时刻随来源一起带进 recorded
+ * @details 来源是纯值类型，屏幕名与捕获时刻要原样穿过信号；这两格在传递中丢了，
+ *          下游就只剩应用与标题，屏幕与时刻再也补不回来。
+ */
+TEST_F(HistoryCoordinatorFixture, RecordCarriesTheScreenAndCapturedTime)
+{
+    const auto              moment = QDateTime{QDate{2026, 11, 9}, QTime{8, 30, 15}};
+    const CaptureSourceInfo source{QStringLiteral("Code.exe"), QStringLiteral("main.cpp"), QStringLiteral("Screen1"), moment};
+
+    m_coordinator->record(m_root / "shots" / "context.png", HistoryKind::Screenshot, QSize{320, 200}, source);
+
+    ASSERT_EQ(m_recordedCount, 1) << "一次记录只该报一声 recorded";
+    EXPECT_EQ(m_recordedSource.screenName, source.screenName) << "屏幕名在传递中丢了";
+    EXPECT_EQ(m_recordedSource.capturedAt, source.capturedAt) << "捕获时刻在传递中丢了";
 }
 
 /**

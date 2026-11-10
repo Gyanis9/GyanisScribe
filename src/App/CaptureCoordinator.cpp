@@ -348,6 +348,9 @@ namespace GyanisScribe::App
 
     void CaptureCoordinator::handleCaptured(const GyanisScribe::Base::CapturedImage &image)
     {
+        // 屏幕与时刻来自抓帧本身：先补齐再开交付那一轮，自动保存与历史记账才拿得到完整来源
+        m_sourceInfo.screenName = image.screenName;
+        m_sourceInfo.capturedAt = image.capturedAt.isValid() ? image.capturedAt : QDateTime::currentDateTime();
         m_dependencies.delivery.beginRound(m_sourceInfo);
         m_lastCapture = image;
 
@@ -484,7 +487,7 @@ namespace GyanisScribe::App
             case GyanisScribe::App::CaptureIntent::Annotate:
                 break;
         }
-        m_annotationWindow->startAnnotation(m_lastCapture, screen.availableGeometry(), m_lastSelection);
+        m_annotationWindow->startAnnotation(m_lastCapture, screen.availableGeometry(), m_lastSelection, m_sourceInfo);
     }
 
     void CaptureCoordinator::deliverCommandLineOutputs()

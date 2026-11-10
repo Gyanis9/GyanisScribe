@@ -1277,6 +1277,60 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住自动保存前来源已经带上抓帧的屏幕与时刻
+     * @details 自动保存是截图完成后最早动盘的一步；来源若在它之后才补齐，
+     *          盘上那张的名字与历史记录就都缺屏幕与时刻。时刻取抓帧自带的那一份。
+     */
+    TEST_F(AppControllerFixture, AutoSaveCarriesTheFrameScreenAndCapturedTime)
+    {
+        m_frameScreenName = m_realScreenName;
+        m_autoSave        = true;
+        makeController();
+
+        std::vector<Core::CaptureSourceInfo> recordedSources;
+        auto                                &history = m_controller->historyCoordinatorForTesting();
+        QObject::connect(&history, &App::HistoryCoordinator::recorded, &history,
+                         [&recordedSources](const std::filesystem::path &, const Core::HistoryKind, const QSize &, const Core::CaptureSourceInfo &source)
+                         { recordedSources.push_back(source); });
+
+        const auto moment = QDateTime{QDate{2026, 11, 9}, QTime{8, 30, 15}};
+        auto       frame  = makeFrame(m_realScreenName);
+        frame.capturedAt  = moment;
+        m_source->setFrame(frame);
+
+        m_controller->capture().startFullScreen(App::CaptureIntent::Annotate);
+
+        ASSERT_EQ(recordedSources.size(), 1) << "自动保存没有进历史，来源就没有落脚点";
+        EXPECT_EQ(recordedSources.front().screenName, m_realScreenName) << "自动保存前没把截图屏幕补进来源";
+        EXPECT_EQ(recordedSources.front().capturedAt, moment) << "抓帧时刻没有在自动保存前补进来源";
+    }
+
+    /**
+     * @brief 钉住帧没给时刻时来源按当前时刻补齐
+     * @details 有些抓帧路径不带时间；来源里仍需要一个有效时刻，
+     *          这里补「此刻」，而不是把无效时刻传给下游。
+     */
+    TEST_F(AppControllerFixture, AutoSaveFillsTheCapturedTimeWhenTheFrameHasNone)
+    {
+        m_frameScreenName = m_realScreenName;
+        m_autoSave        = true;
+        makeController();
+
+        std::vector<Core::CaptureSourceInfo> recordedSources;
+        auto                                &history = m_controller->historyCoordinatorForTesting();
+        QObject::connect(&history, &App::HistoryCoordinator::recorded, &history,
+                         [&recordedSources](const std::filesystem::path &, const Core::HistoryKind, const QSize &, const Core::CaptureSourceInfo &source)
+                         { recordedSources.push_back(source); });
+
+        const auto before = QDateTime::currentDateTime();
+        m_controller->capture().startFullScreen(App::CaptureIntent::Annotate);
+
+        ASSERT_EQ(recordedSources.size(), 1) << "自动保存没有进历史，来源就没有落脚点";
+        EXPECT_TRUE(recordedSources.front().capturedAt.isValid()) << "帧没给时刻时来源没有补上当前时刻";
+        EXPECT_GE(recordedSources.front().capturedAt, before) << "补齐的时刻早于这一轮截图开始的时刻";
+    }
+
+    /**
      * @brief 钉住「截取当前窗口也按『截完之后』那一格交出去」
      * @details 这条入口此前不读那一格：交付时用的是上一次截图留下的值，冷启动时是默认的
      *          「进标注窗」。设置点名了快速保存，这里就该落盘并在清单上留一条。
