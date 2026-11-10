@@ -38,6 +38,7 @@ namespace GyanisScribe::Core
      * @param style 样式
      * @param maximumDimension 大于 0 时按画布宽等比缩小（预览用）；0 表示原尺寸
      * @return 渲染结果，ARGB32_Premultiplied、dpr=1、背景不透明；失败返回中文原因
+     * @note 渲染要画字，必须有 QGuiApplication，且只能在图形界面线程调用；没有应用对象时返回 InternalError，不尝试落图
      */
     [[nodiscard]] Base::Expected<QImage> renderShareImage(const QImage &image, const ShareStyle &style, int maximumDimension = 0);
 
