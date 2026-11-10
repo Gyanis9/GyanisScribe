@@ -293,4 +293,10 @@ namespace GyanisScribe::Core
     inline constexpr std::string_view kTrayLeftClick   = "Tray/LeftClick";
     inline constexpr std::string_view kTrayMiddleClick = "Tray/MiddleClick";
 
+    /// 美化分享的自定义模板（JSON 字符串，版本 1）；读端/写端都在 Gui/Share/ShareDialog
+    inline constexpr std::string_view kShareTemplates = "Share/Templates";
+
+    /// 上次选用的美化模板 id；缺失或指向已删除模板时回落到 light
+    inline constexpr std::string_view kShareLastTemplate = "Share/LastTemplate";
+
 } // namespace GyanisScribe::Core
