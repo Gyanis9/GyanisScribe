@@ -152,7 +152,7 @@ namespace GyanisScribe::Gui
         m_closedReported = false;
         // 轮次守卫跟着开窗重新立起来：上一轮关窗后留下的画布还在引擎里，不能拿它当「还在编辑」
         m_roundActive = true;
-        // 来源随这一轮留在窗口上：空白画布那一轮传的是空来源，不继承上一轮的
+        // 来源随这一轮留在窗口上：空白画布与回溯换帧那几轮传的是空来源，不继承上一轮的
         m_sourceInfo = source;
         // 记下这一轮抓的是哪块屏、哪块区域：刷新截图（F5）要对着同一块地方重抓
         m_refreshScreenName   = captured.screenName;
@@ -242,6 +242,11 @@ namespace GyanisScribe::Gui
     bool AnnotationWindow::isRoundActive() const noexcept
     {
         return m_roundActive;
+    }
+
+    const Core::CaptureSourceInfo &AnnotationWindow::captureSourceForTesting() const noexcept
+    {
+        return m_sourceInfo;
     }
 
     void AnnotationWindow::refreshCapture(const Base::CapturedImage &captured)

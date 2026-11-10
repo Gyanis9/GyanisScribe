@@ -164,8 +164,11 @@ namespace GyanisScribe::App
         // 去向照设置现读：回溯只是换了一张底图，之后的标注/复制/保存仍是用户点的那一档
         m_intent            = settingsCaptureIntent();
         m_captureFlowActive = true;
-        // 回溯帧不是当前前台窗口：不额外取进程，本轮来源留空，免得把当下正在前台的应用记到旧帧上
-        m_sourceInfo = {};
+        // 回溯帧不是当前前台窗口：应用与标题无从得知，屏幕与时刻也不能拿选区那一刻顶替。
+        // 标记这一轮是回溯轮次并清空来源：抓帧回来时 handleCaptured 据标记跳过补齐，
+        // 交付与标注窗拿到的是一份空来源，面板据此显示未知而不是一个看起来可信的假时刻
+        m_sourceInfo  = {};
+        m_rewindRound = true;
         m_capture->startInteractiveWithFrame(frame);
     }
 
@@ -334,8 +337,10 @@ namespace GyanisScribe::App
 
     void CaptureCoordinator::noteForegroundSource()
     {
-        // 每一轮先清空：上一轮的来源不能跟到这一轮
+        // 每一轮先清空：上一轮的来源不能跟到这一轮。
+        // 回溯标记也在这里落回正常档：回溯被取消时标记会停在 true，下一轮真截图必须走补齐那条路
         m_sourceInfo      = {};
+        m_rewindRound     = false;
         const auto window = m_dependencies.integration.foregroundWindow();
         if (!window)
         {
@@ -348,9 +353,16 @@ namespace GyanisScribe::App
 
     void CaptureCoordinator::handleCaptured(const GyanisScribe::Base::CapturedImage &image)
     {
-        // 屏幕与时刻来自抓帧本身：先补齐再开交付那一轮，自动保存与历史记账才拿得到完整来源
-        m_sourceInfo.screenName = image.screenName;
-        m_sourceInfo.capturedAt = image.capturedAt.isValid() ? image.capturedAt : QDateTime::currentDateTime();
+        // 回溯轮次没有来源：标记取走并清掉，屏幕与时刻都不补——回溯帧的时刻早已随裁切丢掉，
+        // 按此刻补齐会把选区那一刻写成这张旧帧的捕获时刻。
+        // 正常截图照旧先从抓帧补齐，再开交付那一轮：自动保存与历史记账才拿得到完整来源
+        const bool rewindRound = m_rewindRound;
+        m_rewindRound          = false;
+        if (!rewindRound)
+        {
+            m_sourceInfo.screenName = image.screenName;
+            m_sourceInfo.capturedAt = image.capturedAt.isValid() ? image.capturedAt : QDateTime::currentDateTime();
+        }
         m_dependencies.delivery.beginRound(m_sourceInfo);
         m_lastCapture = image;
 
@@ -582,7 +594,8 @@ namespace GyanisScribe::App
             return;
         }
         // 这一轮抓到的就是最新那一帧：下一回拖边框重裁必须从它起算。只换画布不换记录的话，
-        // 冻帧还停在刷新之前，重裁会裁出 F5 之前那一张
+        // 冻帧还停在刷新之前，重裁会裁出 F5 之前那一张。
+        // 来源仍停在开轮时那一份：F5 只换底图，不重取应用与捕获时刻
         m_lastCapture = *frame;
         m_annotationWindow->refreshCapture(*frame);
     }

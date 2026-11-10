@@ -1324,10 +1324,96 @@ namespace GyanisScribe
 
         const auto before = QDateTime::currentDateTime();
         m_controller->capture().startFullScreen(App::CaptureIntent::Annotate);
+        const auto after = QDateTime::currentDateTime();
 
         ASSERT_EQ(recordedSources.size(), 1) << "自动保存没有进历史，来源就没有落脚点";
         EXPECT_TRUE(recordedSources.front().capturedAt.isValid()) << "帧没给时刻时来源没有补上当前时刻";
         EXPECT_GE(recordedSources.front().capturedAt, before) << "补齐的时刻早于这一轮截图开始的时刻";
+        EXPECT_LE(recordedSources.front().capturedAt, after) << "补齐的时刻晚于这一轮截图返回的时刻";
+    }
+
+    /**
+     * @brief 钉住回溯轮次的来源整份为空，正常截图则带屏幕与时刻
+     * @details 回溯帧是历史画面：应用、标题、屏幕与捕获时刻都无从得知。抓帧回来若按选区时刻补齐，
+     *          面板就会把一个看起来可信的假时间当成这张旧帧的捕获时刻。这一格先走一轮正常截图作对照，
+     *          再选一帧回溯进标注窗；最后取消一轮回溯，证明标记不会留到下一轮正常截图上。
+     */
+    TEST_F(AppControllerFixture, RewindRoundReachesTheAnnotationWindowWithoutSource)
+    {
+        auto *screen = QGuiApplication::primaryScreen();
+        ASSERT_NE(screen, nullptr) << "离屏平台该有一块屏";
+
+        m_frameScreenName      = screen->name();
+        m_frameRegion          = screen->geometry();
+        m_rewindEnabled        = true;
+        m_sessionNotifications = true;
+        makeController();
+
+        auto &capture = m_controller->capture();
+        auto &window  = capture.annotationWindow();
+
+        // 对照：正常截图那一轮，标注窗收到屏幕与捕获时刻
+        capture.startFullScreen(App::CaptureIntent::Annotate);
+        ASSERT_TRUE(window.isVisible()) << "整屏截图该把标注窗开起来";
+        EXPECT_EQ(window.captureSourceForTesting().screenName, screen->name()) << "正常截图没把屏幕传给标注窗";
+        EXPECT_EQ(window.captureSourceForTesting().windowTitle, QStringLiteral("替身窗口")) << "正常截图没把前台窗口标题传给标注窗";
+        EXPECT_TRUE(window.captureSourceForTesting().capturedAt.isValid()) << "正常截图没把捕获时刻传给标注窗";
+
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(&window, &escape);
+        ASSERT_FALSE(window.isVisible()) << "标注窗没关掉，后面的判据无从判起";
+
+        // 回溯帧要与当前屏同形：同屏名、整屏几何、同缩放因子
+        Base::CapturedImage full = makeFrame(screen->name(), screen->geometry());
+        full.logicalSize         = screen->geometry().size();
+        full.devicePixelRatio    = screen->devicePixelRatio();
+        full.image               = QImage(QSize(qRound(full.logicalSize.width() * full.devicePixelRatio), qRound(full.logicalSize.height() * full.devicePixelRatio)),
+                                          QImage::Format_ARGB32_Premultiplied);
+        full.image.fill(m_frameColor);
+        m_source->setFrame(full);
+
+        auto &rewind = m_controller->rewindCoordinatorForTesting();
+        rewind.captureTickForTesting();
+        ASSERT_TRUE(waitUntil([&rewind] { return rewind.bufferStatsForTesting().sampleCount > 0; }, 5000)) << "回溯缓冲没抓到帧";
+
+        auto id = rewind.firstFrameIdForTesting();
+        ASSERT_TRUE(id.has_value()) << "缓冲里有帧却读不出编号";
+        rewind.chooseFrameForTesting(*id);
+        ASSERT_TRUE(waitUntil([] { return visibleCaptureOverlay() != nullptr; }, 3000)) << "选帧之后没铺出框选遮罩";
+
+        auto *overlay = visibleCaptureOverlay();
+        ASSERT_NE(overlay, nullptr);
+        const auto  global = overlay->geometry().topLeft();
+        QMouseEvent press{QEvent::MouseButtonPress, QPointF{10, 10}, QPointF{global + QPoint{10, 10}}, Qt::LeftButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &press);
+        QMouseEvent move{QEvent::MouseMove, QPointF{109, 89}, QPointF{global + QPoint{109, 89}}, Qt::NoButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &move);
+        QMouseEvent release{QEvent::MouseButtonRelease, QPointF{109, 89}, QPointF{global + QPoint{109, 89}}, Qt::LeftButton, Qt::NoButton, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &release);
+        ASSERT_TRUE(waitUntil([&window] { return window.isVisible(); }, 3000)) << "回溯选帧之后标注窗没开起来";
+
+        const auto &rewindSource = window.captureSourceForTesting();
+        EXPECT_TRUE(rewindSource.processName.isEmpty()) << "回溯轮次补上了应用名";
+        EXPECT_TRUE(rewindSource.windowTitle.isEmpty()) << "回溯轮次补上了窗口标题";
+        EXPECT_TRUE(rewindSource.screenName.isEmpty()) << "回溯轮次补上了屏幕名";
+        EXPECT_FALSE(rewindSource.capturedAt.isValid()) << "回溯轮次补上了捕获时刻：面板会显示一个看起来可信的假时间";
+
+        // 关窗后取消一轮回溯：标记若留在成员上，下一轮正常截图会被当成回溯轮次
+        QApplication::sendEvent(&window, &escape);
+        ASSERT_FALSE(window.isVisible());
+        ASSERT_TRUE(waitUntil([&rewind] { return rewind.statusForTesting() == Core::RewindStatus::Buffering; }, 3000)) << "关窗之后回溯缓冲没回到抓帧";
+        id = rewind.firstFrameIdForTesting();
+        ASSERT_TRUE(id.has_value()) << "缓冲里的帧被清掉了，取消回溯那一段无从判起";
+        rewind.chooseFrameForTesting(*id);
+        ASSERT_TRUE(waitUntil([] { return visibleCaptureOverlay() != nullptr; }, 3000)) << "第二次选帧之后没铺出框选遮罩";
+        QApplication::sendEvent(visibleCaptureOverlay(), &escape);
+        ASSERT_TRUE(waitUntil([] { return visibleCaptureOverlay() == nullptr; }, 3000)) << "取消回溯之后遮罩没收起";
+
+        capture.startFullScreen(App::CaptureIntent::Annotate);
+        ASSERT_TRUE(window.isVisible()) << "取消回溯之后的正常截图没开标注窗";
+        EXPECT_EQ(window.captureSourceForTesting().screenName, screen->name()) << "取消回溯把标记留到了下一轮：正常截图没补屏幕";
+        EXPECT_EQ(window.captureSourceForTesting().windowTitle, QStringLiteral("替身窗口")) << "取消回溯把标记留到了下一轮：正常截图没补标题";
+        EXPECT_TRUE(window.captureSourceForTesting().capturedAt.isValid()) << "取消回溯把标记留到了下一轮：正常截图没补时刻";
     }
 
     /**

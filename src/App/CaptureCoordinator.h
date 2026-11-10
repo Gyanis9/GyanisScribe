@@ -150,7 +150,8 @@ namespace GyanisScribe::App
          * @brief 用回溯缓冲里的一帧进入框选
          * @param frame 回溯帧；屏名与屏内几何仍须对应当前屏幕
          * @details 与 startInteractive 同一条交付链，只是不抓当前屏；去向仍从「截完之后」那一档现读。
-         *          不走延时通道：帧已经冻住了，再等几秒只会让画面更旧。
+         *          回溯帧是历史画面：应用、标题、屏幕与捕获时刻都无从得知，本轮来源整份留空，
+         *          抓帧回来时也不按选区时刻补齐。不走延时通道：帧已经冻住了，再等几秒只会让画面更旧。
          */
         void startInteractiveWithFrame(const GyanisScribe::Base::CapturedImage &frame);
 
@@ -211,12 +212,17 @@ namespace GyanisScribe::App
          */
         void finishCaptureFlow();
 
-        /// 抓帧回来：记下这一轮，再按意图交付
+        /**
+         * @brief 抓帧回来：记下这一轮，再按意图交付
+         * @param image 抓到的帧
+         * @details 正常截图先从帧里补齐屏幕与捕获时刻；回溯轮次据标记跳过补齐，来源保持整份为空。
+         */
         void handleCaptured(const GyanisScribe::Base::CapturedImage &image);
 
         /**
          * @brief 记下这一轮截图的前台来源
-         * @details 只在用户真的发起截图时调用；取不到时留空且不弹提示——元数据拿不到不挡截图
+         * @details 只在用户真的发起截图时调用；取不到时留空且不弹提示——元数据拿不到不挡截图。
+         *          每一轮顺带清掉回溯标记：取消的回溯不会把下一轮正常截图误认成回溯轮次。
          */
         void noteForegroundSource();
 
@@ -261,12 +267,13 @@ namespace GyanisScribe::App
         std::unique_ptr<GyanisScribe::Core::AnnotationEngine> m_annotation;                                          ///< 标注引擎，跨轮次保留（载入新帧会清空）
         std::unique_ptr<GyanisScribe::Gui::AnnotationWindow>  m_annotationWindow;                                    ///< 标注窗口，复用同一把工具栏
         GyanisScribe::App::CaptureIntent                      m_intent = GyanisScribe::App::CaptureIntent::Annotate; ///< 这一帧截完要去做的事
-        GyanisScribe::Core::CaptureSourceInfo                 m_sourceInfo;                                          ///< 本轮截图的前台来源，随历史记账一起交出去
+        GyanisScribe::Core::CaptureSourceInfo                 m_sourceInfo;                                          ///< 本轮截图的前台来源，随历史记账一起交出去；回溯轮次整份为空
         GyanisScribe::App::CaptureOutputSet                   m_commandLineOutputs;                                  ///< 命令行那一次点名的去处，已按交付顺序排好
         QString                                               m_commandLineExec;                ///< --exec 写的那一条命令；只在 m_commandLineExecGiven 为真时压过设置里那一格
         bool                                                  m_commandLineExecGiven = false;   ///< 命令行到底给没给 --exec：给了就只跑那一条
         bool                                                  m_commandLineActive    = false;   ///< 正在跑命令行那次截图：失败路径要往 commandLineActionFailed 也交一份
         bool                                                  m_captureFlowActive    = false;   ///< 有一轮框选起的流程在跑：收场信号只发一次
+        bool                                                  m_rewindRound          = false;   ///< 这一轮从回溯换帧起头：抓帧回来不补屏幕与时刻，来源整份留空
         QTimer                                               *m_delayTimer           = nullptr; ///< 延时截图那一枚，一次只允许有一个在等
         std::function<void()>                                 m_pendingCapture;                 ///< 延时到点要走的那一步，随定时器一起活到触发
         GyanisScribe::Base::CapturedImage                     m_lastCapture;                    ///< 本轮抓到的帧，贴图与识别要用它定位

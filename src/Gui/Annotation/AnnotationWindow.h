@@ -117,7 +117,7 @@ namespace GyanisScribe::Gui
          * @param captured 截图产物，窗口尺寸取它的逻辑尺寸
          * @param screenAvailable 目标屏幕的可用区，工具栏摆放用它
          * @param selection 选区，逻辑坐标；工具栏贴着它摆
-         * @param source 这一帧的来源：应用、窗口标题、屏幕与捕获时刻；空白画布等没有来源的调用留空
+         * @param source 这一帧的来源：应用、窗口标题、屏幕与捕获时刻；空白画布、回溯换帧等没有来源的调用留空
          * @details 会载入画布、清掉上一轮的图形，并按 placeToolbar 重新摆工具栏。
          */
         void startAnnotation(const Base::CapturedImage &captured, const QRect &screenAvailable, const QRect &selection, const Core::CaptureSourceInfo &source = {});
@@ -140,6 +140,13 @@ namespace GyanisScribe::Gui
          *          一扇看不见的父窗背后，也不往看不见的画布上落笔。
          */
         [[nodiscard]] bool isRoundActive() const noexcept;
+
+        /**
+         * @brief 这一轮标注窗收到的来源（只读接缝）
+         * @return 本轮来源；空白画布、回溯换帧等没有来源的轮次为一份空来源
+         * @details 来源只在 startAnnotation 那一刻写入；用例据此核对传递结果，不提供改写入口。
+         */
+        [[nodiscard]] const Core::CaptureSourceInfo &captureSourceForTesting() const noexcept;
 
         /**
          * @brief 把重新抓到的一帧换上：底图换了，标注、选中与撤销历史都留着
