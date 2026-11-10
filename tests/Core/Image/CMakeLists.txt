@@ -3,6 +3,7 @@ add_executable(TestCoreImage
         TestImageFormat.cpp
         TestImageLoading.cpp
         TestOutputDecoration.cpp
+        TestSoftShadow.cpp
         TestClipboardImage.cpp
         TestClipboardFile.cpp)
 
