@@ -221,3 +221,59 @@ TEST(FrameStitch, SeamIsSearchedOnlyInTheUsedRows)
     EXPECT_EQ(stitcher.pixelHeight(), 200) << "接缝该只在已写好的行里找：重叠是 60、新写 40 行；多出来的行说明把扩容的空行当成了内容";
     EXPECT_TRUE(stitcher.snapshot() == page.copy(0, 0, 20, 200)) << "接缝没落在已用行上，成品里多接了一段";
 }
+
+/**
+ * @brief 钉住重叠区里小面积动图不会把整帧误判成接不上
+ * @details 动图或光标闪烁只改动重叠区里的一行、两个像素；逐像素完全相等会返回 0，
+ *          调用方于是把整帧重复接进长图。行内允许少量像素不同、整段允许少量行不同之后，
+ *          真接缝仍要认出 40 行。
+ */
+TEST(FrameStitch, ToleratesOneAnimatedRow)
+{
+    const auto page     = makeTallPage(200, 200);
+    const auto first    = page.copy(0, 0, 200, 100);
+    const auto second   = page.copy(0, 60, 200, 100);
+    QImage     animated = second;
+    // 重叠区里只有一行、两个像素不同：整段至少留一行余量，应仍算接上
+    animated.setPixelColor(0, 0, QColor{255, 0, 255});
+    animated.setPixelColor(1, 0, QColor{255, 0, 255});
+
+    EXPECT_EQ(overlapRowCount(first, second), 40);
+    EXPECT_EQ(overlapRowCount(first, animated), 40) << "小面积动图把整帧误判成接不上";
+}
+
+/**
+ * @brief 钉住超过行或者行内宽容差的动画仍判失败
+ * @details 三行各改五个像素：每行的不同像素数超过宽度的百分之一，不同行数也超过整段
+ *          允许的行数。这种幅度的变化可能是页面真的换了内容，宁可判没接上。
+ */
+TEST(FrameStitch, RejectsAnimationLargerThanTolerance)
+{
+    const auto page     = makeTallPage(200, 200);
+    const auto first    = page.copy(0, 0, 200, 100);
+    const auto second   = page.copy(0, 60, 200, 100);
+    QImage     animated = second;
+    for (auto row = 0; row < 3; ++row)
+    {
+        for (auto column = 0; column < 5; ++column)
+        {
+            animated.setPixelColor(column, row, QColor{255, 0, 255});
+        }
+    }
+    EXPECT_EQ(overlapRowCount(first, animated), 0) << "超过行/行内宽容差仍应判失败";
+}
+
+/**
+ * @brief 钉住短于最小接缝的帧仍按整帧追加
+ * @details 逐行滚动的用例用的是不到 24 行的帧；这类帧没有可判的重叠，
+ *          必须原样接在末尾，不能被接缝搜索折成零行。
+ */
+TEST(FrameStitch, ShortFramesKeepWholeFrameSemantics)
+{
+    const auto    page  = makeTallPage(20, 120);
+    const auto    first = page.copy(0, 0, 20, 100);
+    FrameStitcher stitcher{first};
+    const auto    appended = stitcher.append(page.copy(0, 100, 20, 1));
+    ASSERT_TRUE(appended.has_value());
+    EXPECT_EQ(stitcher.pixelHeight(), 101);
+}

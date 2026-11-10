@@ -5,12 +5,15 @@
 #include <QImage>
 
 #include <algorithm>
+#include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <expected>
 
 namespace
 {
     using GyanisScribe::Core::overlapRowCount;
+    using GyanisScribe::Core::StitchOptions;
 
     /// 首帧再矮也先按这个行数开缓冲：几次追加之内不必扩容，免得每帧都搬一遍
     constexpr int kMinimumBufferRows = 64;
@@ -36,6 +39,48 @@ namespace
         return true;
     }
 
+    /// 两个 ARGB 像素是否在容差之内：任一通道差超过 pixelTolerance 就算不同
+    [[nodiscard]] bool pixelsMatch(const QRgb upper, const QRgb lower, const int pixelTolerance)
+    {
+        return std::abs(qRed(upper) - qRed(lower)) <= pixelTolerance && std::abs(qGreen(upper) - qGreen(lower)) <= pixelTolerance &&
+               std::abs(qBlue(upper) - qBlue(lower)) <= pixelTolerance && std::abs(qAlpha(upper) - qAlpha(lower)) <= pixelTolerance;
+    }
+
+    /// 前一张的最后 rows 行与新一帧的前 rows 行在给定宽容度下是否算接上
+    [[nodiscard]] bool regionMatches(const QImage &previous, const QImage &next, const int rows, const StitchOptions &options)
+    {
+        const auto width = previous.width();
+        // 行内允许的不同像素数按宽度的百分之一取整；窄帧至少留一个，免得一个像素抖动就判死
+        const auto allowedDifferingPixels = std::max(1, width / 100);
+        // 整段允许的不同行数按比例取整，同样至少留一行：动图常常只占一两行，按比例取整会归零
+        const auto allowedDifferingRows = std::max(1, static_cast<int>(std::floor(static_cast<double>(rows) * options.differingRowRatio)));
+        auto       differingRows        = 0;
+        for (auto offset = 0; offset < rows; ++offset)
+        {
+            const auto *upperLine       = reinterpret_cast<const QRgb *>(previous.constScanLine(previous.height() - rows + offset));
+            const auto *lowerLine       = reinterpret_cast<const QRgb *>(next.constScanLine(offset));
+            auto        differingPixels = 0;
+            for (auto column = 0; column < width; ++column)
+            {
+                if (!pixelsMatch(upperLine[column], lowerLine[column], options.pixelTolerance))
+                {
+                    ++differingPixels;
+                    // 一行已超出容差就不必再数：整段判定只关心这一行算不算不同
+                    if (differingPixels > allowedDifferingPixels)
+                    {
+                        break;
+                    }
+                }
+            }
+            // 不同的行数一旦超过整段容差，这段长度就不可能是接缝，继续往下数没有意义
+            if (differingPixels > allowedDifferingPixels && ++differingRows > allowedDifferingRows)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /// 把 source 从 sourceRow 起的 rows 行抄到 destination 的 destinationRow 处；两图必须同宽
     void copyRows(QImage &destination, int destinationRow, const QImage &source, int sourceRow, int rows)
     {
@@ -51,6 +96,12 @@ namespace GyanisScribe::Core
 {
     int overlapRowCount(const QImage &previous, const QImage &next, const int maximumOverlapRows)
     {
+        // 老三参入口按默认宽容度判定：整段对得上的帧行为不变，小面积动图也能接上
+        return overlapRowCount(previous, next, StitchOptions{.maximumOverlapRows = maximumOverlapRows});
+    }
+
+    int overlapRowCount(const QImage &previous, const QImage &next, const StitchOptions &options)
+    {
         const auto upper = asArgb(previous);
         const auto lower = asArgb(next);
         if (upper.isNull() || lower.isNull() || upper.width() != lower.width() || upper.bytesPerLine() != lower.bytesPerLine())
@@ -58,9 +109,18 @@ namespace GyanisScribe::Core
             return 0;
         }
 
-        // 从最长往最短找，取第一个整段相等的：两帧里恰好相同的空白只会对上几行，
+        // 从最长往最短找，取第一个整段匹配的：两帧里恰好相同的空白只会对上几行，
         // 而真接缝是整段重合，往短了找会把空白当成缝
-        const auto candidates = std::min({upper.height(), lower.height(), std::max(0, maximumOverlapRows)});
+        const auto candidates = std::min({upper.height(), lower.height(), std::max(0, options.maximumOverlapRows)});
+        for (auto rows = candidates; rows >= kMinimumOverlapRows; --rows)
+        {
+            if (regionMatches(upper, lower, rows, options))
+            {
+                return rows;
+            }
+        }
+
+        // 容差搜索落空时再按逐字节相等找一遍：纯像素相等的旧判定继续兜底
         for (auto rows = candidates; rows >= kMinimumOverlapRows; --rows)
         {
             if (rowsMatch(upper, lower, rows))

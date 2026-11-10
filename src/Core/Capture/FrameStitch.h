@@ -24,16 +24,39 @@ namespace GyanisScribe::Core
     inline constexpr int kMinimumOverlapRows = 24;
 
     /**
+     * @brief 接缝判定的放宽口径：允许滚动过程中小面积变化不算断缝
+     * @details 动图、光标闪烁或半透明浮层会让相邻两帧的同一块像素略有出入；
+     *          逐像素完全相等会把真接缝判成接不上，整帧重复接进长图。
+     */
+    struct StitchOptions
+    {
+        int    maximumOverlapRows = kMaximumOverlapRows; ///< 最多往回看多少行
+        int    pixelTolerance     = 8;                   ///< 单个通道差超过它，这个像素就算不同
+        double differingRowRatio  = 0.02;                ///< 允许不同的行数占重叠行数的比例
+    };
+
+    /**
      * @brief 认出两张帧重叠了多少行
      * @param previous 前一张帧，已接在成品下面的那一段
      * @param next 刚抓到的新一帧
      * @param maximumOverlapRows 最多往回看多少行
      * @return 重叠行数；对不上少于 kMinimumOverlapRows 行时返回 0
-     * @details 从最长往最短找，取第一个整段相等的：滚动一页往往只露出新的一截，
+     * @details 从最长往最短找，取第一个整段匹配的：滚动一页往往只露出新的一截，
      *          取「最短的相等段」会把两帧里恰好相同的空白当成接缝，接上去就是重复的一段。
      *          两张帧必须同宽；宽度不同说明中途换了屏或缩放，调用方得先收摊。
      */
     [[nodiscard]] int overlapRowCount(const QImage &previous, const QImage &next, int maximumOverlapRows = kMaximumOverlapRows);
+
+    /**
+     * @brief 按给定宽容度认出两张帧重叠了多少行
+     * @param previous 前一张帧，已接在成品下面的那一段
+     * @param next 刚抓到的新一帧
+     * @param options 重叠上限与两档宽容度
+     * @return 重叠行数；容差与精确两轮都找不到时返回 0
+     * @details 行内允许少量像素不同、整段允许少量行不同，小面积动图不会再让真接缝落空；
+     *          先按给定容差从长到短找，找不到再按零像素容差找一遍。
+     */
+    [[nodiscard]] int overlapRowCount(const QImage &previous, const QImage &next, const StitchOptions &options);
 
     /**
      * @brief 长截图拼不下去时的统一说法：缓冲开不出来或扩不出去，都归到这一条
