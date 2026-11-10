@@ -46,7 +46,9 @@ namespace GyanisScribe::Core
      * @return 重叠行数；对不上少于 kMinimumOverlapRows 行时返回 0
      * @details 从最长往最短找，取第一个整段匹配的：滚动一页往往只露出新的一截，
      *          取「最短的相等段」会把两帧里恰好相同的空白当成接缝，接上去就是重复的一段。
-     *          两张帧必须同宽；宽度不同说明中途换了屏或缩放，调用方得先收摊。
+     *          按默认宽容度判定：单像素通道差不超过 8、一行里约 1% 的像素不同、
+     *          整段约 2% 的行不同仍算接上。两张帧必须同宽；宽度不同说明中途换了屏或缩放，
+     *          调用方得先收摊。
      */
     [[nodiscard]] int overlapRowCount(const QImage &previous, const QImage &next, int maximumOverlapRows = kMaximumOverlapRows);
 
@@ -95,6 +97,7 @@ namespace GyanisScribe::Core
          * @param next 刚抓到的新一帧，宽度必须与首帧一致
          * @return 接上了返回空；空图、宽度不同或高度够却找不到可信接缝时返回中文原因；缓冲开不出来时返回内部故障
          * @details 只写 next 里没与已接部分重合的那几行；装不下时按倍数扩容，旧内容逐行搬过去。
+         *          底边把整条参考带都对上时分不清输入框与恰好没动的内容：不裁尾，无新内容就原样通过、有新内容则报错。
          *          矮于 kMinimumOverlapRows 的帧整帧接上；其余帧找不到这么长的重叠就报错，不整帧硬接。
          *          只有高度不少于 kMinimumOverlapRows、整帧接不上、而首尾横带与首帧稳定一致时才按粘性头尾跳过它们再接。
          */

@@ -16,6 +16,7 @@
 using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Core::FrameStitcher;
 using GyanisScribe::Core::overlapRowCount;
+using GyanisScribe::Core::StitchOptions;
 
 namespace
 {
@@ -104,6 +105,18 @@ namespace
 
     /// 长截图接不上时的统一说法：用例两端都要逐字对上，文案一改这里就得跟着改
     constexpr const char *kNoSeamMessage = "长截图接不上：这一段和上一段没有可信的重叠。请回到上一段末尾附近，等画面停稳后再滚一小段；如果已经滚过一屏，请缩小滚动幅度重来";
+
+    /// 造一张每行都不同的长页：makeTallPage 的颜色每 251 行重复一次，认边界时会撞出假重叠
+    [[nodiscard]] QImage makeUniqueTallPage(int width, int height)
+    {
+        QImage page{QSize{width, height}, QImage::Format_ARGB32};
+        for (auto row = 0; row < height; ++row)
+        {
+            const auto color = QColor{row % 251, (row / 251) * 100, (row * 13) % 251, 255};
+            std::fill_n(reinterpret_cast<QRgb *>(page.scanLine(row)), width, color.rgba());
+        }
+        return page;
+    }
 
 } // namespace
 
@@ -468,6 +481,37 @@ TEST(FrameStitch, ToleratesAnimatedContentRowBesideStickyFooter)
 }
 
 /**
+ * @brief 钉住底边整条参考带都对上时不裁尾
+ * @details 首帧比后续帧高，第二帧底部的 17 行内容连同 15 行输入框正好填满整条参考带，
+ *          其中一行只动了一个像素、仍在容差之内。这时分不清哪几行是输入框，裁掉会吃掉内容：
+ *          这一帧必须原样通过、不裁尾，下一帧带来新内容时再重新认出输入框并裁掉。
+ */
+TEST(FrameStitch, KeepsContentWhenWholeBottomBandMatches)
+{
+    const auto content = makeChatContent(40, 200);
+    const auto first   = makeChatFrame(content, 0, 95);
+    QImage     second  = makeChatFrame(content, 30);
+    // 只改一个像素：仍在「一行至多 1% 像素不同」的容差内，底边整条参考带都对得上
+    second.setPixelColor(0, 84, QColor{255, 0, 255});
+
+    FrameStitcher stitcher{first};
+    const auto    appended = stitcher.append(second);
+    ASSERT_TRUE(appended.has_value()) << appended.error().message;
+    EXPECT_EQ(stitcher.stickyTopRowsForTesting(), 0) << "整条参考带都相同，粘性判定不可信；这一帧没带来新内容，状态应清零";
+    EXPECT_EQ(stitcher.stickyBottomRowsForTesting(), 0) << "分不清输入框与内容的整条带不能当成粘性尾裁掉";
+    EXPECT_EQ(stitcher.pixelHeight(), 130) << "底边整条参考带相同不能裁；内容一行都不能少";
+    EXPECT_TRUE(stitcher.snapshot() == makeChatFrame(content, 0, 95)) << "这一帧没有新内容，成品应与首帧逐位相同";
+
+    const auto third     = makeChatFrame(content, 60);
+    const auto appended3 = stitcher.append(third);
+    ASSERT_TRUE(appended3.has_value()) << appended3.error().message;
+    EXPECT_EQ(stitcher.stickyTopRowsForTesting(), 20);
+    EXPECT_EQ(stitcher.stickyBottomRowsForTesting(), 15);
+    EXPECT_EQ(stitcher.pixelHeight(), 145) << "标题 20 + 内容 125 行；少一行都说明底边被当成输入框裁了";
+    EXPECT_TRUE(stitcher.snapshot() == makeChatPage(content, 125)) << "第三帧接上后应铺满内容 0..124";
+}
+
+/**
  * @brief 钉住整帧能接上时不许裁头尾
  * @details 首尾两帧同属一屏的重复块，整帧重叠 60 行；这时按粘性头尾去裁会把真实内容当成
  *          标题栏与输入框吃掉。整帧重叠优先，只有整帧接不上时才试粘性裁剪。
@@ -505,4 +549,41 @@ TEST(FrameStitch, FailsWhenNoTrustworthySeam)
     EXPECT_EQ(appended.error().code, ErrorCode::InvalidArgument);
     EXPECT_EQ(appended.error().message, kNoSeamMessage);
     EXPECT_EQ(stitcher.pixelHeight(), 100) << "接不上时成品不该被硬接长";
+}
+
+/**
+ * @brief 钉住粘性尾至少 8 行才认
+ * @details 7 行输入框与 8 行输入框在同样内容下只差一行；7 行时认不出粘性尾、按无接缝失败，
+ *          8 行时才跳过输入框并把标题栏只留一次。判据同时钉住失败时高度一行未动。
+ */
+TEST(FrameStitch, StickyFooterNeedsAtLeastEightRows)
+{
+    const auto content = makeChatContent(40, 200);
+
+    FrameStitcher sevenRows{makeChatFrame(content, 0, 65, 7)};
+    const auto    seven = sevenRows.append(makeChatFrame(content, 30, 65, 7));
+    ASSERT_FALSE(seven.has_value()) << "7 行输入框不该被认成粘性尾";
+    EXPECT_EQ(seven.error().message, kNoSeamMessage);
+    EXPECT_EQ(sevenRows.pixelHeight(), 92) << "认不出粘性尾时不能裁掉任何行";
+
+    FrameStitcher eightRows{makeChatFrame(content, 0, 65, 8)};
+    const auto    eight = eightRows.append(makeChatFrame(content, 30, 65, 8));
+    ASSERT_TRUE(eight.has_value()) << eight.error().message;
+    EXPECT_EQ(eightRows.stickyTopRowsForTesting(), 20);
+    EXPECT_EQ(eightRows.stickyBottomRowsForTesting(), 8);
+    EXPECT_EQ(eightRows.pixelHeight(), 115) << "标题 20 + 两帧内容 95 行，输入框不进成品";
+    EXPECT_TRUE(eightRows.snapshot() == makeChatPage(content, 95));
+}
+
+/**
+ * @brief 钉住自定义重叠上限会截断搜索
+ * @details 两帧真实重叠 280 行；默认上限 1200 行时照常认出，给定 100 行上限时按没有重叠处理。
+ */
+TEST(FrameStitch, CustomMaximumOverlapRowsStopsTheSearch)
+{
+    const auto page   = makeUniqueTallPage(20, 400);
+    const auto first  = page.copy(0, 0, 20, 300);
+    const auto second = page.copy(0, 20, 20, 300);
+    EXPECT_EQ(overlapRowCount(first, second), 280);
+    EXPECT_EQ(overlapRowCount(first, second, StitchOptions{.maximumOverlapRows = 100}), 0) << "重叠超过给定上限时按没有重叠处理";
 }

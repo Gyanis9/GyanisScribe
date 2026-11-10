@@ -139,6 +139,13 @@ namespace
             std::memcpy(destination.scanLine(destinationRow + row), source.constScanLine(sourceRow + row), static_cast<std::size_t>(stride));
         }
     }
+
+    /// 接缝不可信时的统一说法：整帧与粘性裁剪都认不出来时用它，调用方据此停下这一轮
+    [[nodiscard]] GyanisScribe::Base::Error noTrustworthySeamError()
+    {
+        return GyanisScribe::Base::Error{GyanisScribe::Base::ErrorCode::InvalidArgument,
+                                         GyanisScribe::Base::uiTextUtf8("长截图接不上：这一段和上一段没有可信的重叠。请回到上一段末尾附近，等画面停稳后再滚一小段；如果已经滚过一屏，请缩小滚动幅度重来")};
+    }
 } // namespace
 
 namespace GyanisScribe::Core
@@ -234,6 +241,8 @@ namespace GyanisScribe::Core
         auto bufferTrim   = 0;
         auto stickyTop    = m_stickyTopRows;
         auto stickyBottom = m_stickyBottomRows;
+        // 底边整条参考带都对上：分不清哪几行是输入框、哪几行是恰好没动的内容，这一帧不裁尾
+        auto bottomBandAmbiguous = false;
 
         if (added.height() >= kMinimumOverlapRows)
         {
@@ -262,7 +271,10 @@ namespace GyanisScribe::Core
                     const auto topRun    = matchingLeadingRows(added, m_referenceTop, kStitchOptions);
                     const auto bottomRun = topRun < added.height() ? matchingTrailingRows(added, m_referenceBottom, added.height() - topRun, kStitchOptions) : 0;
                     topSkip              = topRun >= kMinimumStickyRows ? topRun : 0;
-                    bottomSkip           = bottomRun >= kMinimumStickyRows ? bottomRun : 0;
+                    // 底边把整条参考带都对上时，可能是输入框，也可能是输入框上方恰好没动的内容；
+                    // 裁掉会吃内容，因此只认「在参考带内部就停下」的那一段。不足 8 行本来就不认
+                    bottomBandAmbiguous = bottomRun >= kMinimumStickyRows && bottomRun >= m_referenceBottom.height();
+                    bottomSkip          = bottomRun >= kMinimumStickyRows && !bottomBandAmbiguous ? bottomRun : 0;
                     const auto remaining = added.height() - topSkip - bottomSkip;
                     if (topSkip + bottomSkip > 0 && remaining >= kMinimumOverlapRows)
                     {
@@ -287,29 +299,40 @@ namespace GyanisScribe::Core
             if (overlap < kMinimumOverlapRows)
             {
                 // 没有可信接缝就不接：整帧硬接只会得到一张重复的长图，还占掉用户的滚动位置
-                return std::unexpected(Base::Error{
-                        Base::ErrorCode::InvalidArgument,
-                        Base::uiTextUtf8("长截图接不上：这一段和上一段没有可信的重叠。请回到上一段末尾附近，等画面停稳后再滚一小段；如果已经滚过一屏，请缩小滚动幅度重来")});
+                return std::unexpected(noTrustworthySeamError());
             }
+        }
+
+        // 重叠行数不可能超过新帧本身，所以 fresh 最小就是 0：一帧都没滚时这一帧什么都不写
+        const auto fresh = added.height() - topSkip - bottomSkip - overlap;
+        if (bottomBandAmbiguous)
+        {
+            // 没裁掉的吸底尾还在缓冲末尾：这一帧带来新内容时接上去会排到它后面，只能判失败
+            if (fresh > 0)
+            {
+                return std::unexpected(noTrustworthySeamError());
+            }
+            // 这一帧没有任何新内容：缓冲原样保留，粘性状态清零，下一帧重新判定
+            stickyTop    = 0;
+            stickyBottom = 0;
         }
 
         // 到了这里接缝可信：把认出的粘性头尾记下来，并先从缓冲末尾裁掉已经写进去的吸底尾。
         // 裁剪只动已用行数，缓冲里的旧像素留在原处，snapshot() 不会把它们交出去
-        m_stickyTopRows    = stickyTop;
-        m_stickyBottomRows = stickyBottom;
-        m_usedRows -= bufferTrim;
-
-        // 重叠行数不可能超过新帧本身，所以 fresh 最小就是 0：一帧都没滚时这一帧什么都不写
-        const auto fresh = added.height() - topSkip - bottomSkip - overlap;
-        ensureCapacity(m_usedRows + fresh);
-        if (m_usedRows + fresh > m_buffer.height())
+        const auto usedRowsAfterTrim = m_usedRows - bufferTrim;
+        const auto newUsedRows       = usedRowsAfterTrim + fresh;
+        // 先扩容再改状态：扩容失败时累加器必须原样可继续收口，不能只剩一半裁剪
+        ensureCapacity(newUsedRows);
+        if (newUsedRows > m_buffer.height())
         {
             // 扩容没成功时缓冲还是原来那一张，往下写就越界了；让调用方把已有这一段收好
             return std::unexpected(stitchOutOfMemoryError());
         }
+        m_stickyTopRows    = stickyTop;
+        m_stickyBottomRows = stickyBottom;
         // 逐行抄而不是 QPainter：合成会把 alpha 再算一遍，抄过去才是原样
-        copyRows(m_buffer, m_usedRows, added, topSkip + overlap, fresh);
-        m_usedRows += fresh;
+        copyRows(m_buffer, usedRowsAfterTrim, added, topSkip + overlap, fresh);
+        m_usedRows = newUsedRows;
         return {};
     }
 
