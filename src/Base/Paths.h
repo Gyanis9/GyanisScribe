@@ -129,10 +129,11 @@ namespace GyanisScribe::Base
          * @brief 带截图上下文生成导出图像的文件名
          * @param moment 导出时刻
          * @param extension 扩展名，不带点，例如 png、mp4
-         * @param pattern 文件名模板；留空表示用 kDefaultNameTemplate
+         * @param pattern 文件名模板；留空或只含空白表示用 kDefaultNameTemplate
          * @param context 应用名、窗口标题与屏幕名，拼进名字前逐项清洗
          * @return 形如 Chrome_DISPLAY1.png 的文件名
-         * @details 与三参版本共用同一套校验与默认档回落；上下文值清洗后仍可能撞上 Windows 保留设备名，
+         * @details 与三参版本共用同一套校验与默认档回落；拼名用校验去掉首尾空白后的模板，
+         *          与 previewProductName 同解。上下文值清洗后仍可能撞上 Windows 保留设备名，
          *          主名前会补一个下划线，避免写盘时才报系统错误。
          */
         [[nodiscard]] static QString imageFileName(const QDateTime &moment, std::string_view extension, const QString &pattern, const NameTemplateContext &context);

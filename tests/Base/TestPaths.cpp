@@ -366,6 +366,8 @@ TEST(Paths, NameTemplateUnknownVariableListsAllSixTokens)
     ASSERT_FALSE(parsed.has_value());
     const auto &message = parsed.error().message;
     EXPECT_NE(message.find("%date%"), std::string::npos);
+    EXPECT_NE(message.find("%time%"), std::string::npos);
+    EXPECT_NE(message.find("%ms%"), std::string::npos);
     EXPECT_NE(message.find("%app%"), std::string::npos);
     EXPECT_NE(message.find("%title%"), std::string::npos);
     EXPECT_NE(message.find("%monitor%"), std::string::npos);
@@ -420,6 +422,29 @@ TEST(Paths, PreviewReturnsStemAndRejectsInvalidTemplate)
     const auto blank = Paths::previewProductName(QStringLiteral("   "), moment, {});
     ASSERT_TRUE(blank.has_value()) << "只有空白的模板应按默认档预览";
     EXPECT_EQ(*blank, QStringLiteral("GyanisScribe_20261109_140300_123"));
+}
+
+/**
+ * @brief 钉住预览与保存对首尾空白、纯空白模板同一口径
+ * @details 设置页显示的名字必须就是落盘的名字：模板前后带空格时，两边都不该把空格带进主名；
+ *          只有空白的模板在保存侧也按默认档算，而不是先校验失败再悄悄回落。
+ */
+TEST(Paths, PreviewAndImageFileNameAgreeOnPaddedTemplates)
+{
+    const QDateTime moment{QDate{2026, 11, 9}, QTime{14, 3, 0, 123}};
+    const GyanisScribe::Base::NameTemplateContext context{QStringLiteral("Code"), {}, {}};
+
+    const auto preview = Paths::previewProductName(QStringLiteral("  shot-%app%  "), moment, context);
+    ASSERT_TRUE(preview.has_value()) << preview.error().message;
+    EXPECT_EQ(*preview, QStringLiteral("shot-Code"));
+    EXPECT_EQ(Paths::imageFileName(moment, "png", QStringLiteral("  shot-%app%  "), context), *preview + QStringLiteral(".png"))
+            << "带空格的模板在预览与保存两侧该是同一个主名";
+
+    const auto blankPreview = Paths::previewProductName(QStringLiteral("   "), moment, context);
+    ASSERT_TRUE(blankPreview.has_value()) << blankPreview.error().message;
+    EXPECT_EQ(*blankPreview, QStringLiteral("GyanisScribe_20261109_140300_123"));
+    EXPECT_EQ(Paths::imageFileName(moment, "png", QStringLiteral("   "), context), *blankPreview + QStringLiteral(".png"))
+            << "只有空白的模板在保存侧也按默认档";
 }
 
 /**

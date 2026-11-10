@@ -248,9 +248,15 @@ namespace GyanisScribe::Base
 
     QString Paths::imageFileName(const QDateTime &moment, const std::string_view extension, const QString &pattern, const NameTemplateContext &context)
     {
-        // 模板留空表示默认档：与「目录留空表示默认目录」同一约定，调用方不必各抄一份默认值
-        auto effective = pattern.isEmpty() ? defaultNameTemplate() : pattern;
-        if (const auto checked = parseNameTemplate(effective); !checked)
+        // 模板留空表示默认档：与「目录留空表示默认目录」同一约定，调用方不必各抄一份默认值；
+        // 只含空白的模板与预览同一口径，也按空处理
+        auto effective = pattern.trimmed().isEmpty() ? defaultNameTemplate() : pattern;
+        if (const auto checked = parseNameTemplate(effective); checked)
+        {
+            // 拼名用校验去掉首尾空白后的那一份：预览拿到的也是它，两边对带空格的模板才不会各写一个名字
+            effective = *checked;
+        }
+        else
         {
             // 走到这里说明调用方没有先校验（设置页那一路会校验）：按默认档写下去并留下原因，
             // 不拿一个带分隔符的名字去写盘——那会写到模板里那个分隔符指去的地方

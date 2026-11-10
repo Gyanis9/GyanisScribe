@@ -150,8 +150,9 @@ namespace GyanisScribe::App
          * @brief 用回溯缓冲里的一帧进入框选
          * @param frame 回溯帧；屏名与屏内几何仍须对应当前屏幕
          * @details 与 startInteractive 同一条交付链，只是不抓当前屏；去向仍从「截完之后」那一档现读。
-         *          回溯帧是历史画面：应用、标题、屏幕与捕获时刻都无从得知，本轮来源整份留空，
-         *          抓帧回来时也不按选区时刻补齐。不走延时通道：帧已经冻住了，再等几秒只会让画面更旧。
+         *          回溯帧是早先某一刻的历史画面，这一轮刻意不记任何来源：应用、标题、屏幕与捕获时刻整份留空，
+         *          抓帧回来时也不按选区时刻补齐；信息面板因此不出现，文件名里的三格变量回落到 app/window/screen。
+         *          不走延时通道：帧已经冻住了，再等几秒只会让画面更旧。
          */
         void startInteractiveWithFrame(const GyanisScribe::Base::CapturedImage &frame);
 

@@ -164,9 +164,9 @@ namespace GyanisScribe::App
         // 去向照设置现读：回溯只是换了一张底图，之后的标注/复制/保存仍是用户点的那一档
         m_intent            = settingsCaptureIntent();
         m_captureFlowActive = true;
-        // 回溯帧不是当前前台窗口：应用与标题无从得知，屏幕与时刻也不能拿选区那一刻顶替。
-        // 标记这一轮是回溯轮次并清空来源：抓帧回来时 handleCaptured 据标记跳过补齐，
-        // 交付与标注窗拿到的是一份空来源，面板据此显示未知而不是一个看起来可信的假时刻
+        // 回溯帧是早先某一刻的历史画面：这一轮刻意不记任何来源，屏幕与时刻也不拿选区那一刻顶替。
+        // 标记回溯轮次并清空来源：抓帧回来时 handleCaptured 据标记跳过补齐，交付与标注窗拿到的是空来源——
+        // 信息面板因此不出现，文件名里的三格变量回落到 app/window/screen，而不是一个看起来可信的假时刻
         m_sourceInfo  = {};
         m_rewindRound = true;
         m_capture->startInteractiveWithFrame(frame);
