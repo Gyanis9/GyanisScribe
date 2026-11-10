@@ -130,47 +130,6 @@ namespace
         return bottomRows <= 0 || matchingTrailingRows(candidate, referenceBottom, candidate.height(), options) >= bottomRows;
     }
 
-    /// 两张帧各自末尾的 rows 行是否逐字节相同：用来确认缓冲真的以粘性尾收尾
-    [[nodiscard]] bool trailingRowsAreIdentical(const QImage &left, const QImage &right, const int rows)
-    {
-        if (rows <= 0 || left.height() < rows || right.height() < rows)
-        {
-            return false;
-        }
-        const auto stride = left.bytesPerLine();
-        for (auto offset = 0; offset < rows; ++offset)
-        {
-            if (std::memcmp(left.constScanLine(left.height() - rows + offset), right.constScanLine(right.height() - rows + offset), static_cast<std::size_t>(stride)) != 0)
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /// 去掉粘性头尾之后找接缝：容差照旧，但重叠区的末行必须逐字节相同
-    /// @details 容差会把相差几个色阶的相邻行当成同一行，最长优先就会把重叠多算一行，
-    ///          按它裁就少写一行真实内容。重叠末行正是缓冲的最后一行、新内容接上去的位置，
-    ///          要求它逐字节相同，等于要求接缝没有整体错开一行。
-    [[nodiscard]] int trimmedOverlapRowCount(const QImage &previous, const QImage &next, const StitchOptions &options)
-    {
-        const auto candidates = std::min({previous.height(), next.height(), std::max(0, options.maximumOverlapRows)});
-        const auto stride     = previous.bytesPerLine();
-        for (auto rows = candidates; rows >= kMinimumOverlapRows; --rows)
-        {
-            if (!regionMatches(previous, next, rows, options))
-            {
-                continue;
-            }
-            if (std::memcmp(previous.constScanLine(previous.height() - 1), next.constScanLine(rows - 1), static_cast<std::size_t>(stride)) != 0)
-            {
-                continue;
-            }
-            return rows;
-        }
-        return 0;
-    }
-
     /// 把 source 从 sourceRow 起的 rows 行抄到 destination 的 destinationRow 处；两图必须同宽
     void copyRows(QImage &destination, int destinationRow, const QImage &source, int sourceRow, int rows)
     {
@@ -286,17 +245,17 @@ namespace GyanisScribe::Core
 
             if ((stickyTop > 0 || stickyBottom > 0) && stickyBandsStillMatch(added, m_referenceTop, m_referenceBottom, stickyTop, stickyBottom, kStitchOptions))
             {
-                // 头尾仍原样在：它们不再参与接缝，只拿中间可滚动的内容找
+                // 头尾仍原样在：它们不再参与接缝，只拿中间可滚动的内容找；容差与整帧路径共用同一套
                 topSkip              = stickyTop;
                 bottomSkip           = stickyBottom;
                 const auto remaining = added.height() - topSkip - bottomSkip;
-                overlap              = remaining >= kMinimumOverlapRows ? trimmedOverlapRowCount(bufferRows(m_usedRows), contentRows(topSkip, remaining), kStitchOptions) : 0;
+                overlap              = remaining >= kMinimumOverlapRows ? overlapRowCount(bufferRows(m_usedRows), contentRows(topSkip, remaining), kStitchOptions) : 0;
             } else
             {
                 // 头尾不再稳定（或还没认出来）就按整帧处理：整帧能接上时不动头尾，免得把真实内容当标题栏裁掉
                 stickyTop    = 0;
                 stickyBottom = 0;
-                overlap      = overlapRowCount(bufferRows(m_usedRows), added);
+                overlap      = overlapRowCount(bufferRows(m_usedRows), added, kStitchOptions);
                 if (overlap < kMinimumOverlapRows)
                 {
                     // 整帧接不上才怀疑有粘性头尾：找新帧与首帧首尾最长的容差一致横带，太短的按内容看待
@@ -307,10 +266,14 @@ namespace GyanisScribe::Core
                     const auto remaining = added.height() - topSkip - bottomSkip;
                     if (topSkip + bottomSkip > 0 && remaining >= kMinimumOverlapRows)
                     {
-                        // 首帧也带着这条粘性尾时，缓冲末尾那一段正是输入框：先裁掉再接中间内容
-                        const auto trim =
-                                bottomSkip > 0 && m_usedRows > bottomSkip && trailingRowsAreIdentical(bufferRows(m_usedRows), m_referenceBottom, bottomSkip) ? bottomSkip : 0;
-                        overlap = trimmedOverlapRowCount(bufferRows(m_usedRows - trim), contentRows(topSkip, remaining), kStitchOptions);
+                        // 首帧也带着这条粘性尾时，缓冲末尾那一小段正是输入框：先把它从缓冲末尾裁掉再接中间内容。
+                        // 裁剪前提是从缓冲底部往上仍是这条参考尾带（容差判定）；末尾已经是内容时裁掉就是吃用户内容
+                        auto trim = 0;
+                        if (bottomSkip > 0 && m_usedRows > bottomSkip && matchingTrailingRows(bufferRows(m_usedRows), m_referenceBottom, bottomSkip, kStitchOptions) >= bottomSkip)
+                        {
+                            trim = bottomSkip;
+                        }
+                        overlap = overlapRowCount(bufferRows(m_usedRows - trim), contentRows(topSkip, remaining), kStitchOptions);
                         if (overlap >= kMinimumOverlapRows)
                         {
                             bufferTrim   = trim;

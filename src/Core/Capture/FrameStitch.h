@@ -74,8 +74,9 @@ namespace GyanisScribe::Core
     /**
      * @brief 长图累加器：首帧定下宽度与缩放，之后每帧只把新露出的那几行写进缓冲
      * @details 缓冲按倍数扩容，收尾由 snapshot() 深拷贝一次；接 n 帧的总成本与已接高度成正比，
-     *          而不是每帧都把整张长图重抄两遍。首帧顶部与底部各留一条参考带：认出吸顶标题栏或
-     *          吸底输入框之后，后续帧就不再把它接进长图；整帧接不上又没有稳定头尾时报错收摊。
+     *          而不是每帧都把整张长图重抄两遍。首帧顶部与底部各留一条参考带：高度不少于
+     *          kMinimumOverlapRows 的后续帧里，认出吸顶标题栏或吸底输入框之后就不再把它接进长图；
+     *          整帧接不上又没有稳定头尾时报错收摊。
      * @note 像素归本类独占：构造与 append() 都不与入参共享，snapshot() 交出的也是独立图像。
      */
     class FrameStitcher
@@ -95,7 +96,7 @@ namespace GyanisScribe::Core
          * @return 接上了返回空；空图、宽度不同或高度够却找不到可信接缝时返回中文原因；缓冲开不出来时返回内部故障
          * @details 只写 next 里没与已接部分重合的那几行；装不下时按倍数扩容，旧内容逐行搬过去。
          *          矮于 kMinimumOverlapRows 的帧整帧接上；其余帧找不到这么长的重叠就报错，不整帧硬接。
-         *          只有整帧接不上、而首尾横带与首帧稳定一致时才按粘性头尾跳过它们再接。
+         *          只有高度不少于 kMinimumOverlapRows、整帧接不上、而首尾横带与首帧稳定一致时才按粘性头尾跳过它们再接。
          */
         [[nodiscard]] Base::Expected<void> append(const QImage &next);
 
@@ -125,13 +126,13 @@ namespace GyanisScribe::Core
 
         /**
          * @brief 认出来的吸顶头带行数（只给用例用）
-         * @return 之后每帧从顶部跳过、不参与接缝与追加的行数；没认出来时是 0
+         * @return 之后的帧（高不少于 kMinimumOverlapRows）从顶部跳过、不参与接缝与追加的行数；没认出来时是 0
          */
         [[nodiscard]] int stickyTopRowsForTesting() const noexcept;
 
         /**
          * @brief 认出来的吸底尾带行数（只给用例用）
-         * @return 之后每帧从底部跳过、不参与接缝与追加的行数；没认出来时是 0
+         * @return 之后的帧（高不少于 kMinimumOverlapRows）从底部跳过、不参与接缝与追加的行数；没认出来时是 0
          */
         [[nodiscard]] int stickyBottomRowsForTesting() const noexcept;
 
@@ -152,8 +153,8 @@ namespace GyanisScribe::Core
 
         QImage m_referenceTop;             ///< 首帧顶部参考带：吸顶标题栏每次回来都要与它比对
         QImage m_referenceBottom;          ///< 首帧底部参考带：吸底输入框每次回来都要与它比对
-        int    m_stickyTopRows    = 0;     ///< 已认出的吸顶标题栏行数，之后每帧从顶部跳过
-        int    m_stickyBottomRows = 0;     ///< 已认出的吸底输入框行数，之后每帧从底部跳过
+        int    m_stickyTopRows    = 0;     ///< 已认出的吸顶标题栏行数，之后高度不少于 kMinimumOverlapRows 的帧从顶部跳过
+        int    m_stickyBottomRows = 0;     ///< 已认出的吸底输入框行数，之后高度不少于 kMinimumOverlapRows 的帧从底部跳过
         QImage m_buffer;                   ///< 累加用的整块缓冲，容量可能大于已用行数
         int    m_usedRows         = 0;     ///< 缓冲里已经写好的行数，就是成品高度
         bool   m_allocationFailed = false; ///< 构造时缓冲没开出来：append() 直接报内存不够，不碰空缓冲
