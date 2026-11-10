@@ -1,8 +1,11 @@
 #include "Gui/Annotation/AnnotationView.h"
 
+#include "Core/Capture/SourceInfo.h"
 #include "Core/Image/ImageFit.h"
+#include "Core/Settings/SettingsKeys.h"
 #include "Gui/Annotation/AnnotationWindow.h"
 
+#include "Base/Text.h"
 #include "Core/Annotation/AnnotationEngine.h"
 #include "Gui/Annotation/AnnotationToolbar.h"
 #include "Core/Annotation/IAnnotationEngine.h"
@@ -18,13 +21,16 @@
 
 #include <gtest/gtest.h>
 
+#include <QAbstractButton>
 #include <QApplication>
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QGuiApplication>
 #include <QElapsedTimer>
 #include <QFontMetricsF>
 #include <QImage>
 #include <QKeyEvent>
+#include <QLabel>
 #include <QMenu>
 #include <QMouseEvent>
 #include <QPainter>
@@ -54,6 +60,7 @@
 
 using GyanisScribe::Base::CapturedImage;
 using GyanisScribe::Base::ErrorCode;
+using GyanisScribe::Core::CaptureSourceInfo;
 using GyanisScribe::Core::displayRectFor;
 using GyanisScribe::Core::PenParameters;
 using GyanisScribe::Core::SettingsStore;
@@ -88,6 +95,13 @@ namespace
         captured.devicePixelRatio = devicePixelRatio;
         captured.screenName       = QStringLiteral("TestScreen");
         return captured;
+    }
+
+    /// 取信息面板上某一项的文本：标签按对象名认，面板没建或找不到那一项时返回空串
+    QString panelLabelText(const QWidget &panel, const char *objectName)
+    {
+        const auto *label = panel.findChild<QLabel *>(QString::fromLatin1(objectName));
+        return label != nullptr ? label->text() : QString{};
     }
 
     class AnnotationWindowFixture : public ::testing::Test
@@ -131,6 +145,16 @@ namespace
         [[nodiscard]] GyanisScribe::Core::IAnnotationEngine &engine() const
         {
             return *m_engine;
+        }
+
+        /// 本次用例的设置存储：信息面板开关这类要在开窗之前落到 ini 上
+        [[nodiscard]] SettingsStore &settings()
+        {
+            if (m_settings == nullptr)
+            {
+                m_settings = std::make_unique<SettingsStore>(m_iniPath);
+            }
+            return *m_settings;
         }
 
         /// 开一扇真的标注窗：工具栏要的设置与图标就近给，窗口与引擎同生共死
@@ -2407,4 +2431,229 @@ TEST_F(AnnotationWindowFixture, TextEditorCommitKeepsItsTopEdge)
     ASSERT_GE(exportedInkTop, 0) << "导出图里找不到红字，提交没落到画布上";
     EXPECT_LE(std::abs(exportedInkTop - editorInkTopInView * 2), 1)
             << "提交后首行字形顶跳了：输入框在视图第 " << editorInkTopInView << " 行，成品在第 " << exportedInkTop << " 行（物理）";
+}
+
+/**
+ * @brief 钉住信息面板：开关开着且来源齐备时，四行文本逐项写明应用、窗口、屏幕与时刻
+ * @details 面板是独立顶层窗，用例经只读接缝取它；应用名要去掉 .exe，时间按同一份格式核对。
+ *          顺带钉住两件事：面板不跑出本轮屏幕可用区，且「未知」那一档不冒充任何字段。
+ */
+TEST_F(AnnotationWindowFixture, InfoPanelShowsTheSourceFieldsWhenEnabled)
+{
+    ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kCaptureShowInfoPanel, true).has_value()) << "写入信息面板开关失败";
+    auto window = makeWindow();
+
+    CaptureSourceInfo source;
+    source.processName = QStringLiteral("notepad.exe");
+    source.windowTitle = QStringLiteral("无标题 - 记事本");
+    source.screenName  = QStringLiteral("TestScreen");
+    source.capturedAt  = QDateTime{QDate{2026, 11, 9}, QTime{13, 14, 15}};
+    const QRect available{0, 0, 1920, 1080};
+
+    window->startAnnotation(makeCanvas({200, 100}), available, QRect{800, 400, 200, 100}, source);
+
+    ASSERT_TRUE(window->isInfoPanelVisible()) << "开关开着、来源齐备，信息面板却没露出来";
+    const QWidget *panel = window->infoPanelForTesting();
+    ASSERT_NE(panel, nullptr) << "面板可见却取不到它";
+    EXPECT_EQ(panel->objectName(), QStringLiteral("captureInfoPanel"));
+    EXPECT_TRUE(panel->isWindow()) << "面板得是顶层窗：当子控件会被窗口裁切，也说不清有没有被导出";
+    EXPECT_TRUE(panel->windowFlags().testFlag(Qt::Tool)) << "面板该是工具窗：不进任务栏、不抢焦点";
+
+    EXPECT_EQ(panelLabelText(*panel, "captureInfoApp"), QStringLiteral("notepad")) << "应用名要去掉 .exe";
+    EXPECT_EQ(panelLabelText(*panel, "captureInfoTitle"), source.windowTitle);
+    EXPECT_EQ(panelLabelText(*panel, "captureInfoMonitor"), source.screenName);
+    EXPECT_EQ(panelLabelText(*panel, "captureInfoTime"), QStringLiteral("2026-11-09 13:14:15"));
+
+    const auto summary = window->infoPanelText();
+    EXPECT_TRUE(summary.contains(QStringLiteral("notepad")));
+    EXPECT_TRUE(summary.contains(source.windowTitle));
+    EXPECT_TRUE(summary.contains(source.screenName));
+    EXPECT_TRUE(summary.contains(QStringLiteral("2026-11-09 13:14:15")));
+
+    EXPECT_TRUE(available.contains(panel->geometry())) << "面板摆到了屏幕可用区外面：" << panel->geometry().x() << "," << panel->geometry().y();
+}
+
+/**
+ * @brief 钉住面板的三个不露面条件：开关默认关、开关关、来源全空
+ * @details 空白画布与回溯换帧的轮次传的是空来源，拿未知四项凑一块面板只是噪声；
+ *          开关关掉之后再开一轮，上一轮的面板也不能留在桌面上。
+ */
+TEST_F(AnnotationWindowFixture, InfoPanelStaysHiddenWhenDisabledOrSourceEmpty)
+{
+    auto              window = makeWindow();
+    const QRect       available{0, 0, 1920, 1080};
+    const QRect       selection{800, 400, 200, 100};
+    CaptureSourceInfo source;
+    source.processName = QStringLiteral("notepad.exe");
+    source.windowTitle = QStringLiteral("无标题 - 记事本");
+    source.screenName  = QStringLiteral("TestScreen");
+    source.capturedAt  = QDateTime{QDate{2026, 11, 9}, QTime{13, 14, 15}};
+
+    window->startAnnotation(makeCanvas({200, 100}), available, selection, source);
+    EXPECT_FALSE(window->isInfoPanelVisible()) << "开关默认关着，面板不该自己跑出来";
+
+    ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kCaptureShowInfoPanel, true).has_value()) << "写入信息面板开关失败";
+    window->startAnnotation(makeCanvas({200, 100}), available, selection, {});
+    EXPECT_FALSE(window->isInfoPanelVisible()) << "来源全空的轮次不该显示信息面板";
+
+    window->startAnnotation(makeCanvas({200, 100}), available, selection, source);
+    ASSERT_TRUE(window->isInfoPanelVisible()) << "开关开着、来源齐备时面板没出来，后面的收起判据没有基准";
+
+    ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kCaptureShowInfoPanel, false).has_value()) << "写入信息面板开关失败";
+    window->startAnnotation(makeCanvas({200, 100}), available, selection, source);
+    EXPECT_FALSE(window->isInfoPanelVisible()) << "开关关掉后新一轮还留着面板";
+}
+
+/**
+ * @brief 钉住面板右上角那枚关闭：只收这一轮的面板，标注窗不动；下一轮开窗再摆出来
+ * @details 面板是可选的信息层，关掉它不该等于结束标注；开关还开着时，下一轮必须重新显示，
+ *          否则用户会以为这一格开关只管第一次。
+ */
+TEST_F(AnnotationWindowFixture, InfoPanelCloseButtonHidesOnlyThisRound)
+{
+    ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kCaptureShowInfoPanel, true).has_value()) << "写入信息面板开关失败";
+    auto window = makeWindow();
+
+    CaptureSourceInfo source;
+    source.processName = QStringLiteral("notepad.exe");
+    source.windowTitle = QStringLiteral("无标题 - 记事本");
+    source.screenName  = QStringLiteral("TestScreen");
+    source.capturedAt  = QDateTime{QDate{2026, 11, 9}, QTime{13, 14, 15}};
+    const QRect available{0, 0, 1920, 1080};
+    const QRect selection{800, 400, 200, 100};
+
+    window->startAnnotation(makeCanvas({200, 100}), available, selection, source);
+    ASSERT_TRUE(window->isInfoPanelVisible());
+
+    const QWidget *panel = window->infoPanelForTesting();
+    ASSERT_NE(panel, nullptr);
+    auto *closeButton = panel->findChild<QAbstractButton *>(QStringLiteral("captureInfoClose"));
+    ASSERT_NE(closeButton, nullptr) << "信息面板上找不到关闭按钮";
+    closeButton->click();
+
+    EXPECT_FALSE(window->isInfoPanelVisible()) << "点了关闭按钮面板还浮在桌面上";
+    EXPECT_TRUE(window->isVisible()) << "关信息面板把整轮标注一起收了";
+
+    window->startAnnotation(makeCanvas({200, 100}), available, selection, source);
+    EXPECT_TRUE(window->isInfoPanelVisible()) << "下一轮开窗没有把面板重新摆出来";
+}
+
+/**
+ * @brief 钉住收场各出口都收面板：Esc 与交付（回车复制）都不许把面板留在桌面上
+ * @details 面板是独立顶层窗，只藏标注窗会把它留在原地；每档各开一轮新窗口分别核对。
+ */
+TEST_F(AnnotationWindowFixture, InfoPanelHidesWhenTheRoundEnds)
+{
+    ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kCaptureShowInfoPanel, true).has_value()) << "写入信息面板开关失败";
+
+    CaptureSourceInfo source;
+    source.processName = QStringLiteral("notepad.exe");
+    source.windowTitle = QStringLiteral("无标题 - 记事本");
+    source.screenName  = QStringLiteral("TestScreen");
+    source.capturedAt  = QDateTime{QDate{2026, 11, 9}, QTime{13, 14, 15}};
+    const QRect available{0, 0, 1920, 1080};
+    const QRect selection{800, 400, 200, 100};
+
+    const std::vector<std::pair<Qt::Key, Qt::KeyboardModifiers>> endings{
+            {Qt::Key_Escape, Qt::NoModifier},
+            {Qt::Key_Return, Qt::NoModifier},
+    };
+    for (const auto &[key, modifiers]: endings)
+    {
+        auto window = makeWindow();
+        window->startAnnotation(makeCanvas({200, 100}), available, selection, source);
+        ASSERT_TRUE(window->isInfoPanelVisible()) << "按键 " << static_cast<int>(key) << " 那一轮的开始面板没出来";
+
+        pressKeyOn(*window, key, modifiers);
+
+        EXPECT_FALSE(window->isVisible()) << "按键 " << static_cast<int>(key) << " 没收起标注窗";
+        EXPECT_FALSE(window->isInfoPanelVisible()) << "按键 " << static_cast<int>(key) << " 收场后信息面板还留在桌面上";
+    }
+
+    // 系统关窗与工具栏最右那枚 X 也汇到同一条收场路：面板不许留在桌面上
+    auto closedBySystem = makeWindow();
+    closedBySystem->startAnnotation(makeCanvas({200, 100}), available, selection, source);
+    ASSERT_TRUE(closedBySystem->isInfoPanelVisible());
+    closedBySystem->close();
+    EXPECT_FALSE(closedBySystem->isInfoPanelVisible()) << "系统关窗之后信息面板还留在桌面上";
+
+    auto closedByToolbar = makeWindow();
+    closedByToolbar->startAnnotation(makeCanvas({200, 100}), available, selection, source);
+    ASSERT_TRUE(closedByToolbar->isInfoPanelVisible());
+    QToolButton *toolbarClose = nullptr;
+    for (auto *candidate: closedByToolbar->toolbar().findChildren<QToolButton *>())
+    {
+        if (candidate->accessibleName() == GyanisScribe::Base::uiText("关闭标注"))
+        {
+            toolbarClose = candidate;
+        }
+    }
+    ASSERT_NE(toolbarClose, nullptr) << "工具栏上找不到关闭按钮";
+    toolbarClose->click();
+    EXPECT_FALSE(closedByToolbar->isInfoPanelVisible()) << "点了工具栏的 X 之后信息面板还留在桌面上";
+}
+
+/**
+ * @brief 钉住面板不改画布与选中：底图、逻辑尺寸与选中包围盒都与没有面板时同解
+ * @details 面板是盖在屏幕上的另一扇窗，不该进引擎：底图不变、选中还在原处，
+ *          导出走的仍是画布那一份（400×200 物理像素，不会把面板烘进去）。
+ */
+TEST_F(AnnotationWindowFixture, InfoPanelLeavesTheCanvasAndSelectionAlone)
+{
+    ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kCaptureShowInfoPanel, true).has_value()) << "写入信息面板开关失败";
+    auto window = makeWindow();
+
+    CaptureSourceInfo source;
+    source.processName = QStringLiteral("notepad.exe");
+    source.windowTitle = QStringLiteral("无标题 - 记事本");
+    source.screenName  = QStringLiteral("TestScreen");
+    source.capturedAt  = QDateTime{QDate{2026, 11, 9}, QTime{13, 14, 15}};
+    window->startAnnotation(makeCanvas({200, 100}), QRect{0, 0, 1920, 1080}, QRect{800, 400, 200, 100}, source);
+    ASSERT_TRUE(window->isInfoPanelVisible());
+
+    const auto canvasKey = window->canvas().image.cacheKey();
+    const auto selected  = drawAndSelect({10, 10}, {60, 40});
+    ASSERT_TRUE(selected.has_value());
+
+    EXPECT_EQ(window->canvas().image.cacheKey(), canvasKey) << "面板露出来时底图被换了";
+    EXPECT_EQ(window->canvas().logicalSize, QSize(200, 100)) << "面板改了画布逻辑尺寸";
+    EXPECT_EQ(engine().selections().size(), 1U) << "面板把选中集改了";
+    EXPECT_EQ(engine().selectionBounds(), selected) << "面板挪动了选中项";
+    EXPECT_EQ(window->canvas().image.size(), QSize(400, 200)) << "导出用的画布被面板改了尺寸";
+}
+
+/**
+ * @brief 钉住部分来源照样显示：应用与标题空着时给「未知」两档，屏幕与时刻照实写
+ * @details 回溯换帧那类来源只报屏幕与时刻；控制器要的是把拿到的那几项摆出来，
+ *          不是整块面板一起藏掉。
+ */
+TEST_F(AnnotationWindowFixture, InfoPanelKeepsPartialSourceWithUnknownFields)
+{
+    ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kCaptureShowInfoPanel, true).has_value()) << "写入信息面板开关失败";
+    auto window = makeWindow();
+
+    CaptureSourceInfo source;
+    source.screenName = QStringLiteral("TestScreen");
+    source.capturedAt = QDateTime{QDate{2026, 11, 9}, QTime{8, 9, 10}};
+
+    window->startAnnotation(makeCanvas({200, 100}), QRect{0, 0, 1920, 1080}, QRect{800, 400, 200, 100}, source);
+
+    ASSERT_TRUE(window->isInfoPanelVisible()) << "只有屏幕与时刻也算有来源，面板该露出来";
+    const QWidget *panel = window->infoPanelForTesting();
+    ASSERT_NE(panel, nullptr);
+    EXPECT_EQ(panelLabelText(*panel, "captureInfoApp"), GyanisScribe::Base::uiText("未知应用"));
+    EXPECT_EQ(panelLabelText(*panel, "captureInfoTitle"), GyanisScribe::Base::uiText("未知窗口"));
+    EXPECT_EQ(panelLabelText(*panel, "captureInfoMonitor"), source.screenName);
+    EXPECT_EQ(panelLabelText(*panel, "captureInfoTime"), QStringLiteral("2026-11-09 08:09:10"));
+
+    // 只剩应用名时另外三项都写「未知」：进程名带路径也按主名显示，时刻无效不猜一个现在
+    CaptureSourceInfo appOnly;
+    appOnly.processName = QStringLiteral("C:/Tools/notepad.exe");
+    window->startAnnotation(makeCanvas({200, 100}), QRect{0, 0, 1920, 1080}, QRect{800, 400, 200, 100}, appOnly);
+
+    ASSERT_TRUE(window->isInfoPanelVisible()) << "只有应用名也算有来源，面板该露出来";
+    EXPECT_EQ(panelLabelText(*panel, "captureInfoApp"), QStringLiteral("notepad")) << "带路径的进程名也要只留主名";
+    EXPECT_EQ(panelLabelText(*panel, "captureInfoTitle"), GyanisScribe::Base::uiText("未知窗口"));
+    EXPECT_EQ(panelLabelText(*panel, "captureInfoMonitor"), GyanisScribe::Base::uiText("未知屏幕"));
+    EXPECT_EQ(panelLabelText(*panel, "captureInfoTime"), GyanisScribe::Base::uiText("未知时间"));
 }

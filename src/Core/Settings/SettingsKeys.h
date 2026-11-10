@@ -107,6 +107,10 @@ namespace GyanisScribe::Core
 
     /// 截图完成时响一声系统提示音；默认关
     inline constexpr std::string_view kCaptureSound = "Capture/Sound";
+
+    /// 标注窗旁边要不要浮一块截图信息面板（应用、窗口标题、屏幕与捕获时刻）；默认关，读端在 Gui::AnnotationWindow
+    inline constexpr std::string_view kCaptureShowInfoPanel = "Capture/ShowInfoPanel";
+
     /// 放大镜视野档：off（只留读数条）、narrow（9×9，默认）、medium（15×15）、wide（21×21）；词表在 Core/Pick/PickGeometry.h
     inline constexpr std::string_view kCaptureMagnifierView = "Capture/MagnifierView";
     /// 「不参与窗口检测的程序」：逗号分隔的可执行文件名（如 `chrome.exe, cmd.exe`），大小写不敏感；留空即谁都不排除。

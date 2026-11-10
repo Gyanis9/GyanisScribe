@@ -20,6 +20,7 @@
 #include <optional>
 
 class QCloseEvent;
+class QMoveEvent;
 
 namespace GyanisScribe::Base
 {
@@ -89,6 +90,8 @@ namespace GyanisScribe::Gui
      */
     [[nodiscard]] std::optional<Core::ToolKind> toolShortcutFor(int key, Qt::KeyboardModifiers modifiers, const Core::ISettingsStore &settings);
 
+    class CaptureInfoPanel;
+
     /**
      * @brief 标注窗口
      * @details 窗口本身只放视图；工具栏是独立的浮窗，用 placeToolbar 摆在选区旁边并避开屏幕边缘。
@@ -111,6 +114,12 @@ namespace GyanisScribe::Gui
 
         AnnotationWindow(const AnnotationWindow &)            = delete;
         AnnotationWindow &operator=(const AnnotationWindow &) = delete;
+
+        /**
+         * @brief 析构窗口
+         * @details 信息面板与工具栏都是独立顶层窗，随本窗口一起销毁
+         */
+        ~AnnotationWindow() override;
 
         /**
          * @brief 用刚截到的画面开启一轮标注
@@ -147,6 +156,26 @@ namespace GyanisScribe::Gui
          * @details 来源只在 startAnnotation 那一刻写入；用例据此核对传递结果，不提供改写入口。
          */
         [[nodiscard]] const Core::CaptureSourceInfo &captureSourceForTesting() const noexcept;
+
+        /**
+         * @brief 信息面板这一刻可见不可见
+         * @return 面板已建且露在桌面上为真
+         */
+        [[nodiscard]] bool isInfoPanelVisible() const noexcept;
+
+        /**
+         * @brief 信息面板四行文本拼起来的一份摘要
+         * @return 应用、窗口、屏幕与时刻按顺序以换行相连；面板没建时为空串
+         * @note 只给用例核对字段是否落到面板上，界面各处不读这一份
+         */
+        [[nodiscard]] QString infoPanelText() const;
+
+        /**
+         * @brief 信息面板本身（只读接缝）
+         * @return 面板指针；还没建过时为 nullptr
+         * @details 面板是独立顶层窗，不在本窗口的子控件树里；用例按对象名从它身上取标签与关闭按钮。
+         */
+        [[nodiscard]] QWidget *infoPanelForTesting() const noexcept;
 
         /**
          * @brief 把重新抓到的一帧换上：底图换了，标注、选中与撤销历史都留着
@@ -249,6 +278,13 @@ namespace GyanisScribe::Gui
          */
         void closeEvent(QCloseEvent *event) override;
 
+        /**
+         * @brief 窗口挪位后把信息面板跟着挪一次
+         * @param event 移动事件
+         * @details 面板是独立顶层窗，不会随父窗口自动平移；窗口一挪它就得按工具栏的新位置重摆
+         */
+        void moveEvent(QMoveEvent *event) override;
+
     private:
         /// 把标注结果交出去：先收窗口与工具栏，再发对应信号，避免成品图里带上界面；交付完也报 closed()
         void deliver(ShortcutAction action);
@@ -262,9 +298,19 @@ namespace GyanisScribe::Gui
         /// 按记下的选区与屏幕可用区把工具栏摆一次；可见段收放（contextLayoutChanged）后也走这一处
         void placeToolbarForSelection();
 
+        /// 按开关与来源决定信息面板建不建、露不露；开一轮标注时调用一次
+        void updateInfoPanel();
+
+        /// 把信息面板摆到工具栏右侧；右侧放不下换左侧，再不行回屏幕可用区左上角内缩一格，不许出屏
+        void placeInfoPanel();
+
+        /// 收起信息面板：收场、交付与开关关掉都走这一处，面板对象留着下一轮再用
+        void hideInfoPanel() noexcept;
+
         Core::IAnnotationEngine                 &m_engine;              ///< 标注引擎，不拥有
-        Core::ISettingsStore                    &m_settings;            ///< 字母键位的读端（Gui/Controls/AppShortcuts.h 那份清册），不拥有
+        Core::ISettingsStore                    &m_settings;            ///< 配置读端：字母键位清册与信息面板开关，不拥有
         std::unique_ptr<AnnotationToolbar>       m_toolbar;             ///< 浮层工具栏，本窗口拥有
+        std::unique_ptr<CaptureInfoPanel>        m_infoPanel;           ///< 截图信息面板，本窗口拥有；没有来源或开关关着时为空
         std::unique_ptr<AnnotationToolbarBridge> m_toolbarBridge;       ///< 工具栏与引擎的接线：样式、工具、撤销重做都在桥里
         AnnotationView                          *m_view = nullptr;      ///< 画布视图，父对象是本窗口
         QString                                  m_refreshScreenName;   ///< 本轮截图来自哪块屏（F5 重抓用它）

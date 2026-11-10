@@ -3,7 +3,9 @@
 #include "Core/Annotation/AnnotationEngine.h"
 #include "Core/Annotation/IAnnotationEngine.h"
 #include "Core/Capture/ScreenUtils.h"
+#include "Core/Settings/SettingsKeys.h"
 #include "Gui/Annotation/AnnotationToolbarGeometry.h"
+#include "Gui/Annotation/CaptureInfoPanel.h"
 #include "Base/Logger.h"
 #include "Core/Settings/ISettingsStore.h"
 #include "Gui/Controls/AppShortcuts.h"
@@ -11,9 +13,15 @@
 #include "Base/Types.h"
 
 #include <QCloseEvent>
+#include <QGuiApplication>
 #include <QKeyEvent>
+#include <QLabel>
+#include <QMoveEvent>
+#include <QScreen>
+#include <QStringList>
 #include <QVBoxLayout>
 
+#include <algorithm>
 #include <cmath>
 #include <format>
 #include <utility>
@@ -22,6 +30,23 @@ namespace
 {
     /// 按住 Shift 时一次挪多少格：一格太慢、十格在 4K 屏上仍是「一下就跳过目标」，取中间值
     constexpr int kCoarseNudgeStride = 10;
+
+    /// 信息面板与工具栏之间的留白，逻辑像素：贴着边摆会让两块浮层的描边叠在一起
+    constexpr int kInfoPanelGap = 8;
+
+    /// 工具栏与信息面板都放不下时，面板从屏幕可用区左上角内缩这么多，逻辑像素
+    constexpr int kInfoPanelInset = 12;
+
+    /**
+     * @brief 这一轮来源是不是一项都没拿到
+     * @param source 本轮来源
+     * @return 应用、窗口标题、屏幕都是空白且捕获时刻无效时为真
+     * @details 空白画布与回溯换帧传的是这份空来源；来源全空时不摆只写「未知」四项的面板
+     */
+    bool isSourceInfoEmpty(const GyanisScribe::Core::CaptureSourceInfo &source)
+    {
+        return source.processName.trimmed().isEmpty() && source.windowTitle.trimmed().isEmpty() && source.screenName.trimmed().isEmpty() && !source.capturedAt.isValid();
+    }
 } // namespace
 
 namespace GyanisScribe::Gui
@@ -127,8 +152,14 @@ namespace GyanisScribe::Gui
         // 贴图上直接标注那一处共用同一个桥，将来加新参数不会出现「这边接了那边漏了」
         m_toolbarBridge = std::make_unique<AnnotationToolbarBridge>(*m_toolbar, engine, this);
 
-        // 可见段收放让工具栏尺寸变了就重摆一次：收窄后还钉在旧位置会偏出选区中心
-        QObject::connect(m_toolbar.get(), &AnnotationToolbar::contextLayoutChanged, this, [this] { placeToolbarForSelection(); });
+        // 可见段收放让工具栏尺寸变了就重摆一次：收窄后还钉在旧位置会偏出选区中心；
+        // 信息面板挂在工具栏旁边，工具栏一挪它也得跟着重摆
+        QObject::connect(m_toolbar.get(), &AnnotationToolbar::contextLayoutChanged, this,
+                         [this]
+                         {
+                             placeToolbarForSelection();
+                             placeInfoPanel();
+                         });
         // X 与 Esc 同一条路：用户不必记住「要关只能按键盘」
         QObject::connect(m_toolbar.get(), &AnnotationToolbar::closeClicked, this, &AnnotationWindow::closeAnnotation);
         QObject::connect(m_view, &AnnotationView::captureResized, this, [this](const QRect &globalGeometry) { emit cropRequested(m_refreshScreenName, globalGeometry); });
@@ -145,6 +176,8 @@ namespace GyanisScribe::Gui
         // 交出去的是画布原图：检测框与它同坐标系，烘上图形的成品会让文字与框对不上
         QObject::connect(m_toolbarBridge.get(), &AnnotationToolbarBridge::privacyRequested, this, [this] { emit privacyRequested(m_engine.canvas().image); });
     }
+
+    AnnotationWindow::~AnnotationWindow() = default;
 
     void AnnotationWindow::startAnnotation(const Base::CapturedImage &captured, const QRect &screenAvailable, const QRect &selection, const Core::CaptureSourceInfo &source)
     {
@@ -178,12 +211,15 @@ namespace GyanisScribe::Gui
         placeToolbarForSelection();
         m_toolbar->show();
         m_toolbar->raise();
+        // 面板按这一轮的开关与来源决定去留：上一轮用户关掉的那块随新一轮重新评估
+        updateInfoPanel();
     }
 
     void AnnotationWindow::closeAnnotation()
     {
-        // 工具栏是独立顶层窗：藏这一边不会把它一起带走
+        // 工具栏与信息面板都是独立顶层窗：藏这一边不会把它们一起带走
         m_toolbar->hide();
+        hideInfoPanel();
         hide();
         // 收完再报：接收方查可见态时看到的就是「已经收起」
         reportClosedOnce();
@@ -198,6 +234,13 @@ namespace GyanisScribe::Gui
         event->accept();
     }
 
+    void AnnotationWindow::moveEvent(QMoveEvent *event)
+    {
+        QWidget::moveEvent(event);
+        // 面板是独立顶层窗，不会跟着本窗口自动平移；窗口一挪就按工具栏的新位置重摆
+        placeInfoPanel();
+    }
+
     void AnnotationWindow::reportClosedOnce()
     {
         // 交付出口也会收窗：与 Esc/X 共用这一声，一轮只报一次，免得宿主重复恢复抓帧
@@ -208,6 +251,8 @@ namespace GyanisScribe::Gui
         m_closedReported = true;
         // 收场之后这一轮不再可编辑：迟到的异步结果靠它认出窗已经关了
         m_roundActive = false;
+        // 面板是独立顶层窗，收场时一并藏起：交付、Esc/X 与系统关窗都汇到这一处
+        hideInfoPanel();
         emit closed();
     }
 
@@ -229,6 +274,104 @@ namespace GyanisScribe::Gui
         m_toolbar->move(m_placedSelection.left(), m_placedSelection.bottom() + 1);
     }
 
+    void AnnotationWindow::updateInfoPanel()
+    {
+        // 开关默认关；来源全空的轮次（空白画布、回溯换帧）也不摆一块只写「未知」的面板
+        if (!m_settings.boolValue(Core::kCaptureShowInfoPanel, false) || isSourceInfoEmpty(m_sourceInfo))
+        {
+            hideInfoPanel();
+            return;
+        }
+
+        if (!m_infoPanel)
+        {
+            // 不带父控件：面板要摆在标注窗外面，进了子控件树就会被裁切，也说不清有没有被导出
+            m_infoPanel = std::make_unique<CaptureInfoPanel>();
+            // 面板自己收起时由窗口再收一次可见态：可见性只归标注窗管，面板只报一声
+            QObject::connect(m_infoPanel.get(), &CaptureInfoPanel::closed, this, &AnnotationWindow::hideInfoPanel);
+        }
+        m_infoPanel->setSource(m_sourceInfo);
+        m_infoPanel->adjustSize();
+        placeInfoPanel();
+        // 窗口还没露出来时不先亮面板：两块浮层一先一后上屏会闪一下
+        if (!isVisible())
+        {
+            m_infoPanel->hide();
+            return;
+        }
+        m_infoPanel->show();
+        m_infoPanel->raise();
+    }
+
+    void AnnotationWindow::placeInfoPanel()
+    {
+        if (!m_infoPanel)
+        {
+            return;
+        }
+
+        const auto size      = m_infoPanel->sizeHint().isEmpty() ? m_infoPanel->preferredSize() : m_infoPanel->sizeHint();
+        auto       available = m_placedScreenAvailable;
+        if (!available.isValid() || available.isEmpty())
+        {
+            // 摆放依据缺失时退回「窗口当前在哪块屏」；离屏用例没有真实屏幕，这一路可能仍是空
+            if (const auto *screen = QGuiApplication::screenAt(mapToGlobal(rect().center())))
+            {
+                available = screen->availableGeometry();
+            } else if (const auto *primary = QGuiApplication::primaryScreen())
+            {
+                available = primary->availableGeometry();
+            }
+        }
+        if (available.isEmpty())
+        {
+            m_infoPanel->resize(size);
+            return;
+        }
+
+        // 先试工具栏右侧，再试左侧：两块浮层同一行排开，视线不用上下跳
+        const QRect toolbarFrame = m_toolbar->geometry();
+        QRect       target;
+        if (!toolbarFrame.isEmpty())
+        {
+            const QRect onRight{QPoint{toolbarFrame.right() + 1 + kInfoPanelGap, toolbarFrame.top()}, size};
+            const QRect onLeft{QPoint{toolbarFrame.left() - kInfoPanelGap - size.width(), toolbarFrame.top()}, size};
+            if (available.contains(onRight))
+            {
+                target = onRight;
+            } else if (available.contains(onLeft))
+            {
+                target = onLeft;
+            }
+        }
+        if (target.isEmpty())
+        {
+            // 两侧都放不下：退回屏幕可用区左上角，内缩一格免得贴着任务栏与屏边
+            target = QRect{available.topLeft() + QPoint{kInfoPanelInset, kInfoPanelInset}, size};
+        }
+        // 兜底位也可能比可用区还大：把左上角夹回可用区，至少不整块出屏
+        const auto maxX = std::max(available.left(), available.right() - size.width() + 1);
+        const auto maxY = std::max(available.top(), available.bottom() - size.height() + 1);
+        target.moveLeft(std::clamp(target.left(), available.left(), maxX));
+        target.moveTop(std::clamp(target.top(), available.top(), maxY));
+
+        m_infoPanel->resize(size);
+        m_infoPanel->move(target.topLeft());
+        if (m_infoPanel->isVisible())
+        {
+            // 窗口与工具栏随后可能被抬起；面板要留在它们上面才看得见
+            m_infoPanel->raise();
+        }
+    }
+
+    void AnnotationWindow::hideInfoPanel() noexcept
+    {
+        if (m_infoPanel)
+        {
+            m_infoPanel->hide();
+        }
+    }
+
     AnnotationToolbar &AnnotationWindow::toolbar() const noexcept
     {
         return *m_toolbar;
@@ -247,6 +390,39 @@ namespace GyanisScribe::Gui
     const Core::CaptureSourceInfo &AnnotationWindow::captureSourceForTesting() const noexcept
     {
         return m_sourceInfo;
+    }
+
+    bool AnnotationWindow::isInfoPanelVisible() const noexcept
+    {
+        return m_infoPanel != nullptr && m_infoPanel->isVisible();
+    }
+
+    QString AnnotationWindow::infoPanelText() const
+    {
+        if (!m_infoPanel)
+        {
+            return {};
+        }
+        const QStringList valueNames{
+                QStringLiteral("captureInfoApp"),
+                QStringLiteral("captureInfoTitle"),
+                QStringLiteral("captureInfoMonitor"),
+                QStringLiteral("captureInfoTime"),
+        };
+        QStringList lines;
+        for (const auto &name: valueNames)
+        {
+            if (const auto *label = m_infoPanel->findChild<QLabel *>(name))
+            {
+                lines.append(label->text());
+            }
+        }
+        return lines.join(QLatin1Char('\n'));
+    }
+
+    QWidget *AnnotationWindow::infoPanelForTesting() const noexcept
+    {
+        return m_infoPanel.get();
     }
 
     void AnnotationWindow::refreshCapture(const Base::CapturedImage &captured)
@@ -286,6 +462,8 @@ namespace GyanisScribe::Gui
         placeToolbarForSelection();
         m_toolbar->show();
         m_toolbar->raise();
+        // 重裁换了窗口与工具栏的位置，已露出的信息面板跟着重摆；用户关掉的那块不在这里复活
+        placeInfoPanel();
     }
 
     void AnnotationWindow::restoreAfterCrop(const QRect &selection, const QRect &screenAvailable)
@@ -302,6 +480,8 @@ namespace GyanisScribe::Gui
         placeToolbarForSelection();
         m_toolbar->show();
         m_toolbar->raise();
+        // 窗口摆回旧几何之后面板也要回到工具栏旁边
+        placeInfoPanel();
     }
 
     void AnnotationWindow::updateCropPreview(const QRect &globalSelection)
@@ -489,6 +669,7 @@ namespace GyanisScribe::Gui
     {
         // 收界面在导出之前：不然浮窗与选框会被下一轮看见，也会被误当成画面的一部分
         m_toolbar->hide();
+        hideInfoPanel();
         hide();
 
         const auto image = m_engine.exportImage();
