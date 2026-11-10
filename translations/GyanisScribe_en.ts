@@ -1092,6 +1092,10 @@
             <translation>Scrolling capture cannot continue: not enough memory to keep stitching. Narrow the selection or capture it in shorter sections</translation>
         </message>
         <message>
+            <source>长截图接不上：这一段和上一段没有可信的重叠。请回到上一段末尾附近，等画面停稳后再滚一小段；如果已经滚过一屏，请缩小滚动幅度重来</source>
+            <translation>Scrolling capture cannot continue: this section has no trustworthy overlap with the previous one. Go back near the end of the previous section, let the picture settle, then scroll a little; if you already scrolled past a whole screen, scroll in smaller steps and start over</translation>
+        </message>
+        <message>
             <source>选区历史的记录格式不对：第 {} 段「{}」应为「x,y,width,height,屏名」。请删掉这一项，让程序重新记一次</source>
             <translation>The selection history entry is malformed: segment {} "{}" should look like "x,y,width,height,screen-name". Delete that entry so the app can record a fresh one</translation>
         </message>

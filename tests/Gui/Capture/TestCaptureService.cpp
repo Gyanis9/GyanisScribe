@@ -413,6 +413,38 @@ TEST_F(CaptureServiceFixture, FailuresAreWrittenToLog)
 }
 
 /**
+ * @brief 造一张每行颜色都不同的长页面，模拟一路往下滚的内容
+ * @details 相邻行至少有一个通道差得够远，接缝只可能落在真正重合的那几行上；
+ *          251 是质数，行号乘上去在 251 行以内不会有两行同色
+ */
+[[nodiscard]] static QImage makeScrollPage(const int physicalHeight)
+{
+    QImage page{QSize{200, physicalHeight}, QImage::Format_ARGB32_Premultiplied};
+    for (auto row = 0; row < physicalHeight; ++row)
+    {
+        const QColor color{row * 17 % 251, row * 29 % 251, row * 43 % 251};
+        std::fill_n(reinterpret_cast<QRgb *>(page.scanLine(row)), page.width(), color.rgba());
+    }
+    return page;
+}
+
+/**
+ * @brief 从这张长页面上裁一帧整屏：选区不动，页面往上滚了 physicalTop 行
+ * @details 页面按 200×100 的整屏交出去，选区落在帧里的哪一块由调用方的逻辑坐标定；
+ *          帧里选区以外的部分不参与接缝
+ */
+[[nodiscard]] static CapturedImage makeScrolledFrame(const QImage &page, const int physicalTop)
+{
+    CapturedImage frame;
+    frame.image = page.copy(0, physicalTop, 200, 100);
+    frame.image.setDevicePixelRatio(1.0);
+    frame.devicePixelRatio = 2.0;
+    frame.logicalSize      = QSize{100, 50};
+    frame.screenName       = QStringLiteral("FakeScreen-1");
+    return frame;
+}
+
+/**
  * @brief 钉住滚动长截图的整条流程：起一轮、逐帧接上、收口时交出一张自洽的长图
  * @details 判据不走计时器（那是赌调度），用例自己按帧调 grabNextLongFrame。
  *          收口交出的那份形状必须与普通截图同解：物理像素、逻辑尺寸、缩放因子、屏名四样互指同一个点，
@@ -422,11 +454,12 @@ TEST_F(CaptureServiceFixture, LongCaptureStitchesEachGrabbedFrame)
 {
     SettingsStore     settings(m_iniFile);
     FakeCaptureSource source;
-    // 三帧同宽同缩放、内容各不相同：对不上接缝，于是每一帧都整段接在下面
+    // 同一张页面往上滚，每帧与上一帧重合 25 行：接出来的高度是 50 + 25 + 25
+    const auto page    = makeScrollPage(150);
     source.screenQueue = {
-            makeScreenFrame(QSize{200, 100}, 2.0, QColor{10, 200, 20}),
-            makeScreenFrame(QSize{200, 100}, 2.0, QColor{200, 20, 20}),
-            makeScreenFrame(QSize{200, 100}, 2.0, QColor{20, 20, 200}),
+            makeScrolledFrame(page, 0),
+            makeScrolledFrame(page, 25),
+            makeScrolledFrame(page, 50),
     };
     CaptureService service{source, settings, *platform};
 
@@ -450,8 +483,8 @@ TEST_F(CaptureServiceFixture, LongCaptureStitchesEachGrabbedFrame)
 
     service.finishLongCapture();
     ASSERT_TRUE(watch.image.has_value()) << "收口没交出长图";
-    EXPECT_EQ(watch.image->image.size(), QSize(100, 150)) << "长图的物理尺寸不对";
-    EXPECT_EQ(watch.image->logicalSize, QSize(50, 75)) << "逻辑尺寸没跟着长高";
+    EXPECT_EQ(watch.image->image.size(), QSize(100, 100)) << "长图的物理尺寸不对";
+    EXPECT_EQ(watch.image->logicalSize, QSize(50, 50)) << "逻辑尺寸没跟着长高";
     EXPECT_EQ(watch.image->devicePixelRatio, 2.0) << "缩放因子丢了";
     EXPECT_EQ(watch.image->screenName, QStringLiteral("FakeScreen-1")) << "来源屏丢了";
 
@@ -502,7 +535,9 @@ TEST_F(CaptureServiceFixture, CancellingLongCaptureDiscardsTheImageOnly)
 {
     SettingsStore     settings(m_iniFile);
     FakeCaptureSource source;
-    source.screenQueue = {makeScreenFrame(QSize{200, 100}, 2.0, QColor{10, 200, 20})};
+    // 第二帧往上滚了 8 行：与首帧重合 32 行（选区高 20 逻辑像素），这一轮确实接得上
+    const auto page    = makeScrollPage(150);
+    source.screenQueue = {makeScrolledFrame(page, 0), makeScrolledFrame(page, 8)};
     CaptureService service{source, settings, *platform};
 
     std::optional<CapturedImage> finished;
@@ -578,7 +613,9 @@ TEST_F(CaptureServiceFixture, StartingAnotherCaptureWhileALongRoundRunsIsRefused
 {
     SettingsStore     settings(m_iniFile);
     FakeCaptureSource source;
-    source.screenQueue = {makeScreenFrame(QSize{200, 100}, 2.0, QColor{10, 200, 20})};
+    // 两帧是一张页面上的相邻两段：接得上，一轮在拒掉第二次框选之后仍然活着
+    const auto page    = makeScrollPage(150);
+    source.screenQueue = {makeScrolledFrame(page, 0), makeScrolledFrame(page, 25)};
     CaptureService service{source, settings, *platform};
 
     std::optional<CapturedImage> finished;
@@ -595,8 +632,8 @@ TEST_F(CaptureServiceFixture, StartingAnotherCaptureWhileALongRoundRunsIsRefused
 
     service.finishLongCapture();
     ASSERT_TRUE(finished.has_value()) << "被拒的那一次顺手把长截图的结果也丢了";
-    // 队列里只备了一帧，第二帧退回替身那份固定的红图：内容不同 → 整段接上，长图从 50 行变 100 行
-    EXPECT_EQ(finished->image.size(), QSize(100, 100)) << "被拒之后这一轮还能接着接，接出来的高度才对得上";
+    // 第二帧与首帧重合 25 行：拒掉第二次框选之后这一轮还能收口，高度是 50 + 25
+    EXPECT_EQ(finished->image.size(), QSize(100, 75)) << "被拒之后这一轮该原样活着，接出来的高度才对得上";
 }
 
 namespace
