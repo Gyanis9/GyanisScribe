@@ -57,7 +57,6 @@
 #include <QListWidget>
 #include <QMessageBox>
 #include <QMouseEvent>
-#include <QPointer>
 #include <QPushButton>
 #include <QRect>
 #include <QScreen>
@@ -1186,6 +1185,10 @@ namespace GyanisScribe
         EXPECT_EQ(dialog->windowModality(), Qt::WindowModal);
         EXPECT_FALSE(dialog->previewImageForTesting().isNull());
         EXPECT_EQ(dialog->sourceForTesting().screenName, window.captureSourceForTesting().screenName);
+        // 单比屏名可能两边都停在默认值：再用本轮抓帧才会有的时刻与前台标题钉住来源确实传给了对话框
+        EXPECT_TRUE(dialog->sourceForTesting().capturedAt.isValid()) << "对话框的来源停在默认值上：没拿到本轮的捕获时刻";
+        EXPECT_EQ(dialog->sourceForTesting().capturedAt, window.captureSourceForTesting().capturedAt) << "对话框收到的来源与本轮快照对不上";
+        EXPECT_EQ(dialog->sourceForTesting().windowTitle, QStringLiteral("替身窗口")) << "对话框没拿到本轮的前台窗口标题";
         EXPECT_TRUE(window.isVisible()) << "开美化对话框把标注窗关了";
         EXPECT_TRUE(window.isRoundActive());
 
@@ -1196,6 +1199,14 @@ namespace GyanisScribe
         QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
         EXPECT_EQ(window.findChild<GyanisScribe::Gui::ShareDialog *>(), nullptr) << "对话框关掉后没释放";
         EXPECT_TRUE(window.isVisible());
+
+        // 关掉之后再点一次：协调器手里那份必须已随对话框销毁置空，否则这里不是叠窗就是碰已释放的内存
+        window.shareRequested(window.canvas().image);
+        auto *reopened = window.findChild<GyanisScribe::Gui::ShareDialog *>();
+        ASSERT_NE(reopened, nullptr) << "关掉之后再点美化分享，没开新对话框";
+        EXPECT_TRUE(reopened->isVisible()) << "重开的对话框没露出来";
+        reopened->close();
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
     }
 
     /**
