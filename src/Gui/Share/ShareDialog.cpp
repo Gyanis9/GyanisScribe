@@ -76,8 +76,9 @@ namespace
      * @brief 让颜色按钮以当前颜色作底并写出十六进制文本
      * @param button 颜色按钮
      * @param color 当前颜色
-     * @details 底色由自绘按钮的色板档给出，文字按底色亮度换反差色：
-     *          浅底上白字与深底上黑字都读不出来，颜色本身不该把标签吞掉。
+     * @details 底色由自绘按钮的色板档给出，文字按底色亮度换反差色：浅底上白字与
+     *          深底上黑字都读不出来，颜色本身不该把标签吞掉。标签由按钮直接落笔，
+     *          主题样式表的 color 规则盖不掉它。
      */
     void applyColorSwatch(GyanisScribe::Gui::Button *button, const QColor &color)
     {

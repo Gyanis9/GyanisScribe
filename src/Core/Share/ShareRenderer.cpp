@@ -10,7 +10,6 @@
 #include <QGuiApplication>
 #include <QLinearGradient>
 #include <QPainter>
-#include <QPainterPath>
 #include <QPen>
 #include <QPoint>
 
@@ -211,7 +210,8 @@ namespace GyanisScribe::Core
         if (style.border && style.borderPixels > 0)
         {
             const auto penWidth = scaledPixelSpan(style.borderPixels, scale);
-            // 以卡片边线为中线内缩半个笔宽：整圈落在卡片内侧，1 像素笔宽也不外溢
+            // 以卡片边线为中线内缩半个笔宽：整圈落在卡片内侧，1 像素笔宽也不外溢。
+            // 直边与主体与旧实现逐像素一致；描边圆角改为抗锯齿，角上像素是描边色与底层的混色
             Core::paintContinuousCorner(painter, QRectF{card}, cardShape, Qt::NoBrush, QPen{style.borderColor, static_cast<qreal>(penWidth)});
         }
 

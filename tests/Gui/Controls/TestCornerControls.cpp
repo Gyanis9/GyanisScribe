@@ -78,6 +78,31 @@ namespace
     }
 
     /**
+     * @brief 数一块区域里满足颜色判据的像素
+     * @tparam Predicate 接受 QColor 并返回 bool 的判据
+     * @param image 抓到的图
+     * @param area 取样区域
+     * @param predicate 颜色判据
+     * @return 命中像素数
+     */
+    template<typename Predicate>
+    int countPixelsWhere(const QImage &image, const QRect &area, Predicate predicate)
+    {
+        int count = 0;
+        for (int y = area.top(); y <= area.bottom(); ++y)
+        {
+            for (int x = area.left(); x <= area.right(); ++x)
+            {
+                if (predicate(image.pixelColor(x, y)))
+                {
+                    ++count;
+                }
+            }
+        }
+        return count;
+    }
+
+    /**
      * @brief 比对半透明手柄的取样色
      * @details grab() 给出的是预乘格式，半透明色经预乘与反预乘会有取整误差：
      *          透明度必须完全一致，RGB 每通道允许 ±2 的误差。
@@ -265,6 +290,72 @@ TEST_F(CornerControlsFixture, ButtonSelfPaintsHighContrastBorderAndFocusEdge)
     QCoreApplication::processEvents();
     image = host.grab().toImage();
     EXPECT_EQ(image.pixelColor(11, 26), palette.accent) << "聚焦后没有换成主色焦点边";
+}
+
+/**
+ * @brief 钉住色板按钮的反差文字色不被样式表盖掉
+ * @details 色板按钮的标签必须由自绘层直接落笔：交给 CE_PushButtonLabel 时，
+ *          QStyleSheetStyle 按样式表的 color 规则上色，option.palette 里塞的反差色到不了画笔上。
+ *          这里挂真实的浅色样式表，再给按钮一条按对象名匹配、优先级更高的红色文字规则：
+ *          深色板上的笔画必须仍是白色，浅色板上必须仍是近黑，红色一格都不许出现；
+ *          禁用后底色与文字回到主题档，白色不能再留下。
+ */
+TEST_F(CornerControlsFixture, ButtonSwatchLabelKeepsTheContrastColorUnderAConflictingStyleSheet)
+{
+    struct StyleSheetGuard
+    {
+        QString previous = qApp->styleSheet();
+
+        ~StyleSheetGuard()
+        {
+            qApp->setStyleSheet(previous);
+        }
+    } guard;
+    qApp->setStyleSheet(GyanisScribe::Gui::ThemeManager::styleSheetFor(GyanisScribe::Gui::ThemeKind::Light));
+
+    QWidget host;
+    host.resize(160, 100);
+    host.setAutoFillBackground(true);
+    host.setPalette(QPalette{QColor{Qt::white}});
+
+    auto *dark = new GyanisScribe::Gui::Button{QStringLiteral("2A2A2A"), &host};
+    dark->setObjectName(QStringLiteral("swatchContrastDark"));
+    dark->setSwatchColor(QColor{0x2A, 0x2A, 0x2A});
+    dark->setStyleSheet(QStringLiteral("QPushButton#swatchContrastDark { color: red; }"));
+    dark->setGeometry(10, 10, 120, 30);
+
+    auto *light = new GyanisScribe::Gui::Button{QStringLiteral("F2F2EE"), &host};
+    light->setObjectName(QStringLiteral("swatchContrastLight"));
+    light->setSwatchColor(QColor{0xF2, 0xF2, 0xEE});
+    light->setStyleSheet(QStringLiteral("QPushButton#swatchContrastLight { color: red; }"));
+    light->setGeometry(10, 50, 120, 30);
+
+    host.show();
+    QCoreApplication::processEvents();
+
+    const auto isRed       = [](const QColor &color) { return color.red() > 200 && color.green() < 80 && color.blue() < 80; };
+    const auto isWhite     = [](const QColor &color) { return color.alpha() == 255 && color.red() > 240 && color.green() > 240 && color.blue() > 240; };
+    const auto isNearBlack = [](const QColor &color) { return color.alpha() == 255 && color.red() < 60 && color.green() < 60 && color.blue() < 60; };
+
+    QImage image = dark->grab().toImage();
+    const QRect darkLabel = dark->rect().adjusted(2, 2, -2, -2);
+    EXPECT_GT(countPixelsWhere(image, darkLabel, isWhite), 10) << "深色板上的标签没有用白色落笔";
+    EXPECT_EQ(countPixelsWhere(image, darkLabel, isRed), 0) << "样式表的红色文字盖掉了深色板的反差色";
+
+    image = light->grab().toImage();
+    const QRect lightLabel = light->rect().adjusted(2, 2, -2, -2);
+    EXPECT_GT(countPixelsWhere(image, lightLabel, isNearBlack), 10) << "浅色板上的标签没有用近黑落笔";
+    EXPECT_EQ(countPixelsWhere(image, lightLabel, isRed), 0) << "样式表的红色文字盖掉了浅色板的反差色";
+
+    // 禁用态：底色回到主题填充，文字改用次要色；白色与红色都不该留下
+    dark->setEnabled(false);
+    dark->update();
+    QCoreApplication::processEvents();
+    image = dark->grab().toImage();
+    EXPECT_EQ(countPixelsWhere(image, darkLabel, isWhite), 0) << "禁用后的色板按钮还在用白色文字";
+    EXPECT_EQ(countPixelsWhere(image, darkLabel, isRed), 0) << "禁用后的色板按钮落到了样式表的红色文字";
+    EXPECT_GT(countPixelsWhere(image, darkLabel, [](const QColor &color) { return color == QColor{0x53, 0x53, 0x4D}; }), 10)
+            << "禁用后的色板按钮没有回到主题的次要文字色";
 }
 
 /**

@@ -18,8 +18,9 @@ namespace GyanisScribe::Gui
     /**
      * @brief 自绘连续曲率底与状态的按钮
      * @details 填充与描边由 ControlPalette 按状态映射；QSS 只留透明边框与内边距占位，
-     *          文字色仍由样式表给出。构造时打的 squircle 属性把样式表规则限定到本类，
-     *          系统对话框里的原生 QPushButton 因此保留原生外观。
+     *          普通按钮的文字色仍由样式表给出。色板按钮是例外：标签由本类直接按底色
+     *          反差落笔，样式表的 color 规则盖不住它。构造时打的 squircle 属性把样式表
+     *          规则限定到本类，系统对话框里的原生 QPushButton 因此保留原生外观。
      */
     class Button : public QPushButton
     {
@@ -40,16 +41,12 @@ namespace GyanisScribe::Gui
         /**
          * @brief 让按钮以指定颜色作底，供色板一类「按钮本身就是色块」的用法
          * @param color 底色；传无效色回到主题给出的填充
-         * @details 底色有效时文字按底色亮度取深色或白色，禁用时回到主题填充；
-         *          描边取主题的强描边色，白底上也能看出边界。
+         * @details 底色有效时整块按钮铺这支颜色、描边取主题的强描边色，标签由本类
+         *          直接按底色亮度取深色或白色落笔，样式表的 color 规则改不了它；
+         *          禁用时底色回到主题填充，标签改用主题的次要文字色。
+         * @note 色板按钮只画文字标签，不画图标。
          */
         void setSwatchColor(const QColor &color);
-
-        /**
-         * @brief 取当前底色
-         * @return 色板底色；没设过时为无效色
-         */
-        [[nodiscard]] QColor swatchColor() const;
 
     private:
         QColor m_swatchColor; ///< 色板底色；无效色表示按主题填充
@@ -57,8 +54,10 @@ namespace GyanisScribe::Gui
     protected:
         /**
          * @brief 先画连续曲率底，再只画标签
-         * @details 重写 QPushButton::paintEvent()：不调基类，只让样式引擎画 CE_PushButtonLabel；
-         *          没有样式表时原生风格会整块补一层不透明底，把自绘填充盖掉
+         * @details 重写 QPushButton::paintEvent()：不调基类。普通按钮只让样式引擎画
+         *          CE_PushButtonLabel；没有样式表时原生风格会整块补一层不透明底，把自绘
+         *          填充盖掉。色板按钮的标签改由本类直接落笔：QStyleSheetStyle 只按样式表
+         *          规则取文字色，option.palette 里塞的反差色到不了画笔上。
          * @param event 绘制事件
          */
         void paintEvent(QPaintEvent *event) override;

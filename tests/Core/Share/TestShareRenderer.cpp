@@ -334,6 +334,34 @@ TEST(ShareRenderer, BorderStaysInsideCardEdge)
     EXPECT_EQ(rendered->pixelColor(220, 70), QColor(0, 255, 0)) << "右边外一格不该有描边";
 }
 
+/// 描边圆角由抗锯齿路径画出：直边仍是纯描边色，弧线上的角格是描边色与底层的混色
+TEST(ShareRenderer, BorderCornersAreAntialiased)
+{
+    auto style               = flatStyle();
+    style.paddingPixels      = 20;
+    style.cornerRadiusPixels = 20;
+    style.border             = true;
+    style.borderPixels       = 2;
+    style.borderColor        = QColor{0, 0, 255};
+    const auto rendered      = renderShareImage(makeSolidImage(QSize{200, 100}, QColor{255, 0, 0}), style);
+    ASSERT_TRUE(rendered.has_value()) << rendered.error().message;
+
+    // 直边没有圆弧：上边第一行与左边第一列仍是整格描边色，卡片外一格仍是背景
+    EXPECT_EQ(rendered->pixelColor(120, 20), QColor(0, 0, 255)) << "上边直边不再是整格描边色";
+    EXPECT_EQ(rendered->pixelColor(120, 19), QColor(0, 255, 0)) << "上边直边外的背景被描边溢出";
+    EXPECT_EQ(rendered->pixelColor(20, 70), QColor(0, 0, 255)) << "左边直边不再是整格描边色";
+    EXPECT_EQ(rendered->pixelColor(19, 70), QColor(0, 255, 0)) << "左边直边外的背景被描边溢出";
+
+    // 左上圆弧在 45° 方向穿过 (26, 26)：抗锯齿让这一格只盖住部分描边色，
+    // 与卡片里的原图混成一格；描边色、背景色与原图色三者都不是它的答案
+    const auto corner = rendered->pixelColor(26, 26);
+    EXPECT_NE(corner, QColor(0, 0, 255)) << "描边圆角仍是整格硬边，没有抗锯齿";
+    EXPECT_NE(corner, QColor(0, 255, 0)) << "取样格落在卡片圆角外，取到的只是背景";
+    EXPECT_NE(corner, QColor(255, 0, 0)) << "描边圆角的弧线没有落到这一格上";
+    EXPECT_GT(corner.blue(), corner.red()) << "混色的描边分量应压过原图的红色";
+    EXPECT_GT(corner.blue(), corner.green()) << "混色的描边分量应压过背景的绿色";
+}
+
 /// 四套内置模板各画一张：背景互不相同，卡片里是原图，代码窗口另有标题栏
 TEST(ShareRenderer, DrawsEveryBuiltInTemplate)
 {
