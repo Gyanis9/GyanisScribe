@@ -17,6 +17,7 @@
 
 #include <QObject>
 #include <QPoint>
+#include <QPointer>
 #include <QRect>
 #include <QSize>
 #include <QString>
@@ -42,6 +43,7 @@ namespace GyanisScribe::Gui
     class AnnotationWindow;
     class CaptureService;
     class IconProvider;
+    class ShareDialog;
     class ThemeManager;
 } // namespace GyanisScribe::Gui
 
@@ -242,6 +244,9 @@ namespace GyanisScribe::App
         /// 标注窗请求识别二维码/条形码：认出来就复制到剪贴板并报一声
         void scanImage(const QImage &image);
 
+        /// 标注窗请求美化分享：开一扇窗口模态的美化对话框，同一时刻只留一扇
+        void shareImage(const QImage &image);
+
         /// 标注窗请求刷新截图（F5）：重抓这块区域换底图，标注留着
         void refreshLastCapture(const QString &screenName, const QRect &region);
 
@@ -280,6 +285,7 @@ namespace GyanisScribe::App
         std::function<void()>                                 m_pendingCapture;                 ///< 延时到点要走的那一步，随定时器一起活到触发
         GyanisScribe::Base::CapturedImage                     m_lastCapture;                    ///< 本轮抓到的帧，贴图与识别要用它定位
         QRect                                                 m_lastSelection;                  ///< 本轮选区（全局逻辑坐标），标注窗与贴图的位置来源
+        QPointer<GyanisScribe::Gui::ShareDialog>              m_shareDialog;                    ///< 美化对话框，关掉即自毁，不拥有
     };
 
 } // namespace GyanisScribe::App

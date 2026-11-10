@@ -12,6 +12,7 @@
 #include "Core/Ocr/OcrTypes.h"
 #include "Gui/Annotation/AnnotationWindow.h"
 #include "Gui/Capture/CaptureOverlay.h"
+#include "Gui/Share/ShareDialog.h"
 #include "App/TrayController.h"
 #include "Gui/Pick/ColorPickerOverlay.h"
 #include "Gui/Pin/PinWindow.h"
@@ -56,6 +57,7 @@
 #include <QListWidget>
 #include <QMessageBox>
 #include <QMouseEvent>
+#include <QPointer>
 #include <QPushButton>
 #include <QRect>
 #include <QScreen>
@@ -1161,6 +1163,39 @@ namespace GyanisScribe
         EXPECT_EQ(window.geometry(), geometry) << "F5 抓失败后标注窗换了位置";
         EXPECT_EQ(messages, 1) << "F5 抓失败的原因没有说给用户";
         EXPECT_TRUE(said.contains(QStringLiteral("这一帧没抓到"))) << said.toStdString();
+    }
+
+    /**
+     * @brief 钉住美化分享由协调器开窗：同一时刻只有一扇、标注窗不收场
+     */
+    TEST_F(AppControllerFixture, ShareOpensOneBeautifyDialogAndKeepsAnnotationOpen)
+    {
+        m_frameScreenName = m_realScreenName;
+        m_frameRegion     = QRect{0, 0, kFrameWidth, kFrameHeight};
+        makeController();
+
+        auto &capture = m_controller->capture();
+        auto &window  = capture.annotationWindow();
+        capture.startFullScreen(App::CaptureIntent::Annotate);
+        ASSERT_TRUE(window.isVisible()) << "标注窗没开起来";
+
+        window.shareRequested(window.canvas().image);
+        auto *dialog = window.findChild<GyanisScribe::Gui::ShareDialog *>();
+        ASSERT_NE(dialog, nullptr) << "美化分享没开对话框";
+        EXPECT_TRUE(dialog->isVisible());
+        EXPECT_EQ(dialog->windowModality(), Qt::WindowModal);
+        EXPECT_FALSE(dialog->previewImageForTesting().isNull());
+        EXPECT_EQ(dialog->sourceForTesting().screenName, window.captureSourceForTesting().screenName);
+        EXPECT_TRUE(window.isVisible()) << "开美化对话框把标注窗关了";
+        EXPECT_TRUE(window.isRoundActive());
+
+        window.shareRequested(window.canvas().image);
+        EXPECT_EQ(window.findChildren<GyanisScribe::Gui::ShareDialog *>().size(), 1) << "重复请求叠了第二扇窗";
+
+        dialog->close();
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        EXPECT_EQ(window.findChild<GyanisScribe::Gui::ShareDialog *>(), nullptr) << "对话框关掉后没释放";
+        EXPECT_TRUE(window.isVisible());
     }
 
     /**

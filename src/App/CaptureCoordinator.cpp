@@ -26,6 +26,7 @@
 #include "Gui/Capture/CaptureService.h"
 #include "Gui/Privacy/PrivacyReviewDialog.h"
 #include "Gui/Resources/IconProvider.h"
+#include "Gui/Share/ShareDialog.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Gui/Theme/ThemeManager.h"
 #include "Plugins/Barcode/BarcodeDecoder.h"
@@ -121,6 +122,7 @@ namespace GyanisScribe::App
                          [this](const QImage &image) { m_dependencies.pins.pinAt(image, m_lastSelection.topLeft()); });
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::ocrRequested, &m_dependencies.ocr, &GyanisScribe::App::OcrCoordinator::requestRecognition);
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::scanRequested, this, &CaptureCoordinator::scanImage);
+        QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::shareRequested, this, &CaptureCoordinator::shareImage);
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::printRequested, this, &CaptureCoordinator::printImage);
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::refreshRequested, this, &CaptureCoordinator::refreshLastCapture);
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::cropRequested, this, &CaptureCoordinator::cropLastCapture);
@@ -714,6 +716,23 @@ namespace GyanisScribe::App
         {
             emit messageForUser(GyanisScribe::Base::uiText("认出 %1 个码，已复制最上面那条").arg(static_cast<int>(readings->size())), GyanisScribe::Gui::ToastKind::Success);
         }
+    }
+
+    void CaptureCoordinator::shareImage(const QImage &image)
+    {
+        if (m_shareDialog)
+        {
+            m_shareDialog->show();
+            m_shareDialog->raise();
+            m_shareDialog->activateWindow();
+            return;
+        }
+        // 对话框拿的是成品副本：标注窗随后关掉也不影响已经渲染的这一张
+        auto *dialog = new GyanisScribe::Gui::ShareDialog{image, m_sourceInfo, m_dependencies.settings, m_annotationWindow.get()};
+        // 构造只定了窗口模态；销毁时机留给宿主：关掉即释放，这里这份 QPointer 随即变空
+        dialog->setAttribute(Qt::WA_DeleteOnClose, true);
+        m_shareDialog = dialog;
+        dialog->show();
     }
 
     void CaptureCoordinator::handlePrivacyScan(const QImage &image, const GyanisScribe::Core::OcrResult &result)
