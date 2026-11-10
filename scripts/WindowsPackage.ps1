@@ -38,7 +38,12 @@ New-Item -ItemType Directory -Force -Path (Join-Path $stage 'docs') | Out-Null
 Copy-Item $exe $stage -Force
 Copy-Item 'README.md' $stage -Force
 if (-not (Test-Path 'LICENSE.txt')) { throw 'LICENSE.txt missing: the installer must carry the end-user license' }
-Copy-Item 'LICENSE.txt' $stage -Force
+# NSIS decodes the license file with the system ANSI codepage unless it starts with a BOM.
+# The repo LICENSE.txt is BOM-less UTF-8, so an as-is copy turns the Chinese license page into
+# mojibake. Stage a BOM-prefixed UTF-8 copy with CRLF, which NSIS reads as Unicode text.
+$licenseText = (Get-Content -Raw -Encoding utf8 'LICENSE.txt') -replace '\r?\n', "`r`n"
+$licenseUtf8Bom = New-Object System.Text.UTF8Encoding($true)
+[System.IO.File]::WriteAllText((Join-Path $stage 'LICENSE.txt'), $licenseText, $licenseUtf8Bom)
 # The license texts are vendored in the repo, so this call is a repair, not a download step: it only
 # re-fetches a file that is absent or is not the license (a failed fetch once left a 14-byte
 # "404: Not Found" page in the folder, and it copied just as prettily as the real text).
