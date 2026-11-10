@@ -363,8 +363,9 @@ namespace GyanisScribe::Base
 
     Expected<QString> Paths::previewProductName(const QString &pattern, const QDateTime &moment, const NameTemplateContext &context)
     {
-        // 空模板按默认档预览：设置页清空输入框时显示的应与实际保存出来的名字一致
-        const auto effective = pattern.isEmpty() ? defaultNameTemplate() : pattern;
+        // 空模板按默认档预览：设置页清空输入框时显示的应与实际保存出来的名字一致；
+        // 只留空白的模板在保存那一侧也按空处理，预览要同一档
+        const auto effective = pattern.trimmed().isEmpty() ? defaultNameTemplate() : pattern;
         const auto checked   = parseNameTemplate(effective);
         if (!checked)
         {

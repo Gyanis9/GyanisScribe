@@ -2167,7 +2167,7 @@ namespace GyanisScribe::Main
 
         const auto explainHint = [edit](const QString &reason)
         {
-            edit->setToolTip(reason.isEmpty() ? GyanisScribe::Base::uiText("可用变量：%date%（日期）、%time%（时刻）、%ms%（毫秒）；留空表示用默认档。改动后从下一次保存起生效")
+            edit->setToolTip(reason.isEmpty() ? GyanisScribe::Base::uiText("可用变量：%date%（日期）、%time%（时刻）、%ms%（毫秒）、%app%（应用名）、%title%（窗口标题）、%monitor%（屏幕名）；留空表示用默认档。改动后从下一次保存起生效")
                                               : reason);
         };
         explainHint(QString{});

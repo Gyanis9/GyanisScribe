@@ -3604,8 +3604,8 @@
             <translation>File name template</translation>
         </message>
         <message>
-            <source>可用变量：%date%（日期）、%time%（时刻）、%ms%（毫秒）；留空表示用默认档。改动后从下一次保存起生效</source>
-            <translation>Available variables: %date% (date), %time% (time), %ms% (milliseconds); leave blank to use the default. Changes take effect from the next save</translation>
+            <source>可用变量：%date%（日期）、%time%（时刻）、%ms%（毫秒）、%app%（应用名）、%title%（窗口标题）、%monitor%（屏幕名）；留空表示用默认档。改动后从下一次保存起生效</source>
+            <translation>Available variables: %date% (date), %time% (time), %ms% (milliseconds), %app% (application), %title% (window title), %monitor% (screen); leave blank to use the default. Changes take effect from the next save</translation>
         </message>
         <message>
             <source>边框宽度</source>

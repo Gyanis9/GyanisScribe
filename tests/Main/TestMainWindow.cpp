@@ -1113,6 +1113,15 @@ namespace
         ASSERT_NE(preview, nullptr) << "文件名模板输入框下面没有预览标签";
         EXPECT_EQ(preview->accessibleName(), GyanisScribe::Base::uiText("文件名模板预览"));
 
+        // 默认提示必须列全六格变量：只写时刻三格时，输入框的提示会与未知变量的报错各说一套
+        const auto hint = edit->toolTip();
+        for (const auto &variable: {QStringLiteral("%date%"), QStringLiteral("%time%"), QStringLiteral("%ms%"), QStringLiteral("%app%"),
+                                    QStringLiteral("%title%"), QStringLiteral("%monitor%")})
+        {
+            EXPECT_TRUE(hint.contains(variable)) << "默认提示没列出 " << variable.toStdString() << "：" << hint.toStdString();
+        }
+        EXPECT_TRUE(hint.contains(QStringLiteral("留空"))) << "默认提示没说留空等于默认档：" << hint.toStdString();
+
         EXPECT_EQ(preview->text(), QStringLiteral("预演：GyanisScribe_20261109_140300_123.png")) << "空模板没有按默认档预演";
 
         edit->setText(QStringLiteral("%app%_%title%"));
@@ -1129,6 +1138,29 @@ namespace
         closeWindowAndFlush();
         const auto reopened = makeStore();
         EXPECT_TRUE(reopened->stringValue(GyanisScribe::Core::kSaveNameTemplate, QString{}).isEmpty()) << "预览把未校验的文本写进了配置";
+    }
+
+    /**
+     * @brief 钉住建页时按盘上那份非默认模板装输入框与预演，而不是拿默认档凑一行
+     * @details 预览若在建页时固定用默认档算，改过模板的用户每次重开设置页都会被预演骗一次；
+     *          这里先写盘再建窗口，要求输入框、预演与默认提示三处同解。
+     */
+    TEST_F(MainWindowFixture, NameTemplatePreviewReadsStoredTemplateAtConstruction)
+    {
+        ASSERT_TRUE(m_store->setValue(GyanisScribe::Core::kSaveNameTemplate, QStringLiteral("%app%_%title%_%monitor%")).has_value());
+        makeWindow();
+        m_window->open(MainWindowPage::Capture);
+
+        auto *edit = qobject_cast<QLineEdit *>(controlInCurrentPage("文件名模板"));
+        ASSERT_NE(edit, nullptr) << "截图页没有文件名模板这一格";
+        EXPECT_EQ(edit->text(), QStringLiteral("%app%_%title%_%monitor%")) << "盘上的模板没装回输入框";
+
+        auto *preview = m_window->findChild<QLabel *>(QStringLiteral("nameTemplatePreview"));
+        ASSERT_NE(preview, nullptr) << "文件名模板输入框下面没有预览标签";
+        EXPECT_EQ(preview->text(), QStringLiteral("预演：示例应用_示例窗口_屏幕_1.png")) << "建页预演没按盘上那份模板算";
+
+        // 非默认模板下默认提示仍在：留空仍是回到默认档，不是一条报错
+        EXPECT_TRUE(edit->toolTip().contains(QStringLiteral("留空"))) << "非默认模板下默认提示丢了：" << edit->toolTip().toStdString();
     }
 
     /**

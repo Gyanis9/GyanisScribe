@@ -415,6 +415,11 @@ TEST(Paths, PreviewReturnsStemAndRejectsInvalidTemplate)
     const auto empty = Paths::previewProductName(QString{}, moment, {});
     ASSERT_TRUE(empty.has_value()) << "空模板应按默认档预览";
     EXPECT_EQ(*empty, QStringLiteral("GyanisScribe_20261109_140300_123"));
+
+    // 设置页保存时把只有空白的输入按空串写回，预览对这类输入也要落到同一档
+    const auto blank = Paths::previewProductName(QStringLiteral("   "), moment, {});
+    ASSERT_TRUE(blank.has_value()) << "只有空白的模板应按默认档预览";
+    EXPECT_EQ(*blank, QStringLiteral("GyanisScribe_20261109_140300_123"));
 }
 
 /**

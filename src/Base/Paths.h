@@ -193,11 +193,12 @@ namespace GyanisScribe::Base
 
         /**
          * @brief 按模板与上下文预览成品主名
-         * @param pattern 文件名模板；空串表示按默认档预览
+         * @param pattern 文件名模板；空串或只有空白表示按默认档预览
          * @param moment 用于展开时刻变量的时刻
          * @param context 应用名、窗口标题与屏幕名
          * @return 成功返回不含扩展名的主名；模板不合法时返回带中文原因的 InvalidArgument
-         * @details 设置页要显示与实际保存一致的名字：清洗、空值回落与保留设备名前缀都与 imageFileName 同解。
+         * @details 设置页要显示与实际保存一致的名字：清洗、空值回落与保留设备名前缀都与 imageFileName 同解；
+         *          设置页保存时把只有空白的输入按空串写回配置，预览对这类输入同样按默认档算。
          */
         [[nodiscard]] static Expected<QString> previewProductName(const QString &pattern, const QDateTime &moment, const NameTemplateContext &context);
 
