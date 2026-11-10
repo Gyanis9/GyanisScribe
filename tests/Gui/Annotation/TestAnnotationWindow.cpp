@@ -2742,11 +2742,16 @@ TEST_F(AnnotationWindowFixture, InfoPanelKeepsPartialSourceWithUnknownFields)
  * @brief 钉住「美化分享」入口：发出成品、标注窗不收场
  * @details 美化是继续编辑之前的出口，不是交付终点；与复制/保存不同，
  *          点完按钮窗还开着、轮次还活着，也不能发 closed。
+ *          成品与画布原图同为 400x200，靠倍比与笔迹像素区分，判的就是「烘过没有」。
  */
 TEST_F(AnnotationWindowFixture, ShareButtonEmitsTheBakedImageAndKeepsTheRoundOpen)
 {
     auto window = makeWindow();
     window->startAnnotation(makeCanvas({200, 100}), QRect{0, 0, 1920, 1080}, QRect{0, 0, 200, 100});
+    ASSERT_TRUE(window->isVisible());
+
+    // 画一条：交出去的若是画布原图，成品上就找不到这条笔迹
+    ASSERT_TRUE(drawAndSelect({10, 10}, {60, 40}).has_value());
 
     QToolButton *share = nullptr;
     for (auto *candidate: window->toolbar().findChildren<QToolButton *>())
@@ -2768,6 +2773,10 @@ TEST_F(AnnotationWindowFixture, ShareButtonEmitsTheBakedImageAndKeepsTheRoundOpe
     const auto image = shared.at(0).at(0).value<QImage>();
     EXPECT_FALSE(image.isNull());
     EXPECT_EQ(image.size(), QSize(400, 200)) << "交出去的不是画布的物理尺寸";
+    // 画布原图的倍比是 1、导出图按物理/逻辑算成 2：只比尺寸时两者都是 400x200，判不出烘没烘
+    EXPECT_DOUBLE_EQ(image.devicePixelRatio(), 2.0) << "交出去的是画布原图，不是标回倍比的成品";
+    // 矩形上边框那一段在物理图上不会是底色的灰（逻辑坐标乘 2）
+    EXPECT_NE(image.pixelColor(60, 20), QColor(180, 180, 180)) << "交出去的是底图，不是画上图形的成品";
     EXPECT_TRUE(window->isVisible()) << "美化分享把标注窗关了";
     EXPECT_TRUE(window->isRoundActive()) << "美化分享把这一轮画上了句号";
     EXPECT_EQ(closed.count(), 0) << "美化分享不该发 closed";

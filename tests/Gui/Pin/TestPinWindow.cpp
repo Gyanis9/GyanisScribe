@@ -1246,6 +1246,37 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住贴图直接标注不摆「美化分享」：那一处没有美化对话框的宿主
+     * @details 两处共用同一把工具栏；如果把这枚按钮原样留在贴图的标注栏上，
+     *          用户点到的是一枚永远没反应的控件。收起只动这一枚，保存等既有动作照旧在场。
+     */
+    TEST_F(PinWindowFixture, DirectAnnotationHidesTheShareActionWithoutAHost)
+    {
+        auto &window = makeWindow();
+        window.startAnnotation();
+        ASSERT_TRUE(window.isAnnotating());
+
+        QToolButton *shareButton = nullptr;
+        QToolButton *saveButton  = nullptr;
+        for (auto *candidate: window.findChildren<QToolButton *>())
+        {
+            if (candidate->accessibleName() == QString::fromUtf8("美化分享"))
+            {
+                shareButton = candidate;
+            } else if (candidate->accessibleName() == QString::fromUtf8("保存为文件"))
+            {
+                saveButton = candidate;
+            }
+        }
+        ASSERT_NE(shareButton, nullptr) << "贴图的标注工具栏上找不到美化分享按钮";
+        EXPECT_TRUE(shareButton->isHidden()) << "贴图直接标注没有美化对话框的宿主，这枚按钮留着就是死控件";
+        EXPECT_FALSE(shareButton->isEnabled()) << "收起的美化分享仍然可点";
+
+        ASSERT_NE(saveButton, nullptr) << "贴图的标注工具栏上找不到保存按钮";
+        EXPECT_FALSE(saveButton->isHidden()) << "收起美化分享顺手把别的动作也收起来了";
+    }
+
+    /**
      * @brief 钉住直接标注的核心语义：画到收工才烘，Esc 是「收工保留」而不是「丢弃并关闭」
      * @details 贴图本来就存在，标注只是给它添一笔；Esc 若走关闭那一路，用户丢的是整张贴图。
      *          判据取「收工前后贴图手里那张图」：没收工不带笔迹，收工之后笔迹在、内里仍是底图。

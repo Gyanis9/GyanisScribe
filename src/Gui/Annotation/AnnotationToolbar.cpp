@@ -366,9 +366,11 @@ namespace GyanisScribe::Gui
             {
                 m_privacyButton = button;
             }
-            // 美化分享留着对象名与展开提示：用例按对象名找它，提示把这一档能调的四样写全
+            // 美化分享留着指针、对象名与展开提示：没有对话框宿主的工具栏要把它单独收起，
+            // 用例按对象名找它，提示把这一档能调的四样写全
             if (action.signal == &AnnotationToolbar::shareClicked)
             {
+                m_shareButton = button;
                 button->setObjectName(QStringLiteral("shareButton"));
                 button->setToolTip(GyanisScribe::Base::uiText("美化分享（背景、圆角、投影、水印）"));
             }
@@ -884,6 +886,17 @@ namespace GyanisScribe::Gui
         // 收起而不是只置灰：灰着的按钮仍占着动作格，用户还会反复点它试
         m_privacyButton->setVisible(available);
         m_privacyButton->setEnabled(available);
+    }
+
+    void AnnotationToolbar::setShareAvailable(const bool available)
+    {
+        if (m_shareButton == nullptr)
+        {
+            return;
+        }
+        // 与隐私打码同一套收放：没有对话框宿主的工具栏上，这枚按钮只该整枚消失
+        m_shareButton->setVisible(available);
+        m_shareButton->setEnabled(available);
     }
 
     void AnnotationToolbar::setUndoRedoAvailable(const bool canUndo, const bool canRedo)
