@@ -233,7 +233,7 @@ TEST_F(LanguageFixture, BuiltEnglishPackTranslatesKnownString)
         const char *expected; ///< 目录里钉好的英文译文
     };
 
-    for (const Sample sample: {Sample{"截图与标注成品目录", "Folder for screenshots and annotations"}, Sample{"浅色", "Light"}, Sample{"最近使用 %1", "Recent %1"}})
+    for (const Sample sample: {Sample{"截图与标注输出目录", "Folder for screenshots and annotations"}, Sample{"浅色", "Light"}, Sample{"最近使用颜色 %1", "Recent color %1"}})
     {
         const auto translated = QCoreApplication::translate("GyanisScribe", sample.source);
         EXPECT_NE(translated, QString::fromUtf8(sample.source)) << sample.source << "：包装载成功但这条没变，查 .ts 里有没有它、context 对不对";
@@ -241,7 +241,7 @@ TEST_F(LanguageFixture, BuiltEnglishPackTranslatesKnownString)
     }
 
     // 占位符要在译文上继续能用：少一个 %1 就是界面写着 "Recent %1" 这种半成品
-    EXPECT_EQ(QCoreApplication::translate("GyanisScribe", "最近使用 %1").arg(2), QStringLiteral("Recent 2"));
+    EXPECT_EQ(QCoreApplication::translate("GyanisScribe", "最近使用颜色 %1").arg(2), QStringLiteral("Recent color 2"));
 
     removeEveryTranslator();
 }

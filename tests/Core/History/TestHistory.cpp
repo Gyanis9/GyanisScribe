@@ -406,7 +406,7 @@ TEST_F(HistoryFixture, CorruptManifestFailsWithPlaceToFix)
     HistoryStore store{storePath()};
     const auto   unparsable = store.load(kNoLimits, kNow);
     ASSERT_FALSE(static_cast<bool>(unparsable));
-    EXPECT_NE(unparsable.error().message.find("格式不对"), std::string::npos);
+    EXPECT_NE(unparsable.error().message.find("格式无效"), std::string::npos);
     EXPECT_NE(unparsable.error().message.find(pathTextOf(storePath())), std::string::npos) << "报错里没有清单路径，用户不知道去修哪一份";
 }
 
@@ -433,7 +433,7 @@ TEST_F(HistoryFixture, OneBadRecordIsSkippedAndPreserved)
     EXPECT_EQ(loaded->skippedRecords, 1);
     ASSERT_FALSE(loaded->firstProblem.empty()) << "跳过了一条却没有留下原因，界面无从提示";
     EXPECT_NE(loaded->firstProblem.find(pathTextOf(storePath())), std::string::npos) << "跳过原因里没有清单路径，用户不知道去改哪一份：" << loaded->firstProblem;
-    EXPECT_NE(loaded->firstProblem.find("改对"), std::string::npos) << "跳过原因里没有修法，用户只能看着记录被跳过：" << loaded->firstProblem;
+    EXPECT_NE(loaded->firstProblem.find("修正"), std::string::npos) << "跳过原因里没有修法，用户只能看着记录被跳过：" << loaded->firstProblem;
     EXPECT_NE(loaded->firstProblem.find("重建"), std::string::npos) << "跳过原因里没有「删掉清单重建」这一条路：" << loaded->firstProblem;
 
     const auto added = makeArtifact("added.png");
@@ -506,7 +506,7 @@ TEST_F(HistoryFixture, SkipReasonsNameTheProblemAndHowToFixIt)
         EXPECT_TRUE(loaded->entries.isEmpty()) << "坏记录不该混进好记录里";
         EXPECT_NE(loaded->firstProblem.find(fragment), std::string::npos) << "跳过原因没有说清坏在哪：" << loaded->firstProblem;
         EXPECT_NE(loaded->firstProblem.find(pathTextOf(storePath())), std::string::npos) << "跳过原因里没有清单路径：" << loaded->firstProblem;
-        EXPECT_NE(loaded->firstProblem.find("改对"), std::string::npos) << "跳过原因里没有改记录这条修法：" << loaded->firstProblem;
+        EXPECT_NE(loaded->firstProblem.find("修正"), std::string::npos) << "跳过原因里没有改记录这条修法：" << loaded->firstProblem;
         EXPECT_NE(loaded->firstProblem.find("重建"), std::string::npos) << "跳过原因里没有删掉清单重建这条修法：" << loaded->firstProblem;
     }
 }

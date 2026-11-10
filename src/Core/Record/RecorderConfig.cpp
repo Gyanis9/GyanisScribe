@@ -79,7 +79,7 @@ namespace GyanisScribe::Core
         return Base::Expected<int>{std::unexpected{Base::Error{
                 .code    = Base::ErrorCode::InvalidArgument,
                 .message = GyanisScribe::Base::uiFormat(
-                        GyanisScribe::Base::uiTextUtf8("默认帧率 \"{}\" 不在可用范围（1 到 {}）里：请在设置的录屏页重选一个值，或删掉 Record/DefaultFrameRate 这一项回到默认档"),
+                        GyanisScribe::Base::uiTextUtf8("默认帧率 \"{}\" 不在可用范围（1 到 {}）里：请在设置的录屏页重选一个值，或删掉 Record/DefaultFrameRate 此项回到默认档"),
                         stored, kMaximumFrameRate),
         }}};
     }
@@ -95,7 +95,7 @@ namespace GyanisScribe::Core
                 .code    = Base::ErrorCode::InvalidArgument,
                 .message = GyanisScribe::Base::uiFormat(
                         GyanisScribe::Base::uiTextUtf8(
-                                "画面码率 \"{}\" 不在可用范围（0 到 {} kbps，0 表示按质量优先）里：请在设置的录屏页重选，或删掉 Record/VideoBitrateKbps 这一项回到默认档"),
+                                "画面码率 \"{}\" 不在可用范围（0 到 {} kbps，0 表示按质量优先）里：请在设置的录屏页重选，或删掉 Record/VideoBitrateKbps 此项回到默认档"),
                         stored, kMaximumVideoBitrateKbps),
         }}};
     }
@@ -110,7 +110,7 @@ namespace GyanisScribe::Core
                 .code = Base::ErrorCode::InvalidArgument,
                 .message =
                         GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("最长录制时长「{}」不在可用范围（1 到 {} 秒，即最多 {} 分钟）里：请在设置的录屏页重选，或删掉 "
-                                                                                    "Record/MaximumDurationSeconds 这一项回到默认的 {} 秒"),
+                                                                                    "Record/MaximumDurationSeconds 此项回到默认的 {} 秒"),
                                                      stored, kMaximumDurationSeconds, kMaximumDurationSeconds / 60, kDefaultMaximumDurationSeconds),
         }}};
     }
@@ -126,7 +126,7 @@ namespace GyanisScribe::Core
                 .code    = Base::ErrorCode::InvalidArgument,
                 .message = GyanisScribe::Base::uiFormat(
                         GyanisScribe::Base::uiTextUtf8(
-                                "倒计时「{}」不在可用范围（0 到 {} 秒，0 表示立即开始）里：请在设置的录屏页重选，或删掉 Record/CountdownSeconds 这一项回到默认档"),
+                                "倒计时「{}」不在可用范围（0 到 {} 秒，0 表示立即开始）里：请在设置的录屏页重选，或删掉 Record/CountdownSeconds 此项回到默认档"),
                         stored, kMaximumCountdownSeconds),
         }}};
     }

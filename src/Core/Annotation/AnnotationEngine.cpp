@@ -1050,12 +1050,12 @@ namespace GyanisScribe::Core
         if (m_selection.size() != 1 || m_selection.front().tool != ToolKind::Text)
         {
             return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Base::uiTextUtf8("改内容要恰好选中一条文字图形：多选或别的图形都改不了。只有文字工具画出来的那几条可以双击重编")});
+                                               GyanisScribe::Base::uiTextUtf8("修改文字内容需恰好选中一条文字图形；多选或其他图形不支持修改。仅文字工具创建的文字可双击重新编辑。")});
         }
         if (text.isEmpty())
         {
             return std::unexpected(
-                    Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("文字不能是空的：不要这一条就按 Delete 删掉，或按 Ctrl+Z 撤销这次改动")});
+                    Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("文字内容不能为空。如不需要此条，请按 Delete 删除，或按 Ctrl+Z 撤销本次修改。")});
         }
 
         const auto &subject = m_selection.front();
@@ -1199,7 +1199,7 @@ namespace GyanisScribe::Core
     {
         if (!m_handleDrag)
         {
-            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("现在没有在拖手柄。请先按下选中框上的手柄再拖")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("当前未在拖动手柄。请先按住选中框上的手柄再拖动。")});
         }
 
         const HandleDrag session = *m_handleDrag;

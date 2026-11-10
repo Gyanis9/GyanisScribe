@@ -80,7 +80,7 @@ namespace GyanisScribe::Core
         if (!output.commit())
         {
             return std::unexpected(Base::Error{Base::ErrorCode::FileWriteFailed,
-                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("识别结果没落盘：{}（{}）。请检查磁盘空间后重试"),
+                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("识别结果未保存：{}（{}）。请检查磁盘空间后重试"),
                                                                             Base::Paths::toDisplayText(filePath).toStdString(), output.errorString().toStdString())});
         }
         return {};

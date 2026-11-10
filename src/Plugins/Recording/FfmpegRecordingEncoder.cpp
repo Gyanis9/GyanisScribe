@@ -53,7 +53,7 @@ namespace GyanisScribe::Plugins
         // 首帧读不出就别往下探：尺寸是探的输入，拿 0x0 去问编码器只会得到一条与真因无关的失败
         if (size.isEmpty())
         {
-            const auto message = GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("第一帧读不出尺寸（{}）。请确认录屏期间磁盘没满，或先用剪贴板交付这一帧序列"),
+            const auto message = GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("无法读取第一帧尺寸（{}）。请确认录屏期间磁盘空间充足，或先将帧序列交付到剪贴板。"),
                                                               Base::Paths::toDisplayText(frameDirectory).toStdString());
             Base::Logger::error(message);
             return std::unexpected(Base::Error{Base::ErrorCode::FileWriteFailed, message});
@@ -180,7 +180,7 @@ namespace GyanisScribe::Plugins
         if (error || size == 0)
         {
             const auto message =
-                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("ffmpeg 报告成功，但成品不可用：{}。请检查磁盘空间后重编码，或先用剪贴板交付这一帧序列"),
+                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("ffmpeg 报告成功，但输出文件不可用：{}。请检查磁盘空间后重新编码，或先将帧序列交付到剪贴板。"),
                                                  Base::Paths::toDisplayText(outputFile).toStdString());
             Base::Logger::error(message);
             return std::unexpected(Base::Error{Base::ErrorCode::FileWriteFailed, message});
@@ -215,7 +215,7 @@ namespace GyanisScribe::Plugins
             // 超时后必须收尸：留一个还在写文件的 ffmpeg 在后台，下一轮录屏会撞上同一个目录
             process.kill();
             process.waitForFinished(1000);
-            const auto message = GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("{} 超时（{} 毫秒未完成）。可以缩短录屏时长，或先把成品交剪贴板"),
+            const auto message = GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("{} 超时（{} 毫秒内未完成）。可缩短录屏时长，或先将输出文件交付到剪贴板。"),
                                                               std::string{stepName}, timeoutMs);
             Base::Logger::error(message);
             return std::unexpected(Base::Error{Base::ErrorCode::Busy, message});
@@ -224,7 +224,7 @@ namespace GyanisScribe::Plugins
         if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0)
         {
             const auto output  = tailOf(QString::fromUtf8(process.readAll()));
-            const auto message = GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("{} 失败（退出码 {}）：{}。完整输出在日志里，也可以自己敲一遍同样的命令看细节"),
+            const auto message = GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("{} 失败（退出码 {}）：{}。完整输出在日志里，也可以手动执行一遍同样的命令看细节"),
                                                               std::string{stepName}, process.exitCode(), output);
             Base::Logger::error(message);
             return std::unexpected(Base::Error{Base::ErrorCode::InternalError, message});

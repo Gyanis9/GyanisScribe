@@ -261,7 +261,7 @@ namespace GyanisScribe::Core
         {
             return std::unexpected(
                     Base::Error{Base::ErrorCode::InvalidArgument,
-                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("全局热键至少要带一个修饰键：单键 {} 会把其它程序的普通按键吞掉。请加上 Ctrl 或 Alt"),
+                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("全局热键至少要带一个修饰键：单键 {} 会拦截其他程序的普通按键。请加上 Ctrl 或 Alt"),
                                                              keyTokenText(m_key).toStdString())});
         }
         return {};

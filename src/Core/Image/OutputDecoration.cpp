@@ -20,7 +20,7 @@ namespace
     {
         return GyanisScribe::Base::Error{
                 GyanisScribe::Base::ErrorCode::InvalidArgument,
-                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("{} \"{}\" 不在 {} 到 {} 之间：请在设置的截图页重选一个值，或删掉这一项回到默认档"), std::string{key},
+                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("{} \"{}\" 不在 {} 到 {} 之间：请在设置的截图页重选一个值，或删掉此项回到默认档"), std::string{key},
                                              stored, minimum, maximum),
         };
     }

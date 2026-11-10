@@ -187,7 +187,7 @@ namespace GyanisScribe::Core
             return std::unexpected(
                     Base::Error{Base::ErrorCode::InvalidArgument,
                                 GyanisScribe::Base::uiFormat(
-                                        GyanisScribe::Base::uiTextUtf8("上次选区的记录格式不对：收到「{}」，应为「x,y,width,height」四个整数。请删掉这一项，让程序重新记一次"),
+                                        GyanisScribe::Base::uiTextUtf8("上次选区的记录格式不对：收到「{}」，应为「x,y,width,height」四个整数。请删掉此项，让程序重新记一次"),
                                         std::string(text))});
         }
 
@@ -204,7 +204,7 @@ namespace GyanisScribe::Core
                 // 逐段点名是哪一段坏了：四个数字里任何一个被截断或取整都会把选区挪到别处
                 return std::unexpected(
                         Base::Error{Base::ErrorCode::InvalidArgument,
-                                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("上次选区的记录第 {} 段「{}」不是整数。请删掉这一项，让程序重新记一次"), index + 1,
+                                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("上次选区的记录第 {} 段「{}」不是整数。请删掉此项，让程序重新记一次"), index + 1,
                                                                  std::string(field))});
             }
         }
@@ -213,7 +213,7 @@ namespace GyanisScribe::Core
         {
             return std::unexpected(
                     Base::Error{Base::ErrorCode::InvalidArgument,
-                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("上次选区的宽高必须是正数，收到的是 {}×{}。请删掉这一项，让程序重新记一次"), numbers[2],
+                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("上次选区的宽高必须是正数，收到的是 {}×{}。请删掉此项，让程序重新记一次"), numbers[2],
                                                              numbers[3])});
         }
 
@@ -337,7 +337,7 @@ namespace GyanisScribe::Core
         return Base::Expected<int>{std::unexpected{Base::Error{
                 .code    = Base::ErrorCode::InvalidArgument,
                 .message = GyanisScribe::Base::uiFormat(
-                        GyanisScribe::Base::uiTextUtf8("圆角半径 \"{}\" 不在 {} 到 {} 之间：请在设置的截图页重选一个值，或删掉 Capture/CornerRadius 这一项回到默认的 {} 格"),
+                        GyanisScribe::Base::uiTextUtf8("圆角半径 \"{}\" 不在 {} 到 {} 之间：请在设置的截图页重选一个值，或删掉 Capture/CornerRadius 此项回到默认的 {} 格"),
                         logical, kCaptureCornerRadiusMinimum, kCaptureCornerRadiusMaximum, kCaptureCornerRadiusDefault),
         }}};
     }

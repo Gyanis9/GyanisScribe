@@ -24,7 +24,7 @@ namespace GyanisScribe::Core
             if (tokens.isEmpty())
             {
                 return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
-                                                   GyanisScribe::Base::uiTextUtf8("色板是空的：至少要留一格。想回到内置那八格，请把设置里那一格清掉而不是填成空白")});
+                                                   GyanisScribe::Base::uiTextUtf8("色板不能为空，至少保留一格。如需使用内置八色，请清空该设置，不要填入空白值。")});
             }
             if (tokens.size() > static_cast<qsizetype>(kPaletteCapacity))
             {
@@ -67,7 +67,7 @@ namespace GyanisScribe::Core
 
     Base::Expected<std::vector<QColor>> paletteFromTokens(const QStringList &tokens)
     {
-        const auto recovery = Base::uiText("删掉配置里的 %1 这一项可以恢复默认").arg(QString::fromUtf8(Core::kAnnotationPalette)).toStdString();
+        const auto recovery = Base::uiText("删掉配置里的 %1 此项可以恢复默认").arg(QString::fromUtf8(Core::kAnnotationPalette)).toStdString();
         return paletteFromTokensWithHint(tokens, recovery);
     }
 
@@ -137,7 +137,7 @@ namespace GyanisScribe::Core
                 }
             }
         }
-        const auto recovery = Base::uiText("检查导入文件里的色块写法，或删掉配置里的 %1 这一项可以恢复默认").arg(QString::fromUtf8(Core::kAnnotationPalette)).toStdString();
+        const auto recovery = Base::uiText("检查导入文件里的色块写法，或删掉配置里的 %1 此项可以恢复默认").arg(QString::fromUtf8(Core::kAnnotationPalette)).toStdString();
         return paletteFromTokensWithHint(tokens, recovery);
     }
 

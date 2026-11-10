@@ -191,7 +191,7 @@ namespace GyanisScribe::Plugins
         if (!prepared.save(&bytesDevice, "PNG") || encoded.isEmpty())
         {
             return std::unexpected(
-                    Base::Error{Base::ErrorCode::InternalError, GyanisScribe::Base::uiTextUtf8("这一张图没能编成 PNG。请重试一次，或先在标注窗里另存一份 PNG 再识别")});
+                    Base::Error{Base::ErrorCode::InternalError, GyanisScribe::Base::uiTextUtf8("该图片图无法编成 PNG。请重试一次，或先在标注窗里另存一份 PNG 再识别")});
         }
 
         std::vector<uint8_t> pngBytes(static_cast<size_t>(encoded.size()));
@@ -271,7 +271,7 @@ namespace GyanisScribe::Plugins
                     {
                         return std::unexpected(Base::Error{
                                 Base::ErrorCode::InternalError,
-                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("系统识别这一张图失败（{}，错误码 0x{}）。请重试一次，或改用 Tesseract 后端"),
+                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("系统识别该图片图失败（{}，错误码 0x{}）。请重试一次，或改用 Tesseract 后端"),
                                                              fromWinRTString(failure.message()).toStdString(), std::format("{:08X}", static_cast<uint32_t>(failure.code())))});
                     }
                 });

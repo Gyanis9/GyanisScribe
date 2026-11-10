@@ -1091,7 +1091,7 @@ namespace
 
         const auto cancelled = service.cancel();
         ASSERT_FALSE(static_cast<bool>(cancelled)) << "取消接了正在编的那一轮：成品会以「编码失败」的面目回来";
-        EXPECT_NE(cancelled.error().message.find("已经停止并在编"), std::string::npos) << cancelled.error().message;
+        EXPECT_NE(cancelled.error().message.find("已停止并正在编码"), std::string::npos) << cancelled.error().message;
         EXPECT_TRUE(std::filesystem::exists(frameDirectory)) << "目录被取消删掉了，那正是后台编码在读的输入";
         EXPECT_EQ(abortedCount, 0) << "拒了却还是发了 aborted";
 

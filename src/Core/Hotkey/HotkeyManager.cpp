@@ -47,7 +47,7 @@ namespace GyanisScribe::Core
         /// 旧组合也恢复不了时，失败原因要说明这颗键现在按不了，而不是只留一行日志
         void appendUnrestoredNote(Base::Error &error, const QString &previousText)
         {
-            error.message += "；" + Base::uiFormat(Base::uiTextUtf8("旧的 {} 也没能恢复，这颗键暂时按不了"), previousText.toStdString());
+            error.message += "；" + Base::uiFormat(Base::uiTextUtf8("旧的 {} 也无法恢复，该按键暂时不可用"), previousText.toStdString());
         }
     } // namespace
 

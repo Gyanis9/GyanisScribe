@@ -23,7 +23,7 @@ namespace GyanisScribe::Base
         if (pieces.front().contains(placeholder))
         {
             return std::unexpected(Error{.code    = ErrorCode::InvalidArgument,
-                                         .message = uiFormat(uiTextUtf8("外部命令的第一个词「{}」里带着 %file%：%file% 是成品路径，只能出现在参数里。程序名要写在最前面"),
+                                         .message = uiFormat(uiTextUtf8("外部命令的第一个词「{}」里带着 %file%：%file% 是输出文件路径，只能出现在参数里。程序名要写在最前面"),
                                                              pieces.front().toStdString())});
         }
 
@@ -33,8 +33,8 @@ namespace GyanisScribe::Base
             // 不静默把占位符换成空串：那样跑出去的是「少了一个参数」的命令，外部程序会按自己的方式报错，
             // 用户查到这里来只看到「截图后什么都没发生」
             return std::unexpected(Error{.code    = ErrorCode::InvalidArgument,
-                                         .message = uiTextUtf8("这条外部命令要 %file%，可这一轮截图没有落成文件。把设置的「截完之后」选成「直接存成文件」或「快速保存」，"
-                                                               "或者删掉命令里的 %file%")});
+                                         .message = uiTextUtf8("该外部命令需要 %file%，但本次截图未生成文件。请将设置中的「截图完成后」改为「保存到文件」或「保存并复制」，"
+                                                               "或删除命令中的 %file%。")});
         }
 
         ExternalCommandPlan plan{.program = pieces.front(), .arguments = {}};
@@ -57,7 +57,7 @@ namespace GyanisScribe::Base
         }
         return std::unexpected(
                 Error{.code    = ErrorCode::DependencyMissing,
-                      .message = uiFormat(uiTextUtf8("没能起跑外部命令：「{}」开不起来。检查程序名与路径是否还在，路径带空格时要把整段用引号包起来"), plan.program.toStdString())});
+                      .message = uiFormat(uiTextUtf8("无法执行外部命令：「{}」启动失败。请检查程序名与路径是否存在；路径包含空格时，请用引号包裹完整命令。"), plan.program.toStdString())});
     }
 
 } // namespace GyanisScribe::Base

@@ -16,7 +16,7 @@ namespace GyanisScribe::Core
         {
             return Base::Expected<QImage>{std::unexpected{Base::Error{
                     .code    = Base::ErrorCode::DependencyMissing,
-                    .message = GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("读不出这张图：{}。文件可能已被移动或删掉，或这个构建里没有对应的图片解码插件"),
+                    .message = GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("无法读取这张图：{}。文件可能已被移动或删掉，或这个构建里没有对应的图片解码插件"),
                                                             GyanisScribe::Base::Paths::toDisplayText(filePath).toStdString()),
             }}};
         }

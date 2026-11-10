@@ -110,12 +110,12 @@ namespace GyanisScribe::Core
         if (output.write(bom) != bom.size() || output.write(payload) != payload.size())
         {
             return std::unexpected(Base::Error{Base::ErrorCode::FileWriteFailed,
-                                               Base::uiFormat(Base::uiTextUtf8("CSV 没能写入：{}（{}）。请检查磁盘空间后重试"), displayPath, output.errorString().toStdString())});
+                                               Base::uiFormat(Base::uiTextUtf8("CSV 无法写入：{}（{}）。请检查磁盘空间后重试"), displayPath, output.errorString().toStdString())});
         }
         if (!output.commit())
         {
             return std::unexpected(Base::Error{Base::ErrorCode::FileWriteFailed,
-                                               Base::uiFormat(Base::uiTextUtf8("CSV 没能落盘：{}（{}）。请检查磁盘空间后重试"), displayPath, output.errorString().toStdString())});
+                                               Base::uiFormat(Base::uiTextUtf8("CSV 无法保存：{}（{}）。请检查磁盘空间后重试"), displayPath, output.errorString().toStdString())});
         }
         return {};
     }

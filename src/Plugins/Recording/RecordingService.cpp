@@ -244,7 +244,7 @@ namespace GyanisScribe::Plugins
             return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
                                                state == Core::RecordingState::Idle
                                                        ? GyanisScribe::Base::uiTextUtf8("当前没有正在进行的录屏")
-                                                       : GyanisScribe::Base::uiTextUtf8("这一轮已经停止并在编成品：取消只对在录的那几秒有效，不想要成品就等它编完再删")});
+                                                       : GyanisScribe::Base::uiTextUtf8("本轮录制已停止并正在编码：取消仅对正在录制的片段有效；如不需要输出文件，请等待编码完成后再删除。")});
         }
 
         m_timer.stop();
@@ -545,7 +545,7 @@ namespace GyanisScribe::Plugins
             m_audio.reset();
             return std::unexpected(Base::Error{
                     Base::ErrorCode::DependencyMissing,
-                    GyanisScribe::Base::uiTextUtf8("取声的 ffmpeg 起不来。设备可能正被别的程序占用，关掉占用者再录，或在设置里把取声关掉"),
+                    GyanisScribe::Base::uiTextUtf8("音频采集进程无法启动。设备可能正被其他程序占用；请关闭占用程序后重试，或在设置中关闭音频采集。"),
             });
         }
         m_audioOutcome = AudioCaptureOutcome::Captured;

@@ -132,7 +132,7 @@ namespace GyanisScribe
 
         const auto empty = paletteFromTokens({});
         ASSERT_FALSE(empty.has_value());
-        EXPECT_NE(empty.error().message.find("清掉"), std::string::npos) << "空清单要说清回到默认的那条路：" << empty.error().message;
+        EXPECT_NE(empty.error().message.find("清空"), std::string::npos) << "空清单要说清回到默认的那条路：" << empty.error().message;
     }
 
     /**

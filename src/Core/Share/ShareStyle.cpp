@@ -454,12 +454,12 @@ namespace GyanisScribe::Core
         const auto      document = QJsonDocument::fromJson(storedJson.toUtf8(), &parseError);
         if (parseError.error != QJsonParseError::NoError)
         {
-            Base::Logger::warning(Base::uiFormat(Base::uiTextUtf8("美化模板不是一段合法的 JSON（{}），这一格按空处理"), parseError.errorString().toStdString()));
+            Base::Logger::warning(Base::uiFormat(Base::uiTextUtf8("美化模板不是一段合法的 JSON（{}），此项按空处理"), parseError.errorString().toStdString()));
             return {};
         }
         if (!document.isObject())
         {
-            Base::Logger::warning(Base::uiTextUtf8("美化模板的根不是对象，这一格按空处理"));
+            Base::Logger::warning(Base::uiTextUtf8("美化模板的根不是对象，此项按空处理"));
             return {};
         }
 
@@ -471,14 +471,14 @@ namespace GyanisScribe::Core
         if (!versionValue.isDouble() || versionValue.toDouble() != 1.0)
         {
             const auto shown = versionValue.isDouble() ? QString::number(versionValue.toDouble()) : QStringLiteral("?");
-            Base::Logger::warning(Base::uiFormat(Base::uiTextUtf8("美化模板的版本不是 1（{}），这一格按空处理"), shown.toStdString()));
+            Base::Logger::warning(Base::uiFormat(Base::uiTextUtf8("美化模板的版本不是 1（{}），此项按空处理"), shown.toStdString()));
             return {};
         }
 
         const auto entries = root.value(keyText(kKeyTemplates));
         if (!entries.isArray())
         {
-            Base::Logger::warning(Base::uiTextUtf8("美化模板缺少 templates 数组，这一格按空处理"));
+            Base::Logger::warning(Base::uiTextUtf8("美化模板缺少 templates 数组，此项按空处理"));
             return {};
         }
 
@@ -535,7 +535,7 @@ namespace GyanisScribe::Core
             const auto style = parseShareStyle(styleValue.toObject());
             if (!style)
             {
-                Base::Logger::warning(Base::uiFormat(Base::uiTextUtf8("美化模板「{}」的风格读不出来（{}），已跳过"), name.toStdString(), style.error().message));
+                Base::Logger::warning(Base::uiFormat(Base::uiTextUtf8("美化模板「{}」的风格无法读取（{}），已跳过"), name.toStdString(), style.error().message));
                 continue;
             }
             templates.push_back(ShareTemplate{id, name, *style});
@@ -592,7 +592,7 @@ namespace GyanisScribe::Core
         }
         if (templates.size() >= static_cast<std::size_t>(kMaximumCustomShareTemplates))
         {
-            return std::unexpected(invalidArgument(Base::uiTextUtf8("自定义模板最多 30 套，请先删掉几套")));
+            return std::unexpected(invalidArgument(Base::uiTextUtf8("自定义模板最多 30 套，请先删除部分模板")));
         }
 
         auto updated = templates;
@@ -601,7 +601,7 @@ namespace GyanisScribe::Core
         // 这一格随设置一起导出与备份，体积要有硬上限：先序列化再量，比按字段估更贴近真正落盘的字节
         if (serializeShareTemplates(updated).toUtf8().size() > static_cast<qsizetype>(kMaximumShareTemplatesJsonBytes))
         {
-            return std::unexpected(invalidArgument(Base::uiTextUtf8("模板太多，设置里存不下：请先删掉几套")));
+            return std::unexpected(invalidArgument(Base::uiTextUtf8("模板太多，设置里存不下：请先删除部分模板")));
         }
         return updated;
     }
@@ -622,7 +622,7 @@ namespace GyanisScribe::Core
             updated.erase(updated.begin() + static_cast<std::ptrdiff_t>(index));
             return updated;
         }
-        return std::unexpected(invalidArgument(Base::uiTextUtf8("找不到这套模板，可能已经删掉了")));
+        return std::unexpected(invalidArgument(Base::uiTextUtf8("未找到该模板，可能已被删除。")));
     }
 
     QString newCustomShareTemplateId()

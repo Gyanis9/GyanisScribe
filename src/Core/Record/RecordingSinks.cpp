@@ -43,7 +43,7 @@ namespace GyanisScribe::Core
         // 一帧都没有就别往下走：空目录交给 ffmpeg 只会得到一句没人看得懂的报错
         if (m_written == 0)
         {
-            return std::unexpected(Base::Error{Base::ErrorCode::InternalError, GyanisScribe::Base::uiTextUtf8("这一轮一帧都没有存下来，可能是刚开始就按了停止")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InternalError, GyanisScribe::Base::uiTextUtf8("本次一帧都没有存下来，可能是刚开始就按了停止")});
         }
         return {};
     }

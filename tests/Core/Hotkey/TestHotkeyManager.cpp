@@ -599,7 +599,7 @@ TEST_F(HotkeyManagerFixture, FailedRestoreIsReportedToTheUser)
     EXPECT_EQ(reports[0].failures[0].error.code, ErrorCode::Busy);
     const auto reason = QString::fromStdString(reports[0].failures[0].error.message);
     EXPECT_TRUE(reason.contains(QStringLiteral("Ctrl+Alt+A"))) << "原因里没点出原本那颗键，用户无从判断现在还能按什么：" << reason.toStdString();
-    EXPECT_TRUE(reason.contains(QStringLiteral("没能恢复"))) << "旧组合也恢复不了时只写日志，界面会让人以为旧键还能按：" << reason.toStdString();
+    EXPECT_TRUE(reason.contains(QStringLiteral("无法恢复"))) << "旧组合也恢复不了时只写日志，界面会让人以为旧键还能按：" << reason.toStdString();
     EXPECT_EQ(integration.m_backendMirror->liveRegistrations.count(1), 0U) << "两次登记都被拒，编号 1 不该留在册上";
 }
 

@@ -66,7 +66,7 @@ namespace GyanisScribe::Plugins
             {
                 return std::unexpected(Base::Error{
                         Base::ErrorCode::ScreenUnavailable,
-                        GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("找不到名为「{}」的屏幕：多半已经被拔掉。请在不填屏幕名的情况下重抓一次（那样按光标所在屏走）"),
+                        GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("找不到名为「{}」的屏幕：该屏幕可能已被移除。请在不指定屏幕名的情况下重新截取（此时按光标所在屏幕处理）。"),
                                                      screenName.toStdString())});
             }
             return std::unexpected(Base::Error{Base::ErrorCode::ScreenUnavailable, GyanisScribe::Base::uiTextUtf8("Qt 没有报出任何屏幕：请在 QGuiApplication 建好之后再抓图")});

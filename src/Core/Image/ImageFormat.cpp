@@ -84,7 +84,7 @@ namespace GyanisScribe::Core
             return std::unexpected(Base::Error{
                     .code = Base::ErrorCode::InvalidArgument,
                     .message =
-                            Base::uiFormat(Base::uiTextUtf8("保存质量：取值 {} 不在可取区间里，只能是 {} 到 {}。请在设置的截图页重选，或删掉 Save/ImageQuality 这一项回到默认档"),
+                            Base::uiFormat(Base::uiTextUtf8("保存质量：取值 {} 不在可取区间里，只能是 {} 到 {}。请在设置的截图页重选，或删掉 Save/ImageQuality 此项回到默认档"),
                                            stored, kMinimumImageQuality, kMaximumImageQuality),
             });
         }

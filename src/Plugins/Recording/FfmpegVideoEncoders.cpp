@@ -131,8 +131,8 @@ namespace GyanisScribe::Plugins
         }
         return std::unexpected(Base::Error{
                 .code    = Base::ErrorCode::DependencyMissing,
-                .message = Base::uiFormat(Base::uiTextUtf8("你这份 ffmpeg 里没有能开起来的视频编码器（试过 {}）。请换装一个带 libx264 的完整 ffmpeg 构建，"
-                                                           "或者先把这一帧序列自己用 ffmpeg 编一次看报什么"),
+                .message = Base::uiFormat(Base::uiTextUtf8("当前 ffmpeg 构建中没有可用的视频编码器（已尝试 {}）。请安装包含 libx264 的完整 ffmpeg 构建，"
+                                                           "或先用 ffmpeg 手动编码该帧序列以查看错误。"),
                                           tried.join(QStringLiteral("、")).toStdString()),
         });
     }

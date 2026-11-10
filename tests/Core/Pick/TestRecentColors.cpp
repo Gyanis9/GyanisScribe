@@ -28,7 +28,7 @@ namespace
     /// 取色器这一路给解析器的恢复办法：提示里点名的必须是它真正读的那一格
     std::string pickRecoveryHint()
     {
-        return std::format("删掉配置里的 {} 这一项可以恢复默认", kPickRecentColors);
+        return std::format("删除配置中的 {} 可恢复默认设置", kPickRecentColors);
     }
 } // namespace
 
@@ -158,7 +158,7 @@ TEST(RecentColorsRoundTrip, RejectsAnyTokenThatIsNotSixHexDigits)
  */
 TEST(RecentColorsRoundTrip, BadTokenUsesTheCallersListLabelAndRecoveryHint)
 {
-    const auto recovery = std::format("删掉配置里的 {} 这一项可以恢复默认", kAnnotationPalette);
+    const auto recovery = std::format("删除配置中的 {} 可恢复默认设置", kAnnotationPalette);
     const auto parsed   = parseRecentColors({QStringLiteral("#123456"), QStringLiteral("#GGGGGG")}, "自定义色板", recovery);
     ASSERT_FALSE(parsed.has_value());
     EXPECT_EQ(parsed.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument);

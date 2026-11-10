@@ -258,7 +258,7 @@ namespace GyanisScribe::Core
         if (!output.commit())
         {
             return std::unexpected(Base::Error{Base::ErrorCode::FileWriteFailed,
-                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("配置导出没落盘：{}（{}）。请检查磁盘空间与目录权限"),
+                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("配置导出未保存：{}（{}）。请检查磁盘空间与目录权限"),
                                                                             Base::Paths::toDisplayText(filePath).toStdString(), output.errorString().toStdString())});
         }
         return {};

@@ -413,7 +413,7 @@ namespace GyanisScribe::Platform
             // 会话锁屏、刚开机还没人点过窗口都会走到这里：报「先点一下」比报「不支持」更可操作
             return std::unexpected(
                     Base::Error{Base::ErrorCode::ScreenUnavailable,
-                                GyanisScribe::Base::uiTextUtf8("现在没有一个在前台的窗口可截（可能锁了屏或焦点在桌面上）。请先点一下要截的那个窗口，再回来用这一项")});
+                                GyanisScribe::Base::uiTextUtf8("当前没有可截取的前台窗口（可能已锁屏，或焦点位于桌面）。请先激活要截取的窗口，再使用此功能。")});
         }
 
         ForegroundWindow info;
@@ -438,7 +438,7 @@ namespace GyanisScribe::Platform
             // 用户看到的是高亮框跑偏，比没有候选更难解释
             return std::unexpected(Error{
                     ErrorCode::ScreenUnavailable,
-                    GyanisScribe::Base::uiTextUtf8("认不出桌面上有哪些窗口：平台的屏幕清单与界面的屏幕清单配不上对。请先用整屏或框选截图，重开一次智录再试"),
+                    GyanisScribe::Base::uiTextUtf8("无法识别桌面上的窗口：平台的屏幕清单与界面的屏幕清单不一致。请先使用整屏或框选截图，并重新启动智录后重试。"),
             });
         }
 
@@ -529,7 +529,7 @@ namespace GyanisScribe::Platform
         if (uia == nullptr)
         {
             return std::unexpected(Error{ErrorCode::DependencyMissing,
-                                         GyanisScribe::Base::uiTextUtf8("系统的 UI Automation 起不来，认不出界面元素。可以继续用悬停认整扇窗口，或直接框住要的那一块")});
+                                         GyanisScribe::Base::uiTextUtf8("系统的 UI Automation 无法启动，不能识别界面元素。可继续使用悬停识别整个窗口，或直接框选目标区域。")});
         }
 
         Microsoft::WRL::ComPtr<IUIAutomationElement> element;
@@ -646,7 +646,7 @@ namespace GyanisScribe::Platform
         if (command.isEmpty())
         {
             return std::unexpected(
-                    Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("取不到本程序的完整路径，没法写开机启动项。请从安装目录启动本程序后再试一次")});
+                    Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("无法获取本程序的完整路径，不能写入开机启动项。请从安装目录启动本程序后重试。")});
         }
 
         // 写在当前用户的 Run 键下：不需要管理员权限，也不需要计划任务
@@ -665,7 +665,7 @@ namespace GyanisScribe::Platform
             return std::unexpected(
                     Base::Error{Base::ErrorCode::FileWriteFailed,
                                 GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8(
-                                                                     "开机启动项没能{}：写系统设置失败（可能是权限或安全软件拦截）。可以在系统的「启动」设置里把本程序自己加进去"),
+                                                                     "开机启动项无法{}：写系统设置失败（可能是权限或安全软件拦截）。可以在系统的「启动」设置里把本程序手动添加进去"),
                                                              enabled ? GyanisScribe::Base::uiTextUtf8("开启") : GyanisScribe::Base::uiTextUtf8("关闭"))});
         }
         return {};

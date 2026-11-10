@@ -57,7 +57,7 @@ namespace GyanisScribe::Base
     {
         return Base::Error{
                 .code    = Base::ErrorCode::InvalidArgument,
-                .message = Base::uiFormat(Base::uiTextUtf8("{}：取值 \"{}\" 不在可选值里，可取的只有 {}。请在设置的{}重选，或删掉 {} 这一项回到默认档"), std::string{settingName},
+                .message = Base::uiFormat(Base::uiTextUtf8("{}：取值 \"{}\" 不在可选值里，可取的只有 {}。请在设置的{}重选，或删掉 {} 此项回到默认档"), std::string{settingName},
                                           stored.toStdString(), tokenListText(choices), std::string{pageName}, std::string{key}),
         };
     }

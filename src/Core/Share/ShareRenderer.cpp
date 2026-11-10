@@ -60,7 +60,7 @@ namespace
 
     [[nodiscard]] GyanisScribe::Base::Error scaleFailedError()
     {
-        return internalError(GyanisScribe::Base::uiTextUtf8("美化图片没能缩放：内存不够，请缩小截图或减少内边距与投影"));
+        return internalError(GyanisScribe::Base::uiTextUtf8("美化图片无法缩放：内存不够，请缩小截图或减少内边距与投影"));
     }
 
     [[nodiscard]] GyanisScribe::Base::Error noGuiApplicationError()

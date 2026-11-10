@@ -85,7 +85,7 @@ namespace GyanisScribe::Plugins
             {
                 emit failed(Base::Error{
                         .code    = Base::ErrorCode::DependencyMissing,
-                        .message = Base::uiTextUtf8("你这份 ffmpeg 里一个候选编码器都开不起来（逐个真探过）。请换装一个带 libx264 的完整 ffmpeg 构建，"
+                        .message = Base::uiTextUtf8("当前 ffmpeg 构建中没有可用的候选编码器（已逐项检测）。请安装包含 libx264 的完整 ffmpeg 构建；"
                                                     "录屏仍可进行——编码时会再试一遍，全不行才报错"),
                 });
                 return;

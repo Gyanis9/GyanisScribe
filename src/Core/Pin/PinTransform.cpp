@@ -165,7 +165,7 @@ namespace GyanisScribe::Core
         return Base::Expected<int>{std::unexpected{Base::Error{
                 .code    = Base::ErrorCode::InvalidArgument,
                 .message = GyanisScribe::Base::uiFormat(
-                        GyanisScribe::Base::uiTextUtf8("吸附距离 \"{}\" 不在 {} 到 {} 之间：请在设置的贴图页重填这一格，或删掉 Pin/EdgeSnapDistance 这一项回到默认的 {} 格"),
+                        GyanisScribe::Base::uiTextUtf8("吸附距离 \"{}\" 不在 {} 到 {} 之间：请在设置的贴图页重填此项，或删掉 Pin/EdgeSnapDistance 此项回到默认的 {} 格"),
                         distance, kEdgeSnapDistanceMinimum, kEdgeSnapDistanceMaximum, kEdgeSnapTolerance),
         }}};
     }

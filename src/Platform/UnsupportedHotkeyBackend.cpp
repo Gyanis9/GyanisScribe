@@ -12,7 +12,7 @@ namespace GyanisScribe::Platform
     Base::Expected<void> UnsupportedHotkeyBackend::registerHotkey(int, Qt::KeyboardModifiers, Qt::Key)
     {
         return std::unexpected(Base::Error{Base::ErrorCode::PlatformUnsupported,
-                                           GyanisScribe::Base::uiTextUtf8("本平台没有全局热键能力：登记不会生效。请在程序窗口内使用普通快捷键，或等平台适配后再开启这一项")});
+                                           GyanisScribe::Base::uiTextUtf8("本平台没有全局热键能力：登记不会生效。请在程序窗口内使用普通快捷键，或等平台适配后再开启此项")});
     }
 
     Base::Expected<void> UnsupportedHotkeyBackend::unregisterHotkey(int)

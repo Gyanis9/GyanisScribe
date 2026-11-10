@@ -84,7 +84,7 @@ namespace GyanisScribe::Core
         {
             return std::unexpected(Base::Error{
                     .code    = Base::ErrorCode::FileWriteFailed,
-                    .message = GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("「{}」写不进去。请检查这个目录能不能写，或关掉「未保存的截图也进历史」这一档"),
+                    .message = GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("无法写入「{}」。请检查该目录是否可写，或关闭「保留未保存的截图」选项。"),
                                                             Base::Paths::toDisplayText(filePath).toStdString()),
             });
         }

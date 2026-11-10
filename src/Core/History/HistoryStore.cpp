@@ -72,7 +72,7 @@ namespace
      */
     std::string withPlaceToFix(std::string problem, const std::filesystem::path &manifestPath)
     {
-        return GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("{}。清单：{}。请把这一条改对，或删掉这份清单让软件重建（成品文件不受影响）"), problem,
+        return GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("{}。清单：{}。请修正该条记录，或删除该清单文件让软件重建（输出文件不受影响）"), problem,
                                             pathToText(manifestPath));
     }
 } // namespace
@@ -169,7 +169,7 @@ namespace GyanisScribe::Core
         {
             return Expected<RawHistory>{std::unexpected{
                     makeError(ErrorCode::FileWriteFailed,
-                              GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("历史清单打不开：{}。请检查这个文件是否被别的程序占着，或把它删掉让软件重建"),
+                              GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("无法打开历史清单：{}。请检查该文件是否被其他程序占用，或删除该文件让软件重建。"),
                                                            pathToText(m_storagePath)))}};
         }
         const auto bytes = file.readAll();
@@ -180,7 +180,7 @@ namespace GyanisScribe::Core
             return Expected<RawHistory>{std::unexpected{makeError(
                     ErrorCode::InvalidArgument,
                     GyanisScribe::Base::uiFormat(
-                            GyanisScribe::Base::uiTextUtf8("历史清单格式不对：{}。可以把这个文件删掉让软件重建（成品文件不受影响），或按 {{\"entries\": [...]}} 的形状修好"),
+                            GyanisScribe::Base::uiTextUtf8("历史清单格式无效：{}。可删除该文件让软件重建（输出文件不受影响），或按 {{\"entries\": [...]}} 的结构修复"),
                             pathToText(m_storagePath)))}};
         }
 
@@ -218,7 +218,7 @@ namespace GyanisScribe::Core
             const auto moment = QDateTime::fromString(momentText, Qt::ISODateWithMs);
             if (!moment.isValid())
             {
-                skipRecord(index, GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("历史清单第 {} 条的时间 \"{}\" 读不出来。请用 2026-10-10T08:30:00.000 这种写法"),
+                skipRecord(index, GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("历史清单第 {} 条的时间 \"{}\" 无法读取。请用 2026-10-10T08:30:00.000 这种写法"),
                                                                index + 1, momentText.toStdString()));
                 continue;
             }
@@ -278,7 +278,7 @@ namespace GyanisScribe::Core
         {
             return Expected<void>{std::unexpected{
                     makeError(ErrorCode::FileWriteFailed,
-                              GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("历史清单没能落盘：{}。请重试一次，或换一个可写的目录"), pathToText(m_storagePath)))}};
+                              GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("历史清单无法保存：{}。请重试一次，或换一个可写的目录"), pathToText(m_storagePath)))}};
         }
         return Expected<void>{};
     }

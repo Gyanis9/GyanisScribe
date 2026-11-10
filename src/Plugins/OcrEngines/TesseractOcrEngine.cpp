@@ -166,7 +166,7 @@ namespace GyanisScribe::Plugins
         if (TessBaseAPIRecognize(m_api.get(), nullptr) != 0)
         {
             return std::unexpected(Base::Error{Base::ErrorCode::InternalError,
-                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("Tesseract 识别这一张图失败（语言 {}）。请重试一次，或换一种语言再试"),
+                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("Tesseract 识别该图片图失败（语言 {}）。请重试一次，或换一种语言再试"),
                                                                             requestedLanguage.toStdString())});
         }
 

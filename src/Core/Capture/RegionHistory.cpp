@@ -43,7 +43,7 @@ namespace GyanisScribe::Core
             {
                 return std::unexpected(
                         Base::Error{Base::ErrorCode::InvalidArgument,
-                                    Base::uiFormat(Base::uiTextUtf8("选区历史的记录格式不对：第 {} 段「{}」应为「x,y,width,height,屏名」。请删掉这一项，让程序重新记一次"),
+                                    Base::uiFormat(Base::uiTextUtf8("选区历史的记录格式不对：第 {} 段「{}」应为「x,y,width,height,屏名」。请删掉此项，让程序重新记一次"),
                                                    index + 1, segment.toStdString())});
             }
 

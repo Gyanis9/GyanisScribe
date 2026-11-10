@@ -54,7 +54,7 @@ namespace GyanisScribe::Plugins
             {
                 // 屏名对不上多半是多显示器被拔掉：让调用方按光标所在屏重抓，别按名字猜
                 return std::unexpected(Base::Error{Base::ErrorCode::ScreenUnavailable,
-                                                   Base::uiFormat(Base::uiTextUtf8("找不到名为「{}」的屏幕：多半已经被拔掉。请在不填屏幕名的情况下重抓一次（那样按光标所在屏走）"),
+                                                   Base::uiFormat(Base::uiTextUtf8("找不到名为「{}」的屏幕：该屏幕可能已被移除。请在不指定屏幕名的情况下重新截取（此时按光标所在屏幕处理）。"),
                                                                   screenName.toStdString())});
             }
             // 空屏名走光标所在屏；这里为空说明光标点不在任何屏上，通常是 Qt 还没报出屏幕
@@ -401,7 +401,7 @@ namespace GyanisScribe::Plugins
             {
                 releaseFrame();
                 return std::unexpected(
-                        Base::Error{Base::ErrorCode::PlatformUnsupported, Base::uiFormat(Base::uiTextUtf8("桌面的像素格式是 0x{:X}，这一路只认 B8G8R8A8：请改用 Qt 的抓帧原语"),
+                        Base::Error{Base::ErrorCode::PlatformUnsupported, Base::uiFormat(Base::uiTextUtf8("桌面的像素格式是 0x{:X}，该通道只认 B8G8R8A8：请改用 Qt 的抓帧原语"),
                                                                                          static_cast<unsigned>(description.Format))});
             }
 
@@ -433,7 +433,7 @@ namespace GyanisScribe::Plugins
             D3D11_MAPPED_SUBRESOURCE mapped{};
             if (FAILED(adapter.context->Map(state.staging.get(), 0, D3D11_MAP_READ, 0, &mapped)))
             {
-                return std::unexpected(Base::Error{Base::ErrorCode::InternalError, Base::uiTextUtf8("DXGI 抓帧：暂存纹理读不出来。请重试一次")});
+                return std::unexpected(Base::Error{Base::ErrorCode::InternalError, Base::uiTextUtf8("DXGI 抓帧：暂存纹理无法读取。请重试一次")});
             }
             QImage image = Core::imageFromBgraRows(static_cast<const uchar *>(mapped.pData), static_cast<int>(mapped.RowPitch), size);
             adapter.context->Unmap(state.staging.get(), 0);
