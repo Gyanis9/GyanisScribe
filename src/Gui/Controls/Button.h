@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include <QColor>
 #include <QPushButton>
 #include <QToolButton>
 
@@ -35,6 +36,23 @@ namespace GyanisScribe::Gui
          * @param parent Qt 父对象
          */
         explicit Button(const QString &text, QWidget *parent = nullptr);
+
+        /**
+         * @brief 让按钮以指定颜色作底，供色板一类「按钮本身就是色块」的用法
+         * @param color 底色；传无效色回到主题给出的填充
+         * @details 底色有效时文字按底色亮度取深色或白色，禁用时回到主题填充；
+         *          描边取主题的强描边色，白底上也能看出边界。
+         */
+        void setSwatchColor(const QColor &color);
+
+        /**
+         * @brief 取当前底色
+         * @return 色板底色；没设过时为无效色
+         */
+        [[nodiscard]] QColor swatchColor() const;
+
+    private:
+        QColor m_swatchColor; ///< 色板底色；无效色表示按主题填充
 
     protected:
         /**

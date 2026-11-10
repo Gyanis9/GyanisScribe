@@ -25,7 +25,6 @@ class QComboBox;
 class QEvent;
 class QLabel;
 class QLineEdit;
-class QPushButton;
 class QResizeEvent;
 class QSlider;
 class QTimer;
@@ -37,6 +36,8 @@ namespace GyanisScribe::Core
 
 namespace GyanisScribe::Gui
 {
+
+    class Button;
 
     /**
      * @brief 美化分享对话框
@@ -186,8 +187,8 @@ namespace GyanisScribe::Gui
 
         QLabel      *m_preview           = nullptr; ///< 左侧预览
         QComboBox   *m_templateCombo     = nullptr; ///< 模板下拉
-        QPushButton *m_backgroundButton  = nullptr; ///< 背景色按钮
-        QPushButton *m_secondColorButton = nullptr; ///< 渐变终点色按钮
+        Button      *m_backgroundButton  = nullptr; ///< 背景色按钮
+        Button      *m_secondColorButton = nullptr; ///< 渐变终点色按钮
         QCheckBox   *m_gradient          = nullptr; ///< 渐变开关
         QSlider     *m_padding           = nullptr; ///< 内边距滑杆
         QSlider     *m_radius            = nullptr; ///< 圆角滑杆

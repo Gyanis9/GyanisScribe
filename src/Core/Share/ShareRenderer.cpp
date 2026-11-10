@@ -1,6 +1,7 @@
 #include "Core/Share/ShareRenderer.h"
 
 #include "Base/Text.h"
+#include "Core/Geometry/ContinuousCorner.h"
 #include "Core/Image/SoftShadow.h"
 
 #include <QFont>
@@ -167,10 +168,11 @@ namespace GyanisScribe::Core
             }
         }
 
-        QPainterPath cardPath;
-        cardPath.addRoundedRect(card, radius, radius);
+        // 圆角半径是用户填的数据，不是界面分档：平滑度取 0，成品仍是文档里说的普通圆角，
+        // 形状路径则走全仓统一的连续曲率构造，与自绘控件同源
+        const auto cardShape = Core::CornerShape{static_cast<qreal>(radius), 0.0};
         painter.save();
-        painter.setClipPath(cardPath);
+        painter.setClipPath(Core::continuousCornerPath(QRectF{card}, cardShape));
 
         if (chrome > 0)
         {
@@ -210,15 +212,7 @@ namespace GyanisScribe::Core
         {
             const auto penWidth = scaledPixelSpan(style.borderPixels, scale);
             // 以卡片边线为中线内缩半个笔宽：整圈落在卡片内侧，1 像素笔宽也不外溢
-            const auto inset      = static_cast<qreal>(penWidth) / 2.0;
-            const auto borderRect = QRectF{card}.adjusted(inset, inset, -inset, -inset);
-            if (borderRect.width() > 0.0 && borderRect.height() > 0.0)
-            {
-                const auto borderRadius = std::min(static_cast<qreal>(radius), std::min(borderRect.width(), borderRect.height()) / 2.0);
-                painter.setPen(QPen{style.borderColor, static_cast<qreal>(penWidth)});
-                painter.setBrush(Qt::NoBrush);
-                painter.drawRoundedRect(borderRect, borderRadius, borderRadius);
-            }
+            Core::paintContinuousCorner(painter, QRectF{card}, cardShape, Qt::NoBrush, QPen{style.borderColor, static_cast<qreal>(penWidth)});
         }
 
         if (!style.watermarkText.isEmpty())

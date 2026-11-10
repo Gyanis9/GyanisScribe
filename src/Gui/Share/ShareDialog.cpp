@@ -73,21 +73,16 @@ namespace
     }
 
     /**
-     * @brief 让颜色按钮自己显示当前颜色与十六进制文本
+     * @brief 让颜色按钮以当前颜色作底并写出十六进制文本
      * @param button 颜色按钮
      * @param color 当前颜色
-     * @details 按钮底就是选中的颜色，文字按亮度取深色或白色：
+     * @details 底色由自绘按钮的色板档给出，文字按底色亮度换反差色：
      *          浅底上白字与深底上黑字都读不出来，颜色本身不该把标签吞掉。
      */
-    void applyColorSwatch(QPushButton *button, const QColor &color)
+    void applyColorSwatch(GyanisScribe::Gui::Button *button, const QColor &color)
     {
-        const auto hex        = color.name(QColor::HexRgb).toUpper();
-        const auto luminance  = 0.299 * color.redF() + 0.587 * color.greenF() + 0.114 * color.blueF();
-        const auto foreground = luminance >= 0.55 ? QStringLiteral("#141412") : QStringLiteral("#FFFFFF");
-        button->setText(hex);
-        button->setStyleSheet(QStringLiteral("QPushButton { background-color: %1; color: %2; border: 1px solid palette(mid); border-radius: 4px; padding: 2px 6px; }"
-                                             "QPushButton:disabled { background-color: palette(button); color: palette(mid); }")
-                                      .arg(hex, foreground));
+        button->setSwatchColor(color);
+        button->setText(color.name(QColor::HexRgb).toUpper());
     }
 
     /**
@@ -431,14 +426,14 @@ namespace GyanisScribe::Gui
         form->addRow(uiText("当前模板"), m_templateCombo);
 
         form->addRow(makeSectionLabel(formWidget, uiText("背景")));
-        m_backgroundButton = new QPushButton{formWidget};
+        m_backgroundButton = new Button{formWidget};
         m_backgroundButton->setObjectName(QStringLiteral("shareBackgroundColor"));
         m_backgroundButton->setAccessibleName(uiText("背景色"));
         m_backgroundButton->setToolTip(uiText("卡片背后的底色；点一下打开取色器"));
         m_backgroundButton->setMinimumHeight(28);
         form->addRow(uiText("背景色"), m_backgroundButton);
 
-        m_secondColorButton = new QPushButton{formWidget};
+        m_secondColorButton = new Button{formWidget};
         m_secondColorButton->setObjectName(QStringLiteral("shareBackgroundSecondColor"));
         m_secondColorButton->setAccessibleName(uiText("渐变终点"));
         m_secondColorButton->setToolTip(uiText("渐变终点的底色；打开「从上到下渐变」后才用得上"));
