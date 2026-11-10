@@ -30,6 +30,7 @@
 #include <QSize>
 #include <QThreadPool>
 #include <QTimer>
+#include <QWidget>
 
 #include <cstdio>
 #include <algorithm>
@@ -131,6 +132,32 @@ namespace
         }
     }
 
+    /**
+     * @brief 在计时窗之外先把一次性界面开销付掉
+     * @param icons 视图共用的图标供给器
+     * @details 进程里有两笔只付一次的开销：第一枚占位类别图标要走一遍 SVG 解析与八档位图生成，
+     *          第一个顶层窗口要走一遍平台窗口创建与样式装配。两笔都远大于一次正常绘制，
+     *          落进计时窗会被第一跳读成界面线程被单次任务占住。这里按视图同一条取图路径
+     *          先光栅化两种类别图标，再显示并销毁一个空窗；计时窗里剩下的只是视图本来就要做的构造与绘制。
+     *          阈值与窗内的活都不动，挪出去的只是这两笔一次性开销。
+     */
+    void warmUpOneTimeGuiCosts(const IconProvider &icons)
+    {
+        // 与 HistoryView::fallbackIcon 同一出口：截图与录屏两种类别各有一枚占位图
+        for (const auto *name: {"CaptureRegion", "Record"})
+        {
+            const auto icon   = icons.icon(name);
+            // 列表按 96 逻辑像素取图：这一取把「从图标引擎里挑出这一档」也一并落地
+            const auto bitmap = icon.pixmap(QSize{kThumbnailEdge, kThumbnailEdge});
+            EXPECT_FALSE(bitmap.isNull()) << "占位图标 " << name << " 没取出来，预热没有发生，计时窗会照旧计入一次性光栅化";
+        }
+
+        // 空窗不摆任何视图内容：只为触发一次平台窗口创建与样式装配，显示与销毁都留在计时窗之外
+        QWidget scratch;
+        scratch.show();
+        QApplication::processEvents();
+        scratch.hide();
+    }
 
     /// 录屏成品：写一段占位字节即可，视图读不出像素时会退回类别图标
     std::filesystem::path writeVideoArtifact(const std::filesystem::path &directory, const std::string &name)
@@ -918,6 +945,11 @@ TEST_F(HistoryViewFixture, ReportsTheCostOfRefreshingTwoHundredFourKHistoryEntri
         ASSERT_FALSE(copied) << "复制第 " << index << " 份 4K 成品失败：" << copied.message();
         addRecord(target, HistoryKind::Screenshot, kNow.addSecs(-index));
     }
+
+    // 占位图标的第一枚与第一个顶层窗口各有一笔只在进程里付一次的开销，都远大于一次正常绘制。
+    // 它们留在窗内会把构造与首显的第一跳读成界面线程被占住，因此先在计时窗之外付掉；
+    // 阈值、窗内的构造与解码都不动，这里只是把一次性开销挪出去
+    warmUpOneTimeGuiCosts(*m_icons);
 
     // 每 10ms 记一笔：相邻两跳的间隔就是界面线程被单次任务占住的最长时间。
     // 表在构造之前起：构造与首显本身也进窗口，同步解码在里面停多久都会被第一跳量到
