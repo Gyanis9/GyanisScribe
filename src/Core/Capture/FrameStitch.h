@@ -23,6 +23,9 @@ namespace GyanisScribe::Core
     /// 认定是「真接上了」所需的最小重叠行数：只对上两三行多半是两帧里的空白区恰好相同
     inline constexpr int kMinimumOverlapRows = 24;
 
+    /// 认作吸顶头或吸底尾所需的最小行数：比这更短的稳定横带更可能是内容恰好相同
+    inline constexpr int kMinimumStickyRows = 8;
+
     /**
      * @brief 接缝判定的放宽口径：允许滚动过程中小面积变化不算断缝
      * @details 动图、光标闪烁或半透明浮层会让相邻两帧的同一块像素略有出入；
@@ -71,7 +74,8 @@ namespace GyanisScribe::Core
     /**
      * @brief 长图累加器：首帧定下宽度与缩放，之后每帧只把新露出的那几行写进缓冲
      * @details 缓冲按倍数扩容，收尾由 snapshot() 深拷贝一次；接 n 帧的总成本与已接高度成正比，
-     *          而不是每帧都把整张长图重抄两遍。
+     *          而不是每帧都把整张长图重抄两遍。首帧顶部与底部各留一条参考带：认出吸顶标题栏或
+     *          吸底输入框之后，后续帧就不再把它接进长图；整帧接不上又没有稳定头尾时报错收摊。
      * @note 像素归本类独占：构造与 append() 都不与入参共享，snapshot() 交出的也是独立图像。
      */
     class FrameStitcher
@@ -81,15 +85,17 @@ namespace GyanisScribe::Core
          * @brief 用首帧开一个累加器
          * @param first 第一帧；内部转成 ARGB32 抄进自有缓冲，此后与入参不再共享像素
          * @details 首帧非空但缓冲开不出来时只记下这一笔：append() 会直接报内存不够，
-         *          而不是拿空缓冲去接缝或逐行抄。
+         *          而不是拿空缓冲去接缝或逐行抄。顶部与底部的最多四分之一行高会另存为参考带。
          */
         explicit FrameStitcher(const QImage &first);
 
         /**
          * @brief 把新一帧接到缓冲末尾
          * @param next 刚抓到的新一帧，宽度必须与首帧一致
-         * @return 接上了返回空；空图或宽度不同时返回中文原因；缓冲开不出来时返回内部故障
+         * @return 接上了返回空；空图、宽度不同或高度够却找不到可信接缝时返回中文原因；缓冲开不出来时返回内部故障
          * @details 只写 next 里没与已接部分重合的那几行；装不下时按倍数扩容，旧内容逐行搬过去。
+         *          矮于 kMinimumOverlapRows 的帧整帧接上；其余帧找不到这么长的重叠就报错，不整帧硬接。
+         *          只有整帧接不上、而首尾横带与首帧稳定一致时才按粘性头尾跳过它们再接。
          */
         [[nodiscard]] Base::Expected<void> append(const QImage &next);
 
@@ -117,6 +123,18 @@ namespace GyanisScribe::Core
          */
         [[nodiscard]] const uchar *bufferAddressForTesting() const noexcept;
 
+        /**
+         * @brief 认出来的吸顶头带行数（只给用例用）
+         * @return 之后每帧从顶部跳过、不参与接缝与追加的行数；没认出来时是 0
+         */
+        [[nodiscard]] int stickyTopRowsForTesting() const noexcept;
+
+        /**
+         * @brief 认出来的吸底尾带行数（只给用例用）
+         * @return 之后每帧从底部跳过、不参与接缝与追加的行数；没认出来时是 0
+         */
+        [[nodiscard]] int stickyBottomRowsForTesting() const noexcept;
+
         // 像素归本类独占：拷贝与移动都等于把同一块缓冲交给第二个持有者，这里一并禁掉
         FrameStitcher(const FrameStitcher &)            = delete;
         FrameStitcher &operator=(const FrameStitcher &) = delete;
@@ -132,6 +150,10 @@ namespace GyanisScribe::Core
          */
         void ensureCapacity(int rows);
 
+        QImage m_referenceTop;             ///< 首帧顶部参考带：吸顶标题栏每次回来都要与它比对
+        QImage m_referenceBottom;          ///< 首帧底部参考带：吸底输入框每次回来都要与它比对
+        int    m_stickyTopRows    = 0;     ///< 已认出的吸顶标题栏行数，之后每帧从顶部跳过
+        int    m_stickyBottomRows = 0;     ///< 已认出的吸底输入框行数，之后每帧从底部跳过
         QImage m_buffer;                   ///< 累加用的整块缓冲，容量可能大于已用行数
         int    m_usedRows         = 0;     ///< 缓冲里已经写好的行数，就是成品高度
         bool   m_allocationFailed = false; ///< 构造时缓冲没开出来：append() 直接报内存不够，不碰空缓冲

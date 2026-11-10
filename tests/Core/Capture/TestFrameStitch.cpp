@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <string>
 #include <vector>
 
 using GyanisScribe::Base::ErrorCode;
@@ -53,6 +54,36 @@ namespace
             std::fill_n(reinterpret_cast<QRgb *>(page.scanLine(row)), width, QColor{block * 20, block * 40, block * 60, 255}.rgba());
         }
         return page;
+    }
+
+    /// 造一张「每行一个颜色」的聊天内容长页：行号就是颜色，接错一行都能从颜色上认出来
+    [[nodiscard]] QImage makeChatContent(int width, int height)
+    {
+        QImage page{QSize{width, height}, QImage::Format_ARGB32};
+        for (auto row = 0; row < height; ++row)
+        {
+            std::fill_n(reinterpret_cast<QRgb *>(page.scanLine(row)), width, QColor{row % 251, (row * 3) % 251, (row * 7) % 251, 255}.rgba());
+        }
+        return page;
+    }
+
+    /// 造一帧聊天窗口：顶部 20 行标题栏、中间 65 行内容、底部 15 行输入框
+    [[nodiscard]] QImage makeChatFrame(const QImage &content, int contentTop, int contentHeight = 65)
+    {
+        QImage frame{QSize{content.width(), 100}, QImage::Format_ARGB32};
+        for (auto row = 0; row < 20; ++row)
+        {
+            std::fill_n(reinterpret_cast<QRgb *>(frame.scanLine(row)), content.width(), QColor{10, 20, 30, 255}.rgba());
+        }
+        for (auto row = 0; row < contentHeight; ++row)
+        {
+            std::memcpy(frame.scanLine(20 + row), content.constScanLine(contentTop + row), static_cast<std::size_t>(content.bytesPerLine()));
+        }
+        for (auto row = 85; row < 100; ++row)
+        {
+            std::fill_n(reinterpret_cast<QRgb *>(frame.scanLine(row)), content.width(), QColor{200, 210, 220, 255}.rgba());
+        }
+        return frame;
     }
 
 } // namespace
@@ -276,4 +307,74 @@ TEST(FrameStitch, ShortFramesKeepWholeFrameSemantics)
     const auto    appended = stitcher.append(page.copy(0, 100, 20, 1));
     ASSERT_TRUE(appended.has_value());
     EXPECT_EQ(stitcher.pixelHeight(), 101);
+}
+
+/**
+ * @brief 钉住聊天窗口的吸顶标题栏与吸底输入框只保留一次
+ * @details 每帧都是「20 行标题栏 + 65 行内容 + 15 行输入框」，整帧没有重叠；
+ *          去掉头尾后内容才是接得上的那一段。成品该是标题栏 20 行加两帧内容共 95 行，
+ *          输入框一次都不该进入长图。
+ */
+TEST(FrameStitch, RemovesStickyHeaderAndFooterFromChatFrames)
+{
+    const auto content = makeChatContent(40, 200);
+    const auto first   = makeChatFrame(content, 0);
+    const auto second  = makeChatFrame(content, 30);
+
+    FrameStitcher stitcher{first};
+    ASSERT_TRUE(stitcher.append(second).has_value());
+    EXPECT_EQ(stitcher.stickyTopRowsForTesting(), 20);
+    EXPECT_EQ(stitcher.stickyBottomRowsForTesting(), 15);
+    EXPECT_EQ(stitcher.pixelHeight(), 115) << "应为标题 20 + 内容 95 行，输入框不应进入长图";
+
+    QImage expected{QSize{40, 115}, QImage::Format_ARGB32};
+    for (auto row = 0; row < 20; ++row)
+    {
+        std::fill_n(reinterpret_cast<QRgb *>(expected.scanLine(row)), 40, QColor{10, 20, 30, 255}.rgba());
+    }
+    for (auto row = 0; row < 95; ++row)
+    {
+        std::memcpy(expected.scanLine(20 + row), content.constScanLine(row), static_cast<std::size_t>(content.bytesPerLine()));
+    }
+    EXPECT_TRUE(stitcher.snapshot() == expected);
+}
+
+/**
+ * @brief 钉住整帧能接上时不许裁头尾
+ * @details 首尾两帧同属一屏的重复块，整帧重叠 60 行；这时按粘性头尾去裁会把真实内容当成
+ *          标题栏与输入框吃掉。整帧重叠优先，只有整帧接不上时才试粘性裁剪。
+ */
+TEST(FrameStitch, DoesNotTrimStickyWhenWholeFrameOverlaps)
+{
+    const auto page   = makeBlockPage(20, {1, 2, 3, 3});
+    const auto first  = page.copy(0, 0, 20, 120);
+    const auto second = page.copy(0, 60, 20, 60);
+
+    FrameStitcher stitcher{first};
+    ASSERT_TRUE(stitcher.append(second).has_value());
+    EXPECT_EQ(stitcher.stickyTopRowsForTesting(), 0);
+    EXPECT_EQ(stitcher.stickyBottomRowsForTesting(), 0);
+    EXPECT_EQ(stitcher.pixelHeight(), 120);
+}
+
+/**
+ * @brief 钉住高度够却没有可信重叠的帧明确失败、成品不硬接长
+ * @details 两帧内容完全不同时既没有整帧重叠、也没有稳定的头尾横带；
+ *          这时整帧追加只会得到一张重复的长图，必须返回可操作的错误且不动已接好的高度。
+ */
+TEST(FrameStitch, FailsWhenNoTrustworthySeam)
+{
+    const auto first = makeTallPage(20, 100);
+    QImage     different{QSize{20, 100}, QImage::Format_ARGB32};
+    for (auto row = 0; row < 100; ++row)
+    {
+        std::fill_n(reinterpret_cast<QRgb *>(different.scanLine(row)), 20, QColor{255 - row, row, 40, 255}.rgba());
+    }
+
+    FrameStitcher stitcher{first};
+    const auto    appended = stitcher.append(different);
+    ASSERT_FALSE(appended.has_value());
+    EXPECT_EQ(appended.error().code, ErrorCode::InvalidArgument);
+    EXPECT_NE(appended.error().message.find("回到上一段末尾"), std::string::npos);
+    EXPECT_EQ(stitcher.pixelHeight(), 100) << "接不上时成品不该被硬接长";
 }
