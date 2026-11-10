@@ -1,8 +1,11 @@
 #include "Gui/Share/ShareDialog.h"
 
 #include "Base/Logger.h"
+#include "Base/Paths.h"
 #include "Base/Text.h"
+#include "Core/Image/ImageFormat.h"
 #include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/NamingRules.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Share/ShareRenderer.h"
 #include "Gui/Controls/Button.h"
@@ -13,11 +16,17 @@
 #include "Gui/Controls/Slider.h"
 #include "Gui/Theme/DesignTokens.h"
 
+#include <QApplication>
+#include <QBuffer>
 #include <QCheckBox>
+#include <QClipboard>
 #include <QColor>
 #include <QColorDialog>
 #include <QComboBox>
+#include <QDateTime>
 #include <QEvent>
+#include <QFileDialog>
+#include <QFileInfo>
 #include <QFont>
 #include <QFormLayout>
 #include <QFrame>
@@ -29,6 +38,7 @@
 #include <QPixmap>
 #include <QPushButton>
 #include <QResizeEvent>
+#include <QSaveFile>
 #include <QScrollArea>
 #include <QSignalBlocker>
 #include <QSlider>
@@ -159,6 +169,98 @@ namespace GyanisScribe::Gui
     QString ShareDialog::statusText() const
     {
         return m_status;
+    }
+
+    Base::Expected<void> ShareDialog::copyToClipboard()
+    {
+        const auto rendered = Core::renderShareImage(m_image, m_style, 0);
+        if (!rendered)
+        {
+            setStatus(uiText("没能复制到剪贴板：") + QString::fromStdString(rendered.error().message), true);
+            return std::unexpected(rendered.error());
+        }
+        QApplication::clipboard()->setImage(*rendered);
+        setStatus(uiText("已复制到剪贴板"), false);
+        return {};
+    }
+
+    Base::Expected<void> ShareDialog::saveToFile(const std::filesystem::path &filePath)
+    {
+        const auto fail = [this](const Base::Error &reason)
+        {
+            const auto error = Base::Error{reason.code, uiFormat(uiTextUtf8("没能保存美化图片：{}"), reason.message)};
+            Base::Logger::error(error.message);
+            setStatus(QString::fromStdString(error.message), true);
+            return std::unexpected(error);
+        };
+
+        if (m_image.isNull())
+        {
+            return fail(Base::Error{Base::ErrorCode::InvalidArgument, uiTextUtf8("没有可保存的图片")});
+        }
+
+        auto suffix = QString::fromStdWString(filePath.extension().wstring()).toLower();
+        if (suffix.startsWith(QChar{u'.'}))
+        {
+            suffix.remove(0, 1);
+        }
+        if (suffix != QStringLiteral("png") && suffix != QStringLiteral("jpg") && suffix != QStringLiteral("jpeg") && suffix != QStringLiteral("webp"))
+        {
+            return fail(Base::Error{Base::ErrorCode::InvalidArgument,
+                                    uiFormat(uiTextUtf8("不支持的图片格式：{}"), suffix.isEmpty() ? uiTextUtf8("（无后缀）") : suffix.toStdString())});
+        }
+
+        const auto rendered = Core::renderShareImage(m_image, m_style, 0);
+        if (!rendered)
+        {
+            return fail(rendered.error());
+        }
+
+        const auto pathText     = Base::Paths::toDisplayText(filePath);
+        const auto writeFailure = Base::Error{Base::ErrorCode::FileWriteFailed,
+                                              uiFormat(uiTextUtf8("「{}」写不进去。请检查这个目录能不能写"), pathText.toStdString())};
+
+        QSaveFile file{pathText};
+        if (!file.open(QIODevice::WriteOnly))
+        {
+            return fail(writeFailure);
+        }
+
+        QByteArray bytes;
+        QBuffer    buffer{&bytes};
+        buffer.open(QIODevice::WriteOnly);
+        // 按后缀显式指定编码器：.jpeg 是常见写法，而 Qt 的 JPEG 编码器名只有 jpg
+        const auto format  = suffix == QStringLiteral("jpeg") ? QByteArray{"jpg"} : suffix.toUtf8();
+        const auto quality = m_settings.intValue(Core::kSaveImageQuality, Core::kDefaultImageQuality);
+        if (!rendered->save(&buffer, format.constData(), quality))
+        {
+            buffer.close();
+            file.cancelWriting();
+            return fail(Base::Error{Base::ErrorCode::FileWriteFailed, uiFormat(uiTextUtf8("「{}」没能编码成目标格式"), pathText.toStdString())});
+        }
+        buffer.close();
+
+        if (file.write(bytes) != bytes.size())
+        {
+            file.cancelWriting();
+            return fail(writeFailure);
+        }
+        if (!file.commit())
+        {
+            return fail(writeFailure);
+        }
+
+        setStatus(QString::fromStdString(uiFormat(uiTextUtf8("已保存到 {}"), pathText.toStdString())), false);
+        return {};
+    }
+
+    QString ShareDialog::suggestedFilePath() const
+    {
+        const auto configured = m_settings.stringValue(Core::kPathScreenshot, QString{});
+        const auto directory  = configured.isEmpty() ? Base::Paths::defaultScreenshotDirectory() : Base::Paths::fromDisplayText(configured);
+        const auto context    = Base::NameTemplateContext{QFileInfo{m_source.processName}.completeBaseName(), m_source.windowTitle, m_source.screenName};
+        const auto name       = Base::Paths::imageFileName(QDateTime::currentDateTime(), "png", Core::nameTemplateOrDefault(m_settings), context);
+        return Base::Paths::toDisplayText(Base::Paths::uniqueFilePath(directory, name));
     }
 
     Base::Expected<void> ShareDialog::saveTemplateAs(const QString &name)
@@ -392,12 +494,34 @@ namespace GyanisScribe::Gui
         templateLayout->addStretch(1);
         form->addRow(templateRow);
 
+        auto *exportRow    = new QWidget{formWidget};
+        auto *exportLayout = new QHBoxLayout{exportRow};
+        exportLayout->setContentsMargins(0, 0, 0, 0);
+        exportLayout->setSpacing(kSpacingSmall);
+        m_copyButton = new Button{uiText("复制到剪贴板"), exportRow};
+        m_copyButton->setObjectName(QStringLiteral("shareCopy"));
+        m_copyButton->setAccessibleName(uiText("复制到剪贴板"));
+        m_copyButton->setToolTip(uiText("按原尺寸把美化成品放进剪贴板；原图与标注保持不动"));
+        m_saveFileButton = new Button{uiText("保存图片…"), exportRow};
+        m_saveFileButton->setObjectName(QStringLiteral("shareSaveFile"));
+        m_saveFileButton->setAccessibleName(uiText("保存图片"));
+        m_saveFileButton->setToolTip(uiText("按原尺寸把美化成品另存成 PNG、JPG 或 WebP；原图与标注保持不动"));
+        m_closeButton = new Button{uiText("关闭"), exportRow};
+        m_closeButton->setObjectName(QStringLiteral("shareClose"));
+        m_closeButton->setAccessibleName(uiText("关闭美化分享"));
+        m_closeButton->setToolTip(uiText("关掉美化对话框回到标注现场；已经复制或保存的成品不受影响"));
+        exportLayout->addWidget(m_copyButton);
+        exportLayout->addWidget(m_saveFileButton);
+        exportLayout->addWidget(m_closeButton);
+        exportLayout->addStretch(1);
+        form->addRow(exportRow);
+
         m_statusLabel = new QLabel{formWidget};
         m_statusLabel->setObjectName(QStringLiteral("shareStatus"));
         m_statusLabel->setWordWrap(true);
         m_statusLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
         m_statusLabel->setAccessibleName(uiText("操作状态"));
-        m_statusLabel->setToolTip(uiText("这里显示保存、删除模板等操作的结果与失败原因"));
+        m_statusLabel->setToolTip(uiText("这里显示复制、保存与模板操作的结果和失败原因"));
         form->addRow(m_statusLabel);
 
         scroll->setWidget(formWidget);
@@ -516,6 +640,25 @@ namespace GyanisScribe::Gui
                              }
                              (void) deleteSelectedTemplate();
                          });
+
+        QObject::connect(m_copyButton, &QPushButton::clicked, this, [this] { (void) copyToClipboard(); });
+        QObject::connect(m_saveFileButton, &QPushButton::clicked, this,
+                         [this]
+                         {
+                             const auto chosen = QFileDialog::getSaveFileName(this, uiText("保存图片"), suggestedFilePath(),
+                                                                              uiText("PNG 图片 (*.png);;JPEG 图片 (*.jpg *.jpeg);;WebP 图片 (*.webp)"));
+                             if (chosen.isEmpty())
+                             {
+                                 return;
+                             }
+                             auto path = std::filesystem::path{Base::Paths::fromDisplayText(chosen)};
+                             if (path.extension().empty())
+                             {
+                                 path += ".png";
+                             }
+                             (void) saveToFile(path);
+                         });
+        QObject::connect(m_closeButton, &QPushButton::clicked, this, &ShareDialog::accept);
     }
 
     void ShareDialog::loadTemplates()

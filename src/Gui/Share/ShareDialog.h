@@ -1,6 +1,6 @@
 /**
  * @file ShareDialog.h
- * @brief 美化分享对话框：实时预览、模板选择与自定义模板增删
+ * @brief 美化分享对话框：实时预览、模板选择、自定义模板增删与复制/另存
  * @author Gyanis
  * @date 2026-11-10
  * @version 0.0.1
@@ -17,6 +17,7 @@
 #include <QImage>
 #include <QString>
 
+#include <filesystem>
 #include <vector>
 
 class QCheckBox;
@@ -41,7 +42,7 @@ namespace GyanisScribe::Gui
      * @brief 美化分享对话框
      * @details 左侧预览、右侧样式表单；内置模板与本地自定义模板共用一份下拉，
      *          当前选择写回 Share/LastTemplate。预览按 1200 像素宽上限渲染并防抖，
-     *          改控件只更新内存样式，不动原图与标注现场。
+     *          改控件只更新内存样式，不动原图与标注现场；复制与另存都按原尺寸重新渲染。
      */
     class ShareDialog : public QDialog
     {
@@ -86,6 +87,29 @@ namespace GyanisScribe::Gui
          * @return 最近一次操作的结果或错误原因
          */
         [[nodiscard]] QString statusText() const;
+
+        /**
+         * @brief 按原尺寸渲染并放进系统剪贴板
+         * @return 成功返回空载荷；渲染失败时返回原因，状态行同时点亮
+         * @details 剪贴板里拿到的始终是整尺寸成品，而不是左侧那张预览缩略图。
+         */
+        [[nodiscard]] Base::Expected<void> copyToClipboard();
+
+        /**
+         * @brief 按原尺寸渲染并另存为图片
+         * @param filePath 目标文件，后缀决定格式：png、jpg、jpeg 或 webp
+         * @return 成功返回空载荷；格式不支持、渲染失败、编码失败或写盘失败时返回原因，状态行同时点亮
+         * @details 写盘走 QSaveFile 原子替换：中途失败不会在盘上留下半张图。有损档按设置里的
+         *          Save/ImageQuality 写，没填过时用 kDefaultImageQuality；不写历史，也不跑截图后的外部命令。
+         */
+        [[nodiscard]] Base::Expected<void> saveToFile(const std::filesystem::path &filePath);
+
+        /**
+         * @brief 给「保存图片…」对话框准备默认路径
+         * @return 设置里的截图目录（没填时系统图片目录下的 GyanisScribe）加按模板与来源生成的文件名，后缀 .png
+         * @details 名字走与截图保存同一套模板与去重：同一秒里连按两次保存不会默认指向同一个文件。
+         */
+        [[nodiscard]] QString suggestedFilePath() const;
 
         /**
          * @brief 把当前样式另存为自定义模板
@@ -168,6 +192,9 @@ namespace GyanisScribe::Gui
         QComboBox   *m_watermarkCorner   = nullptr; ///< 水印位置
         QPushButton *m_saveTemplate      = nullptr; ///< 另存为模板
         QPushButton *m_deleteTemplate    = nullptr; ///< 删除模板
+        QPushButton *m_copyButton        = nullptr; ///< 复制到剪贴板
+        QPushButton *m_saveFileButton    = nullptr; ///< 保存图片
+        QPushButton *m_closeButton       = nullptr; ///< 关闭对话框
         QLabel      *m_statusLabel       = nullptr; ///< 状态行
 
         QTimer *m_previewTimer = nullptr; ///< 预览防抖

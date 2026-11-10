@@ -1,15 +1,22 @@
 #include "Gui/Share/ShareDialog.h"
+#include "Base/Paths.h"
 #include "Core/Capture/SourceInfo.h"
+#include "Core/Image/ImageFormat.h"
+#include "Core/Settings/NamingRules.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Settings/SettingsStore.h"
+#include "Core/Share/ShareRenderer.h"
 #include "Core/Share/ShareStyle.h"
 
 #include <QApplication>
+#include <QClipboard>
 #include <QColor>
 #include <QComboBox>
 #include <QDateTime>
+#include <QFileInfo>
 #include <QImage>
 #include <QSlider>
+#include <QTemporaryDir>
 #include <QWidget>
 
 #include <gtest/gtest.h>
@@ -157,4 +164,62 @@ TEST_F(ShareDialogFixture, ClosingKeepsTheParentAlive)
     dialog->close();
     EXPECT_FALSE(dialog->isVisible());
     EXPECT_TRUE(parent->isVisible());
+}
+
+/// 复制到剪贴板的图与整尺寸渲染一致
+TEST_F(ShareDialogFixture, CopiesTheFullSizedRender)
+{
+    const auto dialog = makeDialog();
+    auto       copied = dialog->copyToClipboard();
+    ASSERT_TRUE(copied.has_value()) << copied.error().message;
+    const auto expected = Core::renderShareImage(makeImage(), dialog->currentStyle(), 0);
+    ASSERT_TRUE(expected.has_value()) << expected.error().message;
+    const auto actual = QApplication::clipboard()->image();
+    EXPECT_EQ(actual.size(), expected->size());
+    EXPECT_EQ(actual.convertToFormat(QImage::Format_ARGB32), expected->convertToFormat(QImage::Format_ARGB32));
+    EXPECT_NE(dialog->statusText().indexOf(QStringLiteral("已复制")), -1);
+}
+
+/// PNG 与 JPG 都写得出来，尺寸等于整尺寸渲染
+TEST_F(ShareDialogFixture, SavesPngAndJpegAtFullSize)
+{
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const auto dialog   = makeDialog();
+    const auto expected = Core::renderShareImage(makeImage(), dialog->currentStyle(), 0);
+    ASSERT_TRUE(expected.has_value()) << expected.error().message;
+
+    const auto pngPath = std::filesystem::path{directory.path().toStdWString()} / L"share.png";
+    ASSERT_TRUE(dialog->saveToFile(pngPath).has_value());
+    EXPECT_TRUE(std::filesystem::exists(pngPath));
+    EXPECT_EQ(QImage{QString::fromStdWString(pngPath.wstring())}.size(), expected->size());
+
+    const auto jpgPath = std::filesystem::path{directory.path().toStdWString()} / L"share.jpg";
+    ASSERT_TRUE(dialog->saveToFile(jpgPath).has_value());
+    const auto jpg = QImage{QString::fromStdWString(jpgPath.wstring())};
+    EXPECT_EQ(jpg.size(), expected->size());
+    EXPECT_FALSE(jpg.hasAlphaChannel());
+}
+
+/// 写不出去要给中文原因，并把状态行点亮
+TEST_F(ShareDialogFixture, SaveFailureReportsAnActionableReason)
+{
+    const auto dialog  = makeDialog();
+    const auto missing = std::filesystem::path{"Z:/GyanisScribe-Does-Not-Exist/share.png"};
+    const auto saved   = dialog->saveToFile(missing);
+    ASSERT_FALSE(saved.has_value());
+    EXPECT_NE(saved.error().message.find("美化"), std::string::npos) << saved.error().message;
+    EXPECT_FALSE(dialog->statusText().isEmpty());
+}
+
+/// 默认文件名用设置里的截图目录与命名模板，后缀是 .png
+TEST_F(ShareDialogFixture, SuggestedPathUsesTheScreenshotDirectory)
+{
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    ASSERT_TRUE(m_settings->setValue(Core::kPathScreenshot, directory.path()).has_value());
+    const auto dialog = makeDialog();
+    const auto path   = dialog->suggestedFilePath();
+    EXPECT_TRUE(path.startsWith(directory.path()));
+    EXPECT_TRUE(path.endsWith(QStringLiteral(".png")));
 }
