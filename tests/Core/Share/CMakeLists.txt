@@ -1,4 +1,5 @@
 add_executable(TestCoreShare
+        TestShareRenderer.cpp
         TestShareStyle.cpp)
 
 target_link_libraries(TestCoreShare PRIVATE
