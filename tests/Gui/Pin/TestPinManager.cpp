@@ -1308,7 +1308,7 @@ namespace GyanisScribe
         const auto refused = pins.deleteGroup(Core::kFirstPinGroup);
         ASSERT_FALSE(refused.has_value()) << "第一组被删掉了，后面删别组就没有并回去的地方";
         EXPECT_EQ(refused.error().code, GyanisScribe::Base::ErrorCode::InvalidArgument);
-        EXPECT_NE(refused.error().message.find("落点"), std::string::npos) << "拒绝要说明为什么删不掉，实际：" << refused.error().message;
+        EXPECT_NE(refused.error().message.find("接收"), std::string::npos) << "拒绝要说明为什么删不掉，实际：" << refused.error().message;
         EXPECT_EQ(pins.count(), 1) << "拒删归拒删，那张图不该跟着没";
     }
 
@@ -1427,11 +1427,11 @@ namespace GyanisScribe
         static_cast<Gui::PinWindow *>(&first)->setThumbnailMode(true);
         const auto refusedThumbnail = pins.pinRefreshTarget(0);
         ASSERT_FALSE(refusedThumbnail.has_value());
-        EXPECT_NE(refusedThumbnail.error().message.find("小图"), std::string::npos) << refusedThumbnail.error().message;
+        EXPECT_NE(refusedThumbnail.error().message.find("缩略图"), std::string::npos) << refusedThumbnail.error().message;
 
         const auto missing = pins.pinRefreshTarget(7);
         ASSERT_FALSE(missing.has_value());
-        EXPECT_NE(missing.error().message.find("不在册"), std::string::npos) << missing.error().message;
+        EXPECT_NE(missing.error().message.find("未找到"), std::string::npos) << missing.error().message;
     }
 
     /**

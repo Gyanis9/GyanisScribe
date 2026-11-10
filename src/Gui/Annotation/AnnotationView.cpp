@@ -510,7 +510,7 @@ namespace GyanisScribe::Gui
         m_textEditor->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         // Tab 交回界面（与单行时代同解）：在标注里插个制表符没有意义
         m_textEditor->setTabChangesFocus(true);
-        m_textEditor->setPlaceholderText(GyanisScribe::Base::uiText("输入文字，回车换行，Ctrl+回车提交"));
+        m_textEditor->setPlaceholderText(GyanisScribe::Base::uiText("输入文字，按回车键换行，按 Ctrl+回车提交"));
         // 字体与成品同一处拼出：字号、字体族、粗斜体在输入时与提交后才会一致
         const QFont editorFont = m_engine.textInputFont();
         m_textEditor->setFont(editorFont);

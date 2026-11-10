@@ -45,12 +45,12 @@ namespace GyanisScribe::App
 
     /// 全部档位，顺序就是设置页下拉的顺序；第一档是不填配置时的回落档
     inline constexpr std::array<CaptureIntentChoice, 6> kCaptureIntentChoices{
-            CaptureIntentChoice{CaptureIntent::Annotate, "Annotate", "进标注窗", "CaptureRegion"},
+            CaptureIntentChoice{CaptureIntent::Annotate, "Annotate", "在标注窗口中打开", "CaptureRegion"},
             CaptureIntentChoice{CaptureIntent::CopyToClipboard, "Copy", "复制到剪贴板", "Copy"},
-            CaptureIntentChoice{CaptureIntent::SaveToFile, "Save", "直接存成文件", "Save"},
-            CaptureIntentChoice{CaptureIntent::QuickSave, "QuickSave", "快速保存（存文件并复制）", "Save"},
-            CaptureIntentChoice{CaptureIntent::PinToDesk, "Pin", "直接贴到屏幕上", "Pin"},
-            CaptureIntentChoice{CaptureIntent::Recognize, "Recognize", "直接识别文字", "Ocr"},
+            CaptureIntentChoice{CaptureIntent::SaveToFile, "Save", "保存到文件", "Save"},
+            CaptureIntentChoice{CaptureIntent::QuickSave, "QuickSave", "保存并复制", "Save"},
+            CaptureIntentChoice{CaptureIntent::PinToDesk, "Pin", "贴到屏幕", "Pin"},
+            CaptureIntentChoice{CaptureIntent::Recognize, "Recognize", "识别文字", "Ocr"},
     };
 
     /**

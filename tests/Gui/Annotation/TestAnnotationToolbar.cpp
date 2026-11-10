@@ -68,7 +68,7 @@ namespace
     constexpr std::array<std::string_view, 14> kToolShortcuts = {"V", "R", "E", "A", "P", "H", "M", "T", "N", "L", "B", "X", "G", "F"};
 
     /// 动作按钮的中文名，同样按需求第六节的排列顺序抄一份
-    constexpr std::array<std::string_view, 7> kActionLabels = {"复制到剪贴板", "保存为文件", "美化分享", "贴到屏幕上", "识别文字", "识别二维码", "隐私打码"};
+    constexpr std::array<std::string_view, 7> kActionLabels = {"复制到剪贴板", "保存为文件", "美化分享", "固定到屏幕", "识别文字", "识别二维码", "隐私打码"};
 
     /// 全 1920x1080、原点的可用区，几何用例的默认舞台
     constexpr QRect kScreen{0, 0, 1920, 1080};
@@ -639,7 +639,7 @@ namespace
 
         button->click();
         EXPECT_EQ(toolbar->currentTextPlateColorStep(), 3);
-        EXPECT_EQ(button->toolTip(), QString::fromUtf8("底板色：用标注色"));
+        EXPECT_EQ(button->toolTip(), QString::fromUtf8("底板色：跟随标注色"));
 
         button->click();
         EXPECT_EQ(toolbar->currentTextPlateColorStep(), 0) << "四档之后该回到「自动」";
@@ -1324,7 +1324,7 @@ TEST_F(ToolbarFixture, RecentColorsFromSettingsBecomeSwatches)
     ASSERT_EQ(toolbar->colorButtonCount(), static_cast<int>(kAnnotationPaletteColors.size()) + 3) << "预设八格 + 最近两格 + 自定义一枚";
 
     ASSERT_NE(openColorMenu(*toolbar), nullptr);
-    auto *second = buttonByLabel(*toolbar, "最近使用 2");
+    auto *second = buttonByLabel(*toolbar, "最近使用颜色 2");
     ASSERT_NE(second, nullptr) << "第二格没按清单排出来，顺序就不再是「最近」";
     second->click();
     ASSERT_EQ(log.colors.size(), 1U);
@@ -1531,7 +1531,7 @@ TEST_F(ToolbarFixture, WheelOnTheColorRowDimsTheShapeColor)
     // 点那一格发一次、滚一档再发一次：两次都对，第二次带的才是淡掉的那支
     ASSERT_EQ(log.colors.size(), 2u) << "滚了一档却没把颜色通知宿主";
     EXPECT_EQ(log.colors.back().alpha(), 242);
-    EXPECT_EQ(colorButton->toolTip(), QString::fromUtf8("颜色（当前不透明度 95%；在这一枚上滚滚轮调节）")) << "读数没跟上";
+    EXPECT_EQ(colorButton->toolTip(), QString::fromUtf8("颜色（当前不透明度 95%；在按钮上滚动滚轮可调节）")) << "读数没跟上";
 }
 
 /**

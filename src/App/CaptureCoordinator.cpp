@@ -104,7 +104,7 @@ namespace GyanisScribe::App
                          [this](const GyanisScribe::Base::Error &error)
                          {
                              GyanisScribe::Base::Logger::error(std::format("截图未完成：{}", error.message));
-                             emit messageForUser(GyanisScribe::Base::uiText("截图未完成：%1。请重试一次").arg(QString::fromStdString(error.message)),
+                             emit messageForUser(GyanisScribe::Base::uiText("截图未完成：%1。请重试").arg(QString::fromStdString(error.message)),
                                                  GyanisScribe::Gui::ToastKind::Danger);
                              // 命令行那次没有界面可看提示：失败原因另外从 commandLineActionFailed 交回一份
                              if (m_commandLineActive)
@@ -207,7 +207,7 @@ namespace GyanisScribe::App
                 return;
             }
             default:
-                emit commandLineActionFailed(GyanisScribe::Base::uiText("这个命令行动作不走截图这条路"));
+                emit commandLineActionFailed(GyanisScribe::Base::uiText("该命令行操作不经过截图流程"));
                 return;
         }
     }
@@ -248,7 +248,7 @@ namespace GyanisScribe::App
         if (screen == nullptr)
         {
             // 一块屏都拿不到就不摆窗：标注窗没有可依附的几何，硬摆会落在一块不存在的屏幕上
-            emit messageForUser(GyanisScribe::Base::uiText("空白画布没开起来：Qt 没有报出任何可用的屏幕。请在图形会话里重试"), GyanisScribe::Gui::ToastKind::Danger);
+            emit messageForUser(GyanisScribe::Base::uiText("无法创建空白画布：未检测到可用的屏幕。请在图形会话中重试"), GyanisScribe::Gui::ToastKind::Danger);
             return;
         }
 
@@ -314,7 +314,7 @@ namespace GyanisScribe::App
 
         if (m_delayTimer != nullptr)
         {
-            emit messageForUser(GyanisScribe::Base::uiText("上一次延时截图还在等，等它弹出来之后再按"), GyanisScribe::Gui::ToastKind::Information);
+            emit messageForUser(GyanisScribe::Base::uiText("上一次延时截图尚未完成，请等待完成后再操作"), GyanisScribe::Gui::ToastKind::Information);
             return;
         }
 
@@ -333,7 +333,7 @@ namespace GyanisScribe::App
         m_pendingCapture = std::move(begin);
         m_delayTimer->start(seconds * 1000);
         emit messageForUser(
-                QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("{} 秒后开始截图：把要截的菜单或悬停状态摆好，这一会儿别动"), seconds).c_str()),
+                QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("{} 秒后开始截图：请先准备好要截取的菜单或悬停状态，期间请勿操作"), seconds).c_str()),
                 GyanisScribe::Gui::ToastKind::Information);
     }
 
@@ -573,7 +573,7 @@ namespace GyanisScribe::App
         // 区域未知（整屏抓来的那几路）就没法对着重抓：说一声，而不是抓一块错的盖上去
         if (region.isEmpty())
         {
-            emit messageForUser(GyanisScribe::Base::uiText("这一轮没记录选区，刷新截图用不了"), GyanisScribe::Gui::ToastKind::Information);
+            emit messageForUser(GyanisScribe::Base::uiText("本次截图未记录选区，无法刷新截图"), GyanisScribe::Gui::ToastKind::Information);
             return;
         }
 
@@ -595,7 +595,7 @@ namespace GyanisScribe::App
         auto *screen = screenFor(screenName);
         if (screen == nullptr || globalSelection.isEmpty())
         {
-            emit messageForUser(GyanisScribe::Base::uiText("这一轮没记录屏幕或选区，改不了截图范围"), GyanisScribe::Gui::ToastKind::Information);
+            emit messageForUser(GyanisScribe::Base::uiText("本次截图未记录屏幕或选区，无法调整截图范围"), GyanisScribe::Gui::ToastKind::Information);
             return;
         }
 
@@ -655,7 +655,7 @@ namespace GyanisScribe::App
     {
         if (image.isNull())
         {
-            emit messageForUser(GyanisScribe::Base::uiText("还没有可打印的画面"), GyanisScribe::Gui::ToastKind::Information);
+            emit messageForUser(GyanisScribe::Base::uiText("暂无可打印的画面"), GyanisScribe::Gui::ToastKind::Information);
             return;
         }
 
@@ -672,7 +672,7 @@ namespace GyanisScribe::App
         if (!painter.begin(&printer))
         {
             GyanisScribe::Base::Logger::error("打印没能开始：打印设备没有准备好");
-            emit messageForUser(GyanisScribe::Base::uiText("打印没能开始：系统打印设备没有准备好。可以先存成文件再从别处打"), GyanisScribe::Gui::ToastKind::Danger);
+            emit messageForUser(GyanisScribe::Base::uiText("无法开始打印：系统打印设备未就绪。可先保存为文件，再从其他应用打印"), GyanisScribe::Gui::ToastKind::Danger);
             return;
         }
         // 纸面按没有透明通道处理（投影底下垫白）；等比居中用的就是「图片摆进控件」那条既有换算，
@@ -697,7 +697,7 @@ namespace GyanisScribe::App
         }
         if (readings->empty())
         {
-            emit messageForUser(GyanisScribe::Base::uiText("这一张里没认出二维码或条形码"), GyanisScribe::Gui::ToastKind::Information);
+            emit messageForUser(GyanisScribe::Base::uiText("未在图像中识别到二维码或条形码"), GyanisScribe::Gui::ToastKind::Information);
             return;
         }
 
@@ -714,7 +714,7 @@ namespace GyanisScribe::App
             emit messageForUser(GyanisScribe::Base::uiText("已复制识别结果（%1 个字符）").arg(preferred->text.size()), GyanisScribe::Gui::ToastKind::Success);
         } else
         {
-            emit messageForUser(GyanisScribe::Base::uiText("认出 %1 个码，已复制最上面那条").arg(static_cast<int>(readings->size())), GyanisScribe::Gui::ToastKind::Success);
+            emit messageForUser(GyanisScribe::Base::uiText("识别到 %1 个条码，已复制第一条结果").arg(static_cast<int>(readings->size())), GyanisScribe::Gui::ToastKind::Success);
         }
     }
 
@@ -750,7 +750,7 @@ namespace GyanisScribe::App
         const auto &canvas = m_annotation->canvas();
         if (image.isNull() || canvas.image.isNull() || image.cacheKey() != canvas.image.cacheKey())
         {
-            emit messageForUser(GyanisScribe::Base::uiText("画布已经变了，请重新点隐私打码"), GyanisScribe::Gui::ToastKind::Information);
+            emit messageForUser(GyanisScribe::Base::uiText("画布已更新，请重新执行隐私打码"), GyanisScribe::Gui::ToastKind::Information);
             return;
         }
 
@@ -778,7 +778,7 @@ namespace GyanisScribe::App
         const auto items = GyanisScribe::Core::Privacy::detectPii(result, barcodeBoxes, image.size());
         if (items.empty())
         {
-            emit messageForUser(GyanisScribe::Base::uiText("没有发现可打码的敏感信息。请仍自行检查后再分享。"), GyanisScribe::Gui::ToastKind::Information);
+            emit messageForUser(GyanisScribe::Base::uiText("未发现可打码的敏感信息。分享前请自行检查。"), GyanisScribe::Gui::ToastKind::Information);
             return;
         }
 
@@ -803,7 +803,7 @@ namespace GyanisScribe::App
         const auto &currentCanvas = m_annotation->canvas();
         if (currentCanvas.image.isNull() || image.cacheKey() != currentCanvas.image.cacheKey())
         {
-            emit messageForUser(GyanisScribe::Base::uiText("画布已经变了，请重新点隐私打码"), GyanisScribe::Gui::ToastKind::Information);
+            emit messageForUser(GyanisScribe::Base::uiText("画布已更新，请重新执行隐私打码"), GyanisScribe::Gui::ToastKind::Information);
             return;
         }
 

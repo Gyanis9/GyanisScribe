@@ -203,7 +203,7 @@ namespace GyanisScribe
     }
 
     /**
-     * @brief 钉住「腾空这一组」关的是这一组、走的是关闭那一档
+     * @brief 钉住「关闭该组贴图」关的是这一组、走的是关闭那一档
      * @details 与右键的「销毁」分档：关掉的还按得回来，桌上的其余两组不该跟着一起消失。
      */
     TEST_F(PinGroupManagerFixture, ClosingAGroupTakesOnlyItsPinsAndKeepsThemRecoverable)
@@ -258,10 +258,10 @@ namespace GyanisScribe
         auto &window = makeWindow();
 
         auto *table    = window.findChild<QTableWidget *>();
-        auto *show     = findButton(QStringLiteral("摆出这一组"));
-        auto *rename   = findButton(QStringLiteral("重命名这一组"));
-        auto *empty    = findButton(QStringLiteral("腾空这一组"));
-        auto *deletion = findButton(QStringLiteral("删掉这一组"));
+        auto *show     = findButton(QStringLiteral("显示该组"));
+        auto *rename   = findButton(QStringLiteral("重命名该组"));
+        auto *empty    = findButton(QStringLiteral("关闭该组贴图"));
+        auto *deletion = findButton(QStringLiteral("删除该组"));
         ASSERT_NE(table, nullptr) << "表找不到，判据就退成了「按钮不存在也算过」";
         ASSERT_NE(show, nullptr);
         ASSERT_NE(rename, nullptr);
@@ -269,7 +269,7 @@ namespace GyanisScribe
         ASSERT_NE(deletion, nullptr);
 
         clearCurrentRow(*table);
-        EXPECT_FALSE(show->isEnabled()) << "没选中一行时「摆出这一组」按得下去";
+        EXPECT_FALSE(show->isEnabled()) << "没选中一行时「显示该组」按得下去";
         EXPECT_FALSE(deletion->isEnabled());
 
         table->setCurrentCell(1, 0);
@@ -280,7 +280,7 @@ namespace GyanisScribe
     }
 
     /**
-     * @brief 钉住点「摆出这一组」那一下：桌上换人，「摆在桌上」那一列跟着挪行
+     * @brief 钉住点「显示该组」那一下：桌上换人，「摆在桌上」那一列跟着挪行
      * @details 管理器换活动组时不出声，窗上那一列要自己重读；不重读就是上一组还挂着「是」。
      */
     TEST_F(PinGroupManagerFixture, ShowingARowFromTheWindowMovesTheDeskAndTheMark)
@@ -291,7 +291,7 @@ namespace GyanisScribe
         auto *table = window.findChild<QTableWidget *>();
         ASSERT_NE(table, nullptr);
         table->setCurrentCell(1, 0);
-        auto *show = findButton(QStringLiteral("摆出这一组"));
+        auto *show = findButton(QStringLiteral("显示该组"));
         ASSERT_NE(show, nullptr);
         emit show->clicked();
 
@@ -303,7 +303,7 @@ namespace GyanisScribe
     }
 
     /**
-     * @brief 钉住「腾空这一组」那一下：只关这一组，提示说清还能按回来几张
+     * @brief 钉住「关闭该组贴图」那一下：只关这一组，提示说清还能按回来几张
      * @details 那句上限不是装饰：册子只留最近五张，用户以为整组都还能回来就会在第五张之后找不到。
      */
     TEST_F(PinGroupManagerFixture, EmptyingARowClosesOnlyThatGroupAndSaysTheRecoverableCap)
@@ -314,7 +314,7 @@ namespace GyanisScribe
         auto *table = window.findChild<QTableWidget *>();
         ASSERT_NE(table, nullptr);
         table->setCurrentCell(1, 0);
-        auto *empty = findButton(QStringLiteral("腾空这一组"));
+        auto *empty = findButton(QStringLiteral("关闭该组贴图"));
         ASSERT_NE(empty, nullptr);
         emit empty->clicked();
 
@@ -328,7 +328,7 @@ namespace GyanisScribe
     }
 
     /**
-     * @brief 钉住「删掉这一组」把成员并回第一组，名字跟着清
+     * @brief 钉住「删除该组」把成员并回第一组，名字跟着清
      */
     TEST_F(PinGroupManagerFixture, DeletingARowMergesItsPinsBackAndDropsTheName)
     {
@@ -339,7 +339,7 @@ namespace GyanisScribe
         auto *table = window.findChild<QTableWidget *>();
         ASSERT_NE(table, nullptr);
         table->setCurrentCell(1, 0);
-        auto *deletion = findButton(QStringLiteral("删掉这一组"));
+        auto *deletion = findButton(QStringLiteral("删除该组"));
         ASSERT_NE(deletion, nullptr);
         emit deletion->clicked();
 
@@ -360,7 +360,7 @@ namespace GyanisScribe
         auto *table = window.findChild<QTableWidget *>();
         ASSERT_NE(table, nullptr);
         table->setCurrentCell(0, 0);
-        auto *deletion = findButton(QStringLiteral("删掉这一组"));
+        auto *deletion = findButton(QStringLiteral("删除该组"));
         ASSERT_NE(deletion, nullptr);
         emit deletion->clicked();
 
@@ -400,10 +400,10 @@ namespace GyanisScribe
         auto *table = window.findChild<QTableWidget *>();
         ASSERT_NE(table, nullptr);
         clearCurrentRow(*table);
-        auto *show = findButton(QStringLiteral("摆出这一组"));
+        auto *show = findButton(QStringLiteral("显示该组"));
         ASSERT_NE(show, nullptr);
         emit  show->clicked();
-        auto *deletion = findButton(QStringLiteral("删掉这一组"));
+        auto *deletion = findButton(QStringLiteral("删除该组"));
         ASSERT_NE(deletion, nullptr);
         emit deletion->clicked();
 

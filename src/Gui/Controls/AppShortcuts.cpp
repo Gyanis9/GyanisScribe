@@ -35,18 +35,18 @@ namespace GyanisScribe::Gui
                 AppShortcutEntry{"Annotation/Magnifier", "F", "放大镜"},
                 // 截图遮罩：这几颗裸键管的是这一块选区怎么框、怎么交出去
                 AppShortcutEntry{"Mask/AspectRatio", "A", "锁定长宽比"},
-                AppShortcutEntry{"Mask/SizeEditor", "S", "开尺寸输入框"},
-                AppShortcutEntry{"Mask/RegionCycle", "R", "挑最近框过的选区"},
+                AppShortcutEntry{"Mask/SizeEditor", "S", "打开尺寸输入框"},
+                AppShortcutEntry{"Mask/RegionCycle", "R", "选择最近的选区"},
                 AppShortcutEntry{"Mask/CopySize", "V", "复制选区尺寸"},
-                AppShortcutEntry{"Mask/ColorFormat", "C", "颜色写法换一种"},
-                AppShortcutEntry{"Mask/PointerToggle", "P", "这一张含不含鼠标指针"},
+                AppShortcutEntry{"Mask/ColorFormat", "C", "切换颜色格式"},
+                AppShortcutEntry{"Mask/PointerToggle", "P", "切换是否包含鼠标指针"},
                 // 贴图窗：转正那一颗带一个按住 Shift 的反向档
-                AppShortcutEntry{"Pin/Rotate", "R", "转正一挡"},
+                AppShortcutEntry{"Pin/Rotate", "R", "正向旋转一档"},
                 AppShortcutEntry{"Pin/FlipHorizontal", "H", "左右翻转"},
                 AppShortcutEntry{"Pin/FlipVertical", "V", "上下翻转"},
                 AppShortcutEntry{"Pin/Gray", "G", "灰度显示"},
                 AppShortcutEntry{"Pin/Invert", "I", "反色"},
-                AppShortcutEntry{"Pin/Thumbnail", "T", "缩到小图 / 还原"},
+                AppShortcutEntry{"Pin/Thumbnail", "T", "切换缩略图模式"},
         };
     } // namespace
 

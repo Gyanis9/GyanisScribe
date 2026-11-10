@@ -661,17 +661,17 @@ namespace GyanisScribe
         QAction *remove = nullptr;
         for (auto *action: entries)
         {
-            if (action->text() == QString::fromUtf8("重命名这一组…"))
+            if (action->text() == QString::fromUtf8("重命名分组…"))
             {
                 rename = action;
             }
-            if (action->text() == QString::fromUtf8("删除这一组"))
+            if (action->text() == QString::fromUtf8("删除分组"))
             {
                 remove = action;
             }
         }
-        ASSERT_NE(rename, nullptr) << "分组子菜单里少了「重命名这一组…」";
-        ASSERT_NE(remove, nullptr) << "分组子菜单里少了「删除这一组」";
+        ASSERT_NE(rename, nullptr) << "分组子菜单里少了「重命名分组…」";
+        ASSERT_NE(remove, nullptr) << "分组子菜单里少了「删除分组」";
         EXPECT_TRUE(remove->isEnabled()) << "站在第二组上，删组这一项该是点得动的";
 
         // 换到第一组：那一项要灰着并说明为什么
@@ -689,7 +689,7 @@ namespace GyanisScribe
         QAction *firstDelete = nullptr;
         for (auto *action: innerMenu->actions())
         {
-            if (action->text() == QString::fromUtf8("删除这一组"))
+            if (action->text() == QString::fromUtf8("删除分组"))
             {
                 firstDelete = action;
             }
@@ -890,9 +890,9 @@ namespace GyanisScribe
 
     /**
      * @brief 钉住穿透那一项的提示按真行为写：双击关闭这一张，`0` 才是回到原始比例
-     * @details 提示若还写着「双击回到原始比例」，用户双击之后贴图没了，只会以为丢了一张图。
+     * @details 提示若还写着「双击恢复原始比例」，用户双击之后贴图没了，只会以为丢了一张图。
      *          判据取整条文案并显式排除旧口诀：只查两个子串时，「双击关闭」与残留的
-     *          「双击回到原始比例」可以同时出现在一句自相矛盾的话里。
+     *          「双击恢复原始比例」可以同时出现在一句自相矛盾的话里。
      */
     TEST_F(PinWindowFixture, MouseThroughTooltipSaysDoubleClickCloses)
     {
@@ -910,9 +910,9 @@ namespace GyanisScribe
         ASSERT_NE(through, nullptr) << "右键菜单里没有「鼠标穿透」这一项";
 
         const auto hint     = through->toolTip();
-        const auto expected = QString::fromUtf8("滚轮缩放，Ctrl+滚轮旋转，Shift+滚轮调透明度，R 转正一挡（Shift+R 反向），双击关闭这一张；`0` 回到原始比例，Esc 关闭");
+        const auto expected = QString::fromUtf8("滚轮缩放，Ctrl+滚轮旋转，Shift+滚轮调整透明度，R 每次旋转一档直至回正（Shift+R 反向），双击关闭该贴图；`0` 恢复原始比例，Esc 关闭。");
         EXPECT_EQ(hint, expected) << "提示与真行为对不上，实际：" << hint.toStdString();
-        EXPECT_FALSE(hint.contains(QStringLiteral("双击回到原始比例"))) << "提示还写着旧口诀：双击会把这一张关掉，不是回到原始比例";
+        EXPECT_FALSE(hint.contains(QStringLiteral("双击恢复原始比例"))) << "提示还写着旧口诀：双击会关闭该贴图，不是回到原始比例";
         EXPECT_FALSE(hint.contains(QStringLiteral("0 或双击"))) << "提示仍把 `0` 与双击并列成同一档";
     }
 
@@ -1663,7 +1663,7 @@ namespace GyanisScribe
     }
 
     /**
-     * @brief 钉住「只显示这一张」的菜单项：勾选项、点一下把开关意图发出去（谁在屏上由管理器算）
+     * @brief 钉住「仅显示该贴图」的菜单项：勾选项、点一下把开关意图发出去（谁在屏上由管理器算）
      */
     TEST_F(PinWindowFixture, SoloMenuEntryRequestsTheToggle)
     {
@@ -1673,8 +1673,8 @@ namespace GyanisScribe
         QObject::connect(&window, &Gui::PinWindow::soloRequested, [&requested](bool solo) { requested = solo; });
 
         QMenu *menu  = window.buildContextMenu();
-        auto  *entry = findMenuAction(*menu, QString::fromUtf8("只显示这一张"));
-        ASSERT_NE(entry, nullptr) << "右键菜单里没有「只显示这一张」这一项";
+        auto  *entry = findMenuAction(*menu, QString::fromUtf8("仅显示该贴图"));
+        ASSERT_NE(entry, nullptr) << "右键菜单里没有「仅显示该贴图」这一项";
         EXPECT_TRUE(entry->isCheckable()) << "该是勾选项";
         EXPECT_FALSE(entry->isChecked()) << "起点该是没开";
         entry->trigger();
@@ -1686,7 +1686,7 @@ namespace GyanisScribe
         // 管理器把主角态推下来之后，勾选态与发出的值都跟着走
         window.setSoloState(true);
         QMenu *again = window.buildContextMenu();
-        auto  *item  = findMenuAction(*again, QString::fromUtf8("只显示这一张"));
+        auto  *item  = findMenuAction(*again, QString::fromUtf8("仅显示该贴图"));
         ASSERT_NE(item, nullptr);
         EXPECT_TRUE(item->isChecked()) << "主角态推下来之后勾选态没跟上";
         requested.reset();
@@ -2134,7 +2134,7 @@ namespace GyanisScribe
     }
 
     /**
-     * @brief 钉住右键「销毁这一张」报销的是销毁，不是关闭
+     * @brief 钉住右键「销毁该贴图」报销的是销毁，不是关闭
      * @details 两条路只差在管理器要不要把那份像素抄进可恢复的册子，所以判据落在信号上：
      *          同时报关闭就等于销毁过了还能按回来，那一档的区分当场作废。
      */
@@ -2147,8 +2147,8 @@ namespace GyanisScribe
         ASSERT_TRUE(QObject::connect(&window, &Gui::PinWindow::destroyRequested, [&destructions] { ++destructions; }));
 
         auto *menu   = window.buildContextMenu();
-        auto *action = findMenuAction(*menu, QString::fromUtf8("销毁这一张"));
-        ASSERT_NE(action, nullptr) << "右键菜单里没有「销毁这一张」这一项";
+        auto *action = findMenuAction(*menu, QString::fromUtf8("销毁该贴图"));
+        ASSERT_NE(action, nullptr) << "右键菜单里没有「销毁该贴图」这一项";
         action->trigger();
         delete menu;
 
@@ -2805,7 +2805,7 @@ namespace GyanisScribe
 
     /**
      * @brief 钉住色卡身份、右键那一项与改色这一步
-     * @details 三处各钉一次：不是色卡就不该出现「改这一张的颜色…」（点下去会把这张照片换成色卡）；
+     * @details 三处各钉一次：不是色卡就不该出现「修改颜色…」（点下去会把这张照片换成色卡）；
      *          是色卡时这一项要在菜单里；改完手上那张图的像素、记下的原色与布局记录三者一起走——
      *          只改一处时，用户会在菜单里看到旧色、或存盘再打开发现这一项没了。
      *          取色器是模态的，用例驱动不了，所以「换成什么」这一步单独留在公开出口上。
@@ -2815,7 +2815,7 @@ namespace GyanisScribe
         auto &window = makeWindow();
 
         // 菜单是右键那一刻现搭的（不进构造），所以这里直接搭一份来数：动作归菜单持有，借用完随它一起销毁
-        const QString cardItemText = QString::fromUtf8("改这一张的颜色…");
+        const QString cardItemText = QString::fromUtf8("修改颜色…");
         const auto    hasCardItem  = [&window, &cardItemText]
         {
             const std::unique_ptr<QMenu> menu{window.buildContextMenu()};

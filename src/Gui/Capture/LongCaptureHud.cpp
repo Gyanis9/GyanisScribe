@@ -63,12 +63,12 @@ namespace GyanisScribe::Gui
         root->setContentsMargins(GyanisScribe::Gui::kSpacingSmall, GyanisScribe::Gui::kSpacingTiny, GyanisScribe::Gui::kSpacingSmall, GyanisScribe::Gui::kSpacingTiny);
         root->setSpacing(GyanisScribe::Gui::kSpacingTiny);
 
-        auto *hint = new QLabel{GyanisScribe::Base::uiText("滚动要截的页面，接好后按完成"), this};
+        auto *hint = new QLabel{GyanisScribe::Base::uiText("滚动需要截取的页面，拼接完成后点击「完成」。"), this};
         hint->setAccessibleName(GyanisScribe::Base::uiText("长截图提示"));
         GyanisScribe::Gui::applyTextRole(*hint, GyanisScribe::Gui::TextRole::Body);
         root->addWidget(hint);
 
-        m_readout = new QLabel{GyanisScribe::Base::uiText("还没接上任何一段"), this};
+        m_readout = new QLabel{GyanisScribe::Base::uiText("尚未拼接任何片段"), this};
         m_readout->setAccessibleName(GyanisScribe::Base::uiText("已接高度"));
         // 等宽数字：每接一帧就跳一下，比例字体会让整条控制条左右抖。
         // 读数里含中文，按 Mixed 只上 tnum：换可变字族或降重会让中文回退字族映射到 Bold
@@ -80,10 +80,10 @@ namespace GyanisScribe::Gui
         root->addLayout(line);
 
         auto *cancelButton = new Gui::Button{GyanisScribe::Base::uiText("取消"), this};
-        cancelButton->setToolTip(GyanisScribe::Base::uiText("扔掉这一段，不产出长图"));
+        cancelButton->setToolTip(GyanisScribe::Base::uiText("放弃本次长截图，不生成输出图片。"));
         cancelButton->setAccessibleName(GyanisScribe::Base::uiText("取消长截图"));
         auto *finishButton = new Gui::Button{GyanisScribe::Base::uiText("完成"), this};
-        finishButton->setToolTip(GyanisScribe::Base::uiText("结束拼接，把这张长图交给下一步"));
+        finishButton->setToolTip(GyanisScribe::Base::uiText("结束拼接并进入后续处理。"));
         finishButton->setAccessibleName(GyanisScribe::Base::uiText("完成长截图"));
 
         line->addWidget(cancelButton);

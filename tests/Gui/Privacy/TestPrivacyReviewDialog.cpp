@@ -104,7 +104,7 @@ TEST_F(PrivacyReviewDialogFixture, DefaultsSelectEverythingAndMosaic)
 
     auto *note = dialog.findChild<QLabel *>(QStringLiteral("privacyNote"));
     ASSERT_NE(note, nullptr) << "说明文字要以 privacyNote 命名供用例核对";
-    EXPECT_TRUE(note->text().contains(QStringLiteral("未上传"))) << "说明要写明内容未上传";
+    EXPECT_TRUE(note->text().contains(QStringLiteral("不会上传"))) << "说明要写明内容未上传";
 }
 
 /**

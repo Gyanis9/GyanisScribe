@@ -501,7 +501,8 @@ namespace GyanisScribe::Gui
         layout.hintRect        = QRect{hintTopLeft, textSize + QSize(GyanisScribe::Gui::kHintPadding * 2, GyanisScribe::Gui::kHintPadding)};
 
         // 确认/取消怎么写常驻读数下一行：新用户拖完框最容易停在「然后呢」上
-        layout.confirm     = m_isSelecting ? GyanisScribe::Base::uiText("松手即完成 · Esc 取消") : GyanisScribe::Base::uiText("拖四边调整 · Enter/双击确认 · Esc 取消");
+        layout.confirm     = m_isSelecting ? GyanisScribe::Base::uiText("松开鼠标即完成 · Esc 取消")
+                                           : GyanisScribe::Base::uiText("拖动边缘调整 · Enter/双击确认 · Esc 取消");
         const auto confirmSize = metrics.size(Qt::TextSingleLine, layout.confirm);
         layout.confirmRect     = QRect{hintTopLeft + QPoint(0, textSize.height() + kCopiedHintGap), confirmSize + QSize(GyanisScribe::Gui::kHintPadding * 2, GyanisScribe::Gui::kHintPadding)};
 
@@ -1048,7 +1049,7 @@ namespace GyanisScribe::Gui
             m_sizeEditor->setText({});
         }
         m_sizeEditor->setToolTip(QString::fromUtf8(
-                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("按{}填；这一档跟着设置里的「尺寸单位」走"), Core::sizeUnitLabel(m_sizeUnit).toStdString()).c_str()));
+                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("按{}填写；单位跟随设置中的「尺寸单位」。"), Core::sizeUnitLabel(m_sizeUnit).toStdString()).c_str()));
 
         // 摆在读数框那一格（贴顶时会翻到选区下方）；还没有选区就摆光标右下
         const auto base = region.isNull()

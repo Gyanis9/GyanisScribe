@@ -225,7 +225,7 @@ namespace GyanisScribe::Main
                          {
                              if (!QDesktopServices::openUrl(QUrl::fromLocalFile(QString::fromStdWString(filePath.wstring()))))
                              {
-                                 notifyUser(GyanisScribe::Base::uiText("打不开这个文件：它可能已被移动或删除。请刷新记忆库后再试"), GyanisScribe::Gui::ToastKind::Danger);
+                                 notifyUser(GyanisScribe::Base::uiText("无法打开该文件：文件可能已被移动或删除。请刷新记忆库后重试"), GyanisScribe::Gui::ToastKind::Danger);
                              }
                          });
         QObject::connect(m_mainWindow.get(), &MainWindow::memoryRetryOcrRequested, m_memory.get(), &GyanisScribe::App::MemoryCoordinator::retryOcr);
@@ -409,11 +409,11 @@ namespace GyanisScribe::Main
                          {
                              if (m_pins->activeGroup() == group)
                              {
-                                 notifyUser(GyanisScribe::Base::uiText("这张贴图已移到当前分组，就摆在原处"), GyanisScribe::Gui::ToastKind::Information);
+                                 notifyUser(GyanisScribe::Base::uiText("该贴图已移至当前分组，位置保持不变"), GyanisScribe::Gui::ToastKind::Information);
                                  return;
                              }
                              // 热键文本从设置现读：用户改过组合键之后，提示里那个键还得是按得动的那个
-                             notifyUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图已移到{}，先收了起来；按 {} 或从托盘切到那一组就能看见"),
+                             notifyUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("贴图已移至{}，已暂时收起；按 {} 或从托盘切换到该分组即可显示"),
                                                                                        m_pinCoordinator->groupLabel(group).toStdString(),
                                                                                        m_hotkeys->bindingText(GyanisScribe::Core::HotkeyAction::NextPinGroup).toStdString())
                                                                   .c_str()),
@@ -538,7 +538,7 @@ namespace GyanisScribe::Main
             {
                 lines << QStringLiteral("%1（%2）").arg(failure.combination, QString::fromStdString(failure.error.message));
             }
-            notifyUser(GyanisScribe::Base::uiText("这些全局热键没能登记上：") + lines.join(QStringLiteral("；")), GyanisScribe::Gui::ToastKind::Danger);
+            notifyUser(GyanisScribe::Base::uiText("以下全局快捷键注册失败：") + lines.join(QStringLiteral("；")), GyanisScribe::Gui::ToastKind::Danger);
         }
         if (!report.customFailures.empty())
         {
@@ -550,7 +550,7 @@ namespace GyanisScribe::Main
                 const auto label = bound ? GyanisScribe::App::bindableActionLabel(*bound) : failure.token;
                 lines << QStringLiteral("%1（%2）").arg(label + QStringLiteral(" ") + failure.combination, QString::fromStdString(failure.error.message));
             }
-            notifyUser(GyanisScribe::Base::uiText("这些自定义热键没能登记上：") + lines.join(QStringLiteral("；")), GyanisScribe::Gui::ToastKind::Danger);
+            notifyUser(GyanisScribe::Base::uiText("以下自定义快捷键注册失败：") + lines.join(QStringLiteral("；")), GyanisScribe::Gui::ToastKind::Danger);
         }
     }
 
@@ -724,7 +724,7 @@ namespace GyanisScribe::Main
         auto *screen = GyanisScribe::Core::screenAtGlobalPoint(target->center());
         if (screen == nullptr)
         {
-            notifyUser(GyanisScribe::Base::uiText("这块屏幕已经不在了，重抓不到画面。把贴图挪回还在的屏幕上再刷新"), GyanisScribe::Gui::ToastKind::Danger);
+            notifyUser(GyanisScribe::Base::uiText("该屏幕已不存在，无法重新截取画面。请将贴图移至仍连接的屏幕后再刷新"), GyanisScribe::Gui::ToastKind::Danger);
             return;
         }
 
@@ -771,7 +771,7 @@ namespace GyanisScribe::Main
         box.setIcon(QMessageBox::Question);
         // 四条分行的承诺：挤成一段长句时，读的人只会扫到第一行
         QStringList lines;
-        lines << GyanisScribe::Base::uiText("只索引你主动截的图");
+        lines << GyanisScribe::Base::uiText("仅索引主动截取的图像");
         lines << GyanisScribe::Base::uiText("只在本机");
         lines << GyanisScribe::Base::uiText("不上传、不录屏");
         lines << GyanisScribe::Base::uiText("可随时关闭并清空");

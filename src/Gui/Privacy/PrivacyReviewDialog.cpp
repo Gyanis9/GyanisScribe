@@ -61,7 +61,7 @@ namespace GyanisScribe::Gui
         root->setContentsMargins(kSpacingLarge, kSpacingLarge, kSpacingLarge, kSpacingLarge);
         root->setSpacing(kSpacingMedium);
 
-        auto *note = new QLabel{Base::uiText("只在本机检测，未上传；请逐项确认，打码后可撤销。"), this};
+        auto *note = new QLabel{Base::uiText("仅在本机检测，不会上传；请逐项确认，打码后可撤销。"), this};
         note->setObjectName(QStringLiteral("privacyNote"));
         note->setWordWrap(true);
         root->addWidget(note);
@@ -84,7 +84,7 @@ namespace GyanisScribe::Gui
         root->addLayout(buttons);
 
         auto *selectAll  = new Button{Base::uiText("全选"), this};
-        auto *selectNone = new Button{Base::uiText("全不选"), this};
+        auto *selectNone = new Button{Base::uiText("取消全选"), this};
         selectAll->setObjectName(QStringLiteral("privacySelectAll"));
         selectNone->setObjectName(QStringLiteral("privacySelectNone"));
         buttons->addWidget(selectAll);

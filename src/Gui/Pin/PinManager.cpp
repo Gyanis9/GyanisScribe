@@ -555,8 +555,8 @@ namespace GyanisScribe::Gui
         const auto groups = groupsInUse();
         if (groups.size() < 2)
         {
-            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("现在只有 1 个贴图分组，没有下一组可切。"
-                                                                                                                "在贴图的右键菜单里选「移动到分组 → 新建分组」才会多出一组")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("当前只有 1 个贴图分组，没有可切换的下一组。"
+                                                                                                                "请在贴图的右键菜单中选择「移动到分组 → 新建分组」以增加分组。")});
         }
 
         // 活动组不在册（刚被关掉最后一张）时从第一组接着走：indexOf 给 -1，加一取模正好落回 0
@@ -585,7 +585,7 @@ namespace GyanisScribe::Gui
         if (index < 0 || index >= count() || m_pins[static_cast<std::size_t>(index)] == nullptr)
         {
             return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("要移到分组的贴图不在册：索引 {}。请重新在贴图上打开菜单"), index)});
+                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("未找到要移动的贴图（索引 {}）。请重新在贴图上打开右键菜单。"), index)});
         }
 
         const int clamped = group < Core::kFirstPinGroup ? Core::kFirstPinGroup : group;
@@ -604,7 +604,7 @@ namespace GyanisScribe::Gui
         {
             return std::unexpected(
                     Base::Error{Base::ErrorCode::InvalidArgument,
-                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("要替换内容的贴图不在册：索引 {}。请在还摆在桌上的那张贴图上按 Ctrl+V"), index)});
+                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("未找到要替换内容的贴图（索引 {}）。请在仍显示的贴图上按 Ctrl+V。"), index)});
         }
 
         auto &pin = *m_pins[static_cast<std::size_t>(index)];
@@ -612,7 +612,7 @@ namespace GyanisScribe::Gui
         if (pin.isAnimated())
         {
             return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Base::uiTextUtf8("动图不能替换内容：下一帧会把换来的那一份盖掉。请先保存成静态图，再把那张贴出来替换")});
+                                               GyanisScribe::Base::uiTextUtf8("动图不支持替换内容：替换后的内容会被下一帧覆盖。请先保存为静态图片，再贴出该图片进行替换。")});
         }
 
         // 摆位、缩放与角度都不动：这一条只换「这张图」，替换前后用户看到的还是桌上同一个位置
@@ -629,20 +629,20 @@ namespace GyanisScribe::Gui
         {
             return std::unexpected(
                     Base::Error{Base::ErrorCode::InvalidArgument,
-                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("要刷新的贴图不在册：索引 {}。请在还摆在桌上的那张贴图上按 F5"), index)});
+                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("未找到要刷新的贴图（索引 {}）。请在仍显示的贴图上按 F5。"), index)});
         }
 
         auto &pin = *m_pins[static_cast<std::size_t>(index)];
         if (pin.isThumbnailMode())
         {
             return std::unexpected(
-                    Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("缩到小图这一档不刷新：那枚方块的面积不是这张图的面积。按 T 摆回原大小再刷新")});
+                    Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("缩略图模式下不支持刷新：缩略图方块覆盖的屏幕区域与该贴图不对应。请按 T 恢复原始大小后再刷新。")});
         }
         if (pin.isAnimated())
         {
             // 与「动图不能替换内容」「动图不能裁剪」同一道闸门：重抓回来的是一张静态像素，下一帧一到就盖回去了
             return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Base::uiTextUtf8("动图不刷新：换上的那一帧会被下一帧盖掉。要盯实时画面请先存成静态图，再把那张贴出来")});
+                                               GyanisScribe::Base::uiTextUtf8("动图不支持刷新：替换后的画面会被下一帧覆盖。如需观察实时画面，请先保存为静态图片后再贴出。")});
         }
         return pin.imageGlobalRect();
     }
@@ -653,7 +653,7 @@ namespace GyanisScribe::Gui
         if (pin == nullptr)
         {
             return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("要暂时藏起来抓屏的那张贴图不在册：索引 {}"), index)});
+                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("未找到需要临时隐藏后截取屏幕的贴图（索引 {}）。"), index)});
         }
 
         // 贴图压在普通窗口之上：不藏就会抓到「贴图的自己」，从第二次刷新起画面就冻在第一帧上。
@@ -697,7 +697,7 @@ namespace GyanisScribe::Gui
         {
             return std::unexpected(Base::Error{
                     Base::ErrorCode::InvalidArgument,
-                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("要改名字的分组号不对：{}。分组从 {} 起，请在贴图右键菜单里操作"), group, Core::kFirstPinGroup)});
+                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("分组编号无效：{}。分组编号从 {} 开始，请在贴图的右键菜单中操作。"), group, Core::kFirstPinGroup)});
         }
 
         // 空名就是取消命名：表里不留空值，界面对没名字的组一律显示「分组 N」
@@ -724,8 +724,8 @@ namespace GyanisScribe::Gui
     {
         if (group == Core::kFirstPinGroup)
         {
-            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("第一组是删掉别的组时成员并回去的落点，这一组删不掉。"
-                                                                                                                "要把这一张从第一组挪走请用「移动到分组」")});
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("第一组用于接收其他分组删除后并入的贴图，无法删除。"
+                                                                                                                "如需将贴图移出第一组，请使用「移动到分组」。")});
         }
 
         auto moved = 0;
@@ -774,8 +774,8 @@ namespace GyanisScribe::Gui
         {
             // 不说「已经切过去」：切到一个没人的一组等于把整桌收空，用户找不到那几张图
             return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument,
-                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("第 {} 组现在没有贴图，摆不出这一组。"
-                                                                                                           "要把别的图挪过来，请在贴图的右键菜单里选「移动到分组」"),
+                                               GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("第 {} 组当前没有贴图，无法显示该分组。"
+                                                                                                           "如需移入贴图，请在贴图的右键菜单中选择「移动到分组」。"),
                                                                             group)});
         }
         if (group == m_activeGroup)

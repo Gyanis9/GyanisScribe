@@ -306,7 +306,7 @@ TEST_F(CaptureServiceFixture, LastRegionReusesStoredRegionOrFails)
         service.captureLastRegion();
         ASSERT_TRUE(outcome.error.has_value()) << "没有上次区域时必须失败";
         EXPECT_EQ(outcome.error->code, ErrorCode::InvalidArgument);
-        EXPECT_NE(outcome.error->message.find("先框选截图一次"), std::string::npos) << "文案要给出下一步做什么";
+        EXPECT_NE(outcome.error->message.find("框选截图"), std::string::npos) << "文案要给出下一步做什么";
     }
 
     // 记下过之后：按记下的选区与所在屏重抓

@@ -58,7 +58,7 @@ namespace GyanisScribe::App
         return Base::Expected<int>{std::unexpected{Base::Error{
                 .code    = Base::ErrorCode::InvalidArgument,
                 .message = Base::uiFormat(
-                        Base::uiTextUtf8("延时截图的秒数 \"{}\" 不在可用范围（0 到 {} 秒，0 表示不延时）里：请在设置的截图页重选，或删掉 Capture/DelaySeconds 这一项回到默认档"),
+                        Base::uiTextUtf8("延时截图的秒数 \"{}\" 不在可用范围（0 到 {} 秒，0 表示不延时）里：请在设置的截图页重选，或删掉 Capture/DelaySeconds 此项回到默认档"),
                         stored, kMaximumCaptureDelaySeconds),
         }}};
     }

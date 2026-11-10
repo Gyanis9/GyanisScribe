@@ -144,7 +144,7 @@ namespace GyanisScribe::Gui
         if (history->empty())
         {
             deliver(Base::Expected<Base::CapturedImage>(
-                    std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("还没有可复用的上次区域：先框选截图一次，或改用区域截图")})));
+                    std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("没有可复用的上次选区，请先完成一次框选截图或改用区域截图")})));
             return;
         }
 
@@ -168,7 +168,7 @@ namespace GyanisScribe::Gui
         {
             deliver(Base::Expected<Base::CapturedImage>(std::unexpected(Base::Error{
                     Base::ErrorCode::ScreenUnavailable,
-                    Base::uiTextUtf8("这块屏的布局已经变了，回溯到的画面不能再用；请重新开启回溯缓冲")})));
+                    Base::uiTextUtf8("屏幕布局已经变了，回溯画面无法继续使用；请重新开启回溯缓冲")})));
             return;
         }
 
@@ -228,7 +228,7 @@ namespace GyanisScribe::Gui
             // 上一轮长截图还在接：再铺一层遮罩会让手里那张接了一半的图既没交也没作废。
             // 这一句把选择权交回给用户——完成或取消，再开始下一次
             deliver(Base::Expected<Base::CapturedImage>(std::unexpected(
-                    Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("滚动长截图还在接：先在控制条上按完成或取消，再开始下一次截图")})));
+                    Base::Error{Base::ErrorCode::InvalidArgument, GyanisScribe::Base::uiTextUtf8("滚动长截图还在接：请先在控制条上点击「完成」或「取消」，再开始下一次截图")})));
             return;
         }
 
@@ -242,7 +242,7 @@ namespace GyanisScribe::Gui
         if (screens.isEmpty())
         {
             deliver(Base::Expected<Base::CapturedImage>(
-                    std::unexpected(Base::Error{Base::ErrorCode::ScreenUnavailable, GyanisScribe::Base::uiTextUtf8("进入框选失败：Qt 没有报出任何屏幕。请在 GUI 会话里重试")})));
+                    std::unexpected(Base::Error{Base::ErrorCode::ScreenUnavailable, GyanisScribe::Base::uiTextUtf8("进入框选失败：Qt 未报告任何屏幕。请在图形会话中重试")})));
             return;
         }
 
@@ -609,7 +609,7 @@ namespace GyanisScribe::Gui
         const auto height = m_longImage.logicalSize.height();
         if (!grew)
         {
-            return QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已接 {} 像素高：这一段和上一段一样，往下滚一点再接"), height).c_str());
+            return QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已接 {} 像素高：本段与上一段相同，请向下滚动少许后继续拼接"), height).c_str());
         }
         return QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已接 {} 像素高"), height).c_str());
     }

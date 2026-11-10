@@ -89,12 +89,12 @@ namespace GyanisScribe::App
         entries.append(TrayMenuEntry{TrayAction::RecognizeFile, "OcrImage", GyanisScribe::Base::uiText("识别图片文件…"), {}});
         entries.append(TrayMenuEntry{TrayAction::PickColor, "ColorPicker", GyanisScribe::Base::uiText("屏幕取色"), GyanisScribe::Core::kHotkeyPick});
         entries.append(TrayMenuEntry{TrayAction::CloseAllPins, "PinClose", GyanisScribe::Base::uiText("关闭全部贴图"), {}});
-        entries.append(TrayMenuEntry{TrayAction::TogglePinsVisible, "Pin", GyanisScribe::Base::uiText("收起 / 摆回全部贴图"), GyanisScribe::Core::kHotkeyTogglePins});
+        entries.append(TrayMenuEntry{TrayAction::TogglePinsVisible, "Pin", GyanisScribe::Base::uiText("收起 / 显示全部贴图"), GyanisScribe::Core::kHotkeyTogglePins});
         entries.append(TrayMenuEntry{TrayAction::ClearPinsThrough, "PinMouseThrough", GyanisScribe::Base::uiText("取消全部贴图穿透"), {}});
-        entries.append(TrayMenuEntry{TrayAction::PasteClipboard, "PinCopy", GyanisScribe::Base::uiText("把剪贴板里的图贴到屏幕上"), {}});
+        entries.append(TrayMenuEntry{TrayAction::PasteClipboard, "PinCopy", GyanisScribe::Base::uiText("将剪贴板内容贴到屏幕上"), {}});
         // 关闭与销毁是两档：这一条只按得回「关闭」的那几张，销毁过的一张都不回来
-        entries.append(TrayMenuEntry{TrayAction::RepinClosed, "Refresh", GyanisScribe::Base::uiText("重新贴出最近关掉的贴图"), {}});
-        entries.append(TrayMenuEntry{TrayAction::NextPinGroup, "PinGroup", GyanisScribe::Base::uiText("切到下一组贴图"), GyanisScribe::Core::kHotkeyNextPinGroup});
+        entries.append(TrayMenuEntry{TrayAction::RepinClosed, "Refresh", GyanisScribe::Base::uiText("重新贴出最近关闭的贴图"), {}});
+        entries.append(TrayMenuEntry{TrayAction::NextPinGroup, "PinGroup", GyanisScribe::Base::uiText("切换到下一组贴图"), GyanisScribe::Core::kHotkeyNextPinGroup});
         // 图标与「切到下一组贴图」同族（都是分组这一件事），两行的文字各自表意，不会读成同一件事
         entries.append(TrayMenuEntry{TrayAction::ManagePinGroups, "PinGroup", GyanisScribe::Base::uiText("贴图组管理…"), {}});
         entries.append(TrayMenuEntry{});
@@ -231,7 +231,7 @@ namespace GyanisScribe::App
                 // 菜单项上带快捷键提示是需求第五节的原话；显示的是配置里的真值，不是写死的样例。
                 // 用制表符分开：Qt 的菜单会把 \t 之后的文字右对齐，这正是系统菜单里快捷键提示的排法
                 action->setText(QStringLiteral("%1\t%2").arg(entry.label, text));
-                action->setToolTip(GyanisScribe::Base::uiText("快捷键：%1，可在设置页改").arg(text));
+                action->setToolTip(GyanisScribe::Base::uiText("快捷键：%1，可在设置页修改").arg(text));
             }
             const auto trayAction = *entry.action;
             QObject::connect(action, &QAction::triggered, this, [this, trayAction] { emit actionRequested(trayAction); });

@@ -73,8 +73,8 @@ namespace GyanisScribe::Gui
         m_display->setAccessibleName(title);
         // 两档的作用域各有各的规矩，提示要写清这一格能不能只按一颗键：
         // 界面按键里那颗裸键是合法值，用户在提示的误导下会以为「按了没反应」是控件坏了
-        setToolTip(scope == HotkeyEditScope::Global ? GyanisScribe::Base::uiText("%1 的全局热键。点击这一格后按下组合键即可替换，按 Esc 取消").arg(title)
-                                                    : GyanisScribe::Base::uiText("%1 的界面按键。点击这一格后按下要用的那颗键，裸键也算，按 Esc 取消").arg(title));
+        setToolTip(scope == HotkeyEditScope::Global ? GyanisScribe::Base::uiText("%1 的全局快捷键。点击此输入框后按下组合键即可替换，按 Esc 取消。").arg(title)
+                                                    : GyanisScribe::Base::uiText("%1 的应用内快捷键。点击此输入框后按下所需按键；允许使用单键；按 Esc 取消。").arg(title));
 
         // 外部改了同一项（恢复的旧组合写回、导入配置）时跟着变：设置页开着的时候本来就该实时刷新
         QObject::connect(&m_settings, &Core::ISettingsStore::valueChanged, this,

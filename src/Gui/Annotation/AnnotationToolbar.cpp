@@ -180,7 +180,7 @@ namespace GyanisScribe::Gui
             m_palette = Core::defaultAnnotationPalette();
         }
         const auto recentLabel    = GyanisScribe::Base::uiText("最近使用颜色").toStdString();
-        const auto recentRecovery = GyanisScribe::Base::uiText("删掉配置里的 %1 这一项可以恢复默认").arg(QString::fromUtf8(Core::kAnnotationRecentColors)).toStdString();
+        const auto recentRecovery = GyanisScribe::Base::uiText("删除配置中的 %1 可恢复默认设置").arg(QString::fromUtf8(Core::kAnnotationRecentColors)).toStdString();
         if (const auto parsed = Core::parseRecentColors(m_settings.stringListValue(Core::kAnnotationRecentColors, {}), recentLabel, recentRecovery); parsed)
         {
             m_recentColors = *parsed;
@@ -350,7 +350,7 @@ namespace GyanisScribe::Gui
                 ActionSpec{"Copy", GyanisScribe::Base::uiText("复制到剪贴板"), &AnnotationToolbar::copyClicked},
                 ActionSpec{"Save", GyanisScribe::Base::uiText("保存为文件"), &AnnotationToolbar::saveClicked},
                 ActionSpec{"Export", GyanisScribe::Base::uiText("美化分享"), &AnnotationToolbar::shareClicked},
-                ActionSpec{"Pin", GyanisScribe::Base::uiText("贴到屏幕上"), &AnnotationToolbar::pinClicked},
+                ActionSpec{"Pin", GyanisScribe::Base::uiText("固定到屏幕"), &AnnotationToolbar::pinClicked},
                 ActionSpec{"Ocr", GyanisScribe::Base::uiText("识别文字"), &AnnotationToolbar::ocrClicked},
                 ActionSpec{"QrCode", GyanisScribe::Base::uiText("识别二维码"), &AnnotationToolbar::scanClicked},
                 // 隐私打码复用马赛克图标：它是「按规则批量打码」，与工具组里手画马赛克是同一件事的两种入口
@@ -716,7 +716,7 @@ namespace GyanisScribe::Gui
         {
             const auto label = m_textPlateColorStep == Core::kTextPlateColorWhite       ? GyanisScribe::Base::uiText("底板色：白")
                                : m_textPlateColorStep == Core::kTextPlateColorBlack     ? GyanisScribe::Base::uiText("底板色：黑")
-                               : m_textPlateColorStep == Core::kTextPlateColorFromShape ? GyanisScribe::Base::uiText("底板色：用标注色")
+                               : m_textPlateColorStep == Core::kTextPlateColorFromShape ? GyanisScribe::Base::uiText("底板色：跟随标注色")
                                                                                         : GyanisScribe::Base::uiText("底板色：自动");
             m_plateColorButton->setToolTip(label);
             m_plateColorButton->setAccessibleName(label);
@@ -1004,7 +1004,7 @@ namespace GyanisScribe::Gui
         }
         for (std::size_t index = 0; index < m_recentColors.size(); ++index)
         {
-            addSwatch(m_recentColors[index], GyanisScribe::Base::uiText("最近使用 %1").arg(static_cast<int>(index) + 1));
+            addSwatch(m_recentColors[index], GyanisScribe::Base::uiText("最近使用颜色 %1").arg(static_cast<int>(index) + 1));
         }
 
         auto *widgetAction = new QWidgetAction{m_colorMenu};
@@ -1065,7 +1065,7 @@ namespace GyanisScribe::Gui
         }
         // 无障碍名保持「颜色」：那是这一枚按钮的本名，读屏要的是动作而不是状态
         m_colorButton->setIcon(QIcon{colorSwatchPixmap(m_currentColor, m_icons.tintColor())});
-        m_colorButton->setToolTip(GyanisScribe::Base::uiText("颜色（当前不透明度 %1%；在这一枚上滚滚轮调节）").arg(currentColorOpacityPercent()));
+        m_colorButton->setToolTip(GyanisScribe::Base::uiText("颜色（当前不透明度 %1%；在按钮上滚动滚轮可调节）").arg(currentColorOpacityPercent()));
     }
 
     void AnnotationToolbar::refreshToolKeyHints()

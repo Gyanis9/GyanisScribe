@@ -26,7 +26,7 @@ namespace GyanisScribe::App
                              const auto at = m_pendingFetchPoint.value_or(QCursor::pos());
                              m_pendingFetchPoint.reset();
                              m_pins.addPin(result.image, at);
-                             emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已从网页取到这张图（{}×{}）并贴到屏幕上"),
+                             emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已从网页获取图片（{}×{}）并贴到屏幕上"),
                                                                                                 result.image.width(), result.image.height())
                                                                            .c_str()),
                                                  GyanisScribe::Gui::ToastKind::Information);
@@ -66,7 +66,7 @@ namespace GyanisScribe::App
     {
         m_pendingFetchPoint = dropPoint;
         // 先把「正在取」说出来：取图是异步的，不说这一句用户会以为「按了没反应」
-        emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("正在从网页取这张图：{}"), url.toString().toStdString()).c_str()),
+        emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("正在从网页获取图片：{}"), url.toString().toStdString()).c_str()),
                             GyanisScribe::Gui::ToastKind::Information);
         m_fetcher.fetch(url);
     }
@@ -85,7 +85,7 @@ namespace GyanisScribe::App
         {
             return std::unexpected(
                     GyanisScribe::Base::Error{GyanisScribe::Base::ErrorCode::InvalidArgument,
-                                              GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("没找到这个文件：{}"), info.absoluteFilePath().toStdString())});
+                                              GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("未找到文件：{}"), info.absoluteFilePath().toStdString())});
         }
 
         // 复用拖放那条内容转换：图片读像素（GIF 连来源带走）、链接渲染成卡片，判据只有一份
@@ -100,7 +100,7 @@ namespace GyanisScribe::App
         {
             return std::unexpected(GyanisScribe::Base::Error{
                     GyanisScribe::Base::ErrorCode::InvalidArgument,
-                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("「{}」不是能贴的图片：支持 PNG / JPG / WebP / GIF 这类格式"), info.fileName().toStdString())});
+                    GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("「{}」不是可贴出的图片：支持 PNG、JPG、WebP、GIF 等格式"), info.fileName().toStdString())});
         }
         return {};
     }
@@ -126,7 +126,7 @@ namespace GyanisScribe::App
             }
             if (outcome->pinnedCount == 0)
             {
-                emit messageForUser(GyanisScribe::Base::uiText("复制的文件里没有能当图片贴的：请复制图片文件本身，或复制图片内容"), GyanisScribe::Gui::ToastKind::Information);
+                emit messageForUser(GyanisScribe::Base::uiText("复制的文件中没有可贴出的图片：请复制图片文件本身或图片内容"), GyanisScribe::Gui::ToastKind::Information);
                 return;
             }
             showDropOutcome(*outcome);
@@ -172,13 +172,13 @@ namespace GyanisScribe::App
         if (!taken)
         {
             // 空册也要回一句：这条入口在托盘上，不出声就成了「按了没反应」
-            emit messageForUser(GyanisScribe::Base::uiText("没有可以重新贴出的贴图：关掉的那几张最多记 5 张，「销毁」掉的不算"), GyanisScribe::Gui::ToastKind::Information);
+            emit messageForUser(GyanisScribe::Base::uiText("无可重新贴出的贴图：已关闭的贴图最多保留 5 张，已销毁的不计入"), GyanisScribe::Gui::ToastKind::Information);
             return;
         }
 
         m_pins.addPin(taken->image, QCursor::pos(), taken->sourceFile);
         emit messageForUser(
-                QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已重新贴出那张关掉的贴图，还能按回来 {} 张"), m_pins.closedPinCount()).c_str()),
+                QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已重新贴出最近关闭的贴图，剩余 {} 张可重新贴出"), m_pins.closedPinCount()).c_str()),
                 GyanisScribe::Gui::ToastKind::Success);
     }
 
@@ -198,7 +198,7 @@ namespace GyanisScribe::App
     {
         if (!outcome.rejectedNames.isEmpty())
         {
-            emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已贴出 {} 张；{} 不是图片，没贴"), outcome.pinnedCount,
+            emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已贴出 {} 张；{} 不是图片，未贴出"), outcome.pinnedCount,
                                                                                outcome.rejectedNames.join(QStringLiteral("、")).toStdString())
                                                           .c_str()),
                                 GyanisScribe::Gui::ToastKind::Information);
@@ -217,15 +217,15 @@ namespace GyanisScribe::App
 
     void PinCoordinator::reportGroupRenamed(const int group, const QString &name)
     {
-        emit messageForUser(name.isEmpty() ? GyanisScribe::Base::uiText("已取消分组 %1 的名字，切组与菜单里重新按号叫它").arg(group)
+        emit messageForUser(name.isEmpty() ? GyanisScribe::Base::uiText("已清除分组 %1 的名称，切组与菜单中将按序号显示").arg(group)
                                            : GyanisScribe::Base::uiText("分组 %1 改名为「%2」").arg(group).arg(name),
                             name.isEmpty() ? GyanisScribe::Gui::ToastKind::Information : GyanisScribe::Gui::ToastKind::Success);
     }
 
     void PinCoordinator::reportGroupDeleted(const int group, const int movedCount)
     {
-        emit messageForUser(movedCount > 0 ? GyanisScribe::Base::uiText("已删掉分组 %1，把 %2 张并回第一组").arg(group).arg(movedCount)
-                                           : GyanisScribe::Base::uiText("分组 %1 上本来没摆贴图，名字一并清了").arg(group),
+        emit messageForUser(movedCount > 0 ? GyanisScribe::Base::uiText("已删除分组 %1，%2 张贴图已并入第一组").arg(group).arg(movedCount)
+                                           : GyanisScribe::Base::uiText("分组 %1 中没有贴图，名称已一并清除").arg(group),
                             GyanisScribe::Gui::ToastKind::Success);
     }
 
@@ -234,8 +234,8 @@ namespace GyanisScribe::App
         const auto restored = m_pins.clearMouseThrough();
         // 一张都没恢复也要说一声：用户按这条是因为他觉得贴图「点不动」，
         // 没有这句他就会一直以为是程序卡住了
-        emit messageForUser(restored > 0 ? QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已让 {} 张贴图重新吃鼠标"), restored).c_str())
-                                         : GyanisScribe::Base::uiText("没有贴图开着鼠标穿透"),
+        emit messageForUser(restored > 0 ? QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已恢复 {} 张贴图的鼠标交互"), restored).c_str())
+                                         : GyanisScribe::Base::uiText("没有贴图处于鼠标穿透状态"),
                             restored > 0 ? GyanisScribe::Gui::ToastKind::Success : GyanisScribe::Gui::ToastKind::Information);
     }
 
@@ -247,9 +247,9 @@ namespace GyanisScribe::App
         const auto changed = m_pins.setAllPinsConcealed(!show);
         emit       messageForUser(
                 changed > 0 ? QString::fromUtf8(GyanisScribe::Base::uiFormat(
-                                                        show ? GyanisScribe::Base::uiTextUtf8("已摆回 {} 张贴图") : GyanisScribe::Base::uiTextUtf8("已收起 {} 张贴图"), changed)
+                                                        show ? GyanisScribe::Base::uiTextUtf8("已显示 {} 张贴图") : GyanisScribe::Base::uiTextUtf8("已收起 {} 张贴图"), changed)
                                                         .c_str())
-                            : GyanisScribe::Base::uiText("桌上没有贴图"),
+                            : GyanisScribe::Base::uiText("当前没有贴图"),
                 changed > 0 ? GyanisScribe::Gui::ToastKind::Success : GyanisScribe::Gui::ToastKind::Information);
     }
 
@@ -262,7 +262,7 @@ namespace GyanisScribe::App
             emit messageForUser(QString::fromUtf8(switched.error().message.c_str()), GyanisScribe::Gui::ToastKind::Information);
             return;
         }
-        emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已切到{}，桌上是这一组"), groupLabel(*switched).toStdString()).c_str()),
+        emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("已切换到{}，当前显示该分组"), groupLabel(*switched).toStdString()).c_str()),
                             GyanisScribe::Gui::ToastKind::Success);
     }
 
