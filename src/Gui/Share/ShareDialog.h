@@ -99,8 +99,8 @@ namespace GyanisScribe::Gui
          * @brief 按原尺寸渲染并另存为图片
          * @param filePath 目标文件，后缀决定格式：png、jpg、jpeg 或 webp
          * @return 成功返回空载荷；格式不支持、渲染失败、编码失败或写盘失败时返回原因，状态行同时点亮
-         * @details 写盘走 QSaveFile 原子替换：中途失败不会在盘上留下半张图。有损档按设置里的
-         *          Save/ImageQuality 写，没填过时用 kDefaultImageQuality；不写历史，也不跑截图后的外部命令。
+         * @details 写盘走 QSaveFile 原子替换：中途失败不会在盘上留下半张图。有损档固定按
+         *          kDefaultImageQuality 写，不读设置里的保存质量；不写历史，也不跑截图后的外部命令。
          */
         [[nodiscard]] Base::Expected<void> saveToFile(const std::filesystem::path &filePath);
 
@@ -110,6 +110,14 @@ namespace GyanisScribe::Gui
          * @details 名字走与截图保存同一套模板与去重：同一秒里连按两次保存不会默认指向同一个文件。
          */
         [[nodiscard]] QString suggestedFilePath() const;
+
+        /**
+         * @brief 校正「保存图片…」对话框交回的后缀
+         * @param chosen 用户在文件对话框里确认的路径
+         * @return 后缀是 png、jpg、jpeg 或 webp 时原样返回；其余情况（含没有后缀）在末尾补 .png
+         * @details 只服务文件对话框这一路：saveToFile 仍按调用方给的后缀决定格式并报错，不替调用方改名。
+         */
+        [[nodiscard]] static std::filesystem::path savePathForDialog(const std::filesystem::path &chosen);
 
         /**
          * @brief 把当前样式另存为自定义模板

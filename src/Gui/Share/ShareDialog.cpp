@@ -126,6 +126,31 @@ namespace
         }
         label.setPixmap(QPixmap::fromImage(image).scaled(label.size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
     }
+
+    /**
+     * @brief 取路径后缀的小写形式，不带前导的点
+     * @param filePath 文件路径
+     * @return 小写后缀；没有后缀时为空串
+     */
+    QString imageSuffixOf(const std::filesystem::path &filePath)
+    {
+        auto suffix = QString::fromStdWString(filePath.extension().wstring()).toLower();
+        if (suffix.startsWith(QChar{u'.'}))
+        {
+            suffix.remove(0, 1);
+        }
+        return suffix;
+    }
+
+    /**
+     * @brief 判断后缀是不是可写的图片格式
+     * @param suffix 不带点的小写后缀
+     * @return png、jpg、jpeg 或 webp 时返回 true
+     */
+    bool isSupportedImageSuffix(const QString &suffix)
+    {
+        return suffix == QStringLiteral("png") || suffix == QStringLiteral("jpg") || suffix == QStringLiteral("jpeg") || suffix == QStringLiteral("webp");
+    }
 } // namespace
 
 namespace GyanisScribe::Gui
@@ -199,12 +224,8 @@ namespace GyanisScribe::Gui
             return fail(Base::Error{Base::ErrorCode::InvalidArgument, uiTextUtf8("没有可保存的图片")});
         }
 
-        auto suffix = QString::fromStdWString(filePath.extension().wstring()).toLower();
-        if (suffix.startsWith(QChar{u'.'}))
-        {
-            suffix.remove(0, 1);
-        }
-        if (suffix != QStringLiteral("png") && suffix != QStringLiteral("jpg") && suffix != QStringLiteral("jpeg") && suffix != QStringLiteral("webp"))
+        auto suffix = imageSuffixOf(filePath);
+        if (!isSupportedImageSuffix(suffix))
         {
             return fail(Base::Error{Base::ErrorCode::InvalidArgument,
                                     uiFormat(uiTextUtf8("不支持的图片格式：{}"), suffix.isEmpty() ? uiTextUtf8("（无后缀）") : suffix.toStdString())});
@@ -217,8 +238,7 @@ namespace GyanisScribe::Gui
         }
 
         const auto pathText     = Base::Paths::toDisplayText(filePath);
-        const auto writeFailure = Base::Error{Base::ErrorCode::FileWriteFailed,
-                                              uiFormat(uiTextUtf8("「{}」写不进去。请检查这个目录能不能写"), pathText.toStdString())};
+        const auto writeFailure = Base::Error{Base::ErrorCode::FileWriteFailed, uiFormat(uiTextUtf8("「{}」写不进去。请检查这个目录能不能写"), pathText.toStdString())};
 
         QSaveFile file{pathText};
         if (!file.open(QIODevice::WriteOnly))
@@ -230,9 +250,8 @@ namespace GyanisScribe::Gui
         QBuffer    buffer{&bytes};
         buffer.open(QIODevice::WriteOnly);
         // 按后缀显式指定编码器：.jpeg 是常见写法，而 Qt 的 JPEG 编码器名只有 jpg
-        const auto format  = suffix == QStringLiteral("jpeg") ? QByteArray{"jpg"} : suffix.toUtf8();
-        const auto quality = m_settings.intValue(Core::kSaveImageQuality, Core::kDefaultImageQuality);
-        if (!rendered->save(&buffer, format.constData(), quality))
+        const auto format = suffix == QStringLiteral("jpeg") ? QByteArray{"jpg"} : suffix.toUtf8();
+        if (!rendered->save(&buffer, format.constData(), Core::kDefaultImageQuality))
         {
             buffer.close();
             file.cancelWriting();
@@ -252,6 +271,17 @@ namespace GyanisScribe::Gui
 
         setStatus(QString::fromStdString(uiFormat(uiTextUtf8("已保存到 {}"), pathText.toStdString())), false);
         return {};
+    }
+
+    std::filesystem::path ShareDialog::savePathForDialog(const std::filesystem::path &chosen)
+    {
+        if (isSupportedImageSuffix(imageSuffixOf(chosen)))
+        {
+            return chosen;
+        }
+        auto corrected = chosen;
+        corrected += ".png";
+        return corrected;
     }
 
     QString ShareDialog::suggestedFilePath() const
@@ -651,12 +681,7 @@ namespace GyanisScribe::Gui
                              {
                                  return;
                              }
-                             auto path = std::filesystem::path{Base::Paths::fromDisplayText(chosen)};
-                             if (path.extension().empty())
-                             {
-                                 path += ".png";
-                             }
-                             (void) saveToFile(path);
+                             (void) saveToFile(savePathForDialog(std::filesystem::path{Base::Paths::fromDisplayText(chosen)}));
                          });
         QObject::connect(m_closeButton, &QPushButton::clicked, this, &ShareDialog::accept);
     }
