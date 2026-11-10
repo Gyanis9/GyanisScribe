@@ -10,7 +10,9 @@
 #include <QUuid>
 
 #include <array>
+#include <cmath>
 #include <cstddef>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -121,7 +123,14 @@ namespace GyanisScribe::Core
             {
                 return badValueError(key);
             }
-            target = value.toInt();
+            // JSON 的数只有浮点形态：47.9 直接转 int 会被悄悄截成 47，超出 int 范围的会撞上转换的默认值，
+            // 两种都按坏值拒绝，不接受一个和存进去不一样的数
+            const auto number = value.toDouble();
+            if (number != std::trunc(number) || number < static_cast<double>(std::numeric_limits<int>::min()) || number > static_cast<double>(std::numeric_limits<int>::max()))
+            {
+                return badValueError(key);
+            }
+            target = static_cast<int>(number);
             return std::nullopt;
         }
 
@@ -313,9 +322,15 @@ namespace GyanisScribe::Core
         }};
         for (const auto &[field, color]: colors)
         {
+            const auto fieldText = QString::fromLatin1(field.data(), static_cast<qsizetype>(field.size()));
             if (!color->isValid())
             {
-                return std::unexpected(colorError(QString::fromLatin1(field.data(), static_cast<qsizetype>(field.size()))));
+                return std::unexpected(colorError(fieldText));
+            }
+            // 序列化只写 #rrggbb：半透明颜色存下去就变成不透明，读回来与眼前所见对不上，构造时先拒绝
+            if (color->alpha() != 255)
+            {
+                return std::unexpected(colorError(colorText(*color)));
             }
         }
 
@@ -448,7 +463,19 @@ namespace GyanisScribe::Core
             return {};
         }
 
-        const auto entries = document.object().value(keyText(kKeyTemplates));
+        const auto root = document.object();
+
+        // 写端每次都落 version：缺版本、类型不对、版本不认识都按整格坏数据处理，
+        // 不把别的版本的字段硬按 v1 解释
+        const auto versionValue = root.value(keyText(kKeyVersion));
+        if (!versionValue.isDouble() || versionValue.toDouble() != 1.0)
+        {
+            const auto shown = versionValue.isDouble() ? QString::number(versionValue.toDouble()) : QStringLiteral("?");
+            Base::Logger::warning(Base::uiFormat(Base::uiTextUtf8("美化模板的版本不是 1（{}），这一格按空处理"), shown.toStdString()));
+            return {};
+        }
+
+        const auto entries = root.value(keyText(kKeyTemplates));
         if (!entries.isArray())
         {
             Base::Logger::warning(Base::uiTextUtf8("美化模板缺少 templates 数组，这一格按空处理"));

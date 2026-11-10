@@ -123,8 +123,9 @@ namespace GyanisScribe::Core
     [[nodiscard]] std::vector<ShareTemplate> builtInShareTemplates();
 
     /**
-     * @brief 缺省模板（light / 留白）
-     * @return 默认样式与固定 id；模板缺失、指向已删除项时的回落档
+     * @brief 中性缺省模板：出厂默认样式配固定 id 与「留白」名称
+     * @return ShareStyle{} 的字段值；它不是内置「留白」的完整外观（内置那套在它之上打开了描边），
+     *         只作为旧模板缺字段与模板缺失时的中性回退
      */
     [[nodiscard]] ShareTemplate defaultShareTemplate();
 
