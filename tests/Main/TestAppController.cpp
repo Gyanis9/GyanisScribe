@@ -1187,6 +1187,63 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住托盘多屏子菜单里的逐屏截图也吃步骤记录的互斥门禁
+     * @details 那几条「整屏截图：<屏名>」发的是屏名信号，不经过 handleTrayAction：只堵住动作开关时，
+     *          录制中从这一条照样能铺出标注窗并把它截进步骤。停止后再判同一条路恢复可用。
+     */
+    TEST_F(AppControllerFixture, StepRecordingBlocksTheTrayPerScreenCaptureEntry)
+    {
+        m_frameScreenName = m_realScreenName;
+        makeController();
+        auto &steps = m_controller->stepRecorderForTesting();
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        ASSERT_TRUE(steps.isRecording());
+
+        const auto before = visibleToastBubbles();
+        m_controller->trayControllerForTesting().screenCaptureRequested(m_realScreenName);
+        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("先停止步骤记录或处理完审核窗")); }))
+                << "步骤记录在跑时托盘的逐屏截图没被挡回";
+        EXPECT_FALSE(m_controller->capture().annotationWindow().isVisible()) << "步骤记录在跑时托盘的逐屏截图还是把标注窗铺出来了";
+
+        // 停止后同一条路恢复可用：门禁随录制状态复位，入口本身还活着
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        ASSERT_FALSE(steps.isRecording());
+        m_controller->trayControllerForTesting().screenCaptureRequested(m_realScreenName);
+        ASSERT_TRUE(waitUntil([&] { return m_controller->capture().annotationWindow().isVisible(); }, 3000)) << "步骤记录停掉后托盘的逐屏截图仍打不开：门禁没复位";
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(&m_controller->capture().annotationWindow(), &escape);
+    }
+
+    /**
+     * @brief 钉住主窗口动作条里的逐屏截图也吃步骤记录的互斥门禁
+     * @details 没有托盘的机器靠动作条工作，这一条的屏名信号同样绕开了动作开关；
+     *          漏掉它时用户在设置窗里点一下就能在录制中铺出标注窗。
+     */
+    TEST_F(AppControllerFixture, StepRecordingBlocksTheMainWindowPerScreenCaptureEntry)
+    {
+        m_frameScreenName = m_realScreenName;
+        makeController();
+        auto &steps = m_controller->stepRecorderForTesting();
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        ASSERT_TRUE(steps.isRecording());
+
+        auto *window = mainWindowOnDesk();
+        ASSERT_NE(window, nullptr) << "离屏平台装不上托盘，主窗口该自己现身";
+        const auto before = visibleToastBubbles();
+        window->captureScreenRequested(m_realScreenName);
+        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("先停止步骤记录或处理完审核窗")); }))
+                << "步骤记录在跑时主窗口的逐屏截图没被挡回";
+        EXPECT_FALSE(m_controller->capture().annotationWindow().isVisible()) << "步骤记录在跑时主窗口的逐屏截图还是把标注窗铺出来了";
+
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        ASSERT_FALSE(steps.isRecording());
+        window->captureScreenRequested(m_realScreenName);
+        ASSERT_TRUE(waitUntil([&] { return m_controller->capture().annotationWindow().isVisible(); }, 3000)) << "步骤记录停掉后主窗口的逐屏截图仍打不开：门禁没复位";
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(&m_controller->capture().annotationWindow(), &escape);
+    }
+
+    /**
      * @brief 钉住回车复制这一交付出口也结束回溯流程：收场一次，缓冲从暂停回到抓帧
      * @details 标注窗的四个交付出口会收起窗口但不走 closeAnnotation；少发 closed() 时
      *          captureFlowFinished 就永远不来，回溯缓冲停在 CaptureFlow，之后的热键都被

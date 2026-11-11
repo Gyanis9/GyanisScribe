@@ -349,7 +349,8 @@ namespace GyanisScribe::Main
         QObject::connect(m_capture.get(), &GyanisScribe::App::CaptureCoordinator::messageForUser, this, &AppController::notifyUser);
         QObject::connect(m_capture.get(), &GyanisScribe::App::CaptureCoordinator::commandLineActionFailed, this, &AppController::commandLineActionFailed);
         QObject::connect(m_capture.get(), &GyanisScribe::App::CaptureCoordinator::commandLineCaptureDelivered, this, &AppController::commandLineCaptureDelivered);
-        QObject::connect(m_tray.get(), &GyanisScribe::App::TrayController::screenCaptureRequested, m_capture.get(), &GyanisScribe::App::CaptureCoordinator::captureScreen);
+        // 多屏时托盘子菜单里那几条「整屏截图：<屏名>」不走 handleTrayAction：屏名信号直接交给同一个门禁出口
+        QObject::connect(m_tray.get(), &GyanisScribe::App::TrayController::screenCaptureRequested, this, &AppController::captureScreenFromMenu);
         // 隐私打码的两根线：标注窗的入口发起扫描，扫描成功交回截图协调器认码、审核、落笔。
         // 标注窗不关，结果回来之前用户还能接着改；过期画布由 handlePrivacyScan 自己挡
         QObject::connect(&m_capture->annotationWindow(), &GyanisScribe::Gui::AnnotationWindow::privacyRequested, m_privacy.get(),
@@ -407,8 +408,8 @@ namespace GyanisScribe::Main
         QObject::connect(m_mainWindow.get(), &MainWindow::messageForUser, this, [this](const QString &message, GyanisScribe::Gui::ToastKind kind) { notifyUser(message, kind); });
         // 主窗口动作条与托盘菜单发的是同一个枚举，所以出口也只有这一个 handleTrayAction
         QObject::connect(m_mainWindow.get(), &MainWindow::actionRequested, this, &AppController::handleTrayAction);
-        // 「整屏截图：<屏名>」那一条：与整屏截图同一个出口，只是把屏名点了出来
-        QObject::connect(m_mainWindow.get(), &MainWindow::captureScreenRequested, m_capture.get(), &GyanisScribe::App::CaptureCoordinator::captureScreen);
+        // 「整屏截图：<屏名>」也走逐屏截图的同一个出口：步骤记录期间与其余截图入口同门禁
+        QObject::connect(m_mainWindow.get(), &MainWindow::captureScreenRequested, this, &AppController::captureScreenFromMenu);
         // 贴图张数走托盘悬停提示：贴图常被压在别的窗口后面，这是唯一还能看出「挂着几张」的地方
         QObject::connect(m_pins.get(), &GyanisScribe::Gui::PinManager::pinCountChanged, m_tray.get(), &GyanisScribe::App::TrayController::setPinCount);
         // 贴图菜单里的「识别文字」与热键、标注窗走的是同一个出口：一处接线管所有张（含启动恢复的那些）
@@ -489,6 +490,16 @@ namespace GyanisScribe::Main
         }
         notifyUser(GyanisScribe::Base::uiText("先停止步骤记录或处理完审核窗"), GyanisScribe::Gui::ToastKind::Information);
         return true;
+    }
+
+    void AppController::captureScreenFromMenu(const QString &screenName)
+    {
+        // 屏名这一路绕开了托盘动作的开关，门禁要在这里补上：录制中它同样会铺出标注窗并截进步骤
+        if (rejectWhileStepRecorderBusy())
+        {
+            return;
+        }
+        m_capture->captureScreen(screenName);
     }
 
     void AppController::handleHotkeyAction(const GyanisScribe::Core::HotkeyAction action)

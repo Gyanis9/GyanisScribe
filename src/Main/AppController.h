@@ -383,6 +383,14 @@ namespace GyanisScribe::Main
         [[nodiscard]] bool rejectWhileStepRecorderBusy();
 
         /**
+         * @brief 逐屏截图的统一出口：托盘子菜单与主窗口动作条都发一条屏名信号，汇到这里
+         * @param screenName 要截的那块屏
+         * @details 这两条来路不进 handleTrayAction，步骤记录期间要和其余截图入口堵在同一道门禁上，
+         *          否则录制中照样能铺出标注窗。
+         */
+        void captureScreenFromMenu(const QString &screenName);
+
+        /**
          * @brief 热键层报回的一个动作
          * @param action 动作
          * @details 生产侧只有 actionTriggered 一条来路；用例经 handleHotkeyActionForTesting
