@@ -101,6 +101,34 @@ add_dependencies(TestPrivacyCoordinator DeployQtRuntime)
 include(GoogleTest)
 gtest_discover_tests(TestPrivacyCoordinator)
 
+add_executable(TestAppStepRecorder
+        TestStepRecorderCoordinator.cpp)
+
+target_link_libraries(TestAppStepRecorder PRIVATE
+        App
+        Core
+        Gui
+        Platform
+        GTest::gtest
+        GTest::gtest_main
+        Qt6::Widgets
+        Qt6::Test)
+
+# 与 TestRewindCoordinator 同一原因：QSignalSpy 在 Qt6Test 里，共用的部署清单不含这份 DLL
+add_custom_command(TARGET TestAppStepRecorder POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_FILE:Qt6::Test>"
+        "$<TARGET_FILE_DIR:TestAppStepRecorder>/")
+
+if (MSVC)
+    target_compile_options(TestAppStepRecorder PRIVATE /W4 /WX)
+endif ()
+
+add_dependencies(TestAppStepRecorder DeployQtRuntime)
+
+include(GoogleTest)
+gtest_discover_tests(TestAppStepRecorder)
+
 add_executable(TestAppMemoryCoordinator
         TestMemoryCoordinator.cpp
         TestMemoryImport.cpp)

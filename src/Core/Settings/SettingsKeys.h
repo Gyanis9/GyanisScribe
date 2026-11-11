@@ -299,4 +299,7 @@ namespace GyanisScribe::Core
     /// 上次选用的美化模板 id；缺失或指向已删除模板时回落到 light
     inline constexpr std::string_view kShareLastTemplate = "Share/LastTemplate";
 
+    /// 步骤记录的首次说明是否已同意；同意后不再弹说明，拒绝不落盘
+    inline constexpr std::string_view kStepsConsentAccepted = "Steps/ConsentAccepted";
+
 } // namespace GyanisScribe::Core
