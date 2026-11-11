@@ -9,6 +9,8 @@ set(PlatformCommonSources
         StepEventSource.cpp
         IPlatformIntegration.h
         PlatformIntegration.cpp
+        UiElementLabels.h
+        UiElementLabels.cpp
         UnsupportedHotkeyBackend.h
         UnsupportedHotkeyBackend.cpp
         WindowGeometry.h

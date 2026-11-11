@@ -20,6 +20,7 @@
 #include <array>
 #include <chrono>
 #include <iostream>
+#include <optional>
 #include <thread>
 
 using GyanisScribe::Base::ErrorCode;
@@ -366,6 +367,74 @@ TEST(PlatformIntegration, ElementChainDescendsIntoTheWindowUnderThePoint)
         std::ranges::sort(costs);
         std::cout << "[读数] 元素链一次查询中位耗时：" << costs[costs.size() / 2] << "ms（探针窗、链深 " << chain.size() << "、20 轮）" << std::endl;
     }
+}
+
+/**
+ * @brief 钉住元素描述与元素链认到的是同一个元素
+ * @details 两者共用同一段认窗与下钻，元素描述只交最深一级；判据是名字、控件类型标签、窗口标题与矩形
+ *          都落在那颗探针按钮上。环境里没有 UIA 或没有桌面时跳过——标签与替身用例各管其余部分。
+ */
+TEST(PlatformIntegration, UiElementAtPointDescribesTheButtonUnderThePoint)
+{
+    ensureApplication();
+    const auto integration = createPlatformIntegration();
+    ASSERT_NE(integration, nullptr);
+    if (!integration->capabilities().uiElements)
+    {
+        GTEST_SKIP() << "本平台没有界面元素检测：能力位那条用例已钉住降级出口";
+    }
+    if (QGuiApplication::screens().isEmpty())
+    {
+        GTEST_SKIP() << "这个环境没有屏幕可枚举，探针摆不出来";
+    }
+
+    QWidget probe;
+    probe.setWindowTitle(QStringLiteral("智录元素描述探针"));
+    probe.resize(520, 380);
+    auto *const button = new QPushButton(QStringLiteral("叶片"), &probe);
+    button->setGeometry(40, 60, 160, 48);
+    probe.show();
+    QCoreApplication::processEvents();
+
+    const auto buttonCenter = button->mapToGlobal(button->rect().center());
+
+    ExcludeAllButProbe exclusion;
+    exclusion.keep = static_cast<quintptr>(probe.winId());
+    EnumWindows(collectOtherWindows, reinterpret_cast<LPARAM>(&exclusion));
+    ASSERT_FALSE(exclusion.handles.empty()) << "一扇别的窗都没收到，排除名单等于没立起来";
+
+    // UIA 提供器可能比窗口晚一步就绪：有界地等它答出按钮名字，等不到再由断言判红
+    std::optional<GyanisScribe::Platform::UiElementInfo> described;
+    const auto                                            deadline = std::chrono::steady_clock::now() + std::chrono::seconds{2};
+    do
+    {
+        QCoreApplication::processEvents();
+        if (const auto queried = integration->uiElementAtPoint(buttonCenter, exclusion.handles); queried)
+        {
+            described = *queried;
+        }
+        if (!described || described->name != QStringLiteral("叶片"))
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds{20});
+        }
+    } while ((!described || described->name != QStringLiteral("叶片")) && std::chrono::steady_clock::now() < deadline);
+
+    ASSERT_TRUE(described.has_value()) << "探针按钮下没拿到元素描述";
+    EXPECT_EQ(described->name, QStringLiteral("叶片")) << "元素名没落到按钮上：下钻断在了中间某一层";
+    EXPECT_EQ(described->controlType, QStringLiteral("按钮")) << "控件类型标签与 UIA 报的类型对不上：实际是 " << described->controlType.toStdString();
+    EXPECT_EQ(described->windowTitle, probe.windowTitle()) << "窗口标题该取顶层窗口那一份";
+    const auto processName = described->processName;
+    const bool bareExeName = processName.isEmpty() || (processName.endsWith(QStringLiteral(".exe"), Qt::CaseInsensitive) && !processName.contains(QLatin1Char('\\'))
+                                                       && !processName.contains(QLatin1Char('/')));
+    EXPECT_TRUE(bareExeName) << "进程名要么为空，要么是不含路径的可执行文件名：实际是 " << processName.toStdString();
+    EXPECT_TRUE(described->logicalGlobal.adjusted(-4, -4, 4, 4).contains(buttonCenter))
+            << "元素矩形没套住按钮中心：矩形 " << described->logicalGlobal.x() << ',' << described->logicalGlobal.y() << ' ' << described->logicalGlobal.width()
+            << '×' << described->logicalGlobal.height() << "，按钮中心 " << buttonCenter.x() << ',' << buttonCenter.y();
+
+    // 拔屏/改分辨率后的陈旧坐标：与元素链同一条拒绝面，不在任何屏上的点不编元素出来
+    const auto offscreen = integration->uiElementAtPoint(QPoint{-100000, -100000}, {});
+    ASSERT_FALSE(offscreen.has_value()) << "不在任何屏上的点居然算出了元素描述";
+    EXPECT_EQ(offscreen.error().code, ErrorCode::InvalidArgument);
 }
 
 /**

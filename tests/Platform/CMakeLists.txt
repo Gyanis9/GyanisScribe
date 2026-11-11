@@ -3,6 +3,7 @@ add_executable(TestPlatform
         TestWindowGeometry.cpp
         TestSessionNotification.cpp
         TestStepEventSource.cpp
+        TestUiElementLabels.cpp
         TestCrashGuard.cpp)
 
 find_package(Qt6 COMPONENTS Test REQUIRED)

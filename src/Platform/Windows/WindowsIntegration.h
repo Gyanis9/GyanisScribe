@@ -86,6 +86,19 @@ namespace GyanisScribe::Platform
         [[nodiscard]] Base::Expected<std::vector<QRect>> elementChainAtPoint(const QPoint &globalLogicalPoint, const std::vector<quintptr> &excludeWindowHandles) const override;
 
         /**
+         * @brief 光标处最深一级元素的描述，见 IPlatformIntegration::uiElementAtPoint()
+         * @param globalLogicalPoint 全局逻辑坐标
+         * @param excludeWindowHandles 命中到这几扇窗就直接跳过，往下找下一扇
+         * @return 成功返回元素名、控件类型标签、顶层窗口标题与进程、元素矩形（逻辑全局）；
+         *         光标下没有可认的窗口、那扇窗没有 UIA 提供器、或根元素读不出时交空的 optional
+         * @details 认窗与下钻与 elementChainAtPoint 走同一段：先按 z 序认第一扇含住光标、
+         *          不在排除名单里的可见窗，再从它的 UIA 根按「子元素含住点」逐级钻到最深一级。
+         *          名字、几何读不出来只让对应字段为空，不算失败；UIA 起不来才是错误。
+         */
+        [[nodiscard]] Base::Expected<std::optional<UiElementInfo>> uiElementAtPoint(const QPoint                &globalLogicalPoint,
+                                                                                    const std::vector<quintptr> &excludeWindowHandles) const override;
+
+        /**
          * @brief 查开机启动，见 IPlatformIntegration::autostartEnabled()
          * @return 成功返回有没有为「当前这一份可执行体」登记开机启动
          * @details 重写接口：写的是 HKCU 的 Run 键，值指着别的副本路径时按「本份没开」算，

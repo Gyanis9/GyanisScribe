@@ -9,15 +9,18 @@
 
 #pragma once
 
+#include "Base/Text.h"
 #include "Base/Types.h"
 #include "Platform/IHotkeyBackend.h"
 #include "Platform/PlatformCapabilities.h"
 #include "Platform/WindowGeometry.h"
 
 #include <QObject>
+#include <QPoint>
 #include <QString>
 
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace GyanisScribe::Platform
@@ -31,6 +34,18 @@ namespace GyanisScribe::Platform
         quintptr handle = 0;  ///< 平台窗口句柄，与 Qt 的 WId 同一口径，可直接交给抓帧那一步
         QString  title;       ///< 标题栏文字；有些窗口不给标题，空串是正常的
         QString  processName; ///< 进程可执行文件名（不含路径）；取不到时为空串
+    };
+
+    /**
+     * @brief 光标下一个界面元素的描述
+     */
+    struct UiElementInfo
+    {
+        QString name;          ///< 元素名（界面上看得见的文字）；元素没有名字时为空串
+        QString controlType;   ///< 控件类型的中文标签，如「按钮」「编辑框」；读不到时是「控件」
+        QString windowTitle;   ///< 元素所在顶层窗口的标题；窗口不给标题时为空串
+        QString processName;   ///< 顶层窗口所属进程的可执行文件名（不含路径）；取不到时为空串
+        QRect   logicalGlobal; ///< 元素的全局逻辑矩形；读不到几何时是空矩形
     };
 
     /**
@@ -116,6 +131,23 @@ namespace GyanisScribe::Platform
          *          UIA 的命中测试穿不过置顶窗（本机探针实测，工具窗也不例外），所以不能直接问「点下的元素」。
          */
         [[nodiscard]] virtual Base::Expected<std::vector<QRect>> elementChainAtPoint(const QPoint &globalLogicalPoint, const std::vector<quintptr> &excludeWindowHandles) const = 0;
+
+        /**
+         * @brief 光标下最深一级界面元素的描述
+         * @param globalLogicalPoint 全局逻辑坐标
+         * @param excludeWindowHandles 命中到这几位里的窗口直接跳过：录制时把自家 HUD 等窗口交进来，
+         *        免得遮住真正被点的那个界面
+         * @return 成功时给出元素名、控件类型、顶层窗口标题与进程、元素矩形；光标下没有可描述的元素时成功返回空的 optional
+         * @return 本平台给不出时返回 PlatformUnsupported，并指一条替代做法
+         * @details 与 elementChainAtPoint 同一套认窗与下钻，只交最深一级：步骤记录只要「点了哪个元素」，
+         *          不需要整条链。元素没有名字、UIA 没有提供器、窗口根拿不到时都算「没有元素」而不是失败——
+         *          自绘界面照样能被点，只是描述不出它。
+         * @note 默认实现回绝，既有替身不必为这个能力改签名；Windows 那一份按 UIA 给出真实答案。
+         */
+        [[nodiscard]] virtual Base::Expected<std::optional<UiElementInfo>> uiElementAtPoint(const QPoint &, const std::vector<quintptr> &) const
+        {
+            return std::unexpected(Base::Error{Base::ErrorCode::PlatformUnsupported, Base::uiTextUtf8("这台平台还不能描述光标下的界面元素")});
+        }
 
     signals:
         /**

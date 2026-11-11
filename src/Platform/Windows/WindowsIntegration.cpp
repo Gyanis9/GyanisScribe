@@ -1,6 +1,7 @@
 #include "Platform/Windows/WindowsIntegration.h"
 
 #include "Platform/WindowGeometry.h"
+#include "Platform/UiElementLabels.h"
 #include "Platform/Windows/Win32Autostart.h"
 #include "Platform/Windows/Win32HotkeyBackend.h"
 
@@ -102,6 +103,137 @@ namespace
         // EnumWindows 的顺序就是 z 序：第一扇含住光标的算数，当场停表，别看底下的
         search->found = window;
         return FALSE;
+    }
+
+    /**
+     * @brief 把光标点按它所在的那块屏换成平台读数
+     * @param globalLogicalPoint 全局逻辑坐标
+     * @param mappings 各块屏的读数
+     * @return 成功返回全局物理像素下的点；一块屏都配不上、或点不落在任何屏上时返回带中文原因的错误
+     * @details 多显示器下拿别块的缩放因子硬算会整体打偏，所以先选屏再换算；元素链与元素描述共用这一段，
+     *          两处对同一个光标点必须落到同一个像素上。
+     */
+    [[nodiscard]] GyanisScribe::Base::Expected<QPoint> physicalPointForQuery(const QPoint &globalLogicalPoint, const std::vector<MonitorMapping> &mappings)
+    {
+        if (mappings.empty())
+        {
+            // 配不上对就不猜缩放，认得出来的元素框会落在另一块屏上
+            return std::unexpected(Error{ErrorCode::ScreenUnavailable,
+                                         GyanisScribe::Base::uiTextUtf8("认不出光标下的界面元素：平台的屏幕清单与界面的屏幕清单配不上对。可以继续直接框住要截的那一块")});
+        }
+
+        std::optional<std::size_t> owner;
+        for (std::size_t index = 0; index < mappings.size(); ++index)
+        {
+            if (mappings[index].logicalGlobal.contains(globalLogicalPoint))
+            {
+                owner = index;
+                break;
+            }
+        }
+        if (!owner)
+        {
+            return std::unexpected(Error{ErrorCode::InvalidArgument,
+                                         GyanisScribe::Base::uiTextUtf8("这个光标位置不落在任何一块屏幕上（多半是拔屏或改分辨率之后的陈旧坐标）。请把鼠标动一下再试")});
+        }
+        return GyanisScribe::Platform::logicalPointToPhysicalGlobal(globalLogicalPoint, mappings[*owner]);
+    }
+
+    /// 一次元素查询的结果：钻到的最深元素，以及从窗口根到它的物理矩形（由外到内）
+    struct UiaElementHit
+    {
+        Microsoft::WRL::ComPtr<IUIAutomationElement> element;       ///< 最深一级元素；窗口没有提供器或根读不出时为空
+        std::vector<QRect>                           physicalChain; ///< 从窗口根到最深元素的物理矩形；根读不出来时为空
+    };
+
+    /**
+     * @brief 从窗口的 UIA 根按「子元素含住这个点」逐级下钻
+     * @param uia UI Automation 入口
+     * @param window 已经选定并含住光标的顶层窗口
+     * @param physicalPoint 光标位置，全局物理像素
+     * @return 最深一级元素与由外到内的矩形链；没有提供器、根读不出或建不出条件时元素为空
+     * @details 深度与子项预算挡住惰性树里越套越深的包装层与虚拟化列表一次暴露成千上万个条目。
+     *          elementChainAtPoint 与 uiElementAtPoint 共用这一段：两处认到的必须是同一个元素。
+     */
+    [[nodiscard]] UiaElementHit walkToDeepestElement(IUIAutomation *uia, const HWND window, const QPoint &physicalPoint)
+    {
+        UiaElementHit hit;
+
+        Microsoft::WRL::ComPtr<IUIAutomationElement> element;
+        if (FAILED(uia->ElementFromHandle(window, &element)) || element == nullptr)
+        {
+            // 这扇窗没有提供器（自绘界面、老程序）：交空，让调用方退回「没有元素」
+            return hit;
+        }
+
+        // 找子元素要显式给一个「恒真」条件：C++ 侧的 FindAll 不收空条件（.NET 的 TrueCondition 在那边是常量）
+        Microsoft::WRL::ComPtr<IUIAutomationCondition> anyChild;
+        if (FAILED(uia->CreateTrueCondition(&anyChild)) || anyChild == nullptr)
+        {
+            return hit;
+        }
+
+        int childrenBudget = kElementChainChildrenBudget;
+        for (int depth = 0; depth < kElementChainMaximumDepth; ++depth)
+        {
+            RECT bounds{};
+            if (FAILED(element->get_CurrentBoundingRectangle(&bounds)))
+            {
+                break;
+            }
+            // 零宽高的中间层不进链：消费方按键一步步选的是「块」，放一个空矩形进去就是一步死档
+            const QRect physical{bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top};
+            if (!physical.isEmpty())
+            {
+                hit.physicalChain.push_back(physical);
+            }
+
+            if (childrenBudget <= 0)
+            {
+                // 撞上预算：多半是虚拟化列表，停在当前这一层比拖着界面等几百次跨进程调用好
+                break;
+            }
+            Microsoft::WRL::ComPtr<IUIAutomationElementArray> children;
+            if (FAILED(element->FindAll(TreeScope_Children, anyChild.Get(), &children)) || children == nullptr)
+            {
+                break;
+            }
+            int length = 0;
+            if (FAILED(children->get_Length(&length)))
+            {
+                break;
+            }
+
+            Microsoft::WRL::ComPtr<IUIAutomationElement> next;
+            for (int index = 0; index < length && childrenBudget > 0; ++index)
+            {
+                --childrenBudget;
+                Microsoft::WRL::ComPtr<IUIAutomationElement> child;
+                if (FAILED(children->GetElement(index, &child)) || child == nullptr)
+                {
+                    continue;
+                }
+                RECT childBounds{};
+                if (FAILED(child->get_CurrentBoundingRectangle(&childBounds)))
+                {
+                    continue;
+                }
+                const QRect childRect{childBounds.left, childBounds.top, childBounds.right - childBounds.left, childBounds.bottom - childBounds.top};
+                if (childRect.contains(physicalPoint))
+                {
+                    // 树序里靠后的画在上面：重叠的兄弟取最后一个含住点的
+                    next = child;
+                }
+            }
+            if (next == nullptr)
+            {
+                break;
+            }
+            element = next;
+        }
+
+        hit.element = element;
+        return hit;
     }
 
     /**
@@ -488,30 +620,8 @@ namespace GyanisScribe::Platform
 
     Base::Expected<std::vector<QRect>> WindowsIntegration::elementChainAtPoint(const QPoint &globalLogicalPoint, const std::vector<quintptr> &excludeWindowHandles) const
     {
-        const auto mappings = monitorMappings();
-        if (mappings.empty())
-        {
-            // 与窗口枚举同一道闸：配不上对就不猜缩放，认得出来的元素框会落在另一块屏上
-            return std::unexpected(Error{ErrorCode::ScreenUnavailable,
-                                         GyanisScribe::Base::uiTextUtf8("认不出光标下的界面元素：平台的屏幕清单与界面的屏幕清单配不上对。可以继续直接框住要截的那一块")});
-        }
-
-        // 点按它所在的那块屏换算：多显示器下拿别块的缩放因子算会整体打偏
-        std::optional<std::size_t> owner;
-        for (std::size_t index = 0; index < mappings.size(); ++index)
-        {
-            if (mappings[index].logicalGlobal.contains(globalLogicalPoint))
-            {
-                owner = index;
-                break;
-            }
-        }
-        if (!owner)
-        {
-            return std::unexpected(Error{ErrorCode::InvalidArgument,
-                                         GyanisScribe::Base::uiTextUtf8("这个光标位置不落在任何一块屏幕上（多半是拔屏或改分辨率之后的陈旧坐标）。请把鼠标动一下再试")});
-        }
-        const auto physicalPoint = logicalPointToPhysicalGlobal(globalLogicalPoint, mappings[*owner]);
+        const auto mappings      = monitorMappings();
+        const auto physicalPoint = physicalPointForQuery(globalLogicalPoint, mappings);
         if (!physicalPoint)
         {
             return std::unexpected(physicalPoint.error());
@@ -534,85 +644,13 @@ namespace GyanisScribe::Platform
                                          GyanisScribe::Base::uiTextUtf8("系统的 UI Automation 无法启动，不能识别界面元素。可继续使用悬停识别整个窗口，或直接框选目标区域。")});
         }
 
-        Microsoft::WRL::ComPtr<IUIAutomationElement> element;
-        if (FAILED(uia->ElementFromHandle(search.found, &element)) || element == nullptr)
-        {
-            // 这扇窗没有提供器（自绘界面、老程序）：交空链而不是报错——悬停退回只认整扇窗口正是该有的样子
-            return std::vector<QRect>{};
-        }
-
-        // 找子元素要显式给一个「恒真」条件：C++ 侧的 FindAll 不收空条件（.NET 的 TrueCondition 在那边是常量）
-        Microsoft::WRL::ComPtr<IUIAutomationCondition> anyChild;
-        if (FAILED(uia->CreateTrueCondition(&anyChild)) || anyChild == nullptr)
-        {
-            return std::vector<QRect>{};
-        }
-
         // 从窗口根往下按「子元素含住这个点」钻：先按从外到内收，收完翻过来交（消费方按「第一档 = 最深」用）
-        std::vector<QRect> physicalChain;
-        int                childrenBudget = kElementChainChildrenBudget;
-        for (int depth = 0; depth < kElementChainMaximumDepth; ++depth)
-        {
-            RECT bounds{};
-            if (FAILED(element->get_CurrentBoundingRectangle(&bounds)))
-            {
-                break;
-            }
-            // 零宽高的中间层不进链：消费方按键一步步选的是「块」，放一个空矩形进去就是一步死档
-            const QRect physical{bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top};
-            if (!physical.isEmpty())
-            {
-                physicalChain.push_back(physical);
-            }
-
-            if (childrenBudget <= 0)
-            {
-                // 撞上预算：多半是虚拟化列表，停在当前这一层比拖着界面等几百次跨进程调用好
-                break;
-            }
-            Microsoft::WRL::ComPtr<IUIAutomationElementArray> children;
-            if (FAILED(element->FindAll(TreeScope_Children, anyChild.Get(), &children)) || children == nullptr)
-            {
-                break;
-            }
-            int length = 0;
-            if (FAILED(children->get_Length(&length)))
-            {
-                break;
-            }
-
-            Microsoft::WRL::ComPtr<IUIAutomationElement> next;
-            for (int index = 0; index < length && childrenBudget > 0; ++index)
-            {
-                --childrenBudget;
-                Microsoft::WRL::ComPtr<IUIAutomationElement> child;
-                if (FAILED(children->GetElement(index, &child)) || child == nullptr)
-                {
-                    continue;
-                }
-                RECT childBounds{};
-                if (FAILED(child->get_CurrentBoundingRectangle(&childBounds)))
-                {
-                    continue;
-                }
-                const QRect childRect{childBounds.left, childBounds.top, childBounds.right - childBounds.left, childBounds.bottom - childBounds.top};
-                if (childRect.contains(*physicalPoint))
-                {
-                    // 树序里靠后的画在上面：重叠的兄弟取最后一个含住点的
-                    next = child;
-                }
-            }
-            if (next == nullptr)
-            {
-                break;
-            }
-            element = next;
-        }
-        std::ranges::reverse(physicalChain);
+        auto hit = walkToDeepestElement(uia, search.found, *physicalPoint);
+        std::ranges::reverse(hit.physicalChain);
 
         std::vector<QRect> chain;
-        chain.reserve(physicalChain.size());
-        for (const auto &physical: physicalChain)
+        chain.reserve(hit.physicalChain.size());
+        for (const auto &physical: hit.physicalChain)
         {
             // 每个元素按自己的中心认屏：跨屏窗口的元素串在别的屏上时，拿锚点那块屏的缩放硬算会串位
             const auto ownerIndex = monitorIndexForPoint(physical.center(), mappings);
@@ -626,6 +664,74 @@ namespace GyanisScribe::Platform
             }
         }
         return chain;
+    }
+
+    Base::Expected<std::optional<UiElementInfo>> WindowsIntegration::uiElementAtPoint(const QPoint &globalLogicalPoint, const std::vector<quintptr> &excludeWindowHandles) const
+    {
+        const auto mappings      = monitorMappings();
+        const auto physicalPoint = physicalPointForQuery(globalLogicalPoint, mappings);
+        if (!physicalPoint)
+        {
+            return std::unexpected(physicalPoint.error());
+        }
+
+        AnchorSearch search{*physicalPoint, &excludeWindowHandles};
+        EnumWindows(findWindowUnderPoint, reinterpret_cast<LPARAM>(&search));
+        if (search.found == nullptr)
+        {
+            // 光标下没有可认的窗口：没有元素可描述，不是失败
+            return std::optional<UiElementInfo>{};
+        }
+
+        const auto uia = uiAutomation();
+        if (uia == nullptr)
+        {
+            return std::unexpected(Error{ErrorCode::PlatformUnsupported, GyanisScribe::Base::uiTextUtf8("系统的 UI Automation 无法启动，不能描述光标下的界面元素")});
+        }
+
+        const auto hit = walkToDeepestElement(uia, search.found, *physicalPoint);
+        if (hit.element == nullptr)
+        {
+            // 这扇窗没有提供器（自绘界面、老程序）：没有元素可描述，仍算成功
+            return std::optional<UiElementInfo>{};
+        }
+
+        UiElementInfo info;
+        BSTR          name = nullptr;
+        if (SUCCEEDED(hit.element->get_CurrentName(&name)))
+        {
+            if (name != nullptr)
+            {
+                info.name = QString::fromWCharArray(name, static_cast<qsizetype>(SysStringLen(name)));
+                SysFreeString(name);
+            }
+        }
+
+        // 读不到控件类型只让标签回落「控件」：元素本身已经认出来了，这一步不该把整条描述判成失败
+        int controlTypeId = 0;
+        info.controlType  = SUCCEEDED(hit.element->get_CurrentControlType(&controlTypeId)) ? uiControlTypeLabel(controlTypeId) : Base::uiText("控件");
+
+        // 窗口标题与进程按锚定的顶层窗口取：元素所在的顶层窗口就是它，不必沿 UIA 父级再爬一遍
+        constexpr int kWindowTitleBufferLength              = 512;
+        wchar_t       titleBuffer[kWindowTitleBufferLength] = {};
+        const int     written                               = GetWindowTextW(search.found, titleBuffer, kWindowTitleBufferLength);
+        info.windowTitle                                    = written > 0 ? QString::fromWCharArray(titleBuffer, written) : QString();
+        info.processName                                    = processFileName(search.found);
+
+        RECT bounds{};
+        if (SUCCEEDED(hit.element->get_CurrentBoundingRectangle(&bounds)))
+        {
+            const QRect physical{bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top};
+            if (!physical.isEmpty())
+            {
+                const auto ownerIndex = monitorIndexForPoint(physical.center(), mappings);
+                if (ownerIndex != mappings.size())
+                {
+                    info.logicalGlobal = physicalToLogicalGlobal(physical, mappings[ownerIndex]).value_or(QRect{});
+                }
+            }
+        }
+        return std::optional<UiElementInfo>{std::move(info)};
     }
 
     Base::Expected<bool> WindowsIntegration::autostartEnabled() const
