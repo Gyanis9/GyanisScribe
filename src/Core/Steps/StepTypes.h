@@ -35,19 +35,21 @@ namespace GyanisScribe::Core
      */
     struct RecordedStep
     {
-        int       index = 0;               ///< 显示序号，从 1 开始；删除或调序后重排
-        StepKind  kind  = StepKind::Click; ///< 步骤来源
-        QDateTime at;                      ///< 发生时刻
-        QPoint    globalLogicalPoint;      ///< 点击位置（逻辑全局坐标）；窗口切换时为当时光标位置
-        bool      rightButton = false;     ///< 是否为右键点击
-        QString   windowTitle;             ///< 前台窗口标题；取不到为空
-        QString   processName;             ///< 前台窗口进程名；取不到为空
-        QString   elementName;             ///< UIA 元素名；取不到为空
-        QString   controlType;             ///< 本地化控件类型标签；取不到为空
-        QString   description;             ///< 说明；追加时为空按 kind 生成，可编辑，最长 500 字符
-        QString   imagePath;               ///< 整屏 PNG 路径；抓屏失败为空
-        QImage    thumbnail;               ///< 320 像素宽缩略图，仅内存
-        QString   captureError;            ///< 抓屏或落盘失败原因；成功为空
+        int       index = 0;                     ///< 显示序号，从 1 开始；删除或调序后重排
+        StepKind  kind  = StepKind::Click;       ///< 步骤来源
+        QDateTime at;                            ///< 发生时刻
+        QPoint    globalLogicalPoint;            ///< 点击位置（逻辑全局坐标）；窗口切换时为当时光标位置
+        QPoint    clickPointInImage;             ///< 点击点在截图内的逻辑坐标；窗口切换与手动补步无意义，横纵坐标都不为负才算有效
+        qreal     imageDevicePixelRatio = 1.0;   ///< 截图所在屏的缩放因子，导出画标记时用
+        bool      rightButton           = false; ///< 是否为右键点击
+        QString   windowTitle;                   ///< 前台窗口标题；取不到为空
+        QString   processName;                   ///< 前台窗口进程名；取不到为空
+        QString   elementName;                   ///< UIA 元素名；取不到为空
+        QString   controlType;                   ///< 本地化控件类型标签；取不到为空
+        QString   description;                   ///< 说明；追加时为空按 kind 生成，可编辑，最长 500 字符
+        QString   imagePath;                     ///< 整屏 PNG 路径；抓屏失败为空
+        QImage    thumbnail;                     ///< 320 像素宽缩略图，仅内存
+        QString   captureError;                  ///< 抓屏或落盘失败原因；成功为空
     };
 
     /// 单次记录的步骤上限，到达后协调器停止录制并要求先导出或放弃

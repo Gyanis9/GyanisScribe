@@ -2,6 +2,7 @@
 
 #include "Base/Paths.h"
 #include "Base/Text.h"
+#include "Core/Steps/StepImageMarker.h"
 
 #include <QBuffer>
 #include <QByteArray>
@@ -45,7 +46,7 @@ main { max-width: 960px; margin: 0 auto; }
             return escaped;
         }
 
-        /// 空说明按步骤来源补一条自动说明，导出不出现无标题的步骤
+        /// 空说明只写中性的类型标签：再拿元素名或窗口标题补回来，等于把用户删掉的敏感文本又导了出去
         [[nodiscard]] QString stepTitle(const RecordedStep &step)
         {
             const QString description = step.description.trimmed();
@@ -56,28 +57,23 @@ main { max-width: 960px; margin: 0 auto; }
             switch (step.kind)
             {
                 case StepKind::Click:
-                    return clickStepDescription(step.elementName, step.controlType, step.globalLogicalPoint, step.rightButton);
+                    return Base::uiText("点击");
                 case StepKind::WindowChange:
-                    return windowChangeStepDescription(step.windowTitle, step.processName);
+                    return Base::uiText("切换窗口");
                 case StepKind::Manual:
                     return manualStepDescription();
             }
             return QString();
         }
 
-        /// 把一步的整图缩到最长边上限后编码成 JPEG data URI；没有图或读不出来时返回空
-        [[nodiscard]] QString imageDataUri(const RecordedStep &step)
+        /// 把一张图缩到最长边上限后编码成 JPEG data URI；空图返回空
+        [[nodiscard]] QString imageDataUri(const QImage &source)
         {
-            if (step.imagePath.isEmpty())
+            if (source.isNull())
             {
                 return {};
             }
-
-            QImage image;
-            if (!image.load(step.imagePath))
-            {
-                return {};
-            }
+            QImage image = source;
             if (std::max(image.width(), image.height()) > kStepHtmlImageEdge)
             {
                 image = image.scaled(kStepHtmlImageEdge, kStepHtmlImageEdge, Qt::KeepAspectRatio, Qt::SmoothTransformation);
@@ -113,9 +109,9 @@ main { max-width: 960px; margin: 0 auto; }
         }
 
         /// 有图时内嵌 data URI，没有图时给占位；抓屏失败原因一并写出来
-        [[nodiscard]] QString stepImageBlock(const RecordedStep &step, const QString &number)
+        [[nodiscard]] QString stepImageBlock(const RecordedStep &step, const QString &number, const int displayNumber)
         {
-            const QString dataUri = imageDataUri(step);
+            const QString dataUri = imageDataUri(annotatedStepImage(step, displayNumber));
             if (!dataUri.isEmpty())
             {
                 const QString alt = escapeHtml(Base::uiText("第 %1 步截图").arg(number));
@@ -151,8 +147,9 @@ main { max-width: 960px; margin: 0 auto; }
 
         for (std::size_t position = 0; position < steps.size(); ++position)
         {
-            const RecordedStep &step   = steps[position];
-            const QString       number = QStringLiteral("%1").arg(static_cast<int>(position) + 1, 2, 10, QChar('0'));
+            const RecordedStep &step          = steps[position];
+            const int           displayNumber = static_cast<int>(position) + 1;
+            const QString       number        = QStringLiteral("%1").arg(displayNumber, 2, 10, QChar('0'));
             html.append(QStringLiteral("<section class=\"step\">\n<div class=\"num\">%1</div>\n<h2>%2</h2>\n").arg(number, escapeHtml(stepTitle(step))));
 
             const QString meta = stepMeta(step);
@@ -160,7 +157,7 @@ main { max-width: 960px; margin: 0 auto; }
             {
                 html.append(QStringLiteral("<p class=\"meta\">%1</p>\n").arg(meta));
             }
-            html.append(stepImageBlock(step, number));
+            html.append(stepImageBlock(step, number, displayNumber));
             html.append(QStringLiteral("\n</section>\n"));
         }
 
@@ -198,9 +195,9 @@ main { max-width: 960px; margin: 0 auto; }
         }
 
         const QByteArray bytes = html.toUtf8();
+        // 写失败不再调 cancelWriting：它会把出错原因换成「取消写入」，析构时本来也会丢弃临时文件
         if (output.write(bytes) != static_cast<qint64>(bytes.size()))
         {
-            output.cancelWriting();
             return std::unexpected(Base::Error{Base::ErrorCode::FileWriteFailed, Base::uiFormat(Base::uiTextUtf8("步骤教程未保存：{}（{}）。请检查磁盘空间后重试"),
                                                                                                 displayPath.toStdString(), output.errorString().toStdString())});
         }

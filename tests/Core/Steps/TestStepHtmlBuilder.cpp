@@ -7,6 +7,7 @@
 #include <QFile>
 #include <QImage>
 #include <QPoint>
+#include <QSize>
 #include <QString>
 #include <QTemporaryDir>
 
@@ -29,22 +30,36 @@ namespace
         return step;
     }
 
+    /// 按出现顺序取出 HTML 里所有 data URI 的解码字节
+    std::vector<QByteArray> dataUriPayloads(const QString &html)
+    {
+        const QString           marker = QStringLiteral("data:image/jpeg;base64,");
+        std::vector<QByteArray> payloads;
+        auto                    start = qsizetype{0};
+        while (true)
+        {
+            const auto position = html.indexOf(marker, start);
+            if (position < 0)
+            {
+                break;
+            }
+            const auto valueStart = position + marker.size();
+            const auto valueEnd   = html.indexOf(QLatin1Char('"'), valueStart);
+            if (valueEnd <= valueStart)
+            {
+                break;
+            }
+            payloads.push_back(QByteArray::fromBase64(html.mid(valueStart, valueEnd - valueStart).toLatin1()));
+            start = valueEnd + 1;
+        }
+        return payloads;
+    }
+
     /// 从 HTML 里取第一条 data URI 的解码字节；没有 data URI 时返回空
     QByteArray firstDataUriBytes(const QString &html)
     {
-        const QString marker = QStringLiteral("data:image/jpeg;base64,");
-        const auto    start  = html.indexOf(marker);
-        if (start < 0)
-        {
-            return {};
-        }
-        const auto valueStart = start + marker.size();
-        const auto valueEnd   = html.indexOf(QLatin1Char('"'), valueStart);
-        if (valueEnd <= valueStart)
-        {
-            return {};
-        }
-        return QByteArray::fromBase64(html.mid(valueStart, valueEnd - valueStart).toLatin1());
+        const auto payloads = dataUriPayloads(html);
+        return payloads.empty() ? QByteArray{} : payloads.front();
     }
 } // namespace
 
@@ -83,6 +98,34 @@ TEST(StepHtmlBuilder, NumbersStepsAndEmbedsImages)
     EXPECT_TRUE(html.contains(QStringLiteral("charset=\"utf-8\"")));
 }
 
+/// 两步各自的截图都内嵌，且先出现第一步的图，顺序不乱
+TEST(StepHtmlBuilder, EmbedsEachStepsImageInDocumentOrder)
+{
+    QTemporaryDir dir;
+    QImage        first{30, 10, QImage::Format_ARGB32_Premultiplied};
+    first.fill(Qt::blue);
+    const auto firstPath = QDir{dir.path()}.filePath(QStringLiteral("first.png"));
+    ASSERT_TRUE(first.save(firstPath, "PNG"));
+
+    QImage second{10, 30, QImage::Format_ARGB32_Premultiplied};
+    second.fill(Qt::red);
+    const auto secondPath = QDir{dir.path()}.filePath(QStringLiteral("second.png"));
+    ASSERT_TRUE(second.save(secondPath, "PNG"));
+
+    const auto html = buildStepHtml({textStep(QStringLiteral("第一步"), firstPath), textStep(QStringLiteral("第二步"), secondPath)}, QDateTime::currentDateTime());
+    EXPECT_EQ(html.count(QStringLiteral("data:image/jpeg;base64,")), 2);
+
+    // 两张图尺寸不同，按出现顺序解码就能看出谁在前
+    const auto payloads = dataUriPayloads(html);
+    ASSERT_EQ(payloads.size(), 2U);
+    const auto firstDecoded  = QImage::fromData(payloads[0]);
+    const auto secondDecoded = QImage::fromData(payloads[1]);
+    ASSERT_FALSE(firstDecoded.isNull());
+    ASSERT_FALSE(secondDecoded.isNull());
+    EXPECT_EQ(firstDecoded.size(), QSize(30, 10)) << "第一步的图没有排在前面";
+    EXPECT_EQ(secondDecoded.size(), QSize(10, 30));
+}
+
 /// 编号按步骤在列表里的位置走，不看 RecordedStep::index；两位数补零，超过九十九步照常展开
 TEST(StepHtmlBuilder, NumbersStepsByTheirPosition)
 {
@@ -119,15 +162,65 @@ TEST(StepHtmlBuilder, ShowsTimesCountAndWindowTitle)
     EXPECT_TRUE(html.contains(QStringLiteral("窗口：编辑器")));
 }
 
-/// 说明被清空时按步骤来源补一条自动说明，导出不出现无标题的步骤
-TEST(StepHtmlBuilder, FallsBackToAutomaticDescriptionWhenEmpty)
+/// 说明被清空时只写中性的类型标签，不把用户删掉的元素名、进程名又补回来
+TEST(StepHtmlBuilder, FallsBackToNeutralKindLabelWhenEmpty)
 {
     auto step               = textStep({});
+    step.kind               = StepKind::WindowChange;
     step.elementName        = QStringLiteral("保存");
     step.controlType        = QStringLiteral("按钮");
+    step.windowTitle        = QStringLiteral("机密合同.docx");
+    step.processName        = QStringLiteral("notepad.exe");
     step.globalLogicalPoint = QPoint{12, 34};
-    const auto html         = buildStepHtml({step}, QDateTime::currentDateTime());
-    EXPECT_TRUE(html.contains(QStringLiteral("点击「保存」（按钮）")));
+
+    const auto html = buildStepHtml({step}, QDateTime::currentDateTime());
+    EXPECT_TRUE(html.contains(QStringLiteral("<h2>切换窗口</h2>")));
+    EXPECT_FALSE(html.contains(QStringLiteral("保存"))) << "清空说明后元素名又回到了导出里";
+    EXPECT_FALSE(html.contains(QStringLiteral("notepad"))) << "清空说明后进程名又回到了导出里";
+
+    auto clickStep       = step;
+    clickStep.kind       = StepKind::Click;
+    const auto clickHtml = buildStepHtml({clickStep}, QDateTime::currentDateTime());
+    EXPECT_TRUE(clickHtml.contains(QStringLiteral("<h2>点击</h2>")));
+    EXPECT_FALSE(clickHtml.contains(QStringLiteral("保存")));
+
+    // 有说明的步骤原样输出，不换成类型标签
+    auto described           = step;
+    described.kind           = StepKind::Click;
+    described.description    = QStringLiteral("自定义说明");
+    const auto describedHtml = buildStepHtml({described}, QDateTime::currentDateTime());
+    EXPECT_TRUE(describedHtml.contains(QStringLiteral("<h2>自定义说明</h2>")));
+}
+
+/// 点击步骤内嵌的是补画过标记的截图，序号用步骤在文档里的显示序号
+TEST(StepHtmlBuilder, EmbedsMarkedScreenshotForClicks)
+{
+    QTemporaryDir dir;
+    QImage        screen{200, 200, QImage::Format_ARGB32_Premultiplied};
+    screen.fill(Qt::white);
+    const auto path = QDir{dir.path()}.filePath(QStringLiteral("step-001.png"));
+    ASSERT_TRUE(screen.save(path, "PNG"));
+
+    auto step              = textStep(QStringLiteral("点击按钮"), path);
+    step.clickPointInImage = QPoint{100, 100};
+    const auto html        = buildStepHtml({step}, QDateTime::currentDateTime());
+    const auto payload     = firstDataUriBytes(html);
+    ASSERT_FALSE(payload.isEmpty());
+    const auto image = QImage::fromData(payload);
+    ASSERT_FALSE(image.isNull());
+
+    // 圆环是品牌红，JPEG 编码后仍应明显偏红；白底原图不会有这种像素
+    auto ring = false;
+    for (auto x = 70; x <= 130; ++x)
+    {
+        const auto color = image.pixelColor(x, 100);
+        if (color.red() > 150 && color.red() - color.green() > 40 && color.red() - color.blue() > 40)
+        {
+            ring = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(ring) << "导出的截图没有画点击标记";
 }
 
 /// 抓屏失败原因写在占位里，同样转义

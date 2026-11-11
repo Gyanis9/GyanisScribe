@@ -22,6 +22,17 @@ namespace GyanisScribe::Core
 
         /// 序号圆牌相对圆心的偏移，按逻辑像素计
         constexpr qreal kStepNumberOffset = 20.0;
+
+        /// 序号圆牌白色描边的线宽，按逻辑像素计；夹进画面时要把它算进占位
+        constexpr qreal kStepBadgeOutlineWidth = 2.0;
+
+        /// 把圆牌中心限制在 [low, high]；画面小到装不下圆牌时贴在 high 一侧，不留负数
+        [[nodiscard]] qreal clampBadgeCoordinate(const qreal value, const qreal margin, const qreal extent)
+        {
+            const qreal high = std::max(0.0, extent - 1.0 - margin);
+            const qreal low  = std::min(margin, high);
+            return std::clamp(value, low, high);
+        }
     } // namespace
 
     QImage annotateStepClick(const QImage &screen, const QPoint &logicalPointInScreen, const qreal devicePixelRatio, const int stepNumber)
@@ -56,10 +67,13 @@ namespace GyanisScribe::Core
 
             const QFontMetricsF metrics{font};
             const QString       numberText  = QString::number(stepNumber);
-            const QPointF       badgeCenter = center + QPointF{kStepNumberOffset * ratio, -kStepNumberOffset * ratio};
             const qreal         badgeRadius = std::max(metrics.height(), metrics.horizontalAdvance(numberText)) / 2.0 + 4.0 * ratio;
+            // 点击贴着上边或右边时，圆牌会有一半落到图外；整块夹回画面，序号才始终看得见
+            const qreal   margin = badgeRadius + kStepBadgeOutlineWidth * ratio;
+            const QPointF badgeCenter{clampBadgeCoordinate(center.x() + kStepNumberOffset * ratio, margin, marked.width()),
+                                      clampBadgeCoordinate(center.y() - kStepNumberOffset * ratio, margin, marked.height())};
 
-            painter.setPen(QPen{QColor{0xFF, 0xFF, 0xFF}, 2.0 * ratio});
+            painter.setPen(QPen{QColor{0xFF, 0xFF, 0xFF}, kStepBadgeOutlineWidth * ratio});
             painter.setBrush(QColor{0x1F, 0x23, 0x28});
             painter.drawEllipse(badgeCenter, badgeRadius, badgeRadius);
 
@@ -71,6 +85,26 @@ namespace GyanisScribe::Core
 
         painter.end();
         return marked;
+    }
+
+    QImage annotatedStepImage(const RecordedStep &step, const int displayNumber)
+    {
+        if (step.imagePath.isEmpty())
+        {
+            return {};
+        }
+
+        QImage image;
+        if (!image.load(step.imagePath))
+        {
+            return {};
+        }
+        // 窗口切换与手动补步没有真实点击点，原样返回；点击类按导出时的最终序号现画
+        if (step.kind != StepKind::Click || step.clickPointInImage.x() < 0 || step.clickPointInImage.y() < 0)
+        {
+            return image;
+        }
+        return annotateStepClick(image, step.clickPointInImage, step.imageDevicePixelRatio, displayNumber);
     }
 
 } // namespace GyanisScribe::Core

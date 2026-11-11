@@ -32,7 +32,9 @@ namespace GyanisScribe::Core
      * @param generatedAt 生成时刻，写进标题区
      * @return 含内联样式与 data URI 图片的完整文档；steps 为空时返回空串
      * @details 说明、窗口标题与抓屏错误都按 HTML 文本转义；图片读不出来时显示占位；
+     *          点击步骤按最终显示序号画上圆环与序号后再内嵌，磁盘上的截图保持原样；
      *          整图先缩到最长边不超过 1600，再按 JPEG 质量 85 编码成 base64 data URI。
+     *          说明被清空时只写类型标签，不再回填元素名或窗口标题。
      */
     [[nodiscard]] QString buildStepHtml(const std::vector<RecordedStep> &steps, const QDateTime &generatedAt);
 
