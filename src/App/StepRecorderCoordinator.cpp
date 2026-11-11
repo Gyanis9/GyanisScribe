@@ -8,6 +8,7 @@
 #include "Core/Steps/StepTypes.h"
 #include "Gui/Steps/StepConsentDialog.h"
 #include "Gui/Steps/StepRecorderHud.h"
+#include "Gui/Steps/StepReviewWindow.h"
 #include "Gui/Theme/ThemeManager.h"
 #include "Platform/IStepEventSource.h"
 
@@ -59,6 +60,8 @@ namespace GyanisScribe::App
     {
         m_pendingTimer.setSingleShot(true);
         QObject::connect(&m_pendingTimer, &QTimer::timeout, this, &StepRecorderCoordinator::commitPending);
+        // 停止后的审核从这里接手：信号既是给外部的状态通知，也是进入审核的唯一入口
+        QObject::connect(this, &StepRecorderCoordinator::stopped, this, &StepRecorderCoordinator::handleStopped);
 
         // 上一次没审完或崩溃留下的会话先回收，别让临时目录一直涨
         Core::StepSession::cleanupOldSessions(m_dependencies.tempRoot, QDateTime::currentDateTime());
@@ -77,6 +80,11 @@ namespace GyanisScribe::App
         if (m_hud)
         {
             m_hud->hide();
+        }
+        if (m_review)
+        {
+            // 直接删而不是 close：析构路径不该再弹放弃确认；临时目录随后由会话收掉
+            delete m_review.data();
         }
         m_session.cleanup();
     }
@@ -127,8 +135,28 @@ namespace GyanisScribe::App
         return m_hud.get();
     }
 
+    bool StepRecorderCoordinator::isReviewOpen() const noexcept
+    {
+        return !m_review.isNull();
+    }
+
+    Gui::StepReviewWindow *StepRecorderCoordinator::reviewWindowForTesting() const noexcept
+    {
+        return m_review.data();
+    }
+
     void StepRecorderCoordinator::startRecording()
     {
+        // 一次只能有一个步骤会话：审核窗还开着时再开始，把那一扇抬回来让用户先了结
+        if (m_review)
+        {
+            m_review->show();
+            m_review->raise();
+            m_review->activateWindow();
+            emit messageForUser(Base::uiText("先导出或放弃这次记录"), Gui::ToastKind::Information);
+            return;
+        }
+
         // 先看平台给不给：给不出时连首次说明都不该弹，更不该把钩子失败当成用户的错
         if (!m_dependencies.integration.capabilities().stepRecorder)
         {
@@ -209,6 +237,62 @@ namespace GyanisScribe::App
         const int steps = stepCount();
         emit      stateChanged(false, false, steps);
         emit      stopped(steps);
+    }
+
+    void StepRecorderCoordinator::handleStopped(const int steps)
+    {
+        if (steps <= 0)
+        {
+            // 没记到步骤就没有可审核的内容：空目录当场收掉，也不开一扇没有东西的窗
+            m_session.cleanup();
+            emit messageForUser(Base::uiText("这次没有记录到步骤"), Gui::ToastKind::Information);
+            return;
+        }
+        showReview();
+    }
+
+    void StepRecorderCoordinator::showReview()
+    {
+        if (m_review)
+        {
+            m_review->show();
+            m_review->raise();
+            m_review->activateWindow();
+            return;
+        }
+
+        auto *review = new Gui::StepReviewWindow{m_session, m_dependencies.settings, [this] { return captureForManualStep(); }};
+        // 关掉即自毁：协调器只持 QPointer；放弃信号先放掉这份引用，窗口随后自己收场
+        review->setAttribute(Qt::WA_DeleteOnClose);
+        QObject::connect(review, &Gui::StepReviewWindow::discardConfirmed, this, [this] { m_review = nullptr; });
+        m_review = review;
+        review->show();
+        review->raise();
+        review->activateWindow();
+    }
+
+    Base::Expected<QImage> StepRecorderCoordinator::captureForManualStep()
+    {
+        // 审核窗在调用前后自己隐藏与恢复；这里只补控制条，且要等这一轮绘制，
+        // 否则刚隐藏的控制条还会留在截图里
+        const bool hudVisible = m_hud && m_hud->isVisible();
+        if (hudVisible)
+        {
+            m_hud->hide();
+            QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+        }
+
+        const auto captured = m_dependencies.captureSource.grabScreen(QString{});
+
+        if (hudVisible)
+        {
+            m_hud->show();
+        }
+        if (!captured)
+        {
+            return std::unexpected(captured.error());
+        }
+        return captured->image;
     }
 
     void StepRecorderCoordinator::togglePause()
@@ -492,6 +576,14 @@ namespace GyanisScribe::App
         {
             // winId 会把窗口落成原生句柄；控制条已经建好，这一步不会额外弹出什么
             if (const quintptr handle = m_hud->winId(); handle != 0)
+            {
+                handles.push_back(handle);
+            }
+        }
+        if (m_review)
+        {
+            // 审核窗与录制窗同时开着的情形目前不会出现，但两条会话路径共用这套排除表，缺一条就会漏点
+            if (const quintptr handle = m_review->winId(); handle != 0)
             {
                 handles.push_back(handle);
             }

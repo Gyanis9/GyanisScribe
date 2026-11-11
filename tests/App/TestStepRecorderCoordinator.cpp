@@ -10,20 +10,25 @@
 #include "Core/Steps/StepSession.h"
 #include "Gui/Controls/Toast.h"
 #include "Gui/Steps/StepRecorderHud.h"
+#include "Gui/Steps/StepReviewWindow.h"
 #include "Gui/Theme/ThemeManager.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Platform/IStepEventSource.h"
 
 #include <QApplication>
 #include <QByteArray>
+#include <QCoreApplication>
 #include <QCursor>
 #include <QDateTime>
 #include <QDir>
+#include <QEvent>
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QImage>
 #include <QLabel>
+#include <QListWidget>
+#include <QPointer>
 #include <QPushButton>
 #include <QRandomGenerator>
 #include <QScreen>
@@ -54,6 +59,7 @@ using GyanisScribe::Core::kMaximumSteps;
 using GyanisScribe::Core::kStepsConsentAccepted;
 using GyanisScribe::Core::SettingsStore;
 using GyanisScribe::Gui::StepRecorderHud;
+using GyanisScribe::Gui::StepReviewWindow;
 using GyanisScribe::Gui::ThemeManager;
 using GyanisScribe::Gui::ToastKind;
 using GyanisScribe::Platform::ForegroundWindow;
@@ -375,6 +381,12 @@ namespace
         }
         return QGuiApplication::primaryScreen();
     }
+
+    /// 处理掉 deleteLater 排下的销毁：QPointer 要等这一刻才变空
+    void flushDeferredDeletes()
+    {
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    }
 } // namespace
 
 /// 开始录制装钩子并显示控制条，再按一次全部收掉
@@ -585,6 +597,12 @@ TEST_F(StepRecorderCoordinatorFixture, RestartAfterStopStartsFreshSession)
 
     coordinator->toggleRecording();
     ASSERT_FALSE(coordinator->isRecording());
+    // 停止后审核窗接管会话；先放弃，才有资格再开一次
+    auto *review = coordinator->reviewWindowForTesting();
+    ASSERT_NE(review, nullptr);
+    review->discardWithoutConfirmationForTesting();
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    ASSERT_EQ(coordinator->reviewWindowForTesting(), nullptr);
 
     QSignalSpy stateSpy{coordinator.get(), &StepRecorderCoordinator::stateChanged};
     coordinator->toggleRecording();
@@ -883,4 +901,190 @@ TEST_F(StepRecorderCoordinatorFixture, SourceFailureCleansSessionAndHud)
     ASSERT_GE(messageSpy.count(), 1);
     EXPECT_TRUE(messageSpy.last().at(0).toString().contains(QStringLiteral("全局钩子被系统摘除")));
     EXPECT_EQ(stoppedSpy.count(), 0) << "故障不等同正常停止：会话已清，不能进审核";
+}
+
+/// 一步都没记到时收掉空会话并给提示，不开审核窗
+TEST_F(StepRecorderCoordinatorFixture, StopWithoutStepsCleansAndDoesNotOpenReview)
+{
+    auto       coordinator = makeCoordinator();
+    QSignalSpy messageSpy{coordinator.get(), &StepRecorderCoordinator::messageForUser};
+    coordinator->toggleRecording();
+    const auto sessionDirectory = coordinator->sessionForTesting()->tempDirectory();
+    ASSERT_FALSE(sessionDirectory.empty());
+    ASSERT_TRUE(std::filesystem::exists(sessionDirectory));
+
+    coordinator->toggleRecording();
+
+    EXPECT_FALSE(coordinator->isRecording());
+    EXPECT_FALSE(coordinator->isReviewOpen());
+    EXPECT_EQ(coordinator->reviewWindowForTesting(), nullptr);
+    EXPECT_TRUE(coordinator->sessionForTesting()->tempDirectory().empty());
+    EXPECT_FALSE(std::filesystem::exists(sessionDirectory));
+    ASSERT_EQ(messageSpy.count(), 1);
+    EXPECT_TRUE(messageSpy.last().at(0).toString().contains(QStringLiteral("这次没有记录到步骤")));
+    EXPECT_EQ(messageSpy.last().at(1).value<ToastKind>(), ToastKind::Information);
+}
+
+/// 停止且有步骤时打开审核窗，列表带本次会话的那一步，临时截图先留着
+TEST_F(StepRecorderCoordinatorFixture, StopOpensReviewWindowWithSteps)
+{
+    auto coordinator = makeCoordinator();
+    coordinator->toggleRecording();
+    m_source->emitClick(kClickPoint);
+    coordinator->flushPendingForTesting();
+    ASSERT_EQ(coordinator->stepCount(), 1);
+
+    coordinator->toggleRecording();
+
+    auto *review = coordinator->reviewWindowForTesting();
+    ASSERT_NE(review, nullptr);
+    EXPECT_TRUE(coordinator->isReviewOpen());
+    EXPECT_TRUE(review->isVisible());
+    EXPECT_EQ(review->parentWidget(), nullptr) << "审核窗是独立顶层窗口";
+    auto *list = review->findChild<QListWidget *>(QStringLiteral("stepList"));
+    ASSERT_NE(list, nullptr);
+    EXPECT_EQ(list->count(), 1);
+    EXPECT_FALSE(coordinator->sessionForTesting()->tempDirectory().empty()) << "审核期间临时截图要留着";
+}
+
+/// 审核窗补一步走协调器给的抓屏回调：抓光标所在整屏、追加一条手动步骤
+TEST_F(StepRecorderCoordinatorFixture, ManualStepFromReviewUsesTheCaptureLambda)
+{
+    auto coordinator = makeCoordinator();
+    coordinator->toggleRecording();
+    m_source->emitClick(kClickPoint);
+    coordinator->flushPendingForTesting();
+    coordinator->toggleRecording();
+    auto *review = coordinator->reviewWindowForTesting();
+    ASSERT_NE(review, nullptr);
+    const int callsBefore = m_capture->calls;
+    ASSERT_EQ(coordinator->stepCount(), 1);
+
+    review->addManualStepForTesting();
+
+    ASSERT_EQ(coordinator->stepCount(), 2);
+    const auto &steps = coordinator->sessionForTesting()->steps();
+    EXPECT_EQ(steps.back().kind, GyanisScribe::Core::StepKind::Manual);
+    EXPECT_EQ(steps.back().description, GyanisScribe::Core::manualStepDescription());
+    EXPECT_TRUE(QFileInfo::exists(steps.back().imagePath));
+    EXPECT_EQ(m_capture->calls, callsBefore + 1);
+    EXPECT_TRUE(m_capture->lastScreenName.isEmpty()) << "补步抓的是光标所在整屏";
+    EXPECT_TRUE(review->isVisible()) << "抓完审核窗要摆回来";
+    auto *list = review->findChild<QListWidget *>(QStringLiteral("stepList"));
+    ASSERT_NE(list, nullptr);
+    EXPECT_EQ(list->count(), 2);
+}
+
+/// 放弃后清掉临时截图、协调器放掉引用，审核窗自己销毁
+TEST_F(StepRecorderCoordinatorFixture, DiscardCleansTempAndClosesReview)
+{
+    auto coordinator = makeCoordinator();
+    coordinator->toggleRecording();
+    m_source->emitClick(kClickPoint);
+    coordinator->flushPendingForTesting();
+    coordinator->toggleRecording();
+    auto *review = coordinator->reviewWindowForTesting();
+    ASSERT_NE(review, nullptr);
+    QPointer<StepReviewWindow> guard{review};
+    QSignalSpy                 discardSpy{review, &StepReviewWindow::discardConfirmed};
+    const auto                 sessionDirectory = coordinator->sessionForTesting()->tempDirectory();
+    ASSERT_TRUE(std::filesystem::exists(sessionDirectory));
+
+    review->discardWithoutConfirmationForTesting();
+
+    EXPECT_EQ(discardSpy.count(), 1);
+    EXPECT_EQ(coordinator->reviewWindowForTesting(), nullptr);
+    EXPECT_FALSE(coordinator->isReviewOpen());
+    EXPECT_EQ(coordinator->stepCount(), 0);
+    EXPECT_TRUE(coordinator->sessionForTesting()->tempDirectory().empty());
+    EXPECT_FALSE(std::filesystem::exists(sessionDirectory));
+    flushDeferredDeletes();
+    EXPECT_TRUE(guard.isNull()) << "放弃后审核窗要自己销毁";
+}
+
+/// 用户关窗且有步骤时先确认；确认后清理并关闭
+TEST_F(StepRecorderCoordinatorFixture, ClosingReviewWithStepsAsksAndCleans)
+{
+    auto coordinator = makeCoordinator();
+    coordinator->toggleRecording();
+    m_source->emitClick(kClickPoint);
+    coordinator->flushPendingForTesting();
+    coordinator->toggleRecording();
+    auto *review = coordinator->reviewWindowForTesting();
+    ASSERT_NE(review, nullptr);
+    QPointer<StepReviewWindow> guard{review};
+    const auto                 sessionDirectory = coordinator->sessionForTesting()->tempDirectory();
+
+    int askedSteps = 0;
+    review->setDiscardConfirmation(
+            [&askedSteps](const int steps)
+            {
+                askedSteps = steps;
+                return true;
+            });
+
+    EXPECT_TRUE(review->close());
+    EXPECT_EQ(askedSteps, 1);
+    EXPECT_EQ(coordinator->reviewWindowForTesting(), nullptr);
+    EXPECT_FALSE(std::filesystem::exists(sessionDirectory));
+    flushDeferredDeletes();
+    EXPECT_TRUE(guard.isNull());
+}
+
+/// 审核窗导出 HTML 与 PDF 都写出非空文件
+TEST_F(StepRecorderCoordinatorFixture, ReviewExportWritesHtmlAndPdf)
+{
+    auto coordinator = makeCoordinator();
+    coordinator->toggleRecording();
+    m_source->emitClick(kClickPoint);
+    coordinator->flushPendingForTesting();
+    coordinator->toggleRecording();
+    auto *review = coordinator->reviewWindowForTesting();
+    ASSERT_NE(review, nullptr);
+
+    const auto root         = std::filesystem::path{m_tempRoot->path().toStdWString()};
+    const auto htmlPath     = root / L"tutorial.html";
+    const auto pdfPath      = root / L"tutorial.pdf";
+    const auto exportedHtml = review->exportHtml(htmlPath);
+    ASSERT_TRUE(exportedHtml.has_value()) << exportedHtml.error().message;
+    ASSERT_TRUE(std::filesystem::exists(htmlPath));
+    EXPECT_GT(std::filesystem::file_size(htmlPath), 0U);
+
+    const auto exportedPdf = review->exportPdf(pdfPath);
+    ASSERT_TRUE(exportedPdf.has_value()) << exportedPdf.error().message;
+    ASSERT_TRUE(std::filesystem::exists(pdfPath));
+    EXPECT_GT(std::filesystem::file_size(pdfPath), 0U);
+    EXPECT_FALSE(review->statusText().isEmpty());
+}
+
+/// 审核窗开着时再开始：抬回审核窗并提示，不建第二个会话
+TEST_F(StepRecorderCoordinatorFixture, StartWhileReviewOpenRaisesItAndKeepsSession)
+{
+    auto       coordinator = makeCoordinator();
+    QSignalSpy messageSpy{coordinator.get(), &StepRecorderCoordinator::messageForUser};
+    coordinator->toggleRecording();
+    m_source->emitClick(kClickPoint);
+    coordinator->flushPendingForTesting();
+    ASSERT_EQ(coordinator->stepCount(), 1);
+    FakeStepEventSource *firstSource = m_source;
+
+    coordinator->toggleRecording();
+    auto *review = coordinator->reviewWindowForTesting();
+    ASSERT_NE(review, nullptr);
+    const auto sessionDirectory = coordinator->sessionForTesting()->tempDirectory();
+    review->hide();
+    ASSERT_FALSE(review->isVisible());
+    messageSpy.clear();
+
+    coordinator->toggleRecording();
+
+    EXPECT_FALSE(coordinator->isRecording());
+    EXPECT_EQ(coordinator->reviewWindowForTesting(), review) << "不该建第二扇审核窗";
+    EXPECT_TRUE(review->isVisible()) << "再开始要把审核窗抬回屏幕";
+    EXPECT_EQ(coordinator->stepCount(), 1);
+    EXPECT_EQ(m_source, firstSource) << "不该建新事件源";
+    EXPECT_TRUE(std::filesystem::exists(sessionDirectory));
+    ASSERT_EQ(messageSpy.count(), 1);
+    EXPECT_TRUE(messageSpy.last().at(0).toString().contains(QStringLiteral("先导出或放弃这次记录")));
+    EXPECT_EQ(messageSpy.last().at(1).value<ToastKind>(), ToastKind::Information);
 }

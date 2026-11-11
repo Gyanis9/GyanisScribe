@@ -1,6 +1,6 @@
 /**
  * @file StepRecorderCoordinator.h
- * @brief 步骤记录协调器：事件源起停、防抖抓屏、窗口信息、暂停、上限与首次说明
+ * @brief 步骤记录协调器：事件源起停、防抖抓屏、窗口信息、暂停、上限、首次说明与停止后的审核
  * @author Gyanis
  * @date 2026-11-11
  * @version 0.0.1
@@ -15,6 +15,7 @@
 #include "Platform/IStepEventSource.h"
 
 #include <QObject>
+#include <QPointer>
 #include <QString>
 #include <QTimer>
 
@@ -36,6 +37,7 @@ namespace GyanisScribe::Core
 namespace GyanisScribe::Gui
 {
     class StepRecorderHud;
+    class StepReviewWindow;
     class ThemeManager;
 } // namespace GyanisScribe::Gui
 
@@ -72,8 +74,9 @@ namespace GyanisScribe::App
      * @brief 一次操作步骤记录的编排者
      * @details 平台事件源只在录制会话内存在：开始时装钩子，暂停与停止时真卸钩；事件先攒进待处理槽，
      *          延迟之后才抓屏，让点击后的菜单与页面切换落定。界面元素在事件到达时立刻问，
-     *          抓屏之后再问会读到已经变样的界面。
-     * @note 全部状态只在 GUI 线程访问；停止后会话与临时截图留给审核，等下一次开始或析构回收。
+     *          抓屏之后再问会读到已经变样的界面。停止且记过步骤时接着打开审核窗，补步、放弃与导出
+     *          都在那一扇窗里完成；同一时刻只保留一个步骤会话。
+     * @note 全部状态只在 GUI 线程访问；停止后会话与临时截图留给审核，等放弃、关闭审核窗或析构回收。
      */
     class StepRecorderCoordinator : public QObject
     {
@@ -89,14 +92,16 @@ namespace GyanisScribe::App
         explicit StepRecorderCoordinator(StepRecorderDependencies dependencies, QObject *parent = nullptr);
 
         /**
-         * @brief 析构：摘钩子、收起控制条并删掉本次会话的临时目录
+         * @brief 析构：摘钩子、收起控制条、关掉审核窗并删掉本次会话的临时目录
+         * @details 审核窗直接删掉而不走关闭确认：程序都要退出了，不该再让用户为一个已经留不住的会话作答。
          */
         ~StepRecorderCoordinator() override;
 
         /**
          * @brief 开始或停止录制
          * @details 没在录时先过能力与首次说明，再建新会话、装钩子、显示控制条；在录时等同停止。
-         *          停止后不打开审核窗，步骤留在会话里等后续处理。
+         *          停止且记过步骤时打开审核窗；审核窗还开着时再开始只会把它抬回屏幕并提示先导出或放弃，
+         *          不会建第二个会话。
          */
         void toggleRecording();
 
@@ -124,6 +129,15 @@ namespace GyanisScribe::App
         /// 控制条；尚未开始过录制时为 nullptr
         [[nodiscard]] Gui::StepRecorderHud *hudForTesting() noexcept;
 
+        /**
+         * @brief 审核窗是否还在
+         * @return 审核窗建着就为 true；补一步时窗口短暂隐藏的那一下也算还在
+         */
+        [[nodiscard]] bool isReviewOpen() const noexcept;
+
+        /// 审核窗；没开时为 nullptr
+        [[nodiscard]] Gui::StepReviewWindow *reviewWindowForTesting() const noexcept;
+
     signals:
         /// 要说给用户的一句话（由控制器决定用气泡还是落日志）
         void messageForUser(const QString &message, Gui::ToastKind kind);
@@ -131,7 +145,11 @@ namespace GyanisScribe::App
         /// 录制状态与步数变了：开始、停止、暂停、继续与每追加一步都发一次
         void stateChanged(bool recording, bool paused, int steps);
 
-        /// 一次正常停止，带上本次会话的步数；运行期故障走 messageForUser，不经过这一条
+        /**
+         * @brief 一次正常停止，带上本次会话的步数
+         * @details 内部接到停止后的收场：有步骤就开审核窗，没有就收掉空会话；外部仍可据此更新状态。
+         *          运行期故障走 messageForUser，不经过这一条。
+         */
         void stopped(int steps);
 
     private:
@@ -149,6 +167,27 @@ namespace GyanisScribe::App
 
         /// 丢弃待处理事件、卸钩子、收起控制条并广播停止
         void stopRecording();
+
+        /**
+         * @brief 正常停止后的收场
+         * @param steps 本次会话记下的步数
+         * @details 有步骤就打开审核窗把会话交给用户；一步都没有时收掉空目录并告诉用户，
+         *          免得留着一扇没内容的审核窗。
+         */
+        void handleStopped(int steps);
+
+        /**
+         * @brief 显示审核窗
+         * @details 还没建就按本次会话建一扇；已经开着就抬回屏幕，不建第二扇。
+         */
+        void showReview();
+
+        /**
+         * @brief 补一步时抓一张光标所在屏
+         * @return 抓到的整屏图；抓不到时返回原因
+         * @details 审核窗在调用前后自己隐藏与恢复；这里只负责收起控制条，抓完再摆回来。
+         */
+        [[nodiscard]] Base::Expected<QImage> captureForManualStep();
 
         /// 翻转暂停：暂停真卸钩子，继续重新装
         void togglePause();
@@ -201,6 +240,7 @@ namespace GyanisScribe::App
         std::unique_ptr<Platform::IStepEventSource> m_source;            ///< 事件源，只在录制会话内运行
         Core::StepSession                           m_session;           ///< 本次会话的步骤与临时目录
         std::unique_ptr<Gui::StepRecorderHud>       m_hud;               ///< 控制条，首次开始时建
+        QPointer<Gui::StepReviewWindow>             m_review;            ///< 审核窗，关掉即自毁，不拥有
         QTimer                                      m_pendingTimer;      ///< 延迟抓屏的单次计时器
         std::optional<PendingEvent>                 m_pending;           ///< 尚未提交的事件，新事件直接替换
         bool                                        m_recording = false; ///< 是否正在录制
