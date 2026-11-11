@@ -4799,5 +4799,481 @@
             <source>音频采集进程无法启动。设备可能正被其他程序占用；请关闭占用程序后重试，或在设置中关闭音频采集。</source>
             <translation>The audio capture process could not start. The device may be in use by another program; close it and retry, or disable audio capture in Settings.</translation>
         </message>
+        <message>
+            <source>先导出或放弃这次记录</source>
+            <translation>Export or discard this recording first</translation>
+        </message>
+        <message>
+            <source>当前平台不支持记录操作步骤，无法开始录制</source>
+            <translation>This platform cannot record steps, so recording cannot start</translation>
+        </message>
+        <message>
+            <source>无法创建步骤事件源，请重启程序后重试</source>
+            <translation>The step event source could not be created. Restart the app and try again</translation>
+        </message>
+        <message>
+            <source>这次没有记录到步骤</source>
+            <translation>No steps were recorded this time</translation>
+        </message>
+        <message>
+            <source>步骤截图写不进临时目录，已停止本次记录：%1</source>
+            <translation>Step screenshots cannot be written to the temporary directory, so this recording has stopped: %1</translation>
+        </message>
+        <message>
+            <source>已经记满 %1 步，先导出或放弃这次记录</source>
+            <translation>All %1 steps have been recorded; export or discard this recording first</translation>
+        </message>
+        <message>
+            <source>步骤记录</source>
+            <translation>Step recording</translation>
+        </message>
+        <message>
+            <source>点击</source>
+            <translation>Click</translation>
+        </message>
+        <message>
+            <source>切换窗口</source>
+            <translation>Switch window</translation>
+        </message>
+        <message>
+            <source>窗口：%1</source>
+            <translation>Window: %1</translation>
+        </message>
+        <message>
+            <source>第 %1 步截图</source>
+            <translation>Screenshot for step %1</translation>
+        </message>
+        <message>
+            <source>这一张没截到：%1</source>
+            <translation>This screenshot was not captured: %1</translation>
+        </message>
+        <message>
+            <source>这一张没截到</source>
+            <translation>This screenshot was not captured</translation>
+        </message>
+        <message>
+            <source>GyanisScribe 步骤教程</source>
+            <translation>GyanisScribe step tutorial</translation>
+        </message>
+        <message>
+            <source>生成于 %1 · 共 %2 步</source>
+            <translation>Generated %1 · %2 steps</translation>
+        </message>
+        <message>
+            <source>还没有步骤可以导出</source>
+            <translation>There are no steps to export yet</translation>
+        </message>
+        <message>
+            <source>步骤教程没有生成内容，请重试</source>
+            <translation>The step tutorial produced no content; try again</translation>
+        </message>
+        <message>
+            <source>步骤教程写不出去：{}（{}）。请换一个可写的目录后重试</source>
+            <translation>The step tutorial could not be written: {} ({}). Choose a writable directory and try again</translation>
+        </message>
+        <message>
+            <source>步骤教程未保存：{}（{}）。请检查磁盘空间后重试</source>
+            <translation>The step tutorial was not saved: {} ({}). Check disk space and try again</translation>
+        </message>
+        <message>
+            <source>步骤截图删不掉，留在临时目录里：{}（{}）</source>
+            <translation>A step screenshot could not be deleted and remains in the temporary directory: {} ({})</translation>
+        </message>
+        <message>
+            <source>步骤序号 {} 越界，当前只有 {} 步</source>
+            <translation>Step number {} is out of range; only {} steps exist</translation>
+        </message>
+        <message>
+            <source>步骤临时目录为空。请先准备可写的临时目录再开始记录</source>
+            <translation>The step temporary directory is empty. Prepare a writable temporary directory before recording</translation>
+        </message>
+        <message>
+            <source>无法创建步骤临时目录 {}（{}）。请检查目录权限后重试</source>
+            <translation>The step temporary directory could not be created: {} ({}). Check directory permissions and try again</translation>
+        </message>
+        <message>
+            <source>已经记满 {} 步，先导出或放弃这次记录</source>
+            <translation>All {} steps have been recorded; export or discard this recording first</translation>
+        </message>
+        <message>
+            <source>还没有建立步骤临时目录，截图无处可写。请先开始记录再抓屏</source>
+            <translation>No step temporary directory exists, so the screenshot has nowhere to be written. Start recording before capturing</translation>
+        </message>
+        <message>
+            <source>这一张截图是空的，无法保存。请重试抓屏</source>
+            <translation>This screenshot is empty and cannot be saved. Capture again</translation>
+        </message>
+        <message>
+            <source>截图写入失败：%1。请检查临时目录权限与磁盘空间</source>
+            <translation>The screenshot could not be written: %1. Check the temporary directory permissions and free disk space</translation>
+        </message>
+        <message>
+            <source>控件</source>
+            <translation>Control</translation>
+        </message>
+        <message>
+            <source>点击（%1, %2）</source>
+            <translation>Click (%1, %2)</translation>
+        </message>
+        <message>
+            <source>点击「%1」（%2）</source>
+            <translation>Click "%1" (%2)</translation>
+        </message>
+        <message>
+            <source>右键%1</source>
+            <translation>Right-click %1</translation>
+        </message>
+        <message>
+            <source>切换到「%1」</source>
+            <translation>Switch to "%1"</translation>
+        </message>
+        <message>
+            <source>切换窗口（%1）</source>
+            <translation>Switch window (%1)</translation>
+        </message>
+        <message>
+            <source>手动补充</source>
+            <translation>Added manually</translation>
+        </message>
+        <message>
+            <source>步骤记录说明</source>
+            <translation>About step recording</translation>
+        </message>
+        <message>
+            <source>开始记录</source>
+            <translation>Start recording</translation>
+        </message>
+        <message>
+            <source>开始记录后，智录会记录每次点击的坐标、前台窗口的标题与所属进程，并逐步截取整屏画面。所有内容只保存在本机，不会上传；录制期间可以随时暂停或停止。</source>
+            <translation>Once recording starts, GyanisScribe records the coordinates of every click, the title and process of the foreground window, and a full-screen screenshot for each step. Everything stays on this computer and is never uploaded; you can pause or stop at any time while recording.</translation>
+        </message>
+        <message>
+            <source>导出路径为空，无法写入 PDF。请选择保存位置后重试</source>
+            <translation>The export path is empty, so the PDF cannot be written. Choose a save location and try again</translation>
+        </message>
+        <message>
+            <source>无法覆盖已有文件 {}（{}）。请关闭占用它的程序或换一个文件名后重试</source>
+            <translation>The existing file {} could not be overwritten ({}). Close the program using it or choose another file name and try again</translation>
+        </message>
+        <message>
+            <source>步骤 PDF 未写出：{}。请检查磁盘空间与目录权限后重试</source>
+            <translation>The step PDF was not written: {}. Check disk space and directory permissions and try again</translation>
+        </message>
+        <message>
+            <source>步骤记录控制条</source>
+            <translation>Step recording bar</translation>
+        </message>
+        <message>
+            <source>已记录步数</source>
+            <translation>Steps recorded</translation>
+        </message>
+        <message>
+            <source>暂停或继续步骤记录</source>
+            <translation>Pause or resume step recording</translation>
+        </message>
+        <message>
+            <source>停止步骤记录</source>
+            <translation>Stop step recording</translation>
+        </message>
+        <message>
+            <source>结束录制并生成步骤列表。</source>
+            <translation>Finish recording and generate the step list.</translation>
+        </message>
+        <message>
+            <source>步骤记录 · %1</source>
+            <translation>Step recording · %1</translation>
+        </message>
+        <message>
+            <source>继续记录新的点击与窗口切换。</source>
+            <translation>Resume recording new clicks and window switches.</translation>
+        </message>
+        <message>
+            <source>暂停后不再记录新的点击与窗口切换。</source>
+            <translation>While paused, new clicks and window switches are not recorded.</translation>
+        </message>
+        <message>
+            <source>%1. %2</source>
+            <translation>%1. %2</translation>
+        </message>
+        <message>
+            <source>%1. %2 · %3</source>
+            <translation>%1. %2 · %3</translation>
+        </message>
+        <message>
+            <source>核对每一步的说明；可以补一步、调序或删除，确认后导出教程。</source>
+            <translation>Review the description of each step; you can add a step, reorder or delete steps, then export the tutorial when everything looks right.</translation>
+        </message>
+        <message>
+            <source>步骤列表</source>
+            <translation>Step list</translation>
+        </message>
+        <message>
+            <source>步骤说明</source>
+            <translation>Step description</translation>
+        </message>
+        <message>
+            <source>用一句话说明这一步做了什么</source>
+            <translation>Describe what this step does in one sentence</translation>
+        </message>
+        <message>
+            <source>删除当前步骤；后面的序号会自动跟上。</source>
+            <translation>Delete the current step; later numbers move up automatically.</translation>
+        </message>
+        <message>
+            <source>上移</source>
+            <translation>Move up</translation>
+        </message>
+        <message>
+            <source>下移</source>
+            <translation>Move down</translation>
+        </message>
+        <message>
+            <source>补充一步</source>
+            <translation>Add step</translation>
+        </message>
+        <message>
+            <source>立即抓一张整屏画面，作为新的一步追加到末尾。</source>
+            <translation>Capture a full-screen image now and append it as a new step at the end.</translation>
+        </message>
+        <message>
+            <source>导出 HTML…</source>
+            <translation>Export HTML…</translation>
+        </message>
+        <message>
+            <source>把步骤与截图写成单个 HTML 文件，图片内嵌其中。</source>
+            <translation>Write the steps and screenshots to a single HTML file with the images embedded.</translation>
+        </message>
+        <message>
+            <source>导出 PDF…</source>
+            <translation>Export PDF…</translation>
+        </message>
+        <message>
+            <source>把步骤与截图写成 A4 版式的 PDF。</source>
+            <translation>Write the steps and screenshots to an A4 PDF.</translation>
+        </message>
+        <message>
+            <source>步骤状态</source>
+            <translation>Step status</translation>
+        </message>
+        <message>
+            <source>放弃记录</source>
+            <translation>Discard recording</translation>
+        </message>
+        <message>
+            <source>删除本次记录与全部临时截图。</source>
+            <translation>Delete this recording and all temporary screenshots.</translation>
+        </message>
+        <message>
+            <source>已删除一步</source>
+            <translation>Deleted one step</translation>
+        </message>
+        <message>
+            <source>无法补充步骤：没有可用的抓屏回调</source>
+            <translation>Cannot add a step: no screen capture callback is available</translation>
+        </message>
+        <message>
+            <source>没有抓到画面，无法补充这一步</source>
+            <translation>Nothing was captured, so this step cannot be added</translation>
+        </message>
+        <message>
+            <source>已补充第 %1 步</source>
+            <translation>Added step %1</translation>
+        </message>
+        <message>
+            <source>已导出 HTML：%1</source>
+            <translation>HTML exported: %1</translation>
+        </message>
+        <message>
+            <source>已导出 PDF：%1</source>
+            <translation>PDF exported: %1</translation>
+        </message>
+        <message>
+            <source>导出 HTML 教程</source>
+            <translation>Export HTML tutorial</translation>
+        </message>
+        <message>
+            <source>HTML 文件 (*.html)</source>
+            <translation>HTML files (*.html)</translation>
+        </message>
+        <message>
+            <source>导出 PDF 教程</source>
+            <translation>Export PDF tutorial</translation>
+        </message>
+        <message>
+            <source>PDF 文件 (*.pdf)</source>
+            <translation>PDF files (*.pdf)</translation>
+        </message>
+        <message>
+            <source>放弃步骤记录</source>
+            <translation>Discard step recording</translation>
+        </message>
+        <message>
+            <source>确定放弃这次记录的 %1 步吗？临时截图会被删除，操作无法撤销。</source>
+            <translation>Discard the %1 steps in this recording? The temporary screenshots will be deleted and this cannot be undone.</translation>
+        </message>
+        <message>
+            <source>先停止步骤记录或处理完审核窗</source>
+            <translation>Stop step recording or finish the review window first</translation>
+        </message>
+        <message>
+            <source>先结束当前截图/录屏/回溯</source>
+            <translation>Finish the current screenshot, screen recording or Rewind first</translation>
+        </message>
+        <message>
+            <source>这台平台还不能描述光标下的界面元素</source>
+            <translation>This platform cannot describe the UI element under the cursor yet</translation>
+        </message>
+        <message>
+            <source>这台平台还不能记录操作步骤：请用 Windows 版再试</source>
+            <translation>This platform cannot record steps yet; use the Windows version</translation>
+        </message>
+        <message>
+            <source>按钮</source>
+            <translation>Button</translation>
+        </message>
+        <message>
+            <source>日历</source>
+            <translation>Calendar</translation>
+        </message>
+        <message>
+            <source>复选框</source>
+            <translation>Check box</translation>
+        </message>
+        <message>
+            <source>下拉框</source>
+            <translation>Combo box</translation>
+        </message>
+        <message>
+            <source>编辑框</source>
+            <translation>Edit box</translation>
+        </message>
+        <message>
+            <source>链接</source>
+            <translation>Link</translation>
+        </message>
+        <message>
+            <source>图片</source>
+            <translation>Image</translation>
+        </message>
+        <message>
+            <source>列表项</source>
+            <translation>List item</translation>
+        </message>
+        <message>
+            <source>列表</source>
+            <translation>List</translation>
+        </message>
+        <message>
+            <source>菜单</source>
+            <translation>Menu</translation>
+        </message>
+        <message>
+            <source>菜单栏</source>
+            <translation>Menu bar</translation>
+        </message>
+        <message>
+            <source>菜单项</source>
+            <translation>Menu item</translation>
+        </message>
+        <message>
+            <source>进度条</source>
+            <translation>Progress bar</translation>
+        </message>
+        <message>
+            <source>单选框</source>
+            <translation>Radio button</translation>
+        </message>
+        <message>
+            <source>滚动条</source>
+            <translation>Scroll bar</translation>
+        </message>
+        <message>
+            <source>滑块</source>
+            <translation>Slider</translation>
+        </message>
+        <message>
+            <source>微调框</source>
+            <translation>Spinner</translation>
+        </message>
+        <message>
+            <source>状态栏</source>
+            <translation>Status bar</translation>
+        </message>
+        <message>
+            <source>标签页</source>
+            <translation>Tab</translation>
+        </message>
+        <message>
+            <source>标签项</source>
+            <translation>Tab item</translation>
+        </message>
+        <message>
+            <source>文本</source>
+            <translation>Text</translation>
+        </message>
+        <message>
+            <source>工具栏</source>
+            <translation>Toolbar</translation>
+        </message>
+        <message>
+            <source>树</source>
+            <translation>Tree</translation>
+        </message>
+        <message>
+            <source>树项</source>
+            <translation>Tree item</translation>
+        </message>
+        <message>
+            <source>缩略图</source>
+            <translation>Thumbnail</translation>
+        </message>
+        <message>
+            <source>表格</source>
+            <translation>Table</translation>
+        </message>
+        <message>
+            <source>表格项</source>
+            <translation>Table item</translation>
+        </message>
+        <message>
+            <source>文档</source>
+            <translation>Document</translation>
+        </message>
+        <message>
+            <source>拆分按钮</source>
+            <translation>Split button</translation>
+        </message>
+        <message>
+            <source>面板</source>
+            <translation>Pane</translation>
+        </message>
+        <message>
+            <source>表头</source>
+            <translation>Header</translation>
+        </message>
+        <message>
+            <source>表头项</source>
+            <translation>Header item</translation>
+        </message>
+        <message>
+            <source>标题栏</source>
+            <translation>Title bar</translation>
+        </message>
+        <message>
+            <source>分隔线</source>
+            <translation>Separator</translation>
+        </message>
+        <message>
+            <source>系统的 UI Automation 无法启动，不能描述光标下的界面元素</source>
+            <translation>The system UI Automation could not start, so the UI element under the cursor cannot be described</translation>
+        </message>
+        <message>
+            <source>本进程已经在记录操作步骤：请先停止上一次记录，再开始新的记录</source>
+            <translation>This process is already recording steps; stop the previous recording before starting a new one</translation>
+        </message>
+        <message>
+            <source>系统没让装上全局输入监听：请检查安全软件或换一个桌面会话再试</source>
+            <translation>The system did not allow the global input hook to be installed. Check security software or try another desktop session</translation>
+        </message>
 </context>
 </TS>
