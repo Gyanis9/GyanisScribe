@@ -2740,7 +2740,8 @@ namespace GyanisScribe::Main
                                      std::tuple{GyanisScribe::Core::kHotkeyQuickSave, GyanisScribe::Base::uiText("快速保存"), QStringLiteral("Ctrl+Alt+S")},
                                      std::tuple{GyanisScribe::Core::kHotkeyTogglePins, GyanisScribe::Base::uiText("收起 / 显示全部贴图"), QStringLiteral("Ctrl+Alt+H")},
                                      std::tuple{GyanisScribe::Core::kHotkeyNextPinGroup, GyanisScribe::Base::uiText("切换到下一组贴图"), QStringLiteral("Ctrl+Alt+G")},
-                                     std::tuple{GyanisScribe::Core::kHotkeyRewind, GyanisScribe::Base::uiText("回溯缓冲"), QStringLiteral("Ctrl+Alt+Z")}};
+                                     std::tuple{GyanisScribe::Core::kHotkeyRewind, GyanisScribe::Base::uiText("回溯缓冲"), QStringLiteral("Ctrl+Alt+Z")},
+                                     std::tuple{GyanisScribe::Core::kHotkeySteps, GyanisScribe::Base::uiText("步骤记录"), QStringLiteral("Ctrl+Alt+T")}};
 
         const auto intro =
                 m_capabilities.globalHotkeys

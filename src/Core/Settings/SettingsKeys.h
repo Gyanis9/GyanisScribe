@@ -33,6 +33,9 @@ namespace GyanisScribe::Core
     /// 回溯截图的全局热键
     inline constexpr std::string_view kHotkeyRewind = "Hotkey/Rewind";
 
+    /// 步骤记录的全局热键；Ctrl+Alt+R 已是录屏，默认用 Ctrl+Alt+T
+    inline constexpr std::string_view kHotkeySteps = "Hotkey/Steps";
+
     /**
      * @brief 自定义全局热键那一族（`Hotkey/Custom/<功能标识>`），键名不在这里逐个登记
      * @details 一份词表住在 App/CustomHotkeys.h 的 bindableActions()：可绑的功能、标识与配置键都在那一处算，

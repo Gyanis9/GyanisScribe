@@ -106,6 +106,13 @@ namespace GyanisScribe::App
         /// 设置变更后重读：关掉即停，开启则应用新容量，原本关闭的顺手启动
         void reloadFromSettings();
 
+        /**
+         * @brief 选择器此刻是否摆在屏上
+         * @return 选择器建过且可见时为 true
+         * @details 步骤记录启动前要用它挡人：选择器是盖住桌面的遮罩，叠在录制里会把遮罩自己也记成一步。
+         */
+        [[nodiscard]] bool isPickerVisible() const noexcept;
+
         /// 用例直接驱动一次抓帧，不等真实定时器
         void captureTickForTesting();
 

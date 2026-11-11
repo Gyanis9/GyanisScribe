@@ -292,7 +292,7 @@ namespace
                             {"录屏输出目录", "录制范围", "输出格式", "默认帧率", "录屏倒计时", "最长录制时长", "画面码率", "视频编码器", "光标高亮", "麦克风设备", "系统声音设备"},
                             true},
                 Expectation{MainWindowPage::Ocr, {"识别语言", "语言包目录"}, true},
-                Expectation{MainWindowPage::Hotkey, {"截图", "录屏", "文字识别", "屏幕取色", "快速保存", "回溯缓冲", "允许单键作为全局热键"}, true},
+                Expectation{MainWindowPage::Hotkey, {"截图", "录屏", "文字识别", "屏幕取色", "快速保存", "回溯缓冲", "步骤记录", "允许单键作为全局热键"}, true},
                 Expectation{MainWindowPage::Theme, {"主题"}, true},
                 Expectation{MainWindowPage::About, {"智录图标"}, false},
                 Expectation{MainWindowPage::History, {"历史列表"}, false},
@@ -2558,13 +2558,13 @@ TEST_F(MainWindowFixture, ActionBarLandsEveryVisibleTrayEntrySomewhere)
  * @brief 钉住热键页的登记入口跟着平台能力位走：没有登记口的平台上不许装作改了会生效
  * @details 两格都判：能力位为真时每一行都能编辑（少了这一格，把 setEnabled 摘掉也不会红），
  *          为假时所有行都灰掉但仍在——行消失了用户就看不见自己配过什么。
- *          行数由「固定九个动作 + 可绑词表每一项」算出，自定义那一排也归同一道能力位管：
+ *          行数由「固定十个动作 + 可绑词表每一项」算出，自定义那一排也归同一道能力位管：
  *          填了不生效的组合比不填更坑人，两排必须一起灰。界面按键那一栏不吃这道能力位，
  *          因此按配置键前缀只数全局那一排，混在一起判就看不出哪一批被灰掉了。
  */
 TEST_F(MainWindowFixture, HotkeyEntriesFollowTheGlobalHotkeyCapability)
 {
-    const int expectedRows = 9 + static_cast<int>(GyanisScribe::App::bindableActions().size());
+    const int expectedRows = 10 + static_cast<int>(GyanisScribe::App::bindableActions().size());
 
     const auto globalRows = [this]
     {
@@ -2582,8 +2582,8 @@ TEST_F(MainWindowFixture, HotkeyEntriesFollowTheGlobalHotkeyCapability)
     makeWindow(true);
     m_window->open(MainWindowPage::Hotkey);
     auto rows = globalRows();
-    ASSERT_EQ(rows.size(), expectedRows) << "热键页该有固定九行，再给每个可绑功能一行";
-    EXPECT_TRUE(introInCurrentPage().contains(QStringLiteral("上方 9 项为固定动作"))) << "说明里的固定动作数没跟着行表走：" << introInCurrentPage().toStdString();
+    ASSERT_EQ(rows.size(), expectedRows) << "热键页该有固定十行，再给每个可绑功能一行";
+    EXPECT_TRUE(introInCurrentPage().contains(QStringLiteral("上方 10 项为固定动作"))) << "说明里的固定动作数没跟着行表走：" << introInCurrentPage().toStdString();
     for (auto *edit: rows)
     {
         EXPECT_TRUE(edit->isEnabled()) << "有登记口的平台上这些行要能改";

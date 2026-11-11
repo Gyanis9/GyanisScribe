@@ -253,6 +253,12 @@ namespace GyanisScribe::App
         emit bufferStatusChanged(true, m_state != State::Buffering, m_stateReason);
     }
 
+    bool RewindCoordinator::isPickerVisible() const noexcept
+    {
+        // 选择器在首次打开时才建：没建过与建过但收起来都算没摆出来
+        return m_picker != nullptr && m_picker->isVisible();
+    }
+
     void RewindCoordinator::captureTickForTesting()
     {
         onTick();

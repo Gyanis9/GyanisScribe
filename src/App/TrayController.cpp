@@ -85,6 +85,7 @@ namespace GyanisScribe::App
         entries.append(TrayMenuEntry{TrayAction::BlankCanvas, "Annotation", GyanisScribe::Base::uiText("新建空白画布标注"), {}});
         entries.append(TrayMenuEntry{}); // 分隔线
         entries.append(TrayMenuEntry{TrayAction::ToggleRecord, "Record", GyanisScribe::Base::uiText("开始 / 停止录屏"), GyanisScribe::Core::kHotkeyRecord});
+        entries.append(TrayMenuEntry{TrayAction::ToggleSteps, "Number", GyanisScribe::Base::uiText("步骤记录"), GyanisScribe::Core::kHotkeySteps});
         entries.append(TrayMenuEntry{TrayAction::Recognize, "Ocr", GyanisScribe::Base::uiText("识别文字"), GyanisScribe::Core::kHotkeyOcr});
         entries.append(TrayMenuEntry{TrayAction::RecognizeFile, "OcrImage", GyanisScribe::Base::uiText("识别图片文件…"), {}});
         entries.append(TrayMenuEntry{TrayAction::PickColor, "ColorPicker", GyanisScribe::Base::uiText("屏幕取色"), GyanisScribe::Core::kHotkeyPick});
@@ -119,6 +120,12 @@ namespace GyanisScribe::App
             // 没有穿透能力的平台上这张出口永远只会回一句「没有贴图开着鼠标穿透」：
             // 一条按下去永远不会有用处的菜单项不该占这一格
             if (entry.action == TrayAction::ClearPinsThrough && !capabilities.clickThrough)
+            {
+                continue;
+            }
+            // 没有全局输入监听的平台上，步骤记录连钩子都装不上：
+            // 留着这一行就是让用户点出一条「本平台不支持」的报错
+            if (entry.action == TrayAction::ToggleSteps && !capabilities.stepRecorder)
             {
                 continue;
             }

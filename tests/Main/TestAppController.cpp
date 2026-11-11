@@ -8,11 +8,17 @@
 #include "App/HistoryCoordinator.h"
 #include "App/MemoryCoordinator.h"
 #include "App/PrivacyCoordinator.h"
+#include "App/RecordingCoordinator.h"
 #include "App/RewindCoordinator.h"
+#include "App/StepRecorderCoordinator.h"
 #include "Core/Ocr/OcrTypes.h"
+#include "Core/Steps/StepSession.h"
+#include "Core/Steps/StepTypes.h"
 #include "Gui/Annotation/AnnotationWindow.h"
 #include "Gui/Capture/CaptureOverlay.h"
 #include "Gui/Share/ShareDialog.h"
+#include "Gui/Steps/StepRecorderHud.h"
+#include "Gui/Steps/StepReviewWindow.h"
 #include "App/TrayController.h"
 #include "Gui/Pick/ColorPickerOverlay.h"
 #include "Gui/Pin/PinWindow.h"
@@ -34,6 +40,7 @@
 #include "Core/Pin/PinLayout.h"
 #include "Gui/Pin/PinManager.h"
 #include "Platform/IPlatformIntegration.h"
+#include "Platform/IStepEventSource.h"
 #include "Platform/PlatformCapabilities.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Settings/SettingsStore.h"
@@ -163,6 +170,36 @@ namespace GyanisScribe
         };
 
         /**
+         * @brief 假步骤事件源：只回答起停，不装任何系统钩子
+         * @details 接线用例只判「控制器确实把这个替身装上了又摘掉」，事件投递由协调器自己的用例覆盖。
+         */
+        class CountingStepEventSource final : public Platform::IStepEventSource
+        {
+        public:
+            [[nodiscard]] Base::Expected<void> start() override
+            {
+                ++startCalls;
+                m_running = true;
+                return {};
+            }
+
+            void stop() override
+            {
+                ++stopCalls;
+                m_running = false;
+            }
+
+            [[nodiscard]] bool isRunning() const noexcept override
+            {
+                return m_running;
+            }
+
+            int  startCalls = 0;     ///< 装了几次钩子
+            int  stopCalls  = 0;     ///< 摘了几次钩子
+            bool m_running  = false; ///< 是否在监听
+        };
+
+        /**
          * @brief 假热键后端：记录登记与整轮清场次数，并可按组合拒绝一次登记
          * @details 拒绝按 Qt 的修饰键与键值比对，与设置文本解析出来的组合一一对应；
          *          让某一组被拒即可把重登推到「恢复旧组合」那条路上。
@@ -257,6 +294,9 @@ namespace GyanisScribe
             {
                 Platform::PlatformCapabilities caps;
                 caps.sessionNotifications = sessionNotifications;
+                // 步骤记录协调器先看这一位：本组用例要能真的开始一轮录制
+                caps.stepRecorder = true;
+                caps.uiElements   = true;
                 return caps;
             }
 
@@ -303,6 +343,15 @@ namespace GyanisScribe
                 static_cast<void>(globalLogicalPoint);
                 static_cast<void>(excludeWindowHandles);
                 return std::unexpected(Base::Error{Base::ErrorCode::PlatformUnsupported, "替身不演界面元素这一项"});
+            }
+
+            /// 步骤记录会问「点到了哪个元素」：替身交回空，不让整轮录制因为这一项失败
+            [[nodiscard]] Base::Expected<std::optional<Platform::UiElementInfo>> uiElementAtPoint(const QPoint                &globalLogicalPoint,
+                                                                                                  const std::vector<quintptr> &excludeWindowHandles) const override
+            {
+                static_cast<void>(globalLogicalPoint);
+                static_cast<void>(excludeWindowHandles);
+                return std::optional<Platform::UiElementInfo>{};
             }
 
             mutable int        foregroundQueries    = 0;       ///< 前台窗口被问了几次
@@ -416,6 +465,8 @@ namespace GyanisScribe
                 // 只有授权那条用例自己把它翻回未询问
                 ASSERT_TRUE(settings->setValue(Core::kMemoryEnabled, m_memoryEnabled).has_value());
                 ASSERT_TRUE(settings->setValue(Core::kMemoryConsentAsked, m_memoryConsentAsked).has_value());
+                // 步骤记录也按「已经同意」摆：用例要能直接开始，不被首次说明窗卡住
+                ASSERT_TRUE(settings->setValue(Core::kStepsConsentAccepted, true).has_value());
                 m_settings = settings.get();
 
                 auto source      = std::make_unique<CountingScreenSource>(makeFrame(m_frameScreenName, m_frameRegion, m_frameColor));
@@ -441,7 +492,14 @@ namespace GyanisScribe
                 parts.captureSource      = std::move(source);
                 parts.historyStoragePath = m_root / "history.json";
                 parts.memoryStoragePath  = m_memoryStoragePath.empty() ? m_root / "memory.sqlite" : m_memoryStoragePath;
-                m_controller             = std::make_unique<Main::AppController>(std::move(parts), restorePins);
+                // 步骤事件源一律换成本组替身：真事件源会去装全局钩子，离屏环境里也没有可点的窗口
+                parts.stepEventSourceFactory = [this]
+                {
+                    auto source  = std::make_unique<CountingStepEventSource>();
+                    m_stepSource = source.get();
+                    return source;
+                };
+                m_controller = std::make_unique<Main::AppController>(std::move(parts), restorePins);
             }
 
 
@@ -674,6 +732,7 @@ namespace GyanisScribe
             Core::SettingsStore                 *m_settings    = nullptr;                                   ///< 被控制器接管的配置存储（读回历史策略用）
             CountingScreenSource                *m_source      = nullptr;                                   ///< 被抓帧服务接管的替身
             ForegroundWindowStub                *m_integration = nullptr;                                   ///< 被平台那一侧接管的替身
+            CountingStepEventSource             *m_stepSource  = nullptr;                                   ///< 最近一次交给步骤记录协调器的事件源替身
             std::unique_ptr<Main::AppController> m_controller;                                              ///< 被测对象
             QString                              m_realScreenName;                                          ///< 离屏平台那块真屏的名字
             int                                  m_delaySeconds    = 0;                                     ///< 延时截图那一格
@@ -913,6 +972,218 @@ namespace GyanisScribe
         QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
         QApplication::sendEvent(visibleCaptureOverlay(), &escape);
         EXPECT_FALSE(capture.isCaptureFlowActive()) << "取消之后流程标志没复位";
+    }
+
+    /**
+     * @brief 钉住步骤记录已由控制器亲手装配：热键与托盘两条入口都能起停，控制条跟着出现与收起
+     * @details 事件源从注入口进来，起停次数直接判「协调器真的用上了替身」；控制条的可见性是
+     *          用户能看到的那个结果，比只看协调器内部标志更接近这一层的职责。
+     */
+    TEST_F(AppControllerFixture, StepsHotkeyAndTrayEntryStartAndStopTheRecorder)
+    {
+        makeController();
+        auto &steps = m_controller->stepRecorderForTesting();
+        EXPECT_FALSE(steps.isRecording()) << "还没按任何入口，步骤记录就已经在录了";
+
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        ASSERT_TRUE(steps.isRecording()) << "步骤记录热键没把协调器启动起来";
+        ASSERT_NE(m_stepSource, nullptr) << "事件源工厂没交回替身：真事件源会去装系统钩子";
+        EXPECT_EQ(m_stepSource->startCalls, 1);
+        ASSERT_NE(steps.hudForTesting(), nullptr) << "开始记录之后控制条没建出来";
+        EXPECT_TRUE(steps.hudForTesting()->isVisible()) << "开始记录之后控制条没摆在屏上";
+
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        EXPECT_FALSE(steps.isRecording()) << "再按一次步骤记录热键没有停下来";
+        EXPECT_EQ(m_stepSource->stopCalls, 1) << "停止时没有摘掉事件源";
+        EXPECT_FALSE(steps.hudForTesting()->isVisible()) << "停止之后控制条还留在屏上";
+
+        // 托盘那一行走同一条出口：两处入口接的是同一个协调器
+        m_controller->trayControllerForTesting().actionRequested(App::TrayAction::ToggleSteps);
+        ASSERT_TRUE(steps.isRecording()) << "托盘「步骤记录」没有把协调器启动起来";
+        m_controller->trayControllerForTesting().actionRequested(App::TrayAction::ToggleSteps);
+        EXPECT_FALSE(steps.isRecording()) << "托盘再点一次没有停下来";
+    }
+
+    /**
+     * @brief 钉住步骤记录在跑时截图一族被挡回，并且说清先停哪一边
+     * @details 录制期间再开框选或标注，步骤事件会把截图遮罩自己也记进去；截屏钩子之后再抓屏
+     *          还会把控制条拍进画面。这一格判热键入口被挡住、停止后同一条入口恢复可用；
+     *          托盘那一项另有一格。
+     */
+    TEST_F(AppControllerFixture, StepRecordingBlocksCaptureEntriesUntilStopped)
+    {
+        makeController();
+        auto &steps = m_controller->stepRecorderForTesting();
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        ASSERT_TRUE(steps.isRecording());
+
+        const auto before = visibleToastBubbles();
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Capture);
+        EXPECT_EQ(visibleCaptureOverlay(), nullptr) << "步骤记录在跑时截图遮罩还是铺出来了";
+        EXPECT_FALSE(m_controller->capture().isCaptureFlowActive());
+        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("先停止步骤记录或处理完审核窗")); })) << "步骤记录在跑时按截图，没被挡回也没说清出路";
+
+        // 停止后同一个入口恢复可用：上面的门禁不是永久为真
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        ASSERT_FALSE(steps.isRecording());
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Capture);
+        ASSERT_NE(visibleCaptureOverlay(), nullptr) << "步骤记录停掉之后截图仍然打不开：门禁没复位";
+        EXPECT_TRUE(m_controller->capture().isCaptureFlowActive());
+
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(visibleCaptureOverlay(), &escape);
+        EXPECT_FALSE(m_controller->capture().isCaptureFlowActive());
+    }
+
+    /**
+     * @brief 钉住托盘「录屏」这一项在步骤记录期间也被挡回
+     * @details 热键与托盘是两条入口，只接住其中一条时用户换一下点法就会两头同时开录。
+     *          这一格走托盘信号的真实出口，提示与热键那一条同文。
+     */
+    TEST_F(AppControllerFixture, StepRecordingBlocksTheTrayRecordEntry)
+    {
+        makeController();
+        auto &steps = m_controller->stepRecorderForTesting();
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        ASSERT_TRUE(steps.isRecording());
+
+        const auto before = visibleToastBubbles();
+        m_controller->trayControllerForTesting().actionRequested(App::TrayAction::ToggleRecord);
+        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("先停止步骤记录或处理完审核窗")); })) << "步骤记录在跑时托盘「录屏」没被挡回";
+    }
+
+    /**
+     * @brief 钉住截图流程占着屏时，步骤记录不开始
+     * @details 框选在跑有流程标志；只看标注窗可见性会漏掉这一档，控制条会压在框选遮罩上。
+     *          取消之后同一条入口恢复可用。
+     */
+    TEST_F(AppControllerFixture, StepRecordingIsBlockedByACaptureFlow)
+    {
+        m_frameScreenName = m_realScreenName;
+        makeController();
+        auto &steps   = m_controller->stepRecorderForTesting();
+        auto &capture = m_controller->capture();
+
+        capture.startInteractive(App::CaptureIntent::Annotate);
+        ASSERT_NE(visibleCaptureOverlay(), nullptr) << "框选没铺出来，门禁无从判起";
+        const auto beforeFlow = visibleToastBubbles();
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        EXPECT_FALSE(steps.isRecording()) << "框选还在跑就开始记录步骤";
+        EXPECT_TRUE(waitUntil([&] { return newToastText(beforeFlow).contains(QStringLiteral("先结束当前截图/录屏/回溯")); })) << "框选挡回步骤记录时没说清先结束什么";
+
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(visibleCaptureOverlay(), &escape);
+        ASSERT_FALSE(capture.isCaptureFlowActive());
+
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        EXPECT_TRUE(steps.isRecording()) << "框选取消之后步骤记录仍打不开：门禁没复位";
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        EXPECT_FALSE(steps.isRecording());
+    }
+
+    /**
+     * @brief 钉住整屏截图留下的标注窗也挡住步骤记录
+     * @details 整屏这一路不开 captureFlowActive：只看流程标志的门禁会让控制条压到用户正在编辑的画布上。
+     */
+    TEST_F(AppControllerFixture, StepRecordingIsBlockedByAVisibleAnnotationWindow)
+    {
+        m_frameScreenName = m_realScreenName;
+        makeController();
+        auto &steps   = m_controller->stepRecorderForTesting();
+        auto &capture = m_controller->capture();
+
+        capture.startFullScreen(App::CaptureIntent::Annotate);
+        auto &window = capture.annotationWindow();
+        ASSERT_TRUE(window.isVisible()) << "整屏截图该把标注窗开起来";
+        ASSERT_FALSE(capture.isCaptureFlowActive()) << "本用例钉的正是流程标志之外的那一半";
+        const auto beforeWindow = visibleToastBubbles();
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        EXPECT_FALSE(steps.isRecording()) << "标注窗还开着就开始记录步骤";
+        EXPECT_TRUE(waitUntil([&] { return newToastText(beforeWindow).contains(QStringLiteral("先结束当前截图/录屏/回溯")); }));
+
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(&window, &escape);
+        ASSERT_FALSE(window.isVisible());
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        EXPECT_TRUE(steps.isRecording()) << "标注窗关掉之后步骤记录仍打不开：门禁没复位";
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        EXPECT_FALSE(steps.isRecording());
+    }
+
+    /**
+     * @brief 钉住录屏在跑时步骤记录不开始
+     * @details 离屏平台起不了真录屏，这里用控制器亲手接线的那个协调器发出状态变化：
+     *          判的正是「recordingStatusChanged 真的写进了互斥门禁」，而不是 HUD 可不可见。
+     *          秒数为负表示这一轮收场，同一条入口随后必须恢复可用。
+     */
+    TEST_F(AppControllerFixture, StepRecordingIsBlockedWhileScreenRecordingRuns)
+    {
+        makeController();
+        auto &steps     = m_controller->stepRecorderForTesting();
+        auto &recording = m_controller->recordingCoordinatorForTesting();
+
+        recording.recordingStatusChanged(5, false);
+        const auto before = visibleToastBubbles();
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        EXPECT_FALSE(steps.isRecording()) << "录屏在跑时步骤记录还是开始了";
+        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("先结束当前截图/录屏/回溯")); })) << "录屏挡回步骤记录时没说清先结束什么";
+
+        recording.recordingStatusChanged(-1, false);
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        EXPECT_TRUE(steps.isRecording()) << "录屏收场之后步骤记录仍打不开：门禁没跟着状态复位";
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        EXPECT_FALSE(steps.isRecording());
+    }
+
+    /**
+     * @brief 钉住回溯选择器开着时步骤记录不开始
+     * @details 选择器是一层盖住桌面的遮罩，记步骤时把它也拍进去就成了「记录里有一张选择器截图」。
+     *          这一格同时把 isPickerVisible 的两档都判住：默认没有选择器，打开之后为真。
+     */
+    TEST_F(AppControllerFixture, StepRecordingIsBlockedWhileTheRewindPickerIsOpen)
+    {
+        m_frameScreenName      = m_realScreenName;
+        m_rewindEnabled        = true;
+        m_sessionNotifications = true;
+        makeController();
+        auto &rewind = m_controller->rewindCoordinatorForTesting();
+        auto &steps  = m_controller->stepRecorderForTesting();
+
+        EXPECT_FALSE(rewind.isPickerVisible()) << "还没打开选择器，可见性谓词就是真的";
+        rewind.captureTickForTesting();
+        ASSERT_TRUE(waitUntil([&rewind] { return rewind.bufferStatsForTesting().sampleCount > 0; }, 5000)) << "回溯缓冲没抓到帧，选择器无从打开";
+        rewind.showPicker();
+        ASSERT_TRUE(waitUntil([&rewind] { return rewind.isPickerVisible(); }, 3000)) << "选择器没打开，门禁无从判起";
+
+        const auto before = visibleToastBubbles();
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        EXPECT_FALSE(steps.isRecording()) << "回溯选择器还开着就开始记录步骤";
+        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("先结束当前截图/录屏/回溯")); })) << "选择器挡回步骤记录时没说清先结束什么";
+    }
+
+    /**
+     * @brief 钉住审核窗还开着时再按步骤记录不会开第二份会话
+     * @details 审核窗里的步骤与临时截图还没了结；开始第二份会让两扇窗共用一份会话。
+     *          协调器把旧窗抬回屏幕并提示先导出或放弃，本用例判那个提示从控制器接出来了。
+     */
+    TEST_F(AppControllerFixture, StartingStepsWhileReviewIsOpenRaisesTheReviewWindow)
+    {
+        makeController();
+        auto &steps = m_controller->stepRecorderForTesting();
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        ASSERT_TRUE(steps.isRecording());
+
+        ASSERT_NE(steps.sessionForTesting(), nullptr);
+        ASSERT_TRUE(steps.sessionForTesting()->append(Core::RecordedStep{}).has_value()) << "判据要一份有步骤的会话，审核窗才会打开";
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps); // 停止并进入审核
+        ASSERT_FALSE(steps.isRecording());
+        ASSERT_TRUE(steps.isReviewOpen()) << "停止后审核窗没打开，这一格的前提不成立";
+
+        const auto before = visibleToastBubbles();
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        EXPECT_FALSE(steps.isRecording()) << "审核窗还开着就开始了第二份会话";
+        EXPECT_TRUE(steps.isReviewOpen());
+        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("先导出或放弃这次记录")); })) << "审核窗挡回新会话时没把出路说给用户";
     }
 
     /**
@@ -1670,7 +1941,7 @@ namespace GyanisScribe
         ASSERT_NE(m_integration->hotkeyBackend, nullptr) << "替身平台没有交出热键后端，这一格无从判起";
         auto &backend = *m_integration->hotkeyBackend;
         ASSERT_EQ(backend.unregisterAllCalls, 1) << "启动登记该只清一次场";
-        ASSERT_EQ(backend.registeredCount(), 10) << "九个固定动作加一条自定义键没有全部登记上";
+        ASSERT_EQ(backend.registeredCount(), 11) << "十个固定动作加一条自定义键没有全部登记上";
 
         // 新组合被占用：写入设置即触发整轮重登，热键层恢复旧组合后控制器把它写回配置
         backend.rejectCombination(Qt::ControlModifier | Qt::AltModifier, Qt::Key_8);

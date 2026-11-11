@@ -3,6 +3,7 @@
 #include "App/TrayClick.h"
 
 #include "App/TrayController.h"
+#include "Base/Text.h"
 #include "Platform/PlatformCapabilities.h"
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
@@ -37,6 +38,8 @@ using GyanisScribe::App::trayClickRoleForReason;
 using GyanisScribe::App::trayClickRoleInfo;
 using GyanisScribe::App::trayClickRoles;
 using GyanisScribe::App::trayHotkeyHint;
+using GyanisScribe::App::trayMenuEntries;
+using GyanisScribe::App::visibleTrayMenuEntries;
 using GyanisScribe::Core::SettingsStore;
 using GyanisScribe::Platform::PlatformCapabilities;
 
@@ -57,6 +60,7 @@ namespace
         capabilities.windowEnumeration = true;
         capabilities.uiElements        = true;
         capabilities.autostart         = true;
+        capabilities.stepRecorder      = true;
         return capabilities;
     }
 
@@ -101,7 +105,7 @@ TEST(TrayClickTable, MenuHotkeyHintsUseEachActionsOwnDefault)
 {
     const auto store = makeStore("menu-hotkey-hints");
     // 期望值照 README 的热键表另抄一份：与管理器内部那张默认表分开写，才会发现「菜单跟了错的动作」
-    const std::array<std::pair<std::string_view, std::string_view>, 8> defaults{{
+    const std::array<std::pair<std::string_view, std::string_view>, 9> defaults{{
             {GyanisScribe::Core::kHotkeyCapture, "Ctrl+Alt+A"},
             {GyanisScribe::Core::kHotkeyRecord, "Ctrl+Alt+R"},
             {GyanisScribe::Core::kHotkeyOcr, "Ctrl+Alt+O"},
@@ -110,6 +114,7 @@ TEST(TrayClickTable, MenuHotkeyHintsUseEachActionsOwnDefault)
             {GyanisScribe::Core::kHotkeyTogglePins, "Ctrl+Alt+H"},
             {GyanisScribe::Core::kHotkeyNextPinGroup, "Ctrl+Alt+G"},
             {GyanisScribe::Core::kHotkeyQuickSave, "Ctrl+Alt+S"},
+            {GyanisScribe::Core::kHotkeySteps, "Ctrl+Alt+T"},
     }};
     for (const auto &[key, expected]: defaults)
     {
@@ -117,6 +122,33 @@ TEST(TrayClickTable, MenuHotkeyHintsUseEachActionsOwnDefault)
     }
     ASSERT_TRUE(static_cast<bool>(store->setValue(GyanisScribe::Core::kHotkeyPick, QStringLiteral("Ctrl+Shift+P"))));
     EXPECT_EQ(trayHotkeyHint(*store, GyanisScribe::Core::kHotkeyPick), QStringLiteral("Ctrl+Shift+P")) << "存过的组合没有压过默认";
+}
+
+/**
+ * @brief 钉住「步骤记录」这一行：能力在位时出现在菜单里、提示取 Hotkey/Steps，缺能力时整行消失
+ * @details 没有全局输入监听的平台上，这一项点了只会回一句做不了；让它留在菜单里就是给用户
+ *          一条永远不会成功的入口。提示文本另核一次：挂错配置键时菜单会永远显示默认组合。
+ */
+TEST(TrayClickTable, StepRecorderEntryFollowsCapabilityAndCarriesItsHotkey)
+{
+    const auto store = makeStore("steps-entry");
+
+    const auto findSteps = [](const auto &entries) { return std::ranges::find_if(entries, [](const auto &entry) { return entry.action == TrayAction::ToggleSteps; }); };
+
+    const auto visible = visibleTrayMenuEntries(everyCapability());
+    const auto found   = findSteps(visible);
+    ASSERT_NE(found, visible.end()) << "平台能记录步骤，托盘菜单里却没有这一项";
+    EXPECT_EQ(found->label, GyanisScribe::Base::uiText("步骤记录"));
+    EXPECT_EQ(found->hotkeyKey, GyanisScribe::Core::kHotkeySteps) << "这一行没挂到 Hotkey/Steps 上";
+    EXPECT_EQ(found->iconName, "Number") << "图标名要在资源里真的存在";
+    EXPECT_EQ(trayHotkeyHint(*store, found->hotkeyKey), QStringLiteral("Ctrl+Alt+T")) << "步骤记录的默认组合没跟着这一行走";
+
+    auto withoutSteps         = everyCapability();
+    withoutSteps.stepRecorder = false;
+    const auto hidden         = visibleTrayMenuEntries(withoutSteps);
+    EXPECT_EQ(findSteps(hidden), hidden.end()) << "平台给不出输入监听，这一项留在菜单里只会点了报错";
+    const auto allEntries = trayMenuEntries();
+    EXPECT_NE(findSteps(allEntries), allEntries.end()) << "静态菜单表该保留这一项，能力过滤才是唯一出口";
 }
 
 /**

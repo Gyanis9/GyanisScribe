@@ -52,13 +52,14 @@ TEST(CustomHotkeyTable, EveryBindableActionRoundTripsAndCarriesOneLabel)
 
 /**
  * @brief 钉住不该再绑的那些没进可绑表
- * @details 固定那八个各有自己的行与键，再列一遍会出现「同一件事两处都能改」；
+ * @details 固定那九个各有自己的行与键，再列一遍会出现「同一件事两处都能改」；
  *          退出程序与打开设置/关于不给了绑：一条全局热键悄悄把程序带走，比没绑更糟。
  */
 TEST(CustomHotkeyTable, FixedAndDangerousActionsStayUnbindable)
 {
     const std::array forbidden{TrayAction::CaptureRegion,     TrayAction::ToggleRecord, TrayAction::Recognize, TrayAction::PickColor,    TrayAction::CaptureLongRegion,
-                               TrayAction::TogglePinsVisible, TrayAction::NextPinGroup, TrayAction::Quit,      TrayAction::OpenSettings, TrayAction::OpenAbout};
+                               TrayAction::TogglePinsVisible, TrayAction::NextPinGroup, TrayAction::Quit,      TrayAction::OpenSettings, TrayAction::OpenAbout,
+                               TrayAction::ToggleSteps};
 
     for (const auto action: forbidden)
     {

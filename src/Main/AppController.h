@@ -11,6 +11,7 @@
 
 #include "Base/Types.h"
 #include "Core/Hotkey/IHotkeyManager.h"
+#include "Platform/IStepEventSource.h"
 
 #include "Main/MainWindow.h"
 #include "App/CaptureIntent.h"
@@ -65,6 +66,7 @@ namespace GyanisScribe::App
     class PinCoordinator;
     class RecordingCoordinator;
     class RewindCoordinator;
+    class StepRecorderCoordinator;
 } // namespace GyanisScribe::App
 
 namespace GyanisScribe::Core
@@ -150,6 +152,9 @@ namespace GyanisScribe::Main
         std::unique_ptr<GyanisScribe::Core::IScreenCaptureSource>     captureSource;      ///< 抓帧来源；空 = 本机抓屏
         std::filesystem::path                                         historyStoragePath; ///< 历史清单落点；空 = 默认位置
         std::filesystem::path                                         memoryStoragePath;  ///< 记忆索引落点；空 = 默认位置；测试必须给临时路径
+
+        /// 步骤事件源工厂；空表示 Platform::createStepEventSource。测试注入替身，免得真去装全局钩子
+        std::function<std::unique_ptr<GyanisScribe::Platform::IStepEventSource>()> stepEventSourceFactory;
     };
 
 
@@ -275,6 +280,22 @@ namespace GyanisScribe::Main
         [[nodiscard]] GyanisScribe::App::RewindCoordinator &rewindCoordinatorForTesting() const noexcept;
 
         /**
+         * @brief 录屏这一族，仅供用例驱动录制状态
+         * @return 本控制器持有的那一份，所有权不在调用方
+         * @note 离屏平台起不了真录屏：用例要判「录屏在跑时步骤记录被挡住」，
+         *       只能拿控制器亲手接线的这一份发出状态变化。
+         */
+        [[nodiscard]] GyanisScribe::App::RecordingCoordinator &recordingCoordinatorForTesting() const noexcept;
+
+        /**
+         * @brief 步骤记录这一族，仅供用例驱动起停与判状态
+         * @return 本控制器持有的那一份，所有权不在调用方
+         * @note 热键与托盘两条入口都汇到同一个协调器；用例要判「按下去真的开始、再按真的停」，
+         *       只有这一条口子拿得到控制器亲手装配的那个对象。
+         */
+        [[nodiscard]] GyanisScribe::App::StepRecorderCoordinator &stepRecorderForTesting() const noexcept;
+
+        /**
          * @brief 隐私扫描这一族的协调器，仅供用例判入口与画布那一层的接线
          * @return 本控制器持有的那一份，所有权不在调用方
          * @note 生产侧只经标注窗的隐私打码入口进来：用例要判「窗口的信号真的叫到了它、
@@ -337,12 +358,13 @@ namespace GyanisScribe::Main
          * @param captureSource 抓帧来源，所有权交进来
          * @param historyStoragePath 历史清单落点，非空
          * @param memoryStoragePath 记忆索引落点，非空
+         * @param stepEventSourceFactory 步骤事件源工厂；空 = 生产实现
          * @param restorePins 启动时要不要把上次会话的贴图摆回桌面，退出时要不要回写布局
          * @param parent QObject 父对象
          */
         AppController(std::unique_ptr<GyanisScribe::Core::SettingsStore> settings, std::unique_ptr<GyanisScribe::Platform::IPlatformIntegration> integration,
                       std::unique_ptr<GyanisScribe::Core::IScreenCaptureSource> captureSource, std::filesystem::path historyStoragePath, std::filesystem::path memoryStoragePath,
-                      bool restorePins, QObject *parent);
+                      std::function<std::unique_ptr<GyanisScribe::Platform::IStepEventSource>()> stepEventSourceFactory, bool restorePins, QObject *parent);
 
         /**
          * @brief 读设置里那一档「截完之后做什么」
@@ -352,6 +374,13 @@ namespace GyanisScribe::Main
 
         /// 托盘菜单的一项被点了
         void handleTrayAction(GyanisScribe::App::TrayAction action);
+
+        /**
+         * @brief 步骤记录正在录或审核窗还开着时，把截图、录屏这一族入口挡回去
+         * @return 挡回了为 true；调用方直接返回，不再往下走
+         * @details 录制期间再开截图会把遮罩、控制条一起记进步骤；审核窗里的会话也还没了结。
+         */
+        [[nodiscard]] bool rejectWhileStepRecorderBusy();
 
         /**
          * @brief 热键层报回的一个动作
@@ -410,8 +439,14 @@ namespace GyanisScribe::Main
         std::unique_ptr<GyanisScribe::App::RewindCoordinator>   m_rewind;         ///< 回溯这一族（缓冲、选择器、暂停与恢复）
         std::unique_ptr<GyanisScribe::App::PinCoordinator>      m_pinCoordinator; ///< 贴图这一族的贴出动作（剪贴板/文件/回贴/组管理）
         std::unique_ptr<GyanisScribe::App::DeliveryCoordinator> m_delivery;       ///< 交付这一族（装饰、落盘、外部命令、批量报告）
+        // 声明在设置、平台、抓帧来源、录屏与回溯之后：析构逆序先收它，事件源与审核窗不会碰到已经拆掉的底物
+        std::unique_ptr<GyanisScribe::App::StepRecorderCoordinator> m_stepRecorder; ///< 步骤记录这一族（事件源、防抖抓屏、控制条与审核）
 
         bool m_restoringHotkeySettings = false; ///< 正在把恢复的旧组合写回配置：期间自定义键的变更通知不再重登
+        bool m_recordingActive         = false; ///< 录屏是否在跑；由 recordingStatusChanged 维护，互斥门禁读它
+        bool m_stepRecording           = false; ///< 步骤记录是否在录；stateChanged 的镜像
+        bool m_stepPaused              = false; ///< 步骤记录是否暂停；控制条收起后仍要能判
+        int  m_stepSteps               = 0;     ///< 步骤记录已记下的步数
     };
 
 } // namespace GyanisScribe::Main

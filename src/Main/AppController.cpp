@@ -16,6 +16,7 @@
 #include "App/OcrCoordinator.h"
 #include "App/PrivacyCoordinator.h"
 #include "App/RecordingCoordinator.h"
+#include "App/StepRecorderCoordinator.h"
 #include "Gui/Capture/CaptureService.h"
 #include "Core/Capture/IScreenCaptureSource.h"
 #include "Plugins/CaptureSources/ScreenCaptureSourceFactory.h"
@@ -113,13 +114,15 @@ namespace GyanisScribe::Main
                       parts.integration ? std::move(parts.integration) : GyanisScribe::Platform::createPlatformIntegration(),
                       parts.captureSource ? std::move(parts.captureSource) : GyanisScribe::Plugins::createScreenCaptureSource(),
                       parts.historyStoragePath.empty() ? GyanisScribe::Core::HistoryStore::defaultStoragePath() : std::move(parts.historyStoragePath),
-                      parts.memoryStoragePath.empty() ? GyanisScribe::Core::MemoryIndex::defaultStoragePath() : std::move(parts.memoryStoragePath), restorePins, parent)
+                      parts.memoryStoragePath.empty() ? GyanisScribe::Core::MemoryIndex::defaultStoragePath() : std::move(parts.memoryStoragePath),
+                      std::move(parts.stepEventSourceFactory), restorePins, parent)
     {
     }
 
     AppController::AppController(std::unique_ptr<GyanisScribe::Core::SettingsStore> settings, std::unique_ptr<GyanisScribe::Platform::IPlatformIntegration> integration,
                                  std::unique_ptr<GyanisScribe::Core::IScreenCaptureSource> captureSource, std::filesystem::path historyStoragePath,
-                                 std::filesystem::path memoryStoragePath, const bool restorePins, QObject *parent) :
+                                 std::filesystem::path memoryStoragePath, std::function<std::unique_ptr<GyanisScribe::Platform::IStepEventSource>()> stepEventSourceFactory,
+                                 const bool restorePins, QObject *parent) :
         QObject(parent), m_settings(std::move(settings)), m_integration(std::move(integration)), m_captureSource(std::move(captureSource))
     {
         // 语言要排在所有界面对象之前：translator 装晚了，已经建好的控件仍然拿源码文案
@@ -366,12 +369,32 @@ namespace GyanisScribe::Main
                          &GyanisScribe::App::RewindCoordinator::handleCaptureFlowFinished);
         m_rewind->start();
 
+        // 步骤记录排在回溯之后：主题、设置、平台与抓屏来源都已建好，事件源由注入口决定真假，
+        // 首次说明留空让协调器按生产那一套弹窗；会话目录落在未保存归档下的 Steps，启动时回收过期的
+        GyanisScribe::App::StepRecorderDependencies stepDependencies{
+                *m_settings, *m_integration, *m_captureSource, *m_theme, std::move(stepEventSourceFactory), {}, GyanisScribe::Base::Paths::unsavedCaptureDirectory() / "Steps"};
+        m_stepRecorder = std::make_unique<GyanisScribe::App::StepRecorderCoordinator>(std::move(stepDependencies));
+        QObject::connect(m_stepRecorder.get(), &GyanisScribe::App::StepRecorderCoordinator::messageForUser, this, &AppController::notifyUser);
+        // 状态镜像供互斥门禁读：控制条可以收起，光看窗口可见性判不出「还在录」
+        QObject::connect(m_stepRecorder.get(), &GyanisScribe::App::StepRecorderCoordinator::stateChanged, this,
+                         [this](const bool recording, const bool paused, const int steps)
+                         {
+                             m_stepRecording = recording;
+                             m_stepPaused    = paused;
+                             m_stepSteps     = steps;
+                         });
+
         // 录屏这一族整族搬进了 RecordingCoordinator：控制器只留三根线——
         // 要说给用户的话、托盘那一行读数、成品归档进历史
         m_recording = std::make_unique<GyanisScribe::App::RecordingCoordinator>(*m_captureSource, *m_integration, *m_settings, *m_icons);
         QObject::connect(m_recording.get(), &GyanisScribe::App::RecordingCoordinator::messageForUser, this, &AppController::notifyUser);
         QObject::connect(m_recording.get(), &GyanisScribe::App::RecordingCoordinator::recordingStatusChanged, this,
-                         [this](const int seconds, const bool paused) { m_tray->setRecordingStatus(seconds, paused); });
+                         [this](const int seconds, const bool paused)
+                         {
+                             // 控制条可以收进托盘，可见性不是「在录」的真值；负数只在这一轮收场时发
+                             m_recordingActive = seconds >= 0;
+                             m_tray->setRecordingStatus(seconds, paused);
+                         });
         QObject::connect(m_recording.get(), &GyanisScribe::App::RecordingCoordinator::finished, this, [this](const QString &outputPath, const QSize &frameSize)
                          { m_history->record(GyanisScribe::Base::Paths::fromDisplayText(outputPath), GyanisScribe::Core::HistoryKind::Recording, frameSize); });
 
@@ -457,25 +480,56 @@ namespace GyanisScribe::Main
 
     AppController::~AppController() = default;
 
+    bool AppController::rejectWhileStepRecorderBusy()
+    {
+        // 状态镜像与协调器的活状态都判：镜像一般先到，协调器这一条兜住信号没来得及回到槽里的那一下
+        if (!m_stepRecording && !m_stepRecorder->isRecording() && !m_stepRecorder->isReviewOpen())
+        {
+            return false;
+        }
+        notifyUser(GyanisScribe::Base::uiText("先停止步骤记录或处理完审核窗"), GyanisScribe::Gui::ToastKind::Information);
+        return true;
+    }
+
     void AppController::handleHotkeyAction(const GyanisScribe::Core::HotkeyAction action)
     {
         switch (action)
         {
             case GyanisScribe::Core::HotkeyAction::Capture:
+                if (rejectWhileStepRecorderBusy())
+                {
+                    return;
+                }
                 m_capture->startInteractive();
                 return;
             case GyanisScribe::Core::HotkeyAction::Record:
+                if (rejectWhileStepRecorderBusy())
+                {
+                    return;
+                }
                 m_recording->toggle();
                 return;
             case GyanisScribe::Core::HotkeyAction::CaptureLong:
                 // 与托盘那一行同一条路：热键不该有一条自己的截图逻辑
+                if (rejectWhileStepRecorderBusy())
+                {
+                    return;
+                }
                 m_capture->startLong();
                 return;
             case GyanisScribe::Core::HotkeyAction::Pick:
+                if (rejectWhileStepRecorderBusy())
+                {
+                    return;
+                }
                 m_picker->start();
                 return;
             case GyanisScribe::Core::HotkeyAction::Ocr:
                 // 识别热键：截完直接进结果窗口，中间不弹标注窗
+                if (rejectWhileStepRecorderBusy())
+                {
+                    return;
+                }
                 m_capture->startInteractive(GyanisScribe::App::CaptureIntent::Recognize);
                 return;
             case GyanisScribe::Core::HotkeyAction::TogglePins:
@@ -489,9 +543,17 @@ namespace GyanisScribe::Main
             case GyanisScribe::Core::HotkeyAction::QuickSave:
                 // 快速保存走的就是「截完之后」那一档的实体：热键只是替用户把这一档定死，
                 // 不另写一条截图→存盘的捷径，两条各写一遍就会两边行为漂移
+                if (rejectWhileStepRecorderBusy())
+                {
+                    return;
+                }
                 m_capture->startInteractive(GyanisScribe::App::CaptureIntent::QuickSave);
                 return;
             case GyanisScribe::Core::HotkeyAction::Rewind:
+                if (rejectWhileStepRecorderBusy())
+                {
+                    return;
+                }
                 // 回溯选择器会再铺一层遮罩：当前截图或标注还没收场就打开，
                 // 遮罩会把用户正在标注的那一窗拍进去，所以先挡住并说清出路。
                 // 整屏、上次选区与空白画布这几路不开流程标志，标注窗已经立起来时同样算没收场；
@@ -502,6 +564,10 @@ namespace GyanisScribe::Main
                     return;
                 }
                 m_rewind->showPicker();
+                return;
+            case GyanisScribe::Core::HotkeyAction::Steps:
+                // 与托盘那一行只有一条实现：起停判定、互斥门禁与提示文案都不在这一层抄第二份
+                handleTrayAction(GyanisScribe::App::TrayAction::ToggleSteps);
                 return;
         }
     }
@@ -594,32 +660,80 @@ namespace GyanisScribe::Main
         switch (action)
         {
             case GyanisScribe::App::TrayAction::CaptureRegion:
+                if (rejectWhileStepRecorderBusy())
+                {
+                    return;
+                }
                 m_capture->startInteractive();
                 return;
             case GyanisScribe::App::TrayAction::CaptureFullScreen:
+                if (rejectWhileStepRecorderBusy())
+                {
+                    return;
+                }
                 m_capture->startFullScreen();
                 return;
             case GyanisScribe::App::TrayAction::CaptureLastRegion:
+                if (rejectWhileStepRecorderBusy())
+                {
+                    return;
+                }
                 m_capture->startLastRegion();
                 return;
             case GyanisScribe::App::TrayAction::CaptureWindow:
+                if (rejectWhileStepRecorderBusy())
+                {
+                    return;
+                }
                 m_capture->captureForegroundWindow();
                 return;
             case GyanisScribe::App::TrayAction::CaptureLongRegion:
                 // 长截图的入口只做「去框那一条区域」，接与收口都在截图服务里
+                if (rejectWhileStepRecorderBusy())
+                {
+                    return;
+                }
                 m_capture->startLong();
                 return;
             case GyanisScribe::App::TrayAction::BlankCanvas:
+                if (rejectWhileStepRecorderBusy())
+                {
+                    return;
+                }
                 m_capture->startBlankCanvas();
                 return;
             case GyanisScribe::App::TrayAction::RepinClosed:
                 m_pinCoordinator->repinLastClosed();
                 return;
             case GyanisScribe::App::TrayAction::ToggleRecord:
+                if (rejectWhileStepRecorderBusy())
+                {
+                    return;
+                }
                 m_recording->toggle();
+                return;
+            case GyanisScribe::App::TrayAction::ToggleSteps:
+                // 先在录或暂停：这一按就是停止，停止不该被任何互斥门禁挡住
+                if (m_stepRecording || m_stepRecorder->isRecording())
+                {
+                    m_stepRecorder->toggleRecording();
+                    return;
+                }
+                // 截图、录屏与回溯都在占用桌面：控制条压上去会把它们记进步骤或把遮罩拍进截图
+                if (m_capture->isCaptureFlowActive() || m_capture->isDelayPending() || m_capture->annotationWindow().isVisible() || m_recordingActive ||
+                    m_rewind->isPickerVisible())
+                {
+                    notifyUser(GyanisScribe::Base::uiText("先结束当前截图/录屏/回溯"), GyanisScribe::Gui::ToastKind::Information);
+                    return;
+                }
+                m_stepRecorder->toggleRecording();
                 return;
             case GyanisScribe::App::TrayAction::Recognize:
                 // 识别入口先框选：没有一张图，后端无事可做
+                if (rejectWhileStepRecorderBusy())
+                {
+                    return;
+                }
                 m_capture->startInteractive(GyanisScribe::App::CaptureIntent::Recognize);
                 return;
             case GyanisScribe::App::TrayAction::RecognizeFile:
@@ -627,6 +741,10 @@ namespace GyanisScribe::Main
                 m_ocr->pickImageFileAndRecognize();
                 return;
             case GyanisScribe::App::TrayAction::PickColor:
+                if (rejectWhileStepRecorderBusy())
+                {
+                    return;
+                }
                 m_picker->start();
                 return;
             case GyanisScribe::App::TrayAction::ClearPinsThrough:
@@ -683,6 +801,16 @@ namespace GyanisScribe::Main
     GyanisScribe::App::RewindCoordinator &AppController::rewindCoordinatorForTesting() const noexcept
     {
         return *m_rewind;
+    }
+
+    GyanisScribe::App::RecordingCoordinator &AppController::recordingCoordinatorForTesting() const noexcept
+    {
+        return *m_recording;
+    }
+
+    GyanisScribe::App::StepRecorderCoordinator &AppController::stepRecorderForTesting() const noexcept
+    {
+        return *m_stepRecorder;
     }
 
     GyanisScribe::App::PrivacyCoordinator &AppController::privacyCoordinatorForTesting() const noexcept
