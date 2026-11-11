@@ -13,6 +13,7 @@ add_subdirectory(Privacy)
 add_subdirectory(Record)
 add_subdirectory(Annotation)
 add_subdirectory(Rewind)
+add_subdirectory(Steps)
 add_subdirectory(Share)
 
 get_property(GuiSources GLOBAL PROPERTY GyanisScribeGuiSources)
