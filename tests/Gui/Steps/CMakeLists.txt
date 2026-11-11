@@ -3,7 +3,9 @@ find_package(Qt6 COMPONENTS Test REQUIRED)
 add_executable(TestGuiSteps
         TestStepsEnvironment.cpp
         TestStepRecorderHud.cpp
-        TestStepConsentDialog.cpp)
+        TestStepConsentDialog.cpp
+        TestStepPdfExporter.cpp
+        TestStepReviewWindow.cpp)
 
 target_link_libraries(TestGuiSteps PRIVATE
         Gui
@@ -12,6 +14,7 @@ target_link_libraries(TestGuiSteps PRIVATE
         GTest::gtest_main
         Qt6::Widgets
         Qt6::Gui
+        Qt6::PrintSupport
         Qt6::Test)
 
 if (MSVC)
