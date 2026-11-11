@@ -2,4 +2,8 @@
 set_property(GLOBAL APPEND PROPERTY GyanisScribeCoreSources
         ${CMAKE_CURRENT_LIST_DIR}/StepTypes.h
         ${CMAKE_CURRENT_LIST_DIR}/StepSession.h
-        ${CMAKE_CURRENT_LIST_DIR}/StepSession.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/StepSession.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/StepImageMarker.h
+        ${CMAKE_CURRENT_LIST_DIR}/StepImageMarker.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/StepHtmlBuilder.h
+        ${CMAKE_CURRENT_LIST_DIR}/StepHtmlBuilder.cpp)

@@ -1,5 +1,7 @@
 add_executable(TestCoreSteps
-        TestStepSession.cpp)
+        TestStepSession.cpp
+        TestStepImageMarker.cpp
+        TestStepHtmlBuilder.cpp)
 
 target_link_libraries(TestCoreSteps PRIVATE
         Core
