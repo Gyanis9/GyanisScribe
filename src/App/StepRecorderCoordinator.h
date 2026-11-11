@@ -190,6 +190,7 @@ namespace GyanisScribe::App
          * @param pending 待处理事件，读它到达时缓存的值
          * @param window 窗口切换时找到的窗口快照，可为空
          * @param step 正在拼装的步骤，就地填两个字段
+         * @details 句柄为 0 的事件只用到达时缓存的值；提交时再问前台，会把这 250 毫秒里新切过去的窗口算到这一步头上。
          */
         void fillWindowIdentity(const PendingEvent &pending, const std::optional<Platform::ScreenWindow> &window, Core::RecordedStep &step) const;
 

@@ -15,12 +15,17 @@
 #include "Platform/IStepEventSource.h"
 
 #include <QApplication>
+#include <QByteArray>
+#include <QCursor>
 #include <QDateTime>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QImage>
 #include <QLabel>
+#include <QPushButton>
+#include <QRandomGenerator>
 #include <QScreen>
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -32,6 +37,7 @@
 #include <format>
 #include <memory>
 #include <optional>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -61,8 +67,21 @@ using GyanisScribe::Platform::UiElementInfo;
 
 namespace
 {
-    /// 用例里点一下用的固定坐标，落在替身抓回的 400x300 图内
-    constexpr QPoint kClickPoint{100, 100};
+    /// 用例里点一下用的固定坐标：落在副屏，换算到替身抓回的 400x300 图内仍是 (100,100)
+    constexpr QPoint kClickPoint{900, 100};
+
+    /// 离屏平台的两块命名屏：用例靠名字分开「事件点所在屏」与「光标所在屏」，副屏另带一个缩放因子
+    constexpr char kScreensConfigJson[] = R"({
+  "synchronousWindowSystemEvents": false,
+  "windowFrameMargins": true,
+  "screens": [
+    {"name": "screen-main", "x": 0, "y": 0, "width": 800, "height": 600, "logicalDpi": 96, "logicalBaseDpi": 96, "dpr": 1.0},
+    {"name": "screen-side", "x": 800, "y": 0, "width": 800, "height": 600, "logicalDpi": 96, "logicalBaseDpi": 96, "dpr": 1.5}
+  ]
+})";
+
+    /// 离屏配置文件名：SetUpTestSuite 写、TearDownTestSuite 删；每个用例进程各用一份，避免并行互踩
+    QString screensConfigFileName;
 
     class FakeStepEventSource final : public IStepEventSource
     {
@@ -161,6 +180,10 @@ namespace
 
         [[nodiscard]] Expected<ForegroundWindow> foregroundWindow() const override
         {
+            if (foregroundFails)
+            {
+                return std::unexpected(Error{ErrorCode::PlatformUnsupported, "测试替身：取不到前台窗口"});
+            }
             return m_foreground;
         }
 
@@ -200,8 +223,9 @@ namespace
         ForegroundWindow              m_foreground{7, QStringLiteral("Demo"), QStringLiteral("demo.exe")};
         std::vector<ScreenWindow>     m_windows;
         UiElementInfo                 m_element{QStringLiteral("保存"), QStringLiteral("按钮"), QStringLiteral("Demo"), QStringLiteral("demo.exe"), QRect(90, 90, 40, 30)};
-        bool                          uiElementFails = false;
-        mutable int                   uiElementCalls = 0;
+        bool                          uiElementFails  = false;
+        mutable bool                  foregroundFails = false;
+        mutable int                   uiElementCalls  = 0;
         mutable QPoint                lastPoint;
         mutable std::vector<quintptr> lastExclude;
     };
@@ -249,8 +273,15 @@ namespace
     protected:
         static void SetUpTestSuite()
         {
-            // 控制条要真的上屏，离屏平台让用例不在桌面上闪
-            qputenv("QT_QPA_PLATFORM", "offscreen");
+            // 控制条要真的上屏，离屏平台让用例不在桌面上闪；配置里摆两块命名屏，
+            // 点击落在副屏、光标留在主屏，才能判出抓的是事件点所在屏而不是光标屏
+            screensConfigFileName = QStringLiteral("step-recorder-screens-%1.json").arg(QString::number(QRandomGenerator::global()->generate64(), 16));
+            QFile screensConfig{screensConfigFileName};
+            ASSERT_TRUE(screensConfig.open(QIODevice::WriteOnly | QIODevice::Truncate)) << "离屏配置写不进当前目录";
+            ASSERT_GT(screensConfig.write(kScreensConfigJson), 0);
+            screensConfig.close();
+            qputenv("QT_QPA_PLATFORM", QByteArrayLiteral("offscreen:configfile=") + screensConfigFileName.toUtf8());
+
             static int   argumentCount  = 1;
             static char  argumentZero[] = "TestAppStepRecorder";
             static char *arguments[]    = {argumentZero, nullptr};
@@ -266,6 +297,7 @@ namespace
         {
             GyanisScribe::Base::Logger::shutdown();
             application.reset();
+            QFile::remove(screensConfigFileName);
         }
 
         void SetUp() override
@@ -382,8 +414,16 @@ TEST_F(StepRecorderCoordinatorFixture, ClickBecomesAStepAfterDelay)
     EXPECT_EQ(GyanisScribe::App::kCaptureDelayMs, 250);
     EXPECT_EQ(GyanisScribe::App::kClickMergeWindowMs, GyanisScribe::Core::kClickMergeWindowMs);
 
-    auto coordinator = makeCoordinator();
+    auto       coordinator = makeCoordinator();
+    QSignalSpy stateSpy{coordinator.get(), &StepRecorderCoordinator::stateChanged};
     coordinator->toggleRecording();
+
+    // 光标留在主屏：点击落在副屏，抓的必须是事件点所在屏而不是光标屏
+    QCursor::setPos(QPoint(50, 50));
+    auto *cursorScreen = QGuiApplication::screenAt(QCursor::pos());
+    ASSERT_NE(cursorScreen, nullptr);
+    EXPECT_EQ(cursorScreen->name(), QStringLiteral("screen-main"));
+
     m_source->emitClick(kClickPoint);
     EXPECT_EQ(coordinator->stepCount(), 0) << "延迟未到就先落了一步";
 
@@ -396,10 +436,17 @@ TEST_F(StepRecorderCoordinatorFixture, ClickBecomesAStepAfterDelay)
     EXPECT_TRUE(steps.front().captureError.isEmpty());
     EXPECT_EQ(m_platform->uiElementCalls, 1);
     EXPECT_EQ(m_platform->lastPoint, kClickPoint);
-    EXPECT_TRUE(m_capture->lastScreenName.isEmpty()) << "点击要抓光标所在屏";
+
+    ASSERT_EQ(stateSpy.count(), 2) << "开始一次、落一步一次";
+    EXPECT_TRUE(stateSpy.at(1).at(0).toBool());
+    EXPECT_FALSE(stateSpy.at(1).at(1).toBool());
+    EXPECT_EQ(stateSpy.at(1).at(2).toInt(), 1);
 
     auto *screen = screenAtOrPrimary(kClickPoint);
     ASSERT_NE(screen, nullptr);
+    EXPECT_EQ(screen->name(), QStringLiteral("screen-side")) << "固定点击点应落在副屏";
+    EXPECT_EQ(m_capture->lastScreenName, screen->name());
+    EXPECT_NE(m_capture->lastScreenName, cursorScreen->name());
     EXPECT_EQ(steps.front().clickPointInImage, kClickPoint - screen->geometry().topLeft());
     EXPECT_DOUBLE_EQ(steps.front().imageDevicePixelRatio, screen->devicePixelRatio());
 
@@ -464,6 +511,41 @@ TEST_F(StepRecorderCoordinatorFixture, PauseUninstallsHooksAndDropsEvents)
     EXPECT_FALSE(stateSpy.last().at(1).toBool());
 }
 
+/// 控制条上的暂停与停止按钮分别接到暂停与停止入口
+TEST_F(StepRecorderCoordinatorFixture, HudButtonsTogglePauseAndStop)
+{
+    auto       coordinator = makeCoordinator();
+    QSignalSpy stateSpy{coordinator.get(), &StepRecorderCoordinator::stateChanged};
+    QSignalSpy stoppedSpy{coordinator.get(), &StepRecorderCoordinator::stopped};
+    coordinator->toggleRecording();
+    auto *hud = coordinator->hudForTesting();
+    ASSERT_NE(hud, nullptr);
+    auto *pauseButton = hud->findChild<QPushButton *>(QStringLiteral("stepsHudPause"));
+    auto *stopButton  = hud->findChild<QPushButton *>(QStringLiteral("stepsHudStop"));
+    ASSERT_NE(pauseButton, nullptr);
+    ASSERT_NE(stopButton, nullptr);
+
+    pauseButton->click();
+    EXPECT_TRUE(coordinator->isPaused());
+    EXPECT_FALSE(m_source->isRunning());
+    EXPECT_EQ(pauseButton->text(), QStringLiteral("继续"));
+    ASSERT_GE(stateSpy.count(), 2);
+    EXPECT_TRUE(stateSpy.at(1).at(1).toBool());
+
+    pauseButton->click();
+    EXPECT_FALSE(coordinator->isPaused());
+    EXPECT_TRUE(m_source->isRunning());
+    EXPECT_EQ(pauseButton->text(), QStringLiteral("暂停"));
+
+    stopButton->click();
+    EXPECT_FALSE(coordinator->isRecording());
+    EXPECT_FALSE(coordinator->isPaused());
+    EXPECT_FALSE(m_source->isRunning());
+    EXPECT_FALSE(hud->isVisible());
+    ASSERT_EQ(stoppedSpy.count(), 1);
+    EXPECT_EQ(stoppedSpy.at(0).at(0).toInt(), 0);
+}
+
 /// 首次说明被拒就不开录；同意后写配置，之后不再问
 TEST_F(StepRecorderCoordinatorFixture, ConsentDeclinedDoesNotStart)
 {
@@ -487,6 +569,36 @@ TEST_F(StepRecorderCoordinatorFixture, ConsentDeclinedDoesNotStart)
     coordinator->toggleRecording();
     EXPECT_TRUE(coordinator->isRecording());
     EXPECT_EQ(m_consentCalls, 2) << "同意过就不该再问";
+}
+
+/// 停止后再开始是全新会话：步数清零、旧临时目录收掉、换一个新事件源
+TEST_F(StepRecorderCoordinatorFixture, RestartAfterStopStartsFreshSession)
+{
+    auto coordinator = makeCoordinator();
+    coordinator->toggleRecording();
+    FakeStepEventSource *firstSource = m_source;
+    m_source->emitClick(kClickPoint);
+    coordinator->flushPendingForTesting();
+    ASSERT_EQ(coordinator->stepCount(), 1);
+    const auto firstDirectory = coordinator->sessionForTesting()->tempDirectory();
+    ASSERT_TRUE(std::filesystem::exists(firstDirectory));
+
+    coordinator->toggleRecording();
+    ASSERT_FALSE(coordinator->isRecording());
+
+    QSignalSpy stateSpy{coordinator.get(), &StepRecorderCoordinator::stateChanged};
+    coordinator->toggleRecording();
+    EXPECT_TRUE(coordinator->isRecording());
+    EXPECT_EQ(coordinator->stepCount(), 0) << "新会话不能带着上一轮的步骤";
+    ASSERT_NE(m_source, nullptr);
+    EXPECT_NE(m_source, firstSource);
+    EXPECT_EQ(m_source->startCalls, 1);
+    EXPECT_TRUE(m_source->isRunning());
+    EXPECT_FALSE(std::filesystem::exists(firstDirectory)) << "重开前先收掉上一轮的临时目录";
+    EXPECT_NE(coordinator->sessionForTesting()->tempDirectory(), firstDirectory);
+    ASSERT_EQ(stateSpy.count(), 1);
+    EXPECT_TRUE(stateSpy.at(0).at(0).toBool());
+    EXPECT_EQ(stateSpy.at(0).at(2).toInt(), 0);
 }
 
 /// 能力表没给步骤记录时不开录，也不弹首次说明
@@ -554,6 +666,39 @@ TEST_F(StepRecorderCoordinatorFixture, CaptureFailureKeepsPlaceholder)
     EXPECT_TRUE(coordinator->isRecording());
 }
 
+/// 临时图写不进盘就停止：已记的步骤保留，失败的那一步带占位原因
+TEST_F(StepRecorderCoordinatorFixture, AttachFailureStopsRecordingAndKeepsSteps)
+{
+    auto       coordinator = makeCoordinator();
+    QSignalSpy messageSpy{coordinator.get(), &StepRecorderCoordinator::messageForUser};
+    QSignalSpy stoppedSpy{coordinator.get(), &StepRecorderCoordinator::stopped};
+    coordinator->toggleRecording();
+    m_source->emitClick(kClickPoint);
+    coordinator->flushPendingForTesting();
+    ASSERT_EQ(coordinator->stepCount(), 1);
+
+    // 删掉会话临时目录：下一张整图没有落点
+    std::error_code ignored;
+    std::filesystem::remove_all(coordinator->sessionForTesting()->tempDirectory(), ignored);
+
+    m_source->emitClick(kClickPoint + QPoint(40, 40));
+    coordinator->flushPendingForTesting();
+
+    EXPECT_FALSE(coordinator->isRecording());
+    EXPECT_FALSE(m_source->isRunning());
+    EXPECT_FALSE(coordinator->hudForTesting()->isVisible());
+    ASSERT_EQ(coordinator->stepCount(), 2) << "写图失败的那一步作为占位留着，之前的一步不动";
+    const auto &steps = coordinator->sessionForTesting()->steps();
+    EXPECT_TRUE(steps.front().description.contains(QStringLiteral("保存")));
+    EXPECT_FALSE(steps.back().captureError.isEmpty());
+    EXPECT_TRUE(steps.back().imagePath.isEmpty());
+    ASSERT_GE(messageSpy.count(), 1);
+    EXPECT_TRUE(messageSpy.last().at(0).toString().contains(QStringLiteral("写不进临时目录")));
+    EXPECT_EQ(messageSpy.last().at(1).value<ToastKind>(), ToastKind::Danger);
+    ASSERT_EQ(stoppedSpy.count(), 1) << "落盘失败也按正常停止收场";
+    EXPECT_EQ(stoppedSpy.at(0).at(0).toInt(), 2);
+}
+
 /// 同一元素短时间内的重复点击并成一步
 TEST_F(StepRecorderCoordinatorFixture, RepeatedClickMergesIntoOneStep)
 {
@@ -612,6 +757,27 @@ TEST_F(StepRecorderCoordinatorFixture, ElementLookupFailureStillRecords)
     EXPECT_EQ(step.windowTitle, QStringLiteral("Demo"));
 }
 
+/// 句柄为 0 的点击不在提交时补前台窗口：延迟里刚切过去的窗口不算这一步
+TEST_F(StepRecorderCoordinatorFixture, HandlelessClickKeepsArrivalWindowInfo)
+{
+    m_platform->uiElementFails  = true;
+    m_platform->foregroundFails = true;
+    auto coordinator            = makeCoordinator();
+    coordinator->toggleRecording();
+
+    m_source->emitClick(kClickPoint);
+    // 到达时前台查不到；延迟窗口内换成另一个窗口，提交时再问就会张冠李戴
+    m_platform->foregroundFails = false;
+    m_platform->m_foreground    = ForegroundWindow{8, QStringLiteral("Other"), QStringLiteral("other.exe")};
+    coordinator->flushPendingForTesting();
+
+    ASSERT_EQ(coordinator->stepCount(), 1);
+    const auto &step = coordinator->sessionForTesting()->steps().front();
+    EXPECT_TRUE(step.windowTitle.isEmpty()) << "句柄为 0 的点击不该用提交时的前台窗口补标题";
+    EXPECT_TRUE(step.processName.isEmpty());
+    EXPECT_FALSE(step.description.contains(QStringLiteral("Other")));
+}
+
 /// 析构摘钩子并删掉会话临时目录
 TEST_F(StepRecorderCoordinatorFixture, DestructorStopsSourceAndCleansTemp)
 {
@@ -636,6 +802,8 @@ TEST_F(StepRecorderCoordinatorFixture, MaximumStepsStopsRecording)
 {
     auto       coordinator = makeCoordinator();
     QSignalSpy messageSpy{coordinator.get(), &StepRecorderCoordinator::messageForUser};
+    QSignalSpy stateSpy{coordinator.get(), &StepRecorderCoordinator::stateChanged};
+    QSignalSpy stoppedSpy{coordinator.get(), &StepRecorderCoordinator::stopped};
     coordinator->toggleRecording();
     // 抓屏一律失败：这里只判步数上限，不把两百张 PNG 写进临时目录
     m_capture->failAlways = true;
@@ -657,6 +825,11 @@ TEST_F(StepRecorderCoordinatorFixture, MaximumStepsStopsRecording)
     EXPECT_FALSE(coordinator->hudForTesting()->isVisible());
     ASSERT_GE(messageSpy.count(), 1);
     EXPECT_TRUE(messageSpy.last().at(0).toString().contains(QStringLiteral("200")));
+
+    ASSERT_EQ(stoppedSpy.count(), 1) << "记满上限也走正常停止";
+    EXPECT_EQ(stoppedSpy.at(0).at(0).toInt(), kMaximumSteps);
+    EXPECT_FALSE(stateSpy.last().at(0).toBool());
+    EXPECT_EQ(stateSpy.last().at(2).toInt(), kMaximumSteps);
 }
 
 /// 继续录音时钩子装不回来就结束本次记录并提示，已记的步骤保留
@@ -664,6 +837,7 @@ TEST_F(StepRecorderCoordinatorFixture, PauseResumeFailureEndsRecording)
 {
     auto       coordinator = makeCoordinator();
     QSignalSpy messageSpy{coordinator.get(), &StepRecorderCoordinator::messageForUser};
+    QSignalSpy stoppedSpy{coordinator.get(), &StepRecorderCoordinator::stopped};
     coordinator->toggleRecording();
     m_source->emitClick(kClickPoint);
     coordinator->flushPendingForTesting();
@@ -680,6 +854,8 @@ TEST_F(StepRecorderCoordinatorFixture, PauseResumeFailureEndsRecording)
     EXPECT_EQ(coordinator->stepCount(), 1);
     ASSERT_GE(messageSpy.count(), 1);
     EXPECT_TRUE(messageSpy.last().at(0).toString().contains(QStringLiteral("钩子安装失败")));
+    ASSERT_EQ(stoppedSpy.count(), 1) << "继续失败也按正常停止收场";
+    EXPECT_EQ(stoppedSpy.at(0).at(0).toInt(), 1);
 }
 
 /// 运行期故障：停止、清掉临时目录、收起控制条并告诉用户
@@ -687,6 +863,7 @@ TEST_F(StepRecorderCoordinatorFixture, SourceFailureCleansSessionAndHud)
 {
     auto       coordinator = makeCoordinator();
     QSignalSpy messageSpy{coordinator.get(), &StepRecorderCoordinator::messageForUser};
+    QSignalSpy stoppedSpy{coordinator.get(), &StepRecorderCoordinator::stopped};
     coordinator->toggleRecording();
     m_source->emitClick(kClickPoint);
     coordinator->flushPendingForTesting();
@@ -705,4 +882,5 @@ TEST_F(StepRecorderCoordinatorFixture, SourceFailureCleansSessionAndHud)
     EXPECT_FALSE(std::filesystem::exists(sessionDirectory));
     ASSERT_GE(messageSpy.count(), 1);
     EXPECT_TRUE(messageSpy.last().at(0).toString().contains(QStringLiteral("全局钩子被系统摘除")));
+    EXPECT_EQ(stoppedSpy.count(), 0) << "故障不等同正常停止：会话已清，不能进审核";
 }

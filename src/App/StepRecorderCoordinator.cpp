@@ -386,10 +386,13 @@ namespace GyanisScribe::App
             return;
         }
 
-        const QString screenName = step.kind == Core::StepKind::Click ? QString{} : (screen != nullptr ? screen->name() : QString{});
+        // 点击也按事件点所在屏抓：250 毫秒里光标可能已经挪到别的屏，
+        // 抓光标屏会让截图与 clickPointInImage、缩放因子对不上
+        const QString screenName = screen != nullptr ? screen->name() : QString{};
         const auto    captured   = captureScreen(screenName);
-        // 抓屏期间事件源可能报错并已清掉会话，这时不能再往一份废会话里追加
-        if (!m_recording)
+        // 抓屏要等这一轮绘制：期间事件源可能报错清掉会话，或用户按了暂停；
+        // 这一张图与这一步都不该再落进会话
+        if (!m_recording || m_paused)
         {
             return;
         }
@@ -410,7 +413,11 @@ namespace GyanisScribe::App
         {
             if (const auto attached = m_session.attachImage(index, captured->image); !attached)
             {
+                // 临时图写不进去就停在这里：再录下去只会攒下一串没有图的步骤；已记的步骤保留
                 Base::Logger::warning(std::format("步骤截图写不进临时目录：{}", attached.error().message));
+                emit messageForUser(Base::uiText("步骤截图写不进临时目录，已停止本次记录：%1").arg(errorText(attached.error())), Gui::ToastKind::Danger);
+                stopRecording();
+                return;
             }
         }
 
@@ -545,10 +552,11 @@ namespace GyanisScribe::App
                 step.processName = window->processName;
             }
         }
-        if (step.windowTitle.isEmpty() || step.processName.isEmpty())
+        // 句柄为 0 的点击没有可核对的窗口：提交时再问前台，只会把 250 毫秒里刚切过去的窗口
+        // 算到这一步头上；到达时缓存的标题与进程才是当时点到的窗口
+        if (pending.event.windowHandle != 0 && (step.windowTitle.isEmpty() || step.processName.isEmpty()))
         {
-            if (const auto foreground = m_dependencies.integration.foregroundWindow();
-                foreground && (pending.event.windowHandle == 0 || foreground->handle == pending.event.windowHandle))
+            if (const auto foreground = m_dependencies.integration.foregroundWindow(); foreground && foreground->handle == pending.event.windowHandle)
             {
                 if (step.windowTitle.isEmpty())
                 {
