@@ -5,6 +5,8 @@ set(PlatformCommonSources
         AnimationSettings.cpp
         PlatformCapabilities.h
         IHotkeyBackend.h
+        IStepEventSource.h
+        StepEventSource.cpp
         IPlatformIntegration.h
         PlatformIntegration.cpp
         UnsupportedHotkeyBackend.h
@@ -32,6 +34,8 @@ if (WIN32)
     target_sources(Platform PRIVATE
             Windows/WindowsIntegration.h
             Windows/WindowsIntegration.cpp
+            Windows/WindowsStepEventSource.h
+            Windows/WindowsStepEventSource.cpp
             Windows/Win32HotkeyBackend.h
             Windows/Win32HotkeyBackend.cpp
             Windows/Win32HotkeyMapping.h

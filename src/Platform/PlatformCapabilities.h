@@ -27,6 +27,7 @@ namespace GyanisScribe::Platform
         bool uiElements           = false; ///< 光标下的界面元素：Windows 有 UI Automation，截图遮罩按它决定悬停要不要细分到元素一级
         bool autostart            = false; ///< 开机自启动：Windows 写当前用户的 Run 键，其余平台按它把「通用」页那一格灰掉并给出原因
         bool sessionNotifications = false; ///< 锁屏/解锁会话通知：回溯缓冲按它决定能不能安全启用
+        bool stepRecorder         = false; ///< 记录操作步骤的全局输入监听：Windows 有低级鼠标钩子与前台窗口事件，界面按它决定要不要给记录入口
     };
 
 } // namespace GyanisScribe::Platform

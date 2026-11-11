@@ -379,8 +379,9 @@ namespace GyanisScribe::Platform
 
     PlatformCapabilities WindowsIntegration::capabilities() const noexcept
     {
-        // 前五项都按操作系统给得出的能力填：RegisterHotKey、WS_EX_TRANSPARENT、GetForegroundWindow、
-        // EnumWindows、UI Automation。会话通知不写死真：WTS 登记会因会话服务被裁掉或窗口建不出来而失败，
+        // 热键、鼠标穿透、前台窗口、窗口枚举、界面元素与步骤事件源都按操作系统给得出的能力填：
+        // RegisterHotKey、WS_EX_TRANSPARENT、GetForegroundWindow、EnumWindows、UI Automation、
+        // WH_MOUSE_LL 与 SetWinEventHook。会话通知不写死真：WTS 登记会因会话服务被裁掉或窗口建不出来而失败，
         // 这一位按构造时的实测结果填。录屏采集、系统声音与系统 OCR 不在这张表里占位：
         // 那三步的可用性由各自模块在调用点现探（采集探屏幕、编码看 ffmpeg 在不在、识别问系统装了哪几支语言包），
         // 静态位只会说假话
@@ -392,6 +393,7 @@ namespace GyanisScribe::Platform
                 .uiElements           = true,
                 .autostart            = true,
                 .sessionNotifications = m_sessionNotificationRegistered,
+                .stepRecorder         = true,
         };
     }
 

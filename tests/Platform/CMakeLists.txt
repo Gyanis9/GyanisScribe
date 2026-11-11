@@ -2,6 +2,7 @@ add_executable(TestPlatform
         TestPlatform.cpp
         TestWindowGeometry.cpp
         TestSessionNotification.cpp
+        TestStepEventSource.cpp
         TestCrashGuard.cpp)
 
 find_package(Qt6 COMPONENTS Test REQUIRED)
