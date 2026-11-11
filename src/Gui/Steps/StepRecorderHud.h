@@ -52,7 +52,7 @@ namespace GyanisScribe::Gui
 
         /**
          * @brief 切换暂停态
-         * @param paused 暂停时红点转灰、暂停按钮改成「继续」
+         * @param paused 暂停时红点转灰、按钮文字与提示换成继续记录；恢复时回到暂停
          * @note 本类只显示状态，不改状态：按钮点击发 pauseToggled，由录制方调用本函数回写
          */
         void setPaused(bool paused);

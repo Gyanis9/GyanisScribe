@@ -61,12 +61,16 @@ TEST_F(StepRecorderHudFixture, ShowsCountAndEmitsControls)
     ASSERT_NE(pause, nullptr);
     ASSERT_NE(stop, nullptr);
 
+    hud.setStepCount(-3);
+    EXPECT_EQ(count->text(), QStringLiteral("步骤记录 · 0")) << "负数步数要按 0 显示";
     hud.setStepCount(7);
     EXPECT_EQ(count->text(), QStringLiteral("步骤记录 · 7"));
     hud.setPaused(true);
-    EXPECT_TRUE(pause->text().contains(QStringLiteral("继续")));
+    EXPECT_EQ(pause->text(), QStringLiteral("继续"));
+    EXPECT_TRUE(pause->toolTip().contains(QStringLiteral("继续"))) << "暂停后提示还写着重按暂停";
     hud.setPaused(false);
     EXPECT_EQ(pause->text(), QStringLiteral("暂停"));
+    EXPECT_TRUE(pause->toolTip().contains(QStringLiteral("暂停"))) << "恢复后提示没有跟着回到暂停";
 
     QSignalSpy paused{&hud, &StepRecorderHud::pauseToggled};
     QSignalSpy stopped{&hud, &StepRecorderHud::stopRequested};
@@ -90,6 +94,7 @@ TEST_F(StepRecorderHudFixture, StaysOutOfTheWayAndKeepsItsGeometry)
     EXPECT_EQ(hud.minimumHeight(), 48);
     EXPECT_EQ(hud.maximumHeight(), 48);
     EXPECT_EQ(hud.preferredSize().height(), 48);
+    EXPECT_GE(hud.preferredSize().width(), 300) << "建议宽度低于下限，步数跳位时控制条会抽动";
 }
 
 /// 落点跟着可用区原点走，不是屏幕绝对坐标的一半
@@ -112,4 +117,8 @@ TEST_F(StepRecorderHudFixture, DotTurnsGreyWhilePaused)
     hud.setPaused(true);
     EXPECT_TRUE(dot->styleSheet().contains(palette.secondaryText.name())) << "暂停后红点没有转灰";
     EXPECT_FALSE(dot->styleSheet().contains(palette.danger.name()));
+
+    hud.setPaused(false);
+    EXPECT_TRUE(dot->styleSheet().contains(palette.danger.name())) << "恢复后红点没有回到危险色";
+    EXPECT_FALSE(dot->styleSheet().contains(palette.secondaryText.name()));
 }

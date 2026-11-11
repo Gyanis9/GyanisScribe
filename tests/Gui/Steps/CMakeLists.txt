@@ -11,6 +11,7 @@ target_link_libraries(TestGuiSteps PRIVATE
         GTest::gtest
         GTest::gtest_main
         Qt6::Widgets
+        Qt6::Gui
         Qt6::Test)
 
 if (MSVC)

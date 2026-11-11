@@ -20,8 +20,6 @@
 
 namespace
 {
-    using GyanisScribe::Gui::StepRecorderHud;
-
     /// 控制条固定高度，逻辑像素：摆位与命中测试都按这一档算
     constexpr int kHudHeight = 48;
 
@@ -70,7 +68,6 @@ namespace GyanisScribe::Gui
         m_pause = new Button{Base::uiText("暂停"), this};
         m_pause->setObjectName(QStringLiteral("stepsHudPause"));
         m_pause->setAccessibleName(Base::uiText("暂停或继续步骤记录"));
-        m_pause->setToolTip(Base::uiText("暂停后不再记录新的点击与窗口切换。"));
         root->addWidget(m_pause);
 
         m_stop = new Button{Base::uiText("停止"), this};
@@ -105,6 +102,8 @@ namespace GyanisScribe::Gui
     {
         m_paused = paused;
         m_pause->setText(paused ? Base::uiText("继续") : Base::uiText("暂停"));
+        // 提示跟着按钮当前的动作走：暂停后还写着「暂停」会让人以为按下去是继续暂停
+        m_pause->setToolTip(paused ? Base::uiText("继续记录新的点击与窗口切换。") : Base::uiText("暂停后不再记录新的点击与窗口切换。"));
         refreshDot();
     }
 
