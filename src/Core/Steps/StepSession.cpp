@@ -1,5 +1,6 @@
 #include "Core/Steps/StepSession.h"
 
+#include "Base/Logger.h"
 #include "Base/Text.h"
 
 #include <QFileInfo>
@@ -24,6 +25,27 @@ namespace GyanisScribe::Core
         std::filesystem::path toPath(const QString &text)
         {
             return std::filesystem::path{text.toStdWString()};
+        }
+
+        /**
+         * @brief 删掉会话自己写出的整图
+         * @param imagePath 步骤记录的整图路径；为空表示没贴过图
+         * @details 文件已经不在视为正常，删除失败只记一条 Warning 日志：
+         *          留着孤儿文件不影响步骤表，由 cleanup 或启动清理兜底。
+         */
+        void removeImageFile(const QString &imagePath)
+        {
+            if (imagePath.isEmpty())
+            {
+                return;
+            }
+            std::error_code error;
+            std::filesystem::remove(toPath(imagePath), error);
+            if (!error || error == std::errc::no_such_file_or_directory)
+            {
+                return;
+            }
+            Base::Logger::warning(Base::uiFormat(Base::uiTextUtf8("步骤截图删不掉，留在临时目录里：{}（{}）"), imagePath.toStdString(), error.message()));
         }
 
         /**
@@ -76,15 +98,12 @@ namespace GyanisScribe::Core
         /// 越界错误的统一文案，带 1 起的序号与当前步数
         Base::Error outOfRangeError(const std::size_t index, const std::size_t count)
         {
-            return Base::Error{Base::ErrorCode::InvalidArgument, Base::uiFormat(Base::uiTextUtf8("步骤序号 %1 越界，当前只有 %2 步"), index + 1, count)};
+            return Base::Error{Base::ErrorCode::InvalidArgument, Base::uiFormat(Base::uiTextUtf8("步骤序号 {} 越界，当前只有 {} 步"), index + 1, count)};
         }
     } // namespace
 
     Base::Expected<void> StepSession::begin(const std::filesystem::path &tempDirectory)
     {
-        m_steps.clear();
-        m_tempDirectory.clear();
-
         if (tempDirectory.empty())
         {
             return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("步骤临时目录为空。请先准备可写的临时目录再开始记录")});
@@ -94,9 +113,11 @@ namespace GyanisScribe::Core
         std::filesystem::create_directories(tempDirectory, error);
         if (error)
         {
-            return std::unexpected(Base::Error{Base::ErrorCode::FileWriteFailed, Base::uiFormat(Base::uiTextUtf8("无法创建步骤临时目录 %1（%2）。请检查目录权限后重试"),
+            return std::unexpected(Base::Error{Base::ErrorCode::FileWriteFailed, Base::uiFormat(Base::uiTextUtf8("无法创建步骤临时目录 {}（{}）。请检查目录权限后重试"),
                                                                                                 fromPath(tempDirectory).toStdString(), error.message())});
         }
+
+        m_steps.clear();
         m_tempDirectory = tempDirectory;
         return {};
     }
@@ -105,7 +126,7 @@ namespace GyanisScribe::Core
     {
         if (m_steps.size() >= static_cast<std::size_t>(kMaximumSteps))
         {
-            return std::unexpected(Base::Error{Base::ErrorCode::Busy, Base::uiFormat(Base::uiTextUtf8("已经记满 %1 步，先导出或放弃这次记录"), kMaximumSteps)});
+            return std::unexpected(Base::Error{Base::ErrorCode::Busy, Base::uiFormat(Base::uiTextUtf8("已经记满 {} 步，先导出或放弃这次记录"), kMaximumSteps)});
         }
 
         if (step.description.trimmed().isEmpty())
@@ -158,9 +179,14 @@ namespace GyanisScribe::Core
             return std::unexpected(Base::Error{Base::ErrorCode::FileWriteFailed, reason.toStdString()});
         }
 
-        m_steps[index].imagePath = targetText;
-        m_steps[index].thumbnail = image.scaledToWidth(std::min(kStepThumbnailWidth, image.width()), Qt::SmoothTransformation);
+        const QString previousImage = m_steps[index].imagePath;
+        m_steps[index].imagePath    = targetText;
+        m_steps[index].thumbnail    = image.scaledToWidth(std::min(kStepThumbnailWidth, image.width()), Qt::SmoothTransformation);
         m_steps[index].captureError.clear();
+        if (!previousImage.isEmpty() && previousImage != targetText)
+        {
+            removeImageFile(previousImage);
+        }
         return {};
     }
 
@@ -171,12 +197,7 @@ namespace GyanisScribe::Core
             return false;
         }
 
-        const QString imagePath = m_steps[index].imagePath;
-        if (!imagePath.isEmpty())
-        {
-            std::error_code error;
-            std::filesystem::remove(toPath(imagePath), error);
-        }
+        removeImageFile(m_steps[index].imagePath);
         m_steps.erase(m_steps.begin() + static_cast<std::ptrdiff_t>(index));
         bumpIndices();
         return true;

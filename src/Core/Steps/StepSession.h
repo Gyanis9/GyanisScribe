@@ -39,7 +39,8 @@ namespace GyanisScribe::Core
          * @brief 建立一次空会话并创建临时目录
          * @param tempDirectory 本次会话的临时目录，通常在 Steps 下按时刻取名
          * @return 成功返回空载荷；路径为空或建目录失败时返回带路径的中文 Error
-         * @details 会清空已有步骤；旧临时目录不在这里删除，交给 cleanup 或启动清理。
+         * @details 先建目录，成功后才清空已有步骤并记下新目录；失败时步骤表与旧临时目录都保持原样。
+         *          旧临时目录不在这里删除，交给 cleanup 或启动清理。
          */
         [[nodiscard]] Base::Expected<void> begin(const std::filesystem::path &tempDirectory);
 
@@ -57,6 +58,7 @@ namespace GyanisScribe::Core
          * @param image 整屏图，物理像素
          * @return 成功返回空载荷；下标越界、尚未 begin、空图或写盘失败时返回中文 Error
          * @details 失败原因同时写进该步骤的 captureError，供审核窗与导出显示占位。
+         *          重贴成功且换了文件名时删掉这一步骤的旧图，避免旧 PNG 留在临时目录里成为孤儿。
          */
         [[nodiscard]] Base::Expected<void> attachImage(std::size_t index, const QImage &image);
 
@@ -64,6 +66,7 @@ namespace GyanisScribe::Core
          * @brief 删除一步并删掉它的整图文件
          * @param index 步骤数组下标，从 0 开始
          * @return 下标越界返回 false，否则 true
+         * @details 整图文件已经不在时视为正常；其他删除失败只记 Warning 日志，步骤照常移除。
          */
         bool remove(std::size_t index);
 
@@ -118,9 +121,10 @@ namespace GyanisScribe::Core
          * @brief 判断紧邻的一对点击是否应合并为同一步
          * @param previous 已提交的上一步
          * @param next 新到的点击
-         * @return 两者都是点击、时间差在 1.5 秒内、位移不超过 4 像素、
+         * @return 两者都是点击、时间差落在 0 到 1.5 秒之间、位移不超过 4 像素、
          *         元素名与窗口标题都相同时为 true
-         * @details 只读判定，不改动任何步骤；元素名都为空也算相同，此时按坐标合并。
+         * @details 只读判定，不改动任何步骤；时间差为负（next 早于 previous）时不合并；
+         *          元素名都为空也算相同，此时按坐标合并。
          */
         [[nodiscard]] bool shouldMerge(const RecordedStep &previous, const RecordedStep &next) const noexcept;
 

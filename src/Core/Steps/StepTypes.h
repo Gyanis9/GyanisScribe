@@ -68,7 +68,7 @@ namespace GyanisScribe::Core
     /**
      * @brief 生成点击类步骤的自动说明
      * @param elementName 元素名；空或纯空白时回落坐标
-     * @param controlType 控件类型标签；为空时说明里不带括号
+     * @param controlType 控件类型标签；为空时按「控件」显示
      * @param point 点击位置（逻辑全局坐标）
      * @param rightButton 是否右键点击
      * @return 有元素名时为「点击「名字」（类型）」，否则为「点击（x, y）」；右键统一加前缀
@@ -76,14 +76,15 @@ namespace GyanisScribe::Core
     inline QString clickStepDescription(const QString &elementName, const QString &controlType, const QPoint &point, const bool rightButton)
     {
         const QString name = elementName.trimmed();
-        const QString type = controlType.trimmed();
-        QString       text;
+        QString       type = controlType.trimmed();
+        if (type.isEmpty())
+        {
+            type = Base::uiText("控件");
+        }
+        QString text;
         if (name.isEmpty())
         {
             text = Base::uiText("点击（%1, %2）").arg(point.x()).arg(point.y());
-        } else if (type.isEmpty())
-        {
-            text = Base::uiText("点击「%1」").arg(name);
         } else
         {
             text = Base::uiText("点击「%1」（%2）").arg(name, type);
