@@ -5,7 +5,6 @@
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Steps/StepHtmlBuilder.h"
-#include "Core/Steps/StepImageMarker.h"
 #include "Core/Steps/StepSession.h"
 #include "Gui/Controls/Button.h"
 #include "Gui/Controls/LineEdit.h"
@@ -246,12 +245,12 @@ namespace GyanisScribe::Gui
             item->setText(stepRowText(step, displayNumber));
             item->setToolTip(step.windowTitle.isEmpty() ? stepTitle(step) : Base::uiText("窗口：%1").arg(step.windowTitle));
 
-            const QImage  annotated = Core::annotatedStepImage(step, displayNumber);
-            const QImage &thumbnail = annotated.isNull() ? step.thumbnail : annotated;
-            if (!thumbnail.isNull())
+            // 列表图标只用录制时留在内存里的缩略图：刷新不读盘、不现画标记，
+            // 删除或调序一步不会把整批原图重新解码一遍
+            if (!step.thumbnail.isNull())
             {
-                const int width = std::min(Core::kStepThumbnailWidth, thumbnail.width());
-                item->setIcon(QIcon{QPixmap::fromImage(thumbnail.scaledToWidth(width, Qt::SmoothTransformation))});
+                const int width = std::min(Core::kStepThumbnailWidth, step.thumbnail.width());
+                item->setIcon(QIcon{QPixmap::fromImage(step.thumbnail.scaledToWidth(width, Qt::SmoothTransformation))});
             }
         }
 

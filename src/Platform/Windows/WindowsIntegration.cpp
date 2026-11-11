@@ -696,16 +696,26 @@ namespace GyanisScribe::Platform
             return std::optional<UiElementInfo>{};
         }
 
-        UiElementInfo info;
-        BSTR          name = nullptr;
+        QString elementName;
+        BSTR    name = nullptr;
         if (SUCCEEDED(hit.element->get_CurrentName(&name)))
         {
             if (name != nullptr)
             {
-                info.name = QString::fromWCharArray(name, static_cast<qsizetype>(SysStringLen(name)));
+                elementName = QString::fromWCharArray(name, static_cast<qsizetype>(SysStringLen(name)));
                 SysFreeString(name);
             }
         }
+
+        // 最深一级元素没有名字时与「没有元素」同一出口：消费方回落坐标，
+        // 交回一条只有控件类型的描述反而像是认出了什么
+        if (elementName.trimmed().isEmpty())
+        {
+            return std::optional<UiElementInfo>{};
+        }
+
+        UiElementInfo info;
+        info.name = elementName;
 
         // 读不到控件类型只让标签回落「控件」：元素本身已经认出来了，这一步不该把整条描述判成失败
         int controlTypeId = 0;

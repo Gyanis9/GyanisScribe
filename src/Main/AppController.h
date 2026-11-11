@@ -453,8 +453,6 @@ namespace GyanisScribe::Main
         bool m_restoringHotkeySettings = false; ///< 正在把恢复的旧组合写回配置：期间自定义键的变更通知不再重登
         bool m_recordingActive         = false; ///< 录屏是否在跑；由 recordingStatusChanged 维护，互斥门禁读它
         bool m_stepRecording           = false; ///< 步骤记录是否在录；stateChanged 的镜像
-        bool m_stepPaused              = false; ///< 步骤记录是否暂停；控制条收起后仍要能判
-        int  m_stepSteps               = 0;     ///< 步骤记录已记下的步数
     };
 
 } // namespace GyanisScribe::Main

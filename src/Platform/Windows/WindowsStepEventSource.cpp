@@ -114,9 +114,17 @@ namespace GyanisScribe::Platform
             return CallNextHookEx(nullptr, nCode, wParam, lParam);
         }
 
-        // 合成事件（自动化工具、远控回放）不是用户点出来的，记进步骤只会误导
-        if ((info->flags & LLMHF_INJECTED) != 0)
+        const bool isPress = wParam == WM_LBUTTONDOWN || wParam == WM_RBUTTONDOWN;
+
+        // 合成事件（自动化工具、远控回放）不是用户点出来的，记进步骤只会误导；
+        // 低完整性级别的注入同样不是用户的操作
+        if ((info->flags & (LLMHF_INJECTED | LLMHF_LOWER_IL_INJECTED)) != 0)
         {
+            if (isPress)
+            {
+                // 按下被挡掉时清掉等待配对的状态：否则后面的抬起会配到这个点之前那一次旧按下
+                owner->m_pressedValid = false;
+            }
             return CallNextHookEx(nullptr, nCode, wParam, lParam);
         }
 
@@ -126,10 +134,15 @@ namespace GyanisScribe::Platform
         GetWindowThreadProcessId(target, &processId);
         if (processId == GetCurrentProcessId())
         {
+            if (isPress)
+            {
+                // 同注入事件：被挡掉的按下不能留下一个可被别处抬起配对成功的旧点
+                owner->m_pressedValid = false;
+            }
             return CallNextHookEx(nullptr, nCode, wParam, lParam);
         }
 
-        if (wParam == WM_LBUTTONDOWN || wParam == WM_RBUTTONDOWN)
+        if (isPress)
         {
             // 逻辑坐标在按下的这一刻取：钩子给的是物理屏幕坐标，Qt 的坐标域才是消费方要的
             owner->m_pressedPoint = QCursor::pos();

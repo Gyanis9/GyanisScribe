@@ -68,7 +68,8 @@ namespace GyanisScribe::Platform
          * @param wParam 鼠标消息，只处理左/右键的按下与抬起
          * @param lParam 指向 MSLLHOOKSTRUCT 的裸指针
          * @return 始终交回 CallNextHookEx：本钩子只旁听，不消费输入
-         * @details 注入事件与落在本进程窗口上的点击直接跳过；抬起时与按下点相差不超过 6 个逻辑像素才算点击。
+         * @details 注入事件（含低完整性级别注入）与落在本进程窗口上的点击直接跳过，正在按下的那一次也会作废；
+         *          抬起时与按下点相差不超过 6 个逻辑像素才算点击。
          *          回调里不抓屏、不调 UI Automation，只把事件排队投递回 GUI 线程。
          */
         static LRESULT CALLBACK mouseProc(int nCode, WPARAM wParam, LPARAM lParam);

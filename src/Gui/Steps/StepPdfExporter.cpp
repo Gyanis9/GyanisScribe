@@ -2,7 +2,6 @@
 
 #include "Base/Paths.h"
 #include "Base/Text.h"
-#include "Core/Steps/StepHtmlBuilder.h"
 #include "Core/Steps/StepImageMarker.h"
 
 #include <QImage>
@@ -30,6 +29,10 @@ namespace GyanisScribe::Gui
 
         /// 图片显示高度上限，CSS 像素；给标题与说明留出同一页的空间
         constexpr int kPdfImageMaxHeight = 760;
+
+        /// PDF 图片资源的最长边上限，CSS 像素；A4 正文宽约 680，720 已够印得清楚，
+        /// 记满 200 步时也不会把每张 1600 像素的原图都留在文档资源里
+        constexpr int kPdfResourceImageEdge = 720;
 
         /// 把 HTML 特殊字符换成实体；& 先换，避免后面换出的实体被二次转义
         [[nodiscard]] QString escapeHtml(const QString &text)
@@ -86,9 +89,9 @@ namespace GyanisScribe::Gui
             if (!annotated.isNull())
             {
                 QImage printable = annotated;
-                if (std::max(printable.width(), printable.height()) > Core::kStepHtmlImageEdge)
+                if (std::max(printable.width(), printable.height()) > kPdfResourceImageEdge)
                 {
-                    printable = printable.scaled(Core::kStepHtmlImageEdge, Core::kStepHtmlImageEdge, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+                    printable = printable.scaled(kPdfResourceImageEdge, kPdfResourceImageEdge, Qt::KeepAspectRatio, Qt::SmoothTransformation);
                 }
                 if (!printable.isNull())
                 {

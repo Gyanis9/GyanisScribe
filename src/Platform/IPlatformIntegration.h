@@ -41,7 +41,7 @@ namespace GyanisScribe::Platform
      */
     struct UiElementInfo
     {
-        QString name;          ///< 元素名（界面上看得见的文字）；元素没有名字时为空串
+        QString name;          ///< 元素名（界面上看得见的文字）；成功交回时必然非空
         QString controlType;   ///< 控件类型的中文标签，如「按钮」「编辑框」；读不到时是「控件」
         QString windowTitle;   ///< 元素所在顶层窗口的标题；窗口不给标题时为空串
         QString processName;   ///< 顶层窗口所属进程的可执行文件名（不含路径）；取不到时为空串

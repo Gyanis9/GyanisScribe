@@ -118,6 +118,7 @@ GyanisScribe.exe --selftest # 把启动路径跑完就退：日志就绪且全�
 | 框选截图 | `Ctrl+Alt+A` |
 | 回溯截图 | `Ctrl+Alt+Z` |
 | 录屏 / 停止并保存 | `Ctrl+Alt+R` |
+| 步骤记录 | `Ctrl+Alt+T` |
 | 文字识别 | `Ctrl+Alt+O` |
 | 屏幕取色 | `Ctrl+Alt+P` |
 | 滚动长截图 | `Ctrl+Alt+L` |
@@ -125,7 +126,7 @@ GyanisScribe.exe --selftest # 把启动路径跑完就退：日志就绪且全�
 | 收起 / 摆回全部贴图 | `Ctrl+Alt+H` |
 | 切换贴图分组 | `Ctrl+Alt+G` |
 
-九个固定热键之外还能给任意功能再绑十个；截图遮罩、标注窗与贴图窗的窗内键见 [使用指南 · 键位表](docs/UserGuide.md#键位表)。
+十个固定热键之外还能给任意功能再绑十个；截图遮罩、标注窗与贴图窗的窗内键见 [使用指南 · 键位表](docs/UserGuide.md#键位表)。
 
 ## 性能亮点
 

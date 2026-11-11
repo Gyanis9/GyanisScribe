@@ -378,12 +378,7 @@ namespace GyanisScribe::Main
         QObject::connect(m_stepRecorder.get(), &GyanisScribe::App::StepRecorderCoordinator::messageForUser, this, &AppController::notifyUser);
         // 状态镜像供互斥门禁读：控制条可以收起，光看窗口可见性判不出「还在录」
         QObject::connect(m_stepRecorder.get(), &GyanisScribe::App::StepRecorderCoordinator::stateChanged, this,
-                         [this](const bool recording, const bool paused, const int steps)
-                         {
-                             m_stepRecording = recording;
-                             m_stepPaused    = paused;
-                             m_stepSteps     = steps;
-                         });
+                         [this](const bool recording, const bool, const int) { m_stepRecording = recording; });
 
         // 录屏这一族整族搬进了 RecordingCoordinator：控制器只留三根线——
         // 要说给用户的话、托盘那一行读数、成品归档进历史
