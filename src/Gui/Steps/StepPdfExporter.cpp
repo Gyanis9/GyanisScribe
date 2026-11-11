@@ -122,9 +122,8 @@ namespace GyanisScribe::Gui
             {
                 const Core::RecordedStep &step          = steps[position];
                 const int                 displayNumber = static_cast<int>(position) + 1;
-                // 第二步起每步新开一页：说明与截图不会被翻页拆开
-                const QString pageBreak = position == 0 ? QString{} : QStringLiteral(" style=\"page-break-before: always;\"");
-                html.append(QStringLiteral("<h2%1>%2. %3</h2>").arg(pageBreak).arg(displayNumber).arg(escapeHtml(stepTitle(step))));
+                // 每步之间只留间距，正文按 A4 可用高度流式续排，不强行每步新开一页
+                html.append(QStringLiteral("<h2 style=\"margin-top: 16px;\">%1. %2</h2>").arg(displayNumber).arg(escapeHtml(stepTitle(step))));
 
                 const QString meta = stepMeta(step);
                 if (!meta.isEmpty())

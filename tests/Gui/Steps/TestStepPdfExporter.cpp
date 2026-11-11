@@ -17,6 +17,8 @@
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <string_view>
+#include <vector>
 
 using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Core::RecordedStep;
@@ -29,6 +31,21 @@ namespace
     std::filesystem::path tempPath(const QTemporaryDir &directory, const wchar_t *name)
     {
         return std::filesystem::path{directory.path().toStdWString()} / name;
+    }
+
+    /// PDF 里页面对象的个数：每页一个 /Type /Page，页树节点另有 /Type /Pages
+    std::size_t pageObjectCount(const std::string &pdfBytes)
+    {
+        const auto countOccurrences = [&pdfBytes](const std::string_view token)
+        {
+            std::size_t count = 0;
+            for (auto position = pdfBytes.find(token); position != std::string::npos; position = pdfBytes.find(token, position + token.size()))
+            {
+                ++count;
+            }
+            return count;
+        };
+        return countOccurrences("/Type /Page") - countOccurrences("/Type /Pages");
     }
 
     /// 造一张噪点图：纯色块会被压缩到极小，比较文件大小时看不出图片有没有进去
@@ -97,6 +114,29 @@ TEST(StepPdfExporter, EmbedsTheScreenshot)
     std::ifstream     pdfStream{imagePdfPath, std::ios::binary};
     const std::string pdfBytes{std::istreambuf_iterator<char>{pdfStream}, std::istreambuf_iterator<char>{}};
     EXPECT_NE(pdfBytes.find("/Subtype /Image"), std::string::npos);
+}
+
+/// 三步短文字按流式排版留在同一页，分页由可用高度决定，不是每步强开一页
+TEST(StepPdfExporter, FlowsStepsWithoutForcedPageBreak)
+{
+    QTemporaryDir             dir;
+    std::vector<RecordedStep> steps;
+    for (const auto *text: {L"第一步", L"第二步", L"第三步"})
+    {
+        RecordedStep step;
+        step.kind        = StepKind::Manual;
+        step.description = QString::fromWCharArray(text);
+        steps.push_back(step);
+    }
+
+    const auto path    = tempPath(dir, L"flow.pdf");
+    const auto written = writeStepPdf(path, steps, QDateTime::currentDateTime());
+    ASSERT_TRUE(written.has_value()) << written.error().message;
+
+    std::ifstream     pdfStream{path, std::ios::binary};
+    const std::string pdfBytes{std::istreambuf_iterator<char>{pdfStream}, std::istreambuf_iterator<char>{}};
+    ASSERT_FALSE(pdfBytes.empty());
+    EXPECT_EQ(pageObjectCount(pdfBytes), 1u) << "三步短文字被拆成了多页";
 }
 
 /// 输出目录建不出来时返回错误，并且目标位置不能留下半份文件

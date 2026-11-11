@@ -15,7 +15,9 @@
 
 #include <QAbstractItemView>
 #include <QCloseEvent>
+#include <QCoreApplication>
 #include <QDateTime>
+#include <QEventLoop>
 #include <QFileDialog>
 #include <QFont>
 #include <QHBoxLayout>
@@ -36,15 +38,10 @@ namespace GyanisScribe::Gui
 {
     namespace
     {
-        /// 列表项的说明：空说明只写类型标签，不把元素名或窗口标题补回来
-        [[nodiscard]] QString stepTitle(const Core::RecordedStep &step)
+        /// 步骤类型的中文标签
+        [[nodiscard]] QString stepKindLabel(const Core::StepKind kind)
         {
-            const QString description = step.description.trimmed();
-            if (!description.isEmpty())
-            {
-                return description;
-            }
-            switch (step.kind)
+            switch (kind)
             {
                 case Core::StepKind::Click:
                     return Base::uiText("点击");
@@ -56,10 +53,23 @@ namespace GyanisScribe::Gui
             return QString();
         }
 
-        /// 列表行的「序号. 说明」
+        /// 列表项的说明：空说明只写类型标签，不把元素名或窗口标题补回来
+        [[nodiscard]] QString stepTitle(const Core::RecordedStep &step)
+        {
+            const QString description = step.description.trimmed();
+            return description.isEmpty() ? stepKindLabel(step.kind) : description;
+        }
+
+        /// 列表行的「序号. 类型 · 说明」；说明为空或与类型标签相同时只写类型
         [[nodiscard]] QString stepRowText(const Core::RecordedStep &step, const int displayNumber)
         {
-            return Base::uiText("%1. %2").arg(displayNumber).arg(stepTitle(step));
+            const QString type        = stepKindLabel(step.kind);
+            const QString description = step.description.trimmed();
+            if (description.isEmpty() || description == type)
+            {
+                return Base::uiText("%1. %2").arg(displayNumber).arg(type);
+            }
+            return Base::uiText("%1. %2 · %3").arg(displayNumber).arg(type, description);
         }
 
         /// 文件对话框交回的名字没有后缀时补一个，用户只改了主名也不会导出成无后缀文件
@@ -78,7 +88,7 @@ namespace GyanisScribe::Gui
     StepReviewWindow::StepReviewWindow(Core::StepSession &session, Core::ISettingsStore &settings, std::function<Base::Expected<QImage>()> captureForManualStep, QWidget *parent) :
         QDialog(parent), m_session(session), m_settings(settings), m_captureForManualStep(std::move(captureForManualStep))
     {
-        setWindowTitle(Base::uiText("审核步骤"));
+        setWindowTitle(Base::uiText("步骤记录"));
         setObjectName(QStringLiteral("stepsReview"));
         setMinimumSize(920, 560);
         setSizeGripEnabled(true);
@@ -189,8 +199,21 @@ namespace GyanisScribe::Gui
         QObject::connect(m_list, &QListWidget::currentRowChanged, this,
                          [this](int)
                          {
+                             // 选中项换走时先把上一行尚未落库的编辑写回它自己那一行
+                             if (m_editIndex)
+                             {
+                                 applyDescription();
+                             }
                              loadSelectedDescription();
                              updateActions();
+                         });
+        QObject::connect(m_description, &QLineEdit::textEdited, this,
+                         [this]
+                         {
+                             if (!m_editIndex)
+                             {
+                                 m_editIndex = selectedIndex();
+                             }
                          });
         QObject::connect(m_description, &QLineEdit::editingFinished, this, &StepReviewWindow::applyDescription);
         QObject::connect(m_delete, &QPushButton::clicked, this, &StepReviewWindow::deleteSelected);
@@ -284,8 +307,10 @@ namespace GyanisScribe::Gui
 
     void StepReviewWindow::applyDescription()
     {
-        const auto index = selectedIndex();
-        if (!index)
+        // 写回开始编辑时记下的那一行：期间选中项换了，这段文字也不会落到别的步骤上
+        const auto index = m_editIndex ? m_editIndex : selectedIndex();
+        m_editIndex.reset();
+        if (!index || *index >= m_session.count())
         {
             return;
         }
@@ -298,13 +323,21 @@ namespace GyanisScribe::Gui
         }
 
         const Core::RecordedStep &step = m_session.steps()[*index];
-        if (m_description->text() != step.description)
-        {
-            m_description->setText(step.description);
-        }
         if (auto *item = m_list->item(static_cast<int>(*index)))
         {
             item->setText(stepRowText(step, static_cast<int>(*index) + 1));
+        }
+
+        const auto current = selectedIndex();
+        if (!current || *current != *index)
+        {
+            // 选中项已经换走：编辑框该回到新选中项的说明上，不能留着上一行的文字
+            loadSelectedDescription();
+            return;
+        }
+        if (m_description->text() != step.description)
+        {
+            m_description->setText(step.description);
         }
     }
 
@@ -350,7 +383,22 @@ namespace GyanisScribe::Gui
             return;
         }
 
+        // 抓屏时审核窗必须离开屏幕：隐藏与恢复都由这里负责，注入的抓屏回调只管抓光标所在整屏
+        const bool wasVisible = isVisible();
+        if (wasVisible)
+        {
+            hide();
+            // 让平台窗口真正收走，抓屏不会拍到刚隐藏的审核窗
+            QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+        }
+
         auto captured = m_captureForManualStep();
+
+        if (wasVisible)
+        {
+            show();
+        }
+
         if (!captured)
         {
             setStatus(QString::fromStdString(captured.error().message), true);
@@ -421,7 +469,8 @@ namespace GyanisScribe::Gui
 
     void StepReviewWindow::chooseAndExportHtml()
     {
-        const auto chosen = QFileDialog::getSaveFileName(this, Base::uiText("导出 HTML 教程"), suggestedExportPath(QStringLiteral("html")), Base::uiText("HTML 文件 (*.html)"));
+        const auto suggested = Base::Paths::toDisplayText(suggestedStepExportPath(m_settings, QDateTime::currentDateTime(), QStringLiteral("html")));
+        const auto chosen    = QFileDialog::getSaveFileName(this, Base::uiText("导出 HTML 教程"), suggested, Base::uiText("HTML 文件 (*.html)"));
         if (chosen.isEmpty())
         {
             return;
@@ -432,7 +481,8 @@ namespace GyanisScribe::Gui
 
     void StepReviewWindow::chooseAndExportPdf()
     {
-        const auto chosen = QFileDialog::getSaveFileName(this, Base::uiText("导出 PDF 教程"), suggestedExportPath(QStringLiteral("pdf")), Base::uiText("PDF 文件 (*.pdf)"));
+        const auto suggested = Base::Paths::toDisplayText(suggestedStepExportPath(m_settings, QDateTime::currentDateTime(), QStringLiteral("pdf")));
+        const auto chosen    = QFileDialog::getSaveFileName(this, Base::uiText("导出 PDF 教程"), suggested, Base::uiText("PDF 文件 (*.pdf)"));
         if (chosen.isEmpty())
         {
             return;
@@ -448,16 +498,26 @@ namespace GyanisScribe::Gui
 
     bool StepReviewWindow::confirmDiscard()
     {
-        // 一步都不剩时没有可确认的内容，直接清理临时目录
+        // 一步都不剩时没有可确认的内容，直接清理临时目录，也不惊动注入的确认回调
         if (m_session.count() == 0)
         {
             return true;
         }
 
-        const auto answer = QMessageBox::question(this, Base::uiText("放弃步骤记录"),
-                                                  Base::uiText("确定放弃这次记录的 %1 步吗？临时截图会被删除，操作无法撤销。").arg(static_cast<int>(m_session.count())),
+        const int stepCount = static_cast<int>(m_session.count());
+        if (m_confirmDiscard)
+        {
+            return m_confirmDiscard(stepCount);
+        }
+
+        const auto answer = QMessageBox::question(this, Base::uiText("放弃步骤记录"), Base::uiText("确定放弃这次记录的 %1 步吗？临时截图会被删除，操作无法撤销。").arg(stepCount),
                                                   QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
         return answer == QMessageBox::Yes;
+    }
+
+    void StepReviewWindow::setDiscardConfirmation(std::function<bool(int)> confirmation)
+    {
+        m_confirmDiscard = std::move(confirmation);
     }
 
     void StepReviewWindow::discardNow()
@@ -503,12 +563,12 @@ namespace GyanisScribe::Gui
         m_status->setFont(statusFont);
     }
 
-    QString StepReviewWindow::suggestedExportPath(const QString &extension) const
+    std::filesystem::path suggestedStepExportPath(Core::ISettingsStore &settings, const QDateTime &moment, const QString &extension)
     {
-        const auto configured = m_settings.stringValue(Core::kPathScreenshot, QString{});
+        const auto configured = settings.stringValue(Core::kPathScreenshot, QString{});
         const auto directory  = configured.isEmpty() ? Base::Paths::defaultScreenshotDirectory() : Base::Paths::fromDisplayText(configured);
-        const auto name       = Base::Paths::imageFileName(QDateTime::currentDateTime(), extension.toStdString(), QStringLiteral("GyanisScribe_教程_%date%_%time%"));
-        return Base::Paths::toDisplayText(Base::Paths::uniqueFilePath(directory, name));
+        const auto name       = Base::Paths::imageFileName(moment, extension.toStdString(), QStringLiteral("GyanisScribe_教程_%date%_%time%"));
+        return Base::Paths::uniqueFilePath(directory, name);
     }
 
 } // namespace GyanisScribe::Gui

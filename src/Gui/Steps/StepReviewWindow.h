@@ -22,6 +22,7 @@
 #include <optional>
 
 class QCloseEvent;
+class QDateTime;
 class QLabel;
 class QLineEdit;
 class QListWidget;
@@ -35,6 +36,16 @@ namespace GyanisScribe::Core
 namespace GyanisScribe::Gui
 {
     class Button;
+
+    /**
+     * @brief 按截图目录设置与导出时刻拼出默认导出路径
+     * @param settings 配置存储，截图目录读它的 Paths/Screenshot
+     * @param moment 导出时刻，决定文件名里的日期与时刻
+     * @param extension 扩展名，不带点，例如 html、pdf
+     * @return 截图目录下形如 GyanisScribe_教程_20261111_123456.pdf 的路径；重名时已在扩展名前去重
+     * @details 设置里没填目录时回落到用户图片目录下的 GyanisScribe；文件名模板与截图保存共用一份规则。
+     */
+    [[nodiscard]] std::filesystem::path suggestedStepExportPath(Core::ISettingsStore &settings, const QDateTime &moment, const QString &extension);
 
     /**
      * @brief 步骤审核窗
@@ -98,6 +109,13 @@ namespace GyanisScribe::Gui
          */
         void discardWithoutConfirmationForTesting();
 
+        /**
+         * @brief 注入放弃确认回调
+         * @param confirmation 收到当前步骤数，返回是否真的放弃；传空函数恢复默认的原生确认框
+         * @details 默认走 QMessageBox；用例可以换成自己的判定，免去在测试里驱动原生弹窗。
+         */
+        void setDiscardConfirmation(std::function<bool(int)> confirmation);
+
     signals:
         /**
          * @brief 会话已清理、窗口即将关闭
@@ -146,12 +164,13 @@ namespace GyanisScribe::Gui
         void discardNow();
         /// 设状态行文字
         void setStatus(const QString &text, bool error);
-        /// 按截图目录设置与当前时刻拼出默认导出路径
-        [[nodiscard]] QString suggestedExportPath(const QString &extension) const;
 
         Core::StepSession                      &m_session;              ///< 本次记录的会话
         Core::ISettingsStore                   &m_settings;             ///< 配置存储，默认导出目录走它
         std::function<Base::Expected<QImage>()> m_captureForManualStep; ///< 补一步用的抓屏回调
+        std::function<bool(int)>                m_confirmDiscard;       ///< 放弃确认；空表示用默认的 QMessageBox
+
+        std::optional<std::size_t> m_editIndex; ///< 开始编辑说明时所在的行；写回时以它为准，选中项换了也不改投
 
         QListWidget *m_list        = nullptr; ///< 左侧步骤列表
         QLineEdit   *m_description = nullptr; ///< 当前步骤说明

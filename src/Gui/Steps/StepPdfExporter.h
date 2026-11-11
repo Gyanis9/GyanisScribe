@@ -26,8 +26,8 @@ namespace GyanisScribe::Gui
      * @param generatedAt 生成时刻，写进标题区
      * @return 成功返回空载荷；没有步骤或路径为空时返回 InvalidArgument，
      *         建目录或落盘失败时返回带路径的中文 Error
-     * @details 走 QTextDocument 加 QPrinter 的 A4 高分辨率档，每步从第二步起另起一页。
-     *          截图按最终显示序号现画点击标记后以 ImageResource 注册进文档，
+     * @details 走 QTextDocument 加 QPrinter 的 A4 高分辨率档，步骤之间留间距、按可用高度流式分页，
+     *          不强行每步一页。截图按最终显示序号现画点击标记后以 ImageResource 注册进文档，
      *          说明、窗口标题与抓屏错误都按 HTML 文本转义；图片读不出来时显示占位。
      *          写盘结束后核对文件存在且非空，失败时删掉半份文件，不在盘上留下坏 PDF。
      */
