@@ -15,6 +15,7 @@ add_subdirectory(Rewind)
 add_subdirectory(Memory)
 add_subdirectory(Content)
 add_subdirectory(Share)
+add_subdirectory(Steps)
 
 get_property(CoreSources GLOBAL PROPERTY GyanisScribeCoreSources)
 add_library(Core STATIC ${CoreSources})
