@@ -35,12 +35,21 @@ namespace
     {
         std::vector<std::filesystem::path> files;
         const auto                         root = std::filesystem::path{GYANISSCRIBE_SOURCE_DIR} / "src";
+        // 导出教程 HTML 的内联 CSS 是网页内容而非 Qt 控件样式：圆角与阴影声明落在随文件
+        // 交付的独立网页里，不经过 Qt 样式表引擎，也不影响本程序的控件外观。整条不变量
+        // 只豁免这一份源文件，其余文件仍全量扫描。
+        const auto exportedHtmlCss = std::filesystem::path{"Core"} / "Steps" / "StepHtmlBuilder.cpp";
         for (const auto &entry: std::filesystem::recursive_directory_iterator{root})
         {
-            if (entry.is_regular_file() && (entry.path().extension() == ".cpp" || entry.path().extension() == ".h"))
+            if (!entry.is_regular_file() || (entry.path().extension() != ".cpp" && entry.path().extension() != ".h"))
             {
-                files.push_back(entry.path());
+                continue;
             }
+            if (entry.path().lexically_relative(root) == exportedHtmlCss)
+            {
+                continue;
+            }
+            files.push_back(entry.path());
         }
         return files;
     }

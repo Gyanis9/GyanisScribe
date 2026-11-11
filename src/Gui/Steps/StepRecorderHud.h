@@ -20,6 +20,7 @@ class QPushButton;
 
 namespace GyanisScribe::Gui
 {
+    class DotWidget;
     class ThemeManager;
 
     /**
@@ -64,6 +65,13 @@ namespace GyanisScribe::Gui
         [[nodiscard]] QSize preferredSize() const;
 
         /**
+         * @brief 取状态圆点当前显示的颜色
+         * @return 录制中为主题的危险色，暂停时为主题的次要文字色
+         * @details 圆点由自绘控件画填充椭圆，颜色不落在样式表里；用例经由本函数核对换色。
+         */
+        [[nodiscard]] QColor dotColorForTesting() const;
+
+        /**
          * @brief 算控制条在可用区顶部居中的落点
          * @param available 当前屏幕去掉任务栏的可用区，全局逻辑坐标
          * @param hudSize 控制条自己的尺寸
@@ -98,11 +106,11 @@ namespace GyanisScribe::Gui
          */
         void refreshColors();
 
-        /// 按暂停态切换红点颜色
+        /// 按暂停态切换圆点颜色
         void refreshDot();
 
         ThemeManager &m_theme;            ///< 主题来源，不拥有
-        QLabel       *m_dot    = nullptr; ///< 录制状态圆点
+        DotWidget    *m_dot    = nullptr; ///< 录制状态圆点，自绘填充椭圆
         QLabel       *m_count  = nullptr; ///< 步数读数
         QPushButton  *m_pause  = nullptr; ///< 暂停/继续按钮
         QPushButton  *m_stop   = nullptr; ///< 停止按钮

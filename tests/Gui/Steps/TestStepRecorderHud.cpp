@@ -104,21 +104,23 @@ TEST_F(StepRecorderHudFixture, PositionFollowsTheAvailableAreaTopCenter)
     EXPECT_EQ(StepRecorderHud::positionFor(QRect{-1920, 0, 1920, 1080}, QSize{300, 48}), QPoint(-1110, 0));
 }
 
-/// 暂停时红点转灰；恢复后回到危险色
+/// 暂停时状态圆点转灰；恢复后回到危险色。圆点是自绘控件，颜色经 dotColorForTesting 读出
 TEST_F(StepRecorderHudFixture, DotTurnsGreyWhilePaused)
 {
     StepRecorderHud hud{*m_theme};
-    auto           *dot = hud.findChild<QLabel *>(QStringLiteral("stepsHudDot"));
+    auto           *dot = hud.findChild<QWidget *>(QStringLiteral("stepsHudDot"));
     ASSERT_NE(dot, nullptr) << "控制条上没有状态圆点";
+    const QSize dotDiameter{10, 10};
+    EXPECT_EQ(dot->size(), dotDiameter) << "状态圆点直径没有固定在 10 逻辑像素";
 
     const auto palette = m_theme->palette();
-    EXPECT_TRUE(dot->styleSheet().contains(palette.danger.name())) << "录制中红点没取主题的危险色";
+    EXPECT_EQ(hud.dotColorForTesting(), palette.danger) << "录制中圆点没取主题的危险色";
 
     hud.setPaused(true);
-    EXPECT_TRUE(dot->styleSheet().contains(palette.secondaryText.name())) << "暂停后红点没有转灰";
-    EXPECT_FALSE(dot->styleSheet().contains(palette.danger.name()));
+    EXPECT_EQ(hud.dotColorForTesting(), palette.secondaryText) << "暂停后圆点没有转灰";
+    EXPECT_NE(hud.dotColorForTesting(), palette.danger);
 
     hud.setPaused(false);
-    EXPECT_TRUE(dot->styleSheet().contains(palette.danger.name())) << "恢复后红点没有回到危险色";
-    EXPECT_FALSE(dot->styleSheet().contains(palette.secondaryText.name()));
+    EXPECT_EQ(hud.dotColorForTesting(), palette.danger) << "恢复后圆点没有回到危险色";
+    EXPECT_NE(hud.dotColorForTesting(), palette.secondaryText);
 }

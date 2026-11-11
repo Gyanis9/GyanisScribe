@@ -32,6 +32,57 @@ namespace
 
 namespace GyanisScribe::Gui
 {
+    /**
+     * @brief 控制条上的录制状态圆点
+     * @details 圆点是一枚自绘填充椭圆：样式表只能把方框磨出圆角，渲染还要多过一层样式表引擎，
+     *          缩放比例变化时边缘容易发虚；自绘直接按控件矩形画椭圆，直径与抗锯齿边缘都由
+     *          本控件掌控。填充色由控制条按暂停态与主题写入。
+     */
+    class DotWidget final : public QWidget
+    {
+    public:
+        /**
+         * @brief 构造圆点并固定直径
+         * @param parent 父窗口，通常就是控制条
+         */
+        explicit DotWidget(QWidget *parent) : QWidget{parent}
+        {
+            setFixedSize(kHudDotDiameter, kHudDotDiameter);
+            setAttribute(Qt::WA_TransparentForMouseEvents);
+        }
+
+        /**
+         * @brief 换填充色
+         * @param color 圆点颜色
+         */
+        void setColor(const QColor &color)
+        {
+            if (m_color == color)
+            {
+                return;
+            }
+            m_color = color;
+            update();
+        }
+
+    protected:
+        /**
+         * @brief 画圆点
+         * @details 只画这枚填充椭圆，绘制事件本身不参与；控件区域之外的底色留给控制条面板
+         */
+        void paintEvent(QPaintEvent *) override
+        {
+            QPainter painter{this};
+            painter.setRenderHint(QPainter::Antialiasing);
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(m_color);
+            painter.drawEllipse(QRectF{rect()});
+        }
+
+    private:
+        QColor m_color; ///< 圆点填充色
+    };
+
     StepRecorderHud::StepRecorderHud(ThemeManager &theme, QWidget *parent) : QWidget(parent), m_theme(theme)
     {
         // 工具窗 + 不吃焦点：用户接着要操作的是别的程序，控制条抢了焦点就点不中目标
@@ -49,12 +100,9 @@ namespace GyanisScribe::Gui
         root->setContentsMargins(kSpacingMedium, kSpacingSmall, kSpacingMedium, kSpacingSmall);
         root->setSpacing(kSpacingSmall);
 
-        m_dot = new QLabel{this};
+        m_dot = new DotWidget{this};
         m_dot->setObjectName(QStringLiteral("stepsHudDot"));
         m_dot->setAccessibleName(Base::uiText("录制状态"));
-        m_dot->setFixedSize(kHudDotDiameter, kHudDotDiameter);
-        m_dot->setAttribute(Qt::WA_TransparentForMouseEvents);
-        m_dot->setAttribute(Qt::WA_StyledBackground, true);
         root->addWidget(m_dot);
 
         m_count = new QLabel{this};
@@ -114,6 +162,11 @@ namespace GyanisScribe::Gui
         return QSize{std::max(hinted.width(), kHudMinimumWidth), kHudHeight};
     }
 
+    QColor StepRecorderHud::dotColorForTesting() const
+    {
+        return m_paused ? m_pausedDot : m_danger;
+    }
+
     QPoint StepRecorderHud::positionFor(const QRect &available, const QSize &hudSize)
     {
         return available.topLeft() + QPoint{(available.width() - hudSize.width()) / 2, 0};
@@ -150,8 +203,7 @@ namespace GyanisScribe::Gui
 
     void StepRecorderHud::refreshDot()
     {
-        const auto color = m_paused ? m_pausedDot : m_danger;
-        m_dot->setStyleSheet(QStringLiteral("background-color: %1; border-radius: %2px;").arg(color.name()).arg(kHudDotDiameter / 2));
+        m_dot->setColor(dotColorForTesting());
     }
 
 } // namespace GyanisScribe::Gui
