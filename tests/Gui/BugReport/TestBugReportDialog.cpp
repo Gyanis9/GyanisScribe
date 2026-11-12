@@ -179,7 +179,7 @@ namespace
         fallback->start();
 
         QTimer::singleShot(0, qApp,
-                           [drive, &driven, fallback]
+                           [drive, &driven]
                            {
                                auto *review = qobject_cast<PrivacyReviewDialog *>(QApplication::activeModalWidget());
                                if (review == nullptr)
@@ -660,6 +660,7 @@ TEST_F(BugReportDialogFixture, CancellingTheReviewKeepsTheCurrentRedaction)
 {
     auto dialog = makeDialog();
     dialog->setScanResult({makePhoneItem(), makeEmailItem()});
+    ASSERT_EQ(dialog->redactionForTesting().state, RedactionState::Masked) << "前提：调整入口只在已打码时进模态循环";
     const auto before = dialog->reportImageForTesting().copy();
 
     bool driven = false;
@@ -695,6 +696,7 @@ TEST_F(BugReportDialogFixture, ApplyingAnEmptySelectionLeavesTheRedactionAlone)
 {
     auto dialog = makeDialog();
     dialog->setScanResult({makePhoneItem(), makeEmailItem()});
+    ASSERT_EQ(dialog->redactionForTesting().state, RedactionState::Masked) << "前提：调整入口只在已打码时进模态循环";
     const auto before = dialog->reportImageForTesting().copy();
 
     bool driven = false;
