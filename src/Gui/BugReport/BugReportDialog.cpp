@@ -84,7 +84,6 @@ namespace GyanisScribe::Gui
         updatePreviewImage();
         refreshPreview();
         updateActionAvailability();
-        emit redactionStateChanged();
     }
 
     void BugReportDialog::setScanResult(std::vector<Core::Privacy::PiiItem> items)
@@ -100,7 +99,6 @@ namespace GyanisScribe::Gui
             updatePreviewImage();
             refreshPreview();
             updateActionAvailability();
-            emit redactionStateChanged();
             return;
         }
 
@@ -134,7 +132,6 @@ namespace GyanisScribe::Gui
         updatePreviewImage();
         refreshPreview();
         updateActionAvailability();
-        emit redactionStateChanged();
     }
 
     QString BugReportDialog::reportText() const
@@ -522,7 +519,6 @@ namespace GyanisScribe::Gui
         updatePreviewImage();
         refreshPreview();
         updateActionAvailability();
-        emit redactionStateChanged();
         return {};
     }
 

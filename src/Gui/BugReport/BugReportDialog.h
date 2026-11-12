@@ -134,13 +134,6 @@ namespace GyanisScribe::Gui
          */
         void adjustRedactions();
 
-    signals:
-        /**
-         * @brief 打码状态或打码结果发生了变化
-         * @details 宿主用来同步自己的状态提示；检查中、检出、未检出与不可用都会发出。
-         */
-        void redactionStateChanged();
-
     private:
         Q_DISABLE_COPY(BugReportDialog)
 
