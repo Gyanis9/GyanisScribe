@@ -41,6 +41,9 @@ namespace GyanisScribe::Core
         /// 步骤记录的默认组合：R 已归录屏，取 T 与前面九颗默认键都不重复
         constexpr std::string_view kDefaultSteps = "Ctrl+Alt+T";
 
+        /// 元素拾取的默认组合：E 取 element，与前面十颗默认键都不重复
+        constexpr std::string_view kDefaultPickElement = "Ctrl+Alt+E";
+
         /// 恢复成功时把「旧组合仍在使用」接在失败原因后面，用户才知道现在按哪颗键还有用
         void appendRestoredNote(Base::Error &error, const QString &restoredText)
         {
@@ -107,7 +110,8 @@ namespace GyanisScribe::Core
     {
         // 表长度由这份初始化列表自己算：每加一个动作就改三处的日子结束了
         static constexpr std::array kActions = {HotkeyAction::Capture,    HotkeyAction::Record,       HotkeyAction::Ocr,       HotkeyAction::Pick,   HotkeyAction::CaptureLong,
-                                                HotkeyAction::TogglePins, HotkeyAction::NextPinGroup, HotkeyAction::QuickSave, HotkeyAction::Rewind, HotkeyAction::Steps};
+                                                HotkeyAction::TogglePins, HotkeyAction::NextPinGroup, HotkeyAction::QuickSave, HotkeyAction::Rewind, HotkeyAction::Steps,
+                                                HotkeyAction::PickElement};
         return kActions;
     }
 
@@ -135,6 +139,8 @@ namespace GyanisScribe::Core
                 return Core::kHotkeyRewind;
             case HotkeyAction::Steps:
                 return Core::kHotkeySteps;
+            case HotkeyAction::PickElement:
+                return Core::kHotkeyPickElement;
         }
         // 上面穷举过；走到这里说明新增了动作而这里没跟上，交回兜底键名并在日志里点名
         Base::Logger::error(std::format("动作枚举 {} 没有对应的设置键，请把 settingsKeyFor 补全", static_cast<int>(action)));
@@ -177,6 +183,8 @@ namespace GyanisScribe::Core
                 return kDefaultRewind;
             case HotkeyAction::Steps:
                 return kDefaultSteps;
+            case HotkeyAction::PickElement:
+                return kDefaultPickElement;
         }
         Base::Logger::error(std::format("动作枚举 {} 没有对应的默认组合，请把 defaultCombinationTextFor 补全", static_cast<int>(action)));
         return kDefaultCapture;

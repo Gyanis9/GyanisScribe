@@ -83,6 +83,8 @@ namespace GyanisScribe::App
         entries.append(TrayMenuEntry{TrayAction::CaptureLongRegion, "CaptureRegion", GyanisScribe::Base::uiText("滚动长截图"), GyanisScribe::Core::kHotkeyCaptureLong});
         // 不抓屏，直接摆一张白底画布进标注窗：写字、画框、拼几张截图说明时不必先随便截一块屏当底
         entries.append(TrayMenuEntry{TrayAction::BlankCanvas, "Annotation", GyanisScribe::Base::uiText("新建空白画布标注"), {}});
+        // 与框选共用同一层遮罩，只把悬停目标从矩形细分到界面元素：入口贴着截图组摆
+        entries.append(TrayMenuEntry{TrayAction::PickElement, "CursorHighlight", GyanisScribe::Base::uiText("拾取界面元素"), GyanisScribe::Core::kHotkeyPickElement});
         entries.append(TrayMenuEntry{}); // 分隔线
         entries.append(TrayMenuEntry{TrayAction::ToggleRecord, "Record", GyanisScribe::Base::uiText("开始 / 停止录屏"), GyanisScribe::Core::kHotkeyRecord});
         entries.append(TrayMenuEntry{TrayAction::ToggleSteps, "Number", GyanisScribe::Base::uiText("步骤记录"), GyanisScribe::Core::kHotkeySteps});
@@ -126,6 +128,11 @@ namespace GyanisScribe::App
             // 没有全局输入监听的平台上，步骤记录连钩子都装不上：
             // 留着这一行就是让用户点出一条「本平台不支持」的报错
             if (entry.action == TrayAction::ToggleSteps && !capabilities.stepRecorder)
+            {
+                continue;
+            }
+            // 认元素靠平台的界面元素接口：给不出的平台上这一行点了只会回一句做不了
+            if (entry.action == TrayAction::PickElement && !capabilities.uiElements)
             {
                 continue;
             }

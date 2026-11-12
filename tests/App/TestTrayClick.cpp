@@ -105,7 +105,7 @@ TEST(TrayClickTable, MenuHotkeyHintsUseEachActionsOwnDefault)
 {
     const auto store = makeStore("menu-hotkey-hints");
     // 期望值照 README 的热键表另抄一份：与管理器内部那张默认表分开写，才会发现「菜单跟了错的动作」
-    const std::array<std::pair<std::string_view, std::string_view>, 9> defaults{{
+    const std::array<std::pair<std::string_view, std::string_view>, 10> defaults{{
             {GyanisScribe::Core::kHotkeyCapture, "Ctrl+Alt+A"},
             {GyanisScribe::Core::kHotkeyRecord, "Ctrl+Alt+R"},
             {GyanisScribe::Core::kHotkeyOcr, "Ctrl+Alt+O"},
@@ -115,6 +115,7 @@ TEST(TrayClickTable, MenuHotkeyHintsUseEachActionsOwnDefault)
             {GyanisScribe::Core::kHotkeyNextPinGroup, "Ctrl+Alt+G"},
             {GyanisScribe::Core::kHotkeyQuickSave, "Ctrl+Alt+S"},
             {GyanisScribe::Core::kHotkeySteps, "Ctrl+Alt+T"},
+            {GyanisScribe::Core::kHotkeyPickElement, "Ctrl+Alt+E"},
     }};
     for (const auto &[key, expected]: defaults)
     {
@@ -149,6 +150,33 @@ TEST(TrayClickTable, StepRecorderEntryFollowsCapabilityAndCarriesItsHotkey)
     EXPECT_EQ(findSteps(hidden), hidden.end()) << "平台给不出输入监听，这一项留在菜单里只会点了报错";
     const auto allEntries = trayMenuEntries();
     EXPECT_NE(findSteps(allEntries), allEntries.end()) << "静态菜单表该保留这一项，能力过滤才是唯一出口";
+}
+
+/**
+ * @brief 钉住「拾取界面元素」这一行：能力在位时出现、提示取 Hotkey/PickElement，缺能力时整行消失
+ * @details 认元素靠平台的界面元素接口；没有这一位的平台上点它只会回一句做不了。
+ *          提示文本另核一次：挂错配置键时菜单会永远显示默认组合。
+ */
+TEST(TrayClickTable, ElementPickEntryFollowsCapabilityAndCarriesItsHotkey)
+{
+    const auto store = makeStore("element-pick-entry");
+
+    const auto findPick = [](const auto &entries) { return std::ranges::find_if(entries, [](const auto &entry) { return entry.action == TrayAction::PickElement; }); };
+
+    const auto visible = visibleTrayMenuEntries(everyCapability());
+    const auto found   = findPick(visible);
+    ASSERT_NE(found, visible.end()) << "平台给得出界面元素，托盘菜单里却没有这一项";
+    EXPECT_EQ(found->label, GyanisScribe::Base::uiText("拾取界面元素"));
+    EXPECT_EQ(found->hotkeyKey, GyanisScribe::Core::kHotkeyPickElement) << "这一行没挂到 Hotkey/PickElement 上";
+    EXPECT_EQ(found->iconName, "CursorHighlight") << "图标名要在资源里真的存在";
+    EXPECT_EQ(trayHotkeyHint(*store, found->hotkeyKey), QStringLiteral("Ctrl+Alt+E")) << "元素拾取的默认组合没跟着这一行走";
+
+    auto withoutElements       = everyCapability();
+    withoutElements.uiElements = false;
+    const auto hidden          = visibleTrayMenuEntries(withoutElements);
+    EXPECT_EQ(findPick(hidden), hidden.end()) << "平台给不出界面元素，这一项留在菜单里只会点了报错";
+    const auto allEntries = trayMenuEntries();
+    EXPECT_NE(findPick(allEntries), allEntries.end()) << "静态菜单表该保留这一项，能力过滤才是唯一出口";
 }
 
 /**

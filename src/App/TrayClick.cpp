@@ -20,7 +20,7 @@ namespace GyanisScribe::App
 {
     constexpr std::string_view trayActionToken(const TrayAction action) noexcept
     {
-        // 一张开关把 21 个动作的标记逐个点名：漏一支就有一档在设置页上摆得出去、配置里却认不出来
+        // 一张开关把 22 个动作的标记逐个点名：漏一支就有一档在设置页上摆得出去、配置里却认不出来
         switch (action)
         {
             case TrayAction::CaptureRegion:
@@ -65,6 +65,8 @@ namespace GyanisScribe::App
                 return "ManagePinGroups";
             case TrayAction::ToggleSteps:
                 return "ToggleSteps";
+            case TrayAction::PickElement:
+                return "PickElement";
         }
         // 开关已经覆盖全部取值，这一行只回答编译器「还有一条路没返回」：走不到，也不该静默给个别的标记
         return {};

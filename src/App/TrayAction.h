@@ -41,6 +41,7 @@ namespace GyanisScribe::App
         RepinClosed,       ///< 重新贴出最近关掉的贴图（销毁过的不算）；新成员只追加在末尾
         ManagePinGroups,   ///< 打开贴图组管理窗（哪几组、各有几张、叫什么）；新成员只追加在末尾
         ToggleSteps,       ///< 开始或停止步骤记录；新成员只追加在末尾
+        PickElement,       ///< 拾取界面元素；新成员只追加在末尾
     };
 
 } // namespace GyanisScribe::App

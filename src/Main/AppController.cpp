@@ -82,6 +82,11 @@
 
 namespace
 {
+    /// 截图、录屏与回溯共用同一块桌面时挡回后来者的那一句：两个入口各写一遍就会有一处改漏
+    QString desktopBusyMessage()
+    {
+        return GyanisScribe::Base::uiText("先结束当前截图/录屏/回溯");
+    }
 } // namespace
 
 namespace GyanisScribe::Main
@@ -575,6 +580,10 @@ namespace GyanisScribe::Main
                 // 与托盘那一行只有一条实现：起停判定、互斥门禁与提示文案都不在这一层抄第二份
                 handleTrayAction(GyanisScribe::App::TrayAction::ToggleSteps);
                 return;
+            case GyanisScribe::Core::HotkeyAction::PickElement:
+                // 与托盘那一行只有一条实现：能力与互斥门禁都在托盘动作那一段判
+                handleTrayAction(GyanisScribe::App::TrayAction::PickElement);
+                return;
         }
     }
 
@@ -708,6 +717,22 @@ namespace GyanisScribe::Main
                 }
                 m_capture->startBlankCanvas();
                 return;
+            case GyanisScribe::App::TrayAction::PickElement:
+                if (rejectWhileStepRecorderBusy())
+                {
+                    return;
+                }
+                // 元素拾取会铺满屏一层遮罩并走截图流程：截图、录屏与回溯任一件没结束都先挡住。
+                // 整屏、上次选区与空白画布这几路不开流程标志，标注窗已经立起来时同样算没收场；
+                // 延时截图还在倒计时时流程标志也还没立，但再过几秒遮罩就会铺满屏
+                if (m_capture->isCaptureFlowActive() || m_capture->isDelayPending() || m_capture->annotationWindow().isVisible() || m_recordingActive ||
+                    m_rewind->isPickerVisible())
+                {
+                    notifyUser(desktopBusyMessage(), GyanisScribe::Gui::ToastKind::Information);
+                    return;
+                }
+                m_capture->startElementPick();
+                return;
             case GyanisScribe::App::TrayAction::RepinClosed:
                 m_pinCoordinator->repinLastClosed();
                 return;
@@ -729,7 +754,7 @@ namespace GyanisScribe::Main
                 if (m_capture->isCaptureFlowActive() || m_capture->isDelayPending() || m_capture->annotationWindow().isVisible() || m_recordingActive ||
                     m_rewind->isPickerVisible())
                 {
-                    notifyUser(GyanisScribe::Base::uiText("先结束当前截图/录屏/回溯"), GyanisScribe::Gui::ToastKind::Information);
+                    notifyUser(desktopBusyMessage(), GyanisScribe::Gui::ToastKind::Information);
                     return;
                 }
                 m_stepRecorder->toggleRecording();

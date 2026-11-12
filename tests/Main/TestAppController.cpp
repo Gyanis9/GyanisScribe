@@ -1116,6 +1116,208 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住元素拾取热键：铺出元素模式遮罩、流程标志立起，Esc 后收场
+     * @details 热键只做转发，真正的入口在协调器；这一格判的是分派表确实接上了 PickElement，
+     *          并且横幅进入元素模式——否则用户按热键拿到的还是一次普通框选。
+     */
+    TEST_F(AppControllerFixture, ElementPickHotkeyStartsElementOverlayAndEscCancels)
+    {
+        m_frameScreenName = m_realScreenName;
+        makeController();
+        auto &capture = m_controller->capture();
+        EXPECT_FALSE(capture.isCaptureFlowActive()) << "还没按元素拾取热键，流程标志就不是清的";
+
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::PickElement);
+
+        EXPECT_FALSE(capture.isDelayPending()) << "元素拾取热键排上了延时定时器：遮罩铺开才是交互本身";
+        EXPECT_TRUE(capture.isCaptureFlowActive()) << "元素拾取在跑时流程标志是假的：步骤记录与回溯会叠上来";
+        auto *overlay = visibleCaptureOverlay();
+        ASSERT_NE(overlay, nullptr) << "元素拾取热键没铺出遮罩";
+        EXPECT_TRUE(overlay->modeBannerForTesting().contains(QStringLiteral("元素拾取"))) << "热键入口没有把遮罩切到元素模式";
+
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &escape);
+        EXPECT_FALSE(capture.isCaptureFlowActive()) << "取消之后流程标志没复位";
+        EXPECT_TRUE(waitUntil([] { return visibleCaptureOverlay() == nullptr; })) << "Esc 之后元素拾取遮罩没收起";
+    }
+
+    /**
+     * @brief 钉住托盘「拾取界面元素」与热键落到同一个入口
+     * @details 两条入口各写一套时，一处改了能力门禁或模式切换，另一处就会退化成普通框选。
+     */
+    TEST_F(AppControllerFixture, ElementPickTrayEntryTakesTheSamePath)
+    {
+        m_frameScreenName = m_realScreenName;
+        makeController();
+        auto &capture = m_controller->capture();
+
+        m_controller->trayControllerForTesting().actionRequested(App::TrayAction::PickElement);
+
+        EXPECT_TRUE(capture.isCaptureFlowActive()) << "托盘入口没把截图流程标志立起来";
+        auto *overlay = visibleCaptureOverlay();
+        ASSERT_NE(overlay, nullptr) << "托盘「拾取界面元素」没铺出遮罩";
+        EXPECT_TRUE(overlay->modeBannerForTesting().contains(QStringLiteral("元素拾取"))) << "托盘入口没有把遮罩切到元素模式";
+
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &escape);
+        EXPECT_FALSE(capture.isCaptureFlowActive());
+    }
+
+    /**
+     * @brief 钉住步骤记录在录时元素拾取被挡回
+     * @details 录制期间铺遮罩会把遮罩自己记进步骤；挡住的不只是视觉上的重复，流程标志也不能被立起来。
+     */
+    TEST_F(AppControllerFixture, ElementPickIsBlockedWhileStepRecordingRuns)
+    {
+        makeController();
+        auto &steps   = m_controller->stepRecorderForTesting();
+        auto &capture = m_controller->capture();
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        ASSERT_TRUE(steps.isRecording());
+
+        const auto before = visibleToastBubbles();
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::PickElement);
+        EXPECT_EQ(visibleCaptureOverlay(), nullptr) << "步骤记录在跑时元素拾取遮罩还是铺出来了";
+        EXPECT_FALSE(capture.isCaptureFlowActive());
+        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("先停止步骤记录或处理完审核窗")); }))
+                << "步骤记录在跑时按元素拾取，没被挡回也没说清出路";
+    }
+
+    /**
+     * @brief 钉住审核窗未处理时元素拾取被挡回
+     * @details 审核窗里的步骤与临时截图还没了结；再开一层元素遮罩会让用户框到的画面落不进任何一轮。
+     *          提示与录制中的那一档同文：两条出路都是「先停/先处理完步骤记录」。
+     */
+    TEST_F(AppControllerFixture, ElementPickIsBlockedWhileStepReviewIsOpen)
+    {
+        makeController();
+        auto &steps   = m_controller->stepRecorderForTesting();
+        auto &capture = m_controller->capture();
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        ASSERT_TRUE(steps.isRecording());
+        ASSERT_NE(steps.sessionForTesting(), nullptr);
+        ASSERT_TRUE(steps.sessionForTesting()->append(Core::RecordedStep{}).has_value()) << "判据要一份有步骤的会话，审核窗才会打开";
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps); // 停止并进入审核
+        ASSERT_FALSE(steps.isRecording());
+        ASSERT_TRUE(steps.isReviewOpen()) << "停止后审核窗没打开，这一格的前提不成立";
+
+        const auto before = visibleToastBubbles();
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::PickElement);
+        EXPECT_EQ(visibleCaptureOverlay(), nullptr) << "审核窗还开着就铺出了元素拾取遮罩";
+        EXPECT_FALSE(capture.isCaptureFlowActive());
+        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("先停止步骤记录或处理完审核窗")); }))
+                << "审核窗挡回元素拾取时没把出路说给用户";
+    }
+
+    /**
+     * @brief 钉住另一轮截图还在跑时元素拾取被挡回，收场后同一入口恢复可用
+     * @details 遮罩与标注窗只有一套：叠第二层会让用户框到的画面与手里的流程对不上。
+     *          流程标志与遮罩张数一起判，才分得清「被挡回」与「第二层遮罩被静默替换」。
+     */
+    TEST_F(AppControllerFixture, ElementPickIsBlockedWhileAnotherCaptureFlowRuns)
+    {
+        m_frameScreenName = m_realScreenName;
+        makeController();
+        auto &capture = m_controller->capture();
+
+        capture.startInteractive(App::CaptureIntent::Annotate);
+        ASSERT_NE(visibleCaptureOverlay(), nullptr) << "框选没铺出来，门禁无从判起";
+        ASSERT_TRUE(capture.isCaptureFlowActive());
+
+        const auto visibleOverlayCount = []
+        {
+            int count = 0;
+            for (auto *widget: QApplication::topLevelWidgets())
+            {
+                if (auto *overlay = qobject_cast<Gui::CaptureOverlay *>(widget); overlay != nullptr && overlay->isVisible())
+                {
+                    ++count;
+                }
+            }
+            return count;
+        };
+
+        const auto before = visibleToastBubbles();
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::PickElement);
+        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("先结束当前截图/录屏/回溯")); })) << "另一轮框选在跑时元素拾取没被挡回";
+        EXPECT_EQ(visibleOverlayCount(), 1) << "元素拾取在已有遮罩上又叠了一层";
+        EXPECT_TRUE(capture.isCaptureFlowActive()) << "被挡回的那一按把原有流程标志清掉了";
+
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(visibleCaptureOverlay(), &escape);
+        ASSERT_FALSE(capture.isCaptureFlowActive());
+
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::PickElement);
+        auto *overlay = visibleCaptureOverlay();
+        ASSERT_NE(overlay, nullptr) << "上一轮收场后元素拾取仍打不开：门禁没复位";
+        EXPECT_TRUE(overlay->modeBannerForTesting().contains(QStringLiteral("元素拾取")));
+        QApplication::sendEvent(overlay, &escape);
+    }
+
+    /**
+     * @brief 钉住整屏截图留下的标注窗也挡住元素拾取
+     * @details 整屏这一路不开流程标志：只看 captureFlowActive 会让元素遮罩盖到用户正在标注的画布上。
+     *          关窗后同一入口恢复可用，证明挡住它的确实是那扇窗而不是入口本身坏了。
+     */
+    TEST_F(AppControllerFixture, ElementPickIsBlockedByAVisibleAnnotationWindow)
+    {
+        m_frameScreenName = m_realScreenName;
+        makeController();
+        auto &capture = m_controller->capture();
+
+        capture.startFullScreen(App::CaptureIntent::Annotate);
+        auto &window = capture.annotationWindow();
+        ASSERT_TRUE(window.isVisible()) << "整屏截图该把标注窗开起来";
+        ASSERT_FALSE(capture.isCaptureFlowActive()) << "本用例钉的正是流程标志之外的那一半";
+
+        const auto before = visibleToastBubbles();
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::PickElement);
+        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("先结束当前截图/录屏/回溯")); })) << "标注窗还开着时元素拾取没被挡回";
+        EXPECT_EQ(visibleCaptureOverlay(), nullptr) << "标注窗还开着就铺出了元素拾取遮罩";
+
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(&window, &escape);
+        ASSERT_FALSE(window.isVisible()) << "标注窗没关掉，门禁无从判起";
+
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::PickElement);
+        auto *overlay = visibleCaptureOverlay();
+        ASSERT_NE(overlay, nullptr) << "标注窗关掉之后元素拾取仍打不开：门禁没复位";
+        QApplication::sendEvent(overlay, &escape);
+    }
+
+    /**
+     * @brief 钉住元素拾取进行时步骤记录热键被挡回，取消后恢复可用
+     * @details 元素拾取与框选共用流程标志；漏掉这一半时控制条会压到元素遮罩上，
+     *          录制里的点击还会把遮罩自己当成操作目标记进步骤。
+     */
+    TEST_F(AppControllerFixture, StepRecordingIsBlockedWhileElementPickRuns)
+    {
+        m_frameScreenName = m_realScreenName;
+        makeController();
+        auto &steps   = m_controller->stepRecorderForTesting();
+        auto &capture = m_controller->capture();
+
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::PickElement);
+        auto *overlay = visibleCaptureOverlay();
+        ASSERT_NE(overlay, nullptr) << "元素拾取没铺出遮罩，门禁无从判起";
+        ASSERT_TRUE(capture.isCaptureFlowActive());
+
+        const auto before = visibleToastBubbles();
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        EXPECT_FALSE(steps.isRecording()) << "元素拾取还在跑就开始记录步骤";
+        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("先结束当前截图/录屏/回溯")); })) << "元素拾取挡回步骤记录时没说清先结束什么";
+
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &escape);
+        ASSERT_FALSE(capture.isCaptureFlowActive());
+
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        EXPECT_TRUE(steps.isRecording()) << "元素拾取取消之后步骤记录仍打不开：门禁没复位";
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        EXPECT_FALSE(steps.isRecording());
+    }
+
+    /**
      * @brief 钉住整屏截图留下的标注窗也挡住步骤记录
      * @details 整屏这一路不开 captureFlowActive：只看流程标志的门禁会让控制条压到用户正在编辑的画布上。
      */
@@ -2032,7 +2234,7 @@ namespace GyanisScribe
         ASSERT_NE(m_integration->hotkeyBackend, nullptr) << "替身平台没有交出热键后端，这一格无从判起";
         auto &backend = *m_integration->hotkeyBackend;
         ASSERT_EQ(backend.unregisterAllCalls, 1) << "启动登记该只清一次场";
-        ASSERT_EQ(backend.registeredCount(), 11) << "十个固定动作加一条自定义键没有全部登记上";
+        ASSERT_EQ(backend.registeredCount(), 12) << "十一个固定动作加一条自定义键没有全部登记上";
 
         // 新组合被占用：写入设置即触发整轮重登，热键层恢复旧组合后控制器把它写回配置
         backend.rejectCombination(Qt::ControlModifier | Qt::AltModifier, Qt::Key_8);
