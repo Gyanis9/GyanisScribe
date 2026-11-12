@@ -26,7 +26,7 @@ namespace GyanisScribe::Core::Privacy
      */
     struct RedactedImage
     {
-        QImage image;            ///< 打码后的图，与输入同尺寸
+        QImage image;            ///< 打码后的图，与输入同尺寸；devicePixelRatio 为按宽度比算出的倍比
         int    appliedCount = 0; ///< 实际交给引擎的框数
     };
 
@@ -36,9 +36,11 @@ namespace GyanisScribe::Core::Privacy
      * @param physicalBoxes 打码框，与原图同坐标系
      * @param tool 只接受马赛克或高斯模糊
      * @param logicalSize 画布逻辑尺寸，物理框按它换算成逻辑框
-     * @param mosaicBlockSize 马赛克方块边长，逻辑像素
+     * @param mosaicBlockSize 马赛克方块边长，逻辑像素；高斯模糊不看这一项
      * @return 成功返回副本与有效框数；坏输入或全部框被夹掉时返回中文原因
      * @note 只操作副本：离屏引擎、离屏画布，不碰调用方的标注引擎与撤销栈。
+     * @note logicalSize 必须与 image 同比例：倍比按宽度比折算，高宽比不同的组合会整体错位。
+     *       真实调用方都直接取截图的逻辑尺寸，本函数不做运行期比例校验。
      */
     [[nodiscard]] Base::Expected<RedactedImage> redactImage(const QImage &image, std::span<const QRect> physicalBoxes, GyanisScribe::Core::ToolKind tool,
                                                             QSize logicalSize, int mosaicBlockSize);
