@@ -5,7 +5,6 @@
 #include <QCoreApplication>
 #include <QDate>
 #include <QDateTime>
-#include <QDir>
 #include <QFile>
 #include <QSize>
 #include <QTemporaryDir>
@@ -17,7 +16,6 @@
 #include <array>
 #include <filesystem>
 #include <memory>
-#include <string>
 
 using GyanisScribe::Base::uiText;
 using GyanisScribe::Core::BugReport::bugReportDefaultPath;

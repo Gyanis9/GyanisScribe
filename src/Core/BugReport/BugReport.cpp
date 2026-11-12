@@ -2,18 +2,14 @@
 
 #include "Base/Text.h"
 
-#include <QFileInfo>
 #include <QStringList>
 
-#include <algorithm>
-#include <cmath>
+#include <cstdlib>
 #include <system_error>
 
 namespace
 {
-    using GyanisScribe::Base::uiFormat;
     using GyanisScribe::Base::uiText;
-    using GyanisScribe::Base::uiTextUtf8;
     namespace BugReport = GyanisScribe::Core::BugReport;
 
     QString normalizedText(const QString &text)
