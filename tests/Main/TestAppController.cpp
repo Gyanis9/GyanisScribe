@@ -15,6 +15,7 @@
 #include "Core/Steps/StepSession.h"
 #include "Core/Steps/StepTypes.h"
 #include "Gui/Annotation/AnnotationWindow.h"
+#include "Gui/BugReport/BugReportDialog.h"
 #include "Gui/Capture/CaptureOverlay.h"
 #include "Gui/Share/ShareDialog.h"
 #include "Gui/Steps/StepRecorderHud.h"
@@ -1772,6 +1773,80 @@ namespace GyanisScribe
         EXPECT_TRUE(reopened->isVisible()) << "重开的对话框没露出来";
         reopened->close();
         QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    }
+
+    /**
+     * @brief 钉住 Bug 报告入口由截图协调器转交，且上下文与这一轮截图同源
+     */
+    TEST_F(AppControllerFixture, BugReportButtonOpensOneDialogWithTheCaptureContext)
+    {
+        m_frameScreenName = m_realScreenName;
+        m_frameRegion     = QRect{0, 0, kFrameWidth, kFrameHeight};
+        makeController();
+
+        auto &capture = m_controller->capture();
+        auto &window  = capture.annotationWindow();
+        capture.startFullScreen(App::CaptureIntent::Annotate);
+        ASSERT_TRUE(window.isVisible());
+
+        auto *button = window.toolbar().findChild<QToolButton *>(QStringLiteral("bugReportButton"));
+        ASSERT_NE(button, nullptr) << "标注窗工具栏上找不到 Bug 报告入口";
+        button->click();
+
+        auto *dialog = window.findChild<GyanisScribe::Gui::BugReportDialog *>();
+        ASSERT_NE(dialog, nullptr) << "点 Bug 报告没有打开对话框";
+        EXPECT_TRUE(dialog->isVisible());
+        EXPECT_EQ(dialog->windowModality(), Qt::WindowModal);
+        EXPECT_EQ(dialog->environmentForTesting().screenName, window.captureSourceForTesting().screenName);
+        EXPECT_EQ(dialog->environmentForTesting().capturedAt, window.captureSourceForTesting().capturedAt);
+        EXPECT_EQ(dialog->environmentForTesting().windowTitle, QStringLiteral("替身窗口"));
+        EXPECT_EQ(dialog->environmentForTesting().logicalSize, window.canvas().logicalSize);
+        EXPECT_EQ(dialog->environmentForTesting().physicalSize, window.canvas().image.size());
+        EXPECT_DOUBLE_EQ(dialog->environmentForTesting().devicePixelRatio, window.canvas().devicePixelRatio);
+        EXPECT_TRUE(window.isVisible()) << "打开 Bug 报告把标注窗收了";
+        EXPECT_TRUE(window.isRoundActive());
+
+        button->click();
+        EXPECT_EQ(window.findChildren<GyanisScribe::Gui::BugReportDialog *>().size(), 1) << "重复点击叠了第二扇报告窗";
+
+        dialog->close();
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        EXPECT_EQ(window.findChild<GyanisScribe::Gui::BugReportDialog *>(), nullptr) << "报告窗关掉后没释放";
+        EXPECT_TRUE(window.isRoundActive());
+    }
+
+    /**
+     * @brief 钉住没有编辑轮次与空图都只给可操作提示，不开报告窗
+     */
+    TEST_F(AppControllerFixture, BugReportWithoutAnActiveRoundOrImageOnlyExplains)
+    {
+        m_frameScreenName = m_realScreenName;
+        m_frameRegion     = QRect{0, 0, kFrameWidth, kFrameHeight};
+        makeController();
+
+        auto &capture = m_controller->capture();
+        auto &window  = capture.annotationWindow();
+
+        int     messages = 0;
+        QString said;
+        QObject::connect(&capture, &App::CaptureCoordinator::messageForUser, &capture,
+                         [&messages, &said](const QString &message, Gui::ToastKind)
+                         {
+                             ++messages;
+                             said = message;
+                         });
+
+        window.bugReportRequested(QImage{});
+        EXPECT_EQ(messages, 1);
+        EXPECT_EQ(said, Base::uiText("当前没有正在编辑的标注，请重新截图后再试"));
+        EXPECT_EQ(window.findChild<GyanisScribe::Gui::BugReportDialog *>(), nullptr);
+
+        capture.startFullScreen(App::CaptureIntent::Annotate);
+        ASSERT_TRUE(window.isVisible());
+        window.bugReportRequested(QImage{});
+        EXPECT_EQ(messages, 2);
+        EXPECT_EQ(said, Base::uiText("当前没有可生成报告的截图"));
+        EXPECT_EQ(window.findChild<GyanisScribe::Gui::BugReportDialog *>(), nullptr);
     }
 
     /**

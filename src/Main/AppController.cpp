@@ -6,6 +6,7 @@
 #include "Core/Annotation/BlankCanvas.h"
 #include "App/ClipboardPin.h"
 #include "App/CustomHotkeys.h"
+#include "App/BugReportCoordinator.h"
 #include "App/HistoryCoordinator.h"
 #include "App/MemoryCoordinator.h"
 #include "App/DeliveryCoordinator.h"
@@ -180,6 +181,8 @@ namespace GyanisScribe::Main
         QObject::connect(m_privacy.get(), &GyanisScribe::App::PrivacyCoordinator::messageForUser, this, &AppController::notifyUser);
         QObject::connect(m_privacy.get(), &GyanisScribe::App::PrivacyCoordinator::scanFailed, this,
                          [](const GyanisScribe::Base::Error &error) { GyanisScribe::Base::Logger::error(std::format("隐私扫描失败：{}", error.message)); });
+        // 报告这一族的报告窗、自动打码与环境组装都在协调器里；截图协调器负责把这一轮的画布与来源交给它
+        m_bugReport    = std::make_unique<GyanisScribe::App::BugReportCoordinator>(*m_settings, *m_integration);
         m_tray         = std::make_unique<GyanisScribe::App::TrayController>(*m_icons, *m_theme, *m_settings, *m_integration);
         m_historyStore = std::make_unique<GyanisScribe::Core::HistoryStore>(std::move(historyStoragePath));
         // 记忆协调器要排在主窗口之前：窗口的「记忆库」页拿索引的引用。这时还不 start()，
@@ -350,7 +353,7 @@ namespace GyanisScribe::Main
         // 截图这一族（枢纽）整族搬进了 CaptureCoordinator：入口、延时、抓帧、
         // 按意图交付与标注窗都在它身上；控制器只留两根线——要说给用户的话、命令行那次失败的另交一份
         m_capture = std::make_unique<GyanisScribe::App::CaptureCoordinator>(GyanisScribe::App::CaptureCoordinator::Dependencies{
-                *m_settings, *m_integration, *m_theme, *m_icons, *m_captureSource, *m_ocr, *m_pinCoordinator, *m_delivery, *m_history});
+                *m_settings, *m_integration, *m_theme, *m_icons, *m_captureSource, *m_ocr, *m_pinCoordinator, *m_delivery, *m_history, *m_bugReport});
         QObject::connect(m_capture.get(), &GyanisScribe::App::CaptureCoordinator::messageForUser, this, &AppController::notifyUser);
         QObject::connect(m_capture.get(), &GyanisScribe::App::CaptureCoordinator::commandLineActionFailed, this, &AppController::commandLineActionFailed);
         QObject::connect(m_capture.get(), &GyanisScribe::App::CaptureCoordinator::commandLineCaptureDelivered, this, &AppController::commandLineCaptureDelivered);

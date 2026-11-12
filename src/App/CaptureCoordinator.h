@@ -54,6 +54,7 @@ namespace GyanisScribe::Platform
 
 namespace GyanisScribe::App
 {
+    class BugReportCoordinator;
     class DeliveryCoordinator;
     class HistoryCoordinator;
     class OcrCoordinator;
@@ -83,7 +84,7 @@ namespace GyanisScribe::App
         Q_OBJECT
 
     public:
-        /// 构造依赖：枢纽要往四个方向去，缺一条就没有对应的交付路
+        /// 构造依赖：枢纽要往识别、贴图、标注、落盘与报告五处去，缺一条就没有对应的交付路
         struct Dependencies
         {
             GyanisScribe::Core::ISettingsStore           &settings;      ///< 延时秒数、选区历史、快捷入口那几档
@@ -95,6 +96,7 @@ namespace GyanisScribe::App
             GyanisScribe::App::PinCoordinator            &pins;          ///< 交付到贴图
             GyanisScribe::App::DeliveryCoordinator       &delivery;      ///< 交付到落盘与外部命令
             GyanisScribe::App::HistoryCoordinator        &history;       ///< 未保存截图那一路也要进历史清单
+            GyanisScribe::App::BugReportCoordinator      &bugReport;     ///< 把报告窗与扫描交给它，截图枢纽只负责组装这一轮上下文
         };
 
         /**
@@ -254,6 +256,15 @@ namespace GyanisScribe::App
 
         /// 标注窗请求美化分享：开一扇窗口模态的美化对话框，同一时刻只留一扇
         void shareImage(const QImage &image);
+
+        /**
+         * @brief 标注窗请求 Bug 报告：把当前画布与这一轮来源交给报告协调器
+         * @param image 标注窗交出的成品，物理像素
+         * @details 没有正在编辑的标注时只给一句提示：引擎与画布在关窗后还留着上一轮，
+         *          迟到的请求不该落到看不见的画布上。检测图一律取画布原图，
+         *          用户手画的图形不参与识别；屏幕与时刻优先取画布自己的，窗口与进程只来自本轮来源。
+         */
+        void openBugReport(const QImage &image);
 
         /// 标注窗请求刷新截图（F5）：重抓这块区域换底图，标注留着
         void refreshLastCapture(const QString &screenName, const QRect &region);

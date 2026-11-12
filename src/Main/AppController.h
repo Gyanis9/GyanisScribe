@@ -56,6 +56,7 @@ namespace GyanisScribe::Gui
 
 namespace GyanisScribe::App
 {
+    class BugReportCoordinator;
     class HistoryCoordinator;
     class MemoryCoordinator;
     class OcrCoordinator;
@@ -435,6 +436,7 @@ namespace GyanisScribe::Main
         std::unique_ptr<GyanisScribe::App::RecordingCoordinator>      m_recording;     ///< 录屏这一族（配置、服务、控制条、倒计时）
         std::unique_ptr<GyanisScribe::App::OcrCoordinator>            m_ocr;           ///< 识别这一族（后端选型、搬运工、结果窗）
         std::unique_ptr<GyanisScribe::App::PrivacyCoordinator>        m_privacy;       ///< 隐私扫描这一族（后端选型、单飞、结果交回截图协调器）
+        std::unique_ptr<GyanisScribe::App::BugReportCoordinator>      m_bugReport;     ///< Bug 报告这一族（扫描、环境与对话框）
         std::unique_ptr<GyanisScribe::App::TrayController>            m_tray;          ///< 托盘图标与菜单
         // 排在主窗口之前：窗口构造要拿它的索引，析构顺序反过来，窗口先没、库最后关
         std::unique_ptr<GyanisScribe::App::MemoryCoordinator>   m_memory;         ///< 截图记忆这一族（授权、OCR 队列、导入与索引维护）

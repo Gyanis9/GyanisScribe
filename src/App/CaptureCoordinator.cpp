@@ -1,5 +1,6 @@
 #include "App/CaptureCoordinator.h"
 
+#include "App/BugReportCoordinator.h"
 #include "App/DeliveryCoordinator.h"
 #include "App/HistoryCoordinator.h"
 #include "App/OcrCoordinator.h"
@@ -9,6 +10,7 @@
 #include "Base/Text.h"
 #include "Core/Annotation/AnnotationEngine.h"
 #include "Core/Annotation/BlankCanvas.h"
+#include "Core/BugReport/BugReport.h"
 #include "Core/Capture/IScreenCaptureSource.h"
 #include "Core/Capture/RegionHistory.h"
 #include "Core/Capture/ScreenUtils.h"
@@ -123,6 +125,7 @@ namespace GyanisScribe::App
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::ocrRequested, &m_dependencies.ocr, &GyanisScribe::App::OcrCoordinator::requestRecognition);
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::scanRequested, this, &CaptureCoordinator::scanImage);
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::shareRequested, this, &CaptureCoordinator::shareImage);
+        QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::bugReportRequested, this, &CaptureCoordinator::openBugReport);
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::printRequested, this, &CaptureCoordinator::printImage);
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::refreshRequested, this, &CaptureCoordinator::refreshLastCapture);
         QObject::connect(m_annotationWindow.get(), &GyanisScribe::Gui::AnnotationWindow::cropRequested, this, &CaptureCoordinator::cropLastCapture);
@@ -742,6 +745,34 @@ namespace GyanisScribe::App
         dialog->setAttribute(Qt::WA_DeleteOnClose, true);
         m_shareDialog = dialog;
         dialog->show();
+    }
+
+    void CaptureCoordinator::openBugReport(const QImage &image)
+    {
+        // 与隐私扫描同一条判据：关窗后引擎与画布还留着上一轮，迟到的请求不该落到看不见的画布上
+        if (!m_annotationWindow->isRoundActive())
+        {
+            emit messageForUser(noActiveAnnotationMessage(), GyanisScribe::Gui::ToastKind::Information);
+            return;
+        }
+        const auto &canvas = m_annotation->canvas();
+        if (image.isNull() || canvas.image.isNull())
+        {
+            emit messageForUser(GyanisScribe::Base::uiText("当前没有可生成报告的截图"), GyanisScribe::Gui::ToastKind::Information);
+            return;
+        }
+
+        // 检测图一律取画布原图：用户手画的图形不参与识别，框也就不会错位。
+        // 屏幕与时刻优先取画布自己的（重裁、F5 之后它才是这张图的真来源），
+        // 窗口与进程只来自本轮来源：画布上不记这两格
+        GyanisScribe::Core::BugReport::BugReportCaptureContext context;
+        context.logicalSize      = canvas.logicalSize;
+        context.devicePixelRatio = canvas.devicePixelRatio;
+        context.screenName       = canvas.screenName.isEmpty() ? m_sourceInfo.screenName : canvas.screenName;
+        context.capturedAt       = canvas.capturedAt.isValid() ? canvas.capturedAt : m_sourceInfo.capturedAt;
+        context.windowTitle      = m_sourceInfo.windowTitle;
+        context.processName      = m_sourceInfo.processName;
+        m_dependencies.bugReport.openReport(image, canvas.image, context, m_annotationWindow.get());
     }
 
     void CaptureCoordinator::handlePrivacyScan(const QImage &image, const GyanisScribe::Core::OcrResult &result)
