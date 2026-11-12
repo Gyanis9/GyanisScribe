@@ -1085,7 +1085,7 @@ namespace GyanisScribe
      * @brief 钉住元素拾取的协调器入口：不走延时、流程标志立起来、遮罩铺出来，且与框选共用门禁
      * @details 元素拾取本身就是交互：排一个延时定时器只会让用户对着空屏等。入口直接调服务，
      *          流程标志在同一刻立起，步骤记录据此被挡回；按 Esc 走既有取消路径，标志复位。
-     *          热键与托盘入口不经过这一层，由接线那一批补。
+     *          热键与托盘经更上层的接线落到同一个入口，本用例只钉协调器这一层。
      */
     TEST_F(AppControllerFixture, ElementPickEntryStartsTheFlowWithoutDelay)
     {

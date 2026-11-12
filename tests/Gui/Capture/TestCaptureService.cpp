@@ -1098,9 +1098,10 @@ TEST_F(CaptureServiceFixture, ElementPickUsesMetadataChain)
 }
 
 /**
- * @brief 钉住元数据链失败就退回矩形链：仍提示可框选，拖动照常落成选区
+ * @brief 钉住元数据链失败就退回矩形链：矩形链确实被问过，横幅明说没认出元素，拖动照常落成选区
  * @details 平台给不出描述时不能把整轮元素拾取判死：矩形链还认得元素边界，用户仍能框选；
- *          横幅要给出「可拖动」这条出路，而不是停在「悬停选元素」上等一个永远不来的链。
+ *          横幅要退出「悬停选元素」的操作提示，改说没认出元素。只断言「拖动」不算数——
+ *          元素模式的操作提示里本来就有「拖动框选」，退回没发生也照样绿。
  */
 TEST_F(CaptureServiceFixture, ElementPickFallsBackWhenMetadataFails)
 {
@@ -1121,10 +1122,113 @@ TEST_F(CaptureServiceFixture, ElementPickFallsBackWhenMetadataFails)
     moveOver(*overlay, QPoint{40, 30});
     QApplication::processEvents();
     pumpEventsFor(120);
-    EXPECT_TRUE(overlay->modeBannerForTesting().contains(QStringLiteral("拖动"))) << "元数据链失败后横幅没给出框选这条路：" << overlay->modeBannerForTesting().toStdString();
+    ASSERT_EQ(fake.elementInfoQueriedPoints.size(), 1U) << "元素模式没先去问带描述的链";
+    ASSERT_EQ(fake.queriedPoints.size(), 1U) << "元数据链失败后没退回去问矩形链";
+    EXPECT_TRUE(overlay->modeBannerForTesting().contains(QStringLiteral("没认出元素")))
+            << "元数据链失败后横幅还停在元素模式的操作提示上，没说明可以拖动框选：" << overlay->modeBannerForTesting().toStdString();
 
     dragOn(*overlay, QPoint{10, 10}, QPoint{100, 80});
     EXPECT_FALSE(overlay->selectedRegion().isNull()) << "元数据链失败把框选也一起挡掉了";
+}
+
+/**
+ * @brief 钉住元数据链失败的日志只记一次：换个悬停点不再刷，矩形链再失败也不补第二条
+ * @details 鼠标划过认不出元素的界面会报几十个点，每个点一条失败日志会把日志刷满。
+ *          首次元数据失败就占住「这一轮已报过」这位，之后矩形链也失败时只退回空链、不写第二条。
+ */
+TEST_F(CaptureServiceFixture, ElementPickLogsTheMetadataFailureOnce)
+{
+    if (QGuiApplication::screens().isEmpty())
+    {
+        GTEST_SKIP() << "这个环境没有屏幕可枚举，铺不出遮罩";
+    }
+
+    const auto      caseName     = std::string_view(::testing::UnitTest::GetInstance()->current_test_info()->name());
+    const auto      logDirectory = std::filesystem::temp_directory_path() / std::format("GyanisScribe-Capture-{}-logs", caseName);
+    std::error_code ignored;
+    std::filesystem::remove_all(logDirectory, ignored);
+    ASSERT_TRUE(GyanisScribe::Base::Logger::initialize(logDirectory).has_value());
+
+    SettingsStore           settings(m_iniFile);
+    FakeCaptureSource       source;
+    FakePlatformIntegration fake;
+    fake.capabilitiesValue.uiElements = true;
+    fake.elementInfoChainError        = Error{ErrorCode::PlatformUnsupported, "替身：取不到描述"};
+    fake.elementChain                 = std::unexpected(Error{ErrorCode::PlatformUnsupported, "替身：也认不出矩形"});
+    CaptureService service(source, settings, fake);
+
+    auto *overlay = startElementPickAndFindOverlay(service);
+    ASSERT_NE(overlay, nullptr) << "元素拾取入口没铺出遮罩";
+    moveOver(*overlay, QPoint{40, 30});
+    pumpEventsFor(120);
+    moveOver(*overlay, QPoint{90, 60});
+    pumpEventsFor(120);
+    ASSERT_EQ(fake.elementInfoQueriedPoints.size(), 2U) << "换了悬停点却没再问带描述的链，判不出一轮里会不会重复记";
+
+    // 先收 logger 再读文件：sink 带缓冲，边写边读就把「这行到没到盘上」交给了调度
+    GyanisScribe::Base::Logger::shutdown();
+
+    std::ifstream     input(logDirectory / "GyanisScribe.log", std::ios::binary);
+    const std::string logText{std::istreambuf_iterator<char>{input}, std::istreambuf_iterator<char>{}};
+    const auto        occurrences = [&logText](const std::string_view needle)
+    {
+        std::size_t count = 0;
+        for (auto position = logText.find(needle); position != std::string::npos; position = logText.find(needle, position + needle.size()))
+        {
+            ++count;
+        }
+        return count;
+    };
+    EXPECT_EQ(occurrences("元素拾取没拿到带描述的界面元素"), 1U) << "元数据链失败该记一条且只记一条，实际记了 " << occurrences("元素拾取没拿到带描述的界面元素") << " 条";
+    EXPECT_EQ(occurrences("认不出光标下的界面元素"), 0U) << "矩形链失败又写了一条：这一轮的失败原因该只报一次";
+}
+
+/**
+ * @brief 钉住元素模式只属于它那一轮：下一轮普通框选回到普通横幅与矩形链，再下一轮元素拾取又切回来
+ * @details 入口自己决定这一轮按哪种模式铺，收掉遮罩后模式随轮次作废。判据看两处：
+ *          横幅没有元素模式的操作提示，悬停只问矩形链；反过来再开一轮元素拾取，横幅与查询又回到元素这一侧。
+ */
+TEST_F(CaptureServiceFixture, ElementPickModeEndsWithItsRound)
+{
+    if (QGuiApplication::screens().isEmpty())
+    {
+        GTEST_SKIP() << "这个环境没有屏幕可枚举，铺不出遮罩";
+    }
+
+    SettingsStore           settings(m_iniFile);
+    FakeCaptureSource       source;
+    FakePlatformIntegration fake;
+    fake.capabilitiesValue.uiElements = true;
+    CaptureService service(source, settings, fake);
+    Outcome        outcome;
+    wire(service, outcome);
+
+    service.startElementPick();
+    auto *overlay = findOverlay();
+    ASSERT_NE(overlay, nullptr) << "元素拾取入口没铺出遮罩";
+    EXPECT_TRUE(overlay->modeBannerForTesting().contains(QStringLiteral("元素拾取"))) << "元素拾取这一轮没进元素模式";
+    QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+    QApplication::sendEvent(overlay, &escape);
+    ASSERT_EQ(outcome.cancellations, 1) << "Esc 没收掉元素拾取这一轮";
+
+    service.startInteractive();
+    overlay = findOverlay();
+    ASSERT_NE(overlay, nullptr) << "元素拾取之后普通框选没铺出遮罩";
+    EXPECT_FALSE(overlay->modeBannerForTesting().contains(QStringLiteral("元素拾取"))) << "上一轮的元素模式带进了这一轮：" << overlay->modeBannerForTesting().toStdString();
+    moveOver(*overlay, QRect(QPoint{0, 0}, overlay->size()).center());
+    pumpEventsFor(120);
+    EXPECT_TRUE(fake.elementInfoQueriedPoints.empty()) << "普通框选这一轮的悬停去问了带描述的链：模式没随轮次复位";
+    EXPECT_EQ(fake.queriedPoints.size(), 1U) << "普通框选这一轮的悬停没去问矩形链";
+    QApplication::sendEvent(overlay, &escape);
+    ASSERT_EQ(outcome.cancellations, 2) << "Esc 没收掉普通框选这一轮";
+
+    service.startElementPick();
+    overlay = findOverlay();
+    ASSERT_NE(overlay, nullptr) << "普通框选之后元素拾取没铺出遮罩";
+    EXPECT_TRUE(overlay->modeBannerForTesting().contains(QStringLiteral("元素拾取"))) << "上一轮的普通模式带进了这一轮";
+    moveOver(*overlay, QRect(QPoint{0, 0}, overlay->size()).center());
+    pumpEventsFor(120);
+    EXPECT_EQ(fake.elementInfoQueriedPoints.size(), 1U) << "元素拾取这一轮的悬停没先问带描述的链";
 }
 
 /**
@@ -1499,7 +1603,7 @@ TEST_F(CaptureServiceFixture, StartInteractiveWithFrameUsesProvidedFrameAndSkips
     FakeCaptureSource source;
     CaptureService    service(source, settings, *platform);
 
-    CapturedImage frame    = makeFrame();
+    CapturedImage frame = makeFrame();
     frame.screenName       = screen->name();
     frame.logicalSize      = screen->geometry().size();
     frame.devicePixelRatio = screen->devicePixelRatio();
@@ -1519,7 +1623,8 @@ TEST_F(CaptureServiceFixture, StartInteractiveWithFrameUsesProvidedFrameAndSkips
     ASSERT_NE(overlay, nullptr) << "回溯帧没铺出遮罩";
     EXPECT_TRUE(overlay->isVisible()) << "回溯帧的遮罩没有露出来";
     const auto expectedBanner = QStringLiteral("回溯画面 · ") + frame.capturedAt.toString(QStringLiteral("HH:mm:ss"));
-    EXPECT_EQ(overlay->modeBannerForTesting(), expectedBanner) << "横幅没带抓帧时刻，用户分不清这是回看还是实时画面：" << overlay->modeBannerForTesting().toStdString();
+    EXPECT_EQ(overlay->modeBannerForTesting(), expectedBanner)
+            << "横幅没带抓帧时刻，用户分不清这是回看还是实时画面：" << overlay->modeBannerForTesting().toStdString();
 
     const auto global = overlay->geometry().topLeft();
     // 选区端点含尾：从 (10,10) 拖到 (59,39) 才是 50×30；RECT 的右下一格本身也在框里
@@ -1548,7 +1653,7 @@ TEST_F(CaptureServiceFixture, StartInteractiveWithFrameUsesProvidedFrameAndSkips
 
     // 布局对不上：拒绝并给中文出路，不再铺一张半有效的遮罩
     CapturedImage stale = frame;
-    stale.logicalRegion = frame.logicalRegion.adjusted(0, 0, -10, 0);
+    stale.logicalRegion  = frame.logicalRegion.adjusted(0, 0, -10, 0);
     service.startInteractiveWithFrame(stale);
     ASSERT_TRUE(outcome.error.has_value()) << "布局变了照样铺了遮罩";
     EXPECT_EQ(outcome.error->code, ErrorCode::ScreenUnavailable);
@@ -1574,7 +1679,7 @@ TEST_F(CaptureServiceFixture, StartInteractiveWithFrameWithoutTimestampShowsPlai
     FakeCaptureSource source;
     CaptureService    service(source, settings, *platform);
 
-    CapturedImage frame    = makeFrame();
+    CapturedImage frame = makeFrame();
     frame.screenName       = screen->name();
     frame.logicalSize      = screen->geometry().size();
     frame.devicePixelRatio = screen->devicePixelRatio();
