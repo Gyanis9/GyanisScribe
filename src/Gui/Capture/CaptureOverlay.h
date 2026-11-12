@@ -20,6 +20,7 @@
 #include "Core/Capture/ScreenUtils.h"
 #include "Core/Pick/ColorFormat.h"
 #include "Core/Pick/PickGeometry.h"
+#include "Platform/IPlatformIntegration.h"
 
 #include <array>
 #include <optional>
@@ -112,6 +113,21 @@ namespace GyanisScribe::Gui
          *          本方法按这块屏的原点换成局部坐标；空一份就是退回「只认窗口候选」。
          */
         void setElementChain(const std::vector<QRect> &globalRects);
+
+        /**
+         * @brief 切换这一轮遮罩是不是元素拾取模式
+         * @param enabled 真表示遮罩以拾取界面元素为主：横幅给元素上下文，`I` 复制元素信息
+         * @details 普通截图保持假：横幅与 `I` 一概不碰，回溯框选那条横幅也不会被这一档盖掉。
+         */
+        void setElementPickMode(bool enabled);
+
+        /**
+         * @brief 交付光标处一摞带描述的界面元素
+         * @param globalInfos 每一级的名、类型、窗口、进程与全局逻辑矩形，从最深一级排到窗口根；空一份表示光标下没有可描述的元素
+         * @details 与矩形链同一套局部换算与相邻同矩形并档规则，并档时保留最深一级非空的名字与类型。
+         *          描述只在元素拾取模式下用于横幅与 `I` 复制；普通截图送矩形链即可，遮罩上不会凭空多出内容。
+         */
+        void setElementChain(const std::vector<Platform::UiElementInfo> &globalInfos);
 
         /**
          * @brief 交付这块屏上的历史选区
@@ -245,6 +261,12 @@ namespace GyanisScribe::Gui
         /// 当前模式横幅的文本（只给用例用）
         [[nodiscard]] QString modeBannerForTesting() const;
 
+        /**
+         * @brief 当前悬停层要复制进剪贴板的元素信息文本（只给用例用）
+         * @return 与 `I` 写进剪贴板的那一串逐字相同；普通模式或这一层没有描述时为空
+         */
+        [[nodiscard]] QString elementInfoTextForTesting() const;
+
     signals:
         /**
          * @brief 选区已确认
@@ -356,7 +378,7 @@ namespace GyanisScribe::Gui
             QFont   font;        ///< 三层文字共用的字体
             QString hint;        ///< 尺寸读数（含锁定比例与指针档）
             QString confirm;     ///< 确认/取消那一行
-            QString copied;      ///< 「已复制尺寸 …」那一行；空表示不画
+            QString copied;      ///< 「已复制尺寸 …」或「已复制元素信息」那一行；空表示不画
             QRect   hintRect;    ///< 读数条的矩形
             QRect   confirmRect; ///< 确认行的矩形
             QRect   copiedRect;  ///< 「已复制尺寸」的矩形；不画时为空
@@ -383,6 +405,26 @@ namespace GyanisScribe::Gui
          *          链取完或没有链时退回窗口候选。
          */
         void refreshHoveredRegion();
+
+        /**
+         * @brief 按当前层级刷新元素拾取横幅
+         * @details 只在元素模式下动横幅；普通模式的回溯横幅归 setModeBanner 管，这里一个字都不改。
+         *          只写字段不做重绘，调用方本来就要按整块状态算脏区。
+         */
+        void refreshElementBanner();
+
+        /**
+         * @brief 当前层级对应的元素描述
+         * @return 元素模式且位次落在链内时指向那一级描述；整扇窗口那一档与普通模式没有
+         */
+        [[nodiscard]] const Platform::UiElementInfo *currentElementInfo() const;
+
+        /**
+         * @brief 把一级元素描述拼成剪贴板文本
+         * @param info 当前层级的描述
+         * @return 五行「元素、类型、窗口、进程、区域」，缺的字段写「未知」
+         */
+        [[nodiscard]] QString elementInfoClipboardText(const Platform::UiElementInfo &info) const;
 
         /**
          * @brief 画八个抓点的小方块
@@ -477,24 +519,27 @@ namespace GyanisScribe::Gui
         Core::MagnifierView   m_magnifierView;                           ///< 这一轮的放大镜视野档，构造时读一次
         Core::SizeUnit        m_sizeUnit = Core::SizeUnit::Logical;      ///< 这一轮那几处数字用的单位，构造时读一次
 
-        std::vector<QRect>                 m_regionHistory;         ///< 这块屏上的历史选区，最近的在前；由 Gui::CaptureService 推过来
-        int                                m_historyIndex = -1;     ///< 当前选区取自历史里的哪一条；-1 表示不是取自历史（用户自己框/改的）
-        QString                            m_copiedSizeHint;        ///< 「已复制尺寸 …」那行提示，指针一动就清
-        bool                               m_isAdjusting = false;   ///< 是否正拖着某个抓点改选区
-        std::optional<Core::SelectionGrip> m_draggedGrip;           ///< 拖着的那个抓点，没拖时为空
-        QPoint                             m_adjustPoint;           ///< 上一帧的鼠标位置，拖抓点时按增量走
-        bool                               m_isSelecting = false;   ///< 是否正在拖动框选
-        std::vector<QRect>                 m_windowCandidates;      ///< 窗口候选，已换成局部逻辑坐标，按 z 序排
-        std::vector<QRect>                 m_elementChain;          ///< 光标处的元素链，已换成局部逻辑坐标，由深到浅；相邻同矩形已并档
-        std::size_t                        m_elementAscent = 0;     ///< 从这里往上数了几级（0 = 最深一级）；等于链长时看整扇窗口
-        std::optional<QRect>               m_hoveredRegion;         ///< 光标压在上的那一个候选，没有则空
-        std::optional<QRect>               m_pressedHoveredRegion;  ///< 按下那一刻亮着的候选：小位移松手时按它采纳
-        QSize                              m_aspectRatio;           ///< 上一次锁过的长宽比（已约分）；空 = 还没有过
-        bool                               m_aspectLocked  = false; ///< 长宽比锁此刻是不是开着
-        bool                               m_cursorTouched = false; ///< 指针档被 `P` 翻过没有：没翻过就不必多占读数那一格
-        std::optional<bool>                m_cursorIncluded;        ///< 这一轮成品要不要含指针；空 = 这一轮没有这一档
-        QLineEdit                         *m_sizeEditor = nullptr;  ///< 尺寸输入框，开着时才有
-        QString                            m_modeBanner;            ///< 左上角的模式横幅文本；空表示不画
-        QRect                              m_modeBannerRect;        ///< 横幅底板的逻辑矩形，随文本一起算好
+        std::vector<QRect>                   m_regionHistory;                 ///< 这块屏上的历史选区，最近的在前；由 Gui::CaptureService 推过来
+        int                                  m_historyIndex = -1;             ///< 当前选区取自历史里的哪一条；-1 表示不是取自历史（用户自己框/改的）
+        QString                              m_copiedSizeHint;                ///< 「已复制尺寸/元素信息 …」那行提示，指针一动就清
+        bool                                 m_isAdjusting = false;           ///< 是否正拖着某个抓点改选区
+        std::optional<Core::SelectionGrip>   m_draggedGrip;                   ///< 拖着的那个抓点，没拖时为空
+        QPoint                               m_adjustPoint;                   ///< 上一帧的鼠标位置，拖抓点时按增量走
+        bool                                 m_isSelecting = false;           ///< 是否正在拖动框选
+        std::vector<QRect>                   m_windowCandidates;              ///< 窗口候选，已换成局部逻辑坐标，按 z 序排
+        std::vector<QRect>                   m_elementChain;                  ///< 光标处的元素链，已换成局部逻辑坐标，由深到浅；相邻同矩形已并档
+        std::vector<Platform::UiElementInfo> m_elementInfos;                  ///< 与 m_elementChain 逐项对齐的元素描述，已并档；普通截图为空
+        std::size_t                          m_elementAscent         = 0;     ///< 从这里往上数了几级（0 = 最深一级）；等于链长时看整扇窗口
+        bool                                 m_elementPickMode       = false; ///< 这一轮是不是元素拾取：决定横幅与 `I` 是否接管
+        bool                                 m_elementChainDelivered = false; ///< 服务有没有在元素模式下送过链：没送过时横幅仍给操作提示
+        std::optional<QRect>                 m_hoveredRegion;                 ///< 光标压在上的那一个候选，没有则空
+        std::optional<QRect>                 m_pressedHoveredRegion;          ///< 按下那一刻亮着的候选：小位移松手时按它采纳
+        QSize                                m_aspectRatio;                   ///< 上一次锁过的长宽比（已约分）；空 = 还没有过
+        bool                                 m_aspectLocked  = false;         ///< 长宽比锁此刻是不是开着
+        bool                                 m_cursorTouched = false;         ///< 指针档被 `P` 翻过没有：没翻过就不必多占读数那一格
+        std::optional<bool>                  m_cursorIncluded;                ///< 这一轮成品要不要含指针；空 = 这一轮没有这一档
+        QLineEdit                           *m_sizeEditor = nullptr;          ///< 尺寸输入框，开着时才有
+        QString                              m_modeBanner;                    ///< 左上角的模式横幅文本；空表示不画
+        QRect                                m_modeBannerRect;                ///< 横幅底板的逻辑矩形，随文本一起算好
     };
 } // namespace GyanisScribe::Gui

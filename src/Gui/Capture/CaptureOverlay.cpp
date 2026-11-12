@@ -187,7 +187,76 @@ namespace GyanisScribe::Gui
             }
             m_elementChain.push_back(local);
         }
+        // 矩形链没有描述可给：元素模式下横幅退回「没认出元素」，普通模式这一句不会走到
+        m_elementInfos.clear();
+        m_elementChainDelivered = true;
         refreshHoveredRegion();
+        refreshElementBanner();
+        update(before | visualRegionForCurrentState());
+    }
+
+    void CaptureOverlay::setElementPickMode(const bool enabled)
+    {
+        if (m_elementPickMode == enabled)
+        {
+            return;
+        }
+        const auto before = visualRegionForCurrentState();
+        m_elementPickMode = enabled;
+        if (enabled)
+        {
+            refreshElementBanner();
+        } else
+        {
+            // 退出这一档就把它留下的横幅收掉：横幅描述的是上一个模式，留着会误导
+            m_modeBanner.clear();
+            m_modeBannerRect = QRect{};
+        }
+        update(before | visualRegionForCurrentState());
+    }
+
+    void CaptureOverlay::setElementChain(const std::vector<Platform::UiElementInfo> &globalInfos)
+    {
+        // 先记改动前的那一片：横幅与悬停框都可能换位置，旧位置也要一起刷
+        const auto before = visualRegionForCurrentState();
+
+        const auto origin = m_screenGeometry.topLeft();
+        m_elementChain.clear();
+        m_elementInfos.clear();
+        m_elementChain.reserve(globalInfos.size());
+        m_elementInfos.reserve(globalInfos.size());
+        for (const auto &info: globalInfos)
+        {
+            const auto local = info.logicalGlobal.translated(-origin.x(), -origin.y());
+            // 与矩形链同一套并档规则：相邻同矩形是惰性树里的包装层，`,`、`.` 按「块」不按「层」
+            if (!m_elementChain.empty() && m_elementChain.back() == local)
+            {
+                // 描述逐字段补进这一档：最深一级已有的名字/类型优先，缺的那一格往同块的外层取
+                auto &merged = m_elementInfos.back();
+                if (merged.name.isEmpty())
+                {
+                    merged.name = info.name;
+                }
+                if (merged.controlType.isEmpty())
+                {
+                    merged.controlType = info.controlType;
+                }
+                if (merged.windowTitle.isEmpty())
+                {
+                    merged.windowTitle = info.windowTitle;
+                }
+                if (merged.processName.isEmpty())
+                {
+                    merged.processName = info.processName;
+                }
+                continue;
+            }
+            m_elementChain.push_back(local);
+            m_elementInfos.push_back(info);
+        }
+        m_elementChainDelivered = true;
+        refreshHoveredRegion();
+        refreshElementBanner();
         update(before | visualRegionForCurrentState());
     }
 
@@ -456,6 +525,96 @@ namespace GyanisScribe::Gui
         m_hoveredRegion = Core::regionAtPoint(m_cursorPoint, m_windowCandidates);
     }
 
+    const Platform::UiElementInfo *CaptureOverlay::currentElementInfo() const
+    {
+        // 链长那一档是整扇窗口，没有元素描述；普通截图也不读描述，`I` 与横幅都不该被这条接上
+        if (!m_elementPickMode || m_elementAscent >= m_elementChain.size() || m_elementAscent >= m_elementInfos.size())
+        {
+            return nullptr;
+        }
+        return &m_elementInfos[m_elementAscent];
+    }
+
+    QString CaptureOverlay::elementInfoClipboardText(const Platform::UiElementInfo &info) const
+    {
+        const auto unknown        = GyanisScribe::Base::uiText("未知");
+        const auto valueOrUnknown = [&unknown](const QString &value) { return value.isEmpty() ? unknown : value; };
+        const auto region         = info.logicalGlobal;
+        return GyanisScribe::Base::uiText("元素") + QStringLiteral("：") + valueOrUnknown(info.name) + QLatin1Char('\n') + GyanisScribe::Base::uiText("类型") +
+               QStringLiteral("：") + valueOrUnknown(info.controlType) + QLatin1Char('\n') + GyanisScribe::Base::uiText("窗口") + QStringLiteral("：") +
+               valueOrUnknown(info.windowTitle) + QLatin1Char('\n') + GyanisScribe::Base::uiText("进程") + QStringLiteral("：") + valueOrUnknown(info.processName) +
+               QLatin1Char('\n') + GyanisScribe::Base::uiText("区域") + QStringLiteral("：") +
+               QStringLiteral("%1, %2, %3×%4（%5）").arg(region.x()).arg(region.y()).arg(region.width()).arg(region.height()).arg(Core::sizeUnitLabel(Core::SizeUnit::Logical));
+    }
+
+    QString CaptureOverlay::elementInfoTextForTesting() const
+    {
+        if (const auto *info = currentElementInfo())
+        {
+            return elementInfoClipboardText(*info);
+        }
+        return {};
+    }
+
+    void CaptureOverlay::refreshElementBanner()
+    {
+        if (!m_elementPickMode)
+        {
+            // 普通模式的横幅归 setModeBanner 管：回溯框选写上去的那一句不能被这一路改掉
+            return;
+        }
+
+        const auto fallback       = [] { return GyanisScribe::Base::uiText("没认出元素，可拖动框选"); };
+        const auto hasDescription = std::any_of(m_elementInfos.begin(), m_elementInfos.end(), [](const Platform::UiElementInfo &info)
+                                                { return !info.name.isEmpty() || !info.controlType.isEmpty() || !info.windowTitle.isEmpty() || !info.processName.isEmpty(); });
+
+        QString text;
+        if (m_elementChain.empty())
+        {
+            // 服务还没送过链时给操作提示；送过一条空链就是「认不出」，别再说「悬停选元素」
+            text = m_elementChainDelivered ? fallback() : GyanisScribe::Base::uiText("元素拾取：悬停选元素，, / . 换层级，点击选中，拖动框选，Esc 取消");
+        } else if (!hasDescription)
+        {
+            // 服务回落成矩形链：链上没有任何描述，横幅不假装认出了元素
+            text = fallback();
+        } else if (const auto *info = currentElementInfo())
+        {
+            if (!info->name.isEmpty())
+            {
+                text = GyanisScribe::Base::uiText("元素") + QStringLiteral("：") + info->name;
+                if (!info->controlType.isEmpty())
+                {
+                    text += QStringLiteral("（") + info->controlType + QStringLiteral("）");
+                }
+                if (!info->windowTitle.isEmpty())
+                {
+                    text += QStringLiteral(" · ") + info->windowTitle;
+                }
+            } else if (!info->controlType.isEmpty())
+            {
+                text = info->controlType;
+                if (!info->windowTitle.isEmpty())
+                {
+                    text += QStringLiteral(" · ") + info->windowTitle;
+                }
+            } else
+            {
+                text = info->windowTitle;
+            }
+        } else
+        {
+            // 位次升到链长：看的就是整扇窗口，那一档没有元素描述
+            text = GyanisScribe::Base::uiText("整扇窗口");
+        }
+
+        if (text.isEmpty())
+        {
+            text = fallback();
+        }
+        m_modeBanner     = text;
+        m_modeBannerRect = modeBannerRectFor(text);
+    }
+
     QRect CaptureOverlay::normalizeRect(const QPoint &anchor, const QPoint &current)
     {
         return QRect(anchor, current).normalized();
@@ -501,10 +660,10 @@ namespace GyanisScribe::Gui
         layout.hintRect        = QRect{hintTopLeft, textSize + QSize(GyanisScribe::Gui::kHintPadding * 2, GyanisScribe::Gui::kHintPadding)};
 
         // 确认/取消怎么写常驻读数下一行：新用户拖完框最容易停在「然后呢」上
-        layout.confirm     = m_isSelecting ? GyanisScribe::Base::uiText("松开鼠标即完成 · Esc 取消")
-                                           : GyanisScribe::Base::uiText("拖动边缘调整 · Enter/双击确认 · Esc 取消");
+        layout.confirm         = m_isSelecting ? GyanisScribe::Base::uiText("松开鼠标即完成 · Esc 取消") : GyanisScribe::Base::uiText("拖动边缘调整 · Enter/双击确认 · Esc 取消");
         const auto confirmSize = metrics.size(Qt::TextSingleLine, layout.confirm);
-        layout.confirmRect     = QRect{hintTopLeft + QPoint(0, textSize.height() + kCopiedHintGap), confirmSize + QSize(GyanisScribe::Gui::kHintPadding * 2, GyanisScribe::Gui::kHintPadding)};
+        layout.confirmRect =
+                QRect{hintTopLeft + QPoint(0, textSize.height() + kCopiedHintGap), confirmSize + QSize(GyanisScribe::Gui::kHintPadding * 2, GyanisScribe::Gui::kHintPadding)};
 
         // 「已复制尺寸 …」贴在确认行下面一格；指针一动就清（见 mouseMoveEvent），
         // 不为它引一个定时器——那种反馈本来就不必跟秒表绑定
@@ -569,7 +728,7 @@ namespace GyanisScribe::Gui
             }
 
             // 提示区三层文字与位置跟局部重绘共用一次测量：两边各量一遍，字号或文案一变就会有一边算错
-            const auto hint     = hintLayoutFor(shown);
+            const auto hint = hintLayoutFor(shown);
             // 量尺寸时已锁过表格数字，绘制前再显式锁一次：同一属性重复应用不改变字体，绘制处也不依赖量尺寸那一侧
             QFont hintFont = hint.font;
             hintFont       = GyanisScribe::Gui::tabularFont(hintFont, TextScript::Mixed);
@@ -715,6 +874,7 @@ namespace GyanisScribe::Gui
             setCursor(Core::cursorForGrip(Core::gripAt(selectedRegion(), m_cursorPoint)));
         }
         refreshHoveredRegion();
+        refreshElementBanner();
         update(before | visualRegionForCurrentState());
     }
 
@@ -791,6 +951,21 @@ namespace GyanisScribe::Gui
                 m_currentPoint     = changed.bottomRight();
                 update();
             }
+            return;
+        }
+
+        // `I` 只在元素模式里接管：把当前层的元素上下文抄进剪贴板，补上截图之外的说明。
+        // 普通截图没有元素描述可抄，这颗键不归遮罩管，原样交回 Qt
+        if (m_elementPickMode && event->modifiers() == Qt::NoModifier && event->key() == Qt::Key_I)
+        {
+            const auto *info = currentElementInfo();
+            if (info == nullptr)
+            {
+                return;
+            }
+            QGuiApplication::clipboard()->setText(elementInfoClipboardText(*info));
+            m_copiedSizeHint = GyanisScribe::Base::uiText("已复制元素信息");
+            update();
             return;
         }
 
@@ -917,6 +1092,7 @@ namespace GyanisScribe::Gui
                     --m_elementAscent;
                 }
                 refreshHoveredRegion();
+                refreshElementBanner();
                 update();
                 return;
             }

@@ -31,6 +31,7 @@
 using GyanisScribe::Core::ColorFormat;
 using GyanisScribe::Core::SizeUnit;
 using GyanisScribe::Gui::CaptureOverlay;
+using GyanisScribe::Platform::UiElementInfo;
 
 namespace
 {
@@ -519,6 +520,26 @@ void pressKeyAutoRepeat(CaptureOverlay &overlay, const Qt::Key key, const Qt::Ke
     return QGuiApplication::clipboard()->text();
 }
 
+/// 按 I 复制元素信息并读回，读不到就重按一次，最多等两秒
+/// @param expected 期望的文本
+/// @return 最终从剪贴板读到的文本
+/// @details 与 copySizeAndReadBack 同一条重试路：剪贴板是全桌面共享资源，偶发写不进去时重按一次
+[[nodiscard]] QString copyElementInfoAndReadBack(CaptureOverlay &overlay, const QString &expected)
+{
+    for (int attempt = 0; attempt < 40; ++attempt)
+    {
+        pressKey(overlay, Qt::Key_I);
+        const auto text = QGuiApplication::clipboard()->text();
+        if (text == expected)
+        {
+            return text;
+        }
+        QApplication::processEvents();
+        QThread::msleep(50);
+    }
+    return QGuiApplication::clipboard()->text();
+}
+
 /// 拖出一块选区：按下 anchor，拖到 current 后放开
 void dragOut(CaptureOverlay &overlay, const QPoint &anchor, const QPoint &current)
 {
@@ -558,7 +579,7 @@ TEST_F(CaptureOverlayFixture, LargeHintTextKeepsTheWholeRepaintRegion)
     overlay->show();
     QApplication::processEvents();
 
-    overlay->setElementChain({});
+    overlay->setElementChain(std::vector<QRect>{});
     QApplication::processEvents();
 
     const auto region    = overlay->lastPaintRegionForTesting();
@@ -1330,6 +1351,117 @@ TEST_F(CaptureOverlayFixture, ConfirmHintRidesUnderTheSizeReadout)
         }
     }
     EXPECT_GT(bright, 30) << "尺寸读数下一行没有确认提示：新用户看不出拖完框之后怎么确认";
+}
+
+/**
+ * @brief 钉住元素模式：横幅默认给操作提示，悬停后显示名字/类型/窗口，`,`/`.` 换层级后跟着换
+ * @details 元素模式的全部上下文都落在同一条模式横幅上：默认那句话告诉用户怎么用，悬停之后换成
+ *          认出的元素，升到链长那一档换成「整扇窗口」。横幅晚一步刷新，用户按了 `,` 看到的还是下一层的名字。
+ */
+TEST_F(CaptureOverlayFixture, ElementPickModeShowsElementContextAndLevels)
+{
+    auto overlay = makeOverlay();
+    overlay->setElementPickMode(true);
+    EXPECT_TRUE(overlay->modeBannerForTesting().contains(QStringLiteral("元素拾取"))) << overlay->modeBannerForTesting().toStdString();
+    overlay->setWindowCandidates(kCandidates);
+    overlay->setElementChain(std::vector<UiElementInfo>{
+            UiElementInfo{QStringLiteral("保存"), QStringLiteral("按钮"), QStringLiteral("记事本"), QStringLiteral("notepad.exe"), QRect{1960, 30, 80, 40}},
+            UiElementInfo{QStringLiteral("工具栏"), QStringLiteral("工具栏"), QStringLiteral("记事本"), QStringLiteral("notepad.exe"), QRect{1950, 20, 160, 120}},
+    });
+    moveOver(*overlay, QPoint{100, 60});
+    QApplication::processEvents();
+    EXPECT_TRUE(overlay->modeBannerForTesting().contains(QStringLiteral("保存"))) << overlay->modeBannerForTesting().toStdString();
+    EXPECT_TRUE(overlay->modeBannerForTesting().contains(QStringLiteral("按钮")));
+    EXPECT_TRUE(overlay->modeBannerForTesting().contains(QStringLiteral("记事本"))) << overlay->modeBannerForTesting().toStdString();
+    pressKey(*overlay, Qt::Key_Comma);
+    QApplication::processEvents();
+    EXPECT_TRUE(overlay->modeBannerForTesting().contains(QStringLiteral("工具栏"))) << overlay->modeBannerForTesting().toStdString();
+    pressKey(*overlay, Qt::Key_Period);
+    QApplication::processEvents();
+    EXPECT_TRUE(overlay->modeBannerForTesting().contains(QStringLiteral("保存"))) << overlay->modeBannerForTesting().toStdString();
+
+    // 升到链长那一档：整扇窗口没有元素元数据，横幅不许还挂着上一层的名字
+    pressKey(*overlay, Qt::Key_Comma);
+    pressKey(*overlay, Qt::Key_Comma);
+    QApplication::processEvents();
+    EXPECT_EQ(overlay->modeBannerForTesting(), QStringLiteral("整扇窗口")) << overlay->modeBannerForTesting().toStdString();
+}
+
+/**
+ * @brief 钉住相邻同矩形包装层并档时，名字与类型取同块里第一个非空的那一级
+ * @details 最深那一层常常是读不出名字的壳：并档若只看最深一级，横幅会从「保存」掉成空描述，
+ *          按一下 `,` 又直接跳到上一层。判据按并档后的层级与横幅内容一起钉。
+ */
+TEST_F(CaptureOverlayFixture, ElementMetadataMergesDeepestNamedLevel)
+{
+    auto overlay = makeOverlay();
+    overlay->setElementPickMode(true);
+    overlay->setElementChain(std::vector<UiElementInfo>{
+            UiElementInfo{QString{}, QString{}, QStringLiteral("记事本"), QStringLiteral("notepad.exe"), QRect{2060, 150, 80, 40}},
+            UiElementInfo{QStringLiteral("保存"), QStringLiteral("按钮"), QStringLiteral("记事本"), QStringLiteral("notepad.exe"), QRect{2060, 150, 80, 40}},
+            UiElementInfo{QStringLiteral("工具栏"), QStringLiteral("工具栏"), QStringLiteral("记事本"), QStringLiteral("notepad.exe"), QRect{2020, 110, 280, 180}},
+    });
+    moveOver(*overlay, QPoint{200, 160});
+    QApplication::processEvents();
+    EXPECT_TRUE(overlay->modeBannerForTesting().contains(QStringLiteral("保存"))) << overlay->modeBannerForTesting().toStdString();
+    EXPECT_TRUE(overlay->modeBannerForTesting().contains(QStringLiteral("按钮"))) << overlay->modeBannerForTesting().toStdString();
+
+    pressKey(*overlay, Qt::Key_Comma);
+    EXPECT_TRUE(overlay->modeBannerForTesting().contains(QStringLiteral("工具栏"))) << "同块的两级没并成一档，按一下就停在同一层";
+}
+
+/**
+ * @brief 钉住 I 只在元素模式且有元素时复制，文本逐字对上，缺字段写未知
+ * @details 复制的是用户此刻看到的元素上下文：名字、类型、窗口、进程与全局逻辑矩形逐字一致，
+ *          粘贴到文档里才能和截图对上。普通截图没有元素链，`I` 不许改动剪贴板。
+ */
+TEST_F(CaptureOverlayFixture, ElementInfoCopyIsExplicitAndComplete)
+{
+    auto overlay = makeOverlay();
+    overlay->setElementPickMode(true);
+    overlay->setWindowCandidates(kCandidates);
+    overlay->setElementChain(std::vector<UiElementInfo>{
+            UiElementInfo{QStringLiteral("保存"), QStringLiteral("按钮"), QStringLiteral("记事本"), QStringLiteral("notepad.exe"), QRect{1960, 30, 80, 40}},
+    });
+    moveOver(*overlay, QPoint{100, 60});
+    QApplication::processEvents();
+    const auto expected = QStringLiteral("元素：保存\n类型：按钮\n窗口：记事本\n进程：notepad.exe\n区域：1960, 30, 80×40（逻辑像素）");
+    EXPECT_EQ(overlay->elementInfoTextForTesting(), expected) << "元素信息文案与剪贴板不是同一份";
+    EXPECT_EQ(copyElementInfoAndReadBack(*overlay, expected), expected);
+
+    // 缺字段写「未知」：空着一行会让读者以为是程序漏打了一格
+    auto sparse = makeOverlay();
+    sparse->setElementPickMode(true);
+    sparse->setElementChain(std::vector<UiElementInfo>{
+            UiElementInfo{QString{}, QString{}, QString{}, QString{}, QRect{2000, 100, 40, 20}},
+    });
+    moveOver(*sparse, QPoint{100, 100});
+    const auto sparseExpected = QStringLiteral("元素：未知\n类型：未知\n窗口：未知\n进程：未知\n区域：2000, 100, 40×20（逻辑像素）");
+    EXPECT_EQ(copyElementInfoAndReadBack(*sparse, sparseExpected), sparseExpected) << "缺字段没有写成未知";
+
+    // 普通模式没有元素链可复制：I 不得改动剪贴板
+    auto plain = makeOverlay();
+    plain->setWindowCandidates(kCandidates);
+    const auto before = QGuiApplication::clipboard()->text();
+    pressKey(*plain, Qt::Key_I);
+    EXPECT_EQ(QGuiApplication::clipboard()->text(), before);
+}
+
+/**
+ * @brief 钉住没有元素时横幅提示可拖动，拖动仍能框出一块
+ * @details 平台认不出元素是常态出口：这时元素模式必须退回普通框选，而不是让遮罩只剩一个说不通的横幅。
+ */
+TEST_F(CaptureOverlayFixture, ElementPickFallsBackToDragSelection)
+{
+    auto overlay = makeOverlay();
+    overlay->setElementPickMode(true);
+    overlay->setWindowCandidates({});
+    overlay->setElementChain(std::vector<UiElementInfo>{});
+    moveOver(*overlay, QPoint{100, 60});
+    QApplication::processEvents();
+    EXPECT_TRUE(overlay->modeBannerForTesting().contains(QStringLiteral("拖动"))) << overlay->modeBannerForTesting().toStdString();
+    dragOut(*overlay, QPoint{40, 40}, QPoint{160, 120});
+    EXPECT_EQ(overlay->selectedRegion(), QRect(40, 40, 121, 81));
 }
 
 /**

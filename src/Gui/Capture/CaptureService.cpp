@@ -682,7 +682,7 @@ namespace GyanisScribe::Gui
         }
 
         // 问不出来就退回只认窗口，别把上一次的链留在屏幕上装作还认得：那个框已经不对应光标下的东西了
-        overlay->setElementChain({});
+        overlay->setElementChain(std::vector<QRect>{});
         if (m_elementFailureReported)
         {
             return;
