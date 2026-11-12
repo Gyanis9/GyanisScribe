@@ -103,7 +103,16 @@ namespace GyanisScribe::App
                          });
         dialog->show();
 
-        if (detectionImage.isNull() || detectionImage.size() != reportSize)
+        if (detectionImage.isNull())
+        {
+            // 没有检查底图：入口那边漏传了，不是尺寸问题，别让用户去查一个不存在的差异
+            m_dialogKey       = 0;
+            m_queuedDetection = QImage{};
+            dialog->setScanUnavailable(GyanisScribe::Base::uiText("没有可用于检查的底图，无法自动打码；请自行检查后再分享"));
+            return;
+        }
+
+        if (detectionImage.size() != reportSize)
         {
             // 识别框按检测图算，尺寸对不上就整体错位：不猜坐标，直接交给用户自己检查
             // 拒收时连钥匙与排队一起清掉：上一扇窗还在飞的同一张图回来时不该落进这扇只能自查的窗

@@ -606,3 +606,21 @@ TEST_F(BugReportCoordinatorFixture, ReopeningWithTheSameFrameDoesNotQueueASecond
     EXPECT_FALSE(coordinator.isScanningForTesting()) << "已经出结果了还在扫，说明同一张图又被排了一轮";
     EXPECT_EQ(second->redactionForTesting().state, RedactionState::Masked) << "重复扫描把已经打好的码翻成了不可用";
 }
+
+/**
+ * @brief 钉住没有检查底图时给的是「没有底图」，不是「尺寸不一致」
+ * @details 两种毛病给的出路不同：一个是没传底图（调用方的问题），一个是尺寸对不上（坐标会错位）。
+ */
+TEST_F(BugReportCoordinatorFixture, ANullDetectionImageGetsItsOwnReason)
+{
+    auto                 engine = std::make_unique<FakeOcrEngine>(Expected<OcrResult>{makePhoneResult()});
+    BugReportCoordinator coordinator{*m_settings, std::move(engine), emptyBarcodeReader()};
+    QWidget              parent;
+
+    coordinator.openReport(makeImage(QSize{200, 100}, QColor{10, 20, 30}), QImage{}, makeContext(), &parent);
+    auto *dialog = coordinator.dialogForTesting();
+    ASSERT_NE(dialog, nullptr);
+    EXPECT_EQ(dialog->redactionForTesting().state, RedactionState::Unavailable);
+    EXPECT_TRUE(dialog->redactionForTesting().unavailableReason.contains(QStringLiteral("没有可用于检查的底图"))) << "没有底图却报成了尺寸不一致";
+    EXPECT_FALSE(dialog->reportText().contains(QStringLiteral("尺寸不一致"))) << "两句原因串了";
+}

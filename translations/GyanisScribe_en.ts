@@ -5324,6 +5324,10 @@
             <translation>The system's UI Automation could not start, so UI elements under the cursor cannot be listed. Hovering can still recognise whole windows, or frame the target region directly</translation>
         </message>
         <message>
+            <source>没有可用于检查的底图，无法自动打码；请自行检查后再分享</source>
+            <translation>There is no checked image to compare against, so auto-redaction was skipped; check before sharing</translation>
+        </message>
+        <message>
             <source>截图与检查底图尺寸不一致，无法自动打码；请自行检查后再分享</source>
             <translation>The capture and the checked image have different sizes, so auto-redaction was skipped; check before sharing</translation>
         </message>
