@@ -85,6 +85,8 @@ namespace GyanisScribe::Gui
         m_redaction   = Core::BugReport::BugReportRedaction{};
         m_reportImage = m_originalImage;
         m_redactionStatus->setText(uiText("正在检查敏感信息…"));
+        // 上一轮的动作结果对新一轮不成立：留着会让用户以为这次已经存过了
+        setStatus(QString{}, false);
         updatePreviewImage();
         refreshPreview();
         updateActionAvailability();

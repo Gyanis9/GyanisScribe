@@ -411,3 +411,19 @@ TEST_F(BugReportDialogFixture, AdjustButtonSitsInTheLeftColumnUnderTheStatus)
     EXPECT_LT(adjust->geometry().top(), markdownPreview->geometry().top()) << "调整打码落进了底部动作行";
     EXPECT_GT(copy->geometry().top(), markdownPreview->geometry().bottom()) << "复制按钮仍在底部动作行";
 }
+
+/**
+ * @brief 钉住重新发起检查会清掉上一次的复制/保存状态
+ * @details 状态行说的是「上一次操作的结果」：新的一轮检查还没落地时，它挂着的旧读数会让人以为本轮已经存过。
+ */
+TEST_F(BugReportDialogFixture, RestartingAScanClearsThePreviousActionStatus)
+{
+    auto dialog = makeDialog();
+    dialog->setScanResult({});
+    ASSERT_TRUE(dialog->copyReport().has_value()) << "前提：先留下一条操作状态";
+    ASSERT_FALSE(dialog->statusText().isEmpty()) << "前提：状态行确实写上了字";
+
+    dialog->setScanRunning();
+    EXPECT_TRUE(dialog->statusText().isEmpty()) << "重扫开始了，上一次的复制状态还挂在状态行上";
+    EXPECT_EQ(dialog->redactionForTesting().state, RedactionState::Pending);
+}
