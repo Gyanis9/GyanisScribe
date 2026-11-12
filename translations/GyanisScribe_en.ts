@@ -5323,5 +5323,349 @@
             <source>系统的 UI Automation 无法启动，不能列出光标下的界面元素。可继续使用悬停识别整个窗口，或直接框选目标区域。</source>
             <translation>The system's UI Automation could not start, so UI elements under the cursor cannot be listed. Hovering can still recognise whole windows, or frame the target region directly</translation>
         </message>
+        <message>
+            <source>截图与检查底图尺寸不一致，无法自动打码；请自行检查后再分享</source>
+            <translation>The capture and the checked image have different sizes, so auto-redaction was skipped; check before sharing</translation>
+        </message>
+        <message>
+            <source>当前没有可生成报告的截图</source>
+            <translation>There is no capture to build a report from</translation>
+        </message>
+        <message>
+            <source>截图问题反馈</source>
+            <translation>Screenshot report</translation>
+        </message>
+        <message>
+            <source>（未填写）</source>
+            <translation>(not provided)</translation>
+        </message>
+        <message>
+            <source>内核 %1</source>
+            <translation>kernel %1</translation>
+        </message>
+        <message>
+            <source>系统：%1</source>
+            <translation>System: %1</translation>
+        </message>
+        <message>
+            <source>系统：%1（%2）</source>
+            <translation>System: %1 (%2)</translation>
+        </message>
+        <message>
+            <source>截图尺寸：%1 × %2 逻辑像素（%3 × %4 像素，缩放 %5）</source>
+            <translation>Capture size: %1 × %2 logical px (%3 × %4 px, scale %5)</translation>
+        </message>
+        <message>
+            <source>截图尺寸：%1 × %2 逻辑像素</source>
+            <translation>Capture size: %1 × %2 logical px</translation>
+        </message>
+        <message>
+            <source>截图尺寸：%1 × %2 像素</source>
+            <translation>Capture size: %1 × %2 px</translation>
+        </message>
+        <message>
+            <source>正在检查。</source>
+            <translation>Checking.</translation>
+        </message>
+        <message>
+            <source>已对 %1 处敏感信息打码（%2）。请自行检查后再分享。</source>
+            <translation>Redacted %1 sensitive item(s) with %2. Check before sharing.</translation>
+        </message>
+        <message>
+            <source>未检出可打码的敏感信息。请自行检查后再分享。</source>
+            <translation>No redactable sensitive information detected. Check before sharing.</translation>
+        </message>
+        <message>
+            <source>不可用（%1）。本次不保存截图，请自行检查文字内容后再分享。</source>
+            <translation>Unavailable (%1). No screenshot was saved; check the text before sharing.</translation>
+        </message>
+        <message>
+            <source>应用：%1</source>
+            <translation>App: %1</translation>
+        </message>
+        <message>
+            <source>Qt：%1</source>
+            <translation>Qt: %1</translation>
+        </message>
+        <message>
+            <source>屏幕：%1</source>
+            <translation>Screen: %1</translation>
+        </message>
+        <message>
+            <source>截图时间：%1</source>
+            <translation>Capture time: %1</translation>
+        </message>
+        <message>
+            <source>## 环境</source>
+            <translation>## Environment</translation>
+        </message>
+        <message>
+            <source>前台窗口（截图时）：%1</source>
+            <translation>Foreground window (at capture): %1</translation>
+        </message>
+        <message>
+            <source>进程：%1</source>
+            <translation>Process: %1</translation>
+        </message>
+        <message>
+            <source>## 窗口</source>
+            <translation>## Window</translation>
+        </message>
+        <message>
+            <source>## 复现步骤</source>
+            <translation>## Steps to reproduce</translation>
+        </message>
+        <message>
+            <source>## 期望结果</source>
+            <translation>## Expected result</translation>
+        </message>
+        <message>
+            <source>## 实际结果</source>
+            <translation>## Actual result</translation>
+        </message>
+        <message>
+            <source>## 补充说明</source>
+            <translation>## Additional notes</translation>
+        </message>
+        <message>
+            <source>## 截图</source>
+            <translation>## Screenshot</translation>
+        </message>
+        <message>
+            <source>截图：未附带（本段只含文字）。</source>
+            <translation>Screenshot: not attached (text only).</translation>
+        </message>
+        <message>
+            <source>![截图](&lt;%1&gt;)</source>
+            <translation>![Screenshot](&lt;%1&gt;)</translation>
+        </message>
+        <message>
+            <source>自动打码：%1</source>
+            <translation>Auto-redaction: %1</translation>
+        </message>
+        <message>
+            <source>没有可打码的图。请先截图或打开一张图片</source>
+            <translation>There is no image to redact. Capture or open an image first</translation>
+        </message>
+        <message>
+            <source>没有可打码的框</source>
+            <translation>There are no boxes to redact</translation>
+        </message>
+        <message>
+            <source>画布逻辑尺寸为空，无法换算打码框</source>
+            <translation>The canvas logical size is empty; redaction boxes cannot be mapped</translation>
+        </message>
+        <message>
+            <source>只支持马赛克或高斯模糊两种打码方式</source>
+            <translation>Only mosaic or Gaussian blur redaction is supported</translation>
+        </message>
+        <message>
+            <source>马赛克粒度必须大于 0</source>
+            <translation>The mosaic block size must be greater than 0</translation>
+        </message>
+        <message>
+            <source>所有打码框都在画布之外，未改动图片</source>
+            <translation>All redaction boxes are outside the canvas; the image was not changed</translation>
+        </message>
+        <message>
+            <source>自动打码没有产出图像，请重试</source>
+            <translation>Auto-redaction produced no image; try again</translation>
+        </message>
+        <message>
+            <source>Bug 报告</source>
+            <translation>Bug report</translation>
+        </message>
+        <message>
+            <source>Bug 报告（本机生成，自动打码，不上传）</source>
+            <translation>Bug report (local only, auto-redacted, never uploaded)</translation>
+        </message>
+        <message>
+            <source>未检出可打码的敏感信息。请自行检查。</source>
+            <translation>No redactable sensitive information detected. Check before sending.</translation>
+        </message>
+        <message>
+            <source>自动打码失败：%1</source>
+            <translation>Auto-redaction failed: %1</translation>
+        </message>
+        <message>
+            <source>自动打码不可用：%1。本次不会保存截图，报告只含文字。</source>
+            <translation>Auto-redaction unavailable: %1. No screenshot will be saved; the report will contain text only.</translation>
+        </message>
+        <message>
+            <source>正在检查敏感信息，请稍候再复制</source>
+            <translation>Checking for sensitive information; wait before copying</translation>
+        </message>
+        <message>
+            <source>已复制报告文字到剪贴板</source>
+            <translation>Report text copied to the clipboard</translation>
+        </message>
+        <message>
+            <source>正在检查敏感信息，请稍候再保存</source>
+            <translation>Checking for sensitive information; wait before saving</translation>
+        </message>
+        <message>
+            <source>「{}」无法写入。请检查该目录是否可写。</source>
+            <translation>Cannot write "{}". Check that the folder is writable.</translation>
+        </message>
+        <message>
+            <source>已保存报告与截图：%1</source>
+            <translation>Report and screenshot saved to %1</translation>
+        </message>
+        <message>
+            <source>已保存报告文字（未包含截图）：%1</source>
+            <translation>Report text saved without a screenshot: %1</translation>
+        </message>
+        <message>
+            <source>自动打码只在本机运行；报告与截图只会保存到你选定的位置，不会上传。</source>
+            <translation>Auto-redaction runs locally only; the report and screenshot are saved only where you choose and are never uploaded.</translation>
+        </message>
+        <message>
+            <source>Bug 报告说明</source>
+            <translation>Bug report notice</translation>
+        </message>
+        <message>
+            <source>截图预览</source>
+            <translation>Screenshot preview</translation>
+        </message>
+        <message>
+            <source>此处显示将随报告保存的截图副本；自动打码直接改在这张副本上。</source>
+            <translation>Shows the screenshot copy that will be saved with the report; auto-redaction works on this copy.</translation>
+        </message>
+        <message>
+            <source>打码状态</source>
+            <translation>Redaction status</translation>
+        </message>
+        <message>
+            <source>报告标题</source>
+            <translation>Report title</translation>
+        </message>
+        <message>
+            <source>一句话概括问题</source>
+            <translation>Summarize the problem in one line</translation>
+        </message>
+        <message>
+            <source>标题</source>
+            <translation>Title</translation>
+        </message>
+        <message>
+            <source>复现步骤</source>
+            <translation>Steps to reproduce</translation>
+        </message>
+        <message>
+            <source>按顺序写清每一步操作</source>
+            <translation>Describe each step in order</translation>
+        </message>
+        <message>
+            <source>期望结果</source>
+            <translation>Expected result</translation>
+        </message>
+        <message>
+            <source>原本应该发生什么</source>
+            <translation>What should have happened</translation>
+        </message>
+        <message>
+            <source>实际结果</source>
+            <translation>Actual result</translation>
+        </message>
+        <message>
+            <source>实际发生了什么</source>
+            <translation>What actually happened</translation>
+        </message>
+        <message>
+            <source>补充说明</source>
+            <translation>Additional notes</translation>
+        </message>
+        <message>
+            <source>可选：出现频率、影响范围等</source>
+            <translation>Optional: frequency, scope, and so on</translation>
+        </message>
+        <message>
+            <source>包含内容</source>
+            <translation>Included content</translation>
+        </message>
+        <message>
+            <source>环境信息</source>
+            <translation>Environment information</translation>
+        </message>
+        <message>
+            <source>包含环境信息</source>
+            <translation>Include environment information</translation>
+        </message>
+        <message>
+            <source>报告里是否带上系统、Qt、屏幕与截图尺寸；关闭后这一段整段省略。</source>
+            <translation>Whether the report includes the system, Qt, screen, and capture size; when off, this section is omitted entirely.</translation>
+        </message>
+        <message>
+            <source>前台窗口</source>
+            <translation>Foreground window</translation>
+        </message>
+        <message>
+            <source>包含前台窗口</source>
+            <translation>Include the foreground window</translation>
+        </message>
+        <message>
+            <source>报告里是否带上截图时的前台窗口标题与进程名；截图本身可能暴露它们。</source>
+            <translation>Whether the report includes the foreground window title and process name at capture time; the screenshot itself may reveal them.</translation>
+        </message>
+        <message>
+            <source>报告预览（Markdown）</source>
+            <translation>Report preview (Markdown)</translation>
+        </message>
+        <message>
+            <source>报告预览</source>
+            <translation>Report preview</translation>
+        </message>
+        <message>
+            <source>调整打码…</source>
+            <translation>Adjust redactions…</translation>
+        </message>
+        <message>
+            <source>调整打码</source>
+            <translation>Adjust redactions</translation>
+        </message>
+        <message>
+            <source>重新勾选要打码的命中项，或改用高斯模糊；确认后报告随之更新。</source>
+            <translation>Reselect the detected items to redact, or switch to Gaussian blur; the report updates after you confirm.</translation>
+        </message>
+        <message>
+            <source>复制报告</source>
+            <translation>Copy report</translation>
+        </message>
+        <message>
+            <source>把预览里的报告文字复制到剪贴板；只含文字，不含截图。</source>
+            <translation>Copy the report text from the preview to the clipboard; text only, no screenshot.</translation>
+        </message>
+        <message>
+            <source>保存报告…</source>
+            <translation>Save report…</translation>
+        </message>
+        <message>
+            <source>保存报告</source>
+            <translation>Save report</translation>
+        </message>
+        <message>
+            <source>把报告保存为 Markdown；自动打码可用时会在同目录另存一张 PNG 截图。</source>
+            <translation>Save the report as Markdown; when auto-redaction is available, a PNG screenshot is saved alongside it.</translation>
+        </message>
+        <message>
+            <source>关闭报告</source>
+            <translation>Close report</translation>
+        </message>
+        <message>
+            <source>关闭报告对话框；未保存的内容不会保留。</source>
+            <translation>Close the report dialog; unsaved content is discarded.</translation>
+        </message>
+        <message>
+            <source>保存 Bug 报告</source>
+            <translation>Save bug report</translation>
+        </message>
+        <message>
+            <source>Markdown 文件 (*.md)</source>
+            <translation>Markdown files (*.md)</translation>
+        </message>
+        <message>
+            <source>已自动打码 %1 处敏感信息（%2）；请自行检查。</source>
+            <translation>Redacted %1 sensitive item(s) with %2; check before sending.</translation>
+        </message>
 </context>
 </TS>
