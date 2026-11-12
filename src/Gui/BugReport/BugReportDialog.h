@@ -144,6 +144,8 @@ namespace GyanisScribe::Gui
         void refreshPreview();
         /// 按「现在保存会得到什么」组装预览：会落图的两档填上建议路径的 PNG 文件名
         [[nodiscard]] QString previewText() const;
+        /// 保存时会不会写出同目录 PNG：已打码与未检出两档会写
+        [[nodiscard]] bool savesScreenshot() const;
         /// 按打码状态启用或禁用复制、保存与调整打码
         void updateActionAvailability();
         /// 把截图副本按 420×320 等比缩进预览标签

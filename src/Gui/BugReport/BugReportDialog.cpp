@@ -148,10 +148,15 @@ namespace GyanisScribe::Gui
 
     QString BugReportDialog::previewText() const
     {
-        // 预览说的是保存产物：Masked/NoHits 都会落 PNG，链接里的文件名必须与保存那一侧同源
-        const bool includeImage = m_redaction.state == Core::BugReport::RedactionState::Masked || m_redaction.state == Core::BugReport::RedactionState::NoHits;
-        const auto screenshot   = includeImage ? QString::fromStdWString(Core::BugReport::bugReportPathsForDialog(m_suggestedPath).screenshot.filename().wstring()) : QString{};
+        // 预览说的是保存产物：会落 PNG 的两档，链接里的文件名必须与保存那一侧同源
+        const auto screenshot = savesScreenshot() ? QString::fromStdWString(Core::BugReport::bugReportPathsForDialog(m_suggestedPath).screenshot.filename().wstring()) : QString{};
         return Core::BugReport::buildBugReportMarkdown(m_environment, currentFields(), m_redaction, currentOptions(), screenshot);
+    }
+
+    bool BugReportDialog::savesScreenshot() const
+    {
+        // 检查中与打码不可用两档都只写文字，只有落地了打码结果的两档才会落 PNG
+        return m_redaction.state == Core::BugReport::RedactionState::Masked || m_redaction.state == Core::BugReport::RedactionState::NoHits;
     }
 
     QString BugReportDialog::statusText() const
@@ -204,7 +209,7 @@ namespace GyanisScribe::Gui
         };
 
         const auto paths        = Core::BugReport::bugReportPathsForDialog(chosenPath);
-        const bool includeImage = m_redaction.state == Core::BugReport::RedactionState::Masked || m_redaction.state == Core::BugReport::RedactionState::NoHits;
+        const bool includeImage = savesScreenshot();
 
         // 同名的 PNG 已在盘上时整次保存都不做：写图会把旧图盖掉，而报告写失败后的回收又可能删掉它。
         // 先要求用户换一个名字，盘上任何文件都不会被本功能改写或删除。
