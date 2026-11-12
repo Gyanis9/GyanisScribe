@@ -419,6 +419,8 @@ namespace GyanisScribe::Gui
         m_adjustButton->setObjectName(QStringLiteral("bugReportAdjust"));
         m_adjustButton->setAccessibleName(uiText("调整打码"));
         m_adjustButton->setToolTip(uiText("重新勾选要打码的命中项，或改用高斯模糊；确认后报告随之更新。"));
+        // 调整打码改的是左边这张预览：摆在打码状态行下面，用户看完状态就能就地改
+        leftColumn->addWidget(m_adjustButton);
         m_copyButton = new Button{uiText("复制报告"), this};
         m_copyButton->setObjectName(QStringLiteral("bugReportCopy"));
         m_copyButton->setAccessibleName(uiText("复制报告"));
@@ -431,7 +433,6 @@ namespace GyanisScribe::Gui
         m_closeButton->setObjectName(QStringLiteral("bugReportClose"));
         m_closeButton->setAccessibleName(uiText("关闭报告"));
         m_closeButton->setToolTip(uiText("关闭报告对话框；未保存的内容不会保留。"));
-        buttonRow->addWidget(m_adjustButton);
         buttonRow->addWidget(m_copyButton);
         buttonRow->addWidget(m_saveButton);
         buttonRow->addStretch(1);

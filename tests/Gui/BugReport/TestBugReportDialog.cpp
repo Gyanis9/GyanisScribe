@@ -16,6 +16,7 @@
 #include <QGuiApplication>
 #include <QImage>
 #include <QLabel>
+#include <QLayout>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QScreen>
@@ -380,4 +381,33 @@ TEST_F(BugReportDialogFixture, InitialSizeFollowsTheScreenAvailableArea)
     const auto floorSize = bugReportDialogInitialSize(QSize{});
     EXPECT_LE(dialog->width(), qMax(available.width(), floorSize.width()));
     EXPECT_LE(dialog->height(), qMax(available.height(), floorSize.height()));
+}
+
+/**
+ * @brief 钉住「调整打码」在左列、压在打码状态行下、位于 Markdown 预览之上
+ * @details 判据用纵向次序而不是父对象：所有控件都直接挂在对话框上，只有坐标能分清它在哪一栏。
+ */
+TEST_F(BugReportDialogFixture, AdjustButtonSitsInTheLeftColumnUnderTheStatus)
+{
+    auto dialog = makeDialog();
+    dialog->setAttribute(Qt::WA_DontShowOnScreen);
+    dialog->show();
+    QApplication::processEvents();
+    ASSERT_TRUE(dialog->layout()->activate());
+
+    auto *imagePreview    = dialog->findChild<QLabel *>(QStringLiteral("bugReportPreviewImage"));
+    auto *redactionStatus = dialog->findChild<QLabel *>(QStringLiteral("bugReportRedactionStatus"));
+    auto *markdownPreview = dialog->findChild<QTextEdit *>(QStringLiteral("bugReportPreview"));
+    auto *adjust          = dialog->findChild<QPushButton *>(QStringLiteral("bugReportAdjust"));
+    auto *copy            = dialog->findChild<QPushButton *>(QStringLiteral("bugReportCopy"));
+    ASSERT_NE(imagePreview, nullptr);
+    ASSERT_NE(redactionStatus, nullptr);
+    ASSERT_NE(markdownPreview, nullptr);
+    ASSERT_NE(adjust, nullptr);
+    ASSERT_NE(copy, nullptr);
+
+    EXPECT_GT(adjust->geometry().top(), imagePreview->geometry().bottom()) << "调整打码没在预览图下方";
+    EXPECT_GE(adjust->geometry().top(), redactionStatus->geometry().bottom()) << "调整打码没压在打码状态行下面";
+    EXPECT_LT(adjust->geometry().top(), markdownPreview->geometry().top()) << "调整打码落进了底部动作行";
+    EXPECT_GT(copy->geometry().top(), markdownPreview->geometry().bottom()) << "复制按钮仍在底部动作行";
 }
