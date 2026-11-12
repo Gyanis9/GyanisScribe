@@ -149,6 +149,14 @@ namespace GyanisScribe::App
         void startInteractive(std::optional<GyanisScribe::App::CaptureIntent> intent = std::nullopt);
 
         /**
+         * @brief 进入元素拾取：遮罩同时按界面元素细分悬停目标
+         * @details 与框选同一条交付链，只是悬停优先认元素；不走延时——遮罩铺开就是交互本身。
+         *          去向照设置那一格现读，来源在铺遮罩前现取。失败与取消沿用 captureFailed 与
+         *          captureCancelled，收场仍走 finishCaptureFlow。
+         */
+        void startElementPick();
+
+        /**
          * @brief 用回溯缓冲里的一帧进入框选
          * @param frame 回溯帧；屏名与屏内几何仍须对应当前屏幕
          * @details 与 startInteractive 同一条交付链，只是不抓当前屏；去向仍从「截完之后」那一档现读。

@@ -855,11 +855,27 @@ namespace
             return elementChain;
         }
 
-        GyanisScribe::Platform::PlatformCapabilities      capabilitiesValue;
-        std::vector<GyanisScribe::Platform::ScreenWindow> windows; ///< 这一轮让平台「列」出来的窗口，默认空
-        Expected<std::vector<QRect>>                      elementChain{std::vector<QRect>{}};
-        mutable std::vector<QPoint>                       queriedPoints;
-        mutable std::vector<quintptr>                     excludedHandles;
+        [[nodiscard]] Expected<std::vector<GyanisScribe::Platform::UiElementInfo>> uiElementChainAtPoint(const QPoint                &globalLogicalPoint,
+                                                                                                         const std::vector<quintptr> &excludeWindowHandles) const override
+        {
+            elementInfoQueriedPoints.push_back(globalLogicalPoint);
+            elementInfoExcludedHandles = excludeWindowHandles;
+            if (elementInfoChainError)
+            {
+                return std::unexpected(*elementInfoChainError);
+            }
+            return elementInfoChain;
+        }
+
+        GyanisScribe::Platform::PlatformCapabilities       capabilitiesValue;
+        std::vector<GyanisScribe::Platform::ScreenWindow>  windows; ///< 这一轮让平台「列」出来的窗口，默认空
+        Expected<std::vector<QRect>>                       elementChain{std::vector<QRect>{}};
+        std::vector<GyanisScribe::Platform::UiElementInfo> elementInfoChain;      ///< 元素模式下带描述的链，默认空
+        std::optional<Error>                               elementInfoChainError; ///< 非空表示这一轮带描述的链要失败
+        mutable std::vector<QPoint>                        queriedPoints;
+        mutable std::vector<quintptr>                      excludedHandles;
+        mutable std::vector<QPoint>                        elementInfoQueriedPoints;
+        mutable std::vector<quintptr>                      elementInfoExcludedHandles;
     };
 
     /// 找这一轮铺出来的遮罩：它是一张顶层控件，按类型认出来
@@ -894,6 +910,45 @@ namespace
             QApplication::processEvents(QEventLoop::AllEvents, 10);
             QThread::msleep(5);
         }
+    }
+
+    /// 屏上此刻可见的遮罩张数：收掉的旧遮罩还在等 deleteLater，不能按顶层表直接数
+    [[nodiscard]] int visibleOverlayCount()
+    {
+        int visible = 0;
+        for (auto *widget: QApplication::topLevelWidgets())
+        {
+            if (const auto *overlay = qobject_cast<CaptureOverlay *>(widget); overlay != nullptr && overlay->isVisible())
+            {
+                ++visible;
+            }
+        }
+        return visible;
+    }
+
+    /// 起一轮元素拾取并找回这一轮铺出来的遮罩
+    [[nodiscard]] CaptureOverlay *startElementPickAndFindOverlay(CaptureService &service)
+    {
+        service.startElementPick();
+        return findOverlay();
+    }
+
+    /// 往遮罩上报一次悬停移动：局部点给绘制，全局点给服务问平台
+    void moveOver(CaptureOverlay &overlay, const QPoint &localPoint)
+    {
+        const auto  globalPoint = overlay.geometry().topLeft() + localPoint;
+        QMouseEvent move{QEvent::MouseMove, QPointF{localPoint}, QPointF{globalPoint}, Qt::NoButton, Qt::NoButton, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(&overlay, &move);
+    }
+
+    /// 在遮罩上拖一块：只按下再拖，不松手——松手就确认选区并把遮罩收掉，判不了「回退后仍可框选」
+    void dragOn(CaptureOverlay &overlay, const QPoint &from, const QPoint &to)
+    {
+        const auto  global = overlay.geometry().topLeft();
+        QMouseEvent press{QEvent::MouseButtonPress, QPointF{from}, QPointF{global + from}, Qt::LeftButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(&overlay, &press);
+        QMouseEvent move{QEvent::MouseMove, QPointF{to}, QPointF{global + to}, Qt::NoButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(&overlay, &move);
     }
 } // namespace
 
@@ -1010,6 +1065,89 @@ TEST_F(CaptureServiceFixture, HoverDoesNotAskWhenThePlatformHasNoElementDetectio
     QApplication::sendEvent(overlay, &move);
 
     EXPECT_TRUE(fake.queriedPoints.empty()) << "能力位为假还是去问了平台";
+}
+
+/**
+ * @brief 钉住元素拾取的整条悬停回路：遮罩进元素模式、查询走带描述的链、横幅显示元素上下文
+ * @details 入口走 startElementPick；元素模式下服务要先问 uiElementChainAtPoint，把带描述的链送进遮罩。
+ *          只钉「平台被问了」不够：送错重载或没送，横幅都会停在操作提示上，用户看不到元素名。
+ */
+TEST_F(CaptureServiceFixture, ElementPickUsesMetadataChain)
+{
+    if (QGuiApplication::screens().isEmpty())
+    {
+        GTEST_SKIP() << "这个环境没有屏幕可枚举，铺不出遮罩";
+    }
+
+    SettingsStore           settings(m_iniFile);
+    FakeCaptureSource       source;
+    FakePlatformIntegration fake;
+    fake.capabilitiesValue.uiElements = true;
+    CaptureService service(source, settings, fake);
+
+    auto *overlay = startElementPickAndFindOverlay(service);
+    ASSERT_NE(overlay, nullptr) << "元素拾取入口没铺出遮罩";
+    EXPECT_TRUE(overlay->modeBannerForTesting().contains(QStringLiteral("元素拾取"))) << "元素拾取没有把遮罩切到元素模式：" << overlay->modeBannerForTesting().toStdString();
+
+    fake.elementInfoChain = {GyanisScribe::Platform::UiElementInfo{QStringLiteral("保存"), QStringLiteral("按钮"), QStringLiteral("记事本"), QStringLiteral("notepad.exe"),
+                                                                   QRect{overlay->geometry().topLeft() + QPoint{20, 20}, QSize{80, 30}}}};
+    moveOver(*overlay, QPoint{40, 30});
+    QApplication::processEvents();
+    pumpEventsFor(120); // 服务按 40ms 合并查询
+    EXPECT_TRUE(overlay->modeBannerForTesting().contains(QStringLiteral("保存"))) << overlay->modeBannerForTesting().toStdString();
+}
+
+/**
+ * @brief 钉住元数据链失败就退回矩形链：仍提示可框选，拖动照常落成选区
+ * @details 平台给不出描述时不能把整轮元素拾取判死：矩形链还认得元素边界，用户仍能框选；
+ *          横幅要给出「可拖动」这条出路，而不是停在「悬停选元素」上等一个永远不来的链。
+ */
+TEST_F(CaptureServiceFixture, ElementPickFallsBackWhenMetadataFails)
+{
+    if (QGuiApplication::screens().isEmpty())
+    {
+        GTEST_SKIP() << "这个环境没有屏幕可枚举，铺不出遮罩";
+    }
+
+    SettingsStore           settings(m_iniFile);
+    FakeCaptureSource       source;
+    FakePlatformIntegration fake;
+    fake.capabilitiesValue.uiElements = true;
+    fake.elementInfoChainError        = Error{ErrorCode::PlatformUnsupported, "替身：没有元素"};
+    CaptureService service(source, settings, fake);
+
+    auto *overlay = startElementPickAndFindOverlay(service);
+    ASSERT_NE(overlay, nullptr) << "元素拾取入口没铺出遮罩";
+    moveOver(*overlay, QPoint{40, 30});
+    QApplication::processEvents();
+    pumpEventsFor(120);
+    EXPECT_TRUE(overlay->modeBannerForTesting().contains(QStringLiteral("拖动"))) << "元数据链失败后横幅没给出框选这条路：" << overlay->modeBannerForTesting().toStdString();
+
+    dragOn(*overlay, QPoint{10, 10}, QPoint{100, 80});
+    EXPECT_FALSE(overlay->selectedRegion().isNull()) << "元数据链失败把框选也一起挡掉了";
+}
+
+/**
+ * @brief 钉住能力位：平台不承诺界面元素时，startElementPick 交回可操作的错误且不铺遮罩
+ * @details 元素拾取靠 UIA，平台给不出时铺一张「什么也认不出」的遮罩只会让用户以为功能坏了；
+ *          错误文案要指出直接框选这条替代做法。
+ */
+TEST_F(CaptureServiceFixture, ElementPickRequiresTheCapability)
+{
+    SettingsStore           settings(m_iniFile);
+    FakeCaptureSource       source;
+    FakePlatformIntegration fake;
+    fake.capabilitiesValue.uiElements = false;
+    CaptureService service(source, settings, fake);
+    Outcome        outcome;
+    wire(service, outcome);
+
+    service.startElementPick();
+
+    ASSERT_TRUE(outcome.error.has_value()) << "能力位为假却没交回原因";
+    EXPECT_EQ(outcome.error->code, ErrorCode::PlatformUnsupported);
+    EXPECT_NE(outcome.error->message.find("元素"), std::string::npos) << "错误文案没点明是元素拾取不可用：" << outcome.error->message;
+    EXPECT_EQ(visibleOverlayCount(), 0) << "能力位为假还是铺了遮罩";
 }
 
 /**
@@ -1361,7 +1499,7 @@ TEST_F(CaptureServiceFixture, StartInteractiveWithFrameUsesProvidedFrameAndSkips
     FakeCaptureSource source;
     CaptureService    service(source, settings, *platform);
 
-    CapturedImage frame = makeFrame();
+    CapturedImage frame    = makeFrame();
     frame.screenName       = screen->name();
     frame.logicalSize      = screen->geometry().size();
     frame.devicePixelRatio = screen->devicePixelRatio();
@@ -1381,8 +1519,7 @@ TEST_F(CaptureServiceFixture, StartInteractiveWithFrameUsesProvidedFrameAndSkips
     ASSERT_NE(overlay, nullptr) << "回溯帧没铺出遮罩";
     EXPECT_TRUE(overlay->isVisible()) << "回溯帧的遮罩没有露出来";
     const auto expectedBanner = QStringLiteral("回溯画面 · ") + frame.capturedAt.toString(QStringLiteral("HH:mm:ss"));
-    EXPECT_EQ(overlay->modeBannerForTesting(), expectedBanner)
-            << "横幅没带抓帧时刻，用户分不清这是回看还是实时画面：" << overlay->modeBannerForTesting().toStdString();
+    EXPECT_EQ(overlay->modeBannerForTesting(), expectedBanner) << "横幅没带抓帧时刻，用户分不清这是回看还是实时画面：" << overlay->modeBannerForTesting().toStdString();
 
     const auto global = overlay->geometry().topLeft();
     // 选区端点含尾：从 (10,10) 拖到 (59,39) 才是 50×30；RECT 的右下一格本身也在框里
@@ -1411,7 +1548,7 @@ TEST_F(CaptureServiceFixture, StartInteractiveWithFrameUsesProvidedFrameAndSkips
 
     // 布局对不上：拒绝并给中文出路，不再铺一张半有效的遮罩
     CapturedImage stale = frame;
-    stale.logicalRegion  = frame.logicalRegion.adjusted(0, 0, -10, 0);
+    stale.logicalRegion = frame.logicalRegion.adjusted(0, 0, -10, 0);
     service.startInteractiveWithFrame(stale);
     ASSERT_TRUE(outcome.error.has_value()) << "布局变了照样铺了遮罩";
     EXPECT_EQ(outcome.error->code, ErrorCode::ScreenUnavailable);
@@ -1437,7 +1574,7 @@ TEST_F(CaptureServiceFixture, StartInteractiveWithFrameWithoutTimestampShowsPlai
     FakeCaptureSource source;
     CaptureService    service(source, settings, *platform);
 
-    CapturedImage frame = makeFrame();
+    CapturedImage frame    = makeFrame();
     frame.screenName       = screen->name();
     frame.logicalSize      = screen->geometry().size();
     frame.devicePixelRatio = screen->devicePixelRatio();

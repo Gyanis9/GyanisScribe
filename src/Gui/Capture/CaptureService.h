@@ -121,6 +121,13 @@ namespace GyanisScribe::Gui
         void startInteractive() override;
 
         /**
+         * @brief 铺遮罩进入元素拾取，见 Core::ICaptureService::startElementPick()
+         * @details 平台不承诺界面元素时交回 PlatformUnsupported，并指出直接框选这条替代做法：
+         *          铺一张认不出任何元素的遮罩只会让用户以为功能坏了。
+         */
+        void startElementPick() override;
+
+        /**
          * @brief 用回溯缓冲里的一帧进入框选
          * @param frame 回溯帧；screenName 与 logicalRegion 必须仍对应当前屏幕
          * @details 不抓帧、不提供窗口候选/元素链、不合成指针；框选后走 finishRegion 同一条交付链。
@@ -232,6 +239,8 @@ namespace GyanisScribe::Gui
          *          一串跨进程调用。排除名单把在屏的遮罩窗全交进去——UIA 命中穿不过置顶窗，
          *          不排除的话认到的就是遮罩自己。问不出来时把空链送回去（退回只认窗口），
          *          失败原因只报一次，别跟着鼠标一路刷日志。
+         *          元素模式先问带描述的链，横幅与 `I` 靠它给上下文；描述拿不到或是空链时
+         *          退回矩形链，框选与窗口回退照旧可用。
          */
         void queryElementChain(CaptureOverlay *overlay, const QPoint &globalLogicalPoint);
 
@@ -250,8 +259,10 @@ namespace GyanisScribe::Gui
         /**
          * @brief 铺遮罩进入框选
          * @param longCapture 真表示选完区域之后接长图，假表示选完就截这一张
+         * @param elementPick 真表示这一轮按元素拾取铺：横幅与悬停查询走元素这一侧，
+         *        窗口候选仍作为回退送进遮罩
          */
-        void beginInteractive(bool longCapture);
+        void beginInteractive(bool longCapture, bool elementPick = false);
 
         /**
          * @brief 控制条的读数
@@ -293,6 +304,7 @@ namespace GyanisScribe::Gui
         std::optional<QPoint>                 m_lastElementQuery;               ///< 上一格问过的悬停点，同一个点不重复问
         std::optional<bool>                   m_cursorOverride;                 ///< 这一轮遮罩里按 `P` 翻出来的「成品含不含指针」；空即照配置
         bool                                  m_elementFailureReported = false; ///< 元素问询的失败原因本轮是否已经报过
+        bool                                  m_elementPickMode        = false; ///< 这一轮是不是元素拾取；收遮罩即复位
         bool                                  m_longActive             = false; ///< 正在按节拍接帧
     };
 

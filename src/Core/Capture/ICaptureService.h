@@ -69,6 +69,18 @@ namespace GyanisScribe::Core
         virtual void startInteractive() = 0;
 
         /**
+         * @brief 进入元素拾取：框选遮罩同时按界面元素细分悬停目标
+         * @details 与框选同一层遮罩、同一条交付链，只是悬停时优先认光标下的界面元素，
+         *          横幅给出元素上下文，认不出元素时仍可拖动框选。平台给不出界面元素时交回
+         *          可操作的错误，不铺一张什么也认不出的遮罩。
+         * @note 默认实现退回普通框选，既有替身不必为这个入口改签名；真实服务重写它。
+         */
+        virtual void startElementPick()
+        {
+            startInteractive();
+        }
+
+        /**
          * @brief 取消正在进行的框选
          */
         virtual void cancelInteractive() = 0;

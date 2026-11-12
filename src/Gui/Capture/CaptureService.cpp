@@ -157,6 +157,18 @@ namespace GyanisScribe::Gui
         beginInteractive(false);
     }
 
+    void CaptureService::startElementPick()
+    {
+        if (!m_integration.capabilities().uiElements)
+        {
+            // 认元素靠平台的 UI Automation；给不出时铺一张什么也认不出的遮罩只会让用户以为功能坏了
+            deliver(Base::Expected<Base::CapturedImage>(
+                    std::unexpected(Base::Error{Base::ErrorCode::PlatformUnsupported, Base::uiTextUtf8("这台平台不支持界面元素拾取：可直接框选目标区域")})));
+            return;
+        }
+        beginInteractive(false, true);
+    }
+
     void CaptureService::startInteractiveWithFrame(const Base::CapturedImage &frame)
     {
         closeOverlays();
@@ -221,7 +233,7 @@ namespace GyanisScribe::Gui
         beginInteractive(true);
     }
 
-    void CaptureService::beginInteractive(const bool longCapture)
+    void CaptureService::beginInteractive(const bool longCapture, const bool elementPick)
     {
         if (m_longActive)
         {
@@ -245,6 +257,9 @@ namespace GyanisScribe::Gui
                     std::unexpected(Base::Error{Base::ErrorCode::ScreenUnavailable, GyanisScribe::Base::uiTextUtf8("进入框选失败：Qt 未报告任何屏幕。请在图形会话中重试")})));
             return;
         }
+
+        // 这一轮是不是元素拾取：遮罩的横幅与悬停查询都按这一位分派，收遮罩时随轮次一起复位
+        m_elementPickMode = elementPick;
 
         // 候选要在这批遮罩建出来之前取：遮罩自己是一层盖住全屏的窗口，取晚了它会被列成第一个候选，
         // 于是每一格悬停都「认出整屏」，点一下就等于截全屏
@@ -286,6 +301,8 @@ namespace GyanisScribe::Gui
                 }
             }
             overlay->setWindowCandidates(onThisScreen);
+            // 元素模式只改横幅与 `I` 的归属：窗口候选照旧送，认不出元素时就是拖动框选与整窗回退
+            overlay->setElementPickMode(elementPick);
             // 只给同屏的几条：R/Shift+R 循环挑的是这块屏上的几块，别屏的矩形放上来会露出一块越界的框
             overlay->setRegionHistory(Core::regionsOnScreen(*regionHistory, screen->name()));
             // 记住的长宽比在开遮罩时装上：上一轮锁着哪一档，这一轮接着锁
@@ -412,6 +429,8 @@ namespace GyanisScribe::Gui
         m_hoverQueryTimer.stop();
         m_pendingHoverOverlay = nullptr;
         m_pendingHoverPoint.reset();
+        // 元素模式属这一轮：遮罩收掉之后，下一轮从普通框选起算，除非入口自己再打开它
+        m_elementPickMode = false;
 
         // 逐张收掉并清向量：遮罩是顶层窗口，留着不关就会一直压住屏幕
         for (auto &overlay: m_overlays)
@@ -673,6 +692,23 @@ namespace GyanisScribe::Gui
             return;
         }
         m_lastElementQuery = globalLogicalPoint;
+
+        if (m_elementPickMode)
+        {
+            // 元素拾取先要带描述的链：横幅与 `I` 的上下文只从这里来。描述拿不到或是空链时
+            // 不挡框选，往下一步取矩形链——矩形链认得出元素边界，只是没有名字可显示
+            const auto described = m_integration.uiElementChainAtPoint(globalLogicalPoint, overlayHandles());
+            if (described && !described->empty())
+            {
+                overlay->setElementChain(*described);
+                return;
+            }
+            if (!described && !m_elementFailureReported)
+            {
+                m_elementFailureReported = true;
+                Base::Logger::warning(std::format("元素拾取没拿到带描述的界面元素，这一轮退回矩形链与整窗候选：{}", described.error().message));
+            }
+        }
 
         const auto chain = m_integration.elementChainAtPoint(globalLogicalPoint, overlayHandles());
         if (chain)

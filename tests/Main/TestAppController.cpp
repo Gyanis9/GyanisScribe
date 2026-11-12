@@ -1082,6 +1082,40 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住元素拾取的协调器入口：不走延时、流程标志立起来、遮罩铺出来，且与框选共用门禁
+     * @details 元素拾取本身就是交互：排一个延时定时器只会让用户对着空屏等。入口直接调服务，
+     *          流程标志在同一刻立起，步骤记录据此被挡回；按 Esc 走既有取消路径，标志复位。
+     *          热键与托盘入口不经过这一层，由接线那一批补。
+     */
+    TEST_F(AppControllerFixture, ElementPickEntryStartsTheFlowWithoutDelay)
+    {
+        m_frameScreenName = m_realScreenName;
+        m_delaySeconds    = 3;
+        makeController();
+
+        auto &capture = m_controller->capture();
+        EXPECT_FALSE(capture.isCaptureFlowActive()) << "还没起元素拾取，流程标志就不是清的";
+
+        capture.startElementPick();
+
+        EXPECT_FALSE(capture.isDelayPending()) << "元素拾取排上了延时定时器：遮罩铺开才是交互本身";
+        EXPECT_TRUE(capture.isCaptureFlowActive()) << "元素拾取在跑时流程标志是假的：步骤记录与回溯会叠上来";
+        auto *overlay = visibleCaptureOverlay();
+        ASSERT_NE(overlay, nullptr) << "元素拾取没铺出遮罩";
+        EXPECT_TRUE(overlay->modeBannerForTesting().contains(QStringLiteral("元素拾取"))) << "协调器入口没有把遮罩切到元素模式";
+
+        auto      &steps  = m_controller->stepRecorderForTesting();
+        const auto before = visibleToastBubbles();
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::Steps);
+        EXPECT_FALSE(steps.isRecording()) << "元素拾取还在跑就开始记录步骤";
+        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("先结束当前截图/录屏/回溯")); })) << "元素拾取挡回步骤记录时没说清先结束什么";
+
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &escape);
+        EXPECT_FALSE(capture.isCaptureFlowActive()) << "取消之后流程标志没复位";
+    }
+
+    /**
      * @brief 钉住整屏截图留下的标注窗也挡住步骤记录
      * @details 整屏这一路不开 captureFlowActive：只看流程标志的门禁会让控制条压到用户正在编辑的画布上。
      */

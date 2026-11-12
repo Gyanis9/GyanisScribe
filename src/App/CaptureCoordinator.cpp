@@ -161,6 +161,15 @@ namespace GyanisScribe::App
                 });
     }
 
+    void CaptureCoordinator::startElementPick()
+    {
+        m_intent = settingsCaptureIntent();
+        // 元素拾取不走延时：遮罩铺开就是交互本身；来源在铺遮罩前现取，与不延时截图同一条路
+        noteForegroundSource();
+        m_captureFlowActive = true;
+        m_capture->startElementPick();
+    }
+
     void CaptureCoordinator::startInteractiveWithFrame(const GyanisScribe::Base::CapturedImage &frame)
     {
         // 去向照设置现读：回溯只是换了一张底图，之后的标注/复制/保存仍是用户点的那一档
