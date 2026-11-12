@@ -667,13 +667,11 @@ TEST_F(BugReportDialogFixture, CancellingTheReviewKeepsTheCurrentRedaction)
     driveReviewDialog(
             [](PrivacyReviewDialog &review)
             {
-                auto *selectNone = review.findChild<QPushButton *>(QStringLiteral("privacySelectNone"));
-                auto *style      = review.findChild<QComboBox *>(QStringLiteral("privacyStyle"));
-                auto *cancel     = review.findChild<QPushButton *>(QStringLiteral("privacyCancel"));
-                ASSERT_NE(selectNone, nullptr);
+                auto *style  = review.findChild<QComboBox *>(QStringLiteral("privacyStyle"));
+                auto *cancel = review.findChild<QPushButton *>(QStringLiteral("privacyCancel"));
                 ASSERT_NE(style, nullptr);
                 ASSERT_NE(cancel, nullptr);
-                selectNone->click();
+                ASSERT_EQ(review.selectedRows().size(), 2U) << "前提：两行都还勾着，取消后才没有别的路可走";
                 style->setCurrentIndex(1);
                 cancel->click();
             },
