@@ -34,7 +34,7 @@ namespace GyanisScribe::Gui
     /**
      * @brief Bug 报告对话框
      * @details 左侧显示将随报告保存的截图副本与自动打码状态，右侧是可编辑的正文与两段环境开关，
-     *          底部实时预览整份 Markdown。本窗不跑文字识别：检查状态由宿主通过
+     *          底部实时预览保存后的样子：会落图的两档带图片链接，剪贴板里只放文字。本窗不跑文字识别：检查状态由宿主通过
      *          setScanRunning / setScanResult / setScanUnavailable 推进。
      *          自动打码只改内存里的副本，只有用户点保存时才按选定路径落盘；
      *          后端不可用时报告只含文字，不写截图。
@@ -77,8 +77,8 @@ namespace GyanisScribe::Gui
         void setScanUnavailable(const QString &reason);
 
         /**
-         * @brief 取当前报告 Markdown
-         * @return 与预览逐字一致的整份报告；截图文件名留空，保存时才填入
+         * @brief 取复制用的报告 Markdown
+         * @return 整份报告但截图段恒为「未附带」；剪贴板里只有文字，不带截图
          */
         [[nodiscard]] QString reportText() const;
 
@@ -142,6 +142,8 @@ namespace GyanisScribe::Gui
         void buildUi();
         /// 把整份报告写进只读预览
         void refreshPreview();
+        /// 按「现在保存会得到什么」组装预览：会落图的两档填上建议路径的 PNG 文件名
+        [[nodiscard]] QString previewText() const;
         /// 按打码状态启用或禁用复制、保存与调整打码
         void updateActionAvailability();
         /// 把截图副本按 420×320 等比缩进预览标签

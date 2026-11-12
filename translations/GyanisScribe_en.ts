@@ -5636,8 +5636,8 @@
             <translation>Copy report</translation>
         </message>
         <message>
-            <source>把预览里的报告文字复制到剪贴板；只含文字，不含截图。</source>
-            <translation>Copy the report text from the preview to the clipboard; text only, no screenshot.</translation>
+            <source>把报告文字复制到剪贴板；只含文字，不含截图。</source>
+            <translation>Copy the report text to the clipboard; text only, no screenshot.</translation>
         </message>
         <message>
             <source>保存报告…</source>

@@ -146,6 +146,14 @@ namespace GyanisScribe::Gui
         return Core::BugReport::buildBugReportMarkdown(m_environment, currentFields(), m_redaction, currentOptions(), QString{});
     }
 
+    QString BugReportDialog::previewText() const
+    {
+        // 预览说的是保存产物：Masked/NoHits 都会落 PNG，链接里的文件名必须与保存那一侧同源
+        const bool includeImage = m_redaction.state == Core::BugReport::RedactionState::Masked || m_redaction.state == Core::BugReport::RedactionState::NoHits;
+        const auto screenshot   = includeImage ? QString::fromStdWString(Core::BugReport::bugReportPathsForDialog(m_suggestedPath).screenshot.filename().wstring()) : QString{};
+        return Core::BugReport::buildBugReportMarkdown(m_environment, currentFields(), m_redaction, currentOptions(), screenshot);
+    }
+
     QString BugReportDialog::statusText() const
     {
         return m_status->text();
@@ -426,7 +434,7 @@ namespace GyanisScribe::Gui
         m_copyButton = new Button{uiText("复制报告"), this};
         m_copyButton->setObjectName(QStringLiteral("bugReportCopy"));
         m_copyButton->setAccessibleName(uiText("复制报告"));
-        m_copyButton->setToolTip(uiText("把预览里的报告文字复制到剪贴板；只含文字，不含截图。"));
+        m_copyButton->setToolTip(uiText("把报告文字复制到剪贴板；只含文字，不含截图。"));
         m_saveButton = new Button{uiText("保存报告…"), this};
         m_saveButton->setObjectName(QStringLiteral("bugReportSave"));
         m_saveButton->setAccessibleName(uiText("保存报告"));
@@ -474,7 +482,7 @@ namespace GyanisScribe::Gui
     void BugReportDialog::refreshPreview()
     {
         const QSignalBlocker blocker{m_preview};
-        m_preview->setPlainText(reportText());
+        m_preview->setPlainText(previewText());
     }
 
     void BugReportDialog::updateActionAvailability()

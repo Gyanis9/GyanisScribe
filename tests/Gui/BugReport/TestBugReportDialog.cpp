@@ -1,5 +1,5 @@
 // 报告窗用例：字段与开关驱动预览、检查中禁写、自动打码默认全选、
-// 不可用时只存文字、复制文本与预览逐字一致。
+// 不可用时只存文字、预览按保存产物出链接而复制只带文字。
 
 #include "Base/Text.h"
 #include "Core/Annotation/AnnotationTool.h"
@@ -282,17 +282,38 @@ TEST_F(BugReportDialogFixture, UnavailableScanSavesTextOnlyAndNeverAnImage)
     EXPECT_TRUE(text.contains(uiText("截图：未附带（本段只含文字）。")));
 }
 
-TEST_F(BugReportDialogFixture, CopyWritesExactlyThePreviewText)
+/**
+ * @brief 钉住预览展示「现在保存会得到什么」，复制仍是纯文字
+ * @details 预览是给用户核对产物用的：会落图的两档要带图片链接；剪贴板里只放文字，
+ *          两边因此允许不同文，这也正是复制按钮提示语不许再写「预览里的」的原因。
+ */
+TEST_F(BugReportDialogFixture, PreviewShowsTheSavedShapeWhileCopyStaysTextOnly)
 {
-    auto dialog = makeDialog();
-    dialog->setScanResult({});
+    auto  dialog  = makeDialog();
     auto *preview = dialog->findChild<QTextEdit *>(QStringLiteral("bugReportPreview"));
     ASSERT_NE(preview, nullptr);
 
+    // 检查中：两侧同文，都不带图
+    EXPECT_EQ(preview->toPlainText(), dialog->reportText());
+    EXPECT_TRUE(preview->toPlainText().contains(uiText("截图：未附带（本段只含文字）。")));
+
+    // 没检出：保存会带原图，预览要显示链接
+    dialog->setScanResult({});
+    EXPECT_TRUE(preview->toPlainText().contains(QStringLiteral("![截图](<report.png>)"))) << "预览没按保存产物出图片链接";
+    EXPECT_FALSE(preview->toPlainText().contains(uiText("截图：未附带（本段只含文字）。"))) << "预览还在说没带截图";
+    EXPECT_TRUE(dialog->reportText().contains(uiText("截图：未附带（本段只含文字）。"))) << "复制用的文字不该带上截图";
+
+    // 已打码同样会落图
+    dialog->setScanResult({makePhoneItem()});
+    EXPECT_TRUE(preview->toPlainText().contains(QStringLiteral("![截图](<report.png>)")));
+
     ASSERT_TRUE(dialog->copyReport().has_value());
     EXPECT_EQ(QGuiApplication::clipboard()->text(), dialog->reportText());
-    EXPECT_EQ(preview->toPlainText(), dialog->reportText());
-    EXPECT_TRUE(dialog->statusText().contains(QStringLiteral("已复制")));
+    EXPECT_FALSE(QGuiApplication::clipboard()->text().contains(QStringLiteral("![截图]"))) << "剪贴板里出现了图片链接";
+
+    auto *copy = dialog->findChild<QPushButton *>(QStringLiteral("bugReportCopy"));
+    ASSERT_NE(copy, nullptr);
+    EXPECT_EQ(copy->toolTip(), uiText("把报告文字复制到剪贴板；只含文字，不含截图。")) << "复制提示还在暗示两者同文";
 }
 
 TEST_F(BugReportDialogFixture, MaskedSaveWritesTheRedactedPngAndLinksIt)
@@ -426,4 +447,17 @@ TEST_F(BugReportDialogFixture, RestartingAScanClearsThePreviousActionStatus)
     dialog->setScanRunning();
     EXPECT_TRUE(dialog->statusText().isEmpty()) << "重扫开始了，上一次的复制状态还挂在状态行上";
     EXPECT_EQ(dialog->redactionForTesting().state, RedactionState::Pending);
+}
+
+/**
+ * @brief 钉住预览里的图片文件名走与保存相同的路径换算
+ * @details 建议路径是 .markdown 时保存会落 .md 与 .png，预览里的链接必须同名，否则用户对不上文件。
+ */
+TEST_F(BugReportDialogFixture, PreviewImageNameFollowsTheSuggestedPath)
+{
+    auto dialog = std::make_unique<BugReportDialog>(makeImage(), makeEnvironment(), std::filesystem::path{std::wstring{L"D:/reports/崩溃现场.markdown"}});
+    dialog->setScanResult({});
+    auto *preview = dialog->findChild<QTextEdit *>(QStringLiteral("bugReportPreview"));
+    ASSERT_NE(preview, nullptr);
+    EXPECT_TRUE(preview->toPlainText().contains(QStringLiteral("![截图](<崩溃现场.png>)"))) << "预览里的文件名没走与保存相同的路径换算";
 }
