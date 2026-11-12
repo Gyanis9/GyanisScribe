@@ -307,6 +307,15 @@ TEST_F(PrivacyReviewDialogFixture, InitialSelectionAndToolAreHonored)
     EXPECT_EQ(dialog.selectedRows(), (std::vector<int>{0, 2}));
     EXPECT_EQ(dialog.selectedItems().size(), 2U);
     EXPECT_EQ(dialog.redactionTool(), ToolKind::Blur);
+
+    // 顺序按列表、不按调用方给的次序：{2, 0} 进来，{0, 2} 出去
+    PrivacyReviewDialog reversed{makeItems(), std::vector<int>{2, 0}, ToolKind::Mosaic};
+    EXPECT_EQ(reversed.selectedRows(), (std::vector<int>{0, 2})) << "选中行按调用方次序返回了";
+
+    // 马赛克要显式落在第 0 档，不能被任何默认值顶到别的档
+    auto *mosaicStyle = reversed.findChild<QComboBox *>(QStringLiteral("privacyStyle"));
+    ASSERT_NE(mosaicStyle, nullptr);
+    EXPECT_EQ(mosaicStyle->currentIndex(), 0) << "马赛克没落在第 0 档";
 }
 
 /**
@@ -321,4 +330,23 @@ TEST_F(PrivacyReviewDialogFixture, OutOfRangeInitialRowsAreIgnored)
     EXPECT_EQ(list->item(1)->checkState(), Qt::Checked);
     EXPECT_EQ(list->item(2)->checkState(), Qt::Unchecked);
     EXPECT_EQ(dialog.selectedRows(), (std::vector<int>{1}));
+}
+
+/**
+ * @brief 钉住带命中项但初始勾选为空时一行都不勾、应用按钮灰掉
+ * @details 与「空清单」是两件事：清单有行，只是用户这一轮选择还没给。
+ */
+TEST_F(PrivacyReviewDialogFixture, EmptyInitialSelectionChecksNothing)
+{
+    PrivacyReviewDialog dialog{makeItems(), std::vector<int>{}, ToolKind::Mosaic};
+    auto               *list = dialog.findChild<QListWidget *>(QStringLiteral("privacyList"));
+    ASSERT_NE(list, nullptr);
+    ASSERT_EQ(list->count(), 3);
+    EXPECT_TRUE(allCheckStatesAre(list, Qt::Unchecked)) << "空初始勾选却勾上了行";
+    EXPECT_TRUE(dialog.selectedRows().empty());
+    EXPECT_TRUE(dialog.selectedItems().empty());
+
+    auto *apply = dialog.findChild<QPushButton *>(QStringLiteral("privacyApply"));
+    ASSERT_NE(apply, nullptr);
+    EXPECT_FALSE(apply->isEnabled()) << "一项没勾时应用按钮还亮着";
 }
