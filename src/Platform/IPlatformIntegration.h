@@ -41,11 +41,11 @@ namespace GyanisScribe::Platform
      */
     struct UiElementInfo
     {
-        QString name;          ///< 元素名（界面上看得见的文字）；成功交回时必然非空
+        QString name;          ///< 元素名（界面上看得见的文字）；这一级读不到名字时为空串，uiElementAtPoint 交回的那一份必然非空
         QString controlType;   ///< 控件类型的中文标签，如「按钮」「编辑框」；读不到时是「控件」
         QString windowTitle;   ///< 元素所在顶层窗口的标题；窗口不给标题时为空串
         QString processName;   ///< 顶层窗口所属进程的可执行文件名（不含路径）；取不到时为空串
-        QRect   logicalGlobal; ///< 元素的全局逻辑矩形；读不到几何时是空矩形
+        QRect   logicalGlobal; ///< 元素的全局逻辑矩形；换算不出几何的那一级不进链，交回时必然非空
     };
 
     /**
@@ -140,8 +140,9 @@ namespace GyanisScribe::Platform
          * @return 成功返回每一级的名字、控件类型、顶层窗口标题与进程、元素矩形（逻辑全局），从最深一级排到窗口根；
          *         空一份表示光标下这块没有可描述的界面元素
          * @return 本平台给不出时返回 PlatformUnsupported，并指一条替代做法
-         * @details 与 elementChainAtPoint 同一套认窗与下钻，只是每一级多带一份描述：名字或几何读不出的
-         *          那一级只让对应字段为空，不影响其余各级。窗口标题与进程按锚定的顶层窗口读一次，各层共用。
+         * @details 与 elementChainAtPoint 同一套认窗与下钻，只是每一级多带一份描述。名字可以缺失：
+         *          读不出名字的那一级保留空名，链不因此断开。几何不成：换算不出逻辑矩形的那一级直接不进链，
+         *          与矩形链同口径，所以交回的每一级都带着非空矩形。窗口标题与进程按锚定的顶层窗口读一次，各层共用。
          * @note 默认实现回绝，既有替身不必为这个能力改签名；Windows 那一份按 UI Automation 给出真实答案。
          */
         [[nodiscard]] virtual Base::Expected<std::vector<UiElementInfo>> uiElementChainAtPoint(const QPoint &, const std::vector<quintptr> &) const
@@ -154,11 +155,12 @@ namespace GyanisScribe::Platform
          * @param globalLogicalPoint 全局逻辑坐标
          * @param excludeWindowHandles 命中到这几位里的窗口直接跳过：录制时把自家 HUD 等窗口交进来，
          *        免得遮住真正被点的那个界面
-         * @return 成功时给出元素名、控件类型、顶层窗口标题与进程、元素矩形；光标下没有可描述的元素时成功返回空的 optional
+         * @return 成功时给出元素名、控件类型、顶层窗口标题与进程、元素矩形；
+         *         链为空（光标下没有可描述的元素）或链首名为空时成功返回空的 optional
          * @return 本平台给不出时返回 PlatformUnsupported，并指一条替代做法
-         * @details 与 elementChainAtPoint 同一套认窗与下钻，只交最深一级：步骤记录只要「点了哪个元素」，
-         *          不需要整条链。元素没有名字、UIA 没有提供器、窗口根拿不到时都算「没有元素」而不是失败——
-         *          自绘界面照样能被点，只是描述不出它。
+         * @details 取 uiElementChainAtPoint 的链首，只交最深一级：步骤记录只要「点了哪个元素」，不需要整条链。
+         *          元素没有名字、UIA 没有提供器、窗口根拿不到时都算「没有元素」而不是失败——
+         *          自绘界面照样能被点，只是描述不出它。交回的这份描述名字必然非空。
          * @note 默认实现回绝，既有替身不必为这个能力改签名；Windows 那一份按 UIA 给出真实答案。
          */
         [[nodiscard]] virtual Base::Expected<std::optional<UiElementInfo>> uiElementAtPoint(const QPoint &, const std::vector<quintptr> &) const

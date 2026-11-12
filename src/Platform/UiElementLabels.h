@@ -9,7 +9,12 @@
 
 #pragma once
 
+#include "Platform/IPlatformIntegration.h"
+
 #include <QString>
+
+#include <optional>
+#include <vector>
 
 namespace GyanisScribe::Platform
 {
@@ -22,5 +27,15 @@ namespace GyanisScribe::Platform
      *          标签走 Base::uiText，翻译目录按源码里的中文归口。
      */
     [[nodiscard]] QString uiControlTypeLabel(int uiaControlTypeId);
+
+    /**
+     * @brief 从一条元素链里挑出「光标下最深一级」那一份描述
+     * @param chain 由深到浅的元素链，见 IPlatformIntegration::uiElementChainAtPoint()
+     * @return 链首那一级的描述；链为空、或链首的名字 trimmed() 后为空时返回空的 optional
+     * @details 「没有元素」这一出口只有这一处判定：链为空与链首无名同样收场，
+     *          调用方不必各自再写一遍、各自漏掉其中一种。链首没有名字时整级都交不出去——
+     *          交回一条只有控件类型的描述，看着像是真认出了什么。
+     */
+    [[nodiscard]] std::optional<UiElementInfo> headElementOf(const std::vector<UiElementInfo> &chain);
 
 } // namespace GyanisScribe::Platform

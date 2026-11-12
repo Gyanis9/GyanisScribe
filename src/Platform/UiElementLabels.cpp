@@ -94,4 +94,19 @@ namespace GyanisScribe::Platform
         }
     }
 
+    std::optional<UiElementInfo> headElementOf(const std::vector<UiElementInfo> &chain)
+    {
+        if (chain.empty())
+        {
+            return std::nullopt;
+        }
+        const auto &head = chain.front();
+        // 名字是这一级唯一能认出「点了什么」的东西：空名与没有元素同一出口
+        if (head.name.trimmed().isEmpty())
+        {
+            return std::nullopt;
+        }
+        return head;
+    }
+
 } // namespace GyanisScribe::Platform

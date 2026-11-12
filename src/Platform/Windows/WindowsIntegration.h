@@ -91,7 +91,8 @@ namespace GyanisScribe::Platform
          * @param excludeWindowHandles 命中到这几扇窗就直接跳过，往下找下一扇
          * @return 从深到浅的每一级元素描述（逻辑全局）；光标下没有可认的窗口、或那扇窗没有 UI Automation 提供器时交空一份
          * @details 认窗与下钻与 elementChainAtPoint 走同一段，多带一列每级的 UIA 元素；窗口标题与进程
-         *          按锚定的顶层窗口读一次，各层共用。名字读不出的那一级保留空名，几何读不出的那一级不进链。
+         *          按锚定的顶层窗口读一次，各层共用。名字逐级读：读不出的那一级保留空名，链不因此断开；
+         *          几何逐级换算：认不到屏或换算失败的那一级直接不进链，与矩形链的跳过口径一致。
          */
         [[nodiscard]] Base::Expected<std::vector<UiElementInfo>> uiElementChainAtPoint(const QPoint                &globalLogicalPoint,
                                                                                         const std::vector<quintptr> &excludeWindowHandles) const override;
@@ -103,7 +104,7 @@ namespace GyanisScribe::Platform
          * @return 成功返回元素名、控件类型标签、顶层窗口标题与进程、元素矩形（逻辑全局）；
          *         光标下没有可认的窗口、那扇窗没有 UIA 提供器、或链首没有名字时交空的 optional
          * @details 取 uiElementChainAtPoint 的链首（最深一级）：两条接口认到的必须是同一个元素。
-         *          名字、几何读不出来只让对应字段为空，不算失败；UIA 起不来才是错误。
+         *          链为空与链首无名都算「没有元素」，判定在 headElementOf 里只有一处；只有链查询本身报错才向上返回错误。
          */
         [[nodiscard]] Base::Expected<std::optional<UiElementInfo>> uiElementAtPoint(const QPoint                &globalLogicalPoint,
                                                                                     const std::vector<quintptr> &excludeWindowHandles) const override;

@@ -139,10 +139,9 @@ namespace
         return GyanisScribe::Platform::logicalPointToPhysicalGlobal(globalLogicalPoint, mappings[*owner]);
     }
 
-    /// 一次元素查询的结果：钻到的最深元素，以及从窗口根到它的物理矩形与对应元素（由外到内）
+    /// 一次元素查询的结果：从窗口根到最深元素的物理矩形与对应元素（由外到内）
     struct UiaElementHit
     {
-        Microsoft::WRL::ComPtr<IUIAutomationElement>              element;       ///< 最深一级元素；窗口没有提供器或根读不出时为空
         std::vector<QRect>                                        physicalChain; ///< 从窗口根到最深元素的物理矩形；根读不出来时为空
         std::vector<Microsoft::WRL::ComPtr<IUIAutomationElement>> elements;      ///< 与 physicalChain 同序的元素；只收非空矩形那一级
     };
@@ -152,7 +151,7 @@ namespace
      * @param uia UI Automation 入口
      * @param window 已经选定并含住光标的顶层窗口
      * @param physicalPoint 光标位置，全局物理像素
-     * @return 最深一级元素与由外到内的矩形链、元素链；没有提供器、根读不出或建不出条件时元素为空
+     * @return 由外到内的矩形链与同序的元素链；没有提供器、根读不出或建不出条件时两条链都为空
      * @details 深度与子项预算挡住惰性树里越套越深的包装层与虚拟化列表一次暴露成千上万个条目。
      *          elementChainAtPoint 与 uiElementChainAtPoint 共用这一段：两处认到的必须是同一批元素。
      */
@@ -234,7 +233,6 @@ namespace
             element = next;
         }
 
-        hit.element = element;
         return hit;
     }
 
@@ -752,20 +750,8 @@ namespace GyanisScribe::Platform
         {
             return std::unexpected(chain.error());
         }
-        if (chain->empty())
-        {
-            // 光标下没有可认的窗口，或那扇窗没有 UIA 提供器：没有元素可描述，仍算成功
-            return std::optional<UiElementInfo>{};
-        }
-
-        // 链首就是最深一级；它没有名字时与「没有元素」同一出口：消费方回落坐标，
-        // 交回一条只有控件类型的描述反而像是认出了什么
-        const auto &first = chain->front();
-        if (first.name.trimmed().isEmpty())
-        {
-            return std::optional<UiElementInfo>{};
-        }
-        return std::optional<UiElementInfo>{first};
+        // 链首就是最深一级；链为空与链首无名都落在同一条「没有元素」出口上，判定只在 headElementOf 里写一次
+        return headElementOf(*chain);
     }
 
     Base::Expected<bool> WindowsIntegration::autostartEnabled() const

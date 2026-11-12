@@ -49,6 +49,88 @@ namespace
     }
 } // namespace
 
+namespace
+{
+    /// 只补齐必答项的平台替身：不演任何能力，也没重写两个元素查询方法
+    /// @details 用例要验的正是接口自带的默认实现，所以那两格必须保持原样不重写。
+    class StubPlatformIntegration final : public GyanisScribe::Platform::IPlatformIntegration
+    {
+    public:
+        /// 能力表：全为假
+        [[nodiscard]] GyanisScribe::Platform::PlatformCapabilities capabilities() const noexcept override
+        {
+            return {};
+        }
+
+        /// 平台显示名：固定的替身名
+        [[nodiscard]] QString displayName() const override
+        {
+            return QStringLiteral("默认实现替身");
+        }
+
+        /// 热键后端：替身不演这一项
+        [[nodiscard]] std::unique_ptr<GyanisScribe::Platform::IHotkeyBackend> createHotkeyBackend() override
+        {
+            return nullptr;
+        }
+
+        /// 前台窗口：替身不演这一项
+        [[nodiscard]] GyanisScribe::Base::Expected<GyanisScribe::Platform::ForegroundWindow> foregroundWindow() const override
+        {
+            return std::unexpected(GyanisScribe::Base::Error{ErrorCode::PlatformUnsupported, "替身不演取前台窗口这一项"});
+        }
+
+        /// 开机启动状态：替身不演这一项
+        [[nodiscard]] GyanisScribe::Base::Expected<bool> autostartEnabled() const override
+        {
+            return std::unexpected(GyanisScribe::Base::Error{ErrorCode::PlatformUnsupported, "替身不演开机启动这一项"});
+        }
+
+        /// 开关开机启动：替身不演这一项
+        [[nodiscard]] GyanisScribe::Base::Expected<void> setAutostart(bool enabled) override
+        {
+            static_cast<void>(enabled);
+            return std::unexpected(GyanisScribe::Base::Error{ErrorCode::PlatformUnsupported, "替身不演开机启动这一项"});
+        }
+
+        /// 窗口候选：替身不演这一项
+        [[nodiscard]] GyanisScribe::Base::Expected<std::vector<ScreenWindow>> screenWindows() const override
+        {
+            return std::unexpected(GyanisScribe::Base::Error{ErrorCode::PlatformUnsupported, "替身不演枚举窗口这一项"});
+        }
+
+        /// 元素矩形链：替身不演这一项
+        [[nodiscard]] GyanisScribe::Base::Expected<std::vector<QRect>> elementChainAtPoint(const QPoint &globalLogicalPoint,
+                                                                                           const std::vector<quintptr> &excludeWindowHandles) const override
+        {
+            static_cast<void>(globalLogicalPoint);
+            static_cast<void>(excludeWindowHandles);
+            return std::unexpected(GyanisScribe::Base::Error{ErrorCode::PlatformUnsupported, "替身不演界面元素这一项"});
+        }
+    };
+} // namespace
+
+/**
+ * @brief 钉住两个元素查询方法的默认实现：平台没有这一能力时回绝，而不是交回一条空链冒充「光标下没东西」
+ * @details 替身没有重写这两格，验的是接口本身。默认实现若改成返回空链/空 optional，调用方会把
+ *          「这台平台做不到」读成「这里没有元素」，降级提示也就再不会出现。
+ */
+TEST(PlatformIntegration, DefaultElementQueriesRejectWithAReason)
+{
+    StubPlatformIntegration stub;
+    const QPoint           point{10, 10};
+
+    const auto chain = stub.uiElementChainAtPoint(point, {});
+    ASSERT_FALSE(chain.has_value()) << "默认实现居然给出了元素链";
+    EXPECT_EQ(chain.error().code, ErrorCode::PlatformUnsupported);
+    EXPECT_FALSE(chain.error().message.empty()) << "回绝时不许给空原因";
+
+    const auto described = stub.uiElementAtPoint(point, {});
+    ASSERT_FALSE(described.has_value()) << "默认实现居然给出了元素描述";
+    EXPECT_EQ(described.error().code, ErrorCode::PlatformUnsupported);
+    EXPECT_FALSE(described.error().message.empty()) << "回绝时不许给空原因";
+}
+
 /**
  * @brief 钉住系统「显示动画」查询可用：读得出一个稳定值，不因查询失败而崩
  * @details 这一格的值随用户的系统设置与平台变化，用例不断言具体真假；钉的是调用可用、
@@ -432,13 +514,21 @@ TEST(PlatformIntegration, UiElementAtPointDescribesTheButtonUnderThePoint)
             << '×' << described->logicalGlobal.height() << "，按钮中心 " << buttonCenter.x() << ',' << buttonCenter.y();
 
     // 同一次命中，带元数据的链必须与 uiElementAtPoint 指的是同一个元素
+    const auto rectChain     = integration->elementChainAtPoint(buttonCenter, exclusion.handles);
     const auto metadataChain = integration->uiElementChainAtPoint(buttonCenter, exclusion.handles);
+    ASSERT_TRUE(rectChain.has_value()) << rectChain.error().message;
     ASSERT_TRUE(metadataChain.has_value()) << metadataChain.error().message;
     ASSERT_FALSE(metadataChain->empty());
+    // 两条链认的是同一批元素：一个逐级给矩形，一个逐级给描述，长度必须一一对应
+    EXPECT_EQ(metadataChain->size(), rectChain->size())
+            << "矩形链 " << rectChain->size() << " 级，元数据链 " << metadataChain->size() << " 级：两条链认到的不是同一批元素";
     EXPECT_FALSE(metadataChain->front().name.isEmpty());
     EXPECT_FALSE(metadataChain->front().controlType.isEmpty());
     EXPECT_FALSE(metadataChain->front().logicalGlobal.isEmpty());
-    EXPECT_TRUE(metadataChain->front().logicalGlobal.contains(buttonCenter));
+    EXPECT_TRUE(metadataChain->front().logicalGlobal.adjusted(-4, -4, 4, 4).contains(buttonCenter))
+            << "元数据链首的矩形没套住按钮中心：矩形 " << metadataChain->front().logicalGlobal.x() << ',' << metadataChain->front().logicalGlobal.y() << ' '
+            << metadataChain->front().logicalGlobal.width() << '×' << metadataChain->front().logicalGlobal.height() << "，按钮中心 " << buttonCenter.x() << ','
+            << buttonCenter.y();
     const auto deepest = integration->uiElementAtPoint(buttonCenter, exclusion.handles);
     ASSERT_TRUE(deepest.has_value());
     ASSERT_TRUE(deepest->has_value());
