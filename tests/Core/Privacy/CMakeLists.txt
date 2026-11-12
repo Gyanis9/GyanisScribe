@@ -1,6 +1,7 @@
 add_executable(TestCorePrivacy
         TestPiiDetector.cpp
-        TestRedactionGeometry.cpp)
+        TestRedactionGeometry.cpp
+        TestRedactImage.cpp)
 
 target_link_libraries(TestCorePrivacy PRIVATE
         Core

@@ -4,4 +4,6 @@ set_property(GLOBAL APPEND PROPERTY GyanisScribeCoreSources
         ${CMAKE_CURRENT_LIST_DIR}/PiiDetector.h
         ${CMAKE_CURRENT_LIST_DIR}/PiiDetector.cpp
         ${CMAKE_CURRENT_LIST_DIR}/RedactionGeometry.h
-        ${CMAKE_CURRENT_LIST_DIR}/RedactionGeometry.cpp)
+        ${CMAKE_CURRENT_LIST_DIR}/RedactionGeometry.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/RedactImage.h
+        ${CMAKE_CURRENT_LIST_DIR}/RedactImage.cpp)
