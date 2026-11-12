@@ -181,12 +181,14 @@ namespace
 
         /// 建窗口：WA_DontShowOnScreen 让 open() 里的 show() 不再真的弹一块窗口到桌面上
         /// globalHotkeys 默认给真值：这一份装置要测的是「能改」那一格，不能改的那一格由用例自己关掉它
+        /// uiElements 默认关：动作条的元素拾取按钮只在能力位为真的平台上出现
         /// 能力表同时留在 m_capabilities 里：动作条的用例要按同一份表算出应当落点的条目
-        void makeWindow(const bool globalHotkeys = true)
+        void makeWindow(const bool globalHotkeys = true, const bool uiElements = false)
         {
             m_integration                = GyanisScribe::Platform::createPlatformIntegration();
             m_capabilities               = GyanisScribe::Platform::PlatformCapabilities{};
             m_capabilities.globalHotkeys = globalHotkeys;
+            m_capabilities.uiElements    = uiElements;
             m_window                     = std::make_unique<MainWindow>(*m_store, *m_theme, *m_icons, *m_historyStore, *m_memoryIndex, m_capabilities, *m_integration);
             m_window->setAttribute(Qt::WA_DontShowOnScreen);
         }
@@ -2552,6 +2554,37 @@ TEST_F(MainWindowFixture, ActionBarLandsEveryVisibleTrayEntrySomewhere)
     clicked->click();
     EXPECT_EQ(emissions, 1) << "按钮点了却没发信号，或发了不止一次";
     EXPECT_TRUE(emitted == firstPrimaryAction) << "按「" << firstPrimaryLabel.toStdString() << "」发出来的不是它自己的动作";
+}
+
+/**
+ * @brief 钉住 uiElements 能力位开着时动作条给出「拾取界面元素」按钮，点击发同名动作
+ * @details 按钮由托盘条目表通用生成：能力位被漏判时这一格会红，而热键页那一条仍绿。
+ */
+TEST_F(MainWindowFixture, ActionBarOffersElementPickWhenTheCapabilityIsOn)
+{
+    using GyanisScribe::App::TrayAction;
+
+    makeWindow(true, true);
+    m_window->setTrayMenuAvailable(false);
+
+    auto *bar = m_window->findChild<QWidget *>(QStringLiteral("actionBar"));
+    ASSERT_NE(bar, nullptr);
+    const auto buttons = bar->findChildren<QPushButton *>();
+    const auto label   = GyanisScribe::Base::uiText("拾取界面元素");
+    const auto found   = std::ranges::find(buttons, label, &QPushButton::text);
+    ASSERT_NE(found, buttons.end()) << "能力位开着，动作条却没有「拾取界面元素」按钮";
+
+    int        emissions = 0;
+    TrayAction emitted   = TrayAction::Quit;
+    QObject::connect(m_window.get(), &MainWindow::actionRequested,
+                     [&emissions, &emitted](const TrayAction action)
+                     {
+                         ++emissions;
+                         emitted = action;
+                     });
+    (*found)->click();
+    EXPECT_EQ(emissions, 1) << "按钮点了却没发信号，或发了不止一次";
+    EXPECT_TRUE(emitted == TrayAction::PickElement) << "按钮发出来的不是元素拾取";
 }
 
 /**
