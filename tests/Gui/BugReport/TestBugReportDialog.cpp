@@ -187,8 +187,8 @@ namespace
                                    return; // 兜底定时器会把它取消，driven 保持假
                                }
                                driven = true;
-                               fallback->stop();
-                               fallback->deleteLater();
+                               // 兜底不在这里停：驱动体里的断言早退时模态循环还开着，
+                               // 停了就再没有第二只手去取消它；兜底自己会在 3 秒后收场
                                drive(*review);
                            });
     }
