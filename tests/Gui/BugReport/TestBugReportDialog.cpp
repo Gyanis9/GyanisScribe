@@ -6,10 +6,12 @@
 #include "Core/BugReport/BugReport.h"
 #include "Core/Privacy/PiiTypes.h"
 #include "Gui/BugReport/BugReportDialog.h"
+#include "Gui/Privacy/PrivacyReviewDialog.h"
 
 #include <QApplication>
 #include <QCheckBox>
 #include <QClipboard>
+#include <QComboBox>
 #include <QCoreApplication>
 #include <QDate>
 #include <QDir>
@@ -21,15 +23,21 @@
 #include <QLabel>
 #include <QLayout>
 #include <QLineEdit>
+#include <QListWidget>
+#include <QListWidgetItem>
 #include <QPushButton>
 #include <QScreen>
 #include <QTemporaryDir>
 #include <QTextEdit>
 #include <QTime>
+#include <QTimer>
 #include <QTimeZone>
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <cstring>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -41,6 +49,7 @@ using GyanisScribe::Core::BugReport::RedactionState;
 using GyanisScribe::Core::Privacy::PiiItem;
 using GyanisScribe::Core::Privacy::PiiKind;
 using GyanisScribe::Gui::BugReportDialog;
+using GyanisScribe::Gui::PrivacyReviewDialog;
 
 namespace
 {
@@ -105,6 +114,11 @@ namespace
             return PiiItem{PiiKind::Phone, QRect{40, 30, 80, 20}, QStringLiteral("138****8000")};
         }
 
+        static PiiItem makeEmailItem()
+        {
+            return PiiItem{PiiKind::Email, QRect{40, 62, 100, 18}, QStringLiteral("a***@example.com")};
+        }
+
         static void setText(BugReportDialog &dialog, const QString &objectName, const QString &text)
         {
             auto *edit = dialog.findChild<QLineEdit *>(objectName);
@@ -135,6 +149,49 @@ namespace
             }
         }
     };
+
+    /**
+     * @brief 在模态审核窗的事件循环里驱动它
+     * @param drive 拿到审核窗后要做的事
+     * @details 审核窗由 adjustRedactions() 里的 exec() 现建：定时器到点时它已经是活动模态窗。
+     *          另挂一条兜底定时器，驱动没找到窗时取消它，用例不会挂在模态循环里。
+     */
+    void driveReviewDialog(const std::function<void(PrivacyReviewDialog &)> &drive)
+    {
+        QTimer::singleShot(0, qApp,
+                           [drive]
+                           {
+                               if (auto *review = qobject_cast<PrivacyReviewDialog *>(QApplication::activeModalWidget()); review != nullptr)
+                               {
+                                   drive(*review);
+                               }
+                           });
+        QTimer::singleShot(3'000, qApp,
+                           []
+                           {
+                               if (auto *review = qobject_cast<PrivacyReviewDialog *>(QApplication::activeModalWidget()); review != nullptr)
+                               {
+                                   review->reject();
+                               }
+                           });
+    }
+
+    /// 两张图逐像素是否相同
+    bool sameImage(const QImage &left, const QImage &right)
+    {
+        if (left.size() != right.size())
+        {
+            return false;
+        }
+        for (int y = 0; y < left.height(); ++y)
+        {
+            if (std::memcmp(left.constScanLine(y), right.constScanLine(y), static_cast<std::size_t>(left.width()) * 4U) != 0)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
 } // namespace
 
 TEST_F(BugReportDialogFixture, StartsPendingAndBlocksEveryWriteAction)
@@ -529,4 +586,93 @@ TEST_F(BugReportDialogFixture, MarkdownWriteFailureRemovesThePngItJustWrote)
     EXPECT_FALSE(std::filesystem::exists(root / "report.png")) << "报告写失败却把刚写的截图留在盘上";
     EXPECT_TRUE(std::filesystem::is_directory(root / "report.md")) << "前提：同名目录不该被保存改写";
     EXPECT_TRUE(dialog->statusText().contains(QStringLiteral("无法写入"))) << "失败原因没落到状态行";
+}
+
+/**
+ * @brief 钉住调整打码的完整链路：模态审核窗里改勾选与工具，确认后预览与计数一起更新
+ */
+TEST_F(BugReportDialogFixture, AdjustRedactionsAppliesTheNewSelectionAndTool)
+{
+    auto dialog = makeDialog();
+    dialog->setScanResult({makePhoneItem(), makeEmailItem()});
+    ASSERT_EQ(dialog->redactionForTesting().maskedCount, 2);
+    ASSERT_EQ(dialog->redactionForTesting().toolLabel, QStringLiteral("马赛克"));
+    const auto original = dialog->reportImageForTesting().copy();
+
+    driveReviewDialog(
+            [](PrivacyReviewDialog &review)
+            {
+                auto *list  = review.findChild<QListWidget *>(QStringLiteral("privacyList"));
+                auto *style = review.findChild<QComboBox *>(QStringLiteral("privacyStyle"));
+                auto *apply = review.findChild<QPushButton *>(QStringLiteral("privacyApply"));
+                ASSERT_NE(list, nullptr);
+                ASSERT_NE(style, nullptr);
+                ASSERT_NE(apply, nullptr);
+                list->item(1)->setCheckState(Qt::Unchecked);
+                style->setCurrentIndex(1);
+                apply->click();
+            });
+    dialog->adjustRedactions();
+
+    EXPECT_EQ(dialog->redactionForTesting().state, RedactionState::Masked);
+    EXPECT_EQ(dialog->redactionForTesting().maskedCount, 1) << "取消勾选的那一项仍被打码";
+    EXPECT_EQ(dialog->redactionForTesting().toolLabel, QStringLiteral("高斯模糊"));
+    EXPECT_TRUE(dialog->reportText().contains(uiText("已对 1 处敏感信息打码（高斯模糊）"))) << "报告摘要没跟着新选择走";
+    EXPECT_NE(dialog->reportImageForTesting().pixel(80, 40), original.pixel(80, 40)) << "留下的那一项没有按新方式重渲染";
+}
+
+/**
+ * @brief 钉住取消审核窗后打码状态与截图原样不动
+ */
+TEST_F(BugReportDialogFixture, CancellingTheReviewKeepsTheCurrentRedaction)
+{
+    auto dialog = makeDialog();
+    dialog->setScanResult({makePhoneItem(), makeEmailItem()});
+    const auto before = dialog->reportImageForTesting().copy();
+
+    driveReviewDialog(
+            [](PrivacyReviewDialog &review)
+            {
+                auto *selectNone = review.findChild<QPushButton *>(QStringLiteral("privacySelectNone"));
+                auto *style      = review.findChild<QComboBox *>(QStringLiteral("privacyStyle"));
+                auto *cancel     = review.findChild<QPushButton *>(QStringLiteral("privacyCancel"));
+                ASSERT_NE(selectNone, nullptr);
+                ASSERT_NE(style, nullptr);
+                ASSERT_NE(cancel, nullptr);
+                selectNone->click();
+                style->setCurrentIndex(1);
+                cancel->click();
+            });
+    dialog->adjustRedactions();
+
+    EXPECT_EQ(dialog->redactionForTesting().state, RedactionState::Masked);
+    EXPECT_EQ(dialog->redactionForTesting().maskedCount, 2);
+    EXPECT_EQ(dialog->redactionForTesting().toolLabel, QStringLiteral("马赛克"));
+    EXPECT_TRUE(sameImage(before, dialog->reportImageForTesting())) << "取消之后截图被重渲染了";
+}
+
+/**
+ * @brief 钉住空勾选被接受时不动打码状态
+ * @details 应用按钮在空勾选时是灰的，这里直接 accept() 模拟「守卫拿到的输入」，
+ *          钉住 adjustRedactions 自己的空行号守卫。
+ */
+TEST_F(BugReportDialogFixture, ApplyingAnEmptySelectionLeavesTheRedactionAlone)
+{
+    auto dialog = makeDialog();
+    dialog->setScanResult({makePhoneItem(), makeEmailItem()});
+    const auto before = dialog->reportImageForTesting().copy();
+
+    driveReviewDialog(
+            [](PrivacyReviewDialog &review)
+            {
+                auto *selectNone = review.findChild<QPushButton *>(QStringLiteral("privacySelectNone"));
+                ASSERT_NE(selectNone, nullptr);
+                selectNone->click();
+                review.accept();
+            });
+    dialog->adjustRedactions();
+
+    EXPECT_EQ(dialog->redactionForTesting().state, RedactionState::Masked) << "空勾选把打码状态改掉了";
+    EXPECT_EQ(dialog->redactionForTesting().maskedCount, 2);
+    EXPECT_TRUE(sameImage(before, dialog->reportImageForTesting())) << "空勾选把截图重渲染了";
 }
