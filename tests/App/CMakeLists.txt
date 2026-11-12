@@ -153,3 +153,31 @@ add_dependencies(TestAppMemoryCoordinator DeployQtRuntime)
 
 include(GoogleTest)
 gtest_discover_tests(TestAppMemoryCoordinator)
+
+add_executable(TestAppBugReport
+        TestBugReportCoordinator.cpp)
+
+target_link_libraries(TestAppBugReport PRIVATE
+        App
+        Core
+        Gui
+        Platform
+        GTest::gtest
+        GTest::gtest_main
+        Qt6::Widgets
+        Qt6::Test)
+
+# 本目标链了 Qt6::Test，而共用的部署清单只摆产品要的几件：缺这份 DLL，可执行体起不来会被发现那一步报成「测试没跑起来」
+add_custom_command(TARGET TestAppBugReport POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_FILE:Qt6::Test>"
+        "$<TARGET_FILE_DIR:TestAppBugReport>/")
+
+if (MSVC)
+    target_compile_options(TestAppBugReport PRIVATE /W4 /WX)
+endif ()
+
+add_dependencies(TestAppBugReport DeployQtRuntime)
+
+include(GoogleTest)
+gtest_discover_tests(TestAppBugReport)

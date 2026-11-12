@@ -45,7 +45,9 @@ add_library(App STATIC
         RewindCoordinator.h
         RewindCoordinator.cpp
         StepRecorderCoordinator.h
-        StepRecorderCoordinator.cpp)
+        StepRecorderCoordinator.cpp
+        BugReportCoordinator.h
+        BugReportCoordinator.cpp)
 
 target_include_directories(App PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_link_libraries(App PUBLIC
