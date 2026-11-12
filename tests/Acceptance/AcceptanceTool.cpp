@@ -10,6 +10,7 @@
 #include "Core/Ocr/OcrLanguage.h"
 #include "Core/Ocr/OcrTypes.h"
 #include "Core/Rewind/FrameRingBuffer.h"
+#include "Core/Rewind/RewindConfig.h"
 #include "Core/Rewind/RewindFrameCodec.h"
 #include "Core/Rewind/RewindTypes.h"
 #include "Core/Settings/SettingsKeys.h"
@@ -80,14 +81,36 @@ namespace
                 std::fprintf(stderr, "cannot read lines: %s\n", source.toStdString().c_str());
                 return std::nullopt;
             }
+            int row = 0;
             while (!file.atEnd())
             {
-                const QStringList fields = QString::fromUtf8(file.readLine()).trimmed().split(QLatin1Char('\t'));
-                if (fields.size() < 5)
+                ++row;
+                const QString line = QString::fromUtf8(file.readLine()).trimmed();
+                if (line.isEmpty())
                 {
                     continue;
                 }
-                const QRect box{fields[0].toInt(), fields[1].toInt(), fields[2].toInt(), fields[3].toInt()};
+                // 真值行是基准，坏行不能静默跳过：少一行就会把缺失的格子算成产品漏检，红记到产品头上
+                const QStringList fields  = line.split(QLatin1Char('\t'));
+                bool              numeric = true;
+                int               values[4]{};
+                if (fields.size() >= 5)
+                {
+                    for (int field = 0; field < 4; ++field)
+                    {
+                        values[field] = fields[field].toInt(&numeric);
+                        if (!numeric)
+                        {
+                            break;
+                        }
+                    }
+                }
+                if (fields.size() < 5 || !numeric)
+                {
+                    std::fprintf(stderr, "ERROR bad lines row %d: %s\n", row, line.toStdString().c_str());
+                    return std::nullopt;
+                }
+                const QRect box{values[0], values[1], values[2], values[3]};
                 result.lines.push_back(GyanisScribe::Core::OcrLine{{GyanisScribe::Core::OcrWord{fields.mid(4).join(QLatin1Char('\t')), box}}, box});
             }
             return result;
@@ -342,6 +365,12 @@ namespace
             }
             offsets.push_back(last);
         }
+        // 拼接器的首帧连同粘性底带一起进图，单帧页没有接缝把底带裁掉，期望成品注定对不上
+        if (offsets.size() < 2)
+        {
+            std::fprintf(stderr, "ERROR single-frame page: need at least two frames\n");
+            return 3;
+        }
 
         int index = 0;
         for (const int offset: offsets)
@@ -367,11 +396,20 @@ namespace
                 painter.drawImage(0, viewport - bottom, page.copy(0, page.height() - bottom, page.width(), bottom));
             }
             const auto path = outDir / std::format("frame-{:03d}.png", index);
-            frame.save(QString::fromStdWString(path.wstring()), "PNG");
+            if (!frame.save(QString::fromStdWString(path.wstring()), "PNG"))
+            {
+                std::fprintf(stderr, "ERROR cannot write %s\n", QString::fromStdWString(path.wstring()).toStdString().c_str());
+                return 3;
+            }
             ++index;
         }
         // 成品与产品里的长图一致：首帧连同粘性标题栏一起进图，粘性底带在接缝里被裁掉
-        page.copy(0, 0, page.width(), contentBottom).save(QString::fromStdWString((outDir / "expected.png").wstring()), "PNG");
+        const auto expected = outDir / "expected.png";
+        if (!page.copy(0, 0, page.width(), contentBottom).save(QString::fromStdWString(expected.wstring()), "PNG"))
+        {
+            std::fprintf(stderr, "ERROR cannot write %s\n", QString::fromStdWString(expected.wstring()).toStdString().c_str());
+            return 3;
+        }
         std::printf("FRAMES %d\n", index);
         return 0;
     }
@@ -421,11 +459,13 @@ namespace
             std::fprintf(stderr, "frameCount must be positive\n");
             return 2;
         }
-        std::error_code ignored;
-        std::filesystem::create_directories(std::filesystem::path{arguments[3].toStdWString()}, ignored);
+        std::error_code             ignored;
+        const std::filesystem::path outDir{arguments[3].toStdWString()};
+        std::filesystem::create_directories(outDir, ignored);
 
-        // 环形缓冲按产品默认档：10 秒、5 帧每秒、256 MB 预算
-        GyanisScribe::Core::FrameRingBuffer ring{10, 5, 256};
+        // 按产品的默认档开环形缓冲（十秒、五帧每秒、100 MB 预算）；这一批帧够不着时间上限，量的是 4K 编码吞吐与环形缓冲接入，不是预算打满
+        GyanisScribe::Core::FrameRingBuffer ring{GyanisScribe::Core::kDefaultRewindBufferSeconds, GyanisScribe::Core::kDefaultRewindFrameRate,
+                                                 GyanisScribe::Core::kRewindMemoryBudgetMb};
         QElapsedTimer                       watch;
         watch.start();
         qint64 encodedBytes = 0;
@@ -438,6 +478,16 @@ namespace
                 painter.fillRect(QRect{(index * 37) % 3400, 180, 400, 300}, QColor{210, 180, 40});
                 painter.setPen(Qt::white);
                 painter.drawText(QRect{120, 120, 1200, 60}, Qt::AlignLeft, QStringLiteral("4K 验收帧 %1").arg(index));
+            }
+            // 首帧落盘当证据：吞吐读数要能对上喂进去的画面，编码前存的是原始帧
+            if (index == 0)
+            {
+                const auto evidence = outDir / "frame-000.png";
+                if (!frame.save(QString::fromStdWString(evidence.wstring()), "PNG"))
+                {
+                    std::fprintf(stderr, "ERROR cannot write %s\n", QString::fromStdWString(evidence.wstring()).toStdString().c_str());
+                    return 3;
+                }
             }
             const auto encoded = GyanisScribe::Core::encodeRewindFrame(frame);
             if (!encoded)
