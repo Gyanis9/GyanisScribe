@@ -74,7 +74,7 @@ namespace GyanisScribe::App
 
     /**
      * @brief 截图这一族：入口 → 延时 → 抓帧 → 按意图交付
-     * @details 它是枢纽——交付那一跳要往识别、贴图、标注、落盘四处去，所以依赖在构造时一次给全
+     * @details 它是枢纽——交付那一跳要往识别、贴图、标注、落盘、报告五处去，所以依赖在构造时一次给全
      *          （`Dependencies` 是本仓既有形状，AppControllerParts 同款），不各自去摸全局。
      *          要出给用户的话走 messageForUser；命令行那次截图失败还要往 commandLineActionFailed
      *          另交一份（那条路径没有界面可看提示，退出码靠它）。
