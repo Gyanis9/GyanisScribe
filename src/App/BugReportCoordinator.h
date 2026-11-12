@@ -68,7 +68,7 @@ namespace GyanisScribe::App
         /**
          * @brief 测试注入构造：跳过后端工厂，并换掉码识别
          * @param settings 配置来源，读截图输出目录与识别语言
-         * @param engine 识别后端，所有权移入本对象
+         * @param engine 识别后端，所有权移入本对象；为空表示这条链没有识别后端，检查结果按不可用推进
          * @param barcodeReader 码识别函数；为空表示这条链不找码
          * @param parent Qt 父对象
          */

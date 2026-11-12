@@ -159,9 +159,13 @@ namespace GyanisScribe::App
         if (m_injectedEngine)
         {
             m_scanner = std::make_unique<PrivacyCoordinator>(m_settings, std::move(m_injectedEngine));
-        } else
+        } else if (m_integration != nullptr)
         {
             m_scanner = std::make_unique<PrivacyCoordinator>(m_settings, *m_integration);
+        } else
+        {
+            // 注入构造两者都没给：按空引擎处理，由扫描器给出「后端不可用」的可操作原因
+            m_scanner = std::make_unique<PrivacyCoordinator>(m_settings, std::unique_ptr<GyanisScribe::Core::IOcrEngine>{});
         }
 
         // 不接 messageForUser：这条链的检查状态只落在报告窗里，再弹全局气泡反而盖住窗口

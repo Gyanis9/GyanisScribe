@@ -624,3 +624,20 @@ TEST_F(BugReportCoordinatorFixture, ANullDetectionImageGetsItsOwnReason)
     EXPECT_TRUE(dialog->redactionForTesting().unavailableReason.contains(QStringLiteral("没有可用于检查的底图"))) << "没有底图却报成了尺寸不一致";
     EXPECT_FALSE(dialog->reportText().contains(QStringLiteral("尺寸不一致"))) << "两句原因串了";
 }
+
+/**
+ * @brief 钉住注入构造既没给引擎也没给平台能力时不崩，而是走「后端不可用」
+ * @details 这条构造是给用例用的：漏传两者时原先会在 ensureScanner 里解引用空指针。
+ */
+TEST_F(BugReportCoordinatorFixture, InjectionWithoutEngineOrIntegrationLandsInUnavailable)
+{
+    BugReportCoordinator coordinator{*m_settings, nullptr, emptyBarcodeReader()};
+    QWidget              parent;
+
+    coordinator.openReport(makeImage(QSize{200, 100}, QColor{10, 20, 30}), makeImage(QSize{200, 100}, QColor{10, 20, 30}), makeContext(), &parent);
+    auto *dialog = coordinator.dialogForTesting();
+    ASSERT_NE(dialog, nullptr);
+    EXPECT_EQ(dialog->redactionForTesting().state, RedactionState::Unavailable);
+    EXPECT_TRUE(dialog->redactionForTesting().unavailableReason.contains(QStringLiteral("本机没有可用的文字识别后端"))) << "空引擎没走到既有的不可用文案";
+    EXPECT_FALSE(coordinator.isScanningForTesting());
+}
