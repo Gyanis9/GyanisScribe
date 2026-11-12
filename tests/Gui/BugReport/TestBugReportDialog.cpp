@@ -153,32 +153,59 @@ namespace
     /**
      * @brief 在模态审核窗的事件循环里驱动它
      * @param drive 拿到审核窗后要做的事
-     * @details 审核窗由 adjustRedactions() 里的 exec() 现建：定时器到点时它已经是活动模态窗。
-     *          另挂一条兜底定时器，驱动没找到窗时取消它，用例不会挂在模态循环里。
+     * @param driven 驱动是否真的执行过：为假说明没找到审核窗，用例必须据此判红
+     * @details 审核窗由 adjustRedactions() 里的 exec() 现建。兜底定时器走顶层面板的另一条查找路，
+     *          并负责把没被驱动的窗取消掉，用例不会挂在模态循环里。
      */
-    void driveReviewDialog(const std::function<void(PrivacyReviewDialog &)> &drive)
+    void driveReviewDialog(const std::function<void(PrivacyReviewDialog &)> &drive, bool &driven)
     {
+        auto *fallback = new QTimer{qApp};
+        fallback->setSingleShot(true);
+        fallback->setInterval(3'000);
+        QObject::connect(fallback, &QTimer::timeout, qApp,
+                         [fallback]
+                         {
+                             // 驱动没找到窗时兜底把它取消：只认活动窗会一起落空，所以从顶层窗里找
+                             for (auto *widget: QApplication::topLevelWidgets())
+                             {
+                                 if (auto *review = qobject_cast<PrivacyReviewDialog *>(widget); review != nullptr && review->isVisible())
+                                 {
+                                     review->reject();
+                                     break;
+                                 }
+                             }
+                             fallback->deleteLater();
+                         });
+        fallback->start();
+
         QTimer::singleShot(0, qApp,
-                           [drive]
+                           [drive, &driven, fallback]
                            {
-                               if (auto *review = qobject_cast<PrivacyReviewDialog *>(QApplication::activeModalWidget()); review != nullptr)
+                               auto *review = qobject_cast<PrivacyReviewDialog *>(QApplication::activeModalWidget());
+                               if (review == nullptr)
                                {
-                                   drive(*review);
+                                   return; // 兜底定时器会把它取消，driven 保持假
                                }
+                               driven = true;
+                               fallback->stop();
+                               fallback->deleteLater();
+                               drive(*review);
                            });
-        QTimer::singleShot(3'000, qApp,
-                           []
-                           {
-                               if (auto *review = qobject_cast<PrivacyReviewDialog *>(QApplication::activeModalWidget()); review != nullptr)
-                               {
-                                   review->reject();
-                               }
-                           });
+    }
+
+    /// 扫描线按 width*4 连续比对只对 32 位 ARGB 成立
+    bool isArgb32(const QImage &image)
+    {
+        return image.format() == QImage::Format_ARGB32_Premultiplied || image.format() == QImage::Format_ARGB32;
     }
 
     /// 两张图逐像素是否相同
     bool sameImage(const QImage &left, const QImage &right)
     {
+        if (!isArgb32(left) || !isArgb32(right))
+        {
+            return false;
+        }
         if (left.size() != right.size())
         {
             return false;
@@ -599,6 +626,7 @@ TEST_F(BugReportDialogFixture, AdjustRedactionsAppliesTheNewSelectionAndTool)
     ASSERT_EQ(dialog->redactionForTesting().toolLabel, QStringLiteral("马赛克"));
     const auto original = dialog->reportImageForTesting().copy();
 
+    bool driven = false;
     driveReviewDialog(
             [](PrivacyReviewDialog &review)
             {
@@ -608,11 +636,15 @@ TEST_F(BugReportDialogFixture, AdjustRedactionsAppliesTheNewSelectionAndTool)
                 ASSERT_NE(list, nullptr);
                 ASSERT_NE(style, nullptr);
                 ASSERT_NE(apply, nullptr);
+                ASSERT_NE(list->item(1), nullptr);
+                EXPECT_TRUE(list->item(1)->text().contains(QStringLiteral("邮箱"))) << "前提：第 1 行是邮箱项";
                 list->item(1)->setCheckState(Qt::Unchecked);
                 style->setCurrentIndex(1);
                 apply->click();
-            });
+            },
+            driven);
     dialog->adjustRedactions();
+    ASSERT_TRUE(driven) << "模态审核窗没有被驱动，这一条的判据不成立";
 
     EXPECT_EQ(dialog->redactionForTesting().state, RedactionState::Masked);
     EXPECT_EQ(dialog->redactionForTesting().maskedCount, 1) << "取消勾选的那一项仍被打码";
@@ -630,6 +662,7 @@ TEST_F(BugReportDialogFixture, CancellingTheReviewKeepsTheCurrentRedaction)
     dialog->setScanResult({makePhoneItem(), makeEmailItem()});
     const auto before = dialog->reportImageForTesting().copy();
 
+    bool driven = false;
     driveReviewDialog(
             [](PrivacyReviewDialog &review)
             {
@@ -642,8 +675,10 @@ TEST_F(BugReportDialogFixture, CancellingTheReviewKeepsTheCurrentRedaction)
                 selectNone->click();
                 style->setCurrentIndex(1);
                 cancel->click();
-            });
+            },
+            driven);
     dialog->adjustRedactions();
+    ASSERT_TRUE(driven) << "模态审核窗没有被驱动，这一条的判据不成立";
 
     EXPECT_EQ(dialog->redactionForTesting().state, RedactionState::Masked);
     EXPECT_EQ(dialog->redactionForTesting().maskedCount, 2);
@@ -662,15 +697,19 @@ TEST_F(BugReportDialogFixture, ApplyingAnEmptySelectionLeavesTheRedactionAlone)
     dialog->setScanResult({makePhoneItem(), makeEmailItem()});
     const auto before = dialog->reportImageForTesting().copy();
 
+    bool driven = false;
     driveReviewDialog(
             [](PrivacyReviewDialog &review)
             {
                 auto *selectNone = review.findChild<QPushButton *>(QStringLiteral("privacySelectNone"));
                 ASSERT_NE(selectNone, nullptr);
                 selectNone->click();
+                ASSERT_TRUE(review.selectedRows().empty()) << "前提：一项都没勾";
                 review.accept();
-            });
+            },
+            driven);
     dialog->adjustRedactions();
+    ASSERT_TRUE(driven) << "模态审核窗没有被驱动，这一条的判据不成立";
 
     EXPECT_EQ(dialog->redactionForTesting().state, RedactionState::Masked) << "空勾选把打码状态改掉了";
     EXPECT_EQ(dialog->redactionForTesting().maskedCount, 2);
