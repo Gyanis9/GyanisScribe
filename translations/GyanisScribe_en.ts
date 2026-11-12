@@ -5275,5 +5275,57 @@
             <source>系统没让装上全局输入监听：请检查安全软件或换一个桌面会话再试</source>
             <translation>The system did not allow the global input hook to be installed. Check security software or try another desktop session</translation>
         </message>
+        <message>
+            <source>拾取界面元素</source>
+            <translation>Pick a UI element</translation>
+        </message>
+        <message>
+            <source>未知</source>
+            <translation>Unknown</translation>
+        </message>
+        <message>
+            <source>元素</source>
+            <translation>Element</translation>
+        </message>
+        <message>
+            <source>类型</source>
+            <translation>Type</translation>
+        </message>
+        <message>
+            <source>进程</source>
+            <translation>Process</translation>
+        </message>
+        <message>
+            <source>区域</source>
+            <translation>Region</translation>
+        </message>
+        <message>
+            <source>没认出元素，可拖动框选</source>
+            <translation>No element recognised; drag to frame a region</translation>
+        </message>
+        <message>
+            <source>元素拾取：悬停选元素，, / . 换层级，点击选中，拖动框选，Esc 取消</source>
+            <translation>Element picking: hover to pick an element, , / . to change level, click to select, drag to frame, Esc to cancel</translation>
+        </message>
+        <message>
+            <source>整扇窗口</source>
+            <translation>Whole window</translation>
+        </message>
+        <message>
+            <source>已复制元素信息</source>
+            <translation>Copied element info</translation>
+        </message>
+        <message>
+            <source>这台平台不支持界面元素拾取：可直接框选目标区域</source>
+            <translation>This platform does not support UI element picking; frame the target region directly instead</translation>
+        </message>
+        <message>
+            <source>这台平台还不能列出光标下的界面元素</source>
+            <translation>This platform cannot list the UI element under the cursor yet</translation>
+        </message>
+        <message>
+            <source>系统的 UI Automation 无法启动，不能列出光标下的界面元素。可继续使用悬停识别整个窗口，或直接框选目标区域。</source>
+            <translation>The system's UI Automation could not start, so UI elements under the cursor cannot be listed. Hovering can still recognise whole windows, or frame the target region directly</translation>
+        </message>
 </context>
 </TS>

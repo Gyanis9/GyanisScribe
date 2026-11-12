@@ -581,7 +581,8 @@ namespace GyanisScribe::Main
                 handleTrayAction(GyanisScribe::App::TrayAction::ToggleSteps);
                 return;
             case GyanisScribe::Core::HotkeyAction::PickElement:
-                // 与托盘那一行只有一条实现：能力与互斥门禁都在托盘动作那一段判
+                // 与托盘那一行只有一条实现：互斥门禁在托盘动作那一段判；能力由托盘菜单按 uiElements 过滤，
+                // CaptureService::startElementPick 入口还会再挡一次，热键这一路不必自己判
                 handleTrayAction(GyanisScribe::App::TrayAction::PickElement);
                 return;
         }
