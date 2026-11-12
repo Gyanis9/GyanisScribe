@@ -10,8 +10,11 @@
 #include <QApplication>
 #include <QCheckBox>
 #include <QClipboard>
+#include <QCoreApplication>
 #include <QDate>
 #include <QDir>
+#include <QElapsedTimer>
+#include <QEventLoop>
 #include <QFile>
 #include <QGuiApplication>
 #include <QImage>
@@ -115,6 +118,22 @@ namespace
             ASSERT_NE(edit, nullptr) << objectName.toStdString();
             edit->setPlainText(text);
         }
+
+        /// 系统剪贴板是进程外资源：别的程序短暂占用时写入会落空，读写都按有界重试
+        static void setClipboardAndWait(const QString &text)
+        {
+            QElapsedTimer watch;
+            watch.start();
+            for (;;)
+            {
+                QGuiApplication::clipboard()->setText(text);
+                if (QGuiApplication::clipboard()->text() == text || watch.elapsed() > 2'000)
+                {
+                    return;
+                }
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+            }
+        }
     };
 } // namespace
 
@@ -131,7 +150,7 @@ TEST_F(BugReportDialogFixture, StartsPendingAndBlocksEveryWriteAction)
     EXPECT_FALSE(save->isEnabled());
     EXPECT_FALSE(adjust->isEnabled());
 
-    QGuiApplication::clipboard()->setText(QStringLiteral("保持不变"));
+    setClipboardAndWait(QStringLiteral("保持不变"));
     const auto copied = dialog->copyReport();
     EXPECT_FALSE(copied.has_value());
     EXPECT_TRUE(copied.error().message.find("正在检查") != std::string::npos);
@@ -307,10 +326,23 @@ TEST_F(BugReportDialogFixture, PreviewShowsTheSavedShapeWhileCopyStaysTextOnly)
     dialog->setScanResult({makePhoneItem()});
     EXPECT_TRUE(preview->toPlainText().contains(QStringLiteral("![截图](<report.png>)")));
 
-    ASSERT_TRUE(dialog->copyReport().has_value());
-    EXPECT_TRUE(dialog->statusText().contains(QStringLiteral("已复制"))) << "复制成功没有反馈";
-    EXPECT_EQ(QGuiApplication::clipboard()->text(), dialog->reportText());
-    EXPECT_FALSE(QGuiApplication::clipboard()->text().contains(QStringLiteral("![截图]"))) << "剪贴板里出现了图片链接";
+    // 系统剪贴板是进程外资源：别的程序短暂占用时那一次写入会落空，用户的做法就是再按一次
+    QString       copied;
+    QElapsedTimer watch;
+    watch.start();
+    do
+    {
+        EXPECT_TRUE(dialog->copyReport().has_value());
+        copied = QGuiApplication::clipboard()->text();
+        if (copied == dialog->reportText())
+        {
+            break;
+        }
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+    } while (watch.elapsed() < 2'000);
+    ASSERT_TRUE(dialog->statusText().contains(QStringLiteral("已复制"))) << "复制成功没有反馈";
+    EXPECT_EQ(copied, dialog->reportText());
+    EXPECT_FALSE(copied.contains(QStringLiteral("![截图]"))) << "剪贴板里出现了图片链接";
 
     auto *copy = dialog->findChild<QPushButton *>(QStringLiteral("bugReportCopy"));
     ASSERT_NE(copy, nullptr);
