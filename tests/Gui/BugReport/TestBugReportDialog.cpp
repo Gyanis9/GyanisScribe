@@ -508,3 +508,25 @@ TEST_F(BugReportDialogFixture, PreviewImageNameFollowsTheSuggestedPath)
     ASSERT_NE(preview, nullptr);
     EXPECT_TRUE(preview->toPlainText().contains(QStringLiteral("![截图](<崩溃现场.png>)"))) << "预览里的文件名没走与保存相同的路径换算";
 }
+
+/**
+ * @brief 钉住报告写失败时回收本次刚写的截图
+ * @details 把 .md 目标做成同名目录逼 QSaveFile 失败：盘上不许留下没有正文的孤立 PNG。
+ */
+TEST_F(BugReportDialogFixture, MarkdownWriteFailureRemovesThePngItJustWrote)
+{
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const auto root = std::filesystem::path{directory.path().toStdWString()};
+    ASSERT_TRUE(std::filesystem::create_directory(root / "report.md")) << "前提：同名目录要建得出来";
+
+    auto dialog = makeDialog();
+    dialog->setScanResult({}); // NoHits：保存会先落 PNG 再写 .md
+    const auto saved = dialog->saveReport(root / "report");
+
+    ASSERT_FALSE(saved.has_value()) << "报告写不进去却报了成功";
+    EXPECT_NE(saved.error().message.find("无法写入"), std::string::npos) << saved.error().message;
+    EXPECT_FALSE(std::filesystem::exists(root / "report.png")) << "报告写失败却把刚写的截图留在盘上";
+    EXPECT_TRUE(std::filesystem::is_directory(root / "report.md")) << "前提：同名目录不该被保存改写";
+    EXPECT_TRUE(dialog->statusText().contains(QStringLiteral("无法写入"))) << "失败原因没落到状态行";
+}
