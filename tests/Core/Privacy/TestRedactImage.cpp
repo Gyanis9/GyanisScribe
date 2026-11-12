@@ -169,3 +169,15 @@ TEST_F(RedactImageFixture, CountsOnlyBoxesThatLandInsideTheCanvas)
     ASSERT_TRUE(result.has_value()) << result.error().message;
     EXPECT_EQ(result->appliedCount, 1);
 }
+
+/// 模糊不吃马赛克粒度：0 是合法入参，块尺寸对高斯模糊没有意义
+TEST_F(RedactImageFixture, BlurDoesNotRequireAMosaicBlockSize)
+{
+    const auto original = makePattern(QSize{120, 80});
+    const auto before   = original.copy();
+    const QRect box{30, 20, 40, 30};
+    const auto  result = redactImage(original, std::array<QRect, 1>{box}, ToolKind::Blur, original.size(), 0);
+    ASSERT_TRUE(result.has_value()) << result.error().message;
+    EXPECT_EQ(result->appliedCount, 1);
+    EXPECT_GT(changedPixels(before, result->image, box), 0) << "模糊框里一个像素都没变";
+}

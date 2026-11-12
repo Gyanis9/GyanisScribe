@@ -2,6 +2,7 @@
 
 #include "Base/Text.h"
 #include "Core/Annotation/AnnotationEngine.h"
+#include "Core/Annotation/AnnotationShape.h"
 #include "Core/Privacy/RedactionGeometry.h"
 
 #include <utility>
@@ -28,10 +29,14 @@ namespace GyanisScribe::Core::Privacy
         {
             return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("只支持马赛克或高斯模糊两种打码方式")});
         }
-        if (mosaicBlockSize <= 0)
+        if (tool == GyanisScribe::Core::ToolKind::Mosaic && mosaicBlockSize <= 0)
         {
             return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("马赛克粒度必须大于 0")});
         }
+
+        // 模糊不看粒度：入参为 0 时给一个正常值，免得请求里带个对引擎无意义的读数
+        const int effectiveBlockSize =
+                mosaicBlockSize > 0 ? mosaicBlockSize : GyanisScribe::Core::kMosaicBlockSizes[GyanisScribe::Core::kDefaultMosaicBlockStep];
 
         std::vector<GyanisScribe::Core::RedactionRequest> requests;
         requests.reserve(physicalBoxes.size());
@@ -39,7 +44,7 @@ namespace GyanisScribe::Core::Privacy
         {
             if (const auto logical = logicalRedactionRect(box, image.size(), logicalSize); logical)
             {
-                requests.push_back(GyanisScribe::Core::RedactionRequest{.logicalRect = *logical, .mosaicBlockSize = mosaicBlockSize});
+                requests.push_back(GyanisScribe::Core::RedactionRequest{.logicalRect = *logical, .mosaicBlockSize = effectiveBlockSize});
             }
         }
         if (requests.empty())
