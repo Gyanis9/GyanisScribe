@@ -32,6 +32,7 @@
 
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <expected>
@@ -40,6 +41,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -77,6 +79,25 @@ namespace
     {
         QImage image{size, QImage::Format_ARGB32_Premultiplied};
         image.fill(color);
+        return image;
+    }
+
+    /**
+     * @brief 造一张有纹理的图：纯色图上马赛克前后逐像素相同，判不出打码有没有落
+     * @param size 图像尺寸
+     * @return ARGB32 预乘格式的图
+     */
+    QImage makePatternImage(const QSize &size)
+    {
+        QImage image{size, QImage::Format_ARGB32_Premultiplied};
+        for (int y = 0; y < size.height(); ++y)
+        {
+            auto *line = reinterpret_cast<QRgb *>(image.scanLine(y));
+            for (int x = 0; x < size.width(); ++x)
+            {
+                line[x] = qRgba((x * 7 + y * 3) % 256, (x * 11) % 256, (y * 13) % 256, 255);
+            }
+        }
         return image;
     }
 
@@ -191,26 +212,43 @@ namespace
         }
 
         /**
-         * @brief 记下调用并返回进入时那一份结果
+         * @brief 记下这次调用并返回进入时那一份结果
+         * @param image 收到的图，记下来给「扫的是哪一张」的用例断言
          * @param language 记下来给用例断言
          * @return 进入识别体时 m_outcome 的读数
-         * @details 结果在进入时取走：用例会在第一张还压在闸门里时换掉下一次的返回值，
-         *          用来分辨迟到的结果与排队的这一张各自带来了什么。
+         * @details 结果与慢完成档在进入时取走：用例会在第一张还压在闸门里时换掉下一次的返回值。
+         *          睡眠放在锁外——睡着的时候用例还要读调用次数与收到的图。
          */
-        [[nodiscard]] Expected<OcrResult> recognize(const QImage &, const QString &language) override
+        [[nodiscard]] Expected<OcrResult> recognize(const QImage &image, const QString &language) override
         {
-            std::unique_lock lock(m_mutex);
-            ++m_recognizeCalls;
-            m_lastLanguage     = language;
-            m_entered          = true;
-            const auto outcome = m_outcome;
-            m_condition.notify_all();
-
-            // 闸门打开时停在识别体内；每次放行只解一张，下一张仍会停住等用例再放
-            if (m_gated)
+            Expected<OcrResult>               outcome;
+            std::chrono::milliseconds         delay{0};
+            std::shared_ptr<std::atomic<int>> finished;
             {
-                m_condition.wait(lock, [this] { return m_released; });
-                m_released = false;
+                std::unique_lock lock(m_mutex);
+                ++m_recognizeCalls;
+                m_lastLanguage = language;
+                m_lastImage    = image;
+                m_entered      = true;
+                outcome        = m_outcome;
+                delay          = m_completionDelay;
+                finished       = m_finishedCounter;
+                m_condition.notify_all();
+
+                // 闸门打开时停在识别体内；每次放行只解一张，下一张仍会停住等用例再放
+                if (m_gated)
+                {
+                    m_condition.wait(lock, [this] { return m_released; });
+                    m_released = false;
+                }
+            }
+            if (delay.count() > 0)
+            {
+                std::this_thread::sleep_for(delay);
+            }
+            if (finished != nullptr)
+            {
+                finished->fetch_add(1, std::memory_order_relaxed);
             }
             return outcome;
         }
@@ -228,6 +266,14 @@ namespace
             std::scoped_lock lock(m_mutex);
             m_available         = false;
             m_unavailableReason = std::move(reason);
+        }
+
+        /// 让识别睡一会儿再返回，并在返回前给用例的计数器加一：析构等待用例靠它判先后
+        void setSlowCompletion(std::chrono::milliseconds delay, std::shared_ptr<std::atomic<int>> finishedCounter)
+        {
+            std::scoped_lock lock(m_mutex);
+            m_completionDelay = delay;
+            m_finishedCounter = std::move(finishedCounter);
         }
 
         /// 打开闸门：recognize() 会停住直到 release()
@@ -279,17 +325,27 @@ namespace
             return m_lastLanguage;
         }
 
+        /// 最近一次收到的图
+        [[nodiscard]] QImage lastImage() const
+        {
+            std::scoped_lock lock(m_mutex);
+            return m_lastImage;
+        }
+
     private:
-        Expected<OcrResult>     m_outcome;                ///< 下一次识别的返回值，进入识别体时取走
-        bool                    m_available = true;       ///< 可用性
-        QString                 m_unavailableReason;      ///< 不可用原因
-        bool                    m_gated          = false; ///< 是否在 recognize() 里等 release()
-        bool                    m_released       = false; ///< 闸门是否已放行
-        bool                    m_entered        = false; ///< 是否已进入过识别体
-        int                     m_recognizeCalls = 0;     ///< 进入识别体的次数
-        QString                 m_lastLanguage;           ///< 最近一次的语言标签
-        mutable std::mutex      m_mutex;                  ///< 保护上面全部字段
-        std::condition_variable m_condition;              ///< 进入与放行的通知
+        Expected<OcrResult>               m_outcome;                ///< 下一次识别的返回值，进入识别体时取走
+        bool                              m_available = true;       ///< 可用性
+        QString                           m_unavailableReason;      ///< 不可用原因
+        bool                              m_gated          = false; ///< 是否在 recognize() 里等 release()
+        bool                              m_released       = false; ///< 闸门是否已放行
+        bool                              m_entered        = false; ///< 是否已进入过识别体
+        int                               m_recognizeCalls = 0;     ///< 进入识别体的次数
+        QString                           m_lastLanguage;           ///< 最近一次的语言标签
+        QImage                            m_lastImage;              ///< 最近一次收到的图
+        std::chrono::milliseconds         m_completionDelay{0};     ///< 慢完成档的睡眠时长
+        std::shared_ptr<std::atomic<int>> m_finishedCounter;        ///< 慢完成档返回前递增的计数器
+        mutable std::mutex                m_mutex;                  ///< 保护上面全部字段
+        std::condition_variable           m_condition;              ///< 进入与放行的通知
     };
 
     /**
