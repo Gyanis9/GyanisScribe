@@ -9,6 +9,7 @@
 #include "Core/BugReport/BugReport.h"
 #include "Core/Ocr/IOcrEngine.h"
 #include "Core/Ocr/OcrTypes.h"
+#include "Core/Privacy/RedactionGeometry.h"
 #include "Core/Settings/SettingsStore.h"
 #include "Gui/BugReport/BugReportDialog.h"
 #include "Plugins/Barcode/BarcodeDecoder.h"
@@ -712,8 +713,11 @@ TEST_F(BugReportCoordinatorFixture, OneDimensionalBarcodeExpandsToTheBody)
     ASSERT_TRUE(waitUntil([dialog] { return dialog->redactionForTesting().state == RedactionState::Masked; })) << "一维码命中没有进打码状态";
 
     const QImage processed = dialog->reportImageForTesting();
-    int          changedAbove = 0;
-    for (int y = 30; y < 48; ++y)
+    // 扫描线自己带上下各 kRedactionPaddingPixels 的外扩：只看那条带子以上的行，
+    // 否则把扩张改成恒等也照样有像素变化
+    const int scanlinePaddedTop = 48 - GyanisScribe::Core::Privacy::kRedactionPaddingPixels;
+    int       changedAbove      = 0;
+    for (int y = 30; y < scanlinePaddedTop; ++y)
     {
         for (int x = 62; x < 138; ++x)
         {
