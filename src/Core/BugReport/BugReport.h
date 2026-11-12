@@ -133,6 +133,8 @@ namespace GyanisScribe::Core::BugReport
      * @brief 报告对话框的初始逻辑尺寸：夹进屏幕可用区域
      * @param availableArea 目标屏幕的可用区域尺寸，逻辑像素；无效时按空尺寸处理
      * @return 目标版面 1000×760；装不下时四周各留 48 像素边距，但不低于 640×480
+     * @details 真实窗体的最小尺寸还要受版面最小尺寸约束，显示时会被抬到那条线；
+     *          返回值只是逻辑下限，并不保证窗体能放进每一块桌面。
      */
     [[nodiscard]] QSize bugReportDialogInitialSize(QSize availableArea);
 } // namespace GyanisScribe::Core::BugReport

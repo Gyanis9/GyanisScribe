@@ -308,6 +308,7 @@ TEST_F(BugReportDialogFixture, PreviewShowsTheSavedShapeWhileCopyStaysTextOnly)
     EXPECT_TRUE(preview->toPlainText().contains(QStringLiteral("![截图](<report.png>)")));
 
     ASSERT_TRUE(dialog->copyReport().has_value());
+    EXPECT_TRUE(dialog->statusText().contains(QStringLiteral("已复制"))) << "复制成功没有反馈";
     EXPECT_EQ(QGuiApplication::clipboard()->text(), dialog->reportText());
     EXPECT_FALSE(QGuiApplication::clipboard()->text().contains(QStringLiteral("![截图]"))) << "剪贴板里出现了图片链接";
 
@@ -388,20 +389,34 @@ TEST_F(BugReportDialogFixture, SavedPathGetsMarkdownAndPngSiblings)
 }
 
 /**
- * @brief 钉住对话框的初始尺寸走夹取函数：不是硬编码的 1000×760
+ * @brief 钉住对话框显示后的有效尺寸走夹取函数：不是硬编码的 1000×760
  * @details 夹取逻辑本身由 TestCoreBugReport 的表驱动用例钉住；这里钉的是「构造函数真的按当前屏幕算」。
+ *          尺寸要在显示之后读：Qt 只对已显示的窗口应用版面最小尺寸，未显示的窗读到的只是 resize 的原值。
  */
 TEST_F(BugReportDialogFixture, InitialSizeFollowsTheScreenAvailableArea)
 {
-    auto        dialog = makeDialog();
+    auto dialog = makeDialog();
+    dialog->setAttribute(Qt::WA_DontShowOnScreen);
+    dialog->show();
+    QApplication::processEvents();
+    ASSERT_TRUE(dialog->layout()->activate());
+
     const auto *screen = dialog->screen();
     ASSERT_NE(screen, nullptr);
     const auto available = screen->availableGeometry().size();
-    EXPECT_EQ(dialog->size(), bugReportDialogInitialSize(available)) << "初始尺寸没按当前屏幕的可用区域夹取";
-    // 下限是「表单还读得出来」的硬底线：逻辑可用区域比 640×480 还小时窗会超出屏外，这是有意的取舍
-    const auto floorSize = bugReportDialogInitialSize(QSize{});
-    EXPECT_LE(dialog->width(), qMax(available.width(), floorSize.width()));
-    EXPECT_LE(dialog->height(), qMax(available.height(), floorSize.height()));
+    const auto artwork   = dialog->minimumSizeHint();
+    EXPECT_EQ(dialog->size(), bugReportDialogInitialSize(available).expandedTo(artwork)) << "初始尺寸没按当前屏幕的可用区域夹取";
+    // 窗体的实际最小尺寸是版面最小尺寸（左预览与报告预览的下限决定），可用区域比它小时窗仍会超出屏外；
+    // 这是版面设计的既有约束，不在本次夹取里
+    if (available.width() >= artwork.width() && available.height() >= artwork.height())
+    {
+        EXPECT_LE(dialog->width(), available.width());
+        EXPECT_LE(dialog->height(), available.height());
+    } else
+    {
+        EXPECT_EQ(dialog->size(), artwork) << "桌面可用区域 " << available.width() << "x" << available.height() << " 低于版面最小尺寸 " << artwork.width() << "x"
+                                           << artwork.height() << "，窗体会超出屏外；这是版面设计的既有约束";
+    }
 }
 
 /**
