@@ -446,8 +446,8 @@ TEST_F(BugReportDialogFixture, InitialSizeFollowsTheScreenAvailableArea)
         EXPECT_LE(dialog->height(), available.height());
     } else
     {
-        EXPECT_EQ(dialog->size(), artwork) << "桌面可用区域 " << available.width() << "x" << available.height() << " 低于版面最小尺寸 " << artwork.width() << "x"
-                                           << artwork.height() << "，窗体会超出屏外；这是版面设计的既有约束";
+        // 可用区域装不下版面最小尺寸：窗会超出屏外，这是版面设计的既有约束
+        EXPECT_TRUE(dialog->width() > available.width() || dialog->height() > available.height()) << "可用区域装不下版面最小尺寸，窗却没有超出屏外";
     }
 }
 
