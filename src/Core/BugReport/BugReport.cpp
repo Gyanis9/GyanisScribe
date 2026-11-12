@@ -250,4 +250,18 @@ namespace GyanisScribe::Core::BugReport
         screenshot.replace_extension(QStringLiteral(".png").toStdWString());
         return BugReportPaths{markdown, screenshot};
     }
+
+    QSize bugReportDialogInitialSize(const QSize availableArea)
+    {
+        // 1000×760 是左预览右表单并排的版面下限；可用区域更小时先让尺寸，最低让到 640×480。
+        // 低于它表单会挤成读不出的一列，这时宁可让用户自己拖窗
+        constexpr int kTargetWidth  = 1000;
+        constexpr int kTargetHeight = 760;
+        constexpr int kMargin       = 48;
+        constexpr int kFloorWidth   = 640;
+        constexpr int kFloorHeight  = 480;
+        const int     width         = qMin(kTargetWidth, qMax(kFloorWidth, availableArea.width() - kMargin * 2));
+        const int     height        = qMin(kTargetHeight, qMax(kFloorHeight, availableArea.height() - kMargin * 2));
+        return QSize{width, height};
+    }
 } // namespace GyanisScribe::Core::BugReport

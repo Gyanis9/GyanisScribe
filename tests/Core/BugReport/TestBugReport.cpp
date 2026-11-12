@@ -14,12 +14,14 @@
 
 #include <gtest/gtest.h>
 
+#include <array>
 #include <filesystem>
 #include <memory>
 #include <string>
 
 using GyanisScribe::Base::uiText;
 using GyanisScribe::Core::BugReport::bugReportDefaultPath;
+using GyanisScribe::Core::BugReport::bugReportDialogInitialSize;
 using GyanisScribe::Core::BugReport::BugReportEnvironment;
 using GyanisScribe::Core::BugReport::BugReportFields;
 using GyanisScribe::Core::BugReport::BugReportOptions;
@@ -291,4 +293,39 @@ TEST_F(BugReportFixture, NormalizesSavePathToMarkdownAndPngSiblings)
     const auto markdownSuffix = bugReportPathsForDialog(std::filesystem::path{"C:/reports/my report.MD"});
     EXPECT_EQ(QString::fromStdWString(markdownSuffix.markdown.wstring()), QStringLiteral("C:/reports/my report.MD"));
     EXPECT_EQ(QString::fromStdWString(markdownSuffix.screenshot.wstring()), QStringLiteral("C:/reports/my report.png"));
+}
+
+/**
+ * @brief 钉住报告窗初始尺寸按可用区域夹取：大屏原样、小屏让尺寸、极小的屏落到下限
+ * @details 1280×720 这一档是最常见的「1080p + 150% 缩放」逻辑桌面：固定 1000×760 会把窗底推出屏外。
+ */
+TEST_F(BugReportFixture, DialogInitialSizeClampsToTheAvailableArea)
+{
+    struct Case
+    {
+        QSize available;
+        QSize expected;
+    };
+
+    const std::array<Case, 5> cases{{
+            {QSize{2560, 1440}, QSize{1000, 760}}, // 大屏：目标版面原样
+            {QSize{1280, 720}, QSize{1000, 624}},  // 1080p@150%：高度先让
+            {QSize{1024, 600}, QSize{928, 504}},   // 小屏：宽高都让，四周各留 48
+            {QSize{800, 480}, QSize{704, 480}},    // 再小：高度落到下限
+            {QSize{4000, 3000}, QSize{1000, 760}}, // 超大屏：不许拉到整屏
+    }};
+    for (const auto &one: cases)
+    {
+        EXPECT_EQ(bugReportDialogInitialSize(one.available), one.expected) << one.available.width() << "x" << one.available.height();
+    }
+}
+
+/**
+ * @brief 钉住下限与退化的可用区域
+ * @details 拿不到屏幕尺寸（宽高为 0）或屏幕比下限还小时，仍要给一个能用的版面，而不是 0 尺寸窗。
+ */
+TEST_F(BugReportFixture, DialogInitialSizeNeverGoesBelowTheFloor)
+{
+    EXPECT_EQ(bugReportDialogInitialSize(QSize{600, 400}), (QSize{640, 480})) << "可用区域小于下限时不该继续压";
+    EXPECT_EQ(bugReportDialogInitialSize(QSize{}), (QSize{640, 480})) << "拿不到屏幕尺寸时要落在一个能用的版面上";
 }

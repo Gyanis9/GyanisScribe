@@ -18,6 +18,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QScreen>
 #include <QTemporaryDir>
 #include <QTextEdit>
 #include <QTime>
@@ -30,6 +31,7 @@
 #include <vector>
 
 using GyanisScribe::Base::uiText;
+using GyanisScribe::Core::BugReport::bugReportDialogInitialSize;
 using GyanisScribe::Core::BugReport::BugReportEnvironment;
 using GyanisScribe::Core::BugReport::RedactionState;
 using GyanisScribe::Core::Privacy::PiiItem;
@@ -361,4 +363,21 @@ TEST_F(BugReportDialogFixture, SavedPathGetsMarkdownAndPngSiblings)
     ASSERT_TRUE(dialog->saveReport(base).has_value());
     EXPECT_TRUE(std::filesystem::exists(std::filesystem::path{directory.path().toStdWString()} / "report.md"));
     EXPECT_TRUE(std::filesystem::exists(std::filesystem::path{directory.path().toStdWString()} / "report.png"));
+}
+
+/**
+ * @brief 钉住对话框的初始尺寸走夹取函数：不是硬编码的 1000×760
+ * @details 夹取逻辑本身由 TestCoreBugReport 的表驱动用例钉住；这里钉的是「构造函数真的按当前屏幕算」。
+ */
+TEST_F(BugReportDialogFixture, InitialSizeFollowsTheScreenAvailableArea)
+{
+    auto        dialog = makeDialog();
+    const auto *screen = dialog->screen();
+    ASSERT_NE(screen, nullptr);
+    const auto available = screen->availableGeometry().size();
+    EXPECT_EQ(dialog->size(), bugReportDialogInitialSize(available)) << "初始尺寸没按当前屏幕的可用区域夹取";
+    // 下限是「表单还读得出来」的硬底线：逻辑可用区域比 640×480 还小时窗会超出屏外，这是有意的取舍
+    const auto floorSize = bugReportDialogInitialSize(QSize{});
+    EXPECT_LE(dialog->width(), qMax(available.width(), floorSize.width()));
+    EXPECT_LE(dialog->height(), qMax(available.height(), floorSize.height()));
 }

@@ -22,6 +22,7 @@
 #include <QPixmap>
 #include <QPushButton>
 #include <QSaveFile>
+#include <QScreen>
 #include <QSignalBlocker>
 #include <QSizePolicy>
 #include <QTextEdit>
@@ -70,7 +71,10 @@ namespace GyanisScribe::Gui
         setAttribute(Qt::WA_StyledBackground, true);
 
         buildUi();
-        resize(1000, 760);
+        // 初始尺寸夹进当前屏幕的可用区域：小屏与高缩放桌面上固定 1000×760 会把窗底推出屏外
+        const auto *screen    = parentWidget() != nullptr ? parentWidget()->screen() : QGuiApplication::primaryScreen();
+        const auto  available = screen != nullptr ? screen->availableGeometry().size() : QSize{};
+        resize(Core::BugReport::bugReportDialogInitialSize(available));
         setScanRunning();
     }
 
