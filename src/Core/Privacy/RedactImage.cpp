@@ -34,7 +34,7 @@ namespace GyanisScribe::Core::Privacy
             return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("马赛克粒度必须大于 0")});
         }
 
-        // 模糊不看粒度：入参为 0 时给一个正常值，免得请求里带个对引擎无意义的读数
+        // 模糊不看粒度：入参为 0 或负数时给一个正常值，免得请求里带个对引擎无意义的读数
         const int effectiveBlockSize =
                 mosaicBlockSize > 0 ? mosaicBlockSize : GyanisScribe::Core::kMosaicBlockSizes[GyanisScribe::Core::kDefaultMosaicBlockStep];
 
