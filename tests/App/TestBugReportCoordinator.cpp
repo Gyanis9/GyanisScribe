@@ -772,3 +772,20 @@ TEST_F(BugReportCoordinatorFixture, EnvironmentComesFromTheCaptureContextNotTheC
     EXPECT_EQ(dialog->environmentForTesting().capturedAt, context.capturedAt) << "截图时刻被当前时间顶替";
     EXPECT_TRUE(dialog->reportText().contains(QStringLiteral("2020-03-04 05:06:07 UTC+08:00"))) << "报告里的时刻不是截图来源那一刻";
 }
+
+/**
+ * @brief 钉住没有成品图时不开窗、不置钥匙、不发起识别
+ */
+TEST_F(BugReportCoordinatorFixture, NullReportImageOpensNothing)
+{
+    auto  engine = std::make_unique<FakeOcrEngine>(Expected<OcrResult>{makePhoneResult()});
+    auto *fake   = engine.get();
+    BugReportCoordinator coordinator{*m_settings, std::move(engine), emptyBarcodeReader()};
+    QWidget              parent;
+
+    coordinator.openReport(QImage{}, makeImage(QSize{200, 100}, QColor{10, 20, 30}), makeContext(), &parent);
+    EXPECT_EQ(coordinator.dialogForTesting(), nullptr) << "没有成品可写却开了一扇窗";
+    EXPECT_FALSE(coordinator.isScanningForTesting());
+    EXPECT_EQ(fake->recognizeCalls(), 0);
+    EXPECT_TRUE(parent.findChildren<BugReportDialog *>().isEmpty());
+}
