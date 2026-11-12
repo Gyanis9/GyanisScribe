@@ -724,3 +724,26 @@ TEST_F(BugReportCoordinatorFixture, OneDimensionalBarcodeExpandsToTheBody)
     }
     EXPECT_GT(changedAbove, 0) << "一维码没有按最小高度向上扩张：扫描线上方的条码本体没被打码";
 }
+
+/**
+ * @brief 钉住扫描吃的是检查底图，不是报告成品
+ * @details 两张图同尺寸不同内容：夹具原先两图同内容，把底图换成成品也照样绿。
+ */
+TEST_F(BugReportCoordinatorFixture, TheScanRunsOnTheDetectionImageNotTheReportImage)
+{
+    auto  engine = std::make_unique<FakeOcrEngine>(Expected<OcrResult>{OcrResult{}});
+    auto *fake   = engine.get();
+    BugReportCoordinator coordinator{*m_settings, std::move(engine), emptyBarcodeReader()};
+    QWidget              parent;
+
+    const QImage reportImage    = makeImage(QSize{200, 100}, QColor{180, 20, 20});
+    const QImage detectionImage = makePatternImage(QSize{200, 100});
+    coordinator.openReport(reportImage, detectionImage, makeContext(), &parent);
+    auto *dialog = coordinator.dialogForTesting();
+    ASSERT_NE(dialog, nullptr);
+    ASSERT_TRUE(waitUntil([dialog] { return dialog->redactionForTesting().state == RedactionState::NoHits; })) << "扫描没有收尾";
+    const auto received = fake->lastImage();
+    ASSERT_FALSE(received.isNull()) << "假引擎没记下收到的图";
+    EXPECT_EQ(received.pixel(5, 5), detectionImage.pixel(5, 5)) << "扫描吃的不是检查底图";
+    EXPECT_NE(received.pixel(5, 5), reportImage.pixel(5, 5)) << "前提：两张图必须不同内容，否则这条判据分不出来";
+}
