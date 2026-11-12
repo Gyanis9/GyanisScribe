@@ -68,7 +68,7 @@ namespace
     constexpr std::array<std::string_view, 14> kToolShortcuts = {"V", "R", "E", "A", "P", "H", "M", "T", "N", "L", "B", "X", "G", "F"};
 
     /// 动作按钮的中文名，同样按需求第六节的排列顺序抄一份
-    constexpr std::array<std::string_view, 7> kActionLabels = {"复制到剪贴板", "保存为文件", "美化分享", "固定到屏幕", "识别文字", "识别二维码", "隐私打码"};
+    constexpr std::array<std::string_view, 8> kActionLabels = {"复制到剪贴板", "保存为文件", "美化分享", "固定到屏幕", "识别文字", "识别二维码", "隐私打码", "Bug 报告"};
 
     /// 全 1920x1080、原点的可用区，几何用例的默认舞台
     constexpr QRect kScreen{0, 0, 1920, 1080};
@@ -157,7 +157,7 @@ namespace
             std::vector<int>      textItalics;      ///< textItalicChanged 收到的开关（1 开 0 关）
             std::vector<int>      textOutlines;     ///< textOutlineChanged 收到的开关（1 开 0 关）
             std::vector<int>      textBackgrounds;  ///< textBackgroundChanged 收到的开关（1 开 0 关）
-            int                   actions{};        ///< 七个动作按钮的合计触发次数
+            int                   actions{};        ///< 八个动作按钮的合计触发次数
             int                   undo{};           ///< undoClicked 次数
             int                   redo{};           ///< redoClicked 次数
             int                   closes{};         ///< closeClicked 次数
@@ -195,7 +195,7 @@ namespace
             QObject::connect(toolbar.get(), &AnnotationToolbar::redoClicked, [&log] { ++log.redo; });
             QObject::connect(toolbar.get(), &AnnotationToolbar::closeClicked, [&log] { ++log.closes; });
             for (auto signal: {&AnnotationToolbar::copyClicked, &AnnotationToolbar::saveClicked, &AnnotationToolbar::shareClicked, &AnnotationToolbar::pinClicked,
-                               &AnnotationToolbar::ocrClicked, &AnnotationToolbar::scanClicked, &AnnotationToolbar::privacyClicked})
+                               &AnnotationToolbar::ocrClicked, &AnnotationToolbar::scanClicked, &AnnotationToolbar::privacyClicked, &AnnotationToolbar::bugReportClicked})
             {
                 QObject::connect(toolbar.get(), signal, [&log] { ++log.actions; });
             }
@@ -971,7 +971,7 @@ TEST(ToolbarGeometry, RejectsDegenerateInputs)
 
 /**
  * @brief 钉住工具栏的控件齐全且都带无障碍名称
- * @details 需求要那几件工具、八色加自定义、撤销重做与七个动作，并要每个图标按钮都有 tooltip
+ * @details 需求要那几件工具、八色加自定义、撤销重做与八个动作，并要每个图标按钮都有 tooltip
  *          与无障碍名称。这条按控件树逐个核，不看布局画得好不好。
  *          tooltip 比无障碍名多一段键位提示：读屏要的是工具本名，眼睛要的是「按哪个键也能切过去」。
  */
@@ -1218,7 +1218,7 @@ TEST_F(ToolbarFixture, SliderStepsMapToLadderWidths)
 
 /**
  * @brief 钉住颜色菜单里的色块与动作按钮各归各位
- * @details 点色块发 colorChanged；点七个动作各发一次对应信号，混在一起的话「复制」就会去存文件。
+ * @details 点色块发 colorChanged；点八个动作各发一次对应信号，混在一起的话「复制」就会去存文件。
  *          最右那枚 X 只发 closeClicked，不能顺手把图交出去。
  */
 TEST_F(ToolbarFixture, ColorSwatchesAndActionButtonsEmitTheirOwnSignals)
@@ -1241,7 +1241,7 @@ TEST_F(ToolbarFixture, ColorSwatchesAndActionButtonsEmitTheirOwnSignals)
         ASSERT_NE(button, nullptr) << label;
         button->click();
     }
-    EXPECT_EQ(log.actions, 7) << "七个动作按钮的信号没各自分开落地";
+    EXPECT_EQ(log.actions, 8) << "八个动作按钮的信号没各自分开落地";
     EXPECT_EQ(log.undo, 0);
     EXPECT_EQ(log.redo, 0);
 
@@ -1255,7 +1255,7 @@ TEST_F(ToolbarFixture, ColorSwatchesAndActionButtonsEmitTheirOwnSignals)
     ASSERT_NE(closeButton, nullptr) << "工具栏缺一枚显式的关闭入口";
     closeButton->click();
     EXPECT_EQ(log.closes, 1);
-    EXPECT_EQ(log.actions, 7) << "点关闭不该把图交出去";
+    EXPECT_EQ(log.actions, 8) << "点关闭不该把图交出去";
 }
 
 /**

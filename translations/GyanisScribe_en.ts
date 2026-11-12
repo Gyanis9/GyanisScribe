@@ -5352,6 +5352,18 @@
             <translation>System: %1 (%2)</translation>
         </message>
         <message>
+            <source>系统：%1（内核 %2，%3）</source>
+            <translation>System: %1 (kernel %2, %3)</translation>
+        </message>
+        <message>
+            <source>系统：内核 %1，%2</source>
+            <translation>System: kernel %1, %2</translation>
+        </message>
+        <message>
+            <source>系统：%1（内核 %2）</source>
+            <translation>System: %1 (kernel %2)</translation>
+        </message>
+        <message>
             <source>截图尺寸：%1 × %2 逻辑像素（%3 × %4 像素，缩放 %5）</source>
             <translation>Capture size: %1 × %2 logical px (%3 × %4 px, scale %5)</translation>
         </message>
@@ -5484,10 +5496,6 @@
             <translation>No redactable sensitive information detected. Check before sending.</translation>
         </message>
         <message>
-            <source>自动打码失败：%1</source>
-            <translation>Auto-redaction failed: %1</translation>
-        </message>
-        <message>
             <source>自动打码不可用：%1。本次不会保存截图，报告只含文字。</source>
             <translation>Auto-redaction unavailable: %1. No screenshot will be saved; the report will contain text only.</translation>
         </message>
@@ -5508,6 +5516,10 @@
             <translation>Cannot write "{}". Check that the folder is writable.</translation>
         </message>
         <message>
+            <source>同名图片已存在：%1。请换一个名字后重试</source>
+            <translation>A screenshot with the same name already exists: %1. Choose another name and try again.</translation>
+        </message>
+        <message>
             <source>已保存报告与截图：%1</source>
             <translation>Report and screenshot saved to %1</translation>
         </message>
@@ -5516,8 +5528,8 @@
             <translation>Report text saved without a screenshot: %1</translation>
         </message>
         <message>
-            <source>自动打码只在本机运行；报告与截图只会保存到你选定的位置，不会上传。</source>
-            <translation>Auto-redaction runs locally only; the report and screenshot are saved only where you choose and are never uploaded.</translation>
+            <source>只在本机生成，不会上传；自动打码只处理识别到的敏感信息，发送前请自行检查。</source>
+            <translation>Generated locally and never uploaded. Auto-redaction only covers detected sensitive information; check before sending.</translation>
         </message>
         <message>
             <source>Bug 报告说明</source>
@@ -5584,23 +5596,15 @@
             <translation>Included content</translation>
         </message>
         <message>
-            <source>环境信息</source>
-            <translation>Environment information</translation>
-        </message>
-        <message>
-            <source>包含环境信息</source>
-            <translation>Include environment information</translation>
+            <source>包含系统与环境信息</source>
+            <translation>Include system and environment information</translation>
         </message>
         <message>
             <source>报告里是否带上系统、Qt、屏幕与截图尺寸；关闭后这一段整段省略。</source>
             <translation>Whether the report includes the system, Qt, screen, and capture size; when off, this section is omitted entirely.</translation>
         </message>
         <message>
-            <source>前台窗口</source>
-            <translation>Foreground window</translation>
-        </message>
-        <message>
-            <source>包含前台窗口</source>
+            <source>包含前台窗口信息</source>
             <translation>Include the foreground window</translation>
         </message>
         <message>

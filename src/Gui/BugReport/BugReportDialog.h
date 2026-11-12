@@ -72,7 +72,7 @@ namespace GyanisScribe::Gui
         /**
          * @brief 交回「自动打码不可用」的结果
          * @param reason 给用户看的中文原因
-         * @details 截图恢复为未打码的副本，保存时只写 Markdown，不同目录落 PNG。
+         * @details 截图恢复为未打码的副本，保存时只写 Markdown，不写 PNG。
          */
         void setScanUnavailable(const QString &reason);
 
@@ -115,9 +115,10 @@ namespace GyanisScribe::Gui
         /**
          * @brief 把报告与截图保存到用户选定的路径
          * @param chosenPath 保存对话框交回的路径；报告固定为 .md，截图固定为同目录同名的 .png
-         * @return 成功返回空载荷；检查还没回来或任一文件写不进去时返回原因并点亮状态行
+         * @return 成功返回空载荷；检查还没回来、同名 .png 已存在或任一文件写不进去时返回原因并点亮状态行
          * @details 自动打码可用时先写截图再写报告；报告写失败会尽力删掉本次刚写的截图，
          *          不留下没有正文的孤立图片。不可用时只写报告。
+         *          同名 .png 已存在时整次保存直接失败，既不覆盖旧图，也不写报告。
          */
         [[nodiscard]] Base::Expected<void> saveReport(const std::filesystem::path &chosenPath);
 

@@ -15,6 +15,7 @@
 #include <QFile>
 #include <QGuiApplication>
 #include <QImage>
+#include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QTemporaryDir>
@@ -211,6 +212,24 @@ TEST_F(BugReportDialogFixture, ScanResultMasksAllHitsAndDoesNotLeakSamples)
     EXPECT_TRUE(adjust->isEnabled());
 }
 
+TEST_F(BugReportDialogFixture, PrivacyNoteAndToggleLabelsMatchTheCopyContract)
+{
+    auto dialog = makeDialog();
+
+    auto *note = dialog->findChild<QLabel *>(QStringLiteral("bugReportPrivacyNote"));
+    ASSERT_NE(note, nullptr) << "报告窗顶部缺少隐私说明";
+    EXPECT_EQ(note->text(), uiText("只在本机生成，不会上传；自动打码只处理识别到的敏感信息，发送前请自行检查。"));
+
+    auto *systemToggle = dialog->findChild<QCheckBox *>(QStringLiteral("bugReportSystemToggle"));
+    auto *windowToggle = dialog->findChild<QCheckBox *>(QStringLiteral("bugReportWindowToggle"));
+    ASSERT_NE(systemToggle, nullptr);
+    ASSERT_NE(windowToggle, nullptr);
+    EXPECT_EQ(systemToggle->text(), uiText("包含系统与环境信息"));
+    EXPECT_EQ(systemToggle->accessibleName(), uiText("包含系统与环境信息"));
+    EXPECT_EQ(windowToggle->text(), uiText("包含前台窗口信息"));
+    EXPECT_EQ(windowToggle->accessibleName(), uiText("包含前台窗口信息"));
+}
+
 TEST_F(BugReportDialogFixture, EmptyScanResultMeansNoHitsAndSavesBothFiles)
 {
     QTemporaryDir directory;
@@ -222,11 +241,15 @@ TEST_F(BugReportDialogFixture, EmptyScanResultMeansNoHitsAndSavesBothFiles)
 
     const auto chosen = std::filesystem::path{directory.path().toStdWString()} / "my report";
     ASSERT_TRUE(dialog->saveReport(chosen).has_value());
-    EXPECT_TRUE(std::filesystem::exists(chosen.string() + ".md"));
-    EXPECT_TRUE(std::filesystem::exists(chosen.string() + ".png"));
 
-    const auto markdownPath = std::filesystem::path{chosen.string() + ".md"};
-    QFile      markdown{QString::fromStdWString(markdownPath.wstring())};
+    auto markdownPath = chosen;
+    markdownPath.replace_extension(L".md");
+    auto pngPath = chosen;
+    pngPath.replace_extension(L".png");
+    EXPECT_TRUE(std::filesystem::exists(markdownPath));
+    EXPECT_TRUE(std::filesystem::exists(pngPath));
+
+    QFile markdown{QString::fromStdWString(markdownPath.wstring())};
     ASSERT_TRUE(markdown.open(QIODevice::ReadOnly));
     const auto text = QString::fromUtf8(markdown.readAll());
     EXPECT_TRUE(text.contains(QStringLiteral("![截图](<my report.png>)")));
@@ -267,6 +290,65 @@ TEST_F(BugReportDialogFixture, CopyWritesExactlyThePreviewText)
     EXPECT_EQ(QGuiApplication::clipboard()->text(), dialog->reportText());
     EXPECT_EQ(preview->toPlainText(), dialog->reportText());
     EXPECT_TRUE(dialog->statusText().contains(QStringLiteral("已复制")));
+}
+
+TEST_F(BugReportDialogFixture, MaskedSaveWritesTheRedactedPngAndLinksIt)
+{
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    auto       dialog = makeDialog();
+    const auto before = dialog->reportImageForTesting().copy();
+    dialog->setScanResult({makePhoneItem()});
+    ASSERT_EQ(dialog->redactionForTesting().state, RedactionState::Masked);
+
+    const auto base = std::filesystem::path{directory.path().toStdWString()} / "masked";
+    ASSERT_TRUE(dialog->saveReport(base).has_value());
+
+    auto pngPath = base;
+    pngPath.replace_extension(L".png");
+    const QImage saved{QString::fromStdWString(pngPath.wstring())};
+    ASSERT_FALSE(saved.isNull()) << "保存的 PNG 读不回来";
+    EXPECT_EQ(saved.size(), before.size());
+
+    // 命中框在 40..120 × 30..50；中心这点写的是 m_originalImage 时会与原图逐像素相同
+    EXPECT_NE(saved.pixel(80, 40), before.pixel(80, 40)) << "保存的 PNG 没带上自动打码";
+    EXPECT_EQ(saved.pixel(190, 95), before.pixel(190, 95)) << "框外的像素被改了";
+
+    auto markdownPath = base;
+    markdownPath.replace_extension(L".md");
+    QFile markdown{QString::fromStdWString(markdownPath.wstring())};
+    ASSERT_TRUE(markdown.open(QIODevice::ReadOnly));
+    const auto text = QString::fromUtf8(markdown.readAll());
+    EXPECT_TRUE(text.contains(QStringLiteral("![截图](<masked.png>)")));
+}
+
+TEST_F(BugReportDialogFixture, RefusesToOverwriteAnExistingSiblingPng)
+{
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const auto root = std::filesystem::path{directory.path().toStdWString()};
+
+    auto pngPath = root / "report";
+    pngPath.replace_extension(L".png");
+    const QByteArray sentinel{"旧图占位"};
+    {
+        QFile png{QString::fromStdWString(pngPath.wstring())};
+        ASSERT_TRUE(png.open(QIODevice::WriteOnly));
+        ASSERT_EQ(png.write(sentinel), sentinel.size());
+    }
+
+    auto dialog = makeDialog();
+    dialog->setScanResult({});
+    const auto saved = dialog->saveReport(root / "report");
+
+    ASSERT_FALSE(saved.has_value());
+    EXPECT_NE(saved.error().message.find("同名图片已存在"), std::string::npos) << saved.error().message;
+    EXPECT_FALSE(std::filesystem::exists(root / "report.md")) << "保存失败却留下了报告";
+    EXPECT_TRUE(dialog->statusText().contains(QStringLiteral("同名图片已存在")));
+
+    QFile png{QString::fromStdWString(pngPath.wstring())};
+    ASSERT_TRUE(png.open(QIODevice::ReadOnly));
+    EXPECT_EQ(png.readAll(), sentinel) << "拒绝保存却改动了盘上的旧图";
 }
 
 TEST_F(BugReportDialogFixture, SavedPathGetsMarkdownAndPngSiblings)

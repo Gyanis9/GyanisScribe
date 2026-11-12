@@ -118,7 +118,8 @@ namespace GyanisScribe::Gui
 
         if (const auto rendered = renderRedactions(boxes, Core::ToolKind::Mosaic, m_selectedRows); !rendered)
         {
-            setScanUnavailable(uiText("自动打码失败：%1").arg(QString::fromStdString(rendered.error().message)));
+            // setScanUnavailable 自己会加「自动打码不可用：」前缀：这里只交底层的失败原因
+            setScanUnavailable(QString::fromStdString(rendered.error().message));
         }
     }
 
@@ -191,6 +192,16 @@ namespace GyanisScribe::Gui
         const auto paths        = Core::BugReport::bugReportPathsForDialog(chosenPath);
         const bool includeImage = m_redaction.state == Core::BugReport::RedactionState::Masked || m_redaction.state == Core::BugReport::RedactionState::NoHits;
 
+        // 同名的 PNG 已在盘上时整次保存都不做：写图会把旧图盖掉，而报告写失败后的回收又可能删掉它。
+        // 先要求用户换一个名字，盘上任何文件都不会被本功能改写或删除。
+        std::error_code existsError;
+        if (std::filesystem::exists(paths.screenshot, existsError))
+        {
+            const auto error =
+                    Base::Error{Base::ErrorCode::FileWriteFailed, uiText("同名图片已存在：%1。请换一个名字后重试").arg(Base::Paths::toDisplayText(paths.screenshot)).toStdString()};
+            return fail(error);
+        }
+
         bool screenshotWritten = false;
         if (includeImage)
         {
@@ -219,7 +230,7 @@ namespace GyanisScribe::Gui
 
         const auto markdownPathText = Base::Paths::toDisplayText(paths.markdown);
         const auto markdownFailure  = Base::Error{Base::ErrorCode::FileWriteFailed, uiFormat(uiTextUtf8("「{}」无法写入。请检查该目录是否可写。"), markdownPathText.toStdString())};
-        // 报告写失败时只回收本次刚写出的截图：同名旧图是用户的东西，不能顺手删掉
+        // 前面已确认同名 PNG 不存在，所以这里删掉的就是本次刚写出的那张，不会动到旧图
         const auto removeWrittenScreenshot = [screenshotWritten, &paths]
         {
             if (!screenshotWritten)
@@ -286,7 +297,7 @@ namespace GyanisScribe::Gui
 
         if (const auto rendered = renderRedactions(boxes, review.redactionTool(), rows); !rendered)
         {
-            setScanUnavailable(uiText("自动打码失败：%1").arg(QString::fromStdString(rendered.error().message)));
+            setScanUnavailable(QString::fromStdString(rendered.error().message));
         }
     }
 
@@ -296,7 +307,7 @@ namespace GyanisScribe::Gui
         root->setContentsMargins(kSpacingLarge, kSpacingLarge, kSpacingLarge, kSpacingLarge);
         root->setSpacing(kSpacingMedium);
 
-        auto *privacyNote = new QLabel{uiText("自动打码只在本机运行；报告与截图只会保存到你选定的位置，不会上传。"), this};
+        auto *privacyNote = new QLabel{uiText("只在本机生成，不会上传；自动打码只处理识别到的敏感信息，发送前请自行检查。"), this};
         privacyNote->setObjectName(QStringLiteral("bugReportPrivacyNote"));
         privacyNote->setWordWrap(true);
         privacyNote->setAccessibleName(uiText("Bug 报告说明"));
@@ -372,13 +383,13 @@ namespace GyanisScribe::Gui
         toggleLayout->setSpacing(kSpacingMedium);
         m_systemToggle = new CheckBox{toggleRow};
         m_systemToggle->setObjectName(QStringLiteral("bugReportSystemToggle"));
-        m_systemToggle->setText(uiText("环境信息"));
-        m_systemToggle->setAccessibleName(uiText("包含环境信息"));
+        m_systemToggle->setText(uiText("包含系统与环境信息"));
+        m_systemToggle->setAccessibleName(uiText("包含系统与环境信息"));
         m_systemToggle->setToolTip(uiText("报告里是否带上系统、Qt、屏幕与截图尺寸；关闭后这一段整段省略。"));
         m_windowToggle = new CheckBox{toggleRow};
         m_windowToggle->setObjectName(QStringLiteral("bugReportWindowToggle"));
-        m_windowToggle->setText(uiText("前台窗口"));
-        m_windowToggle->setAccessibleName(uiText("包含前台窗口"));
+        m_windowToggle->setText(uiText("包含前台窗口信息"));
+        m_windowToggle->setAccessibleName(uiText("包含前台窗口信息"));
         m_windowToggle->setToolTip(uiText("报告里是否带上截图时的前台窗口标题与进程名；截图本身可能暴露它们。"));
         toggleLayout->addWidget(m_systemToggle);
         toggleLayout->addWidget(m_windowToggle);

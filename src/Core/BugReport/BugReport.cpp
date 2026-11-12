@@ -24,11 +24,16 @@ namespace
         return normalized.trimmed();
     }
 
+    QString normalizedInlineText(const QString &text)
+    {
+        QString normalized = normalizedText(text);
+        normalized.replace(QLatin1Char('\n'), QLatin1Char(' '));
+        return normalized.simplified();
+    }
+
     QString normalizedTitle(const QString &title)
     {
-        QString normalized = normalizedText(title);
-        normalized.replace(QLatin1Char('\n'), QLatin1Char(' '));
-        normalized = normalized.simplified();
+        const auto normalized = normalizedInlineText(title);
         return normalized.isEmpty() ? uiText("截图问题反馈") : normalized;
     }
 
@@ -40,28 +45,39 @@ namespace
 
     QString systemLine(const BugReport::BugReportEnvironment &environment)
     {
-        QStringList extras;
-        if (!environment.osVersion.isEmpty())
-        {
-            extras << uiText("内核 %1").arg(environment.osVersion);
-        }
-        if (!environment.architecture.isEmpty())
-        {
-            extras << environment.architecture;
-        }
-        if (environment.osName.isEmpty() && extras.isEmpty())
-        {
-            return {};
-        }
+        const bool hasVersion = !environment.osVersion.isEmpty();
+        const bool hasArch    = !environment.architecture.isEmpty();
+
+        // 整行都是可翻译模板：分隔符与括号跟着语言走，英文档下不会混进中文逗号
         if (environment.osName.isEmpty())
         {
-            return uiText("系统：%1").arg(extras.join(QStringLiteral("，")));
+            if (hasVersion && hasArch)
+            {
+                return uiText("系统：内核 %1，%2").arg(environment.osVersion, environment.architecture);
+            }
+            if (hasVersion)
+            {
+                return uiText("系统：%1").arg(uiText("内核 %1").arg(environment.osVersion));
+            }
+            if (hasArch)
+            {
+                return uiText("系统：%1").arg(environment.architecture);
+            }
+            return {};
         }
-        if (extras.isEmpty())
+        if (hasVersion && hasArch)
         {
-            return uiText("系统：%1").arg(environment.osName);
+            return uiText("系统：%1（内核 %2，%3）").arg(environment.osName, environment.osVersion, environment.architecture);
         }
-        return uiText("系统：%1（%2）").arg(environment.osName, extras.join(QStringLiteral("，")));
+        if (hasVersion)
+        {
+            return uiText("系统：%1（内核 %2）").arg(environment.osName, environment.osVersion);
+        }
+        if (hasArch)
+        {
+            return uiText("系统：%1（%2）").arg(environment.osName, environment.architecture);
+        }
+        return uiText("系统：%1").arg(environment.osName);
     }
 
     QString sizeLine(const BugReport::BugReportEnvironment &environment)
@@ -150,9 +166,10 @@ namespace GyanisScribe::Core::BugReport
         if (options.includeWindow)
         {
             QStringList windowLines;
-            if (!environment.windowTitle.isEmpty())
+            // 窗口标题来自别的进程，可能带换行：折成单行，否则会把 Markdown 的列表项断成两行
+            if (const auto windowTitle = normalizedInlineText(environment.windowTitle); !windowTitle.isEmpty())
             {
-                windowLines << QStringLiteral("- ") + uiText("前台窗口（截图时）：%1").arg(environment.windowTitle);
+                windowLines << QStringLiteral("- ") + uiText("前台窗口（截图时）：%1").arg(windowTitle);
             }
             if (!environment.processName.isEmpty())
             {

@@ -185,6 +185,26 @@ TEST_F(BugReportFixture, MissingEnvironmentPartsAreOmittedNotFaked)
     EXPECT_TRUE(report.contains(QStringLiteral("应用：智录 0.0.1")));
 }
 
+TEST_F(BugReportFixture, SystemLineKeepsNameAndKernelWhenArchitectureIsMissing)
+{
+    auto environment         = fullEnvironment();
+    environment.architecture = {};
+
+    const auto report = buildBugReportMarkdown(environment, fullFields(), maskedRedaction(), BugReportOptions{});
+    EXPECT_TRUE(report.contains(QStringLiteral("- 系统：Windows 11 Version 23H2（内核 10.0.26100）")));
+}
+
+TEST_F(BugReportFixture, WindowTitleWithLineBreaksStaysOnOneBulletLine)
+{
+    auto environment        = fullEnvironment();
+    environment.windowTitle = QStringLiteral("记事本\r\n未保存 的文档\n* 第一行");
+
+    const auto report = buildBugReportMarkdown(environment, fullFields(), maskedRedaction(), BugReportOptions{});
+    EXPECT_TRUE(report.contains(QStringLiteral("- 前台窗口（截图时）：记事本 未保存 的文档 * 第一行")));
+    EXPECT_FALSE(report.contains(QStringLiteral("记事本\r"))) << "窗口标题里的回车被原样写进了报告";
+    EXPECT_FALSE(report.contains(QStringLiteral("的文档\n*"))) << "窗口标题里的换行把列表项断成了两行";
+}
+
 TEST_F(BugReportFixture, WindowSectionIsOmittedWhenBothWindowFieldsAreEmpty)
 {
     auto environment        = fullEnvironment();

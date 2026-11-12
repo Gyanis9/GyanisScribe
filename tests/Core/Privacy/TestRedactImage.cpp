@@ -124,6 +124,9 @@ TEST_F(RedactImageFixture, MapsPhysicalBoxesThroughTheLogicalSize)
     EXPECT_GT(changedPixels(before, result->image, physicalPadded), 0) << "倍比映射后的框里一个像素都没变";
     EXPECT_EQ(before.pixel(10, 10), result->image.pixel(10, 10));
     EXPECT_EQ(before.pixel(190, 110), result->image.pixel(190, 110));
+    // 正确框在 16..84 × 16..64；150,100 落在「把物理框当成逻辑框再乘一次倍比」的 40..160 × 40..120 里，
+    // 只按整张图的边界判不出倍比算错，必须拿框外但错缩放区内的这一点来咬
+    EXPECT_EQ(before.pixel(150, 100), result->image.pixel(150, 100));
 }
 
 TEST_F(RedactImageFixture, BlurAlsoLeavesPixelsOutsideTheBoxAlone)
