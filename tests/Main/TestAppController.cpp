@@ -1287,6 +1287,53 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住录屏在跑时元素拾取被挡回，收场后恢复可用
+     * @details 门禁读的是协调器发出的 recordingStatusChanged：录屏期间铺元素遮罩，
+     *          遮罩本身会被录进去，点击还会被当成操作目标。
+     */
+    TEST_F(AppControllerFixture, ElementPickIsBlockedWhileScreenRecordingRuns)
+    {
+        makeController();
+        auto &recording = m_controller->recordingCoordinatorForTesting();
+
+        recording.recordingStatusChanged(5, false);
+        const auto before = visibleToastBubbles();
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::PickElement);
+        EXPECT_EQ(visibleCaptureOverlay(), nullptr) << "录屏在跑时还是铺出了元素拾取遮罩";
+        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("先结束当前截图/录屏/回溯")); })) << "录屏挡回元素拾取时没说清先结束什么";
+
+        recording.recordingStatusChanged(-1, false);
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::PickElement);
+        auto *overlay = visibleCaptureOverlay();
+        ASSERT_NE(overlay, nullptr) << "录屏收场之后元素拾取仍打不开：门禁没复位";
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &escape);
+    }
+
+    /**
+     * @brief 钉住回溯选择器开着时元素拾取被挡回
+     * @details 选择器是盖住桌面的遮罩：两层面板叠在一起，点击落在哪一层用户无法预期。
+     */
+    TEST_F(AppControllerFixture, ElementPickIsBlockedWhileTheRewindPickerIsOpen)
+    {
+        m_frameScreenName      = m_realScreenName;
+        m_rewindEnabled        = true;
+        m_sessionNotifications = true;
+        makeController();
+        auto &rewind = m_controller->rewindCoordinatorForTesting();
+
+        rewind.captureTickForTesting();
+        ASSERT_TRUE(waitUntil([&rewind] { return rewind.bufferStatsForTesting().sampleCount > 0; }, 5000)) << "回溯缓冲没抓到帧，选择器无从打开";
+        rewind.showPicker();
+        ASSERT_TRUE(waitUntil([&rewind] { return rewind.isPickerVisible(); }, 3000)) << "选择器没打开，门禁无从判起";
+
+        const auto before = visibleToastBubbles();
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::PickElement);
+        EXPECT_EQ(visibleCaptureOverlay(), nullptr) << "回溯选择器开着时还是铺出了元素拾取遮罩";
+        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("先结束当前截图/录屏/回溯")); })) << "选择器挡回元素拾取时没说清先结束什么";
+    }
+
+    /**
      * @brief 钉住元素拾取进行时步骤记录热键被挡回，取消后恢复可用
      * @details 元素拾取与框选共用流程标志；漏掉这一半时控制条会压到元素遮罩上，
      *          录制里的点击还会把遮罩自己当成操作目标记进步骤。
