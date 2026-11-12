@@ -641,3 +641,26 @@ TEST_F(BugReportCoordinatorFixture, InjectionWithoutEngineOrIntegrationLandsInUn
     EXPECT_TRUE(dialog->redactionForTesting().unavailableReason.contains(QStringLiteral("本机没有可用的文字识别后端"))) << "空引擎没走到既有的不可用文案";
     EXPECT_FALSE(coordinator.isScanningForTesting());
 }
+
+/**
+ * @brief 钉住协调器析构会等在飞识别收场再返回
+ * @details 判据是「析构返回时假引擎的返回计数器已经是 1」：这是先后关系，不是秒表。
+ *          计数器放在用例自己手里，协调器连同引擎一起析构之后仍然读得到。
+ */
+TEST_F(BugReportCoordinatorFixture, DestroyingDuringAScanWaitsForTheWorker)
+{
+    auto finished = std::make_shared<std::atomic<int>>(0);
+    auto engine   = std::make_unique<FakeOcrEngine>(Expected<OcrResult>{makePhoneResult()});
+    auto *fake    = engine.get();
+    fake->setSlowCompletion(std::chrono::milliseconds{200}, finished);
+    QWidget parent;
+
+    {
+        BugReportCoordinator coordinator{*m_settings, std::move(engine), emptyBarcodeReader()};
+        coordinator.openReport(makeImage(QSize{200, 100}, QColor{20, 40, 60}), makeImage(QSize{200, 100}, QColor{20, 40, 60}), makeContext(), &parent);
+        ASSERT_NE(coordinator.dialogForTesting(), nullptr);
+        ASSERT_TRUE(fake->waitUntilEntered(kEnterPatience)) << "识别没有进入识别体，这一条判不出析构等不等";
+    }
+
+    EXPECT_EQ(finished->load(), 1) << "析构没等在飞识别收完就返回了";
+}

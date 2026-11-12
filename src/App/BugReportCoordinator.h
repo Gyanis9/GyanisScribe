@@ -78,6 +78,8 @@ namespace GyanisScribe::App
         /**
          * @brief 析构
          * @note 声明在头、定义在 .cpp：扫描器与引擎只前向声明，内联析构会在别的 TU 里对不完整类型求 sizeof
+         * @note 析构会等在飞的识别结束（扫描器的搬运工在析构里等线程池收场）：应用退出路径上有界，
+         *       但不要在界面线程上频繁重建本对象
          */
         ~BugReportCoordinator() override;
 
