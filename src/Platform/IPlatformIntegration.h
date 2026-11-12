@@ -133,6 +133,23 @@ namespace GyanisScribe::Platform
         [[nodiscard]] virtual Base::Expected<std::vector<QRect>> elementChainAtPoint(const QPoint &globalLogicalPoint, const std::vector<quintptr> &excludeWindowHandles) const = 0;
 
         /**
+         * @brief 光标处一摞界面元素的描述，从最深一级往上排到所在窗口的根
+         * @param globalLogicalPoint 全局逻辑坐标
+         * @param excludeWindowHandles 命中到这几位里的窗口直接跳过：截图时把自家的遮罩窗交进来，
+         *        免得全屏置顶的遮罩自己把底下真正的界面挡在名单外面
+         * @return 成功返回每一级的名字、控件类型、顶层窗口标题与进程、元素矩形（逻辑全局），从最深一级排到窗口根；
+         *         空一份表示光标下这块没有可描述的界面元素
+         * @return 本平台给不出时返回 PlatformUnsupported，并指一条替代做法
+         * @details 与 elementChainAtPoint 同一套认窗与下钻，只是每一级多带一份描述：名字或几何读不出的
+         *          那一级只让对应字段为空，不影响其余各级。窗口标题与进程按锚定的顶层窗口读一次，各层共用。
+         * @note 默认实现回绝，既有替身不必为这个能力改签名；Windows 那一份按 UI Automation 给出真实答案。
+         */
+        [[nodiscard]] virtual Base::Expected<std::vector<UiElementInfo>> uiElementChainAtPoint(const QPoint &, const std::vector<quintptr> &) const
+        {
+            return std::unexpected(Base::Error{Base::ErrorCode::PlatformUnsupported, Base::uiTextUtf8("这台平台还不能列出光标下的界面元素")});
+        }
+
+        /**
          * @brief 光标下最深一级界面元素的描述
          * @param globalLogicalPoint 全局逻辑坐标
          * @param excludeWindowHandles 命中到这几位里的窗口直接跳过：录制时把自家 HUD 等窗口交进来，

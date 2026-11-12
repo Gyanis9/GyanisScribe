@@ -139,11 +139,12 @@ namespace
         return GyanisScribe::Platform::logicalPointToPhysicalGlobal(globalLogicalPoint, mappings[*owner]);
     }
 
-    /// 一次元素查询的结果：钻到的最深元素，以及从窗口根到它的物理矩形（由外到内）
+    /// 一次元素查询的结果：钻到的最深元素，以及从窗口根到它的物理矩形与对应元素（由外到内）
     struct UiaElementHit
     {
-        Microsoft::WRL::ComPtr<IUIAutomationElement> element;       ///< 最深一级元素；窗口没有提供器或根读不出时为空
-        std::vector<QRect>                           physicalChain; ///< 从窗口根到最深元素的物理矩形；根读不出来时为空
+        Microsoft::WRL::ComPtr<IUIAutomationElement>              element;       ///< 最深一级元素；窗口没有提供器或根读不出时为空
+        std::vector<QRect>                                        physicalChain; ///< 从窗口根到最深元素的物理矩形；根读不出来时为空
+        std::vector<Microsoft::WRL::ComPtr<IUIAutomationElement>> elements;      ///< 与 physicalChain 同序的元素；只收非空矩形那一级
     };
 
     /**
@@ -151,9 +152,9 @@ namespace
      * @param uia UI Automation 入口
      * @param window 已经选定并含住光标的顶层窗口
      * @param physicalPoint 光标位置，全局物理像素
-     * @return 最深一级元素与由外到内的矩形链；没有提供器、根读不出或建不出条件时元素为空
+     * @return 最深一级元素与由外到内的矩形链、元素链；没有提供器、根读不出或建不出条件时元素为空
      * @details 深度与子项预算挡住惰性树里越套越深的包装层与虚拟化列表一次暴露成千上万个条目。
-     *          elementChainAtPoint 与 uiElementAtPoint 共用这一段：两处认到的必须是同一个元素。
+     *          elementChainAtPoint 与 uiElementChainAtPoint 共用这一段：两处认到的必须是同一批元素。
      */
     [[nodiscard]] UiaElementHit walkToDeepestElement(IUIAutomation *uia, const HWND window, const QPoint &physicalPoint)
     {
@@ -186,6 +187,7 @@ namespace
             if (!physical.isEmpty())
             {
                 hit.physicalChain.push_back(physical);
+                hit.elements.push_back(element);
             }
 
             if (childrenBudget <= 0)
@@ -666,7 +668,8 @@ namespace GyanisScribe::Platform
         return chain;
     }
 
-    Base::Expected<std::optional<UiElementInfo>> WindowsIntegration::uiElementAtPoint(const QPoint &globalLogicalPoint, const std::vector<quintptr> &excludeWindowHandles) const
+    Base::Expected<std::vector<UiElementInfo>> WindowsIntegration::uiElementChainAtPoint(const QPoint                &globalLogicalPoint,
+                                                                                          const std::vector<quintptr> &excludeWindowHandles) const
     {
         const auto mappings      = monitorMappings();
         const auto physicalPoint = physicalPointForQuery(globalLogicalPoint, mappings);
@@ -675,73 +678,94 @@ namespace GyanisScribe::Platform
             return std::unexpected(physicalPoint.error());
         }
 
+        // 与 elementChainAtPoint 同一套认窗：UIA 的命中测试穿不过置顶遮罩，先拿到遮罩底下那扇窗的句柄
         AnchorSearch search{*physicalPoint, &excludeWindowHandles};
         EnumWindows(findWindowUnderPoint, reinterpret_cast<LPARAM>(&search));
         if (search.found == nullptr)
         {
-            // 光标下没有可认的窗口：没有元素可描述，不是失败
-            return std::optional<UiElementInfo>{};
+            // 光标下没有可认的窗口：交空链，让调用方退回「没有元素」，这里不报错
+            return std::vector<UiElementInfo>{};
         }
 
         const auto uia = uiAutomation();
         if (uia == nullptr)
         {
-            return std::unexpected(Error{ErrorCode::PlatformUnsupported, GyanisScribe::Base::uiTextUtf8("系统的 UI Automation 无法启动，不能描述光标下的界面元素")});
+            return std::unexpected(Error{ErrorCode::PlatformUnsupported,
+                                         GyanisScribe::Base::uiTextUtf8("系统的 UI Automation 无法启动，不能列出光标下的界面元素。可继续使用悬停识别整个窗口，或直接框选目标区域。")});
         }
 
-        const auto hit = walkToDeepestElement(uia, search.found, *physicalPoint);
-        if (hit.element == nullptr)
-        {
-            // 这扇窗没有提供器（自绘界面、老程序）：没有元素可描述，仍算成功
-            return std::optional<UiElementInfo>{};
-        }
+        // 从窗口根往下收，收完与矩形链一起翻过来（消费方按「第一档 = 最深」用）
+        auto hit = walkToDeepestElement(uia, search.found, *physicalPoint);
+        std::ranges::reverse(hit.physicalChain);
+        std::ranges::reverse(hit.elements);
 
-        QString elementName;
-        BSTR    name = nullptr;
-        if (SUCCEEDED(hit.element->get_CurrentName(&name)))
-        {
-            if (name != nullptr)
-            {
-                elementName = QString::fromWCharArray(name, static_cast<qsizetype>(SysStringLen(name)));
-                SysFreeString(name);
-            }
-        }
-
-        // 最深一级元素没有名字时与「没有元素」同一出口：消费方回落坐标，
-        // 交回一条只有控件类型的描述反而像是认出了什么
-        if (elementName.trimmed().isEmpty())
-        {
-            return std::optional<UiElementInfo>{};
-        }
-
-        UiElementInfo info;
-        info.name = elementName;
-
-        // 读不到控件类型只让标签回落「控件」：元素本身已经认出来了，这一步不该把整条描述判成失败
-        int controlTypeId = 0;
-        info.controlType  = SUCCEEDED(hit.element->get_CurrentControlType(&controlTypeId)) ? uiControlTypeLabel(controlTypeId) : Base::uiText("控件");
-
-        // 窗口标题与进程按锚定的顶层窗口取：元素所在的顶层窗口就是它，不必沿 UIA 父级再爬一遍
+        // 窗口标题与进程按锚定的顶层窗口读一次：链上每一级都在这扇窗里，逐级再问一遍只是同一个答案
         constexpr int kWindowTitleBufferLength              = 512;
         wchar_t       titleBuffer[kWindowTitleBufferLength] = {};
         const int     written                               = GetWindowTextW(search.found, titleBuffer, kWindowTitleBufferLength);
-        info.windowTitle                                    = written > 0 ? QString::fromWCharArray(titleBuffer, written) : QString();
-        info.processName                                    = processFileName(search.found);
+        const QString windowTitle                           = written > 0 ? QString::fromWCharArray(titleBuffer, written) : QString();
+        const QString processName                           = processFileName(search.found);
 
-        RECT bounds{};
-        if (SUCCEEDED(hit.element->get_CurrentBoundingRectangle(&bounds)))
+        std::vector<UiElementInfo> chain;
+        chain.reserve(hit.physicalChain.size());
+        for (std::size_t index = 0; index < hit.physicalChain.size(); ++index)
         {
-            const QRect physical{bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top};
-            if (!physical.isEmpty())
+            // 每个元素按自己的中心认屏：跨屏窗口的元素串在别的屏上时，拿锚点那块屏的缩放硬算会串位
+            const auto &physical   = hit.physicalChain[index];
+            const auto  ownerIndex = monitorIndexForPoint(physical.center(), mappings);
+            if (ownerIndex == mappings.size())
             {
-                const auto ownerIndex = monitorIndexForPoint(physical.center(), mappings);
-                if (ownerIndex != mappings.size())
-                {
-                    info.logicalGlobal = physicalToLogicalGlobal(physical, mappings[ownerIndex]).value_or(QRect{});
-                }
+                continue;
             }
+            const auto logical = physicalToLogicalGlobal(physical, mappings[ownerIndex]);
+            if (!logical)
+            {
+                continue;
+            }
+
+            UiElementInfo info;
+            info.logicalGlobal = *logical;
+            info.windowTitle   = windowTitle;
+            info.processName   = processName;
+
+            // 名字读不出的那一级保留空名：链仍按矩形逐级给出，调用方自己决定没有名字的那层怎么用
+            BSTR name = nullptr;
+            if (SUCCEEDED(hit.elements[index]->get_CurrentName(&name)) && name != nullptr)
+            {
+                info.name = QString::fromWCharArray(name, static_cast<qsizetype>(SysStringLen(name)));
+                SysFreeString(name);
+            }
+
+            // 读不到控件类型只让标签回落「控件」：元素本身已经认出来了，这一步不该把整级描述判成失败
+            int controlTypeId = 0;
+            info.controlType  = SUCCEEDED(hit.elements[index]->get_CurrentControlType(&controlTypeId)) ? uiControlTypeLabel(controlTypeId) : Base::uiText("控件");
+            chain.push_back(std::move(info));
         }
-        return std::optional<UiElementInfo>{std::move(info)};
+        return chain;
+    }
+
+    Base::Expected<std::optional<UiElementInfo>> WindowsIntegration::uiElementAtPoint(const QPoint                &globalLogicalPoint,
+                                                                                      const std::vector<quintptr> &excludeWindowHandles) const
+    {
+        const auto chain = uiElementChainAtPoint(globalLogicalPoint, excludeWindowHandles);
+        if (!chain)
+        {
+            return std::unexpected(chain.error());
+        }
+        if (chain->empty())
+        {
+            // 光标下没有可认的窗口，或那扇窗没有 UIA 提供器：没有元素可描述，仍算成功
+            return std::optional<UiElementInfo>{};
+        }
+
+        // 链首就是最深一级；它没有名字时与「没有元素」同一出口：消费方回落坐标，
+        // 交回一条只有控件类型的描述反而像是认出了什么
+        const auto &first = chain->front();
+        if (first.name.trimmed().isEmpty())
+        {
+            return std::optional<UiElementInfo>{};
+        }
+        return std::optional<UiElementInfo>{first};
     }
 
     Base::Expected<bool> WindowsIntegration::autostartEnabled() const

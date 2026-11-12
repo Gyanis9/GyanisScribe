@@ -431,6 +431,22 @@ TEST(PlatformIntegration, UiElementAtPointDescribesTheButtonUnderThePoint)
             << "元素矩形没套住按钮中心：矩形 " << described->logicalGlobal.x() << ',' << described->logicalGlobal.y() << ' ' << described->logicalGlobal.width()
             << '×' << described->logicalGlobal.height() << "，按钮中心 " << buttonCenter.x() << ',' << buttonCenter.y();
 
+    // 同一次命中，带元数据的链必须与 uiElementAtPoint 指的是同一个元素
+    const auto metadataChain = integration->uiElementChainAtPoint(buttonCenter, exclusion.handles);
+    ASSERT_TRUE(metadataChain.has_value()) << metadataChain.error().message;
+    ASSERT_FALSE(metadataChain->empty());
+    EXPECT_FALSE(metadataChain->front().name.isEmpty());
+    EXPECT_FALSE(metadataChain->front().controlType.isEmpty());
+    EXPECT_FALSE(metadataChain->front().logicalGlobal.isEmpty());
+    EXPECT_TRUE(metadataChain->front().logicalGlobal.contains(buttonCenter));
+    const auto deepest = integration->uiElementAtPoint(buttonCenter, exclusion.handles);
+    ASSERT_TRUE(deepest.has_value());
+    ASSERT_TRUE(deepest->has_value());
+    EXPECT_EQ((*deepest)->name, metadataChain->front().name);
+    EXPECT_EQ((*deepest)->controlType, metadataChain->front().controlType);
+    // 链从最深往窗口根排：根矩形不小于最深矩形
+    EXPECT_GE(metadataChain->back().logicalGlobal.width(), metadataChain->front().logicalGlobal.width());
+
     // 拔屏/改分辨率后的陈旧坐标：与元素链同一条拒绝面，不在任何屏上的点不编元素出来
     const auto offscreen = integration->uiElementAtPoint(QPoint{-100000, -100000}, {});
     ASSERT_FALSE(offscreen.has_value()) << "不在任何屏上的点居然算出了元素描述";

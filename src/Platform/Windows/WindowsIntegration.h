@@ -86,13 +86,23 @@ namespace GyanisScribe::Platform
         [[nodiscard]] Base::Expected<std::vector<QRect>> elementChainAtPoint(const QPoint &globalLogicalPoint, const std::vector<quintptr> &excludeWindowHandles) const override;
 
         /**
+         * @brief 光标处一摞界面元素的描述，见 IPlatformIntegration::uiElementChainAtPoint()
+         * @param globalLogicalPoint 全局逻辑坐标
+         * @param excludeWindowHandles 命中到这几扇窗就直接跳过，往下找下一扇
+         * @return 从深到浅的每一级元素描述（逻辑全局）；光标下没有可认的窗口、或那扇窗没有 UI Automation 提供器时交空一份
+         * @details 认窗与下钻与 elementChainAtPoint 走同一段，多带一列每级的 UIA 元素；窗口标题与进程
+         *          按锚定的顶层窗口读一次，各层共用。名字读不出的那一级保留空名，几何读不出的那一级不进链。
+         */
+        [[nodiscard]] Base::Expected<std::vector<UiElementInfo>> uiElementChainAtPoint(const QPoint                &globalLogicalPoint,
+                                                                                        const std::vector<quintptr> &excludeWindowHandles) const override;
+
+        /**
          * @brief 光标处最深一级元素的描述，见 IPlatformIntegration::uiElementAtPoint()
          * @param globalLogicalPoint 全局逻辑坐标
          * @param excludeWindowHandles 命中到这几扇窗就直接跳过，往下找下一扇
          * @return 成功返回元素名、控件类型标签、顶层窗口标题与进程、元素矩形（逻辑全局）；
-         *         光标下没有可认的窗口、那扇窗没有 UIA 提供器、或根元素读不出时交空的 optional
-         * @details 认窗与下钻与 elementChainAtPoint 走同一段：先按 z 序认第一扇含住光标、
-         *          不在排除名单里的可见窗，再从它的 UIA 根按「子元素含住点」逐级钻到最深一级。
+         *         光标下没有可认的窗口、那扇窗没有 UIA 提供器、或链首没有名字时交空的 optional
+         * @details 取 uiElementChainAtPoint 的链首（最深一级）：两条接口认到的必须是同一个元素。
          *          名字、几何读不出来只让对应字段为空，不算失败；UIA 起不来才是错误。
          */
         [[nodiscard]] Base::Expected<std::optional<UiElementInfo>> uiElementAtPoint(const QPoint                &globalLogicalPoint,
