@@ -15,6 +15,7 @@ add_subdirectory(Annotation)
 add_subdirectory(Rewind)
 add_subdirectory(Steps)
 add_subdirectory(Share)
+add_subdirectory(BugReport)
 
 get_property(GuiSources GLOBAL PROPERTY GyanisScribeGuiSources)
 add_library(Gui STATIC ${GuiSources})
