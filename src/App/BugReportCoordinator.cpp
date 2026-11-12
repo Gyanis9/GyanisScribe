@@ -53,6 +53,9 @@ namespace GyanisScribe::App
             return;
         }
 
+        // 先把成品尺寸留住：图交给对话框后，判底图能不能用只认这个读数
+        const auto reportSize = reportImage.size();
+
         GyanisScribe::Core::BugReport::BugReportEnvironment environment;
         environment.appName          = QGuiApplication::applicationDisplayName().isEmpty() ? QCoreApplication::applicationName() : QGuiApplication::applicationDisplayName();
         environment.appVersion       = QCoreApplication::applicationVersion();
@@ -62,7 +65,7 @@ namespace GyanisScribe::App
         environment.qtVersion        = QString::fromLatin1(qVersion());
         environment.screenName       = context.screenName;
         environment.logicalSize      = context.logicalSize;
-        environment.physicalSize     = reportImage.size();
+        environment.physicalSize     = reportSize;
         environment.devicePixelRatio = context.devicePixelRatio > 0.0 ? context.devicePixelRatio : reportImage.devicePixelRatio();
         environment.capturedAt       = context.capturedAt;
         environment.windowTitle      = context.windowTitle;
@@ -83,6 +86,9 @@ namespace GyanisScribe::App
         const auto directory  = configured.isEmpty() ? GyanisScribe::Base::Paths::defaultScreenshotDirectory() : GyanisScribe::Base::Paths::fromDisplayText(configured);
         const auto suggested  = GyanisScribe::Core::BugReport::bugReportDefaultPath(directory, QDateTime::currentDateTime());
 
+        // 码框扩张要按逻辑尺寸折算：在这一刻定格，之后不再借对话框的环境读数
+        m_scanLogicalSize = environment.logicalSize;
+
         auto *dialog = new GyanisScribe::Gui::BugReportDialog{std::move(reportImage), environment, suggested, parent};
         // 关掉就自毁，协调器只持 QPointer：下一次打开会重新建一扇，迟到的结果也不会写进已析构的对象
         dialog->setAttribute(Qt::WA_DeleteOnClose);
@@ -93,22 +99,31 @@ namespace GyanisScribe::App
                              m_dialog          = nullptr;
                              m_dialogKey       = 0;
                              m_queuedDetection = QImage{};
+                             m_scanLogicalSize = QSize{};
                          });
         dialog->show();
 
-        m_dialogKey = static_cast<quint64>(detectionImage.cacheKey());
-        if (detectionImage.isNull() || detectionImage.size() != m_dialog->reportImageForTesting().size())
+        if (detectionImage.isNull() || detectionImage.size() != reportSize)
         {
             // 识别框按检测图算，尺寸对不上就整体错位：不猜坐标，直接交给用户自己检查
+            // 拒收时连钥匙与排队一起清掉：上一扇窗还在飞的同一张图回来时不该落进这扇只能自查的窗
+            m_dialogKey       = 0;
+            m_queuedDetection = QImage{};
             dialog->setScanUnavailable(GyanisScribe::Base::uiText("截图与检查底图尺寸不一致，无法自动打码；请自行检查后再分享"));
             return;
         }
 
+        // 底图确认可用之后才落钥匙：拒收的窗不能替旧图担保
+        m_dialogKey = static_cast<quint64>(detectionImage.cacheKey());
         ensureScanner();
         if (m_scanner->isScanning())
         {
             // 单飞：扫描器不排队，要换的那张图由这里攒着，等它空下来补跑
-            m_queuedDetection = detectionImage;
+            // 正在扫的就是同一张时不再攒：它回来会按钥匙落进这扇窗，重排只会让同一帧跑两遍
+            if (static_cast<quint64>(detectionImage.cacheKey()) != m_inFlightKey)
+            {
+                m_queuedDetection = detectionImage;
+            }
         } else
         {
             startScan(detectionImage);
@@ -172,8 +187,6 @@ namespace GyanisScribe::App
         // 两道对号：这次结果确实是刚发出的那次，且它属于眼前这扇窗；关窗后迟到的结果落不进来
         if (m_dialog && wasLive && key == m_dialogKey)
         {
-            const auto logicalSize = m_dialog->environmentForTesting().logicalSize;
-
             std::vector<QRect> boxes;
             if (m_barcodeReader)
             {
@@ -183,7 +196,7 @@ namespace GyanisScribe::App
                     for (const auto &reading: *readings)
                     {
                         const QRect box = reading.matrix ? reading.box.normalized().intersected(image.rect())
-                                                         : GyanisScribe::Core::Privacy::expandBarcodeScanline(reading.box, image.size(), logicalSize);
+                                                         : GyanisScribe::Core::Privacy::expandBarcodeScanline(reading.box, image.size(), m_scanLogicalSize);
                         if (!box.isEmpty())
                         {
                             boxes.push_back(box);

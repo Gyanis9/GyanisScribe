@@ -1,6 +1,7 @@
 // 报告协调器的直测：开窗时把截图来源写进环境、只开一扇；
 // 扫描结果按 cacheKey 对号入座，旧窗迟到的结果不落新窗，忙时只排最新一张；
-// 码识别后端缺席不拖住文字打码，引擎不可用与底图对不上都落到不可用状态。
+// 码识别后端缺席不拖住文字打码，引擎不可用与底图对不上都落到不可用状态；
+// 拒收的窗不认旧图迟到的结果，同一帧重开也不会把同一张图扫两遍。
 
 #include "App/BugReportCoordinator.h"
 
@@ -477,4 +478,75 @@ TEST_F(BugReportCoordinatorFixture, DetectionImageWithoutMatchingSizeSkipsTheSca
     ASSERT_NE(nullDetectionDialog, nullptr);
     EXPECT_EQ(nullDetectionDialog->redactionForTesting().state, RedactionState::Unavailable);
     EXPECT_EQ(fake->recognizeCalls(), 0) << "没有检查底图时不该凭空认一遍";
+}
+
+TEST_F(BugReportCoordinatorFixture, RejectedDetectionDoesNotArmTheKeyForALateScan)
+{
+    auto  engine = std::make_unique<FakeOcrEngine>(Expected<OcrResult>{makePhoneResult()});
+    auto *fake   = engine.get();
+    fake->setGated();
+    BugReportCoordinator coordinator{*m_settings, std::move(engine), emptyBarcodeReader()};
+    GateReleaseGuard     releaseGuard{*fake};
+    QWidget              parent;
+
+    // 同一份检测图数据：第一次开窗用它当成品和底图，扫描压进闸门里
+    const QImage detection = makeImage(QSize{200, 100}, QColor{20, 40, 60});
+
+    coordinator.openReport(detection, detection, makeContext(), &parent);
+    auto *first = coordinator.dialogForTesting();
+    ASSERT_NE(first, nullptr);
+    ASSERT_TRUE(fake->waitUntilEntered(kEnterPatience)) << "第一扇窗没有开始识别";
+    first->close();
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    ASSERT_EQ(coordinator.dialogForTesting(), nullptr) << "关掉的报告窗还挂在协调器上";
+
+    // 新成品只有 100x50，底图仍是还在飞的那张 200x100：这扇窗只能自查
+    coordinator.openReport(makeImage(QSize{100, 50}, QColor{90, 60, 30}), detection, makeContext(), &parent);
+    auto *second = coordinator.dialogForTesting();
+    ASSERT_NE(second, nullptr);
+    ASSERT_EQ(second->redactionForTesting().state, RedactionState::Unavailable);
+
+    // 旧图的结果若被当成新窗的结果，会把 200x100 的框落到 100x50 的成品上
+    fake->release();
+    ASSERT_TRUE(waitUntil([&coordinator] { return !coordinator.isScanningForTesting(); }, 10'000)) << "放行后旧扫描没有收尾";
+    EXPECT_EQ(second->redactionForTesting().state, RedactionState::Unavailable) << "旧窗迟到的结果落进了拒收的窗";
+    EXPECT_EQ(fake->recognizeCalls(), 1) << "尺寸对不上的窗不该再发起识别";
+}
+
+TEST_F(BugReportCoordinatorFixture, ReopeningWithTheSameFrameDoesNotQueueASecondScan)
+{
+    auto  engine = std::make_unique<FakeOcrEngine>(Expected<OcrResult>{makePhoneResult()});
+    auto *fake   = engine.get();
+    fake->setGated();
+    BugReportCoordinator coordinator{*m_settings, std::move(engine), emptyBarcodeReader()};
+    GateReleaseGuard     releaseGuard{*fake};
+    QWidget              parent;
+
+    const QImage detection = makeImage(QSize{200, 100}, QColor{20, 40, 60});
+
+    coordinator.openReport(detection, detection, makeContext(), &parent);
+    auto *first = coordinator.dialogForTesting();
+    ASSERT_NE(first, nullptr);
+    ASSERT_TRUE(fake->waitUntilEntered(kEnterPatience)) << "第一扇窗没有开始识别";
+    first->close();
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    ASSERT_EQ(coordinator.dialogForTesting(), nullptr) << "关掉的报告窗还挂在协调器上";
+
+    // 重开用的还是同一张底图：它正在扫，结果回来就能落进这扇窗，不该再排一次
+    coordinator.openReport(detection, detection, makeContext(), &parent);
+    auto *second = coordinator.dialogForTesting();
+    ASSERT_NE(second, nullptr);
+    EXPECT_EQ(second->redactionForTesting().state, RedactionState::Pending) << "上一轮没回来时新窗不该假装在扫";
+
+    fake->release();
+    ASSERT_TRUE(waitUntil([second] { return second->redactionForTesting().state == RedactionState::Masked; }, 10'000)) << "同一张图的结果没有落进重开的窗";
+
+    // 仍在扫说明同一帧又被排了一轮：等它进入识别体，让调用次数把这个错误说出来
+    if (coordinator.isScanningForTesting())
+    {
+        static_cast<void>(waitUntil([fake] { return fake->recognizeCalls() > 1; }, 1'000));
+    }
+    EXPECT_EQ(fake->recognizeCalls(), 1) << "同一帧被排进了第二次扫描";
+    EXPECT_FALSE(coordinator.isScanningForTesting()) << "已经出结果了还在扫，说明同一张图又被排了一轮";
+    EXPECT_EQ(second->redactionForTesting().state, RedactionState::Masked) << "重复扫描把已经打好的码翻成了不可用";
 }

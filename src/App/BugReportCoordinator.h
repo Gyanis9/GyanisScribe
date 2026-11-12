@@ -17,6 +17,7 @@
 #include <QImage>
 #include <QObject>
 #include <QPointer>
+#include <QSize>
 
 #include <functional>
 #include <memory>
@@ -133,6 +134,7 @@ namespace GyanisScribe::App
         std::unique_ptr<GyanisScribe::App::PrivacyCoordinator> m_scanner;               ///< 懒建的隐私扫描器
         QPointer<GyanisScribe::Gui::BugReportDialog>           m_dialog;                ///< 当前报告窗，关掉即空
         QImage                                                 m_queuedDetection;       ///< 扫描器忙时攒下的最新检测图
+        QSize                                                  m_scanLogicalSize;       ///< 本轮检查对应的逻辑尺寸，码框扩张用
         quint64                                                m_dialogKey   = 0;       ///< 当前窗等的结果所属图的 cacheKey
         quint64                                                m_inFlightKey = 0;       ///< 正在扫的那张图的 cacheKey
     };
