@@ -321,7 +321,8 @@ namespace GyanisScribe::Gui
                                  // 同一层遮罩两条去处：长截图先把这一块当成开头接住，普通截图当场交成品
                                  if (longCapture)
                                  {
-                                     captureLongRegion(region, screenName);
+                                     // 开头这一帧裁遮罩冻帧，不再现抓：现抓会拍到焦点还没交还、标题栏失活的那一瞬
+                                     captureLongRegion(region, screenName, &*frame);
                                      return;
                                  }
                                  // 普通截图从遮罩那张冻帧里裁：再抓一次屏会把遮罩自己/刚切的桌面抓进去，
@@ -444,7 +445,7 @@ namespace GyanisScribe::Gui
         m_overlays.clear();
     }
 
-    void CaptureService::captureLongRegion(const QRect &logicalRegion, const QString &screenName)
+    void CaptureService::captureLongRegion(const QRect &logicalRegion, const QString &screenName, const Base::CapturedImage *frozenFrame)
     {
         if (m_longActive)
         {
@@ -452,18 +453,37 @@ namespace GyanisScribe::Gui
             cancelLongCapture();
         }
 
-        const auto frame = m_source.grabScreen(screenName);
-        if (!frame)
+        // 第一帧优先裁遮罩那张冻帧：抓屏紧跟在收遮罩之后，焦点还没交还被截窗口，
+        // 现抓的那一帧里标题栏还是失活态，与 250ms 后的实时帧对不上，用户一行没滚就先看到「没有可信的重叠」。
+        // 冻帧拍在遮罩铺出来之前，与用户框选时看到的画面同一张；普通截图那条路也是从它裁
+        std::optional<Base::CapturedImage> first;
+        QString                            resolvedScreenName;
+        if (frozenFrame != nullptr && !frozenFrame->image.isNull())
         {
-            deliver(frame);
-            return;
+            const auto cropped = Core::cropToLogicalRect(*frozenFrame, logicalRegion);
+            if (cropped)
+            {
+                first              = *cropped;
+                resolvedScreenName = frozenFrame->screenName;
+            }
         }
-
-        const auto first = Core::cropToLogicalRect(*frame, logicalRegion);
         if (!first)
         {
-            deliver(first);
-            return;
+            // 没有可用的冻帧（或冻帧裁不出这块区域）才现抓：至少不把这一轮直接判死
+            const auto frame = m_source.grabScreen(screenName);
+            if (!frame)
+            {
+                deliver(frame);
+                return;
+            }
+            const auto cropped = Core::cropToLogicalRect(*frame, logicalRegion);
+            if (!cropped)
+            {
+                deliver(cropped);
+                return;
+            }
+            first              = *cropped;
+            resolvedScreenName = frame->screenName;
         }
 
         m_longStitcher.emplace(first->image);
@@ -471,7 +491,7 @@ namespace GyanisScribe::Gui
         // 像素交给累加器，这里只留读数和来源：留一份中途还会变的副本就得两处同步
         m_longImage.image = {};
         m_longRegion      = logicalRegion;
-        m_longScreenName  = frame->screenName;
+        m_longScreenName  = resolvedScreenName;
         m_longActive      = true;
 
         // 选区同样记进「上次区域」：长截图框出来的那条竖块往往正是下次要复用的那一块

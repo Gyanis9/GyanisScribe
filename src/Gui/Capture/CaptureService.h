@@ -152,10 +152,13 @@ namespace GyanisScribe::Gui
          * @brief 用给定的区域起一轮滚动拼接
          * @param logicalRegion 该屏内的逻辑矩形
          * @param screenName 目标屏幕名，空串取光标所在那块
+         * @param frozenFrame 可选的遮罩冻帧：给了就裁它当第一帧，没给才现抓一帧
          * @details 这一块就是以后每一帧的取样框，位置不再变；第一帧当场接成开头。
          *          上一轮还没收口时先把上一轮作废（发 captureCancelled），不静默吞掉任何一次请求。
+         *          第一帧要裁遮罩冻帧：收遮罩与抓屏之间焦点还没交还被截窗口，现抓的那一帧里
+         *          标题栏还是失活态，250ms 后的实时帧已是激活态，第一段接缝会整片对不上。
          */
-        void captureLongRegion(const QRect &logicalRegion, const QString &screenName = {});
+        void captureLongRegion(const QRect &logicalRegion, const QString &screenName = {}, const Base::CapturedImage *frozenFrame = nullptr);
 
         /**
          * @brief 抓一帧接上去

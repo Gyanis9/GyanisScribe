@@ -1586,6 +1586,53 @@ TEST_F(CaptureServiceFixture, LongCaptureRoutesTheOverlaySelectionIntoTheLongRou
 }
 
 /**
+ * @brief 钉住长截图第一帧取自遮罩那张冻帧，而不是框选确认后再抓一次屏
+ * @details 遮罩一收，焦点先回到遮罩这边再交还被截窗口：紧跟收遮罩抓到的第一帧里标题栏还是失活态，
+ *          250ms 后的实时帧已经是激活态，两帧在标题栏那一带整片不同，用户一行都没滚就先看到
+ *          「没有可信的重叠」。冻帧拍在遮罩铺出来之前，标题栏与之后的实时帧同相。
+ *          判据用两种颜色的替身帧：确认之后不该再抓屏，收口交出的第一帧必须是铺遮罩那一次那张。
+ */
+TEST_F(CaptureServiceFixture, LongCaptureFirstFrameComesFromTheOverlayFrozenFrame)
+{
+    if (QGuiApplication::screens().isEmpty())
+    {
+        GTEST_SKIP() << "这个环境没有屏幕可枚举，铺不出遮罩";
+    }
+
+    SettingsStore     settings(m_iniFile);
+    FakeCaptureSource source;
+    // 第一次抓屏是遮罩底图（红）；后面的绿帧代表「焦点还没交还被截窗口时」抓到的那一帧
+    source.screenQueue = {
+            makeScreenFrame(QSize{200, 100}, 2.0, QColor{255, 0, 0}),
+            makeScreenFrame(QSize{200, 100}, 2.0, QColor{0, 255, 0}),
+    };
+    FakePlatformIntegration fake;
+    CaptureService          service(source, settings, fake);
+    Outcome                 outcome;
+    wire(service, outcome);
+
+    service.startLongCapture();
+    auto *overlay = findOverlay();
+    ASSERT_NE(overlay, nullptr) << "长截图入口没铺出遮罩";
+    ASSERT_EQ(source.requestedScreens.size(), 1U) << "铺遮罩之前没抓底图";
+
+    const auto  anchor = QPoint{5, 5};
+    const auto  pull   = QPoint{45, 35};
+    const auto  global = overlay->geometry().topLeft();
+    QMouseEvent press{QEvent::MouseButtonPress, QPointF{anchor}, QPointF{global + anchor}, Qt::LeftButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+    QApplication::sendEvent(overlay, &press);
+    QMouseEvent move{QEvent::MouseMove, QPointF{pull}, QPointF{global + pull}, Qt::NoButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+    QApplication::sendEvent(overlay, &move);
+    overlay->confirmSelection();
+
+    EXPECT_EQ(source.requestedScreens.size(), 1U) << "确认选区后又抓了一次屏：第一帧会带上遮罩或失活的标题栏";
+    ASSERT_FALSE(outcome.error.has_value()) << "选区一落地就报了错：" << (outcome.error ? outcome.error->message : std::string{});
+    service.finishLongCapture();
+    ASSERT_TRUE(outcome.image.has_value()) << "收口没交出长图";
+    EXPECT_EQ(outcome.image->image.pixelColor(0, 0), QColor(255, 0, 0)) << "第一帧不是铺遮罩前那张冻帧";
+}
+
+/**
  * @brief 钉住回溯帧直接进入框选：不再抓屏、横幅带时刻、框完仍裁同一帧
  * @details 回溯选中的是一帧历史画面：再抓一次屏会把「现在」交出去，横幅不写时刻则用户分不清
  *          这是回看还是实时。取消那一条另起一轮再验，因为「没框到东西」与「用户取消」在服务里
