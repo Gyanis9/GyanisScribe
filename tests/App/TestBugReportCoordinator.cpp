@@ -746,11 +746,12 @@ TEST_F(BugReportCoordinatorFixture, TheScanRunsOnTheDetectionImageNotTheReportIm
     coordinator.openReport(reportImage, detectionImage, makeContext(), &parent);
     auto *dialog = coordinator.dialogForTesting();
     ASSERT_NE(dialog, nullptr);
-    ASSERT_TRUE(waitUntil([dialog] { return dialog->redactionForTesting().state == RedactionState::NoHits; })) << "扫描没有收尾";
+    ASSERT_TRUE(waitUntil([fake] { return fake->recognizeCalls() > 0; })) << "扫描没有发起";
     const auto received = fake->lastImage();
     ASSERT_FALSE(received.isNull()) << "假引擎没记下收到的图";
     EXPECT_EQ(received.pixel(5, 5), detectionImage.pixel(5, 5)) << "扫描吃的不是检查底图";
     EXPECT_NE(received.pixel(5, 5), reportImage.pixel(5, 5)) << "前提：两张图必须不同内容，否则这条判据分不出来";
+    EXPECT_TRUE(waitUntil([dialog] { return dialog->redactionForTesting().state == RedactionState::NoHits; })) << "扫描没有收尾";
 }
 
 /**
