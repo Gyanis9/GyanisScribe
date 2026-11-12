@@ -4,6 +4,14 @@
 <context>
     <name>GyanisScribe</name>
         <message>
+            <source>没有可用于检查的底图，无法自动打码；请自行检查后再分享</source>
+            <translation>There is no checked image to compare against, so auto-redaction was skipped; check before sharing</translation>
+        </message>
+        <message>
+            <source>截图与检查底图尺寸不一致，无法自动打码；请自行检查后再分享</source>
+            <translation>The capture and the checked image have different sizes, so auto-redaction was skipped; check before sharing</translation>
+        </message>
+        <message>
             <source>当前没有正在编辑的标注，请重新截图后再试</source>
             <translation>No annotation is being edited right now. Capture again and retry</translation>
         </message>
@@ -74,6 +82,10 @@
         <message>
             <source>识别到 %1 个条码，已复制第一条结果</source>
             <translation>%1 codes found; the topmost one was copied</translation>
+        </message>
+        <message>
+            <source>当前没有可生成报告的截图</source>
+            <translation>There is no capture to build a report from</translation>
         </message>
         <message>
             <source>画布已更新，请重新执行隐私打码</source>
@@ -380,7 +392,8 @@
             <translation>Recent colors</translation>
         </message>
         <message>
-            <source>删除配置中的 %1 可恢复默认设置</source><translation>Delete the %1 entry in settings to restore the defaults</translation>
+            <source>删除配置中的 %1 可恢复默认设置</source>
+            <translation>Delete the %1 entry in settings to restore the defaults</translation>
         </message>
         <message>
             <source>已复制颜色 </source>
@@ -607,6 +620,30 @@
             <translation>Screen locked; the rewind buffer was cleared</translation>
         </message>
         <message>
+            <source>先导出或放弃这次记录</source>
+            <translation>Export or discard this recording first</translation>
+        </message>
+        <message>
+            <source>当前平台不支持记录操作步骤，无法开始录制</source>
+            <translation>This platform cannot record steps, so recording cannot start</translation>
+        </message>
+        <message>
+            <source>无法创建步骤事件源，请重启程序后重试</source>
+            <translation>The step event source could not be created. Restart the app and try again</translation>
+        </message>
+        <message>
+            <source>这次没有记录到步骤</source>
+            <translation>No steps were recorded this time</translation>
+        </message>
+        <message>
+            <source>步骤截图写不进临时目录，已停止本次记录：%1</source>
+            <translation>Step screenshots cannot be written to the temporary directory, so this recording has stopped: %1</translation>
+        </message>
+        <message>
+            <source>已经记满 %1 步，先导出或放弃这次记录</source>
+            <translation>All %1 steps have been recorded; export or discard this recording first</translation>
+        </message>
+        <message>
             <source>什么都不做</source>
             <translation>Do nothing</translation>
         </message>
@@ -675,8 +712,16 @@
             <translation>New blank canvas</translation>
         </message>
         <message>
+            <source>拾取界面元素</source>
+            <translation>Pick a UI element</translation>
+        </message>
+        <message>
             <source>开始 / 停止录屏</source>
             <translation>Start / stop recording</translation>
+        </message>
+        <message>
+            <source>步骤记录</source>
+            <translation>Step recording</translation>
         </message>
         <message>
             <source>识别图片文件…</source>
@@ -815,10 +860,12 @@
             <translation>The first word of the external command, "{}", carries %file%: %file% is the saved file path and can only appear among the arguments. Write the program name first.</translation>
         </message>
         <message>
-            <source>该外部命令需要 %file%，但本次截图未生成文件。请将设置中的「截图完成后」改为「保存到文件」或「保存并复制」，或删除命令中的 %file%。</source><translation>This external command needs %file%, but this capture wrote no file. Set "After a capture" to "Save straight to a file" or "Quick save (file + clipboard)", or remove %file% from the command.</translation>
+            <source>该外部命令需要 %file%，但本次截图未生成文件。请将设置中的「截图完成后」改为「保存到文件」或「保存并复制」，或删除命令中的 %file%。</source>
+            <translation>This external command needs %file%, but this capture wrote no file. Set "After a capture" to "Save straight to a file" or "Quick save (file + clipboard)", or remove %file% from the command.</translation>
         </message>
         <message>
-            <source>无法执行外部命令：「{}」启动失败。请检查程序名与路径是否存在；路径包含空格时，请用引号包裹完整命令。</source><translation>The external command could not start: "{}" would not launch. Check that the program name and path still exist; quote the whole path when it contains spaces.</translation>
+            <source>无法执行外部命令：「{}」启动失败。请检查程序名与路径是否存在；路径包含空格时，请用引号包裹完整命令。</source>
+            <translation>The external command could not start: "{}" would not launch. Check that the program name and path still exist; quote the whole path when it contains spaces.</translation>
         </message>
         <message>
             <source>日志目录建不出来：{}（原因 {}）。请把 Paths 里的日志目录改到一个可写的路径再重启</source>
@@ -933,10 +980,12 @@
             <translation>Nothing is selected, so there is no text to change. Double-click the text you want to edit</translation>
         </message>
         <message>
-            <source>修改文字内容需恰好选中一条文字图形；多选或其他图形不支持修改。仅文字工具创建的文字可双击重新编辑。</source><translation>Changing content needs exactly one text shape selected: multiple selections or other shapes will not work. Only text shapes drawn with the text tool can be double-clicked to re-edit</translation>
+            <source>修改文字内容需恰好选中一条文字图形；多选或其他图形不支持修改。仅文字工具创建的文字可双击重新编辑。</source>
+            <translation>Changing content needs exactly one text shape selected: multiple selections or other shapes will not work. Only text shapes drawn with the text tool can be double-clicked to re-edit</translation>
         </message>
         <message>
-            <source>文字内容不能为空。如不需要此条，请按 Delete 删除，或按 Ctrl+Z 撤销本次修改。</source><translation>Text cannot be empty: press Delete to drop this shape, or Ctrl+Z to undo this change</translation>
+            <source>文字内容不能为空。如不需要此条，请按 Delete 删除，或按 Ctrl+Z 撤销本次修改。</source>
+            <translation>Text cannot be empty: press Delete to drop this shape, or Ctrl+Z to undo this change</translation>
         </message>
         <message>
             <source>没有选中任何图形，无需删除。请先点中要删的那一条</source>
@@ -963,7 +1012,8 @@
             <translation>Resize handles only appear when exactly one shape is selected. Select a single shape first, then drag a handle</translation>
         </message>
         <message>
-            <source>当前未在拖动手柄。请先按住选中框上的手柄再拖动。</source><translation>No handle drag is in progress. Press a handle on the selection frame first, then drag</translation>
+            <source>当前未在拖动手柄。请先按住选中框上的手柄再拖动。</source>
+            <translation>No handle drag is in progress. Press a handle on the selection frame first, then drag</translation>
         </message>
         <message>
             <source>拖的那条图形已经不在了。请重新点选</source>
@@ -1006,7 +1056,8 @@
             <translation>All of these redaction boxes fall outside the canvas or are too small to see: there is nothing to redact. Run the check again, or draw boxes on the canvas manually</translation>
         </message>
         <message>
-            <source>色板不能为空，至少保留一格。如需使用内置八色，请清空该设置，不要填入空白值。</source><translation>The palette cannot be empty; keep at least one color. To use the built-in eight colors, clear this setting instead of entering a blank value.</translation>
+            <source>色板不能为空，至少保留一格。如需使用内置八色，请清空该设置，不要填入空白值。</source>
+            <translation>The palette cannot be empty; keep at least one color. To use the built-in eight colors, clear this setting instead of entering a blank value.</translation>
         </message>
         <message>
             <source>色板有 {} 格，超出上限 {} 格：请删掉几格再存</source>
@@ -1075,6 +1126,130 @@
         <message>
             <source>文字</source>
             <translation>Text</translation>
+        </message>
+        <message>
+            <source>截图问题反馈</source>
+            <translation>Screenshot report</translation>
+        </message>
+        <message>
+            <source>（未填写）</source>
+            <translation>(not provided)</translation>
+        </message>
+        <message>
+            <source>系统：内核 %1，%2</source>
+            <translation>System: kernel %1, %2</translation>
+        </message>
+        <message>
+            <source>系统：%1</source>
+            <translation>System: %1</translation>
+        </message>
+        <message>
+            <source>内核 %1</source>
+            <translation>kernel %1</translation>
+        </message>
+        <message>
+            <source>系统：%1（内核 %2，%3）</source>
+            <translation>System: %1 (kernel %2, %3)</translation>
+        </message>
+        <message>
+            <source>系统：%1（内核 %2）</source>
+            <translation>System: %1 (kernel %2)</translation>
+        </message>
+        <message>
+            <source>系统：%1（%2）</source>
+            <translation>System: %1 (%2)</translation>
+        </message>
+        <message>
+            <source>截图尺寸：%1 × %2 逻辑像素（%3 × %4 像素，缩放 %5）</source>
+            <translation>Capture size: %1 × %2 logical px (%3 × %4 px, scale %5)</translation>
+        </message>
+        <message>
+            <source>截图尺寸：%1 × %2 逻辑像素</source>
+            <translation>Capture size: %1 × %2 logical px</translation>
+        </message>
+        <message>
+            <source>截图尺寸：%1 × %2 像素</source>
+            <translation>Capture size: %1 × %2 px</translation>
+        </message>
+        <message>
+            <source>正在检查。</source>
+            <translation>Checking.</translation>
+        </message>
+        <message>
+            <source>已对 %1 处敏感信息打码（%2）。请自行检查后再分享。</source>
+            <translation>Redacted %1 sensitive item(s) with %2. Check before sharing.</translation>
+        </message>
+        <message>
+            <source>未检出可打码的敏感信息。请自行检查后再分享。</source>
+            <translation>No redactable sensitive information detected. Check before sharing.</translation>
+        </message>
+        <message>
+            <source>不可用（%1）。本次不保存截图，请自行检查文字内容后再分享。</source>
+            <translation>Unavailable (%1). No screenshot was saved; check the text before sharing.</translation>
+        </message>
+        <message>
+            <source>应用：%1</source>
+            <translation>App: %1</translation>
+        </message>
+        <message>
+            <source>Qt：%1</source>
+            <translation>Qt: %1</translation>
+        </message>
+        <message>
+            <source>屏幕：%1</source>
+            <translation>Screen: %1</translation>
+        </message>
+        <message>
+            <source>截图时间：%1</source>
+            <translation>Capture time: %1</translation>
+        </message>
+        <message>
+            <source>## 环境</source>
+            <translation>## Environment</translation>
+        </message>
+        <message>
+            <source>前台窗口（截图时）：%1</source>
+            <translation>Foreground window (at capture): %1</translation>
+        </message>
+        <message>
+            <source>进程：%1</source>
+            <translation>Process: %1</translation>
+        </message>
+        <message>
+            <source>## 窗口</source>
+            <translation>## Window</translation>
+        </message>
+        <message>
+            <source>## 复现步骤</source>
+            <translation>## Steps to reproduce</translation>
+        </message>
+        <message>
+            <source>## 期望结果</source>
+            <translation>## Expected result</translation>
+        </message>
+        <message>
+            <source>## 实际结果</source>
+            <translation>## Actual result</translation>
+        </message>
+        <message>
+            <source>## 补充说明</source>
+            <translation>## Additional notes</translation>
+        </message>
+        <message>
+            <source>## 截图</source>
+            <translation>## Screenshot</translation>
+        </message>
+        <message>
+            <source>截图：未附带（本段只含文字）。</source>
+            <translation>Screenshot: not attached (text only).</translation>
+        </message>
+        <message>
+            <source>![截图](&lt;%1&gt;)</source>
+            <translation>![Screenshot](&lt;%1&gt;)</translation>
+        </message>
+        <message>
+            <source>自动打码：%1</source>
+            <translation>Auto-redaction: %1</translation>
         </message>
         <message>
             <source>长截图接不上：这一段和上一段没有可信的重叠。请回到上一段末尾附近，等画面停稳后再滚一小段；如果已经滚过一屏，请缩小滚动幅度重来</source>
@@ -1153,17 +1328,20 @@
             <translation>The CSV could not be flushed to disk: {} ({}). Check the free disk space and try again</translation>
         </message>
         <message>
-            <source>{}。清单：{}。请修正该条记录，或删除该清单文件让软件重建（输出文件不受影响）</source><translation>{}. List: {}. Correct this entry, or delete this list and let the app rebuild it (the saved files are not affected)</translation>
+            <source>{}。清单：{}。请修正该条记录，或删除该清单文件让软件重建（输出文件不受影响）</source>
+            <translation>{}. List: {}. Correct this entry, or delete this list and let the app rebuild it (the saved files are not affected)</translation>
         </message>
         <message>
             <source>历史清单里没有这条记录：{}。请刷新列表后再试一次</source>
             <translation>The history list has no such record: {}. Refresh the list and try again.</translation>
         </message>
         <message>
-            <source>无法打开历史清单：{}。请检查该文件是否被其他程序占用，或删除该文件让软件重建。</source><translation>The history list can't be opened: {}. Check whether another program holds this file, or delete it and let the app rebuild it.</translation>
+            <source>无法打开历史清单：{}。请检查该文件是否被其他程序占用，或删除该文件让软件重建。</source>
+            <translation>The history list can't be opened: {}. Check whether another program holds this file, or delete it and let the app rebuild it.</translation>
         </message>
         <message>
-            <source>历史清单格式无效：{}。可删除该文件让软件重建（输出文件不受影响），或按 {{"entries": [...]}} 的结构修复</source><translation>The history list is malformed: {}. Delete this file and let the app rebuild it (the saved files are not touched), or fix it into the shape {{"entries": [...]}}.</translation>
+            <source>历史清单格式无效：{}。可删除该文件让软件重建（输出文件不受影响），或按 {{"entries": [...]}} 的结构修复</source>
+            <translation>The history list is malformed: {}. Delete this file and let the app rebuild it (the saved files are not touched), or fix it into the shape {{"entries": [...]}}.</translation>
         </message>
         <message>
             <source>历史清单第 {} 条缺 path、kind 或 moment</source>
@@ -1202,7 +1380,8 @@
             <translation>This capture is empty, so there is nothing to keep in history. Take it again</translation>
         </message>
         <message>
-            <source>无法写入「{}」。请检查该目录是否可写，或关闭「保留未保存的截图」选项。</source><translation>"{}" could not be written. Check that the folder is writable, or turn off "Keep unsaved screenshots in history"</translation>
+            <source>无法写入「{}」。请检查该目录是否可写，或关闭「保留未保存的截图」选项。</source>
+            <translation>"{}" could not be written. Check that the folder is writable, or turn off "Keep unsaved screenshots in history"</translation>
         </message>
         <message>
             <source>组合键的按键部分不能是修饰键本身：请在 Ctrl、Alt、Shift、Win 之外再选一个字母、数字、空格或 F1-F24</source>
@@ -1229,7 +1408,8 @@
             <translation>Key 0x{:X} can't be used as a global hotkey. Use a letter, a digit, Space or one of F1-F24.</translation>
         </message>
         <message>
-            <source>全局热键至少要带一个修饰键：单键 {} 会拦截其他程序的普通按键。请加上 Ctrl 或 Alt</source><translation>A global hotkey needs at least one modifier: the single key {} would swallow other programs' ordinary keystrokes. Add Ctrl or Alt.</translation>
+            <source>全局热键至少要带一个修饰键：单键 {} 会拦截其他程序的普通按键。请加上 Ctrl 或 Alt</source>
+            <translation>A global hotkey needs at least one modifier: the single key {} would swallow other programs' ordinary keystrokes. Add Ctrl or Alt.</translation>
         </message>
         <message>
             <source>按键 0x{:X} 不能用作界面按键。请改用字母、数字、空格或 F1-F24 之一</source>
@@ -1240,7 +1420,8 @@
             <translation>The previous shortcut {} is still active; the new combination did not take effect</translation>
         </message>
         <message>
-            <source>旧的 {} 也无法恢复，该按键暂时不可用</source><translation>The previous shortcut {} could not be restored either; this shortcut will not work for now</translation>
+            <source>旧的 {} 也无法恢复，该按键暂时不可用</source>
+            <translation>The previous shortcut {} could not be restored either; this shortcut will not work for now</translation>
         </message>
         <message>
             <source>这张图是空的，没有可复制成文件的内容</source>
@@ -1413,6 +1594,34 @@
         <message>
             <source>二维码/条形码</source>
             <translation>QR code/barcode</translation>
+        </message>
+        <message>
+            <source>没有可打码的图。请先截图或打开一张图片</source>
+            <translation>There is no image to redact. Capture or open an image first</translation>
+        </message>
+        <message>
+            <source>没有可打码的框</source>
+            <translation>There are no boxes to redact</translation>
+        </message>
+        <message>
+            <source>画布逻辑尺寸为空，无法换算打码框</source>
+            <translation>The canvas logical size is empty; redaction boxes cannot be mapped</translation>
+        </message>
+        <message>
+            <source>只支持马赛克或高斯模糊两种打码方式</source>
+            <translation>Only mosaic or Gaussian blur redaction is supported</translation>
+        </message>
+        <message>
+            <source>马赛克粒度必须大于 0</source>
+            <translation>The mosaic block size must be greater than 0</translation>
+        </message>
+        <message>
+            <source>所有打码框都在画布之外，未改动图片</source>
+            <translation>All redaction boxes are outside the canvas; the image was not changed</translation>
+        </message>
+        <message>
+            <source>自动打码没有产出图像，请重试</source>
+            <translation>Auto-redaction produced no image; try again</translation>
         </message>
         <message>
             <source>光标高亮的缩放因子必须是正数，收到的是 {}。请传这一块屏幕的 devicePixelRatio</source>
@@ -1691,17 +1900,132 @@
             <translation>A template named “{}” already exists</translation>
         </message>
         <message>
-            <source>自定义模板最多 30 套，请先删除部分模板</source><translation>You can keep at most 30 custom templates; delete a few first</translation>
+            <source>自定义模板最多 30 套，请先删除部分模板</source>
+            <translation>You can keep at most 30 custom templates; delete a few first</translation>
         </message>
         <message>
-            <source>模板太多，设置里存不下：请先删除部分模板</source><translation>There are too many templates to store in the settings; delete a few first</translation>
+            <source>模板太多，设置里存不下：请先删除部分模板</source>
+            <translation>There are too many templates to store in the settings; delete a few first</translation>
         </message>
         <message>
             <source>内置模板不能删除</source>
             <translation>Built-in templates cannot be deleted</translation>
         </message>
         <message>
-            <source>未找到该模板，可能已被删除。</source><translation>That template could not be found; it may have been deleted</translation>
+            <source>未找到该模板，可能已被删除。</source>
+            <translation>That template could not be found; it may have been deleted</translation>
+        </message>
+        <message>
+            <source>点击</source>
+            <translation>Click</translation>
+        </message>
+        <message>
+            <source>切换窗口</source>
+            <translation>Switch window</translation>
+        </message>
+        <message>
+            <source>窗口：%1</source>
+            <translation>Window: %1</translation>
+        </message>
+        <message>
+            <source>第 %1 步截图</source>
+            <translation>Screenshot for step %1</translation>
+        </message>
+        <message>
+            <source>这一张没截到：%1</source>
+            <translation>This screenshot was not captured: %1</translation>
+        </message>
+        <message>
+            <source>这一张没截到</source>
+            <translation>This screenshot was not captured</translation>
+        </message>
+        <message>
+            <source>GyanisScribe 步骤教程</source>
+            <translation>GyanisScribe step tutorial</translation>
+        </message>
+        <message>
+            <source>未知时间</source>
+            <translation>Unknown time</translation>
+        </message>
+        <message>
+            <source>生成于 %1 · 共 %2 步</source>
+            <translation>Generated %1 · %2 steps</translation>
+        </message>
+        <message>
+            <source>还没有步骤可以导出</source>
+            <translation>There are no steps to export yet</translation>
+        </message>
+        <message>
+            <source>步骤教程没有生成内容，请重试</source>
+            <translation>The step tutorial produced no content; try again</translation>
+        </message>
+        <message>
+            <source>步骤教程写不出去：{}（{}）。请换一个可写的目录后重试</source>
+            <translation>The step tutorial could not be written: {} ({}). Choose a writable directory and try again</translation>
+        </message>
+        <message>
+            <source>步骤教程未保存：{}（{}）。请检查磁盘空间后重试</source>
+            <translation>The step tutorial was not saved: {} ({}). Check disk space and try again</translation>
+        </message>
+        <message>
+            <source>步骤截图删不掉，留在临时目录里：{}（{}）</source>
+            <translation>A step screenshot could not be deleted and remains in the temporary directory: {} ({})</translation>
+        </message>
+        <message>
+            <source>步骤序号 {} 越界，当前只有 {} 步</source>
+            <translation>Step number {} is out of range; only {} steps exist</translation>
+        </message>
+        <message>
+            <source>步骤临时目录为空。请先准备可写的临时目录再开始记录</source>
+            <translation>The step temporary directory is empty. Prepare a writable temporary directory before recording</translation>
+        </message>
+        <message>
+            <source>无法创建步骤临时目录 {}（{}）。请检查目录权限后重试</source>
+            <translation>The step temporary directory could not be created: {} ({}). Check directory permissions and try again</translation>
+        </message>
+        <message>
+            <source>已经记满 {} 步，先导出或放弃这次记录</source>
+            <translation>All {} steps have been recorded; export or discard this recording first</translation>
+        </message>
+        <message>
+            <source>还没有建立步骤临时目录，截图无处可写。请先开始记录再抓屏</source>
+            <translation>No step temporary directory exists, so the screenshot has nowhere to be written. Start recording before capturing</translation>
+        </message>
+        <message>
+            <source>这一张截图是空的，无法保存。请重试抓屏</source>
+            <translation>This screenshot is empty and cannot be saved. Capture again</translation>
+        </message>
+        <message>
+            <source>截图写入失败：%1。请检查临时目录权限与磁盘空间</source>
+            <translation>The screenshot could not be written: %1. Check the temporary directory permissions and free disk space</translation>
+        </message>
+        <message>
+            <source>控件</source>
+            <translation>Control</translation>
+        </message>
+        <message>
+            <source>点击（%1, %2）</source>
+            <translation>Click (%1, %2)</translation>
+        </message>
+        <message>
+            <source>点击「%1」（%2）</source>
+            <translation>Click "%1" (%2)</translation>
+        </message>
+        <message>
+            <source>右键%1</source>
+            <translation>Right-click %1</translation>
+        </message>
+        <message>
+            <source>切换到「%1」</source>
+            <translation>Switch to "%1"</translation>
+        </message>
+        <message>
+            <source>切换窗口（%1）</source>
+            <translation>Switch window (%1)</translation>
+        </message>
+        <message>
+            <source>手动补充</source>
+            <translation>Added manually</translation>
         </message>
         <message>
             <source>颜色</source>
@@ -1828,8 +2152,16 @@
             <translation>Privacy redaction</translation>
         </message>
         <message>
+            <source>Bug 报告</source>
+            <translation>Bug report</translation>
+        </message>
+        <message>
             <source>美化分享（背景、圆角、投影、水印）</source>
             <translation>Beautify and share (background, rounded corners, shadow, watermark)</translation>
+        </message>
+        <message>
+            <source>Bug 报告（本机生成，自动打码，不上传）</source>
+            <translation>Bug report (local only, auto-redacted, never uploaded)</translation>
         </message>
         <message>
             <source>关闭标注</source>
@@ -2112,8 +2444,228 @@
             <translation>Unknown screen</translation>
         </message>
         <message>
-            <source>未知时间</source>
-            <translation>Unknown time</translation>
+            <source>未检出可打码的敏感信息。请自行检查。</source>
+            <translation>No redactable sensitive information detected. Check before sending.</translation>
+        </message>
+        <message>
+            <source>自动打码不可用：%1。本次不会保存截图，报告只含文字。</source>
+            <translation>Auto-redaction unavailable: %1. No screenshot will be saved; the report will contain text only.</translation>
+        </message>
+        <message>
+            <source>正在检查敏感信息，请稍候再复制</source>
+            <translation>Checking for sensitive information; wait before copying</translation>
+        </message>
+        <message>
+            <source>已复制报告文字到剪贴板</source>
+            <translation>Report text copied to the clipboard</translation>
+        </message>
+        <message>
+            <source>正在检查敏感信息，请稍候再保存</source>
+            <translation>Checking for sensitive information; wait before saving</translation>
+        </message>
+        <message>
+            <source>同名图片已存在：%1。请换一个名字后重试</source>
+            <translation>A screenshot with the same name already exists: %1. Choose another name and try again.</translation>
+        </message>
+        <message>
+            <source>「{}」无法写入。请检查该目录是否可写。</source>
+            <translation>Cannot write "{}". Check that the folder is writable.</translation>
+        </message>
+        <message>
+            <source>已保存报告与截图：%1</source>
+            <translation>Report and screenshot saved to %1</translation>
+        </message>
+        <message>
+            <source>已保存报告文字（未包含截图）：%1</source>
+            <translation>Report text saved without a screenshot: %1</translation>
+        </message>
+        <message>
+            <source>只在本机生成，不会上传；自动打码只处理识别到的敏感信息，发送前请自行检查。</source>
+            <translation>Generated locally and never uploaded. Auto-redaction only covers detected sensitive information; check before sending.</translation>
+        </message>
+        <message>
+            <source>Bug 报告说明</source>
+            <translation>Bug report notice</translation>
+        </message>
+        <message>
+            <source>截图预览</source>
+            <translation>Screenshot preview</translation>
+        </message>
+        <message>
+            <source>此处显示将随报告保存的截图副本；自动打码直接改在这张副本上。</source>
+            <translation>Shows the screenshot copy that will be saved with the report; auto-redaction works on this copy.</translation>
+        </message>
+        <message>
+            <source>打码状态</source>
+            <translation>Redaction status</translation>
+        </message>
+        <message>
+            <source>报告标题</source>
+            <translation>Report title</translation>
+        </message>
+        <message>
+            <source>一句话概括问题</source>
+            <translation>Summarize the problem in one line</translation>
+        </message>
+        <message>
+            <source>标题</source>
+            <translation>Title</translation>
+        </message>
+        <message>
+            <source>复现步骤</source>
+            <translation>Steps to reproduce</translation>
+        </message>
+        <message>
+            <source>按顺序写清每一步操作</source>
+            <translation>Describe each step in order</translation>
+        </message>
+        <message>
+            <source>期望结果</source>
+            <translation>Expected result</translation>
+        </message>
+        <message>
+            <source>原本应该发生什么</source>
+            <translation>What should have happened</translation>
+        </message>
+        <message>
+            <source>实际结果</source>
+            <translation>Actual result</translation>
+        </message>
+        <message>
+            <source>实际发生了什么</source>
+            <translation>What actually happened</translation>
+        </message>
+        <message>
+            <source>补充说明</source>
+            <translation>Additional notes</translation>
+        </message>
+        <message>
+            <source>可选：出现频率、影响范围等</source>
+            <translation>Optional: frequency, scope, and so on</translation>
+        </message>
+        <message>
+            <source>包含内容</source>
+            <translation>Included content</translation>
+        </message>
+        <message>
+            <source>包含系统与环境信息</source>
+            <translation>Include system and environment information</translation>
+        </message>
+        <message>
+            <source>报告里是否带上系统、Qt、屏幕与截图尺寸；关闭后这一段整段省略。</source>
+            <translation>Whether the report includes the system, Qt, screen, and capture size; when off, this section is omitted entirely.</translation>
+        </message>
+        <message>
+            <source>包含前台窗口信息</source>
+            <translation>Include the foreground window</translation>
+        </message>
+        <message>
+            <source>报告里是否带上截图时的前台窗口标题与进程名；截图本身可能暴露它们。</source>
+            <translation>Whether the report includes the foreground window title and process name at capture time; the screenshot itself may reveal them.</translation>
+        </message>
+        <message>
+            <source>报告预览（Markdown）</source>
+            <translation>Report preview (Markdown)</translation>
+        </message>
+        <message>
+            <source>报告预览</source>
+            <translation>Report preview</translation>
+        </message>
+        <message>
+            <source>调整打码…</source>
+            <translation>Adjust redactions…</translation>
+        </message>
+        <message>
+            <source>调整打码</source>
+            <translation>Adjust redactions</translation>
+        </message>
+        <message>
+            <source>重新勾选要打码的命中项，或改用高斯模糊；确认后报告随之更新。</source>
+            <translation>Reselect the detected items to redact, or switch to Gaussian blur; the report updates after you confirm.</translation>
+        </message>
+        <message>
+            <source>复制报告</source>
+            <translation>Copy report</translation>
+        </message>
+        <message>
+            <source>把报告文字复制到剪贴板；只含文字，不含截图。</source>
+            <translation>Copy the report text to the clipboard; text only, no screenshot.</translation>
+        </message>
+        <message>
+            <source>保存报告…</source>
+            <translation>Save report…</translation>
+        </message>
+        <message>
+            <source>保存报告</source>
+            <translation>Save report</translation>
+        </message>
+        <message>
+            <source>把报告保存为 Markdown；自动打码可用时会在同目录另存一张 PNG 截图。</source>
+            <translation>Save the report as Markdown; when auto-redaction is available, a PNG screenshot is saved alongside it.</translation>
+        </message>
+        <message>
+            <source>关闭</source>
+            <translation>Close</translation>
+        </message>
+        <message>
+            <source>关闭报告</source>
+            <translation>Close report</translation>
+        </message>
+        <message>
+            <source>关闭报告对话框；未保存的内容不会保留。</source>
+            <translation>Close the report dialog; unsaved content is discarded.</translation>
+        </message>
+        <message>
+            <source>操作状态</source>
+            <translation>Status</translation>
+        </message>
+        <message>
+            <source>保存 Bug 报告</source>
+            <translation>Save bug report</translation>
+        </message>
+        <message>
+            <source>Markdown 文件 (*.md)</source>
+            <translation>Markdown files (*.md)</translation>
+        </message>
+        <message>
+            <source>操作失败原因</source>
+            <translation>Failure reason</translation>
+        </message>
+        <message>
+            <source>已自动打码 %1 处敏感信息（%2）；请自行检查。</source>
+            <translation>Redacted %1 sensitive item(s) with %2; check before sending.</translation>
+        </message>
+        <message>
+            <source>未知</source>
+            <translation>Unknown</translation>
+        </message>
+        <message>
+            <source>元素</source>
+            <translation>Element</translation>
+        </message>
+        <message>
+            <source>类型</source>
+            <translation>Type</translation>
+        </message>
+        <message>
+            <source>进程</source>
+            <translation>Process</translation>
+        </message>
+        <message>
+            <source>区域</source>
+            <translation>Region</translation>
+        </message>
+        <message>
+            <source>没认出元素，可拖动框选</source>
+            <translation>No element recognised; drag to frame a region</translation>
+        </message>
+        <message>
+            <source>元素拾取：悬停选元素，, / . 换层级，点击选中，拖动框选，Esc 取消</source>
+            <translation>Element picking: hover to pick an element, , / . to change level, click to select, drag to frame, Esc to cancel</translation>
+        </message>
+        <message>
+            <source>整扇窗口</source>
+            <translation>Whole window</translation>
         </message>
         <message>
             <source>（锁定 %1）</source>
@@ -2136,6 +2688,10 @@
             <translation>Drag the edges to adjust · Enter/double-click to confirm · Esc to cancel</translation>
         </message>
         <message>
+            <source>已复制元素信息</source>
+            <translation>Copied element info</translation>
+        </message>
+        <message>
             <source>已复制尺寸 %1</source>
             <translation>Copied size %1</translation>
         </message>
@@ -2150,6 +2706,10 @@
         <message>
             <source>没有可复用的上次选区，请先完成一次框选截图或改用区域截图</source>
             <translation>No previous region to reuse yet: drag out one capture first, or use region capture.</translation>
+        </message>
+        <message>
+            <source>这台平台不支持界面元素拾取：可直接框选目标区域</source>
+            <translation>This platform does not support UI element picking; frame the target region directly instead</translation>
         </message>
         <message>
             <source>屏幕布局已经变了，回溯画面无法继续使用；请重新开启回溯缓冲</source>
@@ -2678,10 +3238,6 @@
         <message>
             <source>导出 JSON</source>
             <translation>Export JSON</translation>
-        </message>
-        <message>
-            <source>关闭</source>
-            <translation>Close</translation>
         </message>
         <message>
             <source>识别语言</source>
@@ -3552,10 +4108,6 @@
             <translation>Close the beautify dialog and return to the annotation; anything already copied or saved is unaffected</translation>
         </message>
         <message>
-            <source>操作状态</source>
-            <translation>Status</translation>
-        </message>
-        <message>
             <source>此处显示复制、保存与模板操作的结果及失败原因。</source>
             <translation>Shows the results and failure reasons for copy, save and template actions</translation>
         </message>
@@ -3592,12 +4144,188 @@
             <translation>Could not remember the template choice: {}</translation>
         </message>
         <message>
-            <source>操作失败原因</source>
-            <translation>Failure reason</translation>
+            <source>步骤记录说明</source>
+            <translation>About step recording</translation>
+        </message>
+        <message>
+            <source>开始记录</source>
+            <translation>Start recording</translation>
+        </message>
+        <message>
+            <source>开始记录后，智录会记录每次点击的坐标、前台窗口的标题与所属进程，并逐步截取整屏画面。所有内容只保存在本机，不会上传；录制期间可以随时暂停或停止。</source>
+            <translation>Once recording starts, GyanisScribe records the coordinates of every click, the title and process of the foreground window, and a full-screen screenshot for each step. Everything stays on this computer and is never uploaded; you can pause or stop at any time while recording.</translation>
+        </message>
+        <message>
+            <source>导出路径为空，无法写入 PDF。请选择保存位置后重试</source>
+            <translation>The export path is empty, so the PDF cannot be written. Choose a save location and try again</translation>
+        </message>
+        <message>
+            <source>无法覆盖已有文件 {}（{}）。请关闭占用它的程序或换一个文件名后重试</source>
+            <translation>The existing file {} could not be overwritten ({}). Close the program using it or choose another file name and try again</translation>
+        </message>
+        <message>
+            <source>步骤 PDF 未写出：{}。请检查磁盘空间与目录权限后重试</source>
+            <translation>The step PDF was not written: {}. Check disk space and directory permissions and try again</translation>
+        </message>
+        <message>
+            <source>步骤记录控制条</source>
+            <translation>Step recording bar</translation>
+        </message>
+        <message>
+            <source>已记录步数</source>
+            <translation>Steps recorded</translation>
+        </message>
+        <message>
+            <source>暂停或继续步骤记录</source>
+            <translation>Pause or resume step recording</translation>
+        </message>
+        <message>
+            <source>停止步骤记录</source>
+            <translation>Stop step recording</translation>
+        </message>
+        <message>
+            <source>结束录制并生成步骤列表。</source>
+            <translation>Finish recording and generate the step list.</translation>
+        </message>
+        <message>
+            <source>步骤记录 · %1</source>
+            <translation>Step recording · %1</translation>
+        </message>
+        <message>
+            <source>继续记录新的点击与窗口切换。</source>
+            <translation>Resume recording new clicks and window switches.</translation>
+        </message>
+        <message>
+            <source>暂停后不再记录新的点击与窗口切换。</source>
+            <translation>While paused, new clicks and window switches are not recorded.</translation>
+        </message>
+        <message>
+            <source>%1. %2</source>
+            <translation>%1. %2</translation>
+        </message>
+        <message>
+            <source>%1. %2 · %3</source>
+            <translation>%1. %2 · %3</translation>
+        </message>
+        <message>
+            <source>核对每一步的说明；可以补一步、调序或删除，确认后导出教程。</source>
+            <translation>Review the description of each step; you can add a step, reorder or delete steps, then export the tutorial when everything looks right.</translation>
+        </message>
+        <message>
+            <source>步骤列表</source>
+            <translation>Step list</translation>
+        </message>
+        <message>
+            <source>步骤说明</source>
+            <translation>Step description</translation>
+        </message>
+        <message>
+            <source>用一句话说明这一步做了什么</source>
+            <translation>Describe what this step does in one sentence</translation>
+        </message>
+        <message>
+            <source>删除当前步骤；后面的序号会自动跟上。</source>
+            <translation>Delete the current step; later numbers move up automatically.</translation>
+        </message>
+        <message>
+            <source>上移</source>
+            <translation>Move up</translation>
+        </message>
+        <message>
+            <source>下移</source>
+            <translation>Move down</translation>
+        </message>
+        <message>
+            <source>补充一步</source>
+            <translation>Add step</translation>
+        </message>
+        <message>
+            <source>立即抓一张整屏画面，作为新的一步追加到末尾。</source>
+            <translation>Capture a full-screen image now and append it as a new step at the end.</translation>
+        </message>
+        <message>
+            <source>导出 HTML…</source>
+            <translation>Export HTML…</translation>
+        </message>
+        <message>
+            <source>把步骤与截图写成单个 HTML 文件，图片内嵌其中。</source>
+            <translation>Write the steps and screenshots to a single HTML file with the images embedded.</translation>
+        </message>
+        <message>
+            <source>导出 PDF…</source>
+            <translation>Export PDF…</translation>
+        </message>
+        <message>
+            <source>把步骤与截图写成 A4 版式的 PDF。</source>
+            <translation>Write the steps and screenshots to an A4 PDF.</translation>
+        </message>
+        <message>
+            <source>步骤状态</source>
+            <translation>Step status</translation>
+        </message>
+        <message>
+            <source>放弃记录</source>
+            <translation>Discard recording</translation>
+        </message>
+        <message>
+            <source>删除本次记录与全部临时截图。</source>
+            <translation>Delete this recording and all temporary screenshots.</translation>
+        </message>
+        <message>
+            <source>已删除一步</source>
+            <translation>Deleted one step</translation>
+        </message>
+        <message>
+            <source>无法补充步骤：没有可用的抓屏回调</source>
+            <translation>Cannot add a step: no screen capture callback is available</translation>
+        </message>
+        <message>
+            <source>没有抓到画面，无法补充这一步</source>
+            <translation>Nothing was captured, so this step cannot be added</translation>
+        </message>
+        <message>
+            <source>已补充第 %1 步</source>
+            <translation>Added step %1</translation>
+        </message>
+        <message>
+            <source>已导出 HTML：%1</source>
+            <translation>HTML exported: %1</translation>
+        </message>
+        <message>
+            <source>已导出 PDF：%1</source>
+            <translation>PDF exported: %1</translation>
+        </message>
+        <message>
+            <source>导出 HTML 教程</source>
+            <translation>Export HTML tutorial</translation>
+        </message>
+        <message>
+            <source>HTML 文件 (*.html)</source>
+            <translation>HTML files (*.html)</translation>
+        </message>
+        <message>
+            <source>导出 PDF 教程</source>
+            <translation>Export PDF tutorial</translation>
+        </message>
+        <message>
+            <source>PDF 文件 (*.pdf)</source>
+            <translation>PDF files (*.pdf)</translation>
+        </message>
+        <message>
+            <source>放弃步骤记录</source>
+            <translation>Discard step recording</translation>
+        </message>
+        <message>
+            <source>确定放弃这次记录的 %1 步吗？临时截图会被删除，操作无法撤销。</source>
+            <translation>Discard the %1 steps in this recording? The temporary screenshots will be deleted and this cannot be undone.</translation>
         </message>
         <message>
             <source>主题取值 "{}" 不在可用档位里：请在设置的主题页从 Light、Dark、System、HighContrast 四项里选一项，手写配置文件时只能是这四个词（区分大小写）</source>
             <translation>Theme value "{}" is not one of the available options: pick Light, Dark, System, or HighContrast on the Theme page in Settings, or write exactly one of those four words (case-sensitive) when editing the config file by hand</translation>
+        </message>
+        <message>
+            <source>先结束当前截图/录屏/回溯</source>
+            <translation>Finish the current screenshot, screen recording or Rewind first</translation>
         </message>
         <message>
             <source>无法打开该文件：文件可能已被移动或删除。请刷新记忆库后重试</source>
@@ -3610,6 +4338,10 @@
         <message>
             <source>贴图已移至{}，已暂时收起；按 {} 或从托盘切换到该分组即可显示</source>
             <translation>Moved this pin to {}; it is tucked away for now. Press {} (or use the tray) to switch to that group</translation>
+        </message>
+        <message>
+            <source>先停止步骤记录或处理完审核窗</source>
+            <translation>Stop step recording or finish the review window first</translation>
         </message>
         <message>
             <source>以下全局快捷键注册失败：</source>
@@ -4512,6 +5244,154 @@
             <translation>GyanisScribe hit an unhandled error: {}. What could be saved went to the log and a crash dump; look for the newest log in {} (a .dmp next to it is the dump). If it keeps happening, send the log, the dump and the steps you took</translation>
         </message>
         <message>
+            <source>这台平台还不能列出光标下的界面元素</source>
+            <translation>This platform cannot list the UI element under the cursor yet</translation>
+        </message>
+        <message>
+            <source>这台平台还不能描述光标下的界面元素</source>
+            <translation>This platform cannot describe the UI element under the cursor yet</translation>
+        </message>
+        <message>
+            <source>这台平台还不能记录操作步骤：请用 Windows 版再试</source>
+            <translation>This platform cannot record steps yet; use the Windows version</translation>
+        </message>
+        <message>
+            <source>按钮</source>
+            <translation>Button</translation>
+        </message>
+        <message>
+            <source>日历</source>
+            <translation>Calendar</translation>
+        </message>
+        <message>
+            <source>复选框</source>
+            <translation>Check box</translation>
+        </message>
+        <message>
+            <source>下拉框</source>
+            <translation>Combo box</translation>
+        </message>
+        <message>
+            <source>编辑框</source>
+            <translation>Edit box</translation>
+        </message>
+        <message>
+            <source>链接</source>
+            <translation>Link</translation>
+        </message>
+        <message>
+            <source>图片</source>
+            <translation>Image</translation>
+        </message>
+        <message>
+            <source>列表项</source>
+            <translation>List item</translation>
+        </message>
+        <message>
+            <source>列表</source>
+            <translation>List</translation>
+        </message>
+        <message>
+            <source>菜单</source>
+            <translation>Menu</translation>
+        </message>
+        <message>
+            <source>菜单栏</source>
+            <translation>Menu bar</translation>
+        </message>
+        <message>
+            <source>菜单项</source>
+            <translation>Menu item</translation>
+        </message>
+        <message>
+            <source>进度条</source>
+            <translation>Progress bar</translation>
+        </message>
+        <message>
+            <source>单选框</source>
+            <translation>Radio button</translation>
+        </message>
+        <message>
+            <source>滚动条</source>
+            <translation>Scroll bar</translation>
+        </message>
+        <message>
+            <source>滑块</source>
+            <translation>Slider</translation>
+        </message>
+        <message>
+            <source>微调框</source>
+            <translation>Spinner</translation>
+        </message>
+        <message>
+            <source>状态栏</source>
+            <translation>Status bar</translation>
+        </message>
+        <message>
+            <source>标签页</source>
+            <translation>Tab</translation>
+        </message>
+        <message>
+            <source>标签项</source>
+            <translation>Tab item</translation>
+        </message>
+        <message>
+            <source>文本</source>
+            <translation>Text</translation>
+        </message>
+        <message>
+            <source>工具栏</source>
+            <translation>Toolbar</translation>
+        </message>
+        <message>
+            <source>树</source>
+            <translation>Tree</translation>
+        </message>
+        <message>
+            <source>树项</source>
+            <translation>Tree item</translation>
+        </message>
+        <message>
+            <source>缩略图</source>
+            <translation>Thumbnail</translation>
+        </message>
+        <message>
+            <source>表格</source>
+            <translation>Table</translation>
+        </message>
+        <message>
+            <source>表格项</source>
+            <translation>Table item</translation>
+        </message>
+        <message>
+            <source>文档</source>
+            <translation>Document</translation>
+        </message>
+        <message>
+            <source>拆分按钮</source>
+            <translation>Split button</translation>
+        </message>
+        <message>
+            <source>面板</source>
+            <translation>Pane</translation>
+        </message>
+        <message>
+            <source>表头</source>
+            <translation>Header</translation>
+        </message>
+        <message>
+            <source>表头项</source>
+            <translation>Header item</translation>
+        </message>
+        <message>
+            <source>标题栏</source>
+            <translation>Title bar</translation>
+        </message>
+        <message>
+            <source>分隔线</source>
+            <translation>Separator</translation>
+        </message>
+        <message>
             <source>本平台没有全局热键能力：登记不会生效。请在程序窗口内使用普通快捷键，或等平台适配后再开启此项</source>
             <translation>This platform has no global hotkey support: registering won't take effect. Use ordinary shortcuts inside the program window, or enable this once the platform is adapted.</translation>
         </message>
@@ -4544,14 +5424,6 @@
             <translation>Modifiers alone can't be a global hotkey: mask 0x{:X}. Use only combinations of Ctrl, Alt, Shift and Win.</translation>
         </message>
         <message>
-            <source>当前没有可截取的前台窗口（可能已锁屏，或焦点位于桌面）。请先激活要截取的窗口，再使用此功能。</source>
-            <translation>No foreground window is available to capture (the screen may be locked or focus may be on the desktop). Activate the target window and try again.</translation>
-        </message>
-        <message>
-            <source>无法识别桌面上的窗口：平台的屏幕清单与界面的屏幕清单不一致。请先使用整屏或框选截图，并重新启动智录后重试。</source>
-            <translation>Can't tell which windows are on the desktop: the platform's screen list and the interface's screen list didn't pair up. Use full-screen or region capture for now, then restart GyanisScribe</translation>
-        </message>
-        <message>
             <source>认不出光标下的界面元素：平台的屏幕清单与界面的屏幕清单配不上对。可以继续直接框住要截的那一块</source>
             <translation>Can't detect the UI element under the cursor: the platform's screen list and the interface's screen list didn't pair up. You can still frame the part you want directly</translation>
         </message>
@@ -4560,8 +5432,20 @@
             <translation>This cursor position doesn't fall on any screen (most likely a stale coordinate after unplugging a display or changing resolution). Move the mouse and try again</translation>
         </message>
         <message>
+            <source>当前没有可截取的前台窗口（可能已锁屏，或焦点位于桌面）。请先激活要截取的窗口，再使用此功能。</source>
+            <translation>No foreground window is available to capture (the screen may be locked or focus may be on the desktop). Activate the target window and try again.</translation>
+        </message>
+        <message>
+            <source>无法识别桌面上的窗口：平台的屏幕清单与界面的屏幕清单不一致。请先使用整屏或框选截图，并重新启动智录后重试。</source>
+            <translation>Can't tell which windows are on the desktop: the platform's screen list and the interface's screen list didn't pair up. Use full-screen or region capture for now, then restart GyanisScribe</translation>
+        </message>
+        <message>
             <source>系统的 UI Automation 无法启动，不能识别界面元素。可继续使用悬停识别整个窗口，或直接框选目标区域。</source>
             <translation>The system's UI Automation failed to start, so UI elements can't be detected. Hovering can still recognise whole windows, or frame the part you want directly</translation>
+        </message>
+        <message>
+            <source>系统的 UI Automation 无法启动，不能列出光标下的界面元素。可继续使用悬停识别整个窗口，或直接框选目标区域。</source>
+            <translation>The system's UI Automation could not start, so UI elements under the cursor cannot be listed. Hovering can still recognise whole windows, or frame the target region directly</translation>
         </message>
         <message>
             <source>无法获取本程序的完整路径，不能写入开机启动项。请从安装目录启动本程序后重试。</source>
@@ -4574,6 +5458,14 @@
         <message>
             <source>开启</source>
             <translation>enable</translation>
+        </message>
+        <message>
+            <source>本进程已经在记录操作步骤：请先停止上一次记录，再开始新的记录</source>
+            <translation>This process is already recording steps; stop the previous recording before starting a new one</translation>
+        </message>
+        <message>
+            <source>系统没让装上全局输入监听：请检查安全软件或换一个桌面会话再试</source>
+            <translation>The system did not allow the global input hook to be installed. Check security software or try another desktop session</translation>
         </message>
         <message>
             <source>本档没带二维码/条形码识别后端。请用随包发布的安装版，或让构建依赖里带上 zxing-cpp</source>
@@ -4798,882 +5690,6 @@
         <message>
             <source>音频采集进程无法启动。设备可能正被其他程序占用；请关闭占用程序后重试，或在设置中关闭音频采集。</source>
             <translation>The audio capture process could not start. The device may be in use by another program; close it and retry, or disable audio capture in Settings.</translation>
-        </message>
-        <message>
-            <source>先导出或放弃这次记录</source>
-            <translation>Export or discard this recording first</translation>
-        </message>
-        <message>
-            <source>当前平台不支持记录操作步骤，无法开始录制</source>
-            <translation>This platform cannot record steps, so recording cannot start</translation>
-        </message>
-        <message>
-            <source>无法创建步骤事件源，请重启程序后重试</source>
-            <translation>The step event source could not be created. Restart the app and try again</translation>
-        </message>
-        <message>
-            <source>这次没有记录到步骤</source>
-            <translation>No steps were recorded this time</translation>
-        </message>
-        <message>
-            <source>步骤截图写不进临时目录，已停止本次记录：%1</source>
-            <translation>Step screenshots cannot be written to the temporary directory, so this recording has stopped: %1</translation>
-        </message>
-        <message>
-            <source>已经记满 %1 步，先导出或放弃这次记录</source>
-            <translation>All %1 steps have been recorded; export or discard this recording first</translation>
-        </message>
-        <message>
-            <source>步骤记录</source>
-            <translation>Step recording</translation>
-        </message>
-        <message>
-            <source>点击</source>
-            <translation>Click</translation>
-        </message>
-        <message>
-            <source>切换窗口</source>
-            <translation>Switch window</translation>
-        </message>
-        <message>
-            <source>窗口：%1</source>
-            <translation>Window: %1</translation>
-        </message>
-        <message>
-            <source>第 %1 步截图</source>
-            <translation>Screenshot for step %1</translation>
-        </message>
-        <message>
-            <source>这一张没截到：%1</source>
-            <translation>This screenshot was not captured: %1</translation>
-        </message>
-        <message>
-            <source>这一张没截到</source>
-            <translation>This screenshot was not captured</translation>
-        </message>
-        <message>
-            <source>GyanisScribe 步骤教程</source>
-            <translation>GyanisScribe step tutorial</translation>
-        </message>
-        <message>
-            <source>生成于 %1 · 共 %2 步</source>
-            <translation>Generated %1 · %2 steps</translation>
-        </message>
-        <message>
-            <source>还没有步骤可以导出</source>
-            <translation>There are no steps to export yet</translation>
-        </message>
-        <message>
-            <source>步骤教程没有生成内容，请重试</source>
-            <translation>The step tutorial produced no content; try again</translation>
-        </message>
-        <message>
-            <source>步骤教程写不出去：{}（{}）。请换一个可写的目录后重试</source>
-            <translation>The step tutorial could not be written: {} ({}). Choose a writable directory and try again</translation>
-        </message>
-        <message>
-            <source>步骤教程未保存：{}（{}）。请检查磁盘空间后重试</source>
-            <translation>The step tutorial was not saved: {} ({}). Check disk space and try again</translation>
-        </message>
-        <message>
-            <source>步骤截图删不掉，留在临时目录里：{}（{}）</source>
-            <translation>A step screenshot could not be deleted and remains in the temporary directory: {} ({})</translation>
-        </message>
-        <message>
-            <source>步骤序号 {} 越界，当前只有 {} 步</source>
-            <translation>Step number {} is out of range; only {} steps exist</translation>
-        </message>
-        <message>
-            <source>步骤临时目录为空。请先准备可写的临时目录再开始记录</source>
-            <translation>The step temporary directory is empty. Prepare a writable temporary directory before recording</translation>
-        </message>
-        <message>
-            <source>无法创建步骤临时目录 {}（{}）。请检查目录权限后重试</source>
-            <translation>The step temporary directory could not be created: {} ({}). Check directory permissions and try again</translation>
-        </message>
-        <message>
-            <source>已经记满 {} 步，先导出或放弃这次记录</source>
-            <translation>All {} steps have been recorded; export or discard this recording first</translation>
-        </message>
-        <message>
-            <source>还没有建立步骤临时目录，截图无处可写。请先开始记录再抓屏</source>
-            <translation>No step temporary directory exists, so the screenshot has nowhere to be written. Start recording before capturing</translation>
-        </message>
-        <message>
-            <source>这一张截图是空的，无法保存。请重试抓屏</source>
-            <translation>This screenshot is empty and cannot be saved. Capture again</translation>
-        </message>
-        <message>
-            <source>截图写入失败：%1。请检查临时目录权限与磁盘空间</source>
-            <translation>The screenshot could not be written: %1. Check the temporary directory permissions and free disk space</translation>
-        </message>
-        <message>
-            <source>控件</source>
-            <translation>Control</translation>
-        </message>
-        <message>
-            <source>点击（%1, %2）</source>
-            <translation>Click (%1, %2)</translation>
-        </message>
-        <message>
-            <source>点击「%1」（%2）</source>
-            <translation>Click "%1" (%2)</translation>
-        </message>
-        <message>
-            <source>右键%1</source>
-            <translation>Right-click %1</translation>
-        </message>
-        <message>
-            <source>切换到「%1」</source>
-            <translation>Switch to "%1"</translation>
-        </message>
-        <message>
-            <source>切换窗口（%1）</source>
-            <translation>Switch window (%1)</translation>
-        </message>
-        <message>
-            <source>手动补充</source>
-            <translation>Added manually</translation>
-        </message>
-        <message>
-            <source>步骤记录说明</source>
-            <translation>About step recording</translation>
-        </message>
-        <message>
-            <source>开始记录</source>
-            <translation>Start recording</translation>
-        </message>
-        <message>
-            <source>开始记录后，智录会记录每次点击的坐标、前台窗口的标题与所属进程，并逐步截取整屏画面。所有内容只保存在本机，不会上传；录制期间可以随时暂停或停止。</source>
-            <translation>Once recording starts, GyanisScribe records the coordinates of every click, the title and process of the foreground window, and a full-screen screenshot for each step. Everything stays on this computer and is never uploaded; you can pause or stop at any time while recording.</translation>
-        </message>
-        <message>
-            <source>导出路径为空，无法写入 PDF。请选择保存位置后重试</source>
-            <translation>The export path is empty, so the PDF cannot be written. Choose a save location and try again</translation>
-        </message>
-        <message>
-            <source>无法覆盖已有文件 {}（{}）。请关闭占用它的程序或换一个文件名后重试</source>
-            <translation>The existing file {} could not be overwritten ({}). Close the program using it or choose another file name and try again</translation>
-        </message>
-        <message>
-            <source>步骤 PDF 未写出：{}。请检查磁盘空间与目录权限后重试</source>
-            <translation>The step PDF was not written: {}. Check disk space and directory permissions and try again</translation>
-        </message>
-        <message>
-            <source>步骤记录控制条</source>
-            <translation>Step recording bar</translation>
-        </message>
-        <message>
-            <source>已记录步数</source>
-            <translation>Steps recorded</translation>
-        </message>
-        <message>
-            <source>暂停或继续步骤记录</source>
-            <translation>Pause or resume step recording</translation>
-        </message>
-        <message>
-            <source>停止步骤记录</source>
-            <translation>Stop step recording</translation>
-        </message>
-        <message>
-            <source>结束录制并生成步骤列表。</source>
-            <translation>Finish recording and generate the step list.</translation>
-        </message>
-        <message>
-            <source>步骤记录 · %1</source>
-            <translation>Step recording · %1</translation>
-        </message>
-        <message>
-            <source>继续记录新的点击与窗口切换。</source>
-            <translation>Resume recording new clicks and window switches.</translation>
-        </message>
-        <message>
-            <source>暂停后不再记录新的点击与窗口切换。</source>
-            <translation>While paused, new clicks and window switches are not recorded.</translation>
-        </message>
-        <message>
-            <source>%1. %2</source>
-            <translation>%1. %2</translation>
-        </message>
-        <message>
-            <source>%1. %2 · %3</source>
-            <translation>%1. %2 · %3</translation>
-        </message>
-        <message>
-            <source>核对每一步的说明；可以补一步、调序或删除，确认后导出教程。</source>
-            <translation>Review the description of each step; you can add a step, reorder or delete steps, then export the tutorial when everything looks right.</translation>
-        </message>
-        <message>
-            <source>步骤列表</source>
-            <translation>Step list</translation>
-        </message>
-        <message>
-            <source>步骤说明</source>
-            <translation>Step description</translation>
-        </message>
-        <message>
-            <source>用一句话说明这一步做了什么</source>
-            <translation>Describe what this step does in one sentence</translation>
-        </message>
-        <message>
-            <source>删除当前步骤；后面的序号会自动跟上。</source>
-            <translation>Delete the current step; later numbers move up automatically.</translation>
-        </message>
-        <message>
-            <source>上移</source>
-            <translation>Move up</translation>
-        </message>
-        <message>
-            <source>下移</source>
-            <translation>Move down</translation>
-        </message>
-        <message>
-            <source>补充一步</source>
-            <translation>Add step</translation>
-        </message>
-        <message>
-            <source>立即抓一张整屏画面，作为新的一步追加到末尾。</source>
-            <translation>Capture a full-screen image now and append it as a new step at the end.</translation>
-        </message>
-        <message>
-            <source>导出 HTML…</source>
-            <translation>Export HTML…</translation>
-        </message>
-        <message>
-            <source>把步骤与截图写成单个 HTML 文件，图片内嵌其中。</source>
-            <translation>Write the steps and screenshots to a single HTML file with the images embedded.</translation>
-        </message>
-        <message>
-            <source>导出 PDF…</source>
-            <translation>Export PDF…</translation>
-        </message>
-        <message>
-            <source>把步骤与截图写成 A4 版式的 PDF。</source>
-            <translation>Write the steps and screenshots to an A4 PDF.</translation>
-        </message>
-        <message>
-            <source>步骤状态</source>
-            <translation>Step status</translation>
-        </message>
-        <message>
-            <source>放弃记录</source>
-            <translation>Discard recording</translation>
-        </message>
-        <message>
-            <source>删除本次记录与全部临时截图。</source>
-            <translation>Delete this recording and all temporary screenshots.</translation>
-        </message>
-        <message>
-            <source>已删除一步</source>
-            <translation>Deleted one step</translation>
-        </message>
-        <message>
-            <source>无法补充步骤：没有可用的抓屏回调</source>
-            <translation>Cannot add a step: no screen capture callback is available</translation>
-        </message>
-        <message>
-            <source>没有抓到画面，无法补充这一步</source>
-            <translation>Nothing was captured, so this step cannot be added</translation>
-        </message>
-        <message>
-            <source>已补充第 %1 步</source>
-            <translation>Added step %1</translation>
-        </message>
-        <message>
-            <source>已导出 HTML：%1</source>
-            <translation>HTML exported: %1</translation>
-        </message>
-        <message>
-            <source>已导出 PDF：%1</source>
-            <translation>PDF exported: %1</translation>
-        </message>
-        <message>
-            <source>导出 HTML 教程</source>
-            <translation>Export HTML tutorial</translation>
-        </message>
-        <message>
-            <source>HTML 文件 (*.html)</source>
-            <translation>HTML files (*.html)</translation>
-        </message>
-        <message>
-            <source>导出 PDF 教程</source>
-            <translation>Export PDF tutorial</translation>
-        </message>
-        <message>
-            <source>PDF 文件 (*.pdf)</source>
-            <translation>PDF files (*.pdf)</translation>
-        </message>
-        <message>
-            <source>放弃步骤记录</source>
-            <translation>Discard step recording</translation>
-        </message>
-        <message>
-            <source>确定放弃这次记录的 %1 步吗？临时截图会被删除，操作无法撤销。</source>
-            <translation>Discard the %1 steps in this recording? The temporary screenshots will be deleted and this cannot be undone.</translation>
-        </message>
-        <message>
-            <source>先停止步骤记录或处理完审核窗</source>
-            <translation>Stop step recording or finish the review window first</translation>
-        </message>
-        <message>
-            <source>先结束当前截图/录屏/回溯</source>
-            <translation>Finish the current screenshot, screen recording or Rewind first</translation>
-        </message>
-        <message>
-            <source>这台平台还不能描述光标下的界面元素</source>
-            <translation>This platform cannot describe the UI element under the cursor yet</translation>
-        </message>
-        <message>
-            <source>这台平台还不能记录操作步骤：请用 Windows 版再试</source>
-            <translation>This platform cannot record steps yet; use the Windows version</translation>
-        </message>
-        <message>
-            <source>按钮</source>
-            <translation>Button</translation>
-        </message>
-        <message>
-            <source>日历</source>
-            <translation>Calendar</translation>
-        </message>
-        <message>
-            <source>复选框</source>
-            <translation>Check box</translation>
-        </message>
-        <message>
-            <source>下拉框</source>
-            <translation>Combo box</translation>
-        </message>
-        <message>
-            <source>编辑框</source>
-            <translation>Edit box</translation>
-        </message>
-        <message>
-            <source>链接</source>
-            <translation>Link</translation>
-        </message>
-        <message>
-            <source>图片</source>
-            <translation>Image</translation>
-        </message>
-        <message>
-            <source>列表项</source>
-            <translation>List item</translation>
-        </message>
-        <message>
-            <source>列表</source>
-            <translation>List</translation>
-        </message>
-        <message>
-            <source>菜单</source>
-            <translation>Menu</translation>
-        </message>
-        <message>
-            <source>菜单栏</source>
-            <translation>Menu bar</translation>
-        </message>
-        <message>
-            <source>菜单项</source>
-            <translation>Menu item</translation>
-        </message>
-        <message>
-            <source>进度条</source>
-            <translation>Progress bar</translation>
-        </message>
-        <message>
-            <source>单选框</source>
-            <translation>Radio button</translation>
-        </message>
-        <message>
-            <source>滚动条</source>
-            <translation>Scroll bar</translation>
-        </message>
-        <message>
-            <source>滑块</source>
-            <translation>Slider</translation>
-        </message>
-        <message>
-            <source>微调框</source>
-            <translation>Spinner</translation>
-        </message>
-        <message>
-            <source>状态栏</source>
-            <translation>Status bar</translation>
-        </message>
-        <message>
-            <source>标签页</source>
-            <translation>Tab</translation>
-        </message>
-        <message>
-            <source>标签项</source>
-            <translation>Tab item</translation>
-        </message>
-        <message>
-            <source>文本</source>
-            <translation>Text</translation>
-        </message>
-        <message>
-            <source>工具栏</source>
-            <translation>Toolbar</translation>
-        </message>
-        <message>
-            <source>树</source>
-            <translation>Tree</translation>
-        </message>
-        <message>
-            <source>树项</source>
-            <translation>Tree item</translation>
-        </message>
-        <message>
-            <source>缩略图</source>
-            <translation>Thumbnail</translation>
-        </message>
-        <message>
-            <source>表格</source>
-            <translation>Table</translation>
-        </message>
-        <message>
-            <source>表格项</source>
-            <translation>Table item</translation>
-        </message>
-        <message>
-            <source>文档</source>
-            <translation>Document</translation>
-        </message>
-        <message>
-            <source>拆分按钮</source>
-            <translation>Split button</translation>
-        </message>
-        <message>
-            <source>面板</source>
-            <translation>Pane</translation>
-        </message>
-        <message>
-            <source>表头</source>
-            <translation>Header</translation>
-        </message>
-        <message>
-            <source>表头项</source>
-            <translation>Header item</translation>
-        </message>
-        <message>
-            <source>标题栏</source>
-            <translation>Title bar</translation>
-        </message>
-        <message>
-            <source>分隔线</source>
-            <translation>Separator</translation>
-        </message>
-        <message>
-            <source>本进程已经在记录操作步骤：请先停止上一次记录，再开始新的记录</source>
-            <translation>This process is already recording steps; stop the previous recording before starting a new one</translation>
-        </message>
-        <message>
-            <source>系统没让装上全局输入监听：请检查安全软件或换一个桌面会话再试</source>
-            <translation>The system did not allow the global input hook to be installed. Check security software or try another desktop session</translation>
-        </message>
-        <message>
-            <source>拾取界面元素</source>
-            <translation>Pick a UI element</translation>
-        </message>
-        <message>
-            <source>未知</source>
-            <translation>Unknown</translation>
-        </message>
-        <message>
-            <source>元素</source>
-            <translation>Element</translation>
-        </message>
-        <message>
-            <source>类型</source>
-            <translation>Type</translation>
-        </message>
-        <message>
-            <source>进程</source>
-            <translation>Process</translation>
-        </message>
-        <message>
-            <source>区域</source>
-            <translation>Region</translation>
-        </message>
-        <message>
-            <source>没认出元素，可拖动框选</source>
-            <translation>No element recognised; drag to frame a region</translation>
-        </message>
-        <message>
-            <source>元素拾取：悬停选元素，, / . 换层级，点击选中，拖动框选，Esc 取消</source>
-            <translation>Element picking: hover to pick an element, , / . to change level, click to select, drag to frame, Esc to cancel</translation>
-        </message>
-        <message>
-            <source>整扇窗口</source>
-            <translation>Whole window</translation>
-        </message>
-        <message>
-            <source>已复制元素信息</source>
-            <translation>Copied element info</translation>
-        </message>
-        <message>
-            <source>这台平台不支持界面元素拾取：可直接框选目标区域</source>
-            <translation>This platform does not support UI element picking; frame the target region directly instead</translation>
-        </message>
-        <message>
-            <source>这台平台还不能列出光标下的界面元素</source>
-            <translation>This platform cannot list the UI element under the cursor yet</translation>
-        </message>
-        <message>
-            <source>系统的 UI Automation 无法启动，不能列出光标下的界面元素。可继续使用悬停识别整个窗口，或直接框选目标区域。</source>
-            <translation>The system's UI Automation could not start, so UI elements under the cursor cannot be listed. Hovering can still recognise whole windows, or frame the target region directly</translation>
-        </message>
-        <message>
-            <source>没有可用于检查的底图，无法自动打码；请自行检查后再分享</source>
-            <translation>There is no checked image to compare against, so auto-redaction was skipped; check before sharing</translation>
-        </message>
-        <message>
-            <source>截图与检查底图尺寸不一致，无法自动打码；请自行检查后再分享</source>
-            <translation>The capture and the checked image have different sizes, so auto-redaction was skipped; check before sharing</translation>
-        </message>
-        <message>
-            <source>当前没有可生成报告的截图</source>
-            <translation>There is no capture to build a report from</translation>
-        </message>
-        <message>
-            <source>截图问题反馈</source>
-            <translation>Screenshot report</translation>
-        </message>
-        <message>
-            <source>（未填写）</source>
-            <translation>(not provided)</translation>
-        </message>
-        <message>
-            <source>内核 %1</source>
-            <translation>kernel %1</translation>
-        </message>
-        <message>
-            <source>系统：%1</source>
-            <translation>System: %1</translation>
-        </message>
-        <message>
-            <source>系统：%1（%2）</source>
-            <translation>System: %1 (%2)</translation>
-        </message>
-        <message>
-            <source>系统：%1（内核 %2，%3）</source>
-            <translation>System: %1 (kernel %2, %3)</translation>
-        </message>
-        <message>
-            <source>系统：内核 %1，%2</source>
-            <translation>System: kernel %1, %2</translation>
-        </message>
-        <message>
-            <source>系统：%1（内核 %2）</source>
-            <translation>System: %1 (kernel %2)</translation>
-        </message>
-        <message>
-            <source>截图尺寸：%1 × %2 逻辑像素（%3 × %4 像素，缩放 %5）</source>
-            <translation>Capture size: %1 × %2 logical px (%3 × %4 px, scale %5)</translation>
-        </message>
-        <message>
-            <source>截图尺寸：%1 × %2 逻辑像素</source>
-            <translation>Capture size: %1 × %2 logical px</translation>
-        </message>
-        <message>
-            <source>截图尺寸：%1 × %2 像素</source>
-            <translation>Capture size: %1 × %2 px</translation>
-        </message>
-        <message>
-            <source>正在检查。</source>
-            <translation>Checking.</translation>
-        </message>
-        <message>
-            <source>已对 %1 处敏感信息打码（%2）。请自行检查后再分享。</source>
-            <translation>Redacted %1 sensitive item(s) with %2. Check before sharing.</translation>
-        </message>
-        <message>
-            <source>未检出可打码的敏感信息。请自行检查后再分享。</source>
-            <translation>No redactable sensitive information detected. Check before sharing.</translation>
-        </message>
-        <message>
-            <source>不可用（%1）。本次不保存截图，请自行检查文字内容后再分享。</source>
-            <translation>Unavailable (%1). No screenshot was saved; check the text before sharing.</translation>
-        </message>
-        <message>
-            <source>应用：%1</source>
-            <translation>App: %1</translation>
-        </message>
-        <message>
-            <source>Qt：%1</source>
-            <translation>Qt: %1</translation>
-        </message>
-        <message>
-            <source>屏幕：%1</source>
-            <translation>Screen: %1</translation>
-        </message>
-        <message>
-            <source>截图时间：%1</source>
-            <translation>Capture time: %1</translation>
-        </message>
-        <message>
-            <source>## 环境</source>
-            <translation>## Environment</translation>
-        </message>
-        <message>
-            <source>前台窗口（截图时）：%1</source>
-            <translation>Foreground window (at capture): %1</translation>
-        </message>
-        <message>
-            <source>进程：%1</source>
-            <translation>Process: %1</translation>
-        </message>
-        <message>
-            <source>## 窗口</source>
-            <translation>## Window</translation>
-        </message>
-        <message>
-            <source>## 复现步骤</source>
-            <translation>## Steps to reproduce</translation>
-        </message>
-        <message>
-            <source>## 期望结果</source>
-            <translation>## Expected result</translation>
-        </message>
-        <message>
-            <source>## 实际结果</source>
-            <translation>## Actual result</translation>
-        </message>
-        <message>
-            <source>## 补充说明</source>
-            <translation>## Additional notes</translation>
-        </message>
-        <message>
-            <source>## 截图</source>
-            <translation>## Screenshot</translation>
-        </message>
-        <message>
-            <source>截图：未附带（本段只含文字）。</source>
-            <translation>Screenshot: not attached (text only).</translation>
-        </message>
-        <message>
-            <source>![截图](&lt;%1&gt;)</source>
-            <translation>![Screenshot](&lt;%1&gt;)</translation>
-        </message>
-        <message>
-            <source>自动打码：%1</source>
-            <translation>Auto-redaction: %1</translation>
-        </message>
-        <message>
-            <source>没有可打码的图。请先截图或打开一张图片</source>
-            <translation>There is no image to redact. Capture or open an image first</translation>
-        </message>
-        <message>
-            <source>没有可打码的框</source>
-            <translation>There are no boxes to redact</translation>
-        </message>
-        <message>
-            <source>画布逻辑尺寸为空，无法换算打码框</source>
-            <translation>The canvas logical size is empty; redaction boxes cannot be mapped</translation>
-        </message>
-        <message>
-            <source>只支持马赛克或高斯模糊两种打码方式</source>
-            <translation>Only mosaic or Gaussian blur redaction is supported</translation>
-        </message>
-        <message>
-            <source>马赛克粒度必须大于 0</source>
-            <translation>The mosaic block size must be greater than 0</translation>
-        </message>
-        <message>
-            <source>所有打码框都在画布之外，未改动图片</source>
-            <translation>All redaction boxes are outside the canvas; the image was not changed</translation>
-        </message>
-        <message>
-            <source>自动打码没有产出图像，请重试</source>
-            <translation>Auto-redaction produced no image; try again</translation>
-        </message>
-        <message>
-            <source>Bug 报告</source>
-            <translation>Bug report</translation>
-        </message>
-        <message>
-            <source>Bug 报告（本机生成，自动打码，不上传）</source>
-            <translation>Bug report (local only, auto-redacted, never uploaded)</translation>
-        </message>
-        <message>
-            <source>未检出可打码的敏感信息。请自行检查。</source>
-            <translation>No redactable sensitive information detected. Check before sending.</translation>
-        </message>
-        <message>
-            <source>自动打码不可用：%1。本次不会保存截图，报告只含文字。</source>
-            <translation>Auto-redaction unavailable: %1. No screenshot will be saved; the report will contain text only.</translation>
-        </message>
-        <message>
-            <source>正在检查敏感信息，请稍候再复制</source>
-            <translation>Checking for sensitive information; wait before copying</translation>
-        </message>
-        <message>
-            <source>已复制报告文字到剪贴板</source>
-            <translation>Report text copied to the clipboard</translation>
-        </message>
-        <message>
-            <source>正在检查敏感信息，请稍候再保存</source>
-            <translation>Checking for sensitive information; wait before saving</translation>
-        </message>
-        <message>
-            <source>「{}」无法写入。请检查该目录是否可写。</source>
-            <translation>Cannot write "{}". Check that the folder is writable.</translation>
-        </message>
-        <message>
-            <source>同名图片已存在：%1。请换一个名字后重试</source>
-            <translation>A screenshot with the same name already exists: %1. Choose another name and try again.</translation>
-        </message>
-        <message>
-            <source>已保存报告与截图：%1</source>
-            <translation>Report and screenshot saved to %1</translation>
-        </message>
-        <message>
-            <source>已保存报告文字（未包含截图）：%1</source>
-            <translation>Report text saved without a screenshot: %1</translation>
-        </message>
-        <message>
-            <source>只在本机生成，不会上传；自动打码只处理识别到的敏感信息，发送前请自行检查。</source>
-            <translation>Generated locally and never uploaded. Auto-redaction only covers detected sensitive information; check before sending.</translation>
-        </message>
-        <message>
-            <source>Bug 报告说明</source>
-            <translation>Bug report notice</translation>
-        </message>
-        <message>
-            <source>截图预览</source>
-            <translation>Screenshot preview</translation>
-        </message>
-        <message>
-            <source>此处显示将随报告保存的截图副本；自动打码直接改在这张副本上。</source>
-            <translation>Shows the screenshot copy that will be saved with the report; auto-redaction works on this copy.</translation>
-        </message>
-        <message>
-            <source>打码状态</source>
-            <translation>Redaction status</translation>
-        </message>
-        <message>
-            <source>报告标题</source>
-            <translation>Report title</translation>
-        </message>
-        <message>
-            <source>一句话概括问题</source>
-            <translation>Summarize the problem in one line</translation>
-        </message>
-        <message>
-            <source>标题</source>
-            <translation>Title</translation>
-        </message>
-        <message>
-            <source>复现步骤</source>
-            <translation>Steps to reproduce</translation>
-        </message>
-        <message>
-            <source>按顺序写清每一步操作</source>
-            <translation>Describe each step in order</translation>
-        </message>
-        <message>
-            <source>期望结果</source>
-            <translation>Expected result</translation>
-        </message>
-        <message>
-            <source>原本应该发生什么</source>
-            <translation>What should have happened</translation>
-        </message>
-        <message>
-            <source>实际结果</source>
-            <translation>Actual result</translation>
-        </message>
-        <message>
-            <source>实际发生了什么</source>
-            <translation>What actually happened</translation>
-        </message>
-        <message>
-            <source>补充说明</source>
-            <translation>Additional notes</translation>
-        </message>
-        <message>
-            <source>可选：出现频率、影响范围等</source>
-            <translation>Optional: frequency, scope, and so on</translation>
-        </message>
-        <message>
-            <source>包含内容</source>
-            <translation>Included content</translation>
-        </message>
-        <message>
-            <source>包含系统与环境信息</source>
-            <translation>Include system and environment information</translation>
-        </message>
-        <message>
-            <source>报告里是否带上系统、Qt、屏幕与截图尺寸；关闭后这一段整段省略。</source>
-            <translation>Whether the report includes the system, Qt, screen, and capture size; when off, this section is omitted entirely.</translation>
-        </message>
-        <message>
-            <source>包含前台窗口信息</source>
-            <translation>Include the foreground window</translation>
-        </message>
-        <message>
-            <source>报告里是否带上截图时的前台窗口标题与进程名；截图本身可能暴露它们。</source>
-            <translation>Whether the report includes the foreground window title and process name at capture time; the screenshot itself may reveal them.</translation>
-        </message>
-        <message>
-            <source>报告预览（Markdown）</source>
-            <translation>Report preview (Markdown)</translation>
-        </message>
-        <message>
-            <source>报告预览</source>
-            <translation>Report preview</translation>
-        </message>
-        <message>
-            <source>调整打码…</source>
-            <translation>Adjust redactions…</translation>
-        </message>
-        <message>
-            <source>调整打码</source>
-            <translation>Adjust redactions</translation>
-        </message>
-        <message>
-            <source>重新勾选要打码的命中项，或改用高斯模糊；确认后报告随之更新。</source>
-            <translation>Reselect the detected items to redact, or switch to Gaussian blur; the report updates after you confirm.</translation>
-        </message>
-        <message>
-            <source>复制报告</source>
-            <translation>Copy report</translation>
-        </message>
-        <message>
-            <source>把报告文字复制到剪贴板；只含文字，不含截图。</source>
-            <translation>Copy the report text to the clipboard; text only, no screenshot.</translation>
-        </message>
-        <message>
-            <source>保存报告…</source>
-            <translation>Save report…</translation>
-        </message>
-        <message>
-            <source>保存报告</source>
-            <translation>Save report</translation>
-        </message>
-        <message>
-            <source>把报告保存为 Markdown；自动打码可用时会在同目录另存一张 PNG 截图。</source>
-            <translation>Save the report as Markdown; when auto-redaction is available, a PNG screenshot is saved alongside it.</translation>
-        </message>
-        <message>
-            <source>关闭报告</source>
-            <translation>Close report</translation>
-        </message>
-        <message>
-            <source>关闭报告对话框；未保存的内容不会保留。</source>
-            <translation>Close the report dialog; unsaved content is discarded.</translation>
-        </message>
-        <message>
-            <source>保存 Bug 报告</source>
-            <translation>Save bug report</translation>
-        </message>
-        <message>
-            <source>Markdown 文件 (*.md)</source>
-            <translation>Markdown files (*.md)</translation>
-        </message>
-        <message>
-            <source>已自动打码 %1 处敏感信息（%2）；请自行检查。</source>
-            <translation>Redacted %1 sensitive item(s) with %2; check before sending.</translation>
         </message>
 </context>
 </TS>
