@@ -3,6 +3,7 @@
 // 事件用 sendEvent 直接投给控件，判据不依赖「鼠标恰好在这个时刻移动到位」。
 #include "Gui/Capture/CaptureOverlay.h"
 
+#include "Base/Text.h"
 #include "Core/Pick/ColorFormat.h"
 #include "Core/Pick/PickGeometry.h"
 #include "Core/Settings/SettingsKeys.h"
@@ -1459,7 +1460,7 @@ TEST_F(CaptureOverlayFixture, ElementPickFallsBackToDragSelection)
     overlay->setElementChain(std::vector<UiElementInfo>{});
     moveOver(*overlay, QPoint{100, 60});
     QApplication::processEvents();
-    EXPECT_TRUE(overlay->modeBannerForTesting().contains(QStringLiteral("拖动"))) << overlay->modeBannerForTesting().toStdString();
+    EXPECT_EQ(overlay->modeBannerForTesting(), GyanisScribe::Base::uiText("没认出元素，可拖动框选")) << "回退横幅的原文变了";
     dragOut(*overlay, QPoint{40, 40}, QPoint{160, 120});
     EXPECT_EQ(overlay->selectedRegion(), QRect(40, 40, 121, 81));
 }
