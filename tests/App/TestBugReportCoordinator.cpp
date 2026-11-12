@@ -789,3 +789,41 @@ TEST_F(BugReportCoordinatorFixture, NullReportImageOpensNothing)
     EXPECT_EQ(fake->recognizeCalls(), 0);
     EXPECT_TRUE(parent.findChildren<BugReportDialog *>().isEmpty());
 }
+
+/**
+ * @brief 钉住旧图迟到的检查失败不会把被拒窗的原因换掉
+ * @details 与 late-success 那一条同形：窗 B 因尺寸被拒之后自己写了一条原因，
+ *          窗 A 那张图随后失败，失败只属于 A，不能覆盖 B。
+ */
+TEST_F(BugReportCoordinatorFixture, ARejectedWindowKeepsItsOwnReasonWhenAnOldScanFailsLate)
+{
+    auto  engine = std::make_unique<FakeOcrEngine>(Expected<OcrResult>{std::unexpected(Error{ErrorCode::PlatformUnsupported, "识别后端在扫描途中断了"})});
+    auto *fake   = engine.get();
+    fake->setGated();
+    BugReportCoordinator coordinator{*m_settings, std::move(engine), emptyBarcodeReader()};
+    GateReleaseGuard     releaseGuard{*fake};
+    QWidget              parent;
+
+    const QImage detection = makeImage(QSize{200, 100}, QColor{20, 40, 60});
+    coordinator.openReport(detection, detection, makeContext(), &parent);
+    auto *first = coordinator.dialogForTesting();
+    ASSERT_NE(first, nullptr);
+    ASSERT_TRUE(fake->waitUntilEntered(kEnterPatience)) << "第一扇窗没有开始识别";
+    first->close();
+    QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+    ASSERT_EQ(coordinator.dialogForTesting(), nullptr) << "关掉的报告窗还挂在协调器上";
+
+    // 新成品只有 100×50，底图仍是还在飞的那张 200×100：这扇窗只能自查
+    coordinator.openReport(makeImage(QSize{100, 50}, QColor{90, 60, 30}), detection, makeContext(), &parent);
+    auto *second = coordinator.dialogForTesting();
+    ASSERT_NE(second, nullptr);
+    ASSERT_EQ(second->redactionForTesting().state, RedactionState::Unavailable);
+    const auto ownReason = second->redactionForTesting().unavailableReason;
+    ASSERT_TRUE(ownReason.contains(QStringLiteral("尺寸不一致"))) << ownReason.toStdString();
+
+    fake->release();
+    ASSERT_TRUE(waitUntil([&coordinator] { return !coordinator.isScanningForTesting(); }, 10'000)) << "放行后旧扫描没有收尾";
+    EXPECT_EQ(second->redactionForTesting().state, RedactionState::Unavailable);
+    EXPECT_EQ(second->redactionForTesting().unavailableReason, ownReason) << "旧图迟到的失败把被拒窗的原因换掉了";
+    EXPECT_EQ(fake->recognizeCalls(), 1) << "尺寸对不上的窗不该再发起识别";
+}
