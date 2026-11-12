@@ -5264,10 +5264,6 @@
             <translation>Separator</translation>
         </message>
         <message>
-            <source>系统的 UI Automation 无法启动，不能描述光标下的界面元素</source>
-            <translation>The system UI Automation could not start, so the UI element under the cursor cannot be described</translation>
-        </message>
-        <message>
             <source>本进程已经在记录操作步骤：请先停止上一次记录，再开始新的记录</source>
             <translation>This process is already recording steps; stop the previous recording before starting a new one</translation>
         </message>
