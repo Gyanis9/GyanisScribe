@@ -61,16 +61,17 @@ namespace GyanisScribe::Gui
         initializeUi(allRows, Core::ToolKind::Mosaic);
     }
 
-    PrivacyReviewDialog::PrivacyReviewDialog(std::vector<Core::Privacy::PiiItem> items, const std::vector<int> &selectedRows, const Core::ToolKind tool, QWidget *parent) :
+    PrivacyReviewDialog::PrivacyReviewDialog(std::vector<Core::Privacy::PiiItem> items, const std::vector<int> &initialSelection, const Core::ToolKind tool,
+                                             QWidget *parent) :
         QDialog(parent), m_items(std::move(items))
     {
-        initializeUi(selectedRows, tool);
+        initializeUi(initialSelection, tool);
     }
 
-    void PrivacyReviewDialog::initializeUi(const std::vector<int> &selectedRows, const Core::ToolKind tool)
+    void PrivacyReviewDialog::initializeUi(const std::vector<int> &initialSelection, const Core::ToolKind tool)
     {
         std::vector<bool> checked(m_items.size(), false);
-        for (const int row: selectedRows)
+        for (const int row: initialSelection)
         {
             // 调用方可能沿用重新检测前的行号：越界与负值直接跳过，不能拿去索引
             if (row >= 0 && static_cast<std::size_t>(row) < checked.size())
