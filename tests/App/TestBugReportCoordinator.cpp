@@ -23,6 +23,7 @@
 #include <QEventLoop>
 #include <QImage>
 #include <QRect>
+#include <QScreen>
 #include <QSize>
 #include <QString>
 #include <QStringList>
@@ -746,4 +747,28 @@ TEST_F(BugReportCoordinatorFixture, TheScanRunsOnTheDetectionImageNotTheReportIm
     ASSERT_FALSE(received.isNull()) << "假引擎没记下收到的图";
     EXPECT_EQ(received.pixel(5, 5), detectionImage.pixel(5, 5)) << "扫描吃的不是检查底图";
     EXPECT_NE(received.pixel(5, 5), reportImage.pixel(5, 5)) << "前提：两张图必须不同内容，否则这条判据分不出来";
+}
+
+/**
+ * @brief 钉住环境信息只认截图来源，不拿当前屏幕与当前时间顶替
+ */
+TEST_F(BugReportCoordinatorFixture, EnvironmentComesFromTheCaptureContextNotTheCurrentScreen)
+{
+    auto                 engine = std::make_unique<FakeOcrEngine>(Expected<OcrResult>{makePhoneResult()});
+    BugReportCoordinator coordinator{*m_settings, std::move(engine), emptyBarcodeReader()};
+    QWidget              parent;
+
+    const auto *screen = QGuiApplication::primaryScreen();
+    ASSERT_NE(screen, nullptr);
+    auto context       = makeContext();
+    context.screenName = QStringLiteral("DISPLAY-远");
+    context.capturedAt = QDateTime{QDate{2020, 3, 4}, QTime{5, 6, 7}, QTimeZone::fromSecondsAheadOfUtc(8 * 3600)};
+    ASSERT_NE(context.screenName, screen->name()) << "与当前屏同名就分不出取的是哪一份";
+
+    coordinator.openReport(makeImage(QSize{200, 100}, QColor{30, 60, 90}), makeImage(QSize{200, 100}, QColor{30, 60, 90}), context, &parent);
+    auto *dialog = coordinator.dialogForTesting();
+    ASSERT_NE(dialog, nullptr);
+    EXPECT_EQ(dialog->environmentForTesting().screenName, context.screenName) << "屏幕名被当前屏顶替";
+    EXPECT_EQ(dialog->environmentForTesting().capturedAt, context.capturedAt) << "截图时刻被当前时间顶替";
+    EXPECT_TRUE(dialog->reportText().contains(QStringLiteral("2020-03-04 05:06:07 UTC+08:00"))) << "报告里的时刻不是截图来源那一刻";
 }
