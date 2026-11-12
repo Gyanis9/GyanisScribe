@@ -10,6 +10,9 @@
 #include "Core/Annotation/AnnotationPalette.h"
 #include "Gui/Annotation/AnnotationToolbar.h"
 #include "Gui/Annotation/AnnotationToolbarGeometry.h"
+#include "Core/BugReport/BugReport.h"
+#include "Core/Privacy/PiiTypes.h"
+#include "Gui/BugReport/BugReportDialog.h"
 #include "Main/MainWindow.h"
 #include "Core/History/HistoryRules.h"
 #include "Core/History/HistoryStore.h"
@@ -43,8 +46,10 @@
 #include <QSystemTrayIcon>
 #include <QPainter>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QStackedWidget>
 #include <QString>
+#include <QTextEdit>
 #include <QWidget>
 
 #include <array>
@@ -53,6 +58,7 @@
 #include <format>
 #include <fstream>
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -266,6 +272,84 @@ namespace
             shootToast(GyanisScribe::Gui::ToastKind::Information, "information", QStringLiteral("正在识别这一张…"));
             shootToast(GyanisScribe::Gui::ToastKind::Success, "success", QStringLiteral("已保存到截图目录"));
             shootToast(GyanisScribe::Gui::ToastKind::Danger, "danger", QStringLiteral("截图失败：屏幕已不在"));
+        }
+    }
+
+    /**
+     * @brief 拍一档报告窗状态：默认视图一张、预览滚到底再一张
+     * @param dialog 已经 show 过的报告窗
+     * @param outputDirectory 出图目录
+     * @param name 图名（滚到底那张追加 -tail）
+     * @details 截图那一行在报告末尾，默认视图只露开头：判「预览有没有带图片链接」得看滚到底那张。
+     */
+    void shootBugReportState(QWidget &dialog, const std::filesystem::path &outputDirectory, const std::string &name)
+    {
+        shoot(dialog, outputDirectory, name.c_str());
+        if (auto *preview = dialog.findChild<QTextEdit *>(QStringLiteral("bugReportPreview")); preview != nullptr)
+        {
+            preview->verticalScrollBar()->setValue(preview->verticalScrollBar()->maximum());
+        }
+        shoot(dialog, outputDirectory, (name + "-tail").c_str());
+    }
+
+    /**
+     * @brief 拍报告窗的四档状态：检查中 / 已打码 / 未检出 / 不可用
+     * @param outputDirectory 出图目录
+     * @param dialogSize 拍之前显式给的逻辑尺寸：出图要看的是版面本身，不该被离屏屏的尺寸带偏
+     * @param prefix 图名前缀（主题档用）
+     * @details 明暗两轮各拍一遍；100%/150%/200% 缩放档由外部 QT_SCALE_FACTOR 分三次跑。
+     */
+    void shootBugReportFaces(const std::filesystem::path &outputDirectory, const QSize &dialogSize, const std::string &prefix)
+    {
+        using GyanisScribe::Core::BugReport::BugReportEnvironment;
+        using GyanisScribe::Core::Privacy::PiiItem;
+        using GyanisScribe::Core::Privacy::PiiKind;
+
+        const QImage         image = syntheticScreen(QSize{800, 500});
+        BugReportEnvironment environment;
+        environment.appName          = QStringLiteral("智录");
+        environment.appVersion       = QStringLiteral("0.0.1");
+        environment.osName           = QStringLiteral("Windows 11 Version 23H2");
+        environment.osVersion        = QStringLiteral("10.0.26100");
+        environment.architecture     = QStringLiteral("x86_64");
+        environment.qtVersion        = QStringLiteral("6.12.0");
+        environment.screenName       = QStringLiteral("DISPLAY2");
+        environment.logicalSize      = QSize{800, 500};
+        environment.physicalSize     = image.size();
+        environment.devicePixelRatio = 1.0;
+        environment.capturedAt       = QDateTime::currentDateTime();
+        environment.windowTitle      = QStringLiteral("无标题 - 记事本");
+        environment.processName      = QStringLiteral("notepad.exe");
+
+        const auto suggested = std::filesystem::path{std::wstring{L"C:/Users/Public/bug-report.md"}};
+
+        {
+            GyanisScribe::Gui::BugReportDialog dialog{image, environment, suggested};
+            dialog.resize(dialogSize);
+            dialog.show();
+            shootBugReportState(dialog, outputDirectory, prefix + "bug-report-pending");
+        }
+        {
+            GyanisScribe::Gui::BugReportDialog dialog{image, environment, suggested};
+            dialog.resize(dialogSize);
+            dialog.show();
+            dialog.setScanResult({PiiItem{PiiKind::Phone, QRect{120, 90, 180, 26}, QStringLiteral("138****8000")},
+                                  PiiItem{PiiKind::Email, QRect{120, 150, 220, 26}, QStringLiteral("a***@example.com")}});
+            shootBugReportState(dialog, outputDirectory, prefix + "bug-report-masked");
+        }
+        {
+            GyanisScribe::Gui::BugReportDialog dialog{image, environment, suggested};
+            dialog.resize(dialogSize);
+            dialog.show();
+            dialog.setScanResult({});
+            shootBugReportState(dialog, outputDirectory, prefix + "bug-report-nohits");
+        }
+        {
+            GyanisScribe::Gui::BugReportDialog dialog{image, environment, suggested};
+            dialog.resize(dialogSize);
+            dialog.show();
+            dialog.setScanUnavailable(GyanisScribe::Base::uiText("本机没有可用的文字识别后端"));
+            shootBugReportState(dialog, outputDirectory, prefix + "bug-report-unavailable");
         }
     }
 } // namespace
@@ -550,6 +634,21 @@ int main(int argc, char *argv[])
             }
             theme.applyFromSettings();
             shootFloatingFaces(settings, icons, theme, *integration, outputDirectory, std::format("theme-{}-", name));
+        }
+
+        // 面 7：Bug 报告窗——左列摆位、尺寸夹取与预览/复制分文的观感取证。
+        // 两档尺寸各拍一遍：1000×760 是目标版面，704×480 是 800×480 小屏夹出来的目标值；
+        // 版面自身的最小尺寸比它大，实拍会停在那条线上（读数行里能看到实际值）
+        for (const auto &[mode, name]: std::array<std::pair<const char *, const char *>, 2>{{{"Light", "light"}, {"Dark", "dark"}}})
+        {
+            if (const auto written = settings.setValue(GyanisScribe::Core::kThemeMode, QString::fromUtf8(mode)); !written)
+            {
+                std::fprintf(stderr, "failed to switch the theme\n");
+                return 1;
+            }
+            theme.applyFromSettings();
+            shootBugReportFaces(outputDirectory, QSize{1000, 760}, std::format("theme-{}-", name));
+            shootBugReportFaces(outputDirectory, QSize{704, 480}, std::format("theme-{}-small-", name));
         }
     }
 
