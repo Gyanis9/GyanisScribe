@@ -287,3 +287,38 @@ TEST_F(PrivacyReviewDialogFixture, EmptyItemsDoNotAutoAccept)
     EXPECT_TRUE(dialog.selectedItems().empty());
     EXPECT_EQ(dialog.result(), static_cast<int>(QDialog::Rejected)) << "空清单也不能自动确认";
 }
+
+/**
+ * @brief 钉住新的初始勾选与打码方式：报告窗调整打码时不能被重置成全选
+ */
+TEST_F(PrivacyReviewDialogFixture, InitialSelectionAndToolAreHonored)
+{
+    PrivacyReviewDialog dialog{makeItems(), std::vector<int>{0, 2}, ToolKind::Blur};
+    auto               *list  = dialog.findChild<QListWidget *>(QStringLiteral("privacyList"));
+    auto               *style = dialog.findChild<QComboBox *>(QStringLiteral("privacyStyle"));
+    ASSERT_NE(list, nullptr);
+    ASSERT_NE(style, nullptr);
+    ASSERT_EQ(list->count(), 3);
+
+    EXPECT_EQ(list->item(0)->checkState(), Qt::Checked);
+    EXPECT_EQ(list->item(1)->checkState(), Qt::Unchecked);
+    EXPECT_EQ(list->item(2)->checkState(), Qt::Checked);
+    EXPECT_EQ(style->currentIndex(), 1);
+    EXPECT_EQ(dialog.selectedRows(), (std::vector<int>{0, 2}));
+    EXPECT_EQ(dialog.selectedItems().size(), 2U);
+    EXPECT_EQ(dialog.redactionTool(), ToolKind::Blur);
+}
+
+/**
+ * @brief 钉住越界的初始行号被忽略：调用方给错下标不该把对话框带崩
+ */
+TEST_F(PrivacyReviewDialogFixture, OutOfRangeInitialRowsAreIgnored)
+{
+    PrivacyReviewDialog dialog{makeItems(), std::vector<int>{1, 99, -1}, ToolKind::Mosaic};
+    auto               *list = dialog.findChild<QListWidget *>(QStringLiteral("privacyList"));
+    ASSERT_NE(list, nullptr);
+    EXPECT_EQ(list->item(0)->checkState(), Qt::Unchecked);
+    EXPECT_EQ(list->item(1)->checkState(), Qt::Checked);
+    EXPECT_EQ(list->item(2)->checkState(), Qt::Unchecked);
+    EXPECT_EQ(dialog.selectedRows(), (std::vector<int>{1}));
+}

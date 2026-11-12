@@ -52,6 +52,33 @@ namespace GyanisScribe::Gui
 {
     PrivacyReviewDialog::PrivacyReviewDialog(std::vector<Core::Privacy::PiiItem> items, QWidget *parent) : QDialog(parent), m_items(std::move(items))
     {
+        std::vector<int> allRows(m_items.size());
+        for (std::size_t index = 0; index < allRows.size(); ++index)
+        {
+            allRows[index] = static_cast<int>(index);
+        }
+        // 默认入口保持原行为：全部勾选，打码方式落在马赛克
+        initializeUi(allRows, Core::ToolKind::Mosaic);
+    }
+
+    PrivacyReviewDialog::PrivacyReviewDialog(std::vector<Core::Privacy::PiiItem> items, const std::vector<int> &selectedRows, const Core::ToolKind tool, QWidget *parent) :
+        QDialog(parent), m_items(std::move(items))
+    {
+        initializeUi(selectedRows, tool);
+    }
+
+    void PrivacyReviewDialog::initializeUi(const std::vector<int> &selectedRows, const Core::ToolKind tool)
+    {
+        std::vector<bool> checked(m_items.size(), false);
+        for (const int row: selectedRows)
+        {
+            // 调用方可能沿用重新检测前的行号：越界与负值直接跳过，不能拿去索引
+            if (row >= 0 && static_cast<std::size_t>(row) < checked.size())
+            {
+                checked[static_cast<std::size_t>(row)] = true;
+            }
+        }
+
         setWindowTitle(Base::uiText("隐私打码审核"));
         // 顶层窗口自己铺底：样式表只给具名的根上底色
         setObjectName(QStringLiteral("appRoot"));
@@ -70,12 +97,13 @@ namespace GyanisScribe::Gui
         m_list->setObjectName(QStringLiteral("privacyList"));
         m_list->setAccessibleName(Base::uiText("敏感信息清单"));
         // 清单只做勾选：行文本来自脱敏样例，不给编辑入口
-        for (const auto &item: m_items)
+        for (std::size_t index = 0; index < m_items.size(); ++index)
         {
+            const auto   &item    = m_items[index];
             const QString rowText = Base::uiText("%1：%2").arg(typeLabel(item.kind), item.maskedSample);
             auto         *row     = new QListWidgetItem{rowText, m_list};
             row->setFlags(row->flags() | Qt::ItemIsUserCheckable);
-            row->setCheckState(Qt::Checked);
+            row->setCheckState(checked[index] ? Qt::Checked : Qt::Unchecked);
         }
         root->addWidget(m_list, 1);
 
@@ -114,20 +142,33 @@ namespace GyanisScribe::Gui
         QObject::connect(m_list, &QListWidget::itemChanged, this, [this](QListWidgetItem *) { updateApplyEnabled(); });
         QObject::connect(cancel, &QPushButton::clicked, this, &QDialog::reject);
         QObject::connect(m_apply, &QPushButton::clicked, this, &QDialog::accept);
+        // 下拉只有两档：非高斯模糊一律落在马赛克，重开时不会出现第三档
+        m_style->setCurrentIndex(tool == Core::ToolKind::Blur ? 1 : 0);
         updateApplyEnabled();
+    }
+
+    std::vector<int> PrivacyReviewDialog::selectedRows() const
+    {
+        std::vector<int> rows;
+        for (int row = 0; row < m_list->count(); ++row)
+        {
+            if (m_list->item(row)->checkState() == Qt::Checked)
+            {
+                rows.push_back(row);
+            }
+        }
+        return rows;
     }
 
     std::vector<Core::Privacy::PiiItem> PrivacyReviewDialog::selectedItems() const
     {
+        const std::vector<int>              rows = selectedRows();
         std::vector<Core::Privacy::PiiItem> selected;
-        selected.reserve(m_items.size());
-        for (int row = 0; row < m_list->count(); ++row)
+        selected.reserve(rows.size());
+        for (const int row: rows)
         {
             // 行下标就是 m_items 的下标：构造时逐条追加，之后不增删行
-            if (m_list->item(row)->checkState() == Qt::Checked)
-            {
-                selected.push_back(m_items[static_cast<std::size_t>(row)]);
-            }
+            selected.push_back(m_items[static_cast<std::size_t>(row)]);
         }
         return selected;
     }
