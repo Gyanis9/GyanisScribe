@@ -172,6 +172,8 @@ namespace GyanisScribe::Gui
         QObject::connect(m_toolbarBridge.get(), &AnnotationToolbarBridge::ocrRequested, this, [this] { deliver(ShortcutAction::Ocr); });
         // 美化分享不关窗：对话框拿一份成品副本，关了还能接着标注
         QObject::connect(m_toolbarBridge.get(), &AnnotationToolbarBridge::shareRequested, this, [this] { emit shareRequested(m_engine.exportImage()); });
+        // Bug 报告同样不关窗：宿主拿着成品去拼报告，编辑现场留着；成品与美化分享同源
+        QObject::connect(m_toolbarBridge.get(), &AnnotationToolbarBridge::bugReportRequested, this, [this] { emit bugReportRequested(m_engine.exportImage()); });
         // 扫码不关窗：与打印同一条口径，识别结果由宿主提示，编辑现场留着
         QObject::connect(m_toolbarBridge.get(), &AnnotationToolbarBridge::scanRequested, this, [this] { emit scanRequested(m_engine.exportImage()); });
         // 隐私打码也不关窗：检查要等识别回来，结果由宿主审核后才落到画布上。

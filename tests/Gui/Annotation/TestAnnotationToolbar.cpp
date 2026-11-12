@@ -1709,3 +1709,30 @@ TEST_F(ToolbarFixture, ToolButtonsUseTheInlineFocusBorder)
     QToolButton outside;
     EXPECT_FALSE(GyanisScribe::Gui::usesInlineFocusBorder(outside)) << "工具栏外的按钮不该走紧凑焦点边";
 }
+
+/**
+ * @brief 钉住 Bug 报告动作的位置与可用性开关
+ * @details 报告入口排在隐私打码之后、关闭之前，是这一排动作里最后一项业务承诺；
+ *          贴图上的直接标注没有报告宿主，靠同一个开关把这一枚整枚收起，留它在那儿就是一枚死控件。
+ */
+TEST_F(ToolbarFixture, BugReportActionSitsAfterPrivacyAndCanBeHidden)
+{
+    SignalLog log;
+    auto      toolbar       = makeToolbarLogged(log);
+    auto     *bugButton     = buttonByLabel(*toolbar, "Bug 报告");
+    auto     *privacyButton = buttonByLabel(*toolbar, "隐私打码");
+    auto     *closeButton   = buttonByLabel(*toolbar, "关闭标注");
+    ASSERT_NE(bugButton, nullptr) << "工具栏缺少 Bug 报告入口";
+    ASSERT_NE(privacyButton, nullptr);
+    ASSERT_NE(closeButton, nullptr);
+    ASSERT_NE(toolbar->layout(), nullptr);
+    EXPECT_GT(toolbar->layout()->indexOf(bugButton), toolbar->layout()->indexOf(privacyButton)) << "Bug 报告没排在隐私打码之后";
+    EXPECT_LT(toolbar->layout()->indexOf(bugButton), toolbar->layout()->indexOf(closeButton)) << "Bug 报告没排在关闭之前";
+
+    toolbar->setBugReportAvailable(false);
+    EXPECT_TRUE(bugButton->isHidden());
+    EXPECT_FALSE(bugButton->isEnabled());
+    toolbar->setBugReportAvailable(true);
+    EXPECT_FALSE(bugButton->isHidden());
+    EXPECT_TRUE(bugButton->isEnabled());
+}

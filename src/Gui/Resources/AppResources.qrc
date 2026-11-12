@@ -45,6 +45,7 @@
     <file alias="Eraser.svg">Icons/Eraser.svg</file>
     <file alias="Fill.svg">Icons/Fill.svg</file>
     <file alias="Mosaic.svg">Icons/Mosaic.svg</file>
+    <file alias="Bug.svg">Icons/Bug.svg</file>
     <file alias="MosaicGrain.svg">Icons/MosaicGrain.svg</file>
     <file alias="Number.svg">Icons/Number.svg</file>
     <file alias="Ocr.svg">Icons/Ocr.svg</file>

@@ -355,6 +355,8 @@ namespace GyanisScribe::Gui
                 ActionSpec{"QrCode", GyanisScribe::Base::uiText("识别二维码"), &AnnotationToolbar::scanClicked},
                 // 隐私打码复用马赛克图标：它是「按规则批量打码」，与工具组里手画马赛克是同一件事的两种入口
                 ActionSpec{"Mosaic", GyanisScribe::Base::uiText("隐私打码"), &AnnotationToolbar::privacyClicked},
+                // 报告在本机生成、自动打码、不上传：图标与提示都按这条承诺说话
+                ActionSpec{"Bug", GyanisScribe::Base::uiText("Bug 报告"), &AnnotationToolbar::bugReportClicked},
         };
         for (const auto &action: actions)
         {
@@ -373,6 +375,14 @@ namespace GyanisScribe::Gui
                 m_shareButton = button;
                 button->setObjectName(QStringLiteral("shareButton"));
                 button->setToolTip(GyanisScribe::Base::uiText("美化分享（背景、圆角、投影、水印）"));
+            }
+            // Bug 报告同样留着指针与对象名：没有报告宿主的工具栏要把它单独收起，用例按对象名找它。
+            // 提示写明图不出本机，用户才敢把带界面的截图交出去
+            if (action.signal == &AnnotationToolbar::bugReportClicked)
+            {
+                m_bugReportButton = button;
+                button->setObjectName(QStringLiteral("bugReportButton"));
+                button->setToolTip(GyanisScribe::Base::uiText("Bug 报告（本机生成，自动打码，不上传）"));
             }
         }
 
@@ -897,6 +907,17 @@ namespace GyanisScribe::Gui
         // 与隐私打码同一套收放：没有对话框宿主的工具栏上，这枚按钮只该整枚消失
         m_shareButton->setVisible(available);
         m_shareButton->setEnabled(available);
+    }
+
+    void AnnotationToolbar::setBugReportAvailable(const bool available)
+    {
+        if (m_bugReportButton == nullptr)
+        {
+            return;
+        }
+        // 与美化分享同一套收放：没有报告宿主的工具栏上，这枚按钮只该整枚消失
+        m_bugReportButton->setVisible(available);
+        m_bugReportButton->setEnabled(available);
     }
 
     void AnnotationToolbar::setUndoRedoAvailable(const bool canUndo, const bool canRedo)

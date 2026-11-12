@@ -1119,6 +1119,8 @@ namespace GyanisScribe::Gui
             m_annotateToolbar->setPrivacyAvailable(false);
             // 美化分享同理：贴图没有美化对话框的宿主，这枚动作按钮也整枚收起
             m_annotateToolbar->setShareAvailable(false);
+            // Bug 报告没有报告宿主的接缝：贴图上的直接标注同样收起来
+            m_annotateToolbar->setBugReportAvailable(false);
             // 与标注窗同一条摆法：工具栏是独立浮窗，摆在贴图旁边
             m_annotateToolbar->setParent(this, Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
             m_annotateBridge = std::make_unique<Gui::AnnotationToolbarBridge>(*m_annotateToolbar, *m_annotateEngine, this);

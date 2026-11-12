@@ -1274,6 +1274,19 @@ namespace GyanisScribe
 
         ASSERT_NE(saveButton, nullptr) << "贴图的标注工具栏上找不到保存按钮";
         EXPECT_FALSE(saveButton->isHidden()) << "收起美化分享顺手把别的动作也收起来了";
+
+        QToolButton *bugButton = nullptr;
+        for (auto *candidate: window.findChildren<QToolButton *>())
+        {
+            if (candidate->objectName() == QStringLiteral("bugReportButton"))
+            {
+                bugButton = candidate;
+                break;
+            }
+        }
+        ASSERT_NE(bugButton, nullptr) << "贴图的标注工具栏上找不到 Bug 报告按钮";
+        EXPECT_TRUE(bugButton->isHidden()) << "贴图直接标注没有报告宿主，这枚按钮留着就是死控件";
+        EXPECT_FALSE(bugButton->isEnabled());
     }
 
     /**

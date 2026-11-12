@@ -66,7 +66,7 @@ namespace GyanisScribe::Gui
 
     /**
      * @brief 标注工具栏控件
-     * @details 按钮顺序按需求第六节：工具组 → 颜色 → 线宽/字号 → 撤销/重做 → 复制/保存/美化分享/贴图/识别/扫码/隐私打码。
+     * @details 按钮顺序按需求第六节：工具组 → 颜色 → 线宽/字号 → 撤销/重做 → 复制/保存/美化分享/贴图/识别/扫码/隐私打码/Bug 报告。
      *          本控件不直接改画布，只把用户意图发成信号，由宿主窗口转给引擎——
      *          这样工具栏不必拖着引擎一起走，将来别处要复用同一排按钮也不必改这里。
      * @note 每个图标按钮都带 tooltip 与无障碍名称，这是需求的可访问性硬要求，不是装饰。
@@ -117,6 +117,14 @@ namespace GyanisScribe::Gui
          *          按钮留在那里就是一枚点了没反应的死控件，收起来比灰着更像「这里本来没有这一项」。
          */
         void setShareAvailable(bool available);
+
+        /**
+         * @brief 开/关「Bug 报告」动作按钮
+         * @param available true 表示宿主接了报告对话框；false 时这枚按钮整枚收起
+         * @details 贴图上的直接标注复用同一把工具栏，但那一处没有报告对话框的宿主：
+         *          按钮留在那里就是一枚点了没反应的死控件，收起来比灰着更像「这里本来没有这一项」。
+         */
+        void setBugReportAvailable(bool available);
 
         /// 工具按钮数量，由登记表算出：布局与用例据此核对「每一档工具都有一枚按钮」
         [[nodiscard]] static int toolButtonCount();
@@ -357,6 +365,9 @@ namespace GyanisScribe::Gui
         /// 检查并打码画面里的敏感信息（手机号、证件号、二维码等）
         void privacyClicked();
 
+        /// 生成 Bug 报告：交给宿主拼报告与附件，不关窗
+        void bugReportClicked();
+
         /// 关闭标注窗（工具栏最右那枚 X，与 Esc 同一条收场路）
         void closeClicked();
 
@@ -453,6 +464,7 @@ namespace GyanisScribe::Gui
         QToolButton                                 *m_closeButton          = nullptr;                                          ///< 关闭标注窗，与 Esc 同一条收场路
         QToolButton                                 *m_privacyButton        = nullptr;                                       ///< 隐私打码按钮；无宿主时由 setPrivacyAvailable 收起
         QToolButton                                 *m_shareButton          = nullptr;                                       ///< 美化分享按钮；无宿主时由 setShareAvailable 收起
+        QToolButton                                 *m_bugReportButton      = nullptr;                                       ///< Bug 报告按钮；无宿主时收起
         QToolButton                                 *m_undoButton           = nullptr;                                          ///< 撤销按钮
         QToolButton                                 *m_redoButton           = nullptr;                                          ///< 重做按钮
         Slider                                      *m_widthSlider          = nullptr;                                          ///< 线宽滑块，档位对齐 kAnnotationWidths

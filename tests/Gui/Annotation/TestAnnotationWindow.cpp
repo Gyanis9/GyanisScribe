@@ -2781,3 +2781,34 @@ TEST_F(AnnotationWindowFixture, ShareButtonEmitsTheBakedImageAndKeepsTheRoundOpe
     EXPECT_TRUE(window->isRoundActive()) << "美化分享把这一轮画上了句号";
     EXPECT_EQ(closed.count(), 0) << "美化分享不该发 closed";
 }
+
+/**
+ * @brief 钉住「Bug 报告」入口：交出去的是成品，窗口不收场
+ * @details 与美化分享同口径：报告里要的是用户看到的成品，宿主拿着它去拼报告；
+ *          报告对话框由宿主接手，标注窗留着，这一轮也不算收场。
+ */
+TEST_F(AnnotationWindowFixture, BugReportButtonEmitsTheRenderedImageAndKeepsTheWindow)
+{
+    auto window = makeWindow();
+    window->startAnnotation(makeCanvas({200, 100}), QRect{0, 0, 1920, 1080}, QRect{0, 0, 200, 100});
+    ASSERT_TRUE(window->isVisible());
+    ASSERT_TRUE(drawAndSelect({10, 10}, {60, 40}).has_value());
+
+    auto *button = window->toolbar().findChild<QToolButton *>(QStringLiteral("bugReportButton"));
+    ASSERT_NE(button, nullptr) << "工具栏上找不到 Bug 报告按钮";
+    EXPECT_TRUE(button->toolTip().contains(QStringLiteral("Bug 报告")));
+
+    QSignalSpy requested{window.get(), &AnnotationWindow::bugReportRequested};
+    QSignalSpy closed{window.get(), &AnnotationWindow::closed};
+    button->click();
+
+    ASSERT_EQ(requested.count(), 1) << "按钮点了没发 bugReportRequested";
+    const auto image = requested.at(0).at(0).value<QImage>();
+    ASSERT_FALSE(image.isNull());
+    EXPECT_EQ(image.size(), QSize(400, 200));
+    EXPECT_DOUBLE_EQ(image.devicePixelRatio(), 2.0) << "交出去的是画布原图，不是标回倍比的成品";
+    EXPECT_NE(image.pixelColor(60, 20), QColor(180, 180, 180)) << "交出去的是底图，不是画上图形的成品";
+    EXPECT_TRUE(window->isVisible()) << "Bug 报告把标注窗收了";
+    EXPECT_TRUE(window->isRoundActive());
+    EXPECT_EQ(closed.count(), 0);
+}

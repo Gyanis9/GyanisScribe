@@ -273,6 +273,12 @@ namespace GyanisScribe::Gui
          */
         void shareRequested(const QImage &image);
         /**
+         * @brief 请求生成 Bug 报告
+         * @param image 烘焙好的成品，物理像素
+         * @note 与美化分享同口径：只报出去，标注窗不关；报告图与检查底图由宿主另取
+         */
+        void bugReportRequested(const QImage &image);
+        /**
          * @brief 请求打印标注结果
          * @param image 烘焙好的图
          * @note 与其它出口不同：打印不关窗，用户取消打印或在打印之后接着改，现场都不丢
