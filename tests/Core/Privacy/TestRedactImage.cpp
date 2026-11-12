@@ -3,6 +3,7 @@
 #include "Base/Types.h"
 #include "Core/Annotation/AnnotationTool.h"
 #include "Core/Privacy/RedactImage.h"
+#include "Core/Privacy/RedactionGeometry.h"
 
 #include <QColor>
 #include <QGuiApplication>
@@ -18,6 +19,7 @@
 
 using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Core::ToolKind;
+using GyanisScribe::Core::Privacy::kRedactionPaddingPixels;
 using GyanisScribe::Core::Privacy::redactImage;
 
 namespace
@@ -98,7 +100,7 @@ TEST_F(RedactImageFixture, MosaicChangesOnlyTheGivenBox)
     EXPECT_EQ(result->appliedCount, 1);
     EXPECT_EQ(result->image.size(), original.size());
 
-    const auto padded = box.adjusted(-2, -2, 2, 2).intersected(original.rect());
+    const auto padded = box.adjusted(-kRedactionPaddingPixels, -kRedactionPaddingPixels, kRedactionPaddingPixels, kRedactionPaddingPixels).intersected(original.rect());
     EXPECT_GT(changedPixels(before, result->image, padded), 0) << "命中框里一个像素都没变";
     for (int y = 0; y < original.height(); ++y)
     {
@@ -129,16 +131,28 @@ TEST_F(RedactImageFixture, MapsPhysicalBoxesThroughTheLogicalSize)
     EXPECT_EQ(before.pixel(150, 100), result->image.pixel(150, 100));
 }
 
+/// 模糊与马赛克同一组框外探针：整张图逐像素判，不只挑两个角
 TEST_F(RedactImageFixture, BlurAlsoLeavesPixelsOutsideTheBoxAlone)
 {
     const auto original = makePattern(QSize{120, 80});
     const auto before   = original.copy();
-    const auto result   = redactImage(original, std::array<QRect, 1>{QRect{30, 20, 40, 30}}, ToolKind::Blur, original.size(), 8);
+    const QRect box{30, 20, 40, 30};
+    const auto  result = redactImage(original, std::array<QRect, 1>{box}, ToolKind::Blur, original.size(), 8);
     ASSERT_TRUE(result.has_value()) << result.error().message;
     EXPECT_EQ(result->appliedCount, 1);
-    EXPECT_GT(changedPixels(before, result->image, QRect{28, 18, 44, 34}), 0) << "模糊框里一个像素都没变";
-    EXPECT_EQ(before.pixel(5, 5), result->image.pixel(5, 5));
-    EXPECT_EQ(before.pixel(110, 70), result->image.pixel(110, 70));
+
+    const auto padded = box.adjusted(-kRedactionPaddingPixels, -kRedactionPaddingPixels, kRedactionPaddingPixels, kRedactionPaddingPixels).intersected(original.rect());
+    EXPECT_GT(changedPixels(before, result->image, padded), 0) << "模糊框里一个像素都没变";
+    for (int y = 0; y < original.height(); ++y)
+    {
+        for (int x = 0; x < original.width(); ++x)
+        {
+            if (!padded.contains(x, y))
+            {
+                ASSERT_EQ(before.pixel(x, y), result->image.pixel(x, y)) << "框外像素被改了：" << x << "," << y;
+            }
+        }
+    }
     EXPECT_TRUE(samePixels(original, before)) << "输入图被改动了";
 }
 
