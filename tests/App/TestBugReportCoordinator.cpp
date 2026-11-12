@@ -664,3 +664,63 @@ TEST_F(BugReportCoordinatorFixture, DestroyingDuringAScanWaitsForTheWorker)
 
     EXPECT_EQ(finished->load(), 1) << "析构没等在飞识别收完就返回了";
 }
+
+/**
+ * @brief 钉住二维码框并进命中清单
+ * @details 码框来自码识别、不来自 OCR：没有一行文字时它仍要成为一条命中项。
+ */
+TEST_F(BugReportCoordinatorFixture, MatrixBarcodeBoxJoinsTheRedactionList)
+{
+    auto                 engine = std::make_unique<FakeOcrEngine>(Expected<OcrResult>{OcrResult{}});
+    BugReportCoordinator coordinator{
+            *m_settings, std::move(engine),
+            [](const QImage &)
+            {
+                return Expected<std::vector<BarcodeReading>>{std::vector<BarcodeReading>{
+                        BarcodeReading{QStringLiteral("https://example.com"), QStringLiteral("QR Code"), true, QRect{150, 60, 40, 40}}}};
+            }};
+    QWidget parent;
+    const QImage frame = makePatternImage(QSize{200, 100});
+    coordinator.openReport(frame, frame, makeContext(), &parent);
+    auto *dialog = coordinator.dialogForTesting();
+    ASSERT_NE(dialog, nullptr);
+    ASSERT_TRUE(waitUntil([dialog] { return dialog->redactionForTesting().state == RedactionState::Masked; })) << "二维码命中没有进打码状态";
+    EXPECT_EQ(dialog->redactionForTesting().maskedCount, 1);
+    EXPECT_NE(dialog->reportImageForTesting().pixel(170, 80), frame.pixel(170, 80)) << "码框落点没有被打码";
+}
+
+/**
+ * @brief 钉住一维码的扫描线框会向上扩张到码体
+ * @details zxing 给一维码的是细扫描线；不扩张就打不到条码本体，用户以为码清了其实还能读出来。
+ */
+TEST_F(BugReportCoordinatorFixture, OneDimensionalBarcodeExpandsToTheBody)
+{
+    auto                 engine = std::make_unique<FakeOcrEngine>(Expected<OcrResult>{OcrResult{}});
+    BugReportCoordinator coordinator{
+            *m_settings, std::move(engine),
+            [](const QImage &)
+            {
+                return Expected<std::vector<BarcodeReading>>{std::vector<BarcodeReading>{
+                        BarcodeReading{QStringLiteral("6901234567892"), QStringLiteral("EAN-13"), false, QRect{60, 48, 80, 2}}}};
+            }};
+    QWidget parent;
+    const QImage frame = makePatternImage(QSize{200, 100});
+    coordinator.openReport(frame, frame, makeContext(), &parent);
+    auto *dialog = coordinator.dialogForTesting();
+    ASSERT_NE(dialog, nullptr);
+    ASSERT_TRUE(waitUntil([dialog] { return dialog->redactionForTesting().state == RedactionState::Masked; })) << "一维码命中没有进打码状态";
+
+    const QImage processed = dialog->reportImageForTesting();
+    int          changedAbove = 0;
+    for (int y = 30; y < 48; ++y)
+    {
+        for (int x = 62; x < 138; ++x)
+        {
+            if (processed.pixel(x, y) != frame.pixel(x, y))
+            {
+                ++changedAbove;
+            }
+        }
+    }
+    EXPECT_GT(changedAbove, 0) << "一维码没有按最小高度向上扩张：扫描线上方的条码本体没被打码";
+}
