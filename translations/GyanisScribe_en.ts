@@ -644,6 +644,10 @@
             <translation>All %1 steps have been recorded; export or discard this recording first</translation>
         </message>
         <message>
+            <source>这张图没法分带扫描：尺寸为空</source>
+            <translation>The image has no size, so it cannot be scanned in bands</translation>
+        </message>
+        <message>
             <source>什么都不做</source>
             <translation>Do nothing</translation>
         </message>

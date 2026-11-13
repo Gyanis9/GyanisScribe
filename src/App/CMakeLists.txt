@@ -46,6 +46,8 @@ add_library(App STATIC
         RewindCoordinator.cpp
         StepRecorderCoordinator.h
         StepRecorderCoordinator.cpp
+        TiledPrivacyScanner.h
+        TiledPrivacyScanner.cpp
         BugReportCoordinator.h
         BugReportCoordinator.cpp)
 

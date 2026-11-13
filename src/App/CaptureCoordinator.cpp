@@ -47,6 +47,7 @@
 #include <QTimer>
 
 #include <format>
+#include <utility>
 #include <vector>
 
 namespace
@@ -246,6 +247,9 @@ namespace GyanisScribe::App
                 [this]
                 {
                     m_captureFlowActive = true;
+                    // 长截图落地后默认扫一遍：拼接出来的长图最可能带整片的敏感信息。
+                    // 记号在发起这一轮时立，取消或失败那条路会在收场处撤掉
+                    m_longCapturePendingPrivacy = true;
                     m_capture->startLongCapture();
                 });
     }
@@ -474,6 +478,9 @@ namespace GyanisScribe::App
             return;
         }
         m_captureFlowActive = false;
+        // 长截图这一轮到此为止：取消、失败与直接落盘那几条路都没经过标注窗，
+        // 记号要在这里一起撤掉，否则下一张普通截图会被顺带扫一遍
+        m_longCapturePendingPrivacy = false;
         emit captureFlowFinished();
     }
 
@@ -512,6 +519,11 @@ namespace GyanisScribe::App
                 return;
             case GyanisScribe::App::CaptureIntent::Annotate:
                 break;
+        }
+        // 长截图落地 → 自动扫一遍：分带扫描器兜住超高的图，普通截图不走这条
+        if (std::exchange(m_longCapturePendingPrivacy, false))
+        {
+            m_annotationWindow->setAutoPrivacyOnLoad(true);
         }
         m_annotationWindow->startAnnotation(m_lastCapture, screen.availableGeometry(), m_lastSelection, m_sourceInfo);
     }

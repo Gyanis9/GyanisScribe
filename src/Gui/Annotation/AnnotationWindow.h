@@ -131,6 +131,13 @@ namespace GyanisScribe::Gui
          */
         void startAnnotation(const Base::CapturedImage &captured, const QRect &screenAvailable, const QRect &selection, const Core::CaptureSourceInfo &source = {});
 
+        /**
+         * @brief 下一次载入底图后自动发起一次隐私打码
+         * @param enabled 置真表示下一轮开窗时自动发；发出后自动清掉
+         * @details 长截图交付时由协调器置位：拼接后的长图默认扫一遍，普通截图不受影响。
+         */
+        void setAutoPrivacyOnLoad(bool enabled);
+
         /// 浮着的工具栏，测试与调试用它核对摆放
         [[nodiscard]] AnnotationToolbar &toolbar() const noexcept;
 
@@ -359,6 +366,7 @@ namespace GyanisScribe::Gui
         bool                    m_infoPanelClosedByUser    = false; ///< 本轮用户亲手收起了信息面板：抓屏恢复与重裁都不把它带回来
         bool                    m_captureWindowWasVisible  = false; ///< 抓屏前标注窗是否露着：恢复时照这一份还回去
         bool                    m_captureToolbarWasVisible = false; ///< 抓屏前工具栏是否露着：恢复时照这一份还回去
+        bool                    m_autoPrivacyOnLoad        = false; ///< 下一次载入后是否自动发起隐私打码
     };
 
 } // namespace GyanisScribe::Gui

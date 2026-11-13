@@ -219,6 +219,17 @@ namespace GyanisScribe::Gui
         m_toolbar->raise();
         // 面板按这一轮的开关与来源决定去留：上一轮用户关掉的那块随新一轮重新评估
         updateInfoPanel();
+
+        // 标记是一次性的：这一轮发完就清，下一张普通截图不会被顺带扫
+        if (std::exchange(m_autoPrivacyOnLoad, false))
+        {
+            QMetaObject::invokeMethod(this, [this] { emit privacyRequested(m_engine.canvas().image); }, Qt::QueuedConnection);
+        }
+    }
+
+    void AnnotationWindow::setAutoPrivacyOnLoad(const bool enabled)
+    {
+        m_autoPrivacyOnLoad = enabled;
     }
 
     void AnnotationWindow::closeAnnotation()

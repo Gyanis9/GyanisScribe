@@ -7,7 +7,7 @@
 #include "App/CustomHotkeys.h"
 #include "App/HistoryCoordinator.h"
 #include "App/MemoryCoordinator.h"
-#include "App/PrivacyCoordinator.h"
+#include "App/TiledPrivacyScanner.h"
 #include "App/RecordingCoordinator.h"
 #include "App/RewindCoordinator.h"
 #include "App/StepRecorderCoordinator.h"
@@ -2682,25 +2682,25 @@ namespace GyanisScribe
     }
 
     /**
-     * @brief 钉住隐私协调器确实接在窗口入口与画布那一层之间
-     * @details 控制器里没有别的口子能拿到这份协调器，接线少一根都只能靠读代码发现：
-     *          窗口的 privacyRequested 要叫到 requestScan（协调器当场回一句「正在检查」或后端原因），
-     *          协调器的 scanSucceeded 要落到 CaptureCoordinator::handlePrivacyScan（无命中那句提示）。
-     *          真识别一轮由 TestPrivacyCoordinator 的假引擎覆盖，这里只判接线。
+     * @brief 钉住分带扫描器确实接在窗口入口与画布那一层之间
+     * @details 控制器里没有别的口子能拿到这份扫描器，接线少一根都只能靠读代码发现：
+     *          窗口的 privacyRequested 要叫到 start（扫描器当场切带开扫，或当场给出后端原因），
+     *          扫描器的 scanSucceeded 要落到 CaptureCoordinator::handlePrivacyScan（无命中那句提示）。
+     *          逐带真识别由 TestTiledPrivacyScanner 的假引擎覆盖，这里只判接线。
      */
-    TEST_F(AppControllerFixture, PrivacyCoordinatorIsWiredToWindowAndCanvas)
+    TEST_F(AppControllerFixture, TiledPrivacyScannerIsWiredToWindowAndCanvas)
     {
         m_frameScreenName = m_realScreenName;
         makeController();
 
-        auto &privacy = m_controller->privacyCoordinatorForTesting();
+        auto &scanner = m_controller->tiledPrivacyScannerForTesting();
         auto &capture = m_controller->capture();
         auto &window  = capture.annotationWindow();
         capture.startFullScreen(App::CaptureIntent::Annotate);
         ASSERT_TRUE(window.isVisible());
 
-        int privacyMessages = 0;
-        QObject::connect(&privacy, &App::PrivacyCoordinator::messageForUser, &privacy, [&privacyMessages](const QString &, Gui::ToastKind) { ++privacyMessages; });
+        bool reportedFailure = false;
+        QObject::connect(&scanner, &App::TiledPrivacyScanner::scanFailed, &scanner, [&reportedFailure](const Base::Error &) { reportedFailure = true; });
 
         QToolButton *privacyButton = nullptr;
         for (auto *candidate: window.toolbar().findChildren<QToolButton *>())
@@ -2713,7 +2713,7 @@ namespace GyanisScribe
         }
         ASSERT_NE(privacyButton, nullptr) << "标注窗工具栏上找不到隐私打码入口";
         privacyButton->click();
-        EXPECT_EQ(privacyMessages, 1) << "窗口的隐私打码入口没有叫到协调器（既没开始检查也没报后端原因）";
+        EXPECT_TRUE(scanner.isScanning() || reportedFailure) << "窗口的隐私打码入口没有叫到扫描器（既没开始切带也没报后端原因）";
         EXPECT_TRUE(window.isVisible()) << "发起检查就把标注窗收了";
 
         int     canvasMessages = 0;
@@ -2725,9 +2725,9 @@ namespace GyanisScribe
                              said = message;
                          });
 
-        // 直接发一条成功结果：真识别由 TestPrivacyCoordinator 的假引擎驱动，这里判的是这根线
-        privacy.scanSucceeded(window.canvas().image, Core::OcrResult{});
-        EXPECT_EQ(canvasMessages, 1) << "协调器的结果没有落到画布那一层";
+        // 直接发一条成功结果：逐带识别由 TestTiledPrivacyScanner 的假引擎驱动，这里判的是这根线
+        scanner.scanSucceeded(window.canvas().image, Core::OcrResult{});
+        EXPECT_EQ(canvasMessages, 1) << "扫描器的结果没有落到画布那一层";
         EXPECT_EQ(said, Base::uiText("未发现可打码的敏感信息。分享前请自行检查。")) << said.toStdString();
     }
 

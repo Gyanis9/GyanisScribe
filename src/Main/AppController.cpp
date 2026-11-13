@@ -15,7 +15,7 @@
 #include "App/PinCoordinator.h"
 #include "App/PickCoordinator.h"
 #include "App/OcrCoordinator.h"
-#include "App/PrivacyCoordinator.h"
+#include "App/TiledPrivacyScanner.h"
 #include "App/RecordingCoordinator.h"
 #include "App/StepRecorderCoordinator.h"
 #include "Gui/Capture/CaptureService.h"
@@ -175,12 +175,19 @@ namespace GyanisScribe::Main
         // 它要说的那句提示（后端没编进来、没有可认的图、认失败了）走 messageForUser 回到这一层出气泡
         m_ocr = std::make_unique<GyanisScribe::App::OcrCoordinator>(*m_settings, *m_integration, *m_icons, *m_theme);
         QObject::connect(m_ocr.get(), &GyanisScribe::App::OcrCoordinator::messageForUser, this, &AppController::notifyUser);
-        // 隐私扫描这一族只做「一张图的敏感信息检查」：提示回到这一层出气泡，失败只在接 scanFailed 的这一处记一条日志。
-        // 结果要落到画布上，所以接下来那两根线接在截图协调器那边（它才拿得到标注窗与引擎）
-        m_privacy = std::make_unique<GyanisScribe::App::PrivacyCoordinator>(*m_settings, *m_integration);
-        QObject::connect(m_privacy.get(), &GyanisScribe::App::PrivacyCoordinator::messageForUser, this, &AppController::notifyUser);
-        QObject::connect(m_privacy.get(), &GyanisScribe::App::PrivacyCoordinator::scanFailed, this,
-                         [](const GyanisScribe::Base::Error &error) { GyanisScribe::Base::Logger::error(std::format("隐私扫描失败：{}", error.message)); });
+        // 隐私扫描这一族只做「一张图的敏感信息检查」：分带扫描器把长图切带逐带认，收尾交回原图与合并结果。
+        // 它自己选后端、自己单飞；失败原因由这一层出气泡并留一条日志，结果要落到画布上，
+        // 所以接下来那两根线接在截图协调器那边（它才拿得到标注窗与引擎）
+        m_tiledPrivacy = std::make_unique<GyanisScribe::App::TiledPrivacyScanner>(*m_settings, *m_integration);
+        QObject::connect(
+                m_tiledPrivacy.get(), &GyanisScribe::App::TiledPrivacyScanner::scanFailed, this,
+                [this](const GyanisScribe::Base::Error &error)
+                {
+                    GyanisScribe::Base::Logger::error(std::format("隐私扫描失败：{}", error.message));
+                    notifyUser(QString::fromUtf8(
+                                       GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("敏感信息检查失败：{}。请重试一次，或换一种语言再试"), error.message).c_str()),
+                               GyanisScribe::Gui::ToastKind::Danger);
+                });
         // 报告这一族的报告窗、自动打码与环境组装都在协调器里；截图协调器负责把这一轮的画布与来源交给它
         m_bugReport    = std::make_unique<GyanisScribe::App::BugReportCoordinator>(*m_settings, *m_integration);
         m_tray         = std::make_unique<GyanisScribe::App::TrayController>(*m_icons, *m_theme, *m_settings, *m_integration);
@@ -359,11 +366,11 @@ namespace GyanisScribe::Main
         QObject::connect(m_capture.get(), &GyanisScribe::App::CaptureCoordinator::commandLineCaptureDelivered, this, &AppController::commandLineCaptureDelivered);
         // 多屏时托盘子菜单里那几条「整屏截图：<屏名>」不走 handleTrayAction：屏名信号直接交给同一个门禁出口
         QObject::connect(m_tray.get(), &GyanisScribe::App::TrayController::screenCaptureRequested, this, &AppController::captureScreenFromMenu);
-        // 隐私打码的两根线：标注窗的入口发起扫描，扫描成功交回截图协调器认码、审核、落笔。
+        // 隐私打码的两根线：标注窗的入口发起分带扫描，扫描成功交回截图协调器认码、审核、落笔。
         // 标注窗不关，结果回来之前用户还能接着改；过期画布由 handlePrivacyScan 自己挡
-        QObject::connect(&m_capture->annotationWindow(), &GyanisScribe::Gui::AnnotationWindow::privacyRequested, m_privacy.get(),
-                         &GyanisScribe::App::PrivacyCoordinator::requestScan);
-        QObject::connect(m_privacy.get(), &GyanisScribe::App::PrivacyCoordinator::scanSucceeded, m_capture.get(), &GyanisScribe::App::CaptureCoordinator::handlePrivacyScan);
+        QObject::connect(&m_capture->annotationWindow(), &GyanisScribe::Gui::AnnotationWindow::privacyRequested, m_tiledPrivacy.get(),
+                         &GyanisScribe::App::TiledPrivacyScanner::start);
+        QObject::connect(m_tiledPrivacy.get(), &GyanisScribe::App::TiledPrivacyScanner::scanSucceeded, m_capture.get(), &GyanisScribe::App::CaptureCoordinator::handlePrivacyScan);
         // 托盘那一族的逐屏截图接在协调器建好之后：连在尚未构造的成员上时 QObject::connect 不报错，
         // 托盘图标与菜单都照常现身，点下去却什么都不会发生
 
@@ -848,9 +855,9 @@ namespace GyanisScribe::Main
         return *m_stepRecorder;
     }
 
-    GyanisScribe::App::PrivacyCoordinator &AppController::privacyCoordinatorForTesting() const noexcept
+    GyanisScribe::App::TiledPrivacyScanner &AppController::tiledPrivacyScannerForTesting() const noexcept
     {
-        return *m_privacy;
+        return *m_tiledPrivacy;
     }
 
     GyanisScribe::App::HistoryCoordinator &AppController::historyCoordinatorForTesting() const noexcept

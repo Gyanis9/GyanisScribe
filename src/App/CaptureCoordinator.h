@@ -295,16 +295,17 @@ namespace GyanisScribe::App
         GyanisScribe::App::CaptureIntent                      m_intent = GyanisScribe::App::CaptureIntent::Annotate; ///< 这一帧截完要去做的事
         GyanisScribe::Core::CaptureSourceInfo                 m_sourceInfo;                                          ///< 本轮截图的前台来源，随历史记账一起交出去；回溯轮次整份为空
         GyanisScribe::App::CaptureOutputSet                   m_commandLineOutputs;                                  ///< 命令行那一次点名的去处，已按交付顺序排好
-        QString                                               m_commandLineExec;                ///< --exec 写的那一条命令；只在 m_commandLineExecGiven 为真时压过设置里那一格
-        bool                                                  m_commandLineExecGiven = false;   ///< 命令行到底给没给 --exec：给了就只跑那一条
-        bool                                                  m_commandLineActive    = false;   ///< 正在跑命令行那次截图：失败路径要往 commandLineActionFailed 也交一份
-        bool                                                  m_captureFlowActive    = false;   ///< 有一轮框选起的流程在跑：收场信号只发一次
-        bool                                                  m_rewindRound          = false;   ///< 这一轮从回溯换帧起头：抓帧回来不补屏幕与时刻，来源整份留空
-        QTimer                                               *m_delayTimer           = nullptr; ///< 延时截图那一枚，一次只允许有一个在等
-        std::function<void()>                                 m_pendingCapture;                 ///< 延时到点要走的那一步，随定时器一起活到触发
-        GyanisScribe::Base::CapturedImage                     m_lastCapture;                    ///< 本轮抓到的帧，贴图与识别要用它定位
-        QRect                                                 m_lastSelection;                  ///< 本轮选区（全局逻辑坐标），标注窗与贴图的位置来源
-        QPointer<GyanisScribe::Gui::ShareDialog>              m_shareDialog;                    ///< 美化对话框，关掉即自毁，不拥有
+        QString                                               m_commandLineExec;                     ///< --exec 写的那一条命令；只在 m_commandLineExecGiven 为真时压过设置里那一格
+        bool                                                  m_commandLineExecGiven      = false;   ///< 命令行到底给没给 --exec：给了就只跑那一条
+        bool                                                  m_commandLineActive         = false;   ///< 正在跑命令行那次截图：失败路径要往 commandLineActionFailed 也交一份
+        bool                                                  m_captureFlowActive         = false;   ///< 有一轮框选起的流程在跑：收场信号只发一次
+        bool                                                  m_rewindRound               = false;   ///< 这一轮从回溯换帧起头：抓帧回来不补屏幕与时刻，来源整份留空
+        bool                                                  m_longCapturePendingPrivacy = false;   ///< 这一轮长截图落地后是否自动打码
+        QTimer                                               *m_delayTimer                = nullptr; ///< 延时截图那一枚，一次只允许有一个在等
+        std::function<void()>                                 m_pendingCapture;                      ///< 延时到点要走的那一步，随定时器一起活到触发
+        GyanisScribe::Base::CapturedImage                     m_lastCapture;                         ///< 本轮抓到的帧，贴图与识别要用它定位
+        QRect                                                 m_lastSelection;                       ///< 本轮选区（全局逻辑坐标），标注窗与贴图的位置来源
+        QPointer<GyanisScribe::Gui::ShareDialog>              m_shareDialog;                         ///< 美化对话框，关掉即自毁，不拥有
     };
 
 } // namespace GyanisScribe::App

@@ -60,7 +60,7 @@ namespace GyanisScribe::App
     class HistoryCoordinator;
     class MemoryCoordinator;
     class OcrCoordinator;
-    class PrivacyCoordinator;
+    class TiledPrivacyScanner;
     class CaptureCoordinator;
     class DeliveryCoordinator;
     class PickCoordinator;
@@ -297,12 +297,12 @@ namespace GyanisScribe::Main
         [[nodiscard]] GyanisScribe::App::StepRecorderCoordinator &stepRecorderForTesting() const noexcept;
 
         /**
-         * @brief 隐私扫描这一族的协调器，仅供用例判入口与画布那一层的接线
+         * @brief 分带隐私扫描器，仅供用例判入口与画布那一层的接线
          * @return 本控制器持有的那一份，所有权不在调用方
          * @note 生产侧只经标注窗的隐私打码入口进来：用例要判「窗口的信号真的叫到了它、
          *       它的结果真的落进截图协调器」，只有这一条口子拿得到同一个对象。
          */
-        [[nodiscard]] GyanisScribe::App::PrivacyCoordinator &privacyCoordinatorForTesting() const noexcept;
+        [[nodiscard]] GyanisScribe::App::TiledPrivacyScanner &tiledPrivacyScannerForTesting() const noexcept;
 
         /**
          * @brief 历史这一族，仅供用例接记录信号
@@ -435,7 +435,7 @@ namespace GyanisScribe::Main
         std::unique_ptr<GyanisScribe::Gui::PinManager>                m_pins;          ///< 贴图管理器
         std::unique_ptr<GyanisScribe::App::RecordingCoordinator>      m_recording;     ///< 录屏这一族（配置、服务、控制条、倒计时）
         std::unique_ptr<GyanisScribe::App::OcrCoordinator>            m_ocr;           ///< 识别这一族（后端选型、搬运工、结果窗）
-        std::unique_ptr<GyanisScribe::App::PrivacyCoordinator>        m_privacy;       ///< 隐私扫描这一族（后端选型、单飞、结果交回截图协调器）
+        std::unique_ptr<GyanisScribe::App::TiledPrivacyScanner>       m_tiledPrivacy;  ///< 分带隐私扫描（长图切带逐带认、结果交回截图协调器）
         std::unique_ptr<GyanisScribe::App::BugReportCoordinator>      m_bugReport;     ///< Bug 报告这一族（扫描、环境与对话框）
         std::unique_ptr<GyanisScribe::App::TrayController>            m_tray;          ///< 托盘图标与菜单
         // 排在主窗口之前：窗口构造要拿它的索引，析构顺序反过来，窗口先没、库最后关
