@@ -32,7 +32,7 @@ namespace
 {
     // 需求第七节点名的图标清单：这一份是抄来的独立期望值，不从资源目录反推，
     // 否则删掉一枚 SVG 之后用例只会跟着一起改口，就再也抓不住它了
-    constexpr std::array<std::string_view, 55> kRequiredIcons = {
+    constexpr std::array<std::string_view, 56> kRequiredIcons = {
             "Tray",
             "Capture",
             "CaptureFullScreen",
@@ -85,6 +85,7 @@ namespace
             "ThemeLight",
             "ThemeDark",
             "ThemeSystem",
+            "ThemeHighContrast",
             "Exit",
             "About",
             "Refresh",

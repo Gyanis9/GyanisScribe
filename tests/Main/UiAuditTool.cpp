@@ -665,6 +665,33 @@ int main(int argc, char *argv[])
             }
         }
 
+        // 面 6b：主题下拉与四枚行标签图标的取证——明暗两档各拍主题页、录屏页与识别页。
+        // 图标是取色那一刻的快照，两档各取一次才看得出「换了档有没有跟着变色」
+        for (const auto &[mode, name]: std::array<std::pair<const char *, const char *>, 2>{{{"Light", "light"}, {"Dark", "dark"}}})
+        {
+            if (const auto written = settings.setValue(GyanisScribe::Core::kThemeMode, QString::fromUtf8(mode)); !written)
+            {
+                std::fprintf(stderr, "failed to switch the theme\n");
+                return 1;
+            }
+            theme.applyFromSettings();
+            for (const auto &[page, pageName]:
+                 std::array<std::pair<GyanisScribe::Main::MainWindowPage, const char *>, 3>{{{GyanisScribe::Main::MainWindowPage::Theme, "theme"},
+                                                                                           {GyanisScribe::Main::MainWindowPage::Record, "record"},
+                                                                                           {GyanisScribe::Main::MainWindowPage::Ocr, "ocr"}}})
+            {
+                window.open(page);
+                shoot(window, outputDirectory, std::format("theme-{}-main-{}", name, pageName).c_str());
+            }
+        }
+        // 拍完收回浅色：这一段之后那些对照图的起点与文件开头是同一档
+        if (!settings.setValue(GyanisScribe::Core::kThemeMode, QStringLiteral("Light")))
+        {
+            std::fprintf(stderr, "failed to restore the light theme\n");
+            return 1;
+        }
+        theme.applyFromSettings();
+
         // 面 4：深色与高对比度档的对应图（换肤观感核对；浅色已在前面出过）
         for (const auto &[mode, name]: std::array<std::pair<const char *, const char *>, 2>{{{"Dark", "dark"}, {"HighContrast", "hc"}}})
         {

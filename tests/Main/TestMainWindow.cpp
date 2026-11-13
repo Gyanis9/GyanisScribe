@@ -82,6 +82,7 @@ using GyanisScribe::Main::updateStatusHtml;
 #include <QWidget>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
@@ -3102,4 +3103,58 @@ TEST_F(MainWindowFixture, AboutBrandTileKeepsItsLayerOnTheDarkCard)
 
     EXPECT_GE(channelGap(plate, card), 8) << "深色卡片与品牌底板分不出来，砖形仍然会消失";
     EXPECT_GE(channelGap(tile, plate), 8) << "品牌砖与底板之间没有一层可分的边界";
+}
+
+/**
+ * @brief 钉住主题下拉四档各带图标、取声与识别语言四行的行标签带图标，且换肤后两处都重取
+ * @details 这七枚图标此前都在资源里没人用。只看截图分不清「挂了图标」与「图标是空位图」，
+ *          所以按对象名取到行标签，再查它内部那枚子标签上有没有位图；空的与没搭出子标签的一并变红。
+ */
+TEST_F(MainWindowFixture, ThemeItemsAndSettingRowsCarryIcons)
+{
+    // 先钉在浅色档：这一台机器的系统配色可能是深色，起点不定就分不清「换肤后重取」与「本来就这色」
+    ASSERT_TRUE(m_store->setValue(GyanisScribe::Core::kThemeMode, QStringLiteral("Light")).has_value());
+    makeWindow(true);
+
+    m_window->open(MainWindowPage::Theme);
+    QComboBox *themeCombo = nullptr;
+    for (auto *candidate: m_window->findChildren<QComboBox *>())
+    {
+        if (candidate->accessibleName() == GyanisScribe::Base::uiText("主题"))
+        {
+            themeCombo = candidate;
+            break;
+        }
+    }
+    ASSERT_NE(themeCombo, nullptr) << "主题页没有配色方案下拉，判据的前提没构造出来";
+    // 四项与 kThemeChoices 同序：档数变了先改这张判据，别让它悄悄只查前几项
+    ASSERT_EQ(themeCombo->count(), 4) << "主题档位不是四档";
+    for (int index = 0; index < themeCombo->count(); ++index)
+    {
+        EXPECT_FALSE(themeCombo->itemIcon(index).isNull()) << "第 " << index << " 档主题没有图标";
+    }
+
+    const std::array<const char *, 4> rows{"icon-Countdown", "icon-OcrLanguage", "icon-Microphone", "icon-SystemAudio"};
+    for (const auto *name: rows)
+    {
+        auto *label = m_window->findChild<QLabel *>(QString::fromLatin1(name));
+        ASSERT_NE(label, nullptr) << "找不到 " << name;
+        auto *glyph = label->findChild<QLabel *>(QStringLiteral("icon-glyph"));
+        ASSERT_NE(glyph, nullptr) << name << " 没搭出图标子标签";
+        EXPECT_FALSE(glyph->pixmap().isNull()) << name << " 的图标是空的";
+    }
+
+    // 图标是取色那一刻的快照：换肤后下拉里那四枚与行标签那枚都要按名字重取，
+    // 否则深色档会停在浅色档的深描边上，在深底里等于看不见
+    const auto glyphOf = [this](const QString &name)
+    {
+        auto *label = m_window->findChild<QLabel *>(name);
+        return label == nullptr ? QPixmap{} : label->findChild<QLabel *>(QStringLiteral("icon-glyph"))->pixmap();
+    };
+    const auto lightComboKey = themeCombo->itemIcon(0).cacheKey();
+    const auto lightRowKey   = glyphOf(QStringLiteral("icon-Countdown")).cacheKey();
+
+    ASSERT_TRUE(m_theme->setTheme(GyanisScribe::Gui::ThemeKind::Dark).has_value());
+    EXPECT_NE(themeCombo->itemIcon(0).cacheKey(), lightComboKey) << "换主题后主题下拉的图标没重取";
+    EXPECT_NE(glyphOf(QStringLiteral("icon-Countdown")).cacheKey(), lightRowKey) << "换主题后行标签的图标没重取";
 }

@@ -81,6 +81,7 @@
     <file alias="Text.svg">Icons/Text.svg</file>
     <file alias="Theme.svg">Icons/Theme.svg</file>
     <file alias="ThemeDark.svg">Icons/ThemeDark.svg</file>
+    <file alias="ThemeHighContrast.svg">Icons/ThemeHighContrast.svg</file>
     <file alias="ThemeLight.svg">Icons/ThemeLight.svg</file>
     <file alias="ThemeSystem.svg">Icons/ThemeSystem.svg</file>
     <file alias="Tray.svg">Icons/Tray.svg</file>

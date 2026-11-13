@@ -40,6 +40,7 @@
 #include "Gui/Theme/CornerStyle.h"
 #include "Gui/Theme/DesignTokens.h"
 #include "Gui/Controls/HotkeyEdit.h"
+#include "Gui/Controls/IconLabel.h"
 #include "Gui/Resources/IconProvider.h"
 #include "Gui/Theme/Language.h"
 #include "Gui/Theme/ThemeManager.h"
@@ -315,6 +316,19 @@ namespace
             contentWidth = std::max({contentWidth, formWidth, page->sizeHint().width()});
         }
         return contentWidth;
+    }
+
+    /**
+     * @brief 设置页的行标签：有图标的用它，没有的仍传纯文字
+     * @param icons 图标来源
+     * @param theme 主题来源，换肤时按名字重取
+     * @param name 图标名
+     * @param text 已经过 uiText 的标签文字
+     * @return 归表单所有的行标签
+     */
+    QWidget *iconRow(GyanisScribe::Gui::IconProvider &icons, GyanisScribe::Gui::ThemeManager &theme, std::string_view name, const QString &text)
+    {
+        return new GyanisScribe::Gui::IconLabel{icons, theme, name, text};
     }
 
     /**
@@ -615,19 +629,55 @@ namespace
     }
 
     /**
+     * @brief 主题档位对应的图标名：与 kThemeChoices 一一对应
+     * @param kind 档位
+     * @return 该档位在资源里的图标名
+     */
+    std::string_view themeIconName(ThemeKind kind)
+    {
+        switch (kind)
+        {
+            case ThemeKind::Light:
+                return "ThemeLight";
+            case ThemeKind::Dark:
+                return "ThemeDark";
+            case ThemeKind::System:
+                return "ThemeSystem";
+            case ThemeKind::HighContrast:
+                return "ThemeHighContrast";
+        }
+        return "ThemeLight";
+    }
+
+    /**
      * @brief 配色方案下拉：标签与档位都来自 themeChoices()
      * @param theme 主题管理器，选中即时生效
+     * @param icons 图标供给器，每一档前面挂它自己的那枚图标
      * @return 归调用方所有的下拉框
+     * @details 四档的字形各不相同（太阳、月亮、半明半暗的屏幕、实心半圆），
+     *          逐项挂图比逐条读四个字的档名更快认出现在是哪一档。
      */
-    QComboBox *makeThemeCombo(GyanisScribe::Gui::ThemeManager &theme)
+    QComboBox *makeThemeCombo(GyanisScribe::Gui::ThemeManager &theme, GyanisScribe::Gui::IconProvider &icons)
     {
         auto *combo = new GyanisScribe::Gui::ComboBox;
         for (const auto &choice: kThemeChoices)
         {
-            combo->addItem(GyanisScribe::Base::uiText(choice.label));
+            combo->addItem(icons.icon(themeIconName(choice.kind)), GyanisScribe::Base::uiText(choice.label));
         }
         combo->setAccessibleName(GyanisScribe::Base::uiText("主题"));
         combo->setCurrentIndex(indexOfThemeKind(theme.requestedKind()));
+        // QIcon 是取色那一刻的快照：换肤之后按同一张表再取一遍，
+        // 否则深色档会留着浅色档那份深描边，四枚图标在深底上等于看不见
+        QObject::connect(&theme, &GyanisScribe::Gui::ThemeManager::themeChanged, combo,
+                         [&icons, combo]
+                         {
+                             int index = 0;
+                             for (const auto &choice: kThemeChoices)
+                             {
+                                 combo->setItemIcon(index, icons.icon(themeIconName(choice.kind)));
+                                 ++index;
+                             }
+                         });
         QObject::connect(combo, &QComboBox::currentIndexChanged, combo,
                          [&theme](int index)
                          {
@@ -2691,15 +2741,15 @@ namespace GyanisScribe::Main
         form->addRow(GyanisScribe::Base::uiText("输出格式"), formatCombo);
         auto *frameRateSpin = makeFrameRateSpin(m_settings);
         form->addRow(GyanisScribe::Base::uiText("默认帧率"), frameRateSpin);
-        form->addRow(GyanisScribe::Base::uiText("录制倒计时"), makeCountdownSpin(m_settings));
+        form->addRow(iconRow(m_icons, m_theme, "Countdown", GyanisScribe::Base::uiText("录制倒计时")), makeCountdownSpin(m_settings));
         form->addRow(GyanisScribe::Base::uiText("最长录制时长"), makeMaximumDurationSpin(m_settings));
         form->addRow(GyanisScribe::Base::uiText("画面码率"), makeVideoBitrateSpin(m_settings));
         form->addRow(GyanisScribe::Base::uiText("视频编码器"), makeVideoEncoderCombo(m_settings, *m_videoEncoders));
         form->addRow(GyanisScribe::Base::uiText("光标高亮"), makeCursorHighlightCheck(m_settings, m_icons));
         auto *microphoneCombo  = makeAudioDeviceCombo(m_settings, GyanisScribe::Core::kRecordAudioMicrophone, GyanisScribe::Base::uiText("麦克风设备"), *m_audioDevices);
         auto *systemSoundCombo = makeAudioDeviceCombo(m_settings, GyanisScribe::Core::kRecordAudioSystemSound, GyanisScribe::Base::uiText("系统声音设备"), *m_audioDevices);
-        form->addRow(GyanisScribe::Base::uiText("麦克风"), microphoneCombo);
-        form->addRow(GyanisScribe::Base::uiText("系统声音"), systemSoundCombo);
+        form->addRow(iconRow(m_icons, m_theme, "Microphone", GyanisScribe::Base::uiText("麦克风")), microphoneCombo);
+        form->addRow(iconRow(m_icons, m_theme, "SystemAudio", GyanisScribe::Base::uiText("系统声音")), systemSoundCombo);
 
         // 选到 GIF 就把取声那两格关掉、把帧率那一格的天花板收到 24：判据与 RecordingService 跳过取声
         // 用的是同一句，帧率上限与 validateRecorderConfig 同源（kMaximumGifFrameRate 一处真源）
@@ -2719,7 +2769,7 @@ namespace GyanisScribe::Main
         auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
         auto *form = makePageForm(page, GyanisScribe::Base::uiText("可识别的文字取决于语言包。目录留空时按环境变量与程序数据目录查找。"));
-        form->addRow(GyanisScribe::Base::uiText("识别语言"), makeOcrLanguageCombo(m_settings));
+        form->addRow(iconRow(m_icons, m_theme, "OcrLanguage", GyanisScribe::Base::uiText("识别语言")), makeOcrLanguageCombo(m_settings));
         form->addRow(GyanisScribe::Base::uiText("语言包目录"), makePathRow(m_settings, GyanisScribe::Core::kOcrTessDataDirectory, GyanisScribe::Base::uiText("语言包目录"),
                                                                                GyanisScribe::Base::Paths::applicationDataDirectory() / "tessdata", m_icons));
         return page;
@@ -2855,7 +2905,7 @@ namespace GyanisScribe::Main
         auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
         auto *form = makePageForm(page, GyanisScribe::Base::uiText("配色方案立即生效。高对比度模式使用纯黑文字、纯白背景与加粗边框。"));
-        form->addRow(GyanisScribe::Base::uiText("配色方案"), makeThemeCombo(m_theme));
+        form->addRow(GyanisScribe::Base::uiText("配色方案"), makeThemeCombo(m_theme, m_icons));
         return page;
     }
 
