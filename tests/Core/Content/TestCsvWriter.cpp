@@ -124,3 +124,34 @@ TEST(CsvWriter, FailsWhenParentPathIsAFile)
     EXPECT_EQ(result.error().code, GyanisScribe::Base::ErrorCode::FileWriteFailed);
     EXPECT_FALSE(std::filesystem::exists(path));
 }
+
+TEST(CsvWriter, PrefixesFormulaStartersWithASingleQuote)
+{
+    const auto cellOf = [](const QString &value) { return toCsv(tableWith({{value}})); };
+
+    EXPECT_TRUE(cellOf(QStringLiteral("=cmd|calc")).startsWith(QStringLiteral("'=cmd|calc"))) << "等号开头没加前缀";
+    EXPECT_TRUE(cellOf(QStringLiteral("+1+1")).startsWith(QStringLiteral("'+1+1")));
+    EXPECT_TRUE(cellOf(QStringLiteral("@SUM(A1)")).startsWith(QStringLiteral("'@SUM(A1)")));
+    EXPECT_TRUE(cellOf(QStringLiteral("\tHYPERLINK")).startsWith(QStringLiteral("'\tHYPERLINK"))) << "制表符开头没加前缀";
+    EXPECT_EQ(cellOf(QStringLiteral("\rHYPERLINK")), QStringLiteral("\"'\rHYPERLINK\"\r\n")) << "回车开头的单元格要加前缀，同时仍按 RFC 4180 加引号";
+    EXPECT_TRUE(cellOf(QStringLiteral("-cmd|calc")).startsWith(QStringLiteral("'-cmd|calc")));
+    EXPECT_FALSE(cellOf(QStringLiteral("'=already")).startsWith(QStringLiteral("''"))) << "已经带引号前缀的又加了一层";
+}
+
+TEST(CsvWriter, LeavesNumbersAndPlainTextAloneButSeesThroughHalfWidthSpaces)
+{
+    const auto cellOf = [](const QString &value) { return toCsv(tableWith({{value}})); };
+
+    EXPECT_EQ(cellOf(QStringLiteral("-5")), QStringLiteral("-5\r\n")) << "整数负数被改了";
+    EXPECT_EQ(cellOf(QStringLiteral("-3.2")), QStringLiteral("-3.2\r\n")) << "小数负数被改了";
+    EXPECT_EQ(cellOf(QStringLiteral("-1e5")), QStringLiteral("-1e5\r\n")) << "科学计数被改了";
+    EXPECT_EQ(cellOf(QStringLiteral("普通文本")), QStringLiteral("普通文本\r\n"));
+    EXPECT_TRUE(cellOf(QStringLiteral("  =cmd")).startsWith(QStringLiteral("'  =cmd"))) << "半角空格后的等号没被看见";
+    EXPECT_FALSE(cellOf(QStringLiteral("　=cmd")).startsWith(QStringLiteral("'"))) << "全角空格属于内容，不该被当可跳过的前缀";
+}
+
+TEST(CsvWriter, FormulaPrefixStillQuotesWhenTheValueNeedsIt)
+{
+    const auto cellOf = [](const QString &value) { return toCsv(tableWith({{value}})); };
+    EXPECT_EQ(cellOf(QStringLiteral("=cmd,a")), QStringLiteral("\"'=cmd,a\"\r\n")) << "净化与引用没叠加对";
+}
