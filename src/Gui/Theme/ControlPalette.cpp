@@ -108,11 +108,18 @@ namespace GyanisScribe::Gui
     ControlColors inputColors(const ThemePalette &palette, const ThemeKind kind, const bool enabled, const bool readOnly, const bool focused, const bool inlineFocus)
     {
         ControlColors colors;
-        colors.fill        = (!enabled || readOnly) ? palette.mutedFill : palette.controlFill;
+        const bool    active = enabled && !readOnly;
+        colors.fill          = active ? palette.controlFill : palette.mutedFill;
+        // 静息也要有边：浅深档的 controlFill 与卡片 surface 只差一档微明度，没有边时输入框会融进卡片。
+        // 禁用/只读退到 border 弱一档；高对比度档靠 borderStrong 的 2px 边分层次，与这一档的契约一致
+        colors.border      = (kind == ThemeKind::HighContrast || active) ? palette.borderStrong : palette.border;
+        colors.borderWidth = themeBorderWidth(kind);
         const auto border  = focusedBorder(palette, kind, focused, inlineFocus);
-        colors.border      = border.border;
-        colors.borderWidth = border.borderWidth;
-        applyHighContrastBaseBorder(colors, palette, kind);
+        if (border.borderWidth > 0)
+        {
+            colors.border      = border.border;
+            colors.borderWidth = border.borderWidth;
+        }
         return colors;
     }
 

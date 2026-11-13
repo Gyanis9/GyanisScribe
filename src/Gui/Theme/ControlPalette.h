@@ -76,8 +76,9 @@ namespace GyanisScribe::Gui
      * @param readOnly 是否只读
      * @param focused 是否持有焦点
      * @param inlineFocus 是否由控件自绘焦点边
-     * @return 填充与描边；只读与禁用落 mutedFill；
-     *         高对比度档无焦点时也保留 borderStrong 描边，对齐这一档输入控件的 2px 边
+     * @return 填充与描边；只读与禁用落 mutedFill 与弱一档的 border；
+     *         浅深档启用态带 1px borderStrong 静息边（不然 controlFill 与卡片底几乎同色），
+     *         焦点边由 FocusRing 覆盖层或标注工具栏内的自绘边接管；高对比度档一律 2px 边
      */
     [[nodiscard]] ControlColors inputColors(const ThemePalette &palette, ThemeKind kind, bool enabled, bool readOnly, bool focused,
                                             bool inlineFocus);

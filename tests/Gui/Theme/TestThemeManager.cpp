@@ -497,12 +497,17 @@ TEST_F(ThemeManagerFixture, StyleSheetsAndPalettesAgreeInBothDirections)
         EXPECT_EQ(GyanisScribe::Gui::buttonColors(palette, kind, true, true, true, false, false, false).fill, palette.accentHover) << "主按钮悬停底没取 accentHover 角色";
         EXPECT_EQ(GyanisScribe::Gui::toolButtonColors(palette, kind, true, true, false, false, false, false).fill, palette.accentSoft) << "选中的工具按钮没取 accentSoft 角色";
         EXPECT_EQ(GyanisScribe::Gui::toolButtonColors(palette, kind, false, true, false, true, false, false).fill, palette.pressed) << "按下态的工具按钮填充没取 pressed 角色";
-        EXPECT_EQ(GyanisScribe::Gui::inputColors(palette, kind, true, false, false, false).fill, palette.controlFill) << "启用输入框的静息底没取 controlFill 角色";
+        const auto restInput = GyanisScribe::Gui::inputColors(palette, kind, true, false, false, false);
+        EXPECT_EQ(restInput.fill, palette.controlFill) << "启用输入框的静息底没取 controlFill 角色";
         EXPECT_EQ(GyanisScribe::Gui::inputColors(palette, kind, false, false, false, false).fill, palette.mutedFill) << "禁用输入的静默底没取 mutedFill 角色";
         EXPECT_EQ(GyanisScribe::Gui::inputColors(palette, kind, true, true, false, false).fill, palette.mutedFill) << "只读输入的静默底没取 mutedFill 角色";
         EXPECT_EQ(GyanisScribe::Gui::inputColors(palette, kind, true, false, true, true).border, palette.accent) << "标注工具栏内输入框的焦点边没取 accent 角色";
-        EXPECT_EQ(GyanisScribe::Gui::inputColors(palette, kind, true, false, false, false).border, kind == ThemeKind::HighContrast ? palette.borderStrong : QColor{})
-                << "高对比度档输入框的静息描边没取 borderStrong 角色";
+        EXPECT_EQ(restInput.border, palette.borderStrong) << "输入框静息描边没取 borderStrong 角色";
+        EXPECT_EQ(restInput.borderWidth, kind == ThemeKind::HighContrast ? 2 : 1) << "输入框静息描边的宽度不对";
+        // 只断「有边」还不够：描边若与卡片底同色，等于没有。浅深档的 borderStrong 与 surface 至少差 16 个色阶
+        const auto channelGap = [](const QColor &left, const QColor &right)
+        { return std::max({std::abs(left.red() - right.red()), std::abs(left.green() - right.green()), std::abs(left.blue() - right.blue())}); };
+        EXPECT_GE(channelGap(restInput.border, palette.surface), 16) << "输入框静息描边与卡片底的色差太小，输入框会融进背景";
     }
 }
 
