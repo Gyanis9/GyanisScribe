@@ -1304,18 +1304,6 @@
             <translation>Corner radius "{}" is outside {} to {}. Pick a new value on the Shot page of Settings, or delete Capture/CornerRadius to fall back to the default {} pixels</translation>
         </message>
         <message>
-            <source>检测到复杂表格，暂不支持导出 CSV；请改用 Markdown 或 TXT 复制表格内容</source>
-            <translation>A complex table was detected, and CSV export is not supported yet; copy the table content as Markdown or TXT instead</translation>
-        </message>
-        <message>
-            <source>没有检测到可导出的表格，请先确认截图里有对齐的表格</source>
-            <translation>No exportable table was detected. Check that the screenshot contains an aligned table</translation>
-        </message>
-        <message>
-            <source>表格结构不完整，暂不支持导出 CSV；请改用 Markdown 或 TXT 复制表格内容</source>
-            <translation>The table structure is incomplete, and CSV export is not supported yet; copy the table content as Markdown or TXT instead</translation>
-        </message>
-        <message>
             <source>CSV 写不出去：{}（{}）。请换一个可写的目录后重试</source>
             <translation>Cannot write the CSV: {} ({}). Pick a writable directory and try again</translation>
         </message>
@@ -1326,6 +1314,34 @@
         <message>
             <source>CSV 无法保存：{}（{}）。请检查磁盘空间后重试</source>
             <translation>The CSV could not be flushed to disk: {} ({}). Check the free disk space and try again</translation>
+        </message>
+        <message>
+            <source>没有检测到可导出的表格，请先确认截图里有对齐的表格</source>
+            <translation>No exportable table was detected. Check that the screenshot contains an aligned table</translation>
+        </message>
+        <message>
+            <source>检测到复杂表格，暂不支持导出 CSV；请改用 Markdown 或 TXT 复制表格内容</source>
+            <translation>A complex table was detected, and CSV export is not supported yet; copy the table content as Markdown or TXT instead</translation>
+        </message>
+        <message>
+            <source>表格结构不完整，暂不支持导出 CSV；请改用 Markdown 或 TXT 复制表格内容</source>
+            <translation>The table structure is incomplete, and CSV export is not supported yet; copy the table content as Markdown or TXT instead</translation>
+        </message>
+        <message>
+            <source>表格超出 Excel 的行列上限，无法导出 XLSX；请缩小截图范围后重试</source>
+            <translation>The table exceeds Excel's row and column limits and cannot be exported as XLSX; narrow the capture area and try again</translation>
+        </message>
+        <message>
+            <source>XLSX 写不出去：{}（{}）。请换一个可写的目录后重试</source>
+            <translation>Cannot write the XLSX file: {} ({}). Choose a writable directory and try again</translation>
+        </message>
+        <message>
+            <source>XLSX 无法写入：{}（{}）。请检查磁盘空间后重试</source>
+            <translation>Cannot write the XLSX file: {} ({}). Check the disk space and try again</translation>
+        </message>
+        <message>
+            <source>XLSX 无法保存：{}（{}）。请检查磁盘空间后重试</source>
+            <translation>Cannot save the XLSX file: {} ({}). Check the disk space and try again</translation>
         </message>
         <message>
             <source>{}。清单：{}。请修正该条记录，或删除该清单文件让软件重建（输出文件不受影响）</source>
