@@ -284,6 +284,50 @@ TEST(TableDetector, MergesCellPerLineColumnMajorIntoSingleTable)
     EXPECT_EQ(table.lastLine, 5);
 }
 
+TEST(TableDetector, MissingCellDoesNotChainTwoColumnBoundaries)
+{
+    // 一行缺一格时长留白会同时覆盖相邻两处列分界；串联合并会把两列并成一列（5 列变 4 列）
+    QVector<OcrLine> lines;
+    const int        columns[] = {37, 165, 293, 421, 548};
+    for (int row = 0; row < 4; ++row)
+    {
+        const int y = 89 + row * 38;
+        for (int column = 0; column < 5; ++column)
+        {
+            if (row == 2 && column == 2)
+            {
+                continue; // 第三行第三格没有识别出文字
+            }
+            lines.push_back(makeCellLine(columns[column], y, QStringLiteral("x"), 50));
+        }
+    }
+    const auto table = detectTable(makeResult(lines));
+
+    ASSERT_TRUE(table.found);
+    EXPECT_EQ(table.columns, 5) << "缺一格的行把两处列分界串成了一处";
+    EXPECT_EQ(table.rows, 4);
+}
+
+TEST(TableDetector, CellPaddingRowPitchStillFormsOneTable)
+{
+    // 真 OCR 的格内文字高 15、行距 38（padding + 边框）：合并后的行间隙 23 比 1.5×行高还大，
+    // 分段上限若只看行高会把表格切成一条条单行段，检测不到表
+    const auto result = makeResult({
+            makeCellLine(37, 89, QStringLiteral("列1"), 50),  makeCellLine(197, 89, QStringLiteral("列2"), 50),
+            makeCellLine(357, 89, QStringLiteral("列3"), 50), makeCellLine(516, 89, QStringLiteral("列4"), 50),
+            makeCellLine(37, 127, QStringLiteral("A"), 50),   makeCellLine(197, 127, QStringLiteral("B"), 50),
+            makeCellLine(357, 127, QStringLiteral("C"), 50),  makeCellLine(516, 127, QStringLiteral("D"), 50),
+            makeCellLine(37, 165, QStringLiteral("1"), 50),   makeCellLine(197, 165, QStringLiteral("2"), 50),
+            makeCellLine(357, 165, QStringLiteral("3"), 50),  makeCellLine(516, 165, QStringLiteral("4"), 50),
+    });
+    const auto table = detectTable(result);
+
+    ASSERT_TRUE(table.found) << "带单元格内边距的行距把表格切成了单行段";
+    EXPECT_EQ(table.rows, 3);
+    EXPECT_EQ(table.columns, 4);
+    EXPECT_EQ(table.cells[1][3], QStringLiteral("D"));
+}
+
 TEST(TableDetector, CellPerLineRowMajorMatchesColumnMajor)
 {
     const auto result = makeResult({

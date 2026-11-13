@@ -19,8 +19,10 @@ namespace GyanisScribe::Core
     inline constexpr int    kMinTableColumns        = 2;   ///< 表格至少需要的列数
     inline constexpr int    kMaxTableColumns        = 12;  ///< 列数上限；超过视为版面误判
     inline constexpr double kTableVerticalGapFactor = 1.5; ///< 相邻行纵向间隙上限，按行高中位数折算
+    inline constexpr double kTableRowPitchGapFactor = 0.7; ///< 相邻行纵向间隙上限的另一档：按行距中位数折算，容纳单元格内边距
     inline constexpr double kTableCellGapFactor     = 0.8; ///< 单元格间隙下限，按词高中位数折算
     inline constexpr double kTableBoundaryTolerance = 0.5; ///< 列边界聚类容差，按词高中位数折算
+    inline constexpr double kTableBoundaryChainFactor = 2.0; ///< 留白区间重叠时允许串联合并的中点的最大间距，按词高中位数折算
     inline constexpr double kTableBoundarySupport   = 0.6; ///< 列边界至少被多少比例的段内行支持；单格行也计入分母
     inline constexpr double kTableSimpleConfidence  = 0.8; ///< 简单表的最低行完整度
 

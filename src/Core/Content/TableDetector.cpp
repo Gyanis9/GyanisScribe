@@ -67,6 +67,7 @@ namespace GyanisScribe::Core
         {
             double medianLineHeight = 1.0;
             double medianWordHeight = 1.0;
+            double medianRowPitch   = 1.0; ///< 相邻行顶边的间距中位数：格内文字高之外还有单元格内边距与边框
         };
 
         [[nodiscard]] bool isUsableWord(const OcrWord &word)
@@ -213,8 +214,16 @@ namespace GyanisScribe::Core
                              });
 
             // 中位数可能因退化输入为 0，统一抬到 1，后续阈值与除法不至于失效
+            // 相邻行顶边的间距：表格里它还包含单元格内边距与边框，光按文字高分段会把行切散
+            QVector<int> rowPitches;
+            for (qsizetype index = 1; index < rows.size(); ++index)
+            {
+                rowPitches.push_back(rows.at(index).bounds.top() - rows.at(index - 1).bounds.top());
+            }
+
             metrics.medianLineHeight = static_cast<double>(std::max(1, medianOf(lineHeights)));
             metrics.medianWordHeight = static_cast<double>(std::max(1, medianOf(wordHeights)));
+            metrics.medianRowPitch   = static_cast<double>(std::max(1, medianOf(rowPitches)));
             return rows;
         }
 
@@ -283,10 +292,10 @@ namespace GyanisScribe::Core
         }
 
         /// 把各行的留白中点聚成列分界，聚类结果记录有多少行支持它
-        /// @note 中点距离不超过容差，或两行的留白区间重叠，都视为同一处列分界。
-        ///       区间重叠合并是可传递的：一行里缺掉中间单元格时留下的长留白，
-        ///       可能把它覆盖到的相邻分界连成一个簇，簇中点取所有成员中点的平均。
-        [[nodiscard]] QVector<BoundaryCluster> clusterBoundaries(const QVector<BoundaryCandidate> &candidates, const double tolerance)
+        /// @note 中点距离不超过容差，或两行的留白区间重叠且中点相距不远，都视为同一处列分界。
+        ///       一行里缺掉中间单元格时留下的长留白会同时覆盖相邻两处真实分界，
+        ///       中点相距超过 chainTolerance 时不能串联合并，否则两列会被并成一列。
+        [[nodiscard]] QVector<BoundaryCluster> clusterBoundaries(const QVector<BoundaryCandidate> &candidates, const double tolerance, const double chainTolerance)
         {
             const qsizetype count = candidates.size();
             QVector<int>    parents(count, 0);
@@ -308,9 +317,12 @@ namespace GyanisScribe::Core
                 {
                     const BoundaryCandidate &leftCandidate  = candidates.at(left);
                     const BoundaryCandidate &rightCandidate = candidates.at(right);
-                    const bool               isNear         = std::abs(leftCandidate.position - rightCandidate.position) <= tolerance;
-                    // 两行的留白区间重叠时，中点会因左右单元格宽度不同而错开，仍属同一处列分界
-                    const bool isOverlapping = leftCandidate.gapLeft <= rightCandidate.gapRight && rightCandidate.gapLeft <= leftCandidate.gapRight;
+                    const double positionDistance = std::abs(leftCandidate.position - rightCandidate.position);
+                    const bool   isNear           = positionDistance <= tolerance;
+                    // 两行的留白区间重叠时，中点会因左右单元格宽度不同而错开，仍属同一处列分界；
+                    // 缺格留下的长留白跨过两处真实分界时中点相距很远，靠 chainTolerance 拦住串联合并
+                    const bool isOverlapping = leftCandidate.gapLeft <= rightCandidate.gapRight && rightCandidate.gapLeft <= leftCandidate.gapRight &&
+                                               positionDistance <= chainTolerance;
                     if (!isNear && !isOverlapping)
                     {
                         continue;
@@ -381,7 +393,8 @@ namespace GyanisScribe::Core
                 return std::nullopt;
             }
 
-            const QVector<BoundaryCluster> clusters = clusterBoundaries(candidates, tolerance);
+            // 长留白跨过相邻两处真实分界时，中点会落在两者中间；超过这个距离就各自成簇，别串成一列
+            const QVector<BoundaryCluster> clusters = clusterBoundaries(candidates, tolerance, kTableBoundaryChainFactor * metrics.medianWordHeight);
 
             // 支持率的分母是段内总行数；单格表头或合并单元格的行没有分界，但仍计入分母
             const int requiredSupport = std::max(1, static_cast<int>(std::ceil(kTableBoundarySupport * static_cast<double>(rows.size()))));
@@ -619,7 +632,9 @@ namespace GyanisScribe::Core
             return {};
         }
 
-        const double                     verticalLimit = kTableVerticalGapFactor * metrics.medianLineHeight;
+        // 行距比文字高大一截是表格的常态（单元格内边距 + 边框）；只看行高会把每行切成独立段。
+        // 上限取两者中较大的那一个，两个独立表格之间的大段留白仍会断开
+        const double                     verticalLimit = std::max(kTableVerticalGapFactor * metrics.medianLineHeight, kTableRowPitchGapFactor * metrics.medianRowPitch);
         const QVector<QVector<TableRow>> segments      = collectSegments(rows, verticalLimit);
 
         std::optional<TableCandidate> bestSimple;
