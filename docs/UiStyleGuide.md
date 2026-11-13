@@ -26,10 +26,10 @@
 资源缺失时返回空串并记一条含资源路径的错误日志，不装成「已应用」（这条由 `ThemeManagerFixture.MissingStyleSheetYieldsEmptyTextNotAFakeTheme` 钉）。
 同一次 `refresh` 里还会把新档位写进文字排版，并遍历 `allWidgets` 重放文字角色与等宽数字——不重放时控件会停在旧档的字体与字重上。
 
-**样式表不铺裸 `QWidget`**：QSS 只给顶层 `#appRoot` 铺窗口底；`#pageCard` 设置页、`#hudRoot` 录屏控制条、
+**样式表不铺裸 `QWidget`**：QSS 只给顶层 `#appRoot` 与多选对话框的 `#dialogSurface` 铺窗口底；`#pageCard` 设置页、`#hudRoot` 录屏控制条、
 `#AnnotationToolbar` 标注工具栏的底色与形状由自绘类画，`#settingsScroll` 与视口保持透明。
 给裸 `QWidget` 铺底等于让每个子控件各画一块自己的底，表单里会排出一条条灰带。
-QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackground, true)`；现在只有 `#appRoot` 走这条，
+QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackground, true)`；现在 `#appRoot` 与 `#dialogSurface` 走这条，
 另外三个具名容器由各自的 `paintEvent` 提供可见像素。
 
 ## 1.5 视觉语言：微明度分层
@@ -103,7 +103,7 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 自绘职责：
 
 - `Gui::SurfaceWidget` / `SurfaceLabel` 画具名容器与品牌底板的底和边；`Gui::Button` / `ToolButton`、
-  `LineEdit`、`ComboBox`、`TextEdit`、`ListWidget`、`Menu`、`Slider`、`ScrollBar`、`CheckBox`、`SpinBox`
+  `LineEdit`、`ComboBox`、`FontComboBox`、`TextEdit`、`ListWidget`、`Menu`、`Slider`、`ScrollBar`、`CheckBox`、`SpinBox`
   在各自的绘制入口里先画形状再交给基类画内容；`Gui::ListView` 与 `ItemDelegate` 负责下拉弹层的
   面板与项高亮。
 - `Gui::FocusRingController` 的覆盖层按目标控件取 `Indicator`、`Compact` 或 `Control` 形状，内外环都由
@@ -144,7 +144,7 @@ QSS 只留颜色、排版与透明边框占位：
 浅色与深色两份 QSS 逐条同构，覆盖同一批选择器（`QPushButton[squircle="true"]`/`QToolButton[squircle="true"]`、
 `QLineEdit[squircle="true"]`/`QComboBox[squircle="true"]`/`QSpinBox[squircle="true"]`、
 `QMenu[squircle="true"]`、`QCheckBox`、`QToolTip`、`QListWidget`、`QTextEdit`，
-以及具名容器 `#appRoot`/`#hudRoot`/`#AnnotationToolbar`/`#toolbarSeparator`/`#annotationTextEditor`/
+以及具名容器 `#appRoot`/`#dialogSurface`/`#hudRoot`/`#AnnotationToolbar`/`#annotationTextEditor`/
 `#settingsScroll`/`#settingsNav`/`#hotkeyDisplay`/`#annotationColorButton` 与文字角色
 `#pageHint`/`#metricValue`），差异只在色值与占位宽。不带 `squircle` 属性的原生
 `QPushButton`/`QToolButton`/`QMenu` 匹配不到按钮与菜单规则，系统对话框与标准右键菜单按原生外观绘制。滑块与滚动条完全自绘，样式表里没有它们的选择器；
@@ -164,7 +164,7 @@ QSS 只留颜色、排版与透明边框占位：
 | --- | --- | --- | --- |
 | 主窗口（设置 / 历史 / 关于入口） | `src/Main/MainWindow.cpp` | 根 `#appRoot` 铺窗口底（QSS）；顶部动作条 `#actionBar` 只在托盘不可用时出现——带热键提示的主操作是 `Gui::Button`（`CornerRole::Control`），其余条目收在一个 `Gui::ToolButton` 的弹出菜单 `Gui::Menu`「更多」里，两张清单都取自托盘那张表（`visibleTrayMenuEntries`）；多屏且托盘可用时逐屏截图走托盘子菜单（第一项「光标所在屏幕」，后面每块屏一条），没有托盘时同一组「整屏截图：<屏名>」落在动作条的「更多」里。下面是左侧导航 `Gui::ListWidget#settingsNav`（宽 `kNavColumnWidth`=160、不铺容器底，项高亮由 `ItemDelegate` 自绘）+ `QStackedWidget` 十页，每页是一张 `Gui::SurfaceWidget` 卡片（对象名 `#pageCard`，`CornerRole::Card`、`SurfaceFillRole::Surface`，高对比度档自动补 2px `borderStrong` 边），页内 `kSpacingMedium` 边距、标题/说明/表单共用一条居中内容列、表单纵向与横向间距都是 `kSpacingSmall`(8)、字段按类型收宽（下拉 260、数字 140、长文本 340） | 导航项与列表项的选中/悬停由 `ItemDelegate` 按 `CornerRole::Compact` 自绘（选中 `accentSoft`、悬停 `hover`；高对比度档选中项另加 2px 主色边）；每页顶部是 `#pageTitle`（15pt 半粗，字号由 `applyTextRole` 给）加一条 `#pageHint`（10pt 正文档、次要色，只压色不减号）；换主题时已建好的控件随 `allWidgets` 重设调色板并重放排版，自绘控件随调色板重绘 |
 | 标注窗 | `src/Gui/Annotation/AnnotationWindow.cpp` | 画布 `AnnotationView` 自绘底图与图形；四周 2px 主色提示线与八枚抓点（「选择」档）只上屏、不进成品；工具栏另计 | 快捷键动作表（复制/保存/贴图/识别/撤销重做），不可撤销时按钮 `:disabled`；选择档拖边框＝重裁截图范围，途中用整屏冻帧预览并在光标处给像素放大镜与读数，工具栏与信息面板按拖动中的新范围实时跟随；图内空白拖动整体挪范围；松手从同一张冻帧裁，已有标注随裁切平移、撤销栈清空 |
-| 标注工具栏 | `src/Gui/Annotation/AnnotationToolbar.cpp` | `Gui::AnnotationToolbar::paintEvent` 按 `CornerRole::Panel` 自绘卡片（`surface` 底 + `themeBorderWidth` 的 `borderStrong` 微边缘：浅深 1px、高对比度 2px；QSS 只留同宽透明占位）+ `kSpacingHairline` 间距与 26px 按钮档（`Gui::ToolButton` 按 `CornerRole::Compact` 自绘，图标 20；所有工具档宽度 ≤1536 由用例钉死），段与段之间是 `QFrame#toolbarSeparator`（`border` 分隔线）；`kToolbarSliderWidth`=56、字体下拉上限 120；颜色只占一枚按钮，弹出菜单里才是 `kAnnotationPaletteColors` 八色块、`RecentColors.h` 的 `kRecentColorCapacity`(6) 最近用色与「自定义颜色…」；最右是关闭标注的 `X`（与 `Esc` 同一条收场路） | 默认是「选择」档（`V`，不落笔；点中已有图形才选中、按住可拖动），当前工具按钮（`:checked`）走 `accentSoft` 填充（高对比度档另加 2px 主色边），线宽/字号只走阶梯；颜色按钮上的色块即当前形状的色，滚轮落在它上面才调不透明度；可见段按当前工具收放（`updateContextVisibility`）。这一档不装焦点环覆盖层（6px 外扩会压到相邻的 26px 按钮），聚焦边由 `buttonColors`/`toolButtonColors` 自绘（浅深 1px、高对比度 2px 主色），尺寸不跳 |
+| 标注工具栏 | `src/Gui/Annotation/AnnotationToolbar.cpp` | `Gui::AnnotationToolbar::paintEvent` 按 `CornerRole::Panel` 自绘卡片（`surface` 底 + `themeBorderWidth` 的 `borderStrong` 微边缘：浅深 1px、高对比度 2px；QSS 只留同宽透明占位）+ `kSpacingHairline` 间距与 26px 按钮档（`Gui::ToolButton` 按 `CornerRole::Compact` 自绘，图标 20；所有工具档宽度 ≤1536 由用例钉死），段与段之间是自绘的 `ToolbarSeparator`（5px 宽、中间 1px `border` 色，两侧各 2px）；字体下拉 `#annotationFontCombo` 关掉可编辑行编辑、自绘族名与 chevron，与同排 QComboBox/QSpinBox 同高；颜色按钮右下压一枚 6px 自绘 chevron 提示可弹出色板；`kToolbarSliderWidth`=56、字体下拉上限 120；颜色只占一枚按钮，弹出菜单里才是 `kAnnotationPaletteColors` 八色块、`RecentColors.h` 的 `kRecentColorCapacity`(6) 最近用色与「自定义颜色…」；最右是关闭标注的 `X`（与 `Esc` 同一条收场路） | 默认是「选择」档（`V`，不落笔；点中已有图形才选中、按住可拖动），当前工具按钮（`:checked`）走 `accentSoft` 填充（高对比度档另加 2px 主色边），线宽/字号只走阶梯；颜色按钮上的色块即当前形状的色，滚轮落在它上面才调不透明度；可见段按当前工具收放（`updateContextVisibility`）。这一档不装焦点环覆盖层（6px 外扩会压到相邻的 26px 按钮），聚焦边由 `buttonColors`/`toolButtonColors` 自绘（浅深 1px、高对比度 2px 主色），尺寸不跳 |
 | 截图遮罩 | `src/Gui/Capture/CaptureOverlay.cpp` | 自绘：`kCaptureMaskColor` 压暗背景、`kSelectionBorderWidth`+`kAccentColor` 选区框、`kCrosshairColor` 十字虚线、读数用 `kHintFontSize`/`kHintPadding` 压在 `kCaptureHintBackgroundColor` 上 | 光标亮过之后放大镜一直跟着（`isMagnifierVisible()`，悬停、拖框、拉手柄三处同一判据），读数条报坐标与颜色、裸按 `C` 轮换颜色写法（只影响本次）；拖拽中另显示尺寸与坐标读数；`Esc` 取消，鼠标拖框松手即交出（键盘造的选区仍走 `Enter`/双击）。重裁范围在标注窗里做：默认「选择」档拖四边/四角，松手按新范围重抓。这一层不加任何动画 |
 | 贴图窗口 | `src/Gui/Pin/PinWindow.cpp` | 无边框、置顶；悬停或正在拖手柄时画 1px 主色边框（`kBorderWidth`），被选中时画 2px（`kSelectedBorderWidth`），平时一张干净的图不带装饰 | 缩放（滚轮）、旋转、透明度、鼠标穿透、右键菜单；键盘 `R`/`Shift+R` 转正一挡、`0` 回到原始比例与角度（`resetScaleAndRotation()` 这一个出口）、左键双击关闭这一张、`Esc` 关闭；`Qt::Tool \| FramelessWindowHint \| WindowStaysOnTopHint`；穿透态下不抢焦点。松手吸附屏边、贴边收起与悬停展开走 `kSnapSpring`（过阻尼、单调逼近，约 250ms）；拖动与改大小逐帧跟手，按下即停掉进行中的弹簧，快速进出从当前几何重定向，标注期间不收起 |
 | 识别结果窗 | `src/Gui/Ocr/OcrResultWindow.cpp` | 根 `#appRoot` 铺底，`kSpacingLarge` 边距 + `kSpacingMedium` 分栏间距；预览区最小尺寸 `kPreviewMinimumWidth`/`kPreviewMinimumHeight`；右侧文本区是 `Gui::TextEdit`，按 `CornerRole::Panel` 自绘底与边 | 左侧原图右侧文本，点一行在图上圈出该行；置信度那一格在后端给不出时显示「未提供」（不是 0%）；摘要读数上 tabular figures |
@@ -177,6 +177,7 @@ QSS 只留颜色、排版与透明边框占位：
 | 数字输入框 | `src/Gui/Controls/SpinBox.cpp` | 继承 `QSpinBox`，面板按 `CornerRole::Control` 自绘；关掉原生上下按钮，右缘叠两枚自绘 chevron，悬停底取 `QPalette::AlternateBase`（即 `mutedFill`）并按 `CornerRole::Thumbnail`（6px/0.30）自绘 | 点击加/减，范围、后缀、`不限` 等语义仍由 `QSpinBox` 负责；键盘上下键照常；数值上 tabular figures |
 | 历史列表 | `src/Gui/History/HistoryView.cpp` | 缩略图边长 `kThumbnailEdge`（96），圆角 `kThumbnailCornerRadius`（6）由 `Core::makeThumbnail` 按 `CornerRole::Thumbnail`（6px/0.30）掩膜；列表容器是 `Gui::ListWidget`，按 `CornerRole::Panel` 自绘底与边；列表项与导航共用 `ItemDelegate` 的 `Compact` 档高亮 | 顶部一枚搜索框（按文件名、类别或日期）加一个类别筛选下拉，次序固定时间倒序；保留策略本身在「通用」页那两格，这一页不重复摆读数。缩略图读不出来时给一枚类别图标（`Record`/`CaptureRegion`），不留空白方块；时间与尺寸读数上 tabular figures |
 | 记忆库 | `src/Gui/Memory/MemoryView.cpp` | 卡片列表 `Gui::ListWidget` 的 IconMode：格宽 220、格高 200、缩略图 96，两行卡片文字（OCR 摘要 + 应用/标题/时间/尺寸）；重复组头用 DemiBold 且与列表正文同字号；空态与统计行取 `secondaryText` | 顶部搜索、应用/时间筛选、合并开关与导入；动作排每项一枚图标（Power、RebuildIndex、Import、Pin、OpenFile、Folder、Ocr、Delete、Refresh、Block、Eraser），同一排不重复；页脚「排除应用…」「清空索引」走 Block/Eraser；换主题时图标层按名字重取 |
+| 多选清单对话框（隐私审核、排除应用） | `src/Gui/Privacy/PrivacyReviewDialog.cpp`、`src/Gui/Memory/MemoryExcludeDialog.cpp` | 根对象名 `#dialogSurface`，QSS 铺 `surface`；清单是 `Gui::ListWidget` 且 `setOutlineVisible(true)`（浅深 1px `borderStrong`、高对比度 2px）。对话框底与清单同色后，圆角外不再露出 `windowBackground` 的近黑缺口，1px 边负责保留清单边界 | 隐私审核逐项勾选、全选/取消全选、打码方式；排除应用列应用与已排除项、可新增进程，保存前按索引条数确认 |
 
 ## 3. 深浅主题对照
 

@@ -2,7 +2,10 @@
 // 用例不调用 exec()，只直接点按钮或改勾选状态，避免在自动化里阻塞事件循环。
 
 #include "Core/Annotation/AnnotationTool.h"
+#include "Core/Settings/SettingsStore.h"
 #include "Gui/Privacy/PrivacyReviewDialog.h"
+#include "Gui/Theme/DesignTokens.h"
+#include "Gui/Theme/ThemeManager.h"
 
 #include <gtest/gtest.h>
 
@@ -17,8 +20,11 @@
 #include <QRect>
 #include <QSignalSpy>
 #include <QString>
+#include <QTemporaryDir>
 
+#include <cmath>
 #include <cstddef>
+#include <filesystem>
 #include <memory>
 #include <vector>
 
@@ -349,4 +355,32 @@ TEST_F(PrivacyReviewDialogFixture, EmptyInitialSelectionChecksNothing)
     auto *apply = dialog.findChild<QPushButton *>(QStringLiteral("privacyApply"));
     ASSERT_NE(apply, nullptr);
     EXPECT_FALSE(apply->isEnabled()) << "一项没勾时应用按钮还亮着";
+}
+
+/**
+ * @brief 钉住多选清单的圆角外是对话框 surface，而不是深色档那块近黑的窗口底
+ * @details 以前对话框铺 windowBackground，清单是圆角 surface；深色档四个圆角露出的是
+ *          近黑缺口。截取清单左上圆角外一格，必须与 surface 同色。
+ */
+TEST_F(PrivacyReviewDialogFixture, ListCornersSitOnTheDialogSurface)
+{
+    QTemporaryDir temp;
+    ASSERT_TRUE(temp.isValid());
+    GyanisScribe::Core::SettingsStore settings{std::filesystem::path{temp.path().toStdString()} / "settings.ini"};
+    GyanisScribe::Gui::ThemeManager   theme{settings};
+    ASSERT_TRUE(theme.setTheme(GyanisScribe::Gui::ThemeKind::Dark).has_value());
+
+    PrivacyReviewDialog dialog{makeItems()};
+    dialog.resize(560, 420);
+    dialog.show();
+    QApplication::processEvents();
+
+    auto *list = dialog.findChild<QListWidget *>(QStringLiteral("privacyList"));
+    ASSERT_NE(list, nullptr);
+    const QPoint corner = list->mapTo(&dialog, QPoint{1, 1});
+    const QImage shot   = dialog.grab().toImage();
+    const qreal  dpr    = shot.devicePixelRatio() > 0.0 ? shot.devicePixelRatio() : 1.0;
+    const QPoint pixel{static_cast<int>(std::lround(corner.x() * dpr)), static_cast<int>(std::lround(corner.y() * dpr))};
+    EXPECT_EQ(shot.pixelColor(pixel), GyanisScribe::Gui::paletteFor(GyanisScribe::Gui::ThemeKind::Dark).surface)
+            << "多选清单圆角外露出的是窗口底（深色档近黑），不是对话框 surface";
 }

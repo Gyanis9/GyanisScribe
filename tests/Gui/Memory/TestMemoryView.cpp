@@ -3,6 +3,7 @@
 #include "Core/Memory/DuplicateHash.h"
 #include "Core/Memory/MemoryIndex.h"
 #include "Core/Memory/MemoryTypes.h"
+#include "Gui/Controls/ListWidget.h"
 #include "Gui/Memory/ImportProgressDialog.h"
 #include "Gui/Memory/MemoryExcludeDialog.h"
 #include "Gui/Memory/MemoryView.h"
@@ -817,6 +818,15 @@ TEST_F(MemoryViewFixture, ViewOwnsImportDialog)
  * @details 进程名为空的导入条目不可排除；已排除但当前没有条目的进程也要能显示与取消勾选；
  *          新勾选的应用有索引行时，确认框要写明将删除的条数。
  */
+TEST_F(MemoryViewFixture, ExcludeDialogUsesTheSurfaceRootAndAnOutlinedList)
+{
+    MemoryExcludeDialog dialog{std::vector<Core::MemoryAppCount>{}, QStringList{}};
+    EXPECT_EQ(dialog.objectName(), QStringLiteral("dialogSurface")) << "排除应用的对话框底没有换成与清单同一档的 surface";
+    auto *list = static_cast<GyanisScribe::Gui::ListWidget *>(dialog.findChild<QListWidget *>(QStringLiteral("excludeList")));
+    ASSERT_NE(list, nullptr) << "排除应用清单不是 Gui::ListWidget";
+    EXPECT_TRUE(list->outlineVisible()) << "清单与对话框同底时没有补 1px 边，勾选区失去边界";
+}
+
 TEST_F(MemoryViewFixture, ExcludeDialogReturnsCheckedProcesses)
 {
     const std::vector<Core::MemoryAppCount> apps{

@@ -27,6 +27,7 @@
 #include <QHBoxLayout>
 #include <QIcon>
 #include <QMenu>
+#include <QPaintEvent>
 #include <QPainter>
 #include <QPen>
 #include <QPixmap>
@@ -94,15 +95,42 @@ namespace
         return bitmap;
     }
 
-    /// 分组之间的竖线：需求里「工具组 → 颜色 → 线宽/字号 → 撤销/重做 → 动作」的分界靠它
-    QFrame *makeSeparator()
+    /**
+     * @brief 工具栏分组之间的竖线
+     * @details 不用 QFrame::VLine：原生线走 QPalette 的 dark/mid，浅色档下是一条黑缝，
+     *          与「工具组 → 颜色 → 线宽/字号 → 撤销/重做 → 动作」的分组语义不符。
+     *          这里在 5px 宽的小控件中间自绘 1px 主题 border 色，两侧各留 2px，
+     *          与相邻按钮的 2px 节距合起来是 4px 的组间呼吸。
+     */
+    class ToolbarSeparator final : public QWidget
     {
-        auto *separator = new QFrame;
-        separator->setFrameShape(QFrame::VLine);
-        separator->setFrameShadow(QFrame::Plain);
-        // 颜色由样式表按这个名字给：工具组、色板、线宽、字号四段之间要有同一条缝
-        separator->setObjectName(QStringLiteral("toolbarSeparator"));
-        return separator;
+    public:
+        explicit ToolbarSeparator(QWidget *parent = nullptr) : QWidget(parent)
+        {
+            setFixedWidth(5);
+            setFixedHeight(26);
+            setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+            setAttribute(Qt::WA_TransparentForMouseEvents);
+        }
+
+    protected:
+        void paintEvent(QPaintEvent *) override
+        {
+            QPainter painter{this};
+            painter.fillRect(QRect{2, 0, 1, height()}, GyanisScribe::Gui::activePalette().border);
+        }
+    };
+
+    /// 分组之间的竖线：需求里「工具组 → 颜色 → 线宽/字号 → 撤销/重做 → 动作」的分界靠它
+    QWidget *makeSeparator()
+    {
+        return new ToolbarSeparator;
+    }
+
+    /// 把分组竖线按垂直居中加进工具栏
+    void addSeparator(QHBoxLayout &layout)
+    {
+        layout.addWidget(makeSeparator(), 0, Qt::AlignVCenter);
     }
 } // namespace
 
@@ -166,7 +194,7 @@ namespace GyanisScribe::Gui
                                  refreshToolKeyHints();
                              }
                          });
-        layout->addWidget(makeSeparator());
+        addSeparator(*layout);
 
         // 颜色入口：色板、最近使用与自定义取色都收进这一枚按钮弹出的菜单里，工具栏只占一格。
         // 色板读配置里那一份：没填就是内置那八格。读坏了记一条警告再回落（与「最近使用」那一路同一口径），
@@ -202,7 +230,7 @@ namespace GyanisScribe::Gui
         // 每次弹出前重建：色板与最近使用只在面板里出现，选过一格之后不必另外通知界面
         QObject::connect(m_colorMenu, &QMenu::aboutToShow, this, &AnnotationToolbar::rebuildColorMenu);
         layout->addWidget(m_colorButton);
-        layout->addWidget(makeSeparator());
+        addSeparator(*layout);
 
         // 线宽：滑块只走阶梯，取值表与 Gui::kAnnotationWidths 同解，不会出现 3.5 这种没定义过的宽度
         m_widthSlider = new Gui::Slider{Qt::Horizontal, this};
@@ -290,10 +318,18 @@ namespace GyanisScribe::Gui
         layout->addWidget(m_arrowHeadScaleButton);
         // 文字字体族：文字工具用得上，列系统字体。宽度封顶——字体名长的很，放任 sizeHint 会撑出去
         m_fontCombo = new Gui::FontComboBox{this};
+        // 按对象名单独给样式：QFontComboBox 的可编辑行编辑会落回原生方框与箭头，单靠 QComboBox 类型规则盖不住
+        m_fontCombo->setObjectName(QStringLiteral("annotationFontCombo"));
         m_fontCombo->setMaximumWidth(Gui::kToolbarFontComboWidth);
         m_fontCombo->setAccessibleName(GyanisScribe::Base::uiText("字体"));
-        m_fontCombo->setToolTip(GyanisScribe::Base::uiText("字体（文字）"));
-        QObject::connect(m_fontCombo, &QFontComboBox::currentFontChanged, this, [this](const QFont &font) { emit fontFamilyChanged(font.family()); });
+        // 下拉宽度只有 120，长族名会以省略号收尾；悬浮时给出完整族名
+        m_fontCombo->setToolTip(GyanisScribe::Base::uiText("字体（文字）") + QStringLiteral("：") + m_fontCombo->currentFont().family());
+        QObject::connect(m_fontCombo, &QFontComboBox::currentFontChanged, this,
+                         [this](const QFont &font)
+                         {
+                             m_fontCombo->setToolTip(GyanisScribe::Base::uiText("字体（文字）") + QStringLiteral("：") + font.family());
+                             emit fontFamilyChanged(font.family());
+                         });
         layout->addWidget(m_fontCombo);
         layout->addWidget(m_fontSizeCombo);
         // 粗体/斜体：文字工具用得上，保持按下态的开关，与双向箭头同一套口径
@@ -326,7 +362,7 @@ namespace GyanisScribe::Gui
         m_plateColorButton = makeButton("PlateColor", GyanisScribe::Base::uiText("底板色"), false);
         QObject::connect(m_plateColorButton, &QToolButton::clicked, this, &AnnotationToolbar::cycleTextPlateColor);
         layout->addWidget(m_plateColorButton);
-        layout->addWidget(makeSeparator());
+        addSeparator(*layout);
 
         m_undoButton = makeButton("Undo", GyanisScribe::Base::uiText("撤销（Ctrl+Z）"), false);
         m_redoButton = makeButton("Redo", GyanisScribe::Base::uiText("重做（Ctrl+Y）"), false);
@@ -337,7 +373,7 @@ namespace GyanisScribe::Gui
         QObject::connect(m_redoButton, &QToolButton::clicked, this, &AnnotationToolbar::redoClicked);
         layout->addWidget(m_undoButton);
         layout->addWidget(m_redoButton);
-        layout->addWidget(makeSeparator());
+        addSeparator(*layout);
 
         struct ActionSpec
         {
@@ -387,7 +423,7 @@ namespace GyanisScribe::Gui
         }
 
         // 最右那枚 X 与 Esc 同一条收场路：免得用户以为只能去托盘退出或再截一张
-        layout->addWidget(makeSeparator());
+        addSeparator(*layout);
         m_closeButton = makeButton("Close", GyanisScribe::Base::uiText("关闭标注"), false);
         m_closeButton->setToolTip(GyanisScribe::Base::uiText("关闭标注（Esc）"));
         QObject::connect(m_closeButton, &QToolButton::clicked, this, &AnnotationToolbar::closeClicked);

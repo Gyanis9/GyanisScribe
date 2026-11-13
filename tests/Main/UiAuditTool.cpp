@@ -24,9 +24,11 @@
 #include "Core/Record/RecordingSession.h"
 #include "Gui/Capture/CaptureOverlay.h"
 #include "Gui/Controls/Toast.h"
+#include "Gui/Memory/MemoryExcludeDialog.h"
 #include "Gui/Ocr/OcrResultWindow.h"
 #include "Gui/Pin/PinGroupManagerWindow.h"
 #include "Gui/Pin/PinManager.h"
+#include "Gui/Privacy/PrivacyReviewDialog.h"
 #include "Gui/Pin/PinWindow.h"
 #include "Gui/Record/RecordingHud.h"
 #include "Gui/Share/ShareDialog.h"
@@ -355,6 +357,35 @@ namespace
             dialog.setScanUnavailable(GyanisScribe::Base::uiText("本机没有可用的文字识别后端"));
             shootBugReportState(dialog, outputDirectory, prefix + "bug-report-unavailable");
         }
+    }
+
+    /**
+     * @brief 拍两个多选清单对话框：隐私审核与排除应用
+     * @param outputDirectory 出图目录
+     * @param prefix 图名前缀（主题档用）
+     * @details 两扇窗都用 Gui::ListWidget 装可勾选行；四角透出的是对话框底还是列表底，
+     *          只看代码分不清，必须按当前主题各拍一张。
+     */
+    void shootMultiSelectFaces(const std::filesystem::path &outputDirectory, const std::string &prefix)
+    {
+        GyanisScribe::Gui::PrivacyReviewDialog privacy{std::vector<GyanisScribe::Core::Privacy::PiiItem>{
+                {GyanisScribe::Core::Privacy::PiiKind::Phone, QRect{10, 10, 80, 20}, QStringLiteral("138****8000")},
+                {GyanisScribe::Core::Privacy::PiiKind::Email, QRect{10, 40, 100, 20}, QStringLiteral("a***@example.com")},
+                {GyanisScribe::Core::Privacy::PiiKind::Barcode, QRect{10, 70, 80, 80}, QStringLiteral("二维码样例")},
+        }};
+        privacy.resize(560, 420);
+        privacy.show();
+        shoot(privacy, outputDirectory, (prefix + "privacy-review").c_str());
+
+        GyanisScribe::Gui::MemoryExcludeDialog exclude{std::vector<GyanisScribe::Core::MemoryAppCount>{
+                                                               {QStringLiteral("code.exe"), 12},
+                                                               {QStringLiteral("browser.exe"), 3},
+                                                               {QStringLiteral("notepad.exe"), 1},
+                                                       },
+                                                       QStringList{QStringLiteral("notepad.exe")}};
+        exclude.resize(520, 420);
+        exclude.show();
+        shoot(exclude, outputDirectory, (prefix + "memory-exclude").c_str());
     }
 
     /**
@@ -750,6 +781,7 @@ int main(int argc, char *argv[])
             return 1;
         }
         theme.applyFromSettings();
+        shootMultiSelectFaces(outputDirectory, "theme-light-");
 
         // 面 4：深色与高对比度档的对应图（换肤观感核对；浅色已在前面出过）
         for (const auto &[mode, name]: std::array<std::pair<const char *, const char *>, 2>{{{"Dark", "dark"}, {"HighContrast", "hc"}}})
@@ -765,6 +797,7 @@ int main(int argc, char *argv[])
             GyanisScribe::Gui::AnnotationToolbar toolbar{settings, icons, nullptr};
             toolbar.show();
             shoot(toolbar, outputDirectory, std::format("theme-{}-toolbar", name).c_str());
+            shootMultiSelectFaces(outputDirectory, std::format("theme-{}-", name));
         }
 
         // 面 5：浮窗族三档主题全过（P4 矩阵；浅色那一趟同时供 P2 判定用）

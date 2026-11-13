@@ -35,6 +35,18 @@ namespace GyanisScribe::Gui
          */
         void setSurfaceVisible(bool visible);
 
+        /**
+         * @brief 给容器底补一条可见描边
+         * @param visible true 表示浅深档也画 1px borderStrong 边；高对比度档始终 2px
+         * @details 多选对话框的对话框底与列表同为 surface，圆角外不再有颜色差；没有这条边，
+         *          列表与对话框会糊成一整块，勾选行失去边界。历史/记忆库的列表压在 surface 卡片上，
+         *          保持无边。
+         */
+        void setOutlineVisible(bool visible);
+
+        /// 容器底的可见描边这一档开没开（只给用例用）
+        [[nodiscard]] bool outlineVisible() const noexcept;
+
     protected:
         /**
          * @brief 在控件自己的绘制事件里铺容器底
@@ -52,5 +64,6 @@ namespace GyanisScribe::Gui
         void paintSurface();
 
         bool m_surfaceVisible = true; ///< 是否由本类画容器底
+        bool m_outlineVisible = false; ///< 浅深档是否也画容器边
     };
 } // namespace GyanisScribe::Gui

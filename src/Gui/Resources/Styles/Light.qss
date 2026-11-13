@@ -13,6 +13,11 @@ QWidget#appRoot {
     background-color: #F5F5F3;
 }
 
+/* 带多选清单的对话框：底色与清单面板同为 surface，清单圆角外不再露出窗口底的黑角 */
+QWidget#dialogSurface {
+    background-color: #FCFCFB;
+}
+
 /* 阅读面（设置页卡片）：底与圆角由 Gui::SurfaceWidget 按 ContinuousCorner 自绘，
    样式表里不再有 #pageCard 的铺底与圆角规则 */
 
@@ -86,25 +91,40 @@ QWidget#AnnotationToolbar QToolButton[squircle="true"] {
     min-height: 26px;
 }
 
+/* 颜色按钮的菜单提示：自绘一枚 6px chevron 压在色块右下，不用原生小箭头 */
 QToolButton#annotationColorButton[squircle="true"]::menu-indicator {
-    image: none;
+    image: url(:/styles/ComboChevronLight.svg);
+    width: 6px;
+    height: 6px;
+    subcontrol-origin: padding;
+    subcontrol-position: bottom right;
 }
 
-/* ---- 输入类：填充、描边与圆角由 Gui::LineEdit / Gui::ComboBox / Gui::SpinBox 按启用、
+/* ---- 输入类：填充、描边与圆角由 Gui::LineEdit / Gui::ComboBox / Gui::FontComboBox / Gui::SpinBox 按启用、
         只读与焦点状态自绘；这里只留 1px 透明边框、透明底占位、内边距、最小高度与文字色，
         控件总高仍是 32。透明底不能省：样式表一旦写了 border，QStyleSheetStyle 就会按
         QPalette::Base 先铺一层方底，自绘的连续曲率底会被盖掉。
         选择器限定到带 squircle 属性的自绘类：原生对话窗（取色、文本输入、文件对话框）里的
-        QLineEdit / QComboBox / QSpinBox 也匹配类型选择器，透明底加透明边落在它们身上就是
+        QLineEdit / QComboBox / QFontComboBox / QSpinBox 也匹配类型选择器，透明底加透明边落在它们身上就是
         没有底的输入框。微调框不在这一条里：Qt 6.12 的 QStyleSheetStyle 在关掉原生按钮后，
         会按微调框自己的边框与内边距裁内部行编辑，把行编辑收成 1px 宽，数值文本还在却画不出来。
         它的文字色与最小高度另起一条，内部行编辑走下面的后代规则。 */
-QLineEdit[squircle="true"], QComboBox[squircle="true"] {
+QLineEdit[squircle="true"], QComboBox[squircle="true"], QFontComboBox[squircle="true"] {
     color: #141412;
     background: transparent;
     border: 1px solid transparent;
     padding: 0 12px;
     min-height: 30px;
+    selection-background-color: #D8E5F9;
+    selection-color: #141412;
+}
+
+/* 可编辑下拉（字体族）的内部行编辑也要透明、无原生边框；右缘留出下拉箭头的 26px */
+QComboBox[squircle="true"] QLineEdit, QFontComboBox[squircle="true"] QLineEdit {
+    color: #141412;
+    background: transparent;
+    border: none;
+    padding: 0 26px 0 12px;
     selection-background-color: #D8E5F9;
     selection-color: #141412;
 }
@@ -127,12 +147,13 @@ QSpinBox[squircle="true"] {
     min-height: 28px;
 }
 
-QLineEdit[squircle="true"]:disabled, QComboBox[squircle="true"]:disabled, QSpinBox[squircle="true"]:disabled,
-QSpinBox[squircle="true"] QLineEdit:disabled, QComboBox[squircle="true"] QLineEdit:disabled {
+QLineEdit[squircle="true"]:disabled, QComboBox[squircle="true"]:disabled, QFontComboBox[squircle="true"]:disabled, QSpinBox[squircle="true"]:disabled,
+QSpinBox[squircle="true"] QLineEdit:disabled, QComboBox[squircle="true"] QLineEdit:disabled, QFontComboBox[squircle="true"] QLineEdit:disabled {
     color: #53534D;
 }
 
-QLineEdit[squircle="true"]:read-only, QSpinBox[squircle="true"] QLineEdit:read-only, QComboBox[squircle="true"] QLineEdit:read-only {
+QLineEdit[squircle="true"]:read-only, QSpinBox[squircle="true"] QLineEdit:read-only, QComboBox[squircle="true"] QLineEdit:read-only,
+QFontComboBox[squircle="true"] QLineEdit:read-only {
     color: #53534D;
 }
 
@@ -161,11 +182,11 @@ QTextEdit#annotationTextEditor {
 }
 
 /* 下拉箭头走 styles 下的 chevron：与自绘微调框同一笔画，不再让原生风格画方角箭头 */
-QComboBox[squircle="true"] {
+QComboBox[squircle="true"], QFontComboBox[squircle="true"] {
     padding-right: 26px;
 }
 
-QComboBox[squircle="true"]::drop-down {
+QComboBox[squircle="true"]::drop-down, QFontComboBox[squircle="true"]::drop-down {
     subcontrol-origin: padding;
     subcontrol-position: center right;
     width: 26px;
@@ -173,7 +194,7 @@ QComboBox[squircle="true"]::drop-down {
     background: transparent;
 }
 
-QComboBox[squircle="true"]::down-arrow {
+QComboBox[squircle="true"]::down-arrow, QFontComboBox[squircle="true"]::down-arrow {
     image: url(:/styles/ComboChevronLight.svg);
     width: 10px;
     height: 10px;
@@ -181,7 +202,7 @@ QComboBox[squircle="true"]::down-arrow {
 
 /* ---- 下拉弹层：底与项高亮由 Gui::ListView 与 ItemDelegate 按连续曲率自绘，
         这里只留内边距、文字色与 outline；border: none 抑制原生面板框 ---- */
-QComboBox QAbstractItemView {
+QComboBox QAbstractItemView, QFontComboBox QAbstractItemView {
     color: #141412;
     border: none;
     padding: 6px;
@@ -293,12 +314,6 @@ QTextEdit {
     selection-color: #141412;
 }
 
-/* ---- 工具栏分段用的竖线，代码里按对象名给出 ---- */
-QFrame#toolbarSeparator {
-    background-color: #E7E7E2;
-    max-width: 1px;
-    min-width: 1px;
-}
 
 /* ---- 键盘焦点：勾选框的焦点由 Gui::FocusRingController 的覆盖层画，输入类的可见焦点边
         由 ControlPalette::inputColors 自绘（浅深档只在标注工具栏内落笔）；

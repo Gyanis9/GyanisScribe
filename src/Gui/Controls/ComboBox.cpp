@@ -7,6 +7,7 @@
 #include "Gui/Theme/ControlPalette.h"
 #include "Gui/Theme/DesignTokens.h"
 
+#include <QFontMetrics>
 #include <QPainter>
 #include <QPen>
 
@@ -82,6 +83,10 @@ namespace GyanisScribe::Gui
         setView(new ListView{this});
         // 视图构造时装的是通用委托；字体弹层要按族名预览，构造时就换成字体委托
         setItemDelegate(new FontItemDelegate{this});
+        // 可编辑档会带出原生行编辑的方框与箭头；这里只做选字体，不需要输入过滤
+        setEditable(false);
+        // 与同一排的 QComboBox/QSpinBox 同高：自绘后没有原生行编辑撑高，补回 30
+        setMinimumHeight(30);
         preparePopupWindow(*this);
     }
 
@@ -99,10 +104,23 @@ namespace GyanisScribe::Gui
 
     void FontComboBox::paintEvent(QPaintEvent *event)
     {
-        {
-            QPainter painter{this};
-            paintComboChrome(*this, painter);
-        }
-        QFontComboBox::paintEvent(event);
+        Q_UNUSED(event);
+        QPainter painter{this};
+        paintComboChrome(*this, painter);
+
+        // 原生 QFontComboBox 的 paint 会再画一层行编辑方框与系统箭头；这一枚只取它的模型与弹层，
+        // 收起态的文字与 chevron 在这里按其余输入类同一套样式自绘
+        painter.setPen(activePalette().text);
+        painter.setFont(font());
+        const QRect textRect = rect().adjusted(12, 0, -26, 0);
+        painter.drawText(textRect, Qt::AlignVCenter | Qt::AlignLeft, fontMetrics().elidedText(currentText(), Qt::ElideRight, textRect.width()));
+
+        QPen chevron{activePalette().icon, 1.5};
+        chevron.setCapStyle(Qt::RoundCap);
+        painter.setPen(chevron);
+        const int centerX = rect().right() - 15;
+        const int centerY = rect().center().y();
+        painter.drawLine(centerX - 3, centerY - 2, centerX, centerY + 2);
+        painter.drawLine(centerX, centerY + 2, centerX + 3, centerY - 2);
     }
 } // namespace GyanisScribe::Gui

@@ -81,8 +81,8 @@ namespace GyanisScribe::Gui
         }
 
         setWindowTitle(Base::uiText("隐私打码审核"));
-        // 顶层窗口自己铺底：样式表只给具名的根上底色
-        setObjectName(QStringLiteral("appRoot"));
+        // 顶层窗口铺与清单同一档的 surface：清单圆角外不再露出 windowBackground 的黑角
+        setObjectName(QStringLiteral("dialogSurface"));
         setAttribute(Qt::WA_StyledBackground, true);
 
         auto *root = new QVBoxLayout{this};
@@ -94,9 +94,11 @@ namespace GyanisScribe::Gui
         note->setWordWrap(true);
         root->addWidget(note);
 
-        m_list = new ListWidget{this};
-        m_list->setObjectName(QStringLiteral("privacyList"));
-        m_list->setAccessibleName(Base::uiText("敏感信息清单"));
+        auto *list = new ListWidget{this};
+        list->setObjectName(QStringLiteral("privacyList"));
+        list->setOutlineVisible(true);
+        list->setAccessibleName(Base::uiText("敏感信息清单"));
+        m_list = list;
         // 清单只做勾选：行文本来自脱敏样例，不给编辑入口
         for (std::size_t index = 0; index < m_items.size(); ++index)
         {

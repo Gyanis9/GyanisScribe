@@ -39,7 +39,8 @@ namespace GyanisScribe::Gui
     MemoryExcludeDialog::MemoryExcludeDialog(std::vector<Core::MemoryAppCount> apps, const QStringList &excludedProcesses, QWidget *parent) :
         QDialog(parent), m_apps(std::move(apps)), m_excluded(excludedProcesses)
     {
-        setObjectName(QStringLiteral("appRoot"));
+        // 顶层窗口铺与清单同一档的 surface：清单圆角外不再露出 windowBackground 的黑角
+        setObjectName(QStringLiteral("dialogSurface"));
         setWindowTitle(Base::uiText("排除应用"));
         // 顶层窗口自己铺底：样式表只给具名的根上底色
         setAttribute(Qt::WA_StyledBackground, true);
@@ -52,10 +53,12 @@ namespace GyanisScribe::Gui
         note->setWordWrap(true);
         root->addWidget(note);
 
-        m_list = new ListWidget{this};
-        m_list->setObjectName(QStringLiteral("excludeList"));
-        m_list->setAccessibleName(Base::uiText("排除应用清单"));
-        m_list->setSelectionMode(QAbstractItemView::NoSelection);
+        auto *list = new ListWidget{this};
+        list->setObjectName(QStringLiteral("excludeList"));
+        list->setOutlineVisible(true);
+        list->setAccessibleName(Base::uiText("排除应用清单"));
+        list->setSelectionMode(QAbstractItemView::NoSelection);
+        m_list = list;
         root->addWidget(m_list, 1);
 
         // 先按索引里的应用分布列，再补上已排除但当前没有条目的进程：后者也要能取消勾选

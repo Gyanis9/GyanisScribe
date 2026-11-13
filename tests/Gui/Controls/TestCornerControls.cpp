@@ -498,11 +498,12 @@ TEST_F(CornerControlsFixture, ToolButtonPaintsTheMenuIndicatorOnlyWhenItHasAMenu
 }
 
 /**
- * @brief 钉住色块按钮收掉菜单指示器
- * @details 色块自己就是入口提示，样式表用 QToolButton#annotationColorButton::menu-indicator 的 image: none
- *          把箭头收掉；同一档样式表下，把对象名换掉就该重新出现箭头，否则规则没有消费方。
+ * @brief 钉住色块按钮保留一枚自绘菜单指示器
+ * @details 色块自己就是入口提示，但完全不露箭头会让人不知道它还带菜单；样式表给
+ *          QToolButton#annotationColorButton::menu-indicator 一枚 6px chevron。
+ *          同一档样式表下，把对象名换掉仍有原生指示器，两边都该有点墨迹。
  */
-TEST_F(CornerControlsFixture, AnnotationColorButtonSuppressesTheMenuIndicator)
+TEST_F(CornerControlsFixture, AnnotationColorButtonKeepsAVisibleMenuIndicator)
 {
     struct StyleSheetGuard
     {
@@ -541,7 +542,7 @@ TEST_F(CornerControlsFixture, AnnotationColorButtonSuppressesTheMenuIndicator)
     const int    namedInk = countInkPixels(image, menuIndicatorProbe(*colorButton).translated(colorButton->pos()));
     const int    twinInk  = countInkPixels(image, menuIndicatorProbe(*twin).translated(twin->pos()));
     EXPECT_GT(twinInk, 0) << "同一档样式表下，没有这个对象名的按钮该有菜单指示箭头";
-    EXPECT_EQ(namedInk, 0) << "色块按钮的菜单指示器没被样式表收掉";
+    EXPECT_GT(namedInk, 0) << "色块按钮的菜单提示被样式表收掉了";
 }
 
 /**

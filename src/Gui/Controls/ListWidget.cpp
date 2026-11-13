@@ -41,6 +41,21 @@ namespace GyanisScribe::Gui
         update();
     }
 
+    void ListWidget::setOutlineVisible(const bool visible)
+    {
+        if (m_outlineVisible == visible)
+        {
+            return;
+        }
+        m_outlineVisible = visible;
+        update();
+    }
+
+    bool ListWidget::outlineVisible() const noexcept
+    {
+        return m_outlineVisible;
+    }
+
     bool ListWidget::event(QEvent *event)
     {
         if (event->type() == QEvent::Paint)
@@ -57,8 +72,8 @@ namespace GyanisScribe::Gui
             return;
         }
         QPainter   painter{this};
-        const QPen border =
-                activeThemeKind() == ThemeKind::HighContrast ? QPen{activePalette().borderStrong, static_cast<qreal>(themeBorderWidth(ThemeKind::HighContrast))} : QPen{Qt::NoPen};
+        const bool drawOutline = m_outlineVisible || activeThemeKind() == ThemeKind::HighContrast;
+        const QPen border      = drawOutline ? QPen{activePalette().borderStrong, static_cast<qreal>(themeBorderWidth(activeThemeKind()))} : QPen{Qt::NoPen};
         Core::paintContinuousCorner(painter, QRectF{rect()}, Core::cornerShapeFor(Core::CornerRole::Panel), activePalette().surface, border);
     }
 } // namespace GyanisScribe::Gui

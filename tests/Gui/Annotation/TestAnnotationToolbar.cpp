@@ -970,6 +970,21 @@ TEST(ToolbarGeometry, RejectsDegenerateInputs)
 }
 
 /**
+ * @brief 钉住字体下拉不再落回可编辑原生框
+ * @details QFontComboBox 的可编辑行编辑会带出白底黑框的方行编辑与系统箭头，和同一排的
+ *          QComboBox/QSpinBox 完全两副样子；这里只做选字体，收掉行编辑，自绘文字与 chevron。
+ */
+TEST_F(ToolbarFixture, FontComboUsesTheCustomNonEditableChrome)
+{
+    SignalLog  log;
+    const auto toolbar = makeToolbarLogged(log);
+    auto      *font    = toolbar->findChild<QFontComboBox *>(QStringLiteral("annotationFontCombo"));
+    ASSERT_NE(font, nullptr) << "工具栏里没有字体下拉";
+    EXPECT_FALSE(font->isEditable()) << "字体下拉又落回可编辑原生框";
+    EXPECT_EQ(font->lineEdit(), nullptr) << "字体下拉又带出了原生行编辑方框";
+}
+
+/**
  * @brief 钉住工具栏的控件齐全且都带无障碍名称
  * @details 需求要那几件工具、八色加自定义、撤销重做与八个动作，并要每个图标按钮都有 tooltip
  *          与无障碍名称。这条按控件树逐个核，不看布局画得好不好。

@@ -45,7 +45,7 @@ namespace GyanisScribe::Gui
      *          只住在清册一处，这里再存一份字母就会出现「按键改了、按钮提示还是旧的」。
      */
     inline constexpr std::array<std::tuple<Core::ToolKind, std::string_view, std::string_view, std::string_view>, 14> kToolTable = {
-            std::tuple{Core::ToolKind::Select, "CursorHighlight", "选择", "Annotation/Select"},
+            std::tuple{Core::ToolKind::Select, "Select", "选择", "Annotation/Select"},
             std::tuple{Core::ToolKind::Rectangle, "Rectangle", "矩形", "Annotation/Rectangle"},
             std::tuple{Core::ToolKind::Ellipse, "Ellipse", "椭圆", "Annotation/Ellipse"},
             std::tuple{Core::ToolKind::Arrow, "Arrow", "箭头", "Annotation/Arrow"},
