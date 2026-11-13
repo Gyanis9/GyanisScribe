@@ -159,6 +159,7 @@ TEST_F(CaptureOverlayFixture, HoverAdoptsTopmostCandidateInLocalCoordinates)
  * @brief 钉住比屏幕大一圈的窗口候选只交帧内可见部分
  * @details 最大化的窗口外框比屏幕大一圈（DWM 的不可见边框）：越界部分本来就不可见，
  *          悬停与选中都只该交可见部分；原样留着还会让后面的裁剪报「选区超出了这一帧」。
+ *          点一下采纳的就是悬停那一块：交出去的矩形要与帧逐位相同，差一格就带回不可见区。
  */
 TEST_F(CaptureOverlayFixture, WindowCandidateLargerThanFrameIsClampedToTheFrame)
 {
@@ -166,9 +167,85 @@ TEST_F(CaptureOverlayFixture, WindowCandidateLargerThanFrameIsClampedToTheFrame)
     // 全局 (1900,-8,1700,916) 换成这块屏的局部是 (-20,-8,1700,916)，四条边都越出帧
     overlay->setWindowCandidates(std::vector<QRect>{QRect{1900, -8, 1700, 916}});
 
+    const QRect frame{QPoint{0, 0}, overlay->size()};
+    int         emitted = 0;
+    QRect       confirmed;
+    QObject::connect(overlay.get(), &CaptureOverlay::regionSelected, overlay.get(),
+                     [&emitted, &confirmed](const QRect &region)
+                     {
+                         ++emitted;
+                         confirmed = region;
+                     });
+
     moveOver(*overlay, QPoint{200, 200});
     ASSERT_TRUE(overlay->hoveredRegion().has_value());
-    EXPECT_EQ(*overlay->hoveredRegion(), QRect(0, 0, overlay->width(), overlay->height())) << "越界的窗口候选没夹到帧内，交出去的比这一帧还大";
+    EXPECT_EQ(*overlay->hoveredRegion(), frame) << "越界的窗口候选没夹到帧内，交出去的比这一帧还大";
+
+    buttonAt(*overlay, QEvent::MouseButtonPress, QPoint{200, 200});
+    buttonAt(*overlay, QEvent::MouseButtonRelease, QPoint{200, 200});
+    EXPECT_EQ(emitted, 1) << "点一下没有交出夹过帧的选区";
+    EXPECT_EQ(confirmed, frame) << "点一下交出的矩形与帧不是逐位相同";
+    EXPECT_EQ(overlay->selectedRegion(), frame) << "采纳之后的选区还留着越界部分";
+}
+
+/**
+ * @brief 钉住越界的元素链矩形同样只留帧内可见部分，换层不崩
+ * @details 元素链与窗口候选走同一套夹帧规则；这里钉住矩形链那一份：
+ *          悬停交帧、升到整窗一档再降回来都不许把越界部分带出去。
+ */
+TEST_F(CaptureOverlayFixture, ElementChainLargerThanFrameIsClampedToTheFrame)
+{
+    auto overlay = makeOverlay();
+    overlay->setWindowCandidates(kCandidates);
+    // 全局 (1900,-8,1700,916) 换成局部是 (-20,-8,1700,916)
+    overlay->setElementChain(std::vector<QRect>{QRect{1900, -8, 1700, 916}});
+
+    const QRect frame{QPoint{0, 0}, overlay->size()};
+    moveOver(*overlay, QPoint{200, 200});
+    ASSERT_TRUE(overlay->hoveredRegion().has_value());
+    EXPECT_EQ(*overlay->hoveredRegion(), frame) << "越界的元素矩形没夹到帧内";
+    EXPECT_TRUE(frame.contains(*overlay->hoveredRegion()));
+
+    // 升到整扇窗口那一档：退回窗口候选，交出的矩形仍要在帧内
+    QKeyEvent comma{QEvent::KeyPress, Qt::Key_Comma, Qt::NoModifier};
+    QApplication::sendEvent(overlay.get(), &comma);
+    ASSERT_TRUE(overlay->hoveredRegion().has_value()) << "升到整窗一档后没有悬停框";
+    EXPECT_TRUE(frame.contains(*overlay->hoveredRegion())) << "升到整窗一档后交出的矩形越出了帧";
+
+    QKeyEvent period{QEvent::KeyPress, Qt::Key_Period, Qt::NoModifier};
+    QApplication::sendEvent(overlay.get(), &period);
+    ASSERT_TRUE(overlay->hoveredRegion().has_value());
+    EXPECT_EQ(*overlay->hoveredRegion(), frame) << "降回元素那一档后越界部分又回来了";
+}
+
+/**
+ * @brief 钉住越界的元素描述与链同档：区域也是夹过帧的那一块
+ * @details 悬停框夹了帧、描述不夹的话，用户按 I 抄下来的区域会包含屏幕外的一圈；
+ *          升到整窗一档后描述要一起收掉，链与描述不许一档有一档没有。
+ */
+TEST_F(CaptureOverlayFixture, ElementInfoChainClampsDescriptionWithGeometry)
+{
+    auto overlay = makeOverlay();
+    overlay->setWindowCandidates(kCandidates);
+    overlay->setElementPickMode(true);
+    overlay->setElementChain(std::vector<UiElementInfo>{
+            UiElementInfo{QStringLiteral("编辑区"), QStringLiteral("文档"), QStringLiteral("记事本"), QStringLiteral("notepad.exe"), QRect{1900, -8, 1700, 916}},
+    });
+
+    const QRect frame{QPoint{0, 0}, overlay->size()};
+    moveOver(*overlay, QPoint{200, 200});
+    ASSERT_TRUE(overlay->hoveredRegion().has_value());
+    EXPECT_EQ(*overlay->hoveredRegion(), frame) << "越界的元素描述没和悬停框一起夹帧";
+    EXPECT_TRUE(overlay->modeBannerForTesting().contains(QStringLiteral("编辑区"))) << overlay->modeBannerForTesting().toStdString();
+
+    // 这块屏的原点是 (1920,0)：夹过帧的可见部分换回全局就是 (1920,0,800,600)
+    EXPECT_TRUE(overlay->elementInfoTextForTesting().contains(QStringLiteral("1920, 0, 800×600"))) << overlay->elementInfoTextForTesting().toStdString();
+
+    // 升到整扇窗口那一档：链没有这一档，描述也必须一起收掉
+    QKeyEvent comma{QEvent::KeyPress, Qt::Key_Comma, Qt::NoModifier};
+    QApplication::sendEvent(overlay.get(), &comma);
+    EXPECT_EQ(overlay->modeBannerForTesting(), QStringLiteral("整扇窗口")) << overlay->modeBannerForTesting().toStdString();
+    EXPECT_TRUE(overlay->elementInfoTextForTesting().isEmpty()) << "升到整窗一档后还挂着元素描述";
 }
 
 /**

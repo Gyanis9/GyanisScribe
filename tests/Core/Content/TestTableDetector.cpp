@@ -84,6 +84,56 @@ TEST(TableDetector, FindsThreeByThree)
     EXPECT_EQ(table.cells.at(2).at(2), QStringLiteral("6"));
 }
 
+TEST(TableDetector, MarksTwoColumnProseAsComplex)
+{
+    // 正常行距的两栏正文：每一格都是长句，词框宽度几乎铺满整列；这不是可导出的简单表
+    QVector<OcrLine> lines;
+    for (int row = 0; row < 4; ++row)
+    {
+        const int y = 10 + row * 30;
+        lines.push_back(makeWordsLine({makeWord(QStringLiteral("left"), 10, y, 80), makeWord(QStringLiteral("right"), 130, y, 80)}));
+    }
+    const auto table = detectTable(makeResult(lines));
+
+    ASSERT_TRUE(table.found);
+    EXPECT_TRUE(table.complex) << "两栏正文被判成了可导出简单表";
+    EXPECT_EQ(table.columns, 2);
+    EXPECT_TRUE(table.complexReason.contains(QStringLiteral("两栏正文"))) << table.complexReason.toStdString();
+}
+
+TEST(TableDetector, ShortCellsInTwoColumnsStaySimple)
+{
+    // 同几何、每格只有短文本（宽度不到列宽 40%）：这是紧凑的两列表格，不许被两栏正文守卫误伤
+    QVector<OcrLine> lines;
+    for (int row = 0; row < 4; ++row)
+    {
+        const int y = 10 + row * 30;
+        lines.push_back(makeWordsLine({makeWord(QStringLiteral("A"), 10, y, 30), makeWord(QStringLiteral("B"), 130, y, 30)}));
+    }
+    const auto table = detectTable(makeResult(lines));
+
+    ASSERT_TRUE(table.found);
+    EXPECT_FALSE(table.complex) << "短文本两列表格被两栏正文守卫误判成复杂表";
+    EXPECT_EQ(table.rows, 4);
+    EXPECT_EQ(table.columns, 2);
+}
+
+TEST(TableDetector, ShortAndLongCellsOnOneBoundaryStayOneTable)
+{
+    // 同一列第一行短文本、第二行长文本：两处留白区间重叠，中点却相差 70 格；
+    // 旧上限把两行拆成各自孤立的单行证据，表直接丢了
+    const auto first  = makeWordsLine({makeWord(QStringLiteral("A"), 10, 10, 30), makeWord(QStringLiteral("B"), 150, 10, 30)});
+    const auto second = makeWordsLine({makeWord(QStringLiteral("longlong"), 10, 40, 120), makeWord(QStringLiteral("tail"), 200, 40, 120)});
+    const auto table  = detectTable(makeResult({first, second}));
+
+    ASSERT_TRUE(table.found) << "短/长文本的同一处列分界被拆开，两行表丢了";
+    EXPECT_FALSE(table.complex);
+    EXPECT_EQ(table.rows, 2);
+    EXPECT_EQ(table.columns, 2);
+    EXPECT_EQ(table.cells.at(0).at(1), QStringLiteral("B"));
+    EXPECT_EQ(table.cells.at(1).at(1), QStringLiteral("tail"));
+}
+
 TEST(TableDetector, GroupsWordsInsideOneCell)
 {
     OcrLine first      = makeLine(10, {});
@@ -247,10 +297,10 @@ TEST(TableDetector, EmptyAndDegenerateInputIsSafe)
 
 namespace
 {
-    OcrLine makeCellLine(const int x, const int y, const QString &text, const int width = 40)
+    OcrLine makeCellLine(const int x, const int y, const QString &text, const int width = 40, const int height = 20)
     {
         OcrLine       line;
-        const OcrWord word{text, QRect{x, y, width, 20}};
+        const OcrWord word{text, QRect{x, y, width, height}};
         line.words.push_back(word);
         line.boundingBox = word.boundingBox;
         return line;
@@ -310,20 +360,24 @@ TEST(TableDetector, MissingCellDoesNotChainTwoColumnBoundaries)
 
 TEST(TableDetector, CellPaddingRowPitchStillFormsOneTable)
 {
-    // 真 OCR 的格内文字高 15、行距 38（padding + 边框）：合并后的行间隙 23 比 1.5×行高还大，
+    // 真 OCR 的格内文字高 15、行顶间距 38（padding + 边框）：合并后的行间隙 23 比 1.5×15=22.5 还大，
     // 分段上限若只看行高会把表格切成一条条单行段，检测不到表
     const auto result = makeResult({
-            makeCellLine(37, 89, QStringLiteral("列1"), 50),  makeCellLine(197, 89, QStringLiteral("列2"), 50),
-            makeCellLine(357, 89, QStringLiteral("列3"), 50), makeCellLine(516, 89, QStringLiteral("列4"), 50),
-            makeCellLine(37, 127, QStringLiteral("A"), 50),   makeCellLine(197, 127, QStringLiteral("B"), 50),
-            makeCellLine(357, 127, QStringLiteral("C"), 50),  makeCellLine(516, 127, QStringLiteral("D"), 50),
-            makeCellLine(37, 165, QStringLiteral("1"), 50),   makeCellLine(197, 165, QStringLiteral("2"), 50),
-            makeCellLine(357, 165, QStringLiteral("3"), 50),  makeCellLine(516, 165, QStringLiteral("4"), 50),
+            makeCellLine(37, 89, QStringLiteral("列1"), 50, 15),  makeCellLine(197, 89, QStringLiteral("列2"), 50, 15),
+            makeCellLine(357, 89, QStringLiteral("列3"), 50, 15), makeCellLine(516, 89, QStringLiteral("列4"), 50, 15),
+            makeCellLine(37, 127, QStringLiteral("A"), 50, 15),   makeCellLine(197, 127, QStringLiteral("B"), 50, 15),
+            makeCellLine(357, 127, QStringLiteral("C"), 50, 15),  makeCellLine(516, 127, QStringLiteral("D"), 50, 15),
+            makeCellLine(37, 165, QStringLiteral("1"), 50, 15),   makeCellLine(197, 165, QStringLiteral("2"), 50, 15),
+            makeCellLine(357, 165, QStringLiteral("3"), 50, 15),  makeCellLine(516, 165, QStringLiteral("4"), 50, 15),
+            makeCellLine(37, 203, QStringLiteral("5"), 50, 15),   makeCellLine(197, 203, QStringLiteral("6"), 50, 15),
+            makeCellLine(357, 203, QStringLiteral("7"), 50, 15),  makeCellLine(516, 203, QStringLiteral("8"), 50, 15),
+            makeCellLine(37, 241, QStringLiteral("9"), 50, 15),   makeCellLine(197, 241, QStringLiteral("10"), 50, 15),
+            makeCellLine(357, 241, QStringLiteral("11"), 50, 15), makeCellLine(516, 241, QStringLiteral("12"), 50, 15),
     });
     const auto table = detectTable(result);
 
     ASSERT_TRUE(table.found) << "带单元格内边距的行距把表格切成了单行段";
-    EXPECT_EQ(table.rows, 3);
+    EXPECT_EQ(table.rows, 5);
     EXPECT_EQ(table.columns, 4);
     EXPECT_EQ(table.cells[1][3], QStringLiteral("D"));
 }

@@ -273,7 +273,11 @@ namespace GyanisScribe::Gui
                 continue;
             }
             m_elementChain.push_back(local);
-            m_elementInfos.push_back(info);
+            // 描述里的区域也要换成夹过帧的可见部分：链上夹了、描述还留着屏幕外那一圈，
+            // 用户按 I 抄下来的区域与悬停框就不是同一块了
+            Platform::UiElementInfo visible = info;
+            visible.logicalGlobal          = local.translated(origin.x(), origin.y());
+            m_elementInfos.push_back(std::move(visible));
         }
         m_elementChainDelivered = true;
         refreshHoveredRegion();

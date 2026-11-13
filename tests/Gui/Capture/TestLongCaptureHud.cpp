@@ -85,6 +85,7 @@ TEST_F(LongCaptureHudFixture, HudLandsOutsideTheRegionItMustNotBeSeenIn)
  * @brief 钉住两枚按钮各自发出自己的信号
  * @details 「完成」与「取消」在服务里是两条完全不同的收尾：交成品还是作废，
  *          接错一枚就等于用户按了取消却存下一张图。
+ *          click() 是信号接线测试，原生点击由真机 A1 的 HUD 使用验证。
  */
 TEST_F(LongCaptureHudFixture, ButtonsEmitTheirOwnSignals)
 {

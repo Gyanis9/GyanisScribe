@@ -292,9 +292,11 @@ namespace GyanisScribe::Core
         }
 
         /// 把各行的留白中点聚成列分界，聚类结果记录有多少行支持它
-        /// @note 中点距离不超过容差，或两行的留白区间重叠且中点相距不远，都视为同一处列分界。
-        ///       一行里缺掉中间单元格时留下的长留白会同时覆盖相邻两处真实分界，
-        ///       中点相距超过 chainTolerance 时不能串联合并，否则两列会被并成一列。
+        /// @note 中点距离不超过容差，或两行的留白区间重叠，都视为同一处列分界。
+        ///       一行里缺掉中间单元格时留下的长留白会同时覆盖相邻两处真实分界：先按重叠并簇，
+        ///       再在簇内按 position 排序找最大的相邻间隔；间隔超过 chainTolerance 且两侧各有
+        ///       至少两个候选时拆成两簇。这样长留白两侧都有真实分界证据时会拆开，
+        ///       而同一列第一行短文本、第二行长文本时每侧只有一个候选，仍保持合并。
         [[nodiscard]] QVector<BoundaryCluster> clusterBoundaries(const QVector<BoundaryCandidate> &candidates, const double tolerance, const double chainTolerance)
         {
             const qsizetype count = candidates.size();
@@ -320,9 +322,8 @@ namespace GyanisScribe::Core
                     const double positionDistance = std::abs(leftCandidate.position - rightCandidate.position);
                     const bool   isNear           = positionDistance <= tolerance;
                     // 两行的留白区间重叠时，中点会因左右单元格宽度不同而错开，仍属同一处列分界；
-                    // 缺格留下的长留白跨过两处真实分界时中点相距很远，靠 chainTolerance 拦住串联合并
-                    const bool isOverlapping = leftCandidate.gapLeft <= rightCandidate.gapRight && rightCandidate.gapLeft <= leftCandidate.gapRight &&
-                                               positionDistance <= chainTolerance;
+                    // 缺格留下的长留白跨过两处真实分界，由后面的簇内拆分处理，这里不再限中点距离
+                    const bool isOverlapping = leftCandidate.gapLeft <= rightCandidate.gapRight && rightCandidate.gapLeft <= leftCandidate.gapRight;
                     if (!isNear && !isOverlapping)
                     {
                         continue;
@@ -336,32 +337,68 @@ namespace GyanisScribe::Core
                 }
             }
 
-            QVector<BoundaryCluster> clusters;
-            QVector<int>             clusterIndexByRoot(count, -1);
+            QVector<QVector<int>> membersByRoot(count);
             for (qsizetype index = 0; index < count; ++index)
             {
-                const int root = findRoot(static_cast<int>(index));
-                if (clusterIndexByRoot[root] < 0)
+                membersByRoot[findRoot(static_cast<int>(index))].push_back(static_cast<int>(index));
+            }
+
+            const auto aggregate = [&candidates](const QVector<int> &indices)
+            {
+                BoundaryCluster cluster;
+                for (const int index: indices)
                 {
-                    clusterIndexByRoot[root] = static_cast<int>(clusters.size());
-                    clusters.push_back(BoundaryCluster{});
+                    const BoundaryCandidate &candidate = candidates.at(index);
+                    if (cluster.candidateCount == 0)
+                    {
+                        cluster.gapLeft  = candidate.gapLeft;
+                        cluster.gapRight = candidate.gapRight;
+                    } else
+                    {
+                        cluster.gapLeft  = std::min(cluster.gapLeft, candidate.gapLeft);
+                        cluster.gapRight = std::max(cluster.gapRight, candidate.gapRight);
+                    }
+                    cluster.positionSum += candidate.position;
+                    ++cluster.candidateCount;
+                    if (!cluster.rows.contains(candidate.rowIndex))
+                    {
+                        cluster.rows.push_back(candidate.rowIndex);
+                    }
                 }
-                BoundaryCluster         &cluster   = clusters[clusterIndexByRoot[root]];
-                const BoundaryCandidate &candidate = candidates.at(index);
-                if (cluster.candidateCount == 0)
+                return cluster;
+            };
+
+            QVector<BoundaryCluster> clusters;
+            for (QVector<int> &indices: membersByRoot)
+            {
+                if (indices.isEmpty())
                 {
-                    cluster.gapLeft  = candidate.gapLeft;
-                    cluster.gapRight = candidate.gapRight;
+                    continue;
+                }
+                std::sort(indices.begin(), indices.end(),
+                          [&candidates](const int left, const int right) { return candidates.at(left).position < candidates.at(right).position; });
+
+                double    largestGap = 0.0;
+                qsizetype splitAt    = -1;
+                for (qsizetype index = 1; index < indices.size(); ++index)
+                {
+                    const double gap = candidates.at(indices.at(index)).position - candidates.at(indices.at(index - 1)).position;
+                    if (gap > largestGap)
+                    {
+                        largestGap = gap;
+                        splitAt    = index;
+                    }
+                }
+
+                // 只有两侧都攒够两个候选才拆：短/长文本在同一列边界上各只留一个候选，不能被拆散
+                const bool canSplit = largestGap > chainTolerance && splitAt >= 2 && indices.size() - splitAt >= 2;
+                if (canSplit)
+                {
+                    clusters.push_back(aggregate(indices.mid(0, splitAt)));
+                    clusters.push_back(aggregate(indices.mid(splitAt)));
                 } else
                 {
-                    cluster.gapLeft  = std::min(cluster.gapLeft, candidate.gapLeft);
-                    cluster.gapRight = std::max(cluster.gapRight, candidate.gapRight);
-                }
-                cluster.positionSum += candidate.position;
-                ++cluster.candidateCount;
-                if (!cluster.rows.contains(candidate.rowIndex))
-                {
-                    cluster.rows.push_back(candidate.rowIndex);
+                    clusters.push_back(aggregate(indices));
                 }
             }
             return clusters;
@@ -429,6 +466,7 @@ namespace GyanisScribe::Core
             const qsizetype           rowCount = rows.size();
             QVector<QVector<QString>> cells(rowCount, QVector<QString>(columns));
             QVector<int>              nonEmptyCounts(rowCount, 0);
+            QVector<QVector<int>>     cellTextWidths(rowCount, QVector<int>(columns, 0));
             for (qsizetype rowIndex = 0; rowIndex < rowCount; ++rowIndex)
             {
                 QVector<QVector<OcrWord>> wordsByColumn(columns);
@@ -449,6 +487,8 @@ namespace GyanisScribe::Core
                         continue;
                     }
                     std::sort(cellWords.begin(), cellWords.end(), [](const OcrWord &left, const OcrWord &right) { return left.boundingBox.left() < right.boundingBox.left(); });
+                    // 这一格文字宽取词框并集宽度：从最左词的左边到最右词的右边
+                    cellTextWidths[rowIndex][column] = horizontalRight(cellWords.back().boundingBox) - cellWords.front().boundingBox.left();
                     QStringList parts;
                     parts.reserve(cellWords.size());
                     for (const OcrWord &word: cellWords)
@@ -461,6 +501,38 @@ namespace GyanisScribe::Core
             }
 
             QStringList reasons;
+            if (columns == 2)
+            {
+                // 两栏正文与两列表格的几何可以一模一样：正常行距下每一行左右两段都是长句，
+                // 词框几乎顶满各自列宽。列宽由列分界与整段文字外接框推出，逐行看两格是否都铺满；
+                // 绝大多数行都铺满时，这是正文而不是可按列还原的表格
+                QRect tableBounds;
+                for (const TableRow &row: rows)
+                {
+                    tableBounds = tableBounds.isNull() ? row.bounds : tableBounds.united(row.bounds);
+                }
+                const int split      = static_cast<int>(std::lround(separators.front()));
+                const int leftWidth  = split - tableBounds.left();
+                const int rightWidth = horizontalRight(tableBounds) - split;
+                if (leftWidth > 0 && rightWidth > 0)
+                {
+                    int filledRows = 0;
+                    for (qsizetype rowIndex = 0; rowIndex < rowCount; ++rowIndex)
+                    {
+                        const double leftFill  = static_cast<double>(cellTextWidths.at(rowIndex).at(0)) / static_cast<double>(leftWidth);
+                        const double rightFill = static_cast<double>(cellTextWidths.at(rowIndex).at(1)) / static_cast<double>(rightWidth);
+                        if (leftFill > kTableTwoColumnProseFillFactor && rightFill > kTableTwoColumnProseFillFactor)
+                        {
+                            ++filledRows;
+                        }
+                    }
+                    if (static_cast<double>(filledRows) / static_cast<double>(rowCount) >= kTableTwoColumnProseRowFraction)
+                    {
+                        reasons.append(QStringLiteral("两栏文字均接近列宽，疑似两栏正文"));
+                    }
+                }
+            }
+
             bool        crossesColumnBoundary = false;
             for (const TableRow &row: rows)
             {

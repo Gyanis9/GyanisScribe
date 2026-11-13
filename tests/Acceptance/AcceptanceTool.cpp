@@ -146,6 +146,7 @@ namespace
     }
 
     /// 表格真值一格一行：把同一水平带上的单格行并成一条识别行，检测器才看得到行内多词
+    /// 测试侧副本仅用于真值行输入；生产合并由 E2E 覆盖
     GyanisScribe::Core::OcrResult mergeSameBandLines(GyanisScribe::Core::OcrResult result)
     {
         GyanisScribe::Core::OcrResult merged;
