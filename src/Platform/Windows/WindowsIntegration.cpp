@@ -73,9 +73,10 @@ namespace
     {
         const auto failed = [minimize]
         {
-            return std::unexpected(Error{ErrorCode::PlatformUnsupported,
-                                         GyanisScribe::Base::uiTextUtf8(minimize ? "清场没能让开其他窗口，会照常打开框选遮罩；若窗口挡着，可以直接框选要截的那一块"
-                                                                                 : "还原窗口没有成功。可以按一次 Win+D 取回窗口")});
+            // 两条文案各走一次 uiTextUtf8 字面量：并进条件表达式合成一条，翻译目录就抽不到
+            const auto reason = minimize ? GyanisScribe::Base::uiTextUtf8("清场没能让开其他窗口，桌面保持原样。窗口挡着时可以直接框选要截的那一块")
+                                         : GyanisScribe::Base::uiTextUtf8("还原窗口没有成功。按一次 Win+D 取回窗口");
+            return std::unexpected(Error{ErrorCode::PlatformUnsupported, reason});
         };
         CLSID shellClass{};
         if (FAILED(CLSIDFromProgID(L"Shell.Application", &shellClass)))
@@ -548,7 +549,7 @@ namespace GyanisScribe::Platform
     {
         // 热键、鼠标穿透、前台窗口、窗口枚举、界面元素、步骤事件源与清场都按操作系统给得出的能力填：
         // RegisterHotKey、WS_EX_TRANSPARENT、GetForegroundWindow、EnumWindows、UI Automation、
-        // WH_MOUSE_LL 与 SetWinEventHook、桌面视图的可见性与「显示桌面」命令。会话通知不写死真：
+        // WH_MOUSE_LL 与 SetWinEventHook、桌面视图的可见性与「最小化全部 / 撤销最小化全部」命令。会话通知不写死真：
         // WTS 登记会因会话服务被裁掉或窗口建不出来而失败，这一位按构造时的实测结果填。
         // 录屏采集、系统声音与系统 OCR 不在这张表里占位：
         // 那三步的可用性由各自模块在调用点现探（采集探屏幕、编码看 ffmpeg 在不在、识别问系统装了哪几支语言包），
@@ -663,8 +664,10 @@ namespace GyanisScribe::Platform
         const HWND icons = desktopView != nullptr ? FindWindowExW(desktopView, nullptr, L"SysListView32", nullptr) : nullptr;
         if (icons == nullptr)
         {
-            return std::unexpected(Base::Error{Base::ErrorCode::PlatformUnsupported,
-                                               GyanisScribe::Base::uiTextUtf8("找不到桌面视图，清场没有生效。可以直接框选要截的那一块")});
+            return std::unexpected(Base::Error{
+                    Base::ErrorCode::PlatformUnsupported,
+                    cleared ? GyanisScribe::Base::uiTextUtf8("找不到桌面视图，清场没有生效。可以直接框选要截的那一块")
+                            : GyanisScribe::Base::uiTextUtf8("找不到桌面视图，桌面图标没能放回来。可以在桌面右键 → 查看里勾选「显示桌面图标」，窗口按一次 Win+D 取回")});
         }
         if (cleared)
         {

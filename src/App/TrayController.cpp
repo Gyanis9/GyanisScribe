@@ -138,7 +138,7 @@ namespace GyanisScribe::App
             {
                 continue;
             }
-            // 清场靠平台隐藏桌面图标并切「显示桌面」：给不出的平台上这一行点了只会回一句做不了
+            // 清场靠平台隐藏桌面图标并最小化全部窗口：给不出的平台上这一行点了只会回一句做不了
             if (entry.action == TrayAction::SceneClearCapture && !capabilities.sceneCleanup)
             {
                 continue;

@@ -153,7 +153,7 @@ namespace GyanisScribe::App
 
         /**
          * @brief 清场后进入框选截图
-         * @details 先让开桌面图标与其他窗口，清场成功才写标记并铺遮罩；失败把原因说给用户，不铺任何界面。
+         * @details 先让开桌面图标与其他窗口，清场前先写标记、成功才铺遮罩；失败把原因说给用户，不铺任何界面。
          *          这一轮的任何结局都在收场处恢复，守卫析构再兜一次。
          */
         void startSceneClearCapture();

@@ -32,6 +32,10 @@
             <translation>Finish the current screenshot, screen recording or Rewind first</translation>
         </message>
         <message>
+            <source>桌面没有完全恢复：{}。按一次 Win+D 取回窗口；桌面图标可在桌面右键 → 查看里重新勾选「显示桌面图标」</source>
+            <translation>The desktop was not fully restored: {}. Press Win+D once to bring the windows back; to restore desktop icons, re-enable Show desktop icons from the desktop right-click menu under View.</translation>
+        </message>
+        <message>
             <source>该命令行操作不经过截图流程</source>
             <translation>This command-line action does not use the capture flow</translation>
         </message>
@@ -5556,6 +5560,14 @@
             <translation>Modifiers alone can't be a global hotkey: mask 0x{:X}. Use only combinations of Ctrl, Alt, Shift and Win.</translation>
         </message>
         <message>
+            <source>清场没能让开其他窗口，桌面保持原样。窗口挡着时可以直接框选要截的那一块</source>
+            <translation>Clearing the scene could not move other windows aside, so the desktop is unchanged. If a window is in the way, drag-select the area you want to capture directly.</translation>
+        </message>
+        <message>
+            <source>还原窗口没有成功。按一次 Win+D 取回窗口</source>
+            <translation>Restoring the windows did not succeed. Press Win+D once to bring them back.</translation>
+        </message>
+        <message>
             <source>认不出光标下的界面元素：平台的屏幕清单与界面的屏幕清单配不上对。可以继续直接框住要截的那一块</source>
             <translation>Can't detect the UI element under the cursor: the platform's screen list and the interface's screen list didn't pair up. You can still frame the part you want directly</translation>
         </message>
@@ -5574,6 +5586,10 @@
         <message>
             <source>找不到桌面视图，清场没有生效。可以直接框选要截的那一块</source>
             <translation>The desktop view could not be found, so the scene was not cleared. You can drag-select the area you want to capture directly</translation>
+        </message>
+        <message>
+            <source>找不到桌面视图，桌面图标没能放回来。可以在桌面右键 → 查看里勾选「显示桌面图标」，窗口按一次 Win+D 取回</source>
+            <translation>The desktop view could not be found, so the desktop icons could not be restored. Enable Show desktop icons from the desktop right-click menu under View, and press Win+D once to bring the windows back.</translation>
         </message>
         <message>
             <source>系统的 UI Automation 无法启动，不能识别界面元素。可继续使用悬停识别整个窗口，或直接框选目标区域。</source>

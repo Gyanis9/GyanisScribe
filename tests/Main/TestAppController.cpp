@@ -976,6 +976,32 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住收场恢复失败时把两条手动出路说给用户
+     * @details 平台恢复失败而收场处只说一句原因，用户面对的是一张没有图标、窗口也没回来的桌面；
+     *          提示要同时给出 Win+D 与「显示桌面图标」这两步。
+     */
+    TEST_F(AppControllerFixture, SceneClearRestoreFailureShowsManualSteps)
+    {
+        m_frameScreenName   = m_realScreenName;
+        m_sceneRestoreFails = true;
+        makeController();
+
+        auto      &capture = m_controller->capture();
+        const auto before  = visibleToastBubbles();
+        capture.startSceneClearCapture();
+        auto *overlay = visibleCaptureOverlay();
+        ASSERT_NE(overlay, nullptr) << "清场成功后没铺出遮罩，收场失败这条判据无从判起";
+
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &escape);
+
+        ASSERT_EQ(m_integration->sceneClearCalls.size(), std::size_t{2}) << "取消之后没把恢复交给平台";
+        EXPECT_FALSE(m_integration->sceneClearCalls[1]) << "取消之后平台收到的不是恢复";
+        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("Win+D")); })) << "恢复失败没给出「按一次 Win+D」这条手动出路";
+        EXPECT_TRUE(newToastText(before).contains(QStringLiteral("显示桌面图标"))) << "恢复失败没给出重新勾选「显示桌面图标」这条手动出路";
+    }
+
+    /**
      * @brief 钉住回溯协调器由控制器持有并启动，且热键分支的门禁读的是截图流程标志
      * @details 热键那一跳的触发口在控制器内部，本装置发不出一次 HotkeyAction::Rewind：
      *          这一格钉的是它能碰到的三段——协调器确实由控制器构造（访问器拿得到、默认关闭时
@@ -3266,6 +3292,33 @@ namespace GyanisScribe
 
         capture.startSceneClearCapture();
         EXPECT_TRUE(m_integration->sceneClearCalls.empty()) << "延时挂着时仍去做了一次清场";
+    }
+
+    /**
+     * @brief 钉住录屏在跑时清场入口不做任何清场动作
+     * @details 清场会改桌面并把遮罩铺满屏：录屏正把它拍进成品，平台一下都不该动。
+     */
+    TEST_F(AppControllerFixture, SceneClearLeavesTheSceneAloneWhileScreenRecordingRuns)
+    {
+        m_frameScreenName = m_realScreenName;
+        makeController();
+        auto &recording = m_controller->recordingCoordinatorForTesting();
+        recording.recordingStatusChanged(5, false);
+
+        const auto before = visibleToastBubbles();
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::SceneClear);
+
+        EXPECT_TRUE(m_integration->sceneClearCalls.empty()) << "录屏在跑时清场入口仍动了桌面";
+        EXPECT_EQ(visibleCaptureOverlay(), nullptr) << "被挡回的一按还是铺出了框选遮罩";
+        EXPECT_FALSE(m_controller->capture().isCaptureFlowActive()) << "被挡回的一按把截图流程标志立起来了";
+        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("先结束当前截图/录屏/回溯")); })) << "录屏挡回清场时没说清先结束什么";
+
+        recording.recordingStatusChanged(-1, false);
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::SceneClear);
+        auto *overlay = visibleCaptureOverlay();
+        ASSERT_NE(overlay, nullptr) << "录屏收场之后清场仍打不开：门禁没复位";
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &escape);
     }
 
     /**

@@ -769,6 +769,14 @@ namespace GyanisScribe::Main
                 {
                     return;
                 }
+                // 与元素拾取同一套互斥门禁：清场会改桌面并把遮罩铺满屏，
+                // 截图、录屏与回溯任一件没结束都先挡住
+                if (m_capture->isCaptureFlowActive() || m_capture->isDelayPending() || m_capture->annotationWindow().isVisible() || m_recordingActive ||
+                    m_rewind->isPickerVisible())
+                {
+                    notifyUser(desktopBusyMessage(), GyanisScribe::Gui::ToastKind::Information);
+                    return;
+                }
                 m_capture->startSceneClearCapture();
                 return;
             case GyanisScribe::App::TrayAction::BlankCanvas:

@@ -28,7 +28,7 @@ namespace GyanisScribe::Platform
         bool autostart            = false; ///< 开机自启动：Windows 写当前用户的 Run 键，其余平台按它把「通用」页那一格灰掉并给出原因
         bool sessionNotifications = false; ///< 锁屏/解锁会话通知：回溯缓冲按它决定能不能安全启用
         bool stepRecorder         = false; ///< 记录操作步骤的全局输入监听：Windows 有低级鼠标钩子与前台窗口事件，界面按它决定要不要给记录入口
-        bool sceneCleanup         = false; ///< 清场截图：Windows 能隐藏桌面图标并切「显示桌面」，其余平台按它把入口收起
+        bool sceneCleanup         = false; ///< 清场截图：Windows 能隐藏桌面图标并最小化全部窗口，其余平台按它把入口收起
     };
 
 } // namespace GyanisScribe::Platform

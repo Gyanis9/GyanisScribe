@@ -4,6 +4,7 @@
 #include "App/SceneCleanupGuard.h"
 
 #include "Base/Text.h"
+#include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Settings/SettingsStore.h"
 #include "Platform/IPlatformIntegration.h"
@@ -16,6 +17,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <format>
+#include <functional>
 #include <memory>
 #include <string>
 #include <system_error>
@@ -84,6 +86,10 @@ namespace GyanisScribe
              */
             [[nodiscard]] Base::Expected<void> setSceneCleared(const bool cleared) override
             {
+                if (cleared && beforeClear)
+                {
+                    beforeClear();
+                }
                 calls.push_back(cleared);
                 if (cleared && failOnClear)
                 {
@@ -96,9 +102,96 @@ namespace GyanisScribe
                 return {};
             }
 
-            std::vector<bool> calls;                 ///< 每次开关，按调用次序
-            bool              failOnClear   = false; ///< 清场这一档是否交回失败
-            bool              failOnRestore = false; ///< 恢复这一档是否交回失败
+            std::vector<bool>     calls;                 ///< 每次开关，按调用次序
+            bool                  failOnClear   = false; ///< 清场这一档是否交回失败
+            bool                  failOnRestore = false; ///< 恢复这一档是否交回失败
+            std::function<void()> beforeClear;           ///< 清场这一档进平台前想看一眼的现场
+        };
+
+        /**
+         * @brief 只在「清标记」这一步失败的配置替身
+         * @details 标记存在内存里；setValue 收到空 QVariant 时按点名交回失败，
+         *          用来钉恢复后半步失败时标记必须留住。
+         */
+        class FailingMarkerSettingsStub final : public Core::ISettingsStore
+        {
+        public:
+            [[nodiscard]] QString stringValue(const std::string_view key, const QString &defaultValue) const override
+            {
+                if (key == Core::kSceneClearMarker && !markerText.isEmpty())
+                {
+                    return markerText;
+                }
+                return defaultValue;
+            }
+
+            [[nodiscard]] int intValue(std::string_view, int defaultValue) const override
+            {
+                return defaultValue;
+            }
+
+            [[nodiscard]] bool boolValue(std::string_view, bool defaultValue) const override
+            {
+                return defaultValue;
+            }
+
+            [[nodiscard]] QStringList stringListValue(std::string_view, const QStringList &defaultValue) const override
+            {
+                return defaultValue;
+            }
+
+            /**
+             * @brief 写标记；收到空载荷且点名了失败就交回错误
+             * @param key 键名，本替身只认清场标记
+             * @param value 标记文本；空 QVariant 表示清掉
+             * @return 成功返回空载荷；点名失败时回带中文原因
+             */
+            [[nodiscard]] Base::Expected<void> setValue(const std::string_view key, const QVariant &value) override
+            {
+                if (key != Core::kSceneClearMarker)
+                {
+                    return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, "替身只存清场标记这一项"});
+                }
+                if (!value.isValid())
+                {
+                    if (failOnMarkerClear)
+                    {
+                        return std::unexpected(Base::Error{Base::ErrorCode::FileWriteFailed, "替身：标记清不掉"});
+                    }
+                    markerText.clear();
+                    return {};
+                }
+                markerText = value.toString();
+                return {};
+            }
+
+            void sync() override
+            {
+                ++syncCalls;
+            }
+
+            [[nodiscard]] QStringList allKeys() const override
+            {
+                if (markerText.isEmpty())
+                {
+                    return {};
+                }
+                return {QString::fromUtf8(Core::kSceneClearMarker.data(), static_cast<int>(Core::kSceneClearMarker.size()))};
+            }
+
+            [[nodiscard]] Base::Expected<void> exportToFile(const std::filesystem::path &) const override
+            {
+                return {};
+            }
+
+            [[nodiscard]] Base::Expected<int> importFromFile(const std::filesystem::path &) override
+            {
+                return 0;
+            }
+
+            QString markerText;                ///< 当前标记文本；空表示没写过
+            bool    failOnMarkerClear = false; ///< 清标记这一档是否交回失败
+            int     syncCalls         = 0;     ///< 落盘被要求了几次
         };
 
         /**
@@ -153,6 +246,22 @@ namespace GyanisScribe
             ASSERT_EQ(integration.calls.size(), std::size_t{2});
             EXPECT_FALSE(integration.calls[1]) << "恢复该给平台传 false";
             EXPECT_TRUE(marker().isEmpty()) << "恢复成功却没清标记：下次启动会重复恢复";
+        }
+
+        /**
+         * @brief 清场标记要先落盘再动平台：平台清场进行中就该能读回标记
+         * @details 标记写在平台动作之后，清场中途被强杀就没人知道桌面处于清场态；
+         *          假集成在 setSceneCleared(true) 里当场查配置，钉的是这一次调用的先手。
+         */
+        TEST_F(SceneCleanupGuardTest, ClearWritesTheMarkerBeforeTouchingThePlatform)
+        {
+            SceneClearIntegrationStub integration;
+            App::SceneCleanupGuard    guard{integration, *m_settings};
+            QString                   markerDuringClear;
+            integration.beforeClear = [this, &markerDuringClear] { markerDuringClear = marker(); };
+
+            ASSERT_TRUE(guard.clear().has_value());
+            EXPECT_FALSE(markerDuringClear.isEmpty()) << "平台清场开始时标记还没写：清场中途被强杀就没人恢复桌面";
         }
 
         /**
@@ -231,6 +340,32 @@ namespace GyanisScribe
             EXPECT_TRUE(guard.isCleared()) << "恢复失败却把内存状态清成未清场，下一轮不会再试";
             EXPECT_FALSE(marker().isEmpty()) << "恢复失败把标记清了：下次启动不会再补恢复";
             ASSERT_EQ(integration.calls.size(), std::size_t{2});
+            EXPECT_FALSE(integration.calls[1]);
+        }
+
+        /**
+         * @brief 恢复时清标记失败要留住标记，留给下次启动再试
+         * @details 平台已经还原，内存状态不该再报清场；标记清不掉的错误要交回调用方，
+         *          析构也不再对平台补发一次恢复。
+         */
+        TEST_F(SceneCleanupGuardTest, FailedRestoreMarkerClearKeepsTheMarker)
+        {
+            SceneClearIntegrationStub integration;
+            FailingMarkerSettingsStub settings;
+            settings.failOnMarkerClear = true;
+
+            {
+                App::SceneCleanupGuard guard{integration, settings};
+                ASSERT_TRUE(guard.clear().has_value());
+                const auto restored = guard.restore();
+                ASSERT_FALSE(restored.has_value()) << "清标记失败，restore() 不该当成完整成功";
+                EXPECT_EQ(restored.error().message, "替身：标记清不掉") << "清标记的失败原因该原样交回";
+                EXPECT_FALSE(settings.markerText.isEmpty()) << "恢复时清标记失败却把标记丢了：下次启动不会再补恢复";
+                EXPECT_FALSE(guard.isCleared()) << "平台已经还原，内存状态仍报清场";
+            }
+
+            ASSERT_EQ(integration.calls.size(), std::size_t{2}) << "平台已还原却因标记没清掉又补发了一次恢复";
+            EXPECT_TRUE(integration.calls[0]);
             EXPECT_FALSE(integration.calls[1]);
         }
 

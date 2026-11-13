@@ -41,6 +41,16 @@ namespace GyanisScribe::App
             return {};
         }
 
+        // 标记先落盘再动平台：平台动作一开始桌面就可能被改了样，清场中途被强杀时
+        // 只有已经写下的标记能让下次启动知道要恢复
+        const auto written = m_settings.setValue(GyanisScribe::Core::kSceneClearMarker, QDateTime::currentDateTime().toString(Qt::ISODateWithMs));
+        if (!written)
+        {
+            // 写不进去就不碰平台：没有标记的清场态没人认领
+            return std::unexpected(written.error());
+        }
+        m_settings.sync();
+
         if (const auto cleared = m_integration.setSceneCleared(true); !cleared)
         {
             // 平台可能已经动了一半：补一次恢复把桌面撤回去，原错误交回给调用方说明原因
@@ -48,18 +58,13 @@ namespace GyanisScribe::App
             {
                 GyanisScribe::Base::Logger::warning(std::format("清场失败后撤销半边动作也没成：{}", undone.error().message));
             }
-            return std::unexpected(cleared.error());
-        }
-
-        // 标记是崩溃后补恢复的唯一线索：写不进去就不算清场成功，平台动作也要撤掉
-        const auto written = m_settings.setValue(GyanisScribe::Core::kSceneClearMarker, QDateTime::currentDateTime().toString(Qt::ISODateWithMs));
-        if (!written)
-        {
-            if (const auto undone = m_integration.setSceneCleared(false); !undone)
+            // 这次没清成，标记不能留给下次启动去恢复一场没发生的清场
+            if (const auto dropped = m_settings.setValue(GyanisScribe::Core::kSceneClearMarker, QVariant{}); !dropped)
             {
-                GyanisScribe::Base::Logger::warning(std::format("清场标记写不进去，撤销平台动作也没成：{}", undone.error().message));
+                GyanisScribe::Base::Logger::warning(std::format("清场没成，标记也没清掉：{}", dropped.error().message));
             }
-            return std::unexpected(written.error());
+            m_settings.sync();
+            return std::unexpected(cleared.error());
         }
 
         m_cleared = true;
@@ -81,12 +86,14 @@ namespace GyanisScribe::App
             return std::unexpected(restored.error());
         }
 
-        if (const auto cleared = m_settings.setValue(GyanisScribe::Core::kSceneClearMarker, QVariant{}); !cleared)
-        {
-            return std::unexpected(cleared.error());
-        }
-
+        // 平台已经还原，桌面回到原样；标记清不掉只影响下次启动多试一次恢复，
+        // 撤销最小化全部对已还原的窗口没有副作用
         m_cleared = false;
+        if (const auto dropped = m_settings.setValue(GyanisScribe::Core::kSceneClearMarker, QVariant{}); !dropped)
+        {
+            return std::unexpected(dropped.error());
+        }
+        m_settings.sync();
         return {};
     }
 
