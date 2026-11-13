@@ -27,6 +27,7 @@ namespace GyanisScribe::Core
     inline constexpr double kTableSimpleConfidence  = 0.8; ///< 简单表的最低行完整度
     inline constexpr double kTableTwoColumnProseFillFactor = 0.75; ///< 两栏正文守卫：单格文字宽超过列宽的这个比例才算铺满；真机正常行距的两栏正文实测词框几乎顶满列宽
     inline constexpr double kTableTwoColumnProseRowFraction = 0.8; ///< 两栏正文守卫：两格都铺满的行至少占这个比例；真机正常行距的两栏正文逐行如此
+    inline constexpr double kTableTwoColumnProsePitchFactor = 2.0; ///< 两栏正文守卫：行距不超过行高的这个倍数；表格行的单元格内边距会把行距抬到 2.5 倍左右
 
     /**
      * @brief 一次表格检测的结果

@@ -526,7 +526,10 @@ namespace GyanisScribe::Core
                             ++filledRows;
                         }
                     }
-                    if (static_cast<double>(filledRows) / static_cast<double>(rowCount) >= kTableTwoColumnProseRowFraction)
+                    // 表格行的内边距会把行距抬到行高的两倍以上；正常行距的正文没有这段留白。
+                    // 少了这条，带内边距的两列长文本表（真实表格常见）会被误判成正文
+                    const bool compactLines = metrics.medianRowPitch <= kTableTwoColumnProsePitchFactor * metrics.medianLineHeight;
+                    if (compactLines && static_cast<double>(filledRows) / static_cast<double>(rowCount) >= kTableTwoColumnProseRowFraction)
                     {
                         reasons.append(QStringLiteral("两栏文字均接近列宽，疑似两栏正文"));
                     }

@@ -101,6 +101,22 @@ TEST(TableDetector, MarksTwoColumnProseAsComplex)
     EXPECT_TRUE(table.complexReason.contains(QStringLiteral("两栏正文"))) << table.complexReason.toStdString();
 }
 
+TEST(TableDetector, PaddedTwoColumnTableWithLongTextStaysSimple)
+{
+    // 两列长文本但行距被单元格内边距抬高：这是真表格，不是正文
+    QVector<OcrLine> lines;
+    for (int row = 0; row < 4; ++row)
+    {
+        const int y = 10 + row * 38;
+        lines.push_back(makeWordsLine({makeWord(QStringLiteral("left column text"), 10, y, 120, 15), makeWord(QStringLiteral("right column text"), 200, y, 120, 15)}));
+    }
+    const auto table = detectTable(makeResult(lines));
+
+    ASSERT_TRUE(table.found);
+    EXPECT_FALSE(table.complex) << table.complexReason.toStdString();
+    EXPECT_EQ(table.columns, 2);
+}
+
 TEST(TableDetector, ShortCellsInTwoColumnsStaySimple)
 {
     // 同几何、每格只有短文本（宽度不到列宽 40%）：这是紧凑的两列表格，不许被两栏正文守卫误伤
