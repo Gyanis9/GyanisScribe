@@ -7,7 +7,8 @@
 
 #include <QSaveFile>
 
-#include <algorithm>
+#include <QByteArray>
+
 #include <string>
 
 namespace

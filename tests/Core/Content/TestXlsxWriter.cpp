@@ -11,8 +11,6 @@
 
 #include <gtest/gtest.h>
 
-#include <array>
-#include <cstdint>
 #include <filesystem>
 #include <string>
 
@@ -182,4 +180,15 @@ TEST(XlsxWriter, RejectsTheSameTablesAsCsvAndNeverCreatesTheFile)
     ragged.cells.pop_back();
     EXPECT_FALSE(writeXlsxFile(path, ragged).has_value());
     EXPECT_FALSE(std::filesystem::exists(path));
+
+    // 盘上已经有一份同名文件时，拒绝也不许动它
+    {
+        QFile existing{QString::fromStdWString(path.wstring())};
+        ASSERT_TRUE(existing.open(QIODevice::WriteOnly));
+        ASSERT_EQ(existing.write("sentinel"), 8);
+    }
+    EXPECT_FALSE(writeXlsxFile(path, missing).has_value());
+    QFile keep{QString::fromStdWString(path.wstring())};
+    ASSERT_TRUE(keep.open(QIODevice::ReadOnly));
+    EXPECT_EQ(keep.readAll(), QByteArrayLiteral("sentinel")) << "拒绝导出却改动了盘上的旧文件";
 }

@@ -1,7 +1,6 @@
 #include "Core/Content/ZipStoreWriter.h"
 
 #include <array>
-#include <cstdint>
 
 namespace
 {
@@ -55,7 +54,7 @@ namespace GyanisScribe::Core
 {
     void ZipStoreWriter::addFile(const QByteArray &name, const QByteArray &data)
     {
-        m_entries.push_back(Entry{name, data, crc32(data), 0});
+        m_entries.push_back(Entry{name, data, crc32(data)});
     }
 
     QByteArray ZipStoreWriter::finish() const
