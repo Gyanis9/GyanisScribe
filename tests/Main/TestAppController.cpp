@@ -3232,4 +3232,23 @@ namespace GyanisScribe
         EXPECT_TRUE(memoryRows().empty()) << "从导航行进记忆库页没有清掉原图缺失的行";
     }
 
+    /**
+     * @brief 钉住延时还挂着时清场入口不做任何清场动作
+     * @details 延时期间 schedule 会拒收这一轮；若先清了场，就没有任何流程能把它恢复回来，
+     *          桌面会一直停在清场态。
+     */
+    TEST_F(AppControllerFixture, SceneClearLeavesTheSceneAloneWhileADelayIsPending)
+    {
+        m_frameScreenName = m_realScreenName;
+        m_delaySeconds    = 5;
+        makeController();
+        auto &capture = m_controller->capture();
+
+        capture.startInteractive();
+        ASSERT_TRUE(capture.isDelayPending()) << "前提：延时没排上，这一条什么都没判";
+
+        capture.startSceneClearCapture();
+        EXPECT_TRUE(m_integration->sceneClearCalls.empty()) << "延时挂着时仍去做了一次清场";
+    }
+
 } // namespace GyanisScribe

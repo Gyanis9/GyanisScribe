@@ -168,6 +168,14 @@ namespace GyanisScribe::App
 
     void CaptureCoordinator::startSceneClearCapture()
     {
+        // 会把这一轮拒收的情况先挡在清场之前：延时还挂着时 schedule 会拒收，
+        // 那时桌面已经被清干净、又没有任何流程能把它恢复回来
+        if (isCaptureFlowActive() || isDelayPending() || m_annotationWindow->isVisible())
+        {
+            emit messageForUser(GyanisScribe::Base::uiText("先结束当前截图/录屏/回溯"), GyanisScribe::Gui::ToastKind::Information);
+            return;
+        }
+
         // 守卫懒建：没用过清场的那几轮不该为它留一份状态
         if (m_sceneGuard == nullptr)
         {
@@ -183,6 +191,12 @@ namespace GyanisScribe::App
 
         m_sceneClearPending = true;
         startInteractive();
+        // 兜底：schedule 仍然没收这一轮（例如延时在检查之后才排上）就当场恢复，别把桌面丢在清场态
+        if (!isCaptureFlowActive() && !isDelayPending())
+        {
+            m_sceneClearPending = false;
+            static_cast<void>(m_sceneGuard->restore());
+        }
     }
 
     void CaptureCoordinator::startElementPick()
