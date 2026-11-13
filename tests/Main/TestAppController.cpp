@@ -817,6 +817,16 @@ namespace GyanisScribe
     }
 
     /**
+     * @brief 钉住应用级窗口图标已经装好
+     * @details 分享、审核、输入框与消息框不必各自记得设一次；漏设时标题栏与任务栏一片空白。
+     */
+    TEST_F(AppControllerFixture, ApplicationWindowIconIsInstalled)
+    {
+        makeController();
+        EXPECT_FALSE(QApplication::windowIcon().isNull()) << "应用级窗口图标没装：对话框与消息框会没有品牌图标";
+    }
+
+    /**
      * @brief 钉住截图流程收场：取消报一次，标注窗关报一次，重复关闭不再报
      * @details 回溯协调器靠 captureFlowFinished 恢复抓帧：标注窗还开着就报收场，缓冲会在用户标注时又抓起来；
      *          同一轮报两次，恢复动作会重复执行。判据走真遮罩、真标注窗与真信号，不碰内部标志。

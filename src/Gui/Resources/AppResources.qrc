@@ -25,7 +25,9 @@
     <file alias="StrokeColor.svg">Icons/StrokeColor.svg</file>
     <file alias="NumberGroup.svg">Icons/NumberGroup.svg</file>
     <file alias="Magnifier.svg">Icons/Magnifier.svg</file>
+    <file alias="Memory.svg">Icons/Memory.svg</file>
     <file alias="QrCode.svg">Icons/QrCode.svg</file>
+    <file alias="RebuildIndex.svg">Icons/RebuildIndex.svg</file>
     <file alias="Exit.svg">Icons/Exit.svg</file>
     <file alias="Export.svg">Icons/Export.svg</file>
     <file alias="Import.svg">Icons/Import.svg</file>
@@ -42,6 +44,7 @@
     <file alias="Info.svg">Icons/Info.svg</file>
     <file alias="Microphone.svg">Icons/Microphone.svg</file>
     <file alias="Blur.svg">Icons/Blur.svg</file>
+    <file alias="Block.svg">Icons/Block.svg</file>
     <file alias="Eraser.svg">Icons/Eraser.svg</file>
     <file alias="Fill.svg">Icons/Fill.svg</file>
     <file alias="Mosaic.svg">Icons/Mosaic.svg</file>
@@ -54,8 +57,10 @@
     <file alias="OcrImage.svg">Icons/OcrImage.svg</file>
     <file alias="OcrLanguage.svg">Icons/OcrLanguage.svg</file>
     <file alias="OcrRegion.svg">Icons/OcrRegion.svg</file>
+    <file alias="OpenFile.svg">Icons/OpenFile.svg</file>
     <file alias="Pen.svg">Icons/Pen.svg</file>
     <file alias="Polyline.svg">Icons/Polyline.svg</file>
+    <file alias="Power.svg">Icons/Power.svg</file>
     <file alias="Pin.svg">Icons/Pin.svg</file>
     <file alias="PinClose.svg">Icons/PinClose.svg</file>
     <file alias="PinCopy.svg">Icons/PinCopy.svg</file>

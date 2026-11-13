@@ -88,7 +88,7 @@ namespace GyanisScribe::Gui
         QColor pressed;          ///< 中性按下底，比 hover 再重一档
         QColor accentHover;      ///< 主按钮悬停底：填充色的加深档，不换成描边
         QColor accentSoft;       ///< 选中底：导航当前项、勾选的工具按钮，配 text 与 accent 同时可读
-        QColor borderStrong;     ///< 浮层微边缘与高对比度档的描边：压在其它内容上的菜单、提示、控制条用它
+        QColor borderStrong;     ///< 浮层微边缘、输入框静息描边与高对比度档的描边：压在其他内容上的菜单、提示、控制条用它
     };
 
     /// 浅色主题的语义色：windowBackground、surface、controlFill 三档微明度差配一支主色；
@@ -528,8 +528,14 @@ namespace GyanisScribe::Gui
     /// 标注工具栏一排控件之间的行距：比 4 再收一档
     inline constexpr int kSpacingHairline = 2;
 
-    /// 一行设置项里字段的最大宽度：路径与下拉拉到整窗宽时，「这一格填什么」就看不出来了
+    /// 一行设置项里长文本字段的最大宽度：路径与模板拉到整窗宽时，「这一格填什么」就看不出来了
     inline constexpr int kFieldMaximumWidth = 340;
+
+    /// 下拉字段的最大宽度：选项文字比路径短，收到这一档后表单不会整排都是长条
+    inline constexpr int kComboFieldMaximumWidth = 260;
+
+    /// 数字字段的最大宽度：三到四位数加单位用不着半条表单
+    inline constexpr int kNumericFieldMaximumWidth = 140;
 
     /// 设置窗的默认尺寸与最小尺寸：最小宽度按内容实测后可能再抬高
     inline constexpr int kSettingsWindowDefaultWidth  = 840;

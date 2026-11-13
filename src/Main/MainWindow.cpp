@@ -45,6 +45,7 @@
 #include "Gui/Theme/Language.h"
 #include "Gui/Theme/ThemeManager.h"
 
+#include <QAbstractSpinBox>
 #include <QAction>
 #include <QApplication>
 #include <QByteArray>
@@ -59,6 +60,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QList>
 #include <QListWidget>
 #include <QMessageBox>
 #include <QPushButton>
@@ -79,6 +81,7 @@
 #include <format>
 #include <string>
 #include <utility>
+#include <vector>
 namespace
 {
     using GyanisScribe::Base::Expected;
@@ -113,8 +116,8 @@ namespace
             PageChoice{MainWindowPage::Theme, "主题", "Theme"},
             PageChoice{MainWindowPage::About, "关于", "About"},
             PageChoice{MainWindowPage::History, "历史", "History"},
-            // 记忆库紧跟历史：两者都是「截过什么」的去处，复用历史那枚图标，不为此新增资源
-            PageChoice{MainWindowPage::Memory, "记忆库", "History"},
+            // 记忆库是「带识别的截图库」：用自己那张卡片+放大镜图标，与历史一眼分得开
+            PageChoice{MainWindowPage::Memory, "记忆库", "Memory"},
     };
 
     /// 下拉框的全部行：序号、档位、可见标签三者绑在这一张表上
@@ -133,6 +136,29 @@ namespace
 
     /// 导航列的固定宽度：最长的标签是「文字识别」四个汉字加一枚图标与左右内边距，再宽就要挤右侧的字段了
     constexpr int kNavColumnWidth = 160;
+
+    /**
+     * @brief 一行设置字段该收到多宽
+     * @param widget 表单右侧的字段控件
+     * @return 数字框 140、下拉框 260、单行文本 340；其余行容器与勾选框按自身 sizeHint，最大不超过 340
+     * @details 所有字段一律 340 会让「截图延时」这类三四个数字的格子占掉半条表单，右侧看上去就是一片空白。
+     */
+    int settingsFieldMaximumWidth(const QWidget &widget)
+    {
+        if (qobject_cast<const QAbstractSpinBox *>(&widget) != nullptr)
+        {
+            return GyanisScribe::Gui::kNumericFieldMaximumWidth;
+        }
+        if (qobject_cast<const QComboBox *>(&widget) != nullptr)
+        {
+            return GyanisScribe::Gui::kComboFieldMaximumWidth;
+        }
+        if (qobject_cast<const QLineEdit *>(&widget) != nullptr)
+        {
+            return GyanisScribe::Gui::kFieldMaximumWidth;
+        }
+        return std::min(widget.sizeHint().width(), GyanisScribe::Gui::kFieldMaximumWidth);
+    }
 
     /// 导航行上记图标名的角色：换主题时按它重取图标，不用把 kPages 与行号再对一遍
     constexpr int kNavIconNameRole = Qt::UserRole + 1;
@@ -179,15 +205,22 @@ namespace
     {
         auto *layout = new QVBoxLayout{page};
         layout->setContentsMargins(GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium);
-        layout->setSpacing(GyanisScribe::Gui::kSpacingTiny);
+        layout->setSpacing(0);
 
-        auto *text = new QLabel{intro, page};
+        // 标题、说明与表单共用一条内容列，整列在卡片里居中：宽窗下不会全部挤在左边、右侧空一大片
+        auto *content = new QWidget{page};
+        content->setObjectName(QStringLiteral("settingsPageContent"));
+        auto *contentLayout = new QVBoxLayout{content};
+        contentLayout->setContentsMargins(0, 0, 0, 0);
+        contentLayout->setSpacing(GyanisScribe::Gui::kSpacingSmall);
+
+        auto *text = new QLabel{intro, content};
         text->setObjectName(QStringLiteral("pageHint"));
         text->setWordWrap(true);
         text->setMaximumWidth(GyanisScribe::Gui::kIntroMaximumWidth);
         // 说明行是次要文本，同时要让读屏软件把它当成这一段正文念出来
         text->setAccessibleName(GyanisScribe::Base::uiText("这一类的说明"));
-        layout->addWidget(text);
+        contentLayout->addWidget(text);
 
         auto *form = new QFormLayout;
         // 双环要在输入框外占 6px：行距从 2px 提到 8px，环不会压在相邻行上
@@ -197,7 +230,9 @@ namespace
         // 顶对齐会让单行字段看着下沉，竖直方向取居中
         form->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
         form->setFormAlignment(Qt::AlignLeft | Qt::AlignTop);
-        layout->addLayout(form);
+        contentLayout->addLayout(form);
+
+        layout->addWidget(content, 0, Qt::AlignHCenter);
         layout->addStretch();
         return form;
     }
@@ -215,34 +250,33 @@ namespace
     {
         page.setObjectName(QStringLiteral("pageCard"));
 
-        auto *layout = page.layout();
-        if (auto *box = qobject_cast<QVBoxLayout *>(layout); box != nullptr)
+        // 表单页的标题并进居中内容列；历史与记忆库这类视图页没有内容列，仍摆在页顶
+        QWidget     *headerParent = &page;
+        QVBoxLayout *headerLayout = qobject_cast<QVBoxLayout *>(page.layout());
+        if (auto *content = page.findChild<QWidget *>(QStringLiteral("settingsPageContent")); content != nullptr)
         {
-            auto *heading = new QLabel{title, &page};
+            headerParent = content;
+            headerLayout = qobject_cast<QVBoxLayout *>(content->layout());
+        }
+        if (headerLayout != nullptr)
+        {
+            auto *heading = new QLabel{title, headerParent};
             heading->setObjectName(QStringLiteral("pageTitle"));
             GyanisScribe::Gui::applyTextRole(*heading, GyanisScribe::Gui::TextRole::PageTitle);
-            box->insertWidget(0, heading);
+            headerLayout->insertWidget(0, heading);
         }
 
-        // 字段宽度收到一档：路径框与下拉拉到整窗宽之后，「这一格填什么」和下一格就分不出来了
+        // 标签文字左对齐：字段列由最长的一条标签定起点，短标签自然留白，不再靠右对齐把每个词都推到同一右缘。
+        // 字段宽度与内容列宽在 applySettingsFormMetrics 里按控件类型统一收
         if (auto *form = page.findChild<QFormLayout *>(); form != nullptr)
         {
             for (int row = 0; row < form->rowCount(); ++row)
             {
-                // 标签文字左对齐：字段列由最长的一条标签定起点，短标签自然留白，
-                // 不再靠右对齐把每个词都推到同一右缘
                 if (auto *label = form->itemAt(row, QFormLayout::LabelRole); label != nullptr && label->widget() != nullptr)
                 {
                     if (auto *text = qobject_cast<QLabel *>(label->widget()); text != nullptr)
                     {
                         text->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-                    }
-                }
-                if (auto *field = form->itemAt(row, QFormLayout::FieldRole); field != nullptr)
-                {
-                    if (auto *widget = field->widget(); widget != nullptr)
-                    {
-                        widget->setMaximumWidth(GyanisScribe::Gui::kFieldMaximumWidth);
                     }
                 }
             }
@@ -258,7 +292,17 @@ namespace
      */
     int applySettingsFormMetrics(QStackedWidget &stack)
     {
-        int contentWidth = 0;
+        struct PageMetrics
+        {
+            QWidget             *page       = nullptr; ///< 这一页的卡片
+            QWidget             *content    = nullptr; ///< 居中内容列；视图页没有
+            int                  labelWidth = 0;       ///< 本页标签列宽
+            QList<QFormLayout *> forms;                ///< 本页表单，通常一张
+        };
+
+        // 第一趟先量：所有表单页共用一个内容列宽，翻页时标题与说明不会左右跳
+        std::vector<PageMetrics> pages;
+        int                      maxContentWidth = GyanisScribe::Gui::kComboFieldMaximumWidth;
         for (int index = 0; index < stack.count(); ++index)
         {
             auto *scroll = qobject_cast<QScrollArea *>(stack.widget(index));
@@ -267,15 +311,20 @@ namespace
             {
                 continue;
             }
+            auto      *content = page->findChild<QWidget *>(QStringLiteral("settingsPageContent"));
             const auto forms = page->findChildren<QFormLayout *>();
             if (forms.isEmpty())
             {
-                // 历史与记忆库是视图页，没有表单列：它们的 sizeHint 不该反过来把设置窗撑宽
+                // 关于页有内容列但没有表单；历史与记忆库是视图页，两者都没有，不参与尺寸计算
+                if (content != nullptr)
+                {
+                    pages.push_back(PageMetrics{.page = page, .content = content});
+                }
                 continue;
             }
 
             // 每页各按本页最长的一条标签收列：短页不替长页背那块留白，字段紧挨标签列的右缘
-            int pageLabelWidth = 0;
+            int labelWidth = 0;
             for (auto *form: forms)
             {
                 for (int row = 0; row < form->rowCount(); ++row)
@@ -283,39 +332,63 @@ namespace
                     const auto *label = form->itemAt(row, QFormLayout::LabelRole);
                     if (label != nullptr && label->widget() != nullptr)
                     {
-                        pageLabelWidth = std::max(pageLabelWidth, label->widget()->sizeHint().width());
+                        labelWidth = std::max(labelWidth, label->widget()->sizeHint().width());
                     }
                 }
             }
+
+            // 字段按类型收宽：数字框 140、下拉 260、单行文本 340；字段列宽取本页最宽的一条
+            int fieldWidth = 0;
             for (auto *form: forms)
+            {
+                for (int row = 0; row < form->rowCount(); ++row)
+                {
+                    const auto *field = form->itemAt(row, QFormLayout::FieldRole);
+                    if (field != nullptr && field->widget() != nullptr)
+                    {
+                        fieldWidth = std::max(fieldWidth, settingsFieldMaximumWidth(*field->widget()));
+                    }
+                }
+            }
+            maxContentWidth = std::max(maxContentWidth, labelWidth + GyanisScribe::Gui::kSpacingSmall + fieldWidth);
+            pages.push_back(PageMetrics{.page = page, .content = content, .labelWidth = labelWidth, .forms = forms});
+        }
+
+        // 第二趟统一落：内容列同宽并居中；表单字段各自收窄；说明行跟着内容列宽换行
+        int windowContentWidth = 0;
+        for (auto &metrics: pages)
+        {
+            for (auto *form: metrics.forms)
             {
                 for (int row = 0; row < form->rowCount(); ++row)
                 {
                     if (auto *label = form->itemAt(row, QFormLayout::LabelRole); label != nullptr && label->widget() != nullptr)
                     {
-                        label->widget()->setFixedWidth(pageLabelWidth);
+                        label->widget()->setFixedWidth(metrics.labelWidth);
                     }
                     if (auto *field = form->itemAt(row, QFormLayout::FieldRole); field != nullptr && field->widget() != nullptr)
                     {
-                        field->widget()->setMaximumWidth(GyanisScribe::Gui::kFieldMaximumWidth);
+                        field->widget()->setMaximumWidth(settingsFieldMaximumWidth(*field->widget()));
                     }
                 }
             }
-            // 说明行跟着本页表单内容宽走：固定一档会在宽窗里过早换行，在窄窗里又压到字段列
-            for (auto *hint: page->findChildren<QLabel *>())
+            if (metrics.content != nullptr)
+            {
+                metrics.content->setFixedWidth(maxContentWidth);
+            }
+            for (auto *hint: metrics.page->findChildren<QLabel *>())
             {
                 if (hint->objectName() == QStringLiteral("pageHint"))
                 {
-                    hint->setMaximumWidth(pageLabelWidth + GyanisScribe::Gui::kSpacingSmall + GyanisScribe::Gui::kFieldMaximumWidth);
+                    hint->setMaximumWidth(std::min(maxContentWidth, GyanisScribe::Gui::kIntroMaximumWidth));
                 }
             }
-            // sizeHint 用的是字段当前的 sizeHint，不认 maxWidth：按字段上限算一遍，
-            // 再把实际页宽取大，免得最小宽刚好把字段右缘裁掉
-            const int formWidth = pageLabelWidth + GyanisScribe::Gui::kSpacingSmall + GyanisScribe::Gui::kFieldMaximumWidth +
-                                  2 * GyanisScribe::Gui::kSpacingMedium;
-            contentWidth = std::max({contentWidth, formWidth, page->sizeHint().width()});
+            if (!metrics.forms.isEmpty())
+            {
+                windowContentWidth = std::max({windowContentWidth, maxContentWidth + 2 * GyanisScribe::Gui::kSpacingMedium, metrics.page->sizeHint().width()});
+            }
         }
-        return contentWidth;
+        return windowContentWidth;
     }
 
     /**
@@ -360,7 +433,7 @@ namespace
         editor->setToolTip(GyanisScribe::Base::uiText("%1。留空表示使用默认目录。").arg(title));
 
         auto *browse = new GyanisScribe::Gui::Button{GyanisScribe::Base::uiText("浏览…"), row};
-        icons.applyIcon(*browse, "Save");
+        icons.applyIcon(*browse, "Folder");
         browse->setAccessibleName(GyanisScribe::Base::uiText("选择%1的目录").arg(title));
 
         layout->addWidget(editor, 1);
@@ -3050,9 +3123,15 @@ namespace GyanisScribe::Main
         auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
         auto *layout = new QVBoxLayout{page};
-        // 与表单页同一条内容网格：默认边距比表单页小一圈，翻到这一页正文会左跳 7px
+        // 与表单页同一条内容网格：同样的居中内容列，翻到这一页正文不左跳
         layout->setContentsMargins(GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium);
-        layout->setSpacing(GyanisScribe::Gui::kSpacingSmall);
+        layout->setSpacing(0);
+
+        auto *content = new QWidget{page};
+        content->setObjectName(QStringLiteral("settingsPageContent"));
+        auto *contentLayout = new QVBoxLayout{content};
+        contentLayout->setContentsMargins(0, 0, 0, 0);
+        contentLayout->setSpacing(GyanisScribe::Gui::kSpacingSmall);
 
         // 底板与品牌砖拉开一档明度：深色主题的卡片与砖底同为 #151515，没有这层垫底砖形会整片消失。
         // 位图按所有屏幕里最高的缩放比取，窗口挪到 200% 屏上也不用换图。
@@ -3114,11 +3193,12 @@ namespace GyanisScribe::Main
                              m_updateChecker->check();
                          });
 
-        layout->addWidget(logo);
-        layout->addWidget(text);
+        contentLayout->addWidget(logo);
+        contentLayout->addWidget(text);
         // 左对齐到正文左缘：整宽按钮会把标签居中，看着像一条悬空的字
-        layout->addWidget(checkButton, 0, Qt::AlignLeft);
-        layout->addWidget(status);
+        contentLayout->addWidget(checkButton, 0, Qt::AlignLeft);
+        contentLayout->addWidget(status);
+        layout->addWidget(content, 0, Qt::AlignHCenter);
         layout->addStretch();
         return page;
     }

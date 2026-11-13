@@ -16,14 +16,18 @@
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QElapsedTimer>
+#include <QFont>
 #include <QEvent>
 #include <QEventLoop>
+#include <QByteArray>
+#include <QIcon>
 #include <QImage>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QSet>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QThreadPool>
@@ -31,6 +35,7 @@
 #include <QVariant>
 
 #include <algorithm>
+#include <array>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -252,6 +257,63 @@ TEST_F(MemoryViewFixture, MergesDuplicateResultsOnlyWhenEnabled)
     EXPECT_EQ(view.rowCount(), 3) << "重新开启后应再次折成三行";
     EXPECT_TRUE(hasText(QStringLiteral("张重复/相似"))) << "重新合并后没有组头";
     EXPECT_FALSE(hasText(QStringLiteral("旧的一版"))) << "重新合并后旧的一条还露着";
+}
+
+/**
+ * @brief 钉住记忆库页每一枚动作按钮各有一枚不同的图标
+ * @details 重试待处理与重新识别曾共用 OCR 图标、清空与移除曾共用垃圾桶：同一排里两枚长得一样，
+ *          用户只能逐字读标签。按画出来的位图逐枚比对，补图或换图时不会再有重复悄悄溜进来。
+ */
+TEST_F(MemoryViewFixture, ActionButtonsKeepDistinctIcons)
+{
+    const auto view = makeView();
+
+    const auto iconBits = [](const QIcon &icon)
+    {
+        const QImage image = icon.pixmap(QSize{20, 20}).toImage().convertToFormat(QImage::Format_ARGB32);
+        return QByteArray{reinterpret_cast<const char *>(image.constBits()), image.sizeInBytes()};
+    };
+    const std::array<const char *, 11> buttonNames{
+            "memoryEnable", "memoryRebuild", "memoryImport", "memoryPin",          "memoryOpenFile", "memoryOpenFolder",
+            "memoryRetry",  "memoryRemove",  "memoryClear",  "memoryRetryPending", "memoryExclude",
+    };
+    QSet<QByteArray> seen;
+    for (const auto *name: buttonNames)
+    {
+        auto *button = buttonOf(view, QString::fromLatin1(name));
+        ASSERT_NE(button, nullptr) << name;
+        ASSERT_FALSE(button->icon().isNull()) << name << " 没有图标";
+        const auto bits = iconBits(button->icon());
+        EXPECT_FALSE(seen.contains(bits)) << name << " 与前面的按钮用了同一枚图标";
+        seen.insert(bits);
+    }
+}
+
+/**
+ * @brief 钉住重复组头用 DemiBold、字号与列表正文同一档
+ * @details 组头是强调不是标题：整行 Bold 在中文里会糊成一团，也会显得跟旁边的卡片不是一套字体。
+ */
+TEST_F(MemoryViewFixture, GroupHeaderUsesDemiBoldAtTheListBodySize)
+{
+    static_cast<void>(seedDuplicateGroup());
+    auto view = makeView();
+    view.refresh();
+
+    auto *list = view.findChild<QListWidget *>(QStringLiteral("memoryList"));
+    ASSERT_NE(list, nullptr);
+
+    QListWidgetItem *header = nullptr;
+    for (int row = 0; row < list->count(); ++row)
+    {
+        if (list->item(row)->text().contains(QStringLiteral("张重复/相似")))
+        {
+            header = list->item(row);
+            break;
+        }
+    }
+    ASSERT_NE(header, nullptr) << "没有找到重复组头";
+    EXPECT_EQ(header->font().weight(), QFont::DemiBold) << "组头不是 DemiBold";
+    EXPECT_EQ(header->font().pointSizeF(), list->font().pointSizeF()) << "组头字号与列表正文不是同一档";
 }
 
 /**

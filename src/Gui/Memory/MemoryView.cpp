@@ -165,14 +165,14 @@ namespace GyanisScribe::Gui
         m_enableButton->setObjectName(QStringLiteral("memoryEnable"));
         m_enableButton->setAccessibleName(Base::uiText("开启记忆"));
         m_enableButton->setVisible(false);
-        m_icons.applyIcon(*m_enableButton, "Settings");
+        m_icons.applyIcon(*m_enableButton, "Power");
         bannerLayout->addWidget(m_enableButton);
 
         m_rebuildButton = new Button{Base::uiText("重建索引"), m_bannerFrame};
         m_rebuildButton->setObjectName(QStringLiteral("memoryRebuild"));
         m_rebuildButton->setAccessibleName(Base::uiText("重建索引"));
         m_rebuildButton->setVisible(false);
-        m_icons.applyIcon(*m_rebuildButton, "Refresh");
+        m_icons.applyIcon(*m_rebuildButton, "RebuildIndex");
         bannerLayout->addWidget(m_rebuildButton);
         root->addWidget(m_bannerFrame);
 
@@ -229,7 +229,7 @@ namespace GyanisScribe::Gui
         m_retryButton->setObjectName(QStringLiteral("memoryRetry"));
         m_removeButton->setObjectName(QStringLiteral("memoryRemove"));
         const std::array<std::pair<QPushButton *, std::string_view>, 5> actionButtons = {
-                std::pair{m_pinButton, "Pin"},   std::pair{m_openFileButton, "Export"}, std::pair{m_openFolderButton, "Folder"},
+                std::pair{m_pinButton, "Pin"},   std::pair{m_openFileButton, "OpenFile"}, std::pair{m_openFolderButton, "Folder"},
                 std::pair{m_retryButton, "Ocr"}, std::pair{m_removeButton, "Delete"},
         };
         for (const auto &[button, iconName]: actionButtons)
@@ -251,6 +251,8 @@ namespace GyanisScribe::Gui
         m_list->setResizeMode(QListView::Adjust);
         m_list->setMovement(QListView::Static);
         m_list->setSpacing(8);
+        // 卡片宽按两行正文定：默认图标格宽会把应用名、时间与尺寸折成四五截，看着像另一种字体
+        m_list->setGridSize(QSize{220, 200});
         m_list->setWordWrap(true);
         m_list->setSelectionMode(QAbstractItemView::SingleSelection);
         m_list->setAccessibleName(Base::uiText("记忆结果"));
@@ -280,7 +282,7 @@ namespace GyanisScribe::Gui
         m_retryPendingButton->setObjectName(QStringLiteral("memoryRetryPending"));
         m_retryPendingButton->setToolTip(m_retryPendingButton->text());
         m_retryPendingButton->setAccessibleName(m_retryPendingButton->text());
-        m_icons.applyIcon(*m_retryPendingButton, "Ocr");
+        m_icons.applyIcon(*m_retryPendingButton, "Refresh");
         m_retryPendingButton->setVisible(false);
         footer->addWidget(m_retryPendingButton);
 
@@ -288,14 +290,14 @@ namespace GyanisScribe::Gui
         m_excludeButton->setObjectName(QStringLiteral("memoryExclude"));
         m_excludeButton->setToolTip(m_excludeButton->text());
         m_excludeButton->setAccessibleName(m_excludeButton->text());
-        m_icons.applyIcon(*m_excludeButton, "Close");
+        m_icons.applyIcon(*m_excludeButton, "Block");
         footer->addWidget(m_excludeButton);
 
         m_clearButton = new Button{Base::uiText("清空索引"), this};
         m_clearButton->setObjectName(QStringLiteral("memoryClear"));
         m_clearButton->setToolTip(m_clearButton->text());
         m_clearButton->setAccessibleName(m_clearButton->text());
-        m_icons.applyIcon(*m_clearButton, "Delete");
+        m_icons.applyIcon(*m_clearButton, "Eraser");
         footer->addWidget(m_clearButton);
 
         m_searchTimer = new QTimer{this};
@@ -730,7 +732,8 @@ namespace GyanisScribe::Gui
         item->setFlags(Qt::ItemIsEnabled);
         item->setToolTip(Base::uiText("点击展开或收起该组重复或相似截图。"));
         auto font = item->font();
-        font.setBold(true);
+        // DemiBold 是这一套界面的层级字重：整行 Bold 在中文里会糊成一团，也会显得和旁边卡片不是一套字体
+        font.setWeight(QFont::DemiBold);
         item->setFont(font);
         m_list->addItem(item);
     }

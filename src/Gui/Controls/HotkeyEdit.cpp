@@ -214,8 +214,8 @@ namespace GyanisScribe::Gui
     {
         m_display->setFillRole(m_recording ? SurfaceFillRole::AccentSoft
                                            : (isEnabled() ? SurfaceFillRole::ControlFill : SurfaceFillRole::MutedFill));
-        // 录制态的主色边是显式描边，高对比度档也保持主色；静息态不设边，由高对比度档自动补 borderStrong
-        m_display->setBorderColor(m_recording ? activePalette().accent : QColor{});
+        // 录制态的主色边是显式描边；静息态也给一条 borderStrong，与单行输入同一档可辨识度
+        m_display->setBorderColor(m_recording ? activePalette().accent : (isEnabled() ? activePalette().borderStrong : activePalette().border));
     }
 
     void HotkeyEdit::setRecordingState(const bool recording)

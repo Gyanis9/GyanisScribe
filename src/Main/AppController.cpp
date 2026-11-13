@@ -153,6 +153,8 @@ namespace GyanisScribe::Main
         // 主题与图标：样式表落下去、图标描边色跟着走。这里挂一次连接，之后所有取图标的地方都不用再过问主题
         m_theme = std::make_unique<GyanisScribe::Gui::ThemeManager>(*m_settings);
         m_icons = std::make_unique<GyanisScribe::Gui::IconProvider>();
+        // 全应用窗口图标：分享、审核、输入框这些对话框不必各自记得设一次，任务栏与标题栏都有品牌图标
+        QApplication::setWindowIcon(m_icons->brandIcon());
         QObject::connect(m_theme.get(), &GyanisScribe::Gui::ThemeManager::themeChanged, this, [this] { m_icons->setTintColor(m_theme->iconTint()); });
         // 第一次生效必然带一次通知（构造时解算位是「还没落过」的哨兵），描边色就在通知里落定
         m_theme->applyFromSettings();

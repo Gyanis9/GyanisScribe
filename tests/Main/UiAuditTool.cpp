@@ -38,6 +38,7 @@
 #include "Gui/Theme/ThemeManager.h"
 
 #include <QApplication>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QDateTime>
@@ -433,7 +434,7 @@ int main(int argc, char *argv[])
         std::fprintf(stderr, "failed to register a UI font: text would render as tofu\n");
         return 1;
     }
-    QApplication::setFont(QFont(QFontDatabase::applicationFontFamilies(fontId).front(), 9));
+    QApplication::setFont(QFont(QFontDatabase::applicationFontFamilies(fontId).front(), GyanisScribe::Gui::kTextRolePointSizeBody));
 
     const auto      outputDirectory = argc > 1 ? std::filesystem::path(argv[1]) : std::filesystem::current_path() / "audit-shots";
     std::error_code ignored;
@@ -446,7 +447,8 @@ int main(int argc, char *argv[])
 
     GyanisScribe::Core::SettingsStore settings(dataDirectory / "settings.ini");
     GyanisScribe::Gui::IconProvider   icons;
-    GyanisScribe::Gui::ThemeManager   theme(settings);
+    QApplication::setWindowIcon(icons.brandIcon());
+    GyanisScribe::Gui::ThemeManager theme(settings);
     // 样式表要落一次：真实程序里这一步在 AppController 构造里做，这里没有控制器
     theme.applyFromSettings();
 
@@ -595,6 +597,63 @@ int main(int argc, char *argv[])
             window.refreshHistory();
             shoot(window, outputDirectory, "history-filled");
         }
+
+        // 记忆库页：三张卡片看两行卡片的字体、动作图标与统计行，再合并一次看组头字重
+        window.resize(GyanisScribe::Gui::kSettingsWindowDefaultWidth, GyanisScribe::Gui::kSettingsWindowDefaultHeight);
+        window.setMemoryEnabled(true);
+        {
+            const auto now   = QDateTime::currentDateTime();
+            const auto seeds = std::array{
+                    std::tuple{"memory-a.png", QStringLiteral("code"), QStringLiteral("本周项目进度：接口联调完成"), QStringLiteral("笔记")},
+                    std::tuple{"memory-b.png", QStringLiteral("browser"), QStringLiteral("项目周报 第三版"), QStringLiteral("周报")},
+                    std::tuple{"memory-c.png", QStringLiteral("notepad"), QStringLiteral("发布检查清单"), QStringLiteral("清单")},
+            };
+            int offset = 0;
+            for (const auto &[fileName, processName, snippet, title]: seeds)
+            {
+                const auto image = syntheticScreen({320, 200});
+                const auto path  = dataDirectory / fileName;
+                image.save(QString::fromStdString(path.string()));
+                const auto id = memory.upsertPending(GyanisScribe::Core::MemoryUpsert{
+                        .filePath    = path,
+                        .source      = GyanisScribe::Core::MemorySource::Capture,
+                        .capturedAt  = now.addSecs(-600 * offset++),
+                        .size        = image.size(),
+                        .processName = processName,
+                        .windowTitle = title,
+                });
+                if (id)
+                {
+                    static_cast<void>(memory.updateOcr(*id, snippet, QString{}, QStringLiteral("done"), QString{}, false));
+                }
+            }
+        }
+        if (auto *merge = window.findChild<QCheckBox *>(QStringLiteral("memoryMergeToggle")); merge != nullptr)
+        {
+            merge->setChecked(false);
+        }
+        window.refreshMemory();
+        window.open(GyanisScribe::Main::MainWindowPage::Memory);
+        shoot(window, outputDirectory, "memory-filled");
+        if (auto *merge = window.findChild<QCheckBox *>(QStringLiteral("memoryMergeToggle")); merge != nullptr)
+        {
+            merge->setChecked(true);
+            window.refreshMemory();
+            shoot(window, outputDirectory, "memory-merged");
+            merge->setChecked(false);
+        }
+
+        // 深色档同一页：输入框描边、卡片与正文的对比在这一档最容易糊成一片
+        window.resize(GyanisScribe::Gui::kSettingsWindowDefaultWidth, GyanisScribe::Gui::kSettingsWindowDefaultHeight);
+        static_cast<void>(theme.setTheme(GyanisScribe::Gui::ThemeKind::Dark));
+        window.open(GyanisScribe::Main::MainWindowPage::General);
+        shoot(window, outputDirectory, "main-general-dark");
+        window.open(GyanisScribe::Main::MainWindowPage::Capture);
+        shoot(window, outputDirectory, "main-capture-dark");
+        window.open(GyanisScribe::Main::MainWindowPage::Memory);
+        shoot(window, outputDirectory, "memory-filled-dark");
+        static_cast<void>(theme.setTheme(GyanisScribe::Gui::ThemeKind::Light));
+        window.open(GyanisScribe::Main::MainWindowPage::General);
 
         // 「更多」菜单：离屏尽力拍——拍不出可信的图就明说，不当成图（菜单实机可补拍）
         if (auto *moreMenu = window.findChild<QMenu *>(); moreMenu != nullptr)

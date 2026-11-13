@@ -143,7 +143,7 @@ namespace GyanisScribe::Gui
         auto                                                           *deleteButton = new Gui::Button{GyanisScribe::Base::uiText("删除"), this};
         auto                                                           *clearButton  = new Gui::Button{GyanisScribe::Base::uiText("清空列表"), this};
         const std::array<std::pair<QPushButton *, std::string_view>, 5> buttons      = {
-                std::pair{pinButton, "Pin"}, std::pair{ocrButton, "Ocr"}, std::pair{folderButton, "Folder"}, std::pair{deleteButton, "Delete"}, std::pair{clearButton, "Delete"},
+                std::pair{pinButton, "Pin"}, std::pair{ocrButton, "Ocr"}, std::pair{folderButton, "Folder"}, std::pair{deleteButton, "Delete"}, std::pair{clearButton, "Eraser"},
         };
         for (const auto &[button, iconName]: buttons)
         {

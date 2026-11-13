@@ -59,7 +59,10 @@ using GyanisScribe::Main::updateStatusHtml;
 #include <QVBoxLayout>
 #include <QFontMetrics>
 #include <QComboBox>
+#include <QByteArray>
 #include <QIcon>
+#include <QImage>
+#include <QSet>
 #include <QImage>
 #include <QKeyEvent>
 #include <QLabel>
@@ -278,6 +281,21 @@ namespace
             EXPECT_FALSE(navRows->item(static_cast<int>(index))->icon().isNull()) << "导航行点名的图标画不出来：" << std::string{table[index].icon};
         }
 
+        // 非空还不够：历史与记忆库曾共用同一枚时钟，导航上根本分不出是两页。按画出来的位图逐枚比对
+        const auto iconBits = [](const QIcon &icon)
+        {
+            const QImage image = icon.pixmap(QSize{20, 20}).toImage().convertToFormat(QImage::Format_ARGB32);
+            return QByteArray{reinterpret_cast<const char *>(image.constBits()), image.sizeInBytes()};
+        };
+        QSet<QByteArray> navIconBits;
+        for (int row = 0; row < navRows->count(); ++row)
+        {
+            const auto *item = navRows->item(row);
+            const auto  bits = iconBits(item->icon());
+            EXPECT_FALSE(navIconBits.contains(bits)) << "第 " << row << " 行「" << item->text().toStdString() << "」与前面的导航行画的是同一枚图标";
+            navIconBits.insert(bits);
+        }
+
         struct Expectation
         {
             MainWindowPage                page;
@@ -339,7 +357,8 @@ namespace
         ASSERT_GE(historyAt, 0) << "导航表里没有历史";
         EXPECT_EQ(memoryAt, historyAt + 1) << "记忆库没有紧跟历史";
         EXPECT_EQ(toQString(table[static_cast<std::size_t>(memoryAt)].label), QStringLiteral("记忆库"));
-        EXPECT_EQ(toQString(table[static_cast<std::size_t>(memoryAt)].icon), QStringLiteral("History")) << "复用已有图标，不另造资源";
+        EXPECT_EQ(toQString(table[static_cast<std::size_t>(memoryAt)].icon), QStringLiteral("Memory")) << "记忆库改用自己那张卡片+放大镜图标";
+        EXPECT_NE(toQString(table[static_cast<std::size_t>(memoryAt)].icon), toQString(table[static_cast<std::size_t>(historyAt)].icon)) << "记忆库与历史不能共用同一枚图标";
 
         ASSERT_NE(nav(), nullptr);
         ASSERT_NE(stack(), nullptr);
@@ -710,6 +729,27 @@ namespace
                 EXPECT_EQ(fieldLeft, firstFieldLeft) << "同一页里字段列左右跳了";
             }
         }
+    }
+
+    /**
+     * @brief 钉住设置页的内容列在卡片里居中
+     * @details 表单全部左靠会让宽窗右侧空出一大片；内容列与卡片左右留白应当基本相等。
+     */
+    TEST_F(MainWindowFixture, SettingsContentColumnIsCenteredInTheCard)
+    {
+        makeWindow();
+        m_window->open(MainWindowPage::General);
+        QCoreApplication::processEvents();
+        auto *scroll = qobject_cast<QScrollArea *>(stack()->currentWidget());
+        ASSERT_NE(scroll, nullptr);
+        auto *card = scroll->widget();
+        ASSERT_NE(card, nullptr);
+        auto *content = card->findChild<QWidget *>(QStringLiteral("settingsPageContent"));
+        ASSERT_NE(content, nullptr) << "设置页没有内容列";
+
+        const int leftMargin  = content->mapTo(card, QPoint{0, 0}).x();
+        const int rightMargin = card->width() - content->mapTo(card, QPoint{content->width(), 0}).x();
+        EXPECT_NEAR(leftMargin, rightMargin, 2) << "内容列没有在卡片里居中：" << leftMargin << " vs " << rightMargin;
     }
 
     /**

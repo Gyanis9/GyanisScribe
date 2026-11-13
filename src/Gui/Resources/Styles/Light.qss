@@ -30,6 +30,11 @@ QLabel#pageHint {
     color: #53534D;
 }
 
+/* 记忆库的空态与统计行是辅助信息，与其它页的说明行同一档次要色 */
+QLabel#memoryEmptyHint, QLabel#memoryStats {
+    color: #53534D;
+}
+
 QLabel#metricValue {
     color: #141412;
 }
