@@ -3357,11 +3357,30 @@ namespace GyanisScribe
         const auto before   = visibleToastBubbles();
         makeController();
 
-        ASSERT_FALSE(m_integration->sceneClearCalls.empty()) << "标记残留时启动没尝试恢复";
-        EXPECT_TRUE(std::ranges::all_of(m_integration->sceneClearCalls, [](const bool cleared) { return !cleared; })) << "启动兜底给平台传了清场";
+        ASSERT_EQ(m_integration->sceneClearCalls.size(), std::size_t{1}) << "启动兜底该恰好恢复一次：析构再补发一次会把恢复翻成最小化";
+        EXPECT_FALSE(m_integration->sceneClearCalls[0]) << "启动兜底给平台传的不是恢复";
         EXPECT_FALSE(m_settings->stringValue(Core::kSceneClearMarker, QString{}).isEmpty()) << "恢复失败却把标记清掉了：下次启动不会再试";
         EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("自动恢复失败")); })) << "恢复失败没把原因说给用户";
+        EXPECT_TRUE(newToastText(before).contains(QStringLiteral("Win+D"))) << "恢复失败没给出「按一次 Win+D」这条手动出路";
         ASSERT_NE(mainWindowOnDesk(), nullptr) << "恢复失败把启动也阻断掉了";
+    }
+
+    /**
+     * @brief 钉住没有清场能力的平台不为残留标记去动桌面：标记直接清掉，启动照常
+     * @details 标记只可能来自别处拷来的配置；这台平台连清场都做不了，构造守卫再恢复既没有动作可做，
+     *          还会弹一条用户无从处理的提示。留着标记只会让每次启动都空转一遍。
+     */
+    TEST_F(AppControllerFixture, StartupDropsAStaleMarkerWithoutTheSceneCleanupCapability)
+    {
+        m_sceneClearMarker = QStringLiteral("2026-11-12T10:00:00.000");
+        m_sceneCleanup     = false;
+        const auto before  = visibleToastBubbles();
+        makeController();
+
+        EXPECT_TRUE(m_integration->sceneClearCalls.empty()) << "平台给不出清场能力，启动兜底却仍去调了它";
+        EXPECT_TRUE(m_settings->stringValue(Core::kSceneClearMarker, QString{}).isEmpty()) << "没有清场能力时残留标记没被清掉：每次启动都会再走一遍空转";
+        EXPECT_TRUE(newToastText(before).isEmpty()) << "没有清场能力时还弹了一条恢复提示，用户无从处理";
+        ASSERT_NE(mainWindowOnDesk(), nullptr) << "清标记把启动也阻断掉了";
     }
 
 } // namespace GyanisScribe

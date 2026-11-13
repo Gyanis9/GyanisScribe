@@ -79,7 +79,9 @@ namespace GyanisScribe::Platform
          * @return 成功返回空载荷；找不到桌面视图时返回中文原因，此时不碰「显示桌面」
          * @details 覆写接口的默认实现（默认一律回「本平台不支持」）：图标走 SHELLDLL_DefView 下
          *          SysListView32 的可见性，其他窗口交给 Shell_TrayWnd 的「显示桌面」命令。
-         *          切换语义是发一次命令就翻转一次：清场发一次、恢复再发一次；用户中途自己按了 Win+D
+         *          恢复时图标本来就可见，说明清场早已被撤掉或是重启后补恢复（shell 的「显示桌面」
+         *          开关不跨重启保留）：只保证图标可见，不再发「显示桌面」，否则会把恢复翻成全部最小化。
+         *          除此之外切换语义是发一次命令就翻转一次：清场发一次、恢复再发一次；用户中途自己按了 Win+D
          *          会让这一次翻转提前发生，下一次清场反向——这是系统那条命令本身的开关语义。
          */
         [[nodiscard]] Base::Expected<void> setSceneCleared(bool cleared) override;

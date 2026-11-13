@@ -193,6 +193,28 @@ namespace GyanisScribe
         }
 
         /**
+         * @brief 只有残留标记的临时守卫恢复失败后，析构不再补一次平台恢复
+         * @details 启动兜底用的就是这种守卫：它显式 restore() 过，失败时平台可能已经恢复成功、
+         *          只是标记没写掉；析构再发一次会把恢复翻成「全部最小化」，甚至清掉留给下次启动的标记。
+         */
+        TEST_F(SceneCleanupGuardTest, DestructorDoesNotRetryAStaleMarker)
+        {
+            SceneClearIntegrationStub integration;
+            integration.failOnRestore = true;
+            ASSERT_TRUE(m_settings->setValue(Core::kSceneClearMarker, QStringLiteral("2026-11-12T10:00:00.000")).has_value());
+
+            {
+                App::SceneCleanupGuard guard{integration, *m_settings};
+                const auto             restored = guard.restore();
+                ASSERT_FALSE(restored.has_value()) << "前提：这一档恢复要失败，析构是否重试才判得出来";
+                ASSERT_EQ(integration.calls.size(), std::size_t{1}) << "显式恢复该恰好调一次平台";
+            }
+
+            EXPECT_EQ(integration.calls.size(), std::size_t{1}) << "只有标记残留的守卫在析构里又调了一次平台恢复";
+            EXPECT_FALSE(marker().isEmpty()) << "析构把要留给下次启动的标记清掉了";
+        }
+
+        /**
          * @brief 恢复失败要留住标记，留给下次启动再试
          * @details 标记一清，崩溃恢复就再也不知道桌面还处于清场态。
          */

@@ -19,6 +19,14 @@ namespace GyanisScribe::App
 
     SceneCleanupGuard::~SceneCleanupGuard()
     {
+        // 只有本对象真的清过场才由析构兜底：启动兜底那种「只有标记残留」的临时守卫
+        // 已经显式恢复过，失败时平台可能已经恢复成功、只是标记没写掉；
+        // 析构再发一次会把恢复翻成把所有窗口最小化，甚至清掉要留给下次启动的标记
+        if (!m_cleared)
+        {
+            return;
+        }
+
         // 析构里没有再调一次的机会：落日志，标记留着供下次启动补恢复
         if (const auto restored = restore(); !restored)
         {

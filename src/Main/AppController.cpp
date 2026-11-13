@@ -315,18 +315,33 @@ namespace GyanisScribe::Main
         // 恢复失败只说一句、不阻断启动，标记留着供下次再试
         if (!m_settings->stringValue(GyanisScribe::Core::kSceneClearMarker, QString{}).isEmpty())
         {
-            GyanisScribe::App::SceneCleanupGuard guard{*m_integration, *m_settings};
-            if (const auto restored = guard.restore(); !restored)
+            if (!m_integration->capabilities().sceneCleanup)
             {
-                notifyUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(
-                                                    GyanisScribe::Base::uiTextUtf8("上次退出时桌面处于清场状态，启动时自动恢复失败：{}。"
-                                                                                   "请重启程序再试；若桌面图标仍不显示，可在桌面右键菜单的「查看」里重新勾选「显示桌面图标」"),
-                                                    restored.error().message)
-                                                    .c_str()),
-                           GyanisScribe::Gui::ToastKind::Danger);
+                // 标记只可能来自别的机器拷来的配置：这台平台连清场都做不了，恢复无从谈起；
+                // 留着标记只会让每次启动都空走一遍，直接清掉
+                if (const auto dropped = m_settings->setValue(GyanisScribe::Core::kSceneClearMarker, QVariant{}); !dropped)
+                {
+                    GyanisScribe::Base::Logger::warning(std::format("本平台不支持清场截图，残留的清场标记也没清掉：{}", dropped.error().message));
+                } else
+                {
+                    GyanisScribe::Base::Logger::info("本平台不支持清场截图，残留的清场标记已清掉");
+                }
             } else
             {
-                notifyUser(GyanisScribe::Base::uiText("上次退出时桌面处于清场状态，已自动恢复"), GyanisScribe::Gui::ToastKind::Information);
+                GyanisScribe::App::SceneCleanupGuard guard{*m_integration, *m_settings};
+                if (const auto restored = guard.restore(); !restored)
+                {
+                    notifyUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(
+                                                        GyanisScribe::Base::uiTextUtf8("上次退出时桌面处于清场状态，启动时自动恢复失败：{}。"
+                                                                                       "请重启程序再试；若桌面图标仍不显示，可在桌面右键菜单的「查看」里重新勾选「显示桌面图标」；"
+                                                                                       "若窗口没有回来，按一次 Win+D"),
+                                                        restored.error().message)
+                                                        .c_str()),
+                               GyanisScribe::Gui::ToastKind::Danger);
+                } else
+                {
+                    notifyUser(GyanisScribe::Base::uiText("上次退出时桌面处于清场状态，已自动恢复；若窗口没有回来，按一次 Win+D"), GyanisScribe::Gui::ToastKind::Information);
+                }
             }
         }
 

@@ -631,7 +631,16 @@ namespace GyanisScribe::Platform
             return std::unexpected(Base::Error{Base::ErrorCode::PlatformUnsupported,
                                                GyanisScribe::Base::uiTextUtf8("找不到桌面视图，清场没有生效。可以直接框选要截的那一块")});
         }
+        // 图标可见性是可读回的那一半状态：恢复时图标本来就可见，说明清场早已被撤掉，
+        // 也可能是重启后补恢复——shell 的「显示桌面」开关不跨重启保留，重启后桌面本来就全是可见的。
+        // 这时只保证图标可见，再发 419 会把恢复翻成把所有窗口最小化。
+        // 窗口那一半没有可读的原始状态，交给用户按一次 Win+D 取回；清场那一半行为不变，照样发一次 419
+        const bool iconsWereVisible = IsWindowVisible(icons) != FALSE;
         ShowWindow(icons, cleared ? SW_HIDE : SW_SHOW);
+        if (!cleared && iconsWereVisible)
+        {
+            return {};
+        }
 
         // 419 是 Shell_TrayWnd 上「显示桌面」那条命令的编号：系统没有公开记档，这个编号沿用至今。
         // 交给 shell 翻转比自己逐扇最小化再逐扇还原可靠——窗口的原始状态仍归它自己记着

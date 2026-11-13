@@ -4436,12 +4436,12 @@
             <translation>Cannot open this file: it may have been moved or deleted. Refresh memory and try again</translation>
         </message>
         <message>
-            <source>上次退出时桌面处于清场状态，启动时自动恢复失败：{}。请重启程序再试；若桌面图标仍不显示，可在桌面右键菜单的「查看」里重新勾选「显示桌面图标」</source>
-            <translation>The desktop was still cleared when the app last exited, and automatic restore at startup failed: {}. Restart the app to try again; if desktop icons are still hidden, re-enable them from the desktop right-click menu under View &gt; Show desktop icons.</translation>
+            <source>上次退出时桌面处于清场状态，启动时自动恢复失败：{}。请重启程序再试；若桌面图标仍不显示，可在桌面右键菜单的「查看」里重新勾选「显示桌面图标」；若窗口没有回来，按一次 Win+D</source>
+            <translation>The desktop was still cleared when the app last exited, and automatic restore at startup failed: {}. Restart the app to try again; if desktop icons are still hidden, re-enable them from the desktop right-click menu under View &gt; Show desktop icons. If windows do not come back, press Win+D once.</translation>
         </message>
         <message>
-            <source>上次退出时桌面处于清场状态，已自动恢复</source>
-            <translation>The desktop was still cleared when the app last exited and has been restored automatically</translation>
+            <source>上次退出时桌面处于清场状态，已自动恢复；若窗口没有回来，按一次 Win+D</source>
+            <translation>The desktop was still cleared when the app last exited and has been restored automatically. If windows do not come back, press Win+D once.</translation>
         </message>
         <message>
             <source>该贴图已移至当前分组，位置保持不变</source>
