@@ -60,6 +60,9 @@ namespace
     /// 图内按住后挪多远算「要整体挪」：几像素的手抖仍按单击清选中处理
     constexpr int kCaptureMoveSlop = 3;
 
+    /// 拖动节拍：8ms 一拍（约 125Hz），高于多数显示器刷新率；再密只是把主线程烧在重复帧上
+    constexpr int kDragUpdateIntervalMs = 8;
+
     /// 提交前削掉尾巴上的空行：多半是「敲完回车就提交」带出来的，留着会在图形里多出一行空白
     QString textWithoutTrailingBlankLines(const QString &text)
     {
@@ -116,6 +119,17 @@ namespace GyanisScribe::Gui
     {
         setMouseTracking(true);
         setCursor(Qt::ArrowCursor);
+        // 拖动节拍常开：移动事件只记最后一帧，落几何与重绘都排在拍上；松手时冲刷并停表
+        m_dragUpdateTimer.setInterval(kDragUpdateIntervalMs);
+        m_dragUpdateTimer.setSingleShot(false);
+        QObject::connect(&m_dragUpdateTimer, &QTimer::timeout, this,
+                         [this]
+                         {
+                             if (m_hasPendingDragGeometry)
+                             {
+                                 applyPendingDragGeometry();
+                             }
+                         });
         // 引擎的图形变了就重绘：这里不缓存合成图，在途的那一条也要立刻看得见
         QObject::connect(&engine, &Core::IAnnotationEngine::canvasChanged, this, [this] { update(); });
     }
@@ -135,7 +149,8 @@ namespace GyanisScribe::Gui
         if (m_hasCropPreview)
         {
             QPainter painter{this};
-            painter.drawImage(QRect{QPoint{0, 0}, size()}, m_cropPreviewImage, m_cropPreviewImage.rect());
+            // 直接从整屏冻帧的源矩形画到整窗：不先 copy 一块新图，拖动时没有逐帧分配与拷贝
+            painter.drawImage(QRect{QPoint{0, 0}, size()}, m_cropPreviewFrame, m_cropPreviewSource);
             painter.save();
             // 预览图先按控件铺满，图形跟着同一份逻辑尺寸缩放：裁掉一截的预览与图形才不会各按各的比例落
             if (!m_cropPreviewLogicalSize.isEmpty())
@@ -262,12 +277,13 @@ namespace GyanisScribe::Gui
         }
     }
 
-    void AnnotationView::setCropPreview(const QImage &image, const QPointF &shapeOrigin, const QSizeF &previewLogicalSize)
+    void AnnotationView::setCropPreview(const QImage &frame, const QRect &sourceRect, const QPointF &shapeOrigin, const QSizeF &previewLogicalSize)
     {
-        m_cropPreviewImage       = image;
+        m_cropPreviewFrame       = frame;
+        m_cropPreviewSource      = sourceRect;
         m_cropPreviewShapeOrigin = shapeOrigin;
         m_cropPreviewLogicalSize = previewLogicalSize;
-        m_hasCropPreview         = !image.isNull();
+        m_hasCropPreview         = !frame.isNull() && !sourceRect.isEmpty();
         update();
     }
 
@@ -277,9 +293,49 @@ namespace GyanisScribe::Gui
         {
             return;
         }
-        m_hasCropPreview   = false;
-        m_cropPreviewImage = {};
+        m_hasCropPreview    = false;
+        m_cropPreviewFrame  = {};
+        m_cropPreviewSource = {};
         update();
+    }
+
+    void AnnotationView::requestDragGeometry(const QRect &geometry)
+    {
+        m_pendingDragGeometry    = geometry;
+        m_hasPendingDragGeometry = true;
+        if (!m_dragUpdateTimer.isActive())
+        {
+            // 第一次立即生效：按下后不该等到下一个 8ms 才看见窗口动
+            m_dragUpdateTimer.start();
+            applyPendingDragGeometry();
+        }
+    }
+
+    void AnnotationView::applyPendingDragGeometry()
+    {
+        if (!m_hasPendingDragGeometry || window() == nullptr)
+        {
+            return;
+        }
+        const QRect geometry     = m_pendingDragGeometry;
+        m_hasPendingDragGeometry = false;
+        // 贴到屏边时每帧算回同一个矩形：不重复 setGeometry，省掉一次窗口重排
+        if (window()->geometry() != geometry)
+        {
+            window()->setGeometry(geometry);
+        }
+        emit captureResizeMoved(geometry);
+        // 放大镜随光标与窗口一起走；整窗重绘顺带把上一帧的放大镜从旧位置擦掉
+        update();
+    }
+
+    void AnnotationView::flushPendingDragGeometry()
+    {
+        if (m_hasPendingDragGeometry)
+        {
+            applyPendingDragGeometry();
+        }
+        m_dragUpdateTimer.stop();
     }
 
     void AnnotationView::setCropMagnifierSource(const CropMagnifierSource &source)
@@ -525,14 +581,8 @@ namespace GyanisScribe::Gui
             const auto available = window()->screen() != nullptr ? window()->screen()->availableGeometry() : m_captureResizeOriginalGeometry;
             const auto delta     = event->globalPosition().toPoint() - m_captureResizeStartGlobal;
             const auto moved     = Core::dragRegionByGrip(m_captureResizeOriginalGeometry, m_captureResizeGrip, delta, available);
-            // 少于 8px 的窗口既放不下工具栏也点不中边框，拖动时直接不跟
-            if (moved.width() >= 8 && moved.height() >= 8)
-            {
-                window()->setGeometry(moved);
-                emit captureResizeMoved(moved);
-            }
-            // 放大镜随光标与窗口一起走；整窗重绘顺带把上一帧的放大镜从旧位置擦掉
-            update();
+            // 少于 8px 的窗口既放不下工具栏也点不中边框：几何不跟，但仍按拍刷新放大镜
+            requestDragGeometry(moved.width() >= 8 && moved.height() >= 8 ? moved : window()->geometry());
             event->accept();
             return;
         }
@@ -553,9 +603,7 @@ namespace GyanisScribe::Gui
 
             const auto available = window()->screen() != nullptr ? window()->screen()->availableGeometry() : m_captureMoveOriginalGeometry;
             const auto moved     = Core::dragRegionByGrip(m_captureMoveOriginalGeometry, Core::SelectionGrip::Inside, delta, available);
-            window()->setGeometry(moved);
-            emit captureResizeMoved(moved);
-            update();
+            requestDragGeometry(moved);
             event->accept();
             return;
         }
@@ -613,6 +661,8 @@ namespace GyanisScribe::Gui
         {
             m_captureResizing = false;
             setCursor(Qt::ArrowCursor);
+            // 松手落在两个节拍之间时，最后一帧还没落：先冲刷，交出去的才是光标停下的那一块
+            flushPendingDragGeometry();
             clearCropPreview();
             emit captureResized(window()->geometry());
             // 放大镜只属于拖动那一瞬：松手必须立刻收掉，别让它压在刚定下来的边框上
@@ -626,6 +676,7 @@ namespace GyanisScribe::Gui
             const bool moved     = m_captureMoving;
             m_captureMovePending = false;
             m_captureMoving      = false;
+            flushPendingDragGeometry();
             update();
             if (moved)
             {

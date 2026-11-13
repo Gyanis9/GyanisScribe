@@ -2146,6 +2146,54 @@ TEST_F(AnnotationWindowFixture, ToolbarFollowsTheResizeBeforeTheRecaptureBegins)
 }
 
 /**
+ * @brief 钉住拖边的高频移动按一拍一帧落地，松手冲刷最后一帧
+ * @details 高回报率鼠标一秒能发上千个移动事件；逐个 setGeometry 加重绘会把主线程占满。
+ *          这里连发 20 个移动：第一个立即生效，其余只留最后一帧，下一拍落到终点，松手交出的也是终点。
+ */
+TEST_F(AnnotationWindowFixture, CropResizeCoalescesBurstMovesAndFlushesOnRelease)
+{
+    auto window            = makeWindow();
+    auto captured          = makeCanvas(QSize(200, 100));
+    captured.screenName    = QStringLiteral("FakeScreen-9");
+    captured.logicalRegion = QRect(100, 100, 200, 100);
+    window->startAnnotation(captured, QRect(0, 0, 1920, 1080), QRect(100, 100, 200, 100));
+    QApplication::processEvents();
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Select).has_value());
+
+    auto *view = window->findChild<GyanisScribe::Gui::AnnotationView *>();
+    ASSERT_NE(view, nullptr);
+
+    QSignalSpy moved{view, &GyanisScribe::Gui::AnnotationView::captureResizeMoved};
+    QSignalSpy cropped{window.get(), &GyanisScribe::Gui::AnnotationWindow::cropRequested};
+
+    const QPointF pressGlobal = view->mapToGlobal(QPoint{100, 99});
+    QMouseEvent   press{QEvent::MouseButtonPress, QPointF{100, 99}, pressGlobal, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &press);
+
+    // 20 个移动事件一口气投完：全局点按初始窗口位置算，位移逐格加到 20 像素
+    for (int step = 1; step <= 20; ++step)
+    {
+        const QPointF global = view->mapToGlobal(QPoint{100, 99}) + QPointF{0.0, static_cast<qreal>(step)};
+        QMouseEvent   move{QEvent::MouseMove, QPointF{100.0, static_cast<qreal>(99 + step)}, global, Qt::NoButton, Qt::LeftButton, Qt::NoModifier};
+        QApplication::sendEvent(view, &move);
+    }
+
+    EXPECT_EQ(moved.count(), 1) << "第一个移动之后没有再发生同步落地才叫节流";
+    EXPECT_EQ(window->geometry(), QRect(100, 100, 200, 101)) << "第一个移动没有立即生效，窗口要等到下一拍才动";
+
+    ASSERT_TRUE(moved.wait(100)) << "节拍没有把最后一帧落下来";
+    EXPECT_EQ(window->geometry(), QRect(100, 100, 200, 120)) << "下一拍没有落到最后一帧的目标几何";
+    ASSERT_GE(moved.count(), 2);
+    EXPECT_EQ(moved.last().at(0).toRect(), QRect(100, 100, 200, 120)) << "节拍落下的不是最后那一帧";
+
+    QMouseEvent release{QEvent::MouseButtonRelease, QPointF{100, 119}, pressGlobal + QPointF{0.0, 20.0}, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &release);
+
+    ASSERT_EQ(cropped.count(), 1);
+    EXPECT_EQ(cropped.last().at(1).toRect(), QRect(100, 100, 200, 120)) << "松手交出的不是光标停下的那一块";
+}
+
+/**
  * @brief 画过标注之后不再允许重裁：重抓会换掉整张画布，标注会一起没
  */
 TEST_F(AnnotationWindowFixture, SelectToolKeepsAnnotationsWhenResizing)
@@ -2479,7 +2527,7 @@ TEST_F(AnnotationWindowFixture, CropPreviewMapsShapesByClippedOriginAndScale)
     EXPECT_FALSE(inkAt(shot, 90.0, 40.0)) << "图形的旧位置还留着主色：这一趟只做了平移，没有按预览比例缩放";
 
     // 预览逻辑尺寸为空时只平移不缩放：跳过 scale 分支，不会拿空宽去做除法
-    view->setCropPreview(frozen, QPointF{5.0, 5.0}, QSizeF{});
+    view->setCropPreview(frozen, frozen.rect(), QPointF{5.0, 5.0}, QSizeF{});
     QApplication::processEvents();
     const QImage fallback              = view->grab().toImage();
     const qreal  rightMostWithoutScale = rightMostInkOn(fallback, 40.0);
@@ -2513,7 +2561,7 @@ TEST_F(AnnotationWindowFixture, CropPreviewAntialiasesShapeEdges)
     view.resize(200, 100);
     QImage preview{200, 100, QImage::Format_ARGB32};
     preview.fill(QColor(0, 180, 0));
-    view.setCropPreview(preview, QPointF{0.0, 0.0}, QSizeF{200.0, 100.0});
+    view.setCropPreview(preview, preview.rect(), QPointF{0.0, 0.0}, QSizeF{200.0, 100.0});
     QApplication::processEvents();
 
     QImage shot{200, 100, QImage::Format_ARGB32};

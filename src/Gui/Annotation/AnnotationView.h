@@ -19,6 +19,7 @@
 #include <QRect>
 #include <QSize>
 #include <QSizeF>
+#include <QTimer>
 #include <QWidget>
 
 #include <array>
@@ -158,12 +159,15 @@ namespace GyanisScribe::Gui
 
     public:
         /**
-         * @brief 拖边框途中用冻帧裁出来的预览顶替旧画布
-         * @param image 按新范围裁好的冻帧
+         * @brief 拖边框途中用冻帧里的一块顶替旧画布
+         * @param frame 整屏冻帧；QImage 隐式共享，这里不会再复制一份像素
+         * @param sourceRect 这次要画的那一块，冻帧的物理像素坐标
          * @param shapeOrigin 旧画布原点在预览里的位置，预览逻辑坐标
          * @param previewLogicalSize 预览图对应的逻辑尺寸；空尺寸表示不缩放，图形按逻辑坐标直接落
+         * @details 传整帧与源矩形而不是先裁成一张新图：拖动每一帧都复制一块 4K 面积，
+         *          在回报率高的鼠标上会把主线程压住，预览就会落后于光标。
          */
-        void setCropPreview(const QImage &image, const QPointF &shapeOrigin, const QSizeF &previewLogicalSize);
+        void setCropPreview(const QImage &frame, const QRect &sourceRect, const QPointF &shapeOrigin, const QSizeF &previewLogicalSize);
 
         /// 收起重裁预览，回到引擎画布
         void clearCropPreview();
@@ -251,7 +255,8 @@ namespace GyanisScribe::Gui
         QPoint     m_lastCanvasPoint;           ///< 上一次事件换算到的画布坐标
         QTextEdit *m_textEditor = nullptr;      ///< 行内输入框（多行），用完即销毁
 
-        QImage  m_cropPreviewImage;       ///< 重裁途中的冻帧预览
+        QImage  m_cropPreviewFrame;       ///< 重裁途中的整屏冻帧，隐式共享
+        QRect   m_cropPreviewSource;      ///< 预览要画的冻帧源矩形，物理像素
         QPointF m_cropPreviewShapeOrigin; ///< 旧画布原点在预览里的位置，预览逻辑坐标
         QSizeF  m_cropPreviewLogicalSize; ///< 预览图对应的逻辑尺寸
         bool    m_hasCropPreview = false; ///< 是否正在显示预览
@@ -281,6 +286,20 @@ namespace GyanisScribe::Gui
         /// 画重裁放大镜与读数条
         void paintCropMagnifier(QPainter &painter);
 
+        /**
+         * @brief 记下这一帧该落到的窗口几何，按显示节拍应用
+         * @param geometry 这一帧算出的目标几何
+         * @details 高回报率鼠标一秒能发上千个移动事件，每个事件都 setGeometry + 整窗重绘 +
+         *          重摆工具栏会把主线程占满。第一次立即生效，之后按 8ms 一拍只取最后一帧。
+         */
+        void requestDragGeometry(const QRect &geometry);
+
+        /// 应用待落的那一帧几何并通知宿主；没有待落帧时什么都不做
+        void applyPendingDragGeometry();
+
+        /// 松手时把最后一帧冲刷掉并停表：不能让窗口停在节拍之间
+        void flushPendingDragGeometry();
+
         bool                m_captureResizing   = false;                     ///< 「选择」档正在拖窗口边框
         Core::SelectionGrip m_captureResizeGrip = Core::SelectionGrip::None; ///< 拖的是哪一条边或哪一个角
         QPoint              m_captureResizeStartGlobal;                      ///< 按下时的全局坐标
@@ -292,6 +311,9 @@ namespace GyanisScribe::Gui
         QPoint              m_mousePointWidget;                              ///< 最近一次鼠标位置，控件坐标
         CropMagnifierSource m_cropMagnifierSource;                           ///< 重裁放大镜的整屏冻帧
         Core::MagnifierView m_magnifierView = Core::MagnifierView::Narrow;   ///< 这一轮的放大镜视野档
+        QTimer              m_dragUpdateTimer;                               ///< 拖动节拍：8ms 一拍，松手即停
+        QRect               m_pendingDragGeometry;                           ///< 待落的那一帧窗口几何
+        bool                m_hasPendingDragGeometry = false;                ///< 有没有一帧还没落
     };
 
 } // namespace GyanisScribe::Gui
