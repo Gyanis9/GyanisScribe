@@ -1,5 +1,6 @@
 add_executable(TestCorePrivacy
         TestPiiDetector.cpp
+        TestPrivacyScanTiles.cpp
         TestRedactionGeometry.cpp
         TestRedactImage.cpp)
 
