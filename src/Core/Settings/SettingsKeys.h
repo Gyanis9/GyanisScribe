@@ -39,6 +39,9 @@ namespace GyanisScribe::Core
     /// 元素拾取的全局热键，默认 Ctrl+Alt+E：E 取 element，与现有默认键都不重复
     inline constexpr std::string_view kHotkeyPickElement = "Hotkey/PickElement";
 
+    /// 清场截图的全局热键，默认 Ctrl+Alt+X：与现有默认键都不重复
+    inline constexpr std::string_view kHotkeySceneClear = "Hotkey/SceneClear";
+
     /**
      * @brief 自定义全局热键那一族（`Hotkey/Custom/<功能标识>`），键名不在这里逐个登记
      * @details 一份词表住在 App/CustomHotkeys.h 的 bindableActions()：可绑的功能、标识与配置键都在那一处算，

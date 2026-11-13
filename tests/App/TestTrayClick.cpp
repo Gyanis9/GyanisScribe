@@ -47,7 +47,7 @@ namespace
 {
     /**
      * @brief 造一份能力齐平的能力表
-     * @return 六位都置齐的能力表
+     * @return 每一位都置齐的能力表
      * @details 逐位赋值而不是一次填齐：将来加一位能力会在这里留下「没交代」的形状，
      *          而聚合一气写满会把新字段默默留在 false，判据就成了永真
      */
@@ -61,6 +61,7 @@ namespace
         capabilities.uiElements        = true;
         capabilities.autostart         = true;
         capabilities.stepRecorder      = true;
+        capabilities.sceneCleanup      = true;
         return capabilities;
     }
 
@@ -105,7 +106,7 @@ TEST(TrayClickTable, MenuHotkeyHintsUseEachActionsOwnDefault)
 {
     const auto store = makeStore("menu-hotkey-hints");
     // 期望值照 README 的热键表另抄一份：与管理器内部那张默认表分开写，才会发现「菜单跟了错的动作」
-    const std::array<std::pair<std::string_view, std::string_view>, 10> defaults{{
+    const std::array<std::pair<std::string_view, std::string_view>, 11> defaults{{
             {GyanisScribe::Core::kHotkeyCapture, "Ctrl+Alt+A"},
             {GyanisScribe::Core::kHotkeyRecord, "Ctrl+Alt+R"},
             {GyanisScribe::Core::kHotkeyOcr, "Ctrl+Alt+O"},
@@ -116,6 +117,7 @@ TEST(TrayClickTable, MenuHotkeyHintsUseEachActionsOwnDefault)
             {GyanisScribe::Core::kHotkeyQuickSave, "Ctrl+Alt+S"},
             {GyanisScribe::Core::kHotkeySteps, "Ctrl+Alt+T"},
             {GyanisScribe::Core::kHotkeyPickElement, "Ctrl+Alt+E"},
+            {GyanisScribe::Core::kHotkeySceneClear, "Ctrl+Alt+X"},
     }};
     for (const auto &[key, expected]: defaults)
     {
@@ -177,6 +179,34 @@ TEST(TrayClickTable, ElementPickEntryFollowsCapabilityAndCarriesItsHotkey)
     EXPECT_EQ(findPick(hidden), hidden.end()) << "平台给不出界面元素，这一项留在菜单里只会点了报错";
     const auto allEntries = trayMenuEntries();
     EXPECT_NE(findPick(allEntries), allEntries.end()) << "静态菜单表该保留这一项，能力过滤才是唯一出口";
+}
+
+/**
+ * @brief 钉住「清场截图」这一行：能力在位时出现、提示取 Hotkey/SceneClear，缺能力时整行消失
+ * @details 清场要靠平台动桌面图标与窗口；给不出这一位的平台上留着它，就是一条按了只会报错的入口。
+ *          提示文本另核一次：挂错配置键时菜单会永远显示默认组合。
+ */
+TEST(TrayClickTable, SceneClearEntryFollowsCapabilityAndCarriesItsHotkey)
+{
+    const auto store = makeStore("scene-clear-entry");
+
+    const auto findScene = [](const auto &entries)
+    { return std::ranges::find_if(entries, [](const auto &entry) { return entry.action == TrayAction::SceneClearCapture; }); };
+
+    const auto visible = visibleTrayMenuEntries(everyCapability());
+    const auto found   = findScene(visible);
+    ASSERT_NE(found, visible.end()) << "平台做得出清场，托盘菜单里却没有这一项";
+    EXPECT_EQ(found->label, GyanisScribe::Base::uiText("清场截图"));
+    EXPECT_EQ(found->hotkeyKey, GyanisScribe::Core::kHotkeySceneClear) << "这一行没挂到 Hotkey/SceneClear 上";
+    EXPECT_EQ(found->iconName, "CaptureRegion") << "图标名要在资源里真的存在";
+    EXPECT_EQ(trayHotkeyHint(*store, found->hotkeyKey), QStringLiteral("Ctrl+Alt+X")) << "清场截图的默认组合没跟着这一行走";
+
+    auto withoutScene         = everyCapability();
+    withoutScene.sceneCleanup = false;
+    const auto hidden         = visibleTrayMenuEntries(withoutScene);
+    EXPECT_EQ(findScene(hidden), hidden.end()) << "平台做不出清场，这一项留在菜单里只会点了报错";
+    const auto allEntries = trayMenuEntries();
+    EXPECT_NE(findScene(allEntries), allEntries.end()) << "静态菜单表该保留这一项，能力过滤才是唯一出口";
 }
 
 /**

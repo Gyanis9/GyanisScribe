@@ -59,7 +59,7 @@ TEST(CustomHotkeyTable, FixedAndDangerousActionsStayUnbindable)
 {
     const std::array forbidden{TrayAction::CaptureRegion,     TrayAction::ToggleRecord, TrayAction::Recognize, TrayAction::PickColor,    TrayAction::CaptureLongRegion,
                                TrayAction::TogglePinsVisible, TrayAction::NextPinGroup, TrayAction::Quit,      TrayAction::OpenSettings, TrayAction::OpenAbout,
-                               TrayAction::ToggleSteps,       TrayAction::PickElement};
+                               TrayAction::ToggleSteps,       TrayAction::PickElement,  TrayAction::SceneClearCapture};
 
     for (const auto action: forbidden)
     {

@@ -81,6 +81,8 @@ namespace GyanisScribe::App
         // 图标用 CaptureWindow 那一枚：与「框选截图」共用同一枚会让两行在菜单里长得一模一样
         entries.append(TrayMenuEntry{TrayAction::CaptureWindow, "CaptureWindow", GyanisScribe::Base::uiText("截取当前窗口"), {}});
         entries.append(TrayMenuEntry{TrayAction::CaptureLongRegion, "CaptureRegion", GyanisScribe::Base::uiText("滚动长截图"), GyanisScribe::Core::kHotkeyCaptureLong});
+        // 与框选共用同一层遮罩，只是铺之前先把桌面让开：入口贴着截图组摆，它有自己的固定热键
+        entries.append(TrayMenuEntry{TrayAction::SceneClearCapture, "CaptureRegion", GyanisScribe::Base::uiText("清场截图"), GyanisScribe::Core::kHotkeySceneClear});
         // 不抓屏，直接摆一张白底画布进标注窗：写字、画框、拼几张截图说明时不必先随便截一块屏当底
         entries.append(TrayMenuEntry{TrayAction::BlankCanvas, "Annotation", GyanisScribe::Base::uiText("新建空白画布标注"), {}});
         // 与框选共用同一层遮罩，只把悬停目标从矩形细分到界面元素：入口贴着截图组摆
@@ -133,6 +135,11 @@ namespace GyanisScribe::App
             }
             // 认元素靠平台的界面元素接口：给不出的平台上这一行点了只会回一句做不了
             if (entry.action == TrayAction::PickElement && !capabilities.uiElements)
+            {
+                continue;
+            }
+            // 清场靠平台隐藏桌面图标并切「显示桌面」：给不出的平台上这一行点了只会回一句做不了
+            if (entry.action == TrayAction::SceneClearCapture && !capabilities.sceneCleanup)
             {
                 continue;
             }

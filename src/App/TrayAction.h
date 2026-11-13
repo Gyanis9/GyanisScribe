@@ -42,6 +42,7 @@ namespace GyanisScribe::App
         ManagePinGroups,   ///< 打开贴图组管理窗（哪几组、各有几张、叫什么）；新成员只追加在末尾
         ToggleSteps,       ///< 开始或停止步骤记录；新成员只追加在末尾
         PickElement,       ///< 拾取界面元素；新成员只追加在末尾
+        SceneClearCapture, ///< 清场截图：先让开桌面图标与其他窗口再框选；新成员只追加在末尾
     };
 
 } // namespace GyanisScribe::App

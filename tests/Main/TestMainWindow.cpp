@@ -183,13 +183,15 @@ namespace
         /// 建窗口：WA_DontShowOnScreen 让 open() 里的 show() 不再真的弹一块窗口到桌面上
         /// globalHotkeys 默认给真值：这一份装置要测的是「能改」那一格，不能改的那一格由用例自己关掉它
         /// uiElements 默认关：动作条的元素拾取按钮只在能力位为真的平台上出现
+        /// sceneCleanup 默认关：清场入口只在真有桌面操作后端的平台上出现
         /// 能力表同时留在 m_capabilities 里：动作条的用例要按同一份表算出应当落点的条目
-        void makeWindow(const bool globalHotkeys = true, const bool uiElements = false)
+        void makeWindow(const bool globalHotkeys = true, const bool uiElements = false, const bool sceneCleanup = false)
         {
             m_integration                = GyanisScribe::Platform::createPlatformIntegration();
             m_capabilities               = GyanisScribe::Platform::PlatformCapabilities{};
             m_capabilities.globalHotkeys = globalHotkeys;
             m_capabilities.uiElements    = uiElements;
+            m_capabilities.sceneCleanup  = sceneCleanup;
             m_window                     = std::make_unique<MainWindow>(*m_store, *m_theme, *m_icons, *m_historyStore, *m_memoryIndex, m_capabilities, *m_integration);
             m_window->setAttribute(Qt::WA_DontShowOnScreen);
         }
@@ -2592,13 +2594,13 @@ TEST_F(MainWindowFixture, ActionBarOffersElementPickWhenTheCapabilityIsOn)
  * @brief 钉住热键页的登记入口跟着平台能力位走：没有登记口的平台上不许装作改了会生效
  * @details 两格都判：能力位为真时每一行都能编辑（少了这一格，把 setEnabled 摘掉也不会红），
  *          为假时所有行都灰掉但仍在——行消失了用户就看不见自己配过什么。
- *          行数由「固定十一个动作 + 可绑词表每一项」算出，自定义那一排也归同一道能力位管：
+ *          行数由「固定十二个动作 + 可绑词表每一项」算出，自定义那一排也归同一道能力位管：
  *          填了不生效的组合比不填更坑人，两排必须一起灰。界面按键那一栏不吃这道能力位，
  *          因此按配置键前缀只数全局那一排，混在一起判就看不出哪一批被灰掉了。
  */
 TEST_F(MainWindowFixture, HotkeyEntriesFollowTheGlobalHotkeyCapability)
 {
-    const int expectedRows = 11 + static_cast<int>(GyanisScribe::App::bindableActions().size());
+    const int expectedRows = 12 + static_cast<int>(GyanisScribe::App::bindableActions().size());
 
     const auto globalRows = [this]
     {
@@ -2616,8 +2618,8 @@ TEST_F(MainWindowFixture, HotkeyEntriesFollowTheGlobalHotkeyCapability)
     makeWindow(true);
     m_window->open(MainWindowPage::Hotkey);
     auto rows = globalRows();
-    ASSERT_EQ(rows.size(), expectedRows) << "热键页该有固定十一行，再给每个可绑功能一行";
-    EXPECT_TRUE(introInCurrentPage().contains(QStringLiteral("上方 11 项为固定动作"))) << "说明里的固定动作数没跟着行表走：" << introInCurrentPage().toStdString();
+    ASSERT_EQ(rows.size(), expectedRows) << "热键页该有固定十二行，再给每个可绑功能一行";
+    EXPECT_TRUE(introInCurrentPage().contains(QStringLiteral("上方 12 项为固定动作"))) << "说明里的固定动作数没跟着行表走：" << introInCurrentPage().toStdString();
     for (auto *edit: rows)
     {
         EXPECT_TRUE(edit->isEnabled()) << "有登记口的平台上这些行要能改";
@@ -3157,4 +3159,69 @@ TEST_F(MainWindowFixture, ThemeItemsAndSettingRowsCarryIcons)
     ASSERT_TRUE(m_theme->setTheme(GyanisScribe::Gui::ThemeKind::Dark).has_value());
     EXPECT_NE(themeCombo->itemIcon(0).cacheKey(), lightComboKey) << "换主题后主题下拉的图标没重取";
     EXPECT_NE(glyphOf(QStringLiteral("icon-Countdown")).cacheKey(), lightRowKey) << "换主题后行标签的图标没重取";
+}
+
+/**
+ * @brief 钉住能力位为假时「清场截图」在托盘表与动作条上都不出现
+ * @details 两处同源于 visibleTrayMenuEntries；只收起一处，另一边仍是一条按了只会报错的入口。
+ *          托盘这一头判的是菜单表，不是真托盘图标：离屏与没有托盘的机器上表仍是唯一真源。
+ */
+TEST_F(MainWindowFixture, SceneClearEntryIsHiddenWithoutThePlatformCapability)
+{
+    using GyanisScribe::App::TrayAction;
+    using GyanisScribe::App::visibleTrayMenuEntries;
+
+    makeWindow(true, false, false);
+    m_window->setTrayMenuAvailable(false);
+
+    const auto entries = visibleTrayMenuEntries(m_capabilities);
+    EXPECT_EQ(std::ranges::find_if(entries, [](const auto &entry) { return entry.action == TrayAction::SceneClearCapture; }), entries.end())
+            << "平台做不出清场，托盘菜单表却摆着这一项";
+
+    auto *bar = m_window->findChild<QWidget *>(QStringLiteral("actionBar"));
+    ASSERT_NE(bar, nullptr) << "动作条没建出来";
+    const auto label = GyanisScribe::Base::uiText("清场截图");
+    for (auto *button: bar->findChildren<QPushButton *>())
+    {
+        EXPECT_NE(button->text(), label) << "平台做不出清场，动作条却摆着「清场截图」";
+    }
+}
+
+/**
+ * @brief 钉住能力位为真时「清场截图」落在托盘表与动作条，按下发的是清场动作
+ * @details 入口只加在菜单里，没有托盘的机器就一条常设入口都没有；按钮发错动作则等于
+ *          「点了清场却去截别的」，所以按下去那一格要接到同一个枚举上。
+ */
+TEST_F(MainWindowFixture, SceneClearEntryLandsInTrayTableAndActionBarWithTheCapability)
+{
+    using GyanisScribe::App::TrayAction;
+    using GyanisScribe::App::visibleTrayMenuEntries;
+
+    makeWindow(true, false, true);
+    m_window->setTrayMenuAvailable(false);
+
+    const auto entries = visibleTrayMenuEntries(m_capabilities);
+    const auto trayRow = std::ranges::find_if(entries, [](const auto &entry) { return entry.action == TrayAction::SceneClearCapture; });
+    ASSERT_NE(trayRow, entries.end()) << "平台做得出清场，托盘菜单表却没有这一项";
+    EXPECT_EQ(trayRow->label, GyanisScribe::Base::uiText("清场截图"));
+    EXPECT_EQ(trayRow->hotkeyKey, GyanisScribe::Core::kHotkeySceneClear) << "这一行没挂到 Hotkey/SceneClear 上";
+
+    auto *bar = m_window->findChild<QWidget *>(QStringLiteral("actionBar"));
+    ASSERT_NE(bar, nullptr) << "动作条没建出来";
+    const auto buttons = bar->findChildren<QPushButton *>();
+    const auto label   = GyanisScribe::Base::uiText("清场截图");
+    const auto found   = std::ranges::find(buttons, label, &QPushButton::text);
+    ASSERT_NE(found, buttons.end()) << "能力位开着，动作条却没有「清场截图」按钮";
+
+    int        emissions = 0;
+    TrayAction emitted   = TrayAction::Quit;
+    QObject::connect(m_window.get(), &MainWindow::actionRequested,
+                     [&emissions, &emitted](const TrayAction action)
+                     {
+                         ++emissions;
+                         emitted = action;
+                     });
+    (*found)->click();
+    EXPECT_EQ(emissions, 1) << "按钮点了却没发信号，或发了不止一次";
+    EXPECT_TRUE(emitted == TrayAction::SceneClearCapture) << "按钮发出来的不是清场动作";
 }

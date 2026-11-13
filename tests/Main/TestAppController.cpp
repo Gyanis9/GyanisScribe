@@ -281,8 +281,8 @@ namespace GyanisScribe
 
         /**
          * @brief 只演「前台窗口就是这一扇」的平台集成替身
-         * @details 能力位全假：界面按「本平台给不出」筛菜单，与本组判据无关；
-         *          前台窗口查询次数是「到点才取」那条判据的落脚点。
+         * @details 只开用例要用的那几位：其余按「本平台给不出」筛菜单，与本组判据无关；
+         *          清场这一位另开一格，能力门禁的两档都要能在这里摆。前台窗口查询次数是「到点才取」那条判据的落脚点。
          */
         class ForegroundWindowStub final : public Platform::IPlatformIntegration
         {
@@ -298,6 +298,7 @@ namespace GyanisScribe
                 // 步骤记录协调器先看这一位：本组用例要能真的开始一轮录制
                 caps.stepRecorder = true;
                 caps.uiElements   = true;
+                caps.sceneCleanup = sceneCleanup;
                 return caps;
             }
 
@@ -358,6 +359,10 @@ namespace GyanisScribe
                 {
                     return std::unexpected(Base::Error{Base::ErrorCode::Busy, "替身：清场没有生效"});
                 }
+                if (!cleared && sceneRestoreFails)
+                {
+                    return std::unexpected(Base::Error{Base::ErrorCode::Busy, "替身：桌面没有恢复"});
+                }
                 return {};
             }
 
@@ -373,8 +378,10 @@ namespace GyanisScribe
             mutable int        foregroundQueries    = 0;       ///< 前台窗口被问了几次
             HotkeyBackendStub *hotkeyBackend        = nullptr; ///< 建出来的假热键后端；第一次重登之前为空
             bool               sessionNotifications = false;   ///< 锁屏通知这一位；回溯协调器只在它为真时启用
+            bool               sceneCleanup         = true;    ///< 清场能力这一位；默认给真，逐条用例按需要关掉
             std::vector<bool>  sceneClearCalls;                ///< 每次清场开关，按调用次序
-            bool               sceneClearFails = false;        ///< 清场这一档是否交回失败
+            bool               sceneClearFails   = false;      ///< 清场这一档是否交回失败
+            bool               sceneRestoreFails = false;      ///< 恢复这一档是否交回失败
 
         private:
             quintptr m_handle; ///< 每次交回同一枚句柄
@@ -485,12 +492,19 @@ namespace GyanisScribe
                 ASSERT_TRUE(settings->setValue(Core::kMemoryConsentAsked, m_memoryConsentAsked).has_value());
                 // 步骤记录也按「已经同意」摆：用例要能直接开始，不被首次说明窗卡住
                 ASSERT_TRUE(settings->setValue(Core::kStepsConsentAccepted, true).has_value());
+                // 启动兜底读的是构造前落盘的标记：要演「上次没收尾」只能在这之前写
+                if (!m_sceneClearMarker.isEmpty())
+                {
+                    ASSERT_TRUE(settings->setValue(Core::kSceneClearMarker, m_sceneClearMarker).has_value());
+                }
                 m_settings = settings.get();
 
                 auto source      = std::make_unique<CountingScreenSource>(makeFrame(m_frameScreenName, m_frameRegion, m_frameColor));
                 auto integration = std::make_unique<ForegroundWindowStub>(kForegroundWindowHandle);
                 // 回溯协调器在控制器构造里就 start()：能力位与开关必须先落在这份替身上，构造之后再补已经晚了
                 integration->sessionNotifications = m_sessionNotifications;
+                integration->sceneCleanup         = m_sceneCleanup;
+                integration->sceneRestoreFails    = m_sceneRestoreFails;
                 m_source                          = source.get();
                 m_integration                     = integration.get();
 
@@ -766,6 +780,9 @@ namespace GyanisScribe
             QString                              m_customHotkeyText;                                        ///< 预置的自定义绑定；空 = 不写这一格
             bool                                 m_rewindEnabled        = false;                            ///< 回溯开关；真就在造控制器前写进设置
             bool                                 m_sessionNotifications = false;                            ///< 平台是否承诺锁屏通知；回溯协调器只在它为真时启用
+            bool                                 m_sceneCleanup         = true;                             ///< 平台是否给出清场能力；默认给真，能力门禁用例自己关掉
+            bool                                 m_sceneRestoreFails    = false;                            ///< 恢复这一档是否交回失败；启动兜底失败那条用例自己打开
+            QString                              m_sceneClearMarker;                                        ///< 构造前写进配置的清场标记；空 = 不写
             bool                                 m_memoryEnabled        = false;                            ///< 记忆库开关；造控制器前写进设置
             bool                                 m_memoryConsentAsked   = true;                             ///< 记忆库是否已问过授权；默认问过，只有授权那条用例翻回未询问
             std::filesystem::path                m_memoryStoragePath;                                       ///< 记忆索引落点；空 = 临时目录下的 memory.sqlite
@@ -2487,7 +2504,7 @@ namespace GyanisScribe
         ASSERT_NE(m_integration->hotkeyBackend, nullptr) << "替身平台没有交出热键后端，这一格无从判起";
         auto &backend = *m_integration->hotkeyBackend;
         ASSERT_EQ(backend.unregisterAllCalls, 1) << "启动登记该只清一次场";
-        ASSERT_EQ(backend.registeredCount(), 12) << "十一个固定动作加一条自定义键没有全部登记上";
+        ASSERT_EQ(backend.registeredCount(), 13) << "十二个固定动作加一条自定义键没有全部登记上";
 
         // 新组合被占用：写入设置即触发整轮重登，热键层恢复旧组合后控制器把它写回配置
         backend.rejectCombination(Qt::ControlModifier | Qt::AltModifier, Qt::Key_8);
@@ -3249,6 +3266,102 @@ namespace GyanisScribe
 
         capture.startSceneClearCapture();
         EXPECT_TRUE(m_integration->sceneClearCalls.empty()) << "延时挂着时仍去做了一次清场";
+    }
+
+    /**
+     * @brief 钉住能力位为假时托盘入口被拒：平台不动、遮罩不铺，并把替代做法说给用户
+     * @details 菜单会按能力位收起这一项，但热键与从别处抄来的托盘配置仍可能把动作递进来；
+     *          没有清场能力的平台上真去调平台只会让桌面停在没人恢复的半边状态。
+     */
+    TEST_F(AppControllerFixture, SceneClearEntryIsRejectedWithoutThePlatformCapability)
+    {
+        m_sceneCleanup = false;
+        makeController();
+
+        const auto before = visibleToastBubbles();
+        m_controller->trayControllerForTesting().actionRequested(App::TrayAction::SceneClearCapture);
+
+        EXPECT_TRUE(m_integration->sceneClearCalls.empty()) << "平台给不出清场，动作却真去动了桌面";
+        EXPECT_EQ(visibleCaptureOverlay(), nullptr) << "被拒的一按还是铺出了框选遮罩";
+        EXPECT_FALSE(m_controller->capture().isCaptureFlowActive()) << "被拒的一按把截图流程标志立起来了";
+        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("不支持清场截图")); })) << "被拒时没说清这台平台做不到什么";
+    }
+
+    /**
+     * @brief 钉住清场热键走同一个清场入口：平台收到一次 true，框选遮罩随后铺开
+     * @details 热键若没接上分派表，按下去只会安静地什么也不做；只判平台调用还不够，
+     *          流程标志与遮罩一起判才说明这一轮真的进了截图。
+     */
+    TEST_F(AppControllerFixture, SceneClearHotkeyEntersTheCaptureFlow)
+    {
+        m_frameScreenName = m_realScreenName;
+        makeController();
+
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::SceneClear);
+
+        ASSERT_EQ(m_integration->sceneClearCalls.size(), std::size_t{1}) << "清场热键没把动作交到平台上";
+        EXPECT_TRUE(m_integration->sceneClearCalls[0]) << "清场该给平台传 true";
+        EXPECT_TRUE(m_controller->capture().isCaptureFlowActive()) << "清场之后流程标志没立起来";
+        auto *overlay = visibleCaptureOverlay();
+        ASSERT_NE(overlay, nullptr) << "清场成功后没铺出框选遮罩";
+
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &escape);
+    }
+
+    /**
+     * @brief 钉住清场之后取消截图就恢复桌面：平台收到 false 且标记清掉
+     * @details 入口只负责清场，恢复跟着收场那一句走；这条出口断了，桌面图标会一直藏着。
+     */
+    TEST_F(AppControllerFixture, SceneClearHotkeyCancelRestoresTheDesktop)
+    {
+        m_frameScreenName = m_realScreenName;
+        makeController();
+
+        m_controller->handleHotkeyActionForTesting(Core::HotkeyAction::SceneClear);
+        auto *overlay = visibleCaptureOverlay();
+        ASSERT_NE(overlay, nullptr) << "清场后没铺出遮罩，取消这条判据无从判起";
+
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &escape);
+
+        ASSERT_EQ(m_integration->sceneClearCalls.size(), std::size_t{2}) << "取消之后没把桌面恢复回去";
+        EXPECT_TRUE(m_integration->sceneClearCalls[0]);
+        EXPECT_FALSE(m_integration->sceneClearCalls[1]) << "取消之后平台收到的不是恢复";
+        EXPECT_TRUE(m_settings->stringValue(Core::kSceneClearMarker, QString{}).isEmpty()) << "恢复之后标记没清掉";
+    }
+
+    /**
+     * @brief 钉住启动兜底：上次退出时标记还在，构造控制器就先恢复桌面再继续
+     * @details 崩溃或强杀走不到收场那一句，标记是下一次启动唯一还认得出清场态的线索；
+     *          不恢复的话，用户开机看到的是一张没有图标的桌面。
+     */
+    TEST_F(AppControllerFixture, StartupRestoresAStaleSceneClearMarker)
+    {
+        m_sceneClearMarker = QStringLiteral("2026-11-12T10:00:00.000");
+        makeController();
+
+        ASSERT_EQ(m_integration->sceneClearCalls.size(), std::size_t{1}) << "标记残留时启动没补一次恢复";
+        EXPECT_FALSE(m_integration->sceneClearCalls[0]) << "启动兜底给平台传的不是恢复";
+        EXPECT_TRUE(m_settings->stringValue(Core::kSceneClearMarker, QString{}).isEmpty()) << "恢复成功后标记没清掉，下次启动会再恢复一遍";
+    }
+
+    /**
+     * @brief 钉住启动恢复失败不阻断启动：标记留着供下次再试，并把原因与出路说给用户
+     * @details 失败时清掉标记等于放弃这台机器；静默失败则用户只看到一张没有图标的桌面。
+     */
+    TEST_F(AppControllerFixture, StartupRestoreFailureKeepsTheMarkerAndSaysWhy)
+    {
+        m_sceneClearMarker  = QStringLiteral("2026-11-12T10:00:00.000");
+        m_sceneRestoreFails = true;
+        const auto before   = visibleToastBubbles();
+        makeController();
+
+        ASSERT_FALSE(m_integration->sceneClearCalls.empty()) << "标记残留时启动没尝试恢复";
+        EXPECT_TRUE(std::ranges::all_of(m_integration->sceneClearCalls, [](const bool cleared) { return !cleared; })) << "启动兜底给平台传了清场";
+        EXPECT_FALSE(m_settings->stringValue(Core::kSceneClearMarker, QString{}).isEmpty()) << "恢复失败却把标记清掉了：下次启动不会再试";
+        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("自动恢复失败")); })) << "恢复失败没把原因说给用户";
+        ASSERT_NE(mainWindowOnDesk(), nullptr) << "恢复失败把启动也阻断掉了";
     }
 
 } // namespace GyanisScribe

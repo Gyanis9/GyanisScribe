@@ -168,6 +168,14 @@ namespace GyanisScribe::App
 
     void CaptureCoordinator::startSceneClearCapture()
     {
+        // 平台给不出清场时连桌面都不该碰：菜单会按能力位收起这一项，
+        // 但热键与从别处抄来的托盘配置仍可能把动作递进来
+        if (!m_dependencies.integration.capabilities().sceneCleanup)
+        {
+            emit messageForUser(GyanisScribe::Base::uiText("当前平台不支持清场截图，可直接框选目标区域"), GyanisScribe::Gui::ToastKind::Information);
+            return;
+        }
+
         // 会把这一轮拒收的情况先挡在清场之前：延时还挂着时 schedule 会拒收，
         // 那时桌面已经被清干净、又没有任何流程能把它恢复回来
         if (isCaptureFlowActive() || isDelayPending() || m_annotationWindow->isVisible())

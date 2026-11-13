@@ -24,6 +24,14 @@
             <translation>Capture did not complete: %1. Try again</translation>
         </message>
         <message>
+            <source>当前平台不支持清场截图，可直接框选目标区域</source>
+            <translation>This platform does not support scene-clear screenshots; select a region directly instead</translation>
+        </message>
+        <message>
+            <source>先结束当前截图/录屏/回溯</source>
+            <translation>Finish the current screenshot, screen recording or Rewind first</translation>
+        </message>
+        <message>
             <source>该命令行操作不经过截图流程</source>
             <translation>This command-line action does not use the capture flow</translation>
         </message>
@@ -754,6 +762,10 @@
         <message>
             <source>滚动长截图</source>
             <translation>Scrolling capture</translation>
+        </message>
+        <message>
+            <source>清场截图</source>
+            <translation>Scene-clear screenshot</translation>
         </message>
         <message>
             <source>新建空白画布标注</source>
@@ -4420,12 +4432,16 @@
             <translation>Theme value "{}" is not one of the available options: pick Light, Dark, System, or HighContrast on the Theme page in Settings, or write exactly one of those four words (case-sensitive) when editing the config file by hand</translation>
         </message>
         <message>
-            <source>先结束当前截图/录屏/回溯</source>
-            <translation>Finish the current screenshot, screen recording or Rewind first</translation>
-        </message>
-        <message>
             <source>无法打开该文件：文件可能已被移动或删除。请刷新记忆库后重试</source>
             <translation>Cannot open this file: it may have been moved or deleted. Refresh memory and try again</translation>
+        </message>
+        <message>
+            <source>上次退出时桌面处于清场状态，启动时自动恢复失败：{}。请重启程序再试；若桌面图标仍不显示，可在桌面右键菜单的「查看」里重新勾选「显示桌面图标」</source>
+            <translation>The desktop was still cleared when the app last exited, and automatic restore at startup failed: {}. Restart the app to try again; if desktop icons are still hidden, re-enable them from the desktop right-click menu under View &gt; Show desktop icons.</translation>
+        </message>
+        <message>
+            <source>上次退出时桌面处于清场状态，已自动恢复</source>
+            <translation>The desktop was still cleared when the app last exited and has been restored automatically</translation>
         </message>
         <message>
             <source>该贴图已移至当前分组，位置保持不变</source>

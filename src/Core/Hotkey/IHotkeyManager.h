@@ -37,6 +37,7 @@ namespace GyanisScribe::Core
         Rewind,       ///< 回溯截图；追加在末尾，编号排到 9
         Steps,        ///< 记录操作步骤；追加在末尾，编号排到 10
         PickElement,  ///< 拾取界面元素；追加在末尾，编号排到 11
+        SceneClear,   ///< 清场截图；追加在末尾，编号排到 12
     };
 
     /**

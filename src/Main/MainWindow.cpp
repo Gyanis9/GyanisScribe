@@ -2791,6 +2791,7 @@ namespace GyanisScribe::Main
                                      std::tuple{GyanisScribe::Core::kHotkeyOcr, GyanisScribe::Base::uiText("文字识别"), QStringLiteral("Ctrl+Alt+O")},
                                      std::tuple{GyanisScribe::Core::kHotkeyPick, GyanisScribe::Base::uiText("屏幕取色"), QStringLiteral("Ctrl+Alt+P")},
                                      std::tuple{GyanisScribe::Core::kHotkeyCaptureLong, GyanisScribe::Base::uiText("滚动长截图"), QStringLiteral("Ctrl+Alt+L")},
+                                     std::tuple{GyanisScribe::Core::kHotkeySceneClear, GyanisScribe::Base::uiText("清场截图"), QStringLiteral("Ctrl+Alt+X")},
                                      std::tuple{GyanisScribe::Core::kHotkeyQuickSave, GyanisScribe::Base::uiText("快速保存"), QStringLiteral("Ctrl+Alt+S")},
                                      std::tuple{GyanisScribe::Core::kHotkeyTogglePins, GyanisScribe::Base::uiText("收起 / 显示全部贴图"), QStringLiteral("Ctrl+Alt+H")},
                                      std::tuple{GyanisScribe::Core::kHotkeyNextPinGroup, GyanisScribe::Base::uiText("切换到下一组贴图"), QStringLiteral("Ctrl+Alt+G")},

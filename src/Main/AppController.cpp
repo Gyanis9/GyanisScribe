@@ -12,6 +12,7 @@
 #include "App/DeliveryCoordinator.h"
 #include "App/CaptureCoordinator.h"
 #include "App/RewindCoordinator.h"
+#include "App/SceneCleanupGuard.h"
 #include "App/PinCoordinator.h"
 #include "App/PickCoordinator.h"
 #include "App/OcrCoordinator.h"
@@ -309,6 +310,26 @@ namespace GyanisScribe::Main
                          [this](const QImage &image, const QString &sourceFile) { m_pins->addPin(image, QCursor::pos(), sourceFile); });
         m_toast = std::make_unique<GyanisScribe::Gui::Toast>(*m_icons, *m_theme);
         QObject::connect(m_tray.get(), &GyanisScribe::App::TrayController::actionRequested, this, &AppController::handleTrayAction);
+
+        // 上次若在清场态里退出，先把桌面还回去再继续启动：此刻托盘与主窗口都还没对外现身。
+        // 恢复失败只说一句、不阻断启动，标记留着供下次再试
+        if (!m_settings->stringValue(GyanisScribe::Core::kSceneClearMarker, QString{}).isEmpty())
+        {
+            GyanisScribe::App::SceneCleanupGuard guard{*m_integration, *m_settings};
+            if (const auto restored = guard.restore(); !restored)
+            {
+                notifyUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(
+                                                    GyanisScribe::Base::uiTextUtf8("上次退出时桌面处于清场状态，启动时自动恢复失败：{}。"
+                                                                                   "请重启程序再试；若桌面图标仍不显示，可在桌面右键菜单的「查看」里重新勾选「显示桌面图标」"),
+                                                    restored.error().message)
+                                                    .c_str()),
+                           GyanisScribe::Gui::ToastKind::Danger);
+            } else
+            {
+                notifyUser(GyanisScribe::Base::uiText("上次退出时桌面处于清场状态，已自动恢复"), GyanisScribe::Gui::ToastKind::Information);
+            }
+        }
+
         // 托盘在这一步装起：菜单动作那条线已经接好，逐屏截图那一条要等截图协调器建出来才接（见下）；
         // 装没装上的读数先决定主窗口动作条收不收，没有托盘时还要让主窗口自己现身（见下）
         const bool trayInstalled = m_tray->install();
@@ -597,6 +618,10 @@ namespace GyanisScribe::Main
                 // CaptureService::startElementPick 入口还会再挡一次，热键这一路不必自己判
                 handleTrayAction(GyanisScribe::App::TrayAction::PickElement);
                 return;
+            case GyanisScribe::Core::HotkeyAction::SceneClear:
+                // 与托盘那一行只有一条实现：步骤记录门禁与平台能力都只在托盘动作那一段判
+                handleTrayAction(GyanisScribe::App::TrayAction::SceneClearCapture);
+                return;
         }
     }
 
@@ -722,6 +747,14 @@ namespace GyanisScribe::Main
                     return;
                 }
                 m_capture->startLong();
+                return;
+            case GyanisScribe::App::TrayAction::SceneClearCapture:
+                // 清场也是铺同一层框选遮罩：步骤记录在跑时同样要先挡住，免得把遮罩记进步骤
+                if (rejectWhileStepRecorderBusy())
+                {
+                    return;
+                }
+                m_capture->startSceneClearCapture();
                 return;
             case GyanisScribe::App::TrayAction::BlankCanvas:
                 if (rejectWhileStepRecorderBusy())

@@ -62,7 +62,7 @@ TEST(TrayMenuTable, ListsEachActionOnceWithRealIcons)
                                          TrayAction::CloseAllPins,      TrayAction::OpenSettings,      TrayAction::OpenAbout,         TrayAction::Quit,
                                          TrayAction::CaptureLongRegion, TrayAction::ClearPinsThrough,  TrayAction::TogglePinsVisible, TrayAction::PasteClipboard,
                                          TrayAction::NextPinGroup,      TrayAction::BlankCanvas,       TrayAction::RepinClosed,       TrayAction::ManagePinGroups,
-                                         TrayAction::ToggleSteps,       TrayAction::PickElement};
+                                         TrayAction::ToggleSteps,       TrayAction::PickElement,       TrayAction::SceneClearCapture};
 
     const auto actions = actionsInTable();
     EXPECT_EQ(actions.size(), expectedActions.size()) << "表里的动作项数与这份清单不同解";
@@ -106,6 +106,7 @@ TEST(TrayMenuCapabilities, DropsWindowCaptureOnlyWhenThePlatformCannotDiscoverWi
     withDiscovery.clickThrough    = true; // 齐平 = 按能力过滤的项都在，下面那句「能力齐平时一项不改」才判得动
     withDiscovery.stepRecorder    = true;
     withDiscovery.uiElements      = true;
+    withDiscovery.sceneCleanup    = true;
     PlatformCapabilities withoutDiscovery;
 
     const auto hasWindowItem = [](const auto &entries)
@@ -117,8 +118,8 @@ TEST(TrayMenuCapabilities, DropsWindowCaptureOnlyWhenThePlatformCannotDiscoverWi
     EXPECT_TRUE(hasWindowItem(granted)) << "平台给得出前台窗口，菜单却没有那一项";
     EXPECT_FALSE(hasWindowItem(denied)) << "平台给不出前台窗口，菜单里却留着一条按了报错的项";
     EXPECT_EQ(granted.size(), trayMenuEntries().size()) << "能力齐平时过滤不该改动任何一项";
-    // 全零的这一档少四项：按能力过滤的是前台窗口、贴图出口、步骤记录与元素拾取，别的不许跟着掉
-    EXPECT_EQ(denied.size(), granted.size() - 4) << "受能力影响的只有这四条，别的一项都不许跟着被摘";
+    // 全零的这一档少五项：按能力过滤的是前台窗口、贴图出口、步骤记录、元素拾取与清场，别的不许跟着掉
+    EXPECT_EQ(denied.size(), granted.size() - 5) << "受能力影响的只有这五条，别的一项都不许跟着被摘";
 }
 
 /**
@@ -237,7 +238,7 @@ TEST(TrayMenuTable, HotkeyHintsBindToRealSettingKeys)
     const std::vector<std::string_view> knownKeys = {
             GyanisScribe::Core::kHotkeyCapture,     GyanisScribe::Core::kHotkeyRecord,     GyanisScribe::Core::kHotkeyOcr,         GyanisScribe::Core::kHotkeyPick,
             GyanisScribe::Core::kHotkeyCaptureLong, GyanisScribe::Core::kHotkeyTogglePins, GyanisScribe::Core::kHotkeyNextPinGroup, GyanisScribe::Core::kHotkeySteps,
-            GyanisScribe::Core::kHotkeyPickElement};
+            GyanisScribe::Core::kHotkeyPickElement, GyanisScribe::Core::kHotkeySceneClear};
 
     int hinted = 0;
     for (const auto &entry: trayMenuEntries())
@@ -249,7 +250,7 @@ TEST(TrayMenuTable, HotkeyHintsBindToRealSettingKeys)
         ++hinted;
         EXPECT_TRUE(std::ranges::find(knownKeys, entry.hotkeyKey) != knownKeys.end()) << std::string{entry.hotkeyKey};
     }
-    EXPECT_EQ(hinted, 9) << "全局热键有九项带托盘入口，托盘上的提示项也只能是这九项：多出来那条永远显示默认组合";
+    EXPECT_EQ(hinted, 10) << "全局热键有十项带托盘入口，托盘上的提示项也只能是这十项：多出来那条永远显示默认组合";
 }
 
 /**
