@@ -346,6 +346,21 @@ namespace GyanisScribe
                 return std::unexpected(Base::Error{Base::ErrorCode::PlatformUnsupported, "替身不演界面元素这一项"});
             }
 
+            /**
+             * @brief 记下清场开关；可让清场这一档交回一次失败
+             * @param cleared true 为清场，false 为恢复
+             * @return 该档没点名失败时空载荷；清场档点名失败时回带中文原因的失败
+             */
+            [[nodiscard]] Base::Expected<void> setSceneCleared(const bool cleared) override
+            {
+                sceneClearCalls.push_back(cleared);
+                if (cleared && sceneClearFails)
+                {
+                    return std::unexpected(Base::Error{Base::ErrorCode::Busy, "替身：清场没有生效"});
+                }
+                return {};
+            }
+
             /// 步骤记录会问「点到了哪个元素」：替身交回空，不让整轮录制因为这一项失败
             [[nodiscard]] Base::Expected<std::optional<Platform::UiElementInfo>> uiElementAtPoint(const QPoint                &globalLogicalPoint,
                                                                                                   const std::vector<quintptr> &excludeWindowHandles) const override
@@ -358,6 +373,8 @@ namespace GyanisScribe
             mutable int        foregroundQueries    = 0;       ///< 前台窗口被问了几次
             HotkeyBackendStub *hotkeyBackend        = nullptr; ///< 建出来的假热键后端；第一次重登之前为空
             bool               sessionNotifications = false;   ///< 锁屏通知这一位；回溯协调器只在它为真时启用
+            std::vector<bool>  sceneClearCalls;                ///< 每次清场开关，按调用次序
+            bool               sceneClearFails = false;        ///< 清场这一档是否交回失败
 
         private:
             quintptr m_handle; ///< 每次交回同一枚句柄
@@ -825,6 +842,120 @@ namespace GyanisScribe
         EXPECT_EQ(finished, 2) << "标注窗关了却没报收场，回溯会一直停在 CaptureFlow";
         QApplication::sendEvent(&window, &escape);
         EXPECT_EQ(finished, 2) << "同一轮流程报了两次收场，恢复动作会重复执行";
+    }
+
+    /**
+     * @brief 钉住清场成功后进入既有交互式截图：遮罩铺开、流程标志立起、标记落下
+     * @details 清场发生在铺遮罩之前：先让开桌面图标与其他窗口，用户框到的才是清理后的画面。
+     *          平台动作与标记只要有一边没发生，这一轮就不算成功。
+     */
+    TEST_F(AppControllerFixture, SceneClearCaptureEntersTheInteractiveFlow)
+    {
+        m_frameScreenName = m_realScreenName;
+        makeController();
+
+        auto &capture = m_controller->capture();
+        capture.startSceneClearCapture();
+
+        ASSERT_EQ(m_integration->sceneClearCalls.size(), std::size_t{1}) << "入口没把清场交给平台";
+        EXPECT_TRUE(m_integration->sceneClearCalls[0]) << "清场该给平台传 true";
+        EXPECT_FALSE(m_settings->stringValue(Core::kSceneClearMarker, QString{}).isEmpty()) << "清场成功却没写标记：崩溃后没人知道要恢复";
+        EXPECT_TRUE(capture.isCaptureFlowActive()) << "清场之后流程标志没立起来，回溯与步骤记录会叠进来";
+        auto *overlay = visibleCaptureOverlay();
+        ASSERT_NE(overlay, nullptr) << "清场成功后没铺出框选遮罩";
+
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &escape);
+        ASSERT_EQ(m_integration->sceneClearCalls.size(), std::size_t{2});
+        EXPECT_FALSE(m_integration->sceneClearCalls[1]) << "取消之后没恢复清场";
+        EXPECT_TRUE(m_settings->stringValue(Core::kSceneClearMarker, QString{}).isEmpty()) << "恢复之后标记没清掉";
+    }
+
+    /**
+     * @brief 钉住清场截图的三个收场出口各恢复一次：交付、取消、抓帧失败
+     * @details 三种结局都汇合在 captureFlowFinished；恢复跟着这一声走，平台收到的 false 次数
+     *          必须与收场次数相等，多一次说明重复翻动桌面，少一次说明有一路把清场态留给了下一轮。
+     */
+    TEST_F(AppControllerFixture, SceneClearCaptureRestoresOnEveryExit)
+    {
+        m_frameScreenName = m_realScreenName;
+        m_frameRegion     = QRect{0, 0, kFrameWidth, kFrameHeight};
+        m_afterAction     = App::CaptureIntent::CopyToClipboard;
+        makeController();
+
+        int   finished = 0;
+        auto &capture  = m_controller->capture();
+        QObject::connect(&capture, &App::CaptureCoordinator::captureFlowFinished, &capture, [&finished] { ++finished; });
+
+        const auto selectRegion = [](Gui::CaptureOverlay &overlay)
+        {
+            const auto  global = overlay.geometry().topLeft();
+            QMouseEvent press{QEvent::MouseButtonPress, QPointF{5, 5}, QPointF{global + QPoint{5, 5}}, Qt::LeftButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+            QApplication::sendEvent(&overlay, &press);
+            QMouseEvent move{QEvent::MouseMove, QPointF{14, 14}, QPointF{global + QPoint{14, 14}}, Qt::NoButton, Qt::LeftButton, Qt::KeyboardModifiers{}};
+            QApplication::sendEvent(&overlay, &move);
+            QMouseEvent release{QEvent::MouseButtonRelease, QPointF{14, 14}, QPointF{global + QPoint{14, 14}}, Qt::LeftButton, Qt::NoButton, Qt::KeyboardModifiers{}};
+            QApplication::sendEvent(&overlay, &release);
+        };
+        const auto restores = [this] { return std::ranges::count(m_integration->sceneClearCalls, false); };
+
+        // 交付：框一块，去向是复制到剪贴板，交完当场收场
+        capture.startSceneClearCapture();
+        auto *overlay = visibleCaptureOverlay();
+        ASSERT_NE(overlay, nullptr) << "第一轮清场后没铺出遮罩";
+        selectRegion(*overlay);
+        EXPECT_EQ(finished, 1) << "交付出口没报收场";
+        EXPECT_EQ(restores(), 1) << "交付之后没恢复清场";
+        EXPECT_TRUE(m_settings->stringValue(Core::kSceneClearMarker, QString{}).isEmpty()) << "交付之后标记没清掉";
+
+        // 取消：铺出遮罩后按 Esc
+        capture.startSceneClearCapture();
+        overlay = visibleCaptureOverlay();
+        ASSERT_NE(overlay, nullptr) << "第二轮清场后没铺出遮罩";
+        QKeyEvent escape{QEvent::KeyPress, Qt::Key_Escape, Qt::KeyboardModifiers{}};
+        QApplication::sendEvent(overlay, &escape);
+        EXPECT_EQ(finished, 2) << "取消出口没报收场";
+        EXPECT_EQ(restores(), 2) << "取消之后没恢复清场";
+
+        // 抓帧失败：遮罩要拿一块冻帧，那一抓失败就走 captureFailed，遮罩根本不铺
+        m_source->failNextScreenGrab(Base::Error{Base::ErrorCode::ScreenUnavailable, "替身：抓帧没成"});
+        capture.startSceneClearCapture();
+        EXPECT_EQ(visibleCaptureOverlay(), nullptr) << "抓帧失败时遮罩还是铺出来了";
+        EXPECT_EQ(finished, 3) << "抓帧失败出口没报收场";
+        EXPECT_EQ(restores(), 3) << "抓帧失败之后没恢复清场";
+        EXPECT_TRUE(m_settings->stringValue(Core::kSceneClearMarker, QString{}).isEmpty()) << "失败之后标记没清掉";
+    }
+
+    /**
+     * @brief 钉住清场失败不铺遮罩，并把原因说给用户
+     * @details 平台没做成时铺一层遮罩会让用户以为在清理后的画面上框选；
+     *          守卫还要把半边动作撤掉，所以平台会收到一次 true 与一次 false。
+     */
+    TEST_F(AppControllerFixture, SceneClearFailureShowsNoOverlayAndSaysWhy)
+    {
+        makeController();
+        m_integration->sceneClearFails = true;
+
+        int     messages = 0;
+        QString said;
+        auto   &capture = m_controller->capture();
+        QObject::connect(&capture, &App::CaptureCoordinator::messageForUser, &capture,
+                         [&messages, &said](const QString &message, Gui::ToastKind)
+                         {
+                             ++messages;
+                             said = message;
+                         });
+
+        capture.startSceneClearCapture();
+
+        EXPECT_EQ(visibleCaptureOverlay(), nullptr) << "清场失败还是铺出了遮罩";
+        EXPECT_FALSE(capture.isCaptureFlowActive()) << "清场失败却把流程标志立起来了";
+        EXPECT_EQ(messages, 1) << "清场失败没给用户一句提示";
+        EXPECT_TRUE(said.contains(QStringLiteral("替身：清场没有生效"))) << said.toStdString();
+        ASSERT_EQ(m_integration->sceneClearCalls.size(), std::size_t{2}) << "清场失败后补发的撤销不见了";
+        EXPECT_TRUE(m_integration->sceneClearCalls[0]);
+        EXPECT_FALSE(m_integration->sceneClearCalls[1]) << "清场失败没有把半边动作撤掉";
+        EXPECT_TRUE(m_settings->stringValue(Core::kSceneClearMarker, QString{}).isEmpty()) << "清场失败却写了标记";
     }
 
     /**

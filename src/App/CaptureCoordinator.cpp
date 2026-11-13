@@ -5,6 +5,7 @@
 #include "App/HistoryCoordinator.h"
 #include "App/OcrCoordinator.h"
 #include "App/PinCoordinator.h"
+#include "App/SceneCleanupGuard.h"
 #include "Base/Logger.h"
 #include "Base/Paths.h"
 #include "Base/Text.h"
@@ -163,6 +164,25 @@ namespace GyanisScribe::App
                     m_captureFlowActive = true;
                     m_capture->startInteractive();
                 });
+    }
+
+    void CaptureCoordinator::startSceneClearCapture()
+    {
+        // 守卫懒建：没用过清场的那几轮不该为它留一份状态
+        if (m_sceneGuard == nullptr)
+        {
+            m_sceneGuard = std::make_unique<GyanisScribe::App::SceneCleanupGuard>(m_dependencies.integration, m_dependencies.settings);
+        }
+
+        if (const auto cleared = m_sceneGuard->clear(); !cleared)
+        {
+            // 清场没成就不铺遮罩：让用户在没清理的画面上框选会与预期相反
+            emit messageForUser(QString::fromUtf8(cleared.error().message.c_str()), GyanisScribe::Gui::ToastKind::Danger);
+            return;
+        }
+
+        m_sceneClearPending = true;
+        startInteractive();
     }
 
     void CaptureCoordinator::startElementPick()
@@ -481,6 +501,18 @@ namespace GyanisScribe::App
         // 长截图这一轮到此为止：取消、失败与直接落盘那几条路都没经过标注窗，
         // 记号要在这里一起撤掉，否则下一张普通截图会被顺带扫一遍
         m_longCapturePendingPrivacy = false;
+        // 清场的恢复跟着这一轮收场走：交付、取消、失败都从这里出
+        if (m_sceneClearPending)
+        {
+            m_sceneClearPending = false;
+            if (m_sceneGuard != nullptr)
+            {
+                if (const auto restored = m_sceneGuard->restore(); !restored)
+                {
+                    emit messageForUser(QString::fromUtf8(restored.error().message.c_str()), GyanisScribe::Gui::ToastKind::Danger);
+                }
+            }
+        }
         emit captureFlowFinished();
     }
 

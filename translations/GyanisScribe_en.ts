@@ -5356,6 +5356,10 @@
             <translation>GyanisScribe hit an unhandled error: {}. What could be saved went to the log and a crash dump; look for the newest log in {} (a .dmp next to it is the dump). If it keeps happening, send the log, the dump and the steps you took</translation>
         </message>
         <message>
+            <source>本平台不支持清场截图</source>
+            <translation>This platform does not support scene-clear captures</translation>
+        </message>
+        <message>
             <source>这台平台还不能列出光标下的界面元素</source>
             <translation>This platform cannot list the UI element under the cursor yet</translation>
         </message>
@@ -5550,6 +5554,10 @@
         <message>
             <source>无法识别桌面上的窗口：平台的屏幕清单与界面的屏幕清单不一致。请先使用整屏或框选截图，并重新启动智录后重试。</source>
             <translation>Can't tell which windows are on the desktop: the platform's screen list and the interface's screen list didn't pair up. Use full-screen or region capture for now, then restart GyanisScribe</translation>
+        </message>
+        <message>
+            <source>找不到桌面视图，清场没有生效。可以直接框选要截的那一块</source>
+            <translation>The desktop view could not be found, so the scene was not cleared. You can drag-select the area you want to capture directly</translation>
         </message>
         <message>
             <source>系统的 UI Automation 无法启动，不能识别界面元素。可继续使用悬停识别整个窗口，或直接框选目标区域。</source>

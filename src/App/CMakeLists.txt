@@ -40,6 +40,8 @@ add_library(App STATIC
         DeliveryCoordinator.cpp
         CaptureCoordinator.h
         CaptureCoordinator.cpp
+        SceneCleanupGuard.h
+        SceneCleanupGuard.cpp
         PickCoordinator.h
         PickCoordinator.cpp
         RewindCoordinator.h

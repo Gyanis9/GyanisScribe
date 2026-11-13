@@ -311,4 +311,7 @@ namespace GyanisScribe::Core
     /// 步骤截图自动打码：录制结束后先扫一遍本次截图，命中即打码覆写；默认关闭
     inline constexpr std::string_view kStepsAutoRedact = "Steps/AutoRedact";
 
+    /// 清场标记：清场前写入时刻，恢复成功后清掉；启动时残留说明上次没收尾
+    inline constexpr std::string_view kSceneClearMarker = "Scene/ClearedMarker";
+
 } // namespace GyanisScribe::Core

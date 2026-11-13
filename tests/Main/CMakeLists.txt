@@ -57,8 +57,11 @@ gtest_discover_tests(TestModuleFlow PROPERTIES RESOURCE_LOCK "pinLayoutCache\;cl
 # AppController 那一层的直测：延时截图的路由与成品进历史要判「谁在什么时刻被叫到」，
 # 因此给它一套与 TestModuleFlow 同形状的替身（AppControllerParts 注进去，见 TestAppController.cpp）。
 # 控制器要建真窗口，自己一份 QApplication，与上面几组各占一个可执行体。
+# 守卫用例与协调器用例共用清场标记与假集成，编进同一个可执行体一起跑；
+# 源文件按 App 用例归组放在 tests/App，不另起一份 Qt 应用
 add_executable(TestAppController
-        TestAppController.cpp)
+        TestAppController.cpp
+        ../App/TestSceneCleanupGuard.cpp)
 
 target_link_libraries(TestAppController PRIVATE
         Main

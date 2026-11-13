@@ -59,6 +59,7 @@ namespace GyanisScribe::App
     class HistoryCoordinator;
     class OcrCoordinator;
     class PinCoordinator;
+    class SceneCleanupGuard;
 } // namespace GyanisScribe::App
 
 namespace GyanisScribe::App
@@ -149,6 +150,13 @@ namespace GyanisScribe::App
 
         /// 框选截图（热键、托盘、标注窗的「重新截」都从这里进）
         void startInteractive(std::optional<GyanisScribe::App::CaptureIntent> intent = std::nullopt);
+
+        /**
+         * @brief 清场后进入框选截图
+         * @details 先写标记并让开桌面图标与其他窗口，成功才铺遮罩；失败把原因说给用户，不铺任何界面。
+         *          这一轮的任何结局都在收场处恢复，守卫析构再兜一次。
+         */
+        void startSceneClearCapture();
 
         /**
          * @brief 进入元素拾取：遮罩同时按界面元素细分悬停目标
@@ -292,6 +300,7 @@ namespace GyanisScribe::App
         std::unique_ptr<GyanisScribe::Gui::CaptureService>    m_capture;                                             ///< 截图编排
         std::unique_ptr<GyanisScribe::Core::AnnotationEngine> m_annotation;                                          ///< 标注引擎，跨轮次保留（载入新帧会清空）
         std::unique_ptr<GyanisScribe::Gui::AnnotationWindow>  m_annotationWindow;                                    ///< 标注窗口，复用同一把工具栏
+        std::unique_ptr<GyanisScribe::App::SceneCleanupGuard> m_sceneGuard;                                          ///< 清场守卫，首次用到才建
         GyanisScribe::App::CaptureIntent                      m_intent = GyanisScribe::App::CaptureIntent::Annotate; ///< 这一帧截完要去做的事
         GyanisScribe::Core::CaptureSourceInfo                 m_sourceInfo;                                          ///< 本轮截图的前台来源，随历史记账一起交出去；回溯轮次整份为空
         GyanisScribe::App::CaptureOutputSet                   m_commandLineOutputs;                                  ///< 命令行那一次点名的去处，已按交付顺序排好
@@ -299,6 +308,7 @@ namespace GyanisScribe::App
         bool                                                  m_commandLineExecGiven      = false;   ///< 命令行到底给没给 --exec：给了就只跑那一条
         bool                                                  m_commandLineActive         = false;   ///< 正在跑命令行那次截图：失败路径要往 commandLineActionFailed 也交一份
         bool                                                  m_captureFlowActive         = false;   ///< 有一轮框选起的流程在跑：收场信号只发一次
+        bool                                                  m_sceneClearPending         = false;   ///< 这一轮清过场，收场时要恢复
         bool                                                  m_rewindRound               = false;   ///< 这一轮从回溯换帧起头：抓帧回来不补屏幕与时刻，来源整份留空
         bool                                                  m_longCapturePendingPrivacy = false;   ///< 这一轮长截图落地后是否自动打码
         QTimer                                               *m_delayTimer                = nullptr; ///< 延时截图那一枚，一次只允许有一个在等
