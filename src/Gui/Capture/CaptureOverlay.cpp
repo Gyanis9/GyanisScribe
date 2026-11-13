@@ -156,13 +156,22 @@ namespace GyanisScribe::Gui
 
     void CaptureOverlay::setWindowCandidates(const std::vector<QRect> &globalRects)
     {
-        // 换成局部坐标：遮罩上的鼠标读数与选区都是这块屏内的局部值，两套单位混在一起就会错一格
-        const auto origin = m_screenGeometry.topLeft();
+        // 换成局部坐标：遮罩上的鼠标读数与选区都是这块屏内的局部值，两套单位混在一起就会错一格。
+        // 再与帧求交：最大化的窗口 DWM 外框比屏幕大一圈，越界部分本来就不可见，选中只交可见部分，
+        // 别让后面的裁剪报「选区超出了这一帧」
+        const auto  origin = m_screenGeometry.topLeft();
+        const QRect frame{QPoint{0, 0}, m_screenGeometry.size()};
         m_windowCandidates.clear();
         m_windowCandidates.reserve(globalRects.size());
         for (const auto &rect: globalRects)
         {
-            m_windowCandidates.push_back(rect.translated(-origin.x(), -origin.y()));
+            const auto local = rect.translated(-origin.x(), -origin.y()).intersected(frame);
+            // 整块都在帧外的候选没有可见部分，丢掉：留着会亮一个空框
+            if (local.isEmpty())
+            {
+                continue;
+            }
+            m_windowCandidates.push_back(local);
         }
         refreshHoveredRegion();
     }
@@ -172,13 +181,19 @@ namespace GyanisScribe::Gui
         // 先记改动前的那一片：悬停框换位置时要连旧位置一起刷，否则原地留下一个框
         const auto before = visualRegionForCurrentState();
 
-        // 同窗口候选：换算到这块屏的局部坐标再用
-        const auto origin = m_screenGeometry.topLeft();
+        // 同窗口候选：换算到这块屏的局部坐标再与帧求交，越界的元素只留可见部分
+        const auto  origin = m_screenGeometry.topLeft();
+        const QRect frame{QPoint{0, 0}, m_screenGeometry.size()};
         m_elementChain.clear();
         m_elementChain.reserve(globalRects.size());
         for (const auto &rect: globalRects)
         {
-            const auto local = rect.translated(-origin.x(), -origin.y());
+            const auto local = rect.translated(-origin.x(), -origin.y()).intersected(frame);
+            // 整块都在帧外的元素没有可见部分，丢掉，也不占一档
+            if (local.isEmpty())
+            {
+                continue;
+            }
             // 相邻同矩形并档：惰性树里一层包装层套一层同尺寸的壳，`,`、`.` 按的是「块」不是「层」，
             // 不并档就会出现按几下尺寸都不动的死档。只在相邻之间并——链是按深度排的，隔着不同尺寸的重复才是真的退了回去
             if (!m_elementChain.empty() && m_elementChain.back() == local)
@@ -220,14 +235,20 @@ namespace GyanisScribe::Gui
         // 先记改动前的那一片：横幅与悬停框都可能换位置，旧位置也要一起刷
         const auto before = visualRegionForCurrentState();
 
-        const auto origin = m_screenGeometry.topLeft();
+        const auto  origin = m_screenGeometry.topLeft();
+        const QRect frame{QPoint{0, 0}, m_screenGeometry.size()};
         m_elementChain.clear();
         m_elementInfos.clear();
         m_elementChain.reserve(globalInfos.size());
         m_elementInfos.reserve(globalInfos.size());
         for (const auto &info: globalInfos)
         {
-            const auto local = info.logicalGlobal.translated(-origin.x(), -origin.y());
+            // 与矩形链同一套夹帧规则：越界的元素只留可见部分，整块在帧外的连描述一起丢掉
+            const auto local = info.logicalGlobal.translated(-origin.x(), -origin.y()).intersected(frame);
+            if (local.isEmpty())
+            {
+                continue;
+            }
             // 与矩形链同一套并档规则：相邻同矩形是惰性树里的包装层，`,`、`.` 按「块」不按「层」
             if (!m_elementChain.empty() && m_elementChain.back() == local)
             {

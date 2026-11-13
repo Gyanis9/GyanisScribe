@@ -156,6 +156,22 @@ TEST_F(CaptureOverlayFixture, HoverAdoptsTopmostCandidateInLocalCoordinates)
 }
 
 /**
+ * @brief 钉住比屏幕大一圈的窗口候选只交帧内可见部分
+ * @details 最大化的窗口外框比屏幕大一圈（DWM 的不可见边框）：越界部分本来就不可见，
+ *          悬停与选中都只该交可见部分；原样留着还会让后面的裁剪报「选区超出了这一帧」。
+ */
+TEST_F(CaptureOverlayFixture, WindowCandidateLargerThanFrameIsClampedToTheFrame)
+{
+    auto overlay = makeOverlay();
+    // 全局 (1900,-8,1700,916) 换成这块屏的局部是 (-20,-8,1700,916)，四条边都越出帧
+    overlay->setWindowCandidates(std::vector<QRect>{QRect{1900, -8, 1700, 916}});
+
+    moveOver(*overlay, QPoint{200, 200});
+    ASSERT_TRUE(overlay->hoveredRegion().has_value());
+    EXPECT_EQ(*overlay->hoveredRegion(), QRect(0, 0, overlay->width(), overlay->height())) << "越界的窗口候选没夹到帧内，交出去的比这一帧还大";
+}
+
+/**
  * @brief 钉住「按下又原地放开」采纳悬停的那一扇，而原地放开过去什么都不产出
  * @details 这是框选里最常用的一下：点一下就要这一扇窗口。采纳之后选区与窗口边界要逐位相同，
  *          差一格就会把邻窗的一列像素带进成品。
