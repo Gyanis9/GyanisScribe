@@ -3,6 +3,7 @@
 #include "Core/Capture/SourceInfo.h"
 #include "Core/Image/ImageFit.h"
 #include "Core/Settings/SettingsKeys.h"
+#include "Gui/Annotation/AnnotationToolbarGeometry.h"
 #include "Gui/Annotation/AnnotationWindow.h"
 
 #include "Base/Text.h"
@@ -1944,6 +1945,207 @@ TEST_F(AnnotationWindowFixture, SelectToolResizesTheCapturedRegionByDraggingAnEd
 }
 
 /**
+ * @brief 钉住「选择」档按住图内空白能整体挪走截图范围
+ * @details 内部空白过去只清选中、拖动没反应；现在超过手抖阈值后整窗跟着走，
+ *          松手把新范围交给宿主重抓，标注随后按同一段位移平移。
+ */
+TEST_F(AnnotationWindowFixture, SelectToolMovesTheCapturedRegionByDraggingInside)
+{
+    auto window            = makeWindow();
+    auto captured          = makeCanvas(QSize(200, 100));
+    captured.screenName    = QStringLiteral("FakeScreen-9");
+    captured.logicalRegion = QRect(100, 100, 200, 100);
+    window->startAnnotation(captured, QRect(0, 0, 1920, 1080), QRect(100, 100, 200, 100));
+    QApplication::processEvents();
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Select).has_value());
+
+    auto *view = window->findChild<GyanisScribe::Gui::AnnotationView *>();
+    ASSERT_NE(view, nullptr);
+
+    int   crops = 0;
+    QRect cropRegion;
+    QObject::connect(window.get(), &GyanisScribe::Gui::AnnotationWindow::cropRequested,
+                     [&crops, &cropRegion](const QString &, const QRect &selection)
+                     {
+                         ++crops;
+                         cropRegion = selection;
+                     });
+
+    const QPointF pressGlobal = view->mapToGlobal(QPoint{100, 50});
+    const QPointF moveGlobal  = view->mapToGlobal(QPoint{120, 60});
+    QMouseEvent   press{QEvent::MouseButtonPress, QPointF{100, 50}, pressGlobal, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &press);
+    QMouseEvent move{QEvent::MouseMove, QPointF{120, 60}, moveGlobal, Qt::NoButton, Qt::LeftButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &move);
+    QApplication::processEvents();
+
+    EXPECT_EQ(window->geometry(), QRect(120, 110, 200, 100)) << "拖图内空白没有把整块截图范围带走";
+    EXPECT_EQ(crops, 0) << "还没松手就交出了新范围";
+
+    const auto expectedToolbar = GyanisScribe::Gui::placeToolbar(QRect(0, 0, 1920, 1080), window->toolbar().sizeHint(), QRect(120, 110, 200, 100));
+    ASSERT_TRUE(expectedToolbar.has_value());
+    EXPECT_EQ(window->toolbar().geometry(), expectedToolbar->frame) << "整体移动途中工具栏没有跟着走";
+
+    QMouseEvent release{QEvent::MouseButtonRelease, QPointF{120, 60}, moveGlobal, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &release);
+
+    EXPECT_EQ(crops, 1);
+    EXPECT_EQ(cropRegion, QRect(120, 110, 200, 100)) << "松手交出的新范围不是拖出来的那一块";
+}
+
+/**
+ * @brief 钉住图内单击仍只是清选中：新加的整块移动不能把一次点击变成一次重抓
+ */
+TEST_F(AnnotationWindowFixture, SelectToolClickingInsideOnlyClearsTheShapeSelection)
+{
+    auto window            = makeWindow();
+    auto captured          = makeCanvas(QSize(200, 100));
+    captured.screenName    = QStringLiteral("FakeScreen-9");
+    captured.logicalRegion = QRect(100, 100, 200, 100);
+    window->startAnnotation(captured, QRect(0, 0, 1920, 1080), QRect(100, 100, 200, 100));
+    QApplication::processEvents();
+    ASSERT_TRUE(drawAndSelect({10, 10}, {80, 60}).has_value());
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Select).has_value());
+
+    auto *view = window->findChild<GyanisScribe::Gui::AnnotationView *>();
+    ASSERT_NE(view, nullptr);
+    int crops = 0;
+    QObject::connect(window.get(), &GyanisScribe::Gui::AnnotationWindow::cropRequested, [&crops](const QString &, const QRect &) { ++crops; });
+
+    const auto    before = window->geometry();
+    const QPointF global = view->mapToGlobal(QPoint{150, 25});
+    QMouseEvent   press{QEvent::MouseButtonPress, QPointF{150, 25}, global, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &press);
+    QMouseEvent release{QEvent::MouseButtonRelease, QPointF{150, 25}, global, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &release);
+
+    EXPECT_EQ(window->geometry(), before) << "单击把窗口挪走了";
+    EXPECT_TRUE(engine().selections().empty()) << "单击空白没有清掉图形的选中";
+    EXPECT_EQ(crops, 0) << "单击空白不该发起重抓";
+}
+
+/**
+ * @brief 钉住重裁拖边时放大镜从整屏冻帧取样、松手即收
+ * @details 抓点压在窗口边上，放大镜取样的是整屏冻帧而不是拉伸后的画布：
+ *          这里把冻帧铺成洋红，放大镜中心就该是洋红；松手之后它不许留在画面上。
+ */
+TEST_F(AnnotationWindowFixture, CropResizeShowsMagnifierSampledFromTheFrozenFrame)
+{
+    auto window                  = makeWindow();
+    auto captured                = makeCanvas(QSize(400, 400));
+    captured.screenName          = QStringLiteral("FakeScreen-9");
+    captured.logicalRegion       = QRect(100, 100, 400, 400);
+    captured.frozenLogicalSize   = QSize(800, 600);
+    captured.frozenLogicalRegion = QRect(QPoint{0, 0}, QSize(800, 600));
+    captured.frozenImage         = QImage{QSize{800, 600}, QImage::Format_ARGB32};
+    captured.frozenImage.fill(QColor{255, 0, 255});
+    window->startAnnotation(captured, QRect(0, 0, 1920, 1080), QRect(100, 100, 400, 400));
+    QApplication::processEvents();
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Select).has_value());
+
+    auto *view = window->findChild<GyanisScribe::Gui::AnnotationView *>();
+    ASSERT_NE(view, nullptr);
+
+    const auto    pressLocal  = QPoint{399, 150};
+    const auto    moveLocal   = QPoint{379, 150};
+    const QPointF pressGlobal = view->mapToGlobal(pressLocal);
+    const QPointF moveGlobal  = view->mapToGlobal(moveLocal);
+    QMouseEvent   press{QEvent::MouseButtonPress, QPointF{pressLocal}, pressGlobal, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &press);
+    QMouseEvent move{QEvent::MouseMove, QPointF{moveLocal}, moveGlobal, Qt::NoButton, Qt::LeftButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &move);
+    QApplication::processEvents();
+
+    const auto magnifier = view->cropMagnifierRectForTesting();
+    ASSERT_FALSE(magnifier.isEmpty()) << "拖右边框时没有出现放大镜";
+    EXPECT_TRUE(view->rect().contains(magnifier)) << "放大镜画到了控件外";
+    EXPECT_FALSE(view->cropMagnifierReadoutRectForTesting().isEmpty()) << "放大镜下沿没有读数条";
+
+    const auto   shot         = view->grab().toImage();
+    const QColor frozenSample = QColor(255, 0, 255);
+    EXPECT_EQ(shot.pixelColor(magnifier.center()), frozenSample) << "放大镜没有从整屏冻帧取样";
+
+    QMouseEvent release{QEvent::MouseButtonRelease, QPointF{moveLocal}, moveGlobal, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &release);
+
+    EXPECT_TRUE(view->cropMagnifierRectForTesting().isEmpty()) << "松手后放大镜还留在画面上";
+}
+
+/**
+ * @brief 钉住放大镜视野档：关掉像素插图时读数条仍在
+ * @details 设置里那一档写明「仅隐藏像素放大图，坐标读数保留」，重裁这一处也照同一口径办。
+ */
+TEST_F(AnnotationWindowFixture, CropResizeMagnifierHonoursTheOffSettingButKeepsReadout)
+{
+    ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kCaptureMagnifierView, QStringLiteral("off")).has_value());
+
+    auto window                  = makeWindow();
+    auto captured                = makeCanvas(QSize(400, 400));
+    captured.screenName          = QStringLiteral("FakeScreen-9");
+    captured.logicalRegion       = QRect(100, 100, 400, 400);
+    captured.frozenLogicalSize   = QSize(800, 600);
+    captured.frozenLogicalRegion = QRect(QPoint{0, 0}, QSize(800, 600));
+    captured.frozenImage         = QImage{QSize{800, 600}, QImage::Format_ARGB32};
+    captured.frozenImage.fill(QColor{0, 255, 0});
+    window->startAnnotation(captured, QRect(0, 0, 1920, 1080), QRect(100, 100, 400, 400));
+    QApplication::processEvents();
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Select).has_value());
+
+    auto *view = window->findChild<GyanisScribe::Gui::AnnotationView *>();
+    ASSERT_NE(view, nullptr);
+
+    const QPointF pressGlobal = view->mapToGlobal(QPoint{399, 150});
+    QMouseEvent   press{QEvent::MouseButtonPress, QPointF{399, 150}, pressGlobal, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &press);
+
+    EXPECT_TRUE(view->cropMagnifierRectForTesting().isEmpty()) << "视野档是「不显示」时还画出了像素插图";
+    EXPECT_FALSE(view->cropMagnifierReadoutRectForTesting().isEmpty()) << "关掉插图把坐标读数也一起收走了";
+
+    QMouseEvent release{QEvent::MouseButtonRelease, QPointF{399, 150}, pressGlobal, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &release);
+}
+
+/**
+ * @brief 钉住拖边途中工具栏就跟到新范围旁边，而不是等松手后的重抓回来
+ * @details 窗口几何在拖动每一帧都改了，工具栏却只在 recropAnnotation 里重摆，
+ *          于是全程停旧位置，松手后才跳过去。这条按「还没发 cropRequested」那一刻核对。
+ */
+TEST_F(AnnotationWindowFixture, ToolbarFollowsTheResizeBeforeTheRecaptureBegins)
+{
+    auto window            = makeWindow();
+    auto captured          = makeCanvas(QSize(200, 100));
+    captured.screenName    = QStringLiteral("FakeScreen-9");
+    captured.logicalRegion = QRect(100, 100, 200, 100);
+    window->startAnnotation(captured, QRect(0, 0, 1920, 1080), QRect(100, 100, 200, 100));
+    QApplication::processEvents();
+    ASSERT_TRUE(engine().setActiveTool(ToolKind::Select).has_value());
+
+    auto *view = window->findChild<GyanisScribe::Gui::AnnotationView *>();
+    ASSERT_NE(view, nullptr);
+    int crops = 0;
+    QObject::connect(window.get(), &GyanisScribe::Gui::AnnotationWindow::cropRequested, [&crops](const QString &, const QRect &) { ++crops; });
+
+    const auto before = window->toolbar().geometry();
+
+    const QPointF pressGlobal = view->mapToGlobal(QPoint{100, 99});
+    const QPointF moveGlobal  = view->mapToGlobal(QPoint{100, 129});
+    QMouseEvent   press{QEvent::MouseButtonPress, QPointF{100, 99}, pressGlobal, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &press);
+    QMouseEvent move{QEvent::MouseMove, QPointF{100, 129}, moveGlobal, Qt::NoButton, Qt::LeftButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &move);
+    QApplication::processEvents();
+
+    const auto expected = GyanisScribe::Gui::placeToolbar(QRect(0, 0, 1920, 1080), window->toolbar().sizeHint(), QRect(100, 100, 200, 130));
+    ASSERT_TRUE(expected.has_value());
+    EXPECT_EQ(window->toolbar().geometry(), expected->frame) << "拖边途中工具栏没有跟到新选区旁边";
+    EXPECT_NE(window->toolbar().geometry(), before) << "工具栏停在旧位置：没有实时联动";
+    EXPECT_EQ(crops, 0) << "还没松手就发起了重抓";
+
+    QMouseEvent release{QEvent::MouseButtonRelease, QPointF{100, 129}, moveGlobal, Qt::LeftButton, Qt::NoButton, Qt::NoModifier};
+    QApplication::sendEvent(view, &release);
+}
+
+/**
  * @brief 画过标注之后不再允许重裁：重抓会换掉整张画布，标注会一起没
  */
 TEST_F(AnnotationWindowFixture, SelectToolKeepsAnnotationsWhenResizing)
@@ -2203,6 +2405,9 @@ TEST_F(AnnotationWindowFixture, EdgeHandleBeatsWindowGrip)
  */
 TEST_F(AnnotationWindowFixture, CropPreviewMapsShapesByClippedOriginAndScale)
 {
+    // 这条只测预览映射：放大镜像素插图会盖住要扫的那一行，按「不显示」档收掉它（读数条仍在，但不压 y=40）
+    ASSERT_TRUE(settings().setValue(GyanisScribe::Core::kCaptureMagnifierView, QStringLiteral("off")).has_value());
+
     auto *screen = QGuiApplication::primaryScreen();
     ASSERT_NE(screen, nullptr);
 

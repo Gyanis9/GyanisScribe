@@ -3,6 +3,7 @@
 #include "Core/Annotation/AnnotationEngine.h"
 #include "Core/Annotation/IAnnotationEngine.h"
 #include "Core/Capture/ScreenUtils.h"
+#include "Core/Pick/PickGeometry.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Gui/Annotation/AnnotationToolbarGeometry.h"
 #include "Gui/Annotation/CaptureInfoPanel.h"
@@ -163,7 +164,14 @@ namespace GyanisScribe::Gui
         // X 与 Esc 同一条路：用户不必记住「要关只能按键盘」
         QObject::connect(m_toolbar.get(), &AnnotationToolbar::closeClicked, this, &AnnotationWindow::closeAnnotation);
         QObject::connect(m_view, &AnnotationView::captureResized, this, [this](const QRect &globalGeometry) { emit cropRequested(m_refreshScreenName, globalGeometry); });
-        QObject::connect(m_view, &AnnotationView::captureResizeMoved, this, [this](const QRect &globalGeometry) { updateCropPreview(globalGeometry); });
+        QObject::connect(m_view, &AnnotationView::captureResizeMoved, this,
+                         [this](const QRect &globalGeometry)
+                         {
+                             updateCropPreview(globalGeometry);
+                             // 工具栏与信息面板按拖动中的新范围实时重摆；等松手后的 recrop 再摆，全程都停在旧位置
+                             placeToolbarNextTo(globalGeometry);
+                             placeInfoPanel();
+                         });
 
         // 四个动作按钮与快捷键汇到同一个出口：谁按的都走 deliver，界面不需要知道来源
         QObject::connect(m_toolbarBridge.get(), &AnnotationToolbarBridge::copyRequested, this, [this] { deliver(ShortcutAction::Copy); });
@@ -199,6 +207,17 @@ namespace GyanisScribe::Gui
         m_frozenImage         = captured.frozenImage;
         m_frozenLogicalSize   = captured.frozenLogicalSize;
         m_frozenLogicalRegion = captured.frozenLogicalRegion;
+        // 冻帧在桌面上的全局矩形：选区全局原点减掉本轮裁片的屏内原点，再加上冻帧自己的屏内偏移
+        m_frozenFrameGeometry = QRect{selection.topLeft() - captured.logicalRegion.topLeft() + m_frozenLogicalRegion.topLeft(), m_frozenLogicalSize};
+        // 放大镜视野档与截图遮罩共用同一格配置：每轮读一次，读坏只记一条日志并按窄档走
+        std::string magnifierComplaint;
+        m_view->setMagnifierView(Core::magnifierViewOrDefault(
+                m_settings.stringValue(Core::kCaptureMagnifierView, QString::fromUtf8(Core::magnifierViewToken(Core::MagnifierView::Narrow))).toStdString(), magnifierComplaint));
+        if (!magnifierComplaint.empty())
+        {
+            Base::Logger::warning(std::format("放大镜视野读不出：{}，标注窗按窄档走", magnifierComplaint));
+        }
+        updateCropMagnifierSource();
         // 摆放依据也记下来：切工具会收放可见段、尺寸跟着变，重摆必须用同一份选区与可用区
         m_placedScreenAvailable = screenAvailable;
         m_placedSelection       = QRect{selection.topLeft(), captured.logicalSize};
@@ -280,7 +299,16 @@ namespace GyanisScribe::Gui
         {
             return;
         }
-        const auto placed = placeToolbar(m_placedScreenAvailable, m_toolbar->sizeHint(), m_placedSelection);
+        placeToolbarNextTo(m_placedSelection);
+    }
+
+    void AnnotationWindow::placeToolbarNextTo(const QRect &selection)
+    {
+        if (!selection.isValid() || !m_placedScreenAvailable.isValid())
+        {
+            return;
+        }
+        const auto placed = placeToolbar(m_placedScreenAvailable, m_toolbar->sizeHint(), selection);
         if (placed)
         {
             m_toolbar->setGeometry(placed->frame);
@@ -288,7 +316,15 @@ namespace GyanisScribe::Gui
         }
         // 摆不出来的情况只在入参退化时出现，这里给一个不至于让工具栏消失的兜底位置
         Base::Logger::warning(std::format("工具栏摆放失败，改用窗口下沿兜底：{}", placed.error().message));
-        m_toolbar->move(m_placedSelection.left(), m_placedSelection.bottom() + 1);
+        m_toolbar->move(selection.left(), selection.bottom() + 1);
+    }
+
+    void AnnotationWindow::updateCropMagnifierSource()
+    {
+        // 缩放比按冻帧实测：成品那一路的 devicePixelRatio 不一定等于冻帧这一张的比例
+        const qreal dpr =
+                m_frozenImage.isNull() || m_frozenLogicalSize.isEmpty() ? 1.0 : static_cast<qreal>(m_frozenImage.width()) / static_cast<qreal>(m_frozenLogicalSize.width());
+        m_view->setCropMagnifierSource({m_frozenImage, m_frozenFrameGeometry, dpr});
     }
 
     void AnnotationWindow::updateInfoPanel()
@@ -494,6 +530,8 @@ namespace GyanisScribe::Gui
         m_frozenImage         = captured.frozenImage;
         m_frozenLogicalSize   = captured.frozenLogicalSize;
         m_frozenLogicalRegion = captured.frozenLogicalRegion;
+        m_frozenFrameGeometry = QRect{m_placedSelection.topLeft() - captured.logicalRegion.topLeft() + m_frozenLogicalRegion.topLeft(), m_frozenLogicalSize};
+        updateCropMagnifierSource();
         m_engine.refreshCanvas(captured);
     }
 
@@ -508,6 +546,8 @@ namespace GyanisScribe::Gui
         m_frozenImage           = captured.frozenImage;
         m_frozenLogicalSize     = captured.frozenLogicalSize;
         m_frozenLogicalRegion   = captured.frozenLogicalRegion;
+        m_frozenFrameGeometry   = QRect{selection.topLeft() - captured.logicalRegion.topLeft() + m_frozenLogicalRegion.topLeft(), m_frozenLogicalSize};
+        updateCropMagnifierSource();
         m_view->clearCropPreview();
 
         m_engine.recropCanvas(captured, offset);

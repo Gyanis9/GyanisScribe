@@ -1,10 +1,12 @@
 #include "Gui/Annotation/AnnotationView.h"
 
 #include "Core/Image/ImageFit.h"
+#include "Core/Pick/PickGeometry.h"
 #include "Base/Logger.h"
 #include "Base/Text.h"
 #include "Gui/Theme/DesignTokens.h"
 
+#include <QFontMetrics>
 #include <QFontMetricsF>
 #include <QMouseEvent>
 #include <QPainter>
@@ -48,6 +50,15 @@ namespace
 
     /// 输入框的高度下限，逻辑像素：至少装得下一行与光标
     constexpr int kTextEditorMinimumHeight = 24;
+
+    /// 重裁放大镜的边框线宽，逻辑像素：与截图遮罩那一枚同档
+    constexpr int kMagnifierPenWidth = 2;
+
+    /// 重裁放大镜读数条的高度，逻辑像素
+    constexpr int kMagnifierStripHeight = 24;
+
+    /// 图内按住后挪多远算「要整体挪」：几像素的手抖仍按单击清选中处理
+    constexpr int kCaptureMoveSlop = 3;
 
     /// 提交前削掉尾巴上的空行：多半是「敲完回车就提交」带出来的，留着会在图形里多出一行空白
     QString textWithoutTrailingBlankLines(const QString &text)
@@ -137,6 +148,7 @@ namespace GyanisScribe::Gui
             m_engine.paintShapes(painter);
             painter.restore();
             paintCaptureFrame(painter);
+            paintCropMagnifier(painter);
             return;
         }
 
@@ -219,6 +231,9 @@ namespace GyanisScribe::Gui
         // 截图窗与桌面内容逐像素相同：屏上必须有一圈提示线，用户才知道哪一块是这张截图。
         // 画在控件边缘、只走屏显这一条路——exportImage 从引擎取图，不会带上这一笔。
         paintCaptureFrame(painter);
+
+        // 拖边时的像素放大镜排在最后：它要盖住边框与画面，用户正要看的就是光标落点
+        paintCropMagnifier(painter);
     }
 
     void AnnotationView::paintCaptureFrame(QPainter &painter)
@@ -267,6 +282,133 @@ namespace GyanisScribe::Gui
         update();
     }
 
+    void AnnotationView::setCropMagnifierSource(const CropMagnifierSource &source)
+    {
+        m_cropMagnifierSource = source;
+        update();
+    }
+
+    void AnnotationView::setMagnifierView(const Core::MagnifierView view)
+    {
+        m_magnifierView = view;
+        update();
+    }
+
+    QRect AnnotationView::cropMagnifierRectForTesting() const
+    {
+        return cropMagnifierGeometry().view;
+    }
+
+    QRect AnnotationView::cropMagnifierReadoutRectForTesting() const
+    {
+        return cropMagnifierGeometry().readout;
+    }
+
+    QString AnnotationView::cropReadoutText() const
+    {
+        // 读数报的是「这一块新范围」而不是画布：拖边时用户核对的就是边框落点与成品尺寸
+        const auto cursor = mapToGlobal(m_mousePointWidget);
+        return QStringLiteral("%1×%2  (%3, %4)").arg(width()).arg(height()).arg(cursor.x()).arg(cursor.y());
+    }
+
+    AnnotationView::CropMagnifierGeometry AnnotationView::cropMagnifierGeometry() const
+    {
+        CropMagnifierGeometry geometry;
+        // 只有拖抓点时才摆：整体移动时鼠标在图内，放大镜挡住的正是用户要对齐的画面
+        if (!m_captureResizing || m_captureResizeGrip == Core::SelectionGrip::None || window() == nullptr)
+        {
+            return geometry;
+        }
+
+        const auto viewOrigin = mapToGlobal(QPoint{0, 0});
+        const auto windowRect = window()->geometry();
+        const auto bounds     = windowRect.isValid() && !windowRect.isEmpty() ? windowRect : QRect{viewOrigin, size()};
+        // 取样夹在整屏冻帧里、摆放夹在本窗内：光标在边框上时，放大镜两侧的像素都要看得到
+        const auto samplingBounds = m_cropMagnifierSource.frameGeometry.isValid() && !m_cropMagnifierSource.frameGeometry.isEmpty() ? m_cropMagnifierSource.frameGeometry : bounds;
+        const auto sampleEdge     = Core::magnifierSampleEdgeFor(m_magnifierView);
+        // 窗口比默认的 180 格还小时按短边缩一档：照原尺寸画会被裁成半张，格子就看不清了
+        const int  viewEdge = std::max(Core::kMagnifierSampleEdge, std::min({Core::kMagnifierViewEdge, width(), height()}));
+        const auto layout   = Core::magnifierLayoutFor(mapToGlobal(m_mousePointWidget), samplingBounds, bounds, sampleEdge > 0 ? sampleEdge : Core::kMagnifierSampleEdge, viewEdge);
+
+        QRect viewRect = layout.viewRect.translated(-viewOrigin);
+        // 窗口小于放大镜本身时夹回控件内：夹过之后仍按原取样范围放大，读数与落点不受影响
+        viewRect.moveLeft(std::clamp(viewRect.left(), 0, std::max(0, width() - viewRect.width())));
+        viewRect.moveTop(std::clamp(viewRect.top(), 0, std::max(0, height() - viewRect.height())));
+
+        // 读数条按文字实际宽度撑开，但不许出控件；下方放不下就翻到插图上方
+        QFont readoutFont = font();
+        readoutFont.setPointSizeF(std::max<qreal>(GyanisScribe::Gui::kHintFontSize, font().pointSizeF()));
+        readoutFont = tabularFont(readoutFont, TextScript::Mixed);
+        const QFontMetrics metrics{readoutFont};
+        const int          stripWidth = std::clamp(metrics.horizontalAdvance(cropReadoutText()) + 2 * GyanisScribe::Gui::kHintPadding, 1, std::max(1, width()));
+        const int          stripLeft  = std::clamp(viewRect.left(), 0, std::max(0, width() - stripWidth));
+        int                stripTop   = viewRect.bottom() + kMagnifierPenWidth;
+        if (stripTop + kMagnifierStripHeight > height())
+        {
+            stripTop = std::max(0, viewRect.top() - kMagnifierPenWidth - kMagnifierStripHeight);
+        }
+
+        geometry.readout    = QRect{stripLeft, stripTop, stripWidth, kMagnifierStripHeight};
+        geometry.source     = layout.sourceRect;
+        geometry.sampleEdge = sampleEdge > 0 ? sampleEdge : Core::kMagnifierSampleEdge;
+        geometry.cellSize   = layout.cellSize;
+        // 「不显示」只收像素插图；读数条照旧留在原位，与截图遮罩那一档同一口径
+        if (m_magnifierView != Core::MagnifierView::Off && !m_cropMagnifierSource.frame.isNull())
+        {
+            geometry.view = viewRect;
+        }
+        return geometry;
+    }
+
+    void AnnotationView::paintCropMagnifier(QPainter &painter)
+    {
+        const auto geometry = cropMagnifierGeometry();
+        if (geometry.readout.isEmpty())
+        {
+            return;
+        }
+
+        if (!geometry.view.isEmpty())
+        {
+            const auto &frame      = m_cropMagnifierSource.frame;
+            const auto  cropOrigin = Core::framePixelFor(geometry.source.topLeft(), m_cropMagnifierSource.frameGeometry, m_cropMagnifierSource.devicePixelRatio, frame.size());
+            const auto  cropSpan   = static_cast<int>(std::lround(geometry.sampleEdge * m_cropMagnifierSource.devicePixelRatio));
+            const auto  cropSize   = QSize{std::clamp(cropSpan, 1, frame.width() - cropOrigin.x()), std::clamp(cropSpan, 1, frame.height() - cropOrigin.y())};
+
+            // 像素格用最近邻放大：Smooth 会把格子糊成一片，放大镜就没有存在的意义了
+            painter.save();
+            painter.setRenderHint(QPainter::Antialiasing, false);
+            painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(Qt::NoBrush);
+            painter.drawImage(geometry.view, frame.copy(QRect{cropOrigin, cropSize}));
+
+            painter.setPen(QPen{GyanisScribe::Gui::kAccentColor, kMagnifierPenWidth});
+            painter.drawRect(geometry.view);
+            painter.setPen(QPen{GyanisScribe::Gui::kCrosshairColor, 1});
+            for (auto step = 1; step < geometry.sampleEdge; ++step)
+            {
+                const auto offset = step * geometry.cellSize;
+                painter.drawLine(geometry.view.left() + offset, geometry.view.top(), geometry.view.left() + offset, geometry.view.bottom());
+                painter.drawLine(geometry.view.left(), geometry.view.top() + offset, geometry.view.right(), geometry.view.top() + offset);
+            }
+            painter.restore();
+        }
+
+        QFont readoutFont = font();
+        readoutFont.setPointSizeF(std::max<qreal>(GyanisScribe::Gui::kHintFontSize, font().pointSizeF()));
+        readoutFont = tabularFont(readoutFont, TextScript::Mixed);
+
+        painter.save();
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(GyanisScribe::Gui::kCaptureHintBackgroundColor);
+        painter.drawRect(geometry.readout);
+        painter.setFont(readoutFont);
+        painter.setPen(GyanisScribe::Gui::kCaptureHintTextColor);
+        painter.drawText(geometry.readout.adjusted(GyanisScribe::Gui::kHintPadding, 0, -GyanisScribe::Gui::kHintPadding, 0), Qt::AlignVCenter | Qt::AlignLeft, cropReadoutText());
+        painter.restore();
+    }
+
     void AnnotationView::mousePressEvent(QMouseEvent *event)
     {
         if (event->button() != Qt::LeftButton)
@@ -303,6 +445,9 @@ namespace GyanisScribe::Gui
                 m_captureResizeGrip             = grip;
                 m_captureResizeStartGlobal      = event->globalPosition().toPoint();
                 m_captureResizeOriginalGeometry = window()->geometry();
+                m_mousePointWidget              = event->pos();
+                // 按下就亮出放大镜：拖边最需要读数的是「压住边框那一刻」，不必等第一次移动
+                update();
                 event->accept();
                 return;
             }
@@ -347,7 +492,12 @@ namespace GyanisScribe::Gui
         m_engine.clearSelection();
         if (m_engine.activeTool() == Core::ToolKind::Select)
         {
-            // 选择工具不落笔：空白处按一下只是清选中
+            // 图内空白按住可整体挪动截图范围；到松手都没超过手抖阈值就仍按单击清选中
+            m_captureMovePending          = true;
+            m_captureMoving               = false;
+            m_captureMoveStartGlobal      = event->globalPosition().toPoint();
+            m_captureMoveOriginalGeometry = window()->geometry();
+            m_mousePointWidget            = event->pos();
             event->accept();
             return;
         }
@@ -365,6 +515,8 @@ namespace GyanisScribe::Gui
 
     void AnnotationView::mouseMoveEvent(QMouseEvent *event)
     {
+        m_mousePointWidget = event->pos();
+
         const auto rect  = currentDisplayRect();
         const auto point = toCanvasPoint(event->pos(), rect, m_engine.canvas().logicalSize);
 
@@ -379,6 +531,31 @@ namespace GyanisScribe::Gui
                 window()->setGeometry(moved);
                 emit captureResizeMoved(moved);
             }
+            // 放大镜随光标与窗口一起走；整窗重绘顺带把上一帧的放大镜从旧位置擦掉
+            update();
+            event->accept();
+            return;
+        }
+
+        if (m_captureMovePending || m_captureMoving)
+        {
+            const auto delta = event->globalPosition().toPoint() - m_captureMoveStartGlobal;
+            if (!m_captureMoving)
+            {
+                // 几像素的手抖仍是单击：清掉选中是原本的行为，不能顺手把窗口挪走
+                if (std::abs(delta.x()) + std::abs(delta.y()) <= kCaptureMoveSlop)
+                {
+                    event->accept();
+                    return;
+                }
+                m_captureMoving = true;
+            }
+
+            const auto available = window()->screen() != nullptr ? window()->screen()->availableGeometry() : m_captureMoveOriginalGeometry;
+            const auto moved     = Core::dragRegionByGrip(m_captureMoveOriginalGeometry, Core::SelectionGrip::Inside, delta, available);
+            window()->setGeometry(moved);
+            emit captureResizeMoved(moved);
+            update();
             event->accept();
             return;
         }
@@ -438,6 +615,22 @@ namespace GyanisScribe::Gui
             setCursor(Qt::ArrowCursor);
             clearCropPreview();
             emit captureResized(window()->geometry());
+            // 放大镜只属于拖动那一瞬：松手必须立刻收掉，别让它压在刚定下来的边框上
+            update();
+            event->accept();
+            return;
+        }
+
+        if (m_captureMovePending || m_captureMoving)
+        {
+            const bool moved     = m_captureMoving;
+            m_captureMovePending = false;
+            m_captureMoving      = false;
+            update();
+            if (moved)
+            {
+                emit captureResized(window()->geometry());
+            }
             event->accept();
             return;
         }

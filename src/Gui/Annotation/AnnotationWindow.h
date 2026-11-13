@@ -333,6 +333,12 @@ namespace GyanisScribe::Gui
         /// 按记下的选区与屏幕可用区把工具栏摆一次；可见段收放（contextLayoutChanged）后也走这一处
         void placeToolbarForSelection();
 
+        /// 按给定选区摆工具栏：拖边/整体挪动途中每一帧都走这一处，不等重抓回来
+        void placeToolbarNextTo(const QRect &selection);
+
+        /// 把当前冻帧与它在桌面上的全局矩形交给视图，重裁放大镜从这一份取样
+        void updateCropMagnifierSource();
+
         /// 按开关与来源决定信息面板建不建、露不露；开一轮标注时调用一次
         void updateInfoPanel();
 
@@ -356,6 +362,7 @@ namespace GyanisScribe::Gui
         QImage                                   m_frozenImage;         ///< 整屏冻帧，重裁预览用；空表示来源没带
         QSize                                    m_frozenLogicalSize;   ///< 冻帧逻辑尺寸
         QRect                                    m_frozenLogicalRegion; ///< 冻帧在这块屏内的逻辑区域
+        QRect                                    m_frozenFrameGeometry; ///< 冻帧在桌面上的全局矩形，重裁放大镜按它取样
         /// 把冻帧按新选区裁成预览交给视图：拖边框时新露出的区域不是拉伸的旧画布
         void                    updateCropPreview(const QRect &globalSelection);
         QRect                   m_placedScreenAvailable;            ///< 本轮摆放用的屏幕可用区：可见段变化后重摆要同一份

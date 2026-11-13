@@ -11,7 +11,9 @@
 
 #include "Core/Annotation/IAnnotationEngine.h"
 #include "Core/Capture/ScreenUtils.h"
+#include "Core/Pick/PickGeometry.h"
 
+#include <QImage>
 #include <QPoint>
 #include <QPointF>
 #include <QRect>
@@ -34,6 +36,18 @@ namespace GyanisScribe::Gui
 
     /// 抓住手柄的判定半径，控件像素：手柄很小，不给余量就抓不住
     inline constexpr int kHandleHitRadiusWidget = 8;
+
+    /**
+     * @brief 重裁拖边时放大镜的取样源
+     * @details 冻帧是框选那一刻的整屏画面：只从当前画布取样的话，拖边新露出的区域恰好不在画布里，
+     *          放大镜边上会缺一圈正是用户要看的像素。
+     */
+    struct CropMagnifierSource
+    {
+        QImage frame;                  ///< 整屏冻帧；空表示这一轮没有取样源
+        QRect  frameGeometry;          ///< 冻帧在桌面上的全局矩形
+        qreal  devicePixelRatio = 1.0; ///< 冻帧物理像素与逻辑像素之比
+    };
 
     /**
      * @brief 控件坐标换算到画布逻辑坐标
@@ -154,6 +168,25 @@ namespace GyanisScribe::Gui
         /// 收起重裁预览，回到引擎画布
         void clearCropPreview();
 
+        /**
+         * @brief 交给重裁放大镜一份整屏冻帧
+         * @param source 冻帧、它在桌面上的全局矩形与缩放比；空冻帧表示这一轮没有像素取样源
+         * @details 冻帧随本轮换画布一起换（开窗、刷新、重裁）；只换几何不换源会让放大镜停在上一张画面上。
+         */
+        void setCropMagnifierSource(const CropMagnifierSource &source);
+
+        /**
+         * @brief 装上这一轮的放大镜视野档
+         * @param view 视野档；off 只收像素插图，读数条仍在
+         */
+        void setMagnifierView(Core::MagnifierView view);
+
+        /// 重裁拖边时放大镜像素插图的矩形（控件坐标）；不画时为空
+        [[nodiscard]] QRect cropMagnifierRectForTesting() const;
+
+        /// 重裁拖边时放大镜读数条的矩形（控件坐标）；不画时为空
+        [[nodiscard]] QRect cropMagnifierReadoutRectForTesting() const;
+
     private:
         /**
          * @brief 文字的行内输入框：按下处在首行基线上摆一个多行的
@@ -226,10 +259,39 @@ namespace GyanisScribe::Gui
         /// 画屏幕边框与选择档抓点：正常出图与重裁预览共用同一笔
         void paintCaptureFrame(QPainter &painter);
 
+        /**
+         * @brief 重裁放大镜这一刻的几何
+         * @details 像素插图、读数条与取样范围出自同一次布局：画与判据各算一遍就会「看着在框里、实际缺一块」。
+         */
+        struct CropMagnifierGeometry
+        {
+            QRect view;           ///< 像素插图，控件坐标；视野档为 off 或没有冻帧时为空
+            QRect readout;        ///< 读数条，控件坐标
+            QRect source;         ///< 取样范围，全局坐标
+            int   sampleEdge = 0; ///< 取样边长，逻辑像素
+            int   cellSize   = 1; ///< 一格在插图里的边长
+        };
+
+        /// 算重裁放大镜的几何；没在拖抓点时三个矩形都为空
+        [[nodiscard]] CropMagnifierGeometry cropMagnifierGeometry() const;
+
+        /// 读数条上的文字：当前范围尺寸与光标全局坐标
+        [[nodiscard]] QString cropReadoutText() const;
+
+        /// 画重裁放大镜与读数条
+        void paintCropMagnifier(QPainter &painter);
+
         bool                m_captureResizing   = false;                     ///< 「选择」档正在拖窗口边框
         Core::SelectionGrip m_captureResizeGrip = Core::SelectionGrip::None; ///< 拖的是哪一条边或哪一个角
         QPoint              m_captureResizeStartGlobal;                      ///< 按下时的全局坐标
         QRect               m_captureResizeOriginalGeometry;                 ///< 按下前的窗口几何
+        bool                m_captureMovePending = false;                    ///< 图内空白按住、还没超过手抖阈值
+        bool                m_captureMoving      = false;                    ///< 正在整体挪动截图范围
+        QPoint              m_captureMoveStartGlobal;                        ///< 整体挪动按下时的全局坐标
+        QRect               m_captureMoveOriginalGeometry;                   ///< 整体挪动按下前的窗口几何
+        QPoint              m_mousePointWidget;                              ///< 最近一次鼠标位置，控件坐标
+        CropMagnifierSource m_cropMagnifierSource;                           ///< 重裁放大镜的整屏冻帧
+        Core::MagnifierView m_magnifierView = Core::MagnifierView::Narrow;   ///< 这一轮的放大镜视野档
     };
 
 } // namespace GyanisScribe::Gui
