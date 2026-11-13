@@ -1,7 +1,10 @@
 #include "App/RewindCoordinator.h"
 
 #include "Base/Logger.h"
+#include "Base/Paths.h"
 #include "Core/Capture/IScreenCaptureSource.h"
+#include "Core/Record/IRecordingEncoder.h"
+#include "Core/Record/RecorderConfig.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Settings/SettingsStore.h"
 #include "Gui/Controls/Toast.h"
@@ -21,8 +24,10 @@
 
 #include <filesystem>
 #include <format>
+#include <fstream>
 #include <memory>
 #include <optional>
+#include <system_error>
 #include <vector>
 
 Q_DECLARE_METATYPE(GyanisScribe::Base::CapturedImage)
@@ -32,11 +37,15 @@ using GyanisScribe::Base::CapturedImage;
 using GyanisScribe::Base::Error;
 using GyanisScribe::Base::ErrorCode;
 using GyanisScribe::Base::Expected;
+using GyanisScribe::Base::Paths;
+using GyanisScribe::Core::IRecordingEncoder;
 using GyanisScribe::Core::IScreenCaptureSource;
 using GyanisScribe::Core::kRewindBufferSeconds;
 using GyanisScribe::Core::kRewindEnabled;
 using GyanisScribe::Core::kRewindExcludeProcesses;
 using GyanisScribe::Core::kRewindFrameRate;
+using GyanisScribe::Core::OutputFormat;
+using GyanisScribe::Core::RecorderConfig;
 using GyanisScribe::Core::RewindStatus;
 using GyanisScribe::Core::SettingsStore;
 using GyanisScribe::Gui::ToastKind;
@@ -147,6 +156,42 @@ namespace
         mutable std::vector<ScreenWindow> windows;
     };
 
+    /// 假视频编码器：记下参数并把目标文件写出来
+    class FakeVideoEncoder final : public IRecordingEncoder
+    {
+    public:
+        [[nodiscard]] Expected<std::filesystem::path> encode(const RecorderConfig &config, const std::filesystem::path &frameDirectory, const int frameCount,
+                                                             const qint64 recordedDurationMs, const std::filesystem::path &audioWav) override
+        {
+            ++calls;
+            seenFrames   = frameCount;
+            seenDuration = recordedDurationMs;
+            seenConfig   = config;
+            seenAudio    = audioWav;
+            framesOnDisk = 0;
+            for (const auto &entry: std::filesystem::directory_iterator(frameDirectory))
+            {
+                if (entry.path().extension() == L".png")
+                {
+                    ++framesOnDisk;
+                }
+            }
+            output = config.outputDirectory / (config.nameTemplate.toStdWString() + L".mp4");
+            std::filesystem::create_directories(output.parent_path());
+            std::ofstream{output} << "fake";
+            return fail ? Expected<std::filesystem::path>{std::unexpect, Error{ErrorCode::InternalError, "编码器坏了"}} : Expected<std::filesystem::path>{output};
+        }
+
+        int                   calls        = 0;
+        int                   seenFrames   = 0;
+        qint64                seenDuration = 0;
+        int                   framesOnDisk = 0;
+        bool                  fail         = false;
+        RecorderConfig        seenConfig;
+        std::filesystem::path seenAudio;
+        std::filesystem::path output;
+    };
+
     /// 托盘状态信号的一帧读数
     struct StatusSignal
     {
@@ -175,6 +220,30 @@ namespace
             }
         }
         return nullptr;
+    }
+
+    /// 抓若干帧并等它们都进缓冲；抓帧来源每拍换一次颜色，保证每一拍都真编码出新样本
+    void captureFrames(RewindCoordinator &coordinator, const int count)
+    {
+        for (int captured = 0; captured < count; ++captured)
+        {
+            coordinator.captureTickForTesting();
+            QTRY_VERIFY_WITH_TIMEOUT(coordinator.bufferStatsForTesting().sampleCount >= captured + 1, 3000);
+            // 两拍之间隔开几毫秒：首尾时间差要非零，导出时长才有可判的基准
+            QTest::qWait(10);
+        }
+    }
+
+    /// 数一个目录下的条目；目录不存在算 0
+    std::size_t countEntries(const std::filesystem::path &directory)
+    {
+        std::error_code error;
+        std::size_t     entries = 0;
+        for (std::filesystem::directory_iterator iterator{directory, error}, end; !error && iterator != end; iterator.increment(error))
+        {
+            ++entries;
+        }
+        return entries;
     }
 
     std::unique_ptr<QApplication> application;
@@ -888,4 +957,114 @@ TEST_F(RewindCoordinatorFixture, DismissFromErrorPauseKeepsPauseWithoutRepeating
     // 取消选择器不该顺手解除错误暂停，也不该把同一条原因再弹一遍
     QTRY_VERIFY_WITH_TIMEOUT(coordinator.statusForTesting() == RewindStatus::PausedByError, 3000);
     EXPECT_EQ(messages.size(), 1);
+}
+
+TEST_F(RewindCoordinatorFixture, ExportsTheMarkedRangeAsAnMp4)
+{
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(kRewindEnabled, QVariant(true)).has_value());
+    // 抓帧定时器放慢：本用例要的是精确的五帧，自带的抓帧节拍比真实定时器跑得快
+    ASSERT_TRUE(settings.setValue(kRewindFrameRate, QVariant(2)).has_value());
+
+    FakeSource        source;
+    FakePlatform      platform;
+    auto              encoder = std::make_shared<FakeVideoEncoder>();
+    RewindCoordinator coordinator({source, platform, settings, encoder});
+    coordinator.start();
+    captureFrames(coordinator, 5);
+    const auto firstId = coordinator.firstFrameIdForTesting();
+    ASSERT_TRUE(firstId.has_value());
+    // 样本号连续递增：区间 [首, 首+4] 正好是五帧，晚到的定时器样本也改不了这段
+    const quint64 lastId          = *firstId + 4;
+    const auto    firstCapturedAt = coordinator.sampleCapturedAtForTesting(*firstId);
+    const auto    lastCapturedAt  = coordinator.sampleCapturedAtForTesting(lastId);
+    ASSERT_TRUE(firstCapturedAt.isValid());
+    ASSERT_TRUE(lastCapturedAt.isValid());
+
+    const auto      root = std::filesystem::temp_directory_path() / "GyanisScribe-ClipExport";
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+    std::filesystem::create_directories(root, ignored);
+    const auto target      = root / "clip.mp4";
+    const auto clipCache   = Paths::cacheDirectory() / "RewindClips";
+    const auto cacheBefore = countEntries(clipCache);
+
+    QStringList messages;
+    QObject::connect(&coordinator, &RewindCoordinator::messageForUser, &coordinator, [&messages](const QString &message, ToastKind) { messages.append(message); });
+
+    coordinator.exportClipForTesting(*firstId, lastId, target);
+    EXPECT_TRUE(coordinator.isClipExportingForTesting());
+    QTRY_VERIFY_WITH_TIMEOUT(!coordinator.isClipExportingForTesting(), 5000);
+
+    EXPECT_EQ(encoder->calls, 1);
+    EXPECT_EQ(encoder->seenFrames, 5);
+    EXPECT_EQ(encoder->seenDuration, firstCapturedAt.msecsTo(lastCapturedAt));
+    EXPECT_EQ(encoder->framesOnDisk, 5);
+    EXPECT_TRUE(encoder->seenAudio.empty());
+    EXPECT_EQ(encoder->seenConfig.format, OutputFormat::Mp4);
+    EXPECT_TRUE(std::filesystem::exists(target));
+    EXPECT_EQ(countEntries(clipCache), cacheBefore) << "导出结束后临时帧目录没删干净";
+    ASSERT_EQ(messages.size(), 1);
+    EXPECT_TRUE(messages.front().contains(QStringLiteral("已导出片段"))) << messages.front().toStdString();
+
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_F(RewindCoordinatorFixture, RefusesAnExpiredEndpoint)
+{
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(kRewindEnabled, QVariant(true)).has_value());
+
+    FakeSource        source;
+    FakePlatform      platform;
+    auto              encoder = std::make_shared<FakeVideoEncoder>();
+    RewindCoordinator coordinator({source, platform, settings, encoder});
+    coordinator.start();
+    captureFrames(coordinator, 3);
+    const auto firstId = coordinator.firstFrameIdForTesting();
+    ASSERT_TRUE(firstId.has_value());
+
+    // 整段清空等于这三帧都已被淘汰：拿旧号导出只能给提示，不能拿剩下的帧硬凑
+    coordinator.clearBuffer();
+    const auto      target = std::filesystem::temp_directory_path() / "GyanisScribe-ClipExport-expired" / "gone.mp4";
+    std::error_code ignored;
+    std::filesystem::remove_all(target.parent_path(), ignored);
+    QStringList messages;
+    QObject::connect(&coordinator, &RewindCoordinator::messageForUser, &coordinator, [&messages](const QString &message, ToastKind) { messages.append(message); });
+
+    coordinator.exportClipForTesting(*firstId, *firstId + 1, target);
+    EXPECT_FALSE(coordinator.isClipExportingForTesting());
+    EXPECT_EQ(encoder->calls, 0);
+    ASSERT_EQ(messages.size(), 1);
+    EXPECT_TRUE(messages.front().contains(QStringLiteral("过期")));
+    EXPECT_FALSE(std::filesystem::exists(target));
+}
+
+TEST_F(RewindCoordinatorFixture, RefusesASingleFrameRange)
+{
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(kRewindEnabled, QVariant(true)).has_value());
+
+    FakeSource        source;
+    FakePlatform      platform;
+    auto              encoder = std::make_shared<FakeVideoEncoder>();
+    RewindCoordinator coordinator({source, platform, settings, encoder});
+    coordinator.start();
+    captureFrames(coordinator, 3);
+    const auto firstId = coordinator.firstFrameIdForTesting();
+    ASSERT_TRUE(firstId.has_value());
+    const quint64 sameId = *firstId + 1;
+
+    const auto      target = std::filesystem::temp_directory_path() / "GyanisScribe-ClipExport-single" / "single.mp4";
+    std::error_code ignored;
+    std::filesystem::remove_all(target.parent_path(), ignored);
+    QStringList messages;
+    QObject::connect(&coordinator, &RewindCoordinator::messageForUser, &coordinator, [&messages](const QString &message, ToastKind) { messages.append(message); });
+
+    coordinator.exportClipForTesting(sameId, sameId, target);
+    EXPECT_FALSE(coordinator.isClipExportingForTesting());
+    EXPECT_EQ(encoder->calls, 0);
+    ASSERT_EQ(messages.size(), 1);
+    EXPECT_TRUE(messages.front().contains(QStringLiteral("两帧")));
+    EXPECT_FALSE(std::filesystem::exists(target));
 }

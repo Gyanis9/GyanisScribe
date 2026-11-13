@@ -376,8 +376,10 @@ namespace GyanisScribe::Main
 
         // 回溯这一族排在截图协调器之后：缓冲与选择器都由它自己管，控制器只接四条线——
         // 选中的帧进同一条截图链路、要说的话回到提示、缓冲状态推给托盘、流程收场恢复抓帧。
-        // start() 自己读设置与平台能力位：默认关闭，未开启时停在 Disabled，不抓帧也不占托盘那一段
-        m_rewind = std::make_unique<GyanisScribe::App::RewindCoordinator>(GyanisScribe::App::RewindCoordinator::Dependencies{*m_captureSource, *m_integration, *m_settings});
+        // start() 自己读设置与平台能力位：默认关闭，未开启时停在 Disabled，不抓帧也不占托盘那一段。
+        // 编码器传空：录屏协调器排在后面，此时还没有可共享的实例；回溯在首次导出时自建 ffmpeg 编码器
+        m_rewind = std::make_unique<GyanisScribe::App::RewindCoordinator>(
+                GyanisScribe::App::RewindCoordinator::Dependencies{*m_captureSource, *m_integration, *m_settings, {}});
         QObject::connect(m_rewind.get(), &GyanisScribe::App::RewindCoordinator::frameChosen, m_capture.get(), &GyanisScribe::App::CaptureCoordinator::startInteractiveWithFrame);
         QObject::connect(m_rewind.get(), &GyanisScribe::App::RewindCoordinator::messageForUser, this, &AppController::notifyUser);
         QObject::connect(m_rewind.get(), &GyanisScribe::App::RewindCoordinator::bufferStatusChanged, m_tray.get(), &GyanisScribe::App::TrayController::setRewindStatus);

@@ -5767,5 +5767,37 @@
             <source>音频采集进程无法启动。设备可能正被其他程序占用；请关闭占用程序后重试，或在设置中关闭音频采集。</source>
             <translation>The audio capture process could not start. The device may be in use by another program; close it and retry, or disable audio capture in Settings.</translation>
         </message>
+        <message>
+            <source>这段时间已经过期，请重新标起点与终点</source>
+            <translation>This time range has expired. Mark the start and end again</translation>
+        </message>
+        <message>
+            <source>至少选两帧才能导出片段</source>
+            <translation>Select at least two frames to export a clip</translation>
+        </message>
+        <message>
+            <source>片段正在导出，请稍候</source>
+            <translation>A clip is being exported. Please wait</translation>
+        </message>
+        <message>
+            <source>导出回溯片段</source>
+            <translation>Export Rewind Clip</translation>
+        </message>
+        <message>
+            <source>MP4 视频 (*.mp4)</source>
+            <translation>MP4 video (*.mp4)</translation>
+        </message>
+        <message>
+            <source>第 {} 帧解不出来，请重试一次</source>
+            <translation>Frame {} could not be decoded. Try again</translation>
+        </message>
+        <message>
+            <source>片段帧写不出去，请换一个临时目录可写的环境后重试</source>
+            <translation>The clip frames could not be written. Retry in an environment where the cache directory is writable</translation>
+        </message>
+        <message>
+            <source>已导出片段：</source>
+            <translation>Clip exported: </translation>
+        </message>
 </context>
 </TS>

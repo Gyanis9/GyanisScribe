@@ -10,6 +10,7 @@
 #pragma once
 
 #include "Base/Types.h"
+#include "Core/Record/IRecordingEncoder.h"
 #include "Core/Rewind/FrameChangeDetector.h"
 #include "Core/Rewind/FrameRingBuffer.h"
 #include "Core/Rewind/RewindConfig.h"
@@ -23,8 +24,10 @@
 #include <QString>
 #include <QTimer>
 
+#include <filesystem>
 #include <memory>
 #include <optional>
+#include <vector>
 
 class QScreen;
 
@@ -60,14 +63,15 @@ namespace GyanisScribe::App
         /// 构造依赖
         struct Dependencies
         {
-            Core::IScreenCaptureSource     &source;      ///< 抓帧来源
-            Platform::IPlatformIntegration &integration; ///< 前台窗口、窗口枚举与会话信号
-            Core::ISettingsStore           &settings;    ///< 回溯设置
+            Core::IScreenCaptureSource              &source;      ///< 抓帧来源
+            Platform::IPlatformIntegration          &integration; ///< 前台窗口、窗口枚举与会话信号
+            Core::ISettingsStore                    &settings;    ///< 回溯设置
+            std::shared_ptr<Core::IRecordingEncoder> encoder;     ///< 视频编码器；空则首次导出时自建 ffmpeg 编码器
         };
 
         /**
          * @brief 构造协调器
-         * @param dependencies 三样外部依赖，都只引用不拥有
+         * @param dependencies 外部依赖：三项引用不拥有，编码器可为空
          * @param parent Qt 父对象
          */
         explicit RewindCoordinator(Dependencies dependencies, QObject *parent = nullptr);
@@ -163,6 +167,21 @@ namespace GyanisScribe::App
          */
         quint64 injectCorruptFrameForTesting();
 
+        /**
+         * @brief 把一段样本导出成 MP4
+         * @param fromId 起点样本号
+         * @param toId 终点样本号
+         * @details 端点已被淘汰、帧数不足、保存对话框取消、解码失败、编码失败各有自己的提示；
+         *          临时帧目录无论成败都会删掉。
+         */
+        void exportClip(quint64 fromId, quint64 toId);
+
+        /// 用例入口：跳过保存对话框，直接导到给定路径
+        void exportClipForTesting(quint64 fromId, quint64 toId, const std::filesystem::path &target);
+
+        /// 现在有没有一次片段导出在跑
+        [[nodiscard]] bool isClipExportingForTesting() const noexcept;
+
     signals:
         /// 选中的历史帧已解码：控制器据此进入回溯框选
         void frameChosen(const Base::CapturedImage &frame);
@@ -223,6 +242,15 @@ namespace GyanisScribe::App
         /// 排除名单里的程序是否在被抓屏上有可见窗口
         [[nodiscard]] bool exclusionVisible(const QRect &screenRect) const;
 
+        /// 取区间内的样本；端点与帧数的唯一校验点，两条导出入口都从这里过
+        [[nodiscard]] Base::Expected<std::vector<Core::RewindFrameSample>> collectRange(quint64 fromId, quint64 toId) const;
+        /// 置导出态并派给工作线程；设置导出态与派活的唯一入口
+        void startClipExport(std::vector<Core::RewindFrameSample> samples, const std::filesystem::path &target);
+        /// 真正干活：解码写帧、调编码器；全部在调用时同步完成，由外面套工作线程
+        [[nodiscard]] Base::Expected<std::filesystem::path> renderClip(const std::vector<Core::RewindFrameSample> &samples, const std::filesystem::path &target) const;
+        /// 片段导出结束：成功报路径，失败报原因
+        void handleClipExported();
+
         Dependencies                                             m_dependencies;                           ///< 抓帧来源、平台与设置，都不拥有
         Core::RewindConfig                                       m_config;                                 ///< 最近一次应用成功的配置
         Core::FrameRingBuffer                                    m_buffer;                                 ///< 编码后的帧，只在 GUI 线程访问
@@ -231,6 +259,9 @@ namespace GyanisScribe::App
         std::unique_ptr<Gui::RewindPickerWindow>                 m_picker;                                 ///< 选择器，首次打开时建，之后复用
         QFutureWatcher<Base::Expected<Core::RewindEncodedFrame>> m_encoderWatcher;                         ///< 编码结果的回接点
         QFutureWatcher<Base::Expected<QImage>>                   m_decoderWatcher;                         ///< 解码结果的回接点
+        QFutureWatcher<Base::Expected<std::filesystem::path>>    m_clipWatcher;                            ///< 片段导出的回接点
+        std::shared_ptr<Core::IRecordingEncoder>                 m_encoder;                                ///< 视频编码器；未注入时首次导出自建
+        bool                                                     m_clipExporting = false;                  ///< 是否在导出
         std::optional<Core::RewindEncodedFrame>                  m_lastEncoded;                            ///< 最近一次成功编码的字节与缩略图，心跳样本复用
         std::optional<Core::FrameFingerprint>                    m_lastFingerprint;                        ///< 与最近一次编码对应的画面指纹
         std::optional<Base::CapturedImage>                       m_pendingFrame;                           ///< 已提交编码、等结果回接的帧

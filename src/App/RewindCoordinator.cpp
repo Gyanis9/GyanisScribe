@@ -2,22 +2,28 @@
 
 #include "App/CaptureCoordinator.h"
 #include "Base/Logger.h"
+#include "Base/Paths.h"
 #include "Base/Text.h"
 #include "Core/Capture/IScreenCaptureSource.h"
+#include "Core/Record/RecordingSinks.h"
 #include "Core/Rewind/FrameChangeDetector.h"
 #include "Core/Rewind/RewindFrameCodec.h"
 #include "Core/Settings/ISettingsStore.h"
+#include "Core/Settings/NamingRules.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Gui/Rewind/RewindPickerWindow.h"
 #include "Platform/IPlatformIntegration.h"
+#include "Plugins/Recording/FfmpegRecordingEncoder.h"
 
 #include <QCursor>
 #include <QDateTime>
+#include <QFileDialog>
 #include <QGuiApplication>
 #include <QScreen>
 #include <QtConcurrent/QtConcurrentRun>
 
 #include <algorithm>
+#include <filesystem>
 #include <format>
 #include <utility>
 
@@ -36,7 +42,8 @@ namespace
 namespace GyanisScribe::App
 {
     RewindCoordinator::RewindCoordinator(Dependencies dependencies, QObject *parent) :
-        QObject(parent), m_dependencies(dependencies), m_buffer(Core::kDefaultRewindBufferSeconds, Core::kDefaultRewindFrameRate, Core::kRewindMemoryBudgetMb)
+        QObject(parent), m_dependencies(dependencies), m_buffer(Core::kDefaultRewindBufferSeconds, Core::kDefaultRewindFrameRate, Core::kRewindMemoryBudgetMb),
+        m_encoder(std::move(dependencies.encoder))
     {
         QObject::connect(&m_timer, &QTimer::timeout, this, &RewindCoordinator::onTick);
         QObject::connect(&m_dependencies.integration, &Platform::IPlatformIntegration::sessionLocked, this, &RewindCoordinator::handleSessionLocked);
@@ -51,6 +58,7 @@ namespace GyanisScribe::App
                          });
         QObject::connect(&m_encoderWatcher, &QFutureWatcher<Base::Expected<Core::RewindEncodedFrame>>::finished, this, &RewindCoordinator::handleEncoded);
         QObject::connect(&m_decoderWatcher, &QFutureWatcher<Base::Expected<QImage>>::finished, this, &RewindCoordinator::handleDecoded);
+        QObject::connect(&m_clipWatcher, &QFutureWatcher<Base::Expected<std::filesystem::path>>::finished, this, &RewindCoordinator::handleClipExported);
 
         for (auto *screen: QGuiApplication::screens())
         {
@@ -76,8 +84,10 @@ namespace GyanisScribe::App
         // 先断线再等：等待期间结果落地的话，finished 会打在正在析构的对象上
         QObject::disconnect(&m_encoderWatcher, nullptr, this, nullptr);
         QObject::disconnect(&m_decoderWatcher, nullptr, this, nullptr);
+        QObject::disconnect(&m_clipWatcher, nullptr, this, nullptr);
         m_encoderWatcher.waitForFinished();
         m_decoderWatcher.waitForFinished();
+        m_clipWatcher.waitForFinished();
     }
 
     void RewindCoordinator::start()
@@ -351,6 +361,137 @@ namespace GyanisScribe::App
         }
         ++m_nextSampleId;
         return sample.id;
+    }
+
+    Base::Expected<std::vector<Core::RewindFrameSample>> RewindCoordinator::collectRange(const quint64 fromId, const quint64 toId) const
+    {
+        const auto low  = std::min(fromId, toId);
+        const auto high = std::max(fromId, toId);
+        // 端点只要有一个已被淘汰，导出的片段就会悄悄少头少尾：整段拒掉，让用户重新标
+        if (!m_buffer.sampleById(low).has_value() || !m_buffer.sampleById(high).has_value())
+        {
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("这段时间已经过期，请重新标起点与终点")});
+        }
+        std::vector<Core::RewindFrameSample> samples;
+        for (const auto &view: m_buffer.views())
+        {
+            if (view.id >= low && view.id <= high)
+            {
+                if (const auto sample = m_buffer.sampleById(view.id); sample.has_value())
+                {
+                    samples.push_back(*sample);
+                }
+            }
+        }
+        if (samples.size() < 2)
+        {
+            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("至少选两帧才能导出片段")});
+        }
+        return samples;
+    }
+
+    void RewindCoordinator::exportClip(const quint64 fromId, const quint64 toId)
+    {
+        if (m_clipExporting)
+        {
+            emit messageForUser(Base::uiText("片段正在导出，请稍候"), Gui::ToastKind::Information);
+            return;
+        }
+        const auto range = collectRange(fromId, toId);
+        if (!range)
+        {
+            emit messageForUser(QString::fromStdString(range.error().message), Gui::ToastKind::Information);
+            return;
+        }
+
+        // 默认路径与截图保存同源：同一格目录与模板，用户不必为片段再配一遍
+        const auto                      configured = m_dependencies.settings.stringValue(Core::kPathScreenshot, QString{});
+        const auto                      folder     = configured.isEmpty() ? Base::Paths::defaultScreenshotDirectory() : Base::Paths::fromDisplayText(configured);
+        const Base::NameTemplateContext context{QString{}, range->front().foregroundTitle, range->front().screenName};
+        const auto suggestedName = Base::Paths::imageFileName(QDateTime::currentDateTime(), "mp4", Core::nameTemplateOrDefault(m_dependencies.settings), context);
+        const auto suggested     = QString::fromStdWString((folder / suggestedName.toStdWString()).wstring());
+        const auto chosen        = QFileDialog::getSaveFileName(nullptr, Base::uiText("导出回溯片段"), suggested, Base::uiText("MP4 视频 (*.mp4)"));
+        if (chosen.isEmpty())
+        {
+            return; // 取消：一个字节都不写
+        }
+        startClipExport(std::move(*range), chosen.toStdWString());
+    }
+
+    void RewindCoordinator::exportClipForTesting(const quint64 fromId, const quint64 toId, const std::filesystem::path &target)
+    {
+        const auto range = collectRange(fromId, toId);
+        if (!range)
+        {
+            emit messageForUser(QString::fromStdString(range.error().message), Gui::ToastKind::Information);
+            return;
+        }
+        startClipExport(std::move(*range), target);
+    }
+
+    void RewindCoordinator::startClipExport(std::vector<Core::RewindFrameSample> samples, const std::filesystem::path &target)
+    {
+        if (m_encoder == nullptr)
+        {
+            // 录屏协调器比本对象晚构造，拿不到它的实例；本类自建一份，编码器探测缓存跟着这块导出走
+            m_encoder = std::make_shared<Plugins::FfmpegRecordingEncoder>();
+        }
+        m_clipExporting = true;
+        m_clipWatcher.setFuture(QtConcurrent::run([this, samples = std::move(samples), target] { return renderClip(samples, target); }));
+    }
+
+    Base::Expected<std::filesystem::path> RewindCoordinator::renderClip(const std::vector<Core::RewindFrameSample> &samples, const std::filesystem::path &target) const
+    {
+        const auto      temporary = Base::Paths::cacheDirectory() / "RewindClips" / QString::number(QDateTime::currentMSecsSinceEpoch()).toStdWString();
+        std::error_code ignored;
+        std::filesystem::create_directories(temporary, ignored);
+        const auto cleanup = [&temporary]
+        {
+            std::error_code cleanupError;
+            std::filesystem::remove_all(temporary, cleanupError);
+        };
+
+        // 编码器认的是定宽序号的 PNG 序列；逐帧解出来写盘，写不成时把整个临时目录带走
+        for (std::size_t index = 0; index < samples.size(); ++index)
+        {
+            const auto frame = Core::decodeRewindFrame(samples[index].encodedPixels);
+            if (!frame)
+            {
+                cleanup();
+                return std::unexpected(Base::Error{Base::ErrorCode::InternalError, Base::uiFormat(Base::uiTextUtf8("第 {} 帧解不出来，请重试一次"), index + 1)});
+            }
+            if (!frame->save(Base::Paths::toDisplayText(temporary / Core::frameFileName(static_cast<int>(index))), "PNG"))
+            {
+                cleanup();
+                return std::unexpected(Base::Error{Base::ErrorCode::FileWriteFailed, Base::uiTextUtf8("片段帧写不出去，请换一个临时目录可写的环境后重试")});
+            }
+        }
+
+        Core::RecorderConfig config;
+        config.format           = Core::OutputFormat::Mp4;
+        config.outputDirectory  = target.parent_path();
+        config.nameTemplate     = QString::fromStdWString(target.stem().wstring());
+        const qint64 durationMs = samples.front().capturedAt.msecsTo(samples.back().capturedAt);
+        const auto   encoded    = m_encoder->encode(config, temporary, static_cast<int>(samples.size()), durationMs, {});
+        cleanup();
+        return encoded;
+    }
+
+    void RewindCoordinator::handleClipExported()
+    {
+        m_clipExporting    = false;
+        const auto outcome = m_clipWatcher.result();
+        if (!outcome)
+        {
+            emit messageForUser(QString::fromStdString(outcome.error().message), Gui::ToastKind::Danger);
+            return;
+        }
+        emit messageForUser(Base::uiText("已导出片段：") + Base::Paths::toDisplayText(*outcome), Gui::ToastKind::Success);
+    }
+
+    bool RewindCoordinator::isClipExportingForTesting() const noexcept
+    {
+        return m_clipExporting;
     }
 
     void RewindCoordinator::applyConfig(const Core::RewindConfig &config)
