@@ -1,5 +1,6 @@
 #include "App/StepRecorderCoordinator.h"
 
+#include "App/StepsAutoRedactor.h"
 #include "Base/Logger.h"
 #include "Base/Text.h"
 #include "Core/Capture/IScreenCaptureSource.h"
@@ -248,7 +249,47 @@ namespace GyanisScribe::App
             emit messageForUser(Base::uiText("这次没有记录到步骤"), Gui::ToastKind::Information);
             return;
         }
-        showReview();
+
+        // 开关关着就与没有这一档时完全一致：一步都不扫，直接开审核窗
+        if (!m_dependencies.settings.boolValue(Core::kStepsAutoRedact, false))
+        {
+            showReview();
+            return;
+        }
+
+        // 只扫真的抓到图的那几步：抓屏失败的步骤本来就没有文件，也无从打码
+        std::vector<std::filesystem::path> images;
+        for (const auto &step: m_session.steps())
+        {
+            if (!step.imagePath.isEmpty())
+            {
+                images.emplace_back(step.imagePath.toStdWString());
+            }
+        }
+        if (images.empty())
+        {
+            showReview();
+            return;
+        }
+
+        if (!m_autoRedactor)
+        {
+            m_autoRedactor = std::make_unique<StepsAutoRedactor>(m_dependencies.settings, m_dependencies.integration);
+        }
+        // 扫完才开窗：审核窗里的缩略图与整图都是在打码之后重读的，用户看到的就是打过码的那一份
+        emit messageForUser(Base::uiText("正在检查步骤截图里的敏感信息…"), Gui::ToastKind::Information);
+        m_autoRedactor->run(std::move(images),
+                            [this](const int, const int redacted, const int failed)
+                            {
+                                if (failed > 0)
+                                {
+                                    emit messageForUser(Base::uiText("有 %1 张步骤截图没能检查，请在审核窗里自行处理").arg(failed), Gui::ToastKind::Danger);
+                                } else if (redacted > 0)
+                                {
+                                    emit messageForUser(Base::uiText("已对 %1 张步骤截图自动打码").arg(redacted), Gui::ToastKind::Success);
+                                }
+                                showReview();
+                            });
     }
 
     void StepRecorderCoordinator::showReview()

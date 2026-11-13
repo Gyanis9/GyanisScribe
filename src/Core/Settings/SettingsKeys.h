@@ -308,4 +308,7 @@ namespace GyanisScribe::Core
     /// 步骤记录的首次说明是否已同意；同意后不再弹说明，拒绝不落盘
     inline constexpr std::string_view kStepsConsentAccepted = "Steps/ConsentAccepted";
 
+    /// 步骤截图自动打码：录制结束后先扫一遍本次截图，命中即打码覆写；默认关闭
+    inline constexpr std::string_view kStepsAutoRedact = "Steps/AutoRedact";
+
 } // namespace GyanisScribe::Core

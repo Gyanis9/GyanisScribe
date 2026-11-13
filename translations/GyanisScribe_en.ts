@@ -636,6 +636,18 @@
             <translation>No steps were recorded this time</translation>
         </message>
         <message>
+            <source>正在检查步骤截图里的敏感信息…</source>
+            <translation>Checking the step screenshots for sensitive information…</translation>
+        </message>
+        <message>
+            <source>有 %1 张步骤截图没能检查，请在审核窗里自行处理</source>
+            <translation>%1 step screenshot(s) could not be checked; handle them yourself in the review window</translation>
+        </message>
+        <message>
+            <source>已对 %1 张步骤截图自动打码</source>
+            <translation>%1 step screenshot(s) were redacted automatically</translation>
+        </message>
+        <message>
             <source>步骤截图写不进临时目录，已停止本次记录：%1</source>
             <translation>Step screenshots cannot be written to the temporary directory, so this recording has stopped: %1</translation>
         </message>
@@ -4838,6 +4850,22 @@
         <message>
             <source>开机自启动</source>
             <translation>Start at sign-in</translation>
+        </message>
+        <message>
+            <source>步骤截图</source>
+            <translation>Step screenshots</translation>
+        </message>
+        <message>
+            <source>录制结束后自动打码</source>
+            <translation>Redact automatically once recording stops</translation>
+        </message>
+        <message>
+            <source>自动打码步骤截图</source>
+            <translation>Redact step screenshots automatically</translation>
+        </message>
+        <message>
+            <source>录制结束后自动检查并打码本次的步骤截图；默认关闭，关闭时可在审核窗里自行删改。</source>
+            <translation>Once recording stops, check and redact this recording's step screenshots automatically. Off by default; when off, you can still edit or delete them in the review window.</translation>
         </message>
         <message>
             <source>备份与恢复</source>

@@ -43,6 +43,8 @@ namespace GyanisScribe::Gui
 
 namespace GyanisScribe::App
 {
+    class StepsAutoRedactor;
+
     /// 点击到抓屏之间等待的毫秒数：让钩子回调先退出，目标界面的菜单或页面切换也在这段时间里落定
     inline constexpr int kCaptureDelayMs = 250;
 
@@ -172,7 +174,8 @@ namespace GyanisScribe::App
          * @brief 正常停止后的收场
          * @param steps 本次会话记下的步数
          * @details 有步骤就打开审核窗把会话交给用户；一步都没有时收掉空目录并告诉用户，
-         *          免得留着一扇没内容的审核窗。
+         *          免得留着一扇没内容的审核窗。开了「步骤截图自动打码」时先扫一遍本次截图再开窗，
+         *          开关关着时不做任何扫描。
          */
         void handleStopped(int steps);
 
@@ -241,6 +244,7 @@ namespace GyanisScribe::App
         Core::StepSession                           m_session;           ///< 本次会话的步骤与临时目录
         std::unique_ptr<Gui::StepRecorderHud>       m_hud;               ///< 控制条，首次开始时建
         QPointer<Gui::StepReviewWindow>             m_review;            ///< 审核窗，关掉即自毁，不拥有
+        std::unique_ptr<StepsAutoRedactor>          m_autoRedactor;      ///< 步骤截图批量打码器，懒建
         QTimer                                      m_pendingTimer;      ///< 延迟抓屏的单次计时器
         std::optional<PendingEvent>                 m_pending;           ///< 尚未提交的事件，新事件直接替换
         bool                                        m_recording = false; ///< 是否正在录制

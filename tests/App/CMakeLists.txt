@@ -182,6 +182,25 @@ add_dependencies(TestAppBugReport DeployQtRuntime)
 include(GoogleTest)
 gtest_discover_tests(TestAppBugReport)
 
+add_executable(TestAppStepsAutoRedactor
+        TestStepsAutoRedactor.cpp)
+
+target_link_libraries(TestAppStepsAutoRedactor PRIVATE
+        App
+        Core
+        GTest::gtest
+        GTest::gtest_main
+        Qt6::Widgets)
+
+if (MSVC)
+    target_compile_options(TestAppStepsAutoRedactor PRIVATE /W4 /WX)
+endif ()
+
+add_dependencies(TestAppStepsAutoRedactor DeployQtRuntime)
+
+include(GoogleTest)
+gtest_discover_tests(TestAppStepsAutoRedactor)
+
 add_executable(TestAppTiledPrivacyScanner
         TestTiledPrivacyScanner.cpp)
 

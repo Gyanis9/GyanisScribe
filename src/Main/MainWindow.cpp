@@ -2295,6 +2295,10 @@ namespace GyanisScribe::Main
             form->addRow(GyanisScribe::Base::uiText(role.label), makeTrayClickCombo(m_settings, role.role, m_capabilities));
         }
         form->addRow(GyanisScribe::Base::uiText("开机自启动"), makeAutostartCheck(m_integration));
+        form->addRow(GyanisScribe::Base::uiText("步骤截图"),
+                     makeSettingCheck(m_settings, GyanisScribe::Core::kStepsAutoRedact, false, GyanisScribe::Base::uiText("录制结束后自动打码"),
+                                      GyanisScribe::Base::uiText("自动打码步骤截图"),
+                                      GyanisScribe::Base::uiText("录制结束后自动检查并打码本次的步骤截图；默认关闭，关闭时可在审核窗里自行删改。")));
         form->addRow(GyanisScribe::Base::uiText("备份与恢复"), buildTransferRow());
         return page;
     }
