@@ -1,7 +1,8 @@
 add_executable(TestCoreContent
         TestCsvWriter.cpp
         TestMarkdownBuilder.cpp
-        TestTableDetector.cpp)
+        TestTableDetector.cpp
+        TestXlsxWriter.cpp)
 
 target_link_libraries(TestCoreContent PRIVATE
         Core

@@ -2,6 +2,7 @@
 
 #include "Base/Paths.h"
 #include "Base/Text.h"
+#include "Core/Content/TableExportRules.h"
 
 #include <QByteArray>
 #include <QSaveFile>
@@ -12,26 +13,6 @@ namespace GyanisScribe::Core
 {
     namespace
     {
-        [[nodiscard]] bool isExportable(const TableDetection &table)
-        {
-            if (!table.found || table.complex || table.rows <= 0 || table.columns <= 0)
-            {
-                return false;
-            }
-            if (table.cells.size() != table.rows)
-            {
-                return false;
-            }
-            for (const QVector<QString> &row: table.cells)
-            {
-                if (row.size() != table.columns)
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-
         [[nodiscard]] QString quotedField(const QString &value)
         {
             // 只在字段含分隔符、双引号或换行时加引号：这是 RFC 4180 的最小引用，
@@ -49,7 +30,7 @@ namespace GyanisScribe::Core
 
     QString toCsv(const TableDetection &table)
     {
-        if (!isExportable(table))
+        if (tableExportProblem(table).has_value())
         {
             return {};
         }
@@ -72,18 +53,9 @@ namespace GyanisScribe::Core
 
     Base::Expected<void> writeCsvFile(const std::filesystem::path &filePath, const TableDetection &table)
     {
-        if (!isExportable(table))
+        if (const auto problem = tableExportProblem(table); problem.has_value())
         {
-            // 拒绝原因分三档：复杂表、没找到表、尺寸对不上；三者都不该写 BOM 或碰目标文件
-            if (table.complex)
-            {
-                return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("检测到复杂表格，暂不支持导出 CSV；请改用 Markdown 或 TXT 复制表格内容")});
-            }
-            if (!table.found)
-            {
-                return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("没有检测到可导出的表格，请先确认截图里有对齐的表格")});
-            }
-            return std::unexpected(Base::Error{Base::ErrorCode::InvalidArgument, Base::uiTextUtf8("表格结构不完整，暂不支持导出 CSV；请改用 Markdown 或 TXT 复制表格内容")});
+            return std::unexpected(*problem);
         }
 
         const QString     csv         = toCsv(table);
