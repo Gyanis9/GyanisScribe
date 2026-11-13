@@ -32,8 +32,8 @@
             <translation>Finish the current screenshot, screen recording or Rewind first</translation>
         </message>
         <message>
-            <source>桌面没有完全恢复：{}。按一次 Win+D 取回窗口；桌面图标可在桌面右键 → 查看里重新勾选「显示桌面图标」</source>
-            <translation>The desktop was not fully restored: {}. Press Win+D once to bring the windows back; to restore desktop icons, re-enable Show desktop icons from the desktop right-click menu under View.</translation>
+            <source>恢复清场时没有完全成功：{}。若窗口没有回来，按一次 Win+D；桌面图标仍不显示时，可在桌面右键 → 查看里重新勾选「显示桌面图标」</source>
+            <translation>Restoring the cleared scene did not fully succeed: {}. If the windows do not come back, press Win+D once; if the desktop icons are still missing, re-enable Show desktop icons from the desktop right-click menu under View.</translation>
         </message>
         <message>
             <source>该命令行操作不经过截图流程</source>
@@ -662,6 +662,10 @@
         <message>
             <source>已锁屏，回溯缓冲已清空</source>
             <translation>Screen locked; the rewind buffer was cleared</translation>
+        </message>
+        <message>
+            <source>桌面已还原，但清场标记没有清掉；下次启动会再试一次恢复</source>
+            <translation>The desktop has been restored, but the scene-clear marker could not be removed; the next launch will try restoring once more.</translation>
         </message>
         <message>
             <source>先导出或放弃这次记录</source>
@@ -5560,8 +5564,8 @@
             <translation>Modifiers alone can't be a global hotkey: mask 0x{:X}. Use only combinations of Ctrl, Alt, Shift and Win.</translation>
         </message>
         <message>
-            <source>清场没能让开其他窗口，桌面保持原样。窗口挡着时可以直接框选要截的那一块</source>
-            <translation>Clearing the scene could not move other windows aside, so the desktop is unchanged. If a window is in the way, drag-select the area you want to capture directly.</translation>
+            <source>清场没能让开其他窗口，桌面保持原样。可以改用普通框选截图</source>
+            <translation>Clearing the scene could not move other windows aside, so the desktop is unchanged. You can switch to a normal region capture instead.</translation>
         </message>
         <message>
             <source>还原窗口没有成功。按一次 Win+D 取回窗口</source>

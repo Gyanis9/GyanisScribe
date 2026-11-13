@@ -251,17 +251,23 @@ namespace GyanisScribe
         /**
          * @brief 清场标记要先落盘再动平台：平台清场进行中就该能读回标记
          * @details 标记写在平台动作之后，清场中途被强杀就没人知道桌面处于清场态；
-         *          假集成在 setSceneCleared(true) 里当场查配置，钉的是这一次调用的先手。
+         *          假集成在 setSceneCleared(true) 里当场查配置，钉的是「写标记并 sync」先于这一次调用。
          */
         TEST_F(SceneCleanupGuardTest, ClearWritesTheMarkerBeforeTouchingThePlatform)
         {
             SceneClearIntegrationStub integration;
-            App::SceneCleanupGuard    guard{integration, *m_settings};
+            FailingMarkerSettingsStub settings;
+            App::SceneCleanupGuard    guard{integration, settings};
             QString                   markerDuringClear;
-            integration.beforeClear = [this, &markerDuringClear] { markerDuringClear = marker(); };
+            integration.beforeClear = [&settings, &markerDuringClear]
+            {
+                markerDuringClear = settings.markerText;
+                EXPECT_GE(settings.syncCalls, 1) << "标记还停在内存里没落盘：清场中途被强杀时配置里读不到标记";
+            };
 
             ASSERT_TRUE(guard.clear().has_value());
             EXPECT_FALSE(markerDuringClear.isEmpty()) << "平台清场开始时标记还没写：清场中途被强杀就没人恢复桌面";
+            EXPECT_GE(settings.syncCalls, 1) << "清场成功后标记没有落过盘";
         }
 
         /**
@@ -282,10 +288,11 @@ namespace GyanisScribe
         }
 
         /**
-         * @brief 清场失败不写标记，并补发一次恢复把半边动作撤掉
-         * @details 平台可能已经动了一半（藏了图标、发了显示桌面），失败路径不能把桌面留在半截。
+         * @brief 清场失败要补发一次恢复；撤销成功才把先写下的标记删掉
+         * @details 标记在动平台之前就已写下，平台可能已经最小化了一半窗口，
+         *          失败路径不能把桌面留在半截；撤回去了才算这次没清成，标记也要跟着删掉。
          */
-        TEST_F(SceneCleanupGuardTest, FailedClearDoesNotWriteMarkerAndUndoesThePlatformAction)
+        TEST_F(SceneCleanupGuardTest, FailedClearUndoesThePlatformActionAndDropsTheMarker)
         {
             SceneClearIntegrationStub integration;
             integration.failOnClear = true;
@@ -295,10 +302,37 @@ namespace GyanisScribe
             ASSERT_FALSE(cleared.has_value()) << "平台回了失败，clear() 不该当成清场成功";
             EXPECT_EQ(cleared.error().message, "替身：清场没有生效") << "原错误该原样交回";
             EXPECT_FALSE(guard.isCleared());
-            EXPECT_TRUE(marker().isEmpty()) << "清场失败却写了标记：下次启动会去恢复一个没发生的清场";
+            EXPECT_TRUE(marker().isEmpty()) << "清场失败且撤销成功，标记却没删：下次启动会去恢复一场没发生的清场";
             ASSERT_EQ(integration.calls.size(), std::size_t{2});
             EXPECT_TRUE(integration.calls[0]);
             EXPECT_FALSE(integration.calls[1]) << "清场失败没有补发一次恢复：半边动作留在了桌面上";
+        }
+
+        /**
+         * @brief 清场失败且撤销也失败时标记必须留住，析构也不再补恢复
+         * @details 两次平台动作都失败，桌面可能停在半清场态；标记是下次启动唯一能回收这份状态的线索。
+         *          内存里没记成清场，析构没有理由再对平台发第三次恢复。
+         */
+        TEST_F(SceneCleanupGuardTest, FailedClearAndFailedUndoKeepTheMarkerForNextLaunch)
+        {
+            SceneClearIntegrationStub integration;
+            integration.failOnClear   = true;
+            integration.failOnRestore = true;
+
+            {
+                App::SceneCleanupGuard guard{integration, *m_settings};
+                const auto             cleared = guard.clear();
+                ASSERT_FALSE(cleared.has_value()) << "平台回了失败，clear() 不该当成清场成功";
+                EXPECT_EQ(cleared.error().message, "替身：清场没有生效") << "原错误该原样交回";
+                EXPECT_FALSE(guard.isCleared()) << "清场没成却把内存状态记成已清场";
+                EXPECT_FALSE(marker().isEmpty()) << "撤销也失败却把标记删了：半清场态没人认领";
+                ASSERT_EQ(integration.calls.size(), std::size_t{2});
+                EXPECT_TRUE(integration.calls[0]);
+                EXPECT_FALSE(integration.calls[1]) << "清场失败没有补发一次恢复";
+            }
+
+            EXPECT_EQ(integration.calls.size(), std::size_t{2}) << "守卫没有清场态，析构不该再发第三次恢复";
+            EXPECT_FALSE(marker().isEmpty()) << "析构把留给下次启动的标记清掉了";
         }
 
         /**
@@ -359,7 +393,8 @@ namespace GyanisScribe
                 ASSERT_TRUE(guard.clear().has_value());
                 const auto restored = guard.restore();
                 ASSERT_FALSE(restored.has_value()) << "清标记失败，restore() 不该当成完整成功";
-                EXPECT_EQ(restored.error().message, "替身：标记清不掉") << "清标记的失败原因该原样交回";
+                EXPECT_EQ(restored.error().message, "桌面已还原，但清场标记没有清掉；下次启动会再试一次恢复") << "桌面已还原这一事实没写进原因";
+                EXPECT_EQ(restored.error().code, Base::ErrorCode::FileWriteFailed) << "错误码该沿用配置写入失败那一档";
                 EXPECT_FALSE(settings.markerText.isEmpty()) << "恢复时清标记失败却把标记丢了：下次启动不会再补恢复";
                 EXPECT_FALSE(guard.isCleared()) << "平台已经还原，内存状态仍报清场";
             }

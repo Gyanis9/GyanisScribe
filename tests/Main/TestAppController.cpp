@@ -978,7 +978,7 @@ namespace GyanisScribe
     /**
      * @brief 钉住收场恢复失败时把两条手动出路说给用户
      * @details 平台恢复失败而收场处只说一句原因，用户面对的是一张没有图标、窗口也没回来的桌面；
-     *          提示要同时给出 Win+D 与「显示桌面图标」这两步。
+     *          提示要给出 Win+D 的条件句与「显示桌面图标」这两步。
      */
     TEST_F(AppControllerFixture, SceneClearRestoreFailureShowsManualSteps)
     {
@@ -997,7 +997,7 @@ namespace GyanisScribe
 
         ASSERT_EQ(m_integration->sceneClearCalls.size(), std::size_t{2}) << "取消之后没把恢复交给平台";
         EXPECT_FALSE(m_integration->sceneClearCalls[1]) << "取消之后平台收到的不是恢复";
-        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("Win+D")); })) << "恢复失败没给出「按一次 Win+D」这条手动出路";
+        EXPECT_TRUE(waitUntil([&] { return newToastText(before).contains(QStringLiteral("若窗口没有回来")); })) << "恢复失败没给出「若窗口没有回来，按一次 Win+D」这条条件出路";
         EXPECT_TRUE(newToastText(before).contains(QStringLiteral("显示桌面图标"))) << "恢复失败没给出重新勾选「显示桌面图标」这条手动出路";
     }
 

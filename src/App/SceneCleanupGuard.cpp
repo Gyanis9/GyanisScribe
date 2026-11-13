@@ -1,6 +1,7 @@
 #include "App/SceneCleanupGuard.h"
 
 #include "Base/Logger.h"
+#include "Base/Text.h"
 #include "Core/Settings/ISettingsStore.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Platform/IPlatformIntegration.h"
@@ -56,9 +57,11 @@ namespace GyanisScribe::App
             // 平台可能已经动了一半：补一次恢复把桌面撤回去，原错误交回给调用方说明原因
             if (const auto undone = m_integration.setSceneCleared(false); !undone)
             {
-                GyanisScribe::Base::Logger::warning(std::format("清场失败后撤销半边动作也没成：{}", undone.error().message));
+                // 撤销也没成，桌面可能停在半清场态：标记必须留着，下次启动才有人回收这一场
+                GyanisScribe::Base::Logger::warning(std::format("清场失败后撤销也没成，保留标记等下次启动恢复：{}", undone.error().message));
+                return std::unexpected(cleared.error());
             }
-            // 这次没清成，标记不能留给下次启动去恢复一场没发生的清场
+            // 撤回去了才算这次没清成：标记不能留给下次启动去恢复一场没发生的清场
             if (const auto dropped = m_settings.setValue(GyanisScribe::Core::kSceneClearMarker, QVariant{}); !dropped)
             {
                 GyanisScribe::Base::Logger::warning(std::format("清场没成，标记也没清掉：{}", dropped.error().message));
@@ -91,7 +94,8 @@ namespace GyanisScribe::App
         m_cleared = false;
         if (const auto dropped = m_settings.setValue(GyanisScribe::Core::kSceneClearMarker, QVariant{}); !dropped)
         {
-            return std::unexpected(dropped.error());
+            // 桌面已经还原，只有标记没写掉：文案要说清这一点，协调器加上前缀才不会把已还原说成没恢复
+            return std::unexpected(GyanisScribe::Base::Error{dropped.error().code, GyanisScribe::Base::uiTextUtf8("桌面已还原，但清场标记没有清掉；下次启动会再试一次恢复")});
         }
         m_settings.sync();
         return {};

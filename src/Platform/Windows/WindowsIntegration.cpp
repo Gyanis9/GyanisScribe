@@ -74,7 +74,7 @@ namespace
         const auto failed = [minimize]
         {
             // 两条文案各走一次 uiTextUtf8 字面量：并进条件表达式合成一条，翻译目录就抽不到
-            const auto reason = minimize ? GyanisScribe::Base::uiTextUtf8("清场没能让开其他窗口，桌面保持原样。窗口挡着时可以直接框选要截的那一块")
+            const auto reason = minimize ? GyanisScribe::Base::uiTextUtf8("清场没能让开其他窗口，桌面保持原样。可以改用普通框选截图")
                                          : GyanisScribe::Base::uiTextUtf8("还原窗口没有成功。按一次 Win+D 取回窗口");
             return std::unexpected(Error{ErrorCode::PlatformUnsupported, reason});
         };

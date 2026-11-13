@@ -206,12 +206,12 @@ namespace GyanisScribe::App
             if (const auto restored = m_sceneGuard->restore(); !restored)
             {
                 GyanisScribe::Base::Logger::warning(std::format("清场兜底恢复未完成：{}", restored.error().message));
-                emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(
-                                                              GyanisScribe::Base::uiTextUtf8(
-                                                                      "桌面没有完全恢复：{}。按一次 Win+D 取回窗口；桌面图标可在桌面右键 → 查看里重新勾选「显示桌面图标」"),
-                                                              restored.error().message)
-                                                              .c_str()),
-                                    GyanisScribe::Gui::ToastKind::Danger);
+                emit messageForUser(
+                        QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("恢复清场时没有完全成功：{}。若窗口没有回来，按一次 Win+D；"
+                                                                                                      "桌面图标仍不显示时，可在桌面右键 → 查看里重新勾选「显示桌面图标」"),
+                                                                       restored.error().message)
+                                                  .c_str()),
+                        GyanisScribe::Gui::ToastKind::Danger);
             }
         }
     }
@@ -540,12 +540,12 @@ namespace GyanisScribe::App
             {
                 if (const auto restored = m_sceneGuard->restore(); !restored)
                 {
-                    emit messageForUser(QString::fromUtf8(GyanisScribe::Base::uiFormat(
-                                                                  GyanisScribe::Base::uiTextUtf8(
-                                                                          "桌面没有完全恢复：{}。按一次 Win+D 取回窗口；桌面图标可在桌面右键 → 查看里重新勾选「显示桌面图标」"),
-                                                                  restored.error().message)
-                                                                  .c_str()),
-                                        GyanisScribe::Gui::ToastKind::Danger);
+                    emit messageForUser(
+                            QString::fromUtf8(GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("恢复清场时没有完全成功：{}。若窗口没有回来，按一次 Win+D；"
+                                                                                                          "桌面图标仍不显示时，可在桌面右键 → 查看里重新勾选「显示桌面图标」"),
+                                                                           restored.error().message)
+                                                      .c_str()),
+                            GyanisScribe::Gui::ToastKind::Danger);
                 }
             }
         }
