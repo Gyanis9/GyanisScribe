@@ -131,6 +131,13 @@ namespace GyanisScribe::Gui
         [[nodiscard]] Base::Expected<void> exportCsv(const std::filesystem::path &filePath);
 
         /**
+         * @brief 把表格导出成 XLSX
+         * @param filePath 目标路径
+         * @return 成功返回空；表不能导出或写盘失败时返回原因并点亮状态行
+         */
+        [[nodiscard]] Base::Expected<void> exportXlsx(const std::filesystem::path &filePath);
+
+        /**
          * @brief 结果里是否有可复制的 Markdown
          * @return 去掉首尾空白后仍有文字时为 true
          * @details 只看结果本身，不看窗口是否已显示：按钮是否摆出来由这份判断决定。
@@ -197,6 +204,9 @@ namespace GyanisScribe::Gui
         /// 问用户要路径并导出表格 CSV；取消对话框不提示
         void chooseAndExportCsv();
 
+        /// 问用户要路径并导出表格 XLSX；取消对话框不提示
+        void chooseAndExportXlsx();
+
         Q_DISABLE_COPY(OcrResultWindow)
 
         QImage                   m_image;                    ///< 原图，预览按它算方框
@@ -211,6 +221,7 @@ namespace GyanisScribe::Gui
         QWidget                 *m_contentActions = nullptr; ///< 内容动作行，两个动作都不可用时整行隐藏
         QToolButton             *m_copyMarkdown   = nullptr; ///< 复制 Markdown
         QToolButton             *m_exportCsv      = nullptr; ///< 导出表格 CSV
+        QToolButton             *m_exportXlsx     = nullptr; ///< 导出表格 XLSX
         QComboBox               *m_language       = nullptr; ///< 语言下拉，取值来自后端词表
         int                      m_lineIndex      = -1;      ///< 当前定位的行下标，-1 表示不圈任何行
         std::optional<QRect>     m_highlight;                ///< 当前行在预览里的方框

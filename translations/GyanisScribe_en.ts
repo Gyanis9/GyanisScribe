@@ -3240,6 +3240,10 @@
             <translation>Export table CSV</translation>
         </message>
         <message>
+            <source>导出表格 XLSX</source>
+            <translation>Export table XLSX</translation>
+        </message>
+        <message>
             <source>复制全部</source>
             <translation>Copy all</translation>
         </message>
@@ -3322,6 +3326,18 @@
         <message>
             <source>已导出表格 CSV：</source>
             <translation>Exported table CSV: </translation>
+        </message>
+        <message>
+            <source>Excel 工作簿 (*.xlsx)</source>
+            <translation>Excel workbooks (*.xlsx)</translation>
+        </message>
+        <message>
+            <source>导出表格 XLSX 失败：{}。请更换输出目录后重试。</source>
+            <translation>Exporting the table XLSX failed: {}. Pick another directory and try again.</translation>
+        </message>
+        <message>
+            <source>已导出表格 XLSX：</source>
+            <translation>Exported table XLSX: </translation>
         </message>
         <message>
             <source>取色器</source>

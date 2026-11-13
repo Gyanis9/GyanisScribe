@@ -577,3 +577,21 @@ TEST_F(OcrResultWindowFixture, WindowIconUsesTheBrandMark)
     ASSERT_FALSE(icon.isNull()) << "识别结果窗没有窗口图标";
     EXPECT_TRUE(icon.availableSizes().contains(QSize(512, 512))) << "结果窗没走品牌入口：用的还是界面图标";
 }
+
+/// 钉住 XLSX 按钮：对象名、随表格可用性一起显隐、直接导出能落盘
+TEST_F(OcrResultWindowFixture, ExposesAnXlsxExportAlongsideCsv)
+{
+    auto  window = makeWindow(makeTableResult());
+    auto *xlsx   = window->findChild<QToolButton *>(QStringLiteral("ocrExportXlsx"));
+    auto *csv    = window->findChild<QToolButton *>(QStringLiteral("ocrExportCsv"));
+    ASSERT_NE(xlsx, nullptr) << "结果窗没有「导出表格 XLSX」按钮";
+    ASSERT_NE(csv, nullptr);
+    EXPECT_EQ(xlsx->isHidden(), csv->isHidden()) << "XLSX 与 CSV 的可用性不同步";
+
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const auto path = std::filesystem::path{directory.path().toStdWString()} / "table.xlsx";
+    ASSERT_TRUE(window->exportXlsx(path).has_value());
+    EXPECT_TRUE(std::filesystem::exists(path));
+    EXPECT_GT(std::filesystem::file_size(path), 0U);
+}
