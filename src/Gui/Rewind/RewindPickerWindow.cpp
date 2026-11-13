@@ -4,6 +4,7 @@
 #include "Gui/Controls/Button.h"
 #include "Gui/Controls/ListWidget.h"
 
+#include <QBrush>
 #include <QCloseEvent>
 #include <QColor>
 #include <QEvent>
@@ -15,6 +16,7 @@
 #include <QListView>
 #include <QListWidget>
 #include <QPainter>
+#include <QPalette>
 #include <QPen>
 #include <QPixmap>
 #include <QPushButton>
@@ -26,6 +28,8 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <optional>
+#include <utility>
 
 namespace
 {
@@ -115,6 +119,23 @@ namespace GyanisScribe::Gui
         header->addWidget(m_status);
         header->addStretch(1);
 
+        m_rangeLabel = new QLabel{this};
+        m_rangeLabel->setObjectName(QStringLiteral("rewindRange"));
+        header->addWidget(m_rangeLabel);
+
+        m_exportClip = new Button{GyanisScribe::Base::uiText("导出片段…"), this};
+        m_exportClip->setObjectName(QStringLiteral("rewindExportClip"));
+        m_exportClip->setEnabled(false);
+        header->addWidget(m_exportClip);
+        connect(m_exportClip, &QPushButton::clicked, this,
+                [this]
+                {
+                    if (const auto range = validRange(); range.has_value())
+                    {
+                        emit clipRequested(range->first, range->second);
+                    }
+                });
+
         auto *cancel = new Button{GyanisScribe::Base::uiText("取消"), this};
         cancel->setObjectName(QStringLiteral("rewindCancel"));
         header->addWidget(cancel);
@@ -145,6 +166,10 @@ namespace GyanisScribe::Gui
     void RewindPickerWindow::showFrames(const std::vector<Core::RewindFrameView> &frames, const QRect &screenAvailable, const QString &screenName, const bool paused,
                                         const QString &pauseReason)
     {
+        // 新一批样本的编号与上一批没有对应关系，旧标记留着会把区间套到不相干的帧上
+        m_rangeStart.reset();
+        m_rangeEnd.reset();
+
         m_list->clear();
         if (frames.empty())
         {
@@ -174,6 +199,7 @@ namespace GyanisScribe::Gui
                     new QListWidgetItem{QIcon{composeThumbnail(frame.thumbnail, iconBox, frame.isCandidate)}, frame.capturedAt.toString(QStringLiteral("HH:mm:ss.zzz")), m_list};
             item->setData(Qt::UserRole, QVariant::fromValue(frame.id));
             item->setData(kCandidateRole, frame.isCandidate);
+            item->setData(kCapturedAtMsRole, frame.capturedAt.toMSecsSinceEpoch());
             if (frame.isCandidate)
             {
                 item->setToolTip(GyanisScribe::Base::uiText("候选帧：画面或前台窗口发生变化"));
@@ -190,6 +216,7 @@ namespace GyanisScribe::Gui
             }
         }
         m_list->setCurrentRow(current);
+        refreshRange();
         m_status->setText(paused ? GyanisScribe::Base::uiText("回溯缓冲已暂停：%1").arg(pauseReason) : GyanisScribe::Base::uiText("回溯缓冲已暂停"));
         setWindowTitle(GyanisScribe::Base::uiText("回溯截图 · %1").arg(screenName));
 
@@ -223,6 +250,12 @@ namespace GyanisScribe::Gui
                 return;
             case Qt::Key_End:
                 m_list->setCurrentRow(m_list->count() - 1);
+                return;
+            case Qt::Key_BracketLeft:
+                markRangeBoundary(true);
+                return;
+            case Qt::Key_BracketRight:
+                markRangeBoundary(false);
                 return;
             case Qt::Key_Return:
             case Qt::Key_Enter:
@@ -298,5 +331,92 @@ namespace GyanisScribe::Gui
         }
         const int next = std::clamp(m_list->currentRow() + delta, 0, m_list->count() - 1);
         m_list->setCurrentRow(next);
+    }
+
+    std::optional<quint64> RewindPickerWindow::rangeStartForTesting() const
+    {
+        if (const auto range = validRange(); range.has_value())
+        {
+            return range->first;
+        }
+        return m_rangeStart;
+    }
+
+    std::optional<quint64> RewindPickerWindow::rangeEndForTesting() const
+    {
+        if (const auto range = validRange(); range.has_value())
+        {
+            return range->second;
+        }
+        return m_rangeEnd;
+    }
+
+    void RewindPickerWindow::markRangeBoundary(const bool start)
+    {
+        const int row = m_list->currentRow();
+        if (row < 0 || row >= m_list->count())
+        {
+            return;
+        }
+        const auto id = static_cast<quint64>(m_list->item(row)->data(Qt::UserRole).toULongLong());
+        if (start)
+        {
+            m_rangeStart = id;
+        } else
+        {
+            m_rangeEnd = id;
+        }
+        refreshRange();
+    }
+
+    std::optional<std::pair<quint64, quint64>> RewindPickerWindow::validRange() const
+    {
+        if (!m_rangeStart.has_value() || !m_rangeEnd.has_value())
+        {
+            return std::nullopt;
+        }
+        const auto [low, high] = std::minmax(*m_rangeStart, *m_rangeEnd);
+        return std::pair<quint64, quint64>{low, high};
+    }
+
+    void RewindPickerWindow::refreshRange()
+    {
+        const auto range = validRange();
+        for (int row = 0; row < m_list->count(); ++row)
+        {
+            auto      *item   = m_list->item(row);
+            const auto id     = static_cast<quint64>(item->data(Qt::UserRole).toULongLong());
+            const bool inside = range.has_value() && id >= range->first && id <= range->second;
+            item->setData(kRangeRole, inside);
+            // 空背景等于不涂：区间外的项要回到默认外观
+            item->setBackground(inside ? palette().highlight() : QBrush{});
+        }
+
+        const bool complete = range.has_value();
+        m_exportClip->setEnabled(complete);
+        if (!complete)
+        {
+            m_rangeLabel->setText(GyanisScribe::Base::uiText("按 [ 标起点、] 标终点"));
+            return;
+        }
+
+        int    frames  = 0;
+        qint64 firstMs = -1;
+        qint64 lastMs  = -1;
+        for (int row = 0; row < m_list->count(); ++row)
+        {
+            const auto *item = m_list->item(row);
+            const auto  id   = static_cast<quint64>(item->data(Qt::UserRole).toULongLong());
+            if (id < range->first || id > range->second)
+            {
+                continue;
+            }
+            ++frames;
+            const auto ms = item->data(kCapturedAtMsRole).toLongLong();
+            firstMs       = firstMs < 0 ? ms : firstMs;
+            lastMs        = ms;
+        }
+        const double seconds = frames >= 2 ? static_cast<double>(lastMs - firstMs) / 1000.0 : 0.0;
+        m_rangeLabel->setText(GyanisScribe::Base::uiText("已选 %1 帧 · %2 秒").arg(frames).arg(seconds, 0, 'f', 1));
     }
 } // namespace GyanisScribe::Gui

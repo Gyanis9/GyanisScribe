@@ -3880,6 +3880,10 @@
             <translation>Resume</translation>
         </message>
         <message>
+            <source>导出片段…</source>
+            <translation>Export clip…</translation>
+        </message>
+        <message>
             <source>← → 选择，Enter 确认，Esc 取消。下一步可拖框选区域，Ctrl+A 选整屏。</source>
             <translation>← → to choose, Enter to confirm, Esc to cancel. Next, drag to select a region, or press Ctrl+A for the whole screen.</translation>
         </message>
@@ -3894,6 +3898,14 @@
         <message>
             <source>回溯截图 · %1</source>
             <translation>Rewind · %1</translation>
+        </message>
+        <message>
+            <source>按 [ 标起点、] 标终点</source>
+            <translation>Press [ to mark the start, ] to mark the end</translation>
+        </message>
+        <message>
+            <source>已选 %1 帧 · %2 秒</source>
+            <translation>Selected %1 frames · %2 seconds</translation>
         </message>
         <message>
             <source>无法复制到剪贴板：</source>

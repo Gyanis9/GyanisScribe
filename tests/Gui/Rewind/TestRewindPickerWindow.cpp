@@ -8,6 +8,7 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QMouseEvent>
+#include <QObject>
 #include <QPixmap>
 #include <QPoint>
 #include <QPushButton>
@@ -23,6 +24,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <vector>
 
 using GyanisScribe::Core::RewindFrameView;
@@ -104,6 +106,33 @@ namespace
             frames.push_back(makeView(id, false));
         }
         return frames;
+    }
+
+    /// 造一扇选择器；用例经指针读测试口
+    std::unique_ptr<RewindPickerWindow> makeWindow()
+    {
+        return std::make_unique<RewindPickerWindow>();
+    }
+
+    /// 造 N 条样本：样本号从 1 起，抓帧时刻每秒一格
+    std::vector<RewindFrameView> makeViews(const quint64 count)
+    {
+        const QDateTime              start = QDateTime::currentDateTime();
+        std::vector<RewindFrameView> views;
+        views.reserve(static_cast<std::size_t>(count));
+        for (quint64 index = 0; index < count; ++index)
+        {
+            RewindFrameView view = makeView(index + 1, false);
+            view.capturedAt      = start.addMSecs(static_cast<qint64>(index) * 1000);
+            views.push_back(view);
+        }
+        return views;
+    }
+
+    /// 把按键直接投给选择器，用例不依赖窗口拿到焦点
+    void pressKey(QWidget &window, const Qt::Key key)
+    {
+        QTest::keyClick(&window, key);
     }
 } // namespace
 
@@ -397,4 +426,89 @@ TEST_F(RewindPickerFixture, PlacesBottomOrFlipsToTop)
 
     const QPoint clamped = RewindPickerWindow::positionFor(QRect{100, 100, 800, 600}, QSize{900, 100});
     EXPECT_EQ(clamped.x(), 100) << "比屏还宽的窗口应从左边贴齐，不能露出负坐标";
+}
+
+/**
+ * @brief 钉住 `[`/`]` 标起终点、顺序自动纠正与读数
+ * @details 先标终点再标起点是常见操作，端点顺序在这层就该纠正，不能让读数和导出把区间算反。
+ */
+TEST_F(RewindPickerFixture, BracketKeysMarkARangeAndFixTheOrder)
+{
+    auto window = makeWindow();
+    window->showFrames(makeViews(5), QRect{0, 0, 1920, 1080}, QStringLiteral("DISPLAY1"), false, QString());
+
+    auto *list = window->findChild<QListWidget *>(QStringLiteral("rewindFilmstrip"));
+    ASSERT_NE(list, nullptr);
+    list->setCurrentRow(3);
+    pressKey(*window, Qt::Key_BracketLeft);
+    EXPECT_EQ(window->rangeStartForTesting(), std::optional<quint64>{4}) << "起点没标在光标那一帧";
+    EXPECT_FALSE(window->rangeEndForTesting().has_value());
+
+    list->setCurrentRow(1);
+    pressKey(*window, Qt::Key_BracketRight);
+    ASSERT_TRUE(window->rangeStartForTesting().has_value());
+    ASSERT_TRUE(window->rangeEndForTesting().has_value());
+    EXPECT_EQ(*window->rangeStartForTesting(), quint64{2}) << "终点在起点之前时该自动交换";
+    EXPECT_EQ(*window->rangeEndForTesting(), quint64{4});
+
+    auto *range = window->findChild<QLabel *>(QStringLiteral("rewindRange"));
+    ASSERT_NE(range, nullptr);
+    EXPECT_TRUE(range->text().contains(QStringLiteral("3"))) << "读数没报帧数：" << range->text().toStdString();
+}
+
+/**
+ * @brief 钉住范围高亮：区间内带角色、区间外不带
+ * @details 区间内外落成数据角色，涂色只是它的可见投影；端点本身也算在区间内。
+ */
+TEST_F(RewindPickerFixture, MarksTheRangeItems)
+{
+    auto window = makeWindow();
+    window->showFrames(makeViews(5), QRect{0, 0, 1920, 1080}, QStringLiteral("DISPLAY1"), false, QString());
+    auto *list = window->findChild<QListWidget *>(QStringLiteral("rewindFilmstrip"));
+    ASSERT_NE(list, nullptr);
+
+    list->setCurrentRow(1);
+    pressKey(*window, Qt::Key_BracketLeft);
+    list->setCurrentRow(3);
+    pressKey(*window, Qt::Key_BracketRight);
+
+    for (int row = 0; row < list->count(); ++row)
+    {
+        const bool inside = list->item(row)->data(RewindPickerWindow::kRangeRole).toBool();
+        EXPECT_EQ(inside, row >= 1 && row <= 3) << "第 " << row << " 行的范围标记不对";
+    }
+}
+
+/**
+ * @brief 钉住导出按钮：标记不完整时禁用，完整时启用并按纠正后的端点发信号
+ * @details 同一帧标两次也算标记完整，至少两帧由协调器再判。
+ */
+TEST_F(RewindPickerFixture, ExportButtonStaysDisabledUntilTwoFramesAreMarked)
+{
+    auto window = makeWindow();
+    window->showFrames(makeViews(5), QRect{0, 0, 1920, 1080}, QStringLiteral("DISPLAY1"), false, QString());
+    auto *list         = window->findChild<QListWidget *>(QStringLiteral("rewindFilmstrip"));
+    auto *exportButton = window->findChild<QPushButton *>(QStringLiteral("rewindExportClip"));
+    ASSERT_NE(list, nullptr);
+    ASSERT_NE(exportButton, nullptr);
+    EXPECT_FALSE(exportButton->isEnabled()) << "还没标范围时不该能导出";
+
+    list->setCurrentRow(2);
+    pressKey(*window, Qt::Key_BracketLeft);
+    EXPECT_FALSE(exportButton->isEnabled()) << "只有起点时不该能导出";
+
+    pressKey(*window, Qt::Key_BracketRight);
+    EXPECT_TRUE(exportButton->isEnabled());
+
+    quint64 from = 0;
+    quint64 to   = 0;
+    QObject::connect(window.get(), &RewindPickerWindow::clipRequested,
+                     [&](const quint64 left, const quint64 right)
+                     {
+                         from = left;
+                         to   = right;
+                     });
+    exportButton->click();
+    EXPECT_EQ(from, quint64{3});
+    EXPECT_EQ(to, quint64{3}) << "同一帧标两次：端点相等但按钮该允许（协调器再判至少两帧）";
 }

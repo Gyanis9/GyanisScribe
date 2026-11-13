@@ -19,10 +19,14 @@
 
 #include <vector>
 
+#include <optional>
+#include <utility>
+
 class QCloseEvent;
 class QKeyEvent;
 class QLabel;
 class QListWidget;
+class QPushButton;
 
 namespace GyanisScribe::Gui
 {
@@ -37,6 +41,10 @@ namespace GyanisScribe::Gui
     public:
         /// 列表项数据里的候选标记角色
         static constexpr int kCandidateRole = Qt::UserRole + 1;
+        /// 列表项数据里的「在所选区间内」角色
+        static constexpr int kRangeRole = kCandidateRole + 1;
+        /// 列表项数据里的抓帧时刻（毫秒时间戳）
+        static constexpr int kCapturedAtMsRole = Qt::UserRole + 3;
 
         /**
          * @brief 算选择器该摆在哪儿
@@ -62,15 +70,28 @@ namespace GyanisScribe::Gui
          */
         void showFrames(const std::vector<Core::RewindFrameView> &frames, const QRect &screenAvailable, const QString &screenName, bool paused, const QString &pauseReason);
 
+        /**
+         * @brief 取当前标记区间的起点
+         * @return 两端都标过时给交换后的较小样本号；只标了起点时给该起点；没标时为空
+         */
+        [[nodiscard]] std::optional<quint64> rangeStartForTesting() const;
+        /**
+         * @brief 取当前标记区间的终点
+         * @return 两端都标过时给交换后的较大样本号；只标了终点时给该终点；没标时为空
+         */
+        [[nodiscard]] std::optional<quint64> rangeEndForTesting() const;
+
     signals:
         /// 用户确认某一帧
         void frameChosen(quint64 id);
         /// 用户取消
         void dismissed();
+        /// 用户要导出当前区间
+        void clipRequested(quint64 fromId, quint64 toId);
 
     protected:
         /**
-         * @brief 键盘操作：左右与 Home/End 移动光标，回车确认，Esc 取消
+         * @brief 键盘操作：左右与 Home/End 移动光标，[ 与 ] 标起终点，回车确认，Esc 取消
          * @param event 键盘事件
          */
         void keyPressEvent(QKeyEvent *event) override;
@@ -97,9 +118,21 @@ namespace GyanisScribe::Gui
         void chooseCurrent();
         /// 按 delta 移动光标，夹在首尾之间
         void moveCurrent(int delta);
+        /// 把光标那一帧标成起点或终点，并刷新范围外观
+        void markRangeBoundary(bool start);
+        /// 按 m_rangeStart/m_rangeEnd 刷新区间外观、读数与按钮可用性
+        void refreshRange();
+        /// 区间内样本号的首尾（已纠正顺序）；不完整时为空
+        [[nodiscard]] std::optional<std::pair<quint64, quint64>> validRange() const;
 
-        QListWidget *m_list   = nullptr; ///< 胶片条
-        QLabel      *m_status = nullptr; ///< 暂停状态
-        bool         m_active = false;   ///< 是否处于一次展示中，保证取消只发一次
+        QListWidget *m_list       = nullptr; ///< 胶片条
+        QLabel      *m_status     = nullptr; ///< 暂停状态
+        QLabel      *m_rangeLabel = nullptr; ///< 「已选 N 帧 · x.x 秒」
+        QPushButton *m_exportClip = nullptr; ///< 导出片段…
+
+        std::optional<quint64> m_rangeStart; ///< 起点样本号
+        std::optional<quint64> m_rangeEnd;   ///< 终点样本号
+
+        bool m_active = false; ///< 是否处于一次展示中，保证取消只发一次
     };
 } // namespace GyanisScribe::Gui
