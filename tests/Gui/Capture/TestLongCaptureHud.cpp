@@ -167,3 +167,15 @@ TEST_F(LongCaptureHudFixture, PanelIsPaintedWithSquircleCorners)
     EXPECT_EQ(image.pixelColor(0, 0).alpha(), 0) << "控制条左上角不透明：方形底露出来了";
     EXPECT_EQ(image.pixelColor(hud.width() / 2, 2), GyanisScribe::Gui::activePalette().surface);
 }
+
+/**
+ * @brief 钉住控制条不抢目标窗口的焦点
+ * @details Windows 把滚轮发给焦点窗口：控制条一显示就激活自己，用户滚动的是控制条，
+ *          下面要截的页面一帧都不动。两条标志各管一段：窗口类型不许取焦点，显示时也不许激活。
+ */
+TEST_F(LongCaptureHudFixture, HudDoesNotTakeFocusFromTheWindowBeingScrolled)
+{
+    LongCaptureHud hud;
+    EXPECT_TRUE(hud.windowFlags().testFlag(Qt::WindowDoesNotAcceptFocus)) << "控制条会抢焦点，滚轮就落不到目标窗口";
+    EXPECT_TRUE(hud.testAttribute(Qt::WA_ShowWithoutActivating)) << "控制条显示时会激活自己";
+}

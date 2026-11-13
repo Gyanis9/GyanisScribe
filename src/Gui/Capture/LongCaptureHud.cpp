@@ -50,10 +50,13 @@ namespace GyanisScribe::Gui
 
     LongCaptureHud::LongCaptureHud(QWidget *parent) : QWidget(parent)
     {
-        // 工具窗 + 不吃焦点：滚动的是别的窗口，控制条抢了焦点就滚不动了
+        // 工具窗 + 置顶 + 不吃焦点：滚动的是别的窗口，Windows 把滚轮发给焦点窗口，
+        // 控制条一抢到焦点，下面要截的页面就一帧都滚不动
         setWindowTitle(GyanisScribe::Base::uiText("长截图控制条"));
         setAccessibleName(GyanisScribe::Base::uiText("长截图控制条"));
-        setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
+        setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::WindowDoesNotAcceptFocus);
+        // 显示这一下同样不许激活自己：激活同样会把焦点从目标窗口拿走，滚轮跟着就走
+        setAttribute(Qt::WA_ShowWithoutActivating);
         setObjectName(QStringLiteral("hudRoot"));
         // 圆角外不能落系统底色：面板由 paintEvent 画，窗口本身透明
         setAttribute(Qt::WA_TranslucentBackground);
