@@ -74,15 +74,13 @@ namespace GyanisScribe::Platform
         [[nodiscard]] Base::Expected<std::vector<ScreenWindow>> screenWindows() const override;
 
         /**
-         * @brief 隐藏/恢复桌面图标并切换一次「显示桌面」，见 IPlatformIntegration::setSceneCleared()
+         * @brief 隐藏/恢复桌面图标并让开/还原其他窗口，见 IPlatformIntegration::setSceneCleared()
          * @param cleared true 进入清场，false 恢复
-         * @return 成功返回空载荷；找不到桌面视图时返回中文原因，此时不碰「显示桌面」
+         * @return 成功返回空载荷；找不到桌面视图时返回中文原因，此时不碰其他窗口
          * @details 覆写接口的默认实现（默认一律回「本平台不支持」）：图标走 SHELLDLL_DefView 下
-         *          SysListView32 的可见性，其他窗口交给 Shell_TrayWnd 的「显示桌面」命令。
-         *          恢复时图标本来就可见，说明清场早已被撤掉或是重启后补恢复（shell 的「显示桌面」
-         *          开关不跨重启保留）：只保证图标可见，不再发「显示桌面」，否则会把恢复翻成全部最小化。
-         *          除此之外切换语义是发一次命令就翻转一次：清场发一次、恢复再发一次；用户中途自己按了 Win+D
-         *          会让这一次翻转提前发生，下一次清场反向——这是系统那条命令本身的开关语义。
+         *          SysListView32 的可见性，其他窗口交给 Shell.Application 的 MinimizeAll 与 UndoMinimizeALL。
+         * @note 不用 ToggleDesktop 或 Shell_TrayWnd 的 WM_COMMAND 419：Windows 11 26300 实测清场与恢复之间
+         *       只要出现新窗口（遮罩、标注窗就是），再切一次不是还原而是又最小化一遍。
          */
         [[nodiscard]] Base::Expected<void> setSceneCleared(bool cleared) override;
 

@@ -66,6 +66,41 @@ namespace
         return DwmGetWindowAttribute(window, DWMWA_CLOAKED, &cloaked, sizeof(cloaked)) == S_OK && cloaked != 0;
     }
 
+    /// 让开全部窗口 / 撤销这一次让开：IShellDispatch 的 MinimizeAll 与 UndoMinimizeALL 是一对明确语义的命令
+    /// @note 不用 ToggleDesktop 与 WM_COMMAND 419：本机实测清场与恢复之间只要出现新窗口（遮罩、标注窗就是），
+    ///       再切一次不是还原而是又最小化一遍
+    [[nodiscard]] GyanisScribe::Base::Expected<void> shellMinimizeAll(const bool minimize)
+    {
+        const auto failed = [minimize]
+        {
+            return std::unexpected(Error{ErrorCode::PlatformUnsupported,
+                                         GyanisScribe::Base::uiTextUtf8(minimize ? "清场没能让开其他窗口，会照常打开框选遮罩；若窗口挡着，可以直接框选要截的那一块"
+                                                                                 : "还原窗口没有成功。可以按一次 Win+D 取回窗口")});
+        };
+        CLSID shellClass{};
+        if (FAILED(CLSIDFromProgID(L"Shell.Application", &shellClass)))
+        {
+            return failed();
+        }
+        Microsoft::WRL::ComPtr<IDispatch> shell;
+        if (FAILED(CoCreateInstance(shellClass, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&shell))))
+        {
+            return failed();
+        }
+        LPOLESTR methodName = const_cast<LPOLESTR>(minimize ? L"MinimizeAll" : L"UndoMinimizeALL");
+        DISPID   method     = 0;
+        if (FAILED(shell->GetIDsOfNames(IID_NULL, &methodName, 1, LOCALE_USER_DEFAULT, &method)))
+        {
+            return failed();
+        }
+        DISPPARAMS noArguments{};
+        if (FAILED(shell->Invoke(method, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_METHOD, &noArguments, nullptr, nullptr, nullptr)))
+        {
+            return failed();
+        }
+        return {};
+    }
+
     /// 找「光标下那扇窗」要用的现场：z 序扫到第一扇算数的就停
     struct AnchorSearch
     {
@@ -631,24 +666,15 @@ namespace GyanisScribe::Platform
             return std::unexpected(Base::Error{Base::ErrorCode::PlatformUnsupported,
                                                GyanisScribe::Base::uiTextUtf8("找不到桌面视图，清场没有生效。可以直接框选要截的那一块")});
         }
-        // 图标可见性是可读回的那一半状态：恢复时图标本来就可见，说明清场早已被撤掉，
-        // 也可能是重启后补恢复——shell 的「显示桌面」开关不跨重启保留，重启后桌面本来就全是可见的。
-        // 这时只保证图标可见，再发 419 会把恢复翻成把所有窗口最小化。
-        // 窗口那一半没有可读的原始状态，交给用户按一次 Win+D 取回；清场那一半行为不变，照样发一次 419
-        const bool iconsWereVisible = IsWindowVisible(icons) != FALSE;
-        ShowWindow(icons, cleared ? SW_HIDE : SW_SHOW);
-        if (!cleared && iconsWereVisible)
+        if (cleared)
         {
-            return {};
+            ShowWindow(icons, SW_HIDE);
+            return shellMinimizeAll(true);
         }
-
-        // 419 是 Shell_TrayWnd 上「显示桌面」那条命令的编号：系统没有公开记档，这个编号沿用至今。
-        // 交给 shell 翻转比自己逐扇最小化再逐扇还原可靠——窗口的原始状态仍归它自己记着
-        if (const HWND tray = FindWindowW(L"Shell_TrayWnd", nullptr); tray != nullptr)
-        {
-            SendMessageW(tray, WM_COMMAND, static_cast<WPARAM>(419), 0);
-        }
-        return {};
+        // 恢复把图标放回来，再撤销这一次「最小化全部」：重启后没有可撤销的那一次，
+        // 这条命令什么也不做，不会像切换语义那样反而把窗口全收起来
+        ShowWindow(icons, SW_SHOW);
+        return shellMinimizeAll(false);
     }
 
     IUIAutomation *WindowsIntegration::uiAutomation() const
