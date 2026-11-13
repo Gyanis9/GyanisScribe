@@ -8,6 +8,7 @@
 #include "App/TrayController.h"
 #include "Base/Text.h"
 #include "Core/Annotation/AnnotationPalette.h"
+#include "Core/Capture/SourceInfo.h"
 #include "Gui/Annotation/AnnotationToolbar.h"
 #include "Gui/Annotation/AnnotationToolbarGeometry.h"
 #include "Core/BugReport/BugReport.h"
@@ -28,6 +29,7 @@
 #include "Gui/Pin/PinManager.h"
 #include "Gui/Pin/PinWindow.h"
 #include "Gui/Record/RecordingHud.h"
+#include "Gui/Share/ShareDialog.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Settings/SettingsStore.h"
@@ -36,6 +38,7 @@
 #include "Gui/Theme/ThemeManager.h"
 
 #include <QApplication>
+#include <QComboBox>
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QFont>
@@ -352,6 +355,60 @@ namespace
             shootBugReportState(dialog, outputDirectory, prefix + "bug-report-unavailable");
         }
     }
+
+    /**
+     * @brief 拍分享窗：当前模板一张，其余内置模板各一张
+     * @param settings 配置存储（分享窗构造要从这里读自定义模板与上次选择）
+     * @param outputDirectory 出图目录
+     * @param dialogSize 拍之前显式给的逻辑尺寸：出图看的是版面，不该被离屏屏的尺寸带偏
+     * @param prefix 图名前缀（主题档用）
+     * @details 模板切换入口是窗内的下拉（对象名 shareTemplateCombo），按数据 id 逐档切换各拍一张。
+     *          预览是 50 毫秒防抖渲染的，换档后必须 flushPreviewForTesting，否则抓到的是上一档的预览。
+     */
+    void shootShareFaces(GyanisScribe::Core::SettingsStore &settings, const std::filesystem::path &outputDirectory, const QSize &dialogSize, const std::string &prefix)
+    {
+        GyanisScribe::Core::CaptureSourceInfo source;
+        source.processName = QStringLiteral("notepad.exe");
+        source.windowTitle = QStringLiteral("无标题 - 记事本");
+        source.screenName  = QStringLiteral("DISPLAY2");
+        source.capturedAt  = QDateTime::currentDateTime();
+
+        // 拍之前先显式回到默认模板：上次选择会从设置里恢复，第二档主题不该接着上一轮最后切到的模板
+        static_cast<void>(settings.setValue(GyanisScribe::Core::kShareLastTemplate, QStringLiteral("light")));
+
+        const auto image = syntheticScreen(QSize{800, 500});
+        GyanisScribe::Gui::ShareDialog dialog{image, source, settings};
+        dialog.resize(dialogSize);
+        dialog.show();
+
+        auto *combo = dialog.findChild<QComboBox *>(QStringLiteral("shareTemplateCombo"));
+        if (combo == nullptr)
+        {
+            std::fprintf(stderr, "the share dialog has no template combo\n");
+            return;
+        }
+
+        const auto shootCurrent = [&](const std::string &name)
+        {
+            dialog.flushPreviewForTesting();
+            shoot(dialog, outputDirectory, (prefix + name).c_str());
+            const auto preview = dialog.previewImageForTesting();
+            std::printf("share template: %s preview=%dx%d\n", dialog.selectedTemplateId().toStdString().c_str(), preview.width(), preview.height());
+        };
+
+        shootCurrent("share-default");
+        // 其余内置模板：换档走下拉的 currentIndexChanged，与用户手点同一路
+        for (int index = 0; index < combo->count(); ++index)
+        {
+            const auto id = combo->itemData(index).toString();
+            if (id == QLatin1StringView{"light"})
+            {
+                continue;
+            }
+            combo->setCurrentIndex(index);
+            shootCurrent(std::format("share-{}", id.toStdString()));
+        }
+    }
 } // namespace
 
 int main(int argc, char *argv[])
@@ -649,6 +706,18 @@ int main(int argc, char *argv[])
             theme.applyFromSettings();
             shootBugReportFaces(outputDirectory, QSize{1000, 760}, std::format("theme-{}-", name));
             shootBugReportFaces(outputDirectory, QSize{704, 480}, std::format("theme-{}-small-", name));
+        }
+
+        // 面 8：分享窗——模板预览在明暗两档主题下的观感取证。模板切换入口只有窗内的下拉，四套内置模板逐个切一遍
+        for (const auto &[mode, name]: std::array<std::pair<const char *, const char *>, 2>{{{"Light", "light"}, {"Dark", "dark"}}})
+        {
+            if (const auto written = settings.setValue(GyanisScribe::Core::kThemeMode, QString::fromUtf8(mode)); !written)
+            {
+                std::fprintf(stderr, "failed to switch the theme\n");
+                return 1;
+            }
+            theme.applyFromSettings();
+            shootShareFaces(settings, outputDirectory, QSize{900, 700}, std::format("theme-{}-", name));
         }
     }
 
