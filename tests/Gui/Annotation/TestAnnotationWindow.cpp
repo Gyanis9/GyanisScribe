@@ -2812,3 +2812,32 @@ TEST_F(AnnotationWindowFixture, BugReportButtonEmitsTheRenderedImageAndKeepsTheW
     EXPECT_TRUE(window->isRoundActive());
     EXPECT_EQ(closed.count(), 0);
 }
+
+/**
+ * @brief 钉住长截图的自动发起：置了标记时载入底图后自己发一次，且只发一次
+ * @details 标记是一次性的：下一次普通载入不该再触发，否则每张截图都会弹一遍审核。
+ */
+TEST_F(AnnotationWindowFixture, AutoPrivacyOnLoadFiresOnceAndOnlyOnce)
+{
+    auto window       = makeWindow();
+    auto privacyCalls = 0;
+    QObject::connect(window.get(), &AnnotationWindow::privacyRequested, [&](const QImage &) { ++privacyCalls; });
+
+    window->setAutoPrivacyOnLoad(true);
+    window->startAnnotation(makeCanvas({200, 100}), QRect{0, 0, 1920, 1080}, QRect{0, 0, 200, 100});
+    QElapsedTimer watch;
+    watch.start();
+    while (privacyCalls == 0 && watch.elapsed() < 3'000)
+    {
+        QApplication::processEvents(QEventLoop::AllEvents, 10);
+    }
+    ASSERT_EQ(privacyCalls, 1) << "长截图落地后没有自动发起隐私打码";
+
+    // 第二次普通载入：标记已清，不该再发
+    window->startAnnotation(makeCanvas({200, 100}), QRect{0, 0, 1920, 1080}, QRect{0, 0, 200, 100});
+    for (int round = 0; round < 5; ++round)
+    {
+        QApplication::processEvents();
+    }
+    EXPECT_EQ(privacyCalls, 1) << "一次性标记没有清掉，第二张也被扫了";
+}
