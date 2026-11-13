@@ -379,6 +379,31 @@ namespace
     }
 
     /**
+     * @brief 钉住最小窗口宽下记忆库的两排动作都不出界
+     * @details 760 宽时导入与「从记忆库移除」会被右缘裁掉；设置窗的最小宽就是按这一页的两排动作抬到 840 的。
+     */
+    TEST_F(MainWindowFixture, MemoryActionsFitAtTheMinimumWindowWidth)
+    {
+        makeWindow();
+        m_window->setTrayMenuAvailable(true);
+        m_window->setMemoryEnabled(true);
+        m_window->open(MainWindowPage::Memory);
+        m_window->resize(m_window->minimumWidth(), m_window->minimumHeight());
+        QCoreApplication::processEvents();
+
+        auto *memory = m_window->findChild<GyanisScribe::Gui::MemoryView *>();
+        ASSERT_NE(memory, nullptr) << "记忆库页里没有记忆视图";
+        for (const auto *name: {"memoryImport", "memoryPin", "memoryOpenFile", "memoryOpenFolder", "memoryRetry", "memoryRemove", "memoryExclude", "memoryClear"})
+        {
+            auto *button = memory->findChild<QPushButton *>(QString::fromLatin1(name));
+            ASSERT_NE(button, nullptr) << name;
+            ASSERT_TRUE(button->isVisible()) << name << " 在最小宽下没有露出来";
+            const int right = button->mapTo(memory, QPoint{button->width(), 0}).x();
+            EXPECT_LE(right, memory->width()) << name << " 的右缘 " << right << " 超出记忆库视图 " << memory->width();
+        }
+    }
+
+    /**
      * @brief 钉住「进到记忆库页」的信号把导航行与 open() 两条路都算进来，且一次进入只报一次
      * @details 控制器靠这一条做清理与重读；只在 open() 里报的话，用户点导航行那一趟就没有人清理，
      *          已删的文件会一直挂在列表上。反过来两条路各报一次，就会清理两遍、提示两遍。

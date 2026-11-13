@@ -537,10 +537,11 @@ namespace GyanisScribe::Gui
     /// 数字字段的最大宽度：三到四位数加单位用不着半条表单
     inline constexpr int kNumericFieldMaximumWidth = 140;
 
-    /// 设置窗的默认尺寸与最小尺寸：最小宽度按内容实测后可能再抬高
+    /// 设置窗的默认尺寸与最小尺寸：最小宽度按内容实测后可能再抬高；
+    /// 最小宽与默认同档，是因为记忆库页的两排动作在 760 时已经挤到右缘
     inline constexpr int kSettingsWindowDefaultWidth  = 840;
     inline constexpr int kSettingsWindowDefaultHeight = 620;
-    inline constexpr int kSettingsWindowMinimumWidth  = 760;
+    inline constexpr int kSettingsWindowMinimumWidth  = 840;
     inline constexpr int kSettingsWindowMinimumHeight = 480;
 
     /// 页顶说明行的最大宽度：整窗宽的一行长句读起来要回头数，收到这一档就按行折
