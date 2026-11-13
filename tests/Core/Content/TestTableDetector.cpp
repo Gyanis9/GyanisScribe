@@ -244,3 +244,61 @@ TEST(TableDetector, EmptyAndDegenerateInputIsSafe)
     emptyLine.lines = {OcrLine{}};
     EXPECT_FALSE(detectTable(emptyLine).found);
 }
+
+namespace
+{
+    OcrLine makeCellLine(const int x, const int y, const QString &text, const int width = 40)
+    {
+        OcrLine       line;
+        const OcrWord word{text, QRect{x, y, width, 20}};
+        line.words.push_back(word);
+        line.boundingBox = word.boundingBox;
+        return line;
+    }
+} // namespace
+
+TEST(TableDetector, MergesCellPerLineColumnMajorIntoSingleTable)
+{
+    // WinRT 对带框线表格按列优先、每格一行输出：同一视觉行的两格纵带重叠
+    const auto result = makeResult({
+            makeCellLine(10, 10, QStringLiteral("A")),
+            makeCellLine(10, 40, QStringLiteral("1")),
+            makeCellLine(100, 10, QStringLiteral("B")),
+            makeCellLine(100, 40, QStringLiteral("2")),
+            makeCellLine(10, 70, QStringLiteral("3")),
+            makeCellLine(100, 70, QStringLiteral("4")),
+    });
+    const auto table  = detectTable(result);
+
+    ASSERT_TRUE(table.found) << "每格一行的表格没有被认出来";
+    EXPECT_FALSE(table.complex);
+    EXPECT_EQ(table.rows, 3);
+    EXPECT_EQ(table.columns, 2);
+    ASSERT_EQ(table.cells.size(), 3);
+    EXPECT_EQ(table.cells[0][0], QStringLiteral("A"));
+    EXPECT_EQ(table.cells[0][1], QStringLiteral("B"));
+    EXPECT_EQ(table.cells[2][0], QStringLiteral("3"));
+    EXPECT_EQ(table.cells[2][1], QStringLiteral("4"));
+    // 表覆盖的源行是全部 6 条 OCR 行
+    EXPECT_EQ(table.firstLine, 0);
+    EXPECT_EQ(table.lastLine, 5);
+}
+
+TEST(TableDetector, CellPerLineRowMajorMatchesColumnMajor)
+{
+    const auto result = makeResult({
+            makeCellLine(10, 10, QStringLiteral("A")),
+            makeCellLine(100, 10, QStringLiteral("B")),
+            makeCellLine(10, 40, QStringLiteral("1")),
+            makeCellLine(100, 40, QStringLiteral("2")),
+            makeCellLine(10, 70, QStringLiteral("3")),
+            makeCellLine(100, 70, QStringLiteral("4")),
+    });
+    const auto table  = detectTable(result);
+
+    ASSERT_TRUE(table.found);
+    EXPECT_EQ(table.rows, 3);
+    EXPECT_EQ(table.columns, 2);
+    EXPECT_EQ(table.cells[1][0], QStringLiteral("1"));
+    EXPECT_EQ(table.cells[1][1], QStringLiteral("2"));
+}

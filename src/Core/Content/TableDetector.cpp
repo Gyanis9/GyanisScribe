@@ -18,7 +18,8 @@ namespace GyanisScribe::Core
         /// 参与检测的一行：只保留有效词，bounds 由词框并集得到
         struct TableRow
         {
-            int              lineIndex = -1;
+            int              firstLineIndex = -1;
+            int              lastLineIndex  = -1;
             QVector<OcrWord> words;
             QRect            bounds;
         };
@@ -109,16 +110,56 @@ namespace GyanisScribe::Core
             return (values.at(middle - 1) + values.at(middle)) / 2;
         }
 
+        /// 同一视觉行上的多格会被 OCR 拆成多条纵带重叠的行：先并成一条逻辑行，
+        /// 检测器才看得到行内的多格；first/last 记住被并的源行下标范围
+        struct SourceLine
+        {
+            OcrLine line;
+            int     firstIndex = 0;
+            int     lastIndex  = 0;
+        };
+
+        [[nodiscard]] QVector<SourceLine> mergeSameBandLines(const QVector<OcrLine> &lines)
+        {
+            QVector<SourceLine> merged;
+            for (qsizetype index = 0; index < lines.size(); ++index)
+            {
+                const OcrLine &line = lines.at(index);
+                if (line.words.isEmpty())
+                {
+                    continue;
+                }
+                bool joined = false;
+                for (SourceLine &target: merged)
+                {
+                    // 同一行上的格子纵带必然重叠；上下相邻行之间留着行距，不会并到一起
+                    if (line.boundingBox.top() < target.line.boundingBox.bottom() && target.line.boundingBox.top() < line.boundingBox.bottom())
+                    {
+                        target.line.words += line.words;
+                        target.line.boundingBox = target.line.boundingBox.united(line.boundingBox);
+                        target.lastIndex        = static_cast<int>(index);
+                        joined                  = true;
+                        break;
+                    }
+                }
+                if (!joined)
+                {
+                    merged.push_back(SourceLine{line, static_cast<int>(index), static_cast<int>(index)});
+                }
+            }
+            return merged;
+        }
+
         /// 过滤空行与空词，按阅读顺序返回行，并顺带算出行高基准值
-        [[nodiscard]] QVector<TableRow> collectRows(const OcrResult &result, BodyMetrics &metrics)
+        [[nodiscard]] QVector<TableRow> collectRows(const QVector<SourceLine> &lines, BodyMetrics &metrics)
         {
             QVector<TableRow> rows;
             QVector<int>      lineHeights;
             QVector<int>      wordHeights;
 
-            for (qsizetype lineIndex = 0; lineIndex < result.lines.size(); ++lineIndex)
+            for (const SourceLine &source: lines)
             {
-                const OcrLine &line = result.lines.at(lineIndex);
+                const OcrLine &line = source.line;
 
                 QVector<OcrWord> words;
                 words.reserve(line.words.size());
@@ -148,9 +189,10 @@ namespace GyanisScribe::Core
                           });
 
                 TableRow row;
-                row.lineIndex = static_cast<int>(lineIndex);
-                row.words     = std::move(words);
-                row.bounds    = unionOfWords(row.words);
+                row.firstLineIndex = source.firstIndex;
+                row.lastLineIndex  = source.lastIndex;
+                row.words          = std::move(words);
+                row.bounds         = unionOfWords(row.words);
                 lineHeights.push_back(row.bounds.height());
                 for (const OcrWord &word: row.words)
                 {
@@ -536,15 +578,15 @@ namespace GyanisScribe::Core
             candidate.rows          = static_cast<int>(rowCount);
             candidate.columns       = columns;
             candidate.cells         = std::move(cells);
-            candidate.firstLine     = rows.first().lineIndex;
-            candidate.lastLine      = rows.first().lineIndex;
+            candidate.firstLine     = rows.first().firstLineIndex;
+            candidate.lastLine      = rows.first().lastLineIndex;
             candidate.confidence    = confidence;
             candidate.complexReason = reasons.join(QStringLiteral("；"));
             for (const TableRow &row: rows)
             {
                 // 行段按坐标排序，原结果里的行下标可能倒序；首末行取下标的最小值与最大值
-                candidate.firstLine   = std::min(candidate.firstLine, row.lineIndex);
-                candidate.lastLine    = std::max(candidate.lastLine, row.lineIndex);
+                candidate.firstLine   = std::min(candidate.firstLine, row.firstLineIndex);
+                candidate.lastLine    = std::max(candidate.lastLine, row.lastLineIndex);
                 candidate.boundingBox = candidate.boundingBox.isNull() ? row.bounds : candidate.boundingBox.united(row.bounds);
             }
             return candidate;
@@ -569,8 +611,9 @@ namespace GyanisScribe::Core
 
     TableDetection detectTable(const OcrResult &result)
     {
-        BodyMetrics             metrics;
-        const QVector<TableRow> rows = collectRows(result, metrics);
+        BodyMetrics               metrics;
+        const QVector<SourceLine> lines = mergeSameBandLines(result.lines);
+        const QVector<TableRow>   rows  = collectRows(lines, metrics);
         if (rows.size() < kMinTableRows)
         {
             return {};
