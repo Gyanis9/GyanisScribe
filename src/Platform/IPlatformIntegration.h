@@ -119,6 +119,18 @@ namespace GyanisScribe::Platform
         [[nodiscard]] virtual Base::Expected<std::vector<ScreenWindow>> screenWindows() const = 0;
 
         /**
+         * @brief 清场：让开桌面图标与其他窗口
+         * @param cleared true 进入清场，false 恢复
+         * @return 成功返回空载荷；本平台不支持或拿不到桌面视图时返回带中文原因的错误
+         * @note 这里给默认实现（不支持）：既有替身不必为此各写一份，只有真有后端的平台才覆写
+         */
+        [[nodiscard]] virtual Base::Expected<void> setSceneCleared(bool cleared)
+        {
+            static_cast<void>(cleared);
+            return std::unexpected(Base::Error{Base::ErrorCode::PlatformUnsupported, Base::uiTextUtf8("本平台不支持清场截图")});
+        }
+
+        /**
          * @brief 光标处一摞界面元素，从最深一级往上排到所在窗口的根
          * @param globalLogicalPoint 全局逻辑坐标
          * @param excludeWindowHandles 命中到这几位里的窗口直接跳过：截图时把自家的遮罩窗交进来，

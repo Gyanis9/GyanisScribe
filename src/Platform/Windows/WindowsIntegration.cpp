@@ -511,10 +511,11 @@ namespace GyanisScribe::Platform
 
     PlatformCapabilities WindowsIntegration::capabilities() const noexcept
     {
-        // 热键、鼠标穿透、前台窗口、窗口枚举、界面元素与步骤事件源都按操作系统给得出的能力填：
+        // 热键、鼠标穿透、前台窗口、窗口枚举、界面元素、步骤事件源与清场都按操作系统给得出的能力填：
         // RegisterHotKey、WS_EX_TRANSPARENT、GetForegroundWindow、EnumWindows、UI Automation、
-        // WH_MOUSE_LL 与 SetWinEventHook。会话通知不写死真：WTS 登记会因会话服务被裁掉或窗口建不出来而失败，
-        // 这一位按构造时的实测结果填。录屏采集、系统声音与系统 OCR 不在这张表里占位：
+        // WH_MOUSE_LL 与 SetWinEventHook、桌面视图的可见性与「显示桌面」命令。会话通知不写死真：
+        // WTS 登记会因会话服务被裁掉或窗口建不出来而失败，这一位按构造时的实测结果填。
+        // 录屏采集、系统声音与系统 OCR 不在这张表里占位：
         // 那三步的可用性由各自模块在调用点现探（采集探屏幕、编码看 ffmpeg 在不在、识别问系统装了哪几支语言包），
         // 静态位只会说假话
         return PlatformCapabilities{
@@ -526,6 +527,7 @@ namespace GyanisScribe::Platform
                 .autostart            = true,
                 .sessionNotifications = m_sessionNotificationRegistered,
                 .stepRecorder         = true,
+                .sceneCleanup         = true,
         };
     }
 
@@ -599,6 +601,45 @@ namespace GyanisScribe::Platform
             }
         }
         return windows;
+    }
+
+    Base::Expected<void> WindowsIntegration::setSceneCleared(const bool cleared)
+    {
+        // 桌面视图挂两处：常见形状在 Progman 下面，部分系统把它挪到某个 WorkerW 下，两种都找
+        HWND desktopView = nullptr;
+        if (const HWND progman = FindWindowW(L"Progman", nullptr); progman != nullptr)
+        {
+            desktopView = FindWindowExW(progman, nullptr, L"SHELLDLL_DefView", nullptr);
+        }
+        if (desktopView == nullptr)
+        {
+            for (HWND worker = FindWindowExW(nullptr, nullptr, L"WorkerW", nullptr); worker != nullptr;
+                 worker      = FindWindowExW(nullptr, worker, L"WorkerW", nullptr))
+            {
+                desktopView = FindWindowExW(worker, nullptr, L"SHELLDLL_DefView", nullptr);
+                if (desktopView != nullptr)
+                {
+                    break;
+                }
+            }
+        }
+        // 图标列表拿不到就整件事都不做：只收窗口不收图标等于清了一半，
+        // 而且恢复时也没有句柄把图标放回来
+        const HWND icons = desktopView != nullptr ? FindWindowExW(desktopView, nullptr, L"SysListView32", nullptr) : nullptr;
+        if (icons == nullptr)
+        {
+            return std::unexpected(Base::Error{Base::ErrorCode::PlatformUnsupported,
+                                               GyanisScribe::Base::uiTextUtf8("找不到桌面视图，清场没有生效。可以直接框选要截的那一块")});
+        }
+        ShowWindow(icons, cleared ? SW_HIDE : SW_SHOW);
+
+        // 419 是 Shell_TrayWnd 上「显示桌面」那条命令的编号：系统没有公开记档，这个编号沿用至今。
+        // 交给 shell 翻转比自己逐扇最小化再逐扇还原可靠——窗口的原始状态仍归它自己记着
+        if (const HWND tray = FindWindowW(L"Shell_TrayWnd", nullptr); tray != nullptr)
+        {
+            SendMessageW(tray, WM_COMMAND, static_cast<WPARAM>(419), 0);
+        }
+        return {};
     }
 
     IUIAutomation *WindowsIntegration::uiAutomation() const

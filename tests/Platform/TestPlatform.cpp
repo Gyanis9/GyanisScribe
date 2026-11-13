@@ -51,8 +51,8 @@ namespace
 
 namespace
 {
-    /// 只补齐必答项的平台替身：不演任何能力，也没重写两个元素查询方法
-    /// @details 用例要验的正是接口自带的默认实现，所以那两格必须保持原样不重写。
+    /// 只补齐必答项的平台替身：不演任何能力，也没重写带默认实现的那几格
+    /// @details 用例要验的正是接口自带的默认实现（元素查询与清场），所以那几格必须保持原样不重写。
     class StubPlatformIntegration final : public GyanisScribe::Platform::IPlatformIntegration
     {
     public:
@@ -129,6 +129,26 @@ TEST(PlatformIntegration, DefaultElementQueriesRejectWithAReason)
     ASSERT_FALSE(described.has_value()) << "默认实现居然给出了元素描述";
     EXPECT_EQ(described.error().code, ErrorCode::PlatformUnsupported);
     EXPECT_FALSE(described.error().message.empty()) << "回绝时不许给空原因";
+}
+
+/**
+ * @brief 钉住清场的默认实现：没覆写的平台一律回「不支持」，且不假装成功
+ * @details 替身没有重写 setSceneCleared，验的是接口本身。默认实现若改成返回成功，
+ *          入口会在一个根本没做清场的平台上收起自己，用户拍到的仍是满屏图标。
+ */
+TEST(PlatformIntegration, SceneCleanupIsUnsupportedByDefault)
+{
+    StubPlatformIntegration integration;
+
+    const auto cleared = integration.setSceneCleared(true);
+    ASSERT_FALSE(cleared.has_value()) << "默认实现居然报告清场成功";
+    EXPECT_EQ(cleared.error().code, ErrorCode::PlatformUnsupported);
+    EXPECT_NE(cleared.error().message.find("不支持"), std::string::npos) << "回绝时没写清「不支持」：实际是 " << cleared.error().message;
+
+    // 恢复同样走默认实现：既然进不去，恢复也不该报成功
+    const auto restored = integration.setSceneCleared(false);
+    ASSERT_FALSE(restored.has_value()) << "默认实现居然报告恢复成功";
+    EXPECT_EQ(restored.error().code, ErrorCode::PlatformUnsupported);
 }
 
 /**
