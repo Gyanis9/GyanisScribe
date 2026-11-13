@@ -5,7 +5,7 @@
 
 /* ---- 面：只有具名的根与卡片铺底。裸 QWidget 一律不铺——铺了就是每个子控件各画一块底 ---- */
 QWidget#appRoot {
-    background-color: #0B0B0A;
+    background-color: #151515;
 }
 
 /* 带多选清单的对话框：底色与清单面板同为 surface，清单圆角外不再露出窗口底的黑角 */
@@ -16,8 +16,8 @@ QWidget#dialogSurface {
 /* 阅读面（设置页卡片）：底与圆角由 Gui::SurfaceWidget 按 ContinuousCorner 自绘，
    样式表里不再有 #pageCard 的铺底与圆角规则 */
 
-/* 关于页品牌底板：品牌砖的固定砖底与这一档卡片同值；
-   底板取窗口底那一档把砖形重新分出来，否则深色下只剩白框与绿点。底与圆角由 Gui::SurfaceLabel 自绘 */
+/* 关于页品牌底板：底板取 controlFill，比卡片亮一档；
+   品牌砖固定 #151515 与卡片同值，靠底板重新分出砖形。底与圆角由 Gui::SurfaceLabel 自绘 */
 
 /* 悬浮条（录屏控制条、标注工具栏）：面板与圆角由控件自绘，这里只留一条透明边框占位，
    保住原 1px 边占掉的那一格尺寸 */
@@ -285,7 +285,7 @@ QListWidget#settingsNav {
 }
 
 QListWidget#settingsNav::item {
-    min-height: 30px;
+    min-height: 36px;
 }
 
 /* ---- 设置页的滚动层 ---- */

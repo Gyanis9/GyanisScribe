@@ -45,6 +45,15 @@ namespace GyanisScribe::App
 {
 
     /**
+     * @brief 菜单项放在托盘右键的哪一层
+     */
+    enum class TrayMenuPlacement
+    {
+        Primary, ///< 顶层直接可见
+        More     ///< 收进「更多」子菜单
+    };
+
+    /**
      * @brief 菜单项的静态描述
      */
     struct TrayMenuEntry
@@ -53,9 +62,10 @@ namespace GyanisScribe::App
         std::string_view          iconName;  ///< 图标名，空表示不放图标
         QString                   label;     ///< 菜单文字
         std::string_view          hotkeyKey; ///< 快捷键文本取自哪个配置键，空表示不带提示
+        TrayMenuPlacement         placement = TrayMenuPlacement::More; ///< 顶层还是「更多」里
     };
 
-    /// 托盘菜单的条目表，顺序就是菜单里的顺序
+    /// 托盘菜单的条目表：Primary 在前、More 在后；顶层新增项必须显式标 Primary
     [[nodiscard]] QList<TrayMenuEntry> trayMenuEntries();
 
     /**

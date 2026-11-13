@@ -204,7 +204,7 @@ namespace
     QFormLayout *makePageForm(QWidget *page, const QString &intro)
     {
         auto *layout = new QVBoxLayout{page};
-        layout->setContentsMargins(GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium);
+        layout->setContentsMargins(GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge);
         layout->setSpacing(0);
 
         // 标题、说明与表单共用一条内容列，整列在卡片里居中：宽窗下不会全部挤在左边、右侧空一大片
@@ -212,7 +212,7 @@ namespace
         content->setObjectName(QStringLiteral("settingsPageContent"));
         auto *contentLayout = new QVBoxLayout{content};
         contentLayout->setContentsMargins(0, 0, 0, 0);
-        contentLayout->setSpacing(GyanisScribe::Gui::kSpacingSmall);
+        contentLayout->setSpacing(GyanisScribe::Gui::kSpacingMedium);
 
         auto *text = new QLabel{intro, content};
         text->setObjectName(QStringLiteral("pageHint"));
@@ -249,6 +249,11 @@ namespace
     void decoratePage(QWidget &page, const QString &title)
     {
         page.setObjectName(QStringLiteral("pageCard"));
+        // 深色窗口底与卡片同值后，圆角边界全靠这圈随主题的描边；浅色档同样收一圈更轻的分界
+        if (auto *surface = dynamic_cast<GyanisScribe::Gui::SurfaceWidget *>(&page); surface != nullptr)
+        {
+            surface->setOutlineVisible(true);
+        }
 
         // 表单页的标题并进居中内容列；历史与记忆库这类视图页没有内容列，仍摆在页顶
         QWidget     *headerParent = &page;
@@ -1834,7 +1839,7 @@ namespace GyanisScribe::Main
         m_nav   = nav;
         m_stack = new QStackedWidget{this};
         m_nav->setObjectName(QStringLiteral("settingsNav"));
-        m_nav->setIconSize(QSize(20, 20));
+        m_nav->setIconSize(QSize(24, 24));
         m_nav->setFixedWidth(kNavColumnWidth);
         m_nav->setAccessibleName(GyanisScribe::Base::uiText("设置导航"));
         m_nav->setFrameShape(QFrame::NoFrame);
@@ -2164,6 +2169,7 @@ namespace GyanisScribe::Main
         auto  menuFont = moreMenu->font();
         menuFont.setPointSize(GyanisScribe::Gui::kMenuTextPointSize);
         moreMenu->setFont(menuFont);
+        using GyanisScribe::App::TrayMenuPlacement;
         for (const auto &entry: GyanisScribe::App::visibleTrayMenuEntries(m_capabilities))
         {
             const auto action = entry.action;
@@ -2177,17 +2183,22 @@ namespace GyanisScribe::Main
                 // 这三条说的就是这扇窗口：设置与关于是它的内容，退出在没有托盘的机器上是「关掉窗子」
                 continue;
             }
-            if (entry.hotkeyKey.empty())
+            if (entry.placement == TrayMenuPlacement::More)
             {
-                // 没配全局热键的那几条收进「更多」：主操作摆在明面，次要的也不许找不到
+                // 托盘里收进「更多」的那批，在无托盘的动作条上也落在同一个子菜单
                 auto *item = moreMenu->addAction(entry.label);
+                if (!entry.iconName.empty())
+                {
+                    item->setIcon(m_icons.icon(entry.iconName));
+                }
                 QObject::connect(item, &QAction::triggered, this, [this, action] { emit actionRequested(*action); });
                 continue;
             }
             auto *button = new GyanisScribe::Gui::Button{entry.label, bar};
             m_icons.applyIcon(*button, entry.iconName);
             button->setAccessibleName(entry.label);
-            button->setToolTip(GyanisScribe::Base::uiText("与托盘菜单及全局快捷键执行相同操作。"));
+            button->setToolTip(entry.hotkeyKey.empty() ? GyanisScribe::Base::uiText("与托盘菜单执行相同操作。")
+                                                        : GyanisScribe::Base::uiText("与托盘菜单及全局快捷键执行相同操作。"));
             QObject::connect(button, &QPushButton::clicked, this, [this, action] { emit actionRequested(*action); });
             row->addWidget(button);
         }
@@ -2216,6 +2227,7 @@ namespace GyanisScribe::Main
         more->setAccessibleName(GyanisScribe::Base::uiText("更多"));
         more->setPopupMode(QToolButton::InstantPopup);
         more->setMenu(moreMenu);
+        m_icons.applyIcon(*more, "More");
         row->addWidget(more);
         row->addStretch();
         return bar;
@@ -3143,7 +3155,7 @@ namespace GyanisScribe::Main
                 highestRatio = screen->devicePixelRatio();
             }
         }
-        auto *logo = new GyanisScribe::Gui::SurfaceLabel{GyanisScribe::Gui::SurfaceFillRole::WindowBackground, GyanisScribe::Core::CornerRole::Card, page};
+        auto *logo = new GyanisScribe::Gui::SurfaceLabel{GyanisScribe::Gui::SurfaceFillRole::ControlFill, GyanisScribe::Core::CornerRole::Card, page};
         logo->setObjectName(QStringLiteral("brandPlate"));
         logo->setFixedSize(80, 80);
         logo->setContentsMargins(8, 8, 8, 8);

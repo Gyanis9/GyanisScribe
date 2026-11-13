@@ -72,6 +72,12 @@ namespace GyanisScribe::Gui
             border = activePalette().borderStrong;
             width  = themeBorderWidth(ThemeKind::HighContrast);
         }
+        // 卡片静息边：窗口底与卡片同值后，这圈线是圆角处唯一的边界
+        if (m_outlineVisible && !hasExplicitBorder)
+        {
+            border = activePalette().borderStrong;
+            width  = themeBorderWidth(activeThemeKind());
+        }
         paintSurface(painter, QRectF{rect()}, Core::cornerShapeFor(m_role, QSizeF{size()}), fillColorFor(m_fillRole), border, width);
     }
 
@@ -97,6 +103,17 @@ namespace GyanisScribe::Gui
     {
         m_highContrastBorder = enabled;
         update();
+    }
+
+    void SurfaceWidget::setOutlineVisible(const bool visible)
+    {
+        m_outlineVisible = visible;
+        update();
+    }
+
+    bool SurfaceWidget::outlineVisible() const
+    {
+        return m_outlineVisible;
     }
 
     SurfaceLabel::SurfaceLabel(const SurfaceFillRole fillRole, const Core::CornerRole role, QWidget *parent) :

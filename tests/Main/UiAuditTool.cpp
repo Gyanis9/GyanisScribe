@@ -47,15 +47,18 @@
 #include <QFont>
 #include <QFontDatabase>
 #include <QFormLayout>
+#include <QImage>
 #include <QMenu>
 #include <QMouseEvent>
 #include <QSystemTrayIcon>
 #include <QPainter>
 #include <QScrollArea>
 #include <QScrollBar>
+#include <QScreen>
 #include <QStackedWidget>
 #include <QString>
 #include <QTextEdit>
+#include <QThread>
 #include <QWidget>
 
 #include <array>
@@ -448,7 +451,8 @@ int main(int argc, char *argv[])
     // 离屏平台要排在 QApplication 之前：出图不该在用户的桌面上闪一串窗口。
     // 托盘菜单那一面是唯一的例外：离屏没有系统托盘，只能显式要它时换真平台
     const bool liveTray = qEnvironmentVariableIsSet("GYANISSCRIBE_UI_AUDIT_LIVE_TRAY");
-    if (!liveTray)
+    const bool liveCompose = qEnvironmentVariableIsSet("GYANISSCRIBE_UI_AUDIT_LIVE_COMPOSE");
+    if (!liveTray && !liveCompose)
     {
         qputenv("QT_QPA_PLATFORM", "offscreen");
     }
@@ -482,6 +486,49 @@ int main(int argc, char *argv[])
     GyanisScribe::Gui::ThemeManager theme(settings);
     // 样式表要落一次：真实程序里这一步在 AppController 构造里做，这里没有控制器
     theme.applyFromSettings();
+
+    // 图标清册：同一批字形按深浅两档底色各出一张，16/20/24 三档并排摆。
+    // 评审看的是「在真底色上是否还认得出、笔画是否糊」，不是 SVG 文件名。
+    {
+        const auto names = GyanisScribe::Gui::IconProvider::availableIconNames();
+        constexpr int kColumns = 6;
+        constexpr int kCellWidth = 190;
+        constexpr int kCellHeight = 104;
+        const int rows = (names.size() + kColumns - 1) / kColumns;
+        for (const auto [kind, fileSuffix]: {std::pair{GyanisScribe::Gui::ThemeKind::Light, std::string_view{"light"}},
+                                            std::pair{GyanisScribe::Gui::ThemeKind::Dark, std::string_view{"dark"}}})
+        {
+            const auto &palette = GyanisScribe::Gui::paletteFor(kind);
+            QImage      sheet(kColumns * kCellWidth, rows * kCellHeight, QImage::Format_ARGB32_Premultiplied);
+            sheet.fill(palette.surface);
+            QPainter painter{&sheet};
+            QFont    labelFont = QApplication::font();
+            labelFont.setPointSize(8);
+            painter.setFont(labelFont);
+            painter.setPen(palette.text);
+            GyanisScribe::Gui::IconProvider sheetIcons;
+            sheetIcons.setTintColor(palette.icon);
+            for (qsizetype index = 0; index < names.size(); ++index)
+            {
+                const int column = static_cast<int>(index) % kColumns;
+                const int row    = static_cast<int>(index) / kColumns;
+                const int left   = column * kCellWidth;
+                const int top    = row * kCellHeight;
+                const auto name  = names[index].toStdString();
+                // 大图用 2× 副本铺进 48 逻辑像素，下一格的 24/20/16 三档并排看比例
+                painter.drawPixmap(QRect{left + 8, top + 8, 48, 48}, sheetIcons.pixmap(name, GyanisScribe::Gui::IconSize::Large, 2.0));
+                painter.drawPixmap(QPoint{left + 66, top + 18}, sheetIcons.pixmap(name, GyanisScribe::Gui::IconSize::Large));
+                painter.drawPixmap(QPoint{left + 96, top + 22}, sheetIcons.pixmap(name, GyanisScribe::Gui::IconSize::Medium));
+                painter.drawPixmap(QPoint{left + 122, top + 26}, sheetIcons.pixmap(name, GyanisScribe::Gui::IconSize::Small));
+                painter.drawText(QPoint{left + 8, top + 82}, names[index]);
+                painter.setPen(palette.secondaryText);
+                painter.drawText(QPoint{left + 8, top + 96}, QStringLiteral("24 / 20 / 16"));
+                painter.setPen(palette.text);
+            }
+            const auto path = outputDirectory / std::format("icons-sheet-{}.png", fileSuffix);
+            sheet.save(QString::fromStdWString(path.wstring()));
+        }
+    }
 
     // 面 0（只在显式要真托盘时跑）：托盘右键菜单的真渲染。菜单本体是 QMenu，真平台下按真图标、
     // 真主题、真字体排出来；取 contextMenu() 直接抓，不经过系统托盘的鼠标动作
@@ -838,6 +885,79 @@ int main(int argc, char *argv[])
             theme.applyFromSettings();
             shootShareFaces(settings, outputDirectory, QSize{900, 700}, std::format("theme-{}-", name));
         }
+    }
+
+    // 面 8（只在显式要屏幕合成时跑）：离屏 grab 只能证明控件自己画对了，证明不了 DWM 合成后
+    // 圆角外还剩什么。这里把窗口真摆到桌面上，逐扇从屏幕抓回含桌面底的合成结果，
+    // 圆角黑缺口这类合成期缺陷只有这一路取证看得见
+    if (liveCompose)
+    {
+        const auto composeShoot = [&](QWidget &widget, const char *name) {
+            widget.show();
+            QCoreApplication::processEvents();
+            QThread::msleep(250);
+            QCoreApplication::processEvents();
+            auto *screen = QGuiApplication::primaryScreen();
+            if (screen == nullptr)
+            {
+                std::fprintf(stderr, "no primary screen for compose shot %s\n", name);
+                return;
+            }
+            // 抓整屏再裁窗口矩形：分层窗口用 grabWindow(winId) 取回时圆角外常是黑的，
+            // 那是取图路径的假象；整屏截图才是用户眼睛看到的合成结果
+            const auto full     = screen->grabWindow(0);
+            const auto geometry = widget.frameGeometry();
+            const auto shot     = full.copy(QRect{geometry.topLeft(), geometry.size()});
+            const auto filePath = outputDirectory / std::format("compose-{}.png", name);
+            if (!shot.save(QString::fromStdWString(filePath.wstring())))
+            {
+                std::fprintf(stderr, "failed to save compose shot %s\n", name);
+            }
+            std::printf("compose-%s: %dx%d\n", name, shot.width(), shot.height());
+            widget.hide();
+            QCoreApplication::processEvents();
+        };
+        for (const auto &[mode, name]: std::array<std::pair<const char *, const char *>, 2>{{{"Dark", "dark"}, {"Light", "light"}}})
+        {
+            if (const auto written = settings.setValue(GyanisScribe::Core::kThemeMode, QString::fromUtf8(mode)); !written)
+            {
+                std::fprintf(stderr, "failed to switch the theme for compose shots\n");
+                return 1;
+            }
+            theme.applyFromSettings();
+            GyanisScribe::Core::HistoryStore  history(dataDirectory / "history.json");
+            GyanisScribe::Core::MemoryIndex   memory(dataDirectory / "memory.sqlite");
+            static_cast<void>(memory.open());
+            const auto                        integration = GyanisScribe::Platform::createPlatformIntegration();
+            GyanisScribe::Main::MainWindow    window(settings, theme, icons, history, memory, integration->capabilities(), *integration);
+            window.open(GyanisScribe::Main::MainWindowPage::General);
+            composeShoot(window, std::format("main-{}", name).c_str());
+            GyanisScribe::Gui::AnnotationToolbar toolbar{settings, icons, nullptr};
+            composeShoot(toolbar, std::format("toolbar-{}", name).c_str());
+            GyanisScribe::Gui::Toast toast{icons, theme};
+            toast.show(GyanisScribe::Base::uiText("合成取证"), GyanisScribe::Gui::ToastKind::Information);
+            QCoreApplication::processEvents();
+            QThread::msleep(250);
+            for (auto *top: QApplication::topLevelWidgets())
+            {
+                if (top->isVisible() && top->accessibleName() == GyanisScribe::Base::uiText("提示"))
+                {
+                    composeShoot(*top, std::format("toast-{}", name).c_str());
+                }
+            }
+            if (auto *menu = toolbar.findChild<QMenu *>(QStringLiteral("annotationColorMenu")); menu != nullptr)
+            {
+                QMetaObject::invokeMethod(menu, "aboutToShow", Qt::DirectConnection);
+                menu->adjustSize();
+                composeShoot(*menu, std::format("colormenu-{}", name).c_str());
+            }
+        }
+        if (!settings.setValue(GyanisScribe::Core::kThemeMode, QStringLiteral("Light")))
+        {
+            std::fprintf(stderr, "failed to restore the light theme after compose shots\n");
+            return 1;
+        }
+        theme.applyFromSettings();
     }
 
     return 0;

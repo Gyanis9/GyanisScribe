@@ -88,7 +88,7 @@ namespace GyanisScribe::Gui
         QColor pressed;          ///< 中性按下底，比 hover 再重一档
         QColor accentHover;      ///< 主按钮悬停底：填充色的加深档，不换成描边
         QColor accentSoft;       ///< 选中底：导航当前项、勾选的工具按钮，配 text 与 accent 同时可读
-        QColor borderStrong;     ///< 浮层微边缘、输入框静息描边与高对比度档的描边：压在其他内容上的菜单、提示、控制条用它
+        QColor borderStrong;     ///< 浮层微边缘、设置页卡片静息描边、输入框静息描边与高对比度档的描边：压在其他内容上的菜单、提示、控制条用它
     };
 
     /// 浅色主题的语义色：windowBackground、surface、controlFill 三档微明度差配一支主色；
@@ -114,9 +114,10 @@ namespace GyanisScribe::Gui
             QColor{226, 226, 221}, // borderStrong
     };
 
-    /// 深色主题的语义色：同一套角色换成暗底一侧的微明度阶梯，正文与次要文本都比浅色档抬高亮度
+    /// 深色主题的语义色：窗口底与卡片同值，避免连续曲率圆角外露出近黑缺口；
+    /// 卡片边界改由 1px borderStrong 描边给出，控件仍比卡片亮一档
     inline constexpr ThemePalette kDarkPalette{
-            QColor{11, 11, 10},    // windowBackground
+            QColor{21, 21, 21},    // windowBackground：与 surface 同值，圆角外不再露出近黑缺口
             QColor{21, 21, 21},    // surface
             QColor{232, 232, 227}, // text
             QColor{176, 176, 170}, // secondaryText
@@ -128,9 +129,9 @@ namespace GyanisScribe::Gui
             QColor{155, 227, 90},  // success
             QColor{255, 122, 113}, // danger
             QColor{17, 17, 16},    // mutedFill
-            QColor{26, 26, 25},    // controlFill
-            QColor{32, 32, 30},    // hover
-            QColor{38, 38, 36},    // pressed
+            QColor{29, 29, 28},    // controlFill
+            QColor{35, 35, 33},    // hover
+            QColor{41, 41, 39},    // pressed
             QColor{61, 127, 242},  // accentHover
             QColor{34, 52, 77},    // accentSoft
             QColor{42, 42, 40},    // borderStrong

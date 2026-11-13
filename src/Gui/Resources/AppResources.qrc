@@ -26,6 +26,7 @@
     <file alias="NumberGroup.svg">Icons/NumberGroup.svg</file>
     <file alias="Magnifier.svg">Icons/Magnifier.svg</file>
     <file alias="Memory.svg">Icons/Memory.svg</file>
+    <file alias="More.svg">Icons/More.svg</file>
     <file alias="QrCode.svg">Icons/QrCode.svg</file>
     <file alias="RebuildIndex.svg">Icons/RebuildIndex.svg</file>
     <file alias="Exit.svg">Icons/Exit.svg</file>

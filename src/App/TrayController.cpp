@@ -74,39 +74,45 @@ namespace GyanisScribe::App
 
     QList<TrayMenuEntry> trayMenuEntries()
     {
+        using GyanisScribe::App::TrayMenuPlacement;
+
         QList<TrayMenuEntry> entries;
-        entries.append(TrayMenuEntry{TrayAction::CaptureRegion, "CaptureRegion", GyanisScribe::Base::uiText("框选截图"), GyanisScribe::Core::kHotkeyCapture});
+        // 顶层只摆三个最常用的动作，后接「更多」与窗口自己的出口；其余全收进「更多」
+        entries.append(TrayMenuEntry{TrayAction::CaptureRegion, "CaptureRegion", GyanisScribe::Base::uiText("截图"), GyanisScribe::Core::kHotkeyCapture,
+                                     TrayMenuPlacement::Primary});
+        entries.append(TrayMenuEntry{TrayAction::PasteClipboard, "PinCopy", GyanisScribe::Base::uiText("贴图"), {}, TrayMenuPlacement::Primary});
+        entries.append(TrayMenuEntry{TrayAction::ToggleRecord, "Record", GyanisScribe::Base::uiText("录屏"), GyanisScribe::Core::kHotkeyRecord,
+                                     TrayMenuPlacement::Primary});
+        entries.append(TrayMenuEntry{TrayAction::OpenSettings, "Settings", GyanisScribe::Base::uiText("设置"), {}, TrayMenuPlacement::Primary});
+        entries.append(TrayMenuEntry{TrayAction::Quit, "Exit", GyanisScribe::Base::uiText("退出"), {}, TrayMenuPlacement::Primary});
+
         entries.append(TrayMenuEntry{TrayAction::CaptureFullScreen, "CaptureFullScreen", GyanisScribe::Base::uiText("整屏截图"), {}});
         entries.append(TrayMenuEntry{TrayAction::CaptureLastRegion, "CaptureLastRegion", GyanisScribe::Base::uiText("重复上次选区"), {}});
-        // 图标用 CaptureWindow 那一枚：与「框选截图」共用同一枚会让两行在菜单里长得一模一样
+        // 图标用 CaptureWindow 那一枚：与「截图」共用同一枚会让两行在菜单里长得一模一样
         entries.append(TrayMenuEntry{TrayAction::CaptureWindow, "CaptureWindow", GyanisScribe::Base::uiText("截取当前窗口"), {}});
         entries.append(TrayMenuEntry{TrayAction::CaptureLongRegion, "CaptureRegion", GyanisScribe::Base::uiText("滚动长截图"), GyanisScribe::Core::kHotkeyCaptureLong});
-        // 与框选共用同一层遮罩，只是铺之前先把桌面让开：入口贴着截图组摆，它有自己的固定热键
+        // 与截图共用同一层遮罩，只是铺之前先把桌面让开：入口贴着截图组摆，它有自己的固定热键
         entries.append(TrayMenuEntry{TrayAction::SceneClearCapture, "CaptureRegion", GyanisScribe::Base::uiText("清场截图"), GyanisScribe::Core::kHotkeySceneClear});
         // 不抓屏，直接摆一张白底画布进标注窗：写字、画框、拼几张截图说明时不必先随便截一块屏当底
         entries.append(TrayMenuEntry{TrayAction::BlankCanvas, "Annotation", GyanisScribe::Base::uiText("新建空白画布标注"), {}});
-        // 与框选共用同一层遮罩，只把悬停目标从矩形细分到界面元素：入口贴着截图组摆
+        // 与截图共用同一层遮罩，只把悬停目标从矩形细分到界面元素：入口贴着截图组摆
         entries.append(TrayMenuEntry{TrayAction::PickElement, "CursorHighlight", GyanisScribe::Base::uiText("拾取界面元素"), GyanisScribe::Core::kHotkeyPickElement});
-        entries.append(TrayMenuEntry{}); // 分隔线
-        entries.append(TrayMenuEntry{TrayAction::ToggleRecord, "Record", GyanisScribe::Base::uiText("开始 / 停止录屏"), GyanisScribe::Core::kHotkeyRecord});
+        entries.append(TrayMenuEntry{});
         entries.append(TrayMenuEntry{TrayAction::ToggleSteps, "Number", GyanisScribe::Base::uiText("步骤记录"), GyanisScribe::Core::kHotkeySteps});
         entries.append(TrayMenuEntry{TrayAction::Recognize, "Ocr", GyanisScribe::Base::uiText("识别文字"), GyanisScribe::Core::kHotkeyOcr});
         entries.append(TrayMenuEntry{TrayAction::RecognizeFile, "OcrImage", GyanisScribe::Base::uiText("识别图片文件…"), {}});
         entries.append(TrayMenuEntry{TrayAction::PickColor, "ColorPicker", GyanisScribe::Base::uiText("屏幕取色"), GyanisScribe::Core::kHotkeyPick});
+        entries.append(TrayMenuEntry{});
         entries.append(TrayMenuEntry{TrayAction::CloseAllPins, "PinClose", GyanisScribe::Base::uiText("关闭全部贴图"), {}});
         entries.append(TrayMenuEntry{TrayAction::TogglePinsVisible, "Pin", GyanisScribe::Base::uiText("收起 / 显示全部贴图"), GyanisScribe::Core::kHotkeyTogglePins});
         entries.append(TrayMenuEntry{TrayAction::ClearPinsThrough, "PinMouseThrough", GyanisScribe::Base::uiText("取消全部贴图穿透"), {}});
-        entries.append(TrayMenuEntry{TrayAction::PasteClipboard, "PinCopy", GyanisScribe::Base::uiText("将剪贴板内容贴到屏幕上"), {}});
         // 关闭与销毁是两档：这一条只按得回「关闭」的那几张，销毁过的一张都不回来
         entries.append(TrayMenuEntry{TrayAction::RepinClosed, "Refresh", GyanisScribe::Base::uiText("重新贴出最近关闭的贴图"), {}});
         entries.append(TrayMenuEntry{TrayAction::NextPinGroup, "PinGroup", GyanisScribe::Base::uiText("切换到下一组贴图"), GyanisScribe::Core::kHotkeyNextPinGroup});
         // 图标与「切到下一组贴图」同族（都是分组这一件事），两行的文字各自表意，不会读成同一件事
         entries.append(TrayMenuEntry{TrayAction::ManagePinGroups, "PinGroup", GyanisScribe::Base::uiText("贴图组管理…"), {}});
         entries.append(TrayMenuEntry{});
-        entries.append(TrayMenuEntry{TrayAction::OpenSettings, "Settings", GyanisScribe::Base::uiText("设置"), {}});
         entries.append(TrayMenuEntry{TrayAction::OpenAbout, "About", GyanisScribe::Base::uiText("关于智录"), {}});
-        entries.append(TrayMenuEntry{});
-        entries.append(TrayMenuEntry{TrayAction::Quit, "Exit", GyanisScribe::Base::uiText("退出"), {}});
         return entries;
     }
 
@@ -213,19 +219,14 @@ namespace GyanisScribe::App
         menuFont.setPointSize(GyanisScribe::Gui::kMenuTextPointSize);
         menu.setFont(menuFont);
 
-        for (const auto &entry: visibleTrayMenuEntries(m_integration.capabilities()))
+        const auto visibleEntries = visibleTrayMenuEntries(m_integration.capabilities());
+        const auto addEntry       = [this, &screenNames, menuFont](QMenu &target, const TrayMenuEntry &entry)
         {
-            if (!entry.action)
-            {
-                menu.addSeparator();
-                continue;
-            }
-
             // 多屏：把「整屏截图」整条换成子菜单，第一项接管原来那一档
             if (*entry.action == TrayAction::CaptureFullScreen && screenNames.size() > 1)
             {
-                auto *submenu = new Gui::Menu{entry.label, &menu};
-                menu.addMenu(submenu);
+                auto *submenu = new Gui::Menu{entry.label, &target};
+                target.addMenu(submenu);
                 if (!entry.iconName.empty())
                 {
                     submenu->setIcon(m_icons.icon(entry.iconName));
@@ -238,10 +239,10 @@ namespace GyanisScribe::App
                     auto *one = submenu->addAction(GyanisScribe::Base::uiText("整屏截图：%1").arg(name));
                     QObject::connect(one, &QAction::triggered, this, [this, name] { emit screenCaptureRequested(name); });
                 }
-                continue;
+                return;
             }
 
-            const auto action = menu.addAction(entry.label);
+            const auto action = target.addAction(entry.label);
             if (!entry.iconName.empty())
             {
                 action->setIcon(m_icons.icon(entry.iconName));
@@ -256,6 +257,56 @@ namespace GyanisScribe::App
             }
             const auto trayAction = *entry.action;
             QObject::connect(action, &QAction::triggered, this, [this, trayAction] { emit actionRequested(trayAction); });
+        };
+
+        // 「更多」里的条目保持表里的先后与分组；分隔线只在这一层出现
+        QList<TrayMenuEntry> moreEntries;
+        for (const auto &entry: visibleEntries)
+        {
+            if (entry.placement == TrayMenuPlacement::More)
+            {
+                moreEntries.append(entry);
+            }
+        }
+
+        const auto addMoreMenu = [this, &menu, &moreEntries, &addEntry, menuFont]
+        {
+            auto *more = new Gui::Menu{GyanisScribe::Base::uiText("更多"), &menu};
+            more->setFont(menuFont);
+            more->setIcon(m_icons.icon("More"));
+            for (const auto &entry: moreEntries)
+            {
+                if (!entry.action)
+                {
+                    if (!more->actions().isEmpty())
+                    {
+                        more->addSeparator();
+                    }
+                    continue;
+                }
+                addEntry(*more, entry);
+            }
+            menu.addMenu(more);
+        };
+
+        bool moreAdded = false;
+        for (const auto &entry: visibleEntries)
+        {
+            if (!entry.action || entry.placement == TrayMenuPlacement::More)
+            {
+                continue;
+            }
+            // 顶层顺序是截图、贴图、录屏、更多、设置、退出：更多插在设置之前
+            if (!moreAdded && *entry.action == TrayAction::OpenSettings)
+            {
+                addMoreMenu();
+                moreAdded = true;
+            }
+            addEntry(menu, entry);
+        }
+        if (!moreAdded)
+        {
+            addMoreMenu();
         }
     }
 

@@ -37,10 +37,12 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 浅色与深色两档共用同一套骨架，只换色值：
 
 - 分层：窗口底 `windowBackground`、卡片 `surface`、控件 `controlFill` 三档之间只差一点明度；
+  深色档的窗口底与卡片同值（都是 `#151515`），连续曲率圆角外不会露出近黑缺口；
   悬停 `hover` 与按下 `pressed` 再各加深一档；禁用与只读落 `mutedFill`，
   滑块槽与微调框上下按钮的悬停底也取它。
-  卡片的圆角按 `Card` 档（20px、平滑度 0.80，见 §1.6）、内边距 `kSpacingMedium`，底色差已经足够分出「这是一块阅读面」。
-- 容器不描边：`#pageCard`、按钮、工具按钮、列表一律没有可见描边。
+  卡片的圆角按 `Card` 档（20px、平滑度 0.80，见 §1.6）、内边距 `kSpacingMedium`，边界由一圈 1px `borderStrong` 给出。
+- 容器只在设置页阅读面（`#pageCard`）上有一圈静息描边：深色窗口底与卡片同值后，这圈线是圆角处唯一的边界；
+  浅色档同样收一圈更轻的分界。按钮、工具按钮、列表仍不描边。
   输入类（行编辑、下拉、微调、快捷键框、标注行内编辑器与文本区）静息带一条 1px `borderStrong` 边：`controlFill` 与卡片 `surface` 只差一档微明度，没有边时输入框会融进卡片；禁用/只读退一档到 `border`，高对比度档仍按契约用 2px。
   浅色与深色给按钮与输入类保留一条 1px 透明边框占位（数字框不带占位，改为抬高内容最小高），让控件总高固定为按钮 30、输入类 32；
   换色只换底，不换尺寸。高对比度档的 2px 描边是契约，不按这一条归一化：
@@ -162,7 +164,8 @@ QSS 只留颜色、排版与透明边框占位：
 
 | 窗口 | 类与文件 | 样式来源 | 状态 |
 | --- | --- | --- | --- |
-| 主窗口（设置 / 历史 / 关于入口） | `src/Main/MainWindow.cpp` | 根 `#appRoot` 铺窗口底（QSS）；顶部动作条 `#actionBar` 只在托盘不可用时出现——带热键提示的主操作是 `Gui::Button`（`CornerRole::Control`），其余条目收在一个 `Gui::ToolButton` 的弹出菜单 `Gui::Menu`「更多」里，两张清单都取自托盘那张表（`visibleTrayMenuEntries`）；多屏且托盘可用时逐屏截图走托盘子菜单（第一项「光标所在屏幕」，后面每块屏一条），没有托盘时同一组「整屏截图：<屏名>」落在动作条的「更多」里。下面是左侧导航 `Gui::ListWidget#settingsNav`（宽 `kNavColumnWidth`=160、不铺容器底，项高亮由 `ItemDelegate` 自绘）+ `QStackedWidget` 十页，每页是一张 `Gui::SurfaceWidget` 卡片（对象名 `#pageCard`，`CornerRole::Card`、`SurfaceFillRole::Surface`，高对比度档自动补 2px `borderStrong` 边），页内 `kSpacingMedium` 边距、标题/说明/表单共用一条居中内容列、表单纵向与横向间距都是 `kSpacingSmall`(8)、字段按类型收宽（下拉 260、数字 140、长文本 340） | 导航项与列表项的选中/悬停由 `ItemDelegate` 按 `CornerRole::Compact` 自绘（选中 `accentSoft`、悬停 `hover`；高对比度档选中项另加 2px 主色边）；每页顶部是 `#pageTitle`（15pt 半粗，字号由 `applyTextRole` 给）加一条 `#pageHint`（10pt 正文档、次要色，只压色不减号）；换主题时已建好的控件随 `allWidgets` 重设调色板并重放排版，自绘控件随调色板重绘 |
+| 主窗口（设置 / 历史 / 关于入口） | `src/Main/MainWindow.cpp` | 根 `#appRoot` 铺窗口底（QSS）；顶部动作条 `#actionBar` 只在托盘不可用时出现——顶层三个动作（截图 / 贴图 / 录屏）是 `Gui::Button`（`CornerRole::Control`），其余条目收在一个 `Gui::ToolButton` 的弹出菜单 `Gui::Menu`「更多」里，两张清单都取自托盘那张表（`visibleTrayMenuEntries` 的 `TrayMenuPlacement`）；多屏且托盘可用时逐屏截图走托盘子菜单（第一项「光标所在屏幕」，后面每块屏一条），没有托盘时同一组「整屏截图：<屏名>」落在动作条的「更多」里。下面是左侧导航 `Gui::ListWidget#settingsNav`（宽 `kNavColumnWidth`=160、不铺容器底，项高亮由 `ItemDelegate` 自绘）+ `QStackedWidget` 十一页，每页是一张 `Gui::SurfaceWidget` 卡片（对象名 `#pageCard`，`CornerRole::Card`、`SurfaceFillRole::Surface`、`setOutlineVisible(true)`：浅深 1px、高对比度 2px `borderStrong` 边），页内 `kSpacingMedium` 边距、标题/说明/表单共用一条居中内容列、表单纵向与横向间距都是 `kSpacingSmall`(8)、字段按类型收宽（下拉 260、数字 140、长文本 340） | 导航项与列表项的选中/悬停由 `ItemDelegate` 按 `CornerRole::Compact` 自绘（选中 `accentSoft`、悬停 `hover`；高对比度档选中项另加 2px 主色边）；每页顶部是 `#pageTitle`（15pt 半粗，字号由 `applyTextRole` 给）加一条 `#pageHint`（10pt 正文档、次要色，只压色不减号）；换主题时已建好的控件随 `allWidgets` 重设调色板并重放排版，自绘控件随调色板重绘 |
+| 托盘右键菜单 | `src/App/TrayController.cpp` | 顶层固定在六项以内：截图 / 贴图 / 录屏 / 更多 / 设置 / 退出；「更多」是生成的 `Gui::Menu` 子菜单，收全部低频动作与分组分隔线，多屏的「整屏截图」子菜单也挂在里面。条目、图标名、快捷键键位与顶层/更多归属同住 `trayMenuEntries()` 一张表（`TrayMenuPlacement`），平台能力过滤只作用于 `visibleTrayMenuEntries` | 顶层主操作带真快捷键提示，菜单项图标随主题重取；动作条（无托盘时）与托盘同源：顶层三项摆按钮，其余进动作条的「更多」；「更多」里保留「关于」 |
 | 标注窗 | `src/Gui/Annotation/AnnotationWindow.cpp` | 画布 `AnnotationView` 自绘底图与图形；四周 2px 主色提示线与八枚抓点（「选择」档）只上屏、不进成品；工具栏另计 | 快捷键动作表（复制/保存/贴图/识别/撤销重做），不可撤销时按钮 `:disabled`；选择档拖边框＝重裁截图范围，途中用整屏冻帧预览并在光标处给像素放大镜与读数，工具栏与信息面板按拖动中的新范围实时跟随；图内空白拖动整体挪范围；松手从同一张冻帧裁，已有标注随裁切平移、撤销栈清空 |
 | 标注工具栏 | `src/Gui/Annotation/AnnotationToolbar.cpp` | `Gui::AnnotationToolbar::paintEvent` 按 `CornerRole::Panel` 自绘卡片（`surface` 底 + `themeBorderWidth` 的 `borderStrong` 微边缘：浅深 1px、高对比度 2px；QSS 只留同宽透明占位）+ `kSpacingHairline` 间距与 26px 按钮档（`Gui::ToolButton` 按 `CornerRole::Compact` 自绘，图标 20；所有工具档宽度 ≤1536 由用例钉死），段与段之间是自绘的 `ToolbarSeparator`（5px 宽、中间 1px `border` 色，两侧各 2px）；字体下拉 `#annotationFontCombo` 关掉可编辑行编辑、自绘族名与 chevron，与同排 QComboBox/QSpinBox 同高；颜色按钮右下压一枚 6px 自绘 chevron 提示可弹出色板；`kToolbarSliderWidth`=56、字体下拉上限 120；颜色只占一枚按钮，弹出菜单里才是 `kAnnotationPaletteColors` 八色块、`RecentColors.h` 的 `kRecentColorCapacity`(6) 最近用色与「自定义颜色…」；最右是关闭标注的 `X`（与 `Esc` 同一条收场路） | 默认是「选择」档（`V`，不落笔；点中已有图形才选中、按住可拖动），当前工具按钮（`:checked`）走 `accentSoft` 填充（高对比度档另加 2px 主色边），线宽/字号只走阶梯；颜色按钮上的色块即当前形状的色，滚轮落在它上面才调不透明度；可见段按当前工具收放（`updateContextVisibility`）。这一档不装焦点环覆盖层（6px 外扩会压到相邻的 26px 按钮），聚焦边由 `buttonColors`/`toolButtonColors` 自绘（浅深 1px、高对比度 2px 主色），尺寸不跳 |
 | 截图遮罩 | `src/Gui/Capture/CaptureOverlay.cpp` | 自绘：`kCaptureMaskColor` 压暗背景、`kSelectionBorderWidth`+`kAccentColor` 选区框、`kCrosshairColor` 十字虚线、读数用 `kHintFontSize`/`kHintPadding` 压在 `kCaptureHintBackgroundColor` 上 | 光标亮过之后放大镜一直跟着（`isMagnifierVisible()`，悬停、拖框、拉手柄三处同一判据），读数条报坐标与颜色、裸按 `C` 轮换颜色写法（只影响本次）；拖拽中另显示尺寸与坐标读数；`Esc` 取消，鼠标拖框松手即交出（键盘造的选区仍走 `Enter`/双击）。重裁范围在标注窗里做：默认「选择」档拖四边/四角，松手按新范围重抓。这一层不加任何动画 |
@@ -177,7 +180,7 @@ QSS 只留颜色、排版与透明边框占位：
 | 数字输入框 | `src/Gui/Controls/SpinBox.cpp` | 继承 `QSpinBox`，面板按 `CornerRole::Control` 自绘；关掉原生上下按钮，右缘叠两枚自绘 chevron，悬停底取 `QPalette::AlternateBase`（即 `mutedFill`）并按 `CornerRole::Thumbnail`（6px/0.30）自绘 | 点击加/减，范围、后缀、`不限` 等语义仍由 `QSpinBox` 负责；键盘上下键照常；数值上 tabular figures |
 | 历史列表 | `src/Gui/History/HistoryView.cpp` | 缩略图边长 `kThumbnailEdge`（96），圆角 `kThumbnailCornerRadius`（6）由 `Core::makeThumbnail` 按 `CornerRole::Thumbnail`（6px/0.30）掩膜；列表容器是 `Gui::ListWidget`，按 `CornerRole::Panel` 自绘底与边；列表项与导航共用 `ItemDelegate` 的 `Compact` 档高亮 | 顶部一枚搜索框（按文件名、类别或日期）加一个类别筛选下拉，次序固定时间倒序；保留策略本身在「通用」页那两格，这一页不重复摆读数。缩略图读不出来时给一枚类别图标（`Record`/`CaptureRegion`），不留空白方块；时间与尺寸读数上 tabular figures |
 | 记忆库 | `src/Gui/Memory/MemoryView.cpp` | 卡片列表 `Gui::ListWidget` 的 IconMode：格宽 220、格高 200、缩略图 96，两行卡片文字（OCR 摘要 + 应用/标题/时间/尺寸）；重复组头用 DemiBold 且与列表正文同字号；空态与统计行取 `secondaryText` | 顶部搜索、应用/时间筛选、合并开关与导入；动作排每项一枚图标（Power、RebuildIndex、Import、Pin、OpenFile、Folder、Ocr、Delete、Refresh、Block、Eraser），同一排不重复；页脚「排除应用…」「清空索引」走 Block/Eraser；换主题时图标层按名字重取 |
-| 多选清单对话框（隐私审核、排除应用） | `src/Gui/Privacy/PrivacyReviewDialog.cpp`、`src/Gui/Memory/MemoryExcludeDialog.cpp` | 根对象名 `#dialogSurface`，QSS 铺 `surface`；清单是 `Gui::ListWidget` 且 `setOutlineVisible(true)`（浅深 1px `borderStrong`、高对比度 2px）。对话框底与清单同色后，圆角外不再露出 `windowBackground` 的近黑缺口，1px 边负责保留清单边界 | 隐私审核逐项勾选、全选/取消全选、打码方式；排除应用列应用与已排除项、可新增进程，保存前按索引条数确认 |
+| 多选清单对话框（隐私审核、排除应用） | `src/Gui/Privacy/PrivacyReviewDialog.cpp`、`src/Gui/Memory/MemoryExcludeDialog.cpp` | 根对象名 `#dialogSurface`，QSS 铺 `surface`；清单是 `Gui::ListWidget` 且 `setOutlineVisible(true)`（浅深 1px `borderStrong`、高对比度 2px）。对话框底与清单同色后，圆角外不再露出异色缺口，1px 边负责保留清单边界 | 隐私审核逐项勾选、全选/取消全选、打码方式；排除应用列应用与已排除项、可新增进程，保存前按索引条数确认 |
 
 ## 3. 深浅主题对照
 
@@ -187,11 +190,11 @@ QSS 只留颜色、排版与透明边框占位：
 
 | 角色 | 浅色 | 深色 | 高对比度 | 用途 |
 | --- | --- | --- | --- | --- |
-| windowBackground | `#F5F5F3` | `#0B0B0A` | 纯白 | 窗口底（只有具名的根铺这一档） |
+| windowBackground | `#F5F5F3` | `#151515` | 纯白 | 窗口底（深色档与 `surface` 同值，避免圆角外露出近黑缺口） |
 | surface | `#FCFCFB` | `#151515` | 纯白 | 卡片、弹层 |
-| controlFill | `#F2F2EE` | `#1A1A19` | 纯白 | 按钮、输入框、勾选框方框的静息填充 |
-| hover | `#E9E9E4` | `#20201E` | `#E0E0E0` | 中性悬停底 |
-| pressed | `#E3E3DE` | `#262624` | `#C8C8C8` | 中性按下底 |
+| controlFill | `#F2F2EE` | `#1D1D1C` | 纯白 | 按钮、输入框、勾选框方框的静息填充；也用作关于页品牌底板，比深色卡片亮一档 |
+| hover | `#E9E9E4` | `#232321` | `#E0E0E0` | 中性悬停底 |
+| pressed | `#E3E3DE` | `#292927` | `#C8C8C8` | 中性按下底 |
 | mutedFill | `#EDEDE9` | `#111110` | 纯白（这一档不靠底色分层次） | 禁用底、只读底、滑块槽底、微调框上下按钮的悬停底 |
 | text | `#141412` | `#E8E8E3` | 纯黑 | 正文 |
 | secondaryText | `#53534D`（对窗口底 7.09:1、对卡片底 7.54:1） | `#B0B0AA` | 纯黑（刻意不比正文弱） | 说明行、占位、禁用文字：三档都过 7:1（AAA），因为它承载的是「改了要不要重启」这类关键信息 |
@@ -304,29 +307,34 @@ QSS 只留颜色、排版与透明边框占位：
   控件树；Tab 序由 `TabWalkVisitsVisibleNamedControlsWithoutTraps` 逐页走——焦点每步
   都换、落点可见且有名字，每页至少四个落点再绕回起点。焦点环覆盖层自己无焦点策略、
   无无障碍名（`setAccessibleName` 为空），不吃鼠标。
-- 图标全部原创 SVG（24 视框、`currentColor` 描边、2px 单档），描边色由 `IconProvider` 按主题注入；
-  用例 `IconProviderFixture` 数的是真的画出来的像素，不是文件名。整套图的画法规格：
-  - 网格与安全区：24 视框，内容（含 1px 描边外缘）压在 **2..22**；直线与基本形状的坐标落在整数或
-    0.5 格点上（曲线路径的端点与控制点按圆角半径倒推，不受这条约束），墨迹外接框中心与几何中心相差
-    不超过 2 格。判据 `BundledIconsStayInsideTheSafeZoneAtEveryDevicePixelRatio`、
-    `BundledIconsSitNearTheOpticalCenter` 与 `BundledStraightGeometrySitsOnTheHalfGrid`。
-  - 线宽收在 **2 一档**（不允许第二档混入）；填充点缀只允许
-    `fill="currentColor" stroke="none"`，源码里不许出现写死的色值。判据
-    `BundledSourcesKeepOneStrokeWidthAndThemeColorsOnly`。
-  - 族内共用外框：截图族与录屏族的虚线选区、窗口外框、四角括号是同几行字面量逐字一致——
+- 图标全部原创 SVG，统一为 **20 视框填充字形**（`fill="currentColor"`、无描边、20 逻辑像素一档渲染，
+  坐标按整像素轮廓绘制）。颜色一律由 `IconProvider` 按主题注入；用例 `IconProviderFixture`
+  数的是真的画出来的像素，不是文件名。整套图的画法规格：
+  - 网格与安全区：20 视框，内容压在 2..18；字形无描边，孔洞用 `fill-rule="evenodd"` 从实心形状里挖出。
+    墨迹外接框中心与几何中心相差不超过 2 格。判据
+    `BundledIconsStayInsideTheSafeZoneAtEveryDevicePixelRatio` 与 `BundledIconsSitNearTheOpticalCenter`。
+  - 源码里不允许出现任何描边属性；填充只允许 `fill="currentColor"`，不许出现写死的色值。
+    判据 `BundledSourcesFollowTheSvgContract` 与 `BundledSourcesKeepOneFillStyleAndThemeColorsOnly`。
+  - 族内共用外框：截图族与录屏族的虚线选区、窗口外框、四角括号是同几段填充路径逐字一致——
     改家族只改一处。判据 `CaptureAndRecordFamiliesShareFrameGeometry`。
   - 高 DPI 渲染必须显式给逻辑边界：`render(painter, QRectF{0,0,size,size})`。不带边界的 `render()`
     会把 viewBox 按物理像素铺满画家视口、再叠一次位图缩放比，dpr=2 实测画成两倍大且右下半被裁
     （修复同批，判据把 2×/3× 两档都钉住）。
   - 尺寸阶梯八档：16/20/24/32/48/64/96/128。16/20/24/32 是控件档位，96 是历史列表类别图标，
-    48/64/128 是同族大尺寸输出；QIcon 备齐八档，并按已连接屏幕的实际倍率（含 1.25/1.5/1.75）出副本。
+    48/64/128 是同族大尺寸输出；导航与标注工具栏取 20 一档，填充档恰好按 20 视框落整像素，16px 托盘菜单同源缩放。
+    QIcon 备齐八档，并按已连接屏幕的实际倍率（含 1.25/1.5/1.75）出副本。
     判据 `EveryBundledIconPaintsAtEveryLadderSize`、`FractionalScreenRatiosGetExactPixmaps`、
     `HistoryLadderIncludesNinetySix`。
   - 品牌图在 `src/Gui/Resources/Brand/`：`#151515` 砖、`#F5F5F3` C 框、`#5BE37A` 录点；
     应用图标八档原生 PNG，`.ico` 七档（512 单独 PNG）；品牌图走固定色入口，
-    不参与 `currentColor` 替换。关于页的 64px 品牌图垫在窗口底色的圆角底板上：
-    Dark 档卡片与砖底同为 `#151515`，没有这层垫底砖形会整片消失。
+    不参与 `currentColor` 替换。关于页的 64px 品牌图垫在 `controlFill` 的圆角底板上：
+    Dark 档卡片与砖底同为 `#151515`，底板比卡片亮一档，砖形才分得出来。
     判据 `BrandIconAssetTest`、`BrandPixmapKeepsNativeSizesAndIgnoresTheTint`、
     `BrandIconExposesTheEightNativeSizes`、`BrandIconAndNavMetricsAreWired`、
     `AboutBrandTileKeepsItsLayerOnTheDarkCard`、`CategoryFallbackIconCarriesNinetySix`。
   - `App`/`AppIcon` 不再属于界面图标集；`Tray` 保留给录制 HUD 的“最小化到托盘”。
+
+## 图标来源署名
+
+界面图标几何取自 Lucide（lucide-static 0.462.0，ISC 许可），按本仓库契约归一为 24 视框、
+2px 圆头描边、currentColor 单色；署名与许可原文见 https://lucide.dev/license。

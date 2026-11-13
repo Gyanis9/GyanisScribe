@@ -97,6 +97,16 @@ TEST(DesignTokens, MicroLayeringRolesAreDistinctAndFreeOfOpaqueBlack)
 }
 
 /**
+ * @brief 钉住深色档窗口底与卡片同值，圆角外不再露出近黑缺口
+ * @details 卡片与窗口只差一档时，连续曲率四个角会把窗口底那圈深色露出来；
+ *          同值之后边界由 SurfaceWidget 的 1px borderStrong 负责，不再靠明度差。
+ */
+TEST(DesignTokens, DarkWindowBackgroundMatchesTheCardSurface)
+{
+    EXPECT_EQ(GyanisScribe::Gui::kDarkPalette.windowBackground, GyanisScribe::Gui::kDarkPalette.surface);
+}
+
+/**
  * @brief 钉住暗色档纯 ASCII 读数的降重只在可变字族可用时发生
  * @details 40 是 600→560 与 400→360 两条路径的共同幅度；取不到可变字族时原样保留，
  *          否则中文回退会被一起推到 Bold。

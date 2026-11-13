@@ -1,6 +1,7 @@
 #include "Main/MainWindow.h"
 #include "App/TrayController.h"
 
+#include "Base/Text.h"
 #include "Platform/PlatformCapabilities.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Gui/Resources/IconProvider.h"
@@ -8,6 +9,7 @@
 #include <gtest/gtest.h>
 
 #include <QString>
+#include <QStringList>
 
 #include <array>
 #include <string>
@@ -92,6 +94,41 @@ TEST(TrayMenuTable, ListsEachActionOnceWithRealIcons)
             EXPECT_EQ(std::string{entry.iconName}, "CaptureWindow");
         }
     }
+}
+
+/**
+ * @brief 钉住托盘右键顶层只留六个入口，其余动作全部收进「更多」
+ * @details 顶层是截图、贴图、录屏、更多、设置、退出；「更多」由构建器生成，不在表里。
+ *          表里只有这五项是 Primary，多摆一项就会把低频动作又推回第一层。
+ */
+TEST(TrayMenuTable, TopLevelIsSixEntriesAndTheRestLiveUnderMore)
+{
+    using GyanisScribe::App::TrayMenuPlacement;
+
+    std::vector<TrayAction> primaryActions;
+    QStringList             primaryLabels;
+    for (const auto &entry: trayMenuEntries())
+    {
+        if (!entry.action)
+        {
+            continue;
+        }
+        if (entry.placement == TrayMenuPlacement::Primary)
+        {
+            primaryActions.push_back(*entry.action);
+            primaryLabels.append(entry.label);
+        }
+        else
+        {
+            EXPECT_NE(*entry.action, TrayAction::CaptureRegion) << "截图是顶层动作，不该收进更多";
+        }
+    }
+
+    const std::vector<TrayAction> expected{TrayAction::CaptureRegion, TrayAction::PasteClipboard, TrayAction::ToggleRecord,
+                                           TrayAction::OpenSettings, TrayAction::Quit};
+    EXPECT_EQ(primaryActions, expected) << "顶层动作的顺序或数量变了：界面上的六项是这五项再加一个「更多」";
+    EXPECT_EQ(primaryLabels, QStringList({GyanisScribe::Base::uiText("截图"), GyanisScribe::Base::uiText("贴图"), GyanisScribe::Base::uiText("录屏"),
+                                          GyanisScribe::Base::uiText("设置"), GyanisScribe::Base::uiText("退出")}));
 }
 
 /**

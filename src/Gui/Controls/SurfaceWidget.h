@@ -58,12 +58,27 @@ namespace GyanisScribe::Gui
          */
         void setHighContrastBorder(bool enabled);
 
+        /**
+         * @brief 开一条随主题的静息描边
+         * @param visible true 表示用 borderStrong 与主题描边宽度画出卡片边界
+         * @details 深色窗口底与卡片同值后，圆角不会再露出黑缺口；
+         *          边界改由这圈 1px 线给出，浅深两档都随主题取色
+         */
+        void setOutlineVisible(bool visible);
+
+        /**
+         * @brief 静息描边是否可见
+         * @return true 表示当前会画主题描边
+         */
+        [[nodiscard]] bool outlineVisible() const;
+
     protected:
         /**
          * @brief 按当前角色与铺底色画连续曲率底
          * @details 重写 QWidget::paintEvent()：基类只画背景，这里改由本类按连续曲率画底与描边；
          *          开了 setHighContrastBorder 时高对比度档换用 borderStrong 2px 边，
-         *          已经有显式描边的控件保持自己的颜色与宽度
+         *          已经有显式描边的控件保持自己的颜色与宽度；
+         *          开了 setOutlineVisible 时浅深两档都补一圈主题 borderStrong
          * @param event 绘制事件
          */
         void paintEvent(QPaintEvent *event) override;
@@ -74,6 +89,7 @@ namespace GyanisScribe::Gui
         QColor           m_borderColor;                ///< 可见描边色
         int              m_borderWidth        = 0;     ///< 可见描边宽度
         bool             m_highContrastBorder = false; ///< 高对比度档是否自动补边
+        bool             m_outlineVisible     = false; ///< 是否画主题静息描边
     };
 
     /**

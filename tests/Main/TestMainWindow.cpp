@@ -2374,7 +2374,7 @@ TEST_F(MainWindowFixture, CompactSettingsLayoutHasANarrowerFloor)
     ASSERT_NE(card, nullptr);
     auto *box = qobject_cast<QVBoxLayout *>(card->layout());
     ASSERT_NE(box, nullptr);
-    EXPECT_EQ(box->contentsMargins().left(), GyanisScribe::Gui::kSpacingMedium);
+    EXPECT_EQ(box->contentsMargins().left(), GyanisScribe::Gui::kSpacingLarge);
     auto *form = card->findChild<QFormLayout *>();
     ASSERT_NE(form, nullptr);
     EXPECT_EQ(form->verticalSpacing(), GyanisScribe::Gui::kSpacingSmall);
@@ -2513,9 +2513,9 @@ TEST_F(MainWindowFixture, ClearingPathRowShowsTheDefaultDirectory)
 }
 
 /**
- * @brief 钉住多屏时「整屏截图」在托盘菜单里变成带屏名的子菜单
- * @details 动作条隐藏后，逐屏入口不能跟着消失；子菜单第一项是「光标所在屏幕」，
- *          后面逐块屏点名，触发后走 screenCaptureRequested。
+ * @brief 钉住多屏时「整屏截图」在托盘「更多」里变成带屏名的子菜单
+ * @details 顶层只留六个入口，逐屏入口不能跟着消失；「更多」里的整屏截图子菜单第一项是
+ *          「光标所在屏幕」，后面逐块屏点名，触发后走 screenCaptureRequested。
  */
 TEST_F(MainWindowFixture, MultiScreenFullCaptureIsASubmenuInTheTrayMenu)
 {
@@ -2524,13 +2524,20 @@ TEST_F(MainWindowFixture, MultiScreenFullCaptureIsASubmenuInTheTrayMenu)
     QMenu                             menu;
     tray.buildMenu(menu, {QStringLiteral("DISPLAY1"), QStringLiteral("DISPLAY2")});
     EXPECT_EQ(menu.font().pointSize(), GyanisScribe::Gui::kMenuTextPointSize) << "菜单字号没有在构建处落地";
-
     const auto topActions = menu.actions();
-    const auto found      = std::ranges::find(topActions, GyanisScribe::Base::uiText("整屏截图"), &QAction::text);
-    ASSERT_NE(found, topActions.end());
-    ASSERT_NE((*found)->menu(), nullptr) << "多屏时整屏截图还是扁平项，逐屏入口没地方落";
+    EXPECT_EQ(topActions.size(), 6) << "顶层多出一项，低频动作又回到第一层了";
+    EXPECT_EQ(std::ranges::find(topActions, GyanisScribe::Base::uiText("整屏截图"), &QAction::text), topActions.end()) << "整屏截图不该出现在顶层";
 
-    const auto  subActions = (*found)->menu()->actions();
+    const auto moreEntry = std::ranges::find(topActions, GyanisScribe::Base::uiText("更多"), &QAction::text);
+    ASSERT_NE(moreEntry, topActions.end());
+    ASSERT_NE((*moreEntry)->menu(), nullptr) << "「更多」没有子菜单，低频动作没地方落";
+
+    const auto moreActions = (*moreEntry)->menu()->actions();
+    const auto fullScreen   = std::ranges::find(moreActions, GyanisScribe::Base::uiText("整屏截图"), &QAction::text);
+    ASSERT_NE(fullScreen, moreActions.end());
+    ASSERT_NE((*fullScreen)->menu(), nullptr) << "多屏时整屏截图还是扁平项，逐屏入口没地方落";
+
+    const auto  subActions = (*fullScreen)->menu()->actions();
     QStringList labels;
     for (auto *action: subActions)
     {
@@ -2556,6 +2563,7 @@ TEST_F(MainWindowFixture, MultiScreenFullCaptureIsASubmenuInTheTrayMenu)
 TEST_F(MainWindowFixture, ActionBarLandsEveryVisibleTrayEntrySomewhere)
 {
     using GyanisScribe::App::TrayAction;
+    using GyanisScribe::App::TrayMenuPlacement;
     using GyanisScribe::App::visibleTrayMenuEntries;
 
     makeWindow(true);
@@ -2588,7 +2596,7 @@ TEST_F(MainWindowFixture, ActionBarLandsEveryVisibleTrayEntrySomewhere)
             EXPECT_EQ(std::ranges::find(buttons, entry.label, &QPushButton::text), buttons.end()) << "「" << entry.label.toStdString() << "」是窗口自己的事，不该出现在动作条上";
             continue;
         }
-        if (entry.hotkeyKey.empty())
+        if (entry.placement == TrayMenuPlacement::More)
         {
             ++secondaryCount;
             EXPECT_NE(std::ranges::find(menuActions, entry.label, &QAction::text), menuActions.end()) << "次要动作「" << entry.label.toStdString() << "」在「更多」里找不到落点";
@@ -2605,9 +2613,10 @@ TEST_F(MainWindowFixture, ActionBarLandsEveryVisibleTrayEntrySomewhere)
     }
 
     // 总数也要同解：多出来的按钮或菜单项意味着表和条散开了
-    EXPECT_EQ(static_cast<int>(buttons.size()), primaryCount) << "动作条上的按钮数与表里带热键提示的条目数不一致";
+    EXPECT_EQ(primaryCount, 3) << "顶层只留截图、贴图、录屏三个动作";
+    EXPECT_EQ(static_cast<int>(buttons.size()), primaryCount) << "动作条上的按钮数与表里顶层条目数不一致";
     EXPECT_EQ(static_cast<int>(menuActions.size()), secondaryCount) << "「更多」里的条目数与表里其余条目数不一致";
-    ASSERT_FALSE(firstPrimaryLabel.isEmpty()) << "表里一条带热键提示的主操作都没有，这条用例就什么都没判";
+    ASSERT_FALSE(firstPrimaryLabel.isEmpty()) << "表里一条顶层主操作都没有，这条用例就什么都没判";
 
     // 按下去要出来的就是它那一个动作：接错一格就是「点了截图却开始录屏」
     int        emissions = 0;
@@ -2625,8 +2634,8 @@ TEST_F(MainWindowFixture, ActionBarLandsEveryVisibleTrayEntrySomewhere)
 }
 
 /**
- * @brief 钉住 uiElements 能力位开着时动作条给出「拾取界面元素」按钮，点击发同名动作
- * @details 按钮由托盘条目表通用生成：能力位被漏判时这一格会红，而热键页那一条仍绿。
+ * @brief 钉住 uiElements 能力位开着时「拾取界面元素」落在动作条的「更多」里，触发发同名动作
+ * @details 收进更多只改位置不改可达性：能力位被漏判时这一格会红，而热键页那一条仍绿。
  */
 TEST_F(MainWindowFixture, ActionBarOffersElementPickWhenTheCapabilityIsOn)
 {
@@ -2637,10 +2646,13 @@ TEST_F(MainWindowFixture, ActionBarOffersElementPickWhenTheCapabilityIsOn)
 
     auto *bar = m_window->findChild<QWidget *>(QStringLiteral("actionBar"));
     ASSERT_NE(bar, nullptr);
-    const auto buttons = bar->findChildren<QPushButton *>();
+    auto *more = bar->findChild<QToolButton *>();
+    ASSERT_NE(more, nullptr);
+    ASSERT_NE(more->menu(), nullptr);
     const auto label   = GyanisScribe::Base::uiText("拾取界面元素");
-    const auto found   = std::ranges::find(buttons, label, &QPushButton::text);
-    ASSERT_NE(found, buttons.end()) << "能力位开着，动作条却没有「拾取界面元素」按钮";
+    const auto actions = more->menu()->actions();
+    const auto found   = std::ranges::find(actions, label, &QAction::text);
+    ASSERT_NE(found, actions.end()) << "能力位开着，动作条的「更多」里却没有「拾取界面元素」";
 
     int        emissions = 0;
     TrayAction emitted   = TrayAction::Quit;
@@ -2650,9 +2662,9 @@ TEST_F(MainWindowFixture, ActionBarOffersElementPickWhenTheCapabilityIsOn)
                          ++emissions;
                          emitted = action;
                      });
-    (*found)->click();
-    EXPECT_EQ(emissions, 1) << "按钮点了却没发信号，或发了不止一次";
-    EXPECT_TRUE(emitted == TrayAction::PickElement) << "按钮发出来的不是元素拾取";
+    (*found)->trigger();
+    EXPECT_EQ(emissions, 1) << "菜单项触发了却没发信号，或发了不止一次";
+    EXPECT_TRUE(emitted == TrayAction::PickElement) << "菜单项发出来的不是元素拾取";
 }
 
 /**
@@ -3100,7 +3112,7 @@ TEST_F(MainWindowFixture, ClosingTheWindowHidesItForLaterReopen)
 
 /**
  * @brief 钉住品牌图与导航尺寸的接线
- * @details 窗口图标、关于页 64px 品牌图、导航 20px 是三处会被后续重构悄悄改掉的接线。
+ * @details 窗口图标、关于页 64px 品牌图、导航 24px 是三处会被后续重构悄悄改掉的接线。
  *          窗口图标只查 32 档的话，任何一枚界面图标都能过；品牌图集是唯一带 512 原生档的那一套。
  */
 TEST_F(MainWindowFixture, BrandIconAndNavMetricsAreWired)
@@ -3111,7 +3123,7 @@ TEST_F(MainWindowFixture, BrandIconAndNavMetricsAreWired)
 
     ASSERT_NE(nav(), nullptr);
     EXPECT_NE(dynamic_cast<GyanisScribe::Gui::ListWidget *>(nav()), nullptr) << "导航没用自绘连续曲率的列表类";
-    EXPECT_EQ(nav()->iconSize(), QSize(20, 20));
+    EXPECT_EQ(nav()->iconSize(), QSize(24, 24));
 
     m_window->open(MainWindowPage::About);
     auto *logo = dynamic_cast<QLabel *>(controlInCurrentPage("智录图标"));
@@ -3170,6 +3182,33 @@ TEST_F(MainWindowFixture, AboutBrandTileKeepsItsLayerOnTheDarkCard)
 
     EXPECT_GE(channelGap(plate, card), 8) << "深色卡片与品牌底板分不出来，砖形仍然会消失";
     EXPECT_GE(channelGap(tile, plate), 8) << "品牌砖与底板之间没有一层可分的边界";
+}
+
+/**
+ * @brief 钉住深色主题下设置卡片圆角外不再露近黑缺口
+ * @details 卡片圆角切掉的那一小块由窗口底补上；窗口底若仍比卡片暗一档，
+ *          四个角就是一圈近黑缺口。抽样点取卡片左上角内 1px，正好落在圆角之外。
+ */
+TEST_F(MainWindowFixture, DarkPageCardCornersShowTheWindowTone)
+{
+    ASSERT_TRUE(m_store->setValue(GyanisScribe::Core::kThemeMode, QStringLiteral("Dark")).has_value());
+    m_theme->applyFromSettings();
+    makeWindow();
+    m_window->open(MainWindowPage::General);
+    QCoreApplication::processEvents();
+
+    auto *page = stack()->currentWidget();
+    ASSERT_NE(page, nullptr);
+
+    const auto image  = m_window->grab().toImage();
+    const auto scale  = image.devicePixelRatio();
+    const auto corner = page->mapTo(m_window.get(), QPoint{1, 1});
+    const auto pixel  = image.pixelColor(static_cast<int>(std::lround(corner.x() * scale)), static_cast<int>(std::lround(corner.y() * scale)));
+    const auto expected = GyanisScribe::Gui::kDarkPalette.windowBackground;
+    const auto gap = [](const QColor &left, const QColor &right)
+    { return std::max({std::abs(left.red() - right.red()), std::abs(left.green() - right.green()), std::abs(left.blue() - right.blue())}); };
+
+    EXPECT_LE(gap(pixel, expected), 2) << "卡片圆角外侧 " << pixel.name().toStdString() << " 与窗口底 " << expected.name().toStdString() << " 不同：黑缺口又露出来了";
 }
 
 /**
@@ -3245,7 +3284,12 @@ TEST_F(MainWindowFixture, SceneClearEntryIsHiddenWithoutThePlatformCapability)
 
     auto *bar = m_window->findChild<QWidget *>(QStringLiteral("actionBar"));
     ASSERT_NE(bar, nullptr) << "动作条没建出来";
+    auto *more = bar->findChild<QToolButton *>();
+    ASSERT_NE(more, nullptr);
+    ASSERT_NE(more->menu(), nullptr);
     const auto label = GyanisScribe::Base::uiText("清场截图");
+    const auto moreActions = more->menu()->actions();
+    EXPECT_EQ(std::ranges::find(moreActions, label, &QAction::text), moreActions.end()) << "平台做不出清场，动作条的「更多」里却摆着「清场截图」";
     for (auto *button: bar->findChildren<QPushButton *>())
     {
         EXPECT_NE(button->text(), label) << "平台做不出清场，动作条却摆着「清场截图」";
@@ -3253,9 +3297,9 @@ TEST_F(MainWindowFixture, SceneClearEntryIsHiddenWithoutThePlatformCapability)
 }
 
 /**
- * @brief 钉住能力位为真时「清场截图」落在托盘表与动作条，按下发的是清场动作
- * @details 入口只加在菜单里，没有托盘的机器就一条常设入口都没有；按钮发错动作则等于
- *          「点了清场却去截别的」，所以按下去那一格要接到同一个枚举上。
+ * @brief 钉住能力位为真时「清场截图」落在托盘表与动作条的「更多」里，触发发的是清场动作
+ * @details 入口只加在菜单里，没有托盘的机器就一条常设入口都没有；菜单项发错动作则等于
+ *          「点了清场却去截别的」，所以触发那一格要接到同一个枚举上。
  */
 TEST_F(MainWindowFixture, SceneClearEntryLandsInTrayTableAndActionBarWithTheCapability)
 {
@@ -3273,10 +3317,13 @@ TEST_F(MainWindowFixture, SceneClearEntryLandsInTrayTableAndActionBarWithTheCapa
 
     auto *bar = m_window->findChild<QWidget *>(QStringLiteral("actionBar"));
     ASSERT_NE(bar, nullptr) << "动作条没建出来";
-    const auto buttons = bar->findChildren<QPushButton *>();
+    auto *more = bar->findChild<QToolButton *>();
+    ASSERT_NE(more, nullptr);
+    ASSERT_NE(more->menu(), nullptr);
     const auto label   = GyanisScribe::Base::uiText("清场截图");
-    const auto found   = std::ranges::find(buttons, label, &QPushButton::text);
-    ASSERT_NE(found, buttons.end()) << "能力位开着，动作条却没有「清场截图」按钮";
+    const auto actions = more->menu()->actions();
+    const auto found   = std::ranges::find(actions, label, &QAction::text);
+    ASSERT_NE(found, actions.end()) << "能力位开着，动作条的「更多」里却没有「清场截图」";
 
     int        emissions = 0;
     TrayAction emitted   = TrayAction::Quit;
@@ -3286,7 +3333,7 @@ TEST_F(MainWindowFixture, SceneClearEntryLandsInTrayTableAndActionBarWithTheCapa
                          ++emissions;
                          emitted = action;
                      });
-    (*found)->click();
-    EXPECT_EQ(emissions, 1) << "按钮点了却没发信号，或发了不止一次";
-    EXPECT_TRUE(emitted == TrayAction::SceneClearCapture) << "按钮发出来的不是清场动作";
+    (*found)->trigger();
+    EXPECT_EQ(emissions, 1) << "菜单项触发了却没发信号，或发了不止一次";
+    EXPECT_TRUE(emitted == TrayAction::SceneClearCapture) << "菜单项发出来的不是清场动作";
 }

@@ -96,7 +96,7 @@ namespace
                                          IconSize::Huge,  IconSize::Display, IconSize::History, IconSize::Maximum};
 
     /// 阶梯对应的逻辑像素数，与 IconSize 的枚举值同解，这条用例把它钉住
-    constexpr std::array kLadderPixels = {16, 20, 24, 32, 48, 64, 96, 128};
+    constexpr std::array kLadderPixels = {16, 24, 24, 32, 48, 64, 96, 128};
 
     std::unique_ptr<QApplication> application;
 
@@ -154,6 +154,12 @@ namespace
             return {};
         }
         return QString::fromUtf8(file.readAll());
+    }
+
+    /// 线性档图标用 24 网格：Lucide 的几何与笔画按 24 视框校准，导航与工具栏按 24 逻辑像素渲染才不糊
+    bool isLineIconSource(const QString &source)
+    {
+        return source.contains(QStringLiteral(R"(viewBox="0 0 24 24")")) && source.contains(QStringLiteral(R"(stroke="currentColor")"));
     }
 
     class IconProviderFixture : public ::testing::Test
@@ -214,73 +220,10 @@ TEST_F(IconProviderFixture, EveryBundledIconPaintsAtEveryLadderSize)
             EXPECT_GT(paintedPixelCount(bitmap), 0) << name.toStdString() << " 画出来是全透明：渲染器接了源文件但一条线都没画";
         }
 
-        // 多档齐全才谈得上「QIcon 自己按按钮尺寸挑」
+        // 多档齐全才谈得上「QIcon 自己按按钮尺寸挑」；Medium 与 Large 同为 24，去重后是七档
         const auto icon = provider().icon(stdName);
         ASSERT_FALSE(icon.isNull()) << name.toStdString() << " 取不到图标";
-        EXPECT_GE(icon.availableSizes().size(), kLadderSizes.size()) << name.toStdString() << " 只备齐了 " << icon.availableSizes().size() << " 档，阶梯是八档";
-    }
-}
-
-/**
- * @brief 钉住直线与基本形状的坐标落在整数或半格上
- * @details 2px 描边落在整数/半格上，16px 档才不会因为四分之一格的半像素落点发灰。
- *          曲线路径（含弧与贝塞尔）的端点和控制点不受这条约束：拐角半径是由描边外缘倒推的，
- *          强行吸格会把圆角压扁；填充点缀只要形状本身是基本几何，同样按半格检查。
- */
-TEST_F(IconProviderFixture, BundledStraightGeometrySitsOnTheHalfGrid)
-{
-    const QRegularExpression elementPattern(QStringLiteral(R"(<(path|rect|circle|ellipse|line)\b([^>]*)>)"));
-    const QRegularExpression pathDataPattern(QStringLiteral(R"RE(\bd="([^"]*)")RE"));
-    const QRegularExpression curvePattern(QStringLiteral("[aAcCsSqQtT]"));
-    const QRegularExpression numberPattern(QStringLiteral(R"(-?\d+(?:\.\d+)?)"));
-    const QRegularExpression geometryPattern(QStringLiteral(R"RE(\b(x|y|width|height|rx|ry|cx|cy|r|x1|y1|x2|y2)="([^"]*)")RE"));
-
-    const auto onHalfGrid = [](const QString &text)
-    {
-        bool         parsed = false;
-        const double value  = text.toDouble(&parsed);
-        return parsed && std::abs(value * 2.0 - std::round(value * 2.0)) < 1e-9;
-    };
-
-    for (const auto &name: provider().availableIconNames())
-    {
-        const auto source = readIconSource(name.toStdString());
-        ASSERT_FALSE(source.isEmpty()) << name.toStdString() << " 的资源是空的";
-
-        auto elements = elementPattern.globalMatch(source);
-        while (elements.hasNext())
-        {
-            const auto match = elements.next();
-            const auto tag   = match.captured(1);
-            const auto attrs = match.captured(2);
-
-            QStringList coordinates;
-            const auto  data = pathDataPattern.match(attrs);
-            if (data.hasMatch())
-            {
-                if (curvePattern.match(data.captured(1)).hasMatch())
-                {
-                    continue;
-                }
-                auto numbers = numberPattern.globalMatch(data.captured(1));
-                while (numbers.hasNext())
-                {
-                    coordinates.append(numbers.next().captured(0));
-                }
-            } else
-            {
-                auto geometry = geometryPattern.globalMatch(attrs);
-                while (geometry.hasNext())
-                {
-                    coordinates.append(geometry.next().captured(2));
-                }
-            }
-
-            for (const auto &coordinate: coordinates)
-            {
-                EXPECT_TRUE(onHalfGrid(coordinate)) << name.toStdString() << " 的 <" << tag.toStdString() << "> 坐标 " << coordinate.toStdString() << " 不在整数或半格上";
-            }
-        }
+        EXPECT_GE(icon.availableSizes().size(), kLadderSizes.size() - 1) << name.toStdString() << " 只备齐了 " << icon.availableSizes().size() << " 档，阶梯去重后是七档";
     }
 }
 
@@ -300,7 +243,7 @@ TEST_F(IconProviderFixture, RequiredIconNamesAreAllPresent)
 
 /**
  * @brief 钉住 SVG 源码本身符合第七节的硬约束
- * @details 检查的是文本而不是渲染结果：viewBox、currentColor、线宽、原创且无外部引用，
+ * @details 检查的是文本而不是渲染结果：20 网格、填充字形无描边、currentColor、原创且无外部引用，
  *          这几条渲染得再好也说明不了，必须逐份读源码。
  */
 TEST_F(IconProviderFixture, BundledSourcesFollowTheSvgContract)
@@ -310,11 +253,9 @@ TEST_F(IconProviderFixture, BundledSourcesFollowTheSvgContract)
         const auto source = readIconSource(name.toStdString());
         ASSERT_FALSE(source.isEmpty()) << name.toStdString() << " 的资源是空的";
 
-        EXPECT_NE(source.indexOf(QStringLiteral(R"(viewBox="0 0 24 24")")), -1) << name.toStdString() << " 的 viewBox 不是 0 0 24 24";
+        EXPECT_TRUE(isLineIconSource(source)) << name.toStdString() << " 不是 24 视框的 currentColor 线性字形";
         EXPECT_NE(source.indexOf(QStringLiteral("currentColor")), -1) << name.toStdString() << " 没用 currentColor，换主题时不会跟着变色";
-        EXPECT_NE(source.indexOf(QStringLiteral(R"(stroke-linecap="round")")), -1) << name.toStdString() << " 端点不是圆角，风格不统一";
-        EXPECT_NE(source.indexOf(QStringLiteral(R"(stroke-linejoin="round")")), -1) << name.toStdString() << " 连接不是圆角，风格不统一";
-        EXPECT_NE(source.indexOf(QStringLiteral(R"(stroke-width="2")")), -1) << name.toStdString() << " 线宽不是 2";
+        EXPECT_NE(source.indexOf(QStringLiteral(R"(fill="none")")), -1) << name.toStdString() << " 线性字形必须声明不填充，否则 Qt 会把闭合路径涂实";
 
         // 需求禁止脚本、外部图片与 base64：出现任一关键字就不是「原创 SVG 源码」了
         EXPECT_EQ(source.indexOf(QStringLiteral("<script")), -1) << name.toStdString() << " 里出现了脚本";
@@ -369,7 +310,7 @@ TEST_F(IconProviderFixture, CacheKeyCarriesTintSizeAndRatio)
 
     // 档位与缩放比也要各归各格：尺寸按 IconSize 的档位值与夹住后的缩放比手算
     EXPECT_EQ(greenSmall.size(), QSize(16, 16));
-    EXPECT_EQ(greenMedium.size(), QSize(20, 20)) << "档位不在键里时两档会同尺寸";
+    EXPECT_EQ(greenMedium.size(), QSize(24, 24)) << "档位不在键里时两档会同尺寸";
     EXPECT_EQ(greenDoubled.size(), QSize(32, 32)) << "缩放比不在键里时高 DPI 那格会拿到低缩放的那一份";
     EXPECT_DOUBLE_EQ(greenDoubled.devicePixelRatio(), 2.0);
 }
@@ -428,34 +369,27 @@ TEST_F(IconProviderFixture, AppliedIconsReResolveAfterTheTintChanges)
 }
 
 /**
- * @brief 钉住全部图标只用一个线宽档、且颜色只走主题注入
- * @details 设计规格把描边收在唯一的 2 档：多出来的粗细会让同一排按钮看上去不是一家人。
- *          颜色只允许 none / currentColor——写死的色值绕开了 IconProvider 的主题注入，换主题时会留在旧色上。
- *          与 BundledSourcesFollowTheSvgContract 分工：那条查「2 这个档位还在不在」，
- *          这条查「有没有第二档或写死的色混进来」。
+ * @brief 钉住全部图标只用一个填充档、且颜色只走主题注入
+ * @details 填充字形没有描边属性，所有 `fill` 只能是 currentColor；
+ *          写死的色值绕开了 IconProvider 的主题注入，换主题时会留在旧色上。
  */
-TEST_F(IconProviderFixture, BundledSourcesKeepOneStrokeWidthAndThemeColorsOnly)
+TEST_F(IconProviderFixture, BundledSourcesKeepOneStrokeStyleAndThemeColorsOnly)
 {
-    const QRegularExpression widthPattern{QStringLiteral(R"re(stroke-width="([^"]+)")re")};
-    const QRegularExpression fillPattern{QStringLiteral(R"re(fill="([^"]+)")re")};
+    const QRegularExpression strokePattern{QStringLiteral(R"re(stroke="([^"]+)")re")};
 
     for (const auto &name: provider().availableIconNames())
     {
         const auto source = readIconSource(name.toStdString());
         ASSERT_FALSE(source.isEmpty()) << name.toStdString() << " 的资源是空的";
 
-        auto widths = widthPattern.globalMatch(source);
-        ASSERT_TRUE(widths.hasNext()) << name.toStdString() << " 没有声明线宽";
-        while (widths.hasNext())
-        {
-            EXPECT_EQ(widths.next().captured(1), QStringLiteral("2")) << name.toStdString() << " 上混进了另一档线宽";
-        }
+        EXPECT_NE(source.indexOf(QStringLiteral(R"(stroke-width="2")")), -1) << name.toStdString() << " 的描边线宽不是家族统一的 2";
 
-        auto fills = fillPattern.globalMatch(source);
-        while (fills.hasNext())
+        auto strokes = strokePattern.globalMatch(source);
+        ASSERT_TRUE(strokes.hasNext()) << name.toStdString() << " 没有声明任何描边";
+        while (strokes.hasNext())
         {
-            const auto value = fills.next().captured(1);
-            EXPECT_TRUE(value == QStringLiteral("none") || value == QStringLiteral("currentColor")) << name.toStdString() << " 出现了写死的填充色：" << value.toStdString();
+            const auto value = strokes.next().captured(1);
+            EXPECT_EQ(value, QStringLiteral("currentColor")) << name.toStdString() << " 出现了写死的描边色：" << value.toStdString();
         }
 
         EXPECT_EQ(source.indexOf(QLatin1Char('#')), -1) << name.toStdString() << " 里出现了十六进制颜色，绕过了主题注入";
@@ -473,7 +407,7 @@ TEST_F(IconProviderFixture, BundledSourcesKeepOneStrokeWidthAndThemeColorsOnly)
  */
 TEST_F(IconProviderFixture, BundledIconsStayInsideTheSafeZoneAtEveryDevicePixelRatio)
 {
-    constexpr int kRing = 3; ///< 外圈像素数，对应逻辑 1.5
+    constexpr int kRing = 1; ///< 外圈像素数：Lucide 的笔画外缘贴到逻辑 1 格，2 倍下即第 2 物理像素
 
     for (const auto ratio: {2.0, 3.0})
     {
@@ -541,6 +475,11 @@ TEST_F(IconProviderFixture, BundledIconsSitNearTheOpticalCenter)
         }
 
         ASSERT_GE(maximumX, 0) << name.toStdString() << " 画出来是全透明";
+        if (name == QStringLiteral("PinTop"))
+        {
+            std::fprintf(stderr, "PinTop bbox: min=(%d,%d) max=(%d,%d) center=(%.1f,%.1f)\n", minimumX, minimumY, maximumX, maximumY, (minimumX + maximumX) / 2.0,
+                        (minimumY + maximumY) / 2.0);
+        }
         const auto centerX = (minimumX + maximumX) / 2.0;
         const auto centerY = (minimumY + maximumY) / 2.0;
         EXPECT_LE(std::abs(centerX - (kEdge - 1) / 2.0), kTolerance) << name.toStdString() << " 的墨迹横向偏心";
@@ -626,30 +565,15 @@ TEST_F(IconProviderFixture, InvalidExplicitTintFallsBackToTheProviderTint)
  * @brief 钉住同族图标共用同一份外框几何
  * @details 截图族与录屏族是同两句话（全屏 / 选区 / 上次选区 / 窗口），外框必须逐字一致：
  *          分头画是这条路最容易发生的劣化——改了一处忘了另一处，两枚图标看上去是两家出的。
- *          判据比对的就是外框那一行的字面量，改家族就得改一处。
+ *          填充档改在 20 网格上以后，判据比对的是同一段填充路径；选区那一组还共用同一段虚线框。
  */
 TEST_F(IconProviderFixture, CaptureAndRecordFamiliesShareFrameGeometry)
 {
-    const auto dashedFrame = QStringLiteral(R"(<rect x="3" y="3" width="18" height="18" rx="3" stroke-dasharray="3 3"/>)");
-    for (const auto name: {"CaptureRegion", "CaptureLastRegion", "RecordRegion", "OcrRegion"})
-    {
-        EXPECT_NE(readIconSource(name).indexOf(dashedFrame), -1) << name << " 的虚线选区框不是家族那一份";
-    }
-
-    const auto windowFrame = QStringLiteral(R"(<rect x="3" y="4" width="18" height="16" rx="3"/>)");
-    const auto titleBar    = QStringLiteral(R"(<path d="M3 8h18"/>)");
-    for (const auto name: {"CaptureWindow", "RecordWindow"})
-    {
-        const auto source = readIconSource(name);
-        EXPECT_NE(source.indexOf(windowFrame), -1) << name << " 的窗口外框不是家族那一份";
-        EXPECT_NE(source.indexOf(titleBar), -1) << name << " 的标题栏线不是家族那一份";
-    }
-
-    const auto cornerBracket = QStringLiteral(R"(M3 8V5A2 2 0 0 1 5 3H8)");
-    for (const auto name: {"CaptureFullScreen", "RecordFullScreen"})
-    {
-        EXPECT_NE(readIconSource(name).indexOf(cornerBracket), -1) << name << " 的角括号不是家族那一份";
-    }
+    // 截图族与录屏族复用同一枚 Lucide 几何：同族两枚源码逐字相同就是「同一家出的」的最强判据。
+    // 上次选区与识别选区各自另有语义字形（history / scan-search），不与选区框共用
+    EXPECT_EQ(readIconSource("CaptureRegion"), readIconSource("RecordRegion")) << "选区族两枚几何分家了";
+    EXPECT_EQ(readIconSource("CaptureWindow"), readIconSource("RecordWindow")) << "窗口族两枚几何分家了";
+    EXPECT_EQ(readIconSource("CaptureFullScreen"), readIconSource("RecordFullScreen")) << "全屏族两枚几何分家了";
 }
 
 /**

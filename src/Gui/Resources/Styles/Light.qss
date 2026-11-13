@@ -290,7 +290,7 @@ QListWidget#settingsNav {
 }
 
 QListWidget#settingsNav::item {
-    min-height: 30px;
+    min-height: 36px;
 }
 
 /* ---- 设置页的滚动层 ---- */

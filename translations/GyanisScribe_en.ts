@@ -4836,6 +4836,10 @@
             <translation>Performs the same action as the tray menu and global shortcut.</translation>
         </message>
         <message>
+            <source>与托盘菜单执行相同操作。</source>
+            <translation>Performs the same action as the tray menu.</translation>
+        </message>
+        <message>
             <source>更多</source>
             <translation>More</translation>
         </message>
