@@ -8,6 +8,7 @@
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Settings/SettingsStore.h"
 #include "Gui/Controls/Toast.h"
+#include "Gui/Rewind/RewindPickerWindow.h"
 #include "Platform/IPlatformIntegration.h"
 
 #include <QApplication>
@@ -15,6 +16,7 @@
 #include <QCoreApplication>
 #include <QGuiApplication>
 #include <QMetaType>
+#include <QMetaObject>
 #include <QScreen>
 #include <QSignalSpy>
 #include <QTest>
@@ -22,12 +24,15 @@
 
 #include <gtest/gtest.h>
 
+#include <atomic>
+#include <chrono>
 #include <filesystem>
 #include <format>
 #include <fstream>
 #include <memory>
 #include <optional>
 #include <system_error>
+#include <thread>
 #include <vector>
 
 Q_DECLARE_METATYPE(GyanisScribe::Base::CapturedImage)
@@ -189,6 +194,29 @@ namespace
         bool                  fail         = false;
         RecorderConfig        seenConfig;
         std::filesystem::path seenAudio;
+        std::filesystem::path output;
+    };
+
+    /// 假视频编码器：进到 encode 里就停住，等用例放行；用于在导出进行的窗口里取样
+    class BlockingVideoEncoder final : public IRecordingEncoder
+    {
+    public:
+        [[nodiscard]] Expected<std::filesystem::path> encode(const RecorderConfig &config, const std::filesystem::path &, const int, const qint64,
+                                                             const std::filesystem::path &) override
+        {
+            entered.store(true);
+            while (!release.load())
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds{5});
+            }
+            output = config.outputDirectory / (config.nameTemplate.toStdWString() + L".mp4");
+            std::filesystem::create_directories(output.parent_path());
+            std::ofstream{output} << "fake";
+            return Expected<std::filesystem::path>{output};
+        }
+
+        std::atomic<bool>     entered{false};
+        std::atomic<bool>     release{false};
         std::filesystem::path output;
     };
 
@@ -1067,4 +1095,61 @@ TEST_F(RewindCoordinatorFixture, RefusesASingleFrameRange)
     ASSERT_EQ(messages.size(), 1);
     EXPECT_TRUE(messages.front().contains(QStringLiteral("两帧")));
     EXPECT_FALSE(std::filesystem::exists(target));
+}
+
+TEST_F(RewindCoordinatorFixture, ClipRequestIsWiredAndPickerTracksExport)
+{
+    SettingsStore settings(m_iniFile);
+    ASSERT_TRUE(settings.setValue(kRewindEnabled, QVariant(true)).has_value());
+    ASSERT_TRUE(settings.setValue(kRewindFrameRate, QVariant(2)).has_value());
+
+    FakeSource        source;
+    FakePlatform      platform;
+    auto              encoder = std::make_shared<BlockingVideoEncoder>();
+    RewindCoordinator coordinator({source, platform, settings, encoder});
+    coordinator.start();
+    captureFrames(coordinator, 3);
+    const auto firstId = coordinator.firstFrameIdForTesting();
+    ASSERT_TRUE(firstId.has_value());
+
+    coordinator.showPicker();
+    QTRY_VERIFY_WITH_TIMEOUT(findPickerWindow() != nullptr, 3000);
+    auto *picker = qobject_cast<GyanisScribe::Gui::RewindPickerWindow *>(findPickerWindow());
+    ASSERT_NE(picker, nullptr);
+
+    // 断言中途失败也要放行编码器：协调器析构会等导出线程，卡住的假编码器会把整条用例挂死
+    struct EncoderRelease
+    {
+        std::atomic<bool> &flag;
+        ~EncoderRelease()
+        {
+            flag.store(true);
+        }
+    } releaseOnExit{encoder->release};
+
+    const auto      root = std::filesystem::temp_directory_path() / "GyanisScribe-ClipExport-wired";
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+    const auto target = root / "wired.mp4";
+
+    QStringList messages;
+    QObject::connect(&coordinator, &RewindCoordinator::messageForUser, &coordinator, [&messages](const QString &message, ToastKind) { messages.append(message); });
+
+    coordinator.exportClipForTesting(*firstId, *firstId + 2, target);
+    EXPECT_TRUE(coordinator.isClipExportingForTesting());
+    EXPECT_TRUE(picker->isExportingForTesting()) << "协调器开始导出后，还开着的选择器没进入导出中状态";
+    QTRY_VERIFY_WITH_TIMEOUT(encoder->entered.load(), 5000);
+
+    // 导出中再从选择器发一次请求：协调器接住了这条信号，并只回「正在导出」，不会叠出第二次导出
+    ASSERT_TRUE(QMetaObject::invokeMethod(picker, "clipRequested", Qt::DirectConnection, Q_ARG(quint64, *firstId), Q_ARG(quint64, *firstId + 2)));
+    ASSERT_EQ(messages.size(), 1);
+    EXPECT_TRUE(messages.front().contains(QStringLiteral("正在导出"))) << messages.front().toStdString();
+    EXPECT_TRUE(coordinator.isClipExportingForTesting());
+
+    encoder->release.store(true);
+    QTRY_VERIFY_WITH_TIMEOUT(!coordinator.isClipExportingForTesting(), 5000);
+    EXPECT_FALSE(picker->isExportingForTesting()) << "导出结束后选择器还停在导出中";
+    ASSERT_EQ(messages.size(), 2);
+    EXPECT_TRUE(messages.back().contains(QStringLiteral("已导出片段")));
+    std::filesystem::remove_all(root, ignored);
 }

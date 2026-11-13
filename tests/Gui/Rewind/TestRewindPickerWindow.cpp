@@ -512,3 +512,40 @@ TEST_F(RewindPickerFixture, ExportButtonStaysDisabledUntilTwoFramesAreMarked)
     EXPECT_EQ(from, quint64{3});
     EXPECT_EQ(to, quint64{3}) << "同一帧标两次：端点相等但按钮该允许（协调器再判至少两帧）";
 }
+
+/**
+ * @brief 钉住导出中的按钮态：文案换成「正在导出…」且不可再点，结束后按标记恢复
+ * @details 导出在后台跑时再点一次最多只换来一句「正在导出」的提示；按钮自己先拦住这一下。
+ *          同时 `[`/`]` 仍要能改标记，下一次导出按新区间走，所以刷新范围不能把按钮重新点亮。
+ */
+TEST_F(RewindPickerFixture, ExportingSwapsButtonTextAndRestoresItAfterCompletion)
+{
+    auto window = makeWindow();
+    window->showFrames(makeViews(5), QRect{0, 0, 1920, 1080}, QStringLiteral("DISPLAY1"), false, QString());
+    auto *list         = window->findChild<QListWidget *>(QStringLiteral("rewindFilmstrip"));
+    auto *exportButton = window->findChild<QPushButton *>(QStringLiteral("rewindExportClip"));
+    ASSERT_NE(list, nullptr);
+    ASSERT_NE(exportButton, nullptr);
+    ASSERT_FALSE(exportButton->isEnabled());
+    const QString idleText = exportButton->text();
+
+    window->setExporting(true);
+    EXPECT_TRUE(window->isExportingForTesting());
+    EXPECT_TRUE(exportButton->text().contains(QStringLiteral("正在导出"))) << exportButton->text().toStdString();
+    EXPECT_FALSE(exportButton->isEnabled()) << "导出中按钮还能再点";
+
+    // 导出中仍可改标记：范围刷新不该改掉导出中文案，也不该把按钮点亮
+    list->setCurrentRow(1);
+    pressKey(*window, Qt::Key_BracketLeft);
+    list->setCurrentRow(3);
+    pressKey(*window, Qt::Key_BracketRight);
+    ASSERT_EQ(window->rangeStartForTesting(), std::optional<quint64>{2});
+    ASSERT_EQ(window->rangeEndForTesting(), std::optional<quint64>{4});
+    EXPECT_FALSE(exportButton->isEnabled()) << "标记完整后按钮在导出中又被点亮";
+    EXPECT_TRUE(exportButton->text().contains(QStringLiteral("正在导出")));
+
+    window->setExporting(false);
+    EXPECT_FALSE(window->isExportingForTesting());
+    EXPECT_EQ(exportButton->text(), idleText);
+    EXPECT_TRUE(exportButton->isEnabled()) << "导出结束后，完整区间该让按钮恢复可点";
+}

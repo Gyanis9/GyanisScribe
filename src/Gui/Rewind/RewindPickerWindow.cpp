@@ -351,6 +351,25 @@ namespace GyanisScribe::Gui
         return m_rangeEnd;
     }
 
+    void RewindPickerWindow::setExporting(const bool exporting)
+    {
+        m_exporting = exporting;
+        // 两条文案各自写进 uiText：目录门禁只认字面量实参，写成条件表达式会在目录里漏掉这条
+        if (exporting)
+        {
+            m_exportClip->setText(GyanisScribe::Base::uiText("正在导出…"));
+        } else
+        {
+            m_exportClip->setText(GyanisScribe::Base::uiText("导出片段…"));
+        }
+        m_exportClip->setEnabled(!m_exporting && validRange().has_value());
+    }
+
+    bool RewindPickerWindow::isExportingForTesting() const noexcept
+    {
+        return m_exporting;
+    }
+
     void RewindPickerWindow::markRangeBoundary(const bool start)
     {
         const int row = m_list->currentRow();
@@ -393,7 +412,8 @@ namespace GyanisScribe::Gui
         }
 
         const bool complete = range.has_value();
-        m_exportClip->setEnabled(complete);
+        // 导出中即使标记完整也不点亮：按钮上写的是「正在导出…」，点了也只会被协调器挡回来
+        m_exportClip->setEnabled(complete && !m_exporting);
         if (!complete)
         {
             m_rangeLabel->setText(GyanisScribe::Base::uiText("按 [ 标起点、] 标终点"));

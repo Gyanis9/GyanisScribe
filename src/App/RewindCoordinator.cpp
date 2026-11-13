@@ -437,6 +437,11 @@ namespace GyanisScribe::App
             m_encoder = std::make_shared<Plugins::FfmpegRecordingEncoder>();
         }
         m_clipExporting = true;
+        // 选择器可能还开着：同步成导出中，用户才不会对着一个还能点的按钮再发一次请求
+        if (m_picker != nullptr)
+        {
+            m_picker->setExporting(true);
+        }
         m_clipWatcher.setFuture(QtConcurrent::run([this, samples = std::move(samples), target] { return renderClip(samples, target); }));
     }
 
@@ -479,7 +484,11 @@ namespace GyanisScribe::App
 
     void RewindCoordinator::handleClipExported()
     {
-        m_clipExporting    = false;
+        m_clipExporting = false;
+        if (m_picker != nullptr)
+        {
+            m_picker->setExporting(false);
+        }
         const auto outcome = m_clipWatcher.result();
         if (!outcome)
         {
@@ -756,6 +765,7 @@ namespace GyanisScribe::App
             m_picker = std::make_unique<Gui::RewindPickerWindow>();
             QObject::connect(m_picker.get(), &Gui::RewindPickerWindow::frameChosen, this, &RewindCoordinator::chooseFrame);
             QObject::connect(m_picker.get(), &Gui::RewindPickerWindow::dismissed, this, &RewindCoordinator::handlePickerDismissed);
+            QObject::connect(m_picker.get(), &Gui::RewindPickerWindow::clipRequested, this, &RewindCoordinator::exportClip);
         }
         // 摆放按可用区（避开任务栏），抓帧与样本上的屏矩形仍是整屏
         m_picker->showFrames(views, m_screenAvailableRect.isEmpty() ? m_screenRect : m_screenAvailableRect, m_screenName, false, {});

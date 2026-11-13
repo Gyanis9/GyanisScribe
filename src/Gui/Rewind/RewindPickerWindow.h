@@ -81,6 +81,17 @@ namespace GyanisScribe::Gui
          */
         [[nodiscard]] std::optional<quint64> rangeEndForTesting() const;
 
+        /**
+         * @brief 切换导出中外观
+         * @param exporting 是否有一次片段导出在跑
+         * @details 导出中按钮换成「正在导出…」并禁用：再点一次最多只换来一句提示，不如当场拦住。
+         *          结束时按当前标记恢复按钮；`[`/`]` 在导出中仍可改标记，下一次导出按新区间走。
+         */
+        void setExporting(bool exporting);
+
+        /// 当前是否处于导出中，供用例判按钮态与协调器的同步
+        [[nodiscard]] bool isExportingForTesting() const noexcept;
+
     signals:
         /// 用户确认某一帧
         void frameChosen(quint64 id);
@@ -133,6 +144,7 @@ namespace GyanisScribe::Gui
         std::optional<quint64> m_rangeStart; ///< 起点样本号
         std::optional<quint64> m_rangeEnd;   ///< 终点样本号
 
-        bool m_active = false; ///< 是否处于一次展示中，保证取消只发一次
+        bool m_active    = false; ///< 是否处于一次展示中，保证取消只发一次
+        bool m_exporting = false; ///< 是否有片段导出在跑，决定导出按钮的文案与可用性
     };
 } // namespace GyanisScribe::Gui
