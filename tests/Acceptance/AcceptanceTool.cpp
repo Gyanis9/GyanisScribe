@@ -31,6 +31,7 @@
 #include <QPainter>
 #include <QString>
 #include <QStringList>
+#include <QTextStream>
 
 #include <algorithm>
 #include <cstdio>
@@ -273,6 +274,42 @@ namespace
         {
             std::printf("CSV-FAILED %s\n", written.error().message.c_str());
             return 3;
+        }
+        return 0;
+    }
+
+    /// 把真 OCR 的行与词框原样倒出来：D2 归因要看真实行切分，不能只凭渲染图猜
+    int runDumpLines(const QStringList &arguments)
+    {
+        if (arguments.size() != 4)
+        {
+            std::fprintf(stderr, "usage: AcceptanceTool dump-lines <image> <outTsv>\n");
+            return 2;
+        }
+        GyanisScribe::Core::SettingsStore settings{std::filesystem::temp_directory_path() / "acceptance-ocr.ini"};
+        const auto                        parsed = readOcrResult(arguments[2], false, settings);
+        if (!parsed)
+        {
+            return 3;
+        }
+        QFile out{arguments[3]};
+        if (!out.open(QIODevice::WriteOnly | QIODevice::Text))
+        {
+            std::fprintf(stderr, "cannot write %s\n", arguments[3].toStdString().c_str());
+            return 3;
+        }
+        QTextStream stream{&out};
+        for (qsizetype lineIndex = 0; lineIndex < parsed->lines.size(); ++lineIndex)
+        {
+            const auto &line = parsed->lines.at(lineIndex);
+            stream << "LINE\t" << lineIndex << '\t' << line.boundingBox.left() << '\t' << line.boundingBox.top() << '\t' << line.boundingBox.width() << '\t'
+                   << line.boundingBox.height() << '\n';
+            for (qsizetype wordIndex = 0; wordIndex < line.words.size(); ++wordIndex)
+            {
+                const auto &word = line.words.at(wordIndex);
+                stream << "WORD\t" << lineIndex << '\t' << wordIndex << '\t' << word.boundingBox.left() << '\t' << word.boundingBox.top() << '\t'
+                       << word.boundingBox.width() << '\t' << word.boundingBox.height() << '\t' << flatText(word.text).c_str() << '\n';
+            }
         }
         return 0;
     }
@@ -530,7 +567,7 @@ int main(int argc, char *argv[])
     const QStringList arguments = QCoreApplication::arguments();
     if (arguments.size() < 2)
     {
-        std::fprintf(stderr, "usage: AcceptanceTool <stitch|slice|diff|tables|markdown|tables-from-lines|markdown-from-lines|rewind4k> ...\n");
+        std::fprintf(stderr, "usage: AcceptanceTool <stitch|slice|diff|tables|markdown|tables-from-lines|markdown-from-lines|rewind4k|dump-lines> ...\n");
         return 2;
     }
     const QString &mode = arguments[1];
@@ -545,6 +582,10 @@ int main(int argc, char *argv[])
     if (mode == QStringLiteral("diff"))
     {
         return runDiff(arguments);
+    }
+    if (mode == QStringLiteral("dump-lines"))
+    {
+        return runDumpLines(arguments);
     }
     if (mode == QStringLiteral("tables"))
     {
