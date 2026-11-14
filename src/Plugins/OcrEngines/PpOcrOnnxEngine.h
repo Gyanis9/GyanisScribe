@@ -77,7 +77,7 @@ namespace GyanisScribe::Plugins
         /**
          * @brief 可选语言，见 Core::IOcrEngine::supportedLanguages()
          * @return 模型在位时返回 zh-Hans 与 en；不在位时为空表
-         * @note 本后端的两个模型都按简体中文与英文的混合字表训练，两种标签走同一条识别路径
+         * @note 只有识别模型吃这份中英混合字表（检测模型不用字表），两种语言标签走同一条识别路径
          */
         [[nodiscard]] QStringList supportedLanguages() const override;
 

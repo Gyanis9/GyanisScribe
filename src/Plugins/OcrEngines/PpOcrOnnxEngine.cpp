@@ -29,7 +29,7 @@ namespace GyanisScribe::Plugins
 {
     namespace
     {
-        // 认不出字的最小图尺寸，与另外两条识别通道取同一道门槛
+        // 认不出字的最小图尺寸，与系统识别那条通道取同一道门槛
         constexpr int kMinimumImageEdge = 8;
 
         // 运行库的文件名、环境变量与取接口表的符号名
@@ -168,9 +168,11 @@ namespace GyanisScribe::Plugins
 
             if (loaded == nullptr)
             {
+                // 错误码要当场取：uiFormat 实参的求值顺序不定，先算字符串就可能把上次错误冲掉
+                const DWORD loadError = GetLastError();
                 return QString::fromStdString(Base::uiFormat(
                         Base::uiTextUtf8("onnxruntime.dll 加载失败（{}，系统错误码 {}）。请重新安装本程序以恢复随包的运行库"), attemptedPath.toStdString(),
-                        GetLastError()));
+                        loadError));
             }
 
             using GetApiBaseFunction = const OrtApiBase *(ORT_API_CALL *)();
@@ -201,7 +203,7 @@ namespace GyanisScribe::Plugins
             {
                 // 版本串指向 DLL 映像里的静态区：先拷进自己的串再卸载，卸载后原指针随时可能失效
                 const char       *versionText = apiBase->GetVersionString();
-                const std::string version     = versionText != nullptr ? std::string(versionText) : std::string("未知");
+                const std::string version     = versionText != nullptr ? std::string(versionText) : Base::uiTextUtf8("未知");
                 FreeLibrary(loaded);
                 return QString::fromStdString(Base::uiFormat(
                         Base::uiTextUtf8("onnxruntime.dll 的接口版本与程序不符：程序需要 ONNX Runtime API 版本 {}，实际库是 {}。请重新安装本程序以恢复随包的运行库"),
@@ -639,11 +641,11 @@ namespace GyanisScribe::Plugins
         OrtValue       *detOutputValues[] = {nullptr};
         const QString   detRunError =
                 consumeStatus(takeStatus(api->Run(detSession.get(), nullptr, detInputs, detInputValues, 1, detOutputs, 1, detOutputValues), api), api);
-        OrtHandle<OrtValue> detOutput(detOutputValues[0], OrtDeleter<OrtValue>{api->ReleaseValue});
         if (!detRunError.isEmpty())
         {
             return std::unexpected(modelFailure(kPpOcrDetModelFileName, detRunError));
         }
+        OrtHandle<OrtValue> detOutput(detOutputValues[0], OrtDeleter<OrtValue>{api->ReleaseValue});
 
         const auto detView = floatTensorView(detOutput.get(), kPpOcrDetModelFileName);
         if (!detView)
@@ -706,11 +708,11 @@ namespace GyanisScribe::Plugins
             OrtValue       *recOutputValues[] = {nullptr};
             const QString   recRunError       = consumeStatus(
                     takeStatus(api->Run(recSession.get(), nullptr, recInputs, recInputValues, 1, recOutputs, 1, recOutputValues), api), api);
-            OrtHandle<OrtValue> recOutput(recOutputValues[0], OrtDeleter<OrtValue>{api->ReleaseValue});
             if (!recRunError.isEmpty())
             {
                 return std::unexpected(modelFailure(kPpOcrRecModelFileName, recRunError));
             }
+            OrtHandle<OrtValue> recOutput(recOutputValues[0], OrtDeleter<OrtValue>{api->ReleaseValue});
 
             const auto recView = floatTensorView(recOutput.get(), kPpOcrRecModelFileName);
             if (!recView)
@@ -799,7 +801,7 @@ namespace GyanisScribe::Plugins
 
         if (!m_impl->available)
         {
-            return std::unexpected(Base::Error{Base::ErrorCode::PlatformUnsupported,
+            return std::unexpected(Base::Error{Base::ErrorCode::DependencyMissing,
                                                Base::uiFormat(Base::uiTextUtf8("PaddleOCR 后端不可用：{}。请重新安装本程序，或在设置的 OCR 页检查模型目录"),
                                                               m_impl->unavailableReason.toStdString())});
         }
@@ -807,7 +809,7 @@ namespace GyanisScribe::Plugins
         const QString requestedLanguage = language.isEmpty() ? QString::fromUtf8(Core::kDefaultOcrLanguage) : language;
         if (!supportedLanguages().contains(requestedLanguage, Qt::CaseInsensitive))
         {
-            return std::unexpected(Base::Error{Base::ErrorCode::PlatformUnsupported,
+            return std::unexpected(Base::Error{Base::ErrorCode::DependencyMissing,
                                                Base::uiFormat(Base::uiTextUtf8("PaddleOCR 后端不支持语言「{}」，可用的有：{}。请在设置的 OCR 页换一种语言"),
                                                               requestedLanguage.toStdString(), supportedLanguages().join(QStringLiteral("、")).toStdString())});
         }

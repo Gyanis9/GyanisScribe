@@ -58,6 +58,14 @@ TEST_F(PpOcrPostprocessFixture, DropsTinyAndLowScoreBlocksAndClampsToImage)
     EXPECT_EQ(boxes[0].rect, QRect(0, 0, 6, 6)); // 外扩 2 后夹回 0..19
 }
 
+TEST_F(PpOcrPostprocessFixture, DropsComponentsThinnerThanThreePixels)
+{
+    std::vector<float> map(12 * 8, 0.0F);
+    fillBlock(map, 12, 3, 3, 3, 1, 0.9F); // 面积与分数都够，但高只有 1 像素
+    const auto boxes = Core::extractTextBoxes(map.data(), 12, 8);
+    EXPECT_TRUE(boxes.isEmpty()) << "1×3 的细条被当成了文本行";
+}
+
 TEST_F(PpOcrPostprocessFixture, DecodesCtcWithRepeatsAndBlank)
 {
     const QStringList dict{"a", "b", "c"};

@@ -32,7 +32,7 @@
 
 ## 交叉验证
 
-同一 1.32.0 的官方 Windows x64 CPU 发布包（`onnxruntime-win-x64-1.32.0.zip`，96945131 字节）也经镜像完整取回并校验：整包 CRC 全过，包内 `VERSION_NUMBER` 为 `1.32.0`，其 DLL 版本资源为 `1.32.0.20261112.3.fab30a4`（与本 DLL 同一提交 fab30a4，构建号不同），包内 `LICENSE` 与本目录 `LICENSE` 逐字节相同，包内三个头文件与 raw 标签版本内容相同（仅换行符不同）。两条独立官方渠道互证。
+同一 1.32.0 的官方 Windows x64 CPU 发布包（`onnxruntime-win-x64-1.32.0.zip`，96945131 字节）也经镜像完整取回并校验：整包 CRC 全过（该 zip 没有记录 SHA-256，只做了整包 CRC 校验），包内 `VERSION_NUMBER` 为 `1.32.0`，其 DLL 版本资源为 `1.32.0.20261112.3.fab30a4`（与本 DLL 同一提交 fab30a4，构建号不同），包内 `LICENSE` 与本目录 `LICENSE` 逐字节相同，包内三个头文件与 raw 标签版本内容相同（仅换行符不同）。两条独立官方渠道互证。
 
 探针用本目录头文件编译后 `LoadLibraryW` 加载本目录 DLL、`GetApi(32)` 成功、`GetVersionString()` 返回 `1.32.0`，并为两模型建 session 打印签名（见 `vendor/PpocrModels/PROVENANCE.md`）。
 

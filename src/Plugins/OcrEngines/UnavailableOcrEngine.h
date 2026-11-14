@@ -17,7 +17,7 @@ namespace GyanisScribe::Plugins
 
     /**
      * @brief 「本机认不出字」的那一份后端
-     * @details 语言包没就位、或本平台没有编进任何后端时用它：识别一律返回 DependencyMissing 并写清怎么补，
+     * @details 识别模型或运行库没就位、或本平台没有编进任何后端时用它：识别一律返回 DependencyMissing 并写清怎么补，
      *          而不是回一个空结果——空结果与「一行都没认出来」长得一样，用户会以为是图不清楚。
      */
     class UnavailableOcrEngine : public Core::IOcrEngine

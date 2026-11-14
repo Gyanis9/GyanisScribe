@@ -14,7 +14,6 @@
 
 #include <filesystem>
 #include <format>
-#include <string_view>
 #include <vector>
 
 namespace GyanisScribe::Plugins
@@ -104,16 +103,24 @@ namespace GyanisScribe::Plugins
         const auto candidates       = ppOcrModelCandidateDirectories(settings, installDirectory);
         const auto modelDirectory   = firstDirectoryWithModels(candidates);
 
-        auto ppocr = std::make_unique<PpOcrOnnxEngine>(modelDirectory);
-        if (ppocr->isAvailable())
+        // 空目录不建引擎：空路径会被当成「相对当前目录」去找运行库，白加载一次 DLL 还得不到有用的原因
+        QString    ppocrReason;
+        if (modelDirectory.empty())
         {
-            Base::Logger::info(std::format("文字识别后端 PaddleOCR 就绪（平台 {}），模型目录 {}", integration.displayName().toStdString(),
-                                           Base::Paths::toDisplayText(modelDirectory).toStdString()));
-            return ppocr;
+            ppocrReason = describeMissingPpOcrModels(candidates);
         }
-
-        // 模型目录齐了、运行库却没起来时，后端自己的原因比「缺哪个文件」具体
-        const QString ppocrReason = modelDirectory.empty() ? describeMissingPpOcrModels(candidates) : ppocr->unavailableReason();
+        else
+        {
+            auto ppocr = std::make_unique<PpOcrOnnxEngine>(modelDirectory);
+            if (ppocr->isAvailable())
+            {
+                Base::Logger::info(std::format("文字识别后端 PaddleOCR 就绪（平台 {}），模型目录 {}", integration.displayName().toStdString(),
+                                               Base::Paths::toDisplayText(modelDirectory).toStdString()));
+                return ppocr;
+            }
+            // 模型目录齐了、运行库却没起来时，后端自己的原因比「缺哪个文件」具体
+            ppocrReason = ppocr->unavailableReason();
+        }
 
 #if defined(GYANISSCRIBE_HAS_WINRT_OCR)
         // PaddleOCR 不可用时才轮到系统识别；两条原因分开记，用户能自己做的只有前者

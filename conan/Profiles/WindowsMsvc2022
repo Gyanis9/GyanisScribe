@@ -12,7 +12,7 @@
 # 刻意不写 build_type：它由 conan_provider 按预设的 CMAKE_BUILD_TYPE 在命令行上给
 # （-s build_type=…）。写死 Release 的话 Debug 预设也会领到 Release 的依赖图；
 # 两档现在共用同一条依赖图（OCR 的模型与 ONNX Runtime 随仓库 vendored，不经 Conan），
-# 这一行仍按预设的 build_type 传入。
+# build_type 仍按预设传入。
 
 [settings]
 os=Windows

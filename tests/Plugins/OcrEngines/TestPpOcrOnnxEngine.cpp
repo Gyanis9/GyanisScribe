@@ -165,6 +165,30 @@ namespace
         }
     }
 
+    TEST_F(PpOcrOnnxEngineFixture, ReportsMissingModelFilesAsDependencyMissing)
+    {
+        QTemporaryDir empty;
+        ASSERT_TRUE(empty.isValid());
+
+        PpOcrOnnxEngine engine(std::filesystem::path(empty.path().toStdWString()));
+        ASSERT_FALSE(engine.isAvailable());
+
+        const auto result = engine.recognize(makeTextImage(), QStringLiteral("zh-Hans"));
+        ASSERT_FALSE(result.has_value()) << "没有模型却返回了一次成功的空识别";
+        EXPECT_EQ(result.error().code, ErrorCode::DependencyMissing) << result.error().message;
+    }
+
+    TEST_F(PpOcrOnnxEngineFixture, ReportsUnknownLanguageAsDependencyMissing)
+    {
+        PpOcrOnnxEngine engine(kVendoredModels);
+        ASSERT_TRUE(engine.isAvailable()) << engine.unavailableReason().toStdString();
+
+        const auto result = engine.recognize(makeTextImage(), QStringLiteral("ja"));
+        ASSERT_FALSE(result.has_value()) << "不认识的语言被当成了一次成功识别";
+        EXPECT_EQ(result.error().code, ErrorCode::DependencyMissing) << result.error().message;
+        EXPECT_NE(QString::fromStdString(result.error().message).indexOf(QStringLiteral("ja")), -1) << result.error().message;
+    }
+
     TEST_F(PpOcrOnnxEngineFixture, RejectsCorruptModelAsInternalError)
     {
         QTemporaryDir directory;

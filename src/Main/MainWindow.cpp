@@ -2970,7 +2970,7 @@ namespace GyanisScribe::Main
     {
         auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
-        auto *form = makePageForm(page, GyanisScribe::Base::uiText("可识别的文字取决于识别模型。目录留空时按程序目录与应用数据目录查找。"),
+        auto *form = makePageForm(page, GyanisScribe::Base::uiText("可识别的文字取决于识别模型。模型随安装包提供，通常不需要修改；目录留空时按程序目录与应用数据目录查找。"),
                              GyanisScribe::Base::uiText("识别设置"));
         form->addRow(iconRow(m_icons, m_theme, "OcrLanguage", GyanisScribe::Base::uiText("识别语言")), makeOcrLanguageCombo(m_settings));
         form->addRow(GyanisScribe::Base::uiText("模型目录"), makePathRow(m_settings, GyanisScribe::Core::kOcrModelDirectory, GyanisScribe::Base::uiText("模型目录"),

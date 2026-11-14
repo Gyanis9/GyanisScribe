@@ -117,6 +117,11 @@ namespace GyanisScribe::Core
 
                 const int boxWidth  = stats.maxX - stats.minX + 1;
                 const int boxHeight = stats.maxY - stats.minY + 1;
+                // 宽或高不足 3 像素的连通域是笔画交点之类的噪声，按规格直接丢掉
+                if (boxWidth < 3 || boxHeight < 3)
+                {
+                    continue;
+                }
                 const int expand    = std::max(2, static_cast<int>(std::lround(static_cast<double>(unclipRatio) * static_cast<double>(std::min(boxWidth, boxHeight)))));
 
                 const int left   = std::max(0, stats.minX - expand);

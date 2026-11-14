@@ -5272,8 +5272,8 @@
             <translation>System sound device</translation>
         </message>
         <message>
-            <source>可识别的文字取决于识别模型。目录留空时按程序目录与应用数据目录查找。</source>
-            <translation>Recognizable text depends on the recognition models. When the folder is left empty, the program folder and the application data folder are searched.</translation>
+            <source>可识别的文字取决于识别模型。模型随安装包提供，通常不需要修改；目录留空时按程序目录与应用数据目录查找。</source>
+            <translation>Recognizable text depends on the recognition models. The models ship with the installer and normally need no change; when the folder is left empty, the program folder and the application data folder are searched.</translation>
         </message>
         <message>
             <source>识别设置</source>

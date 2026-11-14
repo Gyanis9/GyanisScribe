@@ -22,8 +22,9 @@ namespace GyanisScribe::Core
      * @brief 识别后端
      * @details 同步接口：一次调用要跑几十到上千毫秒，绝不能放在界面线程上——
      *          放线程与把结果投递回界面是控制器那一批的事，后端本身只管认字。
-     * @note 不可用的后端不算错误：recognize() 会返回 PlatformUnsupported，
-     *       而 isAvailable() 让界面在用户点之前就把入口标灰并给原因。
+     * @note 不可用的后端不算错误：recognize() 会返回 DependencyMissing，
+     *       而 isAvailable() 让界面在用户点之前就把入口标灰并给原因；
+     *       PlatformUnsupported 只留给「本平台根本没有编进这类后端」。
      */
     class IOcrEngine
     {
@@ -42,7 +43,7 @@ namespace GyanisScribe::Core
         /**
          * @brief 本后端此刻能不能用
          * @return true 表示可以调 recognize()
-         * @note 判的是运行期条件（语言包、系统组件），不是「本平台有没有实现」——后者归平台能力表
+         * @note 判的是运行期条件（识别模型、运行库、系统组件），不是「本平台有没有实现」——后者归平台能力表
          */
         [[nodiscard]] virtual bool isAvailable() const = 0;
 

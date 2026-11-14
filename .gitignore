@@ -22,7 +22,8 @@ __pycache__/
 
 # 随包分发的 ffmpeg 整棵都不进仓：体积到百 MB 级，二进制、zip、校验戳记都由
 # scripts/FetchFfmpeg.ps1 现场取件与验证，任何一份进历史都是让每次克隆替将来所有版本付空间。
-# vendor/Tessdata 相反：.traineddata 只有几 MB 且是 Apache-2.0，进仓才能让构建不依赖网络
+# vendor/PpocrModels 与 vendor/OnnxRuntime 相反：识别模型与 ONNX Runtime 是本地识别的运行时载荷
+# （合计约 50 MB），进仓才能让构建与测试都不依赖网络，字节与校验值在各自的 PROVENANCE.md 里
 /vendor/Ffmpeg/
 
 # Superpowers 生成的设计与实施计划文档：按本机协作规则只留本地，不进版本库
