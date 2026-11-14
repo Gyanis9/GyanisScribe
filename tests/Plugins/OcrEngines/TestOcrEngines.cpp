@@ -265,9 +265,11 @@ TEST_F(OcrFixture, FactoryPrefersPpOcrWhenModelsArePresent)
 TEST_F(OcrFixture, FactoryFallsBackToSystemOcrOrReportsPpOcrReason)
 {
     SettingsStore settings(m_iniFile);
-    ASSERT_TRUE(locatePpOcrModelDirectory(settings).empty()) << "这个用例的前提是设置、程序目录与应用数据目录都没有完整模型";
+    // 安装目录用临时目录隔离：开发树的构建产物目录里摆着随包模型，拿它当「没有模型」的现场不再成立
+    const auto installDirectory = m_root / "install";
+    ASSERT_TRUE(locatePpOcrModelDirectory(settings, installDirectory).empty()) << "这个用例的前提是设置、安装目录与应用数据目录都没有完整模型";
 
-    const auto engine = createOcrEngine(settings, *integration);
+    const auto engine = createOcrEngine(settings, *integration, installDirectory);
     ASSERT_NE(engine, nullptr) << "选型不许交回空指针";
 
     if (systemOcrAvailable())
@@ -328,7 +330,9 @@ TEST_F(OcrFixture, ReportsMissingPpOcrFilesByName)
 
     SettingsStore settings(m_iniFile);
     ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kOcrModelDirectory, QVariant(GyanisScribe::Base::Paths::toDisplayText(directory))).has_value());
-    EXPECT_TRUE(locatePpOcrModelDirectory(settings).empty()) << "缺两件模型文件的目录被当成了可用模型目录";
+    // 安装目录用临时目录隔离：构建产物目录里有随包模型，不能让本用例的前提跟着构建布局走
+    const auto installDirectory = m_root / "install";
+    EXPECT_TRUE(locatePpOcrModelDirectory(settings, installDirectory).empty()) << "缺两件模型文件的目录被当成了可用模型目录";
 
     PpOcrOnnxEngine engine(directory);
     EXPECT_FALSE(engine.isAvailable()) << "缺两件模型文件却说后端可用";

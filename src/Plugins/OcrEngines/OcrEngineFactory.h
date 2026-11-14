@@ -52,20 +52,23 @@ namespace GyanisScribe::Plugins
     /**
      * @brief 找 PaddleOCR 模型目录
      * @param settings 配置来源，读 Ocr/ModelDirectory
+     * @param applicationDirectory 程序目录，随包模型在它下面的 ppocr 里；空表示当前进程的可执行体目录
      * @return 按 ppOcrModelCandidateDirectories 的顺序第一个放着完整模型的目录；都没有时返回空路径
      * @note 返回空路径不是错误：那是「本机还没有识别模型」，由调用方给出中文指引
      */
-    [[nodiscard]] std::filesystem::path locatePpOcrModelDirectory(const Core::ISettingsStore &settings);
+    [[nodiscard]] std::filesystem::path locatePpOcrModelDirectory(const Core::ISettingsStore &settings, const std::filesystem::path &applicationDirectory = {});
 
     /**
      * @brief 挑一个能用的后端
      * @param settings 配置来源
      * @param integration 平台能力来源
+     * @param applicationDirectory 程序目录，随包模型在它下面的 ppocr 里；空表示当前进程的可执行体目录
      * @return 依次尝试 PaddleOCR 与系统识别；都不可用时交回 UnavailableOcrEngine，
      *         原因先列模型目录与缺的文件，再附系统识别不可用的原因
      * @note 永远返回非空对象：界面拿到的后端要么能用，要么能用中文说明为什么不能用，
      *       不需要每处都判一次空指针
      */
-    [[nodiscard]] std::unique_ptr<Core::IOcrEngine> createOcrEngine(const Core::ISettingsStore &settings, const Platform::IPlatformIntegration &integration);
+    [[nodiscard]] std::unique_ptr<Core::IOcrEngine> createOcrEngine(const Core::ISettingsStore &settings, const Platform::IPlatformIntegration &integration,
+                                                                     const std::filesystem::path &applicationDirectory = {});
 
 } // namespace GyanisScribe::Plugins

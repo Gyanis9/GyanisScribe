@@ -91,15 +91,18 @@ namespace GyanisScribe::Plugins
         return {};
     }
 
-    std::filesystem::path locatePpOcrModelDirectory(const Core::ISettingsStore &settings)
+    std::filesystem::path locatePpOcrModelDirectory(const Core::ISettingsStore &settings, const std::filesystem::path &applicationDirectory)
     {
-        return firstDirectoryWithModels(ppOcrModelCandidateDirectories(settings, Base::Paths::applicationDirectory()));
+        const auto installDirectory = applicationDirectory.empty() ? Base::Paths::applicationDirectory() : applicationDirectory;
+        return firstDirectoryWithModels(ppOcrModelCandidateDirectories(settings, installDirectory));
     }
 
-    std::unique_ptr<Core::IOcrEngine> createOcrEngine(const Core::ISettingsStore &settings, const Platform::IPlatformIntegration &integration)
+    std::unique_ptr<Core::IOcrEngine> createOcrEngine(const Core::ISettingsStore &settings, const Platform::IPlatformIntegration &integration,
+                                                      const std::filesystem::path &applicationDirectory)
     {
-        const auto candidates     = ppOcrModelCandidateDirectories(settings, Base::Paths::applicationDirectory());
-        const auto modelDirectory = firstDirectoryWithModels(candidates);
+        const auto installDirectory = applicationDirectory.empty() ? Base::Paths::applicationDirectory() : applicationDirectory;
+        const auto candidates       = ppOcrModelCandidateDirectories(settings, installDirectory);
+        const auto modelDirectory   = firstDirectoryWithModels(candidates);
 
         auto ppocr = std::make_unique<PpOcrOnnxEngine>(modelDirectory);
         if (ppocr->isAvailable())
