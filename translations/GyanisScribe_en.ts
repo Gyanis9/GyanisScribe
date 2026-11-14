@@ -5869,7 +5869,7 @@
         </message>
         <message>
             <source>这台机器的 Windows 没装本程序认识的识别语言包（系统识别一个可用语言都没有）。请在 设置 → 时间和语言 → 语音 里装上「光学字符识别」，或重新安装本程序以恢复 PaddleOCR 模型</source>
-            <translation>This Windows installation has no recognition language pack this program understands (system recognition reports no usable language). Install Optical Character Recognition under Settings -&amp;gt; Time &amp;amp; Language -&amp;gt; Speech, or reinstall this program to restore the PaddleOCR models</translation>
+            <translation>This Windows installation has no recognition language pack this program understands (system recognition reports no usable language). Install Optical Character Recognition under Settings -&gt; Time &amp; Language -&gt; Speech, or reinstall this program to restore the PaddleOCR models</translation>
         </message>
         <message>
             <source>系统里没有「{}」的识别语言包。现在能用的是 {}。请在 设置 → 时间和语言 → 语音 里装上需要的语言包，或在设置的 OCR 页改选语言</source>
