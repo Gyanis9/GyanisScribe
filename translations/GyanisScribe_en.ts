@@ -5580,8 +5580,76 @@
             <translation>Can't detect the UI element under the cursor: the platform's screen list and the interface's screen list didn't pair up. You can still frame the part you want directly</translation>
         </message>
         <message>
-            <source>这个光标位置不落在任何一块屏幕上（多半是拔屏或改分辨率之后的陈旧坐标）。请把鼠标动一下再试</source>
-            <translation>This cursor position doesn't fall on any screen (most likely a stale coordinate after unplugging a display or changing resolution). Move the mouse and try again</translation>
+            <source>界面与语言</source>
+            <translation>Interface and language</translation>
+        </message>
+        <message>
+            <source>历史记录</source>
+            <translation>History</translation>
+        </message>
+        <message>
+            <source>鼠标与行为</source>
+            <translation>Mouse and behavior</translation>
+        </message>
+        <message>
+            <source>数据与备份</source>
+            <translation>Data and backup</translation>
+        </message>
+        <message>
+            <source>截图行为</source>
+            <translation>Capture behavior</translation>
+        </message>
+        <message>
+            <source>圆角与输出边框</source>
+            <translation>Corners and output border</translation>
+        </message>
+        <message>
+            <source>保存与命名</source>
+            <translation>Saving and naming</translation>
+        </message>
+        <message>
+            <source>读数与辅助显示</source>
+            <translation>Readouts and helper displays</translation>
+        </message>
+        <message>
+            <source>默认样式</source>
+            <translation>Default style</translation>
+        </message>
+        <message>
+            <source>色板</source>
+            <translation>Palette</translation>
+        </message>
+        <message>
+            <source>默认外观</source>
+            <translation>Default appearance</translation>
+        </message>
+        <message>
+            <source>输出与范围</source>
+            <translation>Output and scope</translation>
+        </message>
+        <message>
+            <source>光标</source>
+            <translation>Cursor</translation>
+        </message>
+        <message>
+            <source>音频</source>
+            <translation>Audio</translation>
+        </message>
+        <message>
+            <source>识别设置</source>
+            <translation>Recognition settings</translation>
+        </message>
+        <message>
+            <source>快捷键一览</source>
+            <translation>Shortcut overview</translation>
+        </message>
+        <message>
+            <source>界面主题</source>
+            <translation>Interface theme</translation>
+        </message>
+        <message>
+            <source>该光标位置不在任何屏幕上，通常是拔除屏幕或更改分辨率后留下的旧坐标。请移动鼠标后重试</source>
+            <translation>The cursor position is not on any screen. This is usually a stale coordinate left after a display was removed or its resolution changed. Move the mouse and try again</translation>
         </message>
         <message>
             <source>当前没有可截取的前台窗口（可能已锁屏，或焦点位于桌面）。请先激活要截取的窗口，再使用此功能。</source>

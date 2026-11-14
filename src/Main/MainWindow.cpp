@@ -201,7 +201,50 @@ namespace
      * @details 每一类都得先有一句「这一类管什么、改了会怎样」：需求第五节要的是能自己上手的设置界面，
      *          只列控件名会把「改了不重启就不生效」这类关键信息藏起来。
      */
-    QFormLayout *makePageForm(QWidget *page, const QString &intro)
+    /// 分组卡片挂回哪条内容列：后续分组靠这个属性找回同一列，不再往 makePageForm 传参
+    constexpr auto kSettingsContentProperty = "settingsContentColumn";
+
+    /// 一张分组卡片：卡体与其中的表单一起返回，调用方两样都要用
+    struct SettingsSection
+    {
+        QWidget     *card = nullptr; ///< 带底色的圆角分组卡
+        QFormLayout *form = nullptr; ///< 卡片内的表单
+    };
+
+    /**
+     * @brief 在内容列里造一张分组卡片
+     * @param parent 内容列
+     * @param title 分组标题；空表示这一张不摆标题
+     * @return 卡体与其中的表单
+     * @details 分组用比页面卡浅一档的 mutedFill 区分层级，不额外描边：深色档那圈边会显脏
+     */
+    SettingsSection makeSettingsSection(QWidget *parent, const QString &title)
+    {
+        auto *card   = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Panel, GyanisScribe::Gui::SurfaceFillRole::MutedFill, parent};
+        auto *layout = new QVBoxLayout{card};
+        layout->setContentsMargins(GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium, GyanisScribe::Gui::kSpacingMedium,
+                                   GyanisScribe::Gui::kSpacingMedium);
+        layout->setSpacing(GyanisScribe::Gui::kSpacingSmall);
+        if (!title.isEmpty())
+        {
+            auto *heading = new QLabel{title, card};
+            heading->setObjectName(QStringLiteral("settingsSectionTitle"));
+            GyanisScribe::Gui::applyTextRole(*heading, GyanisScribe::Gui::TextRole::Body);
+            layout->addWidget(heading);
+        }
+        auto *form = new QFormLayout;
+        // 双环要在输入框外占 6px：行距从 2px 提到 8px，环不会压在相邻行上
+        form->setVerticalSpacing(GyanisScribe::Gui::kSpacingSmall);
+        form->setHorizontalSpacing(GyanisScribe::Gui::kSpacingSmall);
+        // 标签左对齐并与字段同一水平线：整列宽由最长标签实测，字段从这一列右缘起排；
+        // 顶对齐会让单行字段看着下沉，竖直方向取居中
+        form->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+        form->setFormAlignment(Qt::AlignLeft | Qt::AlignTop);
+        layout->addLayout(form);
+        return SettingsSection{card, form};
+    }
+
+    QFormLayout *makePageForm(QWidget *page, const QString &intro, const QString &firstSectionTitle)
     {
         auto *layout = new QVBoxLayout{page};
         layout->setContentsMargins(GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge, GyanisScribe::Gui::kSpacingLarge);
@@ -222,19 +265,37 @@ namespace
         text->setAccessibleName(GyanisScribe::Base::uiText("这一类的说明"));
         contentLayout->addWidget(text);
 
-        auto *form = new QFormLayout;
-        // 双环要在输入框外占 6px：行距从 2px 提到 8px，环不会压在相邻行上
-        form->setVerticalSpacing(GyanisScribe::Gui::kSpacingSmall);
-        form->setHorizontalSpacing(GyanisScribe::Gui::kSpacingSmall);
-        // 标签左对齐并与字段同一水平线：整列宽由最长标签实测，字段从这一列右缘起排；
-        // 顶对齐会让单行字段看着下沉，竖直方向取居中
-        form->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-        form->setFormAlignment(Qt::AlignLeft | Qt::AlignTop);
-        contentLayout->addLayout(form);
+        const auto first = makeSettingsSection(content, firstSectionTitle);
+        contentLayout->addWidget(first.card);
+        first.form->setProperty(kSettingsContentProperty, QVariant::fromValue(static_cast<QObject *>(content)));
 
         layout->addWidget(content, 0, Qt::AlignHCenter);
         layout->addStretch();
-        return form;
+        return first.form;
+    }
+
+    /**
+     * @brief 在同一页追加一张分组卡片
+     * @param current 当前分组里的表单（由 makePageForm 或本函数返回）
+     * @param title 新分组的标题
+     * @return 新分组里的表单；找回内容列失败时交回原表单，后续行仍落在上一组里
+     */
+    QFormLayout *addSettingsSection(QFormLayout *current, const QString &title)
+    {
+        if (current == nullptr)
+        {
+            return nullptr;
+        }
+        auto *content = qobject_cast<QWidget *>(current->property(kSettingsContentProperty).value<QObject *>());
+        auto *contentLayout = content != nullptr ? qobject_cast<QVBoxLayout *>(content->layout()) : nullptr;
+        if (contentLayout == nullptr)
+        {
+            return current;
+        }
+        const auto section = makeSettingsSection(content, title);
+        contentLayout->addWidget(section.card);
+        section.form->setProperty(kSettingsContentProperty, QVariant::fromValue(static_cast<QObject *>(content)));
+        return section.form;
     }
 
     /**
@@ -273,7 +334,8 @@ namespace
 
         // 标签文字左对齐：字段列由最长的一条标签定起点，短标签自然留白，不再靠右对齐把每个词都推到同一右缘。
         // 字段宽度与内容列宽在 applySettingsFormMetrics 里按控件类型统一收
-        if (auto *form = page.findChild<QFormLayout *>(); form != nullptr)
+        // 一页可能切出好几张分组卡，每张卡里的标签都要左对齐
+        for (auto *form: page.findChildren<QFormLayout *>())
         {
             for (int row = 0; row < form->rowCount(); ++row)
             {
@@ -2346,8 +2408,10 @@ namespace GyanisScribe::Main
         auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
         auto *form =
-                makePageForm(page, GyanisScribe::Base::uiText("界面语言决定菜单、托盘提示与设置页文案，切换后需重启智录生效。历史记录条数上限与保留天数设为 0 时表示不限制。"));
+                makePageForm(page, GyanisScribe::Base::uiText("界面语言决定菜单、托盘提示与设置页文案，切换后需重启智录生效。历史记录条数上限与保留天数设为 0 时表示不限制。"),
+                             GyanisScribe::Base::uiText("界面与语言"));
         form->addRow(GyanisScribe::Base::uiText("界面语言"), makeUiLanguageCombo(m_settings));
+        form = addSettingsSection(form, GyanisScribe::Base::uiText("历史记录"));
         // 保留策略的读端在 GyanisScribe::Core::policyFromSettings，而那条负数提示写着「请在设置的通用页改回来」——
         // 这一页没有这两格时，那句提示就是把用户指到一个不存在的地方
         form->addRow(GyanisScribe::Base::uiText("历史记录条数上限"),
@@ -2373,6 +2437,7 @@ namespace GyanisScribe::Main
         m_memoryToggle->setChecked(m_memoryEnabled);
         QObject::connect(m_memoryToggle, &QCheckBox::toggled, this, &MainWindow::memoryEnabledToggled);
         form->addRow(GyanisScribe::Base::uiText("截图记忆"), m_memoryToggle);
+        form = addSettingsSection(form, GyanisScribe::Base::uiText("鼠标与行为"));
         form->addRow(GyanisScribe::Base::uiText("分组轮换顺序"), makeGroupRotationEdit(m_settings));
         // 托盘那两下：这一族动作在菜单、热键与鼠标点击三处都走同一个出口，这里只多两个入口而不多一份实现
         for (const auto &role: GyanisScribe::App::trayClickRoles())
@@ -2384,6 +2449,7 @@ namespace GyanisScribe::Main
                      makeSettingCheck(m_settings, GyanisScribe::Core::kStepsAutoRedact, false, GyanisScribe::Base::uiText("录制结束后自动打码"),
                                       GyanisScribe::Base::uiText("自动打码步骤截图"),
                                       GyanisScribe::Base::uiText("录制结束后自动检查并打码本次的步骤截图；默认关闭，关闭时可在审核窗里自行删改。")));
+        form = addSettingsSection(form, GyanisScribe::Base::uiText("数据与备份"));
         form->addRow(GyanisScribe::Base::uiText("备份与恢复"), buildTransferRow());
         return page;
     }
@@ -2616,7 +2682,8 @@ namespace GyanisScribe::Main
     {
         auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
-        auto *form = makePageForm(page, GyanisScribe::Base::uiText("截图与标注输出文件保存在指定目录。取色复制的文本按下方格式生成。"));
+        auto *form = makePageForm(page, GyanisScribe::Base::uiText("截图与标注输出文件保存在指定目录。取色复制的文本按下方格式生成。"),
+                             GyanisScribe::Base::uiText("截图行为"));
         form->addRow(GyanisScribe::Base::uiText("截图完成后"), makeCaptureIntentCombo(m_settings, m_icons));
         form->addRow(GyanisScribe::Base::uiText("显示截图信息面板"),
                      makeSettingCheck(m_settings, GyanisScribe::Core::kCaptureShowInfoPanel, false,
@@ -2626,11 +2693,6 @@ namespace GyanisScribe::Main
                                                                  "默认关闭；面板仅在本机显示，不写入历史或日志。")));
         form->addRow(GyanisScribe::Base::uiText("截图延时"), makeCaptureDelaySpin(m_settings));
         form->addRow(GyanisScribe::Base::uiText("鼠标指针"), makeIncludeCursorCheck(m_settings));
-        form->addRow(GyanisScribe::Base::uiText("圆角处理"),
-                     makeSettingCheck(m_settings, GyanisScribe::Core::kCaptureRoundCorners, GyanisScribe::Core::kDefaultCaptureRoundCorners,
-                                      GyanisScribe::Base::uiText("将输出图片四角裁剪为圆角"), GyanisScribe::Base::uiText("圆角处理"),
-                                      GyanisScribe::Base::uiText("仅对区域截图生效：输出图片四角为透明像素，半径由下方设置决定；整屏、窗口与滚动长截图不应用圆角。")));
-        form->addRow(GyanisScribe::Base::uiText("圆角半径"), makeCornerRadiusSpin(m_settings));
         form->addRow(GyanisScribe::Base::uiText("自动保存"),
                      makeSettingCheck(m_settings, GyanisScribe::Core::kCaptureAutoSave, false, GyanisScribe::Base::uiText("每张截图均保存到输出目录"),
                                       GyanisScribe::Base::uiText("自动保存所有截图"),
@@ -2639,6 +2701,12 @@ namespace GyanisScribe::Main
                      makeSettingCheck(m_settings, GyanisScribe::Core::kCaptureSound, false, GyanisScribe::Base::uiText("截图完成时播放系统提示音"),
                                       GyanisScribe::Base::uiText("截图音效"), GyanisScribe::Base::uiText("使用系统提示音，无需提供音频文件。")));
         form->addRow(GyanisScribe::Base::uiText("截图后执行的命令"), makeExecCommandEdit(m_settings));
+        form = addSettingsSection(form, GyanisScribe::Base::uiText("圆角与输出边框"));
+        form->addRow(GyanisScribe::Base::uiText("圆角处理"),
+                     makeSettingCheck(m_settings, GyanisScribe::Core::kCaptureRoundCorners, GyanisScribe::Core::kDefaultCaptureRoundCorners,
+                                      GyanisScribe::Base::uiText("将输出图片四角裁剪为圆角"), GyanisScribe::Base::uiText("圆角处理"),
+                                      GyanisScribe::Base::uiText("仅对区域截图生效：输出图片四角为透明像素，半径由下方设置决定；整屏、窗口与滚动长截图不应用圆角。")));
+        form->addRow(GyanisScribe::Base::uiText("圆角半径"), makeCornerRadiusSpin(m_settings));
         form->addRow(GyanisScribe::Base::uiText("输出边框"),
                      makeSettingCheck(m_settings, GyanisScribe::Core::kOutputBorder, false, GyanisScribe::Base::uiText("为输出图片添加中灰色边框"),
                                       GyanisScribe::Base::uiText("输出边框"),
@@ -2649,11 +2717,13 @@ namespace GyanisScribe::Main
                      makeSettingCheck(m_settings, GyanisScribe::Core::kOutputShadow, false, GyanisScribe::Base::uiText("为输出图片添加轻投影"),
                                       GyanisScribe::Base::uiText("输出投影"), GyanisScribe::Base::uiText("与边框同组生效：保存文件、复制到剪贴板与打印时均添加；保存为 JPG 时会在投影下方垫白色背景。")));
         form->addRow(GyanisScribe::Base::uiText("投影宽度"), makeShadowWidthSpin(m_settings));
+        form = addSettingsSection(form, GyanisScribe::Base::uiText("保存与命名"));
         form->addRow(GyanisScribe::Base::uiText("截图与标注输出目录"), makePathRow(m_settings, GyanisScribe::Core::kPathScreenshot, GyanisScribe::Base::uiText("截图输出目录"),
                                                                                    GyanisScribe::Base::Paths::defaultScreenshotDirectory(), m_icons));
         form->addRow(GyanisScribe::Base::uiText("保存格式"), makeImageFormatCombo(m_settings));
         form->addRow(GyanisScribe::Base::uiText("保存质量"), makeImageQualitySpin(m_settings));
         form->addRow(GyanisScribe::Base::uiText("文件名模板"), makeNameTemplateRow(m_settings));
+        form = addSettingsSection(form, GyanisScribe::Base::uiText("读数与辅助显示"));
         form->addRow(GyanisScribe::Base::uiText("颜色复制格式"), makeColorFormatCombo(m_settings));
         form->addRow(GyanisScribe::Base::uiText("放大镜视野"), makeMagnifierViewCombo(m_settings));
         form->addRow(GyanisScribe::Base::uiText("尺寸单位"), makeSizeUnitCombo(m_settings));
@@ -2662,6 +2732,7 @@ namespace GyanisScribe::Main
                      makeSettingCheck(m_settings, GyanisScribe::Core::kPickHexUppercase, true, GyanisScribe::Base::uiText("使用大写字母"),
                                       GyanisScribe::Base::uiText("十六进制字母大小写"),
                                       GyanisScribe::Base::uiText("关闭后输出为 #3c78c8 形式；仅影响十六进制写法，其它格式不受影响。")));
+        form = addSettingsSection(form, GyanisScribe::Base::uiText("回溯缓冲"));
         form->addRow(GyanisScribe::Base::uiText("回溯缓冲"), makeRewindEnabledCheck(m_settings));
         form->addRow(GyanisScribe::Base::uiText("缓冲保留时长"), makeRewindBufferSecondsSpin(m_settings));
         form->addRow(GyanisScribe::Base::uiText("缓冲帧率"), makeRewindFrameRateCombo(m_settings));
@@ -2784,13 +2855,15 @@ namespace GyanisScribe::Main
         auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
         auto *form = makePageForm(page, GyanisScribe::Base::uiText("新建标注窗口使用以下默认线宽与字号；之后的修改会由工具栏记录，下次以最近使用的档位打开。"
-                                                                   "自定义色板留空时使用内置八色；下方按钮可导出或导入整套配色。"));
+                                                                   "自定义色板留空时使用内置八色；下方按钮可导出或导入整套配色。"),
+                             GyanisScribe::Base::uiText("默认样式"));
         form->addRow(GyanisScribe::Base::uiText("默认线宽"),
                      makeStepCombo(m_settings, GyanisScribe::Core::kAnnotationDefaultWidth, GyanisScribe::Gui::kAnnotationWidths,
                                    GyanisScribe::Gui::kAnnotationWidths[GyanisScribe::Gui::kDefaultAnnotationWidthStep], GyanisScribe::Base::uiText("默认线宽")));
         form->addRow(GyanisScribe::Base::uiText("默认字号"),
                      makeStepCombo(m_settings, GyanisScribe::Core::kAnnotationDefaultFontSize, GyanisScribe::Gui::kFontSizes,
                                    GyanisScribe::Gui::kFontSizes[GyanisScribe::Gui::kDefaultAnnotationFontSizeIndex], GyanisScribe::Base::uiText("默认字号")));
+        form = addSettingsSection(form, GyanisScribe::Base::uiText("色板"));
         form->addRow(GyanisScribe::Base::uiText("自定义色板"), makePaletteEdit(m_settings));
         form->addRow(GyanisScribe::Base::uiText("色板导入与导出"), buildPaletteTransferRow());
         form->addRow(GyanisScribe::Base::uiText("空白画布背景"),
@@ -2804,7 +2877,8 @@ namespace GyanisScribe::Main
     {
         auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
-        auto *form = makePageForm(page, GyanisScribe::Base::uiText("新建贴图使用此默认不透明度。滚轮调整仅影响当前贴图，不修改此设置。"));
+        auto *form = makePageForm(page, GyanisScribe::Base::uiText("新建贴图使用此默认不透明度。滚轮调整仅影响当前贴图，不修改此设置。"),
+                             GyanisScribe::Base::uiText("默认外观"));
         form->addRow(GyanisScribe::Base::uiText("新贴图默认不透明度"), makeOpacitySpin(m_settings));
         form->addRow(GyanisScribe::Base::uiText("吸附距离"), makeEdgeSnapDistanceSpin(m_settings));
         form->addRow(GyanisScribe::Base::uiText("禁止拖边调整大小"),
@@ -2822,7 +2896,8 @@ namespace GyanisScribe::Main
                                                               "保存为 GIF 时帧率上限低于 MP4（GIF 最高 24 帧/秒）。画面码率设为 0 时由编码器按质量优先处理；"
                                                               "填写具体数值时按该码率控制，GIF 不使用此项。编码器可固定为某个可用项；自动模式会在编码前逐项检测并选择第一个可用项。"
                                                               "录制倒计时为 0 时立即开始。音频设备无法列出时下拉框仅保留“不录制”，悬停可查看原因；"
-                                                              "保存为 GIF 时音频选项会禁用，因为该格式不支持声音。以上设置均从下次录屏开始生效。"));
+                                                              "保存为 GIF 时音频选项会禁用，因为该格式不支持声音。以上设置均从下次录屏开始生效。"),
+                             GyanisScribe::Base::uiText("输出与范围"));
         form->addRow(GyanisScribe::Base::uiText("录屏输出目录"), makePathRow(m_settings, GyanisScribe::Core::kPathRecording, GyanisScribe::Base::uiText("录屏输出目录"),
                                                                              GyanisScribe::Base::Paths::defaultRecordingDirectory(), m_icons));
         form->addRow(GyanisScribe::Base::uiText("录制范围"), makeRecordScopeCombo(m_settings, m_icons));
@@ -2834,9 +2909,11 @@ namespace GyanisScribe::Main
         form->addRow(GyanisScribe::Base::uiText("最长录制时长"), makeMaximumDurationSpin(m_settings));
         form->addRow(GyanisScribe::Base::uiText("画面码率"), makeVideoBitrateSpin(m_settings));
         form->addRow(GyanisScribe::Base::uiText("视频编码器"), makeVideoEncoderCombo(m_settings, *m_videoEncoders));
+        form = addSettingsSection(form, GyanisScribe::Base::uiText("光标高亮"));
         form->addRow(GyanisScribe::Base::uiText("光标高亮"), makeCursorHighlightCheck(m_settings, m_icons));
         auto *microphoneCombo  = makeAudioDeviceCombo(m_settings, GyanisScribe::Core::kRecordAudioMicrophone, GyanisScribe::Base::uiText("麦克风设备"), *m_audioDevices);
         auto *systemSoundCombo = makeAudioDeviceCombo(m_settings, GyanisScribe::Core::kRecordAudioSystemSound, GyanisScribe::Base::uiText("系统声音设备"), *m_audioDevices);
+        form = addSettingsSection(form, GyanisScribe::Base::uiText("音频"));
         form->addRow(iconRow(m_icons, m_theme, "Microphone", GyanisScribe::Base::uiText("麦克风")), microphoneCombo);
         form->addRow(iconRow(m_icons, m_theme, "SystemAudio", GyanisScribe::Base::uiText("系统声音")), systemSoundCombo);
 
@@ -2857,7 +2934,8 @@ namespace GyanisScribe::Main
     {
         auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
-        auto *form = makePageForm(page, GyanisScribe::Base::uiText("可识别的文字取决于语言包。目录留空时按环境变量与程序数据目录查找。"));
+        auto *form = makePageForm(page, GyanisScribe::Base::uiText("可识别的文字取决于语言包。目录留空时按环境变量与程序数据目录查找。"),
+                             GyanisScribe::Base::uiText("识别设置"));
         form->addRow(iconRow(m_icons, m_theme, "OcrLanguage", GyanisScribe::Base::uiText("识别语言")), makeOcrLanguageCombo(m_settings));
         form->addRow(GyanisScribe::Base::uiText("语言包目录"), makePathRow(m_settings, GyanisScribe::Core::kOcrTessDataDirectory, GyanisScribe::Base::uiText("语言包目录"),
                                                                                GyanisScribe::Base::Paths::applicationDataDirectory() / "tessdata", m_icons));
@@ -2893,7 +2971,7 @@ namespace GyanisScribe::Main
                         : GyanisScribe::Base::uiText("当前平台不提供全局快捷键注册接口，上方 %1 项修改后不会生效。"
                                                      "底部一栏为应用内快捷键，不受此能力限制，照常生效。")
                                   .arg(static_cast<int>(rows.size() + GyanisScribe::App::bindableActions().size()));
-        auto *form = makePageForm(page, intro);
+        auto *form = makePageForm(page, intro, GyanisScribe::Base::uiText("快捷键一览"));
         for (const auto &[key, title, defaultText]: rows)
         {
             auto *edit = new GyanisScribe::Gui::HotkeyEdit{m_settings, page};
@@ -2994,7 +3072,8 @@ namespace GyanisScribe::Main
     {
         auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
-        auto *form = makePageForm(page, GyanisScribe::Base::uiText("配色方案立即生效。高对比度模式使用纯黑文字、纯白背景与加粗边框。"));
+        auto *form = makePageForm(page, GyanisScribe::Base::uiText("配色方案立即生效。高对比度模式使用纯黑文字、纯白背景与加粗边框。"),
+                             GyanisScribe::Base::uiText("界面主题"));
         form->addRow(GyanisScribe::Base::uiText("配色方案"), makeThemeCombo(m_theme, m_icons));
         return page;
     }

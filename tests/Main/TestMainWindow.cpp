@@ -619,70 +619,73 @@ namespace
         m_window->open(MainWindowPage::General);
         auto *page = stack()->currentWidget();
         ASSERT_NE(page, nullptr);
-        auto *form = page->findChild<QFormLayout *>();
-        ASSERT_NE(form, nullptr) << "通用页没有表单骨架，判据的前提就没构造出来";
-        EXPECT_TRUE(form->labelAlignment().testFlag(Qt::AlignLeft)) << "标签左对齐是这一版的排版前提";
+        // 分组之后同一页有多张表单卡，但标签列宽由整页统一实测，字段仍落在同一条左缘
+        const auto forms = page->findChildren<QFormLayout *>();
+        ASSERT_FALSE(forms.isEmpty()) << "通用页没有表单骨架，判据的前提就没构造出来";
 
         const QImage pixmap = page->grab().toImage();
         const auto   scale  = pixmap.devicePixelRatio();
+        // 左侧墨迹：最外 4px 不扫，避开标签自身边缘的抗锯齿
+        constexpr int kEdgeInset = 4;
 
-        int    rows        = 0;
-        int    fieldLeft   = -1;
-        int    widestText  = 0;
-        QRect  widestRect;
-        for (int row = 0; row < form->rowCount(); ++row)
+        int   fieldLeft  = -1;
+        int   widestText = 0;
+        QRect widestRect;
+        int   rows       = 0;
+        for (auto *form: forms)
         {
-            const auto *labelItem = form->itemAt(row, QFormLayout::LabelRole);
-            const auto *fieldItem = form->itemAt(row, QFormLayout::FieldRole);
-            if (labelItem == nullptr || fieldItem == nullptr || labelItem->widget() == nullptr || fieldItem->widget() == nullptr)
+            EXPECT_TRUE(form->labelAlignment().testFlag(Qt::AlignLeft)) << "标签左对齐是这一版的排版前提";
+            for (int row = 0; row < form->rowCount(); ++row)
             {
-                continue;
-            }
-            auto *label = labelItem->widget();
-            auto *field = fieldItem->widget();
-            auto *text  = qobject_cast<QLabel *>(label);
-            ASSERT_NE(text, nullptr) << "第 " << row << " 行的标签不是文字控件，前提没构造出来";
-            EXPECT_TRUE(text->alignment().testFlag(Qt::AlignLeft)) << "第 " << row << " 行的标签文字没有左对齐";
-
-            const QRect labelRect{label->mapTo(page, QPoint{0, 0}), label->size()};
-            const int   left = field->mapTo(page, QPoint{0, 0}).x();
-            if (fieldLeft < 0)
-            {
-                fieldLeft = left;
-            }
-            EXPECT_EQ(left, fieldLeft) << "第 " << row << " 行的字段没有落在同一条左缘上";
-
-            // 左侧墨迹：最外 4px 不扫，避开标签自身边缘的抗锯齿
-            constexpr int kEdgeInset = 4;
-            int           leftInk    = -1;
-            for (int x = labelRect.left() + kEdgeInset; x <= labelRect.right() - kEdgeInset && leftInk < 0; ++x)
-            {
-                for (int y = labelRect.top() + 2; y <= labelRect.bottom() - 2; ++y)
+                const auto *labelItem = form->itemAt(row, QFormLayout::LabelRole);
+                const auto *fieldItem = form->itemAt(row, QFormLayout::FieldRole);
+                if (labelItem == nullptr || fieldItem == nullptr || labelItem->widget() == nullptr || fieldItem->widget() == nullptr)
                 {
-                    const auto pixel = pixmap.pixelColor(qRound(x * scale), qRound(y * scale));
-                    if (pixel.red() + pixel.green() + pixel.blue() < 3 * 200)
+                    continue;
+                }
+                auto *label = labelItem->widget();
+                auto *field = fieldItem->widget();
+                auto *text  = qobject_cast<QLabel *>(label);
+                ASSERT_NE(text, nullptr) << "第 " << row << " 行的标签不是文字控件，前提没构造出来";
+                EXPECT_TRUE(text->alignment().testFlag(Qt::AlignLeft)) << "第 " << row << " 行的标签文字没有左对齐";
+
+                const QRect labelRect{label->mapTo(page, QPoint{0, 0}), label->size()};
+                const int   left = field->mapTo(page, QPoint{0, 0}).x();
+                if (fieldLeft < 0)
+                {
+                    fieldLeft = left;
+                }
+                EXPECT_EQ(left, fieldLeft) << "第 " << row << " 行的字段没有落在同一条左缘上";
+
+                int leftInk = -1;
+                for (int x = labelRect.left() + kEdgeInset; x <= labelRect.right() - kEdgeInset && leftInk < 0; ++x)
+                {
+                    for (int y = labelRect.top() + 2; y <= labelRect.bottom() - 2; ++y)
                     {
-                        leftInk = x;
-                        break;
+                        const auto pixel = pixmap.pixelColor(qRound(x * scale), qRound(y * scale));
+                        if (pixel.red() + pixel.green() + pixel.blue() < 3 * 200)
+                        {
+                            leftInk = x;
+                            break;
+                        }
                     }
                 }
-            }
-            ASSERT_GE(leftInk, 0) << "第 " << row << " 行的标签一个字都没画出来";
-            EXPECT_LE(leftInk - labelRect.left(), 8) << "第 " << row << " 行的标签没有从左边开始写";
+                ASSERT_GE(leftInk, 0) << "第 " << row << " 行的标签一个字都没画出来";
+                EXPECT_LE(leftInk - labelRect.left(), 8) << "第 " << row << " 行的标签没有从左边开始写";
 
-            const int textWidth = QFontMetrics{text->font()}.horizontalAdvance(text->text());
-            if (textWidth > widestText)
-            {
-                widestText = textWidth;
-                widestRect = labelRect;
+                const int textWidth = QFontMetrics{text->font()}.horizontalAdvance(text->text());
+                if (textWidth > widestText)
+                {
+                    widestText = textWidth;
+                    widestRect = labelRect;
+                }
+                ++rows;
             }
-            ++rows;
         }
 
         ASSERT_GE(rows, 5) << "通用页参与判据的行太少，前提没构造出来";
         ASSERT_FALSE(widestRect.isNull()) << "没有找到最长标签";
-        constexpr int kEdgeInset = 4;
-        int           rightInk   = -1;
+        int rightInk = -1;
         for (int x = widestRect.right() - kEdgeInset; x >= widestRect.left() && rightInk < 0; --x)
         {
             for (int y = widestRect.top() + 2; y <= widestRect.bottom() - 2; ++y)
@@ -719,40 +722,50 @@ namespace
             ASSERT_NE(scroll, nullptr);
             auto *card = scroll->widget();
             ASSERT_NE(card, nullptr);
-            auto *form = card->findChild<QFormLayout *>();
-            ASSERT_NE(form, nullptr);
+            // 标签列宽按整页实测：分组卡不改变同一页字段共线这一条
+            const auto forms = card->findChildren<QFormLayout *>();
+            ASSERT_FALSE(forms.isEmpty());
 
             int pageLabelWidth = 0;
-            for (int row = 0; row < form->rowCount(); ++row)
+            for (auto *form: forms)
             {
-                const auto *labelItem = form->itemAt(row, QFormLayout::LabelRole);
-                if (labelItem != nullptr && labelItem->widget() != nullptr)
+                for (int row = 0; row < form->rowCount(); ++row)
                 {
-                    pageLabelWidth = std::max(pageLabelWidth, labelItem->widget()->sizeHint().width());
+                    const auto *labelItem = form->itemAt(row, QFormLayout::LabelRole);
+                    if (labelItem != nullptr && labelItem->widget() != nullptr)
+                    {
+                        pageLabelWidth = std::max(pageLabelWidth, labelItem->widget()->sizeHint().width());
+                    }
                 }
             }
             ASSERT_GT(pageLabelWidth, 0) << "这一页没有标签列";
 
             int firstFieldLeft = -1;
-            for (int row = 0; row < form->rowCount(); ++row)
+            int pageRows       = 0;
+            for (auto *form: forms)
             {
-                const auto *labelItem = form->itemAt(row, QFormLayout::LabelRole);
-                const auto *fieldItem = form->itemAt(row, QFormLayout::FieldRole);
-                if (labelItem == nullptr || labelItem->widget() == nullptr || fieldItem == nullptr || fieldItem->widget() == nullptr)
+                for (int row = 0; row < form->rowCount(); ++row)
                 {
-                    continue;
+                    const auto *labelItem = form->itemAt(row, QFormLayout::LabelRole);
+                    const auto *fieldItem = form->itemAt(row, QFormLayout::FieldRole);
+                    if (labelItem == nullptr || labelItem->widget() == nullptr || fieldItem == nullptr || fieldItem->widget() == nullptr)
+                    {
+                        continue;
+                    }
+                    const auto *label = labelItem->widget();
+                    EXPECT_EQ(label->width(), pageLabelWidth) << "第 " << row << " 行的标签没有收到本页最长一档";
+                    const int labelLeft = label->mapTo(card, QPoint{0, 0}).x();
+                    const int fieldLeft = fieldItem->widget()->mapTo(card, QPoint{0, 0}).x();
+                    EXPECT_EQ(fieldLeft, labelLeft + pageLabelWidth + form->horizontalSpacing()) << "第 " << row << " 行的字段没有紧接标签列右缘";
+                    if (firstFieldLeft < 0)
+                    {
+                        firstFieldLeft = fieldLeft;
+                    }
+                    EXPECT_EQ(fieldLeft, firstFieldLeft) << "同一页里字段列左右跳了";
+                    ++pageRows;
                 }
-                const auto *label = labelItem->widget();
-                EXPECT_EQ(label->width(), pageLabelWidth) << "第 " << row << " 行的标签没有收到本页最长一档";
-                const int labelLeft = label->mapTo(card, QPoint{0, 0}).x();
-                const int fieldLeft = fieldItem->widget()->mapTo(card, QPoint{0, 0}).x();
-                EXPECT_EQ(fieldLeft, labelLeft + pageLabelWidth + form->horizontalSpacing()) << "第 " << row << " 行的字段没有紧接标签列右缘";
-                if (firstFieldLeft < 0)
-                {
-                    firstFieldLeft = fieldLeft;
-                }
-                EXPECT_EQ(fieldLeft, firstFieldLeft) << "同一页里字段列左右跳了";
             }
+            EXPECT_GT(pageRows, 0) << static_cast<int>(page) << " 这一页没有标签列";
         }
     }
 
@@ -785,25 +798,28 @@ namespace
     TEST_F(MainWindowFixture, AboutPageSharesTheFormsContentGrid)
     {
         makeWindow();
-        m_window->open(MainWindowPage::General);
-        QCoreApplication::processEvents();
-        auto *general = stack()->currentWidget();
-        ASSERT_NE(general, nullptr);
-        auto *form = general->findChild<QFormLayout *>();
-        ASSERT_NE(form, nullptr);
-        auto *firstLabel = form->itemAt(0, QFormLayout::LabelRole);
-        ASSERT_NE(firstLabel, nullptr);
-        ASSERT_NE(firstLabel->widget(), nullptr);
-        const int formLeft = firstLabel->widget()->mapTo(m_window.get(), QPoint{0, 0}).x();
+        const auto contentCenteredInCard = [this](const MainWindowPage page)
+        {
+            m_window->open(page);
+            QCoreApplication::processEvents();
+            auto *scroll = qobject_cast<QScrollArea *>(stack()->currentWidget());
+            EXPECT_NE(scroll, nullptr);
+            auto *card = scroll != nullptr ? scroll->widget() : nullptr;
+            EXPECT_NE(card, nullptr);
+            auto *content = card != nullptr ? card->findChild<QWidget *>(QStringLiteral("settingsPageContent")) : nullptr;
+            EXPECT_NE(content, nullptr) << static_cast<int>(page) << " 这一页没有内容列";
+            if (card == nullptr || content == nullptr)
+            {
+                return;
+            }
+            const int leftMargin  = content->mapTo(card, QPoint{0, 0}).x();
+            const int rightMargin = card->width() - content->mapTo(card, QPoint{content->width(), 0}).x();
+            EXPECT_NEAR(leftMargin, rightMargin, 2) << static_cast<int>(page) << " 的内容列没有在卡片里居中";
+        };
 
-        m_window->open(MainWindowPage::About);
-        QCoreApplication::processEvents();
-        auto *about = stack()->currentWidget();
-        ASSERT_NE(about, nullptr);
-        auto *aboutLogo = about->findChild<QLabel *>();
-        ASSERT_NE(aboutLogo, nullptr) << "关于页没有正文控件，判据的前提没构造出来";
-        const int aboutLeft = aboutLogo->mapTo(m_window.get(), QPoint{0, 0}).x();
-        EXPECT_EQ(aboutLeft, formLeft) << "关于页正文左缘与表单页的网格对不上";
+        // 关于页与表单页共用同一条居中内容列：两页的正文都从这一列起步，翻页时不横向跳
+        contentCenteredInCard(MainWindowPage::General);
+        contentCenteredInCard(MainWindowPage::About);
     }
 
     /**

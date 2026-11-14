@@ -24,6 +24,11 @@ if (PYTHON3_EXECUTABLE)
     add_test(NAME Style.SourceConventions
             COMMAND ${PYTHON3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/check-source-conventions.py
                     --scan-root ${CMAKE_SOURCE_DIR}/src)
+
+    # 文案体例门禁：界面文案一律正式书面语，术语统一，不许口语词、感叹号与表情符号
+    add_test(NAME Style.CopyStyle
+            COMMAND ${PYTHON3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/check-copy-style.py
+                    --catalog ${CMAKE_SOURCE_DIR}/translations/GyanisScribe_en.ts)
 else ()
     # 没有 Python 就当场说明而不是静默不跑：一条永远不会运行的检查比没有检查更糟
     message(WARNING "没找到 python3：Style.TranslationCatalog 与 Style.SourceConventions 这两条门禁不会注册，界面文案对照与路径窄串没人管")

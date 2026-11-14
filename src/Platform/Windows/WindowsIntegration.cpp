@@ -170,7 +170,7 @@ namespace
         if (!owner)
         {
             return std::unexpected(Error{ErrorCode::InvalidArgument,
-                                         GyanisScribe::Base::uiTextUtf8("这个光标位置不落在任何一块屏幕上（多半是拔屏或改分辨率之后的陈旧坐标）。请把鼠标动一下再试")});
+                                         GyanisScribe::Base::uiTextUtf8("该光标位置不在任何屏幕上，通常是拔除屏幕或更改分辨率后留下的旧坐标。请移动鼠标后重试")});
         }
         return GyanisScribe::Platform::logicalPointToPhysicalGlobal(globalLogicalPoint, mappings[*owner]);
     }

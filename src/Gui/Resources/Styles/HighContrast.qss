@@ -293,6 +293,12 @@ QListWidget#settingsNav::item {
     min-height: 30px;
 }
 
+/* 设置页分组卡的标题：次要色 + 600 字重，靠层级不靠字号 */
+QLabel#settingsSectionTitle {
+    color: #000000;
+    font-weight: 600;
+}
+
 /* ---- 设置页的滚动层 ---- */
 /* 卡片底画在里面的 #pageCard 上：这一层与它的视口都不带底色 */
 QScrollArea#settingsScroll {
