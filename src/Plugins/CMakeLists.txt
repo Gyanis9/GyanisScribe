@@ -22,6 +22,10 @@ if (WIN32 AND MSVC)
     set(GYANISSCRIBE_HAS_WINRT_OCR ON)
 endif ()
 
+# PP-OCR 的模型与 ONNX Runtime 都随仓库分发，是硬依赖而不是可选包：引擎始终收进构建，
+# 条件宏与选中 WinRT 的那条同形，留给叶子目录按标记收源文件
+set(GYANISSCRIBE_HAS_PPOCR ON)
+
 add_subdirectory(Barcode)
 add_subdirectory(CaptureSources)
 add_subdirectory(OcrEngines)
@@ -31,6 +35,10 @@ get_property(PluginsSources GLOBAL PROPERTY GyanisScribePluginsSources)
 add_library(Plugins STATIC ${PluginsSources})
 
 target_include_directories(Plugins PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
+# ONNX Runtime 的 C API 头 vendor 在仓库里：SYSTEM + /external:W0，头文件自身的告警不进零告警门禁
+target_include_directories(Plugins SYSTEM PRIVATE "${CMAKE_SOURCE_DIR}/vendor/OnnxRuntime/include")
+# 宏发给所有消费者：用例据此决定收不收这一份直测，工厂后续按它判断后端有没有编进来
+target_compile_definitions(Plugins PUBLIC GYANISSCRIBE_HAS_PPOCR=1)
 target_link_libraries(Plugins PUBLIC
         Core
         Platform

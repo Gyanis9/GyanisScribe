@@ -29,6 +29,13 @@ add_custom_command(TARGET DeployQtRuntime POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory
         "$<TARGET_FILE_DIR:GyanisScribe>/plugins/platforms")
 
+# ONNX Runtime 与程序分开发布（模型走动态加载），但 DLL 本身必须挨着可执行体：
+# 引擎的查找顺序里「程序目录」是随包那一份的落点，缺它就是启动后报「运行库加载失败」
+add_custom_command(TARGET DeployQtRuntime POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/vendor/OnnxRuntime/bin/onnxruntime.dll"
+        "$<TARGET_FILE_DIR:GyanisScribe>/")
+
 # Concurrent 不在这份清单里：Qt 6 的 QtConcurrent::run 是模板代码，跑的是 QtCore 的线程池，
 # QFutureWatcher 也在 QtCore 里——实测 Release 成品与测试二进制都不 import Qt6Concurrent / libQt6Concurrent
 # （打包那一步的 windeployqt 同样没拷它）。链 Qt6::Concurrent 只是为了拿到头文件，摆一份没人加载的 DLL 进运行目录是死重量。

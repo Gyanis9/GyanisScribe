@@ -14,3 +14,8 @@ if (GYANISSCRIBE_HAS_WINRT_OCR)
             ${CMAKE_CURRENT_LIST_DIR}/WinRTImageOcrEngine.h
             ${CMAKE_CURRENT_LIST_DIR}/WinRTImageOcrEngine.cpp)
 endif ()
+if (GYANISSCRIBE_HAS_PPOCR)
+    set_property(GLOBAL APPEND PROPERTY GyanisScribePluginsSources
+            ${CMAKE_CURRENT_LIST_DIR}/PpOcrOnnxEngine.h
+            ${CMAKE_CURRENT_LIST_DIR}/PpOcrOnnxEngine.cpp)
+endif ()
