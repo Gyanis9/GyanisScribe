@@ -64,12 +64,14 @@ VC++ 运行库也随包带：可执行体导入 `MSVCP140.dll` 与 `VCRUNTIME140
 （Windows 先搜程序目录，加载的就是随包这一份），缺任一件当场中止；UCRT（`api-ms-win-crt-*`）不搬，
 那是 10/11 自带的。`windeployqt --compiler-runtime` 在这套 Qt 上一个 CRT 都不落地（实测），所以自己拷。
 
-「装完即用」这一条也真机量过：把 `dist/` 里的安装器静默装进一个空目录（`/S /D=<空目录>`），
-装出来的目录里 `GyanisScribe.exe`、`ffmpeg.exe`、`ppocr/` 三件模型、`onnxruntime.dll`、`licenses/`、
-`translations/GyanisScribe_en.qm`、`platforms/qwindows.dll` 与 `Uninstaller.exe` 全在；
-就在那个目录里把 PATH 收窄到只剩 `System32` 跑 `--selftest`，退出码 0（当时是严格模式，热键空闲），
-`ffmpeg.exe -version` 也起得来（9.0.2-essentials_build）；随后 `Uninstaller.exe /S` 退出码 0，
-装出来的目录和 HKLM 里那条卸载登记键都不在了。
+「装完即用」这一条早先真机量过：把当时的 `dist/` 安装器静默装进一个空目录（`/S /D=<空目录>`），
+装出来的目录里可执行体、`ffmpeg.exe`、识别数据目录、`licenses/`、`translations/GyanisScribe_en.qm`、
+`platforms/qwindows.dll` 与 `Uninstaller.exe` 全在；就在那个目录里把 PATH 收窄到只剩 `System32` 跑
+`--selftest`，退出码 0（当时是严格模式，热键空闲），`ffmpeg.exe -version` 也起得来（9.0.2-essentials_build）；
+随后 `Uninstaller.exe /S` 退出码 0，装出来的目录和 HKLM 里那条卸载登记键都不在了。
+那次量的是换 OCR 载荷之前的那一版包。现在 `scripts/WindowsPackage.ps1` 摆的是 `ppocr/` 三件模型与
+`onnxruntime.dll`（随包清单以该脚本为准）；这一版载荷的装后自检（装进空目录、收窄 PATH 跑 `--selftest`、卸载）
+还没重新量，等最终门禁后重新装机复测，测过再把结果补在这里。
 
 ## 验证与质量门禁
 
