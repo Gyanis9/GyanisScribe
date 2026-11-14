@@ -36,6 +36,17 @@ add_custom_command(TARGET DeployQtRuntime POST_BUILD
         "${CMAKE_SOURCE_DIR}/vendor/OnnxRuntime/bin/onnxruntime.dll"
         "$<TARGET_FILE_DIR:GyanisScribe>/")
 
+# 识别模型也要挨着可执行体：工厂先找程序目录下的 ppocr，开发树缺了这一份就静默落到系统识别，
+# 开发树量到的行为（语言支持、置信度）与安装包不一致
+add_custom_command(TARGET DeployQtRuntime POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+        "$<TARGET_FILE_DIR:GyanisScribe>/ppocr"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/vendor/PpocrModels/PP-OCRv6_det_small.onnx"
+        "${CMAKE_SOURCE_DIR}/vendor/PpocrModels/PP-OCRv6_rec_small.onnx"
+        "${CMAKE_SOURCE_DIR}/vendor/PpocrModels/ppocrv6_dict.txt"
+        "$<TARGET_FILE_DIR:GyanisScribe>/ppocr/")
+
 # Concurrent 不在这份清单里：Qt 6 的 QtConcurrent::run 是模板代码，跑的是 QtCore 的线程池，
 # QFutureWatcher 也在 QtCore 里——实测 Release 成品与测试二进制都不 import Qt6Concurrent / libQt6Concurrent
 # （打包那一步的 windeployqt 同样没拷它）。链 Qt6::Concurrent 只是为了拿到头文件，摆一份没人加载的 DLL 进运行目录是死重量。
