@@ -32,9 +32,9 @@ if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $stage 'docs') | Out-Null
 
-# The package has to run on a machine where the user installed nothing else: Qt runtime, ffmpeg
-# and the OCR language packs all travel inside it. A missing piece is an error here, never a
-# silent skip -- a package that builds but cannot record or recognise is worse than no package.
+# The package has to run on a machine where the user installed nothing else: Qt runtime, ffmpeg,
+# the OCR models and the ONNX Runtime all travel inside it. A missing piece is an error here,
+# never a silent skip -- a package that builds but cannot record or recognise is worse than no package.
 Copy-Item $exe $stage -Force
 Copy-Item 'README.md' $stage -Force
 if (-not (Test-Path 'LICENSE.txt')) { throw 'LICENSE.txt missing: the installer must carry the end-user license' }
@@ -63,15 +63,20 @@ if (-not (Test-Path $ffmpegExe)) { throw "bundled ffmpeg missing at $ffmpegExe" 
 Copy-Item $ffmpegExe $stage -Force
 Write-Output '[ok] ffmpeg staged next to the executable'
 
-# Ocr looks for <application directory>/tessdata before the user data folder, so shipping the
-# packs here is what makes recognition work straight after installation.
-$tessDataSource = Join-Path 'vendor' 'Tessdata'
-foreach ($required in 'eng.traineddata', 'chi_sim.traineddata') {
-    if (-not (Test-Path (Join-Path $tessDataSource $required))) { throw "language pack $required missing under $tessDataSource" }
+# Ocr looks for <application directory>/ppocr before the user data folder, and loads
+# onnxruntime.dll from the application directory, so shipping both here is what makes
+# recognition work straight after installation.
+$modelSource = Join-Path 'vendor' 'PpocrModels'
+foreach ($required in 'PP-OCRv6_det_small.onnx', 'PP-OCRv6_rec_small.onnx', 'ppocrv6_dict.txt') {
+    if (-not (Test-Path (Join-Path $modelSource $required))) { throw "OCR model $required missing under $modelSource" }
 }
-New-Item -ItemType Directory -Force -Path (Join-Path $stage 'tessdata') | Out-Null
-Copy-Item (Join-Path $tessDataSource '*.traineddata') (Join-Path $stage 'tessdata') -Force
-Write-Output '[ok] OCR language packs staged'
+New-Item -ItemType Directory -Force -Path (Join-Path $stage 'ppocr') | Out-Null
+Copy-Item (Join-Path $modelSource '*.onnx') (Join-Path $stage 'ppocr') -Force
+Copy-Item (Join-Path $modelSource 'ppocrv6_dict.txt') (Join-Path $stage 'ppocr') -Force
+$ortDll = Join-Path 'vendor\OnnxRuntime\bin' 'onnxruntime.dll'
+if (-not (Test-Path $ortDll)) { throw "ONNX Runtime DLL missing at $ortDll" }
+Copy-Item $ortDll $stage -Force
+Write-Output '[ok] OCR runtime and models staged'
 
 # The English catalog is a build product (DeployTranslations runs lrelease). Without it the
 # packaged app exposes the language setting but can never honour it -- the portable folder and

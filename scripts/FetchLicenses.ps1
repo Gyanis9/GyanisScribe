@@ -15,9 +15,9 @@ Set-Location (Split-Path -Parent $PSScriptRoot)
 $licenses = @(
     [pscustomobject]@{ File = 'Qt-LGPL-3.0.txt';        Url = 'https://www.gnu.org/licenses/lgpl-3.0.txt'; Marker = 'GNU LESSER GENERAL PUBLIC LICENSE' }
     [pscustomobject]@{ File = 'FFmpeg-GPL-3.0.txt';     Url = 'https://www.gnu.org/licenses/gpl-3.0.txt';  Marker = 'GNU GENERAL PUBLIC LICENSE' }
-    [pscustomobject]@{ File = 'Tesseract-Apache-2.0.txt'; Url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'; Marker = 'Apache License' }
-    [pscustomobject]@{ File = 'TessData-Apache-2.0.txt';  Url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'; Marker = 'Apache License' }
-    [pscustomobject]@{ File = 'Leptonica-BSD-2.txt';    Url = 'https://raw.githubusercontent.com/DanBloomberg/leptonica/1.87.0/leptonica-license.txt'; Marker = 'Redistribution and use in source and binary forms' }
+    [pscustomobject]@{ File = 'OnnxRuntime-MIT.txt';    Url = 'https://raw.githubusercontent.com/microsoft/onnxruntime/v1.32.0/LICENSE'; Marker = 'MIT License' }
+    [pscustomobject]@{ File = 'PaddleOCR-Apache-2.0.txt'; Url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'; Marker = 'Apache License' }
+    [pscustomobject]@{ File = 'RapidOCR-Apache-2.0.txt';  Url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'; Marker = 'Apache License' }
     [pscustomobject]@{ File = 'Spdlog-MIT.txt';         Url = 'https://raw.githubusercontent.com/gabime/spdlog/v1.17.0/LICENSE'; Marker = 'MIT License' }
     [pscustomobject]@{ File = 'Zxing-Apache-2.0.txt';   Url = 'https://raw.githubusercontent.com/zxing-cpp/zxing-cpp/v3.1.1/LICENSE'; Marker = 'Apache License' }
     [pscustomobject]@{ File = 'GoogleTest-BSD-3-Clause.txt'; Url = 'https://raw.githubusercontent.com/google/googletest/v1.17.0/LICENSE'; Marker = 'Redistribution and use in source and binary forms' }

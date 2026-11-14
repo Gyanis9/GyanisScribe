@@ -39,7 +39,7 @@
 | **贴图** | 把图钉在屏幕最上层对着用：缩放旋转、分组、吸附对齐、多选、动图续播、拖文件与链接上屏 |
 | **取色** | 冻帧加放大镜，六种写法轮换，最近取色一排随时取回 |
 | **录屏** | 整屏 / 选区 / 窗口，MP4 与 GIF，编码器真探测，麦克风与系统声可混音 |
-| **识别** | 系统 OCR 与 Tesseract 双后端，二维码 / 条形码识别，结果可导出 |
+| **识别** | PaddleOCR（PP-OCRv6）本地识别，Windows 系统识别兜底；二维码 / 条形码识别，结果可导出 |
 | **识别结果动作** | 认出文字可复制 Markdown；检测到简单表格可导出 CSV（UTF-8 BOM，Excel 直接打开），复杂表只提示不导出 |
 
 每个功能的完整行为与每一格设置的含义见 [使用指南](docs/UserGuide.md)。
@@ -189,5 +189,5 @@ tests/          逐级镜像 src 的目录结构，统一 GoogleTest
 ## 许可与第三方声明
 
 本软件**免费供任何人使用**，条款见仓库根的 [`LICENSE.txt`](LICENSE.txt)。
-代码、界面与图标均为原创；第三方组件（Qt、FFmpeg、Tesseract、spdlog、zxing-cpp 等）的许可证与分发方式逐条列在
+代码、界面与图标均为原创；第三方组件（Qt、FFmpeg、ONNX Runtime、PaddleOCR、spdlog、zxing-cpp 等）的许可证与分发方式逐条列在
 [docs/ThirdPartyLicenses.md](docs/ThirdPartyLicenses.md)，许可证正文随包发在 `licenses/` 下。
