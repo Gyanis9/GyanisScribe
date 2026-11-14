@@ -1,5 +1,6 @@
 // 文档出图工具：离屏起一份真主窗口（真主题、真图标、临时配置与临时历史），逐页拍成 PNG；
-// 另出三张动作图（截图遮罩、标注窗、贴图），底图是合成的一份中性桌面，不依赖真桌面的现场。
+// 另出十张动作图（截图遮罩、标注、贴图、识别、录屏、回溯、步骤、隐私、分享、报告），
+// 底图是合成的一份中性桌面，不依赖真桌面的现场。
 // 与 CrashProbe 同一条理由不是产品的一部分：不进安装包、不挂任何产品入口，只给文档出图。
 // 跑法：UiShotTool <输出目录>；产图文件名与页面对应关系见下面 kShots 那张表。
 
@@ -10,23 +11,40 @@
 #include "Core/Annotation/AnnotationTool.h"
 #include "Core/Annotation/IAnnotationEngine.h"
 #include "Core/Annotation/PenParameters.h"
+#include "Core/BugReport/BugReport.h"
+#include "Core/Capture/SourceInfo.h"
 #include "Core/History/HistoryStore.h"
 #include "Core/Memory/MemoryIndex.h"
+#include "Core/Ocr/OcrTypes.h"
+#include "Core/Privacy/PiiTypes.h"
+#include "Core/Record/RecordingSession.h"
+#include "Core/Rewind/RewindTypes.h"
+#include "Core/Steps/StepSession.h"
+#include "Core/Steps/StepTypes.h"
 #include "Platform/IPlatformIntegration.h"
 #include "Core/Settings/SettingsKeys.h"
 #include "Core/Settings/SettingsStore.h"
 #include "Gui/Annotation/AnnotationToolbar.h"
 #include "Gui/Annotation/AnnotationWindow.h"
+#include "Gui/BugReport/BugReportDialog.h"
 #include "Gui/Capture/CaptureOverlay.h"
+#include "Gui/Ocr/OcrResultWindow.h"
 #include "Gui/Pin/PinWindow.h"
+#include "Gui/Privacy/PrivacyReviewDialog.h"
+#include "Gui/Record/RecordingHud.h"
 #include "Gui/Resources/IconProvider.h"
+#include "Gui/Rewind/RewindPickerWindow.h"
+#include "Gui/Share/ShareDialog.h"
+#include "Gui/Steps/StepReviewWindow.h"
 #include "Gui/Theme/ThemeManager.h"
 #include "Gui/Theme/SquircleStyle.h"
 
 #include <QApplication>
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QFont>
 #include <QFontDatabase>
+#include <QKeyEvent>
 #include <QLinearGradient>
 #include <QMouseEvent>
 #include <QPainter>
@@ -34,12 +52,14 @@
 #include <QPixmap>
 #include <QString>
 #include <QStringList>
+#include <QThread>
 
 #include <array>
 #include <cstdio>
 #include <filesystem>
 #include <format>
 #include <memory>
+#include <vector>
 
 namespace
 {
@@ -285,6 +305,42 @@ namespace
         engine.clearSelection();
         return engine.setActiveTool(ToolKind::Select).has_value();
     }
+
+    /**
+     * @brief 把控件按当前位置画进一帧合成桌面
+     * @param frame 合成桌面，会被直接改写
+     * @param widget 已 show 且布局落定的控件
+     * @details 动作图只借控件的自绘画法，不把真窗口摆上桌面：位置由调用方先 move 好，
+     *          这里只按 widget.pos() 落笔。
+     */
+    void renderWidgetInto(QImage &frame, QWidget &widget)
+    {
+        QPainter painter{&frame};
+        widget.render(&painter, widget.pos());
+    }
+
+    /**
+     * @brief 把对话框压暗底图后居中画进合成桌面
+     * @param frame 合成桌面，会被直接改写
+     * @param dialog 已 show 且布局落定的对话框
+     * @details 文档图要的是「窗口盖在桌面上」的层次；一层轻暗幕把底图的文字压下去，
+     *          又不至于让对话框的四角看起来浮在真空里。
+     */
+    void renderDialogInto(QImage &frame, QWidget &dialog)
+    {
+        QPainter painter{&frame};
+        painter.fillRect(frame.rect(), QColor{0, 0, 0, 64});
+        const QPoint position{(frame.width() - dialog.width()) / 2, (frame.height() - dialog.height()) / 2};
+        dialog.render(&painter, position);
+    }
+
+    /// 等一拍事件循环：离屏档的布局、防抖预览与样式重算都靠它落定
+    void settleUi()
+    {
+        QCoreApplication::processEvents();
+        QThread::msleep(80);
+        QCoreApplication::processEvents();
+    }
 } // namespace
 
 int main(int argc, char *argv[])
@@ -373,6 +429,8 @@ int main(int argc, char *argv[])
         return true;
     };
     const auto mockup = makeMockupDesktop();
+    // 标注成品留给后面几张动作图当底图：分享窗与报告窗展示的就是用户会交出去的那一张
+    QPixmap annotatedProduct;
 
     // 截图遮罩：拖到一半的现场（选区、三分网格与放大镜读数都在），事件直接投给控件，不碰真鼠标
     {
@@ -414,6 +472,7 @@ int main(int argc, char *argv[])
         annotationWindow.render(&painter, annotationWindow.pos());
         annotationWindow.toolbar().render(&painter, annotationWindow.toolbar().pos());
         painter.end();
+        annotatedProduct = shot.copy(kMockupWindow);
         if (!saveShot(shot, "action-annotation"))
         {
             return 1;
@@ -433,6 +492,260 @@ int main(int argc, char *argv[])
         chartPin.render(&painter, chartPin.pos());
         painter.end();
         if (!saveShot(shot, "action-pin"))
+        {
+            return 1;
+        }
+    }
+
+    // 识别结果：左原图右文本，词框与底图上的可见文字对齐
+    {
+        using GyanisScribe::Core::OcrLine;
+        using GyanisScribe::Core::OcrResult;
+        using GyanisScribe::Core::OcrWord;
+
+        const auto addLine = [](OcrResult &result, const QString &text, const QRect &box)
+        {
+            OcrLine line;
+            line.boundingBox = box;
+            line.words.append(OcrWord{text, box});
+            result.lines.append(line);
+        };
+
+        OcrResult result;
+        result.language          = QStringLiteral("zh-Hans");
+        result.averageConfidence = 0.94;
+        addLine(result, QStringLiteral("数据面板 · 示例应用"), {24, 0, 240, 36});
+        addLine(result, QStringLiteral("总览"), {32, 24, 60, 30});
+        addLine(result, QStringLiteral("任务"), {32, 68, 60, 30});
+        addLine(result, QStringLiteral("报表"), {32, 112, 60, 30});
+        addLine(result, QStringLiteral("消息"), {32, 156, 60, 30});
+        addLine(result, QStringLiteral("设置"), {32, 200, 60, 30});
+        addLine(result, QStringLiteral("本周概览"), {232, 60, 120, 30});
+        addLine(result, QStringLiteral("128"), {248, 150, 48, 34});
+        addLine(result, QStringLiteral("+12%"), {248, 184, 60, 24});
+        addLine(result, QStringLiteral("96.4%"), {464, 150, 88, 34});
+        addLine(result, QStringLiteral("-0.4%"), {464, 184, 70, 24});
+        addLine(result, QStringLiteral("37"), {680, 150, 40, 34});
+        addLine(result, QStringLiteral("+3"), {680, 184, 30, 24});
+
+        GyanisScribe::Gui::OcrResultWindow ocrWindow{mockup.copy(kMockupWindow), result, icons, theme};
+        ocrWindow.resize(840, 520);
+        ocrWindow.show();
+        settleUi();
+        QImage frame = mockup;
+        renderDialogInto(frame, ocrWindow);
+        if (!saveShot(QPixmap::fromImage(frame), "action-ocr"))
+        {
+            return 1;
+        }
+    }
+
+    // 录屏控制条：状态与已录时长，压在桌面顶部
+    {
+        GyanisScribe::Gui::RecordingHud hud{icons, QRect{QPoint{0, 0}, kDesktopSize}};
+        hud.applyState(GyanisScribe::Core::RecordingState::Recording, 0, 42);
+        hud.show();
+        settleUi();
+        hud.move((kDesktopSize.width() - hud.width()) / 2, 24);
+        QImage frame = mockup;
+        renderWidgetInto(frame, hud);
+        if (!saveShot(QPixmap::fromImage(frame), "action-record"))
+        {
+            return 1;
+        }
+    }
+
+    // 回溯选帧条：候选帧标出，`[` `]` 圈一段区间，导出片段按钮随之亮起
+    {
+        using GyanisScribe::Core::RewindFrameView;
+
+        std::vector<RewindFrameView> frames;
+        const QDateTime              capturedAt = QDateTime::currentDateTime();
+        const QImage                 thumbnail  = mockup.scaled(240, 135, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        for (int index = 0; index < 24; ++index)
+        {
+            RewindFrameView view;
+            view.id              = static_cast<quint64>(index + 1);
+            view.thumbnail       = thumbnail;
+            view.capturedAt      = capturedAt.addSecs(index - 24);
+            view.isCandidate     = index % 6 == 3;
+            view.foregroundTitle = QStringLiteral("数据面板 · 示例应用");
+            frames.push_back(view);
+        }
+
+        GyanisScribe::Gui::RewindPickerWindow picker;
+        picker.showFrames(frames, QRect{QPoint{0, 0}, kDesktopSize}, QStringLiteral("屏幕 1"), false, {});
+        settleUi();
+        const auto sendKey = [&picker](const int key)
+        {
+            QKeyEvent event{QEvent::KeyPress, key, Qt::NoModifier};
+            QApplication::sendEvent(&picker, &event);
+        };
+        sendKey(Qt::Key_BracketLeft);
+        for (int index = 0; index < 5; ++index)
+        {
+            sendKey(Qt::Key_Left);
+        }
+        sendKey(Qt::Key_BracketRight);
+        QCoreApplication::processEvents();
+
+        QImage frame = mockup;
+        renderWidgetInto(frame, picker);
+        if (!saveShot(QPixmap::fromImage(frame), "action-rewind"))
+        {
+            return 1;
+        }
+    }
+
+    // 步骤审核：三次操作连同缩略图列成一串，说明可改、可调序
+    {
+        using GyanisScribe::Core::RecordedStep;
+        using GyanisScribe::Core::StepKind;
+
+        GyanisScribe::Core::StepSession session;
+        if (!session.begin(dataDirectory / "Steps"))
+        {
+            std::fprintf(stderr, "failed to begin step session\n");
+            return 1;
+        }
+
+        const QDateTime recordedAt = QDateTime::currentDateTime();
+        RecordedStep    first;
+        first.kind               = StepKind::Click;
+        first.at                 = recordedAt;
+        first.globalLogicalPoint = {520, 300};
+        first.clickPointInImage  = {320, 220};
+        first.windowTitle        = QStringLiteral("数据面板 · 示例应用");
+        first.processName        = QStringLiteral("demo.exe");
+        first.elementName        = QStringLiteral("任务");
+        first.controlType        = QStringLiteral("按钮");
+        first.description        = GyanisScribe::Core::clickStepDescription(first.elementName, first.controlType, first.globalLogicalPoint, false);
+        if (!session.append(first))
+        {
+            std::fprintf(stderr, "failed to append the first step\n");
+            return 1;
+        }
+
+        RecordedStep second;
+        second.kind        = StepKind::WindowChange;
+        second.at          = recordedAt.addSecs(4);
+        second.windowTitle = QStringLiteral("报表 · 示例应用");
+        second.processName = QStringLiteral("demo.exe");
+        second.description = GyanisScribe::Core::windowChangeStepDescription(second.windowTitle, second.processName);
+        if (!session.append(second))
+        {
+            std::fprintf(stderr, "failed to append the second step\n");
+            return 1;
+        }
+
+        RecordedStep third;
+        third.kind               = StepKind::Click;
+        third.at                 = recordedAt.addSecs(9);
+        third.globalLogicalPoint = {860, 470};
+        third.clickPointInImage  = {660, 390};
+        third.windowTitle        = QStringLiteral("报表 · 示例应用");
+        third.processName        = QStringLiteral("demo.exe");
+        third.elementName        = QStringLiteral("导出");
+        third.controlType        = QStringLiteral("按钮");
+        third.description        = GyanisScribe::Core::clickStepDescription(third.elementName, third.controlType, third.globalLogicalPoint, false);
+        if (!session.append(third))
+        {
+            std::fprintf(stderr, "failed to append the third step\n");
+            return 1;
+        }
+
+        if (!session.attachImage(0, mockup) || !session.attachImage(1, mockup.copy(80, 40, 1120, 720)) || !session.attachImage(2, mockup.copy(160, 80, 960, 680)))
+        {
+            std::fprintf(stderr, "failed to write step screenshots\n");
+            return 1;
+        }
+
+        GyanisScribe::Gui::StepReviewWindow review{session, settings, [&mockup] { return GyanisScribe::Base::Expected<QImage>{mockup}; }};
+        review.resize(940, 640);
+        review.show();
+        settleUi();
+        QImage stepsFrame = mockup;
+        renderDialogInto(stepsFrame, review);
+        if (!saveShot(QPixmap::fromImage(stepsFrame), "action-steps"))
+        {
+            return 1;
+        }
+    }
+
+    // 隐私打码审核：本地查出的命中项逐条确认，整批一次打码
+    {
+        using GyanisScribe::Core::Privacy::PiiItem;
+        using GyanisScribe::Core::Privacy::PiiKind;
+
+        const std::vector<PiiItem> items{
+                {PiiKind::Phone, QRect{248, 150, 120, 30}, QStringLiteral("138****5678")},
+                {PiiKind::IdCard, QRect{248, 214, 180, 30}, QStringLiteral("1101**********1234")},
+                {PiiKind::Email, QRect{248, 278, 160, 30}, QStringLiteral("de***@example.com")},
+                {PiiKind::BankCard, QRect{464, 150, 150, 30}, QStringLiteral("6222 **** **** 1234")},
+        };
+        GyanisScribe::Gui::PrivacyReviewDialog privacy{items};
+        privacy.resize(700, 380);
+        privacy.show();
+        settleUi();
+        QImage privacyFrame = mockup;
+        renderDialogInto(privacyFrame, privacy);
+        if (!saveShot(QPixmap::fromImage(privacyFrame), "action-privacy"))
+        {
+            return 1;
+        }
+    }
+
+    // 美化分享：标注成品套模板后的预览
+    {
+        GyanisScribe::Core::CaptureSourceInfo source;
+        source.processName = QStringLiteral("demo.exe");
+        source.windowTitle = QStringLiteral("数据面板 · 示例应用");
+        source.screenName  = QStringLiteral("屏幕 1");
+        source.capturedAt  = QDateTime::currentDateTime();
+
+        GyanisScribe::Gui::ShareDialog share{annotatedProduct.toImage(), source, settings};
+        share.show();
+        settleUi();
+        QImage shareFrame = mockup;
+        renderDialogInto(shareFrame, share);
+        if (!saveShot(QPixmap::fromImage(shareFrame), "action-share"))
+        {
+            return 1;
+        }
+    }
+
+    // Bug 报告：截图本地检查并默认打码，环境与复现步骤随报告带上
+    {
+        using GyanisScribe::Core::BugReport::BugReportEnvironment;
+        using GyanisScribe::Core::Privacy::PiiItem;
+        using GyanisScribe::Core::Privacy::PiiKind;
+
+        BugReportEnvironment environment;
+        environment.appName          = QStringLiteral("智录");
+        environment.appVersion       = QStringLiteral(PROJECT_VERSION);
+        environment.osName           = QStringLiteral("Windows 11");
+        environment.osVersion        = QStringLiteral("10.0.26200");
+        environment.architecture     = QStringLiteral("x86_64");
+        environment.qtVersion        = QString::fromLatin1(qVersion());
+        environment.screenName       = QStringLiteral("屏幕 1");
+        environment.logicalSize      = QSize{880, 600};
+        environment.physicalSize     = QSize{880, 600};
+        environment.devicePixelRatio = 1.0;
+        environment.capturedAt       = QDateTime::currentDateTime();
+        environment.windowTitle      = QStringLiteral("数据面板 · 示例应用");
+        environment.processName      = QStringLiteral("demo.exe");
+
+        GyanisScribe::Gui::BugReportDialog report{annotatedProduct.toImage(), environment, dataDirectory / "BugReport.md"};
+        report.setScanResult(std::vector<PiiItem>{
+                {PiiKind::Phone, QRect{248, 150, 120, 30}, QStringLiteral("138****5678")},
+                {PiiKind::Email, QRect{248, 278, 160, 30}, QStringLiteral("de***@example.com")},
+        });
+        report.resize(980, 700);
+        report.show();
+        settleUi();
+        QImage reportFrame = mockup;
+        renderDialogInto(reportFrame, report);
+        if (!saveShot(QPixmap::fromImage(reportFrame), "action-bugreport"))
         {
             return 1;
         }
