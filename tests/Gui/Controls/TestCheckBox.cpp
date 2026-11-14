@@ -198,6 +198,10 @@ TEST_F(CheckBoxFixture, IndicatorFillFollowsTheState)
             EXPECT_EQ(leftEdgeOf(shot), paletteFor(kind).borderStrong) << "高对比度静息指示器的左缘不是 borderStrong";
             EXPECT_EQ(secondEdgeOf(shot), paletteFor(kind).borderStrong) << "高对比度静息指示器的边只有 1px";
         }
+        else
+        {
+            EXPECT_EQ(leftEdgeOf(shot), paletteFor(kind).border) << static_cast<int>(kind) << " 静息指示器没有描边，和分组卡底分不开";
+        }
 
         box.setAttribute(Qt::WA_UnderMouse, true);
         box.update();

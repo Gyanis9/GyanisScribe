@@ -109,10 +109,12 @@ namespace GyanisScribe::Gui
                 // 静息与禁用是 2px borderStrong，禁用的黑边与旧样式表一致
                 border      = (isEnabled() && (hasFocus() || isChecked() || underMouse())) ? palette.accent : palette.borderStrong;
                 borderWidth = 2;
-            } else if (isEnabled() && underMouse() && !isChecked())
+            }
+            else if (!isChecked())
             {
-                // 悬停边只在可用时出现：控件在悬停中途被禁用后，旧样式表的 :disabled 也会压掉悬停边
-                border      = palette.borderStrong;
+                // 静息也画一圈边：未选中的指示器与分组卡底色接近，没有边就几乎看不见；
+                // 悬停换更强的 borderStrong，禁用态留一档更淡的边交代边界
+                border      = isEnabled() && underMouse() ? palette.borderStrong : palette.border;
                 borderWidth = themeBorderWidth(kind);
             }
 
