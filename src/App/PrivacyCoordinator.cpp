@@ -19,7 +19,7 @@ namespace GyanisScribe::App
          */
         QString fallbackUnavailableReason()
         {
-            return GyanisScribe::Base::uiText("本机没有可用的文字识别后端：请安装系统语言包，或换用 Tesseract 语言包后再试");
+            return GyanisScribe::Base::uiText("本机没有可用的文字识别后端：请检查设置中的 OCR 模型目录，或重新安装本程序后重试");
         }
     } // namespace
 

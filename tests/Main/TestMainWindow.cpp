@@ -314,7 +314,7 @@ namespace
                 Expectation{MainWindowPage::Record,
                             {"录屏输出目录", "录制范围", "输出格式", "默认帧率", "录屏倒计时", "最长录制时长", "画面码率", "视频编码器", "光标高亮", "麦克风设备", "系统声音设备"},
                             true},
-                Expectation{MainWindowPage::Ocr, {"识别语言", "语言包目录"}, true},
+                Expectation{MainWindowPage::Ocr, {"识别语言", "模型目录"}, true},
                 Expectation{MainWindowPage::Hotkey, {"截图", "录屏", "文字识别", "屏幕取色", "快速保存", "回溯缓冲", "步骤记录", "拾取界面元素", "允许单键作为全局热键"}, true},
                 Expectation{MainWindowPage::Theme, {"主题"}, true},
                 Expectation{MainWindowPage::About, {"智录图标"}, false},
@@ -2507,7 +2507,7 @@ TEST_F(MainWindowFixture, PathEditorsShareTheFormFieldLeftEdge)
     const std::array cases{
             Case{MainWindowPage::Capture, "截图输出目录", "截图完成后"},
             Case{MainWindowPage::Record, "录屏输出目录", "录制范围"},
-            Case{MainWindowPage::Ocr, "语言包目录", "识别语言"},
+            Case{MainWindowPage::Ocr, "模型目录", "识别语言"},
     };
 
     for (const auto &one: cases)

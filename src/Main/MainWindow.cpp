@@ -2970,11 +2970,11 @@ namespace GyanisScribe::Main
     {
         auto *page = new GyanisScribe::Gui::SurfaceWidget{GyanisScribe::Core::CornerRole::Card, GyanisScribe::Gui::SurfaceFillRole::Surface, this};
         page->setHighContrastBorder(true);
-        auto *form = makePageForm(page, GyanisScribe::Base::uiText("可识别的文字取决于语言包。目录留空时按环境变量与程序数据目录查找。"),
+        auto *form = makePageForm(page, GyanisScribe::Base::uiText("可识别的文字取决于识别模型。目录留空时按程序目录与应用数据目录查找。"),
                              GyanisScribe::Base::uiText("识别设置"));
         form->addRow(iconRow(m_icons, m_theme, "OcrLanguage", GyanisScribe::Base::uiText("识别语言")), makeOcrLanguageCombo(m_settings));
-        form->addRow(GyanisScribe::Base::uiText("语言包目录"), makePathRow(m_settings, GyanisScribe::Core::kOcrTessDataDirectory, GyanisScribe::Base::uiText("语言包目录"),
-                                                                               GyanisScribe::Base::Paths::applicationDataDirectory() / "tessdata", m_icons));
+        form->addRow(GyanisScribe::Base::uiText("模型目录"), makePathRow(m_settings, GyanisScribe::Core::kOcrModelDirectory, GyanisScribe::Base::uiText("模型目录"),
+                                                                           GyanisScribe::Base::Paths::applicationDataDirectory() / "ppocr", m_icons));
         return page;
     }
 

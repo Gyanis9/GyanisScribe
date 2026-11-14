@@ -91,7 +91,7 @@ namespace
     /// 共享的失配文案：用例与假引擎共用，避免两处各改一半
     QString unavailableReasonText()
     {
-        return QStringLiteral("本机没有可用的文字识别后端：请安装系统语言包，或换用 Tesseract 语言包后再试");
+        return QStringLiteral("本机没有可用的文字识别后端：请检查设置中的 OCR 模型目录，或重新安装本程序后重试");
     }
 
     /**

@@ -332,8 +332,8 @@
             <translation>The fetched data has no readable pixels (it may not be an image, or this machine cannot decode the format): try another image address</translation>
         </message>
         <message>
-            <source>本机没有可用的文字识别后端：请安装系统语言包，或改用 Tesseract 语言包后重试</source>
-            <translation>No text recognition backend is available on this machine: install the system language pack, or switch to a Tesseract language pack and try again</translation>
+            <source>本机没有可用的文字识别后端：请检查设置中的 OCR 模型目录，或重新安装本程序后重试</source>
+            <translation>No text recognition backend is available on this machine: check the OCR model folder in Settings, or reinstall this program and try again</translation>
         </message>
         <message>
             <source>记忆库：该程序在排除名单中，本次截图未建立索引。</source>
@@ -502,10 +502,6 @@
         <message>
             <source>已切换到{}，当前显示该分组</source>
             <translation>Switched to {}. Currently showing that group.</translation>
-        </message>
-        <message>
-            <source>本机没有可用的文字识别后端：请安装系统语言包，或换用 Tesseract 语言包后再试</source>
-            <translation>No text recognition backend is available on this machine: install the system language pack, or switch to a Tesseract language pack and try again</translation>
         </message>
         <message>
             <source>还没有可检查的图：先截一张图或打开一张图片，再发起隐私打码</source>
@@ -752,8 +748,24 @@
             <translation>Rewind buffer is on</translation>
         </message>
         <message>
-            <source>框选截图</source>
-            <translation>Capture a region</translation>
+            <source>截图</source>
+            <translation>Screenshot</translation>
+        </message>
+        <message>
+            <source>贴图</source>
+            <translation>Pin</translation>
+        </message>
+        <message>
+            <source>录屏</source>
+            <translation>Screen recording</translation>
+        </message>
+        <message>
+            <source>设置</source>
+            <translation>Settings</translation>
+        </message>
+        <message>
+            <source>退出</source>
+            <translation>Quit</translation>
         </message>
         <message>
             <source>整屏截图</source>
@@ -784,10 +796,6 @@
             <translation>Pick a UI element</translation>
         </message>
         <message>
-            <source>开始 / 停止录屏</source>
-            <translation>Start / stop recording</translation>
-        </message>
-        <message>
             <source>步骤记录</source>
             <translation>Step recording</translation>
         </message>
@@ -812,10 +820,6 @@
             <translation>Let every pinned image receive the mouse again</translation>
         </message>
         <message>
-            <source>将剪贴板内容贴到屏幕上</source>
-            <translation>Paste the clipboard image onto the screen</translation>
-        </message>
-        <message>
             <source>重新贴出最近关闭的贴图</source>
             <translation>Pin back the most recently closed image</translation>
         </message>
@@ -828,16 +832,8 @@
             <translation>Pin Group Manager…</translation>
         </message>
         <message>
-            <source>设置</source>
-            <translation>Settings</translation>
-        </message>
-        <message>
             <source>关于智录</source>
             <translation>About GyanisScribe</translation>
-        </message>
-        <message>
-            <source>退出</source>
-            <translation>Quit</translation>
         </message>
         <message>
             <source>光标所在屏幕</source>
@@ -850,6 +846,10 @@
         <message>
             <source>快捷键：%1，可在设置页修改</source>
             <translation>Shortcut: %1. Change it on the Settings page</translation>
+        </message>
+        <message>
+            <source>更多</source>
+            <translation>More</translation>
         </message>
         <message>
             <source>超时</source>
@@ -1446,14 +1446,6 @@
         <message>
             <source>历史清单无法保存：{}。请重试一次，或换一个可写的目录</source>
             <translation>The history list wasn't saved to disk: {}. Try again, or pick a writable directory.</translation>
-        </message>
-        <message>
-            <source>录屏</source>
-            <translation>Screen recording</translation>
-        </message>
-        <message>
-            <source>截图</source>
-            <translation>Screenshot</translation>
         </message>
         <message>
             <source>历史文件里的类别 "{}" 不认识。可用取值只有 Screenshot 与 Recording（区分大小写），改不回任一取值就把这一行删掉</source>
@@ -3176,10 +3168,6 @@
             <translation>Merge duplicates</translation>
         </message>
         <message>
-            <source>贴图</source>
-            <translation>Pin</translation>
-        </message>
-        <message>
             <source>打开文件</source>
             <translation>Open file</translation>
         </message>
@@ -4832,16 +4820,12 @@
             <translation>Configuration files (*.json)</translation>
         </message>
         <message>
-            <source>与托盘菜单及全局快捷键执行相同操作。</source>
-            <translation>Performs the same action as the tray menu and global shortcut.</translation>
-        </message>
-        <message>
             <source>与托盘菜单执行相同操作。</source>
             <translation>Performs the same action as the tray menu.</translation>
         </message>
         <message>
-            <source>更多</source>
-            <translation>More</translation>
+            <source>与托盘菜单及全局快捷键执行相同操作。</source>
+            <translation>Performs the same action as the tray menu and global shortcut.</translation>
         </message>
         <message>
             <source>登录系统后自动启动本程序</source>
@@ -4884,6 +4868,14 @@
             <translation>The interface language sets the wording of the menus, the tray hints and these settings pages; a change takes effect after restarting GyanisScribe. The two rows below decide how much history is kept; 0 means no limit.</translation>
         </message>
         <message>
+            <source>界面与语言</source>
+            <translation>Interface and language</translation>
+        </message>
+        <message>
+            <source>历史记录</source>
+            <translation>History</translation>
+        </message>
+        <message>
             <source>历史记录条数上限</source>
             <translation>Maximum history entries</translation>
         </message>
@@ -4924,6 +4916,10 @@
             <translation>When enabled, text and source metadata from screenshots you take are stored in a local index and never uploaded. You can turn it off at any time; existing entries remain searchable and can be cleared.</translation>
         </message>
         <message>
+            <source>鼠标与行为</source>
+            <translation>Mouse and behavior</translation>
+        </message>
+        <message>
             <source>开机自启动</source>
             <translation>Start at sign-in</translation>
         </message>
@@ -4942,6 +4938,10 @@
         <message>
             <source>录制结束后自动检查并打码本次的步骤截图；默认关闭，关闭时可在审核窗里自行删改。</source>
             <translation>Once recording stops, check and redact this recording's step screenshots automatically. Off by default; when off, you can still edit or delete them in the review window.</translation>
+        </message>
+        <message>
+            <source>数据与备份</source>
+            <translation>Data and backup</translation>
         </message>
         <message>
             <source>备份与恢复</source>
@@ -5020,6 +5020,10 @@
             <translation>Screenshots and finished annotations land in this folder. Copied colors are formatted with the format chosen below.</translation>
         </message>
         <message>
+            <source>截图行为</source>
+            <translation>Capture behavior</translation>
+        </message>
+        <message>
             <source>显示截图信息面板</source>
             <translation>Show capture info while annotating</translation>
         </message>
@@ -5034,18 +5038,6 @@
         <message>
             <source>鼠标指针</source>
             <translation>Mouse pointer</translation>
-        </message>
-        <message>
-            <source>圆角处理</source>
-            <translation>Rounded</translation>
-        </message>
-        <message>
-            <source>将输出图片四角裁剪为圆角</source>
-            <translation>Round the corners of output images</translation>
-        </message>
-        <message>
-            <source>仅对区域截图生效：输出图片四角为透明像素，半径由下方设置决定；整屏、窗口与滚动长截图不应用圆角。</source>
-            <translation>Region captures only: the four corners of the product are rounded with transparent pixels there. The row below sets how round; full-screen, window and scrolling captures keep square corners</translation>
         </message>
         <message>
             <source>自动保存</source>
@@ -5076,6 +5068,22 @@
             <translation>Uses the system alert sound; no audio file needed</translation>
         </message>
         <message>
+            <source>圆角与输出边框</source>
+            <translation>Corners and output border</translation>
+        </message>
+        <message>
+            <source>圆角处理</source>
+            <translation>Rounded</translation>
+        </message>
+        <message>
+            <source>将输出图片四角裁剪为圆角</source>
+            <translation>Round the corners of output images</translation>
+        </message>
+        <message>
+            <source>仅对区域截图生效：输出图片四角为透明像素，半径由下方设置决定；整屏、窗口与滚动长截图不应用圆角。</source>
+            <translation>Region captures only: the four corners of the product are rounded with transparent pixels there. The row below sets how round; full-screen, window and scrolling captures keep square corners</translation>
+        </message>
+        <message>
             <source>输出边框</source>
             <translation>Output border</translation>
         </message>
@@ -5100,12 +5108,20 @@
             <translation>Same group as the border: applied to file saves, clipboard copies and printing; flattened onto white for JPG</translation>
         </message>
         <message>
+            <source>保存与命名</source>
+            <translation>Saving and naming</translation>
+        </message>
+        <message>
             <source>截图与标注输出目录</source>
             <translation>Folder for screenshots and annotations</translation>
         </message>
         <message>
             <source>截图输出目录</source>
             <translation>Screenshots</translation>
+        </message>
+        <message>
+            <source>读数与辅助显示</source>
+            <translation>Readouts and helper displays</translation>
         </message>
         <message>
             <source>十六进制字母大小写</source>
@@ -5164,12 +5180,20 @@
             <translation>New annotation windows use the default line width and font size below; later changes are recorded by the toolbar and used next time. Leave the custom palette empty to use the built-in eight colors; the buttons below export or import the whole palette.</translation>
         </message>
         <message>
+            <source>默认样式</source>
+            <translation>Default style</translation>
+        </message>
+        <message>
             <source>默认线宽</source>
             <translation>Default stroke width</translation>
         </message>
         <message>
             <source>默认字号</source>
             <translation>Default font size</translation>
+        </message>
+        <message>
+            <source>色板</source>
+            <translation>Palette</translation>
         </message>
         <message>
             <source>色板导入与导出</source>
@@ -5192,6 +5216,10 @@
             <translation>New pins use this default opacity. Scroll-wheel adjustments affect only the current pin and do not change this setting.</translation>
         </message>
         <message>
+            <source>默认外观</source>
+            <translation>Default appearance</translation>
+        </message>
+        <message>
             <source>新贴图默认不透明度</source>
             <translation>Pin default opacity</translation>
         </message>
@@ -5212,6 +5240,10 @@
             <translation>Recording output files are saved to the specified folder. When Recording area is set to "Last region" or "Current window", only that area is recorded. GIF has a lower frame-rate limit than MP4 (up to 24 fps). A video bitrate of 0 lets the encoder prioritize quality; a specific value enforces that bitrate, and GIF ignores this setting. The encoder can be fixed to an available option; Auto checks each option before encoding and uses the first available one. A countdown of 0 starts immediately. If audio devices cannot be listed, the dropdown keeps only "Do not record" and the reason appears on hover; audio options are disabled for GIF because the format does not support sound. All settings take effect on the next recording.</translation>
         </message>
         <message>
+            <source>输出与范围</source>
+            <translation>Output and scope</translation>
+        </message>
+        <message>
             <source>录屏输出目录</source>
             <translation>Recordings</translation>
         </message>
@@ -5228,6 +5260,10 @@
             <translation>System sound device</translation>
         </message>
         <message>
+            <source>音频</source>
+            <translation>Audio</translation>
+        </message>
+        <message>
             <source>麦克风</source>
             <translation>Microphone device</translation>
         </message>
@@ -5236,12 +5272,16 @@
             <translation>System sound device</translation>
         </message>
         <message>
-            <source>可识别的文字取决于语言包。目录留空时按环境变量与程序数据目录查找。</source>
-            <translation>Which scripts can be recognized depends on the language packs. Leave the folder empty to fall back to the environment variable and the program data folder.</translation>
+            <source>可识别的文字取决于识别模型。目录留空时按程序目录与应用数据目录查找。</source>
+            <translation>Recognizable text depends on the recognition models. When the folder is left empty, the program folder and the application data folder are searched.</translation>
         </message>
         <message>
-            <source>语言包目录</source>
-            <translation>Language packs</translation>
+            <source>识别设置</source>
+            <translation>Recognition settings</translation>
+        </message>
+        <message>
+            <source>模型目录</source>
+            <translation>Model folder</translation>
         </message>
         <message>
             <source>文字识别</source>
@@ -5258,6 +5298,10 @@
         <message>
             <source>当前平台不提供全局快捷键注册接口，上方 %1 项修改后不会生效。底部一栏为应用内快捷键，不受此能力限制，照常生效。</source>
             <translation>This platform has no way to register global hotkeys, so changing the %1 boxes above has no effect. The last section lists the in-window keys, which ignore that capability and keep working.</translation>
+        </message>
+        <message>
+            <source>快捷键一览</source>
+            <translation>Shortcut overview</translation>
         </message>
         <message>
             <source>%1 的全局热键</source>
@@ -5326,6 +5370,10 @@
         <message>
             <source>配色方案立即生效。高对比度模式使用纯黑文字、纯白背景与加粗边框。</source>
             <translation>Color schemes apply immediately. High contrast uses pure black text on pure white with bold borders.</translation>
+        </message>
+        <message>
+            <source>界面主题</source>
+            <translation>Interface theme</translation>
         </message>
         <message>
             <source>配色方案</source>
@@ -5580,74 +5628,6 @@
             <translation>Can't detect the UI element under the cursor: the platform's screen list and the interface's screen list didn't pair up. You can still frame the part you want directly</translation>
         </message>
         <message>
-            <source>界面与语言</source>
-            <translation>Interface and language</translation>
-        </message>
-        <message>
-            <source>历史记录</source>
-            <translation>History</translation>
-        </message>
-        <message>
-            <source>鼠标与行为</source>
-            <translation>Mouse and behavior</translation>
-        </message>
-        <message>
-            <source>数据与备份</source>
-            <translation>Data and backup</translation>
-        </message>
-        <message>
-            <source>截图行为</source>
-            <translation>Capture behavior</translation>
-        </message>
-        <message>
-            <source>圆角与输出边框</source>
-            <translation>Corners and output border</translation>
-        </message>
-        <message>
-            <source>保存与命名</source>
-            <translation>Saving and naming</translation>
-        </message>
-        <message>
-            <source>读数与辅助显示</source>
-            <translation>Readouts and helper displays</translation>
-        </message>
-        <message>
-            <source>默认样式</source>
-            <translation>Default style</translation>
-        </message>
-        <message>
-            <source>色板</source>
-            <translation>Palette</translation>
-        </message>
-        <message>
-            <source>默认外观</source>
-            <translation>Default appearance</translation>
-        </message>
-        <message>
-            <source>输出与范围</source>
-            <translation>Output and scope</translation>
-        </message>
-        <message>
-            <source>光标</source>
-            <translation>Cursor</translation>
-        </message>
-        <message>
-            <source>音频</source>
-            <translation>Audio</translation>
-        </message>
-        <message>
-            <source>识别设置</source>
-            <translation>Recognition settings</translation>
-        </message>
-        <message>
-            <source>快捷键一览</source>
-            <translation>Shortcut overview</translation>
-        </message>
-        <message>
-            <source>界面主题</source>
-            <translation>Interface theme</translation>
-        </message>
-        <message>
             <source>该光标位置不在任何屏幕上，通常是拔除屏幕或更改分辨率后留下的旧坐标。请移动鼠标后重试</source>
             <translation>The cursor position is not on any screen. This is usually a stale coordinate left after a display was removed or its resolution changed. Move the mouse and try again</translation>
         </message>
@@ -5772,52 +5752,124 @@
             <translation>The window for handle {} can't be captured: this platform doesn't allow grabbing other programs' windows, or the window is already closed. Use region capture instead.</translation>
         </message>
         <message>
-            <source>找遍了设置项 {}、环境变量 TESSDATA_PREFIX 与这些目录都没有语言包：{}。语言包本该随安装包一起装好，请先试重新安装本程序；也可以把 eng.traineddata（要认中文再放 chi_sim.traineddata）放进其中一处，或在设置的 OCR 页把语言包目录指过去</source>
-            <translation>None of these has a language pack: the setting {}, the TESSDATA_PREFIX environment variable, the folders {}. One should have come with the installer, so try reinstalling this program first; or put eng.traineddata (add chi_sim.traineddata to read Chinese) into one of them, or point the OCR page of Settings at that folder</translation>
+            <source>{}（缺少 {}）</source>
+            <translation>{} (missing {})</translation>
         </message>
         <message>
-            <source>语言包已就位于 {}，但本次构建没有编入任何识别后端。见 docs/OcrBackends.md：这是 Debug 档的形状，Release 档带真后端</source>
-            <translation>The language pack is in place at {}, but this build compiled in no recognition backend. See docs/OcrBackends.md: that is the Debug shape, the Release build carries the real backend.</translation>
+            <source>没有找到完整的 PaddleOCR 模型目录。找过的位置与缺少的文件：{}。模型本该随安装包一起装好，请先试重新安装本程序；也可以在设置的 OCR 页把模型目录指过去</source>
+            <translation>No complete PaddleOCR model folder was found. Locations searched and the files missing: {}. The models should have come with the installer, so try reinstalling this program first; or point the OCR page of Settings at the model folder</translation>
         </message>
         <message>
-            <source>语言包目录 {} 里没有本程序认识的 traineddata。请至少放入 eng.traineddata（要认中文再加 chi_sim.traineddata），或在设置的 OCR 页把目录指过去</source>
-            <translation>The language pack folder {} holds no traineddata this program knows. Add at least eng.traineddata (plus chi_sim.traineddata to read Chinese), or point the folder at the OCR page in Settings.</translation>
+            <source>PP-OCR 模型 {} 出错：{}。模型文件可能损坏或与随包的运行库版本不符，请重新安装本程序</source>
+            <translation>PP-OCR model {} failed: {}. The model file may be corrupt or may not match the bundled runtime; reinstall this program</translation>
         </message>
         <message>
-            <source>Tesseract 句柄没建出来（内存分配失败）。请重启本程序，若仍然如此请改用系统自带识别或稍后再试</source>
-            <translation>The Tesseract handle couldn't be created (memory allocation failed). Restart GyanisScribe; if it still fails, use the recognition that ships with the system or try again later.</translation>
+            <source>环境变量 {} 指向的 onnxruntime.dll 不存在：{}。请修正该变量，或删除它改用随包的运行库</source>
+            <translation>The onnxruntime.dll that environment variable {} points to does not exist: {}. Correct the variable, or remove it to use the bundled runtime</translation>
         </message>
         <message>
-            <source>语言「{}」需要的模型文件不在：{}。请在设置的 OCR 页改选已有语言，或把该文件放进语言包目录</source>
-            <translation>The model file needed by language "{}" is missing: {}. Pick a language you already have on the OCR page in Settings, or put that file into the language pack folder.</translation>
+            <source>onnxruntime.dll 加载失败（{}，系统错误码 {}）。请重新安装本程序以恢复随包的运行库</source>
+            <translation>Failed to load onnxruntime.dll ({}, system error code {}). Reinstall this program to restore the bundled runtime</translation>
         </message>
         <message>
-            <source>Tesseract 初始化语言 {} 失败（返回值 {}）。请检查语言包是否完整或与本程序用的库版本一致</source>
-            <translation>Tesseract failed to initialize language {} (returned {}). Check that the language pack is complete and matches the Tesseract library version this program uses.</translation>
+            <source>onnxruntime.dll 里找不到 {}（{}），文件可能被换成了别的版本。请重新安装本程序以恢复随包的运行库</source>
+            <translation>onnxruntime.dll does not export {} ({}); the file may have been replaced by a different version. Reinstall this program to restore the bundled runtime</translation>
+        </message>
+        <message>
+            <source>onnxruntime.dll 的接口表为空（{}）。请重新安装本程序以恢复随包的运行库</source>
+            <translation>onnxruntime.dll returned an empty API table ({}). Reinstall this program to restore the bundled runtime</translation>
+        </message>
+        <message>
+            <source>onnxruntime.dll 的接口版本与程序不符：程序需要 ONNX Runtime API 版本 {}，实际库是 {}。请重新安装本程序以恢复随包的运行库</source>
+            <translation>The onnxruntime.dll API version does not match this program: the program needs ONNX Runtime API version {}, but the library is {}. Reinstall this program to restore the bundled runtime</translation>
+        </message>
+        <message>
+            <source>PP-OCR 模型文件不在或为空：{}。请重新安装本程序，或在设置的 OCR 页把模型目录指过去</source>
+            <translation>PP-OCR model files are missing or empty: {}. Reinstall this program, or point the OCR page of Settings at the model folder</translation>
+        </message>
+        <message>
+            <source>模型没有输入或没有输出</source>
+            <translation>The model has no inputs or no outputs</translation>
+        </message>
+        <message>
+            <source>输入不是张量</source>
+            <translation>The input is not a tensor</translation>
+        </message>
+        <message>
+            <source>输出不是 FLOAT 张量</source>
+            <translation>The output is not a FLOAT tensor</translation>
+        </message>
+        <message>
+            <source>输出张量为空</source>
+            <translation>The output tensor is empty</translation>
+        </message>
+        <message>
+            <source>ONNX Runtime 运行环境初始化失败：{}。请重新启动本程序后再试</source>
+            <translation>Failed to initialize the ONNX Runtime environment: {}. Restart this program and try again</translation>
+        </message>
+        <message>
+            <source>ONNX Runtime 张量内存描述创建失败：{}。请重新启动本程序后再试</source>
+            <translation>Failed to create the ONNX Runtime tensor memory description: {}. Restart this program and try again</translation>
+        </message>
+        <message>
+            <source>PP-OCR 字表 {} 读不出来：{}。请重新安装本程序</source>
+            <translation>PP-OCR dictionary {} cannot be read: {}. Reinstall this program</translation>
+        </message>
+        <message>
+            <source>PP-OCR 字表 {} 是空文件。请重新安装本程序</source>
+            <translation>PP-OCR dictionary {} is an empty file. Reinstall this program</translation>
+        </message>
+        <message>
+            <source>PP-OCR 检测输入构造失败：缩放后的图像为空</source>
+            <translation>PP-OCR detection input could not be built: the resized image is empty</translation>
+        </message>
+        <message>
+            <source>输出维数不足，取不到概率图尺寸</source>
+            <translation>The output has too few dimensions to read the probability map size</translation>
+        </message>
+        <message>
+            <source>输出尺寸不是正数</source>
+            <translation>The output size is not positive</translation>
+        </message>
+        <message>
+            <source>输出元素数与概率图尺寸不符</source>
+            <translation>The output element count does not match the probability map size</translation>
+        </message>
+        <message>
+            <source>输出维数不足，取不到时间步与类别数</source>
+            <translation>The output has too few dimensions to read the time steps and class count</translation>
+        </message>
+        <message>
+            <source>输出元素数与时间步乘类别数不符</source>
+            <translation>The output element count does not match time steps multiplied by class count</translation>
         </message>
         <message>
             <source>图片太小或为空（{}×{}），认不出字。请至少框住 {}×{} 的区域</source>
             <translation>The image is too small or empty ({}x{}), so no text can be recognized. Frame an area of at least {}x{}.</translation>
         </message>
         <message>
-            <source>Tesseract 识别该图片图失败（语言 {}）。请重试一次，或换一种语言再试</source>
-            <translation>Tesseract failed on this image (language {}). Try again, or switch to another language.</translation>
+            <source>PaddleOCR 后端不可用：{}。请重新安装本程序，或在设置的 OCR 页检查模型目录</source>
+            <translation>The PaddleOCR backend is unavailable: {}. Reinstall this program, or check the model folder on the OCR page of Settings</translation>
+        </message>
+        <message>
+            <source>PaddleOCR 后端不支持语言「{}」，可用的有：{}。请在设置的 OCR 页换一种语言</source>
+            <translation>The PaddleOCR backend does not support the language "{}"; available languages: {}. Choose another language on the OCR page of Settings</translation>
         </message>
         <message>
             <source>无可用识别后端</source>
             <translation>No recognition backend available</translation>
         </message>
         <message>
-            <source>本程序没有可用的文字识别后端。请在设置里指定 OCR 语言包目录（tessdata），或安装系统自带的识别组件</source>
-            <translation>This program has no text recognition backend available. Set the OCR language pack folder (tessdata) in Settings, or install the recognition component that ships with the system</translation>
+            <source>本程序没有可用的文字识别后端。请重新安装本程序以恢复识别模型，或在设置的 OCR 页把模型目录指过去</source>
+            <translation>This program has no text recognition backend available. Reinstall this program to restore the recognition models, or point the OCR page of Settings at the model folder</translation>
         </message>
         <message>
             <source>Windows 系统识别</source>
             <translation>Windows text recognition</translation>
         </message>
         <message>
-            <source>这台机器的 Windows 没装本程序认识的识别语言包（系统识别一个可用语言都没有）。请在 设置 → 时间和语言 → 语音 里装上「光学字符识别」，或在设置的 OCR 页改用 Tesseract 并放好语言包</source>
-            <translation>This Windows has no text-recognition language pack this app understands (the system engine reports no usable language). Install Optical Character Recognition under Settings -&gt; Time &amp; Language -&gt; Speech, or switch to Tesseract on the OCR settings page and place its language packs</translation>
+            <source>这台机器的 Windows 没装本程序认识的识别语言包（系统识别一个可用语言都没有）。请在 设置 → 时间和语言 → 语音 里装上「光学字符识别」，或重新安装本程序以恢复 PaddleOCR 模型</source>
+            <translation>This Windows installation has no recognition language pack this program understands (system recognition reports no usable language). Install Optical Character Recognition under Settings -&amp;gt; Time &amp;amp; Language -&amp;gt; Speech, or reinstall this program to restore the PaddleOCR models</translation>
         </message>
         <message>
             <source>系统里没有「{}」的识别语言包。现在能用的是 {}。请在 设置 → 时间和语言 → 语音 里装上需要的语言包，或在设置的 OCR 页改选语言</source>
@@ -5836,8 +5888,8 @@
             <translation>The system reports a language pack for "{}", but no recognizer could be created. Reinstall that pack under Settings -&gt; Time &amp; Language -&gt; Speech</translation>
         </message>
         <message>
-            <source>系统识别该图片图失败（{}，错误码 0x{}）。请重试一次，或改用 Tesseract 后端</source>
-            <translation>System recognition failed for this image ({} , error code 0x{}). Try again, or switch to the Tesseract backend</translation>
+            <source>系统识别该图片图失败（{}，错误码 0x{}）。请重试一次，或检查 PaddleOCR 模型目录</source>
+            <translation>System recognition failed for this image ({}, error code 0x{}). Try again, or check the PaddleOCR model folder</translation>
         </message>
         <message>
             <source>列不出音频设备：ffmpeg 的输出里没有认得出的设备行（末段：{}）。请更新 ffmpeg 后重试，录屏仍可静音进行</source>

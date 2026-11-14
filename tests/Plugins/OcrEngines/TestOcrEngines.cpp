@@ -3,10 +3,8 @@
 
 #include "Core/Ocr/IOcrEngine.h"
 #include "Core/Ocr/OcrTextExporter.h"
+#include "Plugins/OcrEngines/PpOcrOnnxEngine.h"
 #include "Plugins/OcrEngines/UnavailableOcrEngine.h"
-#if defined(GYANISSCRIBE_HAS_TESSERACT)
-#include "Plugins/OcrEngines/TesseractOcrEngine.h"
-#endif
 #if defined(GYANISSCRIBE_HAS_WINRT_OCR)
 #include "Plugins/OcrEngines/WinRTImageOcrEngine.h"
 #endif
@@ -93,13 +91,16 @@ namespace
             m_iniFile = m_root / "settings.ini";
         }
 
-        /// 造一个只放了模型文件的目录
-        std::filesystem::path makeModelDirectoryWith(const std::string &modelName)
+        /// 造一个三件模型都非空的目录
+        std::filesystem::path makePpOcrModelDirectory()
         {
-            const auto directory = m_root / "tessdata";
+            const auto directory = m_root / "ppocr";
             std::filesystem::create_directories(directory);
-            std::ofstream model(directory / modelName);
-            model << "假模型文件，只用来验选型逻辑";
+            for (const char *fileName: {kPpOcrDetModelFileName, kPpOcrRecModelFileName, kPpOcrDictFileName})
+            {
+                std::ofstream model(directory / fileName);
+                model << "假模型文件，只用来验选型逻辑";
+            }
             return directory;
         }
 
@@ -224,11 +225,15 @@ TEST_F(OcrFixture, WriteTextFileTakesAPathTheLocalCodepageCannotHold)
  */
 TEST_F(OcrFixture, UnavailableEngineRejectsWithoutPretending)
 {
-    UnavailableOcrEngine engine(QStringLiteral("缺语言包：请把 eng.traineddata 放进设置里指的目录"));
+    UnavailableOcrEngine engine(QStringLiteral("缺模型：请重新安装本程序以恢复识别模型，或在设置的 OCR 页把模型目录指过去"));
     EXPECT_EQ(engine.name(), QStringLiteral("无可用识别后端"));
     EXPECT_FALSE(engine.isAvailable());
     EXPECT_EQ(engine.supportedLanguages().size(), 0);
-    EXPECT_EQ(engine.unavailableReason(), QStringLiteral("缺语言包：请把 eng.traineddata 放进设置里指的目录"));
+    EXPECT_EQ(engine.unavailableReason(), QStringLiteral("缺模型：请重新安装本程序以恢复识别模型，或在设置的 OCR 页把模型目录指过去"));
+
+    const UnavailableOcrEngine defaulted;
+    EXPECT_NE(defaulted.unavailableReason().indexOf(QStringLiteral("模型目录")), -1) << "默认文案要指向模型目录";
+    EXPECT_EQ(defaulted.unavailableReason().indexOf(QStringLiteral("tessdata")), -1) << "默认文案还在让用户放语言包";
 
     const auto recognized = engine.recognize(QImage(20, 20, QImage::Format_ARGB32), QStringLiteral("en"));
     ASSERT_FALSE(recognized.has_value()) << "没有后端却返回空结果，界面会显示「图中没有文字」这种误导话";
@@ -236,41 +241,38 @@ TEST_F(OcrFixture, UnavailableEngineRejectsWithoutPretending)
 }
 
 /**
- * @brief 钉住语言包目录的三级查找与「空目录不算有语言包」
+ * @brief 钉住首选顺序：三件模型齐备时工厂交回 PaddleOCR
  */
-TEST_F(OcrFixture, LocatesTessDataBySettingThenReturnsEmptyWhenMissing)
+TEST_F(OcrFixture, FactoryPrefersPpOcrWhenModelsArePresent)
 {
     SettingsStore settings(m_iniFile);
-    EXPECT_TRUE(locateTessDataDirectory(settings).empty()) << "什么都没放时该交回空路径，让调用方给补法";
+    const auto    directory = makePpOcrModelDirectory();
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kOcrModelDirectory, QVariant(GyanisScribe::Base::Paths::toDisplayText(directory))).has_value());
 
-    const auto directory = makeModelDirectoryWith("eng.traineddata");
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kOcrTessDataDirectory, QVariant(QString::fromLocal8Bit(directory.string().c_str()))).has_value());
-    EXPECT_EQ(locateTessDataDirectory(settings), directory) << "设置里指了有模型文件的目录却找不到";
-
-    // 空目录（只有子目录、没有 traineddata）不算
-    const auto emptyDirectory = m_root / "empty-tessdata";
-    std::filesystem::create_directories(emptyDirectory);
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kOcrTessDataDirectory, QVariant(QString::fromLocal8Bit(emptyDirectory.string().c_str()))).has_value());
-    EXPECT_TRUE(locateTessDataDirectory(settings).empty()) << "空目录被当成了有语言包，初始化时才在下一层报错";
+    const auto engine = createOcrEngine(settings, *integration);
+    ASSERT_NE(engine, nullptr) << "选型不许交回空指针";
+    ASSERT_TRUE(engine->isAvailable()) << engine->unavailableReason().toStdString();
+    EXPECT_EQ(engine->name(), QStringLiteral("PaddleOCR")) << "模型齐备时没有优先选 PaddleOCR";
+    EXPECT_TRUE(engine->supportedLanguages().contains(QStringLiteral("zh-Hans")));
+    EXPECT_TRUE(engine->supportedLanguages().contains(QStringLiteral("en")));
 }
 
 /**
- * @brief 钉住后端选型：先问系统识别，问不到才落回语言包那条路
- * @details 需求 §8 写明 Windows 优先用 Windows.Media.Ocr，所以「没有模型文件」这一格在两种形状下
- *          结论不同：这台机器装了识别语言包时工厂必须交回系统后端（旧断言「没有模型文件就是桩」
- *          在新语义下不成立）；没装才报缺语言包，点名三处查找位置。
+ * @brief 钉住回落顺序：没有模型时先给系统识别，系统识别也没有就报 PaddleOCR 缺什么
+ * @details 这台机器装没装系统识别语言包是运行期事实：装了就必须交回系统后端；
+ *          没装才轮到不可用桩，原因里点名随包的模型目录与缺的文件，且不许再出现 Tesseract 的说法。
  */
-TEST_F(OcrFixture, FactoryPrefersSystemOcrAndFallsBackWithActionableReason)
+TEST_F(OcrFixture, FactoryFallsBackToSystemOcrOrReportsPpOcrReason)
 {
     SettingsStore settings(m_iniFile);
-    const auto    engine = createOcrEngine(settings, *integration);
-    ASSERT_NE(engine, nullptr) << "选型不许交回空指针";
+    ASSERT_TRUE(locatePpOcrModelDirectory(settings).empty()) << "这个用例的前提是设置、程序目录与应用数据目录都没有完整模型";
 
-    EXPECT_TRUE(locateTessDataDirectory(settings).empty());
+    const auto engine = createOcrEngine(settings, *integration);
+    ASSERT_NE(engine, nullptr) << "选型不许交回空指针";
 
     if (systemOcrAvailable())
     {
-        // 系统后端在场就不许再要用户放语言包：这条断言钉住「先问系统」的顺序本身
+        // 系统后端在场就不许再要用户放模型：这条断言钉住「PP-OCR 之后问系统」的回落本身
         EXPECT_TRUE(engine->isAvailable()) << "系统识别可用，工厂却说不可用";
         EXPECT_EQ(engine->name(), QString::fromUtf8(GyanisScribe::Base::uiTextUtf8("Windows 系统识别"))) << "拿到的不是系统后端";
         return;
@@ -278,69 +280,62 @@ TEST_F(OcrFixture, FactoryPrefersSystemOcrAndFallsBackWithActionableReason)
 
     EXPECT_FALSE(engine->isAvailable()) << "机器上一个模型文件都没有，却说后端可用";
     const auto reason = engine->unavailableReason();
-    EXPECT_NE(reason.indexOf(QStringLiteral("TESSDATA_PREFIX")), -1) << "原因里没提环境变量那一路：实际是 " << reason.toStdString();
-    EXPECT_NE(reason.indexOf(QStringLiteral("traineddata")), -1) << "原因里没说该放什么文件";
+    EXPECT_NE(reason.indexOf(QStringLiteral("ppocr")), -1) << "原因里没点名随包的模型目录：实际是 " << reason.toStdString();
+    EXPECT_NE(reason.indexOf(QString::fromLatin1(kPpOcrRecModelFileName)), -1) << "原因里没说缺哪个模型文件：" << reason.toStdString();
+    EXPECT_EQ(reason.indexOf(QStringLiteral("Tesseract")), -1);
+    EXPECT_EQ(reason.indexOf(QStringLiteral("traineddata")), -1);
 
     const auto recognized = engine->recognize(QImage(32, 32, QImage::Format_ARGB32), QStringLiteral("en"));
     EXPECT_FALSE(recognized.has_value());
 }
 
 /**
- * @brief 钉住「语言包在、但这一档没编入后端」那一格：不许把构建配置问题说成用户少放了文件
- * @details 只有既没有 Tesseract、又没有系统识别的那一档走这一格（Tesseract 只进 Release 依赖图，
- *          原因见 conanfile.py；Windows Debug 档现在有系统识别，这一格改由容器那一档跑同一条断言）。
- *          旧的断言是「任何构建都报后端缺席」，新语义是按宏分两种形状：带后端的构建里
- *          同一份语言包必须拿到 Tesseract，那条由下面的用例钉。
+ * @brief 钉住候选顺序：设置项 → 程序目录/ppocr → 应用数据目录/ppocr
+ * @details 软件装完即用：模型在安装包的 ppocr 子目录里。随包那份排在应用数据目录之后，
+ *          就等于装了包还要用户自己去放文件。
  */
-#if !defined(GYANISSCRIBE_HAS_TESSERACT)
-TEST_F(OcrFixture, ReportsMissingBackendSeparatelyFromMissingLanguagePacks)
+TEST_F(OcrFixture, PpOcrModelCandidatesPutBundledDirectoryBeforeUserData)
 {
-    if (systemOcrAvailable())
+    SettingsStore settings(m_iniFile);
+
+    const auto installDirectory    = m_root / "install";
+    const auto configuredDirectory = m_root / "configured";
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kOcrModelDirectory, QVariant(GyanisScribe::Base::Paths::toDisplayText(configuredDirectory))).has_value());
+
+    const auto candidates = ppOcrModelCandidateDirectories(settings, installDirectory);
+    ASSERT_EQ(candidates.size(), 3U) << "候选应恰好是设置项、程序目录与应用数据目录三处";
+    EXPECT_EQ(candidates.at(0), configuredDirectory) << "设置项指的那份没排在最前";
+    EXPECT_EQ(candidates.at(1), installDirectory / "ppocr") << "随包的模型在程序目录下的 ppocr 里";
+    EXPECT_EQ(candidates.at(2), GyanisScribe::Base::Paths::applicationDataDirectory() / "ppocr");
+
+    const auto bundledDirectory = candidates.at(1);
+    std::filesystem::create_directories(bundledDirectory);
+    for (const char *fileName: {kPpOcrDetModelFileName, kPpOcrRecModelFileName, kPpOcrDictFileName})
     {
-        // 工厂先问系统识别并且拿到了它，根本走不到「后端没编入」这一格；跳过而不是改断言，
-        // 这一格在容器那一档（不编 WinRT）仍然是硬覆盖
-        GTEST_SKIP() << "这台机器有系统识别，工厂拿不到「后端没编入」那一格";
+        std::ofstream(bundledDirectory / fileName) << "假模型文件，只用来验查找顺序";
     }
-
-    const auto    directory = makeModelDirectoryWith("eng.traineddata");
-    SettingsStore settings(m_iniFile);
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kOcrTessDataDirectory, QVariant(QString::fromLocal8Bit(directory.string().c_str()))).has_value());
-
-    const auto engine = createOcrEngine(settings, *integration);
-    ASSERT_FALSE(engine->isAvailable());
-    const auto reason = engine->unavailableReason();
-    EXPECT_NE(reason.indexOf(QStringLiteral("没有编入任何识别后端")), -1) << "说的是缺语言包，实际语言包就在：" << reason.toStdString();
-    EXPECT_NE(reason.indexOf(QStringLiteral("OcrBackends")), -1) << "要指到接入办法那篇文档";
-    EXPECT_EQ(reason.indexOf(QStringLiteral("traineddata）放进")), -1) << "不该再让用户去放本已存在的文件";
+    EXPECT_EQ(firstDirectoryWithModels(candidates), bundledDirectory) << "只有随包那份放着完整模型时，选出来的必须是它";
 }
-#else
+
 /**
- * @brief 钉住带后端的构建里，语言包在位就拿到真后端
- * @details 模型文件是这里现造的空文件，所以识别一定失败——失败要报「初始化语言失败」，
- *          不许把坏模型当成「认出来是空结果」悄悄放过去。
+ * @brief 钉住缺件判定：只放检测模型的目录不算可用，原因按文件名点名缺的那两件
  */
-TEST_F(OcrFixture, PrefersTesseractWhenLanguagePacksArePresent)
+TEST_F(OcrFixture, ReportsMissingPpOcrFilesByName)
 {
-    const auto    directory = makeModelDirectoryWith("eng.traineddata");
+    const auto directory = m_root / "partial";
+    std::filesystem::create_directories(directory);
+    std::ofstream(directory / kPpOcrDetModelFileName) << "只有检测模型";
+
     SettingsStore settings(m_iniFile);
-    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kOcrTessDataDirectory, QVariant(QString::fromLocal8Bit(directory.string().c_str()))).has_value());
+    ASSERT_TRUE(settings.setValue(GyanisScribe::Core::kOcrModelDirectory, QVariant(GyanisScribe::Base::Paths::toDisplayText(directory))).has_value());
+    EXPECT_TRUE(locatePpOcrModelDirectory(settings).empty()) << "缺两件模型文件的目录被当成了可用模型目录";
 
-    // 系统识别在场时工厂不会把 Tesseract 交出来（那条顺序归上面那条用例钉），所以这里按能力取
-    // 要验的那份后端：两种形状断的是同一件事——语言包在位时这条路是通的
-    const auto engine = systemOcrAvailable() ? std::make_unique<TesseractOcrEngine>(directory) : createOcrEngine(settings, *integration);
-    ASSERT_TRUE(engine->isAvailable()) << "语言包已经在位却仍报不可用：选型没接上 Tesseract";
-    EXPECT_EQ(engine->name(), QStringLiteral("Tesseract")) << "拿到的不是真后端";
-    EXPECT_TRUE(engine->supportedLanguages().contains(QStringLiteral("en")));
-    EXPECT_TRUE(engine->unavailableReason().isEmpty());
-
-    QImage image(64, 24, QImage::Format_ARGB32);
-    image.fill(Qt::white);
-    const auto recognized = engine->recognize(image, QStringLiteral("en"));
-    ASSERT_FALSE(recognized.has_value()) << "空文件冒充的模型被当成认出来了";
-    EXPECT_NE(recognized.error().message.find("初始化语言"), std::string::npos) << recognized.error().message;
-    EXPECT_EQ(recognized.error().code, GyanisScribe::Base::ErrorCode::InternalError);
+    PpOcrOnnxEngine engine(directory);
+    EXPECT_FALSE(engine.isAvailable()) << "缺两件模型文件却说后端可用";
+    const auto reason = engine.unavailableReason();
+    EXPECT_NE(reason.indexOf(QString::fromLatin1(kPpOcrRecModelFileName)), -1) << "原因里没点名缺的识别模型：" << reason.toStdString();
+    EXPECT_NE(reason.indexOf(QString::fromLatin1(kPpOcrDictFileName)), -1) << "原因里没点名缺的字表：" << reason.toStdString();
 }
-#endif
 
 /**
  * @brief 钉住对外语言标签词表与默认值同解
@@ -350,33 +345,4 @@ TEST_F(OcrFixture, LanguageTagsIncludeTheDefault)
     const auto tags = supportedOcrLanguageTags();
     EXPECT_TRUE(tags.contains(QString::fromUtf8(kDefaultOcrLanguage))) << "默认语言不在词表里，设置页的初始值会显示成一个不存在的选项";
     EXPECT_TRUE(tags.contains(QStringLiteral("en")));
-}
-
-/**
- * @brief 钉住语言包的查找顺序把「随包那份」排在用户数据目录之前
- * @details 软件装完即用：语言包在安装包里，位置是 <程序目录>/tessdata。
- *          排在应用数据目录之后，就等于装了包还要用户自己去放文件。
- */
-TEST_F(OcrFixture, TessDataCandidatesPutTheBundledDirectoryBeforeUserData)
-{
-    SettingsStore settings(m_iniFile);
-
-    const auto installDirectory = m_root / "install";
-    const auto bundledDirectory = installDirectory / "tessdata";
-    std::filesystem::create_directories(bundledDirectory);
-    std::ofstream(bundledDirectory / "eng.traineddata") << "假模型文件，只用来验查找顺序";
-
-    const auto candidates = tessDataCandidateDirectories(settings, installDirectory);
-    const auto indexOf    = [&candidates](const std::filesystem::path &path)
-    {
-        const auto found = std::ranges::find(candidates, path);
-        return found == candidates.end() ? -1 : static_cast<int>(std::ranges::distance(candidates.begin(), found));
-    };
-
-    const auto userDataDirectory = GyanisScribe::Base::Paths::applicationDataDirectory() / "tessdata";
-    ASSERT_GE(indexOf(bundledDirectory), 0) << "候选里没有程序目录下的 tessdata";
-    ASSERT_GE(indexOf(userDataDirectory), 0) << "候选里没有应用数据目录下的 tessdata";
-    EXPECT_LT(indexOf(bundledDirectory), indexOf(userDataDirectory)) << "随包那份排在用户数据目录之后，装完还得自己放语言包";
-
-    EXPECT_EQ(firstDirectoryWithLanguagePacks(candidates), bundledDirectory) << "只有随包那份放着模型时，选出来的必须是它";
 }

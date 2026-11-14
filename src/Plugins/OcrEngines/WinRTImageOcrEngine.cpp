@@ -29,7 +29,7 @@ namespace GyanisScribe::Plugins
 {
     namespace
     {
-        // 认不出字的最小图尺寸：与 Tesseract 后端同一道门槛，界面对两个后端的拒绝形状要一致
+        // 认不出字的最小图尺寸：与 PaddleOCR 后端同一道门槛，界面对两个后端的拒绝形状要一致
         constexpr int kMinimumImageEdge = 8;
 
         /**
@@ -142,7 +142,7 @@ namespace GyanisScribe::Plugins
             return {};
         }
         return QString::fromUtf8(GyanisScribe::Base::uiTextUtf8("这台机器的 Windows 没装本程序认识的识别语言包（系统识别一个可用语言都没有）。请在 设置 → 时间和语言 → 语音 "
-                                                                "里装上「光学字符识别」，或在设置的 OCR 页改用 Tesseract 并放好语言包")
+                                                                "里装上「光学字符识别」，或重新安装本程序以恢复 PaddleOCR 模型")
                                          .c_str());
     }
 
@@ -271,7 +271,7 @@ namespace GyanisScribe::Plugins
                     {
                         return std::unexpected(Base::Error{
                                 Base::ErrorCode::InternalError,
-                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("系统识别该图片图失败（{}，错误码 0x{}）。请重试一次，或改用 Tesseract 后端"),
+                                GyanisScribe::Base::uiFormat(GyanisScribe::Base::uiTextUtf8("系统识别该图片图失败（{}，错误码 0x{}）。请重试一次，或检查 PaddleOCR 模型目录"),
                                                              fromWinRTString(failure.message()).toStdString(), std::format("{:08X}", static_cast<uint32_t>(failure.code())))});
                     }
                 });

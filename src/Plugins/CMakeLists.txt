@@ -9,13 +9,6 @@ if (ZXing_FOUND)
     set(GYANISSCRIBE_HAS_ZXING ON)
 endif ()
 
-# Tesseract 只在 Release 档进依赖图（上游 leptonica 的 Debug 包库名与 cpp_info 不一致，
-# Debug 下 configure 必失败，详见 conanfile.py 与 docs/OcrBackends.md）。找不到就不收那一份源。
-find_package(Tesseract QUIET CONFIG)
-if (Tesseract_FOUND)
-    set(GYANISSCRIBE_HAS_TESSERACT ON)
-endif ()
-
 # Windows 系统识别走系统组件 Windows.Media.Ocr：它不是可选依赖而是平台条件——
 # 投影头 vendor 在 vendor/WinRt，只有 Windows + MSVC 这一档编得到。
 if (WIN32 AND MSVC)
@@ -51,13 +44,6 @@ if (GYANISSCRIBE_HAS_ZXING)
     target_compile_definitions(Plugins PUBLIC GYANISSCRIBE_HAS_ZXING=1)
 endif ()
 
-if (GYANISSCRIBE_HAS_TESSERACT)
-    target_link_libraries(Plugins PUBLIC Tesseract::libtesseract)
-    # 选型代码按这个宏决定「拿到真后端」还是「报后端没编进来」，宏必须发给所有消费者，
-    # 否则界面层与工厂对同一个后端的判断会分家
-    target_compile_definitions(Plugins PUBLIC GYANISSCRIBE_HAS_TESSERACT=1)
-endif ()
-
 # DXGI 桌面重复是 Windows + MSVC 这一档的实现：条件分支由平台决定，
 # 而不是「可选的第三方依赖」（与 Ocr 的 WinRT 后端同一条规矩）
 if (WIN32 AND MSVC)
@@ -66,8 +52,8 @@ if (WIN32 AND MSVC)
     target_compile_options(Plugins PRIVATE /external:W0)
     # 桌面重复的接口在 dxgi，设备与暂存纹理在 d3d11，winrt 运行时伞库随系统
     target_link_libraries(Plugins PRIVATE d3d11 dxgi windowsapp)
-    # 宏要发给所有消费者：工厂「先问系统、再找 Tesseract」这件事在用例里是可观察的断言，
-    # 用例必须知道这一档到底有没有这份后端（与 GYANISSCRIBE_HAS_TESSERACT 同一条理由）
+    # 宏要发给所有消费者：工厂「PP-OCR 之后问系统」这件事在用例里是可观察的断言，
+    # 用例必须知道这一档到底有没有这份后端（与 GYANISSCRIBE_HAS_PPOCR 同一条理由）
     target_compile_definitions(Plugins PUBLIC GYANISSCRIBE_HAS_WINRT_OCR=1)
 endif ()
 

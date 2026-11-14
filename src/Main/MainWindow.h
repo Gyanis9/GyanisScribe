@@ -478,7 +478,7 @@ namespace GyanisScribe::Main
         QWidget *buildPinPage();
         /// 录屏页：成品目录与默认帧率
         QWidget *buildRecordPage();
-        /// 识别页：识别语言与语言包目录
+        /// 识别页：识别语言与模型目录
         QWidget *buildOcrPage();
         /// 快捷键页：每个全局动作一行
         QWidget *buildHotkeyPage();

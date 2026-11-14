@@ -35,7 +35,7 @@ namespace GyanisScribe::Core
 
         /**
          * @brief 后端显示名
-         * @return 中文名，如「Windows 系统识别」「Tesseract」；用例据此辨认工厂选中了哪一个后端
+         * @return 中文名，如「Windows 系统识别」「PaddleOCR」；用例据此辨认工厂选中了哪一个后端
          */
         [[nodiscard]] virtual QString name() const = 0;
 

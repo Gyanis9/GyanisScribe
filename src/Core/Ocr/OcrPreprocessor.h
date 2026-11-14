@@ -16,8 +16,7 @@
 namespace GyanisScribe::Core
 {
 
-    /// 放大倍率的上限：两条通道都实测过——Tesseract 在 7pt 小字上 1× 平均置信度 0.446、2× 0.920，
-    /// 3× 与 4× 又掉回 0.73 上下；系统识别那边同样到这一档就够，再往上只是把内存吃掉
+    /// 放大倍率的上限：系统识别在 7pt 小字上到这一档就够，再往上只是把内存吃掉
     constexpr int kMaximumEnlargeFactor = 2;
 
     /**

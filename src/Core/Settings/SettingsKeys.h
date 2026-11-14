@@ -194,8 +194,8 @@ namespace GyanisScribe::Core
     /// OCR 语言标签，取值见 Core::supportedOcrLanguageTags()
     inline constexpr std::string_view kOcrLanguage = "Ocr/Language";
 
-    /// OCR 语言包（tessdata）目录；为空时按环境变量与程序数据目录找
-    inline constexpr std::string_view kOcrTessDataDirectory = "Ocr/TessDataDirectory";
+    /// PaddleOCR 模型目录（检测模型、识别模型与字表三件都放这里）；为空时按程序目录与应用数据目录下的 ppocr 找
+    inline constexpr std::string_view kOcrModelDirectory = "Ocr/ModelDirectory";
 
     /// 取色复制用的写法：Hex、Rgb、Hsl、Hsv、Hsi 或 Decimal（词表在 Core/Pick/ColorFormat.h）
     inline constexpr std::string_view kPickFormat = "Pick/Format";

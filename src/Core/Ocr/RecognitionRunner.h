@@ -33,7 +33,7 @@ namespace GyanisScribe::Core
      * @brief 识别的线程搬运工
      * @details 后端是同步接口，一次要跑几十到上千毫秒；本类把它放到 Qt 的全局线程池上跑，
      *          结果由 QFutureWatcher 送回界面线程，调用方只接信号。
-     *          同一时间只跑一条：后端自己带可变状态（Tesseract 的语言句柄在 recognize() 里换），
+     *          同一时间只跑一条：后端自己带可变状态（PaddleOCR 的会话在首次识别时创建并复用），
      *          并发调同一个后端不是线程安全的。
      */
     class RecognitionRunner : public QObject

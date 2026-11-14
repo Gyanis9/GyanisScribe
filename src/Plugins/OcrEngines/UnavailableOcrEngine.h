@@ -28,7 +28,7 @@ namespace GyanisScribe::Plugins
          * @param reason 为什么没有后端，中文且要含替代做法
          */
         explicit UnavailableOcrEngine(
-                QString reason = GyanisScribe::Base::uiText("本程序没有可用的文字识别后端。请在设置里指定 OCR 语言包目录（tessdata），或安装系统自带的识别组件"));
+                QString reason = GyanisScribe::Base::uiText("本程序没有可用的文字识别后端。请重新安装本程序以恢复识别模型，或在设置的 OCR 页把模型目录指过去"));
 
         /**
          * @brief 析构桩

@@ -324,7 +324,7 @@ int main(int argc, char *argv[])
     // 目录几格给一条中性占位，别把出图这台机器的真实路径（用户名、临时目录）印进文档图里
     const auto placeholdersSeeded = settings.setValue(GyanisScribe::Core::kPathScreenshot, QStringLiteral("C:/Users/Example/Pictures/GyanisScribe")) &&
                                     settings.setValue(GyanisScribe::Core::kPathRecording, QStringLiteral("C:/Users/Example/Videos/GyanisScribe")) &&
-                                    settings.setValue(GyanisScribe::Core::kOcrTessDataDirectory, QStringLiteral("C:/Users/Example/AppData/Roaming/Gyanis/GyanisScribe/tessdata"));
+                                    settings.setValue(GyanisScribe::Core::kOcrModelDirectory, QStringLiteral("C:/Users/Example/AppData/Roaming/Gyanis/GyanisScribe/ppocr"));
     if (!placeholdersSeeded)
     {
         std::fprintf(stderr, "failed to seed placeholder paths\n");
