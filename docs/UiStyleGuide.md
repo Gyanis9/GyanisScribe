@@ -37,7 +37,7 @@ QWidget 子类要吃样式表的背景必须 `setAttribute(Qt::WA_StyledBackgrou
 浅色与深色两档共用同一套骨架，只换色值：
 
 - 分层：窗口底 `windowBackground`、卡片 `surface`、控件 `controlFill` 三档之间只差一点明度；
-  深色档的窗口底与卡片同值（都是 `#151515`），连续曲率圆角外不会露出近黑缺口；
+  深色档的窗口底与卡片同值（都是 `#17191E`），连续曲率圆角外不会露出近黑缺口；
   悬停 `hover` 与按下 `pressed` 再各加深一档；禁用与只读落 `mutedFill`，
   滑块槽与微调框上下按钮的悬停底也取它。
   卡片的圆角按 `Card` 档（20px、平滑度 0.80，见 §1.6）、内边距 `kSpacingMedium`，边界由一圈 1px `borderStrong` 给出。
@@ -190,22 +190,22 @@ QSS 只留颜色、排版与透明边框占位：
 
 | 角色 | 浅色 | 深色 | 高对比度 | 用途 |
 | --- | --- | --- | --- | --- |
-| windowBackground | `#F5F5F3` | `#151515` | 纯白 | 窗口底（深色档与 `surface` 同值，避免圆角外露出近黑缺口） |
-| surface | `#FCFCFB` | `#151515` | 纯白 | 卡片、弹层 |
-| controlFill | `#F2F2EE` | `#1D1D1C` | 纯白 | 按钮、输入框、勾选框方框的静息填充；也用作关于页品牌底板，比深色卡片亮一档 |
-| hover | `#E9E9E4` | `#232321` | `#E0E0E0` | 中性悬停底 |
-| pressed | `#E3E3DE` | `#292927` | `#C8C8C8` | 中性按下底 |
-| mutedFill | `#EDEDE9` | `#111110` | 纯白（这一档不靠底色分层次） | 禁用底、只读底、滑块槽底、微调框上下按钮的悬停底 |
-| text | `#141412` | `#E8E8E3` | 纯黑 | 正文 |
-| secondaryText | `#53534D`（对窗口底 7.09:1、对卡片底 7.54:1） | `#B0B0AA` | 纯黑（刻意不比正文弱） | 说明行、占位、禁用文字：三档都过 7:1（AAA），因为它承载的是「改了要不要重启」这类关键信息 |
-| border | `#E7E7E2` | `#242422` | 纯黑 + 2px（这一档反过来要求用纯黑） | 分隔线：菜单分隔符、工具栏竖线、滑块槽描边；不做容器描边 |
-| borderStrong | `#E2E2DD` | `#2A2A28` | 纯黑 + 2px | 浮层微边缘（菜单、提示、下拉弹层、控制条、标注工具栏、Toast）、输入类静息描边与高对比度档的控件描边 |
+| windowBackground | `#F3F4F6` | `#17191E` | 纯白 | 窗口底（深色档与 `surface` 同值，避免圆角外露出近黑缺口） |
+| surface | `#FFFFFF` | `#17191E` | 纯白 | 卡片、弹层 |
+| controlFill | `#F1F3F5` | `#23262C` | 纯白 | 按钮、输入框、勾选框方框的静息填充；也用作关于页品牌底板，比深色卡片亮一档 |
+| hover | `#E9ECEF` | `#2A2E35` | `#E0E0E0` | 中性悬停底 |
+| pressed | `#E2E5E9` | `#30353D` | `#C8C8C8` | 中性按下底 |
+| mutedFill | `#E9EBEE` | `#14161A` | 纯白（这一档不靠底色分层次） | 禁用底、只读底、滑块槽底、微调框上下按钮的悬停底 |
+| text | `#0F172A` | `#E6E8EC` | 纯黑 | 正文 |
+| secondaryText | `#46505C`（对窗口底 7.45:1、对卡片底 8.20:1） | `#A6ADBA` | 纯黑（刻意不比正文弱） | 说明行、占位、禁用文字：三档都过 7:1（AAA），因为它承载的是「改了要不要重启」这类关键信息 |
+| border | `#E5E7EB` | `#2E323A` | 纯黑 + 2px（这一档反过来要求用纯黑） | 分隔线：菜单分隔符、工具栏竖线、滑块槽描边；不做容器描边 |
+| borderStrong | `#C7CCD3` | `#4A4F59` | 纯黑 + 2px | 浮层微边缘（菜单、提示、下拉弹层、控制条、标注工具栏、Toast）、输入类静息描边与高对比度档的控件描边 |
 | accent | `#236DE9` | `#4C8DFF` | `#0B57D0` | 焦点环、主按钮、勾选与滑块的强调色（深色档更亮才压得住深底） |
-| onAccent | 纯白 | `#0B0B0A` | 纯白 | 压在主色上的文字与自绘勾：深色档主色偏亮（压白字只有 3.2:1），配深字才够 AA |
-| selection | `#D8E5F9` | `#2A3B57` | 纯黄（让纯黑正文压上去仍是最强对比） | 文本选区 |
-| icon | `#1A1A19` | `#F5F5F3` | `#0B0B0A` | SVG `currentColor` 的替换色 |
+| onAccent | 纯白 | `#0B1220` | 纯白 | 压在主色上的文字与自绘勾：深色档主色偏亮（压白字只有 3.2:1），配深字才够 AA |
+| selection | `#DBEAFE` | `#26344D` | 纯黄（让纯黑正文压上去仍是最强对比） | 文本选区 |
+| icon | `#1F2937` | `#F2F4F8` | `#0B0B0A` | SVG `currentColor` 的替换色 |
 | success / danger | `#3B7D21` / `#CA3932` | `#9BE35A` / `#FF7A71` | `#006400` / `#B00000` | Toast 与状态色（不进样式表） |
-| accentHover / accentSoft | `#1D61D5` / `#E5EEFA` | `#3D7FF2` / `#22344D` | `#08449E` / `#D6E4FB` | 主按钮悬停 / 导航当前项与勾选的工具按钮 |
+| accentHover / accentSoft | `#1D4ED8` / `#EFF6FF` | `#3B7BF0` / `#1E2A44` | `#08449E` / `#D6E4FB` | 主按钮悬停 / 导航当前项与勾选的工具按钮 |
 
 浅色与深色里不出现不透明纯黑；半透明色只出现在截图遮罩（`kCaptureMaskColor`、`kCaptureHintBackgroundColor` 与 `kCrosshairColor`，这三支是固定值、不随主题换）与滚动条滑块——滑块的 rgba 已移进 `Gui::ScrollBar`（浅色档半透明黑、深色档半透明白），样式表里不再有 rgba；`LightAndDarkSheetsUseNoOpaqueBlack` 只负责扫样式表里的不透明纯黑。
 对比要求由用例算：`ThemeManagerFixture` 里的 `contrastRatio` 逐角色核 WCAG——正文压在本档
@@ -327,7 +327,7 @@ QSS 只留颜色、排版与透明边框占位：
   - 品牌图在 `src/Gui/Resources/Brand/`：`#151515` 砖、`#F5F5F3` C 框、`#5BE37A` 录点；
     应用图标八档原生 PNG，`.ico` 七档（512 单独 PNG）；品牌图走固定色入口，
     不参与 `currentColor` 替换。关于页的 64px 品牌图垫在 `controlFill` 的圆角底板上：
-    Dark 档卡片与砖底同为 `#151515`，底板比卡片亮一档，砖形才分得出来。
+    Dark 档卡片 `#17191E` 与砖底 `#151515` 几乎同值，底板比两者都亮一档，砖形才分得出来。
     判据 `BrandIconAssetTest`、`BrandPixmapKeepsNativeSizesAndIgnoresTheTint`、
     `BrandIconExposesTheEightNativeSizes`、`BrandIconAndNavMetricsAreWired`、
     `AboutBrandTileKeepsItsLayerOnTheDarkCard`、`CategoryFallbackIconCarriesNinetySix`。

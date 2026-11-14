@@ -5,19 +5,19 @@
 
 /* ---- 面：只有具名的根与卡片铺底。裸 QWidget 一律不铺——铺了就是每个子控件各画一块底 ---- */
 QWidget#appRoot {
-    background-color: #151515;
+    background-color: #17191E;
 }
 
 /* 带多选清单的对话框：底色与清单面板同为 surface，清单圆角外不再露出窗口底的黑角 */
 QWidget#dialogSurface {
-    background-color: #151515;
+    background-color: #17191E;
 }
 
 /* 阅读面（设置页卡片）：底与圆角由 Gui::SurfaceWidget 按 ContinuousCorner 自绘，
    样式表里不再有 #pageCard 的铺底与圆角规则 */
 
 /* 关于页品牌底板：底板取 controlFill，比卡片亮一档；
-   品牌砖固定 #151515 与卡片同值，靠底板重新分出砖形。底与圆角由 Gui::SurfaceLabel 自绘 */
+   品牌砖固定 #151515，比卡片深一档，靠底板重新分出砖形。底与圆角由 Gui::SurfaceLabel 自绘 */
 
 /* 悬浮条（录屏控制条、标注工具栏）：面板与圆角由控件自绘，这里只留一条透明边框占位，
    保住原 1px 边占掉的那一格尺寸 */
@@ -27,20 +27,20 @@ QWidget#hudRoot, QWidget#AnnotationToolbar {
 
 /* ---- 文字颜色层级（字号见 applyTextRole） ---- */
 QLabel#pageHint {
-    color: #B0B0AA;
+    color: #A6ADBA;
 }
 
 /* 记忆库的空态与统计行是辅助信息，与其它页的说明行同一档次要色 */
 QLabel#memoryEmptyHint, QLabel#memoryStats {
-    color: #B0B0AA;
+    color: #A6ADBA;
 }
 
 QLabel#metricValue {
-    color: #E8E8E3;
+    color: #E6E8EC;
 }
 
 QLabel:disabled {
-    color: #B0B0AA;
+    color: #A6ADBA;
 }
 
 /* ---- 按钮：填充、描边与圆角由 Gui::Button 按状态自绘；
@@ -48,31 +48,31 @@ QLabel:disabled {
         选择器限定到带 squircle 属性的自绘类：QMessageBox、QInputDialog、QColorDialog
         里的原生 QPushButton 保留系统外观，不能落成只剩文字与图标的透明按钮 ---- */
 QPushButton[squircle="true"] {
-    color: #E8E8E3;
+    color: #E6E8EC;
     border: 1px solid transparent;
     padding: 0 15px;
     min-height: 24px;
 }
 
 QPushButton[squircle="true"]:disabled {
-    color: #B0B0AA;
+    color: #A6ADBA;
 }
 
 /* 主按钮的底由 buttonColors 换成主色；QSS 只保文字色与边框占位 */
 QPushButton[squircle="true"]:default {
-    color: #0B0B0A;
+    color: #0B1220;
     border: 1px solid transparent;
 }
 
 QPushButton[squircle="true"]:default:disabled {
-    color: #B0B0AA;
+    color: #A6ADBA;
 }
 
 /* ---- 工具按钮：填充、描边与圆角由 Gui::ToolButton 按选中、悬停、按下与焦点自绘；
         这里只留透明边框、内边距与最小尺寸占位。同样限定到 squircle 属性，
         原生对话窗里的 QToolButton 保留系统外观 ---- */
 QToolButton[squircle="true"] {
-    color: #E8E8E3;
+    color: #E6E8EC;
     border: 1px solid transparent;
     padding: 2px;
     min-width: 22px;
@@ -105,75 +105,75 @@ QToolButton#annotationColorButton[squircle="true"]::menu-indicator {
         会按微调框自己的边框与内边距裁内部行编辑，把行编辑收成 1px 宽，数值文本还在却画不出来。
         它的文字色与最小高度另起一条，内部行编辑走下面的后代规则。 */
 QLineEdit[squircle="true"], QComboBox[squircle="true"], QFontComboBox[squircle="true"] {
-    color: #E8E8E3;
+    color: #E6E8EC;
     background: transparent;
     border: 1px solid transparent;
     padding: 0 12px;
     min-height: 26px;
-    selection-background-color: #2A3B57;
-    selection-color: #E8E8E3;
+    selection-background-color: #26344D;
+    selection-color: #E6E8EC;
 }
 
 /* 可编辑下拉（字体族）的内部行编辑也要透明、无原生边框；右缘留出下拉箭头的 26px */
 QComboBox[squircle="true"] QLineEdit, QFontComboBox[squircle="true"] QLineEdit {
-    color: #E8E8E3;
+    color: #E6E8EC;
     background: transparent;
     border: none;
     padding: 0 26px 0 12px;
-    selection-background-color: #2A3B57;
-    selection-color: #E8E8E3;
+    selection-background-color: #26344D;
+    selection-color: #E6E8EC;
 }
 
 /* 微调框的数值由内部行编辑排：盒模型退回原生子控件算法后，行编辑落在微调框的内容区；
    这里只留文字色、透明底和与单行输入一致的左右缩进，不再带边框与最小高度 */
 QSpinBox[squircle="true"] QLineEdit {
-    color: #E8E8E3;
+    color: #E6E8EC;
     background: transparent;
     border: none;
     padding: 0 12px;
-    selection-background-color: #2A3B57;
-    selection-color: #E8E8E3;
+    selection-background-color: #26344D;
+    selection-color: #E6E8EC;
 }
 
 /* 数字框的 sizeHint 另带上下各 2px 的自有框：原来占位用的 1px 透明边框去掉后空出 2px，
    内容高补到 24 才能与单行输入一样落在总高 28 */
 QSpinBox[squircle="true"] {
-    color: #E8E8E3;
+    color: #E6E8EC;
     min-height: 24px;
 }
 
 QLineEdit[squircle="true"]:disabled, QComboBox[squircle="true"]:disabled, QFontComboBox[squircle="true"]:disabled, QSpinBox[squircle="true"]:disabled,
 QSpinBox[squircle="true"] QLineEdit:disabled, QComboBox[squircle="true"] QLineEdit:disabled, QFontComboBox[squircle="true"] QLineEdit:disabled {
-    color: #B0B0AA;
+    color: #A6ADBA;
 }
 
 QLineEdit[squircle="true"]:read-only, QSpinBox[squircle="true"] QLineEdit:read-only, QComboBox[squircle="true"] QLineEdit:read-only,
 QFontComboBox[squircle="true"] QLineEdit:read-only {
-    color: #B0B0AA;
+    color: #A6ADBA;
 }
 
 /* ---- 快捷键录制框：显示框是 Gui::SurfaceLabel，静息 controlFill、录制态 accentSoft 加主色边、
         禁用态 mutedFill 都由它自绘；这里只留文字色、透明边框、内边距与最小高度 ---- */
 QLabel#hotkeyDisplay {
-    color: #E8E8E3;
+    color: #E6E8EC;
     border: 1px solid transparent;
     padding: 0 12px;
     min-height: 26px;
 }
 
 QLabel#hotkeyDisplay:disabled {
-    color: #B0B0AA;
+    color: #A6ADBA;
 }
 
 /* ---- 标注窗的行内文字输入框：与上面几档输入框同形，别把识别结果区的宽内边距带进去 ----
    上下内边距为零是标注输入框高度算式的前提（AnnotationView::resizeTextEditorToContent 只补边框与余量），
    改这里的 padding 要同步改那边 */
 QTextEdit#annotationTextEditor {
-    color: #E8E8E3;
+    color: #E6E8EC;
     border: 1px solid transparent;
     padding: 0 8px;
-    selection-background-color: #2A3B57;
-    selection-color: #E8E8E3;
+    selection-background-color: #26344D;
+    selection-color: #E6E8EC;
 }
 
 /* 下拉箭头走 styles 下的 chevron：与自绘微调框同一笔画，不再让原生风格画方角箭头 */
@@ -198,12 +198,12 @@ QComboBox[squircle="true"]::down-arrow, QFontComboBox[squircle="true"]::down-arr
 /* ---- 下拉弹层：底与项高亮由 Gui::ListView 与 ItemDelegate 按连续曲率自绘，
         这里只留内边距、文字色与 outline；border: none 抑制原生面板框 ---- */
 QComboBox QAbstractItemView, QFontComboBox QAbstractItemView {
-    color: #E8E8E3;
+    color: #E6E8EC;
     border: none;
     padding: 6px;
     outline: none;
-    selection-background-color: #22344D;
-    selection-color: #E8E8E3;
+    selection-background-color: #1E2A44;
+    selection-color: #E6E8EC;
 }
 
 QComboBox QAbstractItemView::item {
@@ -217,7 +217,7 @@ QComboBox QAbstractItemView::item {
    这里只留 18px 的内容尺寸与 1px 透明边框，占住 20px 的指示器与 22px 的行高。 */
 QCheckBox {
     spacing: 8px;
-    color: #E8E8E3;
+    color: #E6E8EC;
     min-height: 22px;
 }
 
@@ -228,7 +228,7 @@ QCheckBox::indicator {
 }
 
 QCheckBox:disabled {
-    color: #B0B0AA;
+    color: #A6ADBA;
 }
 
 /* ---- 菜单与工具提示：面板、描边与当前项高亮由 Gui::Menu 与 SquircleStyle 按连续曲率自绘，
@@ -244,21 +244,21 @@ QMenu[squircle="true"] {
 
 QMenu[squircle="true"]::item {
     padding: 4px 18px 4px 8px;
-    color: #E8E8E3;
+    color: #E6E8EC;
 }
 
 QMenu[squircle="true"]::item:disabled {
-    color: #B0B0AA;
+    color: #A6ADBA;
 }
 
 QMenu[squircle="true"]::separator {
     height: 1px;
-    background-color: #242422;
+    background-color: #2E323A;
     margin: 2px 6px;
 }
 
 QToolTip {
-    color: #E8E8E3;
+    color: #E6E8EC;
     padding: 5px 9px;
 }
 
@@ -275,7 +275,7 @@ QListWidget::item {
     padding: 4px 8px;
     margin: 1px 2px;
     border: none;
-    color: #E8E8E3;
+    color: #E6E8EC;
 }
 
 QListWidget#settingsNav {
@@ -290,7 +290,7 @@ QListWidget#settingsNav::item {
 
 /* 设置页分组卡的标题：次要色 + 600 字重，靠层级不靠字号 */
 QLabel#settingsSectionTitle {
-    color: #B0B0AA;
+    color: #A6ADBA;
     font-weight: 600;
 }
 
@@ -308,11 +308,11 @@ QScrollArea#settingsScroll > QWidget {
 /* ---- 文本区（识别结果）：底与圆角由 Gui::TextEdit 按 Panel 档自绘，
         这里只留文字色、透明边框、内边距与选区颜色 ---- */
 QTextEdit {
-    color: #E8E8E3;
+    color: #E6E8EC;
     border: 1px solid transparent;
     padding: 8px;
-    selection-background-color: #2A3B57;
-    selection-color: #E8E8E3;
+    selection-background-color: #26344D;
+    selection-color: #E6E8EC;
 }
 
 

@@ -3260,7 +3260,7 @@ namespace GyanisScribe::Main
         contentLayout->setContentsMargins(0, 0, 0, 0);
         contentLayout->setSpacing(GyanisScribe::Gui::kSpacingSmall);
 
-        // 底板与品牌砖拉开一档明度：深色主题的卡片与砖底同为 #151515，没有这层垫底砖形会整片消失。
+        // 底板与品牌砖拉开一档明度：深色主题的卡片 #17191E 与砖底 #151515 几乎同值，没有这层垫底砖形会整片消失。
         // 位图按所有屏幕里最高的缩放比取，窗口挪到 200% 屏上也不用换图。
         qreal highestRatio = 1.0;
         for (const auto *screen: QGuiApplication::screens())

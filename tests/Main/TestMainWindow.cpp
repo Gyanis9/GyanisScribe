@@ -3213,7 +3213,7 @@ TEST_F(MainWindowFixture, BrandIconAndNavMetricsAreWired)
 
 /**
  * @brief 钉住深色主题下品牌砖与卡片之间还有一层底板
- * @details 品牌砖固定 #151515，而深色卡片也是 #151515；没有底板时砖形整片消失，只剩白框与绿点。
+ * @details 品牌砖固定 #151515，而深色卡片 #17191E 与它几乎同值；没有底板时砖形几乎看不出来。
  *          量的是真实画出来的像素：底板取窗口底那一档，砖与底板、底板与卡片都要分得出来。
  */
 TEST_F(MainWindowFixture, AboutBrandTileKeepsItsLayerOnTheDarkCard)
